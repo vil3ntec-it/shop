@@ -26,6 +26,12 @@ import kotlin.math.roundToLong
  *
  *  ⛔ خاموش ([post] با `on = false`)، بی مشتری یا فاکتورِ بی ردیفِ امتیاز ⇒ **همان شیء**: صندوق، فاکتور، برگشت، لغو و
  *  همگام‌سازی بایت‌به‌بایت همان امروز.
+ *
+ *  ── انقضا و اصلاحِ دستی ─────────────────────────────────────────────
+ *  ماندهٔ هر سنجش [balanceAt] است: با [Loyalty.Rule.expiryMonths] ِ قاعده (۰ ⇒ همان جمعِ ساده) و انقضای FIFO ِ هسته، از
+ *  خودِ دفتر و بی هیچ ردیفِ «سوخت». برگشت و لغو قاعده را از `LoyaltyRules.current` (قاعدهٔ در کارِ دکان) می‌گیرند.
+ *  [adjust] = ردیفِ فقط‌افزودنیِ [ADJUST] با علامت و دلیل، فقط صاحب/مدیر، با شناسهٔ کار (`lpa-<کار>`؛ تلاشِ دوباره ردیفِ
+ *  دوم نمی‌سازد) و هرگز زیرِ صفر. (داوریِ نقشِ سرور برای `auditLog` در #802/#805 هنوز مرج نشده.)
  */
 object LoyaltyPoints {
 
@@ -33,9 +39,11 @@ object LoyaltyPoints {
   const val SPEND = "loyalty_spend"
   const val EARN_BACK = "loyalty_earn_back"
   const val SPEND_BACK = "loyalty_spend_back"
+  const val ADJUST = "loyalty_adjust"
 
   private val TYPE = mapOf(
     Loyalty.EARN to EARN, Loyalty.SPEND to SPEND, Loyalty.EARN_BACK to EARN_BACK, Loyalty.SPEND_BACK to SPEND_BACK,
+    Loyalty.ADJUST to ADJUST,
   )
   private val KIND = TYPE.entries.associate { (k, v) -> v to k }
 
@@ -46,7 +54,12 @@ object LoyaltyPoints {
 
   fun eventOf(a: AuditEntry): Loyalty.Event? {
     val kind = KIND[a.type] ?: return null
-    return Loyalty.Event(a.id, kind, a.payRef.orEmpty(), (a.points ?: 0L).coerceAtLeast(0), a.refId.orEmpty(), a.createdAt)
+    val points = a.points ?: 0L
+    return Loyalty.Event(
+      a.id, kind, a.payRef.orEmpty(),
+      if (kind == Loyalty.ADJUST) points.coerceIn(-Loyalty.MAX_POINTS, Loyalty.MAX_POINTS) else points.coerceAtLeast(0),
+      a.refId.orEmpty(), a.createdAt,
+    )
   }
 
   /** رویدادها با مشتریِ ماندگار (پس از ادغام) */
@@ -58,6 +71,10 @@ object LoyaltyPoints {
   fun customerOf(d: ShopData, debtorId: String?): String? = debtorId?.takeIf { it.isNotBlank() }?.let { CustomerCrm.resolve(d, it) }
 
   fun balance(d: ShopData, customer: String): Long = Loyalty.balance(events(d), CustomerCrm.resolve(d, customer))
+
+  /** مانده در لحظهٔ [now] با انقضای [rule]؛ بی انقضا ⇒ همان [balance] */
+  fun balanceAt(d: ShopData, customer: String, rule: Loyalty.Rule, now: Long): Long =
+    Loyalty.balanceAt(events(d), CustomerCrm.resolve(d, customer), rule, now)
 
   /** خریدِ ۱۲ ماهِ پیش از [now] (افغانی): فاکتورهای ثبت‌شدهٔ همین مشتری منهای برگشت‌هایشان؛ [except] بیرون */
   fun spendAfn(d: ShopData, customer: String, now: Long, except: String? = null): Long {
@@ -74,12 +91,15 @@ object LoyaltyPoints {
     return ((sales.sumOf { PayFlow.minor(it.finalTotal) } - back).coerceAtLeast(0)) / 100
   }
 
-  data class View(val customer: String, val balance: Long, val tier: Loyalty.Tier, val spendAfn: Long)
+  /** [soon] امتیازی که تا ۳۰ روزِ دیگر می‌سوزد و [soonAt] نخستین لحظه‌اش (بی انقضا ⇒ ۰ و `null`) */
+  data class View(val customer: String, val balance: Long, val tier: Loyalty.Tier, val spendAfn: Long, val soon: Long = 0, val soonAt: Long? = null)
 
   fun view(d: ShopData, rule: Loyalty.Rule, debtorId: String, now: Long): View {
     val c = CustomerCrm.resolve(d, debtorId)
     val spend = spendAfn(d, c, now)
-    return View(c, balance(d, c), Loyalty.tier(rule, spend), spend)
+    if (rule.expiryMonths <= 0) return View(c, balance(d, c), Loyalty.tier(rule, spend), spend)
+    val st = Loyalty.state(events(d), c, rule, now)
+    return View(c, st.balance, Loyalty.tier(rule, spend), spend, st.soon, st.soonAt)
   }
 
   fun tierName(key: String): String = when (key) {
@@ -111,12 +131,12 @@ object LoyaltyPoints {
    *  مصرفِ [points] امتیازِ [debtorId] روی [cart] ⇒ همان سبد با قیمتِ پایین‌آمدهٔ ردیف‌ها و [Plan] ِ ثبت.
    *  امتیازِ نادرست، بیش از مانده/سهم یا سبدی که پخش در آن دقیق درنمی‌آید ⇒ `null` (سبد همان).
    */
-  fun apply(d: ShopData, cart: List<SalesEngine.CartLine>, rule: Loyalty.Rule, debtorId: String?, points: Long): Applied? {
+  fun apply(d: ShopData, cart: List<SalesEngine.CartLine>, rule: Loyalty.Rule, debtorId: String?, points: Long, now: Long = 0L): Applied? {
     if (points <= 0 || cart.isEmpty()) return null
     val customer = customerOf(d, debtorId) ?: return null
     val lines = cart.map { if (it.quantity > 0) lineAfn(d, it) else 0L }
     val baseAfn = lines.sum()
-    val spend = Loyalty.spend(rule, balance(d, customer), baseAfn * 100, points) as? Loyalty.Spend.Ok ?: return null
+    val spend = Loyalty.spend(rule, balanceAt(d, customer, rule, now), baseAfn * 100, points) as? Loyalty.Spend.Ok ?: return null
     if (spend.valueMinor % 100 != 0L) return null
     val valueAfn = spend.valueMinor / 100
     val shares = Loyalty.split(lines, valueAfn) ?: return null
@@ -129,11 +149,11 @@ object LoyaltyPoints {
     return Applied(out, Plan(customer, spend.points, spend.valueMinor, baseAfn * 100, net * 100))
   }
 
-  /** بیشترین امتیازِ قابلِ مصرف روی [cart] برای [debtorId] */
-  fun capFor(d: ShopData, cart: List<SalesEngine.CartLine>, rule: Loyalty.Rule, debtorId: String?): Long {
+  /** بیشترین امتیازِ قابلِ مصرف روی [cart] برای [debtorId] (با انقضا در [now]) */
+  fun capFor(d: ShopData, cart: List<SalesEngine.CartLine>, rule: Loyalty.Rule, debtorId: String?, now: Long = 0L): Long {
     val customer = customerOf(d, debtorId) ?: return 0
     val base = cart.sumOf { if (it.quantity > 0) lineAfn(d, it) else 0L }
-    return Loyalty.cap(rule, balance(d, customer), base * 100)
+    return Loyalty.cap(rule, balanceAt(d, customer, rule, now), base * 100)
   }
 
   // ── ثبتِ فاکتور ───────────────────────────────────────────────────
@@ -167,7 +187,7 @@ object LoyaltyPoints {
     if (plan != null && plan.points > 0) {
       if (customer == null || customer != CustomerCrm.resolve(d, plan.customer)) return SalesEngine.Result.Failed(StrLoyalty.errCustomer)
       if (PayFlow.minor(sale.total) != plan.netMinor) return SalesEngine.Result.Failed(StrLoyalty.errChanged)
-      when (val s = Loyalty.spend(rule, balance(d, customer), plan.baseMinor, plan.points)) {
+      when (val s = Loyalty.spend(rule, balanceAt(d, customer, rule, now), plan.baseMinor, plan.points)) {
         is Loyalty.Spend.Bad -> return SalesEngine.Result.Failed(message(s.code))
         is Loyalty.Spend.Ok -> {
           if (s.valueMinor != plan.valueMinor || plan.baseMinor - plan.netMinor != s.valueMinor) return SalesEngine.Result.Failed(StrLoyalty.errChanged)
@@ -232,6 +252,10 @@ object LoyaltyPoints {
         if (rv.shortfall > 0) " (${rv.shortfall} امتیاز پیش‌تر خرج شده بود)" else "", today, now, by))
   }.filter { n -> d.auditLog.none { it.id == n.id } }
 
+  /** ماندهٔ برگشت/لغو: با انقضای قاعدهٔ در کار (`LoyaltyRules.current`؛ وصل‌نشده ⇒ بی انقضا، همان جمعِ ساده) */
+  private fun roomOf(d: ShopData, customer: String, now: Long): Long =
+    Loyalty.balanceAt(events(d), customer, LoyaltyRules.current().rule, now)
+
   /** ارزشِ هر امتیاز هنگامِ مصرفِ همین فاکتور (افغانی) — بازپرداختِ مصرف به همان نرخ، نه نرخِ امروز */
   private fun valuePer(d: ShopData, saleId: String): Long {
     val s = d.auditLog.firstOrNull { it.type == SPEND && it.refId == saleId } ?: return 1
@@ -253,7 +277,7 @@ object LoyaltyPoints {
       ?: after.saleReturns.firstOrNull { r -> r.saleId == saleId && before.saleReturns.none { it.id == r.id } }?.id
       ?: return after
     val (part, whole) = returned(after, sale)
-    val rv = Loyalty.reverse(of.earned, of.earnedBack, of.spent, of.spentBack, part, whole, Loyalty.balance(events(after), of.customer))
+    val rv = Loyalty.reverse(of.earned, of.earnedBack, of.spent, of.spentBack, part, whole, roomOf(after, of.customer, now))
     val rows = reversalRows(after, sale, of, rv, "$key-lp", "برگشت", today, now, by)
     return if (rows.isEmpty()) after else after.copy(auditLog = after.auditLog + rows)
   }
@@ -267,7 +291,7 @@ object LoyaltyPoints {
     val d = r.data
     val of = ofSale(d, r.saleId) ?: return r
     val sale = d.sales.find { it.id == r.saleId } ?: return r
-    val rv = Loyalty.reverseAll(of.earned, of.earnedBack, of.spent, of.spentBack, Loyalty.balance(events(d), of.customer))
+    val rv = Loyalty.reverseAll(of.earned, of.earnedBack, of.spent, of.spentBack, roomOf(d, of.customer, now))
     val rows = reversalRows(d, sale, of, rv, "${sale.id}-lx", "لغوِ فاکتور", today, now, by)
     return if (rows.isEmpty()) r else r.copy(data = d.copy(auditLog = d.auditLog + rows))
   }
@@ -295,6 +319,10 @@ object LoyaltyPoints {
 
   data class HistoryRow(val id: String, val at: Long, val date: String, val kind: String, val signed: Long, val saleId: String, val invoice: String, val notes: String)
 
+  /** برچسبِ ردیفِ سابقه: فاکتورِ ردیف، یا دلیلِ اصلاحِ دستی */
+  fun rowText(r: HistoryRow): String =
+    if (r.kind == Loyalty.ADJUST) kindText(r.kind) + " — " + r.notes else kindText(r.kind) + " — " + StrLoyalty.invoice(r.invoice)
+
   /** سابقهٔ امتیازِ مشتری (همان مشتریِ ماندگار)، تازه‌ترین بالا */
   fun history(d: ShopData, debtorId: String): List<HistoryRow> {
     val byId = d.debtors.associateBy { it.id }
@@ -312,6 +340,48 @@ object LoyaltyPoints {
     Loyalty.EARN -> StrLoyalty.kindEarn
     Loyalty.SPEND -> StrLoyalty.kindSpend
     Loyalty.EARN_BACK -> StrLoyalty.kindEarnBack
+    Loyalty.ADJUST -> StrLoyalty.kindAdjust
     else -> StrLoyalty.kindSpendBack
+  }
+
+  // ── اصلاحِ دستی ──────────────────────────────────────────────────
+  const val REASON_MAX = 120
+
+  sealed interface Adjusted {
+    /** نوشته شد، یا همان کار پیش‌تر نوشته شده بود ([again]) — [data] دفترِ پس از آن */
+    data class Ok(val data: ShopData, val again: Boolean) : Adjusted
+    data class Bad(val message: String) : Adjusted
+  }
+
+  /** شناسهٔ ردیفِ اصلاح از شناسهٔ کار — یک کار، یک ردیف */
+  fun adjustId(opId: String): String = "lpa-" + opId.trim()
+
+  /**
+   *  افزودن/کم‌کردنِ [delta] امتیاز برای [debtorId] با [reason] — فقط صاحب/مدیر ([may])، هرگز زیرِ صفر (با انقضای [rule] در
+   *  [now])، فقط‌افزودنی. همان [opId] دوباره ⇒ همان دفتر و `again` (بی ردیفِ دوم، حتی اگر مانده عوض شده باشد).
+   */
+  fun adjust(
+    d: ShopData, debtorId: String?, delta: Long, reason: String, opId: String, rule: Loyalty.Rule,
+    may: Boolean, today: String, now: Long, by: String?,
+  ): Adjusted {
+    if (!may) return Adjusted.Bad(StrLoyalty.adjustOwnerOnly)
+    val op = opId.trim()
+    if (op.isEmpty() || op.length > 80) return Adjusted.Bad(StrLoyalty.errChanged)
+    val id = adjustId(op)
+    if (d.auditLog.any { it.id == id }) return Adjusted.Ok(d, again = true)
+    val why = reason.trim().replace(Regex("\\s+"), " ")
+    if (why.isEmpty()) return Adjusted.Bad(StrLoyalty.adjustNeedsReason)
+    if (why.length > REASON_MAX) return Adjusted.Bad(StrLoyalty.adjustReasonLong(REASON_MAX))
+    val customer = customerOf(d, debtorId)?.takeIf { c -> d.debtors.any { it.id == c } } ?: return Adjusted.Bad(StrLoyalty.errCustomer)
+    return when (val a = Loyalty.adjust(balanceAt(d, customer, rule, now), delta)) {
+      is Loyalty.Adjust.Bad -> Adjusted.Bad(if (a.code == Loyalty.Code.OVER_BALANCE) StrLoyalty.errBalance else StrLoyalty.adjustBadPoints)
+      is Loyalty.Adjust.Ok -> Adjusted.Ok(
+        d.copy(auditLog = d.auditLog + AuditEntry(
+          id = id, type = ADJUST, date = today, refId = null, notes = why, createdAt = now, amount = 0.0,
+          by = by?.trim()?.ifEmpty { null }, payRef = customer, points = a.points,
+        )),
+        again = false,
+      )
+    }
   }
 }

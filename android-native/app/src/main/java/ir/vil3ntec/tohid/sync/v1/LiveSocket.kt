@@ -140,6 +140,7 @@ class LiveSocket(
           if (event == "hello") {
             ir.vil3ntec.tohid.data.ReceiptFlag.kick(app)
             ir.vil3ntec.tohid.data.LedgerMergeFlag.kick(app)
+            ir.vil3ntec.tohid.data.LoyaltyShop.kick(app)   //  PRM-13: قاعدهٔ یکسانِ امتیازِ دکان (پرچمِ خاموش ⇒ همان دستگاه)
           }
           //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش)
           if (event == "hello") ir.vil3ntec.tohid.data.StockFlag.kick(app)

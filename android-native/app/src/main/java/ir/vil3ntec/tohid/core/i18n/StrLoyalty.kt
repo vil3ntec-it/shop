@@ -1,8 +1,8 @@
 package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  امتیازِ وفاداری و سطحِ مشتری (PRM-13) در صندوقِ گوشی و کامپیوتر (`LoyaltyBar`)، رسید، پروندهٔ مشتری و تنظیماتِ
- *  همین دستگاه. قاعده‌ها سرِ `I18n.kt`؛ منطق در `core/promo/Loyalty` (commonMain) و `data/LoyaltyPoints`.
+ *  امتیازِ وفاداری و سطحِ مشتری (PRM-13) در صندوقِ گوشی و کامپیوتر (`LoyaltyBar`)، رسید، پروندهٔ مشتری (با اصلاحِ دستی)،
+ *  تنظیماتِ همین دستگاه، انقضا و قاعدهٔ یکسانِ دکان. قاعده‌ها سرِ `I18n.kt`؛ منطق در `core/promo/Loyalty` (commonMain) و `data/LoyaltyPoints`.
  */
 @Suppress("unused")
 object StrLoyalty {
@@ -57,4 +57,47 @@ object StrLoyalty {
   val kindSpendBack: String get() = t("برگشتِ مصرف", "Use refunded", "د مصرف بېرته ورکول")
   fun invoice(label: Any): String = t("فاکتور #$label", "Invoice #$label", "بل #$label")
   val empty: String get() = t("هنوز امتیازی نیست", "No points yet", "لا امتیاز نشته")
+
+  // انقضا
+  val expiryTitle: String get() = t("انقضای امتیاز (ماه؛ ۰ = هرگز)", "Points expire after (months; 0 = never)", "د امتیاز پای ته رسېدل (میاشتې؛ ۰ = هېڅکله)")
+  val expiryNote: String get() = t(
+    "هر امتیاز این‌قدر ماه پس از کسب می‌سوزد؛ اول کهنه‌ترین امتیاز خرج می‌شود.",
+    "Each point expires this many months after it was earned; the oldest points are used first.",
+    "هر امتیاز د ګټلو څخه دومره میاشتې وروسته سوځي؛ لومړی تر ټولو زوړ امتیاز مصرفېږي.",
+  )
+  val expirySave: String get() = t("ذخیرهٔ انقضا", "Save expiry", "پای ته رسېدل خوندي کړئ")
+  val badExpiry: String get() = t("ماه باید از ۰ تا ۱۲۰ باشد", "Months must be 0 to 120", "میاشتې باید له ۰ تر ۱۲۰ وي")
+  fun soon(points: Any, date: Any): String = t("$points امتیاز تا $date می‌سوزد", "$points points expire by $date", "$points امتیازونه تر $date پورې سوځي")
+
+  // قاعدهٔ یکسانِ دکان
+  val shopTitle: String get() = t("قاعدهٔ یکسان برای همهٔ دستگاه‌های دکان", "One rule for all shop devices", "د هټۍ ټولو وسیلو لپاره یوه قاعده")
+  val shopInForce: String get() = t(
+    "قاعدهٔ یکسانِ دکان در کار است؛ قاعده و روشن/خاموشِ همین دستگاه کنار می‌رود.",
+    "The shop-wide rule is in force; this device's own rule and switch are set aside.",
+    "د هټۍ یوه قاعده چلېږي؛ د همدې وسیلې خپله قاعده او بدلون یو طرف ته کېږي.",
+  )
+  val shopNotSaved: String get() = t("قاعدهٔ یکسانِ دکان هنوز ذخیره نشده است؛ هر دستگاه قاعدهٔ خودش را دارد.", "No shop-wide rule saved yet; each device uses its own.", "د هټۍ یوه قاعده لا نه ده خوندي شوې؛ هره وسیله خپله قاعده لري.")
+  val shopOffline: String get() = t("بی‌اینترنت: آخرین قاعدهٔ دکان که همین دستگاه گرفته به کار می‌رود.", "Offline: the last shop rule this device received is used.", "بې انټرنېټه: د هټۍ وروستۍ قاعده چې همدې وسیلې اخیستې کارول کېږي.")
+  val shopPublish: String get() = t("ذخیرهٔ قاعدهٔ همین دستگاه برای همهٔ دستگاه‌ها", "Save this device's rule for all devices", "د همدې وسیلې قاعده د ټولو وسیلو لپاره خوندي کړئ")
+  val shopSaved: String get() = t("قاعدهٔ یکسانِ دکان ذخیره شد", "Shop-wide rule saved", "د هټۍ یوه قاعده خوندي شوه")
+  val shopSaveFailed: String get() = t("قاعدهٔ دکان ذخیره نشد؛ اینترنت را ببینید و دوباره بزنید", "The shop rule was not saved; check the connection and try again", "د هټۍ قاعده خوندي نه شوه؛ انټرنېټ وګورئ او بیا هڅه وکړئ")
+  fun ruleSummary(every: Any, point: Any, share: Any, months: Any): String = t(
+    "هر $every افغانی ۱ امتیاز · هر امتیاز $point افغانی · تا $share٪ فاکتور · انقضا $months ماه",
+    "1 point per $every AFN · 1 point = $point AFN · up to $share% of an invoice · expiry $months months",
+    "هرو $every افغانیو ته ۱ امتیاز · هر امتیاز $point افغانۍ · د بل تر $share٪ پورې · پای ته رسېدل $months میاشتې",
+  )
+  fun shopVersion(v: Any): String = t("نسخهٔ $v", "Version $v", "نسخه $v")
+
+  // اصلاحِ دستی
+  val adjust: String get() = t("اصلاحِ امتیاز", "Adjust points", "د امتیاز سمون")
+  val adjustAdd: String get() = t("افزودن", "Add", "زیاتول")
+  val adjustRemove: String get() = t("کم‌کردن", "Remove", "کمول")
+  val adjustPoints: String get() = t("چند امتیاز؟", "How many points?", "څو امتیازه؟")
+  val adjustReason: String get() = t("دلیل (لازم)", "Reason (required)", "دلیل (اړین)")
+  val adjustDone: String get() = t("امتیاز اصلاح شد", "Points adjusted", "امتیاز سم شو")
+  val adjustOwnerOnly: String get() = t("اصلاحِ امتیاز فقط با صاحب یا مدیر است", "Only the owner or a manager can adjust points", "امتیاز یوازې څښتن یا مدیر سمولای شي")
+  val adjustNeedsReason: String get() = t("دلیلِ اصلاح را بنویسید", "Write a reason for the adjustment", "د سمون دلیل ولیکئ")
+  fun adjustReasonLong(max: Any): String = t("دلیل حداکثر $max حرف", "Reason is at most $max characters", "دلیل تر ټولو ډېر $max توري")
+  val adjustBadPoints: String get() = t("شمارِ امتیاز درست نیست", "The number of points is not valid", "د امتیاز شمېر سم نه دی")
+  val kindAdjust: String get() = t("اصلاحِ دستی", "Manual adjustment", "لاسي سمون")
 }
