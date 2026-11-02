@@ -378,18 +378,22 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/pick-substitutes-store'));
     api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/order-add-store'));   // CHK-21: افزودنِ قلم پیش از جمع‌آوری، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-method-store'));   // S72: تغییرِ روشِ تحویل پیش از جمع‌آوری، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-visual-store'));   // AI-11: «جست‌وجو با عکس» ِ ویترین، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
     api.use('/shop/receipt-profile', require('./routes/shop-receipt'));
     //  ذخیرهٔ کهنه (#407): فقط پرچمِ `shop.ledger_merge` (پیش‌فرض خاموش) برای برنامه — پیش از `/shop`
     api.use('/shop/ledger-merge', require('./routes/shop-ledger-merge'));
+    //  PRM-13: قاعدهٔ یکسانِ امتیازِ وفاداری برای همهٔ دستگاه‌های دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.loyalty_rule`
+    api.use('/shop/loyalty', require('./routes/shop-loyalty'));
     api.use('/receipt', require('./routes/receipt-public'));
     //  بازارچه (WEB، §۲۳) — پشتِ پرچمِ `market.directory`، پیش‌فرض خاموش. درِ دکان
     //  پیش از `/shop`؛ درِ عمومی `/market` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
@@ -415,6 +419,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/payments', require('./routes/admin-payments'));
     //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش
     api.use('/shop/customer-erasure', require('./routes/shop-customer-erasure'));
+    //  AI-11: «جست‌وجو با عکس» (کالاهای مشابهِ همان دکان) — پشتِ `shop.visual_search`، پیش‌فرض خاموش
+    api.use('/shop/visual-search', require('./routes/shop-visual-search'));
     api.use('/shop', require('./routes/shop'));
     /*
      *  بخشِ پمپ‌بنزین — دفترِ جدا، همان دستگاهِ اشتراک.

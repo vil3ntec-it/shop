@@ -14,10 +14,11 @@ object I18nTables {
     StrInvoices, StrSecurity, StrLine, StrLoyalty, StrKit, StrProducts, StrStock, StrMoney, StrReports, StrAccount,
     StrTraining, // OPS-07
     StrSimpleAsk,
+    StrEvidence, StrLateApology, StrErasure, // RSK-08، NTF-10، SEC-10: صفحه‌های برنامه برای سه درِ سرور
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
-    StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway,
+    StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
     StrTill, // S28b، S45، S46، S50
   )
 }

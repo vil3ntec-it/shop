@@ -872,6 +872,8 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrSale.feesTitle to androidx.compose.material.icons.Icons.Filled.ShoppingBag, // POS-36
                 ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
+                //  NTF-10: فقط با پرچمِ روشنِ `shop.orders.late_apology` (خاموش ⇒ بی ردیف)
+                if (ir.vil3ntec.tohid.ui.screens.lateApologyRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.core.i18n.StrLateApology.title to androidx.compose.material.icons.Icons.Filled.Schedule else null,
                 //  WEB-04 و MKT-02/RSK-09: فقط با پرچمِ روشنِ سرور و دسترسیِ تنظیم (خاموش ⇒ بی ردیف)
                 if (ir.vil3ntec.tohid.ui.screens.storefrontEtaRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE to androidx.compose.material.icons.Icons.Filled.Schedule else null,
                 if (ir.vil3ntec.tohid.ui.screens.promoGuardRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE to androidx.compose.material.icons.Icons.Filled.Redeem else null,

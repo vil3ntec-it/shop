@@ -53,6 +53,8 @@ const FREE = [
     'POST /shop/order-notify/:id/ack']],
   ['گزارشِ خودکارِ صاحب (PAY-20/RPT-12) بخشی از مدیریتِ پایهٔ دکان است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.owner_report و فقط صاحب', [
     'PUT /shop/owner-report']],
+  ['قاعدهٔ یکسانِ امتیازِ وفاداری (PRM-13) بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.loyalty_rule و فقط صاحب/مدیر', [
+    'PUT /shop/loyalty']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
@@ -74,6 +76,8 @@ const FREE = [
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
+  ['«جست‌وجو با عکس» (AI-11) فقط‌خواندنی است، مثلِ جست‌وجوی متنیِ کالا، و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.visual_search', [
+    'POST /shop/visual-search']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
@@ -98,6 +102,10 @@ FLAGS.push('shop.storefront.eta');
 FLAGS.push('shop.orders.dispute_file');
 //  NTF-10: سیاستِ پوزش و کوپنِ تأخیر (`PUT /shop/orders/late-apology`) با پرچمِ خودش
 FLAGS.push('shop.orders.late_apology');
+//  PRM-13: قاعدهٔ یکسانِ امتیازِ وفاداری (`PUT /shop/loyalty`، FREE) با پرچمِ خودش
+FLAGS.push('shop.loyalty_rule');
+//  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) با پرچمِ خودش
+FLAGS.push('shop.visual_search');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

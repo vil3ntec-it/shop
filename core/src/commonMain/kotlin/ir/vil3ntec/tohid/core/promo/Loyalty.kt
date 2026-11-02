@@ -14,6 +14,13 @@ package ir.vil3ntec.tohid.core.promo
  *  فقط افزودنی: [EARN]/[SPEND] با فاکتور، [EARN_BACK]/[SPEND_BACK] با برگشت یا لغو. مانده = جمعِ علامت‌دار ([balance]).
  *  برگشت به نسبتِ پولِ برگشته ([share])، با شمارشِ تجمعی: چند برگشتِ تکه‌تکه بیش از برگشتِ یک‌جا پس نمی‌گیرد و
  *  برگشتِ کامل دقیقاً همه را. یک دستگاه هرگز مانده را منفی نمی‌کند ([reverse])؛ دو دستگاهِ بی‌خبر ⇒ منفی و «نیازمندِ بررسی».
+ *  [ADJUST] اصلاحِ دستیِ صاحب/مدیر است با علامت (افزودن +، کم‌کردن −) و هرگز زیرِ صفر ([adjust]).
+ *
+ *  ── انقضا ([Rule.expiryMonths]، ۰ = هرگز) ─────────────────────────────
+ *  هر امتیازِ تازه یک «دسته» است که [MONTH_MS] × ماه پس از تاریخش می‌سوزد؛ کم‌شدن‌ها (مصرف، پس‌گرفتن، اصلاحِ منفی) از
+ *  کهنه‌ترین دستهٔ زنده برمی‌دارند (FIFO؛ پس‌گرفتنِ کسبِ یک فاکتور اول از دستهٔ همان فاکتور). همه از خودِ دفتر و
+ *  قطعی ([state]): هیچ ردیفِ «سوخت» نوشته نمی‌شود و هیچ کارِ پس‌زمینه‌ای نیست؛ ماندهٔ با انقضا = [balanceAt].
+ *  ماه = ۱/۱۲ ِ ۳۶۵ روز (همان پنجرهٔ ۱۲ ماههٔ سطح)؛ مرز: در همان لحظهٔ [Lot.expiresAt] سوخته است.
  */
 object Loyalty {
 
@@ -21,6 +28,8 @@ object Loyalty {
   const val SPEND = "spend"
   const val EARN_BACK = "earn_back"
   const val SPEND_BACK = "spend_back"
+  /** اصلاحِ دستی با علامت ([Event.points] مثبت یا منفی) */
+  const val ADJUST = "adjust"
 
   const val BRONZE = "bronze"
   const val SILVER = "silver"
@@ -29,6 +38,12 @@ object Loyalty {
   /** سقفِ هر عدد — بیش از این خطای ورودی است، نه دکان */
   const val MAX_POINTS = 1_000_000_000L
   private const val MINOR = 100L
+
+  /** یک ماهِ انقضا = ۳۶۵ روز ÷ ۱۲ (میلی‌ثانیه) — ۱۲ ماه دقیقاً همان پنجرهٔ سطح */
+  const val MONTH_MS = 2_628_000_000L
+  const val MAX_EXPIRY_MONTHS = 120
+  /** «به‌زودی می‌سوزد» = تا ۳۰ روزِ آینده */
+  const val SOON_MS = 30L * 24 * 60 * 60 * 1000
 
   data class Tier(val key: String, val fromAfn: Long, val multiplierPct: Int)
 
@@ -42,13 +57,16 @@ object Loyalty {
     /** آستانهٔ خریدِ ۱۲ ماهه برای نقره‌ای و طلایی (افغانی) */
     val silverAfn: Long = 50_000,
     val goldAfn: Long = 200_000,
+    /** انقضای امتیاز (ماه)؛ ۰ = هرگز — همان رفتارِ پیش از انقضا */
+    val expiryMonths: Int = 0,
   ) {
     val tiers: List<Tier>
       get() = listOf(Tier(BRONZE, 0, 100), Tier(SILVER, silverAfn, 125), Tier(GOLD, goldAfn, 150))
 
     val valid: Boolean
       get() = everyAfn in 1..1_000_000 && pointAfn in 1..1_000_000 && maxSharePct in 1..100 &&
-        silverAfn in 1..1_000_000_000_000 && goldAfn in silverAfn + 1..1_000_000_000_000
+        silverAfn in 1..1_000_000_000_000 && goldAfn in silverAfn + 1..1_000_000_000_000 &&
+        expiryMonths in 0..MAX_EXPIRY_MONTHS
   }
 
   /** [customer] = شناسهٔ ماندگارِ مشتری؛ [saleId] = فاکتوری که رویداد از آن است (برگشت و لغو هم همان) */
@@ -57,6 +75,7 @@ object Loyalty {
   fun signed(e: Event): Long = when (e.kind) {
     EARN, SPEND_BACK -> e.points
     SPEND, EARN_BACK -> -e.points
+    ADJUST -> e.points.coerceIn(-MAX_POINTS, MAX_POINTS)
     else -> 0
   }
 
@@ -65,6 +84,89 @@ object Loyalty {
   /** جمعِ یک نوع برای یک فاکتور */
   fun total(events: List<Event>, saleId: String, kind: String): Long =
     events.filter { it.saleId == saleId && it.kind == kind }.sumOf { it.points }
+
+  // ── انقضا ──────────────────────────────────────────────────────
+  /** دستهٔ زندهٔ امتیاز: از [at]، [left] امتیاز مانده، در [expiresAt] می‌سوزد */
+  data class Lot(val at: Long, val left: Long, val expiresAt: Long)
+
+  /**
+   *  حالِ امتیازِ [Rule.expiryMonths] ‌دار در لحظهٔ [now]: [balance] = جمعِ دسته‌های زنده منهای کسری (دو دستگاهِ بی‌خبر)،
+   *  [expired] = آنچه تا [now] سوخت، [soon] = آنچه تا [SOON_MS] ِ دیگر می‌سوزد و [soonAt] نخستین لحظهٔ سوختنش.
+   */
+  data class State(val balance: Long, val expired: Long, val soon: Long, val soonAt: Long?, val lots: List<Lot>)
+
+  private class Open(val at: Long, val saleId: String, val earn: Boolean, var left: Long, val expiresAt: Long, val seq: Int)
+
+  /**
+   *  FIFO از روی دفتر — قطعی (ترتیب: لحظه، سپس شناسه). افزوده‌ها ([EARN]، [SPEND_BACK]، [ADJUST] ِ مثبت) اول کسریِ قبلی را
+   *  صاف می‌کنند و بقیه دستهٔ تازه می‌شود؛ [SPEND_BACK] از لحظهٔ همان مصرف (نه لحظهٔ برگشت) می‌شمارد تا برگشتِ خرید
+   *  عمرِ امتیاز را دراز نکند. کم‌شده‌ها از کهنه‌ترین دسته برمی‌دارند؛ نبودِ دسته ⇒ کسری (مانده منفی).
+   *  هیچ دسته‌ای پس از [now] نمی‌سوزد، حتی با ردیفِ «آینده» ِ ساعتِ کج.
+   */
+  fun state(events: List<Event>, customer: String, rule: Rule, now: Long, soonMs: Long = SOON_MS): State {
+    val months = rule.expiryMonths.coerceIn(0, MAX_EXPIRY_MONTHS)
+    val life = months * MONTH_MS
+    val mine = events.filter { it.customer == customer }.sortedWith(compareBy<Event> { it.at }.thenBy { it.id })
+    val spentAt = HashMap<String, Long>()
+    mine.forEach { if (it.kind == SPEND && it.saleId.isNotEmpty()) spentAt[it.saleId] = minOf(spentAt[it.saleId] ?: it.at, it.at) }
+    val lots = ArrayList<Open>()
+    var debt = 0L
+    var expired = 0L
+    var seq = 0
+    fun burn(t: Long) {
+      if (months == 0) return
+      val walk = lots.iterator()
+      while (walk.hasNext()) { val l = walk.next(); if (l.expiresAt <= t) { expired += l.left; walk.remove() } }
+    }
+    for (e in mine) {
+      val t = minOf(e.at, now)
+      burn(t)
+      val v = signed(e)
+      if (v > 0) {
+        val pay = minOf(debt, v)
+        debt -= pay
+        val rest = v - pay
+        if (rest <= 0) continue
+        val born = if (e.kind == SPEND_BACK) spentAt[e.saleId] ?: e.at else e.at
+        val ends = if (months == 0) Long.MAX_VALUE else if (born > Long.MAX_VALUE - life) Long.MAX_VALUE else born + life
+        if (months > 0 && ends <= t) { expired += rest; continue }
+        lots += Open(born, e.saleId, e.kind == EARN, rest, ends, seq++)
+        lots.sortWith(compareBy<Open> { it.at }.thenBy { it.seq })
+      } else if (v < 0) {
+        var need = -v
+        val order = if (e.kind == EARN_BACK) lots.filter { it.earn && it.saleId == e.saleId } + lots.filterNot { it.earn && it.saleId == e.saleId } else lots.toList()
+        for (l in order) {
+          if (need == 0L) break
+          val take = minOf(l.left, need)
+          l.left -= take
+          need -= take
+        }
+        lots.removeAll { it.left == 0L }
+        debt += need
+      }
+    }
+    burn(now)
+    val live = lots.map { Lot(it.at, it.left, it.expiresAt) }
+    val until = if (now > Long.MAX_VALUE - soonMs) Long.MAX_VALUE else now + soonMs
+    val soonLots = if (months == 0) emptyList() else live.filter { it.expiresAt <= until }
+    return State(live.sumOf { it.left } - debt, expired, soonLots.sumOf { it.left }, soonLots.minOfOrNull { it.expiresAt }, live)
+  }
+
+  /** مانده در لحظهٔ [now] با انقضای [rule]؛ بی انقضا ⇒ همان [balance] (بایت‌به‌بایت) */
+  fun balanceAt(events: List<Event>, customer: String, rule: Rule, now: Long): Long =
+    if (rule.expiryMonths <= 0) balance(events, customer) else state(events, customer, rule, now).balance
+
+  sealed interface Adjust {
+    data class Ok(val points: Long) : Adjust
+    data class Bad(val code: String) : Adjust
+  }
+
+  /** اصلاحِ دستیِ [delta] امتیاز روی ماندهٔ [balance]: صفر یا بیش از سقف نه، و کم‌کردن هرگز زیرِ صفر */
+  fun adjust(balance: Long, delta: Long): Adjust = when {
+    delta == 0L || delta > MAX_POINTS || delta < -MAX_POINTS -> Adjust.Bad(Code.BAD_POINTS)
+    delta < 0 && -delta > balance.coerceAtLeast(0) -> Adjust.Bad(Code.OVER_BALANCE)
+    else -> Adjust.Ok(delta)
+  }
 
   fun tier(rule: Rule, spendAfn: Long): Tier = rule.tiers.last { spendAfn >= it.fromAfn }
 

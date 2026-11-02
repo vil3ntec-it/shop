@@ -2,7 +2,8 @@
  * ویترین — «حسابِ من» (CRM-13، `/api/store/<slug>/account/history`): خریدهای آنلاین و حضوری و ماندهٔ حسابِ قرض
  * در همین دکان، با شمارهٔ تأییدشده. فقط با `features.accountHistory` (پرچمِ `shop.storefront.account_history`)
  * و دیربار از store.js؛ بخش را همین پرونده می‌سازد ⇒ پرچمِ خاموش، صفحه همان امروز.
- * ⛔ همهٔ متن با textContent (`K.el`)؛ پیوندِ فاکتور فقط مسیرِ `/r/…` ِ همین مبدأ. امتیاز (PRM-13) هنوز نیست.
+ * ⛔ همهٔ متن با textContent (`K.el`)؛ پیوندِ فاکتور فقط مسیرِ `/r/…` ِ همین مبدأ.
+ * امتیاز و سطح (PRM-13) فقط وقتی پاسخ کلیدِ `loyalty` دارد (قاعدهٔ یکسانِ روشنِ دکان)؛ نبودِ کلید ⇒ هیچ.
  */
 (function () {
   'use strict';
@@ -79,6 +80,14 @@
       if (r.linked && r.balanceMinor !== null && r.balanceMinor !== undefined) {
         box.appendChild(el('div', { class: 'card', attrs: { id: 'ah-balance' } },
           el('span', { class: 'muted', text: t('ah.balance') + t('sep') }), el('b', { text: balanceText(r.balanceMinor) })));
+      }
+      var lp = r.linked && r.loyalty;
+      if (lp) {
+        var card = el('div', { class: 'card', attrs: { id: 'ah-points' } },
+          el('span', { class: 'muted', text: t('ah.points') + t('sep') }), el('b', { text: K.fa(lp.points, 0) }),
+          el('span', { class: 'pill plain', text: t('ah.t.' + (lp.tier === 'gold' || lp.tier === 'silver' ? lp.tier : 'bronze')) }));
+        if (lp.soon > 0 && lp.soonAt) card.appendChild(el('small', { class: 'muted', text: t('ah.soon', { n: K.fa(lp.soon, 0), d: day(new Date(lp.soonAt).toISOString().slice(0, 10)) }) }));
+        box.appendChild(card);
       }
       if (!r.linked) box.appendChild(el('p', { class: 'muted', attrs: { id: 'ah-unlinked' }, text: t('ah.unlinked') }));
       box.appendChild(block('online', 'ah.online', r.online));

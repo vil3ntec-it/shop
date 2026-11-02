@@ -1,0 +1,22 @@
+{
+  "dm.title": "Delivery method",
+  "dm.m.shop": "Delivered by the shop itself",
+  "dm.m.courier": "The shop's own courier",
+  "dm.m.company": "Courier company “{name}” (hired by the shop)",
+  "dm.m.external": "An outside courier company (hired by the shop)",
+  "dm.m.pickup": "Pickup at the shop",
+  "dm.r.shop": "Responsible: the shop",
+  "dm.r.customer": "Responsible: you collect it",
+  "dm.change": "Change delivery method",
+  "dm.to": "New method",
+  "dm.to.pickup": "Pickup at the shop (no delivery fee)",
+  "dm.to.delivery": "Deliver to my address",
+  "dm.to.zone": "Deliver to {zone} — {fee}",
+  "dm.addr": "Address (area, street, lane)",
+  "dm.send": "See the new cost",
+  "dm.q": "Delivery fee {fee}, new total {total}.",
+  "dm.eta": "Approx. {a}–{b} minutes.",
+  "dm.yes": "Yes, change it",
+  "dm.done": "Delivery method changed",
+  "dm.locked": "The order is being prepared; the delivery method can no longer change"
+}

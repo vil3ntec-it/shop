@@ -1,0 +1,15 @@
+{
+  "vs.btn": "Search by photo",
+  "vs.title": "Similar items",
+  "vs.hint": "Take or choose a photo of the item; the photo is not kept anywhere.",
+  "vs.busy": "Searching…",
+  "vs.similar": "Similar",
+  "vs.none": "No similar items found.",
+  "vs.notice": "These only look similar in the photo; check the item itself before you buy.",
+  "vs.bad": "This photo can't be measured; take another one (JPEG or PNG).",
+  "vs.big": "The photo is too large; choose a smaller one.",
+  "vs.err": "Search failed; try again.",
+  "vs.open": "View item",
+  "vs.list": "Similar items list",
+  "vs.close": "Close"
+}

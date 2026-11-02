@@ -59,6 +59,18 @@ function poolOptions(max) {
   };
 }
 
+/**
+ * پس‌زدنِ زود (PERF-04): صفِ انتظارِ pg-pool در طول سقف ندارد (فقط هر انتظار تا
+ * `PG_CONNECT_TIMEOUT_MS`). با `PG_POOL_MAX_WAITING` > ۰، پرس‌وجو یا تراکنشی که به صفی با همین
+ * اندازه برسد بی‌درنگ ۵۰۳ ِ `db_busy` (با `Retry-After`) می‌گیرد، نه چند ثانیه انتظار و بعد همان.
+ * فقط مسیرِ `query`/`one`/`many`/`tx`؛ `getPool()` ِ مستقیم (migration، پشتیبان) همان صفِ pg است.
+ */
+function admit(p) {
+  const max = config.db.maxWaiting;
+  if (max > 0 && p.waitingCount >= max) throw require('./middleware/errors').busy();
+  return p;
+}
+
 function getPool() {
   if (isPglite()) return litePool();
   if (pool) return pool;
@@ -141,7 +153,7 @@ async function query(text, params = []) {
     const inTx = txStore.getStore();
     return liteQuery(inTx || await getLite(), text, params);
   }
-  return getPool().query(text, params);
+  return admit(getPool()).query(text, params);
 }
 
 /** اولین ردیف یا null. */
@@ -168,7 +180,7 @@ async function tx(fn) {
       return txStore.run(t, () => fn(client));
     });
   }
-  const client = await getPool().connect();
+  const client = await admit(getPool()).connect();
   try {
     await client.query('BEGIN');
     const out = await fn(client);
