@@ -46,6 +46,18 @@ function listTokenOf(shopId, row, on) {
   return on ? tokenOf(shopId, row.id, { gen: row.track_gen, at: now() }) : tokenOf(shopId, row.id);
 }
 
+/**
+ * لینکی که سرور خودش برای مشتری می‌فرستد (پیامِ وضعیت، لینکِ جایگزین، ۴۰۹ ِ سفارشِ تکراری): پرچمِ روشن ⇒
+ * v2 با نسلِ **جاری** (وگرنه لینکِ تازهٔ پس از «باطل کردن» از همان اول ۴۱۰ می‌گرفت)؛ پرچمِ خاموش ⇒ v1 ِ امروز.
+ * `run` = اتصالِ تراکنشِ جاری (`(sql, params) ⇒ {rows}`)، مثلِ `orders.flagOf`.
+ */
+async function currentTokenOf(shopId, orderId, run = null) {
+  if (!(await orders.flagOf(shopId, LINK_FLAG, run))) return tokenOf(shopId, orderId);
+  const sql = `SELECT track_gen FROM online_orders WHERE shop_id=$1 AND id=$2`;
+  const row = run ? (await run(sql, [shopId, orderId])).rows[0] : await one(sql, [shopId, orderId]);
+  return tokenOf(shopId, orderId, { gen: row ? row.track_gen : 0, at: now() });
+}
+
 /** توکن ⇒ `{ orderId, iat, gen }` (v1: `iat` تهی، `gen` صفر) — یا null. HMAC زمان‌ثابت. */
 function parseToken(shopId, token) {
   const t = String(token || '');
@@ -110,5 +122,5 @@ async function revokeLink(shopId, orderId) {
   return { gen: Number(row.track_gen), token: tokenOf(shopId, row.id, { gen: row.track_gen, at: now() }) };
 }
 
-  return { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, parseToken, orderIdOf, orderIdOfLink, revokeLink };
+  return { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, parseToken, orderIdOf, orderIdOfLink, revokeLink };
 };

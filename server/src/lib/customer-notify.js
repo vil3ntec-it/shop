@@ -266,10 +266,10 @@ function render(event, lang, { no, shop }) {
 }
 
 /** لینکِ صفحهٔ «سفارشِ من» به زبانِ مشتری — فقط اگر نشانیِ عمومیِ ویترین داده شده باشد. */
-function linkFor({ shopId, orderId, slug, lang }) {
+function linkFor({ shopId, orderId, slug, lang, token: given = '' }) {
   const base = String(process.env.STORE_PUBLIC_URL || '').trim().replace(/\/+$/, '');
   if (!base || !/^https:\/\//.test(base) || !slug) return '';
-  const token = require('./storefront').tokenOf(shopId, orderId);
+  const token = given || require('./storefront').tokenOf(shopId, orderId);
   return `${base}/${encodeURIComponent(slug)}${lang && lang !== 'fa' ? `?lang=${lang}` : ''}#/o/${token}`;
 }
 
@@ -377,7 +377,9 @@ async function processRow(row, at) {
     channel: '', key: '', to: { phone: order.customer_phone }, shopId: row.shop_id, orderId: row.order_id,
     event: row.event, lang, title: shop,
     text: render(row.event, lang, { no: Number(order.order_no), shop }),
-    link: linkFor({ shopId: row.shop_id, orderId: row.order_id, slug: order.slug, lang }),
+    //  TEN-03: پرچمِ `shop.storefront.link_expiry` روشن ⇒ لینکِ v2 با نسلِ جاری (پس از «باطل کردن» هم کار می‌کند)
+    link: linkFor({ shopId: row.shop_id, orderId: row.order_id, slug: order.slug, lang,
+      token: await require('./storefront').currentTokenOf(row.shop_id, row.order_id) }),
   };
 
   const tried = [];
