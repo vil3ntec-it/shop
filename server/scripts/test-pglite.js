@@ -27,12 +27,23 @@
  * پس پرچم تورِ ایمنی است: پس از پایانِ همهٔ آزمون‌ها و قلاب‌های یک پرونده، فرآیندش بیرون می‌رود،
  * هر دستگیره‌ای که مانده باشد. هیچ آزمونی رد نمی‌شود و شکستِ هر آزمون همان کدِ خروجِ ناموفق است.
  * نگهبانِ «استخر/دیتابیس فرآیند را نگه نمی‌دارد» خودش جداست (`db-exit-idle.test.js`، فرآیندِ خودش).
+ *
+ * ⏱ با این همه کارِ Electron باز «پس از آخرین آزمونِ یک پرونده» تا ۴۵ دقیقه بی‌صدا ماند (main 171c7d65
+ * پس از sync-epoch؛ دستهٔ نهم پس از api.test.js، ۱۴۰۵/۰۸/۱۱). گیری که بازتولید شد (gdb): ساختنِ PGlite
+ * زیرِ Electron گاه برای همیشه می‌ایستد، رشتهٔ اصلی در `NodePlatform::DrainTasks`، پیش از هر خروجی —
+ * همان نشانهٔ CI اگر پروندهٔ **بعدی** در `h.start()` بایستد (`src/lib/pglite-create.js`، که حالا راهِ
+ * ساختن است). و دو تورِ ایمنی:
+ *   • نگهبان (`scripts/test-watchdog.js`): پرونده‌ای که `TEST_WATCHDOG_SECONDS` (۱۸۰) ثانیه هیچ
+ *     پیشرفتی نداشته باشد با نام، مرحله، آخرین آزمون، wchan و دستگیره‌های بازش گزارش و کشته می‌شود؛
+ *     اجرا ادامه می‌یابد و ناموفق تمام می‌شود.
+ *   • `--test-force-exit` گزارشِ آزمون‌های پایانیِ هر پرونده را با process.exit دور می‌ریخت (زیرِ بار
+ *     ده‌ها آزمون، بی هیچ خطایی)؛ stdout ِ فرآیندِ پرونده حالا هم‌زمان است (`scripts/test-stdout-sync.js`).
  */
-const { spawnSync } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const failures = require('./test-failures');
+const watchdog = require('./test-watchdog');
 
 const dir = path.join(__dirname, '..', 'test');
 const skip = new Set(['backup.test.js', 'pump-isolation.test.js']);
@@ -42,24 +53,25 @@ const files = fs.readdirSync(dir).filter((f) => f.endsWith('.test.js') && !skip.
 const failed = path.join(os.tmpdir(), `test-failures-${process.pid}-${Date.now()}.jsonl`);
 //  `npm test` دو بار این را صدا می‌زند ⇒ هر اجرا به پروندهٔ شواهد افزوده می‌شود، نه رونویسی
 const evidence = process.env.TEST_EVIDENCE_FILE ? path.join(os.tmpdir(), `test-evidence-${process.pid}-${Date.now()}.jsonl`) : '';
-const r = spawnSync(process.execPath, [
-  '--test', '--test-concurrency=1', '--test-force-exit',
-  `--test-reporter=${process.stdout.isTTY ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout',
-  `--test-reporter=${path.join(__dirname, 'test-failures.js')}`, `--test-reporter-destination=${failed}`,
-  //  GATE-NEW-05: پروندهٔ شواهدِ هر آزمون (`test-evidence.js`) فقط اگر CI مقصد داده
-  ...(evidence ? [`--test-reporter=${path.join(__dirname, 'test-evidence.js')}`, `--test-reporter-destination=${evidence}`] : []),
-  ...files,
-], {
-  stdio: 'inherit',
-  env: { ...process.env, TEST_DATABASE_URL: 'pglite:memory' },
-});
-process.stdout.write(failures.summarize(failed, { exitCode: r.status ?? 1 }));
-try { fs.unlinkSync(failed); } catch { /* نبود */ }
-if (evidence) {
-  try {
-    fs.mkdirSync(path.dirname(path.resolve(process.env.TEST_EVIDENCE_FILE)), { recursive: true });
-    fs.appendFileSync(process.env.TEST_EVIDENCE_FILE, fs.readFileSync(evidence));
-    fs.unlinkSync(evidence);
-  } catch { /* بی شواهد؛ نتیجهٔ آزمون همان */ }
-}
-process.exit(r.status ?? 1);
+(async () => {
+  const r = await watchdog.run([
+    '--test', '--test-concurrency=1', '--test-force-exit',
+    `--test-reporter=${process.stdout.isTTY ? 'spec' : 'tap'}`, '--test-reporter-destination=stdout',
+    `--test-reporter=${path.join(__dirname, 'test-failures.js')}`, `--test-reporter-destination=${failed}`,
+    //  GATE-NEW-05: پروندهٔ شواهدِ هر آزمون (`test-evidence.js`) فقط اگر CI مقصد داده
+    ...(evidence ? [`--test-reporter=${path.join(__dirname, 'test-evidence.js')}`, `--test-reporter-destination=${evidence}`] : []),
+    ...files,
+  ], { env: { ...process.env, TEST_DATABASE_URL: 'pglite:memory' } });
+  process.stdout.write(r.stats);
+  process.stdout.write(failures.summarize(failed, { exitCode: r.status }));
+  process.stdout.write(watchdog.summarize(r.hangs));
+  try { fs.unlinkSync(failed); } catch { /* نبود */ }
+  if (evidence) {
+    try {
+      fs.mkdirSync(path.dirname(path.resolve(process.env.TEST_EVIDENCE_FILE)), { recursive: true });
+      fs.appendFileSync(process.env.TEST_EVIDENCE_FILE, fs.readFileSync(evidence));
+      fs.unlinkSync(evidence);
+    } catch { /* بی شواهد؛ نتیجهٔ آزمون همان */ }
+  }
+  process.exit(r.status);
+})();

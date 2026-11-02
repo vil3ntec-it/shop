@@ -152,9 +152,9 @@ async function restoreIsolated(file, { targetUrl = '', keep = false } = {}) {
   const config = require('../config');
   const backup = require('./backup');
   if (isPgliteFile(file)) {
-    const { PGlite, types } = require('@electric-sql/pglite');
+    const { types } = require('@electric-sql/pglite');
     const tar = await backup.decode(file);
-    const lite = await PGlite.create({
+    const lite = await require('./pglite-create').createPglite({
       dataDir: 'memory://',
       loadDataDir: new Blob([tar]),
       parsers: { [types.INT8]: (v) => v, [types.NUMERIC]: (v) => v },
