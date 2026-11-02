@@ -125,6 +125,8 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   fun show(v: HesabAccountView?) {
     view = v
     onView(v)
+    //  نوارِ پوسته («این من نبودم») همان حال را بی پرسشِ دوباره ببیند
+    if (v != null) ir.vil3ntec.tohid.ui.v3.shell.HesabPayChangeWatch.seen(v.pending)
     if (v != null && v.opened) {
       mode = if (v.mode == HesabPayShop.AUTO) HesabPayShop.AUTO else HesabPayShop.SIMPLE
       account = v.account
