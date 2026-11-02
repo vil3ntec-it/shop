@@ -209,7 +209,8 @@ class SimpleAskEngineTest {
     //  گوشی: زبانه و بخش فقط با `askOn`
     val phone = src("ui/screens/Reports.kt")
     assertTrue(phone.contains("val askOn = remember { ir.vil3ntec.tohid.data.SimpleAskPref.on(context) }"))
-    assertTrue(phone.contains("listOfNotNull((\"ask\" to ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.tab).takeIf { askOn })"))
+    //  زبانه درونِ listOfNotNull ِ زبانه‌های اختیاری (کنارِ «شماره‌های جاافتاده»، RPT-17)
+    assertTrue(Regex("""listOfNotNull\([\s\S]{0,300}?\("ask" to ir\.vil3ntec\.tohid\.core\.i18n\.StrSimpleAsk\.tab\)\.takeIf \{ askOn \}""").containsMatchIn(phone))
     assertTrue(phone.contains("\"ask\" -> if (askOn) simpleAskSection(this, d, canSeeMoney)"))
     assertEquals(1, Regex("simpleAskSection\\(").findAll(phone).count())
     //  کامپیوتر: زبانهٔ `ASK` فقط با همان کلید از فهرست می‌گذرد

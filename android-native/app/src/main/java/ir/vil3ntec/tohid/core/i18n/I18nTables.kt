@@ -20,5 +20,6 @@ object I18nTables {
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
     StrTill, // S28b، S45، S46، S50
+    StrRounding, // PAY-09: گردکردنِ نقدی
   )
 }
