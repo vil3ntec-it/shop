@@ -75,6 +75,9 @@ internal fun RouteScope.OrdersRoute() {
   val deskCtl = rememberOrderDesk(remember(context) { Backend.api(context) })
   val bulk = rememberOrderBulk(cfg ?: OrdersConfigDto(), state.tab)
   val printer = remember(context) { OrderSlipPrint.Bulk(context) }
+  //  ORD-10: پیامِ برگهٔ «قبولِ خودکار» ِ سرور (چاپ شد / بی چاپگر) — یک بار
+  val slipMsg = OrdersLive.slipMessage.value
+  LaunchedEffect(slipMsg) { slipMsg?.let { toasts.show(it); OrdersLive.slipMessage.value = null } }
   val header: @Composable () -> Unit = {
     OrderDeskStrip(deskCtl)
     cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }

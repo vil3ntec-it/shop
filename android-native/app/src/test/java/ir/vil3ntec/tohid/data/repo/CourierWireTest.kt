@@ -119,4 +119,15 @@ class CourierWireTest {
     assertNull(plain.bagScanBags)
     assertNull(plain.nearPinMaxM)
   }
+
+  @Test fun `DLV-05 — کارت پیوندهای مسیریابِ سرور را می‌خواند و قالبِ نادرست یا نبودنش null است`() {
+    val geo = "geo:34.528312,69.172451?q=34.528312,69.172451"
+    val osm = "https://osmand.net/map?pin=34.528312,69.172451#17/34.528312/69.172451"
+    val g = "https://www.google.com/maps/dir/?api=1&destination=34.528312,69.172451"
+    val c = CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"picked_up","navigation":{"lat":34.528312,"lng":69.172451,"geo":"$geo","google":"$g","osmand":"$osm"}}"""))!!
+    assertEquals(listOf(geo, osm, g), c.navigation?.links)
+    assertNull(CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"picked_up","navigation":null}"""))!!.navigation)
+    assertNull(CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"picked_up","navigation":{"geo":"javascript:x"}}"""))!!.navigation)
+    assertNull(CourierWire.card(obj("""{"id":"A","orderNo":3,"status":"picked_up"}"""))!!.navigation)
+  }
 }

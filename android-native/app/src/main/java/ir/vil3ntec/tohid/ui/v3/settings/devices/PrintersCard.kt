@@ -20,7 +20,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrOrderSlip
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.print.OrderSlipPrint
 import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -32,6 +34,7 @@ import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3SwipeAction
 import ir.vil3ntec.tohid.ui.v3.V3TextButton
+import ir.vil3ntec.tohid.ui.v3.V3ToggleRow
 import kotlinx.coroutines.launch
 
 /**
@@ -83,6 +86,14 @@ internal fun PrintersCard(highlight: Boolean) {
     }
     V3Divider(start = 64.dp)
     V3ListRow(StrSettings.addPrinter, icon = Icons.Outlined.Add, onClick = { adding = true })
+    //  ORD-10: برگهٔ سفارش روی چاپگرِ پیش‌فرضِ همین دستگاه — پس از «قبول» ِ همین‌جا، و (جدا) برای «قبولِ خودکار» ِ سرور
+    var slipAuto by remember { mutableStateOf(OrderSlipPrint.auto(context)) }
+    var slipServer by remember { mutableStateOf(OrderSlipPrint.autoServer(context)) }
+    V3Divider(start = 64.dp)
+    V3ToggleRow(StrOrderSlip.setting, checked = slipAuto, onCheckedChange = { slipAuto = it; OrderSlipPrint.setAuto(context, it) },
+      subtitle = StrOrderSlip.settingNote, icon = Icons.Outlined.Print)
+    V3ToggleRow(StrOrderSlip.serverSetting, checked = slipServer, onCheckedChange = { slipServer = it; OrderSlipPrint.setAutoServer(context, it) },
+      subtitle = StrOrderSlip.serverSettingNote, icon = Icons.Outlined.Print)
   }
 }
 

@@ -47,6 +47,12 @@ object StrOrderSlip : OrderSlip.Texts {
     "On this device's default printer, once for each order accepted here. Off = no slip.",
     "د همدې وسیلې پر ډیفالټ چاپګر، د هر هغه فرمایش لپاره یو ځل چې دلته ومنل شو. بند = پاڼه نشته.",
   )
+  val serverSetting: String get() = t("برگهٔ سفارش‌های «قبولِ خودکار»", "Slip for auto-accepted orders", "د «پخپله منل شویو» فرمایشونو پاڼه")
+  val serverSettingNote: String get() = t(
+    "سفارشی که سرور خودکار قبول کرد روی چاپگرِ پیش‌فرضِ همین دستگاه، یک بار. فقط روی یک دستگاه روشن کنید تا برگه دوتا نشود.",
+    "Orders the server auto-accepted print once on this device's default printer. Turn on for one device only, or slips repeat.",
+    "هغه فرمایش چې سرور پخپله ومانه د همدې وسیلې پر ډیفالټ چاپګر یو ځل چاپېږي. یوازې پر یوه وسیله یې فعال کړئ چې پاڼه دوه نه شي.",
+  )
 
   // میزِ سفارش (ORD-03/04/08/09، `ui/screens/OrderDeskPanel.kt`)
   val deskOpen: String get() = t("باز — سفارش می‌گیریم", "Open — taking orders", "پرانیستی — فرمایش اخلو")
