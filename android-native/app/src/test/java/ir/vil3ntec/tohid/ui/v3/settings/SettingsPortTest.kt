@@ -188,6 +188,7 @@ class SettingsPortTest {
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
+      "SimpleAskPref.set" to "$PENDING — پرسشِ ساده از گزارش‌ها، RPT-16 (زبانه‌اش در «گزارش‌ها» ِ رابطِ امروز است)",
       "SmartForecastPref.set" to "$PENDING — پیش‌بینیِ تقاضای قابلِ توضیح، AI-07 (صفحه‌اش «پیشنهادِ سفارش» ِ رابطِ امروز است)",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
       "TrainingPref.setOn" to "$PENDING — حالتِ آموزشی، OPS-07",

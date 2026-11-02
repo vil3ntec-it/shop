@@ -480,6 +480,7 @@ fun SettingsScreenLegacy(
       }
     }
     item { ShrinkReportSettingsWired(context) } // گزارشِ ضایعات و کسری (INV-17)، پیش‌فرض خاموش
+    item { SimpleAskSettingsWired(context) } // پرسشِ ساده از گزارش‌ها (RPT-16)، پیش‌فرض خاموش
     item { LabelToolsSettingsWired(context) } // برچسب و بارکدِ داخلی (PRD-23، PRD-05)، پیش‌فرض خاموش
     item { EasySetupSettingsWired(context) } // راه‌اندازیِ آسانِ چاپگر و بارکدخوان (HW-12)، پیش‌فرض خاموش
     item { CountToolsSettingsWired(context) } // انبارگردانیِ تازه: اسکن، چند دستگاه، کور (INV-06/07/08)، پیش‌فرض خاموش

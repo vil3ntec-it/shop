@@ -829,6 +829,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle to androidx.compose.material.icons.Icons.Filled.Tune,
                 ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
                 ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle to androidx.compose.material.icons.Icons.Filled.QuestionAnswer, // RPT-16، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
                 ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE to androidx.compose.material.icons.Icons.Filled.QrCodeScanner, // HW-12، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
