@@ -226,6 +226,12 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 `TohidShared` می‌خواهد (Security، AVFoundation، BackgroundTasks، CoreLocation، LocalAuthentication، PhotosUI، UniformTypeIdentifiers،
 UserNotifications). `iOSApp.init` ⇐ `appDidLaunch()` (پیش از پایانِ راه‌اندازی: BGTaskScheduler، نمایندهٔ اعلان، چرخهٔ برنامه).
 
+**رفعِ CI ِ `ios-app` (از گامِ ۱ سرخ):** xcodebuild در سرآیندِ ObjC ِ چارچوب می‌افتاد — سه نامِ Kotlin هم‌نامِ ماکروهای C‌اند
+(`BuildConfig.DEBUG` با ماکروی `DEBUG` ِ پیکربندیِ Debug، `NAME_MAX` ِ `<limits.h>` در `DeliveryForms`/`NewOrderModel`/`CampaignLinks`،
+`JSONObject.NULL`). نام‌ها عوض نشدند؛ `ios/shared/build.gradle.kts` پس از پیوندِ چارچوب همان ماکروها را فقط درونِ `TohidShared.h`
+با `push_macro`/`undef`/`pop_macro` کنار می‌گذارد (`guardHeaderMacros`). مرحلهٔ پیوندِ برنامه و اجرا روی شبیه‌ساز تا امروز هرگز
+به CI نرسیده بود؛ نتیجه‌اش همین PR است.
+
 **آزمونِ تازه:**
 - `src/jvmTest/…/ios/work/WorkTimingJvmTest` (۸) — زمان‌بندیِ کارهای دوره‌ای در برابرِ قاعده‌های WorkManager ِ اندروید (کفِ ۱۵ دقیقه، سررسید، ساعتِ عقب‌رفته، عقب‌نشینیِ نمایی/خطی). روی لینوکس (`jvmTest`، کارِ `ios-ui-klib`).
 - `src/iosTest/…/ios/Phase3IosTest` (۳) — اجرای کارگرِ ثبت‌شده با WorkManager ِ آیفون، نگاشتِ بارکدِ AVFoundation به قاعدهٔ ML Kit، رفت‌وبرگشتِ `Intent` ِ اعلان از راهِ userInfo. فقط روی شبیه‌ساز (کارِ `ios-app`).
