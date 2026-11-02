@@ -11,6 +11,7 @@
  *   POST /reviews/:id/moderate {decision: approve|reject}
  */
 const express = require('express');
+const config = require('../config');
 const orders = require('../lib/orders');
 const issues = require('../lib/order-issues');
 const reviews = require('../lib/order-reviews');
@@ -21,7 +22,8 @@ const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
-//  سقفِ نرخ برای هر کاربر (دیدنِ عکس و رسیدگی)
+//  سقفِ نرخِ هر IP پیش از احراز (همان الگوی `shop-sync-epoch.js`)، و پس از آن سقفِ هر کاربر (دیدنِ عکس و رسیدگی)
+router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-feedback-ip' }));
 const limit = rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'order-feedback', key: (req) => req.user && req.user.id });
 router.use(requireUser, requireShop, limit, requirePermission('orders.view'));
 
