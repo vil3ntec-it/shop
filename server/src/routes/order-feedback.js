@@ -17,11 +17,13 @@ const reviews = require('../lib/order-reviews');
 const chatMedia = require('../lib/chat-media');
 const audit = require('../lib/audit');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
-const { clientIp } = require('../middleware/ratelimit');
+const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
-router.use(requireUser, requireShop, requirePermission('orders.view'));
+//  سقفِ نرخ برای هر کاربر (دیدنِ عکس و رسیدگی)
+const limit = rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'order-feedback', key: (req) => req.user && req.user.id });
+router.use(requireUser, requireShop, limit, requirePermission('orders.view'));
 
 const manage = requirePermission('orders.manage');
 const actorOf = (req) => ({ type: 'user', id: req.user.id, role: req.role });
