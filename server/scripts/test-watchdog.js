@@ -261,9 +261,13 @@ async function run(args, { env = process.env, seconds = readSeconds(), out = pro
       fileProc = (f && tree.find((p) => p.ppid === child.pid && (p.args.includes(f.f) || p.args.includes(path.join(ROOT, f.f))))) || null;
       targets = fileProc ? [fileProc, ...descendants(list, fileProc.pid)] : tree;
       if (!fileProc) {
-        lines.push(f && f.summary
-          ? '  فرآیندِ پرونده بیرون رفته ولی node --test هنوز منتظرِ بسته شدنِ stdout ِ آن است (زیرفرآیندی که آن را به ارث برده؟).'
-          : '  فرآیندِ پرونده پیدا نشد.');
+        //  zombie: بیرون رفته ولی node --test خروجش را برنداشته (SIGCHLD نرسید؟) — cmdline اش خالی است
+        const zombie = tree.find((p) => p.ppid === child.pid && p.state === 'Z');
+        lines.push(zombie
+          ? `  فرآیندِ پرونده (pid ${zombie.pid}) بیرون رفته ولی node --test خروجش را برنداشته (zombie).`
+          : f && f.summary
+            ? '  فرآیندِ پرونده بیرون رفته ولی node --test هنوز منتظرِ بسته شدنِ stdout ِ آن است (زیرفرآیندی که آن را به ارث برده؟).'
+            : '  فرآیندِ پرونده پیدا نشد.');
       }
       for (const p of targets) lines.push(`  ${p === fileProc ? 'فرآیندِ پرونده' : 'زیرفرآیند'}: pid ${p.pid}${nativeState(p)} ${p.args.slice(0, 200)}`);
       if (fileProc && posix) {
