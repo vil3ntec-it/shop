@@ -35,6 +35,8 @@ const device = {
     && core.evaluate(role, L, 'returns.create', { amount: 100 }).decision !== 'deny') || core.allows(role, L, 'sales.cancel'),
   //  StockPlacesUiAndroid.kt: `if (ShopRole.current(context) == ShopRole.STAFF) return`
   places: (role) => role !== 'staff',
+  //  LoyaltyPoints.adjust: `may` = صاحب/مدیر (PRM-13، #815)
+  manage: (role) => role === 'owner' || role === 'manager',
   //  بی سنجشِ نقش: ساختِ امانی/سفارش، «آماده»، پیش‌پرداخت و قسط
   open: () => true,
 };
@@ -70,6 +72,7 @@ const CASES = {
   'special_order_status:cancelled': ['auditLog', () => ({
     type: 'special_order_status', refId: 'so-1', amountMinor: 100000, reason: 'تأمین نشد', specialOrder: { to: 'cancelled' },
   }), 'cancel'],
+  loyalty_adjust: ['auditLog', () => ({ type: 'loyalty_adjust', payRef: 'd-lp', points: -50, notes: 'اصلاحِ دستی', amountMinor: 0 }), 'manage'],
   stock_place: ['auditLog', () => ({ type: 'stock_place', refId: 'قفسهٔ ۲', reason: 'add' }), 'places'],
   stock_repack: ['auditLog', (id) => ({ type: 'stock_repack', refId: id, refIds: ['warehouseEntries/w1'] }), 'places'],
   stock_assembly: ['auditLog', (id) => ({ type: 'stock_assembly', refId: id, refIds: ['warehouseEntries/w2'] }), 'places'],

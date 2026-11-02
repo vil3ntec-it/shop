@@ -1,6 +1,7 @@
 /*
  * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
- * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار.
+ * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
+ * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
  * سقفِ ۷۵KB بماند (WEB-15، §۳.۱۰)؛ خواندنِ سفارش، پیگیریِ زنده و مسیر همان store.js است.
  *
@@ -64,11 +65,13 @@
       $('o-reorder').onclick = function () { ctx.reorder(o); };
       renderDelivery(o.delivery);
       renderEta(o);
+      renderMethod(o, token);
       renderPay(o, token);
       renderSubs(o, token);
       renderRate(o, token);
       renderPrefs(o, token);
       renderFeedback(o, token);
+      renderChanges(o, token);
       renderAdd(o, token);
       renderApology(o);
       return o;
@@ -131,6 +134,28 @@
         document.head.appendChild(el('script', { attrs: { src: '/store/order-feedback.js' }, on: { load: ok, error: no } }));
       }).then(function () { return window.StoreFeedback({ api: api }); }).catch(function () { feedback = null; return null; });
       feedback.then(function (f) { if (f) f.render(o, token); });
+    }
+
+    //  ORD-14/NTF-08: پیشنهادِ ویرایشِ دکان (پذیرفتن/رد) و پیگیریِ بازپرداخت — store/order-changes.js فقط وقتی سرور
+    //  کلیدِ پُرِ `amendment`/`refund` را داد (پرچم‌های خاموش یا تهی ⇒ نه اسکریپت، نه واژه‌نامه، نه گره‌ای در صفحه)
+    var changes = null;
+    function renderChanges(o, token) {
+      if (!o.amendment && !o.refund) { if ($('o-ch')) $('o-ch').hidden = true; return; }
+      changes = changes || new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/order-changes.js' }, on: { load: ok, error: no } }));
+      }).then(function () { return window.StoreChanges({ api: api, show: renderOrder }); }).catch(function () { changes = null; return null; });
+      changes.then(function (f) { if (f) f.render(o, token); });
+    }
+    //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — store/delivery-method.js فقط وقتی سرور `deliveryMethod` را داد
+    var method = null;
+    function renderMethod(o, token) {
+      if (!o.deliveryMethod) { if ($('o-dm')) $('o-dm').hidden = true; return; }
+      method = method || (window.StoreMethod ? Promise.resolve() : new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/delivery-method.js' }, on: { load: ok, error: no } }));
+      })).then(function () { return window.StoreMethod({ api: api, slug: ctx.slug }); }).catch(function () { method = null; return null; });
+      method.then(function (m) {
+        if (m) m.order(o, token, function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { renderOrder(r.order, token); }); });
+      });
     }
 
     //  DLV-18: پس از «تحویل شد» و تا ۷ روز، یک بار — مشتری به پیک ستاره و برچسب می‌دهد (بی متنِ آزاد).

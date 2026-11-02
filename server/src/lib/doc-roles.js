@@ -44,6 +44,8 @@ const CANCEL = 'cancel';
 const VOID = 'void';
 const BACK = 'back';
 const PLACES = 'places';
+/** فقط صاحب و مدیر — همان `may` ِ `LoyaltyPoints.adjust` */
+const MANAGE = 'manage';
 const OPEN = '';
 /** شکلِ نادرست */
 const BAD = 'bad';
@@ -72,6 +74,9 @@ const points = (need) => (f) => (text(f.payRef) && text(f.refId) && int(f.points
 const doc = (key) => (f) => (isObj(f[key]) && zeroOk(f.amountMinor) ? OPEN : BAD);
 /** وضعیتِ امانی/سفارش: اجازه از مقصد (`<key>.to`) */
 const moved = (key, to) => (f) => (text(f.refId) && zeroOk(f.amountMinor) && isObj(f[key]) && own(to, f[key].to) ? to[f[key].to] : BAD);
+/** اصلاحِ دستیِ امتیاز (PRM-13): مشتری، امتیازِ علامت‌دارِ ناصفر، دلیلِ ناتهی — همان سنجشِ دستگاه */
+const adjusted = (f) => (text(f.payRef) && Number.isInteger(f.points) && f.points !== 0 && Math.abs(f.points) <= MAX_POINTS
+  && typeof f.notes === 'string' && f.notes.trim().length > 0 && zeroOk(f.amountMinor) ? MANAGE : BAD);
 const placed = (f) => (text(f.refId) && (f.reason === 'add' || f.reason === 'archive') ? PLACES : BAD);
 const repacked = (f) => (text(f.refId) ? PLACES : BAD);
 
@@ -86,6 +91,7 @@ const AUDIT = Object.freeze({
   loyalty_spend: points(SELL),
   loyalty_earn_back: points(BACK),
   loyalty_spend_back: points(BACK),
+  loyalty_adjust: adjusted,
   layaway: doc('layaway'),
   layaway_status: moved('layaway', { delivered: SELL, cancelled: CANCEL }),
   special_order: doc('specialOrder'),
@@ -142,6 +148,7 @@ function permits(need, role, layers) {
       || cancel();
   }
   if (need === PLACES) return role !== 'staff';
+  if (need === MANAGE) return role === 'manager';
   return false;
 }
 
@@ -171,4 +178,4 @@ async function judgeV3(c, ctx, op, row) {
   return permits(need, ctx.role, layers) ? null : 'doc_not_allowed';
 }
 
-module.exports = { FLAG, SELL, CANCEL, VOID, BACK, PLACES, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3 };
+module.exports = { FLAG, SELL, CANCEL, VOID, BACK, PLACES, MANAGE, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3 };

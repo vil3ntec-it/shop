@@ -259,6 +259,10 @@ private fun NewPurchaseInvoice(
   val context = androidx.compose.ui.platform.LocalContext.current
   val lines = remember { mutableStateListOf(Draft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
+  //  PUR-09: آخرین فیِ همین تأمین‌کننده زیرِ هر ردیف و Ctrl+I تاریخچهٔ کالای آخرین ردیفِ دست‌خورده
+  val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
+  var touched by remember { mutableStateOf<Draft?>(null) }
+  var historyFor by remember { mutableStateOf<String?>(null) }
 
   //  بارکد از بارکدخوان ⇐ ردیف (همان کالا دوباره ⇐ یکی بیشتر)
   LaunchedEffect(pending.size) {
@@ -308,6 +312,10 @@ private fun NewPurchaseInvoice(
         when {
           e.key == Key.F9 || (e.isPrimaryModifier && (e.key == Key.Enter || e.key == Key.S)) -> { save(); true }
           e.key == Key.Escape -> { onClose(); true }
+          e.isPrimaryModifier && e.key == Key.I -> {
+            historyFor = (touched?.takeIf { it in lines && it.productId.isNotBlank() } ?: lines.lastOrNull { it.productId.isNotBlank() })?.productId
+            historyFor != null
+          }
           else -> false
         }
       }
@@ -317,7 +325,7 @@ private fun NewPurchaseInvoice(
       IconButton(onClick = onClose) { Icon(Icons.Filled.ArrowForward, "برگشت", tint = Shop.colors.text) }
       Text("فاکتورِ خریدِ تازه #$no", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
       Spacer(Modifier.weight(1f))
-      Text("Enter ردیفِ بعد · F9 ثبت · Esc انصراف · بارکدخوان ردیف می‌افزاید", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text("Enter ردیفِ بعد · F9 ثبت · Ctrl+I تاریخچهٔ قیمت · Esc انصراف · بارکدخوان ردیف می‌افزاید", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -357,7 +365,7 @@ private fun NewPurchaseInvoice(
       }
       LazyColumn(Modifier.weight(1f)) {
         itemsIndexed(lines, key = { _, l -> System.identityHashCode(l) }) { i, l ->
-          LineRow(i, l, d, onNext = {
+          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), onTouch = { touched = l }, onNext = {
             if (i == lines.lastIndex) lines += Draft()
             scope.launch { kotlinx.coroutines.delay(60); runCatching { lines[i + 1].focus.requestFocus() } }
           }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = "" } })
@@ -396,10 +404,11 @@ private fun NewPurchaseInvoice(
     }
   }
   LaunchedEffect(Unit) { runCatching { lines.first().focus.requestFocus() } }
+  historyFor?.let { pid -> PriceHistoryDialog(d, buys, pid, supplierId.orEmpty()) { historyFor = null } }
 }
 
 @Composable
-private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove: () -> Unit) {
+private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
   var menu by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val matches = remember(l.query, d) {
@@ -408,7 +417,7 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
     else d.products.filter { it.name.contains(q, true) || it.barcodes.any { b -> b == q } }.take(8)
   }
   fun pick(p: Product) {
-    l.productId = p.id; l.query = p.name; menu = false
+    l.productId = p.id; l.query = p.name; menu = false; onTouch()
     if (l.qty.isBlank()) l.qty = "1"
     if (l.price.isBlank() && p.purchasePrice > 0) l.price = Math.round(p.purchasePrice).toString()
     runCatching { l.qtyFocus.requestFocus() }
@@ -416,6 +425,7 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
   fun enterOn(next: () -> Unit) = Modifier.onPreviewKeyEvent { e ->
     if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { next(); true } else false
   }
+  Column(Modifier.fillMaxWidth()) {
   Row(
     Modifier.fillMaxWidth().background(if (i % 2 == 1) Shop.colors.surface2.copy(alpha = 0.35f) else Shop.colors.surface).padding(horizontal = 8.dp, vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -443,16 +453,21 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, onNext: () -> Unit, onRemove:
       }
     }
     Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.qty, { l.qty = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
+    OutlinedTextField(l.qty, { l.qty = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
       modifier = Modifier.width(94.dp).focusRequester(l.qtyFocus).then(enterOn { runCatching { l.priceFocus.requestFocus() } }))
     Spacer(Modifier.width(6.dp))
-    OutlinedTextField(l.price, { l.price = ir.vil3ntec.tohid.numericInput(it) }, singleLine = true,
+    OutlinedTextField(l.price, { l.price = ir.vil3ntec.tohid.numericInput(it); onTouch() }, singleLine = true,
       modifier = Modifier.width(124.dp).focusRequester(l.priceFocus).then(enterOn(onNext)))
     Spacer(Modifier.width(6.dp))
     OutlinedTextField(l.expiry, { l.expiry = it.take(10) }, singleLine = true, placeholder = { Text("۱۴۰۶/۰۳/۳۱") },
       modifier = Modifier.width(144.dp).then(enterOn(onNext)))
     Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, "حذفِ ردیف", tint = Shop.colors.muted) }
+  }
+  //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)
+  if (hint != null) {
+    Text(hint, Modifier.fillMaxWidth().padding(start = 44.dp, bottom = 4.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  }
   }
 }
 

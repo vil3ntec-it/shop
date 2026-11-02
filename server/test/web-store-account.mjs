@@ -6,6 +6,7 @@
  * دکانِ واقعی با قرض‌دارِ همین شماره (فروشِ حضوری و دفترِ قرض از راهِ همگام‌سازیِ واقعی):
  *   • پرچمِ `shop.storefront.account_history` خاموش ⇒ «سفارش‌های من» همان امروز، بی بخشِ «حسابِ من»؛
  *   • روشن و شمارهٔ تأییدشده ⇒ بخشِ آماده (`data-state=ready`)، ماندهٔ «… بدهکارید»، خریدِ حضوری و دفتر؛
+ *   • PRM-13: بی قاعدهٔ یکسانِ روشنِ دکان کارتِ امتیاز نیست؛ با `shop.loyalty_rule` و قاعدهٔ روشن ⇒ «امتیازِ من» و سطح؛
  *   • راست‌چین، بی نقضِ CSP، بی خطای جاوااسکریپت و (با axe-core) بی خطای دسترس‌پذیریِ همان بخش.
  */
 import { createRequire } from 'node:module';
@@ -123,6 +124,22 @@ ok(await page.locator('#ah-ledger li').count() === 2, 'دو ردیفِ دفتر�
 ok(await page.isHidden('#my-orders') && await page.isHidden('#my-orders-empty'), 'فهرستِ قدیم جایش را به «حسابِ من» داد');
 ok(await page.evaluate(() => getComputedStyle(document.getElementById('my-account')).direction) === 'rtl', 'راست‌چین');
 ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'بی بیرون‌زدگی در ۳۶۰');
+
+//  ── PRM-13: امتیاز فقط با قاعدهٔ یکسانِ روشنِ دکان ──
+ok(!(await page.$('#ah-points')), 'بی قاعدهٔ روشنِ دکان ⇒ کارتِ امتیاز نیست');
+const lp = await call('POST', '/api/sync/v1/push', { device_id: 'dev-owner', schema_version: 2, ops: [
+  op('auditLog', 's1-lp-e', { type: 'loyalty_earn', refId: 's1', payRef: 'd1', points: 15, amount: 0, createdAt: AT }),
+  op('auditLog', 'lpa-1', { type: 'loyalty_adjust', payRef: 'd1', points: 5, amount: 0, createdAt: AT + 2, notes: 'هدیه' }),
+] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+ok(lp.status === 200, 'ردیف‌های امتیاز از راهِ همگام‌سازیِ واقعی رسید', JSON.stringify(lp.body).slice(0, 120));
+await flag('shop.loyalty_rule', true);
+const rule = await call('PUT', '/api/shop/loyalty', { on: true, rule: { everyAfn: 100, pointAfn: 1, maxSharePct: 20, silverAfn: 50000, goldAfn: 200000, expiryMonths: 0 } }, T);
+ok(rule.status === 200, 'قاعدهٔ یکسانِ دکان روشن شد', JSON.stringify(rule.body).slice(0, 120));
+await page.reload();
+await page.waitForSelector('#my-account[data-state="ready"]', { timeout: 15000 });
+ok((await text('#ah-points')).includes('۲۰') && (await text('#ah-points')).includes('برنزی'), 'امتیازِ من: ۲۰، برنزی', await text('#ah-points'));
+ok(!(await text('#my-account')).includes('هدیه'), 'دلیلِ اصلاحِ دستی دیده نمی‌شود');
+ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), 'با کارتِ امتیاز هم بی بیرون‌زدگی در ۳۶۰');
 
 if (axeSrc) {
   const axeCtx = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });

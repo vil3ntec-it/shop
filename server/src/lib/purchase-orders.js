@@ -171,6 +171,8 @@ function receiptOf(row) {
     lines: row.lines,
     posted: row.posted,
     totalMinor: Number(row.total_minor),
+    //  PUR-06: کرایهٔ همین رسید (به حمل‌کننده)؛ رسیدِ پیشین ۰
+    freightMinor: Number(row.freight_minor || 0),
     note: row.note,
     createdBy: row.created_by,
     createdAt: num(row.created_at),
@@ -292,9 +294,10 @@ async function transition(shopId, id, action, { reason } = {}) {
 }
 
 /**
- * رسیدِ دریافت. بدنه: `{id, lines:[{lineId, receivedMilli, damagedMilli?, priceMinor?}], allowOver?, note?}`؛
+ * رسیدِ دریافت. بدنه: `{id, lines:[{lineId, receivedMilli, damagedMilli?, priceMinor?}], allowOver?, note?, freightMinor?}`؛
  * `id` همان کلیدِ یکتای رسید است (سرآیندِ `Idempotency-Key` هم پذیرفته). فیِ نیامده = فیِ سفارش.
- * ⛔ کسی که `stock.adjust` ندارد (شاگرد) فی را عوض نمی‌کند و بیش از سفارش نمی‌پذیرد.
+ * `freightMinor` (PUR-06) کرایهٔ همین رسید به حمل‌کننده است: عددِ صحیحِ ۰ تا سقفِ فی، وگرنه ۴۰۰ `bad_freight`.
+ * ⛔ کسی که `stock.adjust` ندارد (شاگرد) فی را عوض نمی‌کند، بیش از سفارش نمی‌پذیرد و کرایه نمی‌نویسد.
  */
 async function receive(shopId, id, { body, headerKey, userId, role }) {
   const b = body || {};
@@ -303,6 +306,12 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
   const note = text(b.note, MAX_TEXT.note, 'یادداشت');
   const manager = can(role, 'stock.adjust');
   if (allowOver && !manager) throw forbidden('پذیرفتنِ بیش از سفارش فقط با مدیر است', 'over_not_allowed');
+  const freight = b.freightMinor === undefined || b.freightMinor === null ? 0 : b.freightMinor;
+  if (!Number.isSafeInteger(freight) || freight < 0 || freight > MAX_PRICE_MINOR) {
+    throw badRequest('کرایه درست نیست', 'bad_freight');
+  }
+  //  کرایه بهای کالا را بالا می‌برد ⇒ همان مرزِ «تغییرِ فی»
+  if (freight > 0 && !manager) throw forbidden('کرایهٔ رسید فقط با مدیر است', 'freight_not_allowed');
   return tx(async (c) => {
     const run = (t, p) => c.query(t, p);
     const current = await lockOrder(c, shopId, id);
@@ -342,10 +351,10 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
     let row;
     try {
       row = (await c.query(
-        `INSERT INTO purchase_receipts (shop_id, id, po_id, lines, posted, total_minor, note, created_by, created_at)
-         VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9) RETURNING *`,
+        `INSERT INTO purchase_receipts (shop_id, id, po_id, lines, posted, total_minor, freight_minor, note, created_by, created_at)
+         VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6,$7,$8,$9,$10) RETURNING *`,
         [shopId, rid, current.id, JSON.stringify(r.ok.receipt.lines), JSON.stringify(r.ok.lines), r.ok.totalMinor,
-          note, userId || '', at]
+          freight, note, userId || '', at]
       )).rows[0];
     } catch (e) {
       //  همان کلید هم‌زمان روی سفارشِ دیگری نشست (قفلِ هر سفارش جداست) ⇒ تعارض، نه ۵۰۰

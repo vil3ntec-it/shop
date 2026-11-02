@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.nav
 
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -61,4 +62,9 @@ class SettingsEntry(
   val icon: ImageVector,
   val group: String,
   val needs: Set<Need> = emptySet(),
+  /**
+   *  ردیف فقط وقتی دیده می‌شود که این «بله» بگوید — برای صفحه‌ای پشتِ پرچمِ سرور (همان `…Row(api)` ِ رابطِ امروز:
+   *  پرسش در ترکیب، تا پاسخِ روشن پنهان). پیش‌فرض: همیشه.
+   */
+  val shown: @Composable () -> Boolean = { true },
 )

@@ -38,14 +38,32 @@ function errorRef() {
   return `e${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}`;
 }
 
+/*
+ *  PERF-04 (§۱۵.۹ بندِ ۴): استخرِ PostgreSQL تا `PG_CONNECT_TIMEOUT_MS` اتصالی نداد (pg-pool همین
+ *  پیامِ خام را می‌دهد) ⇒ «شلوغ است، کمی بعد» (۵۰۳ + Retry-After)، نه ۵۰۰ ِ «خطای داخلی». برنامه
+ *  ۵۰۳ را با تأخیر دوباره می‌فرستد و کاربر می‌داند خرابی نیست. ثبتِ ۵xx (`recordServer`) سقفِ
+ *  دقیقه‌ای دارد، پس طوفانِ همین خطا استخرِ پر را پرتر نمی‌کند. سنجه: `test/db-pool-busy.test.js`.
+ *  `busy()` همان خطا برای پس‌زدنِ زود، پیش از هر انتظار (`db.js`، `lib/sync-v3-gate.js`).
+ */
+const POOL_BUSY = 'timeout exceeded when trying to connect';
+
 // eslint-disable-next-line no-unused-vars
 function errorHandler(err, req, res, _next) {
+  if (err && !err.status && err.message === POOL_BUSY) {
+    err = Object.assign(new ApiError(503, 'db_busy', 'سرور الان شلوغ است؛ چند ثانیهٔ دیگر دوباره بکوشید'), { cause: err });
+    res.set('Retry-After', '2');
+  } else if (err && err.status === 503 && err.code === 'db_busy') {
+    //  پس‌زدنِ زودِ خودِ سرور (صفِ استخر `PG_POOL_MAX_WAITING`، دروازهٔ push ِ v3) — همان پاسخ
+    res.set('Retry-After', String(err.retryAfter || 2));
+  }
   const status = err.status || 500;
   const exposed = err.expose === true || status < 500;
   const ref = status >= 500 ? errorRef() : '';
   if (status >= 500) {
-    console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method,
-      require('../lib/log-redact').redactPath(req.originalUrl || req.path), err);
+    const where = require('../lib/log-redact').redactPath(req.originalUrl || req.path);
+    //  استخرِ پر زیرِ بار صدها بار در ثانیه می‌رسد: یک خط، بی stack (لاگ خودش بارِ تازه نشود)
+    if (err.code === 'db_busy') console.error(`[error] ${ref} db_busy`, req.method, where);
+    else console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method, where, err);
     //  پنلِ مرکزی ۴.۱۰: همان خطا با همان «کدِ پیگیری» در `server_errors` (پوشانده از راز، بی await؛
     //  شکستِ ثبت هرگز به پاسخ نمی‌رسد) ⇒ مرکزِ رخدادِ پنل آن را می‌بیند، نه فقط لاگِ کنسول
     require('../lib/ops-errors').recordServer({ ref, err, req, status });
@@ -65,4 +83,9 @@ function errorHandler(err, req, res, _next) {
   });
 }
 
-module.exports = { ApiError, errorRef, badRequest, unauthorized, forbidden, notFound, conflict, tooMany, upstream, notFoundHandler, errorHandler };
+/** ۵۰۳ ِ `db_busy` ِ پس‌زدنِ زود: «شلوغ است، [retryAfter] ثانیهٔ دیگر» */
+function busy(retryAfter = 2) {
+  return Object.assign(new ApiError(503, 'db_busy', 'سرور الان شلوغ است؛ چند ثانیهٔ دیگر دوباره بکوشید'), { retryAfter });
+}
+
+module.exports = { ApiError, busy, errorRef, badRequest, unauthorized, forbidden, notFound, conflict, tooMany, upstream, notFoundHandler, errorHandler };

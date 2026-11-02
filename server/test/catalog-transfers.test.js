@@ -291,3 +291,42 @@ test('INV-11: اجازه و جداییِ دکان — شاگرد (stock.move) م
   assert.equal(a.target_id, r.body.transfer.id);
   assert.equal(a.user_id, staff.user.id);
 });
+
+/*
+ *  ScenarioS21 — سناریوی S21 (§۷.۲، INV-11) سر تا ته روی همان راهِ API.
+ *  ماندهٔ سناریو (pending، نه سرخ):
+ *    • «مقصد با اسکن دریافت می‌کند»: صفحهٔ انتقال در برنامه/پنل نیست؛ دریافت فقط با فهرستِ مقدار از API است.
+ *    • «در حالتِ آفلاین هم کار می‌کند»: انتقال فقط در سرور (`/api/shop/catalog/transfers`) است و op ِ دستگاه ندارد.
+ */
+test('ScenarioS21: ارسال از مبدأ کم و در «در مسیر» دیده می‌شود؛ مقصد دریافت می‌کند و کسری ثبت می‌شود، هرگز بی‌صدا گم نمی‌شود', async () => {
+  const s = await seeded('S21', 10);
+  const sent = await send(s, { from: 'shop_floor', to: 'warehouse', lines: [L('x1', 6000), L('x2', 4000)], note: 'S21' });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  const t = sent.body.transfer;
+  //  هنگامِ ارسال: مبدأ کم، «در مسیر» زیاد و قابل‌فروش نیست؛ انتقال در فهرستِ «در مسیر»
+  assert.deepEqual(await levels(s, 'x1'), { floor: 4000, wh: 0, transit: 6000, sellable: 4000 });
+  assert.deepEqual(await levels(s, 'x2'), { floor: 6000, wh: 0, transit: 4000, sellable: 6000 });
+  assert.deepEqual((await cat(s, '/transfers?status=in_transit')).body.transfers.map((x) => x.id), [t.id]);
+
+  //  مقصد ۵ از ۶ ِ x1 و همهٔ x2 را می‌گیرد؛ کسری بی دلیل پذیرفته نیست
+  const silent = await receive(s, t.id, { lines: [{ productId: 'x1', receivedMilli: 5000 }] });
+  assert.equal(silent.status, 400);
+  assert.equal(silent.body.error.code, 'reason_required');
+  const r = await receive(s, t.id, { lines: [{ productId: 'x1', receivedMilli: 5000 }], reason: 'یک دانه نرسید' });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  const done = r.body.transfer;
+  assert.equal(done.status, 'received');
+  assert.deepEqual(done.lines.map((l) => [l.productId, l.sentMilli, l.receivedMilli, l.shortMilli]), [['x1', 6000, 5000, 1000], ['x2', 4000, 4000, 0]]);
+  assert.deepEqual(await levels(s, 'x1'), { floor: 4000, wh: 5000, transit: 0, sellable: 9000 });
+  assert.deepEqual(await levels(s, 'x2'), { floor: 6000, wh: 4000, transit: 0, sellable: 10000 });
+
+  //  هر واحدِ فرستاده یا رسیده یا کسریِ ثبت‌شده است: حرکتِ جدا، دلیل و وظیفهٔ بررسی
+  for (const l of done.lines) assert.equal(l.sentMilli, l.receivedMilli + l.shortMilli);
+  const short = (await staffMoves(s, 'x1')).filter((m) => m.type === 'adjustment');
+  assert.equal(short.length, 1);
+  assert.equal(short[0].deltaOnHandMilli, -1000);
+  assert.match(short[0].reason, /یک دانه نرسید/);
+  const tasks = (await cat(s, '/tasks?status=open')).body.tasks.filter((x) => x.kind === 'transfer_short');
+  assert.deepEqual(tasks.map((x) => [x.productId, x.detail.shortMilli, x.detail.transferId]), [['x1', 1000, t.id]]);
+  await reconciled(s);
+});

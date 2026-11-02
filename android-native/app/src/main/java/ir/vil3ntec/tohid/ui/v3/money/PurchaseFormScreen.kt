@@ -23,7 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.LedgerEngine
+import ir.vil3ntec.tohid.data.PurchaseOrderBook
+import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -72,6 +75,15 @@ internal fun PurchaseFormScreen(
   val product = d.products.find { it.id == form.productId }
   val supplier = d.suppliers.find { it.id == form.supplierId }
   val total = PurchaseFormModel.total(form)
+  //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا، زیرِ «قیمت هر واحد»
+  val buys = remember(d) { PurchaseOrderBook.buys(d) }
+  val lastPrice = remember(buys, form.productId, form.supplierId) {
+    val pid = form.productId; val sid = form.supplierId
+    if (pid == null || sid == null) null
+    else SupplierPricing.last(buys, pid, sid)?.let { p ->
+      StrMoney.lastSupplierPrice(MoneyText.afn(PurchaseOrderBook.asAfn(p.priceMinor)), formatDate(p.date))
+    } ?: StrMoney.noSupplierBuyYet
+  }
 
   V3Form(
     title = StrMoney.newPurchase,
@@ -129,6 +141,7 @@ internal fun PurchaseFormScreen(
           label = StrMoney.unitPrice,
           kind = V3FieldKind.MONEY,
           required = true,
+          helper = lastPrice,
           error = shownErrors.price,
         )
         LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))

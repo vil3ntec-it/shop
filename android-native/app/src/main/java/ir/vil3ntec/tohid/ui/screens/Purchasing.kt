@@ -468,6 +468,11 @@ private fun PurchaseDialog(
             "مقدار${product?.unit?.takeIf { it.isNotBlank() }?.let { " ($it)" } ?: ""}", Modifier.weight(1f))
           NumberField(price, { price = it }, "قیمت هر واحد", Modifier.weight(1f))
         }
+        //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)
+        val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
+        ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, productId, supplierId)?.let {
+          Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, modifier = Modifier.padding(top = 4.dp))
+        }
 
         if (total > 0) {
           Spacer(Modifier.height(8.dp))

@@ -56,7 +56,7 @@ internal fun RouteScope.DeskSettingsScreen(selected: String?) {
       SettingsPageFrame(title = Str.settings, onBack = null, largeTitle = false) {
         items(SettingsLayout.GROUPS, key = { it.title }) { g ->
           val rows = g.sections.filter { it in desk || SettingsLayout.isLink(it) }
-          val more = extra.filter { it.group == g.title }
+          val more = extra.filter { it.group == g.title }.filter { it.shown() }
           if (rows.isNotEmpty() || more.isNotEmpty()) {
             V3Section(SettingsLayout.groupLabel(g.title)) {
               rows.forEachIndexed { i, key ->

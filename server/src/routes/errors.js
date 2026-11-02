@@ -25,6 +25,7 @@ const { query, now, newId } = require('../db');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { resolveToken, tokenOf } = require('../lib/sync-v1-auth');
 const { sectionOf } = require('../lib/tenancy');
+const { maskCards } = require('../lib/ops-errors');
 
 const router = express.Router();
 
@@ -33,9 +34,9 @@ const MAX_STACK = 4000;
 const MAX_LOG = 4000;
 const REPORT_ID = /^cer_[0-9A-HJKMNP-TV-Z]{26}$/;
 
-/** هر چیزی که به کسی برگردد — ایمیل، شماره، توکنِ بلند — پوشانده می‌شود. */
+/** هر چیزی که به کسی برگردد — ایمیل، شماره، توکنِ بلند، شمارهٔ کاملِ کارت (S117) — پوشانده می‌شود. */
 function scrub(text, limit) {
-  return String(text || '')
+  return maskCards(text)
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[ایمیل]')
     //  هر دو شکل: ۰۷xxxxxxxx افغانستان و ۰۹xxxxxxxxx ایران، با یا بی کدِ کشور
     .replace(/\b(?:\+?9[38][\s-]?)?0?7\d{8}\b/g, '[شماره]')

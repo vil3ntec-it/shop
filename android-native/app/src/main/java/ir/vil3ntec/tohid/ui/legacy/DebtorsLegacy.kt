@@ -889,6 +889,8 @@ private fun AccountViewLegacy(
       if (store != null) CrmPricingButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
       //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش ⇒ هیچ)
       if (store != null) ir.vil3ntec.tohid.ui.screens.CustomerCardButton(store, d, account.debtor.id, onMessage, Modifier.fillMaxWidth().padding(top = 8.dp))
+      //  SEC-10: حذفِ دادهٔ این مشتری در سرور — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)
+      ir.vil3ntec.tohid.ui.screens.CustomerErasureButton(account.debtor.phone, Modifier.fillMaxWidth().padding(top = 8.dp))
 
       //  فاکتورهای همین مشتری — تا حالا فقط ردیفِ بدهی دیده می‌شد، نه خودِ خرید
       if (account.sales.isNotEmpty()) {
@@ -925,7 +927,7 @@ private fun AccountViewLegacy(
 
       ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, account.debtor.id, onMessage) // فروشِ امانیِ همین مشتری (POS-27، `LayawayPref`)
       //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
-      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, account.debtor.id, Modifier.padding(top = 18.dp))
+      ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, account.debtor.id, Modifier.padding(top = 18.dp), store, onMessage) // اصلاحِ دستی: صاحب/مدیر
 
       Spacer(Modifier.height(18.dp))
       SectionTitle("تاریخچهٔ تراکنش‌ها")

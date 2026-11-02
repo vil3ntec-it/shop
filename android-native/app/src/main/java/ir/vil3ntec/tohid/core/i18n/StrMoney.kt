@@ -264,6 +264,10 @@ object StrMoney {
   val paidSection: String get() = t("پرداخت", "Payment", "ورکړه")
   val paidField: String get() = t("پرداخت‌شده", "Paid now", "ورکړل شوي")
   val paidHelper: String get() = t("خالی یعنی نسیه", "Empty means on credit", "تش یعنې پور")
+  /** PUR-09: زیرِ «قیمت هر واحد» — آخرین فیِ همین تأمین‌کننده برای همین کالا */
+  fun lastSupplierPrice(price: Any, date: Any): String =
+    t("آخرین فیِ این تأمین‌کننده: $price ($date)", "Last price from this supplier: $price ($date)", "د دې عرضه کوونکي وروستۍ بیه: $price ($date)")
+  val noSupplierBuyYet: String get() = t("از این تأمین‌کننده هنوز خریده نشده", "Not bought from this supplier yet", "له دې عرضه کوونکي لا نه دي اخیستل شوي")
   val remainingLabel: String get() = t("باقی‌مانده", "Remaining", "پاتې")
   val notesSection: String get() = t("توضیحات", "Notes", "یادښتونه")
   val notesField: String get() = t("توضیحات (اختیاری)", "Notes (optional)", "یادښتونه (اختیاري)")

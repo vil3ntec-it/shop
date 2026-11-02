@@ -920,6 +920,8 @@ fun SettingsScreenLegacy(
     //  پرچم‌های سروریِ `shop.storefront.eta` و `shop.storefront.promo_guard`؛ خاموش یا نقشِ بی `settings.write` ⇒ هیچ
     item { StorefrontEtaSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
     item { PromoGuardSettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
+    //  NTF-10: پوزش و کوپنِ خودکارِ تأخیر (پرچمِ سروریِ `shop.orders.late_apology`؛ خاموش ⇒ هیچ؛ نوشتن فقط صاحب و مدیر)
+    item { ir.vil3ntec.tohid.ui.screens.LateApologySettings(if (signedIn && Backend.isReady(context)) Backend.api(context) else null) { toast(it) } }
 
     /* ============== سرورها (پرچمِ `app.multi_server`، فقط صاحبِ دکان) ============== */
     item {
