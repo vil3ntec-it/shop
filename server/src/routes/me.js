@@ -338,7 +338,8 @@ router.post('/push', async (req, res, next) => {
     await require('../lib/push').register({
       app: req.appSection || 'shop',
       token: v.text(req.body?.token, { max: 500, required: true, field: 'توکن پوش' }),
-      provider: v.oneOf(req.body?.provider, ['fcm', 'webpush'], { field: 'سرویس', def: 'fcm' }),
+      //  `apns`: برنامهٔ آیفون (docs/IOS-PLAN-fa.md §۰.۹) — نگه داشته می‌شود، از درِ FCM نمی‌رود (`lib/push.js`)
+      provider: v.oneOf(req.body?.provider, ['fcm', 'webpush', 'apns'], { field: 'سرویس', def: 'fcm' }),
       userId: req.user.id,
       //  ⚠️ دکان هم ثبت می‌شود: خبرِ «کالا تمام شد» مالِ دکان است نه
       //  مالِ یک نفر، و باید به هر گوشی‌ای که به آن دکان وصل است برسد
