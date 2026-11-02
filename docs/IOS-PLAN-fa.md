@@ -115,7 +115,8 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 | ۲-ث | همگام‌سازی | `SyncV1Worker` ِ iOS: هنگامِ باز شدن + `BGAppRefreshTask` | دفترِ مشترک با سرور |
 | ۲-ج | بقیه | انتخابگرِ فایل/عکس (UIDocumentPicker/PHPicker پشتِ همان launcherها)، دوربین و بارکد (VisionKit)، اشتراک (UIActivityViewController)، اعلان، چاپ (شبکه/AirPrint؛ بلوتوثِ کلاسیک نه — بندِ ۵.۱) | — |
 
-**وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و ۲-ج مانده‌اند.
+**وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و بیشترِ ۲-ج در گامِ ۳ (⇐ ۰.۸؛
+بارکد با AVFoundation، نه VisionKit)؛ از ۲-ج چاپ (AirPrint/PDF) و تشخیصِ گفتار مانده‌اند.
 
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
@@ -136,7 +137,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
   - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64` و `jvmTest` (GCM در برابرِ JDK) — نگهبانِ ارزان.
   - `ios-app` (macos-latest): `linkDebugFrameworkIosSimulatorArm64` ⇐ `xcodebuild -target iosApp -sdk iphonesimulator -arch arm64`
     بی امضا ⇐ نصب و اجرا روی شبیه‌ساز، عکس پس از ۲۰ ثانیه و گزارشِ «زنده است؟» (مصنوعِ `ios-app-shots`)؛ از گامِ ۲
-    `iosSimulatorArm64Test` هم (بردارهای رمز با CommonCrypto).
+    `iosSimulatorArm64Test` هم (بردارهای رمز با CommonCrypto؛ از گامِ ۳ WorkManager، بارکد و اعلان).
   - اجرای این کارها روی هر تغییرِ `android-native/**` تصمیمِ هزینه‌ای صاحب‌کار است (دقیقهٔ macOS گران است)؛ فعلاً نه.
 
 ### ۰.۶ ⛔ BLOCKED-EXTERNAL — فقط صاحب‌کار
@@ -149,6 +150,8 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 4. **گواهیِ Apple Distribution و profile ِ ارائه**، و رکوردِ برنامه در App Store Connect (نام، نماد، عکس‌ها، ردهٔ سنی).
 5. **فرم‌های اپل**: Privacy Manifest و برچسب‌های حریمِ خصوصی، پاسخِ «رمزنگاری/صادرات»، و — اگر ورود با گوگل بماند — Sign in with Apple (قاعدهٔ ۴.۸).
 6. بعدتر: کلیدِ APNs برای اعلانِ سرور.
+7. از گامِ ۳: متنِ اجازه‌های `ios/iosApp/iosApp/Info.plist` (دوربین، Face ID، موقعیت، ذخیرهٔ تصویر) و «Background App Refresh» باید با
+   برچسب‌های حریمِ خصوصیِ App Store Connect (بندِ ۵) یکی باشند — پرکردنِ آن فرم‌ها فقط با حسابِ صاحب‌کار.
 
 ### ۰.۷ گامِ ۲ — شبکه، دفترِ رمزدار، تصویر؛ ریشهٔ واقعیِ برنامه (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase2`)
 
@@ -185,7 +188,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 `VisualSearchUi`، `LoyaltyShopAndroid`، `ExpiryPrefAndroid`، `CountReview`…) که دو کارِ آیفونِ #826 را سرخ کرده بودند، حالا بی هیچ سطرِ تازه
 در `ios-exclude.txt` برای iOS کامپایل می‌شوند. قاعده همان است: فایلِ تازه خودبه‌خود iOS است و اگر نشد `ios-ui-klib` نامش را می‌گوید.
 
-**هنوز نه (گامِ ۳)** — هر کدام در iOS «خاموش/نیست» گزارش می‌شود، نه خطای بی‌صدا:
+**هنوز نه (گامِ ۳؛ وضعِ امروز ⇐ ۰.۸)** — هر کدام در iOS «خاموش/نیست» گزارش می‌شود، نه خطای بی‌صدا:
 - همگام‌سازی با سرور (`SyncV1Worker`) و سوکتِ زنده (`LiveSocket`) — دفترِ آیفون فعلاً محلی است؛ `BGAppRefreshTask`.
 - دوربین و بارکدِ دوربین (VisionKit)، انتخابِ فایل/عکس (PHPicker/UIDocumentPicker)، اشتراک‌گذاری، Face ID، اعلانِ محلی، موقعیت، تشخیصِ گفتار.
 - چاپ: چاپگرِ شبکه کامپایل می‌شود ولی روی دستگاهِ واقعی آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست (§۵.۱)؛ PDF/AirPrint ِ گزارش و برگهٔ برچسب.
@@ -195,6 +198,51 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 - آزمونِ دستیِ صفحه‌ها روی شبیه‌ساز/گوشی (این PR فقط ساخت، اجرا و عکسِ نخستین صفحه را در CI دارد).
 
 **بررسیِ محلی:** همان klib روی لینوکس، با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (مخزنِ گوگل این‌جا بسته است؛ init-script و بدل‌ها در مخزن نیستند). CI همان 1.9.3 را با کتابخانه‌های واقعی می‌سازد.
+
+### ۰.۸ گامِ ۳ — همگام‌سازی و سوکتِ زنده، دوربین/عکس/پرونده/اشتراک، Face ID، اعلان، موقعیت، پیوند (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase3`)
+
+> روی `claude/ios-app-phase2` (#834). اندروید، کامپیوتر و `core` دست نخوردند: هیچ فایلی بیرونِ `ios/` و `docs/` عوض نشد
+> (بی seam ِ تازهٔ expect/actual). هر چه اضافه شد shim/جایگزینِ iOS است تا **همان فایل‌های اندروید** روی آیفون کار کنند.
+
+**نتیجه:** ۱۱۱۱ از ۱۱۳۴ فایلِ `android-native/app/src/main/java` برای iOS کامپایل می‌شوند (گامِ ۲: ۱۱۰۹). دو جایگزینِ گامِ ۲
+(`SyncV1WorkerIos`، `LiveSocketIos`) **حذف شدند**: خودِ `sync/v1/SyncV1Worker.kt` و `sync/v1/LiveSocket.kt` ِ اندروید، دست‌نخورده، روی آیفون می‌دوند.
+`ios-exclude.txt`: ۲۰ جایگزین + همان سه فایلِ مستقیم (`MainActivity`، `TohidBackupAgent`، `HesabPayHceService`).
+
+| برش | چه شد (همه پشتِ همان API ِ اندروید که کدِ مشترک صدا می‌زند) | فایل‌ها (زیرِ `ios/shared/src`) |
+|---|---|---|
+| همگام‌سازی | WorkManager ِ **داخلِ فرآیند** (همان شکلِ کامپیوتر): نامِ یکتا، `KEEP`/`UPDATE`/`REPLACE`، مکثِ آغازین، `retry` ِ نمایی/خطی، زمانِ آخرین اجرای هر کارِ دوره‌ای در NSUserDefaults (باز کردنِ دوباره کارِ نارسیده را زود اجرا نمی‌کند). Kotlin/Native بازتاب ندارد ⇐ سازندهٔ پنج کارگرِ اندروید یک بار ثبت می‌شود (`IosWork`). `BGAppRefreshTask` (iOS به صلاحدیدِ خودش، کمینه ۱۵ دقیقه) یک دور همگام‌سازی؛ بازگشت به برنامه ⇐ یک دور و وصلِ دوبارهٔ سوکت | `iosMain/…/androidx/work/Work.kt`، `commonMain/…/ios/work/WorkTiming.kt`، `iosMain/…/ios/IosApp.kt` |
+| سوکتِ زنده | shim ِ `okhttp3` (`OkHttpClient`، `Request`، `WebSocket`، `WebSocketListener`) روی `NSURLSessionWebSocketTask`: ping هر ۳۰ ثانیه (pong ِ نرسیده ⇐ شکست، مثلِ OkHttp)، بستنِ سرور با کد (`onClosing` ⇐ `onClosed`، مثلِ 4403)، هر سوکت دقیقاً یک پایان؛ `Handler.postDelayed` روی صفِ اصلیِ GCD | `iosMain/…/okhttp3/WebSocket.kt`، `android/os/Handler.kt`، `ServerSwitchIos.okHttp` |
+| عکس، دوربین، پرونده | `PickVisualMedia`/`GetContent("image/…")` ⇐ PHPicker (بی اجازهٔ گالری)؛ `TakePicture` ⇐ دوربینِ UIImagePickerController؛ `GetContent`/`GetMultipleContents` ِ دیگر ⇐ UIDocumentPicker (رونوشت در cache با همان نام)؛ `CreateDocument` ⇐ پرونده در cache که کدِ مشترک در آن می‌نویسد و با بستنِ جریان «ذخیره در Files». عکس‌ها JPEG ِ راست‌شده (HEIC و چرخشِ EXIF حل) | `ios/IosPickers.kt`، `ios/IosUi.kt`، `androidx/activity/result/contract/Contracts.kt`، `android/content/Context.kt` |
+| اشتراک | `startActivity(createChooser(ACTION_SEND))` ⇐ UIActivityViewController (متن، `EXTRA_STREAM`، موضوع؛ لنگرِ iPad) — رسید، صورت‌حساب، گزارشِ PDF | `ios/IosPickers.kt`، `android/content/Context.kt` |
+| بارکدِ دوربین | `CameraScanner` روی `AVCaptureMetadataOutput`: همان قالب‌های ML Kit (EAN-13/8، UPC-A/E، Code 128/39، ITF؛ QR با `qr`/`qrOnly`)، UPC-A ِ iOS (EAN-13 با صفر) ⇐ همان ۱۲ رقم، و هر خوانش از همان `BarcodeGuard` ِ مشترک؛ چند بارکد در کادر ⇐ رد (مثلِ `Aim.bestOf`) | `scan/BarcodeScannerIos.kt` |
+| Face ID / Touch ID | `Fingerprint` روی LocalAuthentication (فقط زیست‌سنجی؛ لغو و «با رمز وارد می‌شوم» ⇐ `onFail(null)`). `LocalContext` ِ ریشه حالا `IosActivity` (یک `FragmentActivity`) است، مثلِ اندروید ⇐ `LockGate` و `AppLockLegacy` ِ مشترک خودشان می‌پرسند | `data/FingerprintIos.kt`، `ios/IosApp.kt`، `androidx/fragment/app/FragmentActivity.kt` |
+| اعلانِ محلی | `NotificationManagerCompat`/`NotificationManager` ⇐ UNUserNotificationCenter (شناسهٔ `tohid-<id>`، جایگزینی و `cancel`)؛ `Intent` ِ `setContentIntent` در userInfo ⇐ لمسِ اعلان همان `openNotice` ِ `MainActivity` (سفارشِ تازه). اجازه هنگامِ نخستین نمایشِ دکان (همان لحظهٔ اندرویدِ ۱۳+) | `android/app/Notification.kt`، `PendingIntent.kt`، `androidx/core/app/Notifications.kt`، `ios/IosNotifications.kt` |
+| اجازه‌ها و موقعیت | `checkSelfPermission` و `RequestPermission`/`RequestMultiplePermissions` ⇐ اجازهٔ واقعیِ iOS (دوربین، موقعیت، اعلان؛ گالری همیشه بله؛ بقیه نه). `DeviceLocation` روی CoreLocation («هنگامِ استفاده»، یک‌باره، مهلتِ ۱۲ ثانیه، همان پروندهٔ `tohid-location`) — فقط جایی که کدِ مشترک از پیش می‌خواهد (F0-07، پیک، ویترین) | `ios/IosPermissions.kt`، `ios/IosLocation.kt`، `data/DeviceLocationIos.kt` |
+| پیوند و «برنامه بسته شد» | `vill3n://app/…` (`CFBundleURLTypes` + `.onOpenURL`) ⇐ همان `handleLink` (`DeepLinks.parse`، فقط با `UiV3`)؛ `CrashNotice` همان پنجرهٔ `MainActivity` با `StrShell` و `CrashReporter` | `ios/IosApp.kt`، `ios/IosRoot.kt`، `ios/iosApp/iosApp/iOSApp.swift` |
+
+**پوستهٔ Xcode:** `Info.plist` — `CFBundleURLTypes` (vill3n)، `BGTaskSchedulerPermittedIdentifiers` (`ir.vil3ntec.tohid.refresh`) و
+`UIBackgroundModes=fetch`، و متنِ اجازه‌ها (`NSCameraUsageDescription`، `NSFaceIDUsageDescription`، `NSLocationWhenInUseUsageDescription`،
+`NSPhotoLibraryAddUsageDescription` برای «ذخیرهٔ تصویر» ِ برگهٔ اشتراک). `OTHER_LDFLAGS`: چارچوب‌های سیستمی که چارچوبِ ایستای
+`TohidShared` می‌خواهد (Security، AVFoundation، BackgroundTasks، CoreLocation، LocalAuthentication، PhotosUI، UniformTypeIdentifiers،
+UserNotifications). `iOSApp.init` ⇐ `appDidLaunch()` (پیش از پایانِ راه‌اندازی: BGTaskScheduler، نمایندهٔ اعلان، چرخهٔ برنامه).
+
+**آزمونِ تازه:**
+- `src/jvmTest/…/ios/work/WorkTimingJvmTest` (۸) — زمان‌بندیِ کارهای دوره‌ای در برابرِ قاعده‌های WorkManager ِ اندروید (کفِ ۱۵ دقیقه، سررسید، ساعتِ عقب‌رفته، عقب‌نشینیِ نمایی/خطی). روی لینوکس (`jvmTest`، کارِ `ios-ui-klib`).
+- `src/iosTest/…/ios/Phase3IosTest` (۳) — اجرای کارگرِ ثبت‌شده با WorkManager ِ آیفون، نگاشتِ بارکدِ AVFoundation به قاعدهٔ ML Kit، رفت‌وبرگشتِ `Intent` ِ اعلان از راهِ userInfo. فقط روی شبیه‌ساز (کارِ `ios-app`).
+
+**تفاوت‌های دانسته (عمدی):**
+- iOS برنامهٔ بسته را نگه نمی‌دارد: همگام‌سازیِ پس‌زمینه فقط وقتی iOS `BGAppRefreshTask` بدهد (و نه پس از بستنِ دستیِ برنامه)؛ سوکت در پس‌زمینه می‌افتد و با بازگشت دوباره وصل می‌شود. قیدِ «نت هست» سنجیده نمی‌شود (مثلِ کامپیوتر؛ کارِ بی‌نت `retry` می‌دهد).
+- `CreateDocument`: جای ذخیره **پس از** نوشتن انتخاب می‌شود (پنجرهٔ Files)؛ لغوِ آن پرونده را فقط در cache می‌گذارد.
+- اسکنِ دوربین: فوکوس/بزرگ‌نمایی/چراغِ خودکارِ اندروید (`FocusPilot`، `LightPilot`) نیست؛ فوکوسِ پیوستهٔ iOS. دوربینِ راهنمای عکسِ کالا (`GuidedCapture`) نیست؛ عکس با `TakePicture`.
+- شبیه‌ساز دوربین ندارد ⇐ مسیرهای دوربین فقط روی گوشیِ واقعی آزموده می‌شوند (هنوز نشده).
+
+**هنوز نه (گامِ ۴):** چاپ (PDF/AirPrint ِ گزارش و برگهٔ برچسب؛ چاپگرِ شبکه روی دستگاه آزموده نشده؛ بلوتوثِ کلاسیک در iOS نیست — §۵.۱)؛
+تشخیصِ گفتار (Speech)؛ ورود با گوگل/اپل و گواهیِ «همین برنامه» (`Integrity`) — هر دو حسابِ اپل می‌خواهند (۰.۶)؛ «سرورِ خودِ دکان» با
+گواهیِ سنجاق‌شده (نمایندهٔ NSURLSession، برای HTTP و همین سوکت)؛ اعلانِ سرور (APNs، ۰.۶ بندِ ۶)؛ صدای اسکن (`MediaPlayer`)؛ آزمونِ دستیِ
+صفحه‌ها و دوربین روی گوشیِ واقعی.
+
+**بررسیِ محلی (لینوکس):** همان klib با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (‎۰.۷‎)، `jvmTest` ِ `ios/shared`،
+`core` ِ `jvmTest` و آزمونِ کامپیوتر. پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` فقط در CI ِ macOS.
 
 ## ۱. خلاصه در پنج خط
 

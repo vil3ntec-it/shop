@@ -4,11 +4,12 @@ import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 
-/** shimِ iOS ِ `NotificationCompat`/`NotificationManagerCompat` — نگاه کنید به ‎android/app/Notification.kt‎ (گامِ ۳) */
+/** shimِ iOS ِ `NotificationCompat`/`NotificationManagerCompat` — اعلانِ محلیِ iOS (‎android/app/Notification.kt‎) */
 class NotificationCompat {
   class Builder(context: Context, channel: String) {
     private var title = ""
     private var text = ""
+    private var intent: android.content.Intent? = null
     fun setSmallIcon(id: Int) = this
     fun setContentTitle(t: CharSequence?) = apply { title = t?.toString().orEmpty() }
     fun setContentText(t: CharSequence?) = apply { text = t?.toString().orEmpty() }
@@ -17,12 +18,12 @@ class NotificationCompat {
     fun setPriority(p: Int) = this
     fun setCategory(c: String?) = this
     fun setOnlyAlertOnce(b: Boolean) = this
-    fun setContentIntent(p: PendingIntent?) = this
+    fun setContentIntent(p: PendingIntent?) = apply { intent = p?.intent }
     fun setColor(c: Int) = this
     fun setWhen(w: Long) = this
     fun setShowWhen(b: Boolean) = this
     fun setGroup(g: String?) = this
-    fun build() = Notification(title, text)
+    fun build() = Notification(title, text, intent)
   }
 
   abstract class Style
@@ -43,9 +44,9 @@ class NotificationCompat {
 }
 
 class NotificationManagerCompat private constructor() {
-  fun notify(id: Int, n: Notification) {}
-  fun areNotificationsEnabled() = false
-  fun cancel(id: Int) {}
+  fun notify(id: Int, n: Notification) = android.app.NotificationManager.ios.notify(id, n)
+  fun areNotificationsEnabled() = android.app.NotificationManager.ios.areNotificationsEnabled()
+  fun cancel(id: Int) = android.app.NotificationManager.ios.cancel(id)
 
   companion object {
     fun from(context: Context) = NotificationManagerCompat()

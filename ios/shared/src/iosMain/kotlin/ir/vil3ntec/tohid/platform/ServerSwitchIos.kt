@@ -41,6 +41,9 @@ object ServerSwitchAndroid {
   /** بی پروفایل گواهیِ سنجاق‌شده‌ای نیست */
   fun prepare(connection: HttpURLConnection, base: String) {}
 
+  /** سوکتِ زنده (`sync/v1/LiveSocket`): بی پروفایل همان کلاینت (‎okhttp3/WebSocket.kt‎) */
+  fun okHttp(client: okhttp3.OkHttpClient, base: String): okhttp3.OkHttpClient = client
+
   fun reportFailure(base: String) {}
 
   fun applyPending(context: Context) {}

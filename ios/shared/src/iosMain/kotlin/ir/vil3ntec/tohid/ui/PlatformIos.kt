@@ -4,7 +4,7 @@ import platform.UIKit.UIDevice
 
 /*
  *  جایگزینِ iOS ِ `ui/Platform.kt` (همان API؛ کامپیوتر: ‎desktop/…/ui/PlatformDesk.kt‎).
- *  پوشه و پنجرهٔ «ذخیره به‌عنوان» در آیفون نیست؛ برگهٔ اشتراکِ iOS کارِ گامِ ۲ است.
+ *  پوشه در آیفون نیست (مثلِ اندروید)؛ «ذخیره به‌عنوان» همان `CreateDocument` است (‎ios/IosPickers.kt‎: Files) و اشتراک برگهٔ iOS.
  */
 object Platform {
   const val DESKTOP: Boolean = false

@@ -17,8 +17,8 @@ import platform.Foundation.NSUserDomainMask
  *
  *  فقط آنچه فایل‌های رسیده به iOS لازم دارند. `filesDir` ⇐ `Application Support/tohid` ِ همین
  *  برنامه (پشتیبانِ iCloud ِ دستگاه هم می‌گیردش، مثلِ پشتیبانِ خودکارِ اندروید)؛ `cacheDir` ⇐ `Caches`.
- *  `startActivity` فقط نشانی‌ها را باز می‌کند (‎Intent.kt‎)؛ سرویس‌های سیستم (لرزش، اعلان، چاپ…)
- *  هنوز نیستند ⇐ فایل‌هایشان در `ios/shared/ios-exclude.txt` (گامِ ۲).
+ *  `startActivity` نشانی‌ها را باز می‌کند و `ACTION_SEND` را به برگهٔ اشتراکِ iOS می‌دهد (‎Intent.kt‎)؛
+ *  سرویس‌های سیستم: اتصال، تخته‌برش و اعلان (UNUserNotificationCenter)؛ بقیه null.
  */
 abstract class Context {
   open val applicationContext: Context get() = this
@@ -64,13 +64,17 @@ private fun appDir(kind: ULong, name: String): File {
 
 /**
  *  در اندروید راهِ خواندنِ تنظیمِ سیستم (`Settings.Global`) و فایلِ برگزیده است. در iOS فقط نشانیِ
- *  `file://` (خروجیِ انتخابگرهای گامِ بعد و `Uri.fromFile`) باز می‌شود؛ بقیه ⇐ FileNotFoundException.
+ *  `file://` (خروجیِ انتخابگرهای iOS ‎ios/IosPickers.kt‎ و `Uri.fromFile`) باز می‌شود؛ بقیه ⇐ FileNotFoundException.
  */
 object ContentResolver {
   fun openInputStream(uri: android.net.Uri): java.io.InputStream? = java.io.FileInputStream(fileOf(uri))
-  fun openOutputStream(uri: android.net.Uri): java.io.OutputStream? = java.io.FileOutputStream(fileOf(uri))
-  fun openOutputStream(uri: android.net.Uri, mode: String): java.io.OutputStream? =
-    java.io.FileOutputStream(fileOf(uri), append = mode.contains('a'))
+  fun openOutputStream(uri: android.net.Uri): java.io.OutputStream? = openOutputStream(uri, "w")
+  /** پروندهٔ «ذخیره به‌عنوان» (`CreateDocument`) ⇐ جریانی که با بسته شدن «ذخیره در Files» ِ iOS را باز می‌کند */
+  fun openOutputStream(uri: android.net.Uri, mode: String): java.io.OutputStream? {
+    val file = fileOf(uri)
+    val append = mode.contains('a')
+    return ir.vil3ntec.tohid.ios.IosPickers.exportStream(file, append) ?: java.io.FileOutputStream(file, append = append)
+  }
   fun getType(uri: android.net.Uri): String? = null
 
   private fun fileOf(uri: android.net.Uri): File =
@@ -86,8 +90,12 @@ object IosContext : Context() {
     else -> null
   }
 
-  /** نشانیِ http/tel/mailto/sms ⇐ `openURL` ِ iOS؛ بقیه ⇐ ActivityNotFoundException (همان «برنامه‌ای نیست» ِ اندروید) */
+  /**
+   *  نشانیِ http/tel/mailto/sms ⇐ `openURL` ِ iOS؛ `ACTION_SEND` ⇐ برگهٔ اشتراکِ iOS (‎IosPickers.share‎)؛
+   *  بقیه ⇐ ActivityNotFoundException (همان «برنامه‌ای نیست» ِ اندروید)
+   */
   override fun startActivity(intent: Intent) {
+    if (intent.action == Intent.ACTION_SEND) return ir.vil3ntec.tohid.ios.IosPickers.share(intent)
     //  «تنظیماتِ این برنامه» ِ اندروید ⇐ صفحهٔ همین برنامه در تنظیماتِ iOS (اجازه‌ها)
     if (intent.action == android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS || intent.action == android.provider.Settings.ACTION_SETTINGS) {
       NSURL.URLWithString(platform.UIKit.UIApplicationOpenSettingsURLString)?.let {

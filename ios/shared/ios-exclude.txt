@@ -7,10 +7,10 @@
 #  ── جایگزینِ iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop) ──
 core/net/TokenStore.kt  # جایگزینِ iOS: core/net/TokenStoreIos.kt (توکن در Keychain)
 data/AtRestKeys.kt  # جایگزینِ iOS: data/AtRestKeysIos.kt (KEK در Keychain)
-data/DeviceLocation.kt  # جایگزینِ iOS: data/DeviceLocationIos.kt (بی موقعیت تا گامِ ۳)
+data/DeviceLocation.kt  # جایگزینِ iOS: data/DeviceLocationIos.kt (CoreLocation، «هنگامِ استفاده»، یک‌باره)
 data/DiskWrite.kt  # جایگزینِ iOS: data/DiskWriteIos.kt (fsync + rename ِ POSIX)
 data/FileName.kt  # جایگزینِ iOS: data/FileNameIos.kt (نامِ مسیرِ file://)
-data/Fingerprint.kt  # جایگزینِ iOS: data/FingerprintIos.kt (Face ID گامِ ۳)
+data/Fingerprint.kt  # جایگزینِ iOS: data/FingerprintIos.kt (Face ID / Touch ID با LocalAuthentication)
 data/GoogleSignIn.kt  # جایگزینِ iOS: data/GoogleSignInIos.kt (ورود با گوگل/اپل گامِ ۳؛ ایمیل کار می‌کند)
 data/Migration.kt  # جایگزینِ iOS: data/MigrationIos.kt (دادهٔ وبیِ قدیمی در آیفون نیست)
 hw/PrinterFinderAndroid.kt  # جایگزینِ iOS: hw/PrinterFinderIos.kt (کارتِ شبکه با getifaddrs؛ بی بلوتوث)
@@ -19,11 +19,9 @@ platform/HubRelayAndroid.kt  # جایگزینِ iOS: platform/HubRelayIos.kt (ه
 platform/ServerSwitchAndroid.kt  # جایگزینِ iOS: platform/ServerSwitchIos.kt (همان پرچم‌خاموش ِ اندروید)
 print/LabelSheetPrint.kt  # جایگزینِ iOS: print/LabelSheetPrintIos.kt (AirPrint گامِ ۳)
 print/ReportPrint.kt  # جایگزینِ iOS: print/ReportPrintIos.kt (PDF و AirPrint گامِ ۳)
-scan/BarcodeScanner.kt  # جایگزینِ iOS: scan/BarcodeScannerIos.kt (دوربین گامِ ۳؛ بارکدخوانِ HID کار می‌کند)
-scan/GuidedCapture.kt  # جایگزینِ iOS: scan/GuidedCaptureIos.kt (دوربین گامِ ۳)
+scan/BarcodeScanner.kt  # جایگزینِ iOS: scan/BarcodeScannerIos.kt (دوربین با AVCaptureMetadataOutput؛ CameraX و ML Kit در iOS نیستند)
+scan/GuidedCapture.kt  # جایگزینِ iOS: scan/GuidedCaptureIos.kt (CameraX؛ عکسِ کالا از راهِ TakePicture ِ iOS)
 sync/Integrity.kt  # جایگزینِ iOS: sync/IntegrityIos.kt (امضای برنامه را خودِ iOS وارسی می‌کند)
-sync/v1/LiveSocket.kt  # جایگزینِ iOS: sync/v1/LiveSocketIos.kt (سوکتِ زنده گامِ ۳)
-sync/v1/SyncV1Worker.kt  # جایگزینِ iOS: sync/v1/SyncV1WorkerIos.kt (WorkManager؛ همگام‌سازی گامِ ۳)
 ui/Platform.kt  # جایگزینِ iOS: ui/PlatformIos.kt
 ui/screens/Haptics.kt  # جایگزینِ iOS: ui/screens/HapticsIos.kt
 update/Updater.kt  # جایگزینِ iOS: update/UpdaterIos.kt (به‌روزرسانی فقط از App Store؛ بی APK)

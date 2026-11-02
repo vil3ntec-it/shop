@@ -5,7 +5,7 @@ import android.net.Uri
 /*
  *  shimِ iOS ِ `android.content.Intent` (همان شکلِ کامپیوتر). `IosContext.startActivity`:
  *  «نما» (`ACTION_VIEW`/`ACTION_DIAL`/`ACTION_SENDTO`) با نشانیِ http/tel/mailto/sms ⇐ `openURL` ِ
- *  خودِ iOS؛ بقیه (اشتراک‌گذاری با `ACTION_SEND`، برنامهٔ دیگر) کارِ گامِ ۲ (UIActivityViewController).
+ *  خودِ iOS؛ اشتراک‌گذاری (`ACTION_SEND`، متن و/یا `EXTRA_STREAM`) ⇐ UIActivityViewController؛ برنامهٔ دیگر ⇐ نه.
  */
 open class Intent(var action: String? = null, var data: Uri? = null) {
   var flags: Int = 0

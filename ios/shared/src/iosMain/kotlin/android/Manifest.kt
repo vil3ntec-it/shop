@@ -1,6 +1,6 @@
 package android
 
-/** shimِ iOS ِ نامِ اجازه‌های اندروید — فقط رشته؛ پاسخِ «اجازه هست؟» در iOS همیشه نه (‎ContextCompat‎، گامِ ۳) */
+/** shimِ iOS ِ نامِ اجازه‌های اندروید — فقط رشته؛ پاسخِ «اجازه هست؟» از iOS (‎ir/…/ios/IosPermissions.kt‎) */
 object Manifest {
   object permission {
     const val CAMERA = "android.permission.CAMERA"

@@ -4,7 +4,7 @@ import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 
-/** جایگزینِ iOS ِ `scan/GuidedCapture.kt` (دوربینِ راهنمای عکسِ کالا؛ همان ‎GuidedCaptureDesk‎): دوربینِ آیفون گامِ ۳ */
+/** جایگزینِ iOS ِ `scan/GuidedCapture.kt` (دوربینِ راهنمای CameraX؛ همان ‎GuidedCaptureDesk‎): نیست ⇐ دکمه‌اش پنهان؛ عکسِ کالا با دوربینِ iOS (`TakePicture`) */
 object GuidedCapture {
   const val AVAILABLE = false
 }
