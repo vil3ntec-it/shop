@@ -117,8 +117,10 @@ const REJECT = {
  * @param {{key:string, body:object, input:{expectedTotalMinor:number|null}}} ctx
  */
 async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
-  if (!(await flagOn(sf.shop_id))) return price;
-  const code = codeOf(body);
+  //  NTF-10: کدِ پوزشِ تأخیر (پرچمِ `shop.orders.late_apology`؛ خاموش یا کدِ دیگر ⇒ null و همان راهِ پیشین)
+  const apology = await require('./order-late-apology').couponOf(sf.shop_id, codeOf(body));
+  if (!(await flagOn(sf.shop_id))) return apology ? require('./order-late-apology').wrapPrice(price, apology, { key, input }) : price;
+  const code = apology ? '' : codeOf(body);
   const sale = `sf:${key}`;
   //  MKT-02/RSK-09: پرچم و تنظیم پیش از تراکنش؛ خاموش ⇒ null و همان راهِ پیشین
   const g = await guard.prepare(sf.shop_id, { body, phone, ip });
@@ -140,8 +142,10 @@ async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
       guard.failed(g);
       throw Object.assign(conflict(REJECT.limit_reached, 'promo_code_rejected'), { data: { promo: { code, status: 'limit_reached' } } });
     }
-    const discountMinor = g ? (await guard.settle(run, g, { e, subtotalMinor: out.subtotalMinor, code, key, at })).discountMinor : e.discountMinor;
-    const totalMinor = out.subtotalMinor - discountMinor + out.deliveryFeeMinor;
+    let discountMinor = g ? (await guard.settle(run, g, { e, subtotalMinor: out.subtotalMinor, code, key, at })).discountMinor : e.discountMinor;
+    let totalMinor = out.subtotalMinor - discountMinor + out.deliveryFeeMinor;
+    //  NTF-10: کوپنِ پوزش پس از قاعده‌ها و اولین خرید، یک‌بار و فقط برای همان شماره (lib/order-late-apology)
+    if (apology) ({ discountMinor, totalMinor } = await apology.apply(run, { ...out, discountMinor, totalMinor }, { at, phone: input.customerPhone, sale }));
     if (expected !== null && expected !== totalMinor) {
       throw Object.assign(conflict('قیمت‌ها عوض شده است؛ سبد را دوباره ببینید', 'price_changed'), {
         data: { quote: { subtotalMinor: out.subtotalMinor, discountMinor, deliveryFeeMinor: out.deliveryFeeMinor, totalMinor }, changes: [] },
@@ -219,6 +223,17 @@ async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
     lines.push({ ...l, unitPriceMinor: p.priceMinor, lineTotalMinor: S.lineTotalMinor(l.qtyMilli, p.priceMinor) });
   }
   const subtotalMinor = lines.reduce((s, l) => s + l.lineTotalMinor, 0);
+  //  NTF-10: کدِ پوزش جدا از قاعده‌ها و سدِ کد (بی شماره: شماره در ثبت سنجیده می‌شود)
+  const apology = await require('./order-late-apology').couponOf(sf.shop_id, q.code);
+  if (apology) {
+    const e0 = await evaluate(run, sf, lines, '', at);
+    const ap = await apology.preview(subtotalMinor - e0.discountMinor, at);
+    return {
+      subtotalMinor, discountMinor: e0.discountMinor + ap.discountMinor, totalMinor: subtotalMinor - e0.discountMinor - ap.discountMinor,
+      lines: e0.lines, applied: e0.applied.map(({ name, discountMinor }) => ({ name, discountMinor })),
+      code: { code: q.code, status: ap.status }, unavailable,
+    };
+  }
   let e = await evaluate(run, sf, lines, q.code, at);
   if (!g) {
     return {
