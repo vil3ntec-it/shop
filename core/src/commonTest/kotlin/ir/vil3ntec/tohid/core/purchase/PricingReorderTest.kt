@@ -75,6 +75,20 @@ class PricingReorderTest {
     assertEquals(ReorderCore.Lead(2, 10), ReorderCore.leadTime(old + fresh))
   }
 
+  @Test fun manualLeadDaysWinOverMeasuredWithinRange() {
+    val d = ReorderCore.DAY_MS
+    val measured = listOf(Delivery(1, 1 + 2 * d), Delivery(2, 2 + 4 * d))
+    //  PUR-10: زمانِ دستیِ دفتر بر میانهٔ سنجیده می‌چربد، حتی بی هیچ سفارشِ رسیده
+    assertEquals(ReorderCore.Lead(9, 0, manual = true), ReorderCore.leadTime(measured, 9))
+    assertEquals(ReorderCore.Lead(1, 0, manual = true), ReorderCore.leadTime(emptyList(), 1))
+    assertEquals(ReorderCore.Lead(365, 0, manual = true), ReorderCore.leadTime(emptyList(), ReorderCore.MAX_MANUAL_LEAD_DAYS))
+    //  خالی یا بیرونِ ۱..۳۶۵ ⇒ همان سنجیده
+    assertEquals(ReorderCore.Lead(4, 2), ReorderCore.leadTime(measured, null))
+    assertEquals(ReorderCore.Lead(4, 2), ReorderCore.leadTime(measured, 0))
+    assertEquals(ReorderCore.Lead(4, 2), ReorderCore.leadTime(measured, -3))
+    assertEquals(ReorderCore.Lead(null, 0), ReorderCore.leadTime(emptyList(), 366))
+  }
+
   @Test fun suggestUsesSalesLeadTimeAndOnOrder() {
     //  ۳۰ روز ۶۰ فروش ⇒ روزی ۲؛ زمانِ تأمین ۵ ⇒ نقطهٔ سفارش ۱۰ + حدِ کم ۴ = ۱۴
     val base = Input(onHandMilli = 12_000, onOrderMilli = 0, minStockMilli = 4_000, soldMilli = 60_000, leadDays = 5)
