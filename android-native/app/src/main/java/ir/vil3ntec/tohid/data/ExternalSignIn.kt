@@ -1,16 +1,14 @@
 package ir.vil3ntec.tohid.data
 
-import android.content.Context
-
 /**
  *  ورود با «فراهم‌کنندهٔ بیرونی» — گوگل و اپل، یک قرارداد (`docs/IOS-PLAN-fa.md` §۰.۱۱).
  *
- *  سرور برای هر دو یک قاعده دارد (`server/src/routes/auth.js`، `PROVIDERS`): یافتن با شناسهٔ فراهم‌کننده،
+ *  سرور برای هر دو یک قاعده دارد (`server/src/lib/external-login.js`، `PROVIDERS`): یافتن با شناسهٔ فراهم‌کننده،
  *  ساختن/وصل کردن فقط با ایمیلِ تأییدشده، و ایمیلِ دارای حساب ⇐ ۴۰۹ `<id>_link_required` و اثباتِ روشِ
  *  قبلیِ حساب (رمز یا کدِ ایمیل) — هرگز وصلِ خودکار با ایمیل. این فایل همان را سمتِ برنامه یکی می‌کند:
  *  `ExternalLinkAsk` (برگهٔ «وصل کردن به حسابِ موجود») برای هر دو.
  *
- *  ⛔ این فایل هیچ API ِ سکو ندارد. پنجرهٔ هر فراهم‌کننده مالِ لایهٔ همان سکوست:
+ *  ⛔ این فایل هیچ API ِ سکو ندارد (حتی `Context`). پنجرهٔ هر فراهم‌کننده مالِ لایهٔ همان سکوست:
  *  - گوگل: `data/GoogleSignIn.kt` (Credential Manager ِ اندروید؛ کامپیوتر و آیفون جایگزینِ خودشان).
  *  - اپل: فقط آیفون، `ExternalSignIn.apple` را لایهٔ آیفون هنگامِ شروعِ برنامه می‌گذارد
  *    (`ios/shared/src/iosMain/…/ios/AppleSignInIos.kt`، `ASAuthorizationAppleIDProvider`). اندروید و کامپیوتر
@@ -45,7 +43,7 @@ fun interface AppleSignInUi {
    *  `nonce` ِ خامِ سرور؛ پیاده‌سازی SHA-256 ِ هگزِ آن را به اپل می‌دهد (همان که سرور با ادعای `nonce` می‌سنجد).
    *  `null` یعنی کاربر خودش بست — خطا نیست و پیامِ قرمز نمی‌گیرد. هر چیزِ دیگر با پیامِ روشن پرتاب می‌شود.
    */
-  suspend fun pick(context: Context, nonce: String): AppleCredential?
+  suspend fun pick(nonce: String): AppleCredential?
 }
 
 object ExternalSignIn {

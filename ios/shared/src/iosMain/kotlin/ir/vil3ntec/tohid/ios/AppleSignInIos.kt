@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ios
 
-import android.content.Context
 import ir.vil3ntec.tohid.data.AppleCredential
 import ir.vil3ntec.tohid.data.AppleSignInUi
 import java.security.MessageDigest
@@ -43,7 +42,7 @@ import kotlin.coroutines.resumeWithException
  */
 internal object AppleSignInIos : AppleSignInUi {
 
-  override suspend fun pick(context: Context, nonce: String): AppleCredential? =
+  override suspend fun pick(nonce: String): AppleCredential? =
     suspendCancellableCoroutine { cont ->
       IosUi.onMain {
         val request = ASAuthorizationAppleIDProvider().createRequest()

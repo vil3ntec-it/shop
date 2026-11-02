@@ -341,7 +341,7 @@ class AuthController(
     scope.launch {
       auth.appleNonce()
         .onSuccess { nonce ->
-          runCatching { window.pick(context, nonce) }
+          runCatching { window.pick(nonce) }
             .onSuccess { cred ->
               if (cred != null) {
                 auth.loginWithApple(cred.idToken, nonce, name = cred.name)
