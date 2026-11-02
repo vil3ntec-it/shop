@@ -8,7 +8,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1200,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/WarehouseEngine.kt": 1124,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1273,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/courier/CourierHome.kt": 961,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/courier/CourierHome.kt": 965,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt": 1256,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/legacy/DashboardLegacy.kt": 1156,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/legacy/DebtorsLegacy.kt": 1418,
