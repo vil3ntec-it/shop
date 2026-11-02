@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.courier.CourierSettlement
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.MissionNav
 import ir.vil3ntec.tohid.core.courier.MissionStep
 import ir.vil3ntec.tohid.core.courier.PeriodStats
 import ir.vil3ntec.tohid.core.courier.QueueState
@@ -84,5 +85,10 @@ class CourierCodecTest {
     assertEquals(CourierChecks.Point(34.524356, 69.181234), back.pending[1].position)
     val card = MissionCard(id = "A", orderNo = 1, status = "assigned", bagScanBags = 3, nearPinMaxM = 300)
     assertEquals(card, CourierCodec.cards(CourierCodec.cardsJson(listOf(card))).single())
+    //  DLV-05: پیوندهای مسیریاب برای کارتِ زنده می‌مانند؛ کارتِ کهنه‌تر بی کلید ⇒ null
+    val nav = MissionNav.of("geo:34.5,69.1?q=34.5,69.1", "https://www.google.com/maps/dir/?api=1&destination=34.5,69.1", null)
+    val live = card.copy(status = "picked_up", navigation = nav)
+    assertEquals(live, CourierCodec.cards(CourierCodec.cardsJson(listOf(live))).single())
+    assertNull(CourierCodec.card(org.json.JSONObject("""{"id":"A","orderNo":1,"status":"assigned"}""")).navigation)
   }
 }

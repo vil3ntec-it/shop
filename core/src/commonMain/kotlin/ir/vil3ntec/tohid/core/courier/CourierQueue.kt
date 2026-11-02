@@ -319,6 +319,8 @@ data class MissionCard(
   val bagScanBags: Int? = null,
   /** DLV-17: «تحویل شد» فقط در این فاصله از پین (`nearPin.maxM`، فقط با پرچم)؛ null ⇒ بی سنجش */
   val nearPinMaxM: Int? = null,
+  /** DLV-05: پیوندهای مسیریابِ سرور (`navigation`، فقط با پرچمِ `shop.delivery_map` و فقط تا مأموریت زنده است) */
+  val navigation: MissionNav? = null,
 )
 
 object MissionView {
@@ -338,7 +340,7 @@ object MissionView {
   fun redact(card: MissionCard): MissionCard = card.copy(
     landmark = "", addressText = "", lat = null, lng = null,
     customerName = "", phoneMasked = "", leaveWith = "", callBeforeArrival = false, cashTenderMinor = null,
-    area = "", gateColor = "", addressCorrectedAt = null,
+    area = "", gateColor = "", addressCorrectedAt = null, navigation = null,
   )
 
   /**

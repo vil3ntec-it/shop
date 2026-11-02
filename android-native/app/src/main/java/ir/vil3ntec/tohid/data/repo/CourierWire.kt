@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.courier.CourierSettlement
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.EventResult
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.MissionNav
 import ir.vil3ntec.tohid.core.courier.MissionStep
 import ir.vil3ntec.tohid.core.courier.PeriodStats
 import ir.vil3ntec.tohid.core.courier.UnsettledDelivery
@@ -79,6 +80,8 @@ object CourierWire {
       //  DLV-07/17: فقط با پرچمِ دکان در کارت می‌آیند
       bagScanBags = (o["bagScan"] as? JsonObject)?.let { long(it, "bags") }?.toInt(),
       nearPinMaxM = (o["nearPin"] as? JsonObject)?.let { long(it, "maxM") }?.toInt(),
+      //  DLV-05: فقط با پرچمِ `shop.delivery_map` و فقط تا مأموریت زنده است؛ قالبِ نادرست ⇒ null
+      navigation = (o["navigation"] as? JsonObject)?.let { MissionNav.of(str(it, "geo"), str(it, "google"), str(it, "osmand")) },
       timeline = (o["timeline"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::step) },
     )
   }
