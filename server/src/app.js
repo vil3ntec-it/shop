@@ -415,6 +415,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
     //  وب‌هوکِ بی‌توکنِ ارائه‌دهنده زیرِ `/payments` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی
     api.use('/shop/payments', require('./routes/shop-payments'));
+    //  حساب‌پیِ هر دکان (پول مستقیم به حسابِ همان دکان؛ رمزِ جدای حساب‌پی) — فقط صاحب، مهاجرتِ ۲۰۴
+    api.use('/shop/hesabpay', require('./routes/shop-hesabpay'));
     api.use('/payments', require('./routes/payments-webhook'));
     api.use('/admin/payments', require('./routes/admin-payments'));
     //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش

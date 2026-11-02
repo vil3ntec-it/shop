@@ -73,6 +73,7 @@ object SettingsHelp {
     "کد شاگرد" -> H.staffCodeLine
     "تغییر رمز حساب" -> H.passwordLine
     SettingsLayout.PAY -> H.payLine
+    SettingsLayout.HESAB_SHOP -> H.hesabShopLine
     SettingsLayout.PRINTER -> H.printerLine
     SettingsLayout.CAMERA -> H.cameraLine
     "همگام‌سازی" -> H.syncLine
@@ -130,6 +131,7 @@ object SettingsHelp {
     "کد شاگرد" -> H.staffCodeExample
     "تغییر رمز حساب" -> H.passwordExample
     SettingsLayout.PAY -> H.payExample
+    SettingsLayout.HESAB_SHOP -> H.hesabShopExample
     SettingsLayout.CAMERA -> H.cameraExample
     "همگام‌سازی" -> H.syncExample
     "داده‌ها" -> H.backupExample

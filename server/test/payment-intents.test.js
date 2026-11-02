@@ -11,6 +11,8 @@ process.env.PAYMENTS_PROVIDER = 'fake';
 process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-payment-intents';
 process.env.RATE_PAY_CREATE_MAX = '100000';
 process.env.RATE_PAY_POLL_MAX = '100000';
+//  رمزِ حساب‌پی: دورهای PBKDF2 فقط در آزمون کم (تولید همیشه ۶۰۰٬۰۰۰)
+process.env.HESABPAY_PIN_ITER = '1000';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -110,19 +112,25 @@ test('ساختگی هرگز در تولید: PAYMENTS_PROVIDER=fake + NODE_ENV=p
 
 test('پیکربندی: بی کلید یا بی پرچم ⇒ خاموش و ساختن ۴۰۳ hesabpay_disabled', async () => {
   const off = await shop('بی‌پرچم', { flag: false });
-  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: off.t })).body, { hesabpay: { enabled: false } });
+  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: off.t })).body, { hesabpay: { enabled: false, mode: 'off' } });
   const r = await createPos(off);
   assert.equal(r.status, 403);
   assert.equal(r.body.error.code, 'hesabpay_disabled');
 
   const on = await shop('با‌پرچم');
-  assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: true } });
-  //  حساب‌پیِ واقعی بی HESABPAY_* ⇒ «پیکربندی نشده»، حتی با پرچم
-  process.env.PAYMENTS_PROVIDER = '';
+  assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: true, mode: 'off' } });
+  //  حساب‌پیِ واقعی بی حسابِ خودِ دکان ⇒ «پیکربندی نشده»، حتی با پرچم — و ⛔ کلیدِ سکو (`HESABPAY_*`) هرگز جایگزین نیست
+  const keep = { ...process.env };
+  Object.assign(process.env, { PAYMENTS_PROVIDER: '', HESABPAY_API_KEY: 'platform-key-123', HESABPAY_WEBHOOK_SECRET: 'platform-secret-1',
+    HESABPAY_CRED_KEY: 'cred-key-for-config-test-0123456789abcdef' });
   try {
-    assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: false } });
+    assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: false, mode: 'off' } });
     assert.equal((await createPos(on)).body.error.code, 'hesabpay_disabled');
-  } finally { process.env.PAYMENTS_PROVIDER = 'fake'; }
+  } finally {
+    for (const k of ['PAYMENTS_PROVIDER', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_CRED_KEY']) {
+      if (keep[k] === undefined) delete process.env[k]; else process.env[k] = keep[k];
+    }
+  }
   assert.equal((await h.get('/api/shop/payments/config')).status, 401);
 });
 
@@ -525,9 +533,9 @@ test('ساختگی فقط با NODE_ENV ِ صریحِ test/development و راز
 
 test('آداپتورِ حساب‌پی فقط https: http ِ بیرونی هرگز (کلید نمی‌رود)؛ http ِ loopback فقط در آزمون/توسعه', async () => {
   const HP = require('../src/lib/payment-hesabpay');
-  const names = ['NODE_ENV', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_BASE_URL'];
+  const names = ['NODE_ENV', 'HESABPAY_CRED_KEY', 'HESABPAY_BASE_URL'];
   const prev = Object.fromEntries(names.map((k) => [k, process.env[k]]));
-  Object.assign(process.env, { HESABPAY_API_KEY: 'test-key-123', HESABPAY_WEBHOOK_SECRET: 'whsec-test' });
+  Object.assign(process.env, { HESABPAY_CRED_KEY: 'cred-key-for-https-test-0123456789abcdef' });
   try {
     const cases = [
       ['https://api.hesab.com/api/v1', 'production', true],
@@ -550,11 +558,16 @@ test('آداپتورِ حساب‌پی فقط https: http ِ بیرونی هرگ
       process.env.HESABPAY_BASE_URL = base;
       process.env.NODE_ENV = env;
       assert.equal(HP.configured(), ok, `${env} ${base}`);
+      assert.equal(HP.forShop({ apiKey: 'test-key-123', secret: 'whsec-test' }).configured(), ok, `دکان ${env} ${base}`);
     }
-    //  حتی اگر کسی بی configured() صدا بزند: درخواستی با کلید روی http نمی‌رود
+    //  حتی اگر کسی بی configured() صدا بزند: درخواستی با کلیدِ دکان روی http نمی‌رود
     process.env.NODE_ENV = 'production';
     process.env.HESABPAY_BASE_URL = 'http://api.hesab.invalid/api/v1';
-    await assert.rejects(HP.fetchStatus('HS-1'), /https/);
+    await assert.rejects(HP.forShop({ apiKey: 'test-key-123', secret: 'whsec-test' }).fetchStatus('HS-1'), /https/);
+    //  ⛔ آداپتورِ بی‌دکان هیچ درِ پولی ندارد (نه کلیدِ سکو)
+    assert.equal(HP.createSession, undefined);
+    assert.equal(HP.verifyWebhook, undefined);
+    assert.equal(HP.fetchStatus, undefined);
   } finally {
     for (const [k, v] of Object.entries(prev)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
   }
@@ -708,13 +721,18 @@ test('آداپتورِ حساب‌پی روی سرورِ ساختگیِ حساب
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
   const env = {
-    PAYMENTS_PROVIDER: '', HESABPAY_API_KEY: 'test-key-123', HESABPAY_WEBHOOK_SECRET: 'whsec-test',
+    PAYMENTS_PROVIDER: '', HESABPAY_CRED_KEY: 'cred-key-for-adapter-test-0123456789abcdef',
     HESABPAY_BASE_URL: `http://127.0.0.1:${srv.address().port}/api/v1`,
   };
   const prev = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
   Object.assign(process.env, env);
   try {
     const s = await shop('حساب‌پیِ واقعی');
+    //  کلید و رازِ پذیرندهٔ **خودِ دکان** (رمزشده) — نه از محیط
+    assert.equal((await h.put('/api/v1/shop/hesabpay/pin', { newPin: '258014' }, { token: s.t })).status, 200);
+    const acc = await h.put('/api/v1/shop/hesabpay/account', { pin: '258014', mode: 'auto', apiKey: 'test-key-123', webhookSecret: 'whsec-test' }, { token: s.t });
+    assert.equal(acc.status, 200, JSON.stringify(acc.body));
+    const hookUrl = `/api/v1/payments/webhook/hesabpay/${acc.body.auto.webhookUrl.split('/').pop()}`;
     assert.equal((await h.get('/api/shop/payments/config', { token: s.t })).body.hesabpay.enabled, true);
     const a = await createPos(s);
     assert.equal(a.status, 201, JSON.stringify(a.body));
@@ -728,10 +746,10 @@ test('آداپتورِ حساب‌پی روی سرورِ ساختگیِ حساب
 
     const raw = Buffer.from(JSON.stringify({ event_id: 'HE-1', session_id: 'HS-1', status: 'success', amount: '1450.00', transaction_id: 'TX-9' }));
     const sig = crypto.createHmac('sha256', 'whsec-test').update(raw).digest('hex');
-    const bad = await h.raw('POST', '/api/v1/payments/webhook/hesabpay', raw, { headers: { 'Content-Type': 'application/json', 'x-hesab-signature': sig.replace(/^./, sig[0] === 'a' ? 'b' : 'a') } });
+    const bad = await h.raw('POST', hookUrl, raw, { headers: { 'Content-Type': 'application/json', 'x-hesab-signature': sig.replace(/^./, sig[0] === 'a' ? 'b' : 'a') } });
     assert.equal(bad.status, 401);
     assert.equal((await rowOf(a.body.id)).status, 'pending');
-    const ok = await h.raw('POST', '/api/v1/payments/webhook/hesabpay', raw, { headers: { 'Content-Type': 'application/json', 'x-hesab-signature': `sha256=${sig}` } });
+    const ok = await h.raw('POST', hookUrl, raw, { headers: { 'Content-Type': 'application/json', 'x-hesab-signature': `sha256=${sig}` } });
     assert.equal(ok.status, 200, JSON.stringify(ok.body));
     assert.equal(ok.body.outcome, 'applied');
     assert.ok(seen.some((x) => x.url === '/api/v1/payment/status/HS-1'), 'تأییدِ دوم صدا زده شد');

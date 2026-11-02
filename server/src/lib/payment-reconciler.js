@@ -24,10 +24,13 @@ const RECONCILE_LEASE_KEY = 'lease:payments.reconcile';
 const RECONCILE_LEASE_MS = 10 * 60 * 1000;
 const INSTANCE = `${process.pid}.${crypto.randomBytes(6).toString('hex')}`;
 
-/** تطبیق کاری دارد؟ = ارائه‌دهندهٔ فعال پیکربندی شده و درِ وضعیت دارد. */
+/**
+ * تطبیق کاری دارد؟ = ارائه‌دهندهٔ فعال پیکربندی شده و درِ وضعیت دارد. حساب‌پی: کلیدِ رمزگذاریِ سرور هست و هر قصد
+ * با آداپتورِ **دکانِ خودش** (`forShop`) پرسیده می‌شود (`payment-intents.reconcile`)؛ هرگز کلیدِ سکو.
+ */
 function reconcileReady() {
   const ad = provider();
-  return Boolean(ad && ad.configured() && typeof ad.fetchStatus === 'function');
+  return Boolean(ad && ad.configured() && (typeof ad.fetchStatus === 'function' || typeof ad.forShop === 'function'));
 }
 
 /** اجارهٔ میانِ نمونه‌ها: فقط اگر آزاد، منقضی یا مالِ همین نمونه باشد. */

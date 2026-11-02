@@ -151,6 +151,17 @@
       برچسبِ NFC ِ پرداختِ حساب‌پی. `exported=true` لازمِ خودِ اندروید است؛ فقط سرویسِ NFC ِ سیستم
       (`BIND_NFC_SERVICE`) می‌تواند به آن وصل شود. بی پرداختِ باز به هر دستوری «پرونده نیست» می‌گوید.
     -->
+    <!-- «حساب‌پیِ دکان» (حالتِ ساده): فقط پیشنهاد از اعلانِ برنامهٔ حساب‌پی؛ اجازه را صاحب خودش در تنظیماتِ اندروید
+         می‌دهد و کلیدِ همین دستگاه پیش‌فرض خاموش است. هیچ اجازهٔ خواندنِ پیامک گرفته نمی‌شود. -->
+    <service
+        android:name=".pay.platform.HesabPayNoticeService"
+        android:exported="true"
+        android:label="@string/app_name"
+        android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+      <intent-filter>
+        <action android:name="android.service.notification.NotificationListenerService" />
+      </intent-filter>
+    </service>
     <service
         android:name=".pay.platform.HesabPayHceService"
         android:exported="true"

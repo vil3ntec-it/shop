@@ -4,7 +4,7 @@ package ir.vil3ntec.tohid.core.gateway
  *  کارگزارِ قصدِ پرداختِ حساب‌پی — کاتلینِ خالص؛ HTTP را پلتفرم می‌دهد ([GatewayTransport]).
  *
  *  درها (پیشوندِ برنامهٔ دکان، `/api/v1` یا `/api`، را لایهٔ HTTP ِ برنامه می‌گذارد):
- *    GET  /shop/payments/config                 ⇐ {hesabpay:{enabled}}
+ *    GET  /shop/payments/config                 ⇐ {hesabpay:{enabled, mode, simple?}} (حساب‌پیِ خودِ دکان: [TillHesab])
  *    POST /shop/payments/intents                ⇐ ساختن (با کلیدِ یکتایی)
  *    GET  /shop/payments/intents/:id?wait=N     ⇐ وضعیت، با انتظارِ بلند
  *    POST /shop/payments/intents/:id/cancel     ⇐ لغو
@@ -29,6 +29,9 @@ interface GatewayTransport {
 
   /** `idempotencyKey` ⇐ سرآیندِ `Idempotency-Key` (همان مقدارِ بدنه) */
   suspend fun post(path: String, body: Map<String, Any?>, idempotencyKey: String? = null): GatewayReply
+
+  /** PUT — فقط «حساب‌پیِ دکان» ([HesabPayAccountClient])؛ پلتفرمی که ندارد ⇐ «نرسید» */
+  suspend fun put(path: String, body: Map<String, Any?>): GatewayReply = GatewayReply(0, message = "put")
 }
 
 /** نتیجهٔ یک درخواست */
@@ -47,11 +50,14 @@ sealed interface GatewayCall<out T> {
 
 class HesabPayClient(private val transport: GatewayTransport) {
 
-  /** حساب‌پی برای این دکان روشن است؟ هر خطا ⇐ نه */
-  suspend fun enabled(): Boolean {
+  /** درگاهِ خودکارِ حساب‌پی برای این دکان روشن است؟ هر خطا ⇐ نه */
+  suspend fun enabled(): Boolean = till().gateway
+
+  /** حساب‌پیِ همین دکان برای صندوق: درگاهِ خودکار و/یا شماره و QR ِ حالتِ ساده. هر خطا ⇐ خاموش */
+  suspend fun till(): TillHesab {
     val r = transport.get("$ROOT/config")
-    if (r.status !in 200..299) return false
-    return ((r.body?.get("hesabpay") as? Map<*, *>)?.get("enabled")) == true
+    if (r.status !in 200..299) return TillHesab.OFF
+    return TillHesab.fromMap(r.body)
   }
 
   /**

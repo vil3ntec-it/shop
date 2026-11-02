@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.core.gateway.IntentPoller
 import ir.vil3ntec.tohid.core.gateway.IntentStatus
 import ir.vil3ntec.tohid.core.gateway.PaymentIntent
 import ir.vil3ntec.tohid.core.gateway.PendingPayment
+import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.qr.QrCode
@@ -106,14 +107,17 @@ fun CheckoutGateways(
   onPaid: (Settlement) -> Unit,
   modifier: Modifier = Modifier,
 ) {
-  var available by remember { mutableStateOf(false) }
+  var till by remember { mutableStateOf(TillHesab.OFF) }
   //  هر فاکتورِ تازه دوباره می‌پرسد (یک دقیقه در حافظه): پرچم یا نت که عوض شد، صفحهٔ ماندگارِ کامپیوتر هم می‌فهمد
-  LaunchedEffect(hook.env, hook.saleKey) { available = hook.env.available() }
-  if (!available) return
+  LaunchedEffect(hook.env, hook.saleKey) { till = hook.env.till() }
+  if (!till.any) return
   Column(modifier) {
-    HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid)
+    //  درگاهِ خودکار با کلیدِ خودِ دکان (قصدِ سرور + وب‌هوکِ امضاشده)
+    if (till.gateway) HesabPayEntry(hook, total, panel?.draft(total, customerId), enabled, busy, onPaid)
+    //  حالتِ ساده: شماره/QR ِ خودِ دکان؛ تأیید فقط با «پول رسید» ِ صندوقدار
+    till.simple?.let { HesabPaySimpleEntry(hook, it, total, panel?.draft(total, customerId), enabled, busy, onPaid) }
     //  کارت‌خوان (آداپتورِ دستی) فقط جایی که ثبتِ دستیِ PAY-06 هست: پنلِ ترکیبی
-    if (panel != null) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy)
+    if (panel != null && till.gateway) CardTerminalEntry(hook.saleKey, total, panel, customerId, enabled, busy)
   }
 }
 
