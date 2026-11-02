@@ -271,6 +271,7 @@
 ### v3 · کارمندان و مجوز
 
 - `shift.report` (PAY-15، گزارشِ X و Z ِ صندوقِ شیفت): پیش‌فرض همه allow (همان امروز؛ شاگرد نمای کور)، `restrict`، بی تأیید و فقط نمایشی؛ در `SERVER_EDITABLE` مثلِ `reports.money` تا «کارمندان» نشانش دهد؛ برنامه با `ShopRole.allows(…, "shift.report")` دکمهٔ X، Zِ پس از بستن و «گزارش Z» را می‌بندد، نه خودِ بستن (`claude/part-PAY-3`).
+- ⛔ STF-06 (پرچمِ خاموشِ `shop.staff_scope`، `lib/staff-scope.js`، `core/staff/StaffScope.kt`): «مکان» = قفسه یا انبار ِ موجودیِ سرور (شعبه در داده نیست). کارِ عضوِ محدود باید همهٔ مکان‌هایی را که نام می‌برد در محدوده داشته باشد و دست‌کم یکی («خراب» و «در مسیر» مکان نیستند) ⇒ وگرنه ۴۰۳ `location_out_of_scope`؛ ارسال از مبدأ، دریافت و رد در مقصد. مالک هرگز محدود نیست؛ خالی یا همهٔ مکان‌ها = همه (ردیف پاک می‌شود)؛ محدوده در هر درخواست از نو خوانده می‌شود. پرچم خاموش ⇒ هیچ خواندنی از `shop_member_scopes` و پاسخ‌ها بایت‌به‌بایت همان (`staff-scope.test.js`).
 - مجوز با هستهٔ سه‌حالتهٔ `perm-core` (allow/deny/approve، سقفِ `maxPct`/`maxAmount`) و بردارِ `core/test-vectors/perm-v1.json` (#243).
 - لایه‌ها فقط می‌بندند: سرور اول `can(role)`ِ امروز را می‌سنجد، بعد لایهٔ نقش و کاربر؛ مالک همیشه همه‌کاره؛ نقش یا مجوزِ ناشناخته ممنوع (#243، #248).
 - از سرور فقط `settings.write`، `audit.view` (بستن) و `reports.money` (نمایش) تغییرپذیرند؛ تخفیف و لغو `not_enforceable_yet` تا سرور opها را با هسته بسنجد؛ پنهان کردنِ دکمه امنیت نیست (S90، #243).
@@ -648,6 +649,7 @@
 | `market.changes` | دکان / `all` | خاموش | جریانِ تغییرِ بازار (`market_changes`، S6): هر تغییرِ پروفایل، حضور، فهرست، انتشار/قیمتِ کالا، کاتالوگ و جریمه در همان تراکنش یک ردیف (امضای حالت ⇒ تکرار بی ردیف)؛ بازار کش و نمایهٔ جست‌وجو را با `seq` باطل می‌کند. خاموش ⇒ هیچ ردیف، همان کشِ زمانی | S6 | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲ از `core/receipt` (چاپ، PNG/PDF، توکنِ QR)؛ و **رسیدِ برگشتِ** نسخهٔ ۲ از `ReturnReceiptLayout` (RET-12)؛ خاموش ⇒ همان چیدمانِ پیشین، بیت‌به‌بیت. برنامه از `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #379، RET-12 | main؛ رسیدِ برگشت باز |
 | `shop.staff_time` | دکان / `all` | خاموش | STF-07/STF-08: `/api/shop/staff-time/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_time_disabled`)؛ کارتِ «ورود و خروج» و «پورسانتِ این ماه» در «مدیریت» ِ اندروید و کامپیوتر فقط با `enabled` ِ `/config` به فهرستِ کارت‌ها می‌آید | `claude/new-stf-2` | باز |
+| `shop.staff_scope` | دکان / `all` | خاموش | STF-06: محدودهٔ مکانِ کارمند در `/api/shop/catalog` (بیرونِ محدوده ⇒ ۴۰۳ `location_out_of_scope`، فهرست‌ها فقط محدوده)؛ `/api/shop/staff-scope/*` جز `/config` (خاموش ⇒ ۴۰۳ `staff_scope_disabled`)؛ کلیدهای «مکان‌های مجاز» در صفحهٔ کارمند فقط با پرچمِ روشن | `claude/stf06-branch-scope` | باز |
 | `shop.purchase_orders` | دکان / `all` | خاموش | `/api/shop/purchase-orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `purchase_orders_disabled`)؛ سفارشِ خرید، فرستادن، لغو و رسیدِ دریافت (PUR-02/04)؛ کلیدِ اشتراکِ `purchasing` رایگان است | #471 | باز |
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
@@ -741,6 +743,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۱۷۶: «خبرم کن» ِ بیرونِ محدوده `storefront_area_requests` (CHK-10، `claude/part-chk-2`)؛ ۱۷۴ از آنِ `claude/part-chk-1` (#628) و ۱۷۵ از آنِ `claude/new-rpt-2` است.
 - ۱۸۱ (`181_staff_time.sql`: `staff_punches` و `shop_commission_plans`، STF-07/STF-08، `claude/new-stf-2`؛ نخست ۱۸۰ بود و چون ۱۸۰ از آنِ #681 (`claude/new-web-3`) است، به ۱۸۱ رفت).
 - ۱۸۶ (`186_owner_reports.sql`: `owner_report_settings` و `owner_reports`، PAY-20/RPT-12، `claude/owner-daily-report`؛ ۱۴۰۵/۰۸/۱۰ پس از سنجشِ main و PRهای باز: بزرگ‌ترین ۱۸۵ بود).
+- ۱۸۹ (`189_staff_scope.sql`: `shop_member_scopes`، STF-06، `claude/stf06-branch-scope`؛ ۱۸۶ و ۱۸۸ از آنِ #768 و #770، ۱۹۰ سپرده به کارِ دیگر).
 - ۱۸۵ (`185_delivery_ratings.sql`: `delivery_ratings`، DLV-18، #707؛ ۱۸۲ تا ۱۸۴ برای کارهای هم‌زمانِ دو هماهنگ‌کنندهٔ دیگر خالی ماند).
 - ۱۹۱ (`191_order_issues_reviews.sql`: `order_issues`، `order_issue_photos`، `order_reviews`، NTF-07/09، `claude/ntf-order-issue-review`؛ ۱۸۶ و ۱۸۸ تا ۱۹۰ گرفته یا سپرده بود).
 - ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
