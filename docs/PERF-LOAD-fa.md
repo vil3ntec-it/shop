@@ -90,7 +90,7 @@ node scripts/load-test.mjs --profile smoke --no-budget                 # PGlite 
 |---|---|
 | ماشین | Intel Xeon @ 2.10GHz، ۴ vCPU، ۱۶GB (نزدیکِ ۸GB در دستِ کارهای دیگر)، Linux 6.18، **مشترک**: بارِ ماشین در هر نمایه کنارِ نتیجه آمده |
 | نرم‌افزار | Node v22.22.0؛ PostgreSQL 16.15 با پیکربندیِ پیش‌فرض، روی همان ماشین؛ `PG_POOL_MAX` پیش‌فرضِ ۱۰ |
-| کد | شاخهٔ `claude/perf02-load-tests` روی main @ `75119878` |
+| کد | شاخهٔ `claude/perf02-load-tests` روی main @ `75119878` — **پیش از** نمایه‌های PERF-03 (migration ‏۱۹۸) که پس از این اجراها به main رسید |
 | بار | `--rate 40 --shops 20 --devices 3 --scale 0.05 --small-scale 0.003` |
 | PGlite | **اجرا نشد** جز دودآزمون (§۲۹.۶ بندِ ۸: نتیجهٔ PostgreSQL به PGlite تعمیم داده نمی‌شود) |
 
