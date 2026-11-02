@@ -588,27 +588,6 @@ fun SettingsScreenLegacy(
       }
     }
 
-    /* ============ رابطِ تازه (نسخهٔ ۳) — پرچمِ `UiV3`، پیش‌فرض خاموش، فقط همین دستگاه ============ */
-    item {
-      SettingsSectionLegacy(
-        icon = Icons.Filled.Palette,
-        title = ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE,
-        subtitle = "خاموش — همین رابطِ امروز",
-        tint = Shop.colors.muted,
-      ) {
-        Text(
-          "آزمایشی و فقط روی همین دستگاه؛ داده و همگام‌سازی دست نمی‌خورند. از تنظیماتِ رابطِ تازه برمی‌گردید.",
-          style = MaterialTheme.typography.labelSmall,
-          color = Shop.colors.muted2,
-        )
-        Spacer(Modifier.height(8.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-          Text("روشن کردنِ رابطِ تازه", style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
-          Switch(checked = ir.vil3ntec.tohid.ui.UiV3.on, onCheckedChange = { ir.vil3ntec.tohid.ui.UiV3.set(context, it) })
-        }
-      }
-    }
-
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { ReportKeysSettingsWired(context) } //  کلیدهای دوره در گزارش‌ها (RPT-13)، پیش‌فرض خاموش
 
     /* ====== چتِ دکان: پیشرفتِ فرستادن و جای دستگاه (CHAT-05/07، پیش‌فرض خاموش) ====== */
