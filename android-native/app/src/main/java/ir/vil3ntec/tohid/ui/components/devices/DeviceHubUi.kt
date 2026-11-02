@@ -167,7 +167,8 @@ fun DeviceHubBody(colors: HubColors, toast: (String) -> Unit) {
   }
 
   fun add(s: DeviceSignal, v: DeviceVerdict) {
-    val kind = if (v.kind == DeviceKind.UNKNOWN || v.kind == DeviceKind.OTHER) DeviceKind.SCANNER.takeIf { v.serial } ?: DeviceKind.UNKNOWN else v.kind
+    //  نوعِ نامشخص حدس زده نمی‌شود: درگاهی که شاید چاپگر است نباید با خوانندهٔ بارکدخوان بسته بماند — «نقش» را صاحب‌کار می‌گذارد
+    val kind = if (v.kind == DeviceKind.OTHER) DeviceKind.UNKNOWN else v.kind
     val d = SavedDevice(s.link, s.name, kind, auto = true)
     store(DeviceRoster.upsert(DeviceLinks.load(context), d))
     assign(d)
@@ -295,6 +296,8 @@ private fun SavedRow(d: SavedDevice, colors: HubColors, onTest: () -> Unit, onRo
 /** «اسکن وقتی برنامه بسته است»: وضعیت (کلیدِ جدا ندارد) و راهنمای حالتِ صفحه‌کلید */
 @Composable
 fun BackgroundScanBody(colors: HubColors) {
+  val context = LocalContext.current
+  LaunchedEffect(Unit) { DeviceLinks.load(context) }
   val saved by DeviceLinks.roster
   val scanners = DeviceRoster.backgroundScanners(saved)
   val connected = scanners.count { DeviceLinks.states[DeviceLinks.key(it.link)] == DeviceState.CONNECTED }
