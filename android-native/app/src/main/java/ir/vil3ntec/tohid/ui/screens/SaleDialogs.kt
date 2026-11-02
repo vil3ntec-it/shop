@@ -108,7 +108,7 @@ fun CheckoutDialog(
     blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) },
     rules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }, // POS-24، پیش‌فرض خاموش
     //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
-    seller = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") },
+    seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) }, // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 
@@ -343,7 +343,7 @@ fun CheckoutDialog(
       title = "تأییدِ تخفیف",
       summary = "تخفیفِ ${money(basis.discount)} ؋ روی فاکتورِ ${money(basis.subtotal)} ؋",
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
-      requesterUserId = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false },
       onDismiss = { askApproval = false },
@@ -945,8 +945,12 @@ fun CartLineDialog(
   serials: ir.vil3ntec.tohid.ui.components.pos.PosLineSerials? = null, // POS-28 — کالای سریال‌دار؛ `null` ⇒ همان کادرِ پیشین
   /** S05 — واحدهای کالا با قیمتِ لیست و «بستهٔ کامل» (`TillGoodsPref.plan`)؛ `null` (خاموش) ⇒ همان کادرِ پیشین */
   units: ir.vil3ntec.tohid.data.UnitLine.Plan? = null,
+  /** S45 — «درخواستِ تأیید» برای ردِ قاعدهٔ جهت یا سقفِ قلمِ آزاد (`PriceApproval`)؛ `null` ⇒ همان پیامِ رد */
+  priceAsk: ir.vil3ntec.tohid.data.PriceAsk? = null,
 ) {
   val policy = linePolicy
+  var grant by remember { mutableStateOf<ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?>(null) }
+  var asking by remember { mutableStateOf(false) }
   var noteText by remember { mutableStateOf(note?.value.orEmpty()) }; var serialText by remember { mutableStateOf(serials?.text.orEmpty()) }
   var qtyText by remember { mutableStateOf(qty(units?.startCount ?: quantity)) }
   var priceText by remember { mutableStateOf(qty(unitPrice)) }
@@ -966,9 +970,16 @@ fun CartLineDialog(
   val listPrice = unitNow?.let(ir.vil3ntec.tohid.core.product.UnitSale::lineUnitPrice) // قیمتِ هر واحدِ پایه از قیمتِ بسته
   val parsedPrice = priceText.toDoubleOrNull()
   //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف (`LinePolicy.edit`)؛ خاموش ⇒ بی رد و بی تخفیف
-  val edit = ir.vil3ntec.tohid.data.LinePolicy.edit(
+  val firstEdit = ir.vil3ntec.tohid.data.LinePolicy.edit(
     policy, free, basePrice, unitPrice, if (manual) parsedPrice else null, parsedQty, discountPercent, discountText,
   )
+  //  S45: تأییدِ گرفته‌شده فقط همان قاعده را برای همان قیمت برمی‌دارد (`PriceApproval.lifted`/`covers`)
+  val typedMinor = if (manual) parsedPrice?.let(DiscountGate::minor) else null
+  val granted = grant?.takeIf { ir.vil3ntec.tohid.core.pos.PriceApproval.covers(it, typedMinor) }
+  val edit = if (granted == null) firstEdit else ir.vil3ntec.tohid.data.LinePolicy.edit(
+    ir.vil3ntec.tohid.core.pos.PriceApproval.lifted(policy, granted.code), free, basePrice, unitPrice, parsedPrice, parsedQty, discountPercent, discountText,
+  )
+  val askCode = firstEdit.problem?.takeIf { priceAsk != null && granted == null && typedMinor != null && ir.vil3ntec.tohid.core.pos.PriceApproval.askable(policy, it) }
   val ok = parsedQty != null && parsedQty > 0 && (!manual || (parsedPrice != null && parsedPrice >= 0)) && edit.ok
 
   Dialog(onDismissRequest = onDismiss) {
@@ -1074,6 +1085,8 @@ fun CartLineDialog(
           show = edit.canDiscount, percent = discountPercent, text = discountText, problem = edit.problem,
           onPercent = { discountPercent = it }, onText = { discountText = it },
         )
+        if (askCode != null) TextButton(onClick = { asking = true }) { Text(ir.vil3ntec.tohid.core.i18n.StrTill.askApproval) }
+        granted?.let { Text(ir.vil3ntec.tohid.core.i18n.StrTill.approvedBy(it.by), style = MaterialTheme.typography.labelSmall, color = Shop.colors.success) }
 
         Spacer(Modifier.height(14.dp))
         val shownPrice = if (manual) (parsedPrice ?: 0.0) else listPrice ?: basePrice
@@ -1091,11 +1104,24 @@ fun CartLineDialog(
           Button(
             enabled = ok,
             //  تخفیفِ ردیف ⇒ قیمتِ واحدِ پس از تخفیف؛ وگرنه همان قیمتِ دستیِ پیشین
-            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else listPrice); note?.save?.invoke(noteText); serials?.save(serialText) },
+            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else listPrice); note?.save?.invoke(noteText); serials?.save(serialText); if (firstEdit.problem != null) granted?.let { priceAsk?.onGranted?.invoke(it) } },
           ) { Text("ثبت") }
         }
       }
     }
+  }
+  val ask = priceAsk
+  if (asking && ask != null && askCode != null && typedMinor != null) {
+    ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog(
+      title = ir.vil3ntec.tohid.core.i18n.StrTill.priceTitle,
+      summary = ir.vil3ntec.tohid.core.i18n.StrTill.priceSummary(name, money(basePrice), money(typedMinor / 100.0)),
+      selfRole = ask.selfRole, selfName = ask.selfName, requesterUserId = ask.requesterUserId,
+      onApproved = { by, role, reason ->
+        grant = ir.vil3ntec.tohid.core.pos.PriceApproval.Grant(askCode, by, role, reason, ask.selfName, DiscountGate.minor(basePrice), typedMinor)
+        asking = false
+      },
+      onDismiss = { asking = false },
+    )
   }
 }
 

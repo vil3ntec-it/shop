@@ -12,6 +12,12 @@ object OrderDesk {
 
   /** همان بازه‌های سرور: «شلوغم» ۰ تا ۲۴۰ دقیقه (۰ = پایان)، توقف ۵ تا ۱۴۴۰ */
   val BUSY_MINUTES: List<Int> = listOf(15, 30, 60)
+
+  /** S42 — Ctrl+B (`orders.busy` ِ keymap.json): «شلوغم» ۳۰ دقیقه، همان دکمهٔ ۳۰ دقیقه */
+  const val BUSY_KEY_MINUTES: Int = 30
+
+  /** Ctrl+B کار می‌کند؟ فقط همان‌جا که دکمه‌های «شلوغم» هست: مجوزِ مدیریتِ سفارش و میزِ باز */
+  fun busyKey(canManage: Boolean, status: String): Int? = if (canManage && status == "open") BUSY_KEY_MINUTES else null
   val PAUSE_MINUTES: List<Int> = listOf(15, 30, 60, 120)
 
   /** `paused` بر `busy` جلو می‌افتد (ویترین سفارش نمی‌گیرد)؛ گذشته ⇒ باز (همان `view` ِ سرور با ساعتِ همین لحظه) */

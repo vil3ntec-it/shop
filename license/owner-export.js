@@ -156,6 +156,7 @@
     syncStatus: 'وضعیت همگام‌سازی',
     cancelReason: 'دلیل لغو',
     seller: 'فروشنده',
+    correctedAt: 'تاریخِ تصحیح‌شده (UTC)',
     approval: 'تأییدِ مدیر',
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',

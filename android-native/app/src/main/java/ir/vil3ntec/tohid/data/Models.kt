@@ -316,6 +316,14 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val note: String? = null,
+  /**
+   *  «تاریخِ تصحیح‌شده» (S28b، بخشِ ۳.۸.۱ بندِ ۸) — فقط سرورِ Sync v3 می‌نویسد، وقتی ساعتِ همین فاکتور
+   *  (`createdAt`) بیش از ۵ دقیقه با زمانِ تصحیح‌شده فرق داشت؛ `createdAt` و `date` ِ دستگاه دست نمی‌خورند.
+   *  برنامه هرگز خودش نمی‌گذارد؛ ⛔ `null` نوشته نمی‌شود، پس فاکتورِ با ساعتِ درست بایت‌به‌بایت همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val correctedAt: Long? = null,
 )
 
 /**

@@ -692,6 +692,8 @@ fun SaleScreenLegacy(
         custom = line.free || line.unitPrice != null,
         free = line.free,
         linePolicy = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) },
+        //  S45: ردِ قاعدهٔ جهت/سقفِ قلمِ آزاد ⇒ «درخواستِ تأیید» (فقط با «قیمت و تخفیفِ ردیف» ِ روشن)
+        priceAsk = remember(id) { ir.vil3ntec.tohid.data.LinePolicyPrefs.ask(context, store, scope, if (line.free) line.label else product?.name.orEmpty(), if (line.free) null else id) },
         saleUnit = product?.saleUnit.orEmpty(),
         unitFactor = product?.unitFactor ?: 1.0, units = remember(id) { ir.vil3ntec.tohid.data.TillGoodsPref.plan(context, product, line) }, // S05 (خاموش ⇒ null)
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)

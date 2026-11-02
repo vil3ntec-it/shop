@@ -130,6 +130,10 @@ object SettingsLayout {
   const val POS_TOUCH = "حالتِ لمسیِ صندوق (کامپیوتر)"
   /** کلیدهای بیشترِ صندوق (`PosMoreKeysPrefs`) — فقط کامپیوتر */
   const val POS_MORE_KEYS = "کلیدهای بیشترِ صندوق"
+  /** راهنمای کلیدِ هر صفحه از keymap.json و برچسب‌های Ctrl (S50، `KeyHelpPref`) — فقط کامپیوتر */
+  const val KEY_HELP = "راهنمای کلیدِ هر صفحه (F1 و Ctrl)"
+  /** تعویضِ کاربر روی صندوق با PIN ِ شخصی (S46، `TillUser`) — فقط کامپیوتر */
+  const val TILL_SWITCH = "تعویضِ کاربر روی صندوق (Ctrl+L)"
   /** کلیدهای دوره در گزارش‌ها (RPT-13، `ReportKeysPref`) — فقط کامپیوتر */
   const val REPORT_KEYS = "کلیدهای دوره در گزارش‌ها"
   /** شماره‌های جاافتادهٔ اسناد (RPT-17، `DocGapsPref`) — فقط کامپیوتر */
@@ -162,7 +166,7 @@ object SettingsLayout {
       SALES,
       listOf(
         "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
-        POS_MORE_KEYS, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
+        POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
         DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, TILL_GOODS, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
         SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
         STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, PRODUCT_TOOLS, PRODUCT_INFO, LABEL_TOOLS,
@@ -230,6 +234,8 @@ object SettingsLayout {
     POS_PRICE_CHECK to "price-check",
     POS_TOUCH to "touch-mode",
     POS_MORE_KEYS to "more-keys",
+    KEY_HELP to "key-help",
+    TILL_SWITCH to "till-switch",
     REPORT_KEYS to "report-keys",
     DOC_GAPS to "doc-gaps",
     LINE_PRICING to "line-pricing",
@@ -307,6 +313,8 @@ object SettingsLayout {
     POS_PRICE_CHECK -> ir.vil3ntec.tohid.core.i18n.StrPriceCheck.section
     POS_TOUCH -> ir.vil3ntec.tohid.core.i18n.StrTouch.section
     POS_MORE_KEYS -> StrPos.moreKeys
+    KEY_HELP -> ir.vil3ntec.tohid.core.i18n.StrTill.keyHelpTitle
+    TILL_SWITCH -> ir.vil3ntec.tohid.core.i18n.StrTill.switchTitle
     REPORT_KEYS -> ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys
     DOC_GAPS -> ir.vil3ntec.tohid.core.i18n.StrReports.docGaps
     LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
@@ -362,7 +370,7 @@ object SettingsLayout {
    *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد؛ کلیدهای صندوق و گزارشِ کامپیوتر هم (همان
    *  `Platform.DESKTOP` ِ `SettingsLegacy`).
    */
-  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, REPORT_KEYS, DOC_GAPS)
+  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, DOC_GAPS)
 
   /**
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ

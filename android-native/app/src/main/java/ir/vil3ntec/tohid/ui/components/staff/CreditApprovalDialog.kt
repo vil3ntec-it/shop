@@ -68,6 +68,26 @@ fun CreditApprovalDialog(
   onDismiss: () -> Unit,
   /** S22: همین پنجره برای «فروشِ منقضی» (`ExpiryGate`) — فقط عنوان فرق دارد؛ نام، نقش و دلیل همان */
   title: String = StrPos.creditOverTitle,
+) = PinApprovalDialog(
+  title, summary, selfRole, selfName, requesterUserId,
+  onApproved = { by, role, reason -> onApproved(CreditGate.Approval(by, role, debtorId, addMinor, reason)) },
+  onDismiss = onDismiss,
+)
+
+/**
+ *  همان پنجرهٔ «تأییدِ صریحِ مدیر یا PIN ِ مدیر/صاحب با دلیل» برای کاری که سرور سقفش را نمی‌سنجد (پس برگهٔ
+ *  امضاشده ندارد): فروشِ نسیه بیش از سقف (S07) و تغییرِ قیمتِ بیرون از قاعده (S45، `PriceApproval`).
+ *  @param onApproved (نامِ تأییدکننده، نقشش، دلیل)
+ */
+@Composable
+fun PinApprovalDialog(
+  title: String,
+  summary: String,
+  selfRole: String,
+  selfName: String,
+  requesterUserId: String,
+  onApproved: (by: String, role: String, reason: String) -> Unit,
+  onDismiss: () -> Unit,
 ) {
   val context = LocalContext.current
   val store = remember { StaffPins(context) }
@@ -128,7 +148,7 @@ fun CreditApprovalDialog(
             Button(
               enabled = reason.isNotBlank(),
               onClick = {
-                onApproved(CreditGate.Approval(selfName.trim().ifBlank { roleName(selfRole) }, selfRole, debtorId, addMinor, reason.trim()))
+                onApproved(selfName.trim().ifBlank { roleName(selfRole) }, selfRole, reason.trim())
               },
             ) { Text(StrPos.creditApproveSelf) }
           }
@@ -154,7 +174,7 @@ fun CreditApprovalDialog(
               store.put(out.record)
               busy = false
               if (out.ok) {
-                onApproved(CreditGate.Approval(r.name.ifBlank { roleName(r.role) }, r.role, debtorId, addMinor, reason.trim()))
+                onApproved(r.name.ifBlank { roleName(r.role) }, r.role, reason.trim())
               } else {
                 locked = out.record.locked
                 error = StrPos.pinWrong(plain(PinGuard.remaining(out.record.guard)))

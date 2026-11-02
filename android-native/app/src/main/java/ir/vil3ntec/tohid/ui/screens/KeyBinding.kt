@@ -32,6 +32,19 @@ fun KeyEvent.matches(a: KeyAction): Boolean = type == KeyEventType.KeyDown && a.
 /** برچسبِ کوتاهِ نخستین کلید: «Ctrl+P»، روی مک «Cmd+P» */
 val KeyAction.hint: String get() = hint(onMac)
 
+/**
+ *  کارِ keymap ِ همین صفحه تا وقتی صفحه باز است و [enabled] (S42): پنجرهٔ کامپیوتر کلیدِ [action] را به
+ *  [run] می‌رساند (`AppNav.dispatchKey`). گوشی کلیدی نمی‌فرستد، پس آن‌جا بی‌اثر است.
+ */
+@androidx.compose.runtime.Composable
+fun ScreenKey(action: KeyAction, enabled: Boolean, run: () -> Unit) {
+  val latest = androidx.compose.runtime.rememberUpdatedState(run)
+  androidx.compose.runtime.DisposableEffect(action.id, enabled) {
+    if (enabled) ir.vil3ntec.tohid.ui.AppNav.screenKeys[action.id] = { latest.value() }
+    onDispose { if (enabled) ir.vil3ntec.tohid.ui.AppNav.screenKeys.remove(action.id) }
+  }
+}
+
 /** نامِ کلید ⇒ `Key`ِ Compose. `when`ِ کامل است: نامِ تازه در keymap بی نگاشت کامپایل نمی‌شود. */
 internal fun KeyName.matches(k: Key): Boolean = when (this) {
   KeyName.A -> k == Key.A

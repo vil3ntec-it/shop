@@ -2,15 +2,28 @@ package ir.vil3ntec.tohid.ui.v3.settings.sections
 
 // i18n: سه‌زبانه
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrPriceCheck
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrShell
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.i18n.StrTouch
+import ir.vil3ntec.tohid.data.TillUser
+import ir.vil3ntec.tohid.ui.components.keys.KeyHelpPref
+import ir.vil3ntec.tohid.ui.components.staff.TillUsersBlock
+import ir.vil3ntec.tohid.ui.v3.V3Segmented
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsBlock
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsNote
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 import ir.vil3ntec.tohid.data.DocGapsPref
 import ir.vil3ntec.tohid.data.ReportKeysPref
 import ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs
@@ -74,5 +87,27 @@ internal fun RouteScope.DocGapsScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   ToggleScreen(SettingsLayout.DOC_GAPS, onBack, DocGapsPref.on(context), StrReports.docGapsOn, StrReports.docGapsNote) {
     DocGapsPref.setOn(context, it)
+  }
+}
+
+/** `settings/sales/key-help`: راهنمای کلیدِ هر صفحه از keymap.json و برچسب‌های Ctrl (S50) */
+@Composable
+internal fun RouteScope.KeyHelpScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  val on = remember { KeyHelpPref.load(context); KeyHelpPref.on.value }
+  ToggleScreen(SettingsLayout.KEY_HELP, onBack, on, StrShell.switchOn, StrTill.keyHelpNote) { KeyHelpPref.set(context, it) }
+}
+
+/** `settings/sales/till-switch`: تعویضِ کاربر روی صندوق با PIN ِ شخصی (S46) — روشن/خاموش و کاربرانِ PIN‌دار */
+@Composable
+internal fun RouteScope.TillSwitchScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  var on by remember { TillUser.load(context); mutableStateOf(TillUser.on.value) }
+  SettingsPageFrame(title = SettingsLayout.labelOf(SettingsLayout.TILL_SWITCH), subtitle = if (on) StrShell.switchOn else StrSettings.off, onBack = onBack) {
+    item(key = "choice") {
+      SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { on = it == 1; TillUser.set(context, on) }) }
+      SettingsNote(StrTill.switchNote)
+    }
+    if (on) item(key = "users") { SettingsBlock { Column { TillUsersBlock() } } }
   }
 }

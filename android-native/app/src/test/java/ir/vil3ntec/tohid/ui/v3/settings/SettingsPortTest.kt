@@ -166,6 +166,8 @@ class SettingsPortTest {
       SettingsLayout.POS_PRICE_CHECK to "settings/sales/price-check",
       SettingsLayout.POS_TOUCH to "settings/sales/touch-mode",
       SettingsLayout.POS_MORE_KEYS to "settings/sales/more-keys",
+      SettingsLayout.KEY_HELP to "settings/sales/key-help",
+      SettingsLayout.TILL_SWITCH to "settings/sales/till-switch",
       SettingsLayout.REPORT_KEYS to "settings/sales/report-keys",
       SettingsLayout.DOC_GAPS to "settings/sales/doc-gaps",
       SettingsLayout.LINE_PRICING to "settings/sales/line-pricing",
@@ -244,7 +246,7 @@ class SettingsPortTest {
       "StorefrontEtaLive.set", "PromoGuardLive.set",
       "GiftReceiptPrefs.set", "DeliverLaterPrefs.set", "SpecialOrderPref.set", "PriceWhyPrefs.set",
       "ShrinkReportPref.set", "CountToolsPref.setOn", "CountToolsPref.setBlind", "LabelToolsPref.set", "ProductInfoPrefs.set",
-      "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
+      "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "KeyHelpPref.set", "TillUser.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
       "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
       "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
       "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
@@ -255,7 +257,7 @@ class SettingsPortTest {
     /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */
     private val DESK_ONLY: Set<String> = setOf(
       SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
-      SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
+      SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
     )
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */

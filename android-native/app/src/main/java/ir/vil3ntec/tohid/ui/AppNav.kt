@@ -53,4 +53,25 @@ object AppNav {
    */
   val lockNow = androidx.compose.runtime.mutableIntStateOf(0)
   fun lock() { lockNow.intValue++ }
+
+  /**
+   *  کارهای keymap ِ صفحهٔ باز (S42): صفحه با `ScreenKey` کارِ خودش را با شناسهٔ keymap.json این‌جا می‌گذارد و
+   *  پنجرهٔ کامپیوتر کلیدِ همان کار را به آن می‌رساند ([dispatchKey]). صفحه بسته ⇒ برداشته می‌شود؛ خالی ⇒ هیچ.
+   */
+  val screenKeys = androidx.compose.runtime.mutableStateMapOf<String, () -> Unit>()
+
+  /** کلیدی که به کارِ ثبت‌شدهٔ صفحه می‌خورد ⇒ همان کار؛ `true` یعنی گرفته شد. planned هرگز. */
+  fun dispatchKey(matches: (ir.vil3ntec.tohid.core.keymap.KeyAction) -> Boolean): Boolean {
+    for ((id, run) in screenKeys.toList()) {
+      val a = ir.vil3ntec.tohid.core.keymap.KeyMap.ALL.firstOrNull { it.id == id } ?: continue
+      if (a.status != ir.vil3ntec.tohid.core.keymap.KeyStatus.PLANNED && matches(a)) { run(); return true }
+    }
+    return false
+  }
+
+  /** مسیرِ صفحهٔ باز با زیرصفحه (مثلاً «orders») — فقط برای راهنمای کلیدهای همان صفحه (S50، `KeyHelp.scopeOf`) */
+  val route = mutableStateOf("dashboard")
+
+  /** برچسب‌های «نگه‌داشتنِ Ctrl» (S50) — پنجرهٔ کامپیوتر می‌گذارد و برمی‌دارد */
+  val keyLabels = mutableStateOf(false)
 }

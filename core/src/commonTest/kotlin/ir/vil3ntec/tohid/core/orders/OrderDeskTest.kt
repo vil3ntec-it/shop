@@ -40,6 +40,15 @@ class OrderDeskTest {
   }
 
   @Test
+  fun ctrlBIsBusyThirtyMinutesOnlyWhereTheButtonIs() {
+    assertEquals(30, OrderDesk.busyKey(canManage = true, status = "open"))
+    assertTrue(OrderDesk.BUSY_KEY_MINUTES in OrderDesk.BUSY_MINUTES)
+    assertNull(OrderDesk.busyKey(canManage = false, status = "open"))
+    assertNull(OrderDesk.busyKey(canManage = true, status = "busy"))
+    assertNull(OrderDesk.busyKey(canManage = true, status = "paused"))
+  }
+
+  @Test
   fun boundedSettings() {
     assertEquals(5, OrderDesk.bounded(" 5 ", 1, 500))
     assertNull(OrderDesk.bounded("0", 1, 500))

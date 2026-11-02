@@ -133,7 +133,7 @@ private fun AppRootActive(
   val nav = rememberV3Nav(V3Modules.table, "home")
   //  OPS-06: صفحهٔ باز برای راهنمای F1 (پنجرهٔ کامپیوتر بیرونِ همین درخت است)؛ شناسهٔ راهنما همان
   //  مسیرِ رابطِ امروز است (`ScreenGuides`)، پس «خانه» ِ نسخهٔ ۳ همان `dashboard`
-  LaunchedEffect(nav.current) { AppNav.screen.value = RoutePaths.base(nav.current).let { if (it == "home") "dashboard" else it } }
+  LaunchedEffect(nav.current) { AppNav.screen.value = RoutePaths.base(nav.current).let { if (it == "home") "dashboard" else it }; AppNav.route.value = RoutePaths.base(nav.current) }
   var migration by remember { mutableStateOf<String?>(null) }
 
   //  «رمز را دوباره بزنید» برای هر کارِ حساس (`reauth_required`، بندِ ۲۱.۱)
@@ -313,9 +313,15 @@ private fun AppRootActive(
   val hasAccount = !syncState.accessToken.isNullOrBlank()
   val locked = lockStore.enabled && !unlocked
   val askLock = hasAccount && !lockStore.enabled && !lockAsked && !syncState.lockDeclined
-  val held = !loaded || locked || needsShop || askLock
+  //  S46: Ctrl+L ⇒ قفلِ «هر کس با PIN ِ خودش» (`TillUser`)؛ تنظیمِ خاموش ⇒ هیچ (مثلِ امروزِ نسخهٔ ۳)
+  val lockAsk by AppNav.lockNow
+  var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }
+  LaunchedEffect(lockAsk) { if (lockAsk != lockSeen) { lockSeen = lockAsk; ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled) } }
+  val tillLocked = ir.vil3ntec.tohid.data.TillUser.locked.value
+  val held = !loaded || locked || needsShop || askLock || tillLocked
   SideEffect { nav.held = held }
   if (locked) { AppLockScreen { unlocked = true }; return }
+  if (tillLocked) { ir.vil3ntec.tohid.ui.components.staff.TillLockScreen(cartStore, store, lockStore.enabled); return }
   //  «دکانت کدام است؟» — فقط وقتی مطمئنیم دکانی نیست
   if (needsShop) { ShopSetupScreen(store) { needsShop = false }; return }
   //  رمزِ برنامه، یک بار، بعد از ساختنِ حساب
