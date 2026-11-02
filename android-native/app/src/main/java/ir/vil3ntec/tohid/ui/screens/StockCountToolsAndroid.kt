@@ -102,16 +102,3 @@ fun StockCountToolsWired(
     now = { System.currentTimeMillis() },
   )
 }
-
-/** بخشِ «انبارگردانیِ تازه» با خواندن و نوشتنِ `CountToolsPref` — تا `Settings` یک خط بخواهد */
-@Composable
-fun CountToolsSettingsWired(context: android.content.Context) {
-  var on by remember { mutableStateOf(CountToolsPref.on(context)) }
-  var blind by remember { mutableStateOf(CountToolsPref.blind(context)) }
-  CountToolsSettings(
-    on = on,
-    blind = blind,
-    onChange = { on = it; CountToolsPref.setOn(context, it) },
-    onBlind = { blind = it; CountToolsPref.setBlind(context, it) },
-  )
-}

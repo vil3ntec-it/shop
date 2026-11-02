@@ -8,8 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -20,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrProduct
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.product.CustomFields
 import ir.vil3ntec.tohid.core.product.ProductAlternatives
 import ir.vil3ntec.tohid.core.product.PriceSchedule
@@ -32,8 +29,6 @@ import ir.vil3ntec.tohid.core.product.ProductTerms
 import ir.vil3ntec.tohid.core.product.ShelfLocation
 import ir.vil3ntec.tohid.data.ProductInfoMap
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -306,25 +301,6 @@ fun OrderLineShelf(d: ShopData, productId: String) {
   if (productId.isEmpty() || !productInfoOn()) return
   val loc = d.products.firstOrNull { it.id == productId }?.let { ProductInfoMap.shelf(it) }?.takeIf { !it.isEmpty } ?: return
   Text(shelfLabel(loc), style = MaterialTheme.typography.labelSmall, color = Shop.colors.primary)
-}
-
-/** بخشِ تنظیمات — خودش نمی‌خواند و نمی‌نویسد: مقدار و نوشتن از صدازننده (`ProductInfoPrefs`) */
-@Composable
-fun ProductInfoSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Inventory2,
-    title = StrProduct.section,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrProduct.note, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
-  }
 }
 
 /** سقفِ نویسهٔ کادرِ فهرست — ۲۰ واژه × ۶۰ نویسه با جداکننده جا می‌شود */

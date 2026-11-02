@@ -42,13 +42,6 @@ object PosMoreKeysPrefs {
   }
 }
 
-/** بخشِ تنظیمات با خواندن و نوشتنِ همین تنظیم — مرزِ پلتفرم، تا `Settings` فقط یک خط بخواهد */
-@androidx.compose.runtime.Composable
-fun PosMoreKeysSettingsWired(context: android.content.Context) {
-  PosMoreKeysPrefs.load(context)
-  PosMoreKeysSettings(PosMoreKeysPrefs.on.value) { PosMoreKeysPrefs.set(context, it) }
-}
-
 /** کلیدِ Compose ⇒ نامِ کلیدِ `PosMoreKeys` (فیزیکی، مستقل از چیدمان) */
 private fun KeyEvent.moreKey(): PosMoreKeys.Key = when (key) {
   Key.F5 -> PosMoreKeys.Key.F5

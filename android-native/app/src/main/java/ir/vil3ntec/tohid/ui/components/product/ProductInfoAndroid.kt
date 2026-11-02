@@ -32,10 +32,3 @@ fun productInfoOn(): Boolean {
   ProductInfoPrefs.load(LocalContext.current)
   return ProductInfoPrefs.on.value
 }
-
-/** بخشِ تنظیمات با خواندن و نوشتنِ همین تنظیم — مرزِ پلتفرم، تا `Settings` یک خط بخواهد */
-@Composable
-fun ProductInfoSettingsWired(context: android.content.Context) {
-  ProductInfoPrefs.load(context)
-  ProductInfoSettings(ProductInfoPrefs.on.value) { ProductInfoPrefs.set(context, it) }
-}

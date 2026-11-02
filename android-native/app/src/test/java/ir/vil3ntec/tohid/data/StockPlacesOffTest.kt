@@ -64,9 +64,12 @@ class StockPlacesOffTest {
   }
 
   /** متنِ خامِ `android-native` (کامپیوتر پیش از کامپایل چند عبارت را عوض می‌کند، این دو پرونده را نه) */
-  private fun src(rel: String): String =
+  private fun root(): File =
     listOf("src/main/java/ir/vil3ntec/tohid", "../android-native/app/src/main/java/ir/vil3ntec/tohid", "android-native/app/src/main/java/ir/vil3ntec/tohid")
-      .map { File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
+      .map(::File).firstOrNull { it.isDirectory } ?: error("ریشهٔ کد پیدا نشد (cwd=${File(".").absoluteFile})")
+
+  private fun src(rel: String): String =
+    root().resolve(rel).takeIf { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
 
   @Test fun `پیش‌فرض خاموش و دکمه و نوشتن فقط پشتِ همان تنظیم`() {
     val pref = src("data/StockPlacesAndroid.kt")
@@ -76,9 +79,16 @@ class StockPlacesOffTest {
     //  هر نوشتن فقط از `StockPlacesPref.record` (دفترِ همین لحظهٔ دیسک، یک بار برای هر کلید)
     assertEquals(1, Regex(Regex.escape("StockPlacesPref.record(")).findAll(entry).count())
     assertEquals(5, Regex("""(?<!fun )\bwrite\(""").findAll(entry).count())
-    val wh = src("ui/screens/Warehouse.kt")
-    assertEquals(1, Regex(Regex.escape("StockPlacesEntry(")).findAll(wh).count())
-    assertTrue("انبار خودش هیچ نوشتنِ تازه‌ای ندارد", !wh.contains("StockPlaces.") && !wh.contains("Repack."))
+    //  «انبارِ» رابطِ امروز (`Warehouse.kt`، بی‌مرجع از نسخهٔ ۳) در «پاک‌سازی، گامِ ۳» پاک شد. جای سنجشِ «انبار خودش
+    //  نمی‌نویسد»: هیچ صفحه‌ای جز همین درگاه و برگه‌اش به `StockPlaces`/`Repack` دست نمی‌زند و `record` فقط همین‌جاست
+    val ui = root().resolve("ui").walkTopDown().filter { it.isFile && it.extension == "kt" }
+      .associate { it.relativeTo(root()).invariantSeparatorsPath to it.readText() }
+    assertEquals(listOf("ui/screens/StockPlacesUiAndroid.kt"), ui.filterValues { it.contains("StockPlacesPref.record(") }.keys.sorted())
+    assertEquals(
+      "صفحه‌ای بیرون از درگاهِ محل‌ها به StockPlaces/Repack دست می‌زند",
+      listOf("ui/screens/StockPlacesSheet.kt", "ui/screens/StockPlacesUiAndroid.kt"),
+      ui.filterValues { Regex("""\b(StockPlaces|Repack)\.""").containsMatchIn(it) }.keys.sorted(),
+    )
   }
 
   private companion object {
