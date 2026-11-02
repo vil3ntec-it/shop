@@ -138,6 +138,8 @@ object LedgerOwner {
     user: String,
     shop: String,
   ): Result {
+    //  OPS-07: در حالتِ آموزشی دفترِ واقعی جابه‌جا نمی‌شود (ورود و دکانِ تازه هم بی شبکه نمی‌رسند)
+    if (TrainingMode.on) return Result.SAME
     val state = SyncStore(context)
     val previousUser = currentUser(context)
     val previousShop = currentShop(context)

@@ -34,7 +34,9 @@ import java.util.concurrent.atomic.AtomicReference
 class CartStore(context: Context) : HeldCart {
 
   private val prefs = context.getSharedPreferences("tohid", Context.MODE_PRIVATE)
-  private val file = File(context.filesDir, FILE)
+  //  OPS-07: پیش‌نویسِ سبدِ حالتِ آموزشی در `files/training` — نمونه‌ای که در آموزش ساخته شد هرگز سبدِ واقعی را نمی‌بیند
+  private val file = File(TrainingLedger.filesDir(context), FILE)
+  private val training = TrainingMode.on
   /** برای چاپ و کشوی پس از فروش (HW-02/03) — هر دو پیش‌فرض خاموش */
   private val app: Context = context.applicationContext ?: context
 
@@ -73,7 +75,8 @@ class CartStore(context: Context) : HeldCart {
 
   private fun load(): SaleDraft? {
     if (file.isFile) return SaleDraftCodec.decode(runCatching { file.readText(Charsets.UTF_8) }.getOrNull())
-    //  پیش‌نویسِ نسخهٔ پیش (SharedPreferences، همان شکلِ وب)
+    //  پیش‌نویسِ نسخهٔ پیش (SharedPreferences، همان شکلِ وب) — مالِ دفترِ واقعی، پس آموزش نه می‌خواندش نه پاکش می‌کند
+    if (training) return null
     val legacy = SaleDraftCodec.decode(prefs.getString(LEGACY_KEY, null)) ?: return null
     return legacy.copy(debtorId = prefs.getString(LEGACY_DEBTOR_KEY, null))
   }
@@ -82,7 +85,7 @@ class CartStore(context: Context) : HeldCart {
     val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value)
     write(file, draft) {
       //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
-      if (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY)) {
+      if (!training && (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY))) {
         prefs.edit().remove(LEGACY_KEY).remove(LEGACY_DEBTOR_KEY).apply()
       }
     }

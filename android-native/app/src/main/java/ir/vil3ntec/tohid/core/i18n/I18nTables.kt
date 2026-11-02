@@ -12,6 +12,7 @@ object I18nTables {
     StrPlaces, // INV-20/21
     Str, StrNav, StrAuth, StrSettings, StrHome, StrSale, StrShell, StrPos, StrExpenses, StrFields,
     StrInvoices, StrSecurity, StrLine, StrLoyalty, StrKit, StrProducts, StrStock, StrMoney, StrReports, StrAccount,
+    StrTraining, // OPS-07
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,

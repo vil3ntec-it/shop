@@ -1172,6 +1172,9 @@ fun SettingsScreenLegacy(
       }
     }
 
+    /* ============== حالتِ آموزشی (OPS-07)، پیش‌فرض خاموش — دفترِ جدا با دادهٔ نمونه ============== */
+    item { ir.vil3ntec.tohid.ui.screens.TrainingSettingsWired(context, ::toast) }
+
     /* ============================ درباره ============================ */
     item {
       SettingsSectionLegacy(

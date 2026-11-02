@@ -141,7 +141,8 @@ object AutoSync {
   @Volatile private var windowStart = 0L
 
   /** هم نشانی هست، هم حساب — یعنی اصلاً می‌شود به سرور زد */
-  private fun ready(context: Context): Boolean = Backend.isReady(context)
+  //  OPS-07: حالتِ آموزشی ⇒ هیچ دورِ همگام‌سازی (`TrainingMode`)
+  private fun ready(context: Context): Boolean = ir.vil3ntec.tohid.data.TrainingMode.networkAllowed() && Backend.isReady(context)
 
   /* ------------------------------ راه‌ها ------------------------------ */
 
@@ -151,6 +152,7 @@ object AutoSync {
    *  هر بار که دفتر تغییر می‌کند صدا زده می‌شود.
    */
   fun nudge(context: Context, store: ShopStore) {
+    if (store.training) return   //  OPS-07: دفترِ آموزشی هرگز به موتور نمی‌رسد
     val app = context.applicationContext
     if (!ready(app)) return
 
@@ -171,6 +173,7 @@ object AutoSync {
 
   /** همین حالا — برای بازِ شدنِ برنامه و برای بعد از ورود */
   fun now(context: Context, store: ShopStore) {
+    if (store.training) return
     val app = context.applicationContext
     if (!ready(app)) return
     scope.launch { runOnce(app, store) }
@@ -183,6 +186,7 @@ object AutoSync {
    *  برمی‌گردد، `now` یک بار همه‌چیز را تازه می‌کند.
    */
   fun startPolling(context: Context, store: ShopStore) {
+    if (store.training) return   //  پیمایشِ دفترِ واقعی سرِ جایش؛ در آموزش `ready` خاموش است
     val app = context.applicationContext
     polling?.cancel()
     polling = scope.launch {
@@ -201,6 +205,7 @@ object AutoSync {
   /* ------------------------------ اجرا ------------------------------ */
 
   private suspend fun runOnce(app: Context, store: ShopStore) {
+    if (store.training) return
     if (running) return          // یکی در حال اجراست؛ `unsent` سرِ جایش می‌ماند
     if (!ready(app)) return
 
