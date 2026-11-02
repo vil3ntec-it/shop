@@ -1,0 +1,266 @@
+import java.util.Properties
+
+/*
+ *  رابطِ کاربریِ مشترکِ آیفون — همان کدِ Compose ِ اندروید، روی iOS با Compose Multiplatform.
+ *
+ *  ── چرا این شکل (همان الگوی desktop/build.gradle.kts) ───────────────
+ *  هیچ صفحه‌ای این‌جا دوباره نوشته نمی‌شود. فایل‌های `android-native/app/src/main/java`
+ *  هنگامِ ساخت به `build/generated/ios-src` کپی و برای iOS کامپایل می‌شوند:
+ *
+ *    ۱) `ios-exclude.txt` — فایل‌هایی که هنوز به JVM/اندروید تکیه دارند (Context،
+ *       SharedPreferences، java.io.File، شبکهٔ JDK، چاپ…) و در iOS نیستند. هر سطر دلیل دارد؛
+ *       کوچک کردنِ این فهرست کارِ گامِ ۲ِ docs/IOS-PLAN-fa.md است.
+ *    ۲) `src/iosMain/kotlin` — shimهای iOS (مثلِ `desktop/src/shim`): نام‌های JVM ای که
+ *       کدِ مشترک صدا می‌زند — `java.*` (File، Calendar، URLEncoder…) و `android.*` (Context،
+ *       SharedPreferences، Intent…) با همان نام، و `System`/`Math`/`synchronized`/`String.format` در
+ *       `ir.vil3ntec.tohid.ios.jvm` — با پیاده‌سازیِ Foundation/UIKit. سرِ هر فایلِ کپی‌شده یک خطِ
+ *       import افزوده می‌شود و `@Synchronized` به `synchronized` برمی‌گردد؛ متنِ دیگرِ فایل دست نمی‌خورد.
+ *       فایل‌های `*Ios.kt` جایگزینِ همان API اند (مثلِ «replaced» ِ کامپیوتر).
+ *    ۳) ریشهٔ کوچکِ آیفون (`ir.vil3ntec.tohid.ios.IosRoot`) فقط composableهای مشترک را
+ *       کنارِ هم می‌گذارد؛ `MainViewController()` همان را به SwiftUI می‌دهد (`ios/iosApp`).
+ *
+ *  ⛔ اندروید و کامپیوتر این ساخت را نمی‌خوانند. هدف‌های iOS فقط با `-Pios=true` (مثلِ core)؛
+ *  بی پرچم هیچ هدفی پیکربندی نمی‌شود.
+ *  ⛔ نسخه‌های Kotlin/Compose همان `desktop/build.gradle.kts` — با هم عوض می‌شوند.
+ *  ──────────────────────────────────────────────────────────────────
+ */
+plugins {
+  kotlin("multiplatform") version "2.2.20"
+  id("org.jetbrains.kotlin.plugin.compose") version "2.2.20"
+  id("org.jetbrains.kotlin.plugin.serialization") version "2.2.20"
+  id("org.jetbrains.compose") version "1.9.3"
+}
+
+val ios = providers.gradleProperty("ios").orNull == "true"
+
+val android = rootDir.resolve("../../android-native")
+val androidSrc = android.resolve("app/src/main/java")
+val androidProps = Properties().apply {
+  android.resolve("gradle.properties").inputStream().use { load(it) }
+}
+fun prop(name: String): String = (androidProps.getProperty(name) ?: "").trim()
+
+/*
+ *  فهرستِ بیرون‌مانده: هر سطر یک مسیر زیرِ `ir/vil3ntec/tohid/` (فایل، یا پوشه با `/` ِ پایانی)،
+ *  پس از `#` دلیل. هر فایلِ تازه‌ای که در این فهرست نیست خودبه‌خود به iOS می‌رسد — پس
+ *  کدِ تازهٔ وابسته به JVM همین‌جا (کارِ `ios-ui-klib`) دیده می‌شود.
+ */
+val excludeFile = file("ios-exclude.txt")
+val excluded: List<String> = excludeFile.readLines(Charsets.UTF_8)
+  .map { it.substringBefore('#').trim() }
+  .filter { it.isNotEmpty() }
+  .map { "ir/vil3ntec/tohid/$it" }
+
+/*
+ *  سرِ هر فایلِ کپی‌شده: shimهای iOS و `Dispatchers.IO` (در Kotlin/Native یک extension است و
+ *  import می‌خواهد). import ِ ستاره‌دار پس از importهای صریح و همان بسته می‌آید، پس هیچ نامی
+ *  که فایل خودش دارد را نمی‌پوشاند.
+ */
+val injected = "import ir.vil3ntec.tohid.ios.jvm.*\nimport kotlinx.coroutines.IO\n"
+
+/*
+ *  `@Synchronized` (قفلِ JVM روی تابع) در Kotlin/Native نیست. همان معنا با `synchronized` ِ shim
+ *  (یک قفلِ بازگشتیِ سراسری، ‎ios/jvm/Jvm.kt‎):
+ *    `@Synchronized fun f(…) { BODY }`  ⇐  `fun f(…) { synchronized(Unit) { BODY } }`
+ *    `@Synchronized fun f(…) = EXPR`    ⇐  `fun f(…) = synchronized(Unit) { EXPR }`
+ *  `return` درونِ BODY همان بازگشت از f است (shim ِ inline با قراردادِ EXACTLY_ONCE). متنِ اندروید
+ *  دست نمی‌خورد؛ فقط کپیِ iOS. شکلِ ناشناخته ⇐ شکستنِ ساخت، نه کدِ بی‌قفل.
+ */
+fun unsynchronize(src: String, where: String): String {
+  val sb = StringBuilder(src)
+  val tag = "@Synchronized"
+  var from = 0
+  while (true) {
+    val at = sb.indexOf(tag, from)
+    if (at < 0) break
+    if (skipCode(sb, 0, at) != at) { from = at + tag.length; continue }
+    sb.delete(at, at + tag.length)
+    val funAt = sb.indexOf("fun ", at)
+    //  میانِ نشان و `fun` فقط واژهٔ دسترسی/override (`private`، `override`…)
+    require(funAt >= 0 && Regex("[\\s\\w]*").matches(sb.substring(at, funAt))) { "$where: @Synchronized بی fun" }
+    var i = funAt
+    var depth = 0
+    while (i < sb.length) {
+      val c = sb[i]
+      if (c == '(' || c == '<') depth++ else if (c == ')' || (c == '>' && sb[i - 1] != '-')) depth--
+      else if (depth == 0 && (c == '{' || c == '=')) break
+      i++
+    }
+    if (sb[i] == '{') {
+      val close = codeEnd(sb, i + 1, closing = '}')
+      sb.insert(close, "} ")
+      sb.insert(i + 1, " synchronized(Unit) {")
+    } else {
+      val end = codeEnd(sb, i + 1, closing = null)
+      sb.insert(end, " }")
+      sb.insert(i + 1, " synchronized(Unit) {")
+    }
+    from = at
+  }
+  return sb.toString()
+}
+
+/** از `start` جلو می‌رود و رشته/نویسه/توضیح را می‌پَرد؛ نخستین جایی که به `stop` برسد یا متن تمام شود */
+fun skipCode(t: CharSequence, start: Int, stop: Int): Int {
+  var i = start
+  while (i < stop) i = step(t, i)
+  return i
+}
+
+/** یک گامِ پیمایش: اگر در i رشته یا توضیح آغاز شود، پایانش؛ وگرنه i+1 */
+fun step(t: CharSequence, i: Int): Int {
+  fun at(k: Int, s: String) = t.length >= k + s.length && t.subSequence(k, k + s.length) == s
+  return when {
+    at(i, "//") -> { var k = i; while (k < t.length && t[k] != '\n') k++; k }
+    at(i, "/*") -> { var k = i + 2; var d = 1; while (k < t.length && d > 0) { if (at(k, "/*")) { d++; k += 2 } else if (at(k, "*/")) { d--; k += 2 } else k++ }; k }
+    at(i, "\"\"\"") -> { var k = i + 3; while (k < t.length && !at(k, "\"\"\"")) { k = if (at(k, "\${")) codeEnd(t, k + 2, '}') + 1 else k + 1 }; while (at(k + 1, "\"\"\"")) k++; k + 3 }
+    t[i] == '"' -> { var k = i + 1; while (k < t.length && t[k] != '"') { k = when { t[k] == '\\' -> k + 2; at(k, "\${") -> codeEnd(t, k + 2, '}') + 1; else -> k + 1 } }; k + 1 }
+    t[i] == '\'' -> { var k = i + 1; while (k < t.length && t[k] != '\'') k += if (t[k] == '\\') 2 else 1; k + 1 }
+    else -> i + 1
+  }
+}
+
+/**
+ *  پایانِ کد از `start`: با `closing` جای همان بست در عمقِ صفر؛ بی آن (بدنهٔ `=`) پایانِ سطری که
+ *  عمقش صفر است و سطرِ بعد با عملگر ادامه نمی‌یابد — پیش از توضیح و فاصلهٔ پایانِ سطر.
+ */
+fun codeEnd(t: CharSequence, start: Int, closing: Char?): Int {
+  var i = start
+  var depth = 0
+  var lastCode = start
+  while (i < t.length) {
+    val c = t[i]
+    //  `= ⏎ EXPR`: تا نخستین تکهٔ کد، پایانِ سطر پایانِ بدنه نیست
+    if (c == '\n' && closing == null && depth == 0 && lastCode > start) {
+      val rest = t.subSequence(i + 1, t.length).trimStart()
+      val more = listOf(".", "?.", "?:", "&&", "||", "+", "-", "*", "/", "%", "=").any { rest.startsWith(it) && !rest.startsWith("//") && !rest.startsWith("/*") }
+      if (!more) return lastCode
+    }
+    if (c == '(' || c == '{' || c == '[') depth++
+    if (c == ')' || c == '}' || c == ']') {
+      if (depth == 0 && c == closing) return i
+      depth--
+    }
+    val next = step(t, i)
+    val token = t.subSequence(i, next)
+    if (!token.startsWith("//") && !token.startsWith("/*") && !token.isBlank()) lastCode = next
+    i = next
+  }
+  require(closing == null) { "پایانِ بدنهٔ @Synchronized پیدا نشد" }
+  return lastCode
+}
+
+val iosSources by tasks.registering {
+  val out = layout.buildDirectory.dir("generated/ios-src")
+  inputs.dir(androidSrc)
+  inputs.file(excludeFile)
+  inputs.property("injected", injected)
+  outputs.dir(out)
+  doLast {
+    val dest = out.get().asFile
+    dest.deleteRecursively()
+    val used = HashSet<String>()
+    var kept = 0
+    androidSrc.walkTopDown().filter { it.isFile && it.extension == "kt" }.forEach { f ->
+      val rel = f.relativeTo(androidSrc).invariantSeparatorsPath
+      val hit = excluded.firstOrNull { if (it.endsWith("/")) rel.startsWith(it) else rel == it }
+      if (hit != null) { used += hit; return@forEach }
+      val raw = f.readText(Charsets.UTF_8)
+      val text = if ("@Synchronized" in raw) unsynchronize(raw, rel) else raw
+      val pkg = Regex("(?m)^package [\\w.]+[ \\t]*$").find(text)
+      val body = if (pkg == null) text else text.substring(0, pkg.range.last + 1) + "\n" + injected + text.substring(pkg.range.last + 1)
+      dest.resolve(rel).apply { parentFile.mkdirs() }.writeText(body, Charsets.UTF_8)
+      kept++
+    }
+    excluded.filter { it !in used }.forEach {
+      logger.warn("⚠️ سطرِ ios-exclude.txt دیگر فایلی ندارد: ${it.removePrefix("ir/vil3ntec/tohid/")}")
+    }
+    logger.lifecycle("iOS: $kept فایلِ مشترک کپی شد، ${used.size} سطرِ بیرون‌مانده به کار رفت")
+  }
+}
+
+/*
+ *  `BuildConfig` — همان فیلدهای اندروید و کامپیوتر؛ نشانیِ سرور و شناسهٔ برنامه از
+ *  `android-native/gradle.properties` (قاعدهٔ «یک سرور، یک حساب»). کلیدهای امضا خالی‌اند:
+ *  آیفون نه APK دارد نه به‌روزرسانیِ درون‌برنامه‌ای (قاعدهٔ ۲.۵.۲ ِ اپل).
+ */
+val generateConfig by tasks.registering {
+  val out = layout.buildDirectory.dir("generated/ios-config")
+  val apiBase = prop("tohid.apiBase")
+  val appId = prop("tohid.appId").ifBlank { "shop" }
+  inputs.property("apiBase", apiBase)
+  inputs.property("appId", appId)
+  outputs.dir(out)
+  doLast {
+    val dir = out.get().asFile.resolve("ir/vil3ntec/tohid").apply { mkdirs() }
+    fun q(s: String) = "\"" + s.replace("\\", "\\\\").replace("\"", "\\\"").replace("$", "\\$") + "\""
+    dir.resolve("BuildConfig.kt").writeText(
+      """
+      |// ساخته‌شده به دستِ ios/shared/build.gradle.kts — دستی ویرایش نکنید.
+      |package ir.vil3ntec.tohid
+      |
+      |object BuildConfig {
+      |  const val DEBUG: Boolean = false
+      |  const val STORE: String = "appstore"
+      |  const val APPLICATION_ID: String = "ir.vil3ntec.tohid"
+      |  const val VERSION_NAME: String = "1.0"
+      |  const val VERSION_CODE: Int = 100
+      |  const val API_BASE: String = ${q(apiBase)}
+      |  const val APP_ID: String = ${q(appId)}
+      |  const val LICENSE_PUBLIC_KEY: String = ""
+      |  const val UPDATE_PUBLIC_KEY: String = ""
+      |  const val SIGNING_SHA256: String = ""
+      |  const val PREVIEW: Boolean = false
+      |  const val DESKTOP: Boolean = false
+      |}
+      |""".trimMargin(),
+      Charsets.UTF_8,
+    )
+  }
+}
+
+kotlin {
+  if (ios) {
+    listOf(iosArm64(), iosSimulatorArm64()).forEach {
+      it.binaries.framework {
+        baseName = "TohidShared"
+        isStatic = true
+      }
+    }
+  }
+  sourceSets {
+    if (ios) {
+      iosMain {
+        kotlin.srcDir(iosSources)
+        kotlin.srcDir(generateConfig)
+        dependencies {
+          implementation("ir.vil3ntec.tohid:core:1.0")
+          implementation(compose.runtime)
+          implementation(compose.foundation)
+          implementation(compose.material)
+          implementation(compose.ui)
+          implementation(compose.animation)
+          //  همان نسخه‌های desktop/build.gradle.kts
+          implementation("org.jetbrains.compose.material3:material3:1.9.0")
+          implementation(compose.materialIconsExtended)
+          implementation("org.jetbrains.androidx.lifecycle:lifecycle-runtime-compose:2.9.4")
+          implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+          implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
+        }
+      }
+    }
+  }
+  compilerOptions {
+    //  همان هشدارهای اندروید؛ این‌جا خطا نمی‌شوند (مثلِ کامپیوتر)
+    suppressWarnings.set(true)
+    optIn.addAll(
+      "androidx.compose.material3.ExperimentalMaterial3Api",
+      "androidx.compose.foundation.ExperimentalFoundationApi",
+      "androidx.compose.foundation.layout.ExperimentalLayoutApi",
+      "kotlinx.cinterop.ExperimentalForeignApi",
+      "kotlinx.cinterop.BetaInteropApi",
+      //  `assert` در Kotlin/Native آزمایشی است؛ در اندروید و کامپیوتر نه
+      "kotlin.experimental.ExperimentalNativeApi",
+    )
+  }
+}
