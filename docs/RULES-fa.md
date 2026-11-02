@@ -567,6 +567,10 @@
 - ⛔ secret و فایلِ کلید هرگز در مخزن؛ اسکنِ هر PR سد است و مقدار را چاپ نمی‌کند. استثنا فقط در `tools/security/secret-scan-allow.json` (دلیل، بی مقدار)؛ رازِ لورفته را چرخاندن لازم است، نه فقط برداشتن.
 - آزمون به نگذشتنِ یک میلی‌ثانیه میانِ دو `Date.now()` تکیه ندارد: opهای یک «ثبت» ِ v1 یک `ts` ِ مشترک می‌گیرند (نگهبانِ کارمند «همان ثبت» را با ts ِ برابر می‌شناسد؛ مثلِ `save()` ِ `staff-guard-companions.test.js`). بازتولید: `--require` ِ شیمی که هر `Date.now()` را یک ms جلو می‌برد.
 - سرور روی Express 5 است: دستگیره و میان‌افزارِ async مستقیم، بی پوشانندهٔ `Promise.resolve(fn(…)).catch(next)` (سنجهٔ `express-wrap`).
+- ⛔ CodeQL ِ `js/missing-rate-limiting`: `rateLimit` ِ `server/src/middleware/ratelimit.js` با model pack ِ `.github/codeql/extensions/shop-javascript`
+  شناخته می‌شود. سقفِ مسیرِ تازه فقط با همین `rateLimit` و **پیش از** دستگیره/احراز (`router.use(rateLimit(…))` یا در همان مسیر)؛
+  سقفِ دست‌ساز یا کتابخانهٔ دیگر نه. جابه‌جایی/تغییرِ نامِ آن فایل یا export ⇒ سطرِ model هم (`tools/security/codeql-models.test.mjs` سد است).
+  هشدار با فیلتر، تغییرِ شدت یا خاموش کردنِ پرسش ساکت نمی‌شود؛ هشدارِ باقی‌مانده یعنی مسیری واقعاً بی سقف است.
 
 ### v3 · نقشهٔ پرچم‌ها
 

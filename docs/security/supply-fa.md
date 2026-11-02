@@ -57,7 +57,8 @@ secretها و varهای ورک‌فلوها (فقط نام): `TOHID_KEYSTORE_B64
 | npm | `tools/security/npm-audit-gate.mjs` روی `server/` (`--omit=dev`) | **سد**: critical. high: هشدار تا **۱۴۰۵/۱۰/۰۱ (2026-12-22)** و از آن روز خودکار سد. قطعیِ رجیستری: سه تلاش، بعد هشدار و عبور (NOT-TESTED آن اجرا). استثنا فقط GHSA + دلیل + تاریخ در `audit-allow.json` |
 | actionlint 1.7.7 | دانلود با sha256ِ سنجیده | گزارش (۱۳ یادداشتِ shellcheck از پیش، همه info) |
 | SBOM | `npm sbom` (CycloneDX 1.5 و SPDX 2.3) + فهرستِ actionها | artifactِ `sbom` (۳۰ روز) |
-| CodeQL | `codeql.yml`: JS/TS و Actions، `security-extended`، PRهایی که سرور/وب/license/ورک‌فلو را عوض می‌کنند + main + هفتگی | گزارش (Security ⇒ Code scanning)؛ PR را قرمز نمی‌کند |
+| CodeQL | `codeql.yml`: JS/TS و Actions، `security-extended`، PRهایی که سرور/وب/license/ورک‌فلو/`.github/codeql` را عوض می‌کنند + main + هفتگی | گزارش (Security ⇒ Code scanning)؛ PR را قرمز نمی‌کند |
+| model pack ِ CodeQL | `.github/codeql/extensions/shop-javascript` (CodeQL خودش پیدا می‌کند): `typeModel` ِ `["express-rate-limit", "file:server/src/middleware/ratelimit.js", "Member[rateLimit]"]` ⇒ `js/missing-rate-limiting` خروجیِ `rateLimit({…})` ِ مخزن را میان‌افزارِ سقفِ نرخ می‌شناسد (پیش از این هر مسیرِ تازه هشدارِ کاذب می‌گرفت، #837). ساکت کردن، تغییرِ شدت یا خاموش کردنِ پرسش نیست؛ مسیرِ بی سقف همچنان هشدار می‌گیرد | `tools/security/codeql-models.test.mjs` سد: فایل و export ِ مدل‌شده هست، `rateLimit` واقعاً ۴۲۹ می‌دهد، پرسش فیلتر نشده |
 
 قاعده‌ها در `docs/RULES-fa.md` بخشِ «v3 · CI و آزمون» هم آمد تا عامل‌های بعدی برنگردانند.
 

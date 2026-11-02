@@ -8,6 +8,9 @@ name: CodeQL (گزارش)
 #  results»). ⛔ همزمان «Default setup» ِ CodeQL را در تنظیمات روشن نکنید: GitHub بارگذاریِ این ورک‌فلو
 #  را رد می‌کند. یکی از دو: همین فایل (پیشنهاد) یا Default setup + برداشتنِ این فایل.
 #  Kotlin (java-kotlin) ساخت می‌خواهد و هنوز این‌جا نیست — طرحش در همان سند.
+#  model pack ِ مخزن: `.github/codeql/extensions/shop-javascript` (CodeQL خودش پیدا می‌کند) — `rateLimit` ِ
+#  `server/src/middleware/ratelimit.js` را برای js/missing-rate-limiting «میان‌افزارِ سقفِ نرخ» می‌شناساند؛
+#  ساکت کردن یا عوض کردنِ شدت نیست. تغییرِ آن پوشه هم این ورک‌فلو را اجرا می‌کند.
 
 on:
   pull_request:
@@ -19,6 +22,7 @@ on:
       - 'index.html'
       - 'sw.js'
       - '.github/workflows/**'
+      - '.github/codeql/**'
   push:
     branches: [main]
     paths:
@@ -29,6 +33,7 @@ on:
       - 'index.html'
       - 'sw.js'
       - '.github/workflows/**'
+      - '.github/codeql/**'
   schedule:
     - cron: '23 4 * * 3'
   workflow_dispatch:
