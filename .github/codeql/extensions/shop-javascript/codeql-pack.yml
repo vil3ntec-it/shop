@@ -1,0 +1,10 @@
+#  model pack ِ CodeQL ِ همین مخزن — فقط داده (data extension)، بی پرسشِ تازه و بی ساکت کردنِ هشدار.
+#  CodeQL هر pack ِ زیرِ `.github/codeql/extensions/` را خودش پیدا می‌کند (هم `codeql.yml` و هم Default setup)؛
+#  `codeql.yml` با تغییرِ همین پوشه هم اجرا می‌شود. شرح: docs/security/supply-fa.md (بخشِ CodeQL).
+name: vil3ntec-it/shop-javascript-models
+version: 1.0.0
+library: true
+extensionTargets:
+  codeql/javascript-all: '*'
+dataExtensions:
+  - models/**/*.yml

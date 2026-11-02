@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
+import ir.vil3ntec.tohid.core.i18n.StrStock
+import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
@@ -29,12 +31,39 @@ data class MoveDay(val date: String, val moves: List<MoveUi>)
 /** حالتِ خالصِ `stock/{id}/movements` (آزمون: `MovementsModelTest`) */
 object MovementsModel {
 
-  fun days(d: ShopData, productId: String): List<MoveDay> =
-    d.stockMovements.filter { it.productId == productId }
+  /** @param kind صافیِ گونه (INV-02)؛ `null` ⇒ همه */
+  fun days(d: ShopData, productId: String, kind: MoveKind? = null): List<MoveDay> =
+    moves(d, productId, kind)
       .sortedByDescending { it.createdAt }
       .map { MoveUi(it, MoveKind.of(it.type), link(d, it)) }
       .groupBy { it.move.date }
       .map { (date, moves) -> MoveDay(date, moves) }
+
+  private fun moves(d: ShopData, productId: String, kind: MoveKind?): List<StockMovement> =
+    d.stockMovements.filter { it.productId == productId && (kind == null || MoveKind.of(it.type) == kind) }
+
+  /** INV-02: گونه‌هایی که این کالا حرکت دارد (تراشه‌های صافی، به ترتیبِ `MoveKind`)؛ یک گونه ⇒ بی تراشه */
+  fun kinds(d: ShopData, productId: String): List<MoveKind> {
+    val seen = d.stockMovements.filter { it.productId == productId }.mapTo(HashSet()) { MoveKind.of(it.type) }
+    return MoveKind.entries.filter { it in seen }.takeIf { it.size > 1 }.orEmpty()
+  }
+
+  /**
+   *  INV-02: زیرعنوانِ یک حرکت — یادداشت، دلیل (اگر جدا از یادداشت باشد) و کاربرِ ثبت‌کننده
+   *  (`StockMovement.reason/userId`)؛ هیچ‌کدام ⇒ null.
+   */
+  fun detail(m: StockMovement): String? {
+    val notes = m.notes.trim()
+    return listOfNotNull(
+      notes.ifEmpty { null },
+      m.reason?.trim()?.takeIf { it.isNotEmpty() && it != notes },
+      m.userId?.trim()?.ifEmpty { null }?.let(StrStock::moveBy),
+    ).joinToString(" · ").ifEmpty { null }
+  }
+
+  /** INV-02: خروجیِ CSV ِ همان حرکت‌هایی که صفحه با صافیِ کنونی نشان می‌دهد (با کاربر و دلیل) */
+  fun csv(d: ShopData, productId: String, kind: MoveKind?, today: String): ReportCsv.Sheet =
+    ReportCsv.moves(d, moves(d, productId, kind), "حرکات-انبار-$today")
 
   /**
    *  مقصدِ یک حرکت: فروش و لغوِ فروش ⇐ همان فاکتور؛ مرجوعی ⇐ فاکتورِ همان مرجوعی؛ ورودِ

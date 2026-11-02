@@ -1,12 +1,13 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.Expense
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Supplier
 
 /** نوشته‌های برگهٔ تأمین‌کننده (`purchasing/suppliers/new|{id}/edit`) */
-internal data class SupplierForm(val name: String = "", val phone: String = "", val address: String = "", val notes: String = "")
+internal data class SupplierForm(val name: String = "", val phone: String = "", val address: String = "", val notes: String = "", val leadDays: String = "")
 
 /** نوشته‌های برگهٔ پرداخت (`purchasing/suppliers/{id}/pay`) */
 internal data class PayForm(val amount: String = "", val date: String = "", val notes: String = "")
@@ -22,11 +23,21 @@ internal object LedgerFormsModel {
 
   private fun num(text: String): Double? = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()
 
-  fun of(s: Supplier?): SupplierForm = if (s == null) SupplierForm() else SupplierForm(s.name, s.phone, s.address, s.notes)
+  fun of(s: Supplier?): SupplierForm =
+    if (s == null) SupplierForm() else SupplierForm(s.name, s.phone, s.address, s.notes, s.leadDays?.toString().orEmpty())
 
   fun nameError(f: SupplierForm): String? = if (f.name.isBlank()) StrKit.required else null
 
-  fun draft(f: SupplierForm) = LedgerEngine.SupplierDraft(f.name, f.phone, f.address, f.notes)
+  /** PUR-10 — زمانِ تأمینِ دستی: خالی ⇒ null؛ عددِ کامل ۱ تا ۳۶۵ (رقمِ فارسی هم)؛ وگرنه -1 */
+  fun leadDays(f: SupplierForm): Int? {
+    val t = ir.vil3ntec.tohid.normalizeDigits(f.leadDays).trim()
+    if (t.isEmpty()) return null
+    return t.toIntOrNull()?.takeIf { it in 1..ir.vil3ntec.tohid.core.purchase.ReorderCore.MAX_MANUAL_LEAD_DAYS } ?: -1
+  }
+
+  fun leadError(f: SupplierForm): String? = if (leadDays(f) == -1) StrMoney.leadDaysBad else null
+
+  fun draft(f: SupplierForm) = LedgerEngine.SupplierDraft(f.name, f.phone, f.address, f.notes, leadDays = leadDays(f)?.takeIf { it > 0 }, leadSet = true)
 
   fun payAmount(f: PayForm): Double = num(f.amount) ?: 0.0
 

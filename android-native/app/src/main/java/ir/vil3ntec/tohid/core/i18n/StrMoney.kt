@@ -139,6 +139,10 @@ object StrMoney {
 
   //  برگهٔ قرض‌دار و برگهٔ تراکنش
   val name: String get() = t("نام", "Name", "نوم")
+  /** PUR-10 — زمانِ تأمینِ دستیِ تأمین‌کننده */
+  val leadDaysOptional: String get() = t("زمانِ تأمین به روز (اختیاری)", "Lead time in days (optional)", "د رسولو وخت په ورځو (اختیاري)")
+  val leadDaysHelp: String get() = t("اگر خالی بماند، از سفارش‌های رسیده سنجیده می‌شود", "Left empty, it's measured from received orders", "که تش پاتې شي، له رسېدلو فرمایشونو اندازه کېږي")
+  val leadDaysBad: String get() = t("عددی از ۱ تا ۳۶۵ بنویسید", "Enter a number from 1 to 365", "له ۱ تر ۳۶۵ پورې شمېر ولیکئ")
   val phoneOptional: String get() = t("تلفن (اختیاری)", "Phone (optional)", "تلیفون (اختیاري)")
   val creditLimitField: String get() = t("سقفِ اعتبار (اختیاری)", "Credit limit (optional)", "د پور حد (اختیاري)")
   val creditLimitHelper: String get() = t(
@@ -150,6 +154,8 @@ object StrMoney {
   val phone2Optional: String get() = t("شمارهٔ دوم (اختیاری)", "Second phone (optional)", "دویمه شمېره (اختیاري)")
   val tagsField: String get() = t("برچسب‌ها (اختیاری)", "Tags (optional)", "نښانونه (اختیاري)")
   val tagsHelper: String get() = t("با «،» جدا کنید — مثلاً عمده، همسایه", "Separate with commas — e.g. wholesale, neighbour", "په «،» جلا کړئ — لکه عمده، ګاونډی")
+  /** CRM-11: صافیِ برچسبِ فهرستِ قرض‌داران */
+  val allTags: String get() = t("همهٔ برچسب‌ها", "All tags", "ټول نښانونه")
   val consentTitle: String get() = t("رضایت برای پیامِ تبلیغاتی", "Consent to promotional messages", "د تبلیغي پیغام لپاره رضایت")
   val consentUnknown: String get() = t("نپرسیده", "Not asked", "نه دی پوښتل شوی")
   val consentYes: String get() = t("بله", "Yes", "هو")

@@ -97,8 +97,7 @@
   -->
   <!--
     برگشتِ پیش‌نما (`android:enableOnBackInvokedCallback`) فقط در نسخهٔ پیش‌نمایش روشن است
-    (`src/preview/AndroidManifest.xml`، رابطِ نسخهٔ ۳ آن‌جا پیش‌فرض روشن است). بستهٔ اصلی مثلِ main
-    بی آن می‌ماند تا روشن شدنِ `UiV3` برای همه؛ نسخهٔ ۳ در بستهٔ اصلی هم برمی‌گردد، فقط
+    (`src/preview/AndroidManifest.xml`). بستهٔ اصلی هنوز بی آن است؛ رابطِ نسخهٔ ۳ در بستهٔ اصلی هم برمی‌گردد، فقط
     بی جابه‌جاییِ پا‌به‌پای انگشت (`PredictiveBackHandler` در `V3RouteHost`).
   -->
   <application
@@ -129,9 +128,8 @@
     </activity>
 
     <!--
-      پیوندِ درونیِ برنامه: vill3n://app/<مسیر> (`DeepLinks`) — فقط با رابطِ نسخهٔ ۳. پیش‌فرض خاموش
-      (`enabled="false"`)؛ `MainActivity.syncLinkAlias` با پرچمِ `UiV3` روشن/خاموشش می‌کند. پس با پرچمِ
-      خاموش، مثلِ main، هیچ پیوندِ بیرونی برنامه را باز نمی‌کند. اعلان‌های خودِ برنامه صریح به
+      پیوندِ درونیِ برنامه: vill3n://app/<مسیر> (`DeepLinks`). پیش‌فرض خاموش (`enabled="false"`)؛
+      `MainActivity.syncLinkAlias` در هر اجرا روشنش می‌کند. اعلان‌های خودِ برنامه صریح به
       `MainActivity` می‌روند (`getLaunchIntentForPackage`) و به این بند بسته نیستند.
     -->
     <activity-alias

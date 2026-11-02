@@ -98,7 +98,7 @@ val StockModule = AppModule(
         stock = ShopStore.stock(data, id),
         onSave = { f ->
           writer.commit(
-            WarehouseEngine.adjustStock(data, id, f.quantity, f.choice.increase, f.reason, f.choice.kind, writer.today, writer.now, writer.newId),
+            WarehouseEngine.adjustStock(data, id, f.quantity, f.choice.increase, f.reason, f.choice.kind, writer.today, writer.now, writer.newId, userId = writer.user),
             if (f.choice == AdjustChoice.RETURN) StrStock.returned else StrStock.adjusted,
           )
         },
@@ -107,7 +107,8 @@ val StockModule = AppModule(
     },
     V3Route("stock/{id}/movements", RouteKind.PAGE, { StrStock.movementsRow }, parent = "stock/{id}", chrome = Chrome.OWN) {
       val writer = rememberStockWriter()
-      MovementsScreen(data, args["id"].orEmpty(), writer.today, onOpen = { nav.open(it) }, onBack = { back() })
+      val export = rememberCsvExport { ok -> if (ok) writer.info(StrStock.fileSaved) else writer.fail(StrStock.fileFailed) }
+      MovementsScreen(data, args["id"].orEmpty(), writer.today, onOpen = { nav.open(it) }, onBack = { back() }, onExport = export)
     },
     V3Route("stock/{id}/entries/{entryId}/delete", RouteKind.SHEET, { StrStock.deleteEntryTitle }, parent = "stock/{id}", chrome = Chrome.OWN) {
       val writer = rememberStockWriter()
@@ -133,7 +134,7 @@ val StockModule = AppModule(
         onExport = export,
         onSave = { counted, note ->
           val n = WarehouseEngine.countLines(data, counted).size
-          writer.commit(WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId), StrStock.countSaved(money(n.toDouble())))
+          writer.commit(WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, userId = writer.user), StrStock.countSaved(money(n.toDouble())))
         },
         onBack = { back() },
       )

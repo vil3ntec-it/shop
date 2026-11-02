@@ -254,9 +254,8 @@ data class ShopColors(
  *  از THEME-V2 همان «آسمان» (پیش‌فرض)؛ جای سبزآبیِ VILL3N. صفحه‌های تازه از `Shop.colors` می‌خوانند.
  */
 object Brand {
-  //  پرچمِ نسخهٔ ۳ خاموش (`UiV3`) ⇒ همان سبزآبیِ امروز
-  val primary: Color get() = if (ir.vil3ntec.tohid.ui.UiV3.on) Color(0xFF2563EB) else Vill3nBrand.PRIMARY
-  val deep: Color get() = if (ir.vil3ntec.tohid.ui.UiV3.on) Color(0xFF1D4ED8) else Vill3nBrand.DEEP
+  val primary = Color(0xFF2563EB)
+  val deep = Color(0xFF1D4ED8)
   val successSurface = Color(0xFFDDF5EF)
   val blue = Color(0xFF2563EB)
   val blueSurface = Color(0xFFDBEAFE)
@@ -414,8 +413,7 @@ fun TohidTheme(
     ThemeChoice.SYSTEM -> isSystemInDarkTheme()
   }
   //  تمِ همین دستگاه (`ThemeStore`، پیش‌فرض «آسمان») × روز/شب
-  //  پرچمِ نسخهٔ ۳ خاموش (`UiV3`، پیش‌فرض) ⇒ پالتِ سبزآبیِ امروز (`LegacyPalette.kt`)
-  val target = paletteFor(ir.vil3ntec.tohid.ui.UiV3.on, ThemeStore.theme, dark)
+  val target = shopColors(ThemeStore.theme, dark)
   //  عوض‌شدنِ روز/شب یا تم مثلِ خاموش‌وروشنِ چراغ نیست: رنگ‌های اصلی در ۲۵۰ms نرم جابه‌جا می‌شوند
   //  و بقیه دنبالشان می‌آیند (THEME-V2)
   val spec = remember { androidx.compose.animation.core.tween<Color>(250) }

@@ -66,6 +66,37 @@ class StockPagesModelTest {
   }
 
   @Test
+  fun `حرکات انبار با صافی گونه و کاربر و دلیل و خروجی همان صافی`() {
+    val d = ShopData(
+      products = listOf(rice),
+      stockMovements = listOf(
+        StockMovement(id = "m1", productId = "rice", type = "sale", qty = -2.0, date = "2026-10-20", createdAt = 1),
+        StockMovement(id = "m2", productId = "rice", type = "adjustment", qty = -1.0, date = "2026-10-20", notes = "شکسته", createdAt = 2, userId = " علی ", reason = "damage"),
+        StockMovement(id = "m3", productId = "rice", type = "count_adjust", qty = 0.5, date = "2026-10-21", notes = "انبارگردانی", createdAt = 3, userId = "مریم", reason = "انبارگردانی"),
+        StockMovement(id = "m4", productId = "other", type = "purchase_in", qty = 9.0, date = "2026-10-21", createdAt = 4),
+      ),
+    )
+    assertEquals(listOf(MoveKind.SALE, MoveKind.ADJUSTMENT), MovementsModel.kinds(d, "rice"))
+    //  یک گونه ⇒ تراشه‌ای نیست
+    assertTrue(MovementsModel.kinds(d, "other").isEmpty())
+    val adj = MovementsModel.days(d, "rice", MoveKind.ADJUSTMENT).flatMap { it.moves }.map { it.move.id }
+    assertEquals(listOf("m3", "m2"), adj)
+    assertEquals(3, MovementsModel.days(d, "rice").sumOf { it.moves.size })
+    //  یادداشت، دلیلِ جدا و کاربر؛ دلیلِ برابر با یادداشت دو بار نمی‌آید؛ بی هیچ ⇒ null
+    val m = d.stockMovements.associateBy { it.id }
+    assertEquals("شکسته · damage · ${ir.vil3ntec.tohid.core.i18n.StrStock.moveBy("علی")}", MovementsModel.detail(m.getValue("m2")))
+    assertEquals("انبارگردانی · ${ir.vil3ntec.tohid.core.i18n.StrStock.moveBy("مریم")}", MovementsModel.detail(m.getValue("m3")))
+    assertNull(MovementsModel.detail(m.getValue("m1")))
+    //  خروجی فقط همان صافی و با ستون‌های کاربر و دلیل
+    val sheet = MovementsModel.csv(d, "rice", MoveKind.ADJUSTMENT, "2026-10-21")
+    assertEquals(listOf("کاربر", "دلیل"), sheet.rows[0].takeLast(2))
+    assertEquals(3, sheet.rows.size)
+    assertEquals(listOf("2026-10-20", "برنج", "اصلاح موجودی", "-1", "شکسته", "علی", "damage"), sheet.rows[1])
+    assertEquals("0.50", sheet.rows[2][3])
+    assertEquals(4, MovementsModel.csv(d, "rice", null, "2026-10-21").rows.size)
+  }
+
+  @Test
   fun `دیروز از مرز ماه و سال می گذرد`() {
     assertEquals("2026-09-30", MovementsModel.yesterday("2026-10-01"))
     assertEquals("2025-12-31", MovementsModel.yesterday("2026-01-01"))

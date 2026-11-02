@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountBalanceWallet
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
@@ -31,15 +29,13 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.gateway.AccountCall
 import ir.vil3ntec.tohid.core.gateway.HesabAccountView
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
-import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
 /*
  *  «حساب‌پیِ دکان» — تنظیمِ صاحبِ دکان (درخواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۱؛ دستهٔ B ِ `SettingsTiers`، زیرِ «پیشرفته»).
- *  یک صفحه برای هر دو رابط: نسخهٔ ۳ (`HesabPayAccountScreen` در `ui/v3/settings/sections`) و رابطِ امروز
- *  (`SettingsLegacy`).
+ *  بدنهٔ صفحهٔ نسخهٔ ۳ (`HesabPayAccountScreen` در `ui/v3/settings/sections`).
  *
  *  - رمزِ جدای حساب‌پی (نه رمزِ برنامه): بی آن نه دیدن، نه عوض کردن. سرور می‌سنجدش و پس از ۵ خطا قفل می‌کند؛
  *    هر تغییر در سرور سابقه دارد و به دستگاه‌های صاحب خبر می‌رود.
@@ -68,25 +64,6 @@ internal fun hesabPayRefusal(r: AccountCall.Refused): String = r.message.ifBlank
 }
 
 private const val HP_OFFLINE = "سرور در دسترس نیست؛ اینترنت را ببینید و دوباره بکوشید."
-
-/** رابطِ امروز (`SettingsLegacy`): همان صفحه در بخشِ تاشو؛ زیرنویس «وصل است / وصل نیست» */
-@Composable
-fun HesabPayLegacySection(signedIn: Boolean, toast: (String) -> Unit) {
-  val deps = rememberHesabPayDeps()
-  var hp by remember { mutableStateOf<HesabAccountView?>(null) }
-  SettingsSectionLegacy(
-    icon = Icons.Filled.AccountBalanceWallet,
-    title = StrSettingsHelp.hesabShopTitle,
-    subtitle = if (hp == null) StrSettingsHelp.hesabShopLine else hesabPayStatusLine(hp),
-    stateKey = SettingsLayout.HESAB_SHOP,
-  ) {
-    HesabPayAccountSettings(
-      ready = deps.ownerReady(signedIn),
-      toast = toast,
-      onView = { hp = it },
-    )
-  }
-}
 
 /** `ready` = واردشده، سرورِ آماده و نقشِ همین دستگاه صاحبِ دکان */
 @Composable

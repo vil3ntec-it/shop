@@ -37,10 +37,10 @@ class SpecialOrderWiringTest {
     fun count(rel: String, what: String) = Regex(Regex.escape(what)).findAll(src(rel)).count()
     val call = "SpecialOrderBar(d, store, cartDebtorId, ::toast"
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Sale.kt", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SaleLegacy.kt", call))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/DeskSale.kt", call))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/SettingsLegacy.kt", "SpecialOrderSettingsWired(context)"))
     assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/Settings.kt", "SpecialOrderSettingsWired(context)"))
-    assertEquals(1, count("ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt", "StrSpecialOrder.settingsTitle to"))
+    //  صفحه و ردیفِ تنظیماتِ نسخهٔ ۳ (گوشی و کامپیوتر) — جای `SettingsLegacy` و فهرستِ کامپیوترِ رابطِ قدیمِ پاک‌شده
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/v3/settings/sections/PosStockToggleScreensAndroid.kt", "SpecialOrderPref.set(context, it)"))
+    assertEquals(1, count("ir/vil3ntec/tohid/ui/screens/SettingsLayout.kt", "SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle"))
   }
 }

@@ -142,9 +142,16 @@ object DebtorListModel {
     return Row(debtor, balance, days(d, debtor.id, now))
   }
 
-  /** کارت‌های صفحه: جست‌وجو، بعد ترتیب */
-  fun rows(d: ShopData, term: String, sort: Sort, now: Long): List<Row> =
-    sorted(CustomerCrm.active(d).filter { matches(it, term) }.map { row(d, it, now) }, sort)
+  /** کارت‌های صفحه: جست‌وجو و صافیِ برچسب (CRM-11، `CustomerCrm.hasTag`؛ `null` ⇒ همه)، بعد ترتیب */
+  fun rows(d: ShopData, term: String, sort: Sort, now: Long, tag: String? = null): List<Row> =
+    sorted(CustomerCrm.active(d).filter { matches(it, term) && (tag.isNullOrBlank() || CustomerCrm.hasTag(it, tag)) }.map { row(d, it, now) }, sort)
+
+  /** تراشه‌های صافیِ برچسب: برچسب‌های مشتریانِ فعال با شمار (`CustomerCrm.allTags`)؛ برچسبی نیست ⇒ هیچ تراشه */
+  fun tagChips(d: ShopData): List<Pair<String, Int>> = CustomerCrm.allTags(d)
+
+  /** برچسبِ انتخاب‌شده‌ای که دیگر در دفتر نیست ⇒ همه */
+  fun keptTag(d: ShopData, tag: String?): String? =
+    tag?.takeIf { t -> CustomerCrm.active(d).any { CustomerCrm.hasTag(it, t) } }
 
   fun summary(d: ShopData): Summary = Summary(
     people = CustomerCrm.active(d).size,

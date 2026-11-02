@@ -20,8 +20,6 @@ import ir.vil3ntec.tohid.ui.v3.onboarding.AuthGate
  */
 @Composable
 fun WelcomeScreen(store: ShopStore, onDone: () -> Unit) {
-  //  پرچمِ نسخهٔ ۳ خاموش (پیش‌فرض) ⇒ همان رابطِ امروز (`ui/legacy`، `UiV3`)
-  if (!ir.vil3ntec.tohid.ui.UiV3.on) { WelcomeScreenLegacy(store, onDone); return }
   AuthGate(store, onDone = onDone)
 }
 

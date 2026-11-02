@@ -49,6 +49,7 @@ internal fun SupplierFormSheet(supplier: Supplier?, onClose: () -> Unit, onSave:
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   val nameError = LedgerFormsModel.nameError(f)
+  val leadError = LedgerFormsModel.leadError(f)
   V3FormSheet(title = if (supplier == null) StrMoney.newSupplier else StrMoney.editSupplier, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
       V3TextField(f.name, { f = f.copy(name = it) }, StrMoney.name, required = true, error = nameError.takeIf { tried })
@@ -58,10 +59,13 @@ internal fun SupplierFormSheet(supplier: Supplier?, onClose: () -> Unit, onSave:
       V3TextField(f.address, { f = f.copy(address = it) }, StrMoney.addressOptional)
       Spacer(Modifier.height(12.dp))
       V3TextField(f.notes, { f = f.copy(notes = it) }, StrMoney.notesOptional, singleLine = false)
+      Spacer(Modifier.height(12.dp))
+      //  PUR-10: زمانِ تأمینِ دستی ⇐ «پیشنهادِ سفارش» و نقطهٔ سفارش؛ خالی ⇒ سنجیده از سفارش‌ها
+      V3TextField(f.leadDays, { f = f.copy(leadDays = it) }, StrMoney.leadDaysOptional, kind = V3FieldKind.NUMBER, helper = StrMoney.leadDaysHelp, error = leadError.takeIf { tried })
       Spacer(Modifier.height(18.dp))
       V3Button(
         StrKit.save,
-        { tried = true; if (nameError != null) shake++ else if (onSave(LedgerFormsModel.draft(f))) sheet.finish(onSaved) },
+        { tried = true; if (nameError != null || leadError != null) shake++ else if (onSave(LedgerFormsModel.draft(f))) sheet.finish(onSaved) },
         Modifier.fillMaxWidth(),
         haptic = true,
       )

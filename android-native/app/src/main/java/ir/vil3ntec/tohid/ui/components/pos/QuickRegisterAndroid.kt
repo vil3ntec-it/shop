@@ -11,6 +11,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.StrQuickRegister
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.LinePolicyPrefs
 import ir.vil3ntec.tohid.data.ProductInfoMap
@@ -24,7 +25,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
 /**
- *  S03 (POS-17) — مرزِ سکوی «ثبتِ سریع» در صندوقِ گوشی و کامپیوتر (رابطِ امروز). خاموش (`TillGoodsPref.quickRegister`)
+ *  S03 (POS-17) — مرزِ سکوی «ثبتِ سریع» در صندوقِ کامپیوتر (`DeskSale`) و رابطِ امروزِ گوشی؛ صندوقِ گوشیِ نسخهٔ ۳
+ *  همان قاعده را با [quickNext] و همان ثبت را با [saveQuick] می‌گیرد (`ui/v3/sales/cart/QuickTillModel`). خاموش (`TillGoodsPref.quickRegister`)
  *  ⇒ [rememberQuickTill] `null` است و صندوق همان راهِ پیشین («ثبت کالا» ⇐ صفحهٔ انبار) را می‌رود.
  *  - نقشِ مجاز (`QuickRegister.allowed`): پیامِ «این بارکد ثبت نیست»؛ Enter (کامپیوتر) یا «ثبتِ سریع» پنجره را باز
  *    می‌کند و کالای ثبت‌شده همان‌جا به فاکتور می‌رود.
@@ -38,14 +40,16 @@ class QuickTill internal constructor(val may: Boolean, private val freeOpen: Boo
 
   /** بارکدِ ناشناس در صندوق: پیام و راهِ بعدی */
   fun unknown(code: String, scope: CoroutineScope, snackbar: SnackbarHostState, onFreeLine: () -> Unit) {
-    pending = if (may) code else null
+    val next = QuickRegister.next(on = true, may = may, freeLineOpen = freeOpen)
+    val quick = next == QuickRegister.Next.QUICK
+    pending = if (quick) code else null
     scope.launch {
       val r = snackbar.showSnackbar(
-        if (may) "$QUICK_UNKNOWN — Enter: $QUICK_ACTION" else QUICK_UNKNOWN,
-        actionLabel = if (may) QUICK_ACTION else if (freeOpen) QUICK_FREE_ACTION else null,
+        if (quick) "$QUICK_UNKNOWN — Enter: $QUICK_ACTION" else QUICK_UNKNOWN,
+        actionLabel = when (next) { QuickRegister.Next.QUICK -> QUICK_ACTION; QuickRegister.Next.FREE_LINE -> QUICK_FREE_ACTION; else -> null },
         duration = SnackbarDuration.Long,
       )
-      if (r == SnackbarResult.ActionPerformed) { if (may) { open = code; pending = null } else onFreeLine() }
+      if (r == SnackbarResult.ActionPerformed) { if (quick) { open = code; pending = null } else onFreeLine() }
     }
   }
 
@@ -69,6 +73,28 @@ private fun quickTill(context: Context): QuickTill? =
   if (!TillGoodsPref.quickRegister(context)) null
   else QuickTill(QuickRegister.allowed(ShopRole.current(context)), QuickRegister.freeLineOpen(LinePolicyPrefs.of(context)))
 
+/** راهِ بارکدِ ناشناس با تنظیم و نقشِ همین لحظه (`QuickRegister.next`) — صندوقِ گوشیِ نسخهٔ ۳ */
+fun quickNext(context: Context): QuickRegister.Next = QuickRegister.next(
+  TillGoodsPref.quickRegister(context),
+  QuickRegister.allowed(ShopRole.current(context)),
+  QuickRegister.freeLineOpen(LinePolicyPrefs.of(context)),
+)
+
+/** نتیجهٔ ثبتِ سریعِ نشسته روی دیسک: پیام و این‌که کالا به فاکتور رفت */
+class QuickSaved(val message: String, val added: Boolean)
+
+/**
+ *  گامِ پایانیِ ثبتِ سریع، یکی برای پنجرهٔ کامپیوتر و برگهٔ گوشیِ نسخهٔ ۳: دفترِ تازه روی دیسک، سپس کالا با
+ *  موجودیِ در دست به سبد (`SalesEngine.addToCartCapped`). `null` ⇒ دفتر ننشست (پیامش را `ShopStore` می‌دهد).
+ */
+suspend fun saveQuick(ok: QuickRegister.Result.Ok, store: ShopStore, cartStore: CartStore): QuickSaved? {
+  if (!store.save(ok.data)) return null
+  val name = ok.data.products.firstOrNull { it.id == ok.productId }?.name.orEmpty()
+  val added = SalesEngine.addToCartCapped(cartStore.lines.value, ok.productId, ok.quantity, ProductInfoMap.sellable(ok.data, ok.productId))
+  return if (ok.quantity > 0 && cartStore.set(added.cart)) QuickSaved(StrQuickRegister.added(name), true)
+  else QuickSaved(StrQuickRegister.notAdded(name), false)
+}
+
 /**
  *  پنجرهٔ ثبتِ سریع (اگر باز است): ثبت روی دفترِ همین لحظهٔ دیسک، سپس کالا با موجودیِ تازه به سبد. [onDone] پیامِ
  *  نتیجه را می‌گیرد (صفحه نشانش می‌دهد و کادرِ اسکن را دوباره فوکوس می‌کند).
@@ -84,15 +110,7 @@ fun QuickTillDialog(q: QuickTill?, store: ShopStore, cartStore: CartStore, onDon
       is QuickRegister.Result.Failed -> r.message
       is QuickRegister.Result.Ok -> {
         q.open = null
-        scope.launch {
-          if (!store.save(r.data)) { onDone(null); return@launch }
-          val name = r.data.products.firstOrNull { it.id == r.productId }?.name.orEmpty()
-          val added = SalesEngine.addToCartCapped(cartStore.lines.value, r.productId, r.quantity, ProductInfoMap.sellable(r.data, r.productId))
-          onDone(
-            if (r.quantity > 0 && cartStore.set(added.cart)) "«$name» ثبت و به فاکتور اضافه شد"
-            else "«$name» ثبت شد؛ موجودی ندارد و به فاکتور نرفت",
-          )
-        }
+        scope.launch { onDone(saveQuick(r, store, cartStore)?.message) }
         null
       }
     }

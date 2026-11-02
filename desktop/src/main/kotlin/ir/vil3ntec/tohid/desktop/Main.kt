@@ -100,7 +100,6 @@ fun main() {
   ir.vil3ntec.tohid.ShopDayChoice.load(context)
   ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
   ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
-  ir.vil3ntec.tohid.ui.UiV3.load(context)
 
   var live: LiveSocket? = null
   runCatching {

@@ -3,12 +3,11 @@ package ir.vil3ntec.tohid.ui.v3.sales.scan
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
-import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 
 /**
  *  چسبِ `scan?for=sale`: دوربینِ پیوسته روی صندوق — هر کد به `SaleScan.reads`، پاسخِ صندوق در
- *  پایینِ همین برگه (`SaleScanPanel`)، بارکدِ دستی و «هر اسکن». «ثبتِ کالا» ِ بارکدِ ناشناس ⇒
- *  برگه جایش را به `products/new?barcode=` می‌دهد و «برگشت» به صندوق برمی‌گردد.
+ *  پایینِ همین برگه (`SaleScanPanel`)، بارکدِ دستی و «هر اسکن». کارِ بارکدِ ناشناس («ثبتِ کالا»، «ثبتِ سریع»
+ *  یا «قلمِ آزاد» — `QuickTillModel`) ⇒ برگه جایش را به همان مسیر می‌دهد و «برگشت» به صندوق برمی‌گردد.
  */
 @Composable
 fun RouteScope.SaleScanRoute() {
@@ -30,7 +29,7 @@ fun RouteScope.SaleScanRoute() {
         multiplier = SaleScan.multiplier.intValue,
         onMultiplier = { SaleScan.multiplier.intValue = it },
         onManual = { SaleScan.reads.trySend(SaleScan.Read(it, manual = true)) },
-        onRegister = { code -> nav.replace(ProductsPaths.new(barcode = code)) },
+        onAction = { path -> nav.replace(path) },
       )
     },
   )

@@ -5,6 +5,8 @@ import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.Expense
+import ir.vil3ntec.tohid.data.LedgerEngine
+import ir.vil3ntec.tohid.data.Supplier
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.DebtorListModel
 import org.junit.Assert.assertEquals
@@ -148,5 +150,34 @@ class MoneyFormsModelTest {
     assertEquals(3, DebtorListModel.summary(d).people)
     assertEquals(listOf("t"), DebtorListModel.rows(d, "0705556677", DebtorListModel.Sort.NAME, 0L).map { it.debtor.id })
     assertEquals(listOf("t"), DebtorListModel.rows(d, "#عمده", DebtorListModel.Sort.NAME, 0L).map { it.debtor.id })
+  }
+
+  @Test
+  fun `زمان تامین دستی تامین کننده از فرم به دفتر و بی فیلد دست نمی خورد`() {
+    //  PUR-10: خالی ⇒ null، رقمِ فارسی پذیرفته، بیرونِ ۱ تا ۳۶۵ یا اعشار ⇒ خطا
+    assertNull(LedgerFormsModel.leadDays(SupplierForm(name = "نور", leadDays = " ")))
+    assertEquals(12, LedgerFormsModel.leadDays(SupplierForm(name = "نور", leadDays = "۱۲")))
+    assertEquals(-1, LedgerFormsModel.leadDays(SupplierForm(name = "نور", leadDays = "0")))
+    assertEquals(-1, LedgerFormsModel.leadDays(SupplierForm(name = "نور", leadDays = "366")))
+    assertEquals(-1, LedgerFormsModel.leadDays(SupplierForm(name = "نور", leadDays = "2.5")))
+    assertNotNull(LedgerFormsModel.leadError(SupplierForm(name = "نور", leadDays = "abc")))
+    assertNull(LedgerFormsModel.leadError(SupplierForm(name = "نور", leadDays = "7")))
+
+    var n = 0
+    val newId = { "s${++n}" }
+    val added = LedgerEngine.addSupplier(ShopData(), LedgerFormsModel.draft(SupplierForm(name = "نور", leadDays = "۱۲")), 1, newId) as LedgerEngine.Result.Ok
+    val s = added.data.suppliers.single()
+    assertEquals(12, s.leadDays)
+    assertEquals("12", LedgerFormsModel.of(s).leadDays)
+    //  فرمِ بی فیلد (پیش‌نویسِ بی `leadSet`) زمانِ پیشین را نگه می‌دارد؛ فرمِ تازه با خالی پاکش می‌کند
+    val kept = LedgerEngine.editSupplier(added.data, s.id, LedgerEngine.SupplierDraft(name = "نور ۲")) as LedgerEngine.Result.Ok
+    assertEquals(12, kept.data.suppliers.single().leadDays)
+    val cleared = LedgerEngine.editSupplier(kept.data, s.id, LedgerFormsModel.draft(SupplierForm(name = "نور"))) as LedgerEngine.Result.Ok
+    assertNull(cleared.data.suppliers.single().leadDays)
+    assertEquals("", LedgerFormsModel.of(Supplier(id = "x")).leadDays)
+    //  به «پیشنهادِ سفارش» می‌رسد: دستی بر سنجیده می‌چربد
+    val lead = ir.vil3ntec.tohid.data.PurchaseOrderBook.leadTime(emptyList(), s.id, ir.vil3ntec.tohid.data.PurchaseOrderBook.manualLead(added.data, s.id))
+    assertEquals(12, lead.days)
+    assertTrue(lead.manual)
   }
 }
