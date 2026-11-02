@@ -126,6 +126,7 @@ fun RouteScope.SaleRoute() {
     heldStrip = if (held.visible) ({ HeldStrip(held, data) }) else null,
     onHold = if (held.visible) ({ held.askHold() }) else null,
     onHeldList = if (held.visible) ({ held.dialog = HeldDialog.List }) else null,
+    tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) },
     modifier = Modifier.hidScanner { onCode(it, manual = true, fromPhone = false) },
     actions = SaleActions(
       tap = { item -> if (item.weighed) nav.open(SalesPaths.keypad(item.id)) else feedback.addOne(data, item.id) },

@@ -73,8 +73,11 @@ class ScenarioS25Test {
     fun src(rel: String): String =
       listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
         .map { File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
-    val phone = src("ir/vil3ntec/tohid/ui/screens/Purchasing.kt")
+    //  گوشی: برگهٔ «برگشت به تأمین‌کننده» ِ نسخهٔ ۳ (`purchasing/suppliers/{id}/return`) — صفحهٔ خریدِ رابطِ قدیم
+    //  (`ui/screens/Purchasing.kt`) پس از دستهٔ ۱۳ بی‌راه بود؛ رسیدنِ این مسیر را `V3ReachabilityTest` می‌سنجد
+    val phone = src("ir/vil3ntec/tohid/ui/v3/money/SupplierReturnAndroid.kt")
     assertTrue(phone.contains("PurchaseBook.invoiceSheet(r.data, credit).let { sh -> ir.vil3ntec.tohid.print.ReportPrint.print(context, sh, sh.name) }"))
+    assertTrue(phone.contains("PurchaseBook.supplierReturn("))
     val desk = src("ir/vil3ntec/tohid/ui/screens/DeskPurchasing.kt")
     assertTrue(desk.contains("PurchaseBook.invoiceSheet(d, inv).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) }"))
   }

@@ -65,6 +65,10 @@ class StockListActions(
   val newProduct: () -> Unit,
   /** ثبتِ ورود از صفحهٔ دکمهٔ شناور: null یعنی ثبت شد؛ وگرنه دلیلِ رد */
   val saveEntry: (ir.vil3ntec.tohid.data.WarehouseEngine.EntryDraft) -> String?,
+  /** کارهای افزوده (`StockExtras`): پسِ «…» ِ گوشی و تراشه‌های کارِ کامپیوتر */
+  val extras: List<V3MenuItem> = emptyList(),
+  /** بالای فهرست، زیرِ کارتِ آمار (نوارِ «دفترِ موجودی» با موتورِ تازه) */
+  val header: @Composable () -> Unit = {},
 )
 
 /**
@@ -112,7 +116,7 @@ fun StockListScreen(
       V3MenuItem(Icons.AutoMirrored.Outlined.FactCheck, StrStock.menuCount, onClick = actions.count),
       V3MenuItem(Icons.Outlined.UploadFile, StrStock.menuImport, onClick = actions.import),
       V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrStock.menuBulk, onClick = actions.bulk),
-    ),
+    ) + actions.extras,
     search = if (empty) null else ({ V3SearchField(query, { query = it }, StrStock.searchHint) }),
     chips = if (empty) null else ({
       FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it })
@@ -227,8 +231,10 @@ private fun StockList(
         V3Chip(StrStock.menuCount, selected = false, icon = Icons.AutoMirrored.Outlined.FactCheck, onClick = actions.count)
         V3Chip(StrStock.menuBulk, selected = false, icon = Icons.AutoMirrored.Outlined.PlaylistAdd, onClick = actions.bulk)
         V3Chip(StrStock.menuImport, selected = false, icon = Icons.Outlined.UploadFile, onClick = actions.import)
+        actions.extras.forEach { x -> V3Chip(x.label, selected = false, icon = x.icon, onClick = x.onClick) }
       }
     }
+    item(key = "header") { actions.header() }
     if (rows.isEmpty()) item(key = "no-match") {
       V3EmptyState(Icons.Outlined.SearchOff, StrKit.nothingFound, body = StrStock.noMatchBody, action = StrStock.clearFilters, onAction = onClear)
     }

@@ -167,6 +167,7 @@ object SettingsSearchIndex {
     "داده‌ها" to kw("پشتیبان بک‌آپ بازگردانی", "backup restore", "بیک اپ بېرته راوستل"),
     L.ABOUT_APP to kw("نسخه به‌روزرسانی آپدیت", "version update", "نسخه تازه کول"),
     L.CHAT_GUARD to kw("گفت‌وگو چت جا", "chat storage", "خبرې اترې"),
+    L.SERVERS to kw("سرور دیگر شبکه دکان خانه نشانی", "server other network address home", "سرور شبکه پته"),
     L.OWNER_REPORT to kw("گزارش خودکار صاحب", "owner report", "د خاوند راپور"),
     L.TAX_QUARTER to kw("مالیات سه ماهه", "quarterly tax", "درې میاشتنۍ مالیه"),
     L.CRM_REPORTS to kw("گزارش مشتری", "customer reports", "د پېرودونکو راپورونه"),

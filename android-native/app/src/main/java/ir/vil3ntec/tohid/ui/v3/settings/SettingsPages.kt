@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
+import androidx.compose.material.icons.outlined.Dns
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ServersScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
 import androidx.compose.material.icons.outlined.AccountCircle
@@ -228,6 +230,7 @@ internal object SettingsPages {
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },
+    Page(SettingsLayout.SERVERS, Icons.Outlined.Dns) { ServersScreen(it) },
   )
 
   fun of(key: String): SettingsPage? = ALL.firstOrNull { it.key == key }

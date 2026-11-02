@@ -159,6 +159,7 @@ internal fun RouteScope.StorefrontRoute() {
     onRetry = { scope.launch { reload() } },
     onBack = backOrNull?.let { b -> { if (dirty) askDiscard = true else b() } },
     bottomBar = bottomBar,
+    extras = storefrontExtras(cfg),
   ) { t, pad ->
     val c = cfg ?: return@StorefrontScreen
     when (t) {

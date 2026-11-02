@@ -179,6 +179,8 @@ object SettingsLayout {
   const val SCAN_CASH = "فروشِ نقدی با کارتِ فرمان"
   /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
   const val TRAINING = "حالتِ آموزشی"
+  /** سرورهای دیگر (`ServersSettings`، پرچمِ همین دستگاه `app.multi_server`؛ فقط صاحب؛ تصمیم ⇒ B) — همان `SERVERS_SECTION_TITLE` */
+  const val SERVERS = "سرورها"
 
   /** پیوند به «حسابِ من» (نام و عکسِ دکان) — ردیفِ نخستِ «دکان و امنیت» */
   const val PROFILE = "حساب من"
@@ -224,7 +226,7 @@ object SettingsLayout {
     Group(
       DATA,
       listOf(
-        Part("data", listOf("همگام‌سازی", "داده‌ها", ABOUT_APP, CHAT_GUARD)),
+        Part("data", listOf("همگام‌سازی", "داده‌ها", ABOUT_APP, CHAT_GUARD, SERVERS)),
         Part("reports", listOf(OWNER_REPORT, TAX_QUARTER, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS, DOC_GAPS)),
       ),
     ),
@@ -364,6 +366,7 @@ object SettingsLayout {
     PRODUCT_TOOLS to "product-tools",
     FRAUD_TRAIL to "fraud-trail",
     CHAT_GUARD to "chat-storage",
+    SERVERS to "servers",
     CAMERA to "camera",
     "همگام‌سازی" to "sync",
     "داده‌ها" to "backup",
@@ -445,6 +448,7 @@ object SettingsLayout {
     PRODUCT_TOOLS -> StrShell.productTools
     FRAUD_TRAIL -> StrShell.fraudTrail
     CHAT_GUARD -> ir.vil3ntec.tohid.core.i18n.StrChat.guard
+    SERVERS -> ir.vil3ntec.tohid.core.i18n.StrReach.servers
     PRINTER -> StrSettings.printerRow
     CAMERA -> StrSettings.scannerRow
     PERIPHERALS -> StrSettings.peripheralsRow

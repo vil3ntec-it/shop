@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import androidx.compose.material.icons.automirrored.outlined.AssignmentReturn
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import android.content.Intent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -63,6 +65,8 @@ internal class SupplierLedgerActions(
   val onNewPurchase: () -> Unit,
   val onEdit: () -> Unit,
   val onDelete: () -> Unit,
+  /** PUR-08/S25: برگشت به تأمین‌کننده با سندِ کسر (`SupplierReturnAndroid.kt`) */
+  val onReturn: (() -> Unit)? = null,
 )
 
 /**
@@ -95,8 +99,9 @@ internal fun SupplierLedgerScreen(id: String, d: ShopData, actions: SupplierLedg
     title = supplier.name,
     onBack = actions.onBack,
     largeTitle = false,
-    overflow = listOf(
+    overflow = listOfNotNull(
       V3MenuItem(Icons.Outlined.Edit, StrMoney.edit, onClick = actions.onEdit),
+      actions.onReturn?.let { V3MenuItem(Icons.AutoMirrored.Outlined.AssignmentReturn, StrReach.supplierReturn, onClick = it) },
       V3MenuItem(Icons.Outlined.DeleteOutline, StrMoney.delete, danger = true) { askDelete = true },
     ),
     bottomBar = {

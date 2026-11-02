@@ -85,6 +85,7 @@ internal fun RouteScope.TeamRoute() {
       newCode = { nav.open(AccountPaths.NEW_CODE) },
       closeFresh = { team.fresh = null },
     ),
+    staff = { TeamStaffSections(shops, owner) },
   )
 
   when (ask) {

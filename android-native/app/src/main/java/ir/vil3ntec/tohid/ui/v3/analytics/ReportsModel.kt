@@ -9,13 +9,34 @@ import ir.vil3ntec.tohid.data.StockMovement
  *  امروز: «سود و فروش» و «خرید» قیمتِ خریدِ دکان‌اند)، `ranged` ⇒ ردیفِ بازه دارد، `csv` همان
  *  بخشِ `ReportCsv.of` که خروجی و چاپِ امروزِ همین زبانه است.
  */
-enum class ReportTab(val id: String, val money: Boolean, val ranged: Boolean, val csv: String) {
+/** یک زبانهٔ «گزارش‌ها»: پایه ([ReportTab]) یا اختیاری ([ReportExtra]) */
+interface ReportPage {
+  val id: String
+  val money: Boolean
+  val ranged: Boolean
+  val csv: String
+}
+
+enum class ReportTab(override val id: String, override val money: Boolean, override val ranged: Boolean, override val csv: String) : ReportPage {
   PROFIT("profit", money = true, ranged = true, csv = "sales"),
   PRODUCTS("products", money = false, ranged = false, csv = "products"),
   DEBTORS("debtors", money = false, ranged = false, csv = "debtors"),
   PURCHASES("purchases", money = true, ranged = true, csv = "purchases"),
   EXPIRY("expiry", money = false, ranged = false, csv = "expiry"),
   STOCK("stock", money = false, ranged = false, csv = "stock"),
+}
+
+/**
+ *  زبانه‌های اختیاریِ گوشی (همان «گزارش‌ها» ِ گوشیِ پیشین)، هر کدام پشتِ تنظیمِ خودش — ضایعات (`ShrinkReportPref`)،
+ *  سنِ بدهی و RFM (`ShopPolicy.crmReports`)، شماره‌های جاافتاده (`DocGapsPref`) و «پرسشِ ساده» (`SimpleAskPref`).
+ *  `csv` همان بخشِ `ReportCsv.of`؛ «پرسشِ ساده» برگه ندارد.
+ */
+enum class ReportExtra(override val id: String, override val money: Boolean, override val ranged: Boolean, override val csv: String) : ReportPage {
+  SHRINK("shrink", money = true, ranged = true, csv = "shrink"),
+  AGING("aging", money = false, ranged = false, csv = "aging"),
+  RFM("rfm", money = true, ranged = false, csv = "rfm"),
+  GAPS("gaps", money = false, ranged = false, csv = "gaps"),
+  ASK("ask", money = false, ranged = false, csv = ""),
 }
 
 /** بازهٔ انتخاب‌شده: گزینهٔ `ReportEngine.Range` و ماه/سالِ خورشیدیِ «ماه…»/«سال…» */
@@ -42,6 +63,14 @@ object ReportsModel {
   )
 
   fun tabs(canSeeMoney: Boolean): List<ReportTab> = ReportTab.entries.filter { canSeeMoney || !it.money }
+
+  /** زبانه‌های پایه و سپس اختیاری‌های روشن (پولی فقط با `canSeeMoney`) */
+  fun pages(canSeeMoney: Boolean, extras: Set<ReportExtra>): List<ReportPage> =
+    tabs(canSeeMoney) + ReportExtra.entries.filter { it in extras && (canSeeMoney || !it.money) }
+
+  /** زبانهٔ پیوند در میانِ همه؛ ناشناخته ⇒ همان `tabOf` */
+  fun pageOf(id: String?, canSeeMoney: Boolean, extras: Set<ReportExtra>): ReportPage =
+    pages(canSeeMoney, extras).firstOrNull { it.id == id } ?: tabOf(id, canSeeMoney)
 
   /** زبانهٔ پیوند؛ ناشناخته یا بسته برای این کاربر ⇒ نخستین زبانهٔ باز (همان پیش‌فرضِ امروز) */
   fun tabOf(id: String?, canSeeMoney: Boolean): ReportTab = tabs(canSeeMoney).let { all -> all.firstOrNull { it.id == id } ?: all.first() }
