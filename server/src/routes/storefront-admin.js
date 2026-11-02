@@ -56,6 +56,11 @@ router.get('/config', async (req, res) => {
     bulk: st.flag ? await sf.bulkFlagOn(req.shopId) : false,
     //  M3: لوگو و تصویرِ سر فقط با پرچمِ جدای `shop.storefront.media`
     media: st.flag ? await sfm.flagOn(req.shopId) : false,
+    //  WEB-24: برگهٔ «بنرها» ِ برنامه فقط با پرچمِ `shop.storefront.banners` — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...(st.flag && (await extras.bannersOn(req.shopId)) ? { banners: true } : {}),
+    //  CHK-10: فهرستِ «خبرم کن» در «ارسال و زمان» ِ برنامه — همان دروازهٔ `GET /area-requests`
+    //  (`settings.write` + ناحیه + `shop.storefront.notify_area`)؛ نقشِ دیگر یا خاموش ⇒ کلید نیست
+    ...(st.flag && can(req.role, 'settings.write') && (await areas.flagOn(req.shopId)) ? { notifyArea: true } : {}),
   });
 });
 

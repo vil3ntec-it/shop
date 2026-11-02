@@ -833,4 +833,86 @@ object StrOnline {
     DeskActions.Act.HAND_TO_COMPANY to "شرکت ته ورکړل شو", DeskActions.Act.DELIVER to "وسپارل شو", DeskActions.Act.FAIL to "ناکام",
     DeskActions.Act.RETRY to "بیا هڅه", DeskActions.Act.RETURN to "بسته راستنه شوه", DeskActions.Act.RECALL to "بېرته غوښتل", DeskActions.Act.FIX_ADDRESS to "پته سمول",
   )
+
+  // ── WEB-24: بنرهای زمان‌بندی‌شدهٔ ویترین (برگهٔ «بنرها») ────────────────────────
+  val sfTabBanners: String get() = t("بنرها", "Banners", "بنرونه")
+  val bnSection: String get() = t("بنرهای زمان‌بندی‌شده", "Scheduled banners", "مهال‌وېشل شوي بنرونه")
+  fun bnHelp(max: Int): String = t(
+    "بالای کاتالوگِ ویترین، فقط در همان روزها و همان ناحیه‌ها دیده می‌شوند و خودبه‌خود نمی‌چرخند. حداکثر ${asIs(max)} بنر.",
+    "Shown above the storefront catalogue only on those days and in those zones, without auto-rotation. Up to $max banners.",
+    "د ویترین د لړلیک پورته یوازې په هماغو ورځو او سیمو کې ښکاري او پخپله نه اوړي. تر $max بنرونو پورې.",
+  )
+  val bnEmpty: String get() = t("هنوز بنری نیست.", "No banners yet.", "تر اوسه بنر نشته.")
+  val bnAdd: String get() = t("افزودنِ بنر", "Add banner", "بنر زیاتول")
+  fun bnN(i: Int): String = t("بنرِ ${asIs(i)}", "Banner $i", "بنر $i")
+  val bnTitle: String get() = t("عنوان", "Title", "سرلیک")
+  val bnBody: String get() = t("متن (اختیاری)", "Text (optional)", "متن (اختیاري)")
+  val bnFrom: String get() = t("از روزِ", "From", "له ورځې")
+  val bnTo: String get() = t("تا روزِ (خودش هم)", "Until (inclusive)", "تر ورځې (پخپله هم)")
+  val bnWeek: String get() = t("یک هفته", "One week", "یوه اونۍ")
+  val bnMonth: String get() = t("یک ماه", "One month", "یوه میاشت")
+  val bnLink: String get() = t("پیوند", "Link", "لینک")
+  val bnLinkNone: String get() = t("بی پیوند", "No link", "بې لینک")
+  val bnLinkProduct: String get() = t("کالا", "Product", "توکی")
+  val bnLinkCategory: String get() = t("دسته", "Category", "کټګوري")
+  val bnFindProduct: String get() = t("کالای ویترین را بجویید", "Search a storefront product", "د ویترین توکی ولټوئ")
+  val bnNoProducts: String get() = t("کالای منتشرشده‌ای با این نام نیست", "No published product with this name", "په دې نوم خپور شوی توکی نشته")
+  fun bnLinkedTo(name: String): String = t("پیوند به: ${asIs(name)}", "Links to: $name", "لینک ته: $name")
+  val bnCategory: String get() = t("نامِ دسته (همان نامِ ویترین)", "Category name (as in the storefront)", "د کټګورۍ نوم (لکه په ویترین کې)")
+  val bnZones: String get() = t("کجا دیده شود", "Where to show", "چېرته وښودل شي")
+  val bnEverywhere: String get() = t("همه‌جا", "Everywhere", "هرچېرې")
+  fun bnSort(max: Int): String = t("اولویت (۰ تا ${asIs(max)}؛ بیشتر جلوتر)", "Priority (0 to $max; higher first)", "لومړیتوب (۰ تر $max؛ لوړ مخکې)")
+  val bnRemove: String get() = t("برداشتنِ بنر", "Remove banner", "بنر لرې کول")
+  val bnRemoved: String get() = t("بنر برداشته شد", "Banner removed", "بنر لرې شو")
+  val bnSave: String get() = t("ذخیرهٔ بنرها", "Save banners", "بنرونه خوندي کول")
+  val bnSaved: String get() = t("بنرها ذخیره شد", "Banners saved", "بنرونه خوندي شول")
+  val bnLoadFailed: String get() = t("بنرها نیامد", "Couldn't load banners", "بنرونه رانغلل")
+  val bnLive: String get() = t("اکنون دیده می‌شود", "Showing now", "اوس ښکاري")
+  val bnLater: String get() = t("هنوز نرسیده", "Not started yet", "لا نه دی پیل شوی")
+  val bnEnded: String get() = t("تمام شده", "Ended", "پای ته رسېدلی")
+  val bnZoneGone: String get() = t("ناحیهٔ برداشته‌شده", "Removed zone", "لرې شوې سیمه")
+  val bnErrTitle: String get() = t("عنوان لازم است", "A title is required", "سرلیک اړین دی")
+  fun bnErrTooLong(max: Int): String = t("حداکثر ${asIs(max)} حرف", "At most $max characters", "تر $max تورو پورې")
+  val bnErrDate: String get() = t("تاریخ خوانا نیست", "The date can't be read", "نېټه نه لوستل کېږي")
+  val bnErrEndBefore: String get() = t("«تا» پیش از «از» است", "“Until” is before “From”", "«تر» له «له» مخکې دی")
+  fun bnErrSpan(days: Int): String = t("حداکثر ${asIs(days)} روز", "At most $days days", "تر $days ورځو پورې")
+  val bnErrProduct: String get() = t("کالای پیوند را برگزینید", "Choose the linked product", "د لینک توکی وټاکئ")
+  val bnErrCategory: String get() = t("نامِ دسته لازم است", "A category name is required", "د کټګورۍ نوم اړین دی")
+  fun bnErrSort(max: Int): String = t("عددِ ۰ تا ${asIs(max)}", "A number from 0 to $max", "له ۰ تر $max پورې شمېره")
+  val bnErrZonesGone: String get() = t(
+    "ناحیه‌های این بنر برداشته شده‌اند؛ ناحیه‌ای برگزینید یا «همه‌جا»",
+    "This banner's zones were removed; choose a zone or “Everywhere”",
+    "د دې بنر سیمې لرې شوې؛ یوه سیمه یا «هرچېرې» وټاکئ",
+  )
+  fun bnErrTooMany(max: Int): String = t("حداکثر ${asIs(max)} بنر", "At most $max banners", "تر $max بنرونو پورې")
+
+  // ── CHK-10/S34: «خبرم کن» ِ بیرونِ محدوده در «ارسال و زمان» ──────────────────────
+  val arTitle: String get() = t("«خبرم کن» ِ بیرونِ محدوده", "“Notify me” outside the zones", "له سیمو بهر «خبر مې کړه»")
+  val arHelp: String get() = t(
+    "شماره فقط برای محلی دیده می‌شود که اکنون ناحیه‌ای پوشانده است. سرور پیامی نمی‌فرستد؛ خودتان زنگ بزنید یا پیام بدهید و بعد «خبر دادم» را بزنید.",
+    "A number is shown only for a place a zone now covers. The server sends no message; call or message them yourself, then tap “Notified”.",
+    "شمېره یوازې د هغه ځای لپاره ښکاري چې اوس یوه سیمه یې پوښي. سرور پیغام نه لېږي؛ پخپله زنګ ووهئ یا پیغام ورکړئ او بیا «خبر مې ورکړ» ووهئ.",
+  )
+  fun arSummary(total: Int, covered: Int): String = t(
+    "${asIs(total)} درخواست؛ ${asIs(covered)} تا اکنون در ناحیهٔ ارسال است",
+    "$total ${pl(total, "request", "requests")}; $covered now inside a delivery zone",
+    "$total غوښتنې؛ $covered یې اوس د لېږد په سیمه کې دي",
+  )
+  val arNoContacts: String get() = t(
+    "کسی برای خبر دادن نیست؛ وقتی ناحیه‌ای محلِ درخواستی را بپوشاند، شماره‌اش این‌جا می‌آید.",
+    "No one to notify yet; when a zone covers a requested place, the number appears here.",
+    "تر اوسه څوک د خبرولو لپاره نشته؛ کله چې یوه سیمه د غوښتنې ځای وپوښي، شمېره یې دلته راځي.",
+  )
+  fun arContactSub(zone: String, ago: String): String = t("ناحیهٔ «${asIs(zone)}» · ${asIs(ago)}", "Zone “$zone” · $ago", "سیمه «$zone» · $ago")
+  val arNotified: String get() = t("خبر دادم", "Notified", "خبر مې ورکړ")
+  val arNotifiedDone: String get() = t("ثبت شد؛ از فهرست برداشته شد", "Saved; removed from the list", "ثبت شو؛ له لېست څخه لرې شو")
+  val arCellsTitle: String get() = t("تقاضا به ازای محل (خانهٔ ۳۰۰ متری، بی شماره)", "Demand by place (300 m cells, no numbers)", "د ځای له مخې غوښتنه (۳۰۰ متره خونې، بې شمېرې)")
+  fun arCell(count: Int, lat: String, lng: String): String = t(
+    "${asIs(count)} درخواست نزدیکِ ${asIs(lat)}، ${asIs(lng)}",
+    "$count ${pl(count, "request", "requests")} near $lat, $lng",
+    "$count غوښتنې د $lat، $lng ته نږدې",
+  )
+  fun arCovered(zone: String): String = t("اکنون در ناحیهٔ «${asIs(zone)}»", "Now in zone “$zone”", "اوس د «$zone» په سیمه کې")
+  val arOutside: String get() = t("هنوز بیرون از ناحیه‌ها", "Still outside all zones", "لا هم له ټولو سیمو بهر")
+  val arLoadFailed: String get() = t("فهرستِ «خبرم کن» نیامد", "Couldn't load the “notify me” list", "د «خبر مې کړه» لېست رانغی")
 }

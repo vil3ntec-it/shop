@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.core.storefront.MarketListingRepository
 import ir.vil3ntec.tohid.core.storefront.StorefrontDelivery
 import ir.vil3ntec.tohid.data.DeviceLocation
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.StorefrontBannersRepository
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryDto
 import ir.vil3ntec.tohid.data.repo.StorefrontDeliveryRepository
 import ir.vil3ntec.tohid.data.repo.StorefrontRepository
@@ -74,7 +75,15 @@ internal fun RouteScope.StorefrontRoute() {
   var formErrors by remember(settings?.updatedAt) { mutableStateOf(emptyMap<String, String>()) }
   var saving by remember { mutableStateOf(false) }
   var askDiscard by remember { mutableStateOf(false) }
-  val dirty = cfg != null && form != StorefrontSettingsModel.from(settings)
+  //  WEB-24: برگهٔ «بنرها» (فرمش بیرون از برگه تا با عوضِ برگه گم نشود)
+  val banners = remember(context) { BannersController(StorefrontBannersRepository(Backend.api(context)), StorefrontDeliveryRepository(Backend.api(context))) }
+  LaunchedEffect(tab) {
+    if (tab == StorefrontModel.BANNERS && !banners.loaded) {
+      banners.load(tz, withZones = cfg?.zones == true)
+      if (StorefrontHub.products.value == null) StorefrontHub.load(repo)
+    }
+  }
+  val dirty = cfg != null && (form != StorefrontSettingsModel.from(settings) || banners.dirty)
   BackHandler(enabled = dirty) { askDiscard = true }
 
   //  کالاها
@@ -146,6 +155,14 @@ internal fun RouteScope.StorefrontRoute() {
           }
         }
       }, loading = zonesSaving)
+    }) else null
+    StorefrontModel.BANNERS -> if (banners.loaded) ({
+      V3FormBar(StrOnline.bnSave, {
+        if (!banners.saving) scope.launch {
+          val err = banners.save(tz)
+          if (err == null) { Haptics.success(context); toasts.show(StrOnline.bnSaved) } else toasts.show(err)
+        }
+      }, loading = banners.saving)
     }) else null
     else -> null
   }
@@ -221,8 +238,15 @@ internal fun RouteScope.StorefrontRoute() {
           Icons.Outlined.CloudOff, StrOnline.dzLoadFailed,
           body = zonesError ?: StrOnline.checkConnection, action = StrKit.retry, onAction = { scope.launch { loadZones() } },
         )
-        else -> ZonesPane(zonesForm, zonesErrors, { zonesForm = it }, pad)
+        else -> ZonesPane(zonesForm, zonesErrors, { zonesForm = it }, pad, notifyArea = c.notifyArea)
       }
+      StorefrontModel.BANNERS -> BannersPane(
+        ctl = banners,
+        products = StorefrontHub.products.value,
+        tz = tz,
+        onRetry = { scope.launch { banners.load(tz, withZones = c.zones) } },
+        pad = pad,
+      )
     }
   }
 

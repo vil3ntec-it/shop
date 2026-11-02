@@ -52,10 +52,11 @@ data class ZonesForm(
  *  برگهٔ «ارسال و زمان» (پرچمِ جدای `zones`): هر ناحیه یک کارت (نام، چندضلعی | دایره، هزینه، حداقل،
  *  «رایگان از…»، فعال) و هر بازه یک کارت (ارسال | دریافت، روزها، ساعت، ظرفیت، مهلت، فعال). برداشتن
  *  با «برگرداندن»؛ خطا زیرِ همان کادر (کلیدهای `z0.name` …)؛ «ذخیره» نوارِ چسبانِ پایین است.
+ *  با [notifyArea] (`config.notifyArea`) زیرش فهرستِ «خبرم کن» ِ بیرونِ محدوده (`AreaRequestsSection`، CHK-10).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ZonesPane(form: ZonesForm, errors: Map<String, String>, onChange: (ZonesForm) -> Unit, pad: PaddingValues) {
+fun ZonesPane(form: ZonesForm, errors: Map<String, String>, onChange: (ZonesForm) -> Unit, pad: PaddingValues, notifyArea: Boolean = false) {
   val toasts = LocalV3Toasts.current
   Column(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState())
@@ -94,6 +95,8 @@ fun ZonesPane(form: ZonesForm, errors: Map<String, String>, onChange: (ZonesForm
       V3Divider()
       FlowRow(Modifier.padding(12.dp)) { V3AddChip(StrOnline.dzAddRule) { onChange(form.copy(rules = form.rules + StorefrontDelivery.RuleDraft())) } }
     }
+    //  CHK-10: «خبرم کن» ِ بیرونِ محدوده — همان‌جا که ناحیه بزرگ‌تر می‌شود (فقط صاحب/مدیر با پرچم)
+    if (notifyArea) AreaRequestsSection()
     Spacer(Modifier.height(24.dp))
   }
 }

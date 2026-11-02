@@ -114,6 +114,7 @@ test('CHK-10 ⛔: پرچمِ خاموش ⇒ درِ مشتری همان پاسخ�
   assert.equal(own.status, 403);
   assert.equal(own.body.error.code, 'notify_area_disabled');
   assert.equal('notifyArea' in (await h.get('/api/shop/orders/config', { token: s.token })).body, false, 'خاموش ⇒ پاسخِ پیشینِ `/orders/config`');
+  assert.equal('notifyArea' in (await h.get('/api/shop/storefront/config', { token: s.token })).body, false, 'خاموش ⇒ پاسخِ پیشینِ `/storefront/config`');
   const where = await h.get(`/api/store/${s.slug}/delivery?lat=${OUTSIDE.lat}&lng=${OUTSIDE.lng}`);
   assert.deepEqual(Object.keys(where.body).sort(), ['inZone', 'pickup', 'zone', 'zoned']);
   assert.equal((await rowsOf(s.shopId)).length, 0);
@@ -124,6 +125,7 @@ test('CHK-10 ⛔: پرچمِ خاموش ⇒ درِ مشتری همان پاسخ�
   const offZones = await ask(z.slug, OUTSIDE, T(tz));
   assert.deepEqual([offZones.status, offZones.body], [unknown.status, unknown.body]);
   assert.equal((await h.get('/api/shop/storefront/area-requests', { token: z.token })).body.error.code, 'zones_disabled');
+  assert.equal('notifyArea' in (await h.get('/api/shop/storefront/config', { token: z.token })).body, false, 'بی ناحیه ⇒ بی کلید');
 });
 
 test('S34: پینِ بیرون ⇒ ارسال ثبت نمی‌شود، «دریافت از دکان» با همان سبد ثبت می‌شود، «خبرم کن» فقط خانهٔ شبکه را نگه می‌دارد', async () => {
@@ -192,6 +194,8 @@ test('CHK-10: دکان تقاضا را بی شماره می‌بیند؛ شما�
 
   //  وب (license/area-requests.js): فهرست فقط برای صاحب و مدیر (`settings.write`) — صندوق‌دار نه کلید دارد نه فهرست
   assert.equal((await h.get('/api/shop/orders/config', { token: s.token })).body.notifyArea, true);
+  //  برنامهٔ مدیریت (برگهٔ «ارسال و زمان»): همان کلید در `/storefront/config`
+  assert.equal((await h.get('/api/shop/storefront/config', { token: s.token })).body.notifyArea, true);
   {
     resetAll();
     const fresh = await h.signIn(s, 'shop');
@@ -201,6 +205,7 @@ test('CHK-10: دکان تقاضا را بی شماره می‌بیند؛ شما�
     assert.ok([200, 201].includes((await h.post('/api/shop/join', { code: inv.body.code }, { token: u.accessToken })).status));
     const c = await h.signIn(u, 'shop');
     assert.equal('notifyArea' in (await h.get('/api/shop/orders/config', { token: c.accessToken })).body, false, 'صندوق‌دار ⇒ بی کلید');
+    assert.equal('notifyArea' in (await h.get('/api/shop/storefront/config', { token: c.accessToken })).body, false, 'صندوق‌دار ⇒ بی کلیدِ ویترین');
     assert.equal((await h.get('/api/shop/storefront/area-requests', { token: c.accessToken })).status, 403);
     resetAll();
   }

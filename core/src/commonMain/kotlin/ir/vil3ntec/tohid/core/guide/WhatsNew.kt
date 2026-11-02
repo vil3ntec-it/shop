@@ -35,6 +35,22 @@ object WhatsNew {
   )
 
   val ALL: List<Note> = listOf(
+    //  دستهٔ ۱۳ (تصمیمِ صاحب‌کار «شکلِ قدیم هرگز»): شکلِ قدیم و کلیدِ گزینشش رفت ⇒ بی‌صدا نه (OPS-05)
+    Note(
+      id = "v3.legacy-look-removed",
+      version = "2.14.5",
+      kind = Kind.REMOVED,
+      text = GuideText(
+        fa = "شکلِ قدیمِ برنامه برداشته شد، همراهِ کلیدِ «رابطِ تازه (نسخهٔ ۳)» در تنظیمات. هر کاری که شکلِ قدیم داشت در شکلِ تازه هست و دیگر چیزی برای گزینش نمانده است.",
+        en = "The old look of the app has been removed, together with the “New interface (version 3)” switch in Settings. Everything the old look could do is in the new look, so there is nothing left to choose.",
+        ps = "د اپ زړه بڼه لرې شوه، د تنظیماتو د «نوې بڼه (نسخه ۳)» کیلي سره یوځای. هر هغه کار چې زړې بڼې درلود په نوې بڼه کې شته، نو د ټاکلو لپاره څه نه دي پاتې.",
+      ),
+      instead = GuideText(
+        fa = "همان کارها در شکلِ تازه: نوارِ پایینِ گوشی یا منوی کنارِ کامپیوتر، و «بیشتر». هر تنظیم را با جست‌وجوی بالای «تنظیمات» پیدا کنید.",
+        en = "Find the same tasks in the new look: the bottom bar on a phone or the side menu on a computer, and “More”. Find any setting with the search at the top of Settings.",
+        ps = "همدا کارونه په نوې بڼه کې: د ګوشي لاندې پټه یا د کمپیوټر د څنګ مینو، او «نور». هره تنظیم د «تنظیمات» په سر کې د لټون په مرسته پیدا کړئ.",
+      ),
+    ),
     Note(
       id = "ops05.intro",
       version = "2.14.5",
