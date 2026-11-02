@@ -144,6 +144,11 @@ fun RouteScope.InvoiceRoute() {
   val v2 = returnsV2()
   val canCancel = remember { ShopRole.canCancelSale(context) }
   val row = HistoryModel.row(data, sale, v2)
+  //  PAY-07 — وضعیتِ ردیف‌های غیرنقد
+  val payRows = ir.vil3ntec.tohid.data.PayStatusFlow.view(data, sale)
+  val sells = remember { ShopRole.canWrite(context, "sales") }
+  val manages = remember { !ShopRole.isStaff(context) }
+  val payActs = payRows.any { it.manual && ir.vil3ntec.tohid.core.pay.PayStatus.allowed(it.status, sells, manages).isNotEmpty() }
   //  فاکتورِ نسخهٔ ۲ فقط با پرچمِ `shop.receipt_v2` (خاموش ⇒ همین رسیدِ کارتی، مثلِ پیش)
   val receiptV2 = remember { ReceiptFlag.enabled(context) }
   val paper by produceState<ImageBitmap?>(null, sale, data.saleItems.size, receiptV2) {
@@ -176,8 +181,9 @@ fun RouteScope.InvoiceRoute() {
       }) else null,
     ),
     paper = paper,
-    payRows = ir.vil3ntec.tohid.data.PayStatusFlow.view(data, sale),
-    onPayRow = { nav.open(SalesPaths.payStatus(sale.id, it)) },
+    payRows = payRows,
+    //  فقط وقتی همین کاربر کاری روی یکی از ردیف‌ها دارد (ثبتِ دستیِ «تأییدشده» را فقط صاحب/مدیر اصلاح می‌کند)
+    onPayRow = if (payActs) ({ nav.open(SalesPaths.payStatus(sale.id, it)) }) else null,
   )
 }
 

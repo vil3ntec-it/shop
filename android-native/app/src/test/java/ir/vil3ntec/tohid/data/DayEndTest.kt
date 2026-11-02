@@ -45,14 +45,7 @@ class DayEndTest {
         Sale(id = "s9", finalTotal = 999.0, createdAt = base - 2 * h),
       ),
       saleReturns = listOf(SaleReturn(id = "r1", saleId = "s1", amount = 50.0, createdAt = base + 11 * h)),
-      //  PAY-07: کارتِ ثبتِ دستی فقط پس از «پول رسید» ِ صندوقدار پولِ رسیده است (X/Z)
-      auditLog = listOf(
-        openA,
-        AuditEntry(
-          id = "ps1", type = "pay_status", refId = "s2", amount = 200.0, createdAt = base + 10 * h + 1, by = "علی",
-          payRow = 1, payMethod = "afpay_card", fromStatus = "pending", toStatus = "confirmed",
-        ),
-      ),
+      auditLog = listOf(openA),
     )
     val counts = mapOf("100000" to 1L, "50000" to 1L, "10000" to 2L, "5000" to 1L)
     val z = ok(PayFlow.closeRow(d, openA, PayFlow.Count(counts, methodCounts = mapOf("afpay_card" to 20000L), by = "علی"), base + 12 * h, newId))

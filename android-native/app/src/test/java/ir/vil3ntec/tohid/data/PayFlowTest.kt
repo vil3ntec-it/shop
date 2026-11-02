@@ -93,8 +93,7 @@ class PayFlowTest {
   @Test fun `legacyShift ۲ - فروشِ کیف‌پولی با payments همان coreExpected`() {
     val c = v["legacyShift"]!!.jsonArray.map { it.jsonObject }.first { it["coreExpected"]!!.jsonObject.has("hesabpay") }
     val base = ledgerOf(c["data"]!!.jsonObject)
-    //  PAY-07: فقط پولِ رسیده در X/Z — ردیفِ کیف پولِ «تأییدشده» (ردیفِ «در انتظار» را `PayStatusFlowTest` می‌سنجد)
-    val d = base.copy(sales = base.sales.map { it.copy(payments = listOf(SalePayment("hesabpay", "wallet", 40000, "confirmed", "R1", "cashier"))) })
+    val d = base.copy(sales = base.sales.map { it.copy(payments = listOf(SalePayment("hesabpay", "wallet", 40000, "pending", "R1", "manual"))) })
     val r = ok(PayFlow.report(d, AuditEntry(id = "sh-1", createdAt = c.lng("from")!!, amount = c.dbl("opening")), null, c.lng("to")!!))
     assertEquals(expectedOf(c["coreExpected"]!!.jsonObject), r.report.expected)
     //  صندوقِ قدیمیِ همین برنامه (`CashShift`، پرچمِ خاموش) هم کیف پول را نقدِ دخل نمی‌شمارد
@@ -183,16 +182,10 @@ class PayFlowTest {
     assertEquals(0, noRef.index)
     assertTrue(PayFlow.message(noRef).contains("HesabPay"))
     val d = ShopData(sales = listOf(Sale(id = "S06", finalTotal = 2450.0, createdAt = 100, payments = f.payments)))
-    //  PAY-07: ثبتِ دستیِ «در انتظار» پولِ رسیده نیست — تا «پول رسید» ِ صندوقدار بیرون از X است
     val x = ok(PayFlow.report(d, AuditEntry(id = "sh", createdAt = 0), null, 200)).report
     assertEquals(100000L, x.methods.getValue("cash").sales)
-    assertEquals(0L, x.methods["hesabpay"]?.sales ?: 0L)
-    assertEquals(100000L, x.expected!!["cash"])
-    val built = PayStatusFlow.build(d, "ps1", PayStatusFlow.Request("S06", 1, "confirmed", "سارا", sell = true, manage = false), "2026-11-02", 150)
-    val confirmed = d.copy(auditLog = listOf((built as PayStatusFlow.Built.Ok).row))
-    val x2 = ok(PayFlow.report(confirmed, AuditEntry(id = "sh", createdAt = 0), null, 200)).report
-    assertEquals(145000L, x2.methods.getValue("hesabpay").sales)
-    assertEquals(mapOf("cash" to 100000L, "hesabpay" to 145000L), x2.expected)
+    assertEquals(145000L, x.methods.getValue("hesabpay").sales)
+    assertEquals(mapOf("cash" to 100000L, "hesabpay" to 145000L), x.expected)
   }
 
   @Test fun `پرداختِ جزئی به حساب؛ بی مشتری رد؛ پولِ پس فقط از نقد`() {

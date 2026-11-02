@@ -24,9 +24,9 @@ object StrPayStatus {
     "د ګېټوې تایید — حالت یې یوازې سرور بدلوي",
   )
   val sheetBody: String get() = t(
-    "فاکتور دست نمی‌خورد: یک ردیفِ جدا با نامِ شما در سابقه می‌ماند. «در انتظار»، «ناموفق»، «لغو» و «نیازمند بررسی» در جمعِ دریافتیِ صندوق نیستند.",
-    "The invoice is not edited: a separate record with your name stays in the history. Pending, failed, cancelled and needs-review payments are not in the register's received total.",
-    "بل نه بدلېږي: یو جلا ریکارډ ستاسو د نوم سره په تاریخچه کې پاتې کېږي. «په تمه»، «ناکام»، «لغوه» او «کتنې ته اړتیا» د صندوق په ترلاسه شوې ټولګه کې نه دي.",
+    "فاکتور دست نمی‌خورد: یک ردیفِ جدا با نامِ شما در سابقه می‌ماند. «نیازمند بررسی»، «ناموفق» و «لغو» از جمعِ دریافتیِ صندوق بیرون می‌روند.",
+    "The invoice is not edited: a separate record with your name stays in the history. Needs-review, failed and cancelled payments leave the register's received total.",
+    "بل نه بدلېږي: یو جلا ریکارډ ستاسو د نوم سره په تاریخچه کې پاتې کېږي. «کتنې ته اړتیا»، «ناکام» او «لغوه» د صندوق له ترلاسه شوې ټولګې وځي.",
   )
   val toConfirmed: String get() = t("پول رسید — تأیید", "Money received — confirm", "پیسې ورسېدې — تایید")
   val toReview: String get() = t("نیازمند بررسی", "Needs review", "کتنې ته اړتیا")

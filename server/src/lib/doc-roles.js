@@ -29,8 +29,9 @@
  *           برگشتِ امتیاز `LoyaltyPoints.afterReturn/afterCancel`): برگشت ⇐ `returns` نوشتنی و `returns.create`
  *           نه «ممنوع» (`ReturnFlow.permDecision`: allow، یا approve با PIN)، یا لغو ⇐ CANCEL
  *   PLACES  `StockPlacesEntry`: هر نقش جز `staff` (شاگرد) — محل‌ها و بسته‌بندیِ دوباره
- *   MANAGE  فقط صاحب و مدیر: اصلاحِ دستیِ امتیاز (PRM-13)؛ و PAY-07 `pay_status` جز «در انتظار ⇐ تأییدشده/نیازمند بررسی»
- *           که SELL است (`PayStatus.need` ِ هسته، صفحهٔ وضعیتِ پرداختِ فاکتور: `PayStatusRoute`)
+ *   MANAGE  فقط صاحب و مدیر: اصلاحِ دستیِ امتیاز (PRM-13)؛ و PAY-07 `pay_status` (اصلاحِ ثبتِ دستیِ «تأییدشده» به
+ *           «نیازمند بررسی»/«ناموفق»/«لغو» و حلِ بررسی) جز «در انتظار ⇐ تأییدشده/نیازمند بررسی» که SELL است
+ *           (`PayStatus.need` ِ هسته، صفحهٔ وضعیتِ پرداختِ فاکتور: `PayStatusRoute`)
  *   ''      بی سنجشِ نقش در برنامه (ساختِ امانی و سفارش، «آماده»، پیش‌پرداخت و قسط): فقط شکل
  *
  * ⛔ Sync v1 (`sync-v1.js` ِ مشترک با پمپ) دست نمی‌خورد: v1 این ردیف‌ها را فقط با `canWrite` ِ جدول می‌نشاند و
@@ -81,7 +82,8 @@ const adjusted = (f) => (text(f.payRef) && Number.isInteger(f.points) && f.point
   && typeof f.notes === 'string' && f.notes.trim().length > 0 && zeroOk(f.amountMinor) ? MANAGE : BAD);
 /**
  * PAY-07 — تغییرِ وضعیتِ یک ردیفِ پرداختِ غیرنقدِ فاکتور (`PayStatusFlow.row`): فاکتور (`refId`)، جای ردیف (`payRow`)،
- * روشش، و گذارِ (`fromStatus` ⇐ `toStatus`) که دستی گذاشتنی است. اجازه همان `PayStatus.need` ِ هسته. بازپرداخت از راهِ
+ * روشش، و گذارِ (`fromStatus` ⇐ `toStatus`) که دستی گذاشتنی است (`PayStatus.canMove`: جدولِ هسته + `CORRECTIONS` ِ
+ * «تأییدشده»؛ ثبتِ دستیِ صندوقدار از «تأییدشده» آغاز می‌شود). اجازه همان `PayStatus.need` ِ هسته. بازپرداخت از راهِ
  * برگشت است و هرگز با این ردیف نیست. گذارِ کهنه (وضعیتِ ردیف دیگر `fromStatus` نیست) را خودِ برنامه هنگامِ خواندن کنار می‌گذارد.
  */
 const PAY_MOVES = Object.freeze({
@@ -89,6 +91,9 @@ const PAY_MOVES = Object.freeze({
   'pending>needs_review': SELL,
   'pending>failed': MANAGE,
   'pending>cancelled': MANAGE,
+  'confirmed>needs_review': MANAGE,
+  'confirmed>failed': MANAGE,
+  'confirmed>cancelled': MANAGE,
   'needs_review>confirmed': MANAGE,
   'needs_review>failed': MANAGE,
   'needs_review>cancelled': MANAGE,

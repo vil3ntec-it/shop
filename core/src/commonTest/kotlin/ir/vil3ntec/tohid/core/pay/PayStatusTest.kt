@@ -7,12 +7,15 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-/** PAY-07 — وضعیتِ ردیف‌های غیرنقدِ فاکتور: گذار، اجازه، دو دستگاه، پولِ دریافتی و بازپرداخت */
+/** PAY-07 — وضعیتِ ردیف‌های غیرنقدِ فاکتور: آغازِ «تأییدشده» ِ ثبتِ دستی، اصلاح، اجازه، دو دستگاه، پولِ دریافتی و بازپرداخت */
 class PayStatusTest {
+  /** ثبتِ دستیِ صندوقدار — همان ردیفی که `Pay.settle` امروز می‌نویسد */
   private val card = Row("afpay_card", "card", 150_000, "pending", "manual")
   private val cash = Row("cash", "cash", 50_000, "confirmed")
   private val gateway = Row("hesabpay", "wallet", 80_000, "confirmed", "gateway")
-  private val rows = listOf(cash, card, gateway)
+  /** ردیفی که واقعاً منتظرِ تأیید است (نه ثبتِ دستی) */
+  private val awaiting = Row("hesabpay", "wallet", 20_000, "pending")
+  private val rows = listOf(cash, card, gateway, awaiting)
 
   private fun input(
     to: String, index: Int = 1, sell: Boolean = true, manage: Boolean = false, existing: List<Change> = emptyList(),
@@ -23,68 +26,83 @@ class PayStatusTest {
   private fun err(r: PayResult<Change>) = (r as PayResult.Err).code
 
   @Test
-  fun cashierConfirmsOrFlagsPendingOnly() {
-    val c = ok(PayStatus.check(input("confirmed")))
-    assertEquals(Change("c1", "s1", 1, "afpay_card", "pending", "confirmed", 1_000, "سارا"), c)
-    assertEquals("needs_review", ok(PayStatus.check(input("needs_review"))).to)
-    assertEquals("PERM_DENIED", err(PayStatus.check(input("failed"))))
-    assertEquals("PERM_DENIED", err(PayStatus.check(input("cancelled"))))
-    //  حلِ «نیازمند بررسی» فقط صاحب/مدیر
-    val flagged = ok(PayStatus.check(input("needs_review")))
+  fun manualEntryStartsConfirmedAndCountsAsReceived() {
+    val st = PayStatus.apply("s1", rows, emptyList()).statuses
+    assertEquals(listOf("confirmed", "confirmed", "confirmed", "pending"), st)
+    assertEquals(mapOf("hesabpay" to 20_000L), PayStatus.unreceived(rows, st))
+    assertEquals("confirmed", PayStatus.initial(card))
+    assertEquals("pending", PayStatus.initial(awaiting))
+  }
+
+  @Test
+  fun onlyOwnerOrManagerMovesAManualEntryOut() {
+    for (to in listOf("needs_review", "failed", "cancelled")) {
+      assertEquals("PERM_DENIED", err(PayStatus.check(input(to))), to)
+      val c = ok(PayStatus.check(input(to, sell = false, manage = true)))
+      assertEquals(Change("c1", "s1", 1, "afpay_card", "confirmed", to, 1_000, "سارا"), c)
+    }
+    val flagged = ok(PayStatus.check(input("needs_review", manage = true)))
     assertEquals("PERM_DENIED", err(PayStatus.check(input("confirmed", id = "c2", existing = listOf(flagged)))))
     assertEquals("confirmed", ok(PayStatus.check(input("confirmed", id = "c2", manage = true, existing = listOf(flagged)))).to)
   }
 
   @Test
+  fun cashierConfirmsOrFlagsOnlyARowThatAwaitsConfirmation() {
+    assertEquals("confirmed", ok(PayStatus.check(input("confirmed", index = 3))).to)
+    assertEquals("needs_review", ok(PayStatus.check(input("needs_review", index = 3))).to)
+    assertEquals("PERM_DENIED", err(PayStatus.check(input("failed", index = 3))))
+    assertEquals("cancelled", ok(PayStatus.check(input("cancelled", index = 3, manage = true))).to)
+  }
+
+  @Test
   fun invalidTransitionsAndTargetsAreRejected() {
-    val done = ok(PayStatus.check(input("confirmed")))
-    //  پایانی برنمی‌گردد؛ بازپرداخت فقط از راهِ برگشت
-    assertEquals("BAD_TRANSITION", err(PayStatus.check(input("failed", id = "c2", manage = true, existing = listOf(done)))))
+    //  تأییدشده دوباره تأیید نمی‌شود؛ ناموفق/لغو پایانی است؛ بازپرداخت فقط از راهِ برگشت
+    assertEquals("BAD_TRANSITION", err(PayStatus.check(input("confirmed", manage = true))))
     assertEquals("BAD_TRANSITION", err(PayStatus.check(input("refunded", manage = true))))
     assertEquals("BAD_TRANSITION", err(PayStatus.check(input("pending", manage = true))))
     assertEquals("BAD_STATUS", err(PayStatus.check(input("paid", manage = true))))
     val failed = ok(PayStatus.check(input("failed", manage = true)))
-    assertEquals("BAD_TRANSITION", err(PayStatus.check(input("confirmed", id = "c3", manage = true, existing = listOf(failed)))))
+    for (to in listOf("confirmed", "needs_review", "cancelled")) {
+      assertEquals("BAD_TRANSITION", err(PayStatus.check(input(to, id = "c3", manage = true, existing = listOf(failed)))), to)
+    }
   }
 
   @Test
   fun onlyManualNonCashRowsOfALiveShopSale() {
-    assertEquals("NOT_MANUAL", err(PayStatus.check(input("confirmed", index = 0, manage = true))))
-    assertEquals("NOT_MANUAL", err(PayStatus.check(input("confirmed", index = 2, manage = true))))
-    assertEquals("BAD_INDEX", err(PayStatus.check(input("confirmed", index = 9))))
-    assertEquals("SALE_CANCELLED", err(PayStatus.check(input("confirmed").copy(cancelled = true))))
-    assertEquals("SALE_ONLINE", err(PayStatus.check(input("confirmed").copy(online = true))))
-    val courier = Row("cod", "cash", 1_000, "pending", custody = "courier")
-    assertEquals(false, PayStatus.manual(courier))
-    assertEquals("BY_REQUIRED", err(PayStatus.check(input("confirmed", by = " "))))
-    assertEquals("BAD_NOTE", err(PayStatus.check(input("confirmed", note = "a\nb"))))
-    assertEquals("BAD_NOTE", err(PayStatus.check(input("confirmed", note = "x".repeat(121)))))
-    assertEquals("INVALID_TIME", err(PayStatus.check(input("confirmed", at = 0))))
+    assertEquals("NOT_MANUAL", err(PayStatus.check(input("failed", index = 0, manage = true))))
+    assertEquals("NOT_MANUAL", err(PayStatus.check(input("failed", index = 2, manage = true))))
+    assertEquals("BAD_INDEX", err(PayStatus.check(input("failed", index = 9, manage = true))))
+    assertEquals("SALE_CANCELLED", err(PayStatus.check(input("failed", manage = true).copy(cancelled = true))))
+    assertEquals("SALE_ONLINE", err(PayStatus.check(input("failed", manage = true).copy(online = true))))
+    assertEquals(false, PayStatus.manual(Row("cod", "cash", 1_000, "pending", custody = "courier")))
+    assertEquals("BY_REQUIRED", err(PayStatus.check(input("failed", manage = true, by = " "))))
+    assertEquals("BAD_NOTE", err(PayStatus.check(input("failed", manage = true, note = "a\nb"))))
+    assertEquals("BAD_NOTE", err(PayStatus.check(input("failed", manage = true, note = "x".repeat(121)))))
+    assertEquals("INVALID_TIME", err(PayStatus.check(input("failed", manage = true, at = 0))))
   }
 
   @Test
   fun sameIdIsDuplicateOtherContentConflicts() {
-    val c = ok(PayStatus.check(input("confirmed")))
-    val again = PayStatus.check(input("confirmed", existing = listOf(c)))
-    assertTrue((again as PayResult.Ok).duplicate)
-    assertEquals("ID_CONFLICT", err(PayStatus.check(input("needs_review", existing = listOf(c)))))
+    val c = ok(PayStatus.check(input("needs_review", manage = true)))
+    assertTrue((PayStatus.check(input("needs_review", manage = true, existing = listOf(c))) as PayResult.Ok).duplicate)
+    assertEquals("ID_CONFLICT", err(PayStatus.check(input("failed", manage = true, existing = listOf(c)))))
   }
 
   @Test
   fun twoOfflineDevicesEarliestWinsRegardlessOfArrival() {
-    val a = Change("a", "s1", 1, "afpay_card", "pending", "confirmed", 10, "سارا")
-    val b = Change("b", "s1", 1, "afpay_card", "pending", "needs_review", 20, "علی")
+    val a = Change("a", "s1", 1, "afpay_card", "confirmed", "needs_review", 10, "مدیر")
+    val b = Change("b", "s1", 1, "afpay_card", "confirmed", "failed", 20, "صاحب")
     for (order in listOf(listOf(a, b), listOf(b, a))) {
       val r = PayStatus.apply("s1", rows, order)
-      assertEquals(listOf("confirmed", "confirmed", "confirmed"), r.statuses)
+      assertEquals("needs_review", r.statuses[1])
       assertEquals(listOf("a"), r.applied)
       assertEquals(listOf("b"), r.skipped)
     }
     //  مرزِ زمان (Z): سندِ پس از بستن دیده نمی‌شود
-    assertEquals("pending", PayStatus.apply("s1", rows, listOf(a), until = 9).statuses[1])
+    assertEquals("confirmed", PayStatus.apply("s1", rows, listOf(a), until = 9).statuses[1])
     //  سندِ فاکتورِ دیگر، روشِ دیگر یا ردیفِ نه-دستی بی‌اثر
     val other = listOf(a.copy(id = "x", saleId = "s2"), a.copy(id = "y", method = "hawala"), a.copy(id = "z", index = 2))
-    assertEquals(rows.map { it.status }, PayStatus.apply("s1", rows, other).statuses)
+    assertEquals(listOf("confirmed", "confirmed", "confirmed", "pending"), PayStatus.apply("s1", rows, other).statuses)
   }
 
   @Test
@@ -96,8 +114,8 @@ class PayStatusTest {
     }
     assertEquals(emptyMap<String, Long>(), PayStatus.unreceived(many, listOf("confirmed", "confirmed", "partially_refunded", "refunded")))
     assertEquals(
-      mapOf("pending" to 150_000L, "confirmed" to 110_000L),
-      PayStatus.totals(many, listOf("confirmed", "pending", "confirmed", "confirmed")),
+      mapOf("needs_review" to 150_000L, "confirmed" to 110_000L),
+      PayStatus.totals(many, listOf("confirmed", "needs_review", "confirmed", "confirmed")),
     )
   }
 
@@ -114,17 +132,19 @@ class PayStatusTest {
   @Test
   fun summaryShowsTheWorstNonCashRow() {
     assertNull(PayStatus.summary(listOf(cash), listOf("confirmed")))
-    assertEquals("needs_review", PayStatus.summary(rows, listOf("confirmed", "needs_review", "confirmed")))
-    assertEquals("pending", PayStatus.summary(rows, listOf("confirmed", "pending", "confirmed")))
-    assertEquals("confirmed", PayStatus.summary(rows, listOf("confirmed", "confirmed", "confirmed")))
+    assertEquals("needs_review", PayStatus.summary(rows, listOf("confirmed", "needs_review", "confirmed", "pending")))
+    assertEquals("pending", PayStatus.summary(rows, listOf("confirmed", "confirmed", "confirmed", "pending")))
+    assertEquals("confirmed", PayStatus.summary(rows.take(3), listOf("confirmed", "confirmed", "confirmed")))
   }
 
   @Test
   fun allowedListsWhatThisUserMaySet() {
+    assertEquals(emptyList<String>(), PayStatus.allowed("confirmed", sell = true, manage = false))
+    assertEquals(listOf("needs_review", "failed", "cancelled"), PayStatus.allowed("confirmed", sell = true, manage = true))
     assertEquals(listOf("confirmed", "needs_review"), PayStatus.allowed("pending", sell = true, manage = false))
     assertEquals(listOf("confirmed", "failed", "cancelled", "needs_review"), PayStatus.allowed("pending", sell = true, manage = true))
     assertEquals(emptyList<String>(), PayStatus.allowed("needs_review", sell = true, manage = false))
     assertEquals(listOf("confirmed", "failed", "cancelled"), PayStatus.allowed("needs_review", sell = false, manage = true))
-    assertEquals(emptyList<String>(), PayStatus.allowed("confirmed", sell = true, manage = true))
+    assertEquals(emptyList<String>(), PayStatus.allowed("failed", sell = true, manage = true))
   }
 }

@@ -12,13 +12,18 @@ import ir.vil3ntec.tohid.core.money.addExact
  *  و مثلِ بقیهٔ سابقه همگام می‌شود. وضعیتِ همین لحظهٔ هر ردیف را [apply] از ردیفِ ثبت‌شده و همین سندها می‌سازد.
  *
  *  قاعده‌ها:
- *   • فقط ردیفِ «ثبتِ دستی» ([manual]): کیف پول، کارت، حواله، دیگر — نه نقد (همیشه تأییدشده)، نه «به حساب»،
+ *   • ⛔ صندوق ساده می‌ماند (صاحب‌کار): ردیفِ «ثبتِ دستی» (`pending` + `verification = manual` ِ ذخیره‌شده، PAY-08)
+ *     **«تأییدشده»** خوانده و شمرده می‌شود ([initial]) — صندوقدار آن را زد چون پول رسید؛ هیچ گامِ اجباریِ تازه‌ای
+ *     نیست و جمعِ X/Z همان امروز است. «در انتظار» فقط جایی است که جریان واقعاً منتظر است (حساب‌پیِ «ساده» پیش از
+ *     «پول رسید»، حساب‌پیِ «خودکار» تا وب‌هوکِ سرور).
+ *   • فقط ردیفِ دستی ([manual]): کیف پول، کارت، حواله، دیگر — نه نقد (همیشه تأییدشده)، نه «به حساب»،
  *     نه اعتبار و کارتِ هدیه (دفترِ خودشان)، نه ردیفِ تأییدِ سرور (`gateway`/`provider`: حساب‌پیِ خودکار؛ سرور
  *     مرجع است)، نه امانتِ پیک. فاکتورِ لغوشده و اینترنتی نه.
- *   • دستی فقط به [TARGETS]؛ بازپرداخت از راهِ برگشت می‌آید ([withRefunds])، نه از دکمه.
+ *   • گذارها: جدولِ هسته محدود به [TARGETS]، به‌علاوهٔ [CORRECTIONS] (اصلاحِ ثبتِ «تأییدشده» به «نیازمند بررسی»،
+ *     «ناموفق» یا «لغو»). بازپرداخت از راهِ برگشت می‌آید ([withRefunds])، نه از دکمه.
  *   • اجازه ([need]): «در انتظار» ⇒ «تأییدشده» یا «نیازمند بررسی» = صندوق (هر نقشی که فروش می‌نویسد، [SELL]);
- *     هر گذارِ دیگر (ناموفق، لغو، و حلِ «نیازمند بررسی») فقط صاحب و مدیر ([MANAGE]). سرور همین را در
- *     `server/src/lib/doc-roles.js` (پرچمِ `shop.sync.doc_roles`) می‌سنجد.
+ *     هر گذارِ دیگر (اصلاحِ تأییدشده، ناموفق، لغو، حلِ «نیازمند بررسی») فقط صاحب و مدیر ([MANAGE]). سرور همین را
+ *     در `server/src/lib/doc-roles.js` (پرچمِ `shop.sync.doc_roles`) می‌سنجد.
  *   • سند `from` دارد (مقایسه و جایگزینی): دو دستگاهِ آفلاین ⇒ [apply] به ترتیبِ (زمان، شناسه)، و سندی که
  *     `from` اش دیگر وضعیتِ همان ردیف نیست کنار می‌رود (`skipped`) — بی وابستگی به ترتیبِ رسیدن.
  *   • پولِ دریافتی فقط [RECEIVED]؛ «در انتظار»، «ناموفق»، «لغو» و «نیازمند بررسی» هرگز در X/Z و گزارش پولِ
@@ -53,6 +58,15 @@ object PayStatus {
 
   /** تأییدِ سرور (درگاه/ارائه‌دهنده) — وضعیتش را فقط سرور عوض می‌کند */
   val SERVER_VERIFIED: Set<String> = setOf("gateway", "provider")
+
+  /** سطحِ «ثبتِ دستی» ِ PAY-08 — صندوقدار پولِ رسیده را زد */
+  const val MANUAL = "manual"
+
+  /**
+   *  اصلاح‌های دستی بیرون از جدولِ چرخهٔ درگاه (`Pay.TRANSITIONS`): ثبتِ «تأییدشده» را صاحب/مدیر بعداً به «نیازمند
+   *  بررسی»، «ناموفق» یا «لغو» می‌برد (و از جمعِ دریافتی بیرون می‌رود).
+   */
+  val CORRECTIONS: Map<String, List<String>> = mapOf(CONFIRMED to listOf(NEEDS_REVIEW, FAILED, CANCELLED))
 
   /** یک ردیفِ پرداختِ فاکتور (به پول) — همان `SalePayment` ِ برنامه */
   data class Row(
@@ -98,6 +112,13 @@ object PayStatus {
     val existing: List<Change> = emptyList(),
   )
 
+  /** وضعیتِ آغازینِ ردیف: ثبتِ دستیِ صندوقدار (`pending` + `manual`) ⇒ «تأییدشده»؛ بقیه همان ذخیره‌شده */
+  fun initial(r: Row): String = if (r.status == PENDING && r.verification == MANUAL) CONFIRMED else r.status
+
+  /** گذارِ دستیِ روا: مقصدِ دستی، و جدولِ هسته یا [CORRECTIONS] */
+  fun canMove(from: String, to: String): Boolean =
+    to in TARGETS && (Pay.canTransition(from, to) || CORRECTIONS[from]?.contains(to) == true)
+
   /** ردیفی که وضعیتش دستی عوض می‌شود */
   fun manual(r: Row): Boolean =
     r.kind in MANUAL_KINDS && r.verification !in SERVER_VERIFIED && r.custody == null && r.amount > 0
@@ -108,14 +129,15 @@ object PayStatus {
 
   /** گذارهایی که این کاربر از [from] می‌تواند بگذارد */
   fun allowed(from: String, sell: Boolean, manage: Boolean): List<String> =
-    Pay.TRANSITIONS[from].orEmpty().filter { it in TARGETS && if (need(from, it) == SELL) sell else manage }
+    (Pay.TRANSITIONS[from].orEmpty() + CORRECTIONS[from].orEmpty()).distinct()
+      .filter { canMove(from, it) && if (need(from, it) == SELL) sell else manage }
 
   /**
    *  وضعیتِ همین لحظهٔ هر ردیف پس از سندهای ثبت‌شده تا [until]، به ترتیبِ (زمان، شناسه). سندِ نامعتبر — ردیفِ
    *  نبوده یا روشِ دیگر، ردیفِ نه-دستی، مقصدِ نادستی، `from` ِ کهنه یا گذارِ ناروا — کنار می‌رود.
    */
   fun apply(saleId: String, rows: List<Row>, changes: List<Change>, until: Long = Long.MAX_VALUE): Applied {
-    val st = rows.map { it.status }.toMutableList()
+    val st = rows.map(::initial).toMutableList()
     val applied = ArrayList<String>()
     val skipped = ArrayList<String>()
     val seen = HashSet<String>()
@@ -124,8 +146,7 @@ object PayStatus {
       .forEach { c ->
         if (!seen.add(c.id)) return@forEach
         val row = rows.getOrNull(c.index)
-        val ok = row != null && row.method == c.method && manual(row) && c.to in TARGETS &&
-          st[c.index] == c.from && Pay.canTransition(c.from, c.to)
+        val ok = row != null && row.method == c.method && manual(row) && st[c.index] == c.from && canMove(c.from, c.to)
         if (ok) { st[c.index] = c.to; applied += c.id } else skipped += c.id
       }
     return Applied(st, applied, skipped)
@@ -194,10 +215,7 @@ object PayStatus {
     if (input.to !in Pay.STATUSES) return PayResult.Err("BAD_STATUS")
     if (input.to !in TARGETS) return PayResult.Err("BAD_TRANSITION")
     val from = apply(saleId, input.rows, input.existing).statuses[input.index]
-    when (val t = Pay.transition(from, input.to)) {
-      is PayResult.Err -> return t
-      is PayResult.Ok -> Unit
-    }
+    if (!canMove(from, input.to)) return PayResult.Err("BAD_TRANSITION")
     val may = if (need(from, input.to) == SELL) input.sell else input.manage
     if (!may) return PayResult.Err("PERM_DENIED")
     if (by.isEmpty()) return PayResult.Err("BY_REQUIRED")

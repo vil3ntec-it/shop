@@ -13,7 +13,8 @@ import kotlin.test.assertTrue
 /**
  *  PAY-07: `PayStatus` در برابرِ `constants.statuses` و `constants.transitions` ِ `core/test-vectors/pay-v1.json` —
  *  همان جدولی که `server/test/pay-core.test.js` با `license/pay-core.js` می‌خواند. هر جفتِ (از، به): سندی که
- *  گذارِ جدول نیست یا مقصدِ دستی نیست کنار می‌رود و `check` ردش می‌کند؛ بقیه می‌نشیند.
+ *  نه گذارِ جدول است نه اصلاحِ `PayStatus.CORRECTIONS`، یا مقصدِ دستی نیست، کنار می‌رود و `check` ردش می‌کند؛ بقیه
+ *  می‌نشیند. اصلاح فقط از «تأییدشده» و فقط به «نیازمند بررسی»/«ناموفق»/«لغو» (نه بازپرداخت، نه برگشت به «در انتظار»).
  */
 class PayStatusVectorsTest {
 
@@ -42,17 +43,29 @@ class PayStatusVectorsTest {
     var applied = 0
     var rejected = 0
     for (from in statuses) for (to in statuses + listOf("paid")) {
-      val row = PayStatus.Row("afpay_card", "card", 10_000, from, "manual")
+      //  ردیفی با همین وضعیتِ ذخیره‌شده (بی `manual`، تا آغازش همان [from] باشد)
+      val row = PayStatus.Row("afpay_card", "card", 10_000, from)
       val change = PayStatus.Change("x", "s", 0, "afpay_card", from, to, 5, "سارا")
-      val expect = to in table[from].orEmpty() && to in PayStatus.TARGETS
+      val expect = to in PayStatus.TARGETS && (to in table[from].orEmpty() || to in PayStatus.CORRECTIONS[from].orEmpty())
       val got = PayStatus.apply("s", listOf(row), listOf(change))
       assertEquals(if (expect) to else from, got.statuses.single(), "$from ⇒ $to")
       val check = PayStatus.check(PayStatus.Input("x", "s", listOf(row), 0, to, 5, "سارا", sell = true, manage = true))
       assertEquals(expect, check is PayResult.Ok, "$from ⇒ $to: $check")
       if (expect) applied++ else rejected++
     }
-    //  ۷ گذارِ دستی (۴ از «در انتظار»، ۳ از «نیازمند بررسی»)؛ بقیه رد
-    assertEquals(7, applied)
+    //  ۱۰ گذارِ دستی (۴ از «در انتظار»، ۳ از «نیازمند بررسی»، ۳ اصلاحِ «تأییدشده»)؛ بقیه رد
+    assertEquals(10, applied)
     assertTrue(rejected > 40)
+  }
+
+  @Test
+  fun correctionsOnlyLeaveConfirmedAndNeverRefundOrReopen() {
+    assertEquals(setOf("confirmed"), PayStatus.CORRECTIONS.keys)
+    for (to in PayStatus.CORRECTIONS.values.flatten()) {
+      assertTrue(to in listOf("needs_review", "failed", "cancelled"), to)
+      assertTrue(to !in table["confirmed"].orEmpty(), to)
+    }
+    //  ثبتِ دستیِ ذخیره‌شده (`pending` + `manual`) از «تأییدشده» آغاز می‌شود
+    assertEquals("confirmed", PayStatus.initial(PayStatus.Row("hawala", "transfer", 1, "pending", "manual")))
   }
 }

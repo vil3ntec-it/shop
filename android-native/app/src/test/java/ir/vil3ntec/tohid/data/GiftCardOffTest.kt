@@ -71,8 +71,6 @@ class GiftCardOffTest {
   }
 
   private companion object {
-    //  PAY-07: ردیفِ HesabPay ِ ثبتِ دستیِ «در انتظار» ِ فاکتورِ sA دیگر در رویدادِ فروشِ صندوق (`ledgerEvents`) نیست —
-    //  فقط پولِ رسیده؛ بقیهٔ سناریو (فاکتور، برگشت، دخل، JSON) همان
-    const val GOLDEN = "6f9cb874d643adc63e00d9f1007c9f42d5d735ac9e5039a8f069624039abf0da"
+    const val GOLDEN = "da4d1775bf0603179c9f0f8bcdbb056f96f6936ed89f18797c341085dc62ff40"
   }
 }
