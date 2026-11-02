@@ -203,6 +203,8 @@ FLAGS.push('shop.storefront.campaigns');
 FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
 //  ORD-14: تسویهٔ تفاوتِ ویرایشِ سفارشِ پرداخت‌شده
 FLAGS.push('shop.orders.amend_paid');
+//  NTF-07/09: گزارشِ مشکلِ سفارش با عکس و نظرِ سفارش (`/shop/order-feedback/…`)
+FLAGS.push('shop.orders.issue_reports', 'shop.orders.reviews');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -409,6 +411,22 @@ async function seedShop(a) {
     { eventId: fresh('pick-photo'), parcelOnly: true, imageBase64: F.jpeg(320, 240, { seed: 41 }).toString('base64') }, { token: a.accessToken });
   assert.equal(pph.status, 201, JSON.stringify(pph.body));
   ids.pickPhoto = pph.body.photo.id;
+  //  NTF-07/09: گزارشِ مشکل با یک عکس و یک نظرِ «در انتظار» برای همین سفارشِ «الف» (ردیفِ واقعی، بی درِ مشتری)
+  const { ulid } = require('../src/lib/ulid');
+  ids.orderIssue = ulid(now());
+  await query(
+    `INSERT INTO order_issues (id, shop_id, order_id, kind, body, request_key, request_hash, created_at)
+     VALUES ($1,$2,$3,'damaged','کیسه پاره بود',$4,'h',$5)`, [ids.orderIssue, a.shopId, ids.pickPhotoOrder, fresh('issue-key'), now()]);
+  ids.orderIssuePhoto = ulid(now());
+  const issueJpeg = F.jpeg(320, 240, { seed: 43 });
+  await query(
+    `INSERT INTO order_issue_photos (id, shop_id, issue_id, mime, size, width, height, hash, data, created_at)
+     VALUES ($1,$2,$3,'image/jpeg',$4,320,240,$5,$6,$7)`,
+    [ids.orderIssuePhoto, a.shopId, ids.orderIssue, issueJpeg.length, crypto.createHash('sha256').update(issueJpeg).digest('hex'), issueJpeg, now()]);
+  ids.orderReview = ulid(now());
+  await query(
+    `INSERT INTO order_reviews (id, shop_id, order_id, stars, comment, request_hash, created_at)
+     VALUES ($1,$2,$3,4,'خوب',$4,$5)`, [ids.orderReview, a.shopId, ids.pickPhotoOrder, 'h', now()]);
 
   const courier = await courierOf(a, 'پیکِ الف');
   ids.courier = courier.id;
@@ -519,6 +537,9 @@ function concreteFor(ids) {
     [/(\/pick\/products\/):productId/, ids.product],
     [/(\/pick\/batches\/):batchId/, ids.pickBatch],
     [/^(\/shop\/orders\/):id(\/pick\/photos\/):photoId/, `${ids.pickPhotoOrder}$2${ids.pickPhoto}`],
+    [/^(\/shop\/order-feedback\/issues\/):id(\/photos\/):photoId/, `${ids.orderIssue}$2${ids.orderIssuePhoto}`],
+    [/^(\/shop\/order-feedback\/issues\/):id/, ids.orderIssue],
+    [/^(\/shop\/order-feedback\/reviews\/):id/, ids.orderReview],
     [/(\/amendments\/):amendId/, ids.amend],
     [/(\/notices\/):noticeId/, ids.notice],
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
@@ -609,6 +630,8 @@ function bodyFor(r, ids) {
     'POST /shop/trust/cases/:id/appeal': { body: 'اعتراضِ «ب» به این تصمیم' },
     'PUT /shop/purchase-orders/:id': { version: 1, supplierId: 'sup-b', lines: [{ productId: 'p-b', qtyMilli: 1000, priceMinor: 1 }] },
     'POST /shop/purchase-orders/:id/cancel': { reason: 'آزمون' },
+    'POST /shop/order-feedback/issues/:id/resolve': { reply: 'پاسخِ ب' },
+    'POST /shop/order-feedback/reviews/:id/moderate': { decision: 'approve' },
     'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});

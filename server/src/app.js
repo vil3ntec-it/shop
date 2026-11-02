@@ -358,6 +358,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders/desk', require('./routes/order-desk'));
     //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     api.use('/shop/orders/bulk', require('./routes/order-bulk'));
+    api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
@@ -369,6 +370,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));
     //  فاکتورِ نسخهٔ ۲: سربرگ و لوگوی دکان زیرِ `/shop` (پیش از آن)، و درِ عمومیِ QRِ
     //  هر فاکتور `/receipt` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)

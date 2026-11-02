@@ -334,6 +334,8 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    //  گزارشِ مشکل و نظرِ سفارش (NTF-07/09): نوشتن به‌ازای هر سفارش (توکن) در **یک ساعت**
+    storeFeedbackMax: num(process.env.RATE_STORE_FEEDBACK_MAX, 20),
     /*
      *  «این پین در محدوده است؟» (‎GET /api/store/:slug/delivery‎) — به‌ازای
      *  (IP، ویترین) در **۲۴ ساعت**. پاسخ خودش با خانهٔ ۳۰۰ متریِ شبکه است؛

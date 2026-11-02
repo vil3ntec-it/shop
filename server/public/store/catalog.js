@@ -10,6 +10,7 @@
  * WEB-24 فقط با `features.banners` (پرچمِ `shop.storefront.banners`): بنرهای همین لحظه برای ناحیهٔ مشتری از
  * `GET /banners?zone=` (ساعت، ناحیه و کالای فروختنی را سرور می‌سنجد)، ردیفِ افقی بی چرخشِ خودکار؛ پیوندِ کالا ⇒ برگهٔ
  * کالا، پیوندِ دسته ⇒ همان دسته (فقط اگر دسته در ویترین هست)؛ ناحیه عوض شد ⇒ دوباره، با برگشت به کاتالوگ.
+ * NTF-09 فقط با `features.reviews` (پرچمِ `shop.orders.reviews`): `store/reviews.js` ِ دیربار نظرهای تأییدشده را پیش از «اخیر» می‌نشاند.
  * متن‌ها در واژه‌نامهٔ جدای `kit/i18n/catalog.<زبان>.json`؛ نیامد ⇒ این بخش‌ها نیستند (کلیدِ خام هرگز).
  *
  * ⛔ فقط دادهٔ واقعیِ سرور؛ نبود ⇒ بخش پنهان. قیمت هرگز ذخیره نمی‌شود. متن فقط با textContent.
@@ -183,6 +184,13 @@
         if (ok && f.favorites) start();
         if (ok && f.banners) startBanners();
       });
+    }
+    //  NTF-09: نظرهای تأییدشده — store/reviews.js فقط با `features.reviews` (پرچمِ خاموش ⇒ نه اسکریپت، نه واژه‌نامه، نه گره)
+    if (f.reviews) {
+      new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/reviews.js' }, on: { load: ok, error: no } }));
+      }).then(function () { return window.StoreReviews({ api: api, anchor: $('recent') }); })
+        .catch(function () { /* بی reviews.js (شبکه) همان کاتالوگ، بی نظرها */ });
     }
 
     return {

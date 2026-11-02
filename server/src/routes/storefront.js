@@ -130,6 +130,8 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  NTF-09: نظرهای تأییدشده در ویترین (`store/reviews.js` ِ دیربار، `GET /:slug/reviews`) با پرچمِ `shop.orders.reviews`
+    ...((await orders.flagOf(shopId, require('../lib/order-reviews').FLAG)) ? { reviews: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -291,6 +293,11 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  CHK-24: «ویرایشِ دستورِ تحویل» فقط با پرچمِ `shop.orders.delivery_prefs` (خاموش ⇒ کلید نیست)
   const prefs = await require('../lib/delivery-prefs').customerPrefs(req.store.shop_id, orderId);
   if (prefs !== undefined) order.deliveryPrefs = prefs;
+  //  NTF-07/09: گزارشِ مشکل و نظر — فقط با پرچم‌های `shop.orders.issue_reports` / `shop.orders.reviews` (خاموش ⇒ کلید نیست)
+  const issueReports = await require('../lib/order-issues').customerView(req.store.shop_id, orderId);
+  if (issueReports !== undefined) order.issueReports = issueReports;
+  const review = await require('../lib/order-reviews').customerView(req.store.shop_id, orderId, order.status);
+  if (review !== undefined) order.review = review;
   res.json({ order });
 });
 
