@@ -49,6 +49,15 @@ class MessageDigest private constructor(val algorithm: String) {
   val digestLength: Int get() = hash(algorithm, ByteArray(0)).size
 
   companion object {
+    /** مقایسهٔ زمانِ ثابت، مثلِ JDK */
+    fun isEqual(a: ByteArray?, b: ByteArray?): Boolean {
+      if (a === b) return true
+      if (a == null || b == null || a.size != b.size) return false
+      var r = 0
+      for (i in a.indices) r = r or (a[i].toInt() xor b[i].toInt())
+      return r == 0
+    }
+
     fun getInstance(algorithm: String): MessageDigest {
       val name = algorithm.uppercase().replace("-", "")
       if (name !in setOf("SHA256", "SHA1", "SHA512", "MD5")) throw NoSuchAlgorithmException("$algorithm MessageDigest not available")

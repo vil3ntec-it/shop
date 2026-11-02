@@ -17,6 +17,20 @@ class ConcurrentHashMap<K : Any, V : Any>(initialCapacity: Int = 16) : AbstractM
   fun computeIfAbsent(key: K, f: (K) -> V): V = synchronized(this) { m.getOrPut(key) { f(key) } }
   fun remove(key: K, value: V): Boolean = synchronized(this) { if (m[key] == value) { m.remove(key); true } else false }
 
+  companion object {
+    /** `ConcurrentHashMap.newKeySet()` — مجموعه‌ای با همان قفل */
+    fun <T : Any> newKeySet(): MutableSet<T> {
+      val m = ConcurrentHashMap<T, Boolean>()
+      return object : AbstractMutableSet<T>() {
+        override val size: Int get() = m.size
+        override fun add(element: T): Boolean = m.putIfAbsent(element, true) == null
+        override fun remove(element: T): Boolean = m.remove(element) != null
+        override fun contains(element: T): Boolean = m.containsKey(element)
+        override fun iterator(): MutableIterator<T> = m.keys.toMutableList().iterator()
+      }
+    }
+  }
+
   /** نمایه‌ای از همین لحظه (مثلِ تکرارگرِ «ضعیفاً سازگار» ِ JDK، بی ConcurrentModificationException) */
   override val entries: MutableSet<MutableMap.MutableEntry<K, V>>
     get() = synchronized(this) { LinkedHashMap(m).entries }

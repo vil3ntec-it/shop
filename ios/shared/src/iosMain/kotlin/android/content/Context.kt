@@ -32,6 +32,7 @@ abstract class Context {
   open fun deleteSharedPreferences(name: String): Boolean = false
   open val contentResolver: ContentResolver get() = ContentResolver
   open val packageManager: android.content.pm.PackageManager get() = android.content.pm.PackageManager
+  open val applicationInfo: android.content.pm.ApplicationInfo get() = android.content.pm.ApplicationInfo.ios
   /** سرویسِ سیستمیِ اندروید در iOS نیست ⇐ null (کدِ مشترک همیشه `as?` می‌گیرد) */
   open fun getSystemService(name: String): Any? = null
   open fun <T : Any> getSystemService(serviceClass: Class<T>): T? = null
@@ -81,11 +82,19 @@ object IosContext : Context() {
   override fun getSystemService(name: String): Any? = when (name) {
     CONNECTIVITY_SERVICE -> android.net.ConnectivityManager.ios
     CLIPBOARD_SERVICE -> ClipboardManager.ios
+    NOTIFICATION_SERVICE -> android.app.NotificationManager.ios
     else -> null
   }
 
   /** نشانیِ http/tel/mailto/sms ⇐ `openURL` ِ iOS؛ بقیه ⇐ ActivityNotFoundException (همان «برنامه‌ای نیست» ِ اندروید) */
   override fun startActivity(intent: Intent) {
+    //  «تنظیماتِ این برنامه» ِ اندروید ⇐ صفحهٔ همین برنامه در تنظیماتِ iOS (اجازه‌ها)
+    if (intent.action == android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS || intent.action == android.provider.Settings.ACTION_SETTINGS) {
+      NSURL.URLWithString(platform.UIKit.UIApplicationOpenSettingsURLString)?.let {
+        UIApplication.sharedApplication.openURL(it, options = emptyMap<Any?, Any>(), completionHandler = null)
+        return
+      }
+    }
     val uri = intent.data?.toString().orEmpty()
     val viewable = intent.action == Intent.ACTION_VIEW || intent.action == Intent.ACTION_DIAL || intent.action == Intent.ACTION_SENDTO
     val url = if (viewable) NSURL.URLWithString(uri) else null

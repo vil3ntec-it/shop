@@ -168,7 +168,7 @@ private fun narrow(s: String, max: Int): ByteArray = ByteArray(s.length) { i -> 
 
 private fun widen(b: ByteArray, off: Int, len: Int): String = buildString(len) { for (i in off until off + len) append((b[i].toInt() and 0xFF).toChar()) }
 
-fun String.toByteArray(charset: Charset): ByteArray = when (charset) {
+fun String.toByteArray(charset: Charset = Charsets.UTF_8): ByteArray = when (charset) {
   Charsets.US_ASCII -> narrow(this, 0x7F)
   Charsets.ISO_8859_1 -> narrow(this, 0xFF)
   else -> encodeToByteArray()
@@ -232,14 +232,34 @@ fun interface Runnable {
 }
 
 /*
- *  `Thread` فقط برای کارخانهٔ رشتهٔ `Executors` (که در iOS صدا زده نمی‌شود، ‎java/util/concurrent‎)؛
- *  ساختنِ رشتهٔ خام در iOS نیست ⇐ `start()` خطا می‌دهد تا بی‌صدا کاری نکند.
+ *  `Thread` ِ JVM: کارخانهٔ رشتهٔ `Executors` (در iOS صدا زده نمی‌شود، ‎java/util/concurrent‎) و `Thread { … }.start()`.
  */
 class Thread(private val target: Runnable? = null, val name: String = "") {
   var isDaemon: Boolean = false
-  fun start(): Unit = throw UnsupportedOperationException("iOS: Thread ِ خام نیست؛ کوروتین یا Executors")
+  /** کار روی صفِ پس‌زمینهٔ GCD (iOS رشتهٔ خامِ JVM ندارد؛ همان «کار جدا از رشتهٔ اصلی») */
+  fun start() {
+    val r = target ?: return
+    platform.darwin.dispatch_async(platform.darwin.dispatch_get_global_queue(platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) { r.run() }
+  }
+
+  fun interface UncaughtExceptionHandler {
+    fun uncaughtException(t: Thread, e: Throwable)
+  }
 
   companion object {
+    private var handler: UncaughtExceptionHandler? = null
+
+    fun currentThread(): Thread = Thread(name = if (platform.Foundation.NSThread.isMainThread) "main" else "worker")
+
+    fun getDefaultUncaughtExceptionHandler(): UncaughtExceptionHandler? = handler
+
+    /** همان «خطای گرفته‌نشده» ِ JVM روی قلابِ Kotlin/Native (پس از آن برنامه بسته می‌شود، مثلِ اندروید) */
+    @OptIn(kotlin.experimental.ExperimentalNativeApi::class)
+    fun setDefaultUncaughtExceptionHandler(h: UncaughtExceptionHandler?) {
+      handler = h
+      if (h != null) kotlin.native.setUnhandledExceptionHook { e -> h.uncaughtException(currentThread(), e) }
+    }
+
     /** همان `Thread.sleep` (مسدود؛ فقط درونِ `Dispatchers.IO`، مثلِ اندروید) */
     fun sleep(millis: Long) {
       if (millis > 0) platform.posix.usleep((millis * 1000).coerceAtMost(UInt.MAX_VALUE.toLong()).toUInt())
@@ -284,3 +304,7 @@ inline fun <T> java.util.concurrent.locks.Lock.withLock(action: () -> T): T {
     unlock()
   }
 }
+
+/** `kotlin.io` ِ JVM: جریانِ خواندن از آرایه */
+fun ByteArray.inputStream(): java.io.ByteArrayInputStream = java.io.ByteArrayInputStream(this)
+fun ByteArray.inputStream(offset: Int, length: Int): java.io.ByteArrayInputStream = java.io.ByteArrayInputStream(this, offset, length)

@@ -51,3 +51,50 @@ object ServerSwitchAndroid {
 
   fun logEntries(context: Context): List<LogEntry> = emptyList()
 }
+
+/**
+ *  همان `ServersController` ِ اندروید برای صفحهٔ «سرورها»؛ در آیفون فقط می‌خواند و همیشه می‌گوید «این‌جا نه»:
+ *  `canManage` نه، `test` ⇐ «روی آیفون هنوز نیست»، افزودن/حذف/جابه‌جایی ⇐ همان پیام. (گامِ ۳: سنجاقِ گواهی.)
+ */
+class ServersController(context: Context) {
+  private val app = context.applicationContext
+
+  val canManage: Boolean get() = false
+  val pinRequired: Boolean get() = false
+  fun pinOk(pin: String): Boolean = false
+
+  fun enabled(): Boolean = ServerSwitchAndroid.enabled(app)
+  fun profiles(): ServerProfiles = ServerSwitchAndroid.profiles(app)
+  fun blocked(id: String): Boolean = false
+  fun log(): List<ServerSwitchAndroid.LogEntry> = emptyList()
+  fun fingerprintOf(p: ServerProfile): String = p.serverId?.let { ir.vil3ntec.tohid.core.server.ServerIdentity.fingerprint(it) }.orEmpty()
+  fun setEnabled(on: Boolean): Boolean = false
+
+  data class Candidate(
+    val urls: List<String>,
+    val name: String,
+    val info: ir.vil3ntec.tohid.core.server.ServerInfo,
+    val lan: Boolean,
+    val certPins: Map<String, String>,
+    val alternateOf: ServerProfile?,
+    val newCertFingerprint: String?,
+  ) {
+    val fingerprint: String get() = info.fingerprint
+  }
+
+  sealed class Test {
+    data class Ready(val candidate: Candidate) : Test()
+    data class Failed(val message: String) : Test()
+    data class NeedsCertTrust(val url: String, val fingerprint: String) : Test()
+  }
+
+  suspend fun test(input: String, lan: Boolean, trustCert: String? = null): Test = Test.Failed(NOT_YET)
+  fun add(c: Candidate): String? = NOT_YET
+  fun remove(id: String): String? = NOT_YET
+  fun switchTo(id: String): String? = NOT_YET
+  fun restartNow(): Nothing = ServerSwitchAndroid.restartNow()
+
+  private companion object {
+    const val NOT_YET = "سرورِ خودِ دکان روی آیفون هنوز نیست"
+  }
+}
