@@ -147,7 +147,8 @@ async function flagIn(run, shopId) {
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
   return v === true;
 }
-const flagOf = (shopId) => flagIn((t, p) => query(t, p), shopId);
+//  `run` ⇐ اتصالِ تراکنشِ صدازننده (`noticeResend.resend`)؛ نیامده ⇒ استخر
+const flagOf = (shopId, run = (t, p) => query(t, p)) => flagIn(run, shopId);
 
 // ════════════════════════════════════════════════════════════════════
 //  نوشتن — درونِ تراکنشِ سفارش
