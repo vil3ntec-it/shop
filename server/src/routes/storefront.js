@@ -31,7 +31,10 @@ const campaigns = require('../lib/campaigns');
 const areas = require('../lib/storefront-area-requests');
 const onlineReport = require('../lib/order-online-report');
 const orderDesk = require('../lib/order-desk');
+const eta = require('../lib/storefront-eta');
 const audit = require('../lib/audit');
+const erasure = require('../lib/customer-erasure');
+const { phoneKey } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
@@ -134,6 +137,12 @@ async function featuresOf(shopId) {
     //  WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» ِ وب (`store/filters.js` ِ دیربار) با `shop.storefront.filters`/`.alerts`
     ...((await finder.flagOn(shopId)) ? { filters: true } : {}),
     ...((await require('../lib/storefront-alerts').flagOn(shopId)) ? { alerts: true } : {}),
+    //  WEB-04: «تحویلِ تقریبی» در سبد و ثبت (`GET /:slug/eta`، `storefront-eta-store.js`) با پرچمِ `shop.storefront.eta`
+    ...((await eta.flagOn(shopId)) ? { eta: true } : {}),
+    //  NTF-09: نظرهای تأییدشده در ویترین (`store/reviews.js` ِ دیربار، `GET /:slug/reviews`) با پرچمِ `shop.orders.reviews`
+    ...((await orders.flagOf(shopId, require('../lib/order-reviews').FLAG)) ? { reviews: true } : {}),
+    //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
+    ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -302,6 +311,9 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   if (issueReports !== undefined) order.issueReports = issueReports;
   const review = await require('../lib/order-reviews').customerView(req.store.shop_id, orderId, order.status);
   if (review !== undefined) order.review = review;
+  //  WEB-04: زمانِ تقریبیِ همین سفارش، از نو با هر مرحله — فقط با پرچمِ `shop.storefront.eta` (خاموش ⇒ کلید نیست)
+  const live = await eta.orderEta(req.store, orderId);
+  if (live !== undefined) order.eta = live;
   res.json({ order });
 });
 
@@ -371,6 +383,25 @@ router.delete('/:slug/account', checkoutLimit, store, customer, async (req, res)
     targetType: 'store_customer', targetId: req.customer.id, detail: {}, ip: clientIp(req),
   });
   res.json(out);
+});
+
+//  SEC-10: حذفِ دادهٔ شخصیِ خودِ مشتری در **همین** دکان (`lib/customer-erasure.js`)؛ حساب می‌ماند
+//  (پاک کردنش همان `DELETE /:slug/account`). پرچمِ `shop.customer_erasure` خاموش یا نشانیِ ناشناس ⇒
+//  `next('route')`، همان پاسخِ امروز. اجرای واقعی بلیتِ تازهٔ «شماره تأیید شد» ِ **همان** شمارهٔ حساب
+//  می‌خواهد؛ `dryRun: true` فقط شمارش‌ها (بی نوشتن).
+const erasureOn = async (req, res, next) => {
+  next((await erasure.flagOnSlug(req.params.slug)) ? undefined : 'route');
+};
+router.post('/:slug/account/erase', checkoutLimit, erasureOn, store, customer, async (req, res) => {
+  const dryRun = req.body && req.body.dryRun === true;
+  if (!dryRun) {
+    const phone = await sf.verifiedPhoneOfTicket(ticketOf(req), { maxAgeMs: config.storefront.accountTicketMaxMs });
+    if (!phone) throw new ApiError(401, 'verification_required', 'برای حذفِ داده‌ها، همین حالا شمارهٔ خود را با کد تأیید کنید');
+    if (phoneKey(phone) !== phoneKey(req.customer.phone)) {
+      throw new ApiError(403, 'phone_mismatch', 'کدِ تأیید باید برای همان شمارهٔ این حساب باشد');
+    }
+  }
+  res.json(await erasure.erase(req.store.shop_id, { phone: req.customer.phone, customerId: req.customer.id }, { dryRun, by: 'customer' }));
 });
 
 router.post('/:slug/account/logout', checkoutLimit, store, async (req, res) => {

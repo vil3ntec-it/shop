@@ -334,6 +334,11 @@ object SalesEngine {
      *  (تحویلِ سفارش، `OrderFulfillment`) هرگز توکنِ تصادفی نمی‌گیرد.
      */
     receiptToken: String? = null,
+    /**
+     *  POS-27 — سندِ امانی‌ای که همین فروش تحویلش می‌دهد (`Layaways.deliver`): کالای کنارگذاشتهٔ همان سند مانعِ همین
+     *  فروش نیست. `null` ⇒ همهٔ کنارگذاشته‌ها از موجودیِ فروختنی کم‌اند (تنظیمِ خاموش ⇒ هیچ).
+     */
+    ownReservation: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
@@ -344,7 +349,7 @@ object SalesEngine {
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
       (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
-      var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
+      var available = ProductInfoMap.sellable(d, p.id, ownReservation) // PRD-09: کالای خدماتی موجودی نمی‌خواهد؛ POS-27: منهای کنارگذاشتهٔ امانی
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
       //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
       if (checkout.blockExpired) {
@@ -356,7 +361,10 @@ object SalesEngine {
           )
         }
       }
-      if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
+      if (line.quantity > available) {
+        val held = Layaways.reserved(d, p.id, ownReservation)
+        return Result.Failed(if (held > 0) Layaways.heldMessage(p, line.quantity, available, held) else shortageMessage(p, line.quantity, available))
+      }
     }
 
     /*
@@ -660,7 +668,9 @@ object SalesEngine {
     reason: String = "",
     /** RPT-09: لغوکننده روی ردیفِ `cancel_sale` (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
     by: String? = null,
-  ): Result {
+  ): Result = LoyaltyPoints.afterCancel(cancelPlain(d, saleId, today, now, newId, reason, by), today, now, by) // PRM-13: فاکتورِ بی امتیاز ⇒ همان شیء
+
+  private fun cancelPlain(d: ShopData, saleId: String, today: String, now: Long, newId: () -> String, reason: String, by: String?): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
     //  ORD-20: فاکتورِ سفارشِ اینترنتی را سرور ساخته؛ لغو/«اصلاح در سبد» یعنی دوباره زدن
@@ -795,6 +805,10 @@ object SalesEngine {
     newId: () -> String,
     /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
     by: String? = null,
+  ): Result = LoyaltyPoints.afterReturn(d, recordReturnPlain(d, saleId, quantities, reason, today, now, newId, by), saleId, today, now, by) // PRM-13
+
+  private fun recordReturnPlain(
+    d: ShopData, saleId: String, quantities: Map<String, Double>, reason: String, today: String, now: Long, newId: () -> String, by: String?,
   ): Result {
     val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند

@@ -1,0 +1,15 @@
+{
+  "rv.title": "Customer reviews",
+  "rv.hint": "From this shop's customers after delivery; only what the shop approved, with no names or phone numbers.",
+  "rv.avg": "Average {a} of 5",
+  "rv.count": "{n} reviews",
+  "rv.count.1": "1 review",
+  "rv.stars": "{n} of 5 stars",
+  "rv.only": "Stars only, no text",
+  "rv.list": "Customer reviews",
+  "rv.lv1": "Bad",
+  "rv.lv2": "Poor",
+  "rv.lv3": "Average",
+  "rv.lv4": "Good",
+  "rv.lv5": "Excellent"
+}

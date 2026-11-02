@@ -8,6 +8,7 @@
  *   • WEB-20: دکمهٔ «فرستادنِ نشانیِ کالا» (پرچمِ `shop.storefront.seo`) نشانیِ `/p/…` را کپی می‌کند؛
  *   • WEB-11: ♥ روی کارت و برگهٔ کالا، «دلخواه‌ها» و «فهرستِ خرید» (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ)؛
  *   • WEB-24: بنرهای همین لحظه (پرچمِ `shop.storefront.banners`)، پیوندِ کالا و دسته؛
+ *   • WEB-04: «تحویلِ تقریبی: … تا … دقیقه» در برگهٔ ثبت (ارسال و دریافت) و پیگیری (پرچمِ `shop.storefront.eta`؛ خاموش ⇒ هیچ)؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -182,11 +183,43 @@ await page.locator('#banners-list .banner').nth(1).getByRole('button').click();
 await page.waitForSelector('#cats [aria-pressed="true"]:has-text("خوراکی")', { timeout: 5000 });
 ok(true, 'پیوندِ دسته ⇒ همان دسته در کاتالوگ');
 
+//  WEB-04: زمانِ تقریبیِ تحویل — خاموش ⇒ برگهٔ ثبت بی آن؛ روشن ⇒ بازهٔ همان سرور (بی سابقه: ۱۵ + ۲۰ دقیقه) و پیگیری
+const etaText = () => { const e = document.getElementById('ck-eta'); return e && !e.hidden ? e.textContent : ''; };
+await page.goto(`${base}/store/${slug}#/checkout`);
+await page.waitForSelector('#view-checkout:not([hidden]) #cart-lines li', { timeout: 10000 });
+await page.waitForFunction(() => Boolean((document.getElementById('t-total') || {}).textContent), null, { timeout: 5000 });
+ok(await page.isHidden('#ck-eta'), 'WEB-04 خاموش: برگهٔ ثبت بی «تحویلِ تقریبی»');
+await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.storefront.eta', value: true }, A);
+await page.goto(`${base}/store/${slug}`);
+await page.waitForSelector('#products li[data-id="rice"]', { timeout: 15000 });
+await page.evaluate(() => { location.hash = '#/checkout'; });
+await page.waitForSelector('#view-checkout:not([hidden]) #cart-lines li', { timeout: 10000 });
+await page.check('input[name="fulfillment"][value="delivery"]');
+await page.waitForFunction(() => { const e = document.getElementById('ck-eta'); return Boolean(e && !e.hidden && /تحویلِ تقریبی: (۳۰|30) تا (۴۵|45) دقیقه/.test(e.textContent)); },
+  null, { timeout: 10000 });
+ok(true, 'WEB-04: ارسال ⇒ «تحویلِ تقریبی: ۳۰ تا ۴۵ دقیقه»', await page.evaluate(etaText));
+await page.check('input[name="fulfillment"][value="pickup"]');
+await page.waitForFunction(() => { const e = document.getElementById('ck-eta'); return Boolean(e && !e.hidden && /آماده برای دریافت، تقریبی: (۱۰|10) تا (۲۰|20) دقیقه/.test(e.textContent)); },
+  null, { timeout: 5000 });
+ok(true, 'WEB-04: دریافت از دکان ⇒ «آماده برای دریافت، تقریبی: ۱۰ تا ۲۰ دقیقه»');
+{
+  const phone = '0791113777';
+  const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
+  const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+  const placed = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone },
+    lines: [{ productId: 'rice', qtyMilli: 1000 }] }, null, { 'Idempotency-Key': `eta-${Date.now()}-key`, 'X-Store-Ticket': vc.body.ticket });
+  ok(placed.status === 201, 'سفارشِ آزمایشیِ پیگیری ثبت شد', JSON.stringify(placed.body).slice(0, 120));
+  await page.evaluate((tk) => { location.hash = '#/o/' + encodeURIComponent(tk); }, placed.body.order.token);
+  await page.waitForFunction(() => { const e = document.getElementById('o-eta-live'); return Boolean(e && !e.hidden && /تقریبی: .+ تا .+ دقیقهٔ دیگر/.test(e.textContent)); },
+    null, { timeout: 10000 });
+  ok(true, 'WEB-04: پیگیری ⇒ «آماده برای دریافت، تقریبی: … تا … دقیقهٔ دیگر»', await page.textContent('#o-eta-live'));
+}
+
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));
 await ctx.close();
 await browser.close();
 server.close();
 await closeDb();
-console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر، فرستادنِ نشانی، دلخواه‌ها، فهرستِ خرید و بنرها');
+console.log(bad ? `❌ ${bad} ایراد` : '✅ ویترین: آفلاین، دیده‌شده‌های اخیر، فرستادنِ نشانی، دلخواه‌ها، فهرستِ خرید، بنرها و زمانِ تقریبیِ تحویل');
 process.exit(bad ? 1 : 0);
