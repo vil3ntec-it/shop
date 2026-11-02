@@ -13,11 +13,13 @@ const express = require('express');
 const rep = require('../lib/owner-report');
 const audit = require('../lib/audit');
 const { requireUser, requireShop } = require('../middleware/auth');
-const { clientIp } = require('../middleware/ratelimit');
+const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
-router.use(requireUser, requireShop);
+//  سقفِ نرخ برای هر کاربر — تنظیم کم عوض می‌شود؛ خواندن هم پایگاه را می‌زند
+const limit = rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) => req.user && req.user.id });
+router.use(requireUser, requireShop, limit);
 
 const isOwner = (req) => req.role === 'owner';
 
