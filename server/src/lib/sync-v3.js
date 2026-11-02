@@ -35,7 +35,6 @@ const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
 const permCore = require('./perm-core');
-const gate = require('./sync-v3-gate');
 
 const PROTOCOL = 3;
 const MAX_OPS = 500;
@@ -82,23 +81,8 @@ const lockKey = (ctx) => `sync-v3:${ctx.app}:${ctx.accountKind}:${ctx.accountId}
 function lock(c, ctx) {
   return c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [lockKey(ctx)]);
 }
-
-/**
- * تراکنش زیرِ قفلِ حساب. نوبت اول در صفِ همین فرآیند (`sync-v3-gate.js`، بی اتصال)، بعد همان
- * تراکنش و همان `pg_advisory_xact_lock` ِ درونِ آن (درستیِ چند نمونهٔ سرور). [heavy] ⇒ جایی از
- * سقفِ push ِ هم‌زمان هم. صف پر یا انتظار بلند ⇒ ۵۰۳ ِ `db_busy` پیش از هر نوشتن.
- */
-async function lockedTx(ctx, fn, { heavy = false } = {}) {
-  const free = await gate.enter(lockKey(ctx), { heavy });
-  try {
-    return await tx(async (c) => {
-      await lock(c, ctx);
-      return fn(c);
-    });
-  } finally {
-    free();
-  }
-}
+//  تراکنش زیرِ قفلِ حساب: اول نوبت در صفِ فرآیند، بی اتصال ([heavy]: جای push هم؛ `sync-v3-gate.js`)، بعد همان قفلِ advisory
+const lockedTx = (ctx, fn, heavy = false) => require('./sync-v3-gate').run(lockKey(ctx), heavy, () => tx((c) => lock(c, ctx).then(() => fn(c))));
 
 function requireShop(ctx) {
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') {
@@ -871,7 +855,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       lastError: errorText(lastError), clockOffsetMs: intOrNull(clockOffsetMs, -1e12, 1e12),
     });
     return { results, applied, head: await headSeq(c, ctx) };
-  }, { heavy: true });
+  }, true);
   return { ...out, protocol: PROTOCOL, server_time: now(), hlc: clock.peek() };
 }
 

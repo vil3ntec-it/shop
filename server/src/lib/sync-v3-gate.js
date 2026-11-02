@@ -122,6 +122,16 @@ async function enter(key, { heavy = false } = {}) {
   };
 }
 
+/** [fn] پس از نوبتِ [key] (و جای push با [heavy])؛ آزاد با پایانِ آن، موفق یا ناموفق */
+async function run(key, heavy, fn) {
+  const free = await enter(key, { heavy });
+  try {
+    return await fn();
+  } finally {
+    free();
+  }
+}
+
 /** نمای همین لحظه (سنجشِ بار و آزمون)؛ `reset` بیشینه‌ها را صفر می‌کند */
 function stats({ reset = false } = {}) {
   const out = { on: on(), inflight, waiting, slotQueue: slotQueue.length, keys: chains.size, ...counters };
@@ -129,4 +139,4 @@ function stats({ reset = false } = {}) {
   return out;
 }
 
-module.exports = { enter, stats, RETRY_AFTER_S };
+module.exports = { enter, run, stats, RETRY_AFTER_S };
