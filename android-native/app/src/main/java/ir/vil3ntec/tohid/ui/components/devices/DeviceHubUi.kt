@@ -403,7 +403,9 @@ fun PendingScansPrompt(data: ShopData, open: (ScanTarget) -> Unit, onNewItem: (S
 
   fun toSale() {
     scope.launch {
-      val plan = withContext(Dispatchers.Default) { ScanSaleHold.plan(data, pending) }
+      //  «کارتِ فرمان» روشن ⇒ «فاکتورِ تازه» مرزِ دو فاکتور است (خاموش ⇒ همه یک فاکتور، همان امروز)
+      val commands = ir.vil3ntec.tohid.scan.ScanCashPref.commandOf(context)
+      val plan = withContext(Dispatchers.Default) { ScanSaleHold.plan(data, pending, commands) }
       if (plan.settled.isNotEmpty()) ScanInbox.take(plan.settled)
       if (plan.invoices.isEmpty()) { failure = StrDevices.unknownCodes(plan.unknown.size); return@launch }
       val store = HeldInvoices.of(context)

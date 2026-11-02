@@ -74,8 +74,9 @@ object MoreLayout {
     }
     val withApp = if (fromModules.any { it.items.any { i -> i.route == APP } }) fromModules
     else fromModules + Group(MoreGroup.ACCOUNT.title.text, listOf(appItem(version)))
-    return if (!canManage) withApp else withApp + Group(SETTINGS, SettingsLayout.GROUPS.map {
-      Item("settings:" + it.title, it.title, SettingsPaths.group(it.title), settingsGroup = it.title, icon = settingsIcon(it.title), hue = settingsHue(it.title))
+    //  همان دسته‌های صفحهٔ اولِ تنظیمات (نسخهٔ دوم، ۱۴۰۵/۰۸/۱۱)؛ «دستگاه‌ها» خودش در گروهِ «دکان» ِ همین صفحه هست و تکرار نمی‌شود
+    return if (!canManage) withApp else withApp + Group(SETTINGS, SettingsLayout.GROUPS.filterNot { it.title in SettingsLayout.GROUP_LINKS }.map {
+      Item("settings:" + it.title, SettingsLayout.groupLabel(it.title), SettingsPaths.group(it.title), settingsGroup = it.title, icon = settingsIcon(it.title), hue = settingsHue(it.title))
     })
   }
 

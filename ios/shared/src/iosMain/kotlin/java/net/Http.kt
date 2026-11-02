@@ -60,7 +60,9 @@ class URL(private val spec: String) {
   val path: String get() = ns.path.orEmpty()
   val query: String? get() = ns.query
 
-  fun openConnection(): URLConnection = HttpURLConnection(this)
+  /** https ⇐ `HttpsURLConnection` (سنجاقِ گواهیِ «سرورِ خودِ دکان»، ‎javax/net/ssl‎)، مثلِ JDK */
+  fun openConnection(): URLConnection =
+    if (protocol.equals("https", ignoreCase = true)) javax.net.ssl.HttpsURLConnection(this) else HttpURLConnection(this)
   override fun toString(): String = spec
   override fun equals(other: Any?): Boolean = other is URL && other.spec == spec
   override fun hashCode(): Int = spec.hashCode()
@@ -144,17 +146,23 @@ open class HttpURLConnection internal constructor(url: URL) : URLConnection(url)
     headers.forEach { (k, v) -> request.setValue(v, forHTTPHeaderField = k) }
     if (body.size() > 0) request.setHTTPBody(body.toByteArray().toNSData())
 
+    //  گواهیِ سنجاق‌شده (`PinnedTls.applyTo` ِ کدِ مشترک) ⇐ نشستِ سنجاق‌دار؛ وگرنه اعتمادِ پیش‌فرضِ iOS
+    val https = this as? javax.net.ssl.HttpsURLConnection
+    val pinned = https?.sslSocketFactory
     val signal = dispatch_semaphore_create(0)
     var data: NSData? = null
     var meta: NSURLResponse? = null
     var failure: NSError? = null
-    val task = session.dataTaskWithRequest(request) { d, r, e ->
+    val task = (if (pinned != null) javax.net.ssl.PinnedHttp.session else session).dataTaskWithRequest(request) { d, r, e ->
       data = d; meta = r; failure = e
       dispatch_semaphore_signal(signal)
     }
+    if (pinned != null) javax.net.ssl.PinnedHttp.register(task, pinned, https.hostnameVerifier)
     task.resume()
     dispatch_semaphore_wait(signal, DISPATCH_TIME_FOREVER)
 
+    //  دست‌دادنی که سنجاق رد کرد ⇐ همان ردهٔ JDK (`ServerSwitchAndroid.probe` همین را می‌گیرد)، نه «لغو شد»
+    if (pinned != null && javax.net.ssl.PinnedHttp.finish(task)) throw javax.net.ssl.SSLHandshakeException("certificate pin mismatch")
     failure?.let { throw it.toIOException() }
     val http = meta as? NSHTTPURLResponse ?: throw IOException("پاسخِ HTTP نیست: $url")
     val headers = http.allHeaderFields.entries.associate { (k, v) -> k.toString() to v.toString() }

@@ -101,7 +101,7 @@ class ScanInboxTest {
   }
 
   @Test fun `انبارگردانی - شمار به خانه افزوده می‌شود و ناشناس جداست`() {
-    val scans = listOf(s("1", "4006381333931"), s("2", "M1"), s("3", "200000002468"), s("4", "999"), s("5", CommandCard.payload(CommandCard.Command.CASH, "")))
+    val scans = listOf(s("1", "4006381333931"), s("2", "M1"), s("3", "200000002468"), s("4", "999"), s("5", CommandCard.payload(CommandCard.Command.CASH, CommandCard.Key("00".repeat(32), 1))))
     val r = ScanApply.counts(mapOf("p1" to "۳", "p9" to "1"), data, scans)
     assertEquals("5", r.counts["p1"])
     assertEquals("1", r.counts["p2"])
@@ -142,15 +142,20 @@ class ScanInboxTest {
     val again = ScanSaleHold.plan(sold, scans)
     assertTrue(again.invoices.isEmpty())
     assertEquals(setOf("1", "2"), again.settled)
-    //  هیچ پروندهٔ اسکن، نگه‌داشتن یا «دستگاه‌ها» راهِ ثبتِ فروش ندارد — فروش فقط از پنلِ پرداختِ صندوق
+    //  هیچ پروندهٔ اسکن، نگه‌داشتن یا «دستگاه‌ها» راهِ ثبتِ فروش ندارد — فروش فقط از پنلِ پرداختِ صندوق، یا (راهِ «ب»،
+    //  کارتِ فرمانِ روشن) فقط از `ScanCashSale` پشتِ دروازهٔ `ScanSaleRule.why`
     val root = DesktopPhrases.repo().resolve("android-native/app/src/main/java/ir/vil3ntec/tohid")
     listOf(
-      "scan/ScanInbox.kt", "scan/ScanApply.kt", "scan/ScanServiceAndroid.kt", "data/ScanSaleHold.kt", "hw/DeviceLinks.kt",
-      "ui/components/devices/DeviceHubUi.kt",
+      "scan/ScanInbox.kt", "scan/ScanApply.kt", "scan/ScanServiceAndroid.kt", "scan/ScanCashAndroid.kt", "data/ScanSaleHold.kt",
+      "hw/DeviceLinks.kt", "ui/components/devices/DeviceHubUi.kt", "ui/components/devices/CommandCardAndroid.kt",
     ).forEach { rel ->
       val text = root.resolve(rel).readText()
       assertFalse("$rel فروش ثبت می‌کند", text.contains("SalesEngine.record") || text.contains(".recordSale("))
     }
+    val cash = root.resolve("data/ScanCashSale.kt").readText()
+    assertEquals(1, Regex("""SalesEngine\.record\(""").findAll(cash).count())
+    assertTrue(cash.contains("ScanSaleRule.why(batch, gate, missing.size)") && cash.contains("if (!gate.cardOn || pending.isEmpty()) return Plan()"))
+    assertTrue(cash.contains("payment = SalesEngine.Payment.CASH"))
   }
 
   @Test fun `نگه‌داشتنِ فاکتورِ اسکن - شمارهٔ آزاد، بی تکرار و با سقف`() {

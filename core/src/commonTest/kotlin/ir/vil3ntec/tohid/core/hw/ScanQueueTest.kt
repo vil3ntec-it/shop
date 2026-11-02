@@ -127,7 +127,7 @@ class ScanQueueTest {
     assertEquals(mark, st.memory[Discovery.key(dev)])
   }
 
-  private val key = "shop-1"
+  private val key = CommandCard.Key("00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff", 1)
   private fun cmd(c: CommandCard.Command) = CommandCard.payload(c, key)
   private fun seq(vararg codes: String) = codes.mapIndexed { i, c -> s("$i", c, i * 1_000L) }
   private fun split(list: List<QueuedScan>) = CommandSequence.split(list) { CommandCard.parse(it, key) }
@@ -138,7 +138,7 @@ class ScanQueueTest {
     assertEquals(CommandCard.Command.CASH, CommandCard.parse(cash, key))
     assertEquals(CommandCard.Command.CASH, CommandCard.parse(cash.lowercase(), key))
     //  کارتِ دکانِ دیگر فرمان نیست، ولی کالا هم نیست
-    assertNull(CommandCard.parse(cash, "shop-2"))
+    assertNull(CommandCard.parse(cash, CommandCard.Key("ff".repeat(32), 1)))
     assertTrue(CommandCard.isCommandLike(cash))
     assertNull(CommandCard.parse("4006381333931", key))
     assertFalse(CommandCard.isCommandLike("4006381333931"))
@@ -148,7 +148,7 @@ class ScanQueueTest {
   @Test fun `دنبالهٔ فرمان - تازه، حذفِ آخرین، نقد، نقدِ دوباره و نبودِ نقد`() {
     val r = split(seq(
       "A", "B", cmd(CommandCard.Command.UNDO), "C", cmd(CommandCard.Command.CASH), cmd(CommandCard.Command.CASH),
-      "D", cmd(CommandCard.Command.NEW), cmd(CommandCard.Command.UNDO), "E", "E", CommandCard.payload(CommandCard.Command.CASH, "other"),
+      "D", cmd(CommandCard.Command.NEW), cmd(CommandCard.Command.UNDO), "E", "E", CommandCard.payload(CommandCard.Command.CASH, CommandCard.Key("ab".repeat(32), 1)),
     ))
     assertEquals(listOf(listOf("A", "C"), listOf("D"), listOf("E", "E")), r.batches.map { b -> b.items.map { it.code } })
     assertEquals(listOf(true, false, false), r.batches.map { it.cashClosed })

@@ -167,6 +167,8 @@ object IosLifecycle {
         wasBackground = false
         if (IosBoot.started) IosSync.resumed()
       }
+      //  توکنِ APNs پس از ورود (روزی یک بار برای هر حساب؛ ‎IosPush.kt‎)
+      if (IosBoot.started) IosPush.upload()
     }
     observers += center.addObserverForName(UIApplicationWillResignActiveNotification, null, main) { _ ->
       ShopChatSync.foreground = false

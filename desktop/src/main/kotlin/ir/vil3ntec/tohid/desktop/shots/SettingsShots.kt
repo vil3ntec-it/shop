@@ -27,7 +27,7 @@ import ir.vil3ntec.tohid.ui.v3.rememberV3Toasts
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SettingsShotState
 
 /**
- *  عکس‌های گروهِ G9 تنظیمات: ریشه (صاحبِ دکان و کارمندِ بی‌دسترسی)، صفحه‌های گروه،
+ *  عکس‌های گروهِ G9 تنظیمات: صفحهٔ اول (صاحبِ دکان و کارمندِ بی‌دسترسی)، صفحهٔ هر دسته، «قابلیت‌ها»، جست‌وجو،
  *  هر صفحهٔ بخش، برگهٔ رمز، همگام‌سازیِ خطادار، پشتیبان و تأییدِ پاک‌سازی، و
  *  دستگاه‌های جانبی روی چاپگرها و گوشی ⇄ کامپیوتر. هر حالت روشن/تیره × فارسی/انگلیسی.
  */
@@ -36,38 +36,40 @@ object SettingsShots : GroupShots {
   override val shots = listOf(
     Shot("root", route = "settings"),
     Shot("root-staff", content = { StaffPreview("settings", it) }),
-    Shot("security", route = "settings/security"),
-    Shot("general", route = "settings/general"),
+    //  تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): صفحهٔ هر دسته، «قابلیت‌ها» و نتیجه‌های جست‌وجو (یکی با آزمایشی‌ها)
+    Shot("shop", route = "settings/shop"),
+    Shot("sales", route = "settings/sales"),
+    Shot("goods", route = "settings/goods"),
     Shot("data", route = "settings/data"),
+    Shot("look", route = "settings/look"),
+    Shot("features", route = "settings/features"),
+    Shot("search", route = "settings", prepare = { SettingsShotState.query = "رسید" }, cleanup = { SettingsShotState.query = "" }),
+    Shot("search-experimental", route = "settings", prepare = { SettingsShotState.query = "آزمایشی" }, cleanup = { SettingsShotState.query = "" }),
     Shot("about", route = "settings/about"),
-    Shot("alerts", route = "settings/general/alerts"),
-    Shot("appearance", route = "settings/general/appearance"),
-    Shot("navbar", route = "settings/general/navbar"),
-    Shot("language", route = "settings/general/language"),
-    Shot("digits", route = "settings/general/digits"),
-    Shot("app-lock", route = "settings/security/app-lock", prepare = { SettingsShotState.lockOn = true }, cleanup = { SettingsShotState.lockOn = null }),
-    Shot("app-lock-pin", route = "settings/security/app-lock/pin"),
-    Shot("staff-code", route = "settings/security/staff-code"),
-    Shot("sessions", route = "settings/security/sessions"),
-    Shot("password", route = "settings/security/password"),
+    Shot("alerts", route = "settings/shop/alerts"),
+    Shot("appearance", route = "settings/look/appearance"),
+    Shot("navbar", route = "settings/look/navbar"),
+    Shot("language", route = "settings/look/language"),
+    Shot("digits", route = "settings/look/digits"),
+    Shot("app-lock", route = "settings/shop/app-lock", prepare = { SettingsShotState.lockOn = true }, cleanup = { SettingsShotState.lockOn = null }),
+    Shot("app-lock-pin", route = "settings/shop/app-lock/pin"),
+    Shot("staff-code", route = "settings/shop/staff-code"),
+    Shot("sessions", route = "settings/shop/sessions"),
+    Shot("password", route = "settings/shop/password"),
     Shot("expiry", route = "settings/sales/expiry"),
     //  بخش‌های آمده از تنظیماتِ رابطِ امروز (SettingsPortTest)
-    Shot("sales", route = "settings/sales"),
-    //  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): «پیشرفته» ِ باز در ریشه و در گروهِ فروش، و کارتِ «این چه می‌کند؟» روی یک بخشِ پیشرفته
-    Shot("root-advanced", route = "settings", prepare = { SettingsShotState.advancedOpen = true }, cleanup = { SettingsShotState.advancedOpen = false }),
-    Shot("sales-advanced", route = "settings/sales", prepare = { SettingsShotState.advancedOpen = true }, cleanup = { SettingsShotState.advancedOpen = false }),
     Shot("gift-cards", route = "settings/sales/gift-cards"),
     Shot("checkout-rules", route = "settings/sales/checkout-rules"),
     Shot("held-invoices", route = "settings/sales/held-invoices"),
     Shot("returns", route = "settings/sales/returns"),
     Shot("payments", route = "settings/sales/payments"),
     Shot("credit-limit", route = "settings/sales/credit-limit"),
-    Shot("customer-reports", route = "settings/sales/customer-reports"),
+    Shot("customer-reports", route = "settings/data/customer-reports"),
     Shot("till-receive", route = "settings/sales/till-receive"),
-    Shot("stock-insight", route = "settings/sales/stock-insight"),
-    Shot("product-tools", route = "settings/sales/product-tools"),
-    Shot("fraud-trail", route = "settings/security/fraud-trail"),
-    Shot("encryption", route = "settings/security/encryption"),
+    Shot("stock-insight", route = "settings/goods/stock-insight"),
+    Shot("product-tools", route = "settings/goods/product-tools"),
+    Shot("fraud-trail", route = "settings/shop/fraud-trail"),
+    Shot("encryption", route = "settings/shop/encryption"),
     Shot("camera", route = "settings/devices/camera"),
     Shot(
       "sync-error", route = "settings/data/sync",

@@ -384,9 +384,11 @@ object PayFlow {
     //  فاکتورِ اینترنتیِ سرور (W، #321) و مرجوعیِ سرورِ آن پولِ دخل نیستند — همان قاعدهٔ `CashShift`
     val online = d.sales.filter(CashShift::isOnline).mapTo(HashSet()) { it.id }
     val fixes = PayFixFlow.bySale(d)
+    //  PAY-07: فقط پولِ رسیده — ردیفِ «در انتظار»/«ناموفق»/«لغو»/«نیازمند بررسی» (تا `to`) بیرون (`PayStatusFlow`)
+    val statuses = PayStatusFlow.bySale(d)
     d.sales.forEach { s ->
       if (s.status == "cancelled" || s.id in online || !inWindow(s.createdAt)) return@forEach
-      val rows = saleRows(s, fixes[s.id].orEmpty(), to)
+      val rows = PayStatusFlow.received(saleRows(s, fixes[s.id].orEmpty(), to), PayStatusFlow.unreceived(s, statuses[s.id].orEmpty(), to))
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
     }
     d.transactions.forEach { t ->

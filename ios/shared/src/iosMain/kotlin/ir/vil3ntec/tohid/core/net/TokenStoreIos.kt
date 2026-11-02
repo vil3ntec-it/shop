@@ -45,7 +45,7 @@ class TokenStore(context: Context) : TokenStorage {
     prefs.edit().remove(EXPIRES).apply()
   }
 
-  /** «سرورِ خودِ دکان» روی آیفون خاموش است (‎ServerSwitchIos‎)؛ همان رفتارِ کامپیوتر برای کامل بودنِ API */
+  /** بایگانیِ توکنِ هر سرور هنگامِ «سرورِ بعدی» (`ServerSwitchAndroid.applyPending`، همان رفتارِ اندروید) */
   fun stashTo(scope: String) {
     val tag = "@srv:" + scope.ifEmpty { "default" }
     for (k in listOf(ACCESS, REFRESH)) write(k + tag, read(k))

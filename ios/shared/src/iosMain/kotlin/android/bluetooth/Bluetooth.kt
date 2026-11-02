@@ -30,16 +30,25 @@ class BluetoothManager private constructor() {
 class BluetoothDevice internal constructor(val address: String) {
   val name: String? get() = null
   val bondState: Int get() = BOND_NONE
+  val bluetoothClass: BluetoothClass? get() = null
+  val uuids: Array<android.os.ParcelUuid>? get() = null
+  val type: Int get() = DEVICE_TYPE_UNKNOWN
   fun createRfcommSocketToServiceRecord(uuid: UUID): BluetoothSocket = throw java.io.IOException("iOS: بلوتوثِ کلاسیک نیست")
   fun createInsecureRfcommSocketToServiceRecord(uuid: UUID): BluetoothSocket = createRfcommSocketToServiceRecord(uuid)
 
   companion object {
     const val BOND_NONE = 10
     const val BOND_BONDED = 12
+    const val DEVICE_TYPE_UNKNOWN = 0
+    const val DEVICE_TYPE_CLASSIC = 1
+    const val DEVICE_TYPE_LE = 2
+    const val DEVICE_TYPE_DUAL = 3
     const val ACTION_FOUND = "android.bluetooth.device.action.FOUND"
     const val EXTRA_DEVICE = "android.bluetooth.device.extra.DEVICE"
   }
 }
+
+class BluetoothClass internal constructor(val deviceClass: Int, val majorDeviceClass: Int)
 
 class BluetoothSocket private constructor() : Closeable {
   val inputStream: InputStream get() = throw java.io.IOException("iOS: بلوتوثِ کلاسیک نیست")

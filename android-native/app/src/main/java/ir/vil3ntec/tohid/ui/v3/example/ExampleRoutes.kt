@@ -45,7 +45,7 @@ val ExampleModule = AppModule(
     ModuleEntry("example", { StrKit.exampleTitle }, "example", Icons.Outlined.Extension, setOf(Place.MORE), MoreGroup.SHOP, V3Hue.PURPLE, order = 99),
   ),
   settings = listOf(
-    SettingsEntry({ StrKit.exampleTitle }, "settings/example", Icons.Outlined.Extension, SettingsLayout.GENERAL),
+    SettingsEntry({ StrKit.exampleTitle }, "settings/example", Icons.Outlined.Extension, SettingsLayout.LOOK),
   ),
   routes = listOf(
     V3Route("example", RouteKind.PAGE, { StrKit.exampleTitle }, chrome = Chrome.OWN) { ExampleScreen() },

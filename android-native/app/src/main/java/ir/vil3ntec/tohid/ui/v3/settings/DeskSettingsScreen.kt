@@ -4,103 +4,75 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
-import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
-import ir.vil3ntec.tohid.ui.screens.SettingsTiers
-import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
-import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.v3.V3Divider
-import ir.vil3ntec.tohid.ui.v3.V3ListRow
-import ir.vil3ntec.tohid.ui.v3.V3Section
+import ir.vil3ntec.tohid.ui.screens.SettingsSearchIndex
 import ir.vil3ntec.tohid.ui.v3.V3TwoPane
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
-import ir.vil3ntec.tohid.ui.v3.nav.V3Modules
+import ir.vil3ntec.tohid.ui.v3.settings.devices.DevicesScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SettingsShotState
 
 /**
- *  تنظیماتِ صفحهٔ پهن (کامپیوتر، تبلتِ افقی — `shell.wide`): فهرستِ بخش‌ها در ستونِ آغاز (همان گروه‌ها، بی بخش‌های فقط‌گوشی —
- *  `SettingsLayout.deskSections`) و صفحهٔ همان بخش در ستونِ پایان — **همان** صفحه‌های
- *  گوشی (`SettingsPages`)، بی دکمهٔ برگشت. پیوندِ هر بخش (`settings/security/app-lock`)
- *  همان بخش را باز انتخاب می‌کند.
+ *  تنظیماتِ صفحهٔ پهن (کامپیوتر، تبلتِ افقی — `shell.wide`)، نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): ستونِ آغاز همان صفحهٔ اولِ
+ *  گوشی است — کادرِ جست‌وجو، شش دسته و پیوندِ «قابلیت‌ها» — و ستونِ پایان صفحهٔ دستهٔ انتخاب‌شده (همان بخش‌های کوتاه)؛
+ *  زدنِ ردیف همان صفحهٔ گوشی (`SettingsPages`) را در ستونِ پایان باز می‌کند، با برگشت به صفحهٔ دسته. «دستگاه‌ها» همان
+ *  صفحهٔ همهٔ دستگاه‌هاست. پیوندِ هر بخش (`settings/shop/app-lock`) همان بخش را باز می‌کند — بخشِ پنهان (A) و آزمایشی هم.
  *
- *  تنظیماتِ کم (۱۴۰۵/۰۸/۱۱، `SettingsTiers`): ستون فقط بخش‌های اصلی را دارد و زیرش ردیفِ بستهٔ «پیشرفته»؛
- *  بخشِ روشن و پنهان (A) ردیف ندارد ولی نشانیِ مستقیمش (`selected`) همان صفحه را باز می‌کند.
+ *  @param group دستهٔ باز (`SettingsLayout`) یا `SettingsPaths.FEATURES`
+ *  @param section بخشی که صفحه‌اش باز باشد
  */
 @Composable
-internal fun RouteScope.DeskSettingsScreen(selected: String?) {
+internal fun RouteScope.DeskSettingsScreen(group: String? = null, section: String? = null) {
   val facts = rememberSettingsFacts(theme)
-  //  کامپیوتر دوربین و نوارِ پایینِ گوشی را ندارد؛ تبلتِ پهن دارد (بی بخش‌های فقط‌کامپیوتر، `PHONE_HIDDEN`)
-  val all = if (Platform.DESKTOP) SettingsLayout.deskSections else SettingsLayout.sections.filterNot { it in SettingsLayout.PHONE_HIDDEN }
-  //  بخشِ پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارد؛ نشانیِ مستقیمش همان صفحه را باز می‌کند (صفحه خودش «خاموش» می‌گوید)
-  val desk = all.filter { SettingsLayout.shown(it, facts.serverOn) }
-  val main = desk.filter { SettingsTiers.tier(it) == SettingsTiers.Tier.MAIN }
-  var pick by rememberSaveable(selected) { mutableStateOf(selected?.takeIf { it in all } ?: main.firstOrNull() ?: desk.first()) }
-  val extra = remember(access) { V3Modules.settingsEntries(access) }
-  val lockToggle = rememberLockToggle()
-  //  «پیشرفته» باز است اگر بخشِ انتخاب‌شده خودش پیشرفته باشد
-  var advanced by rememberSaveable(selected) { mutableStateOf(SettingsTiers.tier(pick) == SettingsTiers.Tier.ADVANCED) }
-  @Composable
-  fun Group(g: SettingsLayout.Group, tier: SettingsTiers.Tier) {
-    val rows = g.sections.filter { (it in desk || SettingsLayout.isLink(it)) && SettingsTiers.tier(it) == tier }
-    val more = if (tier == SettingsTiers.Tier.ADVANCED) extra.filter { it.group == g.title }.filter { it.shown() } else emptyList()
-    if (rows.isEmpty() && more.isEmpty()) return
-    V3Section(SettingsLayout.groupLabel(g.title)) {
-      rows.forEachIndexed { i, key ->
-        if (i > 0) V3Divider(start = ROW_DIVIDER_START)
-        Box {
-          SettingsRow(key, facts, onClick = {
-            val link = SettingsLayout.LINKS[key]
-            if (link != null) nav.open(link) else pick = key
-          }, onLockToggle = lockToggle)
-          if (key == pick) SelectedMark(Modifier.align(Alignment.CenterStart))
-        }
-      }
-      more.forEachIndexed { i, e ->
-        if (rows.isNotEmpty() || i > 0) V3Divider(start = ROW_DIVIDER_START)
-        V3ListRow(e.label(), subtitle = e.subtitle(), icon = e.icon, tile = false, onClick = { nav.open(e.route) })
-      }
+  val docs = rememberSearchDocs(facts)
+  var query by rememberSaveable { mutableStateOf(SettingsShotState.query) }
+  val start = group ?: section?.let(SettingsLayout::groupOf) ?: SettingsLayout.GROUPS.first().title
+  var cat by rememberSaveable(group, section) { mutableStateOf(start) }
+  var pick by rememberSaveable(group, section) { mutableStateOf(section?.takeIf { SettingsPages.of(it) != null }) }
+  val openRow: (String) -> Unit = { key ->
+    val link = SettingsLayout.LINKS[key]
+    if (link != null) nav.open(link) else pick = key
+  }
+  fun open(d: SettingsSearchIndex.Doc) {
+    when (d.kind) {
+      SettingsSearchIndex.Kind.CATEGORY -> { cat = d.key; pick = null }
+      SettingsSearchIndex.Kind.FEATURES -> { cat = SettingsPaths.FEATURES; pick = null }
+      SettingsSearchIndex.Kind.SECTION -> { SettingsLayout.groupOf(d.key)?.let { cat = it }; openRow(d.key) }
+      SettingsSearchIndex.Kind.EXTRA -> nav.open(d.key)
     }
   }
   V3TwoPane(
     listWidth = 320.dp,
     list = {
       SettingsPageFrame(title = Str.settings, onBack = null, largeTitle = false) {
-        items(SettingsLayout.GROUPS, key = { it.title }) { g -> Group(g, SettingsTiers.Tier.MAIN) }
-        item(key = "advanced") { AdvancedRow(advanced) { advanced = !advanced } }
-        if (advanced) items(SettingsLayout.GROUPS, key = { "advanced/" + it.title }) { g -> Group(g, SettingsTiers.Tier.ADVANCED) }
+        item(key = "search") { SettingsSearchBox(query) { query = it } }
+        if (query.isBlank()) {
+          item(key = "home") { SettingsHomeCard(selected = cat) { cat = it; pick = null } }
+          item(key = "features") { FeaturesLink { cat = SettingsPaths.FEATURES; pick = null } }
+        } else {
+          searchResults(SettingsSearchIndex.search(docs, query), query, ::open)
+        }
       }
     },
     detail = {
-      AnimatedContent(pick, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) }, label = "deskSettings") { key ->
-        //  «این چه می‌کند؟» بالای صفحهٔ همان بخش (`SettingsPageFrame`)
-        CompositionLocalProvider(LocalSettingsKey provides key) { SettingsPages.of(key)?.content?.invoke(this@DeskSettingsScreen, null) }
+      AnimatedContent(cat to pick, transitionSpec = { fadeIn(MotionSpec.tweenOf(MotionTokens.MEDIUM)) togetherWith fadeOut(MotionSpec.tweenOf(MotionTokens.SHORT)) }, label = "deskSettings") { (c, key) ->
+        when {
+          //  «این چه می‌کند؟» بالای صفحهٔ همان بخش (`SettingsPageFrame`)؛ برگشت ⇐ صفحهٔ دسته
+          key != null -> CompositionLocalProvider(LocalSettingsKey provides key) { SettingsPages.of(key)?.content?.invoke(this@DeskSettingsScreen, { pick = null }) }
+          c == SettingsPaths.FEATURES -> FeaturesScreen(onBack = null, onOptions = { k -> SettingsLayout.groupOf(k)?.let { cat = it }; pick = k })
+          c in SettingsLayout.GROUP_LINKS -> DevicesScreen(data, tab = null, onBack = null)
+          else -> CategoryBody(c, facts, onBack = null, onRow = openRow, onExtra = { nav.open(it) })
+        }
       }
     },
   )
 }
-
-/** نشانِ ردیفِ انتخاب‌شده: نوارِ برند در لبهٔ آغاز (رنگ تنها نیست: صفحهٔ کنار همان بخش است) */
-@Composable
-private fun SelectedMark(modifier: Modifier) {
-  Box(modifier.width(4.dp).height(28.dp).clip(RoundedCornerShape(2.dp)).background(PhoneV3Roles.focus(PhoneV3.colors)))
-}
-

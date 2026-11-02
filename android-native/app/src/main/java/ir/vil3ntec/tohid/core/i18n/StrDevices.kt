@@ -128,4 +128,92 @@ object StrDevices {
   )
   val newItem: String get() = t("ثبتِ کالا", "New item", "نوی توکی")
   fun countAdded(n: Any): String = t("شمارِ ${asIs(n)} کالا از بارکدخوان افزوده شد", "Counts for $n ${pl(n, "item", "items")} added from the scanner", "د $n توکو شمېر له بارکوډ لوستونکي ورزیات شو")
+  //  ── «کارتِ فرمان» — فروشِ نقدیِ خودکار از بارکدخوان (راهِ «ب»، B، پیش‌فرض خاموش) ─────────────
+  val cashCardTitle: String get() = t("فروشِ نقدی با کارتِ فرمان", "Cash sales with the command card", "د امر کارت سره نغدي پلور")
+  val cashCardNote: String get() = t(
+    "روشن ⇒ کالاها را اسکن کنید و بعد «نقد پرداخت شد» را از کارت؛ برنامه حتی بسته، فروشِ نقدی را با همان قیمت، تخفیفِ خودکار و گردکردنِ صندوق ثبت می‌کند و رسید چاپ می‌شود. قرض و مشتری همیشه از صندوق.",
+    "On ⇒ scan the items, then \"Cash paid\" from the card; even with the app closed the cash sale is recorded with the till's prices, automatic discounts and rounding, and the receipt prints. Credit and customers always go through the till.",
+    "روښانه ⇒ توکي سکن کړئ او بیا له کارت «نغدې ورکړل شوې»؛ اپ آن بند هم نغدي پلور د صندوق په بیه، خپلکاره تخفیف او ګردولو ثبتوي او رسید چاپېږي. پور او پیرودونکی تل له صندوق.",
+  )
+  val cashCardSafety: String get() = t(
+    "صندوقِ بسته، کاربرِ بی اجازهٔ فروش یا بارکدِ بی کالا ⇒ فروش ثبت نمی‌شود و فاکتورِ نگه‌داشته ساخته می‌شود تا با «پرداخت» ثبت کنید.",
+    "Till closed, a user without sale permission or an unknown barcode ⇒ no sale is recorded; a held invoice is made for you to pay.",
+    "بند صندوق، د پلور بې اجازې کاروونکی یا بې توکي بارکوډ ⇒ پلور نه ثبتېږي او ساتل شوی بل جوړېږي چې په «تادیه» یې ثبت کړئ.",
+  )
+  val cashCardOwnerOnly: String get() = t(
+    "فقط صاحب یا مدیرِ دکان این را عوض می‌کند.",
+    "Only the shop owner or a manager can change this.",
+    "یوازې د دوکان څښتن یا مدیر دا بدلولی شي.",
+  )
+  val cashCardAsk: String get() = t("فروشِ نقدیِ خودکار روشن شود؟", "Turn on automatic cash sales?", "خپلکاره نغدي پلور روښانه شي؟")
+  val cashCardAskBody: String get() = t(
+    "با هر «نقد پرداخت شد» از کارت، بی زدنِ دکمه‌ای فروشِ نقدی در دفتر ثبت می‌شود و در گزارشِ صندوق می‌آید. پس از روشن کردن، کارت را از «دستگاه‌ها» چاپ کنید.",
+    "Each \"Cash paid\" from the card records a cash sale in the books without any tap, and it appears in the till report. After turning it on, print the card from \"Devices\".",
+    "له کارت هره «نغدې ورکړل شوې» پرته له کومې تڼۍ نغدي پلور په دفتر کې ثبتوي او د صندوق په راپور کې راځي. له روښانه کولو وروسته کارت له «وسیلې» چاپ کړئ.",
+  )
+  val turnOn: String get() = t("روشن کن", "Turn on", "روښانه یې کړه")
+
+  val cardTitle: String get() = t("کارتِ فرمان", "Command card", "د امر کارت")
+  val cardLine: String get() = t(
+    "این سه بارکد را چاپ کنید و کنارِ بارکدخوان بگذارید. کارت مالِ همین دستگاه است.",
+    "Print these three barcodes and keep them by the scanner. The card belongs to this device.",
+    "دا درې بارکوډونه چاپ کړئ او د بارکوډ لوستونکي څنګ ته یې کېږدئ. کارت د همدې وسیلې دی.",
+  )
+  val cmdNew: String get() = t("فاکتورِ تازه", "New invoice", "نوی بل")
+  val cmdCash: String get() = t("نقد پرداخت شد", "Cash paid", "نغدې ورکړل شوې")
+  val cmdUndo: String get() = t("حذفِ آخرین کالا", "Remove last item", "وروستی توکی لرې کول")
+  val printCard: String get() = t("چاپِ کارت", "Print card", "کارت چاپول")
+  val newCard: String get() = t("کارتِ تازه", "New card", "نوی کارت")
+  val newCardAsk: String get() = t(
+    "کارتِ تازه ساخته شود؟ کارت‌های چاپ‌شدهٔ پیشین دیگر کار نمی‌کنند.",
+    "Make a new card? Cards printed before will stop working.",
+    "نوی کارت جوړ شي؟ پخواني چاپ شوي کارتونه نور کار نه کوي.",
+  )
+  //  نسخهٔ کارتِ فرمان، نه کارتِ بانکی (نگهبانِ S117 در card-data.test.js)
+  fun cardEdition(n: Any): String = t("کارتِ فرمان، نسخهٔ ${asIs(n)}", "Command card, edition $n", "د امر کارت، $n نسخه")
+  val cardNoPrinter: String get() = t(
+    "چاپگرِ رسید ثبت نشده — کارت را از روی صفحه اسکن کنید یا چاپگر بیفزایید",
+    "No receipt printer is set — scan the card from the screen or add a printer",
+    "د رسید چاپګر نه دی ثبت — کارت له پردې سکن کړئ یا چاپګر زیات کړئ",
+  )
+  fun cardDrawFailed(message: String): String = t("کارت کشیده نشد: ${asIs(message)}", "The card could not be drawn: $message", "کارت جوړ نه شو: $message")
+  val printerLinkBad: String get() = t("نشانیِ چاپگر خوانده نشد", "The printer address could not be read", "د چاپګر پته ونه لوستل شوه")
+  val cardPrinted: String get() = t("کارت چاپ شد", "Card printed", "کارت چاپ شو")
+  val cardOff: String get() = t(
+    "«فروشِ نقدی با کارتِ فرمان» خاموش است — از «تنظیمات ⇐ پیشرفته» روشن کنید.",
+    "\"Cash sales with the command card\" is off — turn it on in \"Settings ⇐ Advanced\".",
+    "«د امر کارت سره نغدي پلور» بند دی — له «امستنې ⇐ پرمختللي» یې روښانه کړئ.",
+  )
+  fun lastRun(recorded: Any, held: Any): String = t(
+    "آخرین کار: ${asIs(recorded)} فروشِ نقدی ثبت شد، ${asIs(held)} فاکتور نگه‌داشته شد",
+    "Last run: $recorded cash ${pl(recorded, "sale", "sales")} recorded, $held held",
+    "وروستی کار: $recorded نغدي پلور ثبت شول، $held بلونه وساتل شول",
+  )
+  fun ignoredCodes(n: Any): String = t(
+    "${asIs(n)} کدِ فرمانِ نادرست یا کهنه نادیده ماند",
+    "$n invalid or old command ${pl(n, "code was", "codes were")} ignored",
+    "$n ناسم یا زاړه د امر کوډونه پرېښودل شول",
+  )
+
+  //  چرا فروش خودکار ثبت نشد — یادداشتِ فاکتورِ نگه‌داشته
+  val whyTillClosed: String get() = t("صندوق بسته بود", "the till was closed", "صندوق بند و")
+  val whyNoPermission: String get() = t("کاربرِ صندوق اجازهٔ فروش نداشت", "the till user had no sale permission", "د صندوق کاروونکي د پلور اجازه نه درلوده")
+  fun whyUnknown(codes: String): String = t("بارکدِ بی کالا: ${asIs(codes)}", "barcode with no item: $codes", "بې توکي بارکوډ: $codes")
+  val whyLongGap: String get() = t("میانِ اسکنِ کالاها فاصلهٔ زیاد بود", "there was a long gap between scans", "د سکنونو ترمنځ اوږد واټن و")
+  val whyNotSaved: String get() = t("دفتر روی دستگاه نوشته نشد", "the books were not saved on this device", "دفتر په وسیله کې ونه لیکل شو")
+  fun whyRefused(message: String): String = t("ثبت نشد: ${asIs(message)}", "not recorded: $message", "ثبت نه شو: $message")
+  fun heldNote(why: String): String = t(
+    "نقد گرفته شد ولی فروش ثبت نشد — ${asIs(why)}. با «پرداخت» ثبت کنید.",
+    "Cash was taken but the sale was not recorded — $why. Record it with \"Pay\".",
+    "نغدې واخیستل شوې خو پلور ثبت نه شو — $why. په «تادیه» یې ثبت کړئ.",
+  )
+
+  //  گزارشِ صندوق (X/Z و صفحهٔ صندوق)
+  fun scannerSales(n: Any, amount: String): String = t(
+    "ثبت از اسکنر: ${asIs(n)} فاکتور، ${asIs(amount)}",
+    "Recorded from scanner: $n ${pl(n, "invoice", "invoices")}, $amount",
+    "له سکنر ثبت: $n بلونه، $amount",
+  )
+  fun scannerSalesCount(n: Any): String = t("ثبت از اسکنر: ${asIs(n)} فاکتور", "Recorded from scanner: $n ${pl(n, "invoice", "invoices")}", "له سکنر ثبت: $n بلونه")
+  fun scannerFromMemory(n: Any): String = t("${asIs(n)} از حافظهٔ بارکدخوان", "$n from scanner memory", "$n د بارکوډ لوستونکي له حافظې")
 }

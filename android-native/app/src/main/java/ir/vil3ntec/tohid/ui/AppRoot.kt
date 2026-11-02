@@ -607,7 +607,7 @@ private fun AppRootActive(
         //  فعال از ریشهٔ پشته (تبی که صفحه درونش است)، نه بالای پشته (AUDIT-NAV N1)
         current = NavCatalog.of(NavCatalog.activeForStack(navLayout, nav.stack.entries, V3Modules.table::canonical) ?: NavCatalog.MORE)?.route,
         onPick = { item -> nav.open(item.route) },
-        onEdit = { nav.open("settings/general/navbar") },
+        onEdit = { nav.open(ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths.NAVBAR) },
         modifier = Modifier.align(Alignment.BottomCenter),
         renewDays = renewDays,
         onRenew = { nav.open("subscription/plans") },
