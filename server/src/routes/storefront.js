@@ -130,6 +130,8 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
+    ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }

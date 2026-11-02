@@ -31,10 +31,12 @@ const PARTS = {
   checkout: { js: 'store/checkout.js', from: 'id="view-checkout"', to: 'id="view-order"' },
   //  دلخواه‌ها و فهرستِ خرید (WEB-11، catalog.js ِ دیربار): فقط بخشِ `#saved` ترجمه می‌شود، نه کلِ کاتالوگ (نشانه‌های data-i)
   catalog: { js: 'store/catalog.js', from: 'id="saved"', to: 'id="recent"', root: 'saved' },
+  //  «حسابِ من» (CRM-13، account.js ِ دیربار): بخش را خودِ account.js می‌سازد ⇒ پوستهٔ HTML بی هیچ کلیدِ آن
+  account: { js: 'store/account.js', from: 'id="view-orders"', to: '</main>', root: 'view-orders' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'market/index.html', 'store/index.html'];
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/account.js', 'market/index.html', 'store/index.html'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {
@@ -102,7 +104,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js']) {
+  for (const f of ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/account.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|پښتو|[۰-۹٬٫]+)$/.test(m[1])));
