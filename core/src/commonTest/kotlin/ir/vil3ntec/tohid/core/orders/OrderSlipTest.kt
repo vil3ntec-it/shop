@@ -77,6 +77,19 @@ class OrderSlipTest {
     assertEquals(OrderSlip.Kind.HEAD, rows.first { it.text.startsWith("total:") }.kind)
   }
 
+  /** OPS-07: مهرِ «آموزشی» درست زیرِ سرِ برگه؛ بی مهر (یا مهرِ خالی) همان ردیف‌های امروز، بی کم و زیاد */
+  @Test
+  fun trainingMarkSitsUnderTheTitleAndNoMarkKeepsTodaysRows() {
+    val today = OrderSlip.rows(order(), Tx, 1_000L, time)
+    assertEquals(today, OrderSlip.rows(order(), Tx, 1_000L, time, mark = null))
+    assertEquals(today, OrderSlip.rows(order(), Tx, 1_000L, time, mark = "  "))
+    val marked = OrderSlip.rows(order(), Tx, 1_000L, time, mark = " آموزشی ")
+    assertEquals(today.size + 1, marked.size)
+    assertEquals("title:42", marked[0].text)
+    assertEquals(OrderSlip.Row("آموزشی", OrderSlip.Kind.HEAD, center = true), marked[1])
+    assertEquals(today.drop(1), marked.drop(2))
+  }
+
   @Test
   fun paidPickupHasNoCollectNoLandmarkAndShowsDiscountScheduleAndNote() {
     val rows = OrderSlip.rows(

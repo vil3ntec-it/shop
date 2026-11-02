@@ -1,0 +1,170 @@
+'use strict';
+/**
+ * LOC-06/LOC-08 در وبِ خریدار — لایهٔ دریِ `public/kit/dari.js` (همان `core/.../text/DariText.kt`). بی مرورگر و بی پایگاه.
+ *   ۱) فهرست (WORDS، PHRASES، KEEP و دو جدولِ پسوند) همان DariText.kt است (`scripts/dari-words.js`)؛ واژهٔ تازه
+ *      در کاتلین بی `node scripts/dari-words.js --write` ⇒ همین آزمون سرخ.
+ *   ۲) هر `assertEquals("…", DariText.of("…"))` ِ `DariTextTest.kt` (خوانده از خودِ پرونده) همین‌جا هم، و بقیهٔ
+ *      موردهای همان پرونده (واژهٔ درونِ واژه، protect، چسبیدن) دستی.
+ *   ۳) قالبِ وب: {جای‌خالی} و دادهٔ پرشده (نامِ کالا، دکان) دست نمی‌خورد؛ واژهٔ چسبیده به جای‌خالی نه؛ KEYS.
+ *   ۴) واژه‌های نامطمئن (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۱۱) و گفتاری فارسی می‌مانند.
+ *   ۵) روی واژه‌نامه‌های واقعیِ وب: جای‌خالی‌ها همان، هیچ «مصرف/مصارف» (هزینهٔ مشتری ≠ مصارفِ دکان)، فارسی دست‌نخورده.
+ *   ۶) بارِ نخست (store.js + kit.js + boot.js) زیرِ ۷۵KB و dari.js در آن نیست؛ فقط kit.js با prs می‌خواهدش.
+ */
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+const vm = require('node:vm');
+const W = require('../scripts/dari-words');
+const D = require('../public/kit/dari');
+
+const PUB = path.join(__dirname, '..', 'public');
+const read = (f) => fs.readFileSync(path.join(PUB, f), 'utf8');
+const ZWNJ = '\u200C';
+const KT_TEST = path.join(__dirname, '..', '..', 'core', 'src', 'commonTest', 'kotlin', 'ir', 'vil3ntec', 'tohid', 'core', 'text', 'DariTextTest.kt');
+const p = (s) => D.protect(s);
+const holes = (s) => [...String(s).matchAll(/\{(\w+)\}/g)].map((m) => m[1]).sort().join(',');
+/** همان پر کردنِ `K.t` ِ کیت: پس از لایه */
+const fill = (tpl, v) => tpl.replace(/\{(\w+)\}/g, (m, k) => (v[k] === undefined ? m : v[k]));
+
+test('فهرستِ وب همان DariText.kt است (منبعِ یکتا)', () => {
+  const want = W.build();
+  assert.deepEqual(JSON.parse(JSON.stringify(D.DATA)), want);
+  assert.equal(W.current().text, W.render(want), 'بلوکِ dari.js کهنه است: node scripts/dari-words.js --write');
+  assert.ok(want.words.length >= 15 && want.words.length <= 24, `${want.words.length} واژه — فهرست کوتاه می‌ماند`);
+  for (const w of want.words) assert.ok(w.fa && w.dari && w.fa !== w.dari, w.fa);
+});
+
+test('سازنده سطرِ ناشناختهٔ کاتلین را بی‌صدا رد نمی‌کند', () => {
+  const src = fs.readFileSync(W.KT, 'utf8');
+  assert.throws(() => W.build(src.replace('Word("خیابان", "سرک"),', 'Word("خیابان", "سرک", vowel = true),')), /پارامترِ ناشناخته|سطرِ ناشناخته/);
+  assert.throws(() => W.build(src.replace('Word("خیابان", "سرک"),', 'Word(fa = "خیابان", dari = "سرک"),')), /سطرِ ناشناخته/);
+  assert.throws(() => W.build(src.replace('Word("خیابان", "سرک"),', 'Word("خیابان", "سرک\\u0020"),')), /گریز/);
+});
+
+test('همهٔ برابری‌های سادهٔ DariTextTest.kt در وب هم برقرار است', () => {
+  const kt = fs.readFileSync(KT_TEST, 'utf8');
+  const str = (s) => s.replace(/\$\{zwnj\}/g, ZWNJ);
+  const cases = [...kt.matchAll(/assertEquals\("((?:[^"\\$]|\$\{zwnj\})*)", DariText\.of\("((?:[^"\\$]|\$\{zwnj\})*)"\)\)/g)]
+    .map((m) => [str(m[1]), str(m[2])]);
+  assert.ok(cases.length >= 30, `${cases.length} مورد از کاتلین`);
+  for (const [want, fa] of cases) assert.equal(D.of(fa), want, fa);
+});
+
+test('واژه درونِ واژهٔ دیگر، پسوندِ ناشناخته و متنِ بی واژه دست نمی‌خورد (همان کاتلین)', () => {
+  for (const s of ['داستان', 'درصدد', 'خرگوشی', 'انبارگردانی', 'استانبول', 'گوشه', 'کارمندیار', `پیش${ZWNJ}انبار`,
+    'انباران', `هزینه${ZWNJ}هایش`, 'ذخیره', 'Save', '', 'مانده: 1,250 افغانی', 'خوندي کول', 'شاگرد']) {
+    assert.equal(D.of(s), s, s);
+  }
+  for (const w of D.DATA.words) assert.equal(D.of(w.dari), w.dari, `دریِ «${w.fa}» دوباره عوض می‌شود`);
+});
+
+test('دادهٔ protect‌شده (asIs) بایت‌به‌بایت همان؛ واژهٔ چسبیده به داده نه (همان کاتلین)', () => {
+  const product = 'گوشی سامسونگ انبار';
+  assert.equal(D.of(`گوشی «${p(product)}» به انبار رفت`), `مبایل «${product}» به گدام رفت`);
+  const customer = 'فروشگاه کریم';
+  assert.equal(D.of(`${p(customer)} — ${p('500')} ؋ بدهکاریم`), `${customer} — 500 ؋ قرض‌داریم`);
+  assert.equal(D.of(product), 'مبایل سامسونگ گدام', 'بی نشانه، همان متن دری می‌شد');
+  const out = D.of(`${p('گوشی')}${p('')} و ${p('انبار')}`);
+  assert.equal(out, 'گوشی و انبار');
+  assert.ok(![...out].some((c) => c === D.OPEN || c === D.CLOSE));
+  assert.equal(D.of(`${p(`پیش${ZWNJ}`)}انبار`), `پیش${ZWNJ}انبار`);
+  assert.equal(D.of(`انبار${p('گردانی')}`), 'انبارگردانی');
+  assert.equal(D.of(`${p('12')} انبار`), '12 گدام');
+  assert.equal(D.strip('گوشی'), 'گوشی');
+  assert.equal(D.strip(`کالای ${p('گوشی')}`), 'کالای گوشی');
+});
+
+test('قالبِ وب: {جای‌خالی} و دادهٔ پرشده هرگز دری نمی‌شود', () => {
+  //  نامِ کالا و دکان (داده) پس از لایه می‌نشیند ⇒ همان که فروشنده نوشته
+  const v = { name: 'گوشی سامسونگ', shop: 'فروشگاه کریم', m: '۱۲۰', n: '۳' };
+  assert.equal(fill(D.t('افزودنِ {name} به سبد'), v), 'افزودنِ گوشی سامسونگ به سبد');
+  assert.equal(fill(D.t('{shop} — گوشیِ {name}'), v), 'فروشگاه کریم — مبایلِ گوشی سامسونگ');
+  assert.equal(D.t('{m} بدهکارید'), '{m} قرض‌دارید');
+  assert.equal(fill(D.t('{n} درصد از {name} در انبار'), v), '۳ فیصد از گوشی سامسونگ در گدام');
+  //  چسبیده به جای‌خالی: نمی‌دانیم چه می‌آید ⇒ دست نزن
+  assert.equal(D.t('{x}انبار'), '{x}انبار');
+  assert.equal(D.t('انبار{x}'), 'انبار{x}');
+  assert.equal(D.t(`انبار${ZWNJ}{x}`), `انبار${ZWNJ}{x}`);
+  //  بی واژهٔ فارسی، تهی و انگلیسی همان
+  for (const s of ['', '{n}', 'Checkout', '۱۲۳']) assert.equal(D.t(s), s);
+  //  KEYS بر لایه جلو است؛ null = همان فارسی
+  assert.equal(D.t('هزینهٔ سبدِ کوچک {fee}', 'zone.small'), 'هزینهٔ سبدِ کوچک {fee}');
+  assert.equal(D.t('هزینهٔ سبدِ کوچک {fee}'), 'مصرفِ سبدِ کوچک {fee}', 'بی KEYS لایه «مصرف» می‌گذاشت');
+  //  PHRASES ِ کاتلین و KEEP
+  assert.equal(D.t('تحویل و هزینه'), 'تحویل و کرایه');
+  assert.equal(D.t('فروشگاه من — برنامهٔ گوشی'), 'فروشگاه من — برنامهٔ مبایل');
+});
+
+test('واژه‌های نامطمئن و گفتاری فارسی می‌مانند', () => {
+  //  تصمیمِ صاحب‌کار (README ِ claude-ops §۲.۲): تا صاحب‌کار نگوید عوض نمی‌شوند
+  const unsure = ['انبارگردانی', 'گاوصندوق', 'اسکناس', 'پیامک', 'تلفن', 'کالا', 'سود', 'چاپگر', 'تراکنش', 'کیسه', 'دوربین',
+    'پول', 'ماشین', 'بله', 'نه', 'خرید', 'سبد', 'سفارش', 'تحویل', 'رایگان', 'قیمت'];
+  for (const w of unsure) {
+    assert.equal(D.t(w), w, w);
+    assert.equal(D.t(`این ${w} را ببینید`), `این ${w} را ببینید`, w);
+  }
+  const fa = new Set(D.DATA.words.map((w) => w.fa));
+  for (const w of unsure) assert.ok(!fa.has(w), `«${w}» نامطمئن است و در فهرست نیست`);
+});
+
+//  همهٔ واژه‌نامه‌های فارسیِ وب: اصلی + هر بخش (K.part)
+const dictFiles = fs.readdirSync(path.join(PUB, 'kit', 'i18n')).filter((f) => /^(fa|[a-z]+\.fa)\.json$/.test(f)).sort();
+
+test('روی واژه‌نامه‌های واقعیِ وب: جای‌خالی‌ها همان، ناخالی، بی «مصرف»، فارسی دست‌نخورده', () => {
+  assert.ok(dictFiles.includes('fa.json') && dictFiles.length >= 10, dictFiles.join(' '));
+  const changed = [];
+  const all = {};
+  for (const f of dictFiles) {
+    const raw = read(`kit/i18n/${f}`);
+    const fa = JSON.parse(raw);
+    for (const [k, v] of Object.entries(fa)) {
+      all[k] = v;
+      const out = D.t(v, k);
+      assert.ok(typeof out === 'string' && out.trim(), `${f} ${k}: خالی`);
+      assert.equal(holes(out), holes(v), `${f} ${k}: جای‌خالی‌ها`);
+      const spend = (x) => (x.match(/مصرف|مصارف/g) || []).length;   //  «یک‌بارمصرف» ِ خودِ فارسی می‌ماند
+      assert.equal(spend(out), spend(v), `${f} ${k}: «${out}» — هزینهٔ مشتری «مصرف» نیست؛ کلید را در KEYS ِ dari.js بگذار`);
+      assert.ok(![...out].some((c) => c === D.OPEN || c === D.CLOSE), `${f} ${k}: نشانه ماند`);
+      if (out !== v) changed.push(k);
+    }
+    assert.equal(JSON.stringify(fa), JSON.stringify(JSON.parse(raw)), `${f}: لایه واژه‌نامهٔ فارسی را عوض کرد`);
+  }
+  //  واژه‌های پایهٔ K.FB ِ کیت (وقتی واژه‌نامه نیامد) هم از همان K.t می‌گذرند
+  const fbLine = read('kit/kit.js').split('\n').find((l) => /^\s*K\.FB = \{/.test(l));
+  const fb = Function(`'use strict'; return (${fbLine.replace(/^\s*K\.FB = /, '').replace(/;\s*$/, '')});`)();
+  for (const [k, v] of Object.entries(fb)) assert.equal(D.t(v, k), D.t(all[k], k), `K.FB ${k}`);
+  assert.ok(changed.length >= 10, `${changed.length} متنِ وب دری شد: ${changed.join(' ')}`);
+  for (const k of ['shop.go', 'phone.l', 'stock.wh', 'ck.fee', 'ah.owe']) assert.ok(changed.includes(k), k);
+  for (const [k, v] of Object.entries(D.KEYS)) {
+    assert.ok(k in all, `KEYS: کلیدِ ${k} در هیچ واژه‌نامه‌ای نیست`);
+    if (v !== null) assert.equal(holes(v), holes(all[k]), `KEYS ${k}: جای‌خالی‌ها`);
+  }
+});
+
+test('مرورگر: dari.js بی module خودش را روی VILL3N.tx می‌گذارد و ES5 است', () => {
+  const src = read('kit/dari.js');
+  const ctx = { VILL3N: {} };
+  vm.runInNewContext(src, ctx);
+  assert.equal(typeof ctx.VILL3N.tx, 'function');
+  assert.equal(ctx.VILL3N.tx('شمارهٔ موبایل', 'phone.l'), 'شمارهٔ مبایل');
+  assert.equal(ctx.VILL3N.tx('هزینهٔ سبدِ کوچک {fee}', 'zone.small'), 'هزینهٔ سبدِ کوچک {fee}');
+  //  مانندِ کیت: گوشیِ کهنه هم باید بخواندش (بی let/const/arrow/template/class)
+  const code = src.split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join('\n');
+  assert.doesNotMatch(code, /\b(let|const|class)\s|=>|`/);
+});
+
+test('بارِ نخست زیرِ ۷۵KB؛ لایه و فهرست فقط با دری بار می‌شوند', () => {
+  const first = ['store/store.js', 'kit/kit.js', 'kit/boot.js'].reduce((s, f) => s + fs.statSync(path.join(PUB, f)).size, 0);
+  assert.ok(first < 75 * 1024, `بارِ نخست ${first} بایت`);
+  for (const f of ['store/index.html', 'market/index.html']) assert.doesNotMatch(read(f), /dari\.js/, `${f} نباید dari.js را بخواهد`);
+  for (const f of ['kit/boot.js', 'store/store.js']) assert.doesNotMatch(read(f), /'[^']*dari\.js'/, `${f} نباید dari.js را بخواهد`);
+  const kit = read('kit/kit.js');
+  assert.match(kit, /LANG == 'prs' && K\.js\('\/kit\/dari\.js'\)/, 'کیت فقط برای دری لایه را می‌خواهد');
+  assert.doesNotMatch(kit, /کمپیوتر|گدام|فیصد|مبایل/, 'هیچ واژهٔ فهرست در بارِ نخست');
+  //  دری در گزینش‌گر میانِ فارسی و English؛ lang/dir ِ آن در boot
+  assert.match(kit, /\[\['fa', 'فارسی'\], \['prs', 'دری'\], \['en', 'English'\], \['ps', 'پښتو'\]\]/);
+  const boot = read('kit/boot.js');
+  assert.match(boot, /prs: 'rtl'/);
+  assert.match(boot, /lang=\(fa\|prs\|en\|ps\)/);
+});

@@ -1,9 +1,11 @@
 package ir.vil3ntec.tohid.ios
 
+import android.content.Intent
 import android.content.IosContext
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.TokenStore
 import ir.vil3ntec.tohid.data.LedgerOwner
+import ir.vil3ntec.tohid.data.OrderNotify
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.cinterop.ByteVar
 import kotlinx.cinterop.readBytes
@@ -26,8 +28,9 @@ import platform.UIKit.registerForRemoteNotifications
  *  ۲) نمایندهٔ برنامهٔ SwiftUI (‎ios/iosApp/iosApp/iOSApp.swift‎) توکنِ دستگاه را به `apnsToken` می‌دهد.
  *  ۳) توکن (هگزِ کوچک) به همان درِ ثبتِ توکنِ سرور می‌رود: `POST /api/me/push` با `provider = "apns"`، `platform = "ios"`
  *     — پشتِ همان ورود و همان توکنِ دسترسی (`Backend.api`). فقط وقتی واردیم، و برای هر «توکن + حساب» یک بار در روز.
- *  سرور توکنِ apns را نگه می‌دارد و از درِ FCM نمی‌فرستد (`server/src/lib/push.js`). فرستادنِ واقعی به APNs کلیدِ p8
- *  و Team ID ِ صاحب‌کار را می‌خواهد (docs/IOS-PLAN-fa.md §۰.۶)؛ تا آن روز اعلانِ سفارش همان دیدبانِ محلی است.
+ *  سرور توکنِ apns را از درِ FCM نمی‌فرستد؛ فرستنده‌اش `server/src/lib/apns.js` است (HTTP/2 + JWT ِ ES256) و فقط با کلیدِ
+ *  p8 ِ صاحب‌کار در محیطِ سرور روشن می‌شود (docs/IOS-PLAN-fa.md §۰.۶ و §۰.۱۰)؛ تا آن روز اعلانِ سفارش همان دیدبانِ محلی است.
+ *  ۴) لمسِ اعلانِ سرور (`remoteIntent`): دادهٔ پیام در سطحِ بالای userInfo است ⇐ همان `Intent` ِ اعلانِ محلیِ سفارش.
  *  ⛔ بی قابلیتِ «Push Notifications» در امضای برنامه (حسابِ اپل) iOS توکن نمی‌دهد ⇐ `apnsFailed`، فقط ثبتِ دلیل.
  */
 internal object IosPush {
@@ -64,6 +67,21 @@ internal object IosPush {
         })
       }.onSuccess { prefs.edit().putString("sent", key).putLong("sentAt", now).apply() }
     }
+  }
+
+  /**
+   *  اعلانِ سرور (userInfo با `aps`) ⇐ `Intent` ِ لمس؛ اعلانِ محلی (بی `aps`) ⇐ null و همان `IosNotifications.intentOf`.
+   *  `order_notify` (`server/src/lib/order-notify.js`) ⇐ همان دو extra ِ `OrderNotify` که اعلانِ محلیِ دیدبان می‌گذارد،
+   *  پس لمس همان سفارش را باز می‌کند و رسیدِ «دیده شد» همان راه را می‌رود (شناسه‌ها را `OrderNotify.fromIntent` می‌سنجد).
+   */
+  fun remoteIntent(info: Map<Any?, *>): Intent? {
+    if (info["aps"] == null) return null
+    val intent = Intent()
+    if (info["type"] == "order_notify") {
+      (info["notifId"] as? String)?.let { intent.putExtra(OrderNotify.EXTRA_NOTIF, it) }
+      (info["orderId"] as? String)?.let { intent.putExtra(OrderNotify.EXTRA_ORDER, it) }
+    }
+    return intent
   }
 
   /** بایت‌های توکن ⇐ هگزِ کوچک (همان شکلی که APNs در نشانیِ `/3/device/<token>` می‌خواهد) */

@@ -5,8 +5,11 @@
  *   پرونده ── فقط خواندن و فقط آن‌چه امروز ثبت است: خطِ زمانیِ سفارش، مأموریت‌ها و رویدادهای پیک (زمانِ دستگاه در
  *             برابرِ زمانِ سرور)، فاصلهٔ «تحویل شد» تا پین، اسکن‌های جمع‌آوری، قفسه و کیسه، تأییدِ تحویل (کد)،
  *             فرادادهٔ عکس‌ها، گزارشِ مشکلِ مشتری (NTF-07)، تماسِ پیک و گفت‌وگو (فقط شمار) و خودِ اختلاف‌ها.
- *   اختلاف ── باز کردن (نوع + دلیل)، یادداشت، و بستن با نتیجه؛ هر کدام یک ردیفِ `audit_logs` (`order.dispute.*`) در
- *             همان تراکنش. هیچ جدولِ تازه، هیچ ویرایش و هیچ پاک کردن: وضعیت همیشه از همین ردیف‌ها ساخته می‌شود.
+ *   اختلاف ── باز کردن (نوع + دلیل)، یادداشت، سپردن به مسئول با مهلت (§۱۹.۹ بندِ ۵)، و بستن با نتیجه؛ هر کدام یک
+ *             ردیفِ `audit_logs` (`order.dispute.*`) در همان تراکنش. هیچ جدولِ تازه، هیچ ویرایش و هیچ پاک کردن: وضعیت
+ *             همیشه از همین ردیف‌ها ساخته می‌شود؛ سپردنِ دوباره ردیفِ تازه است و آخرین سپردن مسئول و مهلتِ امروز است.
+ *             مسئول فقط صاحبِ دکان یا عضوِ فعالِ دارای `orders.manage`؛ مهلت از اکنون تا ۹۰ روز؛ گذشتنِ مهلتِ اختلافِ باز
+ *             ⇒ `overdue` (فقط نما، هیچ کارِ خودکاری — §۱۹.۹ بندِ ۷).
  *
  * ⛔ هیچ دادهٔ تازه‌ای گردآوری نمی‌شود. موقعیتِ خامِ پیک هیچ‌جا نگه داشته نمی‌شود (DLV-16، `courier-checks`) ⇒ فقط
  *    فاصلهٔ گردشده؛ نقطهٔ زندهٔ `delivery_locations` (فقط در راه، پاک‌شونده) در پرونده نیست. شمارهٔ مشتری پوشیده،
@@ -27,7 +30,12 @@ const { badRequest, notFound, conflict, forbidden } = require('../middleware/err
 const FLAG = 'shop.orders.dispute_file';
 const KINDS = Object.freeze(['not_delivered', 'missing_item', 'wrong_item', 'damaged', 'cash', 'late', 'other']);
 const OUTCOMES = Object.freeze(['customer_favor', 'shop_favor', 'settled', 'withdrawn']);
-const ACTION = Object.freeze({ open: 'order.dispute.open', note: 'order.dispute.note', resolve: 'order.dispute.resolve' });
+const ACTION = Object.freeze({
+  open: 'order.dispute.open', note: 'order.dispute.note', resolve: 'order.dispute.resolve', assign: 'order.dispute.assign',
+});
+/** مهلتِ سپردن: از اکنون (با ۵ دقیقه گذشتِ ساعت) تا ۹۰ روز */
+const DUE = Object.freeze({ pastMs: 5 * 60 * 1000, maxMs: 90 * 24 * 60 * 60 * 1000 });
+const USER_RE = /^[A-Za-z0-9_-]{1,80}$/;
 const TEXT = Object.freeze({ min: 3, max: 1000 });
 const MAX_ENTRIES = 200;
 const CLOCK_WARN_MS = 5 * 60 * 1000;
@@ -59,7 +67,7 @@ async function entriesOf(run, shopId, orderId) {
   return rows.sort((a, b) => (Number(a.detail.seq) || 0) - (Number(b.detail.seq) || 0));
 }
 
-function disputesOf(entries) {
+function disputesOf(entries, at0 = now()) {
   const byId = new Map();
   for (const e of entries) {
     const d = e.detail;
@@ -68,17 +76,24 @@ function disputesOf(entries) {
     if (e.action === ACTION.open) {
       byId.set(e.id, {
         id: e.id, kind: d.kind, reason: d.text, status: 'open', openedBy: by, openedAt: at, notes: [], resolution: null,
+        assigneeId: null, dueAt: null, overdue: false, assignments: [],
       });
       continue;
     }
     const x = byId.get(d.disputeId);
     if (!x) continue;
     if (e.action === ACTION.note) x.notes.push({ id: e.id, text: d.text, by, at });
+    if (e.action === ACTION.assign && !x.resolution) {
+      x.assignments.push({ id: e.id, assigneeId: d.assigneeId, dueAt: Number(d.dueAt), text: d.text || '', by, at });
+      x.assigneeId = d.assigneeId;
+      x.dueAt = Number(d.dueAt);
+    }
     if (e.action === ACTION.resolve && !x.resolution) {
       x.status = 'resolved';
       x.resolution = { id: e.id, outcome: d.outcome, text: d.text, by, at };
     }
   }
+  for (const x of byId.values()) x.overdue = x.status === 'open' && x.dueAt !== null && x.dueAt < at0;
   return [...byId.values()];
 }
 
@@ -103,12 +118,29 @@ function parse(action, body) {
       if (!OUTCOMES.includes(b.outcome)) throw badRequest('نتیجهٔ اختلاف معتبر نیست', 'bad_outcome');
       out.outcome = b.outcome;
     }
+    if (action === ACTION.assign) {
+      if (typeof b.assigneeId !== 'string' || !USER_RE.test(b.assigneeId)) throw badRequest('مسئولِ اختلاف معتبر نیست', 'bad_assignee');
+      out.assigneeId = b.assigneeId;
+      if (!Number.isSafeInteger(b.dueAt)) throw badRequest('مهلتِ اختلاف معتبر نیست', 'bad_due');
+      out.dueAt = b.dueAt;
+    }
   }
-  out.text = issues.cleanText(action === ACTION.open ? b.reason : b.text, TEXT, 'bad_text');
+  //  سپردن: یادداشت اختیاری است (نبود ⇒ '')
+  out.text = action === ACTION.assign && (b.text === undefined || b.text === null || b.text === '')
+    ? '' : issues.cleanText(action === ACTION.open ? b.reason : b.text, TEXT, 'bad_text');
   return out;
 }
 
+/** مسئول فقط صاحبِ همین دکان یا عضوِ فعالی که `orders.manage` دارد (همان کسانی که پرونده را می‌بینند) */
+async function assignable(run, shopId, userId) {
+  const owner = (await run('SELECT 1 FROM shops WHERE id=$1 AND owner_user_id=$2', [shopId, userId])).rows[0];
+  if (owner) return true;
+  const m = (await run("SELECT role FROM shop_members WHERE shop_id=$1 AND user_id=$2 AND status='active'", [shopId, userId])).rows[0];
+  return !!m && can(m.role, 'orders.manage');
+}
+
 const sameBody = (d, p) => d.text === p.text && (d.kind || '') === (p.kind || '') && (d.outcome || '') === (p.outcome || '')
+  && (d.assigneeId || '') === (p.assigneeId || '') && (d.dueAt ?? null) === (p.dueAt ?? null)
   && (p.disputeId === undefined || d.disputeId === p.disputeId);
 
 /** ⇒ `{dispute, replayed}` — `actor`: `{id, role, ip}` */
@@ -137,10 +169,16 @@ async function act(shopId, orderId, action, body, actor) {
       if (!open) throw conflict('اختلافِ بازی برای این سفارش نیست', 'no_open_dispute');
       if (p.disputeId && p.disputeId !== open.id) throw conflict('اختلافِ باز عوض شده است؛ پرونده را دوباره بخوانید', 'dispute_changed');
     }
+    if (action === ACTION.assign) {
+      const t = now();
+      if (p.dueAt < t - DUE.pastMs || p.dueAt > t + DUE.maxMs) throw badRequest('مهلت باید از اکنون تا ۹۰ روز باشد', 'bad_due');
+      if (!(await assignable(run, shopId, p.assigneeId))) throw badRequest('مسئول باید صاحب یا کارمندِ فعالِ دارای اجازهٔ سفارش‌ها باشد', 'bad_assignee');
+    }
     const seq = entries.reduce((m, e) => Math.max(m, Number(e.detail.seq) || 0), 0) + 1;
     const detail = {
       seq, orderNo: Number(o.order_no), role: actor.role || '', text: p.text, requestKey: p.key,
       ...(p.kind ? { kind: p.kind } : {}), ...(p.outcome ? { outcome: p.outcome } : {}),
+      ...(p.assigneeId ? { assigneeId: p.assigneeId, dueAt: p.dueAt } : {}),
       ...(action === ACTION.open ? {} : { disputeId: open.id }),
     };
     const row = await audit.logIn(c, {
@@ -156,6 +194,7 @@ async function act(shopId, orderId, action, body, actor) {
 const open = (shopId, orderId, body, actor) => act(shopId, orderId, ACTION.open, body, actor);
 const note = (shopId, orderId, body, actor) => act(shopId, orderId, ACTION.note, body, actor);
 const resolve = (shopId, orderId, body, actor) => act(shopId, orderId, ACTION.resolve, body, actor);
+const assign = (shopId, orderId, body, actor) => act(shopId, orderId, ACTION.assign, body, actor);
 
 // ════════════════════════════════════════════════════════════════════
 //  پرونده (فقط خواندن)
@@ -257,6 +296,18 @@ async function peopleOf(shopId, userIds, courierIds) {
 
 const uniq = (xs) => [...new Set(xs.filter((x) => typeof x === 'string' && x))];
 
+/** کسانی که اختلاف را می‌شود به آن‌ها سپرد (همان `assignable`): صاحب و اعضای فعالِ دارای `orders.manage` — فقط نام و نقش */
+async function assigneesOf(shopId) {
+  const rows = await db.many(
+    `SELECT u.id, u.name, 'owner' AS role FROM shops s JOIN users u ON u.id = s.owner_user_id WHERE s.id=$1
+     UNION ALL
+     SELECT u.id, u.name, m.role FROM shop_members m JOIN users u ON u.id = m.user_id
+      WHERE m.shop_id=$1 AND m.status='active'`, [shopId]);
+  const seen = new Set();
+  return rows.filter((r) => can(r.role, 'orders.manage') && !seen.has(r.id) && seen.add(r.id))
+    .map((r) => ({ userId: r.id, name: r.name || '', role: r.role }));
+}
+
 /** پروندهٔ یک سفارش برای `viewer` (`{id, role}`) — سفارشِ دکانِ دیگر ⇒ ۴۰۴. */
 async function fileOf(shopId, orderId, viewer) {
   await needFlag(shopId);
@@ -286,7 +337,8 @@ async function fileOf(shopId, orderId, viewer) {
     ...events.map((e) => e.actorId),
     ...scans.pickEvents.map((e) => e.actorId), ...scans.shelfScans.map((s) => s.by), scans.pick && scans.pick.pickerId,
     ...pick.map((p) => p.createdBy), ...contacts.courierCalls.map((c) => c.userId),
-    ...disputes.flatMap((d) => [d.openedBy.userId, ...d.notes.map((n) => n.by.userId), d.resolution && d.resolution.by.userId]),
+    ...disputes.flatMap((d) => [d.openedBy.userId, ...d.notes.map((n) => n.by.userId), d.resolution && d.resolution.by.userId,
+      ...d.assignments.flatMap((a) => [a.assigneeId, a.by.userId])]),
   ]), uniq(assignments.map((a) => a.courierId)));
   const addr = order.address || {};
   return {
@@ -333,10 +385,11 @@ async function fileOf(shopId, orderId, viewer) {
     current: disputes.find((d) => d.status === 'open') || null,
     people,
     truncated,
+    assignees: await assigneesOf(shopId),
   };
 }
 
 module.exports = {
-  FLAG, KINDS, OUTCOMES, ACTION, TEXT, MAX_ENTRIES, CLOCK_WARN_MS,
-  enabled, needFlag, fileOf, open, note, resolve,
+  FLAG, KINDS, OUTCOMES, ACTION, TEXT, MAX_ENTRIES, CLOCK_WARN_MS, DUE,
+  enabled, needFlag, fileOf, open, note, resolve, assign,
 };

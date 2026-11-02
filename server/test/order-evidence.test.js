@@ -325,6 +325,94 @@ test('RSK-08: چرخهٔ اختلاف فقط افزودنی — یک باز، ک
   assert.equal(f.current.id, next.body.dispute.id);
 });
 
+const assignD = (s, id, body = {}, token = s.token) => h.post(`/api/shop/orders/evidence/${id}/disputes/assign`,
+  { requestKey: key('asg'), ...body }, { token });
+
+test('RSK-08 §۱۹.۹ بندِ ۵: مسئول و مهلتِ اختلاف — فقط صاحب/کارمندِ دارای orders.manage، مهلتِ تا ۹۰ روز، گذشتنِ مهلت فقط نما', async () => {
+  const s = await shop('مسئول');
+  const o = await order(s);
+  const staff = await member(s, 'staff');
+  const accountant = await member(s, 'accountant');
+  const other = await shop('همسایهٔ مسئول');
+  const hour = 60 * 60 * 1000;
+  //  بی اختلافِ باز ⇒ ۴۰۹، بی ردیف
+  assert.equal((await assignD(s, o.id, { assigneeId: staff.userId, dueAt: Date.now() + hour })).body.error.code, 'no_open_dispute');
+  const d = (await openD(s, o.id)).body.dispute;
+  assert.equal(d.assigneeId, null);
+  assert.equal(d.dueAt, null);
+  assert.equal(d.overdue, false);
+  const before = await disputeRows(s.shopId, o.id);
+  //  ورودیِ نادرست ⇒ ۴۰۰ و هیچ ردیفی
+  for (const [body, code] of [
+    [{ dueAt: Date.now() + hour }, 'bad_assignee'],
+    [{ assigneeId: staff.userId }, 'bad_due'],
+    [{ assigneeId: staff.userId, dueAt: String(Date.now() + hour) }, 'bad_due'],
+    [{ assigneeId: staff.userId, dueAt: Date.now() - 24 * hour }, 'bad_due'],
+    [{ assigneeId: staff.userId, dueAt: Date.now() + 91 * 24 * hour }, 'bad_due'],
+    [{ assigneeId: accountant.userId, dueAt: Date.now() + hour }, 'bad_assignee'],
+    [{ assigneeId: other.user.id, dueAt: Date.now() + hour }, 'bad_assignee'],
+    [{ assigneeId: staff.userId, dueAt: Date.now() + hour, text: 'ab' }, 'bad_text'],
+  ]) {
+    const r = await assignD(s, o.id, body);
+    assert.equal(r.status, 400, `${code}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, code);
+  }
+  assert.deepEqual(await disputeRows(s.shopId, o.id), before);
+  //  حسابدار (بی orders.manage) ۴۰۳؛ دکانِ دیگر ۴۰۴
+  const denied = await assignD(s, o.id, { assigneeId: staff.userId, dueAt: Date.now() + hour }, accountant.token);
+  assert.equal(denied.status, 403, JSON.stringify(denied.body));
+  assert.equal((await assignD(other, o.id, { assigneeId: other.user.id, dueAt: Date.now() + hour })).body.error.code, 'order_not_found');
+
+  //  سپردن به کارمند با مهلتِ دو ساعت؛ تکرارِ همان کلید ⇒ همان، کلید با بدنهٔ دیگر ⇒ ۴۰۹
+  const k = key('asg');
+  const due = Date.now() + 2 * hour;
+  const a1 = await assignD(s, o.id, { requestKey: k, assigneeId: staff.userId, dueAt: due, text: 'تا عصر با پیک صحبت کند' });
+  assert.equal(a1.status, 201, JSON.stringify(a1.body));
+  assert.equal(a1.body.dispute.assigneeId, staff.userId);
+  assert.equal(a1.body.dispute.dueAt, due);
+  assert.equal(a1.body.dispute.overdue, false);
+  assert.equal(a1.body.dispute.assignments.length, 1);
+  assert.equal(a1.body.dispute.assignments[0].text, 'تا عصر با پیک صحبت کند');
+  const again = await assignD(s, o.id, { requestKey: k, assigneeId: staff.userId, dueAt: due, text: 'تا عصر با پیک صحبت کند' });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.replayed, true);
+  assert.equal((await assignD(s, o.id, { requestKey: k, assigneeId: staff.userId, dueAt: due + 1 })).body.error.code, 'request_key_reused');
+  //  کارمندِ دارای orders.manage هم می‌سپارد؛ آخرین سپردن مسئولِ امروز است — مهلتِ همین حالا گذشته ⇒ overdue (فقط نما)
+  const late = Date.now() - 60 * 1000;
+  const a2 = await assignD(s, o.id, { assigneeId: s.user.id, dueAt: late }, staff.token);
+  assert.equal(a2.status, 201, JSON.stringify(a2.body));
+  assert.equal(a2.body.dispute.assigneeId, s.user.id);
+  assert.equal(a2.body.dispute.overdue, true);
+  assert.equal(a2.body.dispute.status, 'open', 'گذشتنِ مهلت هیچ کارِ خودکاری نمی‌کند');
+  const f = (await file(s, o.id)).body;
+  assert.equal(f.current.assigneeId, s.user.id);
+  assert.deepEqual(f.current.assignments.map((x) => x.assigneeId), [staff.userId, s.user.id]);
+  assert.ok(f.people.users[staff.userId], 'نامِ مسئول در people');
+  //  فهرستِ سپردنی: صاحب و کارمندِ دارای orders.manage؛ حسابدار نه
+  const can = f.assignees.map((x) => x.userId);
+  assert.ok(can.includes(s.user.id) && can.includes(staff.userId));
+  assert.equal(can.includes(accountant.userId), false);
+  const html = (await h.get(`/api/shop/orders/evidence/${o.id}/print`, { token: s.token })).body.raw;
+  assert.match(html, /مسئول:/);
+  assert.match(html, /مهلت گذشته/);
+  //  پس از بستن: سپردن ۴۰۹ و اختلافِ بسته دیگر «گذشته» نیست
+  assert.equal((await resolveD(s, o.id)).status, 201);
+  assert.equal((await assignD(s, o.id, { assigneeId: staff.userId, dueAt: Date.now() + hour })).body.error.code, 'no_open_dispute');
+  const closed = (await file(s, o.id)).body.disputes[0];
+  assert.equal(closed.overdue, false);
+  const rows = await disputeRows(s.shopId, o.id);
+  assert.deepEqual(rows.map((r) => r.action), ['order.dispute.open', 'order.dispute.assign', 'order.dispute.assign', 'order.dispute.resolve']);
+  assert.deepEqual(rows[0], before[0], 'ردیفِ بازکردن پس از سپردن بایت‌به‌بایت همان');
+
+  //  پرچمِ خاموش ⇒ ۴۰۳ و هیچ ردیفی
+  const off = await shop('مسئولِ خاموش', []);
+  const o2 = await order(off);
+  const r = await assignD(off, o2.id, { assigneeId: off.user.id, dueAt: Date.now() + hour });
+  assert.equal(r.status, 403);
+  assert.equal(r.body.error.code, 'dispute_file_disabled');
+  assert.equal((await disputeRows(off.shopId, o2.id)).length, 0);
+});
+
 test('RSK-08 ⛔ پرچمِ خاموش: درها ۴۰۳ و هیچ ردیفی؛ پاسخِ سفارش و مأموریت بیت‌به‌بیت همان', async () => {
   const s = await shop('خاموش', []);
   const o = await order(s);

@@ -15,6 +15,15 @@ object BagLabelPrint {
 
   data class Bag(val qr: String, val caption: String)
 
+  /**
+   *  نوشتهٔ زیرِ QR با مهرِ اختیاریِ [mark] (OPS-07: «آموزشی» ِ حالتِ آموزش): «مهر · نوشته»؛ null یا خالی ⇒ همان
+   *  [caption] ِ سرور. متنِ QR هرگز دست نمی‌خورد.
+   */
+  fun caption(caption: String, mark: String?): String {
+    val m = mark?.trim().orEmpty()
+    return if (m.isEmpty()) caption else "$m · $caption"
+  }
+
   /** فاصلهٔ میانِ دو کیسه (نقطه) — جای بریدن با قیچی */
   const val GAP = 40
 

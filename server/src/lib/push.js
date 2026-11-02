@@ -21,6 +21,7 @@
 const { createSign } = require('crypto');
 const { query, one, many, newId, now } = require('../db');
 const plans = require('./plans');
+const apns = require('./apns');
 
 const PREFIX = 'push_';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
@@ -83,6 +84,8 @@ async function masked() {
     project,
     account,
     devices: counts.n,
+    //  آیفون: فقط «روشن؟/کدام محیط/چرا خاموش» — کلید فقط در محیطِ سرور است (`lib/apns.js`)
+    apns: apns.status(),
   };
 }
 
@@ -238,22 +241,48 @@ async function sendTo(target, message) {
     return { sent: rows.length, total: rows.length };
   }
 
+  //  کلیدِ «پوش روشن» ِ پنل کلیدِ اصلیِ هر دو راه است؛ FCM حسابِ سرویس و APNs کلیدِ محیط را هم می‌خواهد
   const cfg = await current();
-  if (!cfg.enabled || !cfg.serviceAccount) return { sent: 0, skipped: 'push_off' };
+  const apnsSender = cfg.enabled ? apns.sender() : null;
+  const fcmOn = cfg.enabled && !!cfg.serviceAccount;
+  if (!fcmOn && !apnsSender) return { sent: 0, skipped: 'push_off' };
 
-  let sa;
-  try { sa = JSON.parse(cfg.serviceAccount); } catch { return { sent: 0, skipped: 'bad_service_account' }; }
+  let sa = null;
+  if (fcmOn) {
+    try { sa = JSON.parse(cfg.serviceAccount); } catch { if (!apnsSender) return { sent: 0, skipped: 'bad_service_account' }; }
+  }
 
   const rows = await targetsFor(target);
   if (!rows.length) return { sent: 0, skipped: target.userId || target.adminId || target.shopId
     || target.stationId || target.deviceUid || target.allAdmins ? 'no_devices' : 'no_target' };
 
   //  توکنِ APNs ِ برنامهٔ آیفون از درِ FCM نمی‌رود: گوگل آن را «نامعتبر» می‌خواند و ردیف «کهنه» می‌شد.
-  //  فرستادن به APNs کلیدِ p8 ِ حسابِ اپلِ صاحب‌کار را می‌خواهد (docs/IOS-PLAN-fa.md §۰.۶)؛ تا آن روز
+  //  فرستنده‌اش `lib/apns.js` است با کلیدِ p8 ِ حسابِ اپلِ صاحب‌کار (docs/IOS-PLAN-fa.md §۰.۶ و §۰.۱۰)؛ بی آن
   //  این توکن‌ها فقط ثبت و نگه داشته می‌شوند — نه فرستاده، نه کهنه.
   const fcmRows = rows.filter(r => r.provider !== 'apns');
-  if (!fcmRows.length) return { sent: 0, total: rows.length, skipped: 'apns_only' };
+  const apnsRows = rows.filter(r => r.provider === 'apns');
+  const out = { sent: 0, total: rows.length };
 
+  if (apnsRows.length && apnsSender) {
+    const r = await sendApns(apnsSender, apnsRows, message);
+    out.sent += r.sent;
+    if (r.error) out.apnsError = r.error;
+  }
+
+  if (fcmRows.length && sa) {
+    const r = await sendFcm(sa, fcmRows, message);
+    out.sent += r.sent;
+    if (r.error) out.error = r.error;
+  }
+
+  if (!fcmRows.length && !apnsSender) out.skipped = 'apns_only';
+  else if (!apnsRows.length && !sa) out.skipped = 'fcm_off';
+  //  هیچ نرسید ⇒ خطای APNs هم دیده شود (`order-notify` فقط `error` را می‌خواند)
+  if (!out.sent && !out.error && out.apnsError) out.error = out.apnsError;
+  return out;
+}
+
+async function sendFcm(sa, fcmRows, message) {
   let bearer;
   try { bearer = await googleToken(sa); } catch (err) { return { sent: 0, error: err.message }; }
 
@@ -294,7 +323,36 @@ async function sendTo(target, message) {
       await query('UPDATE push_tokens SET last_error=$2 WHERE id=$1', [row.id, String(err.message).slice(0, 300)]);
     }
   }
-  return { sent, total: rows.length };
+  return { sent };
+}
+
+/**
+ * APNs: هر ردیف یک درخواست روی همان نشستِ HTTP/2. «مرده» (۴۱۰، BadDeviceToken) ⇒ کهنه؛
+ * خطای کلید/تیم (۴۰۳ ِ دیگر) ⇒ بقیهٔ دسته فرستاده نمی‌شود. `last_error` فقط «apns کد دلیل» است — بی توکن.
+ */
+async function sendApns(sender, apnsRows, message) {
+  let sent = 0;
+  const collapseId = message.collapseId || (message.data && message.data.notifId) || '';
+  for (const row of apnsRows) {
+    let r;
+    try {
+      r = await sender.send(row.token, { ...message, collapseId });
+    } catch {
+      r = { ok: false, status: 0, reason: 'send_failed' };
+    }
+    if (r.ok) {
+      sent++;
+      await query('UPDATE push_tokens SET last_ok_at=$2, last_error=$3 WHERE id=$1', [row.id, now(), '']);
+      continue;
+    }
+    const note = `apns ${r.status || ''} ${r.reason || ''}`.replace(/\s+/g, ' ').trim().slice(0, 120);
+    await query(
+      `UPDATE push_tokens SET last_error=$2, status=$3 WHERE id=$1`,
+      [row.id, note, r.dead ? 'stale' : row.status]
+    );
+    if (r.fatal) return { sent, error: note };
+  }
+  return { sent };
 }
 
 module.exports = { current, save, masked, invalidate, register, unregister, sendTo, targetsFor, setDeliver };

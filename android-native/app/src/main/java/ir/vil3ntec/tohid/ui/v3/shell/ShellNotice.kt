@@ -21,6 +21,8 @@ fun ShellNotice() {
   val desk = LocalDeskLayout.current
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
     if (desk || !home) SubscriptionNotice()
+    //  «این من نبودم — لغو کن»: فقط صاحب، فقط وقتی حسابِ گیرندهٔ حساب‌پی در انتظار است (همهٔ صفحه‌ها)
+    HesabPayChangeNotice()
     ClockSkewNotice()
     if (!desk) UpdateNotice()
   }

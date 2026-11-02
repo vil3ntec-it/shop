@@ -69,6 +69,15 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
   val (from, to) = ReportEngine.rangeOf(range, today)
   val names = remember(d) { d.debtors.associate { it.id to it.name } }
   val counts = remember(d) { d.saleItems.groupingBy { it.saleId }.eachCount() }
+  //  PAY-07: سندهای `pay_status` ِ هر فاکتور (دفترِ بی سند ⇒ نقشهٔ خالی، همان ستونِ امروز)
+  val payChanges = remember(d) { ir.vil3ntec.tohid.data.PayStatusFlow.bySale(d) }
+  val payUser = remember {
+    val role = ir.vil3ntec.tohid.data.ShopRole
+    DeskPayUser(
+      sell = role.canWrite(context, "sales"), manage = !role.isStaff(context),
+      me = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("").trim().ifEmpty { role.current(context) },
+    )
+  }
   val list = remember(d, search, from, to, pay, state) {
     val q = search.trim()
     d.sales
@@ -157,7 +166,11 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
             6 -> TCell(if (s.remaining > 0.5) money(s.remaining) else "", Shop.colors.danger)
             7 -> TCell(ir.vil3ntec.tohid.data.PayFlow.payLabel(s))
             8 -> TCell(s.seller.ifBlank { "—" }, Shop.colors.muted)
-            else -> TCell(if (off) StrSale.cancelled else StrInvoices.recorded, if (off) Shop.colors.danger else Shop.colors.success)
+            else -> {
+              //  PAY-07: وضعیتِ پرداختِ غیرِ «تأییدشده» (در انتظار، نیازمند بررسی، ناموفق، لغو، بازپرداخت) به جای «ثبت‌شده»
+              val chip = if (off) null else ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s, payChanges[s.id].orEmpty())
+              TCell(DeskPayCell.text(off, chip, StrInvoices.recorded, StrSale.cancelled), DeskPayCell.color(off, chip))
+            }
           }
         },
         onClick = { picked = list[it].id },
@@ -167,6 +180,7 @@ fun DeskInvoicesScreen(store: ShopStore, cartStore: CartStore, d: ShopData, snac
         Spacer(Modifier.width(12.dp))
         Column(Modifier.width(380.dp).fillMaxHeight()) {
           InvoicePeek(d, sale, Modifier.weight(1f).fillMaxWidth()) { show = sale }
+          DeskPayStatus(store, d, sale, payUser, ::toast)   // PAY-07: فاکتورِ بی ردیفِ غیرنقد ⇒ هیچ
           Spacer(Modifier.height(6.dp))
           OutlinedButton(onClick = { saleSheet(d, sale).let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }, modifier = Modifier.fillMaxWidth()) {
             Text(StrInvoices.printA4)

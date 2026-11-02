@@ -85,6 +85,10 @@ internal fun disputeLines(f: OrderEvidence.File, d: OrderEvidence.Dispute, stamp
   val lines = buildList {
     add(StrEvidence.openedBy(f.who(d.openedBy.userId), stamp(d.openedAt)))
     add(d.reason)
+    //  §۱۹.۹ بندِ ۵: مسئول و مهلت (آخرین سپردن)؛ «مهلت گذشته» فقط برای اختلافِ باز
+    d.assigneeId?.let { who ->
+      add(StrEvidence.ownerLine(f.who(who), d.dueAt?.let(stamp) ?: "—") + if (d.overdue) " · ${StrEvidence.overdue}" else "")
+    }
     d.notes.forEach { n -> add(StrEvidence.noteLine(f.who(n.by.userId), stamp(n.at), n.text)) }
     d.resolution?.let { r -> add(StrEvidence.resolution(evidenceOutcome(r.outcome), f.who(r.by.userId), r.text)) }
   }
@@ -278,6 +282,7 @@ internal class OrderEvidenceController(
               OrderEvidence.Act.OPEN -> StrEvidence.openedOk
               OrderEvidence.Act.NOTE -> StrEvidence.notedOk
               OrderEvidence.Act.RESOLVE -> StrEvidence.resolvedOk
+              OrderEvidence.Act.ASSIGN -> StrEvidence.assignedOk
             }
           }
           .onFailure { e ->

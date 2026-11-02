@@ -21,7 +21,8 @@ import java.io.File
  *  سه چیز، جدا از دفترِ دکان (پوشه و ترجیحاتِ خودش؛ دفتر دست نمی‌خورد):
  *    • صفِ رویدادها (`QueueState`): تا سرور «رسید» نگوید پاک نمی‌شود.
  *    • کارت‌های آخرین پرسش: برای دیدنِ مأموریت‌ها بی اینترنت. کارتِ
- *      پایان‌یافته بی نشانی و مشتری نگه داشته می‌شود (`MissionView.forStorage`).
+ *      پایان‌یافته بی نشانی و مشتری نگه داشته می‌شود (`MissionView.forStorage`)؛
+ *      با «رمزگذاریِ داده» ِ روشن رمزدار (`CourierSeal`، همان کلیدِ `AtRest`).
  *    • عکس‌های در انتظار: فایلِ JPEG + شناسهٔ رویداد؛ پس از رسیدن پاک.
  */
 class CourierStore(context: Context) {
@@ -32,9 +33,12 @@ class CourierStore(context: Context) {
   fun queue(): QueueState = CourierCodec.queue(prefs.getString(K_QUEUE, null))
   fun saveQueue(q: QueueState) { prefs.edit().putString(K_QUEUE, CourierCodec.queueJson(q)).commit() }
 
-  fun cards(scope: String): List<MissionCard> = CourierCodec.cards(prefs.getString(cardsKey(scope), null))
+  /** DLV-10: کارت‌ها با رمزِ دفترِ دستگاه اگر «رمزگذاریِ داده» روشن است (`CourierSeal`)؛ خاموش ⇒ همان JSON ِ امروز */
+  fun cards(scope: String): List<MissionCard> =
+    CourierCodec.cards(CourierSeal.unwrap(prefs.getString(cardsKey(scope), null)) { AtRest.codec(app).open(it) })
   fun saveCards(scope: String, cards: List<MissionCard>) {
-    prefs.edit().putString(cardsKey(scope), CourierCodec.cardsJson(MissionView.forStorage(cards))).apply()
+    val json = CourierCodec.cardsJson(MissionView.forStorage(cards))
+    prefs.edit().putString(cardsKey(scope), CourierSeal.wrap(json) { AtRest.encode(app, it) }).apply()
   }
 
   var courierName: String

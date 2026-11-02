@@ -35,6 +35,7 @@ class OrderEvidenceRepository(private val api: ApiClient) : OrderEvidenceSource 
       OrderEvidence.Act.OPEN -> OrderEvidence.openPath(orderId)
       OrderEvidence.Act.NOTE -> OrderEvidence.notePath(orderId)
       OrderEvidence.Act.RESOLVE -> OrderEvidence.resolvePath(orderId)
+      OrderEvidence.Act.ASSIGN -> OrderEvidence.assignPath(orderId)
     } ?: throw ApiFailure.InvalidResponse("id")
     val body = OrderEvidence.body(p.draft, p.key, p.disputeId) ?: throw ApiFailure.InvalidResponse("body")
     OrderEvidence.written(api.post(path, body)) ?: throw ApiFailure.InvalidResponse("dispute")

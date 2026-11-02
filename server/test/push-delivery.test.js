@@ -387,6 +387,95 @@ test('توکنِ APNs از درِ FCM نمی‌رود و کهنه هم نمی‌
   }
 });
 
+test('آیفون: فرستندهٔ APNs (سرورِ HTTP/2 ِ ساختگی) — رسیده، ۴۱۰ ⇒ کهنه، کلیدِ نادرست ⇒ ایست؛ FCM دست نمی‌خورد', async () => {
+  const http2 = require('node:http2');
+  const { generateKeyPairSync } = require('node:crypto');
+  const apns = require('../src/lib/apns');
+  const { privateKey } = generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
+  const cfg = apns.readConfig({
+    APNS_KEY_ID: 'ABC123DEFG', APNS_TEAM_ID: 'TEAM123456', APNS_BUNDLE_ID: 'ir.vil3ntec.tohid',
+    APNS_KEY_P8: privateKey.export({ type: 'pkcs8', format: 'pem' }),
+  }).cfg;
+  const live = 'b2'.repeat(32);
+  const dead = 'c3'.repeat(32);
+  const live2 = 'd4'.repeat(32);
+
+  let answer = (token) => (token === dead ? { status: 410, reason: 'Unregistered' } : { status: 200 });
+  const seen = [];
+  const sessions = new Set();
+  const server = http2.createServer();
+  server.on('session', (x) => sessions.add(x));
+  server.on('stream', (stream, headers) => {
+    const token = String(headers[':path']).split('/').pop();
+    let body = '';
+    stream.on('data', (c) => { body += c; });
+    stream.on('end', () => {
+      seen.push({ token, topic: headers['apns-topic'], body: JSON.parse(body) });
+      const r = answer(token);
+      stream.respond({ ':status': r.status });
+      stream.end(r.reason ? JSON.stringify({ reason: r.reason }) : '');
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const sender = apns.createSender(cfg, { origin: `http://127.0.0.1:${server.address().port}`, sleep: async () => {} });
+
+  const o = await shopOwner('آیفونِ اپل');
+  for (const t of [live, dead]) {
+    await h.post('/api/me/push', { token: t, provider: 'apns', platform: 'ios' }, { token: o.accessToken });
+  }
+  await h.post('/api/me/push', { token: 'tok-fcm-apple-shop' }, { token: o.accessToken });
+
+  push.setDeliver(null);
+  apns.useSender(sender);
+  //  کلیدِ «پوش روشن» ِ پنل، بی حسابِ سرویسِ FCM ⇒ فقط APNs
+  await push.save({ enabled: true });
+  try {
+    const out = await push.sendTo({ shopId: o.shopId, app: 'shop' }, {
+      title: 'سفارشِ تازه', body: 'باز کنید', channel: 'orders',
+      data: { type: 'order_notify', notifId: 'ntf_x', orderId: 'ord_x' },
+    });
+    assert.equal(out.sent, 1, JSON.stringify(out));
+    assert.equal(out.total, 3);
+    assert.deepEqual(seen.map((x) => x.token).sort(), [live, dead].sort(), 'فقط توکن‌های apns به اپل');
+    assert.equal(seen[0].topic, 'ir.vil3ntec.tohid');
+    assert.equal(seen.find((x) => x.token === live).body.orderId, 'ord_x');
+
+    const rows = await require('../src/db').many(
+      `SELECT token, status, last_error, last_ok_at FROM push_tokens WHERE shop_id=$1`, [o.shopId]);
+    const by = Object.fromEntries(rows.map((r) => [r.token, r]));
+    assert.equal(by[live].status, 'active');
+    assert.ok(by[live].last_ok_at, 'رسیده ثبت شد');
+    assert.equal(by[dead].status, 'stale', '۴۱۰ ⇒ کهنه');
+    assert.equal(by[dead].last_error, 'apns 410 Unregistered');
+    assert.ok(!by[dead].last_error.includes(dead), 'توکن در last_error نیست');
+    assert.equal(by['tok-fcm-apple-shop'].status, 'active', 'FCM ِ خاموش ردیفِ اندروید را کهنه نمی‌کند');
+    assert.equal(by['tok-fcm-apple-shop'].last_error, '');
+
+    //  کلید/تیمِ نادرست ⇒ نخستین ۴۰۳ بقیهٔ دسته را می‌ایستاند (اپل را نمی‌کوبیم)
+    await h.post('/api/me/push', { token: live2, provider: 'apns', platform: 'ios' }, { token: o.accessToken });
+    seen.length = 0;
+    answer = () => ({ status: 403, reason: 'InvalidProviderToken' });
+    const denied = await push.sendTo({ shopId: o.shopId, app: 'shop' }, { title: 'x', body: 'y' });
+    assert.equal(denied.sent, 0);
+    assert.match(denied.error, /InvalidProviderToken/);
+    assert.equal(seen.length, 1, 'پس از خطای کلید دیگر فرستاده نشد');
+
+    //  کلیدِ اصلیِ پنل خاموش ⇒ APNs هم خاموش
+    await push.save({ enabled: false });
+    seen.length = 0;
+    const off = await push.sendTo({ shopId: o.shopId, app: 'shop' }, { title: 'x', body: 'y' });
+    assert.equal(off.skipped, 'push_off');
+    assert.equal(seen.length, 0);
+  } finally {
+    apns.useSender(undefined);
+    sender.close();
+    await push.save({ enabled: false });
+    for (const x of sessions) x.destroy();
+    await new Promise((r) => server.close(r));
+    push.setDeliver((row, message) => { outbox.push({ row, message }); });
+  }
+});
+
 // ══════════════════════════════════════════════════════════════════
 //  ۵) بی تنظیماتِ پوش، هیچ‌چیز نمی‌شکند
 // ══════════════════════════════════════════════════════════════════

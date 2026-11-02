@@ -105,11 +105,12 @@ private fun EvidenceSheet(src: OrderEvidenceSource, orderId: String, onClose: ()
               if (cur == null) V3Button(StrEvidence.openDispute, { c.begin(OrderEvidence.Act.OPEN) }, enabled = !c.busy)
               else {
                 V3Button(StrEvidence.addNote, { c.begin(OrderEvidence.Act.NOTE) }, kind = V3ButtonKind.SECONDARY, enabled = !c.busy)
+                V3Button(StrEvidence.assign, { c.begin(OrderEvidence.Act.ASSIGN) }, kind = V3ButtonKind.SECONDARY, enabled = !c.busy)
                 V3Button(StrEvidence.resolve, { c.begin(OrderEvidence.Act.RESOLVE) }, enabled = !c.busy)
               }
             }
           } else {
-            DraftV3(c, d, cur)
+            DraftV3(c, d, cur, f.assignees)
           }
         }
         c.note?.let { (ok, msg) ->
@@ -138,7 +139,7 @@ private fun Lines(block: Pair<String, List<String>>) {
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun DraftV3(c: OrderEvidenceController, d: OrderEvidence.Draft, current: OrderEvidence.Dispute?) {
+private fun DraftV3(c: OrderEvidenceController, d: OrderEvidence.Draft, current: OrderEvidence.Dispute?, people: List<OrderEvidence.Assignee>) {
   val muted = PhoneV3.colors.inkMuted
   val pad = Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
   when (d.act) {
@@ -154,12 +155,26 @@ private fun DraftV3(c: OrderEvidenceController, d: OrderEvidence.Draft, current:
         for (o in OrderEvidence.OUTCOMES) V3Chip(evidenceOutcome(o), selected = d.choice == o, onClick = { c.edit(d.copy(choice = o)) })
       }
     }
+    OrderEvidence.Act.ASSIGN -> {
+      //  §۱۹.۹ بندِ ۵: مسئول از فهرستِ سرور و مهلتِ آماده (ساعت از همین لحظه)
+      Text(StrEvidence.assigneeLabel, style = V3Type.subhead, color = muted, modifier = pad)
+      if (people.isEmpty()) Text(StrEvidence.noAssignees, style = V3Type.footnote, color = muted, modifier = pad)
+      FlowRow(pad, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (p in people) V3Chip(p.name.ifBlank { p.userId.take(10) }, selected = d.choice == p.userId, onClick = { c.edit(d.copy(choice = p.userId)) })
+      }
+      Text(StrEvidence.dueLabel, style = V3Type.subhead, color = muted, modifier = pad)
+      FlowRow(pad, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        for (h in OrderEvidence.DUE_HOURS) V3Chip(StrEvidence.dueIn(h), selected = d.dueHours == h,
+          onClick = { c.edit(d.copy(dueAt = OrderEvidence.dueIn(h), dueHours = h)) })
+      }
+    }
     OrderEvidence.Act.NOTE -> Unit
   }
   val label = when (d.act) {
     OrderEvidence.Act.OPEN -> StrEvidence.reasonLabel
     OrderEvidence.Act.NOTE -> StrEvidence.noteLabel
     OrderEvidence.Act.RESOLVE -> StrEvidence.resolveLabel
+    OrderEvidence.Act.ASSIGN -> StrEvidence.assignNoteLabel
   }
   V3TextField(d.text, { c.edit(d.copy(text = it)) }, label, pad.fillMaxWidth(), singleLine = false)
   FlowRow(pad, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {

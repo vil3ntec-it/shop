@@ -106,6 +106,16 @@ object PayStatusFlow {
     return PayStatus.summary(rows(s), current(d, s, changes))?.takeIf { it != PayStatus.CONFIRMED }
   }
 
+  /**
+   *  PAY-07 (کامپیوتر، `DeskInvoices`): ردیف‌های غیرنقدِ فاکتور با گذارهایی که همین کاربر دارد — همان [view] و
+   *  `PayStatus.allowed` ِ برگهٔ گوشی؛ ردیفِ درگاه، فاکتورِ لغوشده یا اینترنتی ⇒ بی گذار. ثبتِ دستی «تأییدشده» است و
+   *  فقط صاحب و مدیر آن را به «نیازمند بررسی»/«ناموفق»/«لغو» می‌برند؛ ثبت همان [record].
+   */
+  data class DeskRow(val view: RowView, val targets: List<String>)
+
+  fun desk(d: ShopData, s: Sale, sell: Boolean, manage: Boolean, changes: List<PayStatus.Change> = bySale(d)[s.id].orEmpty()): List<DeskRow> =
+    view(d, s, changes).map { DeskRow(it, if (it.manual) PayStatus.allowed(it.status, sell, manage) else emptyList()) }
+
   /** «نیازمند بررسی»: هر ردیفِ زنده با همین وضعیت، تازه‌ترین فاکتور اول */
   data class ReviewItem(val sale: Sale, val row: RowView)
 
