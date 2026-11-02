@@ -716,3 +716,28 @@ test('QA #263: خواندنِ کاملِ دفتر (full) فقط مالک و مد
   assert.equal((await stockOf(s, 'r1')).levels.shop_floor, 4000, 'خواندنِ دوباره دو بار نمی‌شمارد');
   await reconciled(s, 'r1');
 });
+
+test('S97: شروعِ ساده (دکان فقط با نام، پرچم‌های پیشرفته خاموش) و روشن کردنِ کاتالوگ بعداً — همان دکان و همان کالا، موجودی از دفترِ پیشین، بی ردیفِ تکراری', async () => {
+  //  شروعِ ساده: کالا، ورودِ انبار و فروش از دستگاه — هیچ تنظیمِ دیگری، هیچ ردیفِ کاتالوگ
+  const s = await shop('شروعِ ساده');
+  await push(s, [product('qs1', { name: 'چای سبز' }), entry('qs1-e', 'qs1', 6), ...sale('qs1-s', [['qs1-i', 'qs1', 2]])]);
+  for (const t of ['catalog_products', 'stock_moves', 'stock_levels']) assert.equal(await count(t, s.shopId), 0, `${t} پیش از روشن شدن`);
+
+  //  پیشرفته بعداً، روی همان دکان: کالای پیشین با همان شناسه و موجودیِ ۶ − ۲ از همان دفتر
+  await enable(s);
+  const first = await stockOf(s, 'qs1');
+  assert.equal(first.levels.shop_floor, 4000, JSON.stringify(first));
+  const list = await cat(s, '/products');
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  assert.deepEqual(list.body.items.filter((i) => i.id === 'qs1').map((i) => i.name), ['چای سبز'], 'یک کالا، همان نام');
+  const moves = await count('stock_moves', s.shopId);
+  const products = await count('catalog_products', s.shopId);
+
+  //  خواندنِ دوباره و فروشِ تازه پس از روشن شدن چیزی را دو بار نمی‌سازد
+  assert.equal((await stockOf(s, 'qs1')).levels.shop_floor, 4000);
+  assert.equal(await count('stock_moves', s.shopId), moves, 'خواندنِ دوباره حرکتِ تازه نساخت');
+  assert.equal(await count('catalog_products', s.shopId), products, 'کالای تکراری ساخته نشد');
+  await push(s, sale('qs1-s2', [['qs1-i2', 'qs1', 1]]));
+  assert.equal((await stockOf(s, 'qs1')).levels.shop_floor, 3000);
+  await reconciled(s, 'qs1');
+});
