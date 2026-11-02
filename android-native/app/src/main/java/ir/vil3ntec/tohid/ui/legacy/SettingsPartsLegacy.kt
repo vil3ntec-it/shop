@@ -38,8 +38,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
-import ir.vil3ntec.tohid.ui.screens.SettingsLayout
-import ir.vil3ntec.tohid.ui.screens.SettingsTiers
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 

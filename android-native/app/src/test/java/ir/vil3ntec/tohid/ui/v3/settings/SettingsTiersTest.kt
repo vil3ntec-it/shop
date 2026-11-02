@@ -3,7 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.settings
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
-import ir.vil3ntec.tohid.ui.legacy.deskLegacyTier
+import ir.vil3ntec.tohid.ui.screens.deskLegacyTier
 import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.SettingsTiers
