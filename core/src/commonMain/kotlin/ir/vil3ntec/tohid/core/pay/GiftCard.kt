@@ -6,8 +6,9 @@ package ir.vil3ntec.tohid.core.pay
  *  ── کارتِ هدیه: دفترِ فقط‌افزودنی ──────────────────────────────────
  *  هر کارت یک کد دارد ([CODE_LEN] نویسه از [ALPHABET]، نویسهٔ آخر وارسیِ Luhn mod 32 که هر خطای یک‌نویسه‌ای و
  *  بیشترِ جابه‌جاییِ دو نویسهٔ کنارِ هم را می‌گیرد). رویدادها: صدور ([ISSUE]، مبلغِ اول)، خرج ([REDEEM]، با شناسهٔ
- *  فاکتور)، برگشت به کارت ([REFUND]) و باطل ([VOID]، با دلیل). هیچ رویدادی ویرایش یا پاک نمی‌شود؛ مانده از روی
- *  رویدادها ساخته می‌شود ([view])، به ترتیبِ (`at`، `id`).
+ *  فاکتور)، برگشت به کارت ([REFUND])، شارژِ دوباره ([RECHARGE]، PRM-14) و باطل ([VOID]، با دلیل). هیچ رویدادی ویرایش
+ *  یا پاک نمی‌شود؛ مانده از روی رویدادها ساخته می‌شود ([view])، به ترتیبِ (`at`، `id`).
+ *  باطل پولی جابه‌جا نمی‌کند: ماندهٔ کارتِ باطل از بدهیِ دکان کنار می‌رود ([View.liabilityMinor]، [Liability.voidedMinor]).
  *
  *  ── بی دوبار خرج کردن ─────────────────────────────────────────────
  *    • روی یک دستگاه: [build] خرج را فقط تا ماندهٔ همان لحظه می‌پذیرد، و شناسهٔ تکراری با همان محتوا `duplicate`
@@ -31,7 +32,9 @@ object GiftCard {
   const val REDEEM = "redeem"
   const val REFUND = "refund"
   const val VOID = "void"
-  val KINDS: List<String> = listOf(ISSUE, REDEEM, REFUND, VOID)
+  /** PRM-14 — شارژِ دوبارهٔ کارتِ موجود و نه‌باطل (مثلِ صدور: مبلغ ≥ ۱، بی دلیل) */
+  const val RECHARGE = "recharge"
+  val KINDS: List<String> = listOf(ISSUE, REDEEM, REFUND, VOID, RECHARGE)
 
   /** ۳۲ نویسه، بی 0/O و 1/I */
   const val ALPHABET = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
@@ -162,6 +165,8 @@ object GiftCard {
     val review: Boolean,
     /** تازه‌ترین اول */
     val history: List<Line>,
+    /** جمعِ شارژهای دوباره (PRM-14) */
+    val rechargedMinor: Long = 0L,
   ) {
     /** آنچه هنوز خرج‌شدنی است */
     val spendableMinor: Long get() = if (void || balanceMinor < 0) 0 else balanceMinor
@@ -186,6 +191,7 @@ object GiftCard {
   private class Acc(val code: String, val issuedAt: Long, var issued: Long) {
     var redeemed = 0L
     var refunded = 0L
+    var recharged = 0L
     var balance = issued
     var void = false
     var review = false
@@ -221,6 +227,14 @@ object GiftCard {
           c.refunded = r; c.balance = b
           if (c.void) c.review = true
         }
+        RECHARGE -> {
+          val r = sum(c.recharged, e.amountMinor)
+          val b = sum(c.balance, e.amountMinor)
+          if (r == null || b == null) { bad += e.id; continue }
+          c.recharged = r; c.balance = b
+          //  شارژی که پس از باطل (از دستگاهِ دیگر) رسید: پولش گرفته شد ولی کارت خرج‌شدنی نیست
+          if (c.void) c.review = true
+        }
         VOID -> {
           if (c.void) { bad += e.id; continue }
           c.void = true
@@ -230,7 +244,7 @@ object GiftCard {
     }
     return View(
       cards = cards.values.map {
-        Card(it.code, it.issuedAt, it.issued, it.redeemed, it.refunded, it.balance, it.void, it.review, it.lines.asReversed().toList())
+        Card(it.code, it.issuedAt, it.issued, it.redeemed, it.refunded, it.balance, it.void, it.review, it.lines.asReversed().toList(), it.recharged)
       },
       invalid = bad,
     )
@@ -269,7 +283,7 @@ object GiftCard {
   /**
    *  سنجش و ساختِ رویدادِ تازه روی دفترِ همین دستگاه. `at` دست‌کم یکی پس از آخرین رویدادِ دیده‌شده است (ساعتِ
    *  عقب‌ماندهٔ دستگاه خرج را پیش از صدوری که همین‌جا دیده شد نمی‌برد). صدورِ کدِ موجود `CODE_TAKEN`؛ خرج فقط تا
-   *  ماندهٔ خرج‌شدنی ([spendProblem])؛ برگشت و باطل فقط روی کارتِ موجود و نه‌باطل.
+   *  ماندهٔ خرج‌شدنی ([spendProblem])؛ برگشت، شارژ و باطل فقط روی کارتِ موجود و نه‌باطل.
    */
   fun build(events: List<Event>, input: Input): Result<Event> {
     val id = clean(input.id) ?: return Result.Err(Code.ID_REQUIRED)
@@ -292,10 +306,57 @@ object GiftCard {
       else -> {
         if (card == null) return Result.Err(Code.UNKNOWN_CARD)
         if (card.void) return Result.Err(Code.CARD_VOID)
-        if (sum(card.balanceMinor, e.amountMinor) == null || sum(card.refundedMinor, e.amountMinor) == null) return Result.Err(Code.INVALID_AMOUNT)
+        val total = if (e.kind == RECHARGE) card.rechargedMinor else card.refundedMinor
+        if (sum(card.balanceMinor, e.amountMinor) == null || sum(total, e.amountMinor) == null) return Result.Err(Code.INVALID_AMOUNT)
       }
     }
     return Result.Ok(e)
+  }
+
+  // ── گزارشِ بدهیِ کارت‌ها (PAY-24، PRM-14) ─────────────────────────
+
+  /**
+   *  بدهیِ دکان به دارندگانِ کارت، فقط از رویدادهای درستِ دفتر ([view]؛ ردیفِ کنارگذاشته در هیچ جمعی نیست).
+   *  همیشه: صدور + شارژ − خرج + برگشت − باطل = [netMinor] ([reconciles])، و [outstandingMinor] همان [View.liabilityMinor].
+   */
+  data class Liability(
+    val issuedMinor: Long,
+    val rechargedMinor: Long,
+    val redeemedMinor: Long,
+    val refundedMinor: Long,
+    /** ماندهٔ کارت‌های باطل — از بدهی کنار رفت، بی نقد ([VOID]) */
+    val voidedMinor: Long,
+    /** جمعِ ماندهٔ مثبتِ کارت‌های نه‌باطل — آنچه دکان بدهکار است */
+    val outstandingMinor: Long,
+    /** جمعِ ماندهٔ منفیِ کارت‌های نه‌باطل (قدرِ مطلق): دوبار خرج از دو دستگاه، «نیازمندِ بررسی» */
+    val overdrawnMinor: Long,
+    /** کارت‌های نه‌باطل با ماندهٔ نه‌صفر، بیشترین مانده اول */
+    val open: List<Card>,
+    val activeCount: Int,
+    val voidCount: Int,
+    /** کدِ کارت‌های «نیازمندِ بررسی» */
+    val review: List<String>,
+  ) {
+    /** جمعِ ماندهٔ کارت‌های نه‌باطل */
+    val netMinor: Long get() = outstandingMinor - overdrawnMinor
+    val reconciles: Boolean get() = issuedMinor + rechargedMinor - redeemedMinor + refundedMinor - voidedMinor == netMinor
+  }
+
+  fun liability(v: View): Liability {
+    val live = v.cards.filter { !it.void }
+    return Liability(
+      issuedMinor = v.cards.sumOf { it.issuedMinor },
+      rechargedMinor = v.cards.sumOf { it.rechargedMinor },
+      redeemedMinor = v.cards.sumOf { it.redeemedMinor },
+      refundedMinor = v.cards.sumOf { it.refundedMinor },
+      voidedMinor = v.cards.filter { it.void }.sumOf { it.balanceMinor },
+      outstandingMinor = live.filter { it.balanceMinor > 0 }.sumOf { it.balanceMinor },
+      overdrawnMinor = -live.filter { it.balanceMinor < 0 }.sumOf { it.balanceMinor },
+      open = live.filter { it.balanceMinor != 0L }.sortedWith(compareByDescending<Card> { it.balanceMinor }.thenBy { it.code }),
+      activeCount = live.size,
+      voidCount = v.cards.size - live.size,
+      review = v.review,
+    )
   }
 }
 
