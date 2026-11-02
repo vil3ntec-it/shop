@@ -207,6 +207,8 @@ FLAGS.push('shop.orders.notice_resend', 'shop.customer_notify');
 FLAGS.push('shop.orders.amend_paid');
 //  NTF-07/09: گزارشِ مشکلِ سفارش با عکس و نظرِ سفارش (`/shop/order-feedback/…`)
 FLAGS.push('shop.orders.issue_reports', 'shop.orders.reviews');
+//  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`/shop/orders/evidence/…`)
+FLAGS.push('shop.orders.dispute_file');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -545,6 +547,7 @@ function concreteFor(ids) {
     [/(\/amendments\/):amendId/, ids.amend],
     [/(\/notices\/):noticeId/, ids.notice],
     [/^(\/shop\/orders\/risk\/lists\/):entryId/, ids.riskEntry],
+    [/^(\/shop\/orders\/evidence\/):id/, ids.order],
     [/^(\/shop\/orders\/):id/, ids.order],
     [/^(\/shop\/storefront\/products\/):productId/, ids.product],
     [/^(\/shop\/storefront\/media\/):kind/, 'logo'],
@@ -636,6 +639,9 @@ function bodyFor(r, ids) {
     'POST /shop/purchase-orders/:id/cancel': { reason: 'آزمون' },
     'POST /shop/order-feedback/issues/:id/resolve': { reply: 'پاسخِ ب' },
     'POST /shop/order-feedback/reviews/:id/moderate': { decision: 'approve' },
+    'POST /shop/orders/evidence/:id/disputes': { kind: 'damaged', reason: 'آزمونِ اختلاف', requestKey: fresh('dispute-open') },
+    'POST /shop/orders/evidence/:id/disputes/notes': { text: 'یادداشت', requestKey: fresh('dispute-note') },
+    'POST /shop/orders/evidence/:id/disputes/resolve': { outcome: 'settled', text: 'بسته شد', requestKey: fresh('dispute-res') },
     'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});

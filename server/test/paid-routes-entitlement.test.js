@@ -87,6 +87,8 @@ FLAGS.push('shop.storefront.media');
 FLAGS.push('shop.storefront.campaigns');
 //  MKT-02/RSK-09: اولین خرید و سدِ تخفیف (`/shop/storefront/promo-guard`) با پرچمِ خودش
 FLAGS.push('shop.storefront.promo_guard');
+//  RSK-08: پروندهٔ مدرکِ اختلافِ سفارش (`POST /shop/orders/evidence/:id/disputes…`، PAID با needWrite) با پرچمِ خودش
+FLAGS.push('shop.orders.dispute_file');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
