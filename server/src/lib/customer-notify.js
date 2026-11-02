@@ -236,6 +236,9 @@ function setProviders(map) {
   providers = out;
 }
 
+/** سرویس‌دهندهٔ نشانده‌شدهٔ همین کانال — یا null (خبرِ «موجود/ارزان شد» ِ `storefront-alerts` همان زنجیره را می‌خواند) */
+const providerOf = (channel) => providers[channel] || null;
+
 function channelState() {
   return Object.fromEntries(CHANNELS.map((ch) => [ch, providers[ch] ? 'configured' : 'not_configured']));
 }
@@ -318,7 +321,8 @@ async function spentToday(shopId, channel, at) {
     `SELECT tried FROM customer_notify_outbox WHERE shop_id=$1 AND channel=$2 AND status='sent' AND sent_at > $3`,
     [shopId, channel, at - cost.DAY_MS]
   );
-  return cost.spentOf(rows.map((r) => asJson(r.tried)), channel);
+  //  سقفِ هر دکان و کانال مشترک است: خبرِ «موجود/ارزان شد» (WEB-10) هم شمرده می‌شود (بی آن ردیف ⇒ همان صفر)
+  return cost.spentOf(rows.map((r) => asJson(r.tried)), channel) + await require('./storefront-alerts').spentToday(shopId, channel, at);
 }
 
 async function overCap(row, at) {
@@ -491,5 +495,5 @@ async function forOrder(shopId, orderId) {
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
   flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
-  tick, start, stop, soon, forOrder, shape,
+  tick, start, stop, soon, forOrder, shape, providerOf, callProvider, spentToday, cleanName,
 };

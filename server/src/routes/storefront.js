@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
+const finder = require('../lib/storefront-filters');
 const cart = require('../lib/store-cart');
 const storeSeo = require('../lib/store-seo');
 const views = require('../lib/public-views');
@@ -130,6 +131,9 @@ async function featuresOf(shopId) {
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
+    //  WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» ِ وب (`store/filters.js` ِ دیربار) با `shop.storefront.filters`/`.alerts`
+    ...((await finder.flagOn(shopId)) ? { filters: true } : {}),
+    ...((await require('../lib/storefront-alerts').flagOn(shopId)) ? { alerts: true } : {}),
   };
   return Object.keys(f).length ? { features: f } : {};
 }
@@ -185,6 +189,8 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
       contactPhone: req.store.contact_phone,
+      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)
+      filters: await finder.parse(req.store.shop_id, req.query),
     });
   //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
   if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {
