@@ -102,7 +102,10 @@ fun ReportsScreen(d: ShopData) {
   val shrinkOn = remember { ShrinkReportPref.on(context) } && canSeeMoney
   //  CRM-04/14 — «سنِ بدهی» و «تحلیلِ خرید» (`CustomerReportsPhone.kt`)، همان تنظیمِ خاموشِ «گزارش‌های مشتری»
   val crmOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context) }
-  val shown = (if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections) + crmTabs(crmOn, canSeeMoney)
+  //  RPT-16 — «پرسشِ ساده» (پیش‌فرض خاموش ⇒ همان زبانه‌های امروز)؛ پرسشِ پولی را خودِ `SimpleAsk` با `canSeeMoney` می‌بندد
+  val askOn = remember { ir.vil3ntec.tohid.data.SimpleAskPref.on(context) }
+  val shown = (if (shrinkOn) sections + ("shrink" to StrShrink.title) else sections) + crmTabs(crmOn, canSeeMoney) +
+    listOfNotNull(("ask" to ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.tab).takeIf { askOn })
 
   var range by rememberSaveable { mutableStateOf(ReportEngine.Range.MONTH) }
   var section by rememberSaveable { mutableStateOf(if (canSeeMoney) "sales" else "products") }
@@ -136,7 +139,8 @@ fun ReportsScreen(d: ShopData) {
       }
 
       Spacer(Modifier.height(10.dp))
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      //  «پرسشِ ساده» برگهٔ CSV ندارد (`ReportCsv.of` کلیدِ ناشناخته را «گردشِ موجودی» می‌کند)
+      if (section != "ask") Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedButton(
           onClick = {
             val sheet = ReportCsv.of(section, d, from, to, todayIso())
@@ -177,6 +181,7 @@ fun ReportsScreen(d: ShopData) {
       "shrink" -> if (shrinkOn) shrinkSection(this, d, range, from, to) { range = it }
       "aging" -> if (crmOn) agingSection(this, d, todayIso())
       "rfm" -> if (crmOn && canSeeMoney) rfmSection(this, d, todayIso())
+      "ask" -> if (askOn) simpleAskSection(this, d, canSeeMoney)
       else -> stockSection(this, d, stockProduct) { stockProduct = it }
     }
   }

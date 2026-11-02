@@ -196,6 +196,8 @@ class HttpEngine(
     headers: Map<String, String> = emptyMap(),
     anonymous: Boolean = false,
   ): JsonObject {
+    //  OPS-07: حالتِ آموزشی ⇒ هیچ درخواستی، پیش از ساختنِ نشانی (همگام‌سازی، فرستادن، پشتیبانِ ابری…)
+    trainingGate()
     val base = baseUrl()
     //  همان `ApiConfig.reject` ِ امروز؛ فقط نشانیِ پروفایلِ سرور (پرچمِ `app.multi_server`) قاعدهٔ خودش را دارد
     ServerSwitchAndroid.reject(base, allowInsecure)?.let { throw it }
@@ -285,6 +287,13 @@ class HttpEngine(
    *  ⛔ `anonymous`: شناسهٔ دستگاه نمی‌رود، تا سرور نتواند شمارهٔ خریدار و
    *  سفارش‌هایش را به دستگاهِ صاحب دکانی که همین گوشی را دارد پیوند بزند.
    */
+  /** OPS-07 — تنها درِ شبکهٔ برنامه بسته در حالتِ آموزشی (`TrainingMode`)؛ خطا تکرارشدنی نیست */
+  private fun trainingGate() {
+    if (!ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) {
+      throw ApiFailure.Forbidden(ir.vil3ntec.tohid.core.i18n.StrTraining.networkBlocked, ir.vil3ntec.tohid.data.TrainingMode.NETWORK_CODE)
+    }
+  }
+
   private fun stamp(connection: HttpURLConnection, token: String?, headers: Map<String, String>, anonymous: Boolean) {
     if (token != null) connection.setRequestProperty("Authorization", "Bearer $token")
     runCatching { identity() }.getOrNull()?.forEach { (k, v) ->
@@ -318,6 +327,7 @@ class HttpEngine(
     anonymous: Boolean = false,
   ): ByteArray =
     withContext(Dispatchers.IO) {
+      trainingGate()
       val base = baseUrl()
       ServerSwitchAndroid.reject(base, allowInsecure)?.let { throw it }
       if (!online()) throw ApiFailure.Offline()

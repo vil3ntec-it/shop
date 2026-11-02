@@ -314,7 +314,7 @@ async function customerLinks(shopId, order, actor) {
   const sfRow = (await db.query('SELECT slug FROM storefronts WHERE shop_id=$1', [shopId])).rows[0];
   if (!sfRow || !sfRow.slug) return { link: '', whatsappUrl: '' };
   const sf = require('./storefront');
-  const token = sf.tokenOf(shopId, order.id);
+  const token = await sf.currentTokenOf(shopId, order.id);   // TEN-03: پرچمِ روشن ⇒ نسلِ جاری
   const base = String(config.serverUrl || '').trim().replace(/\/+$/, '');
   const page = base ? `${base}/store/${encodeURIComponent(sfRow.slug)}` : `https://${sfRow.slug}.${config.storefront.domain}/`;
   const link = `${page}#/o/${encodeURIComponent(token)}`;
@@ -522,11 +522,13 @@ function customerView(r, line, at) {
   };
 }
 
-/** سفارشِ همین ویترین از توکن — یا ۴۰۴ (توکنِ نادرست، سفارشِ دیگر، پرچمِ خاموش، یا هنوز جمع‌آوری نشده) */
+/**
+ * سفارشِ همین ویترین از توکن — یا ۴۰۴ (توکنِ نادرست، سفارشِ دیگر، پرچمِ خاموش، یا هنوز جمع‌آوری نشده)؛
+ * TEN-03: با پرچمِ `shop.storefront.link_expiry` لینکِ منقضی یا باطل ۴۱۰ (همان `orderIdOfLink` ِ پیگیری)
+ */
 async function orderOfToken(store, token) {
   const sf = require('./storefront');
-  const id = sf.orderIdOf(store.shop_id, token);
-  if (!id) throw notFound('سفارش پیدا نشد', 'order_not_found');
+  const id = await sf.orderIdOfLink(store, token);
   const order = await orderOf((t, p) => db.query(t, p), store.shop_id, id);
   if (!order || order.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
   return id;

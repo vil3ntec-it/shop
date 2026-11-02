@@ -58,10 +58,12 @@ object Receipts {
   const val SHARE_DOTS = PrinterProfile.WIDTH_80MM
 
   /** توکنِ QR برای فروشِ تازهٔ صندوق — فقط با پرچمِ `shop.receipt_v2`؛ خاموش ⇒ null (همان فروشِ پیشین) */
-  fun newToken(context: Context): String? = if (ReceiptFlag.enabled(context)) ReceiptTokens.new() else null
+  fun newToken(context: Context): String? =
+    if (ReceiptFlag.enabled(context) && !ir.vil3ntec.tohid.data.TrainingMode.on) ReceiptTokens.new() else null   //  OPS-07: فاکتورِ آموزشی نشانیِ عمومی ندارد
 
   fun publicUrl(context: Context, sale: Sale): String? {
     val token = sale.receiptToken ?: return null
+    if (ir.vil3ntec.tohid.data.TrainingMode.on) return null
     if (!ReceiptFlag.enabled(context) || !ReceiptProfileStore.current(context).qr) return null
     return ReceiptTokens.url(AppConfig.baseUrl(context), LedgerOwner.currentShop(context), token)
   }
@@ -126,7 +128,7 @@ object Receipts {
       //  MKT-10: QR ِ ویترین زیرِ فاکتور — تنظیمِ همین دستگاه، پیش‌فرض خاموش
       storeQrUrl = ReceiptStoreQr.url(context),
       logo = ReceiptProfileStore.logoMono(context, widthDots),
-      copyMark = copyMark,
+      copyMark = ir.vil3ntec.tohid.data.TrainingMode.watermark(copyMark),   //  OPS-07: «آموزشی» روی هر فاکتور و رسیدِ برگشتِ آموزشی
       note = sale.note,
     )
   }
@@ -222,7 +224,7 @@ object Receipts {
       by = doc.by,
       exchange = exchange,
       logo = ReceiptProfileStore.logoMono(context, widthDots),
-      copyMark = copyMark,
+      copyMark = ir.vil3ntec.tohid.data.TrainingMode.watermark(copyMark),   //  OPS-07: «آموزشی» روی هر فاکتور و رسیدِ برگشتِ آموزشی
     )
   }
 

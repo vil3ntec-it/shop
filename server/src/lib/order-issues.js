@@ -199,11 +199,24 @@ async function forShop(shopId, q = {}) {
   const rows = await db.many(
     `SELECT i.*, o.order_no FROM order_issues i JOIN online_orders o ON o.id = i.order_id
       WHERE i.shop_id=$1 AND ($2 = 'all' OR i.status = $2) ORDER BY i.created_at DESC, i.id DESC LIMIT 200`, [shopId, status]);
+  return { issues: await withPhotos(shopId, rows) };
+}
+
+/** ردیف‌های گزارش ⇒ نمای دکان با فرادادهٔ عکس‌ها (بی بایت). */
+async function withPhotos(shopId, rows) {
   const ids = rows.map((r) => r.id);
   const photos = ids.length ? await db.many(
     `SELECT id, issue_id, mime, size, width, height, created_at FROM order_issue_photos
       WHERE shop_id=$1 AND issue_id = ANY($2::text[]) ORDER BY created_at, id`, [shopId, ids]) : [];
-  return { issues: rows.map((r) => shopIssue(r, photos.filter((p) => p.issue_id === r.id))) };
+  return rows.map((r) => shopIssue(r, photos.filter((p) => p.issue_id === r.id)));
+}
+
+/** RSK-08: گزارش‌های یک سفارش برای پروندهٔ اختلاف — هرچه ثبت شده، بی سنجشِ پرچم (فقط خواندن). */
+async function forOrder(shopId, orderId) {
+  const rows = await db.many(
+    `SELECT i.*, o.order_no FROM order_issues i JOIN online_orders o ON o.id = i.order_id
+      WHERE i.shop_id=$1 AND i.order_id=$2 ORDER BY i.created_at, i.id`, [shopId, String(orderId || '')]);
+  return withPhotos(shopId, rows);
 }
 
 /** بایت‌های یک عکس — فقط همان دکان و همان گزارش. */
@@ -244,5 +257,5 @@ async function resolve(shopId, issueId, body, actor) {
 
 module.exports = {
   FLAG, KINDS, MAX_PER_ORDER, MAX_PHOTOS, TEXT, REPLY,
-  parseReport, parsePhoto, customerView, report, addPhoto, forShop, photoOf, resolve,
+  parseReport, parsePhoto, customerView, report, addPhoto, forShop, forOrder, photoOf, resolve, cleanText,
 };

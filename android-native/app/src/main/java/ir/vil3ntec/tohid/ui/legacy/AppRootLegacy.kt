@@ -829,7 +829,9 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle to androidx.compose.material.icons.Icons.Filled.Tune,
                 ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys to androidx.compose.material.icons.Icons.Filled.Keyboard,
                 ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle to androidx.compose.material.icons.Icons.Filled.TableChart,
+                ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle to androidx.compose.material.icons.Icons.Filled.QuestionAnswer, // RPT-16، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle to androidx.compose.material.icons.Icons.Filled.Print,
+                ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE to androidx.compose.material.icons.Icons.Filled.QrCodeScanner, // HW-12، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.ui.screens.STOCK_PLACES_TITLE to androidx.compose.material.icons.Icons.Filled.Inventory2, // INV-20/21
                 //  پرچمِ `shop.stock_v2` خاموش ⇒ بی ستونِ «موجودی و بها» (کارتش هم پنهان است)
@@ -876,6 +878,7 @@ fun AppRootLegacy(
                 Str.signedInDevices to androidx.compose.material.icons.Icons.Filled.Devices,
                 Str.staffCode to androidx.compose.material.icons.Icons.Filled.Key,
                 Str.data to androidx.compose.material.icons.Icons.Filled.Storage,
+                ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.School, // OPS-07، پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrReports.docGaps to androidx.compose.material.icons.Icons.Filled.FormatListNumbered,
                 //  PAY-20/RPT-12: فقط صاحبِ واردشده و پرچمِ سروریِ `shop.owner_report` (خاموش ⇒ بی ردیف)
                 if (ir.vil3ntec.tohid.ui.screens.ownerReportRow(if (ir.vil3ntec.tohid.data.ShopRole.current(context) == ir.vil3ntec.tohid.data.ShopRole.OWNER && ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE to androidx.compose.material.icons.Icons.Filled.TableChart else null,
