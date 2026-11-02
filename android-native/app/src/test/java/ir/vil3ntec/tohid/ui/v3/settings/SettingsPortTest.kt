@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CheckoutRulesText
 import ir.vil3ntec.tohid.ui.v3.settings.sections.plainAfghani
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -117,8 +118,8 @@ class SettingsPortTest {
     }
     assertEquals(SettingsLayout.SECURITY, SettingsLayout.groupOf(SettingsLayout.ENCRYPTION))
     ported.filterNot { it == SettingsLayout.ENCRYPTION }.forEach { assertEquals(it, SettingsLayout.SALES, SettingsLayout.groupOf(it)) }
-    //  «گزارش‌های مشتری» مثلِ رابطِ امروز فقط کامپیوتر
-    assertEquals(setOf(SettingsLayout.CRM_REPORTS), SettingsLayout.PHONE_HIDDEN)
+    //  «گزارش‌های مشتری» و کلیدهای صندوق و گزارشِ کامپیوتر مثلِ رابطِ امروز فقط کامپیوتر
+    assertEquals(setOf(SettingsLayout.CRM_REPORTS) + DESK_ONLY, SettingsLayout.PHONE_HIDDEN)
     assertTrue(SettingsLayout.CRM_REPORTS in SettingsLayout.deskSections)
     //  کلیدِ برگشت همان عنوانِ رابطِ امروز است
     assertEquals(ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE, SettingsLayout.RETURNS)
@@ -136,6 +137,89 @@ class SettingsPortTest {
   }
 
   @Test
+  fun `پول و صندوق، کالا و انبار، گزارش و ویترین هر کدام صفحه دارند و همان نوشتنِ رابطِ امروز را صدا می‌زنند`() {
+    val v3 = writers(v3Files)
+    PORTED_WRITERS.forEach { assertTrue("$it در نسخهٔ ۳ نیست", it in v3) }
+    val keys = mapOf(
+      SettingsLayout.GIFT_CARD to "settings/sales/gift-cards",
+      SettingsLayout.LAYAWAY to "settings/sales/layaway",
+      SettingsLayout.LOYALTY to "settings/sales/loyalty",
+      SettingsLayout.SAFE_BOOK to "settings/sales/safe",
+      SettingsLayout.TAX_QUARTER to "settings/sales/tax-quarter",
+      SettingsLayout.CUSTOMER_CARD to "settings/sales/customer-cards",
+      SettingsLayout.STOCK_PLACES to "settings/sales/stock-places",
+      SettingsLayout.SMART_FORECAST to "settings/sales/forecast",
+      SettingsLayout.ANOMALY to "settings/security/anomalies",
+      SettingsLayout.OWNER_REPORT to "settings/sales/owner-report",
+      SettingsLayout.STOREFRONT_ETA to "settings/sales/storefront-eta",
+      SettingsLayout.PROMO_GUARD to "settings/sales/promo-guard",
+      SettingsLayout.GIFT_RECEIPT to "settings/sales/gift-receipt",
+      SettingsLayout.DELIVER_LATER to "settings/sales/deliver-later",
+      SettingsLayout.SPECIAL_ORDER to "settings/sales/special-orders",
+      SettingsLayout.PRICE_WHY to "settings/sales/price-why",
+      SettingsLayout.SHRINK_REPORT to "settings/sales/shrink-report",
+      SettingsLayout.COUNT_TOOLS to "settings/sales/stock-count",
+      SettingsLayout.LABEL_TOOLS to "settings/sales/labels",
+      SettingsLayout.PRODUCT_INFO to "settings/sales/product-info",
+      SettingsLayout.POS_SEARCH to "settings/sales/smart-search",
+      SettingsLayout.POS_PRICE_CHECK to "settings/sales/price-check",
+      SettingsLayout.POS_TOUCH to "settings/sales/touch-mode",
+      SettingsLayout.POS_MORE_KEYS to "settings/sales/more-keys",
+      SettingsLayout.REPORT_KEYS to "settings/sales/report-keys",
+      SettingsLayout.DOC_GAPS to "settings/sales/doc-gaps",
+      SettingsLayout.LINE_PRICING to "settings/sales/line-pricing",
+      SettingsLayout.POS_NOTES to "settings/sales/notes",
+      SettingsLayout.AUTO_FEES to "settings/sales/auto-fees",
+      SettingsLayout.SIMPLE_ASK to "settings/sales/simple-ask",
+      SettingsLayout.EASY_SETUP to "settings/devices/easy-setup",
+      SettingsLayout.TRAINING to "settings/general/training",
+    )
+    keys.forEach { (key, path) ->
+      assertEquals(key, path, SettingsPaths.section(key))
+      assertTrue("$key نامِ ردیف ندارد", SettingsLayout.labelOf(key).isNotBlank())
+      //  روی کامپیوتر همه (هیچ‌کدام فقط‌گوشی نیست، مثلِ رابطِ امروز)
+      assertTrue("$key در ستونِ کامپیوتر نیست", key in SettingsLayout.deskSections)
+      assertEquals("$key فقط‌کامپیوتر؟", key in DESK_ONLY, key in SettingsLayout.PHONE_HIDDEN)
+    }
+    //  کلید همان عنوانِ بخشِ رابطِ امروز است
+    assertEquals(ir.vil3ntec.tohid.ui.screens.STOCK_PLACES_TITLE, SettingsLayout.STOCK_PLACES)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.SMART_FORECAST_TITLE, SettingsLayout.SMART_FORECAST)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.ANOMALY_TITLE, SettingsLayout.ANOMALY)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE, SettingsLayout.OWNER_REPORT)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE, SettingsLayout.STOREFRONT_ETA)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE, SettingsLayout.PROMO_GUARD)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE, SettingsLayout.EASY_SETUP)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE, SettingsLayout.TRAINING)
+    //  حالتِ آموزشی: ورود و پاک کردن همان `TrainingLedger` و همان سدِ نقشِ `TrainingSettingsWired`
+    val ops = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/OpsToggleScreensAndroid.kt" }.value
+    listOf("TrainingLedger.enter(", "TrainingLedger.wipe(", "TrainingMode.canEnter(role, staff)", "TrainingMode.canManage(role)", "if (!active)")
+      .forEach { assertTrue("$it در صفحهٔ آموزش نیست", ops.contains(it)) }
+  }
+
+  @Test
+  fun `بخش‌های پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارند`() {
+    assertEquals(
+      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD),
+      SettingsLayout.SERVER_GATED,
+    )
+    SettingsLayout.SERVER_GATED.forEach { key ->
+      assertFalse("$key بی پاسخِ سرور دیده شد", SettingsLayout.shown(key, emptySet()))
+      assertTrue(SettingsLayout.shown(key, setOf(key)))
+      assertFalse("$key با پاسخِ بخشِ دیگری دیده شد", SettingsLayout.shown(key, SettingsLayout.SERVER_GATED - key))
+    }
+    //  بخشِ بی پرچم همیشه دیده می‌شود
+    (SettingsLayout.sections - SettingsLayout.SERVER_GATED).forEach { assertTrue(it, SettingsLayout.shown(it, emptySet())) }
+    //  ردیف‌های گروه و ستونِ کامپیوتر همان فیلتر را می‌گذرانند، و هر سه صفحه خودش هم با پاسخِ خاموش هیچ نمی‌کشد
+    val rows = sources.entries.first { rel(it.key) == "ui/v3/settings/SettingsRows.kt" }.value
+    val desk = sources.entries.first { rel(it.key) == "ui/v3/settings/DeskSettingsScreen.kt" }.value
+    assertTrue(rows.contains("SettingsLayout.shown(it, facts.serverOn)") && rows.contains("serverOn = rememberServerSections()"))
+    assertTrue(desk.contains("SettingsLayout.shown(it, facts.serverOn)"))
+    val server = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/ServerSettingsScreensAndroid.kt" }.value
+    listOf("ownerReportRow(", "storefrontEtaRow(", "promoGuardRow(", "it.enabled && it.owner", "StorefrontEtaApi.visible(it)", "ShopRole.OWNER")
+      .forEach { assertTrue("$it در صفحه‌های سروری نیست", server.contains(it)) }
+  }
+
+  @Test
   fun `آستانهٔ قاعدهٔ فاکتور همان قاعدهٔ رابطِ امروز`() {
     assertEquals(1234.5, CheckoutRulesText.valid("1234.5")!!, 0.0)
     assertEquals(0.0, CheckoutRulesText.valid("0")!!, 0.0)
@@ -149,55 +233,36 @@ class SettingsPortTest {
   }
 
   companion object {
+    /** نوشتن‌هایی که از EXCEPTIONS به صفحه‌های نسخهٔ ۳ آمدند — نباید دوباره استثنا شوند */
+    val PORTED_WRITERS: List<String> = listOf(
+      "GiftCardPref.set", "LayawayPref.set", "LoyaltyPref.set", "LoyaltyPref.setRule", "SafeBookPref.set",
+      "TaxQuarterPref.setOn", "TaxQuarterPref.setConfig", "CustomerCardPref.setOn",
+      "StockPlacesPref.setPlaces", "StockPlacesPref.setRepack",
+      "SmartForecastPref.set", "AnomalyPref.set", "OwnerReportLive.set",
+      "StorefrontEtaLive.set", "PromoGuardLive.set",
+      "GiftReceiptPrefs.set", "DeliverLaterPrefs.set", "SpecialOrderPref.set", "PriceWhyPrefs.set",
+      "ShrinkReportPref.set", "CountToolsPref.setOn", "CountToolsPref.setBlind", "LabelToolsPref.set", "ProductInfoPrefs.set",
+      "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
+      "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
+      "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
+      "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
+    )
+
+    /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */
+    private val DESK_ONLY: Set<String> = setOf(
+      SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
+      SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
+    )
+
+    /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */
+    @Suppress("unused")
     private const val PENDING = "هنوز فقط در رابطِ امروز (`…SettingsWired` ِ `SettingsLegacy`)؛ صفحهٔ نسخهٔ ۳ ندارد"
 
     /**
-     *  نوشتنِ تنظیمی که در نسخهٔ ۳ نیست ⇐ دلیل. فهرستِ باز: این‌ها هنوز صفحهٔ نسخهٔ ۳ ندارند و هر کدام که آمد
-     *  از این‌جا برداشته شود («استثنای کهنه» قرمز است). بخشِ تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود.
+     *  نوشتنِ تنظیمی که در نسخهٔ ۳ نیست ⇐ دلیل. اکنون خالی: همهٔ تنظیم‌های رابطِ امروز صفحهٔ نسخهٔ ۳ دارند. بخشِ
+     *  تازه‌ای که فقط به رابطِ امروز برود همین‌جا قرمز می‌شود — یا صفحه‌اش را بسازید، یا با `PENDING` و دلیل این‌جا
+     *  بگذارید (و هر کدام که آمد برداشته شود: «استثنای کهنه» قرمز است).
      */
-    val EXCEPTIONS: Map<String, String> = mapOf(
-      "AnomalyPref.set" to "$PENDING — تشخیصِ ناهنجاری، AI-08 (کادرش در «ضدتقلب» ِ گزارشِ تازهٔ رابطِ امروز است)",
-      "AutoFeesPref.set" to "$PENDING — هزینهٔ خودکارِ فاکتور، POS-36",
-      "CountToolsPref.setBlind" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
-      "CountToolsPref.setOn" to "$PENDING — انبارگردانیِ تازه، INV-06/07/08",
-      "CustomerCardPref.setOn" to "$PENDING — کارت یا بارکدِ مشتری، CRM-16",
-      "DeliverLaterPrefs.set" to "$PENDING — فروش با تحویلِ بعدی، POS-38",
-      "DocGapsPref.setOn" to "$PENDING — شماره‌های جاافتاده، RPT-17، فقط کامپیوتر",
-      "EasySetupPref.set" to "$PENDING — راه‌اندازیِ آسانِ چاپگر و بارکدخوان، HW-12 (کارش در «دستگاه‌ها» ِ رابطِ امروز)",
-      "GiftReceiptPrefs.set" to "$PENDING — رسیدِ هدیه، POS-34",
-      "LoyaltyPref.set" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
-      "LoyaltyPref.setRule" to "$PENDING — امتیازِ وفاداری و سطحِ مشتری، PRM-13",
-      "LabelToolsPref.set" to "$PENDING — برچسب و بارکدِ داخلی، PRD-23/PRD-05",
-      "LinePolicyPrefs.setDirection" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
-      "LinePolicyPrefs.setFreeLineCapMinor" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
-      "LinePolicyPrefs.setOn" to "$PENDING — قیمت و تخفیفِ ردیف، POS-08/10/20/21",
-      "OwnerReportLive.set" to "$PENDING — گزارشِ خودکار برای صاحب (تنظیمِ سروریِ فقط صاحب)، PAY-20/RPT-12",
-      "PosMoreKeysPrefs.set" to "$PENDING — کلیدهای بیشترِ صندوق، فقط کامپیوتر",
-      "PosNotesPrefs.set" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
-      "PosNotesPrefs.setTemplates" to "$PENDING — یادداشتِ ردیف و فاکتور، POS-11",
-      "PosPriceCheckPrefs.set" to "$PENDING — بررسیِ قیمت در صندوق، فقط کامپیوتر",
-      "PosSearchPrefs.set" to "$PENDING — جست‌وجوی مقاوم، POS-04، فقط کامپیوتر",
-      "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
-      "PromoGuardLive.set" to "$PENDING — تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیفِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.promo_guard`)، MKT-02/RSK-09",
-      "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
-      "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
-      "StockPlacesPref.setPlaces" to "$PENDING — محل‌ها و انتقال، INV-20",
-      "StockPlacesPref.setRepack" to "$PENDING — بسته‌بندیِ دوباره و ساختِ بسته، INV-21",
-      "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
-      "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
-      "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
-      "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
-      "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
-      "SimpleAskPref.set" to "$PENDING — پرسشِ ساده از گزارش‌ها، RPT-16 (زبانه‌اش در «گزارش‌ها» ِ رابطِ امروز است)",
-      "SmartForecastPref.set" to "$PENDING — پیش‌بینیِ تقاضای قابلِ توضیح، AI-07 (صفحه‌اش «پیشنهادِ سفارش» ِ رابطِ امروز است)",
-      "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
-      "TrainingPref.setOn" to "$PENDING — حالتِ آموزشی، OPS-07",
-      "TrainingPref.setStaff" to "$PENDING — حالتِ آموزشی (کارمند هم)، OPS-07",
-      "TaxQuarterPref.setConfig" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
-      "TaxQuarterPref.setOn" to "$PENDING — گزارشِ مالیاتِ سه‌ماهه، RPT-10",
-      "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",
-      "LayawayPref.set" to "$PENDING — فروشِ امانی و قسطی، POS-27",
-      "StorefrontEtaLive.set" to "$PENDING — زمانِ تقریبیِ تحویلِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.eta`)، WEB-04",
-    )
+    val EXCEPTIONS: Map<String, String> = emptyMap()
   }
 }

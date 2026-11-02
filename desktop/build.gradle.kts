@@ -310,9 +310,10 @@ compose.desktop {
       copyright = "© VIL3NTEC"
       //  ماژول‌های JDK که برنامه لازم دارد: شبکه، چاپ (javax.print در java.desktop)،
       //  رمزنگاری (TLS با EC)، و `jdk.charsets`/`jdk.localedata` برای متنِ فارسی
+      //  `jdk.httpserver`: هابِ محلیِ SYN-09 (‎desktop/hub/HubServer.kt‎) — فقط با پرچم و تنظیمِ روشن گوش می‌دهد
       modules(
         "java.net.http", "java.desktop", "java.prefs", "java.naming", "java.instrument", "java.management",
-        "jdk.crypto.ec", "jdk.unsupported", "jdk.charsets", "jdk.localedata", "jdk.accessibility",
+        "jdk.crypto.ec", "jdk.unsupported", "jdk.charsets", "jdk.localedata", "jdk.accessibility", "jdk.httpserver",
       )
       windows {
         menu = true

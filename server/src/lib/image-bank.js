@@ -18,6 +18,7 @@
  * ⛔ هیچ قیمت، موجودی، بدهی یا دادهٔ دکانی در جدول‌های بانک نیست؛ جست‌وجو
  *    فقط جدول‌های بانک را می‌خواند (۳۷.۹ بندِ آخر).
  * ⛔ هیچ چیزی به سرویسِ بیرونی نمی‌رود — ‎lib/image-pipeline.js‎.
+ * کیفیت ─ پرچمِ خاموشِ `image_bank.quality`: نشان‌های پیشنهادیِ IMG-15 — ‎lib/image-originals.js‎.
  */
 const crypto = require('crypto');
 const db = require('../db');
@@ -26,6 +27,7 @@ const T = require('./text-core');
 const ID = require('./image-identity');
 const bytes = require('./image-bytes');
 const photos = require('./product-photos');
+const { checkOriginal, putBlob, tooLarge, ...QS } = require('./image-originals');
 const { ulid } = require('./ulid');
 const { stripControl } = require('./validate');
 const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
@@ -43,7 +45,6 @@ const DERIV = {
   zoom: { side: 2400, bytes: BANK_MAX_BYTES },
 };
 const SIZES = ['original', ...Object.keys(DERIV)];
-const MIN_SIDE = 300;            // کوچک‌تر ⇒ نشانِ «too_small» برای بازبین
 const PAGE_MAX = 50;
 const CANDIDATE_MAX = 500;
 const FUZZY_SCAN = 500;
@@ -61,7 +62,6 @@ const json = (t, def) => { try { return JSON.parse(t); } catch { return def; } }
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 const q1 = async (c, t, p) => (await c.query(t, p)).rows[0] || null;
 const qa = async (c, t, p) => (await c.query(t, p)).rows;
-const tooLarge = (max) => new ApiError(413, 'too_large', `عکس بزرگ‌تر از ${Math.round(max / 1024)} کیلوبایت است`);
 const intIn = (v, lo, hi, def) => {
   const n = Number(v);
   return Number.isInteger(n) && n >= lo && n <= hi ? n : def;
@@ -82,6 +82,7 @@ async function flagOf(key, scope) {
 }
 const shopEnabled = (shopId) => flagOf(SHOP_FLAG, shopId);
 const centralEnabled = () => flagOf(CENTRAL_FLAG, 'all');
+const qualityOn = (scope) => flagOf('image_bank.quality', scope);
 
 function fileUrl(base, id, version, size) {
   return `${base}/file/${encodeURIComponent(id)}/${version}/${size}`;
@@ -90,26 +91,6 @@ function fileUrl(base, id, version, size) {
 // ════════════════════════════════════════════════════════════════════
 //  بایت‌ها و نسخه‌ها
 // ════════════════════════════════════════════════════════════════════
-
-/** سنجشِ اصل: نوع از محتوا، ابعاد، سقفِ حجم؛ نشانه‌های کیفیت برای بازبین. */
-function checkOriginal(buf, max) {
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
-  if (buf.length > max) throw tooLarge(max);
-  const info = bytes.inspect(buf);
-  const flags = [...info.warnings];
-  if (Math.max(info.width, info.height) < MIN_SIDE) flags.push('too_small');
-  return { info, flags };
-}
-
-async function putBlob(c, buf, info) {
-  const hash = sha256(buf);
-  await c.query(
-    `INSERT INTO image_blobs (hash, mime, size, width, height, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (hash) DO NOTHING`,
-    [hash, info.mime, buf.length, info.width, info.height, buf, now()]
-  );
-  return hash;
-}
 
 /** همان محتوا در همان دامنهٔ دید (دکانِ خود، یا central+pending) — فقط نشان. */
 async function duplicatesOf(c, hash, space, ownerShopId, exceptId = '') {
@@ -129,6 +110,7 @@ async function insertImage(c, f) {
   const t = now();
   const lic = { ...LIC0, ...(f.license || {}) };
   const dups = f.dups || await duplicatesOf(c, f.hash, f.space, f.ownerShopId || '');
+  const q = f.quality && await QS.near(c, f, dups);
   await c.query(
     `INSERT INTO images (id, space, owner_shop_id, status, role, bank_product_id, shop_product_id,
         match_status, match_reasons, license_source, license_holder, license_type, license_status,
@@ -142,7 +124,7 @@ async function insertImage(c, f) {
       str(lic.source), str(lic.holder), str(lic.type, 64), oneOf(lic.status, LICENSES, 'unknown'),
       lic.commercial === true, lic.status === 'licensed' ? t : 0,
       f.originShopId || '', f.originImageId || '', f.consentBy || '', f.consentBy ? t : 0,
-      JSON.stringify(f.proposal || {}), JSON.stringify(dups), JSON.stringify(f.flags || []),
+      JSON.stringify(f.proposal || {}), JSON.stringify(dups), JSON.stringify(q ? q.flags : f.flags || []),
       f.batchId || '', f.createdBy || '', t]
   );
   await c.query(
@@ -150,7 +132,7 @@ async function insertImage(c, f) {
      VALUES ($1,1,'original',0,$2,$3,'','{}',$4,$5,$6)`,
     [id, f.hash, f.orientation || 0, f.versionReview || 'needs_review', f.createdBy || '', t]
   );
-  return { id, duplicate_of: dups };
+  return q ? { id, duplicate_of: dups, ...await QS.saveNear(c, id, q) } : { id, duplicate_of: dups };
 }
 
 async function addVersion(c, img, buf, info, { tool = '', settings = {}, review = 'needs_review', by = '' }) {
@@ -449,18 +431,19 @@ async function bankRev() {
 // ════════════════════════════════════════════════════════════════════
 
 async function shopUpload(shopId, userId, buf, { productId = '', role = 'main' } = {}) {
-  const { info, flags } = checkOriginal(buf, SHOP_MAX_BYTES);
+  const { info, flags, metrics, dhash } = checkOriginal(buf, SHOP_MAX_BYTES, await qualityOn(shopId));
   const pid = productId ? photos.checkId(productId) : '';
   return tx(async (c) => {
     const n = await q1(c, 'SELECT COUNT(*)::int AS n FROM images WHERE owner_shop_id=$1', [shopId]);
     if (Number(n?.n || 0) >= SHOP_MAX_IMAGES) throw badRequest('سقفِ عکس‌های این دکان پر است', 'quota');
-    const hash = await putBlob(c, buf, info);
+    const hash = await putBlob(c, buf, info, dhash);
     const out = await insertImage(c, {
       space: 'shop', ownerShopId: shopId, status: 'APPROVED', role, shopProductId: pid, hash,
-      orientation: info.orientation, flags, createdBy: userId, versionReview: 'approved',
+      orientation: info.orientation, flags, createdBy: userId, versionReview: 'approved', quality: !!metrics,
       license: { source: 'shop_own', holder: shopId, type: 'shop_own_photo', status: 'unknown' },
     });
-    return { ...out, version: 1, width: info.width, height: info.height, mime: info.mime, quality_flags: flags };
+    return { ...out, version: 1, width: info.width, height: info.height, mime: info.mime, quality_flags: out.quality_flags || flags,
+      ...(metrics && { quality: metrics }) };
   });
 }
 
@@ -521,7 +504,7 @@ async function shopList(shopId, { productId = '', cursor = '', limit = 50, base 
   return {
     items: rows.map((r) => ({
       id: r.id, product_id: r.shop_product_id, role: r.role, version: Number(r.current_version),
-      quality_flags: json(r.quality_flags, []), duplicate_of: json(r.duplicate_of, []),
+      quality_flags: json(r.quality_flags, []), duplicate_of: json(r.duplicate_of, []), near_duplicate_of: QS.nearOut(r),
       urls: { original: fileUrl(base, r.id, Number(r.current_version), 'original'),
         ...urlsOf(base, r.id, Number(r.current_version), derivs.get(r.id + '@' + r.current_version)) },
       proposals: props.filter((p) => p.origin_image_id === r.id)
@@ -677,7 +660,7 @@ async function propose(shopId, userId, imageId, body) {
     const out = await insertImage(c, {
       space: 'pending', status: 'NEEDS_REVIEW', role: img.role, bankProductId,
       match: 'unconfirmed', reasons: ['shop_proposal'], hash: v.blob_hash, orientation: v.orientation,
-      flags: json(img.quality_flags, []), createdBy: userId, proposal,
+      flags: json(img.quality_flags, []).filter((x) => x !== 'near_duplicate'), createdBy: userId, proposal, quality: await qualityOn('all'),
       originShopId: shopId, originImageId: img.id, consentBy: userId,
       license: { source: 'shop:' + shopId, holder: shopId, type: 'shop_own_photo', status: 'unknown' },
     });
@@ -714,20 +697,21 @@ function licenseInput(b, def = LIC0) {
 }
 
 async function adminUpload(adminId, buf, q) {
-  const { info, flags } = checkOriginal(buf, BANK_MAX_BYTES);
+  const { info, flags, metrics, dhash } = checkOriginal(buf, BANK_MAX_BYTES, await qualityOn('all'));
   return tx(async (c) => {
     const bankProductId = str(q.bank_product_id, 40);
     if (bankProductId && !await q1(c, 'SELECT 1 FROM bank_products WHERE id=$1', [bankProductId])) {
       throw notFound('کالای بانک پیدا نشد');
     }
-    const hash = await putBlob(c, buf, info);
+    const hash = await putBlob(c, buf, info, dhash);
     const out = await insertImage(c, {
-      space: 'pending', status: 'NEEDS_REVIEW', role: q.role, bankProductId, hash, orientation: info.orientation,
+      space: 'pending', status: 'NEEDS_REVIEW', role: q.role, bankProductId, hash, orientation: info.orientation, quality: !!metrics,
       //  پیوندِ صریحِ مدیر = تأییدِ انسانی
       match: bankProductId ? 'exact' : 'unconfirmed', reasons: bankProductId ? ['admin_linked'] : [],
       flags, createdBy: adminId, license: licenseInput(q),
     });
-    return { ...out, status: 'NEEDS_REVIEW', width: info.width, height: info.height, quality_flags: flags };
+    return { ...out, status: 'NEEDS_REVIEW', width: info.width, height: info.height, quality_flags: out.quality_flags || flags,
+      ...(metrics && { quality: metrics }) };
   });
 }
 
@@ -893,7 +877,7 @@ async function adminDetail(id, base) {
     license: { source: img.license_source, holder: img.license_holder, type: img.license_type,
       status: img.license_status, commercial_use: img.commercial_use, checked_at: Number(img.license_checked_at) },
     origin: img.origin_shop_id ? { shop_id: img.origin_shop_id, consent_by: img.consent_by, consent_at: Number(img.consent_at) } : null,
-    proposal: json(img.proposal, {}), duplicate_of: json(img.duplicate_of, []), quality_flags: json(img.quality_flags, []),
+    proposal: json(img.proposal, {}), duplicate_of: json(img.duplicate_of, []), quality_flags: json(img.quality_flags, []), near_duplicate_of: QS.nearOut(img),
     product: product ? productOut(product) : null, batch_id: img.batch_id, review_note: img.review_note,
     versions: versions.map((v) => ({
       version: v.version, kind: v.kind, parent: v.parent, tool: v.tool, review: v.review, mime: v.mime,
@@ -958,10 +942,10 @@ async function batchFile(id, name, buf) {
     await batchOf(c, id);
     let row;
     try {
-      const { info, flags } = checkOriginal(buf, BANK_MAX_BYTES);
+      const { info, flags, metrics, dhash } = checkOriginal(buf, BANK_MAX_BYTES, await qualityOn('all'));
       if (!bytes.extensionMatches(fname, info.mime)) flags.push('extension_mismatch');
-      const hash = await putBlob(c, buf, info);
-      row = { status: 'ok', error: '', hash, flags, orientation: info.orientation };
+      const hash = await putBlob(c, buf, info, dhash);
+      row = { status: 'ok', error: '', hash, flags, orientation: info.orientation, metrics };
     } catch (err) {
       if (!(err instanceof ApiError)) throw err;
       row = { status: 'failed', error: err.code, hash: '', flags: [], orientation: 0 };
@@ -972,7 +956,7 @@ async function batchFile(id, name, buf) {
        ON CONFLICT (batch_id, name) DO UPDATE SET blob_hash=EXCLUDED.blob_hash, status=EXCLUDED.status,
           error=EXCLUDED.error, warnings=EXCLUDED.warnings, orientation=EXCLUDED.orientation`,
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
-    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf) };
+    return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf), ...(row.metrics && { quality: row.metrics }) };
   }
 }
 
@@ -1081,7 +1065,7 @@ async function processRow(c, batch, raw, adminId, dryRun) {
     space: 'pending', status: 'NEEDS_REVIEW', role: oneOf(input.image_role, ROLES, 'main'),
     bankProductId: res.match === 'ambiguous' ? '' : res.product_id, match: res.match, reasons,
     hash: file.blob_hash, orientation: Number(file.orientation), flags: json(file.warnings, []),
-    createdBy: adminId, batchId: batch.id, license: lic, dups: res.duplicate_of,
+    createdBy: adminId, batchId: batch.id, license: lic, dups: res.duplicate_of, quality: await qualityOn('all'),
     proposal: res.candidates.length ? { candidates: res.candidates } : {},
   });
   res.image_id = out.id;

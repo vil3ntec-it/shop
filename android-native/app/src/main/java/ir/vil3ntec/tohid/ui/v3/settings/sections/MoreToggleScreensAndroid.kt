@@ -31,9 +31,13 @@ import kotlinx.coroutines.launch
  *  پیش‌فرضِ خاموش و همان نوشتن (`SettingsPortTest`)؛ فقط رویِ کیت (`V3Segmented` + توضیح).
  */
 
-private val SWITCH: List<String> get() = listOf(StrShell.switchOff, StrShell.switchOn)
+/** خاموش | روشن — برچسب‌های همان رابطِ امروز (صفحه‌های دیگرِ همین بسته هم) */
+internal val SWITCH: List<String> get() = listOf(StrShell.switchOff, StrShell.switchOn)
 
-/** یک کلیدِ خاموش | روشن با توضیح؛ `save` همان نوشتنِ رابطِ امروز؛ `deviceOnly` ⇒ «فقط همین دستگاه» زیرِ توضیح */
+/**
+ *  یک کلیدِ خاموش | روشن با توضیح؛ `save` همان نوشتنِ رابطِ امروز؛ `more` بندهای دیگرِ توضیحِ همان بخش (به همان
+ *  ترتیب)؛ `deviceOnly` ⇒ «فقط همین دستگاه» زیرِ توضیح
+ */
 @Composable
 internal fun RouteScope.ToggleScreen(
   key: String,
@@ -42,6 +46,7 @@ internal fun RouteScope.ToggleScreen(
   onText: String,
   note: String,
   deviceOnly: Boolean = false,
+  more: List<String> = emptyList(),
   save: (Boolean) -> Unit,
 ) {
   var on by remember { mutableStateOf(initial) }
@@ -49,6 +54,7 @@ internal fun RouteScope.ToggleScreen(
     item(key = "choice") {
       SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { on = it == 1; save(on) }) }
       SettingsNote(note)
+      more.forEach { SettingsNote(it) }
       if (deviceOnly) SettingsNote(StrShell.thisDeviceOnly)
     }
   }

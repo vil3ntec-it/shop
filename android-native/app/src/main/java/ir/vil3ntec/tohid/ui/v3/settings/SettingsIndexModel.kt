@@ -32,6 +32,8 @@ internal data class SettingsFacts(
   val lastSyncOk: Long = 0,
   val now: Long = 0,
   val version: String = "",
+  /** بخش‌های پشتِ پرچمِ سرور که سرور همین لحظه «روشن» گفته (`SettingsLayout.SERVER_GATED`)؛ تا پاسخ، هیچ */
+  val serverOn: Set<String> = emptySet(),
 )
 
 /** ردیف‌های صفحهٔ تنظیمات: مقدارِ خاکستریِ پایانِ هر ردیف — خالص، آزمون‌پذیر */
