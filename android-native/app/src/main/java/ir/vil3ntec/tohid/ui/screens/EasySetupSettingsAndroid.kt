@@ -16,8 +16,8 @@ import ir.vil3ntec.tohid.print.EasySetupPref
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /*
- *  HW-12 — بخشِ تنظیماتِ «راه‌اندازیِ آسانِ دستگاه‌ها» (همین دستگاه، پیش‌فرض خاموش). عنوان در فهرستِ
- *  `DeskSettingsLegacy` هم هست. کارِ اصلی در «دستگاه‌ها» است (`EasySetupAndroid.kt`).
+ *  HW-12 — بخشِ تنظیماتِ «راه‌اندازیِ آسانِ دستگاه‌ها» (همین دستگاه، پیش‌فرض خاموش). 
+ *  کارِ اصلی در «دستگاه‌ها» است (`EasySetupAndroid.kt`).
  */
 
 const val EASY_SETUP_TITLE = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"

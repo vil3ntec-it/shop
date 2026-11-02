@@ -34,7 +34,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  (`StockPlacesUiAndroid.kt`). پشتِ `StockPlacesPref`، پیش‌فرض خاموش.
  */
 
-/** عنوانِ بخشِ تنظیمات — همان که `DeskSettingsLegacy` در ستونِ چپ نشان می‌دهد (`AppRootLegacy`) */
+/** عنوانِ بخشِ تنظیمات — همان کلیدِ `SettingsLayout` */
 const val STOCK_PLACES_TITLE = "محل‌ها و بسته‌بندیِ دوباره"
 
 private fun milliText(milli: Long): String = (if (milli < 0) "−" else "") + qty(kotlin.math.abs(milli) / 1000.0)

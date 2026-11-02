@@ -3,9 +3,10 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 
 /**
- *  OPS-05 — «چه چیزی تازه است» روی **همین دستگاه**: کلیدِ نمایش (`tohid-policy:whats_new`، **پیش‌فرض
- *  خاموش**) و آخرین نسخهٔ پایهٔ دیده‌شده (`tohid-whats-new:seen`). خاموش ⇒ هیچ چیز خوانده یا نوشته
- *  نمی‌شود و برنامه همان است که بود. منطق در `core/guide/WhatsNew`.
+ *  OPS-05 — «چه چیزی تازه است» روی **همین دستگاه**: کلیدِ نمایش (`tohid-policy:whats_new`) و آخرین نسخهٔ پایهٔ
+ *  دیده‌شده (`tohid-whats-new:seen`). **پیش‌فرض روشن** (قاعدهٔ صاحب‌کار ۱۴۰۵/۰۸/۱۱: آنچه تصمیم نمی‌خواهد روشن و
+ *  پنهان؛ نسخهٔ ۳ کلیدی برایش نشان نمی‌دهد)؛ فقط کسی که در رابطِ قدیم خاموشش کرده بود خاموش می‌ماند ⇒ هیچ چیز
+ *  خوانده یا نوشته نمی‌شود. منطق در `core/guide/WhatsNew`.
  */
 object WhatsNewPref {
 
@@ -16,7 +17,10 @@ object WhatsNewPref {
 
   private fun prefs(context: Context, name: String) = context.applicationContext.getSharedPreferences(name, Context.MODE_PRIVATE)
 
-  fun on(context: Context): Boolean = runCatching { prefs(context, POLICY).getBoolean(KEY_ON, false) }.getOrDefault(false)
+  fun on(context: Context): Boolean = runCatching { prefs(context, POLICY).getBoolean(KEY_ON, DEFAULT_ON) }.getOrDefault(DEFAULT_ON)
+
+  /** پیش‌فرضِ نمایش — روشن */
+  const val DEFAULT_ON = true
 
   fun setOn(context: Context, on: Boolean) {
     prefs(context, POLICY).edit().putBoolean(KEY_ON, on).apply()

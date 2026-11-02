@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.stock
 
 import ir.vil3ntec.tohid.data.ExpiryEngine
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.PurchaseSuggest
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -31,6 +32,12 @@ data class StockRowUi(
   val expired: Boolean,
   /** کمترین روزِ ماندهٔ محموله‌های نزدیک به انقضا؛ null یعنی نزدیک نیست */
   val expiresInDays: Long?,
+  /**
+   *  INV-14 — «این موجودی چند روز کافی است» (`DemandForecast.daysLeft` با روزِ هفته و فصل، همان عددِ
+   *  «پیشنهادِ سفارش»)؛ بی فروش یا کالای غیرفعال ⇒ null. [coverBeyond] ⇒ بیش از سقفِ ۳۶۵ روز.
+   */
+  val coverDays: Int? = null,
+  val coverBeyond: Boolean = false,
 )
 
 /** خلاصهٔ کلِ انبار: کارتِ آمار، شمارِ هر فیلتر و ردیف‌ها */
@@ -51,6 +58,8 @@ object StockListModel {
     val alerts = ExpiryEngine.alerts(d, today)
     val expired = alerts.filter { it.expired }.map { it.product.id }.toSet()
     val near = alerts.filter { !it.expired }.groupBy { it.product.id }.mapValues { (_, lots) -> lots.minOf { it.daysLeft } }
+    //  INV-14: بی سفارشِ باز (فقط فروش و موجودی) — «چند روز» به زمانِ تأمین و «در راه» وابسته نیست
+    val cover = PurchaseSuggest.rows(d, emptyList(), today).associate { it.product.id to it.forecast }
     val rows = d.products.map { p ->
       StockRowUi(
         product = p,
@@ -63,11 +72,16 @@ object StockListModel {
         },
         expired = p.id in expired,
         expiresInDays = near[p.id],
+        coverDays = cover[p.id]?.daysLeft,
+        coverBeyond = cover[p.id]?.daysLeftBeyond == true,
       )
     }
     val counts = StockFilter.entries.associateWith { f -> rows.count { matches(it, f) } }
     return StockOverview(WarehouseEngine.summary(d), rows, counts)
   }
+
+  /** INV-14: روزهای کافی که ردیف نشان می‌دهد — تمام‌شده («تمام» خودش قرص دارد) و بی فروش ⇒ null */
+  fun coverShown(row: StockRowUi): Int? = row.coverDays?.takeIf { it > 0 && row.level != StockLevel.OUT }
 
   fun matches(row: StockRowUi, filter: StockFilter): Boolean = when (filter) {
     StockFilter.ALL -> true

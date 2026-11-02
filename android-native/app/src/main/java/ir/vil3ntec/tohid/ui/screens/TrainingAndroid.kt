@@ -41,7 +41,7 @@ import ir.vil3ntec.tohid.data.TrainingPref
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
-/** OPS-07 — عنوانِ ثابتِ بخش؛ همین در فهرستِ `DeskSettingsLegacy` ِ `AppRootLegacy` */
+/** OPS-07 — عنوانِ ثابتِ بخش */
 const val TRAINING_SETTINGS_TITLE = "حالتِ آموزشی"
 
 /**

@@ -2,8 +2,6 @@ package ir.vil3ntec.tohid.ui.v3.settings
 
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
-import ir.vil3ntec.tohid.core.i18n.Str
-import ir.vil3ntec.tohid.ui.screens.deskLegacyTier
 import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.SettingsTiers
@@ -127,9 +125,6 @@ class SettingsTiersTest {
       assertFalse(it.contains("Tier.ADVANCED"))
       assertFalse(it.contains("AdvancedRow"))
     }
-    //  رابطِ امروز: کارتِ گوشی و ستونِ کامپیوتر
-    val legacy = src("ui/legacy/SettingsPartsLegacy.kt")
-    assertTrue(legacy.contains("if (SettingsTiers.hiddenTitle(title)) return"))
   }
 
   @Test
@@ -174,21 +169,19 @@ class SettingsTiersTest {
   }
 
   @Test
-  fun `رابطِ امروز — عنوانِ A پنهان، B پیشرفته، عنوانِ ناشناس در فهرستِ اصلی`() {
+  fun `بخشِ A در هر زبان پنهان است — عنوانِ ترجمه‌شده به کلیدِ خودش برمی‌گردد، عنوانِ ناشناس هرگز`() {
+    //  جای آزمونِ رابطِ قدیم (`deskLegacyTier`، `hiddenTitle`) که ۱۴۰۵/۰۸/۱۱ پاک شد: همان سنجش روی قاعدهٔ نسخهٔ ۳
+    val features = SettingsLayout.FEATURES.toSet()
     for (lang in Lang.entries) {
       I18n.source = { lang }
       SettingsTiers.ALWAYS_ON.forEach { key ->
-        assertTrue("$key ($lang)", SettingsTiers.hiddenTitle(SettingsLayout.labelOf(key)))
-        assertEquals(key, Tier.HIDDEN, deskLegacyTier(SettingsLayout.labelOf(key)))
+        assertTrue("$key ($lang)", SettingsLayout.keyOf(SettingsLayout.labelOf(key), fallback = "") in SettingsTiers.ALWAYS_ON)
+        assertEquals(key, Tier.HIDDEN, SettingsTiers.tier(key))
+        for (desktop in listOf(true, false)) {
+          assertFalse("$key ($lang)", SettingsLayout.visible(key, desktop, SettingsLayout.SERVER_GATED, features))
+        }
       }
-      assertEquals(Tier.MAIN, deskLegacyTier(Str.appLock))
-      assertEquals(Tier.MAIN, deskLegacyTier(Str.appearance))
-      assertEquals(Tier.ADVANCED, deskLegacyTier(Str.alerts))
-      assertEquals(Tier.ADVANCED, deskLegacyTier(Str.signedInDevices))
-      assertEquals(Tier.ADVANCED, deskLegacyTier(ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE))
-      assertEquals(Tier.ADVANCED, deskLegacyTier(ir.vil3ntec.tohid.core.i18n.StrSale.checkoutRulesTitle))
-      assertEquals(Tier.MAIN, deskLegacyTier("بخشی که نیست"))
-      assertFalse(SettingsTiers.hiddenTitle("بخشی که نیست"))
+      assertEquals("", SettingsLayout.keyOf("بخشی که نیست", fallback = ""))
     }
   }
 

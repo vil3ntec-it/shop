@@ -150,7 +150,7 @@ fun DeskSaleScreen(
   var receiveBusy by remember { mutableStateOf(false) }
   var receiptOf by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
   var freeLine by remember { mutableStateOf(false) }
-  var editLine by remember { mutableStateOf<String?>(null) }; var unitNext by remember { mutableStateOf(false) } // S05: Ctrl+U ⇒ برگهٔ ردیف با واحدِ بعدی
+  var editLine by remember { mutableStateOf<String?>(null) }; var unitNext by remember { mutableStateOf(false) }; var rowDiscount by remember { mutableStateOf(false) } // POS-41: F5 // S05: Ctrl+U ⇒ برگهٔ ردیف با واحدِ بعدی
   val quick = ir.vil3ntec.tohid.ui.components.pos.rememberQuickTill() // S03 (`TillGoodsPref.quickRegister`، خاموش ⇒ null و راهِ پیشین)
   var lastInvoice by remember { mutableStateOf<Pair<ShopData, String>?>(null) }
   var showInvoice by remember { mutableStateOf(false) }
@@ -672,7 +672,7 @@ fun DeskSaleScreen(
           onEdit = { editLine = it },
           onMinus = { step(it, -1); refocus() },
           onPlus = { step(it, 1); refocus() },
-          rowHints = if (moreKeys) listOf(KeyMap.SALE_EDIT_ROW.hint, "${KeyMap.SALE_QTY_UP.hint} ${KeyMap.SALE_QTY_DOWN.hint}", KeyMap.SALE_DELETE_ROW.hint) else emptyList(),
+          rowHints = if (moreKeys) listOf(KeyMap.SALE_EDIT_ROW.hint, KeyMap.SALE_DISCOUNT_ROW.hint, "${KeyMap.SALE_QTY_UP.hint} ${KeyMap.SALE_QTY_DOWN.hint}", KeyMap.SALE_DELETE_ROW.hint) else emptyList(),
           //  PRM-18: هر تخفیفِ اعمال‌شده یک ردیف با نامش و کادرِ کد — تهِ همان فهرست،
           //  با اسکرولِ اقلام، تا جای ردیف‌های سبد را نگیرند
           footer = if (promoSnap.active) {
@@ -793,7 +793,12 @@ fun DeskSaleScreen(
           returnMode = true
           return@onPreviewKeyEvent true
         }
-        if (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e) != null) { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
+        when (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e)) {
+          ir.vil3ntec.tohid.core.pos.PosMoreKeys.Act.DISCOUNT_INVOICE -> { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
+          //  POS-41: F5 ⇒ برگهٔ ردیفِ انتخاب‌شده با فوکوس روی «تخفیفِ ردیف»؛ بی ردیف کلید مالِ صندوق نیست
+          ir.vil3ntec.tohid.core.pos.PosMoreKeys.Act.DISCOUNT_ROW -> selected?.let { rowDiscount = true; editLine = it; return@onPreviewKeyEvent true }
+          else -> Unit
+        }
         when (PosKeys.screen(keyName(e.key), e.isPrimaryModifier)) {
           PosAction.FINISH -> { if (payV2 && keyName(e.key) == KeyName.F9) { if (cart.isNotEmpty()) payOpen = true } else finish(); true }
           PosAction.CUSTOMER -> { pickDebtor = true; true }
@@ -912,7 +917,7 @@ fun DeskSaleScreen(
   }
   editLine?.let { id ->
     val line = cart.find { it.productId == id }
-    if (line == null) editLine = null else {
+    if (line == null) { editLine = null; rowDiscount = false } else {
       val p = d.products.find { it.id == id }
       val base = if (line.free) (line.unitPrice ?: 0.0) else (p?.salePrice ?: 0.0)
       CartLineDialog(
@@ -931,11 +936,12 @@ fun DeskSaleScreen(
         //  POS-22 (پشتِ `PriceWhyPrefs`، پیش‌فرض خاموش)
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
-        onDismiss = { editLine = null; unitNext = false; refocus() },
+        focusDiscount = rowDiscount,
+        onDismiss = { editLine = null; unitNext = false; rowDiscount = false; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)
           next = SalesEngine.setLinePrice(next, id, if (line.free) (price ?: line.unitPrice) else price)
-          cartStore.set(next); editLine = null; unitNext = false; refocus()
+          cartStore.set(next); editLine = null; unitNext = false; rowDiscount = false; refocus()
         },
       )
     }

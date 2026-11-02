@@ -6,9 +6,14 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
@@ -19,6 +24,7 @@ import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
+import ir.vil3ntec.tohid.ui.screens.WhatsNewAll
 import ir.vil3ntec.tohid.ui.screens.rememberUpdateRepo
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Divider
@@ -54,6 +60,14 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
       item(key = "update") {
         V3Section(StrNav.appUpdate, padding = PaddingValues(16.dp)) { UpdateCard(rememberUpdateRepo()) }
       }
+    }
+    //  OPS-05: «دیدنِ همهٔ تغییرها» (پنجرهٔ یک‌بارهٔ پس از به‌روزرسانی در پوسته، `WhatsNewOnUpdate`)
+    item(key = "whats-new") {
+      var all by remember { mutableStateOf(false) }
+      V3Section(StrSettings.whatsNew) {
+        V3ListRow(StrSettings.whatsNewAll, icon = Icons.Outlined.NewReleases, hue = V3Hue.BRAND, onClick = { all = true })
+      }
+      if (all) WhatsNewAll { all = false }
     }
     item(key = "status") {
       V3Section(StrNav.status) {

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.core.i18n.StrExpenses
+import ir.vil3ntec.tohid.core.purchase.ReorderCore
 
 /**
  *  مصارف، خرید و تأمین‌کننده‌ها.
@@ -100,7 +101,14 @@ object LedgerEngine {
     val phone: String = "",
     val address: String = "",
     val notes: String = "",
+    /** PUR-10 — زمانِ تأمینِ دستی (روز)؛ `null` ⇒ خالی (همان سنجیده از سفارش‌ها) */
+    val leadDays: Int? = null,
+    /** فرمی که این فیلد را دارد ⇒ true؛ فرمِ بی فیلد زمانِ پیشین را دست نمی‌زند */
+    val leadSet: Boolean = false,
   )
+
+  /** زمانِ دستیِ معتبر (۱ تا ۳۶۵) یا null */
+  private fun lead(draft: SupplierDraft): Int? = draft.leadDays?.takeIf { it in 1..ReorderCore.MAX_MANUAL_LEAD_DAYS }
 
   fun addSupplier(d: ShopData, draft: SupplierDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
@@ -115,6 +123,7 @@ object LedgerEngine {
           address = draft.address.trim(),
           notes = draft.notes.trim(),
           createdAt = now,
+          leadDays = lead(draft),
         )
       ),
       id = id,
@@ -133,6 +142,7 @@ object LedgerEngine {
             phone = ir.vil3ntec.tohid.LocaleText.phoneForSave(draft.phone),
             address = draft.address.trim(),
             notes = draft.notes.trim(),
+            leadDays = if (draft.leadSet) lead(draft) else it.leadDays,
           ) else it
         }
       ),

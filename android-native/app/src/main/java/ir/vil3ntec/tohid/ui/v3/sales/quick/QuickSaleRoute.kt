@@ -33,7 +33,7 @@ fun RouteScope.QuickSaleRoute() {
   LaunchedEffect(data.products.size, data.debtors.size) { cart.prune(data) }
   val index = remember(data.products) { ShopStore.barcodeIndex(data) }
   val feedback = remember(cart, toasts, snackbar, scope) {
-    CartFeedback(context, cart, toasts, snackbar, scope) { code -> nav.open(ProductsPaths.new(barcode = code)) }
+    CartFeedback(context, cart, toasts, snackbar, scope) { path -> nav.open(path) }
   }
   QuickSaleScreen(
     d = data,

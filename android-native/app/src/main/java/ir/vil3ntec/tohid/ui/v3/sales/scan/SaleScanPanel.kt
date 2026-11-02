@@ -50,7 +50,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 /**
  *  پایینِ برگهٔ اسکنِ صندوق: پاسخِ آخرین خواندن (قرصِ تیره با آیکنِ «خواند»/«نه» — هر پاسخِ
  *  تازه با فنرِ کوچک)، بارکدِ دستی و «هر اسکن ×۱ ×۲ ×۵ ×۱۰». همه همان کارهای قابِ اسکنِ
- *  صندوقِ پیشین؛ بارکدِ ناشناس ⇒ «ثبتِ کالا» همان‌جا.
+ *  صندوقِ پیشین؛ بارکدِ ناشناس ⇒ کارِ بعدی («ثبتِ کالا»، «ثبتِ سریع» یا «قلمِ آزاد») همان‌جا.
  */
 @Composable
 fun SaleScanPanel(
@@ -58,7 +58,8 @@ fun SaleScanPanel(
   multiplier: Int,
   onMultiplier: (Int) -> Unit,
   onManual: (String) -> Unit,
-  onRegister: (String) -> Unit,
+  /** کارِ پیام (بارکدِ ناشناس) — مسیرِ `CartNote.path` */
+  onAction: (String) -> Unit,
 ) {
   val c = PhoneV3.colors
   var manual by remember { mutableStateOf("") }
@@ -87,7 +88,9 @@ fun SaleScanPanel(
           )
           Spacer(Modifier.width(8.dp))
           Text(s.note.text, style = V3Type.subhead, color = c.onBlack, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-          s.note.register?.let { code -> V3Button(StrSale.registerItemAlt, { onRegister(code) }, kind = V3ButtonKind.SECONDARY, height = 36.dp) }
+          val path = s.note.path
+          val label = s.note.action
+          if (path != null && label != null) V3Button(label, { onAction(path) }, kind = V3ButtonKind.SECONDARY, height = 36.dp)
         }
       }
     }

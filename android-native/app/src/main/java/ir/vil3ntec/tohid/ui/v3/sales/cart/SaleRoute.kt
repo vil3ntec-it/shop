@@ -53,7 +53,7 @@ fun RouteScope.SaleRoute() {
   LaunchedEffect(data.products.size, data.debtors.size) { cart.prune(data) }
   val index = remember(data.products) { ShopStore.barcodeIndex(data) }
   val feedback = remember(cart, toasts, snackbar, scope) {
-    CartFeedback(context, cart, toasts, snackbar, scope) { code -> nav.open(ProductsPaths.new(barcode = code)) }
+    CartFeedback(context, cart, toasts, snackbar, scope) { path -> nav.open(path) }
   }
   //  POS-12: چند فاکتورِ هم‌زمان (تنظیمِ «چند فاکتورِ هم‌زمان»، پیش‌فرض خاموش) — جابه‌جایی ⇒ تسویهٔ
   //  نیمه‌کاره مالِ فاکتورِ قبلی بود و از نو آغاز می‌شود

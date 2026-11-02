@@ -68,7 +68,7 @@ import ir.vil3ntec.tohid.ui.v3.stock.rememberCsvExport
 /*
  *  تنظیم‌های پول و صندوق که فقط در رابطِ امروز بودند (`GiftCardSettingsWired`، `LayawaySettingsWired`،
  *  `SafeBookSettingsWired`، `CustomerCardSettingsWired`، `LoyaltySettingsWired`، `TaxQuarterSettingsWired` در
- *  `ui/legacy/SettingsLegacy.kt`) — همان کلید، همان پیش‌فرضِ خاموش، همان نوشتن و همان سنجش (`SettingsPortTest`)؛
+ *  رابطِ قدیمِ پاک‌شده) — همان کلید، همان پیش‌فرضِ خاموش، همان نوشتن و همان سنجش (`SettingsPortTest`)؛
  *  فقط رویِ کیت (`ToggleScreen`، `V3TextField`). همه فقط همین دستگاه.
  */
 

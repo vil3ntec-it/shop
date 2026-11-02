@@ -953,6 +953,8 @@ fun CartLineDialog(
   units: ir.vil3ntec.tohid.data.UnitLine.Plan? = null,
   /** S45 — «درخواستِ تأیید» برای ردِ قاعدهٔ جهت یا سقفِ قلمِ آزاد (`PriceApproval`)؛ `null` ⇒ همان پیامِ رد */
   priceAsk: ir.vil3ntec.tohid.data.PriceAsk? = null,
+  /** POS-41 — F5 («تخفیفِ ردیف»): فوکوس روی کادرِ تخفیفِ ردیف وقتی سیاست آن را نشان می‌دهد */
+  focusDiscount: Boolean = false,
 ) {
   val policy = linePolicy
   var grant by remember { mutableStateOf<ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?>(null) }
@@ -1090,6 +1092,7 @@ fun CartLineDialog(
         ir.vil3ntec.tohid.ui.components.pos.LineDiscountPanel(
           show = edit.canDiscount, percent = discountPercent, text = discountText, problem = edit.problem,
           onPercent = { discountPercent = it }, onText = { discountText = it },
+          focus = if (focusDiscount) remember { androidx.compose.ui.focus.FocusRequester() } else null,
         )
         if (askCode != null) TextButton(onClick = { asking = true }) { Text(ir.vil3ntec.tohid.core.i18n.StrTill.askApproval) }
         granted?.let { Text(ir.vil3ntec.tohid.core.i18n.StrTill.approvedBy(it.by), style = MaterialTheme.typography.labelSmall, color = Shop.colors.success) }

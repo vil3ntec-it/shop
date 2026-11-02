@@ -15,15 +15,18 @@ import ir.vil3ntec.tohid.ui.v3.V3Toasts
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 
-/** پاسخِ کوتاهِ سبد به یک کار — متن، رنگِ پیام و (بارکدِ ناشناس) «ثبتِ کالا» با همان کد */
-data class CartNote(val text: String, val tone: V3Tone, val register: String? = null)
+/**
+ *  پاسخِ کوتاهِ سبد به یک کار — متن، رنگِ پیام و (بارکدِ ناشناس) کارِ بعدی با همان کد: برچسبِ دکمه و مسیرش
+ *  («ثبتِ کالا»، «ثبتِ سریع» یا «قلمِ آزاد» — `QuickTillModel`)
+ */
+data class CartNote(val text: String, val tone: V3Tone, val action: String? = null, val path: String? = null)
 
 /**
  *  پاسخِ سبد به کارهای فروشنده — صدا، لرزش و پیامِ کوتاهِ همان امروز، یک‌جا برای صندوق و
  *  فروشِ سریع (نه دو نسخه). سبد فقط از `CartModel` عوض می‌شود. پیام را صدازننده نشان
  *  می‌دهد: پیامِ کوتاهِ پوسته (`show`) یا خطِ پایینِ برگهٔ اسکن.
  *
- *  @param register «ثبتِ کالا» با همین بارکد (`products/new?barcode=`)
+ *  @param open بازکردنِ مسیرِ کارِ پیام (بارکدِ ناشناس ⇒ `QuickTillModel.path`)
  */
 class CartFeedback(
   private val context: Context,
@@ -31,7 +34,7 @@ class CartFeedback(
   private val toasts: V3Toasts,
   private val snackbar: SnackbarHostState,
   private val scope: CoroutineScope,
-  private val register: (String) -> Unit,
+  private val open: (String) -> Unit,
 ) {
 
   /** زدنِ کاشی: یک پله، با نگهبانِ موجودی؛ «تمام شد» لرزش و پیامِ موتور */
@@ -89,18 +92,20 @@ class CartFeedback(
           return CartNote(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.picked(c.name), V3Tone.SUCCESS)
         }
         ScanFeedback.unknown(context)
-        CartNote(StrSale.unknownBarcode, V3Tone.WARNING, register = s.code)
+        //  S03 (POS-17): «ثبتِ سریع» در خودِ صندوق، «قلمِ آزاد» یا «ثبتِ کالا» — همان قاعدهٔ صندوقِ کامپیوتر
+        QuickTillModel.unknown(s.code, ir.vil3ntec.tohid.ui.components.pos.quickNext(context))
       }
     }
   }
 
-  /** پیام در میزبانِ پیامِ پوسته؛ بارکدِ ناشناس با کارِ «ثبتِ کالا» */
+  /** پیام در میزبانِ پیامِ پوسته؛ بارکدِ ناشناس با دکمهٔ کارِ بعدی */
   fun show(note: CartNote) {
-    val code = note.register
-    if (code == null) { toasts.show(note.text, note.tone); return }
+    val path = note.path
+    val label = note.action
+    if (path == null || label == null) { toasts.show(note.text, note.tone); return }
     scope.launch {
-      val answer = snackbar.showSnackbar(V3SnackVisuals(note.text, note.tone, actionLabel = StrSale.registerItemAlt))
-      if (answer == SnackbarResult.ActionPerformed) register(code)
+      val answer = snackbar.showSnackbar(V3SnackVisuals(note.text, note.tone, actionLabel = label))
+      if (answer == SnackbarResult.ActionPerformed) open(path)
     }
   }
 
@@ -108,7 +113,4 @@ class CartFeedback(
     ScanFeedback.unknown(context)
     toasts.show(CartStore.NOT_ADDED, V3Tone.WARNING)
   }
-
-  /** «ثبتِ کالا» ِ بارکدِ ناشناس از برگهٔ اسکن */
-  fun registerCode(code: String) = register(code)
 }

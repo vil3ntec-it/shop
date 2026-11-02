@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.keymap
 
+import ir.vil3ntec.tohid.ui.AppLockKey
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -14,9 +15,10 @@ import java.io.File
  *  و سابقه‌ها به نامِ کاربرِ درست ثبت می‌شوند.»
  *
  *  سنجیده: سطرِ نخست — Ctrl+L در keymap.json کارِ سراسریِ «قفلِ صندوق» است، کلیدِ دیگری نیست، برنامهٔ کامپیوتر
- *  آن را به `AppNav.lock()` می‌دهد و هر دو `AppRoot` (امروز و نسخهٔ ۳) با تنظیمِ «تعویضِ کاربر روی صندوق»
- *  (`TillUser`، پیش‌فرض خاموش) صفحهٔ قفلِ PIN ِ شخصی (`TillLockScreen`) را می‌اندازند، وگرنه همان قفلِ امروز
- *  (از متنِ منبع، چون AppNav وضعیتِ Compose دارد — همان روشِ DeskMenuTest). نقشِ برنامه از `TillUser.role` است
+ *  آن را به `AppNav.lock()` می‌دهد و پوستهٔ نسخهٔ ۳ (`AppRoot`) با تنظیمِ «تعویضِ کاربر روی صندوق»
+ *  (`TillUser`، پیش‌فرض خاموش) صفحهٔ قفلِ PIN ِ شخصی (`TillLockScreen`) را می‌اندازد، وگرنه با رمزِ برنامه قفلِ
+ *  برنامه (`AppLockScreen`) و بی آن فقط راهش (`AppLockKey`) — از متنِ منبع، چون AppNav وضعیتِ Compose دارد
+ *  (همان روشِ DeskMenuTest). نقشِ برنامه از `TillUser.role` است
  *  (هرگز بالاتر از حسابِ دستگاه) و فروشنده و درخواست‌کنندهٔ تأیید از `TillUser.me`/`meId`.
  *  رفتار روی دیسکِ واقعی (PIN با `ApproverVault`، سبدِ جدای هر کاربر، سابقه به نامِ درست، نقش):
  *  `desktop/…/ScenarioS46DesktopTest`؛ قاعده‌ها: core ‏`TillSwitchTest`.
@@ -49,14 +51,30 @@ class ScenarioS46Test {
     val nav = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppNav.kt", "src/main/java/ir/vil3ntec/tohid/ui/AppNav.kt")
     assertNotNull(nav)
     assertTrue(nav!!.readText().contains("fun lock() { lockNow.intValue++ }"))
-    val root = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt", "src/main/java/ir/vil3ntec/tohid/ui/legacy/AppRootLegacy.kt")
-    assertNotNull(root)
-    val text = root!!.readText()
-    //  هر بالا رفتنِ lockNow ⇒ نخست قفلِ PIN ِ شخصی (تنظیمِ روشن و راهِ برگشت)، وگرنه رمزِ برنامه همان دم
-    assertTrue(Regex("""LaunchedEffect\(lockAsk\)[\s\S]{0,400}TillUser\.lock\(context, lockStore\.enabled\)\) return@LaunchedEffect\s+if \(lockStore\.enabled\) unlocked = false""").containsMatchIn(text))
-    assertTrue(Regex("""if \(ir\.vil3ntec\.tohid\.data\.TillUser\.locked\.value\) \{\s+ir\.vil3ntec\.tohid\.ui\.components\.staff\.TillLockScreen\(cartStore, store, lockStore\.enabled\)""").containsMatchIn(text))
+    //  هر بالا رفتنِ lockNow (یک بار، نه با هر ساختِ دوباره) ⇒ نخست قفلِ PIN ِ شخصی (`TillUser`) و صفحهٔ قفلِ صندوق؛
+    //  آن خاموش یا بی راهِ برگشت ⇒ قفلِ برنامه با رمزِ برنامه، وگرنه فقط راهش (`AppLockKey`، #851) — پوستهٔ نسخهٔ ۳
+    //  (رابطِ قدیم ۱۴۰۵/۰۸/۱۱ پاک شد)
     val v3 = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt", "src/main/java/ir/vil3ntec/tohid/ui/AppRoot.kt")!!.readText()
-    assertTrue(v3.contains("TillUser.lock(context, lockStore.enabled)") && v3.contains("TillLockScreen(cartStore, store, lockStore.enabled)"))
+    assertTrue("lockAsk از AppNav.lockNow نیست", v3.contains("val lockAsk by AppNav.lockNow"))
+    assertTrue(v3.contains("var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }"))
+    assertTrue(
+      "Ctrl+L در AppRoot به TillUser.lock و AppLockKey نمی‌رسد",
+      Regex(
+        """LaunchedEffect\(lockAsk\) \{\s*if \(lockAsk == lockSeen\) return@LaunchedEffect\s*lockSeen = lockAsk\s*""" +
+          """when \(AppLockKey\.after\(ir\.vil3ntec\.tohid\.data\.TillUser\.lock\(context, lockStore\.enabled\), lockStore\.enabled\)\) \{\s*""" +
+          """AppLockKey\.Then\.TILL -> Unit\s*""" +
+          """AppLockKey\.Then\.APP -> unlocked = false\s*""" +
+          """AppLockKey\.Then\.HINT -> toasts\.show\(ir\.vil3ntec\.tohid\.core\.i18n\.StrTill\.lockNeedsPassword"""
+      ).containsMatchIn(v3)
+    )
+    assertTrue(v3.contains("val locked = lockStore.enabled && !unlocked"))
+    assertTrue(v3.contains("if (locked) { AppLockScreen { unlocked = true }; return }"))
+    assertTrue(v3.contains("if (tillLocked) { ir.vil3ntec.tohid.ui.components.staff.TillLockScreen(cartStore, store, lockStore.enabled); return }"))
+    //  قاعدهٔ همان `when`: قفلِ صندوق بر قفلِ برنامه پیش است و بی هیچ‌کدام قفلی وانمود نمی‌شود
+    assertEquals(AppLockKey.Then.TILL, AppLockKey.after(tillLocked = true, appLock = true))
+    assertEquals(AppLockKey.Then.TILL, AppLockKey.after(tillLocked = true, appLock = false))
+    assertEquals(AppLockKey.Then.APP, AppLockKey.after(tillLocked = false, appLock = true))
+    assertEquals(AppLockKey.Then.HINT, AppLockKey.after(tillLocked = false, appLock = false))
   }
 
   @Test

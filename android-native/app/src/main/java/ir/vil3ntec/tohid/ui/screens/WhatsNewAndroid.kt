@@ -24,7 +24,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 /**
  *  OPS-05 — مرزِ پلتفرمِ «چه چیزی تازه است» (خواندن و نوشتنِ `WhatsNewPref`، نسخهٔ `BuildConfig`).
  *
- *  [WhatsNewOnUpdate] در `AppRoot`: فقط با کلیدِ روشن؛ نخستین اجرا نسخهٔ نصب‌شده را «دیده‌شده» می‌گذارد و
+ *  [WhatsNewOnUpdate] در پوستهٔ نسخهٔ ۳ (`AppRoot`) و رابطِ قدیم: با کلیدِ روشن (پیش‌فرض)؛ نخستین اجرا نسخهٔ نصب‌شده را «دیده‌شده» می‌گذارد و
  *  هیچ نشان نمی‌دهد؛ پس از به‌روزرسانی یادداشت‌های نسخه‌های تازه یک بار، و «فهمیدم» (یا بستن) ⇒ دیده‌شده.
  *  خاموش ⇒ هیچ خواندن و نوشتنی.
  */
@@ -47,7 +47,7 @@ fun WhatsNewOnUpdate() {
   }
 }
 
-/** بخشِ «دربارهٔ برنامه»: کلیدِ نمایش (پیش‌فرض خاموش) و، با کلیدِ روشن، «دیدنِ همهٔ تغییرها» */
+/** بخشِ «دربارهٔ برنامه» ِ رابطِ قدیم: کلیدِ نمایش (پیش‌فرض روشن) و، با کلیدِ روشن، «دیدنِ همهٔ تغییرها» (نسخهٔ ۳: [WhatsNewAll]) */
 @Composable
 fun WhatsNewSettingsRows() {
   val context = LocalContext.current
@@ -78,4 +78,10 @@ fun WhatsNewSettingsRows() {
     )
   }
   if (all) WhatsNewDialog(WhatsNew.history(WhatsNew.ALL, BuildConfig.VERSION_NAME)) { all = false }
+}
+
+/** «دیدنِ همهٔ تغییرها» تا همین نسخه — «دربارهٔ برنامه» ِ نسخهٔ ۳ (گوشی و کامپیوتر)؛ فقط خواندن، بی نوشتن */
+@Composable
+fun WhatsNewAll(onClose: () -> Unit) {
+  WhatsNewDialog(WhatsNew.history(WhatsNew.ALL, BuildConfig.VERSION_NAME), onClose)
 }

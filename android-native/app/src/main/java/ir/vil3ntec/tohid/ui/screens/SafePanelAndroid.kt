@@ -310,7 +310,7 @@ private fun SafeHistoryLine(line: SafeCore.Line) {
   if (line.late) StatusPill(StrSafe.late, PillTone.WARNING)
 }
 
-/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در `SettingsLegacy` کنارِ تنظیم‌های صندوق */
+/** بخشِ تنظیمات (همین دستگاه، پیش‌فرض خاموش) — یک خط در تنظیماتِ نسخهٔ ۳ (`Settings.kt`) */
 @Composable
 fun SafeBookSettingsWired(context: android.content.Context) {
   var on by remember { mutableStateOf(SafeBookPref.on(context)) }

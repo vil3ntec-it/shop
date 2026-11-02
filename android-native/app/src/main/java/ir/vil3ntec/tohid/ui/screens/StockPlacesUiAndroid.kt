@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  *  (`StockPlacesPref.record`). هر پنجره یک کلید دارد که پس از هر ثبتِ موفق تازه می‌شود ⇒ دو ضربه یک ثبت.
  */
 
-/** بخشِ «محل‌ها و بسته‌بندیِ دوباره» با خواندن و نوشتنِ `StockPlacesPref` — تا `SettingsLegacy` یک خط بخواهد */
+/** بخشِ «محل‌ها و بسته‌بندیِ دوباره» با خواندن و نوشتنِ `StockPlacesPref` — تا تنظیمات یک خط بخواهد */
 @Composable
 fun StockPlacesSettingsWired(context: android.content.Context) {
   var places by remember { mutableStateOf(StockPlacesPref.places(context)) }

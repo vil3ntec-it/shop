@@ -50,7 +50,7 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
- *  PRM-13 — امتیازِ وفاداری در صندوقِ گوشی و کامپیوتر (`SaleLegacy`، `Sale`، `QuickSale`، `DeskSale`)، پروندهٔ مشتری
+ *  PRM-13 — امتیازِ وفاداری در صندوقِ گوشی و کامپیوتر (`Sale`، `QuickSale`، `DeskSale`)، پروندهٔ مشتری
  *  (با اصلاحِ دستیِ صاحب/مدیر) و تنظیمات. فقط با قاعدهٔ در کار (`LoyaltyPref.effective`: قاعدهٔ یکسانِ دکان یا همین
  *  دستگاه؛ پیش‌فرض خاموش ⇒ [rememberLoyaltyTill] `null`، سبد و ثبت همان امروز). قاعده‌ها در هستهٔ `core/promo/Loyalty`
  *  و `data/LoyaltyPoints`؛ این‌جا فقط نمایش و انتخابِ «چند امتیاز».
