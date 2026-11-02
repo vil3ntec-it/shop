@@ -334,6 +334,11 @@ object SalesEngine {
      *  (تحویلِ سفارش، `OrderFulfillment`) هرگز توکنِ تصادفی نمی‌گیرد.
      */
     receiptToken: String? = null,
+    /**
+     *  POS-27 — سندِ امانی‌ای که همین فروش تحویلش می‌دهد (`Layaways.deliver`): کالای کنارگذاشتهٔ همان سند مانعِ همین
+     *  فروش نیست. `null` ⇒ همهٔ کنارگذاشته‌ها از موجودیِ فروختنی کم‌اند (تنظیمِ خاموش ⇒ هیچ).
+     */
+    ownReservation: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
@@ -344,7 +349,7 @@ object SalesEngine {
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
       (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
-      var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
+      var available = ProductInfoMap.sellable(d, p.id, ownReservation) // PRD-09: کالای خدماتی موجودی نمی‌خواهد؛ POS-27: منهای کنارگذاشتهٔ امانی
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
       //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
       if (checkout.blockExpired) {
@@ -356,7 +361,10 @@ object SalesEngine {
           )
         }
       }
-      if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
+      if (line.quantity > available) {
+        val held = Layaways.reserved(d, p.id, ownReservation)
+        return Result.Failed(if (held > 0) Layaways.heldMessage(p, line.quantity, available, held) else shortageMessage(p, line.quantity, available))
+      }
     }
 
     /*
@@ -386,8 +394,10 @@ object SalesEngine {
 
     val t = totals(d, cart, checkout)
 
+    //  PAY-24: ردیفِ کارتِ هدیه/اعتبارِ فروشگاه «تأییدشده با دفتر» است؛ تسویهٔ بی آن همان شیء
+    val stl = checkout.settlement?.let(ir.vil3ntec.tohid.core.pay.StoredPay::confirm)
     //  PAY (v3 A4): با پرچم، پرداخت از تسویهٔ هسته می‌آید — همان مبلغِ همین فاکتور، بی ناتمام
-    val settled = checkout.settlement?.let { st ->
+    val settled = stl?.let { st ->
       if (st.total != PayFlow.minor(t.finalTotal)) return Result.Failed(PayFlow.message(PayFlow.Problem("TOTAL_MISMATCH")))
       if (st.status == "short") return Result.Failed(PayFlow.message(PayFlow.Problem("SHORT", remaining = st.remaining)))
       PayFlow.saleFields(st)
@@ -434,7 +444,7 @@ object SalesEngine {
     //  با تأیید، ردِ `credit_over_limit` با نامِ تأییدکننده و دلیل کنارِ فروش
     var creditOk: Pair<CreditGate.Over, CreditGate.Approval>? = null
     if (checkout.creditGate && onCredit && debtorId != null) {
-      val over = creditOverOf(d, debtorId, remaining)
+      val over = creditOverOf(d, debtorId, remaining + storedCredit(stl))
       when (CreditGate.state(over, debtorId, checkout.creditApproval)) {
         CreditGate.State.FREE -> Unit
         CreditGate.State.NEEDS_APPROVAL -> return Result.Failed(creditOverText(over!!) + " — " + CREDIT_NEEDS_APPROVAL)
@@ -473,6 +483,14 @@ object SalesEngine {
       receiptToken = receiptToken,
       note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(checkout.note),
     )
+
+    //  PAY-24: خرج از کارتِ هدیه و اعتبارِ فروشگاه روی همین دفتر و در همین ثبت (همه یا هیچ؛ شناسه از همین فاکتور)؛
+    //  تسویهٔ بی کارت/اعتبار ⇒ هیچ ردیف
+    val stored = when (val g = stl?.let { GiftCards.forSale(d, it, saleId, debtorId, sale.invoiceLabel() ?: "0", today, now, checkout.seller.trim().ifEmpty { null }) }) {
+      null -> GiftCards.Rows()
+      is GiftCards.Out.Bad -> return Result.Failed(g.message)
+      is GiftCards.Out.Ok -> g.rows
+    }
 
     val items = mutableListOf<SaleItem>()
     val movements = mutableListOf<StockMovement>()
@@ -546,6 +564,7 @@ object SalesEngine {
         kind = SALE_CREDIT,
       )
     }
+    transactions += stored.transactions
 
     val audit = d.auditLog + AuditEntry(
       id = newId(),
@@ -571,7 +590,7 @@ object SalesEngine {
           reason = ok.reason.trim(),
         )
       },
-    )
+    ) + stored.audit
 
     return Result.Ok(
       d.copy(
@@ -586,6 +605,10 @@ object SalesEngine {
       saleId = saleId,
     )
   }
+
+  /** PAY-24 — اعتبارِ فروشگاهِ این تسویه (افغانی): طلبی که خرج می‌شود ماندهٔ مشتری را بالا می‌برد، پس در سقف هم هست */
+  private fun storedCredit(st: ir.vil3ntec.tohid.core.pay.Settlement?): Double =
+    st?.let { PayFlow.major(ir.vil3ntec.tohid.core.pay.StoredPay.creditMinor(it)) } ?: 0.0
 
   /* ========================= سقفِ اعتبار در صندوق (CRM-03) ========================= */
 
@@ -619,7 +642,7 @@ object SalesEngine {
     if (paidRaw.isNaN() || paidRaw < 0) return null
     val remaining = max(0.0, finalTotal - min(paidRaw, finalTotal))
     if (remaining <= 0) return null
-    return creditOverOf(d, debtorId, remaining)
+    return creditOverOf(d, debtorId, remaining + storedCredit(checkout.settlement))
   }
 
   /* ========================= لغو فروش و مرجوعی ========================= */
@@ -674,6 +697,13 @@ object SalesEngine {
       }
     }
 
+    //  PAY-24: کارت و اعتبارِ خرج‌شدهٔ این فاکتور (منهای آنچه با برگشت پس رفت) برمی‌گردد؛ فاکتورِ بی آن‌ها ⇒ هیچ
+    val stored = when (val g = GiftCards.forCancel(d, sale, "لغوِ فاکتور #${sale.invoiceLabel() ?: "0"}", today, now, by)) {
+      is GiftCards.Out.Bad -> return Result.Failed(g.message)
+      is GiftCards.Out.Ok -> g.rows
+    }
+    transactions += stored.transactions
+
     //  جنسِ برگشته در دفترِ گردشِ انبار هم دیده شود — پیش‌تر موجودی برمی‌گشت
     //  (فروشِ لغوشده شمرده نمی‌شود) ولی گردش هیچ ردیفی نداشت و با موجودی نمی‌خواند
     val back = d.saleItems
@@ -699,7 +729,7 @@ object SalesEngine {
           notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
           createdAt = now,
           by = by,
-        ),
+        ) + stored.audit,
       ),
       invoiceNumber = sale.invoiceNumber ?: 0,
       saleId = saleId,

@@ -132,7 +132,7 @@ fun AppRootLegacy(
 ) {
   val context = LocalContext.current
   //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش) پیش از نخستین صفحه
-  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }
+  remember(context) { ir.vil3ntec.tohid.data.StockFlag.load(context) }; remember(context) { ir.vil3ntec.tohid.data.LayawayPref.load(context) } // POS-27: کنار گذاشتنِ کالای امانی فقط با تنظیمِ همین دستگاه
   val scope = rememberCoroutineScope()
   val data by store.data.collectAsState()
   val loaded by store.loaded.collectAsState()
@@ -861,6 +861,7 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrPos.quoteSettingsTitle to androidx.compose.material.icons.Icons.Filled.Description, ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2, // POS-26
                 ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.LocalOffer,
                 ir.vil3ntec.tohid.core.i18n.StrPayFix.settingsTitle to androidx.compose.material.icons.Icons.Filled.SwapHoriz,
+                ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrLayaway.settingsTitle to androidx.compose.material.icons.Icons.Filled.Schedule, // PAY-24، POS-27
                 Str.appLock to androidx.compose.material.icons.Icons.Filled.Lock,
                 ir.vil3ntec.tohid.ui.screens.SECURITY_SECTION_TITLE to androidx.compose.material.icons.Icons.Filled.Security,
                 Str.changeAccountPassword to androidx.compose.material.icons.Icons.Filled.Password,

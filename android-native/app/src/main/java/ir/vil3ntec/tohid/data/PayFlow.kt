@@ -17,6 +17,7 @@ import ir.vil3ntec.tohid.core.pay.ShiftEventInput
 import ir.vil3ntec.tohid.core.pay.ShiftReport
 import ir.vil3ntec.tohid.core.pay.ShiftRow
 import ir.vil3ntec.tohid.core.pay.ShiftSlip
+import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.pay.Tender
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -75,8 +76,11 @@ object PayFlow {
 
   fun methodName(id: String): String = method(id)?.name ?: id
 
-  /** روش‌های ردیفِ پنل: روشن و غیرنقد (کیف پول، کارت، حواله) */
-  fun panelMethods(): List<PayMethod> = Pay.DEFAULT_METHODS.filter { it.enabled && it.kind != CASH }
+  /**
+   *  روش‌های ردیفِ پنل: روشن و غیرنقد (کیف پول، کارت، حواله). [stored] (PAY-24، `GiftCardPref`) ⇒ کارتِ هدیه و اعتبارِ
+   *  فروشگاه هم؛ پیش‌فرض خاموش ⇒ همان فهرستِ امروز.
+   */
+  fun panelMethods(stored: Boolean = false): List<PayMethod> = StoredPay.methods(stored).filter { it.enabled && it.kind != CASH }
 
   // ── خطا و پیام ─────────────────────────────────────────
   data class Problem(
@@ -106,6 +110,8 @@ object PayFlow {
       "SHIFT_OPEN_ALREADY" -> "صندوق از قبل باز است"
       "INVALID_TIME" -> "ساعتِ این دستگاه از زمانِ باز شدنِ صندوق عقب‌تر است"
       "BAD_DENOMINATION", "INVALID_COUNT" -> "شمارِ اسکناس درست نیست"
+      //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه (فقط با تنظیم)
+      "BAD_CODE", "UNKNOWN_CARD", "CARD_VOID", "INSUFFICIENT_BALANCE", "NO_CUSTOMER", "INSUFFICIENT_CREDIT" -> GiftCards.message(p.code)
       else -> "مبلغ درست نیست"
     }
   }
@@ -121,6 +127,8 @@ object PayFlow {
     val cash: String = "",
     val rows: List<DraftRow> = emptyList(),
     val customerId: String? = null,
+    /** PAY-24 — کارتِ هدیه و اعتبارِ فروشگاه روشن (`GiftCardPref`)؛ `false` ⇒ همان جدولِ امروز (هر دو خاموش) */
+    val stored: Boolean = false,
   )
 
   sealed interface Outcome<out T> {
@@ -150,17 +158,23 @@ object PayFlow {
         if (ref.isEmpty()) return@forEachIndexed
         return Outcome.Bad(Problem("INVALID_AMOUNT", i, r.method))
       }
-      tenders += Tender(r.method, minor(a), ref = ref.ifEmpty { null })
+      //  PAY-24: کدِ کارت یک‌دست (فاصله، خط‌تیره، رقمِ فارسی)؛ اعتبار فقط با مشتری
+      val kind = if (d.stored) method(r.method)?.kind else null
+      val code = if (kind == StoredPay.GIFT) ir.vil3ntec.tohid.core.pay.GiftCard.normalize(ref) ?: return Outcome.Bad(Problem("BAD_CODE", i, r.method)) else ref
+      if (kind == StoredPay.CREDIT && d.customerId.isNullOrBlank()) return Outcome.Bad(Problem("NO_CUSTOMER", i, r.method))
+      tenders += Tender(r.method, minor(a), ref = code.ifEmpty { null })
       at += i
     }
-    return Outcome.Ok(Built(SettleInput(total = minor(d.total), tenders = tenders, customerId = d.customerId?.trim()?.ifEmpty { null }), at))
+    val methods = if (d.stored) StoredPay.methods(true) else null
+    return Outcome.Ok(Built(SettleInput(total = minor(d.total), tenders = tenders, customerId = d.customerId?.trim()?.ifEmpty { null }, methods = methods), at))
   }
 
   /** پیش‌نمایشِ زنده: همان `settle`ِ هسته؛ خطا با شمارهٔ ردیف و روش */
   fun preview(d: Draft): Outcome<Settlement> {
     val b = when (val x = input(d, true)) { is Outcome.Ok -> x.value; is Outcome.Bad -> return x }
     return when (val s = Pay.settle(b.input)) {
-      is PayResult.Ok -> Outcome.Ok(s.value)
+      //  PAY-24: ردیفِ کارت/اعتبار «تأییدشده با دفتر» است (`StoredPay.confirm`)؛ تسویهٔ بی آن همان شیء
+      is PayResult.Ok -> Outcome.Ok(StoredPay.confirm(s.value))
       is PayResult.Err -> {
         val i = s.index?.takeIf { it >= 0 }?.let { b.at[it] } ?: -1
         Outcome.Bad(Problem(s.code, i, if (i >= 0) d.rows[i].method else null))
@@ -307,7 +321,8 @@ object PayFlow {
     val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return buildList {
       list.filter { it.amountMinor > 0 }.forEach { p ->
-        add(rowName(p) + pendingNote(p) + (p.ref?.let { " — $it" } ?: "") to major(p.amountMinor))
+        //  PAY-24: کدِ کارتِ هدیه خودش پول است ⇒ روی رسید فقط چهار نویسهٔ آخر
+        add(rowName(p) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
       }
       s.tenderedMinor?.takeIf { it > 0 }?.let { add("دریافتی" to major(it)) }
       s.changeMinor?.takeIf { it > 0 }?.let { add("پولِ پس" to major(it)) }
@@ -366,6 +381,10 @@ object PayFlow {
       if (t.type != "receive" || !CashShift.isCashReceipt(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
     }
+    //  PAY-24: فروشِ کارتِ هدیه نقد به دخل می‌آورد — همان `CashShift.totals`
+    GiftCards.issueRows(d, from, to).forEach { a ->
+      ev += 0 to ShiftEventInput(id = "gci:${a.id}", type = "receipt", at = a.createdAt, method = CASH, amount = minor(a.amount))
+    }
     d.auditLog.forEach { a ->
       if (a.type !in AUDIT_TYPES || a.refId != open.id) return@forEach
       val by = a.by?.ifEmpty { null }
@@ -392,8 +411,9 @@ object PayFlow {
     }
     //  POS-26: بازپرداختِ نقدِ پیش‌پرداختِ سفارشِ ویژهٔ لغوشده — همان «پولِ پس» ِ `CashShift.totals`
     d.transactions.forEach { t ->
-      if (!SpecialOrders.isRefund(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
-      ev += 2 to ShiftEventInput(id = "sor:${t.id}", type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
+      if (!(SpecialOrders.isRefund(t) || Layaways.isRefund(t)) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
+      //  POS-27: بازپرداختِ نقدِ امانیِ لغوشده هم همین «پولِ پس» است (`Layaways.REFUND`)
+      ev += 2 to ShiftEventInput(id = (if (Layaways.isRefund(t)) "lyr:" else "sor:") + t.id, type = "refund", at = t.createdAt, rows = listOf(ShiftRow(CASH, minor(t.amount))))
     }
     fun out(id: String, at: Long, amount: Double, reason: String, note: String?) {
       if (!inWindow(at) || minor(amount) <= 0) return

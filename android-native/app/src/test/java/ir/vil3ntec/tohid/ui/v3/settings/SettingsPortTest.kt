@@ -180,6 +180,8 @@ class SettingsPortTest {
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
+      "GiftCardPref.set" to "$PENDING — کارتِ هدیه و اعتبارِ فروشگاه، PAY-24",
+      "LayawayPref.set" to "$PENDING — فروشِ امانی و قسطی، POS-27",
     )
   }
 }
