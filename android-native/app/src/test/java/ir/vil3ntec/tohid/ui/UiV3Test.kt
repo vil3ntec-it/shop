@@ -16,21 +16,22 @@ import org.junit.Test
 class UiV3Test {
 
   @Test
-  fun `پیش‌فرض خاموش است — فقط نسخهٔ پیش‌نمایش بی انتخاب روشن است`() {
-    assertFalse(UiV3.resolve(stored = null, preview = false))
-    assertTrue(UiV3.resolve(stored = null, preview = true))
+  fun `رابطِ تازه همیشه روشن است — هر انتخابِ کهنه و هر ساخت`() {
+    //  تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۱۱: «شکلِ قدیم هرگز نیاید»
+    for (stored in listOf(null, true, false)) for (preview in listOf(true, false)) {
+      assertTrue(UiV3.resolve(stored = stored, preview = preview))
+    }
+    assertTrue(UiV3.on)
   }
 
   @Test
-  fun `انتخابِ ذخیره‌شدهٔ دستگاه بر پیش‌فرض جلو می‌افتد`() {
-    assertTrue(UiV3.resolve(stored = true, preview = false))
-    assertFalse(UiV3.resolve(stored = false, preview = true))
-  }
-
-  @Test
-  fun `ساختِ معمولی (نه پیش‌نمایش) با پرچمِ خاموش بالا می‌آید`() {
-    //  BuildConfig.PREVIEW ِ آزمون‌ها false است ⇒ مقدارِ آغازینِ پیش از `load` خاموش
-    assertFalse(UiV3.on)
+  fun `هیچ تنظیمی کلیدِ رابطِ تازه را ندارد`() {
+    val root = generateSequence(java.io.File("").absoluteFile) { it.parentFile }.first { java.io.File(it, "android-native").isDirectory }
+    val main = java.io.File(root, "android-native/app/src/main/java")
+    val hits = main.walkTopDown().filter { it.isFile && it.name.endsWith(".kt") }
+      .filter { f -> f.readText().let { it.contains("UiV3.set(") || it.contains("item(key = \"ui-v3\")") } }
+      .map { it.relativeTo(main).path }.toList()
+    assertEquals(emptyList<String>(), hits)
   }
 
   @Test

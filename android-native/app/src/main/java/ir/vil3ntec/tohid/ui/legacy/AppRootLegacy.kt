@@ -883,7 +883,6 @@ fun AppRootLegacy(
                 if (ir.vil3ntec.tohid.ui.screens.promoGuardRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE to androidx.compose.material.icons.Icons.Filled.Redeem else null,
                 ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.core.i18n.StrPos.notesSection to androidx.compose.material.icons.Icons.Filled.Edit, // POS-11
-                ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE to androidx.compose.material.icons.Icons.Filled.Palette, //  روشن‌کردنِ نسخهٔ ۳ روی همین کامپیوتر
                 //  پیش‌فاکتور (POS-25)، لیستِ قیمت (POS-18) و اصلاحِ روشِ پرداخت (POS-40) — هر سه پیش‌فرض خاموش
                 ir.vil3ntec.tohid.core.i18n.StrPos.quoteSettingsTitle to androidx.compose.material.icons.Icons.Filled.Description, ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle to androidx.compose.material.icons.Icons.Filled.Inventory2, // POS-26
                 ir.vil3ntec.tohid.ui.components.pos.PRICE_LIST_SETTINGS_TITLE to androidx.compose.material.icons.Icons.Filled.LocalOffer,

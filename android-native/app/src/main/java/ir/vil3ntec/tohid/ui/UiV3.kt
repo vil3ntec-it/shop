@@ -5,7 +5,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 
 /**
- *  پرچمِ «رابطِ نسخهٔ ۳» — **پیش‌فرض خاموش** (تصمیمِ صاحب محصول، ۱۴۰۵/۰۸/۰۸، PR #359).
+ *  رابطِ نسخهٔ ۳ — **همیشه روشن** (تصمیمِ صاحب‌کار ۱۴۰۵/۰۸/۱۱: «شکلِ قدیم هرگز نیاید»؛ پیش‌تر پیش‌فرض خاموش، PR #359).
+ *  کلیدش از همهٔ تنظیمات برداشته شد؛ `preview` فقط برای عکسِ کامپیوتر می‌ماند. پاک‌کردنِ `ui/legacy` گامِ بعد است.
  *
  *  خاموش ⇒ همان رابطِ امروز، بی هیچ تغییری: پوسته، خانه، فروش، قرض‌داران، تنظیمات، پروفایل،
  *  خوش‌آمد، پیک، VIP و پالتِ سبزآبیِ VILL3N از رونوشت‌های پوشهٔ `ui/legacy` (پسوندِ `Legacy`) (همان کدِ main).
@@ -24,28 +25,19 @@ object UiV3 {
   const val TOGGLE_TITLE = "رابطِ تازه (نسخهٔ ۳)"
 
   /** روشن؟ — `mutableStateOf`: با `set` کلِ برنامه بی راه‌اندازیِ دوباره عوض می‌شود */
-  var on by mutableStateOf(resolve(stored = null, preview = isPreview()))
+  var on by mutableStateOf(true)
     private set
 
   /**
    *  مقدارِ پرچم: انتخابِ ذخیره‌شدهٔ همین دستگاه، وگرنه پیش‌فرض (خاموش؛ فقط نسخهٔ پیش‌نمایش روشن).
    *  خالص — آزمون: `UiV3Test`.
    */
-  fun resolve(stored: Boolean?, preview: Boolean): Boolean = stored ?: preview
+  @Suppress("UNUSED_PARAMETER")
+  fun resolve(stored: Boolean?, preview: Boolean): Boolean = true
 
-  fun load(context: android.content.Context) {
-    val p = runCatching { context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE) }.getOrNull()
-    val stored = p?.let { if (it.contains(KEY)) it.getBoolean(KEY, false) else null }
-    on = resolve(stored, isPreview())
-  }
-
-  fun set(context: android.content.Context, value: Boolean) {
-    on = value
-    runCatching {
-      context.applicationContext.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE)
-        .edit().putBoolean(KEY, value).apply()
-    }
-  }
+  /** دیگر انتخابی نیست: همیشه نسخهٔ ۳ (مقدارِ کهنهٔ `ui_v3` نادیده می‌ماند) */
+  @Suppress("UNUSED_PARAMETER")
+  fun load(context: android.content.Context) { on = true }
 
   /** فقط پیش‌نمایش و عکسِ کامپیوتر (بی ذخیره) */
   fun preview(value: Boolean) { on = value }
