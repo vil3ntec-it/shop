@@ -51,6 +51,8 @@ const FREE = [
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
     'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
+  ['گزارشِ خودکارِ صاحب (PAY-20/RPT-12) بخشی از مدیریتِ پایهٔ دکان است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.owner_report و فقط صاحب', [
+    'PUT /shop/owner-report']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
