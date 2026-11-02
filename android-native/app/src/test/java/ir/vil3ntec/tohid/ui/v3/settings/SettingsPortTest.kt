@@ -174,6 +174,7 @@ class SettingsPortTest {
       "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
       "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
       "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
+      "PurchaseFxPref.set" to "$PENDING — خرید به ارزِ دیگر، PUR-11 (فقط فاکتورِ خریدِ کامپیوتر)",
       "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
       "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",

@@ -20,6 +20,8 @@ object PurchaseBook {
     val price: Double,
     val unit: String = "",
     val expiryDate: String = "",
+    /** PUR-11 — فیِ اصلیِ ارزی (صدمِ واحد)؛ فقط با `record(fx = …)`، که آن‌گاه [price] از همین ساخته می‌شود */
+    val fxPriceMinor: Long? = null,
   )
 
   sealed interface Result {
@@ -52,7 +54,33 @@ object PurchaseBook {
     userId: String? = null,
     /** سررسیدِ پرداختِ کلِ فاکتور (`yyyy-MM-dd`، PUR-07)؛ `null` = ندارد */
     dueDate: String? = null,
+    /*
+     *  PUR-11 — ارز و نرخِ همین فاکتور (`PurchaseFx`)؛ `null` = افغانی، همان راهِ امروز. با نرخ: فیِ هر ردیف از
+     *  `fxPriceMinor` با همین نرخ به افغانی می‌رود و از آن پس همه چیز همان راهِ افغانی است؛ پرداخت و هزینهٔ جانبی افغانی‌اند.
+     */
+    fx: PurchaseFx.Rate? = null,
   ): Result {
+    if (fx != null) {
+      PurchaseFx.check(fx)?.let { return Result.Failed(it) }
+      val conv = ArrayList<Line>(lines.size)
+      var n = 0
+      for (l in lines) {
+        if (l.productId.isBlank()) { conv += l; continue }
+        n++
+        val fp = l.fxPriceMinor?.takeIf { it in 0..PurchaseFx.MAX_PRICE_MINOR } ?: return Result.Failed("ردیفِ $n: ${PurchaseFx.BAD_PRICE}")
+        val afn = PurchaseFx.toAfnMinor(fp, fx.rateMicros) ?: return Result.Failed("ردیفِ $n: ${PurchaseFx.TOO_LARGE}")
+        if (PurchaseFx.lineTotalMinor(l.quantity, fp) == null) return Result.Failed("ردیفِ $n: ${PurchaseFx.TOO_LARGE}")
+        conv += l.copy(price = afn / 100.0)
+      }
+      val r = record(d, supplierId, conv, paid, date, notes, today, now, newId, landedTotal, locationId, userId, dueDate)
+      if (r !is Result.Ok) return r
+      val made = r.data.purchases.filter { it.invoiceNo == r.invoiceNo }
+      val real = conv.filter { it.productId.isNotBlank() }
+      if (made.size != real.size) return Result.Failed(PurchaseFx.TOO_LARGE)
+      //  ردیف‌های همین فاکتور به همان ترتیبِ ثبت (`ids` ِ پایین) — هر کدام فیِ ارزیِ خودش
+      val stamped = made.zip(real).associate { (p, l) -> p.id to PurchaseFx.stamp(p, fx, l.fxPriceMinor!!) }
+      return Result.Ok(r.data.copy(purchases = r.data.purchases.map { stamped[it.id] ?: it }), r.invoiceNo)
+    }
     if (d.suppliers.none { it.id == supplierId }) return Result.Failed("تأمین‌کننده را انتخاب کنید")
     if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed("هزینهٔ جانبی درست نیست")
     val due = dueDate?.trim()?.ifEmpty { null }
@@ -135,6 +163,8 @@ object PurchaseBook {
     val isReturn: Boolean get() = total < 0
     /** سررسیدِ پرداخت (PUR-07) — زودترین سررسیدِ ردیف‌ها */
     val dueDate: String? get() = lines.mapNotNull { it.dueDate?.takeIf { d -> d.isNotBlank() } }.minOrNull()
+    /** PUR-11 — ارز، نرخ و جمعِ ارزیِ سند؛ `null` = فاکتورِ افغانی */
+    val fx: PurchaseFx.Summary? get() = PurchaseFx.summary(lines)
   }
 
   /** همهٔ فاکتورهای خرید، تازه‌ترین بالا */
@@ -368,6 +398,10 @@ object PurchaseBook {
     rows += listOf("", "جمع", "", "", "", r(inv.total))
     rows += listOf("", "پرداخت‌شده", "", "", "", r(inv.paid))
     rows += listOf("", "مانده", "", "", "", r(inv.debt))
+    //  PUR-11 — اصلِ ارزیِ سند (فقط فاکتورِ ارزی؛ افغانی ⇒ همان برگهٔ امروز)
+    inv.fx?.let { fx ->
+      rows += listOf("", "ارز", fx.currency, "نرخ", PurchaseFx.rateText(fx.rateMicros), PurchaseFx.minorText(fx.totalMinor))
+    }
     val title = if (inv.no > 0) "فاکتور-خرید-${inv.no}" else "خرید"
     return ReportCsv.Sheet("$title-${safe(supplier)}-${inv.date}", rows)
   }

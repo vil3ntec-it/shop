@@ -249,6 +249,11 @@ object OwnerExport {
     "toLocationId" to "محلِ مقصد",
     "userId" to "کاربر",
     "lotId" to "سری",
+    //  خرید به ارزِ دیگر (PUR-11، افزودنی، فقط خریدِ ارزی) — همان `license/owner-export.js`
+    "fxCurrency" to "ارزِ خرید",
+    "fxRateMicros" to "نرخِ ارز (افغانی برای یک واحد × ۱۰۰۰۰۰۰)",
+    "fxPriceMinor" to "فیِ ارزی (صدمِ واحد)",
+    "fxTotalMinor" to "جمعِ ارزی (صدمِ واحد)",
     //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
     //  گاوصندوق (PAY-18)
     "amountMinor" to "مبلغ (پول)",
