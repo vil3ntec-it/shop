@@ -51,7 +51,8 @@ class ScenarioS45PriceTest {
   @Test
   fun `S45 فروشِ قرضی همان پنجرهٔ مشترکِ PIN است`() {
     val credit = source("android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/staff/CreditApprovalDialog.kt")
-    assertNotNull(Regex("""fun CreditApprovalDialog\([\s\S]*?\) = PinApprovalDialog\(\s+StrPos\.creditOverTitle""").find(credit))
+    //  عنوان پارامترِ پیش‌فرضِ creditOverTitle است (S22 همین پنجره را با عنوانِ «فروشِ منقضی» هم می‌خواند)
+    assertNotNull(Regex("""fun CreditApprovalDialog\([\s\S]*?title: String = StrPos\.creditOverTitle,\s*\) = PinApprovalDialog\(\s+title""").find(credit))
     assertTrue(credit.contains("ApproverVault.verify(r, pin)"))
   }
 }
