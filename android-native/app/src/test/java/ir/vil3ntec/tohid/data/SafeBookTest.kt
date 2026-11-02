@@ -107,4 +107,64 @@ class SafeBookTest {
     assertEquals(other.safeEntries, mine.safeEntries)
     assertEquals(7_000L, SafeBook.view(mine).balanceMinor)
   }
+
+  // ── انتقالِ دخل ⇄ گاوصندوق: دو ردیف با هم یا هیچ ─────────────────────
+
+  /** صندوقِ باز با ۱٬۰۰۰ افغانی */
+  private fun withShift(d: ShopData = ShopData()): ShopData =
+    (CashShift.open(d, 1_000.0, "علی", "2026-11-01", 500) { "sh1" } as CashShift.Result.Ok).data
+
+  @Test fun `از دخل به گاوصندوق — ردیفِ گاوصندوق با ردیفِ جفتِ خروجِ نقد`() {
+    val d0 = withShift()
+    val r = ok(SafeBook.transfer(d0, SafeCore.FROM_DRAWER, 40_000, " علی ", "2026-11-01", 1_000, "s-1", "a-1"))
+    val safe = r.data.safeEntries.single()
+    assertEquals(SafeCore.FROM_DRAWER, safe.kind)
+    assertEquals(40_000L, safe.amountMinor)
+    assertEquals("sh1", safe.shiftId)
+    assertEquals("a-1", safe.auditId)
+    assertEquals("علی", safe.by)
+    val cash = r.data.auditLog.single { it.id == "a-1" }
+    assertEquals("cash_out", cash.type)
+    assertEquals("sh1", cash.refId)
+    assertEquals(400.0, cash.amount, 0.0)
+    assertEquals("other", cash.reason)
+    assertEquals(SafeBook.DRAWER_NOTE, cash.note)
+    assertEquals("2026-11-01", cash.date)
+    assertTrue(cash.notes, cash.notes.contains("گاوصندوق") && cash.notes.contains("علی"))
+    assertEquals(40_000L, SafeBook.view(r.data).balanceMinor)
+    //  نقدِ موردِ انتظارِ دخل همان ۴۰۰ کم شد (هم صندوقِ ساده، هم pay-core)
+    val shift = CashShift.current(r.data)!!
+    assertEquals(600.0, CashShift.totalsOf(r.data, shift, 2_000).expected, 0.0)
+    assertEquals(600.0, PayFlow.expectedCash(r.data, shift.open, 2_000), 0.0)
+  }
+
+  @Test fun `از گاوصندوق به دخل — ورودِ نقد، و بیش از مانده هیچ`() {
+    var d = withShift(ok(SafeBook.count(ShopData(), 50_000, null, "", 100, ids)).data)
+    failed(SafeBook.transfer(d, SafeCore.TO_DRAWER, 50_001, "", "2026-11-01", 1_000, "t-1", "a-1"), SafeCore.Code.INSUFFICIENT_FUNDS)
+    d = ok(SafeBook.transfer(d, SafeCore.TO_DRAWER, 20_000, "", "2026-11-01", 1_000, "t-1", "a-1")).data
+    assertEquals("cash_in", d.auditLog.single { it.id == "a-1" }.type)
+    assertEquals(30_000L, SafeBook.view(d).balanceMinor)
+    assertEquals(1_200.0, CashShift.totalsOf(d, CashShift.current(d)!!, 2_000).expected, 0.0)
+  }
+
+  @Test fun `خروج بیش از نقدِ دخل یا صندوقِ بسته هیچ ردیفی نمی‌نویسد`() {
+    val d = withShift()
+    val over = failed(SafeBook.transfer(d, SafeCore.FROM_DRAWER, 100_001, "", "2026-11-01", 1_000, "s-1", "a-1"), "INSUFFICIENT_CASH")
+    assertTrue(over.message.isNotBlank())
+    failed(SafeBook.transfer(ShopData(), SafeCore.FROM_DRAWER, 100, "", "2026-11-01", 1_000, "s-1", "a-1"), SafeBook.SHIFT_CLOSED)
+    failed(SafeBook.transfer(d, SafeCore.TO_BANK, 100, "", "2026-11-01", 1_000, "s-1", "a-1"), SafeCore.Code.BAD_KIND)
+    failed(SafeBook.transfer(d, SafeCore.FROM_DRAWER, 0, "", "2026-11-01", 1_000, "s-1", "a-1"), SafeCore.Code.INVALID_AMOUNT)
+    assertTrue(d.safeEntries.isEmpty())
+    assertEquals(1, d.auditLog.size)
+  }
+
+  @Test fun `تکرارِ همان انتقال (همان شناسه) ردیفِ دوم نمی‌سازد، حتی پس از بستنِ صندوق`() {
+    val d = ok(SafeBook.transfer(withShift(), SafeCore.FROM_DRAWER, 10_000, "", "2026-11-01", 1_000, "s-1", "a-1")).data
+    val again = ok(SafeBook.transfer(d, SafeCore.FROM_DRAWER, 10_000, "", "2026-11-01", 9_000, "s-1", "a-1"))
+    assertTrue(again.duplicate)
+    assertSame(d, again.data)
+    failed(SafeBook.transfer(d, SafeCore.FROM_DRAWER, 20_000, "", "2026-11-01", 9_000, "s-1", "a-1"), SafeCore.Code.ID_CONFLICT)
+    val closed = (CashShift.close(d, 900.0, "", "", "2026-11-01", 5_000) { "z1" } as CashShift.Result.Ok).data
+    assertTrue(ok(SafeBook.transfer(closed, SafeCore.FROM_DRAWER, 10_000, "", "2026-11-01", 9_000, "s-1", "a-1")).duplicate)
+  }
 }

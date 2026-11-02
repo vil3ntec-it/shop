@@ -1,6 +1,6 @@
 {
  "version": 1,
- "about": "بردارهای مرجعِ هستهٔ تخفیف (PRM-01..09، 11، 12، 17). هر مبلغ عددِ صحیح به واحدِ کوچک (۱۰۰ = یک افغانی)، هر مقدار به هزارم. کاتلین (core/promo/PromoCore.kt) و JS (license/promo-core.js) هر دو باید همهٔ این‌ها را بگذرانند. عددها دستی و از روی قاعده نوشته شده‌اند، نه از خروجیِ کد. ردیف‌های نمونه: A=۱۰۰ (بها ۶۰، drinks، s1)، B=۲۵۰ (بها ۲۰۰، snacks، s2)، C=۳۵۰ (بها نامعلوم، drinks، s2)، W=۱۱۵ در کیلو (fruit).",
+ "about": "بردارهای مرجعِ هستهٔ تخفیف (PRM-01..12، 17). هر مبلغ عددِ صحیح به واحدِ کوچک (۱۰۰ = یک افغانی)، هر مقدار به هزارم. کاتلین (core/promo/PromoCore.kt) و JS (license/promo-core.js) هر دو باید همهٔ این‌ها را بگذرانند. عددها دستی و از روی قاعده نوشته شده‌اند، نه از خروجیِ کد. ردیف‌های نمونه: A=۱۰۰ (بها ۶۰، drinks، s1)، B=۲۵۰ (بها ۲۰۰، snacks، s2)، C=۳۵۰ (بها نامعلوم، drinks، s2)، W=۱۱۵ در کیلو (fruit).",
  "kinds": [
   "percent",
   "amount",
@@ -8,7 +8,8 @@
   "tiers",
   "bxgy",
   "bundle",
-  "threshold"
+  "threshold",
+  "expiry"
  ],
  "stacks": [
   "exclusive",
@@ -1108,6 +1109,98 @@
    },
    "out": [
     "tiers"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000,
+    "nearDays": 7
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000,
+    "nearDays": 365
+   },
+   "out": []
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000
+   },
+   "out": [
+    "expiry"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000,
+    "nearDays": 0
+   },
+   "out": [
+    "expiry"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000,
+    "nearDays": 366
+   },
+   "out": [
+    "expiry"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 3000,
+    "nearDays": "7"
+   },
+   "out": [
+    "expiry"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 0,
+    "nearDays": 7
+   },
+   "out": [
+    "bp"
+   ]
+  },
+  {
+   "rule": {
+    "id": "e",
+    "name": "نزدیکِ انقضا",
+    "kind": "expiry",
+    "bp": 10001,
+    "nearDays": 1.5
+   },
+   "out": [
+    "bp",
+    "expiry"
    ]
   }
  ],
@@ -4535,6 +4628,626 @@
       "discountMinor": 5000
      }
     ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: FEFO — فقط ۲ واحدِ محمولهٔ ۳روزه از ۵ (۳۰٪ ⇒ ۶۰)، محمولهٔ ۴۰روزه و ردیفِ بی محموله هیچ",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 3,
+        "qtyMilli": 2000
+       },
+       {
+        "daysLeft": 40,
+        "qtyMilli": 10000
+       }
+      ]
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 75000,
+    "discountMinor": 6000,
+    "totalMinor": 69000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 6000,
+      "netMinor": 44000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 6000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: منقضی (روزِ منفی) تخفیف نمی‌گیرد؛ روزِ صفر می‌گیرد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": -2,
+        "qtyMilli": 3000
+       },
+       {
+        "daysLeft": 0,
+        "qtyMilli": 1000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 50000,
+    "discountMinor": 3000,
+    "totalMinor": 47000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 3000,
+      "netMinor": 47000
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 3000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: مرزِ بازه — روزِ ۷ با nearDays=۷ هست، روزِ ۸ نه",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 7,
+        "qtyMilli": 1000
+       },
+       {
+        "daysLeft": 8,
+        "qtyMilli": 2000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 50000,
+    "discountMinor": 3000,
+    "totalMinor": 47000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 3000,
+      "netMinor": 47000
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 3000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: ردیفِ بی محموله ⇒ هیچ",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1"
+     },
+     {
+      "key": "b",
+      "productId": "B",
+      "qtyMilli": 1000,
+      "unitMinor": 25000,
+      "costMinor": 20000,
+      "category": "snacks",
+      "supplierId": "s2"
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 75000,
+    "discountMinor": 0,
+    "totalMinor": 75000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 0,
+      "netMinor": 50000
+     },
+     {
+      "key": "b",
+      "amountMinor": 25000,
+      "discountMinor": 0,
+      "netMinor": 25000
+     }
+    ],
+    "applied": [],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: همهٔ ردیف نزدیک (مانده بیش از مقدار) ⇒ همان درصدِ ردیف",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 2000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 2,
+        "qtyMilli": 5000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 20000,
+    "discountMinor": 6000,
+    "totalMinor": 14000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 20000,
+      "discountMinor": 6000,
+      "netMinor": 14000
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 6000
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: دو ردیفِ یک کالا از یک ماندهٔ ۳ واحدی به ترتیبِ سبد (۲ + ۱)",
+   "cart": {
+    "lines": [
+     {
+      "key": "c1",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2",
+      "lots": [
+       {
+        "daysLeft": 1,
+        "qtyMilli": 3000
+       }
+      ]
+     },
+     {
+      "key": "c2",
+      "productId": "C",
+      "qtyMilli": 2000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2",
+      "lots": [
+       {
+        "daysLeft": 1,
+        "qtyMilli": 3000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 5000,
+     "nearDays": 3
+    }
+   ],
+   "out": {
+    "subtotalMinor": 140000,
+    "discountMinor": 52500,
+    "totalMinor": 87500,
+    "lines": [
+     {
+      "key": "c1",
+      "amountMinor": 70000,
+      "discountMinor": 35000,
+      "netMinor": 35000
+     },
+     {
+      "key": "c2",
+      "amountMinor": 70000,
+      "discountMinor": 17500,
+      "netMinor": 52500
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 52500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: کیلویی — نیم کیلوی نزدیک از ۱٫۵ (۵۷٫۵ ⇒ ۵۸ افغانی، ۲۰٪ ⇒ ۱۲)",
+   "cart": {
+    "lines": [
+     {
+      "key": "w",
+      "productId": "W",
+      "qtyMilli": 1500,
+      "unitMinor": 11500,
+      "category": "fruit",
+      "lots": [
+       {
+        "daysLeft": 5,
+        "qtyMilli": 500
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 2000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 17300,
+    "discountMinor": 1200,
+    "totalMinor": 16100,
+    "lines": [
+     {
+      "key": "w",
+      "amountMinor": 17300,
+      "discountMinor": 1200,
+      "netMinor": 16100
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 1200
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: هر دو «بهترین قیمت» ⇒ فقط پرسودتر (انقضا ۲۷۵ در برابرِ ده درصد ۸۵)",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 3,
+        "qtyMilli": 2000
+       }
+      ]
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2",
+      "lots": [
+       {
+        "daysLeft": 1,
+        "qtyMilli": 1000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 5000,
+     "nearDays": 7
+    },
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 85000,
+    "discountMinor": 27500,
+    "totalMinor": 57500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 10000,
+      "netMinor": 40000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 17500,
+      "netMinor": 17500
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 27500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: انقضای ترکیبی ۸۰٪ + ده درصد روی مانده؛ کفِ بهای A سهمِ دوم را از ۵۰ به ۴۰ می‌بُرد",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 3,
+        "qtyMilli": 2000
+       }
+      ]
+     },
+     {
+      "key": "c",
+      "productId": "C",
+      "qtyMilli": 1000,
+      "unitMinor": 35000,
+      "category": "drinks",
+      "supplierId": "s2",
+      "lots": [
+       {
+        "daysLeft": 1,
+        "qtyMilli": 1000
+       }
+      ]
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 8000,
+     "nearDays": 7,
+     "stack": "combine"
+    },
+    {
+     "id": "p10",
+     "name": "ده درصد",
+     "kind": "percent",
+     "bp": 1000
+    }
+   ],
+   "out": {
+    "subtotalMinor": 85000,
+    "discountMinor": 51500,
+    "totalMinor": 33500,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 20000,
+      "netMinor": 30000
+     },
+     {
+      "key": "c",
+      "amountMinor": 35000,
+      "discountMinor": 31500,
+      "netMinor": 3500
+     }
+    ],
+    "applied": [
+     {
+      "id": "ex",
+      "name": "نزدیکِ انقضا",
+      "discountMinor": 44000
+     },
+     {
+      "id": "p10",
+      "name": "ده درصد",
+      "discountMinor": 7500
+     }
+    ],
+    "codes": []
+   }
+  },
+  {
+   "name": "PRM-10: قیمتِ دستی (noPromo) با محمولهٔ نزدیک ⇒ هیچ",
+   "cart": {
+    "lines": [
+     {
+      "key": "a",
+      "productId": "A",
+      "qtyMilli": 5000,
+      "unitMinor": 10000,
+      "costMinor": 6000,
+      "category": "drinks",
+      "supplierId": "s1",
+      "lots": [
+       {
+        "daysLeft": 1,
+        "qtyMilli": 5000
+       }
+      ],
+      "noPromo": true
+     }
+    ]
+   },
+   "rules": [
+    {
+     "id": "ex",
+     "name": "نزدیکِ انقضا",
+     "kind": "expiry",
+     "bp": 3000,
+     "nearDays": 7
+    }
+   ],
+   "out": {
+    "subtotalMinor": 50000,
+    "discountMinor": 0,
+    "totalMinor": 50000,
+    "lines": [
+     {
+      "key": "a",
+      "amountMinor": 50000,
+      "discountMinor": 0,
+      "netMinor": 50000
+     }
+    ],
+    "applied": [],
     "codes": []
    }
   }
