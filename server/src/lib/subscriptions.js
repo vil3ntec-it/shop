@@ -113,10 +113,10 @@ function build(T) {
   /**
    * تازه‌ترین اشتراک دکان، حتی اگر تمام شده باشد.
    * برای نمایش وضعیت لازم است: کاربر باید «اشتراک تمام شد» ببیند،
-   * نه «اشتراکی وجود ندارد».
+   * نه «اشتراکی وجود ندارد». `get` ⇐ مثلِ `liveOf`.
    */
-  async function latestOf(tenantId) {
-    return one(
+  async function latestOf(tenantId, get = one) {
+    return get(
       `SELECT * FROM ${TBL} WHERE ${KEY}=$1
         ORDER BY (status IN ('active','suspended','pending')) DESC, ends_at DESC, created_at DESC
         LIMIT 1`,
@@ -261,12 +261,15 @@ function build(T) {
    *  تا ۲.۱۴.۴ این‌جا `one`/`query` ِ سراسری بود: روی PGlite همان تراکنش است (AsyncLocalStorage)،
    *  ولی روی PostgreSQL به استخر می‌رفت و جدا COMMIT می‌شد. شکست یا مرگِ فرآیند پس از نوشتنِ
    *  اشتراک و پیش از ثبتِ کلیدِ یکتایی (`idempotency.save`) تمدید را نگه می‌داشت و تکرارِ همان کلید
-   *  دورهٔ دوم می‌نشاند. خواندنِ پلن (`plans.getPlan`) پیکربندی است و بیرون می‌ماند.
+   *  دورهٔ دوم می‌نشاند. خواندنِ پلن (`plans.getPlan`) هم با همان `c` است (فقط خواندن، همان ردیفِ ثبت‌شده):
+   *  پیش‌تر از استخر بود و اعطاهای هم‌زمانِ پشتِ قفلِ `sub-grant` همهٔ اتصال‌ها را نگه می‌داشتند ⇒
+   *  `timeout exceeded when trying to connect` (همان RSK-07 ِ `orders.flagOf`).
    */
   async function grantLocked(c, tenantId, { plan = 'custom', days = null, startsAt = null, endsAt = null,
     features = [], maxDevices = 10, graceDays = 0, note = '', createdBy = '', price = null,
     allowUnsuspend = false } = {}) {
     const get = async (text, params) => (await c.query(text, params)).rows[0] || null;
+    const run = (text, params) => c.query(text, params);
 
     const tenant = await get(`SELECT id FROM ${TEN} WHERE id=$1`, [tenantId]);
     if (!tenant) throw notFound(T.notFoundMessage, T.notFoundCode);
@@ -305,7 +308,7 @@ function build(T) {
       //  وگرنه در گزارش‌ها اشتراکی دیده می‌شد که ماه‌ها پیش شروع شده.
       start = if_live(existing, t) ?? start;
     } else {
-      const p = await plans.getPlan(plan, T.app);
+      const p = await plans.getPlan(plan, T.app, run);
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
       end = plans.endOfPeriod(base, p.amount, p.unit);
       start = if_live(existing, t) ?? start;
@@ -331,7 +334,7 @@ function build(T) {
      *  نمی‌کند — پس اشتراک‌های امروزیِ `m1`/`m6`/`y1` دست‌نخورده‌اند.
      */
     if (!features.length) {
-      const p = await plans.getPlan(plan, T.app);
+      const p = await plans.getPlan(plan, T.app, run);
       if (p && Array.isArray(p.features) && p.features.length) features = p.features;
     }
 
@@ -347,7 +350,7 @@ function build(T) {
      */
     let snapPrice = price === null || price === undefined || price === '' ? null : Math.round(Number(price));
     if (snapPrice === null) {
-      const p = await plans.getPlan(plan, T.app);
+      const p = await plans.getPlan(plan, T.app, run);
       snapPrice = p ? plans.discountOf(p, t).finalPrice : null;
     }
     const currency = T.app === 'pump' ? 'USD' : 'AFN';

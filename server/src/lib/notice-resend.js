@@ -63,7 +63,7 @@ async function resend(shopId, orderId, noticeId, { key, actor }) {
       return { replayed: true, row, prevStatus: String(d.prevStatus || ''), orderNo: Number(order.order_no) };
     }
     if (!row) throw notFound('پیام پیدا نشد', 'notice_not_found');
-    if (!(await notify.flagOf(shopId))) throw fail('پیام به مشتری برای این دکان خاموش است', 'notify_disabled');
+    if (!(await notify.flagOf(shopId, (t, p) => c.query(t, p)))) throw fail('پیام به مشتری برای این دکان خاموش است', 'notify_disabled');
     if (!RESENDABLE.includes(row.status)) {
       throw fail('این پیام دوباره فرستادنی نیست', 'notice_not_resendable', { current: row.status });
     }

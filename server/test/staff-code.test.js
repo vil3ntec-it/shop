@@ -4,11 +4,15 @@
  *
  * سه چیزی که تازه‌اند و باید همان‌طور بمانند: کد دکان با هر بار پرسیدن
  * عوض نشود، تمدید ردّ خودش را بگذارد، و کد ورود برای ایمیل هم برود.
+ *
+ * و هم‌زمانی: ۱۵ پیوستنِ هم‌زمان با کدِ ثابتِ یک دکان پشتِ `FOR UPDATE` ِ همان کد می‌مانند. سنجشِ اشتراک
+ * (`entitlementOf`) درونِ همان تراکنش است؛ پیش‌تر از استخر می‌خواند و روی PostgreSQL (استخرِ ۱۰)
+ * دارندهٔ قفل اتصالِ دوم نمی‌گرفت ⇒ ۵۰۰ ِ `timeout exceeded when trying to connect`.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query, newId, now } = require('../src/db');
+const { query, one, newId, now } = require('../src/db');
 
 test.before(async () => {
   await h.start();
@@ -119,4 +123,28 @@ test('کد ورود برای ایمیل هم صادر می‌شود', async () =
   });
   assert.equal(verify.status, 201, 'حساب تازه با ایمیل ساخته می‌شود');
   assert.equal(verify.body.user.email, 'someone@example.com');
+});
+
+test('اتصالِ تراکنش: ۱۵ پیوستنِ هم‌زمان با کدِ ثابتِ دکان ⇒ به اندازهٔ جای خالی ۲۰۱، بقیه ۴۰۳ shop_full؛ بی ۵۰۰', async () => {
+  const owner = await h.newUser('صاحبِ هم‌زمان');
+  const made = await h.post('/api/shop', { name: 'دکانِ هم‌زمان' }, { token: owner.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const shopId = made.body.shop.id;
+  const members = async () => (await one(
+    `SELECT COUNT(*)::int AS n FROM shop_members WHERE shop_id=$1 AND status='active'`, [shopId]
+  )).n;
+  const seats = 10;
+  const before = await members();
+  await query('UPDATE shops SET max_members=$2 WHERE id=$1', [shopId, before + seats]);
+  const code = (await h.get('/api/shop/staff-code', { token: owner.accessToken })).body.code;
+  assert.ok(code);
+
+  const staff = [];
+  for (let i = 0; i < 15; i++) staff.push(await h.newUser(`شاگردِ هم‌زمان ${i}`));
+  const res = await Promise.all(staff.map((u) => h.post('/api/shop/staff/join', { code }, { token: u.accessToken })));
+  const codes = res.map((r) => r.status).sort();
+  assert.deepEqual(codes, [...Array(seats).fill(201), ...Array(5).fill(403)],
+    JSON.stringify(res.filter((r) => r.status !== 201).map((r) => r.body)));
+  for (const r of res.filter((x) => x.status === 403)) assert.equal(r.body.error.code, 'shop_full');
+  assert.equal(await members(), before + seats, 'ظرفیت درست شمرده شد');
 });
