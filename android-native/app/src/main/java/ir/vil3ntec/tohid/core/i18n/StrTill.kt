@@ -70,4 +70,10 @@ object StrTill {
   fun gapHours(hours: String): String = t("${asIs(hours)} ساعت", "$hours hours", "$hours ساعته")
   fun gapMinutes(minutes: String): String = t("${asIs(minutes)} دقیقه", "$minutes minutes", "$minutes دقیقې")
   val correctedDate: String get() = t("تاریخِ تصحیح‌شده", "Corrected date", "سمه شوې نېټه")
+  /** S46/STF-04: Ctrl+L بی «تعویضِ کاربر» و بی رمزِ برنامه — قفلی نیست که بیفتد، فقط راهش */
+  val lockNeedsPassword: String get() = t(
+    "برای قفلِ صندوق با Ctrl+L، اول در «تنظیمات» رمزِ برنامه را بگذارید.",
+    "To lock the till with Ctrl+L, first set an app password in “Settings”.",
+    "د Ctrl+L سره د صندوق د قفلولو لپاره، لومړی په «تنظیمات» کې د اپ پټنوم کېږدئ.",
+  )
 }

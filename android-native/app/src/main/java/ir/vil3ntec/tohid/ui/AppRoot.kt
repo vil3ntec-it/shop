@@ -313,10 +313,19 @@ private fun AppRootActive(
   val hasAccount = !syncState.accessToken.isNullOrBlank()
   val locked = lockStore.enabled && !unlocked
   val askLock = hasAccount && !lockStore.enabled && !lockAsked && !syncState.lockDeclined
-  //  S46: Ctrl+L ⇒ قفلِ «هر کس با PIN ِ خودش» (`TillUser`)؛ تنظیمِ خاموش ⇒ هیچ (مثلِ امروزِ نسخهٔ ۳)
+  //  S46/STF-04: Ctrl+L ⇒ نخست قفلِ «هر کس با PIN ِ خودش» (`TillUser`)؛ آن خاموش یا بی راهِ برگشت ⇒ قفلِ برنامه
+  //  همان دم، و بی رمزِ برنامه فقط راهش گفته می‌شود (`AppLockKey`)
   val lockAsk by AppNav.lockNow
   var lockSeen by rememberSaveable { mutableStateOf(AppNav.lockNow.intValue) }
-  LaunchedEffect(lockAsk) { if (lockAsk != lockSeen) { lockSeen = lockAsk; ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled) } }
+  LaunchedEffect(lockAsk) {
+    if (lockAsk == lockSeen) return@LaunchedEffect
+    lockSeen = lockAsk
+    when (AppLockKey.after(ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled), lockStore.enabled)) {
+      AppLockKey.Then.TILL -> Unit
+      AppLockKey.Then.APP -> unlocked = false
+      AppLockKey.Then.HINT -> toasts.show(ir.vil3ntec.tohid.core.i18n.StrTill.lockNeedsPassword, ir.vil3ntec.tohid.ui.theme.V3Tone.WARNING)
+    }
+  }
   val tillLocked = ir.vil3ntec.tohid.data.TillUser.locked.value
   val held = !loaded || locked || needsShop || askLock || tillLocked
   SideEffect { nav.held = held }
@@ -559,6 +568,8 @@ private fun AppRootActive(
       }
       //  دوربینِ گوشی برای کامپیوتر — درخواست، فرستادن و استودیو
       PhoneLinkHost(store, data, snackbar)
+      //  OPS-05: «چه چیزی تازه است» یک بار پس از به‌روزرسانی (نخستین اجرا هیچ) — پشتِ قفل‌ها و دروازه‌ها نه
+      ir.vil3ntec.tohid.ui.screens.WhatsNewOnUpdate()
       //  جست‌وجوی سریع (Ctrl+K)
       if (AppNav.palette.value) {
         CommandPalette(data, onDismiss = { AppNav.palette.value = false }) { hit ->

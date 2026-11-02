@@ -183,8 +183,11 @@ private fun actionLook(action: DebtorLedgerModel.Action): Pair<ImageVector, Stri
 private fun DrawerInfo(account: DebtorEngine.Account, book: DebtBook.Book?) {
   val lines = remember(account, book) { DebtorLedgerModel.info(account, book) }
   val notes = account.debtor.notes
-  if (lines.isEmpty() && notes.isBlank()) return
+  //  CRM-02/11: شمارهٔ دوم و برچسب‌های پرونده (همان خطِ `CustomerProfileForm.extraLine` ِ پروندهٔ کامپیوتر)
+  val profile = remember(account.debtor) { ir.vil3ntec.tohid.data.CustomerProfileForm.extraLine(account.debtor) }
+  if (lines.isEmpty() && notes.isBlank() && profile.isBlank()) return
   Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    if (profile.isNotBlank()) Text(profile, style = v3Text(13, FontWeight.Medium, 19), color = PhoneV3.colors.ink)
     lines.forEach { line ->
       V3StatusPill(
         when (line.tone) {

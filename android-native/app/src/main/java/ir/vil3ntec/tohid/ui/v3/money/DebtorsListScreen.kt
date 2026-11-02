@@ -2,7 +2,11 @@ package ir.vil3ntec.tohid.ui.v3.money
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +47,7 @@ import ir.vil3ntec.tohid.ui.screens.DebtorsStatsCard
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.PhoneDebtorsTheme
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Debt
+import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
@@ -78,8 +83,12 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
   val stagger = rememberV3Stagger()
   val hidden = MoneyUndo.hiddenDebtors
   val term = search.trim()
+  //  CRM-11: صافیِ برچسب (همان صافیِ پروندهٔ کامپیوتر)؛ برچسبی که دیگر نیست ⇒ همه
+  var tagPick by rememberSaveable { mutableStateOf<String?>(null) }
+  val tag = remember(d, tagPick) { DebtorListModel.keptTag(d, tagPick) }
+  val tags = remember(d) { DebtorListModel.tagChips(d) }
   //  ردیف‌ها یک بار حساب می‌شوند، نه با هر کشیدنِ فهرست (`DebtorListModel`)
-  val allRows = remember(d, term, sort) { DebtorListModel.rows(d, term, sort, System.currentTimeMillis()) }
+  val allRows = remember(d, term, sort, tag) { DebtorListModel.rows(d, term, sort, System.currentTimeMillis(), tag) }
   val rows = if (hidden.isEmpty()) allRows else allRows.filterNot { it.debtor.id in hidden }
   val summary = remember(d) { DebtorListModel.summary(d) }
   val motion = Motion.enabled
@@ -102,6 +111,13 @@ internal fun DebtorsListScreen(d: ShopData, sortArg: String?, queryArg: String?,
               Spacer(Modifier.height(12.dp))
               DebtorsSearchField(value = search, onValueChange = { search = it })
               Spacer(Modifier.height(10.dp))
+              if (tags.isNotEmpty()) {
+                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                  V3Chip(StrMoney.allTags, tag == null, { tagPick = null })
+                  tags.forEach { (t, n) -> V3Chip("#$t", tag == t, { tagPick = if (tag == t) null else t }, count = n) }
+                }
+                Spacer(Modifier.height(10.dp))
+              }
               val onMerge = actions.onMerge
               if (onMerge != null && duplicates > 0) {
                 V3ListRow(

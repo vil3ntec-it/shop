@@ -85,6 +85,8 @@ internal fun DebtorLedgerScreen(
   actions: DebtorLedgerActions,
   /** کشو باز/بسته از بیرون (عکس‌ها)؛ null ⇒ همان که کاربر روی دستگاه گذاشته */
   drawerOpen: Boolean? = null,
+  /** بخش‌های پروندهٔ مشتری زیرِ فاکتورها — امانی، امتیاز و قیمتِ گروه (`DebtorFileExtras`)؛ عکس‌ها بی آن */
+  extras: (@Composable () -> Unit)? = null,
 ) {
   val hidden = MoneyUndo.hiddenTx
   val account = remember(d, id) { DebtorEngine.account(d, id) }
@@ -148,7 +150,7 @@ internal fun DebtorLedgerScreen(
           },
           detail = {
             LazyColumn(Modifier.fillMaxSize(), contentPadding = listPad.copyTop(10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-              ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
+              ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it })
             }
           },
         )
@@ -160,7 +162,7 @@ internal fun DebtorLedgerScreen(
             }
           }
           item(key = "totals") { LedgerTotals(totalCells) }
-          ledgerItems(rows, book, account, actions, stagger, onMenu = { menuFor = it })
+          ledgerItems(rows, book, account, actions, stagger, extras, onMenu = { menuFor = it })
         }
       }
     }
@@ -206,6 +208,7 @@ private fun LazyListScope.ledgerItems(
   account: DebtorEngine.Account,
   actions: DebtorLedgerActions,
   stagger: V3StaggerState,
+  extras: (@Composable () -> Unit)?,
   onMenu: (String) -> Unit,
 ) {
   item(key = "tx-title") {
@@ -247,6 +250,8 @@ private fun LazyListScope.ledgerItems(
   if (account.sales.isNotEmpty()) {
     item(key = "sales") { DebtorInvoices(account, actions.onOpenSale, actions.onOlderSales) }
   }
+  //  POS-27، PRM-13، CRM-08/12: بخش‌های پرونده که هر کدام با تنظیمِ خودش دیده می‌شوند
+  if (extras != null) item(key = "extras") { extras() }
   //  SEC-10: «حذفِ دادهٔ این مشتری» — فقط صاحب و پرچمِ روشنِ `shop.customer_erasure` (خاموش ⇒ هیچ)
   item(key = "erase") { CustomerErasureV3(account.debtor.phone) }
 }

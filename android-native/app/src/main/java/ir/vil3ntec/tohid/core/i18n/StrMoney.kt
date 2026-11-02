@@ -150,6 +150,8 @@ object StrMoney {
   val phone2Optional: String get() = t("شمارهٔ دوم (اختیاری)", "Second phone (optional)", "دویمه شمېره (اختیاري)")
   val tagsField: String get() = t("برچسب‌ها (اختیاری)", "Tags (optional)", "نښانونه (اختیاري)")
   val tagsHelper: String get() = t("با «،» جدا کنید — مثلاً عمده، همسایه", "Separate with commas — e.g. wholesale, neighbour", "په «،» جلا کړئ — لکه عمده، ګاونډی")
+  /** CRM-11: صافیِ برچسبِ فهرستِ قرض‌داران */
+  val allTags: String get() = t("همهٔ برچسب‌ها", "All tags", "ټول نښانونه")
   val consentTitle: String get() = t("رضایت برای پیامِ تبلیغاتی", "Consent to promotional messages", "د تبلیغي پیغام لپاره رضایت")
   val consentUnknown: String get() = t("نپرسیده", "Not asked", "نه دی پوښتل شوی")
   val consentYes: String get() = t("بله", "Yes", "هو")

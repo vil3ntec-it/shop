@@ -95,7 +95,7 @@ fun LayawayBar(d: ShopData, store: ShopStore, cart: CartStore, toast: (String) -
   if (listing) LayawayListDialog(store, views, toast) { listing = false }
 }
 
-/** پروندهٔ مشتری (`DebtorsLegacy`): امانی‌های همین مشتری با نشانِ «دیر» و همان کارها — فقط با همان تنظیم */
+/** پروندهٔ مشتری (گوشی: `DebtorFileExtras` ِ نسخهٔ ۳؛ کامپیوتر: `DeskCustomers`): امانی‌های همین مشتری با نشانِ «دیر» و همان کارها — فقط با همان تنظیم */
 @Composable
 fun LayawayCustomerPanel(d: ShopData, store: ShopStore?, debtorId: String, toast: (String) -> Unit) {
   val context = LocalContext.current
