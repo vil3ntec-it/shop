@@ -38,6 +38,15 @@ object StrCount {
   fun summaryCounted(n: Any): String = t("شمرده: $n", "Counted: $n", "شمېرل شوي: $n")
   fun summaryDiff(n: Any, value: Any): String = t("اختلاف: $n · ارزش: $value ؋", "Differences: $n · value: $value ؋", "توپیر: $n · ارزښت: $value ؋")
   val save: String get() = t("ثبتِ شمارش", "Save count", "شمېرنه ثبتول")
+
+  // بازبینی و صافی پیش از ثبت (S20: INV-09، INV-05)
+  val all: String get() = t("همه", "All", "ټول")
+  val allCategories: String get() = t("همهٔ دسته‌ها", "All categories", "ټولې ډلې")
+  val allSuppliers: String get() = t("همهٔ تأمین‌کننده‌ها", "All suppliers", "ټول عرضه‌کوونکي")
+  fun uncounted(n: Any): String = t("شمرده‌نشده: $n", "Not counted: $n", "نه شمېرل شوي: $n")
+  fun matched(n: Any): String = t("منطبق: $n", "Matching: $n", "سمون لرونکي: $n")
+  fun differing(n: Any, value: Any): String = t("مغایر: $n · $value ؋", "Different: $n · $value ؋", "توپیر لرونکي: $n · $value ؋")
+  val untouched: String get() = t("کالاهای شمرده‌نشده دست نمی‌خورند", "Products that aren't counted are left unchanged", "نه شمېرل شوي توکي نه بدلېږي")
   val csv: String get() = t("CSV", "CSV", "CSV")
 
   // چند دستگاه
@@ -62,9 +71,9 @@ object StrCount {
   val settingsTitle: String get() = t("انبارگردانیِ تازه", "New stock count", "نوې شمېرنه")
   val settingsOn: String get() = t("اسکن و چند دستگاه", "Scanning and several devices", "سکن او څو وسیلې")
   val settingsNote: String get() = t(
-    "پنجرهٔ «انبارگردانی» ِ انبار با اسکن (هر اسکن یک عدد؛ کالای وزنی با نوشتن) و شمارشِ هم‌زمان با چند دستگاه (برگهٔ هر دستگاه با فایل می‌آید و جمع می‌شود). ثبت همان «اصلاحِ موجودی» ِ امروز است. پس از تغییر، «انبار» را دوباره باز کنید.",
-    "The Warehouse “Stock count” window with scanning (one unit per scan; weighed products are typed) and counting with several devices at once (each device's sheet comes as a file and is added up). Saving makes the same stock adjustments as today. After changing this, reopen “Warehouse”.",
-    "د ګودام «شمېرنې» کړکۍ له سکن سره (هر سکن یو عدد؛ وزني توکي لیکل کېږي) او په یو وخت د څو وسیلو شمېرنه (د هرې وسیلې پاڼه د دوتنې په توګه راځي او جمع کېږي). ثبتول هماغه نن ورځنی «د زېرمې سمون» دی. له بدلون وروسته «ګودام» بیا پرانیزئ.",
+    "پنجرهٔ «انبارگردانی» ِ انبار با اسکن (هر اسکن یک عدد؛ کالای وزنی با نوشتن) و شمارشِ هم‌زمان با چند دستگاه (برگهٔ هر دستگاه با فایل می‌آید و جمع می‌شود)، صافیِ دسته و بازبینیِ شمرده‌نشده/منطبق/مغایر. ثبت «اصلاحِ شمارش» است — حرکتی جدا از اصلاحِ دستی، با همان اثر بر موجودی. پس از تغییر، «انبار» را دوباره باز کنید.",
+    "The Warehouse “Stock count” window with scanning (one unit per scan; weighed products are typed) and counting with several devices at once (each device's sheet comes as a file and is added up), a category filter and a review of not counted / matching / different. Saving records “count adjustments” — a movement type of their own, separate from manual adjustments, with the same effect on stock. After changing this, reopen “Warehouse”.",
+    "د ګودام «شمېرنې» کړکۍ له سکن سره (هر سکن یو عدد؛ وزني توکي لیکل کېږي) او په یو وخت د څو وسیلو شمېرنه (د هرې وسیلې پاڼه د دوتنې په توګه راځي او جمع کېږي)، د ډلې چاڼ او د نه شمېرل شویو/سمون لرونکو/توپیر لرونکو بیاکتنه. ثبتول «د شمېرنې سمون» دی — له لاسي سمون نه جلا خوځښت، په زېرمه همغه اغېز. له بدلون وروسته «ګودام» بیا پرانیزئ.",
   )
   val blindTitle: String get() = t("شمارشِ کور", "Blind count", "ړنده شمېرنه")
   val blindNote: String get() = t(

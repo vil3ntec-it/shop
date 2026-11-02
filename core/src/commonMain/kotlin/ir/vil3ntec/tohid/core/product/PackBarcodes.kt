@@ -5,7 +5,8 @@ package ir.vil3ntec.tohid.core.product
  *
  *  یک «بسته» (کارتن، شل، باکس، …) نام، اندازه به **واحدِ موجودیِ همان کالا** (به هزارم: کارتنِ ۲۴ دانه‌ای
  *  ⇒ 24000) و بارکدهای خودش را دارد. اسکنِ بارکدِ بسته یعنی «اندازهٔ بسته» از واحدِ موجودی به سبد می‌رود —
- *  همان ردیفِ کالا، همان قیمتِ واحد × اندازه (قیمتِ جدای بسته کارِ PRD-12 است).
+ *  همان ردیفِ کالا، همان قیمتِ واحد × اندازه. قیمتِ جدای بسته در لیستِ قیمتِ کالا (`priceMinor`، اختیاری؛ S05) فقط
+ *  وقتی به کار می‌رود که صندوق واحدِ ردیف را عوض کند (`UnitSale`، پشتِ تنظیمِ خاموش).
  *
  *  • بارکد بین کالاها تکراری نمی‌شود (§۳.۴): بارکدِ بسته نه بارکدِ کالای دیگر است، نه بارکدِ بستهٔ کالای
  *    دیگر، نه بارکدِ خودِ همین کالا (وگرنه یک اسکن هم «۱» بود هم «۲۴»)، نه تکراری بینِ بسته‌ها.
@@ -23,17 +24,24 @@ object PackBarcodes {
   /** همهٔ بارکدهای بسته‌های یک کالا */
   const val MAX_CODES = ProductBarcodes.MAX
 
-  data class Pack(val name: String, val sizeMilli: Long, val barcodes: List<String>)
+  /** `priceMinor`: قیمتِ یک بسته در لیستِ قیمت (یک‌صدمِ افغانی)؛ `null` ⇒ تعریف نشده، یعنی اندازه × قیمتِ واحد */
+  data class Pack(val name: String, val sizeMilli: Long, val barcodes: List<String>, val priceMinor: Long? = null)
 
-  /** ورودیِ فرم: هر بسته یک ردیف با نام، اندازه و بارکدها (با «،»)؛ ردیفِ تمامِ خالی نادیده */
-  data class Draft(val name: String = "", val size: String = "", val barcodes: String = "")
+  /** ورودیِ فرم: هر بسته یک ردیف با نام، اندازه، بارکدها (با «،») و قیمتِ اختیاری؛ ردیفِ تمامِ خالی نادیده */
+  data class Draft(val name: String = "", val size: String = "", val barcodes: String = "", val price: String = "")
 
   sealed interface Checked {
     data class Ok(val packs: List<Pack>) : Checked
     data class Failed(val message: String) : Checked
   }
 
-  fun draftOf(p: Pack): Draft = Draft(p.name, sizeText(p.sizeMilli), p.barcodes.joinToString("، "))
+  fun draftOf(p: Pack): Draft = Draft(p.name, sizeText(p.sizeMilli), p.barcodes.joinToString("، "), p.priceMinor?.let(::priceText).orEmpty())
+
+  /** 170050 ⇐ «1700.5» */
+  fun priceText(minor: Long): String {
+    val frac = minor % 100
+    return if (frac == 0L) (minor / 100).toString() else "${minor / 100}." + frac.toString().padStart(2, '0').trimEnd('0')
+  }
 
   /** 24000 ⇐ «24»، 250 ⇐ «0.25» */
   fun sizeText(milli: Long): String {
@@ -58,7 +66,7 @@ object PackBarcodes {
     selfId: String?,
     ownerOf: (String) -> String?,
   ): Checked {
-    val rows = drafts.filter { it.name.isNotBlank() || it.size.isNotBlank() || it.barcodes.isNotBlank() }
+    val rows = drafts.filter { it.name.isNotBlank() || it.size.isNotBlank() || it.barcodes.isNotBlank() || it.price.isNotBlank() }
     if (rows.size > MAX_PACKS) return Checked.Failed("حداکثر $MAX_PACKS بسته برای یک کالا")
     val out = ArrayList<Pack>()
     val names = HashSet<String>()
@@ -89,7 +97,9 @@ object PackBarcodes {
         val owner = ownerOf(c)
         if (owner != null && owner != selfId) return Checked.Failed("بارکدِ $c قبلاً برای کالای دیگری ثبت شده")
       }
-      out += Pack(name, size, codes)
+      val price = if (r.price.isBlank()) null else DecimalText.scaled(r.price, 2)?.takeIf { it > 0 }
+        ?: return Checked.Failed("قیمتِ بستهٔ «$name» را با عددِ بیش از صفر بنویسید، یا خالی بگذارید")
+      out += Pack(name, size, codes, price)
     }
     if (seen.size > MAX_CODES) return Checked.Failed("حداکثر $MAX_CODES بارکد برای بسته‌های یک کالا")
     return Checked.Ok(out)

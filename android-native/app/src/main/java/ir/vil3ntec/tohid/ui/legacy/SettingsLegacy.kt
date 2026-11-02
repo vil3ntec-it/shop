@@ -457,10 +457,11 @@ fun SettingsScreenLegacy(
     /* ============================ انقضا ============================ */
     item {
       var blockExpired by remember { mutableStateOf(ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context)) }
+      var withApproval by remember { mutableStateOf(ir.vil3ntec.tohid.data.ExpiryPref.approval(context)) } // S22
       SettingsSectionLegacy(
         icon = Icons.Filled.Lock,
         title = Str.expiredGoods,
-        subtitle = if (blockExpired) StrSettings.notSold else StrSettings.warnOnly,
+        subtitle = if (blockExpired) StrSettings.notSold else if (withApproval) StrSettings.withApproval else StrSettings.warnOnly,
         tint = if (blockExpired) Shop.colors.danger else Shop.colors.warning,
       ) {
         Text(
@@ -470,13 +471,15 @@ fun SettingsScreenLegacy(
         )
         Spacer(Modifier.height(8.dp))
         SegmentedChoiceLegacy(
-          options = listOf("warn" to StrSettings.warnOnly, "block" to StrSettings.dontSell),
-          selected = if (blockExpired) "block" else "warn",
+          options = listOf("warn" to StrSettings.warnOnly, "approve" to StrSettings.withApproval, "block" to StrSettings.dontSell),
+          selected = if (blockExpired) "block" else if (withApproval) "approve" else "warn",
           onSelect = {
             blockExpired = it == "block"
             ir.vil3ntec.tohid.data.ShopPolicy.setBlockExpired(context, blockExpired)
+            withApproval = it == "approve"; ir.vil3ntec.tohid.data.ExpiryPref.setApproval(context, withApproval)
           },
         )
+        ir.vil3ntec.tohid.ui.screens.ExpiryDaysSettingsWired(context)
       }
     }
     item { ShrinkReportSettingsWired(context) } // گزارشِ ضایعات و کسری (INV-17)، پیش‌فرض خاموش
@@ -691,6 +694,7 @@ fun SettingsScreenLegacy(
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) item { DocGapsSettingsWired(context) } //  شماره‌های جاافتاده (RPT-17)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.TaxQuarterSettingsWired(context, d, snackbar) } //  مالیاتِ سه‌ماهه و یادآورِ سررسید (RPT-10)، پیش‌فرض خاموش
     item { ir.vil3ntec.tohid.ui.screens.CustomerCardSettingsWired(context) } //  کارت یا بارکدِ مشتری (CRM-16)، پیش‌فرض خاموش
+    item { ir.vil3ntec.tohid.ui.screens.TillGoodsSettingsWired(context) } //  ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05)، پیش‌فرض خاموش
 
     /* ============ تحلیلِ موجودی (INV-15، INV-16) — گزارشِ کالاها در گوشی و کامپیوتر ============ */
     //  پیش‌فرض خاموش؛ فقط خواندنی و فقط همین دستگاه (`ShopPolicy.stockInsight`).

@@ -110,8 +110,8 @@ object WarehouseEngine {
     return null
   }
 
-  /** اصلاح موجودی | برگشت به تأمین‌کننده — همان دو حالتِ نسخهٔ وب */
-  enum class AdjustKind { ADJUSTMENT, SUPPLIER_RETURN }
+  /** اصلاح موجودی | برگشت به تأمین‌کننده — همان دو حالتِ نسخهٔ وب؛ COUNT: «اصلاحِ شمارش» ِ انبارگردانیِ تازه (S20، `count_adjust`) */
+  enum class AdjustKind { ADJUSTMENT, SUPPLIER_RETURN, COUNT }
 
   /* ------------------------------ انبارگردانی ------------------------------ */
 
@@ -145,6 +145,8 @@ object WarehouseEngine {
     now: Long,
     newId: () -> String,
     shift: Map<String, Double> = emptyMap(),
+    /** S20 (`CountToolsPref`): `COUNT` ⇒ حرکتِ جدای «اصلاحِ شمارش» (`count_adjust`)؛ پیش‌فرض همان «اصلاح موجودی» */
+    kind: AdjustKind = AdjustKind.ADJUSTMENT,
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
     val lines = countLines(d, counted, shift)
@@ -154,7 +156,7 @@ object WarehouseEngine {
     var lastId = ""
     for (l in lines) {
       when (val r = adjustStock(
-        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, AdjustKind.ADJUSTMENT, today, now, newId,
+        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId,
       )) {
         is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
         is Result.Ok -> { data = r.data; lastId = r.id }
@@ -232,7 +234,7 @@ object WarehouseEngine {
     val fractional = SalesEngine.isFractionalUnit(unit) || saleUnit.isNotBlank()
     return when (val c = PackBarcodes.check(drafts, unit, fractional, codes, selfId) { owners[it] }) {
       is PackBarcodes.Checked.Failed -> null to c.message
-      is PackBarcodes.Checked.Ok -> c.packs.map { ProductPack(it.name, it.sizeMilli, it.barcodes) }.ifEmpty { null } to null
+      is PackBarcodes.Checked.Ok -> c.packs.map { ProductPack(it.name, it.sizeMilli, it.barcodes, it.priceMinor) }.ifEmpty { null } to null
     }
   }
 
@@ -877,8 +879,9 @@ object WarehouseEngine {
     }
     val id = newId()
     val date = today
-    val label = if (kind == AdjustKind.SUPPLIER_RETURN) "برگشت به تأمین‌کننده" else "اصلاح موجودی"
+    val label = when (kind) { AdjustKind.SUPPLIER_RETURN -> "برگشت به تأمین‌کننده"; AdjustKind.COUNT -> "اصلاحِ شمارش"; else -> "اصلاح موجودی" }
     val stockKind: String? = when {
+      kind == AdjustKind.COUNT -> "count"
       adjKind == null -> null
       kind == AdjustKind.SUPPLIER_RETURN -> "supplier_return"
       //  خراب/گم‌شده/منقضی فقط کاهش است؛ افزایش ⇒ اصلاحِ شمارش
@@ -908,7 +911,7 @@ object WarehouseEngine {
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
           productId = productId,
-          type = if (kind == AdjustKind.SUPPLIER_RETURN) "supplier_return" else "adjustment",
+          type = when (kind) { AdjustKind.SUPPLIER_RETURN -> "supplier_return"; AdjustKind.COUNT -> "count_adjust"; else -> "adjustment" },
           qty = delta,
           date = date,
           notes = why,

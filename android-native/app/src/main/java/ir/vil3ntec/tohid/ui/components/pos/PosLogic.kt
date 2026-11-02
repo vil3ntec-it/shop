@@ -223,6 +223,8 @@ enum class PosAction {
   SUBMIT, HINT_DOWN, HINT_UP, ROW_DOWN, ROW_UP, CLEAR_QUERY, DELETE_ROW, QTY_UP, QTY_DOWN,
   /** POS-15 — Ctrl+I (`KeyMap.SALE_PRICE_CHECK`)؛ صفحه فقط با `PosPriceCheckPrefs` روشن آن را می‌خورد */
   PRICE_CHECK,
+  /** POS-09، S05 — Ctrl+U (`KeyMap.SALE_UNIT`): واحدِ ردیف؛ صفحه فقط با `TillGoodsPref.units` روشن آن را می‌خورد */
+  UNIT,
 }
 
 /**
@@ -241,6 +243,7 @@ object PosKeys {
     key == KeyName.F7 -> PosAction.RECEIVE
     key == KeyName.F8 -> PosAction.REPRINT
     primary && key == KeyName.I -> PosAction.PRICE_CHECK
+    primary && key == KeyName.U -> PosAction.UNIT
     else -> null
   }
 

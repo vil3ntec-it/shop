@@ -84,6 +84,7 @@ import androidx.compose.material.icons.outlined.Summarize
 import androidx.compose.material.icons.outlined.Warehouse
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AnomalyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.CustomerCardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TillGoodsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftCardScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LayawayScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LoyaltyScreen
@@ -190,6 +191,7 @@ internal object SettingsPages {
     Page(SettingsLayout.SAFE_BOOK, Icons.Outlined.AccountBalance) { SafeBookScreen(it) },
     Page(SettingsLayout.LOYALTY, Icons.Outlined.Loyalty) { LoyaltyScreen(it) },
     Page(SettingsLayout.CUSTOMER_CARD, Icons.Outlined.CreditCard) { CustomerCardScreen(it) },
+    Page(SettingsLayout.TILL_GOODS, Icons.Outlined.QrCodeScanner) { TillGoodsScreen(it) },
     Page(SettingsLayout.SIMPLE_ASK, Icons.Outlined.QuestionAnswer) { SimpleAskScreen(it) },
     Page(SettingsLayout.REPORT_KEYS, Icons.Outlined.Keyboard) { ReportKeysScreen(it) },
     Page(SettingsLayout.DOC_GAPS, Icons.Outlined.FormatListNumbered) { DocGapsScreen(it) },

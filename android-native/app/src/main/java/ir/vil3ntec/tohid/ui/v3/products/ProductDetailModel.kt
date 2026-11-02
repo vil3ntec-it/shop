@@ -53,7 +53,7 @@ object ProductDetailModel {
     "customer_return" -> MoveKind.CUSTOMER_RETURN
     "sale_cancel" -> MoveKind.SALE_CANCEL
     "supplier_return" -> MoveKind.SUPPLIER_RETURN
-    "adjustment" -> MoveKind.ADJUSTMENT
+    "adjustment", "count_adjust" -> MoveKind.ADJUSTMENT
     else -> MoveKind.OTHER
   }
 }

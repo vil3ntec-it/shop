@@ -943,12 +943,16 @@ fun CartLineDialog(
   /** POS-11 — یادداشتِ ردیف (`posLineNote`)؛ `null` (تنظیمِ خاموش) ⇒ همان کادرِ پیشین */
   note: ir.vil3ntec.tohid.ui.components.pos.PosLineNote? = null,
   serials: ir.vil3ntec.tohid.ui.components.pos.PosLineSerials? = null, // POS-28 — کالای سریال‌دار؛ `null` ⇒ همان کادرِ پیشین
+  /** S05 — واحدهای کالا با قیمتِ لیست و «بستهٔ کامل» (`TillGoodsPref.plan`)؛ `null` (خاموش) ⇒ همان کادرِ پیشین */
+  units: ir.vil3ntec.tohid.data.UnitLine.Plan? = null,
 ) {
   val policy = linePolicy
   var noteText by remember { mutableStateOf(note?.value.orEmpty()) }; var serialText by remember { mutableStateOf(serials?.text.orEmpty()) }
-  var qtyText by remember { mutableStateOf(qty(quantity)) }
+  var qtyText by remember { mutableStateOf(qty(units?.startCount ?: quantity)) }
   var priceText by remember { mutableStateOf(qty(unitPrice)) }
-  var manual by remember { mutableStateOf(custom) }
+  var manual by remember { mutableStateOf(custom && units?.packPriced != true) }
+  var unitAt by remember { mutableStateOf(units?.startAt ?: 0) }
+  val unitNow = units?.units?.getOrNull(unitAt)
   var discountText by remember { mutableStateOf("") }
   var discountPercent by remember { mutableStateOf(true) }
   //  مقدار به کدام واحد تایپ می‌شود؛ موجودی و قیمت همیشه به `unit` می‌مانند
@@ -956,7 +960,10 @@ fun CartLineDialog(
   val hasSaleUnit = saleUnit.isNotBlank() && unitFactor > 0
 
   val typedQty = qtyText.toDoubleOrNull()
-  val parsedQty = typedQty?.let { if (inSaleUnit) Math.round(it * unitFactor * 1000.0) / 1000.0 else it }
+  val parsedQty = if (unitNow != null) ir.vil3ntec.tohid.core.product.UnitSale.toBase(typedQty, unitNow, units?.wholeOnly == true)
+    else typedQty?.let { if (inSaleUnit) Math.round(it * unitFactor * 1000.0) / 1000.0 else it }
+  val partBad = unitNow != null && typedQty != null && ir.vil3ntec.tohid.core.product.UnitSale.partRejected(typedQty, unitNow, units?.wholeOnly == true)
+  val listPrice = unitNow?.let(ir.vil3ntec.tohid.core.product.UnitSale::lineUnitPrice) // قیمتِ هر واحدِ پایه از قیمتِ بسته
   val parsedPrice = priceText.toDoubleOrNull()
   //  POS-08/10/20: قاعدهٔ جهت، سقفِ قلمِ آزاد و تخفیفِ ردیف (`LinePolicy.edit`)؛ خاموش ⇒ بی رد و بی تخفیف
   val edit = ir.vil3ntec.tohid.data.LinePolicy.edit(
@@ -978,7 +985,19 @@ fun CartLineDialog(
           Spacer(Modifier.height(12.dp))
         }
 
-        if (hasSaleUnit) {
+        if (units != null) {
+          SegmentedChoice(
+            options = units.units.mapIndexed { i, u -> i.toString() to ir.vil3ntec.tohid.data.UnitLine.label(u, unit) },
+            selected = unitAt.toString(),
+            onSelect = { c ->
+              val j = c.toIntOrNull() ?: 0
+              //  همان مقدار، به واحدِ تازه
+              if (j != unitAt) typedQty?.let { v -> qtyText = qty(ir.vil3ntec.tohid.core.product.UnitSale.fromBase(v * units.units[unitAt].sizeMilli / 1000.0, units.units[j])) }
+              unitAt = j
+            },
+          )
+          Spacer(Modifier.height(8.dp))
+        } else if (hasSaleUnit) {
           SegmentedChoice(
             options = listOf("stock" to unit.ifBlank { "واحد" }, "sale" to saleUnit),
             selected = if (inSaleUnit) "sale" else "stock",
@@ -998,11 +1017,19 @@ fun CartLineDialog(
         NumberField(
           value = qtyText,
           onValueChange = { qtyText = it },
-          label = (if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) "تعداد ($u)" else "تعداد" },
+          label = (unitNow?.name ?: if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) "تعداد ($u)" else "تعداد" },
           modifier = Modifier.fillMaxWidth(),
         )
-        ir.vil3ntec.tohid.ui.components.pos.ScaleWeighButton(unit) { qtyText = qty(it); inSaleUnit = false }
-        if (inSaleUnit && parsedQty != null) {
+        ir.vil3ntec.tohid.ui.components.pos.ScaleWeighButton(unit) { qtyText = qty(it); inSaleUnit = false; unitAt = 0 }
+        if (unitNow != null && (unitAt > 0 || partBad)) {
+          Spacer(Modifier.height(4.dp))
+          Text(
+            if (partBad) ir.vil3ntec.tohid.core.product.UnitSale.partMessage(unitNow.name)
+            else "= ${qty(parsedQty ?: 0.0)} $unit" + (unitNow.priceMinor?.let { " · ${unitNow.name} ${money(it / 100.0)} ؋ (لیستِ قیمت)" } ?: ""),
+            style = MaterialTheme.typography.labelSmall,
+            color = if (partBad) Shop.colors.danger else Shop.colors.muted,
+          )
+        } else if (inSaleUnit && parsedQty != null) {
           Spacer(Modifier.height(4.dp))
           Text(
             "= ${qty(parsedQty)} $unit",
@@ -1049,7 +1076,7 @@ fun CartLineDialog(
         )
 
         Spacer(Modifier.height(14.dp))
-        val shownPrice = if (manual) (parsedPrice ?: 0.0) else basePrice
+        val shownPrice = if (manual) (parsedPrice ?: 0.0) else listPrice ?: basePrice
         Text(
           "جمع این ردیف: ${money((parsedQty ?: 0.0) * shownPrice)} ؋",
           style = MaterialTheme.typography.titleSmall,
@@ -1064,7 +1091,7 @@ fun CartLineDialog(
           Button(
             enabled = ok,
             //  تخفیفِ ردیف ⇒ قیمتِ واحدِ پس از تخفیف؛ وگرنه همان قیمتِ دستیِ پیشین
-            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else null); note?.save?.invoke(noteText); serials?.save(serialText) },
+            onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else listPrice); note?.save?.invoke(noteText); serials?.save(serialText) },
           ) { Text("ثبت") }
         }
       }

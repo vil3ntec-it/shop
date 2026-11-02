@@ -686,7 +686,7 @@ private fun RowEcho(text: String, warn: Boolean) {
 
 /** یک ردیفِ تراشهٔ صافی (INV-05): «همه» و هر گزینه؛ `null` ⇒ همه */
 @Composable
-private fun CountFilterChips(all: String, options: List<Pair<String, String>>, picked: String?, onPick: (String?) -> Unit) {
+internal fun CountFilterChips(all: String, options: List<Pair<String, String>>, picked: String?, onPick: (String?) -> Unit) {
   Row(
     Modifier.fillMaxWidth().padding(top = 6.dp).horizontalScroll(rememberScrollState()),
     horizontalArrangement = Arrangement.spacedBy(6.dp),

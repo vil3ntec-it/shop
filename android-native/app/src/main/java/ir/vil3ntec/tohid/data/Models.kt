@@ -124,6 +124,8 @@ data class ProductPack(
   val name: String = "",
   val sizeMilli: Long = 0,
   val barcodes: List<String> = emptyList(),
+  /** قیمتِ یک بسته در لیستِ قیمت (S05، Minor)؛ `null` تعریف نشده و نوشته نمی‌شود ⇒ JSON ِ بستهٔ پیشین همان */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceMinor: Long? = null,
 )
 
 @Serializable
