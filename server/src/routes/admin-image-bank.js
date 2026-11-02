@@ -123,7 +123,8 @@ router.get('/review', async (req, res) => {
       return {
         id: i.id, status: i.status, space: i.space, role: i.role, from_shop: i.from_shop, batch_id: i.batch_id,
         created_at: i.created_at, match_status: d.match_status || '', match_reasons: d.match_reasons || [],
-        quality_flags: i.quality_flags, duplicate_of: i.duplicate_of, license: d.license || null,
+        quality_flags: i.quality_flags, duplicate_of: i.duplicate_of, near_duplicate_of: d.near_duplicate_of,
+        license: d.license || null,
         product: d.product || null,
         candidates: (d.proposal?.candidates || []).map((id) => byId.get(String(id)) || { id: String(id), missing: true }),
         version: d.current_version || null,

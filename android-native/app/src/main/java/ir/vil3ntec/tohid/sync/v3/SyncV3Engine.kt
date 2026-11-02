@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync.v3
 
+import ir.vil3ntec.tohid.core.hub.HubRelayPort
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.v3.HlcClock
@@ -157,6 +158,8 @@ data class V3Step(
   val retryInMs: Long = 0,
   /** ورودی‌هایی که پس از بازیابیِ سرور دوباره جلوی صف آمدند (§۹.۵) */
   val replayed: Int = 0,
+  /** SYN-09: سرور نرسید و هاب این شمار op را نگه داشت — هنوز «در انتظار»، صف و `lastOkAt` دست نخورده */
+  val relayed: Int = 0,
 )
 
 internal class SyncV3Engine(
@@ -171,6 +174,8 @@ internal class SyncV3Engine(
   private val withLock: (() -> Unit) -> Unit = { it() },
   /** §۹.۵: شناسهٔ ردیف‌های بایگانی‌شدهٔ دفتر (`LedgerArchive.archivedIds`) — از Snapshot برنمی‌گردند */
   private val archived: () -> Map<String, Set<String>> = { emptyMap() },
+  /** SYN-09: هابِ محلی (`platform/HubRelayAndroid`)؛ `null` (پرچمِ خاموش) ⇒ همان امروز */
+  private val hub: HubRelayPort? = null,
 ) {
   val deviceId: String = deviceId.replace(Regex("[^A-Za-z0-9_.-]"), "-").take(64).ifEmpty { "device" }
 
@@ -475,7 +480,8 @@ internal class SyncV3Engine(
         put("schema_version", JsonPrimitive(LedgerDiff.BASE_SCHEMA))
       }
     }
-    val r = tryCall("POST", "/push", body) ?: return fail(0, null)
+    //  SYN-09: فقط «به سرور نرسید» به هاب می‌رود؛ شکست همان است و پاسخِ هاب چیزی را از صف برنمی‌دارد
+    val r = tryCall("POST", "/push", body) ?: return fail(0, null).copy(relayed = relay(body))
     val rb = r.body
     if (r.status != 200 || rb == null) return fail(r.status, rb)
 
@@ -485,6 +491,10 @@ internal class SyncV3Engine(
     withLock { step = settle(b, results) }
     return step
   }
+
+  private suspend fun relay(body: JsonObject): Int = try { hub?.relay(body)?.pending ?: 0 } catch (e: CancellationException) {
+    throw e
+  } catch (e: Exception) { 0 }
 
   private fun settle(b: Batch, results: List<JsonObject?>): V3Step {
     val done = HashSet<String>()

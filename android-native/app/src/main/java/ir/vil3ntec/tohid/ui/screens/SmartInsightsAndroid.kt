@@ -29,6 +29,14 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 const val SMART_FORECAST_TITLE = "پیش‌بینیِ تقاضا (آزمایشی)"
 const val ANOMALY_TITLE = "تشخیصِ ناهنجاری (آزمایشی)"
 
+/** توضیحِ بخش‌ها — یکی برای رابطِ امروز و صفحهٔ نسخهٔ ۳ (`settings/sales/forecast`، `settings/security/anomalies`) */
+const val SMART_FORECAST_NOTE =
+  "در «پیشنهادِ سفارش»: کالای پرفروش با میانگینِ متحرکِ ۲۸ روز و روزِ هفته، کالای کم‌فروش با روشِ Croston؛ " +
+  "پیش‌بینیِ هر روزِ آینده، دلیل از همان عددها و اطمینان از درازای داده و نوسان. بی اینترنت، روی دفترِ همین دستگاه."
+const val ANOMALY_NOTE =
+  "در زبانهٔ «ضدتقلب» ِ گزارشِ تازه: لغو و تخفیف و کشوی هر صندوقدار، اختلافِ صندوق، کمِ موجودی با «اصلاح»، فروش زیرِ بها، " +
+  "فاکتورِ نیمه‌شب و روزهای بیرون از معمولِ برگشتی و تخفیف. هر مورد فقط «نیازمندِ بررسی» است و چیزی را نمی‌بندد."
+
 /** «پیشنهادِ سفارش» با پیش‌بینیِ قابلِ توضیح؟ (AI-07) */
 @Composable
 fun rememberSmartForecastOn(): Boolean {
@@ -53,8 +61,7 @@ fun SmartForecastSettingsWired(context: android.content.Context) {
     tint = if (on) Shop.colors.primary else Shop.colors.muted,
   ) {
     Text(
-      "در «پیشنهادِ سفارش»: کالای پرفروش با میانگینِ متحرکِ ۲۸ روز و روزِ هفته، کالای کم‌فروش با روشِ Croston؛ " +
-        "پیش‌بینیِ هر روزِ آینده، دلیل از همان عددها و اطمینان از درازای داده و نوسان. بی اینترنت، روی دفترِ همین دستگاه.",
+      SMART_FORECAST_NOTE,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
     Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
@@ -77,8 +84,7 @@ fun AnomalySettingsWired(context: android.content.Context) {
     tint = if (on) Shop.colors.warning else Shop.colors.muted,
   ) {
     Text(
-      "در زبانهٔ «ضدتقلب» ِ گزارشِ تازه: لغو و تخفیف و کشوی هر صندوقدار، اختلافِ صندوق، کمِ موجودی با «اصلاح»، فروش زیرِ بها، " +
-        "فاکتورِ نیمه‌شب و روزهای بیرون از معمولِ برگشتی و تخفیف. هر مورد فقط «نیازمندِ بررسی» است و چیزی را نمی‌بندد.",
+      ANOMALY_NOTE,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
     Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)

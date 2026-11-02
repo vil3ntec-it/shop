@@ -22,6 +22,11 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 
 const val EASY_SETUP_TITLE = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"
 
+/** توضیحِ بخش — یکی برای رابطِ امروز و صفحهٔ نسخهٔ ۳ (`settings/devices/easy-setup`) */
+const val EASY_SETUP_NOTE =
+  "در «دستگاه‌ها»: پیدا کردنِ خودکارِ چاپگرِ شبکه (فقط زیرشبکهٔ همین وای‌فای/LAN، درگاهِ ۹۱۰۰) و بلوتوثِ نزدیک، " +
+  "چاپِ شناسایی، برگهٔ بارکدِ آزمون و «آزمونِ بارکدخوان» که پیشوند و پسوندِ بارکدخوان را خودش پیدا می‌کند."
+
 @Composable
 fun EasySetupSettingsWired(context: android.content.Context) {
   LaunchedEffect(Unit) { EasySetupPref.load(context) }
@@ -33,8 +38,7 @@ fun EasySetupSettingsWired(context: android.content.Context) {
     tint = if (on) Shop.colors.primary else Shop.colors.muted,
   ) {
     Text(
-      "در «دستگاه‌ها»: پیدا کردنِ خودکارِ چاپگرِ شبکه (فقط زیرشبکهٔ همین وای‌فای/LAN، درگاهِ ۹۱۰۰) و بلوتوثِ نزدیک، " +
-        "چاپِ شناسایی، برگهٔ بارکدِ آزمون و «آزمونِ بارکدخوان» که پیشوند و پسوندِ بارکدخوان را خودش پیدا می‌کند.",
+      EASY_SETUP_NOTE,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
     Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
