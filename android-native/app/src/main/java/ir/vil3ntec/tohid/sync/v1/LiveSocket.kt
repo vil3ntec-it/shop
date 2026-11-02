@@ -81,6 +81,8 @@ class LiveSocket(
   fun connect() {
     current = this
     if (socket != null || dialing) return
+    //  OPS-07: حالتِ آموزشی ⇒ نه سوکت، نه Pull ِ پس از رخداد
+    if (!ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return
     if (!Backend.isReady(app)) return
     val token = Backend.tokens(app).accessToken ?: return
     val base = AppConfig.baseUrl(app).ifBlank { return }

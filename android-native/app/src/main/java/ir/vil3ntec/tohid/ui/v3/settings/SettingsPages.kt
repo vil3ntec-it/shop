@@ -125,6 +125,12 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.ReportKeysScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LinePricingScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PosNotesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.AutoFeesScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.EasySetupScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SimpleAskScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TrainingScreen
+import androidx.compose.material.icons.outlined.QuestionAnswer
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SettingsSuggest
 import androidx.compose.material.icons.outlined.AddCard
 import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.Discount
@@ -151,6 +157,7 @@ internal object SettingsPages {
     Page(SettingsLayout.NAV_BAR, Icons.Outlined.CallToAction) { NavBarScreen(shell.navAllowed, it) },
     Page("زبان", Icons.Outlined.Language) { LanguageScreen(it) },
     Page("تاریخ و رقم", Icons.Outlined.CalendarToday) { DigitsScreen(it) },
+    Page(SettingsLayout.TRAINING, Icons.Outlined.School) { TrainingScreen(it) },
     Page("قفل برنامه", Icons.Outlined.Lock) { AppLockScreen(it) },
     Page(SettingsLayout.ENCRYPTION, Icons.Outlined.Shield) { EncryptionScreen(it) },
     Page("کد شاگرد", Icons.Outlined.Key) { StaffCodeScreen(it) },
@@ -183,6 +190,7 @@ internal object SettingsPages {
     Page(SettingsLayout.SAFE_BOOK, Icons.Outlined.AccountBalance) { SafeBookScreen(it) },
     Page(SettingsLayout.LOYALTY, Icons.Outlined.Loyalty) { LoyaltyScreen(it) },
     Page(SettingsLayout.CUSTOMER_CARD, Icons.Outlined.CreditCard) { CustomerCardScreen(it) },
+    Page(SettingsLayout.SIMPLE_ASK, Icons.Outlined.QuestionAnswer) { SimpleAskScreen(it) },
     Page(SettingsLayout.REPORT_KEYS, Icons.Outlined.Keyboard) { ReportKeysScreen(it) },
     Page(SettingsLayout.DOC_GAPS, Icons.Outlined.FormatListNumbered) { DocGapsScreen(it) },
     Page(SettingsLayout.TAX_QUARTER, Icons.Outlined.Receipt) { TaxQuarterScreen(it) },
@@ -203,6 +211,7 @@ internal object SettingsPages {
     Page(SettingsLayout.ANOMALY, Icons.Outlined.ReportProblem) { AnomalyScreen(it) },
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
+    Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },

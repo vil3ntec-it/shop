@@ -296,7 +296,8 @@ router.get('/:slug/orders', readLimit, store, async (req, res) => {
 
 router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  PAY-21: قصدِ گذشته از زمان پیش از خواندن بسته می‌شود؛ دکمه فقط وقتی همین حالا پرداختنی است
-  const orderId = sf.orderIdOf(req.store.shop_id, req.params.token);
+  //  TEN-03: نخست سنجشِ لینک (نادرست ۴۰۴؛ منقضی/باطل ۴۱۰) — هیچ نوشتنی برای لینکِ ناروا
+  const orderId = await sf.orderIdOfLink(req.store, req.params.token);
   await pay.refreshOrder(req.store.shop_id, orderId);
   const order = await sf.track(req.store, req.params.token);
   order.onlinePay = { available: await pay.orderPayable(req.store.shop_id, orderId) };

@@ -170,6 +170,9 @@ class SettingsPortTest {
       SettingsLayout.LINE_PRICING to "settings/sales/line-pricing",
       SettingsLayout.POS_NOTES to "settings/sales/notes",
       SettingsLayout.AUTO_FEES to "settings/sales/auto-fees",
+      SettingsLayout.SIMPLE_ASK to "settings/sales/simple-ask",
+      SettingsLayout.EASY_SETUP to "settings/devices/easy-setup",
+      SettingsLayout.TRAINING to "settings/general/training",
     )
     keys.forEach { (key, path) ->
       assertEquals(key, path, SettingsPaths.section(key))
@@ -185,6 +188,12 @@ class SettingsPortTest {
     assertEquals(ir.vil3ntec.tohid.ui.screens.OWNER_REPORT_TITLE, SettingsLayout.OWNER_REPORT)
     assertEquals(ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE, SettingsLayout.STOREFRONT_ETA)
     assertEquals(ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE, SettingsLayout.PROMO_GUARD)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.EASY_SETUP_TITLE, SettingsLayout.EASY_SETUP)
+    assertEquals(ir.vil3ntec.tohid.ui.screens.TRAINING_SETTINGS_TITLE, SettingsLayout.TRAINING)
+    //  حالتِ آموزشی: ورود و پاک کردن همان `TrainingLedger` و همان سدِ نقشِ `TrainingSettingsWired`
+    val ops = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/OpsToggleScreensAndroid.kt" }.value
+    listOf("TrainingLedger.enter(", "TrainingLedger.wipe(", "TrainingMode.canEnter(role, staff)", "TrainingMode.canManage(role)", "if (!active)")
+      .forEach { assertTrue("$it در صفحهٔ آموزش نیست", ops.contains(it)) }
   }
 
   @Test
@@ -236,7 +245,7 @@ class SettingsPortTest {
       "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
       "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
       "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
-      "AutoFeesPref.set",
+      "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
     )
 
     /** کلیدهایی که `SettingsLegacy` فقط پشتِ `Platform.DESKTOP` دارد */

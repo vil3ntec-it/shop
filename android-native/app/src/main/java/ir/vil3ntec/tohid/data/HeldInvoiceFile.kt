@@ -20,12 +20,24 @@ class FileHeldDisk(private val file: File) : HeldDisk {
 object HeldInvoices {
   @Volatile private var store: HeldInvoiceStore? = null
 
+  /** OPS-07: فاکتورهای نگه‌داشتهٔ حالتِ آموزشی — پروندهٔ جدا در `files/training`، بی سریِ سندِ دستگاه */
+  @Volatile private var training: HeldInvoiceStore? = null
+
   /** ساختن چیزی نمی‌خواند؛ فایل و سریِ دستگاه با نخستین کار روی `Dispatchers.IO` خوانده می‌شوند */
-  fun of(context: Context): HeldInvoiceStore = store ?: synchronized(this) {
-    val app = context.applicationContext ?: context
-    store ?: HeldInvoiceStore(
-      FileHeldDisk(File(app.filesDir, HeldInvoiceStore.FILE)),
-      device = { ir.vil3ntec.tohid.sync.DocSeries.current(app) },
-    ).also { store = it }
+  fun of(context: Context): HeldInvoiceStore {
+    val inTraining = TrainingMode.on
+    (if (inTraining) training else store)?.let { return it }
+    return synchronized(this) {
+      val app = context.applicationContext ?: context
+      if (inTraining) training ?: HeldInvoiceStore(FileHeldDisk(File(TrainingLedger.filesDir(app), HeldInvoiceStore.FILE)), device = { "" })
+        .also { training = it }
+      else store ?: HeldInvoiceStore(
+        FileHeldDisk(File(app.filesDir, HeldInvoiceStore.FILE)),
+        device = { ir.vil3ntec.tohid.sync.DocSeries.current(app) },
+      ).also { store = it }
+    }
   }
+
+  /** خروج از آموزش (`TrainingLedger.exit`): ورودِ بعدی پرونده را از نو می‌خواند (شاید پاک شده باشد) */
+  fun forgetTraining() { training = null }
 }

@@ -140,6 +140,12 @@ object SettingsLayout {
   const val POS_NOTES = "یادداشتِ ردیف و فاکتور"
   /** هزینهٔ خودکارِ فاکتور (POS-36، `AutoFeesPref`) */
   const val AUTO_FEES = "هزینهٔ خودکار"
+  /** پرسشِ ساده از گزارش‌ها (RPT-16، `SimpleAskPref`) */
+  const val SIMPLE_ASK = "پرسشِ ساده از گزارش‌ها"
+  /** راه‌اندازیِ آسانِ دستگاه‌ها (HW-12، `EasySetupPref`) — همان `EASY_SETUP_TITLE` */
+  const val EASY_SETUP = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"
+  /** حالتِ آموزشی (OPS-07، `TrainingPref` و `TrainingLedger`) — همان `TRAINING_SETTINGS_TITLE` */
+  const val TRAINING = "حالتِ آموزشی"
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
@@ -148,20 +154,20 @@ object SettingsLayout {
   )
 
   val GROUPS: List<Group> = listOf(
-    Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
+    Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم", TRAINING)),
     Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب", FRAUD_TRAIL, ANOMALY)),
     Group(
       SALES,
       listOf(
         "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
-        POS_MORE_KEYS, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, REPORT_KEYS,
+        POS_MORE_KEYS, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
         DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
         SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
         STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, PRODUCT_TOOLS, PRODUCT_INFO, LABEL_TOOLS,
         STOREFRONT_ETA, PROMO_GUARD, PRINTER,
       ),
     ),
-    Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
+    Group(DEVICES, listOf(CAMERA, EASY_SETUP, PERIPHERALS)),
     Group(DATA, listOf("همگام‌سازی", "داده‌ها", CHAT_GUARD)),
     Group(ABOUT, listOf(ABOUT_APP)),
   )
@@ -227,6 +233,9 @@ object SettingsLayout {
     LINE_PRICING to "line-pricing",
     POS_NOTES to "notes",
     AUTO_FEES to "auto-fees",
+    SIMPLE_ASK to "simple-ask",
+    EASY_SETUP to "easy-setup",
+    TRAINING to "training",
     TILL_RECEIVE to "till-receive",
     STOCK_MODE to "stock-mode",
     STOCK_INSIGHT to "stock-insight",
@@ -300,6 +309,9 @@ object SettingsLayout {
     LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
     POS_NOTES -> StrPos.notesSection
     AUTO_FEES -> StrSale.feesTitle
+    SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle
+    EASY_SETUP -> EASY_SETUP_TITLE
+    TRAINING -> TRAINING_SETTINGS_TITLE
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE
     STOCK_INSIGHT -> StrShell.stockInsight

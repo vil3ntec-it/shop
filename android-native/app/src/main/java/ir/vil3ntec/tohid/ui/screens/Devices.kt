@@ -47,7 +47,7 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
-  LaunchedEffect(Unit) { PhoneScanner.load(context); PhotoPrefs.load(context) }
+  LaunchedEffect(Unit) { PhoneScanner.load(context); PhotoPrefs.load(context); ir.vil3ntec.tohid.print.EasySetupPref.load(context) }
 
   //  تنظیمِ چاپگر و کشو فقط صاحب و مدیر (`settings.write`)؛ باز کردنِ کشو با `drawer.open`
   //  نقش یا سیاستِ دکان که عوض شد (پاسخِ تازهٔ سرور) همین‌جا دوباره سنجیده می‌شود
@@ -63,7 +63,7 @@ fun DevicesScreen(data: ir.vil3ntec.tohid.data.ShopData, snackbar: SnackbarHostS
     Spacer(Modifier.height(14.dp))
     LabelsPanel(data, ::toast)
     Spacer(Modifier.height(14.dp))
-    ScannersPanel()
+    ScannersPanel(canAdmin, ::toast)
   }
   val right: @Composable () -> Unit = {
     PhoneScannerPanel(data, ::toast)
@@ -119,6 +119,9 @@ private fun PrintersPanel(toast: (String) -> Unit, canAdmin: Boolean, canDrawer:
   var adding by remember { mutableStateOf(false) }
   var name by remember { mutableStateOf("") }
   var editing by remember { mutableStateOf<PrinterRegistry.Saved?>(null) }
+  //  HW-12: «پیدا کردنِ خودکار» فقط با «راه‌اندازیِ آسان» ِ روشن (پیش‌فرض خاموش ⇒ همان امروز)
+  var finding by remember { mutableStateOf(false) }
+  val easy = ir.vil3ntec.tohid.print.EasySetupPref.on.value
 
   Panel {
     Head(Icons.Filled.Print, "چاپگرها", "حرارتیِ ۵۸ و ۸۰ میلی‌متری — بلوتوث، وای‌فای، سیم یا چاپگرِ نصب‌شده")
@@ -162,6 +165,13 @@ private fun PrintersPanel(toast: (String) -> Unit, canAdmin: Boolean, canDrawer:
         Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp)); Text("افزودنِ چاپگر")
       }
+      if (easy) {
+        Spacer(Modifier.height(6.dp))
+        OutlinedButton(onClick = { finding = true }) {
+          Icon(Icons.Filled.Search, contentDescription = null, modifier = Modifier.size(18.dp))
+          Spacer(Modifier.width(6.dp)); Text("پیدا کردنِ خودکارِ چاپگر (شبکه و بلوتوث)")
+        }
+      }
     }
     Spacer(Modifier.height(6.dp))
     Text(
@@ -171,6 +181,9 @@ private fun PrintersPanel(toast: (String) -> Unit, canAdmin: Boolean, canDrawer:
   }
   editing?.takeIf { canAdmin }?.let { p ->
     PrinterSettingsDialog(p, onDismiss = { editing = null }, onSaved = { editing = null; tick++; toast("تنظیمِ چاپگر ذخیره شد") }, toast = toast, canDrawer = canDrawer)
+  }
+  if (finding && easy && canAdmin) {
+    PrinterFinderDialog(onDismiss = { finding = false; tick++ }, onAdded = { tick++; toast("«$it» به چاپگرها افزوده شد") }, toast = toast)
   }
   if (adding && canAdmin) {
     PrinterDialog(
@@ -190,7 +203,7 @@ private fun PrintersPanel(toast: (String) -> Unit, canAdmin: Boolean, canDrawer:
 /* ============================== بارکدخوان ============================== */
 
 @Composable
-private fun ScannersPanel() {
+private fun ScannersPanel(canAdmin: Boolean, toast: (String) -> Unit) {
   var test by remember { mutableStateOf("") }
   var last by remember { mutableStateOf<String?>(null) }
   Panel {
@@ -221,6 +234,8 @@ private fun ScannersPanel() {
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
     if (ir.vil3ntec.tohid.print.HwTools.on.value) { Spacer(Modifier.height(10.dp)); ScannerTools() }
+    //  HW-12: برگهٔ بارکدخوان و «آزمونِ بارکدخوان» فقط با «راه‌اندازیِ آسان» ِ روشن
+    if (ir.vil3ntec.tohid.print.EasySetupPref.on.value && canAdmin) { Spacer(Modifier.height(10.dp)); ScannerSetupTools(canAdmin, toast) }
   }
 }
 
