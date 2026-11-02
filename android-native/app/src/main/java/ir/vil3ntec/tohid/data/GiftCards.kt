@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.hw.Barcodes
+import ir.vil3ntec.tohid.core.hw.Code128
 import ir.vil3ntec.tohid.core.i18n.StrGiftCard
 import ir.vil3ntec.tohid.core.pay.GiftCard
 import ir.vil3ntec.tohid.core.pay.Settlement
@@ -11,12 +13,14 @@ import ir.vil3ntec.tohid.core.pay.StoredPay
  *  `core/pay/{GiftCard,StoredPay}`؛ این‌جا فقط دفتر ⇄ رویداد.
  *
  *  ── بی جدولِ تازه و بی مهاجرت (همان الگوی سفارشِ ویژه، POS-26) ──────────
- *    • کارت: ردیف‌های سابقهٔ [ISSUE]/[REDEEM]/[REFUND]/[VOID]، هر کدام یک رویدادِ `GiftCard.Event`: شناسهٔ ردیف =
+ *    • کارت: ردیف‌های سابقهٔ [ISSUE]/[REDEEM]/[REFUND]/[VOID]/[RECHARGE]، هر کدام یک رویدادِ `GiftCard.Event`: شناسهٔ ردیف =
  *      شناسهٔ رویداد، `payRef` = کدِ کارت، `refId` = فاکتور (خرج) یا سندِ برگشت/لغو، `amount` = مبلغ، `by`، `reason`.
  *      مانده از رویدادها ([view])؛ هیچ ردیفی ویرایش نمی‌شود.
  *    • اعتبار: همان طلبِ مشتری در دفترِ قرض‌دار؛ خرج «برد» با `kind` = [CREDIT] (`refId` = فاکتور)، برگشت به اعتبار
  *      «رسید» با همان `kind` (`refId` = سندِ برگشت یا فاکتورِ لغوشده). هیچ‌کدام نقدِ دخل نیست (`CashShift.isCashReceipt`).
- *    • فروشِ کارت ([issue]) نقد به دخل می‌آورد: `CashShift.totals` و `PayFlow.ledgerEvents` آن را رسیدِ نقد می‌شمارند.
+ *    • فروشِ کارت ([issue]) و شارژِ دوباره ([recharge]) نقد به دخل می‌آورند: `CashShift.totals` و `PayFlow.ledgerEvents`
+ *      همان یک ردیف را رسیدِ نقد می‌شمارند ([cashRows]) — دفترِ کارت و دخل یک ردیف‌اند، پس هم‌اتم.
+ *    • باطل ([void]) با اجازه و دلیل؛ پولی جابه‌جا نمی‌کند: ماندهٔ کارت از بدهی کنار می‌رود (قاعدهٔ `GiftCard.VOID`).
  *
  *  ── هم‌اتم و بی خرجِ دوم ─────────────────────────────────────────────
  *  ردیف‌های خرج داخلِ همان `SalesEngine.record` ِ فاکتور ساخته و با همان دفتر نوشته می‌شوند (همه یا هیچ)؛ شناسه‌شان از
@@ -30,14 +34,20 @@ object GiftCards {
   const val REDEEM = "gift_card_redeem"
   const val REFUND = "gift_card_refund"
   const val VOID = "gift_card_void"
+  /** PRM-14 — شارژِ دوباره (نقد به دخل) */
+  const val RECHARGE = "gift_card_recharge"
 
   /** `DebtTransaction.kind` ِ خرج (برد) و برگشت (رسید) ِ اعتبارِ فروشگاه — همان `CashShift.STORE_CREDIT_RECEIPT` */
   const val CREDIT = CashShift.STORE_CREDIT_RECEIPT
 
   /** کدهای ردِ همین‌جا (کنارِ کدهای `GiftCard.Code` و `StoreCredit`) */
   const val NO_CARD_ROWS = "NO_CARD_ROWS"
+  /** باطل بی اجازه (همان `sales.cancel` ِ لغوِ فاکتور) */
+  const val NOT_ALLOWED = "NOT_ALLOWED"
 
-  private val TYPE = mapOf(GiftCard.ISSUE to ISSUE, GiftCard.REDEEM to REDEEM, GiftCard.REFUND to REFUND, GiftCard.VOID to VOID)
+  private val TYPE = mapOf(
+    GiftCard.ISSUE to ISSUE, GiftCard.REDEEM to REDEEM, GiftCard.REFUND to REFUND, GiftCard.VOID to VOID, GiftCard.RECHARGE to RECHARGE,
+  )
   private val KIND = TYPE.entries.associate { (k, v) -> v to k }
 
   fun isRow(a: AuditEntry): Boolean = a.type in KIND
@@ -180,7 +190,8 @@ object GiftCards {
 
   // ── فروشِ کارت ────────────────────────────────────────────────
   sealed interface Issued {
-    data class Ok(val data: ShopData, val event: GiftCard.Event) : Issued
+    /** [again] ⇒ همین کلید با همین محتوا پیش‌تر نشسته بود: [data] همان دفترِ ورودی، بی ردیفِ دوم */
+    data class Ok(val data: ShopData, val event: GiftCard.Event, val again: Boolean = false) : Issued
     data class Bad(val code: String) : Issued
   }
 
@@ -196,12 +207,79 @@ object GiftCards {
       )
     }
 
-  /** نقدِ فروشِ کارت در پنجرهٔ صندوق (افغانی) — `CashShift.totals` */
-  fun issueCash(d: ShopData, from: Long, to: Long): Double = issueRows(d, from, to).sumOf { it.amount }
+  /**
+   *  PRM-14 — شارژِ دوبارهٔ کارتِ موجود و نه‌باطل با [amountMinor]، با شناسهٔ [key] (پنجره هنگامِ باز شدن می‌سازد).
+   *  یک ردیفِ [RECHARGE]: هم دفترِ کارت، هم رسیدِ نقدِ دخل ([cashRows]). همان کلید با همان محتوا ⇒ `again` و همان
+   *  دفتر؛ با محتوای دیگر ⇒ `ID_CONFLICT`.
+   */
+  fun recharge(cur: ShopData, key: String, code: String?, amountMinor: Long, today: String, now: Long, by: String?): Issued =
+    when (val r = GiftCard.build(events(cur), GiftCard.Input(key, GiftCard.RECHARGE, code, amountMinor, now, by = by))) {
+      is GiftCard.Result.Err -> Issued.Bad(r.code)
+      is GiftCard.Result.Ok -> if (r.duplicate) Issued.Ok(cur, r.value, again = true) else Issued.Ok(
+        cur.copy(auditLog = cur.auditLog + entry(r.value, today, "شارژِ کارتِ هدیهٔ ${mask(r.value.code)} — ${fmt(r.value.amountMinor)} افغانی (نقد)")),
+        r.value,
+      )
+    }
 
-  /** ردیف‌های فروشِ کارت در پنجره — `PayFlow.ledgerEvents` (رسیدِ نقد) */
-  fun issueRows(d: ShopData, from: Long, to: Long): List<AuditEntry> =
-    d.auditLog.filter { it.type == ISSUE && it.createdAt in from..to && PayFlow.minor(it.amount) > 0 }
+  /**
+   *  PAY-24 — باطل کردنِ کارت: فقط با اجازه ([allowed]، همان `sales.cancel`) و با دلیل (`GiftCard.REASON_MIN`). پولی
+   *  جابه‌جا نمی‌کند: ماندهٔ همان لحظه از بدهیِ دکان کنار می‌رود و در یادداشتِ ردیف می‌ماند. تکرارِ همان کلید ⇒ `again`.
+   */
+  fun void(cur: ShopData, key: String, code: String?, reason: String?, allowed: Boolean, today: String, now: Long, by: String?): Issued {
+    if (!allowed) return Issued.Bad(NOT_ALLOWED)
+    val all = events(cur)
+    return when (val r = GiftCard.build(all, GiftCard.Input(key, GiftCard.VOID, code, 0, now, by = by, reason = reason))) {
+      is GiftCard.Result.Err -> Issued.Bad(r.code)
+      is GiftCard.Result.Ok -> if (r.duplicate) Issued.Ok(cur, r.value, again = true) else {
+        val left = GiftCard.view(all).card(r.value.code)?.balanceMinor ?: 0L
+        val notes = "باطل کردنِ کارتِ هدیهٔ ${mask(r.value.code)} — ${r.value.reason} — ماندهٔ ${fmt(left)} افغانی از بدهی کنار رفت (بی بازپرداختِ نقد)"
+        Issued.Ok(cur.copy(auditLog = cur.auditLog + entry(r.value, today, notes)), r.value)
+      }
+    }
+  }
+
+  /** نقدِ فروش و شارژِ کارت در پنجرهٔ صندوق (افغانی) — `CashShift.totals` */
+  fun cashIn(d: ShopData, from: Long, to: Long): Double = cashRows(d, from, to).sumOf { it.amount }
+
+  /** ردیف‌های فروش و شارژِ کارت در پنجره — `PayFlow.ledgerEvents` (رسیدِ نقد) */
+  fun cashRows(d: ShopData, from: Long, to: Long): List<AuditEntry> =
+    d.auditLog.filter { (it.type == ISSUE || it.type == RECHARGE) && it.createdAt in from..to && PayFlow.minor(it.amount) > 0 }
+
+  // ── گزارشِ بدهی و برگهٔ چاپی ────────────────────────────────────────
+
+  /** بدهیِ دکان به دارندگانِ کارت، فقط از ردیف‌های دفتر — `GiftCard.liability` */
+  fun liability(d: ShopData): GiftCard.Liability = GiftCard.liability(view(d))
+
+  /**
+   *  PRM-14 — برگهٔ چاپیِ کارت، محتوای خالص (کشیدن و چاپ: `print/GiftCardPrintAndroid`). کد با نویسهٔ وارسی‌اش
+   *  ([check]، Luhn mod 32) خوانا و بارکدِ Code128 ِ همان کد ([barcode]، بی خط‌تیره) که کادرِ کد و بارکدخوان
+   *  می‌پذیرند. ⛔ فقط برگهٔ خودِ کارت کد را کامل دارد؛ رسید و سابقه فقط [mask].
+   */
+  data class Sheet(
+    val title: String,
+    val shop: String?,
+    /** «ABCD-EFGH-JKLM» */
+    val code: String,
+    val barcode: String,
+    val check: Char,
+    /** ماژول‌های Code128 (`'1'` = خطِ سیاه) — `Barcodes.modulesString` */
+    val modules: String,
+    /** فقط هنگامِ فروش/شارژ: مبلغِ همان ردیف */
+    val amount: String?,
+    val date: String?,
+    val note: String,
+  )
+
+  /** کدِ نادرست یا بارکدِ ناساختنی ⇒ null */
+  fun sheet(code: String?, amountMinor: Long?, shop: String?, date: String?): Sheet? {
+    val c = GiftCard.normalize(code) ?: return null
+    val modules = runCatching { Code128.modules(c) }.getOrNull() ?: return null
+    return Sheet(
+      title = StrGiftCard.sheetTitle, shop = shop?.trim()?.ifEmpty { null }, code = GiftCard.display(c), barcode = c, check = c.last(),
+      modules = Barcodes.modulesString(modules), amount = amountMinor?.takeIf { it > 0 }?.let { StrGiftCard.sheetAmount(fmt(it)) },
+      date = date?.trim()?.ifEmpty { null }, note = StrGiftCard.sheetNote,
+    )
+  }
 
   fun message(code: String): String = when (code) {
     GiftCard.Code.BAD_CODE -> StrGiftCard.errCode
@@ -214,6 +292,8 @@ object GiftCards {
     StoreCredit.NO_CUSTOMER -> StrGiftCard.errNoCustomer
     StoreCredit.INSUFFICIENT_CREDIT -> StrGiftCard.errCredit
     NO_CARD_ROWS -> StrGiftCard.errRefundOver
+    NOT_ALLOWED -> StrGiftCard.errNotAllowed
+    GiftCard.Code.REASON_REQUIRED -> StrGiftCard.errReason
     else -> StrGiftCard.errNotSaved
   }
 }
