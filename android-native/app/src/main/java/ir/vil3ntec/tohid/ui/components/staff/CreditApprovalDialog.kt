@@ -66,6 +66,8 @@ fun CreditApprovalDialog(
   requesterUserId: String,
   onApproved: (CreditGate.Approval) -> Unit,
   onDismiss: () -> Unit,
+  /** S22: همین پنجره برای «فروشِ منقضی» (`ExpiryGate`) — فقط عنوان فرق دارد؛ نام، نقش و دلیل همان */
+  title: String = StrPos.creditOverTitle,
 ) {
   val context = LocalContext.current
   val store = remember { StaffPins(context) }
@@ -83,7 +85,7 @@ fun CreditApprovalDialog(
   Dialog(onDismissRequest = { if (!busy) onDismiss() }) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text(StrPos.creditOverTitle, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(8.dp))
         StatusPill(StrPos.needsApproval, PillTone.WARNING)
         Spacer(Modifier.height(8.dp))

@@ -96,7 +96,7 @@ object ReportCsv {
       rows += listOf(
         l.product.name, l.entry.batch, l.entry.productionDate, l.entry.expiryDate, l.daysLeft.toString(),
         ir.vil3ntec.tohid.qty(l.remaining), l.product.unit,
-        when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.NEAR_DAYS -> "نزدیک به انقضا"; else -> "سالم" },
+        when { l.expired -> "منقضی"; l.daysLeft <= ExpiryEngine.nearDays -> "نزدیک به انقضا"; else -> "سالم" },
       )
     }
     return Sheet("گزارش-انقضا-$today", rows)
@@ -287,6 +287,7 @@ object ReportCsv {
     "customer_return" -> "مرجوعی مشتری"
     "supplier_return" -> "برگشت به تأمین‌کننده"
     "adjustment" -> "اصلاح موجودی"
+    "count_adjust" -> "اصلاحِ شمارش"
     "damage" -> "ضایعات"
     //  انتقال بین محل‌ها (موتورِ تازهٔ موجودی): دو ردیف، خروجیِ منفی و ورودیِ مثبت
     "transfer_out" -> "انتقالِ خروجی"

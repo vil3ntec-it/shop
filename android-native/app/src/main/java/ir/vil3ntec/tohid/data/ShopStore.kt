@@ -1182,7 +1182,7 @@ class ShopStore(
         d.products.mapNotNull { p -> p.packs?.takeIf { it.isNotEmpty() }?.let { p.id to it.map(::coreOf) } }
       )
 
-    fun coreOf(p: ProductPack) = ir.vil3ntec.tohid.core.product.PackBarcodes.Pack(p.name, p.sizeMilli, p.barcodes)
+    fun coreOf(p: ProductPack) = ir.vil3ntec.tohid.core.product.PackBarcodes.Pack(p.name, p.sizeMilli, p.barcodes, p.priceMinor)
 
     /**
      *  همهٔ بارکدهای دکان (کالا و بسته) ⇐ شناسهٔ کالا — برای سنجشِ «بارکد بین کالاها تکراری نمی‌شود» (§۳.۴).

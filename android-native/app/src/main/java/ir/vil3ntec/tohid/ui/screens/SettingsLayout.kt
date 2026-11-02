@@ -136,6 +136,8 @@ object SettingsLayout {
   const val DOC_GAPS = "شماره‌های جاافتادهٔ اسناد"
   /** قیمت و تخفیفِ ردیف (POS-08/10/20/21، `LinePolicyPrefs`) */
   const val LINE_PRICING = "قیمت و تخفیفِ ردیف"
+  /** ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05، `TillGoodsPref`) — همان `TILL_GOODS_TITLE` */
+  const val TILL_GOODS = "ثبتِ سریع و واحدِ بزرگ در صندوق"
   /** یادداشتِ ردیف و فاکتور (POS-11، `PosNotesPrefs`) */
   const val POS_NOTES = "یادداشتِ ردیف و فاکتور"
   /** هزینهٔ خودکارِ فاکتور (POS-36، `AutoFeesPref`) */
@@ -161,7 +163,7 @@ object SettingsLayout {
       listOf(
         "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
         POS_MORE_KEYS, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS,
-        DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
+        DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, TILL_GOODS, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
         SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
         STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, PRODUCT_TOOLS, PRODUCT_INFO, LABEL_TOOLS,
         STOREFRONT_ETA, PROMO_GUARD, PRINTER,
@@ -231,6 +233,7 @@ object SettingsLayout {
     REPORT_KEYS to "report-keys",
     DOC_GAPS to "doc-gaps",
     LINE_PRICING to "line-pricing",
+    TILL_GOODS to "till-goods",
     POS_NOTES to "notes",
     AUTO_FEES to "auto-fees",
     SIMPLE_ASK to "simple-ask",
@@ -307,6 +310,7 @@ object SettingsLayout {
     REPORT_KEYS -> ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys
     DOC_GAPS -> ir.vil3ntec.tohid.core.i18n.StrReports.docGaps
     LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
+    TILL_GOODS -> TILL_GOODS_TITLE
     POS_NOTES -> StrPos.notesSection
     AUTO_FEES -> StrSale.feesTitle
     SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle

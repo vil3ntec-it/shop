@@ -88,6 +88,7 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     Motion.load(applicationContext)
     LocaleChoice.load(applicationContext)
     ShopDayChoice.load(applicationContext)
+    ir.vil3ntec.tohid.data.ExpiryPref.load(applicationContext) // S22: روزِ هشدارِ انقضا
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
     ModeState.load(applicationContext)
     ir.vil3ntec.tohid.ui.UiV3.load(applicationContext)

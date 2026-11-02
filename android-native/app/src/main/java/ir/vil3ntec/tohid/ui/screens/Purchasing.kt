@@ -157,7 +157,18 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
         userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
       )) {
         is ir.vil3ntec.tohid.data.PurchaseBook.Result.Failed -> toast(r.message)
-        is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; toast("برگشت و سندِ کسر ثبت شد"); returnFor = null }
+        is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok -> {
+          returnFor = null
+          //  S25: همان برگهٔ چاپیِ «سندِ کسر» ِ کامپیوتر (`PurchaseBook.invoiceSheet`) با چاپِ گوشی (`ReportPrint`)
+          scope.launch {
+            if (!store.save(r.data)) return@launch
+            val credit = ir.vil3ntec.tohid.data.PurchaseBook.invoices(r.data, supplierId).filter { it.isReturn }.maxByOrNull { it.createdAt }
+            val asked = snackbar.showSnackbar("برگشت و سندِ کسر ثبت شد", actionLabel = if (credit != null) "چاپِ سندِ کسر" else null, duration = SnackbarDuration.Long)
+            if (asked == SnackbarResult.ActionPerformed && credit != null) {
+              ir.vil3ntec.tohid.data.PurchaseBook.invoiceSheet(r.data, credit).let { sh -> ir.vil3ntec.tohid.print.ReportPrint.print(context, sh, sh.name) }
+            }
+          }
+        }
       }
     }
   }
