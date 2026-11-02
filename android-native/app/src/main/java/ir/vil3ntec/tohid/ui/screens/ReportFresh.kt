@@ -199,7 +199,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val money = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
-  val tabs = remember(money) { HeatmapModel.tabs(DayEndModel.tabs(ReportFreshModel.tabs(money), money), money) }
+  //  RPT-17: «شماره‌های جاافتاده» با همان تنظیمِ زبانهٔ «گزارش‌ها» (`DocGapsPref`)
+  val gapsOn = remember { ir.vil3ntec.tohid.data.DocGapsPref.on(context) }
+  val tabs = remember(money, gapsOn) { DocGapsFresh.tabs(HeatmapModel.tabs(DayEndModel.tabs(ReportFreshModel.tabs(money), money), money), gapsOn) }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
@@ -233,7 +235,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours))
     } else null
   }
-  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: view.tables
+  val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
+  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
   val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-')
 
@@ -300,6 +303,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     when {
       dayEnd != null -> DayEndSummary(dayEnd)
       heat != null -> HeatmapSummary(heat)
+      gaps != null -> Unit   // RPT-17: شمارها در خودِ جدول‌اند
       else -> Summary(view, def.id, d, money)
     }
 

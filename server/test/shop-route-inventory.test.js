@@ -658,6 +658,7 @@ function bodyFor(r, ids) {
     'POST /shop/orders/evidence/:id/disputes': { kind: 'damaged', reason: 'آزمونِ اختلاف', requestKey: fresh('dispute-open') },
     'POST /shop/orders/evidence/:id/disputes/notes': { text: 'یادداشت', requestKey: fresh('dispute-note') },
     'POST /shop/orders/evidence/:id/disputes/resolve': { outcome: 'settled', text: 'بسته شد', requestKey: fresh('dispute-res') },
+    'POST /shop/orders/evidence/:id/disputes/assign': { assigneeId: 'u-x', dueAt: Date.now() + 3_600_000, requestKey: fresh('dispute-asg') },
     'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});

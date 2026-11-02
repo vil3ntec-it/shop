@@ -55,6 +55,17 @@ object StrEvidence {
     t("نتیجه: ${asIs(outcome)} (${asIs(who)}) — ${asIs(text)}", "Outcome: $outcome ($who) — $text", "پایله: $outcome ($who) — $text")
   fun past(n: Int): String = t("اختلاف‌های بسته (${asIs(n)})", "Resolved disputes ($n)", "بندې شوې شخړې ($n)")
 
+  // §۱۹.۹ بندِ ۵ — مسئول و مهلتِ اختلاف
+  val assign: String get() = t("سپردن به مسئول", "Assign an owner", "مسؤل ته سپارل")
+  val assigneeLabel: String get() = t("مسئول", "Owner", "مسؤل")
+  val dueLabel: String get() = t("مهلت", "Deadline", "موده")
+  fun dueIn(hours: Int): String = t("${asIs(hours)} ساعت", "$hours hours", "$hours ساعته")
+  val assignNoteLabel: String get() = t("یادداشت (اختیاری)", "Note (optional)", "یادښت (اختیاري)")
+  val noAssignees: String get() = t("کسی برای سپردن نیست", "There is nobody to assign", "د سپارلو لپاره هېڅوک نشته")
+  val assignedOk: String get() = t("اختلاف به مسئول سپرده شد", "Dispute assigned", "شخړه مسؤل ته وسپارل شوه")
+  fun ownerLine(who: String, due: String): String = t("مسئول: ${asIs(who)} · مهلت ${asIs(due)}", "Owner: $who · due $due", "مسؤل: $who · موده $due")
+  val overdue: String get() = t("مهلت گذشته", "Overdue", "موده تېره شوې")
+
   // نوع — همان `KINDS` ِ سرور
   val kNotDelivered: String get() = t("نرسید", "Not delivered", "ونه رسېد")
   val kMissing: String get() = t("کالایی کم بود", "An item was missing", "یو توکی کم و")
