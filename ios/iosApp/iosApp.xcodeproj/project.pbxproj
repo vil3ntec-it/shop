@@ -283,6 +283,8 @@
 					UserNotifications,
 					"-framework",
 					AVFAudio,
+					"-framework",
+					AuthenticationServices,
 					"-lz",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}";
@@ -332,6 +334,8 @@
 					UserNotifications,
 					"-framework",
 					AVFAudio,
+					"-framework",
+					AuthenticationServices,
 					"-lz",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = "${BUNDLE_ID}";

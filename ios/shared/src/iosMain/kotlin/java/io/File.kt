@@ -124,11 +124,8 @@ class File(path: String) : Comparable<File> {
   fun forEachLine(charset: Charset? = null, action: (String) -> Unit) = bufferedReader().forEachLine(action)
   fun createNewFile(): Boolean = if (exists()) false else { writeBytes(ByteArray(0)); true }
   fun canRead(): Boolean = exists()
-  fun walk(): Sequence<File> = sequence {
-    yield(this@File)
-    if (isDirectory) listFiles()?.forEach { yieldAll(it.walk()) }
-  }
-  fun walkTopDown(): Sequence<File> = walk()
+  fun walk(): FileTreeWalk = FileTreeWalk(this)
+  fun walkTopDown(): FileTreeWalk = walk()
   fun copyTo(target: File, overwrite: Boolean = false): File {
     if (target.exists() && !overwrite) throw IOException("${target.path}: هست")
     target.writeBytes(readBytes())
@@ -159,3 +156,23 @@ fun interface FilenameFilter {
 }
 
 open class FileNotFoundException(message: String? = null) : IOException(message)
+
+/**
+ *  همان `kotlin.io.FileTreeWalk` ِ JVM (بالا به پایین): ریشه هم برمی‌آید؛ `onEnter` پیش از ورود به هر پوشه (ریشه هم)
+ *  پرسیده می‌شود و «نه» یعنی خودِ پوشه و همهٔ درونش کنار می‌روند (گامِ ۶: `data/TohidBackupAgent.kt`).
+ */
+class FileTreeWalk internal constructor(private val start: File, private val enter: (File) -> Boolean = { true }) : Sequence<File> {
+  fun onEnter(function: (File) -> Boolean): FileTreeWalk = FileTreeWalk(start) { enter(it) && function(it) }
+
+  override fun iterator(): Iterator<File> = sequence { visit(start) }.iterator()
+
+  private suspend fun SequenceScope<File>.visit(f: File) {
+    if (f.isDirectory) {
+      if (!enter(f)) return
+      yield(f)
+      f.listFiles()?.forEach { visit(it) }
+    } else {
+      yield(f)
+    }
+  }
+}

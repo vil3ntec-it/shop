@@ -17,6 +17,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.data.ExternalLinkAsk
+import ir.vil3ntec.tohid.data.SignInProvider
 import ir.vil3ntec.tohid.ui.screens.GoogleMark
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -45,13 +47,13 @@ internal fun GoogleButton(enabled: Boolean, onClick: () -> Unit) {
 }
 
 /**
- *  «این ایمیل از قبل حساب دارد» — وصل کردنِ گوگل به همان حساب. ⛔ برابر بودنِ ایمیل به‌تنهایی کافی
+ *  «این ایمیل از قبل حساب دارد» — وصل کردنِ گوگل (یا اپل ِ آیفون) به همان حساب. ⛔ برابر بودنِ ایمیل به‌تنهایی کافی
  *  نیست: رمزِ همان حساب، یا کدی که به ایمیلِ حساب می‌رود. بستن یعنی «وصل نکن» (هیچ حسابی ساخته یا
  *  عوض نمی‌شود)؛ تا درخواست در راه است برگه بسته نمی‌شود.
  */
 @Composable
-internal fun GoogleLinkSheet(
-  ask: GoogleLinkAsk,
+internal fun ExternalLinkSheet(
+  ask: ExternalLinkAsk,
   busy: Boolean,
   onDismiss: () -> Unit,
   onSendCode: () -> Unit,
@@ -59,8 +61,9 @@ internal fun GoogleLinkSheet(
 ) {
   val c = PhoneV3.colors
   var secret by remember(ask.codeSent) { mutableStateOf("") }
-  V3Sheet(onDismiss = onDismiss, title = StrAuth.googleLinkTitle, dismissible = !busy, detents = false) { closer ->
-    Text(ask.message.ifBlank { StrAuth.googleLinkBody }, style = V3Type.callout, color = c.inkMuted)
+  val apple = ask.provider == SignInProvider.APPLE
+  V3Sheet(onDismiss = onDismiss, title = if (apple) StrAuth.appleLinkTitle else StrAuth.googleLinkTitle, dismissible = !busy, detents = false) { closer ->
+    Text(ask.message.ifBlank { if (apple) StrAuth.appleLinkBody else StrAuth.googleLinkBody }, style = V3Type.callout, color = c.inkMuted)
     Spacer(Modifier.height(6.dp))
     Text(ask.email, style = V3Type.headline, color = c.ink)
     Spacer(Modifier.height(14.dp))
