@@ -91,15 +91,16 @@ function view(row, at) {
 
 const rowOf = (shopId) => one('SELECT * FROM order_desk WHERE shop_id = $1', [String(shopId)]);
 
-/** صفِ باز (توقفِ خودکار) — سفارشِ آزمایشی و زمان‌بندی‌شدهٔ هنوز نرسیده شمرده نمی‌شوند. */
-async function queueOf(shopId, at) {
-  const r = await one(
-    `SELECT COUNT(*) FILTER (WHERE status = ANY($3::text[]))::int AS open,
+//  PERF-03: هر دو شمارش فقط سفارش‌های `OPEN_STATUSES` اند ⇒ همان شرط در WHERE تا `ix_online_orders_shop_status`
+//  فقط سفارش‌های باز را بخواند، نه همهٔ سفارش‌های دکان (پیش‌تر Seq Scan؛ `docs/PERF-QUERY-PLANS-fa.md`). نتیجه همان.
+const QUEUE_SQL = `SELECT COUNT(*) FILTER (WHERE status = ANY($3::text[]))::int AS open,
             MIN(created_at) FILTER (WHERE status = 'new') AS oldest
        FROM online_orders
-      WHERE shop_id = $1 AND is_test = false AND (scheduled_for IS NULL OR scheduled_for <= $2)`,
-    [String(shopId), at, OPEN_STATUSES]
-  );
+      WHERE shop_id = $1 AND status = ANY($3::text[]) AND is_test = false AND (scheduled_for IS NULL OR scheduled_for <= $2)`;
+
+/** صفِ باز (توقفِ خودکار) — سفارشِ آزمایشی و زمان‌بندی‌شدهٔ هنوز نرسیده شمرده نمی‌شوند. */
+async function queueOf(shopId, at) {
+  const r = await one(QUEUE_SQL, [String(shopId), at, OPEN_STATUSES]);
   return { open: Number(r?.open || 0), oldestNewAt: nul(r?.oldest) };
 }
 
@@ -412,7 +413,7 @@ function stop() {
 }
 
 module.exports = {
-  FLAG_KEY, PAUSE_REASONS, AUTO_REASON, OPEN_STATUSES, PREP_STATUSES,
+  FLAG_KEY, PAUSE_REASONS, AUTO_REASON, OPEN_STATUSES, PREP_STATUSES, QUEUE_SQL,
   flagOf, view, stateOf, busy, pause, resume, saveSettings,
   guardCheckout, overlay, afterOrder, evaluateAutoPause, sweep, start, stop,
 };

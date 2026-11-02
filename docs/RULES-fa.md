@@ -764,6 +764,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۱۹۱ (`191_order_issues_reviews.sql`: `order_issues`، `order_issue_photos`، `order_reviews`، NTF-07/09، `claude/ntf-order-issue-review`؛ ۱۸۶ و ۱۸۸ تا ۱۹۰ گرفته یا سپرده بود).
 - ۱۹۲ (`192_storefront_promo_guard.sql`: `storefront_promo_guard` و `storefront_promo_claims`، MKT-02/RSK-09، `claude/first-order-promo`؛ ۱۸۶ و ۱۸۸ تا ۱۹۱ گرفته یا سپرده بودند؛ rollback در `server/migrations/rollback/`).
 - ۱۹۷ (`197_order_late_apology.sql`: `order_late_apology_policy`، `order_late_apologies` و رویدادِ `order_late_apology` در CHECK ِ `customer_notify_outbox.event`، NTF-10، `claude/chk21-ntf10`؛ ۱۸۶ تا ۱۹۳ گرفته و ۱۹۴ تا ۱۹۶ برای کارهای هم‌زمان خالی ماند).
+- ۱۹۸ (`198_perf03_indexes.sql`: فقط نمایه — `ix_sync_v3_rows_moves_product`، `ix_sync_rows_stock_ref`، `ix_sync_v3_rows_stock_ref`، `ix_sync_v3_rows_product_barcodes`، `ix_online_orders_shop_phone`؛ PERF-03، `claude/perf03-query-plans`؛ شماره را هماهنگ‌کننده سپرد؛ rollback در `server/migrations/rollback/`؛ یافته‌ها `docs/PERF-QUERY-PLANS-fa.md`).
 - ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
 
 ### v3 · تعارض‌های حل‌شده
