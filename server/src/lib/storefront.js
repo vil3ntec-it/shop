@@ -559,7 +559,7 @@ function macOf(shopId, orderId) {
 }
 
 //  TEN-03: لینکِ پیگیریِ زمان‌دار و باطل‌شدنی — `lib/storefront-links.js` (شرح همان‌جا)
-const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
+const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
 
 /**
  * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
@@ -634,7 +634,7 @@ async function track(sf, token) {
   const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)));
+  return require('./order-late-apology').withApology(sf.shop_id, id, await require('./order-add-items').withAddItems(sf.shop_id, o, await require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)))));   //  ORD-14 `amendment`، CHK-21 `addItems`، NTF-10 `apology` — هر کدام فقط با پرچمِ خودش
 }
 
 async function cancel(sf, token) {
@@ -1134,7 +1134,7 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
+  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
   K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن

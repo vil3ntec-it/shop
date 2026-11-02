@@ -60,6 +60,8 @@ object DocChainSync {
 
   /** یک دور؛ صدازننده (`SyncV1Worker`) شکست را نمی‌بیند */
   suspend fun cycle(context: Context, data: ShopData) {
+    //  OPS-07: زنجیرهٔ سریِ واقعیِ دستگاه در حالتِ آموزشی جلو نمی‌رود
+    if (ir.vil3ntec.tohid.data.TrainingMode.on) return
     val app = context.applicationContext ?: context
     val account = SyncStateV1.currentAccount(app)
     val shop = LedgerOwner.currentShop(app)
@@ -94,6 +96,7 @@ object DocChainSync {
    *  صدا بزند.
    */
   suspend fun recordVoid(context: Context, before: ShopData, saleId: String, kind: InvoiceVoid.Kind, reason: String) {
+    if (ir.vil3ntec.tohid.data.TrainingMode.on) return   //  OPS-07: ابطالِ فاکتورِ آموزشی روی زنجیرهٔ واقعی نمی‌نشیند
     val app = context.applicationContext ?: context
     val account = SyncStateV1.currentAccount(app)
     val shop = LedgerOwner.currentShop(app)
