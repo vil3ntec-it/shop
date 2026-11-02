@@ -178,6 +178,8 @@ class SettingsPortTest {
       "PromoGuardLive.set" to "$PENDING — تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیفِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.promo_guard`)، MKT-02/RSK-09",
       "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
       "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
+      "StockPlacesPref.setPlaces" to "$PENDING — محل‌ها و انتقال، INV-20",
+      "StockPlacesPref.setRepack" to "$PENDING — بسته‌بندیِ دوباره و ساختِ بسته، INV-21",
       "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
       "ReturnPolicyPrefs.setBlocked" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
       "ReturnPolicyPrefs.setDays" to "$PENDING — سیاستِ برگشت (روز و کالای بی‌برگشت)",
