@@ -67,7 +67,57 @@
       renderSubs(o, token);
       renderRate(o, token);
       renderPrefs(o, token);
+      renderAdd(o, token);
+      renderApology(o);
       return o;
+    }
+
+    //  بخشِ پرچم‌دار فقط وقتی سرور کلیدش را داد ساخته می‌شود (پیش از «خریدِ دوباره») — خاموش ⇒ همان صفحهٔ امروز
+    function part(id, build) {
+      if (!$(id)) $('o-reorder').parentNode.insertBefore(build(), $('o-reorder'));
+      return $(id);
+    }
+
+    //  CHK-21: تا پیش از جمع‌آوری، سبدِ همین دستگاه به همین سفارش (پرچمِ `shop.orders.add_items`؛ نبودِ `addItems` ⇒ هیچ).
+    //  تصمیمِ آخر با سرور است (قیمتِ امروز، موجودی، وضعیت زیرِ قفل)؛ پس از جمع‌آوری پیامِ «در حال آماده‌سازی» (S38).
+    function renderAdd(o, token) {
+      var a = o.addItems;
+      if (!a || (!a.allowed && !a.preparing)) { if ($('o-add')) $('o-add').hidden = true; return; }
+      var box = part('o-add', function () {
+        return el('div', { class: 'stack', attrs: { id: 'o-add' } }, el('div', { class: 'note', hidden: true, attrs: { id: 'o-add-note', role: 'status' } }),
+          el('button', { class: 'btn btn-block', text: t('od.add'), attrs: { id: 'o-add-btn', type: 'button' } }));
+      });
+      var note = $('o-add-note'); var btn = $('o-add-btn');
+      box.hidden = false;
+      btn.hidden = !a.allowed;
+      if (!a.allowed) { K.note(note, 'warn', t('od.add.prep')); return; }
+      note.hidden = true;
+      btn.disabled = false;
+      btn.onclick = function () {
+        var cart = ctx.cart();
+        var lines = Object.keys(cart).map(function (id) { return { productId: id, qtyMilli: cart[id].qtyMilli }; });
+        if (!lines.length) { K.note(note, 'warn', t('od.add.empty')); return; }
+        K.confirm(t('od.add.q', { n: K.fa(lines.length, 0) }), t('od.add.yes')).then(function (yes) {
+          if (!yes) return;
+          var scope = 'add:' + ctx.slug + ':' + token; var body = { lines: lines };
+          btn.disabled = true;
+          api('/orders/' + encodeURIComponent(token) + '/items', { method: 'POST', body: body, key: K.keyFor(scope, body) }).then(function (r) {
+            K.dropKey(scope);
+            ctx.emptyCart();
+            renderOrder(r.order, token);
+            K.note($('o-add-note'), 'ok', t('od.add.done'));
+          }).catch(function (e) { btn.disabled = false; K.note(note, 'err', e.message); });
+        });
+      };
+    }
+
+    //  NTF-10: پوزشِ تأخیر و کدِ تخفیفِ یک‌بارمصرفِ همین شماره (پرچمِ `shop.orders.late_apology`؛ نبودِ `apology` ⇒ پنهان)
+    function renderApology(o) {
+      var a = o.apology; var c = a && a.coupon;
+      if (!a) { if ($('o-apology')) $('o-apology').hidden = true; return; }
+      var box = part('o-apology', function () { return el('div', { class: 'note', attrs: { id: 'o-apology', role: 'status' } }); });
+      var v = c ? (c.kind === 'amount' ? K.money(c.amountMinor) : t('od.ap.pct', { n: K.fa(c.bp / 100, 0) })) : '';
+      K.note(box, 'ok', t('od.ap') + (c && c.usable ? ' ' + t('od.ap.code', { code: c.code, v: v, d: K.when(c.expiresAt) }) : c && c.redeemed ? ' ' + t('od.ap.used') : ''));
     }
 
     //  DLV-18: پس از «تحویل شد» و تا ۷ روز، یک بار — مشتری به پیک ستاره و برچسب می‌دهد (بی متنِ آزاد).

@@ -8,7 +8,7 @@
  *           هنوز ساخته نشده و پیکی سپرده نشده: سپردن پس از «بسته‌بندی» است). فقط سفارشِ
  *           **پرداخت‌نشده** (نقد هنگامِ تحویل)؛ پرداخت‌شده ⇒ ۴۰۹ `amend_paid_order`.
  *   چه ──── مقدارِ تازهٔ قلم‌های موجود؛ ۰ = برداشتنِ قلم؛ دست‌کم یک قلم می‌ماند (همه را برداشتن =
- *           لغو). افزودنِ قلم CHK-21 است (فاز ۵). قیمتِ واحد همان قیمتِ ثبت است — هرگز از کلاینت.
+ *           لغو). افزودنِ قلم CHK-21 است (`order-add-items.js`، همین قفل و دروازه). قیمتِ واحد همان قیمتِ ثبت است — هرگز از کلاینت.
  *           مبلغ: همان `S.lineTotalMinor` ِ ساختِ سفارش؛ تخفیف و هزینهٔ ارسال دست نمی‌خورند؛
  *           تخفیفِ بیش از جمعِ تازهٔ اقلام ⇒ ۴۰۹ `amend_discount_exceeds`.
  *   رضایت ─ سفارشِ **ویترین**: فقط خودِ مشتری با توکنِ پیگیری می‌پذیرد یا رد می‌کند، تا [TTL_MS]؛
@@ -461,4 +461,6 @@ async function settlementsOf(shopId, w) {
 module.exports = {
   FLAG_KEY, PAID_FLAG_KEY, AMEND_STATUSES, REASONS, CONSENT_VIA, SETTLE_METHODS, TTL_MS, TYPES,
   flagOf, paidFlagOf, configOf, parse, plan, ledgerOf, propose, decide, settle, settlementsOf, staffOf, withAmendment,
+  //  CHK-21 (`order-add-items.js`) همین قفل، دروازه و رویداد را به کار می‌برد — نسخهٔ دوم نه
+  lockOrder, event, blockerOf, BLOCK_MESSAGE,
 };

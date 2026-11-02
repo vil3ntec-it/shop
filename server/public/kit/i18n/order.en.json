@@ -45,5 +45,17 @@
   "od.prefs.saved": "Saved; the courier sees these instructions.",
   "od.prefs.locked": "The order has left the shop; contact the courier to change this.",
   "err.delivery_locked": "The order has left the shop; contact the courier to change this.",
-  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again."
+  "err.version_conflict": "The instructions were just changed elsewhere; refresh and try again.",
+  "od.add": "Add my cart to this order",
+  "od.add.q": "Add {n} cart items to this order at today's prices?",
+  "od.add.yes": "Add",
+  "od.add.empty": "Your cart is empty; add items to the cart first.",
+  "od.add.done": "Added to this order.",
+  "od.add.prep": "This order is being prepared; buy new items with a new order.",
+  "od.ap": "We are sorry this order is late.",
+  "od.ap.code": "Discount code {code} ({v}) until {d}, for this phone number only.",
+  "od.ap.used": "The apology discount code has been used.",
+  "err.order_preparing": "This order is being prepared; buy new items with a new order.",
+  "err.not_your_order": "This order was not placed with your verified number.",
+  "od.ap.pct": "{n}%"
 }

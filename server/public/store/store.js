@@ -452,7 +452,7 @@
     //  واژه‌نامهٔ همین صفحه (`kit/i18n/order.<زبان>.json`) هم‌زمان با اسکریپت؛ نیامد ⇒ متنِ فارسیِ HTML، بی کلیدِ خام
     orderView = orderView || Promise.all([new Promise(function (ok, no) {
       document.head.appendChild(el('script', { attrs: { src: '/store/order.js' }, on: { load: ok, error: no } }));
-    }), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder }); })
+    }), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
@@ -480,7 +480,7 @@
         $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
         $('o-meta').textContent = e.message;
         $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
-        $('o-dlv').hidden = true;
+        $('o-dlv').hidden = true; ['o-add', 'o-apology'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
       });
     };
     load();

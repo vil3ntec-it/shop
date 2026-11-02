@@ -77,6 +77,21 @@ const MATRIX = Object.freeze({
 const EVENTS = Object.freeze(Object.keys(MATRIX));
 
 /**
+ * NTF-10: رویدادِ سیستمیِ بی گذارِ وضعیت (نه در `EVENT_OF`/`MATRIX`) — کانال‌ها و قالبِ خودش. فقط کانال‌های رایگان
+ * (پوزش فوری نیست)؛ همان سقفِ هر مشتری و سقفِ هزینهٔ NTF-02. جای‌نگهدار همان `{no}` و `{shop}`.
+ */
+const EXTRA = Object.freeze({
+  order_late_apology: Object.freeze({
+    channels: FREE,
+    text: Object.freeze({
+      fa: 'از تأخیرِ سفارشِ شمارهٔ {no} در «{shop}» پوزش می‌خواهیم؛ جزئیات در صفحهٔ پیگیریِ سفارش است.',
+      ps: 'د «{shop}» د فرمایش شمېره {no} د ځنډ له امله بښنه غواړو؛ جزئیات د فرمایش د تعقیب په پاڼه کې دي.',
+      en: 'Sorry for the delay with order #{no} at {shop}. Details are on your order page.',
+    }),
+  }),
+});
+
+/**
  * NTF-03: قالبِ هر رویداد به سه زبانِ وبِ خریدار (همان fa، ps، en ِ `public/kit/i18n`).
  * جای‌نگهدارِ مجاز فقط `{no}` (شمارهٔ سفارش) و `{shop}` (نامِ ویترین) — هیچ دادهٔ دیگری.
  */
@@ -190,11 +205,30 @@ async function onStatusIn(run, { shopId, order, to, at = now() }) {
   //  پیامِ کهنه‌ترِ همین سفارش که هنوز نرفته دیگر به کار نمی‌آید
   await run(
     `UPDATE customer_notify_outbox SET status='superseded', updated_at=$3
-      WHERE order_id=$1 AND id <> $2 AND status='pending'`,
-    [order.id, id, at]
+      WHERE order_id=$1 AND id <> $2 AND status='pending' AND event = ANY($4::text[])`,
+    [order.id, id, at, EVENTS]   //  پیامِ سیستمیِ NTF-10 (`EXTRA`) کنار زده نمی‌شود
   );
   soon();
   return id;
+}
+
+/**
+ * NTF-10: پیامِ سیستمیِ [EXTRA] (پوزشِ تأخیر) — همان صف، یکتایی و پرچم؛ پیامِ دیگری را کنار نمی‌زند.
+ * @returns {Promise<string|null>} شناسهٔ ردیف (تکرار یا پرچمِ خاموش ⇒ null)
+ */
+async function onExtraIn(run, { shopId, order, event, at = now() }) {
+  if (!EXTRA[event] || !order || order.source !== 'storefront' || order.is_test === true || !order.customer_phone) return null;
+  if (!(await flagIn(run, shopId))) return null;
+  const r = await run(
+    `INSERT INTO customer_notify_outbox (id, shop_id, order_id, event, lang, phone_key, status,
+                                          next_attempt_at, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'pending',$7,$7,$7)
+     ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
+    [ulid(at), shopId, order.id, event, langOf(order.customer_lang) || 'fa', phoneKey(order.customer_phone), at]
+  );
+  if (!r.rows[0]) return null;
+  soon();
+  return r.rows[0].id;
 }
 
 /**
@@ -256,7 +290,7 @@ function cleanName(s) {
 /** NTF-03: متنِ رویداد به زبانِ مشتری (زبانِ ناشناس ⇒ fa). */
 function render(event, lang, { no, shop }) {
   const l = LANGS.includes(lang) ? lang : 'fa';
-  const tpl = TEMPLATES[l][event];
+  const tpl = TEMPLATES[l][event] || (EXTRA[event] && EXTRA[event].text[l]);
   if (!tpl) throw new Error(`no template: ${event}`);
   const digits = l === 'en' ? String(no) : faNum(no);
   return tpl.replace('{no}', digits).replace('{shop}', cleanName(shop));
@@ -377,7 +411,7 @@ async function processRow(row, at) {
   };
 
   const tried = [];
-  for (const channel of MATRIX[row.event] || []) {
+  for (const channel of MATRIX[row.event] || (EXTRA[row.event] && EXTRA[row.event].channels) || []) {
     const p = providers[channel];
     if (!p) { tried.push({ channel, result: 'not_configured' }); continue; }
     //  NTF-02: پیامک با لینک (اگر هست) شمرده می‌شود — بخشِ بیشتر، نه کمتر
@@ -490,6 +524,6 @@ async function forOrder(shopId, orderId) {
 
 module.exports = {
   FLAG_KEY, CHANNELS, LANGS, EVENT_OF, MATRIX, EVENTS, TEMPLATES, MAX_ATTEMPTS, PER_HOUR, PER_DAY, MAX_AGE_MS,
-  flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
+  EXTRA, onExtraIn, flagOf, onStatusIn, onCreatedIn, setProviders, channelState, render, linkFor, phoneKey,
   tick, start, stop, soon, forOrder, shape,
 };

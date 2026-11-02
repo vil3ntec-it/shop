@@ -635,7 +635,7 @@ async function track(sf, token) {
   const id = await orderIdOfLink(sf, token);
   const o = await orders.get(sf.shop_id, id, CUSTOMER);
   if (o.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
-  return require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)));
+  return require('./order-late-apology').withApology(sf.shop_id, id, await require('./order-add-items').withAddItems(sf.shop_id, o, await require('./order-amend').withAmendment(sf.shop_id, id, publicOrder(o, token, await require('./delivery').customerView(sf.shop_id, id)))));   //  ORD-14 `amendment`، CHK-21 `addItems`، NTF-10 `apology` — هر کدام فقط با پرچمِ خودش
 }
 
 async function cancel(sf, token) {
