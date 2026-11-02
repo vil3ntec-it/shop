@@ -59,15 +59,17 @@ function parsePerms(v) {
   return typeof v === 'object' ? v : {};
 }
 
-/** دو لایهٔ یک عضو: [نقش، کاربر] — هر کدام {} اگر نبود */
-async function layersFor(shopId, role, userId) {
+/**
+ * دو لایهٔ یک عضو: [نقش، کاربر] — هر کدام {} اگر نبود.
+ * `run` = اتصالِ تراکنشِ صدازننده (`(sql, params) ⇒ {rows}`، مثلِ `orders.flagOf`)؛ نیامده ⇒ استخر.
+ */
+async function layersFor(shopId, role, userId, run = null) {
   if (!shopId || role === 'owner') return [{}, {}];
-  const rows = await many(
-    `SELECT 'role' AS scope, perms FROM shop_role_perms WHERE shop_id=$1 AND role=$2
+  const sql = `SELECT 'role' AS scope, perms FROM shop_role_perms WHERE shop_id=$1 AND role=$2
      UNION ALL
-     SELECT 'member' AS scope, perms FROM shop_member_perms WHERE shop_id=$1 AND user_id=$3`,
-    [shopId, String(role || ''), String(userId || '')]
-  );
+     SELECT 'member' AS scope, perms FROM shop_member_perms WHERE shop_id=$1 AND user_id=$3`;
+  const params = [shopId, String(role || ''), String(userId || '')];
+  const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   const out = [{}, {}];
   for (const r of rows) out[r.scope === 'role' ? 0 : 1] = parsePerms(r.perms);
   return out;

@@ -90,10 +90,10 @@ function check(row) {
   return null;
 }
 
-/** آیا این عضو (نقش + لایهٔ نقش + لایهٔ خودش) پولِ گاوصندوق را جابه‌جا می‌کند */
-async function mayMove(ctx) {
+/** آیا این عضو (نقش + لایهٔ نقش + لایهٔ خودش) پولِ گاوصندوق را جابه‌جا می‌کند. `run` ⇐ اتصالِ تراکنش (`judgeV3`) */
+async function mayMove(ctx, run = null) {
   if (!can(ctx.role, PERM)) return false;
-  return permCore.allows(ctx.role, await staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId), PERM);
+  return permCore.allows(ctx.role, await staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId, run), PERM);
 }
 
 /** شکل + زمانِ نه‌چندان آینده — null یعنی درست */
@@ -264,14 +264,15 @@ async function judgeBatch(ctx, ops, req, res) {
  * ردیفِ موجود را سیاستِ `log` ِ خودِ v3 داوری می‌کند: عینِ همان یا بخشی از آن بی‌اثر، دیگری
  * صندوقِ تعارض — و تعارض ساختن کارِ کسی است که `safe.move` دارد، حتی با محتوای «از دخل».
  * @param existing  ردیفِ فعلیِ v3 (یا null)
+ * @param run  اتصالِ تراکنشِ پوش (`(sql, params) ⇒ {rows}`)؛ نیامده ⇒ استخر
  */
-async function judgeV3(ctx, op, existing) {
+async function judgeV3(ctx, op, existing, run = null) {
   if (op.kind !== 'insert') return 'safe_append_only';
   if (existing && within(op.fields, existing.data, op.row_id)) return null;
   const row = rowOf(op);
   if (!row || invalid(row, Date.now())) return 'safe_invalid';
-  if (existing) return (await mayMove(ctx)) ? null : 'safe_not_allowed';
-  return judgeNew(row, () => mayMove(ctx));
+  if (existing) return (await mayMove(ctx, run)) ? null : 'safe_not_allowed';
+  return judgeNew(row, () => mayMove(ctx, run));
 }
 
 module.exports = {

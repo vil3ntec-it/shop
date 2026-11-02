@@ -219,7 +219,7 @@ async function memberPolicy(q, shopId, userId) {
     [shopId, String(userId || '')]
   )).rows[0];
   if (!m) return null;
-  return { role: m.role, layers: await staffPerms.layersFor(shopId, m.role, userId) };
+  return { role: m.role, layers: await staffPerms.layersFor(shopId, m.role, userId, (s, p) => q.query(s, p)) };
 }
 
 const dbq = { query: (s, p) => query(s, p) };
@@ -269,10 +269,10 @@ async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
   return prev && prev.op_id === String(opId || '') ? null : 'approval_replayed';
 }
 
-/** لایه‌های همان کاربرِ توکن — یک بار برای هر دسته */
-async function requesterLayers(ctx) {
+/** لایه‌های همان کاربرِ توکن — یک بار برای هر دسته؛ `q` (تراکنشِ v3، پشتِ قفلِ حساب) ⇒ همان اتصال، نه استخر */
+async function requesterLayers(ctx, q = null) {
   if (!ctx._permLayers) {
-    ctx._permLayers = staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId);
+    ctx._permLayers = staffPerms.layersFor(ctx.accountId, ctx.role, ctx.userId, q ? (s, p) => q.query(s, p) : null);
   }
   return ctx._permLayers;
 }
@@ -283,7 +283,7 @@ async function requesterLayers(ctx) {
  * @returns {Promise<null | {reason, box, detail}>}
  */
 async function judge(q, ctx, need, slip, { opId, at, deviceId, path, fallback = false }) {
-  const layers = await requesterLayers(ctx);
+  const layers = await requesterLayers(ctx, q);
   const d = core.evaluate(ctx.role, layers, need.perm, need.req);
   if (d.decision === 'allow' || fallback) return null;
   const detail = {

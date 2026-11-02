@@ -169,6 +169,39 @@ test('POS-19: پلهٔ قیمتِ ثابت فقط با پرچمِ shop.promo_tie
   assert.equal((await h.get('/api/shop/promos', { token: b.staff })).body.tierPrice, false);
 });
 
+test('PRM-10: «نزدیکِ انقضا» فقط با پرچمِ shop.promo_expiry، مالِ همان دکان؛ خاموش ⇒ پاسخ بی کلیدِ expiry', async () => {
+  const a = await shopWithTeam('انقضا');
+  const b = await shopWithTeam('انقضای دوم');
+  const rule = { name: 'نزدیکِ انقضا', kind: 'expiry', bp: 3000, nearDays: 7 };
+  const before = await h.get('/api/shop/promos', { token: a.staff });
+  assert.equal('expiry' in before.body, false, JSON.stringify(before.body));
+  const off = await h.put('/api/shop/promos/rules/ex', { rule }, { token: a.owner });
+  assert.equal(off.status, 403, JSON.stringify(off.body));
+  assert.equal(off.body.error.code, 'expiry_promo_disabled');
+  assert.deepEqual((await h.get('/api/shop/promos', { token: a.owner })).body.rules, []);
+  //  قاعدهٔ دیگر `nearDays` نمی‌گیرد — دادهٔ ذخیره‌شده همان شکلِ پیشین
+  const pct = await h.put('/api/shop/promos/rules/p', { rule: P10 }, { token: a.owner });
+  assert.equal(pct.status, 200, JSON.stringify(pct.body));
+  assert.equal('nearDays' in pct.body.rule, false);
+
+  await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.promo_expiry','true',1)", [a.shopId]);
+  assert.equal((await h.get('/api/shop/promos', { token: a.staff })).body.expiry, true);
+  const on = await h.put('/api/shop/promos/rules/ex', { rule }, { token: a.manager });
+  assert.equal(on.status, 200, JSON.stringify(on.body));
+  assert.equal(on.body.rule.kind, 'expiry');
+  assert.equal(on.body.rule.nearDays, 7);
+  assert.equal(on.body.rule.bp, 3000);
+  //  همان اعتبارسنجیِ هسته: ۱ تا ۳۶۵ روز
+  for (const nearDays of [0, 366, '7', undefined]) {
+    const bad = await h.put('/api/shop/promos/rules/ey', { rule: { ...rule, nearDays } }, { token: a.owner });
+    assert.equal(bad.status, 400, `${nearDays} ${JSON.stringify(bad.body)}`);
+    assert.deepEqual(bad.body.error.fields, ['expiry']);
+  }
+  //  دکانِ دیگر پرچم ندارد
+  assert.equal((await h.put('/api/shop/promos/rules/ex', { rule }, { token: b.owner })).status, 403);
+  assert.equal('expiry' in (await h.get('/api/shop/promos', { token: b.staff })).body, false);
+});
+
 test('«زیرِ بهای خرید» فقط با صاحب', async () => {
   const t = await shopWithTeam('پ');
   const rule = { ...P10, allowBelowCost: true };

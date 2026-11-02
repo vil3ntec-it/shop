@@ -11,6 +11,9 @@
  *   ۴) `shop.delivery_near_pin`: «تحویل شد» ِ پیک فقط با موقعیت و در فاصلهٔ `max_m` از پین؛ دور ⇒ رد با فاصله و
  *      **بی سوختنِ تلاشِ کد**؛ سفارشِ بی پین سنجیده نمی‌شود؛ تأییدِ دستیِ کارمند (با توضیح) از آن نمی‌گذرد؛
  *      موقعیت هیچ‌جا در دیتابیس نمی‌ماند، فقط فاصلهٔ گرد.
+ *   ۵) هم‌زمانی: ۱۵ «گرفتم» ِ هم‌زمانِ یک مأموریت (کیسهٔ جامانده) پشتِ `FOR UPDATE` ِ مأموریت ⇒ همه رد،
+ *      بی ۵۰۰. خواندنِ پرچم‌ها درونِ همان تراکنش است؛ پیش‌تر از استخر بود و روی PostgreSQL (استخرِ ۱۰)
+ *      دارندهٔ قفل اتصالِ دوم نمی‌گرفت ⇒ `timeout exceeded when trying to connect`.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -253,4 +256,22 @@ test('DLV-17: سفارشِ بی پین سنجیده نمی‌شود؛ max_m ِ �
     { token: s.token, headers: { 'Idempotency-Key': key('staff') } });
   assert.equal(staff.status, 200, JSON.stringify(staff.body));
   assert.equal((await one('SELECT status FROM delivery_assignments WHERE id=$1', [b.id])).status, 'delivered');
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   ۵) هم‌زمانی — خواندنِ پرچم درونِ تراکنشِ رویداد
+   ══════════════════════════════════════════════════════════════════ */
+
+test('DLV-07 هم‌زمان: ۱۵ «گرفتم» ِ هم‌زمانِ یک مأموریت ⇒ همه سنجیده و رد، بی ۵۰۰؛ «گرفتم» ِ درست سپس applied', async () => {
+  const s = await liveShop('هم‌زمان');
+  await setFlag(s.shopId, K.BAG_FLAG, true);
+  const o = await packedOrder(s, { bags: 2 });
+  const a = await assigned(s, o);
+  //  هر ۱۵ تا پشتِ `FOR UPDATE` ِ مأموریت می‌مانند و هر کدام پرچم را درونِ تراکنشِ خودش می‌خواند
+  const res = await Promise.all(Array.from({ length: 15 }, () => h.post('/api/courier/events',
+    { deviceId: 'courier-phone', events: [ev(a.id, 'picked_up', { bags: [label(o, 1, 2)] })] }, { token: s.courier.token })));
+  assert.deepEqual(res.map((r) => r.status), Array(15).fill(200), JSON.stringify(res.filter((r) => r.status !== 200).map((r) => r.body)));
+  for (const r of res) assert.equal(r.body.results[0].code, 'bags_incomplete', JSON.stringify(r.body));
+  assert.equal((await one('SELECT status FROM delivery_assignments WHERE id=$1', [a.id])).status, 'assigned', 'هیچ ردی گذار نزد');
+  assert.equal((await send(s, [ev(a.id, 'picked_up', { bags: [label(o, 1, 2), label(o, 2, 2)] })]))[0].status, 'applied');
 });

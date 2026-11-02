@@ -392,7 +392,8 @@ private fun PromoEditor(
         value = f.name, onValueChange = { f = f.copy(name = it.take(80)) },
         label = { Text("نام (روی سبد دیده می‌شود)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
       )
-      Choice("نوع", PromoText.KINDS, f.kind) { f = f.copy(kind = it, tiers = listOf("" to ""), tierAmount = false, pct = if (it == "bxgy") "100" else f.pct) }
+      //  PRM-10: «نزدیکِ انقضا» فقط با پرچمِ `shop.promo_expiry` (یا قاعده‌ای که از پیش چنین است)
+      Choice("نوع", PromoText.kinds(PromoLive.snap.value.expiry || rule.kind == "expiry"), f.kind) { f = f.copy(kind = it, tiers = listOf("" to ""), tierAmount = false, pct = if (it == "bxgy") "100" else f.pct) }
 
       when (f.kind) {
         "percent" -> NumField("درصدِ تخفیف", f.pct) { f = f.copy(pct = it) }
@@ -441,6 +442,13 @@ private fun PromoEditor(
         "bundle" -> Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
           NumField("تعدادِ بسته", f.bundleQty, Modifier.weight(1f)) { f = f.copy(bundleQty = it) }
           NumField("قیمتِ بسته (؋)", f.bundlePrice, Modifier.weight(1f)) { f = f.copy(bundlePrice = it) }
+        }
+        "expiry" -> {
+          Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
+            NumField("درصدِ تخفیف", f.pct, Modifier.weight(1f)) { f = f.copy(pct = it) }
+            NumField("چند روز پیش از انقضا", f.nearDays, Modifier.weight(1f)) { f = f.copy(nearDays = it) }
+          }
+          Hint("فقط واحدهایی که در محموله‌های تا این چند روز مانده به انقضا نشسته‌اند تخفیف می‌گیرند (اول آنچه زودتر تمام می‌شود). کالای منقضی تخفیف نمی‌گیرد.")
         }
       }
 
