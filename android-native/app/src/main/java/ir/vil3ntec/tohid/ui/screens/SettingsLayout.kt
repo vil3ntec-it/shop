@@ -82,6 +82,64 @@ object SettingsLayout {
   const val PRICE_LIST = "لیستِ قیمت در صندوق (خرده/عمده)"
   /** پیش‌فاکتور (POS-25، `QuotePref`) — همان عنوانِ `QuoteSettingsWired` */
   const val QUOTE = "پیش‌فاکتور (قیمت‌دهی)"
+  /** کارتِ هدیه و اعتبارِ فروشگاه (PAY-24، `GiftCardPref`) — همان عنوانِ `GiftCardSettingsWired` */
+  const val GIFT_CARD = "کارتِ هدیه و اعتبارِ فروشگاه"
+  /** فروشِ امانی و قسطی (POS-27، `LayawayPref`) */
+  const val LAYAWAY = "فروشِ امانی و قسطی"
+  /** امتیازِ وفاداری و سطحِ مشتری (PRM-13، `LoyaltyPref`) */
+  const val LOYALTY = "امتیازِ وفاداری و سطحِ مشتری"
+  /** گاوصندوق (PAY-18، `SafeBookPref`) */
+  const val SAFE_BOOK = "گاوصندوق"
+  /** گزارشِ مالیاتِ سه‌ماهه (RPT-10، `TaxQuarterPref`) */
+  const val TAX_QUARTER = "گزارشِ مالیاتِ سه‌ماهه"
+  /** کارت یا بارکدِ مشتری (CRM-16، `CustomerCardPref`) */
+  const val CUSTOMER_CARD = "کارت یا بارکدِ مشتری"
+  /** محل‌ها و بسته‌بندیِ دوباره (INV-20/21، `StockPlacesPref`) — همان `STOCK_PLACES_TITLE` */
+  const val STOCK_PLACES = "محل‌ها و بسته‌بندیِ دوباره"
+  /** پیش‌بینیِ تقاضا (AI-07، `SmartForecastPref`) — همان `SMART_FORECAST_TITLE` */
+  const val SMART_FORECAST = "پیش‌بینیِ تقاضا (آزمایشی)"
+  /** تشخیصِ ناهنجاری (AI-08، `AnomalyPref`) — همان `ANOMALY_TITLE` */
+  const val ANOMALY = "تشخیصِ ناهنجاری (آزمایشی)"
+  /** گزارشِ خودکار برای صاحب (PAY-20/RPT-12، `OwnerReportLive`، پرچمِ سرورِ `shop.owner_report`) — همان `OWNER_REPORT_TITLE` */
+  const val OWNER_REPORT = "گزارشِ خودکار برای صاحب"
+  /** زمانِ تقریبیِ تحویلِ ویترین (WEB-04، `StorefrontEtaLive`، پرچمِ سرورِ `shop.storefront.eta`) — همان `STOREFRONT_ETA_TITLE` */
+  const val STOREFRONT_ETA = "زمانِ تقریبیِ تحویلِ ویترین"
+  /** اولین خرید و سدِ تخفیف (MKT-02/RSK-09، `PromoGuardLive`، پرچمِ سرورِ `shop.storefront.promo_guard`) — همان `PROMO_GUARD_TITLE` */
+  const val PROMO_GUARD = "تخفیفِ اولین خرید و سدِ سوءاستفاده"
+  /** رسیدِ هدیهٔ بی قیمت (POS-34، `GiftReceiptPrefs`) */
+  const val GIFT_RECEIPT = "رسیدِ هدیه"
+  /** فروش با تحویلِ بعدی (POS-38، `DeliverLaterPrefs`) */
+  const val DELIVER_LATER = "فروش با تحویلِ بعدی"
+  /** سفارشِ ویژه با پیش‌پرداخت (POS-26، `SpecialOrderPref`) */
+  const val SPECIAL_ORDER = "سفارشِ ویژه با پیش‌پرداخت"
+  /** «چرا این قیمت؟» (POS-22، `PriceWhyPrefs`) */
+  const val PRICE_WHY = "«چرا این قیمت؟» در صندوق"
+  /** گزارشِ ضایعات و کسری (INV-17، `ShrinkReportPref`) */
+  const val SHRINK_REPORT = "گزارشِ ضایعات و کسری"
+  /** انبارگردانیِ تازه (INV-06/07/08، `CountToolsPref`) */
+  const val COUNT_TOOLS = "انبارگردانیِ تازه"
+  /** برچسب و بارکدِ داخلی (PRD-23/PRD-05، `LabelToolsPref`) */
+  const val LABEL_TOOLS = "برچسب و بارکدِ داخلی"
+  /** کد، نام‌های دیگر و محلِ قفسه (PRD-02/PRD-26، `ProductInfoPrefs`) */
+  const val PRODUCT_INFO = "کد، نام‌های دیگر و محلِ قفسه"
+  /** جست‌وجوی مقاومِ صندوق (POS-04، `PosSearchPrefs`) — فقط کامپیوتر */
+  const val POS_SEARCH = "جست‌وجوی مقاومِ صندوق"
+  /** قیمت‌پرسی در صندوق (POS-15، `PosPriceCheckPrefs`) — فقط کامپیوتر */
+  const val POS_PRICE_CHECK = "قیمت‌پرسی در صندوق (Ctrl+I)"
+  /** حالتِ لمسیِ صندوق (POS-31، `PosTouchPrefs`) — فقط کامپیوتر */
+  const val POS_TOUCH = "حالتِ لمسیِ صندوق (کامپیوتر)"
+  /** کلیدهای بیشترِ صندوق (`PosMoreKeysPrefs`) — فقط کامپیوتر */
+  const val POS_MORE_KEYS = "کلیدهای بیشترِ صندوق"
+  /** کلیدهای دوره در گزارش‌ها (RPT-13، `ReportKeysPref`) — فقط کامپیوتر */
+  const val REPORT_KEYS = "کلیدهای دوره در گزارش‌ها"
+  /** شماره‌های جاافتادهٔ اسناد (RPT-17، `DocGapsPref`) — فقط کامپیوتر */
+  const val DOC_GAPS = "شماره‌های جاافتادهٔ اسناد"
+  /** قیمت و تخفیفِ ردیف (POS-08/10/20/21، `LinePolicyPrefs`) */
+  const val LINE_PRICING = "قیمت و تخفیفِ ردیف"
+  /** یادداشتِ ردیف و فاکتور (POS-11، `PosNotesPrefs`) */
+  const val POS_NOTES = "یادداشتِ ردیف و فاکتور"
+  /** هزینهٔ خودکارِ فاکتور (POS-36، `AutoFeesPref`) */
+  const val AUTO_FEES = "هزینهٔ خودکار"
 
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
@@ -91,12 +149,16 @@ object SettingsLayout {
 
   val GROUPS: List<Group> = listOf(
     Group(GENERAL, listOf("هشدارها", "ظاهر", NAV_BAR, "زبان", "تاریخ و رقم")),
-    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب", FRAUD_TRAIL)),
+    Group(SECURITY, listOf("قفل برنامه", ENCRYPTION, "کد شاگرد", "دستگاه‌های وارد شده", "تغییر رمز حساب", FRAUD_TRAIL, ANOMALY)),
     Group(
       SALES,
       listOf(
-        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, CREDIT_GATE, CRM_REPORTS,
-        PRICE_LIST, QUOTE, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, PRODUCT_TOOLS, PRINTER,
+        "کالای منقضی", CHECKOUT_RULES, HELD, RETURNS, PAY, PAY_FIX, TILL_RECEIVE, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH,
+        POS_MORE_KEYS, GIFT_CARD, LAYAWAY, SAFE_BOOK, CREDIT_GATE, LOYALTY, CUSTOMER_CARD, CRM_REPORTS, REPORT_KEYS,
+        DOC_GAPS, TAX_QUARTER, OWNER_REPORT, LINE_PRICING, PRICE_LIST, PRICE_WHY, POS_NOTES, AUTO_FEES, QUOTE,
+        SPECIAL_ORDER, DELIVER_LATER, GIFT_RECEIPT, STOCK_MODE, STOCK_INSIGHT, STOCK_LEVELS, SMART_FORECAST,
+        STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, PRODUCT_TOOLS, PRODUCT_INFO, LABEL_TOOLS,
+        STOREFRONT_ETA, PROMO_GUARD, PRINTER,
       ),
     ),
     Group(DEVICES, listOf(CAMERA, PERIPHERALS)),
@@ -136,6 +198,35 @@ object SettingsLayout {
     CRM_REPORTS to "customer-reports",
     PRICE_LIST to "price-lists",
     QUOTE to "quotes",
+    GIFT_CARD to "gift-cards",
+    LAYAWAY to "layaway",
+    LOYALTY to "loyalty",
+    SAFE_BOOK to "safe",
+    TAX_QUARTER to "tax-quarter",
+    CUSTOMER_CARD to "customer-cards",
+    STOCK_PLACES to "stock-places",
+    SMART_FORECAST to "forecast",
+    ANOMALY to "anomalies",
+    OWNER_REPORT to "owner-report",
+    STOREFRONT_ETA to "storefront-eta",
+    PROMO_GUARD to "promo-guard",
+    GIFT_RECEIPT to "gift-receipt",
+    DELIVER_LATER to "deliver-later",
+    SPECIAL_ORDER to "special-orders",
+    PRICE_WHY to "price-why",
+    SHRINK_REPORT to "shrink-report",
+    COUNT_TOOLS to "stock-count",
+    LABEL_TOOLS to "labels",
+    PRODUCT_INFO to "product-info",
+    POS_SEARCH to "smart-search",
+    POS_PRICE_CHECK to "price-check",
+    POS_TOUCH to "touch-mode",
+    POS_MORE_KEYS to "more-keys",
+    REPORT_KEYS to "report-keys",
+    DOC_GAPS to "doc-gaps",
+    LINE_PRICING to "line-pricing",
+    POS_NOTES to "notes",
+    AUTO_FEES to "auto-fees",
     TILL_RECEIVE to "till-receive",
     STOCK_MODE to "stock-mode",
     STOCK_INSIGHT to "stock-insight",
@@ -180,6 +271,35 @@ object SettingsLayout {
     CRM_REPORTS -> StrShell.crmReports
     PRICE_LIST -> StrPos.priceListTitle
     QUOTE -> StrPos.quoteSettingsTitle
+    GIFT_CARD -> ir.vil3ntec.tohid.core.i18n.StrGiftCard.settingsTitle
+    LAYAWAY -> ir.vil3ntec.tohid.core.i18n.StrLayaway.settingsTitle
+    LOYALTY -> ir.vil3ntec.tohid.core.i18n.StrLoyalty.settingsTitle
+    SAFE_BOOK -> ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle
+    TAX_QUARTER -> ir.vil3ntec.tohid.core.i18n.StrTaxQuarter.settingsTitle
+    CUSTOMER_CARD -> ir.vil3ntec.tohid.core.i18n.StrCustomerCard.settingsTitle
+    STOCK_PLACES -> STOCK_PLACES_TITLE
+    SMART_FORECAST -> SMART_FORECAST_TITLE
+    ANOMALY -> ANOMALY_TITLE
+    OWNER_REPORT -> OWNER_REPORT_TITLE
+    STOREFRONT_ETA -> STOREFRONT_ETA_TITLE
+    PROMO_GUARD -> PROMO_GUARD_TITLE
+    GIFT_RECEIPT -> ir.vil3ntec.tohid.core.i18n.StrGift.section
+    DELIVER_LATER -> ir.vil3ntec.tohid.core.i18n.StrDeliver.section
+    SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle
+    PRICE_WHY -> ir.vil3ntec.tohid.core.i18n.StrWhy.section
+    SHRINK_REPORT -> ir.vil3ntec.tohid.core.i18n.StrShrink.settingsTitle
+    COUNT_TOOLS -> ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle
+    LABEL_TOOLS -> ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle
+    PRODUCT_INFO -> ir.vil3ntec.tohid.core.i18n.StrProduct.section
+    POS_SEARCH -> StrPos.smartSearch
+    POS_PRICE_CHECK -> ir.vil3ntec.tohid.core.i18n.StrPriceCheck.section
+    POS_TOUCH -> ir.vil3ntec.tohid.core.i18n.StrTouch.section
+    POS_MORE_KEYS -> StrPos.moreKeys
+    REPORT_KEYS -> ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys
+    DOC_GAPS -> ir.vil3ntec.tohid.core.i18n.StrReports.docGaps
+    LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
+    POS_NOTES -> StrPos.notesSection
+    AUTO_FEES -> StrSale.feesTitle
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE
     STOCK_INSIGHT -> StrShell.stockInsight
@@ -223,9 +343,19 @@ object SettingsLayout {
 
   /**
    *  بخش‌هایی که فقط کامپیوتر دارد — مثلِ رابطِ امروز: «گزارش‌های مشتری» فقط زبانه‌های «گزارش‌ها»ی
-   *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد.
+   *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد؛ کلیدهای صندوق و گزارشِ کامپیوتر هم (همان
+   *  `Platform.DESKTOP` ِ `SettingsLegacy`).
    */
-  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS)
+  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, REPORT_KEYS, DOC_GAPS)
+
+  /**
+   *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ
+   *  کامپیوتر). `serverOn` همان بخش‌هایی است که درِ سرورشان همین لحظه «دیده شود» گفته (`SettingsFacts.serverOn`).
+   */
+  val SERVER_GATED: Set<String> = setOf(OWNER_REPORT, STOREFRONT_ETA, PROMO_GUARD)
+
+  /** ردیفِ این بخش کشیده شود؟ — بخشِ بی پرچم همیشه؛ بخشِ پشتِ پرچم فقط با پاسخِ روشنِ سرور */
+  fun shown(key: String, serverOn: Set<String>): Boolean = key !in SERVER_GATED || key in serverOn
 
   /**
    *  فهرستِ ستونِ کناریِ تنظیماتِ کامپیوتر: ترتیبِ دادهٔ `given` می‌ماند و هر بخشی
