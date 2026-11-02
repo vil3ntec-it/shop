@@ -66,7 +66,7 @@ describe('نگهبانِ آزمون', { concurrency: true }, () => {
     assert.match(r.out, new RegExp(header(fx('hang-exit')).source + 'همهٔ آزمون‌ها و قلاب‌ها تمام شدند \\(test:summary رسید\\)'));
     assert.match(r.out, /آخرین آزمونِ تمام‌شده: «همه سبز، ولی خروج گیر می‌کند»/);
     assert.match(r.out, /گزارشِ Node نرسید/);
-    if (process.platform === 'linux') assert.match(r.out, /فرآیندِ پرونده: pid \d+ \[حالت \S+، wchan futex/);
+    if (process.platform === 'linux') assert.match(r.out, /فرآیندِ پرونده: pid \d+ \[حالت \S+، رشتهٔ اصلی futex/);
     assert.match(r.out, new RegExp(`not ok \\d+ - ${esc(fx('hang-exit'))}`));
     assert.match(r.out, /^ok \d+ - پروندهٔ پس از گیر/m, 'پروندهٔ بعدی اجرا نشد');
   });

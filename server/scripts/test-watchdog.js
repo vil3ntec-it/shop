@@ -101,13 +101,27 @@ function descendants(list, root) {
   return out;
 }
 
-/** لینوکس: حالت و wchan ِ رشتهٔ اصلی — «ep_poll» یعنی حلقهٔ رویداد بیکار است، «futex…» یعنی گیرِ بومی. */
+/**
+ * لینوکس: حالت و wchan ِ رشتهٔ اصلی و همهٔ رشته‌ها — «ep_poll» یعنی حلقهٔ رویداد (یا spawnSync) منتظر
+ * است، «futex…» یعنی رشته‌ای در کدِ بومی منتظرِ قفل یا رشتهٔ دیگری است.
+ */
 function nativeState(p) {
+  const wchan = (file) => { try { return fs.readFileSync(file, 'utf8').trim() || '-'; } catch { return '?'; } };
   try {
-    const wchan = fs.readFileSync(`/proc/${p.pid}/wchan`, 'utf8').trim() || '-';
-    const threads = fs.readdirSync(`/proc/${p.pid}/task`).length;
-    return ` [حالت ${p.state}، wchan ${wchan}، ${threads} رشته]`;
+    const counts = new Map();
+    for (const t of fs.readdirSync(`/proc/${p.pid}/task`)) {
+      const w = wchan(`/proc/${p.pid}/task/${t}/wchan`);
+      counts.set(w, (counts.get(w) || 0) + 1);
+    }
+    const all = [...counts].map(([w, n]) => `${w}×${n}`).join(' ');
+    return ` [حالت ${p.state}، رشتهٔ اصلی ${wchan(`/proc/${p.pid}/wchan`)}؛ رشته‌ها: ${all}]`;
   } catch { return p.state ? ` [حالت ${p.state}]` : ''; }
+}
+
+/** فرمان کوتاه: بی پیشوندِ پوشهٔ server و مسیرِ خودِ node/electron */
+function shortArgs(args) {
+  return args.split(ROOT + path.sep).join('').split(process.execPath).join(path.basename(process.execPath))
+    .replace(/ --report-on-signal --report-directory=\S+/, '').slice(0, 300);
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -269,10 +283,10 @@ async function run(args, { env = process.env, seconds = readSeconds(), out = pro
             ? '  فرآیندِ پرونده بیرون رفته ولی node --test هنوز منتظرِ بسته شدنِ stdout ِ آن است (زیرفرآیندی که آن را به ارث برده؟).'
             : '  فرآیندِ پرونده پیدا نشد.');
       }
-      for (const p of targets) lines.push(`  ${p === fileProc ? 'فرآیندِ پرونده' : 'زیرفرآیند'}: pid ${p.pid}${nativeState(p)} ${p.args.slice(0, 200)}`);
+      for (const p of targets) lines.push(`  ${p === fileProc ? 'فرآیندِ پرونده' : 'زیرفرآیند'}: pid ${p.pid}${nativeState(p)} ${shortArgs(p.args)}`);
       if (fileProc && posix) {
         const r = await nodeReport(fileProc.pid, dir);
-        lines.push(r ? '  گزارشِ Node (حلقهٔ رویداد هنوز می‌چرخد):' : '  گزارشِ Node نرسید — رشتهٔ اصلی JS اجرا نمی‌کند (گیرِ بومی یا حلقهٔ همگام).');
+        lines.push(r ? '  گزارشِ Node (حلقهٔ رویداد هنوز می‌چرخد):' : '  گزارشِ Node نرسید — رشتهٔ اصلی JS اجرا نمی‌کند (گیرِ بومی، حلقهٔ همگام یا انتظارِ spawnSync برای زیرفرآیند).');
         if (r) lines.push(...reportLines(r));
       }
     }
