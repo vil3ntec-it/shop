@@ -25,7 +25,9 @@ object BagLabelsPrint {
     val bytes = withContext(Dispatchers.IO) {
       runCatching {
         val p = printer.profile()
-        val image = BagLabelPrint.image(labels.map { BagLabelPrint.Bag(it.first, it.second) }, p.paperDots) { text ->
+        //  OPS-07: در حالتِ آموزش هر برچسب «آموزشی · …» (`TrainingMode.watermark`)؛ بیرون از آن همان نوشتهٔ سرور
+        val bags = labels.map { BagLabelPrint.Bag(it.first, BagLabelPrint.caption(it.second, ir.vil3ntec.tohid.data.TrainingMode.watermark(null))) }
+        val image = BagLabelPrint.image(bags, p.paperDots) { text ->
           HwPages.text(context, p.paperDots, listOf(HwPages.Line(text, HwPages.Style.HEAD)))
         }
         EscPos.document(image, p)

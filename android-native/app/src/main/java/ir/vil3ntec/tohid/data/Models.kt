@@ -365,13 +365,12 @@ data class SalePayment(
   @JsonNames("amountMinor")
   val amountMinor: Long,
   val status: String,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val ref: String? = null,
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val verification: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val ref: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val verification: String? = null,
   /** امانتِ کیست، اگر پول هنوز دستِ دکان نیست — `courier` برای «نقد هنگامِ تحویل»ِ فاکتورِ W */
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val custody: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val custody: String? = null,
+  /** حساب‌پیِ دکان: اثرِ انگشتِ حسابِ گیرنده (همان `PaymentRow.payee`) ⇐ گزارشِ «پول به کدام حساب رفت» ِ صاحب */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val payee: String? = null,
 )
 
 /**

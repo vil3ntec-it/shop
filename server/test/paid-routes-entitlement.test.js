@@ -70,7 +70,9 @@ const FREE = [
   ['«حساب‌پیِ دکان» (حساب و رمزِ جدای حساب‌پی، فقط صاحب) کلیدِ کاتالوگ ندارد: صاحب پس از پایانِ اشتراک هم باید بتواند حسابِ '
     + 'پولش را ببیند، عوض کند یا بردارد', [
     'POST /shop/hesabpay/open', 'PUT /shop/hesabpay/pin', 'POST /shop/hesabpay/pin/reset',
-    'PUT /shop/hesabpay/account', 'POST /shop/hesabpay/account/remove']],
+    'PUT /shop/hesabpay/account', 'POST /shop/hesabpay/account/remove',
+    //  «این من نبودم — لغو کن» (نگهبانِ حسابِ گیرنده، مهاجرتِ ۲۰۵): دزدیدنِ حساب پس از پایانِ اشتراک هم باید لغوشدنی بماند
+    'POST /shop/hesabpay/pending/cancel']],
   ['ورود و خروجِ کارمند و نرخ‌های پورسانت (STF-07، STF-08) کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.staff_time؛ '
     + 'ساعتِ کارِ ثبت‌شده پس از پایانِ اشتراک هم باید ثبت‌شدنی بماند', [
     'POST /shop/staff-time/punches', 'PUT /shop/staff-time/commission-plan']],

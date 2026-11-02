@@ -14,7 +14,38 @@ import ir.vil3ntec.tohid.core.perm.PinGuard
  *    امضاشده با رازِ همان دکان؛ تأییدِ خودکار فقط با مرجع و مبلغِ برابر از راهِ رسمی.
  *
  *  رمزِ حساب‌پی جدا از رمزِ برنامه است و سرور می‌سنجدش (قفل پس از ۵ خطا)؛ این‌جا فقط شکلش پیش از فرستادن.
+ *
+ *  نگهبانِ حسابِ گیرنده (سرور: `lib/hesabpay-guard.js`، مهاجرتِ ۲۰۵): QR ِ صندوق فقط از حسابِ ذخیره‌شده در سرور
+ *  ([TillHesab.simple]) و کنارش «پول به حسابِ <نام> — <۴ رقم>» ([Payee])؛ حسابِ تازه ۲۴ ساعت در انتظار ([PendingPayee])
+ *  با «این من نبودم — لغو کن» ([HesabPayAccountClient.cancelPending])؛ اثرِ انگشتِ گیرنده ([Payee.fp]) روی هر ردیفِ پرداخت.
  */
+
+/**
+ *  حسابِ گیرندهٔ پولِ دکان: نام و ۴ رقمِ آخر (برای «پول به حسابِ …») و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد.
+ *  `active` فقط در تاریخچهٔ حساب‌ها ([TillHesab.payees]) معنا دارد.
+ */
+data class Payee(val name: String, val last4: String, val fp: String, val active: Boolean = true) {
+  companion object {
+    fun fromMap(m: Map<*, *>?): Payee? {
+      val last4 = (m?.get("last4") as? String).orEmpty()
+      if (m == null || last4.isBlank()) return null
+      return Payee((m["name"] as? String).orEmpty(), last4, (m["fp"] as? String).orEmpty(), m["active"] != false)
+    }
+  }
+}
+
+/** X/Z: جمعِ «پول رسید» ِ حساب‌پیِ یک حساب. `kind`: [ACTIVE] | [RETIRED] (حسابِ کهنهٔ همین دکان) | [UNKNOWN] | [NONE] (برنامهٔ کهنه) */
+data class PayeeTotal(val kind: String, val name: String, val last4: String, val fp: String, val count: Int, val amountMinor: Long) {
+  companion object {
+    const val ACTIVE = "active"
+    const val RETIRED = "retired"
+    const val UNKNOWN = "unknown"
+    const val NONE = "none"
+  }
+}
+
+/** حسابِ تازه‌ای که هنوز فعال نیست (۲۴ ساعت) — فقط نام و ۴ رقم */
+data class PendingPayee(val name: String, val last4: String, val until: Long)
 
 /** شماره و QR ِ دکان برای صندوقِ حالتِ ساده */
 data class SimpleAccount(val account: String, val qrPayload: String) {
@@ -22,8 +53,17 @@ data class SimpleAccount(val account: String, val qrPayload: String) {
   val qrText: String get() = qrPayload.ifBlank { account }
 }
 
-/** حالِ حساب‌پی برای صندوق (`GET /shop/payments/config`) */
-data class TillHesab(val gateway: Boolean, val mode: String, val simple: SimpleAccount?) {
+/**
+ *  حالِ حساب‌پی برای صندوق (`GET /shop/payments/config`)؛ `payee` = گیرندهٔ فعال (سرورِ کهنه ⇐ null)؛ `payees` = حساب‌هایی
+ *  که روزی فعال بودند (X/Z به تفکیکِ حساب)
+ */
+data class TillHesab(
+  val gateway: Boolean,
+  val mode: String,
+  val simple: SimpleAccount?,
+  val payee: Payee? = null,
+  val payees: List<Payee> = emptyList(),
+) {
   val any: Boolean get() = gateway || simple != null
 
   companion object {
@@ -36,7 +76,8 @@ data class TillHesab(val gateway: Boolean, val mode: String, val simple: SimpleA
       val account = (s?.get("account") as? String).orEmpty()
       val qr = (s?.get("qrPayload") as? String).orEmpty()
       val simple = if (mode == HesabPayShop.SIMPLE && (account.isNotBlank() || qr.isNotBlank())) SimpleAccount(account, qr) else null
-      return TillHesab(h["enabled"] == true, mode, simple)
+      val known = (h["payees"] as? List<*>).orEmpty().mapNotNull { Payee.fromMap(it as? Map<*, *>) }.filter { it.fp.isNotBlank() }
+      return TillHesab(h["enabled"] == true, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known)
     }
   }
 }
@@ -119,6 +160,27 @@ object HesabPayShop {
     return "HP-" + out.substring(0, 4) + "-" + out.substring(4)
   }
 
+  /**
+   *  X/Z: «پول رسید» ‌های حساب‌پی (اثرِ انگشتِ گیرنده، مبلغ به پول) به تفکیکِ حساب — حسابِ فعال اول، سپس کهنه‌ها، سپس
+   *  ⚠️ ناشناخته (اثرِ انگشتی که هیچ‌گاه حسابِ این دکان نبود) و «بی نشان» (برنامهٔ کهنه). نام و ۴ رقم فقط از [known] (سرور).
+   */
+  fun byPayee(rows: List<Pair<String?, Long>>, known: List<Payee>): List<PayeeTotal> {
+    val groups = LinkedHashMap<String, MutableList<Long>>()
+    rows.forEach { (fp, amount) -> groups.getOrPut(fp?.trim().orEmpty()) { ArrayList() }.add(amount) }
+    val out = groups.map { (fp, amounts) ->
+      val k = known.firstOrNull { it.fp == fp }
+      val kind = when {
+        fp.isEmpty() -> PayeeTotal.NONE
+        k == null -> PayeeTotal.UNKNOWN
+        k.active -> PayeeTotal.ACTIVE
+        else -> PayeeTotal.RETIRED
+      }
+      PayeeTotal(kind, k?.name.orEmpty(), k?.last4.orEmpty(), fp, amounts.size, amounts.sum())
+    }
+    val order = listOf(PayeeTotal.ACTIVE, PayeeTotal.RETIRED, PayeeTotal.UNKNOWN, PayeeTotal.NONE)
+    return out.sortedWith(compareBy({ order.indexOf(it.kind) }, { -it.amountMinor }))
+  }
+
   /** کد برای مقایسه: فقط حرف و رقمِ بزرگ (یادداشتِ پرداخت‌کننده خط تیره یا فاصله را جا می‌اندازد) */
   fun refKey(text: String): String = latin(text).uppercase().filter { it in 'A'..'Z' || it in '0'..'9' }
 }
@@ -139,6 +201,16 @@ data class HesabAccountView(
   val keyLast4: String = "",
   val merchantSet: Boolean = false,
   val webhookUrl: String = "",
+  /** گیرندهٔ فعال («پول به حسابِ <نام> — <۴ رقم>») */
+  val payee: Payee? = null,
+  /** حسابِ در انتظارِ فعال شدن ⇐ نوارِ «این من نبودم — لغو کن» */
+  val pending: PendingPayee? = null,
+  /** بخش پس از «این من نبودم» تا این لحظه بسته است */
+  val sectionLockedUntil: Long? = null,
+  /** همین دستگاه برای تغییر مطمئن است؟ (null = سرورِ کهنه) و از کی */
+  val deviceTrusted: Boolean? = null,
+  val trustedAfter: Long? = null,
+  val trustDays: Int = 7,
 ) {
   companion object {
     private fun long(v: Any?): Long? = when (v) {
@@ -150,6 +222,9 @@ data class HesabAccountView(
       if (m == null || m["pinSet"] !is Boolean) return null
       val mode = (m["mode"] as? String)?.takeIf { it in HesabPayShop.MODES } ?: HesabPayShop.OFF
       val auto = m["auto"] as? Map<*, *>
+      val p = m["pending"] as? Map<*, *>
+      val pending = p?.let { x -> long(x["until"])?.let { PendingPayee((x["name"] as? String).orEmpty(), (x["last4"] as? String).orEmpty(), it) } }
+      val device = m["device"] as? Map<*, *>
       return HesabAccountView(
         pinSet = m["pinSet"] == true,
         locked = m["locked"] == true,
@@ -165,6 +240,12 @@ data class HesabAccountView(
         keyLast4 = (auto?.get("keyLast4") as? String).orEmpty(),
         merchantSet = auto?.get("merchantSet") == true,
         webhookUrl = (auto?.get("webhookUrl") as? String).orEmpty(),
+        payee = Payee.fromMap(m["payee"] as? Map<*, *>),
+        pending = pending,
+        sectionLockedUntil = long(m["sectionLockedUntil"]),
+        deviceTrusted = device?.get("trusted") as? Boolean,
+        trustedAfter = long(device?.get("trustedAfter")),
+        trustDays = long(m["trustDays"])?.toInt() ?: 7,
       )
     }
   }
@@ -203,18 +284,25 @@ class HesabPayAccountClient(private val transport: GatewayTransport) {
   /** رمز فراموش شد: رمز و حساب پاک و ۲۴ ساعت بی حسابِ تازه (سرور) */
   suspend fun resetPin(): AccountCall = of(transport.post("${HesabPayShop.ROOT}/pin/reset", emptyMap()), opened = false)
 
-  suspend fun saveSimple(pin: String, account: String, qr: String): AccountCall {
-    val body = linkedMapOf<String, Any?>("pin" to pin, "mode" to HesabPayShop.SIMPLE)
+  /** `name` = نامِ صاحبِ حساب (همان که صندوق کنارِ QR نشان می‌دهد)؛ سرور اجباری می‌خواهدش */
+  suspend fun saveSimple(pin: String, name: String, account: String, qr: String): AccountCall {
+    val body = linkedMapOf<String, Any?>("pin" to pin, "name" to name.trim(), "mode" to HesabPayShop.SIMPLE)
     if (account.isNotBlank()) body["account"] = account.trim()
     if (qr.isNotBlank()) body["qr"] = qr.trim()
     return of(transport.put("${HesabPayShop.ROOT}/account", body), opened = true)
   }
 
-  suspend fun saveAuto(pin: String, apiKey: String, webhookSecret: String, merchantId: String): AccountCall {
-    val body = linkedMapOf<String, Any?>("pin" to pin, "mode" to HesabPayShop.AUTO, "apiKey" to apiKey.trim(), "webhookSecret" to webhookSecret.trim())
-    if (merchantId.isNotBlank()) body["merchantId"] = merchantId.trim()
+  /** «خودکار»: شناسهٔ پذیرنده اجباری است (سرور «پرداخت شد» را فقط با پذیرندهٔ همین دکان می‌زند) */
+  suspend fun saveAuto(pin: String, name: String, apiKey: String, webhookSecret: String, merchantId: String): AccountCall {
+    val body = linkedMapOf<String, Any?>(
+      "pin" to pin, "name" to name.trim(), "mode" to HesabPayShop.AUTO, "apiKey" to apiKey.trim(),
+      "webhookSecret" to webhookSecret.trim(), "merchantId" to merchantId.trim(),
+    )
     return of(transport.put("${HesabPayShop.ROOT}/account", body), opened = true)
   }
+
+  /** «این من نبودم — لغو کن»: حسابِ در انتظار پاک و بخش ۲۴ ساعت بسته (سرور تأییدِ دوبارهٔ ورود می‌خواهد، نه رمزِ حساب‌پی) */
+  suspend fun cancelPending(): AccountCall = of(transport.post("${HesabPayShop.ROOT}/pending/cancel", emptyMap()), opened = false)
 
   suspend fun remove(pin: String): AccountCall = of(transport.post("${HesabPayShop.ROOT}/account/remove", mapOf("pin" to pin)), opened = true)
 

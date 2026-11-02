@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.sales.drawer
 
+import ir.vil3ntec.tohid.core.gateway.HesabPayShop
+import ir.vil3ntec.tohid.core.gateway.Payee
+import ir.vil3ntec.tohid.core.gateway.PayeeTotal
+import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.ShiftReport
@@ -61,6 +65,24 @@ object DrawerModel {
     val head = if (seesMoney) ir.vil3ntec.tohid.core.i18n.StrDevices.scannerSales(s.count, PhoneSaleText.amount(PayFlow.major(s.totalMinor)))
     else ir.vil3ntec.tohid.core.i18n.StrDevices.scannerSalesCount(s.count)
     return if (s.fromMemory > 0) head + " · " + ir.vil3ntec.tohid.core.i18n.StrDevices.scannerFromMemory(s.fromMemory) else head
+  }
+
+  /**
+   *  X/Z: «پول رسید» ‌های حساب‌پیِ بازه به تفکیکِ حسابِ گیرنده (`SalePayment.payee`)، با نام و ۴ رقم از تاریخچهٔ حساب‌های
+   *  سرور ([known] = `TillHesab.payees`). ⚠️ حسابی که مالِ این دکان نیست جدا و با نشان. شاگرد (شمارشِ کور) فقط شمار را می‌بیند.
+   */
+  fun hesabPayLines(d: ShopData, from: Long, to: Long, known: List<Payee>, seesMoney: Boolean): List<String> {
+    val rows = d.sales.filter { it.status != "cancelled" && it.createdAt in from..to }
+      .flatMap { s -> s.payments.orEmpty().filter { it.method == "hesabpay" && it.status == "confirmed" }.map { it.payee to it.amountMinor } }
+    return HesabPayShop.byPayee(rows, known).map { p ->
+      val label = when (p.kind) {
+        PayeeTotal.ACTIVE -> "${p.name.ifBlank { "—" }} — ${p.last4}"
+        PayeeTotal.RETIRED -> StrPay.xzRetired(p.name.ifBlank { "—" }, p.last4)
+        PayeeTotal.UNKNOWN -> StrPay.xzUnknown
+        else -> StrPay.xzNone
+      }
+      if (seesMoney) StrPay.xzPayee(label, PhoneSaleText.amount(PayFlow.major(p.amountMinor)), p.count) else StrPay.xzPayeeCount(label, p.count)
+    }
   }
 
   fun diff(counted: Double?, expected: Double): DrawerDiff? {

@@ -31,6 +31,7 @@ function disputesHtml(f) {
   return f.disputes.map((d) => `<div class="box">
   <div><b>${h(KIND_FA[d.kind] || d.kind)}</b> · ${d.status === 'open' ? 'باز' : 'بسته'} · ${at(d.openedAt)} · ${who(f.people, d.openedBy.userId)}</div>
   <p>${h(d.reason)}</p>
+  ${d.assigneeId ? `<p><b>مسئول: ${who(f.people, d.assigneeId)}</b> · مهلت ${at(d.dueAt)}${d.overdue ? ' · <b>مهلت گذشته</b>' : ''}</p>` : ''}
   ${table(['زمان', 'کاربر', 'یادداشت'], d.notes.map((n) => [at(n.at), who(f.people, n.by.userId), h(n.text)]))}
   ${d.resolution ? `<p><b>نتیجه: ${h(OUTCOME_FA[d.resolution.outcome] || d.resolution.outcome)}</b> · ${at(d.resolution.at)} · ${
     who(f.people, d.resolution.by.userId)}<br>${h(d.resolution.text)}</p>` : ''}

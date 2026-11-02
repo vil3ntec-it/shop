@@ -50,7 +50,14 @@
    ```
    تعارض‌ها: `python3 $OPS/cres.py <file> o|t|ot|to`، `baseline.json` با `python3 $OPS/baseline-max.py tools/quality/baseline.json`، STATUS با `python3 $OPS/batch-status.py`.
 3. **آزمونِ محلی:** `bash $OPS/desk-check.sh $S/wt-batchN` (هسته + کامپیوتر؛ ۱۳ آزمونِ `ui.theme` فقط محلی سرخ‌اند) و سرور روی PGlite: `bash $OPS/a3-test.sh $S/wt-batchN test/<file>...` (۵ آزمونِ `pg_dump` روی PGlite همیشه سرخ‌اند). PostgreSQL ِ محلی: پورت 55432، کاربر shop/shoppass، `TEST_DATABASE_URL=postgres://shop:shoppass@127.0.0.1:55432/shop_test`.
-4. **push:** `WT=$S/wt-batchN BUMP=1 bash $OPS/finish-pr.sh 0 ccr-3a0d593c-ac0jpj-batch-N` (spec، بارگذاریِ برنامه، شمارهٔ مهاجرت، کیفیت با شبیه‌سازیِ squash، eslint، نگهبانِ پمپ، push). سپس PR، صبر برای CI (`bash $OPS/wprs.sh <pr>`)، squash-merge، و بستنِ PRهای درونش با کامنتِ «با دستهٔ #… در main آمد».
+4. **push:** `WT=$S/wt-batchN BUMP=1 bash $OPS/finish-pr.sh 0 ccr-3a0d593c-ac0jpj-batch-N` (spec، بارگذاریِ برنامه، شمارهٔ مهاجرت، کیفیت با شبیه‌سازیِ squash، eslint، نگهبانِ پمپ، push).
+   **پیش از آن پایانِ کامیتِ همین سیزن را بده** (کامیت‌هایی که خودِ ابزار می‌سازد — unwrap و سقفِ کیفیت — همین را می‌گیرند؛ سیزنِ کهنه هرگز):
+   ```
+   export CLAUDE_FOOTER='Co-Authored-By: Claude … <noreply@anthropic.com>
+   Claude-Session: https://claude.ai/code/session_…'   # دقیقاً همان دو سطرِ «Attribution» ِ همین سیزن
+   ```
+   نبودن، بدشکل بودن یا سیزنِ دیگر (در سیزنِ ابری با `CLAUDE_CODE_REMOTE_SESSION_ID` سنجیده می‌شود) ⇒ `FOOTER MISSING/BAD/STALE` و
+   خروج پیش از هر کار (`footer.sh`). سپس PR، صبر برای CI (`bash $OPS/wprs.sh <pr>`)، squash-merge، و بستنِ PRهای درونش با کامنتِ «با دستهٔ #… در main آمد».
 5. **دستهٔ بعدی روی سرِ دستهٔ قبلی** چیده می‌شود. پس از squash ِ قبلی، ادغامِ main تعارض می‌دهد؛ چون درختِ main همان دستهٔ قبلی است، **سمتِ دسته را نگه دار** (`git checkout --ours`)، و STATUS را با `batch-status.py`.
 6. PR ِ پشته‌ای که پایه‌اش squash شد: فقط کامیت‌های خودش را cherry-pick کن (`git log --no-merges <br> ^<base-br> ^<old-main>`).
 
@@ -90,7 +97,8 @@
 
 | ابزار | کار |
 |---|---|
-| `finish-pr.sh <n> <branch>` (`WT=`، `BUMP=1`) | بررسیِ کامل و push |
+| `finish-pr.sh <n> <branch>` (`WT=`، `BUMP=1`، `CLAUDE_FOOTER` لازم) | بررسیِ کامل و push |
+| `footer.sh` (`. $OPS/footer.sh; claude_footer`) | پایانِ کامیتِ ابزارها از `CLAUDE_FOOTER`، سنجیده با سیزنِ کنونی |
 | `bmerge.sh <wt> <branch…>` | ادغامِ پیاپی در دسته |
 | `batch-status.py` | ادغامِ ردیف‌به‌ردیفِ STATUS |
 | `cres.py <file> o\|t\|ot\|to` | حلِ تکه‌های تعارض |
