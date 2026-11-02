@@ -45,6 +45,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
   { key: 'shop.staff_scope', scope: 'shop', default: false, what: 'دسترسیِ کارمند محدود به مکانِ موجودی (STF-06)' },
   { key: 'shop.storefront.eta', scope: 'shop', default: false, what: 'زمانِ تقریبیِ تحویلِ ویترین (WEB-04)' },
+  { key: 'shop.storefront.account_history', scope: 'shop', default: false, what: '«حسابِ من» ِ ویترین: خریدِ حضوری و مانده' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
 ]);
 
