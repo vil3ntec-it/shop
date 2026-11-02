@@ -4,7 +4,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrOnline.kt": 836,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt": 805,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt": 819,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/SalesEngine.kt": 900,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/SalesEngine.kt": 908,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1160,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/WarehouseEngine.kt": 1121,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/scan/BarcodeScanner.kt": 1273,
