@@ -17,7 +17,9 @@
  *   ⛔ هر هشدار سطحِ اهمیت دارد: critical · high · medium · low.
  *
  * دیدن/تأیید/بستن: `routes/admin-ops.js` (تأیید و بستنِ دستی با سابقه).
- * ارسالِ بیرونی (پیامک، ایمیل): نیست — پنلِ خانگی هشدارهای برگزیده را با رباتِ تلگرامِ مالک می‌فرستد.
+ * خبرِ بحرانی به مسئول (ایمیل/پوش، پیگیری، «بسته شد»): `lib/ops-paging.js` (OPS-01@29، پشتِ پرچمِ `ops.critical_alerts`؛
+ * قاعدهٔ `critical_health` هم فقط با همان پرچم سنجیده می‌شود، وگرنه `state: 'off'`). پنلِ خانگی هم هشدارهای برگزیده را
+ * با رباتِ تلگرامِ مالک می‌فرستد.
  */
 const { one, many, newId, now, tx } = require('../db');
 const audit = require('./audit');
@@ -48,6 +50,7 @@ const RULES = Object.freeze({
   settlement_mismatch: { severity: 'high', window: 7 * DAY, what: 'تسویهٔ نقدِ پیک در ۷ روزِ گذشته با کسری یا اضافه' },
   version_incompatible: { severity: 'high', what: 'دستگاهِ فعال (۳۰ روز) زیرِ حداقل نسخهٔ پشتیبانی‌شدهٔ همان برنامه' },
   admin_suspicious: { severity: 'high', window: HOUR, min: 10, what: 'ورودِ ناموفقِ مدیر: ۱۰ بار برای یک نامِ کاربری یا ۳۰ بار از یک IP در یک ساعت؛ یا ۱۰ حالتِ دکان (تعلیق/بایگانی…) از یک مدیر در ۱۰ دقیقه' },
+  critical_health: { severity: 'critical', flag: true, window: 10 * 60_000, what: 'OPS-01@29 (فقط با پرچمِ ops.critical_alerts): دیتابیسِ شلوغ (۱۰ پس‌زدنِ db_busy/اتصال در ۱۰ دقیقه یا صفِ استخرِ پر)، جهشِ ۵xx (۱۰۰ در ۱۰ دقیقه)، صفِ ایمیل/تلگرامِ گیرکرده بیش از ۳۰ دقیقه، سه شکستِ پیاپیِ تطبیقِ پرداخت' },
 });
 const SEVERITIES = Object.freeze(['critical', 'high', 'medium', 'low']);
 const STATUSES = Object.freeze(['open', 'acknowledged', 'resolved']);
@@ -142,16 +145,19 @@ const finders = {
         });
       }
     }
+    const critical = await require('./ops-paging').criticalJobs();   //  پرچمِ خاموش ⇒ [] ⇒ همان «high» ِ پیشین
     for (const j of require('./job-beat').snapshot(t)) {
       if (j.status === 'warn') {
         out.push({
-          target: `job.${j.name}`, severity: 'high', title: `کارِ پس‌زمینهٔ «${j.name}» ${j.lastError ? 'شکست خورد' : 'از مهلتش گذشته'}`,
+          target: `job.${j.name}`, severity: critical.includes(j.name) ? 'critical' : 'high', title: `کارِ پس‌زمینهٔ «${j.name}» ${j.lastError ? 'شکست خورد' : 'از مهلتش گذشته'}`,
           detail: { job: j.name, lastOkAt: j.lastOkAt, lastFailAt: j.lastFailAt, lastError: j.lastError },
         });
       }
     }
     return out;
   },
+
+  critical_health(t) { return require('./ops-paging').criticalFindings(t); },
 
   async payment_failed(t) {
     const since = t - RULES.payment_failed.window;
@@ -373,9 +379,13 @@ async function evaluate({ force = false } = {}) {
       const t = now();
       const budget = { left: LIMITS.maxNewPerRun };
       const rules = [];
+      const paging = require('./ops-paging');
+      const flagOn = await paging.enabled().catch(() => false);
       for (const id of Object.keys(RULES)) {
         const def = RULES[id];
         const base = { id, severity: def.severity, what: def.what, windowMs: def.window || null, min: def.min || null };
+        //  قاعدهٔ پرچم‌دار با پرچمِ خاموش: نه سنجش، نه بستنِ خودکار
+        if (def.flag && !flagOn) { rules.push({ ...base, state: 'off' }); continue; }
         let findings;
         try {
           findings = await finders[id](t);
@@ -395,6 +405,8 @@ async function evaluate({ force = false } = {}) {
       }
       lastEvalAt = Date.now();
       lastReport = { evaluatedAt: t, rules };
+      //  OPS-01@29: رخدادِ بحرانیِ تازه همین دم به مسئول (خودش زیرِ قفل و یکی‌کننده است)
+      if (flagOn) lastReport.paging = await paging.run().catch((err) => ({ state: 'error', reason: String(err.code || err.name || 'error').slice(0, 60) }));
       return lastReport;
     } finally {
       running = null;

@@ -367,6 +367,7 @@ const CAPABILITY_PROBES = {
     'PUT /admin/delivery/thresholds'],
   'ops.v1': ['GET /admin/ops/releases', 'GET /admin/ops/health', 'GET /admin/ops/integrations', 'GET /admin/ops/incidents',
     'GET /admin/ops/alerts', 'POST /admin/ops/alerts/evaluate', 'POST /admin/ops/incidents/x1/status', 'POST /admin/ops/alerts/x1/ack'],
+  'ops-paging.v1': ['GET /admin/ops/alerts/paging', 'PUT /admin/ops/alerts/paging'],
   //  فقط وقتی OPS-01 (#559) در همین نسخه است
   ...((() => { try { require.resolve('../src/lib/release-stage'); return true; } catch { return false; } })()
     ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
