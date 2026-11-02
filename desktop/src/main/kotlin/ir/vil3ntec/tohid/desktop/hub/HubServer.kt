@@ -4,6 +4,7 @@ import com.sun.net.httpserver.HttpExchange
 import com.sun.net.httpserver.HttpsConfigurator
 import com.sun.net.httpserver.HttpsParameters
 import com.sun.net.httpserver.HttpsServer
+import ir.vil3ntec.tohid.core.hub.CloudAnswer
 import ir.vil3ntec.tohid.core.hub.CloudCheck
 import ir.vil3ntec.tohid.core.hub.HubAuth
 import ir.vil3ntec.tohid.core.hub.HubBox
@@ -43,6 +44,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *
  *  - ⛔ فقط شبکهٔ دکان: درخواستِ نشانیِ عمومی ۴۰۳ (نشانیِ خصوصی، link-local، ULA و همین کامپیوتر).
  *  - ⛔ فقط TLS با گواهیِ سنجاق‌شدهٔ خودِ هاب (`HubTls`)؛ http اصلاً گوش داده نمی‌شود.
+ *  - ⛔ فقط دکانِ خودِ همین کامپیوتر: توکنِ دکانِ دیگر ۴۰۳ `hub_other_shop` و دسته‌اش هرگز به صف نمی‌رسد.
  *  - ⛔ هر درخواست توکن می‌خواهد (`HubAuth`)؛ هاب توکن را **فقط در حافظه** نگه می‌دارد تا دستهٔ همان دستگاه را
  *    با همان توکن بفرستد. روی دیسک فقط درهمِ توکن، صف و کلیدِ TLS — هر سه با `seal` (همان `SecretBox`).
  *  - ⛔ هر IP سقفِ درخواست دارد و سقفِ جدایی برای سنجشِ توکن نزدِ سرور (تا هاب ابزارِ کوبیدنِ سرور نشود).
@@ -53,6 +55,8 @@ internal class HubServer(
   private val dir: File,
   private val tls: HubTls,
   private val serverId: String,
+  /** دکانِ حسابِ خودِ همین کامپیوتر — فقط توکنِ همین دکان پذیرفته است */
+  private val shopId: String,
   private val cloud: HubCloud,
   private val seal: (String) -> String,
   private val open: (String) -> String?,
@@ -175,12 +179,12 @@ internal class HubServer(
       val device = ex.requestHeaders.getFirst("X-Device")?.trim()
       val app = header(ex, "X-App")
       val snap = synchronized(lock) { passes }
-      val decided = HubAuth.decide(snap, token, device, clock()) {
+      val decided = HubAuth.decide(snap, token, device, shopId, clock()) {
         if (synchronized(lock) { verifies.allow(ip, clock()) }) cloud.verify(token!!, device!!, app)
-        else CloudCheck.UNREACHABLE
+        else CloudAnswer(CloudCheck.UNREACHABLE)
       }
       synchronized(lock) {
-        val n = HubAuth.apply(passes, decided.change)
+        val n = HubAuth.apply(passes, decided.change, shopId)
         if (n != passes) { save(PASSES_FILE, HubAuth.encode(n)); passes = n }
       }
       val v = decided.verdict

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.desktop.hub
 
+import ir.vil3ntec.tohid.core.hub.CloudAnswer
 import ir.vil3ntec.tohid.core.hub.CloudCheck
 import ir.vil3ntec.tohid.core.hub.HubBatch
 import ir.vil3ntec.tohid.core.hub.HubCloud
@@ -46,10 +47,13 @@ class HubServerTest {
       return HubReply(200, """{"ok":true,"results":[${apply(batch.opIds).joinToString(",")}]}""")
     }
 
-    @Synchronized override fun verify(token: String, deviceId: String, app: String): CloudCheck {
+    /** توکن ⇒ دکان؛ نبود ⇒ دکانِ هاب */
+    val shops = HashMap<String, String>()
+
+    @Synchronized override fun verify(token: String, deviceId: String, app: String): CloudAnswer {
       verifies++
-      if (!online) return CloudCheck.UNREACHABLE
-      return if (tokens[token] == deviceId) CloudCheck.VALID else CloudCheck.INVALID
+      if (!online) return CloudAnswer(CloudCheck.UNREACHABLE)
+      return if (tokens[token] == deviceId) CloudAnswer(CloudCheck.VALID, shops[token] ?: SHOP) else CloudAnswer(CloudCheck.INVALID)
     }
 
     /** خودِ دستگاه، بی هاب، همان opها را می‌فرستد */
@@ -65,6 +69,10 @@ class HubServerTest {
 
   private class Hub(val server: HubServer, val pin: String, val dir: File) {
     val port get() = server.port
+  }
+
+  private companion object {
+    const val SHOP = "shop-A"
   }
 
   private val sid = "srv_0123456789abcdef0123"
@@ -89,7 +97,7 @@ class HubServerTest {
   private fun hub(dir: File, cloud: FakeCloud, burst: Int = 60, perMinute: Int = 120, limits: HubLimits = HubLimits()): Hub {
     val tls = HubTls.loadOrCreate(dir, seal, open)
     val s = HubServer(
-      dir, tls, sid, cloud, seal, open, autoForward = false, limits = limits, requestsPerMinute = perMinute, requestBurst = burst,
+      dir, tls, sid, SHOP, cloud, seal, open, autoForward = false, limits = limits, requestsPerMinute = perMinute, requestBurst = burst,
     )
     s.start(InetSocketAddress(InetAddress.getLoopbackAddress(), 0))
     started += s
@@ -176,6 +184,34 @@ class HubServerTest {
     assertEquals(429, limited.status)
     assertTrue(limited.body.contains("hub_rate_limited"))
     assertTrue(h.server.snapshot().batches.isEmpty())
+  }
+
+  @Test fun `توکنِ دکانِ دیگر ۴۰۳ می‌گیرد و دسته‌اش هرگز به صف نمی‌رسد`() {
+    val c = cloud()
+    val tokC = "tok-C-0123456789abcdef"
+    c.tokens[tokC] = "devC"
+    c.shops[tokC] = "shop-B"
+    val h = hub(newDir(), c)
+    val r = hello(h, tokC, "devC")
+    assertEquals(403, r.status)
+    assertTrue(r.body.contains("hub_other_shop"))
+    //  هر بار دوباره رد، و صف خالی می‌ماند — صفِ هاب با حسابِ دیگر پر نمی‌شود
+    repeat(3) { i ->
+      val p = push(h, tokC, "devC", "c$i")
+      assertEquals(403, p.status)
+      assertTrue(p.body.contains("hub_other_shop"))
+    }
+    assertTrue(h.server.snapshot().batches.isEmpty())
+    //  بی اینترنت هم همان ۴۰۳ (درهمش با «دکانِ دیگر» به خاطر سپرده شد)، و فقط یک بار از سرور پرسیده شد
+    c.online = false
+    assertEquals(403, push(h, tokC, "devC", "c9").status)
+    assertEquals(1, c.verifies)
+    assertTrue(h.server.snapshot().batches.isEmpty())
+    assertEquals(0, h.server.forwardNow().forwarded)
+    //  توکنِ همین دکان همان‌جا کار می‌کند
+    c.online = true
+    assertEquals(200, push(h, tokA, "devA", "a1").status)
+    assertEquals(listOf("a1"), h.server.snapshot().batches.flatMap { it.opIds })
   }
 
   @Test fun `فقط نشانی‌های شبکهٔ دکان پذیرفته‌اند`() {

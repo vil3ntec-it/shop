@@ -34,10 +34,13 @@ class LocalHubTest {
       return HubReply(200, """{"ok":true,"results":[$res]}""")
     }
 
-    override fun verify(token: String, deviceId: String, app: String): CloudCheck {
+    /** توکن ⇒ دکان؛ نبود ⇒ دکانِ خودِ هاب */
+    val shops = HashMap<String, String>()
+
+    override fun verify(token: String, deviceId: String, app: String): CloudAnswer {
       verifies++
-      if (!online) return CloudCheck.UNREACHABLE
-      return if (tokens[token] == deviceId) CloudCheck.VALID else CloudCheck.INVALID
+      if (!online) return CloudAnswer(CloudCheck.UNREACHABLE)
+      return if (tokens[token] == deviceId) CloudAnswer(CloudCheck.VALID, shops[token] ?: SHOP) else CloudAnswer(CloudCheck.INVALID)
     }
   }
 
@@ -64,6 +67,10 @@ class LocalHubTest {
     state = n
     saved = HubQueue.encode(n)
     return r
+  }
+
+  private companion object {
+    const val SHOP = "shop-A"
   }
 
   private val tokA = "tok-A-0123456789abcdef"
@@ -263,7 +270,7 @@ class LocalHubTest {
     val c = cloud()
     var passes = HubPasses()
     fun ask(token: String?, device: String?, now: Long): HubVerdict {
-      val r = HubAuth.decide(passes, token, device, now) { c.verify(token!!, device!!, "shop") }
+      val r = HubAuth.decide(passes, token, device, SHOP, now) { c.verify(token!!, device!!, "shop") }
       passes = HubAuth.apply(passes, r.change)
       return r.verdict
     }
@@ -294,7 +301,7 @@ class LocalHubTest {
     val c = cloud()
     var passes = HubPasses()
     fun ask(token: String, device: String, now: Long = 0): HubVerdict {
-      val r = HubAuth.decide(passes, token, device, now) { c.verify(token, device, "shop") }
+      val r = HubAuth.decide(passes, token, device, SHOP, now) { c.verify(token, device, "shop") }
       passes = HubAuth.apply(passes, r.change)
       return r.verdict
     }
@@ -313,10 +320,66 @@ class LocalHubTest {
   }
 
   @Test
+  fun otherShopTokenIsRefusedRememberedAndNeverQueued() {
+    val c = cloud()
+    c.shops[tokB] = "shop-B"
+    var passes = HubPasses()
+    fun ask(token: String, device: String, hubShop: String = SHOP, now: Long = 0): HubVerdict {
+      val r = HubAuth.decide(passes, token, device, hubShop, now) { c.verify(token, device, "shop") }
+      passes = HubAuth.apply(passes, r.change, hubShop)
+      return r.verdict
+    }
+    //  توکنِ زنده از همان سرور ولی دکانِ دیگر ⇒ ۴۰۳؛ درهمش با «دکانِ دیگر» به خاطر سپرده می‌شود
+    val other = ask(tokB, "devB")
+    assertEquals(HubVerdict.Refuse(HubRefusal.OTHER_SHOP), other)
+    assertEquals(403, HubRefusal.OTHER_SHOP.status)
+    assertEquals("hub_other_shop", HubRefusal.OTHER_SHOP.code)
+    assertEquals("shop-B", passes.passes.single().shopId)
+    //  تکرار (و بی اینترنت) همان ۴۰۳، بی تماسِ دوباره با سرور
+    val asked = c.verifies
+    assertEquals(HubVerdict.Refuse(HubRefusal.OTHER_SHOP), ask(tokB, "devB", now = HubAuth.OFFLINE_TTL_MS * 3))
+    c.online = false
+    assertEquals(HubVerdict.Refuse(HubRefusal.OTHER_SHOP), ask(tokB, "devB"))
+    assertEquals(asked, c.verifies)
+    c.online = true
+    //  توکنِ همین دکان پذیرفته و با شناسهٔ دکان نشسته است
+    assertIs<HubVerdict.Accept>(ask(tokA, "devA"))
+    assertEquals(setOf(SHOP, "shop-B"), passes.passes.map { it.shopId }.toSet())
+    //  دکانِ هاب عوض شد ⇒ فهرستِ ۲۴ ساعته هم رد می‌کند، بی تماس با سرور
+    val before = c.verifies
+    assertEquals(HubVerdict.Refuse(HubRefusal.OTHER_SHOP), ask(tokA, "devA", hubShop = "shop-C", now = 1))
+    assertEquals(before, c.verifies)
+    //  هابِ بی دکان هیچ‌کس را نمی‌پذیرد
+    assertEquals(HubVerdict.Refuse(HubRefusal.OTHER_SHOP), ask(tokA, "devA", hubShop = ""))
+    //  سرریزِ فهرست: درهم‌های دکانِ دیگر اول بیرون می‌روند، درهمِ همین دکان می‌ماند
+    var full = passes
+    for (i in 0 until HubAuth.MAX_PASSES) full = HubAuth.apply(full, HubPassChange.Put(HubPass("x$i", "d$i", 10L + i, "shop-X")), SHOP)
+    assertTrue(full.passes.any { it.shopId == SHOP })
+    assertEquals(HubAuth.MAX_PASSES, full.passes.size)
+    //  پذیرفته نشد ⇒ هیچ دسته‌ای به صف نمی‌رسد: صف فقط پس از Accept صدا زده می‌شود (HubServerTest)
+  }
+
+  @Test
+  fun relayReplyCountsAsPendingNeverDone() {
+    val sent = listOf("o1", "o2", "o3")
+    val ok = """{"ok":true,"hub":true,"accepted":true,"queued":1,"results":[""" +
+      """{"op_id":"o1","status":"hub_queued"},{"op_id":"o2","status":"hub_settled"},{"op_id":"o3","status":"hub_queued"}]}"""
+    assertEquals(HubRelay.Outcome(pending = 3), HubRelay.interpret(200, ok, sent))
+    //  هاب نباید وضعیتِ سرور بگوید
+    val lie = """{"ok":true,"hub":true,"results":[{"op_id":"o1","status":"applied"}]}"""
+    assertEquals(HubRelay.Outcome(refused = "hub_bad_reply"), HubRelay.interpret(200, lie, sent))
+    assertEquals(HubRelay.Outcome(refused = "hub_bad_reply"), HubRelay.interpret(200, """{"ok":true,"results":[]}""", sent))
+    assertEquals(HubRelay.Outcome(refused = "hub_other_shop"), HubRelay.interpret(403, """{"ok":false,"error":"hub_other_shop"}""", sent))
+    assertEquals(HubRelay.Outcome(refused = "hub_0"), HubRelay.interpret(0, null, sent))
+    val body = kotlinx.serialization.json.Json.parseToJsonElement(body("devA", "o1", "o2")) as kotlinx.serialization.json.JsonObject
+    assertEquals(listOf("o1", "o2"), HubRelay.opIdsOf(body))
+  }
+
+  @Test
   fun authClockBackwardsNeedsTheCloud() {
-    val p = HubPasses(passes = listOf(HubPass(HubAuth.hashOf(tokA), "devA", 10_000_000)))
+    val p = HubPasses(passes = listOf(HubPass(HubAuth.hashOf(tokA), "devA", 10_000_000, SHOP)))
     var asked = 0
-    val r = HubAuth.decide(p, tokA, "devA", 5_000) { asked++; CloudCheck.UNREACHABLE }
+    val r = HubAuth.decide(p, tokA, "devA", SHOP, 5_000) { asked++; CloudAnswer(CloudCheck.UNREACHABLE) }
     assertEquals(1, asked)
     assertEquals(HubVerdict.Refuse(HubRefusal.STALE), r.verdict)
     //  سقفِ فهرست

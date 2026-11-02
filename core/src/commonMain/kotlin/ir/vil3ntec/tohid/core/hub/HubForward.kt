@@ -6,13 +6,16 @@ data class HubReply(val status: Int, val body: String?)
 /** سنجشِ توکنِ دستگاه نزدِ سرور */
 enum class CloudCheck { VALID, INVALID, UNREACHABLE }
 
+/** پاسخِ سنجش: `shopId` همان دکانی است که سرور توکن را به آن بسته (`GET /me` ⇐ `shop.id`) */
+data class CloudAnswer(val check: CloudCheck, val shopId: String = "")
+
 /**
  *  درگاهِ سرور برای هاب. ⛔ دسته با **توکنِ خودِ همان دستگاه** می‌رود، نه توکنِ هاب: نقش، مجوز و
  *  پیوندِ دستگاهِ سرور (`device_mismatch`) همان است که اگر دستگاه خودش می‌فرستاد.
  */
 interface HubCloud {
   fun push(batch: HubBatch, token: String): HubReply
-  fun verify(token: String, deviceId: String, app: String): CloudCheck
+  fun verify(token: String, deviceId: String, app: String): CloudAnswer
 }
 
 /** نگه‌دارندهٔ صف — `update` اتمی است و پیش از برگشتن روی دیسک می‌نشیند */

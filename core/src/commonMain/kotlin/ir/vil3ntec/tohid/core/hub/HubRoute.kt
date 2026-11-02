@@ -24,6 +24,12 @@ object HubRoute {
 
   const val PROTOCOL: Int = 1
 
+  /** تنظیم‌های همین دستگاه در `tohid-servers` (همگام نمی‌شوند). روی کامپیوترِ هاب `hub.local` یعنی «هاب باش» */
+  const val SETTING_ON: String = "hub.local"
+  /** نشانی و سنجاقِ هابی که این دستگاه به آن وصل می‌شود — از جفت‌سازی (هنوز دستی) */
+  const val SETTING_URL: String = "hub.url"
+  const val SETTING_PIN: String = "hub.pin"
+
   private val json = Json { ignoreUnknownKeys = true }
 
   fun choose(

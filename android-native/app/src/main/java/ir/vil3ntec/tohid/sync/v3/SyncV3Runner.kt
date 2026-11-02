@@ -153,6 +153,8 @@ class SyncV3Runner private constructor(context: Context) {
       ledger = ledger,
       withLock = { block -> synchronized(lock()) { block() } },
       archived = { LedgerArchive.archivedIds(LedgerArchive.readArchive(app)) },
+      //  SYN-09: پرچمِ `app.multi_server` خاموش ⇒ null ⇒ همان امروز
+      hub = ir.vil3ntec.tohid.platform.HubRelayAndroid.of(app),
     ).load().also { engine = it }
   }
 
