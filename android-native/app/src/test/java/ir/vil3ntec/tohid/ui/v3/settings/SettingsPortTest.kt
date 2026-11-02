@@ -172,6 +172,7 @@ class SettingsPortTest {
       "PosPriceCheckPrefs.set" to "$PENDING — بررسیِ قیمت در صندوق، فقط کامپیوتر",
       "PosSearchPrefs.set" to "$PENDING — جست‌وجوی مقاوم، POS-04، فقط کامپیوتر",
       "PosTouchPrefs.setOn" to "$PENDING — حالتِ لمسیِ صندوق، POS-31، فقط کامپیوتر",
+      "PromoGuardLive.set" to "$PENDING — تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیفِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.promo_guard`)، MKT-02/RSK-09",
       "PriceWhyPrefs.set" to "$PENDING — «چرا این قیمت؟»، POS-22",
       "ProductInfoPrefs.set" to "$PENDING — نام‌های دیگر و محلِ قفسه، PRD-02/PRD-26",
       "ReportKeysPref.setOn" to "$PENDING — کلیدهای دوره در گزارش‌ها، RPT-13، فقط کامپیوتر",
@@ -180,6 +181,7 @@ class SettingsPortTest {
       "SafeBookPref.set" to "$PENDING — گاوصندوق، PAY-18 (صفحه‌اش هم فقط در «تاریخچهٔ فروش» ِ رابطِ امروز است)",
       "ShrinkReportPref.set" to "$PENDING — گزارشِ ضایعات و کسری، INV-17",
       "SpecialOrderPref.set" to "$PENDING — سفارشِ ویژه، POS-26",
+      "StorefrontEtaLive.set" to "$PENDING — زمانِ تقریبیِ تحویلِ ویترین (تنظیمِ سروریِ صاحب و مدیر، پشتِ پرچمِ `shop.storefront.eta`)، WEB-04",
     )
   }
 }

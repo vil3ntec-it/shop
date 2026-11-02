@@ -854,6 +854,9 @@ fun AppRootLegacy(
                 ir.vil3ntec.tohid.core.i18n.StrWhy.section to androidx.compose.material.icons.Icons.Filled.Info,
                 ir.vil3ntec.tohid.core.i18n.StrGift.section to androidx.compose.material.icons.Icons.Filled.CardGiftcard, ir.vil3ntec.tohid.core.i18n.StrSale.feesTitle to androidx.compose.material.icons.Icons.Filled.ShoppingBag, // POS-36
                 ir.vil3ntec.tohid.core.i18n.StrDeliver.section to androidx.compose.material.icons.Icons.Filled.LocalShipping,
+                //  WEB-04 و MKT-02/RSK-09: فقط با پرچمِ روشنِ سرور و دسترسیِ تنظیم (خاموش ⇒ بی ردیف)
+                if (ir.vil3ntec.tohid.ui.screens.storefrontEtaRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.STOREFRONT_ETA_TITLE to androidx.compose.material.icons.Icons.Filled.Schedule else null,
+                if (ir.vil3ntec.tohid.ui.screens.promoGuardRow(if (ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) ir.vil3ntec.tohid.data.repo.Backend.api(context) else null)) ir.vil3ntec.tohid.ui.screens.PROMO_GUARD_TITLE to androidx.compose.material.icons.Icons.Filled.Redeem else null,
                 ir.vil3ntec.tohid.core.i18n.StrProduct.section to androidx.compose.material.icons.Icons.Filled.Inventory2,
                 ir.vil3ntec.tohid.core.i18n.StrPos.notesSection to androidx.compose.material.icons.Icons.Filled.Edit, // POS-11
                 ir.vil3ntec.tohid.ui.UiV3.TOGGLE_TITLE to androidx.compose.material.icons.Icons.Filled.Palette, //  روشن‌کردنِ نسخهٔ ۳ روی همین کامپیوتر
