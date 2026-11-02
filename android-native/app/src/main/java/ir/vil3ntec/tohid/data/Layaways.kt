@@ -133,7 +133,7 @@ object Layaways {
     val deposits = ix.deposits[row.id] ?: 0L
     val payments = ix.payments[row.id] ?: 0L
     val moves = ix.moves[row.id].orEmpty().sortedBy { it.createdAt }
-    val live = moves.lastOrNull { m -> m.layaway?.let { it.to == DELIVERED && it.saleId != null && it.saleId !in ix.cancelledSales } == true }
+    val live = liveDelivery(moves, ix.cancelledSales)
     val cancelled = moves.any { it.layaway?.to == CANCELLED }
     val status = when {
       cancelled -> Status.CANCELLED
@@ -154,6 +154,60 @@ object Layaways {
       review = broken || deposits > deposit || progress.overMinor > 0 || (cancelled && live != null),
       by = row.by,
     )
+  }
+
+  /** رویدادِ تحویلِ زنده: تحویلی که فاکتورش لغو نشده */
+  private fun liveDelivery(moves: List<AuditEntry>, cancelledSales: Set<String>): AuditEntry? =
+    moves.lastOrNull { m -> m.layaway?.let { it.to == DELIVERED && it.saleId != null && it.saleId !in cancelledSales } == true }
+
+  /* ───────────────────────────── کنار گذاشتنِ کالا ───────────────────────────── */
+
+  /**
+   *  کالای سندِ باز (نه تحویل‌شده، نه لغوشده) کنار گذاشته است: از موجودیِ فروختنی (`ProductInfoMap.sellable` ⇐ سقفِ سبد
+   *  و `SalesEngine.record`) کم می‌شود، نه از موجودیِ انبار (`ShopStore.stock` — جنس هنوز در دکان است). فقط با تنظیمِ
+   *  همین دستگاه (`LayawayPref.load`/`set` این را می‌گذارد)؛ خاموش ⇒ هیچ کم نمی‌شود و حتی دفتر خوانده نمی‌شود. تحویلِ
+   *  همان سند سهمِ خودش را مصرف می‌کند (`SalesEngine.record(ownReservation)`)؛ لغو و تحویل آن را آزاد می‌کنند.
+   *  قلمِ آزاد و کالای خدماتی (PRD-09) کنار گذاشته نمی‌شوند.
+   */
+  @Volatile var reserving: Boolean = false
+
+  private class Holds(val d: ShopData, val byDoc: Map<String, Map<String, Long>>)
+
+  @Volatile private var holdsCache: Holds? = null
+
+  /** سندِ باز ⇒ کالا ⇒ مقدارِ کنارگذاشته به هزارم (به واحدِ ردیفِ سبد)؛ یک بار برای هر نسخهٔ دفتر */
+  fun holds(d: ShopData): Map<String, Map<String, Long>> {
+    holdsCache?.takeIf { it.d === d }?.let { return it.byDoc }
+    val docs = d.auditLog.filter(::isDoc)
+    val out = LinkedHashMap<String, Map<String, Long>>()
+    if (docs.isNotEmpty()) {
+      val moves = d.auditLog.filter { it.type == MOVE && it.refId != null }.groupBy { it.refId!! }
+      val cancelledSales = d.sales.filter { it.status == "cancelled" }.mapTo(HashSet()) { it.id }
+      for (row in docs) {
+        val ms = moves[row.id].orEmpty().sortedBy { it.createdAt }
+        if (ms.any { it.layaway?.to == CANCELLED } || liveDelivery(ms, cancelledSales) != null) continue
+        val m = HashMap<String, Long>()
+        for (l in row.layaway?.lines.orEmpty()) if (l.label == null && l.qtyMilli > 0) m[l.productId] = (m[l.productId] ?: 0L) + l.qtyMilli
+        if (m.isNotEmpty()) out[row.id] = m
+      }
+    }
+    holdsCache = Holds(d, out)
+    return out
+  }
+
+  /** مقدارِ کنارگذاشتهٔ [productId] در همهٔ سندهای باز جز [except]؛ تنظیمِ خاموش ⇒ ۰ */
+  fun reserved(d: ShopData, productId: String, except: String? = null): Double {
+    if (!reserving) return 0.0
+    var milli = 0L
+    for ((doc, m) in holds(d)) if (doc != except) milli += m[productId] ?: 0L
+    return milli / 1000.0
+  }
+
+  /** ردِ فروشی که به کالای کنارگذاشته می‌رسد — روشن بگوید چرا */
+  fun heldMessage(p: Product, wanted: Double, free: Double, held: Double): String {
+    val u = if (p.unit.isNotBlank()) " ${p.unit}" else ""
+    return "«${p.name}»: ${ir.vil3ntec.tohid.qty(held)}$u برای فروشِ امانی کنار گذاشته شده و فروخته نمی‌شود؛ " +
+      "فقط ${ir.vil3ntec.tohid.qty(free.coerceAtLeast(0.0))}$u آزاد است، شما ${ir.vil3ntec.tohid.qty(wanted)}$u خواستید."
   }
 
   /** همهٔ سندها: بازها اول (دیرها، بعد زودترین قسطِ بعدی)، بعد بسته‌ها (تازه‌ترین اول) */
@@ -262,6 +316,7 @@ object Layaways {
     if (schedule.sumOf { it.amountMinor } != total - dep) return Built.Bad("TOTAL_MISMATCH")
     var n = 0
     val probe = SalesEngine.Checkout(seller = by, payment = SalesEngine.Payment.CREDIT, paidAmount = 0.0, debtorId = debtor, blockExpired = blockExpired)
+    //  کالای سندهای بازِ دیگر کنار گذاشته است ⇒ همان واحدِ آخر دو امانی نمی‌شود
     when (val r = SalesEngine.record(cur, lines.map { cartLine(cur, it) }, probe, today, now, { "probe${n++}" }, saleId = "$key-probe")) {
       is SalesEngine.Result.Failed -> return Built.Bad("SALE", r.message)
       is SalesEngine.Result.Ok -> if (PayFlow.minor(r.data.sales.last().finalTotal) != total) return Built.Bad("TOTAL_MISMATCH")
@@ -321,7 +376,8 @@ object Layaways {
     if (!v.paidUp) return Built.Bad("NOT_SETTLED")
     if (cur.debtors.none { it.id == v.debtorId }) return Built.Bad("NO_CUSTOMER")
     val checkout = SalesEngine.Checkout(seller = by, payment = SalesEngine.Payment.CREDIT, paidAmount = 0.0, debtorId = v.debtorId, blockExpired = blockExpired)
-    val data = when (val r = SalesEngine.record(cur, v.lines.map { cartLine(cur, it) }, checkout, today, now, newId, series, saleId = key)) {
+    //  سهمِ کنارگذاشتهٔ همین سند مصرف می‌شود، نه مانع (`ownReservation`)
+    val data = when (val r = SalesEngine.record(cur, v.lines.map { cartLine(cur, it) }, checkout, today, now, newId, series, saleId = key, ownReservation = v.id)) {
       is SalesEngine.Result.Failed -> return Built.Bad("SALE", r.message)
       is SalesEngine.Result.Ok -> r.data
     }

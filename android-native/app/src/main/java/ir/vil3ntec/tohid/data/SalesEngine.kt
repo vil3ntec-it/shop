@@ -334,6 +334,11 @@ object SalesEngine {
      *  (تحویلِ سفارش، `OrderFulfillment`) هرگز توکنِ تصادفی نمی‌گیرد.
      */
     receiptToken: String? = null,
+    /**
+     *  POS-27 — سندِ امانی‌ای که همین فروش تحویلش می‌دهد (`Layaways.deliver`): کالای کنارگذاشتهٔ همان سند مانعِ همین
+     *  فروش نیست. `null` ⇒ همهٔ کنارگذاشته‌ها از موجودیِ فروختنی کم‌اند (تنظیمِ خاموش ⇒ هیچ).
+     */
+    ownReservation: String? = null,
   ): Result {
     if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
@@ -344,7 +349,7 @@ object SalesEngine {
       if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
       (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
-      var available = ProductInfoMap.sellable(d, p.id) // PRD-09: کالای خدماتی موجودی نمی‌خواهد
+      var available = ProductInfoMap.sellable(d, p.id, ownReservation) // PRD-09: کالای خدماتی موجودی نمی‌خواهد؛ POS-27: منهای کنارگذاشتهٔ امانی
       //  سیاستِ دکان: کالای منقضی فروخته نشود ⇒ ماندهٔ محموله‌های منقضی از
       //  موجودیِ فروختنی کم می‌شود (FEFO؛ شرح سرِ `ExpiryEngine`)
       if (checkout.blockExpired) {
@@ -356,7 +361,10 @@ object SalesEngine {
           )
         }
       }
-      if (line.quantity > available) return Result.Failed(shortageMessage(p, line.quantity, available))
+      if (line.quantity > available) {
+        val held = Layaways.reserved(d, p.id, ownReservation)
+        return Result.Failed(if (held > 0) Layaways.heldMessage(p, line.quantity, available, held) else shortageMessage(p, line.quantity, available))
+      }
     }
 
     /*
