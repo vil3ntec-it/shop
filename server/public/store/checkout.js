@@ -43,6 +43,29 @@
     var slotAt = 0;             // `startsAt` ِ برگزیده؛ ۰ = هرچه زودتر / هیچ
     var drawn = null;
 
+    // ── WEB-04: «تحویلِ تقریبی» (فقط با `store.features.eta`، پرچمِ `shop.storefront.eta`) ──
+    //  بازه فقط از `GET /eta` (کشِ کوتاهِ سرور)؛ همیشه دو عدد و «تقریبی»، هرگز وعدهٔ دقیق. بازهٔ برگزیده (CHK-12) خودش
+    //  زمانِ تحویل است ⇒ پنهان؛ ناحیهٔ ندانسته ⇒ پنهان. دکانِ بی اتصالِ تأییدشده ⇒ «فعلاً قابل تخمین نیست». خاموش ⇒ همان فرم.
+    var eta = null; var etaAt = 0;
+    function loadEta() {
+      if (!(c.store.features && c.store.features.eta) || Date.now() - etaAt < 30000) return;
+      etaAt = Date.now();
+      api('/eta').then(function (r) { eta = r.eta || null; }, function () { eta = null; }).then(renderCheckout);
+    }
+    function renderEta(f) {
+      loadEta();
+      var x = null;
+      if (eta && eta.available && f && !slotAt) {
+        if (f === 'pickup') x = eta.pickup;
+        else if (!c.zones()) x = eta.delivery;
+        else if (c.zone) x = (eta.zones || []).filter(function (z) { return z.id === c.zone.id; })[0] || null;
+      }
+      var none = !x && Boolean(eta && eta.reason === 'unconfirmed' && f && !slotAt);
+      var box = $('ck-eta');
+      box.hidden = !(x || none);
+      box.textContent = x ? t(f === 'pickup' ? 'ck.eta.pickup' : 'ck.eta', { a: K.fa(x.minMinutes, 0), b: K.fa(x.maxMinutes, 0) }) : none ? t('ck.eta.none') : '';
+    }
+
     // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
     //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
     //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
@@ -193,6 +216,7 @@
       if (below) K.note($('min-order'), 'warn', t('ck.min', { m: K.money(min) })); else $('min-order').hidden = true;
       renderZone(f);
       renderSlots(f);
+      renderEta(f);
       renderVerify();
       var ok = verifiedFor($('c-phone').value);
       var btn = $('submit-order');

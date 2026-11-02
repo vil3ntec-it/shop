@@ -383,6 +383,8 @@ const config = {
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
     //  TEN-03 — لینکِ پیگیریِ سفارش (پرچمِ `shop.storefront.link_expiry`) چند روز پس از صدور کار می‌کند
     trackLinkTtlMs: num(process.env.STORE_TRACK_LINK_DAYS, 30) * 24 * 60 * 60 * 1000,
+    //  WEB-04 — زمانِ تقریبیِ عمومیِ ویترین (`GET /api/store/:slug/eta`) این‌قدر در حافظهٔ همین نمونه می‌ماند؛ ۰ ⇒ بی حافظه
+    etaCacheMs: num(process.env.STORE_ETA_CACHE_MS, 30 * 1000),
   },
 
   /**
