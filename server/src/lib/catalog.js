@@ -619,10 +619,10 @@ function moveView(r) {
 }
 
 /** دفترِ گردش (INV-16) — تازه‌ترین اول، صفحه‌بندیِ کلیدی. */
-async function moves(shopId, { productId, cursor, limit } = {}) {
+async function moves(shopId, { productId, cursor, limit, places = null } = {}) {
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
   const params = [shopId];
-  const where = ['shop_id=$1'];
+  const where = places ? ['shop_id=$1', `location = ANY($${params.push(places)}::text[])`] : ['shop_id=$1'];   //  STF-06: فقط مکان‌های محدوده
   if (productId) { params.push(String(productId)); where.push(`product_id=$${params.length}`); }
   const cur = decodeCursor(cursor);
   if (cur) {
@@ -642,12 +642,12 @@ async function moves(shopId, { productId, cursor, limit } = {}) {
 //  وظیفه‌ها (INV-19)
 // ════════════════════════════════════════════════════════════════════
 
-async function tasks(shopId, { status = 'open', limit } = {}) {
+async function tasks(shopId, { status = 'open', limit, places = null } = {}) {   //  places: STF-06 (`staff-scope.taskPlaces`)
   if (!['open', 'resolved', 'dismissed'].includes(status)) throw badRequest('وضعیتِ وظیفه معتبر نیست', 'bad_status');
   const lim = Math.min(Math.max(Number(limit) || 50, 1), MAX_LIST);
   return (await query(
-    `SELECT * FROM stock_tasks WHERE shop_id=$1 AND status=$2 ORDER BY created_at DESC, id DESC LIMIT $3`,
-    [shopId, status, lim]
+    `SELECT * FROM stock_tasks WHERE shop_id=$1 AND status=$2${places ? " AND (location = ANY($4::text[]) OR (kind = 'transfer_short' AND detail->>'to' = ANY($4::text[])))" : ''} ORDER BY created_at DESC, id DESC LIMIT $3`,
+    places ? [shopId, status, lim, places] : [shopId, status, lim]
   )).rows.map((r) => ({
     id: r.id, kind: r.kind, productId: r.product_id, location: r.location, status: r.status,
     detail: decode(r.detail) || {}, hits: num(r.hits), createdAt: num(r.created_at), updatedAt: num(r.updated_at),

@@ -267,6 +267,12 @@ fun SaleScreenLegacy(
     val lotHit = if (hit is BarcodeMatch.Hit.Product) null else ir.vil3ntec.tohid.data.StockActions.lotForCode(d, code)
     val productId = (hit as? BarcodeMatch.Hit.Product)?.id ?: lotHit?.first
     if (productId == null) {
+      //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
+      ir.vil3ntec.tohid.data.CustomerCards.atTill(ir.vil3ntec.tohid.data.CustomerCardPref.on(context), d, code, index)?.let { c ->
+        if (cartStore.setDebtor(c.id)) { ScanFeedback.ok(context); toast(ir.vil3ntec.tohid.core.i18n.StrCustomerCard.picked(c.name)) }
+        else { ScanFeedback.unknown(context); toast(CartStore.NOT_ADDED) }
+        return
+      }
       ScanFeedback.unknown(context)
       // بارکد گم نمی‌شود: هم در کادرِ دستی می‌ماند، هم می‌شود همان‌جا
       // کالای تازه‌اش را ثبت کرد و برگشت
@@ -510,6 +516,7 @@ fun SaleScreenLegacy(
 
       /* ---------------------------- سبد ---------------------------- */
       item { ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) }; item { ir.vil3ntec.tohid.ui.components.pos.SpecialOrderBar(d, store, cartDebtorId, ::toast, Modifier.padding(bottom = 8.dp)) } // پیش‌فاکتور (POS-25، `QuotePref`) و سفارشِ ویژه (POS-26، `SpecialOrderPref`)
+      item { ir.vil3ntec.tohid.ui.components.pos.GiftCardBar(d, store, ::toast, Modifier.padding(bottom = 8.dp)) } // کارتِ هدیه (PAY-24، `GiftCardPref`)
       item { ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) } // POS-18
       item { TillReceivePhone(d, store, cartDebtorId, ::toast) } // POS-39، پشتِ `TillReceivePref` (پیش‌فرض خاموش)
       item { ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it) } }

@@ -33,6 +33,12 @@ import ir.vil3ntec.tohid.core.text.LocaleFormat
  *  بزرگ‌ترین N (۰ تا [MAX_COVER_DAYS]) که مصرفِ پیش‌بینی‌شدهٔ N روزِ آینده از موجودیِ دست
  *  (بی «در راه») بیشتر نشود. بی فروش ⇒ `null` (تمام نمی‌شود)، موجودیِ ≤ ۰ ⇒ ۰.
  *
+ *  ── پیش‌بینیِ قابلِ توضیح (AI-07، [Input.smart]) ─────────────────────
+ *  فقط با `smart = true` (تنظیمِ خاموشِ دستگاه): کالای پرفروش ⇐ میانگینِ متحرکِ [SmartDemand.MA_DAYS] روزِ اخیر
+ *  با همین ضریبِ روزِ هفته؛ کالای کم‌فروش (دست‌کم نیمی از روزها بی فروش) ⇐ Croston/SBA. اطمینان از درازای داده و
+ *  نوسان، پیش‌بینیِ تک‌تکِ روزهای آینده و دلیلِ فارسی از همان عددها — شرح در `SmartDemand`. `smart = false`
+ *  (پیش‌فرض) ⇒ همهٔ این پرونده بیت‌به‌بیت همان پیشین است و [Forecast.smart] `null`.
+ *
  *  عددها صحیح: مقدار هزارم، ضریب هزارم (permille)، گرد فقط `PurchaseOrderCore.mulDivRound`.
  *  Kotlinِ خالص در commonMain (§۴۰.۳).
  */
@@ -72,6 +78,10 @@ object DemandForecast {
     /** نخستین روزِ کالا (نخستین فروش یا خرید)؛ `null` ⇒ کالا از آغازِ پنجره بوده و فصل سنجیده نمی‌شود */
     val firstJdn: Int? = null,
     val wholeUnits: Boolean = true,
+    /** AI-07: میانگینِ متحرک یا Croston با اطمینان از نوسان ([SmartDemand])؛ `false` ⇒ همان حسابِ پیشین */
+    val smart: Boolean = false,
+    /** AI-07: چند روزِ آینده تک‌تک پیش‌بینی شود ([SmartDemand.Smart.perDayMilli]) */
+    val smartDays: Int = SmartDemand.FORECAST_DAYS,
   )
 
   data class Forecast(
@@ -99,24 +109,33 @@ object DemandForecast {
     val saleDays: Int,
     /** پنجرهٔ به‌کاررفته (کالای تازه ⇒ کوتاه‌تر) */
     val windowDaysUsed: Int,
+    /** AI-07: روش، پیش‌بینیِ هر روز و نوسان؛ `null` = [Input.smart] خاموش */
+    val smart: SmartDemand.Smart? = null,
   )
 
   /** روزِ هفتهٔ ISO از JDN (JDN ِ ۰ دوشنبه است) */
   fun isoWeekday(jdn: Int): Int = jdn.mod(7) + 1
 
-  private fun divRound(n: Long, d: Long): Long = (2 * n + d).floorDiv(2 * d)
+  internal fun divRound(n: Long, d: Long): Long = (2 * n + d).floorDiv(2 * d)
 
-  private class Model(
-    val total: Long,
+  /** مصرفِ پیش‌بینی‌شدهٔ فردا تا N روزِ دیگر — [Model] ِ پیشین یا مدل‌های AI-07 */
+  internal interface Demand {
+    /** جمعِ فروشِ خالصِ پنجره؛ صفر ⇒ «بی فروش» */
+    val total: Long
+    fun demand(n: Int): Long
+  }
+
+  internal class Model(
+    override val total: Long,
     val eff: Int,
     /** جمع و شمارِ هر روزِ هفته؛ `null` ⇒ میانگینِ ساده */
     val sums: LongArray?,
     val counts: IntArray?,
     val season: Int,
     val todayJdn: Int,
-  ) {
+  ) : Demand {
     /** مصرفِ پیش‌بینی‌شدهٔ روزهای فردا تا N روزِ دیگر */
-    fun demand(n: Int): Long {
+    override fun demand(n: Int): Long {
       if (n <= 0 || total == 0L) return 0L
       val s = sums ?: return PurchaseOrderCore.mulDivRound(total, n.toLong() * season, eff.toLong() * NEUTRAL)
       val c = counts!!
@@ -136,6 +155,7 @@ object DemandForecast {
     require(i.windowDays in 1..MAX_WINDOW_DAYS) { "demand-forecast: 0 < windowDays ≤ $MAX_WINDOW_DAYS" }
     require(i.coverDays in 0..MAX_COVER_DAYS) { "demand-forecast: 0 ≤ coverDays ≤ $MAX_COVER_DAYS" }
     require(i.leadDays == null || i.leadDays in 0..MAX_COVER_DAYS) { "demand-forecast: 0 ≤ leadDays ≤ $MAX_COVER_DAYS" }
+    require(!i.smart || i.smartDays in 1..MAX_COVER_DAYS) { "demand-forecast: 0 < smartDays ≤ $MAX_COVER_DAYS" }
     val today = i.todayJdn
     val windowStart = today - i.windowDays + 1
     val start = if (i.firstJdn != null && i.firstJdn > windowStart) minOf(i.firstJdn, today) else windowStart
@@ -167,19 +187,26 @@ object DemandForecast {
     val weekdayPermille = if (!weekly) null else List(7) { w ->
       divRound(sums[w] * eff * NEUTRAL, counts[w].toLong() * total).toInt()
     }
-    val peak = weekdayPermille?.withIndex()?.maxByOrNull { it.value }?.takeIf { it.value >= PEAK_SHOWN }?.let { it.index + 1 }
+    var peak = weekdayPermille?.withIndex()?.maxByOrNull { it.value }?.takeIf { it.value >= PEAK_SHOWN }?.let { it.index + 1 }
 
     val leadUsed = i.leadDays ?: ReorderCore.DEFAULT_LEAD_DAYS
     val horizon = maxOf(1, leadUsed + i.coverDays)
     val season = seasonOf(i, today, eff, horizon, ::sumRange)
 
-    val model = Model(total, eff, if (weekly) sums else null, if (weekly) counts else null, season ?: NEUTRAL, today)
-    val daily = PurchaseOrderCore.mulDivRound(total, 1, eff.toLong())
+    val base = Model(total, eff, if (weekly) sums else null, if (weekly) counts else null, season ?: NEUTRAL, today)
+    //  AI-07: فقط با `smart`؛ خاموش ⇒ همان `base` و همان حسابِ پیشین
+    val fit = if (!i.smart) null else SmartDemand.fit(
+      SmartDemand.Window(byDay, start, today, eff, total, saleDays, if (weekly) sums else null, if (weekly) counts else null, season ?: NEUTRAL, i.leadDays != null),
+      i.smartDays,
+    )
+    val model: Demand = fit?.model ?: base
+    if (fit != null && fit.smart.method == SmartDemand.Method.CROSTON) peak = null
+    val daily = fit?.smart?.levelMilli ?: PurchaseOrderCore.mulDivRound(total, 1, eff.toLong())
     val min = maxOf(0L, i.minStockMilli)
     val onOrder = maxOf(0L, i.onOrderMilli)
     val reorderPoint = PurchaseOrderCore.add(model.demand(leadUsed), min)
     val position = PurchaseOrderCore.add(i.onHandMilli, onOrder)
-    val confidence = when {
+    val confidence = fit?.confidence ?: when {
       total > 0 && i.leadDays != null && saleDays >= SURE_SALE_DAYS && eff >= MIN_WEEKDAY_DAYS -> Confidence.HIGH
       total > 0 && (i.leadDays != null || saleDays >= SURE_SALE_DAYS) -> Confidence.MEDIUM
       else -> Confidence.LOW
@@ -201,7 +228,7 @@ object DemandForecast {
     }
     return Forecast(
       qty, reason, confidence, daily, reorderPoint, position, leadUsed, i.leadDays != null, left, beyond,
-      weekdayPermille, peak, season, onOrder, saleDays, eff,
+      weekdayPermille, peak, season, onOrder, saleDays, eff, fit?.smart,
     )
   }
 
@@ -218,7 +245,7 @@ object DemandForecast {
   }
 
   /** بزرگ‌ترین N که مصرفِ N روزِ آینده ≤ موجودی (مصرف با N کم نمی‌شود ⇒ جست‌وجوی دودویی) */
-  private fun daysLeft(m: Model, onHand: Long): Pair<Int?, Boolean> {
+  private fun daysLeft(m: Demand, onHand: Long): Pair<Int?, Boolean> {
     if (m.total == 0L) return null to false
     if (onHand <= 0L) return 0 to false
     if (m.demand(MAX_COVER_DAYS) <= onHand) return MAX_COVER_DAYS to true
@@ -261,7 +288,11 @@ object DemandForecast {
   fun why(f: Forecast, digits: String = LocaleFormat.DIGITS_FA): String {
     fun n(x: Int) = LocaleFormat.displayDigits(x.toString(), digits)
     val parts = ArrayList<String>()
-    if (f.dailyMilli > 0 || f.saleDays > 0) parts += "میانگینِ روزانه ${qtyText(f.dailyMilli, digits)}"
+    val smart = f.smart
+    //  AI-07: کم‌فروش با اندازه و فاصلهٔ Croston، پرفروش با پنجرهٔ میانگینِ متحرک؛ خاموش ⇒ همان دو خطِ پیشین
+    if (smart != null && smart.method == SmartDemand.Method.CROSTON) parts += SmartDemand.crostonText(smart, digits)
+    else if (f.dailyMilli > 0 || f.saleDays > 0) parts += "میانگینِ روزانه ${qtyText(f.dailyMilli, digits)}" +
+      (if (smart != null) " (${n(smart.levelDays)} روزِ اخیر)" else "")
     else parts += "در ${n(f.windowDaysUsed)} روز فروشی نبود"
     val peak = f.peakWeekday
     if (peak != null) parts += "روزِ ${weekdayName(peak)} ${factorText(f.weekdayPermille!![peak - 1], digits)} برابر"
@@ -277,6 +308,7 @@ object DemandForecast {
     if (f.reason == Reason.BELOW_MIN) parts += "زیرِ حدِ کم"
     if (f.onOrderMilli > 0) parts += "${qtyText(f.onOrderMilli, digits)} در راه"
     parts += "زمانِ تأمین ${n(f.leadDaysUsed)} روز" + (if (f.leadMeasured) "" else " (سنجیده نشده)")
+    smart?.cvPermille?.let { parts += "نوسان ${SmartDemand.percentText(it, digits)}" }
     return parts.joinToString("، ")
   }
 

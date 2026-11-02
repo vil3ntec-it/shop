@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.MemberDto
+import ir.vil3ntec.tohid.core.staff.StaffScope
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -59,6 +60,8 @@ internal class MemberActions(
   val block: (deviceId: String) -> Unit,
   val unblock: (deviceId: String) -> Unit,
   val remove: () -> Unit,
+  /** STF-06: کلیدِ یک مکان */
+  val place: (place: String, on: Boolean) -> Unit = { _, _ -> },
 )
 
 /**
@@ -94,6 +97,19 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
                 perms.forEachIndexed { i, p ->
                   if (i > 0) V3Divider(start = 16.dp)
                   V3ToggleRow(p.label, p.on, { actions.toggle(p.key, it) }, enabled = canEdit && !busy, modifier = Modifier.v3Stagger(stagger, p.key, i))
+                }
+              }
+            }
+            val places = team.scope?.of(member.id, member.userId)?.places
+            if (places != null) {
+              V3Section(StrAccount.scopeTitle, footer = if (canEdit) StrAccount.scopeHelper else StrAccount.permsOwnerOnly) {
+                StaffScope.PLACES.forEachIndexed { i, place ->
+                  if (i > 0) V3Divider(start = 16.dp)
+                  val on = StaffScope.isOn(places, place)
+                  V3ToggleRow(
+                    if (place == StaffScope.WAREHOUSE) StrAccount.placeWarehouse else StrAccount.placeShopFloor, on, { actions.place(place, it) },
+                    enabled = canEdit && !busy && StaffScope.toggle(places, place, !on) != null,
+                  )
                 }
               }
             }
@@ -153,6 +169,18 @@ internal fun RouteScope.MemberRoute(id: String) {
           TeamSession.scope.launch {
             shops.setMemberPerms(layer.id, MemberModel.withMode(layer, key, on))
               .onSuccess { shops.permissions().onSuccess { team.perms = it.shop } }
+              .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+            busy = false
+          }
+        }
+      },
+      place = { place, on ->
+        val next = member?.let { m -> team.scope?.of(m.id, m.userId)?.let { StaffScope.toggle(it.places, place, on) } }
+        if (member != null && next != null) {
+          busy = true
+          TeamSession.scope.launch {
+            shops.setStaffScope(member.id, next)
+              .onSuccess { team.scope = shops.staffScopeMembers() }
               .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
             busy = false
           }

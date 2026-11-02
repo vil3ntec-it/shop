@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.model.MemberDto
 import ir.vil3ntec.tohid.core.model.ShopDeviceDto
 import ir.vil3ntec.tohid.core.model.ShopPermsDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
+import ir.vil3ntec.tohid.core.model.StaffScopeMembersDto
 import ir.vil3ntec.tohid.data.repo.ShopRepository
 
 /**
@@ -33,6 +34,8 @@ internal class TeamData {
   var courierAllowed by mutableStateOf(false)
   var perms by mutableStateOf<ShopPermsDto?>(null)
   var devices by mutableStateOf<List<ShopDeviceDto>?>(null)
+  /** STF-06: محدودهٔ مکانِ اعضا — `null` یعنی پرچم خاموش یا بی اجازه، پس بخش دیده نمی‌شود */
+  var scope by mutableStateOf<StaffScopeMembersDto?>(null)
   var error by mutableStateOf<String?>(null)
   var fresh by mutableStateOf<String?>(null)
   /** کارمندی که همین حالا برداشته شد — ردیفش پیش از خواندنِ دوباره نرم جمع می‌شود (`V3Collapse`) */
@@ -50,6 +53,7 @@ internal class TeamData {
     courierAllowed = isOwner && shops.courierInviteAllowed()
     shops.permissions().onSuccess { perms = it.shop }
     shops.devices().onSuccess { devices = it }
+    scope = shops.staffScopeMembers()
     loaded = true
   }
 }

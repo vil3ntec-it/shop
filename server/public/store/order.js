@@ -1,6 +1,6 @@
 /*
  * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
- * تأییدِ جایگزینِ کالای پیدانشده (PCK-05).
+ * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
  * سقفِ ۷۵KB بماند (WEB-15، §۳.۱۰)؛ خواندنِ سفارش، پیگیریِ زنده و مسیر همان store.js است.
  *
@@ -67,7 +67,19 @@
       renderSubs(o, token);
       renderRate(o, token);
       renderPrefs(o, token);
+      renderFeedback(o, token);
       return o;
+    }
+
+    //  NTF-07/09: «گزارشِ مشکل» با عکس و نظرِ سفارش — store/order-feedback.js فقط وقتی سرور کلیدش را داد
+    //  (پرچم‌های خاموش ⇒ نه کلید، نه اسکریپت، نه واژه‌نامه، نه گره‌ای در صفحه)
+    var feedback = null;
+    function renderFeedback(o, token) {
+      if (o.issueReports === undefined && o.review === undefined) { if ($('o-fb')) $('o-fb').hidden = true; return; }
+      feedback = feedback || new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/order-feedback.js' }, on: { load: ok, error: no } }));
+      }).then(function () { return window.StoreFeedback({ api: api }); }).catch(function () { feedback = null; return null; });
+      feedback.then(function (f) { if (f) f.render(o, token); });
     }
 
     //  DLV-18: پس از «تحویل شد» و تا ۷ روز، یک بار — مشتری به پیک ستاره و برچسب می‌دهد (بی متنِ آزاد).

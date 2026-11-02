@@ -93,3 +93,14 @@
 .banner { flex: 0 0 min(86%, 420px); display: flex; flex-direction: column; align-items: flex-start; gap: var(--s2); padding: var(--s4); scroll-snap-align: start; }
 .banner p { margin: 0; color: var(--muted); }
 .banner .btn { margin-top: auto; }
+/* WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» (store/filters.js ِ دیربار) */
+.filters summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.filters summary .pill:empty { display: none; }
+.fl-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3); margin-top: var(--s2); }
+.fl-form label, .fl-form fieldset { display: flex; flex-direction: column; gap: var(--s1); font-size: 14px; }
+.fl-form fieldset { flex-direction: row; flex-wrap: wrap; border: 0; padding: 0; margin: 0; }
+.fl-form legend { color: var(--muted); padding: 0; margin-bottom: var(--s1); width: 100%; }
+.fl-form select, .fl-form input[type="text"] { min-height: 44px; min-width: 7em; }
+.fl-form .fl-check { flex-direction: row; align-items: center; min-height: 44px; }
+.fl-actions { display: flex; gap: var(--s2); }
+.ps-alerts { display: grid; gap: var(--s2); margin-top: var(--s2); }

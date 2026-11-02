@@ -184,6 +184,16 @@
         if (ok && f.banners) startBanners();
       });
     }
+    //  WEB-07/10: فیلتر و «خبرم کن» (store/filters.js ِ دیربار) فقط با `features.filters`/`features.alerts`
+    var finder = null;
+    if (f.filters || f.alerts) {
+      new Promise(function (ok, no) {
+        document.head.appendChild(el('script', { attrs: { src: '/store/filters.js' }, on: { load: ok, error: no } }));
+      }).then(function () {
+        finder = window.StoreFinder({ api: ctx.api, features: f, filter: ctx.filter });
+        if (sheetP) finder.seen(sheetP);
+      }).catch(function () { /* بی filters.js (شبکه) همان کاتالوگ */ });
+    }
 
     return {
       picks: picks,
@@ -191,6 +201,7 @@
         if (recent) recent.then(function (r) { r.seen(p); }, function () { /* بی فهرستِ اخیر */ });
         sheetP = p;
         paintSheet();
+        if (finder) finder.seen(p);
       },
       card: function (li, p) { if (on) li.appendChild(favBtn(p)); },
       cart: function () { if (on) drawList(); },

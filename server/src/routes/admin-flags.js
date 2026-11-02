@@ -41,6 +41,9 @@ const KNOWN = Object.freeze([
   { key: 'beta.devices', scope: 'release', default: [], what: 'دستگاه‌های کانالِ آزمایشی' },
   { key: 'shop.receipt_v2', scope: 'shop', default: false, what: 'فاکتورِ نسخهٔ ۲' },
   { key: 'shop.promo_stamp', scope: 'shop', default: false, what: 'نشانِ تخفیفِ خودکار روی فاکتور' },
+  { key: 'shop.storefront.filters', scope: 'shop', default: false, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },
+  { key: 'shop.storefront.alerts', scope: 'shop', default: false, what: '«خبرم کن وقتی موجود/ارزان شد» ِ ویترین' },
+  { key: 'shop.staff_scope', scope: 'shop', default: false, what: 'دسترسیِ کارمند محدود به مکانِ موجودی (STF-06)' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
 ]);
 
