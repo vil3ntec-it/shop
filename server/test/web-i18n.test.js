@@ -41,10 +41,12 @@ const PARTS = {
   reviews: { js: 'store/reviews.js', root: 'rv' },
   //  «حسابِ من» (CRM-13، account.js ِ دیربار): بخش را خودِ account.js می‌سازد ⇒ پوستهٔ HTML بی هیچ کلیدِ آن
   account: { js: 'store/account.js', from: 'id="view-orders"', to: '</main>', root: 'view-orders' },
+  //  «جست‌وجو با عکس» (AI-11، visual-search.js ِ دیربار از catalog.js، فقط با `features.visualSearch`): بخش را خودِ اسکریپت می‌سازد
+  vsearch: { js: 'store/visual-search.js', root: 'vs' },
 };
 const parts = Object.fromEntries(Object.keys(PARTS).map((n) => [n, Object.fromEntries(LANGS.map((l) => [l, JSON.parse(read(`kit/i18n/${n}.${l}.json`))]))]));
 const dict = Object.fromEntries(LANGS.map((l) => [l, Object.assign({}, main[l], ...Object.values(parts).map((p) => p[l]))]));
-const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js'];
+const SOURCES = ['kit/kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/recent.js', 'store/catalog.js', 'store/filters.js', 'store/order-feedback.js', 'store/order-changes.js', 'store/reviews.js', 'market/index.html', 'store/index.html', 'store/account.js', 'store/visual-search.js'];
 const ARABIC = /[\u0600-\u06FF]/;
 
 function usedKeys() {

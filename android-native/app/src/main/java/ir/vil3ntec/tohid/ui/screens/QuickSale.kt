@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.product.VisualSearch
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -194,6 +195,10 @@ fun QuickSaleScreen(
             label = "جستجوی نام کالا یا بارکد",
           )
           Spacer(Modifier.height(8.dp))
+          //  AI-11: «جست‌وجو با عکس» فقط با پرچمِ روشنِ سرور؛ «مشابه» ِ زده‌شده فقط در کادرِ جست‌وجو می‌نشیند، نه در سبد
+          VisualSearchEntry(rememberVisualSearchApi(), d.products, VisualSearch.Place.TILL, Modifier.fillMaxWidth().padding(bottom = 8.dp)) { t ->
+            if (t is VisualSearch.Tap.Search) { category = null; search = t.query }
+          }
           TohidSecondaryButton(
             text = "اسکن بارکد",
             icon = Icons.Filled.QrCodeScanner,

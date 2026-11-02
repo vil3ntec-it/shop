@@ -128,6 +128,11 @@ test('AI-11: پرچمِ خاموش ⇒ همان ۴۰۴ ِ مسیرِ ناشنا�
   assert.deepEqual(off.body, unknown.body);
   const anon = await h.raw('POST', '/api/shop/visual-search', Q_SAME);
   assert.equal(anon.status, 401, 'بی توکن ⇒ ۴۰۱ مثلِ هر درِ دکان');
+  //  درِ «روشن است؟» ِ برنامه هم: خاموش ⇒ همان ۴۰۴ ِ مسیرِ ناشناخته ⇒ دکمه پنهان
+  const status = await h.get('/api/shop/visual-search', { token: A.token });
+  const unknownGet = await h.get('/api/shop/no-such-route-ai11', { token: A.token });
+  assert.equal(status.status, unknownGet.status);
+  assert.deepEqual(status.body, unknownGet.body);
   assert.deepEqual(await vs.backfill(A.shopId), { hashed: 0, removed: 0, more: false, enabled: false });
   assert.deepEqual(await vs.sweep(), { hashed: 0 });
   assert.equal(await nIndex(A.shopId), 0, 'خاموش ⇒ هیچ ردیفی');
@@ -180,6 +185,11 @@ test('AI-11: رتبه روی مجموعهٔ مصنوعی، آستانه، وتو
   assert.deepEqual(Object.keys(r.body).sort(), ['indexed', 'items', 'label', 'notice', 'threshold'], 'هیچ «انتخاب‌شده» یا افزودنِ خودکار');
   assert.doesNotMatch(JSON.stringify(r.body), /همان|یکسان|عینِ|خودِ همین/, 'هرگز ادعای یکی بودن');
   assert.doesNotMatch(vs.NOTICE + vs.LABEL, /همان/);
+  //  درِ «روشن است؟» ِ برنامه (دکمهٔ «جست‌وجو با عکس») — فقط با پرچمِ روشن، بی دادهٔ کالا
+  const st = await h.get('/api/shop/visual-search', { token: A.token });
+  assert.equal(st.status, 200, JSON.stringify(st.body));
+  assert.deepEqual(st.body, { enabled: true, label: 'مشابه', notice: vs.NOTICE, indexed: Object.keys(IMG).length });
+  assert.equal(st.headers.get('cache-control'), 'no-store');
 
   assert.deepEqual(ids(await search(A, Q_SAME, '?limit=2')), ['p-base', 'p-shift']);
   const none = await search(A, Q_NONE);
@@ -247,11 +257,15 @@ test('AI-11: ویترین پشتِ پرچمِ خودش — فقط کالاهای
     assert.equal((await h.put(`/api/shop/storefront/products/${id}`, { published: true }, { token: A.token })).status, 200);
   }
   const url = `/api/store/${slug}/visual-search`;
+  //  `features.visualSearch` (store/visual-search.js ِ دیربار) فقط با هر دو پرچم؛ خاموش ⇒ کلید نیست
+  const feat = async () => { const g = await h.get(`/api/store/${slug}`); assert.equal(g.status, 200); return (g.body.features || {}).visualSearch; };
+  assert.equal(await feat(), undefined, 'پرچمِ ویترین خاموش ⇒ کلیدی نیست');
   const off = await h.raw('POST', url, Q_SAME);
   const unknown = await h.raw('POST', `/api/store/${slug}/no-such-route-ai11`, Q_SAME);
   assert.equal(off.status, unknown.status, 'پرچمِ ویترین خاموش ⇒ همان مسیرِ ناشناخته');
   assert.deepEqual(off.body, unknown.body);
   await setFlag(A.shopId, vs.STORE_FLAG, true);
+  assert.equal(await feat(), true, 'هر دو پرچم ⇒ features.visualSearch');
   const cartBefore = await rowCounts();
   const r = await h.raw('POST', url, Q_SAME);
   assert.equal(r.status, 200, JSON.stringify(r.body));
@@ -262,6 +276,7 @@ test('AI-11: ویترین پشتِ پرچمِ خودش — فقط کالاهای
   await setFlag(A.shopId, vs.FLAG, false);
   const noIndex = await h.raw('POST', url, Q_SAME);
   assert.equal(noIndex.status, unknown.status, 'پرچمِ نمایه خاموش ⇒ ویترین هم خاموش');
+  assert.equal(await feat(), undefined, 'پرچمِ نمایه خاموش ⇒ کلید هم نیست');
   await setFlag(A.shopId, vs.FLAG, true);
   assert.equal((await h.raw('POST', `/api/store/no-such-store-${uniq()}/visual-search`, Q_SAME)).body.error.code, 'store_not_found');
 });
