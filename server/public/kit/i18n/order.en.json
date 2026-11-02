@@ -53,7 +53,6 @@
   "od.add.yes": "Add",
   "od.add.empty": "Your cart is empty; add items to the cart first.",
   "od.add.done": "Added to this order.",
-  "od.add.prep": "This order is being prepared; buy new items with a new order.",
   "od.ap": "We are sorry this order is late.",
   "od.ap.code": "Discount code {code} ({v}) until {d}, for this phone number only.",
   "od.ap.used": "The apology discount code has been used.",

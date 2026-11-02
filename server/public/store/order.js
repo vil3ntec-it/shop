@@ -92,7 +92,7 @@
       var note = $('o-add-note'); var btn = $('o-add-btn');
       box.hidden = false;
       btn.hidden = !a.allowed;
-      if (!a.allowed) { K.note(note, 'warn', t('od.add.prep')); return; }
+      if (!a.allowed) { K.note(note, 'warn', t('err.order_preparing')); return; }
       note.hidden = true;
       btn.disabled = false;
       btn.onclick = function () {
