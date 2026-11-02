@@ -70,6 +70,70 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.StockLevelsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.FraudTrailScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ChatGuardScreen
+import androidx.compose.material.icons.outlined.AccountBalance
+import androidx.compose.material.icons.outlined.CardGiftcard
+import androidx.compose.material.icons.outlined.CreditCard
+import androidx.compose.material.icons.outlined.Insights
+import androidx.compose.material.icons.outlined.LocalShipping
+import androidx.compose.material.icons.outlined.Loyalty
+import androidx.compose.material.icons.outlined.Receipt
+import androidx.compose.material.icons.outlined.Redeem
+import androidx.compose.material.icons.outlined.ReportProblem
+import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Summarize
+import androidx.compose.material.icons.outlined.Warehouse
+import ir.vil3ntec.tohid.ui.v3.settings.sections.AnomalyScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.CustomerCardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftCardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LayawayScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LoyaltyScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.OwnerReportScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PromoGuardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SafeBookScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SmartForecastScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.StockPlacesScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.StorefrontEtaScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TaxQuarterScreen
+import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Celebration
+import androidx.compose.material.icons.outlined.FactCheck
+import androidx.compose.material.icons.outlined.PendingActions
+import androidx.compose.material.icons.outlined.QuestionMark
+import androidx.compose.material.icons.outlined.RemoveShoppingCart
+import androidx.compose.material.icons.outlined.Sell
+import androidx.compose.material.icons.outlined.ShoppingBag
+import ir.vil3ntec.tohid.ui.v3.settings.sections.CountToolsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.DeliverLaterScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftReceiptScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LabelToolsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PriceWhyScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductInfoScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ShrinkReportScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SpecialOrderScreen
+import androidx.compose.material.icons.outlined.FormatListNumbered
+import androidx.compose.material.icons.outlined.Keyboard
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.outlined.PriceCheck
+import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.KeyboardCommandKey
+import ir.vil3ntec.tohid.ui.v3.settings.sections.DocGapsScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PosMoreKeysScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PosPriceCheckScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PosSearchScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PosTouchScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ReportKeysScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LinePricingScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PosNotesScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.AutoFeesScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.EasySetupScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SimpleAskScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.TrainingScreen
+import androidx.compose.material.icons.outlined.QuestionAnswer
+import androidx.compose.material.icons.outlined.School
+import androidx.compose.material.icons.outlined.SettingsSuggest
+import androidx.compose.material.icons.outlined.AddCard
+import androidx.compose.material.icons.outlined.EditNote
+import androidx.compose.material.icons.outlined.Discount
 
 /** صفحهٔ یک بخش: کلیدش (`SettingsLayout`)، آیکنِ خطیِ ردیفش و خودِ صفحه */
 internal class SettingsPage(
@@ -93,6 +157,7 @@ internal object SettingsPages {
     Page(SettingsLayout.NAV_BAR, Icons.Outlined.CallToAction) { NavBarScreen(shell.navAllowed, it) },
     Page("زبان", Icons.Outlined.Language) { LanguageScreen(it) },
     Page("تاریخ و رقم", Icons.Outlined.CalendarToday) { DigitsScreen(it) },
+    Page(SettingsLayout.TRAINING, Icons.Outlined.School) { TrainingScreen(it) },
     Page("قفل برنامه", Icons.Outlined.Lock) { AppLockScreen(it) },
     Page(SettingsLayout.ENCRYPTION, Icons.Outlined.Shield) { EncryptionScreen(it) },
     Page("کد شاگرد", Icons.Outlined.Key) { StaffCodeScreen(it) },
@@ -106,16 +171,47 @@ internal object SettingsPages {
     Page(SettingsLayout.PAY_FIX, Icons.Outlined.PublishedWithChanges) { PayFixSettingsScreen(it) },
     Page(SettingsLayout.CREDIT_GATE, Icons.Outlined.CreditCardOff) { CreditGateScreen(it) },
     Page(SettingsLayout.CRM_REPORTS, Icons.Outlined.TableChart) { CrmReportsScreen(it) },
+    Page(SettingsLayout.LINE_PRICING, Icons.Outlined.Discount) { LinePricingScreen(it) },
     Page(SettingsLayout.PRICE_LIST, Icons.Outlined.LocalOffer) { PriceListSettingsScreen(it) },
     Page(SettingsLayout.QUOTE, Icons.Outlined.RequestQuote) { QuoteSettingsScreen(it) },
+    Page(SettingsLayout.PRICE_WHY, Icons.Outlined.QuestionMark) { PriceWhyScreen(it) },
+    Page(SettingsLayout.POS_NOTES, Icons.Outlined.EditNote) { PosNotesScreen(it) },
+    Page(SettingsLayout.AUTO_FEES, Icons.Outlined.AddCard) { AutoFeesScreen(it) },
+    Page(SettingsLayout.SPECIAL_ORDER, Icons.Outlined.ShoppingBag) { SpecialOrderScreen(it) },
+    Page(SettingsLayout.DELIVER_LATER, Icons.Outlined.PendingActions) { DeliverLaterScreen(it) },
+    Page(SettingsLayout.GIFT_RECEIPT, Icons.Outlined.Celebration) { GiftReceiptScreen(it) },
     Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
+    Page(SettingsLayout.POS_SEARCH, Icons.Outlined.Search) { PosSearchScreen(it) },
+    Page(SettingsLayout.POS_PRICE_CHECK, Icons.Outlined.PriceCheck) { PosPriceCheckScreen(it) },
+    Page(SettingsLayout.POS_TOUCH, Icons.Outlined.TouchApp) { PosTouchScreen(it) },
+    Page(SettingsLayout.POS_MORE_KEYS, Icons.Outlined.KeyboardCommandKey) { PosMoreKeysScreen(it) },
+    Page(SettingsLayout.GIFT_CARD, Icons.Outlined.CardGiftcard) { GiftCardScreen(it) },
+    Page(SettingsLayout.LAYAWAY, Icons.Outlined.Schedule) { LayawayScreen(it) },
+    Page(SettingsLayout.SAFE_BOOK, Icons.Outlined.AccountBalance) { SafeBookScreen(it) },
+    Page(SettingsLayout.LOYALTY, Icons.Outlined.Loyalty) { LoyaltyScreen(it) },
+    Page(SettingsLayout.CUSTOMER_CARD, Icons.Outlined.CreditCard) { CustomerCardScreen(it) },
+    Page(SettingsLayout.SIMPLE_ASK, Icons.Outlined.QuestionAnswer) { SimpleAskScreen(it) },
+    Page(SettingsLayout.REPORT_KEYS, Icons.Outlined.Keyboard) { ReportKeysScreen(it) },
+    Page(SettingsLayout.DOC_GAPS, Icons.Outlined.FormatListNumbered) { DocGapsScreen(it) },
+    Page(SettingsLayout.TAX_QUARTER, Icons.Outlined.Receipt) { TaxQuarterScreen(it) },
+    Page(SettingsLayout.OWNER_REPORT, Icons.Outlined.Summarize) { OwnerReportScreen(it) },
     Page(SettingsLayout.STOCK_MODE, Icons.Outlined.SwapHoriz) { StockModeScreen(it) },
     Page(SettingsLayout.STOCK_INSIGHT, Icons.Outlined.Inventory2) { StockInsightScreen(it) },
     Page(SettingsLayout.STOCK_LEVELS, Icons.Outlined.Inventory) { StockLevelsScreen(it) },
+    Page(SettingsLayout.SMART_FORECAST, Icons.Outlined.Insights) { SmartForecastScreen(it) },
+    Page(SettingsLayout.STOCK_PLACES, Icons.Outlined.Warehouse) { StockPlacesScreen(it) },
+    Page(SettingsLayout.COUNT_TOOLS, Icons.Outlined.FactCheck) { CountToolsScreen(it) },
+    Page(SettingsLayout.SHRINK_REPORT, Icons.Outlined.RemoveShoppingCart) { ShrinkReportScreen(it) },
     Page(SettingsLayout.PRODUCT_TOOLS, Icons.Outlined.Description) { ProductToolsScreen(it) },
+    Page(SettingsLayout.PRODUCT_INFO, Icons.Outlined.Badge) { ProductInfoScreen(it) },
+    Page(SettingsLayout.LABEL_TOOLS, Icons.Outlined.Sell) { LabelToolsScreen(it) },
+    Page(SettingsLayout.STOREFRONT_ETA, Icons.Outlined.LocalShipping) { StorefrontEtaScreen(it) },
+    Page(SettingsLayout.PROMO_GUARD, Icons.Outlined.Redeem) { PromoGuardScreen(it) },
     Page(SettingsLayout.FRAUD_TRAIL, Icons.Outlined.History) { FraudTrailScreen(it) },
+    Page(SettingsLayout.ANOMALY, Icons.Outlined.ReportProblem) { AnomalyScreen(it) },
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
+    Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
     Page("همگام‌سازی", Icons.Outlined.Sync) { SyncScreen(it) },
     Page("داده‌ها", Icons.Outlined.Backup) { BackupScreen(it) },
     Page(SettingsLayout.ABOUT_APP, Icons.Outlined.Info) { AboutScreen(data, it) },

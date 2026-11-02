@@ -49,6 +49,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Toggle
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.nav.SettingsEntry
 import ir.vil3ntec.tohid.ui.v3.settings.sections.rememberLockOn
+import ir.vil3ntec.tohid.ui.v3.settings.sections.rememberServerSections
 
 /** خطِ مویی میانِ ردیف‌ها، از زیرِ متن (آیکنِ ۲۴ + فاصله‌ها) */
 internal val ROW_DIVIDER_START = 60.dp
@@ -89,6 +90,7 @@ internal fun rememberSettingsFacts(theme: ThemeChoice): SettingsFacts {
     lastSyncOk = maxOf(lastSync, v1.lastOkAt),
     now = System.currentTimeMillis(),
     version = BuildConfig.VERSION_NAME,
+    serverOn = rememberServerSections(),
   )
 }
 
@@ -112,9 +114,10 @@ internal fun SettingsGroupCard(
   showTitle: Boolean = true,
   footer: String? = null,
 ) {
-  //  بخشِ فقط‌کامپیوتر (`PHONE_HIDDEN`) روی گوشی ردیف ندارد، مثلِ رابطِ امروز
+  //  بخشِ فقط‌کامپیوتر (`PHONE_HIDDEN`) روی گوشی ردیف ندارد، و بخشِ پشتِ پرچمِ سرور تا پاسخِ روشن هیچ‌جا — مثلِ رابطِ امروز
   val all = SettingsLayout.GROUPS.firstOrNull { it.title == group }?.sections.orEmpty()
-  val sections = if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) all else all.filterNot { it in SettingsLayout.PHONE_HIDDEN }
+  val sections = (if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) all else all.filterNot { it in SettingsLayout.PHONE_HIDDEN })
+    .filter { SettingsLayout.shown(it, facts.serverOn) }
   V3Section(if (showTitle) SettingsLayout.groupLabel(group) else null, modifier, footer = footer) {
     sections.forEachIndexed { i, key ->
       if (i > 0) V3Divider(start = ROW_DIVIDER_START)

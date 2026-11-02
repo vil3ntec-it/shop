@@ -84,6 +84,8 @@ internal fun RouteScope.ReturnsSettingsScreen(onBack: (() -> Unit)?) {
         }
         SettingsNote(StrSettings.returnReasonsNote(ReturnReasons.MAX_COUNT, ReturnReasons.MAX_LENGTH))
       }
+      //  RET-09: مهلت و اقلامِ غیرقابلِ برگشت (همان `ReturnPolicySettingsWired` ِ رابطِ امروز)
+      returnPolicyItems()
     }
   }
 }
