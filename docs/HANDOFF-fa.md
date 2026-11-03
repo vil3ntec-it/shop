@@ -53,6 +53,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps12-partial` (کمبودهای PARTIAL، دورِ ۱۲؛ روی main ِ `1d2d81e2b`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (همه PARTIAL، شاهدِ CI): **PUR-14** فاکتورِ جدای تأمین‌کننده — مهاجرتِ **۲۰۸** `purchase_bills` (+ rollback، آزموده روی PGlite)،
+  `POST …/purchase-orders/:id/bills` و `…/bills/:billId/void` (فقط مدیر، کلیدِ یکتا، شمارهٔ فعالِ یکتا، باطل با دلیل، سقفِ IP پیش از احراز؛
+  SUB-10، `shop-route-inventory`، `route-authz`، `tenant-matrix` سبز)؛ برنامه: تطبیق با فاکتورِ فعالِ تأمین‌کننده، فرم و «باطل» در جزئیاتِ
+  سفارش (`PurchaseBillTest`). **CRM-09** `Debtor.deliveryAddress` (فیلدِ v1 بی migration، الگوی `phone2`؛ برگهٔ ویرایش و پروندهٔ نسخهٔ ۳،
+  ادغام، خروجی؛ `CustomerDeliveryAddressTest`). **STF-02** تأییدِ لغو فقط روی Sync v3 (`CancelApproval`، `Sale.cancelApproval` ⇐ `approval` ِ
+  op ِ «c» در `V3Convert`؛ دکانِ v1 همان امروز). **RSK-03** کارتِ «سابقهٔ این مشتری» در جزئیاتِ سفارش و **RSK-04** «بستن/مطمئن کردنِ این شماره»
+  و فهرست با برداشتن (`core/orders/OrderRisk`). بی پروندهٔ پمپ.
+- رد شد: **SYN-07** — روشن کردنِ v3 برای دکانِ واقعی = جابه‌جاییِ دادهٔ زنده + `SYNC_V3_ENABLED` ِ سرورِ زنده ⇒ D-17 (در `OWNER-DECISIONS-fa.md`
+  و ستونِ «مانع» ِ SYN-07 ثبت شد). یافته: لغوِ برگه‌دارِ **مدیرِ** «نیازمند تأیید» در v1 پذیرفته می‌شود ولی برگه در `approval` با `shop.doc_chain`
+  «ویرایشِ فاکتورِ قطعی» است ⇒ ساخته نشد.
+- نیمه‌کاره: CI و مرجِ همین PR. قدمِ بعدی: شاهدِ CI برای این شش ردیف؛ راهِ «سفارش‌های خرید» در گوشیِ نسخهٔ ۳؛ افزودنِ پین به فهرستِ بسته.
 ### ۱۴۰۵/۰۸/۱۲ — نگهبانِ مرجِ #877، #878، #880، #882، #883، #885 و #881 (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: #877 (`013f90e4`)، #878 (`83dcd9f2`، پس از ادغامِ main؛ STATUS با `batch-status.py`، HANDOFF و «تازه‌ها» هر دو
   سمت)، #880 (`9e3f39d0`)، #882 (`eac92fff`) و #883 (`1fcf35b4`) squash شدند؛ `claude/img12` (#881) از نو روی main ساخته

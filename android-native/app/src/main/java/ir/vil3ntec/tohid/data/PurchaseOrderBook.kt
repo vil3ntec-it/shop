@@ -107,6 +107,39 @@ data class PurchaseOrderDto(
   val firstReceiptAt: Long? = null,
   /** فقط در `GET /:id` و پاسخِ کارها */
   val receipts: List<PoReceiptDto> = emptyList(),
+  /** PUR-14: شمارِ فاکتورهای فعالِ تأمین‌کننده (فهرست هم دارد)؛ سرورِ پیشین ⇒ ۰ */
+  val billCount: Int = 0,
+  /** PUR-14: فاکتورهای جدای تأمین‌کننده با باطل‌شده‌ها — فقط در `GET /:id` و پاسخِ کارها */
+  val bills: List<PoBillDto> = emptyList(),
+)
+
+/** ردیفِ فاکتورِ تأمین‌کننده (PUR-14): ردیفِ سفارش یا کالای بیرون از سفارش (`lineId = null`)؛ جمع همان که او نوشته */
+@Serializable
+data class PoBillLineDto(val lineId: String? = null, val productId: String = "", val qtyMilli: Long = 0, val totalMinor: Long = 0)
+
+@Serializable
+data class PoBillDto(
+  val id: String = "",
+  val poId: String = "",
+  val billNo: String = "",
+  val billDate: String? = null,
+  val lines: List<PoBillLineDto> = emptyList(),
+  val totalMinor: Long = 0,
+  val note: String = "",
+  val createdBy: String = "",
+  val createdAt: Long = 0,
+  val voidedAt: Long? = null,
+  val voidReason: String? = null,
+) {
+  val active: Boolean get() = voidedAt == null
+}
+
+@Serializable
+data class PoBilledDto(
+  val order: PurchaseOrderDto = PurchaseOrderDto(),
+  val bill: PoBillDto = PoBillDto(),
+  val replayed: Boolean = false,
+  val changed: Boolean = false,
 )
 
 @Serializable
@@ -261,8 +294,12 @@ object PurchaseOrderBook {
 
   /* ── تطبیقِ سه‌طرفه (PUR-14) ───────────────────────────────────────── */
 
-  /** فاکتورِ تأمین‌کننده در این برنامه = ردیف‌های خریدِ دفتر که از رسیدهای همین سفارش آمده‌اند */
+  /**
+   *  طرفِ سوم: **فاکتورِ جدای تأمین‌کننده** (سرور، مهاجرتِ ۲۰۸) وقتی دست‌کم یکی فعال است؛ وگرنه — مثلِ پیش از آن —
+   *  ردیف‌های خریدِ دفتر که از رسیدهای همین سفارش آمده‌اند. سرورِ پیشین `bills` نمی‌فرستد ⇒ همان رفتارِ پیشین.
+   */
   fun bills(d: ShopData, o: PurchaseOrderDto): List<PurchaseOrderCore.Bill> {
+    if (hasSupplierBills(o)) return supplierBills(o)
     val byId = d.purchases.associateBy { it.id }
     return o.receipts.flatMap { r ->
       toPost(r).mapNotNull { p ->
@@ -272,7 +309,70 @@ object PurchaseOrderBook {
   }
 
   fun match(d: ShopData, o: PurchaseOrderDto): PurchaseOrderCore.Match =
-    PurchaseOrderCore.match(core(o), coreReceipts(o), bills(d, o), LEDGER_TOLERANCE)
+    PurchaseOrderCore.match(core(o), coreReceipts(o), bills(d, o), if (hasSupplierBills(o)) BILL_TOLERANCE else LEDGER_TOLERANCE)
+
+  /**
+   *  مرزِ تطبیق با فاکتورِ کاغذیِ تأمین‌کننده: مقدار دقیق؛ مبلغِ هر ردیف تا یک افغانی (گردِ دستیِ فاکتور).
+   *  بیشتر از آن «فی بالاتر/پایین‌تر از سفارش» است.
+   */
+  val BILL_TOLERANCE = PurchaseOrderCore.Tolerance(qtyMilli = 0, priceBp = 0, absMinor = 100)
+
+  fun hasSupplierBills(o: PurchaseOrderDto): Boolean = o.bills.any { it.active }
+
+  /** ردیف‌های همهٔ فاکتورهای فعالِ تأمین‌کننده ⇐ هسته (باطل‌شده‌ها هرگز) */
+  fun supplierBills(o: PurchaseOrderDto): List<PurchaseOrderCore.Bill> =
+    o.bills.filter { it.active }.flatMap { b -> b.lines.map { PurchaseOrderCore.Bill(it.lineId, it.productId, it.qtyMilli, it.totalMinor) } }
+
+  /** فرمِ فاکتور: هر ردیفِ سفارش با مقدارِ پذیرفتهٔ رسیدها و مبلغِ «مقدار × فیِ سفارش»؛ ردیفِ بی پذیرفته هم (مقدارِ سفارش) */
+  data class BillRow(val lineId: String, val productId: String, val name: String, val unit: String, val qty: String, val total: String)
+
+  fun billRows(o: PurchaseOrderDto): List<BillRow> {
+    val prog = o.progress.associateBy { it.lineId }
+    return o.lines.map { l ->
+      val q = prog[l.id]?.acceptedMilli?.takeIf { it > 0 } ?: l.qtyMilli
+      BillRow(l.id, l.productId, l.name, l.unit, plain(units(q)), plain(asAfn(PurchaseOrderCore.lineTotalMinor(q, l.priceMinor))))
+    }
+  }
+
+  /** فرم ⇐ ردیف‌های فاکتور؛ ردیفِ خالی یا صفر کنار؛ عددِ نادرست ⇐ `null` (صفحه پیام می‌دهد و چیزی نمی‌فرستد) */
+  fun billLines(rows: List<BillRow>): List<PoBillLineDto>? {
+    val out = ArrayList<PoBillLineDto>()
+    for (r in rows) {
+      val qt = ir.vil3ntec.tohid.normalizeDigits(r.qty).trim()
+      if (qt.isEmpty()) continue
+      val q = qt.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: return null
+      if (q == 0.0) continue
+      val tt = ir.vil3ntec.tohid.normalizeDigits(r.total).trim()
+      val t = (if (tt.isEmpty()) 0.0 else tt.toDoubleOrNull())?.takeIf { it.isFinite() && it >= 0 } ?: return null
+      out += PoBillLineDto(r.lineId, r.productId, milli(q), minor(t))
+    }
+    return out
+  }
+
+  /** سطرِ فهرستِ فاکتورها: شماره، تاریخ، جمع (و «باطل» برای باطل‌شده) */
+  fun billLine(b: PoBillDto): String = buildString {
+    append("فاکتورِ «").append(b.billNo).append("»")
+    b.billDate?.let { append(" · ").append(ir.vil3ntec.tohid.formatDate(it)) }
+    append(" · ").append(ir.vil3ntec.tohid.money(asAfn(b.totalMinor))).append(" ؋")
+    if (!b.active) append(" · باطل")
+  }
+
+  /** سرخطِ تطبیقِ درست — با فاکتورِ تأمین‌کننده یا فاکتورِ دفتر */
+  fun matchTitle(supplier: Boolean): String =
+    if (supplier) "تطبیقِ سفارش، رسید و فاکتورِ تأمین‌کننده: درست" else "تطبیقِ سفارش، رسید و فاکتور: درست"
+
+  /** متنِ هر ناهمخوانی؛ «فاکتور» همان طرفِ سوم است (تأمین‌کننده یا دفتر) */
+  fun issueText(i: PurchaseOrderCore.Issue, supplier: Boolean = false): String = when (i) {
+    PurchaseOrderCore.Issue.RECEIVED_OVER_ORDER -> "بیش از سفارش رسیده"
+    PurchaseOrderCore.Issue.BILLED_OVER_RECEIVED -> if (supplier) "فاکتورِ تأمین‌کننده بیش از رسید" else "فاکتور بیش از رسید"
+    PurchaseOrderCore.Issue.BILLED_UNDER_RECEIVED -> if (supplier) "رسیده ولی در فاکتورِ تأمین‌کننده نیست" else "رسیده ولی فاکتورش در دفتر نیست"
+    PurchaseOrderCore.Issue.PRICE_OVER_ORDER -> "فی بالاتر از سفارش"
+    PurchaseOrderCore.Issue.PRICE_UNDER_ORDER -> "فی پایین‌تر از سفارش"
+    PurchaseOrderCore.Issue.NOT_ON_ORDER -> "بیرون از سفارش"
+  }
+
+  /** «۱۲» نه «12.0»؛ رقمِ لاتین تا کادر همان را نشان دهد که کاربر می‌نویسد */
+  private fun plain(x: Double): String = if (x == kotlin.math.floor(x) && kotlin.math.abs(x) < 1e15) x.toLong().toString() else x.toString()
 
   /* ── پیشنهادِ ردیف (PUR-03) ────────────────────────────────────────── */
 

@@ -116,6 +116,8 @@ object OwnerExport {
     "mergedInto" to "ادغام‌شده در",
     //  کارتِ مشتری (CRM-16) — همان `license/owner-export.js`
     "cardCode" to "کارت مشتری",
+    //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
+    "deliveryAddress" to "نشانی تحویل",
     "notes" to "یادداشت",
     "createdAt" to "زمان ثبت (UTC)",
     "date" to "تاریخ",
@@ -203,6 +205,7 @@ object OwnerExport {
     "seller" to "فروشنده",
     "correctedAt" to "تاریخِ تصحیح‌شده (UTC)", //  S28b: از سرور، وقتی ساعتِ دستگاه کج بود
     "approval" to "تأییدِ مدیر",
+    "cancelApproval" to "تأییدِ لغو",
     "payments" to "ردیف‌های پرداخت",
     "tenderedMinor" to "دریافتی (پول)",
     "changeMinor" to "پول پس (پول)",

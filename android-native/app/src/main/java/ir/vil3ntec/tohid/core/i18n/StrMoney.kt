@@ -154,6 +154,16 @@ object StrMoney {
   val phone2Optional: String get() = t("شمارهٔ دوم (اختیاری)", "Second phone (optional)", "دویمه شمېره (اختیاري)")
   val tagsField: String get() = t("برچسب‌ها (اختیاری)", "Tags (optional)", "نښانونه (اختیاري)")
   val tagsHelper: String get() = t("با «،» جدا کنید — مثلاً عمده، همسایه", "Separate with commas — e.g. wholesale, neighbour", "په «،» جلا کړئ — لکه عمده، ګاونډی")
+  /* CRM-09 — نشانیِ تحویلِ مشتری (§۴.۴) */
+  val addressTitle: String get() = t("نشانیِ تحویل (اختیاری)", "Delivery address (optional)", "د سپارلو پته (اختیاري)")
+  val addressLandmark: String get() = t("نزدیک‌ترین نشانه", "Nearest landmark", "نږدې نښه")
+  val addressLandmarkHint: String get() = t("مسجد، مکتب، دکان، چوک…", "Mosque, school, shop, square…", "جومات، ښوونځی، دوکان، څلورلارې…")
+  val addressArea: String get() = t("ولایت، ناحیه، گذر یا کوچه", "Province, district, street", "ولایت، ناحیه، کوڅه")
+  val addressGate: String get() = t("رنگِ دروازه و منزل", "Gate colour and house", "د دروازې رنګ او کور")
+  val addressFloor: String get() = t("طبقه", "Floor", "پوړ")
+  val addressPlusCode: String get() = t("Plus Code", "Plus Code", "Plus Code")
+  val addressPostal: String get() = t("کدِ پستی (اختیاری)", "Postal code (optional)", "پوستي کوډ (اختیاري)")
+  fun addressLine(line: String): String = t("نشانی: ${asIs(line)}", "Address: $line", "پته: $line")
   /** CRM-11: صافیِ برچسبِ فهرستِ قرض‌داران */
   val allTags: String get() = t("همهٔ برچسب‌ها", "All tags", "ټول نښانونه")
   val consentTitle: String get() = t("رضایت برای پیامِ تبلیغاتی", "Consent to promotional messages", "د تبلیغي پیغام لپاره رضایت")

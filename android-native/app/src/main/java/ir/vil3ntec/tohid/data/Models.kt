@@ -256,6 +256,8 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val approval: kotlinx.serialization.json.JsonObject? = null,
+  /** STF-02 — برگهٔ تأییدِ **لغوِ** همین فاکتور (فقط Sync v3؛ شرح سرِ `core/perm/CancelApproval`)؛ `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val cancelApproval: kotlinx.serialization.json.JsonObject? = null,
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
@@ -589,6 +591,8 @@ data class Debtor(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val cardCode: String? = null,
+  /** نشانیِ تحویل (CRM-09) — شرح سرِ `DeliveryAddress`؛ `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val deliveryAddress: DeliveryAddress? = null,
 )
 
 @Serializable

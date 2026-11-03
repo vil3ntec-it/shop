@@ -3,6 +3,8 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.data.PoBillLineDto
+import ir.vil3ntec.tohid.data.PoBilledDto
 import ir.vil3ntec.tohid.data.PoConfigDto
 import ir.vil3ntec.tohid.data.PoLineDto
 import ir.vil3ntec.tohid.data.PoOrderDto
@@ -82,6 +84,36 @@ class PurchaseOrderRepository(private val api: ApiClient) {
       }
       ApiJson.decode<PoReceivedDto>(api.post("$ROOT/${enc(id)}/receipts", body))
     }
+
+  /**
+   *  PUR-14 — فاکتورِ جدای تأمین‌کننده؛ [billId] کلیدِ یکتای همین فاکتور است (صفحه یک بار می‌سازد): تکرارِ همان
+   *  درخواست همان فاکتور است. فقط مدیر و صاحب (`stock.adjust`).
+   */
+  suspend fun bill(id: String, billId: String, billNo: String, billDate: String?, note: String, lines: List<PoBillLineDto>): ApiResult<PoBilledDto> =
+    result {
+      val body = buildJsonObject {
+        put("id", billId)
+        put("billNo", billNo)
+        if (!billDate.isNullOrBlank()) put("billDate", billDate)
+        put("note", note)
+        put("lines", buildJsonArray {
+          lines.forEach { l ->
+            add(buildJsonObject {
+              l.lineId?.let { put("lineId", it) }
+              put("productId", l.productId)
+              put("qtyMilli", l.qtyMilli)
+              put("totalMinor", l.totalMinor)
+            })
+          }
+        })
+      }
+      ApiJson.decode<PoBilledDto>(api.post("$ROOT/${enc(id)}/bills", body))
+    }
+
+  /** باطل کردنِ فاکتورِ تأمین‌کننده با دلیل؛ تکرار بی اثر */
+  suspend fun voidBill(id: String, billId: String, reason: String): ApiResult<PoBilledDto> = result {
+    ApiJson.decode<PoBilledDto>(api.post("$ROOT/${enc(id)}/bills/${enc(billId)}/void", buildJsonObject { put("reason", reason) }))
+  }
 
   data class Draft(
     val supplierId: String,
