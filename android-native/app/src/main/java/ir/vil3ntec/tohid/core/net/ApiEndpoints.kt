@@ -34,6 +34,10 @@ object ApiEndpoints {
     const val STAFF = "/auth/staff"
     const val GOOGLE = "/auth/google"
     const val GOOGLE_LINK_CODE = "/auth/google/link-code"
+    //  ورود با اپل (فقط آیفون): nonce ِ یک‌بارمصرفِ سرور ⇐ پنجرهٔ اپل ⇐ توکن + nonce
+    const val APPLE_NONCE = "/auth/apple/nonce"
+    const val APPLE = "/auth/apple"
+    const val APPLE_LINK_CODE = "/auth/apple/link-code"
     const val REFRESH = "/auth/refresh"
     const val LOGOUT = "/auth/logout"
     const val OTP_REQUEST = "/auth/otp/request"

@@ -37,6 +37,7 @@ const PUBLIC = [
     'POST /api/auth/register', 'POST /api/auth/register/start', 'POST /api/auth/register/verify', 'POST /api/auth/register/complete',
     'POST /api/auth/login', 'POST /api/auth/otp/request', 'POST /api/auth/otp/verify',
     'POST /api/auth/google', 'POST /api/auth/google/link-code',
+    'POST /api/auth/apple/nonce', 'POST /api/auth/apple', 'POST /api/auth/apple/link-code',
     'POST /api/auth/password/forgot', 'POST /api/auth/password/reset',
     'POST /api/auth/:app/request-code', 'POST /api/auth/:app/verify',
     'POST /api/admin/login']],

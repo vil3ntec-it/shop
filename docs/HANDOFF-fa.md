@@ -61,6 +61,13 @@
   AI-12 (ویترینِ مشتری + خواندنِ دست‌نوشته).
 - نیمه‌کاره: «توضیح» و «از عکس» ِ AI-06 (جورِ دسته از «مشابه» ِ AI-11 وقتی AI-11 به رابطِ نسخهٔ ۳ آمد)؛ شاهدِ CI.
 - قدمِ بعدی: CI ِ PR را ببین و مرج کن؛ برای AI-09/10/12 تصمیمِ صاحب‌کار دربارهٔ مدلِ خودمیزبان (سخت‌افزار، مجوز، نماهای امن).
+### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۶، شاخهٔ `claude/ios-app-phase6` (روی #852؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ورود با اپل — سرور (`lib/apple.js`، `/auth/apple/nonce`، `/auth/apple`، `/auth/apple/link-code`؛ جدولِ مشترکِ `PROVIDERS` با گوگل،
+  nonce ِ HMAC ِ یک‌بارمصرف؛ بی `APPLE_CLIENT_IDS` خاموش)، کدِ مشترک (`data/ExternalSignIn.kt`، `AuthController.apple`، `AppleButton`؛ اندروید و
+  کامپیوتر دکمه ندارند) و پنجرهٔ iOS (`ios/AppleSignInIos.kt`). `ios-exclude.txt` ۱۹ ⇐ ۱۳ (TokenStore، FileName، Fingerprint، Integrity،
+  TohidBackupAgent، HesabPayHceService)؛ ۱۱۴۲ از ۱۱۵۵ فایل برای iOS (`docs/IOS-PLAN-fa.md` §۰.۱۱). دستهٔ ۱۳ (#855) در شاخه ادغام شد.
+- نیمه‌کاره: آزمونِ شبیه‌ساز (`Phase6IosTest`) و xcodebuild فقط در CI ِ macOS؛ ورودِ اپل روی گوشیِ واقعی منتظرِ حسابِ اپل (§۰.۶ بندِ ۵).
+- قدمِ بعدی: مرجِ #852 و سپس همین PR؛ اگر صاحب‌کار حسابِ اپل داد: entitlements ِ `applesignin` + `aps-environment` و `APPLE_CLIENT_IDS`.
 
 ### ۱۴۰۵/۰۸/۱۲ — شاخهٔ `claude/gaps6-dlv-admin` (کمبودهای PARTIAL، دورِ ۶ — اول پیک و مدیریت)
 - انجام شد: **RSK-08** مسئول و مهلتِ اختلاف (§۱۹.۹ بندِ ۵): `POST /api/shop/orders/evidence/:id/disputes/assign` (فقط‌افزودنی در
