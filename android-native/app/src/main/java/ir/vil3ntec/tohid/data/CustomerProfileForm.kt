@@ -62,9 +62,9 @@ object CustomerProfileForm {
     }
   }
 
-  /** نوشتهٔ کوتاهِ زیرِ نام: شمارهٔ دوم و برچسب‌ها («#عمده #همسایه») — خالی ⇒ "" */
-  fun extraLine(debtor: Debtor): String = listOfNotNull(
-    debtor.phone2?.takeIf { it.isNotBlank() }?.let { LocaleText.phoneDisplay(it) },
+  /** نوشتهٔ کوتاهِ زیرِ نام: شمارهٔ دوم و برچسب‌ها («#عمده #همسایه») — خالی ⇒ ""؛ [contacts] CRM-15: بی مجوز شماره پوشیده */
+  fun extraLine(debtor: Debtor, contacts: Boolean = true): String = listOfNotNull(
+    debtor.phone2?.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.core.text.ContactMask.show(LocaleText.phoneDisplay(it), contacts) },
     debtor.tags.orEmpty().takeIf { it.isNotEmpty() }?.joinToString(" ") { "#$it" },
   ).joinToString(" · ")
 }

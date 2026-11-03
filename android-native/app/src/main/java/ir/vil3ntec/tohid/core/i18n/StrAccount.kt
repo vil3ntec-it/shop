@@ -180,6 +180,8 @@ object StrAccount {
   val permSettings: String get() = t("تنظیماتِ دکان", "Shop settings", "د دوکان امستنې")
   val permAudit: String get() = t("سابقهٔ عملیات", "Activity log", "د کړنو تاریخچه")
   val permMoney: String get() = t("دیدنِ عددهای مالی (درآمد، سود)", "See money figures (income, profit)", "مالي شمېرې لیدل (عاید، ګټه)")
+  /** CRM-15 — `customers.contact` */
+  val permContacts: String get() = t("دیدنِ شمارهٔ مشتریان (تماس و پیام)", "See customers' phone numbers (call and message)", "د پېرودونکو شمېرې لیدل (زنګ او پیغام)")
   val devicesTitle: String get() = t("دستگاه‌ها", "Devices", "وسایل")
   val noDevices: String get() = t("دستگاهی ثبت نشده است.", "No devices registered.", "هېڅ وسیله نه ده ثبت.")
   val device: String get() = t("دستگاه", "Device", "وسیله")
