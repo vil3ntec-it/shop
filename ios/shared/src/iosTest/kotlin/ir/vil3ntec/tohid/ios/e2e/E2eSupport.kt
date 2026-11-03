@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ios.e2e
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.asSkiaBitmap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.SemanticsActions
@@ -17,6 +18,9 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onFirst
+import androidx.compose.ui.test.onLast
+import androidx.compose.ui.test.performTouchInput
+import androidx.compose.ui.test.swipe
 import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
@@ -78,14 +82,36 @@ internal class E2eEnv(
   }
 
   /** ردیف‌های همگام‌شدهٔ همین دکان روی سرور (`sync_rows`) — گواهِ این‌که نوشتنِ آیفون به سرور رسید */
-  fun serverRows(table: String): List<JsonObject> {
-    val c = java.net.URL("$probe/rows?table=$table").openConnection() as java.net.HttpURLConnection
+  fun serverRows(table: String): List<JsonObject> =
+    (probeGet("/rows?table=$table")["rows"] as? JsonArray ?: JsonArray(emptyList())).map { it.jsonObject }
+
+  /**
+   *  سفارشی که مشتری از ویترینِ همین دکان می‌گذارد (`GET /order/new` ِ backend.mjs: بارِ اول بخشِ سفارش و ویترین برای
+   *  همین دکان روشن، سپس همان `POST /store/:slug/checkout` ِ صفحهٔ ویترین) — نه از راهِ برنامه
+   */
+  fun placeOrder(): PlacedOrder {
+    val j = probeGet("/order/new", 60_000)
+    fun s(k: String) = j[k]?.jsonPrimitive?.content ?: throw AssertionError("/order/new: «$k» نیست — $j")
+    return PlacedOrder(s("id"), s("orderNo").toLong(), s("totalMinor").toLong(), s("product"))
+  }
+
+  /** حالِ سفارش روی سرور: وضعیت و شمارِ «فاکتور شد» (رویدادِ `invoice` ِ `lib/order-flow.js`) */
+  fun orderState(id: String): Pair<String, Int> {
+    val j = probeGet("/order?id=$id")
+    return (j["status"]?.jsonPrimitive?.content.orEmpty()) to (j["invoices"]?.jsonPrimitive?.content?.toIntOrNull() ?: -1)
+  }
+
+  private fun probeGet(path: String, timeoutMs: Int = 5_000): JsonObject {
+    val c = java.net.URL("$probe$path").openConnection() as java.net.HttpURLConnection
     c.connectTimeout = 5_000
-    c.readTimeout = 5_000
+    c.readTimeout = timeoutMs
     val body = c.inputStream.readBytes().decodeToString()
-    return (Json.parseToJsonElement(body).jsonObject["rows"] as? JsonArray ?: JsonArray(emptyList())).map { it.jsonObject }
+    return Json.parseToJsonElement(body).jsonObject
   }
 }
+
+/** سفارشِ ویترین (`E2eEnv.placeOrder`) */
+internal class PlacedOrder(val id: String, val orderNo: Long, val totalMinor: Long, val product: String)
 
 /** یافتنِ چیزها روی صفحه — با همان متن‌های `Str*` که برنامه نشان می‌دهد (برچسبِ دکمه، کادر، زبانه) */
 @OptIn(ExperimentalTestApi::class)
@@ -108,6 +134,11 @@ internal object Find {
   /** کاشی/ردیفِ کالای صندوق: «یکی به سبد» و نامِ کالا */
   fun tile(name: String, addOne: String) =
     clickLabel(addOne) and (hasContentDescription(name, substring = true) or hasText(name, substring = true))
+
+  /** برچسبِ کلیک با این آغاز (کاشی‌ای که شمارش را هم در نامِ دسترس‌پذیرش می‌گوید) */
+  fun clickLabelStarting(prefix: String) = SemanticsMatcher("onClickLabel از «$prefix»") {
+    it.config.getOrNull(SemanticsActions.OnClick)?.label?.startsWith(prefix) == true
+  }
 
   fun text(value: String, substring: Boolean = false) = hasText(value, substring = substring)
 
@@ -203,11 +234,11 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
    *  زیرِ نوارِ شناورِ پایین هم «بیرونِ قاب» است؛ پیمایشی که جا را عوض نکرد (تهِ فهرست، برگهٔ کوتاه) ⇐ بس — پیمایشِ
    *  بی‌جا به برگه می‌رسد و آن را می‌کشد (اجرای پنجم).
    */
-  fun reveal(m: SemanticsMatcher) {
+  fun reveal(m: SemanticsMatcher, lastOne: Boolean = false) {
     val bar = if (shown(Find.tab(NavCatalog.HOME))) REVEAL_MARGIN else 0f
     var last: Float? = null
     repeat(8) {
-      val node = ui.onAllNodes(m).onFirst().fetchSemanticsNode()
+      val node = pick(m, lastOne).fetchSemanticsNode()
       var parent = node.parent
       while (parent != null && !parent.config.contains(SemanticsActions.ScrollBy)) parent = parent.parent
       val box = parent ?: return
@@ -236,11 +267,11 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
    *  تا چیز کامل روی صفحه و ایستاده باشد (برگه‌ای که از پایین بالا می‌آید: کادری که پیش‌تر پیدا شد هنوز بیرونِ صفحه
    *  است و زدنش هیچ — اجرای پنجم). بیشینه شش ثانیه؛ پس از آن همان‌جا که هست.
    */
-  fun settle(m: SemanticsMatcher) {
+  fun settle(m: SemanticsMatcher, lastOne: Boolean = false) {
     val start = TimeSource.Monotonic.markNow()
     var last: androidx.compose.ui.geometry.Rect? = null
     while (start.elapsedNow().inWholeMilliseconds < 6_000) {
-      val at = ui.onAllNodes(m).onFirst().fetchSemanticsNode().rect()
+      val at = pick(m, lastOne).fetchSemanticsNode().rect()
       val s = screen()
       if (at == last && at.top >= s.top && at.bottom <= s.bottom && at.left >= s.left && at.right <= s.right) return
       last = at
@@ -253,13 +284,45 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
    *  هنوز جا می‌افتد گاه به پردهٔ پشتش می‌خورد و برگه را می‌بست (اجراهای ۵ تا ۷)؛ آزمون جریانِ برنامه را می‌سنجد، نه
    *  تشخیصِ لمسِ Compose.
    */
-  fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
+  fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000, lastOne: Boolean = false) {
     waitFor(m, what, timeoutMs)
-    reveal(m)
-    settle(m)
-    ui.onAllNodes(m).onFirst().performSemanticsAction(SemanticsActions.OnClick)
+    reveal(m, lastOne)
+    settle(m, lastOne)
+    pick(m, lastOne).performSemanticsAction(SemanticsActions.OnClick)
     note("زدن: $what")
     pump(600)
+  }
+
+  /** نخستین (یا آخرین: برگه‌ای که روی صفحه با دکمهٔ هم‌نام باز شده، پس از آن در درخت می‌آید) */
+  private fun pick(m: SemanticsMatcher, lastOne: Boolean) = ui.onAllNodes(m).let { if (lastOne) it.onLast() else it.onFirst() }
+
+  /**
+   *  زدنِ دکمهٔ خاموش، مثلِ دسترس‌پذیری که کنشِ کلیکِ چیزِ «غیرفعال» را باز هم می‌فرستد: اگر کنشی هست اجرا می‌شود
+   *  (سدِ پشتِ دکمه — نه فقط ظاهرِ خاموشش — باید جلوی کار را بگیرد)؛ بی کنش ⇐ هیچ
+   */
+  fun pressDisabled(m: SemanticsMatcher, what: String) {
+    waitFor(m, what)
+    val action = pick(m, false).fetchSemanticsNode().config.getOrNull(SemanticsActions.OnClick)?.action
+    note("زدنِ دکمهٔ خاموش: $what (${if (action == null) "بی کنش" else "کنشِ کلیک فرستاده شد"})")
+    action?.invoke()
+    pump(800)
+  }
+
+  /**
+   *  کشیدنِ انگشت رو به پایین روی صفحه (لمسِ واقعی، نه کنشِ دسترس‌پذیری): از `dyBelow` پیکسل زیرِ [below] به اندازهٔ
+   *  [distance] پیکسل در [ms] میلی‌ثانیه — مثلِ کشیدنِ کادرِ پنهانِ بالای خانه
+   */
+  fun pullDown(below: SemanticsMatcher, what: String, distance: Float, ms: Long, dyBelow: Float = 150f) {
+    waitFor(below, what)
+    val at = pick(below, false).fetchSemanticsNode().rect()
+    val s = screen()
+    val y0 = at.bottom + dyBelow
+    val y1 = minOf(y0 + distance, s.bottom - 60f)
+    ui.onAllNodes(isRoot()).onFirst().performTouchInput {
+      swipe(Offset(s.center.x, y0), Offset(s.center.x, y1), ms)
+    }
+    note("کشیدن: $what (${y0.toInt()} ⇐ ${y1.toInt()} پیکسل، $ms میلی‌ثانیه)")
+    pump(1_200)
   }
 
   fun type(label: String, value: String) {
@@ -354,15 +417,31 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
  */
 @Composable
 internal fun E2eHost(content: @Composable () -> Unit) {
-  val owner = remember { ResumedOwner() }
+  val owner = remember { ResumedOwner().also { E2eApp.owner = it } }
   CompositionLocalProvider(LocalLifecycleOwner provides owner) { content() }
 }
 
-private class ResumedOwner : LifecycleOwner {
+/**
+ *  رفتن به برنامهٔ دیگر و برگشتن (همان `ON_STOP`/`ON_START` که `ComposeUIViewController` هنگامِ پس‌زمینه و پیش‌زمینه
+ *  می‌فرستد) — برنامه با آن، مثلِ گوشی، همگام‌سازی و «بخشِ سفارش روشن است؟» را از نو می‌پرسد (`AppRoot`، `OrdersLive.Host`)
+ */
+internal object E2eApp {
+  internal var owner: ResumedOwner? = null
+
+  fun background() = owner?.move(Lifecycle.State.CREATED)
+
+  fun foreground() = owner?.move(Lifecycle.State.RESUMED)
+}
+
+internal class ResumedOwner : LifecycleOwner {
   private val registry = LifecycleRegistry(this)
   override val lifecycle: Lifecycle get() = registry
 
   init {
     registry.currentState = Lifecycle.State.RESUMED
+  }
+
+  fun move(to: Lifecycle.State) {
+    registry.currentState = to
   }
 }

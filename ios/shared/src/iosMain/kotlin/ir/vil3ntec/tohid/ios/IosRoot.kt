@@ -11,6 +11,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.Configuration
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalHapticFeedback
 import ir.vil3ntec.tohid.AppShell
 import ir.vil3ntec.tohid.AppStart
 import ir.vil3ntec.tohid.data.ShopRole
@@ -70,6 +71,8 @@ fun IosRoot() {
     CompositionLocalProvider(
       LocalContext provides IosActivity,
       LocalConfiguration provides Configuration(maxWidth.value.toInt(), maxHeight.value.toInt()),
+      //  بازخوردِ لمسیِ Compose با همان نقشهٔ `Haptics` (موفق، خطا، تأیید، انتخاب، آستانه — `IosHaptics`)
+      LocalHapticFeedback provides IosHapticFeedback,
     ) {
       //  همان بدنهٔ `setContent` ِ `MainActivity`؛ اجازهٔ اعلان (سفارشِ تازه، دیدبان، یادآور) هنگامِ نخستین نمایشِ دکان
       AppShell(IosContext, store, onShopShown = { IosNotifications.askOnce() })

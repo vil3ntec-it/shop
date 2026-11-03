@@ -169,10 +169,11 @@ jobs:
           if [ ! -s ios-e2e/backend.json ]; then tail -60 ios-e2e/backend.log; echo "::error::سرورِ آزمون بالا نیامد"; exit 1; fi
           tail -1 ios-e2e/backend.log
       #  ۵) روی شبیه‌ساز: shimهای رمزنگاری (CommonCrypto/Keychain) در برابرِ بردارهای JDK، shimهای گام‌های ۳ تا ۷، و
-      #  آزمونِ سرتاسریِ جریان‌های اصلی (`src/iosTest/…/e2e/CoreFlowsE2EIosTest`: ورود، صندوق، کالا، «تازه‌ها»، دری)
+      #  آزمونِ سرتاسریِ جریان‌های اصلی (`src/iosTest/…/e2e/CoreFlowsE2EIosTest`: ورود، صندوق، کالا، «تازه‌ها»، نسیه با قرض‌دار،
+      #  کادرِ صندوقِ خانه و «+»، سفارشِ آنلاین تا یک فاکتور، دری — §۰.۱۳ و §۰.۱۵)
       - name: iosSimulatorArm64Test (ios/shared) — رمز، shimها و جریان‌های اصلی
         if: always()
-        #  کامپایل و پیوندِ آزمون ~۱۲، آزمونِ سرتاسری ≤ ۱۵ دقیقه (نگهبانِ خودش)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
+        #  کامپایل و پیوندِ آزمون ~۱۲، آزمونِ سرتاسری ≤ ۲۰ دقیقه (نگهبانِ خودش)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
         timeout-minutes: 45
         env:
           TOHID_E2E_BACKEND: ${{ github.workspace }}/ios-e2e/backend.json
