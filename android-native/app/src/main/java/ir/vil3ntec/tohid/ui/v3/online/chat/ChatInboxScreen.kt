@@ -25,6 +25,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.chat.ChatConversation
+import ir.vil3ntec.tohid.core.chat.ChatSearchHit
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
+import ir.vil3ntec.tohid.core.i18n.StrChat
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Palette
@@ -56,6 +59,8 @@ data class InboxState(
   val status: String = "open",
   val query: String = "",
   val now: Long = 0L,
+  /** CHAT-14: پیام‌هایی که متنشان با جست‌وجو جور است (`GET /search`) */
+  val hits: List<ChatSearchHit> = emptyList(),
 )
 
 /**
@@ -72,6 +77,7 @@ fun ChatInboxScreen(
   onBack: (() -> Unit)?,
   modifier: Modifier = Modifier,
   selectedId: String? = null,
+  onOpenHit: (ChatSearchHit) -> Unit = {},
 ) {
   val stagger = rememberV3Stagger(state.status)
   V3Scaffold(
@@ -88,13 +94,31 @@ fun ChatInboxScreen(
       if (state.error != null) item(key = "offline") { V3Message(V3Tone.WARNING, state.error, Modifier.padding(bottom = 12.dp)) }
       when {
         state.list.isEmpty() && state.loading -> item(key = "skeleton") { V3Skeleton(rows = 5) }
-        state.list.isEmpty() && state.query.isNotEmpty() -> item(key = "nomatch") { V3EmptyState(Icons.Outlined.SearchOff, StrOnline.ctNoMatch) }
+        state.list.isEmpty() && state.query.isNotEmpty() && state.hits.isEmpty() -> item(key = "nomatch") { V3EmptyState(Icons.Outlined.SearchOff, StrOnline.ctNoMatch) }
+        state.list.isEmpty() && state.query.isNotEmpty() -> Unit
         state.list.isEmpty() -> item(key = "empty") { V3EmptyState(Icons.Outlined.Forum, StrOnline.ctEmptyTitle, body = StrOnline.ctEmptyBody) }
         else -> itemsIndexed(state.list, key = { _, c -> c.id }) { i, c ->
           V3Card(
             Modifier.padding(bottom = 8.dp).v3AnimateItem(this).v3Stagger(stagger, c.id, i),
             padding = PaddingValues(0.dp),
           ) { ConversationRow(c, state.now, selected = c.id == selectedId) { onOpen(c) } }
+        }
+      }
+      //  CHAT-14: «در پیام‌ها» — هر یافته با نامِ مشتریِ همان گفت‌وگو (اگر در صندوق دیده شده) ⇐ همان گفت‌وگو
+      if (state.hits.isNotEmpty()) {
+        item(key = "hits-title") { Text(StrChat.inMessages, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 8.dp, bottom = 6.dp)) }
+        itemsIndexed(state.hits, key = { _, h -> "hit-" + h.id }) { _, h ->
+          V3Card(Modifier.padding(bottom = 8.dp), padding = PaddingValues(0.dp)) {
+            V3ListRow(
+              title = ChatModel.name(ChatHub.known[h.conversationId] ?: state.list.firstOrNull { it.id == h.conversationId }),
+              subtitle = h.body.ifBlank { OnlineFmt.ctKind(h.kind) },
+              subtitleLines = 2,
+              leading = { ChatAvatar(ChatModel.name(ChatHub.known[h.conversationId]).trim().take(1).ifEmpty { "•" }) },
+              value = OrdersModel.scheduleLabel(h.createdAt, state.now),
+              selected = if (h.conversationId == selectedId) true else null,
+              onClick = { onOpenHit(h) },
+            )
+          }
         }
       }
     }

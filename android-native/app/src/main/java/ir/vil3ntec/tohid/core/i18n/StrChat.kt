@@ -24,4 +24,22 @@ object StrChat {
     "This device is low on storage; free up some space to record, play or send media.",
     "د دې وسیلې ځای لږ دی؛ د ثبت، غږولو یا رسنۍ لېږلو لپاره یو څه ځای خالي کړئ.",
   )
+
+  // CHAT-14 — پاسخ، ویرایش، سنجاق و جست‌وجو در گفت‌وگوی برنامهٔ مدیریت
+  val actions: String get() = t("کارها", "Actions", "کړنې")
+  val actionsTitle: String get() = t("کارهای این پیام", "Message actions", "د دې پیغام کړنې")
+  val reply: String get() = t("پاسخ", "Reply", "ځواب")
+  val edit: String get() = t("ویرایش", "Edit", "سمول")
+  val pin: String get() = t("سنجاق در بالای گفت‌وگو", "Pin to the top of the chat", "د خبرو اترو سر ته ټاکل")
+  val unpin: String get() = t("برداشتنِ سنجاق", "Unpin", "ټاکنه لرې کول")
+  val pinNote: String get() = t(
+    "سنجاق را همهٔ کارمندانِ این دکان می‌بینند، مشتری نه؛ تا ۵ پیام.",
+    "Everyone on this shop's staff sees pins, the customer doesn't; up to 5 messages.",
+    "ټاکنې د دې دوکان ټول کارکوونکي ویني، پېرودونکی نه؛ تر ۵ پیغامونو.",
+  )
+  val pinned: String get() = t("سنجاق‌شده", "Pinned", "ټاکل شوي")
+  fun replyingTo(text: String): String = t("پاسخ به: ${asIs(text)}", "Replying to: $text", "ځواب ته: $text")
+  val editing: String get() = t("ویرایشِ پیام — «فرستادن» متنِ تازه را می‌گذارد", "Editing message — \"Send\" saves the new text", "د پیغام سمول — «لېږل» نوی متن ساتي")
+  val earlier: String get() = t("پیامِ پیشین", "Earlier message", "پخوانی پیغام")
+  val inMessages: String get() = t("در پیام‌ها", "In messages", "په پیغامونو کې")
 }

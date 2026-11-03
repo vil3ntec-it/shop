@@ -54,6 +54,9 @@ fun KeypadSheet(
   onClose: () -> Unit,
   /** متنِ آغازِ دلخواه (عکس‌های پیش‌نمایش) */
   initial: String? = null,
+  /** POS-06: کالا در صفحهٔ اولِ صندوقِ همین دستگاه سنجاق است؟ null ⇒ بی دکمهٔ سنجاق */
+  pinned: Boolean? = null,
+  onPin: () -> Unit = {},
 ) {
   val c = PhoneV3.colors
   var text by remember(item.product.id) { mutableStateOf(initial ?: KeypadModel.start(item)) }
@@ -115,5 +118,9 @@ fun KeypadSheet(
       enabled = problem == null,
       haptic = true,
     )
+    if (pinned != null) {
+      Spacer(Modifier.height(8.dp))
+      V3Button(if (pinned) StrSale.unpinFirst else StrSale.pinFirst, { closer.close { onPin() } }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
+    }
   }
 }

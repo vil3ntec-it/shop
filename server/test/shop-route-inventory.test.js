@@ -644,6 +644,7 @@ function bodyFor(r, ids) {
     'PUT /shop/chat/conversations/:id/status': { status: 'closed' },
     'POST /shop/chat/conversations/:id/messages': { clientId: `client-${fresh('x')}-0000`, body: 'سلام' },
     'PATCH /shop/chat/conversations/:id/messages/:mid': { body: 'ویرایش' },
+    'POST /shop/chat/conversations/:id/messages/:mid/edit': { body: 'ویرایش' },
     'POST /shop/chat/conversations/:id/receipts': { readUpTo: 1, deliveredUpTo: 1 },
     'POST /shop/chat/conversations/:id/reports': { reason: 'spam', note: 'آزمون' },
     'PUT /shop/catalog/products/:id/low': { location: 'shop_floor', lowMilli: 5000 },
