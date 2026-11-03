@@ -20,8 +20,14 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PromoRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -231,6 +237,8 @@ object PromoLive {
       while (isActive) {
         ensure(context)
         if (System.currentTimeMillis() - bound.triedAt > REFRESH_MS) refresh(context)
+        //  PRM-02: لغوهایی که بی اینترنت ماندند
+        if (!isDemo && pending(context).isNotEmpty()) flushReleases(context)
         delay(60_000)
       }
     }
@@ -288,27 +296,86 @@ object PromoLive {
   }
 
   /**
-   *  PRM-02 — پیش از ساختنِ فاکتور (`CartStore.post`، زیرِ قفلِ ثبت): کدهای اعمال‌شدهٔ سقف‌دار از سرور
-   *  گرفته می‌شوند. `null` ⇒ ثبت؛ پیام ⇒ ثبت نه و سبد سرِ جایش.
+   *  PRM-02 — پیش از ساختنِ فاکتور (`CartStore.post`، زیرِ قفلِ ثبت) در **هر** صندوق — گوشیِ نسخهٔ ۳ (`CheckoutRoute`)،
+   *  کامپیوتر (`DeskSale`)، `Sale` و `QuickSale`: کدهای اعمال‌شدهٔ سقف‌دار از سرور گرفته می‌شوند. `null` ⇒ ثبت؛ پیام ⇒ ثبت
+   *  نه و سبد سرِ جایش. قاعده (کدام کد، بی اینترنت، رد) در `TillSale.redeem`؛ این‌جا فقط حالِ دکان، وصل بودن و شبکه.
    *  ⛔ پرچمِ `redeem` خاموش، کلیدِ دکان خاموش (`outcome == null`) یا بی کدِ سقف‌دار ⇒ هیچ پرسشی، همان امروز.
    *  ⛔ بی پاسخِ سرور کدِ سقف‌دار پذیرفته نمی‌شود (`PromoRedeem.decide`)؛ کلیدِ همین سبد ⇒ زدنِ دوباره بی‌خطر.
    */
   suspend fun redeemGate(context: Context, saleKey: String, outcome: PromoEngine.Outcome?): String? {
     if (isDemo || outcome == null) return null
     val s = PromoEngine.forAccount(snap.value, account(context))
-    if (!s.redeem) return null
-    val codes = ir.vil3ntec.tohid.core.promo.PromoRedeem.capped(s.rules, outcome.codes)
-    if (codes.isEmpty()) return null
-    val offline = ir.vil3ntec.tohid.core.i18n.StrPos.couponNeedsOnline(codes.joinToString("، "))
-    if (!Backend.isReady(context)) return offline
-    val r = repository(context).redeem(saleKey, codes)
-    val f = (r as? ApiResult.Failure)?.error
-    return when (ir.vil3ntec.tohid.core.promo.PromoRedeem.decide(f == null, f?.status ?: 0, f?.code.orEmpty())) {
+    val out = ir.vil3ntec.tohid.data.TillSale.redeem(s.redeem, s.rules, outcome, online = { Backend.isReady(context) }) { codes ->
+      val f = (repository(context).redeem(saleKey, codes) as? ApiResult.Failure)?.error
+      ir.vil3ntec.tohid.data.TillSale.Reply(f == null, f?.status ?: 0, f?.code.orEmpty(), f?.userMessage)
+    }
+    when (out.decision) {
       //  شمارِ مصرف عوض شد ⇒ تازه‌سازیِ بعدیِ `Host` زودتر (کمتر از یک دقیقه)
-      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.GO -> { bound.triedAt = 0L; null }
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.GO -> bound.triedAt = 0L
       //  ظرفیتِ پر/کدِ خاموش ⇒ حالِ تازه تا سبد «تمام شد» را نشان دهد؛ پیامِ خودِ سرور (نام و دلیلِ کد)
-      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.REJECTED -> { refresh(context); f?.userMessage ?: offline }
-      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.UNREACHABLE -> offline
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.REJECTED -> refresh(context)
+      ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.UNREACHABLE, null -> Unit
+    }
+    return out.message
+  }
+
+  /* ── PRM-02: آزادِ خودکار با لغوِ فاکتور ─────────────────────────────── */
+
+  private const val RELEASE = "release-v1"
+  private val releaseLock = Mutex()
+  /** بیرون از صفحه: برگهٔ لغو پس از تأیید بسته می‌شود و کارِ شبکه نباید با آن بمیرد */
+  private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+  /** صفِ «حساب@دکان␉شناسهٔ فاکتور» ِ آزادنشده‌ها روی همین دستگاه (کهنه اول) */
+  private fun pending(context: Context): List<String> =
+    prefs(context).getString(RELEASE, null).orEmpty().split('\n').filter { it.isNotBlank() }
+
+  private fun savePending(context: Context, q: List<String>) {
+    prefs(context).edit().putString(RELEASE, q.joinToString("\n")).apply()
+  }
+
+  /**
+   *  PRM-02 — فاکتوری که لغو شد (برگهٔ «لغو» یا «اصلاحِ فاکتور» ِ نسخهٔ ۳): پس از نشستنِ لغو در دفتر، کدهای
+   *  سقف‌دارش در سرور آزاد می‌شوند تا ظرفیتِ کد برگردد. بی اینترنت در صفِ همین دستگاه می‌ماند و `Host` هر دقیقه
+   *  دوباره می‌فرستد. لغوی که ذخیره نشد (۳۰ ثانیه دفتر آن را لغوشده نشان نداد) چیزی آزاد نمی‌کند.
+   *  ⛔ دکانی که شمارشِ کد ندارد و فاکتوری که کدی ندارد هیچ پرسشی به سرور نمی‌فرستد (`PromoRedeem.releaseNeeded`).
+   */
+  fun releaseOnVoid(context: Context, store: ir.vil3ntec.tohid.data.ShopStore, sale: ir.vil3ntec.tohid.data.Sale) {
+    if (isDemo) return
+    val app = context.applicationContext ?: context
+    background.launch {
+      loadCache(app)
+      val key = account(app)
+      if (!ir.vil3ntec.tohid.core.promo.PromoRedeem.releaseNeeded(PromoEngine.forAccount(snap.value, key).redeem, sale.coupons)) return@launch
+      withTimeoutOrNull(30_000) {
+        store.data.first { d -> d.sales.any { it.id == sale.id && it.status == "cancelled" } }
+      } ?: return@launch
+      synchronized(this@PromoLive) {
+        savePending(app, ir.vil3ntec.tohid.core.promo.PromoRedeem.enqueue(pending(app), key + "\t" + sale.id))
+      }
+      flushReleases(app)
+    }
+  }
+
+  /** صفِ آزادنشده‌های همین حساب@دکان؛ نخستین «دوباره» می‌ایستد تا بارِ بعد */
+  suspend fun flushReleases(context: Context) = releaseLock.withLock {
+    if (isDemo || !Backend.isReady(context)) return@withLock
+    val key = account(context)
+    for (entry in pending(context)) {
+      val tab = entry.indexOf('\t')
+      if (tab < 0) { synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }; continue }
+      if (entry.substring(0, tab) != key) continue
+      val r = repository(context).release(entry.substring(tab + 1))
+      val f = (r as? ApiResult.Failure)?.error
+      when (ir.vil3ntec.tohid.core.promo.PromoRedeem.releaseDecision(f == null, f?.status ?: 0, f?.code.orEmpty())) {
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.RETRY -> return@withLock
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.DONE -> {
+          synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }
+          bound.triedAt = 0L // شمارِ مصرف عوض شد ⇒ تازه‌سازیِ بعدیِ `Host` زودتر
+        }
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.DROP ->
+          synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }
+      }
     }
   }
 

@@ -229,6 +229,22 @@ class PosLogicTest {
     assertEquals(listOf(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F9, shift = true)), ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_RETURN_MODE.keys)
   }
 
+  /** PAY-19: Shift+F8 = «کشو بی فروش» (`sale.drawer` از `keymap.json`)؛ F8 ِ تنها همان چاپِ دوباره */
+  @Test
+  fun `Shift+F8 کشو بی فروش است و F8 ِ تنها همان چاپِ دوباره`() {
+    assertTrue(PosKeys.noSaleDrawer(KeyName.F8, primary = false, shift = true, alt = false))
+    assertFalse(PosKeys.noSaleDrawer(KeyName.F8, primary = false, shift = false, alt = false))
+    assertEquals(PosAction.REPRINT, PosKeys.screen(KeyName.F8, primary = false))
+    //  پیرایه‌ها دقیق‌اند: Ctrl+Shift+F8 و Alt+Shift+F8 کشو را باز نمی‌کنند
+    assertFalse(PosKeys.noSaleDrawer(KeyName.F8, primary = true, shift = true, alt = false))
+    assertFalse(PosKeys.noSaleDrawer(KeyName.F8, primary = false, shift = true, alt = true))
+    assertFalse(PosKeys.noSaleDrawer(KeyName.F9, primary = false, shift = true, alt = false))
+    assertFalse(PosKeys.noSaleDrawer(null, primary = false, shift = true, alt = false))
+    //  کلید از `keymap.json` می‌آید و دیگر «planned» نیست (فقط صندوقِ کامپیوتر ⇒ partial)
+    assertEquals(listOf(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F8, shift = true)), ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_DRAWER.keys)
+    assertEquals(ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_DRAWER.status)
+  }
+
   @Test
   fun `کلیدهای کادر — Esc هرگز سبد را پاک نمی‌کند و + − Delete فقط با کادرِ خالی`() {
     assertEquals(PosAction.SUBMIT, PosKeys.field(KeyName.Enter, false, queryEmpty = false, hasMatches = true, hasSelection = false))

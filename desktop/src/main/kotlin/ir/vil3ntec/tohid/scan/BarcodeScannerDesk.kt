@@ -165,28 +165,6 @@ fun CameraScanner(
 private const val READY_TEXT = "آماده اسکن — بارکدخوان را روی کالا بگیرید"
 
 /**
- *  جلوگیری از اسکنِ تکراری — همان پنجرهٔ ۱۲۰۰ میلی‌ثانیه‌ای.
- *  (همان کلاسِ اندروید؛ این‌جا تکرار شده چون فایلِ اندروید دوربینِ
- *  CameraX را هم در خود دارد.)
- */
-class ScanGate(private val windowMs: Long = 1200) {
-  private var lastCode: String? = null
-  private var lastAt = 0L
-
-  fun accept(code: String, now: Long = System.currentTimeMillis()): Boolean {
-    if (code == lastCode && now - lastAt < windowMs) return false
-    lastCode = code
-    lastAt = now
-    return true
-  }
-
-  fun reset() {
-    lastCode = null
-    lastAt = 0
-  }
-}
-
-/**
  *  بوقِ اسکن روی بلندگوی کامپیوتر.
  *
  *  فایلِ `scan_beep.mp3`ِ گوشی را جاوا بی کتابخانه پخش نمی‌کند؛ پس همان

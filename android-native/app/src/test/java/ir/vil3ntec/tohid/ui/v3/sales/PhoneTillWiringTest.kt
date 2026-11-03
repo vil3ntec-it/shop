@@ -40,6 +40,29 @@ class PhoneTillWiringTest {
     assertTrue(src("ui/components/pos/LoyaltyBarAndroid.kt").contains("return points(context, till).post(r, by)"))
   }
 
+  /**
+   *  PRM-02 (دورِ ۸ ِ کمبودها): صندوقِ گوشیِ نسخهٔ ۳ فاکتور را بی گرفتنِ کدِ سقف‌دار از سرور ثبت می‌کرد ⇒ سقفِ کد از گوشی
+   *  دور زده می‌شد. حالا هر صندوقی که سبد را ثبت می‌کند (`.post(store`) همان دروازهٔ کامپیوتر را می‌دهد؛ رفتارِ خودِ
+   *  دروازه در `TillSaleRedeemTest`.
+   */
+  @Test
+  fun `هر صندوق، گوشیِ نسخهٔ ۳ هم، کدِ سقف‌دار را پیش از ثبت از همان دروازهٔ کامپیوتر می‌گذراند`() {
+    assertTrue(
+      "پرداختِ گوشی بی دروازهٔ کدِ سقف‌دار ثبت می‌کند",
+      checkout.contains("cart.post(store, gate = { key -> PromoLive.redeemGate(context, key, promo) })"),
+    )
+    val gated = Regex("""\.post\(store, gate = \{ key -> (ir\.vil3ntec\.tohid\.ui\.)?PromoLive\.redeemGate\(context, key, promo\) \}\)""")
+    val tills = listOf("ui/v3/sales/checkout/CheckoutRoute.kt", "ui/screens/DeskSale.kt", "ui/screens/Sale.kt", "ui/screens/QuickSale.kt")
+    for (rel in tills) {
+      val s = src(rel)
+      val posts = Regex("""\.post\(store\b""").findAll(s).count()
+      assertTrue("$rel سبد را ثبت نمی‌کند", posts > 0)
+      assertEquals("$rel: هر ثبتِ سبد با دروازهٔ کدِ سقف‌دار", posts, gated.findAll(s).count())
+    }
+    //  قاعده یک جاست: دروازهٔ برنامه فقط حال و شبکه را به `TillSale.redeem` می‌دهد
+    assertTrue(src("ui/PromoLive.kt").contains("ir.vil3ntec.tohid.data.TillSale.redeem(s.redeem, s.rules, outcome, online = { Backend.isReady(context) })"))
+  }
+
   @Test
   fun `یادداشتِ فاکتور کنارِ سبدِ گوشی است و رسید آن را و امتیاز را نشان می‌دهد`() {
     assertTrue(src("ui/v3/sales/cart/PhoneTillTools.kt").contains("InvoiceNoteButton(cart.note.collectAsState().value, lines.isNotEmpty()) { cart.setNote(it) }"))

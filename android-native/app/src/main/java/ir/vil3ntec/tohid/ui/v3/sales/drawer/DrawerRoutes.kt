@@ -35,6 +35,8 @@ private fun RouteScope.me(context: android.content.Context): String =
 fun RouteScope.DrawerRoute() {
   val context = LocalContext.current
   val staff = remember { ShopRole.isStaff(context) }
+  //  PAY-13: نمای کور = کارمند + شمارشِ کورِ روشنِ دکان (`ShopPolicy.blindCount`، پیش‌فرض روشن)
+  val blind = remember { ShopPolicy.blindHere(context) }
   //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم؛ خاموش ⇒ صندوقِ ساده
   val payV2 = remember { ShopPolicy.payV2(context) }
   val shift = remember(data) { CashShift.current(data) }
@@ -46,8 +48,8 @@ fun RouteScope.DrawerRoute() {
       shift = shift,
       totals = totals,
       payV2 = payV2,
-      blind = payV2 && staff,
-      expectedMinor = x?.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !staff) }?.expected?.get(PayFlow.CASH),
+      blind = payV2 && blind,
+      expectedMinor = x?.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !blind) }?.expected?.get(PayFlow.CASH),
       reportError = (x as? PayFlow.Outcome.Bad)?.let { PayFlow.message(it.problem) },
       skipped = x?.valueOrNull()?.skipped?.size ?: 0,
       history = remember(data) { CashShift.list(data).take(60) },
@@ -104,7 +106,8 @@ fun RouteScope.DrawerCloseRoute() {
   val shift = remember(data) { CashShift.current(data) }
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
   val payV2 = remember { ShopPolicy.payV2(context) }
-  val staff = remember { ShopRole.isStaff(context) }
+  //  PAY-13: بستنِ کور = کارمند + شمارشِ کورِ روشنِ دکان
+  val blind = remember { ShopPolicy.blindHere(context) }
   val me = remember { me(context) }
   if (!payV2) {
     DrawerCloseSheet(
@@ -133,15 +136,15 @@ fun RouteScope.DrawerCloseRoute() {
   var error by remember { mutableStateOf<String?>(null) }
   val x = remember(data, shift) { PayFlow.report(data, shift.open, null, System.currentTimeMillis()) }
   DrawerCountSheet(
-    blind = staff,
-    expectedMinor = x.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !staff) }?.expected?.get(PayFlow.CASH),
+    blind = blind,
+    expectedMinor = x.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !blind) }?.expected?.get(PayFlow.CASH),
     error = error,
     onSubmit = { counts, reason ->
-      when (val r = PayFlow.closeRow(data, shift.open, PayFlow.Count(counts, by = me, blind = staff, reason = reason), System.currentTimeMillis(), Ulid::next)) {
+      when (val r = PayFlow.closeRow(data, shift.open, PayFlow.Count(counts, by = me, blind = blind, reason = reason), System.currentTimeMillis(), Ulid::next)) {
         is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") StrSale.reasonOver50 else PayFlow.message(r.problem)
         is PayFlow.Outcome.Ok -> {
           val z = r.value.report
-          val notes = DrawerNotes.close(z.expected?.get(PayFlow.CASH) ?: 0, r.value.row.amount, z.variance?.get(PayFlow.CASH) ?: 0L, reason, me, blind = staff)
+          val notes = DrawerNotes.close(z.expected?.get(PayFlow.CASH) ?: 0, r.value.row.amount, z.variance?.get(PayFlow.CASH) ?: 0L, reason, me, blind = blind)
           val row = r.value.row.copy(date = todayIso(), notes = notes)
           //  زیرِ قفلِ نوشتن روی دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد گم نمی‌شود
           scope.launch {
@@ -216,7 +219,7 @@ fun RouteScope.DrawerXRoute() {
   else remember(data, shift) { DrawerNotes.unreceived(data, shift.open.createdAt, System.currentTimeMillis()) }
   //  حساب‌پی به تفکیکِ حسابِ گیرنده (نام و ۴ رقم از تاریخچهٔ سرور)
   val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
-  ShiftReportSheet(rep, staff, title = null,
+  ShiftReportSheet(rep, remember { ShopPolicy.blindHere(context) }, title = null,
     notes = listOfNotNull(DrawerModel.scannerLine(data, rep.openedAt, rep.at, seesMoney = !staff)) + DrawerNotes.unreceivedNotes(waiting) +
       DrawerModel.hesabPayLines(data, rep.openedAt, rep.at, known, seesMoney = !staff),
     onClose = { back() })
@@ -232,6 +235,6 @@ fun RouteScope.DrawerShiftRoute() {
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
   val z = shift.close?.z?.let { PayFlow.reportOf(it) }
   val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
-  if (z != null) ShiftReportSheet(z, staff, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)) + DrawerModel.hesabPayLines(data, z.openedAt, z.at, known, seesMoney = !staff), onClose = { back() })
+  if (z != null) ShiftReportSheet(z, remember { ShopPolicy.blindHere(context) }, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)) + DrawerModel.hesabPayLines(data, z.openedAt, z.at, known, seesMoney = !staff), onClose = { back() })
   else ShiftNotesSheet(shift, onClose = { back() })
 }

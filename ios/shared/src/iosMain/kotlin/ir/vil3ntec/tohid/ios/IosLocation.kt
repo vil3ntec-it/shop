@@ -1,9 +1,6 @@
 package ir.vil3ntec.tohid.ios
 
 import kotlinx.cinterop.useContents
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.suspendCancellableCoroutine
-import kotlinx.coroutines.withContext
 import platform.CoreLocation.CLLocation
 import platform.CoreLocation.CLLocationManager
 import platform.CoreLocation.CLLocationManagerDelegateProtocol
@@ -12,11 +9,14 @@ import platform.CoreLocation.kCLAuthorizationStatusAuthorizedWhenInUse
 import platform.CoreLocation.kCLAuthorizationStatusNotDetermined
 import platform.CoreLocation.kCLLocationAccuracyHundredMeters
 import platform.Foundation.NSError
+import platform.Foundation.NSThread
 import platform.darwin.NSObject
-import kotlin.coroutines.resume
+import platform.darwin.dispatch_get_main_queue
+import platform.darwin.dispatch_sync
 
 /*
- *  موقعیتِ آیفون (CoreLocation) پشتِ همان `data/DeviceLocation` ِ مشترک — فقط جایی که کدِ مشترک از پیش
+ *  موقعیتِ آیفون (CoreLocation) پشتِ همان `data/DeviceLocation` ِ اندروید (از گامِ ۷ خودِ فایلِ اندروید، با shim ِ
+ *  `android.location` ‎android/location/Location.kt‎) — فقط جایی که کدِ مشترک از پیش
  *  می‌خواهد (لوکیشنِ دکان F0-07 با رضایتِ صریح، پیک، ویترینِ نزدیک). فقط «هنگامِ استفاده» و یک‌باره
  *  (`requestLocation`)، نه دنبال‌کردنِ پیوسته و نه پس‌زمینه. همه روی رشتهٔ اصلی (قاعدهٔ CLLocationManager).
  */
@@ -47,18 +47,27 @@ internal object IosLocation {
     m.requestWhenInUseAuthorization()
   }
 
-  /** آخرین موقعیتِ دانسته (بی پرسیدن از سخت‌افزار) */
-  suspend fun last(): CLLocation? = withContext(Dispatchers.Main) { manager().location }
+  /**
+   *  آخرین موقعیتِ دانسته (بی پرسیدن از سخت‌افزار) — `LocationManager.getLastKnownLocation` ِ shim (‎android/location‎).
+   *  از هر رشته: کدِ مشترک آن را بیرون از رشتهٔ اصلی هم می‌خواهد (`LocationPing` در کارِ پس‌زمینه)، ولی مدیر فقط
+   *  روی رشتهٔ اصلی ساخته و خوانده می‌شود ⇐ گذرِ همگام به آن رشته (رشتهٔ اصلی هرگز منتظرِ این خواندن نمی‌ماند).
+   */
+  fun lastNow(): CLLocation? {
+    if (NSThread.isMainThread) return manager().location
+    var loc: CLLocation? = null
+    dispatch_sync(dispatch_get_main_queue()) { loc = manager().location }
+    return loc
+  }
 
-  /** یک موقعیتِ تازه؛ نشد ⇐ null (مهلت را فراخواننده می‌گذارد) */
-  suspend fun once(): CLLocation? = withContext(Dispatchers.Main) {
-    suspendCancellableCoroutine { cont ->
-      val m = manager()
-      val take: (CLLocation?) -> Unit = { loc -> if (cont.isActive) cont.resume(loc) }
-      waitingFix += take
-      cont.invokeOnCancellation { IosUi.onMain { waitingFix -= take } }
-      m.requestLocation()
-    }
+  /** یک موقعیتِ تازه برای `take` (شکست ⇐ `take(null)`)؛ فقط روی رشتهٔ اصلی. مهلت را صدازننده می‌گذارد */
+  fun requestFix(take: (CLLocation?) -> Unit) {
+    waitingFix += take
+    manager().requestLocation()
+  }
+
+  /** همان `take` دیگر خبر نگیرد (لغو یا `removeUpdates`)؛ فقط روی رشتهٔ اصلی */
+  fun dropFix(take: (CLLocation?) -> Unit) {
+    waitingFix -= take
   }
 
   fun CLLocation.latLng(): Pair<Double, Double> = coordinate.useContents { latitude to longitude }

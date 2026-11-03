@@ -35,6 +35,24 @@ object ShopPolicy {
     prefs(context).edit().putBoolean(PAY_V2, on).apply()
   }
 
+  /*
+   *  PAY-13 — «شمارشِ کور» ِ صندوقِ شیفت، انتخابِ دکان‌دار (تنظیمات › فروش و پرداخت › پرداخت). پیش‌فرض **روشن** =
+   *  همان رفتارِ پیشین: شاگرد در X، Z و بستن «مورد انتظار» و اختلاف را نمی‌بیند. خاموش ⇒ شاگرد هم می‌بیند. صاحب و
+   *  مدیر همیشه می‌بینند (`ShiftSlip.blind`). مثلِ همهٔ سیاست‌های این فایل روی همین دستگاه؛ صفحهٔ تنظیم فقط با
+   *  `settings.write` (شاگرد نمی‌تواند برای خودش خاموشش کند).
+   */
+  private const val BLIND_COUNT = "blind_count"
+
+  fun blindCount(context: Context): Boolean = prefs(context).getBoolean(BLIND_COUNT, true)
+
+  fun setBlindCount(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(BLIND_COUNT, on).apply()
+  }
+
+  /** نمای کورِ صندوق برای کاربرِ واردشده: کارمند **و** شمارشِ کورِ روشن */
+  fun blindHere(context: Context): Boolean =
+    ir.vil3ntec.tohid.core.pay.ShiftSlip.blind(ShopRole.isStaff(context), blindCount(context))
+
   /**
    *  گزارش‌های مشتری در «گزارش‌ها»ی کامپیوتر: سنِ بدهی، تحلیلِ خرید (RFM)، مشتریانِ
    *  تکراری و یادآوریِ امروز (CRM-04/06/10/14). پیش‌فرض **خاموش**: تا دکان‌دار خودش

@@ -86,12 +86,17 @@ class V3PortedFeaturesTest {
       val at = root.indexOf(gate)
       assertTrue(gate, at in 1 until call)
     }
-    assertTrue(src("ui/v3/settings/sections/AboutScreen.kt").contains("if (all) WhatsNewAll { all = false }"))
+    //  «دیدنِ همهٔ تغییرها» در «دربارهٔ برنامه» همان صفحهٔ «بیشتر» ← «تازه‌ها» را باز می‌کند
+    assertTrue(src("ui/v3/settings/sections/AboutScreen.kt").contains("onClick = { openWhatsNew(nav) }"))
     val pref = src("data/WhatsNewPrefAndroid.kt")
     assertTrue(pref.contains("const val DEFAULT_ON = true"))
-    assertTrue(pref.contains("getBoolean(KEY_ON, DEFAULT_ON)"))
-    //  نخستین اجرا هیچ نشان نمی‌دهد: نسخهٔ نصب‌شده «دیده‌شده» می‌شود
-    assertTrue(src("ui/screens/WhatsNewAndroid.kt").contains("if (seen == null) { WhatsNewPref.setSeen(context, WhatsNew.seenAfter(null, current)); emptyList() }"))
+    assertTrue(pref.contains("getBoolean(KEY_ON, true)"))
+    //  نخستین اجرا هیچ نشان نمی‌دهد (`WhatsNew.plan`: همه «دیده‌شده» همان دم، `WhatsNewTest`) و «فهمیدم» دیده‌شده را می‌نویسد
+    val boundary = src("ui/screens/WhatsNewAndroid.kt")
+    assertTrue(boundary.contains("plan.storeNow?.let { WhatsNewPref.setKeys(context, it) }"))
+    assertTrue(boundary.contains("WhatsNewPref.setKeys(context, WhatsNew.ack(sections, WhatsNewPref.keys(context)))"))
+    //  متن از `docs/WHATS-NEW-fa.md` ِ همراهِ برنامه، نه فهرستِ درونِ کد
+    assertTrue(boundary.contains("WhatsNew.bundled.sections"))
   }
 
   @Test

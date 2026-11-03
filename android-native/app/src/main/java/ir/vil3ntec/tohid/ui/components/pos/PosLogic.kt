@@ -255,6 +255,13 @@ object PosKeys {
   fun returnMode(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
     enabled && key != null && KeyMap.SALE_RETURN_MODE.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
 
+  /**
+   *  PAY-19 — «کشو بی فروش» (`sale.drawer`، Shift+F8 از `keymap.json`)، پیش از [screen]: بی آن Shift+F8 مثلِ F8
+   *  فاکتورِ آخر را دوباره نشان می‌داد. پیرایه‌ها دقیق‌اند (Ctrl/Alt نه).
+   */
+  fun noSaleDrawer(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean): Boolean =
+    key != null && KeyMap.SALE_DRAWER.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
+
   /** کادرِ اسکن/جست‌وجو */
   fun field(key: KeyName?, primary: Boolean, queryEmpty: Boolean, hasMatches: Boolean, hasSelection: Boolean): PosAction? = when (key) {
     KeyName.Enter -> if (!primary) PosAction.SUBMIT else null

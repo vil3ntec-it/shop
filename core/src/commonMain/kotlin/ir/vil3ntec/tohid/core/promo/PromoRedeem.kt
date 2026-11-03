@@ -53,4 +53,43 @@ object PromoRedeem {
     status == 400 -> Decision.REJECTED
     else -> Decision.UNREACHABLE
   }
+
+  // ── آزادِ خودکار با لغوِ فاکتور (PRM-02) ─────────────────────────────
+
+  /**
+   *  پس از لغوِ فاکتور باید از سرور آزاد کردنِ کدها خواسته شود؟ شمارشِ سرور در آخرین حالِ دکان روشن است
+   *  (`redeem`) یا خودِ فاکتور کدِ اعمال‌شده دارد (`Sale.coupons`، پرچمِ `shop.promo_stamp`). نه ⇒ هیچ پرسشی:
+   *  دکانی که سقفِ کد ندارد با هر لغو به سرور نمی‌رود.
+   */
+  fun releaseNeeded(redeemOn: Boolean, saleCoupons: List<String>): Boolean =
+    redeemOn || saleCoupons.any { it.isNotBlank() }
+
+  enum class Release {
+    /** آزاد شد، چیزی برای آزاد کردن نبود، یا شمارش در سرور خاموش است ⇒ از صف بیرون */
+    DONE,
+    /** هرگز با تلاشِ دوباره درست نمی‌شود (اجازه نیست، ورودیِ نادرست) ⇒ از صف بیرون، بی تکرارِ بی‌پایان */
+    DROP,
+    /** پاسخی نیامد، نشست تمام شد یا سرور نتوانست ⇒ در صف می‌ماند تا بارِ بعد */
+    RETRY,
+  }
+
+  /** پاسخِ `POST /redeem/release` ⇒ سرنوشتِ ردیفِ صف (`status` ۰ = پاسخی نرسید) */
+  fun releaseDecision(ok: Boolean, status: Int, code: String): Release = when {
+    ok -> Release.DONE
+    //  شمارش خاموش ⇒ سقفی شمرده نمی‌شود؛ روشن شدنِ دوباره ردیف‌های آزادنشدهٔ کهنه را می‌شمارد، ولی صف همیشگی نمی‌ماند
+    status == 403 && code == "promo_uses_disabled" -> Release.DONE
+    //  `release_not_allowed`/`permission_denied`: لغوکننده اجازهٔ آزاد کردن ندارد ⇒ کارِ صاحب یا مدیر، نه تکرارِ همین دستگاه
+    status == 403 || status == 400 || status == 404 -> Release.DROP
+    else -> Release.RETRY
+  }
+
+  /** سقفِ صفِ آزادنشده‌ها روی دستگاه — صفِ بی‌اینترنتِ طولانی هرگز بی‌اندازه بزرگ نمی‌شود */
+  const val MAX_PENDING = 200
+
+  /** افزودنِ یک ردیف به صف: بی تکرار (همان ردیف ته می‌رود)، سقفِ [MAX_PENDING] با بیرون رفتنِ کهنه‌ترین */
+  fun enqueue(queue: List<String>, entry: String): List<String> {
+    if (entry.isBlank()) return queue
+    val next = queue.filter { it != entry } + entry
+    return if (next.size > MAX_PENDING) next.takeLast(MAX_PENDING) else next
+  }
 }

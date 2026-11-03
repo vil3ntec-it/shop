@@ -46,6 +46,15 @@ class PromoRepository(private val api: ApiClient) {
     Unit
   }
 
+  /**
+   *  PRM-02 — آزاد کردنِ همهٔ کدهای سقف‌دارِ یک فاکتورِ لغوشده (`POST /redeem/release`، بی `codes` ⇒ همه).
+   *  همان فاکتور دوباره ⇒ `released: 0`، بی اثرِ دوم. خطا ⇒ `ApiFailure` (`PromoRedeem.releaseDecision`).
+   */
+  suspend fun release(saleId: String): ApiResult<Unit> = result {
+    api.post("$ROOT/redeem/release", buildJsonObject { put("saleId", saleId) })
+    Unit
+  }
+
   private companion object {
     const val ROOT = "/shop/promos"
     fun enc(s: String): String = URLEncoder.encode(s, "UTF-8")
