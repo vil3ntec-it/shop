@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.product.ProductSuggest
 import ir.vil3ntec.tohid.data.Supplier
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -89,15 +90,24 @@ internal fun ProductFieldGroups(
   section: FieldSection,
   mode: ProductFormModel.Mode,
   nameHelper: String? = null,
+  /** AI-06: دستهٔ پیشنهادی از نام (`rememberCategorySuggest`)؛ null ⇒ هیچ */
+  suggest: ((String) -> List<ProductSuggest.Pick>)? = null,
 ) {
   val strict = mode == ProductFormModel.Mode.NEW
   var newUnit by remember { mutableStateOf(false) }
+  //  فقط تا دسته خالی است؛ زدنِ تراشه همان انتخابِ دسته است
+  val picks = remember(row.name, row.category, suggest) {
+    if (suggest == null || row.category.isNotBlank()) emptyList() else suggest(row.name)
+  }
   section(StrProducts.groupMain) {
     V3TextField(
       row.name, { v -> hooks.onChange { it.copy(name = v) } }, StrProducts.name,
       modifier = Modifier.fillMaxWidth().field(Field.NAME, hooks),
       placeholder = StrProducts.namePlaceholder, helper = nameHelper, error = errors[Field.NAME]?.let(::problemText), required = true,
     )
+    V3Collapse(picks.isNotEmpty()) {
+      CategorySuggestions(picks) { cat -> hooks.onChange { it.copy(category = cat) } }
+    }
     Spacer(Modifier.height(14.dp))
     ChipGroup(StrProducts.category, errors[Field.CATEGORY], required = strict) {
       (categories + listOfNotNull(row.category.takeIf { it.isNotBlank() && it !in categories })).forEach { cat ->

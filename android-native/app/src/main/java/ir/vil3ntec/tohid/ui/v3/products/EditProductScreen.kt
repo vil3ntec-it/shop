@@ -86,6 +86,8 @@ internal fun EditProductScreen(
   var shake by remember { mutableIntStateOf(0) }
   val stagger = rememberV3Stagger(productId)
   val focus = remember { HashMap<String, FocusRequester>() }
+  //  AI-06: فقط وقتی دستهٔ کالا خالی است دیده می‌شود
+  val suggest = rememberCategorySuggest(data)
   val errors = ProductFormModel.errors(row, Mode.EDIT)
 
   val hooks = FieldHooks(
@@ -136,7 +138,7 @@ internal fun EditProductScreen(
       }
       val visible = touched.visible(0, errors)
       Column(Modifier.v3Shake(shake.takeIf { it > 0 }).v3Stagger(stagger, "fields", 0)) {
-        ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT)
+        ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT, suggest = suggest)
       }
       Column(Modifier.fillMaxWidth().padding(top = 8.dp).v3Stagger(stagger, "more", 1)) {
         CollapsibleHeader(StrProducts.groupMore, more) { more = !more }

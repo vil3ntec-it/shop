@@ -118,6 +118,10 @@ data class StorefrontConfigDto(
   val bulk: Boolean = false,
   /** M3: پرچمِ جدای لوگو و تصویرِ سر (`shop.storefront.media`)؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val media: Boolean = false,
+  /** WEB-24: برگهٔ «بنرها» (`shop.storefront.banners`)؛ خاموش یا سرورِ قدیمی کلید نمی‌فرستد ⇒ خاموش */
+  val banners: Boolean = false,
+  /** CHK-10: فهرستِ «خبرم کن» در «ارسال و زمان» (صاحب/مدیر + `shop.storefront.notify_area`)؛ نیامده ⇒ خاموش */
+  val notifyArea: Boolean = false,
   /** پرچمِ `shop.orders.subscribers_only`: سفارشِ آنلاینِ تازه فقط با اشتراکِ فعال؛ سرورِ قدیمی نمی‌فرستد ⇒ خاموش */
   val subscribersOnly: Boolean = false,
   /** اشتراکِ فعالِ همین لحظه به گفتهٔ سرور (دورهٔ آزمایشی نه) */

@@ -215,6 +215,9 @@ class SettingsHomeTest {
     assertTrue(SettingsLayout.GIFT_CARD in keys("ډالۍ"))
     //  غلطِ تایپی
     assertTrue(SettingsLayout.TAX_QUARTER in keys("مالیت"))
+    //  بخشِ A ِ پنهان (AI-06) فقط با جست‌وجو پیدا می‌شود
+    assertTrue(SettingsLayout.PRODUCT_SUGGEST in keys("پیشنهاد دسته"))
+    assertTrue(SettingsLayout.PRODUCT_SUGGEST in keys("suggest category"))
     //  «قابلیت‌ها» و دسته‌ها هم پیدا می‌شوند
     assertTrue(SettingsSearchIndex.FEATURES_KEY in keys("قابلیت"))
     assertEquals(SettingsLayout.SHOP, keys("دکان و امنیت").first())

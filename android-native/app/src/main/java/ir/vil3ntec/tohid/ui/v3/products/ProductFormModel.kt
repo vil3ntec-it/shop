@@ -167,6 +167,17 @@ object ProductFormModel {
     return if (buy >= 0 && sell >= 0) sell - buy else null
   }
 
+  /**
+   *  «افزودن از متن» (AI-06): هر نام یک ردیفِ تازه فقط با همان نام (کلیدها از [firstKey])؛ قیمت، دسته، واحد و
+   *  بارکد خالی می‌مانند تا کاربر بنویسد/برگزیند. ردیفِ کاملاً خالی (بی دسته و واحد هم) جایش را می‌دهد؛ هر ردیفِ
+   *  دیگر سرِ جایش می‌ماند.
+   */
+  fun withPasted(rows: List<ProductRowDraft>, names: List<String>, firstKey: Int): List<ProductRowDraft> {
+    if (names.isEmpty()) return rows
+    val kept = rows.filterNot { untouched(it) && it.category.isBlank() && it.unit.isBlank() }
+    return kept + names.mapIndexed { i, n -> ProductRowDraft(key = firstKey + i, name = n) }
+  }
+
   /** تکثیرِ ردیف — بی بارکد (بارکد یکتاست) */
   fun duplicate(r: ProductRowDraft, key: Int): ProductRowDraft = r.copy(key = key, barcode = "")
 

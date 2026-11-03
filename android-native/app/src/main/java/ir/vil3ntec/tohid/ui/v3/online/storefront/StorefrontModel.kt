@@ -7,7 +7,7 @@ import ir.vil3ntec.tohid.data.repo.StorefrontProductDto
 
 /**
  *  حالتِ خالصِ صفحهٔ ویترین (آزمون: `StorefrontModelTest`): کدام برگه‌ها (`ارسال و زمان` فقط با پرچمِ
- *  جدای `zones` ِ سرور)، برگهٔ آغاز از پیوند، فیلترِ کالاها و متنِ قیمت — همان قاعده‌های صفحهٔ پیشین.
+ *  جدای `zones` ِ سرور، «بنرها» فقط با `banners` و اجازهٔ مدیریت)، برگهٔ آغاز از پیوند، فیلترِ کالاها و متنِ قیمت — همان قاعده‌های صفحهٔ پیشین.
  */
 object StorefrontModel {
   const val STATUS = "status"
@@ -15,15 +15,18 @@ object StorefrontModel {
   const val PRODUCTS = "products"
   const val MARKET = "market"
   const val DELIVERY = "delivery"
+  /** WEB-24: فقط با `config.banners` (پرچمِ `shop.storefront.banners`) و فقط صاحب/مدیر */
+  const val BANNERS = "banners"
 
   /** برگه‌هایی که بی ویترینِ ساخته‌شده معنا ندارند ⇒ «اول ویترین را بسازید» */
-  val NEEDS_SETTINGS = setOf(STATUS, PRODUCTS, DELIVERY)
+  val NEEDS_SETTINGS = setOf(STATUS, PRODUCTS, DELIVERY, BANNERS)
 
   fun tabs(config: StorefrontConfigDto?): List<String> =
-    listOf(STATUS, SETTINGS, PRODUCTS, MARKET) + if (config?.zones == true) listOf(DELIVERY) else emptyList()
+    listOf(STATUS, SETTINGS, PRODUCTS, MARKET) + (if (config?.zones == true) listOf(DELIVERY) else emptyList()) +
+      if (config?.banners == true && config.permissions.manage) listOf(BANNERS) else emptyList()
 
   fun initialTab(query: String?, config: StorefrontConfigDto?): String =
-    query?.takeIf { it in tabs(config) || (it == DELIVERY && config == null) } ?: STATUS
+    query?.takeIf { it in tabs(config) || (it in setOf(DELIVERY, BANNERS) && config == null) } ?: STATUS
 
   fun label(tab: String): String = when (tab) {
     STATUS -> StrOnline.sfTabStatus
@@ -31,6 +34,7 @@ object StorefrontModel {
     PRODUCTS -> StrOnline.sfTabProducts
     MARKET -> StrOnline.sfTabMarket
     DELIVERY -> StrOnline.sfTabDelivery
+    BANNERS -> StrOnline.sfTabBanners
     else -> tab
   }
 

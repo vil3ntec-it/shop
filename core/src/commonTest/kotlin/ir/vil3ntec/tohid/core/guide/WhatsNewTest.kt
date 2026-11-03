@@ -28,6 +28,24 @@ class WhatsNewTest {
     assertTrue(WhatsNew.ALL.isNotEmpty())
   }
 
+  /**
+   *  «هیچ قابلیتی بی‌صدا حذف نمی‌شود»: دستهٔ ۱۳ شکلِ قدیمِ برنامه و کلیدِ «رابطِ تازه (نسخهٔ ۳)» را
+   *  برداشت (تصمیمِ صاحب‌کار «شکلِ قدیم هرگز») ⇒ یادداشتِ «برداشته‌شده» با «به‌جایش»، اولِ همان نسخه.
+   */
+  @Test
+  fun legacyLookRemovalIsAnnouncedWithWhereToGoNow() {
+    val n = WhatsNew.ALL.single { it.id == "v3.legacy-look-removed" }
+    assertEquals(Kind.REMOVED, n.kind)
+    assertEquals("2.14.5", n.version)
+    val instead = n.instead
+    assertTrue(instead != null && listOf(instead.fa, instead.en, instead.ps).all { it.isNotBlank() })
+    assertTrue(n.text.fa.contains("شکلِ قدیم") && n.text.fa.contains("رابطِ تازه"), n.text.fa)
+    //  به‌روزرسانی از ۲.۱۴.۴ ⇒ همین یادداشت اول دیده می‌شود (برداشته‌شده پیش از تازه)
+    assertEquals("v3.legacy-look-removed", WhatsNew.pending(WhatsNew.ALL, "2.14.4", "2.14.5.1400").first().id)
+    //  دری همان فارسی با لایهٔ واژه (`GuideText.of("prs")`)، خالی نه
+    assertTrue(n.text.of("prs").isNotBlank() && instead!!.of("prs").isNotBlank())
+  }
+
   @Test
   fun buildNumberAndSuffixAreIgnored() {
     assertEquals(listOf(2, 14, 5), WhatsNew.base("2.14.5.1234-preview"))

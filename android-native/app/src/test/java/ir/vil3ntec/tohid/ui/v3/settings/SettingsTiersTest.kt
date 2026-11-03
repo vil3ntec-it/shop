@@ -204,6 +204,7 @@ class SettingsTiersTest {
       SettingsLayout.COUNT_TOOLS to listOf("data/CountToolsAndroid.kt" to "TOOLS"),
       SettingsLayout.SHRINK_REPORT to listOf("data/ShrinkReportAndroid.kt" to "KEY"),
       SettingsLayout.CHAT_GUARD to listOf("data/ShopPolicy.kt" to "CHAT_MEDIA_GUARD"),
+      SettingsLayout.PRODUCT_SUGGEST to listOf("data/ProductSuggestPrefAndroid.kt" to "KEY"),
     )
 
     /** B ⇐ کلیدهای روشن/خاموشِ هر بخش (پیش‌فرض باید `false` بماند) */

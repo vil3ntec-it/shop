@@ -181,6 +181,7 @@ class SettingsPortTest {
       SettingsLayout.COUNT_TOOLS to "settings/goods/stock-count",
       SettingsLayout.LABEL_TOOLS to "settings/goods/labels",
       SettingsLayout.PRODUCT_INFO to "settings/goods/product-info",
+      SettingsLayout.PRODUCT_SUGGEST to "settings/goods/product-suggest",
       SettingsLayout.POS_SEARCH to "settings/sales/smart-search",
       SettingsLayout.POS_PRICE_CHECK to "settings/sales/price-check",
       SettingsLayout.POS_TOUCH to "settings/sales/touch-mode",
@@ -291,7 +292,7 @@ class SettingsPortTest {
       "PosSearchPrefs.set", "PosPriceCheckPrefs.set", "PosTouchPrefs.setOn", "PosMoreKeysPrefs.set", "KeyHelpPref.set", "TillUser.set", "ReportKeysPref.setOn", "DocGapsPref.setOn",
       "LinePolicyPrefs.setOn", "LinePolicyPrefs.setDirection", "LinePolicyPrefs.setFreeLineCapMinor",
       "ReturnPolicyPrefs.setDays", "ReturnPolicyPrefs.setBlocked", "PosNotesPrefs.set", "PosNotesPrefs.setTemplates",
-      "AutoFeesPref.set", "SimpleAskPref.set", "EasySetupPref.set", "ScanCashPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
+      "AutoFeesPref.set", "SimpleAskPref.set", "ProductSuggestPref.set", "EasySetupPref.set", "ScanCashPref.set", "TrainingPref.setOn", "TrainingPref.setStaff",
       //  S03/S05/S22 — ثبتِ سریع، واحدِ بزرگ و «بستهٔ کامل»؛ «منقضی فقط با مجوز» و روزِ هشدار
       "TillGoodsPref.setQuickRegister", "TillGoodsPref.setUnits", "TillGoodsPref.setWholePacks", "ExpiryPref.setApproval", "ExpiryPref.setNearDays",
     )
