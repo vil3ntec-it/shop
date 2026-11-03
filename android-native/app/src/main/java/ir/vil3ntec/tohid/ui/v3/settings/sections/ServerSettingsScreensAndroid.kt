@@ -76,10 +76,12 @@ internal fun rememberServerSections(): Set<String> {
   val api = rememberSettingsApi(ownerOnly = false)
   val eta = storefrontEtaRow(api)
   val promo = promoGuardRow(api)
+  val online = onlineOrdersRow(api)
   return buildSet {
     if (report) add(SettingsLayout.OWNER_REPORT)
     if (eta) add(SettingsLayout.STOREFRONT_ETA)
     if (promo) add(SettingsLayout.PROMO_GUARD)
+    if (online) add(SettingsLayout.ONLINE_ORDERS)
   }
 }
 

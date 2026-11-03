@@ -1,0 +1,17 @@
+{
+  "ps.title": "Payment",
+  "ps.s.awaiting_accept": "Waiting for the seller to accept. After that you choose here how to pay {a}.",
+  "ps.s.awaiting_choice": "The seller accepted your order. Please choose how to pay {a}.",
+  "ps.s.cash.delivery": "Payment: cash on delivery — {a}",
+  "ps.s.cash.pickup": "Payment: cash at pickup — {a}",
+  "ps.s.online_pending": "Online payment in progress; this page updates by itself.",
+  "ps.s.paid_online": "Paid (HesabPay) — {a}",
+  "ps.s.cash_collected": "Cash received — {a}",
+  "ps.s.cash_settled": "Cash received — {a}",
+  "ps.s.refunded": "The money for this order was refunded.",
+  "ps.s.closed": "This order is closed; no payment is needed.",
+  "ps.cash.delivery": "I'll pay cash on delivery",
+  "ps.cash.pickup": "I'll pay cash at pickup",
+  "ps.cash.done": "Payment method saved: cash",
+  "ps.online": "Or pay online now with “Pay with HesabPay”."
+}

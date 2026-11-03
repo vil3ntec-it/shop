@@ -36,6 +36,7 @@ const audit = require('../lib/audit');
 const erasure = require('../lib/customer-erasure');
 const { phoneKey } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
+const flow = require('../lib/order-flow');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { notFound, ApiError } = require('../middleware/errors');
@@ -310,7 +311,10 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   const orderId = await sf.orderIdOfLink(req.store, req.params.token);
   await pay.refreshOrder(req.store.shop_id, orderId);
   const order = await sf.track(req.store, req.params.token);
-  order.onlinePay = { available: await pay.orderPayable(req.store.shop_id, orderId) };
+  //  «پرداخت پس از پذیرش» (lib/order-flow): پیش از قبول یا پس از فاکتورِ نقدی دکمه نیست؛ کارتِ «پرداخت» فقط با تنظیمِ روشن
+  const flowView = await flow.trackView(req.store.shop_id, orderId);
+  order.onlinePay = { available: !flowView.blocked && await pay.orderPayable(req.store.shop_id, orderId) };
+  if (flowView.step !== undefined) order.paymentStep = { ...flowView.step, online: order.onlinePay.available };
   //  NTF-08: پیگیریِ بازپرداخت — فقط با پرچمِ `shop.orders.refund_tracking` (خاموش ⇒ کلید نیست)
   const refund = await require('../lib/order-refund-view').viewOf(req.store.shop_id, orderId);
   if (refund !== undefined) order.refund = refund;
@@ -341,6 +345,7 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
 router.post('/:slug/orders/:token/pay', checkoutLimit, store, async (req, res) => {
   await sf.track(req.store, req.params.token);   // توکنِ درست و سفارشِ همین ویترین — وگرنه ۴۰۴
   const orderId = sf.orderIdOf(req.store.shop_id, req.params.token);
+  await flow.guardOnlinePay(req.store.shop_id, orderId);   //  ۴۰۹ `order_not_accepted` / `order_invoiced`
   const base = String(config.serverUrl || '').trim().replace(/\/+$/, '');
   const page = base ? `${base}/store/${encodeURIComponent(req.store.slug)}`
     : `https://${req.store.slug}.${config.storefront.domain}/`;

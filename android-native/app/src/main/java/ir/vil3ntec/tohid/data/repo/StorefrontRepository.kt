@@ -152,6 +152,8 @@ data class StorefrontSettingsDto(
   val closedDates: List<String> = emptyList(),
   val presenceMode: String = "auto",
   val declaredUntil: Long? = null,
+  /** «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، `lib/order-flow.js`)؛ سرورِ پیشین ⇒ خاموش */
+  val payAfterAccept: Boolean = false,
   val updatedAt: Long = 0,
 )
 

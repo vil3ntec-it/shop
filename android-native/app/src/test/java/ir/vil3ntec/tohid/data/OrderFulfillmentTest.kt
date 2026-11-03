@@ -149,6 +149,56 @@ class OrderFulfillmentTest {
   }
 
   @Test
+  fun `«به فاکتور» پیش از تحویل ⇒ همان فروشِ تحویل با زمانِ «فاکتور شد»؛ دو دستگاه و تحویلِ بعدی فاکتورِ دوم نمی‌سازند`() {
+    //  سفارشِ ارسالیِ «بسته‌شده» با رویدادِ «فاکتور شد» ِ سرور (`POST /shop/orders/:id/invoice`)
+    val invoiceAt = 7_000L
+    val packed = order(fulfillment = "delivery", status = "packed", discountMinor = 0, events = listOf(
+      OrderEventDto(kind = "status", fromStatus = "picking", toStatus = "packed", at = 6_000L),
+      OrderEventDto(kind = "note", fromStatus = "packed", toStatus = "packed", at = invoiceAt,
+        detail = ir.vil3ntec.tohid.core.model.OrderEventDetailDto(type = "invoice")),
+    ))
+    assertEquals(invoiceAt, OrderFulfillment.invoicedAt(packed))
+    assertEquals(9_999L, OrderFulfillment.invoicedAt(packed.copy(invoice = ir.vil3ntec.tohid.core.model.OrderInvoiceDto("o-01ORDER", 9_999L))))
+    assertNull(OrderFulfillment.invoicedAt(order()))
+    val base = ledger()
+    val a = ok(OrderFulfillment.fulfill(base, packed, "2026-10-19", invoiceAt, seller = "x")).data
+    val sale = a.sales.single()
+    assertEquals("o-01ORDER", sale.id)
+    assertEquals("O", sale.series)
+    assertEquals(12, sale.invoiceNumber)
+    assertEquals(185.5, sale.finalTotal, 1e-9)
+    assertEquals("نقدِ ارسال تا تسویهٔ پیک امانت است", "courier", sale.payments!!.single().custody)
+    assertEquals(8.5, ShopStore.stock(a, "p1"), 1e-9)
+    //  دو بار زدن ⇒ پیش‌تر ثبت شده
+    assertEquals(OrderFulfillment.Result.Already("o-01ORDER"), OrderFulfillment.fulfill(a, packed, "2026-10-19", invoiceAt))
+    //  دستگاهِ دوم با همان «فاکتور شد» ⇒ همان ردیف‌ها؛ پس از همگام‌سازی یک فاکتور و یک بار کسر
+    val b = ok(OrderFulfillment.fulfill(base.copy(nextInvoiceNo = 40), packed, "2026-10-19", invoiceAt, seller = "x")).data
+    assertEquals(a.sales, b.sales)
+    assertEquals(a.saleItems, b.saleItems)
+    val merged = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(a), LedgerDiff.diff(LedgerDiff.shadowOf(base), LedgerDiff.toJson(b))))
+    assertEquals(1, merged.sales.size)
+    assertEquals(8.5, ShopStore.stock(merged, "p1"), 1e-9)
+    //  پیک بُرد ⇒ تحویل همان فروش را «پیش‌تر ثبت شده» می‌بیند (موجودی دوباره کم نمی‌شود)
+    val sent = packed.copy(status = "out_for_delivery", events = packed.events +
+      OrderEventDto(kind = "status", fromStatus = "packed", toStatus = "out_for_delivery", at = 8_000L))
+    assertFalse(OrderFulfillment.needsSale(a, sent, since = 0L))
+    assertEquals(OrderFulfillment.Result.Already("o-01ORDER"), OrderFulfillment.fulfill(a, sent, "2026-10-19", 8_000L, allowShortage = true))
+  }
+
+  @Test
+  fun `سفارشِ فاکتورشده که پیش از بیرون رفتن لغو شد ⇒ لغوِ همان فروش و برگشتِ موجودی؛ بی فاکتور هیچ`() {
+    val packed = order(fulfillment = "delivery", status = "packed", events = emptyList())
+    val base = ok(OrderFulfillment.fulfill(ledger(), packed, "2026-10-19", 7_000L)).data
+    val cancelled = packed.copy(status = "cancelled")
+    assertTrue("cancelled" in OrderFulfillment.BACK_IN_SHOP)
+    assertTrue(OrderFulfillment.needsReverse(base, cancelled))
+    val back = (OrderFulfillment.reverse(base, cancelled, "2026-10-19", 7_500L) as OrderFulfillment.Result.Ok).data
+    assertEquals("cancelled", back.sales.single().status)
+    assertEquals(10.0, ShopStore.stock(back, "p1"), 1e-9)
+    assertFalse("بی فاکتور ⇒ هیچ", OrderFulfillment.needsReverse(ledger(), cancelled))
+  }
+
+  @Test
   fun `پس از تحویل (کالا رفته) کمبود رد نمی‌کند — ثبت با موجودیِ منفی و گزارشِ کمبود (INV-19)`() {
     val r = ok(OrderFulfillment.fulfill(ledger(riceUnits = 1.0), order(), "2026-10-19", 1L, allowShortage = true))
     assertEquals(1, r.short.size)

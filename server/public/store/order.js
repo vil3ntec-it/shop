@@ -1,7 +1,8 @@
 /*
  * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
  * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
- * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار.
+ * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار؛ «پرداخت پس از پذیرش» در
+ * `pay-step.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
  * سقف بماند (WEB-15، §۳.۱۰)؛ مسیر و نخستین خواندنِ سفارش در store.js، پیگیریِ زنده و برگهٔ خطا همین‌جا.
  *
@@ -305,6 +306,17 @@
       else if (st === 'failed' && can) K.note($('o-paynote'), 'warn', t('od.pay.failed'));
       else $('o-paynote').hidden = true;
       $('o-pay').onclick = function () { payOnline(token, true); };
+      renderPayStep(o, token);
+    }
+
+    //  «پرداخت پس از پذیرش» (lib/order-flow): کارتِ «پرداخت» با «نقد هنگامِ تحویل/برداشت» — store/pay-step.js فقط وقتی
+    //  پیگیری کلیدِ `paymentStep` را داد (تنظیمِ خاموشِ دکان ⇒ نه اسکریپت، نه واژه‌نامه، نه گره)؛ حساب‌پی همان `#o-pay`
+    var payStep = null;
+    function renderPayStep(o, token) {
+      if (!o.paymentStep) { if ($('o-ps')) $('o-ps').hidden = true; return; }
+      payStep = payStep || K.js('/store/pay-step.js').then(function () { return window.StorePayStep({ api: api, show: renderOrder }); })
+        .catch(function () { payStep = null; return null; });
+      payStep.then(function (f) { if (f) f.render(o, token); });
     }
 
     function payOnline(token, retry) {

@@ -61,6 +61,8 @@ router.get('/config', async (req, res) => {
     : await ledger.sinceOf(req.shopId);
   res.json({
     ...st,
+    //  «چرا سفارش نمی‌رسد؟» — هر دروازهٔ میانِ ویترین و این برنامه با کد و «چه کسی درستش می‌کند» (lib/order-arrival)
+    arrival: await require('../lib/order-arrival').arrivalOf(req.shopId),
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
     //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
@@ -187,6 +189,8 @@ router.get('/:id', needFlag, async (req, res) => {
   order.refund = await refunds.summary(req.shopId, order.id);
   //  ORD-14: آخرین پیشنهاد/ویرایش — فقط با پرچمِ `shop.orders.amend` (خاموش ⇒ همان پاسخِ پیشین)
   if (await amend.flagOf(req.shopId)) order.amendment = await amend.staffOf(req.shopId, order.id);
+  //  «فاکتور شد» و حالِ پرداخت («پرداخت پس از پذیرش»، مهاجرتِ ۲۱۰) — lib/order-flow
+  Object.assign(order, await require('../lib/order-flow').staffView(req.shopId, order));
   res.json({ order });
 });
 

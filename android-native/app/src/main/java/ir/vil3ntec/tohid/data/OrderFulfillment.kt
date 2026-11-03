@@ -64,8 +64,11 @@ object OrderFulfillment {
     "refunded_partial",
   )
 
-  /** کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود — همان `BACK_IN_SHOP` ِ سرور */
-  val BACK_IN_SHOP: Set<String> = setOf("returned_to_store", "restocked")
+  /**
+   *  کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود — همان `BACK_IN_SHOP` ِ سرور. `cancelled`: سفارشی که پیش از
+   *  بیرون رفتن «به فاکتور» خورد (`OrderInvoice`، از «بسته شد») و بعد لغو شد؛ بی فروشِ زنده هیچ ([needsReverse]).
+   */
+  val BACK_IN_SHOP: Set<String> = setOf("returned_to_store", "restocked", "cancelled")
 
   const val CHANNEL = "online"
   /** سریِ فاکتورِ تحویلِ سفارش — هیچ دستگاهی آن را نمی‌گیرد (`doc-series.LETTERS` بی O) */
@@ -88,6 +91,13 @@ object OrderFulfillment {
     val legacy = legacySaleIdOf(orderId)
     return d.sales.firstOrNull { it.orderId == orderId || it.id == mine || it.id == legacy }
   }
+
+  /**
+   *  «فاکتور شد» ِ سرور (`POST /shop/orders/:id/invoice`، رویدادِ `note` ِ `invoice`) — زمانِ فروشِ همین سفارش بر هر
+   *  دستگاه، تا فاکتورِ زودتر از تحویل و فروشِ تحویلِ دستگاهِ دیگر همان ردیف‌ها باشند. نزده ⇒ null.
+   */
+  fun invoicedAt(o: OrderDto): Long? =
+    o.invoice?.at?.takeIf { it > 0 } ?: o.events.lastOrNull { it.kind == "note" && it.detail.type == "invoice" }?.at
 
   /** نخستین گذارِ تحویل (زمانِ سرور) — از فهرستِ `handover` یا خطِ زمانیِ سفارش */
   fun handedOverAt(o: OrderDto): Long? =

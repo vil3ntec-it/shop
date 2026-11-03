@@ -23,6 +23,8 @@ function settingsView(sf, status = null) {
     closedDates: asJson(sf.closed_dates, []),
     presenceMode: sf.presence_mode || 'auto',
     declaredUntil: sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until),
+    //  «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، `lib/order-flow.js`) — تنظیمِ خصوصیِ دکان، نه نمای عمومی
+    payAfterAccept: sf.pay_after_accept === true,
     updatedAt: Number(sf.updated_at),
   };
 }
@@ -145,6 +147,10 @@ async function saveSettings(shopId, body, userId) {
         JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
         v.delivery_fee_minor, v.min_order_minor, userId || '', at]
     ).then(() => require('./market-changes').record(c, shopId, { entity: 'shop', kind: cur ? 'update' : 'create', state: v, at }));   //  S6: همان تراکنش
+    //  مهاجرتِ ۲۱۰: جدا از `v` تا به دفترِ تغییرهای بازار (S6) نرود
+    if (has('payAfterAccept')) {
+      await c.query('UPDATE storefronts SET pay_after_accept = $2 WHERE shop_id = $1', [shopId, bool(b.payAfterAccept, 'پرداخت پس از پذیرش')]);
+    }
     //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
     if (has('timezone') || has('weeklyHours') || has('closedDates')) {
       await recordEvent(c, shopId, {

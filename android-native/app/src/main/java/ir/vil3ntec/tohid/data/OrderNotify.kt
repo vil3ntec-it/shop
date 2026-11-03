@@ -115,7 +115,8 @@ object OrderNotify {
     fresh.forEach { show(context, it) }
   }
 
-  private fun allowed(context: Context): Boolean =
+  /** اجازهٔ اعلانِ همین برنامه (اندروید ۱۳ به بعد) — تنظیماتِ «سفارشِ آنلاین» هم همین را می‌گوید */
+  fun allowed(context: Context): Boolean =
     Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
       ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
       PackageManager.PERMISSION_GRANTED

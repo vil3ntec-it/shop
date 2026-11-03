@@ -69,8 +69,11 @@ const OUT_OF_SHOP = Object.freeze([
   'picked_up', 'out_for_delivery', 'delivered', 'delivery_failed', 'retry_scheduled', 'return_requested',
   'refunded_partial',
 ]);
-/** کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود */
-const BACK_IN_SHOP = Object.freeze(['returned_to_store', 'restocked']);
+/**
+ * کالا به دکان برگشت ⇒ فروشِ تحویل لغو می‌شود. `cancelled`: سفارشی که پیش از بیرون رفتن «به فاکتور» خورد
+ * (`lib/order-flow.claimInvoice`، از «بسته شد») و بعد لغو شد — کالا هرگز نرفت. بی فروشِ زندهٔ `o-…` هیچ.
+ */
+const BACK_IN_SHOP = Object.freeze(['returned_to_store', 'restocked', 'cancelled']);
 const MAX_PENDING = 50;
 /** کلیدِ کفِ هر دکان در «تنظیماتِ زنده» (scope = شناسهٔ دکان) */
 const FLOOR_KEY = 'shop.orders.handover_floor';
