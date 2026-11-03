@@ -48,6 +48,7 @@ const FREE = [
     'POST /shop/catalog/transfers', 'POST /shop/catalog/transfers/:id/receive', 'POST /shop/catalog/transfers/:id/reject',
     'POST /shop/images/select', 'POST /shop/images', 'POST /shop/images/:id/versions', 'PUT /shop/images/:id/v/:version/:size',
     'POST /shop/images/:id/propose', 'POST /shop/images/:id/report', 'POST /shop/images/:id/process',
+    'POST /shop/images/changes', 'POST /shop/images/changes/:id/rollback',
     'PUT /shop/promos/settings', 'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
     'POST /shop/promos/redeem', 'POST /shop/promos/redeem/release',
     'POST /shop/order-notify/:id/ack']],
