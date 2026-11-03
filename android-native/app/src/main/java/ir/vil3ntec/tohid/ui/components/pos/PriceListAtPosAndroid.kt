@@ -16,6 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.sale.PriceList
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -81,7 +82,7 @@ fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.Car
   FilterChip(
     selected = state.list == PriceList.WHOLESALE,
     onClick = { state = PriceList.toggle(state) },
-    label = { Text(if (state.list == PriceList.WHOLESALE) "لیستِ قیمت: عمده" else "لیستِ قیمت: خرده") },
+    label = { Text(if (state.list == PriceList.WHOLESALE) StrPos.priceListWholesaleChip else StrPos.priceListRetailChip) },
     modifier = modifier.padding(bottom = 6.dp),
   )
 }

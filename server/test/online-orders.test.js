@@ -462,6 +462,13 @@ test('برگه‌ها، شمارش‌ها، کارت و صفحه‌بندی', as
   assert.ok(card.createdAt > 0);
   assert.deepEqual(card.next, ['accepted', 'rejected', 'cancelled_by_customer']);
   assert.equal(card.lines, undefined, 'کارت سبک است؛ ردیف‌ها در جزئیات');
+  //  «سفارش‌های آنلاین» ِ برنامه: نامِ تا سه قلمِ نخست به ترتیبِ ثبت — فقط نام، نه قیمت و تعداد
+  assert.deepEqual(card.itemsPreview, ['برنج', 'نوشابه']);
+  assert.ok(p1.items.every((x) => Array.isArray(x.itemsPreview) && x.itemsPreview.length === 2));
+  const many4 = await mk({ lines: ['آرد', 'شکر', 'چای', 'روغن'].map((name) => ({ name, qtyMilli: 1000, unitPriceMinor: 100 })) });
+  const listed = (await h.get('/api/shop/orders?tab=new&limit=50', { token: a.token })).body.items.find((x) => x.id === many4.id);
+  assert.deepEqual(listed.itemsPreview, ['آرد', 'شکر', 'چای']);
+  assert.equal(listed.itemsCount, 4);
 
   const schList = (await h.get('/api/shop/orders?tab=scheduled', { token: a.token })).body;
   assert.deepEqual(schList.items.map(x => x.id), [sch.id]);

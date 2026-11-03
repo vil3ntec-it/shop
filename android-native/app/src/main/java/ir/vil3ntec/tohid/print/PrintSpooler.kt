@@ -124,6 +124,8 @@ object PrintSpooler {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
   private val wake = Channel<Unit>(Channel.CONFLATED)
   private val firstTry = ConcurrentHashMap<String, CompletableDeferred<String?>>()
+  /** پایانِ کار در صف: `true` چاپ شد، `false` کنار گذاشته شد (چاپِ چندتکهٔ تاریخچه، `PeriodPrint`) */
+  private val lastTry = ConcurrentHashMap<String, CompletableDeferred<Boolean>>()
 
   @Volatile private var app: Context? = null
 
@@ -170,6 +172,8 @@ object PrintSpooler {
     copyBytes: ByteArray? = null,
     /** شمارهٔ نسخهٔ رسیدِ خودکار، از ۱ (POS-35) */
     copy: Int = 1,
+    /** وقتی کار از صف رفت: `true` چاپ شد، `false` کنار گذاشته شد — نه فقط نخستین تلاش */
+    onDone: CompletableDeferred<Boolean>? = null,
   ): Submitted {
     //  کشو «همین حالا یا هرگز» است — هرگز در صف (`kick`)
     if (kind == PrintQueue.Kind.DRAWER) return Submitted(null, "کشو در صف نمی‌رود")
@@ -183,9 +187,11 @@ object PrintSpooler {
       copyBytes?.let { copyFile(ctx, id).writeBytes(EscPos.withoutDrawerKick(it)) }
     }.onFailure { dropFiles(ctx, id); return Submitted(null, "کارِ چاپ ذخیره نشد: ${it.message}") }
     if (waiter != null) firstTry[id] = waiter
+    if (onDone != null) lastTry[id] = onDone
     val added = synchronized(queue) { queue.enqueue(job) }
     if (!added) {
       firstTry.remove(id)
+      lastTry.remove(id)?.complete(false)
       dropFiles(ctx, id)
       return Submitted(null, "این فاکتور همین حالا در صفِ چاپ است")
     }
@@ -377,6 +383,7 @@ object PrintSpooler {
     synchronized(queue) { queue.discard(id) }
     app?.let { ctx -> dropFiles(ctx, id); persist(ctx) }
     firstTry.remove(id)?.complete("کنار گذاشته شد")
+    lastTry.remove(id)?.complete(false)
     publish()
     wake.trySend(Unit)
   }
@@ -436,6 +443,7 @@ object PrintSpooler {
       }
       lastError.value = err
       firstTry.remove(job.id)?.complete(err)
+      if (err == null) lastTry.remove(job.id)?.complete(true) else if (bytes == null || link == null) lastTry.remove(job.id)?.complete(false)
       persist(ctx)
       publish()
     }

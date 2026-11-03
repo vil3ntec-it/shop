@@ -69,6 +69,9 @@ fun RouteScope.SaleRoute() {
   val heldBook by held.store.book.collectAsState()
   val heldQty = remember(heldBook) { ir.vil3ntec.tohid.data.HeldStock.reserved(heldBook) }
   val gate = remember { ScanGate() }
+  //  S11: Enter ِ صفحه‌کلیدِ بیرونی بی اسکن ⇒ «پرداخت»، فقط با پنلِ پرداخت (`ShopPolicy.payV2`، پیش‌فرض خاموش) — `bareEnterPays`
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() }
   val d by rememberUpdatedState(data)
   val codes by rememberUpdatedState(index)
 
@@ -80,6 +83,7 @@ fun RouteScope.SaleRoute() {
   /** یک بارکد از هر راه؛ دوربین سدِ تکرار دارد، دستی و سخت‌افزاری نه */
   fun onCode(raw: String, manual: Boolean, fromPhone: Boolean) {
     val code = raw.trim().takeIf { it.isNotEmpty() } ?: return
+    enterGate.mark()
     if (!manual && !gate.accept(code)) return
     //  این گوشی بارکدخوانِ کامپیوتر است ⇒ بارکد به سبدِ کامپیوتر می‌رود
     if (!fromPhone && PhoneScanner.sendCode.value != null) {
@@ -134,7 +138,9 @@ fun RouteScope.SaleRoute() {
     //  INV-03: آنچه در فاکتورهای نگه‌داشته کنار رفته از موجودیِ کاشی کم (بی نگه‌داشته ⇒ همان موجودی)
     held = heldQty,
     pins = remember { TillPinsPrefs.load(context); TillPinsPrefs.pins }.value, // POS-06: چیدمانِ همین دستگاه
-    modifier = Modifier.hidScanner { onCode(it, manual = true, fromPhone = false) },
+    modifier = Modifier.hidScanner(
+      onBareEnter = { bareEnterPays(payV2, enterGate, cart.lines.value.isEmpty()) { CheckoutSession.reset(); nav.open(SalesPaths.checkout()) } },
+    ) { onCode(it, manual = true, fromPhone = false) },
     actions = SaleActions(
       tap = { item -> if (item.weighed) nav.open(SalesPaths.keypad(item.id)) else feedback.addOne(data, item.id) },
       hold = { item -> nav.open(SalesPaths.keypad(item.id)) },

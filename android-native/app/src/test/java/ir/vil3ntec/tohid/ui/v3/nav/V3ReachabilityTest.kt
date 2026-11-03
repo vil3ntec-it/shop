@@ -99,6 +99,13 @@ class V3ReachabilityTest {
       pos("rememberLoyaltyTill"), pos("LoyaltyBar"), "ir.vil3ntec.tohid.data.TillSale", root = PHONE_CHECKOUT,
     ),
     Feature("POS-11 یادداشتِ فاکتورِ صندوقِ گوشی", "sale", pos("InvoiceNoteButton"), root = PHONE_SALE),
+    //  «تاریخچه» ِ روز/ماه/سال و چاپِ هر دوره از صفِ چاپ (خواستِ صاحب‌کار) — گوشی، تبلت و کامپیوتر از یک مسیر
+    Feature(
+      "تاریخچهٔ روز/ماه/سال، فیلتر و چاپِ خلاصه یا همهٔ فاکتورهای هر دوره", "sales",
+      "$HISTORY.HistoryScreen", "$HISTORY.PeriodCard", "$HISTORY.MoneySplit", "$HISTORY.FilterSheet",
+      "$HISTORY.HistoryPrintSheet", "$HISTORY.PrintBannerCard", "ir.vil3ntec.tohid.print.PeriodPrint",
+    ),
+    Feature("جدولِ اکسلیِ فاکتورهای کامپیوتر از سربرگِ تاریخچه", "sales/table", s("DeskInvoicesScreen")),
     //  ── سفارش و تحویل ──
     Feature("PCK جمع‌آوری و بسته‌بندیِ سفارش", "orders/{id}/pick", s("OrderPickHost"), s("OrderPickButton")),
     Feature("PCK-10/12 قفسه و دستهٔ جمع‌آوری", "orders", s("PickDeskEntry")),
@@ -111,6 +118,14 @@ class V3ReachabilityTest {
     Feature("RPT-15 گزارشِ نقدِ پیک‌ها", "delivery/cash-report", s("CashReportSheet")),
     Feature("DLV-18 امتیازِ تحویل‌ها", "delivery/ratings", s("RatingsSheet")),
     Feature("PCK-11 QR ِ کدِ تحویل", "delivery/code", s("HandoverQr")),
+    //  ── «سفارش‌های آنلاین» (خواستِ صاحب‌کار): کاشیِ خانه جای «فروشِ تازه»؛ صندوق با نوار یا دکمهٔ شناورِ خانه ──
+    Feature("کاشیِ «سفارش‌های آنلاین» با نشانِ زنده روی خانه", "orders", "$SHELL.HomeOrdersTile", "$SHELL.rememberHomeOrders"),
+    Feature("«فروشِ تازه» ِ شناور روی خانه وقتی نوار راهِ صندوق ندارد", "sale", "$SHELL.HomeSaleFab", "$SHELL.HomeTiles"),
+    Feature("آماده‌سازی و تحویل: عکس برای مشتری، «بسته شد»، پیک یا «خودش می‌آید»", "orders/{id}", "$ONLINE.orders.OrderPrepCardV3"),
+    Feature(
+      "گفت‌وگوی هر سفارش: «بسته شد»، «مشکل دارم» و رشته‌های پیشینِ مشتری", "chat/{conversationId}",
+      "$ONLINE.chat.ChatLifeBanner", "$ONLINE.chat.ChatEarlierThreads",
+    ),
     //  ── ویترین ──
     Feature("پیوند و QR ِ کارزار", "storefront/campaigns", s("CampaignsPane")),
     Feature("M3 عکس و ویدیوی ویترین", "storefront/media", s("StorefrontMediaPanel")),
@@ -161,6 +176,21 @@ class V3ReachabilityTest {
       else null
     }
     assertEquals(emptyList<String>(), bad)
+  }
+
+  /**
+   *  «فروشِ تازه» از خانه رفت (کاشیِ «سفارش‌های آنلاین» جایش آمد) ⇒ صندوق باید از ریشه با دستِ کاربر برسد: زبانهٔ
+   *  صندوق در جدولِ نسخهٔ ۳، دکمهٔ شناورِ خانه و کاشیِ کششیِ خانه به همان مقصد، و `HomeTilesTest` برای هر چیدمانِ نوار.
+   */
+  @Test
+  fun `صندوق پس از رفتنِ کاشیِ «فروشِ تازه» هنوز از خانه می‌رسد`() {
+    val sale = V3Modules.table.resolve("sale")
+    assertTrue("زبانهٔ صندوق", sale != null && sale.route.kind == RouteKind.TAB && AppMode.SHOP in sale.module.modes)
+    val shell = File(repo, "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/shell")
+    val fab = SourceGraph.strip(File(shell, "HomeShortcuts.kt").readText())
+    assertTrue("دکمهٔ شناور به «فروشِ تازه» می‌رود", "onOpen(ShellTargets.NEW_SALE)" in fab.substringAfter("fun HomeSaleFab("))
+    assertTrue("کاشیِ کششیِ خانه هنوز «فروشِ تازه» دارد", "ShellTargets.NEW_SALE" in File(shell, "HomeDrawerCard.kt").readText())
+    assertTrue("$SHELL.HomeSaleFab" in reached("$SHELL.HomeScreen"))
   }
 
   @Test
@@ -271,6 +301,9 @@ class V3ReachabilityTest {
     const val PHONE_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsScreen"
     const val DESK_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsDesk"
     const val MONEY = "ir.vil3ntec.tohid.ui.v3.money"
+    const val HISTORY = "ir.vil3ntec.tohid.ui.v3.sales.history"
+    const val SHELL = "ir.vil3ntec.tohid.ui.v3.shell"
+    const val ONLINE = "ir.vil3ntec.tohid.ui.v3.online"
     val repo: File = generateSequence(File("").absoluteFile) { it.parentFile }.first { File(it, "android-native").isDirectory }
     val graph: SourceGraph by lazy { SourceGraph.of(File(repo, "android-native/app/src/main/java")) }
     private val cache = HashMap<String, Set<String>>()

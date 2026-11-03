@@ -72,6 +72,7 @@
       renderPrefs(o, token);
       renderFeedback(o, token);
       renderChanges(o, token);
+      renderChat(o);
       renderAdd(o, token);
       renderApology(o);
       return o;
@@ -145,6 +146,12 @@
         document.head.appendChild(el('script', { attrs: { src: '/store/order-changes.js' }, on: { load: ok, error: no } }));
       }).then(function () { return window.StoreChanges({ api: api, show: renderOrder }); }).catch(function () { changes = null; return null; });
       changes.then(function (f) { if (f) f.render(o, token); });
+    }
+    //  گفت‌وگو با دکان دربارهٔ همین سفارش (یک رشته برای هر سفارش، «بسته شد»/«مشکل دارم») — store/chat.js فقط وقتی
+    //  پیگیری کلیدِ `chat` را داد (پرچمِ `shop.chat`؛ خاموش ⇒ نه اسکریپت، نه واژه‌نامه، نه گره)
+    function renderChat(o) {
+      if (!o.chat) { if ($('o-chat')) $('o-chat').hidden = true; return; }
+      K.js('/store/chat.js').then(function () { window.StoreChat({ api: api, slug: ctx.slug }).entry(o); }, function () { /* بی گفت‌وگو */ });
     }
     //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — store/delivery-method.js فقط وقتی سرور `deliveryMethod` را داد
     var method = null;
@@ -339,7 +346,7 @@
       $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
       $('o-meta').textContent = e.message;
       $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
-      $('o-dlv').hidden = true; ['o-add', 'o-apology'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
+      $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
     }
 
     return { open: open, fail: fail, stop: function () { clearTimeout(poll); } };

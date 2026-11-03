@@ -146,7 +146,7 @@ await checkout(prs, 'شمارهٔ مبایل');
 ok((await prs.textContent('#t-fee-label')) === 'کرایهٔ ارسال', 'دری: «شمارهٔ مبایل» و «کرایهٔ ارسال»', await prs.textContent('#t-fee-label'));
 //  واژه‌نامهٔ هر بخش (K.part): همان fa.json ِ بخش + لایه، هرگز `.prs.json`
 const part = await prs.evaluate(() => window.K.part('method').then((r) => [r, window.K.t('dm.to.pickup'), window.K.t('dm.send')]));
-ok(part[0] === true && part[1] === 'دریافت از دکان (بی کرایهٔ ارسال)' && part[2] === 'دیدنِ هزینهٔ تازه',
+ok(part[0] === true && part[1] === 'دریافت از دکان (بدون کرایهٔ ارسال)' && part[2] === 'دیدنِ هزینهٔ تازه',
   'دری: واژه‌نامهٔ بخش (method) از fa، لایه روی آن و جانشینیِ کلید‌به‌کلید (dm.send فارسی می‌ماند)', part.join(' | '));
 ok(fa.seen.some((u) => u === '/kit/i18n/method.fa.json') && !fa.seen.some((u) => /\.prs\.json$|\/prs\.json$/.test(u)) && fa.seen.includes('/kit/dari.js'),
   'دری: fa.json و method.fa.json و dari.js خواسته شد، هیچ prs.json', fa.seen.filter((u) => /i18n|dari/.test(u)).join(' '));

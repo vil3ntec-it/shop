@@ -328,6 +328,16 @@ private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp,
  *  پنلِ پرداختِ کامپیوتر (F9 با پرچم): همان `PaySplitSection` در پنجره. مشتری را صفحه
  *  پیش از F9 با F2 می‌گذارد؛ باقی‌مانده فقط با مشتری به حساب می‌رود.
  */
+/** POS-41 — کلیدهای سطحِ پنلِ پرداخت (`sale.payment.*` ِ keymap.json)؛ بقیه (Enter، PageUp/Down، Shift+رقم) مالِ کادرهاست */
+internal enum class PayPanelKey { BACK, CUSTOMER }
+
+/** خالص: [hit] = «این رویداد همین کار است؟»؛ F2 فقط وقتی صفحه گزینشِ مشتری را دارد ([canCustomer]) */
+internal fun payPanelKey(hit: (ir.vil3ntec.tohid.core.keymap.KeyAction) -> Boolean, canCustomer: Boolean): PayPanelKey? = when {
+  hit(KeyMap.SALE_PAYMENT_BACK) -> PayPanelKey.BACK
+  canCustomer && hit(KeyMap.SALE_PAYMENT_CUSTOMER) -> PayPanelKey.CUSTOMER
+  else -> null
+}
+
 @Composable
 fun PayPanelDialog(
   total: Double,
@@ -344,6 +354,8 @@ fun PayPanelDialog(
   stored: Boolean = false,
   /** PAY-09 — پلهٔ گردکردنِ نقدی (`CashRoundPref`)؛ ۰ ⇒ همان پنلِ امروز */
   cashRounding: Long = 0L,
+  /** POS-41 — F2 (`sale.payment.customer`): مشتری برای باقی‌ماندهٔ قرضی؛ صفحه پنل را می‌بندد و پس از گزینش دوباره باز می‌کند. `null` ⇒ کلید هیچ */
+  onCustomer: (() -> Unit)? = null,
 ) {
   val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
   val cashFocus = remember { FocusRequester() }
@@ -363,7 +375,11 @@ fun PayPanelDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(14.dp), modifier = Modifier.widthIn(max = 640.dp)) {
       Column(
         Modifier.padding(18.dp).verticalScroll(rememberScrollState()).onPreviewKeyEvent { e ->
-          if (e.down(Key.Escape)) { onDismiss(); true } else false
+          when (payPanelKey({ e.matches(it) }, canCustomer = onCustomer != null && !busy)) {
+            PayPanelKey.BACK -> { onDismiss(); true }
+            PayPanelKey.CUSTOMER -> { onCustomer?.invoke(); true }
+            null -> false
+          }
         },
       ) {
         Text(StrPos.payPanel, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)

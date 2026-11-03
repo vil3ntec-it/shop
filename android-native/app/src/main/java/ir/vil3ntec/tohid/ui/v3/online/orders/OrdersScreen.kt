@@ -19,9 +19,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrOrdersHub
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
-import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
@@ -90,7 +90,7 @@ fun OrdersScreen(
     overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = actions.onRetry)),
     chips = {
       DraftCountTabs(
-        tabs = OrderStates.TABS.map { t -> CountTab(t, StrOnline.orderTab(t), state.counts[t] ?: 0, attention = t == "new") },
+        tabs = OrdersHubModel.tabs(state.counts, state.tab).map { t -> CountTab(t, StrOrdersHub.tab(t), state.counts[t] ?: 0, attention = t == "new") },
         selected = state.tab,
         onSelect = actions.onTab,
       )

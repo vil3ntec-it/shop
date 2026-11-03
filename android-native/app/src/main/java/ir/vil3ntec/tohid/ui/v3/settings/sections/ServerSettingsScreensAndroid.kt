@@ -15,6 +15,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.report.OwnerReportPlan
 import ir.vil3ntec.tohid.core.storefront.EtaViewDto
@@ -82,7 +83,7 @@ internal fun rememberServerSections(): Set<String> {
   }
 }
 
-private val OWNER_STATUS = mapOf("sent" to "فرستاده شد", "error" to "نرسید", "claimed" to "در راه")
+private val OWNER_STATUS: Map<String, String> get() = mapOf("sent" to StrSettingsPages.ownerSent, "error" to StrSettingsPages.ownerError, "claimed" to StrSettingsPages.ownerClaimed)
 private const val PICK_WEEKDAY = "weekday"
 private const val PICK_HOUR = "hour"
 
@@ -102,7 +103,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
   val v = view?.takeIf { api != null && it.enabled && it.owner }
   SettingsPageFrame(
     title = SettingsLayout.labelOf(SettingsLayout.OWNER_REPORT),
-    subtitle = if (v == null) StrSettings.off else if (v.settings.active) OwnerReportPlan.coverage(v.settings) else "خاموش",
+    subtitle = if (v == null) StrSettings.off else if (v.settings.active) OwnerReportPlan.coverage(v.settings) else StrSettingsPages.off,
     onBack = onBack,
   ) {
     if (v == null || api == null) {
@@ -111,36 +112,35 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
     }
     item(key = "intro") {
       SettingsNote(
-        "خلاصهٔ فروش، برگشتی، خالص، روشِ پرداخت و پرفروش‌ها از ردیف‌های همگام‌شدهٔ همین دکان، فقط برای صاحبِ دکان. " +
-          "ساعت به وقتِ دکان${if (v.timezone.isNotBlank()) " (${v.timezone})" else ""}؛ هر روز حداکثر یک گزارش. واتس‌اپ هنوز وصل نیست.",
+        StrSettingsPages.ownerIntro(if (v.timezone.isNotBlank()) " (${v.timezone})" else ""),
       )
-      SettingsBlock { V3Segmented(listOf("خاموش", "روشن"), if (draft.active) 1 else 0, { draft = draft.copy(active = it == 1) }) }
+      SettingsBlock { V3Segmented(listOf(StrSettingsPages.off, StrSettingsPages.on), if (draft.active) 1 else 0, { draft = draft.copy(active = it == 1) }) }
     }
     if (draft.active) {
       item(key = "plan") {
         SettingsBlock {
           V3Segmented(
-            listOf("هر روز", "هر هفته"),
+            listOf(StrSettingsPages.daily, StrSettingsPages.weekly),
             if (draft.frequency == OwnerReportPlan.WEEKLY) 1 else 0,
             { draft = draft.copy(frequency = if (it == 1) OwnerReportPlan.WEEKLY else OwnerReportPlan.DAILY) },
           )
         }
         V3Section(null) {
           if (draft.frequency == OwnerReportPlan.WEEKLY) {
-            V3PickerRow("روزِ هفته", OwnerReportPlan.weekdayName(draft.weekday), onClick = { pick = PICK_WEEKDAY })
+            V3PickerRow(StrSettingsPages.weekday, OwnerReportPlan.weekdayName(draft.weekday), onClick = { pick = PICK_WEEKDAY })
             V3Divider(start = 16.dp)
           }
-          V3PickerRow("ساعت", OwnerReportPlan.hourLabel(draft.hour), onClick = { pick = PICK_HOUR })
+          V3PickerRow(StrSettingsPages.hour, OwnerReportPlan.hourLabel(draft.hour), onClick = { pick = PICK_HOUR })
         }
         SettingsNote(OwnerReportPlan.coverage(draft))
       }
       item(key = "channels") {
         V3Section(null) {
-          listOf(OwnerReportPlan.INAPP to "داخلِ برنامه", OwnerReportPlan.PUSH to "پوش", OwnerReportPlan.EMAIL to "ایمیل").forEachIndexed { i, (ch, label) ->
+          listOf(OwnerReportPlan.INAPP to StrSettingsPages.inApp, OwnerReportPlan.PUSH to StrSettingsPages.push, OwnerReportPlan.EMAIL to StrSettingsPages.email).forEachIndexed { i, (ch, label) ->
             if (i > 0) V3Divider(start = 16.dp)
             val usable = ch != OwnerReportPlan.EMAIL || v.emailAvailable
             V3ToggleRow(
-              if (usable) label else "$label (حساب ایمیل ندارد)",
+              if (usable) label else StrSettingsPages.noEmail(label),
               ch in draft.channels,
               { draft = draft.copy(channels = OwnerReportPlan.toggleChannel(draft.channels, ch)) },
               enabled = usable,
@@ -151,13 +151,13 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
     }
     item(key = "save") {
       V3Button(
-        text = "ذخیره",
+        text = StrSettingsPages.save,
         onClick = {
           busy = true
           scope.launch {
             OwnerReportLive.set(api, draft, v.settings.version)
-              .onSuccess { s -> view = v.copy(settings = s); draft = s; toasts.show("ذخیره شد") }
-              .onFailure { f -> toasts.show(if (f.code == "version_conflict") "تنظیم در این میان عوض شده؛ دوباره باز کنید" else f.userMessage) }
+              .onSuccess { s -> view = v.copy(settings = s); draft = s; toasts.show(StrSettingsPages.saved) }
+              .onFailure { f -> toasts.show(if (f.code == "version_conflict") StrSettingsPages.versionConflict else f.userMessage) }
             busy = false
           }
         },
@@ -166,7 +166,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
         loading = busy,
       )
       for (r in v.reports.take(5)) {
-        val net = r.netSalesMinor?.let { " — خالص ${ir.vil3ntec.tohid.money(it / 100.0)}" }.orEmpty()
+        val net = r.netSalesMinor?.let { StrSettingsPages.reportNet(ir.vil3ntec.tohid.money(it / 100.0)) }.orEmpty()
         SettingsNote("${r.reportDate} · ${OWNER_STATUS[r.status] ?: r.status}$net")
       }
     }
@@ -175,7 +175,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
     PICK_WEEKDAY -> {
       val names = OwnerReportPlan.WEEK_ORDER.map(OwnerReportPlan::weekdayName)
       V3PickerSheet(
-        title = "روزِ هفته",
+        title = StrSettingsPages.weekday,
         options = names,
         selected = OwnerReportPlan.weekdayName(draft.weekday),
         onPick = { n -> names.indexOf(n).takeIf { it >= 0 }?.let { draft = draft.copy(weekday = OwnerReportPlan.WEEK_ORDER[it]) }; pick = null },
@@ -186,7 +186,7 @@ internal fun RouteScope.OwnerReportScreen(onBack: (() -> Unit)?) {
     PICK_HOUR -> {
       val hours = (0..23).map(OwnerReportPlan::hourLabel)
       V3PickerSheet(
-        title = "ساعت",
+        title = StrSettingsPages.hour,
         options = hours,
         selected = OwnerReportPlan.hourLabel(draft.hour),
         onPick = { h -> hours.indexOf(h).takeIf { it >= 0 }?.let { draft = draft.copy(hour = it) }; pick = null },
@@ -227,7 +227,7 @@ internal fun RouteScope.StorefrontEtaScreen(onBack: (() -> Unit)?) {
   val v = view?.takeIf { api != null && StorefrontEtaApi.visible(it) }
   SettingsPageFrame(
     title = SettingsLayout.labelOf(SettingsLayout.STOREFRONT_ETA),
-    subtitle = if (v == null) StrSettings.off else if (v.settings.show) "روشن — مشتری بازهٔ تقریبی می‌بیند" else "خاموش",
+    subtitle = if (v == null) StrSettings.off else if (v.settings.show) StrSettingsPages.etaOn else StrSettingsPages.off,
     onBack = onBack,
   ) {
     if (v == null || api == null) {
@@ -236,26 +236,25 @@ internal fun RouteScope.StorefrontEtaScreen(onBack: (() -> Unit)?) {
     }
     item(key = "show") {
       SettingsNote(
-        "مشتری پیش از ثبت و در پیگیری یک بازه می‌بیند (نه یک وعده): صفِ سفارش‌ها، آماده‌سازی، شلوغی، پیک و راه. " +
-          "با سه سفارشِ آماده‌شدهٔ اخیر، آماده‌سازی از خودِ سفارش‌ها حساب می‌شود.",
+        StrSettingsPages.etaIntro,
       )
-      SettingsBlock { V3Segmented(listOf("نشان داده نشود", "نشان داده شود"), if (form.show) 1 else 0, { form = form.copy(show = it == 1) }) }
+      SettingsBlock { V3Segmented(listOf(StrSettingsPages.etaHide, StrSettingsPages.etaShow), if (form.show) 1 else 0, { form = form.copy(show = it == 1) }) }
     }
     item(key = "minutes") {
       SettingsBlock {
-        NumberField(form.prep, { form = form.copy(prep = it) }, "دقیقهٔ آماده‌سازیِ هر سفارش (۱ تا ۲۴۰)", errors["prep"])
-        NumberField(form.travel, { form = form.copy(travel = it) }, "دقیقهٔ راهِ پیک (۰ تا ۲۴۰)", errors["travel"])
-        NumberField(form.parallel, { form = form.copy(parallel = it) }, "سفارشِ هم‌زمانی که دکان آماده می‌کند (۱ تا ۲۰)", errors["parallel"])
+        NumberField(form.prep, { form = form.copy(prep = it) }, StrSettingsPages.etaPrep, errors["prep"])
+        NumberField(form.travel, { form = form.copy(travel = it) }, StrSettingsPages.etaTravel, errors["travel"])
+        NumberField(form.parallel, { form = form.copy(parallel = it) }, StrSettingsPages.etaParallel, errors["parallel"])
       }
     }
     if (v.zones.isNotEmpty()) {
       item(key = "zones") {
-        SettingsNote("دقیقهٔ راهِ هر ناحیه (۰ تا ۲۴۰)؛ خالی = همان دقیقهٔ راهِ بالا")
+        SettingsNote(StrSettingsPages.etaZones)
         SettingsBlock {
           for (z in v.zones) {
             NumberField(
               form.zones[z.id].orEmpty(), { form = form.copy(zones = form.zones + (z.id to it)) },
-              if (z.active) z.name else "${z.name} (غیرفعال)", errors["zone:${z.id}"],
+              if (z.active) z.name else StrSettingsPages.inactiveZone(z.name), errors["zone:${z.id}"],
             )
           }
         }
@@ -264,19 +263,19 @@ internal fun RouteScope.StorefrontEtaScreen(onBack: (() -> Unit)?) {
     item(key = "save") {
       errors["zones"]?.let { SettingsNote(it) }
       V3Button(
-        text = "ذخیره",
+        text = StrSettingsPages.save,
         onClick = {
           val c = StorefrontEtaApi.check(form, v.zones.map { it.id }, v.settings.version)
           errors = c.errors
           val body = c.body
           if (body == null) {
-            toasts.show("چند کادر درست نیست؛ پیامِ زیرِ هر کادر را ببینید")
+            toasts.show(StrSettingsPages.fixFields)
           } else {
             busy = true
             scope.launch {
               StorefrontEtaLive.set(api, body)
                 .onSuccess {
-                  toasts.show("ذخیره شد")
+                  toasts.show(StrSettingsPages.saved)
                   StorefrontEtaLive.load(api).onSuccess { n -> view = n; form = StorefrontEtaApi.formOf(n) }
                 }
                 .onFailure { f -> toasts.show(StorefrontEtaApi.errorText(f.code, f.userMessage)) }
@@ -316,12 +315,12 @@ internal fun RouteScope.PromoGuardScreen(onBack: (() -> Unit)?) {
       buildString {
         append(
           when {
-            !f0.enabled -> "اولین خرید خاموش"
-            f0.kind == PromoGuardApi.AMOUNT -> "اولین خرید: ${afghani(f0.amountMinor)}"
-            else -> "اولین خرید: ${PromoGuardApi.percentText(f0.bp)}٪"
+            !f0.enabled -> StrSettingsPages.firstOff
+            f0.kind == PromoGuardApi.AMOUNT -> StrSettingsPages.firstAmount(afghani(f0.amountMinor))
+            else -> StrSettingsPages.firstPercent(PromoGuardApi.percentText(f0.bp))
           },
         )
-        if (suspects.isNotEmpty()) append(" · ${ir.vil3ntec.tohid.core.storefront.StorefrontOwner.toFa(suspects.size.toString())} موردِ مشکوک")
+        if (suspects.isNotEmpty()) append(StrSettingsPages.suspects(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.toFa(suspects.size.toString())))
       }
     } ?: StrSettings.off,
     onBack = onBack,
@@ -331,28 +330,28 @@ internal fun RouteScope.PromoGuardScreen(onBack: (() -> Unit)?) {
       return@SettingsPageFrame
     }
     item(key = "first") {
-      SettingsNote("اولین خرید فقط یک بار برای هر شمارهٔ تأییدشده و هر دستگاه، وقتی آن شماره سفارشِ پیشینی در این دکان ندارد.")
-      SettingsBlock { V3Segmented(listOf("اولین خرید خاموش", "اولین خرید روشن"), if (form.enabled) 1 else 0, { form = form.copy(enabled = it == 1) }) }
+      SettingsNote(StrSettingsPages.firstNote)
+      SettingsBlock { V3Segmented(listOf(StrSettingsPages.firstOff, StrSettingsPages.firstOn), if (form.enabled) 1 else 0, { form = form.copy(enabled = it == 1) }) }
     }
     if (form.enabled) {
       item(key = "offer") {
         SettingsBlock {
           V3Segmented(
-            listOf("درصد", "مبلغ"),
+            listOf(StrSettingsPages.percent, StrSettingsPages.amount),
             if (form.kind == PromoGuardApi.AMOUNT) 1 else 0,
             { form = form.copy(kind = if (it == 1) PromoGuardApi.AMOUNT else PromoGuardApi.PERCENT) },
           )
           if (form.kind == PromoGuardApi.PERCENT) {
-            NumberField(form.percent, { form = form.copy(percent = it) }, "درصدِ تخفیف (تا ۱۰۰)", errors["percent"])
-            NumberField(form.max, { form = form.copy(max = it) }, "سقفِ تخفیف به افغانی (خالی = بی سقف)", errors["max"])
+            NumberField(form.percent, { form = form.copy(percent = it) }, StrSettingsPages.percentField, errors["percent"])
+            NumberField(form.max, { form = form.copy(max = it) }, StrSettingsPages.maxField, errors["max"])
           } else {
-            NumberField(form.amount, { form = form.copy(amount = it) }, "مبلغِ تخفیف به افغانی", errors["amount"])
+            NumberField(form.amount, { form = form.copy(amount = it) }, StrSettingsPages.amountField, errors["amount"])
           }
-          NumberField(form.minSubtotal, { form = form.copy(minSubtotal = it) }, "کفِ سبد به افغانی (خالی = بی کف)", errors["minSubtotal"])
+          NumberField(form.minSubtotal, { form = form.copy(minSubtotal = it) }, StrSettingsPages.minSubtotalField, errors["minSubtotal"])
         }
         SettingsBlock {
           V3Segmented(
-            listOf("با تخفیف‌های دیگر", "انحصاری"),
+            listOf(StrSettingsPages.stackCombine, StrSettingsPages.stackExclusive),
             if (form.stack == PromoGuardApi.EXCLUSIVE) 1 else 0,
             { form = form.copy(stack = if (it == 1) PromoGuardApi.EXCLUSIVE else PromoGuardApi.COMBINE) },
           )
@@ -360,27 +359,27 @@ internal fun RouteScope.PromoGuardScreen(onBack: (() -> Unit)?) {
       }
     }
     item(key = "guard") {
-      SettingsNote("سدِ سوءاستفاده — برای همهٔ کدهای ویترین؛ خالی یا ۰ = بی سقف")
+      SettingsNote(StrSettingsPages.guardNote)
       SettingsBlock {
-        NumberField(form.codePerPhone, { form = form.copy(codePerPhone = it) }, "هر کد برای هر شماره چند بار (۰ تا ۱۰۰۰)", errors["codePerPhone"])
-        NumberField(form.codePerDevice, { form = form.copy(codePerDevice = it) }, "هر کد برای هر دستگاه چند بار (۰ تا ۱۰۰۰)", errors["codePerDevice"])
-        NumberField(form.maxDiscount, { form = form.copy(maxDiscount = it) }, "سقفِ تخفیفِ هر سفارش به افغانی", errors["maxDiscount"])
+        NumberField(form.codePerPhone, { form = form.copy(codePerPhone = it) }, StrSettingsPages.codePerPhone, errors["codePerPhone"])
+        NumberField(form.codePerDevice, { form = form.copy(codePerDevice = it) }, StrSettingsPages.codePerDevice, errors["codePerDevice"])
+        NumberField(form.maxDiscount, { form = form.copy(maxDiscount = it) }, StrSettingsPages.maxDiscount, errors["maxDiscount"])
       }
     }
     item(key = "save") {
       V3Button(
-        text = "ذخیره",
+        text = StrSettingsPages.save,
         onClick = {
           val c = PromoGuardApi.check(form)
           errors = c.errors
           val next = c.settings
           if (next == null) {
-            toasts.show("چند کادر درست نیست؛ پیامِ زیرِ هر کادر را ببینید")
+            toasts.show(StrSettingsPages.fixFields)
           } else {
             busy = true
             scope.launch {
               PromoGuardLive.set(api, next)
-                .onSuccess { s -> view = v.copy(settings = s); form = PromoGuardApi.formOf(s); toasts.show("ذخیره شد") }
+                .onSuccess { s -> view = v.copy(settings = s); form = PromoGuardApi.formOf(s); toasts.show(StrSettingsPages.saved) }
                 .onFailure { f -> toasts.show(PromoGuardApi.errorText(f.code, f.userMessage)) }
               busy = false
             }
@@ -398,7 +397,7 @@ internal fun RouteScope.PromoGuardScreen(onBack: (() -> Unit)?) {
         SettingsNote(r.detail)
       }
       if (v.recent.isNotEmpty()) {
-        SettingsNote("تخفیف‌های نشستهٔ اخیر")
+        SettingsNote(StrSettingsPages.recentDiscounts)
         for (c in v.recent.take(5)) {
           val code = if (c.code.isNotBlank()) " ${c.code}" else ""
           SettingsNote("${PromoGuardApi.kindLabel(c.kind)}$code · ${c.phone} · ${afghani(c.discountMinor)}")

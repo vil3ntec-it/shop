@@ -37,6 +37,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerScreen
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerView
 import ir.vil3ntec.tohid.ui.v3.sales.history.CancelSheet
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryActions
+import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryBook
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryFilter
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryQuery
@@ -252,11 +253,11 @@ private val noHistory = HistoryActions({}, {}, {}, {}, {}, {}, {}, {}, {}, null)
 @Composable
 private fun HistoryShot(filter: HistoryFilter) {
   val d = History.ledger()
-  val today = todayIso()
   HistoryScreen(
-    d, today, HistoryModel.yesterday(today), returnsV2 = true, canCancel = true,
+    d, remember(d) { HistoryBook.build(d, ir.vil3ntec.tohid.data.ReportBridge.deviceClock(), History.now) },
+    returnsV2 = true, canCancel = true,
     drawer = DrawerModel.line(d, History.now, blind = false),
-    query = remember { HistoryQuery(filter, "", HistoryModel.ALL_MONTHS) },
+    query = remember { HistoryQuery(filter, "") },
     actions = noHistory,
   )
 }

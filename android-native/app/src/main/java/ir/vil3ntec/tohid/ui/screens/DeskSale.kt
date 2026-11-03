@@ -142,6 +142,7 @@ fun DeskSaleScreen(
   var hint by remember { mutableStateOf(0) }
   var selected by remember { mutableStateOf<String?>(null) }
   var pickDebtor by remember { mutableStateOf(false) }
+  var payAfterPick by remember { mutableStateOf(false) } // POS-41: F2 ِ پنلِ پرداخت ⇒ گزینشِ مشتری، سپس همان پنل دوباره
   //  POS-39: دریافت از مشتری (F7) — فقط با کلیدِ همین دستگاه (پیش‌فرض خاموش)
   val tillReceive = remember { ir.vil3ntec.tohid.data.TillReceivePref.on(context) }
   var receivePick by remember { mutableStateOf(false) }
@@ -504,12 +505,6 @@ fun DeskSaleScreen(
       )
     }
   }
-  //  کارت و ردیفِ کالا: زدن ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده). − / + فقط در سبد است
-  val productCb = PosProductCallbacks(
-    stockOf = { ShopStore.stock(d, it) },
-    qtyOf = { id -> PosCartOps.qtyOf(cart, id) },
-    onAdd = { p -> add(p, parsed.first); query = ""; refocus() },
-  )
   val gridState = rememberLazyGridState()
   val tableState = rememberLazyListState()
   LaunchedEffect(category) {
@@ -539,6 +534,11 @@ fun DeskSaleScreen(
     },
     onFocusBack = { refocus() },
   )
+  //  POS-05: موجودیِ کاشی «قابل‌فروش» = موجودی − نگه‌داشته‌های همین صندوق (همان گوشی؛ بی نگه‌داشته همان موجودی)
+  val heldQty = held.store.book.collectAsState().value.let { b -> remember(b) { ir.vil3ntec.tohid.data.HeldStock.reserved(b) } }
+  //  کارت و ردیفِ کالا: زدن ⇐ افزودن (با پیشوندِ «۳*» اگر نوشته شده). − / + فقط در سبد است
+  val productCb = PosProductCallbacks(stockOf = { ir.vil3ntec.tohid.data.HeldStock.sellable(ShopStore.stock(d, it), it, heldQty) },
+    qtyOf = { id -> PosCartOps.qtyOf(cart, id) }, onAdd = { p -> add(p, parsed.first); query = ""; refocus() })
 
   //  POS-07 (فقط کامپیوترِ لمسی): صفحه‌کلیدِ عددی روی ردیفِ انتخاب‌شده — همان راهِ کادرِ ردیف (`PosKeypad`)
   val pad = rememberTouchPad(remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) }, selected); val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard() // POS-31: صفحه‌کلیدِ حروف
@@ -925,8 +925,8 @@ fun DeskSaleScreen(
     DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
   }
   if (pickDebtor) {
-    DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus() }, onPick = { id ->
-      cartStore.setDebtor(id); pickDebtor = false; refocus()
+    DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
+      cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
     })
   }
   ir.vil3ntec.tohid.ui.components.pos.QuickTillDialog(quick, store, cartStore) { m -> m?.let(::toast); refocus() } // S03
@@ -1015,7 +1015,7 @@ fun DeskSaleScreen(
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
-      cashRounding = cashStep, // PAY-09
+      cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, // PAY-09؛ POS-41: F2
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(

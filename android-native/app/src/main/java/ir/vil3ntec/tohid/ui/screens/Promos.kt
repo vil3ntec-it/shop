@@ -367,6 +367,11 @@ private fun PromoEditor(
   val brands = remember(d.products, rule.id) {
     (d.products.mapNotNull { it.brand?.trim()?.takeIf { b -> b.isNotEmpty() } } + rule.scope.brands + rule.scope.exBrands).distinct().sorted()
   }
+  //  PRM-08: تأمین‌کنندگانِ دکان و هر شناسه‌ای که خودِ قاعده دارد (تا قاعدهٔ کهنه بی‌صدا چیزی را گم نکند)
+  val suppliers = remember(d.suppliers, rule.id) {
+    (d.suppliers.map { it.id } + rule.scope.suppliers + rule.scope.exSuppliers).distinct()
+      .sortedBy { PromoText.supplierName(it, d) }
+  }
   //  PRM-11: گروه‌های مشتریِ دکان (CRM-08) و هر گروهی که خودِ قاعده دارد (تا قاعدهٔ کهنه گروهی را بی‌صدا گم نکند)
   val groups = remember(d.debtors, rule.id) {
     (ir.vil3ntec.tohid.data.CustomerCrm.groups(d).map { it.first } + rule.groups)
@@ -467,7 +472,7 @@ private fun PromoEditor(
           categories.forEach { cat ->
             FilterChip(
               selected = cat in f.categories,
-              onClick = { f = f.copy(categories = if (cat in f.categories) f.categories - cat else f.categories + cat) },
+              onClick = { f = f.copy(categories = if (cat in f.categories) f.categories - cat else f.categories + cat, exCategories = f.exCategories - cat) },
               label = { Text(cat) },
             )
           }
@@ -485,6 +490,18 @@ private fun PromoEditor(
           }
         }
       }
+      if (suppliers.isNotEmpty()) {
+        Text("تأمین‌کننده", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          suppliers.forEach { id ->
+            FilterChip(
+              selected = id in f.suppliers,
+              onClick = { f = f.copy(suppliers = if (id in f.suppliers) f.suppliers - id else f.suppliers + id, exSuppliers = f.exSuppliers - id) },
+              label = { Text(PromoText.supplierName(id, d)) },
+            )
+          }
+        }
+      }
       if (f.kind != "price") ProductPick("کالاهای مشخص", f.products, d) { f = f.copy(products = it) }
       ProductPick("جز این کالاها", f.exProducts, d) { f = f.copy(exProducts = it) }
       if (brands.isNotEmpty()) {
@@ -495,6 +512,30 @@ private fun PromoEditor(
               selected = b in f.exBrands,
               onClick = { f = f.copy(exBrands = if (b in f.exBrands) f.exBrands - b else f.exBrands + b, brands = f.brands - b) },
               label = { Text(b) },
+            )
+          }
+        }
+      }
+      if (categories.isNotEmpty()) {
+        Text("جز این دسته‌ها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          categories.forEach { cat ->
+            FilterChip(
+              selected = cat in f.exCategories,
+              onClick = { f = f.copy(exCategories = if (cat in f.exCategories) f.exCategories - cat else f.exCategories + cat, categories = f.categories - cat) },
+              label = { Text(cat) },
+            )
+          }
+        }
+      }
+      if (suppliers.isNotEmpty()) {
+        Text("جز این تأمین‌کنندگان", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          suppliers.forEach { id ->
+            FilterChip(
+              selected = id in f.exSuppliers,
+              onClick = { f = f.copy(exSuppliers = if (id in f.exSuppliers) f.exSuppliers - id else f.exSuppliers + id, suppliers = f.suppliers - id) },
+              label = { Text(PromoText.supplierName(id, d)) },
             )
           }
         }

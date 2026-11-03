@@ -32,7 +32,8 @@ test('فهرستِ وب همان DariText.kt است (منبعِ یکتا)', () =
   const want = W.build();
   assert.deepEqual(JSON.parse(JSON.stringify(D.DATA)), want);
   assert.equal(W.current().text, W.render(want), 'بلوکِ dari.js کهنه است: node scripts/dari-words.js --write');
-  assert.ok(want.words.length >= 15 && want.words.length <= 24, `${want.words.length} واژه — فهرست کوتاه می‌ماند`);
+  //  ۱۴۰۵/۰۸/۱۳: سقف ۲۴ ⇐ ۶۴ با خواستِ «واژهٔ دریِ بیشتر» (همان سقفِ DariTextTest.kt)
+  assert.ok(want.words.length >= 15 && want.words.length <= 64, `${want.words.length} واژه — فهرست کوتاه می‌ماند`);
   for (const w of want.words) assert.ok(w.fa && w.dari && w.fa !== w.dari, w.fa);
 });
 
@@ -141,6 +142,40 @@ test('روی واژه‌نامه‌های واقعیِ وب: جای‌خالی�
     assert.ok(k in all, `KEYS: کلیدِ ${k} در هیچ واژه‌نامه‌ای نیست`);
     if (v !== null) assert.equal(holes(v), holes(all[k]), `KEYS ${k}: جای‌خالی‌ها`);
   }
+});
+
+test('جملهٔ کاملِ دری با {} (کلید‌به‌کلید): مقدار و {جای‌خالی} بایت‌به‌بایت سرِ جای خود', () => {
+  //  همان PHRASES ِ کاتلین: هر {} یک مقدارِ asIs است، به همان ترتیب
+  assert.equal(D.of(`PIN درست نیست — ${p('2')} تلاش مانده`), 'PIN درست نیست — 2 بار دیگر می‌توانید کوشش کنید');
+  assert.equal(D.of(`شلوغم ${p('گوشی انبار')} دقیقه`), 'مصروفم گوشی انبار دقیقه', 'مقدار هرگز دری نمی‌شود');
+  assert.equal(D.shape(`اعتبار تا ${p('1405/08/20')}`), 'اعتبار تا {}');
+  //  قالبِ وب: {نام} همان {} است و پس از لایه پر می‌شود
+  assert.equal(D.t('شلوغ — {m} دقیقهٔ دیگر'), 'مصروف — {m} دقیقهٔ دیگر');
+  assert.equal(fill(D.t('اعتبار تا {d}'), { d: '۱۴۰۵/۰۸/۲۰' }), 'میعاد تا ۱۴۰۵/۰۸/۲۰');
+  //  بی نشانه (فارسیِ خامِ پرشده) کلیدِ {} نمی‌خورد
+  assert.equal(D.of('PIN درست نیست — 2 تلاش مانده'), 'PIN درست نیست — 2 تلاش مانده');
+  for (const [fa, dari] of Object.entries(D.DATA.phrases)) {
+    assert.equal(fa.split('{}').length, dari.split('{}').length, `شمارِ {} در «${fa}»`);
+    assert.notEqual(fa, dari, fa);
+  }
+});
+
+test('سازنده کلیدِ تکراریِ PHRASES را نمی‌پذیرد و جملهٔ دوسطری را می‌خواند', () => {
+  const src = fs.readFileSync(W.KT, 'utf8');
+  const dup = src.replace('    // </dari-phrases>', '    "اعتبار تا {}" to "تا {}",\n    // </dari-phrases>');
+  assert.throws(() => W.build(dup), /تکراری/);
+  const two = W.build();
+  assert.ok(Object.keys(two.phrases).some((k) => k.startsWith('مشتری منتظر است؟')), 'جملهٔ دوسطری خوانده نشد');
+});
+
+test('هر واژه و جملهٔ دری در فهرستِ بازبینیِ صاحب‌کار (docs/DARI-REVIEW-fa.md) هست', () => {
+  const doc = fs.readFileSync(path.join(__dirname, '..', '..', 'docs', 'DARI-REVIEW-fa.md'), 'utf8');
+  const cell = (s) => s.replace(/\|/g, '\\|');
+  const missing = [];
+  for (const w of D.DATA.words) if (!doc.includes(`| ${cell(w.fa)} | ${cell(w.dari)} |`)) missing.push(`${w.fa} ⇐ ${w.dari}`);
+  for (const [fa, dari] of Object.entries(D.DATA.phrases)) if (!doc.includes(`| ${cell(fa)} | ${cell(dari)} |`)) missing.push(`${fa} ⇐ ${dari}`);
+  assert.deepEqual(missing, [], 'ردیفِ «فارسی | دری» در فهرستِ بازبینی نیست');
+  assert.match(doc, /نیاز به تأییدِ صاحب‌کار/);
 });
 
 test('مرورگر: dari.js بی module خودش را روی VILL3N.tx می‌گذارد و ES5 است', () => {

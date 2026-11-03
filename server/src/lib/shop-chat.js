@@ -89,6 +89,8 @@ const gone = () => notFound('این گفت‌وگو پیدا نشد', 'conversat
 const isAuthor = (v, m) => m.sender === v.side && (v.side === 'customer' || m.sender_user_id === v.userId);
 //  سنجاقِ پیام (CHAT-14) — `lib/shop-chat-pins.js`؛ تابع‌های این پرونده hoist می‌شوند
 const pins = require('./shop-chat-pins')({ rowOf, lockedMessage, viewerKey, viewOf, n, asJson });
+//  یک رشته برای هر سفارش و «بسته شد» / «مشکل دارم» / دورِ تازهٔ عمومی — `lib/shop-chat-life.js` (مهاجرتِ ۲۰۹)
+const life = require('./shop-chat-life')({ rowOf, viewOf, viewSql, conversationView, blocksOf });
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم
@@ -141,7 +143,7 @@ function viewSql(viewer) {
       (SELECT json_build_object('kind', m.kind, 'body', LEFT(m.body, 80), 'sender', m.sender,
                                 'deleted', m.deleted_at IS NOT NULL, 'at', m.created_at)
          FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last,
-      ${pins.pinnedSql(mine)}
+      ${life.ORDER_COLS}, ${pins.pinnedSql(mine)}
     FROM shop_chat_conversations c
     JOIN shops s ON s.id = c.shop_id
     LEFT JOIN online_orders o ON o.id = c.order_id AND o.shop_id = c.shop_id`;
@@ -149,6 +151,7 @@ function viewSql(viewer) {
 
 function conversationView(viewer, r) {
   const last = r.last ? asJson(r.last) : null;
+  const lf = life.lifeOf(r);   //  رشتهٔ بسته ⇒ `canSend: false` برای هر دو طرف (سرور هم ۴۰۹ می‌دهد)
   const base = {
     id: r.id,
     status: r.status,
@@ -164,12 +167,13 @@ function conversationView(viewer, r) {
     lastMessageAt: r.last_message_at == null ? null : n(r.last_message_at),
     createdAt: n(r.created_at),
     updatedAt: n(r.updated_at),
+    life: life.viewLife(viewer, lf),
   };
   if (viewer.side === 'customer') {
     return {
       ...base,
       shop: { name: r.shop_name || '' },
-      canSend: !r.blocked_by_shop,
+      canSend: !r.blocked_by_shop && lf.state !== 'closed',
       blockedShop: !!r.blocked_by_customer,
       receipts: {
         peerDeliveredSeq: n(r.shop_delivered_seq), peerReadSeq: n(r.shop_read_seq),
@@ -188,7 +192,7 @@ function conversationView(viewer, r) {
     },
     blockedCustomer: !!r.blocked_by_shop,
     customerBlockedShop: !!r.blocked_by_customer,
-    canSend: !r.blocked_by_customer,
+    canSend: !r.blocked_by_customer && lf.state !== 'closed',
     receipts: {
       peerDeliveredSeq: n(r.customer_delivered_seq), peerReadSeq: n(r.customer_read_seq),
       myDeliveredSeq: n(r.shop_delivered_seq), myReadSeq: n(r.shop_read_seq),
@@ -226,6 +230,7 @@ async function list(viewer, { cursor, limit, status, q } = {}) {
   if (viewer.side === 'customer') {
     where.push(acct.mineSql(viewer, args));
   } else {
+    await life.settle(viewer.shopId);   //  رشته‌های بسته از «باز» ِ صندوق بیرون
     where.push("(c.seq > 0 OR c.order_id <> '')");
     const st = str(status);
     if (st && st !== 'all') {
@@ -318,6 +323,7 @@ async function open(viewer, body) {
     if (!row) throw conflict('گفت‌وگو با این دکان از این شماره ممکن نیست؛ با حسابِ خود وارد شوید', 'chat_unavailable');
   } else if (viewer.side === 'customer') {
     await acct.reopen(viewer, row, name);   // نامِ خالی، و با نشستِ حساب گره به همان حساب
+    if (!orderId) await life.restart(viewer, row.id);   // عمومیِ بسته ⇒ دورِ تازه در همان رشته
   }
   return { conversation: await viewOf(viewer, row.id), created };
 }
@@ -413,6 +419,7 @@ async function send(viewer, id, body) {
       if (prev.request_hash !== hash) throw conflict('این شناسهٔ پیام پیش‌تر با متنِ دیگری فرستاده شده', 'client_id_reused');
       return { conv, row: prev, replayed: true };
     }
+    await life.assertOpen(c, conv.id);   //  رشتهٔ بسته ⇒ ۴۰۹ `chat_closed` (تکرارِ پیامِ پذیرفته همان بالا)
     const bl = await blocksOf(conv.shop_id, conv.customer_phone, c);
     if (viewer.side === 'customer' && bl.shop) throw forbidden('این دکان پیامِ شما را نمی‌پذیرد', 'chat_blocked');
     if (viewer.side === 'shop' && bl.customer) throw forbidden('مشتری پیامِ این دکان را بسته است', 'chat_blocked_by_customer');
@@ -551,6 +558,7 @@ async function edit(viewer, id, messageId, body) {
     const m = await lockedMessage(c, conv, messageId);
     if (m.deleted_at) throw notFound('این پیام پاک شده است', 'message_not_found');
     if (!isAuthor(viewer, m)) throw forbidden('فقط نویسندهٔ پیام می‌تواند ویرایشش کند', 'not_author');
+    await life.assertOpen(c, conv.id);
     if (now() - n(m.created_at) > config.shopChat.editWindowMs) throw forbidden('مهلتِ ویرایشِ این پیام گذشته است', 'edit_window_passed');
     if (m.kind === 'text' && !text) throw badRequest('پیام خالی است', 'empty_message');
     if (m.body === text) return { changed: false };
@@ -663,6 +671,7 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
   if (viewer.side === 'customer' && (await blocksOf(conv.shop_id, conv.customer_phone)).shop) {
     throw forbidden('این دکان پیامِ شما را نمی‌پذیرد', 'chat_blocked');
   }
+  await life.assertOpen(null, conv.id);
   if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
   const s = chatMedia.sniff(buf);
   if (!s) throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)، پیامِ صوتی (Opus، AAC، MP3، AMR) و PDF');
@@ -812,31 +821,6 @@ async function search(viewer, q, { limit } = {}) {
 }
 
 // ════════════════════════════════════════════════════════════════════
-//  گزارش‌ها برای مدیرِ سامانه
-// ════════════════════════════════════════════════════════════════════
-
-async function reportsForAdmin({ status = 'open', limit } = {}) {
-  const st = ['open', 'reviewed', 'all'].includes(status) ? status : 'open';
-  const lim = intIn(limit, { min: 1, max: 200, def: 50 });
-  const rows = await many(
-    `SELECT r.*, s.name AS shop_name FROM shop_chat_reports r JOIN shops s ON s.id = r.shop_id
-      ${st === 'all' ? '' : 'WHERE r.status = $2'} ORDER BY r.created_at DESC LIMIT $1`,
-    st === 'all' ? [lim] : [lim, st]
-  );
-  return rows.map((r) => ({
-    id: r.id, shopId: r.shop_id, shopName: r.shop_name, conversationId: r.conversation_id,
-    messageId: r.message_id || null, reporter: r.reporter, reason: r.reason, note: r.note,
-    snapshot: asJson(r.snapshot), status: r.status, createdAt: n(r.created_at),
-  }));
-}
-
-async function reviewReport(id) {
-  const r = await one("UPDATE shop_chat_reports SET status='reviewed' WHERE id=$1 RETURNING id", [String(id || '')]);
-  if (!r) throw notFound('این گزارش پیدا نشد', 'report_not_found');
-  return { id: r.id, status: 'reviewed' };
-}
-
-// ════════════════════════════════════════════════════════════════════
 //  پاک‌سازی
 // ════════════════════════════════════════════════════════════════════
 
@@ -865,7 +849,7 @@ module.exports = {
   flagOf, list, open, viewOf, setStatus, adoptForPhoneChange: acct.adoptForPhoneChange,
   send, changes, edit, remove, receipts,
   putMedia, getMedia, sendMedia: chatMedia.send, rawMedia,
-  setBlock, report, search, pin: pins.pin, MAX_PINS: pins.MAX_PINS,
-  reportsForAdmin, reviewReport,
+  setBlock, report, search, pin: pins.pin, MAX_PINS: pins.MAX_PINS, issue: life.issue, history: life.history, lifeOf: life.lifeOf,
+  ...require('./shop-chat-reports'),
   sweep, maskPhone, waiting,
 };

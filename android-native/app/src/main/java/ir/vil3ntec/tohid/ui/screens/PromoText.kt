@@ -84,16 +84,22 @@ object PromoText {
     val parts = buildList {
       if (s.categories.isNotEmpty()) add("دستهٔ " + s.categories.joinToString("، "))
       if (s.brands.isNotEmpty()) add("برندِ " + s.brands.joinToString("، "))
+      if (s.suppliers.isNotEmpty()) add("تأمین‌کنندهٔ " + s.suppliers.joinToString("، ") { supplierName(it, d) })
       val ids = if (r.kind == "price") r.prices.map { it.productId } else s.products
       if (ids.isNotEmpty()) add(if (ids.size == 1) name(ids[0]) else "${ids.size} کالا")
     }
     var t = if (parts.isEmpty()) "همهٔ کالاها" else parts.joinToString(" + ")
     if (s.exProducts.isNotEmpty()) t += " (جز ${if (s.exProducts.size == 1) name(s.exProducts[0]) else "${s.exProducts.size} کالا"})"
     if (s.exBrands.isNotEmpty()) t += " (جز برندِ ${s.exBrands.joinToString("، ")})"
+    if (s.exCategories.isNotEmpty()) t += " (جز دستهٔ ${s.exCategories.joinToString("، ")})"
+    if (s.exSuppliers.isNotEmpty()) t += " (جز تأمین‌کنندهٔ ${s.exSuppliers.joinToString("، ") { supplierName(it, d) }})"
     //  PRM-11: قاعدهٔ «فقط این گروه‌های مشتری»
     if (r.groups.isNotEmpty()) t += " · " + ir.vil3ntec.tohid.core.i18n.StrLine.promoOnlyGroups(r.groups.joinToString("، "))
     return t
   }
+
+  /** PRM-08 — نامِ تأمین‌کننده از شناسه؛ حذف‌شده ⇒ برچسبِ ثابت (شناسه به کاربر نشان داده نمی‌شود) */
+  fun supplierName(id: String, d: ShopData): String = d.suppliers.firstOrNull { it.id == id }?.name?.trim()?.ifEmpty { null } ?: "(حذف‌شده)"
 
   fun hm(m: Long): String = if (m < 0) "" else "${(m / 60 % 24).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}"
 
@@ -155,6 +161,10 @@ data class PromoForm(
   /** PRM-08: برندهای شامل و مستثنا (PRD-06، `Product.brand`) */
   val brands: Set<String> = emptySet(),
   val exBrands: Set<String> = emptySet(),
+  /** PRM-08: دسته‌های مستثنا و تأمین‌کنندگانِ شامل/مستثنا (شناسهٔ `Supplier`) */
+  val exCategories: Set<String> = emptySet(),
+  val suppliers: Set<String> = emptySet(),
+  val exSuppliers: Set<String> = emptySet(),
   val products: Set<String> = emptySet(),
   val exProducts: Set<String> = emptySet(),
   /** PRM-11 — فقط مشتریانِ این گروه‌ها (`Debtor.group`، CRM-08)؛ خالی = همه */
@@ -200,6 +210,9 @@ data class PromoForm(
       categories = r.scope.categories.toSet(),
       brands = r.scope.brands.toSet(),
       exBrands = r.scope.exBrands.toSet(),
+      exCategories = r.scope.exCategories.toSet(),
+      suppliers = r.scope.suppliers.toSet(),
+      exSuppliers = r.scope.exSuppliers.toSet(),
       products = r.scope.products.toSet(),
       exProducts = r.scope.exProducts.toSet(),
       groups = r.groups.toSet(),
@@ -229,6 +242,7 @@ data class PromoForm(
   }
 
   private fun dbl(s: String): Double? = ir.vil3ntec.tohid.parseNumber(s)
+  private fun keep(now: Set<String>, was: List<String>): List<String> = if (now == was.toSet()) was else now.sorted()
   private fun minor(s: String): Long = dbl(s)?.let { (it * 100).roundToLong() } ?: -1
   private fun bp(s: String): Long = dbl(s)?.let { (it * 100).roundToLong() } ?: 0
   private fun int(s: String, dflt: Long): Long = dbl(s)?.takeIf { it == Math.floor(it) }?.roundToLong() ?: dflt
@@ -262,6 +276,10 @@ data class PromoForm(
         categories = categories.sorted(),
         brands = brands.sorted(),
         exBrands = exBrands.sorted(),
+        //  PRM-08: دست‌نخورده ⇒ همان ترتیبِ پیشین (N2)
+        exCategories = keep(exCategories, base.scope.exCategories),
+        suppliers = keep(suppliers, base.scope.suppliers),
+        exSuppliers = keep(exSuppliers, base.scope.exSuppliers),
         products = if (kind == "price") base.scope.products.takeIf { base.kind == "price" }.orEmpty() else products.sorted(),
         exProducts = exProducts.sorted(),
       ),

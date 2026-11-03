@@ -72,6 +72,11 @@ router.get('/conversations/:id', on, async (req, res) => {
   res.json({ conversation: await chat.viewOf(viewerOf(req), req.params.id) });
 });
 
+//  گفت‌وگوهای پیشینِ همین مشتری در همین دکان (سفارش‌ها و عمومی)، تازه‌ترین بالا — برای نمایشِ جمع‌شده بالای رشته
+router.get('/conversations/:id/history', on, async (req, res) => {
+  res.json(await chat.history(viewerOf(req), req.params.id));
+});
+
 router.put('/conversations/:id/status', on, reply, async (req, res) => {
   res.json({ conversation: await chat.setStatus(viewerOf(req), req.params.id, req.body?.status) });
 });

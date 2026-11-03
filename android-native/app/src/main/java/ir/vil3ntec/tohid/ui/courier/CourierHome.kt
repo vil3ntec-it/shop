@@ -74,6 +74,7 @@ import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.MissionView
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.i18n.StrCourier
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.data.CourierStore
 import ir.vil3ntec.tohid.data.CourierSync
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -124,52 +125,51 @@ import kotlinx.coroutines.launch
  *  گوشی همان را با دادهٔ نمایشی صدا می‌زند).
  */
 
-internal val STATUS_LABEL = mapOf(
-  "requested" to "تازه", "assigned" to "قبول شد", "picked_up" to "بسته گرفته شد",
-  "moving" to "در راه", "arrived" to "رسیده", "failed" to "ناموفق",
-  "delivered" to "تحویل شد", "rejected" to "رد شد", "withdrawn" to "پس گرفته شد", "returned" to "برگشت به دکان",
+internal val STATUS_LABEL: Map<String, String> get() = mapOf(
+  "requested" to StrCourierApp.stRequested, "assigned" to StrCourierApp.stAssigned, "picked_up" to StrCourierApp.stPickedUp,
+  "moving" to StrCourierApp.stMoving, "arrived" to StrCourierApp.stArrived, "failed" to StrCourierApp.stFailed,
+  "delivered" to StrCourierApp.stDelivered, "rejected" to StrCourierApp.stRejected, "withdrawn" to StrCourierApp.stWithdrawn, "returned" to StrCourierApp.stReturned,
 )
 
 /** جملهٔ بزرگِ هر پله */
 internal fun headline(s: String): String = when (s) {
-  "requested" -> "کارِ تازه — قبول یا رد"
-  "assigned" -> "بسته را از دکان بگیرید"
-  "picked_up" -> "بسته دستِ شماست"
-  "moving" -> "در راهِ مشتری"
-  "arrived" -> "پیشِ مشتری هستید"
-  "failed" -> "تحویل نشد"
-  "delivered" -> "تحویل شد"
-  "rejected" -> "این کار را رد کردید"
-  "withdrawn" -> "دکان این کار را پس گرفت"
-  "returned" -> "بسته به دکان برگشت"
+  "requested" -> StrCourierApp.hlRequested
+  "assigned" -> StrCourierApp.hlAssigned
+  "picked_up" -> StrCourierApp.hlPickedUp
+  "moving" -> StrCourierApp.hlMoving
+  "arrived" -> StrCourierApp.hlArrived
+  "failed" -> StrCourierApp.hlFailed
+  "delivered" -> StrCourierApp.stDelivered
+  "rejected" -> StrCourierApp.hlRejected
+  "withdrawn" -> StrCourierApp.hlWithdrawn
+  "returned" -> StrCourierApp.hlReturned
   else -> STATUS_LABEL[s] ?: s
 }
 
 internal fun actionLabel(from: String, to: String): String = when (to) {
-  "assigned" -> "قبول"
-  "rejected" -> "رد"
-  "picked_up" -> "بسته را گرفتم"
-  "moving" -> if (from == "failed") "تلاشِ دوباره" else "راه افتادم"
-  "arrived" -> "رسیدم"
-  "delivered" -> "تحویل شد"
-  "failed" -> "ناموفق"
+  "assigned" -> StrCourierApp.acAccept
+  "rejected" -> StrCourierApp.acReject
+  "picked_up" -> StrCourierApp.acPickedUp
+  "moving" -> if (from == "failed") StrCourierApp.acRetry else StrCourierApp.acMoving
+  "arrived" -> StrCourierApp.acArrived
+  "delivered" -> StrCourierApp.stDelivered
+  "failed" -> StrCourierApp.stFailed
   else -> to
 }
 
 internal fun isNegative(to: String) = to == "rejected" || to == "failed"
-
-internal val REASON_LABEL = mapOf(
-  "busy" to "سرم شلوغ است", "too_far" to "خیلی دور است", "cash_limit" to "سقفِ نقدم پر است",
-  "no_answer" to "تماس بی‌پاسخ / کسی نبود", "wrong_address" to "نشانی پیدا نشد", "refused" to "مشتری نپذیرفت",
-  "recalled" to "دکان پس خواست", "partial_payment" to "مشتری کمتر داد", "refused_amount" to "مبلغ را نپذیرفت",
-  "damaged_or_short" to "کالا آسیب یا کسری داشت", "other" to "دلیلِ دیگر (بنویسید)",
+internal val REASON_LABEL: Map<String, String> get() = mapOf(
+  "busy" to StrCourierApp.rsBusy, "too_far" to StrCourierApp.rsTooFar, "cash_limit" to StrCourierApp.rsCashLimit,
+  "no_answer" to StrCourierApp.rsNoAnswer, "wrong_address" to StrCourierApp.rsWrongAddress, "refused" to StrCourierApp.rsRefused,
+  "recalled" to StrCourierApp.rsRecalled, "partial_payment" to StrCourierApp.rsPartialPayment, "refused_amount" to StrCourierApp.rsRefusedAmount,
+  "damaged_or_short" to StrCourierApp.rsDamagedOrShort, "other" to StrCourierApp.rsOther,
 )
 
 /** یادداشتِ «دکان پس خواست» روی کارت و جزئیات */
-internal const val RECALL_NOTE = "دکان این سفارش را پس خواسته است — بسته را برگردانید."
+internal val RECALL_NOTE: String get() = StrCourierApp.recallNote
 
 /** پله‌های نوارِ پیشرفت: گرفتم ⇐ در راه ⇐ رسیدم ⇐ تحویل */
-internal val STEPS = listOf("گرفتم", "در راه", "رسیدم", "تحویل")
+internal val STEPS: List<String> get() = listOf(StrCourierApp.stepGot, StrCourierApp.stMoving, StrCourierApp.acArrived, StrCourierApp.stepDelivered)
 
 /** چند پله رسیده — منفی یعنی نوار نشان داده نمی‌شود */
 internal fun reached(status: String): Int = when (status) {
@@ -181,7 +181,7 @@ internal fun reached(status: String): Int = when (status) {
   else -> -1
 }
 
-internal fun afn(minor: Long): String = "${money(minor / 100.0)} افغانی"
+internal fun afn(minor: Long): String = ir.vil3ntec.tohid.core.i18n.StrOnline.afnAmount(money(minor / 100.0))
 
 /** ساعت:دقیقهٔ گوشی */
 internal fun clock(at: Long): String {
@@ -259,8 +259,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
     val out = runCatching { CourierSync.flush(context, store) }.getOrNull()
     syncing = false
     reloadLocal()
-    lastError = out?.failure?.let { courierFailureText(it, "اینترنت نیست — کارها در صفِ گوشی می‌مانند") }
-    summaryError = out?.summaryFailure?.let { courierFailureText(it, "اینترنت نیست") }   //  «نقدِ من» تازه نشد ⇒ نقد و آمار می‌گویند
+    lastError = out?.failure?.let { courierFailureText(it, StrCourierApp.offlineQueued) }
+    summaryError = out?.summaryFailure?.let { courierFailureText(it, StrCourierApp.offlineShort) }   //  «نقدِ من» تازه نشد ⇒ نقد و آمار می‌گویند
     out?.photoErrors?.firstOrNull()?.let { snackbar.showSnackbar(it) }
   }
 
@@ -277,7 +277,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
       queue = next
       scope.launch { sync() }
     } catch (e: CourierInputError) {
-      scope.launch { snackbar.showSnackbar(e.message ?: "ثبت نشد") }
+      scope.launch { snackbar.showSnackbar(e.message ?: StrCourierApp.notSaved) }
     }
   }
 
@@ -315,14 +315,14 @@ fun CourierHome(onSignedOut: () -> Unit) {
       val eventId = "cph-" + ir.vil3ntec.tohid.sync.v1.Ulid.next()
       store.addPhoto(CourierStore.PendingPhoto(eventId, card.id, System.currentTimeMillis()), bytes)
       photosWaiting = store.photos().size
-      scope.launch { snackbar.showSnackbar("عکسِ بسته در صف است"); sync() }
+      scope.launch { snackbar.showSnackbar(StrCourierApp.photoQueued); sync() }
     },
     onCallShop = { phone ->
       //  فقط صفحهٔ شماره‌گیر با شمارهٔ دکان باز می‌شود؛ تماس را خودِ پیک می‌زند
       val opened = runCatching {
         context.startActivity(android.content.Intent(android.content.Intent.ACTION_DIAL, Uri.parse("tel:$phone")))
       }.isSuccess
-      if (!opened) scope.launch { snackbar.showSnackbar("شماره‌گیرِ گوشی باز نشد") }
+      if (!opened) scope.launch { snackbar.showSnackbar(StrCourierApp.dialerFailed) }
     },
     onNavigate = { c -> openMissionRoute(context, c) },   // DLV-05: پیوندهای سرور، وگرنه همان پیشین
     onSignOut = {
@@ -411,7 +411,7 @@ internal fun CourierBoard(
   fun open(c: MissionCard) { detailTab = "track"; openId = c.id }
 
   fun callShop() {
-    if (shopPhone.isBlank()) scope.launch { snackbar.showSnackbar("شمارهٔ دکان هنوز ثبت نشده است") }
+    if (shopPhone.isBlank()) scope.launch { snackbar.showSnackbar(StrCourierApp.shopPhoneMissing) }
     else onCallShop(shopPhone)
   }
 
@@ -487,7 +487,7 @@ internal fun CourierBoard(
                   val toTable = view.mode == ViewMode.CARD
                   V3IconButton(
                     if (toTable) Icons.Outlined.TableRows else Icons.Outlined.GridView,
-                    if (toTable) "نمای جدولی" else "نمای کارتی",
+                    if (toTable) ir.vil3ntec.tohid.core.i18n.Str.tableView else ir.vil3ntec.tohid.core.i18n.Str.cardView,
                     onClick = { view.set(ViewModePref.other(view.mode)) },
                   )
                 }
@@ -596,7 +596,7 @@ private fun RouteTab(
   ) {
     item(key = "head") {
       Row(Modifier.fillMaxWidth().padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text("مسیر", style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+        Text(StrCourierApp.route, style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
         wideToggle()
         //  DLV-04: «مسیرِ پیشنهادی» فقط با پرچمِ دکان (`/courier/me`)
         onRoutePlan?.let { Spacer(Modifier.width(8.dp)); V3IconButton(Icons.Outlined.Place, StrCourier.routeTitle, onClick = it) }
@@ -607,7 +607,7 @@ private fun RouteTab(
     item(key = "sync") { SyncLine(syncing, waitingTotal, lastError) }
     itemsIndexed(queue.rejected, key = { _, r -> "rej-" + r.event.eventId }) { _, r ->
       RejectedNote(
-        title = "«${actionLabel("", r.event.type)}» ثبت نشد",
+        title = StrCourierApp.actionNotSaved(actionLabel("", r.event.type)),
         message = r.message.ifBlank { r.code },
         onDismiss = { onDismissRejected(r.event.eventId) },
         modifier = Modifier.animateItem(),
@@ -615,7 +615,7 @@ private fun RouteTab(
     }
     item(key = "tabs") {
       V3Segmented(
-        listOf("فعال · ${live.size.fa()}", "پایان‌یافته · ${finished.size.fa()}"),
+        listOf(StrCourierApp.tabActive(live.size.fa()), StrCourierApp.tabFinished(finished.size.fa())),
         selected = if (routeTab == "active") 0 else 1,
         onSelect = { onRouteTab(if (it == 0) "active" else "done") },
       )
@@ -624,12 +624,12 @@ private fun RouteTab(
       item(key = "empty-$routeTab") {
         if (routeTab == "active") {
           EmptyCard(
-            title = "فعلاً مأموریتی ندارید",
-            sub = "دکان که بسپارد، همین‌جا دیده می‌شود.",
+            title = StrCourierApp.noMissionsTitle,
+            sub = StrCourierApp.noMissionsBody,
             onRefresh = if (syncing) null else onRefresh,
           )
         } else {
-          EmptyCard(title = "هنوز مأموریتی تمام نشده است", sub = "کارهای تحویل‌شده و برگشتی این‌جا می‌آیند.", onRefresh = null)
+          EmptyCard(title = StrCourierApp.noFinishedTitle, sub = StrCourierApp.noFinishedBody, onRefresh = null)
         }
       }
     } else {
@@ -652,10 +652,10 @@ internal fun SyncLine(syncing: Boolean, waiting: Int, lastError: String?) {
   val p = PhoneV3.colors
   Column {
     val (text, tone) = when {
-      syncing -> "در حالِ فرستادن…" to V3Status.INACTIVE
-      waiting > 0 -> "${waiting.fa()} کار در صفِ گوشی" to V3Status.WARNING
-      lastError != null -> "وصل نیست" to V3Status.INACTIVE
-      else -> "همه به دکان رسید" to V3Status.DELIVERED
+      syncing -> StrCourierApp.sendingDots to V3Status.INACTIVE
+      waiting > 0 -> StrCourierApp.queuedOnPhone(waiting.fa()) to V3Status.WARNING
+      lastError != null -> StrCourierApp.notConnected to V3Status.INACTIVE
+      else -> StrCourierApp.allReachedShop to V3Status.DELIVERED
     }
     Row { V3StatusPill(tone, text) }
     if (lastError != null) {
@@ -683,7 +683,7 @@ private fun RejectedNote(title: String, message: String, onDismiss: () -> Unit, 
     Box(
       Modifier.size(40.dp).clip(CircleShape).background(p.tile).clickable(onClick = onDismiss),
       contentAlignment = Alignment.Center,
-    ) { Icon(Icons.Outlined.Close, contentDescription = "دیدم", tint = p.icon, modifier = Modifier.size(18.dp)) }
+    ) { Icon(Icons.Outlined.Close, contentDescription = StrCourierApp.seen, tint = p.icon, modifier = Modifier.size(18.dp)) }
   }
 }
 
@@ -703,7 +703,7 @@ internal fun EmptyCard(title: String, sub: String, onRefresh: (() -> Unit)?) {
     Text(sub, style = courierText(14.sp), color = p.inkMuted, textAlign = TextAlign.Center)
     if (onRefresh != null) {
       Spacer(Modifier.height(16.dp))
-      CourierSecondary("به‌روز کردن", onRefresh, icon = Icons.Outlined.Refresh)
+      CourierSecondary(StrCourierApp.refresh, onRefresh, icon = Icons.Outlined.Refresh)
     }
   }
 }
@@ -763,7 +763,7 @@ private fun MissionCardView(
     modifier.fillMaxWidth().courierCard(p).clip(CourierCardShape).clickable(onClick = onOpen).padding(18.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("سفارشِ #${c.orderNo.fa()}", style = courierText(14.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+      Text(StrCourierApp.orderNo(c.orderNo.fa()), style = courierText(14.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
       if (waiting) { QueuedPill(); Spacer(Modifier.width(6.dp)) }
       MissionStatus(c.status)
     }
@@ -785,11 +785,11 @@ private fun MissionCardView(
       Spacer(Modifier.height(12.dp))
       FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
         if (live) {
-          if (c.expectedCollectMinor > 0) CourierInfoChip(Icons.Outlined.Payments, "نقد: ${afn(c.expectedCollectMinor)}")
-          if (c.requiresCode) CourierInfoChip(Icons.Outlined.Lock, "کدِ تحویل")
+          if (c.expectedCollectMinor > 0) CourierInfoChip(Icons.Outlined.Payments, StrCourierApp.cashChip(afn(c.expectedCollectMinor)))
+          if (c.requiresCode) CourierInfoChip(Icons.Outlined.Lock, StrCourierApp.deliveryCode)
         } else {
-          c.cashCollectedMinor?.let { CourierInfoChip(Icons.Outlined.CheckCircle, "گرفته شد: ${afn(it)}", positive = true) }
-          if (c.fareMinor > 0) CourierInfoChip(Icons.Outlined.Payments, "کرایه: ${afn(c.fareMinor)}")
+          c.cashCollectedMinor?.let { CourierInfoChip(Icons.Outlined.CheckCircle, StrCourierApp.collectedChip(afn(it)), positive = true) }
+          if (c.fareMinor > 0) CourierInfoChip(Icons.Outlined.Payments, StrCourierApp.fareChip(afn(c.fareMinor)))
         }
       }
     }
@@ -847,23 +847,23 @@ private fun ReasonSheet(type: String, onDismiss: () -> Unit, onDone: (String, St
   var reason by remember { mutableStateOf("") }
   var note by remember { mutableStateOf("") }
   val ready = reason.isNotBlank() && (reason != "other" || note.isNotBlank())
-  V3Sheet(onDismiss = onDismiss, title = if (type == "rejected") "ردِ این کار" else "تحویل نشد") { _ ->
-    CourierSheetSub("دلیل را انتخاب کنید")
+  V3Sheet(onDismiss = onDismiss, title = if (type == "rejected") StrCourierApp.rejectTitle else StrCourierApp.hlFailed) { _ ->
+    CourierSheetSub(StrCourierApp.pickReason)
     Spacer(Modifier.height(14.dp))
     ReasonList(CourierFlow.reasonsFor(type).map { it to (REASON_LABEL[it] ?: it) }, reason) { reason = it }
     Spacer(Modifier.height(14.dp))
     V3TextField(
       note, { note = it.take(CourierQueue.MAX_NOTE) },
-      "توضیح" + if (reason == "other") " (لازم)" else " (اختیاری)",
+      if (reason == "other") StrCourierApp.noteRequired else StrCourierApp.noteOptional,
       Modifier.fillMaxWidth(), singleLine = false,
     )
     Spacer(Modifier.height(18.dp))
     StepButton(
-      "ثبت", { onDone(reason, note.trim()) }, Modifier.fillMaxWidth(),
+      StrCourierApp.save, { onDone(reason, note.trim()) }, Modifier.fillMaxWidth(),
       kind = if (type == "failed") V3ButtonKind.DANGER else V3ButtonKind.PRIMARY, enabled = ready,
     )
     Spacer(Modifier.height(8.dp))
-    CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary(StrCourierApp.cancel, onDismiss, Modifier.fillMaxWidth())
   }
 }
 
@@ -891,46 +891,46 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
   val differs = collects && minor != null && minor != c.expectedCollectMinor
   val codeOk = !c.requiresCode || CourierQueue.latinDigits(code).length >= 4
   val cashOk = !collects || (minor != null && (!differs || (cashReason.isNotBlank() && (cashReason != "other" || note.isNotBlank()))))
-  V3Sheet(onDismiss = onDismiss, title = "تحویل به مشتری") { _ ->
-    CourierSheetSub("سفارشِ #${c.orderNo.fa()}")
+  V3Sheet(onDismiss = onDismiss, title = StrCourierApp.deliverTitle) { _ ->
+    CourierSheetSub(StrCourierApp.orderNo(c.orderNo.fa()))
     if (collects) {
       Spacer(Modifier.height(16.dp))
       Column(Modifier.fillMaxWidth().background(p.tile, CourierGroupShape).padding(vertical = 16.dp)) {
-        CourierBigAmount("نقدِ این سفارش", afn(c.expectedCollectMinor))
+        CourierBigAmount(StrCourierApp.orderCash, afn(c.expectedCollectMinor))
       }
     }
     if (c.requiresCode) {
       Spacer(Modifier.height(16.dp))
       V3TextField(
         code, { code = numberInput(it).filter { ch -> ch != '.' }.take(12) },
-        "کدِ تحویل — از مشتری بپرسید", Modifier.fillMaxWidth(), kind = V3FieldKind.BARCODE, placeholder = "••••",
+        StrCourierApp.codeAsk, Modifier.fillMaxWidth(), kind = V3FieldKind.BARCODE, placeholder = "••••",
       )
     }
     if (collects) {
       Spacer(Modifier.height(14.dp))
       V3TextField(
-        cash, { cash = numberInput(it) }, "نقدِ گرفته‌شده (افغانی)", Modifier.fillMaxWidth(),
+        cash, { cash = numberInput(it) }, StrCourierApp.cashTakenField, Modifier.fillMaxWidth(),
         kind = V3FieldKind.MONEY,
       )
       if (differs) {
         Spacer(Modifier.height(14.dp))
-        Text("مبلغ با سفارش فرق دارد — دلیل:", style = courierText(14.sp, FontWeight.Bold), color = p.ink)
+        Text(StrCourierApp.amountDiffers, style = courierText(14.sp, FontWeight.Bold), color = p.ink)
         Spacer(Modifier.height(8.dp))
         ReasonList(CourierFlow.CASH_REASONS.map { it to (REASON_LABEL[it] ?: it) }, cashReason) { cashReason = it }
         Spacer(Modifier.height(12.dp))
         V3TextField(
           note, { note = it.take(CourierQueue.MAX_NOTE) },
-          "توضیح" + if (cashReason == "other") " (لازم)" else " (اختیاری)",
+          if (cashReason == "other") StrCourierApp.noteRequired else StrCourierApp.noteOptional,
           Modifier.fillMaxWidth(), singleLine = false,
         )
       }
     }
     if (!c.requiresCode && !collects) {
       Spacer(Modifier.height(12.dp))
-      Text("بسته به مشتری رسید؟", style = courierText(16.sp), color = p.ink)
+      Text(StrCourierApp.reachedCustomerQ, style = courierText(16.sp), color = p.ink)
     }
     Spacer(Modifier.height(18.dp))
-    val label = if (collects && minor != null) "تحویل شد · ${afn(minor)} گرفتم" else "تحویل شد"
+    val label = if (collects && minor != null) StrCourierApp.deliveredTook(afn(minor)) else StrCourierApp.stDelivered
     StepButton(
       label,
       { onDone(CourierQueue.latinDigits(code), minor, if (differs) cashReason else "", if (differs) note.trim() else "") },
@@ -938,7 +938,7 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
       enabled = codeOk && cashOk,
     )
     Spacer(Modifier.height(8.dp))
-    CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary(StrCourierApp.cancel, onDismiss, Modifier.fillMaxWidth())
   }
 }
 
@@ -946,11 +946,11 @@ private fun DeliverSheet(c: MissionCard, onDismiss: () -> Unit, onDone: (code: S
 @Composable
 private fun SignOutSheet(waiting: Int, onDismiss: () -> Unit, onConfirm: () -> Unit) {
   V3ConfirmSheet(
-    title = "خروج از حسابِ پیک",
+    title = StrCourierApp.signOutTitle,
     message = if (waiting > 0)
-      "${waiting.fa()} کار هنوز به دکان نرسیده و با خروج از این گوشی پاک می‌شود. اول به اینترنت وصل شوید و «به‌روز کردن» را بزنید."
-    else "مأموریت‌ها و نشانی‌ها از این گوشی پاک می‌شوند.",
-    confirm = if (waiting > 0) "با وجودِ این خارج شو" else "خروج",
+      StrCourierApp.signOutWaiting(waiting.fa())
+    else StrCourierApp.signOutBody,
+    confirm = if (waiting > 0) StrCourierApp.signOutAnyway else StrCourierApp.signOut,
     onConfirm = onConfirm,
     onDismiss = onDismiss,
     icon = Icons.AutoMirrored.Outlined.Logout,

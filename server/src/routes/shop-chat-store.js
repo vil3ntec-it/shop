@@ -88,6 +88,12 @@ router.get(`${base}/conversations/:id`, readLimit, customer, async (req, res) =>
   res.json({ conversation: await chat.viewOf(v(req), req.params.id) });
 });
 
+//  «مشکل دارم»: رشتهٔ سفارشِ بسته تا ۷ روز پس از پایان دوباره باز می‌شود (`lib/shop-chat-life.js`)؛ پس از آن ۴۰۹
+router.post(`${base}/conversations/:id/issue`, readLimit, customer, sendLimit, async (req, res) => {
+  const out = await chat.issue(v(req), req.params.id);
+  res.json(out);
+});
+
 router.get(`${base}/conversations/:id/messages`, readLimit, customer, async (req, res) => {
   const out = await chat.changes(v(req), req.params.id, {
     after: req.query.after, limit: req.query.limit, wait: req.query.wait, signal: goneSignal(res),

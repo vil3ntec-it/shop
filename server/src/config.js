@@ -455,6 +455,9 @@ const config = {
     editWindowMs:   num(process.env.CHAT_EDIT_WINDOW_MIN, 15) * 60 * 1000,
     deleteWindowMs: num(process.env.CHAT_DELETE_WINDOW_MIN, 1440) * 60 * 1000,
     retentionDays:  num(process.env.CHAT_SHOP_RETENTION_DAYS, 0),
+    //  چرخهٔ عمرِ رشته (`lib/shop-chat-life.js`): «مشکل دارم» تا چند روز پس از پایانِ سفارش؛ رشتهٔ عمومی پس از چند روز بی‌کاری بسته
+    issueWindowMs:  num(process.env.CHAT_ISSUE_WINDOW_DAYS, 7) * 24 * 3600 * 1000,
+    idleCloseMs:    num(process.env.CHAT_IDLE_CLOSE_DAYS, 7) * 24 * 3600 * 1000,
     //  به‌ازای هر فرستنده (مشتری: دکان+شماره، کارمند: کاربر) در پنجرهٔ `rateLimit.windowMs`
     sendMax:        num(process.env.RATE_CHAT_SEND_MAX, 300),
     uploadMax:      num(process.env.RATE_CHAT_UPLOAD_MAX, 60),

@@ -56,4 +56,26 @@ class HeldStockTest {
     assertEquals(1.0, CatalogModel.items(d, index, "", null, emptyMap(), reserved).first { it.id == "cola" }.stock, 1e-9)
     assertEquals(10.0, CatalogModel.items(d, index, "", null, emptyMap(), reserved).first { it.id == "rice" }.stock, 1e-9)
   }
+
+  /**
+   *  POS-05: کاشیِ صندوقِ کامپیوتر (`ProductTile`/`ProductTable` با `PosProductCallbacks.stockOf`) همان «قابل‌فروش» ِ
+   *  گوشی را نشان می‌دهد — یک قاعده (`HeldStock.sellable`) برای هر دو؛ پیش‌تر کامپیوتر موجودیِ کل را نشان می‌داد.
+   */
+  @Test fun `POS-05 کاشیِ صندوقِ کامپیوتر هم موجودیِ قابل‌فروش را با همان قاعدهٔ گوشی نشان می‌دهد`() {
+    val book = HeldBook(items = listOf(held("h1", SaleDraft.Line("cola", 3.0)), held("h2", SaleDraft.Line("cola", 1.0))))
+    val reserved = HeldStock.reserved(book)
+    assertEquals(1.0, HeldStock.sellable(ShopStore.stock(d, "cola"), "cola", reserved), 1e-9)
+    assertEquals(10.0, HeldStock.sellable(ShopStore.stock(d, "rice"), "rice", reserved), 1e-9)
+    assertEquals(5.0, HeldStock.sellable(ShopStore.stock(d, "cola"), "cola", emptyMap()), 1e-9)
+
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/DeskSale.kt") }.firstOrNull { it.isFile }?.readText()
+      ?: error("DeskSale.kt پیدا نشد")
+    val cb = src.substringAfter("val productCb = PosProductCallbacks(").substringBefore("qtyOf")
+    assertTrue(cb.contains("HeldStock.sellable(ShopStore.stock(d, it), it, heldQty)"))
+    //  همان دفترِ نگه‌داشته‌های همین صندوق (نه سبدِ جاری)
+    val q = "val heldQty = held.store.book.collectAsState().value.let { b -> remember(b) { ir.vil3ntec.tohid.data.HeldStock.reserved(b) } }"
+    assertTrue(src.contains(q))
+    assertTrue(src.indexOf(q) > src.indexOf("val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices("))
+  }
 }

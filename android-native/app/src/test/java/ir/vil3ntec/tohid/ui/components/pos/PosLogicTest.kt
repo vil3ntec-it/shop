@@ -362,4 +362,38 @@ class PosLogicTest {
     assertTrue(till.posted != null)
     assertEquals(5, till.keys)
   }
+
+  /**
+   *  POS-41: کلیدهای پنلِ پرداختِ کامپیوتر (`sale.payment.*`) دیگر «planned» نیستند — Enter (ثبت/نقدِ دقیق)، PageDown/PageUp
+   *  (روشِ بعدی/قبلی)، Shift+۱..۶ (اسکناس)، Esc (برگشت) و تازه F2 (مشتری، `payPanelKey`)؛ فقط صندوقِ کامپیوتر ⇒ partial.
+   *  مانده: Alt+P (چاپِ همین فاکتور) و Tab/Shift+Tab ِ مستند.
+   */
+  @Test
+  fun `POS-41 کلیدهای پنلِ پرداخت از keymap می‌آیند و F2 مشتری و Esc برگشت است`() {
+    val km = ir.vil3ntec.tohid.core.keymap.KeyMap
+    val partial = listOf(
+      km.SALE_PAYMENT_SUBMIT, km.SALE_PAYMENT_NEXT_METHOD, km.SALE_PAYMENT_PREV_METHOD,
+      km.SALE_PAYMENT_NOTE10, km.SALE_PAYMENT_NOTE20, km.SALE_PAYMENT_NOTE50, km.SALE_PAYMENT_NOTE100,
+      km.SALE_PAYMENT_NOTE500, km.SALE_PAYMENT_NOTE1000, km.SALE_PAYMENT_CUSTOMER, km.SALE_PAYMENT_BACK,
+    )
+    partial.forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, it.status) }
+    listOf(km.SALE_PAYMENT_TOGGLE_PRINT, km.SALE_PAYMENT_NEXT_FIELD, km.SALE_PAYMENT_PREV_FIELD)
+      .forEach { assertEquals(it.id, ir.vil3ntec.tohid.core.keymap.KeyStatus.PLANNED, it.status) }
+
+    fun press(c: ir.vil3ntec.tohid.core.keymap.Chord, canCustomer: Boolean = true) = payPanelKey({ c in it.keys }, canCustomer)
+    assertEquals(PayPanelKey.CUSTOMER, press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F2)))
+    assertEquals(PayPanelKey.BACK, press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.Escape)))
+    //  بی گزینشِ مشتری (یا هنگامِ ثبت) F2 خورده نمی‌شود؛ Enter و Shift+F2 مالِ پنل نیستند
+    assertNull(press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F2), canCustomer = false))
+    assertNull(press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.Enter)))
+    assertNull(press(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.F2, shift = true)))
+
+    //  صندوقِ کامپیوتر: F2 ⇐ پنل بسته، فهرستِ مشتری، و پس از گزینش (یا بستن) همان پنل دوباره
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/DeskSale.kt") }.firstOrNull { it.isFile }?.readText()
+      ?: error("DeskSale.kt پیدا نشد")
+    assertTrue(src.contains("onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }"))
+    val picker = src.substringAfter("if (pickDebtor) {").substringBefore("QuickTillDialog")
+    assertEquals(2, Regex("if \\(payAfterPick\\) \\{ payAfterPick = false; payOpen = true \\}").findAll(picker).count())
+  }
 }

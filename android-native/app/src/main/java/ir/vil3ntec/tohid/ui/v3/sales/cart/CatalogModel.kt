@@ -42,7 +42,7 @@ object CatalogModel {
     name = p.name,
     price = p.salePrice,
     unit = p.unit,
-    stock = ShopStore.stock(d, p.id) - (held[p.id] ?: 0.0),
+    stock = ir.vil3ntec.tohid.data.HeldStock.sellable(ShopStore.stock(d, p.id), p.id, held),
     hasPhoto = p.photo,
     inCart = inCart,
     weighed = SalesEngine.isFractionalUnit(p.unit),

@@ -118,6 +118,14 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
     if (uri != null) scope.launch { if (ctl.sendImage(uri, draft)) draft = "" }
   }
   val voice = rememberVoiceState()
+  //  «عکس برای مشتری» ِ سفارش (`?photo=1`): گزینشگرِ عکس یک بار همان دمِ باز شدن
+  var photoAsked by rememberSaveable(id) { mutableStateOf(false) }
+  LaunchedEffect(id) {
+    if (args.query("photo") == "1" && !photoAsked && ctl.canWrite) { photoAsked = true; pickImage.launch("image/*") }
+  }
+  //  رشته‌های پیشینِ همین مشتری (یک رشته برای هر سفارش) — جمع‌شده بالای رشته
+  var earlier by remember(id) { mutableStateOf<List<ChatConversation>>(emptyList()) }
+  LaunchedEffect(id) { Backend.shopChat(context).history(id).onSuccess { r -> earlier = r.conversations; r.conversations.forEach { ChatHub.known[it.id] = it } } }
   val view = ThreadView(
     conversation = ctl.conversation,
     server = server,
@@ -127,6 +135,7 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
     canModerate = cfg.permissions.moderate,
     imageOf = ctl::imageOf,
     localImageOf = ctl::imageOf,
+    earlier = earlier,
     pinned = ctl.pinned(server),
     hasActions = { ctl.actionsOf(it).isNotEmpty() },
   )
@@ -143,6 +152,7 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
       onCancel = ctl::cancel,
       loadThumb = { m -> ctl.thumb(m) },
       loadLocal = { x -> ctl.localThumb(x) },
+      onEarlier = { cid -> nav.open(OnlinePaths.conversation(cid)) },
       onMore = { m -> actionsFor = m },
     ),
     onBack = if (embedded) null else backOrNull,
