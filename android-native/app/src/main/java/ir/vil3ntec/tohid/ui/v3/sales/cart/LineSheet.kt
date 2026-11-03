@@ -19,7 +19,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrSale
-import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3Button
@@ -34,7 +33,7 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 /**
  *  برگهٔ «تعداد و قیمتِ این ردیف» (`sale/line/{i}`، نگه داشتنِ ردیفِ سبد): واحد (اگر کالا
- *  واحدِ فروشِ دوم دارد)، «تعداد (کیلوگرم)»، «قیمت هر واحد» با یادِ قیمتِ خودِ کالا، «موجودی در
+ *  واحدِ فروشِ دوم دارد؛ با «واحدِ بزرگ در صندوق» همهٔ واحدها و بسته‌ها با قیمتِ لیست، POS-09)، «تعداد (کیلوگرم)»، «قیمت هر واحد» با یادِ قیمتِ خودِ کالا، «موجودی در
  *  محل‌ها» (POS-16، فقط با «محل‌های نگه‌داری» ِ روشن و محلی جز محلِ اصلی)، جمعِ
  *  شمارندهٔ همین ردیف، «ثبت» و «برداشتن از سبد». خطا زیرِ همان کادر و لرزشِ کوتاه.
  *
@@ -60,7 +59,11 @@ fun LineSheet(
   val total = rememberCountUp(LineModel.total(form, info, start))
 
   V3Sheet(onDismiss = onClose, title = info.name, detents = false) { closer ->
-    if (info.hasSaleUnit) {
+    if (info.units != null) {
+      //  POS-09 (S05): پایه، واحدِ دوم و بسته‌ها — فقط با «واحدِ بزرگ در صندوق» ِ همین دستگاه
+      V3Segmented(LineModel.unitLabels(info), form.unitAt, { form = LineModel.switchTo(form, info, it) })
+      Spacer(Modifier.height(14.dp))
+    } else if (info.hasSaleUnit) {
       V3Segmented(
         listOf(info.unit.ifBlank { StrSale.unitFallback }, info.saleUnit),
         if (form.inSaleUnit) 1 else 0,
@@ -76,20 +79,20 @@ fun LineSheet(
         kind = V3FieldKind.NUMBER,
         required = true,
         error = qtyError,
-        helper = if (form.inSaleUnit) LineModel.quantity(form, info)?.let { "= ${qty(it)} ${info.unit}" } else null,
+        helper = LineModel.qtyHelper(form, info),
         suffix = unit.ifBlank { null },
       )
       Spacer(Modifier.height(12.dp))
       V3TextField(
-        form.priceText, { form = form.copy(priceText = it, resetPrice = false) },
+        form.priceText, { form = form.copy(priceText = it, resetPrice = false, priceTouched = true) },
         StrSale.unitPrice,
         Modifier.fillMaxWidth(),
         kind = V3FieldKind.MONEY,
         error = priceError,
-        helper = if (info.free) null else StrSale.basePriceHelper(PhoneSaleText.amount(info.basePrice)),
+        helper = if (info.free) null else LineModel.packPriceText(form, info) ?: StrSale.basePriceHelper(PhoneSaleText.amount(info.basePrice)),
       )
       if (!info.free && info.unitPrice != null && !form.resetPrice) {
-        V3TextButton(StrSale.backToItemPrice, { form = form.copy(priceText = qty(info.basePrice), resetPrice = true) }, Modifier.padding(top = 4.dp))
+        V3TextButton(StrSale.backToItemPrice, { form = LineModel.resetPrice(form, info) }, Modifier.padding(top = 4.dp))
       }
     }
     if (info.places.isNotEmpty()) {

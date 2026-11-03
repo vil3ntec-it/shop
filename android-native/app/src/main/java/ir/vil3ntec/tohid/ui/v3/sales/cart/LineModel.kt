@@ -1,11 +1,13 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.product.UnitSale
 import ir.vil3ntec.tohid.data.PlaceQty
 import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.UnitLine
 import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.qty
 
@@ -26,9 +28,16 @@ data class LineInfo(
   val product: Product?,
   /** POS-16 — موجودیِ همین کالا در هر محلِ نگه‌داری (INV-20)؛ خالی ⇒ بخشش نیست (شرح سرِ `PlaceStock.of`) */
   val places: List<PlaceQty> = emptyList(),
+  /**
+   *  POS-09 (S05) — واحدهای کالا (پایه، واحدِ دوم و بسته‌ها با قیمتِ لیست) فقط با «واحدِ بزرگ در صندوق» ِ همین
+   *  دستگاه (`TillGoodsPref.units`، پیش‌فرض خاموش) و کالای چندواحدی؛ `null` ⇒ همان برگهٔ امروز (دو واحد یا هیچ)
+   */
+  val units: UnitLine.Plan? = null,
 ) {
   val hasSaleUnit: Boolean get() = saleUnit.isNotBlank() && unitFactor > 0
   val custom: Boolean get() = free || unitPrice != null
+  /** قیمتِ دستیِ ردیف که از قیمتِ لیستِ یک بسته نیامده (با عوض شدنِ واحد می‌ماند) */
+  val manualPrice: Boolean get() = unitPrice != null && units?.packPriced != true
 }
 
 /** نوشته‌های فرم */
@@ -39,6 +48,10 @@ data class LineForm(
   val inSaleUnit: Boolean = false,
   /** «برگشت به قیمتِ کالا» زده شد */
   val resetPrice: Boolean = false,
+  /** POS-09 — واحدِ ردیف از `LineInfo.units` (۰ = پایه)؛ بی `units` بی‌اثر */
+  val unitAt: Int = 0,
+  /** POS-09 — کاربر خودش قیمت نوشت (با `units` قیمتِ نانوشته با واحد عوض می‌شود) */
+  val priceTouched: Boolean = false,
 )
 
 /**
@@ -54,11 +67,13 @@ object LineModel {
   /**
    *  @param places «محل‌های نگه‌داری» ِ همین دستگاه روشن است (`StockPlacesPref.places`) — صدازننده می‌خواند؛
    *  پیش‌فرض false ⇒ همان برگهٔ امروز
+   *  @param units «واحدِ بزرگ در صندوق» ِ همین دستگاه (`TillGoodsPref.units`) و [wholeOnly] «فقط بستهٔ کامل»
+   *  (`TillGoodsPref.wholePacks`) — صدازننده می‌خواند؛ پیش‌فرض false ⇒ همان برگهٔ امروز
    */
-  fun info(d: ShopData, line: SalesEngine.CartLine, places: Boolean = false): LineInfo {
+  fun info(d: ShopData, line: SalesEngine.CartLine, places: Boolean = false, units: Boolean = false, wholeOnly: Boolean = false): LineInfo {
     val p = d.products.find { it.id == line.productId }
     val base = if (line.free) line.unitPrice ?: 0.0 else p?.salePrice ?: 0.0
-    return LineInfo(
+    return withUnits(LineInfo(
       id = line.productId,
       name = if (line.free) line.label else p?.name.orEmpty(),
       unit = p?.unit.orEmpty(),
@@ -70,13 +85,61 @@ object LineModel {
       free = line.free,
       product = p,
       places = if (places && !line.free) PlaceStock.of(d, p) else emptyList(),
-    )
+    ), units, wholeOnly)
+  }
+
+  /** POS-09 — برنامهٔ واحدهای ردیف روی [info] (`UnitLine.plan`)؛ خاموش، قلمِ آزاد یا کالای تک‌واحد ⇒ همان [info] */
+  fun withUnits(info: LineInfo, on: Boolean, wholeOnly: Boolean): LineInfo {
+    val p = info.product
+    if (!on || info.free || p == null) return info
+    return info.copy(units = UnitLine.plan(p, wholeOnly, info.quantity, info.unitPrice, next = false))
+  }
+
+  /** واحدِ [i] ِ برنامهٔ ردیف؛ بیرون از فهرست ⇒ پایه */
+  private fun unitOf(plan: UnitLine.Plan, i: Int): UnitSale.Unit = plan.units.getOrNull(i) ?: plan.units[0]
+
+  /** برچسبِ هر واحد برای انتخاب: پایه با نامِ خودش، بسته «کارتن (۱۲ دانه)» */
+  fun unitLabels(info: LineInfo): List<String> = info.units?.units.orEmpty().mapIndexed { i, u ->
+    if (i == 0) info.unit.ifBlank { StrSale.unitFallback } else UnitLine.label(u, info.unit)
+  }
+
+  /** قیمتِ هر واحدِ پایه از قیمتِ لیستِ واحدِ انتخاب‌شده؛ `null` ⇒ قیمتِ خودِ کالا (`UnitSale.lineUnitPrice`) */
+  fun listPrice(form: LineForm, info: LineInfo): Double? = info.units?.let { UnitSale.lineUnitPrice(unitOf(it, form.unitAt)) }
+
+  /** قیمتِ واحدِ [u] در لیستِ قیمت (خودِ بسته، نه هر واحدِ پایه)؛ `null` ⇒ بسته قیمتِ جدا ندارد */
+  fun packPriceText(form: LineForm, info: LineInfo): String? {
+    val plan = info.units ?: return null
+    val u = unitOf(plan, form.unitAt)
+    val minor = u.priceMinor ?: return null
+    return if (form.unitAt > 0) StrSale.packListPrice(u.name, ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText.amount(minor / 100.0)) else null
+  }
+
+  /**
+   *  POS-09 — عوض کردنِ واحدِ ردیف به [to]: همان مقدار به واحدِ تازه (نه پاک شدنِ کادر)؛ قیمتِ نانوشته (و نه دستیِ
+   *  پیشینِ ردیف) قیمتِ لیستِ واحدِ تازه می‌شود — همان `CartLineDialog` ِ پیشین.
+   */
+  fun switchTo(form: LineForm, info: LineInfo, to: Int): LineForm {
+    val plan = info.units ?: return form
+    if (to == form.unitAt || to !in plan.units.indices) return form
+    val typed = parseNumber(form.qtyText)
+    val qtyText = if (typed == null) form.qtyText
+      else qty(UnitSale.fromBase(typed * unitOf(plan, form.unitAt).sizeMilli / 1000.0, plan.units[to]))
+    val next = form.copy(qtyText = qtyText, unitAt = to)
+    val list = listPrice(next, info)
+    return if (!form.priceTouched && (form.resetPrice || !info.manualPrice)) next.copy(priceText = qty(list ?: info.basePrice)) else next
   }
 
   /** «۳ کیلوگرم» ِ یک محل */
   fun placeQtyText(q: PlaceQty, unit: String): String = (qty(q.milli / 1000.0) + " " + unit).trim()
 
-  fun start(info: LineInfo): LineForm = LineForm(qty(info.quantity), qty(info.unitPrice ?: info.basePrice))
+  fun start(info: LineInfo): LineForm = info.units?.let { plan ->
+    //  POS-09: برگه با واحدی باز می‌شود که مقدارِ ردیف را بی اعشار می‌گیرد (`UnitLine.plan`)
+    LineForm(qty(plan.startCount), qty(info.unitPrice ?: info.basePrice), unitAt = plan.startAt)
+  } ?: LineForm(qty(info.quantity), qty(info.unitPrice ?: info.basePrice))
+
+  /** «برگشت به قیمتِ کالا»: قیمتِ خودِ کالا — با `units` قیمتِ لیستِ واحدِ انتخاب‌شده */
+  fun resetPrice(form: LineForm, info: LineInfo): LineForm =
+    form.copy(priceText = qty(listPrice(form, info) ?: info.basePrice), resetPrice = true, priceTouched = false)
 
   /** عوض کردنِ واحد: همان مقدار به واحدِ تازه، نه پاک شدنِ کادر */
   fun switchUnit(form: LineForm, info: LineInfo, toSale: Boolean): LineForm {
@@ -86,17 +149,30 @@ object LineModel {
     return form.copy(qtyText = qty(next), inSaleUnit = toSale)
   }
 
-  /** مقدارِ ثبت به واحدِ موجودی؛ null ⇒ عدد نیست */
+  /** مقدارِ ثبت به واحدِ موجودی؛ null ⇒ عدد نیست (با `units`: صفر/منفی یا بخشی از بستهٔ نامجاز هم) */
   fun quantity(form: LineForm, info: LineInfo): Double? {
     val typed = parseNumber(form.qtyText) ?: return null
+    info.units?.let { plan -> return UnitSale.toBase(typed, unitOf(plan, form.unitAt), plan.wholeOnly) }
     val p = info.product
     return if (form.inSaleUnit && p != null) SalesEngine.toStockQty(p, typed) else typed
   }
 
   /** واحدی که کادرِ مقدار با آن نوشته می‌شود */
-  fun shownUnit(form: LineForm, info: LineInfo): String = if (form.inSaleUnit) info.saleUnit else info.unit
+  fun shownUnit(form: LineForm, info: LineInfo): String = info.units?.let { plan ->
+    if (form.unitAt == 0) info.unit else unitOf(plan, form.unitAt).name
+  } ?: if (form.inSaleUnit) info.saleUnit else info.unit
+
+  /** زیرِ کادرِ مقدار: «= ۱۲ دانه» وقتی به واحدی جز پایه نوشته می‌شود */
+  fun qtyHelper(form: LineForm, info: LineInfo): String? =
+    if ((info.units != null && form.unitAt > 0) || (info.units == null && form.inSaleUnit)) quantity(form, info)?.let { "= ${qty(it)} ${info.unit}" } else null
 
   fun qtyError(form: LineForm, info: LineInfo): String? {
+    info.units?.let { plan ->
+      val typed = parseNumber(form.qtyText) ?: return StrSale.badNumberShort
+      if (typed <= 0) return StrSale.positiveNeeded
+      val u = unitOf(plan, form.unitAt)
+      if (UnitSale.partRejected(typed, u, plan.wholeOnly)) return StrSale.partPackRejected(u.name)
+    }
     val q = quantity(form, info) ?: return StrSale.badNumberShort
     if (q <= 0) return StrSale.positiveNeeded
     return info.product?.let { SalesEngine.quantityProblem(it, q) }
@@ -109,6 +185,16 @@ object LineModel {
 
   /** قیمتی که ردیف پس از ثبت دارد (null ⇒ قیمتِ کالا) */
   fun wantedPrice(form: LineForm, info: LineInfo, start: LineForm): Double? {
+    if (info.units != null && !info.free) {
+      //  POS-09: نانوشته ⇒ قیمتِ دستیِ پیشینِ ردیف، وگرنه قیمتِ لیستِ واحدِ انتخاب‌شده (null ⇒ قیمتِ کالا)
+      val list = listPrice(form, info)
+      val untouched = if (info.manualPrice) info.unitPrice else list
+      return when {
+        form.resetPrice -> list
+        form.priceTouched -> parseNumber(form.priceText) ?: untouched
+        else -> untouched
+      }
+    }
     val wanted = when {
       form.resetPrice && form.priceText == qty(info.basePrice) -> null
       form.priceText == start.priceText -> info.unitPrice
