@@ -23,6 +23,7 @@ import ir.vil3ntec.tohid.ios.IosNetRoute
 import ir.vil3ntec.tohid.ios.IosRoot
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
+import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.jsonPrimitive
 import platform.Foundation.NSBundle
@@ -57,6 +58,11 @@ class CoreFlowsE2EIosTest {
       NSBundle.mainBundle.pathForResource("vazirmatn_regular", ofType = "ttf") != null,
       "قلمِ Vazirmatn کنارِ test.kexe نیست: ${NSBundle.mainBundle.bundlePath}",
     )
+
+    //  نصبِ تازه: انتخابِ حالت و «خوش‌آمد» (پروندهٔ `tohid`) را آزمون‌های پیشینِ همین فرآیند گذاشته‌اند (پیوندِ
+    //  `Phase7IosTest` حالتِ «دکان» را برمی‌گزیند) ⇐ پاک، تا برنامه مثلِ بارِ اولِ نصب از «از برنامه چه می‌خواهید؟» بالا بیاید
+    IosContext.deleteSharedPreferences("tohid")
+    ModeState.chosen.value = null
 
     runSkikoComposeUiTest(size = Size(WIDTH * SCALE, HEIGHT * SCALE), density = Density(SCALE)) {
       val e = E2eDriver(this, env.shots)

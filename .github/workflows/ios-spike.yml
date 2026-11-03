@@ -95,9 +95,10 @@ jobs:
         with:
           path: ~/.konan
           key: konan-ui-${{ runner.os }}-${{ hashFiles('ios/shared/build.gradle.kts', 'core/build.gradle.kts') }}
-      #  klib ِ شبیه‌ساز + آزمونِ خالصِ حالتِ GCM ِ دفترِ رمزدار در برابرِ خودِ JDK (همان بایت‌های اندروید/کامپیوتر)
-      - name: compileKotlinIosSimulatorArm64 و jvmTest (ios/shared)
-        run: ./desktop/gradlew --no-daemon -p ios/shared -Pios=true compileKotlinIosSimulatorArm64 jvmTest
+      #  klib ِ شبیه‌ساز + klib ِ آزمون‌های شبیه‌ساز (از گامِ ۸ آزمونِ سرتاسری هم؛ خطای کامپایلش این‌جا، نه پس از دقیقه‌های مک)
+      #  + آزمونِ خالصِ حالتِ GCM ِ دفترِ رمزدار در برابرِ خودِ JDK (همان بایت‌های اندروید/کامپیوتر)
+      - name: compileKotlinIosSimulatorArm64، compileTestKotlinIosSimulatorArm64 و jvmTest (ios/shared)
+        run: ./desktop/gradlew --no-daemon -p ios/shared -Pios=true compileKotlinIosSimulatorArm64 compileTestKotlinIosSimulatorArm64 jvmTest
 
   #  برنامهٔ آیفون روی macOS: چارچوبِ Compose (`TohidShared`)، برنامهٔ Xcode برای شبیه‌ساز بی امضا،
   #  و یک بار اجرا روی شبیه‌ساز با عکس. امضا و انتشار BLOCKED-EXTERNAL است (حسابِ اپل ِ صاحب‌کار).
@@ -180,7 +181,23 @@ jobs:
           rc=$?
           grep -ho '<testsuite [^>]*' ios/shared/build/test-results/iosSimulatorArm64Test/*.xml
           if [ -s ios-e2e/shots/summary.md ]; then cat ios-e2e/shots/summary.md >> "$GITHUB_STEP_SUMMARY"; cat ios-e2e/shots/summary.md; else echo "::warning::جدولِ آزمونِ سرتاسری نیست (ios-e2e/shots/summary.md)"; fi
+          #  لاگِ گام‌ها و درختِ دسترس‌پذیریِ هر گامِ سرخ همین‌جا هم (بی دانلودِ مصنوع)
+          if [ -f ios-e2e/shots/e2e.log ]; then echo "::group::e2e.log"; cat ios-e2e/shots/e2e.log; echo "::endgroup::"; fi
+          for f in ios-e2e/shots/*FAIL*.txt; do [ -f "$f" ] && { echo "::group::$f"; head -400 "$f"; echo "::endgroup::"; }; done
+          ls -la ios-e2e/shots 2>/dev/null || true
           exit $rc
+      #  کوچک‌شدهٔ هر عکس (JPEG ِ ۵۲۰ نقطه، base64 میانِ THUMB-BEGIN/THUMB-END) در لاگ: سیزن‌های Claude مصنوع را
+      #  دانلود نمی‌توانند ولی لاگ را می‌خوانند؛ صاحب‌کار همان مصنوعِ ios-e2e-shots را با کیفیتِ کامل می‌بیند
+      - name: کوچک‌شدهٔ عکس‌های آزمونِ سرتاسری در لاگ
+        if: always()
+        run: |
+          mkdir -p ios-e2e/thumbs
+          for f in ios-e2e/shots/*.png; do
+            [ -f "$f" ] || continue
+            t="ios-e2e/thumbs/$(basename "${f%.png}").jpg"
+            sips -s format jpeg -s formatOptions 50 -Z 520 "$f" --out "$t" >/dev/null 2>&1 || continue
+            echo "THUMB-BEGIN $(basename "$t")"; base64 -i "$t" | fold -w 120; echo "THUMB-END"
+          done
       - name: پایانِ سرورِ آزمون
         if: always()
         run: |

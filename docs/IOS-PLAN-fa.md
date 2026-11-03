@@ -136,7 +136,8 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
   در محیطِ این PR مخزنِ گوگل (androidx ِ iOS) و download.jetbrains.com بسته بودند: بررسیِ محلی با init-script ِ جدا (در مخزن نیست)
   روی Compose ‎1.7.3 ِ Maven Central و بی گروه‌های `androidx.*` انجام شد؛ CI همان ‎1.9.3 را با همهٔ وابستگی‌ها می‌سازد.
 - **CI** (`.github/workflows/ios-spike.yml`، هر دو «گزارش» و `continue-on-error`، روی `core/**` و `ios/**`):
-  - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64` و `jvmTest` (GCM در برابرِ JDK) — نگهبانِ ارزان.
+  - `ios-ui-klib` (ubuntu): همان `compileKotlinIosSimulatorArm64`، از گامِ ۸ `compileTestKotlinIosSimulatorArm64` (آزمون‌های شبیه‌ساز و
+    آزمونِ سرتاسری) و `jvmTest` (GCM در برابرِ JDK) — نگهبانِ ارزان.
   - `ios-app` (macos-latest): `linkDebugFrameworkIosSimulatorArm64` ⇐ `xcodebuild -target iosApp -sdk iphonesimulator -arch arm64`
     بی امضا ⇐ نصب و اجرا روی شبیه‌ساز، عکس پس از ۲۰ ثانیه و گزارشِ «زنده است؟» (مصنوعِ `ios-app-shots`)؛ از گامِ ۲
     `iosSimulatorArm64Test` هم (بردارهای رمز با CommonCrypto؛ از گامِ ۳ WorkManager، بارکد و اعلان). از گامِ ۸ همان آزمون
