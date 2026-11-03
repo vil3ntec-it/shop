@@ -31,7 +31,6 @@
     "server/public/admin/app.js": 2436,
     "server/public/admin/index.html": 1387,
     "server/src/lib/catalog.js": 918,
-    "server/src/lib/delivery.js": 1170,
     "server/src/lib/image-bank.js": 1195,
     "server/src/lib/market.js": 811,
     "server/src/lib/notices.js": 825,
