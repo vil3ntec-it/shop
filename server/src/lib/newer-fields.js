@@ -155,10 +155,14 @@ function filterOps(ops, { version = '', shape = 'v1', caps = [], client: who = '
   return res;
 }
 
-/** پاسخ‌های دستهٔ پالایش‌شده ⇒ به ترتیبِ دستهٔ اصلی، با `ignored` برای opِ کوتاه‌شده */
+/**
+ * پاسخ‌های دستهٔ پالایش‌شده ⇒ به ترتیبِ دستهٔ اصلی، با `ignored` برای opِ کوتاه‌شده (کنارِ `ignored` ِ پالایشِ دیگر،
+ * مثلاً فیلدِ تماسِ CRM-15 در ‎lib/customer-contact.js‎ — جای آن را نمی‌گیرد)
+ */
 function mergeResults(fl, results) {
   if (!Array.isArray(results) || (!fl.dropped.size && !fl.trimmed.size)) return results;
-  const rest = results.map((r) => (r && fl.trimmed.has(r.op_id) ? { ...r, ignored: fl.trimmed.get(r.op_id) } : r));
+  const rest = results.map((r) => (r && fl.trimmed.has(r.op_id)
+    ? { ...r, ignored: [...(Array.isArray(r.ignored) ? r.ignored : []), ...fl.trimmed.get(r.op_id)] } : r));
   const merged = [];
   for (let i = 0; i < fl.length; i++) merged.push(fl.dropped.has(i) ? fl.dropped.get(i) : rest.shift());
   return merged.filter(Boolean).concat(rest);

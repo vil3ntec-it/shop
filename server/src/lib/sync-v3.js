@@ -465,7 +465,7 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null, hideContact = false }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
@@ -484,6 +484,8 @@ async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
     }
     return out;
   }
+  const cc = hideContact ? require('./customer-contact').guardV3(op, row, origin) : null;   //  ⛔ CRM-15: تماسِ ردیفِ موجود دست نمی‌خورد
+  if (cc) { if (cc.noop) return cc.noop; op = cc.op; }
 
   //  نگهبانِ ساعت: سرور با HLCِ کج جلو نمی‌رود و آن را «مؤثر» نمی‌کند
   let eff = op.hlc;
@@ -511,16 +513,14 @@ async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
 
   if (res.effect && res.row) await after(c, ctx, op, res, { eff, origin, t });
 
-  const out = { op_id: op.op_id, status: res.status, server_seq: seq, hlc: eff };
+  const out = { op_id: op.op_id, status: res.status, server_seq: seq, hlc: eff, ...(cc ? { ignored: cc.ignored } : {}) };
   if (skewed) out.skewed = true;
   if (res.conflicts.length) out.conflicts = res.conflicts.length;
   if (res.status !== 'applied') {
     //  حالِ واقعیِ همین فیلدها، تا دستگاه بی pull خودش را درست کند
     const now = res.row || row || emptyRow();
-    out.current = {
-      deleted: !!now.deleted_at,
-      data: op.kind === 'delete' || op.kind === 'cancel' ? now.data : pick(now.data, Object.keys(op.fields || {})),
-    };
+    const data = op.kind === 'delete' || op.kind === 'cancel' ? now.data : pick(now.data, Object.keys(op.fields || {}));
+    out.current = { deleted: !!now.deleted_at, data: hideContact ? require('./customer-contact').omit(op.table, data) : data };
   }
   return out;
 }
@@ -688,7 +688,7 @@ function errorText(v) {
  * @throws 426 اگر برنامه از سرور جلوتر باشد — و هیچ چیزی اعمال نمی‌شود (opها روی برنامه می‌مانند)
  */
 async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaVersion = 0, ops, appVersion = '',
-  queued = null, lastError, clockOffsetMs = null }) {
+  queued = null, lastError, clockOffsetMs = null, hideContact = false }) {
   requireShop(ctx);
   if (deviceId === SERVER_DEVICE) throw badRequest('این شناسهٔ دستگاه رزرو است', 'bad_device');
   const proto = Number(protocol) || PROTOCOL;
@@ -802,7 +802,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, plan });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, plan, hideContact });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }

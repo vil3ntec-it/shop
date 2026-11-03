@@ -19,7 +19,9 @@ const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-customer-ip' }));
-router.use(requireUser, requireShop, requirePermission('orders.view'), requirePermission('orders.contact'));
+//  CRM-15: جست‌وجو با شمارهٔ مشتری ⇒ `customers.contact` هم (‎lib/customer-contact.js‎)
+router.use(requireUser, requireShop, requirePermission('orders.view'), requirePermission('orders.contact'),
+  require('../lib/customer-contact').requireOrdersContact);
 
 const needFlag = async (req, res, next) => {
   if (!(await orders.flagOf(req.shopId))) return next(forbidden('سفارشِ آنلاین برای این دکان روشن نیست', 'orders_disabled'));

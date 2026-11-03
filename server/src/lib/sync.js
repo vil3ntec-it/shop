@@ -19,6 +19,7 @@ const { badRequest, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
 const permCore = require('./perm-core');
 const roleRows = require('./role-rows');
+const contact = require('./customer-contact');
 
 /** نام مجموعه در برنامه → جدول دیتابیس. هر چیز بیرون این فهرست رد می‌شود. */
 const TABLES = {
@@ -84,7 +85,7 @@ async function currentRev(shopId) {
 /**
  * نوشتن تغییرات یک دستگاه.
  *
- * @param {object} ctx {shopId, userId, deviceId, role}
+ * @param {object} ctx {shopId, userId, deviceId, role, hideContact?} — `hideContact` (CRM-15): اصل `customers.contact` ندارد
  * @param {Array}  changes [{collection,id,updatedAt,deleted,data}]
  */
 async function pushChanges(ctx, changes) {
@@ -155,8 +156,8 @@ async function pushChanges(ctx, changes) {
 
       const updatedAt = Number(raw.updatedAt) || t;
       const deleted = raw.deleted === true;
-      const data = deleted ? {} : (raw.data && typeof raw.data === 'object' ? raw.data : {});
-      const json = JSON.stringify(data);
+      let data = deleted ? {} : (raw.data && typeof raw.data === 'object' ? raw.data : {});
+      let json = JSON.stringify(data);
       if (Buffer.byteLength(json, 'utf8') > MAX_RECORD_BYTES) { skipped++; continue; }
 
       // رکورد فعلی سرور را قفل می‌کنیم تا دو دستگاه همزمان روی هم ننویسند
@@ -171,14 +172,22 @@ async function pushChanges(ctx, changes) {
         [shopId, recordId]
       )).rows[0];
 
-      /** تعارض، همراه با آنچه سرور واقعاً دارد. */
+      /** تعارض، همراه با آنچه سرور واقعاً دارد (CRM-15: بی شماره و نشانیِ مشتری برای اصلِ بی مجوز). */
       const conflictWith = (reason) => ({
         collection, id: recordId, reason,
         serverUpdatedAt: Number(existing.updated_at),
         serverVersion: existing.version,
         deleted: existing.deleted === true,
-        data: existing.deleted ? null : existing.data,
+        data: existing.deleted ? null : ctx.hideContact ? contact.omit(collection, existing.data) : existing.data,
       });
+
+      //  ⛔ CRM-15: راهِ قدیم کلِ ردیف را جایگزین می‌کند؛ اصلِ بی `customers.contact` شماره و نشانیِ ردیفِ موجود را
+      //  نه عوض می‌کند نه پاک (همان سرور می‌ماند، هرچه فرستاده — پوشیده، خالی یا هیچ)؛ ردیفِ تازه بی مقدارِ پوشیده
+      if (ctx.hideContact && !deleted && contact.fieldsOf(collection)) {
+        data = contact.keepServer(collection, data, existing ? existing.data : null);
+        json = JSON.stringify(data);
+        if (Buffer.byteLength(json, 'utf8') > MAX_RECORD_BYTES) { skipped++; continue; }
+      }
 
       if (existing) {
         // شاگرد فقط رکورد خودش را حذف می‌کند
