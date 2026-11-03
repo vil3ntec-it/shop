@@ -799,6 +799,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۱۹۸ (`198_perf03_indexes.sql`: فقط نمایه — `ix_sync_v3_rows_moves_product`، `ix_sync_rows_stock_ref`، `ix_sync_v3_rows_stock_ref`، `ix_sync_v3_rows_product_barcodes`، `ix_online_orders_shop_phone`؛ PERF-03، `claude/perf03-query-plans`؛ شماره را هماهنگ‌کننده سپرد؛ rollback در `server/migrations/rollback/`؛ یافته‌ها `docs/PERF-QUERY-PLANS-fa.md`).
 - ۲۰۲ (`202_shop_loyalty_rule.sql`: `shop_loyalty_rules`، PRM-13 قاعدهٔ یکسانِ امتیاز، `claude/loyalty-complete`؛ سپردهٔ هماهنگ‌کننده: تا ۱۹۹ و ۲۰۱ گرفته بود).
 - ۲۰۴ (`204_shop_hesabpay.sql`: `shop_hesabpay` — حساب‌پیِ هر دکان، رمزِ جدای حساب‌پی و نشانیِ وب‌هوکِ دکان، PAY-21/PAY-06، `claude/hesabpay-per-shop`؛ ۱۴۰۵/۰۸/۱۱ پس از سنجشِ main: بزرگ‌ترین ۲۰۳ بود؛ rollback در `server/migrations/rollback/`).
+- ۲۰۶ (`206_market_regions.sql`: `market_listings.province`/`district` و `shop_census_marks` — S109 شمارشِ منطقه‌ای، `claude/missing-rows-1`؛ ۲۰۵ از آنِ #853 (`205_hesabpay_payee_guard.sql`)؛ rollback در `server/migrations/rollback/`).
 - ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
 
 ### v3 · تعارض‌های حل‌شده

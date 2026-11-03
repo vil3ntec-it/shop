@@ -35,6 +35,8 @@ object ProductsPaths {
   fun edit(id: String) = item(id) + "/edit"
   fun photo(id: String) = item(id) + "/photo"
   fun studio(id: String, source: String) = RoutePaths.withQuery(photo(id) + "/studio", "src" to source)
+  fun photoBank(id: String) = photo(id) + "/bank"
+  fun photoGuided(id: String) = photo(id) + "/guided"
   /** برگهٔ دسته‌ها؛ `pick` ⇐ انتخاب برای نتیجه (`nav.openForResult`)، `selected` دستهٔ فعلی */
   fun categories(pick: Boolean = false, selected: String? = null) =
     RoutePaths.withQuery("products/categories", "pick" to if (pick) "1" else null, "selected" to selected?.takeIf { pick })
@@ -79,6 +81,7 @@ val ProductsModule = AppModule(
           stock = { nav.open(StockPaths.item(id)) },
           movements = { nav.open(StockPaths.movements(id)) },
         ),
+        photoExtra = { BankPhotoSlot(id) },
       )
     },
     //  بارکدِ ناشناس (صندوق، انبار، جست‌وجو) ⇐ همین فرم با بارکدِ پرشده؛ یک کالا ثبت شد ⇐ ورودِ انبارِ همان (مثلِ امروز)
@@ -98,10 +101,14 @@ val ProductsModule = AppModule(
       DraftPhotoSourceSheet(
         open = true,
         title = StrProducts.photoTitle,
+        more = rememberPhotoMore(id),
         onDismiss = { picked?.let { nav.replace(ProductsPaths.studio(id, it.toString())) } ?: back() },
         onPicked = { picked = it },
       )
     },
+    //  بانکِ تصاویر (۳۶.۶) و دوربینِ راهنما (۳۷.۵) — همان پنجره‌های صفحهٔ کالای پیشین (`ProductPhotoExtrasAndroid.kt`)
+    V3Route("products/{id}/photo/bank", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoBankRoute(args["id"].orEmpty()) },
+    V3Route("products/{id}/photo/guided", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoGuidedRoute(args["id"].orEmpty()) },
     V3Route("products/{id}/photo/studio", RouteKind.PAGE, { StrProducts.studioTitle }, parent = "products/{id}", chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
       val src = args.query("src")

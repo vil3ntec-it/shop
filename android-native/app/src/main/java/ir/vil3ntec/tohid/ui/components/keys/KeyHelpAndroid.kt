@@ -5,16 +5,12 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Keyboard
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -36,15 +32,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Popup
 import androidx.compose.ui.window.PopupProperties
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.i18n.StrTill
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyScope
 import ir.vil3ntec.tohid.core.keymap.KeyStatus
 import ir.vil3ntec.tohid.core.keys.KeyHelp
 import ir.vil3ntec.tohid.ui.AppNav
-import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.delay
 
@@ -71,31 +64,6 @@ object KeyHelpPref {
     if (!value) AppNav.keyLabels.value = false
     context.getSharedPreferences("tohid-ui", 0).edit().putBoolean(KEY, value).apply()
   }
-}
-
-/** بخشِ تنظیماتِ رابطِ امروز — خودش نمی‌خواند و نمی‌نویسد */
-@Composable
-fun KeyHelpSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Keyboard,
-    title = StrTill.keyHelpTitle,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrTill.keyHelpNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
-  }
-}
-
-@Composable
-fun KeyHelpSettingsWired(context: android.content.Context) {
-  KeyHelpPref.load(context)
-  KeyHelpSettings(KeyHelpPref.on.value) { KeyHelpPref.set(context, it) }
 }
 
 private val onMac: Boolean = System.getProperty("os.name").orEmpty().startsWith("Mac")

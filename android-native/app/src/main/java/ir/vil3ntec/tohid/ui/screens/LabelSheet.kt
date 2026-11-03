@@ -200,22 +200,3 @@ fun LabelSheet(
     }
   }
 }
-
-/** بخشِ «تنظیمات» — خواندن و نوشتنِ کلید در مرزِ پلتفرم است (`LabelToolsSettingsWired`) */
-@Composable
-fun LabelToolsSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Print,
-    title = StrLabel.settingsTitle,
-    subtitle = if (on) StrLabel.settingsOn else StrLabel.off,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrLabel.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrLabel.off, "on" to StrLabel.on),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
-  }
-}

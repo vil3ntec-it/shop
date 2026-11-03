@@ -7,10 +7,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.TableChart
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -179,24 +176,5 @@ internal fun shrinkSection(
       )
     }
     Spacer(Modifier.height(6.dp))
-  }
-}
-
-/** بخشِ «تنظیمات» — خواندن و نوشتنِ کلید در مرزِ پلتفرم است (`ShrinkReportSettingsWired`) */
-@Composable
-fun ShrinkReportSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.TableChart,
-    title = StrShrink.settingsTitle,
-    subtitle = if (on) StrShrink.settingsOn else StrShrink.off,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrShrink.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShrink.off, "on" to StrShrink.on),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
   }
 }

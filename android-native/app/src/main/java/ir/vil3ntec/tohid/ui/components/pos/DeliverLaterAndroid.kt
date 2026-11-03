@@ -58,10 +58,3 @@ fun DeliverLaterSheetWired(
     onCreated = onCreated,
   )
 }
-
-/** بخشِ تنظیمات با خواندن و نوشتنِ همین تنظیم — تا `Settings` یک خط بخواهد */
-@Composable
-fun DeliverLaterSettingsWired(context: android.content.Context) {
-  DeliverLaterPrefs.load(context)
-  DeliverLaterSettings(DeliverLaterPrefs.on.value) { DeliverLaterPrefs.set(context, it) }
-}

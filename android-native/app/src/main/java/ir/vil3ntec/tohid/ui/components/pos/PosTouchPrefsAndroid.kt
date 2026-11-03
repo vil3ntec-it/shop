@@ -51,10 +51,3 @@ object PosTouchPrefs {
   /** کلیدِ نوارِ صندوق دیده شود */
   fun showToggle(): Boolean = TouchMode.showToggle(Platform.DESKTOP, on.value)
 }
-
-/** بخشِ تنظیمات با خواندن و نوشتنِ همین تنظیم — مرزِ پلتفرم، تا `Settings` فقط یک خط بخواهد */
-@androidx.compose.runtime.Composable
-fun PosTouchSettingsWired(context: android.content.Context) {
-  PosTouchPrefs.load(context)
-  PosTouchSettings(PosTouchPrefs.on.value) { PosTouchPrefs.setOn(context, it) }
-}

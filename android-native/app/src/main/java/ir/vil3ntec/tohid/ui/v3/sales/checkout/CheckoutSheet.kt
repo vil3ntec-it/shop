@@ -87,6 +87,8 @@ data class CheckoutView(
   val canAskApproval: Boolean,
   /** PAY-24 — دفترِ صفحه برای کارت و اعتبار در پنلِ ترکیبی، فقط با `GiftCardPref`؛ `null` ⇒ همان پنلِ امروز */
   val giftLedger: ShopData? = null,
+  /** PRM-13 — نوارِ امتیازِ مشتری (مانده، سطح، «مصرفِ امتیاز»)؛ قاعدهٔ خاموش یا بی مشتری ⇒ `null` */
+  val points: (@Composable () -> Unit)? = null,
 )
 
 /** کارهای برگه — هر کدام یک تغییرِ فرم یا یک مسیر */
@@ -162,6 +164,7 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
         Spacer(Modifier.height(12.dp))
       }
       CustomerRow(v, a)
+      v.points?.let { bar -> Spacer(Modifier.height(8.dp)); bar() }
 
       if (v.canDiscount) {
         Spacer(Modifier.height(12.dp))

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -54,6 +55,8 @@ internal fun DraftPhotoSourceSheet(
   onDismiss: () -> Unit,
   title: String = StrProducts.pickImage,
   note: String = StrProducts.photoNote,
+  /** راه‌های دیگر (بانکِ تصاویر، دوربینِ راهنما) — هر کدام برگه را می‌بندد و کارِ خودش را می‌کند */
+  more: List<V3MenuItem> = emptyList(),
   onPicked: (Uri) -> Unit,
 ) {
   val context = LocalContext.current
@@ -102,6 +105,10 @@ internal fun DraftPhotoSourceSheet(
         hue = V3Hue.BLUE,
         onClick = { fromGallery.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
       )
+      more.forEach { m ->
+        V3Divider(start = 64.dp)
+        V3ListRow(title = m.label, icon = m.icon, hue = V3Hue.TEAL, onClick = m.onClick)
+      }
     }
     Text(note, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.fillMaxWidth().padding(start = 6.dp, end = 6.dp, top = 10.dp))
   }

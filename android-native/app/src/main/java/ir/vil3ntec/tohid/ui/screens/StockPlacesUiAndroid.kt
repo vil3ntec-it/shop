@@ -34,19 +34,6 @@ import kotlinx.coroutines.launch
  *  (`StockPlacesPref.record`). هر پنجره یک کلید دارد که پس از هر ثبتِ موفق تازه می‌شود ⇒ دو ضربه یک ثبت.
  */
 
-/** بخشِ «محل‌ها و بسته‌بندیِ دوباره» با خواندن و نوشتنِ `StockPlacesPref` — تا تنظیمات یک خط بخواهد */
-@Composable
-fun StockPlacesSettingsWired(context: android.content.Context) {
-  var places by remember { mutableStateOf(StockPlacesPref.places(context)) }
-  var repack by remember { mutableStateOf(StockPlacesPref.repack(context)) }
-  StockPlacesSettings(
-    places = places,
-    repack = repack,
-    onPlaces = { places = it; StockPlacesPref.setPlaces(context, it) },
-    onRepack = { repack = it; StockPlacesPref.setRepack(context, it) },
-  )
-}
-
 /**
  *  دکمه‌ها و پنجره‌های انبار. هر دو تنظیم خاموش (پیش‌فرض) یا صندوق‌دار ⇒ هیچ (همان انبارِ امروز). موتورِ تازهٔ موجودی
  *  روشن ⇒ انتقال همان «دفترِ موجودی» است (با سری و بها) و این‌جا فقط بسته‌بندی می‌آید.

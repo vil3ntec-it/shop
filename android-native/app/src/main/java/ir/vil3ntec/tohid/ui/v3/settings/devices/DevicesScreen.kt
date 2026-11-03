@@ -72,6 +72,8 @@ internal fun DevicesScreen(data: ShopData, tab: String?, onBack: (() -> Unit)?) 
     item(key = DeviceTab.PHONE.id) { PhoneLinkCard(data, lit == DeviceTab.PHONE) }
     item(key = DeviceTab.LIVE.id) { LiveCard(lit == DeviceTab.LIVE) }
     item(key = DeviceTab.PHOTOS.id) { PhotosCard(lit == DeviceTab.PHOTOS) }
+    //  ابزارهای سخت‌افزارِ صفحهٔ دستگاه‌هایِ پیشین (چاپگر، صفِ چاپ، برچسب، ترازو، نمایشگرِ مشتری) — `DevicesHwAndroid.kt`
+    item(key = "hw") { DevicesHwExtras(data) }
   }
   }
 }

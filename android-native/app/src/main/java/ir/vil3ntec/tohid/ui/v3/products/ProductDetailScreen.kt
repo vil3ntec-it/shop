@@ -62,6 +62,8 @@ internal fun ProductDetailScreen(
   toasts: V3Toasts,
   productId: String,
   nav: ProductDetailNav,
+  /** زیرِ عکس: کدام عکس در ویترین است و نسخه‌های بانکِ تصاویر (IMG-BANK-08/09/16؛ فقط با بانکِ روشن) */
+  photoExtra: @Composable () -> Unit = {},
 ) {
   val product = data.products.find { it.id == productId }
   if (product == null) {
@@ -96,6 +98,7 @@ internal fun ProductDetailScreen(
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding())) {
       //  ورودِ پلکانیِ بخش‌ها (بارِ اول)؛ عددها با شمارنده
       Box(Modifier.v3Stagger(stagger, "hero", 0)) { ProductHero(product, figures.status, onPhoto = nav.photo) }
+      photoExtra()
       Spacer(Modifier.height(8.dp))
       Box(Modifier.v3Stagger(stagger, "figures", 1)) { FiguresCard(product, figures, onStock = nav.stock) }
       Box(Modifier.v3Stagger(stagger, "profit", 2)) { ProfitCard(product, figures) }

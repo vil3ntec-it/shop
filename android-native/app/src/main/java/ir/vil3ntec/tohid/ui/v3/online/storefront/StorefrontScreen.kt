@@ -41,6 +41,8 @@ fun StorefrontScreen(
   onRetry: () -> Unit,
   onBack: (() -> Unit)?,
   bottomBar: (@Composable () -> Unit)? = null,
+  /** کارهای افزودهٔ «…» (پیوند و QR ِ کارزار، عکس و ویدیوی ویترین) — `StorefrontExtras.kt` */
+  extras: List<V3MenuItem> = emptyList(),
   pane: @Composable (tab: String, pad: PaddingValues) -> Unit,
 ) {
   val tabs = StorefrontModel.tabs(config)
@@ -49,7 +51,7 @@ fun StorefrontScreen(
     title = StrOnline.sfTitle,
     subtitle = StrOnline.sfCaption,
     onBack = onBack,
-    overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = onRetry)),
+    overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = onRetry)) + if (ready) extras else emptyList(),
     chips = if (ready) ({ DraftCountTabs(tabs.map { CountTab(it, StorefrontModel.label(it)) }, tab, onTab) }) else null,
     bottomBar = if (ready && !(config?.settings == null && tab in StorefrontModel.NEEDS_SETTINGS)) bottomBar else null,
   ) { pad ->

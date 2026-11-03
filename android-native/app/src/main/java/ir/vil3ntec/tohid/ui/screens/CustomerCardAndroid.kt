@@ -5,8 +5,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.CreditCard
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -25,7 +23,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrCustomerCard
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.CustomerCardPref
 import ir.vil3ntec.tohid.data.CustomerCards
 import ir.vil3ntec.tohid.data.CustomerCrm
@@ -35,29 +32,6 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.print.CustomerCardPrint
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
-
-/**
- *  CRM-16 — بخشِ «کارت یا بارکدِ مشتری» در تنظیماتِ گوشی و کامپیوتر (`CustomerCardPref`، پیش‌فرض خاموش).
- */
-@Composable
-fun CustomerCardSettingsWired(context: android.content.Context) {
-  var on by remember { mutableStateOf(CustomerCardPref.on(context)) }
-  SettingsSection(
-    icon = Icons.Filled.CreditCard,
-    title = StrCustomerCard.settingsTitle,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.primary else Shop.colors.muted,
-  ) {
-    Text(StrCustomerCard.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { on = it == "on"; CustomerCardPref.setOn(context, on) },
-    )
-  }
-}
 
 /**
  *  دکمهٔ «کارتِ مشتری» در پروندهٔ مشتری (گوشی و کامپیوتر، کنارِ `CrmPricingButton`): دیدنِ کد، ساختنِ کدِ

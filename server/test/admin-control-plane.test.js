@@ -362,6 +362,7 @@ const CAPABILITY_PROBES = {
   'search.v1': ['GET /admin/search?q=ab'],
   'market-admin.v1': ['GET /admin/market/overview', 'GET /admin/market/sellers', 'GET /admin/market/orders',
     'GET /admin/market/commission', 'GET /admin/market/history'],
+  'market-regions.v1': ['GET /admin/market/regions', 'GET /admin/shops/x1/census', 'PUT /admin/shops/x1/census'],
   'delivery-watch.v1': ['GET /admin/delivery/overview', 'GET /admin/delivery/queue', 'GET /admin/delivery/events',
     'GET /admin/delivery/connectivity', 'GET /admin/delivery/report', 'GET /admin/delivery/thresholds',
     'PUT /admin/delivery/thresholds'],

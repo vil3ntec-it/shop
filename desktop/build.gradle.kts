@@ -82,6 +82,8 @@ val replaced = listOf(
   "data/GoogleSignIn.kt",
   "data/Migration.kt",
   "scan/BarcodeScanner.kt",
+  //  HW-08: گوشی وب‌کم ندارد (فهرستِ تهی)؛ کامپیوتر: ‎scan/WebcamPlatformDesk.kt‎ (openpnp-capture و ZXing)
+  "scan/WebcamPlatform.kt",
   "sync/Integrity.kt",
   "update/Updater.kt",
   //  چاپِ گزارش: اندروید روی PDFِ چاپ رسم می‌کند، این‌جا `PrinterJob`ِ جاوا —
@@ -275,6 +277,10 @@ dependencies {
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
   //  چاپگر و بارکدخوانِ بلوتوثی/سریال روی کامپیوتر — درگاهِ COM (‎android/bluetooth/Bluetooth.kt‎)
   implementation("com.fazecast:jSerialComm:2.11.0")
+  //  HW-08: وب‌کمِ کامپیوتر به‌عنوانِ بارکدخوان — گرفتنِ فریم (openpnp-capture، MIT، کتابخانهٔ بومیِ ویندوز/مک/لینوکس
+  //  درونِ همان jar، روی JNA) و خواندنِ بارکد از تصویر (ZXing، Apache-2.0، جاوای خالص، بی سرویسِ بیرونی)
+  implementation("org.openpnp:openpnp-capture-java:0.0.28-0")
+  implementation("com.google.zxing:core:3.5.3")
   //  `org.json` روی اندروید درونِ سیستم است؛ این‌جا باید آورده شود
   implementation("org.json:json:20250517")
 

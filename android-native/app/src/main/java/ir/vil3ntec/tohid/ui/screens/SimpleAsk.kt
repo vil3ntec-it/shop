@@ -42,7 +42,6 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.core.i18n.I18n
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
 import ir.vil3ntec.tohid.core.report.SimpleAsk
 import ir.vil3ntec.tohid.core.report.SimpleAsk.Param
@@ -335,25 +334,5 @@ private fun ValueRow(label: String, value: String, strong: Boolean) {
   Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
     Text(label, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, modifier = Modifier.weight(1f))
     Text(value, style = if (strong) MaterialTheme.typography.titleMedium else MaterialTheme.typography.bodyMedium, fontWeight = if (strong) FontWeight.Bold else FontWeight.Normal, color = Shop.colors.text)
-  }
-}
-
-/** بخشِ «تنظیمات» — خواندن و نوشتنِ کلید در مرزِ پلتفرم است (`SimpleAskSettingsWired`) */
-@Composable
-fun SimpleAskSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.QuestionAnswer,
-    title = StrSimpleAsk.settingsTitle,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.primary else Shop.colors.muted,
-  ) {
-    Text(StrSimpleAsk.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Text(StrShell.thisDeviceOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
   }
 }

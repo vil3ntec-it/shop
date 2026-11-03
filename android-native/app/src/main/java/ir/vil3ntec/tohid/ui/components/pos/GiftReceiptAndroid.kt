@@ -20,11 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrGift
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
-import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 
@@ -75,27 +72,6 @@ fun GiftReceiptButton(d: ShopData, sale: Sale, onMessage: (String) -> Unit) {
         onMessage(StrGift.sending)
         scope.launch { onMessage(ir.vil3ntec.tohid.print.PrintJob.printGift(context, d, sale, address, width) ?: StrGift.printed) }
       },
-    )
-  }
-}
-
-/** بخشِ تنظیمات با خواندن و نوشتنِ همین تنظیم — تا `Settings` یک خط بخواهد */
-@Composable
-fun GiftReceiptSettingsWired(context: android.content.Context) {
-  GiftReceiptPrefs.load(context)
-  val on = GiftReceiptPrefs.on.value
-  SettingsSection(
-    icon = Icons.Filled.CardGiftcard,
-    title = StrGift.section,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrGift.note, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { GiftReceiptPrefs.set(context, it == "on") },
     )
   }
 }

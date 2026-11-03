@@ -62,6 +62,8 @@ fun NewOrderScreen(
   onBack: () -> Unit,
   start: OrderDraft.Form = OrderDraft.Form(),
   showErrors: Boolean = false,
+  /** کادرهای پشتِ پرچمِ سرور (CHK-14 پولِ نقدِ مشتری، CHK-15 «اگر کالایی نبود») — `OrderExtrasAndroid.kt` */
+  extras: @Composable (form: OrderDraft.Form, onForm: (OrderDraft.Form) -> Unit) -> Unit = { _, _ -> },
 ) {
   val toasts = LocalV3Toasts.current
   var form by remember { mutableStateOf(start) }
@@ -162,6 +164,7 @@ fun NewOrderScreen(
         singleLine = false, modifier = Modifier.fillMaxWidth().padding(12.dp),
       )
     }
+    Column(Modifier.padding(horizontal = 4.dp)) { extras(form) { form = it } }
     V3Section(null) {
       V3ToggleRow(StrOnline.testOrder, form.test, { form = form.copy(test = it) }, subtitle = StrOnline.testHelper, icon = Icons.Outlined.Science, hue = V3Hue.VIOLET)
     }

@@ -29,6 +29,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import androidx.compose.material.icons.outlined.Schedule
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -79,6 +81,8 @@ fun AdminScreen(
   onOpen: (String) -> Unit,
   wide: Boolean = false,
   today: String = todayIso(),
+  /** STF-07/08 روشن (پرچمِ سرور) ⇒ ردیفِ «ساعتِ کار و پورسانت» */
+  staffTime: Boolean = false,
 ) {
   val n = remember(d, today) { AdminModel.numbers(d, today, System.currentTimeMillis()) }
   val kpis = AdminModel.kpis(canSeeMoney)
@@ -101,6 +105,7 @@ fun AdminScreen(
       V3Section(null) {
         val rows = buildList {
           if (canManage) add(AdminLink(StrReports.staff, Icons.Outlined.Badge, V3Hue.BLUE, AccountPaths.TEAM, membersValue(members)))
+          if (staffTime) add(AdminLink(StrReach.staffTime, Icons.Outlined.Schedule, V3Hue.TEAL, AnalyticsPaths.STAFF_TIME, null))
           if (canAudit) add(AdminLink(StrReports.auditTitle, Icons.AutoMirrored.Outlined.ManageSearch, V3Hue.PURPLE, AnalyticsPaths.audit(), StrReports.auditCount(d.auditLog.size)))
           add(AdminLink(StrReports.subscription, Icons.Outlined.WorkspacePremium, V3Hue.ORANGE, AccountPaths.SUBSCRIPTION, null))
           if (canManage) add(AdminLink(Str.settings, Icons.Outlined.Settings, null, SettingsPaths.ROOT, null))
