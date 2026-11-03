@@ -57,14 +57,21 @@ internal fun repriceCart(d: ShopData, lines: List<SalesEngine.CartLine>, list: S
   return if (changed) out else lines
 }
 
+/**
+ *  @param toggles شمارِ Ctrl+R ِ صندوقِ کامپیوتر (`PosKeys.priceList`، POS-18): هر یک بیشتر ⇒ همان `PriceList.toggle` ِ
+ *  زدنِ نشان. صفر (گوشی و پیش‌فرض) ⇒ هیچ.
+ */
 @Composable
-fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.CartLine>, debtorId: String?, modifier: Modifier = Modifier) {
+fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.CartLine>, debtorId: String?, modifier: Modifier = Modifier, toggles: Int = 0) {
   val context = LocalContext.current
   val on = remember { PriceListPrefs.on(context) }
   if (!on) return
   fun customerList(): String? = debtorId?.let { id -> d.debtors.find { it.id == id }?.priceList.orEmpty() }
   var state by remember { mutableStateOf(PriceList.FRESH) }
   LaunchedEffect(debtorId) { state = PriceList.onCustomer(state, customerList()) }
+  //  Ctrl+R: فقط افزایشِ شمار، نه نخستین ترکیب (همان شمارِ پیشین ⇒ هیچ)
+  val seen = remember { intArrayOf(toggles) }
+  LaunchedEffect(toggles) { if (toggles != seen[0]) { seen[0] = toggles; state = PriceList.toggle(state) } }
   //  فاکتورِ تازه (سبدِ خالی) از نو: لیستِ مشتریِ همین لحظه یا خرده، بی انتخابِ دستی
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) state = PriceList.onCustomer(PriceList.FRESH, customerList()) }
   LaunchedEffect(cart, state.list) {

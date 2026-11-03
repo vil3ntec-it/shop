@@ -53,6 +53,19 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps9-partial` (کمبودهای PARTIAL، دورِ ۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **CRM-16** دکمهٔ «کارتِ مشتری» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳ (`DebtorFileExtras`، همان `CustomerCardButton`)؛ **POS-18** Ctrl+R
+  ِ صندوقِ کامپیوتر خرده ⇄ عمده (`PosKeys.priceList`، keymap «partial»، فقط با `PriceListPrefs` روشن)؛ **PUR-05** فاکتورِ خریدِ چندردیفه
+  در «ثبت خرید» ِ گوشی (`PurchaseFormModel.more` ⇐ `PurchaseBook.record`؛ تک‌ردیفه همان `addPurchase`)؛ **CRM-07** سفارش‌های باز/لغوشدهٔ
+  مشتری در پروندهٔ گوشی و کامپیوتر (`GET /api/shop/orders/customer`، `orders.contact`، سطلِ IP پیش از احراز؛ `CustomerOnlineOrdersPanel`)؛
+  **INV-05** صافیِ برند و قفسه در هر دو پنجرهٔ انبارگردانی (`CountFilter.brands/shelves`)؛ **PRM-08** برندِ کالا به `PromoCore` و برندِ
+  شامل/مستثنا در ویرایشگرِ تخفیف. همه PARTIAL ماندند (شاهدِ CI). بی مهاجرت.
+- یافته: «مانده» ِ چند ردیف کهنه است و STATUS ِ آن‌ها دست نخورد (برای ممیزیِ بعد): NTF-10 صفحهٔ سیاست در برنامه هست
+  (`LateApologyScreen`)، CRM-03 صندوقِ نسخهٔ ۳ تأییدِ سقف دارد (`CheckoutRoute`/`CreditApprovalRoute`)، CRM-13 امتیاز در حسابِ وب هست
+  (`store-account-history.js`)، INV-20/21 صفحهٔ نسخهٔ ۳ دارند (`StockPlacesRoute`).
+- رد شد: INV-10 (پیش‌نویسِ `StockBook` با برگهٔ لحظهٔ آغاز کار می‌کند ⇒ D-19)، LOC-04 (هیچ صفحه‌ای `isWorkingDay` نمی‌خواند؛ گرفتنِ جدول اثری
+  نمی‌داشت)، POS-09 ِ نسخهٔ ۳ (بسته‌ها و قیمتِ بسته، بزرگ).
+- قدمِ بعدی: CI ِ همین PR و ادغام در دسته.
 ### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۸، شاخهٔ `claude/ios-app-phase8` (روی main پس از #875؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: آزمونِ سرتاسریِ جریان‌های اصلی روی شبیه‌ساز در کارِ `ios-app` (`iosSimulatorArm64Test`): ریشهٔ برنامه (`IosRoot`) روی
   Skia ِ بی‌صفحه با زدن و نوشتن روی صفحه — بالا آمدن تا ورود، ورود با ایمیل و رمز، فروشِ نقد در صندوق (`TillSale.record`)،

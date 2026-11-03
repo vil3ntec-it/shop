@@ -62,6 +62,19 @@ class V3PortedFeaturesTest {
     assertTrue(src("ui/screens/DeskCustomers.kt").contains("LayawayCustomerPanel(d, store, id, ::toast)"))
   }
 
+  /** CRM-16 — دکمهٔ «کارتِ مشتری» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳، همان جزءِ پروندهٔ کامپیوتر (خاموش ⇒ هیچ) */
+  @Test
+  fun `پروندهٔ مشتری — کارتِ مشتری در حسابِ گوشیِ نسخهٔ ۳ همان دکمهٔ کامپیوتر`() {
+    val extras = src("ui/v3/money/DebtorFileExtras.kt")
+    assertTrue(extras.contains("import ir.vil3ntec.tohid.ui.screens.CustomerCardButton"))
+    assertTrue(extras.contains("CustomerCardButton(store, d, debtorId, toast,"))
+    assertTrue(src("ui/screens/DeskCustomers.kt").contains("CustomerCardButton(store, d, id, ::toast,"))
+    //  کلید و مشتریِ فعال در خودِ دکمه سنجیده می‌شوند ⇒ خاموش یا ادغام‌شده هیچ چیز نمی‌کشد
+    val button = src("ui/screens/CustomerCardAndroid.kt")
+    assertTrue(button.contains("if (!on) return"))
+    assertTrue(button.contains("if (!CustomerCrm.isActive(debtor)) return"))
+  }
+
   @Test
   fun `پروندهٔ مشتری — شمارهٔ دوم و برچسب در کشوی حساب، صافیِ برچسب در فهرست`() {
     val parts = src("ui/v3/money/DebtorLedgerParts.kt")
