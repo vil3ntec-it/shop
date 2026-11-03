@@ -96,4 +96,18 @@ class CashKeysTest {
     assertTrue(CashKeys.enterArmed(5_000))
     assertFalse(CashKeys.enterArmed(-1))
   }
+
+  /** S11 (§۵.۲): Enter در کادرِ خالی ⇒ پنلِ پرداخت فقط ≥ ۵۰۰ میلی‌ثانیه پس از آخرین اسکن یا Enter؛ سبدِ خالی هرگز */
+  @Test
+  fun emptyEnterOpensPayOnlyFiveHundredMillisecondsAfterLastScanOrEnter() {
+    assertEquals(500L, CashKeys.EMPTY_ENTER_MS)
+    //  پسوندِ Enter ِ بارکدخوان: دو و سه Enter ِ پشتِ سرِ هم
+    for (ms in listOf(0L, 15L, 30L, 499L)) assertFalse(CashKeys.emptyEnterOpensPay(ms, cartEmpty = false), "$ms")
+    assertTrue(CashKeys.emptyEnterOpensPay(500, cartEmpty = false))
+    assertTrue(CashKeys.emptyEnterOpensPay(5_000, cartEmpty = false))
+    assertTrue(CashKeys.emptyEnterOpensPay(null, cartEmpty = false), "بی اسکن یا Enter ِ پیشین")
+    assertFalse(CashKeys.emptyEnterOpensPay(null, cartEmpty = true))
+    assertFalse(CashKeys.emptyEnterOpensPay(5_000, cartEmpty = true))
+    assertFalse(CashKeys.emptyEnterOpensPay(-1, cartEmpty = false))
+  }
 }

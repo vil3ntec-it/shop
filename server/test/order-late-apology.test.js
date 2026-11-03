@@ -11,6 +11,8 @@
  *      `inactive`، سفارشِ مبدأ لغوشده بی کوپن؛ درصد با پلهٔ ۱۰۰؛ پیش‌نمایشِ `/promos/quote`.
  *   ۴) سقفِ هزینهٔ NTF-02: کانالِ پولیِ پُر صدا زده نمی‌شود (`cost_cap`) و کانالِ رایگانِ بعدی می‌برد.
  *   ۵) تأخیرِ کارِ مشتری (عقب‌انداختن با `customer_request`) ⇒ بی پیام و بی کوپن؛ لغوشده هرگز نامزد نیست.
+ *   ۶) TEN-02: پوزشِ «الف» به سفارش، صف، رویداد، کوپن، فهرست و پیگیریِ «ب» نمی‌رسد؛ پرچم و آستانهٔ هر دکان جدا و
+ *      کوپنِ «الف» در ویترینِ «ب» ناشناخته است.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '500';
 const test = require('node:test');
@@ -284,4 +286,65 @@ test('تأخیرِ کارِ مشتری ⇒ بی پیام و بی کوپن؛ لغ
   assert.equal(bad.status, 400);
   const bad2 = await policy(s, { enabled: true, lateMinutes: 10, coupon: { kind: 'percent', bp: 9000, days: 3 } });
   assert.equal(bad2.status, 400);
+});
+
+test('TEN-02: دو دکان — پوزشِ «الف» به سفارش، صف، کوپن و فهرستِ «ب» نمی‌رسد؛ پرچم و آستانهٔ هر دکان جدا', async () => {
+  const a = await shop('الفِ پوزش');
+  const b = await shop('بِ پوزش');
+  const c = await shop('جیمِ خاموش', { on: false });
+  const pa = await policy(a, { enabled: true, lateMinutes: 10, coupon: { kind: 'amount', amountMinor: 5000, days: 7 } });
+  assert.equal(pa.status, 200, JSON.stringify(pa.body));
+  const pb = await policy(b, { enabled: true, lateMinutes: 60, coupon: { kind: 'amount', amountMinor: 3000, days: 7 } });
+  assert.equal(pb.status, 200, JSON.stringify(pb.body));
+  //  «ج»: سیاستِ روشن با آستانهٔ کوتاه‌تر در پایگاه داده، ولی پرچمِ خاموش
+  await query(`INSERT INTO order_late_apology_policy (shop_id, enabled, late_minutes, coupon_kind, coupon_amount_minor, updated_at)
+               VALUES ($1, true, 5, 'amount', 5000, $2)`, [c.shopId, now()]);
+  //  همان مشتری در هر سه دکان
+  const oa = await storeOrder(a);
+  const ob = await storeOrder(b);
+  const oc = await storeOrder(c);
+  const due = Math.max(await dueOf(oa.id), await dueOf(ob.id), await dueOf(oc.id));
+  const snap = (id) => one('SELECT * FROM online_orders WHERE id=$1', [id]);
+  const [b0, c0] = [await snap(ob.id), await snap(oc.id)];
+  const audits = async () => (await many(
+    `SELECT shop_id, target_id FROM audit_logs WHERE action='order.late_apology' AND target_id = ANY($1::text[]) ORDER BY created_at, id`,
+    [[oa.id, ob.id, oc.id]])).map((r) => [r.shop_id, r.target_id]);
+
+  //  از آستانهٔ «الف» گذشته، نه از «ب»؛ «ج» خاموش
+  await A.sweep(due + 20 * MIN);
+  const [ra] = await rowsOf(oa.id);
+  assert.equal(ra.shop_id, a.shopId);
+  assert.equal(ra.late_minutes, 10);
+  assert.deepEqual((await outboxOf(oa.id)).map((q) => q.shop_id), [a.shopId]);
+  for (const o of [ob, oc]) {
+    assert.equal((await rowsOf(o.id)).length, 0, `${o.id}: بی تصمیم`);
+    assert.equal((await outboxOf(o.id)).length, 0, `${o.id}: بی پیام`);
+    assert.equal((await eventsOf(o.id)).length, 0, `${o.id}: بی رویداد`);
+  }
+  assert.deepEqual(await snap(ob.id), b0, 'سفارشِ «ب» دست نخورد');
+  assert.deepEqual(await snap(oc.id), c0, 'سفارشِ «ج» دست نخورد');
+  assert.deepEqual(await audits(), [[a.shopId, oa.id]]);
+  assert.equal((await track(b, ob.token)).body.order.apology, null);
+  assert.deepEqual((await h.get('/api/shop/orders/late-apology', { token: a.token })).body.recent.map((x) => x.orderId), [oa.id]);
+  assert.deepEqual((await h.get('/api/shop/orders/late-apology', { token: b.token })).body.recent, [], 'فهرستِ «ب» بی تصمیمِ «الف»');
+
+  //  کوپنِ «الف» در ویترینِ «ب» با همان شماره ⇒ ناشناخته: بی تخفیف، و کوپنِ «الف» مصرف نمی‌شود
+  const atB = await checkout(b, { body: { promoCode: ra.coupon_code } });
+  assert.equal(atB.status, 201, JSON.stringify(atB.body));
+  assert.equal(atB.body.order.discountMinor, 0);
+  assert.equal((await rowsOf(oa.id))[0].redeemed_at, null);
+
+  //  نوبتِ «ب» با آستانه و کوپنِ خودش؛ «الف» دوباره نه؛ «ج» هرگز
+  await A.sweep(due + 61 * MIN);
+  const [rb] = await rowsOf(ob.id);
+  assert.equal(rb.shop_id, b.shopId);
+  assert.equal(rb.late_minutes, 60);
+  assert.equal(Number(rb.coupon_amount_minor), 3000);
+  assert.notEqual(rb.coupon_code, ra.coupon_code);
+  assert.equal((await rowsOf(oa.id)).length, 1);
+  assert.equal((await outboxOf(oa.id)).length, 1);
+  assert.equal((await rowsOf(oc.id)).length, 0);
+  assert.deepEqual(await audits(), [[a.shopId, oa.id], [b.shopId, ob.id]]);
+  assert.equal((await track(a, oa.token)).body.order.apology.coupon.code, ra.coupon_code, 'پیگیریِ «الف» کوپنِ خودش');
+  assert.equal((await track(b, ob.token)).body.order.apology.coupon.code, rb.coupon_code, 'پیگیریِ «ب» کوپنِ خودش');
 });

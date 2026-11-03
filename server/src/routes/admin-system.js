@@ -8,6 +8,9 @@
  *                                      یا «آزمایشی» (OPS-04@29)
  *   GET /api/admin/system/versions  ⇐ نسخهٔ دستگاه‌های فعال و هشدارِ کهنه یا
  *                                      زیرِ حداقل (OPS-04)
+ *   GET /api/admin/system/notify-usage?days= ⇐ مصرف و هزینهٔ پیامِ مشتری برای هر دکان
+ *                                      و هر کانال، سقفِ روزانه و نشانه‌های سوءاستفاده (OPS-09؛
+ *                                      `lib/notify-usage.js`)؛ بی شماره و متن
  *   POST /api/admin/system/chain-verify ⇐ بررسیِ زنجیرهٔ هشِ سابقه (SEC-02)؛
  *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
  *   GET /api/admin/system/reconciliation ⇐ تطبیقِ فروشِ آنلاین، لغو، بازپرداخت، نقدِ
@@ -42,6 +45,13 @@ router.get('/versions', async (req, res, next) => {
   try {
     res.set('Cache-Control', 'no-store');
     res.json(await health.versions());
+  } catch (err) { next(err); }
+});
+
+router.get('/notify-usage', async (req, res, next) => {
+  try {
+    res.set('Cache-Control', 'no-store');
+    res.json(await require('../lib/notify-usage').report({ days: req.query.days }));
   } catch (err) { next(err); }
 });
 

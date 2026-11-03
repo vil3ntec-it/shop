@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.parseNumber
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyName
+import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.ui.components.common.ScreenKind
 import ir.vil3ntec.tohid.ui.components.common.ViewMode
@@ -183,6 +184,8 @@ fun DeskSaleScreen(
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
   val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
   var payOpen by remember { mutableStateOf(false) }
+  //  S11/§۵.۲: لحظهٔ آخرین اسکن یا Enter — Enter در کادرِ خالی فقط پس از ۵۰۰ میلی‌ثانیه پنلِ پرداخت را باز می‌کند
+  var lastScanOrEnter by remember { mutableStateOf<kotlin.time.TimeMark?>(null) }
   val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
@@ -303,8 +306,13 @@ fun DeskSaleScreen(
 
   /** Enter در کادر: بارکدِ کامل ⇐ همان؛ وگرنه پیشنهادِ برجسته (`PosSearch`) */
   fun submit() {
+    val since = lastScanOrEnter?.elapsedNow()?.inWholeMilliseconds
+    lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()
     if (quick?.enter(query) == true) { query = ""; return } // S03: Enter پس از بارکدِ ناشناس ⇒ ثبتِ سریع
     if (scaleLabel(query, d)) { query = ""; return }
+    //  S11 (§۵.۲): با پنلِ پرداخت (`payV2`) Enter در کادرِ خالی ⇒ پنل، فقط ≥ ۵۰۰ میلی‌ثانیه پس از آخرین اسکن/Enter
+    //  (Enter ِ پسوندِ بارکدخوان هیچ کار)؛ بی پنل همان «هیچ کار» ِ امروز
+    if (payV2 && query.isBlank()) { if (CashKeys.emptyEnterOpensPay(since, cart.isEmpty())) payOpen = true; return }
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
@@ -327,6 +335,7 @@ fun DeskSaleScreen(
    */
   val latestD by rememberUpdatedState(d)
   fun fromScanner(code: String): Boolean {
+    lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()
     val dd = latestD
     if (scaleLabel(code, dd)) return true
     //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام

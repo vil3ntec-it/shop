@@ -61,4 +61,15 @@ object CashKeys {
 
   /** PAY-04 — Enter فقط وقتی کار می‌کند که دستِ کم [ENTER_GUARD_MS] از باز شدنِ پنل گذشته باشد */
   fun enterArmed(elapsedMs: Long): Boolean = elapsedMs >= ENTER_GUARD_MS
+
+  /** §۵.۲ (S11) — Enter در کادرِ خالیِ صندوق پنلِ پرداخت را فقط پس از این مدت از آخرین اسکن یا Enter باز می‌کند */
+  const val EMPTY_ENTER_MS: Long = 500
+
+  /**
+   *  §۵.۲ (S11) — Enter در کادرِ خالیِ صندوق: «رفتن به پنلِ پرداخت، فقط اگر ≥ ۵۰۰ میلی‌ثانیه از آخرین اسکن یا Enter
+   *  گذشته باشد»؛ Enter ِ پسوندِ بارکدخوان (دو یا سه Enter پشتِ سرِ هم) هیچ کار نمی‌کند. [sinceLastMs] = از آخرین اسکن
+   *  یا Enter ِ پیش از همین (null ⇒ پیش از این هیچ). سبدِ خالی ⇒ هرگز.
+   */
+  fun emptyEnterOpensPay(sinceLastMs: Long?, cartEmpty: Boolean): Boolean =
+    !cartEmpty && (sinceLastMs == null || sinceLastMs >= EMPTY_ENTER_MS)
 }

@@ -25,8 +25,9 @@ import org.junit.Test
  *
  *  ماندهٔ سناریو (pending، نه سرخ):
  *   • گامِ ۲ (دو کلیک در وب با قطع و وصلِ شبکه) آزموده نشده: صندوقِ وب منجمد است و این آزمون فقط برنامه را می‌سنجد.
- *   • قاعدهٔ «Enter در کادرِ خالی پس از ≥ ۵۰۰ میلی‌ثانیه ⇒ پنلِ پرداخت» (§۵.۲) پیاده نیست: Enter در کادرِ خالی هیچ کاری
- *     نمی‌کند و پنل با F9 باز می‌شود؛ نگهبانِ پنل ۴۰۰ میلی‌ثانیه پس از باز شدن است.
+ *   • قاعدهٔ «Enter در کادرِ خالی پس از ≥ ۵۰۰ میلی‌ثانیه ⇒ پنلِ پرداخت» (§۵.۲) فقط در صندوقِ کامپیوتر و فقط با پنلِ
+ *     پرداخت (`payV2`) است (`CashKeys.emptyEnterOpensPay`)؛ بی پنل Enter در کادرِ خالی همان «هیچ کار» ِ امروز و صندوقِ
+ *     گوشی (صفحه‌کلیدِ بیرونی) آن را ندارد.
  */
 class ScenarioS11Test {
 
@@ -72,5 +73,33 @@ class ScenarioS11Test {
     //  اگر پنل باز شده باشد، Enter ِ زیرِ ۴۰۰ میلی‌ثانیه پس از باز شدن فاکتور را نمی‌بندد
     for (ms in listOf(0L, 15L, 30L, CashKeys.ENTER_GUARD_MS - 1)) assertFalse(CashKeys.enterArmed(ms))
     assertTrue(CashKeys.enterArmed(CashKeys.ENTER_GUARD_MS))
+  }
+
+  @Test
+  fun `S11 — Enter در کادرِ خالی ⇒ پنلِ پرداخت فقط ۵۰۰ میلی‌ثانیه پس از آخرین اسکن یا Enter`() {
+    //  اسکن با Enter ِ پسوند (۰)، دو Enter ِ دیگرِ بارکدخوان (۱۵ و ۳۰) ⇒ پنل باز نمی‌شود و فروشی هم نیست
+    var last: Long? = 0L
+    var opened = 0
+    for (at in listOf(15L, 30L)) {
+      if (CashKeys.emptyEnterOpensPay(at - last!!, cartEmpty = false)) opened++
+      last = at
+    }
+    assertEquals(0, opened)
+    //  صندوقدار پس از مکث Enter می‌زند ⇒ پنل (نگهبانِ ۴۰۰ ِ خودِ پنل فاکتور را با همان Enter نمی‌بندد)
+    assertTrue(CashKeys.emptyEnterOpensPay(30L + CashKeys.EMPTY_ENTER_MS - last!!, cartEmpty = false))
+    assertFalse(CashKeys.enterArmed(0))
+    assertFalse("سبدِ خالی هرگز", CashKeys.emptyEnterOpensPay(null, cartEmpty = true))
+  }
+
+  @Test
+  fun `S11 — صندوقِ کامپیوتر قاعده را فقط با پنلِ پرداخت و پیش از جست‌وجو می‌زند و اسکنِ بیرون از کادر هم شمرده می‌شود`() {
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/DeskSale.kt") }.firstOrNull { it.isFile }?.readText()
+      ?: error("DeskSale.kt پیدا نشد")
+    val submit = src.substringAfter("fun submit() {").substringBefore("PosSearch.resolve(")
+    assertTrue(submit.contains("lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()"))
+    assertTrue(submit.contains("if (payV2 && query.isBlank()) { if (CashKeys.emptyEnterOpensPay(since, cart.isEmpty())) payOpen = true; return }"))
+    assertTrue(src.substringAfter("fun fromScanner(code: String): Boolean {").substringBefore("val dd = latestD")
+      .contains("lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()"))
   }
 }
