@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.data.Supplier
 import ir.vil3ntec.tohid.data.SupplierPayment
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -183,11 +184,13 @@ class MoneyPagesModelTest {
 
   @Test
   fun `فرمِ خرید — ردیف‌های افزوده با چرخشِ صفحه نمی‌روند`() {
-    //  همان قالبِ `PurchaseFormSaver`: هفت کادر، سپس سه‌تایی‌های ردیف
+    //  همان قالبِ `PurchaseFormSaver`: هشت کادر (با انقضای ردیفِ نخست، PUR-05)، سپس چهارتایی‌های ردیف (با انقضای هر ردیف)
     val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/PurchaseFormScreen.kt") }.first { it.isFile }.readText()
-    assertTrue(src.contains("it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price) }"))
-    assertTrue(src.contains("more = v.drop(7).chunked(3).filter { it.size == 3 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2]) })"))
+    assertTrue(src.contains("it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price, r.expiry) }"))
+    assertTrue(src.contains("more = v.drop(8).chunked(4).filter { it.size == 4 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2], r[3]) })"))
+    assertTrue(src.contains("it.paid, it.date, it.notes, it.expiry) +"))
+    assertTrue(src.contains("PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6], expiry = v[7],"))
     //  تک‌ردیفه همان `onSave` (موتورِ امروز)، چندردیفه `onSaveMany` ⇒ `PurchaseBook.record`
     assertTrue(src.contains("else if (!PurchaseFormModel.multi(form)) { if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack() }"))
     val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
@@ -221,5 +224,49 @@ class MoneyPagesModelTest {
     assertEquals(0.75f, shares[0], 0.0001f)
     assertEquals(0.25f, shares[1], 0.0001f)
     assertEquals(listOf(0f), ExpensesModel.shares(listOf("a" to 0.0)))
+  }
+
+  /**
+   *  PUR-05 — انقضای هر ردیفِ خرید در گوشی: همان کادرِ «ورودِ کالا» ِ انبار (شمسی، اختیاری). تک‌ردیفه با `addPurchase`
+   *  و چندردیفه با `PurchaseBook.record` انقضا را روی ورودِ انبارِ همان محموله می‌نشانند (FEFO و هشدارِ انقضا)؛
+   *  تایپِ نادرست ثبت نمی‌شود؛ خالی همان خریدِ امروز.
+   */
+  @Test
+  fun `فرمِ خرید — انقضای هر ردیف روی ورودِ انبارِ همان محموله می‌نشیند و تایپِ نادرست ثبت نمی‌شود`() {
+    val p = ledger.products.first()
+    val supplier = ledger.suppliers.first().id
+    val one = PurchaseForm(supplierId = supplier, productId = p.id, quantity = "2", price = "95", date = "2026-10-20")
+    //  خالی ⇒ بی خطا و بی انقضا (همان امروز)
+    assertNull(PurchaseFormModel.errors(one).expiry)
+    assertEquals("", PurchaseFormModel.draft(one, "کیلو").expiryDate)
+    //  نادرست ⇒ خطای درجا و فرم ثبت نمی‌شود
+    val bad = PurchaseFormModel.errors(one.copy(expiry = "۱۴۰۶/۱۳/۴۰"))
+    assertTrue(bad.any)
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrStock.errExpiry, bad.expiry)
+    //  تک‌ردیفه: انقضای شمسی ⇒ ISO روی ورودِ انبار
+    val iso = PurchaseFormModel.expiryIso("۱۴۰۶/۰۳/۳۱")
+    assertNotNull(iso)
+    val single = one.copy(expiry = "۱۴۰۶/۰۳/۳۱")
+    assertFalse(PurchaseFormModel.errors(single).any)
+    assertEquals(iso, PurchaseFormModel.draft(single, "کیلو").expiryDate)
+    var n = 0
+    val r1 = ir.vil3ntec.tohid.data.LedgerEngine.addPurchase(ledger, PurchaseFormModel.draft(single, "کیلو"), "2026-10-20", 1L) { "pe1-${n++}" }
+    assertTrue(r1 is ir.vil3ntec.tohid.data.LedgerEngine.Result.Ok)
+    val d1 = (r1 as ir.vil3ntec.tohid.data.LedgerEngine.Result.Ok).data
+    assertEquals(iso, d1.warehouseEntries.last().expiryDate)
+
+    //  چندردیفه: هر ردیف انقضای خودش؛ ردیفِ بی انقضا بی انقضا؛ ردیفِ نادرست خطای خودش
+    var f = PurchaseFormModel.pickRowProduct(PurchaseFormModel.addRow(single), 0, p)
+    f = PurchaseFormModel.setRow(f, 0, f.more[0].copy(quantity = "1", expiry = "1406/1/2"))
+    f = PurchaseFormModel.pickRowProduct(PurchaseFormModel.addRow(f), 1, p)
+    f = PurchaseFormModel.setRow(f, 1, f.more[1].copy(quantity = "1"))
+    assertFalse(PurchaseFormModel.errors(f).any)
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrStock.errExpiry, PurchaseFormModel.errors(PurchaseFormModel.setRow(f, 1, f.more[1].copy(expiry = "x"))).rows[1].expiry)
+    val lines = PurchaseFormModel.lines(f) { "کیلو" }
+    assertEquals(listOf(iso, PurchaseFormModel.expiryIso("1406/1/2"), ""), lines.map { it.expiryDate })
+    val r = ir.vil3ntec.tohid.data.PurchaseBook.record(ledger, supplier, lines, 0.0, f.date, "", "2026-10-20", 1L, { "pe2-${n++}" })
+    assertTrue(r is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok)
+    val d2 = (r as ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok).data
+    assertEquals(listOf(iso, PurchaseFormModel.expiryIso("1406/1/2"), ""), d2.warehouseEntries.takeLast(3).map { it.expiryDate })
   }
 }

@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.PurchaseBook
@@ -48,14 +49,26 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 private enum class PurchasePicker { SUPPLIER, PRODUCT }
 
 private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
-  //  هفت کادرِ ردیفِ نخست، سپس سه‌تایی‌های ردیف‌های افزوده (PUR-05)
-  save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes) +
-    it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price) } },
+  //  هشت کادرِ ردیفِ نخست (با انقضا)، سپس چهارتایی‌های ردیف‌های افزوده (PUR-05)
+  save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes, it.expiry) +
+    it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price, r.expiry) } },
   restore = { v ->
-    PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6],
-      more = v.drop(7).chunked(3).filter { it.size == 3 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2]) })
+    PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6], expiry = v[7],
+      more = v.drop(8).chunked(4).filter { it.size == 4 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2], r[3]) })
   },
 )
+
+/** PUR-05: تاریخِ انقضای محموله — همان کادرِ «ورودِ کالا» ِ انبار (شمسی، اختیاری) */
+@Composable
+private fun ExpiryField(value: String, onValue: (String) -> Unit, error: String?) {
+  V3TextField(
+    value, onValue, StrStock.expiry, Modifier.fillMaxWidth(),
+    kind = V3FieldKind.DATE,
+    placeholder = StrStock.datePlaceholder,
+    helper = PurchaseFormModel.expiryIso(value)?.takeIf { it.isNotEmpty() }?.let(::formatDate) ?: StrStock.dateHelper,
+    error = error,
+  )
+}
 
 /**
  *  «ثبت خرید» (`purchasing/new?supplier=`، صفحه): گروه‌های «تأمین‌کننده» (پیش‌پُر از حسابِ همان
@@ -163,6 +176,8 @@ internal fun PurchaseFormScreen(
           helper = lastPrice,
           error = shownErrors.price,
         )
+        Spacer(Modifier.height(12.dp))
+        ExpiryField(form.expiry, { form = form.copy(expiry = it) }, shownErrors.expiry)
         LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))
       }
       //  PUR-05: ردیف‌های افزوده — هر کدام کالا، مقدار و قیمتِ خودش
@@ -197,6 +212,8 @@ internal fun PurchaseFormScreen(
             required = true,
             error = rowErrors.price,
           )
+          Spacer(Modifier.height(12.dp))
+          ExpiryField(row.expiry, { form = PurchaseFormModel.setRow(form, i, row.copy(expiry = it)) }, rowErrors.expiry)
           Spacer(Modifier.height(12.dp))
           V3Button(StrMoney.removePurchaseRow, { form = PurchaseFormModel.removeRow(form, i) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
         }
