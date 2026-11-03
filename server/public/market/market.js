@@ -12,8 +12,15 @@
   var state = { overview: null, category: '', near: null, offset: 0, q: '', verifyAvailable: true, view: '' };
   var searchTimer = 0; var searchSeq = 0; var feedSeq = 0;
 
-  //  نشانه‌های دسته‌ها (فقط بازارچه؛ کیت سبک می‌ماند)
+  //  نشانه‌های فقط-بازارچه (پوسته و دسته‌ها؛ کیت و بارِ نخستِ ویترین سبک می‌مانند)
   var I = K.ICONS;
+  I.clock = 'M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18z M12 7v5l3 2';
+  I.pin = 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z';
+  I.locate = 'M12 2.5v3 M12 18.5v3 M2.5 12h3 M18.5 12h3 M12 7a5 5 0 1 0 0 10 5 5 0 0 0 0-10z';
+  I.chev = 'M15 6l-6 6 6 6';
+  I.grid = 'M4 4h6v6H4z M14 4h6v6h-6z M4 14h6v6H4z M14 14h6v6h-6z';
+  I.tag = 'M3.5 12.5V4h8.5l8.5 8.5-8.5 8.5z M8 8.5h.01';
+  I.shield = 'M12 3l7.5 3v5.5c0 4.5-3.2 8-7.5 9.5-4.3-1.5-7.5-5-7.5-9.5V6z M9 12l2 2 4-4';
   I.cart = 'M3 4h2l2.4 11h10.2L20 7.5H6.2 M9.5 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z M17 20a1 1 0 1 0 0-2 1 1 0 0 0 0 2z';
   I.bread = 'M5 11a3.5 3.5 0 0 1 0-7h14a3.5 3.5 0 0 1 0 7v9H5z M9.5 8v3 M14.5 8v3';
   I.apple = 'M12 7.5c-2-1.5-6.5-1-7 3.5-.4 3.6 1.6 8.5 4.5 9 1 .2 1.7-.4 2.5-.4s1.5.6 2.5.4c2.9-.5 4.9-5.4 4.5-9-.5-4.5-5-5-7-3.5z M12 7.5c0-2 1-3.5 3-4.5';
@@ -72,7 +79,7 @@
     else if (s.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (s.distanceKm !== null && s.distanceKm !== undefined) meta.appendChild(el('span', {}, K.icon('pin'), t('dist', { n: K.fa(s.distanceKm, 1) })));
     var cover = el('span', { class: 'cover' + (s.cover ? ' tile' : '') });
-    if (s.cover) cover.appendChild(el('img', { attrs: { src: K.photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '84', height: '84' } }));
+    if (s.cover) cover.appendChild(el('img', { attrs: { src: photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '84', height: '84' } }));
     else cover.appendChild(K.avatar(s.title, s.accent, s.slug));
     var pills = el('div', { class: 'pills' });
     if (s.isNew) pills.appendChild(el('span', { class: 'pill plain new', text: t('shop.new') }));
@@ -95,11 +102,12 @@
   }
 
   // ── کارتِ کالا با «افزودن» به سبدِ همان دکان (روی همین دستگاه) ──
+  function photo(slug, id) { return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/thumb'; }
   function cartOf(slug) { return K.load(K.cartKey(slug), {}) || {}; }
   function productCard(p) {
     var li = K.productCard(p, {
       href: '/store/' + encodeURIComponent(p.shop.slug) + '#/p/' + encodeURIComponent(p.id),
-      photo: K.photo(p.shop.slug, p.id), qty: (cartOf(p.shop.slug)[p.id] || {}).qtyMilli || 0, onAdd: add, shop: true,
+      photo: photo(p.shop.slug, p.id), qty: (cartOf(p.shop.slug)[p.id] || {}).qtyMilli || 0, onAdd: add, shop: true,
     });
     li.setAttribute('data-shop', p.shop.slug);
     return li;

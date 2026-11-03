@@ -650,6 +650,43 @@ await call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.ord
 }
 ok(!fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'store', 'index.html'), 'utf8').includes('catalog.js'), 'catalog.js در بارِ نخست نیست');
 
+//  WEB-15: پنجرهٔ تنظیمات (kit/settings.js) و یاورهای ثبت/پیگیری (kit/order-kit.js) دیربارند — نخستین نقاشی و کاتالوگ
+//  بی آن‌ها؛ نیامدنشان (شبکه) ⇒ کاتالوگ و سبد بی خطا، تنظیمات پیامِ شبکه و صفحهٔ سفارش برگهٔ خطا؛ با شبکه زدنِ بعد باز می‌کند
+{
+  const zc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  let block = true; const asked = [];
+  await zc.route(/\/kit\/(settings|order-kit)\.js$/, (r) => { asked.push(new URL(r.request().url()).pathname); return block ? r.abort() : r.continue(); });
+  const zp = await zc.newPage();
+  const ze = [];
+  zp.on('pageerror', (e) => ze.push(String(e)));
+  await zp.goto(`${base}/store/${slug}`, { waitUntil: 'networkidle' });
+  await zp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  ok(asked.length === 0, 'بارِ نخست: kit/settings.js و kit/order-kit.js خواسته نشدند', asked.join(' '));
+  await zp.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
+  await zp.waitForSelector('#cart-bar:not([hidden])', { timeout: 5000 });
+  await zp.click('#open-cart');
+  await zp.waitForSelector('#sheet-lines li', { state: 'visible', timeout: 5000 });
+  ok(ze.length === 0, 'بی پرونده‌های دیربارِ کیت: کاتالوگ، سبد و برگهٔ سبد بی خطا', ze.join(' | '));
+  await zp.goto(`${base}/store/${slug}`);
+  await zp.waitForSelector('#products li[data-id]', { timeout: 15000 });
+  await zp.click('.topbar [data-act="lang"]');
+  await zp.waitForFunction(() => { const t = document.getElementById('toast'); return t && !t.hidden && t.textContent.trim(); }, null, { timeout: 5000 });
+  ok(!(await zp.$('dialog[open]')), 'تنظیمات بی settings.js: پیامِ شبکه، بی پنجرهٔ نیمه‌کاره', await zp.textContent('#toast'));
+  await zp.goto(`${base}/store/${slug}#/o/${encodeURIComponent(placedToken)}`);
+  await zp.waitForSelector('#o-status.err', { timeout: 10000 });
+  ok(await zp.isHidden('#o-cancel') && await zp.isHidden('#o-reorder'), 'صفحهٔ سفارش بی order-kit.js: برگهٔ خطا، بی دکمهٔ نیمه‌کاره', await zp.textContent('#o-status'));
+  block = false;
+  await zp.reload();
+  await zp.waitForFunction(() => /\d|[۰-۹]/.test(document.getElementById('o-title').textContent), null, { timeout: 10000 });
+  ok(await zp.isVisible('#o-steps li'), 'با شبکه: صفحهٔ سفارش و پله‌ها (K.orderSteps ِ دیربار) آمدند');
+  await zp.click('.topbar [data-act="lang"]');
+  await zp.waitForSelector('dialog.confirm[open] input[name="lang"]:checked', { timeout: 5000 });
+  ok(await zp.isChecked('dialog.confirm input[name="lang"][value="fa"]'), 'با شبکه: پنجرهٔ تنظیمات با زبانِ همین صفحه باز شد');
+  await zp.keyboard.press('Escape');
+  ok(ze.length === 0, 'پرونده‌های دیربارِ کیت: بی خطای جاوااسکریپت', ze.join(' | '));
+  await zc.close();
+}
+
 await page.goto(`${base}/store/no-such-store`);
 await page.waitForSelector('#view-missing:not([hidden])', { timeout: 10000 });
 ok(true, 'ویترینِ ناموجود: «پیدا نشد»');
@@ -659,7 +696,9 @@ ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | 
 const jsSize = fs.statSync(path.join(import.meta.dirname, '..', 'public', 'store', 'store.js')).size
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'kit.js')).size
   + fs.statSync(path.join(import.meta.dirname, '..', 'public', 'kit', 'boot.js')).size;
-ok(jsSize < 75 * 1024, 'جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ ۷۵KB (۳.۱۰)', `${jsSize} بایت، فشرده‌نشده`);
+const BUDGET = require('./storefront-budget.js');
+ok(BUDGET.FIRST_LOAD <= BUDGET.SPEC, 'سقفِ چرخ‌دنده‌ای هرگز بالای سقفِ سند (۷۵KB، ۳.۱۰)', `${BUDGET.FIRST_LOAD} ≤ ${BUDGET.SPEC}`);
+ok(jsSize < BUDGET.FIRST_LOAD, `جاوااسکریپتِ صفحه (آغاز + کیت + ویترین) زیرِ سقفِ بارِ نخست (${BUDGET.FIRST_LOAD / 1024}KB، ۳.۱۰)`, `${jsSize} بایت، فشرده‌نشده`);
 //  صفحهٔ سفارش همان بارِ اول + order.js است؛ سقفِ §۳.۱۰ برای آن هم (با فشرده‌سازیِ سند)
 const orderGz = zlib.gzipSync(Buffer.concat(['store/store.js', 'store/order.js', 'kit/kit.js', 'kit/boot.js']
   .map((f) => fs.readFileSync(path.join(import.meta.dirname, '..', 'public', f))))).length;

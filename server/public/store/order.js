@@ -3,7 +3,7 @@
  * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
  * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
- * سقفِ ۷۵KB بماند (WEB-15، §۳.۱۰)؛ خواندنِ سفارش، پیگیریِ زنده و مسیر همان store.js است.
+ * سقف بماند (WEB-15، §۳.۱۰)؛ مسیر و نخستین خواندنِ سفارش در store.js، پیگیریِ زنده و برگهٔ خطا همین‌جا.
  *
  * ⛔ نشانی و مبلغِ پرداخت را سرور می‌سازد و «پرداخت شد» فقط از وضعیتِ سرور می‌آید، هرگز از
  *    برگشت از صفحهٔ حساب‌پی. نقد هنگامِ تحویل همان می‌ماند.
@@ -320,6 +320,28 @@
       });
     }
 
-    return { render: renderOrder };
+    // ── خواندن و پیگیریِ زنده؛ store.js نخستین پاسخ را هم‌زمان با همین پرونده می‌گیرد و `open` را می‌خواند ──
+    //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
+    //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
+    var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
+    var poll = 0;
+    function open(token, order) {
+      clearTimeout(poll);
+      var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(fail); };
+      var o = renderOrder(order, token);
+      var pend = o.paymentStatus === 'pending';
+      if (pend || FINAL.indexOf(o.status) < 0) poll = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else poll = setTimeout(load, 20000); }, pend ? 5000 : 20000);
+    }
+    function fail(e) {
+      $('o-title').textContent = t('od.title');
+      K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
+      $('o-status').className = 'pill err';
+      $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
+      $('o-meta').textContent = e.message;
+      $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
+      $('o-dlv').hidden = true; ['o-add', 'o-apology'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
+    }
+
+    return { open: open, fail: fail, stop: function () { clearTimeout(poll); } };
   };
 })();
