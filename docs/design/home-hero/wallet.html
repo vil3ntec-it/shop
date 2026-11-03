@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_regular.ttf);font-weight:400}
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_medium.ttf);font-weight:500}
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_bold.ttf);font-weight:700}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:V,sans-serif;background:#f1f1f3;padding:28px;width:1960px}
+h1{font-size:30px;font-weight:700;color:#111;margin:0 6px 4px}
+.sub{font-size:16px;color:#555;margin:0 6px 22px}
+.grid{display:grid;grid-template-columns:repeat(4,440px);gap:30px}
+.tag{font-size:21px;font-weight:700;color:#111;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tag b{background:#111;color:#fff;border-radius:50%;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+.tag span{font-size:13.5px;font-weight:400;color:#666}
+.ph{width:440px;height:900px;border-radius:44px;background:#fafafa;overflow:hidden;position:relative;border:9px solid #0b0b0c;box-shadow:0 20px 40px rgba(0,0,0,.18)}
+.hero{margin:10px 10px 0;border-radius:36px;background:radial-gradient(120% 90% at 50% 0%,#2a2a2d 0%,#111113 55%,#070708 100%);color:#fff;padding:18px 18px 22px;position:relative;overflow:hidden;box-shadow:inset 0 1px 0 rgba(255,255,255,.08)}
+.hrow{display:flex;justify-content:space-between;align-items:center}
+.av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f97316,#22d3ee);display:flex;align-items:center;justify-content:center;font-weight:700}
+.bell{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,.04)}
+.sel{text-align:center;margin-top:18px;font-size:16px;opacity:.9}
+.amt{text-align:center;font-size:52px;font-weight:700;letter-spacing:-1px;margin-top:2px;background:linear-gradient(180deg,#ffffff 30%,#9b9ba3 100%);-webkit-background-clip:text;background-clip:text;color:transparent;line-height:1.15}
+.amt small{font-size:.5em}
+.sec2{text-align:center;font-size:14.5px;opacity:.85;margin-top:2px}
+.btns{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:26px}
+.pb{border-radius:999px;padding:9px 18px;font-size:13px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 6px 14px rgba(0,0,0,.4)}
+.plus{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 18px rgba(0,0,0,.5)}
+.chip{display:flex;justify-content:center;margin-top:22px}
+.chip span{border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 12px;font-size:12px;background:rgba(255,255,255,.04)}
+.chip i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;margin-left:6px;box-shadow:0 0 8px #4ade80}
+.dots{display:flex;gap:5px;justify-content:center;margin-top:12px}.dots i{width:16px;height:4px;border-radius:2px;background:#fff}.dots i+i{width:4px;opacity:.35}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:16px 14px 0}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:#374151}
+.ic{width:56px;height:56px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.secT{font-weight:700;font-size:16px;margin:14px 18px 6px;display:flex;justify-content:space-between}
+.secT a{color:#2563eb;font-size:13px;font-weight:500}
+.list{margin:0 14px;background:#fff;border-radius:18px;padding:2px 14px;border:1px solid #e5e7eb}
+.row{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid #eef0f4;font-size:13.5px}
+.row:last-child{border-bottom:0}
+.a{font-weight:700}.st{text-decoration:line-through;color:#9ca3af}.tm{color:#9ca3af;font-size:12px;margin-left:8px}
+.nav{position:absolute;bottom:0;left:0;right:0;height:62px;background:#fff;border-top:1px solid #e5e7eb;display:flex;justify-content:space-around;align-items:center;font-size:18px;color:#6b7280}
+.nav .on{color:#2563eb;background:#e0e7ff;border-radius:14px;padding:4px 14px}
+svg{display:block}
+</style></head><body>
+<h1>نزدیک به نمونه‌ای که فرستادی — چهار حالت</h1>
+<div class="sub">فقط بخشِ بالا (جای دو کارتِ «صندوق» و «فروشِ امروز») عوض می‌شود. چهار دکمه و فهرستِ «امروز» همان است.</div>
+<div class="grid" id="g"></div>
+<template id="bottom">
+<div class="acts"><div class="act"><div class="ic" style="background:#dbeafe">🛒</div>فروشِ تازه</div><div class="act"><div class="ic" style="background:#ccfbf1">↙</div>دریافت</div><div class="act"><div class="ic" style="background:#fef3c7">📥</div>ورودِ کالا</div><div class="act"><div class="ic" style="background:#ede9fe">🕘</div>تاریخچه</div></div>
+<div class="secT">امروز<a>همه</a></div>
+<div class="list"><div class="row"><span>مشتریِ گذری</span><span><span class="tm">18:57</span><span class="a st">700 ؋</span></span></div><div class="row"><span>haroon</span><span><span class="tm">11:50</span><span class="a">150 ؋</span></span></div><div class="row"><span>مشتریِ گذری</span><span><span class="tm">06:01</span><span class="a st">150 ؋</span></span></div><div class="row"><span>مشتریِ گذری</span><span><span class="tm">00:09</span><span class="a">950 ؋</span></span></div></div>
+<div class="nav"><span>☰</span><span>🕘</span><span>🏷️</span><span class="on">⌂</span><span>🔍</span></div>
+</template>
+<script>
+const head=`<div class="hrow"><div class="bell">🔔</div><div class="av">د</div></div>`;
+const btns=`<div class="btns"><span class="pb">↗ پرداخت</span><span class="plus">+</span><span class="pb">↙ دریافت</span></div>`;
+const chip=`<div class="chip"><span><i></i>همگام شد</span></div>`;
+const spark=(op,h=70)=>`<svg viewBox="0 0 400 ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="opacity:${op}"><defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></linearGradient></defs><path d="M0 ${h*.55} C40 ${h*.5} 60 ${h*.8} 100 ${h*.75} S170 ${h*.3} 210 ${h*.35} 290 ${h*.7} 330 ${h*.5} 380 ${h*.2} 400 ${h*.25} L400 ${h} L0 ${h}Z" fill="url(#sg)"/><path d="M0 ${h*.55} C40 ${h*.5} 60 ${h*.8} 100 ${h*.75} S170 ${h*.3} 210 ${h*.35} 290 ${h*.7} 330 ${h*.5} 380 ${h*.2} 400 ${h*.25}" stroke="#fff" stroke-width="2" fill="none"/></svg>`;
+const V=[
+['همان سبک، ساده','عددِ بزرگ، سه دکمهٔ گرد، نشانِ همگام‌سازی',
+`<div class="hero">${head}<div class="sel">صندوق ⌄</div><div class="amt">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div>${btns}${chip}<div class="dots"><i></i><i></i></div></div>`],
+['با منحنیِ کم‌رنگ پشتِ عدد','نمودارِ فروشِ امروز، آرام و خاکستری',
+`<div class="hero">${head}<div class="sel">صندوق ⌄</div><div style="position:relative"><div style="position:absolute;left:-18px;right:-18px;top:18px">${spark(.35,90)}</div><div class="amt" style="position:relative">15,000 <small>؋</small></div><div class="sec2" style="position:relative">فروشِ امروز 1,100 ؋ · ضرر 1,300 ؋</div></div>${btns}${chip}<div class="dots"><i></i><i></i></div></div>`],
+['با کاشیِ نمودار زیرش','مثلِ کاشیِ سیاهِ «Portfolio» در نمونه',
+`<div class="hero" style="padding-bottom:18px">${head}<div class="sel">صندوق ⌄</div><div class="amt">15,000 <small>؋</small></div><div class="sec2">نقدِ دخل</div>${btns}${chip}</div>
+<div style="margin:10px 10px 0;display:flex;gap:8px"><div style="flex:none;width:150px;border-radius:20px;background:#111113;color:#fff;padding:10px 12px"><svg viewBox="0 0 120 34" width="100%" height="34"><path d="M0 26 L12 22 L22 28 L34 12 L46 18 L58 8 L70 16 L82 10 L94 20 L106 6 L120 12" stroke="#9ca3af" stroke-width="1.6" fill="none"/></svg><div style="font-weight:700;font-size:17px">1,100 ؋</div><div style="font-size:11px;opacity:.6">فروشِ امروز</div></div>
+<div style="flex:1;border-radius:20px;background:#ececee;padding:10px 12px;display:flex;flex-direction:column;justify-content:center;gap:2px;font-size:13px"><div style="display:flex;justify-content:space-between"><span>فاکتور</span><b>۴</b></div><div style="display:flex;justify-content:space-between"><span>ضررِ امروز</span><b style="color:#dc2626">1,300 ؋</b></div><div style="display:flex;justify-content:space-between"><span>نسبت به دیروز</span><b style="color:#16a34a">▲ ۱۲٪</b></div></div></div>`],
+['دو صفحه با کشیدن','صفحهٔ ۱ صندوق، صفحهٔ ۲ فروشِ امروز — هم‌شکل',
+`<div style="display:flex;gap:10px;margin:10px 10px 0 0"><div class="hero" style="margin:0;flex:none;width:350px">${head}<div class="sel">صندوق ⌄</div><div class="amt">15,000 <small>؋</small></div><div class="sec2">نقدِ دخل · ضرر 1,300 ؋</div>${btns}${chip}<div class="dots"><i></i><i></i></div></div>
+<div class="hero" style="margin:0;flex:none;width:350px;opacity:.95">${head}<div class="sel">فروشِ امروز</div><div class="amt">1,100 <small>؋</small></div><div style="margin:6px -18px 0">${spark(.5,70)}</div><div class="sec2">۴ فاکتور · ▲ ۱۲٪ از دیروز</div></div></div>
+<div style="text-align:center;font-size:11.5px;color:#666;margin-top:6px">⟵ بکش: صفحهٔ دوم «فروشِ امروز»</div>`],
+];
+const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+const bottom=document.getElementById('bottom').innerHTML;
+document.getElementById('g').innerHTML=V.map((v,i)=>`<div><div class="tag"><b>${fa(i+1)}</b>${v[0]}<span>${v[1]}</span></div><div class="ph">${v[2]}${bottom}</div></div>`).join('');
+</script></body></html>

@@ -371,7 +371,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/onboarding/ShopSetupGate.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/onboarding/TermsStep.kt": 3,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/chat/ChatRouteContent.kt": 5,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/chat/ChatThreadController.kt": 7,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/chat/ChatThreadController.kt": 6,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/chat/VoiceBar.kt": 6,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/CodeOnceSheet.kt": 1,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/DeliveryModel.kt": 4,

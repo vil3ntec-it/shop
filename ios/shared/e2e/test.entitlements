@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  اجازه‌های test.kexe ِ شبیه‌ساز (گامِ ۸، docs/IOS-PLAN-fa.md §۰.۱۳) — فقط آزمون، با `-sectcreate __TEXT __entitlements`
+  (همان راهِ Xcode برای ساختِ شبیه‌ساز، «Simulated.xcent»): کلیددانِ iOS برای فرآیندِ بی بسته بی گروهِ دسترسی
+  errSecMissingEntitlement (-34018) می‌دهد. شناسه ساختگی است و فقط درونِ شبیه‌ساز معنا دارد؛ برنامه اجازه‌های خودش را دارد.
+-->
+<plist version="1.0">
+<dict>
+	<key>application-identifier</key>
+	<string>TOHIDE2E00.ir.vil3ntec.tohid.e2e</string>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>TOHIDE2E00.ir.vil3ntec.tohid.e2e</string>
+	</array>
+</dict>
+</plist>
