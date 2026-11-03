@@ -115,4 +115,23 @@ class ProductFormModelTest {
     assertEquals("x", ProductFormModel.update(rows, 2) { it.copy(name = "x") }[1].name)
     assertEquals(full.name, ProductFormModel.update(rows, 2) { it.copy(name = "x") }[0].name)
   }
+
+  @Test
+  fun `افزودن از متن — هر نام یک ردیفِ تازه فقط با نام، ردیفِ کاملاً خالی جا می‌دهد`() {
+    val blank = ProductRowDraft(key = 0)
+    val withBarcode = ProductRowDraft(key = 1, barcode = "6260012345678")
+    val chosen = ProductRowDraft(key = 2, category = "خوراکی")
+    val out = ProductFormModel.withPasted(listOf(blank, withBarcode, full, chosen), listOf("روغن ۵ لیتر", "برنج سیلا"), firstKey = 10)
+    //  ردیفِ بی‌هیچ‌چیز رفت؛ بارکدِ مسیر، ردیفِ کامل و دستهٔ برگزیده ماندند
+    assertEquals(listOf(withBarcode, full, chosen), out.take(3))
+    val added = out.drop(3)
+    assertEquals(listOf("روغن ۵ لیتر", "برنج سیلا"), added.map { it.name })
+    assertEquals(listOf(10, 11), added.map { it.key })
+    //  هیچ قیمت، بارکد، دسته یا واحدی ساخته نمی‌شود — هر دو تا کاربر ننویسد نیمه‌پرند
+    assertTrue(added.all { it.purchase.isEmpty() && it.sale.isEmpty() && it.barcode.isEmpty() && it.category.isEmpty() && it.unit.isEmpty() })
+    assertTrue(added.none(ProductFormModel::ready))
+    assertEquals(ProductFormModel.Check.Broken(2), ProductFormModel.check(out.drop(1)))
+    //  بی نام ⇒ همان ردیف‌ها
+    assertEquals(listOf(blank), ProductFormModel.withPasted(listOf(blank), emptyList(), 5))
+  }
 }

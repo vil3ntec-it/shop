@@ -105,6 +105,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.StockPlacesScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StorefrontEtaScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.TaxQuarterScreen
 import androidx.compose.material.icons.outlined.Badge
+import androidx.compose.material.icons.outlined.Category
 import androidx.compose.material.icons.outlined.Celebration
 import androidx.compose.material.icons.outlined.FactCheck
 import androidx.compose.material.icons.outlined.PendingActions
@@ -118,6 +119,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.GiftReceiptScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LabelToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PriceWhyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductInfoScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductSuggestScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ShrinkReportScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SpecialOrderScreen
 import androidx.compose.material.icons.outlined.FormatListNumbered
@@ -220,6 +222,7 @@ internal object SettingsPages {
     Page(SettingsLayout.SHRINK_REPORT, Icons.Outlined.RemoveShoppingCart) { ShrinkReportScreen(it) },
     Page(SettingsLayout.PRODUCT_TOOLS, Icons.Outlined.Description) { ProductToolsScreen(it) },
     Page(SettingsLayout.PRODUCT_INFO, Icons.Outlined.Badge) { ProductInfoScreen(it) },
+    Page(SettingsLayout.PRODUCT_SUGGEST, Icons.Outlined.Category) { ProductSuggestScreen(it) },
     Page(SettingsLayout.LABEL_TOOLS, Icons.Outlined.Sell) { LabelToolsScreen(it) },
     Page(SettingsLayout.STOREFRONT_ETA, Icons.Outlined.LocalShipping) { StorefrontEtaScreen(it) },
     Page(SettingsLayout.PROMO_GUARD, Icons.Outlined.Redeem) { PromoGuardScreen(it) },

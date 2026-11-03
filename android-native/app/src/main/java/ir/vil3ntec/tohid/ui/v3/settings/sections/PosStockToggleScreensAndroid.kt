@@ -13,12 +13,14 @@ import ir.vil3ntec.tohid.core.i18n.StrDeliver
 import ir.vil3ntec.tohid.core.i18n.StrGift
 import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.i18n.StrProduct
+import ir.vil3ntec.tohid.core.i18n.StrProductSuggest
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.core.i18n.StrSpecialOrder
 import ir.vil3ntec.tohid.core.i18n.StrWhy
 import ir.vil3ntec.tohid.data.CountToolsPref
 import ir.vil3ntec.tohid.data.LabelToolsPref
+import ir.vil3ntec.tohid.data.ProductSuggestPref
 import ir.vil3ntec.tohid.data.ShrinkReportPref
 import ir.vil3ntec.tohid.data.SpecialOrderPref
 import ir.vil3ntec.tohid.ui.components.pos.DeliverLaterPrefs
@@ -96,6 +98,15 @@ internal fun RouteScope.ProductInfoScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   val on = remember { ProductInfoPrefs.load(context); ProductInfoPrefs.on.value }
   ToggleScreen(SettingsLayout.PRODUCT_INFO, onBack, on, StrShell.switchOn, StrProduct.note) { ProductInfoPrefs.set(context, it) }
+}
+
+/** `settings/goods/product-suggest`: پیشنهادِ دسته و نام در فرمِ کالا (AI-06) — ردهٔ A، فقط همین دستگاه */
+@Composable
+internal fun RouteScope.ProductSuggestScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  ToggleScreen(SettingsLayout.PRODUCT_SUGGEST, onBack, ProductSuggestPref.on(context), StrShell.switchOn, StrProductSuggest.settingsNote, deviceOnly = true) {
+    ProductSuggestPref.set(context, it)
+  }
 }
 
 /**
