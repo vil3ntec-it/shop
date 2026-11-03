@@ -30,6 +30,9 @@ object StrPlaces {
     "کارتن په دانو ووېشئ یا له څو توکو بسته جوړه کړئ؛ بیه له توکي سره ځي.",
   )
 
+  /** POS-16 — سرخطِ «موجودی در محل‌ها» در برگهٔ ردیفِ سبدِ صندوق */
+  val atTill: String get() = t("موجودی در محل‌ها", "Stock by place", "موجودي په ځایونو کې")
+
   val openPlaces: String get() = t("محل‌ها و انتقال", "Places and transfers", "ځایونه او لېږد")
   val openRepack: String get() = t("بسته‌بندیِ دوباره و ساختِ بسته", "Repack and assemble", "بیا بسته‌بندي او د بستې جوړول")
 

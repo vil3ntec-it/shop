@@ -162,3 +162,25 @@ object StockPlaces {
     return Result.Ok(StockActions.transferRows(d, p, src, dest, qtyMilli, null, reason, user, today, now, key, newId), key)
   }
 }
+
+/** موجودیِ یک کالا در یک محل — `milli` هزارمِ واحدِ موجودی (منفی هم می‌شود: فروش از محلی بیش از ورودش) */
+data class PlaceQty(val place: String, val label: String, val milli: Long)
+
+/**
+ *  POS-16 — «موجودی در محل‌ها» برای صندوق: **فقط خواندنی** و همان حسابِ [StockPlaces.stockAt] (ورود با محل + انتقال − فروش؛
+ *  جمعِ محل‌ها دقیقاً موجودیِ امروزِ کالا) — صفحه‌ها خودشان به `StockPlaces` دست نمی‌زنند (`StockPlacesOffTest`). فقط وقتی
+ *  دست‌کم یک محلِ **دیگر** جز محلِ اصلی برای این کالا عدد دارد، وگرنه چیزی بیش از موجودیِ همیشگی نیست. کیت و خدماتی موجودیِ
+ *  خودشان را ندارند ⇒ هیچ. موتورِ تازهٔ موجودی (`StockLedger.isOn`) محل‌ها را در «دفترِ موجودی» دارد ⇒ هیچ (همان دروازهٔ
+ *  «محل‌ها و انتقال» در `StockExtras`). ترتیب: محلِ اصلی، سپس به نام. شعبه در داده نیست (فقط محل‌های همین دکان).
+ *  صدازننده فقط با «محل‌های نگه‌داری» ِ روشنِ همین دستگاه (`StockPlacesPref.places`) می‌خواند؛ آزمون: `LinePlacesTest`.
+ */
+object PlaceStock {
+  fun of(d: ShopData, p: Product?): List<PlaceQty> {
+    if (p == null || p.stockless == true || !p.kit.isNullOrEmpty() || StockLedger.isOn(d)) return emptyList()
+    val byPlace = StockPlaces.stockAt(d)[p.id].orEmpty().filterValues { it != 0L }
+    if (byPlace.keys.none { it != StockLedger.MAIN }) return emptyList()
+    return byPlace.entries
+      .sortedWith(compareBy({ it.key != StockLedger.MAIN }, { it.key }))
+      .map { (loc, q) -> PlaceQty(loc, StockPlaces.label(loc), q) }
+  }
+}

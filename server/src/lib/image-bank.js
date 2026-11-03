@@ -522,82 +522,82 @@ async function shopList(shopId, { productId = '', cursor = '', limit = 50, base 
  *            آخرین عکسِ مرکزیِ همین کالا (IMG-BANK-16).
  *   shop     عکسِ خودِ دکان — آخرین عکسِ مرکزی برای بازگشت می‌ماند.
  *   none     بی عکس (placeholder).
+ * `selectIn` همان، درونِ تراکنشِ صدازننده (دستهٔ تغییرِ IMG-PRO-17: چند انتخاب، یا همه یا هیچ).
  */
-async function select(shopId, userId, body) {
+const select = (shopId, userId, body) => tx((c) => selectIn(c, shopId, userId, body));
+async function selectIn(c, shopId, userId, body) {
   const productId = photos.checkId(body.product_id);
   const source = oneOf(body.source, ['central', 'shop', 'none'], '');
   if (!source) throw badRequest('منبع: central، shop یا none', 'bad_source');
-  return tx(async (c) => {
-    const prev = await q1(c, 'SELECT * FROM shop_product_images WHERE shop_id=$1 AND product_id=$2 FOR UPDATE',
-      [shopId, productId]);
-    const row = {
-      source, image_id: '', version: 0, match_status: 'unconfirmed', confirmed_by: '',
-      central_image_id: prev?.central_image_id || '', central_version: Number(prev?.central_version || 0),
-      central_match: prev?.central_match || '', central_confirmed_by: prev?.central_confirmed_by || '',
-      bank_product_id: prev?.bank_product_id || '',
-    };
-    let classification = null;
-    if (source === 'central') {
-      const imageId = str(body.image_id, 40) || row.central_image_id;
-      if (!imageId) throw badRequest('عکسِ مرکزی انتخاب نشده', 'image_required');
-      const img = await q1(c, 'SELECT * FROM images WHERE id=$1', [imageId]);
-      if (!img || img.space !== 'central') throw notFound('عکس پیدا نشد');
-      if (img.status !== 'APPROVED' || !img.search_enabled) {
-        throw conflict('این عکس دیگر در بانک قابلِ انتخاب نیست', 'image_not_selectable');
-      }
-      const reverting = !body.image_id && imageId === row.central_image_id;
-      const version = body.version != null ? intIn(body.version, 1, 100000, 0)
-        : (reverting ? row.central_version : Number(img.current_version));
-      const v = await q1(c, 'SELECT review FROM image_versions WHERE image_id=$1 AND version=$2', [imageId, version]);
-      if (!v || v.review !== 'approved' || version > Number(img.current_version)) {
-        throw conflict('این نسخهٔ عکس تأیید نشده است', 'version_not_approved');
-      }
-      const bp = await q1(c, 'SELECT * FROM bank_products WHERE id=$1', [img.bank_product_id]);
-      if (!bp) throw conflict('عکس به کالای بانک وصل نیست', 'product_missing');
-      const expect = body.expect && typeof body.expect === 'object' ? body.expect : null;
-      //  بازگشت به همان عکسِ مرکزی: تطبیقِ همان بار (با تأییدش) معتبر است
-      classification = reverting && !expect && row.central_match
-        ? { status: row.central_match, reasons: ['previous_selection'], diffs: [], by: row.central_confirmed_by }
-        : ID.classify({ ...bp, alt_names: json(bp.alt_names, []) }, expect || {});
-      if (classification.reasons.includes('barcode_different')) {
-        throw new ApiError(409, 'barcode_mismatch', 'بارکدِ کالای شما با کالای این عکس فرق دارد');
-      }
-      if (classification.status !== 'exact' && body.confirm !== true) {
-        const e = new ApiError(409, 'needs_confirmation', 'تطبیق قطعی نیست — مشخصات را ببینید و تأیید کنید');
-        e.details = classification;
-        throw e;
-      }
-      const confirmedBy = classification.status === 'exact' ? '' : (classification.by || userId);
-      Object.assign(row, {
-        image_id: imageId, version, match_status: classification.status, confirmed_by: confirmedBy,
-        central_image_id: imageId, central_version: version, central_match: classification.status,
-        central_confirmed_by: confirmedBy, bank_product_id: bp.id,
-      });
-      if (!reverting && prev?.image_id !== imageId) {
-        await c.query('UPDATE images SET use_count=use_count+1 WHERE id=$1', [imageId]);
-      }
-    } else if (source === 'shop') {
-      const img = await ownImage(c, shopId, str(body.image_id, 40));
-      if (!img) throw notFound('عکس پیدا نشد');
-      const version = body.version != null ? intIn(body.version, 1, 100000, 0) : Number(img.current_version);
-      const v = await q1(c, 'SELECT 1 FROM image_versions WHERE image_id=$1 AND version=$2', [img.id, version]);
-      if (!v) throw notFound('این نسخه نیست');
-      Object.assign(row, { image_id: img.id, version, match_status: 'exact' });
+  const prev = await q1(c, 'SELECT * FROM shop_product_images WHERE shop_id=$1 AND product_id=$2 FOR UPDATE',
+    [shopId, productId]);
+  const row = {
+    source, image_id: '', version: 0, match_status: 'unconfirmed', confirmed_by: '',
+    central_image_id: prev?.central_image_id || '', central_version: Number(prev?.central_version || 0),
+    central_match: prev?.central_match || '', central_confirmed_by: prev?.central_confirmed_by || '',
+    bank_product_id: prev?.bank_product_id || '',
+  };
+  let classification = null;
+  if (source === 'central') {
+    const imageId = str(body.image_id, 40) || row.central_image_id;
+    if (!imageId) throw badRequest('عکسِ مرکزی انتخاب نشده', 'image_required');
+    const img = await q1(c, 'SELECT * FROM images WHERE id=$1', [imageId]);
+    if (!img || img.space !== 'central') throw notFound('عکس پیدا نشد');
+    if (img.status !== 'APPROVED' || !img.search_enabled) {
+      throw conflict('این عکس دیگر در بانک قابلِ انتخاب نیست', 'image_not_selectable');
     }
-    await c.query(
-      `INSERT INTO shop_product_images (shop_id, product_id, source, image_id, version, match_status, confirmed_by,
-          central_image_id, central_version, central_match, central_confirmed_by, bank_product_id, updated_by, updated_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-       ON CONFLICT (shop_id, product_id) DO UPDATE SET source=EXCLUDED.source, image_id=EXCLUDED.image_id,
-          version=EXCLUDED.version, match_status=EXCLUDED.match_status, confirmed_by=EXCLUDED.confirmed_by,
-          central_image_id=EXCLUDED.central_image_id, central_version=EXCLUDED.central_version,
-          central_match=EXCLUDED.central_match, central_confirmed_by=EXCLUDED.central_confirmed_by,
-          bank_product_id=EXCLUDED.bank_product_id, updated_by=EXCLUDED.updated_by, updated_at=EXCLUDED.updated_at`,
-      [shopId, productId, row.source, row.image_id, row.version, row.match_status, row.confirmed_by,
-        row.central_image_id, row.central_version, row.central_match, row.central_confirmed_by, row.bank_product_id,
-        userId, now()]);
-    return { product_id: productId, ...row, classification };
-  });
+    const reverting = !body.image_id && imageId === row.central_image_id;
+    const version = body.version != null ? intIn(body.version, 1, 100000, 0)
+      : (reverting ? row.central_version : Number(img.current_version));
+    const v = await q1(c, 'SELECT review FROM image_versions WHERE image_id=$1 AND version=$2', [imageId, version]);
+    if (!v || v.review !== 'approved' || version > Number(img.current_version)) {
+      throw conflict('این نسخهٔ عکس تأیید نشده است', 'version_not_approved');
+    }
+    const bp = await q1(c, 'SELECT * FROM bank_products WHERE id=$1', [img.bank_product_id]);
+    if (!bp) throw conflict('عکس به کالای بانک وصل نیست', 'product_missing');
+    const expect = body.expect && typeof body.expect === 'object' ? body.expect : null;
+    //  بازگشت به همان عکسِ مرکزی: تطبیقِ همان بار (با تأییدش) معتبر است
+    classification = reverting && !expect && row.central_match
+      ? { status: row.central_match, reasons: ['previous_selection'], diffs: [], by: row.central_confirmed_by }
+      : ID.classify({ ...bp, alt_names: json(bp.alt_names, []) }, expect || {});
+    if (classification.reasons.includes('barcode_different')) {
+      throw new ApiError(409, 'barcode_mismatch', 'بارکدِ کالای شما با کالای این عکس فرق دارد');
+    }
+    if (classification.status !== 'exact' && body.confirm !== true) {
+      const e = new ApiError(409, 'needs_confirmation', 'تطبیق قطعی نیست — مشخصات را ببینید و تأیید کنید');
+      e.details = classification;
+      throw e;
+    }
+    const confirmedBy = classification.status === 'exact' ? '' : (classification.by || userId);
+    Object.assign(row, {
+      image_id: imageId, version, match_status: classification.status, confirmed_by: confirmedBy,
+      central_image_id: imageId, central_version: version, central_match: classification.status,
+      central_confirmed_by: confirmedBy, bank_product_id: bp.id,
+    });
+    if (!reverting && prev?.image_id !== imageId) {
+      await c.query('UPDATE images SET use_count=use_count+1 WHERE id=$1', [imageId]);
+    }
+  } else if (source === 'shop') {
+    const img = await ownImage(c, shopId, str(body.image_id, 40));
+    if (!img) throw notFound('عکس پیدا نشد');
+    const version = body.version != null ? intIn(body.version, 1, 100000, 0) : Number(img.current_version);
+    const v = await q1(c, 'SELECT 1 FROM image_versions WHERE image_id=$1 AND version=$2', [img.id, version]);
+    if (!v) throw notFound('این نسخه نیست');
+    Object.assign(row, { image_id: img.id, version, match_status: 'exact' });
+  }
+  await c.query(
+    `INSERT INTO shop_product_images (shop_id, product_id, source, image_id, version, match_status, confirmed_by,
+        central_image_id, central_version, central_match, central_confirmed_by, bank_product_id, updated_by, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+     ON CONFLICT (shop_id, product_id) DO UPDATE SET source=EXCLUDED.source, image_id=EXCLUDED.image_id,
+        version=EXCLUDED.version, match_status=EXCLUDED.match_status, confirmed_by=EXCLUDED.confirmed_by,
+        central_image_id=EXCLUDED.central_image_id, central_version=EXCLUDED.central_version,
+        central_match=EXCLUDED.central_match, central_confirmed_by=EXCLUDED.central_confirmed_by,
+        bank_product_id=EXCLUDED.bank_product_id, updated_by=EXCLUDED.updated_by, updated_at=EXCLUDED.updated_at`,
+    [shopId, productId, row.source, row.image_id, row.version, row.match_status, row.confirmed_by,
+      row.central_image_id, row.central_version, row.central_match, row.central_confirmed_by, row.bank_product_id,
+      userId, now()]);
+  return { product_id: productId, ...row, classification };
 }
 
 /** کدام عکس برای این کالا نمایش داده می‌شود — منبع همیشه صریح است. */
@@ -1189,7 +1189,7 @@ module.exports = {
   SHOP_FLAG, CENTRAL_FLAG, SIZES, DERIV, ROLES, LICENSES, REPORT_KINDS, ROWS_MAX,
   flagOf, shopEnabled, centralEnabled, imageRow, readFile, fileUrl, putBlob,
   productInput, insertProduct, updateProduct, productOut,
-  search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, resolve, propose, report,
+  search, shopUpload, shopCanRead, shopVersion, shopDerivative, shopList, select, selectIn, resolve, propose, report,
   adminUpload, adminPatch, adminVersion, adminDerivative, approve, reject, archive, setSearch, adminDetail, queue,
   batchCreate, batchFile, batchRows, batchStatus, batchReport, reportCsv, reportsList, parseCsv, tx,
 };
