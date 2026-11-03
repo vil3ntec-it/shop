@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
@@ -16,10 +18,12 @@ internal data class PurchaseForm(
   val notes: String = "",
   /** PUR-05: ردیفِ دوم به بعدِ همین فاکتور (ردیفِ نخست همان کادرهای بالاست)؛ خالی ⇒ همان خریدِ تک‌ردیفهٔ امروز */
   val more: List<PurchaseRow> = emptyList(),
+  /** PUR-05: تاریخِ انقضای ردیفِ نخست، همان‌طور که تایپ شد (شمسی؛ خالی = بی انقضا) */
+  val expiry: String = "",
 )
 
-/** یک ردیفِ افزوده‌شدهٔ فاکتورِ خرید (PUR-05) — همان متنِ خامِ کادرها */
-internal data class PurchaseRow(val productId: String? = null, val quantity: String = "", val price: String = "")
+/** یک ردیفِ افزوده‌شدهٔ فاکتورِ خرید (PUR-05) — همان متنِ خامِ کادرها؛ [expiry] مثلِ ردیفِ نخست */
+internal data class PurchaseRow(val productId: String? = null, val quantity: String = "", val price: String = "", val expiry: String = "")
 
 /**
  *  فرمِ «ثبت خرید» (`purchasing/new?supplier=`) — منطقِ خالص، زیرِ آزمون. جمع و باقی فقط برای
@@ -74,8 +78,8 @@ internal object PurchaseFormModel {
   private fun priceText(v: Double): String = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
 
   /** خطای یک ردیفِ افزوده */
-  data class RowErrors(val product: String? = null, val quantity: String? = null, val price: String? = null) {
-    val any: Boolean get() = listOf(product, quantity, price).any { it != null }
+  data class RowErrors(val product: String? = null, val quantity: String? = null, val price: String? = null, val expiry: String? = null) {
+    val any: Boolean get() = listOf(product, quantity, price, expiry).any { it != null }
   }
 
   data class Errors(
@@ -86,12 +90,18 @@ internal object PurchaseFormModel {
     val paid: String? = null,
     /** هم‌اندازهٔ `PurchaseForm.more` */
     val rows: List<RowErrors> = emptyList(),
+    val expiry: String? = null,
   ) {
-    val any: Boolean get() = listOf(supplier, product, quantity, price, paid).any { it != null } || rows.any { it.any }
+    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry).any { it != null } || rows.any { it.any }
   }
 
   private fun quantityError(text: String): String? = num(text).let { if (it == null || it <= 0) StrMoney.invalidNumber else null }
   private fun priceError(text: String): String? = num(text).let { if (it == null || it < 0) StrMoney.invalidNumber else null }
+
+  /** PUR-05: انقضای تایپ‌شده ⇒ `yyyy-MM-dd`؛ خالی ⇒ "" (بی انقضا)؛ نادرست ⇒ null (همان قاعدهٔ «ورودِ کالا» ِ انبار) */
+  fun expiryIso(text: String): String? = if (text.isBlank()) "" else Jalali.parseTyped(text)
+
+  private fun expiryError(text: String): String? = if (expiryIso(text) == null) StrStock.errExpiry else null
 
   /** خطای درجای هر کادر — همان شرط‌های موتور، پیش از زدن */
   fun errors(f: PurchaseForm): Errors = Errors(
@@ -105,8 +115,10 @@ internal object PurchaseFormModel {
         product = if (r.productId == null) StrMoney.pickItem else null,
         quantity = quantityError(r.quantity),
         price = priceError(r.price),
+        expiry = expiryError(r.expiry),
       )
     },
+    expiry = expiryError(f.expiry),
   )
 
   /** چیزی نوشته یا عوض شده ⇒ «برگشت» اول «دور ریخته شود؟» */
@@ -122,6 +134,8 @@ internal object PurchaseFormModel {
     paidAmount = num(f.paid) ?: 0.0,
     date = f.date,
     notes = f.notes.trim(),
+    //  PUR-05: انقضای محموله روی ورودِ انبار (FEFO و هشدارِ انقضا)؛ خالی ⇒ همان خریدِ امروز
+    expiryDate = expiryIso(f.expiry).orEmpty(),
   )
 
   /**
@@ -129,9 +143,12 @@ internal object PurchaseFormModel {
    *  ردیف‌های افزوده به همان ترتیب؛ واحد همان واحدِ کالا. پرداخت میانِ ردیف‌ها به ترتیب پخش می‌شود (کارِ `PurchaseBook`).
    */
   fun lines(f: PurchaseForm, unitOf: (String) -> String): List<PurchaseBook.Line> =
-    (listOf(PurchaseRow(f.productId, f.quantity, f.price)) + f.more).map { r ->
+    (listOf(PurchaseRow(f.productId, f.quantity, f.price, f.expiry)) + f.more).map { r ->
       val id = r.productId.orEmpty()
-      PurchaseBook.Line(productId = id, quantity = num(r.quantity) ?: 0.0, price = num(r.price) ?: -1.0, unit = unitOf(id))
+      PurchaseBook.Line(
+        productId = id, quantity = num(r.quantity) ?: 0.0, price = num(r.price) ?: -1.0, unit = unitOf(id),
+        expiryDate = expiryIso(r.expiry).orEmpty(),
+      )
     }
 
   /** پرداختِ کلِ فاکتور (خالی = نسیه) */

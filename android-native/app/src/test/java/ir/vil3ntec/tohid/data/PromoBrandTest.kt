@@ -86,4 +86,53 @@ class PromoBrandTest {
     assertNotNull(src.indexOf("if (brands.isNotEmpty()) {").takeIf { it > 0 })
     assertTrue(src.contains("(d.products.mapNotNull { it.brand?.trim()?.takeIf { b -> b.isNotEmpty() } } + rule.scope.brands + rule.scope.exBrands).distinct().sorted()"))
   }
+
+  /**
+   *  PRM-08 — تأمین‌کنندهٔ شامل/مستثنا و دستهٔ مستثنا در ویرایشگر (`PromoForm.suppliers/exSuppliers/exCategories`):
+   *  هسته همان قاعده را داشت؛ فرم نشانش نمی‌داد. رفت‌وبرگشت، «جز» بر «شامل» مقدم، و متنِ دامنه با نامِ تأمین‌کننده.
+   */
+  @Test
+  fun `PRM-08 تأمین‌کنندهٔ شامل و مستثنا و دستهٔ مستثنا از ویرایشگر به قاعده می‌رسند و مستثنا مقدم است`() {
+    val ds = d.copy(
+      products = listOf(tea.copy(supplierId = "s1"), tea2.copy(supplierId = "s2"), rice.copy(supplierId = "s1")),
+      suppliers = listOf(Supplier(id = "s1", name = "پخشِ کابل"), Supplier(id = "s2", name = "تجارتیِ هرات")),
+    )
+    fun offOf(scope: PromoCore.Scope): Map<String, Double> {
+      val o = PromoEngine.evaluate(ds, cart, PromoEngine.Snapshot(enabled = true, rules = listOf(rule(scope))), emptyList(), "2026-11-03", 600)
+      val priced = PromoEngine.priced(cart, o)
+      return cart.zip(priced).associate { (a, b) -> a.productId to (ds.products.first { it.id == a.productId }.salePrice - (b.unitPrice ?: ds.products.first { it.id == a.productId }.salePrice)) }
+    }
+
+    //  فرمِ تازه: «تأمین‌کننده: پخشِ کابل» و «جز این دسته‌ها: خوراکی» ⇒ فقط چایِ پخشِ کابل
+    val base = rule(PromoCore.Scope())
+    val f = PromoForm.of(base).copy(suppliers = setOf("s1"), exCategories = setOf("خوراکی"))
+    val r = f.toRule(base)
+    assertEquals(listOf("s1"), r.scope.suppliers)
+    assertEquals(listOf("خوراکی"), r.scope.exCategories)
+    val off = offOf(r.scope)
+    assertEquals(30.0, off.getValue("tea"), 0.001)
+    assertEquals(0.0, off.getValue("tea2"), 0.001)
+    assertEquals(0.0, off.getValue("rice"), 0.001)
+    //  «جز این تأمین‌کنندگان» بر دستهٔ شامل مقدم است
+    val ex = PromoForm.of(base).copy(categories = setOf("نوشیدنی"), exSuppliers = setOf("s2")).toRule(base)
+    val exOff = offOf(ex.scope)
+    assertEquals(30.0, exOff.getValue("tea"), 0.001)
+    assertEquals(0.0, exOff.getValue("tea2"), 0.001)
+
+    //  رفت‌وبرگشت: فرمِ دست‌نخورده همان قاعده و همان ترتیب (N2)
+    val old = rule(PromoCore.Scope(suppliers = listOf("s2", "s1"), exSuppliers = listOf("gone"), exCategories = listOf("ب", "الف")))
+    assertEquals(old.scope, PromoForm.of(old).toRule(old).scope)
+    val text = PromoText.scopeText(old, ds)
+    assertTrue(text, text.contains("تأمین‌کنندهٔ تجارتیِ هرات، پخشِ کابل"))
+    assertTrue(text, text.contains("جز تأمین‌کنندهٔ (حذف‌شده)"))
+    assertTrue(text, text.contains("جز دستهٔ ب، الف"))
+
+    //  ویرایشگر تراشه‌های تأمین‌کننده و «جز این دسته‌ها/تأمین‌کنندگان» را دارد و هر تراشه طرفِ دیگر را پاک می‌کند
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/ui/screens/Promos.kt") }.first { it.isFile }.readText()
+    assertTrue(src.contains("onClick = { f = f.copy(suppliers = if (id in f.suppliers) f.suppliers - id else f.suppliers + id, exSuppliers = f.exSuppliers - id) }"))
+    assertTrue(src.contains("onClick = { f = f.copy(exSuppliers = if (id in f.exSuppliers) f.exSuppliers - id else f.exSuppliers + id, suppliers = f.suppliers - id) }"))
+    assertTrue(src.contains("onClick = { f = f.copy(exCategories = if (cat in f.exCategories) f.exCategories - cat else f.exCategories + cat, categories = f.categories - cat) }"))
+    assertTrue(src.contains("(d.suppliers.map { it.id } + rule.scope.suppliers + rule.scope.exSuppliers).distinct()"))
+  }
 }
