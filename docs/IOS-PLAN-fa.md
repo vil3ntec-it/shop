@@ -119,6 +119,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 بارکد با AVFoundation، نه VisionKit)؛ چاپ (AirPrint/PDF) در گامِ ۴ (⇐ ۰.۹)؛ از ۲-ج فقط تشخیصِ گفتار مانده است.
 گامِ ۶ (⇐ ۰.۱۱): ورود با اپل و قراردادِ مشترکِ «فراهم‌کننده»، و شش فایلِ دیگرِ اندروید خودشان روی آیفون (`ios-exclude.txt`: ۱۹ ⇐ ۱۳).
 گامِ ۷ (⇐ ۰.۱۲): هیچ سطرِ بی‌دلیل در `ios-exclude.txt` (۱۳ ⇐ ۱۲)؛ `DeviceLocation` ِ اندروید روی آیفون، پوستهٔ برنامه، `ScanGate` و قاعدهٔ نسخه مشترک.
+گامِ ۸ (⇐ ۰.۱۳): آزمونِ سرتاسریِ جریان‌های اصلی روی شبیه‌ساز با سرورِ واقعی. گامِ ۹ (⇐ ۰.۱۴): `Migration` و `PayDevice` ِ اندروید روی آیفون (`ios-exclude.txt`: ۱۲ ⇐ ۱۰).
 
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
@@ -519,7 +520,7 @@ Kotlin/Native همین نام را برای جعبهٔ `kotlin.Double` در زم
 `ios/shared` ۲۰/۲۰. `backend.mjs` روی لینوکس بالا آمد: ثبت‌نام، دکان، کالا با ۵۰ عدد از دستگاهِ دوم، و `/rows` همان ردیف‌ها را داد.
 اجرای خودِ آزمون فقط روی شبیه‌سازِ macOS است: نتیجه پایین.
 
-**نتیجهٔ CI ِ macOS (کارِ `ios-app` ِ PR #879):**
+**نتیجهٔ CI ِ macOS (کارِ `ios-app` ِ PR #879):** سبز در اجرای هشتم — هر هفت گام (پایینِ جدول).
 
 | اجرا | چه شد | چه کردیم |
 |---|---|---|
@@ -530,6 +531,48 @@ Kotlin/Native همین نام را برای جعبهٔ `kotlin.Double` در زم
 | ۵ (41618582967) | ۰۱، ۰۲ و **۰۳ سبز** (همگام‌سازیِ iOS کالای دستگاهِ دیگر را روی دیسک نشاند)؛ صندوق: کادرِ «نام» ِ برگهٔ «قلم آزاد» هنوز زیرِ صفحه بود (برگه از پایین بالا می‌آمد) و زدنش روی پرده افتاد ⇐ برگه بسته شد؛ کالا: «افزودن» ِ برگهٔ دسته‌ها پس از پیمایشِ بی‌جای برگه نگرفت؛ ۰۶ و ۰۷ پشتِ همان برگه ماندند | پیش از هر زدن تا «کامل روی صفحه و ایستاده»؛ پیمایش فقط وقتی واقعاً بیرونِ قاب (نوارِ پایین فقط وقتی هست) و بس اگر جا عوض نشد |
 | ۶ (41628675330) | ۰۱، ۰۲، ۰۳ و **۰۵ سبز** (کالای تازه با دسته و قیمت در دفتر و روی سرور)؛ صندوق: برگهٔ «قلم آزاد» پس از نوشتنِ «نام» بسته شد؛ «تازه‌ها» و «ظاهر و زبان» ِ زیرِ صفحهٔ «بیشتر» هرگز پیمایش نشدند | `boundsInWindow` به قابِ پدر بریده می‌شود و چیزِ بیرونِ قاب «درونِ قاب» می‌نمود ⇐ جای واقعی (`positionInWindow` + اندازه)؛ نوشتن با کنشِ SetText بی زدن (تمرکز در برگه پیمایشِ «به دید آوردن» می‌سازد) |
 | ۷ (41639811522) | ۰۱ تا **۰۴ سبز**: فروشِ نقدِ «قلم آزاد» در صندوق با `TillSale.record` در دفتر و روی سرور؛ کالا: برگهٔ دسته‌ها بی افزودن بسته شد (لمسِ «افزودن» به پرده خورد)؛ ۰۶ و ۰۷ پشتِ فرمِ نیمه‌کاره ماندند | زدن با کنشِ OnClick ِ خودِ چیز (بالا) |
+| **۸ (41652743435، کارِ 125974915281)** | **هر هفت گام سبز** (۰۱ ۸٫۸ث، ۰۲ ۲۶٫۵ث، ۰۳ ۱٫۶ث، ۰۴ ۳۳٫۴ث، ۰۵ ۱۹٫۸ث، ۰۶ ۷٫۴ث، ۰۷ ۲۶٫۷ث): `CoreFlowsE2EIosTest` ۱/۱ و `NetRouteIosTest` ۲/۲، با بقیهٔ آزمون‌های شبیه‌ساز ۳۰/۳۰؛ ۱۹ عکس در `ios-e2e-shots`. کلیددانِ `test.kexe` همان -25291 ⇐ کلیددانِ حافظه (محیطِ آزمون) | همین سر با #879 در main آمد (squash ‏ba7784b95) |
+
+### ۰.۱۴ گامِ ۹ — `Migration.kt` و `PayDevice.kt` ِ اندروید خودشان روی آیفون (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase9`)
+
+> روی main پس از #879 (گامِ ۸، ‏ba7784b95). باز هم **همان فایل‌های اندروید**؛ اندروید و کامپیوتر دست نخوردند (هیچ فایلی بیرونِ
+> `ios/` و `docs/` عوض نشد). نتیجهٔ آیفون همان همتاهای پاک‌شده است: «دفترِ قدیمی نیست»، «NFC نیست»، بی صفحهٔ مشتری.
+
+**سنجش (فایل‌های `android-native/app/src/main/java` که برای iOS کامپایل می‌شوند):**
+
+| | کامپایل برای iOS | همه | `ios-exclude.txt` | خطِ بیرون‌مانده |
+|---|---:|---:|---:|---:|
+| **پیش از این گام:** main پس از #879 (`ba7784b95`) | ۱۱۹۱ | ۱۲۰۳ | ۱۲ (۴ فقط-اندروید + ۸ همتا) | ۲٬۸۶۰ |
+| **پس از این گام** | **۱۱۹۳** (۹۹٫۲٪) | ۱۲۰۳ | **۱۰** (۲ فقط-اندروید + ۸ همتا) | **۲٬۶۵۰** |
+
+همتاهای iOS (`*Ios.kt` ِ هم‌API): ۱۱ فایل ⇐ ۹ فایل، ۶۲۲ خط (`MigrationIos.kt` و `PayDeviceIos.kt` پاک شدند).
+
+**چه شد:**
+
+| فایلِ اندروید | روی آیفون | shim ِ تازه (همه `internal`، بیرون از سرآیندِ ObjC؛ جز `ComponentActivity`) |
+|---|---|---|
+| `data/Migration.kt` | `hasLegacyWebData` پوشهٔ `app_webview` را کنارِ `filesDir` ِ آیفون نمی‌یابد ⇐ `readLegacyData` = null پیش از هر WebView. اگر روزی WebView ساخته شود ⇐ `UnsupportedOperationException` و `runCatching` ِ `AppRoot` ⇐ همان «دفترِ قدیمی نیست» | `android/webkit/WebView.kt` (`WebView`، `WebSettings`، `WebViewClient`، `WebResourceRequest/Response`، `ValueCallback`)، `androidx/webkit/WebViewAssetLoader.kt` |
+| `pay/platform/PayDevice.kt` | `nfc()`: `hasSystemFeature(FEATURE_NFC_HOST_CARD_EMULATION)` = false ⇐ `NONE` (پس دکمهٔ «تنظیماتِ NFC» ِ برگهٔ حساب‌پی که فقط با `OFF` می‌آید هرگز دیده نمی‌شود)؛ `HceForeground`: `NfcAdapter.getDefaultAdapter` = null ⇐ هیچ؛ `CustomerScreen`: `getSystemService(DISPLAY_SERVICE)` = null ⇐ بی `Presentation` | `android/nfc/NfcAdapter.kt`، `android/nfc/cardemulation/CardEmulation.kt`، `android/hardware/display/DisplayManager.kt`، `android/view/Display.kt`، `android/app/Presentation.kt`، `androidx/compose/ui/platform/ComposeView.kt`، `setViewTree*Owner` (`androidx/lifecycle`، `androidx/savedstate`)، `androidx/activity/ComponentActivity.kt` (عمومی: `FragmentActivity` ِ shim و `IosActivity` اکنون از آن می‌آیند، مثلِ اندروید)؛ `PackageManager.hasSystemFeature` (= false) و `Context.DISPLAY_SERVICE` |
+
+**۱۰ سطری که می‌مانند و چرا** (بی تغییر از §۰.۱۲؛ این گام دوباره سنجید):
+- **فقط اندروید (۲):** `MainActivity.kt` (نقطهٔ ورودِ اندروید؛ منطقش در `AppShellAndroid.kt` مشترک است)، `update/Updater.kt` (نصبِ APK؛ آیفون فقط App Store).
+- **همتا (۸)، چون shim ِ هم‌نام دروغ می‌گفت یا ضعیف‌تر بود:** `AtRestKeys` (متنِ «کلیدِ سخت‌افزاری» ِ Keystore)، `DiskWrite` (شاخهٔ
+  `SDK_INT >= 26`؛ `SDK_INT` ِ سراسریِ shim = 0 ⇐ بی fsync ِ پوشه؛ بالا بردنش شاخهٔ همهٔ فایل‌های دیگر را هم عوض می‌کند)،
+  `GoogleSignIn` (پیام‌های Credential Manager)، `PrinterFinderAndroid` (کارتِ شبکه و بلوتوثِ کلاسیک)، `BarcodeScanner` و
+  `GuidedCapture` (CameraX + ML Kit ⇐ AVFoundation)، `Platform` (شناسهٔ دستگاه `ios-…` در برابرِ `android-…`)، `Haptics` (الگوی
+  `Vibrator`؛ یکی کردن با Core Haptics تصمیمِ صاحب‌کار).
+
+**آزمونِ تازه:** `src/iosTest/…/ios/Phase9IosTest` (۳) — `Migration` ِ اندروید روی آیفون (`hasLegacyWebData` نادرست، `readLegacyData` null
+با `IosContext` و `IosActivity`، WebView ⇐ خطای روشن)؛ `PayDevice.nfc` = `NONE`، بی `NfcAdapter` و بی نمایشگرِ دوم؛ `HceForeground`
+و `CustomerScreen` با `active = true` زیرِ `LocalContext = IosActivity` (همان ریشهٔ آیفون) بی خطا و بی صفحهٔ مشتری. فقط روی شبیه‌ساز.
+
+**بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS با Compose 1.7.3 و همان بدل‌های محلیِ گامِ ۶ (init-script در مخزن نیست):
+پس از گام هر دو سبز (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`؛ `iosSources`: «۱۱۹۵ فایلِ مشترک کپی شد، ۱۰ سطرِ
+بیرون‌مانده به کار رفت» = ۱۱۹۳ + ۲ فایلِ `core/src/jvmMain`). `jvmTest` ِ `ios/shared` ۲۰/۲۰ (با `ObjcNamesJvmTest`: `ComponentActivity` ِ عمومی
+نامِ رزروشده‌ای نمی‌گیرد). اندروید و کامپیوتر دست نخوردند، پس ساختشان را همان CI ِ خودشان می‌سنجد.
+
+**نتیجهٔ CI ِ macOS:** کارِ `ios-app` ِ PR ِ همین گام (پیوند، چارچوب، xcodebuild، `Phase9IosTest` و آزمونِ سرتاسریِ §۰.۱۳ که باید سبز
+بماند)؛ مثلِ §۰.۱۳ در گامِ بعد این‌جا ثبت می‌شود.
 
 ## ۱. خلاصه در پنج خط
 

@@ -62,6 +62,7 @@ abstract class Context {
     const val LOCATION_SERVICE = "location"
     const val PRINT_SERVICE = "print"
     const val ACTIVITY_SERVICE = "activity"
+    const val DISPLAY_SERVICE = "display"
   }
 }
 
