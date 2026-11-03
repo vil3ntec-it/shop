@@ -95,7 +95,7 @@ object StrImageChanges {
   // ── IMG-PRO-16: نسخه‌های عکس ──
   val versionsTitle: String get() = t("نسخه‌های عکس", "Photo versions", "د انځور نسخې")
   val versionsNote: String get() = t(
-    "همان نسخه‌هایی که ویترین و برنامه نشان می‌دهند: کوچک (فهرست‌ها) و بزرگ (صفحهٔ کالا)، روی گوشی و صفحهٔ بزرگ. هیچ نسخه‌ای بزرگ‌تر از خودش کشیده نمی‌شود.",
+    "همان نسخه‌هایی که ویترین و برنامه نشان می‌دهند: کوچک (فهرست‌ها) و بزرگ (صفحهٔ کالا)، در گوشی و صفحهٔ بزرگ. هیچ نسخه‌ای بزرگ‌تر از خودش کشیده نمی‌شود.",
     "The versions the storefront and app show: small (lists) and large (product page), on a phone and a large screen. No version is stretched beyond its own size.",
     "هغه نسخې چې ویټرین او برنامه یې ښيي: کوچنۍ (لړلیکونه) او لویه (د توکي پاڼه)، په ګوشي او لویه پرده. هېڅ نسخه له خپل اندازې لویه نه کشول کېږي.",
   )
