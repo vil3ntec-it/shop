@@ -19,8 +19,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.chat.ChatActions
 import ir.vil3ntec.tohid.core.chat.ChatConfig
 import ir.vil3ntec.tohid.core.chat.ChatConversation
+import ir.vil3ntec.tohid.core.chat.ChatMessage
+import ir.vil3ntec.tohid.core.chat.ChatSearchHit
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.data.ChatMedia
 import ir.vil3ntec.tohid.data.ShopChatSync
@@ -58,15 +61,23 @@ internal fun RouteScope.ChatRoute() {
       delay(INBOX_POLL_MS)
     }
   }
+  //  CHAT-14: جست‌وجو در متنِ پیام‌ها (`GET /search`) کنارِ جست‌وجوی نام/شماره — از دو حرف به بالا
+  var hits by remember { mutableStateOf<List<ChatSearchHit>>(emptyList()) }
+  LaunchedEffect(query) {
+    if (!ChatActions.canSearch(query)) { hits = emptyList(); return@LaunchedEffect }
+    delay(SEARCH_DEBOUNCE_MS)
+    Backend.shopChat(context).search(query).onSuccess { hits = it.results }.onFailure { hits = emptyList() }
+  }
   val wide = desk
   var selected by rememberSaveable { mutableStateOf<String?>(null) }
-  val state = InboxState(list, loading, error, status, query, System.currentTimeMillis())
+  val state = InboxState(list, loading, error, status, query, System.currentTimeMillis(), hits)
   val inbox: @Composable () -> Unit = {
     ChatInboxScreen(
       state = state,
       onQuery = { query = it },
       onStatus = { status = it },
       onOpen = { c -> if (wide) selected = c.id else nav.open(OnlinePaths.conversation(c.id)) },
+      onOpenHit = { h -> if (wide) selected = h.conversationId else nav.open(OnlinePaths.conversation(h.conversationId)) },
       onBack = backOrNull,
       selectedId = if (wide) selected else null,
     )
@@ -97,6 +108,7 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
 
   var draft by rememberSaveable(id) { mutableStateOf("") }
   var reportFor by remember(id) { mutableStateOf<String?>(null) }
+  var actionsFor by remember(id) { mutableStateOf<ChatMessage?>(null) }
   var reporting by remember(id) { mutableStateOf(false) }
   val queueVersion = ShopChatSync.version.intValue
   val tick = ctl.tick
@@ -115,6 +127,8 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
     canModerate = cfg.permissions.moderate,
     imageOf = ctl::imageOf,
     localImageOf = ctl::imageOf,
+    pinned = ctl.pinned(server),
+    hasActions = { ctl.actionsOf(it).isNotEmpty() },
   )
   ChatThreadScreen(
     view = view,
@@ -129,6 +143,7 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
       onCancel = ctl::cancel,
       loadThumb = { m -> ctl.thumb(m) },
       loadLocal = { x -> ctl.localThumb(x) },
+      onMore = { m -> actionsFor = m },
     ),
     onBack = if (embedded) null else backOrNull,
     composer = {
@@ -136,13 +151,29 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
         draft = draft,
         onDraft = { if (it.length <= cfg.limits.bodyMax) draft = it },
         enabled = ctl.canWrite,
-        onSend = { ctl.sendText(draft); draft = "" },
+        onSend = {
+          val e = ctl.editing
+          if (e == null) { ctl.sendText(draft); draft = "" } else scope.launch { if (ctl.saveEdit(e, draft)) draft = "" }
+        },
         onPhoto = { pickImage.launch("image/*") },
         mic = if (ChatMedia.voiceSupported) ({ VoiceMic(voice, ctl.canWrite) { ctl.banner = it } }) else null,
-        status = { VoiceStatus(voice, cfg.limits.audioMax, ctl.canWrite) { bytes, ms -> ctl.sendVoice(bytes, ms) } },
+        status = {
+          ChatReplyBar(ctl.replying, ctl.editing) { if (ctl.editing != null) draft = ""; ctl.editing = null; ctl.replying = null }
+          VoiceStatus(voice, cfg.limits.audioMax, ctl.canWrite) { bytes, ms -> ctl.sendVoice(bytes, ms) }
+        },
       )
     },
   )
+  actionsFor?.let { m ->
+    ChatMessageSheet(m, ctl.actionsOf(m), onDismiss = { actionsFor = null }, onAction = { a ->
+      actionsFor = null
+      when (a) {
+        ChatActions.Action.REPLY -> { ctl.editing = null; ctl.replying = m }
+        ChatActions.Action.EDIT -> { ctl.replying = null; ctl.editing = m; draft = m.body }
+        ChatActions.Action.PIN, ChatActions.Action.UNPIN -> scope.launch { ctl.togglePin(m) }
+      }
+    })
+  }
   reportFor?.let { mid ->
     ChatReportSheet(
       forMessage = mid.isNotEmpty(),
