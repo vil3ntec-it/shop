@@ -129,7 +129,7 @@ fun DeskSaleScreen(
   val cartDebtorId by cartStore.debtorId.collectAsState()
   LaunchedEffect(d.products.size, d.debtors.size) { cartStore.prune(d) }
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
-  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart, cartDebtorId) // PRM-11: گروهِ مشتری
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — `finish` با سبدِ عوض‌شده ثبت نمی‌کند
   val pricedFrom = cart

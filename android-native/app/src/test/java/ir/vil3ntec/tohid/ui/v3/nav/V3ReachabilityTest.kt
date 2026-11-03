@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.nav
 
 import ir.vil3ntec.tohid.core.nav.AppMode
+import ir.vil3ntec.tohid.ui.screens.SettingsHelp
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.SettingsSearchIndex
 import ir.vil3ntec.tohid.ui.screens.SettingsTiers
@@ -122,6 +123,14 @@ class V3ReachabilityTest {
     Feature("OPS-05 تازه‌ها — همهٔ تغییرها از «بیشتر»", "whats-new", s("WhatsNewScreen")),
     Feature("OPS-05 تازه‌ها — برگهٔ یک‌باره پس از به‌روزرسانی", "whats-new", s("WhatsNewOnUpdate"), s("WhatsNewSheet")),
     Feature("OPS-05 کلیدِ ردهٔ A ِ «تازه‌ها»", "settings/data/whats-new", s("whatsNewFromNow"), pattern = "settings/{group}/{section}"),
+    //  ── «گزارش‌های مشتری» روی گوشی (دورِ ۱۴): کلید تا این دور روی گوشی ردیف نداشت و این کارها هرگز روشن نمی‌شدند ──
+    Feature("CRM-10 ادغامِ مشتریانِ تکراری (گوشی)", "debtors/merge", "ir.vil3ntec.tohid.ui.v3.money.DebtorMergeSheet"),
+    Feature("CRM-05 تصویرِ صورت‌حساب (گوشی)", "debtors/{id}", "ir.vil3ntec.tohid.print.StatementImage"),
+    Feature("CRM-08/12 گروه، لیستِ قیمت و رضایتِ تبلیغ (گوشی)", "debtors/{id}", s("CrmPricingButton")),
+    Feature(
+      "کلیدِ «گزارش‌های مشتری» (ردهٔ B)", "settings/data/customer-reports",
+      "ir.vil3ntec.tohid.ui.v3.settings.sections.CrmReportsScreen", pattern = "settings/{group}/{section}",
+    ),
   )
 
   @Test
@@ -205,7 +214,57 @@ class V3ReachabilityTest {
     assertTrue(SettingsLayout.visible(key, desktop = true, serverOn = emptySet(), featuresOn = emptySet()))
   }
 
+  /**
+   *  «هیچ چیز بی‌راه نماند» (صاحب‌کار): کلیدِ این بخش‌ها روی **همین دستگاه** است، پس کاری که در صفحه‌های گوشی پشتِ
+   *  یکی از آن‌هاست با پنهان بودنِ ردیفش روی گوشی (`SettingsLayout.PHONE_HIDDEN`) هرگز روشن نمی‌شود — روشن کردن
+   *  روی کامپیوتر گوشی را روشن نمی‌کند. «گزارش‌های مشتری» تا دورِ ۱۴ همین بود: ادغامِ تکراری‌ها، تصویرِ صورت‌حساب،
+   *  گروه و لیستِ قیمت، و سنِ بدهی و RFM ِ گوشی پشتِ آن بودند و ردیفش فقط روی کامپیوتر.
+   *  صفحه‌های گوشیِ نسخهٔ ۳ = هر پروندهٔ زیرِ `ui/v3` جز صفحه‌های خودِ تنظیمات و پرونده‌های `Desk…`/`…Desk`.
+   */
+  @Test
+  fun `کلیدی که روی گوشی پنهان است هیچ کارِ صفحه‌های گوشی را پشتِ خودش ندارد`() {
+    assertEquals("بخشِ پنهان روی گوشی بی خواننده در GATES", emptySet<String>(), SettingsLayout.PHONE_HIDDEN - GATES.keys)
+    val v3 = File(repo, "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3")
+    val phone = v3.walkTopDown()
+      .filter { it.isFile && it.extension == "kt" && !it.relativeTo(v3).invariantSeparatorsPath.startsWith("settings/") && "Desk" !in it.name }
+      .associate { it.relativeTo(v3).invariantSeparatorsPath to SourceGraph.strip(it.readText()) }
+    assertTrue("صفحه‌های گوشی پیدا نشدند", phone.keys.any { it.startsWith("money/") })
+    val bad = SettingsLayout.PHONE_HIDDEN.sorted().flatMap { key ->
+      GATES.getValue(key).flatMap { gate -> phone.filterValues { gate in it }.keys.sorted().map { "$key ⇐ «$gate» در ui/v3/$it" } }
+    }
+    assertEquals("کارِ گوشی پشتِ کلیدی که روی گوشی ردیف ندارد:", emptyList<String>(), bad)
+  }
+
+  @Test
+  fun `«گزارش‌های مشتری» روی گوشی ردیف و توضیح دارد و «ادغام» و «صورت‌حساب» پیدایش می‌کنند`() {
+    val key = SettingsLayout.CRM_REPORTS
+    //  ردهٔ B (تصمیمِ سیاستیِ دکان): پیش‌فرض خاموش، دیدنی در دستهٔ خودش با یک خطِ ساده
+    assertEquals(SettingsTiers.Tier.ADVANCED, SettingsTiers.tier(key))
+    for (desktop in listOf(false, true)) {
+      assertTrue("$key ($desktop) ردیف ندارد", SettingsLayout.visible(key, desktop, serverOn = emptySet(), featuresOn = emptySet()))
+    }
+    assertTrue(SettingsHelp.line(key).orEmpty().isNotBlank())
+    val docs = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet())
+    listOf("گزارش مشتری", "ادغام", "تکراری", "صورت‌حساب", "merge duplicates", "customer group").forEach { q ->
+      assertTrue("جست‌وجوی «$q» روی گوشی", SettingsSearchIndex.search(docs, q).any { it.key == key })
+    }
+  }
+
   private companion object {
+    /**
+     *  بخش ⇐ خواننده‌(های) «روشن است؟» ِ کلیدش در کد. هر بخشِ `PHONE_HIDDEN` باید این‌جا باشد؛ دلیلِ «فقط کامپیوتر»
+     *  ِ هر کدام در `SettingsPortTest.DESK_ONLY`. `TillUser.me`/`meId` دروازه نیستند (خاموش ⇒ همان نامِ حساب).
+     */
+    val GATES: Map<String, List<String>> = mapOf(
+      SettingsLayout.CRM_REPORTS to listOf("ShopPolicy.crmReports("),
+      SettingsLayout.POS_SEARCH to listOf("PosSearchPrefs."),
+      SettingsLayout.POS_TOUCH to listOf("PosTouchPrefs."),
+      SettingsLayout.POS_MORE_KEYS to listOf("PosMoreKeysPrefs."),
+      SettingsLayout.KEY_HELP to listOf("KeyHelpPref."),
+      SettingsLayout.TILL_SWITCH to listOf("TillUser.on", "TillUser.lock(", "TillUser.current(", "TillUser.unlock("),
+      SettingsLayout.REPORT_KEYS to listOf("ReportKeysPref."),
+      SettingsLayout.WEBCAM to listOf("WebcamPref."),
+    )
     const val APP_ROOT = "ir.vil3ntec.tohid.ui.AppRoot"
     const val PHONE_SALE = "ir.vil3ntec.tohid.ui.v3.sales.cart.SaleRoute"
     const val PHONE_CHECKOUT = "ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute"
