@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.pay.PayStatus
 import ir.vil3ntec.tohid.core.report.ReportClock
 import ir.vil3ntec.tohid.data.CashShift
@@ -45,7 +46,7 @@ class RowLookup(d: ShopData) {
   /** همان `SalesEngine.itemName`، با نمایهٔ کالا */
   fun itemName(item: SaleItem): String =
     if (item.productId.isBlank()) item.name.ifBlank { HistoryModel.FREE_ITEM }
-    else products[item.productId] ?: item.name.ifBlank { "(محصول حذف‌شده)" }
+    else products[item.productId] ?: item.name.ifBlank { StrMoney.deletedProduct }
 }
 
 /**
