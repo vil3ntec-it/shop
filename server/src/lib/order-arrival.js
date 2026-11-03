@@ -13,7 +13,7 @@
  *    محصول‌اند؛ فقط گفته می‌شوند. `fix`: `support` (پرچم/سرور، کارِ پشتیبانی)، `subscribe` (اشتراک)،
  *    `storefront` (تنظیمِ ویترین در برنامه)، `products` (کالا در ویترین)، `server` (راه‌اندازیِ سرور).
  */
-const config = require('../config');
+const { serverSecret } = require('./server-secret');
 const { one } = require('../db');
 
 /**
@@ -67,7 +67,7 @@ async function factsOf(shopId) {
     subscribersOnly: st.subscribersOnly, subscribed: st.subscribed,
     storefrontMade: made, storefrontOn: made && row.enabled === true, shopActive: Boolean(row) && row.shop_status === 'active',
     suspended: Boolean(row) && row.suspended === true, hasProducts,
-    phoneCheck: Boolean(phoneCheck), serverReady: Boolean(config.secrets.api || config.secrets.jwt), alerts: Boolean(notify),
+    phoneCheck: Boolean(phoneCheck), serverReady: Boolean(serverSecret(['api', 'jwt'], '')), alerts: Boolean(notify),
   };
 }
 
