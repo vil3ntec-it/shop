@@ -233,4 +233,20 @@ class ShiftSlipTest {
     val half = ok(blindClose(-10_000)).z!!.copy(expected = null, variance = null, reason = "پولِ خرد")
     assertTrue(ShiftSlip.rows(half).none { it.kind == Kind.NEEDS_REVIEW || it.kind == Kind.REASON || it.kind == Kind.FLOAT || it.method != null && it.kind != Kind.COUNTED && it.kind != Kind.DENOMINATION })
   }
+
+  /** PAY-13 — کور فقط کارمند و فقط با شمارشِ کورِ روشنِ دکان؛ صاحب و مدیر هرگز */
+  @Test
+  fun blindCountIsAShopOptionNotTheStaffRoleItself() {
+    assertTrue(ShiftSlip.blind(staff = true, shopBlindCount = true))
+    assertEquals(false, ShiftSlip.blind(staff = true, shopBlindCount = false))
+    assertEquals(false, ShiftSlip.blind(staff = false, shopBlindCount = true))
+    assertEquals(false, ShiftSlip.blind(staff = false, shopBlindCount = false))
+    //  دکانی که کور را خاموش کرد: شاگرد همان گزارشِ کاملِ مدیر را می‌بیند (مورد انتظار و اختلاف)
+    val x = x()
+    val seen = ShiftSlip.forViewer(x, seesExpected = !ShiftSlip.blind(staff = true, shopBlindCount = false))
+    assertEquals(x, seen)
+    assertEquals(1_680_000L, seen.expected!![Pay.CASH])
+    //  روشن (پیش‌فرض) ⇒ همان نمای کورِ پیشین
+    assertNull(ShiftSlip.forViewer(x, seesExpected = !ShiftSlip.blind(staff = true, shopBlindCount = true)).expected)
+  }
 }

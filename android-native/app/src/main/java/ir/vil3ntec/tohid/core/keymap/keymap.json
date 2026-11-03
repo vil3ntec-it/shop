@@ -64,7 +64,7 @@
     { "id": "sale.prevOpen", "scope": "sale", "title": "فاکتورِ بازِ قبلی", "status": "partial", "keys": ["Mod+PageUp"] },
     { "id": "sale.receive", "scope": "sale", "title": "دریافتِ وجه یا قسط از مشتری", "status": "partial", "keys": ["F7"], "web": ["Alt+R"] },
     { "id": "sale.reprint", "scope": "sale", "title": "چاپِ دوبارهٔ آخرین رسید", "status": "live", "keys": ["F8"], "web": ["Alt+P"] },
-    { "id": "sale.drawer", "scope": "sale", "title": "باز کردنِ کشوی پول بدون فروش", "status": "planned", "keys": ["Shift+F8"] },
+    { "id": "sale.drawer", "scope": "sale", "title": "باز کردنِ کشوی پول بدون فروش", "status": "partial", "keys": ["Shift+F8"] },
     { "id": "sale.payPanel", "scope": "sale", "title": "پنلِ پرداخت (امروز F9 فروش را فوری می‌بندد)", "status": "planned", "keys": ["F9"], "web": ["Alt+Enter"] },
     { "id": "sale.returnMode", "scope": "sale", "title": "حالتِ برگشت", "status": "planned", "keys": ["Shift+F9"], "web": ["Alt+Shift+Enter"] },
     { "id": "sale.finishExact", "scope": "sale", "title": "پایانِ فوری با نقدِ دقیق", "status": "live", "keys": ["F12", "Mod+Enter"], "web": ["Mod+Enter"], "overrides": ["global.save"] },

@@ -161,7 +161,11 @@ object StrSettings {
   val getLatest: String get() = t("دریافت آخرین نسخه", "Get the latest version", "وروستۍ نسخه واخلئ")
   fun installedVersion(v: Any): String = t("نسخهٔ نصب‌شده: ${asIs(v)}", "Installed version: $v", "نصب شوې نسخه: $v")
   //  «چه چیزی تازه است» (OPS-05)
-  val whatsNew: String get() = t("چه چیزی تازه است", "What's new", "څه نوي دي")
+  //  OPS-05: «تازه‌ها» — نامی که صاحب‌کار به کار می‌برد (منو، برگهٔ پس از به‌روزرسانی، «دربارهٔ برنامه»)
+  val whatsNew: String get() = t("تازه‌ها", "What's new", "څه نوي دي")
+  val whatsNewNow: String get() = t("تازه‌های این نسخه", "New in this version", "په دې نسخه کې نوي")
+  val whatsNewSetting: String get() = t("«تازه‌ها» پس از به‌روزرسانی", "“What's new” after updates", "له تازه کېدو وروسته «څه نوي دي»")
+  val whatsNewPersianOnly: String get() = t("یادداشت‌ها به فارسی نوشته شده‌اند.", "These notes are written in Persian.", "یادښتونه په فارسي لیکل شوي دي.")
   val whatsNewShow: String get() = t("نشان دادن پس از هر به‌روزرسانی", "Show after each update", "له هر تازه کېدو وروسته ښودل")
   val whatsNewNote: String get() = t(
     "روشن: پس از هر به‌روزرسانی، تغییرهای همان نسخه یک بار نشان داده می‌شوند و هر قابلیتِ برداشته‌شده با جای تازه‌اش گفته می‌شود. فقط روی همین دستگاه.",
@@ -174,6 +178,7 @@ object StrSettings {
   val whatsNewKindNew: String get() = t("تازه", "New", "نوی")
   val whatsNewKindChanged: String get() = t("تغییر", "Changed", "بدل شوی")
   val whatsNewKindRemoved: String get() = t("برداشته شد", "Removed", "لرې شو")
+  val whatsNewKindFixed: String get() = t("رفع شد", "Fixed", "سم شو")
   fun whatsNewInstead(text: String): String = t("به‌جایش: ${asIs(text)}", "Instead: $text", "پر ځای یې: $text")
   val whatsNewGotIt: String get() = t("فهمیدم", "Got it", "پوه شوم")
   val restoreQ: String get() = t("بازیابی اطلاعات؟", "Restore data?", "معلومات بېرته راوګرځول شي؟")

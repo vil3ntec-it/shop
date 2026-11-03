@@ -3,16 +3,20 @@ package ir.vil3ntec.tohid.ui.v3.nav
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Menu
+import androidx.compose.material.icons.outlined.NewReleases
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.ui.screens.MoreAppPage
 import ir.vil3ntec.tohid.ui.screens.MoreScreen
 import ir.vil3ntec.tohid.ui.screens.PromosScreen
+import ir.vil3ntec.tohid.ui.screens.WHATS_NEW_ROUTE
+import ir.vil3ntec.tohid.ui.screens.WhatsNewScreen
 import ir.vil3ntec.tohid.ui.v3.V3Hue
 import ir.vil3ntec.tohid.ui.v3.gallery.KitGallery
 
@@ -21,7 +25,7 @@ const val KIT_GALLERY_FLAG = "dev.kit"
 
 /**
  *  مسیرهای خودِ پایه (foundation): «بیشتر» (فهرستِ همهٔ بخش‌ها از روی ماژول‌ها)،
- *  «نسخه و به‌روزرسانی» برای همه، و صفحهٔ نمونهٔ کیت پشتِ پرچم.
+ *  «نسخه و به‌روزرسانی» و «تازه‌ها» برای همه، و صفحهٔ نمونهٔ کیت پشتِ پرچم.
  */
 val FoundationModule = AppModule(
   id = "foundation",
@@ -30,12 +34,15 @@ val FoundationModule = AppModule(
   modes = setOf(AppMode.SHOP),
   entries = listOf(
     ModuleEntry("more", { Str.more }, "more", Icons.Outlined.Menu, setOf(Place.NAV), order = 50),
+    //  OPS-05: «تازه‌ها» برای همه (کارمند هم)، همیشه در «بیشتر» — کنارِ «نسخه و به‌روزرسانی»
+    ModuleEntry("whats-new", { StrSettings.whatsNew }, WHATS_NEW_ROUTE, Icons.Outlined.NewReleases, setOf(Place.MORE), MoreGroup.ACCOUNT, V3Hue.BRAND, order = 90),
   ),
   routes = listOf(
     V3Route("more", RouteKind.TAB, { Str.more }, chrome = Chrome.OWN) { MoreScreen(store, data) { nav.open(it) } },
     V3Route("app/updates", RouteKind.PAGE, { StrNav.appUpdate }, aliases = listOf("app"), chrome = Chrome.OWN) {
       MoreAppPage(data) { back() }
     },
+    V3Route(WHATS_NEW_ROUTE, RouteKind.PAGE, { StrSettings.whatsNew }, parent = "more", chrome = Chrome.OWN) { WhatsNewScreen { back() } },
     V3Route("dev/kit", RouteKind.PAGE, { "V3 kit" }, flag = KIT_GALLERY_FLAG, chrome = Chrome.OWN) { KitGallery(onBack = { back() }) },
   ),
 )

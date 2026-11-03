@@ -19,6 +19,7 @@ import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.LightMode
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Notifications
+import androidx.compose.material.icons.outlined.NewReleases
 import androidx.compose.material.icons.outlined.Password
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -79,6 +80,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.StockLevelsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ProductToolsScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.FraudTrailScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ChatGuardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.WhatsNewSettingScreen
 import androidx.compose.material.icons.outlined.AccountBalance
 import androidx.compose.material.icons.outlined.CardGiftcard
 import androidx.compose.material.icons.outlined.CreditCard
@@ -229,6 +231,7 @@ internal object SettingsPages {
     Page(SettingsLayout.FRAUD_TRAIL, Icons.Outlined.History) { FraudTrailScreen(it) },
     Page(SettingsLayout.ANOMALY, Icons.Outlined.ReportProblem) { AnomalyScreen(it) },
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },
+    Page(SettingsLayout.WHATS_NEW, Icons.Outlined.NewReleases) { WhatsNewSettingScreen(it) },
     Page(SettingsLayout.CAMERA, Icons.Outlined.QrCodeScanner) { CameraScreen(it) },
     Page(SettingsLayout.EASY_SETUP, Icons.Outlined.SettingsSuggest) { EasySetupScreen(it) },
     Page(SettingsLayout.SCAN_CASH, Icons.Outlined.PointOfSale) { ScanCashScreen(it) },

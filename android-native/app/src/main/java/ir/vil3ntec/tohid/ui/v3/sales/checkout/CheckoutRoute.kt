@@ -148,7 +148,9 @@ fun RouteScope.CheckoutRoute() {
         //  S2 (#375): با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور — پرچمِ `shop.promo_stamp` خاموش ⇒ همان
         //  همان زنجیرهٔ صندوقِ کامپیوتر (`TillSale`): سبدِ پس از امتیاز و یادداشتِ فاکتور ⇒ ثبت ⇒ نشانِ تخفیفِ خودکار ⇒
         //  ردیف‌های مصرف و کسبِ امتیاز در همان دفتر
-        when (val posted = cart.post(store) { key ->
+        //  PRM-02: پیش از ساختنِ فاکتور، زیرِ همان قفل و با کلیدِ همین فاکتور، کدِ سقف‌دار از سرور — همان دروازهٔ صندوقِ
+        //  کامپیوتر (`PromoLive.redeemGate` ⇐ `TillSale.redeem`)؛ رد یا بی اینترنت ⇒ همان پیام بالای برگه و هیچ ثبتی
+        when (val posted = cart.post(store, gate = { key -> PromoLive.redeemGate(context, key, promo) }) { key ->
           TillSale.record(
             d, priced, sale, note, promo, points,
             today = todayIso(),

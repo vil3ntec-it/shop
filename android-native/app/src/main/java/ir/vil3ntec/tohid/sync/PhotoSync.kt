@@ -2,11 +2,13 @@ package ir.vil3ntec.tohid.sync
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.sync.PhotoSyncPlan
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -100,6 +102,9 @@ object PhotoSync {
       p.edit().putBoolean("seeded", true).apply()
     }
 
+    //  SYN-14: اولویتِ پایین‌تر از دفتر — تا همگام‌سازیِ دفتر مشغول است صبر (رویهم حداکثر یک دقیقه در هر دور)
+    var waited = yieldToLedger(context, 0L)
+
     //  ۱) فرستادن
     for (id in (p.getStringSet("up", emptySet()) ?: emptySet()).toList()) {
       val bytes = PhotoStore.bytes(context, id)
@@ -118,37 +123,65 @@ object PhotoSync {
       if (ok) { edit(context, "del", remove = id); p.edit().remove("h:$id").apply() } else return@withLock
     }
 
-    //  ۲) گرفتن
+    //  ۲) گرفتن — SYN-14: نشانه فقط تا پیش از نخستین عکسِ ناتمام جلو می‌رود (`PhotoSyncPlan.cursor`) تا دانلودِ
+    //  قطع‌شده دورِ بعد از همان‌جا ادامه یابد؛ عکسی که `MAX_TRIES` بار نشد رد می‌شود تا صف بسته نماند
     var since = p.getLong("rev", 0L)
     var got = 0
     repeat(40) {
-      val page: JsonObject = runCatching { api.get("/sync/v1/photos?since=$since") }.getOrNull() ?: return@withLock
+      waited = yieldToLedger(context, waited)
+      val page: JsonObject = runCatching { api.get("/sync/v1/photos?since=$since") }.getOrNull() ?: return@withLock arrived(context, got)
       val items = page["items"] as? JsonArray ?: JsonArray(emptyList())
+      val done = ArrayList<PhotoSyncPlan.Item>(items.size)
       for (el in items) {
         val o = el.jsonObject
-        val id = o["product_id"]?.jsonPrimitive?.contentOrNull ?: continue
+        val rev = o["rev"]?.jsonPrimitive?.longOrNull ?: since
+        val id = o["product_id"]?.jsonPrimitive?.contentOrNull
+        if (id == null) { done += PhotoSyncPlan.Item(rev, true); continue }
         val hash = o["hash"]?.jsonPrimitive?.contentOrNull.orEmpty()
         val deleted = o["deleted"]?.jsonPrimitive?.booleanOrNull == true
         //  کاری که خودِ این دستگاه هنوز نفرستاده بر نسخهٔ سرور جلو است
-        if (id in (p.getStringSet("up", emptySet()) ?: emptySet())) continue
+        if (id in (p.getStringSet("up", emptySet()) ?: emptySet())) { done += PhotoSyncPlan.Item(rev, true); continue }
         if (deleted) {
           PhotoStore.delete(context, id); p.edit().remove("h:$id").apply(); got++
+          done += PhotoSyncPlan.Item(rev, true)
         } else if (hash.isNotEmpty() && (p.getString("h:$id", "") != hash || !PhotoStore.exists(context, id))) {
-          val one = runCatching { api.get("/sync/v1/photos/" + enc(id)) }.getOrNull() ?: continue
-          val data = one["data"]?.jsonPrimitive?.contentOrNull ?: continue
-          if (PhotoStore.saveBytes(context, id, unb64(data)).isSuccess) {
+          val data = runCatching { api.get("/sync/v1/photos/" + enc(id)) }.getOrNull()?.get("data")?.jsonPrimitive?.contentOrNull
+          val ok = data != null && runCatching { PhotoStore.saveBytes(context, id, unb64(data)).isSuccess }.getOrDefault(false)
+          if (ok) {
             p.edit().putString("h:$id", hash).apply(); got++
+            done += PhotoSyncPlan.Item(rev, true)
+          } else {
+            val (stuckRev, tries) = PhotoSyncPlan.failed(p.getLong("stuck_rev", -1L), p.getInt("stuck_tries", 0), rev)
+            p.edit().putLong("stuck_rev", stuckRev).putInt("stuck_tries", tries).apply()
+            done += PhotoSyncPlan.Item(rev, PhotoSyncPlan.giveUp(stuckRev, tries, rev))
+            if (!done.last().done) break
           }
+        } else {
+          done += PhotoSyncPlan.Item(rev, true)
         }
       }
-      since = page["head"]?.jsonPrimitive?.longOrNull ?: since
+      since = PhotoSyncPlan.cursor(since, done, page["head"]?.jsonPrimitive?.longOrNull ?: since)
       p.edit().putLong("rev", since).apply()
-      if (page["has_more"]?.jsonPrimitive?.booleanOrNull != true) {
-        if (got > 0) { version.value = version.value + 1; if (ir.vil3ntec.tohid.data.PhotoBot.autoEnabled(context)) ir.vil3ntec.tohid.data.PhotoBot.start(context, onlyNew = true) }
-        return@withLock
-      }
+      if (PhotoSyncPlan.stopped(done) || page["has_more"]?.jsonPrimitive?.booleanOrNull != true) return@withLock arrived(context, got)
     }
+    arrived(context, got)
+  }
+
+  /** عکسی رسید ⇒ صفحه‌ها تازه و ربات (اگر روشن است) فقط تازه‌ها را */
+  private fun arrived(context: Context, got: Int) {
     if (got > 0) { version.value = version.value + 1; if (ir.vil3ntec.tohid.data.PhotoBot.autoEnabled(context)) ir.vil3ntec.tohid.data.PhotoBot.start(context, onlyNew = true) }
+  }
+
+  /** SYN-14 — تا دفتر مشغول است صبر (`PhotoSyncPlan.waitMs`)؛ @return صبرِ رویهمِ همین دور */
+  private suspend fun yieldToLedger(context: Context, waitedMs: Long): Long {
+    var waited = waitedMs
+    while (true) {
+      val busy = runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).ledgerBusy }.getOrDefault(false)
+      val w = PhotoSyncPlan.waitMs(busy, waited)
+      if (w <= 0L) return waited
+      delay(w)
+      waited += w
+    }
   }
 
   private fun enc(s: String) = java.net.URLEncoder.encode(s, "UTF-8")

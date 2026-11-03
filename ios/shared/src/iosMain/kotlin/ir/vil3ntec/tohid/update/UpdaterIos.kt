@@ -37,25 +37,10 @@ object Updater {
     device: String = "",
   ): Result<Release?> = Result.failure(IllegalStateException(APP_STORE))
 
-  /** همان قاعدهٔ اندروید (ناب) */
-  fun versionOf(assetName: String, tag: String): String {
-    val fromName = Regex("(\\d+(?:\\.\\d+)+)").find(assetName)?.value
-    if (fromName != null) return fromName
-    val fromTag = Regex("(\\d+(?:\\.\\d+)+)").find(tag)?.value
-    return fromTag ?: tag.removePrefix("v")
-  }
+  /** همان قاعدهٔ اندروید و کامپیوتر (`ReleaseVersion` ِ مشترک) */
+  fun versionOf(assetName: String, tag: String): String = ReleaseVersion.of(assetName, tag)
 
-  /** همان قاعدهٔ اندروید (ناب) */
-  fun isNewer(remote: String, local: String): Boolean {
-    val a = remote.split(".", "-").mapNotNull { it.toIntOrNull() }
-    val b = local.split(".", "-").mapNotNull { it.toIntOrNull() }
-    for (i in 0 until maxOf(a.size, b.size)) {
-      val x = a.getOrElse(i) { 0 }
-      val y = b.getOrElse(i) { 0 }
-      if (x != y) return x > y
-    }
-    return false
-  }
+  fun isNewer(remote: String, local: String): Boolean = ReleaseVersion.isNewer(remote, local)
 
   @Suppress("UNUSED_PARAMETER")
   suspend fun download(

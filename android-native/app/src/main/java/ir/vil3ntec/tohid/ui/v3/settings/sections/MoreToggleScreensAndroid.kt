@@ -15,8 +15,10 @@ import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.StockActions
 import ir.vil3ntec.tohid.data.StockLedger
 import ir.vil3ntec.tohid.data.TillReceivePref
+import ir.vil3ntec.tohid.data.WhatsNewPref
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.newId
+import ir.vil3ntec.tohid.ui.screens.whatsNewFromNow
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
@@ -111,6 +113,16 @@ internal fun RouteScope.ChatGuardScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   ToggleScreen(SettingsLayout.CHAT_GUARD, onBack, ShopPolicy.chatMediaGuard(context), StrChat.guardOn, StrChat.guardNote) {
     ShopPolicy.setChatMediaGuard(context, it)
+  }
+}
+
+/** `settings/data/whats-new`: «تازه‌ها» ی یک‌باره پس از به‌روزرسانی (OPS-05، ردهٔ A) — روشن یعنی «از همین نسخه به بعد» */
+@Composable
+internal fun RouteScope.WhatsNewSettingScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  ToggleScreen(SettingsLayout.WHATS_NEW, onBack, WhatsNewPref.on(context), StrSettings.whatsNewShow, StrSettings.whatsNewNote) {
+    WhatsNewPref.setOn(context, it)
+    if (it) whatsNewFromNow(context)
   }
 }
 
