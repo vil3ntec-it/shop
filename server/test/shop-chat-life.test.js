@@ -245,6 +245,28 @@ test('گفت‌وگوی عمومی پس از ۷ روز بی‌کاری بسته�
   assert.equal((await chat.open(me, {})).conversation.life.sessionAt, fresh.life.sessionAt);
 });
 
+test('رشتهٔ بسته: «حذف برای همه» از هر دو طرف ۴۰۹ `chat_closed`؛ «حذف برای من» باز؛ «مشکل دارم» ⇒ دوباره شدنی', async () => {
+  const s = await shop('حذفِ بسته');
+  const me = customer(s.shopId, '+93791110051');
+  const o = await order(s, '0791110051', { upTo: 'ready_for_pickup' });
+  const conv = await shopConv(s, o.id);
+  const fromShop = (await shopSend(s, conv.id, 'بسته‌تان آماده است')).body.message;
+  const fromMe = (await chat.send(me, conv.id, { clientId: cid(), body: 'می‌آیم' })).message;
+  assert.equal((await h.post(`/api/shop/orders/${o.id}/transition`, { to: 'picked_up' }, { token: s.token })).status, 200);
+
+  //  پیام‌ها تازه‌اند (درونِ مهلتِ حذف) ولی رشته بسته است ⇒ پاک کردن برای طرفِ دیگر هم نوشتن است
+  const shopDel = await h.del(`${base}/conversations/${conv.id}/messages/${fromShop.id}?for=all`, { token: s.token });
+  assert.equal(code(shopDel), '409:chat_closed');
+  await assert.rejects(chat.remove(me, conv.id, fromMe.id, 'all'), (e) => e.status === 409 && e.code === 'chat_closed');
+  const kept = await chat.changes(me, conv.id, { after: 0 });
+  assert.deepEqual(kept.messages.map((m) => !!m.deleted), [false, false], 'هیچ پیامی برای طرفِ دیگر پاک نشد');
+  //  «حذف برای من» فقط نمای خودِ بیننده است و باز می‌ماند
+  assert.equal((await chat.remove(me, conv.id, fromShop.id, 'me')).message.hidden, true);
+  //  «مشکل دارم» ⇒ رشته باز ⇒ حذف برای همه مثلِ همیشه
+  assert.equal((await chat.issue(me, conv.id)).reopened, true);
+  assert.equal((await chat.remove(me, conv.id, fromMe.id, 'all')).message.deleted, true);
+});
+
 test('جداسازی: دکان و مشتریِ دیگر به رشته، «مشکل دارم» و تاریخچه نمی‌رسند', async () => {
   const a = await shop('جدا الف');
   const b = await shop('جدا ب');
