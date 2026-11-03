@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.pos.SaleNotes
 import ir.vil3ntec.tohid.ui.components.pos.PosNotesPrefs
@@ -46,7 +47,7 @@ internal fun RouteScope.PosNotesScreen(onBack: (() -> Unit)?) {
     item(key = "choice") {
       SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { PosNotesPrefs.set(context, it == 1) }) }
       SettingsNote(
-        "یادداشتِ هر ردیف (در کادرِ ویرایشِ ردیف) و یادداشتِ کلِ فاکتور، روی رسید چاپ می‌شوند. قالب‌ها با یک لمس افزوده می‌شوند. انتخابِ همین دستگاه است.",
+        StrSettingsPages.posNotesNote,
       )
     }
     if (on) {
@@ -59,7 +60,7 @@ internal fun RouteScope.PosNotesScreen(onBack: (() -> Unit)?) {
               V3ListRow(
                 t,
                 chevron = false,
-                trailing = { V3TextButton("حذف", { PosNotesPrefs.setTemplates(context, SaleNotes.removeTemplate(list, t)) }, danger = true) },
+                trailing = { V3TextButton(StrSettingsPages.delete, { PosNotesPrefs.setTemplates(context, SaleNotes.removeTemplate(list, t)) }, danger = true) },
               )
             }
           }
@@ -68,9 +69,9 @@ internal fun RouteScope.PosNotesScreen(onBack: (() -> Unit)?) {
           var draft by remember { mutableStateOf("") }
           SettingsBlock {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
-              V3TextField(draft, { draft = it.take(SaleNotes.MAX) }, "قالبِ تازه", Modifier.weight(1f))
+              V3TextField(draft, { draft = it.take(SaleNotes.MAX) }, StrSettingsPages.newTemplate, Modifier.weight(1f))
               if (SaleNotes.clean(draft) != null) {
-                V3TextButton("افزودن", { PosNotesPrefs.setTemplates(context, SaleNotes.addTemplate(list, draft)); draft = "" }, Modifier.padding(bottom = 6.dp))
+                V3TextButton(StrSettingsPages.add, { PosNotesPrefs.setTemplates(context, SaleNotes.addTemplate(list, draft)); draft = "" }, Modifier.padding(bottom = 6.dp))
               }
             }
           }

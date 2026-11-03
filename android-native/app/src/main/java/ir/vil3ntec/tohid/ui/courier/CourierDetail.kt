@@ -56,7 +56,9 @@ import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.PlusCode
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.courier.TrackRow
+import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrCourier
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -81,28 +83,28 @@ private val SheetTop = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
 
 /** عنوانِ هر ردیفِ خطِ زمانی */
 private fun trackTitle(r: TrackRow): String = when {
-  r.kind == "recall" -> "دکان سفارش را پس خواست"
-  r.kind == "photo" -> "عکسِ بسته ثبت شد"
-  r.kind == "created" || r.to == "requested" -> "کارِ تازه سپرده شد"
+  r.kind == "recall" -> StrCourierApp.evRecall
+  r.kind == "photo" -> StrCourierApp.evPhoto
+  r.kind == "created" || r.to == "requested" -> StrCourierApp.evCreated
   else -> when (r.to) {
-    "assigned" -> "قبول کردید"
-    "rejected" -> "رد کردید"
-    "picked_up" -> "بسته را از دکان گرفتید"
-    "moving" -> "در راهِ مشتری"
-    "arrived" -> "به مقصد رسیدید"
-    "delivered" -> "به مشتری تحویل شد"
-    "failed" -> "تحویل نشد"
-    "returned" -> "بسته به دکان برگشت"
-    "withdrawn" -> "دکان پس گرفت"
+    "assigned" -> StrCourierApp.evAssigned
+    "rejected" -> StrCourierApp.evRejected
+    "picked_up" -> StrCourierApp.evPickedUp
+    "moving" -> StrCourierApp.hlMoving
+    "arrived" -> StrCourierApp.evArrived
+    "delivered" -> StrCourierApp.evDelivered
+    "failed" -> StrCourierApp.hlFailed
+    "returned" -> StrCourierApp.hlReturned
+    "withdrawn" -> StrCourierApp.evWithdrawn
     else -> STATUS_LABEL[r.to] ?: r.to
   }
 }
 
 private fun trackSub(r: TrackRow): String {
   val who = when {
-    r.pending -> "در صفِ گوشی — هنوز به دکان نرسیده"
-    r.by == "courier" -> "توسطِ شما"
-    r.by == "shop" -> "توسطِ دکان"
+    r.pending -> StrCourierApp.byPending
+    r.by == "courier" -> StrCourierApp.byCourier
+    r.by == "shop" -> StrCourierApp.byShop
     else -> ""
   }
   val why = REASON_LABEL[r.reason]
@@ -128,9 +130,9 @@ internal fun CourierDetailPage(
   val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
   Column(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, Str.goBack, onClick = onBack)
       Text(
-        "سفارشِ #${c.orderNo.fa()}",
+        StrCourierApp.orderNo(c.orderNo.fa()),
         style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center,
         modifier = Modifier.weight(1f),
       )
@@ -144,7 +146,7 @@ internal fun CourierDetailPage(
       Spacer(Modifier.height(12.dp))
       CourierOnDark {
         V3Segmented(
-          listOf("جزئیاتِ پیگیری", "جزئیاتِ ارسال"),
+          listOf(StrCourierApp.tabTrack, StrCourierApp.tabShipping),
           selected = if (detailTab == "track") 0 else 1,
           onSelect = { onDetailTab(if (it == 0) "track" else "ship") },
           modifier = Modifier.padding(horizontal = 16.dp),
@@ -190,25 +192,25 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
       }
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
-        Text("از", style = courierText(12.sp), color = p.onBlackMuted)
-        Text(shopName.ifBlank { "دکان" }, style = courierText(15.sp, FontWeight.Bold), color = p.onBlack)
+        Text(StrCourierApp.from, style = courierText(12.sp), color = p.onBlackMuted)
+        Text(shopName.ifBlank { Str.shop }, style = courierText(15.sp, FontWeight.Bold), color = p.onBlack)
         Spacer(Modifier.height(10.dp))
         Box(Modifier.fillMaxWidth().height(1.dp).background(p.blackRaised))
         Spacer(Modifier.height(10.dp))
-        Text("به", style = courierText(12.sp), color = p.onBlackMuted)
+        Text(StrCourierApp.to, style = courierText(12.sp), color = p.onBlackMuted)
         if (live) {
           Text(c.landmark.ifBlank { "—" }, style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
           if (c.addressText.isNotBlank()) Text(c.addressText, style = courierText(13.sp), color = p.onBlackMuted)
           //  S33: Plus Code از پینِ مقصد (نه ژئوکدر، نه شبکه) — برای نقشهٔ آفلاین یا گفتن با تلفن
           missionPlusCode(c)?.let { Text(StrCourier.plusCode(it), style = courierText(13.sp, FontWeight.Medium), color = p.onBlack) }
         } else {
-          Text("نشانی پس از پایانِ کار دیگر نشان داده نمی‌شود", style = courierText(13.sp), color = p.onBlackMuted)
+          Text(StrCourierApp.addressHidden, style = courierText(13.sp), color = p.onBlackMuted)
         }
       }
     }
     if (live && c.lat != null && c.lng != null) {
       Spacer(Modifier.height(14.dp))
-      CourierOnDark { CourierSecondary("مسیریابی", onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions) }
+      CourierOnDark { CourierSecondary(StrCourierApp.navigate, onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions) }
     }
   }
 }
@@ -218,7 +220,7 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
   val p = PhoneV3.colors
   Row(verticalAlignment = Alignment.Bottom) {
     Column(Modifier.weight(1f)) {
-      Text("شمارهٔ سفارش", style = courierText(12.sp), color = p.onBlackMuted)
+      Text(StrCourierApp.orderNumber, style = courierText(12.sp), color = p.onBlackMuted)
       Text("#${c.orderNo.fa()}", style = courierText(22.sp, FontWeight.Bold), color = p.onBlack)
     }
     CourierOnDark {
@@ -237,7 +239,7 @@ private fun TrackTab(c: MissionCard, queue: QueueState, waiting: Boolean, live: 
   Spacer(Modifier.height(18.dp))
   val rows = CourierBoardModel.track(c, queue)
   if (rows.isEmpty()) {
-    Text("خطِ زمانی پس از همگام‌سازی با دکان می‌آید.", style = courierText(13.sp), color = p.onBlackMuted)
+    Text(StrCourierApp.timelineLater, style = courierText(13.sp), color = p.onBlackMuted)
   }
   rows.forEachIndexed { i, r ->
     TrackRowView(r, last = i == rows.lastIndex, modifier = Modifier.v3Stagger(seen, "t-${c.id}-${r.at}-$i", i))
@@ -294,32 +296,32 @@ private fun ShipTab(c: MissionCard, live: Boolean) {
   val p = PhoneV3.colors
   val dark = PhoneV3UiDark
   val rows = buildList {
-    add(Triple("تعدادِ قلم", if (c.itemsCount > 0) c.itemsCount.fa() else "—", false))
-    if (c.expectedCollectMinor > 0) add(Triple(if (live) "نقدِ گرفتنی" else "نقدِ سفارش", afn(c.expectedCollectMinor), true))
-    else add(Triple("نقد", "از مشتری گرفته نمی‌شود", false))
-    c.cashCollectedMinor?.let { add(Triple("گرفته شد", afn(it), true)) }
-    if (c.fareMinor > 0) add(Triple("کرایهٔ شما", afn(c.fareMinor), false))
-    add(Triple("کدِ تحویل", if (c.requiresCode) "از مشتری بپرسید" else "لازم نیست", false))
-    add(Triple("عکسِ بسته", if (c.photoAllowed) "مشتری رضایت داده" else "بی عکس", false))
+    add(Triple(StrCourierApp.itemsCount, if (c.itemsCount > 0) c.itemsCount.fa() else "—", false))
+    if (c.expectedCollectMinor > 0) add(Triple(if (live) StrCourierApp.cashToCollect else StrCourierApp.orderCashLabel, afn(c.expectedCollectMinor), true))
+    else add(Triple(StrCourierApp.cash, StrCourierApp.noCashFromCustomer, false))
+    c.cashCollectedMinor?.let { add(Triple(StrCourierApp.collected, afn(it), true)) }
+    if (c.fareMinor > 0) add(Triple(StrCourierApp.yourFare, afn(c.fareMinor), false))
+    add(Triple(StrCourierApp.deliveryCode, if (c.requiresCode) StrCourierApp.askCustomer else StrCourierApp.notNeeded, false))
+    add(Triple(StrCourierApp.parcelPhoto, if (c.photoAllowed) StrCourierApp.customerConsented else StrCourierApp.noPhoto, false))
     if (live) {
-      if (c.customerName.isNotBlank()) add(Triple("مشتری", c.customerName, false))
+      if (c.customerName.isNotBlank()) add(Triple(StrCourierApp.customer, c.customerName, false))
       val note = listOfNotNull(
-        c.leaveWith.ifBlank { null }?.let { "سپردن به: $it" },
-        if (c.callBeforeArrival) "پیش از رسیدن خبر دهید" else null,
+        c.leaveWith.ifBlank { null }?.let { StrCourierApp.leaveWith(it) },
+        if (c.callBeforeArrival) StrCourierApp.callBefore else null,
       ).joinToString(" · ")
-      add(Triple("یادداشتِ تحویل", note.ifBlank { "—" }, false))
+      add(Triple(StrCourierApp.deliveryNote, note.ifBlank { "—" }, false))
     }
   }
   rows.forEach { (label, value, strong) -> DarkKV(label, value, strong) }
-  if (live && c.phoneMasked.isNotBlank()) DarkKV("شماره (پوشیده)", c.phoneMasked, false, ltr = true)
+  if (live && c.phoneMasked.isNotBlank()) DarkKV(StrCourierApp.maskedPhone, c.phoneMasked, false, ltr = true)
   if (!live) {
     Spacer(Modifier.height(10.dp))
-    Text("مشتری و نشانی پس از پایانِ کار از این گوشی پاک شد.", style = courierText(13.sp), color = p.onBlackMuted)
+    Text(StrCourierApp.customerErased, style = courierText(13.sp), color = p.onBlackMuted)
   }
   if (c.status == "failed") {
     Spacer(Modifier.height(10.dp))
     Text(
-      "اگر دوباره نمی‌روید، بسته را به دکان برگردانید؛ برگشت را دکان هنگامِ تحویل گرفتن ثبت می‌کند.",
+      StrCourierApp.failedReturnNote,
       style = courierText(13.sp), color = dark.awaiting.fg,
     )
   }
@@ -358,7 +360,7 @@ private fun ActionArea(c: MissionCard, actions: List<String>, onAction: (String)
       if (rest.isNotEmpty() || photo || negative.isNotEmpty()) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
           rest.forEach { to -> CourierSecondary(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f)) }
-          if (photo) CourierSecondary("عکسِ بسته", onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera)
+          if (photo) CourierSecondary(StrCourierApp.parcelPhoto, onPhoto, Modifier.weight(1f), icon = Icons.Outlined.PhotoCamera)
           negative.forEach { to -> CourierSecondary(actionLabel(c.status, to), { onAction(to) }, Modifier.weight(1f), negative = true) }
         }
       }

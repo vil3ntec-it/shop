@@ -38,6 +38,8 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.v3.V3IconButton
@@ -70,7 +72,7 @@ internal fun CourierJoinScreen(
     Modifier.fillMaxSize().background(p.bg).statusBarsPadding().navigationBarsPadding().imePadding(),
   ) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, Str.goBack, onClick = onBack)
     }
     Column(
       Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 20.dp)
@@ -81,32 +83,32 @@ internal fun CourierJoinScreen(
         Icon(Icons.Outlined.LocalShipping, contentDescription = null, tint = p.icon, modifier = Modifier.size(32.dp))
       }
       Spacer(Modifier.height(18.dp))
-      Text("ورودِ پیک", style = courierText(30.sp, FontWeight.Bold), color = p.ink)
+      Text(StrCourierApp.joinTitle, style = courierText(30.sp, FontWeight.Bold), color = p.ink)
       Spacer(Modifier.height(6.dp))
       Text(
-        "کدِ دعوتی را که صاحب دکان به شما داده بزنید. ایمیل و رمز لازم نیست.",
+        StrCourierApp.joinBody,
         style = courierText(15.sp), color = p.inkMuted,
       )
       Spacer(Modifier.height(20.dp))
       Column(Modifier.fillMaxWidth().courierCard(p).padding(18.dp)) {
-        V3TextField(name, onName, "نام شما", Modifier.fillMaxWidth(), placeholder = "مثلاً کریم")
+        V3TextField(name, onName, StrCourierApp.yourName, Modifier.fillMaxWidth(), placeholder = StrCourierApp.nameExample)
         Spacer(Modifier.height(14.dp))
         //  کد را صفحهٔ خوش‌آمد بزرگ می‌کند (`onCode` ⇐ uppercase)؛ لاتین است پس چپ‌به‌راست نوشته می‌شود
         V3TextField(
-          code, onCode, "کدِ دعوت", Modifier.fillMaxWidth(), placeholder = "SHG-XXXX-XXXX-XXXX",
+          code, onCode, StrCourierApp.inviteCode, Modifier.fillMaxWidth(), placeholder = "SHG-XXXX-XXXX-XXXX",
           error = error?.takeIf { it.isNotBlank() },
         )
       }
       Spacer(Modifier.height(16.dp))
       Column(Modifier.fillMaxWidth().courierCard(p, CourierGroupShape, elevation = 6.dp).padding(horizontal = 16.dp, vertical = 6.dp)) {
-        JoinPoint(Icons.Outlined.Place, "فقط مأموریت‌های خودتان، با نشانه و نشانی", divider = true)
-        JoinPoint(Icons.Outlined.CloudOff, "بی اینترنت هم ثبت می‌شود و بعد خودش می‌رود", divider = true)
-        JoinPoint(Icons.Outlined.Payments, "نقدِ هر سفارش جدا ثبت می‌شود", divider = false)
+        JoinPoint(Icons.Outlined.Place, StrCourierApp.joinOwnOnly, divider = true)
+        JoinPoint(Icons.Outlined.CloudOff, StrCourierApp.joinOffline, divider = true)
+        JoinPoint(Icons.Outlined.Payments, StrCourierApp.joinCash, divider = false)
       }
       Spacer(Modifier.height(20.dp))
     }
     Box(Modifier.fillMaxWidth().padding(16.dp)) {
-      StepButton("پیوستن", onJoin, Modifier.fillMaxWidth(), enabled = code.isNotBlank(), loading = busy)
+      StepButton(StrCourierApp.join, onJoin, Modifier.fillMaxWidth(), enabled = code.isNotBlank(), loading = busy)
     }
   }
 }

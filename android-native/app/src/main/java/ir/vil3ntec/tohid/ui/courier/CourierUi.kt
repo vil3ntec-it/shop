@@ -43,6 +43,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.ui.components.common.OrderStatusTone
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -134,7 +135,7 @@ internal fun MissionStatus(status: String, modifier: Modifier = Modifier) {
 /** «در صف»: کارِ همین گوشی که هنوز به دکان نرسیده — هشدار (کهربایی)، نه «در انتظارِ تأیید» */
 @Composable
 internal fun QueuedPill(modifier: Modifier = Modifier) {
-  V3StatusPill(V3Status.WARNING, "در صف", modifier)
+  V3StatusPill(V3Status.WARNING, StrCourierApp.queued, modifier)
 }
 
 /**
@@ -183,7 +184,7 @@ internal fun CourierSecondary(
 @Composable
 internal fun RefreshButton(syncing: Boolean, onRefresh: () -> Unit) {
   Box(contentAlignment = Alignment.Center) {
-    V3IconButton(Icons.Outlined.Refresh, "به‌روز کردن", onClick = { if (!syncing) onRefresh() })
+    V3IconButton(Icons.Outlined.Refresh, StrCourierApp.refresh, onClick = { if (!syncing) onRefresh() })
     if (syncing) {
       CircularProgressIndicator(Modifier.size(44.dp), color = PhoneV3Roles.brandText(PhoneV3.colors), strokeWidth = 2.dp)
     }

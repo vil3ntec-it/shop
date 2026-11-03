@@ -38,7 +38,7 @@ class DariTextTest {
     assertEquals("مبایل${zwnj}ها", DariText.of("گوشی${zwnj}ها"))
     assertEquals("مبایلی دیگر", DariText.of("گوشی${zwnj}ای دیگر"))
     assertEquals("مبایلش", DariText.of("گوشی${zwnj}اش"))
-    assertEquals("مصرفِ خودکار", DariText.of("هزینهٔ خودکار"))
+    assertEquals("مصرفِ دکان", DariText.of("هزینهٔ دکان"))
     assertEquals("کرایهٔ ارسال: 20", DariText.of("هزینهٔ ارسال: 20"))
     assertEquals("مصارفِ ثبت‌شده", DariText.of("هزینه${zwnj}های ثبت‌شده"))
     assertEquals("همهٔ مصارف", DariText.of("همهٔ هزینه${zwnj}ها"))
@@ -72,6 +72,8 @@ class DariTextTest {
     assertEquals("فروشگاه من — برنامهٔ مبایل", DariText.of("فروشگاه من — برنامهٔ گوشی"))
     assertEquals("مثلاً «دکان نور»", DariText.of("مثلاً «فروشگاه نور»"))
     assertEquals("تحویل و کرایه", DariText.of("تحویل و هزینه"))
+    //  جملهٔ کامل بر واژه جلو است: «هزینهٔ خودکار» ِ صندوق پولِ مشتری است، نه «مصارف»
+    assertEquals("فیسِ خودکار", DariText.of("هزینهٔ خودکار"))
     assertEquals("قرض‌دارانی که مانده دارند", DariText.of("قرض‌دارِ بدهکار"))
   }
 
@@ -87,8 +89,71 @@ class DariTextTest {
       assertTrue(w.dari.isNotBlank() && w.fa != w.dari)
     }
     for ((fa, dari) in DariText.PHRASES) assertTrue(dari.isNotBlank() && fa != dari)
-    //  فهرست کوتاه می‌ماند؛ هر واژهٔ تازه با بازبینیِ صاحب‌کار
-    assertTrue(DariText.WORDS.size <= 24)
+    //  فهرست کوتاه می‌ماند؛ هر واژهٔ تازه با بازبینیِ صاحب‌کار (۱۴۰۵/۰۸/۱۳: سقف ۲۴ ⇐ ۶۴ با خواستِ «واژهٔ دریِ بیشتر»)
+    assertTrue(DariText.WORDS.size <= 64)
+    assertEquals(DariText.WORDS.size, DariText.WORDS.map { it.fa }.toSet().size, "واژهٔ تکراری در فهرست")
+  }
+
+  @Test
+  fun newAfghanWordsWithTheirSuffixes() {
+    assertEquals("معلوماتِ دکان", DariText.of("اطلاعاتِ دکان"))
+    assertEquals("بدون انترنت", DariText.of("بی اینترنت"))
+    assertEquals("سفارشِ انترنتی", DariText.of("سفارشِ اینترنتی"))
+    assertEquals("قرضِ ما", DariText.of("بدهیِ ما"))
+    assertEquals("قرض ندارد", DariText.of("بدهی ندارد"))
+    assertEquals("کد کاپی شد", DariText.of("کد کپی شد"))
+    assertEquals("حداقل ۸ حرف", DariText.of("حداقل ۸ نویسه"))
+    assertEquals("ذخیره نشد — دوباره کوشش کنید", DariText.of("ذخیره نشد — دوباره امتحان کنید"))
+    assertEquals("معلومات موفقانه بازیابی گردید", DariText.of("اطلاعات با موفقیت بازیابی شد"))
+    assertEquals("ماهِ شمسی", DariText.of("ماهِ خورشیدی"))
+    assertEquals("سرور حالا جواب نمی‌دهد", DariText.of("سرور الان جواب نمی‌دهد"))
+    assertEquals("باقیِ برنامه", DariText.of("بقیهٔ برنامه"))
+    assertEquals("پرداخت گردید — تشکر از خرید شما", DariText.of("پرداخت شد — سپاس از خرید شما"))
+    assertEquals("پیامِ معذرت", DariText.of("پیامِ پوزش"))
+    assertEquals("مدیرِ سیستم", DariText.of("مدیرِ سامانه"))
+    assertEquals("رهنمای کلید", DariText.of("راهنمای کلید"))
+    assertEquals("واپسی — فاکتور", DariText.of("مرجوعی — فاکتور"))
+    assertEquals("امروز رخصتی", DariText.of("امروز تعطیل"))
+    assertEquals("رخصتیِ استثنایی", DariText.of("تعطیلیِ استثنایی"))
+    assertEquals("لیستِ قیمت: پرچون", DariText.of("لیستِ قیمت: خرده"))
+    assertEquals("کدِ جدید", DariText.of("کدِ تازه"))
+    assertEquals("پیامِ جدیدی نیست", DariText.of("پیامِ تازه‌ای نیست"))
+    assertEquals("صرف نظر", DariText.of("بی${zwnj}خیال"))
+    assertEquals("باقیِ پول: 20", DariText.of("پولِ پس: 20"))
+    assertEquals("قبلاً ثبت شده بود", DariText.of("پیش${zwnj}تر ثبت شده بود"))
+    assertEquals("ثبت گردیدند", DariText.of("ثبت شدند"))
+  }
+
+  @Test
+  fun lookalikesOfTheNewWordsStayFarsi() {
+    //  «بی» فقط حرفِ اضافهٔ جدا: «بیش»، «بیست»، «بیرون»، «بی‌نام» دست نمی‌خورند
+    for (s in listOf("بیش از سقف", "بیست", "بیرون", "بی${zwnj}نام", "بیمه", "بدهید", "بدهیم", "ثبت شده", "ثبت شدن",
+      "تازه کردن از سرور", "صف خودش تازه می‌شود", "تازه${zwnj}تر", "تعطیلات", "خرده${zwnj}ریز", "رایگان امتحان کنید")) {
+      assertEquals(s, DariText.of(s), s)
+    }
+  }
+
+  @Test
+  fun wholeSentencesWithValuesKeepTheValuesByteForByte() {
+    //  کلیدِ PHRASES با `{}`: جملهٔ کاملِ دری، و مقدار (داده) همان‌طور که داده شده
+    assertEquals("PIN درست نیست — 2 بار دیگر می‌توانید کوشش کنید", DariText.of("PIN درست نیست — ${p("2")} تلاش مانده"))
+    assertEquals("میعاد تا 1405/08/20", DariText.of("اعتبار تا ${p("1405/08/20")}"))
+    assertEquals("مصروف — 15 دقیقهٔ دیگر", DariText.of("شلوغ — ${p("15")} دقیقهٔ دیگر"))
+    //  مقدارِ پر از واژه‌های فهرست هم دری نمی‌شود
+    assertEquals("مصروفم گوشی انبار دقیقه", DariText.of("شلوغم ${p("گوشی انبار")} دقیقه"))
+    assertEquals("PIN درست نیست — {} بار دیگر می‌توانید کوشش کنید", DariText.PHRASES[DariText.shape("PIN درست نیست — ${p("2")} تلاش مانده")])
+    //  همان جمله بی نشانه (فارسیِ خام) کلیدِ `{}` نمی‌خورد
+    assertEquals("PIN درست نیست — 2 تلاش مانده", DariText.of("PIN درست نیست — 2 تلاش مانده"))
+    assertEquals("شلوغ — {} دقیقهٔ دیگر", DariText.shape("شلوغ — ${p("15")} دقیقهٔ دیگر"))
+  }
+
+  @Test
+  fun everyWholeSentenceHasTheSamePlaceholdersAndNoMarkers() {
+    for ((fa, dari) in DariText.PHRASES) {
+      assertEquals(fa.split("{}").size, dari.split("{}").size, "شمارِ {} در «$fa»")
+      assertTrue(dari.none { it == DariText.OPEN || it == DariText.CLOSE }, fa)
+      assertTrue(fa.trim() == fa && dari.trim() == dari, "فاصلهٔ اضافه در «$fa»")
+    }
   }
 
   private fun p(s: String) = DariText.protect(s)
