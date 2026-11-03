@@ -79,14 +79,14 @@ class LineUnitsTest {
     val back = LineModel.switchTo(cartons, info, 0)
     assertEquals(qty(24.0), back.qtyText)
     assertEquals(qty(150.0), back.priceText)
-    assertNull(LineModel.wantedPrice(back, info, start), "دوباره دانه ⇒ قیمتِ خودِ کالا")
+    assertNull("دوباره دانه ⇒ قیمتِ خودِ کالا", LineModel.wantedPrice(back, info, start))
     //  ردیفی که پیش‌تر دو کارتن با قیمتِ لیست ثبت شد ⇒ برگه با «کارتن» و «۲»
     val again = on(line(24.0, 1700.0 / 12))
     val s2 = LineModel.start(again)
     assertEquals(1, s2.unitAt)
     assertEquals(qty(2.0), s2.qtyText)
     assertEquals(1700.0 / 12, LineModel.wantedPrice(s2, again, s2)!!, 1e-9)
-    assertEquals("قیمتِ لیست دستی شمرده نمی‌شود", null, LineModel.wantedPrice(LineModel.switchTo(s2, again, 0), again, s2))
+    assertNull("قیمتِ لیست دستی شمرده نمی‌شود", LineModel.wantedPrice(LineModel.switchTo(s2, again, 0), again, s2))
   }
 
   @Test fun `قیمتِ دستیِ ردیف و قیمتِ نوشته با عوض شدنِ واحد می‌مانند؛ «برگشت» ⇒ قیمتِ لیستِ همان واحد`() {
@@ -101,7 +101,7 @@ class LineUnitsTest {
     val reset = LineModel.resetPrice(cartons, info)
     assertEquals(qty(1700.0 / 12), reset.priceText)
     assertEquals(1700.0 / 12, LineModel.wantedPrice(reset, info, start)!!, 1e-9)
-    assertEquals("برگشت روی دانه ⇒ قیمتِ کالا", null, LineModel.wantedPrice(LineModel.switchTo(reset, info, 0), info, start))
+    assertNull("برگشت روی دانه ⇒ قیمتِ کالا", LineModel.wantedPrice(LineModel.switchTo(reset, info, 0), info, start))
   }
 
   @Test fun `فقط بستهٔ کامل ⇒ ۱٫۵ کارتن رد با نامِ واحد؛ دانه آزاد؛ صفر و نانوشته همان خطاهای امروز`() {
@@ -111,7 +111,7 @@ class LineUnitsTest {
     assertNull(LineModel.quantity(half, info))
     assertEquals(StrSale.partPackRejected("کارتن"), LineModel.qtyError(half, info))
     assertEquals(false, LineModel.valid(half, info))
-    assertEquals("دانه ۱٫۵ (کالای غیرِ وزنی را موتور می‌سنجد)", null, LineModel.qtyError(start.copy(qtyText = "1.5"), info))
+    assertNull("دانه ۱٫۵ (کالای غیرِ وزنی را موتور می‌سنجد)", LineModel.qtyError(start.copy(qtyText = "1.5"), info))
     assertEquals(StrSale.positiveNeeded, LineModel.qtyError(half.copy(qtyText = "0"), info))
     assertEquals(StrSale.badNumberShort, LineModel.qtyError(half.copy(qtyText = "x"), info))
     val free = on(line(1.0), whole = false)
