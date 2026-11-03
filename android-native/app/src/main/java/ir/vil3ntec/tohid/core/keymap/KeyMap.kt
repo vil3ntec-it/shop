@@ -348,7 +348,7 @@ object KeyMap {
     overrides = listOf("global.back"),
   )
   val SALE_PAYMENT_SUBMIT = KeyAction(
-    "sale.payment.submit", "sale.payment", "ثبت؛ مبلغِ خالی = نقدِ دقیق", KeyStatus.PLANNED,
+    "sale.payment.submit", "sale.payment", "ثبت؛ مبلغِ خالی = نقدِ دقیق", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Enter)),
     web = listOf(Chord(KeyName.Enter)),
   )
@@ -363,42 +363,42 @@ object KeyMap {
     web = listOf(Chord(KeyName.Tab, shift = true)),
   )
   val SALE_PAYMENT_NEXT_METHOD = KeyAction(
-    "sale.payment.nextMethod", "sale.payment", "روشِ پرداختِ بعدی", KeyStatus.PLANNED,
+    "sale.payment.nextMethod", "sale.payment", "روشِ پرداختِ بعدی", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.PageDown)),
     web = listOf(Chord(KeyName.PageDown)),
   )
   val SALE_PAYMENT_PREV_METHOD = KeyAction(
-    "sale.payment.prevMethod", "sale.payment", "روشِ پرداختِ قبلی", KeyStatus.PLANNED,
+    "sale.payment.prevMethod", "sale.payment", "روشِ پرداختِ قبلی", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.PageUp)),
     web = listOf(Chord(KeyName.PageUp)),
   )
   val SALE_PAYMENT_NOTE10 = KeyAction(
-    "sale.payment.note10", "sale.payment", "اسکناسِ ۱۰", KeyStatus.PLANNED,
+    "sale.payment.note10", "sale.payment", "اسکناسِ ۱۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D1, shift = true)),
     web = listOf(Chord(KeyName.D1, shift = true)),
   )
   val SALE_PAYMENT_NOTE20 = KeyAction(
-    "sale.payment.note20", "sale.payment", "اسکناسِ ۲۰", KeyStatus.PLANNED,
+    "sale.payment.note20", "sale.payment", "اسکناسِ ۲۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D2, shift = true)),
     web = listOf(Chord(KeyName.D2, shift = true)),
   )
   val SALE_PAYMENT_NOTE50 = KeyAction(
-    "sale.payment.note50", "sale.payment", "اسکناسِ ۵۰", KeyStatus.PLANNED,
+    "sale.payment.note50", "sale.payment", "اسکناسِ ۵۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D3, shift = true)),
     web = listOf(Chord(KeyName.D3, shift = true)),
   )
   val SALE_PAYMENT_NOTE100 = KeyAction(
-    "sale.payment.note100", "sale.payment", "اسکناسِ ۱۰۰", KeyStatus.PLANNED,
+    "sale.payment.note100", "sale.payment", "اسکناسِ ۱۰۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D4, shift = true)),
     web = listOf(Chord(KeyName.D4, shift = true)),
   )
   val SALE_PAYMENT_NOTE500 = KeyAction(
-    "sale.payment.note500", "sale.payment", "اسکناسِ ۵۰۰", KeyStatus.PLANNED,
+    "sale.payment.note500", "sale.payment", "اسکناسِ ۵۰۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D5, shift = true)),
     web = listOf(Chord(KeyName.D5, shift = true)),
   )
   val SALE_PAYMENT_NOTE1000 = KeyAction(
-    "sale.payment.note1000", "sale.payment", "اسکناسِ ۱۰۰۰", KeyStatus.PLANNED,
+    "sale.payment.note1000", "sale.payment", "اسکناسِ ۱۰۰۰", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.D6, shift = true)),
     web = listOf(Chord(KeyName.D6, shift = true)),
   )
@@ -408,12 +408,12 @@ object KeyMap {
     web = listOf(Chord(KeyName.P, alt = true)),
   )
   val SALE_PAYMENT_CUSTOMER = KeyAction(
-    "sale.payment.customer", "sale.payment", "مشتری (برای باقی‌ماندهٔ قرضی)", KeyStatus.PLANNED,
+    "sale.payment.customer", "sale.payment", "مشتری (برای باقی‌ماندهٔ قرضی)", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.F2)),
     web = listOf(Chord(KeyName.C, alt = true)),
   )
   val SALE_PAYMENT_BACK = KeyAction(
-    "sale.payment.back", "sale.payment", "برگشت به سبد، بی ثبتِ هیچ چیز", KeyStatus.PLANNED,
+    "sale.payment.back", "sale.payment", "برگشت به سبد، بی ثبتِ هیچ چیز", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Escape)),
     web = listOf(Chord(KeyName.Escape)),
   )
