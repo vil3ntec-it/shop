@@ -124,6 +124,11 @@ class DariWordsTest {
     "تازه‌تر", "تازه‌سازی", "تازه‌اند", // برتر و «به‌روز کردن»، نه «جدید»
   ) + DariText.KEEP // «تازه کردن»، «تازه می‌شود»… = به‌روز کردن (فهرستِ نام‌دارِ خودِ لایه)
 
+  /** واژهٔ فهرست که آغازِ بسیاری واژه‌های دیگر است: فقط شکلِ جدایش سنجیده می‌شود (هر تازه‌ای با دلیل) */
+  private val standaloneOnly = setOf(
+    "بی", // حرفِ اضافهٔ جدا ⇐ «بدون»؛ «بیش»، «بیرون»، «بین»، «بیشتر» و «بی‌تغییر» واژه‌های دیگرند
+  )
+
   @Test fun `دری زبانِ جدای انتخاب‌گر است با خط و جهتِ فارسی`() {
     assertEquals(listOf("فارسی", "دری", "English", "پښتو"), Lang.entries.map { it.native })
     assertEquals(Lang.PRS, Lang.of("prs"))
@@ -152,7 +157,8 @@ class DariWordsTest {
       var text = r.outDari
       for (a in dariAllowed) text = text.replace(a, "")
       for (w in DariText.WORDS) {
-        val hit = Regex("(?<![\\p{L}\\p{M}\\u200C])" + Regex.escape(w.fa)).find(text) ?: continue
+        val tail = if (w.fa in standaloneOnly) "(?![\\p{L}\\p{M}\\u200C])" else ""
+        val hit = Regex("(?<![\\p{L}\\p{M}\\u200C])" + Regex.escape(w.fa) + tail).find(text) ?: continue
         left += "${r.key}: «${w.fa}» در «${text.substring(maxOf(0, hit.range.first - 20), minOf(text.length, hit.range.last + 20))}»"
       }
     }
@@ -184,7 +190,7 @@ class DariWordsTest {
     assertEquals("سرم شلوغ است", StrCourierApp.rsBusy)
     assertEquals("راه افتادم", StrCourierApp.acMoving)
     assertEquals("اینترنت نیست — کارها در صفِ گوشی می‌مانند", StrCourierApp.offlineQueued)
-    assertEquals("1,200 افغانی", StrCourierApp.afn("1,200"))
+    assertEquals("1,200 افغانی", StrOnline.afnAmount("1,200"))
     assertEquals("دکان سفارشِ #12 را پس خواسته است", StrCourierApp.orderRecalled("12"))
     assertEquals("موتورِ تازه روشن (آزمایشی)", StrSettingsPages.stockModeOn)
     assertEquals("چند کادر درست نیست؛ پیامِ زیرِ هر کادر را ببینید", StrSettingsPages.fixFields)
@@ -194,7 +200,7 @@ class DariWordsTest {
     assertEquals("مصروف هستم", StrCourierApp.rsBusy)
     assertEquals("روان شدم", StrCourierApp.acMoving)
     assertEquals("انترنت نیست — کارها در صفِ مبایل می‌مانند", StrCourierApp.offlineQueued)
-    assertEquals("1,200 افغانی", StrCourierApp.afn("1,200"))
+    assertEquals("1,200 افغانی", StrOnline.afnAmount("1,200"))
     assertEquals("موتورِ جدید روشن (آزمایشی)", StrSettingsPages.stockModeOn)
     assertEquals("انترنت وصل نیست", ir.vil3ntec.tohid.core.net.ApiFailure.Offline().userMessage)
     //  جزئیاتِ خطا داده است: «گوشی» ِ درونش دری نمی‌شود

@@ -134,7 +134,7 @@ class DariCoverageTest {
 
   /* ------------------------------- دور زدنِ لایه ------------------------------- */
 
-  /** کدِ پرونده بی توضیح‌ها (`//`، `/* */`، سطرهای `*`) */
+  /** کدِ پرونده بی سطرهای توضیح و بی توضیحِ پایانِ سطر */
   private fun code(f: File): String = f.readLines().filterNot { it.trimStart().let { t -> t.startsWith("//") || t.startsWith("*") || t.startsWith("/*") } }
     .joinToString("\n") { it.replace(Regex("""\s//\s.*$"""), "") }
 

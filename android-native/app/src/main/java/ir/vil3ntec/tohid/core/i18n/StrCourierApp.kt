@@ -1,7 +1,7 @@
 package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  حالتِ پیک (`ui/courier/*`): خانه، مسیر، آمار، حساب، «نقدِ من»، جزئیاتِ سفارش، تحویل و ورود.
+ *  حالتِ پیک (پوشهٔ `ui/courier`): خانه، مسیر، آمار، حساب، «نقدِ من»، جزئیاتِ سفارش، تحویل و ورود.
  *  این نوشته‌ها پیش‌تر متنِ خامِ فارسی در خودِ صفحه‌ها بودند و از هیچ زبانی نمی‌گذشتند (دری، انگلیسی و پشتو
  *  همه فارسی می‌دیدند). فارسی کلمه‌به‌کلمه همان پیشین است. قاعده‌ها سرِ `I18n.kt`.
  */
@@ -61,8 +61,6 @@ object StrCourierApp {
   // ── نوارِ پیشرفت ──
   val stepGot: String get() = t("گرفتم", "Picked up", "واخیستل")
   val stepDelivered: String get() = t("تحویل", "Delivered", "سپارل")
-
-  fun afn(amount: String): String = t("${asIs(amount)} افغانی", "$amount AFN", "$amount افغانۍ")
 
   // ── همگام‌سازی و صف ──
   val offlineQueued: String get() = t(
@@ -193,7 +191,7 @@ object StrCourierApp {
   val joinBody: String get() = t(
     "کدِ دعوتی را که صاحب دکان به شما داده بزنید. ایمیل و رمز لازم نیست.",
     "Enter the invite code the shop owner gave you. No email or password needed.",
-    "هغه بلنه کوډ ولیکئ چې د دوکان خاوند درکړی. برېښنالیک او پټنوم ته اړتیا نشته.",
+    "هغه د بلنې کوډ ولیکئ چې د دوکان خاوند درکړی. برېښنالیک او پټنوم ته اړتیا نشته.",
   )
   val yourName: String get() = t("نام شما", "Your name", "ستاسو نوم")
   val nameExample: String get() = t("مثلاً کریم", "e.g. Karim", "لکه کریم")

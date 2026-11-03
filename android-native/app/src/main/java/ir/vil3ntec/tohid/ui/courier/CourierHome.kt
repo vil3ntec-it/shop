@@ -181,7 +181,7 @@ internal fun reached(status: String): Int = when (status) {
   else -> -1
 }
 
-internal fun afn(minor: Long): String = StrCourierApp.afn(money(minor / 100.0))
+internal fun afn(minor: Long): String = ir.vil3ntec.tohid.core.i18n.StrOnline.afnAmount(money(minor / 100.0))
 
 /** ساعت:دقیقهٔ گوشی */
 internal fun clock(at: Long): String {
