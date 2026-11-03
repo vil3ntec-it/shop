@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.data.DayEnd
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.invoiceLabel
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -89,11 +90,54 @@ object DayEndModel {
     else -> "بسته (Z)"
   }
 
+  //  ── RPT-04 / S48: «ریزِ تراکنش‌ها» ی یک ردیفِ روش (کلیک یا Enter روی ردیفِ «نقد») ──
+
+  const val METHODS_ID = "dayend.methods"
+  const val DETAIL_ID = "dayend.detail"
+
+  /** نامِ ردیفِ جدولِ روش‌ها ⇐ شناسهٔ روش؛ ردیفِ «جمع» یا نامِ ناشناخته ⇒ null (ریز ندارد) */
+  fun methodOf(r: DayClose.Report?, rowName: String): String? =
+    r?.methods?.firstOrNull { PayFlow.methodName(it.method) == rowName }?.method
+
+  private fun kindLabel(type: String): String = when (type) {
+    "sale" -> "فروش"
+    "refund" -> "برگشت"
+    else -> "رسید"
+  }
+
+  /** سندِ هر رویدادِ دفتر از شناسه‌اش (`sale:`، `ret:`، `rcv:`، `gci:`، `sor:`/`lyr:`) — بی نامِ مشتری */
+  fun docLabel(d: ShopData, id: String): String {
+    val ref = id.substringAfter(':', "")
+    fun inv(saleId: String?): String = d.sales.find { it.id == saleId }?.invoiceLabel()?.let { "فاکتور #$it" } ?: "فاکتور"
+    return when (id.substringBefore(':')) {
+      "sale" -> inv(ref)
+      "ret" -> "برگشتِ " + inv(d.saleReturns.find { it.id == ref }?.saleId)
+      "rcv" -> "دریافتِ قرض"
+      "gci" -> "کارتِ هدیه"
+      "sor", "lyr" -> "پس دادنِ پیش‌پرداخت"
+      else -> ""
+    }
+  }
+
+  private val DETAIL_COLS = listOf(
+    col("time", "ساعت", "text"), col("kind", "نوع", "text"), col("doc", "سند", "text"), col("amount", "مبلغ", "money"),
+  )
+
+  /** جدولِ ریزِ روشِ [method] در روزِ [day]؛ جمعش همان «خالص دفتر» ِ همان ردیف است (`DayEnd.lines`) */
+  fun details(d: ShopData, day: String, method: String, clock: ReportClock, offsetMinutes: Int): ReportTables.Table {
+    val lines = DayEnd.lines(d, day, method, clock)
+    return ReportTables.Table(
+      DETAIL_ID, "ریزِ تراکنش‌ها — ${PayFlow.methodName(method)}", DETAIL_COLS,
+      lines.map { listOf(p(hhmm(it.at, offsetMinutes)), p(kindLabel(it.type)), p(docLabel(d, it.id)), p(it.amount)) },
+      listOf(p("جمع"), p(""), p("${lines.size} تراکنش"), p(lines.sumOf { it.amount })),
+    )
+  }
+
   private fun sumOrNull(v: List<Long?>): Long? = v.filterNotNull().takeIf { it.isNotEmpty() }?.sum()
 
   fun tables(r: DayClose.Report, offsetMinutes: Int): List<ReportTables.Table> {
     val methods = ReportTables.Table(
-      "dayend.methods", "پایان روز به تفکیک روش", METHOD_COLS,
+      METHODS_ID, "پایان روز به تفکیک روش", METHOD_COLS,
       r.methods.map { methodCells(PayFlow.methodName(it.method), it) },
       methodCells("جمع", r.total),
     )

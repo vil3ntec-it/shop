@@ -29,5 +29,6 @@ object I18nTables {
     StrReach, // درهای نسخهٔ ۳ به کارهای بی‌راه‌مانده پس از رابطِ قدیم (`V3ReachabilityTest`)
     StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
+    StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
   )
 }

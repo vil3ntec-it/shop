@@ -31,3 +31,7 @@ internal fun rememberErasureApi(): ApiClient? {
   val owner = ShopRole.current(context) == ShopRole.OWNER && Backend.isReady(context)
   return remember(context, owner) { if (owner) Backend.api(context) else null }
 }
+
+/** RPT-14: درِ سرورِ «گزارشِ فروشِ اینترنتی» برای کاربرِ واردشده؛ بیرون از حساب ⇒ null (نه راه، نه صفحه) */
+@Composable
+fun onlineReportApi(): ApiClient? = lateApologyApi()

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.analytics
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.outlined.AutoAwesome
+import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrShrink
 import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
@@ -28,6 +29,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Print
+import androidx.compose.material.icons.outlined.ShoppingCart
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -106,10 +108,13 @@ fun ReportsScreen(
       if (SimpleAskPref.on(context)) add(ReportExtra.ASK)
     }
   }
+  //  RPT-14: «گزارشِ فروشِ اینترنتی» در «…» فقط با پرچمِ روشنِ سرور (هر دو نما)
+  val online = rememberOnlineReportVisible()
+  val onlineItem = if (online) listOf(V3MenuItem(Icons.Outlined.ShoppingCart, StrOnlineReport.title) { onOpen(AnalyticsPaths.ONLINE_REPORT) }) else emptyList()
   //  «گزارشِ تازه» (همان کلیدِ کامپیوتر، فقط همین دستگاه): روشن ⇒ صفحهٔ هستهٔ مشترکِ گزارش با کلیدِ برگشتِ خودش
   LaunchedEffect(Unit) { ReportFresh.load(context) }
   if (ReportFresh.on.value) {
-    V3Scaffold(title = Str.reports, onBack = onBack, bottomReserve = bottomReserve) { pad ->
+    V3Scaffold(title = Str.reports, onBack = onBack, overflow = onlineItem, bottomReserve = bottomReserve) { pad ->
       Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { PhoneFreshReports(d) }
     }
     return
@@ -161,7 +166,7 @@ fun ReportsScreen(
     overflow = listOf(
       V3MenuItem(Icons.Outlined.TableChart, StrReports.exportCsv) { exportCsv() },
       V3MenuItem(Icons.Outlined.AutoAwesome, StrReach.freshOn) { ReportFresh.set(context, true) },
-    ),
+    ) + onlineItem,
     chips = {
       DraftTabStrip(tabs.map { tabLabel(it) }, tabs.indexOf(tab).coerceAtLeast(0), { tabId = tabs[it].id })
     },

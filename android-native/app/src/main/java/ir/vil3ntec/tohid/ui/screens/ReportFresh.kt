@@ -61,6 +61,7 @@ import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
  *  «گزارشِ تازه» — صفحه‌های گزارش و کارت‌های خانه روی هستهٔ مشترکِ گزارش
@@ -235,6 +236,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours))
     } else null
   }
+  //  RPT-04 / S48: ریزِ تراکنش‌های یک روش (کلیک یا Enter روی ردیفِ «نقد» ِ «پایانِ روز»)
+  var drill by remember(day) { mutableStateOf<String?>(null) }
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
   val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
@@ -311,9 +314,15 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     if (tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)
     tables.forEach { t ->
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth())
+      val onRow: ((List<JsonPrimitive>) -> Unit)? =
+        if (dayEnd != null && t.id == DayEndModel.METHODS_ID) { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } } else null
+      if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)
       else FreshCards(t, Modifier.weight(1f).fillMaxWidth())
     }
+  }
+  drill?.let { m ->
+    val detail = remember(d, day, m) { DayEndModel.details(d, day, m, clock, ReportBridge.offsetMinutes()) }
+    DayEndDetailDialog(detail) { drill = null }
   }
 }
 
@@ -458,9 +467,12 @@ private fun colWidth(kind: String): Dp = when (kind) {
   else -> 120.dp
 }
 
-/** جدولِ خط‌دار با سرستونِ مرتب‌کننده (کلیکِ دوم نزولی/صعودی) و ردیفِ جمعِ ثابت */
+/**
+ *  جدولِ خط‌دار با سرستونِ مرتب‌کننده (کلیکِ دوم نزولی/صعودی) و ردیفِ جمعِ ثابت. [onRow] ⇒ هر ردیف دکمه است:
+ *  کلیک، یا Tab تا ردیف و Enter (`KeyMap.REPORTS_DRILL`)، «ریز» ِ همان ردیف را باز می‌کند (RPT-04/RPT-13).
+ */
 @Composable
-private fun FreshTable(t: ReportTables.Table, modifier: Modifier) {
+internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List<JsonPrimitive>) -> Unit)? = null) {
   var sort by remember(t.id) { mutableStateOf<Pair<Int, Boolean>?>(null) }
   val rows = remember(t, sort) { sort?.let { (c, desc) -> ReportBoard.sortRows(t.rows, c, desc) } ?: t.rows }
   val line = Shop.colors.border
@@ -489,7 +501,12 @@ private fun FreshTable(t: ReportTables.Table, modifier: Modifier) {
           Text("در این بازه چیزی نیست.", Modifier.width(width).padding(24.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
         }
         items(rows.size) { r ->
-          Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface)) {
+          val drill = onRow?.let { open ->
+            Modifier
+              .onPreviewKeyEvent { e -> if (e.matches(KeyMap.REPORTS_DRILL)) { open(rows[r]); true } else false }
+              .clickable(role = Role.Button, onClickLabel = "ریزِ ${ReportFreshModel.display(rows[r].first(), t.columns[0].kind, ::formatDate)}") { open(rows[r]) }
+          } ?: Modifier
+          Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface).then(drill)) {
             rows[r].forEachIndexed { i, v ->
               cell(i, null) {
                 Text(
@@ -566,6 +583,11 @@ fun PhoneFreshReports(d: ShopData) {
   val dayEnd = remember(d, today, money) {
     if (money) DayEndModel.build(d, today, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
   }
+  //  RPT-08: «ساعت و روز» روی گوشی هم — همان نقشهٔ کامپیوتر، فقط برای کسی که پول را می‌بیند
+  var heatSpan by remember { mutableStateOf(HeatmapModel.PHONE_SPANS.first()) }
+  val heat = remember(d, heatSpan, today, money) {
+    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours)) else null
+  }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
   LaunchedEffect(ReportFresh.preset.value) { ReportFresh.preset.value = null }
 
@@ -586,6 +608,7 @@ fun PhoneFreshReports(d: ShopData) {
     }
     item { HomeKpis(d, {}, money, columns = 2) }
     dayEnd?.let { b -> item { DayEndPhone(b) } }
+    heat?.let { h -> item { HeatmapPhone(h, heatSpan) { heatSpan = it } } }
     phoneDebts(this, debts)
   }
 }

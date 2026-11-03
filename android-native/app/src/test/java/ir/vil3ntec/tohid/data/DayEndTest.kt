@@ -186,5 +186,53 @@ class DayEndTest {
     assertEquals("23:59", DayEndModel.hhmm(-60_000L, 0))
   }
 
+  /**
+   *  RPT-04 / S48 — «Enter روی ردیفِ نقد = ریزِ تراکنش‌ها»: هر ردیفِ ریز رویدادِ دفترِ همان روز با سهمِ همان روش
+   *  (برگشت منفی)، و جمعش برای **هر** روش دقیقاً «خالص دفتر» ِ همان ردیف.
+   */
+  @Test
+  fun `ریزِ هر روش همان رویدادهای دفترِ روز است و جمعش خالصِ دفترِ همان ردیف`() {
+    val d = ledger()
+    val r = DayEnd.report(d, date, clock, now)
+    val cash = DayEnd.lines(d, date, "cash", clock)
+    assertEquals(listOf("sale:s1", "sale:s2", "ret:r1", "rcv:t1"), cash.map { it.id })
+    assertEquals(listOf(50000L, 30000L, -5000L, 10000L), cash.map { it.amount })
+    for (m in r.methods) assertEquals(m.method, m.ledger.net, DayEnd.lines(d, date, m.method, clock).sumOf { it.amount })
+    assertEquals(listOf("sale:s3"), DayEnd.lines(d, date, "account", clock).map { it.id })
+    //  روزِ پیش (s9) و تاریخِ نامعتبر
+    assertTrue(DayEnd.lines(d, "2026-10-28", "cash", clock).none { it.id == "sale:s1" })
+    assertEquals(emptyList<DayEnd.Line>(), DayEnd.lines(d, "نامعتبر", "cash", clock))
+  }
+
+  @Test
+  fun `جدولِ ریز ساعت و نوع و سند دارد و ردیفِ جمع ریز ندارد`() {
+    val d = ledger().let { x -> x.copy(sales = x.sales.map { if (it.id == "s2") it.copy(invoiceNumber = 12) else it }) }
+    val r = DayEnd.report(d, date, clock, now)
+    assertEquals("cash", DayEndModel.methodOf(r, PayFlow.methodName("cash")))
+    assertNull(DayEndModel.methodOf(r, "جمع"))
+    assertNull(DayEndModel.methodOf(null, PayFlow.methodName("cash")))
+    val t = DayEndModel.details(d, date, "cash", clock, 270)
+    assertEquals(DayEndModel.DETAIL_ID, t.id)
+    assertEquals(listOf("time", "kind", "doc", "amount"), t.columns.map { it.key })
+    assertEquals(listOf("14:30", "فروش", "فاکتور #12", "30000"), t.rows[1].map { it.content })
+    assertEquals(listOf("برگشت", "برگشتِ فاکتور"), t.rows[2].drop(1).take(2).map { it.content })
+    assertEquals("دریافتِ قرض", t.rows[3][2].content)
+    assertEquals(r.methods.single { it.method == "cash" }.ledger.net.toString(), t.total!![3].content)
+    assertEquals("4 تراکنش", t.total!![2].content)
+  }
+
+  private fun src(rel: String): String =
+    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+
+  @Test
+  fun `ردیفِ روشِ پایانِ روز با کلیک یا Enter ریز را باز می‌کند`() {
+    val fresh = src("ui/screens/ReportFresh.kt")
+    assertTrue(fresh.contains("e.matches(KeyMap.REPORTS_DRILL)"))
+    assertTrue(fresh.contains("t.id == DayEndModel.METHODS_ID"))
+    assertTrue(fresh.contains("DayEndModel.details(d, day, m, clock, ReportBridge.offsetMinutes())"))
+    assertTrue(fresh.contains("FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)"))
+  }
+
   private fun at(hour: Int, minute: Int) = base + hour * h + minute * 60_000L
 }

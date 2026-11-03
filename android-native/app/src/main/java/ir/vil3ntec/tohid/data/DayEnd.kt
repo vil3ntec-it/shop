@@ -85,6 +85,27 @@ object DayEnd {
       }
     }
 
+  /** یک ردیفِ «ریزِ تراکنش‌ها» ی یک روش: رویدادِ دفتر و سهمِ علامت‌دارِ همان روش (برگشت منفی) */
+  data class Line(val id: String, val type: String, val at: Long, val amount: Long)
+
+  /**
+   *  ریزِ روشِ [method] در روزِ کاریِ [date] (RPT-04، S48: Enter روی ردیفِ «نقد») — همان رویدادهای [events] که
+   *  `DayClose` در «خالص دفتر» می‌شمارد (همان پنجره، همان روزِ ساعتِ گزارش‌ها)، پس جمعِ [Line.amount] ها دقیقاً
+   *  `ledger.net` ِ ردیفِ همان روش است. رویدادِ بی سهم از این روش نمی‌آید. به ترتیبِ لحظه.
+   */
+  fun lines(d: ShopData, date: String, method: String, clock: ReportClock): List<Line> {
+    val w = window(date) ?: return emptyList()
+    return PayFlow.ledgerEvents(d, AuditEntry(id = DAY_REF, createdAt = w.first), w.second - 1).mapNotNull { e ->
+      if (clock.date(e.at) != date) return@mapNotNull null
+      val share = when (e.type) {
+        "sale", "refund" -> e.rows.orEmpty().filter { it.method == method }.takeIf { it.isNotEmpty() }?.sumOf { it.amount }
+        "receipt" -> if ((e.method ?: PayFlow.CASH) == method) e.amount ?: 0L else null
+        else -> null
+      } ?: return@mapNotNull null
+      Line(e.id.orEmpty(), e.type, e.at, if (e.type == "refund") -share else share)
+    }.sortedWith(compareBy<Line>({ it.at }, { it.id }))
+  }
+
   /**
    *  پایانِ روزِ `date` (`yyyy-MM-dd`ِ روزِ کاری) با ساعتِ گزارش‌ها. جمعِ بیرون از بازهٔ دقیق
    *  [ArithmeticException] می‌دهد (صفحه پیامش را نشان می‌دهد، عددِ گردشده نه).
