@@ -50,7 +50,7 @@ class CustomerOnlineOrdersTest {
     assertEquals(listOf("f", "c", "h", "e", "a"), rows.map { it.id })
     assertEquals(120.5, CustomerOnlineOrders.amount(rows.first()), 0.0)
     //  همان دو فهرستِ سرور (`OPEN_STATUSES` + `CUSTOMER_OTHER`)
-    val server = File(listOf("../server/src/lib/orders.js", "server/src/lib/orders.js").first { File(it).isFile }).readText()
+    val server = File(listOf("../../server/src/lib/orders.js", "../server/src/lib/orders.js", "server/src/lib/orders.js").first { File(it).isFile }).readText()
     for (s in CustomerOnlineOrders.OPEN + CustomerOnlineOrders.CANCELLED) assertTrue(s, server.contains("'$s'"))
   }
 
