@@ -15,6 +15,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.AddShoppingCart
 import androidx.compose.material.icons.outlined.DeleteOutline
 import androidx.compose.material.icons.outlined.Edit
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.screens.v3Text
@@ -69,6 +71,8 @@ internal class SuppliersActions(
   val onDelete: (String) -> Unit,
   val onNewSupplier: () -> Unit,
   val onNewPurchase: () -> Unit,
+  /** PUR-14: «فاکتورهای تأمین‌کننده» — `null` ⇒ پرچمِ سفارشِ خرید خاموش یا کاربر مدیر/صاحب نیست (تراشه پنهان) */
+  val onSupplierBills: (() -> Unit)? = null,
 )
 
 /**
@@ -98,7 +102,10 @@ internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
             title = StrMoney.supplierDebtTotal,
             value = MoneyText.afn(owed),
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
-            chips = listOf(V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier)),
+            chips = listOfNotNull(
+              V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),
+              actions.onSupplierBills?.let { V3HeroChip(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
+            ),
           )
           Spacer(Modifier.height(16.dp))
         }

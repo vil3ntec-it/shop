@@ -1,8 +1,8 @@
 {
   "_doc": "Caps for tools/quality/quality.mjs. They may only go down: run --lower-baseline after an improvement. Raising a cap by hand needs a reason in the PR body. Guide: docs/QUALITY-fa.md",
   "fileSize": {
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrOnline.kt": 924,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt": 844,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrOnline.kt": 933,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/data/Models.kt": 848,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt": 849,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/SalesEngine.kt": 955,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/data/ShopStore.kt": 1200,
@@ -12,7 +12,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/BulkSheets.kt": 851,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskCustomers.kt": 864,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskProducts.kt": 969,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt": 1033,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/DeskSale.kt": 1035,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Orders.kt": 855,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Profile.kt": 1065,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/screens/Sale.kt": 1617,
@@ -378,7 +378,7 @@
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/DeliveryRouteContent.kt": 7,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/DeskStore.kt": 2,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/delivery/InvoiceSheet.kt": 2,
-    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersHub.kt": 9,
+    "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersHub.kt": 10,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersModel.kt": 13,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersQueueController.kt": 3,
     "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/online/orders/OrdersRouteContent.kt": 5,

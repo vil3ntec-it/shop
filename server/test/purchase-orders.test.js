@@ -364,3 +364,90 @@ test('PUR-06 کرایهٔ رسید (S19: ۲۸۰ به حمل‌کننده): مد�
   assert.equal(plain.status, 201, JSON.stringify(plain.body));
   assert.equal(plain.body.receipt.freightMinor, 0);
 });
+
+test('PUR-14 فاکتورِ جدای تأمین‌کننده: فقط مدیر، نه پیش‌نویس؛ تکرار و کلید؛ شمارهٔ فعالِ یکتا؛ ردیفِ نادرست؛ باطل با دلیل؛ دکانِ دیگر ۴۰۴', async () => {
+  const t = await shopWithTeam('فاکتور');
+  const o = (await create(t.manager)).body.order;
+  const bill = {
+    id: 'bill-1', billNo: 'F-7781', billDate: '2026-11-04', note: 'فاکتورِ کاغذی',
+    lines: [{ lineId: 'l1', qtyMilli: 10000, totalMinor: 100000 }, { lineId: 'l2', qtyMilli: 7000, totalMinor: 147000 },
+      { productId: 'pZ', qtyMilli: 1000, totalMinor: 5000 }],
+  };
+  //  پیش‌نویس فاکتور ندارد؛ شاگرد هرگز
+  const early = await h.post(`${BASE}/${o.id}/bills`, bill, { token: t.manager });
+  assert.equal(early.status, 409, JSON.stringify(early.body));
+  assert.equal(early.body.error.code, 'not_sent');
+  assert.equal((await h.post(`${BASE}/${o.id}/send`, {}, { token: t.manager })).status, 200);
+  const staff = await h.post(`${BASE}/${o.id}/bills`, bill, { token: t.staff });
+  assert.equal(staff.status, 403, JSON.stringify(staff.body));
+
+  //  ورودیِ نادرست ⇒ ۴۰۰ با کدِ پایدار و شمارهٔ ردیف، و هیچ فاکتوری
+  const bad = [
+    [{ ...bill, billNo: '  ' }, 'bill_no_required'],
+    [{ ...bill, lines: [] }, 'bill_lines_required'],
+    [{ ...bill, lines: [{ lineId: 'l9', qtyMilli: 1000, totalMinor: 1 }] }, 'unknown_line'],
+    [{ ...bill, lines: [{ lineId: 'l1', productId: 'pB', qtyMilli: 1000, totalMinor: 1 }] }, 'product_mismatch'],
+    [{ ...bill, lines: [{ lineId: 'l1', qtyMilli: 1000, totalMinor: 1 }, { productId: 'pA', qtyMilli: 1, totalMinor: 1 }] }, 'duplicate_product'],
+    [{ ...bill, lines: [{ qtyMilli: 1000, totalMinor: 1 }] }, 'product_required'],
+    [{ ...bill, lines: [{ lineId: 'l1', qtyMilli: 0, totalMinor: 1 }] }, 'bad_qty'],
+    [{ ...bill, lines: [{ lineId: 'l1', qtyMilli: 1000, totalMinor: -1 }] }, 'bad_total'],
+    [{ ...bill, lines: [{ lineId: 'l1', qtyMilli: 1000, totalMinor: 1.5 }] }, 'bad_total'],
+    [{ ...bill, billDate: '2026-02-30' }, 'bad_date'],
+    [{ ...bill, id: '' }, 'bill_id_required'],
+  ];
+  for (const [body, code] of bad) {
+    const r = await h.post(`${BASE}/${o.id}/bills`, body, { token: t.manager });
+    assert.equal(r.status, 400, `${code}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, code);
+  }
+  assert.equal((await many('SELECT 1 FROM purchase_bills WHERE shop_id=$1', [t.shopId])).length, 0, 'ردها هیچ فاکتوری نساختند');
+
+  const ok = await h.post(`${BASE}/${o.id}/bills`, bill, { token: t.manager });
+  assert.equal(ok.status, 201, JSON.stringify(ok.body));
+  assert.equal(ok.body.bill.billNo, 'F-7781');
+  assert.equal(ok.body.bill.totalMinor, 252000);
+  assert.deepEqual(ok.body.bill.lines.map((l) => [l.lineId, l.productId]), [['l1', 'pA'], ['l2', 'pB'], [null, 'pZ']]);
+  assert.equal(ok.body.order.billCount, 1);
+  assert.equal(ok.body.order.version, o.version + 2, 'فرستادن و فاکتور هر کدام نسخه را بالا بردند');
+  //  همان کلید و همان بدنه ⇒ همان فاکتور؛ بدنهٔ دیگر ⇒ ۴۰۹
+  const again = await h.post(`${BASE}/${o.id}/bills`, bill, { token: t.manager });
+  assert.equal(again.status, 200);
+  assert.equal(again.body.replayed, true);
+  const reused = await h.post(`${BASE}/${o.id}/bills`, { ...bill, note: 'دیگر' }, { token: t.manager });
+  assert.equal(reused.status, 409);
+  assert.equal(reused.body.error.code, 'idempotency_key_reused');
+  //  همان شماره با کلیدِ دیگر ⇒ ۴۰۹ (فاکتورِ دوباره‌وارد‌شده بدهی را دو بار نشان نمی‌دهد)
+  const twice = await h.post(`${BASE}/${o.id}/bills`, { ...bill, id: 'bill-2' }, { token: t.manager });
+  assert.equal(twice.status, 409);
+  assert.equal(twice.body.error.code, 'bill_no_taken');
+
+  //  جزئیات: فاکتور با ردیف‌ها؛ فهرست فقط شمار
+  const detail = await h.get(`${BASE}/${o.id}`, { token: t.staff });
+  assert.deepEqual(detail.body.order.bills.map((b) => [b.id, b.billNo, b.billDate, b.voidedAt]), [['bill-1', 'F-7781', '2026-11-04', null]]);
+  const listed = (await h.get(BASE, { token: t.staff })).body.orders.find((x) => x.id === o.id);
+  assert.equal(listed.billCount, 1);
+  assert.equal(listed.bills, undefined);
+
+  //  دکانِ دیگر: نه می‌بیند، نه می‌نویسد، نه باطل می‌کند
+  const other = await shopWithTeam('فاکتورِ دیگر');
+  assert.equal((await h.post(`${BASE}/${o.id}/bills`, { ...bill, id: 'bill-x' }, { token: other.manager })).status, 404);
+  assert.equal((await h.post(`${BASE}/${o.id}/bills/bill-1/void`, { reason: 'x' }, { token: other.manager })).status, 404);
+
+  //  باطل: دلیل لازم؛ شاگرد نه؛ تکرار بی اثر؛ شماره آزاد می‌شود
+  assert.equal((await h.post(`${BASE}/${o.id}/bills/bill-1/void`, {}, { token: t.manager })).body.error.code, 'reason_required');
+  assert.equal((await h.post(`${BASE}/${o.id}/bills/bill-1/void`, { reason: 'x' }, { token: t.staff })).status, 403);
+  assert.equal((await h.post(`${BASE}/${o.id}/bills/nope/void`, { reason: 'x' }, { token: t.manager })).body.error.code, 'bill_not_found');
+  const v = await h.post(`${BASE}/${o.id}/bills/bill-1/void`, { reason: 'شمارهٔ اشتباه' }, { token: t.manager });
+  assert.equal(v.status, 200, JSON.stringify(v.body));
+  assert.equal(v.body.changed, true);
+  assert.equal(v.body.bill.voidReason, 'شمارهٔ اشتباه');
+  assert.equal(v.body.order.billCount, 0);
+  assert.equal((await h.post(`${BASE}/${o.id}/bills/bill-1/void`, { reason: 'دوباره' }, { token: t.manager })).body.changed, false);
+  const fixed = await h.post(`${BASE}/${o.id}/bills`, { ...bill, id: 'bill-2' }, { token: t.manager });
+  assert.equal(fixed.status, 201, JSON.stringify(fixed.body));
+  assert.deepEqual(fixed.body.order.bills.map((b) => [b.id, b.voidedAt !== null]), [['bill-1', true], ['bill-2', false]]);
+  //  سابقه: ثبت و باطل
+  const acts = (await many("SELECT action FROM audit_logs WHERE shop_id=$1 AND action LIKE 'purchase_order.bill%'", [t.shopId]))
+    .map((r) => r.action).sort();
+  assert.deepEqual(acts, ['purchase_order.bill', 'purchase_order.bill', 'purchase_order.bill_void']);
+});

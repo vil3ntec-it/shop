@@ -36,14 +36,14 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  `reports.money`. **فقط می‌خواند** — چیزی به سبد افزوده نمی‌شود. تنظیمِ خاموش (`PosPriceCheckPrefs`) ⇒ برگشت.
  */
 @Composable
-fun PriceCheckSheet(d: ShopData, today: String, showCost: Boolean, onClose: () -> Unit) {
+fun PriceCheckSheet(d: ShopData, today: String, showCost: Boolean, onClose: () -> Unit, places: Boolean = false) {
   val c = PhoneV3.colors
   var query by remember { mutableStateOf("") }
   var picked by remember { mutableStateOf<String?>(null) }
   val index = remember(d.products) { ShopStore.barcodeIndex(d) }
   val matches = remember(query, d.products) { PriceCheckData.matches(d, query) }
   val id = remember(query, picked, index) { PriceCheckData.pick(d, index, query, picked) }
-  val view = remember(id, d, today) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today) } }
+  val view = remember(id, d, today, places) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places) } }
   V3Sheet(onDismiss = onClose, title = StrPriceCheck.title) {
     V3SearchField(query, { query = it; picked = null }, StrPriceCheck.hint)
     Spacer(Modifier.height(10.dp))

@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -213,6 +214,12 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       }
       //  RSK-08: «پروندهٔ مدرک» — همان شرط و حالتِ رابطِ امروز (`orders.manage` و پرچمِ `shop.orders.dispute_file`)
       OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true, remember(context) { Backend.api(context) })
+      //  RSK-03: سابقهٔ همین مشتری در همین دکان پیش از ارسال — فقط با پرچمِ `shop.order_risk` (خاموش ⇒ هیچ)؛
+      //  RSK-04: فهرستِ بسته/مطمئن فقط برای `orders.contact` و فقط با شمارهٔ کاملِ همین سفارش
+      OrderRiskCardV3(
+        o.id, remember(context) { OrdersHub.repo(context) }, rev,
+        canList = perms.contact, phone = OrderDetailModel.fullPhone(o),
+      )
       //  جمع‌آوری (PCK)، ویرایش (ORD-14)، ترجیحِ تحویل (CHK-14)، جایگزینی (CHK-15/16)، پیام‌ها (ORD-16) و برگشتِ کالا (RET-11)
       OrderDetailExtras(o, cfg)
     }
@@ -232,6 +239,10 @@ internal fun RouteScope.OrderActionRoute() {
   LaunchedEffect(id) { if (OrdersHub.known[id] == null) OrdersHub.fetch(context, id).onFailure { error = it.userMessage } }
   val order = OrdersHub.known[id]
   val perms = OrdersLive.config.value?.permissions ?: OrderPermsDto()
+  //  FIN-01: دفترِ بازپرداختِ روشن ⇒ «بازپرداخت‌شده» با مبلغ و دلیل از `/refunds` (کلیدِ یکتای همین برگه)
+  val ledger = OrderRefundModel.ledger(OrdersLive.config.value, to)
+  //  کلیدِ تازه فقط پس از ردِ قطعیِ سرور (مبلغ عوض می‌شود ⇒ کلیدِ کهنه `idempotency_key_reused` می‌گرفت)؛ قطعِ نت ⇒ همان کلید
+  var refundKey by rememberSaveable(id, to) { mutableStateOf(OrdersRepository.newKey()) }
   //  گذارِ نامجاز (پیوندِ کهنه یا وضعیتِ تازه) ⇐ برگه بسته می‌شود؛ سرور هم نمی‌پذیرفت
   LaunchedEffect(order?.status, to) {
     if (order != null && to !in OrdersModel.bar(order, perms).let { listOfNotNull(it.primary) + it.danger + it.others }) back()
@@ -242,12 +253,30 @@ internal fun RouteScope.OrderActionRoute() {
     to = to,
     busy = busy,
     error = error,
+    ledger = ledger,
     onDismiss = { back() },
     onConfirm = { f ->
       val blocked = OrdersHub.preflight(context, store, order, to)
       if (blocked != null) { error = blocked; return@OrderActionSheet }
       busy = true
       error = null
+      if (ledger) {
+        val minor = OrderRefundModel.amountMinor(f.amount) ?: run { busy = false; return@OrderActionSheet }
+        scope.launch {
+          OrdersHub.refund(context, store, order, to, minor, f.note, refundKey, say = { toasts.show(it) })
+            .onSuccess {
+              Haptics.success(context)
+              toasts.show(StrOnline.refundRecorded(OnlineFmt.afn(minor), it.orderNo))
+              back()
+            }
+            .onFailure { e ->
+              error = e.userMessage
+              if (!e.retryable) refundKey = OrdersRepository.newKey()
+            }
+          busy = false
+        }
+        return@OrderActionSheet
+      }
       scope.launch {
         OrdersHub.transition(context, store, order, to, f.reason, f.note, OrderActionModel.readyOf(to, f), say = { toasts.show(it) })
           .onSuccess {

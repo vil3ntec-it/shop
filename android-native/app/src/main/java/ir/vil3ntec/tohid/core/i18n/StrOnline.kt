@@ -116,6 +116,15 @@ object StrOnline {
   fun minutes(m: Int): String = t("${asIs(m)} دقیقه", "$m min", "$m دقیقې")
   fun refundWarn(amount: String): String = t("پول به مشتری برمی‌گردد (${asIs(amount)}). مطمئنید؟", "Money goes back to the customer ($amount). Are you sure?", "پیسې پېرودونکي ته بېرته ورکول کېږي ($amount). ډاډه یاست؟")
   fun movesTo(status: String): String = t("سفارش به «${asIs(status)}» می‌رود.", "The order moves to “$status”.", "فرمایش «$status» ته ځي.")
+  // ── FIN-01: «ثبتِ بازپرداخت» با مبلغ (دفترِ بازپرداختِ روشن) ──
+  val refundAmount: String get() = t("مبلغِ بازپرداخت (افغانی، نقد)", "Refund amount (AFN, cash)", "د بېرته ورکړې اندازه (افغانۍ، نغدې)")
+  fun refundRemaining(amount: String): String = t("ماندهٔ قابلِ برگشت: ${asIs(amount)}", "Refundable left: $amount", "د بېرته ورکړې پاتې: $amount")
+  val refundReason: String get() = t("دلیلِ بازپرداخت", "Refund reason", "د بېرته ورکړې لامل")
+  val refundBadAmount: String get() = t("مبلغ را درست بنویسید (بیش از صفر، حداکثر دو رقمِ اعشار)", "Enter a valid amount (above zero, at most two decimals)", "اندازه سمه ولیکئ (له صفر پورته، تر دوو اعشاري رقمونو)")
+  fun refundMustEqual(amount: String): String = t("بازپرداختِ کامل همان مانده است: ${asIs(amount)}", "A full refund is exactly what is left: $amount", "بشپړه بېرته ورکړه همغه پاتې ده: $amount")
+  fun refundMustBeBelow(amount: String): String = t("بازپرداختِ بخشی باید کمتر از مانده (${asIs(amount)}) باشد", "A partial refund must be less than what is left ($amount)", "برخه‌یي بېرته ورکړه باید له پاتې ($amount) لږه وي")
+  val refundNeedsReason: String get() = t("دلیلِ بازپرداخت لازم است", "A refund reason is required", "د بېرته ورکړې لامل اړین دی")
+  fun refundRecorded(amount: String, n: Long): String = t("بازپرداختِ ${asIs(amount)} برای سفارش #${asIs(n)} ثبت شد", "Refund of $amount recorded for order #$n", "د $amount بېرته ورکړه د #$n فرمایش لپاره ثبت شوه")
 
   // ── سفارشِ دستی ────────────────────────────────────────────────────────────
   val fromWhere: String get() = t("از کجا", "Source", "له کومه")

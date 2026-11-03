@@ -225,7 +225,10 @@ test('امروز هیچ کانالی وصل نیست ⇒ no_channel با فهر�
   assert.equal(r.body.items.length, 1);
   assert.equal(r.body.items[0].status, 'no_channel');
   const text = JSON.stringify(r.body);
-  for (const bad of ['791234567', 'phone_key', 'زرمینه', 'کوچهٔ', '37035']) assert.ok(!text.includes(bad), `بی ${bad}`);
+  for (const bad of ['791234567', 'phone_key', 'زرمینه', 'کوچهٔ']) assert.ok(!text.includes(bad), `بی ${bad}`);
+  //  مبلغ (۳۷۰۳۵) به‌شکلِ عددِ جدا: زمانِ میلی‌ثانیه‌ایِ همین پاسخ هم «37035» دارد وقتی آزمون در بازهٔ
+  //  1793703500000–1793703599999 (۱۴۰۵/۰۸/۱۲، ساعتِ ۱۰:۵۸ UTC) بدود — سرخیِ PostgreSQL ِ #887؛ با مرزِ رقم همان نشت سنجیده می‌شود
+  assert.ok(!/(?<!\d)37035(?!\d)/.test(text), 'بی 37035');
 
   //  دکانِ دیگر همین سفارش را نمی‌بیند
   const b = await liveShop('دیگر');

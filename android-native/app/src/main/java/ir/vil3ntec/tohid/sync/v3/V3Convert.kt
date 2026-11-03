@@ -185,7 +185,10 @@ object V3Convert {
         val reason = if (given.isNotEmpty()) given.take(200) else DEFAULT_CANCEL_REASON
         set.remove("status")
         set.remove("cancelReason")
-        parts += "c" to mapOf("kind" to JsonPrimitive("cancel"), "reason" to JsonPrimitive(reason))
+        //  STF-02: برگهٔ تأییدِ لغو (`Sale.cancelApproval`) همراهِ خودِ op ِ لغو — همان `approval` که سرور می‌سنجد؛ فیلدِ سند نیست
+        val slip = set.remove("cancelApproval") as? JsonObject
+        parts += "c" to (mapOf("kind" to JsonPrimitive("cancel"), "reason" to JsonPrimitive(reason)) +
+          (if (slip != null) mapOf("approval" to slip) else emptyMap()))
       }
     }
     if (counterInc.isNotEmpty()) parts += "d" to mapOf("kind" to JsonPrimitive("delta"), "fields" to JsonObject(counterInc))

@@ -510,6 +510,11 @@ async function seedShop(a) {
   const rc = await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/receipts`,
     { id: 'inv-receipt-a1', lines: [{ lineId: 'l1', receivedMilli: 1000 }] }, { token: a.accessToken });
   assert.equal(rc.status, 201, JSON.stringify(rc.body));
+  //  PUR-14: فاکتورِ جدای تأمین‌کننده روی همان سفارش — شناسه را برنامه می‌سازد
+  ids.purchaseBill = 'inv-bill-a1';
+  const bl = await h.post(`/api/shop/purchase-orders/${ids.purchaseOrder}/bills`,
+    { id: ids.purchaseBill, billNo: 'F-100', lines: [{ lineId: 'l1', qtyMilli: 1000, totalMinor: 1000 }] }, { token: a.accessToken });
+  assert.equal(bl.status, 201, JSON.stringify(bl.body));
 
   //  شکایتِ بازارچه از «الف» + پاسخِ دکان — از لایهٔ اعتماد، همان راهِ مشتریِ ویترین
   const filed = await trust.file({ shop_id: a.shopId }, { phone: '+93791112244', ip: '' },
@@ -594,6 +599,7 @@ function concreteFor(ids) {
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
+    [/(\/bills\/):billId/, ids.purchaseBill],
     [/^(\/shop\/payments\/intents\/):id/, ids.paymentIntent],
   ];
   const QUERY = {
@@ -667,6 +673,8 @@ function bodyFor(r, ids) {
     'POST /shop/orders/evidence/:id/disputes/resolve': { outcome: 'settled', text: 'بسته شد', requestKey: fresh('dispute-res') },
     'POST /shop/orders/evidence/:id/disputes/assign': { assigneeId: 'u-x', dueAt: Date.now() + 3_600_000, requestKey: fresh('dispute-asg') },
     'POST /shop/purchase-orders/:id/receipts': { id: `rcpt-${fresh('r')}`, lines: [{ lineId: 'l1', receivedMilli: 1000 }] },
+    'POST /shop/purchase-orders/:id/bills': { id: `bill-${fresh('b')}`, billNo: `F-${fresh('n')}`, lines: [{ lineId: 'l1', qtyMilli: 1000, totalMinor: 1000 }] },
+    'POST /shop/purchase-orders/:id/bills/:billId/void': { reason: 'آزمون' },
   };
   return B[key] ?? (r.method === 'GET' || r.method === 'DELETE' ? null : {});
 }

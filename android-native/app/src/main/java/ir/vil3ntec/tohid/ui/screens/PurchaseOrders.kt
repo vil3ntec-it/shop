@@ -24,6 +24,7 @@ import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.core.text.TextNormalizer
+import ir.vil3ntec.tohid.data.PoBillDto
 import ir.vil3ntec.tohid.data.PoConfigDto
 import ir.vil3ntec.tohid.data.PoLineDto
 import ir.vil3ntec.tohid.data.PoPermsDto
@@ -77,6 +78,8 @@ private sealed interface PoMode {
   /** `base == null` ⇒ سفارشِ تازه */
   data class Edit(val base: PurchaseOrderDto?) : PoMode
   data class Receive(val order: PurchaseOrderDto) : PoMode
+  /** PUR-14: ثبتِ فاکتورِ جدای تأمین‌کننده */
+  data class Bill(val order: PurchaseOrderDto) : PoMode
   /** پیشنهادِ سفارش (INV-13/14، `PurchaseSuggestView.kt`) */
   data object Suggest : PoMode
 }
@@ -111,9 +114,10 @@ private fun PurchaseOrdersDialog(
             PoMode.Index -> PoList(repo, perms, onOpen = { mode = PoMode.Detail(it) }, onNew = { mode = PoMode.Edit(null) }, onSuggest = { mode = PoMode.Suggest })
             PoMode.Suggest -> PoSuggest(d, repo, perms, toast, onCreated = { mode = PoMode.Detail(it.id) })
             is PoMode.Detail -> PoDetail(store, d, host, perms, m.id, toast,
-              onEdit = { mode = PoMode.Edit(it) }, onReceive = { mode = PoMode.Receive(it) })
+              onEdit = { mode = PoMode.Edit(it) }, onReceive = { mode = PoMode.Receive(it) }, onBill = { mode = PoMode.Bill(it) })
             is PoMode.Edit -> PoEditor(d, repo, m.base, toast, onSaved = { mode = PoMode.Detail(it.id) })
             is PoMode.Receive -> PoReceive(store, d, host, perms, m.order, toast, onDone = { mode = PoMode.Detail(m.order.id) })
+            is PoMode.Bill -> PoBill(d, repo, m.order, toast, onDone = { mode = PoMode.Detail(m.order.id) })
           }
         }
       }
@@ -191,6 +195,7 @@ private fun PoDetail(
   toast: (String) -> Unit,
   onEdit: (PurchaseOrderDto) -> Unit,
   onReceive: (PurchaseOrderDto) -> Unit,
+  onBill: (PurchaseOrderDto) -> Unit,
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
@@ -199,6 +204,8 @@ private fun PoDetail(
   var error by remember(id) { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
   var cancelAsk by remember { mutableStateOf(false) }
+  //  PUR-14: فاکتورِ تأمین‌کننده‌ای که «باطل» برایش باز است
+  var voidAsk by remember { mutableStateOf<PoBillDto?>(null) }
   LaunchedEffect(id) {
     val r = repo.get(id)
     order = r.valueOrNull(); error = r.errorMessage()
@@ -309,7 +316,14 @@ private fun PoDetail(
       if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.CANCEL)) {
         OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text("لغو", color = c.danger) }
       }
+      //  PUR-14: فاکتورِ کاغذیِ خودِ تأمین‌کننده، جدا از رسید (پس از فرستادن؛ فقط مدیر)
+      if (PurchaseOrderBook.canBill(o, perms.manage)) {
+        OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text("فاکتورِ تأمین‌کننده") }
+      }
     }
+
+    //  PUR-14: فاکتورهای ثبت‌شدهٔ تأمین‌کننده — همان فهرستِ گوشیِ نسخهٔ ۳ (`PurchaseBills.kt`)
+    PoBillsList(o, perms.manage, busy) { voidAsk = it }
 
     //  رسیدها و ثبت در دفترِ همین دستگاه
     if (o.receipts.isNotEmpty()) {
@@ -339,15 +353,19 @@ private fun PoDetail(
           else TextButton(onClick = { postReceipt(r) }) { Text("ثبت در دفتر") }
         }
       }
-      //  PUR-14: سفارش ⇔ رسید ⇔ فاکتورِ دفتر
-      val m = remember(d, o) { PurchaseOrderBook.match(d, o) }
-      Spacer(Modifier.height(6.dp))
-      if (m.matched) Text("تطبیقِ سفارش، رسید و فاکتور: درست", style = MaterialTheme.typography.labelSmall, color = c.success)
-      else m.lines.filter { it.issues.isNotEmpty() }.forEach { ml ->
-        Text(
-          "${o.lines.find { it.id == ml.lineId }?.name ?: names[ml.productId] ?: ml.productId}: " + ml.issues.joinToString("، ") { issueText(it) },
-          style = MaterialTheme.typography.labelSmall, color = c.warning,
-        )
+      //  PUR-14: سفارش ⇔ رسید ⇔ فاکتورِ تأمین‌کننده (یا فاکتورِ دفتر وقتی تأمین‌کننده فاکتوری نداده)
+      PoMatchLines(d, o)
+    }
+  }
+
+  voidAsk?.let { b ->
+    PoBillVoidDialog(b, busy, onDismiss = { voidAsk = null }) { why ->
+      voidAsk = null
+      busy = true
+      scope.launch {
+        val r = repo.voidBill(o.id, b.id, why)
+        busy = false
+        r.valueOrNull()?.let { order = it.order; toast("فاکتور باطل شد") } ?: toast(r.errorMessage() ?: "نشد")
       }
     }
   }
@@ -379,14 +397,6 @@ private fun PoDetail(
   }
 }
 
-private fun issueText(i: PurchaseOrderCore.Issue): String = when (i) {
-  PurchaseOrderCore.Issue.RECEIVED_OVER_ORDER -> "بیش از سفارش رسیده"
-  PurchaseOrderCore.Issue.BILLED_OVER_RECEIVED -> "فاکتور بیش از رسید"
-  PurchaseOrderCore.Issue.BILLED_UNDER_RECEIVED -> "رسیده ولی فاکتورش در دفتر نیست"
-  PurchaseOrderCore.Issue.PRICE_OVER_ORDER -> "فی بالاتر از سفارش"
-  PurchaseOrderCore.Issue.PRICE_UNDER_ORDER -> "فی پایین‌تر از سفارش"
-  PurchaseOrderCore.Issue.NOT_ON_ORDER -> "بیرون از سفارش"
-}
 
 /* ══════════════════════════ ساختن و ویرایش ══════════════════════════ */
 

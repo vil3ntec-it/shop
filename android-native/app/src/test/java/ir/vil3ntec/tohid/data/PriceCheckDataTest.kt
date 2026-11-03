@@ -77,4 +77,38 @@ class PriceCheckDataTest {
     assertEquals("milk", PriceCheckData.pick(withCode, index, "چای", "milk"))
     assertTrue(PriceCheckData.matches(withCode, "").isEmpty())
   }
+
+  /** S17 — همان انبارِ برگهٔ ردیف (POS-16): ۲۰ در محلِ اصلی، ۱۰ در «انبارِ پشتی»، ۴ در «قفسهٔ ۲»، ۳ فروخته از اصلی */
+  private val placed = ShopData(
+    products = listOf(Product(id = "p1", name = "نوشابه", unit = "عدد", salePrice = 60.0), Product(id = "p2", name = "صابون", unit = "عدد", salePrice = 40.0)),
+    warehouseEntries = listOf(
+      WarehouseEntry(id = "w1", productId = "p1", units = 20.0),
+      WarehouseEntry(id = "w2", productId = "p1", units = 10.0, locationId = "انبارِ پشتی"),
+      WarehouseEntry(id = "w3", productId = "p1", units = 4.0, locationId = "قفسهٔ ۲"),
+      WarehouseEntry(id = "w4", productId = "p2", units = 8.0),
+    ),
+    sales = listOf(Sale(id = "s1", date = "2026-11-03")),
+    saleItems = listOf(SaleItem(id = "i1", saleId = "s1", productId = "p1", quantity = 3.0)),
+  )
+
+  @Test fun `S17 — با «محل‌های نگه‌داری» موجودیِ هر محل زیرِ موجودیِ کل، پیش از افزودن به سبد`() {
+    val p1 = placed.products.first { it.id == "p1" }
+    val v = PriceCheckData.of(placed, p1, "2026-11-03", places = true)
+    //  همان `PlaceStock.of` ِ برگهٔ ردیف؛ جمعِ محل‌ها همان موجودیِ کل
+    assertEquals(PlaceStock.of(placed, p1), v.places)
+    assertEquals(StockLedger.milli(v.stock), v.places.sumOf { it.milli })
+    val lines = PriceCheckData.lines(v, showCost = false)
+    val at = lines.indexOfFirst { it.label == ir.vil3ntec.tohid.core.i18n.StrPriceCheck.stock }
+    assertEquals(
+      v.places.map { ir.vil3ntec.tohid.core.i18n.StrPriceCheck.atPlace(it.label, ir.vil3ntec.tohid.qty(it.milli / 1000.0) + " عدد") },
+      lines.subList(at + 1, at + 1 + v.places.size).map { it.value },
+    )
+    assertTrue(lines.subList(at + 1, at + 1 + v.places.size).all { it.label.isEmpty() && it.tone == PriceCheckData.Tone.MUTED })
+    //  خاموش (پیش‌فرض) ⇒ همان کارتِ پیشین، سطر به سطر
+    val off = PriceCheckData.of(placed, p1, "2026-11-03")
+    assertTrue(off.places.isEmpty())
+    assertEquals(PriceCheckData.lines(off, false), PriceCheckData.lines(v.copy(places = emptyList()), false))
+    //  کالایی که جز محلِ اصلی جایی ندارد ⇒ هیچ سطرِ محل
+    assertTrue(PriceCheckData.of(placed, placed.products.first { it.id == "p2" }, "2026-11-03", places = true).places.isEmpty())
+  }
 }

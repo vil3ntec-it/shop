@@ -1017,6 +1017,8 @@ fun DeskSaleScreen(
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(
     d, ir.vil3ntec.tohid.todayIso(), remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }, onDismiss = { priceCheck = false; refocus() },
+    //  S17: موجودیِ هر محل با «محل‌های نگه‌داری» ِ همین دستگاه
+    places = remember { ir.vil3ntec.tohid.data.StockPlacesPref.places(context) },
   )
   if (showInvoice) lastInvoice?.let { (snap, id) ->
     snap.sales.find { it.id == id }?.let { sale ->
