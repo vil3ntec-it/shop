@@ -110,4 +110,19 @@ class CashKeysTest {
     assertFalse(CashKeys.emptyEnterOpensPay(5_000, cartEmpty = true))
     assertFalse(CashKeys.emptyEnterOpensPay(-1, cartEmpty = false))
   }
+
+  /** S11: اسکن (Enter ِ پسوند) و دو Enter ِ دیگرِ بارکدخوان ⇒ پنل نه؛ پس از مکث ⇒ پنل؛ هر Enter لحظهٔ تازه است */
+  @Test
+  fun emptyEnterGateCountsEveryScanAndEnter() {
+    var t = 10_000L
+    val g = EmptyEnterGate { t }
+    assertTrue(g.emptyEnter(cartEmpty = false), "نخستین Enter بی اسکنِ پیشین")
+    g.mark()                       //  اسکن با Enter ِ پسوند
+    t += 15; assertFalse(g.emptyEnter(cartEmpty = false))
+    t += 15; assertFalse(g.emptyEnter(cartEmpty = false))
+    t += 499; assertFalse(g.emptyEnter(cartEmpty = false), "۴۹۹ پس از Enter ِ پیشین، نه پس از اسکن")
+    t += 500; assertTrue(g.emptyEnter(cartEmpty = false))
+    t += 500; assertFalse(g.emptyEnter(cartEmpty = true), "سبدِ خالی هرگز")
+    g.mark(); t += 100; assertFalse(g.emptyEnter(cartEmpty = false), "اسکنِ بیرون از کادر هم شمرده می‌شود")
+  }
 }

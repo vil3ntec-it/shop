@@ -97,9 +97,10 @@ class ScenarioS11Test {
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/DeskSale.kt") }.firstOrNull { it.isFile }?.readText()
       ?: error("DeskSale.kt پیدا نشد")
     val submit = src.substringAfter("fun submit() {").substringBefore("PosSearch.resolve(")
-    assertTrue(submit.contains("lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()"))
-    assertTrue(submit.contains("if (payV2 && query.isBlank()) { if (CashKeys.emptyEnterOpensPay(since, cart.isEmpty())) payOpen = true; return }"))
-    assertTrue(src.substringAfter("fun fromScanner(code: String): Boolean {").substringBefore("val dd = latestD")
-      .contains("lastScanOrEnter = kotlin.time.TimeSource.Monotonic.markNow()"))
+    //  هر Enter لحظه را می‌نشاند؛ Enter ِ کادرِ خالی فقط با پنلِ پرداخت سنجیده می‌شود و پس از ثبتِ سریع و برچسبِ ترازو
+    assertTrue(submit.contains("val pay = if (payV2 && query.isBlank()) enterGate.emptyEnter(cart.isEmpty()) else { enterGate.mark(); false }"))
+    assertTrue(submit.indexOf("if (payV2 && query.isBlank()) { if (pay) payOpen = true; return }") > submit.indexOf("scaleLabel(query, d)"))
+    assertTrue(src.contains("val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() }"))
+    assertTrue(src.substringAfter("fun fromScanner(code: String): Boolean {").substringBefore("val dd = latestD").contains("enterGate.mark()"))
   }
 }

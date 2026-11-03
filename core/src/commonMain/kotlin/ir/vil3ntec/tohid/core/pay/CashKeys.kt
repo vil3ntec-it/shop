@@ -73,3 +73,29 @@ object CashKeys {
   fun emptyEnterOpensPay(sinceLastMs: Long?, cartEmpty: Boolean): Boolean =
     !cartEmpty && (sinceLastMs == null || sinceLastMs >= EMPTY_ENTER_MS)
 }
+
+/**
+ *  S11 (§۵.۲) — «آخرین اسکن یا Enter» ِ کادرِ جست‌وجوی صندوق برای [CashKeys.emptyEnterOpensPay]. هر Enter و هر اسکن (درون
+ *  یا بیرونِ کادر) لحظه را می‌نشاند؛ [now] ساعتِ یکنوا به میلی‌ثانیه (آزمون: ساعتِ ساختگی).
+ */
+class EmptyEnterGate(private val now: () -> Long = monotonicMs()) {
+  private var last: Long? = null
+
+  /** اسکن یا Enter ِ کادرِ پُر */
+  fun mark() { last = now() }
+
+  /** Enter در کادرِ خالی: پنلِ پرداخت باز شود؟ همین Enter هم لحظهٔ تازه است */
+  fun emptyEnter(cartEmpty: Boolean): Boolean {
+    val t = now()
+    val since = last?.let { t - it }
+    last = t
+    return CashKeys.emptyEnterOpensPay(since, cartEmpty)
+  }
+
+  private companion object {
+    fun monotonicMs(): () -> Long {
+      val origin = kotlin.time.TimeSource.Monotonic.markNow()
+      return { origin.elapsedNow().inWholeMilliseconds }
+    }
+  }
+}
