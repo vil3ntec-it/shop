@@ -1136,30 +1136,6 @@ private class FocusPilot {
 }
 
 /**
- *  جلوگیری از اسکنِ تکراری.
- *
- *  دوربین یک بارکد را در یک ثانیه ده‌ها بار می‌بیند. بدونِ این، یک بار
- *  گرفتنِ کالا جلوی دوربین ده‌ها عدد به سبد اضافه می‌کرد.
- *  پنجرهٔ زمانی همان ۱۲۰۰ میلی‌ثانیهٔ نسخهٔ وب است.
- */
-class ScanGate(private val windowMs: Long = 1200) {
-  private var lastCode: String? = null
-  private var lastAt = 0L
-
-  fun accept(code: String, now: Long = System.currentTimeMillis()): Boolean {
-    if (code == lastCode && now - lastAt < windowMs) return false
-    lastCode = code
-    lastAt = now
-    return true
-  }
-
-  fun reset() {
-    lastCode = null
-    lastAt = 0
-  }
-}
-
-/**
  *  بوقِ اسکن + لرزش — بازخوردی که فروشنده بدونِ نگاه‌کردن به صفحه می‌فهمد.
  *
  *  صدا همان بوقِ آشنای بارکدخوانِ دکان است (`res/raw/scan_beep.mp3`)، نه

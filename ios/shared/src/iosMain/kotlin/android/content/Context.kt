@@ -18,7 +18,7 @@ import platform.Foundation.NSUserDomainMask
  *  فقط آنچه فایل‌های رسیده به iOS لازم دارند. `filesDir` ⇐ `Application Support/tohid` ِ همین
  *  برنامه (پشتیبانِ iCloud ِ دستگاه هم می‌گیردش، مثلِ پشتیبانِ خودکارِ اندروید)؛ `cacheDir` ⇐ `Caches`.
  *  `startActivity` نشانی‌ها را باز می‌کند و `ACTION_SEND` را به برگهٔ اشتراکِ iOS می‌دهد (‎Intent.kt‎)؛
- *  سرویس‌های سیستم: اتصال، تخته‌برش و اعلان (UNUserNotificationCenter)؛ بقیه null.
+ *  سرویس‌های سیستم: اتصال، تخته‌برش، اعلان (UNUserNotificationCenter)، چاپ و موقعیت (CoreLocation)؛ بقیه null.
  */
 abstract class Context {
   open val applicationContext: Context get() = this
@@ -112,6 +112,7 @@ object IosContext : Context() {
     CLIPBOARD_SERVICE -> ClipboardManager.ios
     NOTIFICATION_SERVICE -> android.app.NotificationManager.ios
     PRINT_SERVICE -> android.print.PrintManager.ios
+    LOCATION_SERVICE -> android.location.LocationManager.ios
     else -> null
   }
 
