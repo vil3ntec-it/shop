@@ -74,7 +74,8 @@ await E.step('E2E-SEC-13.idswap', 'دکانِ دو با شناسه‌های دک
   assert.equal(cross.status, 404, `توکنِ پیگیریِ دکانِ یک روی ویترینِ دو: ${cross.status}`);
   const own = await E.get(`/api/store/e2e-sec-one/orders/${encodeURIComponent(trackToken)}`);
   assert.equal(own.status, 200);
-  const guess = await E.get(`/api/store/e2e-sec-one/orders/${encodeURIComponent(trackToken.slice(0, -2) + 'AA')}`);
+  //  همیشه جز توکنِ درست (پایانِ «AA» یک بار در ۴۰۹۶ خودِ توکن بود؛ همان `tampered` ِ test/helpers.js)
+  const guess = await E.get(`/api/store/e2e-sec-one/orders/${encodeURIComponent(trackToken.slice(0, -2) + (trackToken.endsWith('AA') ? 'BB' : 'AA'))}`);
   assert.equal(guess.status, 404, 'توکنِ حدسی سفارش را نشان داد');
 }, { needs: ['E2E-SEC-13.0'] });
 

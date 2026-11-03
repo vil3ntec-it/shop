@@ -199,8 +199,22 @@ function withoutEpochs(text, slugs = []) {
   return out;
 }
 
+/*
+ *  نسخهٔ دست‌خوردهٔ یک بلیت/توکن که **همیشه** با اصل فرق دارد: نویسه‌های آخر (به درازای `suffix`) هر کدام به
+ *  `suffix[i]` می‌شوند، و اگر اصل همان نویسه را داشت به نویسهٔ دیگری. «دو نویسهٔ آخر ⇒ xx» وقتی HMAC ِ base64url
+ *  خودش به xx ختم می‌شد (یک بار در ۶۴² = ۴۰۹۶) همان بلیتِ درست بود و سرور درست ۲۰۱ می‌داد: سرخیِ «زیرِ Electron»
+ *  روی 83dcd9f2 (run 41585590213، بلیتِ صادرشده در 06:03:43.249Z با HMAC ِ «…WWQxx»). نویسهٔ یکی‌مانده به آخر در
+ *  base64url همیشه شش بیتِ کامل است ⇒ بایت‌های رمزگشوده هم فرق می‌کنند.
+ */
+function tampered(token, suffix = 'xx') {
+  const s = String(token);
+  const tail = s.slice(-suffix.length);
+  const alt = [...suffix].map((c, i) => (c !== tail[i] ? c : c === 'A' ? 'B' : 'A')).join('');
+  return s.slice(0, -suffix.length) + alt;
+}
+
 module.exports = {
-  withoutEpochs,
+  withoutEpochs, tampered,
   start, stop, resetDatabase, api, get, post, put, patch, del, raw, download, newUser, signIn, query,
   base: () => base,
   //  سرورِ HTTPِ آزمون — برای سوار کردنِ سوکتِ زنده (‎index.js‎ در تولید همین کار را می‌کند)
