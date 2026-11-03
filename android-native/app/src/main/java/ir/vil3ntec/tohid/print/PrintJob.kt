@@ -112,8 +112,8 @@ object PrintJob {
     }
   }
 
-  /** RET-01 — QRِ رسید فقط وقتی «برگشت و تعویضِ تازه» روشن است؛ خاموش ⇒ همان رسیدِ امروز */
-  private fun receiptQr(context: Context, sale: Sale): String? =
+  /** RET-01 — QRِ رسید فقط وقتی «برگشت و تعویضِ تازه» روشن است؛ خاموش ⇒ همان رسیدِ امروز (`InvoiceFile` هم) */
+  internal fun receiptQr(context: Context, sale: Sale): String? =
     if (ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) && sale.status != "cancelled") {
       ir.vil3ntec.tohid.data.ReturnFlow.receiptCode(sale)
     } else null

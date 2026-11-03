@@ -183,6 +183,9 @@ fun RouteScope.InvoiceRoute() {
       pdf = if (receiptV2 && !Platform.DESKTOP) ({
         scope.launch { PrintJob.sharePdf(context, data, sale)?.let { toasts.show(it, V3Tone.WARNING) } }
       }) else null,
+      //  POS-32، کامپیوتر: برگهٔ اشتراک نیست ⇒ همان تصویر و PDF به فایل
+      saveImage = if (Platform.DESKTOP) ({ scope.launch { toasts.show(ir.vil3ntec.tohid.print.InvoiceFile.save(context, data, sale, pdf = false)) } }) else null,
+      savePdf = if (receiptV2 && Platform.DESKTOP) ({ scope.launch { toasts.show(ir.vil3ntec.tohid.print.InvoiceFile.save(context, data, sale, pdf = true)) } }) else null,
     ),
     paper = paper,
     payRows = payRows,

@@ -252,9 +252,11 @@ object PromoLive {
   /**
    *  تخفیفِ سبدِ صندوق؛ خاموش ⇒ null و جمع و ثبت همان سبدِ دست‌نخورده است.
    *  اگر قاعده‌ای بازهٔ زمانی دارد، هر نیم دقیقه دوباره سنجیده می‌شود (ساعتِ خوش).
+   *  @param debtorId PRM-11 — مشتریِ همین فاکتور: قاعدهٔ «فقط این گروه‌ها» با گروهِ او (`PromoEngine.groupOf`)؛
+   *  بی مشتری ⇒ همان سبدِ بی گروهِ پیشین
    */
   @Composable
-  fun rememberOutcome(d: ShopData, cart: List<SalesEngine.CartLine>): PromoEngine.Outcome? {
+  fun rememberOutcome(d: ShopData, cart: List<SalesEngine.CartLine>, debtorId: String? = null): PromoEngine.Outcome? {
     val context = LocalContext.current
     //  S1: حالِ حسابِ دیگر هرگز — حتی پیش از آن‌که `ensure` آن را دور بریزد
     val key = account(context)
@@ -269,8 +271,9 @@ object PromoLive {
     }
     val today = ir.vil3ntec.tohid.todayIso()
     val minute = minuteNow()
-    return remember(d, cart, s, codes, today, if (timed) minute else -1, tick) {
-      PromoEngine.evaluate(d, cart, s, codes, today, minute)
+    val group = remember(d, debtorId, s) { PromoEngine.groupOf(d, debtorId, s.rules) }
+    return remember(d, cart, s, codes, today, if (timed) minute else -1, tick, group) {
+      PromoEngine.evaluate(d, cart, s, codes, today, minute, group)
     }
   }
 

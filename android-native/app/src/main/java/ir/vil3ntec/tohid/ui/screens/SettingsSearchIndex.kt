@@ -174,7 +174,11 @@ object SettingsSearchIndex {
     L.SERVERS to kw("سرور دیگر شبکه دکان خانه نشانی", "server other network address home", "سرور شبکه پته"),
     L.OWNER_REPORT to kw("گزارش خودکار صاحب", "owner report", "د خاوند راپور"),
     L.TAX_QUARTER to kw("مالیات سه ماهه", "quarterly tax", "درې میاشتنۍ مالیه"),
-    L.CRM_REPORTS to kw("گزارش مشتری", "customer reports", "د پېرودونکو راپورونه"),
+    L.CRM_REPORTS to kw(
+      "گزارش مشتری ادغام تکراری صورت‌حساب گروه مشتری لیست قیمت سن بدهی",
+      "customer reports merge duplicates statement image customer group price list debt aging RFM",
+      "د پېرودونکو راپورونه یوځای کول تکراري صورتحساب ډله",
+    ),
     L.SIMPLE_ASK to kw("پرسش گزارش", "ask reports", "پوښتنه راپور"),
     L.REPORT_KEYS to kw("کلید دوره گزارش", "report period keys", "د دورې کیلي"),
     L.DOC_GAPS to kw("شماره جاافتاده سند", "document gaps", "ورک شوې شمېرې"),

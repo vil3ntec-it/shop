@@ -274,6 +274,11 @@ object StrSale {
   val print: String get() = t("چاپ", "Print", "چاپ")
   val send: String get() = t("فرستادن", "Send", "لېږل")
   val sharePdf: String get() = t("فرستادنِ PDF", "Send as PDF", "د PDF په توګه ولېږئ")
+  // POS-32، کامپیوتر: برگهٔ اشتراک نیست ⇒ ذخیرهٔ فایل برای فرستادن از واتس‌اپ/تلگرامِ وب
+  val saveImage: String get() = t("ذخیرهٔ تصویر", "Save image", "انځور خوندي کړئ")
+  val savePdf: String get() = t("ذخیرهٔ PDF", "Save PDF", "PDF خوندي کړئ")
+  val invoiceNotMade: String get() = t("فاکتور ساخته نشد", "The invoice couldn't be made", "بل جوړ نه شو")
+  fun savedTo(path: String): String = t("ذخیره شد: ${asIs(path)}", "Saved: $path", "خوندي شو: $path")
   val newSale: String get() = t("فروشِ تازه", "New sale", "نوی پلور")
 
   // پرداختِ ترکیبی

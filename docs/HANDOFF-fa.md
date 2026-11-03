@@ -53,6 +53,22 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps14-partial` (کمبودهای PARTIAL، دورِ ۱۴؛ روی main پس از مرجِ #886؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- رفعِ «بی‌راه» (اولویتِ بالا): کلیدِ «گزارش‌های مشتری» (`ShopPolicy.crmReports`، ردهٔ B، پیش‌فرض خاموش) روی گوشی ردیف نداشت
+  (`SettingsLayout.PHONE_HIDDEN`) ولی ادغامِ تکراری‌ها (CRM-10)، تصویرِ صورت‌حساب (CRM-05)، «گروه، لیستِ قیمت و رضایت»
+  (CRM-08/12) و سنِ بدهی/RFM ِ گوشی پشتِ آن بودند ⇒ روی گوشی هرگز روشن نمی‌شدند. حالا ردیف و خطِ ساده در «داده و پشتیبان» ِ
+  گوشی، توضیحِ همان سکو (`crmNotePhone`)، و جست‌وجوی «ادغام/تکراری/صورت‌حساب». نگهبانِ همیشگی: `V3ReachabilityTest` هر
+  بخشِ `PHONE_HIDDEN` را با خواننده‌اش (`GATES`) در صفحه‌های گوشیِ `ui/v3` می‌گردد؛ `SettingsPortTest.DESK_ONLY` دلیلِ هر
+  بخشِ فقط‌کامپیوتر را دارد. پویشِ بقیه: POS_SEARCH، POS_TOUCH، POS_MORE_KEYS، KEY_HELP، TILL_SWITCH، REPORT_KEYS، WEBCAM
+  عمداً فقط کامپیوترند (هیچ صفحهٔ گوشی پشتشان نیست؛ `TillUser.me` خاموش ⇒ نامِ حساب)؛ DESK_HIDDEN (دوربین، نوارِ پایین) هیچ
+  کلیدی ندارند.
+- انجام شد (همه PARTIAL ماندند، شاهدِ CI): **PRM-11** گروهِ مشتری در تخفیفِ خودکار (`PromoEngine.groupOf`، «برای کدام
+  مشتریان» در ویرایشگر)؛ **POS-32** «ذخیرهٔ تصویر/PDF» ِ فاکتور در کامپیوتر (`InvoiceFile.bytes/save`، `InvoiceSaveRow`)؛ **POS-26**
+  رسیدِ چاپیِ پیش‌پرداختِ سفارشِ ویژه (`SpecialOrders.depositTx` ⇐ `DebtReceiptDialog`)؛ **SEC-10** متنِ privacy.html
+  (`#customer-erasure`) گره‌خورده به `KEPT` با `privacy-erasure-text.test.js`. بی مهاجرت، بی مسیرِ تازه، بی پروندهٔ پمپ.
+- رد شد: PRM-18 («مانده» فقط آزمونِ صفحه است)، INV-04@32 (به O-06 وابسته)، SYN-12/S30 (با #421 هم‌پوشانی)، HW-09 ِ گوشی
+  (ترازوی بلوتوثی بی درگاهِ صندوق)، TEN-02/DLV-03 («مانده» ِ STATUS کهنه است: #515 و #537 مرج شده‌اند — برای ممیزیِ بعد).
+- نیمه‌کاره: CI و مرجِ همین PR. قدمِ بعدی: شاهدِ CI ِ همین ردیف‌ها؛ رابطِ وبِ SEC-10.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps11-partial` (کمبودهای PARTIAL، دورِ ۱۱؛ روی main پس از مرجِ #883؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد (همه PARTIAL ماندند، شاهدِ CI): **POS-03** «۳*نام» در صندوق و «فروشِ سریع» ِ گوشیِ نسخهٔ ۳ (`CatalogModel.query`، `CartModel.addCount`)؛
   **POS-15** «قیمت‌پرسی» در منوی «…» ِ صندوقِ گوشی (`sale/price-check`، همان `PosPriceCheckPrefs` ِ ردهٔ A که از `PHONE_HIDDEN` بیرون آمد؛
