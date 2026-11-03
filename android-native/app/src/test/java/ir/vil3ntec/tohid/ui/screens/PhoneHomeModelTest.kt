@@ -95,6 +95,44 @@ class PhoneHomeModelTest {
   }
 
   @Test
+  fun `باز — اسکرولی که روی کادر شروع نشد کادر را نمی‌بندد`() {
+    val shown = PullCard.touchDown(PullCard.forceShown(), atTop = true, onCard = false)
+    val (s, used) = PullCard.pushUp(shown, 200f, cfg)
+    assertEquals(0f, used)
+    assertTrue(PullCard.release(s, -5000f, cfg).shown)
+    //  صفحه بالا نبود (لمس روی کادر ولی پیمایش‌شده) ⇒ همان
+    assertEquals(0f, PullCard.pushUp(PullCard.touchDown(PullCard.forceShown(), atTop = false, onCard = true), 200f, cfg).second)
+  }
+
+  @Test
+  fun `باز — کشیدنِ کادر رو به بالا هم‌پای انگشت جمعش می‌کند و پس از آستانه پنهان می‌شود`() {
+    var s = PullCard.touchDown(PullCard.forceShown(), atTop = true, onCard = true)
+    val (a, used) = PullCard.pushUp(s, 60f, cfg)
+    assertEquals(60f, used, 0.01f)
+    assertEquals(cfg.open - 60f, PullCard.visible(a, cfg), 0.01f)
+    //  کوتاه و آرام ⇒ با فنر باز برمی‌گردد
+    assertTrue(PullCard.release(a, 0f, cfg).shown)
+    //  کوتاه ولی تند رو به بالا ⇒ پنهان
+    assertFalse(PullCard.release(a, -2000f, cfg).shown)
+    //  پس از آستانه ⇒ پنهان؛ هرگز بیش از بلندیِ کادر
+    s = PullCard.pushUp(a, 1000f, cfg).first
+    assertEquals(cfg.open, s.push, 0.01f)
+    assertEquals(0f, PullCard.visible(s, cfg), 0.01f)
+    assertFalse(PullCard.release(s, 0f, cfg).shown)
+  }
+
+  @Test
+  fun `باز — پایین آوردنِ انگشت پیش از رها کردن کادر را باز نگه می‌دارد`() {
+    val s = PullCard.pushUp(PullCard.touchDown(PullCard.forceShown(), atTop = true, onCard = true), 200f, cfg).first
+    val (back, used) = PullCard.pushDown(s, 500f)
+    assertEquals(200f, used, 0.01f)
+    assertEquals(0f, back.push)
+    assertTrue(PullCard.release(back, 0f, cfg).shown)
+    //  پنهان: پایین آوردن کاری با «جمع شدن» ندارد
+    assertEquals(0f, PullCard.pushDown(PullCard.State(), 50f).second)
+  }
+
+  @Test
   fun `عکسِ نیمه‌کشیده همان نیمه را نشان می‌دهد`() {
     val s = PullCard.forcePulled(0.5f, cfg)
     assertEquals(0.5f, PullCard.progress(s, cfg), 0.01f)

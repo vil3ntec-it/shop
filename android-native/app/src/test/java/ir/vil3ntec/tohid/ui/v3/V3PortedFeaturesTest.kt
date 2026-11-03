@@ -78,7 +78,9 @@ class V3PortedFeaturesTest {
   @Test
   fun `پروندهٔ مشتری — شمارهٔ دوم و برچسب در کشوی حساب، صافیِ برچسب در فهرست`() {
     val parts = src("ui/v3/money/DebtorLedgerParts.kt")
-    assertTrue(parts.contains("CustomerProfileForm.extraLine(account.debtor)"))
+    //  CRM-15: همان خط، با مجوزِ دیدنِ شماره (`customers.contact`؛ بی آن شمارهٔ دوم پوشیده)
+    assertTrue(parts.contains("CustomerProfileForm.extraLine(account.debtor, contacts)"))
+    assertTrue(parts.contains("val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()"))
     assertTrue(parts.contains("if (profile.isNotBlank()) Text(profile,"))
     val list = src("ui/v3/money/DebtorsListScreen.kt")
     assertTrue(list.contains("DebtorListModel.rows(d, term, sort, System.currentTimeMillis(), tag)"))

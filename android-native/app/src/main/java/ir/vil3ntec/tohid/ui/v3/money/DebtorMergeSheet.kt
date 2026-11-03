@@ -38,6 +38,7 @@ internal fun DebtorMergeSheet(
   onClose: () -> Unit,
 ) {
   val c = PhoneV3.colors
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری بی مجوز پوشیده
   V3Sheet(onDismiss = onClose, title = StrMoney.mergeTitle) {
     if (groups.isEmpty()) {
       V3EmptyState(Icons.Outlined.PeopleOutline, StrMoney.noDuplicates)
@@ -58,7 +59,7 @@ internal fun DebtorMergeSheet(
           val keep = m.id == g.keep.id
           V3ListRow(
             title = m.name,
-            subtitle = m.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.LocaleText.phoneDisplay(it) },
+            subtitle = m.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.ui.components.customerPhone(it, contacts) }, // CRM-15
             tile = false,
             value = if (keep) StrMoney.mergeKeep else if (blocked == null) StrMoney.mergeAction else null,
             valueColor = if (keep) c.inkMuted else c.accent,

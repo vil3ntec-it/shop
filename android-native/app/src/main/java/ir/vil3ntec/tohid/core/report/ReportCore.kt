@@ -346,6 +346,46 @@ object ReportCore {
     return SalesReport(f, t, costing.id, a.totals, d("product"), d("category"), d("user"), d("hour"), d("payment"), d("channel"))
   }
 
+  /**
+   *  RPT-13 — «ریز» ِ یک ردیفِ تفکیکِ فروش (Enter یا کلیک در «گزارش‌ها»): هر فاکتورِ بازه که سهمی در کلیدِ [key] از
+   *  تفکیکِ [dim] دارد، با **همان** سهمِ «فروش» (پس از تخفیفِ پخش‌شده با `allocate`) و مقداری که ستون‌های همان ردیف جمع
+   *  می‌زنند — جمعِ سهم‌ها = `Row.sales` و شمارشان = `Row.invoices`. برگشت‌ها جدا در ستونِ «برگشتی» ِ ردیف‌اند و این‌جا
+   *  نیستند. فقط‌خواندنی؛ به ترتیبِ زمان. همان کلیدهای `aggregate` (کالا، دسته، فروشنده، ساعت، روش، کانال).
+   */
+  data class InvoiceShare(val saleId: String, val date: String, val createdAt: Long, val qty: Long, val sales: Long)
+
+  fun invoicesOf(l: ReportLedger, from: String?, to: String?, dim: String, key: String, clock: ReportClock? = null): List<InvoiceShare> {
+    if (dim !in DIMS) return emptyList()
+    val f = from?.ifEmpty { null } ?: "0000-01-01"
+    val t = to?.ifEmpty { null } ?: "9999-12-31"
+    val out = ArrayList<InvoiceShare>()
+    for (s in l.sales) {
+      if (s.cancelled) continue
+      val d = posDate(s, clock)
+      if (!(d >= f && d <= t)) continue
+      val items = l.itemsBySale[s.id].orEmpty()
+      val pids = items.map { it.productId }.ifEmpty { listOf("") }
+      val qtys = items.map { it.qty }.ifEmpty { listOf(0L) }
+      val gross = items.map { it.total }.ifEmpty { listOf(s.total) }
+      val shares = allocate(gross.sum() - s.finalTotal, gross)
+      val hour = posHour(s, clock)
+      var qty = 0L; var sales = 0L; var hit = false
+      pids.forEachIndexed { i, pid ->
+        val k = when (dim) {
+          "product" -> pid
+          "category" -> l.products[pid]?.category ?: ""
+          "user" -> s.seller
+          "hour" -> hour
+          "payment" -> s.method
+          else -> s.channel
+        }
+        if (k == key) { hit = true; qty += qtys[i]; sales += gross[i] - shares[i] }
+      }
+      if (hit) out += InvoiceShare(s.id, d, s.createdAt, qty, sales)
+    }
+    return out.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.saleId }))
+  }
+
   /* ---------------- داشبوردِ امروز (RPT-01) ---------------- */
 
   private fun delta(a: Day, b: Day): Map<String, Delta> {

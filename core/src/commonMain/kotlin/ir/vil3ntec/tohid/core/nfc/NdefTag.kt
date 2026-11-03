@@ -30,8 +30,13 @@ class NdefType4Tag {
   }
 
   /** پاسخِ یک دستور. `uri`: نشانیِ پرداختِ فعال، یا `null` */
-  fun process(apdu: ByteArray, uri: String?): ByteArray {
-    val ndef = uri?.let { Ndef.file(it) }
+  fun process(apdu: ByteArray, uri: String?): ByteArray = processFile(apdu, uri?.let { Ndef.file(it) })
+
+  /**
+   *  پاسخِ یک دستور با پروندهٔ NDEF ِ آماده (NLEN + پیام؛ [Ndef.fileOf] یا [PayTag.file]) — پرداختِ صندوقِ نسخهٔ ۳ با
+   *  نشانی + متنِ مبلغ، کد و گیرنده. `null` ⇒ برچسب خاموش (6A 82).
+   */
+  fun processFile(apdu: ByteArray, ndef: ByteArray?): ByteArray {
     if (ndef == null) { reset(); return SW_FILE_NOT_FOUND.copyOf() }
     if (apdu.size < 4) return SW_WRONG_LENGTH.copyOf()
     if (apdu[0].toInt() != 0x00) return SW_CLA_NOT_SUPPORTED.copyOf()
@@ -137,8 +142,11 @@ class NdefType4Tag {
   }
 }
 
-/** پیامِ NDEF با یک رکوردِ URI (NFC Forum URI RTD) */
+/** پیامِ NDEF با یک رکوردِ URI (NFC Forum URI RTD)، و پیامِ چندرکوردی (URI + Text، [PayTag]) */
 object Ndef {
+
+  /** رکوردِ «شناخته‌شده» (TNF 1) پیش از چیدن در پیام: نوع (`U`، `T`) و بار */
+  class Record(val type: ByteArray, val payload: ByteArray)
 
   /** پیشوندهای کوتاه‌شدهٔ URI RTD — درازتر اول، تا `https://www.` پیش از `https://` بنشیند */
   private val PREFIXES = listOf(
@@ -149,20 +157,46 @@ object Ndef {
   )
 
   /** رکوردِ تکِ URI به‌عنوانِ پیامِ کامل (MB و ME روشن) */
-  fun uriMessage(uri: String): ByteArray {
+  fun uriMessage(uri: String): ByteArray = message(listOf(uriRecord(uri)))
+
+  /** رکوردِ URI با پیشوندِ کوتاه‌شده */
+  fun uriRecord(uri: String): Record {
     val (code, rest) = PREFIXES.firstOrNull { uri.startsWith(it.first) }?.let { it.second to uri.substring(it.first.length) }
       ?: (0x00 to uri)
-    val payload = byteArrayOf(code.toByte()) + rest.encodeToByteArray()
-    val type = byteArrayOf(0x55) // 'U'
-    return if (payload.size <= 255) {
-      byteArrayOf(0xD1.toByte(), type.size.toByte(), payload.size.toByte()) + type + payload
-    } else {
-      val n = payload.size
-      byteArrayOf(
-        0xC1.toByte(), type.size.toByte(),
-        (n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte(),
-      ) + type + payload
+    return Record(byteArrayOf(0x55), byteArrayOf(code.toByte()) + rest.encodeToByteArray()) // 'U'
+  }
+
+  /** رکوردِ متن (NFC Forum Text RTD): بایتِ وضعیت (UTF-8، طولِ زبان) + کدِ زبان + متن */
+  fun textRecord(text: String, lang: String = "fa"): Record {
+    val code = lang.encodeToByteArray()
+    require(code.size in 1..63) { "lang" }
+    return Record(byteArrayOf(0x54), byteArrayOf(code.size.toByte()) + code + text.encodeToByteArray()) // 'T'
+  }
+
+  /** چیدنِ رکوردها در یک پیام: MB روی نخستین، ME روی آخرین، SR برای بارِ ≤ ۲۵۵ بایت، TNF ِ «شناخته‌شده» */
+  fun message(records: List<Record>): ByteArray {
+    require(records.isNotEmpty()) { "empty" }
+    var out = ByteArray(0)
+    records.forEachIndexed { i, r ->
+      val short = r.payload.size <= 255
+      val flags = (if (i == 0) 0x80 else 0) or (if (i == records.lastIndex) 0x40 else 0) or (if (short) 0x10 else 0) or 0x01
+      val n = r.payload.size
+      val len = if (short) byteArrayOf(n.toByte()) else byteArrayOf((n ushr 24).toByte(), (n ushr 16).toByte(), (n ushr 8).toByte(), n.toByte())
+      out += byteArrayOf(flags.toByte(), r.type.size.toByte()) + len + r.type + r.payload
     }
+    return out
+  }
+
+  /** پروندهٔ NDEF از پیامِ آماده: NLEN (دو بایت) + پیام؛ بیش از [NdefType4Tag.MAX_NDEF_FILE] ⇐ `null` */
+  fun fileOf(msg: ByteArray): ByteArray? {
+    if (msg.isEmpty() || msg.size + 2 > NdefType4Tag.MAX_NDEF_FILE) return null
+    return byteArrayOf((msg.size shr 8).toByte(), (msg.size and 0xFF).toByte()) + msg
+  }
+
+  /** نشانیِ پذیرفتنی برای رکوردِ URI ِ برچسب: فقط `https://`/`http://`، بی فاصله و نویسهٔ کنترلی */
+  fun linkOk(uri: String): Boolean {
+    val u = uri.trim()
+    return u.isNotEmpty() && (u.startsWith("https://") || u.startsWith("http://")) && u.none { it.code < 0x21 || it.code == 0x7F }
   }
 
   /**
@@ -171,10 +205,7 @@ object Ndef {
    */
   fun file(uri: String): ByteArray? {
     val u = uri.trim()
-    if (u.isEmpty() || !(u.startsWith("https://") || u.startsWith("http://"))) return null
-    if (u.any { it.code < 0x21 || it.code == 0x7F }) return null
-    val msg = uriMessage(u)
-    if (msg.size + 2 > NdefType4Tag.MAX_NDEF_FILE) return null
-    return byteArrayOf((msg.size shr 8).toByte(), (msg.size and 0xFF).toByte()) + msg
+    if (!linkOk(u)) return null
+    return fileOf(uriMessage(u))
   }
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Person
+import androidx.compose.material.icons.outlined.QrCode2
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -89,7 +90,14 @@ data class CheckoutView(
   val giftLedger: ShopData? = null,
   /** PRM-13 — نوارِ امتیازِ مشتری (مانده، سطح، «مصرفِ امتیاز»)؛ قاعدهٔ خاموش یا بی مشتری ⇒ `null` */
   val points: (@Composable () -> Unit)? = null,
+  /** نسیه بی مشتریِ درست (`CreditDebtor`) ⇒ متنِ کنارِ «ثبت» ِ خاموش با «انتخابِ مشتری»؛ `null` ⇒ آزاد */
+  val creditBlock: String? = null,
+  /** PAY-21 — ردیفِ «پرداخت با حساب‌پی (NFC/QR)» (`TillHesab.tillNfc`)؛ `null` ⇒ پنهان */
+  val hesab: HesabEntry? = null,
 )
+
+/** ردیفِ حساب‌پیِ برگهٔ تسویه: عنوان، زیرنویس (حالت یا «باقی را می‌پردازد») و زدنی بودن */
+data class HesabEntry(val title: String, val subtitle: String, val enabled: Boolean)
 
 /** کارهای برگه — هر کدام یک تغییرِ فرم یا یک مسیر */
 class CheckoutActions(
@@ -101,6 +109,8 @@ class CheckoutActions(
   val removeCoupon: (String) -> Unit,
   val submit: () -> Unit,
   val close: () -> Unit,
+  /** PAY-21 — «پرداخت با حساب‌پی (NFC/QR)» ⇐ `sale/checkout/hesabpay` (یا ثبتِ دوبارهٔ پرداختِ تأییدشده) */
+  val hesabPay: () -> Unit = {},
 )
 
 /**
@@ -186,8 +196,22 @@ private fun FormBody(v: CheckoutView, pay: PayPanelState, a: CheckoutActions) {
         )
         Spacer(Modifier.height(12.dp))
       }
+      v.hesab?.let { h ->
+        V3Card(radius = 16.dp, padding = PaddingValues(0.dp)) {
+          V3ListRow(
+            title = h.title, subtitle = h.subtitle, icon = Icons.Outlined.QrCode2, hue = V3Hue.MINT,
+            onClick = if (h.enabled) a.hesabPay else null,
+          )
+        }
+        Spacer(Modifier.height(12.dp))
+      }
       SaleTotals(v.rows)
       Spacer(Modifier.height(12.dp))
+    }
+    //  ⛔ «ثبت» خاموش است: پیامِ روشن و میان‌برِ «انتخابِ مشتری» درست بالای دکمه (نه بالای برگه که دیده نمی‌شد)
+    v.creditBlock?.let {
+      V3Message(V3Tone.WARNING, it, Modifier.semantics { liveRegion = LiveRegionMode.Polite }, action = StrSale.pickCustomer, onAction = a.customer)
+      Spacer(Modifier.height(10.dp))
     }
     V3Button(
       if (v.busy) StrSale.posting else StrSale.recordSale,

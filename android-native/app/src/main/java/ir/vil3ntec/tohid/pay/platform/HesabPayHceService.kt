@@ -21,7 +21,7 @@ class HesabPayHceService : HostApduService() {
 
   override fun processCommandApdu(commandApdu: ByteArray?, extras: Bundle?): ByteArray {
     val apdu = commandApdu ?: return NdefType4Tag.SW_WRONG_LENGTH.copyOf()
-    return tag.process(apdu, HceSlot.url)
+    return tag.processFile(apdu, HceSlot.file())
   }
 
   override fun onDeactivated(reason: Int) {

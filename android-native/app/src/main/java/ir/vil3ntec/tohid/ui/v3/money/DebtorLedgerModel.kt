@@ -59,8 +59,9 @@ object DebtorLedgerModel {
    *  گرفتنی؛ صورت‌حساب و چاپ فقط وقتی تراکنشی هست. ویرایش و حذف همیشه.
    *  [image] (CRM-05، «گزارش‌های مشتری» روشن) ⇒ «تصویرِ صورت‌حساب» هم، کنارِ صورت‌حساب و چاپ.
    */
-  fun actions(phone: String, hasTransactions: Boolean, image: Boolean = false): List<Action> = buildList {
-    if (dialable(phone).isNotEmpty()) addAll(listOf(Action.CALL, Action.SMS, Action.WHATSAPP))
+  /** @param contacts CRM-15 — مجوزِ دیدنِ شمارهٔ مشتری (`customers.contact`)؛ بی آن تماس، پیامک و واتس‌اپ نیست */
+  fun actions(phone: String, hasTransactions: Boolean, image: Boolean = false, contacts: Boolean = true): List<Action> = buildList {
+    if (contacts && dialable(phone).isNotEmpty()) addAll(listOf(Action.CALL, Action.SMS, Action.WHATSAPP))
     add(Action.EDIT)
     if (hasTransactions) addAll(listOf(Action.STATEMENT_CSV, Action.PRINT))
     if (hasTransactions && image) add(Action.STATEMENT_IMAGE)
@@ -106,9 +107,9 @@ object DebtorLedgerModel {
   }
 
   /** خلاصهٔ کشوی بسته: شماره (اگر هست) و «۶ روز بدهکار» / «بدهی ندارد» */
-  fun summary(phone: String, since: Long?, now: Long = System.currentTimeMillis()): String {
+  fun summary(phone: String, since: Long?, now: Long = System.currentTimeMillis(), contacts: Boolean = true): String {
     val debt = if (since != null) StrMoney.inDebtShort(ir.vil3ntec.tohid.spanText(since, now)) else StrMoney.noDebt
-    val number = ir.vil3ntec.tohid.LocaleText.phoneDisplay(phone).trim()
+    val number = ir.vil3ntec.tohid.ui.components.customerPhone(phone, contacts).trim()
     return if (number.isEmpty()) debt else "\u2066$number\u2069 · $debt"
   }
 

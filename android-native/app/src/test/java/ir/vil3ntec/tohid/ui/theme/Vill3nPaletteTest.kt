@@ -37,17 +37,18 @@ class Vill3nPaletteTest {
     ShopTheme.entries.flatMap { t -> listOf("${t.id}-روز" to shopColors(t, false), "${t.id}-شب" to shopColors(t, true)) }
 
   /** نام ⇐ مقدارِ فایلِ صاحب‌کار برای «آسمان» (و مشتق‌های ثبت‌شدهٔ `gen_themes.py`) */
+  //  THEME-V3 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳): برند همان؛ خنثی‌ها از نو — روز تمیزتر، شب لایه‌های نزدیک‌به‌سیاه
   private val ownerLight = mapOf(
-    "background" to "#F5F8FF", "backgroundSubtle" to "#ECF0F8", "surface" to "#FFFFFF",
-    "surfaceElevated" to "#EEF3FF", "surfaceSelected" to "#E5ECFD",
-    "textPrimary" to "#0F172A", "textSecondary" to "#5B6A80", "textMuted" to "#7C8BA1",
-    "icon" to "#64748B", "iconActive" to "#2563EB",
-    "borderCard" to "#D5DEE9", "borderInput" to "#C8D2E0", "divider" to "#EDF1F7",
+    "background" to "#F4F7FC", "backgroundSubtle" to "#EAEFF7", "surface" to "#FFFFFF",
+    "surfaceElevated" to "#F0F4FC", "surfaceSelected" to "#E4EBFC",
+    "textPrimary" to "#0B1324", "textSecondary" to "#526075", "textMuted" to "#75839A",
+    "icon" to "#5E6C82", "iconActive" to "#2563EB",
+    "borderCard" to "#D4DCE8", "borderInput" to "#C2CDDC", "divider" to "#ECF0F6",
     "brandPrimary" to "#2563EB", "brandDeep" to "#1D4ED8", "link" to "#1D4ED8",
   )
   private val ownerDark = mapOf(
-    "background" to "#0B1020", "surface" to "#121A2E", "surfaceElevated" to "#1A2440",
-    "textPrimary" to "#E6ECFF", "textSecondary" to "#94A3B8", "textMuted" to "#8897AC",
+    "background" to "#07090E", "surface" to "#11151E", "surfaceElevated" to "#1B202C",
+    "textPrimary" to "#EEF1F8", "textSecondary" to "#A2ACBE", "textMuted" to "#8E99AC",
     "iconActive" to "#60A5FA", "brandPrimary" to "#60A5FA",
   )
 
@@ -66,11 +67,11 @@ class Vill3nPaletteTest {
    */
   private val deviations = mapOf(
     //  #64748B روی زمینه‌های رنگیِ تازه (#EEF3FF، زمینهٔ گزینهٔ فعال) زیرِ ۴٫۵:۱
-    "light:textSecondary" to ("#64748B" to "#5B6A80"),
+    "light:textSecondary" to ("#64748B" to "#526075"),
     //  #CBD5E1 روی سفید ۱٫۴۸:۱ — کفِ خطِ کادرِ ورودی ۱٫۵
-    "light:borderInput" to ("#CBD5E1" to "#C8D2E0"),
+    "light:borderInput" to ("#CBD5E1" to "#C2CDDC"),
     //  در شب `textMuted` متنِ عادی است و روی سطحِ ۲ باید ≥ ۴٫۵:۱ بماند
-    "dark:textMuted" to ("#7C8BA1" to "#8897AC"),
+    "dark:textMuted" to ("#7C8BA1" to "#8E99AC"),
   )
 
   @Test
@@ -112,7 +113,7 @@ class Vill3nPaletteTest {
     assertEquals(listOf("#DC2626", "#FFFFFF"), b(l.danger).take(2))
     assertEquals(listOf("#E2E8F0", "#94A3B8"), b(l.disabled).take(2))
     assertEquals(listOf("#60A5FA", "#0B1020"), b(d.primary).take(2))
-    assertEquals(listOf("#121A2E", "#60A5FA"), b(d.secondary).take(2))
+    assertEquals(listOf("#11151E", "#60A5FA"), b(d.secondary).take(2))
     assertEquals(listOf("#DC2626", "#FFFFFF"), b(d.danger).take(2))
     //  وضعیت‌ها ثابت‌اند و به تم بستگی ندارند (THEME-V2 «رنگ‌های معنایی»): «در انتظارِ تأیید» بنفش
     //  (همان بنفشِ «نیازِ بررسی»)، هشدار کهربایی

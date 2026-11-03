@@ -102,13 +102,18 @@ internal fun DayEndPhone(b: DayEndModel.Built) {
 
 /** RPT-04 / S48 — «ریزِ تراکنش‌ها» ی یک روش (کلیک یا Enter روی ردیفِ روش)؛ Esc یا «بستن» برمی‌گردد */
 @Composable
-internal fun DayEndDetailDialog(t: ReportTables.Table, onClose: () -> Unit) {
+internal fun DayEndDetailDialog(
+  t: ReportTables.Table,
+  /** RPT-13: ریزِ ردیفِ تفکیکِ فروش نوشتهٔ خودش را دارد */
+  note: String = "جمعِ این ریز همان «خالص دفتر» ِ همین روش است.",
+  onClose: () -> Unit,
+) {
   AlertDialog(
     onDismissRequest = onClose,
     title = { Text(t.title, fontWeight = FontWeight.Bold) },
     text = {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text("جمعِ این ریز همان «خالص دفتر» ِ همین روش است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Text(note, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         FreshTable(t, Modifier.fillMaxWidth().heightIn(max = 420.dp))
       }
     },

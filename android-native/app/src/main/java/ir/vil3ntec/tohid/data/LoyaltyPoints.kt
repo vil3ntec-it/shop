@@ -296,6 +296,87 @@ object LoyaltyPoints {
     return if (rows.isEmpty()) r else r.copy(data = d.copy(auditLog = d.auditLog + rows))
   }
 
+  // ── کسب روی پرداختِ بعدیِ نسیه ─────────────────────────────────────
+  /**
+   *  PRM-13 — «کسب = پولِ پرداخت‌شده»: سهمِ نسیهٔ فاکتور هنگامِ ثبت امتیاز نمی‌گیرد ([post] فقط `paidAmount`)؛ پرداختِ بعدیِ
+   *  همان مشتری (رسیدِ دستیِ «دریافت»، `kind` تهی — نه برگشت، لغو، اعتبار یا امانی) آن را می‌گیرد. روی دفترِ پس از رسید:
+   *
+   *   • همهٔ پرداخت‌های دستیِ مشتری (هر زمان) با FIFO ِ زمان روی بدهی‌هایش پخش می‌شوند: نسیهٔ بازِ هر فاکتور
+   *     (`debtGiven − debtSettled`؛ برگشت و لغو آن را کم کرده‌اند) و بردِ دستی (`give` با `kind` تهی) — پس پولی که بدهیِ
+   *     کهنه‌تر یا قرضِ دستی را بست امتیازِ فاکتورِ تازه‌تر نمی‌شود. فقط فاکتورهای پس از آغازِ امتیازِ دکان (نخستین
+   *     ردیفِ `loyalty_*`) امتیاز می‌گیرند.
+   *   • هدفِ هر فاکتور = `earn(قاعده، سطحِ همان فاکتور، پرداختِ هنگامِ ثبت + سهمِ پرداخت‌شدهٔ نسیه)` تا سقفِ خالصِ فاکتور پس از
+   *     برگشت؛ فقط **افزایش** تا هدف (کسبِ فاکتور منهای پس‌گرفته‌ها) ردیفِ [EARN] ِ تازه با شناسهٔ `<رسید>-lp-<فاکتور>` و
+   *     `refId` = همان فاکتور — پس برگشت و لغو ([afterReturn]، [afterCancel]) آن را هم به همان نسبت پس می‌گیرند.
+   *   • تجمعی و از خودِ دفتر: تلاشِ دوباره یا رسیدِ دیگری که پیش‌تر پردازش شده هرگز امتیازِ دوم نمی‌سازد (هدف همان است)،
+   *     و رسیدی که ردیفی با پیشوندِ خودش دارد دوباره دیده نمی‌شود.
+   *  خاموش ([cfg] `on = false`)، رسیدِ غیرِ دستی، بی مشتری یا بی نسیهٔ باز ⇒ **همان شیء** [after].
+   */
+  fun afterPayment(after: ShopData, txId: String, by: String?, cfg: LoyaltyRules.Config = LoyaltyRules.current()): ShopData {
+    if (!cfg.on || !cfg.rule.valid) return after
+    val tx = after.transactions.firstOrNull { it.id == txId && it.type == "receive" && it.kind == null } ?: return after
+    if (after.auditLog.any { it.id.startsWith("$txId-lp-") }) return after
+    val start = after.auditLog.filter { isRow(it) }.minOfOrNull { it.createdAt } ?: return after
+    val byId = after.debtors.associateBy { it.id }
+    val customer = CustomerCrm.resolve(byId, tx.debtorId)
+    fun mine(id: String?) = id != null && CustomerCrm.resolve(byId, id) == customer
+    //  بدهی‌ها به ترتیبِ زمان: (زمان، شناسه، مبلغِ باز، فاکتور یا null برای بردِ دستی)
+    class Debt(val at: Long, val id: String, val open: Long, val sale: Sale?)
+    val debts = (
+      after.sales.filter { s -> s.status != "cancelled" && mine(s.debtorId) }
+        .map { Debt(it.createdAt, it.id, PayFlow.minor(it.debtGiven - it.debtSettled).coerceAtLeast(0), it) } +
+        after.transactions.filter { it.type == "give" && it.kind == null && mine(it.debtorId) }
+          .map { Debt(it.createdAt, it.id, PayFlow.minor(it.amount).coerceAtLeast(0), null) }
+      ).filter { it.open > 0 }.sortedWith(compareBy({ it.at }, { it.id }))
+    if (debts.none { it.sale != null && it.at >= start }) return after
+    var pool = after.transactions.filter { it.type == "receive" && it.kind == null && mine(it.debtorId) }
+      .sumOf { PayFlow.minor(it.amount).coerceAtLeast(0) }
+    val ev = events(after)
+    val rows = ArrayList<AuditEntry>()
+    for (debt in debts) {
+      if (pool <= 0) break
+      val paidCredit = minOf(pool, debt.open)
+      pool -= paidCredit
+      val s = debt.sale ?: continue
+      if (s.createdAt < start) continue
+      val whole = PayFlow.minor(s.finalTotal)
+      val back = after.saleReturns.filter { it.saleId == s.id }.sumOf { PayFlow.minor(it.amount) }
+      val base = minOf(minOf(PayFlow.minor(s.paidAmount), whole).coerceAtLeast(0) + paidCredit, (whole - back).coerceAtLeast(0))
+      val tier = Loyalty.tier(cfg.rule, spendAfn(after, customer, s.createdAt, except = s.id))
+      val target = Loyalty.earn(cfg.rule, tier, base)
+      val have = Loyalty.total(ev, s.id, Loyalty.EARN) - Loyalty.total(ev, s.id, Loyalty.EARN_BACK)
+      val add = target - have
+      if (add > 0) rows += row(
+        "$txId-lp-${s.id}", Loyalty.EARN, customer, add, 0, s.id,
+        "کسبِ $add امتیاز روی پرداختِ نسیه (${tierName(tier.key)} ×${multText(tier.multiplierPct)}) — فاکتور #${label(s)}",
+        tx.date, tx.createdAt, by,
+      )
+    }
+    return if (rows.isEmpty()) after else after.copy(auditLog = after.auditLog + rows)
+  }
+
+  /**
+   *  PRM-13 — رسیدِ دستیِ [txId] حذف شد (`DebtorEngine.deleteTransaction`): امتیازی که همان رسید داد (`<رسید>-lp-<فاکتور>`)
+   *  پس گرفته می‌شود — هر ردیف یک [EARN_BACK] با شناسهٔ `<همان ردیف>-x` و همان فاکتور، تا ماندهٔ مشتری (هرگز منفی؛ با
+   *  انقضای قاعدهٔ در کار). دوباره ⇒ همان؛ رسیدِ بی ردیفِ امتیاز ⇒ همان شیء.
+   */
+  fun afterPaymentDeleted(after: ShopData, txId: String, today: String, now: Long): ShopData {
+    val granted = after.auditLog.filter { it.type == EARN && it.id.startsWith("$txId-lp-") }
+    if (granted.isEmpty()) return after
+    var d = after
+    for (g in granted) {
+      val id = g.id + "-x"
+      if (d.auditLog.any { it.id == id }) continue
+      val customer = CustomerCrm.resolve(d, g.payRef.orEmpty())
+      val back = minOf(g.points ?: 0L, roomOf(d, customer, now))
+      if (back <= 0) continue
+      d = d.copy(auditLog = d.auditLog + row(
+        id, Loyalty.EARN_BACK, customer, back, 0, g.refId.orEmpty(), "پس‌گرفتنِ $back امتیاز — حذفِ رسیدِ پرداختِ نسیه", today, now, null,
+      ))
+    }
+    return d
+  }
+
   // ── رسید و پروندهٔ مشتری ──────────────────────────────────────────
   data class OnSale(val earned: Long, val spent: Long, val spentMinor: Long)
 

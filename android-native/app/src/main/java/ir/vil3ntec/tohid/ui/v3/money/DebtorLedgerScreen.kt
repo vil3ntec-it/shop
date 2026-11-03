@@ -110,6 +110,7 @@ internal fun DebtorLedgerScreen(
     account.debtor.phone, account.transactions.isNotEmpty(),
     //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
     image = ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context),
+    contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts(), // CRM-15
   )
   val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 

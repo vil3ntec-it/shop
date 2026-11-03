@@ -54,6 +54,9 @@ object ShellTargets {
   fun notifications(tab: String? = null): String = ShellPaths.notifications(tab)
   fun search(q: String? = null): String = ShellPaths.search(q)
 
+  /** دکمهٔ «+» ِ کادرِ بالای خانه: اضافه یا برداشت در صندوق یا گاوصندوق (همان عملیاتِ امروز، `HeroMoney`) */
+  fun heroMoney(safe: Boolean): String = ShellPaths.heroMoney(safe)
+
   /** مسیرِ بی پرسش — برای مقایسه با مسیرِ ثبت‌شده */
   fun base(path: String): String = RoutePaths.normalize(path.substringBefore('?'))
 }

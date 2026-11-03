@@ -158,12 +158,17 @@
 - هر فروش/سفارش حداکثر یک قصدِ زنده (`ux_payment_intents_live_ref`)؛ `ref_id` عوض نمی‌شود؛ فروشِ پرداخت‌شده قصدِ تازه نمی‌گیرد (`already_paid`).
 - برنامه پس از `paid` فروش را با همان `refId` می‌بندد و ردیفِ `payment` ِ پاسخ (`method: hesabpay`، `verification: gateway`) را می‌افزاید.
 - ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط بیرون از `NODE_ENV=production`؛ در تولید نادیده و `/webhook/fake` ۴۰۱.
+- ⛔ **صندوقِ گوشیِ نسخهٔ ۳ (NFC/QR، `sale/checkout/hesabpay`)**: در فقط با `TillHesab.tillNfc` (گیرندهٔ معلوم + درگاهِ خودکار، یا «ساده» با پرچمِ `pay.hesabpay` ⇐ `flag` ِ `/config`). برچسبِ HCE ِ نوعِ ۴ فقط تا «در انتظار»: پیامِ NDEF = URI ِ پرداخت (قصدِ سرور، یا QR ِ دکان اگر `http(s)`) + Text ِ مبلغ، کدِ فاکتور و گیرنده (`core/nfc/PayTag`، `HceSlot.ndef`)؛ آیفون HCE ندارد ⇒ فقط QR. تأیید فقط از `core/gateway/HesabTill`: «خودکار» = قصدِ `paid` با همین `refId`، مبلغ و ارز، ردیفِ `gateway` و `payeeFp` = گیرندهٔ فعال و بی `needsReview` (همان `verdict` در `HesabPaySheet` ِ کامپیوتر)؛ «ساده» = فقط «پول رسید» ِ فروشنده. هر ناجوری ⇒ «بررسی»، هرگز خودکار. نمای قصد `payeeFp` و ردیفِ آماده `payee` دارد. منطقِ قصد مشترک: `pay/HesabPayIntentFlow`.
 - ویترین: `POST /api/store/:slug/orders/:token/pay` (توکنِ پیگیری = اجازه، کلیدِ یکتایی در فضای `sf:`، مبلغ از سفارش، نشانیِ بازگشت را سرور می‌سازد ⇒ بی redirect ِ باز)؛ صفحه «پرداخت‌شده» را فقط از `paymentStatus` ِ پیگیری می‌خواند.
 - تطبیق: `housekeeping` ِ `app.js` هر ۶ ساعت (۴۸ ساعتِ اخیر) و `POST /api/admin/payments/reconcile` (مدیرِ ارشد)؛ فهرست `GET /api/admin/payments/intents` (زبانهٔ «عملیات»)؛ `paid → refunded` فقط `POST /api/admin/payments/intents/:id/refund` (مدیرِ ارشد، پس از برگرداندنِ پول در خودِ حساب‌پی).
 - ⛔ ارائه‌دهندهٔ ساختگی (`PAYMENTS_PROVIDER=fake`) فقط با `NODE_ENV` ِ صریحِ `test`/`development` و `PAYMENTS_FAKE_SECRET` (رازِ پیش‌فرض در کد نیست)؛ هر محیطِ دیگر یا بی راز ⇒ نادیده و `/webhook/fake` ۴۰۱.
 - ⛔ `HESABPAY_BASE_URL` فقط `https` (کلید در سرآیند می‌رود)؛ تنها استثنا http ِ loopback برای سرورِ ساختگیِ آزمون، فقط در `test`/`development`.
 - درهای «حساب‌پیِ دکان» `/api/v1/shop/hesabpay/*` فقط صاحب (`owner_only`) و دستهٔ SUB-10: FREE؛ سقفِ IP پیش از احراز.
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
+- ⛔ PRM-13 — امتیازِ پرداختِ بعدیِ نسیه فقط از `LoyaltyPoints.afterPayment` (رسیدِ دستیِ `kind` تهی؛ `DebtEntry.change` و فرمِ رسیدِ
+  گوشی) و حذفِ رسید فقط با `afterPaymentDeleted` ِ `DebtorEngine.deleteTransaction`: هدفِ **تجمعیِ** هر فاکتور از خودِ دفتر (FIFO ِ همهٔ
+  رسیدهای دستی روی نسیهٔ باز و بردِ دستی، تا خالصِ پس از برگشت) و فقط افزایش — هرگز «امتیازِ همین رسید» به‌تنهایی؛ ردیف با `refId` ِ
+  فاکتور تا برگشت/لغو آن را هم پس بگیرند. سنجه: `LoyaltyCreditPaymentTest`.
 
 ### v3 · موجودی و کاتالوگ
 
@@ -208,6 +213,7 @@
 
 ### v3 · قرض‌داران
 
+- ⛔ **پولِ نسیه همیشه صاحب دارد** (صاحب‌کار ۱۴۰۵/۰۸/۱۳): هر سهمِ «به حساب» > ۰ (نسیهٔ کامل، پرداختِ ناقص، باقیِ پرداختِ ترکیبی) فقط به مشتریِ **انتخاب‌شده، موجود و فعال** (ادغام‌نشده، CRM-10). قاعده فقط `data/CreditDebtor` و روی خودِ `SalesEngine.record` (همهٔ صندوق‌ها، آیفون، فاکتورِ نگه‌داشته و تعویض)؛ صندوق‌ها همان را می‌خوانند و «ثبت» را خاموش می‌کنند با پیامِ کنارِ دکمه و «انتخابِ مشتری» (`CheckoutModel.creditBlock`، `DeskSale` ِ `deskCredit` ⇐ F9، `PayPanelDialog`). هر برگهٔ انتخابِ مشتری فقط از `CustomerCrm.active` (برگهٔ گوشی همه را نشان می‌داد). نقدِ کامل همان امروز. سرور ردیفِ نسیهٔ بی‌مشتریِ برنامهٔ کهنه را **رد نمی‌کند** (فروشِ واقعی) و دست نمی‌زند: سابقهٔ `sale.credit_no_debtor` پس از push ِ v1 و `/api/sync` (`lib/credit-debtor.js`، یک بار برای هر فاکتور) و بررسیِ `orphan.credit_no_debtor` (warn) در `verify-data`. سنجه: `CreditDebtorTest`، `CheckoutCreditGateTest`، `server/test/credit-debtor.test.js`.
 - منطقِ دفترِ قرض فقط `data/DebtBook.kt` و `license/debt-book.js` با `license/test-vectors/debt-book-v1.json`؛ Double فقط در مرز (#261).
 - تخصیصِ پرداخت: اول بردِ فاکتورِ نام‌برده، بعد قدیمی‌ترین بردِ باز، مازاد پیش‌پرداخت؛ فقط نمایش است و در دفتر چیزی جابه‌جا نمی‌کند (§۲۱.۱۱، #261).
 - `dueDate` و `creditLimit` اختیاری‌اند (`EncodeDefault.NEVER`) و برداشتنشان با `null`ِ صریح؛ migration ندارد (#261).
@@ -292,6 +298,10 @@
 
 ### v3 · کارمندان و مجوز
 
+- ⛔ CRM-15 — `customers.contact` (شماره و نشانیِ مشتری): فقط نمایشی و `full`؛ پیش‌فرض سه نقشِ قدیم، صندوق‌دار و حسابدار allow و
+  انباردار و جمع‌آور deny؛ در `SERVER_EDITABLE`. هر صفحه‌ای که شمارهٔ **مشتری** نشان می‌دهد فقط از `customerPhone(phone, rememberCanSeeContacts())`
+  (`ui/components/ContactPrivacy.kt` و مرزِ سکوی `ContactPrivacyAndroid.kt` ⇐ `core/text/ContactMask`) — نه `LocaleText.phoneDisplay` ِ مستقیم؛ بی مجوز تماس/پیامک/واتس‌اپ ِ
+  پرونده هم نیست (`DebtorLedgerModel.actions(contacts=)`). سنجه: `ContactPrivacyTest`، `ContactMaskTest`، `staff-perms.test.js` «CRM-15…».
 - `shift.report` (PAY-15، گزارشِ X و Z ِ صندوقِ شیفت): پیش‌فرض همه allow (همان امروز؛ شاگرد نمای کور)، `restrict`، بی تأیید و فقط نمایشی؛ در `SERVER_EDITABLE` مثلِ `reports.money` تا «کارمندان» نشانش دهد؛ برنامه با `ShopRole.allows(…, "shift.report")` دکمهٔ X، Zِ پس از بستن و «گزارش Z» را می‌بندد، نه خودِ بستن (`claude/part-PAY-3`).
 - ⛔ STF-06 (پرچمِ خاموشِ `shop.staff_scope`، `lib/staff-scope.js`، `core/staff/StaffScope.kt`): «مکان» = قفسه یا انبار ِ موجودیِ سرور (شعبه در داده نیست). کارِ عضوِ محدود باید همهٔ مکان‌هایی را که نام می‌برد در محدوده داشته باشد و دست‌کم یکی («خراب» و «در مسیر» مکان نیستند) ⇒ وگرنه ۴۰۳ `location_out_of_scope`؛ ارسال از مبدأ، دریافت و رد در مقصد. مالک هرگز محدود نیست؛ خالی یا همهٔ مکان‌ها = همه (ردیف پاک می‌شود)؛ محدوده در هر درخواست از نو خوانده می‌شود. پرچم خاموش ⇒ هیچ خواندنی از `shop_member_scopes` و پاسخ‌ها بایت‌به‌بایت همان (`staff-scope.test.js`).
 - مجوز با هستهٔ سه‌حالتهٔ `perm-core` (allow/deny/approve، سقفِ `maxPct`/`maxAmount`) و بردارِ `core/test-vectors/perm-v1.json` (#243).

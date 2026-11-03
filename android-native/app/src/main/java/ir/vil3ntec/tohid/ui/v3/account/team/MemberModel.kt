@@ -22,6 +22,7 @@ object MemberModel {
     "settings.write" -> StrAccount.permSettings
     "audit.view" -> StrAccount.permAudit
     "reports.money" -> StrAccount.permMoney
+    "customers.contact" -> StrAccount.permContacts
     else -> key
   }
 

@@ -58,6 +58,7 @@ fun CustomerPickerSheet(
   initialQuery: String = "",
 ) {
   val c = PhoneV3.colors
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری بی مجوز پوشیده
   var query by remember { mutableStateOf(initialQuery) }
   val rows = remember(d.debtors, d.transactions, query) { CustomerPickerModel.rows(d, query) }
   val stagger = rememberV3Stagger()
@@ -87,7 +88,7 @@ fun CustomerPickerSheet(
         V3ListRow(
           title = r.name,
           modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, r.id, i),
-          subtitle = r.phone.ifBlank { null },
+          subtitle = r.phone.ifBlank { null }?.let { ir.vil3ntec.tohid.ui.components.customerPhone(it, contacts) }, // CRM-15
           icon = Icons.Outlined.Person,
           hue = V3Hue.CORAL,
           value = CustomerPickerModel.label(r.balance),

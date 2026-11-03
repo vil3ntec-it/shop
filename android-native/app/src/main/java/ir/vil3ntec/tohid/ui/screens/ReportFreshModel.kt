@@ -83,6 +83,40 @@ object ReportFreshModel {
     }
   }
 
+  /* ---------------- RPT-13: ریزِ ردیفِ تفکیکِ فروش ---------------- */
+
+  const val DRILL_ID = "sales.drill"
+
+  /** ردیف‌های همان تفکیک، هم‌ترتیبِ جدولِ `sales.<dim>` و «سود و حاشیه» (`ReportTables.sales`) */
+  fun dimRows(s: ReportCore.SalesReport, dim: String): List<ReportCore.Row> = when (dim) {
+    "category" -> s.category
+    "user" -> s.user
+    "hour" -> s.hour
+    "payment" -> s.payment
+    "channel" -> s.channel
+    else -> s.product
+  }
+
+  /**
+   *  ردیفِ [index] از جدولِ تفکیکِ [dim] ⇒ جدولِ فاکتورهایش (روز، فاکتور، مقدار، سهمِ فروش) با جمعی برابرِ ستونِ
+   *  «فروش» ِ همان ردیف؛ ردیفِ بی‌جا ⇒ null. [label] همان نوشتهٔ خانهٔ اول، [doc] نامِ فاکتور (`DayEndModel.docLabel`).
+   */
+  fun drill(
+    l: ReportLedger, s: ReportCore.SalesReport, dim: String, index: Int, label: String, clock: ReportClock?, doc: (String) -> String,
+  ): ReportTables.Table? {
+    val row = dimRows(s, dim).getOrNull(index) ?: return null
+    val list = ReportCore.invoicesOf(l, s.from, s.to, dim, row.key, clock)
+    return ReportTables.Table(
+      DRILL_ID, "ریزِ «${label.ifBlank { "—" }}» — ${list.size} فاکتور",
+      listOf(
+        ReportTables.Column("date", "روز", "date"), ReportTables.Column("doc", "فاکتور", "text"),
+        ReportTables.Column("qty", "مقدار", "qty"), ReportTables.Column("sales", "فروش", "money"),
+      ),
+      list.map { listOf(JsonPrimitive(it.date), JsonPrimitive(doc(it.saleId)), JsonPrimitive(it.qty), JsonPrimitive(it.sales)) },
+      listOf(JsonPrimitive("جمع"), JsonPrimitive(""), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
+    )
+  }
+
   /** «12.3٪» — یک رقمِ اعشار، بی علامتِ مثبت */
   fun percent(bp: Long): String {
     val a = if (bp < 0) -bp else bp
