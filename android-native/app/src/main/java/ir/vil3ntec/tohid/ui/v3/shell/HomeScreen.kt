@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
@@ -77,6 +78,9 @@ private val BLOCK = 24.dp
 
 /** فاصلهٔ زیرِ کادرِ پنهانِ باز تا کادرِ اصلی */
 private val DRAWER_GAP = 12.dp
+
+/** جای دکمهٔ شناورِ «فروشِ تازه» زیرِ آخرین بلوک (تا رویش ننشیند) */
+private val FAB_ROOM = 72.dp
 
 /** نشانِ «راهنمای کشیدن دیگر لازم نیست» — فقط روی همین دستگاه */
 private const val PREFS = "tohid-shell"
@@ -163,6 +167,8 @@ private fun HomePage(
   val navBottom = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   val drawerPager = rememberPagerState(initialPage = shot.drawerPage.coerceIn(0, DrawerPages.COUNT - 1)) { DrawerPages.COUNT }
   val stagger = rememberV3Stagger()
+  val orders = rememberHomeOrders()
+  val saleFab = HomeTiles.saleFab(orders != null, ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value.ids)
 
   /* ---------- کادرِ پنهان: کششِ لاستیکی از بالای صفحه (HOME-V2 §۱) ---------- */
   //  بلندیِ کادرِ باز = همان کادرِ بزرگ (با درشتیِ نوشته) + فاصلهٔ زیرش
@@ -295,7 +301,7 @@ private fun HomePage(
       Spacer(Modifier.height(4.dp))
       HomeSalesCard(view.todaySales, trend, onStats, Modifier.v3Stagger(stagger, "sales", 1))
       Spacer(Modifier.height(BLOCK))
-      HomeShortcuts(onOpen, Modifier.v3Stagger(stagger, "shortcuts", 2))
+      HomeShortcuts(onOpen, Modifier.v3Stagger(stagger, "shortcuts", 2), orders)
       Spacer(Modifier.height(BLOCK))
       HomeToday(d, purchases = view.canSeeMoney, onOpen = onOpen, modifier = Modifier.v3Stagger(stagger, "today", 3))
       val pressing = HomeAlerts.pressing(view.alerts)
@@ -303,8 +309,10 @@ private fun HomePage(
         Spacer(Modifier.height(BLOCK))
         HomeUrgent(pressing, onOpen, Modifier.v3Stagger(stagger, "urgent", 4))
       }
-      Spacer(Modifier.height(bottomReserve + navBottom + BLOCK))
+      Spacer(Modifier.height(bottomReserve + navBottom + BLOCK + if (saleFab) FAB_ROOM else 0.dp))
     }
+    //  کاشیِ «فروشِ تازه» جایش را به سفارش‌ها داد و نوار هم راهِ صندوق ندارد ⇒ دکمهٔ شناورِ «فروشِ تازه»
+    if (saleFab) HomeSaleFab(onOpen, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = bottomReserve + navBottom + 12.dp))
   }
 }
 

@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 956,
+    "routes": 958,
     "byAuth": {
-      "none-detected": 183,
+      "none-detected": 184,
       "admin": 276,
       "inline": 2,
-      "user": 452,
+      "user": 453,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 669,
-      "empty": 285,
+      "empty": 287,
       "unresolved": 2
     }
   },
@@ -624,6 +624,7 @@
     {"method":"GET","path":"/api/shop/chat/conversations/:id","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/shop/chat/conversations/:id/block","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/chat/conversations/:id/block","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/chat/conversations/:id/history","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/chat/conversations/:id/media","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":["role"],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/chat/conversations/:id/media/:mediaId","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id","mediaId"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/chat/conversations/:id/messages","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":["after","limit","wait"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
@@ -890,6 +891,7 @@
     {"method":"GET","path":"/api/store/:slug/chat/conversations/:id","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/store/:slug/chat/conversations/:id/block","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/store/:slug/chat/conversations/:id/block","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/issue","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/media","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":["role"],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/store/:slug/chat/conversations/:id/media/:mediaId","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mediaId","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/chat/conversations/:id/messages","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":["after","limit","wait"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},

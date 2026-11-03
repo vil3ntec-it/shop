@@ -145,6 +145,8 @@ async function featuresOf(shopId, sf) {
     ...((await require('../lib/visual-search').storeFlagOn(shopId)) ? { visualSearch: true } : {}),
     //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
+    //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`
+    ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
   };
   //  S71: روش و مسئولِ هر تحویلی که این ویترین دارد (برگهٔ ثبت) با پرچمِ `shop.storefront.delivery_method`
   const dm = await require('../lib/order-delivery-method').storeMethods(sf);
@@ -326,6 +328,8 @@ router.get('/:slug/orders/:token', readLimit, store, async (req, res) => {
   //  S71/S72: روش و مسئولِ تحویل و «تغییرِ روش» — فقط با پرچمِ `shop.storefront.delivery_method` (خاموش ⇒ کلید نیست)
   const method = await require('../lib/order-delivery-method').customerView(req.store, orderId);
   if (method !== undefined) order.deliveryMethod = method;
+  //  گفت‌وگوی همین سفارش (یک رشته برای هر سفارش) — فقط با پرچمِ `shop.chat` (خاموش ⇒ کلید نیست)
+  if (await require('../lib/shop-chat').flagOf(req.store.shop_id)) order.chat = true;
   res.json({ order });
 });
 

@@ -62,6 +62,25 @@ data class ChatLast(
   val deleted: Boolean = false,
 )
 
+/**
+ *  چرخهٔ عمرِ رشته (`lib/shop-chat-life.js`، یک رشته برای هر سفارش): `state` = open | closed | reopened؛
+ *  `kind` = order | general؛ `reason` ِ بستن = completed | ended | idle. «بسته» یعنی هر دو طرف فقط می‌خوانند
+ *  (سرور ۴۰۹ `chat_closed` می‌دهد). `issueUntil` = پایانِ مهلتِ «مشکل دارم» ِ مشتری.
+ */
+@Serializable
+data class ChatLife(
+  val kind: String = "order",
+  val state: String = "open",
+  val reason: String = "",
+  val closedAt: Long? = null,
+  val issueUntil: Long? = null,
+  val reopenedAt: Long? = null,
+  val sessionAt: Long? = null,
+) {
+  val closed: Boolean get() = state == "closed"
+  val reopened: Boolean get() = state == "reopened"
+}
+
 @Serializable
 data class ChatConversation(
   val id: String,
@@ -80,6 +99,7 @@ data class ChatConversation(
   val customerBlockedShop: Boolean = false,
   val canSend: Boolean = true,
   val receipts: ChatReceipts = ChatReceipts(),
+  val life: ChatLife = ChatLife(),
   /** سنجاق‌های طرفِ دکان (CHAT-14، مهاجرتِ ۱۴۱) — همهٔ کارمندانِ همین دکان می‌بینند، مشتری نه */
   val pinned: List<ChatPin> = emptyList(),
 )

@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material3.Icon
@@ -35,6 +36,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrOrdersHub
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.screens.MotionSpec
@@ -96,6 +98,9 @@ fun OrderCard(
         Spacer(Modifier.width(8.dp))
       }
       Text(OnlineFmt.orderNo(o.orderNo), style = V3Type.headline, color = c.ink)
+      Spacer(Modifier.width(8.dp))
+      //  «سفارشِ آنلاین» — جدا از فروشِ صندوق، روی هر کارتِ صف (خواستِ صاحب‌کار)
+      DraftTag(StrOrdersHub.onlineBadge, Icons.Outlined.Language, tone = V3Tone.INFO)
       Spacer(Modifier.weight(1f))
       OrderStatusPill(o.status)
     }
@@ -107,6 +112,8 @@ fun OrderCard(
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
+    Spacer(Modifier.height(4.dp))
+    Text(OrdersHubModel.items(o), style = V3Type.callout, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
     Spacer(Modifier.height(10.dp))
     OrderTags(o, now)
     Spacer(Modifier.height(12.dp))
@@ -134,8 +141,9 @@ fun OrderCard(
 @Composable
 fun OrderTags(o: OrderDto, now: Long) {
   FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-    if (o.fulfillment == "delivery") DraftTag(StrOnline.delivery, Icons.Outlined.TwoWheeler)
-    else DraftTag(StrOnline.pickup, Icons.Outlined.Storefront)
+    //  روشِ تحویل به زبانِ صاحب‌کار: «با پیک» یا «خودش می‌آید»
+    if (OrdersHubModel.courier(o)) DraftTag(OrdersHubModel.method(o), Icons.Outlined.TwoWheeler)
+    else DraftTag(OrdersHubModel.method(o), Icons.Outlined.Storefront)
     o.scheduledFor?.let { DraftTag(StrOnline.forTime(OrdersModel.scheduleLabel(it, now)), Icons.Outlined.Schedule) }
     DraftTag(StrOnline.items(o.itemsCount), Icons.Outlined.ShoppingBag)
     DraftTag(OnlineFmt.pay(o.paymentStatus, o.paymentMethod), Icons.Outlined.Payments)

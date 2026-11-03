@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.chat.ChatConversation
 import ir.vil3ntec.tohid.core.chat.ChatCustomer
 import ir.vil3ntec.tohid.core.chat.ChatLast
+import ir.vil3ntec.tohid.core.chat.ChatLife
 import ir.vil3ntec.tohid.core.chat.ChatMediaRef
 import ir.vil3ntec.tohid.core.chat.ChatMessage
 import ir.vil3ntec.tohid.core.chat.ChatMeta
@@ -134,6 +135,9 @@ object OnlineShots : GroupShots {
     Shot("chat-thread", content = { Thread(offline = false, canReply = true) }),
     Shot("chat-thread-offline", content = { Thread(offline = true, canReply = true) }),
     Shot("chat-thread-readonly", content = { Thread(offline = false, canReply = false) }),
+    //  یک رشته برای هر سفارش: «بسته شد» (مهلتِ «مشکل دارم» باز) با رشته‌های پیشینِ همین مشتری، و «مشکل دارم» زده‌شده
+    Shot("chat-thread-closed", content = { Thread(offline = false, canReply = true, life = ChatLife(state = "closed", reason = "completed", issueUntil = OnlineDemo.now + 5 * 86_400_000L)) }),
+    Shot("chat-thread-reopened", content = { Thread(offline = false, canReply = true, life = ChatLife(state = "reopened", reopenedAt = OnlineDemo.now)) }),
     //  میزِ تحویل
     Shot("delivery-assign", content = { Desk(DeliveryModel.ASSIGN) }),
     Shot("delivery-couriers", content = { Desk(DeliveryModel.COURIERS) }),
@@ -239,10 +243,15 @@ private fun Inbox(offline: Boolean) {
 }
 
 @Composable
-private fun Thread(offline: Boolean, canReply: Boolean) {
-  val conv = OnlineDemo.conversations[0]
+private fun Thread(offline: Boolean, canReply: Boolean, life: ChatLife? = null) {
+  val conv = OnlineDemo.conversations[0].let { c -> if (life == null) c else c.copy(life = life, canSend = !life.closed) }
+  val earlier = if (life == null) emptyList() else listOf(
+    ChatConversation(id = "old-1", orderNo = 1038, life = ChatLife(state = "closed", reason = "completed"), lastMessage = ChatLast(preview = "ممنون، رسید")),
+    ChatConversation(id = "old-g", life = ChatLife(kind = "general", state = "closed", reason = "idle"), lastMessage = ChatLast(preview = "آردِ ۲۵ کیلویی دارید؟")),
+  )
   ChatThreadScreen(
     ThreadView(
+      earlier = earlier,
       conversation = conv,
       server = OnlineDemo.messages,
       local = if (canReply) listOf(OutboxItem("q1", conv.id, body = "فردا صبح هم می‌آورید؟", state = if (offline) ChatQueue.WAITING else ChatQueue.SENDING, createdAt = OnlineDemo.now)) else emptyList(),

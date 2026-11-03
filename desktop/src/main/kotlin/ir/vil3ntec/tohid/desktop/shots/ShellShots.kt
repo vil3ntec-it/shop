@@ -18,6 +18,9 @@ import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.EventsRepository
+import ir.vil3ntec.tohid.ui.components.common.NavCatalog
+import ir.vil3ntec.tohid.ui.components.common.NavLayout
+import ir.vil3ntec.tohid.ui.components.common.NavLayouts
 import ir.vil3ntec.tohid.ui.components.common.PhoneNav
 import ir.vil3ntec.tohid.ui.screens.HomeAlerts
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -62,6 +65,17 @@ private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0
     val withY = androidx.compose.runtime.remember(d) { withYesterday(d, ratio) }
     HomeScreen(withY, {}, PhoneNav.RESERVE, shot)
   }
+}
+
+/** بخشِ سفارشِ روشن با شمارش‌های نمایشی (کاشیِ «سفارش‌های آنلاین» ِ خانه) */
+private fun ordersOn(counts: Map<String, Int>) {
+  ir.vil3ntec.tohid.ui.OrdersLive.config.value = ir.vil3ntec.tohid.core.model.OrdersConfigDto(flag = true, entitled = true, enabled = true)
+  ir.vil3ntec.tohid.ui.OrdersLive.counts.value = counts
+}
+
+private fun ordersOff() {
+  ir.vil3ntec.tohid.ui.OrdersLive.config.value = null
+  ir.vil3ntec.tohid.ui.OrdersLive.counts.value = emptyMap()
 }
 
 /** خبرهای نمایشیِ دکان (بی دادهٔ واقعی) */
@@ -125,6 +139,18 @@ object ShellShots : GroupShots {
       prepare = { ir.vil3ntec.tohid.LocaleChoice.setDigits(ir.vil3ntec.tohid.desktop.DesktopContext, ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_FA) },
       cleanup = { ir.vil3ntec.tohid.LocaleChoice.setDigits(ir.vil3ntec.tohid.desktop.DesktopContext, ir.vil3ntec.tohid.core.text.LocaleFormat.DIGITS_LATN) },
       content = { s -> Home(s, HomeShot(reveal = 1f)) },
+    ),
+    //  «سفارش‌های آنلاین» جای «فروشِ تازه»: با سفارشِ تازه (نقطهٔ تپنده)، فقط در-کارها، و نوارِ بی «فروش» (دکمهٔ شناور)
+    Shot("home-orders-new", prepare = { ordersOn(mapOf("new" to 3, "preparing" to 2, "ready" to 1)) }, cleanup = ::ordersOff, content = { s -> Home(s) }),
+    Shot("home-orders-busy", prepare = { ordersOn(mapOf("preparing" to 2, "on_the_way" to 1)) }, cleanup = ::ordersOff, content = { s -> Home(s) }),
+    Shot(
+      "home-orders-sale-fab",
+      prepare = {
+        ordersOn(mapOf("new" to 12))
+        PhoneNav.layout.value = NavLayout(NavCatalog.SEARCH, listOf(NavCatalog.HOME, NavCatalog.PRODUCTS, NavCatalog.HISTORY, NavCatalog.MORE), NavCatalog.ACCOUNT)
+      },
+      cleanup = { ordersOff(); PhoneNav.layout.value = NavLayouts.DEFAULT },
+      content = { s -> Home(s) },
     ),
     Shot("home-6-alerts", content = { s -> Home(s, HomeShot(alerts = SIX)) }),
     Shot("home-0-alerts", content = { s -> Home(s, HomeShot(alerts = emptyList())) }),

@@ -25,4 +25,6 @@ object HomeAccents {
   val RECEIVE = HomeAccent.MINT
   val STOCK_ENTRY = HomeAccent.AMBER
   val HISTORY = HomeAccent.VIOLET
+  /** «سفارش‌های آنلاین»: مرجانی — جدا از چهار رنگِ میان‌برهای دیگر */
+  val ORDERS = HomeAccent.CORAL
 }
