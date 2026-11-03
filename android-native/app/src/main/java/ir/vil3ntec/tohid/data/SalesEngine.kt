@@ -501,7 +501,7 @@ object SalesEngine {
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
       roundingMinor = roundingMinor.takeIf { it != 0L },
-      receiptToken = receiptToken,
+      receiptToken = receiptToken, shiftId = TillDrawer.stamp(d), // PAY-17: مهرِ کشوی نام‌دارِ همین دستگاه (خاموش ⇒ null)
       note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(checkout.note),
     )
 
@@ -837,7 +837,7 @@ object SalesEngine {
     newId: () -> String,
     /** RPT-09: ثبت‌کنندهٔ مرجوعی روی هر ردیف (`FraudTrailPref.by`)؛ `null` ⇒ نوشته نمی‌شود، همان پیشین */
     by: String? = null,
-  ): Result = LoyaltyPoints.afterReturn(d, recordReturnPlain(d, saleId, quantities, reason, today, now, newId, by), saleId, today, now, by) // PRM-13
+  ): Result = TillDrawer.stamped(d, LoyaltyPoints.afterReturn(d, recordReturnPlain(d, saleId, quantities, reason, today, now, newId, by), saleId, today, now, by)) // PRM-13؛ PAY-17 مهرِ کشو
 
   private fun recordReturnPlain(
     d: ShopData, saleId: String, quantities: Map<String, Double>, reason: String, today: String, now: Long, newId: () -> String, by: String?,

@@ -379,7 +379,13 @@ object PayFlow {
 
   fun ledgerEvents(d: ShopData, open: AuditEntry, to: Long): List<ShiftEventInput> {
     val from = open.createdAt
-    fun inWindow(at: Long) = at in from..to
+    //  PAY-17 (`core/pay/Drawers`، همان قاعدهٔ `CashShift.totals`): کشوی اصلی ⇒ ردیف‌های بی مهرِ پنجره (بی «چند کشو» همهٔ
+    //  ردیف‌ها، همان امروز)؛ کشوی نام‌دار ⇒ فقط فروش/رسید/برگشتِ مهرِ خودش و ورود/خروجِ صریحش؛ بقیه مالِ کشوی اصلی
+    val drawers = TillDrawer.named(d)
+    val own = open.id.takeIf { open.drawer != null }
+    fun counts(stamp: String?, at: Long): Boolean =
+      ir.vil3ntec.tohid.core.pay.Drawers.counts(stamp, at, open.id, isNamed = own != null, named = drawers, from = from, to = to)
+    fun inWindow(at: Long) = own == null && at in from..to
     val ev = ArrayList<Pair<Int, ShiftEventInput>>()
     //  فاکتورِ اینترنتیِ سرور (W، #321) و مرجوعیِ سرورِ آن پولِ دخل نیستند — همان قاعدهٔ `CashShift`
     val online = d.sales.filter(CashShift::isOnline).mapTo(HashSet()) { it.id }
@@ -387,17 +393,17 @@ object PayFlow {
     //  PAY-07: فقط پولِ رسیده — ردیفِ «در انتظار»/«ناموفق»/«لغو»/«نیازمند بررسی» (تا `to`) بیرون (`PayStatusFlow`)
     val statuses = PayStatusFlow.bySale(d)
     d.sales.forEach { s ->
-      if (s.status == "cancelled" || s.id in online || !inWindow(s.createdAt)) return@forEach
+      if (s.status == "cancelled" || s.id in online || !counts(s.shiftId, s.createdAt)) return@forEach
       val rows = PayStatusFlow.received(saleRows(s, fixes[s.id].orEmpty(), to), PayStatusFlow.unreceived(s, statuses[s.id].orEmpty(), to))
       if (rows.isNotEmpty()) ev += 0 to ShiftEventInput(id = "sale:${s.id}", type = "sale", at = s.createdAt, rows = rows)
     }
     d.transactions.forEach { t ->
       //  رسیدِ ساختهٔ لغو (فقط بستنِ بدهی) پولِ دخل نیست — همان `CashShift.isCashReceipt`
-      if (t.type != "receive" || !CashShift.isCashReceipt(t) || !inWindow(t.createdAt) || minor(t.amount) <= 0) return@forEach
+      if (t.type != "receive" || !CashShift.isCashReceipt(t) || !counts(t.shiftId, t.createdAt) || minor(t.amount) <= 0) return@forEach
       ev += 0 to ShiftEventInput(id = "rcv:${t.id}", type = "receipt", at = t.createdAt, method = CASH, amount = minor(t.amount))
     }
     //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه نقد به دخل می‌آورند — همان `CashShift.totals`
-    GiftCards.cashRows(d, from, to).forEach { a ->
+    if (own == null) GiftCards.cashRows(d, from, to).forEach { a ->
       ev += 0 to ShiftEventInput(id = "gci:${a.id}", type = "receipt", at = a.createdAt, method = CASH, amount = minor(a.amount))
     }
     d.auditLog.forEach { a ->
@@ -413,7 +419,7 @@ object PayFlow {
       )
     }
     d.saleReturns.forEach { r ->
-      if (!inWindow(r.createdAt) || minor(r.amount) <= 0 || CashShift.isOnlineReturn(r, online)) return@forEach
+      if (!counts(r.shiftId, r.createdAt) || minor(r.amount) <= 0 || CashShift.isOnlineReturn(r, online)) return@forEach
       //  نقدِ دخل همان `CashShift` است ([ReturnFlow.drawerAmount]؛ سهمِ حساب و اعتبار را رسیدِ
       //  `customer_return` خنثی می‌کند). بازپرداخت به کیف پول/کارت/حواله (`toMethods`) ردیفِ همان
       //  روش است؛ روشی که جدولِ شیفت ندارد پولِ دخل نیست و ردیف نمی‌گیرد، تا کلِ رویداد رد نشود.
@@ -437,7 +443,9 @@ object PayFlow {
     d.expenses.forEach { out("exp:${it.id}", it.createdAt, it.amount, "petty_expense", null) }
     d.supplierPayments.forEach { out("sup:${it.id}", it.createdAt, it.amount, "other", "پرداخت به تأمین‌کننده") }
     d.purchases.forEach { out("pur:${it.id}", it.createdAt, it.paidAmount, "other", "پیش‌پرداختِ خرید") }
-    return ev.sortedWith(compareBy<Pair<Int, ShiftEventInput>>({ it.first }, { it.second.at }, { it.second.id })).map { it.second }
+    val sorted = ev.sortedWith(compareBy<Pair<Int, ShiftEventInput>>({ it.first }, { it.second.at }, { it.second.id })).map { it.second }
+    //  PAY-17: کشوی نام‌دار با مهر شمرده می‌شود، نه با ساعت — ردیفِ دستگاهِ دیگری با ساعتِ عقب‌تر (شناور) پیش از بازشدن نمی‌افتد
+    return if (own == null) sorted else sorted.map { if (it.at < from) it.copy(at = from) else it }
   }
 
   data class Skipped(val id: String, val type: String, val code: String, val amount: Long)

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.analytics
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.foundation.layout.Box
 import androidx.compose.material.icons.outlined.AutoAwesome
+import ir.vil3ntec.tohid.core.i18n.StrBranches
 import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrShrink
@@ -30,6 +31,7 @@ import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.ShoppingCart
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -110,7 +112,10 @@ fun ReportsScreen(
   }
   //  RPT-14: «گزارشِ فروشِ اینترنتی» در «…» فقط با پرچمِ روشنِ سرور (هر دو نما)
   val online = rememberOnlineReportVisible()
-  val onlineItem = if (online) listOf(V3MenuItem(Icons.Outlined.ShoppingCart, StrOnlineReport.title) { onOpen(AnalyticsPaths.ONLINE_REPORT) }) else emptyList()
+  //  RPT-18: «گزارشِ همهٔ شعبه‌ها» فقط با پرچمِ روشنِ سرور و فقط برای صاحب (هر دو نما)
+  val branches = rememberBranchesReportVisible()
+  val branchesItem = if (branches) listOf(V3MenuItem(Icons.Outlined.Storefront, StrBranches.title) { onOpen(AnalyticsPaths.BRANCHES_REPORT) }) else emptyList()
+  val onlineItem = if (online) listOf(V3MenuItem(Icons.Outlined.ShoppingCart, StrOnlineReport.title) { onOpen(AnalyticsPaths.ONLINE_REPORT) }) + branchesItem else branchesItem
   //  «گزارشِ تازه» (همان کلیدِ کامپیوتر، فقط همین دستگاه): روشن ⇒ صفحهٔ هستهٔ مشترکِ گزارش با کلیدِ برگشتِ خودش
   LaunchedEffect(Unit) { ReportFresh.load(context) }
   if (ReportFresh.on.value) {

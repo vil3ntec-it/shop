@@ -24,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.StrDrawers
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
@@ -57,6 +58,8 @@ class DrawerActions(
   val xReport: () -> Unit,
   val shift: (String) -> Unit,
   val back: (() -> Unit)?,
+  /** PAY-17: «ادامه روی این دستگاه» (شناسهٔ شیفتِ نام‌دار) یا کشوی اصلی (`null`) */
+  val pick: (CashShift.Shift?) -> Unit = {},
 )
 
 /** آنچه صفحه نشان می‌دهد — از `DrawerRoute` */
@@ -74,6 +77,8 @@ data class DrawerView(
   val history: List<CashShift.Shift>,
   /** «ثبت از اسکنر» در همین صندوق (`DrawerModel.scannerLine`) */
   val scanner: String? = null,
+  /** PAY-17: کشوهای باز (فقط با «چند کشو» ِ روشن؛ خاموش ⇒ `null` و صفحه همان امروز) */
+  val drawers: List<CashShift.Shift>? = null,
 )
 
 /**
@@ -96,7 +101,10 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
           V3IconTile(Icons.Outlined.PointOfSale, hue = if (open) V3Hue.BRAND else null, size = 44.dp)
           Spacer(Modifier.width(12.dp))
           Column(Modifier.weight(1f)) {
-            Text(if (open) StrSale.drawerOpen else StrSale.drawerClosed, style = V3Type.headline, color = c.ink)
+            Text(
+              v.shift?.open?.drawer?.let { StrDrawers.drawerTitle(it) } ?: if (open) StrSale.drawerOpen else StrSale.drawerClosed,
+              style = V3Type.headline, color = c.ink,
+            )
             v.shift?.let { Text(StrSale.sinceWhen(SaleTime.stamp(it.open.createdAt)), style = V3Type.footnote, color = c.inkMuted) }
           }
           V3StatusPill(if (open) V3Status.DELIVERED else V3Status.INACTIVE, if (open) StrSale.openWord else StrSale.closedWord)
@@ -118,6 +126,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         Spacer(Modifier.height(12.dp))
         SaleTotals(DrawerModel.breakdown(it))
       }
+      if (v.shift?.open?.drawer != null) { Spacer(Modifier.height(8.dp)); Text(StrDrawers.namedNote, style = V3Type.footnote, color = c.inkMuted) }
       v.scanner?.takeIf { open }?.let { Spacer(Modifier.height(8.dp)); Text(it, style = V3Type.footnote, color = c.inkMuted) }
       Spacer(Modifier.height(14.dp))
       V3Button(if (open) StrSale.closeDrawer else StrSale.openDrawer, if (open) actions.close else actions.open, Modifier.fillMaxWidth(), haptic = true)
@@ -130,6 +139,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         Spacer(Modifier.height(8.dp))
         V3Button(StrSale.xReport, actions.xReport, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL, icon = Icons.AutoMirrored.Outlined.ReceiptLong, height = 44.dp)
       }
+      v.drawers?.let { list -> DrawersSection(list, v.shift?.open?.id, actions.pick) }
       V3Section(StrSale.drawerHistory) {
         if (v.history.isEmpty()) Text(StrSale.noShiftYet, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
         v.history.forEachIndexed { i, sh ->
@@ -143,6 +153,32 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
           )
         }
       }
+    }
+  }
+}
+
+/** PAY-17: کشوهای باز — کدام روی همین دستگاه است، و «ادامه روی این دستگاه» برای بقیه */
+@Composable
+private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (CashShift.Shift?) -> Unit) {
+  val c = PhoneV3.colors
+  V3Section(StrDrawers.drawers, footer = StrDrawers.drawersNote) {
+    if (list.isEmpty()) Text(StrDrawers.noneOpen, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
+    list.forEachIndexed { i, sh ->
+      if (i > 0) V3Divider(start = 64.dp)
+      val isMine = sh.open.id == mine
+      V3ListRow(
+        title = sh.open.drawer ?: StrDrawers.mainDrawer,
+        subtitle = StrDrawers.since(SaleTime.stamp(sh.open.createdAt), sh.open.by ?: ""),
+        icon = Icons.Outlined.PointOfSale,
+        hue = if (isMine) V3Hue.BRAND else null,
+        value = if (isMine) StrDrawers.thisDevice else StrDrawers.continueHere,
+        chevron = !isMine,
+        onClick = if (isMine) null else ({ pick(sh.takeIf { it.open.drawer != null }) }),
+      )
+    }
+    if (mine != null && list.any { it.open.id == mine && it.open.drawer != null }) {
+      V3Divider(start = 64.dp)
+      V3ListRow(title = StrDrawers.useMain, icon = Icons.Outlined.PointOfSale, onClick = { pick(null) })
     }
   }
 }

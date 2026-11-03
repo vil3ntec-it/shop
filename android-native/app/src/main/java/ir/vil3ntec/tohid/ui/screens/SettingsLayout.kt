@@ -89,6 +89,8 @@ object SettingsLayout {
   const val CRM_REPORTS = "گزارش‌های مشتری"
   /** دریافتِ وجه یا قسط از مشتری در صندوق (POS-39، `TillReceivePref`) */
   const val TILL_RECEIVE = "دریافت از مشتری"
+  /** چند کشو یا چند صندوقدار و شیفتِ شناور (PAY-17، `MultiDrawerPref`، همین دستگاه) */
+  const val MULTI_DRAWER = "چند کشو و شیفت شناور"
   /** موجودی و بها (`StockActions.setMode`، پشتِ پرچمِ سرورِ `shop.stock_v2`) — همان `STOCK_SETTINGS_TITLE` */
   const val STOCK_MODE = "موجودی و بها"
   /** تحلیلِ موجودی (INV-15/16، `ShopPolicy.stockInsight`) */
@@ -217,7 +219,7 @@ object SettingsLayout {
         Part("pay", listOf(PAY, HESAB_SHOP, TILL_RECEIVE, PAY_FIX, CREDIT_GATE, GIFT_CARD, LAYAWAY, SAFE_BOOK, CUSTOMER_CARD)),
         Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)),
         Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
-        Part("till", listOf(POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
+        Part("till", listOf(MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
         Part("online", listOf(STOREFRONT_ETA, PROMO_GUARD)),
       ),
     ),
@@ -368,6 +370,7 @@ object SettingsLayout {
     WEBCAM to "webcam",
     TRAINING to "training",
     TILL_RECEIVE to "till-receive",
+    MULTI_DRAWER to "multi-drawer",
     STOCK_MODE to "stock-mode",
     STOCK_INSIGHT to "stock-insight",
     STOCK_LEVELS to "stock-levels",
@@ -453,6 +456,7 @@ object SettingsLayout {
     WEBCAM -> ir.vil3ntec.tohid.core.i18n.StrDevices.webcamTitle
     TRAINING -> TRAINING_SETTINGS_TITLE
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
+    MULTI_DRAWER -> ir.vil3ntec.tohid.core.i18n.StrDrawers.settingsTitle
     STOCK_MODE -> STOCK_SETTINGS_TITLE
     STOCK_INSIGHT -> StrShell.stockInsight
     STOCK_LEVELS -> StrShell.stockLevels

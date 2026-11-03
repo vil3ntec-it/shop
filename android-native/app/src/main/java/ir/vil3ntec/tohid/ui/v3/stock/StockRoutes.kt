@@ -7,6 +7,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLabel
+import ir.vil3ntec.tohid.core.i18n.StrImageChanges
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -49,6 +50,10 @@ object StockPaths {
   fun book(tab: String? = null) = StockExtras.bookPath(tab)
   const val BULK_PRODUCTS = "stock/bulk-products"
   const val IMAGES = "stock/images"
+  /** IMG-PRO-17: تغییرِ دسته‌ایِ عکس‌ها و برگشتش — راهش فقط با بانکِ روشن (`ImageChangesGate`) */
+  const val IMAGE_CHANGES = "stock/images/changes"
+  const val IMAGE_CHANGES_NEW = "stock/images/changes/new"
+  fun imageChange(id: String) = "$IMAGE_CHANGES/" + RoutePaths.encode(id)
   const val IMPORT_HISTORY = "stock/import/history"
 }
 
@@ -174,6 +179,9 @@ val StockModule = AppModule(
     V3Route(StockPaths.BOOK, RouteKind.PAGE, { StrReach.stockBook }, parent = StockPaths.LIST, aliases = listOf("stockbook")) { StockBookRoute() },
     V3Route(StockPaths.BULK_PRODUCTS, RouteKind.SHEET, { StrReach.bulkProducts }, parent = StockPaths.LIST, chrome = Chrome.OWN) { BulkProductsRoute() },
     V3Route(StockPaths.IMAGES, RouteKind.SHEET, { StrReach.imageImport }, parent = StockPaths.LIST, chrome = Chrome.OWN) { ImageImportRoute() },
+    V3Route(StockPaths.IMAGE_CHANGES, RouteKind.PAGE, { StrImageChanges.title }, parent = StockPaths.LIST) { ImageChangesRoute() },
+    V3Route(StockPaths.IMAGE_CHANGES_NEW, RouteKind.PAGE, { StrImageChanges.newBatch }, parent = StockPaths.IMAGE_CHANGES) { ImageBatchRoute() },
+    V3Route("stock/images/changes/{id}", RouteKind.PAGE, { StrImageChanges.batch }, parent = StockPaths.IMAGE_CHANGES) { ImageChangeRoute(args["id"].orEmpty()) },
     V3Route(StockPaths.IMPORT_HISTORY, RouteKind.SHEET, { StrReach.importHistory }, parent = StockPaths.IMPORT, chrome = Chrome.OWN) { ImportHistoryRoute() },
   ),
 )
