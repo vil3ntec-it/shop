@@ -139,7 +139,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         Spacer(Modifier.height(8.dp))
         V3Button(StrSale.xReport, actions.xReport, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL, icon = Icons.AutoMirrored.Outlined.ReceiptLong, height = 44.dp)
       }
-      v.drawers?.let { list -> DrawersSection(list, v.shift?.open?.id, actions.pick) }
+      v.drawers?.let { list -> DrawersSection(list, v.shift?.open?.id, actions.pick, actions.open) }
       V3Section(StrSale.drawerHistory) {
         if (v.history.isEmpty()) Text(StrSale.noShiftYet, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
         v.history.forEachIndexed { i, sh ->
@@ -159,7 +159,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
 
 /** PAY-17: کشوهای باز — کدام روی همین دستگاه است، و «ادامه روی این دستگاه» برای بقیه */
 @Composable
-private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (CashShift.Shift?) -> Unit) {
+private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (CashShift.Shift?) -> Unit, openNew: () -> Unit) {
   val c = PhoneV3.colors
   V3Section(StrDrawers.drawers, footer = StrDrawers.drawersNote) {
     if (list.isEmpty()) Text(StrDrawers.noneOpen, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
@@ -180,5 +180,8 @@ private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (Ca
       V3Divider(start = 64.dp)
       V3ListRow(title = StrDrawers.useMain, icon = Icons.Outlined.PointOfSale, onClick = { pick(null) })
     }
+    //  صندوقدارِ دوم روی همین دستگاه: کشوی خودش را باز می‌کند، بی بستنِ کشوی اولی
+    if (list.isNotEmpty()) V3Divider(start = 64.dp)
+    V3ListRow(title = StrDrawers.newDrawer, icon = Icons.Outlined.PointOfSale, onClick = openNew)
   }
 }

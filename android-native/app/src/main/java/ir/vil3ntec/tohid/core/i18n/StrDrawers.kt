@@ -24,6 +24,7 @@ object StrDrawers {
   val useMain: String get() = t("این دستگاه روی کشوی اصلی", "Use the main drawer on this device", "دا دستګاه په اصلي دخل")
   fun since(at: String, by: String): String =
     if (by.isBlank()) t("از ${asIs(at)}", "since $at", "له $at") else t("از ${asIs(at)} — ${asIs(by)}", "since $at — $by", "له $at — $by")
+  val newDrawer: String get() = t("بازکردنِ کشوی تازه روی این دستگاه", "Open a new drawer on this device", "په دې دستګاه نوی دخل پرانیزئ")
   val noneOpen: String get() = t("هیچ کشوی بازی نیست.", "No drawer is open.", "هېڅ دخل پرانیستی نه دی.")
   val drawerName: String get() = t("نامِ کشو یا صندوقدار", "Drawer or cashier name", "د دخل یا صندوقدار نوم")
   val drawerNameHelp: String get() = t("مثلاً «کشوی ۲» یا نامِ صندوقدار؛ خالی ⇒ کشوی اصلی.", "For example “Drawer 2” or the cashier's name; empty ⇒ the main drawer.", "لکه «دخل ۲» یا د صندوقدار نوم؛ تش ⇒ اصلي دخل.")
