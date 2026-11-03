@@ -93,6 +93,7 @@ class MarketContractTest {
     assertEquals(5000L, p.maxQtyMilli)
     assertEquals(StockBadge.UNVERIFIED, p.stock!!.status)
     assertNull(p.stock!!.checkedAt)
+    assertEquals("b0c68a8e1047", p.photoVersion)   //  IMG-12: نسخهٔ عکس برای ‎?v=‎
     val d = MarketContract.product(sample("productDetail"))
     assertEquals("برنجِ دانه‌بلند", d.description)
     assertEquals(listOf(ProductSpec("وزن", "۱ کیلو")), d.specs)
@@ -102,6 +103,7 @@ class MarketContractTest {
     val q = MarketContract.product(sample("searchProduct"))
     assertNull(q.stock)
     assertNull(q.shop!!.distanceKm)
+    assertNull(q.photoVersion)   //  کلید نیست (سرورِ کهنه یا بی عکس) ⇒ نشانیِ بی نسخه
     assertEquals(2, MarketContract.products("[${sample("product")},${sample("searchProduct")}]").size)
   }
 

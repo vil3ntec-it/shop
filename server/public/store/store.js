@@ -47,7 +47,8 @@
   }
   function api(path, opts) { return K.api(BASE + path, opts); }
   //  WEB-16: کارت و سبد thumb؛ برگهٔ کالا photo
-  function photoUrl(id, big) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb'); }
+  //  IMG-12: v = photoVersion (عکسِ تازه ⇒ نشانیِ تازه)
+  function photoUrl(id, big, v) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb') + (v ? '?v=' + encodeURIComponent(v) : ''); }
 
   var VIEWS = ['view-missing', 'view-catalog', 'view-checkout', 'view-order', 'view-orders'];
   function show(id) {
@@ -116,7 +117,7 @@
 
   function card(p) {
     var li = K.productCard(p, {
-      photo: photoUrl(p.id), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
+      photo: photoUrl(p.id, 0, p.photoVersion), qty: cart[p.id] ? cart[p.id].qtyMilli : 0, onAdd: addOne,
       onOpen: function () { location.hash = '#/p/' + encodeURIComponent(p.id); },
     });
     if (more) more.card(li, p);
@@ -194,7 +195,7 @@
       var st = K.stockOf(x);
       $('ps-cat').textContent = x.category || '';
       $('ps-cat').hidden = !x.category;
-      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1), alt: '', width: '300', height: '300' } })
+      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1, x.photoVersion), alt: '', width: '300', height: '300' } })
         : el('span', { class: 'ph', text: String(x.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
       $('ps-img').classList.toggle('tile', Boolean(x.photo));
@@ -255,7 +256,7 @@
     else {
       cart[id] = {
         qtyMilli: milli, name: src.name, unit: src.unit || '', priceMinor: src.priceMinor,
-        maxQtyMilli: src.maxQtyMilli || null, photo: Boolean(src.photo), unavailable: line ? line.unavailable === true : false,
+        maxQtyMilli: src.maxQtyMilli || null, photo: Boolean(src.photo), photoVersion: src.photoVersion, unavailable: line ? line.unavailable === true : false,
       };
     }
     saveCart();
@@ -299,7 +300,7 @@
 
   function thumb(id, l) {
     var th = el('span', { class: 'thumb' + (l.photo ? ' photo tile' : '') });
-    if (l.photo) th.appendChild(el('img', { attrs: { src: photoUrl(id), alt: '', loading: 'lazy', width: '44', height: '44' } }));
+    if (l.photo) th.appendChild(el('img', { attrs: { src: photoUrl(id, 0, l.photoVersion), alt: '', loading: 'lazy', width: '44', height: '44' } }));
     else th.textContent = String(l.name || '?').slice(0, 1);
     return th;
   }
@@ -402,7 +403,7 @@
         var l = cart[id]; var p = by[id];
         if (!p || !K.stockOf(p).orderable) { if (!l.unavailable) gone++; l.unavailable = true; return; }
         if (p.priceMinor !== l.priceMinor) changed++;
-        l.unavailable = false; l.priceMinor = p.priceMinor; l.name = p.name; l.unit = p.unit; l.maxQtyMilli = p.maxQtyMilli || null; l.photo = Boolean(p.photo);
+        l.unavailable = false; l.priceMinor = p.priceMinor; l.name = p.name; l.unit = p.unit; l.maxQtyMilli = p.maxQtyMilli || null; l.photo = Boolean(p.photo); l.photoVersion = p.photoVersion;
       });
       saveCart();
       if (changed) K.toast(t('cart.repriced', { n: K.fa(changed, 0) }));

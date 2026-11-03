@@ -146,6 +146,8 @@ data class PublicProduct(
   val specs: List<ProductSpec> = emptyList(),
   val regularPriceMinor: Long? = null,
   val shop: PublicShopRef? = null,
+  /** IMG-12: نسخهٔ عکس (۱۲ hex) برای `?v=` ِ نشانیِ عکس؛ عکسِ تازه ⇒ نسخهٔ تازه. null ⇒ بی عکس یا سرورِ کهنه (نشانیِ بی نسخه). */
+  val photoVersion: String? = null,
 )
 
 @Serializable

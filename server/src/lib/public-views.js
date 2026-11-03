@@ -50,12 +50,13 @@ const FIELDS = Object.freeze({
   shopRef: ['slug', 'title', 'accent', 'badge', 'orderAcceptance', 'distanceKm'],
   //  §۱.۳ — کالا در ویترین (`description`/`specs` فقط در صفحهٔ کالا)
   //  `regularPriceMinor` فقط در «ارزان‌تر از قیمتِ دکان» (`highlights.deals`، WEB-02 #626)
-  product: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo', 'stock',
-    'description?', 'specs?'],
+  //  `photoVersion` (IMG-12) فقط با عکس: نسخهٔ ۱۲-hex برای `?v=` ِ نشانیِ عکس. افزوده به v1.
+  product: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo', 'photoVersion?',
+    'stock', 'description?', 'specs?'],
   //  کالا در خانهٔ بازار (`regularPriceMinor` فقط با `showDeals` ِ صاحب دکان)
   marketProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo',
-    'stock', 'shop'],
-  searchProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'photo', 'shop'],
+    'photoVersion?', 'stock', 'shop'],
+  searchProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'photo', 'photoVersion?', 'shop'],
   //  §۱.۴ — موجودی؛ عددها فقط با `show_qty = exact`
   stock: ['status', 'reason?', 'checkedAt?', 'unit?', 'prepMinutes?', 'sellableMilli?', 'readyMilli?', 'laterMilli?'],
   //  §۱.۷ — سفارش (پیگیری با توکن). افزوده به v1 از main (همان شکلِ main): `substitution` (CHK-15 #525)،

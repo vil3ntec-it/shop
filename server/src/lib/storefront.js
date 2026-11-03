@@ -206,6 +206,8 @@ function productView(row) {
     priceMinor: priceOf(row),
     maxQtyMilli: row.max_qty_milli === null || row.max_qty_milli === undefined ? null : Number(row.max_qty_milli),
     photo: row.has_photo === true,
+    //  IMG-12: نسخهٔ عکسِ همگام‌شده برای `?v=` ِ نشانیِ عکس (بانک در `withBank` جایش را می‌گیرد)؛ بی عکس ⇒ بی کلید
+    ...(row.has_photo === true && row.photo_hash && { photoVersion: shelf.photoTag(`l:${row.photo_hash}`) }),
     //  ۳۲.۱/۳۲.۳: سرور هنوز دفترِ موجودی ندارد ⇒ «در حال بررسی»، هرگز «موجود»
     stock: { status: 'unverified', checkedAt: null },
   });
@@ -213,7 +215,9 @@ function productView(row) {
 
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
   EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
-            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo`;
+            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo,
+  (SELECT ph.hash FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
+            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS photo_hash`;
 //  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
 //  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
 const NOT_HIDDEN = `NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
@@ -282,11 +286,17 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '', 
   }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
 
+/** عکسِ بانک (پرچمِ دکان) پیش از عکسِ همگام‌شده — همان ترتیبِ `photo()` ⇒ «عکس دارد» و نسخهٔ عکس (IMG-12) از بانک. */
+async function withBank(shopId, items) {
+  const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
+  for (const p of items) if (bank.has(p.id)) Object.assign(p, { photo: true, photoVersion: bank.get(p.id) });
+  return items;
+}
+
 /** عکسِ بانک (اگر هست)، جزئیاتِ M4 (برند، بارکد، واحد، variant، `bankProductId`؛ فقط با `market.product_details`) و موجودیِ کاتالوگ (اگر روشن است) روی نماها. */
 async function decorate(shopId, items) {
   if (!items.length) return items;
-  const bank = await shelf.bankIds(shopId, items.map((p) => p.id));
-  for (const p of items) if (bank.has(p.id)) p.photo = true;
+  await withBank(shopId, items);
   return shelf.applyStock(shopId, await require('./product-details').attach(shopId, items));
 }
 
@@ -407,7 +417,8 @@ async function catalogByIds(shopId, raw) {
       WHERE sp.shop_id = $1 AND sp.product_id = ANY($2::text[]) AND sp.published AND ${LIVE_PRODUCT}`,
     [shopId, ids]
   );
-  return { items: rows.map(productView).filter((p) => p.priceMinor !== null && p.name), nextCursor: null };
+  //  عکسِ بانک همان کاتالوگ ⇒ عکس و نسخهٔ عکسِ سبد پس از تازه شدن نمی‌پرند (IMG-12)
+  return { items: await withBank(shopId, rows.map(productView).filter((p) => p.priceMinor !== null && p.name)), nextCursor: null };
 }
 
 /**
@@ -424,7 +435,8 @@ async function photo(shopId, productId, size = 'display') {
   if (!live) return null;
   const banked = await shelf.bankImage(shopId, productId, size === 'thumb' ? 'thumb' : 'display');
   if (banked) return banked;
-  return require('./product-photos').get({ app: 'shop', accountId: shopId }, productId);
+  const legacy = await require('./product-photos').get({ app: 'shop', accountId: shopId }, productId);
+  return legacy && { ...legacy, tag: shelf.photoTag(`l:${legacy.hash}`) };
 }
 
 // ════════════════════════════════════════════════════════════════════
