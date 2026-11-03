@@ -22,7 +22,7 @@ import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton
  *  - مانده و سابقهٔ امتیازِ وفاداری (PRM-13، `LoyaltyHistory`؛ `LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)؛
  *  - «گروه، لیستِ قیمت و رضایت» (CRM-08/12، `CrmPricingButton`، پشتِ «گزارش‌های مشتری»)؛
  *  - «کارتِ مشتری» (CRM-16، `CustomerCardButton` — همان دکمهٔ پروندهٔ کامپیوتر، پشتِ `CustomerCardPref`؛ مشتریِ ادغام‌شده نه)؛
- *  - «دادنِ اعتبارِ هدیه» (PRM-15، `StoreCreditGrantButton` — همان دکمهٔ پروندهٔ کامپیوتر، پشتِ `GiftCardPref` و تخفیفِ «مجاز»)؛
+ *  - «دادنِ اعتبارِ هدیه» (PRM-15، `StoreCreditGrantButton`، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ)؛
  *  - سفارش‌های اینترنتیِ باز یا لغوشده (CRM-07، `CustomerOnlineOrdersPanel` — همان بخشِ کامپیوتر، فقط با بخشِ سفارشِ
  *    روشن و اجازهٔ «تماس»).
  *  هر کدام خاموش یا بی ردیف ⇒ هیچ چیز کشیده نمی‌شود.

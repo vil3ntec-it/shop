@@ -75,13 +75,12 @@ class V3PortedFeaturesTest {
     assertTrue(button.contains("if (!CustomerCrm.isActive(debtor)) return"))
   }
 
-  /** PRM-15 — «دادنِ اعتبارِ هدیه» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳ و کامپیوتر، یک جزء؛ خاموش، ادغام‌شده یا بی تخفیف ⇒ هیچ */
+  /** PRM-15 — «دادنِ اعتبارِ هدیه» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳ (جزءِ مشترکِ `ui/screens`)؛ خاموش، ادغام‌شده یا بی تخفیف ⇒ هیچ */
   @Test
-  fun `پروندهٔ مشتری — دادنِ اعتبارِ هدیه در حسابِ گوشیِ نسخهٔ ۳ همان دکمهٔ کامپیوتر`() {
+  fun `پروندهٔ مشتری — دادنِ اعتبارِ هدیه در حسابِ گوشیِ نسخهٔ ۳`() {
     val extras = src("ui/v3/money/DebtorFileExtras.kt")
     assertTrue(extras.contains("import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton"))
     assertTrue(extras.contains("StoreCreditGrantButton(store, d, debtorId, toast,"))
-    assertTrue(src("ui/screens/DeskCustomers.kt").contains("StoreCreditGrantButton(store, d, id, ::toast,"))
     val button = src("ui/screens/StoreCreditGrantAndroid.kt")
     assertTrue(button.contains("val on = remember { GiftCardPref.on(context) }"))
     assertTrue(button.contains("if (!on) return"))

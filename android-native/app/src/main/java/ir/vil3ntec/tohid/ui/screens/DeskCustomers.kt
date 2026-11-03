@@ -440,7 +440,6 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       StatementImageButton(d, id, ::toast, Modifier.padding(start = 6.dp))
       CrmPricingButton(store, d, id, ::toast, Modifier.padding(start = 6.dp))
       CustomerCardButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // CRM-16، پیش‌فرض خاموش
-      StoreCreditGrantButton(store, d, id, ::toast, Modifier.padding(start = 6.dp)) // PRM-15، پشتِ کارتِ هدیه (خاموش)
       CustomerErasureButton(d.debtors.find { it.id == id }?.phone, Modifier.padding(start = 6.dp)) // SEC-10، فقط صاحب و پرچمِ روشن
     }
     entry?.let { kind ->
