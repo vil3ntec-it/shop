@@ -61,6 +61,9 @@ class InvoiceActions(
   val back: (() -> Unit)?,
   /** فاکتورِ نسخهٔ ۲ (`shop.receipt_v2`) و گوشی ⇒ «PDF» */
   val pdf: (() -> Unit)? = null,
+  /** POS-32، کامپیوتر: «ذخیرهٔ تصویر» (همیشه) و «ذخیرهٔ PDF» (فاکتورِ نسخهٔ ۲) — `InvoiceFile.save` */
+  val saveImage: (() -> Unit)? = null,
+  val savePdf: (() -> Unit)? = null,
 )
 
 /**
@@ -89,6 +92,8 @@ fun InvoiceScreen(
     overflow = buildList {
       actions.ret?.let { add(V3MenuItem(Icons.AutoMirrored.Outlined.AssignmentReturn, if (returnsV2) StrSale.returnOrExchange else StrSale.returnWord, onClick = it)) }
       actions.pdf?.let { add(V3MenuItem(Icons.Outlined.PictureAsPdf, StrSale.sharePdf, onClick = it)) }
+      actions.saveImage?.let { add(V3MenuItem(Icons.AutoMirrored.Outlined.ReceiptLong, StrSale.saveImage, onClick = it)) }
+      actions.savePdf?.let { add(V3MenuItem(Icons.Outlined.PictureAsPdf, StrSale.savePdf, onClick = it)) }
       actions.fix?.let { add(V3MenuItem(Icons.Outlined.Edit, StrSale.fixInvoice, onClick = it)) }
       actions.cancel?.let { add(V3MenuItem(Icons.Outlined.Block, StrSale.cancelSale, danger = true, onClick = it)) }
     },

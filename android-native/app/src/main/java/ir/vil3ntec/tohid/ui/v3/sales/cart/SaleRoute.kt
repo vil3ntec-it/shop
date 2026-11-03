@@ -47,7 +47,7 @@ fun RouteScope.SaleRoute() {
   val scope = rememberCoroutineScope()
   val lines by cart.lines.collectAsState()
   val debtorId by cart.debtorId.collectAsState()
-  val promo = PromoLive.rememberOutcome(data, lines)
+  val promo = PromoLive.rememberOutcome(data, lines, debtorId) // PRM-11: گروهِ مشتریِ همین سبد
   val total = SalesEngine.cartTotal(data, PromoEngine.priced(lines, promo))
   //  کالا یا قرض‌دارِ حذف‌شده در سبد نمی‌ماند
   LaunchedEffect(data.products.size, data.debtors.size) { cart.prune(data) }

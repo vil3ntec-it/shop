@@ -114,16 +114,18 @@ internal fun RouteScope.CreditGateScreen(onBack: (() -> Unit)?) {
 }
 
 /**
- *  `settings/sales/customer-reports`: گزارش‌های مشتری (CRM-04/06/10/14) — همان `ShopPolicy.setCrmReports`.
- *  فقط کامپیوتر ردیفش را دارد (`SettingsLayout.PHONE_HIDDEN`)، مثلِ رابطِ امروز؛ پیش‌فرض خاموش.
+ *  `settings/data/customer-reports`: گزارش‌های مشتری (CRM-04/05/06/08/10/14) — همان `ShopPolicy.setCrmReports`، ردهٔ B،
+ *  پیش‌فرض خاموش. گوشی و کامپیوتر هر دو ردیف دارند (دورِ ۱۴): ادغامِ تکراری‌ها، تصویرِ صورت‌حساب، گروه و لیستِ قیمت
+ *  و سنِ بدهی و RFM ِ گوشی هم پشتِ همین کلیدِ همین دستگاه‌اند؛ توضیحِ هر سکو کارهای همان سکو را می‌گوید.
  */
 @Composable
 internal fun RouteScope.CrmReportsScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   var on by remember { mutableStateOf(ShopPolicy.crmReports(context)) }
+  val desk = ir.vil3ntec.tohid.ui.Platform.DESKTOP
   SettingsPageFrame(
     title = SettingsLayout.labelOf(SettingsLayout.CRM_REPORTS),
-    subtitle = if (on) StrShell.crmShownInReports else StrSettings.off,
+    subtitle = if (!on) StrSettings.off else if (desk) StrShell.crmShownInReports else StrShell.crmShownPhone,
     onBack = onBack,
   ) {
     item(key = "choice") {
@@ -137,10 +139,10 @@ internal fun RouteScope.CrmReportsScreen(onBack: (() -> Unit)?) {
           },
         )
       }
-      SettingsNote(StrShell.crmNote)
+      SettingsNote(if (desk) StrShell.crmNote else StrShell.crmNotePhone)
     }
     //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود (فقط کامپیوتر، مثلِ رابطِ امروز)
-    if (on && ir.vil3ntec.tohid.ui.Platform.DESKTOP) item(key = "reminder") {
+    if (on && desk) item(key = "reminder") {
       var reminderText by remember { mutableStateOf(DebtReminderPref.template(context)) }
       SettingsBlock {
         DebtReminderTemplateEditor(

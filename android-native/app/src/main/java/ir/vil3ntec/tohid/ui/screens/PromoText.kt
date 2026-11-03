@@ -90,6 +90,8 @@ object PromoText {
     var t = if (parts.isEmpty()) "همهٔ کالاها" else parts.joinToString(" + ")
     if (s.exProducts.isNotEmpty()) t += " (جز ${if (s.exProducts.size == 1) name(s.exProducts[0]) else "${s.exProducts.size} کالا"})"
     if (s.exBrands.isNotEmpty()) t += " (جز برندِ ${s.exBrands.joinToString("، ")})"
+    //  PRM-11: قاعدهٔ «فقط این گروه‌های مشتری»
+    if (r.groups.isNotEmpty()) t += " · " + ir.vil3ntec.tohid.core.i18n.StrLine.promoOnlyGroups(r.groups.joinToString("، "))
     return t
   }
 
@@ -155,6 +157,8 @@ data class PromoForm(
   val exBrands: Set<String> = emptySet(),
   val products: Set<String> = emptySet(),
   val exProducts: Set<String> = emptySet(),
+  /** PRM-11 — فقط مشتریانِ این گروه‌ها (`Debtor.group`، CRM-08)؛ خالی = همه */
+  val groups: Set<String> = emptySet(),
   val days: Set<Long> = emptySet(),
   val start: String = "",
   val end: String = "",
@@ -198,6 +202,7 @@ data class PromoForm(
       exBrands = r.scope.exBrands.toSet(),
       products = r.scope.products.toSet(),
       exProducts = r.scope.exProducts.toSet(),
+      groups = r.groups.toSet(),
       days = r.window.days.toSet(),
       start = PromoText.hm(r.window.start),
       end = PromoText.hm(r.window.end),
@@ -229,7 +234,7 @@ data class PromoForm(
   private fun int(s: String, dflt: Long): Long = dbl(s)?.takeIf { it == Math.floor(it) }?.roundToLong() ?: dflt
 
   /**
-   *  فرم ⇒ قاعده، روی `base` (شناسه، کانال، شمارِ مصرف و گروه‌ها از همان می‌مانند).
+   *  فرم ⇒ قاعده، روی `base` (شناسه، کانال و شمارِ مصرف از همان می‌مانند؛ گروه‌ها از فرم، PRM-11).
    *  قاعدهٔ تازه فقط برای صندوق است (`channels = ["pos"]` را خودِ `base` دارد).
    *  ⛔ هر چه فرم نشان نمی‌دهد دست نمی‌خورد (N2): کانالِ خالی (= همه) خالی می‌ماند،
    *  و از «قیمتِ ویژه»ی چندکالایی فقط ردیفِ نخست (همان که فرم دارد) عوض می‌شود.
@@ -251,6 +256,8 @@ data class PromoForm(
       code = code.trim(),
       allowBelowCost = allowBelowCost,
       channels = base.channels,
+      //  PRM-11: گروه‌های دست‌نخورده همان ترتیبِ پیشین را نگه می‌دارند (N2)
+      groups = if (groups == base.groups.toSet()) base.groups else groups.sorted(),
       scope = base.scope.copy(
         categories = categories.sorted(),
         brands = brands.sorted(),

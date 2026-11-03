@@ -78,9 +78,10 @@ fun RouteScope.CheckoutRoute() {
 
   var actions = CheckoutActions({}, {}, {}, {}, {}, {}, {}, ::close)
   val view: CheckoutView? = if (done != null || lines.isEmpty()) last[0] else {
-    val promo = PromoLive.rememberOutcome(data, lines)
-    val priced = PromoEngine.priced(lines, promo)
     val form = CheckoutSession.form ?: CheckoutModel.start(cart.debtorId.value, data.debtors, HeldSession.extras(cart).discount)
+    //  PRM-11: تخفیفِ «فقط این گروه‌ها» با مشتریِ همین برگه (عوض کردنِ مشتری ⇒ دوباره سنجیده می‌شود)
+    val promo = PromoLive.rememberOutcome(data, lines, form.debtorId)
+    val priced = PromoEngine.priced(lines, promo)
     //  PRM-13: امتیازِ وفاداریِ مشتریِ همین فاکتور — همان `rememberLoyaltyTill` ِ صندوقِ کامپیوتر؛ جمع، سقفِ اعتبار و ثبت
     //  با سبدِ پس از امتیاز (`TillSale.cart`)؛ قاعدهٔ خاموش یا بی مشتری ⇒ `null` و همان سبد
     val loyalty = rememberLoyaltyTill(data, priced, form.debtorId)
