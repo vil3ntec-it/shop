@@ -40,10 +40,10 @@ class StoreCreditGrantTest {
   @Test
   fun theBalanceAfterAGrantMovesTowardsCredit() {
     //  ماندهٔ دفتر: مثبت = بدهی، منفی = طلب. هدیه یک «رسید» ِ غیرنقد است ⇒ اول از بدهی کم می‌شود، بعد طلب
-    assertEquals(-50_000, StoreCredit.afterGrant(0, 50_000))
-    assertEquals(20_000, StoreCredit.afterGrant(70_000, 50_000))
-    assertEquals(-80_000, StoreCredit.afterGrant(-30_000, 50_000))
-    assertEquals(50_000, StoreCredit.available(StoreCredit.afterGrant(0, 50_000)))
-    assertEquals(0, StoreCredit.available(StoreCredit.afterGrant(70_000, 50_000)))
+    assertEquals(-50_000L, StoreCredit.afterGrant(0, 50_000))
+    assertEquals(20_000L, StoreCredit.afterGrant(70_000, 50_000))
+    assertEquals(-80_000L, StoreCredit.afterGrant(-30_000, 50_000))
+    assertEquals(50_000L, StoreCredit.available(StoreCredit.afterGrant(0, 50_000)))
+    assertEquals(0L, StoreCredit.available(StoreCredit.afterGrant(70_000, 50_000)))
   }
 }
