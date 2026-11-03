@@ -74,6 +74,8 @@
 - **رفع‌شده‌ها (دوباره نیاورید):** `tenant-matrix` (ردپای «الف» پس از آرام شدنِ نوشتن‌های بی‌await)، `web-store-zones.mjs` (`addRice` با کلیکِ DOM).
 - **«آزمون‌های سرور زیرِ Electron»** گاه ۴۵ دقیقه گیر می‌کرد؛ PR ‏#838 (نگهبانِ پرونده + ساختنِ PGlite با حلقهٔ رویدادِ زنده) — باید CI ِ آن سبز و مرج شود.
 - **چک‌های آیفون** («رابطِ مشترکِ آیفون — klib» و «برنامهٔ آیفون — Xcode») `continue-on-error`اند؛ فایل‌های تازهٔ اندروید باید برای iOS شیم بگیرند، نه exclude.
+  shim ِ هم‌نامِ ردهٔ زمانِ اجرای Kotlin/Native (`java.lang.Double`، `Long`، `Number`…) **`internal`** باشد، وگرنه پیوندِ چارچوب با
+  `OBJC_CLASS_$_TohidShared<نام>: symbol multiply defined` می‌افتد (`ObjcNamesJvmTest`؛ `docs/IOS-PLAN-fa.md` پایانِ §۰.۱۲).
 
 ## ۶. محیط
 

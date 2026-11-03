@@ -445,6 +445,14 @@ iOS کامپایل می‌شوند (klib ِ دستهٔ ۱۵ پیش از این �
 فقط CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test`. اندروید روی این ماشین ساخته نمی‌شود (SDK نیست):
 `MainActivity` و `AppShellAndroid.kt` را CI ِ اندروید می‌سازد؛ خودِ `AppShellAndroid.kt` با کامپیوتر و آیفون هم کامپایل شد.
 
+**رفعِ پیوندِ چارچوب (پس از #869/#871):** کارِ `ios-app` از این گام در `linkDebugFrameworkIosSimulatorArm64` با
+`Linking globals named 'OBJC_CLASS_$_TohidSharedDouble': symbol multiply defined!` می‌افتاد (klib سبز بود). ریشه: shim ِ تازهٔ
+`java.lang.Double` (`object`، عمومی) در سرآیندِ ObjC نامِ `TohidSharedDouble` می‌گرفت (پیشوندِ چارچوب + نامِ ساده، بی بسته) و
+Kotlin/Native همین نام را برای جعبهٔ `kotlin.Double` در زمانِ اجرای خودش دارد — نامگذار فقط `Base`/`MutableSet`/`MutableDictionary`
+را رزرو می‌کند، نه `Number` و جعبه‌های عدد. یک چارچوب است و `export()` ِ دوباره‌ای نیست. رفع: shim `internal` (فقط برای کامپایلِ همین
+ماژول، نه API ِ Swift؛ بی پرچمِ پیوند). نگهبان: `src/jvmTest/…/ios/ObjcNamesJvmTest` (کارِ ارزانِ `ios-ui-klib`) هر ردهٔ عمومیِ سطحِ
+بالا به نامِ `Number`، `Byte`…`Double`، `Boolean` در shimها، `commonMain` و کدِ اندروید را رد می‌کند.
+
 ## ۱. خلاصه در پنج خط
 
 1. کدِ برنامه **۳۴۲ فایلِ Kotlin و ۸۹٬۸۷۲ خط** است. از این‌ها **۱۲۰ فایل** فقط Kotlin/Compose/kotlinx دارند، **۵۸ فایل** فقط به JDK تکیه دارند (`java.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized`…) و **۱۶۴ فایل** به اندروید وابسته‌اند (`android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `R.`، کتابخانه‌های گوگل، OkHttp).
