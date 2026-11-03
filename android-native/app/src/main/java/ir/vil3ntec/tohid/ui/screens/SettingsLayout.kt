@@ -155,7 +155,7 @@ object SettingsLayout {
   const val PRODUCT_SUGGEST = "پیشنهادِ دسته و نام"
   /** جست‌وجوی مقاومِ صندوق (POS-04، `PosSearchPrefs`) — فقط کامپیوتر */
   const val POS_SEARCH = "جست‌وجوی مقاومِ صندوق"
-  /** قیمت‌پرسی در صندوق (POS-15، `PosPriceCheckPrefs`) — فقط کامپیوتر */
+  /** قیمت‌پرسی در صندوق (POS-15، `PosPriceCheckPrefs`) — کامپیوتر (Ctrl+I) و گوشی (منوی «…» ِ صندوق) */
   const val POS_PRICE_CHECK = "قیمت‌پرسی در صندوق (Ctrl+I)"
   /** حالتِ لمسیِ صندوق (POS-31، `PosTouchPrefs`) — فقط کامپیوتر */
   const val POS_TOUCH = "حالتِ لمسیِ صندوق (کامپیوتر)"
@@ -538,7 +538,7 @@ object SettingsLayout {
    *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد؛ کلیدهای صندوق و گزارشِ کامپیوتر هم (همان
    *  `Platform.DESKTOP` ِ رابطِ قدیمِ پاک‌شده). «شماره‌های جاافتاده» (RPT-17) زبانهٔ گوشی هم دارد و این‌جا نیست.
    */
-  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_PRICE_CHECK, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, WEBCAM)
+  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, WEBCAM)
 
   /**
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ

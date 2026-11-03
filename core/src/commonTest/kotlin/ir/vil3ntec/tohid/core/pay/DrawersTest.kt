@@ -55,4 +55,36 @@ class DrawersTest {
     assertNull(Drawers.label("x".repeat(Drawers.LABEL_MAX + 1)))
     assertEquals("x".repeat(Drawers.LABEL_MAX), Drawers.label("x".repeat(Drawers.LABEL_MAX)))
   }
+
+  @Test
+  fun allDrawersTogetherSumExpectedButCountOnlyClosedOnes() {
+    val c = Drawers.combine(
+      listOf(
+        Drawers.Sum("n2", "محمود", open = false, openingMinor = 300_00, expectedMinor = 900_00, countedMinor = 880_00),
+        Drawers.Sum("m", null, open = true, openingMinor = 1000_00, expectedMinor = 2150_00, countedMinor = null),
+        Drawers.Sum("n1", "احمد", open = false, openingMinor = 200_00, expectedMinor = 500_00, countedMinor = 510_00),
+        //  شناسهٔ تکراری (همان کشو دو بار) یک بار شمرده می‌شود
+        Drawers.Sum("n1", "احمد", open = false, openingMinor = 200_00, expectedMinor = 500_00, countedMinor = 510_00),
+      ),
+    )
+    assertEquals(listOf("m", "n1", "n2"), c.drawers.map { it.id }, "کشوی اصلی اول، بعد نام‌دارها به ترتیبِ نام")
+    assertEquals(1500_00L, c.openingMinor)
+    assertEquals(3550_00L, c.expectedMinor, "موردِ انتظارِ همه، باز و بسته")
+    assertEquals(1390_00L, c.countedMinor, "شمرده فقط کشوهای بسته")
+    //  +۱۰ و −۲۰ ⇒ −۱۰؛ کشوی باز هنوز شمرده نشده و اختلافی نمی‌سازد
+    assertEquals(-10_00L, c.varianceMinor)
+    assertEquals(1, c.open)
+    assertEquals(2, c.closed)
+  }
+
+  @Test
+  fun aClosedDrawerWithoutCountAddsNoVarianceAndTheDayWindowKeepsOpenOnes() {
+    val c = Drawers.combine(listOf(Drawers.Sum("z", "ز", open = false, openingMinor = 0, expectedMinor = 100_00, countedMinor = null)))
+    assertEquals(0L, c.countedMinor)
+    assertEquals(0L, c.varianceMinor)
+    assertEquals(Drawers.Combined(emptyList(), 0, 0, 0, 0, 0, 0), Drawers.combine(emptyList()))
+    assertTrue(Drawers.inDay(null, 1_000), "هنوز باز ⇒ امروز")
+    assertTrue(Drawers.inDay(1_000, 1_000), "بسته از آغازِ روز")
+    assertFalse(Drawers.inDay(999, 1_000), "بستهٔ دیروز")
+  }
 }

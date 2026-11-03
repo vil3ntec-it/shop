@@ -53,4 +53,28 @@ class PriceCheckDataTest {
     assertNull(v.card.marginBp)
     assertEquals(before, d)
   }
+
+  @Test fun `سطرهای کارت برای گوشی و کامپیوتر یکی و قیمتِ خرید فقط با دیدنِ پول`() {
+    val v = PriceCheckData.of(d, milk, "2026-10-31")
+    val S = ir.vil3ntec.tohid.core.i18n.StrPriceCheck
+    val shown = PriceCheckData.lines(v, showCost = false)
+    assertTrue(shown.none { it.label == S.cost })
+    assertTrue("فیِ خرید پنهان", shown.single { it.label == S.lastPurchase }.value.let { !it.contains("41") && it.contains("پخشِ شمال") })
+    assertEquals("9 دانه", shown.single { it.label == S.stock }.value)
+    assertEquals(PriceCheckData.Tone.WARN, shown.single { it.label == S.expiry }.tone)
+    assertEquals(PriceCheckData.Tone.DANGER, shown.last().tone)
+    val boss = PriceCheckData.lines(v, showCost = true)
+    assertTrue(boss.any { it.label == S.cost && it.value.startsWith("40") })
+    assertTrue(boss.single { it.label == S.lastPurchase }.value.contains("41"))
+  }
+
+  @Test fun `برگهٔ قیمت‌پرسیِ گوشی کالا را با نام، بارکد یا انتخاب پیدا می‌کند`() {
+    val withCode = d.copy(products = d.products.map { if (it.id == "milk") it.copy(barcodes = listOf("6260001")) else it })
+    val index = ShopStore.barcodeIndex(withCode)
+    assertEquals("milk", PriceCheckData.pick(withCode, index, "6260001", null))
+    assertEquals("tea", PriceCheckData.pick(withCode, index, "چای", null))
+    assertNull("خالی", PriceCheckData.pick(withCode, index, "  ", null))
+    assertEquals("milk", PriceCheckData.pick(withCode, index, "چای", "milk"))
+    assertTrue(PriceCheckData.matches(withCode, "").isEmpty())
+  }
 }

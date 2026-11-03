@@ -49,6 +49,7 @@ fun RouteScope.QuickSaleRoute() {
       newProduct = { nav.open(ProductsPaths.new()) },
       pay = { CheckoutSession.reset(); nav.open(SalesPaths.checkout(quick = true)) },
       openCart = { nav.switchTab(SalesPaths.SALE) },
+      tapCount = { id, n -> feedback.addCount(data, id, n) },
     ),
   )
 }

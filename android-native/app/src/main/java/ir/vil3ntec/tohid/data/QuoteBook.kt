@@ -96,4 +96,25 @@ object Quotes {
 
   /** تازه‌ترین اول */
   fun listed(book: QuoteBook): List<SavedQuote> = book.items.sortedByDescending { it.number }
+
+  /** نامِ مشتریِ پیش‌فاکتور، یا «مشتریِ گذری» */
+  fun customer(d: ShopData, q: SavedQuote): String =
+    q.debtorId?.let { id -> d.debtors.find { it.id == id }?.name?.ifBlank { null } } ?: ir.vil3ntec.tohid.core.i18n.StrPos.quoteWalkIn
+
+  /**
+   *  POS-25 «ارسال» — متنِ سادهٔ پیش‌فاکتور برای واتس‌اپ، تلگرام یا پیامک (گوشی: برگهٔ اشتراک؛ کامپیوتر: کپی): همان سطرهای
+   *  برگهٔ چاپی — شماره، تاریخ، «اعتبار تا»، مشتری، ردیف‌ها با قیمتِ ثابت، جمع، یادداشت و «این فاکتور نیست». سندِ مالی نمی‌سازد.
+   */
+  fun shareText(q: SavedQuote, d: ShopData): String {
+    val S = ir.vil3ntec.tohid.core.i18n.StrPos
+    val rows = q.lines.map { l ->
+      val name = l.label.ifBlank { d.products.find { it.id == l.productId }?.name.orEmpty() }
+      val price = l.unitPrice ?: 0.0
+      "• " + S.quoteSlipLine(name, ir.vil3ntec.tohid.qty(l.quantity), ir.vil3ntec.tohid.money(price), ir.vil3ntec.tohid.money(SalesEngine.lineTotal(price, l.quantity)))
+    }
+    return (
+      listOf(S.quoteSlipTitle(q.number), S.quoteSlipDate(ir.vil3ntec.tohid.displayDate(q.createdDay)), S.quoteValidTo(ir.vil3ntec.tohid.displayDate(q.validUntil)), S.quoteSlipCustomer(customer(d, q))) +
+        rows + S.quoteSlipTotal(ir.vil3ntec.tohid.money(PayFlow.major(q.totalMinor))) + listOfNotNull(q.note) + S.quoteSlipFooter
+      ).joinToString("\n")
+  }
 }

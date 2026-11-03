@@ -45,7 +45,13 @@ object CatalogModel {
     stockless = p.stockless == true,
   )
 
-  /** کاشی‌های جورشده به ترتیبِ نمایش */
+  /**
+   *  POS-03 — پیشوندِ شمار «۳*» یا «۳×» پیش از نام یا بارکد (همان `CartQuery` ِ صندوقِ کامپیوتر، رقمِ فارسی هم): جست‌وجو با
+   *  بخشِ پس از ستاره و هر لمسِ کاشی همان شمار را می‌افزاید. بی پیشوند ⇒ شمار ۱ و همان نوشته (رفتارِ امروز).
+   */
+  fun query(text: String): ir.vil3ntec.tohid.data.CartQuery.Parsed = ir.vil3ntec.tohid.data.CartQuery.parse(text)
+
+  /** کاشی‌های جورشده به ترتیبِ نمایش — با پیشوندِ شمار فقط بخشِ پس از ستاره جست‌وجو می‌شود */
   fun items(
     d: ShopData,
     index: CatalogSearch.Index,
@@ -54,7 +60,7 @@ object CatalogModel {
     inCart: Map<String, Double>,
   ): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
-    return CatalogSearch.search(index, query, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
+    return CatalogSearch.search(index, query(query).term, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
   }
 
   /** «پرفروش‌ها» ِ سرِ کاتالوگ — کالایی که هرگز فروخته نشده نه */
