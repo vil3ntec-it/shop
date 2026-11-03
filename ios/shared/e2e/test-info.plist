@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Info.plist ِ test.kexe ِ شبیه‌ساز (گامِ ۸، docs/IOS-PLAN-fa.md §۰.۱۳) — فقط آزمون، با `-sectcreate __TEXT __info_plist`
+  (ios/shared/build.gradle.kts). برنامهٔ آیفون Info.plist ِ خودش را دارد (ios/iosApp/iosApp/Info.plist) و این را نمی‌بیند.
+  ATS: سرورِ آزمونِ سرتاسری (ios/e2e/backend.mjs) http و فقط روی 127.0.0.1 است.
+-->
+<plist version="1.0">
+<dict>
+	<key>CFBundleName</key>
+	<string>TohidSharedTests</string>
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+		<key>NSAllowsLocalNetworking</key>
+		<true/>
+	</dict>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>آزمونِ شبیه‌ساز</string>
+	<key>NSCameraUsageDescription</key>
+	<string>آزمونِ شبیه‌ساز</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>آزمونِ شبیه‌ساز</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>آزمونِ شبیه‌ساز</string>
+</dict>
+</plist>

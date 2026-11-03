@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="fa" dir="rtl"><head><meta charset="utf-8">
+<style>
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_regular.ttf);font-weight:400}
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_medium.ttf);font-weight:500}
+@font-face{font-family:V;src:url(file:///home/user/shop/android-native/app/src/main/res/font/vazirmatn_bold.ttf);font-weight:700}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:V,sans-serif;background:#f1f1f3;padding:28px;width:1960px}
+h1{font-size:30px;font-weight:700;color:#111;margin:0 6px 4px}
+.sub{font-size:16px;color:#555;margin:0 6px 22px}
+.grid{display:grid;grid-template-columns:repeat(4,440px);gap:30px 30px}
+.tag{font-size:20px;font-weight:700;color:#111;display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.tag b{background:#111;color:#fff;border-radius:50%;width:36px;height:36px;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+.tag span{font-size:13px;font-weight:400;color:#666}
+.ph{width:440px;height:560px;border-radius:44px 44px 18px 18px;background:#fafafa;overflow:hidden;position:relative;border:9px solid #0b0b0c;border-bottom:0;box-shadow:0 20px 40px rgba(0,0,0,.14)}
+.hero{margin:10px 10px 0;border-radius:36px;color:#fff;padding:18px 18px 20px;position:relative;overflow:hidden}
+.hrow{display:flex;justify-content:space-between;align-items:center;position:relative;z-index:2}
+.av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f97316,#22d3ee);display:flex;align-items:center;justify-content:center;font-weight:700}
+.bell{width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;background:rgba(255,255,255,.04)}
+.sel{text-align:center;margin-top:14px;font-size:15px;opacity:.9;position:relative;z-index:2}
+.amt{text-align:center;font-size:50px;font-weight:700;letter-spacing:-1px;line-height:1.15;position:relative;z-index:2}
+.amt small{font-size:.5em}
+.silver{background:linear-gradient(180deg,#fff 30%,#9b9ba3 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+.sec2{text-align:center;font-size:14px;opacity:.85;position:relative;z-index:2}
+.btns{display:flex;justify-content:center;align-items:center;gap:14px;margin-top:22px;position:relative;z-index:2}
+.pb{border-radius:999px;padding:9px 18px;font-size:13px;border:1px solid rgba(255,255,255,.18);background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.02));box-shadow:inset 0 1px 0 rgba(255,255,255,.12),0 6px 14px rgba(0,0,0,.35)}
+.plus{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:30px;border:1px solid rgba(255,255,255,.22);background:linear-gradient(180deg,rgba(255,255,255,.14),rgba(255,255,255,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 8px 18px rgba(0,0,0,.45)}
+.chip{display:flex;justify-content:center;margin-top:18px;position:relative;z-index:2}
+.chip span{border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 12px;font-size:12px;background:rgba(255,255,255,.05)}
+.chip i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#4ade80;margin-left:6px;box-shadow:0 0 8px #4ade80}
+.dots{display:flex;gap:5px;justify-content:center;margin-top:10px;position:relative;z-index:2}.dots i{width:16px;height:4px;border-radius:2px;background:#fff}.dots i+i{width:4px;opacity:.35}
+.acts{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:14px 14px 0}
+.act{display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12px;color:#374151}
+.ic{width:56px;height:56px;border-radius:17px;display:flex;align-items:center;justify-content:center;font-size:22px}
+.cut{position:absolute;bottom:0;left:0;right:0;height:40px;background:linear-gradient(transparent,#f1f1f3)}
+svg{display:block}
+</style></head><body>
+<h1>کیفِ پولِ سیاه — هشت نمونهٔ دیگر</h1>
+<div class="sub">فقط بخشِ بالا فرق دارد؛ چهار دکمه و فهرستِ «امروز» و نوارِ پایین همان است (اینجا فقط دکمه‌ها برای مقایسه پیداست).</div>
+<div class="grid" id="g"></div>
+<script>
+const acts=`<div class="acts"><div class="act"><div class="ic" style="background:#dbeafe">🛒</div>فروشِ تازه</div><div class="act"><div class="ic" style="background:#ccfbf1">↙</div>دریافت</div><div class="act"><div class="ic" style="background:#fef3c7">📥</div>ورودِ کالا</div><div class="act"><div class="ic" style="background:#ede9fe">🕘</div>تاریخچه</div></div><div class="cut"></div>`;
+const head=(b='rgba(255,255,255,.25)')=>`<div class="hrow"><div class="bell" style="border-color:${b}">🔔</div><div class="av">د</div></div>`;
+const chip=(t='همگام شد',c='#4ade80')=>`<div class="chip"><span><i style="background:${c};box-shadow:0 0 8px ${c}"></i>${t}</span></div>`;
+const spark=(col,op,h,id)=>`<svg viewBox="0 0 400 ${h}" width="100%" height="${h}" preserveAspectRatio="none" style="opacity:${op}"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".4"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs><path d="M0 ${h*.6} C40 ${h*.55} 60 ${h*.85} 100 ${h*.78} S170 ${h*.3} 210 ${h*.36} 290 ${h*.72} 330 ${h*.5} 380 ${h*.18} 400 ${h*.24} L400 ${h} L0 ${h}Z" fill="url(#${id})"/><path d="M0 ${h*.6} C40 ${h*.55} 60 ${h*.85} 100 ${h*.78} S170 ${h*.3} 210 ${h*.36} 290 ${h*.72} 330 ${h*.5} 380 ${h*.18} 400 ${h*.24}" stroke="${col}" stroke-width="2.2" fill="none"/></svg>`;
+const V=[
+['گرافیتِ مات','خاکستریِ خیلی تیره با بافتِ نرم',
+`<div class="hero" style="background:radial-gradient(130% 100% at 50% 0%,#3a3a3f 0%,#1c1c20 50%,#0d0d0f 100%)">${head()}<div class="sel">صندوق ⌄</div><div class="amt silver">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div><div class="btns"><span class="pb">↗ پرداخت</span><span class="plus">+</span><span class="pb">↙ دریافت</span></div>${chip()}<div class="dots"><i></i><i></i></div></div>`],
+['شبِ نیلی','سرمه‌ایِ عمیق به‌جای سیاه',
+`<div class="hero" style="background:radial-gradient(130% 100% at 50% 0%,#1e2a5a 0%,#0f1633 55%,#070a1a 100%)">${head('rgba(165,180,252,.35)')}<div class="sel">صندوق ⌄</div><div class="amt" style="background:linear-gradient(180deg,#fff 30%,#a5b4fc 100%);-webkit-background-clip:text;background-clip:text;color:transparent">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div><div class="btns"><span class="pb">↗ پرداخت</span><span class="plus" style="background:linear-gradient(180deg,#6366f1,#4338ca);border-color:#818cf8">+</span><span class="pb">↙ دریافت</span></div>${chip()}<div class="dots"><i></i><i></i></div></div>`],
+['سیاه و طلایی','لوکس، با خطِ طلایی',
+`<div class="hero" style="background:radial-gradient(130% 100% at 50% 0%,#2b2620 0%,#121110 55%,#080707 100%);border:1px solid rgba(212,175,55,.35)">${head('rgba(212,175,55,.45)')}<div class="sel" style="color:#e9d18f">صندوق ⌄</div><div class="amt" style="background:linear-gradient(180deg,#fff3c4 20%,#c9a227 100%);-webkit-background-clip:text;background-clip:text;color:transparent">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div><div class="btns"><span class="pb" style="border-color:rgba(212,175,55,.4)">↗ پرداخت</span><span class="plus" style="background:linear-gradient(180deg,#e7c55a,#a8801c);color:#1a1405;border:0">+</span><span class="pb" style="border-color:rgba(212,175,55,.4)">↙ دریافت</span></div>${chip('همگام شد','#e7c55a')}<div class="dots"><i style="background:#e7c55a"></i><i style="background:#e7c55a"></i></div></div>`],
+['سیاه با سبزِ نئون','خطِ فروش با رنگِ سبزِ درخشان',
+`<div class="hero" style="background:#0a0a0b">${head()}<div class="sel">صندوق ⌄</div><div class="amt silver">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز <b style="color:#4ade80">1,100 ؋</b> · ▲ ۱۲٪</div><div style="margin:4px -18px 0">${spark('#4ade80',1,56,'n1')}</div><div class="btns" style="margin-top:8px"><span class="pb">↗ پرداخت</span><span class="plus" style="background:#4ade80;color:#052e16;border:0;box-shadow:0 0 18px #4ade8088">+</span><span class="pb">↙ دریافت</span></div>${chip()}</div>`],
+['شیشهٔ دودی','شیشهٔ تیره روی رنگ‌های محو',
+`<div class="hero" style="background:#0d0d10;padding:0"><i style="position:absolute;width:220px;height:220px;border-radius:50%;background:#7c3aed;filter:blur(60px);right:-40px;top:-60px;opacity:.7"></i><i style="position:absolute;width:200px;height:200px;border-radius:50%;background:#0ea5e9;filter:blur(60px);left:-50px;bottom:-60px;opacity:.6"></i>
+<div style="position:relative;margin:0;padding:18px 18px 20px;backdrop-filter:blur(20px);background:rgba(15,15,20,.45)">${head()}<div class="sel">صندوق ⌄</div><div class="amt silver">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div><div class="btns"><span class="pb">↗ پرداخت</span><span class="plus">+</span><span class="pb">↙ دریافت</span></div>${chip()}<div class="dots"><i></i><i></i></div></div></div>`],
+['دکمه‌های آیکونی','چهار دکمهٔ گرد با نام زیرش',
+`<div class="hero" style="background:radial-gradient(130% 100% at 50% 0%,#2a2a2d 0%,#111113 55%,#070708 100%)">${head()}<div class="sel">صندوق ⌄</div><div class="amt silver">15,000 <small>؋</small></div><div class="sec2">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div>
+<div style="display:flex;justify-content:space-around;margin-top:22px;font-size:11.5px;text-align:center;position:relative">${['↙|دریافت','+|فروش','↗|پرداخت','≡|گزارش'].map(x=>{const[a,b]=x.split('|');return `<div><div class="plus" style="width:52px;height:52px;font-size:22px;margin:0 auto 6px">${a}</div>${b}</div>`}).join('')}</div>${chip()}</div>`],
+['عدد راست‌چین','عدد و دکمه‌ها از راست، نمودارِ کوچک چپ',
+`<div class="hero" style="background:radial-gradient(130% 100% at 70% 0%,#2a2a2d 0%,#111113 55%,#070708 100%)">${head()}<div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:16px;position:relative"><div><div style="font-size:15px;opacity:.85">صندوق ⌄</div><div class="amt silver" style="text-align:right">15,000 <small>؋</small></div><div style="font-size:13px;opacity:.8">فروشِ امروز 1,100 ؋</div></div><div style="width:150px">${spark('#e5e7eb',.85,70,'s7')}<div style="font-size:11px;opacity:.6;text-align:center">فروشِ امروز</div></div></div>
+<div class="btns" style="justify-content:flex-start"><span class="plus" style="width:52px;height:52px">+</span><span class="pb">↙ دریافت</span><span class="pb">↗ پرداخت</span></div>${chip()}</div>`],
+['سفید (روشن)','همان سبک ولی روشن، کنارِ بقیهٔ صفحه',
+`<div class="hero" style="background:linear-gradient(180deg,#ffffff,#f1f1f4);color:#111;border:1px solid #e4e4e7;box-shadow:0 10px 30px rgba(0,0,0,.08)">${head('#d4d4d8').replace('rgba(255,255,255,.04)','#fff')}<div class="sel">صندوق ⌄</div><div class="amt" style="background:linear-gradient(180deg,#111 40%,#6b7280 100%);-webkit-background-clip:text;background-clip:text;color:transparent">15,000 <small>؋</small></div><div class="sec2" style="color:#4b5563">فروشِ امروز 1,100 ؋ · ۴ فاکتور</div><div class="btns">${['↗ پرداخت'].map(x=>`<span class="pb" style="color:#111;border-color:#d4d4d8;background:#fff;box-shadow:0 4px 10px rgba(0,0,0,.06)">${x}</span>`).join('')}<span class="plus" style="background:#111;color:#fff;border:0">+</span><span class="pb" style="color:#111;border-color:#d4d4d8;background:#fff;box-shadow:0 4px 10px rgba(0,0,0,.06)">↙ دریافت</span></div><div class="chip"><span style="color:#111;border-color:#d4d4d8;background:#fff"><i></i>همگام شد</span></div><div class="dots"><i style="background:#111"></i><i style="background:#111"></i></div></div>`],
+];
+const fa=n=>String(n).replace(/\d/g,d=>'۰۱۲۳۴۵۶۷۸۹'[d]);
+document.getElementById('g').innerHTML=V.map((v,i)=>`<div><div class="tag"><b>${fa(i+5)}</b>${v[0]}<span>${v[1]}</span></div><div class="ph">${v[2]}${acts}</div></div>`).join('');
+</script></body></html>

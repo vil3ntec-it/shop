@@ -190,8 +190,22 @@ object Receipts {
     context: Context, d: ShopData, docId: String, widthDots: Int,
     copyMark: String? = null, fallbackName: String = localName(context),
   ): ReturnReceiptInput? {
-    val doc = ReturnFlow.doc(d, docId) ?: return null
     val profile = ReceiptProfileStore.current(context)
+    return returnInputOf(
+      d, docId, ShopHeader(profile.name.ifBlank { fallbackName }, profile.address, profile.phone, profile.footer),
+      logo = ReceiptProfileStore.logoMono(context, widthDots),
+      copyMark = ir.vil3ntec.tohid.data.TrainingMode.watermark(copyMark),   //  OPS-07: «آموزشی» روی هر فاکتور و رسیدِ برگشتِ آموزشی
+    )
+  }
+
+  /**
+   *  همان [returnInput] بی `Context`: سندِ ثبت‌شده ⇒ ورودیِ رسید، با سربرگ و لوگوی داده‌شده (S15 — سناریوی تعویض
+   *  همین را از سندِ واقعی می‌سازد). `null` ⇒ سند پیدا نشد.
+   */
+  fun returnInputOf(
+    d: ShopData, docId: String, shop: ShopHeader, logo: MonoImage? = null, copyMark: String? = null,
+  ): ReturnReceiptInput? {
+    val doc = ReturnFlow.doc(d, docId) ?: return null
     fun unitOf(productId: String) = d.products.find { it.id == productId }?.unit.orEmpty()
     val refunds = buildList {
       add(PaymentLine(StrPos.offDebt, doc.split.account))
@@ -210,7 +224,7 @@ object Receipts {
       )
     }
     return ReturnReceiptInput(
-      shop = ShopHeader(profile.name.ifBlank { fallbackName }, profile.address, profile.phone, profile.footer),
+      shop = shop,
       label = doc.label,
       invoiceNo = doc.sale?.let { it.invoiceLabel().orEmpty() },
       dateIso = doc.date,
@@ -224,8 +238,8 @@ object Receipts {
       approvedBy = doc.approvedBy,
       by = doc.by,
       exchange = exchange,
-      logo = ReceiptProfileStore.logoMono(context, widthDots),
-      copyMark = ir.vil3ntec.tohid.data.TrainingMode.watermark(copyMark),   //  OPS-07: «آموزشی» روی هر فاکتور و رسیدِ برگشتِ آموزشی
+      logo = logo,
+      copyMark = copyMark,
     )
   }
 
