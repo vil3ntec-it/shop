@@ -53,6 +53,11 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۲ — نگهبانِ مرجِ #877، #878 و #880 (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: #877 (دورِ ۹) squash شد (`013f90e4`)؛ main (#874، #877) در `claude/gaps10-partial` ادغام شد (STATUS با
+  `batch-status.py`، HANDOFF و «تازه‌ها» هر دو سمت؛ بخشِ دورِ ۱۰ بالای بخشِ رسیده به main) و #878 squash شد (`83dcd9f2`)؛
+  main (#878) در `claude/sf-budget` (#880) ادغام شد (HANDOFF هر دو سمت). نیمه‌کاره: CI و مرجِ #880.
+  قدمِ بعدی: دورِ تازهٔ شاهدِ CI برای ردیف‌های دورِ ۹ و ۱۰ و WEB-15.
 ### ۱۴۰۵/۰۸/۱۲ — شاخهٔ `claude/sf-budget` (بودجهٔ بارِ نخستِ ویترین، WEB-15؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: JS ِ بارِ نخستِ ویترین (store.js + kit.js + boot.js) ۷۶٬۷۳۳ ⇐ ۶۹٬۷۵۲ بایت (۶٬۹۸۱ کمتر؛ بازارچه ۶۵٬۸۹۸ ⇐ ۶۰٬۴۶۵) بی
   بالا بردنِ سقف: پنجرهٔ تنظیمات ⇐ `kit/settings.js` (با زدنِ دکمه)، `K.normPhone/keyFor/dropKey/confirm/reason/orderSteps` ⇐
@@ -63,6 +68,18 @@
 - نیمه‌کاره: هیچ؛ PR باز است (مرج نشد، به خواستِ صاحب‌کار).
 - قدمِ بعدی: CI ِ PR و مرج. IMG-12 و هر کارِ تازهٔ ویترین: کدِ نخستین نقاشی فقط تا سقفِ چرخ‌دنده‌ای؛ بیشتر ⇒ دلیل در PR و بالا
   بردنِ `FIRST_LOAD` (تا ۷۵KB)، وگرنه پروندهٔ دیربار با `K.js`.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps10-partial` (کمبودهای PARTIAL، دورِ ۱۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **SEC-03** لغو و «اصلاح» ِ تاریخچهٔ نسخهٔ ۳ (`CancelRoute`/`FixRoute`) از `SalesVoid.run` (= `InvoiceVoid.check` ⇐
+  `SalesEngine.cancel`)، لغوکننده با `FraudTrailPref.by` و `DocChainSync.recordVoid` فقط پس از ذخیرهٔ موفق؛ **RPT-04** (S48) کلیک یا
+  Enter روی ردیفِ روشِ «پایان روز» ⇒ ریزِ تراکنش‌ها (`DayEnd.lines`، `DayEndModel.details`، جمع = «خالص دفتر»)، و `reports.drill` ِ
+  keymap «partial» (**RPT-13**)؛ **RPT-08** «ساعت و روز» در «گزارشِ تازه» ِ گوشی (`HeatmapPhone`، فقط با دیدنِ پول)؛ **RPT-14** صفحهٔ
+  «گزارشِ فروشِ اینترنتی» (`reports/online`، `core/report/OnlineReport`، راهش فقط با پاسخِ روشنِ سرور). همه PARTIAL ماندند (شاهدِ CI).
+  بی مهاجرت و بی تغییرِ سرور.
+- STATUS ِ کهنه (یافتهٔ دورِ ۹) با نامِ آزمون‌ها بازنویسی شد: NTF-10 (مانده فقط D-09)، CRM-03 (مانده سنجشِ سرور)، CRM-13 (مانده شاهدِ CI
+  و برنامهٔ خرید O-04)، INV-20/21 (صفحهٔ نسخهٔ ۳ هست؛ مانده سری/انقضا، فروش از محل، BOM).
+- رد شد: IMG-12 (بودجهٔ بارِ نخستِ ویترین فقط ۶۷ بایت جا دارد؛ نشانیِ نسخه‌دارِ عکس بی کوچک کردنِ store.js/kit.js جا نمی‌شود)،
+  ستونِ مقایسهٔ RPT-13 (برگه‌های `ReportCsv` متن‌اند و ردیف‌به‌ردیف جفت نمی‌شوند).
+- قدمِ بعدی: CI ِ همین PR و ادغام در دسته (کنارِ `claude/gaps9-partial`؛ `WHATS-NEW-fa.md` و `HANDOFF-fa.md` هر دو سمت).
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps9-partial` (کمبودهای PARTIAL، دورِ ۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **CRM-16** دکمهٔ «کارتِ مشتری» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳ (`DebtorFileExtras`، همان `CustomerCardButton`)؛ **POS-18** Ctrl+R
   ِ صندوقِ کامپیوتر خرده ⇄ عمده (`PosKeys.priceList`، keymap «partial»، فقط با `PriceListPrefs` روشن)؛ **PUR-05** فاکتورِ خریدِ چندردیفه

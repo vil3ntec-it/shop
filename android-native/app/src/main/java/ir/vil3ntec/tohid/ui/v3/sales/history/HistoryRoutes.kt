@@ -17,8 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
+import ir.vil3ntec.tohid.data.FraudTrailPref
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnSettings
@@ -29,10 +31,12 @@ import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.PrintLog
 import ir.vil3ntec.tohid.print.PrintSpooler
+import ir.vil3ntec.tohid.sync.platform.DocChainSync
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.ReturnsShot
+import ir.vil3ntec.tohid.ui.screens.SalesVoid
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
@@ -209,13 +213,17 @@ fun RouteScope.CancelRoute() {
   val sale = saleOrBack() ?: return
   val canCancel = remember { ShopRole.canCancelSale(context) }
   if (!canCancel) { LaunchedEffect(Unit) { toasts.show(StrSale.cancelDenied, V3Tone.WARNING); back() }; return }
+  //  SEC-03: کنترل فقط از `InvoiceVoid.check` (`SalesVoid.run`) و سندِ معکوس در زنجیرهٔ اسناد فقط پس از ذخیرهٔ موفق
+  val by = remember { FraudTrailPref.by(context) }
   CancelSheet(
     warning = SalesEngine.cancelWarning(sale),
     onConfirm = { reason ->
-      when (val r = SalesEngine.cancel(data, sale.id, todayIso(), System.currentTimeMillis(), Ulid::next, reason = reason)) {
-        is SalesEngine.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
-        is SalesEngine.Result.Ok -> {
-          scope.launch { store.save(r.data) }
+      val before = data
+      when (val r = SalesVoid.run(before, sale.id, canCancel, InvoiceVoid.Kind.VOID, reason, todayIso(), System.currentTimeMillis(), Ulid::next, by, StrSale.cancelDenied)) {
+        is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
+        is SalesVoid.Outcome.Failed -> toasts.show(r.message, V3Tone.ERROR)
+        is SalesVoid.Outcome.Ok -> {
+          scope.launch { if (store.save(r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.VOID, r.reason) }
           //  PRM-02: کدهای سقف‌دارِ این فاکتور پس از نشستنِ لغو در دفتر آزاد می‌شوند (بی اینترنت ⇒ صف)
           ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.saleCancelled, V3Tone.SUCCESS)
@@ -238,6 +246,7 @@ fun RouteScope.FixRoute() {
   val sale = saleOrBack() ?: return
   val canCancel = remember { ShopRole.canCancelSale(context) }
   if (!canCancel) { LaunchedEffect(Unit) { toasts.show(StrSale.cancelDenied, V3Tone.WARNING); back() }; return }
+  val by = remember { FraudTrailPref.by(context) }
   V3ConfirmSheet(
     title = StrSale.fixTitle,
     message = StrSale.fixBody(ReceiptModel.number(sale)),
@@ -246,11 +255,14 @@ fun RouteScope.FixRoute() {
     danger = false,
     //  برگه پیش از `onConfirm` خودش بسته شده (`onDismiss`)؛ این‌جا برگشتِ دوباره نیست
     onConfirm = {
-      val lines = HistoryModel.reopenLines(data, sale, Ulid::next)
-      when (val r = SalesEngine.cancel(data, sale.id, todayIso(), System.currentTimeMillis(), Ulid::next, reason = HistoryModel.EDIT_IN_CART)) {
-        is SalesEngine.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
-        is SalesEngine.Result.Ok -> {
-          scope.launch { store.save(r.data) }
+      val before = data
+      val lines = HistoryModel.reopenLines(before, sale, Ulid::next)
+      //  SEC-03: «اصلاح» همان کنترل و سندِ معکوسِ لغو را دارد (دلیلِ ثابتِ `InvoiceVoid.CORRECTION_REASON`)
+      when (val r = SalesVoid.run(before, sale.id, canCancel, InvoiceVoid.Kind.CORRECTION, HistoryModel.EDIT_IN_CART, todayIso(), System.currentTimeMillis(), Ulid::next, by, StrSale.cancelDenied)) {
+        is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
+        is SalesVoid.Outcome.Failed -> toasts.show(r.message, V3Tone.ERROR)
+        is SalesVoid.Outcome.Ok -> {
+          scope.launch { if (store.save(r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.CORRECTION, r.reason) }
           //  PRM-02: فاکتورِ اصلاح‌شده لغو است ⇒ کدهایش آزاد؛ ثبتِ دوباره با کلیدِ تازه دوباره می‌گیرد
           ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.fixDone, V3Tone.SUCCESS)
