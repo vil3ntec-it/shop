@@ -19,7 +19,7 @@
   var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹ ِ out_of_stock، فقط در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
-  var pollTimer = 0; var searchTimer = 0;
+  var searchTimer = 0;
   var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
   //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
   var campaign = campaignOfPage();
@@ -418,11 +418,13 @@
 
   // ── ثبتِ سفارش: store/checkout.js، فقط با بازشدنِ سبد یا صفحهٔ ثبت (بودجهٔ JS ِ بارِ اول، WEB-15) ──
   var checkout = null; var checkoutP = null;
+  var ORDER_KIT = '/kit/order-kit.js';
   function loadCheckout() {
-    checkoutP = checkoutP || K.js('/store/checkout.js').then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
+    //  یاورهای ثبت (شماره، کلیدِ یکتایی، پرسشِ تأیید) در kit/order-kit.js ِ دیربار، هم‌زمان
+    checkoutP = checkoutP || Promise.all([K.js('/store/checkout.js'), K.js(ORDER_KIT)]).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
-        ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; },
+        ids: ids, subtotal: subtotal, feeFor: feeFor, minFor: minFor, zones: zones, setZone: setZone, get zone() { return zone; }, shipText: shipText,
         defaultFulfillment: defaultFulfillment, hasBad: hasBad,
         short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
@@ -442,41 +444,31 @@
   }
 
   // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
-  var orderView = null;
+  var orderView = null; var ov = null;
   function loadOrderView() {
-    //  واژه‌نامهٔ order.<زبان>.json هم‌زمان؛ نیامد ⇒ متنِ HTML
-    orderView = orderView || Promise.all([K.js('/store/order.js'), K.part('order', $('view-order'))]).then(function () { return window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); })
+    //  واژه‌نامهٔ order.<زبان>.json و یاورهای پیگیری (kit/order-kit.js) هم‌زمان؛ واژه‌نامه نیامد ⇒ متنِ HTML
+    orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); return ov; })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
+  function stopOrder() { if (ov) ov.stop(); }
 
-  var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
   function openOrder(token) {
     show('view-order');
     document.title = t('od.title') + ' — ' + store.title;
-    clearTimeout(pollTimer);
+    stopOrder();
     $('o-msg').hidden = true;
     if (K.loadS('placed:' + token)) K.note($('o-placed'), 'ok', t('od.placed'));
     else $('o-placed').hidden = true;
-    var load = function () {
-      //  نخستین بار order.js هم‌زمان با خودِ سفارش می‌آید، نه پس از آن
-      Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) {
-        var o = r[1].render(r[0].order, token);
-        //  پیگیریِ زنده فقط جلوی چشم و تا سفارش تمام نشده
-        //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
-        var pend = o.paymentStatus === 'pending';
-        if (pend || FINAL.indexOf(o.status) < 0) pollTimer = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else pollTimer = setTimeout(load, 20000); }, pend ? 5000 : 20000);
-      }).catch(function (e) {
-        $('o-title').textContent = t('od.title');
-        K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
-        $('o-status').className = 'pill err';
-        $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
-        $('o-meta').textContent = e.message;
-        $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
-        $('o-dlv').hidden = true; ['o-add', 'o-apology'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
-      });
-    };
-    load();
+    //  نخستین بار order.js هم‌زمان با خودِ سفارش می‌آید، نه پس از آن؛ پیگیریِ زنده و برگهٔ خطا در order.js (`open`، `fail`)
+    Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) { r[1].open(token, r[0].order); }).catch(function (e) {
+      if (ov) { ov.fail(e); return; }
+      //  order.js نیامد ⇒ هنوز هیچ چیزِ سفارش در صفحه نیست (بخش‌ها پنهان‌اند تا order.js بنشاندشان)
+      $('o-title').textContent = t('od.title');
+      $('o-status').className = 'pill err';
+      $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
+      $('o-meta').textContent = e.message;
+    });
   }
 
   /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. «فهرستِ خرید» (WEB-11) هم با `fail` ِ خودش. */
@@ -543,7 +535,7 @@
     if (!store) return;
     var h = location.hash || '#/';
     if (h.indexOf('#/o/') === 0) { closeAll(); try { return openOrder(decodeURIComponent(h.slice(4))); } catch (e) { return openOrder(''); } }
-    clearTimeout(pollTimer);
+    stopOrder();
     if (h === '#/orders') { closeAll(); return openOrders(); }
     if (h === '#/checkout') { closeAll(); return openCheckout(); }
     if ($('view-catalog').hidden) show('view-catalog');
@@ -577,7 +569,6 @@
     $('missing-art').appendChild(K.icon('store'));
     $('empty-art').appendChild(K.icon('search'));
     $('orders-art').appendChild(K.icon('receipt'));
-    $('pay-ico').appendChild(K.icon('cash'));
     if (!/^[a-z0-9][a-z0-9-]{1,30}[a-z0-9]$/.test(slug)) { show('view-missing'); return; }
     api('').then(function (r) {
       store = r.store;
@@ -587,16 +578,11 @@
       store.features = r.features || {};
       verifyAvailable = !r.verification || r.verification.available !== false;
       if (r.seo && typeof r.seo.productBase === 'string') {
-        var ss = el('script', { attrs: { src: '/store/share.js' } });
-        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود
-        ss.onload = function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; };
-        document.head.appendChild(ss);
+        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود؛ نیامد ⇒ بی دکمه
+        K.js('/store/share.js').then(function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; }, function () { /* بی «فرستادن» */ });
       }
       renderHead();
       renderCats();
-      $('opt-delivery').hidden = !store.fulfillment.delivery;
-      $('opt-pickup').hidden = !store.fulfillment.pickup;
-      $('opt-delivery-fee').textContent = zones() ? shipText() : store.deliveryFeeMinor > 0 ? K.money(store.deliveryFeeMinor) : t('free');
       setZone({ id: K.loadS('zone:' + slug) });
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
