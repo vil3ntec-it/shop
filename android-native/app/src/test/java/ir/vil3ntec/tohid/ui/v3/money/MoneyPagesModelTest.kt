@@ -133,6 +133,68 @@ class MoneyPagesModelTest {
     assertTrue(PurchaseFormModel.dirty(initial.copy(quantity = "1"), initial))
   }
 
+  /** PUR-05: فاکتورِ خریدِ چندردیفه در گوشی — همان `PurchaseBook.record` ِ کامپیوتر */
+  @Test
+  fun `فرمِ خرید — ردیف‌های افزوده جمع و خطای خودشان را دارند و با PurchaseBook یک فاکتور می‌شوند`() {
+    val p = ledger.products.first()
+    val one = PurchaseForm(supplierId = "s1", productId = p.id, quantity = "2", price = "95", paid = "300", date = "2026-10-20")
+    //  بی ردیفِ افزوده ⇒ همان تک‌ردیفهٔ امروز (همان جمع، همان راهِ `addPurchase`)
+    assertFalse(PurchaseFormModel.multi(one))
+    assertEquals(190.0, PurchaseFormModel.total(one), 0.0)
+    var f = PurchaseFormModel.addRow(one)
+    assertTrue(PurchaseFormModel.multi(f))
+    //  ردیفِ خالی خطای خودش را دارد و فرم ثبت نمی‌شود
+    val bad = PurchaseFormModel.errors(f)
+    assertTrue(bad.any)
+    assertEquals(1, bad.rows.size)
+    assertTrue(bad.rows[0].product != null && bad.rows[0].quantity != null && bad.rows[0].price != null)
+    //  کالای ردیف قیمتِ خریدِ خودش را پیشنهاد می‌گیرد؛ هر ردیف جدا گرد می‌شود
+    f = PurchaseFormModel.pickRowProduct(f, 0, p)
+    assertEquals("95", f.more[0].price)
+    f = PurchaseFormModel.setRow(f, 0, f.more[0].copy(quantity = "1.5", price = "33"))
+    assertFalse(PurchaseFormModel.errors(f).any)
+    assertEquals(190.0 + 50.0, PurchaseFormModel.total(f), 0.0)
+    assertEquals(0.0, PurchaseFormModel.remaining(f.copy(paid = "240")), 0.0)
+    //  برداشتن و نشانیِ بیرونِ ردیف‌ها
+    assertEquals(one, PurchaseFormModel.removeRow(f, 0))
+    assertEquals(f, PurchaseFormModel.removeRow(f, 5))
+    assertEquals(f, PurchaseFormModel.setRow(f, 5, PurchaseRow()))
+    //  سقفِ ردیف‌ها (ردیفِ نخست هم شمرده می‌شود)
+    var big = one
+    repeat(PurchaseFormModel.MAX_ROWS + 5) { big = PurchaseFormModel.addRow(big) }
+    assertEquals(PurchaseFormModel.MAX_ROWS - 1, big.more.size)
+    //  ثبت: همان فاکتورِ چندردیفهٔ کامپیوتر با یک شماره و پرداختِ پخش‌شده به ترتیب
+    val lines = PurchaseFormModel.lines(f) { id -> if (id == p.id) "کیلو" else "" }
+    assertEquals(listOf(p.id, p.id), lines.map { it.productId })
+    assertEquals(listOf(2.0, 1.5), lines.map { it.quantity })
+    assertEquals(listOf("کیلو", "کیلو"), lines.map { it.unit })
+    val supplier = ledger.suppliers.first().id
+    var n = 0
+    val r = ir.vil3ntec.tohid.data.PurchaseBook.record(
+      ledger, supplier, lines, PurchaseFormModel.paid(f), f.date, "", "2026-10-20", 1L, { "pur5-${n++}" },
+    )
+    assertTrue(r is ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok)
+    val ok = r as ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok
+    val added = ok.data.purchases.filter { it.invoiceNo == ok.invoiceNo }
+    assertEquals(2, added.size)
+    assertEquals(240.0, added.sumOf { it.totalAmount }, 0.0)
+    assertEquals(240.0, added.sumOf { it.paidAmount }, 0.0)
+  }
+
+  @Test
+  fun `فرمِ خرید — ردیف‌های افزوده با چرخشِ صفحه نمی‌روند`() {
+    //  همان قالبِ `PurchaseFormSaver`: هفت کادر، سپس سه‌تایی‌های ردیف
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/PurchaseFormScreen.kt") }.first { it.isFile }.readText()
+    assertTrue(src.contains("it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price) }"))
+    assertTrue(src.contains("more = v.drop(7).chunked(3).filter { it.size == 3 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2]) })"))
+    //  تک‌ردیفه همان `onSave` (موتورِ امروز)، چندردیفه `onSaveMany` ⇒ `PurchaseBook.record`
+    assertTrue(src.contains("else if (!PurchaseFormModel.multi(form)) { if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack() }"))
+    val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt") }.first { it.isFile }.readText()
+    assertTrue(routes.contains("ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId)"))
+  }
+
   /* ------------------------------ مصارف ------------------------------ */
 
   @Test

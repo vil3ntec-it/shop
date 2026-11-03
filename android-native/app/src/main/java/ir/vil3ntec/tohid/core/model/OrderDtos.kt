@@ -360,3 +360,10 @@ data class OrderPageDto(
   val items: List<OrderDto> = emptyList(),
   val nextCursor: String? = null,
 )
+
+/** `GET /shop/orders/customer?phone=…` (CRM-07) — سفارش‌های باز و لغوشدهٔ یک مشتری، تازه‌ترین بالا */
+@Serializable
+data class OrderCustomerPageDto(
+  val items: List<OrderDto> = emptyList(),
+  val more: Boolean = false,
+)

@@ -57,7 +57,7 @@
     "sale.finishExact": {"scope":"sale","title":"پایانِ فوری با نقدِ دقیق","status":"live","page":null,"web":[["Enter",true,false,false]],"overrides":["global.save"]},
     "sale.priceCheck": {"scope":"sale","title":"قیمت‌پرسی بدون افزودن","status":"planned","page":null,"web":[["I",false,false,true]],"overrides":[]},
     "sale.unit": {"scope":"sale","title":"تغییرِ واحدِ ردیف","status":"planned","page":null,"web":[["U",false,false,true]],"overrides":[]},
-    "sale.priceList": {"scope":"sale","title":"تغییرِ لیستِ قیمتِ فاکتور","status":"planned","page":null,"web":[["R",false,true,true]],"overrides":[]},
+    "sale.priceList": {"scope":"sale","title":"تغییرِ لیستِ قیمتِ فاکتور","status":"partial","page":null,"web":[["R",false,true,true]],"overrides":[]},
     "sale.clear": {"scope":"sale","title":"پاک کردنِ کادر؛ خالی کردنِ فاکتور فقط با تأیید","status":"live","page":null,"web":[["Escape",false,false,false]],"overrides":["global.back"]},
     "sale.payment.submit": {"scope":"sale.payment","title":"ثبت؛ مبلغِ خالی = نقدِ دقیق","status":"planned","page":null,"web":[["Enter",false,false,false]],"overrides":[]},
     "sale.payment.nextField": {"scope":"sale.payment","title":"فیلدِ بعدی","status":"planned","page":null,"web":[["Tab",false,false,false]],"overrides":[]},

@@ -731,6 +731,12 @@ object StrOnline {
   fun dlSaleFailed(n: Long, m: String): String = t("سفارش #${asIs(n)} تحویل شد؛ فروش همین حالا ثبت نشد (${asIs(m)}) — برنامه دوباره می‌کوشد، در صندوق دستی نزنید.", "Order #$n handed over; the sale wasn't recorded just now ($m) — the app will retry, don't enter it at the till.", "فرمایش #$n وسپارل شو؛ پلور اوس ثبت نشو ($m) — اپ بیا هڅه کوي، په صندوق کې یې لاسي مه ثبتوئ.")
   fun dlSaleNeedsReview(n: Long, m: String): String = t("سفارش #${asIs(n)} تحویل شد؛ فروشش خودکار ثبت نمی‌شود — ${asIs(m)}", "Order #$n handed over; its sale won't be recorded automatically — $m", "فرمایش #$n وسپارل شو؛ پلور یې خپلکاره نه ثبتیږي — $m")
 
+  // ── CRM-07: سفارش‌های باز/لغوشدهٔ مشتری در پروندهٔ او (`CustomerOnlineOrdersPanel`) ──────────
+  fun customerOrders(n: Any): String = t("سفارش‌های اینترنتیِ باز یا لغوشده (${asIs(n)})", "Open or cancelled online orders ($n)", "پرانیستي یا لغوه شوي آنلاین فرمایشونه ($n)")
+  fun customerOrderLine(no: Any, amount: Any, ago: Any): String =
+    t("#${asIs(no)} · ${asIs(amount)} ؋ · ${asIs(ago)}", "#$no · $amount ؋ · $ago", "#$no · $amount ؋ · $ago")
+  val customerOrdersMore: String get() = t("سفارش‌های بیشتری هست — در «سفارش‌ها» ببینید", "There are more — see Orders", "نور هم شته — په «فرمایشونه» کې یې وګورئ")
+
   // ── جدول‌های ترجمهٔ واژه‌های موتور ───────────────────────────────────────────
   private val STATUS_EN = mapOf(
     "new" to "New", "accepted" to "Accepted", "rejected" to "Rejected", "auto_rejected" to "Auto-rejected",

@@ -262,6 +262,14 @@ object PosKeys {
   fun noSaleDrawer(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean): Boolean =
     key != null && KeyMap.SALE_DRAWER.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
 
+  /**
+   *  POS-18 — «لیستِ قیمتِ فاکتور» (`sale.priceList`، Ctrl+R از `keymap.json`)، پیش از [screen]: خرده ⇄ عمده،
+   *  همان کارِ زدنِ نشانِ «لیستِ قیمت». فقط با «لیستِ قیمت در صندوق» ِ روشن ([enabled] = `PriceListPrefs.on`)؛
+   *  خاموش ⇒ `false` و کلید مالِ صندوق نیست (همان امروز). پیرایه‌ها دقیق‌اند (Shift/Alt نه).
+   */
+  fun priceList(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
+    enabled && key != null && KeyMap.SALE_PRICE_LIST.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
+
   /** کادرِ اسکن/جست‌وجو */
   fun field(key: KeyName?, primary: Boolean, queryEmpty: Boolean, hasMatches: Boolean, hasSelection: Boolean): PosAction? = when (key) {
     KeyName.Enter -> if (!primary) PosAction.SUBMIT else null

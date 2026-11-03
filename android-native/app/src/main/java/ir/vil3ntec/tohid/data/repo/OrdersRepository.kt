@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.model.HandoverPageDto
 import ir.vil3ntec.tohid.core.model.OrderBulkOutDto
+import ir.vil3ntec.tohid.core.model.OrderCustomerPageDto
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderNoticeDto
 import ir.vil3ntec.tohid.core.model.OrderNoticesDto
@@ -47,6 +48,15 @@ class OrdersRepository(private val api: ApiClient) {
       if (!cursor.isNullOrBlank()) append("&cursor=").append(enc(cursor))
     }
     ApiJson.decode<OrderPageDto>(api.get(q))
+  }
+
+  /**
+   *  CRM-07: سفارش‌های هنوز تحویل‌نشده یا لغوشدهٔ یک مشتری (تا دو شماره، اول و دوم) برای پروندهٔ او؛
+   *  فقط صاحب و مدیر (`orders.contact`)، پاسخ همان کارتِ فهرست با شمارهٔ پوشیده.
+   */
+  suspend fun forCustomer(phones: List<String>): ApiResult<OrderCustomerPageDto> = result {
+    val q = phones.take(2).joinToString("&") { "phone=" + enc(it) }
+    ApiJson.decode<OrderCustomerPageDto>(api.get("$ROOT/customer?$q"))
   }
 
   suspend fun get(id: String): ApiResult<OrderDto> =

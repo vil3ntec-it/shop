@@ -70,7 +70,7 @@
     { "id": "sale.finishExact", "scope": "sale", "title": "پایانِ فوری با نقدِ دقیق", "status": "live", "keys": ["F12", "Mod+Enter"], "web": ["Mod+Enter"], "overrides": ["global.save"] },
     { "id": "sale.priceCheck", "scope": "sale", "title": "قیمت‌پرسی بدون افزودن", "status": "planned", "keys": ["Mod+I"], "web": ["Alt+I"] },
     { "id": "sale.unit", "scope": "sale", "title": "تغییرِ واحدِ ردیف", "status": "planned", "keys": ["Mod+U"], "web": ["Alt+U"] },
-    { "id": "sale.priceList", "scope": "sale", "title": "تغییرِ لیستِ قیمتِ فاکتور", "status": "planned", "keys": ["Mod+R"], "web": ["Alt+Shift+R"] },
+    { "id": "sale.priceList", "scope": "sale", "title": "تغییرِ لیستِ قیمتِ فاکتور", "status": "partial", "keys": ["Mod+R"], "web": ["Alt+Shift+R"] },
     { "id": "sale.clear", "scope": "sale", "title": "پاک کردنِ کادر؛ خالی کردنِ فاکتور فقط با تأیید", "status": "live", "keys": ["Escape"], "web": ["Escape"], "overrides": ["global.back"] },
 
     { "id": "sale.payment.submit", "scope": "sale.payment", "title": "ثبت؛ مبلغِ خالی = نقدِ دقیق", "status": "planned", "keys": ["Enter"], "web": ["Enter"] },

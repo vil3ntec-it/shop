@@ -245,6 +245,27 @@ class PosLogicTest {
     assertEquals(ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_DRAWER.status)
   }
 
+  /** POS-18: Ctrl+R = خرده ⇄ عمده (`sale.priceList` از `keymap.json`) فقط با «لیستِ قیمت در صندوق» ِ روشن */
+  @Test
+  fun `Ctrl+R لیستِ قیمتِ فاکتور را عوض می‌کند و خاموش کلید مالِ صندوق نیست`() {
+    assertTrue(PosKeys.priceList(KeyName.R, primary = true, shift = false, alt = false, enabled = true))
+    //  خاموش ⇒ همان امروز: کلید خورده نمی‌شود
+    assertFalse(PosKeys.priceList(KeyName.R, primary = true, shift = false, alt = false, enabled = false))
+    //  پیرایه‌ها دقیق‌اند: R ِ تنها، Ctrl+Shift+R و Ctrl+Alt+R نه؛ کلیدِ صفحه هم نیست
+    assertFalse(PosKeys.priceList(KeyName.R, primary = false, shift = false, alt = false, enabled = true))
+    assertFalse(PosKeys.priceList(KeyName.R, primary = true, shift = true, alt = false, enabled = true))
+    assertFalse(PosKeys.priceList(KeyName.R, primary = true, shift = false, alt = true, enabled = true))
+    assertFalse(PosKeys.priceList(null, primary = true, shift = false, alt = false, enabled = true))
+    assertNull(PosKeys.screen(KeyName.R, primary = true))
+    //  کلید از `keymap.json` می‌آید و دیگر «planned» نیست (فقط صندوقِ کامپیوتر و با تنظیمِ روشن ⇒ partial)
+    assertEquals(listOf(ir.vil3ntec.tohid.core.keymap.Chord(KeyName.R, mod = true)), ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_PRICE_LIST.keys)
+    assertEquals(ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_PRICE_LIST.status)
+    //  همان یک `toggle` ِ هسته که نشانِ «لیستِ قیمت» می‌زند
+    val s = ir.vil3ntec.tohid.core.sale.PriceList.toggle(ir.vil3ntec.tohid.core.sale.PriceList.FRESH)
+    assertEquals(ir.vil3ntec.tohid.core.sale.PriceList.WHOLESALE, s.list)
+    assertTrue(s.byHand)
+  }
+
   @Test
   fun `کلیدهای کادر — Esc هرگز سبد را پاک نمی‌کند و + − Delete فقط با کادرِ خالی`() {
     assertEquals(PosAction.SUBMIT, PosKeys.field(KeyName.Enter, false, queryEmpty = false, hasMatches = true, hasSelection = false))

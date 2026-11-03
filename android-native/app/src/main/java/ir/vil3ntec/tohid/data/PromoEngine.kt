@@ -171,6 +171,8 @@ object PromoEngine {
         costMinor = (p.purchasePrice * 100).roundToLong().coerceAtLeast(0),
         category = p.category,
         supplierId = p.supplierId,
+        //  PRM-08: برندِ کالا (PRD-06) برای قاعده‌های شامل/مستثنای برند؛ بی برند ⇒ "" (همان پیشین)
+        brand = p.brand?.trim().orEmpty(),
         noPromo = line.unitPrice != null,
         lots = lots[p.id].orEmpty(),
       )
