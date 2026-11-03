@@ -31,7 +31,7 @@ object StrOrderFlow {
     "phone_check_off" -> t("تأییدِ شمارهٔ مشتری روی سرور راه نیفتاده", "Customer phone verification isn't set up on the server", "د پېرودونکي د شمېرې تایید په سرور کې نه دی چالان شوی")
     "server_not_ready" -> t("ویترین روی سرور آماده نیست", "The storefront isn't ready on the server", "ویترین په سرور کې چمتو نه دی")
     "alerts_off" -> t("اعلانِ سفارشِ تازه خاموش است", "New-order alerts are off", "د نوي فرمایش خبرتیا بنده ده")
-    else -> t("سفارشِ آنلاین به این دکان نمی‌رسد", "Online orders can't reach this shop", "آنلاین فرمایشونه دې دوکان ته نه رسېږي")
+    else -> t("سفارشِ آنلاین به این دکان نمی‌رسد (${asIs(code)})", "Online orders can't reach this shop ($code)", "آنلاین فرمایشونه دې دوکان ته نه رسېږي ($code)")
   }
 
   /** «چه باید کرد» ِ هر دروازه، به زبانِ ساده */
@@ -92,7 +92,7 @@ object StrOrderFlow {
       "Orders appear in Online orders but don't ring; ask support to turn on order alerts.",
       "فرمایش په «آنلاین فرمایشونو» کې راځي خو زنګ نه وهي؛ له ملاتړ وغواړئ چې د فرمایش خبرتیا فعاله کړي.",
     )
-    else -> t("با پشتیبانی تماس بگیرید.", "Contact support.", "له ملاتړ سره اړیکه ونیسئ.")
+    else -> t("با پشتیبانی تماس بگیرید (کد: ${asIs(code)}).", "Contact support (code: $code).", "له ملاتړ سره اړیکه ونیسئ (کوډ: $code).")
   }
 
   val fixStorefront: String get() = t("باز کردنِ ویترین", "Open storefront", "ویترین پرانیستل")
@@ -141,19 +141,18 @@ object StrOrderFlow {
 
   // ── حالِ پرداختِ مشتری (جزئیاتِ سفارش، `payStep`) ──
   val payTitle: String get() = t("پرداختِ مشتری", "Customer payment", "د پېرودونکي تادیه")
-  fun payState(state: String, pickup: Boolean, chosen: Boolean): String = when (state) {
-    "awaiting_accept" -> t("پس از «قبول» از مشتری روشِ پرداخت پرسیده می‌شود.", "After you accept, the customer is asked how to pay.", "له منلو وروسته له پېرودونکي د تادیې لاره پوښتل کېږي.")
-    "awaiting_choice" -> t("منتظرِ انتخابِ مشتری؛ اگر انتخاب نکند، نقد هنگامِ تحویل.", "Waiting for the customer to choose; if they don't, cash on delivery.", "د پېرودونکي د ټاکنې په تمه؛ که ونه ټاکي، د سپارلو پر مهال نغدې.")
-    "online_pending" -> t("پرداختِ آنلاین در جریان است.", "Online payment is in progress.", "آنلاین تادیه روانه ده.")
-    "paid_online" -> t("پرداخت‌شده با حساب‌پی.", "Paid with HesabPay.", "په حساب‌پې ورکړل شوې.")
-    "cash_collected" -> t("نقد گرفته شد؛ منتظرِ تسویهٔ پیک.", "Cash collected; waiting for the courier to settle.", "نغدې واخیستل شوې؛ د پیک د تصفیې په تمه.")
-    "cash_settled" -> t("نقد به دکان رسید.", "The cash reached the shop.", "نغدې دوکان ته ورسېدې.")
-    "refunded" -> t("پول برگشت داده شد.", "The money was refunded.", "پیسې بېرته ورکړل شوې.")
-    "closed" -> t("سفارش بسته است.", "The order is closed.", "فرمایش تړل شوی.")
-    else -> (if (pickup) t("نقد هنگامِ برداشت — سرِ پیشخوان.", "Cash at pickup — at the counter.", "د اخیستو پر مهال نغدې — په کاونټر کې.")
-    else t("نقد هنگامِ تحویل — پیک می‌گیرد.", "Cash on delivery — the courier collects.", "د سپارلو پر مهال نغدې — پیک یې اخلي.")) +
-      (if (chosen) " " + t("(انتخابِ مشتری)", "(customer's choice)", "(د پېرودونکي ټاکنه)") else "")
-  }
+  val payAwaitingAccept: String get() = t("پس از «قبول» از مشتری روشِ پرداخت پرسیده می‌شود.", "After you accept, the customer is asked how to pay.", "له منلو وروسته له پېرودونکي د تادیې لاره پوښتل کېږي.")
+  val payAwaitingChoice: String get() = t("منتظرِ انتخابِ مشتری؛ اگر انتخاب نکند، نقد هنگامِ تحویل.", "Waiting for the customer to choose; if they don't, cash on delivery.", "د پېرودونکي د ټاکنې په تمه؛ که ونه ټاکي، د سپارلو پر مهال نغدې.")
+  val payOnlinePending: String get() = t("پرداختِ آنلاین در جریان است.", "Online payment is in progress.", "آنلاین تادیه روانه ده.")
+  val payPaidOnline: String get() = t("پرداخت‌شده با حساب‌پی.", "Paid with HesabPay.", "په حساب‌پې ورکړل شوې.")
+  val payCashCollected: String get() = t("نقد گرفته شد؛ منتظرِ تسویهٔ پیک.", "Cash collected; waiting for the courier to settle.", "نغدې واخیستل شوې؛ د پیک د تصفیې په تمه.")
+  val payCashSettled: String get() = t("نقد به دکان رسید.", "The cash reached the shop.", "نغدې دوکان ته ورسېدې.")
+  val payRefunded: String get() = t("پول برگشت داده شد.", "The money was refunded.", "پیسې بېرته ورکړل شوې.")
+  val payClosed: String get() = t("سفارش بسته است.", "The order is closed.", "فرمایش تړل شوی.")
+  val payCashPickup: String get() = t("نقد هنگامِ برداشت — سرِ پیشخوان.", "Cash at pickup — at the counter.", "د اخیستو پر مهال نغدې — په کاونټر کې.")
+  val payCashPickupChosen: String get() = t("نقد هنگامِ برداشت — سرِ پیشخوان (انتخابِ مشتری).", "Cash at pickup — at the counter (customer's choice).", "د اخیستو پر مهال نغدې — په کاونټر کې (د پېرودونکي ټاکنه).")
+  val payCashDelivery: String get() = t("نقد هنگامِ تحویل — پیک می‌گیرد.", "Cash on delivery — the courier collects.", "د سپارلو پر مهال نغدې — پیک یې اخلي.")
+  val payCashDeliveryChosen: String get() = t("نقد هنگامِ تحویل — پیک می‌گیرد (انتخابِ مشتری).", "Cash on delivery — the courier collects (customer's choice).", "د سپارلو پر مهال نغدې — پیک یې اخلي (د پېرودونکي ټاکنه).")
 
   // ── «به سبد / فاکتور» ──
   val invoiceTitle: String get() = t("فاکتور", "Invoice", "بل")

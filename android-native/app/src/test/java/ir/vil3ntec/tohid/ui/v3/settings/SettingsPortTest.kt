@@ -242,7 +242,8 @@ class SettingsPortTest {
   @Test
   fun `بخش‌های پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارند`() {
     assertEquals(
-      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD),
+      //  «سفارشِ آنلاین» (۱۴۰۵/۰۸/۱۳): پشتِ پاسخِ `/shop/orders/config` (`onlineOrdersRow`)، نه پرچم
+      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD, SettingsLayout.ONLINE_ORDERS),
       SettingsLayout.SERVER_GATED,
     )
     SettingsLayout.SERVER_GATED.forEach { key ->
@@ -265,7 +266,7 @@ class SettingsPortTest {
     assertTrue(rows.contains("SettingsLayout.visibleParts(group, Platform.DESKTOP, facts.serverOn, featuresOn)") && rows.contains("serverOn = rememberServerSections()"))
     assertTrue(index.contains("SettingsSearchIndex.docs(Platform.DESKTOP, facts.serverOn, extras)"))
     val server = sources.entries.first { rel(it.key) == "ui/v3/settings/sections/ServerSettingsScreensAndroid.kt" }.value
-    listOf("ownerReportRow(", "storefrontEtaRow(", "promoGuardRow(", "it.enabled && it.owner", "StorefrontEtaApi.visible(it)", "ShopRole.OWNER")
+    listOf("ownerReportRow(", "storefrontEtaRow(", "promoGuardRow(", "onlineOrdersRow(", "it.enabled && it.owner", "StorefrontEtaApi.visible(it)", "ShopRole.OWNER")
       .forEach { assertTrue("$it در صفحه‌های سروری نیست", server.contains(it)) }
   }
 

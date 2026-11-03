@@ -68,3 +68,24 @@ internal fun RouteScope.openFix(fix: OrderFlow.Fix) {
     OrderFlow.Fix.SERVER, OrderFlow.Fix.NONE -> Unit
   }
 }
+
+/**
+ *  متنِ «پرداختِ مشتری» برای `payStep.state` ِ سرور (`lib/order-flow.payStateOf`); حالتِ ناشناختهٔ سرورِ تازه‌تر ⇒ همان
+ *  نقدِ پیش‌فرض (مثلِ سرور).
+ */
+internal fun payStateText(state: String, pickup: Boolean, chosen: Boolean): String = when (state) {
+  "awaiting_accept" -> StrOrderFlow.payAwaitingAccept
+  "awaiting_choice" -> StrOrderFlow.payAwaitingChoice
+  "online_pending" -> StrOrderFlow.payOnlinePending
+  "paid_online" -> StrOrderFlow.payPaidOnline
+  "cash_collected" -> StrOrderFlow.payCashCollected
+  "cash_settled" -> StrOrderFlow.payCashSettled
+  "refunded" -> StrOrderFlow.payRefunded
+  "closed" -> StrOrderFlow.payClosed
+  else -> when {
+    pickup && chosen -> StrOrderFlow.payCashPickupChosen
+    pickup -> StrOrderFlow.payCashPickup
+    chosen -> StrOrderFlow.payCashDeliveryChosen
+    else -> StrOrderFlow.payCashDelivery
+  }
+}

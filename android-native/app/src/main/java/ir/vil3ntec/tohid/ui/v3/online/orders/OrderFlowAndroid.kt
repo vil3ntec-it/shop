@@ -71,7 +71,7 @@ private fun PayStepCard(o: OrderDto, state: String, choice: String) {
   if (state.isBlank()) return
   V3Section(null) {
     V3ListRow(
-      StrOrderFlow.payTitle, subtitle = StrOrderFlow.payState(state, o.fulfillment == "pickup", choice == "cash"),
+      StrOrderFlow.payTitle, subtitle = payStateText(state, o.fulfillment == "pickup", choice == "cash"),
       icon = Icons.Outlined.Payments, chevron = false, subtitleLines = 3,
     )
   }
