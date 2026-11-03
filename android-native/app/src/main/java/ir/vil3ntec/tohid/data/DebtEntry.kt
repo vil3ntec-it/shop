@@ -69,8 +69,11 @@ object DebtEntry {
         dueDate = e.dueDate, overLimit = e.overLimit, txId = key,
       )
       when (r) {
-        //  PAY-17: رسیدِ همین دستگاه مهرِ کشوی نام‌دارِ برگزیده‌اش را می‌گیرد (خاموش ⇒ همان شیء)
-        is DebtorEngine.Result.Ok -> TillDrawer.stampNew(cur, r.data)
+        //  PAY-17: رسیدِ همین دستگاه مهرِ کشوی نام‌دارِ برگزیده‌اش را می‌گیرد (خاموش ⇒ همان شیء)؛ PRM-13: رسیدِ مشتری امتیازِ
+        //  سهمِ نسیهٔ پرداخت‌شده را در همان دفتر می‌دهد (امتیازِ خاموش یا بی نسیهٔ باز ⇒ همان شیء)
+        is DebtorEngine.Result.Ok -> TillDrawer.stampNew(
+          cur, if (e.kind == DebtorEngine.Kind.RECEIVE) LoyaltyPoints.afterPayment(r.data, key, null) else r.data,
+        )
         is DebtorEngine.Result.Failed -> { fail(r.message); null }
       }
     }

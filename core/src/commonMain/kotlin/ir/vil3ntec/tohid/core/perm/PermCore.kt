@@ -92,6 +92,9 @@ object PermCore {
     "shift.report" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "allow"), "restrict", false, emptyList(), true),
     // گاوصندوق (PAY-18): شمارش، ورود، خروج، به بانک و به دخل؛ «از دخل» فقط نوشتن می‌خواهد
     "safe.move" to Spec(OMD, "restrict", false, emptyList(), false),
+    // CRM-15: دیدنِ شماره و نشانیِ مشتری (کمترین اطلاعاتِ شخصی) — فقط نمایش (داده روی دستگاه هست)؛ سه نقشِ قدیم
+    // و صندوق‌دار و حسابدار مثلِ امروز می‌بینند، انباردار و جمع‌آور نه؛ صاحب برای هر نقش یا کاربر تنگ یا باز می‌کند
+    "customers.contact" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "allow"), "full", false, emptyList(), true),
   )
 
   /** «همه» — رفتارِ امروزِ سه نقشِ قدیم */

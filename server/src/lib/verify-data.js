@@ -124,6 +124,25 @@ function ledgerChecks(src) {
                 AND (NOT rel.alive OR p.deleted_at IS NULL))`,
     },
     {
+      //  صاحب‌کار ۱۴۰۵/۰۸/۱۳ (`CreditDebtor` ِ برنامه، ‎lib/credit-debtor.js‎): فاکتوری با سهمِ «به حساب» و بی مشتری —
+      //  بدهی به هیچ‌کس نرفت. برنامهٔ تازه نمی‌سازد؛ دفترِ کهنه شاید دارد ⇒ `warn` (اصلاح: مشتری روی همان فاکتور)
+      id: 'orphan.credit_no_debtor', severity: 'warn',
+      title: 'فاکتورِ نسیه بی مشتری: سهمِ «به حساب» (debtGiven، یا مانده با نسیه یا ردیفِ account) دارد ولی debtorId ندارد',
+      sql: `SELECT s.account_id, 'sales/' || s.row_id AS ref,
+                   concat_ws(' ', s.data->>'paymentMethod', s.data->>'debtGiven', s.data->>'remaining') AS value
+          FROM ${R} s
+         WHERE ${sumWhere('s')} AND s.table_name = 'sales'
+           AND COALESCE(s.data->>'status', '') <> 'cancelled'
+           AND COALESCE(btrim(s.data->>'debtorId'), '') = ''
+           AND (COALESCE(${num('s', 'debtGiven')}, 0) > 0.004
+             OR ((s.data->>'paymentMethod' = 'credit'
+                  OR EXISTS (
+                    SELECT 1 FROM jsonb_array_elements(CASE WHEN jsonb_typeof(s.data->'payments') = 'array' THEN s.data->'payments' ELSE '[]'::jsonb END) p
+                     WHERE (CASE WHEN jsonb_typeof(p) = 'object' AND p->>'kind' = 'account' AND jsonb_typeof(p->'amount') = 'number'
+                                 THEN (p->>'amount')::numeric END) > 0))
+                 AND COALESCE(${num('s', 'remaining')}, 0) > 0.004))`,
+    },
+    {
       id: 'orphan.ledger_account', severity: 'error',
       title: 'دفترِ همگام‌سازی برای دکانی که دیگر وجود ندارد',
       sql: `SELECT r.account_id, r.account_id AS ref, count(*)::text AS value

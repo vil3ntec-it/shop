@@ -598,6 +598,7 @@ async function remove(viewer, id, messageId, scope) {
       return { changed: true, convId: conv.id };
     }
     if (m.deleted_at) return { changed: false };
+    await life.assertOpen(c, conv.id);   //  رشتهٔ بسته فقط خواندنی است: «حذف برای همه» هم ۴۰۹ `chat_closed` (فقط «حذف برای من» باز)
     const moderator = viewer.side === 'shop' && m.sender === 'shop' && can(viewer.role, 'chat.moderate');
     if (!isAuthor(viewer, m) && !moderator) throw forbidden('این پیام را نمی‌توانید برای همه پاک کنید', 'delete_not_allowed');
     if (!moderator && now() - n(m.created_at) > config.shopChat.deleteWindowMs) {

@@ -96,7 +96,7 @@ async function configOf(shopId) {
   //  `payee` = گیرندهٔ فعال («پول به حسابِ <نام> — <۴ رقم>» کنارِ QR، و اثرِ انگشتی که صندوق روی ردیفِ پرداخت می‌گذارد)
   const extra = { ...(till.simple ? { simple: till.simple } : {}), ...(till.payee ? { payee: till.payee } : {}),
     ...(till.payees.length ? { payees: till.payees } : {}) };
-  return { hesabpay: { enabled: await enabledFor(shopId), mode: till.mode, ...extra } };
+  return { hesabpay: { enabled: await enabledFor(shopId), flag: await flagOf(shopId), mode: till.mode, ...extra } };
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -109,7 +109,7 @@ const num = (v) => (v === null || v === undefined ? null : Number(v));
 function paymentRow(r) {
   return {
     method: METHOD_ID, kind: METHOD_KIND, amount: Number(r.amount_minor),
-    ref: r.provider_ref || r.id, status: 'confirmed', verification: 'gateway', intentId: r.id,
+    ref: r.provider_ref || r.id, status: 'confirmed', verification: 'gateway', intentId: r.id, ...(r.payee_fp ? { payee: r.payee_fp } : {}),
   };
 }
 
@@ -129,7 +129,7 @@ function view(r) {
     paidAt: num(r.paid_at),
     providerRef: r.provider_ref || '',
     needsReview: r.needs_review === true,
-    createdAt: num(r.created_at),
+    createdAt: num(r.created_at), payeeFp: r.payee_fp || '', // #853: گیرندهٔ قصد — صندوق فقط با گیرندهٔ فعال خودکار می‌بندد
   };
   if ((r.status === 'paid' || r.status === 'refunded') && r.kind === 'pos_sale') out.payment = paymentRow(r);
   return out;

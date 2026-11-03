@@ -29,16 +29,23 @@ class ThemeV2PaletteTest {
 
   private val all: List<ShopColors> = ShopTheme.entries.flatMap { listOf(shopColors(it, false), shopColors(it, true)) }
 
-  /** ستون‌های جدولِ فایل: primary روشن، دکمهٔ اصلیِ روشن، primary تیره، گرادیانِ روشن، گرادیانِ تیره، زمینه/سطحِ روشن و تیره */
+  /**
+   *  ستون‌های جدولِ فایل: primary روشن، دکمهٔ اصلیِ روشن، primary تیره، گرادیانِ روشن، گرادیانِ تیره، زمینه/سطحِ روشن و تیره،
+   *  متنِ روز، متن و متنِ کم‌رنگِ شب. رنگِ برند و گرادیان همان THEME-V2؛ زمینه، سطح و متن از «خنثی‌های همان رنگ» (THEME-V3،
+   *  خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳: «هر سه تم را جذاب‌تر کن و دارک‌مود را هم») — شب لایه‌های نزدیک‌به‌سیاه با پله‌های روشن.
+   */
   private val owner = mapOf(
     ShopTheme.SKY to listOf(
-      "#2563EB", "#1D4ED8", "#60A5FA", "#2563EB #4F46E5 #7C3AED", "#1E3A8A #312E81 #4C1D95", "#F5F8FF/#FFFFFF", "#0B1020/#121A2E",
+      "#2563EB", "#1D4ED8", "#60A5FA", "#2563EB #4F46E5 #7C3AED", "#1E3A8A #312E81 #4C1D95", "#F4F7FC/#FFFFFF", "#07090E/#11151E",
+      "#0B1324", "#EEF1F8", "#A2ACBE",
     ),
     ShopTheme.OCEAN to listOf(
-      "#0284C7", "#0369A1", "#38BDF8", "#0369A1 #0EA5E9 #22D3EE", "#0C4A6E #075985 #155E75", "#F2F9FC/#FFFFFF", "#07141C/#0F2230",
+      "#0284C7", "#0369A1", "#38BDF8", "#0369A1 #0EA5E9 #22D3EE", "#0C4A6E #075985 #155E75", "#F1F8FB/#FFFFFF", "#050A0C/#0E171B",
+      "#0A1A24", "#ECF4F7", "#9CB0B9",
     ),
     ShopTheme.DUSK to listOf(
-      "#4F46E5", "#4338CA", "#818CF8", "#4F46E5 #DB2777 #F97316", "#312E81 #831843 #9A3412", "#F7F6FF/#FFFFFF", "#100E1F/#1B1830",
+      "#4F46E5", "#4338CA", "#818CF8", "#4F46E5 #DB2777 #F97316", "#312E81 #831843 #9A3412", "#F7F6FE/#FFFFFF", "#09080E/#14121C",
+      "#14122A", "#F0EEF8", "#A9A5C0",
     ),
   )
 
@@ -54,9 +61,9 @@ class ThemeV2PaletteTest {
       assertEquals("$t گرادیانِ تیره", w[4], d.heroGradient.joinToString(" ") { hex(it) })
       assertEquals("$t زمینه", w[5], "${hex(l.background)}/${hex(l.surface)}")
       assertEquals("$t زمینهٔ تیره", w[6], "${hex(d.background)}/${hex(d.surface)}")
-      assertEquals("#0F172A", hex(l.textPrimary))
-      assertEquals("#E6ECFF", hex(d.textPrimary))
-      assertEquals("#94A3B8", hex(d.textSecondary))
+      assertEquals("$t متنِ روز", w[7], hex(l.textPrimary))
+      assertEquals("$t متنِ شب", w[8], hex(d.textPrimary))
+      assertEquals("$t متنِ کم‌رنگِ شب", w[9], hex(d.textSecondary))
       assertFalse(l.isDark)
       assertTrue(d.isDark)
       //  «نوارِ پایین و انتخاب‌ها: primaryِ تم»
@@ -65,8 +72,8 @@ class ThemeV2PaletteTest {
     }
     assertEquals("شش پالتِ جدا", 6, all.toSet().size)
     //  سطحِ ۲ِ «آسمان» از فایل؛ دو تمِ دیگر مشتق‌اند
-    assertEquals("#EEF3FF", hex(shopColors(ShopTheme.SKY, false).surfaceElevated))
-    assertEquals("#1A2440", hex(shopColors(ShopTheme.SKY, true).surfaceElevated))
+    assertEquals("#F0F4FC", hex(shopColors(ShopTheme.SKY, false).surfaceElevated))
+    assertEquals("#1B202C", hex(shopColors(ShopTheme.SKY, true).surfaceElevated))
   }
 
   @Test

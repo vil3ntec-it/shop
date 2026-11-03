@@ -128,6 +128,36 @@ test('هیچ لایه‌ای بیش از نقش نمی‌دهد و چیزِ اج
   assert.deepEqual(staffShop.body.permissions, permissionsOf('staff'));
 });
 
+test('CRM-15: «شمارهٔ مشتریان» (customers.contact) — پیش‌فرضِ امروز، بستن برای نقش و کاربر، فقط نمایشی', async () => {
+  const t = await shopWithTeam('شماره');
+  const tok = { token: t.owner.accessToken };
+  //  بی لایه همان امروز: هر سه می‌بینند، و فهرستِ قدیمیِ مجوز دست نمی‌خورد
+  for (const u of [t.owner, t.manager, t.staff]) {
+    const shop = await h.get('/api/shop', { token: u.accessToken });
+    assert.equal(shop.body.policy.effective['customers.contact'].mode, 'allow');
+  }
+  //  کلید در فهرستِ صاحب، «full» و فقط نمایشی
+  const page = (await h.get('/api/shop/permissions', tok)).body;
+  const entry = page.shop.catalog.find((c) => c.key === 'customers.contact');
+  assert.ok(entry, JSON.stringify(page.shop.catalog));
+  assert.equal(entry.edit, 'full');
+  assert.equal(entry.display, true);
+  //  صاحب برای نقشِ شاگرد می‌بندد ⇒ شاگرد پوشیده می‌بیند؛ مدیر دست نمی‌خورد
+  const put = await h.put('/api/shop/permissions/roles/staff', { perms: { 'customers.contact': { mode: 'deny' } } }, tok);
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.equal((await h.get('/api/shop', { token: t.staff.accessToken })).body.policy.effective['customers.contact'].mode, 'deny');
+  assert.equal((await h.get('/api/shop', { token: t.manager.accessToken })).body.policy.effective['customers.contact'].mode, 'allow');
+  //  لایهٔ همین کاربر دوباره باز می‌کند (full)؛ فهرستِ قدیمیِ مجوزِ شاگرد همان
+  const sid = page.shop.members.find((m) => m.role === 'staff').userId;
+  const back = await h.put(`/api/shop/permissions/members/${sid}`, { perms: { 'customers.contact': { mode: 'allow' } } }, tok);
+  assert.equal(back.status, 200, JSON.stringify(back.body));
+  const staffShop = await h.get('/api/shop', { token: t.staff.accessToken });
+  assert.equal(staffShop.body.policy.effective['customers.contact'].mode, 'allow');
+  assert.deepEqual(staffShop.body.permissions, permissionsOf('staff'));
+  //  شاگرد خودش نمی‌تواند لایه بنویسد
+  assert.equal((await h.put('/api/shop/permissions/roles/staff', { perms: {} }, { token: t.staff.accessToken })).status, 403);
+});
+
 test('لایه‌ها مالِ همان دکان‌اند (دکانِ دیگر نه)', async () => {
   const a = await shopWithTeam('الف');
   const b = await shopWithTeam('ب');

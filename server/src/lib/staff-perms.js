@@ -35,6 +35,8 @@ const SERVER_EDITABLE = Object.freeze([
   'safe.move',
   //  فقط نمایشی، مثلِ reports.money: گزارشِ X و Z ِ صندوقِ شیفت در برنامه (PAY-15، `ShopRole.allows`)
   'shift.report',
+  //  فقط نمایشی: شماره و نشانیِ مشتری در برنامه (CRM-15، `rememberCanSeeContacts`)
+  'customers.contact',
 ]);
 //  همهٔ نقش‌های کارمند، از جمله چهار نقشِ تازهٔ A16 (مهاجرتِ ۱۲۳)
 const EDITABLE_ROLES = STAFF_ROLES;

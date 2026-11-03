@@ -1,16 +1,17 @@
 #  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
-#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۲).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۴).
 #  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
 #  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
 #  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
 #  گامِ ۷ (§۰.۱۲): هیچ سطری بی دلیل نیست. هر سطر یکی از دو دسته است؛ منطقِ خالصِ درونشان به کدِ مشترک رفته
 #  (`ScanGate` ⇐ core، `ReleaseVersion`، پوستهٔ برنامه ⇐ `AppShellAndroid.kt`) و آنچه ماند خودِ کارِ سکوست.
 
+#  گامِ ۹ (§۰.۱۴): `data/Migration.kt` و `pay/platform/PayDevice.kt` خودشان روی آیفون (shimهای بی‌رفتارِ WebView، NFC و
+#  نمایشگرِ دوم؛ همان «دفترِ قدیمی نیست» و «NFC نیست» ِ همتاهای پاک‌شده).
+
 #  ── الف) فقط اندروید، برای همیشه (iOS همتا نمی‌خواهد؛ همتای کوچکش فقط همان API را بی‌اثر نگه می‌دارد) ──
 MainActivity.kt  # نقطهٔ ورودِ اندروید (Activity، مانیفست، نامِ مستعارِ پیوند، سرویسِ اسکنِ پس‌زمینه). ورودِ آیفون: ios/IosRoot.kt ⇐ همان AppShell/AppStart ِ مشترک
-data/Migration.kt  # کوچِ دفتر از برنامهٔ وبیِ قدیمیِ اندروید (WebView ِ همان بسته). آیفون آن برنامه را هرگز نداشت ⇐ data/MigrationIos.kt: null
 update/Updater.kt  # دانلود، سنجشِ امضا و نصبِ APK. iOS فقط App Store (قاعدهٔ ۲.۵.۲ ِ اپل) ⇐ update/UpdaterIos.kt؛ قاعدهٔ شماره‌ها مشترک (update/ReleaseVersion.kt)
-pay/platform/PayDevice.kt  # NFC ِ «شبیه‌سازیِ کارت» (HCE) و نمایشگرِ دومِ مشتری (Presentation). iOS به برنامه HCE نمی‌دهد ⇐ pay/platform/PayDeviceIos.kt: «NFC نیست»
 
 #  ── ب) همتای iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop): سرویسِ سکو که shim ِ هم‌نام دروغ می‌گفت یا ضعیف‌تر بود ──
 data/AtRestKeys.kt  # KEK ِ Android Keystore (سخت‌افزاری، چرخشِ نام) و متنِ صفحهٔ امنیت؛ iOS: data/AtRestKeysIos.kt (Keychain، «فقط همین دستگاه»، HARDWARE_BACKED=false)

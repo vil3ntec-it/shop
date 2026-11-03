@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Sheet
  */
 @Composable
 internal fun ReceivePickerSheet(d: ShopData, onPick: (String) -> Unit, onClose: () -> Unit) {
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری بی مجوز پوشیده
   var query by rememberSaveable { mutableStateOf("") }
   val term = query.trim()
   val rows = remember(d, term) {
@@ -58,7 +59,7 @@ internal fun ReceivePickerSheet(d: ShopData, onPick: (String) -> Unit, onClose: 
           if (i > 0) V3Divider(start = 16.dp)
           V3ListRow(
             title = r.debtor.name,
-            subtitle = r.debtor.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.LocaleText.phoneDisplay(it) },
+            subtitle = r.debtor.phone.takeIf { it.isNotBlank() }?.let { ir.vil3ntec.tohid.ui.components.customerPhone(it, contacts) }, // CRM-15
             tile = false,
             trailing = { Text(MoneyText.afn(r.balance), style = v3Text(14, FontWeight.SemiBold, 20), color = LedgerTone.OWE.ink()) },
             onClick = { onPick(r.debtor.id) },

@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.screens
 
-import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.Debtor
@@ -162,8 +161,9 @@ object DebtorListModel {
   /* ------------------------------ متنِ کارت ------------------------------ */
 
   /** زیرِ مبلغ: شماره اگر هست، وگرنه «۱٬۰۰۰ افغانی بدهکار» / «حساب صاف است» */
-  fun subtitle(row: Row): String =
-    if (row.debtor.phone.isNotBlank()) LocaleText.phoneDisplay(row.debtor.phone)
+  /** @param contacts CRM-15 — بی مجوزِ `customers.contact` شماره پوشیده است */
+  fun subtitle(row: Row, contacts: Boolean = true): String =
+    if (row.debtor.phone.isNotBlank()) ir.vil3ntec.tohid.ui.components.customerPhone(row.debtor.phone, contacts)
     else ir.vil3ntec.tohid.ui.v3.money.MoneyText.state(row.balance)
 
   /** قرصِ ساعت: فقط وقتی بدهکار است */
