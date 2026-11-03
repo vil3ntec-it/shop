@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.ui.components.common.openOnMap
 
 /**
@@ -18,5 +19,5 @@ internal fun openMissionRoute(context: Context, c: MissionCard) {
   }
   val lat = c.lat
   val lng = c.lng
-  if (!opened && lat != null && lng != null) openOnMap(context, lat, lng, c.landmark.ifBlank { "مقصد" })
+  if (!opened && lat != null && lng != null) openOnMap(context, lat, lng, c.landmark.ifBlank { StrCourierApp.destination })
 }

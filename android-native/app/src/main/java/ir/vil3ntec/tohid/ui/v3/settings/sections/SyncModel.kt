@@ -45,7 +45,7 @@ internal object SyncModel {
 
   data class Diagnosis(val problem: Problem, val title: String, val body: String, val action: String, val tone: V3Tone, val detail: String?)
 
-  private val OFFLINE_HINTS = listOf("unable to resolve", "failed to connect", "timeout", "timed out", "network", "connection", "socket", "اینترنت", "وصل نشد", "نت نیست")
+  private val OFFLINE_HINTS = listOf("unable to resolve", "failed to connect", "timeout", "timed out", "network", "connection", "socket", "اینترنت", "انترنت", "وصل نشد", "نت نیست")
   private val SIGN_IN_HINTS = listOf("401", "unauthor", "token", "نشست", "دوباره وارد", "وارد حساب")
   private val SERVER_HINTS = listOf("500", "502", "503", "504", "server error", "bad gateway", "سرور")
   private val LOCAL_HINTS = listOf("ژورنال", "سایه", "journal")

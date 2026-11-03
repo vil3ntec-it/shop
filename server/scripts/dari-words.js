@@ -65,10 +65,18 @@ function build(src = fs.readFileSync(KT, 'utf8')) {
     return w;
   });
   const phrases = {};
+  //  جملهٔ بلند: «"فارسی" to» در یک سطر و «"دری",» در سطرِ بعد
+  const pairs = [];
   for (const l of lines(block(src, 'val PHRASES: Map<String, String> = mapOf(', '\n  )'))) {
+    if (pairs.length && /^"[^"]*" to$/.test(pairs[pairs.length - 1])) pairs[pairs.length - 1] += ` ${l}`;
+    else pairs.push(l);
+  }
+  for (const l of pairs) {
     const m = /^"([^"]*)" to "([^"]*)",?$/.exec(l);
     if (!m) throw new Error(`DariText.kt PHRASES: سطرِ ناشناخته: ${l}`);
-    phrases[kstr(m[1], 'PHRASES')] = kstr(m[2], 'PHRASES');
+    const fa = kstr(m[1], 'PHRASES');
+    if (fa in phrases) throw new Error(`DariText.kt PHRASES: کلیدِ تکراری: ${fa}`);
+    phrases[fa] = kstr(m[2], 'PHRASES');
   }
   const keep = block(src, 'val KEEP: List<String> = listOf(', ')\n').split(',').map((x) => x.trim()).filter(Boolean)
     .map((x) => kval(x, 'KEEP'));

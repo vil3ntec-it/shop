@@ -98,13 +98,23 @@ object I18n {
     else -> Tone.INFO
   }
 
+  /** «… گردید» ِ جدا (لحنِ رسمیِ دری برای «… شد»)، نه «برگردید» */
+  private val SUCCESS_PRS = Regex("(^|[\\s«])گردید")
+
+  /** دری: همان قاعدهٔ فارسی، به‌اضافهٔ «… گردید» ِ لایهٔ واژه (`DariText`) برای موفقیت */
+  private fun toneDari(message: String): Tone = when (val fa = toneFa(message)) {
+    Tone.INFO -> if (SUCCESS_PRS.containsMatchIn(message)) Tone.SUCCESS else Tone.INFO
+    else -> fa
+  }
+
   /**
    *  رنگِ پیامِ کوتاه (Toast) از خودِ متن. فارسی دقیقاً همان قاعدهٔ پیشین
    *  (اول خطا، بعد موفقیت)؛ انگلیسی و پشتو اول واژه‌های خودشان را می‌سنجند و
    *  اگر چیزی نیافتند همان قاعدهٔ فارسی (برای پیامی که هنوز ترجمه نشده).
    */
   fun toneOf(message: String, lang: Lang = this.lang): Tone = when (lang) {
-    Lang.FA, Lang.PRS -> toneFa(message)
+    Lang.FA -> toneFa(message)
+    Lang.PRS -> toneDari(message)
     Lang.EN -> {
       val low = message.lowercase()
       when {

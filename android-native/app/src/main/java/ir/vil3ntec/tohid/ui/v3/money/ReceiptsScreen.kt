@@ -32,6 +32,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.JALALI_MONTHS
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.CustomerCrm
@@ -207,6 +208,6 @@ private fun ReceiptRow(row: ReceiptsModel.Row, first: Boolean, last: Boolean, ta
 /** قرض‌دار برای فیلتر — با شناسه، نه با نام (دو نفر ممکن است هم‌نام باشند) */
 @Composable
 private fun DebtorFilterSheet(d: ShopData, selected: String?, onPick: (String?) -> Unit, onDismiss: () -> Unit) {
-  val options = remember(d) { listOf(PickOption(null, StrMoney.allDebtors)) + CustomerCrm.active(d).map { PickOption(it.id, it.name, it.phone.ifBlank { null }) } }
+  val options = remember(d, I18n.lang) { listOf(PickOption(null, StrMoney.allDebtors)) + CustomerCrm.active(d).map { PickOption(it.id, it.name, it.phone.ifBlank { null }) } }
   IdPickerSheet(StrMoney.debtor, options, selected, onPick, onDismiss)
 }

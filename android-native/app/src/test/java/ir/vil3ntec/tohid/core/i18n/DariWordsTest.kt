@@ -118,7 +118,11 @@ class DariWordsTest {
   private val dariAllowed = listOf(
     "انبارگردانی", // هنوز همتای دریِ قطعی ندارد — در PR «برای تصمیمِ صاحب‌کار»
     "فروشگاه من", // نامِ برنامه
-  )
+    //  ۱۴۰۵/۰۸/۱۳: واژهٔ دیگری که فقط با واژهٔ فهرست آغاز می‌شود و درست است فارسی بماند
+    "شده", // «ثبت شده»، «حذف شده»… صفتِ مفعولی؛ فقط «… شد» ⇐ «… گردید»
+    "بدهید", "بدهیم", // فعلِ «دادن»، نه «بدهی»
+    "تازه‌تر", "تازه‌سازی", "تازه‌اند", // برتر و «به‌روز کردن»، نه «جدید»
+  ) + DariText.KEEP // «تازه کردن»، «تازه می‌شود»… = به‌روز کردن (فهرستِ نام‌دارِ خودِ لایه)
 
   @Test fun `دری زبانِ جدای انتخاب‌گر است با خط و جهتِ فارسی`() {
     assertEquals(listOf("فارسی", "دری", "English", "پښتو"), Lang.entries.map { it.native })
@@ -156,8 +160,60 @@ class DariWordsTest {
   }
 
   @Test fun `کلیدِ هر عبارتِ کاملِ دری متنِ فارسیِ یکی از جدول‌هاست`() {
-    val fa = rows().map { it.fa }.toSet()
+    val all = rows()
+    //  کلیدِ با `{}` همان متنِ دری‌شدهٔ ردیف است که هر مقدارِ asIs در آن `{}` شده (`DariText.shape`)
+    val fa = all.map { it.fa }.toSet() + all.map { DariText.shape(it.faOfDari) }.toSet()
     for (k in DariText.PHRASES.keys) assertTrue("عبارتِ «$k» دیگر در جدول‌ها نیست", k in fa)
+    //  و هر جملهٔ کامل واقعاً در خروجیِ دری می‌نشیند (کلیدِ مرده یا جای خالیِ بی asIs نه)
+    val used = all.filter { DariText.PHRASES.containsKey(it.fa) || DariText.PHRASES.containsKey(DariText.shape(it.faOfDari)) }
+    for (r in used) assertTrue("${r.key}: جملهٔ کامل ننشست: «${r.outDari}»", r.outDari != r.outFa)
+  }
+
+  @Test fun `جملهٔ کاملِ دری عبارتِ جدولِ کامپیوتر را ندارد (کلید روی کامپیوتر هم همان است)`() {
+    val desk = DesktopPhrases.load().map { it.first }
+    for (k in DariText.PHRASES.keys) for (p in desk) assertFalse("«$k» عبارتِ کامپیوتریِ «$p» را دارد", k.contains(p))
+    //  و هیچ متنِ فارسیِ جدول `{}` ِ خام ندارد (وگرنه با جای خالیِ PHRASES یکی گرفته می‌شد)
+    for (r in rows()) assertFalse("${r.key}: «{}» در متنِ فارسی", r.fa.contains("{}"))
+  }
+
+  /* ------------- فارسی بایت‌به‌بایت همان (نگهبان) و نوشته‌هایی که از دور‌زدنِ لایه بیرون آمدند ------------- */
+
+  @Test fun `فارسیِ نوشته‌های جابه‌جاشده همان متنِ پیشینِ صفحه است و دری عوض می‌شود`() {
+    I18n.source = { Lang.FA }
+    //  پیک (`ui/courier`) و تنظیماتِ نسخهٔ ۳: همان جمله‌های خامِ پیشین، کلمه‌به‌کلمه
+    assertEquals("سرم شلوغ است", StrCourierApp.rsBusy)
+    assertEquals("راه افتادم", StrCourierApp.acMoving)
+    assertEquals("اینترنت نیست — کارها در صفِ گوشی می‌مانند", StrCourierApp.offlineQueued)
+    assertEquals("1,200 افغانی", StrCourierApp.afn("1,200"))
+    assertEquals("دکان سفارشِ #12 را پس خواسته است", StrCourierApp.orderRecalled("12"))
+    assertEquals("موتورِ تازه روشن (آزمایشی)", StrSettingsPages.stockModeOn)
+    assertEquals("چند کادر درست نیست؛ پیامِ زیرِ هر کادر را ببینید", StrSettingsPages.fixFields)
+    assertEquals("اینترنت وصل نیست", ir.vil3ntec.tohid.core.net.ApiFailure.Offline().userMessage)
+    assertEquals("پاسخ سرور خوانده نشد (x)", ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("x").userMessage)
+    I18n.source = { Lang.PRS }
+    assertEquals("مصروف هستم", StrCourierApp.rsBusy)
+    assertEquals("روان شدم", StrCourierApp.acMoving)
+    assertEquals("انترنت نیست — کارها در صفِ مبایل می‌مانند", StrCourierApp.offlineQueued)
+    assertEquals("1,200 افغانی", StrCourierApp.afn("1,200"))
+    assertEquals("موتورِ جدید روشن (آزمایشی)", StrSettingsPages.stockModeOn)
+    assertEquals("انترنت وصل نیست", ir.vil3ntec.tohid.core.net.ApiFailure.Offline().userMessage)
+    //  جزئیاتِ خطا داده است: «گوشی» ِ درونش دری نمی‌شود
+    assertEquals("پاسخ سرور خوانده نشد (گوشی)", ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("گوشی").userMessage)
+    //  انگلیسی و پشتوی پیامِ محلیِ شبکه همان فارسیِ پیشین (هنوز ترجمه ندارد؛ `SyncModel.classify` آن را می‌خواند)
+    I18n.source = { Lang.EN }
+    assertEquals("اینترنت وصل نیست", ir.vil3ntec.tohid.core.net.ApiFailure.Offline().userMessage)
+    assertEquals("I'm busy", StrCourierApp.rsBusy)
+  }
+
+  @Test fun `همگام‌سازی پیامِ «انترنت» ِ دری را هم بی‌اینترنت می‌شناسد`() {
+    assertEquals(
+      ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.Problem.OFFLINE,
+      ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.classify("انترنت وصل نیست"),
+    )
+    assertEquals(
+      ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.classify("نشست شما تمام شد؛ دوباره وارد شوید"),
+      ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel.classify(DariText.of("نشست شما تمام شد؛ دوباره وارد شوید")),
+    )
   }
 
   @Test fun `واژه‌های LOC-08 در دری هم همان‌اند`() {
@@ -181,6 +237,12 @@ class DariWordsTest {
     assertEquals(I18n.gregorianMonths(Lang.FA), I18n.gregorianMonths(Lang.PRS))
     assertFalse(I18n.gregorian(Lang.PRS, I18n.CAL_AUTO))
     assertEquals(I18n.Tone.ERROR, I18n.toneOf("ذخیره نشد", Lang.PRS))
+    //  «… گردید» ِ دری سبز است؛ «برگردید» نه؛ فارسی همان قاعدهٔ پیشین
+    assertEquals(I18n.Tone.SUCCESS, I18n.toneOf("ثبت گردید", Lang.PRS))
+    assertEquals(I18n.Tone.SUCCESS, I18n.toneOf(DariText.of("فروش لغو شد"), Lang.PRS))
+    assertEquals(I18n.Tone.INFO, I18n.toneOf("به صفحهٔ قبل برگردید", Lang.PRS))
+    assertEquals(I18n.Tone.INFO, I18n.toneOf("ثبت گردید", Lang.FA))
+    assertEquals(I18n.Tone.ERROR, I18n.toneOf(DariText.of("ثبت نشد، دوباره امتحان کنید"), Lang.PRS))
     assertEquals("مبایل را وصل کنید", GuideText("گوشی را وصل کنید").of("prs"))
     assertEquals("گوشی را وصل کنید", GuideText("گوشی را وصل کنید").of("fa"))
   }

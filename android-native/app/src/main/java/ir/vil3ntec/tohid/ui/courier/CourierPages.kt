@@ -77,6 +77,8 @@ import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.CourierSummary
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.QueueState
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.formatMillis
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -101,11 +103,11 @@ import ir.vil3ntec.tohid.ui.v3.v3Stagger
  */
 
 private fun lastSyncText(at: Long): String =
-  if (at <= 0) "هنوز با دکان همگام نشده است" else "آخرین به‌روزرسانی: ${formatMillis(at)} · ${clock(at)}"
+  if (at <= 0) StrCourierApp.neverSynced else StrCourierApp.lastSync(formatMillis(at), clock(at))
 
 /** «تا کی» ِ عددهای نقد و آمار — زمانِ خودِ سرور در همان پاسخ، نه ساعتِ همگام‌سازیِ گوشی */
 private fun asOfText(s: CourierSummary): String =
-  if (s.serverTime <= 0) "زمانِ این عددها معلوم نیست" else "تا ${formatMillis(s.serverTime)} · ${clock(s.serverTime)}، طبقِ سرور"
+  if (s.serverTime <= 0) StrCourierApp.asOfUnknown else StrCourierApp.asOf(formatMillis(s.serverTime), clock(s.serverTime))
 
 /** تازه کردنِ «نقدِ من»/آمار نشد ⇒ پیدا، تا عددِ کهنه تازه دیده نشود */
 @Composable
@@ -118,7 +120,7 @@ private fun StaleNote(error: String?) {
   ) {
     Icon(Icons.Outlined.ReportProblem, contentDescription = null, tint = ui.awaiting.fg, modifier = Modifier.size(18.dp))
     Spacer(Modifier.width(8.dp))
-    Text("تازه نشد: $error — عددها مالِ همان زمانِ پایین‌اند.", style = courierText(13.sp, FontWeight.Medium), color = ui.awaiting.fg)
+    Text(StrCourierApp.staleNote(error), style = courierText(13.sp, FontWeight.Medium), color = ui.awaiting.fg)
   }
 }
 
@@ -171,30 +173,30 @@ internal fun CourierHomeTab(
         Avatar(name, 48)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-          Text(name.ifBlank { "پیک" }, style = courierText(18.sp, FontWeight.Bold), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text(name.ifBlank { StrCourierApp.courier }, style = courierText(18.sp, FontWeight.Bold), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
           Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Storefront, contentDescription = null, tint = p.icon, modifier = Modifier.size(15.dp))
             Spacer(Modifier.width(4.dp))
             Text(
-              summary?.shopName?.ifBlank { null } ?: "دکان",
+              summary?.shopName?.ifBlank { null } ?: Str.shop,
               style = courierText(13.sp), color = p.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
             )
           }
         }
-        V3IconButton(Icons.Outlined.NotificationsNone, "پیام‌ها", dot = bell.total > 0, onClick = onBell)
+        V3IconButton(Icons.Outlined.NotificationsNone, StrCourierApp.messages, dot = bell.total > 0, onClick = onBell)
       }
     }
     item(key = "search") {
       Column {
-        Text("پیگیریِ سفارش", style = courierText(16.sp, FontWeight.Bold), color = p.ink)
+        Text(StrCourierApp.trackOrder, style = courierText(16.sp, FontWeight.Bold), color = p.ink)
         Spacer(Modifier.height(8.dp))
-        V3SearchField(query, onQuery, "شمارهٔ سفارش…")
+        V3SearchField(query, onQuery, StrCourierApp.orderSearchHint)
       }
     }
     if (query.isNotBlank()) {
       if (results.isEmpty()) {
         item(key = "none") {
-          Text("سفارشی با این شماره یا نشانه پیدا نشد.", style = courierText(14.sp), color = p.inkMuted, modifier = Modifier.padding(4.dp))
+          Text(StrCourierApp.orderNotFound, style = courierText(14.sp), color = p.inkMuted, modifier = Modifier.padding(4.dp))
         }
       } else {
         itemsIndexed(results, key = { _, c -> "s-" + c.id }) { _, c ->
@@ -202,25 +204,25 @@ internal fun CourierHomeTab(
         }
       }
     } else {
-      item(key = "cur-h") { CourierSectionHead("مأموریتِ جاری", if (live.size > 1) "همه" else null, onMissions) }
+      item(key = "cur-h") { CourierSectionHead(StrCourierApp.currentMission, if (live.size > 1) StrCourierApp.all else null, onMissions) }
       item(key = "cur") {
         CurrentMissionCard(current, current?.let { CourierQueue.pendingFor(queue, it.id).isNotEmpty() } == true) {
           current?.let(onOpen)
         }
       }
-      item(key = "short-h") { CourierSectionHead("میان‌برها") }
+      item(key = "short-h") { CourierSectionHead(StrCourierApp.shortcuts) }
       item(key = "short") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-          Shortcut(Icons.Outlined.Inventory2, "مأموریت‌ها", onMissions)
-          Shortcut(Icons.Outlined.Payments, "نقدِ من", onCash)
-          Shortcut(Icons.Outlined.Call, "تماس با دکان", onCallShop)
-          Shortcut(Icons.Outlined.TaskAlt, "تحویل‌شده‌ها", onDelivered)
+          Shortcut(Icons.Outlined.Inventory2, StrCourierApp.missions, onMissions)
+          Shortcut(Icons.Outlined.Payments, StrCourierApp.myCash, onCash)
+          Shortcut(Icons.Outlined.Call, StrCourierApp.callShop, onCallShop)
+          Shortcut(Icons.Outlined.TaskAlt, StrCourierApp.deliveredList, onDelivered)
         }
       }
-      item(key = "recent-h") { CourierSectionHead("کارهای اخیر", if (recent.isNotEmpty()) "همه" else null, onMissions) }
+      item(key = "recent-h") { CourierSectionHead(StrCourierApp.recentWork, if (recent.isNotEmpty()) StrCourierApp.all else null, onMissions) }
       if (recent.isEmpty()) {
         item(key = "recent-empty") {
-          Text("هنوز کاری ثبت نشده است.", style = courierText(14.sp), color = p.inkMuted, modifier = Modifier.padding(4.dp))
+          Text(StrCourierApp.noWorkYet, style = courierText(14.sp), color = p.inkMuted, modifier = Modifier.padding(4.dp))
         }
       } else {
         itemsIndexed(recent, key = { _, c -> "r-" + c.id }) { index, c ->
@@ -241,7 +243,7 @@ private fun CurrentMissionCard(c: MissionCard?, waiting: Boolean, onOpen: () -> 
   val dark = PhoneV3UiDark
   Column(
     Modifier.fillMaxWidth().courierDark(p).clip(CourierCardShape)
-      .then(if (c != null) Modifier.v3Pressable(label = "سفارشِ #${c.orderNo.fa()}", onClick = onOpen) else Modifier)
+      .then(if (c != null) Modifier.v3Pressable(label = StrCourierApp.orderNo(c.orderNo.fa()), onClick = onOpen) else Modifier)
       .padding(18.dp),
   ) {
     if (c == null) {
@@ -251,8 +253,8 @@ private fun CurrentMissionCard(c: MissionCard?, waiting: Boolean, onOpen: () -> 
         }
         Spacer(Modifier.width(12.dp))
         Column {
-          Text("مأموریتِ زنده‌ای ندارید", style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
-          Text("دکان که بسپارد، همین‌جا می‌آید.", style = courierText(13.sp), color = p.onBlackMuted)
+          Text(StrCourierApp.noLiveMission, style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
+          Text(StrCourierApp.noLiveMissionBody, style = courierText(13.sp), color = p.onBlackMuted)
         }
       }
     } else {
@@ -268,15 +270,15 @@ private fun CurrentMissionBody(c: MissionCard, waiting: Boolean) {
   Column {
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text("سفارش", style = courierText(12.sp), color = p.onBlackMuted)
+        Text(StrCourierApp.order, style = courierText(12.sp), color = p.onBlackMuted)
         Text("#${c.orderNo.fa()}", style = courierText(24.sp, FontWeight.Bold), color = p.onBlack)
       }
       Box(Modifier.size(44.dp).background(dark.primaryOnDark, CircleShape), contentAlignment = Alignment.Center) {
-        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = "جزئیات", tint = dark.onPrimaryOnDark, modifier = Modifier.size(22.dp))
+        Icon(Icons.AutoMirrored.Outlined.ArrowForward, contentDescription = StrCourierApp.details, tint = dark.onPrimaryOnDark, modifier = Modifier.size(22.dp))
       }
     }
     Spacer(Modifier.height(12.dp))
-    Text("مقصد", style = courierText(12.sp), color = p.onBlackMuted)
+    Text(StrCourierApp.destination, style = courierText(12.sp), color = p.onBlackMuted)
     Row(verticalAlignment = Alignment.CenterVertically) {
       Icon(Icons.Outlined.Place, contentDescription = null, tint = dark.primaryOnDark, modifier = Modifier.size(18.dp))
       Spacer(Modifier.width(6.dp))
@@ -284,7 +286,7 @@ private fun CurrentMissionBody(c: MissionCard, waiting: Boolean) {
     }
     Spacer(Modifier.height(10.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("وضعیت", style = courierText(12.sp), color = p.onBlackMuted)
+      Text(StrCourierApp.status, style = courierText(12.sp), color = p.onBlackMuted)
       Spacer(Modifier.width(8.dp))
       CourierOnDark {
         MissionStatus(c.status)
@@ -331,7 +333,7 @@ internal fun RecentRow(c: MissionCard, waiting: Boolean, modifier: Modifier = Mo
     Column(Modifier.weight(1f)) {
       Text("#${c.orderNo.fa()}", style = courierText(15.sp, FontWeight.Bold), color = p.ink)
       Text(
-        c.landmark.ifBlank { if (ir.vil3ntec.tohid.core.courier.CourierFlow.isLive(c.status)) "—" else "پایان یافت · نشانی پاک شد" },
+        c.landmark.ifBlank { if (ir.vil3ntec.tohid.core.courier.CourierFlow.isLive(c.status)) "—" else StrCourierApp.endedAddressErased },
         style = courierText(13.sp), color = p.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis,
       )
     }
@@ -352,10 +354,10 @@ internal fun RecentRow(c: MissionCard, waiting: Boolean, modifier: Modifier = Mo
 private data class NavItem(val id: String, val label: String, val icon: ImageVector)
 
 private val NAV = listOf(
-  NavItem("home", "خانه", Icons.Outlined.Home),
-  NavItem("route", "مسیر", Icons.Outlined.Route),
-  NavItem("stats", "آمار", Icons.Outlined.BarChart),
-  NavItem("account", "حساب", Icons.Outlined.Person),
+  NavItem("home", StrCourierApp.navHome, Icons.Outlined.Home),
+  NavItem("route", StrCourierApp.route, Icons.Outlined.Route),
+  NavItem("stats", StrCourierApp.navStats, Icons.Outlined.BarChart),
+  NavItem("account", StrCourierApp.navAccount, Icons.Outlined.Person),
 )
 
 /** نوارِ تیرهٔ شناور (مرجع): برگهٔ فعال = دایرهٔ سبزآبی + نام که با فنر باز می‌شود */
@@ -418,14 +420,14 @@ internal fun CourierStatsTab(
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("آمار", style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+      Text(StrCourierApp.navStats, style = courierText(28.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
       RefreshButton(syncing, onRefresh)
     }
-    V3Segmented(listOf("امروز", "این هفته"), selected = if (week) 1 else 0, onSelect = { onWeek(it == 1) })
+    V3Segmented(listOf(StrCourierApp.today, StrCourierApp.thisWeek), selected = if (week) 1 else 0, onSelect = { onWeek(it == 1) })
     if (summary == null) {
       EmptyCard(
-        "آمار هنوز از دکان نیامده",
-        "به اینترنت که وصل شوید، شمارِ تحویل‌ها و نقدِ گرفته‌شده این‌جا می‌آید.",
+        StrCourierApp.statsNotYet,
+        StrCourierApp.statsNotYetBody,
         if (syncing) null else onRefresh,
       )
     } else {
@@ -441,23 +443,23 @@ private fun StatsBody(summary: CourierSummary, week: Boolean, onCash: () -> Unit
   Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
     val s = if (week) summary.week else summary.today
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      StatTile("تحویل‌شده", s.delivered.fa(), Icons.Outlined.TaskAlt, Modifier.weight(1f))
+      StatTile(StrCourierApp.deliveredStat, s.delivered.fa(), Icons.Outlined.TaskAlt, Modifier.weight(1f))
       //  فقط «تحویل نشد» ِ خودِ پیک، به زمانِ همان رویداد (برگشتِ دکان این نیست)
-      StatTile("ناموفق", s.failed.fa(), Icons.Outlined.ReportProblem, Modifier.weight(1f))
+      StatTile(StrCourierApp.stFailed, s.failed.fa(), Icons.Outlined.ReportProblem, Modifier.weight(1f))
     }
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-      StatTile("نقدِ گرفته‌شده", afn(s.collectedCashMinor), Icons.Outlined.Payments, Modifier.weight(1f))
-      StatTile("کرایهٔ من", afn(s.fareMinor), Icons.Outlined.AccountBalanceWallet, Modifier.weight(1f))
+      StatTile(StrCourierApp.cashCollected, afn(s.collectedCashMinor), Icons.Outlined.Payments, Modifier.weight(1f))
+      StatTile(StrCourierApp.myFare, afn(s.fareMinor), Icons.Outlined.AccountBalanceWallet, Modifier.weight(1f))
     }
     Column(Modifier.fillMaxWidth().courierDark(p).padding(18.dp)) {
-      Text("نقدِ در دستِ شما", style = courierText(13.sp), color = p.onBlackMuted)
+      Text(StrCourierApp.cashInHand, style = courierText(13.sp), color = p.onBlackMuted)
       Text(afn(summary.cashInHandMinor), style = courierText(26.sp, FontWeight.Bold), color = p.onBlack)
       Spacer(Modifier.height(12.dp))
-      CourierOnDark { StepButton("دیدنِ نقدِ من", onCash, Modifier.fillMaxWidth(), icon = Icons.Outlined.Payments) }
+      CourierOnDark { StepButton(StrCourierApp.seeMyCash, onCash, Modifier.fillMaxWidth(), icon = Icons.Outlined.Payments) }
     }
     Text(
       //  مرزها را سرور به وقتِ دکان ساخته است (آغازِ هفتهٔ دکان)
-      (if (week) "از آغازِ هفتهٔ دکان، ${formatMillis(s.from)}" else "از آغازِ امروزِ دکان") + " · " + asOfText(summary),
+      (if (week) StrCourierApp.fromWeekStart(formatMillis(s.from)) else StrCourierApp.fromTodayStart) + " · " + asOfText(summary),
       style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp),
     )
   }
@@ -499,29 +501,29 @@ internal fun CourierAccountTab(
     Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).padding(top = 16.dp, bottom = NavClearance),
     verticalArrangement = Arrangement.spacedBy(14.dp),
   ) {
-    Text("حساب", style = courierText(28.sp, FontWeight.Bold), color = p.ink)
+    Text(StrCourierApp.navAccount, style = courierText(28.sp, FontWeight.Bold), color = p.ink)
     Column(Modifier.fillMaxWidth().courierCard(p).padding(20.dp), horizontalAlignment = Alignment.CenterHorizontally) {
       Avatar(name, 72)
       Spacer(Modifier.height(10.dp))
-      Text(name.ifBlank { "پیک" }, style = courierText(20.sp, FontWeight.Bold), color = p.ink)
-      Text(summary?.shopName?.ifBlank { null } ?: "دکان", style = courierText(14.sp), color = p.inkMuted)
+      Text(name.ifBlank { StrCourierApp.courier }, style = courierText(20.sp, FontWeight.Bold), color = p.ink)
+      Text(summary?.shopName?.ifBlank { null } ?: Str.shop, style = courierText(14.sp), color = p.inkMuted)
       Spacer(Modifier.height(8.dp))
-      V3StatusPill(V3Status.PREPARING, "پیک")
+      V3StatusPill(V3Status.PREPARING, StrCourierApp.courier)
     }
     Column(Modifier.fillMaxWidth().courierCard(p).padding(horizontal = 16.dp, vertical = 4.dp)) {
       val phone = summary?.shopPhone.orEmpty()
-      AccountRow(Icons.Outlined.Call, "تماس با دکان", phone.ifBlank { "ثبت نشده" }, ltr = phone.isNotBlank(), onClick = onCallShop)
-      AccountRow(Icons.Outlined.Payments, "نقدِ من", summary?.let { afn(it.cashInHandMinor) } ?: "—", onClick = onCash)
+      AccountRow(Icons.Outlined.Call, StrCourierApp.callShop, phone.ifBlank { StrCourierApp.notSet }, ltr = phone.isNotBlank(), onClick = onCallShop)
+      AccountRow(Icons.Outlined.Payments, StrCourierApp.myCash, summary?.let { afn(it.cashInHandMinor) } ?: "—", onClick = onCash)
       val syncText = when {
-        syncing -> "در حالِ فرستادن…"
-        waiting > 0 -> "${waiting.fa()} کار در صف"
-        lastError != null -> "وصل نیست"
-        else -> "همه رسید"
+        syncing -> StrCourierApp.sendingDots
+        waiting > 0 -> StrCourierApp.queuedShort(waiting.fa())
+        lastError != null -> StrCourierApp.notConnected
+        else -> StrCourierApp.allReached
       }
-      AccountRow(Icons.Outlined.Sync, "همگام‌سازی", syncText, onClick = onRefresh, divider = false)
+      AccountRow(Icons.Outlined.Sync, StrCourierApp.sync, syncText, onClick = onRefresh, divider = false)
     }
     Text(lastSyncText(lastSyncAt), style = courierText(12.sp), color = p.inkMuted, modifier = Modifier.padding(horizontal = 4.dp))
-    CourierSecondary("خروج از حسابِ پیک", onSignOut, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Logout, negative = true)
+    CourierSecondary(StrCourierApp.signOutTitle, onSignOut, Modifier.fillMaxWidth(), icon = Icons.AutoMirrored.Outlined.Logout, negative = true)
   }
 }
 
@@ -554,13 +556,13 @@ internal fun CourierCashPage(summary: CourierSummary?, staleError: String?, sync
   val p = PhoneV3.colors
   Column(Modifier.fillMaxSize()) {
     Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, "بازگشت", onClick = onBack)
-      Text("نقدِ من", style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+      V3IconButton(Icons.AutoMirrored.Outlined.ArrowBack, Str.goBack, onClick = onBack)
+      Text(StrCourierApp.myCash, style = courierText(18.sp, FontWeight.Bold), color = p.ink, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
       RefreshButton(syncing, onRefresh)
     }
     if (summary == null) {
       Box(Modifier.padding(16.dp)) {
-        EmptyCard("هنوز از دکان نیامده", "به اینترنت که وصل شوید، نقدِ در دست و تسویه‌ها این‌جا می‌آید.", if (syncing) null else onRefresh)
+        EmptyCard(StrCourierApp.notFromShopYet, StrCourierApp.cashNotYetBody, if (syncing) null else onRefresh)
       }
     } else {
       CashList(summary, staleError)
@@ -583,12 +585,12 @@ private fun CashList(summary: CourierSummary, staleError: String?) {
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(horizontal = 4.dp)) {
           Icon(Icons.Outlined.Info, contentDescription = null, tint = p.icon, modifier = Modifier.size(16.dp))
           Spacer(Modifier.width(6.dp))
-          Text("تسویه را دکان ثبت می‌کند؛ این‌جا فقط دیدن است. " + asOfText(summary), style = courierText(12.sp), color = p.inkMuted)
+          Text(StrCourierApp.settleNote(asOfText(summary)), style = courierText(12.sp), color = p.inkMuted)
         }
       }
-      item(key = "un-h") { CourierSectionHead("تحویل‌شده، هنوز تسویه‌نشده") }
+      item(key = "un-h") { CourierSectionHead(StrCourierApp.unsettledHead) }
       if (summary.unsettled.isEmpty()) {
-        item(key = "un-empty") { CalmNote("نقدِ تسویه‌نشده‌ای نزدِ شما نیست.") }
+        item(key = "un-empty") { CalmNote(StrCourierApp.noUnsettled) }
       } else {
         item(key = "un") {
           Column(Modifier.fillMaxWidth().courierCard(p, CourierGroupShape).padding(horizontal = 16.dp, vertical = 4.dp)) {
@@ -599,11 +601,11 @@ private fun CashList(summary: CourierSummary, staleError: String?) {
                 Column(horizontalAlignment = Alignment.End) {
                   //  سفارشِ پیش‌پرداخت: نقدی در دستِ پیک نیست (فقط کرایه‌اش در تسویه می‌آید)
                   Text(
-                    if (u.cashCollectedMinor == 0L && u.expectedCollectMinor == 0L) "بی نقد" else afn(u.cashCollectedMinor),
+                    if (u.cashCollectedMinor == 0L && u.expectedCollectMinor == 0L) StrCourierApp.noCash else afn(u.cashCollectedMinor),
                     style = courierText(14.sp, FontWeight.Bold), color = p.ink,
                   )
                   if (u.cashCollectedMinor != u.expectedCollectMinor) {
-                    Text("از ${afn(u.expectedCollectMinor)}", style = courierText(11.sp), color = ui.awaiting.fg)
+                    Text(StrCourierApp.ofExpected(afn(u.expectedCollectMinor)), style = courierText(11.sp), color = ui.awaiting.fg)
                   }
                 }
               }
@@ -614,7 +616,7 @@ private fun CashList(summary: CourierSummary, staleError: String?) {
             if (more > 0) {
               Box(Modifier.fillMaxWidth().height(1.dp).background(p.hairline))
               Text(
-                "+${more.fa()} موردِ دیگر — در جمعِ «نقدِ در دست» آمده است",
+                StrCourierApp.moreInTotal(more.fa()),
                 style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted,
                 modifier = Modifier.padding(vertical = 12.dp),
               )
@@ -622,27 +624,27 @@ private fun CashList(summary: CourierSummary, staleError: String?) {
           }
         }
       }
-      item(key = "st-h") { CourierSectionHead("تاریخچهٔ تسویه") }
+      item(key = "st-h") { CourierSectionHead(StrCourierApp.settleHistory) }
       if (summary.settlements.isEmpty()) {
-        item(key = "st-empty") { CalmNote("هنوز تسویه‌ای ثبت نشده است.") }
+        item(key = "st-empty") { CalmNote(StrCourierApp.noSettleYet) }
       } else {
         itemsIndexed(summary.settlements, key = { _, s -> "st-${s.settleNo}" }) { _, s ->
           Column(Modifier.fillMaxWidth().courierCard(p, CourierGroupShape).padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-              Text("تسویهٔ #${s.settleNo.fa()}", style = courierText(15.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
+              Text(StrCourierApp.settleNo(s.settleNo.fa()), style = courierText(15.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
               Text(formatMillis(s.at), style = courierText(12.sp), color = p.inkMuted)
             }
             Spacer(Modifier.height(4.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-              Text("${s.assignmentsCount.fa()} سفارش · دکان گرفت", style = courierText(13.sp), color = p.inkMuted, modifier = Modifier.weight(1f))
+              Text(StrCourierApp.settleOrders(s.assignmentsCount.fa()), style = courierText(13.sp), color = p.inkMuted, modifier = Modifier.weight(1f))
               Text(afn(s.receivedMinor), style = courierText(15.sp, FontWeight.Bold), color = p.ink)
             }
             Spacer(Modifier.height(8.dp))
             Row {
               when {
-                s.shortageMinor > 0 -> V3StatusPill(V3Status.CANCELLED, "کسری: ${afn(s.shortageMinor)}")
-                s.excessMinor > 0 -> V3StatusPill(V3Status.WARNING, "اضافه: ${afn(s.excessMinor)}")
-                else -> V3StatusPill(V3Status.DELIVERED, "بی اختلاف")
+                s.shortageMinor > 0 -> V3StatusPill(V3Status.CANCELLED, StrCourierApp.shortage(afn(s.shortageMinor)))
+                s.excessMinor > 0 -> V3StatusPill(V3Status.WARNING, StrCourierApp.excess(afn(s.excessMinor)))
+                else -> V3StatusPill(V3Status.DELIVERED, StrCourierApp.noDiff)
               }
             }
           }
@@ -659,7 +661,7 @@ private fun CashHero(s: CourierSummary) {
   val noCash = CourierBoardModel.noCash(s)
   val fill by animateFloatAsState(pct / 100f, if (Motion.enabled) tween(600, delayMillis = 120) else snap(), label = "capUse")
   Column(Modifier.fillMaxWidth().courierDark(p).padding(18.dp)) {
-    Text("نقدِ در دستِ شما", style = courierText(13.sp), color = p.onBlackMuted)
+    Text(StrCourierApp.cashInHand, style = courierText(13.sp), color = p.onBlackMuted)
     Text(afn(s.cashInHandMinor), style = courierText(30.sp, FontWeight.Bold), color = p.onBlack)
     Spacer(Modifier.height(14.dp))
     Box(Modifier.fillMaxWidth().height(8.dp).background(p.blackRaised, CourierPillShape)) {
@@ -671,15 +673,15 @@ private fun CashHero(s: CourierSummary) {
     Spacer(Modifier.height(6.dp))
     Text(
       //  سقفِ صفر در دکان یعنی «نقد نگیرد»: سفارشِ نقدی به این پیک سپرده نمی‌شود
-      if (noCash) "سقفِ نقدِ شما صفر است: نقد نگیرد — سفارشِ نقدی سپرده نمی‌شود"
-      else "پُریِ سقف (در دست + در راه): ${pct.fa()}٪",
+      if (noCash) StrCourierApp.zeroCap
+      else StrCourierApp.capFill(pct.fa()),
       style = courierText(12.sp), color = p.onBlackMuted,
     )
     Spacer(Modifier.height(14.dp))
     Row(Modifier.fillMaxWidth()) {
-      CashFigure("سقف", if (noCash) "نقد نگیرد" else afn(s.cashCapMinor), Modifier.weight(1f))
-      CashFigure("در راه", afn(s.liveExpectedMinor), Modifier.weight(1f))
-      CashFigure("جای خالی", afn(s.headroomMinor), Modifier.weight(1f))
+      CashFigure(StrCourierApp.cap, if (noCash) StrCourierApp.noCashTaking else afn(s.cashCapMinor), Modifier.weight(1f))
+      CashFigure(StrCourierApp.stMoving, afn(s.liveExpectedMinor), Modifier.weight(1f))
+      CashFigure(StrCourierApp.headroom, afn(s.headroomMinor), Modifier.weight(1f))
     }
   }
 }
@@ -717,21 +719,21 @@ internal fun CourierBellSheet(
   val p = PhoneV3.colors
   val ui = PhoneV3.ui
   val b = CourierBoardModel.bell(live, queue)
-  V3Sheet(onDismiss = onDismiss, title = "پیام‌ها") { _ ->
+  V3Sheet(onDismiss = onDismiss, title = StrCourierApp.messages) { _ ->
     if (b.total == 0) {
-      Text("پیامِ تازه‌ای نیست.", style = courierText(15.sp), color = p.inkMuted)
+      Text(StrCourierApp.noNewMessage, style = courierText(15.sp), color = p.inkMuted)
     }
     if (b.newMissions > 0) {
-      BellRow(Icons.Outlined.Inventory2, "${b.newMissions.fa()} کارِ تازه — قبول یا رد", ui.awaiting, onNewMissions)
+      BellRow(Icons.Outlined.Inventory2, StrCourierApp.newJobs(b.newMissions.fa()), ui.awaiting, onNewMissions)
     }
     live.filter { it.recallRequested }.forEach { c ->
-      BellRow(Icons.Outlined.Info, "دکان سفارشِ #${c.orderNo.fa()} را پس خواسته است", ui.cancelled) { onOpen(c) }
+      BellRow(Icons.Outlined.Info, StrCourierApp.orderRecalled(c.orderNo.fa()), ui.cancelled) { onOpen(c) }
     }
     if (b.rejectedEvents > 0) {
-      BellRow(Icons.Outlined.ReportProblem, "${b.rejectedEvents.fa()} کار ثبت نشد — ببینید", ui.cancelled, onRejected)
+      BellRow(Icons.Outlined.ReportProblem, StrCourierApp.jobsNotSaved(b.rejectedEvents.fa()), ui.cancelled, onRejected)
     }
     Spacer(Modifier.height(16.dp))
-    CourierSecondary("بستن", onDismiss, Modifier.fillMaxWidth())
+    CourierSecondary(StrCourierApp.close, onDismiss, Modifier.fillMaxWidth())
   }
 }
 

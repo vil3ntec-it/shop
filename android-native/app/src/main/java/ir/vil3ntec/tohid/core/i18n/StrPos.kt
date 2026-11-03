@@ -218,6 +218,9 @@ object StrPos {
     "په صندوق کې ټوکرۍ د همدې شېبې په بیو او «تر … معتبر» سره د مخکني بل په توګه خوندي او چاپېږي او تر وروستۍ ورځې په همغو بیو ټوکرۍ ته راګرځي چې وپلورل شي. مخکني بلونه یوازې په همدې وسیله دي.",
   )
 
+  /** نشانِ «لیستِ قیمت» روی سبدِ صندوق (`PriceListAtPos`) — پیش‌تر متنِ خام، بی زبان */
+  val priceListWholesaleChip: String get() = t("لیستِ قیمت: عمده", "Price list: wholesale", "د بیو لېست: عمده")
+  val priceListRetailChip: String get() = t("لیستِ قیمت: خرده", "Price list: retail", "د بیو لېست: پرچون")
   // لیستِ قیمت در صندوق (POS-18، همین دستگاه) — همان متنِ `PriceListSettingsWired`
   val priceListTitle: String get() = t("لیستِ قیمت در صندوق (خرده/عمده)", "Price list at the till (retail/wholesale)", "په صندوق کې د بیو لېست (پرچون/عمده)")
   val priceListNote: String get() = t(

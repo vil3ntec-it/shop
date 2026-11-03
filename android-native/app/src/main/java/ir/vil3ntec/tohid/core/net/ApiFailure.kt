@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.net
 
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.asIs
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -59,22 +61,22 @@ sealed class ApiFailure(
   internal fun withDetail(error: JsonObject?): ApiFailure { detail = error; return this }
 
   /** هنوز نشانی سروری تنظیم نشده — برنامه کاملاً آفلاین کار می‌کند */
-  class NotConfigured : ApiFailure("نشانی سرور تنظیم نشده است", "not_configured")
+  class NotConfigured : ApiFailure(localText("نشانی سرور تنظیم نشده است"), "not_configured")
 
   /** نشانی هست ولی پذیرفتنی نیست */
   class BadConfiguration(message: String) : ApiFailure(message, "bad_configuration")
 
   /** خودِ دستگاه نت ندارد — پیش از فرستادن معلوم می‌شود */
-  class Offline : ApiFailure("اینترنت وصل نیست", "offline", retryable = true)
+  class Offline : ApiFailure(localText("اینترنت وصل نیست"), "offline", retryable = true)
 
   /** نت هست ولی سرور جواب نداد: دامنه پیدا نشد، یا در دسترس نیست */
-  class Unreachable : ApiFailure("سرور در دسترس نیست", "unreachable", retryable = true)
+  class Unreachable : ApiFailure(localText("سرور در دسترس نیست"), "unreachable", retryable = true)
 
   /** سرور هست ولی به‌موقع جواب نداد */
-  class Timeout : ApiFailure("سرور به‌موقع پاسخ نداد", "timeout", retryable = true)
+  class Timeout : ApiFailure(localText("سرور به‌موقع پاسخ نداد"), "timeout", retryable = true)
 
   /** نشستِ کاربر منقضی شده و تازه هم نشد — باید دوباره وارد شود */
-  class SessionExpired : ApiFailure("نشست شما تمام شد؛ دوباره وارد شوید", "session_expired")
+  class SessionExpired : ApiFailure(localText("نشست شما تمام شد؛ دوباره وارد شوید"), "session_expired")
 
   /** ورود نشد — رمز یا کد درست نیست */
   class Unauthorized(message: String, code: String) : ApiFailure(message, code)
@@ -100,7 +102,7 @@ sealed class ApiFailure(
 
   /** پاسخ رسید ولی آن چیزی نبود که قرار بود باشد */
   class InvalidResponse(detail: String = "") :
-    ApiFailure(if (detail.isEmpty()) "پاسخ سرور خوانده نشد" else "پاسخ سرور خوانده نشد ($detail)", "invalid_response")
+    ApiFailure(localText(if (detail.isEmpty()) "پاسخ سرور خوانده نشد" else "پاسخ سرور خوانده نشد (${asIs(detail)})"), "invalid_response")
 
   companion object {
 
@@ -195,7 +197,9 @@ sealed class ApiFailure(
      *  بالا آمده. `docker compose up -d` بدونِ `--build` ایمیج را از نو
      *  نمی‌سازد و همین یک نکته، ساعت‌ها گشتن می‌سازد.
      */
-    private fun known(code: String): String? = when (code) {
+    private fun known(code: String): String? = knownFa(code)?.let(::localText)
+
+    private fun knownFa(code: String): String? = when (code) {
       "not_found" -> "سرورِ شما قدیمی است و این بخش را ندارد. نسخهٔ تازهٔ سرور را بالا بیاورید."
       "no_shop" -> "برای این حساب دکانی ثبت نشده است"
       "shop_not_found" -> "دکان پیدا نشد"
@@ -215,7 +219,9 @@ sealed class ApiFailure(
     }
 
     /** پیامِ جایگزین، فقط وقتی سرور خودش چیزی نگفته باشد */
-    private fun generic(status: Int): String = when (status) {
+    private fun generic(status: Int): String = localText(genericFa(status))
+
+    private fun genericFa(status: Int): String = when (status) {
       400 -> "درخواست درست نبود"
       401 -> "ایمیل/شماره یا رمز درست نیست"
       403 -> "این حساب اجازهٔ این کار را ندارد"
@@ -223,7 +229,7 @@ sealed class ApiFailure(
       409 -> "این مورد از قبل ثبت شده است"
       429 -> "درخواست‌ها زیاد بود؛ کمی بعد دوباره امتحان کنید"
       in 500..599 -> "سرور خطا داد؛ کمی بعد دوباره امتحان کنید"
-      else -> "پاسخ سرور درست نبود ($status)"
+      else -> "پاسخ سرور درست نبود (${asIs(status)})"
     }
 
     /**
@@ -239,7 +245,7 @@ sealed class ApiFailure(
       is java.net.UnknownHostException -> Unreachable()
       is java.net.ConnectException -> Unreachable()
       is java.net.NoRouteToHostException -> Unreachable()
-      is javax.net.ssl.SSLException -> BadConfiguration("اتصال امن با سرور برقرار نشد")
+      is javax.net.ssl.SSLException -> BadConfiguration(localText("اتصال امن با سرور برقرار نشد"))
       is java.io.IOException -> Unreachable()
       else -> InvalidResponse()
     }
@@ -253,5 +259,12 @@ sealed class ApiFailure(
  *  (خطای محلی، خواندنِ پرونده) متنِ جایگزین به کار می‌آید. هیچ‌وقت
  *  پیامِ خامِ انگلیسیِ یک کتابخانه به کاربر نشان داده نمی‌شود.
  */
+/**
+ *  پیامِ محلیِ همین لایه (نه پیامِ خودِ سرور): فارسی، انگلیسی و پشتو همان فارسیِ امروز — این پیام‌ها هنوز
+ *  ترجمه ندارند و `SyncModel.classify` و صف‌ها همین متن را می‌خوانند — و دری از لایهٔ واژه (`DariText`)
+ *  می‌گذرد. مقدارِ درونِ متن با `asIs`. پیامِ سرور داده است و دست نمی‌خورد.
+ */
+internal fun localText(fa: String): String = I18n.pick(I18n.lang, fa, null, null)
+
 fun Throwable.userText(fallback: String): String =
   (this as? ApiFailure)?.userMessage ?: fallback

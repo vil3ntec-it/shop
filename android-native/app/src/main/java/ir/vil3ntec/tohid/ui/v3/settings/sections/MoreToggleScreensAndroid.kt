@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrChat
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.data.FraudTrailPref
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -149,7 +150,7 @@ internal fun RouteScope.StockModeScreen(onBack: (() -> Unit)?) {
   var ask by remember { mutableStateOf<Boolean?>(null) }
   SettingsPageFrame(
     title = SettingsLayout.labelOf(SettingsLayout.STOCK_MODE),
-    subtitle = if (StockLedger.serverFlag && on) "موتورِ تازه روشن (آزمایشی)" else StrSettings.off,
+    subtitle = if (StockLedger.serverFlag && on) StrSettingsPages.stockModeOn else StrSettings.off,
     onBack = onBack,
   ) {
     item(key = "mode") {
@@ -159,17 +160,16 @@ internal fun RouteScope.StockModeScreen(onBack: (() -> Unit)?) {
       }
       SettingsBlock { V3Segmented(SWITCH, if (on) 1 else 0, { pick -> if ((pick == 1) != on) ask = pick == 1 }) }
       SettingsNote(
-        "روشن: بهای میانگینِ موزون با هزینهٔ جانبیِ خرید، سری و انقضا با برداشتِ FEFO سرِ صندوق، دفترِ حرکت با کاربر و دلیل، " +
-          "شمارش با بازبینی، انتقال بین محل‌ها و «وظیفهٔ بررسی» برای موجودیِ منفی. برای همهٔ دستگاه‌های همین دکان یکی است.",
+        StrSettingsPages.stockModeNote,
       )
-      SettingsNote("آزمایشی: روشِ بهای تمام‌شده هنوز تصمیمِ باز است (D-23)، پس بها و سود «تقریبی»اند.")
+      SettingsNote(StrSettingsPages.stockModeTrial)
     }
   }
   ask?.let { next ->
     V3ConfirmSheet(
-      title = if (next) "موتورِ تازهٔ موجودی و بها روشن شود؟" else "موتورِ تازه خاموش شود؟",
-      message = if (next) "روی همهٔ دستگاه‌های این دکان روشن می‌شود. موجودیِ هر کالا همان عددِ امروز می‌ماند." else "فروش و خرید به رفتارِ امروز برمی‌گردد. چیزی از دفتر پاک نمی‌شود.",
-      confirm = if (next) "روشن کن" else "خاموش کن",
+      title = if (next) StrSettingsPages.stockModeAskOn else StrSettingsPages.stockModeAskOff,
+      message = if (next) StrSettingsPages.stockModeOnBody else StrSettingsPages.stockModeOffBody,
+      confirm = if (next) StrSettingsPages.turnOn else StrSettingsPages.turnOff,
       danger = !next,
       onDismiss = { ask = null },
       onConfirm = {

@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.delivery.DeliveryText
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderDraft
@@ -40,7 +41,7 @@ internal data class DeskData(
   /** مأموریت‌های ارسال (نه دریافتِ حضوری) */
   val missions: List<Mission> = live.filter { it.mode != "pickup" }
 
-  fun courierName(id: String): String = couriers.firstOrNull { it.id == id }?.name ?: "پیک"
+  fun courierName(id: String): String = couriers.firstOrNull { it.id == id }?.name ?: StrCourierApp.courier
 
   companion object {
     val ASSIGNABLE = setOf("accepted", "picking", "packed")

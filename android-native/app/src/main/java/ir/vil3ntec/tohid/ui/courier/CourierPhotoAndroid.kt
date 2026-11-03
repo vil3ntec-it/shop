@@ -21,6 +21,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.fa
 import ir.vil3ntec.tohid.ui.screens.PhotoSourceSheet
@@ -56,14 +57,14 @@ internal fun PhotoFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (ByteArra
   var error by remember { mutableStateOf<String?>(null) }
 
   if (!pick) {
-    V3Sheet(onDismiss = onDismiss, title = "عکسِ بسته") { _ ->
+    V3Sheet(onDismiss = onDismiss, title = StrCourierApp.parcelPhoto) { _ ->
       Text(
-        "مشتریِ سفارشِ #${c.orderNo.fa()} به عکسِ تحویل رضایت داده است. عکس فقط از بسته گرفته شود؛ چهرهٔ کسی در عکس نباشد.",
+        StrCourierApp.photoConsent(c.orderNo.fa()),
         style = courierText(15.sp), color = p.inkMuted,
       )
       Spacer(Modifier.height(12.dp))
       V3Card(padding = PaddingValues(0.dp)) {
-        V3ToggleRow("عکس فقط از بسته است", parcelOnly, { parcelOnly = it }, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.SKY)
+        V3ToggleRow(StrCourierApp.parcelOnly, parcelOnly, { parcelOnly = it }, icon = Icons.Outlined.PhotoCamera, hue = V3Hue.SKY)
       }
       error?.let {
         Spacer(Modifier.height(8.dp))
@@ -71,23 +72,23 @@ internal fun PhotoFlow(c: MissionCard, onDismiss: () -> Unit, onReady: (ByteArra
       }
       Spacer(Modifier.height(18.dp))
       StepButton(
-        "گرفتنِ عکس", { pick = true }, Modifier.fillMaxWidth(),
+        StrCourierApp.takePhoto, { pick = true }, Modifier.fillMaxWidth(),
         enabled = parcelOnly && !busy, loading = busy, icon = Icons.Outlined.PhotoCamera,
       )
       Spacer(Modifier.height(8.dp))
-      CourierSecondary("انصراف", onDismiss, Modifier.fillMaxWidth())
+      CourierSecondary(StrCourierApp.cancel, onDismiss, Modifier.fillMaxWidth())
     }
   }
   PhotoSourceSheet(
     open = pick,
     onDismiss = { pick = false },
-    note = "فقط بسته؛ عکس پس از رسیدن به دکان از این گوشی پاک می‌شود",
+    note = StrCourierApp.photoNote,
   ) { uri ->
     busy = true
     scope.launch {
       val bytes = withContext(Dispatchers.IO) { runCatching { parcelJpeg(context, uri) }.getOrNull() }
       busy = false
-      if (bytes == null) error = "عکس خوانده نشد؛ دوباره بگیرید" else onReady(bytes)
+      if (bytes == null) error = StrCourierApp.photoUnread else onReady(bytes)
     }
   }
 }
