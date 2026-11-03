@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.PlaceQty
+import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -22,6 +24,8 @@ data class LineInfo(
   val basePrice: Double,
   val free: Boolean,
   val product: Product?,
+  /** POS-16 — موجودیِ همین کالا در هر محلِ نگه‌داری (INV-20)؛ خالی ⇒ بخشش نیست (شرح سرِ `PlaceStock.of`) */
+  val places: List<PlaceQty> = emptyList(),
 ) {
   val hasSaleUnit: Boolean get() = saleUnit.isNotBlank() && unitFactor > 0
   val custom: Boolean get() = free || unitPrice != null
@@ -47,7 +51,11 @@ data class LineForm(
  */
 object LineModel {
 
-  fun info(d: ShopData, line: SalesEngine.CartLine): LineInfo {
+  /**
+   *  @param places «محل‌های نگه‌داری» ِ همین دستگاه روشن است (`StockPlacesPref.places`) — صدازننده می‌خواند؛
+   *  پیش‌فرض false ⇒ همان برگهٔ امروز
+   */
+  fun info(d: ShopData, line: SalesEngine.CartLine, places: Boolean = false): LineInfo {
     val p = d.products.find { it.id == line.productId }
     val base = if (line.free) line.unitPrice ?: 0.0 else p?.salePrice ?: 0.0
     return LineInfo(
@@ -61,8 +69,12 @@ object LineModel {
       basePrice = base,
       free = line.free,
       product = p,
+      places = if (places && !line.free) PlaceStock.of(d, p) else emptyList(),
     )
   }
+
+  /** «۳ کیلوگرم» ِ یک محل */
+  fun placeQtyText(q: PlaceQty, unit: String): String = (qty(q.milli / 1000.0) + " " + unit).trim()
 
   fun start(info: LineInfo): LineForm = LineForm(qty(info.quantity), qty(info.unitPrice ?: info.basePrice))
 

@@ -17,6 +17,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -33,7 +34,8 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 /**
  *  برگهٔ «تعداد و قیمتِ این ردیف» (`sale/line/{i}`، نگه داشتنِ ردیفِ سبد): واحد (اگر کالا
- *  واحدِ فروشِ دوم دارد)، «تعداد (کیلوگرم)»، «قیمت هر واحد» با یادِ قیمتِ خودِ کالا، جمعِ
+ *  واحدِ فروشِ دوم دارد)، «تعداد (کیلوگرم)»، «قیمت هر واحد» با یادِ قیمتِ خودِ کالا، «موجودی در
+ *  محل‌ها» (POS-16، فقط با «محل‌های نگه‌داری» ِ روشن و محلی جز محلِ اصلی)، جمعِ
  *  شمارندهٔ همین ردیف، «ثبت» و «برداشتن از سبد». خطا زیرِ همان کادر و لرزشِ کوتاه.
  *
  *  @param onSave نوشته‌های فرم و حالتِ آغاز — صدازننده `LineModel.apply` را روی سبدِ همان لحظه می‌زند
@@ -88,6 +90,17 @@ fun LineSheet(
       )
       if (!info.free && info.unitPrice != null && !form.resetPrice) {
         V3TextButton(StrSale.backToItemPrice, { form = form.copy(priceText = qty(info.basePrice), resetPrice = true) }, Modifier.padding(top = 4.dp))
+      }
+    }
+    if (info.places.isNotEmpty()) {
+      //  POS-16 — موجودیِ همین کالا در هر محل (فقط خواندنی؛ جمعِ محل‌ها همان موجودیِ کالا)
+      Spacer(Modifier.height(14.dp))
+      Text(StrPlaces.atTill, style = V3Type.footnote, color = c.inkMuted)
+      for (pq in info.places) {
+        Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+          Text(pq.label, style = V3Type.callout, color = c.ink, modifier = Modifier.weight(1f))
+          Text(LineModel.placeQtyText(pq, info.unit), style = V3Type.callout, color = if (pq.milli < 0) c.negative else c.ink)
+        }
       }
     }
     Spacer(Modifier.height(16.dp))
