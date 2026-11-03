@@ -748,7 +748,7 @@ test('درِ مشتری /api/store/:slug/chat با بلیتِ ویترین', { s
   await setFlag(o.shopId, 'shop.chat', true);
   //  بی بلیت یا با بلیتِ دست‌خورده ⇒ ۴۰۱
   assert.equal((await pub('POST', '/conversations', {}, '')).status, 401);
-  assert.equal((await pub('POST', '/conversations', {}, `${ticket.slice(0, -2)}xx`)).body.error.code, 'verification_required');
+  assert.equal((await pub('POST', '/conversations', {}, h.tampered(ticket))).body.error.code, 'verification_required');
 
   r = await pub('POST', '/conversations', { name: 'نادر' });
   assert.equal(r.status, 201, JSON.stringify(r.body));

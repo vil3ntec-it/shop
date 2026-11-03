@@ -102,12 +102,12 @@
   }
 
   // ── کارتِ کالا با «افزودن» به سبدِ همان دکان (روی همین دستگاه) ──
-  function photo(slug, id) { return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/thumb'; }
+  function photo(slug, id, v) { return '/api/store/' + encodeURIComponent(slug) + '/products/' + encodeURIComponent(id) + '/thumb' + (v ? '?v=' + encodeURIComponent(v) : ''); }
   function cartOf(slug) { return K.load(K.cartKey(slug), {}) || {}; }
   function productCard(p) {
     var li = K.productCard(p, {
       href: '/store/' + encodeURIComponent(p.shop.slug) + '#/p/' + encodeURIComponent(p.id),
-      photo: photo(p.shop.slug, p.id), qty: (cartOf(p.shop.slug)[p.id] || {}).qtyMilli || 0, onAdd: add, shop: true,
+      photo: photo(p.shop.slug, p.id, p.photoVersion), qty: (cartOf(p.shop.slug)[p.id] || {}).qtyMilli || 0, onAdd: add, shop: true,
     });
     li.setAttribute('data-shop', p.shop.slug);
     return li;
@@ -116,7 +116,7 @@
     var c = cartOf(p.shop.slug);
     var cur = c[p.id] ? c[p.id].qtyMilli : 0;
     if (p.maxQtyMilli && cur + 1000 > p.maxQtyMilli) { K.toast(t('maxq', { q: K.qty(p.maxQtyMilli) })); return; }
-    c[p.id] = { qtyMilli: cur + 1000, name: p.name, unit: p.unit || '', priceMinor: p.priceMinor, maxQtyMilli: p.maxQtyMilli || null, photo: Boolean(p.photo), unavailable: false };
+    c[p.id] = { qtyMilli: cur + 1000, name: p.name, unit: p.unit || '', priceMinor: p.priceMinor, maxQtyMilli: p.maxQtyMilli || null, photo: Boolean(p.photo), photoVersion: p.photoVersion, unavailable: false };
     K.save(K.cartKey(p.shop.slug), c);
     K.save(K.cartMetaKey(p.shop.slug), { title: p.shop.title, accent: p.shop.accent, at: Date.now() });
     var focused = document.activeElement;

@@ -1,6 +1,6 @@
 {
   "_doc": "قراردادِ نمای عمومیِ دکان ⇐ بازار (docs/MARKETPLACE-CONTRACT-fa.md، S2/S4). ⛔ با تغییرِ fields، schemaVersion و نامِ پرونده بالا می‌رود (market-public-v2.json). سرور: server/test/public-views.test.js و server/src/lib/public-views.js؛ core: MarketContractTest.kt. inputs = ورودیِ سازنده‌های سرور (با فیلدهای داخلی که نباید بیرون بیایند)، samples = نمای عمومیِ همان.",
-  "_v1Additions": "پیش از نخستین انتشارِ v1 (شاخهٔ #418)، فیلدهایی که main همین حالا عمومی می‌فرستد به همین نسخه افزوده شد — بی v2: order.substitution و orderLine.substitution/substituteName (CHK-15/16 #525)، order.smallBasketFeeMinor/slotFeeMinor (CHK-06/07 #494)، order.onlinePay = {available} فقط در پیگیری (PAY-21 #529)، product.regularPriceMinor? در highlights.deals (WEB-02 #626)، shop.media = {logo, header} با هر کدام null یا {version, width, height, mime, url} (M3 #428)، shop.ordering? = {accepting, code?, message?} فقط با پرچمِ shop.orders.subscribers_only (#467).",
+  "_v1Additions": "پیش از نخستین انتشارِ v1 (شاخهٔ #418)، فیلدهایی که main همین حالا عمومی می‌فرستد به همین نسخه افزوده شد — بی v2: order.substitution و orderLine.substitution/substituteName (CHK-15/16 #525)، order.smallBasketFeeMinor/slotFeeMinor (CHK-06/07 #494)، order.onlinePay = {available} فقط در پیگیری (PAY-21 #529)، product.regularPriceMinor? در highlights.deals (WEB-02 #626)، shop.media = {logo, header} با هر کدام null یا {version, width, height, mime, url} (M3 #428)، shop.ordering? = {accepting, code?, message?} فقط با پرچمِ shop.orders.subscribers_only (#467). product/marketProduct/searchProduct.photoVersion? = نسخهٔ ۱۲-hex ِ عکس برای ‎?v=‎ ِ نشانیِ عکس، فقط وقتی عکس هست (IMG-12).",
   "schemaVersion": 1,
   "fields": {
     "shop": [
@@ -98,6 +98,7 @@
       "regularPriceMinor?",
       "maxQtyMilli",
       "photo",
+      "photoVersion?",
       "stock",
       "description?",
       "specs?"
@@ -111,6 +112,7 @@
       "regularPriceMinor?",
       "maxQtyMilli",
       "photo",
+      "photoVersion?",
       "stock",
       "shop"
     ],
@@ -121,6 +123,7 @@
       "category",
       "priceMinor",
       "photo",
+      "photoVersion?",
       "shop"
     ],
     "stock": [
@@ -287,6 +290,7 @@
       "online_price_minor": null,
       "max_qty_milli": "5000",
       "has_photo": true,
+      "photo_hash": "3f2a9c0d5e7b1a4c6d8e0f1a2b3c4d5e",
       "data": {
         "name": "برنج",
         "unit": "کیلو",
@@ -457,6 +461,7 @@
       "priceMinor": 12000,
       "maxQtyMilli": 5000,
       "photo": true,
+      "photoVersion": "b0c68a8e1047",
       "stock": {
         "status": "unverified",
         "checkedAt": null

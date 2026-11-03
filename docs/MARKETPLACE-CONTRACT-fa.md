@@ -210,6 +210,7 @@
 | `order` | `onlinePay?` = `{ available }` — فقط در پیگیری (`GET /api/store/:slug/orders/:token`) | PAY-21، #529 |
 | `product` | `regularPriceMinor?` — فقط در `highlights.deals` («ارزان‌تر از قیمتِ دکان») | WEB-02، #626 |
 | `shop` | `media?` = `{ logo, header }`، هر کدام `null` یا `{ version, width, height, mime, url }` (پرچمِ خاموش ⇒ هر دو `null`) | M3، #428 |
+| `product`، `marketProduct`، `searchProduct` | `photoVersion?` — نسخهٔ ۱۲-hex ِ عکس برای `?v=` ِ نشانیِ عکس؛ فقط وقتی عکس هست (نبود ⇒ نشانیِ بی نسخه) | IMG-12، `claude/img12` |
 
 فیلدهای پشتِ پرچم‌های خاموشِ دیگر (`order.delivery` ِ S5، `order.refund` ِ NTF-08، `store.publicId` ِ S3، جزئیاتِ M4 در جست‌وجو) هنوز در این فهرست نیستند؛ تا آن‌ها نیامده‌اند پرچمِ `market.public_views` خاموش بماند.
 

@@ -281,7 +281,7 @@ test('فقط صاحبِ سفارش: بی تأیید ۴۰۱، شمارهٔ دیگ
   const cross = await h.post(`/api/store/${other.slug}/orders/${o.token}/items`, body,
     { headers: { 'Idempotency-Key': key(), 'X-Store-Ticket': await ticketFor(other.slug, PHONE) } });
   assert.equal(cross.status, 404);
-  const broken = await addItems(s, `${o.token.slice(0, -2)}zz`, body);
+  const broken = await addItems(s, h.tampered(o.token, 'zz'), body);
   assert.equal(broken.status, 404);
   assert.deepEqual(await linesOf(o.id), before.lines);
   assert.deepEqual(await orderRow(o.id), before.row);
