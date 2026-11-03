@@ -5,6 +5,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.StockPlacesPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -23,7 +24,9 @@ fun RouteScope.LineRoute() {
   val context = LocalContext.current
   val at = args.int("i") ?: -1
   val line = remember { cart.lines.value.getOrNull(at) }
-  val info = remember(line) { line?.let { LineModel.info(data, it) } }
+  //  POS-16: «موجودی در محل‌ها» فقط با «محل‌های نگه‌داری» ِ همین دستگاه (INV-20، پیش‌فرض خاموش ⇒ برگهٔ امروز)
+  val placesOn = remember { StockPlacesPref.places(context) }
+  val info = remember(line) { line?.let { LineModel.info(data, it, places = placesOn) } }
   if (line == null || info == null) {
     LaunchedEffect(Unit) { toasts.show(StrSale.lineGone, V3Tone.WARNING); back() }
     return

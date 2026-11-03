@@ -333,6 +333,11 @@ async function seedShop(a) {
   const own = await h.raw('POST', `/api/shop/images/?product_id=${ids.product}`, F.jpeg(800, 600, { seed: 731 }), { token: a.accessToken });
   assert.equal(own.status, 201, JSON.stringify(own.body));
   ids.image = own.body.id;
+  //  دستهٔ تغییرِ عکسِ «الف» (IMG-PRO-17) — «ب» نه می‌بیند، نه برمی‌گرداند
+  const change = await h.post('/api/shop/images/changes', { key: fresh('imgchg'), items: [{ product_id: ids.product, source: 'shop', image_id: ids.image }] },
+    { token: a.accessToken });
+  assert.equal(change.status, 201, JSON.stringify(change.body));
+  ids.imageChange = change.body.change.id;
 
   //  سفارشِ مشتری (اعلانِ سفارش) — از لایهٔ سفارش، همان راهِ ویترین
   await orders.create(a.shopId, {
@@ -570,6 +575,7 @@ function concreteFor(ids) {
     [/^(\/shop\/storefront\/campaigns\/):id/, ids.campaign],
     [/^(\/shop\/storefront\/area-requests\/):id/, ids.areaRequest],
     [/^(\/shop\/images\/products\/):productId/, ids.product],
+    [/^(\/shop\/images\/changes\/):id/, ids.imageChange],
     [/^(\/shop\/images\/file\/):id/, ids.image],
     [/^(\/shop\/images\/):id/, ids.image],
     [/(\/):version\b/, '1'],
@@ -644,6 +650,7 @@ function bodyFor(r, ids) {
     'POST /shop/images/:id/report': { kind: 'wrong_product', note: 'آزمون' },
     'POST /shop/images/:id/process': { step: 'strip_metadata' },
     'POST /shop/images/:id/propose': { consent: true },
+    'POST /shop/images/changes/:id/rollback': { reason: 'آزمون' },
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
