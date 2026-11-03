@@ -213,6 +213,12 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       }
       //  RSK-08: «پروندهٔ مدرک» — همان شرط و حالتِ رابطِ امروز (`orders.manage` و پرچمِ `shop.orders.dispute_file`)
       OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true, remember(context) { Backend.api(context) })
+      //  RSK-03: سابقهٔ همین مشتری در همین دکان پیش از ارسال — فقط با پرچمِ `shop.order_risk` (خاموش ⇒ هیچ)؛
+      //  RSK-04: فهرستِ بسته/مطمئن فقط برای `orders.contact` و فقط با شمارهٔ کاملِ همین سفارش
+      OrderRiskCardV3(
+        o.id, remember(context) { OrdersHub.repo(context) }, rev,
+        canList = perms.contact, phone = OrderDetailModel.fullPhone(o),
+      )
       //  جمع‌آوری (PCK)، ویرایش (ORD-14)، ترجیحِ تحویل (CHK-14)، جایگزینی (CHK-15/16)، پیام‌ها (ORD-16) و برگشتِ کالا (RET-11)
       OrderDetailExtras(o, cfg)
     }

@@ -1,7 +1,8 @@
 'use strict';
 /**
- * سفارشِ خرید از تأمین‌کننده — PUR-02 (پیش‌نویس، فرستاده، بخشی، کامل، لغو) و PUR-04 (رسیدِ
- * دریافتِ کامل/جزئی با خراب و باقی‌ماندهٔ باز)، §۶.۶ و سناریوی S19.
+ * سفارشِ خرید از تأمین‌کننده — PUR-02 (پیش‌نویس، فرستاده، بخشی، کامل، لغو)، PUR-04 (رسیدِ
+ * دریافتِ کامل/جزئی با خراب و باقی‌ماندهٔ باز) و PUR-14 (فاکتورِ جدای تأمین‌کننده برای تطبیقِ
+ * سه‌طرفه، مهاجرتِ ۲۰۸)، §۶.۶ و سناریوی S19.
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.purchase_orders` در «تنظیماتِ زنده» فقط `GET /config` جواب
  *    می‌دهد. ⛔ shop_id فقط از عضویتِ کاربرِ توکن (INV-11).
@@ -31,8 +32,10 @@ const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 /** مرزهای کسب‌وکار (سخت‌تر از سقفِ امنِ هسته؛ همان اندازه‌های سفارشِ آنلاین) */
 const MAX_QTY_MILLI = 1_000_000_000;         // یک میلیون واحد
 const MAX_PRICE_MINOR = 100_000_000_000;     // یک میلیارد افغانی
-const MAX_TEXT = { supplierName: 120, name: 200, unit: 30, note: 500, reason: 300 };
+const MAX_TEXT = { supplierName: 120, name: 200, unit: 30, note: 500, reason: 300, billNo: 60 };
 const MAX_LIST = 100;
+/** PUR-14: جمعِ یک ردیفِ فاکتورِ تأمین‌کننده (همان سقفِ فی × یک میلیون واحد نه — سقفِ امنِ یک فاکتور) */
+const MAX_BILL_MINOR = 1_000_000_000_000_000;
 
 /** پیامِ فارسیِ هر کدِ هسته */
 const MESSAGES = {
@@ -58,10 +61,18 @@ const MESSAGES = {
   damaged_over_received: 'خراب بیش از رسیده است',
   nothing_received: 'هیچ مقداری وارد نشده است',
   over_ordered: 'بیش از باقی‌ماندهٔ سفارش است',
+  //  PUR-14 — فاکتورِ تأمین‌کننده
+  bill_no_required: 'شمارهٔ فاکتورِ تأمین‌کننده را بنویسید',
+  bill_no_taken: 'این شمارهٔ فاکتور پیش‌تر برای همین سفارش ثبت شده است',
+  bill_lines_required: 'دست‌کم یک ردیف در فاکتور لازم است',
+  product_mismatch: 'کالای این ردیف با ردیفِ سفارش یکی نیست',
+  bad_total: 'مبلغِ ردیفِ فاکتور درست نیست',
+  bill_not_found: 'فاکتورِ تأمین‌کننده پیدا نشد',
+  bill_voided: 'این فاکتور پیش‌تر باطل شده است',
 };
 
 /** کدِ هسته ⇒ خطای HTTP (۴۰۹ برای گذارِ نامجاز و تعارضِ کلید، ۴۰۰ برای ورودی) */
-const CONFLICTS = new Set(['not_draft', 'not_sent', 'cancelled', 'complete', 'id_conflict']);
+const CONFLICTS = new Set(['not_draft', 'not_sent', 'cancelled', 'complete', 'id_conflict', 'bill_no_taken', 'bill_voided']);
 function refuse(f) {
   const msg = MESSAGES[f.code] || f.code;
   const err = CONFLICTS.has(f.code) ? conflict(msg, f.code) : badRequest(msg, f.code);
@@ -179,8 +190,28 @@ function receiptOf(row) {
   };
 }
 
-/** سفارش + وضعیتِ نمایشی، پیشرفتِ هر ردیف، جمع‌ها و کارهای مجاز */
-function view(order, receipts, { withReceipts = true } = {}) {
+function billOf(row) {
+  return {
+    id: row.id,
+    poId: row.po_id,
+    billNo: row.bill_no,
+    billDate: row.bill_date,
+    lines: row.lines,
+    totalMinor: Number(row.total_minor),
+    note: row.note,
+    createdBy: row.created_by,
+    createdAt: num(row.created_at),
+    voidedAt: num(row.voided_at),
+    voidedBy: row.voided_by || null,
+    voidReason: row.void_reason || null,
+  };
+}
+
+/**
+ * سفارش + وضعیتِ نمایشی، پیشرفتِ هر ردیف، جمع‌ها و کارهای مجاز. `bills` (PUR-14) همهٔ فاکتورهای
+ * تأمین‌کننده با باطل‌شده‌ها؛ `billCount` فقط فعال‌ها. برنامهٔ پیشین این دو کلید را نمی‌شناسد و کنار می‌گذارد.
+ */
+function view(order, receipts, { withReceipts = true, bills = [] } = {}) {
   const status = core.status(order, receipts);
   const out = {
     ...order,
@@ -191,9 +222,16 @@ function view(order, receipts, { withReceipts = true } = {}) {
     receiptCount: receipts.length,
     //  زمانِ تأمین (PUR-10): «فرستادن ⇐ نخستین رسید» را برنامه از همین دو زمان می‌سنجد (ReorderCore)
     firstReceiptAt: receipts.length ? Math.min(...receipts.map((r) => r.createdAt)) : null,
+    billCount: bills.filter((b) => b.voidedAt === null).length,
   };
-  if (withReceipts) out.receipts = receipts;
+  if (withReceipts) { out.receipts = receipts; out.bills = bills; }
   return out;
+}
+
+async function billsOf(run, shopId, poId) {
+  return (await run(
+    'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 ORDER BY created_at, id', [shopId, poId]
+  )).rows.map(billOf);
 }
 
 async function receiptsOf(run, shopId, poId) {
@@ -227,7 +265,7 @@ async function create(shopId, { key, body, userId }) {
         throw conflict('این کلیدِ یکتایی پیش‌تر برای سفارشِ دیگری به کار رفته است', 'idempotency_key_reused');
       }
       const o = orderOf(prev);
-      return { order: view(o, await receiptsOf(run, shopId, o.id)), replayed: true };
+      return { order: view(o, await receiptsOf(run, shopId, o.id), { bills: await billsOf(run, shopId, o.id) }), replayed: true };
     }
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(po_no), 0) + 1 AS n FROM purchase_orders WHERE shop_id=$1', [shopId]
@@ -266,7 +304,7 @@ async function update(shopId, id, { body }) {
       [shopId, current.id, draft.supplierId, draft.supplierName, JSON.stringify(draft.lines), draft.expectedDate,
         draft.note, now()]
     )).rows[0];
-    return view(orderOf(row), receipts);
+    return view(orderOf(row), receipts, { bills: await billsOf(run, shopId, current.id) });
   });
 }
 
@@ -279,7 +317,8 @@ async function transition(shopId, id, action, { reason } = {}) {
     const receipts = await receiptsOf(run, shopId, current.id);
     const r = action === 'send' ? core.send(current, receipts) : core.cancel(current, receipts, why);
     if (r.failure) throw refuse(r.failure);
-    if (r.unchanged) return { order: view(current, receipts), changed: false };
+    const bills = await billsOf(run, shopId, current.id);
+    if (r.unchanged) return { order: view(current, receipts, { bills }), changed: false };
     const at = now();
     const row = (await c.query(
       action === 'send'
@@ -289,7 +328,7 @@ async function transition(shopId, id, action, { reason } = {}) {
            WHERE shop_id=$1 AND id=$2 RETURNING *`,
       action === 'send' ? [shopId, current.id, at] : [shopId, current.id, at, why || null]
     )).rows[0];
-    return { order: view(orderOf(row), receipts), changed: true };
+    return { order: view(orderOf(row), receipts, { bills }), changed: true };
   });
 }
 
@@ -332,7 +371,10 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
     const r = core.receive(current, receipts, { id: rid, lines }, allowOver);
     if (r.failure) throw refuse(r.failure);
     if (r.duplicate) {
-      return { order: view(current, receipts), receipt: receipts.find((x) => x.id === r.duplicate.id), replayed: true };
+      return {
+        order: view(current, receipts, { bills: await billsOf(run, shopId, current.id) }),
+        receipt: receipts.find((x) => x.id === r.duplicate.id), replayed: true,
+      };
     }
     if (!manager) {
       lines.forEach((l, i) => {
@@ -367,7 +409,145 @@ async function receive(shopId, id, { body, headerKey, userId, role }) {
       [shopId, current.id, at]
     )).rows[0];
     const receipt = receiptOf(row);
-    return { order: view(orderOf(updated), receipts.concat([receipt])), receipt, replayed: false };
+    const bills = await billsOf(run, shopId, current.id);
+    return { order: view(orderOf(updated), receipts.concat([receipt]), { bills }), receipt, replayed: false };
+  });
+}
+
+/* ── فاکتورِ جدای تأمین‌کننده (PUR-14) ─────────────────────────────── */
+
+const blankText = (v) => v === undefined || v === null || v === '';
+
+/**
+ * بدنهٔ فاکتور ⇐ فاکتورِ درست یا ۴۰۰ (کدِ پایدار و ردیف). ردیف: `{lineId?, productId?, qtyMilli, totalMinor}`؛
+ * ردیفِ سفارش (`lineId`) کالایش را از سفارش می‌گیرد؛ کالای بیرون از سفارش فقط با `productId` (همان «بیرون از
+ * سفارش» ِ هسته). یک کالا دو بار نمی‌آید. جمعِ ردیف همان مبلغی است که تأمین‌کننده نوشته (نه مقدار × فی).
+ */
+function parseBill(order, body) {
+  const b = body || {};
+  const billNo = text(b.billNo, MAX_TEXT.billNo, 'شمارهٔ فاکتور');
+  if (!billNo) throw refuse({ code: 'bill_no_required' });
+  let billDate = null;
+  if (!blankText(b.billDate)) {
+    const v = b.billDate;
+    const d = typeof v === 'string' && DATE_RE.test(v) ? new Date(`${v}T00:00:00Z`) : null;
+    if (!d || Number.isNaN(d.getTime()) || d.toISOString().slice(0, 10) !== v) throw badRequest('تاریخِ فاکتور درست نیست', 'bad_date');
+    billDate = v;
+  }
+  const note = text(b.note, MAX_TEXT.note, 'یادداشت');
+  const raw = Array.isArray(b.lines) ? b.lines : [];
+  if (!raw.length) throw refuse({ code: 'bill_lines_required' });
+  if (raw.length > core.MAX_LINES) throw refuse({ code: 'too_many_lines' });
+  const byId = new Map(order.lines.map((l) => [l.id, l]));
+  const seen = new Set();
+  let total = 0;
+  const lines = raw.map((l, i) => {
+    const x = l && typeof l === 'object' ? l : {};
+    const lineId = blankText(x.lineId) ? null : x.lineId;
+    let productId = blankText(x.productId) ? null : x.productId;
+    if (lineId !== null) {
+      const ol = typeof lineId === 'string' ? byId.get(lineId) : null;
+      if (!ol) throw refuse({ code: 'unknown_line', lineId, index: i });
+      if (productId !== null && productId !== ol.productId) throw refuse({ code: 'product_mismatch', lineId, index: i });
+      productId = ol.productId;
+    } else if (!core.refOk(productId)) {
+      throw refuse({ code: 'product_required', lineId: null, index: i });
+    }
+    if (seen.has(productId)) throw refuse({ code: 'duplicate_product', lineId, index: i });
+    seen.add(productId);
+    if (!Number.isSafeInteger(x.qtyMilli) || x.qtyMilli <= 0 || x.qtyMilli > MAX_QTY_MILLI) throw refuse({ code: 'bad_qty', lineId, index: i });
+    if (!Number.isSafeInteger(x.totalMinor) || x.totalMinor < 0 || x.totalMinor > MAX_BILL_MINOR) throw refuse({ code: 'bad_total', lineId, index: i });
+    total += x.totalMinor;
+    if (!Number.isSafeInteger(total)) throw refuse({ code: 'overflow' });
+    return { lineId, productId, qtyMilli: x.qtyMilli, totalMinor: x.totalMinor };
+  });
+  return { billNo, billDate, note, lines, totalMinor: total };
+}
+
+/**
+ * ثبتِ فاکتورِ تأمین‌کننده برای سفارشِ فرستاده (بخشی، کامل یا لغوشده با رسید هم). `id` ِ بدنه (یا سرآیندِ
+ * `Idempotency-Key`) کلیدِ یکتاست: همان کلید و همان بدنه ⇒ همان فاکتور (`replayed`)، بدنهٔ دیگر ⇒ ۴۰۹
+ * `idempotency_key_reused`، کلیدِ سفارشِ دیگر ⇒ ۴۰۹ `id_conflict`. همان شمارهٔ فعال در همان سفارش ⇒ ۴۰۹ `bill_no_taken`.
+ * هیچ ردیفی در دفترِ دکان نوشته نمی‌شود (بدهیِ تأمین‌کننده همان راهِ رسید ⇐ فاکتورِ خریدِ دفتر را دارد).
+ */
+async function bill(shopId, id, { body, headerKey, userId }) {
+  const b = body || {};
+  const bid = typeof b.id === 'string' && b.id ? b.id : headerKey;
+  if (!core.idOk(bid)) throw badRequest('کلیدِ یکتای فاکتور لازم است', 'bill_id_required');
+  return tx(async (c) => {
+    const run = (t, p) => c.query(t, p);
+    const current = await lockOrder(c, shopId, id);
+    if (current.state === core.STATE.DRAFT) throw refuse({ code: 'not_sent' });
+    const parsed = parseBill(current, b);
+    const hash = hashOf(parsed);
+    const prev = (await c.query('SELECT * FROM purchase_bills WHERE shop_id=$1 AND id=$2', [shopId, bid])).rows[0];
+    if (prev) {
+      if (prev.po_id !== current.id) throw refuse({ code: 'id_conflict' });
+      if (prev.request_hash !== hash) {
+        throw conflict('این کلیدِ یکتایی پیش‌تر برای فاکتورِ دیگری به کار رفته است', 'idempotency_key_reused');
+      }
+      return {
+        order: view(current, await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
+        bill: billOf(prev), replayed: true,
+      };
+    }
+    const taken = (await c.query(
+      'SELECT 1 FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 AND bill_no=$3 AND voided_at IS NULL', [shopId, current.id, parsed.billNo]
+    )).rows[0];
+    if (taken) throw refuse({ code: 'bill_no_taken' });
+    const at = now();
+    let row;
+    try {
+      row = (await c.query(
+        `INSERT INTO purchase_bills (shop_id, id, po_id, bill_no, bill_date, lines, total_minor, request_hash, note, created_by, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6::jsonb,$7,$8,$9,$10,$11) RETURNING *`,
+        [shopId, bid, current.id, parsed.billNo, parsed.billDate, JSON.stringify(parsed.lines), parsed.totalMinor, hash,
+          parsed.note, userId || '', at]
+      )).rows[0];
+    } catch (e) {
+      //  همان کلید هم‌زمان روی سفارشِ دیگری (قفلِ هر سفارش جداست) ⇒ تعارض، نه ۵۰۰
+      if (e && e.code === '23505') throw refuse({ code: 'id_conflict' });
+      throw e;
+    }
+    const updated = (await c.query(
+      'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *', [shopId, current.id, at]
+    )).rows[0];
+    return {
+      order: view(orderOf(updated), await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
+      bill: billOf(row), replayed: false,
+    };
+  });
+}
+
+/** باطل کردنِ فاکتورِ تأمین‌کننده با دلیل؛ تکرار بی اثر (`changed: false`)؛ شماره‌اش برای فاکتورِ درست آزاد می‌شود */
+async function voidBill(shopId, id, billId, { reason, userId }) {
+  const why = text(reason, MAX_TEXT.reason, 'دلیل');
+  if (!why) throw refuse({ code: 'reason_required' });
+  return tx(async (c) => {
+    const run = (t, p) => c.query(t, p);
+    const current = await lockOrder(c, shopId, id);
+    const row = (await c.query(
+      'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id=$2 AND id=$3', [shopId, current.id, String(billId || '')]
+    )).rows[0];
+    if (!row) throw notFound(MESSAGES.bill_not_found, 'bill_not_found');
+    if (row.voided_at !== null) {
+      return {
+        order: view(current, await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
+        bill: billOf(row), changed: false,
+      };
+    }
+    const at = now();
+    const done = (await c.query(
+      `UPDATE purchase_bills SET voided_at=$4, voided_by=$5, void_reason=$6 WHERE shop_id=$1 AND po_id=$2 AND id=$3 RETURNING *`,
+      [shopId, current.id, row.id, at, userId || '', why]
+    )).rows[0];
+    const updated = (await c.query(
+      'UPDATE purchase_orders SET version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2 RETURNING *', [shopId, current.id, at]
+    )).rows[0];
+    return {
+      order: view(orderOf(updated), await receiptsOf(run, shopId, current.id), { bills: await billsOf(run, shopId, current.id) }),
+      bill: billOf(done), changed: true,
+    };
   });
 }
 
@@ -375,7 +555,7 @@ async function get(shopId, id) {
   const rows = await many('SELECT * FROM purchase_orders WHERE shop_id=$1 AND id=$2', [shopId, String(id || '')]);
   if (!rows.length) throw notFound('سفارشِ خرید پیدا نشد', 'purchase_order_not_found');
   const o = orderOf(rows[0]);
-  return view(o, await receiptsOf(query, shopId, o.id));
+  return view(o, await receiptsOf(query, shopId, o.id), { bills: await billsOf(query, shopId, o.id) });
 }
 
 /**
@@ -404,20 +584,25 @@ async function list(shopId, { state, supplierId, cursor, limit } = {}) {
   const page = rows.slice(0, n).map(orderOf);
   const ids = page.map((o) => o.id);
   const byPo = new Map(ids.map((x) => [x, []]));
+  const billsBy = new Map(ids.map((x) => [x, []]));
   if (ids.length) {
     const rs = await many(
       'SELECT * FROM purchase_receipts WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
     );
     for (const r of rs) byPo.get(r.po_id).push(receiptOf(r));
+    const bs = await many(
+      'SELECT * FROM purchase_bills WHERE shop_id=$1 AND po_id = ANY($2::text[]) ORDER BY created_at, id', [shopId, ids]
+    );
+    for (const x of bs) billsBy.get(x.po_id).push(billOf(x));
   }
   const last = page[page.length - 1];
   return {
-    orders: page.map((o) => view(o, byPo.get(o.id), { withReceipts: false })),
+    orders: page.map((o) => view(o, byPo.get(o.id), { withReceipts: false, bills: billsBy.get(o.id) })),
     next: rows.length > n && last ? `${last.updatedAt}:${last.id}` : null,
   };
 }
 
 module.exports = {
-  FLAG_KEY, MAX_QTY_MILLI, MAX_PRICE_MINOR, MAX_LIST,
-  enabled, requireEnabled, parseDraft, clientKeyOf, create, update, transition, receive, get, list,
+  FLAG_KEY, MAX_QTY_MILLI, MAX_PRICE_MINOR, MAX_LIST, MAX_BILL_MINOR,
+  enabled, requireEnabled, parseDraft, clientKeyOf, create, update, transition, receive, bill, voidBill, get, list,
 };

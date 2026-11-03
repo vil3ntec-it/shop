@@ -164,6 +164,8 @@ object CustomerMerge {
       priceList = keep.priceList ?: drop.priceList,
       creditLimit = keep.creditLimit ?: drop.creditLimit,
       marketingConsent = consent,
+      //  CRM-09: نشانیِ ماندگار مقدم؛ بی آن نشانیِ تکراری
+      deliveryAddress = keep.deliveryAddress ?: drop.deliveryAddress,
     )
   }
 

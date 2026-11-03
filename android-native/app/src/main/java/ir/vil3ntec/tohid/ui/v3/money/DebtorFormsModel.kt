@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.money
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DeliveryAddress
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -21,6 +22,8 @@ internal data class DebtorForm(
   val consent: Boolean? = null,
   /** منبعِ «بله» («حضوری»، «تلفنی») — بی آن «بله» پذیرفته نیست */
   val consentSource: String = "",
+  /** نشانیِ تحویل (CRM-09) — همه اختیاری؛ همه خالی ⇒ بی نشانی */
+  val address: DeliveryAddress = DeliveryAddress(),
 )
 
 /** نوشته‌های برگهٔ تراکنش (`debtors/{id}/tx?kind=`) */
@@ -53,6 +56,7 @@ internal object DebtorFormsModel {
       creditLimit = limitText(debtor.creditLimit),
       tags = p.tags.joinToString("، "),
       consent = debtor.marketingConsent,
+      address = debtor.deliveryAddress ?: DeliveryAddress(),
     )
   }
 
@@ -73,7 +77,8 @@ internal object DebtorFormsModel {
 
   /**
    *  ذخیرهٔ کاملِ برگه — همه یا هیچ: قرض‌دار (`add` / `editWithLimit`)، بعد شمارهٔ دوم و برچسب
-   *  (`CustomerCrm.setProfile`، گروه و لیستِ قیمت همان که بود) و رضایت (`setMarketingConsent`).
+   *  (`CustomerCrm.setProfile`، گروه و لیستِ قیمت همان که بود)، نشانیِ تحویل (`setDeliveryAddress`، CRM-09)
+   *  و رضایت (`setMarketingConsent`).
    *  هر کدام رد کند، هیچ‌چیز نوشته نمی‌شود و پیامِ همان موتور برمی‌گردد.
    */
   fun save(d: ShopData, editingId: String?, f: DebtorForm, now: Long, newId: () -> String): DebtorEngine.Result {
@@ -84,7 +89,9 @@ internal object DebtorFormsModel {
     val profile = CustomerCrm.profileOf(debtor).copy(phone2 = f.phone2, tags = CustomerCrm.parseTags(f.tags))
     val withProfile = CustomerCrm.setProfile(saved.data, id, profile)
     if (withProfile !is DebtorEngine.Result.Ok) return withProfile
-    val withConsent = CustomerCrm.setMarketingConsent(withProfile.data, id, f.consent, f.consentSource)
+    val withAddress = CustomerCrm.setDeliveryAddress(withProfile.data, id, f.address)
+    if (withAddress !is DebtorEngine.Result.Ok) return withAddress
+    val withConsent = CustomerCrm.setMarketingConsent(withAddress.data, id, f.consent, f.consentSource)
     return if (withConsent is DebtorEngine.Result.Ok) DebtorEngine.Result.Ok(withConsent.data, id) else withConsent
   }
 

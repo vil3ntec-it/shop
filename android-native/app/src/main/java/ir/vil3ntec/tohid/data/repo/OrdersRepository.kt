@@ -63,6 +63,23 @@ class OrdersRepository(private val api: ApiClient) {
     result { order(api.get("$ROOT/${enc(id)}")) }
 
   /**
+   *  RSK-03: سابقهٔ همین مشتری در همین دکان پیش از ارسال (`GET /:id/risk`) — فقط خواندن، بی شماره؛ پرچمِ
+   *  `shop.order_risk` خاموش ⇒ `enabled = false` (کارت دیده نمی‌شود).
+   */
+  suspend fun risk(id: String): ApiResult<ir.vil3ntec.tohid.core.orders.OrderRisk.View> =
+    result { ir.vil3ntec.tohid.core.orders.OrderRisk.parse(api.get("$ROOT/${enc(id)}/risk")) }
+
+  /** RSK-04: ردیف‌های فعالِ فهرستِ بسته و مطمئن — فقط صاحب و مدیر (`orders.contact`)؛ پرچمِ خاموش ⇒ ۴۰۳ `order_risk_disabled` */
+  suspend fun riskLists(): ApiResult<List<ir.vil3ntec.tohid.core.orders.OrderRisk.Entry>> =
+    result { ir.vil3ntec.tohid.core.orders.OrderRisk.entries(api.get("$ROOT/risk/lists")) }
+
+  /** RSK-04: افزودن (بدنه از `OrderRisk.phoneEntryBody`)؛ ردِ سرور (شمارهٔ هم‌اکنون در فهرستِ دیگر، سقف) ⇒ پیامِ خودش */
+  suspend fun addRiskEntry(body: JsonObject): ApiResult<Unit> = result { api.post("$ROOT/risk/lists", body); Unit }
+
+  /** RSK-04: برداشتنِ نرم (سابقه می‌ماند)؛ تکرار بی اثر */
+  suspend fun removeRiskEntry(entryId: String): ApiResult<Unit> = result { api.delete("$ROOT/risk/lists/${enc(entryId)}"); Unit }
+
+  /**
    *  سفارش‌های تحویل‌شده (مشتری گرفت / به پیک داده شد / رسید) که فروششان هنوز در دفترِ
    *  همگام‌شدهٔ دکان نیست (`items`)، و برگشته‌هایی که فروششان لغو نشده (`reversals`).
    *  [since]: کفِ سرور؛ [after]: صفحهٔ بعد؛ [orderId]: فقط همان سفارش (پیش از هر ثبت).

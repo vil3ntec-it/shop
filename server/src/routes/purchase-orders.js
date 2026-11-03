@@ -11,15 +11,23 @@
  * سفارش نمی‌پذیرد — lib/purchase-orders.js).
  *
  * زیرِ پیشوندِ موجودِ `/shop` است، پس `ACCOUNT_PREFIXES` ِ پنلِ خانگی چیزِ تازه‌ای نمی‌خواهد.
+ *
+ * PUR-14 — فاکتورِ جدای تأمین‌کننده (مهاجرتِ ۲۰۸، شرح در lib/purchase-orders.js):
+ *   POST /:id/bills                  `{id, billNo, billDate?, note?, lines:[{lineId?, productId?, qtyMilli, totalMinor}]}`
+ *                                    ⇒ ۲۰۱ (همان کلید و بدنه ⇒ ۲۰۰ و `replayed`)؛ فقط `stock.adjust` (بدهیِ تأمین‌کننده)
+ *   POST /:id/bills/:billId/void     `{reason}` ⇒ ۲۰۰؛ تکرار بی اثر
+ * ⛔ سقفِ نرخ برای هر IP **پیش از** احراز (همان سقفِ عمومی؛ سطلِ جدا).
  */
 const express = require('express');
 const po = require('../lib/purchase-orders');
 const audit = require('../lib/audit');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
-const { clientIp } = require('../middleware/ratelimit');
+const { rateLimit, clientIp } = require('../middleware/ratelimit');
+const config = require('../config');
 
 const router = express.Router();
+router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'purchase-orders-ip' }));
 router.use(requireUser, requireShop, requirePermission('stock.view'));
 
 const needFlag = async (req, res, next) => { await po.requireEnabled(req.shopId); next(); };
@@ -83,6 +91,21 @@ router.post('/:id/receipts', needFlag, requirePermission('stock.move'), async (r
     });
   } else res.set('Idempotent-Replayed', 'true');
   res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.post('/:id/bills', needFlag, requirePermission('stock.adjust'), async (req, res) => {
+  const headerKey = typeof req.get === 'function' ? req.get('idempotency-key') : undefined;
+  const out = await po.bill(req.shopId, req.params.id, { body: req.body, headerKey, userId: req.user.id });
+  if (!out.replayed) {
+    await log(req, 'purchase_order.bill', out.order.id, { bill: out.bill.id, billNo: out.bill.billNo, totalMinor: out.bill.totalMinor });
+  } else res.set('Idempotent-Replayed', 'true');
+  res.status(out.replayed ? 200 : 201).json(out);
+});
+
+router.post('/:id/bills/:billId/void', needFlag, requirePermission('stock.adjust'), async (req, res) => {
+  const out = await po.voidBill(req.shopId, req.params.id, req.params.billId, { reason: req.body?.reason, userId: req.user.id });
+  if (out.changed) await log(req, 'purchase_order.bill_void', out.order.id, { bill: out.bill.id, reason: out.bill.voidReason });
+  res.json(out);
 });
 
 module.exports = router;

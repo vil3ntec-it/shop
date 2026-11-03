@@ -268,6 +268,10 @@ object StrSale {
   val approved: String get() = t("تأیید شد", "Approved", "تایید شو")
   val discountDenied: String get() = t("این تخفیف برای شما ممنوع است", "This discount isn't allowed for you", "دا تخفیف ستاسو لپاره منع دی")
   val discountApproval: String get() = t("تأییدِ تخفیف", "Discount approval", "د تخفیف تایید")
+  /* STF-02 — تأییدِ لغوِ فاکتور (فقط Sync v3) */
+  val cancelApproval: String get() = t("تأییدِ لغوِ فاکتور", "Invoice cancellation approval", "د بل د لغوې تایید")
+  fun cancelApprovalSummary(no: Any, total: Any): String =
+    t("لغوِ فاکتورِ ${asIs(no)} به مبلغِ ${asIs(total)}", "Cancel invoice $no for $total", "د $no بل لغوه کول په $total")
   fun discountApprovalSummary(off: Any, total: Any): String = t("تخفیفِ ${asIs(off)} روی فاکتورِ ${asIs(total)}", "A $off discount on a $total invoice", "پر $total بل $off تخفیف")
   val promoCode: String get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
   val apply: String get() = t("اعمال", "Apply", "پلي کول")
