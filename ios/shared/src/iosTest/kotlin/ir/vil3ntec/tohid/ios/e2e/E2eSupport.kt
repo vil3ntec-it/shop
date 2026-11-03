@@ -212,7 +212,7 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
       while (parent != null && !parent.config.contains(SemanticsActions.ScrollBy)) parent = parent.parent
       val box = parent ?: return
       val view = box.boundsInWindow
-      val at = node.boundsInWindow
+      val at = node.rect()
       val bottom = minOf(view.bottom, screen().bottom - bar)
       if (at.top >= view.top && at.bottom <= bottom) return
       if (last == at.top) return
@@ -226,6 +226,13 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
   private fun screen() = ui.onAllNodes(isRoot()).onFirst().fetchSemanticsNode().boundsInWindow
 
   /**
+   *  جای واقعیِ گره، بی بریدن — `boundsInWindow` به قابِ پدرها بریده می‌شود و چیزِ پیمایش‌شده به بیرون «نقطه‌ای در لبه»
+   *  می‌شود که «درونِ قاب» به نظر می‌آید (اجرای ششم: «تازه‌ها» و «ظاهر و زبان» ِ زیرِ صفحه هرگز پیمایش نشدند)
+   */
+  private fun androidx.compose.ui.semantics.SemanticsNode.rect() =
+    androidx.compose.ui.geometry.Rect(positionInWindow, androidx.compose.ui.geometry.Size(size.width.toFloat(), size.height.toFloat()))
+
+  /**
    *  تا چیز کامل روی صفحه و ایستاده باشد (برگه‌ای که از پایین بالا می‌آید: کادری که پیش‌تر پیدا شد هنوز بیرونِ صفحه
    *  است و زدنش هیچ — اجرای پنجم). بیشینه شش ثانیه؛ پس از آن همان‌جا که هست.
    */
@@ -233,7 +240,7 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     val start = TimeSource.Monotonic.markNow()
     var last: androidx.compose.ui.geometry.Rect? = null
     while (start.elapsedNow().inWholeMilliseconds < 6_000) {
-      val at = ui.onAllNodes(m).onFirst().fetchSemanticsNode().boundsInWindow
+      val at = ui.onAllNodes(m).onFirst().fetchSemanticsNode().rect()
       val s = screen()
       if (at == last && at.top >= s.top && at.bottom <= s.bottom && at.left >= s.left && at.right <= s.right) return
       last = at
@@ -256,9 +263,8 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     waitFor(m, label)
     reveal(m)
     settle(m)
-    ui.onAllNodes(m).onFirst().performClick()
-    pump(300)
-    settle(m)
+    //  بی زدن (تمرکز): کنشِ SetText ِ همان کادر، مثلِ دسترس‌پذیری. تمرکز در برگه پیمایشِ «به دید آوردن» می‌سازد و برگهٔ
+    //  «قلمِ آزاد» ِ صندوق پس از آن بسته شد (اجرای ششم)
     ui.onAllNodes(m).onFirst().performTextReplacement(value)
     note("نوشتن در «$label»")
     pump(300)
