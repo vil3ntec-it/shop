@@ -21,6 +21,8 @@ const { rateLimit, refund } = require('../middleware/ratelimit');
 const { notFound } = require('../middleware/errors');
 
 const router = express.Router();
+//  رشته‌های پیشینِ همین مشتری (یک رشته برای هر سفارش، `lib/shop-chat-life.js`) — سطلِ IP پیش از احراز
+router.use('/conversations/:id/history', rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-history-ip' }));
 router.use(requireUser, requireShop, requirePermission('chat.view'));
 
 const viewerOf = (req) => ({ side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role });
@@ -68,6 +70,11 @@ router.get('/search', on, async (req, res) => {
 
 router.get('/conversations/:id', on, async (req, res) => {
   res.json({ conversation: await chat.viewOf(viewerOf(req), req.params.id) });
+});
+
+//  گفت‌وگوهای پیشینِ همین مشتری در همین دکان (سفارش‌ها و عمومی)، تازه‌ترین بالا — برای نمایشِ جمع‌شده بالای رشته
+router.get('/conversations/:id/history', on, async (req, res) => {
+  res.json(await chat.history(viewerOf(req), req.params.id));
 });
 
 router.put('/conversations/:id/status', on, reply, async (req, res) => {

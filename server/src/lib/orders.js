@@ -675,9 +675,19 @@ async function list(shopId, { tab = 'new', limit, cursor } = {}, viewer) {
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
   const last = page[page.length - 1];
+  //  کارتِ صف («سفارش‌های آنلاین» ِ برنامه): نامِ سه قلمِ نخستِ هر سفارش — یک پرسش برای همهٔ صفحه
+  const preview = {};
+  if (page.length) {
+    const names = await many(
+      `SELECT order_id, name FROM (SELECT order_id, name, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY line_no) AS k
+         FROM online_order_lines WHERE shop_id = $1 AND order_id = ANY($2::text[])) x WHERE k <= 3 ORDER BY order_id, k`,
+      [shopId, page.map((r) => r.id)]
+    );
+    for (const n of names) (preview[n.order_id] = preview[n.order_id] || []).push(n.name);
+  }
   return {
     tab,
-    items: page.map((r) => card(r, viewer, at)),
+    items: page.map((r) => ({ ...card(r, viewer, at), itemsPreview: preview[r.id] || [] })),
     nextCursor: more ? encodeCursor(Number(last[col]), last.id) : null,
   };
 }

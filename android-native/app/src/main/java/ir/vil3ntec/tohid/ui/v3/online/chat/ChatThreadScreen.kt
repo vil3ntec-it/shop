@@ -48,6 +48,8 @@ class ThreadView(
   val canModerate: Boolean,
   val imageOf: (ChatMessage) -> ImageBitmap?,
   val localImageOf: (OutboxItem) -> ImageBitmap?,
+  /** رشته‌های پیشینِ همین مشتری (یک رشته برای هر سفارش) — جمع‌شده بالای رشته */
+  val earlier: List<ChatConversation> = emptyList(),
 )
 
 class ThreadActions(
@@ -61,12 +63,14 @@ class ThreadActions(
   val onCancel: (OutboxItem) -> Unit,
   val loadThumb: suspend (ChatMessage) -> Unit,
   val loadLocal: suspend (OutboxItem) -> Unit,
+  val onEarlier: (String) -> Unit = {},
 )
 
 /**
  *  یک گفت‌وگو (`chat/{id}`): سربرگ با نامِ مشتری و شماره، تراشهٔ «سفارشِ ۱۰۴۲» (⇐ همان سفارش)،
  *  «…» برای بستن/باز کردن، گزارش و مسدودی (فقط با همان دسترسی)، حباب‌های متن/عکس/صدا/فایل با رسید،
- *  حبابِ صفِ همین دستگاه با ساعت، و نوارِ نوشتن. بی اجازهٔ پاسخ ⇐ «فقط خواندن».
+ *  حبابِ صفِ همین دستگاه با ساعت، و نوارِ نوشتن. بی اجازهٔ پاسخ ⇐ «فقط خواندن». رشتهٔ «بسته شد» ⇐ پیامِ وضع به‌جای
+ *  نوار؛ رشته‌های پیشینِ همین مشتری جمع‌شده بالای پیام‌ها (`ChatLife.kt`).
  */
 @Composable
 fun ChatThreadScreen(
@@ -88,7 +92,8 @@ fun ChatThreadScreen(
     onBack = onBack,
     largeTitle = false,
     overflow = buildList {
-      if (view.canReply && conv != null) add(
+      //  رشتهٔ «بسته شد» (پایانِ سفارش/بی‌کاری) با کلیدِ صندوق باز نمی‌شود — فقط «مشکل دارم» ِ مشتری
+      if (view.canReply && conv != null && !conv.life.closed) add(
         V3MenuItem(if (conv.status == "open") Icons.Outlined.Lock else Icons.Outlined.LockOpen, if (conv.status == "open") StrOnline.ctCloseConv else StrOnline.ctReopen, onClick = actions.onToggleStatus),
       )
       add(V3MenuItem(Icons.Outlined.Flag, StrOnline.ctReportConv) { actions.onReport(null) })
@@ -104,8 +109,11 @@ fun ChatThreadScreen(
     bottomBar = {
       Column(Modifier.fillMaxWidth().background(c.bg)) {
         when {
+          //  «بسته شد»: هر دو طرف فقط می‌خوانند (سرور ۴۰۹ `chat_closed`) ⇒ پیامِ وضع به‌جای نوارِ نوشتن
+          conv != null && conv.life.closed -> ChatLifeBanner(conv.life, Modifier.padding(horizontal = 12.dp, vertical = 8.dp))
           !view.canReply -> Text(StrOnline.ctReadOnly, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(16.dp))
           else -> {
+            if (conv != null && conv.life.reopened) ChatLifeBanner(conv.life, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
             if (conv?.customerBlockedShop == true) V3Message(V3Tone.ERROR, StrOnline.ctCustomerBlockedNote, Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
             composer()
           }
@@ -120,6 +128,7 @@ fun ChatThreadScreen(
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = pad.calculateBottomPadding() + 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
+        if (view.earlier.isNotEmpty()) item(key = "earlier") { ChatEarlierThreads(view.earlier, actions.onEarlier) }
         view.banner?.let { (text, bad) -> item(key = "banner") { V3Message(if (bad) V3Tone.ERROR else V3Tone.WARNING, text) } }
         if (total == 0) item(key = "empty") {
           Text(StrOnline.ctNoMessageYet, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(24.dp))

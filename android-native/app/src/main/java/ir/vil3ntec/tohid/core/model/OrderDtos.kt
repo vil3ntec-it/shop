@@ -287,6 +287,8 @@ data class OrderDto(
   val codStatus: String = "",
   val customer: OrderCustomerDto = OrderCustomerDto(),
   val itemsCount: Int = 0,
+  /** صف (`GET /shop/orders`): نامِ سه قلمِ نخست — کارتِ «سفارش‌های آنلاین» */
+  val itemsPreview: List<String> = emptyList(),
   val currency: String = "",
   val totalMinor: Long = 0,
   val scheduledFor: Long? = null,

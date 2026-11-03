@@ -207,6 +207,8 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
   //  ORD-07: «عقب انداختن» زیرِ سرِ صفحه — فقط با پرچم، وضعیتِ مجاز و `orders.manage`
   val extra: (@Composable () -> Unit)? = order?.let { o ->
     {
+      //  «سفارش‌های آنلاین»: روشِ تحویل، عکس برای مشتری (گفت‌وگوی همین سفارش)، «بسته شد» و پیک/«خودش می‌آید»
+      OrderPrepCardV3(o, cfg)
       OrderDelayEntryV3(o, cfg, OrdersHub.repo(context)) { fresh, msg ->
         OrdersHub.put(fresh)
         OrdersHub.changed.value++

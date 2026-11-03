@@ -34,6 +34,19 @@ class ShopChatRepository(private val api: ApiClient) {
     ApiJson.decode<ChatList>(api.get(path))
   }
 
+  /**
+   *  رشتهٔ گفت‌وگوی یک سفارش (یک رشته برای هر سفارش) — نبود ⇒ ساخته می‌شود؛ بود ⇒ همان (شاید «بسته شد»).
+   *  کارمند فقط از روی سفارشِ همین دکان باز می‌کند (سرور: `order_required`/`order_not_found`).
+   */
+  suspend fun open(orderId: String): ApiResult<ChatConversation> = result {
+    conv(api.post(ApiEndpoints.ShopChat.CONVERSATIONS, buildJsonObject { put("orderId", orderId) }))
+  }
+
+  /** رشته‌های پیشینِ همین مشتری در همین دکان (سفارش‌ها و عمومی)، تازه‌ترین بالا — بی خودِ این رشته */
+  suspend fun history(id: String): ApiResult<ChatList> = result {
+    ApiJson.decode<ChatList>(api.get(ApiEndpoints.ShopChat.conversation(id) + "/history"))
+  }
+
   /** تغییرها پس از `after` (rev)؛ `waitMs` > ۰ یعنی long-poll (سقفِ سرور ۲۵ ثانیه). */
   suspend fun changes(id: String, after: Long, waitMs: Long): ApiResult<ChatChanges> = result {
     val path = ApiEndpoints.withQuery(

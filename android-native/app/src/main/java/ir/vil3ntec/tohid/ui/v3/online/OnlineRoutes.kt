@@ -62,6 +62,8 @@ object OnlinePaths {
   const val STOREFRONT_MEDIA = "storefront/media"
   const val CHAT = "chat"
   fun conversation(id: String) = "chat/" + RoutePaths.encode(id)
+  /** گفت‌وگو با گزینشگرِ عکس همان دم باز (`?photo=1`) — «عکس برای مشتری» ِ سفارش */
+  fun conversation(id: String, photo: Boolean) = RoutePaths.withQuery(conversation(id), "photo" to (if (photo) "1" else null))
   const val DELIVERY = "delivery"
   fun delivery(tab: String? = null) = RoutePaths.withQuery(DELIVERY, "tab" to tab)
   fun deliveryAssign(orderId: String) = "delivery/assign/" + RoutePaths.encode(orderId)

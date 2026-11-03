@@ -79,6 +79,9 @@
     Array.prototype.forEach.call(document.querySelectorAll('.mk'), function (a) { a.hidden = !marketOn; });
     $('side-logo').href = marketOn ? '/market/' : '#/';
     if (store.contactPhone) { $('store-call').href = 'tel:' + store.contactPhone; $('store-call').hidden = false; }
+    //  گفت‌وگو با دکان (store/chat.js ِ دیربار، فقط با `features.chat`)
+    $('store-chat').hidden = !store.features.chat;
+    $('store-chat').onclick = function () { K.js('/store/chat.js').then(function () { window.StoreChat({ api: api, slug: slug }).general(); }); };
 
     var s = store.status;
     var box = K.clear($('store-status'));
@@ -565,6 +568,7 @@
     $('to-market').appendChild(K.icon('back'));
     $('to-catalog').appendChild(K.icon('back'));
     $('store-call').appendChild(K.icon('phone'));
+    $('store-chat').appendChild(K.icon('chat'));
     $('cart-close').appendChild(K.icon('close'));
     $('ps-close').appendChild(K.icon('close'));
     $('missing-art').appendChild(K.icon('store'));
