@@ -431,18 +431,13 @@ object SalesEngine {
     val remaining = max(0.0, finalTotal - paid)
 
     /*
-     *  مشتری. در نسیه اجباری است و بدهی می‌سازد؛ در نقدی اختیاری است و
-     *  فقط نامِ مشتری روی فاکتور می‌نشیند. `debtGiven` پایین‌تر تعیین
-     *  می‌کند که بدهی ساخته شود یا نه — نه خودِ این فیلد.
+     *  مشتری. در نسیه اجباری است و بدهی می‌سازد؛ در نقدی اختیاری است و فقط نامش روی فاکتور می‌نشیند (`debtGiven`
+     *  پایین‌تر). ⛔ هر سهمِ نپرداخته (نسیه، پرداختِ ناقص، باقیِ ترکیبی) فقط به مشتریِ موجود و فعال — `CreditDebtor`.
      */
     val debtorId: String? = checkout.debtorId?.takeIf { it.isNotBlank() }
-    if (debtorId != null && d.debtors.none { it.id == debtorId }) {
-      return Result.Failed("قرض‌دار پیدا نشد")
-    }
+    if (debtorId != null && d.debtors.none { it.id == debtorId }) return Result.Failed("قرض‌دار پیدا نشد")
     val credit = if (settled != null) settled.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
-    if (credit && remaining > 0 && debtorId == null) {
-      return Result.Failed("برای فروش نسیه، قرض‌دار را انتخاب کنید")
-    }
+    CreditDebtor.check(d, debtorId, (credit && remaining > 0) || PayFlow.minor(remaining) > 0)?.let { return Result.Failed(CreditDebtor.engineText(d, it, debtorId)) }
     //  POS-24: قاعده‌های دکان پس از قاعدهٔ ثابتِ بالا، روی همان جمع‌ها به پول؛ خاموش ⇒ هیچ
     if (checkout.rules.active) {
       val facts = ir.vil3ntec.tohid.core.sale.CheckoutFacts(

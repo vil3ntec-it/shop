@@ -48,6 +48,8 @@ data class GatewayPaymentRow(
   val status: String,
   val verification: String?,
   val intentId: String?,
+  /** اثرِ انگشتِ حسابِ گیرنده (`payee_fp` ِ قصد، #853) — سرورِ کهنه ⇒ `null` */
+  val payee: String? = null,
 ) {
   companion object {
     fun fromMap(m: Map<*, *>?): GatewayPaymentRow? {
@@ -65,6 +67,7 @@ data class GatewayPaymentRow(
         status = status,
         verification = Wire.str(m["verification"]).ifEmpty { null },
         intentId = Wire.str(m["intentId"]).ifEmpty { null },
+        payee = Wire.str(m["payee"]).ifEmpty { null },
       )
     }
   }
@@ -92,6 +95,11 @@ data class PaymentIntent(
   val payment: GatewayPaymentRow?,
   /** زمانِ ساختن به ساعتِ سرور — برای تخمینِ اختلافِ ساعتِ دستگاه در شمارشِ معکوس */
   val createdAt: Long? = null,
+  /**
+   *  اثرِ انگشتِ حسابِ گیرنده‌ای که قصد برایش ساخته شد (`payee_fp`، #853) — صندوق فقط وقتی خودکار می‌بندد که همان حسابِ
+   *  فعالِ دکان باشد (`HesabTill.verdict`). سرورِ کهنه ⇒ خالی ⇒ هرگز خودکار.
+   */
+  val payeeFp: String = "",
 ) {
   companion object {
     /** درختِ JSON ⇐ قصد؛ بی شناسه، بی مبلغِ درست یا بی ارز ⇐ `null` */
@@ -118,6 +126,7 @@ data class PaymentIntent(
         needsReview = m["needsReview"] == true,
         payment = GatewayPaymentRow.fromMap(m["payment"] as? Map<*, *>),
         createdAt = Wire.long(m["createdAt"])?.takeIf { it > 0 },
+        payeeFp = Wire.str(m["payeeFp"]),
       )
     }
   }

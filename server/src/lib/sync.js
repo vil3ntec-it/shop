@@ -226,6 +226,10 @@ async function pushChanges(ctx, changes) {
       const r = (await c.query('SELECT last_rev FROM shop_rev WHERE shop_id=$1', [shopId])).rows[0];
       return Number(r.last_rev);
     })() };
+  }).then(async (out) => {
+    //  نسیهٔ بی مشتری از برنامهٔ کهنه: پذیرفته، فقط سابقه (‎lib/credit-debtor.js‎)
+    await require('./credit-debtor').flagLegacy({ shopId, userId, deviceId, ip: ctx.ip || '', path: ctx.finalized === 'enforce' ? 'api' : 'legacy' }, changes, out.conflicts);
+    return out;
   }).finally(() => (guard ? guard.finish() : null));
 }
 

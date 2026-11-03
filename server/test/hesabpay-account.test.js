@@ -259,7 +259,7 @@ test('حالتِ ساده: شمارهٔ یک‌دست برای صندوق؛ هی
   const cfg = (await h.get('/api/v1/shop/payments/config', { token: cashier })).body;
   const fp1 = (await one('SELECT payee_fp FROM shop_hesabpay WHERE shop_id=$1', [s.shopId])).payee_fp;
   assert.match(fp1, /^hp1_[0-9a-f]{32}$/);
-  assert.deepEqual(cfg, { hesabpay: { enabled: false, mode: 'simple', simple: { account: '0799123456', qrPayload: 'hesabpay://pay?to=0799123456' },
+  assert.deepEqual(cfg, { hesabpay: { enabled: false, flag: true, mode: 'simple', simple: { account: '0799123456', qrPayload: 'hesabpay://pay?to=0799123456' },
     payee: { name: NAME, last4: '3456', fp: fp1 }, payees: [{ fp: fp1, name: NAME, last4: '3456', active: true }] } });
   const c = await createPos(s);
   assert.equal(c.body.error.code, 'hesabpay_disabled', 'حالتِ ساده هیچ قصد/تأییدِ سروری ندارد');
@@ -298,7 +298,7 @@ test('حالتِ خودکار: کلید رمزشده و فقط‌نوشتنی (�
   const cfg = await h.get('/api/v1/shop/payments/config', { token: cashier });
   const row = await one('SELECT * FROM shop_hesabpay WHERE shop_id=$1', [s.shopId]);
   assert.equal(cfg.body.hesabpay.payee.fp, row.payee_fp);
-  assert.deepEqual(cfg.body, { hesabpay: { enabled: true, mode: 'auto', payee: { name: NAME, last4: '0042', fp: row.payee_fp },
+  assert.deepEqual(cfg.body, { hesabpay: { enabled: true, flag: true, mode: 'auto', payee: { name: NAME, last4: '0042', fp: row.payee_fp },
     payees: [{ fp: row.payee_fp, name: NAME, last4: '0042', active: true }] } });
   const logs = await many('SELECT detail FROM audit_logs WHERE shop_id=$1', [s.shopId]);
   for (const blob of [r.body, opened.body, (await h.get(URL, { token: s.t })).body, cfg.body, row, logs].map((x) => JSON.stringify(x))) {
@@ -323,7 +323,7 @@ test('پول به حسابِ همان دکان: قصد و تأییدِ دوم ب
   assert.deepEqual(made.map((x) => x.auth), ['API-KEY KEY-A-0001', 'API-KEY KEY-B-0002']);
   assert.equal(made[0].body.reference, ia.body.id);
   //  دکانِ بی‌حساب: خاموش؛ هیچ درخواستی (نه با کلیدِ سکو)
-  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: none.t })).body, { hesabpay: { enabled: false, mode: 'off' } });
+  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: none.t })).body, { hesabpay: { enabled: false, flag: true, mode: 'off' } });
   assert.equal((await createPos(none)).body.error.code, 'hesabpay_disabled');
   assert.ok(!seen.some((x) => x.auth.includes('PLATFORM') || JSON.stringify(x.body || {}).includes('PLATFORM')), '⛔ کلیدِ سکو هرگز');
   assert.equal(await pay.gatewayFor(none.shopId), null);
@@ -334,6 +334,11 @@ test('پول به حسابِ همان دکان: قصد و تأییدِ دوم ب
   assert.ok(out.paid >= 1, JSON.stringify(out));
   assert.equal((await intentRow(ia.body.id)).status, 'paid');
   assert.equal((await intentRow(ib.body.id)).status, 'pending');
+  //  #853 در صندوق: نمای قصد و ردیفِ پرداختِ آماده گیرندهٔ قصد را می‌گویند — صندوقِ گوشی فقط با گیرندهٔ فعال خودکار می‌بندد
+  const fpA = (await one('SELECT payee_fp FROM shop_hesabpay WHERE shop_id=$1', [a.shopId])).payee_fp;
+  assert.equal(ia.body.payeeFp, fpA);
+  const paidView = (await h.get(`/api/v1/shop/payments/intents/${ia.body.id}`, { token: a.t })).body;
+  assert.deepEqual([paidView.status, paidView.payeeFp, paidView.payment.payee, paidView.payment.verification], ['paid', fpA, fpA, 'gateway']);
   const asked = seen.filter((x) => x.url.startsWith('/api/v1/payment/status/'));
   assert.ok(asked.length >= 2 && !asked.some((x) => x.auth.includes('PLATFORM')), JSON.stringify(asked));
   const statusFor = (sid) => asked.find((x) => x.url === `/api/v1/payment/status/${encodeURIComponent(sid)}`);

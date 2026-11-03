@@ -63,8 +63,16 @@ data class TillHesab(
   val simple: SimpleAccount?,
   val payee: Payee? = null,
   val payees: List<Payee> = emptyList(),
+  /** پرچمِ `pay.hesabpay` ِ همین دکان (`/config` ِ `flag`؛ سرورِ کهنه ⇒ همان `enabled`) */
+  val flag: Boolean = gateway,
 ) {
   val any: Boolean get() = gateway || simple != null
+
+  /**
+   *  درِ «پرداخت با حساب‌پی (NFC/QR)» ِ صندوقِ گوشیِ نسخهٔ ۳: درگاهِ خودکار (خودش پشتِ پرچم)، یا حالتِ ساده **با** پرچمِ
+   *  `pay.hesabpay` و گیرندهٔ معلوم (نام و ۴ رقم کنارِ NFC/QR، #853). بی هر کدام ⇒ در دیده نمی‌شود.
+   */
+  val tillNfc: Boolean get() = payee != null && (gateway || (simple != null && flag))
 
   companion object {
     val OFF = TillHesab(false, HesabPayShop.OFF, null)
@@ -77,7 +85,9 @@ data class TillHesab(
       val qr = (s?.get("qrPayload") as? String).orEmpty()
       val simple = if (mode == HesabPayShop.SIMPLE && (account.isNotBlank() || qr.isNotBlank())) SimpleAccount(account, qr) else null
       val known = (h["payees"] as? List<*>).orEmpty().mapNotNull { Payee.fromMap(it as? Map<*, *>) }.filter { it.fp.isNotBlank() }
-      return TillHesab(h["enabled"] == true, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known)
+      val enabled = h["enabled"] == true
+      val flag = (h["flag"] as? Boolean) ?: enabled
+      return TillHesab(enabled, mode, simple, if (mode == HesabPayShop.OFF) null else Payee.fromMap(h["payee"] as? Map<*, *>), known, flag)
     }
   }
 }

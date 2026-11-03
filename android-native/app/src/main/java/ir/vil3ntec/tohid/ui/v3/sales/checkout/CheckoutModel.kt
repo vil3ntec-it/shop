@@ -52,7 +52,8 @@ object CheckoutModel {
 
   /** @param presetDiscount POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
   fun start(presetDebtorId: String?, debtors: List<Debtor>, presetDiscount: String = ""): CheckoutForm {
-    val preset = presetDebtorId?.takeIf { id -> debtors.any { it.id == id } }
+    //  مشتریِ ادغام‌شده (CRM-10) نسیه نمی‌گیرد (`CreditDebtor`) ⇒ مثلِ مشتریِ ناپیدا، نقدی
+    val preset = presetDebtorId?.takeIf { id -> debtors.any { it.id == id && ir.vil3ntec.tohid.data.CustomerCrm.isActive(it) } }
     val discount = presetDiscount.ifBlank { "0" }
     return if (preset != null) CheckoutForm(SalesEngine.Payment.CREDIT, preset, discountText = discount, paidText = "0")
     else CheckoutForm(SalesEngine.Payment.CASH, null, discountText = discount)
@@ -149,8 +150,20 @@ object CheckoutModel {
     return if (CreditGate.state(over, debtorId, approval) == CreditGate.State.APPROVED) options.copy(creditApproval = approval) else null
   }
 
-  /** ثبت ممکن است؟ — همان شرطِ دکمهٔ «ثبت فروش» ِ پیشین */
-  fun canSubmit(busy: Boolean, discountError: String?, paidError: String?, gate: DiscountGate.State): Boolean =
-    !busy && discountError == null && paidError == null &&
+  /**
+   *  ثبت ممکن است؟ — همان شرطِ دکمهٔ «ثبت فروش» ِ پیشین، و ⛔ سهمِ نسیه‌ای که صاحبِ درست ندارد ([creditBlock]) «ثبت» را
+   *  خاموش می‌کند (پیامش با «انتخابِ مشتری» کنارِ دکمه).
+   */
+  fun canSubmit(busy: Boolean, discountError: String?, paidError: String?, gate: DiscountGate.State, creditBlock: String? = null): Boolean =
+    !busy && discountError == null && paidError == null && creditBlock == null &&
       gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED
+
+  /**
+   *  نسیه بی مشتری (`CreditDebtor`، صاحب‌کار ۱۴۰۵/۰۸/۱۳) — پرداختِ ساده: «نسیه» با باقی‌مانده؛ پنلِ ترکیبی ([split] =
+   *  پیش‌نمایشِ همان پنل): هر باقیِ پرداخت‌نشده. مشتریِ نبود، ناپیدا یا ادغام‌شده ⇒ پیام؛ وگرنه `null`.
+   *  همان قاعدهٔ `SalesEngine.record` (که دوباره می‌سنجد)؛ فروشِ سریع (`?from=quick`) همین برگه است.
+   */
+  fun creditBlock(d: ShopData, form: CheckoutForm, n: CheckoutNumbers, payV2: Boolean, split: ir.vil3ntec.tohid.core.pay.Settlement?): String? =
+    if (payV2) ir.vil3ntec.tohid.data.CreditDebtor.tillBlock(d, form.debtorId, ir.vil3ntec.tohid.data.CreditDebtor.splitOwed(split), split = true)
+    else ir.vil3ntec.tohid.data.CreditDebtor.tillBlock(d, form.debtorId, ir.vil3ntec.tohid.data.CreditDebtor.plainOwed(form.payment == SalesEngine.Payment.CREDIT, n.remaining), split = false)
 }

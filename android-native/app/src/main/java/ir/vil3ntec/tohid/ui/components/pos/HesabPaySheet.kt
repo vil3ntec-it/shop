@@ -47,12 +47,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import ir.vil3ntec.tohid.core.gateway.GatewayCall
-import ir.vil3ntec.tohid.core.gateway.HesabPayAttempts
 import ir.vil3ntec.tohid.core.gateway.IntentPoller
 import ir.vil3ntec.tohid.core.gateway.IntentStatus
 import ir.vil3ntec.tohid.core.gateway.PaymentIntent
-import ir.vil3ntec.tohid.core.gateway.PendingPayment
 import ir.vil3ntec.tohid.core.gateway.Payee
 import ir.vil3ntec.tohid.core.gateway.TillHesab
 import ir.vil3ntec.tohid.core.i18n.StrPay
@@ -61,6 +58,9 @@ import ir.vil3ntec.tohid.core.qr.QrCode
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.pay.CustomerPay
 import ir.vil3ntec.tohid.pay.HceSlot
+import ir.vil3ntec.tohid.core.gateway.HesabTill
+import ir.vil3ntec.tohid.pay.HesabHold
+import ir.vil3ntec.tohid.pay.HesabPayIntentFlow
 import ir.vil3ntec.tohid.pay.HesabPaySettle
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
 import ir.vil3ntec.tohid.pay.platform.PayDevice
@@ -201,9 +201,12 @@ private fun HesabPaySheet(
   var running by remember { mutableStateOf(true) }
   //  سنجشِ تازهٔ صندوق (دفترِ همین لحظه)، نه آنچه هنگامِ باز شدن بود
   val check by rememberUpdatedState(precheck)
-  val flow = remember { SheetFlow(env, saleKey, amountMinor, total, draft) { check() } }
+  val flow = remember { HesabPayIntentFlow(env, saleKey, amountMinor, total, draft) { check() } }
 
   fun paid(i: PaymentIntent) {
+    //  ⛔ #853: فقط همین فاکتور، همین مبلغ و همین حسابِ گیرنده (`HesabTill.verdict`)؛ هر ناجوری ⇒ هرگز خودکار، فقط پیام
+    val expect = HesabTill.Expect(HesabTill.Mode.AUTO, saleKey, "", amountMinor, payee?.fp.orEmpty(), Long.MAX_VALUE)
+    HesabTill.verdict(expect, i)?.let { phase = Phase.Ended(HesabHold.text(it), retry = false); return }
     when (val s = flow.settle(i)) {
       is PayFlow.Outcome.Ok -> { phase = Phase.Paid(i, s.value); onPaid(s.value) }
       is PayFlow.Outcome.Bad -> phase = Phase.Ended(StrPay.amountMismatch, retry = false)
@@ -214,7 +217,7 @@ private fun HesabPaySheet(
     if (!running) return@LaunchedEffect
     phase = Phase.Starting
     val start = flow.start()
-    if (start !is SheetFlow.Step.Show) { phase = (start as SheetFlow.Step.Stop).phase; return@LaunchedEffect }
+    if (start !is HesabPayIntentFlow.Step.Show) { phase = (start as HesabPayIntentFlow.Step.Stop).let { Phase.Ended(it.message, it.retry) }; return@LaunchedEffect }
     var cur = start.intent
     phase = Phase.Live(cur)
     val end = IntentPoller(env.client, now = env::now, sleep = { delay(it) }).run(cur) { ev ->
@@ -241,8 +244,8 @@ private fun HesabPaySheet(
     phase = Phase.Starting
     scope.launch {
       when (val r = flow.cancel(live)) {
-        is SheetFlow.Step.Show -> if (r.intent.status == IntentStatus.PAID) paid(r.intent) else onClose()
-        is SheetFlow.Step.Stop -> phase = r.phase
+        is HesabPayIntentFlow.Step.Show -> if (r.intent.status == IntentStatus.PAID) paid(r.intent) else onClose()
+        is HesabPayIntentFlow.Step.Stop -> phase = Phase.Ended(r.message, r.retry)
       }
     }
   }
@@ -438,118 +441,4 @@ private fun Countdown(env: HesabPayEnv, expiresAt: Long?, skewMs: Long) {
   val left = ((expiresAt - (now - skewMs)) / 1000).coerceAtLeast(0)
   val text = "${left / 60}:${(left % 60).toString().padStart(2, '0')}"
   Text(StrPay.expiresIn(text), color = if (left < 60) Shop.colors.warning else Shop.colors.muted, style = MaterialTheme.typography.labelLarge)
-}
-
-/**
- *  گام‌های برگه، بی Compose: آغاز (ازسرگیری، جایگزینی یا ساختن)، دیدنِ هر وضعیت، لغو و تسویه.
- *  هر رکورد پیش از درخواست ذخیره می‌شود؛ کلیدِ یکتایی تا تلاشِ تازه همان می‌ماند.
- */
-private class SheetFlow(
-  private val env: HesabPayEnv,
-  private val saleKey: String,
-  private val amountMinor: Long,
-  private val total: Double,
-  private val draft: PayFlow.Draft?,
-  private val precheck: () -> String?,
-) {
-  sealed interface Step {
-    data class Show(val intent: PaymentIntent) : Step
-    data class Stop(val phase: Phase) : Step
-  }
-
-  private var rec: PendingPayment? = null
-  val skewMs: Long get() = rec?.skewMs ?: 0
-
-  suspend fun start(): Step = when (val plan = HesabPayAttempts.plan(env.pending.of(saleKey), saleKey, amountMinor, env.now())) {
-    is HesabPayAttempts.Plan.Resume -> resume(plan.pending)
-    is HesabPayAttempts.Plan.Replace -> replace(plan.old, plan.fresh)
-    is HesabPayAttempts.Plan.Fresh -> create(plan.pending)
-  }
-
-  /** همان قصد: بی شناسه (پاسخِ ساختن گم شد) ⇐ همان کلید دوباره؛ با شناسه ⇐ خواندن */
-  private suspend fun resume(p: PendingPayment): Step {
-    rec = p
-    val id = p.intentId ?: return create(p)
-    return when (val r = env.client.fetch(id, 0)) {
-      is GatewayCall.Ok -> show(r.value)
-      is GatewayCall.Refused -> if (r.code == "payment_not_found") { forget(); start() } else stop(r.message.ifEmpty { StrPay.unreachable }, true)
-      is GatewayCall.Offline -> stop(StrPay.unreachable, true)
-      GatewayCall.Disabled -> stop(StrPay.unreachable, true)
-    }
-  }
-
-  /** سبد پس از QR عوض شد ⇐ اول لغوِ قصدِ قبلی؛ اگر همان دم پرداخت شده بود، فروش بسته نمی‌شود */
-  private suspend fun replace(old: PendingPayment, fresh: PendingPayment): Step {
-    val oldId = old.intentId ?: return create(fresh)
-    val now: PaymentIntent? = when (val gone = env.client.cancel(oldId)) {
-      is GatewayCall.Ok -> gone.value
-      is GatewayCall.Refused ->
-        if (gone.code == "payment_not_found") null
-        else (env.client.fetch(oldId, 0) as? GatewayCall.Ok<PaymentIntent>)?.value ?: return stop(StrPay.unreachable, true)
-      is GatewayCall.Offline -> return stop(StrPay.unreachable, true)
-      GatewayCall.Disabled -> return stop(StrPay.unreachable, true)
-    }
-    if (now != null && now.status == IntentStatus.PAID) {
-      env.pending.save(HesabPayAttempts.withIntent(old, now))
-      return stop(StrPay.amountMismatch, false)
-    }
-    return create(fresh)
-  }
-
-  private suspend fun create(p: PendingPayment): Step {
-    //  پیش از گرفتنِ پول: فاکتوری که ثبت‌شدنی نیست (موجودی، تکرار) قصد نمی‌گیرد
-    precheck()?.let { return stop(it, true) }
-    rec = p
-    env.pending.save(p)
-    return when (val r = env.client.create(saleKey, amountMinor, p.idempotencyKey)) {
-      is GatewayCall.Ok -> show(r.value, fresh = true)
-      is GatewayCall.Refused -> when (r.code) {
-        "provider_unavailable" -> { env.pending.save(p.copy(status = IntentStatus.FAILED.wire)); stop(StrPay.providerDown, true) }
-        "already_paid" -> stop(StrPay.alreadyPaid, false)
-        "intent_active" -> stop(StrPay.otherOpen, true)
-        "hesabpay_disabled" -> stop(StrPay.disabled, false)
-        "idempotency_key_reused" -> { forget(); stop(StrPay.unreachable, true) }
-        else -> stop(r.message.ifEmpty { StrPay.unreachable }, true)
-      }
-      is GatewayCall.Offline -> stop(StrPay.unreachable, true)
-      GatewayCall.Disabled -> stop(StrPay.disabled, false)
-    }
-  }
-
-  private fun show(i: PaymentIntent, fresh: Boolean = false): Step {
-    //  هرگز قصدِ فاکتورِ دیگر یا مبلغِ دیگر روی این فاکتور
-    if ((i.refId.isNotEmpty() && i.refId != saleKey) || i.amountMinor != amountMinor) return stop(StrPay.amountMismatch, false)
-    seen(i, if (fresh) env.now() else null)
-    return Step.Show(i)
-  }
-
-  fun seen(i: PaymentIntent, localNow: Long? = null) {
-    val r = rec ?: return
-    val next = HesabPayAttempts.withIntent(r, i, localNow)
-    rec = next
-    env.pending.save(next)
-  }
-
-  fun forget() {
-    rec = null
-    env.pending.forget(saleKey)
-  }
-
-  suspend fun cancel(i: PaymentIntent): Step = when (val r = env.client.cancel(i.id)) {
-    is GatewayCall.Ok -> { seen(r.value); Step.Show(r.value) }
-    is GatewayCall.Refused -> when (r.code) {
-      //  دیگر لغوشدنی نیست ⇐ شاید همین الان پرداخت شد
-      "not_cancellable" -> when (val f = env.client.fetch(i.id, 0)) {
-        is GatewayCall.Ok -> { seen(f.value); Step.Show(f.value) }
-        else -> stop(StrPay.unknown, true)
-      }
-      "payment_not_found" -> { forget(); stop(StrPay.cancelled, true) }
-      else -> stop(r.message.ifEmpty { StrPay.unknown }, true)
-    }
-    is GatewayCall.Offline, GatewayCall.Disabled -> stop(StrPay.unknown, true)
-  }
-
-  fun settle(i: PaymentIntent): PayFlow.Outcome<Settlement> = HesabPaySettle.settle(total, draft, saleKey, i)
-
-  private fun stop(message: String, retry: Boolean) = Step.Stop(Phase.Ended(message, retry))
 }
