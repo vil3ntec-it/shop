@@ -293,6 +293,7 @@ val testBundleFiles = listOf(
   "drawable-xxxhdpi/logo_mark.png", "raw/scan_beep.mp3",
 ).map { android.resolve("app/src/main/res/$it") }
 val testInfoPlist = file("e2e/test-info.plist")
+val testEntitlements = file("e2e/test.entitlements")
 
 /*
  *  سرورِ آزمونِ سرتاسری و پوشهٔ عکس‌ها (CI: `ios/e2e/backend.mjs`) ⇐ فرآیندِ آزمون روی شبیه‌ساز. `simctl spawn` فقط
@@ -321,11 +322,14 @@ kotlin {
       }
       //  گامِ ۸ (آزمونِ سرتاسریِ شبیه‌ساز، `src/iosTest/…/e2e`): `test.kexe` هم «بستهٔ برنامه» ای دارد که ResFont و
       //  PainterRes از آن می‌خوانند (`NSBundle.mainBundle` ِ فرآیندِ بی بسته = پوشهٔ خودِ kexe) و Info.plist ِ
-      //  کوچکِ خودش (`e2e/test-info.plist`، درونِ بخشِ __info_plist): ATS برای سرورِ آزمونِ http روی 127.0.0.1.
+      //  کوچکِ خودش (`e2e/test-info.plist`، درونِ بخشِ __info_plist): ATS برای سرورِ آزمونِ http روی 127.0.0.1؛ و اجازهٔ
+      //  کلیددان (`e2e/test.entitlements`، بخشِ __entitlements ِ ساختِ شبیه‌ساز) برای توکنِ ورود و کلیدِ دفتر.
       it.binaries.withType<TestExecutable>().configureEach {
         linkerOpts("-sectcreate", "__TEXT", "__info_plist", testInfoPlist.absolutePath)
+        linkerOpts("-sectcreate", "__TEXT", "__entitlements", testEntitlements.absolutePath)
         linkTaskProvider.configure {
           inputs.file(testInfoPlist)
+          inputs.file(testEntitlements)
           inputs.files(testBundleFiles)
           doLast { testBundleFiles.forEach { f -> f.copyTo(outputDirectory.resolve(f.name), overwrite = true) } }
         }

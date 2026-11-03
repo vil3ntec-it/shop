@@ -122,8 +122,15 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
 
   private val steps = ArrayList<Step>()
   private val failed = HashSet<String>()
+  private val facts = ArrayList<String>()
   private val log = StringBuilder()
   private val began = TimeSource.Monotonic.markNow()
+
+  /** حالِ محیطِ آزمون (نه گام): در سرِ `summary.md` */
+  fun fact(s: String) {
+    facts += s
+    note("محیط: $s")
+  }
 
   fun note(s: String) {
     val line = "[${began.elapsedNow().inWholeMilliseconds / 1000.0}s] $s"
@@ -229,7 +236,8 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
         append("| ${s.id} | ${s.title} | $mark | ${s.ms / 1000.0}s | ${s.error.orEmpty().replace('|', '/').replace('\n', ' ').take(400)} |\n")
       }
     }
-    runCatching { File("$out/summary.md").writeText("# آزمونِ سرتاسریِ آیفون — جریان‌های اصلی\n\n$table") }
+    val env = if (facts.isEmpty()) "" else facts.joinToString("\n", postfix = "\n\n") { "- $it" }
+    runCatching { File("$out/summary.md").writeText("# آزمونِ سرتاسریِ آیفون — جریان‌های اصلی\n\n$env$table") }
     runCatching { File("$out/e2e.log").writeText(log.toString()) }
     println(table)
     val bad = steps.filter { it.ok != true }

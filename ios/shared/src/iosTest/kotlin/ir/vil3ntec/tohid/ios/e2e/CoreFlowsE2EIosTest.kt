@@ -21,6 +21,8 @@ import ir.vil3ntec.tohid.core.i18n.StrSettingsHome
 import ir.vil3ntec.tohid.ios.IosBoot
 import ir.vil3ntec.tohid.ios.IosNetRoute
 import ir.vil3ntec.tohid.ios.IosRoot
+import ir.vil3ntec.tohid.ios.keychain.Keychain
+import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
@@ -63,10 +65,14 @@ class CoreFlowsE2EIosTest {
     //  `Phase7IosTest` حالتِ «دکان» را برمی‌گزیند) ⇐ پاک، تا برنامه مثلِ بارِ اولِ نصب از «از برنامه چه می‌خواهید؟» بالا بیاید
     IosContext.deleteSharedPreferences("tohid")
     ModeState.chosen.value = null
+    //  کلیددانِ iOS (توکنِ ورود، کلیدِ دفتر): test.kexe اجازه‌اش را از `e2e/test.entitlements` دارد؛ اگر شبیه‌ساز نپذیرفت
+    //  (errSecMissingEntitlement)، کلیددانِ درونِ حافظهٔ همین فرآیند — محیطِ آزمون، نه رفتارِ برنامه (در summary.md)
+    val keychain = keychainProbe()
 
     runSkikoComposeUiTest(size = Size(WIDTH * SCALE, HEIGHT * SCALE), density = Density(SCALE)) {
       val e = E2eDriver(this, env.shots)
       e.note("سرور: ${env.api} — نگاه: ${env.probe} — عکس‌ها: ${env.shots}")
+      e.fact(keychain)
       //  ساعتِ Compose را راننده جلو می‌برد (همپای زمانِ واقعی): چرخنده‌ها و انیمیشن‌های بی‌پایان آزمون را قفل نکنند
       mainClock.autoAdvance = false
       setContent { E2eHost { IosRoot() } }
@@ -89,15 +95,17 @@ class CoreFlowsE2EIosTest {
         e.shot("02a-login-filled")
         e.tap(Find.button(StrAuth.signInToAccount) and isEnabled(), StrAuth.signInToAccount)
         //  پس از ورود: «رمزِ برنامه» یک بار پیشنهاد می‌شود (`LockSetupGate`) ⇐ «فعلاً نه»؛ سپس خانه با نوارِ پایین
+        //  (`shown(home)` تنها کافی نیست: در جابه‌جاییِ AnimatedContent خانه و دروازه هر دو در درخت‌اند)
         val home = Find.tab(NavCatalog.HOME)
         e.until("خانهٔ دکان پس از ورود", 60_000) {
           if (e.shown(Find.button(StrAuth.notNow))) {
             e.shot("02b-lock-offer")
             e.tap(Find.button(StrAuth.notNow), StrAuth.notNow)
           }
-          e.shown(home)
+          e.shown(home) && !e.shown(Find.field(StrAuth.email)) && !e.shown(Find.button(StrAuth.notNow))
         }
-        assertTrue(!SyncStore(IosContext).accessToken.isNullOrBlank(), "پس از ورود نشستی نیست")
+        assertTrue(Backend.tokens(IosContext).signedIn, "پس از ورود نشستی نیست (TokenStore)")
+        assertTrue(!SyncStore(IosContext).accessToken.isNullOrBlank(), "SyncStore توکن را نمی‌بیند")
         e.shot("02c-home")
       }
 
@@ -192,6 +200,18 @@ class CoreFlowsE2EIosTest {
 
       e.finish()
     }
+  }
+
+  /** نوشتن، خواندن و پاک کردنِ یک قلمِ کلیددان؛ شکست ⇐ کلیددانِ درونِ حافظه (`Keychain.memory`) و دلیلش */
+  private fun keychainProbe(): String {
+    val probe = byteArrayOf(7, 1, 4, 0, 5)
+    val error = runCatching {
+      Keychain.put("e2e-probe", probe)
+      check(Keychain.read("e2e-probe")?.contentEquals(probe) == true) { "خواندن همان نبود" }
+      Keychain.delete("e2e-probe")
+    }.exceptionOrNull() ?: return "کلیددان: کلیددانِ واقعیِ iOS ِ شبیه‌ساز"
+    Keychain.memory = HashMap()
+    return "کلیددان: کلیددانِ iOS در test.kexe نشد (${error.message}) ⇐ کلیددانِ درونِ حافظهٔ همین فرآیند"
   }
 
   private companion object {
