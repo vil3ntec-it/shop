@@ -120,7 +120,7 @@
     { "id": "productGrid.save", "scope": "productGrid", "title": "ثبتِ همهٔ تغییرها", "status": "live", "keys": ["Mod+S"] },
     { "id": "productGrid.cancel", "scope": "productGrid", "title": "لغوِ ویرایشِ خانه؛ بستنِ جدول", "status": "live", "keys": ["Escape"] },
 
-    { "id": "reports.drill", "scope": "reports", "title": "ریز شدن در ردیف", "status": "planned", "keys": ["Enter"] },
+    { "id": "reports.drill", "scope": "reports", "title": "ریز شدن در ردیف", "status": "partial", "keys": ["Enter"] },
     { "id": "reports.nextPeriod", "scope": "reports", "title": "دورهٔ بعد", "status": "planned", "keys": ["Plus", "Shift+Equals"] },
     { "id": "reports.prevPeriod", "scope": "reports", "title": "دورهٔ قبل", "status": "planned", "keys": ["Minus"] },
     { "id": "reports.compare", "scope": "reports", "title": "ستونِ مقایسه با دورهٔ قبل", "status": "planned", "keys": ["Mod+Shift+C"] }

@@ -73,4 +73,20 @@ class HeatmapModelTest {
     assertFalse(HeatmapModel.tabs(base, money = false).any { it.id == HeatmapModel.TAB_ID })
     assertNull(HeatmapModel.peakLabel(HeatmapModel.build(ShopData(), range, 270, 0)))
   }
+
+  /** RPT-08 روی گوشی: «گزارشِ تازه» ِ گوشی (پیش‌تر فقط امروز و بدهی) همان نقشه را با بازه‌های کوتاه نشان می‌دهد */
+  @Test
+  fun phoneShowsTheSameHeatmapForMoneyOnlyWithShortSpans() {
+    assertEquals(listOf("week", "month", "quarter"), HeatmapModel.PHONE_SPANS)
+    assertTrue(HeatmapModel.PHONE_SPANS.all { it in ReportBoard.SPANS && it in ReportBoard.SPAN_LABELS })
+    //  «۷ روز» تا ۲ نوامبر شنبه و یکشنبه را دارد؛ همان عددهای زبانهٔ کامپیوتر
+    val week = HeatmapModel.build(d, ReportBoard.range(HeatmapModel.PHONE_SPANS.first(), "2026-11-02"), 270, 0)
+    assertEquals("شنبه 18:00", HeatmapModel.peakLabel(week))
+    assertEquals(4, week.total.count)
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/screens/ReportFresh.kt") }.first { it.isFile }.readText()
+    val phone = src.substring(src.indexOf("fun PhoneFreshReports("))
+    assertTrue("فقط با دیدنِ پول", phone.contains("if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today)"))
+    assertTrue(phone.contains("heat?.let { h -> item { HeatmapPhone(h, heatSpan) { heatSpan = it } } }"))
+  }
 }

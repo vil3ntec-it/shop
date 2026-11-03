@@ -108,4 +108,38 @@ internal object SalesVoid {
     "reason_too_long" -> StrInvoices.reasonTooLong(InvoiceVoid.REASON_MAX)
     else -> StrInvoices.invoiceNotFound
   }
+
+  /** نتیجهٔ یک لغو یا «اصلاح» پیش از ذخیره */
+  sealed class Outcome {
+    /** ردِ `InvoiceVoid.check` با پیامِ صفحه؛ دفتر دست نخورد */
+    data class Denied(val message: String) : Outcome()
+    /** ردِ خودِ موتور (`SalesEngine.cancel`)؛ دفتر دست نخورد */
+    data class Failed(val message: String) : Outcome()
+    /** دفترِ پس از لغو و دلیلِ پذیرفته (اصلاح ⇒ همان `CORRECTION_REASON`) */
+    data class Ok(val data: ShopData, val reason: String) : Outcome()
+  }
+
+  /**
+   *  SEC-03 — کنترلِ یگانه و اثرِ دفتریِ لغو/«اصلاح» برای هر صفحه (نسخهٔ ۳: `CancelRoute`/`FixRoute`):
+   *  `InvoiceVoid.check` ⇐ `SalesEngine.cancel` با همان دلیلِ پذیرفته. نه ذخیره می‌کند، نه زنجیره را؛ صفحه پس از
+   *  `store.save` ِ موفق `DocChainSync.recordVoid` را با دفترِ **پیش از** لغو صدا می‌زند.
+   */
+  fun run(
+    d: ShopData,
+    saleId: String,
+    canCancel: Boolean,
+    kind: InvoiceVoid.Kind,
+    reason: String,
+    today: String,
+    now: Long,
+    newId: () -> String,
+    by: String?,
+    noPermission: String,
+  ): Outcome = when (val check = InvoiceVoid.check(facts(d, saleId), canCancel, kind, reason)) {
+    is InvoiceVoid.Decision.Denied -> Outcome.Denied(denied(check.code, noPermission))
+    is InvoiceVoid.Decision.Allowed -> when (val r = SalesEngine.cancel(d, saleId, today, now, newId, reason = check.reason, by = by)) {
+      is SalesEngine.Result.Failed -> Outcome.Failed(r.message)
+      is SalesEngine.Result.Ok -> Outcome.Ok(r.data, check.reason)
+    }
+  }
 }

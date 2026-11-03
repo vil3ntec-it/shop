@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.InsertChart
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.SnackbarHostState
@@ -35,6 +36,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrShrink
@@ -137,8 +139,10 @@ private fun DeskSpan.label() = when (this) {
  *  (`KeyMap.GLOBAL_PRINT`/`GLOBAL_EXPORT`). «گزارشِ تازه» همان کلیدِ امروز است (فقط کامپیوتر).
  */
 @Composable
-fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
+fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Unit = {}) {
   val context = LocalContext.current
+  //  RPT-14: «گزارشِ فروشِ اینترنتی» فقط با پرچمِ روشنِ سرور
+  val online = rememberOnlineReportVisible()
   ReportFresh.load(context)
   if (ReportFresh.on.value) { DeskFreshReports(d, snackbar); return }
   val c = PhoneV3.colors
@@ -215,6 +219,10 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
         Spacer(Modifier.width(8.dp))
         V3Toggle(ReportFresh.on.value, StrReports.freshReport) { ReportFresh.set(context, it) }
         Spacer(Modifier.width(16.dp))
+        if (online) {
+          V3Button(StrOnlineReport.title, { onOpen(AnalyticsPaths.ONLINE_REPORT) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.InsertChart, height = 40.dp)
+          Spacer(Modifier.width(8.dp))
+        }
         V3Button("${StrReports.printShort}  ${KeyMap.GLOBAL_PRINT.hint}", ::print, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Print, height = 40.dp)
         Spacer(Modifier.width(8.dp))
         V3Button("${StrReports.excel}  ${KeyMap.GLOBAL_EXPORT.hint}", ::excel, icon = Icons.Outlined.TableChart, height = 40.dp)
