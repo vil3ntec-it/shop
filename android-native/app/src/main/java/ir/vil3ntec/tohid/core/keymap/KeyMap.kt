@@ -548,7 +548,7 @@ object KeyMap {
     web = emptyList(),
   )
   val REPORTS_DRILL = KeyAction(
-    "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.PLANNED,
+    "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Enter)),
     web = emptyList(),
   )

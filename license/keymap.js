@@ -99,7 +99,7 @@
     "productGrid.undo": {"scope":"productGrid","title":"برگرداندن","status":"live","page":null,"web":[],"overrides":[]},
     "productGrid.save": {"scope":"productGrid","title":"ثبتِ همهٔ تغییرها","status":"live","page":null,"web":[],"overrides":[]},
     "productGrid.cancel": {"scope":"productGrid","title":"لغوِ ویرایشِ خانه؛ بستنِ جدول","status":"live","page":null,"web":[],"overrides":[]},
-    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"planned","page":null,"web":[],"overrides":[]},
+    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"partial","page":null,"web":[],"overrides":[]},
     "reports.nextPeriod": {"scope":"reports","title":"دورهٔ بعد","status":"planned","page":null,"web":[],"overrides":[]},
     "reports.prevPeriod": {"scope":"reports","title":"دورهٔ قبل","status":"planned","page":null,"web":[],"overrides":[]},
     "reports.compare": {"scope":"reports","title":"ستونِ مقایسه با دورهٔ قبل","status":"planned","page":null,"web":[],"overrides":[]}

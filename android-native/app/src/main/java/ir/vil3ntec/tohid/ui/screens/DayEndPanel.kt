@@ -4,14 +4,19 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.width
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.common.PillTone
 import ir.vil3ntec.tohid.ui.components.common.StatCard
@@ -93,4 +98,20 @@ internal fun DayEndPhone(b: DayEndModel.Built) {
     }
     Text(NOTE, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
+}
+
+/** RPT-04 / S48 — «ریزِ تراکنش‌ها» ی یک روش (کلیک یا Enter روی ردیفِ روش)؛ Esc یا «بستن» برمی‌گردد */
+@Composable
+internal fun DayEndDetailDialog(t: ReportTables.Table, onClose: () -> Unit) {
+  AlertDialog(
+    onDismissRequest = onClose,
+    title = { Text(t.title, fontWeight = FontWeight.Bold) },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text("جمعِ این ریز همان «خالص دفتر» ِ همین روش است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        FreshTable(t, Modifier.fillMaxWidth().heightIn(max = 420.dp))
+      }
+    },
+    confirmButton = { TextButton(onClick = onClose) { Text("بستن") } },
+  )
 }

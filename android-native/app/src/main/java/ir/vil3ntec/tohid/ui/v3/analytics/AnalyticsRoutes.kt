@@ -10,6 +10,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.ui.screens.rememberStaffTimeConfig
 import ir.vil3ntec.tohid.core.i18n.StrReports
@@ -37,6 +38,8 @@ object AnalyticsPaths {
   const val ADMIN = "admin"
   /** STF-07/08: ساعتِ کار و پورسانت — فقط با پرچمِ `shop.staff_time` (`StaffTimeHub`) */
   const val STAFF_TIME = "admin/staff-time"
+  /** RPT-14: گزارشِ فروشِ اینترنتی — راهش فقط با پرچمِ `shop.orders.online_report` ِ سرور (`OnlineReportLive`) */
+  const val ONLINE_REPORT = "reports/online"
 }
 
 /** پولِ دکان (سود، قیمتِ خرید) برای همین کاربر باز است؟ — همان `ShopRole.canSeeMoney` ِ امروز */
@@ -58,7 +61,7 @@ val AnalyticsModule = AppModule(
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reports }, chrome = Chrome.OWN) {
-      if (desk) ReportsDesk(data, snackbar)
+      if (desk) ReportsDesk(data, snackbar) { nav.open(it) }
       else ReportsScreen(
         d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
         onBack = backOrNull, bottomReserve = bottomReserve, onOpen = { nav.open(it) },
@@ -86,6 +89,7 @@ val AnalyticsModule = AppModule(
       )
     },
     V3Route(AnalyticsPaths.STAFF_TIME, RouteKind.PAGE, { StrReach.staffTime }, parent = AnalyticsPaths.ADMIN) { StaffTimePage(data) },
+    V3Route(AnalyticsPaths.ONLINE_REPORT, RouteKind.PAGE, { StrOnlineReport.title }, parent = AnalyticsPaths.REPORTS) { OnlineReportPage() },
     V3Route("reports/export", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
     V3Route("reports/print", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
   ),

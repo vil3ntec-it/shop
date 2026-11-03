@@ -23,6 +23,12 @@ object HeatmapModel {
   const val TAB_ID = "heatmap"
   val TAB = ReportBoard.TabDef(TAB_ID, "ساعت و روز", true)
 
+  /**
+   *  گوشی (RPT-08): همان نقشه زیرِ «پایانِ امروز» با سه بازهٔ کوتاه‌تر از «همه» (نخستین پیش‌فرض) — «امروز» یک ردیف
+   *  است و نقشه نمی‌خواهد؛ بازه‌ها همان `ReportBoard.range` ِ کامپیوتر.
+   */
+  val PHONE_SPANS = listOf("week", "month", "quarter")
+
   /** زبانه‌های صفحه: همان زبانه‌ها، و «ساعت و روز» فقط با دیدنِ پول */
   fun tabs(base: List<ReportBoard.TabDef>, money: Boolean): List<ReportBoard.TabDef> = if (money) base + TAB else base
 
