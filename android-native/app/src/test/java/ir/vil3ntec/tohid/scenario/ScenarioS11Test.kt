@@ -1,20 +1,26 @@
 package ir.vil3ntec.tohid.scenario
 
 import ir.vil3ntec.tohid.core.pay.CashKeys
+import ir.vil3ntec.tohid.core.pay.EmptyEnterGate
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEntry
+import ir.vil3ntec.tohid.scan.HidScan
 import ir.vil3ntec.tohid.ui.components.pos.PosHit
 import ir.vil3ntec.tohid.ui.components.pos.PosSearch
+import ir.vil3ntec.tohid.ui.v3.sales.cart.bareEnterPays
+import ir.vil3ntec.tohid.ui.v3.sales.cart.hidKey
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -26,8 +32,9 @@ import org.junit.Test
  *  ماندهٔ سناریو (pending، نه سرخ):
  *   • گامِ ۲ (دو کلیک در وب با قطع و وصلِ شبکه) آزموده نشده: صندوقِ وب منجمد است و این آزمون فقط برنامه را می‌سنجد.
  *   • قاعدهٔ «Enter در کادرِ خالی پس از ≥ ۵۰۰ میلی‌ثانیه ⇒ پنلِ پرداخت» (§۵.۲) فقط در صندوقِ کامپیوتر و فقط با پنلِ
- *     پرداخت (`payV2`) است (`CashKeys.emptyEnterOpensPay`)؛ بی پنل Enter در کادرِ خالی همان «هیچ کار» ِ امروز و صندوقِ
- *     گوشی (صفحه‌کلیدِ بیرونی) آن را ندارد.
+ *     پرداخت (`payV2`) است (`CashKeys.emptyEnterOpensPay`)؛ بی پنل Enter در کادرِ خالی همان «هیچ کار» ِ امروز. صندوقِ
+ *     گوشیِ نسخهٔ ۳ با صفحه‌کلیدِ بیرونی همان قاعده را دارد (`bareEnterPays` ⇐ «پرداخت»)؛ رفتنِ واقعی به برگهٔ پرداخت
+ *     (`SalesPaths.checkout`) صفحه است و فقط در CI.
  */
 class ScenarioS11Test {
 
@@ -102,5 +109,56 @@ class ScenarioS11Test {
     assertTrue(submit.indexOf("if (payV2 && query.isBlank()) { if (pay) payOpen = true; return }") > submit.indexOf("scaleLabel(query, d)"))
     assertTrue(src.contains("val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() }"))
     assertTrue(src.substringAfter("fun fromScanner(code: String): Boolean {").substringBefore("val dd = latestD").contains("enterGate.mark()"))
+  }
+
+  /**
+   *  صندوقِ گوشیِ نسخهٔ ۳ با صفحه‌کلید یا بارکدخوانِ بیرونی (`Modifier.hidScanner` ⇐ `hidKey` و `bareEnterPays`): همان
+   *  `HidScan` و `EmptyEnterGate` ِ واقعی با ساعتِ دستی.
+   */
+  @Test
+  fun `S11 — صندوقِ گوشی با صفحه‌کلیدِ بیرونی ⇒ Enter ِ بی اسکن پرداخت را فقط با پنل و ۵۰۰ میلی‌ثانیه پس از آخرین اسکن باز می‌کند`() {
+    var t = 0L
+    val gate = EmptyEnterGate { t }
+    val hid = HidScan(maxGapMs = 50, minLength = 4)
+    var pays = 0
+    fun key(enter: Boolean, ch: Char?, payV2: Boolean = true, cartEmpty: Boolean = false) =
+      hidKey(enter, ch, t, hid::feed, hid::submit) { bareEnterPays(payV2, gate, cartEmpty) { pays++ } }
+
+    //  بارکدخوان: نویسه‌های تند و CR ⇒ کد (صفحه آن را به `onCode` می‌دهد که لحظه را می‌نشاند)، سپس LF ِ پانزده میلی‌ثانیه بعد
+    "6260000000017".forEach { c -> t++; assertNull(key(false, c)!!.code) }
+    t++
+    assertEquals("6260000000017", key(true, null)?.code)
+    gate.mark()
+    t += 15
+    val lf = key(true, null)
+    assertNotNull("Enter ِ دوم خورده شد و به دکمه‌ای نرسید", lf)
+    assertNull(lf!!.code)
+    assertEquals(0, pays)
+    //  صندوقدار پس از مکث Enter می‌زند ⇒ «پرداخت»؛ Enter ِ پشتِ سرِ همان (زیرِ نیم ثانیه) دوباره نه
+    t += CashKeys.EMPTY_ENTER_MS
+    key(true, null)
+    assertEquals(1, pays)
+    t += 100
+    key(true, null)
+    assertEquals(1, pays)
+
+    //  سبدِ خالی هرگز؛ بی پنلِ پرداخت (پیش‌فرض) Enter ِ آدم همان راهِ امروز را می‌رود (خورده نمی‌شود)
+    t += 5_000
+    assertNotNull(key(true, null, cartEmpty = true))
+    t += 5_000
+    assertNull(key(true, null, payV2 = false))
+    assertEquals(1, pays)
+  }
+
+  @Test
+  fun `S11 — صندوقِ گوشی هر اسکن را می‌شمارد و Enter ِ بی اسکن را فقط با پنلِ پرداخت به پرداخت می‌برد`() {
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/sales/cart/SaleRoute.kt") }.firstOrNull { it.isFile }?.readText()
+      ?: error("SaleRoute.kt پیدا نشد")
+    assertTrue(src.contains("val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }"))
+    //  هر بارکد از هر راه (بارکدخوان، دوربین، گوشیِ جفت‌شده) پیش از هر کار لحظه را می‌نشاند
+    val onCode = src.substringAfter("fun onCode(raw: String, manual: Boolean, fromPhone: Boolean) {").substringBefore("gate.accept(code)")
+    assertTrue(onCode.contains("enterGate.mark()"))
+    assertTrue(src.contains("onBareEnter = { bareEnterPays(payV2, enterGate, cart.lines.value.isEmpty()) { CheckoutSession.reset(); nav.open(SalesPaths.checkout()) } }"))
   }
 }

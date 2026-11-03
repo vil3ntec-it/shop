@@ -15,6 +15,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import ir.vil3ntec.tohid.core.pay.EmptyEnterGate
 import ir.vil3ntec.tohid.scan.HidScan
 import ir.vil3ntec.tohid.scan.scanChar
 
@@ -25,11 +26,13 @@ import ir.vil3ntec.tohid.scan.scanChar
  *  نویسه‌ها با کلیدِ فیزیکی (چیدمانِ فارسی/پشتو «۶» و «ش» هم همان رقم است، F0-06). بارکدخوانی که
  *  به‌جای Enter پسوندِ تنظیم‌شده می‌زند، کدش را از خروجیِ `HidScan.feed` می‌دهد (HW-05، همان
  *  قراردادِ `Sale.kt` در #437) — منطقش [hidKey]، خالص و سنجیده.
+ *  @param onBareEnter Enter ِ بی اسکن (صفحه‌کلیدِ بیرونی)؛ `true` ⇒ خورده شد (S11، [bareEnterPays])
  */
-fun Modifier.hidScanner(onCode: (String) -> Unit): Modifier = composed {
+fun Modifier.hidScanner(onBareEnter: () -> Boolean = { false }, onCode: (String) -> Unit): Modifier = composed {
   val hid = remember { HidScan() }
   val focus = remember { FocusRequester() }
   val latest by rememberUpdatedState(onCode)
+  val bare by rememberUpdatedState(onBareEnter)
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
   DisposableEffect(Unit) { onDispose { hid.reset() } }
   focusRequester(focus)
@@ -38,7 +41,7 @@ fun Modifier.hidScanner(onCode: (String) -> Unit): Modifier = composed {
       if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
       val enter = event.key == Key.Enter || event.key == Key.NumPadEnter
       val ch = if (enter) null else event.scanChar(allowSpace = true)
-      val step = hidKey(enter, ch, System.currentTimeMillis(), hid::feed, hid::submit) ?: return@onKeyEvent false
+      val step = hidKey(enter, ch, System.currentTimeMillis(), hid::feed, hid::submit, bare) ?: return@onKeyEvent false
       step.code?.let(latest)
       true
     }
@@ -49,8 +52,8 @@ internal class HidStep(val code: String?)
 
 /**
  *  خالص: یک کلید ⇒ `null` (به کادر یا دکمه برسد) یا [HidStep].
- *  Enter ⇒ `submit`؛ Enter ِ بی اسکن (آدم) خورده نمی‌شود. نویسه ⇒ `feed` — و خروجیِ آن **خوانده
- *  می‌شود**: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) همین‌جا کد را تمام می‌کند.
+ *  Enter ⇒ `submit`؛ Enter ِ بی اسکن (آدم) خورده نمی‌شود مگر [bareEnter] بخواهد (S11). نویسه ⇒ `feed` — و
+ *  خروجیِ آن **خوانده می‌شود**: پسوندِ تنظیم‌شده (بارکدخوانِ بی Enter) همین‌جا کد را تمام می‌کند.
  */
 internal fun hidKey(
   enter: Boolean,
@@ -58,8 +61,21 @@ internal fun hidKey(
   now: Long,
   feed: (Char, Long) -> String?,
   submit: (Long) -> String?,
+  bareEnter: () -> Boolean = { false },
 ): HidStep? {
-  if (enter) return submit(now)?.let { HidStep(it) }
+  if (enter) return submit(now)?.let { HidStep(it) } ?: if (bareEnter()) HidStep(null) else null
   val c = ch ?: return null
   return HidStep(feed(c, now))
+}
+
+/**
+ *  S11 (§۵.۲) در صندوقِ گوشی با صفحه‌کلیدِ بیرونی — همان قاعدهٔ صندوقِ کامپیوتر (`CashKeys.emptyEnterOpensPay`):
+ *  بی پنلِ پرداخت ([payV2] خاموش، پیش‌فرض) ⇒ `false` و Enter همان راهِ امروز را می‌رود. با پنل ⇒ Enter خورده می‌شود و
+ *  «پرداخت» فقط اگر سبد پر است و دست‌کم ۵۰۰ میلی‌ثانیه از آخرین اسکن یا Enter گذشته ([EmptyEnterGate])؛ پس Enter ِ
+ *  دومِ بارکدخوان (CR+LF) یا Enter ِ پشتِ‌سرِهم پنل را باز نمی‌کند.
+ */
+internal fun bareEnterPays(payV2: Boolean, gate: EmptyEnterGate, cartEmpty: Boolean, pay: () -> Unit): Boolean {
+  if (!payV2) return false
+  if (gate.emptyEnter(cartEmpty)) pay()
+  return true
 }

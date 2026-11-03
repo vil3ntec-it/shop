@@ -110,6 +110,9 @@ object HeldStock {
     }
     return out
   }
+
+  /** POS-05 — موجودیِ «قابل‌فروش» ِ کاشیِ صندوق (گوشی و کامپیوتر): موجودی − مقدارِ همان کالا در نگه‌داشته‌ها ([reserved]) */
+  fun sellable(stock: Double, productId: String, held: Map<String, Double>): Double = stock - (held[productId] ?: 0.0)
 }
 
 object HeldInvoiceCodec {
