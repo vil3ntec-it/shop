@@ -17,18 +17,14 @@ import kotlinx.coroutines.withContext
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.audit.InvoiceVoid
 import ir.vil3ntec.tohid.core.i18n.StrSale
-import ir.vil3ntec.tohid.core.receipt.ReceiptTokens
 import ir.vil3ntec.tohid.data.FraudTrailPref
-import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnSettings
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
-import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.print.PrintJob
 import ir.vil3ntec.tohid.print.PrintLog
@@ -46,7 +42,6 @@ import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.storeName
-import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintModel
 import ir.vil3ntec.tohid.ui.v3.sales.print.PrintSheet
 import kotlinx.coroutines.launch
@@ -64,68 +59,9 @@ internal fun returnsV2(): Boolean {
   return remember { ReturnSettings.enabled(context) } || ReturnsShot.open.value != null
 }
 
-/** `sales` — تاریخچه (`?filter=` و `?q=` از پیوند) */
+/** `sales` — تاریخچه (`?filter=`، `?q=` و `?where=` از پیوند)؛ گوشی، تبلت و کامپیوتر — بدنه در `HistoryHostAndroid.kt` */
 @Composable
-fun RouteScope.HistoryRoute() {
-  val context = LocalContext.current
-  val v2 = returnsV2()
-  val canCancel = remember { ShopRole.canCancelSale(context) }
-  val blind = remember { ShopPolicy.payV2(context) && ShopPolicy.blindHere(context) } // PAY-13: شمارشِ کورِ اختیاریِ دکان
-  val query = rememberSaveable(saver = HistoryQuerySaver) {
-    HistoryQuery(HistoryFilter.of(args.query("filter")), args.query("q").orEmpty(), HistoryModel.ALL_MONTHS)
-  }
-  val today = remember { todayIso() }
-  //  نشانِ همین دکان در QRِ فاکتورِ نسخهٔ ۲ (`ReceiptTokens.shopTag`)
-  val shopTag = remember { ReceiptTokens.shopTag(LedgerOwner.currentShop(context)) }
-  //  عکسِ CI (`DevShot` «ret»): فرمِ برگشتِ تازه‌ترین فاکتورِ زنده، یا برگشتِ بی رسید
-  val shot = ReturnsShot.open.value
-  LaunchedEffect(shot) {
-    when (shot) {
-      "first" -> data.sales.filter { HistoryModel.canReturn(data, it) }.maxByOrNull { it.createdAt }?.let { nav.open(SalesPaths.returnOf(it.id)) }
-      "none" -> nav.open(SalesPaths.RETURN_NONE)
-    }
-  }
-  HistoryScreen(
-    d = data,
-    today = today,
-    yesterday = remember(today) { HistoryModel.yesterday(today) },
-    returnsV2 = v2,
-    canCancel = canCancel,
-    drawer = DrawerModel.line(data, System.currentTimeMillis(), blind),
-    query = query,
-    actions = HistoryActions(
-      open = { nav.open(SalesPaths.invoice(it)) },
-      ret = { nav.open(SalesPaths.returnOf(it)) },
-      cancel = { nav.open(SalesPaths.cancelOf(it)) },
-      fix = { nav.open(SalesPaths.fixOf(it)) },
-      returnReceipt = { nav.open(SalesPaths.returnReceipt(it)) },
-      drawer = { nav.open(SalesPaths.DRAWER) },
-      noReceipt = if (v2) ({ nav.open(SalesPaths.RETURN_NONE) }) else null,
-      //  گوشی: QRِ رسید با دوربین؛ کامپیوتر: اسکنرِ دستی همین کادر را پر می‌کند
-      scanReceipt = if (v2 && !Platform.DESKTOP) ({
-        nav.openForResult(SalesPaths.scan(SalesPaths.SCAN_RECEIPT)) { code ->
-          if (code != null) {
-            query.search = code
-            if (ReturnFlow.isForeignReceipt(code, shopTag)) toasts.show(ReturnFlow.FOREIGN_RECEIPT, V3Tone.WARNING)
-            //  یک فاکتورِ زنده ⇒ همان لحظه فرمِ برگشت
-            HistoryModel.scanned(data, code, shopTag)?.let { nav.open(SalesPaths.returnOf(it.id)) }
-          }
-        }
-      }) else null,
-      newSale = { nav.switchTab(SalesPaths.SALE) },
-      back = backOrNull,
-      payReview = { nav.open(SalesPaths.PAY_REVIEW) },
-    ),
-    bottomReserve = bottomReserve,
-    shopTag = shopTag,
-    reviews = reviewCount(data),
-  )
-}
-
-private val HistoryQuerySaver = androidx.compose.runtime.saveable.listSaver<HistoryQuery, String>(
-  save = { listOf(it.filter.id, it.search, it.month) },
-  restore = { HistoryQuery(HistoryFilter.of(it[0]), it[1], it[2]) },
-)
+fun RouteScope.HistoryRoute() = HistoryHost()
 
 /** فاکتورِ مسیر، یا پیام و برگشت */
 @Composable

@@ -120,8 +120,13 @@ object HistoryModel {
   fun returnDocs(d: ShopData, s: Sale): List<String> =
     d.saleReturns.filter { it.saleId == s.id }.mapNotNull { it.docId }.distinct()
 
-  /** @param fixed POS-40: روشِ پرداختِ این فاکتور اصلاح شد (`PayFixFlow.fixedSales`) ⇒ نشان کنارِ نوع */
-  fun row(d: ShopData, s: Sale, returnsV2: Boolean, fixed: Boolean = false): HistoryRow {
+  /**
+   *  @param fixed POS-40: روشِ پرداختِ این فاکتور اصلاح شد (`PayFixFlow.fixedSales`) ⇒ نشان کنارِ نوع
+   *  @param look نمایه‌های یک‌بارهٔ تاریخچه (`RowLookup`) — همان معنا، بی گشتنِ همهٔ دفتر برای هر ردیف
+   *  @param withDate بخشِ ماه و سال: روزِ فاکتور پیش از ساعت
+   */
+  fun row(d: ShopData, s: Sale, returnsV2: Boolean, fixed: Boolean = false, look: RowLookup? = null, withDate: Boolean = false): HistoryRow {
+    if (look != null) return fast(d, s, returnsV2, look, withDate)
     val state = ReceiptModel.state(s)
     val items = d.saleItems.count { it.saleId == s.id }
     return HistoryRow(
@@ -141,6 +146,30 @@ object HistoryModel {
       canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
       returnDocs = if (returnsV2) returnDocs(d, s) else emptyList(),
       payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s),
+    )
+  }
+
+  private fun fast(d: ShopData, s: Sale, returnsV2: Boolean, look: RowLookup, withDate: Boolean): HistoryRow {
+    val state = ReceiptModel.state(s)
+    val day = if (withDate && s.date.isNotBlank()) displayDate(s.date) else ""
+    return HistoryRow(
+      id = s.id,
+      number = "#" + ReceiptModel.number(s),
+      name = s.debtorId?.let(look.debtors::get) ?: StrSale.cashPay,
+      subtitle = listOf(day, SaleTime.clock(s.createdAt), StrSale.itemsCount(plain(look.items[s.id]?.size ?: 0)))
+        .filter { it.isNotBlank() }.joinToString(" · "),
+      amount = s.finalTotal,
+      state = state,
+      payLabel = when (state) {
+        SaleState.CANCELLED -> StrSale.cancelled
+        SaleState.ONLINE -> StrSale.online
+        SaleState.DONE -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ReceiptModel.payLabel(s), s.id in look.fixed)
+      },
+      credit = PayFlow.payGroup(s) == "credit",
+      canReturn = look.canReturn(s),
+      canCancel = s.status != "cancelled" && !s.isOnlineOrder(),
+      returnDocs = if (returnsV2) look.returnDocs[s.id].orEmpty() else emptyList(),
+      payState = ir.vil3ntec.tohid.data.PayStatusFlow.chip(d, s, look.payChanges[s.id].orEmpty()),
     )
   }
 
