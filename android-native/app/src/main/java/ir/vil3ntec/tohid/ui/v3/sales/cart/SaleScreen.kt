@@ -65,6 +65,10 @@ class SaleActions(
   val history: () -> Unit,
   val back: () -> Unit,
   val toggleMode: () -> Unit,
+  /** POS-03: لمسِ کاشی با پیشوندِ «۳*» ِ کادرِ جست‌وجو — همان شمار (وزنی هم، بی صفحه‌کلید) */
+  val tapCount: (PhoneCatalogItem, Double) -> Unit = { item, _ -> tap(item) },
+  /** POS-15: «قیمت‌پرسی» ِ منوی «…» — `null` ⇒ بی ردیف (تنظیمِ خاموش) */
+  val priceCheck: (() -> Unit)? = null,
 )
 
 /** حالتِ آغازِ دلخواه (عکس‌های پیش‌نمایش) */
@@ -148,7 +152,11 @@ fun SaleScreen(
             else -> StrSale.emptyCategory
           },
           bottomGap = bottomGap,
-          onTap = actions.tap,
+          //  POS-03: «۳*نام» ⇒ هر لمس سه تا؛ پس از افزودن کادر پاک می‌شود (لمسِ بعدی دوباره سه تا نمی‌شود)
+          onTap = { item ->
+            val q = CatalogModel.query(search)
+            if (q.count != 1.0) { actions.tapCount(item, q.count); search = "" } else actions.tap(item)
+          },
           onHold = actions.hold,
           onMinus = actions.minus,
           onMenu = { menu = true },
@@ -226,6 +234,7 @@ fun SaleScreen(
         onClose = { menu = false },
         onHold = onHold,
         onHeldList = onHeldList,
+        onPriceCheck = actions.priceCheck,
       )
     }
   }

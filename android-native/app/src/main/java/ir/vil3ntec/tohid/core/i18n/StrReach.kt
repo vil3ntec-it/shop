@@ -50,6 +50,9 @@ object StrReach {
   val freshOn: String get() = t("گزارشِ تازه", "New report", "نوی راپور")
   val compare: String get() = t("مقایسه با دورهٔ پیش", "Compare with previous period", "له تېرې دورې سره پرتله")
   val prevPeriod: String get() = t("دورهٔ پیش", "Previous period", "تېره دوره")
+  /** RPT-13 — سرخطِ دو ستونِ مقایسه در خودِ جدولِ گزارش */
+  val prevColumn: String get() = t("دورهٔ قبل", "Previous period", "تېره دوره")
+  val changeColumn: String get() = t("تغییر", "Change", "بدلون")
   val nextPeriod: String get() = t("دورهٔ بعد", "Next period", "راتلونکې دوره")
 
   //  ── خرید ──

@@ -60,6 +60,8 @@ class DrawerActions(
   val back: (() -> Unit)?,
   /** PAY-17: «ادامه روی این دستگاه» (شناسهٔ شیفتِ نام‌دار) یا کشوی اصلی (`null`) */
   val pick: (CashShift.Shift?) -> Unit = {},
+  /** PAY-17: «همهٔ کشوها با هم» — `null` ⇒ بی ردیف (بی «چند کشو» یا نمای کور) */
+  val all: (() -> Unit)? = null,
 )
 
 /** آنچه صفحه نشان می‌دهد — از `DrawerRoute` */
@@ -139,7 +141,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
         Spacer(Modifier.height(8.dp))
         V3Button(StrSale.xReport, actions.xReport, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL, icon = Icons.AutoMirrored.Outlined.ReceiptLong, height = 44.dp)
       }
-      v.drawers?.let { list -> DrawersSection(list, v.shift?.open?.id, actions.pick, actions.open) }
+      v.drawers?.let { list -> DrawersSection(list, v.shift?.open?.id, actions.pick, actions.open, actions.all) }
       V3Section(StrSale.drawerHistory) {
         if (v.history.isEmpty()) Text(StrSale.noShiftYet, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
         v.history.forEachIndexed { i, sh ->
@@ -159,7 +161,7 @@ fun DrawerScreen(v: DrawerView, actions: DrawerActions) {
 
 /** PAY-17: کشوهای باز — کدام روی همین دستگاه است، و «ادامه روی این دستگاه» برای بقیه */
 @Composable
-private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (CashShift.Shift?) -> Unit, openNew: () -> Unit) {
+private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (CashShift.Shift?) -> Unit, openNew: () -> Unit, all: (() -> Unit)?) {
   val c = PhoneV3.colors
   V3Section(StrDrawers.drawers, footer = StrDrawers.drawersNote) {
     if (list.isEmpty()) Text(StrDrawers.noneOpen, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(14.dp))
@@ -183,5 +185,6 @@ private fun DrawersSection(list: List<CashShift.Shift>, mine: String?, pick: (Ca
     //  صندوقدارِ دوم روی همین دستگاه: کشوی خودش را باز می‌کند، بی بستنِ کشوی اولی
     if (list.isNotEmpty()) V3Divider(start = 64.dp)
     V3ListRow(title = StrDrawers.newDrawer, icon = Icons.Outlined.PointOfSale, onClick = openNew)
+    all?.let { V3Divider(start = 64.dp); V3ListRow(title = StrDrawers.allTitle, icon = Icons.AutoMirrored.Outlined.ReceiptLong, chevron = true, onClick = it) }
   }
 }

@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.PriceCheck
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -37,6 +38,8 @@ fun SaleMenuSheet(
   /** «چند فاکتورِ هم‌زمان» روشن (POS-12) ⇒ نگه‌داشتن و فهرستِ فاکتورهای باز */
   onHold: (() -> Unit)? = null,
   onHeldList: (() -> Unit)? = null,
+  /** POS-15: «قیمت‌پرسی» (`PosPriceCheckPrefs`)؛ `null` ⇒ بی ردیف */
+  onPriceCheck: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
@@ -49,6 +52,10 @@ fun SaleMenuSheet(
       V3ListRow(StrSale.quickSale, subtitle = StrSale.quickHint, icon = Icons.Outlined.GridView, hue = V3Hue.BRAND, onClick = { go(onQuickSale) })
       V3Divider(start = 64.dp)
       V3ListRow(Str.salesHistoryAlt, icon = Icons.Outlined.History, hue = V3Hue.VIOLET, onClick = { go(onHistory) })
+      onPriceCheck?.let { check ->
+        V3Divider(start = 64.dp)
+        V3ListRow(ir.vil3ntec.tohid.core.i18n.StrPriceCheck.title, subtitle = ir.vil3ntec.tohid.core.i18n.StrPriceCheck.menuHint, icon = Icons.Outlined.PriceCheck, hue = V3Hue.TEAL, onClick = { go(check) })
+      }
       onHold?.let { hold ->
         V3Divider(start = 64.dp)
         V3ListRow(StrPos.holdInvoice, icon = Icons.Outlined.PauseCircleOutline, hue = V3Hue.TEAL, onClick = { go(hold) })

@@ -7,6 +7,8 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrPriceCheck {
   val title: String get() = t("قیمت‌پرسی", "Price check", "د بیې پوښتنه")
+  /** POS-15 — زیرنویسِ ردیفِ منوی «…» ِ صندوقِ گوشی */
+  val menuHint: String get() = t("قیمت، موجودی و انقضا — بی افزودن به سبد", "Price, stock and expiry — nothing added to the cart", "بیه، موجودي او پای نېټه — ټوکرۍ ته له ورزیاتولو پرته")
   val hint: String get() = t("بارکد یا نامِ کالا — چیزی به فاکتور افزوده نمی‌شود", "Barcode or item name — nothing is added to the invoice", "بارکوډ یا د توکي نوم — بل ته هېڅ نه ورزیاتېږي")
   val retail: String get() = t("قیمتِ فروش", "Sale price", "د پلور بیه")
   val wholesale: String get() = t("قیمتِ عمده", "Wholesale price", "د عمده بیه")
@@ -25,8 +27,8 @@ object StrPriceCheck {
   // تنظیمات
   val section: String get() = t("قیمت‌پرسی در صندوق (Ctrl+I)", "Price check at the till (Ctrl+I)", "په صندوق کې د بیې پوښتنه (Ctrl+I)")
   val note: String get() = t(
-    "روشن: Ctrl+I در صندوقِ کامپیوتر پنجرهٔ قیمت‌پرسی را باز می‌کند — قیمت‌ها، موجودی، آخرین خرید و نزدیک‌ترین انقضا، بی افزودن به فاکتور. قیمتِ خرید و سود فقط برای کسی که گزارشِ پول را می‌بیند. فقط روی همین دستگاه.",
-    "On: Ctrl+I on the computer till opens a price check — prices, stock, last purchase and nearest expiry, without adding to the invoice. Cost and margin only for people who can see money reports. This device only.",
-    "روښانه: Ctrl+I د کمپیوټر په صندوق کې د بیې پوښتنې کړکۍ پرانیزي — بیې، موجودي، وروستی پېر او تر ټولو نږدې پای نېټه، بل ته له ورزیاتولو پرته. د پېر بیه او ګټه یوازې د هغه چا لپاره چې د پیسو راپور ویني. یوازې همدا وسیله.",
+    "روشن: Ctrl+I در صندوقِ کامپیوتر و «قیمت‌پرسی» در منوی «…» ِ صندوقِ گوشی برگهٔ قیمت‌پرسی را باز می‌کند — قیمت‌ها، موجودی، آخرین خرید و نزدیک‌ترین انقضا، بی افزودن به فاکتور. قیمتِ خرید و سود فقط برای کسی که گزارشِ پول را می‌بیند. فقط روی همین دستگاه.",
+    "On: Ctrl+I on the computer till and “Price check” in the phone till's “…” menu open a price check — prices, stock, last purchase and nearest expiry, without adding to the invoice. Cost and margin only for people who can see money reports. This device only.",
+    "روښانه: Ctrl+I د کمپیوټر په صندوق کې او د ګوشي د صندوق په «…» مېنو کې «د بیې پوښتنه» د بیې پوښتنې پاڼه پرانیزي — بیې، موجودي، وروستی پېر او تر ټولو نږدې پای نېټه، بل ته له ورزیاتولو پرته. د پېر بیه او ګټه یوازې د هغه چا لپاره چې د پیسو راپور ویني. یوازې همدا وسیله.",
   )
 }

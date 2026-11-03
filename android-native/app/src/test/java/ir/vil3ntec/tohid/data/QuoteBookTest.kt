@@ -67,4 +67,22 @@ class QuoteBookTest {
     assertNull(QuoteBookCodec.decode("{خراب"))
     assertEquals(2, (Quotes.create(book, d, cart, null, null, "2026-11-01", 7, 2, "q2", "") as Quotes.Result.Ok).quote.number)
   }
+
+  @Test fun `ارسالِ پیش‌فاکتور همان سطرهای برگهٔ چاپی است و سندِ مالی نمی‌سازد`() {
+    val q = (made() as Quotes.Result.Ok).quote
+    val withCustomer = d.copy(debtors = listOf(Debtor(id = "c1", name = "کریم")))
+    val text = Quotes.shareText(q, withCustomer)
+    val lines = text.lines()
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrPos.quoteSlipTitle(1), lines.first())
+    assertTrue(lines.any { it.contains("کریم") })
+    assertTrue("سه ردیف با قیمتِ ثابت", lines.count { it.startsWith("• ") } == 3)
+    assertTrue(lines.any { it.startsWith("• برنج") && it.contains("500") })
+    assertTrue(lines.any { it.startsWith("• بسته‌بندی") })
+    assertTrue(lines.any { it.contains("630") })
+    assertTrue(lines.contains("آقای کریمی"))
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrPos.quoteSlipFooter, lines.last())
+    //  مشتریِ ناشناس ⇒ «مشتریِ نقدی»
+    assertTrue(Quotes.shareText(q, d).contains(ir.vil3ntec.tohid.core.i18n.StrPos.quoteWalkIn))
+    assertTrue(withCustomer.sales.isEmpty())
+  }
 }

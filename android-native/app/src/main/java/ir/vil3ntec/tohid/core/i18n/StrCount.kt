@@ -50,6 +50,14 @@ object StrCount {
   fun matched(n: Any): String = t("منطبق: ${asIs(n)}", "Matching: $n", "سمون لرونکي: $n")
   fun differing(n: Any, value: Any): String = t("مغایر: ${asIs(n)} · ${asIs(value)} ؋", "Different: $n · $value ؋", "توپیر لرونکي: $n · $value ؋")
   val untouched: String get() = t("کالاهای شمرده‌نشده دست نمی‌خورند", "Products that aren't counted are left unchanged", "نه شمېرل شوي توکي نه بدلېږي")
+  // ── INV-09: «مستثنا» و «شمارشِ دوباره» ──
+  fun excludedChip(n: Any): String = t("مستثنا: ${asIs(n)}", "Excluded: $n", "مستثنا: $n")
+  val exclude: String get() = t("مستثنا", "Exclude", "مستثنا")
+  val includeAgain: String get() = t("برگرداندن", "Include", "بېرته")
+  val excludedMark: String get() = t("مستثنا — موجودی‌اش دست نمی‌خورد", "Excluded — its stock stays unchanged", "مستثنا — موجودي یې نه بدلېږي")
+  fun recountButton(n: Any): String = t("شمارشِ دوبارهٔ مغایرها (${asIs(n)})", "Recount the differences ($n)", "د توپیر لرونکو بیا شمېرنه ($n)")
+  fun recountStarted(n: Any): String = t("${asIs(n)} کالای مغایر خالی شد؛ دوباره بشمارید.", "$n differing items cleared; count them again.", "$n توپیر لرونکي توکي تش شول؛ بیا یې وشمېرئ.")
+  val recountMark: String get() = t("شمارشِ دوباره — هنوز شمرده نشده", "Recount — not counted yet", "بیا شمېرنه — لا نه دی شمېرل شوی")
   val csv: String get() = t("CSV", "CSV", "CSV")
 
   // چند دستگاه

@@ -37,6 +37,21 @@ object CartModel {
     return Step(added.cart.takeIf { it !== lines }, note, true)
   }
 
+  /**
+   *  POS-03 — «۳*» ِ کادرِ جست‌وجو و لمسِ کاشی: [count] تا (کالای وزنی همان مقدار، بی صفحه‌کلید) با همان نگهبانِ موجودیِ
+   *  [addOne]. شمارِ نادرست (صفر، منفی، اعشار برای کالای شمردنی) ⇒ همان یک پلهٔ امروز.
+   */
+  fun addCount(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String, count: Double): Step {
+    val p = d.products.find { it.id == productId } ?: return Step(null, null, false)
+    val weighed = SalesEngine.isFractionalUnit(p.unit)
+    if (!count.isFinite() || count <= 0 || count == 1.0 || (!weighed && count != kotlin.math.floor(count))) return addOne(d, lines, productId)
+    val added = SalesEngine.addToCartCapped(lines, p.id, count, ProductInfoMap.sellable(d, p.id))
+    if (!added.capped) return Step(added.cart, null, false)
+    val note = if (added.available <= 0) SalesEngine.shortageMessage(p, count, added.available)
+    else StrSale.onlyLeftOf(p.name, stockLeft(p, added.available))
+    return Step(added.cart.takeIf { it !== lines }, note, true)
+  }
+
   /** یک پله کمتر («−» ِ کاشی)؛ پلهٔ آخر ردیف را برمی‌دارد */
   fun minusOne(d: ShopData, lines: List<SalesEngine.CartLine>, productId: String): List<SalesEngine.CartLine>? {
     val p = d.products.find { it.id == productId } ?: return null

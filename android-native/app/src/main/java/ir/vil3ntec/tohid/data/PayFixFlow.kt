@@ -40,6 +40,12 @@ object PayFixFlow {
     return d.auditLog.mapNotNull(::fixOf).groupBy { it.saleId }
   }
 
+  /** POS-40 — فاکتورهایی که روشِ پرداختشان اصلاح شد (از هر دستگاه)؛ دفترِ بی اصلاح ⇒ خالی */
+  fun fixedSales(d: ShopData): Set<String> = bySale(d).keys
+
+  /** POS-40 — نشانِ اصلاح در ستونِ «نوع» ِ فهرستِ فاکتورها: «نقدی · اصلاح‌شده»؛ بی اصلاح همان نوشتهٔ امروز */
+  fun kindLabel(base: String, fixed: Boolean): String = if (fixed) ir.vil3ntec.tohid.core.i18n.StrPayFix.fixedKind(base) else base
+
   /** ردیف‌های ثبت‌شدهٔ فاکتور، بی اصلاح — همان `PayFlow.saleRows` ِ امروز */
   fun baseRows(s: Sale): List<PayFix.Row> = PayFlow.saleRows(s).map { PayFix.Row(it.method, it.amount) }
 

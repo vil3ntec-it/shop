@@ -72,6 +72,7 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
   if (!on) return
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   val scope = rememberCoroutineScope()
+  val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
   val lines by cart.lines.collectAsState()
   val debtorId by cart.debtorId.collectAsState()
   var book by remember { mutableStateOf(QuoteBook()) }
@@ -120,6 +121,19 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
     QuoteListDialog(
       d = d, book = book, cartKey = cart.snapshot().key, today = ir.vil3ntec.tohid.todayIso(),
       onPrint = { q -> scope.launch { toast(printQuote(context, d, q)) } },
+      //  POS-25 «ارسال»: گوشی ⇐ برگهٔ اشتراک (واتس‌اپ، تلگرام، پیامک)؛ کامپیوتر ⇐ کپیِ متن
+      onShare = { q ->
+        val text = Quotes.shareText(q, d)
+        if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) { clipboard.setText(androidx.compose.ui.text.AnnotatedString(text)); toast(StrPos.quoteCopied) }
+        else runCatching {
+          val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(android.content.Intent.EXTRA_SUBJECT, StrPos.quoteSlipTitle(q.number))
+            putExtra(android.content.Intent.EXTRA_TEXT, text)
+          }
+          context.startActivity(android.content.Intent.createChooser(send, StrPos.quoteShare).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
+        }.onFailure { toast(StrPos.quoteErrNotSaved) }
+      },
       onConvert = { q ->
         val today = ir.vil3ntec.tohid.todayIso()
         when (val r = Quotes.convert(book, q.id, d, cart.snapshot().key, cart.lines.value.isEmpty(), today)) {
@@ -174,8 +188,7 @@ private fun QuoteSaveDialog(onDismiss: () -> Unit, onSave: (Int, String) -> Unit
   )
 }
 
-private fun customer(d: ShopData, q: SavedQuote): String =
-  q.debtorId?.let { id -> d.debtors.find { it.id == id }?.name?.ifBlank { null } } ?: StrPos.quoteWalkIn
+private fun customer(d: ShopData, q: SavedQuote): String = Quotes.customer(d, q)
 
 private fun stateLabel(s: Quote.State): String = when (s) {
   Quote.State.VALID -> StrPos.quoteStateValid
@@ -188,6 +201,7 @@ private fun stateLabel(s: Quote.State): String = when (s) {
 private fun QuoteListDialog(
   d: ShopData, book: QuoteBook, cartKey: String?, today: String,
   onPrint: (SavedQuote) -> Unit, onConvert: (SavedQuote) -> Unit, onDelete: (SavedQuote) -> Unit, onDismiss: () -> Unit,
+  onShare: (SavedQuote) -> Unit = {},
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -206,6 +220,7 @@ private fun QuoteListDialog(
           )
           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = { onPrint(q) }) { Text(StrPos.quotePrint) }
+            TextButton(onClick = { onShare(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quoteCopy else StrPos.quoteShare) }
             if (st == Quote.State.VALID || st == Quote.State.IN_CART) TextButton(onClick = { onConvert(q) }) { Text(StrPos.quoteToCart) }
             TextButton(onClick = { onDelete(q) }) { Text(StrPos.quoteDelete, color = Shop.colors.danger) }
           }

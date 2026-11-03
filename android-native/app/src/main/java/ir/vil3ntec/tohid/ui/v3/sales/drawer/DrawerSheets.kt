@@ -238,6 +238,25 @@ fun ShiftReportSheet(rep: ShiftReport, staff: Boolean, title: String?, notes: Li
   }
 }
 
+/** PAY-17 — «همهٔ کشوها با هم»: همان کارتِ ردیف‌های گزارشِ X/Z، با یک یادداشت بالایش */
+@Composable
+fun DrawerLinesSheet(title: String, note: String, lines: List<ReportLine>, onClose: () -> Unit) {
+  val c = PhoneV3.colors
+  V3Sheet(onDismiss = onClose, title = title) {
+    Text(note, style = V3Type.footnote, color = c.inkMuted)
+    Spacer(Modifier.height(8.dp))
+    V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
+      lines.forEach { l ->
+        Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), verticalAlignment = Alignment.CenterVertically) {
+          Text(l.label, style = if (l.strong) V3Type.headline else V3Type.callout, color = if (l.strong) c.ink else c.inkMuted, modifier = Modifier.weight(1f))
+          Spacer(Modifier.padding(start = 8.dp))
+          Text(l.value, style = if (l.strong) V3Type.headline else V3Type.callout, color = c.ink)
+        }
+      }
+    }
+  }
+}
+
 /** ریزِ یک صندوقِ گذشته بی گزارشِ Z (صندوقِ ساده) — یادداشتِ باز و بستن */
 @Composable
 fun ShiftNotesSheet(shift: CashShift.Shift, onClose: () -> Unit) {

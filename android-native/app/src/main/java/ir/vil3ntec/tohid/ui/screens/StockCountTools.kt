@@ -89,6 +89,9 @@ fun StockCountToolsSheet(
   var brand by remember { mutableStateOf<String?>(null) }
   var shelf by remember { mutableStateOf<String?>(null) }
   var bucket by remember { mutableStateOf<CountReview.Kind?>(null) }
+  //  INV-09: «مستثنا» (اصلاح نمی‌شود) و «شمارشِ دوباره» (عددِ پیشینِ مغایرها کنار می‌رود تا دوباره شمرده شوند)
+  var excluded by remember { mutableStateOf(setOf<String>()) }
+  var recount by remember { mutableStateOf(setOf<String>()) }
   //  «اسکن‌های در انتظار» ⇒ انبارگردانی: شمارِ بارکدخوان به خانه‌ها، با لحظهٔ همین حالا (INV-10)
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT)?.let { h ->
@@ -103,19 +106,29 @@ fun StockCountToolsSheet(
   val names = remember(d) { d.products.associate { it.id to it.name } }
   val (own, bad) = remember(texts) { CountSheetModel.own(texts) }
   val merged = remember(own, imported, ownSheetId) { CountSheetModel.total(own, ownSheetId, imported) }
-  val counted = remember(merged) { CountSheetModel.asDouble(merged.counts) }
+  val counted = remember(merged, own, recount) { CountReview.afterRecount(CountSheetModel.asDouble(merged.counts), CountSheetModel.asDouble(own), recount) }
+  //  INV-09: آنچه ثبت می‌شود — مستثناها بیرون (مثلِ شمرده‌نشده دست نمی‌خورند)
+  val saved = remember(counted, excluded) { CountReview.saved(counted, excluded) }
   val countedAt = remember(at, imported, ownSheetId) {
     CountDuringSales.latest(imported.filter { it.sheetId != ownSheetId }.map { it.at to it.counts.keys } + at.map { (id, t) -> t to setOf(id) })
   }
   val shift = remember(d, countedAt) { ir.vil3ntec.tohid.data.CountShift.of(d, countedAt) }
-  val lines = remember(d, counted, blind, shift) { if (blind) emptyList() else WarehouseEngine.countLines(d, counted, shift) }
+  val lines = remember(d, saved, blind, shift) { if (blind) emptyList() else WarehouseEngine.countLines(d, saved, shift) }
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val others = remember(imported, ownSheetId) { CountMerge.merge(imported.filter { it.sheetId != ownSheetId }).counts }
   val term = search.trim()
   val scope = remember(d, term, category, supplierId, brand, shelf) { CountFilter.shown(d.products, term, category, supplierId, brand, shelf) }
-  val review = remember(d, scope, counted, shift) { CountReview.of(d, scope, counted, shift) }
-  //  کور: «منطبق» و «مغایر» عددِ برنامه را لو می‌دهند ⇒ فقط شمرده‌نشده جدا می‌شود
-  val shown = bucket?.let { k -> review.rows.filter { if (blind) (it.kind == CountReview.Kind.UNCOUNTED) == (k == CountReview.Kind.UNCOUNTED) else it.kind == k }.map { it.product } } ?: scope
+  val review = remember(d, scope, counted, shift, excluded) { CountReview.of(d, scope, counted, shift, excluded) }
+  //  کور: «منطبق» و «مغایر» عددِ برنامه را لو می‌دهند ⇒ فقط شمرده‌نشده (و مستثنا) جدا می‌شود
+  val shown = bucket?.let { k ->
+    review.rows.filter { r ->
+      when {
+        k == CountReview.Kind.EXCLUDED -> r.kind == k
+        blind -> r.kind != CountReview.Kind.EXCLUDED && (r.kind == CountReview.Kind.UNCOUNTED) == (k == CountReview.Kind.UNCOUNTED)
+        else -> r.kind == k
+      }
+    }.map { it.product }
+  } ?: scope
   val categories = remember(d) { CountFilter.categories(d.products) }
   val suppliers = remember(d) { CountFilter.suppliers(d.products, d.suppliers) }
   val brands = remember(d) { CountFilter.brands(d.products) }
@@ -220,13 +233,24 @@ fun StockCountToolsSheet(
           CountFilterChips(
             StrCount.all,
             listOf(CountReview.Kind.UNCOUNTED.name to StrCount.uncounted(plain(review.uncounted))) +
-              if (blind) listOf(CountReview.Kind.MATCHED.name to StrCount.summaryCounted(plain(review.matched + review.differing)))
+              (if (blind) listOf(CountReview.Kind.MATCHED.name to StrCount.summaryCounted(plain(review.matched + review.differing)))
               else listOf(
                 CountReview.Kind.MATCHED.name to StrCount.matched(plain(review.matched)),
                 CountReview.Kind.DIFF.name to StrCount.differing(plain(review.differing), money(review.value)),
-              ),
+              )) + if (review.excluded > 0) listOf(CountReview.Kind.EXCLUDED.name to StrCount.excludedChip(plain(review.excluded))) else emptyList(),
             bucket?.name,
           ) { k -> bucket = k?.let(CountReview.Kind::valueOf) }
+          //  INV-09: «شمارشِ دوباره» ِ مغایرها (نه در شمارشِ کور — مغایر بودن عددِ برنامه را لو می‌دهد)
+          if (!blind && review.differing > 0) {
+            TextButton(onClick = {
+              val ids = CountReview.recount(review)
+              recount = recount + ids
+              texts = texts - ids
+              at = at - ids
+              bucket = CountReview.Kind.UNCOUNTED
+              message = StrCount.recountStarted(plain(ids.size))
+            }) { Text(StrCount.recountButton(plain(review.differing))) }
+          }
           Text(StrCount.untouched, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
           notice?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.text) }
           Spacer(Modifier.height(6.dp))
@@ -234,7 +258,9 @@ fun StockCountToolsSheet(
           LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             items(shown, key = { it.id }) { p ->
               val sysMilli = Math.round((stock[p.id] ?: 0.0) * 1000)
-              val total = merged.counts[p.id]
+              //  INV-09: کالای «شمارشِ دوباره» فقط عددِ تازهٔ همین دستگاه را دارد
+              val total = if (p.id in recount) own[p.id] else merged.counts[p.id]
+              val out = p.id in excluded
               val hint = CountBlind.hint(sysMilli, total, blind)
               val other = others[p.id]
               val cell = CountSheetModel.parse(texts[p.id].orEmpty())
@@ -270,6 +296,12 @@ fun StockCountToolsSheet(
                   if (p.id in merged.shared) {
                     Text(StrCount.sharedMark, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
                   }
+                  if (out) Text(StrCount.excludedMark, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
+                  else if (p.id in recount && texts[p.id].isNullOrBlank()) Text(StrCount.recountMark, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
+                }
+                //  INV-09: «مستثنا» ⇄ «برگرداندن» — مستثنا هرگز اصلاح (و هرگز صفر) نمی‌شود
+                TextButton(onClick = { excluded = if (out) excluded - p.id else excluded + p.id }) {
+                  Text(if (out) StrCount.includeAgain else StrCount.exclude, style = MaterialTheme.typography.labelSmall)
                 }
                 OutlinedTextField(
                   value = texts[p.id].orEmpty(),
@@ -292,7 +324,7 @@ fun StockCountToolsSheet(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
           ) {
             Text(
-              StrCount.summaryCounted(plain(merged.counts.size)) +
+              StrCount.summaryCounted(plain(saved.size)) +
                 if (blind) "" else " · " + StrCount.summaryDiff(plain(lines.size), money(lines.sumOf { it.value })),
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted,
@@ -306,13 +338,13 @@ fun StockCountToolsSheet(
             TohidButton(
               text = StrCount.save,
               icon = Icons.Filled.Inventory2,
-              enabled = merged.counts.isNotEmpty(),
+              enabled = saved.isNotEmpty(),
               onClick = {
                 if (bad != null) {
                   error = StrCount.badNumber(names[bad].orEmpty())
                 } else {
                   error = null
-                  onSave(counted, countedAt, note)
+                  onSave(saved, countedAt, note)
                 }
               },
             )
