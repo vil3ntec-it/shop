@@ -89,6 +89,9 @@ router.post('/login', adminLimit, async (req, res, next) => {
   });
 });
 
+//  OPS-09: «مصرفِ پیام» چند جدول را می‌شمارد ⇒ سطلِ IP ِ خودش پیش از احراز (CodeQL ِ js/missing-rate-limiting)
+router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, keyPrefix: 'admin-notify-usage-ip' }));
+
 router.use(requireAdmin);
 
 //  SEC-AUTH-13: تأییدِ دوبارهٔ نشستِ مدیر — بدنه در `lib/auth-session-hardening.js`

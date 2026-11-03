@@ -4,7 +4,7 @@
  *
  * پس از `app.js` بار می‌شود و ابزارهای همان را به کار می‌برد ($، el، call،
  * fa، dateTime، msg و `LOADERS`). هر بخشِ تازهٔ عملیات (نسخهٔ دستگاه‌ها،
- * سوءاستفاده و پیامک، زنجیرهٔ هش، تطبیقِ فروش) یک تابعِ `load*` است که در
+ * سوءاستفاده و پیامک (OPS-09)، زنجیرهٔ هش، تطبیقِ فروش) یک تابعِ `load*` است که در
  * `OPS_PARTS` می‌نشیند؛ شکستِ یکی فقط پیامِ همان بخش را قرمز می‌کند.
  *
  * ⛔ همه درونِ یک تابعِ بی‌نام: اسکریپت‌های کلاسیک یک حوزهٔ سراسری دارند و یک
@@ -112,6 +112,100 @@
     $('ops-ver-checked').textContent = `دستگاه‌های همگام‌شده در ${fa(out.activeDays)} روزِ گذشته · بررسی: ${dateTime(out.checkedAt)}`
       + (out.truncated ? ' · فهرست بریده شد (پرشمارترین‌ها)' : '');
   }
+
+  // ---------- مصرف و هزینهٔ پیامِ مشتری — OPS-09 ----------
+  //  هزینه به میکرودلار می‌آید؛ فقط برای نمایش به دلار — هیچ حسابی این‌جا نیست
+  const CHANNEL_FA = { push: 'پوش', whatsapp: 'واتس‌اپ', telegram: 'تلگرام', sms: 'پیامک' };
+  const usd = (micros) => `${(Number(micros || 0) / 1e6).toLocaleString('fa-AF', { maximumFractionDigits: 2 })} دلار`;
+
+  async function loadUsage() {
+    const body = $('ops-usage');
+    const note = $('ops-usage-msg');
+    body.innerHTML = '';
+    msg(note, '');
+    const days = Number($('ops-usage-days').value) || 7;
+    const out = await call('GET', `/admin/system/notify-usage?days=${days}`);
+    const caps = out.channels.filter((c) => c.unitMicros > 0)
+      .map((c) => `${CHANNEL_FA[c.channel] || c.channel}: ${usd(c.unitMicros)} هر پیام، سقفِ روزانهٔ هر دکان ${usd(c.capMicros)}`);
+    if (!out.shops.length) {
+      const tr = el('tr');
+      const empty = el('td', 'muted', 'در این بازه پیامی به مشتری نرفته و هیچ پیامی با سقف رد نشده است');
+      empty.colSpan = 7;
+      tr.appendChild(empty);
+      body.appendChild(tr);
+    }
+    for (const s of out.shops) {
+      const tr = el('tr');
+      tr.dataset.shop = s.shopId;
+      tr.appendChild(el('td', '', s.name || s.shopId));
+      tr.appendChild(el('td', '', fa(s.sent)));
+      tr.appendChild(el('td', '', usd(s.costMicros)));
+      const parts = Object.entries(s.byChannel).filter(([, c]) => c.sent > 0)
+        .map(([ch, c]) => `${CHANNEL_FA[ch] || ch} ${fa(c.sent)}${c.costMicros ? ` (${usd(c.costMicros)})` : ''}`);
+      tr.appendChild(el('td', 'muted', parts.join(' · ') || '—'));
+      tr.appendChild(el('td', s.costCap ? '' : 'muted', fa(s.costCap)));
+      tr.appendChild(el('td', s.rateLimited ? '' : 'muted', fa(s.rateLimited)));
+      const st = el('td');
+      if (s.nearCap.length) {
+        st.appendChild(el('span', 'badge b-warn', `نزدیکِ سقفِ ${s.nearCap.map((c) => CHANNEL_FA[c] || c).join('، ')}`));
+      } else if (s.costCap || s.rateLimited) {
+        st.appendChild(el('span', 'badge b-warn', 'پیامِ ردشده دارد'));
+      } else {
+        st.appendChild(el('span', 'badge b-ok', 'عادی'));
+      }
+      tr.appendChild(st);
+      body.appendChild(tr);
+    }
+    const t = out.totals;
+    const warn = [];
+    if (t.costCap) warn.push(`${fa(t.costCap)} پیام با سقفِ هزینهٔ دکان رد شد`);
+    if (t.rateLimited) warn.push(`${fa(t.rateLimited)} پیام با سقفِ هر مشتری نگه داشته شد`);
+    if (warn.length) msg(note, `⚠️ ${warn.join(' · ')} — نشانهٔ احتمالیِ سوءاستفاده؛ دکانِ پرشمار را ببینید`, 'warn');
+    $('ops-usage-checked').textContent = `${fa(t.sent)} پیام، ${usd(t.costMicros)} در ${fa(out.days)} روزِ گذشته`
+      + ` · ${fa(t.shops)} دکان${out.shopsTruncated ? ` (فقط ${fa(out.shops.length)} پرهزینه‌ترین)` : ''}`
+      + `${out.truncated ? ' · شمارش بریده شد (تازه‌ترین‌ها)' : ''}`
+      + `${caps.length ? ` · ${caps.join(' · ')}` : ''} · بررسی: ${dateTime(out.checkedAt)}`;
+  }
+
+  //  بخش همین‌جا ساخته می‌شود (index.html سقفِ اندازه دارد)، زیرِ «سرویس‌های بیرونی»
+  function usagePanel() {
+    const panel = el('div', 'panel');
+    panel.appendChild(el('h2', '', 'مصرف و هزینهٔ پیامِ مشتری'));
+    const row = el('div', 'row');
+    const days = el('select');
+    days.id = 'ops-usage-days';
+    days.setAttribute('aria-label', 'بازه');
+    for (const [v, t] of [[1, '۲۴ ساعتِ گذشته'], [7, '۷ روزِ گذشته'], [31, '۳۱ روزِ گذشته']]) {
+      const o = el('option', '', t);
+      o.value = String(v);
+      o.selected = v === 7;
+      days.appendChild(o);
+    }
+    days.onchange = () => loadUsage().catch((err) => msg($('ops-usage-msg'), err.message, 'bad'));
+    row.appendChild(days);
+    const checked = el('span', 'muted');
+    checked.id = 'ops-usage-checked';
+    row.appendChild(checked);
+    panel.appendChild(row);
+    const note = el('div');
+    note.id = 'ops-usage-msg';
+    panel.appendChild(note);
+    const scroll = el('div', 'table-scroll');
+    const table = el('table');
+    const head = el('tr');
+    for (const h of ['دکان', 'پیامِ رفته', 'هزینه', 'هر کانال', 'ردشده با سقفِ هزینه', 'ردشده با سقفِ مشتری', 'هشدار']) head.appendChild(el('th', '', h));
+    const thead = el('thead');
+    thead.appendChild(head);
+    table.appendChild(thead);
+    const body = el('tbody');
+    body.id = 'ops-usage';
+    table.appendChild(body);
+    scroll.appendChild(table);
+    panel.appendChild(scroll);
+    $('ops-providers').closest('.panel').after(panel);
+  }
+
+  document.addEventListener('DOMContentLoaded', usagePanel);
 
   // ---------- زنجیرهٔ هشِ سابقه — SEC-02 ----------
   //  فقط با دکمه (سنجش هزینه دارد) و فقط مدیرِ ارشد؛ همان سنجشِ scripts/verify-chain.js
@@ -338,6 +432,7 @@
   const OPS_PARTS = [
     [loadProviders, 'ops-prov-msg'],
     [loadVersions, 'ops-ver-msg'],
+    [loadUsage, 'ops-usage-msg'],
     [loadPayments, 'ops-pay-msg'],
   ];
 
