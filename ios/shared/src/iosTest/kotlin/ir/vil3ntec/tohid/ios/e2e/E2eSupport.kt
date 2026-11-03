@@ -200,27 +200,52 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
   /**
    *  پیمایش تا چیز در قابِ پدرِ پیمایش‌پذیرش باشد — با کنشِ `ScrollBy` ِ همان پدر و ساعتی که راننده جلو می‌برد.
    *  (`performScrollTo` ِ ui-test پیمایشِ انیمیشن‌دار را با ساعتِ ایستاده تا ابد منتظر می‌ماند: گیرِ اجرای چهارم.)
+   *  زیرِ نوارِ شناورِ پایین هم «بیرونِ قاب» است؛ پیمایشی که جا را عوض نکرد (تهِ فهرست، برگهٔ کوتاه) ⇐ بس — پیمایشِ
+   *  بی‌جا به برگه می‌رسد و آن را می‌کشد (اجرای پنجم).
    */
   fun reveal(m: SemanticsMatcher) {
+    val bar = if (shown(Find.tab(NavCatalog.HOME))) REVEAL_MARGIN else 0f
+    var last: Float? = null
     repeat(8) {
       val node = ui.onAllNodes(m).onFirst().fetchSemanticsNode()
       var parent = node.parent
       while (parent != null && !parent.config.contains(SemanticsActions.ScrollBy)) parent = parent.parent
       val box = parent ?: return
-      val view = box.boundsInRoot
-      val at = node.boundsInRoot
-      if (at.top >= view.top && at.bottom <= view.bottom - REVEAL_MARGIN) return
+      val view = box.boundsInWindow
+      val at = node.boundsInWindow
+      val bottom = minOf(view.bottom, screen().bottom - bar)
+      if (at.top >= view.top && at.bottom <= bottom) return
+      if (last == at.top) return
+      last = at.top
       val dy = at.center.y - (view.top + view.height / 3)
       box.config[SemanticsActions.ScrollBy].action?.invoke(0f, dy)
       pump(500)
     }
   }
 
+  private fun screen() = ui.onAllNodes(isRoot()).onFirst().fetchSemanticsNode().boundsInWindow
+
+  /**
+   *  تا چیز کامل روی صفحه و ایستاده باشد (برگه‌ای که از پایین بالا می‌آید: کادری که پیش‌تر پیدا شد هنوز بیرونِ صفحه
+   *  است و زدنش هیچ — اجرای پنجم). بیشینه شش ثانیه؛ پس از آن همان‌جا که هست.
+   */
+  fun settle(m: SemanticsMatcher) {
+    val start = TimeSource.Monotonic.markNow()
+    var last: androidx.compose.ui.geometry.Rect? = null
+    while (start.elapsedNow().inWholeMilliseconds < 6_000) {
+      val at = ui.onAllNodes(m).onFirst().fetchSemanticsNode().boundsInWindow
+      val s = screen()
+      if (at == last && at.top >= s.top && at.bottom <= s.bottom && at.left >= s.left && at.right <= s.right) return
+      last = at
+      pump(200)
+    }
+  }
+
   fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
     waitFor(m, what, timeoutMs)
     reveal(m)
+    settle(m)
     val node = ui.onAllNodes(m).onFirst()
-    pump(250)
     node.performClick()
     note("زدن: $what")
     pump(600)
@@ -230,10 +255,11 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     val m = Find.field(label)
     waitFor(m, label)
     reveal(m)
-    val node = ui.onAllNodes(m).onFirst()
-    node.performClick()
-    pump(200)
-    node.performTextReplacement(value)
+    settle(m)
+    ui.onAllNodes(m).onFirst().performClick()
+    pump(300)
+    settle(m)
+    ui.onAllNodes(m).onFirst().performTextReplacement(value)
     note("نوشتن در «$label»")
     pump(300)
   }
