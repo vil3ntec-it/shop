@@ -24,6 +24,11 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    //  روش‌های دریافت و نشانهٔ پرداخت فقط در همین صفحه‌اند ⇒ این‌جا، نه در بارِ نخستِ store.js
+    $('opt-delivery').hidden = !c.store.fulfillment.delivery;
+    $('opt-pickup').hidden = !c.store.fulfillment.pickup;
+    $('opt-delivery-fee').textContent = c.zones() ? c.shipText() : c.store.deliveryFeeMinor > 0 ? K.money(c.store.deliveryFeeMinor) : t('free');
+    if (!$('pay-ico').firstChild) $('pay-ico').appendChild(K.icon('cash'));
     //  CHK-07/10 (فقط با `store.delivery.zoned`): پینِ بیرون از محدوده ⇒ «دریافت از دکان» یا «خبرم کن»
     var area = null;
     //  CHK-08 (§۴.۴، همان پرچمِ `shop.storefront.address_extra`): ولایت، گذر یا کوچه، منزل و طبقه — همه اختیاری؛ کدِ پستی

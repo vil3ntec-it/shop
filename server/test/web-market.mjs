@@ -499,7 +499,7 @@ ok((await fetch(`${base}/store/${gc.slug}/manifest.webmanifest`)).status === 200
 const pub = path.join(import.meta.dirname, '..', 'public');
 const size = (...f) => f.reduce((s, x) => s + fs.statSync(path.join(pub, x)).size, 0);
 ok(size('kit/boot.js', 'kit/kit.js', 'market/market.js') < 75 * 1024, 'JS ِ بازارچه زیرِ ۷۵KB', `${size('kit/boot.js', 'kit/kit.js', 'market/market.js')} بایت`);
-ok(size('kit/boot.js', 'kit/kit.js', 'store/store.js') < 75 * 1024, 'JS ِ ویترین زیرِ ۷۵KB', `${size('kit/boot.js', 'kit/kit.js', 'store/store.js')} بایت`);
+ok(size('kit/boot.js', 'kit/kit.js', 'store/store.js') < require('./storefront-budget.js').FIRST_LOAD, 'JS ِ ویترین زیرِ سقفِ بارِ نخست (storefront-budget)', `${size('kit/boot.js', 'kit/kit.js', 'store/store.js')} بایت`);
 //  واژه‌نامه دادهٔ JSON است (نه اسکریپت) و فقط زبانِ همان صفحه بار می‌شود
 for (const l of ['fa', 'en', 'ps']) ok(size(`kit/i18n/${l}.json`) < 24 * 1024, `واژه‌نامهٔ ${l} کوچک است`, `${size(`kit/i18n/${l}.json`)} بایت`);
 const html = ['market/index.html', 'market/market.js', 'store/index.html', 'store/store.js', 'store/order.js', 'kit/kit.js'].map((f) => fs.readFileSync(path.join(pub, f), 'utf8')).join('\n');
