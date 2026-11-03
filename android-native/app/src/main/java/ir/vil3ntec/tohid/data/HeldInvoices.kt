@@ -96,6 +96,22 @@ data class HeldTag(val id: String, val number: Int, val label: String = "", val 
 @Serializable
 data class HeldBook(val v: Int = 1, val items: List<HeldInvoice> = emptyList(), val current: HeldTag? = null)
 
+/**
+ *  INV-03 — «قابل‌فروش» در صندوق: مقدارِ هر کالا در فاکتورهای **نگه‌داشتهٔ** همین دستگاه (`HeldBook.items`؛ سبدِ جاری در آن
+ *  نیست)، تا آخرین دانه‌ای که برای مشتریِ دیگری کنار گذاشته شده «موجود» دیده نشود. قلمِ آزاد (بی کالا) و مقدارِ نامعتبر
+ *  بیرون. بی نگه‌داشته (پیش‌فرض: «چند فاکتورِ هم‌زمان» خاموش) ⇒ خالی ⇒ همان موجودیِ امروز. رزروِ سفارشِ اینترنتی (O-06) نه.
+ */
+object HeldStock {
+  fun reserved(book: HeldBook): Map<String, Double> {
+    val out = LinkedHashMap<String, Double>()
+    for (h in book.items) for (l in h.lines) {
+      if (l.productId.isBlank() || !l.quantity.isFinite() || l.quantity <= 0) continue
+      out[l.productId] = (out[l.productId] ?: 0.0) + l.quantity
+    }
+    return out
+  }
+}
+
 object HeldInvoiceCodec {
   private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
   fun encode(b: HeldBook): String = json.encodeToString(b)

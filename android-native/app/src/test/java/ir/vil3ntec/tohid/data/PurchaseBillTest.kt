@@ -134,4 +134,27 @@ class PurchaseBillTest {
     assertEquals(0, old.order.billCount)
     assertTrue(old.order.bills.isEmpty())
   }
+
+  @Test fun `گوشی و کامپیوتر — فاکتور و باطل فقط برای مدیر و فقط پس از فرستادن`() {
+    assertTrue(PurchaseOrderBook.canBill(po, manage = true))
+    //  شاگرد (بی `stock.adjust`) نه فرم دارد نه «باطل»
+    assertFalse(PurchaseOrderBook.canBill(po, manage = false))
+    assertFalse(PurchaseOrderBook.canVoid(exact, manage = false))
+    //  پیش‌نویس هنوز فاکتور نمی‌گیرد (سرور: ۴۰۹ `not_sent`)؛ لغوشده می‌گیرد (فاکتورِ پیشین باطل‌شدنی است)
+    assertFalse(PurchaseOrderBook.canBill(po.copy(state = "draft", status = "draft"), manage = true))
+    assertTrue(PurchaseOrderBook.canBill(po.copy(state = "cancelled", status = "cancelled"), manage = true))
+    //  باطل‌شده دوباره باطل نمی‌شود
+    assertTrue(PurchaseOrderBook.canVoid(exact, manage = true))
+    assertFalse(PurchaseOrderBook.canVoid(exact.copy(voidedAt = 9, voidReason = "اشتباه"), manage = true))
+  }
+
+  @Test fun `فهرستِ گوشی — بی پیش‌نویس؛ رسیده و بی فاکتور بالا، بعد تازه‌ترین`() {
+    val draft = po.copy(id = "d", state = "draft", status = "draft", updatedAt = 99)
+    val billed = po.copy(id = "b", billCount = 1, totals = PoTotalsDto(acceptedMinor = 240_000), updatedAt = 50)
+    val waiting = po.copy(id = "w", billCount = 0, totals = PoTotalsDto(acceptedMinor = 240_000), updatedAt = 10)
+    val nothingYet = po.copy(id = "n", status = "sent", billCount = 0, totals = PoTotalsDto(acceptedMinor = 0), updatedAt = 70)
+    val cancelled = po.copy(id = "c", state = "cancelled", status = "cancelled", billCount = 1, updatedAt = 5)
+    assertEquals(listOf("w", "n", "b", "c"), PurchaseOrderBook.billable(listOf(draft, billed, waiting, nothingYet, cancelled)).map { it.id })
+    assertTrue(PurchaseOrderBook.billable(listOf(draft)).isEmpty())
+  }
 }

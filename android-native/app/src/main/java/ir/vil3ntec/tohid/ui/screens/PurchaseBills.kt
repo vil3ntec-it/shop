@@ -9,19 +9,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.data.PoBillDto
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.ShopData
@@ -90,4 +96,73 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
     Spacer(Modifier.height(10.dp))
     Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "در حالِ ثبت…" else "ثبتِ فاکتور") }
   }
+}
+
+/**
+ *  فاکتورهای ثبت‌شدهٔ تأمین‌کننده (باطل‌شده خط‌خورده با دلیل و بی اثر در تطبیق)؛ «باطل» فقط با [PurchaseOrderBook.canVoid].
+ *  کامپیوتر (`PoDetail`) و گوشیِ نسخهٔ ۳ (`ui/v3/money/SupplierBillsPages.kt`) همین یکی را می‌کشند.
+ */
+@Composable
+internal fun PoBillsList(order: PurchaseOrderDto, manage: Boolean, busy: Boolean, onVoid: (PoBillDto) -> Unit) {
+  if (order.bills.isEmpty()) return
+  val c = Shop.colors
+  Spacer(Modifier.height(14.dp))
+  Text("فاکتورهای تأمین‌کننده", style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
+  order.bills.forEach { b ->
+    Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+      Column(Modifier.weight(1f)) {
+        Text(
+          PurchaseOrderBook.billLine(b),
+          color = if (b.active) c.text else c.muted, style = MaterialTheme.typography.bodySmall,
+          textDecoration = if (b.active) null else TextDecoration.LineThrough,
+        )
+        b.voidReason?.takeIf { !b.active }?.let { Text("باطل: $it", style = MaterialTheme.typography.labelSmall, color = c.muted) }
+      }
+      if (PurchaseOrderBook.canVoid(b, manage)) TextButton(onClick = { onVoid(b) }, enabled = !busy) { Text("باطل", color = c.danger) }
+    }
+  }
+}
+
+/** سطرهای تطبیقِ سفارش ⇔ رسید ⇔ فاکتورِ تأمین‌کننده (یا فاکتورِ دفتر وقتی تأمین‌کننده فاکتوری نداده) — کامپیوتر و گوشی */
+@Composable
+internal fun PoMatchLines(d: ShopData, order: PurchaseOrderDto) {
+  val c = Shop.colors
+  val names = remember(d) { d.products.associate { it.id to it.name } }
+  val m = remember(d, order) { PurchaseOrderBook.match(d, order) }
+  val supplier = PurchaseOrderBook.hasSupplierBills(order)
+  Spacer(Modifier.height(6.dp))
+  if (m.matched) Text(PurchaseOrderBook.matchTitle(supplier), style = MaterialTheme.typography.labelSmall, color = c.success)
+  else m.lines.filter { it.issues.isNotEmpty() }.forEach { ml ->
+    Text(
+      "${order.lines.find { it.id == ml.lineId }?.name ?: names[ml.productId] ?: ml.productId}: " +
+        ml.issues.joinToString("، ") { PurchaseOrderBook.issueText(it, supplier) },
+      style = MaterialTheme.typography.labelSmall, color = c.warning,
+    )
+  }
+}
+
+/**
+ *  «باطل کردنِ فاکتور» با دلیلِ لازم — فاکتور پاک نمی‌شود (`POST …/bills/:billId/void`، تکرار بی اثر). [onConfirm] دلیلِ
+ *  پیراسته را می‌گیرد؛ فرستادن و نتیجه با صدازننده (کامپیوتر و گوشی).
+ */
+@Composable
+internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
+  val c = Shop.colors
+  var why by remember(bill.id) { mutableStateOf("") }
+  AlertDialog(
+    onDismissRequest = onDismiss,
+    containerColor = c.surfaceSolid,
+    title = { Text("باطل کردنِ فاکتورِ «${bill.billNo}»؟", color = c.text) },
+    text = {
+      Column {
+        Text("فاکتور پاک نمی‌شود؛ با دلیل خط می‌خورد و در تطبیق به حساب نمی‌آید. شماره‌اش برای فاکتورِ درست آزاد می‌شود.",
+          style = MaterialTheme.typography.bodySmall, color = c.muted)
+        OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text("دلیل (لازم)") }, singleLine = true)
+      }
+    },
+    confirmButton = {
+      TextButton(enabled = why.isNotBlank() && !busy, onClick = { onConfirm(why.trim()) }) { Text("باطل کن", color = c.danger) }
+    },
+    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+  )
 }

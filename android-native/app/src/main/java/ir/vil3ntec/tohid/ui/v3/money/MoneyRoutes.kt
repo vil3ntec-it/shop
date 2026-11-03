@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -59,6 +60,10 @@ object MoneyPaths {
   fun paySupplier(id: String) = supplier(id) + "/pay"
   fun returnSupplier(id: String) = supplier(id) + "/return"
   fun newPurchase(supplier: String? = null) = RoutePaths.withQuery("purchasing/new", "supplier" to supplier)
+  /** PUR-14: فاکتورهای تأمین‌کننده در گوشی — درش فقط با پرچمِ `shop.purchase_orders` و برای مدیر/صاحب (`rememberSupplierBillsDoor`) */
+  const val SUPPLIER_BILLS = "purchasing/bills"
+  fun supplierBill(orderId: String) = SUPPLIER_BILLS + "/" + RoutePaths.encode(orderId)
+  fun newSupplierBill(orderId: String) = supplierBill(orderId) + "/new"
   const val EXPENSES = "expenses"
   fun expenses(month: String? = null, category: String? = null) = RoutePaths.withQuery(EXPENSES, "month" to month, "category" to category)
   const val NEW_EXPENSE = "expenses/new"
@@ -164,19 +169,27 @@ val MoneyModule = AppModule(
     /* --------------------------- خرید و تأمین‌کننده --------------------------- */
     V3Route(MoneyPaths.PURCHASING, RouteKind.TAB, { Str.purchasing }, chrome = Chrome.OWN) {
       if (desk) DeskPurchasingScreen(store, data, snackbar)
-      else SuppliersScreen(
-        d = data,
-        actions = SuppliersActions(
-          onBack = backOrNull,
-          onOpen = { nav.open(MoneyPaths.supplier(it)) },
-          onPay = { nav.open(MoneyPaths.paySupplier(it)) },
-          onEdit = { nav.open(MoneyPaths.editSupplier(it)) },
-          onDelete = { id -> MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) },
-          onNewSupplier = { nav.open(MoneyPaths.NEW_SUPPLIER) },
-          onNewPurchase = { nav.open(MoneyPaths.newPurchase()) },
-        ),
-      )
+      else {
+        //  PUR-14: فاکتورِ تأمین‌کننده و «باطل» روی گوشی هم (پیش‌تر فقط پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر)
+        val billsDoor = rememberSupplierBillsDoor()
+        SuppliersScreen(
+          d = data,
+          actions = SuppliersActions(
+            onBack = backOrNull,
+            onOpen = { nav.open(MoneyPaths.supplier(it)) },
+            onPay = { nav.open(MoneyPaths.paySupplier(it)) },
+            onEdit = { nav.open(MoneyPaths.editSupplier(it)) },
+            onDelete = { id -> MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) },
+            onNewSupplier = { nav.open(MoneyPaths.NEW_SUPPLIER) },
+            onNewPurchase = { nav.open(MoneyPaths.newPurchase()) },
+            onSupplierBills = if (billsDoor) ({ nav.open(MoneyPaths.SUPPLIER_BILLS) }) else null,
+          ),
+        )
+      }
     },
+    V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING) { SupplierBillsRoute() },
+    V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS) { SupplierBillRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/bills/{id}/new", RouteKind.PAGE, { StrSupplierBills.newBill }, parent = "purchasing/bills/{id}") { SupplierBillNewRoute(args["id"].orEmpty()) },
     V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierFormRoute(null) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()

@@ -16,5 +16,7 @@ fun RouteScope.PriceCheckRoute() {
   val on = remember { PosPriceCheckPrefs.load(context); PosPriceCheckPrefs.on.value }
   if (!on) { LaunchedEffect(Unit) { back() }; return }
   val showCost = remember { ShopRole.canSeeMoney(context) }
-  PriceCheckSheet(data, todayIso(), showCost, onClose = { back() })
+  //  S17: موجودیِ هر محل فقط با «محل‌های نگه‌داری» ِ همین دستگاه (همان دروازهٔ برگهٔ ردیف، POS-16)
+  val places = remember { ir.vil3ntec.tohid.data.StockPlacesPref.places(context) }
+  PriceCheckSheet(data, todayIso(), showCost, onClose = { back() }, places = places)
 }

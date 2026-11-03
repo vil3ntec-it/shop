@@ -15,6 +15,8 @@ object StrPriceCheck {
   val cost: String get() = t("قیمتِ خرید", "Cost price", "د پېر بیه")
   fun margin(pct: String): String = t("سود: ${asIs(pct)}٪", "Margin: $pct%", "ګټه: $pct٪")
   val stock: String get() = t("موجودی", "In stock", "موجودي")
+  /** S17 — موجودیِ یک محلِ نگه‌داری زیرِ موجودیِ کل */
+  fun atPlace(place: String, qty: String): String = t("${asIs(place)}: ${asIs(qty)}", "$place: $qty", "$place: $qty")
   val lastPurchase: String get() = t("آخرین خرید", "Last purchase", "وروستی پېر")
   val noPurchase: String get() = t("خریدی ثبت نشده", "No purchase recorded", "هېڅ پېر نه دی ثبت")
   val expiry: String get() = t("نزدیک‌ترین انقضا", "Nearest expiry", "تر ټولو نږدې پای نېټه")

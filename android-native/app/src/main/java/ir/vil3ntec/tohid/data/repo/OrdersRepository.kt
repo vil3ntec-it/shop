@@ -131,6 +131,21 @@ class OrdersRepository(private val api: ApiClient) {
   }
 
   /**
+   *  FIN-01 «ثبتِ بازپرداخت» (`POST /:id/refunds`، فقط با `refundLedger` ِ `/config`): [key] یک بار برای هر برگه ⇒ «تأیید» ِ
+   *  دوباره پس از قطعِ نت ردیفِ دوم نمی‌سازد. فقط نقد (سرور). [final] = بستنِ سفارش با «بازپرداختِ بخشی»؛ برابر با مانده
+   *  خودبه‌خود «بازپرداختِ کامل». بیش از مانده ⇒ ۴۰۹ `refund_exceeds_remaining` و هیچ ردیفی.
+   */
+  suspend fun refund(id: String, key: String, amountMinor: Long, reason: String, final: Boolean): ApiResult<OrderDto> = result {
+    val body = buildJsonObject {
+      put("amountMinor", amountMinor)
+      put("reason", reason.trim())
+      put("method", "cash")
+      put("final", final)
+    }
+    order(api.postKeyed("$ROOT/${enc(id)}/refunds", body, key))
+  }
+
+  /**
    *  ORD-07 «عقب انداختن» (`POST /:id/delay`، پرچمِ `shop.orders.delay`): [key] یک بار برای هر پنجره ⇒
    *  «تأیید» ِ دوباره پس از قطعِ نت دو بار عقب نمی‌برد. [expectedReadyAt] همان زمانی است که کاربر دید
    *  (`null` = «بی زمان»)؛ کسِ دیگری زودتر عوضش کرده ⇒ ۴۰۹ `ready_changed` و هیچ تغییری.
