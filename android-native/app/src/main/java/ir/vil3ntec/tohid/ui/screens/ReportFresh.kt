@@ -238,6 +238,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   }
   //  RPT-04 / S48: ریزِ تراکنش‌های یک روش (کلیک یا Enter روی ردیفِ «نقد» ِ «پایانِ روز»)
   var drill by remember(day) { mutableStateOf<String?>(null) }
+  //  RPT-13: ریزِ ردیفِ تفکیکِ فروش («فروش» و «سود و حاشیه»؛ کلیک یا Enter) ⇐ فاکتورهای همان ردیف
+  var salesDrill by remember(def.id, span, dim) { mutableStateOf<ReportTables.Table?>(null) }
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
   val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
@@ -314,8 +316,15 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     if (tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)
     tables.forEach { t ->
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
-      val onRow: ((List<JsonPrimitive>) -> Unit)? =
-        if (dayEnd != null && t.id == DayEndModel.METHODS_ID) { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } } else null
+      val sales = view.sales
+      val onRow: ((List<JsonPrimitive>) -> Unit)? = when {
+        dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
+        sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
+          val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
+          salesDrill = ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock) { DayEndModel.docLabel(d, it) }
+        }
+        else -> null
+      }
       if (viewMode.mode == ViewMode.TABLE) FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)
       else FreshCards(t, Modifier.weight(1f).fillMaxWidth())
     }
@@ -323,6 +332,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   drill?.let { m ->
     val detail = remember(d, day, m) { DayEndModel.details(d, day, m, clock, ReportBridge.offsetMinutes()) }
     DayEndDetailDialog(detail) { drill = null }
+  }
+  salesDrill?.let { t ->
+    DayEndDetailDialog(t, note = "جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ ردیف است؛ برگشتی جداست.") { salesDrill = null }
   }
 }
 
