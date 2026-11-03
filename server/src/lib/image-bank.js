@@ -522,12 +522,9 @@ async function shopList(shopId, { productId = '', cursor = '', limit = 50, base 
  *            آخرین عکسِ مرکزیِ همین کالا (IMG-BANK-16).
  *   shop     عکسِ خودِ دکان — آخرین عکسِ مرکزی برای بازگشت می‌ماند.
  *   none     بی عکس (placeholder).
+ * `selectIn` همان، درونِ تراکنشِ صدازننده (دستهٔ تغییرِ IMG-PRO-17: چند انتخاب، یا همه یا هیچ).
  */
-async function select(shopId, userId, body) {
-  return tx((c) => selectIn(c, shopId, userId, body));
-}
-
-/** همان `select` درونِ تراکنشِ صدازننده (دستهٔ تغییرِ IMG-PRO-17: چند انتخاب، یا همه یا هیچ) */
+const select = (shopId, userId, body) => tx((c) => selectIn(c, shopId, userId, body));
 async function selectIn(c, shopId, userId, body) {
   const productId = photos.checkId(body.product_id);
   const source = oneOf(body.source, ['central', 'shop', 'none'], '');
