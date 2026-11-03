@@ -1,6 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.pos.TillPins
 
 /**
@@ -28,4 +31,11 @@ object TillPinsPrefs {
     runCatching { context.getSharedPreferences(PREFS, 0).edit().putString(KEY, TillPins.encode(next)).apply() }
     return id in next
   }
+}
+
+/** برگه‌ای که Context ندارد (`KeypadRoute`): سنجاق‌ها بار می‌شوند و این تابع سنجاق/برداشتن را می‌کند؛ @return حالا سنجاق است؟ */
+@Composable
+fun rememberTillPinToggle(): (String) -> Boolean {
+  val context = LocalContext.current
+  return remember(context) { TillPinsPrefs.load(context); { id: String -> TillPinsPrefs.toggle(context, id) } }
 }

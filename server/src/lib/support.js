@@ -221,7 +221,7 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
    *  `ops-errors.maskCards` (۱۵ تا ۱۹ رقم با Luhn ⇒ «[کارت]») پیش از نوشتن در دیتابیس، پیش‌نمایش و پوش.
    *  ⛔ رشتهٔ پمپ دست نمی‌خورد (کدِ مشترک با پروژهٔ پمپ؛ O-19) — رفتارِ پیامِ پمپ بیت‌به‌بیت همان پیشین.
    */
-  if (thread.app !== 'pump') text = require('./ops-errors').maskCards(text);
+  if (thread.app !== require('./tenancy').PUMP.app) text = require('./ops-errors').maskCards(text);
 
   /*
    *  پیامِ رسانه‌ای فقط به رسانه‌ای اشاره می‌کند که در **همین** رشته
