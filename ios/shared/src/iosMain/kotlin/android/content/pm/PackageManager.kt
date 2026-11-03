@@ -12,6 +12,12 @@ object PackageManager {
   fun queryIntentActivities(intent: android.content.Intent, flags: Int): List<Any> = emptyList()
 
   /**
+   *  گامِ ۹ (`pay/platform/PayDevice.kt` ِ اندروید): ویژگی‌های سخت‌افزاریِ اندروید — تنها پرسشِ کدِ مشترک
+   *  «شبیه‌سازیِ کارت» (HCE) است که iOS به برنامه نمی‌دهد ⇐ همیشه نادرست
+   */
+  fun hasSystemFeature(name: String): Boolean = false
+
+  /**
    *  گامِ ۶ (`sync/Integrity.kt` ِ اندروید): امضای برنامه را خودِ iOS وارسی می‌کند و برنامه گواهیِ APK ندارد ⇐
    *  `PackageInfo` بی امضا ⇐ اثرِ انگشت «» و `isGenuine` با `SIGNING_SHA256` ِ خالیِ آیفون «درست» (همان جایگزینِ پیشین).
    */
