@@ -3,6 +3,8 @@
  * «به فاکتور» ِ یک‌ضربِ سفارشِ آنلاین — `POST /api/shop/orders/:id/invoice` (`lib/order-flow.claimInvoice`).
  *
  * سرور فقط «فاکتور شد» را یک بار و زیرِ قفلِ ردیف می‌نشاند (رویدادِ `note` ِ `invoice`، فقط از «بسته شد» به بعد)؛
+ * «دریافت از دکان» ِ پرداخت‌نشده فقط همراهِ «مشتری گرفت» (از «بسته شد» ۴۰۹ `invoice_at_handover`؛ از «آمادهٔ دریافت»
+ * همین درخواست تحویل می‌دهد؛ زمانِ فاکتور = زمانِ تحویل).
  * فروش را برنامهٔ دکان با شناسهٔ ثابتِ `o-<سفارش>` و زمانِ همین پاسخ می‌نویسد (`OrderFulfillment.fulfill`) ⇒ دو
  * بار زدن یا دو دستگاه یک فاکتور و یک بار کسرِ موجودی.
  *
@@ -50,6 +52,13 @@ router.post('/:id/invoice', needFlag, requirePermission('orders.manage'), needWr
   const out = await flow.claimInvoice(req.shopId, req.params.id, actor);
   const order = await orders.get(req.shopId, req.params.id, actor);
   Object.assign(order, await flow.staffView(req.shopId, order));
+  //  «دریافت از دکان» ِ پرداخت‌نشده: همین فاکتور «مشتری گرفت» را زد ⇒ همان ممیزیِ گذارِ `routes/orders.js`
+  if (out.handedOver) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'order.transition', targetType: 'online_order', targetId: order.id,
+      detail: { orderNo: order.orderNo, from: 'ready_for_pickup', to: 'picked_up', reason: order.statusReason }, ip: clientIp(req),
+    });
+  }
   if (out.created) {
     await audit.log({
       shopId: req.shopId, userId: req.user.id, action: 'order.invoice', targetType: 'online_order', targetId: order.id,

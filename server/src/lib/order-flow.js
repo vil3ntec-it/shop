@@ -184,8 +184,11 @@ async function trackView(shopId, orderId) {
   };
 }
 
-/** رویدادِ `note` درونِ تراکنش + نسخهٔ تازهٔ ردیف (تا صفِ زندهٔ برنامه و پیگیری تازه شوند) */
-async function noteIn(c, shopId, row, actor, detail, at) {
+/**
+ * رویدادِ `note` درونِ تراکنش + نسخهٔ تازهٔ ردیف (تا صفِ زندهٔ برنامه و پیگیری تازه شوند). `touched` = `updated_at` ِ ردیف
+ * (پیش‌فرض همان `at`) — رویدادی که زمانش گذشته است (فاکتورِ پس از تحویل) ردیف را به عقب نمی‌برد.
+ */
+async function noteIn(c, shopId, row, actor, detail, at, touched = at) {
   const seq = Number((await c.query(
     'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id = $1', [row.id]
   )).rows[0].n);
@@ -196,7 +199,7 @@ async function noteIn(c, shopId, row, actor, detail, at) {
     [ulid(at), row.id, shopId, seq, row.status, actor.type, actor.id || '', JSON.stringify(detail), at]
   );
   await c.query('UPDATE online_orders SET version = version + 1, updated_at = $3 WHERE shop_id = $1 AND id = $2',
-    [shopId, row.id, at]);
+    [shopId, row.id, touched]);
 }
 
 const lockRow = async (c, shopId, id) => (await c.query(
@@ -234,7 +237,8 @@ async function choose(shopId, orderId, body) {
 
 /**
  * «فاکتور شد» ِ یک سفارش — یک بار، زیرِ قفلِ ردیف. دومین بار (همان دستگاه یا دیگری) همان را برمی‌گرداند.
- * @returns {Promise<{invoice:{saleId:string, at:number, by:string}, created:boolean}>}
+ * `handedOver`: «دریافت از دکان» ِ پرداخت‌نشده که همین فاکتور «مشتری گرفت» را هم زد.
+ * @returns {Promise<{invoice:{saleId:string, at:number, by:string}, created:boolean, handedOver?:boolean}>}
  */
 async function claimInvoice(shopId, orderId, actor) {
   return tx(async (c) => {
@@ -256,8 +260,29 @@ async function claimInvoice(shopId, orderId, actor) {
           AND status IN ('created', 'pending') AND expires_at > $3 LIMIT 1`, [String(shopId), row.id, at]
     )).rows[0];
     if (row.payment_status === 'pending' || live) throw conflict('پرداختِ آنلاینِ این سفارش در جریان است؛ پس از روشن شدنش فاکتور بزنید', 'payment_pending');
-    await noteIn(c, shopId, row, actor, { type: 'invoice', saleId: saleIdOf(row.id) }, at);
-    return { invoice: { saleId: saleIdOf(row.id), at, by: actor.id || '' }, created: true };
+    //  «دریافت از دکان» ِ پرداخت‌نشده: نقد همان لحظهٔ تحویل سرِ پیشخوان به دخل می‌آید ⇒ فاکتور فقط همراهِ «مشتری گرفت»
+    //  (همان `OrderFlow.plan` ِ برنامه، حالا در سرور): از «بسته شد» ۴۰۹؛ از «آمادهٔ دریافت» همین تراکنش تحویل می‌دهد
+    //  (`orders.transitionIn`، راهِ یگانهٔ گذار)؛ زمانِ فاکتور = نخستین «مشتری گرفت» ⇒ زمانِ فروشِ نقدی = زمانِ تحویل.
+    let cur = row;
+    let invoiceAt = at;
+    let handedOver = false;
+    if (row.fulfillment === 'pickup' && !PAID.includes(row.payment_status)) {
+      if (row.status === 'packed') {
+        throw withCurrent(conflict('فاکتورِ «دریافت از دکان» ِ پرداخت‌نشده همراهِ «مشتری گرفت» زده می‌شود', 'invoice_at_handover'), row.status);
+      }
+      if (row.status === 'ready_for_pickup') {
+        await require('./orders').transitionIn(c, shopId, row.id, { to: 'picked_up' }, actor);
+        cur = { ...row, status: 'picked_up' };
+        handedOver = true;
+      }
+      const h = (await c.query(
+        `SELECT MIN(created_at)::bigint AS at FROM online_order_events
+          WHERE order_id = $1 AND kind = 'status' AND to_status = 'picked_up'`, [row.id]
+      )).rows[0];
+      if (h && h.at !== null) invoiceAt = Number(h.at);
+    }
+    await noteIn(c, shopId, cur, actor, { type: 'invoice', saleId: saleIdOf(row.id) }, invoiceAt, Math.max(invoiceAt, now()));
+    return { invoice: { saleId: saleIdOf(row.id), at: invoiceAt, by: actor.id || '' }, created: true, handedOver };
   });
 }
 
