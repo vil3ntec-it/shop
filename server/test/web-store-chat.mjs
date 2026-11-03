@@ -15,6 +15,8 @@
 import { createRequire } from 'node:module';
 import { missingTool, PLAYWRIGHT_INSTALL } from './browser-guard.mjs';
 import { execSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -24,6 +26,10 @@ for (const p of [globalRoot && `${globalRoot}/playwright`, 'playwright']) {
   try { ({ chromium } = require(p)); break; } catch { /* بعدی */ }
 }
 if (!chromium) missingTool('پلی‌رایت', PLAYWRIGHT_INSTALL);
+let axeSrc = null;
+for (const p of [`${globalRoot}/axe-core/axe.min.js`, path.join(import.meta.dirname, '..', 'node_modules', 'axe-core', 'axe.min.js'), process.env.AXE_PATH || '']) {
+  if (p && fs.existsSync(p)) { axeSrc = fs.readFileSync(p, 'utf8'); break; }
+}
 
 process.env.NODE_ENV = 'test';
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL || 'postgres://shop:shoppass@127.0.0.1:5432/shop_test';
@@ -206,6 +212,29 @@ ok(!(await page.evaluate(() => document.getElementById('ct-old').open)) && await
 const genRow = await one('SELECT id, session_at FROM shop_chat_conversations WHERE id=$1', [gen.id]);
 ok(genRow.session_at > 0, 'سرور: دورِ تازه در همان رشته (session_at)');
 await page.keyboard.press('Escape');
+
+//  ── دسترس‌پذیری (axe-core) ِ برگهٔ گفت‌وگو: کنتراست، نامِ دکمه، برچسبِ فیلد، متنِ عکس ──
+if (axeSrc) {
+  const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
+  await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
+    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+  const ap = await ac.newPage();
+  await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o1.token)}`);
+  await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
+  await ap.click('#o-chat-open');
+  await ap.waitForFunction(() => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, { timeout: 15000 });
+  await ap.waitForTimeout(400);
+  await ap.addScriptTag({ content: axeSrc });
+  const v = await ap.evaluate(async () => (await window.axe.run(document.getElementById('chat-sheet'),
+    { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations
+    .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core): برگهٔ گفت‌وگو', v.join(' | '));
+  await ac.close();
+} else if (process.env.SKIP_BROWSER_TESTS === '1') {
+  console.log('⏭  axe-core نیست و SKIP_BROWSER_TESTS=1 — سنجهٔ دسترس‌پذیری اجرا نشد');
+} else {
+  ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
+}
 
 //  ── پرچمِ خاموش ⇒ همان ویترینِ پیشین ──
 await flag('shop.chat', false);

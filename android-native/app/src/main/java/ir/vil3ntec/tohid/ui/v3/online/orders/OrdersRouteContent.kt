@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.online.orders
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.icons.Icons
@@ -22,6 +23,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
@@ -45,9 +47,16 @@ import kotlinx.coroutines.launch
  *  ناوبری و پیام‌ها این‌جاست؛ صفحه‌ها فقط حالت می‌کشند (و عکس‌ها همان صفحه‌ها را با دادهٔ نمایشی).
  */
 
-/** `orders?tab=` — گوشی: صف؛ کامپیوترِ پهن: صف | جزئیات (V3TwoPane) */
+/** `orders?tab=` — گوشی: صف؛ کامپیوتر و تبلتِ پهن (≥ ۸۴۰dp، همان مرزِ خانهٔ تبلت): صف | جزئیات (V3TwoPane) */
 @Composable
 internal fun RouteScope.OrdersRoute() {
+  BoxWithConstraints(Modifier.fillMaxSize()) { OrdersRouteBody(wide = desk || maxWidth >= TABLET_TWO_PANE) }
+}
+
+private val TABLET_TWO_PANE = 840.dp
+
+@Composable
+private fun RouteScope.OrdersRouteBody(wide: Boolean) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val cfg = OrdersLive.config.value
@@ -63,7 +72,6 @@ internal fun RouteScope.OrdersRoute() {
       nav.open(OnlinePaths.order(pending))
     }
   }
-  val wide = desk
   var selected by rememberSaveable { mutableStateOf<String?>(null) }
   val perms = cfg?.permissions ?: OrderPermsDto()
   val notes = OrderFulfillNotes.queue(
