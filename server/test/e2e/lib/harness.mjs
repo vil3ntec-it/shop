@@ -33,9 +33,10 @@ export const fa = (n) => String(n).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸�
 
 /**
  * سرور را بالا می‌آورد.
- * @param {{name:string, env?:Record<string,string>}} opts
+ * @param {{name:string, env?:Record<string,string>, port?:number}} opts — `port` ۰ (پیش‌فرض) ⇒ درگاهِ آزاد؛
+ *   برنامهٔ آیفون در آزمونِ سرتاسریِ شبیه‌ساز (`ios/e2e/backend.mjs`) درگاهِ ثابت می‌خواهد
  */
-export async function boot({ name, env = {} }) {
+export async function boot({ name, env = {}, port = 0 }) {
   //  ⚠️ پیش از نخستین `require`ِ کدِ سرور — config همان لحظه خوانده می‌شود
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `e2e-${name}-`));
   Object.assign(process.env, {
@@ -84,7 +85,7 @@ export async function boot({ name, env = {} }) {
   mailer.send = async (mail) => { inbox.push({ to: String(mail.to || '').toLowerCase(), subject: mail.subject, text: mail.text || '', at: Date.now() }); return { ok: true }; };
 
   const app = await createApp({ runMigrations: false });
-  const api = await new Promise((r) => { const s = app.listen(0, '127.0.0.1', () => r(s)); });
+  const api = await new Promise((r) => { const s = app.listen(port, '127.0.0.1', () => r(s)); });
   //  همان کارهای `src/index.js` پس از listen
   outbox.start();
   await syncV1.syncSchemaTable();

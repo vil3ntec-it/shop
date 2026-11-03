@@ -78,6 +78,9 @@
 - **چک‌های آیفون** («رابطِ مشترکِ آیفون — klib» و «برنامهٔ آیفون — Xcode») `continue-on-error`اند؛ فایل‌های تازهٔ اندروید باید برای iOS شیم بگیرند، نه exclude.
   shim ِ هم‌نامِ ردهٔ زمانِ اجرای Kotlin/Native (`java.lang.Double`، `Long`، `Number`…) **`internal`** باشد، وگرنه پیوندِ چارچوب با
   `OBJC_CLASS_$_TohidShared<نام>: symbol multiply defined` می‌افتد (`ObjcNamesJvmTest`؛ `docs/IOS-PLAN-fa.md` پایانِ §۰.۱۲).
+  از گامِ ۸ کارِ «برنامهٔ آیفون» جریان‌های اصلی را سرتاسری روی شبیه‌ساز با سرورِ واقعی (PGlite، `ios/e2e/backend.mjs`) می‌زند؛
+  عکسِ هر گام و `summary.md` در مصنوعِ `ios-e2e-shots` (`docs/IOS-PLAN-fa.md` §۰.۱۳). برچسبِ تازهٔ صفحه‌های ورود، صندوق، کالا،
+  «بیشتر» و زبان ⇐ همان آزمون (`CoreFlowsE2EIosTest`) را ببین.
 
 ## ۶. محیط
 

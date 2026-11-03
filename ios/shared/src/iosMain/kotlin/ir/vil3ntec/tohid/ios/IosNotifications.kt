@@ -38,18 +38,22 @@ object IosNotifications {
   var enabled: Boolean = false
     private set
 
-  private val center: UNUserNotificationCenter get() = UNUserNotificationCenter.currentNotificationCenter()
+  /**
+   *  مرکزِ اعلانِ iOS فقط برای برنامهٔ ثبت‌شده هست؛ فرآیندِ بی بسته (آزمونِ شبیه‌ساز) ⇐ null و همان رفتارِ «اجازه نیست»
+   *  (بی آن `currentNotificationCenter` با استثنای ObjC فرآیند را می‌بندد — گامِ ۸، `IosHost`).
+   */
+  private val center: UNUserNotificationCenter? get() = if (IosHost.inApp) UNUserNotificationCenter.currentNotificationCenter() else null
   private val delegate = Delegate()
   private const val ACTION = "tohid.action"
 
   /** پیش از پایانِ راه‌اندازیِ برنامه (‎MainViewController.kt‎: `appDidLaunch`) — تا لمسِ اعلانی که برنامه را باز کرد گم نشود */
   fun install() {
-    center.delegate = delegate
+    center?.delegate = delegate
     refresh()
   }
 
   fun refresh() {
-    center.getNotificationSettingsWithCompletionHandler { s ->
+    center?.getNotificationSettingsWithCompletionHandler { s ->
       enabled = granted(s?.authorizationStatus)
     }
   }
@@ -59,6 +63,7 @@ object IosNotifications {
 
   /** `RequestPermission(POST_NOTIFICATIONS)`: پاسخ‌داده ⇐ همان پاسخ؛ وگرنه پنجرهٔ اجازهٔ iOS */
   fun request(done: (Boolean) -> Unit) {
+    val center = center ?: return done(false)
     center.getNotificationSettingsWithCompletionHandler { s ->
       if (s?.authorizationStatus != UNAuthorizationStatusNotDetermined) {
         enabled = granted(s?.authorizationStatus)
@@ -73,6 +78,7 @@ object IosNotifications {
   }
 
   fun post(id: Int, title: String, text: String, intent: Intent?) {
+    val center = center ?: return
     val content = UNMutableNotificationContent()
     content.setTitle(title)
     content.setBody(text)
@@ -86,6 +92,7 @@ object IosNotifications {
   }
 
   fun cancel(id: Int) {
+    val center = center ?: return
     center.removePendingNotificationRequestsWithIdentifiers(listOf(key(id)))
     center.removeDeliveredNotificationsWithIdentifiers(listOf(key(id)))
   }
