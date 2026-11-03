@@ -93,6 +93,26 @@ internal object OrdersHub {
     return r
   }
 
+  /**
+   *  FIN-01 «ثبتِ بازپرداخت» با مبلغ (دفترِ بازپرداختِ روشن) — پس از پاسخ همان کارهای [transition]: نسخهٔ تازه، و اگر
+   *  سفارش به برگشت رسید لغوِ فروشِ تحویل در دفترِ دکان؛ شمارش‌ها دوباره از سرور. [key] یک بار برای هر برگه.
+   */
+  suspend fun refund(
+    context: Context, store: ShopStore, o: OrderDto, to: String, amountMinor: Long, reason: String, key: String,
+    say: (String) -> Unit = {},
+  ): ApiResult<OrderDto> {
+    val r = repo(context).refund(o.id, key, amountMinor, reason, OrderRefundModel.final(to))
+    if (r is ApiResult.Success) {
+      put(r.value)
+      stale.remove(o.id)
+      val n = r.value
+      if (n.status in OrderFulfillment.HANDED_OVER || n.status in OrderFulfillment.BACK_IN_SHOP) postSale(context, store, n)?.let(say)
+    }
+    changed.value++
+    OrdersLive.pollSummary(context)
+    return r
+  }
+
   suspend fun create(context: Context, key: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     repo(context).create(key, body).onSuccess {
       put(it)

@@ -101,6 +101,8 @@ fun SaleScreen(
   start: SaleStart = SaleStart(),
   /** ابزارهای سبد (پیش‌فاکتور، سفارشِ ویژه، کارتِ هدیه، امانی، لیستِ قیمت، دریافتِ بدهی، ارسال) — `PhoneTillTools` */
   tools: (@Composable () -> Unit)? = null,
+  /** INV-03: مقدارِ هر کالا در فاکتورهای نگه‌داشته (`HeldStock.reserved`) ⇒ موجودیِ کاشی «قابل‌فروش» */
+  held: Map<String, Double> = emptyMap(),
 ) {
   var search by rememberSaveable { mutableStateOf(start.search) }
   var picked by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,8 +120,8 @@ fun SaleScreen(
 
   val index = remember(d.products, d.sales, d.saleItems) { CatalogModel.index(d) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
-  val items = remember(index, search, category, inCart, d) { CatalogModel.items(d, index, search, category, inCart) }
-  val best = remember(index, inCart, d) { CatalogModel.bestsellers(d, index, inCart) }
+  val items = remember(index, search, category, inCart, d, held) { CatalogModel.items(d, index, search, category, inCart, held) }
+  val best = remember(index, inCart, d, held) { CatalogModel.bestsellers(d, index, inCart, held) }
   val rows = remember(cart, d.products) { CartSummary.rows(cart, d.products) }
 
   Box(modifier.fillMaxSize()) {

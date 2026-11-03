@@ -79,6 +79,15 @@ class V3ReachabilityTest {
     Feature("گزارشِ تازه و پایانِ روز (گوشی)", "reports", s("PhoneFreshReports"), root = PHONE_REPORTS),
     //  ── خرید و صندوق ──
     Feature("S25/PUR-08 برگشت به تأمین‌کننده و چاپِ سندِ کسر (گوشی)", "purchasing/suppliers/{id}/return", s("SupplierReturnDialog")),
+    //  PUR-14 (دورِ ۱۳): فاکتورِ تأمین‌کننده و «باطل» پیش‌تر فقط در پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر — ریشه همان صفحهٔ گوشی
+    //  تا رسیدنِ پنجره از کامپیوتر جای آن را نگیرد
+    Feature("PUR-14 فهرستِ فاکتورهای تأمین‌کننده (گوشی)", "purchasing/bills", "$MONEY.SupplierBillsRoute", root = "$MONEY.SupplierBillsRoute"),
+    Feature(
+      "PUR-14 فاکتورهای یک سفارش، «باطل» و تطبیق (گوشی)", "purchasing/bills/{id}",
+      s("PoBillsList"), s("PoBillVoidDialog"), s("PoMatchLines"), root = "$MONEY.SupplierBillRoute",
+    ),
+    Feature("PUR-14 فرمِ فاکتورِ تأمین‌کننده (گوشی)", "purchasing/bills/{id}/new", s("PoBill"), root = "$MONEY.SupplierBillNewRoute"),
+    Feature("PUR-14 درِ «فاکتورهای تأمین‌کننده» در زبانهٔ خریدِ گوشی", "purchasing", "$MONEY.rememberSupplierBillsDoor", "$MONEY.SuppliersScreen"),
     Feature("POS-39 دریافتِ بدهی در صندوقِ گوشی", "sale", s("TillReceivePhone"), root = PHONE_SALE),
     Feature(
       "POS-25/26/27/18، PAY-24، POS-38 ابزارهای سبدِ صندوقِ گوشی", "sale",
@@ -261,6 +270,7 @@ class V3ReachabilityTest {
     const val PHONE_CHECKOUT = "ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute"
     const val PHONE_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsScreen"
     const val DESK_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsDesk"
+    const val MONEY = "ir.vil3ntec.tohid.ui.v3.money"
     val repo: File = generateSequence(File("").absoluteFile) { it.parentFile }.first { File(it, "android-native").isDirectory }
     val graph: SourceGraph by lazy { SourceGraph.of(File(repo, "android-native/app/src/main/java")) }
     private val cache = HashMap<String, Set<String>>()

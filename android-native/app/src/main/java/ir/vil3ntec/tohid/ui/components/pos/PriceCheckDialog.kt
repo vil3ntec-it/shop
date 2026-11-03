@@ -52,7 +52,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *  به فاکتور نمی‌افزاید. قیمتِ خرید، سود و فیِ آخرین خرید فقط با [showCost] (`reports.money`).
  */
 @Composable
-fun PriceCheckDialog(d: ShopData, today: String, showCost: Boolean, onDismiss: () -> Unit) {
+fun PriceCheckDialog(d: ShopData, today: String, showCost: Boolean, onDismiss: () -> Unit, places: Boolean = false) {
   val c = Shop.colors
   var query by remember { mutableStateOf("") }
   var picked by remember { mutableStateOf<String?>(null) }
@@ -61,7 +61,7 @@ fun PriceCheckDialog(d: ShopData, today: String, showCost: Boolean, onDismiss: (
   val matches = remember(term, d.products) { PosCatalog.matches(d.products, term).take(8) }
   val exact = remember(term, index) { (BarcodeMatch.find(term, index) as? BarcodeMatch.Hit.Product)?.id }
   val id = picked ?: exact ?: matches.singleOrNull()?.id
-  val view = remember(id, d, today) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today) } }
+  val view = remember(id, d, today, places) { id?.let { i -> d.products.find { it.id == i } }?.let { PriceCheckData.of(d, it, today, places) } }
   val focus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 

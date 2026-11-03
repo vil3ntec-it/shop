@@ -60,6 +60,8 @@ object StrCourier {
   fun total(km: String): String = t("همهٔ راه: ${asIs(km)} کیلومتر", "Whole route: $km km", "ټوله لار: $km کیلومتره")
   val noPin: String get() = t("بی پین — آخرِ راه", "No pin — last", "بې پن — د لارې په پای کې")
   val noLandmark: String get() = t("بی نشانه", "No landmark", "بې نښه")
+  /** S33 — Plus Code ِ ساخته از پینِ مقصد (`core/courier/PlusCode`)، برای نقشهٔ آفلاین یا گفتن با تلفن */
+  fun plusCode(code: String): String = t("Plus Code: ${asIs(code)}", "Plus Code: $code", "Plus Code: $code")
   val routeEmpty: String get() = t("مأموریتِ پذیرفته‌ای برای مسیر نیست", "No accepted missions for a route", "د لارې لپاره منل شوې دنده نشته")
 
   // امتیاز (DLV-18)

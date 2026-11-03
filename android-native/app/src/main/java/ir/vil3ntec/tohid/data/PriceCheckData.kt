@@ -17,12 +17,18 @@ object PriceCheckData {
     val card: PriceCheck.Card,
     /** نامِ تأمین‌کنندهٔ آخرین خرید؛ نبود ⇒ `null` */
     val supplier: String?,
+    /**
+     *  S17 — موجودیِ هر محلِ نگه‌داری (INV-20)، همان `PlaceStock.of` ِ برگهٔ ردیفِ صندوق (POS-16)، پیش از افزودن به سبد؛
+     *  خالی ⇒ فقط همان یک عددِ کل (تنظیمِ «محل‌های نگه‌داری» خاموش، یا کالا جز محلِ اصلی جایی ندارد)
+     */
+    val places: List<PlaceQty> = emptyList(),
   )
 
   private fun minor(afn: Double): Long = if (afn.isFinite()) (afn * 100).roundToLong() else 0L
   private fun milli(q: Double): Long = if (q.isFinite()) (q * 1000).roundToLong() else 0L
 
-  fun of(d: ShopData, product: Product, today: String): View {
+  /** [places]: «محل‌های نگه‌داری» ِ همین دستگاه روشن است (`StockPlacesPref.places`) — صدازننده می‌خواند؛ خاموش ⇒ همان کارتِ پیشین */
+  fun of(d: ShopData, product: Product, today: String, places: Boolean = false): View {
     val names = d.suppliers.associate { it.id to it.name }
     val purchases = d.purchases.filter { it.productId == product.id }.map {
       PriceCheck.Purchase(it.date, it.createdAt, minor(it.purchasePrice), milli(it.quantity), it.supplierId)
@@ -30,7 +36,10 @@ object PriceCheckData {
     val lots = ExpiryEngine.lots(d, today).filter { it.product.id == product.id }
       .map { PriceCheck.Lot(it.entry.expiryDate, milli(it.remaining)) }
     val card = PriceCheck.card(minor(product.salePrice), minor(product.purchasePrice), purchases, lots, today)
-    return View(product, ShopStore.stock(d, product.id), card, card.last?.supplier?.let { names[it]?.ifBlank { null } })
+    return View(
+      product, ShopStore.stock(d, product.id), card, card.last?.supplier?.let { names[it]?.ifBlank { null } },
+      if (places) PlaceStock.of(d, product) else emptyList(),
+    )
   }
 
   /** رنگِ یک سطرِ کارت — رنگ هرگز تنها نیست، متنِ سطر خودش می‌گوید */
@@ -54,6 +63,10 @@ object PriceCheckData {
       v.card.marginBp?.let { add(Line("", S.margin((it / 100).toString()), if (it < 0) Tone.DANGER else Tone.MUTED)) }
     }
     add(Line(S.stock, (ir.vil3ntec.tohid.qty(v.stock) + " " + unit).trim(), if (v.stock <= 0) Tone.DANGER else Tone.NORMAL))
+    //  S17: هر محل یک سطرِ دنباله زیرِ موجودی (جمعِ محل‌ها همان موجودیِ کل؛ منفی سرخ)
+    v.places.forEach { pq ->
+      add(Line("", S.atPlace(pq.label, (ir.vil3ntec.tohid.qty(pq.milli / 1000.0) + " " + unit).trim()), if (pq.milli < 0) Tone.DANGER else Tone.MUTED))
+    }
     val last = v.card.last
     add(
       Line(

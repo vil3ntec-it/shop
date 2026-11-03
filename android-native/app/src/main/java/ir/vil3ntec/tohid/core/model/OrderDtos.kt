@@ -60,6 +60,11 @@ data class OrdersConfigDto(
   val noticeResend: OrderNoticeResendCfgDto? = null,
   /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
   val amend: OrderAmendCfgDto? = null,
+  /**
+   *  FIN-01: دفترِ بازپرداخت (پرچمِ خاموشِ `shop.orders.refunds`) — روشن ⇒ «بازپرداخت‌شده» فقط با مبلغ از `POST /:id/refunds`
+   *  (گذارِ ساده ۴۰۹ `refund_via_ledger`)؛ سرورِ پیشین ⇒ false و همان گذارِ پیشین
+   */
+  val refundLedger: Boolean = false,
 )
 
 /** `amend` ِ `/config` (`order-amend.configOf` + `paid`/`settleMethods`) */
@@ -326,6 +331,16 @@ data class OrderDto(
   val reviewCode: String? = null,
   /** ORD-14: آخرین پیشنهاد/ویرایش — فقط در جزئیات و فقط با پرچمِ `shop.orders.amend` */
   val amendment: OrderAmendmentDto? = null,
+  /** FIN-01: دفترِ بازپرداختِ همین سفارش (`refunds.summary`) — فقط در `GET /:id` و پاسخِ `/refunds`؛ سرورِ پیشین ⇒ null */
+  val refund: OrderRefundSummaryDto? = null,
+)
+
+/** `refund` ِ جزئیاتِ سفارش (`order-refunds.summaryOf`): جمعِ برگشته و ماندهٔ قابلِ برگشت، به واحدِ خرد */
+@Serializable
+data class OrderRefundSummaryDto(
+  val totalMinor: Long = 0,
+  val refundedMinor: Long = 0,
+  val remainingMinor: Long = 0,
 )
 
 /** یک رویدادِ بازپرداخت: `r<seq>` (ردیفِ دفتر) یا `full` (گذارِ «بازپرداختِ کامل» / پولِ برگشتهٔ درگاه) */

@@ -53,6 +53,7 @@ import ir.vil3ntec.tohid.core.courier.CourierBoardModel
 import ir.vil3ntec.tohid.core.courier.CourierFlow
 import ir.vil3ntec.tohid.core.courier.CourierQueue
 import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.core.courier.PlusCode
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.courier.TrackRow
 import ir.vil3ntec.tohid.core.i18n.StrCourier
@@ -198,6 +199,8 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
         if (live) {
           Text(c.landmark.ifBlank { "—" }, style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
           if (c.addressText.isNotBlank()) Text(c.addressText, style = courierText(13.sp), color = p.onBlackMuted)
+          //  S33: Plus Code از پینِ مقصد (نه ژئوکدر، نه شبکه) — برای نقشهٔ آفلاین یا گفتن با تلفن
+          missionPlusCode(c)?.let { Text(StrCourier.plusCode(it), style = courierText(13.sp, FontWeight.Medium), color = p.onBlack) }
         } else {
           Text("نشانی پس از پایانِ کار دیگر نشان داده نمی‌شود", style = courierText(13.sp), color = p.onBlackMuted)
         }
@@ -361,4 +364,11 @@ private fun ActionArea(c: MissionCard, actions: List<String>, onAction: (String)
       }
     }
   }
+}
+
+/** S33 — Plus Code ِ ده‌نویسه‌ای از پینِ مأموریت؛ بی پین ⇒ `null` (همان کارتِ پیشین) */
+internal fun missionPlusCode(c: MissionCard): String? {
+  val lat = c.lat ?: return null
+  val lng = c.lng ?: return null
+  return PlusCode.encode(lat, lng)
 }

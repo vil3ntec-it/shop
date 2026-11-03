@@ -66,6 +66,8 @@ fun RouteScope.SaleRoute() {
       CheckoutSession.reset()
     },
   )
+  val heldBook by held.store.book.collectAsState()
+  val heldQty = remember(heldBook) { ir.vil3ntec.tohid.data.HeldStock.reserved(heldBook) }
   val gate = remember { ScanGate() }
   val d by rememberUpdatedState(data)
   val codes by rememberUpdatedState(index)
@@ -129,6 +131,8 @@ fun RouteScope.SaleRoute() {
     onHold = if (held.visible) ({ held.askHold() }) else null,
     onHeldList = if (held.visible) ({ held.dialog = HeldDialog.List }) else null,
     tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) },
+    //  INV-03: آنچه در فاکتورهای نگه‌داشته کنار رفته از موجودیِ کاشی کم (بی نگه‌داشته ⇒ همان موجودی)
+    held = heldQty,
     modifier = Modifier.hidScanner { onCode(it, manual = true, fromPhone = false) },
     actions = SaleActions(
       tap = { item -> if (item.weighed) nav.open(SalesPaths.keypad(item.id)) else feedback.addOne(data, item.id) },

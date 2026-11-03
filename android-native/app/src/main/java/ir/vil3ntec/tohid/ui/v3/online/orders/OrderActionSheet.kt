@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Chip
+import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3TextField
@@ -46,9 +47,11 @@ fun OrderActionSheet(
   onConfirm: (OrderActionModel.Form) -> Unit,
   onDismiss: () -> Unit,
   start: OrderActionModel.Form = OrderActionModel.start(order, to),
+  /** FIN-01: دفترِ بازپرداختِ روشن ⇒ مبلغ و دلیل به جای هشدارِ ساده (`OrderRefundModel`) */
+  ledger: Boolean = false,
 ) {
   val c = PhoneV3.colors
-  var form by remember(order.id, to) { mutableStateOf(start) }
+  var form by remember(order.id, to) { mutableStateOf(if (ledger) start.copy(amount = OrderRefundModel.startAmount(order, to)) else start) }
   var tried by remember { mutableIntStateOf(0) }
   val choices = OrderActionModel.choices(order, to)
   val danger = OrdersModel.danger(to)
@@ -86,7 +89,37 @@ fun OrderActionSheet(
         OrderText.READY_MINUTES.forEach { m -> V3Chip(StrOnline.minutes(m), form.ready == m, { form = form.copy(ready = m) }) }
       }
     }
-    if (OrderActionModel.refund(to)) {
+    if (OrderActionModel.refund(to) && ledger) {
+      //  FIN-01: مبلغ (کامل از پیش پُر با مانده) و دلیلِ لازم ⇐ `POST /:id/refunds`
+      val remaining = OnlineFmt.afn(OrderRefundModel.remainingMinor(order))
+      val problem = if (tried > 0) OrderRefundModel.check(order, to, form.amount, form.note) else null
+      Spacer(Modifier.height(16.dp))
+      V3TextField(
+        form.amount, { if (it.length <= 16) form = form.copy(amount = it) },
+        label = StrOnline.refundAmount,
+        helper = StrOnline.refundRemaining(remaining),
+        error = when (problem) {
+          OrderRefundModel.Problem.AMOUNT -> StrOnline.refundBadAmount
+          OrderRefundModel.Problem.NOT_REMAINING -> StrOnline.refundMustEqual(remaining)
+          OrderRefundModel.Problem.NOT_BELOW_REMAINING -> StrOnline.refundMustBeBelow(remaining)
+          else -> null
+        },
+        required = true,
+        kind = V3FieldKind.MONEY,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(12.dp))
+      V3TextField(
+        form.note, { if (it.length <= OrderRefundModel.REASON_MAX) form = form.copy(note = it) },
+        label = StrOnline.refundReason,
+        error = if (problem == OrderRefundModel.Problem.REASON) StrOnline.refundNeedsReason else null,
+        required = true,
+        singleLine = false,
+        modifier = Modifier.fillMaxWidth(),
+      )
+      Spacer(Modifier.height(12.dp))
+      V3Message(V3Tone.WARNING, StrOnline.refundWarn(OnlineFmt.afn(OrderRefundModel.amountMinor(form.amount) ?: 0L)))
+    } else if (OrderActionModel.refund(to)) {
       Spacer(Modifier.height(16.dp))
       V3Message(V3Tone.WARNING, StrOnline.refundWarn(OnlineFmt.afn(order.totalMinor)))
     }
@@ -98,7 +131,8 @@ fun OrderActionSheet(
     V3Button(
       StrOnline.orderAction(to),
       {
-        if (OrderActionModel.valid(to, form)) onConfirm(form) else tried++
+        val ok = OrderActionModel.valid(to, form) && !(ledger && OrderRefundModel.check(order, to, form.amount, form.note) != null)
+        if (ok) onConfirm(form) else tried++
       },
       Modifier.fillMaxWidth().padding(bottom = 4.dp).v3Shake(tried.takeIf { it > 0 }),
       kind = if (danger) V3ButtonKind.DANGER else V3ButtonKind.PRIMARY,

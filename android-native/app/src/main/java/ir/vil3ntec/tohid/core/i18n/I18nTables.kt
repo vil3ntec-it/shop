@@ -33,5 +33,6 @@ object I18nTables {
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
+    StrSupplierBills, // PUR-14: فاکتورهای تأمین‌کننده در گوشیِ نسخهٔ ۳
   )
 }
