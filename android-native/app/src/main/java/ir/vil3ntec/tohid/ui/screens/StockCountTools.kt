@@ -52,7 +52,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
  *
  *  حساب در `core/stock/CountTools` و `CountSheetModel` است؛ ثبت همان `WarehouseEngine.stockCount`
  *  (`onSave`)، پس شمرده‌نشده دست نمی‌خورد و هر اختلاف «اصلاحِ شمارش» (`count_adjust`) با دلیلِ «انبارگردانی» می‌شود.
- *  صافیِ دسته/تأمین‌کننده (`CountFilter`، INV-05) و بازبینیِ شمرده‌نشده/منطبق/مغایر (`CountReview`، INV-09) روی همان فهرست.
+ *  صافیِ دسته/تأمین‌کننده/برند/قفسه (`CountFilter`، INV-05) و بازبینیِ شمرده‌نشده/منطبق/مغایر (`CountReview`، INV-09) روی همان فهرست.
  *  فروش‌های حینِ شمارش (INV-10): لحظهٔ شمردنِ هر کالا همراهِ شمرده‌ها می‌رود (`core/stock/CountDuringSales`)؛
  *  پیش‌نویسِ بازگردانده‌شده لحظه ندارد و همان مقایسهٔ امروز را دارد.
  *  فایل و دوربین در مرزِ پلتفرم (`StockCountToolsWired`). پیش‌فرض خاموش (`CountToolsPref`).
@@ -86,6 +86,8 @@ fun StockCountToolsSheet(
   //  S20: صافیِ دسته/تأمین‌کننده (INV-05) و دستهٔ بازبینی (INV-09)؛ `null` ⇒ همه
   var category by remember { mutableStateOf<String?>(null) }
   var supplierId by remember { mutableStateOf<String?>(null) }
+  var brand by remember { mutableStateOf<String?>(null) }
+  var shelf by remember { mutableStateOf<String?>(null) }
   var bucket by remember { mutableStateOf<CountReview.Kind?>(null) }
   //  «اسکن‌های در انتظار» ⇒ انبارگردانی: شمارِ بارکدخوان به خانه‌ها، با لحظهٔ همین حالا (INV-10)
   LaunchedEffect(Unit) {
@@ -110,12 +112,14 @@ fun StockCountToolsSheet(
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val others = remember(imported, ownSheetId) { CountMerge.merge(imported.filter { it.sheetId != ownSheetId }).counts }
   val term = search.trim()
-  val scope = remember(d, term, category, supplierId) { CountFilter.shown(d.products, term, category, supplierId) }
+  val scope = remember(d, term, category, supplierId, brand, shelf) { CountFilter.shown(d.products, term, category, supplierId, brand, shelf) }
   val review = remember(d, scope, counted, shift) { CountReview.of(d, scope, counted, shift) }
   //  کور: «منطبق» و «مغایر» عددِ برنامه را لو می‌دهند ⇒ فقط شمرده‌نشده جدا می‌شود
   val shown = bucket?.let { k -> review.rows.filter { if (blind) (it.kind == CountReview.Kind.UNCOUNTED) == (k == CountReview.Kind.UNCOUNTED) else it.kind == k }.map { it.product } } ?: scope
   val categories = remember(d) { CountFilter.categories(d.products) }
   val suppliers = remember(d) { CountFilter.suppliers(d.products, d.suppliers) }
+  val brands = remember(d) { CountFilter.brands(d.products) }
+  val shelves = remember(d) { CountFilter.shelves(d.products) }
 
   fun scan(code: String) {
     if (code.isBlank()) return
@@ -212,6 +216,7 @@ fun StockCountToolsSheet(
           if (imported.isEmpty()) Text(StrCount.multiNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
           if (categories.isNotEmpty()) CountFilterChips(StrCount.allCategories, categories.map { it to it }, category) { category = it }
           if (suppliers.isNotEmpty()) CountFilterChips(StrCount.allSuppliers, suppliers.map { it.id to it.name.ifBlank { it.id } }, supplierId) { supplierId = it }
+          CountBrandShelfChips(brands, brand, { brand = it }, shelves, shelf, { shelf = it }) // INV-05: برند و قفسه
           CountFilterChips(
             StrCount.all,
             listOf(CountReview.Kind.UNCOUNTED.name to StrCount.uncounted(plain(review.uncounted))) +

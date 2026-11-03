@@ -278,6 +278,10 @@ object StrMoney {
   val notesSection: String get() = t("توضیحات", "Notes", "یادښتونه")
   val notesField: String get() = t("توضیحات (اختیاری)", "Notes (optional)", "یادښتونه (اختیاري)")
   val purchaseSaved: String get() = t("خرید با موفقیت ثبت شد", "Purchase recorded", "پېرود ثبت شو")
+  /** PUR-05: فاکتورِ خریدِ چندردیفه در گوشی */
+  val addPurchaseRow: String get() = t("افزودنِ ردیفِ کالا", "Add an item row", "د توکي کرښه زیاته کړئ")
+  fun purchaseRow(n: Any): String = t("ردیفِ ${asIs(n)}", "Row $n", "کرښه $n")
+  val removePurchaseRow: String get() = t("برداشتنِ این ردیف", "Remove this row", "دا کرښه لرې کړئ")
   val invalidNumber: String get() = t("عدد درست بنویسید", "Enter a valid number", "سم شمېر ولیکئ")
 
   /* ------------------------------ مصارف ------------------------------ */

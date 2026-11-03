@@ -208,6 +208,14 @@ val MoneyModule = AppModule(
         onSave = { draft ->
           MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId), StrMoney.purchaseSaved) != null
         },
+        //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)
+        onSaveMany = { supplierId, lines, paid, date, notes ->
+          MoneyWriter.purchase(
+            store, toasts, context,
+            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId),
+            StrMoney.purchaseSaved,
+          ) != null
+        },
       )
     },
 

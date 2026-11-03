@@ -363,6 +363,10 @@ private fun PromoEditor(
   var error by remember { mutableStateOf("") }
   var saving by remember { mutableStateOf(false) }
   val categories = remember(d.products) { d.products.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
+  //  PRM-08: برندهای کالاها (PRD-06) و هر برندی که خودِ قاعده دارد (تا قاعدهٔ کهنه بی‌صدا برندی را گم نکند)
+  val brands = remember(d.products, rule.id) {
+    (d.products.mapNotNull { it.brand?.trim()?.takeIf { b -> b.isNotEmpty() } } + rule.scope.brands + rule.scope.exBrands).distinct().sorted()
+  }
   val lockedBelow = rule.allowBelowCost && !canBelowCost
 
   fun save() {
@@ -464,8 +468,32 @@ private fun PromoEditor(
           }
         }
       }
+      if (brands.isNotEmpty()) {
+        Text("برند", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          brands.forEach { b ->
+            FilterChip(
+              selected = b in f.brands,
+              onClick = { f = f.copy(brands = if (b in f.brands) f.brands - b else f.brands + b, exBrands = f.exBrands - b) },
+              label = { Text(b) },
+            )
+          }
+        }
+      }
       if (f.kind != "price") ProductPick("کالاهای مشخص", f.products, d) { f = f.copy(products = it) }
       ProductPick("جز این کالاها", f.exProducts, d) { f = f.copy(exProducts = it) }
+      if (brands.isNotEmpty()) {
+        Text("جز این برندها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          brands.forEach { b ->
+            FilterChip(
+              selected = b in f.exBrands,
+              onClick = { f = f.copy(exBrands = if (b in f.exBrands) f.exBrands - b else f.exBrands + b, brands = f.brands - b) },
+              label = { Text(b) },
+            )
+          }
+        }
+      }
       Hint("هیچ دسته یا کالایی نزنید ⇐ همهٔ کالاها. «جز» بر «شامل» مقدم است.")
 
       Section("چه وقت")

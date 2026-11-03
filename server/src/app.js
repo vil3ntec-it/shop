@@ -367,6 +367,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
     //  پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.late_apology`
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
+    //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
+    api.use('/shop/orders/customer', require('./routes/order-customer'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)

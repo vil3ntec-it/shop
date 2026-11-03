@@ -25,13 +25,16 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.LedgerEngine
+import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
+import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3DateField
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
@@ -45,8 +48,13 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 private enum class PurchasePicker { SUPPLIER, PRODUCT }
 
 private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
-  save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes) },
-  restore = { v -> PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6]) },
+  //  هفت کادرِ ردیفِ نخست، سپس سه‌تایی‌های ردیف‌های افزوده (PUR-05)
+  save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes) +
+    it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price) } },
+  restore = { v ->
+    PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6],
+      more = v.drop(7).chunked(3).filter { it.size == 3 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2]) })
+  },
 )
 
 /**
@@ -54,6 +62,8 @@ private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
  *  تأمین‌کننده)، «کالا» (انبارِ خالی ⇒ راهنما و پیوندِ «کالای تازه»)، «مقدار و قیمت» با «جمع خرید»
  *  ِ زنده، «پرداخت» (خالی یعنی نسیه) با «باقی‌مانده» ِ زنده، تاریخ و توضیحات. دکمهٔ چسبانِ «ثبت خرید»؛
  *  نوشتهٔ ذخیره‌نشده ⇒ «دور ریخته شود؟». ثبت = `LedgerEngine.addPurchase` (اثرِ انبار همان امروز).
+ *  PUR-05: «افزودنِ ردیفِ کالا» ⇒ فاکتورِ چندردیفه (کالا، مقدار و قیمتِ هر ردیف، یک پرداخت برای کل) و ثبت با همان
+ *  `PurchaseBook.record` ِ فاکتورِ چندردیفهٔ کامپیوتر ([onSaveMany])؛ بی ردیفِ افزوده همان راهِ تک‌ردیفهٔ امروز.
  */
 @Composable
 internal fun PurchaseFormScreen(
@@ -63,6 +73,8 @@ internal fun PurchaseFormScreen(
   onNewProduct: () -> Unit,
   /** `true` ⇐ موتور پذیرفت (صفحه بسته می‌شود)؛ ردِ موتور پیامِ خودش را دارد */
   onSave: (LedgerEngine.PurchaseDraft) -> Boolean,
+  /** PUR-05: فاکتورِ چندردیفه (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح) ⇒ `PurchaseBook.record`؛ `true` ⇐ پذیرفته */
+  onSaveMany: (String, List<PurchaseBook.Line>, Double, String, String) -> Boolean,
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
@@ -70,6 +82,8 @@ internal fun PurchaseFormScreen(
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
+  //  کالای کدام ردیف انتخاب می‌شود: -1 = ردیفِ نخست، وگرنه شمارهٔ ردیفِ افزوده (PUR-05)
+  var pickRow by remember { mutableStateOf(-1) }
   val errors = PurchaseFormModel.errors(form)
   val shownErrors = if (tried) errors else PurchaseFormModel.Errors()
   val product = d.products.find { it.id == form.productId }
@@ -91,7 +105,12 @@ internal fun PurchaseFormScreen(
     onPrimary = {
       tried = true
       if (errors.any) shake++
-      else if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack()
+      else if (!PurchaseFormModel.multi(form)) { if (onSave(PurchaseFormModel.draft(form, product?.unit.orEmpty()))) onBack() }
+      else if (onSaveMany(
+          form.supplierId.orEmpty(),
+          PurchaseFormModel.lines(form) { id -> d.products.find { it.id == id }?.unit.orEmpty() },
+          PurchaseFormModel.paid(form), form.date, form.notes.trim(),
+        )) onBack()
     },
     onBack = onBack,
     dirty = PurchaseFormModel.dirty(form, initial),
@@ -120,7 +139,7 @@ internal fun PurchaseFormScreen(
             placeholder = StrMoney.pickItem,
             icon = Icons.Outlined.Inventory2,
             error = shownErrors.product,
-            onClick = { picker = PurchasePicker.PRODUCT },
+            onClick = { pickRow = -1; picker = PurchasePicker.PRODUCT },
           )
         }
       }
@@ -145,6 +164,48 @@ internal fun PurchaseFormScreen(
           error = shownErrors.price,
         )
         LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))
+      }
+      //  PUR-05: ردیف‌های افزوده — هر کدام کالا، مقدار و قیمتِ خودش
+      form.more.forEachIndexed { i, row ->
+        val rowProduct = d.products.find { it.id == row.productId }
+        val rowErrors = if (tried) shownErrors.rows.getOrNull(i) ?: PurchaseFormModel.RowErrors() else PurchaseFormModel.RowErrors()
+        V3Section(StrMoney.purchaseRow(i + 2), padding = PaddingValues(16.dp)) {
+          V3PickerRow(
+            label = StrMoney.item,
+            value = rowProduct?.name,
+            placeholder = StrMoney.pickItem,
+            icon = Icons.Outlined.Inventory2,
+            error = rowErrors.product,
+            onClick = { pickRow = i; picker = PurchasePicker.PRODUCT },
+          )
+          Spacer(Modifier.height(12.dp))
+          V3TextField(
+            value = row.quantity,
+            onValueChange = { form = PurchaseFormModel.setRow(form, i, row.copy(quantity = it)) },
+            label = StrMoney.quantity,
+            kind = V3FieldKind.NUMBER,
+            required = true,
+            suffix = rowProduct?.unit?.takeIf { it.isNotBlank() },
+            error = rowErrors.quantity,
+          )
+          Spacer(Modifier.height(12.dp))
+          V3TextField(
+            value = row.price,
+            onValueChange = { form = PurchaseFormModel.setRow(form, i, row.copy(price = it)) },
+            label = StrMoney.unitPrice,
+            kind = V3FieldKind.MONEY,
+            required = true,
+            error = rowErrors.price,
+          )
+          Spacer(Modifier.height(12.dp))
+          V3Button(StrMoney.removePurchaseRow, { form = PurchaseFormModel.removeRow(form, i) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
+        }
+      }
+      if (d.products.isNotEmpty() && form.more.size + 1 < PurchaseFormModel.MAX_ROWS) {
+        V3Button(
+          StrMoney.addPurchaseRow, { form = PurchaseFormModel.addRow(form) },
+          Modifier.fillMaxWidth().padding(vertical = 8.dp), kind = V3ButtonKind.SECONDARY,
+        )
       }
       V3Section(StrMoney.paidSection, padding = PaddingValues(16.dp)) {
         V3TextField(
@@ -175,13 +236,20 @@ internal fun PurchaseFormScreen(
       onPick = { id -> form = form.copy(supplierId = id) },
       onDismiss = { picker = null },
     )
-    PurchasePicker.PRODUCT -> IdPickerSheet(
-      title = StrMoney.item,
-      options = d.products.filter { it.active || it.id == form.productId }.map { PickOption(it.id, it.name, it.barcodes.firstOrNull()) },
-      selected = form.productId,
-      onPick = { id -> d.products.find { it.id == id }?.let { p -> form = PurchaseFormModel.pickProduct(form, p) } },
-      onDismiss = { picker = null },
-    )
+    PurchasePicker.PRODUCT -> {
+      val current = if (pickRow < 0) form.productId else form.more.getOrNull(pickRow)?.productId
+      IdPickerSheet(
+        title = StrMoney.item,
+        options = d.products.filter { it.active || it.id == current }.map { PickOption(it.id, it.name, it.barcodes.firstOrNull()) },
+        selected = current,
+        onPick = { id ->
+          d.products.find { it.id == id }?.let { p ->
+            form = if (pickRow < 0) PurchaseFormModel.pickProduct(form, p) else PurchaseFormModel.pickRowProduct(form, pickRow, p)
+          }
+        },
+        onDismiss = { picker = null },
+      )
+    }
     null -> Unit
   }
 }

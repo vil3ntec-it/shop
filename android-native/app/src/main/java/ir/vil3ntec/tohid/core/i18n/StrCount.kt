@@ -43,6 +43,9 @@ object StrCount {
   val all: String get() = t("همه", "All", "ټول")
   val allCategories: String get() = t("همهٔ دسته‌ها", "All categories", "ټولې ډلې")
   val allSuppliers: String get() = t("همهٔ تأمین‌کننده‌ها", "All suppliers", "ټول عرضه‌کوونکي")
+  /** INV-05: صافیِ برند و قفسه (فقط وقتی کالایی برند یا قفسه دارد) */
+  val allBrands: String get() = t("همهٔ برندها", "All brands", "ټول برندونه")
+  val allShelves: String get() = t("همهٔ قفسه‌ها", "All shelves", "ټولې المارۍ")
   fun uncounted(n: Any): String = t("شمرده‌نشده: ${asIs(n)}", "Not counted: $n", "نه شمېرل شوي: $n")
   fun matched(n: Any): String = t("منطبق: ${asIs(n)}", "Matching: $n", "سمون لرونکي: $n")
   fun differing(n: Any, value: Any): String = t("مغایر: ${asIs(n)} · ${asIs(value)} ؋", "Different: $n · $value ؋", "توپیر لرونکي: $n · $value ؋")

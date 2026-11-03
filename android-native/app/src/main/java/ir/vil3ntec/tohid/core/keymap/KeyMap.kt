@@ -337,7 +337,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.U, alt = true)),
   )
   val SALE_PRICE_LIST = KeyAction(
-    "sale.priceList", "sale", "تغییرِ لیستِ قیمتِ فاکتور", KeyStatus.PLANNED,
+    "sale.priceList", "sale", "تغییرِ لیستِ قیمتِ فاکتور", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.R, mod = true)),
     web = listOf(Chord(KeyName.R, shift = true, alt = true)),
   )
