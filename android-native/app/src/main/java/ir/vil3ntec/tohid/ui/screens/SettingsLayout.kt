@@ -135,6 +135,11 @@ object SettingsLayout {
   const val STOREFRONT_ETA = "زمانِ تقریبیِ تحویلِ ویترین"
   /** اولین خرید و سدِ تخفیف (MKT-02/RSK-09، `PromoGuardLive`، پرچمِ سرورِ `shop.storefront.promo_guard`) — همان `PROMO_GUARD_TITLE` */
   const val PROMO_GUARD = "تخفیفِ اولین خرید و سدِ سوءاستفاده"
+  /**
+   *  «سفارشِ آنلاین» (درخواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳): «چرا سفارش نمی‌رسد؟» (`arrival` ِ `/shop/orders/config`) و «پرداخت
+   *  پس از پذیرش» ِ ویترین — پشتِ پاسخِ سرور (`OnlineOrdersLive`)، نه پرچم: خاموشیِ بخش همین‌جا گفته می‌شود
+   */
+  const val ONLINE_ORDERS = "سفارشِ آنلاین"
   /** رسیدِ هدیهٔ بی قیمت (POS-34، `GiftReceiptPrefs`) */
   const val GIFT_RECEIPT = "رسیدِ هدیه"
   /** فروش با تحویلِ بعدی (POS-38، `DeliverLaterPrefs`) */
@@ -220,7 +225,7 @@ object SettingsLayout {
         Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)),
         Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
         Part("till", listOf(MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
-        Part("online", listOf(STOREFRONT_ETA, PROMO_GUARD)),
+        Part("online", listOf(ONLINE_ORDERS, STOREFRONT_ETA, PROMO_GUARD)),
       ),
     ),
     Group(
@@ -343,6 +348,7 @@ object SettingsLayout {
     OWNER_REPORT to "owner-report",
     STOREFRONT_ETA to "storefront-eta",
     PROMO_GUARD to "promo-guard",
+    ONLINE_ORDERS to "online-orders",
     GIFT_RECEIPT to "gift-receipt",
     DELIVER_LATER to "deliver-later",
     SPECIAL_ORDER to "special-orders",
@@ -429,6 +435,7 @@ object SettingsLayout {
     OWNER_REPORT -> OWNER_REPORT_TITLE
     STOREFRONT_ETA -> STOREFRONT_ETA_TITLE
     PROMO_GUARD -> PROMO_GUARD_TITLE
+    ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsTitle
     GIFT_RECEIPT -> ir.vil3ntec.tohid.core.i18n.StrGift.section
     DELIVER_LATER -> ir.vil3ntec.tohid.core.i18n.StrDeliver.section
     SPECIAL_ORDER -> ir.vil3ntec.tohid.core.i18n.StrSpecialOrder.settingsTitle
@@ -545,7 +552,7 @@ object SettingsLayout {
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ
    *  کامپیوتر). `serverOn` همان بخش‌هایی است که درِ سرورشان همین لحظه «دیده شود» گفته (`SettingsFacts.serverOn`).
    */
-  val SERVER_GATED: Set<String> = setOf(OWNER_REPORT, STOREFRONT_ETA, PROMO_GUARD)
+  val SERVER_GATED: Set<String> = setOf(OWNER_REPORT, STOREFRONT_ETA, PROMO_GUARD, ONLINE_ORDERS)
 
   /** ردیفِ این بخش کشیده شود؟ — بخشِ بی پرچم همیشه؛ بخشِ پشتِ پرچم فقط با پاسخِ روشنِ سرور */
   fun shown(key: String, serverOn: Set<String>): Boolean = key !in SERVER_GATED || key in serverOn

@@ -118,6 +118,7 @@ object SettingsHelp {
     SettingsLayout.LABEL_TOOLS -> H.labelsLine
     SettingsLayout.STOREFRONT_ETA -> H.etaLine
     SettingsLayout.PROMO_GUARD -> H.promoLine
+    SettingsLayout.ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsLine
     SettingsLayout.EASY_SETUP -> H.easySetupLine
     SettingsLayout.SCAN_CASH -> H.scanCashLine
     SettingsLayout.SERVERS -> ir.vil3ntec.tohid.core.i18n.StrReach.serversLine
@@ -180,6 +181,7 @@ object SettingsHelp {
     SettingsLayout.LABEL_TOOLS -> H.labelsExample
     SettingsLayout.STOREFRONT_ETA -> H.etaExample
     SettingsLayout.PROMO_GUARD -> H.promoExample
+    SettingsLayout.ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsExample
     SettingsLayout.EASY_SETUP -> H.easySetupExample
     SettingsLayout.SCAN_CASH -> H.scanCashExample
     SettingsLayout.SERVERS -> ir.vil3ntec.tohid.core.i18n.StrReach.serversExample

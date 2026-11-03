@@ -54,6 +54,12 @@ object OrdersLive {
 
   /** فقط وقتی بخش برای این دکان روشن است، تهی نیست */
   val config = mutableStateOf<OrdersConfigDto?>(null)
+
+  /**
+   *  «چرا سفارشِ آنلاین نمی‌رسد؟» (`arrival` ِ `/config`) — **حتی وقتی بخش خاموش است** (پیش‌تر خاموشی بی‌صدا بود:
+   *  `config` تهی و هیچ حرفی). تنظیمات («سفارشِ آنلاین») و سرِ صف همین را نشان می‌دهند. نیامده ⇒ null.
+   */
+  val arrival = mutableStateOf<ir.vil3ntec.tohid.core.model.OrderArrivalDto?>(null)
   val counts = mutableStateOf<Map<String, Int>>(emptyMap())
 
   /** نشانگرِ تغییرِ صف — صفحهٔ باز با عوض شدنش فهرست را تازه می‌کند */
@@ -236,7 +242,8 @@ object OrdersLive {
       return@withLock Posted.Skipped(if (reverse) SKIPPED_REVERSE_NOTE else SKIPPED_NOTE)
     }
     note(waiting, item, null)
-    val at = (if (reverse) item.returnedAt else OrderFulfillment.handedOverAt(item)) ?: System.currentTimeMillis()
+    //  «فاکتور شد» ِ سرور (به فاکتورِ زودتر از تحویل) بر زمانِ تحویل جلو می‌افتد ⇒ همان ردیف‌ها روی هر دستگاه
+    val at = (if (reverse) item.returnedAt else OrderFulfillment.invoicedAt(item) ?: OrderFulfillment.handedOverAt(item)) ?: System.currentTimeMillis()
     val day = isoDay(at)
     val seller = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
     val blockExpired = ShopPolicy.blockExpired(context)
@@ -438,6 +445,7 @@ object OrdersLive {
       val r = repository(context).config()
       //  قطعِ گذرا بخشِ روشن را خاموش نمی‌کند
       val keep = r is ApiResult.Failure && r.error.retryable && known
+      (r as? ApiResult.Success)?.value?.let { arrival.value = it.arrival }
       if (!keep) apply((r as? ApiResult.Success)?.value?.takeIf { it.enabled })
     }
   }

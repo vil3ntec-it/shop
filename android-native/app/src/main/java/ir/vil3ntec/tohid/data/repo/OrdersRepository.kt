@@ -93,6 +93,13 @@ class OrdersRepository(private val api: ApiClient) {
     ApiJson.decode<HandoverPageDto>(api.get(q))
   }
 
+  /**
+   *  «به فاکتور» (`POST /:id/invoice`، `lib/order-flow.claimInvoice`): سرور «فاکتور شد» را یک بار زیرِ قفل می‌نشاند؛
+   *  تکرار (همین دستگاه یا دیگری) همان فاکتور و همان زمان ⇒ بی کلیدِ یکتایی. پاسخ جزئیاتِ تازه با `invoice`.
+   */
+  suspend fun invoice(id: String): ApiResult<OrderDto> =
+    result { order(api.post("$ROOT/${enc(id)}/invoice", JsonObject(emptyMap()))) }
+
   suspend fun create(clientKey: String, body: OrderDraft.Body): ApiResult<OrderDto> =
     result { order(api.post(ROOT, createJson(clientKey, body))) }
 

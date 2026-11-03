@@ -65,7 +65,36 @@ data class OrdersConfigDto(
    *  (گذارِ ساده ۴۰۹ `refund_via_ledger`)؛ سرورِ پیشین ⇒ false و همان گذارِ پیشین
    */
   val refundLedger: Boolean = false,
+  /**
+   *  «چرا سفارشِ آنلاین نمی‌رسد؟» (`lib/order-arrival.js`) — هر دروازهٔ میانِ ویترین و این برنامه با کد و «چه کسی
+   *  درستش می‌کند»؛ حتی وقتی `enabled` نیست. سرورِ پیشین ⇒ null
+   */
+  val arrival: OrderArrivalDto? = null,
 )
+
+/** `arrival` ِ `/config`: `ok` = هیچ دروازه‌ای بسته نیست؛ ترتیبِ `blockers` همان ترتیبِ زنجیره (نخستین = اصلی) */
+@Serializable
+data class OrderArrivalDto(
+  val ok: Boolean = true,
+  val blockers: List<OrderArrivalItemDto> = emptyList(),
+  val warnings: List<OrderArrivalItemDto> = emptyList(),
+)
+
+/** یک دروازه: `code` (مثلاً `storefront_hidden`) و `fix` (`support`/`subscribe`/`storefront`/`products`/`server`) */
+@Serializable
+data class OrderArrivalItemDto(val code: String = "", val fix: String = "")
+
+/** «فاکتور شد» ِ سفارش (`lib/order-flow.invoiceOf`): فروشِ `o-<سفارش>` با زمانِ همین رویداد */
+@Serializable
+data class OrderInvoiceDto(val saleId: String = "", val at: Long = 0, val by: String = "")
+
+/**
+ *  حالِ پرداخت برای فروشنده (`lib/order-flow.payStateOf`): `mode` = `after_accept` («پرداخت پس از پذیرش») یا `any`؛
+ *  `state` = awaiting_accept · awaiting_choice · cash · online_pending · paid_online · cash_collected · cash_settled ·
+ *  refunded · closed؛ `choice` = `cash` یا تهی
+ */
+@Serializable
+data class OrderPayStepDto(val mode: String = "", val state: String = "", val choice: String = "")
 
 /** `amend` ِ `/config` (`order-amend.configOf` + `paid`/`settleMethods`) */
 @Serializable
@@ -335,6 +364,10 @@ data class OrderDto(
   val amendment: OrderAmendmentDto? = null,
   /** FIN-01: دفترِ بازپرداختِ همین سفارش (`refunds.summary`) — فقط در `GET /:id` و پاسخِ `/refunds`؛ سرورِ پیشین ⇒ null */
   val refund: OrderRefundSummaryDto? = null,
+  /** «فاکتور شد» (`lib/order-flow`) — فقط در `GET /:id` و پاسخِ `/invoice`؛ نزده یا سرورِ پیشین ⇒ null */
+  val invoice: OrderInvoiceDto? = null,
+  /** حالِ پرداخت (`lib/order-flow.staffView`) — فقط در `GET /:id` و پاسخِ `/invoice`؛ سرورِ پیشین ⇒ null */
+  val payStep: OrderPayStepDto? = null,
 )
 
 /** `refund` ِ جزئیاتِ سفارش (`order-refunds.summaryOf`): جمعِ برگشته و ماندهٔ قابلِ برگشت، به واحدِ خرد */

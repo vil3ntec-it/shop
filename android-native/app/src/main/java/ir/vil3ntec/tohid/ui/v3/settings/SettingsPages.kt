@@ -102,6 +102,7 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.LayawayScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LoyaltyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.OwnerReportScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PromoGuardScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.OnlineOrdersScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SafeBookScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SmartForecastScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StockPlacesScreen
@@ -230,6 +231,7 @@ internal object SettingsPages {
     Page(SettingsLayout.LABEL_TOOLS, Icons.Outlined.Sell) { LabelToolsScreen(it) },
     Page(SettingsLayout.STOREFRONT_ETA, Icons.Outlined.LocalShipping) { StorefrontEtaScreen(it) },
     Page(SettingsLayout.PROMO_GUARD, Icons.Outlined.Redeem) { PromoGuardScreen(it) },
+    Page(SettingsLayout.ONLINE_ORDERS, Icons.Outlined.ShoppingBag) { OnlineOrdersScreen(it) },
     Page(SettingsLayout.FRAUD_TRAIL, Icons.Outlined.History) { FraudTrailScreen(it) },
     Page(SettingsLayout.ANOMALY, Icons.Outlined.ReportProblem) { AnomalyScreen(it) },
     Page(SettingsLayout.CHAT_GUARD, Icons.Outlined.Storage) { ChatGuardScreen(it) },

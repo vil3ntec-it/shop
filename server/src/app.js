@@ -371,6 +371,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
     //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
     api.use('/shop/orders/customer', require('./routes/order-customer'));
+    //  «به فاکتور» ِ یک‌ضرب (`POST /shop/orders/:id/invoice`، lib/order-flow) — پیش از `/shop/orders`
+    api.use('/shop/orders', require('./routes/order-flow'));
     api.use('/shop/orders', require('./routes/orders'));
     //  ویترین (فاز ۴): تنظیمِ دکان زیرِ `/shop` (پیش از آن)، و درِ عمومی
     //  `/store` — پیشوندِ تازه ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی (دستورالعمل در PR)
@@ -385,6 +387,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/order-amend-store'));   // ORD-14: رضایتِ مشتری به ویرایشِ سفارش
     api.use('/store', require('./routes/order-add-store'));   // CHK-21: افزودنِ قلم پیش از جمع‌آوری، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-method-store'));   // S72: تغییرِ روشِ تحویل پیش از جمع‌آوری، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/order-pay-store'));   // «پرداخت پس از پذیرش»: نقد هنگامِ تحویل، پشتِ تنظیمِ خاموشِ دکان
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش

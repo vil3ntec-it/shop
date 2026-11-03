@@ -89,6 +89,8 @@ private fun RouteScope.OrdersRouteBody(wide: Boolean) {
   LaunchedEffect(slipMsg) { slipMsg?.let { toasts.show(it); OrdersLive.slipMessage.value = null } }
   val header: @Composable () -> Unit = {
     OrderDeskStrip(deskCtl)
+    //  «چرا سفارش نمی‌رسد؟» — ویترینِ خاموش، بی کالا، دورهٔ آزمایشی، اعلانِ خاموش… (lib/order-arrival)
+    OrdersLive.arrival.value?.let { a -> OrderArrivalCardV3(a, onFix = { openFix(it) }) }
     cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }
     //  قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09) و «کالا به انبار برگشت؟» ِ بازپرداخت‌ها (RET-11)
     OrderQueueExtras(cfg, onChanged = { ctl.reload() }, onOpen = ::openOrder)
@@ -217,6 +219,8 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
     {
       //  «سفارش‌های آنلاین»: روشِ تحویل، عکس برای مشتری (گفت‌وگوی همین سفارش)، «بسته شد» و پیک/«خودش می‌آید»
       OrderPrepCardV3(o, cfg)
+      //  «پرداختِ مشتری» و «به سبد / فاکتور» ِ یک‌ضرب (درخواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳؛ lib/order-flow)
+      OrderFlowCardsV3(o, cfg)
       OrderDelayEntryV3(o, cfg, OrdersHub.repo(context)) { fresh, msg ->
         OrdersHub.put(fresh)
         OrdersHub.changed.value++
