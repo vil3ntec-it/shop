@@ -28,7 +28,6 @@
     "license/sync-engine.js": 893,
     "license/sync-v3-engine.js": 1258,
     "license/vip.js": 867,
-    "server/public/admin/app.js": 2436,
     "server/public/admin/index.html": 1387,
     "server/src/lib/image-bank.js": 1195,
     "server/src/lib/notices.js": 825,
