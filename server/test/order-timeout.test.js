@@ -11,6 +11,7 @@
  *   - «با تأخیر» (اتصالِ تأییدنشده) و سفارشِ زمان‌بندی‌شده مُهر نمی‌خورند؛ arm با
  *     ساعتِ ساختِ سفارش می‌سنجد.
  *   - سفارشِ خطادار صف را نمی‌گیرد؛ ردِ خودکار سابقه و اعلانِ دکان دارد.
+ *   - TEN-02: کارِ «الف» سفارش، سابقه، اعلان و گیرنده‌های «ب» را نمی‌خواند و عوض نمی‌کند؛ پرچمِ اعلانِ هر دکان جدا.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '200';
 const test = require('node:test');
@@ -227,6 +228,60 @@ test('سفارشِ خطادار صف را نمی‌گیرد؛ پس از چند �
     assert.ok(await one(`SELECT 1 AS x FROM audit_logs WHERE action='order.auto_reject_failed' AND target_id=$1`, [bad.id]));
   } finally {
     orders.transition = realTransition;
+    push.sendTo = realSend;
+  }
+});
+
+test('TEN-02: دو دکان — ردِ خودکارِ «الف» به سفارش، سابقه و اعلانِ «ب» نمی‌رسد؛ پرچمِ اعلانِ هر دکان جدا', async () => {
+  const a = await liveStore('الفِ مهلت');
+  const b = await liveStore('بِ مهلت');
+  await setFlag(a.shopId, 'shop.order_notify', true);   //  «ب» بی پرچمِ اعلان
+  const oa = await order(a, '0791113011');
+  const ob = await order(b, '0791113011');               //  همان مشتری در هر دو دکان
+  const da = Number(oa.accept_deadline_at);
+  const dbLater = da + 10 * MIN;                         //  مهلتِ «ب» هنوز نرسیده
+  await query('UPDATE online_orders SET accept_deadline_at=$2 WHERE id=$1', [ob.id, dbLater]);
+  const rowB = () => one('SELECT * FROM online_orders WHERE id=$1', [ob.id]);
+  const before = await rowB();
+  const push = require('../src/lib/push');
+  const realSend = push.sendTo;
+  const pushed = [];
+  push.sendTo = async (target, msg) => { pushed.push({ target, msg }); return { sent: 1, total: 1 }; };
+  const touchesB = (p) => p.target.shopId === b.shopId || p.msg.data.shopId === b.shopId || p.msg.data.orderId === ob.id
+    || (p.target.onlyUserIds || []).includes(b.user.id);
+  const audits = async (ids) => (await query(
+    `SELECT shop_id, target_id FROM audit_logs WHERE action='order.auto_rejected' AND target_id = ANY($1::text[]) ORDER BY created_at, id`,
+    [ids])).rows;
+  try {
+    assert.ok(await timeout.sweep(da) >= 1);
+    assert.equal((await one('SELECT status FROM online_orders WHERE id=$1', [oa.id])).status, 'auto_rejected');
+    assert.deepEqual(await rowB(), before, 'سفارشِ «ب» (وضعیت، مهلت، زمانِ تغییر) دست نخورد');
+    assert.deepEqual(await statusEvents(ob.id), []);
+    const mineA = pushed.filter((p) => p.msg.data.orderId === oa.id);
+    assert.equal(mineA.length, 1);
+    assert.equal(mineA[0].target.shopId, a.shopId);
+    assert.equal(mineA[0].msg.data.shopId, a.shopId);
+    assert.ok(mineA[0].target.onlyUserIds.includes(a.user.id));
+    assert.equal(pushed.some(touchesB), false, 'هیچ اعلانی به دکان، صاحب یا سفارشِ «ب»');
+    assert.deepEqual(await audits([oa.id, ob.id]), [{ shop_id: a.shopId, target_id: oa.id }]);
+
+    //  نوبتِ «ب» و سفارشِ دومِ «الف» در یک جاروب («ب» جلوتر): هر کدام ردِ خودش و سابقهٔ خودش؛ «ب» بی اعلان
+    //  (پرچمِ «الف» به «ب» نمی‌رسد) و اعلانِ «الف» بی گیرنده یا دادهٔ «ب»؛ سفارشِ نخستِ «الف» دوباره دست نمی‌خورد
+    const oa2 = await order(a, '0791113012');
+    await query('UPDATE online_orders SET accept_deadline_at=$2 WHERE id=$1', [oa2.id, dbLater + 1]);
+    assert.ok(await timeout.sweep(dbLater + 1) >= 2);
+    for (const id of [ob.id, oa2.id]) {
+      assert.equal((await one('SELECT status FROM online_orders WHERE id=$1', [id])).status, 'auto_rejected', id);
+    }
+    assert.equal(pushed.some(touchesB), false, 'پرچمِ خاموشِ «ب» ⇒ هیچ اعلان؛ گیرندهٔ «ب» در اعلانِ «الف» نه');
+    const second = pushed.filter((p) => p.msg.data.orderId === oa2.id);
+    assert.equal(second.length, 1);
+    assert.deepEqual(second[0].target.onlyUserIds, mineA[0].target.onlyUserIds, 'گیرنده‌های «الف» همان');
+    assert.equal(pushed.filter((p) => p.msg.data.orderId === oa.id).length, 1);
+    assert.deepEqual((await statusEvents(oa.id)).map((e) => e.to_status), ['auto_rejected']);
+    assert.deepEqual(await audits([oa.id, ob.id, oa2.id]), [{ shop_id: a.shopId, target_id: oa.id }, { shop_id: b.shopId, target_id: ob.id },
+      { shop_id: a.shopId, target_id: oa2.id }]);
+  } finally {
     push.sendTo = realSend;
   }
 });
