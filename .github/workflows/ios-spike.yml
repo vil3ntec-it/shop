@@ -172,6 +172,8 @@ jobs:
       #  آزمونِ سرتاسریِ جریان‌های اصلی (`src/iosTest/…/e2e/CoreFlowsE2EIosTest`: ورود، صندوق، کالا، «تازه‌ها»، دری)
       - name: iosSimulatorArm64Test (ios/shared) — رمز، shimها و جریان‌های اصلی
         if: always()
+        #  کامپایل و پیوندِ آزمون ~۱۲، آزمونِ سرتاسری ≤ ۱۵ دقیقه (نگهبانِ خودش)؛ گیرِ دیگر کارِ ۱۱۵ دقیقه‌ای را نخورد
+        timeout-minutes: 45
         env:
           TOHID_E2E_BACKEND: ${{ github.workspace }}/ios-e2e/backend.json
           TOHID_E2E_SHOTS: ${{ github.workspace }}/ios-e2e/shots

@@ -136,7 +136,31 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     val line = "[${began.elapsedNow().inWholeMilliseconds / 1000.0}s] $s"
     println("e2e: $line")
     log.append(line).append('\n')
+    //  هر سطر همان دم روی دیسک: اگر فرآیند گیر کرد یا افتاد، تا همین‌جا در CI دیده می‌شود
+    runCatching { File("$out/e2e.log").writeText(log.toString()) }
   }
+
+  /** گامِ در حالِ اجرا — برای نگهبانِ زمان (`armWatchdog`) */
+  @kotlin.concurrent.Volatile
+  private var current: String = "آغاز"
+
+  /**
+   *  نگهبانِ زمان روی رشتهٔ دیگر (صفِ سراسریِ GCD): اگر آزمون تا `seconds` تمام نشد (رشتهٔ اصلی گیر کرده)، همان گام و جدولِ
+   *  تا همین‌جا را می‌نویسد و فرآیندِ آزمون را با کدِ ۳ می‌بندد — سرخِ روشن به‌جای کارِ CI ِ بی‌پایان.
+   */
+  fun armWatchdog(seconds: Long) {
+    val deadline = platform.darwin.dispatch_time(platform.darwin.DISPATCH_TIME_NOW, seconds * 1_000_000_000L)
+    platform.darwin.dispatch_after(deadline, platform.darwin.dispatch_get_global_queue(platform.darwin.DISPATCH_QUEUE_PRIORITY_DEFAULT.toLong(), 0u)) {
+      if (done) return@dispatch_after
+      runCatching { File("$out/e2e.log").writeText(log.toString() + "⏱ نگهبان: پس از $seconds ثانیه در «$current» گیر کرد\n") }
+      runCatching { File("$out/summary.md").writeText("# آزمونِ سرتاسریِ آیفون — جریان‌های اصلی\n\n⏱ نگهبان: پس از $seconds ثانیه در «$current» گیر کرد (رشتهٔ اصلی پاسخ نداد)\n\n" + table()) }
+      println("e2e: ⏱ watchdog — stuck in «$current» after ${seconds}s")
+      platform.posix.exit(3)
+    }
+  }
+
+  @kotlin.concurrent.Volatile
+  private var done = false
 
   /** زمانِ واقعی می‌گذرد و ساعتِ Compose همراهش؛ کارهای رشتهٔ اصلی (Dispatchers.Main، صفِ اصلیِ GCD) هم می‌روند */
   fun pump(ms: Long) {
@@ -159,7 +183,10 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     }
   }
 
-  fun waitFor(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) = until("«$what» روی صفحه", timeoutMs) { shown(m) }
+  fun waitFor(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
+    note("…«$what»")
+    until("«$what» روی صفحه", timeoutMs) { shown(m) }
+  }
 
   fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
     waitFor(m, what, timeoutMs)
@@ -195,6 +222,7 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
 
   /** عکسِ کلِ صفحهٔ گوشی (همهٔ لایه‌ها: برگه‌ها و پنجره‌ها) و درختِ دسترس‌پذیریِ همان لحظه */
   fun shot(name: String) {
+    note("…عکسِ $name")
     pump(500)
     runCatching {
       val bitmap = ui.captureToImage().asSkiaBitmap()
@@ -216,6 +244,7 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
       return
     }
     note("▶ $id $title")
+    current = "$id $title"
     val start = TimeSource.Monotonic.markNow()
     val error = runCatching(body).exceptionOrNull()
     val ms = start.elapsedNow().inWholeMilliseconds
@@ -227,15 +256,19 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     steps += Step(id, title, error == null, ms, error?.let { "${it::class.simpleName}: ${it.message}" })
   }
 
+  /** جدولِ markdown ِ گام‌ها تا همین لحظه */
+  private fun table(): String = buildString {
+    append("| گام | شرح | نتیجه | زمان | خطا |\n|---|---|---|---:|---|\n")
+    steps.forEach { s ->
+      val mark = when (s.ok) { true -> "✅"; false -> "❌"; null -> "⏭ اجرا نشد" }
+      append("| ${s.id} | ${s.title} | $mark | ${s.ms / 1000.0}s | ${s.error.orEmpty().replace('|', '/').replace('\n', ' ').take(400)} |\n")
+    }
+  }
+
   /** جدولِ گام‌ها (`summary.md`) و لاگ (`e2e.log`) کنارِ عکس‌ها؛ هر گامِ سرخ یا اجرانشده ⇐ آزمون سرخ */
   fun finish() {
-    val table = buildString {
-      append("| گام | شرح | نتیجه | زمان | خطا |\n|---|---|---|---:|---|\n")
-      steps.forEach { s ->
-        val mark = when (s.ok) { true -> "✅"; false -> "❌"; null -> "⏭ اجرا نشد" }
-        append("| ${s.id} | ${s.title} | $mark | ${s.ms / 1000.0}s | ${s.error.orEmpty().replace('|', '/').replace('\n', ' ').take(400)} |\n")
-      }
-    }
+    done = true
+    val table = table()
     val env = if (facts.isEmpty()) "" else facts.joinToString("\n", postfix = "\n\n") { "- $it" }
     runCatching { File("$out/summary.md").writeText("# آزمونِ سرتاسریِ آیفون — جریان‌های اصلی\n\n$env$table") }
     runCatching { File("$out/e2e.log").writeText(log.toString()) }

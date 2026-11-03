@@ -73,6 +73,8 @@ class CoreFlowsE2EIosTest {
       val e = E2eDriver(this, env.shots)
       e.note("سرور: ${env.api} — نگاه: ${env.probe} — عکس‌ها: ${env.shots}")
       e.fact(keychain)
+      //  همهٔ گام‌ها با بیشینهٔ مهلت‌هایشان زیرِ ده دقیقه‌اند؛ گیرِ رشتهٔ اصلی ⇐ سرخِ روشن، نه کارِ CI ِ بی‌پایان
+      e.armWatchdog(WATCHDOG_S)
       //  ساعتِ Compose را راننده جلو می‌برد (همپای زمانِ واقعی): چرخنده‌ها و انیمیشن‌های بی‌پایان آزمون را قفل نکنند
       mainClock.autoAdvance = false
       setContent { E2eHost { IosRoot() } }
@@ -219,5 +221,6 @@ class CoreFlowsE2EIosTest {
     const val WIDTH = 390f
     const val HEIGHT = 844f
     const val SCALE = 3f
+    const val WATCHDOG_S = 15 * 60L
   }
 }
