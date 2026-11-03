@@ -17,7 +17,7 @@ import androidx.compose.ui.test.hasSetTextAction
 import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onFirst
-import androidx.compose.ui.test.performClick
+import androidx.compose.ui.test.performSemanticsAction
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
 import androidx.lifecycle.Lifecycle
@@ -248,12 +248,16 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     }
   }
 
+  /**
+   *  زدن مثلِ دسترس‌پذیری (VoiceOver): کنشِ OnClick ِ همان چیز، پس از آوردن به دید و ایستادن. لمسِ ساختگی روی برگه‌ای که
+   *  هنوز جا می‌افتد گاه به پردهٔ پشتش می‌خورد و برگه را می‌بست (اجراهای ۵ تا ۷)؛ آزمون جریانِ برنامه را می‌سنجد، نه
+   *  تشخیصِ لمسِ Compose.
+   */
   fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
     waitFor(m, what, timeoutMs)
     reveal(m)
     settle(m)
-    val node = ui.onAllNodes(m).onFirst()
-    node.performClick()
+    ui.onAllNodes(m).onFirst().performSemanticsAction(SemanticsActions.OnClick)
     note("زدن: $what")
     pump(600)
   }
