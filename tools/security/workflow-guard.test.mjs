@@ -5,7 +5,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
-import { checkWorkflow, walk, EXCLUDED } from './workflow-guard.mjs';
+import { checkWorkflow, walk, EXCLUDED, RELEASE_JOBS } from './workflow-guard.mjs';
 
 const SHA = 'a'.repeat(40);
 const rules = (found) => found.map((f) => f.rule).sort();
@@ -66,9 +66,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - run: true
+      - run: gradle --no-daemon testReleaseUnitTest
   publish:
     needs: build
+    if: \${{ github.ref == 'refs/heads/main' }}
     permissions:
       contents: write
     runs-on: ubuntu-latest
@@ -103,6 +104,84 @@ test('inject: ورودیِ نامطمئن داخلِ run (بلوکی و یک‌�
 `);
   const f = checkWorkflow('i.yml', y);
   assert.deepEqual(rules(f), ['inject', 'inject', 'inject', 'inject', 'inject']);
+});
+
+/* ── S64: «آزمونِ سرخ یا شاخهٔ غیرمجاز هرگز منتشر نمی‌شود» ─────────────────────── */
+
+const release = (o = {}) => `name: r
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest${o.checkCoe ? '\n    continue-on-error: true' : ''}
+    steps:
+      - uses: actions/checkout@${SHA} # v4.4.0
+      - name: آزمون
+        run: ${o.testRun ?? './gradlew --no-daemon test'}${o.stepCoe ? '\n        continue-on-error: true' : ''}${o.stepIf ? `\n        if: ${o.stepIf}` : ''}
+${o.extraJob ?? ''}  package:
+    needs: ${o.packageNeeds ?? 'check'}
+    if: >-
+      ${o.packageIf ?? "github.event_name != 'pull_request'"}
+    runs-on: ubuntu-latest
+    steps:
+      - run: ./gradlew --no-daemon packageMsi
+  publish:
+    needs: ${o.publishNeeds ?? 'package'}
+    if: \${{ ${o.publishIf ?? "github.ref == 'refs/heads/main' && github.event_name != 'pull_request'"} }}
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - run: gh release upload x
+`;
+const releaseMsgs = (y, f = 'tohid-desktop.yml') => checkWorkflow(f, y).filter((x) => x.rule === 'release').map((x) => x.msg);
+
+test('release (S64): انتشار فقط از main و فقط پس از آزمونِ سبز — نمونهٔ سالم می‌گذرد', () => {
+  assert.deepEqual(checkWorkflow('tohid-desktop.yml', release()), []);
+  //  `needs` به شکلِ فهرست و فهرستِ چندخطی هم
+  assert.deepEqual(releaseMsgs(release({ publishNeeds: '[package]' })), []);
+  assert.deepEqual(releaseMsgs(release({ publishNeeds: '\n      - package' })), []);
+  //  کارِ آزمونِ فقط-PR در زنجیره لازم نیست
+  const prOnly = "  lint:\n    if: github.event_name == 'pull_request'\n    runs-on: ubuntu-latest\n    steps:\n      - run: npm test\n";
+  assert.deepEqual(releaseMsgs(release({ extraJob: prOnly })), []);
+});
+
+test('release (S64): شاخهٔ غیرمجاز — بی شرطِ main سد است', () => {
+  assert.match(releaseMsgs(release({ publishIf: "github.event_name != 'pull_request'" }))[0], /فقط از main/);
+  assert.match(releaseMsgs(release({ publishIf: "github.ref != 'refs/heads/main'" }))[0], /فقط از main/);
+  assert.match(releaseMsgs(release({ publishIf: 'true' }))[0], /فقط از main/);
+});
+
+test('release (S64): آزمونِ سرخ — زنجیرهٔ بی آزمون، always()، continue-on-error و کارِ آزمونِ بیرون از needs سد است', () => {
+  //  انتشار مستقیم پس از ساخت، بی آزمون
+  assert.match(releaseMsgs(release({ packageNeeds: '[]', testRun: 'echo hi' })).join(' | '), /هیچ گامِ آزمونِ سدکننده/);
+  //  آزمون هست ولی در needs نیست
+  assert.match(releaseMsgs(release({ packageNeeds: '[]' })).join(' | '), /«check» در needs ِ انتشارِ «publish» نیست/);
+  //  کارِ میانی پس از آزمونِ سرخ هم می‌دود
+  assert.match(releaseMsgs(release({ packageIf: "always() && github.event_name != 'pull_request'" }))[0], /always\(\)/);
+  assert.match(releaseMsgs(release({ publishIf: "!cancelled() && github.ref == 'refs/heads/main'" }))[0], /always\(\)/);
+  //  گام یا کارِ آزمون گزارشی است
+  assert.match(releaseMsgs(release({ stepCoe: true })).join(' | '), /continue-on-error/);
+  assert.match(releaseMsgs(release({ checkCoe: true })).join(' | '), /continue-on-error/);
+  //  گامِ آزمونِ شرطی تنها آزمونِ زنجیره نیست
+  assert.match(releaseMsgs(release({ stepIf: "github.event_name == 'pull_request'" })).join(' | '), /هیچ گامِ آزمونِ سدکننده/);
+  //  کارِ آزمونِ دوم (مثلِ disk-windows ِ نصابِ کامپیوتر) که انتشار منتظرش نیست
+  const side = '  disk-windows:\n    runs-on: windows-latest\n    steps:\n      - run: ./gradlew --no-daemon test --tests X\n';
+  assert.match(releaseMsgs(release({ extraJob: side })).join(' | '), /«disk-windows» در needs/);
+  assert.deepEqual(releaseMsgs(release({ extraJob: side, publishNeeds: '[package, disk-windows]' })), []);
+});
+
+test('release (S64): هر کارِ انتشارِ فهرست در فایلِ خودش هست؛ پوستهٔ بازنشسته فقط از main', () => {
+  assert.match(releaseMsgs(release().replace('  publish:', '  ship:'), 'tohid-admin.yml')[0], /در فایل نیست/);
+  const dir = path.join(path.dirname(new URL(import.meta.url).pathname), '../../.github/workflows');
+  for (const key of Object.keys(RELEASE_JOBS)) assert.ok(fs.existsSync(path.join(dir, key.split(':')[0])), key);
+  const old = fs.readFileSync(path.join(dir, 'android-release.yml'), 'utf8');
+  assert.deepEqual(releaseMsgs(old, 'android-release.yml'), []);
+  assert.match(releaseMsgs(old.replace("github.ref == 'refs/heads/main'", 'true'), 'android-release.yml')[0], /فقط از main/);
 });
 
 test('walk: متنِ بلوکِ run کلید شمرده نمی‌شود', () => {

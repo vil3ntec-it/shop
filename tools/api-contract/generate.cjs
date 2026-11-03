@@ -5,6 +5,7 @@
  *
  *   node tools/api-contract/generate.cjs           ⇒ docs/api/routes.json را از نو می‌نویسد
  *   node tools/api-contract/generate.cjs --check   ⇒ کد ۱ اگر docs/api/routes.json کهنه باشد
+ *   … --out <پرونده>                               ⇒ همان، روی پرونده‌ای دیگر (آزمونِ نگهبان: server/test/api-contract.test.js)
  *
  * پیش‌نیاز: `server/node_modules` (cd server && npm ci). شبکه، دیتابیسِ واقعی و secret لازم نیست.
  *
@@ -23,7 +24,8 @@ const X = require('./extract.cjs');
 
 const ROOT = path.resolve(__dirname, '..', '..');
 const SERVER = path.join(ROOT, 'server');
-const OUT = path.join(ROOT, 'docs', 'api', 'routes.json');
+const outArg = process.argv.indexOf('--out');
+const OUT = outArg > 0 && process.argv[outArg + 1] ? path.resolve(process.argv[outArg + 1]) : path.join(ROOT, 'docs', 'api', 'routes.json');
 const CHECK = process.argv.includes('--check');
 
 if (process.env.API_CONTRACT_CHILD !== '1') {
@@ -33,6 +35,8 @@ if (process.env.API_CONTRACT_CHILD !== '1') {
     DATABASE_URL: 'pglite:memory', BACKUP_ENABLED: 'false', BACKUP_PATH: path.join(tmp, 'backups'),
     API_SECRET: 'api-contract-synthetic-not-a-secret', OTP_SECRET: 'api-contract-synthetic-not-a-secret2',
   };
+  //  زیرِ Electron (`ELECTRON_RUN_AS_NODE`) `process.execPath` خودِ Electron است؛ بی این پرچم فرزند برنامهٔ Electron می‌شد، نه Node
+  if (process.env.ELECTRON_RUN_AS_NODE) env.ELECTRON_RUN_AS_NODE = process.env.ELECTRON_RUN_AS_NODE;
   const r = spawnSync(process.execPath, [__filename], { env, encoding: 'utf8', maxBuffer: 64 << 20, stdio: ['ignore', 'pipe', 'inherit'] });
   fs.rmSync(tmp, { recursive: true, force: true });
   if (r.status !== 0) process.exit(r.status || 1);
@@ -40,10 +44,21 @@ if (process.env.API_CONTRACT_CHILD !== '1') {
   if (CHECK) {
     const old = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8') : '';
     if (old !== text) {
-      console.error('✖ docs/api/routes.json کهنه است: node tools/api-contract/generate.cjs');
+      console.error(`✖ ${path.relative(ROOT, OUT)} کهنه است: node tools/api-contract/generate.cjs`);
+      //  کدام مسیرها: بی این، پیامِ سرخ فقط «کهنه است» بود و باید کلِ فایل را مقایسه می‌کردید
+      const keys = (t) => { try { return new Set(JSON.parse(t).routes.map((x) => `${x.method} ${x.path}`)); } catch { return new Set(); } };
+      const was = keys(old);
+      const now = keys(text);
+      const added = [...now].filter((k) => !was.has(k));
+      const gone = [...was].filter((k) => !now.has(k));
+      for (const [mark, list] of [['+', added], ['-', gone]]) {
+        for (const k of list.slice(0, 20)) console.error(`  ${mark} ${k}`);
+        if (list.length > 20) console.error(`  ${mark} … و ${list.length - 20} مسیرِ دیگر`);
+      }
+      if (!added.length && !gone.length) console.error('  (همان مسیرها؛ نگهبان، شکلِ درخواست/پاسخ یا سرخط عوض شده)');
       process.exit(1);
     }
-    console.log('✓ docs/api/routes.json تازه است');
+    console.log(`✓ ${path.relative(ROOT, OUT)} تازه است`);
   } else {
     fs.mkdirSync(path.dirname(OUT), { recursive: true });
     fs.writeFileSync(OUT, text);

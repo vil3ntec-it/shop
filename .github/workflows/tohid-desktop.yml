@@ -459,9 +459,11 @@ jobs:
   #  انتشار فقط از `main` — همان قاعدهٔ «مرج ⇒ انتشار».
   #  فایل‌ها یکی‌یکی و `version.txt` آخر (همان درسِ «Error saving asset»ِ
   #  برنامهٔ اندروید): هیچ لحظه‌ای شماره‌ای اعلام نمی‌شود که فایلش نیامده.
+  #  S64: آزمونِ ذخیره روی ویندوز (`disk-windows`، F0-01) هم سد است — پیش‌تر کارِ جدایی بود که انتشار منتظرش نمی‌ماند و
+  #  نصاب با آزمونِ سرخِ ذخیرهٔ دفتر روی ویندوز هم منتشر می‌شد (`tools/security/workflow-guard.mjs`، قاعدهٔ release).
   publish:
     name: انتشار
-    needs: package
+    needs: [package, disk-windows]
     if: ${{ github.ref == 'refs/heads/main' && github.event_name != 'pull_request' }}
     runs-on: ubuntu-latest
     permissions:
