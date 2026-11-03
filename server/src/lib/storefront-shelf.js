@@ -10,7 +10,10 @@
  *   موجودی ─ `catalog.publicStock()` (PR #263، پرچمِ `shop.catalog`) اگر روی
  *            همین سرور باشد؛ نبودِ ماژول یا پرچمِ خاموش ⇒ همان «در حال بررسی»
  *            ِ امروز، هرگز «موجود» ِ ساختگی.
+ *   نسخه ─── IMG-12: `photoTag` ِ هویتِ همان عکسی که سرو می‌شود — بانک (عکس، نسخه) یا عکسِ همگام‌شده (hash)؛
+ *            همان `photoVersion` ِ کالا و `?v=` ِ نشانیِ عکس (`routes/storefront.js`).
  */
+const crypto = require('node:crypto');
 const db = require('../db');
 const { many } = db;
 
@@ -45,17 +48,21 @@ async function applyStock(shopId, items) {
 /** ناموجود هرگز پیشنهاد نمی‌شود (WEB-09). */
 const suggestable = (p) => !(p.stock && (p.stock.status === 'out_of_stock' || p.stock.status === 'unavailable'));
 
-/** کالاهایی که عکسِ بانک دارند (پرچمِ دکان روشن) — مجموعهٔ شناسه‌ها. */
+/** IMG-12: نشانهٔ کوتاه (۱۲ hex) از هویتِ عکس — `b:<عکس>:<نسخه>` ِ بانک یا `l:<hash>` ِ عکسِ همگام‌شده؛ شناسهٔ درونی بیرون نمی‌رود. */
+const photoTag = (identity) => crypto.createHash('sha256').update(identity).digest('hex').slice(0, 12);
+const bankTag = (row) => photoTag(`b:${row.image_id}:${Number(row.version)}`);
+
+/** کالاهایی که عکسِ بانک دارند (پرچمِ دکان روشن) — شناسه ⇒ نسخهٔ عکس (`photoTag`). */
 async function bankIds(shopId, ids) {
-  if (!ids.length) return new Set();
+  if (!ids.length) return new Map();
   const bank = require('./image-bank');
-  if (!(await bank.shopEnabled(shopId))) return new Set();
+  if (!(await bank.shopEnabled(shopId))) return new Map();
   const rows = await many(
-    `SELECT product_id FROM shop_product_images
+    `SELECT product_id, image_id, version FROM shop_product_images
       WHERE shop_id = $1 AND product_id = ANY($2::text[]) AND source <> 'none' AND image_id <> ''`,
     [shopId, ids]
   );
-  return new Set(rows.map((r) => r.product_id));
+  return new Map(rows.map((r) => [r.product_id, bankTag(r)]));
 }
 
 /** نسخهٔ کوچکِ بانک برای این کالا — یا null (پرچم خاموش، بی عکس، بی اجازه، بی آن اندازه). */
@@ -72,7 +79,7 @@ async function bankImage(shopId, productId, size) {
   const version = Number(row.version);
   if (!img || !(await bank.shopCanRead(shopId, img, version, size))) return null;
   const f = await bank.readFile(img.id, version, size);
-  return f ? { data: f.data, hash: f.hash, mime: f.mime } : null;
+  return f ? { data: f.data, hash: f.hash, mime: f.mime, tag: bankTag(row) } : null;
 }
 
-module.exports = { applyStock, suggestable, bankIds, bankImage, catalogLib };
+module.exports = { applyStock, suggestable, bankIds, bankImage, photoTag, catalogLib };
