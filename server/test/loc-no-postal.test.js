@@ -7,7 +7,8 @@
  *      می‌شود و نبودش هرگز ۴۰۰ نیست.
  *   ۲) نگهبان: در کدِ صفحه‌ها و فرم‌ها (وبِ ویترین، بازارچه، پنل، وبِ مدیریت، برنامهٔ اندروید و
  *      کامپیوتر، core) و در مهاجرت‌های پایگاه هیچ کادر، ستون یا سنجشی برای کدِ پستی نیست؛ اگر روزی
- *      افزوده شود این آزمون جای دقیقش را می‌گوید تا اختیاری بودنش بازبینی شود.
+ *      افزوده شود این آزمون جای دقیقش را می‌گوید تا اختیاری بودنش بازبینی شود. سطرهای بازبینی‌شده
+ *      (کادرِ اختیاریِ §۴.۴ در نشانیِ تحویلِ قرض‌دار، CRM-09) با متنِ دقیق در `REVIEWED_OPTIONAL`اند.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -28,6 +29,23 @@ test('LOC-10: نشانیِ بی کدِ پستی پذیرفته است و کلی�
 });
 
 const POSTAL = /postal|post_?code|postcode|zip_?code|zipcode|کد[\s‌]?پستی/i;
+
+//  بازبینیِ اختیاری بودن (۱۴۰۵/۰۸/۱۲، CRM-09 ِ #887): §۴.۴ ِ مشخصات در فرمِ نشانی «کدِ پستیِ **اختیاری**» می‌خواهد و
+//  نشانیِ تحویلِ قرض‌دار (`Debtor.deliveryAddress`) آن را دارد. فقط همین سطرها، **دقیقاً با همین متن**، پذیرفته‌اند و
+//  چرا اختیاری‌اند کنارِ هر کدام آمده؛ سطرِ تازه در هر جای دیگر، یا هر تغییرِ همین سطرها (مثلاً برداشتنِ `isNotEmpty()`
+//  یا پیش‌فرضِ خالی) ⇒ دوباره سرخ و دوباره بازبینی. وب، سرور و مهاجرت‌ها هیچ سطرِ پذیرفته‌ای ندارند.
+const KT = 'android-native/app/src/main/java/ir/vil3ntec/tohid/';
+const REVIEWED_OPTIONAL = new Map([
+  [KT + 'core/i18n/StrMoney.kt|val addressPostal: String get() = t("کدِ پستی (اختیاری)", "Postal code (optional)", "پوستي کوډ (اختیاري)")', 'برچسبِ کادر با «(اختیاری)» در هر سه زبان'],
+  [KT + 'data/CustomerCrm.kt|private val POSTAL = Regex("^[0-9]{4,10}$")', 'شکلِ رقم، فقط برای مقدارِ پر (سطرِ isNotEmpty)'],
+  [KT + 'data/CustomerCrm.kt|val postal = ir.vil3ntec.tohid.latinDigits(a.postalCode).filterNot { it.isWhitespace() }', 'یکدست‌کردنِ رقم؛ خالی خالی می‌ماند'],
+  [KT + 'data/CustomerCrm.kt|if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed("کدِ پستی فقط رقم است")', 'سنجش فقط وقتی پر است؛ خالی هرگز خطا نیست'],
+  [KT + 'data/CustomerCrm.kt|val next = DeliveryAddress(area, landmark, gate, floor, plus, postal).takeIf { it != DeliveryAddress() }', 'خالی ⇒ بخشِ خالی (نوشته نمی‌شود)'],
+  [KT + 'data/CustomerCrm.kt|listOf(a.landmark, a.area, a.gate, a.floor, a.plusCode, a.postalCode).filter { it.isNotBlank() }.joinToString(" · ")', 'نمایش؛ بخشِ خالی نمی‌آید'],
+  [KT + 'data/DeliveryAddress.kt|*  منزل؛ `floor` = طبقه؛ `plusCode` = Plus Code (بزرگ)؛ `postalCode` = فقط رقم.', 'شرح؛ همان‌جا: «هر بخش اختیاری»'],
+  [KT + 'data/DeliveryAddress.kt|@OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val postalCode: String = "",', 'پیش‌فرضِ خالی و نوشته نمی‌شود'],
+  [KT + 'ui/v3/money/DebtorFormSheets.kt|V3TextField(f.address.postalCode, { f = f.copy(address = f.address.copy(postalCode = it)) }, StrMoney.addressPostal, Modifier.weight(1f),', 'کادرِ اختیاری با همان برچسب'],
+]);
 const EXT = new Set(['.js', '.mjs', '.cjs', '.html', '.json', '.sql', '.kt', '.kts', '.css']);
 const SKIP_DIR = new Set(['node_modules', 'vendor', 'build', '.gradle', 'test', 'tests']);
 
@@ -61,9 +79,18 @@ test('LOC-10: هیچ فرم، سنجش یا ستونی کدِ پستی نمی‌
   }
   assert.ok(files.length > 300, `فقط ${files.length} پرونده خوانده شد`);
   const hits = [];
+  const seen = new Set();
   for (const f of files) {
+    const rel = path.relative(ROOT, f).split(path.sep).join('/');
     const lines = fs.readFileSync(f, 'utf8').split('\n');
-    lines.forEach((line, i) => { if (POSTAL.test(line)) hits.push(`${path.relative(ROOT, f)}:${i + 1}: ${line.trim().slice(0, 120)}`); });
+    lines.forEach((line, i) => {
+      if (!POSTAL.test(line)) return;
+      const key = `${rel}|${line.trim()}`;
+      if (REVIEWED_OPTIONAL.has(key)) seen.add(key);
+      else hits.push(`${rel}:${i + 1}: ${line.trim().slice(0, 120)}`);
+    });
   }
   assert.deepEqual(hits, [], 'کدِ پستی پیدا شد — باید اختیاری بماند (LOC-10)');
+  //  فهرستِ بازبینی‌شده کهنه نماند: سطری که دیگر نیست باید از فهرست برود
+  assert.deepEqual([...REVIEWED_OPTIONAL.keys()].filter((k) => !seen.has(k)), [], 'سطرِ بازبینی‌شده دیگر نیست — از REVIEWED_OPTIONAL بردار');
 });
