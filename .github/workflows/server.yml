@@ -23,6 +23,9 @@ on:
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       # شاخهٔ «ضایعات» ِ برگشتِ تازه را آزمونِ سرتاسریِ return.e2e.mjs از خودِ کاتلین می‌خواند (S13.waste)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt'
+      # SEC-AI-01: قراردادِ API و مولدش با `api-contract.test.js` با سرور سنجیده می‌شوند (ویرایشِ دستی هم)
+      - 'docs/api/routes.json'
+      - 'tools/api-contract/**'
       - '.github/workflows/server.yml'
   pull_request:
     paths:
@@ -37,6 +40,9 @@ on:
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'
       # شاخهٔ «ضایعات» ِ برگشتِ تازه را آزمونِ سرتاسریِ return.e2e.mjs از خودِ کاتلین می‌خواند (S13.waste)
       - 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/ReturnFlow.kt'
+      # SEC-AI-01: قراردادِ API و مولدش با `api-contract.test.js` با سرور سنجیده می‌شوند (ویرایشِ دستی هم)
+      - 'docs/api/routes.json'
+      - 'tools/api-contract/**'
       - '.github/workflows/server.yml'
   workflow_dispatch:
 
