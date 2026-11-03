@@ -53,6 +53,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۸، شاخهٔ `claude/ios-app-phase8` (روی main پس از #875؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: آزمونِ سرتاسریِ جریان‌های اصلی روی شبیه‌ساز در کارِ `ios-app` (`iosSimulatorArm64Test`): ریشهٔ برنامه (`IosRoot`) روی
+  Skia ِ بی‌صفحه با زدن و نوشتن روی صفحه — بالا آمدن تا ورود، ورود با ایمیل و رمز، فروشِ نقد در صندوق (`TillSale.record`)،
+  کالای تازه، «تازه‌ها»، زبانِ دری — در برابرِ سرورِ واقعیِ مخزن روی PGlite (`ios/e2e/backend.mjs`)، با سنجشِ دفتر و `sync_rows` ِ
+  سرور و عکسِ هر گام (مصنوعِ `ios-e2e-shots`). لایهٔ iOS: `IosNetRoute` (فقط آزمون)، `IosHost` (اعلان و لرزش بیرون از `.app`
+  بی‌صدا). شرح: `docs/IOS-PLAN-fa.md` §۰.۱۳.
+- آزمون: klib و klib ِ آزمونِ iOS سبز (Compose 1.7.3 ِ محلی)، `ios/shared` jvmTest ۲۰/۲۰؛ خودِ آزمونِ سرتاسری فقط روی macOS.
+- نیمه‌کاره: نتیجهٔ نخستین اجرای CI ِ macOS (در §۰.۱۳ نوشته می‌شود).
+- قدمِ بعدی: سبز کردنِ گام‌های سرخ (اگر بود) از روی عکس و درختِ `ios-e2e-shots`؛ سپس همین راه برای حالتِ پیک و برگشتِ فروش.
+
 ### ۱۴۰۵/۰۸/۱۲ — شاخهٔ `claude/split-big-files` («شکستنِ فایل‌های بزرگ»، پیگیریِ سقف‌های موقتِ #690؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: بازسازیِ خالص، هر پرونده یک کامیت، همان خط‌ها جابه‌جا: `storefront.js` ۱۱۴۲⇐۷۸۰ (`storefront-ticket`، `storefront-owner`)،
   `delivery.js` ۱۱۷۰⇐۷۳۵ (`delivery-views/recall/call/photos/settle`)، `catalog.js` ۹۱۸⇐۷۴۷ (`catalog-manual`)، `market.js` ۸۱۱⇐۷۳۸

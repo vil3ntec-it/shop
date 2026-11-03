@@ -103,10 +103,13 @@ jobs:
   #  و یک بار اجرا روی شبیه‌ساز با عکس. امضا و انتشار BLOCKED-EXTERNAL است (حسابِ اپل ِ صاحب‌کار).
   #  ۷۵ دقیقه کم بود: گامِ ۴ (#841) هر چهار مرحله را سبز گذراند (پیوند ~۳۰، xcodebuild ~۱۷، اجرا ~۶، آزمون ~۲۲ دقیقه)
   #  و کار در ذخیرهٔ کشِ پایانی «لغو» شد. هزینهٔ اجرای کامل همان است؛ فقط سرخِ دروغ در پایان نمی‌آید.
+  #  گامِ ۸ (docs/IOS-PLAN-fa.md §۰.۱۳): آزمونِ سرتاسریِ جریان‌های اصلی در همان `iosSimulatorArm64Test` با سرورِ واقعیِ
+  #  مخزن روی PGlite (`ios/e2e/backend.mjs`) و عکسِ هر گام (مصنوعِ `ios-e2e-shots`) ⇐ سقف ۱۱۵ دقیقه.
+  #  کار همچنان «گزارش» و continue-on-error است؛ درونش هر گام سخت‌گیر است (سرخ ⇐ همان مرحله سرخ).
   ios-app:
     name: برنامهٔ آیفون — چارچوب، Xcode و شبیه‌ساز (گزارش)
     runs-on: macos-latest
-    timeout-minutes: 100
+    timeout-minutes: 115
     continue-on-error: true
     env:
       LC_ALL: en_US.UTF-8
@@ -148,15 +151,51 @@ jobs:
           xcrun simctl io "$UDID" screenshot ios-shots/ios-app.png
           xcrun simctl spawn "$UDID" log show --last 3m --predicate 'process == "iosApp"' > ios-shots/ios-app.log 2>&1 || true
           if xcrun simctl spawn "$UDID" launchctl list | grep -q 'ir.vil3ntec.tohid'; then echo "برنامه پس از ۲۰ ثانیه زنده است"; else echo "::warning::برنامه پس از ۲۰ ثانیه زنده نیست (ios-shots/ios-app.log)"; exit 1; fi
-      #  ۴) shimهای رمزنگاری روی شبیه‌ساز (CommonCrypto/Keychain) در برابرِ بردارهای JDK — `src/iosTest`
-      - name: iosSimulatorArm64Test (ios/shared)
+      #  ۴) سرورِ آزمونِ سرتاسری (گامِ ۸): همان سرورِ مخزن روی PGlite ِ در حافظه، فقط 127.0.0.1، با صاحبِ دکان (ایمیل و رمز)
+      #  و یک کالای موجود از دستگاهِ دیگرِ همان دکان؛ شبیه‌ساز شبکهٔ همین مک را دارد
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        if: always()
+        with:
+          node-version: '22'
+      - name: سرورِ آزمونِ سرتاسری (PGlite)
         if: always()
         run: |
+          (cd server && npm ci --no-audit --no-fund)
+          mkdir -p ios-e2e/shots
+          node ios/e2e/backend.mjs "$PWD/ios-e2e/backend.json" > ios-e2e/backend.log 2>&1 &
+          echo $! > ios-e2e/backend.pid
+          for i in $(seq 1 90); do [ -s ios-e2e/backend.json ] && break; sleep 1; done
+          if [ ! -s ios-e2e/backend.json ]; then tail -60 ios-e2e/backend.log; echo "::error::سرورِ آزمون بالا نیامد"; exit 1; fi
+          tail -1 ios-e2e/backend.log
+      #  ۵) روی شبیه‌ساز: shimهای رمزنگاری (CommonCrypto/Keychain) در برابرِ بردارهای JDK، shimهای گام‌های ۳ تا ۷، و
+      #  آزمونِ سرتاسریِ جریان‌های اصلی (`src/iosTest/…/e2e/CoreFlowsE2EIosTest`: ورود، صندوق، کالا، «تازه‌ها»، دری)
+      - name: iosSimulatorArm64Test (ios/shared) — رمز، shimها و جریان‌های اصلی
+        if: always()
+        env:
+          TOHID_E2E_BACKEND: ${{ github.workspace }}/ios-e2e/backend.json
+          TOHID_E2E_SHOTS: ${{ github.workspace }}/ios-e2e/shots
+        run: |
+          set +e
           ./desktop/gradlew --no-daemon -p ios/shared -Pios=true iosSimulatorArm64Test
-          grep -ho '<testsuite [^>]*' ios/shared/build/test-results/iosSimulatorArm64Test/*.xml || true
+          rc=$?
+          grep -ho '<testsuite [^>]*' ios/shared/build/test-results/iosSimulatorArm64Test/*.xml
+          if [ -s ios-e2e/shots/summary.md ]; then cat ios-e2e/shots/summary.md >> "$GITHUB_STEP_SUMMARY"; cat ios-e2e/shots/summary.md; else echo "::warning::جدولِ آزمونِ سرتاسری نیست (ios-e2e/shots/summary.md)"; fi
+          exit $rc
+      - name: پایانِ سرورِ آزمون
+        if: always()
+        run: |
+          [ -f ios-e2e/backend.pid ] && kill "$(cat ios-e2e/backend.pid)" 2>/dev/null || true
+          cp ios/shared/build/test-results/iosSimulatorArm64Test/*.xml ios-e2e/ 2>/dev/null || true
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
           name: ios-app-shots
           path: ios-shots/
+          if-no-files-found: ignore
+      #  عکسِ هر گامِ آزمونِ سرتاسری (۳۹۰×۸۴۴، ۳x) + درختِ دسترس‌پذیری، `summary.md`، `e2e.log`، لاگِ سرور و نتیجهٔ آزمون‌ها
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: ios-e2e-shots
+          path: ios-e2e/
           if-no-files-found: ignore
