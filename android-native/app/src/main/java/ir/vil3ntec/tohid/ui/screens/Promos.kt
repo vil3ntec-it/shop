@@ -367,6 +367,11 @@ private fun PromoEditor(
   val brands = remember(d.products, rule.id) {
     (d.products.mapNotNull { it.brand?.trim()?.takeIf { b -> b.isNotEmpty() } } + rule.scope.brands + rule.scope.exBrands).distinct().sorted()
   }
+  //  PRM-11: گروه‌های مشتریِ دکان (CRM-08) و هر گروهی که خودِ قاعده دارد (تا قاعدهٔ کهنه گروهی را بی‌صدا گم نکند)
+  val groups = remember(d.debtors, rule.id) {
+    (ir.vil3ntec.tohid.data.CustomerCrm.groups(d).map { it.first } + rule.groups)
+      .distinctBy { ir.vil3ntec.tohid.core.text.TextNormalizer.compareKey(it) }.sorted()
+  }
   val lockedBelow = rule.allowBelowCost && !canBelowCost
 
   fun save() {
@@ -495,6 +500,20 @@ private fun PromoEditor(
         }
       }
       Hint("هیچ دسته یا کالایی نزنید ⇐ همهٔ کالاها. «جز» بر «شامل» مقدم است.")
+
+      if (groups.isNotEmpty()) {
+        Section(ir.vil3ntec.tohid.core.i18n.StrLine.promoGroupsTitle)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
+          groups.forEach { g ->
+            FilterChip(
+              selected = g in f.groups,
+              onClick = { f = f.copy(groups = if (g in f.groups) f.groups - g else f.groups + g) },
+              label = { Text(g) },
+            )
+          }
+        }
+        Hint(ir.vil3ntec.tohid.core.i18n.StrLine.promoGroupsHint)
+      }
 
       Section("چه وقت")
       FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {

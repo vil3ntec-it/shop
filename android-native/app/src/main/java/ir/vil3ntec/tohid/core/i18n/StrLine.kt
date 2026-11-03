@@ -46,4 +46,13 @@ object StrLine {
   val freeLineClosed: String get() = t("قلمِ آزاد برای شما بسته است", "Custom items are closed for you", "آزاد توکی ستاسو لپاره بند دی")
   val tooLarge: String get() = t("عدد بیش از اندازه است", "The number is too large", "شمېره له حده ډېره لویه ده")
   fun freeLineOverCap(a: Any): String = t("قیمتِ قلمِ آزاد حداکثر ${asIs(a)} ؋", "A custom item can cost at most $a ؋", "د آزاد توکي بیه تر $a ؋ پورې")
+
+  // PRM-11 — تخفیفِ خودکار فقط برای گروه‌های مشتری (گروهِ CRM-08 در پروندهٔ مشتری)
+  val promoGroupsTitle: String get() = t("برای کدام مشتریان", "For which customers", "د کومو پیرودونکو لپاره")
+  val promoGroupsHint: String get() = t(
+    "هیچ گروهی نزنید ⇐ همه، حتی فروشِ بی مشتری. با گروه، تخفیف فقط وقتی می‌آید که مشتریِ همان گروه روی فاکتور باشد (گروه در پروندهٔ مشتری: «گروه، لیستِ قیمت و رضایت»).",
+    "Pick no group ⇒ everyone, even a sale without a customer. With groups, the discount applies only when a customer of that group is on the invoice (set the group in the customer's file: “Group, price list and consent”).",
+    "هېڅ ډله مه ټاکئ ⇐ ټول، حتی بې پیرودونکي پلور. له ډلې سره، تخفیف یوازې هغه وخت راځي چې د هماغې ډلې پیرودونکی په بل کې وي (ډله د پیرودونکي په دوسیه کې: «ډله، د بیو لړ او رضایت»).",
+  )
+  fun promoOnlyGroups(names: String): String = t("فقط گروهِ ${asIs(names)}", "Only group $names", "یوازې ډله $names")
 }

@@ -137,8 +137,11 @@ class SettingsPortTest {
     assertEquals(SettingsLayout.DATA, SettingsLayout.groupOf(SettingsLayout.CRM_REPORTS))
     ported.filterNot { it == SettingsLayout.ENCRYPTION || it == SettingsLayout.CRM_REPORTS }
       .forEach { assertEquals(it, SettingsLayout.SALES, SettingsLayout.groupOf(it)) }
-    //  «گزارش‌های مشتری» و کلیدهای صندوق و گزارشِ کامپیوتر مثلِ رابطِ امروز فقط کامپیوتر
-    assertEquals(setOf(SettingsLayout.CRM_REPORTS) + DESK_ONLY, SettingsLayout.PHONE_HIDDEN)
+    //  کلیدهای صندوق و گزارشِ کامپیوتر مثلِ رابطِ امروز فقط کامپیوتر. «گزارش‌های مشتری» از دورِ ۱۴ روی گوشی هم:
+    //  ادغامِ تکراری‌ها، تصویرِ صورت‌حساب، گروه و لیستِ قیمت، و سنِ بدهی و RFM ِ گوشی پشتِ همین کلیدِ همین دستگاه‌اند
+    //  (`V3ReachabilityTest`)؛ پنهان بودنش روی گوشی یعنی آن‌ها روی گوشی هرگز روشن نمی‌شدند.
+    assertEquals(DESK_ONLY.keys, SettingsLayout.PHONE_HIDDEN)
+    assertFalse(SettingsLayout.CRM_REPORTS in SettingsLayout.PHONE_HIDDEN)
     assertTrue(SettingsLayout.CRM_REPORTS in SettingsLayout.deskSections)
     //  کلیدِ برگشت همان عنوانِ رابطِ امروز است
     assertEquals(ir.vil3ntec.tohid.ui.screens.RETURN_SETTINGS_TITLE, SettingsLayout.RETURNS)
@@ -320,13 +323,20 @@ class SettingsPortTest {
       "settings/general/appearance" to "ظاهر",
     )
 
-    /** کلیدهایی که رابطِ قدیم فقط پشتِ `Platform.DESKTOP` داشت */
-    private val DESK_ONLY: Set<String> = setOf(
-      //  POS-15: «قیمت‌پرسی در صندوق» از دورِ ۱۱ گوشی هم دارد (منوی «…» ِ صندوق) ⇒ فقط‌کامپیوتر نیست
-      SettingsLayout.POS_SEARCH, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
-      SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS,
-      //  HW-08: وب‌کم به‌عنوانِ بارکدخوان — گوشی دوربینِ خودش را دارد
-      SettingsLayout.WEBCAM,
+    /**
+     *  بخش‌هایی که عمداً فقط کامپیوتر ردیف دارند ⇐ دلیل (رابطِ قدیم همین‌ها را پشتِ `Platform.DESKTOP` داشت). هیچ صفحهٔ
+     *  گوشی پشتِ کلیدشان نیست (`V3ReachabilityTest`، `GATES`). POS-15: «قیمت‌پرسی در صندوق» از دورِ ۱۱ و «گزارش‌های مشتری»
+     *  از دورِ ۱۴ گوشی هم دارند ⇒ این‌جا نیستند.
+     */
+    private val DESK_ONLY: Map<String, String> = mapOf(
+      SettingsLayout.POS_SEARCH to "جست‌وجوی کادرِ صندوقِ کامپیوتر (`DeskSale`)؛ گوشی `CatalogSearch` ِ خودش را دارد — ردهٔ A، روشن",
+      SettingsLayout.POS_TOUCH to "دکمه‌های لمسیِ صندوقِ کامپیوتر (`TouchKeypad`)؛ گوشی همیشه لمسی است",
+      SettingsLayout.POS_MORE_KEYS to "کلیدهای بیشترِ صفحه‌کلیدِ صندوقِ کامپیوتر (`DeskSale`)",
+      SettingsLayout.KEY_HELP to "برچسبِ کلیدهای میان‌برِ صفحه‌کلید — ردهٔ A، روشن",
+      SettingsLayout.TILL_SWITCH to "تعویضِ کاربرِ صندوق با Ctrl+L ِ کامپیوتر (`AppRoot`)؛ خاموش ⇒ `TillUser.me` همان نامِ حساب",
+      SettingsLayout.REPORT_KEYS to "کلیدهای دورهٔ «گزارش‌ها» ِ کامپیوتر (`ReportsDesk`) — ردهٔ A، روشن",
+      //  HW-08
+      SettingsLayout.WEBCAM to "وب‌کم به‌عنوانِ بارکدخوان — گوشی دوربینِ خودش را دارد",
     )
 
     /** دلیلِ پیش‌فرضِ استثنای تازه: `"X.set" to "$PENDING — …"` */

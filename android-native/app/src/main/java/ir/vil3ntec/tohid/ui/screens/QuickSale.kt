@@ -104,7 +104,7 @@ fun QuickSaleScreen(
   val cart by cartStore.lines.collectAsState()
   val cartDebtorId by cartStore.debtorId.collectAsState()
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
-  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart, cartDebtorId) // PRM-11: گروهِ مشتری
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  PRM-13: امتیازِ وفاداری (قاعدهٔ در کار، پیش‌فرض خاموش ⇒ null و `loyal` همان `priced`)
   val loyalty = ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill(d, priced, cartDebtorId)

@@ -180,11 +180,25 @@ object PromoEngine {
   }
 
   /**
+   *  PRM-11 — گروهِ مشتریِ همین فاکتور برای قاعده‌های «فقط این گروه‌ها» (`PromoCore.Rule.groups`). گروه همان
+   *  `Debtor.group` (CRM-08) است و هسته آن را **دقیقاً** با نامِ گروهِ قاعده می‌سنجد؛ پس اگر قاعده‌ای همان گروه را با
+   *  نوشتنِ دیگری دارد («عمده» و «عمده »، «ي/ی») نامِ قاعده برمی‌گردد — همان کلیدِ `CustomerCrm.groups`.
+   *  بی مشتری، مشتریِ ناشناس یا بی گروه ⇒ "" (همان ورودیِ پیشین: قاعدهٔ گروه‌دار اعمال نمی‌شود).
+   */
+  fun groupOf(d: ShopData, debtorId: String?, rules: List<PromoCore.Rule>): String {
+    val raw = debtorId?.let { id -> d.debtors.find { it.id == id } }?.group?.trim().orEmpty()
+    if (raw.isEmpty()) return ""
+    val key = ir.vil3ntec.tohid.core.text.TextNormalizer.compareKey(raw)
+    return rules.asSequence().flatMap { it.groups.asSequence() }.firstOrNull { ir.vil3ntec.tohid.core.text.TextNormalizer.compareKey(it) == key } ?: raw
+  }
+
+  /**
    *  سبد + قاعده‌ها ⇒ نتیجه، یا `null` وقتی چیزی برای اعمال نیست (خاموش، بی
    *  قاعدهٔ فعال، سبدِ خالی، یا عددی بیرون از بازهٔ امنِ هسته).
    *
    *  @param date تاریخِ محلیِ دکان «YYYY-MM-DD»
    *  @param minute دقیقه از نیمه‌شب
+   *  @param group PRM-11 — گروهِ مشتریِ فاکتور ([groupOf])؛ "" ⇒ همان سبدِ بی گروهِ پیشین
    */
   fun evaluate(
     d: ShopData,
@@ -193,11 +207,12 @@ object PromoEngine {
     coupons: List<String>,
     date: String,
     minute: Int,
+    group: String = "",
   ): Outcome? {
     if (!snap.active || cart.isEmpty()) return null
     //  PRM-10: محموله‌ها فقط وقتی قاعدهٔ فعالِ «نزدیکِ انقضا» هست — وگرنه همان ورودیِ پیشین
     val expiry = snap.rules.any { it.active && it.kind == "expiry" }
-    val input = PromoCore.Cart(lines(d, cart, if (expiry) date else null), coupons, group = "", channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100)
+    val input = PromoCore.Cart(lines(d, cart, if (expiry) date else null), coupons, group = group, channel = "pos", at = PromoCore.At(date, minute.toLong()), stepMinor = 100)
     val r = runCatching { PromoCore.evaluate(input, snap.rules) }.getOrNull() ?: return null
     val net = r.lines.associate { it.key to it }
     val parts = runCatching { split(input, snap.rules, r) }.getOrNull()
