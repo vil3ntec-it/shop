@@ -233,6 +233,17 @@ class SettingsHomeTest {
     assertTrue(SettingsSearchIndex.search(prs, "انبار").any { it.key == SettingsLayout.GOODS })
   }
 
+  /** PAY-13 — «شمارشِ کور» گزینهٔ صفحهٔ «پرداخت» است؛ جست‌وجو به همان صفحه می‌برد، به هر سه زبان */
+  @Test
+  fun `جست‌وجوی شمارشِ کور به صفحهٔ پرداخت می‌رسد`() {
+    val docs = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet())
+    assertTrue(SettingsSearchIndex.search(docs, "شمارش کور").any { it.key == SettingsLayout.PAY })
+    assertTrue(SettingsSearchIndex.search(docs, "blind count").any { it.key == SettingsLayout.PAY })
+    assertTrue(SettingsSearchIndex.search(docs, "پټ شمېرل").any { it.key == SettingsLayout.PAY })
+    val desk = SettingsSearchIndex.docs(desktop = true, serverOn = emptySet())
+    assertTrue(SettingsSearchIndex.search(desk, "شمارش کور").any { it.key == SettingsLayout.PAY })
+  }
+
   @Test
   fun `جست‌وجو فقط بخشِ همین سکو و پرچمِ روشنِ سرور را دارد و هر نتیجه به صفحه‌اش می‌رسد`() {
     val phone = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet()).map { it.key }

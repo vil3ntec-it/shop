@@ -53,6 +53,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps8-partial` (کمبودهای PARTIAL، دورِ ۸، و فهرستِ تصمیم‌های صاحب‌کار؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **PAY-19** Shift+F8 ِ صندوقِ کامپیوتر ⇐ پنجرهٔ دلیلِ «کشو بی فروش» (`PosKeys.noSaleDrawer`، `DrawerNoSale.keyGate`؛ keymap «partial»)؛
+  **PRM-02** آزادِ خودکارِ کدهای سقف‌دار با لغو/اصلاحِ فاکتورِ نسخهٔ ۳ (`PromoLive.releaseOnVoid` + صفِ بی‌اینترنت، `PromoRedeem.release*`)؛
+  **PAY-13** «شمارشِ کور» تنظیمِ دکان شد (`ShopPolicy.blindCount`، ردیف در `settings/sales/payments`، `ShiftSlip.blind`)؛ **SYN-14** عکس‌ها
+  قابلِ ادامه و پس از دفتر (`core/sync/PhotoSyncPlan`، `SyncV1Engine.ledgerBusy`). هر چهار PARTIAL ماندند (شاهدِ CI). بی مهاجرت.
+- **`docs/OWNER-DECISIONS-fa.md`**: ۳۰ تصمیمِ باز (D-xx و O-01..O-19) با پرسشِ ساده، گزینه‌ها، پیشنهاد و ردیف‌هایی که باز می‌کنند (۹۴ ردیف).
+- نیمه‌کاره / یافته: صندوقِ پرداختِ گوشیِ نسخهٔ ۳ (`CheckoutRoute`) کدِ سقف‌دار را پیش از ثبت از سرور نمی‌گیرد (`redeemGate` فقط در صندوقِ
+  کامپیوتر) — در «مانده» ِ PRM-02 آمد؛ به خاطرِ #862 که همین فایل را دارد دست نخورد.
+- قدمِ بعدی: CI ِ همین PR؛ پس از مرجِ #862، `gate` ِ `redeemGate` در `CheckoutRoute`؛ جوابِ صاحب‌کار به `OWNER-DECISIONS-fa.md`.
+
 ### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۶، شاخهٔ `claude/ios-app-phase6` (روی #852؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: ورود با اپل — سرور (`lib/apple.js`، `/auth/apple/nonce`، `/auth/apple`، `/auth/apple/link-code`؛ جدولِ مشترکِ `PROVIDERS` با گوگل،
   nonce ِ HMAC ِ یک‌بارمصرف؛ بی `APPLE_CLIENT_IDS` خاموش)، کدِ مشترک (`data/ExternalSignIn.kt`، `AuthController.apple`، `AppleButton`؛ اندروید و

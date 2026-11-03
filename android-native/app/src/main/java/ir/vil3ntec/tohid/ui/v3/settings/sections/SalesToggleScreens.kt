@@ -11,6 +11,7 @@ import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.pay.TillRounding
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrShell
+import ir.vil3ntec.tohid.core.i18n.StrShift
 import ir.vil3ntec.tohid.data.CashRoundPref
 import ir.vil3ntec.tohid.data.DebtReminderPref
 import ir.vil3ntec.tohid.data.HeldRules
@@ -38,6 +39,7 @@ private val OFF_ON: List<String> get() = listOf(StrShell.switchOff, StrShell.swi
 internal fun RouteScope.PaySettingsScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   var payV2 by remember { mutableStateOf(ShopPolicy.payV2(context)) }
+  var blind by remember { mutableStateOf(ShopPolicy.blindCount(context)) }
   var cashStep by remember { mutableStateOf(CashRoundPref.step(context)) }
   SettingsPageFrame(title = SettingsLayout.labelOf(SettingsLayout.PAY), onBack = onBack) {
     item(key = "choice") {
@@ -52,6 +54,21 @@ internal fun RouteScope.PaySettingsScreen(onBack: (() -> Unit)?) {
         )
       }
       SettingsNote(StrShell.payNote)
+    }
+    //  PAY-13: شمارشِ کورِ شاگرد — فقط با «ترکیبی و شیفت» معنا دارد؛ پیش‌فرض روشن (همان رفتارِ پیشین)
+    if (payV2) item(key = "blind") {
+      SettingsBlock {
+        PartTitle(StrShift.blindSettingTitle)
+        V3Segmented(
+          options = OFF_ON,
+          selected = if (blind) 1 else 0,
+          onSelect = {
+            blind = it == 1
+            ShopPolicy.setBlindCount(context, blind)
+          },
+        )
+      }
+      SettingsNote(StrShift.blindSettingNote)
     }
     //  PAY-09: گردکردنِ نقدی (خاموش | ۵ | ۱۰ افغانی) — همان `CashRoundPref.set` ِ رابطِ امروز، پیش‌فرض خاموش
     item(key = "rounding") {

@@ -57,4 +57,14 @@ class DrawerNoSaleTest {
     assertTrue(e.notes.endsWith("تأیید: policy"))
     assertFalse(e.notes.contains("صاحب"))
   }
+
+  /** PAY-19 — Shift+F8 ِ صندوقِ کامپیوتر: بی چاپگرِ کشودار پیام، بی `drawer.open` همان APPROVAL_REQUIRED، وگرنه پنجرهٔ دلیل */
+  @Test
+  fun `کلیدِ کشو — بی چاپگرِ کشودار پیام، بی مجوز رد، با هر دو پنجرهٔ دلیل`() {
+    assertEquals(DrawerNoSale.NO_DRAWER_PRINTER, DrawerNoSale.keyGate(hasDrawerPrinter = false, allowed = true))
+    //  نبودِ چاپگر پیش از مجوز: شاگرد هم می‌فهمد چرا کشو باز نمی‌شود، نه «تأیید می‌خواهد»
+    assertEquals(DrawerNoSale.NO_DRAWER_PRINTER, DrawerNoSale.keyGate(hasDrawerPrinter = false, allowed = false))
+    assertEquals(DrawerNoSale.NEED_APPROVAL, DrawerNoSale.keyGate(hasDrawerPrinter = true, allowed = false))
+    assertNull(DrawerNoSale.keyGate(hasDrawerPrinter = true, allowed = true))
+  }
 }

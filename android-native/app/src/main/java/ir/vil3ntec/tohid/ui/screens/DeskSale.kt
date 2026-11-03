@@ -96,7 +96,7 @@ import ir.vil3ntec.tohid.core.i18n.StrInvoices
  *  • **سبد جدول است**؛ ↑↓ ردیف را عوض می‌کند (وقتی کادر خالی است)،
  *    + و − تعداد، Delete حذف، F3 تعداد/قیمتِ دستی.
  *  • **تسویه کنارِ سبد است، نه پنجره**: نوعِ پرداخت، تخفیف، دریافتی؛
- *    F9 یا Ctrl+Enter ثبت. F2 مشتری، F4 قلمِ آزاد، F8 چاپِ فاکتورِ آخر،
+ *    F9 یا Ctrl+Enter ثبت. F2 مشتری، F4 قلمِ آزاد، F8 چاپِ فاکتورِ آخر، Shift+F8 کشو بی فروش (PAY-19)،
  *    Esc پاک کردنِ کادر.
  *
  *  چیدمان — نسخهٔ ۲ (VISUAL-DIRECTION «نسخهٔ ۲»، RTL): کاتالوگ راست و پهن با
@@ -205,6 +205,8 @@ fun DeskSaleScreen(
   val returnsV2 = remember { ir.vil3ntec.tohid.data.ReturnSettings.enabled(context) }
   val myReceiptTag = remember { ir.vil3ntec.tohid.core.receipt.ReceiptTokens.shopTag(ir.vil3ntec.tohid.data.LedgerOwner.currentShop(context)) }
   var returnMode by remember { mutableStateOf(false) }
+  //  PAY-19: Shift+F8 ⇒ پنجرهٔ دلیلِ «کشو بی فروش» با چاپگرِ پیش‌فرضِ کشودار (همان `OpenDrawerDialog` ِ دستگاه‌ها)
+  var noSaleDrawer by remember { mutableStateOf<ir.vil3ntec.tohid.print.PrinterRegistry.Saved?>(null) }
 
   val searchFocus = remember { FocusRequester() }
   val moreKeys = ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.isOn(context); val discountFocus = remember { FocusRequester() } // POS-41، خاموش ⇒ همان
@@ -793,6 +795,13 @@ fun DeskSaleScreen(
           returnMode = true
           return@onPreviewKeyEvent true
         }
+        //  PAY-19: Shift+F8 همیشه مالِ کشو است (دیگر چاپِ دوبارهٔ F8 نیست)؛ بی چاپگرِ کشودار یا بی `drawer.open` فقط پیام
+        if (PosKeys.noSaleDrawer(keyName(e.key), e.isPrimaryModifier, e.isShiftPressed, e.isAltPressed)) {
+          val printer = ir.vil3ntec.tohid.print.PrinterRegistry.defaultSaved(context)?.takeIf { it.drawer }
+          ir.vil3ntec.tohid.data.DrawerNoSale.keyGate(printer != null, ir.vil3ntec.tohid.data.ShopRole.canOpenDrawer(context))
+            ?.let(::toast) ?: run { noSaleDrawer = printer }
+          return@onPreviewKeyEvent true
+        }
         when (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e)) {
           ir.vil3ntec.tohid.core.pos.PosMoreKeys.Act.DISCOUNT_INVOICE -> { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
           //  POS-41: F5 ⇒ برگهٔ ردیفِ انتخاب‌شده با فوکوس روی «تخفیفِ ردیف»؛ بی ردیف کلید مالِ صندوق نیست
@@ -1009,6 +1018,7 @@ fun DeskSaleScreen(
   if (returnMode) {
     ReturnModeHost(d = d, store = store, shopTag = myReceiptTag, onClose = { returnMode = false; refocus() }, onMessage = ::toast)
   }
+  noSaleDrawer?.let { printer -> OpenDrawerDialog(printer, onDismiss = { noSaleDrawer = null; refocus() }, toast = ::toast) }
 }
 
 /** کلیدِ Compose ⇒ نامِ کلیدِ فیزیکی (`KeyName`) برای `PosKeys` — همان نگاشتِ `KeyBinding.kt` */

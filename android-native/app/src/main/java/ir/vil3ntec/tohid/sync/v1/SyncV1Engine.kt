@@ -85,6 +85,9 @@ class SyncV1Engine private constructor(context: Context) {
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
 
   @Volatile private var busy = false
+
+  /** SYN-14: دفتر همین حالا می‌فرستد یا می‌گیرد — عکس‌ها (`PhotoSync`، `PhotoSyncPlan.waitMs`) تا آن صبر می‌کنند */
+  val ledgerBusy: Boolean get() = busy || gate.isLocked
   @Volatile var liveConnected: Boolean = false
     internal set
   @Volatile private var attempt = 0

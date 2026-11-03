@@ -54,4 +54,40 @@ class PromoRedeemTest {
       assertEquals("$status $code", Decision.UNREACHABLE, PromoRedeem.decide(false, status, code))
     }
   }
+
+  /** PRM-02 — آزادِ خودکار با لغوِ فاکتور: کی پرسیده شود، پاسخ چه معنایی دارد و صف چطور می‌ماند */
+  @Test
+  fun `لغوِ فاکتور — فقط با شمارشِ روشن یا کدِ روی فاکتور به سرور می‌رود`() {
+    assertEquals(false, PromoRedeem.releaseNeeded(redeemOn = false, saleCoupons = emptyList()))
+    assertEquals(false, PromoRedeem.releaseNeeded(redeemOn = false, saleCoupons = listOf("", "  ")))
+    assertEquals(true, PromoRedeem.releaseNeeded(redeemOn = true, saleCoupons = emptyList()))
+    //  شمارش همین حالا خاموش است ولی فاکتور کدِ اعمال‌شده دارد ⇒ باز هم می‌پرسد (سرور خودش می‌گوید خاموش)
+    assertEquals(true, PromoRedeem.releaseNeeded(redeemOn = false, saleCoupons = listOf("CAP10")))
+  }
+
+  @Test
+  fun `پاسخِ آزاد کردن — آزاد یا خاموش بیرون، بی اجازه رها، بی پاسخ دوباره`() {
+    assertEquals(PromoRedeem.Release.DONE, PromoRedeem.releaseDecision(true, 200, ""))
+    assertEquals(PromoRedeem.Release.DONE, PromoRedeem.releaseDecision(false, 403, "promo_uses_disabled"))
+    assertEquals(PromoRedeem.Release.DROP, PromoRedeem.releaseDecision(false, 403, "release_not_allowed"))
+    assertEquals(PromoRedeem.Release.DROP, PromoRedeem.releaseDecision(false, 403, "permission_denied"))
+    assertEquals(PromoRedeem.Release.DROP, PromoRedeem.releaseDecision(false, 400, "invalid_sale"))
+    assertEquals(PromoRedeem.Release.DROP, PromoRedeem.releaseDecision(false, 404, "not_found"))
+    for ((status, code) in listOf(0 to "offline", 401 to "session_expired", 429 to "rate_limited", 500 to "internal", 502 to "x", 503 to "x")) {
+      assertEquals("$status $code", PromoRedeem.Release.RETRY, PromoRedeem.releaseDecision(false, status, code))
+    }
+  }
+
+  @Test
+  fun `صفِ آزادنشده‌ها — بی تکرار، تازه ته، سقف‌دار`() {
+    val q = PromoRedeem.enqueue(PromoRedeem.enqueue(emptyList(), "a"), "b")
+    assertEquals(listOf("a", "b"), q)
+    assertEquals(listOf("b", "a"), PromoRedeem.enqueue(q, "a"))
+    assertEquals(q, PromoRedeem.enqueue(q, " "))
+    val full = (1..PromoRedeem.MAX_PENDING).fold(emptyList<String>()) { acc, n -> PromoRedeem.enqueue(acc, "s$n") }
+    val over = PromoRedeem.enqueue(full, "new")
+    assertEquals(PromoRedeem.MAX_PENDING, over.size)
+    assertEquals("s2", over.first())
+    assertEquals("new", over.last())
+  }
 }
