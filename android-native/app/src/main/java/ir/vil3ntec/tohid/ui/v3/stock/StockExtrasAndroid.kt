@@ -10,6 +10,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.Collections
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Print
@@ -27,12 +28,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrLabel
+import ir.vil3ntec.tohid.core.i18n.StrImageChanges
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.product.ImportTable
 import ir.vil3ntec.tohid.data.CountShift
 import ir.vil3ntec.tohid.data.CountToolsPref
 import ir.vil3ntec.tohid.data.FileName
+import ir.vil3ntec.tohid.data.ImageBank
 import ir.vil3ntec.tohid.data.LabelToolsPref
 import ir.vil3ntec.tohid.data.ProductImport
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -79,13 +82,17 @@ internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {
       labelTools = LabelToolsPref.on(context),
     )
   }
-  return StockExtras.of(flags).map { x ->
+  //  IMG-PRO-17: «تغییرِ دسته‌ایِ عکس‌ها» فقط با بانکِ روشن (پرچمِ `shop.image_bank`؛ پرسشِ همان `/config`)
+  LaunchedEffect(Unit) { if (ImageBank.enabled.value == null) ImageBank.refresh(context) }
+  val imageChanges = ImageChangesGate.visible(ImageBank.enabled.value, flags.staff)
+  return StockExtras.of(flags.copy(imageChanges = imageChanges)).map { x ->
     when (x) {
       StockExtra.PLACES -> V3MenuItem(Icons.Outlined.SwapHoriz, StrReach.places) { nav.open(x.route) }
       StockExtra.LABELS -> V3MenuItem(Icons.Outlined.Print, StrLabel.openButton) { nav.open(x.route) }
       StockExtra.BOOK -> V3MenuItem(Icons.Outlined.MenuBook, StrReach.stockBook) { nav.open(x.route) }
       StockExtra.BULK_PRODUCTS -> V3MenuItem(Icons.AutoMirrored.Outlined.PlaylistAdd, StrReach.bulkProducts) { nav.open(x.route) }
       StockExtra.IMAGES -> V3MenuItem(Icons.Outlined.AddPhotoAlternate, StrReach.imageImport) { nav.open(x.route) }
+      StockExtra.IMAGE_CHANGES -> V3MenuItem(Icons.Outlined.Collections, StrImageChanges.title) { nav.open(x.route) }
     }
   }
 }

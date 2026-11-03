@@ -69,7 +69,8 @@ object DebtEntry {
         dueDate = e.dueDate, overLimit = e.overLimit, txId = key,
       )
       when (r) {
-        is DebtorEngine.Result.Ok -> r.data
+        //  PAY-17: رسیدِ همین دستگاه مهرِ کشوی نام‌دارِ برگزیده‌اش را می‌گیرد (خاموش ⇒ همان شیء)
+        is DebtorEngine.Result.Ok -> TillDrawer.stampNew(cur, r.data)
         is DebtorEngine.Result.Failed -> { fail(r.message); null }
       }
     }

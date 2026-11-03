@@ -11,9 +11,11 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.CashShift
+import ir.vil3ntec.tohid.data.MultiDrawerPref
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.TillDrawer
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
@@ -39,7 +41,9 @@ fun RouteScope.DrawerRoute() {
   val blind = remember { ShopPolicy.blindHere(context) }
   //  PAY (v3 A4): صندوقِ شیفت با هستهٔ pay-core — فقط با پرچم؛ خاموش ⇒ صندوقِ ساده
   val payV2 = remember { ShopPolicy.payV2(context) }
-  val shift = remember(data) { CashShift.current(data) }
+  val multi = remember { MultiDrawerPref.on(context) }
+  val scope = rememberCoroutineScope()
+  val shift = remember(data, TillDrawer.picked) { CashShift.current(data) }
   val now = System.currentTimeMillis()
   val totals = if (!payV2) shift?.let { CashShift.totalsOf(data, it, now) } else null
   val x = if (payV2) remember(data, shift) { shift?.let { PayFlow.report(data, it.open, null, now) } } else null
@@ -54,6 +58,8 @@ fun RouteScope.DrawerRoute() {
       skipped = x?.valueOrNull()?.skipped?.size ?: 0,
       history = remember(data) { CashShift.list(data).take(60) },
       scanner = shift?.let { DrawerModel.scannerLine(data, it.open.createdAt, now, seesMoney = !staff) },
+      //  PAY-17: کشوهای باز فقط با «چند کشو» ِ روشنِ همین دستگاه
+      drawers = if (multi) remember(data) { TillDrawer.open(data) } else null,
     ),
     DrawerActions(
       open = { nav.open(SalesPaths.DRAWER_OPEN) },
@@ -65,6 +71,7 @@ fun RouteScope.DrawerRoute() {
       },
       shift = { nav.open(SalesPaths.drawerShift(it)) },
       back = backOrNull,
+      pick = { sh -> if (sh == null) MultiDrawerPref.pick(context, null) else scope.launch { resumeHere(context, sh, me(context)) } },
     ),
   )
 }
@@ -74,8 +81,11 @@ fun RouteScope.DrawerRoute() {
 fun RouteScope.DrawerOpenRoute() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
-  if (CashShift.current(data) != null) { LaunchedEffect(Unit) { back() }; return }
+  //  PAY-17: با «چند کشو» کشوی نام‌دار هم باز می‌شود (هر کدام صندوقِ خودش)؛ بی آن همان یک صندوق
+  val multi = remember { MultiDrawerPref.on(context) }
+  if (!multi && CashShift.current(data) != null) { LaunchedEffect(Unit) { back() }; return }
   DrawerOpenSheet(
+    onSubmitNamed = if (!multi) null else { v, name -> openNamedHere(context, scope, v, name, me(context)) },
     onSubmit = { v ->
       val by = me(context)
       val today = todayIso()
@@ -87,8 +97,11 @@ fun RouteScope.DrawerOpenRoute() {
           //  همان CashShift.open روی دفترِ همان لحظه، زیرِ قفلِ نوشتن — نه تصویرِ کهنهٔ صفحه
           scope.launch {
             val wrote = store.update { d -> (CashShift.open(d, v, by, today, now) { id } as? CashShift.Result.Ok)?.data }
-            if (wrote == true) toasts.show(StrSale.drawerOpened, V3Tone.SUCCESS)
-            else toasts.show(StrSale.notSaved, V3Tone.ERROR)
+            if (wrote == true) {
+              //  PAY-17: کشوی اصلیِ تازه ⇒ همین دستگاه رویش (کشوی نام‌دارِ دیگر باز می‌ماند)
+              if (multi) MultiDrawerPref.pick(context, null)
+              toasts.show(StrSale.drawerOpened, V3Tone.SUCCESS)
+            } else toasts.show(StrSale.notSaved, V3Tone.ERROR)
           }
           back()
         }
@@ -122,8 +135,11 @@ fun RouteScope.DrawerCloseRoute() {
             //  «موردِ انتظار» از دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد هم در آن است و گم نمی‌شود
             scope.launch {
               val wrote = store.update { d -> (CashShift.close(d, v, note, me, today, now) { id } as? CashShift.Result.Ok)?.data }
-              if (wrote == true) toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
-              else toasts.show(StrSale.notSaved, V3Tone.ERROR)
+              if (wrote == true) {
+                //  PAY-17: کشوی نام‌دارِ بسته دیگر روی این دستگاه نیست
+                if (shift.open.drawer != null) MultiDrawerPref.pick(context, null)
+                toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
+              } else toasts.show(StrSale.notSaved, V3Tone.ERROR)
             }
             back()
           }
@@ -148,8 +164,10 @@ fun RouteScope.DrawerCloseRoute() {
           val row = r.value.row.copy(date = todayIso(), notes = notes)
           //  زیرِ قفلِ نوشتن روی دفترِ همان لحظه — فروشی که هم‌زمان ثبت شد گم نمی‌شود
           scope.launch {
-            if (store.appendAudit { row }) toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
-            else toasts.show(StrSale.notSaved, V3Tone.ERROR)
+            if (store.appendAudit { row }) {
+              if (shift.open.drawer != null) MultiDrawerPref.pick(context, null)
+              toasts.show(StrSale.drawerClosedDone, V3Tone.SUCCESS)
+            } else toasts.show(StrSale.notSaved, V3Tone.ERROR)
           }
           //  همان لحظه گزارشِ Z ِ همین بستن (پیش از رسیدنِ دفترِ تازه)
           DrawerSession.z = z

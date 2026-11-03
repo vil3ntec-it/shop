@@ -329,9 +329,9 @@ data class Sale(
    *  (`createdAt`) بیش از ۵ دقیقه با زمانِ تصحیح‌شده فرق داشت؛ `createdAt` و `date` ِ دستگاه دست نمی‌خورند.
    *  برنامه هرگز خودش نمی‌گذارد؛ ⛔ `null` نوشته نمی‌شود، پس فاکتورِ با ساعتِ درست بایت‌به‌بایت همان.
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val correctedAt: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val correctedAt: Long? = null,
+  /** PAY-17 — مهرِ شیفتِ کشوی نام‌داری که دستگاهِ ثبت‌کننده رویش بود (`TillDrawer`)؛ کشوی اصلی `null` و `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val shiftId: String? = null,
 )
 
 /**
@@ -526,9 +526,9 @@ data class SaleReturn(
    *  سند `returns/<docId>`، مبلغ = جمعِ ردیف‌های سند. فقط روی **نخستین** ردیفِ سند و فقط وقتی تأیید
    *  لازم بوده؛ سرور برگه را از هر ردیفِ سند برمی‌دارد (`groupReturns`). `null` نوشته نمی‌شود.
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val approval: kotlinx.serialization.json.JsonObject? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val approval: kotlinx.serialization.json.JsonObject? = null,
+  /** PAY-17 — مهرِ شیفتِ کشوی نام‌داری که دستگاهِ ثبت‌کننده رویش بود (`TillDrawer`)؛ کشوی اصلی `null` و `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val shiftId: String? = null,
 )
 
 @Serializable
@@ -625,9 +625,9 @@ data class DebtTransaction(
    *  `store_credit` (برای آینده: پرداخت با اعتبارِ فروشگاه). `null` = ردیفِ دستی.
    *  صندوق `sale_cancel` و `store_credit` را نقد نمی‌شمارد (`CashShift.isCashReceipt`).
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val kind: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val kind: String? = null,
+  /** PAY-17 — مهرِ شیفتِ کشوی نام‌داری که دستگاهِ ثبت‌کننده رویش بود (`TillDrawer`)؛ کشوی اصلی `null` و `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val shiftId: String? = null,
 )
 
 @Serializable
@@ -768,9 +768,7 @@ data class AuditEntry(
   val amount: Double = 0.0,
   /*  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و `shift_close`ِ با شمارش) و `pay_fix` (POS-40).
    *  همان نام‌های رویدادِ pay-core و `ReportLedger`؛ `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند. */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val by: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val by: String? = null,
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val approvedBy: String? = null,
@@ -804,6 +802,8 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val payMethod: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val fromStatus: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toStatus: String? = null,
+  /** PAY-17 — فقط `shift_open` ِ کشوی نام‌دار («چند کشو»، `TillDrawer`): نامِ کشو یا صندوقدار. کشوی اصلی `null` و `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val drawer: String? = null,
 )
 
 /**
