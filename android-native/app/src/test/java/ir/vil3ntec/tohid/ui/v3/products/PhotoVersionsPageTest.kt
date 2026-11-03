@@ -13,12 +13,8 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import java.io.File
-import javax.imageio.IIOImage
-import javax.imageio.ImageIO
-import javax.imageio.ImageWriteParam
 
 /**
  *  IMG-PRO-16 — «نسخه‌های عکس»: نسخهٔ کوچک و بزرگِ عکسِ بانک خوانده و سنجیده می‌شوند، داوری همان `ImageQuality`، و
@@ -26,24 +22,46 @@ import javax.imageio.ImageWriteParam
  */
 class PhotoVersionsPageTest {
 
-  /** عکسِ آزمون با لبه‌های تیز، کدگذاری‌شده با کیفیتِ [q] (همان مقیاسِ IJG ِ `Bitmap.compress`) */
+  /**
+   *  عکسِ آزمون با لبه‌های تیز، کدگذاری‌شده با کیفیتِ [q] (همان مقیاسِ IJG ِ `Bitmap.compress`).
+   *  `java.awt.image` و `javax.imageio` در classpath ِ کامپایلِ آزمونِ اندروید (android.jar) نیستند ولی JVM ِ آزمون دارد —
+   *  پس با بازتاب صدا زده می‌شوند (همان راهِ `DesignTokensTest`) تا آزمون در CI ِ اندروید و کامپیوتر هر دو کامپایل شود.
+   */
   private fun jpeg(w: Int, h: Int, q: Int): ByteArray {
-    val im = BufferedImage(w, h, BufferedImage.TYPE_INT_RGB)
-    val g = im.createGraphics()
-    g.color = java.awt.Color.WHITE
-    g.fillRect(0, 0, w, h)
-    g.color = java.awt.Color(0x1a3a6b)
-    g.fillRect(w / 8, h / 8, w / 2, h / 3)
+    val int = Int::class.javaPrimitiveType!!
+    val imageC = Class.forName("java.awt.image.BufferedImage")
+    val im = imageC.getConstructor(int, int, int).newInstance(w, h, imageC.getField("TYPE_INT_RGB").getInt(null))
+    val g = imageC.getMethod("createGraphics").invoke(im)
+    val graphicsC = Class.forName("java.awt.Graphics")
+    val colorC = Class.forName("java.awt.Color")
+    val setColor = graphicsC.getMethod("setColor", colorC)
+    val fillRect = graphicsC.getMethod("fillRect", int, int, int, int)
+    fun color(rgb: Int) = colorC.getConstructor(int).newInstance(rgb)
+    setColor.invoke(g, color(0xFFFFFF))
+    fillRect.invoke(g, 0, 0, w, h)
+    setColor.invoke(g, color(0x1a3a6b))
+    fillRect.invoke(g, w / 8, h / 8, w / 2, h / 3)
     //  «نوشته»: میله‌های باریکِ سیاه با فاصلهٔ یک‌درمیان (لبهٔ تیز مثلِ حروف و بارکد) — بی قلم تا آزمون به فونتِ سیستم تکیه نکند
-    g.color = java.awt.Color.BLACK
+    setColor.invoke(g, color(0x000000))
     var x = w / 10
-    while (x < w * 9 / 10) { g.fillRect(x, h * 2 / 3, 1 + (x % 3), h / 6); x += 4 + (x % 5) }
-    g.dispose()
-    val writer = ImageIO.getImageWritersByFormatName("jpeg").next()
-    val p = writer.defaultWriteParam.apply { compressionMode = ImageWriteParam.MODE_EXPLICIT; compressionQuality = q / 100f }
+    while (x < w * 9 / 10) { fillRect.invoke(g, x, h * 2 / 3, 1 + (x % 3), h / 6); x += 4 + (x % 5) }
+    graphicsC.getMethod("dispose").invoke(g)
+    val ioC = Class.forName("javax.imageio.ImageIO")
+    val writerC = Class.forName("javax.imageio.ImageWriter")
+    val paramC = Class.forName("javax.imageio.ImageWriteParam")
+    val metaC = Class.forName("javax.imageio.metadata.IIOMetadata")
+    val iioC = Class.forName("javax.imageio.IIOImage")
+    val writer = (ioC.getMethod("getImageWritersByFormatName", String::class.java).invoke(null, "jpeg") as Iterator<*>).next()
+    val p = writerC.getMethod("getDefaultWriteParam").invoke(writer)
+    paramC.getMethod("setCompressionMode", int).invoke(p, paramC.getField("MODE_EXPLICIT").getInt(null))
+    paramC.getMethod("setCompressionQuality", Float::class.javaPrimitiveType!!).invoke(p, q / 100f)
     val out = ByteArrayOutputStream()
-    ImageIO.createImageOutputStream(out).use { os -> writer.output = os; writer.write(null, IIOImage(im, null, null), p) }
-    writer.dispose()
+    (ioC.getMethod("createImageOutputStream", Any::class.java).invoke(null, out) as java.io.Closeable).use { os ->
+      writerC.getMethod("setOutput", Any::class.java).invoke(writer, os)
+      val iio = iioC.getConstructor(Class.forName("java.awt.image.RenderedImage"), List::class.java, metaC).newInstance(im, null, null)
+      writerC.getMethod("write", metaC, iioC, paramC).invoke(writer, null, iio, p)
+    }
+    writerC.getMethod("dispose").invoke(writer)
     return out.toByteArray()
   }
 
