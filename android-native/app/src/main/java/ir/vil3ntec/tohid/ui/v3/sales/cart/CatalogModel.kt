@@ -32,13 +32,16 @@ object CatalogModel {
   /** نمایه — یک بار با هر تغییرِ کالاها یا فروش‌ها، نه با هر حرف */
   fun index(d: ShopData): CatalogSearch.Index = CatalogSearch.index(d.products, CatalogSearch.popularity(d.sales, d.saleItems))
 
-  /** کاشیِ یک کالا با مقدارش در سبد */
-  fun item(d: ShopData, p: Product, inCart: Double): PhoneCatalogItem = PhoneCatalogItem(
+  /**
+   *  کاشیِ یک کالا با مقدارش در سبد. [held] (INV-03، `HeldStock.reserved`): مقدارِ همان کالا در فاکتورهای نگه‌داشته ⇒
+   *  موجودیِ کاشی «قابل‌فروش» است (موجودی − نگه‌داشته)؛ خالی ⇒ همان `ShopStore.stock`.
+   */
+  fun item(d: ShopData, p: Product, inCart: Double, held: Map<String, Double> = emptyMap()): PhoneCatalogItem = PhoneCatalogItem(
     id = p.id,
     name = p.name,
     price = p.salePrice,
     unit = p.unit,
-    stock = ShopStore.stock(d, p.id),
+    stock = ShopStore.stock(d, p.id) - (held[p.id] ?: 0.0),
     hasPhoto = p.photo,
     inCart = inCart,
     weighed = SalesEngine.isFractionalUnit(p.unit),
@@ -58,15 +61,16 @@ object CatalogModel {
     query: String,
     category: String?,
     inCart: Map<String, Double>,
+    held: Map<String, Double> = emptyMap(),
   ): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
-    return CatalogSearch.search(index, query(query).term, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
+    return CatalogSearch.search(index, query(query).term, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
   }
 
   /** «پرفروش‌ها» ِ سرِ کاتالوگ — کالایی که هرگز فروخته نشده نه */
-  fun bestsellers(d: ShopData, index: CatalogSearch.Index, inCart: Map<String, Double>): List<PhoneCatalogItem> {
+  fun bestsellers(d: ShopData, index: CatalogSearch.Index, inCart: Map<String, Double>, held: Map<String, Double> = emptyMap()): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
-    return CatalogSearch.top(index).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0) } }
+    return CatalogSearch.top(index).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
   }
 
   /** کاشی‌ای نیست ⇒ کدام پیام */

@@ -10,7 +10,8 @@ import ir.vil3ntec.tohid.core.orders.OrderStates
  */
 object OrderActionModel {
 
-  data class Form(val reason: String = "", val note: String = "", val ready: Int? = DEFAULT_READY)
+  /** [amount]: فقط «ثبتِ بازپرداخت» ِ دفتر (FIN-01، `OrderRefundModel`) — نوشتهٔ مبلغ به افغانی */
+  data class Form(val reason: String = "", val note: String = "", val ready: Int? = DEFAULT_READY, val amount: String = "")
 
   const val DEFAULT_READY = 15
   const val NOTE_MAX = 300

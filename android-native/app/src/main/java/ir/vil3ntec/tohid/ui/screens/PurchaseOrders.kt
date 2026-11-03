@@ -317,29 +317,13 @@ private fun PoDetail(
         OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text("لغو", color = c.danger) }
       }
       //  PUR-14: فاکتورِ کاغذیِ خودِ تأمین‌کننده، جدا از رسید (پس از فرستادن؛ فقط مدیر)
-      if (perms.manage && st != PurchaseOrderCore.Status.DRAFT) {
+      if (PurchaseOrderBook.canBill(o, perms.manage)) {
         OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text("فاکتورِ تأمین‌کننده") }
       }
     }
 
-    //  PUR-14: فاکتورهای ثبت‌شدهٔ تأمین‌کننده (باطل‌شده خط‌خورده و بی اثر در تطبیق)
-    if (o.bills.isNotEmpty()) {
-      Spacer(Modifier.height(14.dp))
-      Text("فاکتورهای تأمین‌کننده", style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
-      o.bills.forEach { b ->
-        Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-          Column(Modifier.weight(1f)) {
-            Text(
-              PurchaseOrderBook.billLine(b),
-              color = if (b.active) c.text else c.muted, style = MaterialTheme.typography.bodySmall,
-              textDecoration = if (b.active) null else androidx.compose.ui.text.style.TextDecoration.LineThrough,
-            )
-            b.voidReason?.takeIf { !b.active }?.let { Text("باطل: $it", style = MaterialTheme.typography.labelSmall, color = c.muted) }
-          }
-          if (b.active && perms.manage) TextButton(onClick = { voidAsk = b }, enabled = !busy) { Text("باطل", color = c.danger) }
-        }
-      }
-    }
+    //  PUR-14: فاکتورهای ثبت‌شدهٔ تأمین‌کننده — همان فهرستِ گوشیِ نسخهٔ ۳ (`PurchaseBills.kt`)
+    PoBillsList(o, perms.manage, busy) { voidAsk = it }
 
     //  رسیدها و ثبت در دفترِ همین دستگاه
     if (o.receipts.isNotEmpty()) {
@@ -370,46 +354,20 @@ private fun PoDetail(
         }
       }
       //  PUR-14: سفارش ⇔ رسید ⇔ فاکتورِ تأمین‌کننده (یا فاکتورِ دفتر وقتی تأمین‌کننده فاکتوری نداده)
-      val m = remember(d, o) { PurchaseOrderBook.match(d, o) }
-      val supplier = PurchaseOrderBook.hasSupplierBills(o)
-      Spacer(Modifier.height(6.dp))
-      if (m.matched) Text(PurchaseOrderBook.matchTitle(supplier), style = MaterialTheme.typography.labelSmall, color = c.success)
-      else m.lines.filter { it.issues.isNotEmpty() }.forEach { ml ->
-        Text(
-          "${o.lines.find { it.id == ml.lineId }?.name ?: names[ml.productId] ?: ml.productId}: " +
-            ml.issues.joinToString("، ") { PurchaseOrderBook.issueText(it, supplier) },
-          style = MaterialTheme.typography.labelSmall, color = c.warning,
-        )
-      }
+      PoMatchLines(d, o)
     }
   }
 
   voidAsk?.let { b ->
-    var why by remember(b.id) { mutableStateOf("") }
-    AlertDialog(
-      onDismissRequest = { voidAsk = null },
-      containerColor = c.surfaceSolid,
-      title = { Text("باطل کردنِ فاکتورِ «${b.billNo}»؟", color = c.text) },
-      text = {
-        Column {
-          Text("فاکتور پاک نمی‌شود؛ با دلیل خط می‌خورد و در تطبیق به حساب نمی‌آید. شماره‌اش برای فاکتورِ درست آزاد می‌شود.",
-            style = MaterialTheme.typography.bodySmall, color = c.muted)
-          OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text("دلیل (لازم)") }, singleLine = true)
-        }
-      },
-      confirmButton = {
-        TextButton(enabled = why.isNotBlank() && !busy, onClick = {
-          voidAsk = null
-          busy = true
-          scope.launch {
-            val r = repo.voidBill(o.id, b.id, why.trim())
-            busy = false
-            r.valueOrNull()?.let { order = it.order; toast("فاکتور باطل شد") } ?: toast(r.errorMessage() ?: "نشد")
-          }
-        }) { Text("باطل کن", color = c.danger) }
-      },
-      dismissButton = { TextButton(onClick = { voidAsk = null }) { Text("انصراف") } },
-    )
+    PoBillVoidDialog(b, busy, onDismiss = { voidAsk = null }) { why ->
+      voidAsk = null
+      busy = true
+      scope.launch {
+        val r = repo.voidBill(o.id, b.id, why)
+        busy = false
+        r.valueOrNull()?.let { order = it.order; toast("فاکتور باطل شد") } ?: toast(r.errorMessage() ?: "نشد")
+      }
+    }
   }
 
   if (cancelAsk) {

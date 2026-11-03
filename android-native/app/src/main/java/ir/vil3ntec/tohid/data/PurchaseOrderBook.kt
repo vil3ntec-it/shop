@@ -319,6 +319,23 @@ object PurchaseOrderBook {
 
   fun hasSupplierBills(o: PurchaseOrderDto): Boolean = o.bills.any { it.active }
 
+  /**
+   *  «فاکتورِ تأمین‌کننده» و «باطل» فقط برای مدیر و صاحب (`permissions.manage` ِ `GET /config` = `stock.adjust` ِ سرور) و
+   *  فقط پس از فرستادن (سرور: پیش‌نویس ⇒ ۴۰۹ `not_sent`). کامپیوتر (`PoDetail`) و گوشیِ نسخهٔ ۳ (`SupplierBillRoute`) همین را می‌پرسند.
+   */
+  fun canBill(o: PurchaseOrderDto, manage: Boolean): Boolean = manage && status(o) != PurchaseOrderCore.Status.DRAFT
+
+  /** «باطل» ِ یک فاکتور: فقط مدیر و فقط فاکتورِ هنوز فعال (باطل‌شده دوباره باطل نمی‌شود) */
+  fun canVoid(b: PoBillDto, manage: Boolean): Boolean = manage && b.active
+
+  /**
+   *  فهرستِ «فاکتورهای تأمین‌کننده» ِ گوشی (PUR-14): سفارش‌هایی که فاکتور می‌گیرند (هر وضعیتی جز پیش‌نویس، لغوشده هم چون
+   *  فاکتورِ پیشینش باطل‌شدنی است)؛ آن‌که هنوز رسیده ولی فاکتورِ فعال ندارد بالا، بعد تازه‌ترین تغییر.
+   */
+  fun billable(orders: List<PurchaseOrderDto>): List<PurchaseOrderDto> =
+    orders.filter { status(it) != PurchaseOrderCore.Status.DRAFT }
+      .sortedWith(compareBy<PurchaseOrderDto>({ !(it.billCount == 0 && it.totals.acceptedMinor > 0) }, { -it.updatedAt }, { it.id }))
+
   /** ردیف‌های همهٔ فاکتورهای فعالِ تأمین‌کننده ⇐ هسته (باطل‌شده‌ها هرگز) */
   fun supplierBills(o: PurchaseOrderDto): List<PurchaseOrderCore.Bill> =
     o.bills.filter { it.active }.flatMap { b -> b.lines.map { PurchaseOrderCore.Bill(it.lineId, it.productId, it.qtyMilli, it.totalMinor) } }
