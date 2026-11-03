@@ -164,6 +164,10 @@
 - ⛔ `HESABPAY_BASE_URL` فقط `https` (کلید در سرآیند می‌رود)؛ تنها استثنا http ِ loopback برای سرورِ ساختگیِ آزمون، فقط در `test`/`development`.
 - درهای «حساب‌پیِ دکان» `/api/v1/shop/hesabpay/*` فقط صاحب (`owner_only`) و دستهٔ SUB-10: FREE؛ سقفِ IP پیش از احراز.
 - درهای دکان `/api/v1/shop/payments/*` (دستهٔ SUB-10: FREE)؛ وب‌هوکِ بی‌توکن عمداً بیرون از `/shop` در `/api/v1/payments/webhook/<نام>` (درهای `/shop` همه درِ کاربرند، courier_scope) با بدنهٔ خام پیش از پارسرِ JSON (`app.js`). پیشوندِ تازهٔ `/payments` ⇒ `ACCOUNT_PREFIXES` ِ پنلِ خانگی.
+- ⛔ PRM-13 — امتیازِ پرداختِ بعدیِ نسیه فقط از `LoyaltyPoints.afterPayment` (رسیدِ دستیِ `kind` تهی؛ `DebtEntry.change` و فرمِ رسیدِ
+  گوشی) و حذفِ رسید فقط با `afterPaymentDeleted` ِ `DebtorEngine.deleteTransaction`: هدفِ **تجمعیِ** هر فاکتور از خودِ دفتر (FIFO ِ همهٔ
+  رسیدهای دستی روی نسیهٔ باز و بردِ دستی، تا خالصِ پس از برگشت) و فقط افزایش — هرگز «امتیازِ همین رسید» به‌تنهایی؛ ردیف با `refId` ِ
+  فاکتور تا برگشت/لغو آن را هم پس بگیرند. سنجه: `LoyaltyCreditPaymentTest`.
 
 ### v3 · موجودی و کاتالوگ
 
