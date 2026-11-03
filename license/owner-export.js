@@ -75,6 +75,8 @@
     mergedInto: 'ادغام‌شده در',
     //  کارتِ مشتری (CRM-16) — همان `OwnerExport.kt`
     cardCode: 'کارت مشتری',
+    //  نشانیِ تحویلِ مشتری (CRM-09) — همان `OwnerExport.kt`
+    deliveryAddress: 'نشانی تحویل',
     notes: 'یادداشت',
     createdAt: 'زمان ثبت (UTC)',
     date: 'تاریخ',
@@ -158,6 +160,7 @@
     seller: 'فروشنده',
     correctedAt: 'تاریخِ تصحیح‌شده (UTC)',
     approval: 'تأییدِ مدیر',
+    cancelApproval: 'تأییدِ لغو',
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',

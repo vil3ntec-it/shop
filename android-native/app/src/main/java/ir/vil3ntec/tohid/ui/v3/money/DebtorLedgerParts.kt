@@ -185,9 +185,12 @@ private fun DrawerInfo(account: DebtorEngine.Account, book: DebtBook.Book?) {
   val notes = account.debtor.notes
   //  CRM-02/11: شمارهٔ دوم و برچسب‌های پرونده (همان خطِ `CustomerProfileForm.extraLine` ِ پروندهٔ کامپیوتر)
   val profile = remember(account.debtor) { ir.vil3ntec.tohid.data.CustomerProfileForm.extraLine(account.debtor) }
-  if (lines.isEmpty() && notes.isBlank() && profile.isBlank()) return
+  //  CRM-09: نشانیِ تحویلِ پرونده (یک سطر: نشانه، ناحیه، دروازه، طبقه، Plus Code، کدِ پستی)
+  val address = remember(account.debtor) { ir.vil3ntec.tohid.data.CustomerCrm.addressLine(account.debtor.deliveryAddress) }
+  if (lines.isEmpty() && notes.isBlank() && profile.isBlank() && address.isBlank()) return
   Column(Modifier.padding(start = 14.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
     if (profile.isNotBlank()) Text(profile, style = v3Text(13, FontWeight.Medium, 19), color = PhoneV3.colors.ink)
+    if (address.isNotBlank()) Text(StrMoney.addressLine(address), style = v3Text(13, FontWeight.Normal, 19), color = PhoneV3.colors.ink)
     lines.forEach { line ->
       V3StatusPill(
         when (line.tone) {

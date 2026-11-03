@@ -135,11 +135,17 @@ internal object SalesVoid {
     newId: () -> String,
     by: String?,
     noPermission: String,
-  ): Outcome = when (val check = InvoiceVoid.check(facts(d, saleId), canCancel, kind, reason)) {
+    /** STF-02: برگهٔ تأییدِ لغو (فقط Sync v3، `CancelApproval.offered`) — جای «اجازه» برای نقشِ «نیازمند تأیید» */
+    cancelApproval: kotlinx.serialization.json.JsonObject? = null,
+  ): Outcome = when (val check = InvoiceVoid.check(facts(d, saleId), canCancel || cancelApproval != null, kind, reason)) {
     is InvoiceVoid.Decision.Denied -> Outcome.Denied(denied(check.code, noPermission))
     is InvoiceVoid.Decision.Allowed -> when (val r = SalesEngine.cancel(d, saleId, today, now, newId, reason = check.reason, by = by)) {
       is SalesEngine.Result.Failed -> Outcome.Failed(r.message)
-      is SalesEngine.Result.Ok -> Outcome.Ok(r.data, check.reason)
+      is SalesEngine.Result.Ok -> Outcome.Ok(
+        if (cancelApproval == null) r.data
+        else r.data.copy(sales = r.data.sales.map { if (it.id == saleId) it.copy(cancelApproval = cancelApproval) else it }),
+        check.reason,
+      )
     }
   }
 }

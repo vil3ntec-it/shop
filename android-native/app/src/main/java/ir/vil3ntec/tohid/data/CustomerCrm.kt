@@ -217,6 +217,42 @@ object CustomerCrm {
     )
   }
 
+  /* ------------------------------ نشانیِ تحویل (CRM-09) ------------------------------ */
+
+  const val MAX_ADDRESS_PART = 120
+  const val MAX_GATE = 40
+  const val MAX_FLOOR = 20
+  /** Open Location Code: کدِ کامل (`8FW4V75V+8Q`) یا کوتاهِ محله‌ای (`V75V+8Q`)؛ فقط حروفِ الفبای کد */
+  private val PLUS_CODE = Regex("^[23456789CFGHJMPQRVWX]{2,8}\\+[23456789CFGHJMPQRVWX]{0,3}$")
+  private val POSTAL = Regex("^[0-9]{4,10}$")
+
+  /**
+   *  نشانیِ تحویلِ مشتری: هر بخش پاک‌سازی و سنجیده؛ همه خالی ⇒ برداشتنِ نشانی. Plus Code بزرگ و بی فاصله، کدِ پستی
+   *  رقمِ لاتین. بی ردیفِ سابقه (مثلِ شمارهٔ دوم) — پول را عوض نمی‌کند. همان نشانی ⇒ همان دفتر (بی op).
+   */
+  fun setDeliveryAddress(d: ShopData, id: String, a: DeliveryAddress): DebtorEngine.Result {
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
+    if (!isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
+    val area = clean(a.area)
+    val landmark = clean(a.landmark)
+    val gate = clean(a.gate)
+    val floor = clean(a.floor)
+    val plus = ir.vil3ntec.tohid.latinDigits(a.plusCode).filterNot { it.isWhitespace() }.uppercase()
+    val postal = ir.vil3ntec.tohid.latinDigits(a.postalCode).filterNot { it.isWhitespace() }
+    if (area.length > MAX_ADDRESS_PART || landmark.length > MAX_ADDRESS_PART) return DebtorEngine.Result.Failed("هر بخشِ نشانی حداکثر $MAX_ADDRESS_PART حرف")
+    if (gate.length > MAX_GATE) return DebtorEngine.Result.Failed("رنگِ دروازه حداکثر $MAX_GATE حرف")
+    if (floor.length > MAX_FLOOR) return DebtorEngine.Result.Failed("طبقه حداکثر $MAX_FLOOR حرف")
+    if (plus.isNotEmpty() && !PLUS_CODE.matches(plus)) return DebtorEngine.Result.Failed("Plus Code درست نیست (مثلاً V75V+8Q)")
+    if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed("کدِ پستی فقط رقم است")
+    val next = DeliveryAddress(area, landmark, gate, floor, plus, postal).takeIf { it != DeliveryAddress() }
+    if (next == c.deliveryAddress) return DebtorEngine.Result.Ok(d, id)
+    return DebtorEngine.Result.Ok(d.copy(debtors = d.debtors.map { if (it.id == id) it.copy(deliveryAddress = next) else it }), id)
+  }
+
+  /** یک سطرِ نشانی برای پرونده و پیک: «نشانه · ناحیه · دروازه · طبقه · Plus Code · کدِ پستی»؛ بی نشانی ⇒ "" */
+  fun addressLine(a: DeliveryAddress?): String = if (a == null) "" else
+    listOf(a.landmark, a.area, a.gate, a.floor, a.plusCode, a.postalCode).filter { it.isNotBlank() }.joinToString(" · ")
+
   /* ------------------------- رضایتِ پیامِ تبلیغاتی ------------------------- */
 
   fun consentText(v: Boolean?): String = when (v) { true -> "بله"; false -> "نه"; null -> "نپرسیده" }

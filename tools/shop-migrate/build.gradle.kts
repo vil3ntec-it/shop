@@ -28,6 +28,8 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/SafeEntry.kt",
   //  مدل‌های خالصی که `Models.kt` به آن‌ها اشاره می‌کند: کیت، قیمتِ زمان‌بندی‌شده، تنوع، سفارشِ ویژه
   "ir/vil3ntec/tohid/data/ModelParts.kt",
+  //  CRM-09: `Debtor.deliveryAddress` — نشانیِ تحویل در پروندهٔ جدای خودش (کاتلینِ خالص)
+  "ir/vil3ntec/tohid/data/DeliveryAddress.kt",
   "ir/vil3ntec/tohid/Jalali.kt",
   //  LOC-03: `todayIso` روزِ کاری را از `ShopDay` می‌گیرد؛ `ShopDayChoice` (حالتِ Compose و Context)
   //  این‌جا جانشینِ JVMِ خودش را در src/main دارد — همیشه نیمه‌شب، پس خروجی همان دیروز است

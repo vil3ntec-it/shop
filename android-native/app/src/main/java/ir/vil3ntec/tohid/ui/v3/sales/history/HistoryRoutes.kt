@@ -5,6 +5,8 @@ import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.SearchOff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
@@ -208,21 +210,46 @@ fun RouteScope.SalePrintRoute() {
   )
 }
 
-/** `sales/{saleId}/cancel` — لغو بی دلیل ثبت نمی‌شود؛ فقط صاحب و مدیر (`sales.cancel`) */
+/**
+ *  `sales/{saleId}/cancel` — لغو بی دلیل ثبت نمی‌شود؛ صاحب و مدیر (`sales.cancel`)، و STF-02: نقشِ «نیازمند تأیید» فقط روی
+ *  دستگاهِ Sync v3 با برگهٔ امضاشدهٔ مدیر/صاحب (`CancelApproval.offered`؛ دکانِ v1 همان امروز: «لغو با صاحب یا مدیر»).
+ */
 @Composable
 fun RouteScope.CancelRoute() {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val sale = saleOrBack() ?: return
   val canCancel = remember { ShopRole.canCancelSale(context) }
-  if (!canCancel) { LaunchedEffect(Unit) { toasts.show(StrSale.cancelDenied, V3Tone.WARNING); back() }; return }
+  val askable = remember {
+    !canCancel && ir.vil3ntec.tohid.core.perm.CancelApproval.offered(
+      ShopRole.decide(context, ir.vil3ntec.tohid.core.perm.CancelApproval.PERM).decision,
+      runCatching { ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(context) }.getOrDefault(false),
+    )
+  }
+  if (!canCancel && !askable) { LaunchedEffect(Unit) { toasts.show(StrSale.cancelDenied, V3Tone.WARNING); back() }; return }
+  var slip by remember(sale.id) { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
+  if (!canCancel && slip == null) {
+    ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalSheet(
+      ask = ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalAsk(
+        title = StrSale.cancelApproval,
+        summary = StrSale.cancelApprovalSummary(ReceiptModel.number(sale), ir.vil3ntec.tohid.money(sale.finalTotal)),
+        need = ir.vil3ntec.tohid.core.perm.CancelApproval.need(sale.id, Math.round(sale.finalTotal * 100.0)),
+      ),
+      shopId = remember { ShopRole.shopId(context) },
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
+      onApproved = { slip = it },
+      onClose = { back() },
+    )
+    return
+  }
   //  SEC-03: کنترل فقط از `InvoiceVoid.check` (`SalesVoid.run`) و سندِ معکوس در زنجیرهٔ اسناد فقط پس از ذخیرهٔ موفق
   val by = remember { FraudTrailPref.by(context) }
   CancelSheet(
     warning = SalesEngine.cancelWarning(sale),
     onConfirm = { reason ->
       val before = data
-      when (val r = SalesVoid.run(before, sale.id, canCancel, InvoiceVoid.Kind.VOID, reason, todayIso(), System.currentTimeMillis(), Ulid::next, by, StrSale.cancelDenied)) {
+      val cancelSlip = slip?.let(ir.vil3ntec.tohid.data.DiscountGate::json)
+      when (val r = SalesVoid.run(before, sale.id, canCancel, InvoiceVoid.Kind.VOID, reason, todayIso(), System.currentTimeMillis(), Ulid::next, by, StrSale.cancelDenied, cancelApproval = cancelSlip)) {
         is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
         is SalesVoid.Outcome.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesVoid.Outcome.Ok -> {

@@ -80,6 +80,25 @@ internal fun DebtorFormSheet(
       Spacer(Modifier.height(12.dp))
       V3TextField(f.tags, { f = f.copy(tags = it) }, StrMoney.tagsField, helper = StrMoney.tagsHelper)
       Spacer(Modifier.height(14.dp))
+      //  CRM-09: نشانیِ تحویل (§۴.۴) — «نشانه + شماره»؛ همه اختیاری
+      Text(StrMoney.addressTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
+      Spacer(Modifier.height(6.dp))
+      V3TextField(f.address.landmark, { f = f.copy(address = f.address.copy(landmark = it)) }, StrMoney.addressLandmark,
+        placeholder = StrMoney.addressLandmarkHint)
+      Spacer(Modifier.height(10.dp))
+      V3TextField(f.address.area, { f = f.copy(address = f.address.copy(area = it)) }, StrMoney.addressArea)
+      Spacer(Modifier.height(10.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        V3TextField(f.address.gate, { f = f.copy(address = f.address.copy(gate = it)) }, StrMoney.addressGate, Modifier.weight(1f))
+        V3TextField(f.address.floor, { f = f.copy(address = f.address.copy(floor = it)) }, StrMoney.addressFloor, Modifier.weight(1f))
+      }
+      Spacer(Modifier.height(10.dp))
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        V3TextField(f.address.plusCode, { f = f.copy(address = f.address.copy(plusCode = it)) }, StrMoney.addressPlusCode, Modifier.weight(1f))
+        V3TextField(f.address.postalCode, { f = f.copy(address = f.address.copy(postalCode = it)) }, StrMoney.addressPostal, Modifier.weight(1f),
+          kind = V3FieldKind.NUMBER)
+      }
+      Spacer(Modifier.height(14.dp))
       Text(StrMoney.consentTitle, style = v3Text(13, FontWeight.SemiBold, 18), color = PhoneV3.colors.inkMuted)
       Spacer(Modifier.height(6.dp))
       V3Segmented(
