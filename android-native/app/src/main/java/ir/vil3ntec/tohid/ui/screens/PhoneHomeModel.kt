@@ -32,16 +32,23 @@ import ir.vil3ntec.tohid.ui.v3.stock.StockPaths
  *  • گذر از `threshold` ⇒ `latched` (صدازننده یک لرزشِ کوچک می‌دهد) و رها کردن کادر را باز
  *    نگه می‌دارد؛ برگشتِ انگشت به زیرِ نیمهٔ آستانه قفل را برمی‌دارد.
  *  • رها کردنِ بی‌قفل ⇒ با فنر پس می‌رود، مگر پرتابِ تند پس از کششِ کوتاه.
- *  • باز: کشیدن رو به بالا، اسکرول یا دکمهٔ برگشت ⇒ بسته (`dismiss`).
+ *  • باز (HOME-V3، کادرِ ماندگار): اسکرولِ معمولی کادر را **نمی‌بندد** — کادر مثلِ بقیهٔ صفحه بالا می‌رود و باز می‌ماند.
+ *    فقط کشیدنِ رو به بالایی که **روی خودِ کادر** و با صفحهٔ در بالا شروع شد (`touchDown(…, onCard = true)`) کادر را
+ *    ۱:۱ با انگشت جمع می‌کند (`pushUp`/`pushDown`)؛ رها کردن پس از آستانه یا پرتابِ تندِ رو به بالا ⇒ پنهان
+ *    (`releasePush`)، وگرنه با فنر باز برمی‌گردد. زدنِ دستگیره هم پنهان/باز می‌کند (`dismiss`).
  */
 object PullCard {
-  /** `finger` پیکسلِ خامِ انگشت از آغازِ کشش؛ `armed` یعنی لمس از بالای صفحه شروع شد */
+  /**
+   *  `finger` پیکسلِ خامِ انگشت از آغازِ کشش؛ `armed` یعنی لمس از بالای صفحه شروع شد (کادرِ باز: روی خودِ کادر)؛
+   *  `push` پیکسلی که کادرِ باز با انگشت بالا رفته
+   */
   data class State(
     val shown: Boolean = false,
     val finger: Float = 0f,
     val dragging: Boolean = false,
     val armed: Boolean = false,
     val latched: Boolean = false,
+    val push: Float = 0f,
   )
 
   /**
@@ -79,8 +86,30 @@ object PullCard {
   private fun latch(was: Boolean, visible: Float, c: Config): Boolean =
     if (was) visible >= c.threshold * 0.5f else visible >= c.threshold
 
-  fun touchDown(s: State, atTop: Boolean): State =
-    if (s.shown) s else s.copy(armed = atTop, finger = 0f, dragging = false, latched = false)
+  fun touchDown(s: State, atTop: Boolean, onCard: Boolean = false): State =
+    if (s.shown) s.copy(armed = atTop && onCard, push = 0f, dragging = false)
+    else s.copy(armed = atTop, finger = 0f, dragging = false, latched = false)
+
+  /** کادرِ باز: انگشت `dy` پیکسل بالا رفت (لمس روی کادر، صفحه در بالا) ⇒ کادر ۱:۱ جمع می‌شود. دومی = پیکسلِ خورده */
+  fun pushUp(s: State, dy: Float, c: Config): Pair<State, Float> {
+    if (!s.shown || !s.armed || dy <= 0f) return s to 0f
+    val p = (s.push + dy).coerceAtMost(c.open)
+    return s.copy(push = p, dragging = true) to (p - s.push)
+  }
+
+  /** کادرِ نیمه‌جمع: انگشت `dy` پیکسل پایین آمد ⇒ همان اندازه باز می‌شود */
+  fun pushDown(s: State, dy: Float): Pair<State, Float> {
+    if (!s.shown || s.push <= 0f || dy <= 0f) return s to 0f
+    val take = minOf(s.push, dy)
+    return s.copy(push = s.push - take) to take
+  }
+
+  /** رها کردنِ کادرِ نیمه‌جمع؛ `velocityY` منفی یعنی رو به بالا */
+  fun releasePush(s: State, velocityY: Float, c: Config): State {
+    if (!s.shown) return s
+    val hide = s.push >= c.threshold || (s.push >= c.flingMin && velocityY <= -c.flingVelocity)
+    return if (hide) State() else State(shown = true)
+  }
 
   /** انگشت `dy` پیکسل پایین رفت و اسکرول جایی برای خوردنش نداشت */
   fun pullDown(s: State, dy: Float, c: Config): State {
@@ -102,7 +131,7 @@ object PullCard {
 
   /** انگشت رها شد؛ `velocityY` مثبت یعنی رو به پایین */
   fun release(s: State, velocityY: Float, c: Config): State {
-    if (s.shown) return s.copy(dragging = false)
+    if (s.shown) return releasePush(s, velocityY, c)
     val open = s.latched || (stretch(s.finger, c) >= c.flingMin && velocityY >= c.flingVelocity)
     return if (open) State(shown = true) else State()
   }
@@ -116,7 +145,7 @@ object PullCard {
     State(armed = true, dragging = true, finger = fingerFor(c.open * fraction, c)).let { it.copy(latched = latch(false, stretch(it.finger, c), c)) }
 
   /** پیکسلِ دیدنیِ کادر همین حالا */
-  fun visible(s: State, c: Config): Float = if (s.shown) c.open else stretch(s.finger, c)
+  fun visible(s: State, c: Config): Float = if (s.shown) (c.open - s.push).coerceAtLeast(0f) else stretch(s.finger, c)
 
   /** ۰ = پنهان، ۱ = کامل پایین آمده (کشِ بیش از باز هم ۱) */
   fun progress(s: State, c: Config): Float =

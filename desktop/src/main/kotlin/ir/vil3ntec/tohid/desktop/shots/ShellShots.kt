@@ -12,6 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.layout
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
@@ -26,6 +27,9 @@ import ir.vil3ntec.tohid.ui.screens.HomeAlerts
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.shell.DraftNoticeBar
+import ir.vil3ntec.tohid.ui.v3.shell.HeroMoney
+import ir.vil3ntec.tohid.ui.v3.shell.HeroMoneySheet
+import ir.vil3ntec.tohid.ui.v3.shell.HomeHero
 import ir.vil3ntec.tohid.ui.v3.shell.HomeScreen
 import ir.vil3ntec.tohid.ui.v3.shell.HomeShot
 import ir.vil3ntec.tohid.ui.v3.shell.NotificationsScreen
@@ -60,9 +64,12 @@ private fun withYesterday(d: ShopData, ratio: Double): ShopData {
 
 /** خانه با دیروزِ نمایشی (پیش‌فرض: امروز ۲۲٪ بیشتر ⇐ سبز) */
 @Composable
-private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0.82) {
+private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0.82, safe: Boolean = false) {
+  //  تنظیمِ «گاوصندوق» ِ همین دستگاه پیش از ساختِ خانه — هر عکسِ خانه خودش روشن/خاموشش می‌کند (نه در پاک‌سازیِ عکسِ
+  //  پیشین، که ترتیبش با ساختِ عکسِ بعد قطعی نیست)
+  androidx.compose.runtime.remember { ir.vil3ntec.tohid.data.SafeBookPref.set(ir.vil3ntec.tohid.desktop.DesktopContext, safe) }
   Data(s) { d ->
-    val withY = androidx.compose.runtime.remember(d) { withYesterday(d, ratio) }
+    val withY = androidx.compose.runtime.remember(d) { withYesterday(d, ratio).let { if (safe) withSafe(it) else it } }
     HomeScreen(withY, {}, PhoneNav.RESERVE, shot)
   }
 }
@@ -76,6 +83,45 @@ private fun ordersOn(counts: Map<String, Int>) {
 private fun ordersOff() {
   ir.vil3ntec.tohid.ui.OrdersLive.config.value = null
   ir.vil3ntec.tohid.ui.OrdersLive.counts.value = emptyMap()
+}
+
+/**
+ *  گاوصندوقِ نمایشی (HOME-V3، صفحهٔ دومِ کادرِ بالا): شمارش، چند ورود و خروج در روزهای گذشته و امروز — فقط در حافظهٔ
+ *  همین عکس، از همان `SafeBook`.
+ */
+private fun withSafe(d: ShopData): ShopData {
+  val now = System.currentTimeMillis()
+  val day = 24L * 60 * 60 * 1000
+  var n = 0
+  val ids = { "01SHOTSAFE${(++n).toString().padStart(16, '0')}" }
+  var out = d
+  fun step(r: ir.vil3ntec.tohid.data.SafeBook.Result) { (r as? ir.vil3ntec.tohid.data.SafeBook.Result.Ok)?.let { out = it.data } }
+  step(ir.vil3ntec.tohid.data.SafeBook.count(out, 6_000_000, null, "صاحب", now - 6 * day, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.deposit(out, 1_500_000, "deposit", null, "صاحب", now - 5 * day, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.withdraw(out, 800_000, "owner_withdrawal", null, "صاحب", now - 3 * day, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.deposit(out, 2_200_000, "deposit", null, "صاحب", now - 2 * day, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.withdraw(out, 450_000, "petty_expense", null, "صاحب", now - day, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.deposit(out, 900_000, "deposit", null, "صاحب", now - 2 * 60 * 60 * 1000, ids))
+  step(ir.vil3ntec.tohid.data.SafeBook.withdraw(out, 300_000, "owner_withdrawal", null, "صاحب", now - 30 * 60 * 1000, ids))
+  return out
+}
+
+/** خانهٔ تبلت: اندازهٔ واقعیِ ۱۲۸۰×۸۰۰dp (دوستونه از ۸۴۰dp)، کوچک‌شده به پهنای پنجرهٔ عکس */
+@Composable
+private fun TabletHome(store: ShopStore) {
+  val scale = 390f / 1280f
+  androidx.compose.foundation.layout.Box(
+    Modifier.fillMaxSize().layout { m, c ->
+      val p = m.measure(androidx.compose.ui.unit.Constraints.fixed(1280.dp.roundToPx(), 800.dp.roundToPx()))
+      layout(c.maxWidth, c.maxHeight) {
+        p.placeWithLayer(0, 0) {
+          scaleX = scale
+          scaleY = scale
+          transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 0f)
+        }
+      }
+    },
+  ) { Home(store, HomeShot(reveal = 1f)) }
 }
 
 /** خبرهای نمایشیِ دکان (بی دادهٔ واقعی) */
@@ -154,10 +200,32 @@ object ShellShots : GroupShots {
     ),
     Shot("home-6-alerts", content = { s -> Home(s, HomeShot(alerts = SIX)) }),
     Shot("home-0-alerts", content = { s -> Home(s, HomeShot(alerts = emptyList())) }),
-    //  کادرِ پنهان (HOME-V2 §۱): نیمه‌کشیده، باز روی «صندوق»، باز روی «گاوصندوق»
+    //  کادرِ بالا (HOME-V3، انتخابِ صاحب‌کار): نیمه‌کشیده، باز روی «صندوق» (هفته/امروز/ماه)، «گاوصندوق»، و برگهٔ «+»
     Shot("home-pull-half", content = { s -> Home(s, HomeShot(reveal = 0.5f)) }),
     Shot("home-drawer", content = { s -> Home(s, HomeShot(reveal = 1f)) }),
-    Shot("home-safe", content = { s -> Home(s, HomeShot(reveal = 1f, drawerPage = 1)) }),
+    Shot("home-hero-today", content = { s -> Home(s, HomeShot(reveal = 1f, range = HomeHero.Range.TODAY)) }),
+    Shot("home-hero-month", content = { s -> Home(s, HomeShot(reveal = 1f, range = HomeHero.Range.MONTH)) }),
+    Shot("home-safe", content = { s -> Home(s, HomeShot(reveal = 1f, drawerPage = 1), safe = true) }),
+    Shot("home-safe-sheet", content = { s ->
+      androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        Home(s, HomeShot(reveal = 1f, drawerPage = 1), safe = true)
+        HeroMoneySheet(
+          page = HomeHero.Page.SAFE, shiftClosed = false, busy = false, error = null,
+          onSubmit = { _, _, _, _ -> }, onOpenDrawer = {}, onClose = {}, start = HeroMoney.Dir.TAKE, startAmount = "2500",
+        )
+      }
+    }),
+    //  تبلت (۱۲۸۰×۸۰۰، خانه | آمار) با کادرِ بالای باز — کوچک‌شده تا در پنجرهٔ گوشی جا شود
+    Shot("home-hero-tablet", content = { s -> TabletHome(s) }),
+    Shot("home-hero-sheet", content = { s ->
+      androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        Home(s, HomeShot(reveal = 1f))
+        HeroMoneySheet(
+          page = HomeHero.Page.TILL, shiftClosed = false, busy = false, error = null,
+          onSubmit = { _, _, _, _ -> }, onOpenDrawer = {}, onClose = {}, startAmount = "1500",
+        )
+      }
+    }),
     Shot("home-stats", content = { s -> Home(s, HomeShot(page = 1)) }),
     Shot("home-big", content = { s -> Home(s, HomeShot(big = true, reveal = 1f)) }),
     Shot("transactions", route = "transactions"),

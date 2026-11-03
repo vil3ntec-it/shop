@@ -92,8 +92,8 @@ private fun dialogTitle(kind: String): String = when (kind) {
   else -> StrSafe.toDrawer
 }
 
-/** پیامِ سه‌زبانهٔ کدِ رد؛ کدِ ناشناخته ⇒ همان پیامِ `SafeBook`/`PayFlow` */
-private fun errorText(f: SafeBook.Result.Failed): String = when (f.code) {
+/** پیامِ سه‌زبانهٔ کدِ رد؛ کدِ ناشناخته ⇒ همان پیامِ `SafeBook`/`PayFlow` (برگهٔ «+» ِ خانه هم همین را می‌گیرد) */
+internal fun safeErrorText(f: SafeBook.Result.Failed): String = when (f.code) {
   SafeCore.Code.REASON_REQUIRED -> f.varianceMinor?.let {
     StrSafe.varianceNeedsReason(it > 0, safeAfn(kotlin.math.abs(it)), safeAfn(Pay.DEFAULT_VARIANCE_THRESHOLD))
   } ?: StrSafe.reasonRequired
@@ -196,7 +196,7 @@ private fun SafeMoveDialog(kind: String, balanceMinor: Long, store: ShopStore, m
       busy = false
       when (r) {
         is SafeBookPref.Saved.Ok -> { toast(if (r.again) StrSafe.already else StrSafe.saved); onDismiss() }
-        is SafeBookPref.Saved.Bad -> error = errorText(r.failed)
+        is SafeBookPref.Saved.Bad -> error = safeErrorText(r.failed)
         SafeBookPref.Saved.NotSaved -> error = StrSafe.notSaved
       }
     }

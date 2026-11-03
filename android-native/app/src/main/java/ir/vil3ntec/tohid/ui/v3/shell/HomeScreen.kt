@@ -1,6 +1,5 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -31,6 +30,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -46,6 +46,8 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.PointerEventPass
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
+import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -61,7 +63,6 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.PhoneStatsPage
 import ir.vil3ntec.tohid.ui.screens.PullCard
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
-import ir.vil3ntec.tohid.ui.v3.HERO_HEIGHT
 import ir.vil3ntec.tohid.ui.v3.LocalV3SystemBottom
 import ir.vil3ntec.tohid.ui.v3.nav.HomePager
 import ir.vil3ntec.tohid.ui.v3.nav.LocalDeskLayout
@@ -86,12 +87,17 @@ private val FAB_ROOM = 72.dp
 private const val PREFS = "tohid-shell"
 private const val HINT_DONE = "pull_hint_done"
 
+/** کادرِ بالای خانه باز مانده بود (HOME-V3) — فقط روی همین دستگاه */
+private const val HERO_SHOWN = "hero_shown"
+
 /**
- *  خانه (`home`، TAB) — HOME-V2: ساده و جذاب، از بالا به پایین همین و نه بیشتر:
- *  سرخط (نامِ دکان ˅ + زنگ)، دستگیرهٔ کادرِ پنهان، کادرِ اصلیِ «فروشِ امروز»، چهار میان‌بر،
- *  «امروز» (۵ ردیف) و هشدار فقط وقتی کاری فوری هست. کادرِ «صندوق / گاوصندوق» پنهان است و فقط با
- *  کشیدنِ به‌زورِ صفحه از بالا بیرون می‌آید (`PullCard`). ورقهٔ ۲: آمار (G6، `HomePager.stats`)؛
- *  زدن روی کادرِ اصلی همان‌جا می‌رود. تبلتِ ≥۸۴۰dp ⇐ خانه | آمار.
+ *  خانه (`home`، TAB) — HOME-V2/V3: ساده و جذاب، از بالا به پایین همین و نه بیشتر:
+ *  سرخط (نامِ دکان ˅ + زنگ)، دستگیرهٔ کادرِ بالا، چهار میان‌بر، «امروز» (۵ ردیف) و هشدار فقط وقتی کاری
+ *  فوری هست. کادرِ بالا (HOME-V3، انتخابِ صاحب‌کار: «صندوق / گاوصندوق» با نمودار و «+»، جای دو کادرِ
+ *  «صندوق» و «فروشِ امروز») پنهان است و با کشیدنِ به‌زورِ صفحه از بالا یا زدنِ دستگیره بیرون می‌آید
+ *  (`PullCard`)؛ باز/پنهان روی همین دستگاه می‌ماند. ورقهٔ ۲: آمار (G6، `HomePager.stats`). تبلتِ ≥۸۴۰dp ⇐ خانه | آمار.
+ *
+ *  خانه کششِ «تازه کردن» ندارد؛ پس کشیدن از بالا فقط مالِ همین کادر است.
  *
  *  @param bottomReserve جای نوارِ شناورِ پایین؛ محتوا زیرِ آن هم دیده می‌شود
  */
@@ -99,16 +105,13 @@ private const val HINT_DONE = "pull_hint_done"
 fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: HomeShot = HomeShot.NONE) {
   val live = rememberHomeView(d)
   val view = (if (shot.big) live.big() else live).let { v -> shot.alerts?.let { v.copy(alerts = it, bellDot = it.any { a -> a.urgent }) } ?: v }
-  val today = ir.vil3ntec.tohid.todayIso()
-  val trend = remember(d, today) { HomeTrend.of(d.sales, today, System.currentTimeMillis()) }
   val pages = if (view.canSeeMoney) 2 else 1
   BoxWithConstraints(Modifier.fillMaxSize().background(PhoneV3.colors.bg)) {
     if (maxWidth >= TABLET_SPLIT && !LocalDeskLayout.current) {
-      HomeTablet(d, view, trend, onOpen, bottomReserve, pages, shot)
+      HomeTablet(d, view, onOpen, bottomReserve, pages, shot)
       return@BoxWithConstraints
     }
     val pager = rememberPagerState(initialPage = (HomePager.page.value ?: shot.page).coerceIn(0, pages - 1)) { pages }
-    val scope = rememberCoroutineScope()
     //  پیوندِ `stats?period=` (G6) ورقِ آمار را می‌خواهد ⇐ با فنرِ کیت همان‌جا
     val wanted = HomePager.page.value
     LaunchedEffect(wanted, pages) {
@@ -117,7 +120,6 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
         HomePager.page.value = null
       }
     }
-    val onStats: (() -> Unit)? = if (pages > 1) ({ scope.launch { pager.animateScrollToPage(1, animationSpec = MotionSpec.sheet()) } }) else null
     val rtl = LocalLayoutDirection.current
     CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Ltr) {
       //  ورق با انگشت ۱:۱ می‌آید و با سرعتِ رها کردن روی فنرِ کیت می‌نشیند (MOTION-APPLE)
@@ -128,7 +130,7 @@ fun HomeScreen(d: ShopData, onOpen: (String) -> Unit, bottomReserve: Dp, shot: H
         flingBehavior = PagerDefaults.flingBehavior(pager, snapAnimationSpec = MotionSpec.sheet()),
       ) { page ->
         CompositionLocalProvider(LocalLayoutDirection provides rtl) {
-          if (page == 0) HomePage(d, view, trend, onOpen, onStats, bottomReserve, shot)
+          if (page == 0) HomePage(d, view, onOpen, bottomReserve, shot)
           else HomeStatsPage(d, bottomReserve, pages, pager.currentPage, shot.big)
         }
       }
@@ -150,9 +152,7 @@ private fun HomeStatsPage(d: ShopData, bottomReserve: Dp, pages: Int, current: I
 private fun HomePage(
   d: ShopData,
   view: HomeView,
-  trend: HomeTrend.View,
   onOpen: (String) -> Unit,
-  onStats: (() -> Unit)?,
   bottomReserve: Dp,
   shot: HomeShot,
   modifier: Modifier = Modifier,
@@ -165,37 +165,49 @@ private fun HomePage(
   val scope = rememberCoroutineScope()
   val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
   val navBottom = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-  val drawerPager = rememberPagerState(initialPage = shot.drawerPage.coerceIn(0, DrawerPages.COUNT - 1)) { DrawerPages.COUNT }
   val stagger = rememberV3Stagger()
   val orders = rememberHomeOrders()
   val saleFab = HomeTiles.saleFab(orders != null, ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value.ids)
 
-  /* ---------- کادرِ پنهان: کششِ لاستیکی از بالای صفحه (HOME-V2 §۱) ---------- */
-  //  بلندیِ کادرِ باز = همان کادرِ بزرگ (با درشتیِ نوشته) + فاصلهٔ زیرش
+  /* ---------- کادرِ بالا (HOME-V3): پنهان تا کششِ به‌زور از بالای صفحه؛ باز/پنهان ماندگار ---------- */
+  val input = rememberHeroInput(d)
+  var range by remember { mutableStateOf(shot.range) }
+  val faces = rememberHeroFaces(d, view, input, range)
+  val heroPager = rememberPagerState(initialPage = shot.drawerPage.coerceIn(0, faces.size - 1)) { faces.size }
+  val heroHeight = HERO_CARD_HEIGHT * density.fontScale.coerceIn(1f, 1.3f)
+  //  بلندیِ کادرِ باز = همان کادر (با درشتیِ نوشته) + فاصلهٔ زیرش
   val cfg = remember(density) {
-    val open = HERO_HEIGHT * density.fontScale.coerceIn(1f, 1.3f) + DRAWER_GAP
+    val open = heroHeight + DRAWER_GAP
     with(density) { PullCard.Config(open = open.toPx(), threshold = 84.dp.toPx(), flingMin = 28.dp.toPx(), flingVelocity = 1100.dp.toPx()) }
   }
+  //  باز/پنهان روی همین دستگاه می‌ماند (رفتن به بخشِ دیگر، بستنِ برنامه) تا خودِ کاربر عوضش کند؛ عکس‌ها حالتِ خودشان
+  val prefs = remember { context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE) }
+  val kept = remember { shot == HomeShot.NONE && prefs.getBoolean(HERO_SHOWN, false) }
   //  حالت فقط در لَمبداهای اندازه/رسم خوانده می‌شود ⇐ کشیدن صفحه را دوباره نمی‌سازد (۶۰ فریم)
   var pc by remember {
     mutableStateOf(
       when {
-        shot.reveal >= 1f -> PullCard.forceShown()
+        shot.reveal >= 1f || kept -> PullCard.forceShown()
         shot.reveal > 0f -> PullCard.forcePulled(shot.reveal, cfg)
         else -> PullCard.State()
       },
     )
   }
-  val settle = remember { Animatable(if (shot.reveal >= 1f) cfg.open else 0f) }
+  val settle = remember { Animatable(if (shot.reveal >= 1f || kept) cfg.open else 0f) }
   val shown by remember { derivedStateOf { pc.shown } }
   //  کادر فقط وقتی ساخته می‌شود که دیده شود؛ بولی ⇐ کشیدن ترکیب را دوباره نمی‌سازد
   val alive by remember { derivedStateOf { pc.shown || pc.dragging || settle.isRunning || settle.value > 0f } }
   fun visible(): Float = if (pc.dragging) PullCard.visible(pc, cfg) else settle.value
   fun progress(): Float = (visible() / cfg.open).coerceIn(0f, 1f)
+  //  جای کادر در ستونِ پیمایش — لمسی که روی خودِ کادر شروع شد می‌تواند پنهانش کند
+  var heroTop by remember { mutableFloatStateOf(0f) }
 
-  val prefs = remember { context.getSharedPreferences(PREFS, android.content.Context.MODE_PRIVATE) }
   var hint by remember { mutableStateOf(!prefs.getBoolean(HINT_DONE, false)) }
+  fun keep(on: Boolean) {
+    if (shot == HomeShot.NONE) prefs.edit().putBoolean(HERO_SHOWN, on).apply()
+  }
   fun opened() {
+    keep(true)
     if (hint) {
       hint = false
       prefs.edit().putBoolean(HINT_DONE, true).apply()
@@ -208,19 +220,25 @@ private fun HomePage(
   }
   fun close() {
     if (!pc.shown) return
+    val from = visible()
     pc = PullCard.dismiss(pc)
-    scope.launch { settle.animateTo(0f, MotionSpec.sheet()) }
+    keep(false)
+    scope.launch {
+      settle.snapTo(from)
+      settle.animateTo(0f, MotionSpec.sheet())
+    }
   }
-  BackHandler(enabled = shown) { close() }
 
   val connection = remember(cfg) {
     object : NestedScrollConnection {
       override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
         if (source != NestedScrollSource.UserInput || available.y >= 0f) return Offset.Zero
-        //  باز: کشیدن رو به بالا یا اسکرول ⇐ بسته (اسکرول همان‌طور ادامه می‌دهد)
+        //  باز: فقط کشیدنی که روی خودِ کادر و در بالای صفحه شروع شد کادر را جمع می‌کند؛ اسکرولِ دیگر همان اسکرول است
         if (pc.shown) {
-          close()
-          return Offset.Zero
+          if (scroll.value > 0) return Offset.Zero
+          val (s, used) = PullCard.pushUp(pc, -available.y, cfg)
+          pc = s
+          return Offset(0f, -used)
         }
         val (s, used) = PullCard.pullUp(pc, -available.y, cfg)
         pc = s
@@ -230,6 +248,11 @@ private fun HomePage(
       override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
         //  فقط حرکتِ انگشت که اسکرول دیگر نخورد (بالای صفحه) — نه پرتاب
         if (source != NestedScrollSource.UserInput || available.y <= 0f) return Offset.Zero
+        if (pc.shown) {
+          val (s, used) = PullCard.pushDown(pc, available.y)
+          pc = s
+          return Offset(0f, used)
+        }
         val before = pc
         pc = PullCard.pullDown(pc, available.y, cfg)
         if (!before.latched && pc.latched) haptic.performHapticFeedback(HapticFeedbackType.GestureThresholdActivate)
@@ -239,12 +262,14 @@ private fun HomePage(
       override suspend fun onPreFling(available: Velocity): Velocity {
         if (!pc.dragging) return Velocity.Zero
         val from = PullCard.visible(pc, cfg)
+        val was = pc.shown
         val next = PullCard.release(pc, available.y, cfg)
         settle.snapTo(from)
         pc = next
-        if (next.shown) opened()
+        if (next.shown && !was) opened()
+        if (!next.shown && was) keep(false)
         scope.launch {
-          settle.animateTo(if (next.shown) cfg.open else 0f, MotionSpec.sheet(), initialVelocity = if (next.shown) available.y * PullCard.RUBBER * 0.5f else 0f)
+          settle.animateTo(if (next.shown) cfg.open else 0f, MotionSpec.sheet(), initialVelocity = if (next.shown && !was) available.y * PullCard.RUBBER * 0.5f else 0f)
         }
         return available
       }
@@ -257,11 +282,12 @@ private fun HomePage(
       .background(p.bg)
       .pointerInput(cfg) {
         awaitEachGesture {
-          awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
+          val down = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
           val atTop = scroll.value == 0
+          val onCard = pc.shown && down.position.y >= heroTop && down.position.y <= heroTop + visible()
           //  فنرِ برگشت هنوز در راه است ⇐ کشش از همان جا ادامه می‌یابد، نه از صفر
           val carry = if (!pc.shown && !pc.dragging && settle.value > 0f) PullCard.fingerFor(settle.value, cfg) else 0f
-          pc = PullCard.touchDown(pc, atTop).let { if (carry > 0f && atTop) it.copy(finger = carry) else it }
+          pc = PullCard.touchDown(pc, atTop, onCard).let { if (carry > 0f && atTop) it.copy(finger = carry) else it }
           if (carry > 0f) scope.launch { settle.stop() }
         }
       }
@@ -276,6 +302,7 @@ private fun HomePage(
         Modifier
           .fillMaxWidth()
           .clipToBounds()
+          .onPlaced { heroTop = it.positionInParent().y }
           .layout { measurable, constraints ->
             val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
             val v = visible().roundToInt().coerceAtLeast(0)
@@ -293,14 +320,21 @@ private fun HomePage(
         //  تا کسی نکشیده، ساخته نمی‌شود
         if (alive) {
           Column {
-            HomeDrawerPager(view, drawerPager, onOpen)
+            HomeHeroPager(
+              faces = faces,
+              sync = view.sync,
+              state = heroPager,
+              range = range,
+              onRange = { range = it },
+              onPlus = { onOpen(ShellTargets.heroMoney(safe = it == HomeHero.Page.SAFE)) },
+              onHide = ::close,
+              height = heroHeight,
+            )
             Spacer(Modifier.height(DRAWER_GAP))
           }
         }
       }
       Spacer(Modifier.height(4.dp))
-      HomeSalesCard(view.todaySales, trend, onStats, Modifier.v3Stagger(stagger, "sales", 1))
-      Spacer(Modifier.height(BLOCK))
       HomeShortcuts(onOpen, Modifier.v3Stagger(stagger, "shortcuts", 2), orders)
       Spacer(Modifier.height(BLOCK))
       HomeToday(d, purchases = view.canSeeMoney, onOpen = onOpen, modifier = Modifier.v3Stagger(stagger, "today", 3))
@@ -318,11 +352,11 @@ private fun HomePage(
 
 /** تبلت: آغاز = همان خانهٔ ساده (با کادرِ پنهان)؛ پایان = آمار (برای کسی که آمار دارد) */
 @Composable
-private fun HomeTablet(d: ShopData, view: HomeView, trend: HomeTrend.View, onOpen: (String) -> Unit, bottomReserve: Dp, pages: Int, shot: HomeShot) {
+private fun HomeTablet(d: ShopData, view: HomeView, onOpen: (String) -> Unit, bottomReserve: Dp, pages: Int, shot: HomeShot) {
   val p = PhoneV3.colors
   Row(Modifier.fillMaxSize().background(p.bg)) {
     Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = Alignment.TopCenter) {
-      HomePage(d, view, trend, onOpen, onStats = null, bottomReserve = bottomReserve, shot = shot, modifier = Modifier.widthIn(max = 640.dp))
+      HomePage(d, view, onOpen, bottomReserve = bottomReserve, shot = shot, modifier = Modifier.widthIn(max = 640.dp))
     }
     if (pages > 1) {
       Spacer(Modifier.width(1.dp).fillMaxHeight().background(p.hairline))
