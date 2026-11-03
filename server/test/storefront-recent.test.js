@@ -14,6 +14,7 @@ const path = require('node:path');
 const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const R = require('../public/store/recent.js');
+const { FIRST_LOAD } = require('./storefront-budget');
 
 const PUB = path.join(__dirname, '..', 'public');
 let admin = '';
@@ -56,7 +57,7 @@ test('پرچم: خاموش بی کلید، روشن `recent: true`؛ recent.js �
   assert.equal(js.status, 200);
   assert.match(js.headers.get('content-type') || '', /javascript/);
   const first = ['store/store.js', 'kit/kit.js', 'kit/boot.js'].reduce((s, f) => s + fs.statSync(path.join(PUB, f)).size, 0);
-  assert.ok(first < 75 * 1024, `بارِ نخست ${first} بایت`);
+  assert.ok(first < FIRST_LOAD, `بارِ نخست ${first} بایت`);
   const html = fs.readFileSync(path.join(PUB, 'store', 'index.html'), 'utf8');
   assert.doesNotMatch(html, /recent\.js/, 'recent.js در بارِ نخست نیست');
 });

@@ -17,6 +17,7 @@ const path = require('node:path');
 const vm = require('node:vm');
 const W = require('../scripts/dari-words');
 const D = require('../public/kit/dari');
+const { FIRST_LOAD } = require('./storefront-budget');
 
 const PUB = path.join(__dirname, '..', 'public');
 const read = (f) => fs.readFileSync(path.join(PUB, f), 'utf8');
@@ -154,16 +155,20 @@ test('مرورگر: dari.js بی module خودش را روی VILL3N.tx می‌گ
   assert.doesNotMatch(code, /\b(let|const|class)\s|=>|`/);
 });
 
-test('بارِ نخست زیرِ ۷۵KB؛ لایه و فهرست فقط با دری بار می‌شوند', () => {
+test('بارِ نخست زیرِ سقف (storefront-budget)؛ لایه و فهرست فقط با دری بار می‌شوند', () => {
   const first = ['store/store.js', 'kit/kit.js', 'kit/boot.js'].reduce((s, f) => s + fs.statSync(path.join(PUB, f)).size, 0);
-  assert.ok(first < 75 * 1024, `بارِ نخست ${first} بایت`);
+  assert.ok(first < FIRST_LOAD, `بارِ نخست ${first} بایت`);
   for (const f of ['store/index.html', 'market/index.html']) assert.doesNotMatch(read(f), /dari\.js/, `${f} نباید dari.js را بخواهد`);
   for (const f of ['kit/boot.js', 'store/store.js']) assert.doesNotMatch(read(f), /'[^']*dari\.js'/, `${f} نباید dari.js را بخواهد`);
   const kit = read('kit/kit.js');
   assert.match(kit, /LANG == 'prs' && K\.js\('\/kit\/dari\.js'\)/, 'کیت فقط برای دری لایه را می‌خواهد');
   assert.doesNotMatch(kit, /کمپیوتر|گدام|فیصد|مبایل/, 'هیچ واژهٔ فهرست در بارِ نخست');
-  //  دری در گزینش‌گر میانِ فارسی و English؛ lang/dir ِ آن در boot
-  assert.match(kit, /\[\['fa', 'فارسی'\], \['prs', 'دری'\], \['en', 'English'\], \['ps', 'پښتو'\]\]/);
+  //  دری در گزینش‌گر میانِ فارسی و English (پنجرهٔ تنظیمات، kit/settings.js ِ دیربار با زدنِ دکمه)؛ lang/dir ِ آن در boot
+  const settings = read('kit/settings.js');
+  assert.match(settings, /\[\['fa', 'فارسی'\], \['prs', 'دری'\], \['en', 'English'\], \['ps', 'پښتو'\]\]/);
+  assert.doesNotMatch(settings, /کمپیوتر|گدام|فیصد|مبایل/, 'هیچ واژهٔ فهرست در پنجرهٔ تنظیمات');
+  assert.match(kit, /K\.js\('\/kit\/settings\.js'\)/, 'کیت پنجرهٔ تنظیمات را فقط با زدنِ دکمه می‌خواهد');
+  for (const f of ['store/index.html', 'market/index.html']) assert.doesNotMatch(read(f), /settings\.js|order-kit\.js/, `${f}: پرونده‌های دیربارِ کیت در بارِ نخست نیستند`);
   const boot = read('kit/boot.js');
   assert.match(boot, /prs: 'rtl'/);
   assert.match(boot, /lang=\(fa\|prs\|en\|ps\)/);

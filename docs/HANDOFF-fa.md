@@ -60,10 +60,22 @@
   پرچمِ خاموشِ `shop.branches_report`). IMG-BANK-18 (#463) و IMG-PRO-11 (`GuidedCapture`) پیش‌تر ساخته شده بودند و STATUS جا
   مانده بود ⇒ PARTIAL با نامِ آزمون. نیمه‌کاره: CI و مرجِ همین PR؛ صفحهٔ برنامه برای IMG-PRO-17 و RPT-18 نیست.
   قدمِ بعدی: آن دو صفحه، و PAY-17 و IMG-PRO-16 (بی مانع ولی بزرگ‌تر).
-### ۱۴۰۵/۰۸/۱۲ — نگهبانِ مرجِ #877 و #878 (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
-- انجام شد: #877 (دورِ ۹) با همهٔ چک‌های سبز squash شد (`013f90e4`)؛ main (#874، #877) در `claude/gaps10-partial` ادغام شد:
-  STATUS با `batch-status.py`، HANDOFF و «تازه‌ها» هر دو سمت (بخشِ دورِ ۱۰ بالای بخشِ رسیده به main). نیمه‌کاره: CI و مرجِ #878.
-  قدمِ بعدی: پس از مرجِ #878 دورِ تازهٔ شاهدِ CI برای ردیف‌های دورِ ۹ و ۱۰.
+### ۱۴۰۵/۰۸/۱۲ — نگهبانِ مرجِ #877، #878، #880، #881 و #882 (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: #877 (دورِ ۹) squash شد (`013f90e4`)؛ main (#874، #877) در `claude/gaps10-partial` ادغام شد (STATUS با
+  `batch-status.py`، HANDOFF و «تازه‌ها» هر دو سمت؛ بخشِ دورِ ۱۰ بالای بخشِ رسیده به main) و #878 squash شد (`83dcd9f2`)؛
+  main (#878) در `claude/sf-budget` ادغام و #880 squash شد (`9e3f39d0`)؛ `claude/img12` (#881) از نو روی main ساخته شد
+  (فقط cherry-pick ِ `f21e3b206`، README §۴.۶) و PR به main برگشت؛ main (#880) در `claude/missing-rows-2` (#882) ادغام شد.
+  نیمه‌کاره: CI و مرجِ #881 و #882. قدمِ بعدی: دورِ تازهٔ شاهدِ CI برای ردیف‌های دورِ ۹ و ۱۰، WEB-15، IMG-12 و دورِ ۲ ِ MISSING.
+### ۱۴۰۵/۰۸/۱۲ — شاخهٔ `claude/sf-budget` (بودجهٔ بارِ نخستِ ویترین، WEB-15؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: JS ِ بارِ نخستِ ویترین (store.js + kit.js + boot.js) ۷۶٬۷۳۳ ⇐ ۶۹٬۷۵۲ بایت (۶٬۹۸۱ کمتر؛ بازارچه ۶۵٬۸۹۸ ⇐ ۶۰٬۴۶۵) بی
+  بالا بردنِ سقف: پنجرهٔ تنظیمات ⇐ `kit/settings.js` (با زدنِ دکمه)، `K.normPhone/keyFor/dropKey/confirm/reason/orderSteps` ⇐
+  `kit/order-kit.js` (همراهِ checkout.js و order.js)، پیگیریِ زنده و برگهٔ خطای سفارش ⇐ order.js (`open/fail/stop`)، تنظیمِ
+  روش‌های دریافت ⇐ checkout.js، نشانه‌های فقط-بازارچه و `K.photo` ⇐ market.js، نشانهٔ بی‌کارِ `bag` برداشته، `K.js` هر نشانی
+  یک بار. سقفِ آزمون‌ها یک‌جا در `server/test/storefront-budget.js`: چرخ‌دنده‌ای ۷۰KB (سند ۷۵KB هرگز بالا نمی‌رود). سبد و
+  برگهٔ سبد عمداً در بارِ نخست ماندند (بی اینترنت کار می‌کنند). ۱۲ آزمونِ مرورگرِ ویترین/بازارچه سبز (۵۱۶ ✅، ۸ تازه)، ۲۰۸ آزمونِ سرور.
+- نیمه‌کاره: هیچ؛ PR باز است (مرج نشد، به خواستِ صاحب‌کار).
+- قدمِ بعدی: CI ِ PR و مرج. IMG-12 و هر کارِ تازهٔ ویترین: کدِ نخستین نقاشی فقط تا سقفِ چرخ‌دنده‌ای؛ بیشتر ⇒ دلیل در PR و بالا
+  بردنِ `FIRST_LOAD` (تا ۷۵KB)، وگرنه پروندهٔ دیربار با `K.js`.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps10-partial` (کمبودهای PARTIAL، دورِ ۱۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **SEC-03** لغو و «اصلاح» ِ تاریخچهٔ نسخهٔ ۳ (`CancelRoute`/`FixRoute`) از `SalesVoid.run` (= `InvoiceVoid.check` ⇐
   `SalesEngine.cancel`)، لغوکننده با `FraudTrailPref.by` و `DocChainSync.recordVoid` فقط پس از ذخیرهٔ موفق؛ **RPT-04** (S48) کلیک یا
