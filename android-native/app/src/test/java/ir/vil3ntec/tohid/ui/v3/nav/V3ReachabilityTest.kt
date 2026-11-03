@@ -98,6 +98,10 @@ class V3ReachabilityTest {
     Feature("HW تنظیمِ چاپگر و کشو", "devices", s("PrinterSettingsDialog"), s("OpenDrawerDialog")),
     Feature("HW-12 راه‌اندازیِ آسانِ چاپگر و بارکدخوان", "devices", s("PrinterFinderDialog"), s("ScannerSetupTools")),
     Feature("سرورهای دیگر", "settings/data/servers", s("ServersSettings"), pattern = "settings/{group}/{section}"),
+    //  ── «تازه‌ها» (OPS-05، خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۲) ──
+    Feature("OPS-05 تازه‌ها — همهٔ تغییرها از «بیشتر»", "whats-new", s("WhatsNewScreen")),
+    Feature("OPS-05 تازه‌ها — برگهٔ یک‌باره پس از به‌روزرسانی", "whats-new", s("WhatsNewOnUpdate"), s("WhatsNewSheet")),
+    Feature("OPS-05 کلیدِ ردهٔ A ِ «تازه‌ها»", "settings/data/whats-new", s("whatsNewFromNow"), pattern = "settings/{group}/{section}"),
   )
 
   @Test

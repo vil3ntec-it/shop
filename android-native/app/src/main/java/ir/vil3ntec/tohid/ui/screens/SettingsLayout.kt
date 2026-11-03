@@ -101,6 +101,8 @@ object SettingsLayout {
   const val FRAUD_TRAIL = "سابقه ضدتقلب"
   /** پیشرفت و جای دستگاه در گفت‌وگو (`ShopPolicy.chatMediaGuard`) */
   const val CHAT_GUARD = "جای گفت‌وگو"
+  /** OPS-05: «تازه‌ها» پس از به‌روزرسانی (`WhatsNewPref`) — ردهٔ A، روشن و پنهان */
+  const val WHATS_NEW = "«تازه‌ها» پس از به‌روزرسانی"
   /** اصلاحِ روشِ پرداخت پس از فروش (POS-40، `PayFixPref`) — همان عنوانِ `PayFixSettingsWired` */
   const val PAY_FIX = "اصلاحِ روشِ پرداخت پس از فروش"
   /** لیستِ قیمت در صندوق (POS-18، `PriceListPrefs`) — همان `PRICE_LIST_SETTINGS_TITLE` */
@@ -230,7 +232,7 @@ object SettingsLayout {
     Group(
       DATA,
       listOf(
-        Part("data", listOf("همگام‌سازی", "داده‌ها", ABOUT_APP, CHAT_GUARD, SERVERS)),
+        Part("data", listOf("همگام‌سازی", "داده‌ها", ABOUT_APP, WHATS_NEW, CHAT_GUARD, SERVERS)),
         Part("reports", listOf(OWNER_REPORT, TAX_QUARTER, CRM_REPORTS, SIMPLE_ASK, REPORT_KEYS, DOC_GAPS)),
       ),
     ),
@@ -377,6 +379,7 @@ object SettingsLayout {
     "همگام‌سازی" to "sync",
     "داده‌ها" to "backup",
     ABOUT_APP to "app",
+    WHATS_NEW to "whats-new",
   )
 
   /**
@@ -463,6 +466,7 @@ object SettingsLayout {
     "همگام‌سازی" -> StrSettings.syncRow
     "داده‌ها" -> StrSettings.backupRow
     ABOUT_APP -> StrSettings.versionRow
+    WHATS_NEW -> StrSettings.whatsNewSetting
     PROFILE -> StrSettingsHome.profileRow
     else -> row
   }

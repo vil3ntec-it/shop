@@ -50,6 +50,15 @@ jobs:
         continue-on-error: true
         run: node tools/quality/quality.mjs --check eslint
 
+      #  OPS-05 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۲): PR ِ کدِ برنامه بی سطرِ تازه در docs/WHATS-NEW-fa.md ⇒ هشدار روی PR.
+      #  مرحلهٔ ۱ ِ همین ورک‌فلو فقط گزارش است؛ سدِ محلی `finish-pr.sh` و سنجشِ کاملِ قالب `WhatsNewFileTest` (توحید بومی).
+      - name: «تازه‌ها» — سطرِ تازه برای کدِ برنامه (گزارش)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        run: |
+          node --test tools/whatsnew/check.test.mjs
+          node tools/whatsnew/check.mjs --base HEAD^1
+
       - name: شمارهٔ مهاجرت‌ها (سد)
         if: always()
         run: node tools/quality/quality.mjs --check migrations

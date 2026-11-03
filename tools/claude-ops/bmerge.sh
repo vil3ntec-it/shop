@@ -10,6 +10,9 @@ for b in "$@"; do
   fi
   U=$(git diff --name-only --diff-filter=U)
   if echo "$U" | grep -qx docs/spec/STATUS.md; then python3 $OPS/batch-status.py >/dev/null && git add docs/spec/STATUS.md; fi
+  #  «تازه‌ها» (OPS-05): هر دو PR سطر زیرِ همان بخشِ بالا می‌افزایند ⇒ هر دو سمت (ما، سپس آن‌ها)
+  W=docs/WHATS-NEW-fa.md
+  if echo "$U" | grep -qx $W; then python3 $OPS/cres.py $W $(yes ot | head -n "$(grep -c '^<<<<<<< ' $W)") && git add $W; fi
   U=$(git diff --name-only --diff-filter=U | tr '\n' ' ')
   if [ -n "$U" ]; then echo "STOP $b U=[$U]"; exit 1; fi
   git rev-parse -q --verify MERGE_HEAD >/dev/null && git commit -q --no-edit

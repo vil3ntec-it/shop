@@ -63,11 +63,57 @@ kotlin {
   if (nativeGuard) linuxX64()
 }
 
+/*
+ *  OPS-05 — «تازه‌ها»: `docs/WHATS-NEW-fa.md` (تنها منبع، خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۲) هنگامِ ساخت به
+ *  `WhatsNewBundled.kt` (همان بسته‌ی `core/guide`) می‌رود تا برنامه بی شبکه همان متنی را نشان دهد که با همین کد
+ *  ساخته شد. خواندن و سنجیدنِ متن فقط در `WhatsNew.parse` است؛ این‌جا فقط بسته‌بندی. تکه‌های ۸۰۰۰ نویسه‌ای
+ *  (سقفِ رشتهٔ ثابتِ JVM ۶۴ کیلوبایت است) و جانشینِ نیمه (surrogate) با `\u` تا تکه‌ها جدا هم درست بمانند.
+ */
+val whatsNewSource = file("../docs/WHATS-NEW-fa.md")
+val generateWhatsNew by tasks.registering {
+  val src = whatsNewSource
+  val out = layout.buildDirectory.dir("generated/whatsnew/kotlin")
+  inputs.file(src).withPropertyName("whatsNew").withPathSensitivity(PathSensitivity.NONE)
+  outputs.dir(out)
+  doLast {
+    check(src.isFile) { "docs/WHATS-NEW-fa.md نیست — «تازه‌ها» ی برنامه از همین پرونده ساخته می‌شود" }
+    val text = src.readText(Charsets.UTF_8).replace("\r\n", "\n")
+    fun lit(s: String): String = buildString {
+      append('"')
+      for (c in s) when {
+        c == '\\' -> append("\\\\")
+        c == '"' -> append("\\\"")
+        c == '$' -> append("\\$")
+        c == '\n' -> append("\\n")
+        c == '\t' -> append("\\t")
+        c < ' ' || c.isSurrogate() || c == ' ' || c == ' ' -> append("\\u" + c.code.toString(16).padStart(4, '0'))
+        else -> append(c)
+      }
+      append('"')
+    }
+    val chunks = text.chunked(8000).joinToString(",\n") { "    " + lit(it) }
+    val dir = out.get().asFile.resolve("ir/vil3ntec/tohid/core/guide").apply { mkdirs() }
+    dir.resolve("WhatsNewBundled.kt").writeText(
+      "// ساخته‌شده از docs/WHATS-NEW-fa.md به دستِ core/build.gradle.kts (generateWhatsNew) — دستی ویرایش نکنید.\n" +
+        "package ir.vil3ntec.tohid.core.guide\n\n" +
+        "internal object WhatsNewBundled {\n" +
+        "  val text: String = arrayOf(\n$chunks,\n  ).joinToString(\"\")\n" +
+        "}\n",
+      Charsets.UTF_8,
+    )
+  }
+}
+kotlin.sourceSets.commonMain { kotlin.srcDir(generateWhatsNew) }
+
 //  همان آزمون JSONها را هنگامِ اجرا می‌خواند؛ بی این ورودی، تغییرِ فقط JSON آزمون را
 //  UP-TO-DATE (سبزِ کهنه) رد می‌کرد
 tasks.named<Test>("jvmTest") {
   inputs.files(fileTree("test-vectors"), fileTree("../license/test-vectors"))
     .withPropertyName("testVectors")
+    .withPathSensitivity(PathSensitivity.RELATIVE)
+  //  `WhatsNewFileTest`: «تازه‌ها» و خطِ نسخهٔ برنامه
+  inputs.files(whatsNewSource, file("../android-native/app/build.gradle.kts"))
+    .withPropertyName("whatsNewFiles")
     .withPathSensitivity(PathSensitivity.RELATIVE)
 }
 

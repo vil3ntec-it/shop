@@ -39,7 +39,7 @@ object SettingsTiers {
 
   /** A — روشن و پنهان */
   val ALWAYS_ON: Set<String> = setOf(
-    SettingsLayout.FRAUD_TRAIL,
+    SettingsLayout.WHATS_NEW, SettingsLayout.FRAUD_TRAIL,
     SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.KEY_HELP,
     SettingsLayout.CUSTOMER_CARD, SettingsLayout.SIMPLE_ASK, SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
     SettingsLayout.PRICE_WHY, SettingsLayout.POS_NOTES, SettingsLayout.GIFT_RECEIPT,
