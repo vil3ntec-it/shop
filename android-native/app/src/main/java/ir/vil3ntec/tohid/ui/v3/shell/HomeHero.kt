@@ -72,8 +72,9 @@ object HomeHero {
   fun hourOf(ms: Long, dayStartMs: Long): Int = ((ms - dayStartMs) / HOUR_MS).toInt().coerceIn(0, HOURS - 1)
 
   /**
-   *  فروشِ بازه برای صفحهٔ «صندوق». امروز به ساعت: فاکتورِ امروزِ بی‌ساعت (`createdAt == 0`، دادهٔ کهنه) در خانهٔ
-   *  همین حالا می‌نشیند تا جمعِ نمودار همان «فروشِ امروز» بماند.
+   *  فروشِ بازه برای صفحهٔ «صندوق». هفته و ماه: فروشِ هر روز. امروز: **جمعِ فروش تا پایانِ هر ساعت** (خطِ رو به بالا،
+   *  نه تیزیِ تک‌ساعت‌ها) — پس نقطهٔ «همین حالا» همان «فروشِ امروز» ِ پایینِ کادر است. فاکتورِ امروزِ بی‌ساعت
+   *  (`createdAt == 0`، دادهٔ کهنه) در خانهٔ همین حالا می‌نشیند تا جمع همان بماند.
    */
   fun sales(
     sales: List<Sale>,
@@ -92,6 +93,7 @@ object HomeHero {
         any = true
         v[if (s.createdAt > 0L) minOf(hourOf(s.createdAt, dayStartMs), now) else now] += s.finalTotal
       }
+      for (i in 1..now) v[i] += v[i - 1]
       return Series(v.toList(), now, ticks(range, HOURS, weekLetters), !any)
     }
     val (dates, now) = days(range, today)

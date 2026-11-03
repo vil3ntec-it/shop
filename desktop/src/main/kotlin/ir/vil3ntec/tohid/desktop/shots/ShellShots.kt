@@ -24,6 +24,7 @@ import ir.vil3ntec.tohid.ui.screens.HomeAlerts
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.shell.DraftNoticeBar
+import ir.vil3ntec.tohid.ui.v3.shell.HeroMoney
 import ir.vil3ntec.tohid.ui.v3.shell.HeroMoneySheet
 import ir.vil3ntec.tohid.ui.v3.shell.HomeHero
 import ir.vil3ntec.tohid.ui.v3.shell.HomeScreen
@@ -61,6 +62,9 @@ private fun withYesterday(d: ShopData, ratio: Double): ShopData {
 /** خانه با دیروزِ نمایشی (پیش‌فرض: امروز ۲۲٪ بیشتر ⇐ سبز) */
 @Composable
 private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0.82, safe: Boolean = false) {
+  //  تنظیمِ «گاوصندوق» ِ همین دستگاه پیش از ساختِ خانه — هر عکسِ خانه خودش روشن/خاموشش می‌کند (نه در پاک‌سازیِ عکسِ
+  //  پیشین، که ترتیبش با ساختِ عکسِ بعد قطعی نیست)
+  androidx.compose.runtime.remember { ir.vil3ntec.tohid.data.SafeBookPref.set(ir.vil3ntec.tohid.desktop.DesktopContext, safe) }
   Data(s) { d ->
     val withY = androidx.compose.runtime.remember(d) { withYesterday(d, ratio).let { if (safe) withSafe(it) else it } }
     HomeScreen(withY, {}, PhoneNav.RESERVE, shot)
@@ -69,7 +73,7 @@ private fun Home(s: ShopStore, shot: HomeShot = HomeShot.NONE, ratio: Double = 0
 
 /**
  *  گاوصندوقِ نمایشی (HOME-V3، صفحهٔ دومِ کادرِ بالا): شمارش، چند ورود و خروج در روزهای گذشته و امروز — فقط در حافظهٔ
- *  همین عکس، از همان `SafeBook`. تنظیمِ «گاوصندوق» ِ همین دستگاه پیش از ساختِ خانه روشن و پس از عکس خاموش می‌شود.
+ *  همین عکس، از همان `SafeBook`.
  */
 private fun withSafe(d: ShopData): ShopData {
   val now = System.currentTimeMillis()
@@ -104,16 +108,6 @@ private fun TabletHome(store: ShopStore) {
       }
     },
   ) { Home(store, HomeShot(reveal = 1f)) }
-}
-
-/** صفحهٔ «گاوصندوق» فقط با تنظیمِ همین دستگاه — پیش از نخستین ساخت روشن، پس از عکس خاموش */
-@Composable
-private fun SafeOn(content: @Composable () -> Unit) {
-  androidx.compose.runtime.remember { ir.vil3ntec.tohid.data.SafeBookPref.set(ir.vil3ntec.tohid.desktop.DesktopContext, true) }
-  androidx.compose.runtime.DisposableEffect(Unit) {
-    onDispose { ir.vil3ntec.tohid.data.SafeBookPref.set(ir.vil3ntec.tohid.desktop.DesktopContext, false) }
-  }
-  content()
 }
 
 /** خبرهای نمایشیِ دکان (بی دادهٔ واقعی) */
@@ -185,7 +179,16 @@ object ShellShots : GroupShots {
     Shot("home-drawer", content = { s -> Home(s, HomeShot(reveal = 1f)) }),
     Shot("home-hero-today", content = { s -> Home(s, HomeShot(reveal = 1f, range = HomeHero.Range.TODAY)) }),
     Shot("home-hero-month", content = { s -> Home(s, HomeShot(reveal = 1f, range = HomeHero.Range.MONTH)) }),
-    Shot("home-safe", content = { s -> SafeOn { Home(s, HomeShot(reveal = 1f, drawerPage = 1), safe = true) } }),
+    Shot("home-safe", content = { s -> Home(s, HomeShot(reveal = 1f, drawerPage = 1), safe = true) }),
+    Shot("home-safe-sheet", content = { s ->
+      androidx.compose.foundation.layout.Box(Modifier.fillMaxSize()) {
+        Home(s, HomeShot(reveal = 1f, drawerPage = 1), safe = true)
+        HeroMoneySheet(
+          page = HomeHero.Page.SAFE, shiftClosed = false, busy = false, error = null,
+          onSubmit = { _, _, _, _ -> }, onOpenDrawer = {}, onClose = {}, start = HeroMoney.Dir.TAKE, startAmount = "2500",
+        )
+      }
+    }),
     //  تبلت (۱۲۸۰×۸۰۰، خانه | آمار) با کادرِ بالای باز — کوچک‌شده تا در پنجرهٔ گوشی جا شود
     Shot("home-hero-tablet", content = { s -> TabletHome(s) }),
     Shot("home-hero-sheet", content = { s ->

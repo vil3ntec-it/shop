@@ -66,7 +66,7 @@ fun HeroMoneySheet(
     Text(StrSale.reasonWord, style = V3Type.subhead, color = c.inkMuted)
     Spacer(Modifier.height(6.dp))
     V3ChipRow(contentPadding = PaddingValues(0.dp)) {
-      reasons.forEach { r -> V3Chip(DrawerModel.moveLabel(r), r == reason, { if (!busy) reason = r }) }
+      reasons.forEach { r -> V3Chip(reasonLabel(page, r), r == reason, { if (!busy) reason = r }) }
     }
     Spacer(Modifier.height(12.dp))
     V3TextField(note, { note = it.take(SafeCore.MAX_TEXT) }, StrHero.noteOptional)
@@ -85,3 +85,14 @@ fun HeroMoneySheet(
     )
   }
 }
+
+/** نامِ دلیل: صندوق همان برچسب‌های برگهٔ «ورود/خروجِ نقد»، گاوصندوق همان برچسب‌های پنجرهٔ گاوصندوق */
+private fun reasonLabel(page: HomeHero.Page, r: String): String =
+  if (page == HomeHero.Page.TILL) DrawerModel.moveLabel(r)
+  else when (r) {
+    "deposit" -> StrSafe.reasonDeposit
+    "owner_withdrawal" -> StrSafe.reasonOwnerWithdrawal
+    "petty_expense" -> StrSafe.reasonPettyExpense
+    SafeCore.OTHER -> StrSafe.reasonOther
+    else -> r
+  }

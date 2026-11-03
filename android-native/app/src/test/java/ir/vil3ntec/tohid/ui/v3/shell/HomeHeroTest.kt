@@ -53,7 +53,7 @@ class HomeHeroTest {
   }
 
   @Test
-  fun `امروز به ساعت؛ فاکتورِ بی‌ساعت در همین حالا و جمع همان فروشِ امروز`() {
+  fun `امروز جمعِ فروش تا هر ساعت است؛ فاکتورِ بی‌ساعت در همین حالا و نقطهٔ همین حالا همان فروشِ امروز`() {
     val now = dayStart + 10 * hour + 30 * 60_000
     val s = HomeHero.sales(
       listOf(
@@ -66,10 +66,13 @@ class HomeHeroTest {
     )
     assertEquals(24, s.values.size)
     assertEquals(10, s.now)
+    assertEquals(0.0, s.values[0], 0.0)
     assertEquals(50.0, s.values[1], 0.0)
-    assertEquals(70.0, s.values[9], 0.0)
-    assertEquals(30.0, s.values[10], 0.0)
-    assertEquals(150.0, s.values.sum(), 0.0)
+    assertEquals(50.0, s.values[8], 0.0)
+    assertEquals(120.0, s.values[9], 0.0)
+    assertEquals(150.0, s.values[10], 0.0)
+    assertEquals(150.0, s.current, 0.0)
+    assertEquals(0.0, s.values[11], 0.0) //  هنوز نیامده
     assertEquals(listOf("0", "", "", "", "4"), s.ticks.take(5))
   }
 
