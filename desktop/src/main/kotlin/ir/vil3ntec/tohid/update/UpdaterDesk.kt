@@ -102,23 +102,10 @@ object Updater {
     )
   }
 
-  fun versionOf(assetName: String, tag: String): String {
-    val fromName = Regex("(\\d+(?:\\.\\d+)+)").find(assetName)?.value
-    if (fromName != null) return fromName
-    val fromTag = Regex("(\\d+(?:\\.\\d+)+)").find(tag)?.value
-    return fromTag ?: tag.removePrefix("v")
-  }
+  /** همان قاعدهٔ اندروید و آیفون (`ReleaseVersion` ِ مشترک) */
+  fun versionOf(assetName: String, tag: String): String = ReleaseVersion.of(assetName, tag)
 
-  fun isNewer(remote: String, local: String): Boolean {
-    val a = remote.split(".", "-").mapNotNull { it.toIntOrNull() }
-    val b = local.split(".", "-").mapNotNull { it.toIntOrNull() }
-    for (i in 0 until maxOf(a.size, b.size)) {
-      val x = a.getOrElse(i) { 0 }
-      val y = b.getOrElse(i) { 0 }
-      if (x != y) return x > y
-    }
-    return false
-  }
+  fun isNewer(remote: String, local: String): Boolean = ReleaseVersion.isNewer(remote, local)
 
   private fun target(context: Context, release: Release): File =
     File(File(context.cacheDir, "updates"), "${release.version}-$assetName")

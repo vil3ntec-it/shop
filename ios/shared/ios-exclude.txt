@@ -1,22 +1,23 @@
 #  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
-#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۱).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۲).
 #  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
 #  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
 #  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
+#  گامِ ۷ (§۰.۱۲): هیچ سطری بی دلیل نیست. هر سطر یکی از دو دسته است؛ منطقِ خالصِ درونشان به کدِ مشترک رفته
+#  (`ScanGate` ⇐ core، `ReleaseVersion`، پوستهٔ برنامه ⇐ `AppShellAndroid.kt`) و آنچه ماند خودِ کارِ سکوست.
 
-#  ── جایگزینِ iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop) ──
-data/AtRestKeys.kt  # جایگزینِ iOS: data/AtRestKeysIos.kt (KEK در Keychain)
-data/DeviceLocation.kt  # جایگزینِ iOS: data/DeviceLocationIos.kt (CoreLocation، «هنگامِ استفاده»، یک‌باره)
-data/DiskWrite.kt  # جایگزینِ iOS: data/DiskWriteIos.kt (fsync + rename ِ POSIX)
-data/GoogleSignIn.kt  # جایگزینِ iOS: data/GoogleSignInIos.kt (Credential Manager ِ گوگل؛ اپل: ios/AppleSignInIos.kt پشتِ data/ExternalSignIn.kt)
-data/Migration.kt  # جایگزینِ iOS: data/MigrationIos.kt (دادهٔ وبیِ قدیمی در آیفون نیست)
-hw/PrinterFinderAndroid.kt  # جایگزینِ iOS: hw/PrinterFinderIos.kt (کارتِ شبکه با getifaddrs؛ بی بلوتوث)
-pay/platform/PayDevice.kt  # جایگزینِ iOS: pay/platform/PayDeviceIos.kt (NFC ِ HCE و نمایشگرِ مشتری در iOS نیست)
-scan/BarcodeScanner.kt  # جایگزینِ iOS: scan/BarcodeScannerIos.kt (دوربین با AVCaptureMetadataOutput؛ CameraX و ML Kit در iOS نیستند)
-scan/GuidedCapture.kt  # جایگزینِ iOS: scan/GuidedCaptureIos.kt (CameraX؛ عکسِ کالا از راهِ TakePicture ِ iOS)
-ui/Platform.kt  # جایگزینِ iOS: ui/PlatformIos.kt
-ui/screens/Haptics.kt  # جایگزینِ iOS: ui/screens/HapticsIos.kt
-update/Updater.kt  # جایگزینِ iOS: update/UpdaterIos.kt (به‌روزرسانی فقط از App Store؛ بی APK)
+#  ── الف) فقط اندروید، برای همیشه (iOS همتا نمی‌خواهد؛ همتای کوچکش فقط همان API را بی‌اثر نگه می‌دارد) ──
+MainActivity.kt  # نقطهٔ ورودِ اندروید (Activity، مانیفست، نامِ مستعارِ پیوند، سرویسِ اسکنِ پس‌زمینه). ورودِ آیفون: ios/IosRoot.kt ⇐ همان AppShell/AppStart ِ مشترک
+data/Migration.kt  # کوچِ دفتر از برنامهٔ وبیِ قدیمیِ اندروید (WebView ِ همان بسته). آیفون آن برنامه را هرگز نداشت ⇐ data/MigrationIos.kt: null
+update/Updater.kt  # دانلود، سنجشِ امضا و نصبِ APK. iOS فقط App Store (قاعدهٔ ۲.۵.۲ ِ اپل) ⇐ update/UpdaterIos.kt؛ قاعدهٔ شماره‌ها مشترک (update/ReleaseVersion.kt)
+pay/platform/PayDevice.kt  # NFC ِ «شبیه‌سازیِ کارت» (HCE) و نمایشگرِ دومِ مشتری (Presentation). iOS به برنامه HCE نمی‌دهد ⇐ pay/platform/PayDeviceIos.kt: «NFC نیست»
 
-#  ── مستقیم: API ِ JVM/اندروید در خودِ فایل ──
-MainActivity.kt  # androidx، android.os.Bundle
+#  ── ب) همتای iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop): سرویسِ سکو که shim ِ هم‌نام دروغ می‌گفت یا ضعیف‌تر بود ──
+data/AtRestKeys.kt  # KEK ِ Android Keystore (سخت‌افزاری، چرخشِ نام) و متنِ صفحهٔ امنیت؛ iOS: data/AtRestKeysIos.kt (Keychain، «فقط همین دستگاه»، HARDWARE_BACKED=false)
+data/DiskWrite.kt  # شاخهٔ java.nio با سطحِ API (SDK_INT ِ shim = 0 ⇐ بی fsync ِ پوشه)؛ iOS: data/DiskWriteIos.kt (همان تضمین با fsync + rename ِ POSIX)
+data/GoogleSignIn.kt  # Credential Manager ِ اندروید (ورود با گوگل در همهٔ سکوها خاموش است)؛ iOS: data/GoogleSignInIos.kt — ورودِ آیفون اپل است (ios/AppleSignInIos.kt پشتِ data/ExternalSignIn.kt)
+hw/PrinterFinderAndroid.kt  # کارتِ شبکه (ConnectivityManager) و جست‌وجوی بلوتوثِ کلاسیک؛ iOS: hw/PrinterFinderIos.kt (getifaddrs؛ بی بلوتوث، §۵.۱)
+scan/BarcodeScanner.kt  # CameraX + ML Kit + MediaPlayer؛ iOS: scan/BarcodeScannerIos.kt (AVFoundation). سدها مشترک‌اند: BarcodeGuard و ScanGate (core)
+scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/GuidedCaptureIos.kt (دکمه پنهان، عکسِ کالا با دوربینِ خودِ iOS از راهِ TakePicture)
+ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
+ui/screens/Haptics.kt  # الگوی لرزشِ Vibrator؛ iOS: ui/screens/HapticsIos.kt (بازخوردِ لمسیِ خودِ iOS: موفق/تأیید/خطا)

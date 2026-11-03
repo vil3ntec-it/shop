@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۷، شاخهٔ `claude/ios-app-phase7` (روی main پس از #861 و دستهٔ ۱۵؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `ios-exclude.txt` ۱۳ ⇐ ۱۲ و هیچ سطرِ بی‌دلیل (۴ فقط-اندروید، ۸ همتای iOS؛ دلیلِ هر سطر در خودِ فایل و جدولِ
+  `docs/IOS-PLAN-fa.md` §۰.۱۲). `data/DeviceLocation.kt` ِ اندروید با shim ِ `android.location` (CoreLocation) روی آیفون و
+  `DeviceLocationIos.kt` پاک شد. بدنهٔ `setContent`، `CrashNotice`، پیوند، لمسِ اعلان و همگام‌سازیِ `MainActivity` به
+  `AppShellAndroid.kt` (`AppShell`، `AppStart`) رفت و ریشهٔ آیفون همان را صدا می‌زند (رونوشت‌ها پاک شد). `ScanGate` ⇐ `core`
+  (یک نسخه به‌جای سه)، `versionOf`/`isNewer` ⇐ `update/ReleaseVersion.kt` (یک نسخه به‌جای سه). iOS: ۱۱۵۱ ⇐ ۱۱۵۴ از ۱۱۶۶ فایل.
+- آزمون: klib و klib ِ آزمونِ iOS سبز (Compose 1.7.3 ِ محلی)، `ios/shared` jvmTest ۱۸/۱۸، `Phase7IosTest` (۶؛ فقط شبیه‌ساز) با
+  حساب‌پیِ سادهٔ دستهٔ ۱۴، دری و `TillSale.record` ِ دستهٔ ۱۵؛ هسته ۱۱۷۲/۱۱۷۲، کامپیوتر ۲۷۸۷ با همان ۱۳ ِ شناختهٔ `ui.theme`.
+- نیمه‌کاره: اندروید این‌جا ساخته نمی‌شود (SDK نیست)؛ `MainActivity` را فقط CI می‌سازد. `desktop/…/Main.kt` هنوز رونوشتِ پوسته را دارد.
+- قدمِ بعدی: CI ِ macOS (`ios-app`) برای `Phase7IosTest`؛ تصمیمِ صاحب‌کار دربارهٔ لرزشِ یکسان (Core Haptics)؛ بردنِ کامپیوتر به `AppShell`.
+
 ### ۱۴۰۵/۰۸/۱۲، نیمه‌شب — حسابِ دوم: #861 و دستهٔ ۱۵ (سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: #861 (آیفون گامِ ۶) main را گرفت (تعارض فقط در این فایل و `docs/IOS-PLAN-fa.md`؛ هر دو سمت ماند، §۰.۱۰ گامِ ۵ و
   §۰.۱۱ گامِ ۶) و با ۳۱ چکِ سبز مرج شد (`3fccb68e`). دستهٔ ۱۵ به این ترتیب: #862 (راهِ نسخهٔ ۳ برای کارهای بی‌راه، با PRM-13 و
