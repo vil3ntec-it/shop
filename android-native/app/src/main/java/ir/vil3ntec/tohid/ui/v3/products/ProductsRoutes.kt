@@ -9,6 +9,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.StrImageChanges
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.nav.Place
@@ -37,6 +38,8 @@ object ProductsPaths {
   fun studio(id: String, source: String) = RoutePaths.withQuery(photo(id) + "/studio", "src" to source)
   fun photoBank(id: String) = photo(id) + "/bank"
   fun photoGuided(id: String) = photo(id) + "/guided"
+  /** IMG-PRO-16: نسخهٔ کوچک و بزرگِ عکسِ بانک و سنجهٔ فشرده‌سازی — راهش فقط با بانکِ روشن (`rememberPhotoMore`) */
+  fun photoVersions(id: String) = photo(id) + "/versions"
   /** برگهٔ دسته‌ها؛ `pick` ⇐ انتخاب برای نتیجه (`nav.openForResult`)، `selected` دستهٔ فعلی */
   fun categories(pick: Boolean = false, selected: String? = null) =
     RoutePaths.withQuery("products/categories", "pick" to if (pick) "1" else null, "selected" to selected?.takeIf { pick })
@@ -109,6 +112,7 @@ val ProductsModule = AppModule(
     //  بانکِ تصاویر (۳۶.۶) و دوربینِ راهنما (۳۷.۵) — همان پنجره‌های صفحهٔ کالای پیشین (`ProductPhotoExtrasAndroid.kt`)
     V3Route("products/{id}/photo/bank", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoBankRoute(args["id"].orEmpty()) },
     V3Route("products/{id}/photo/guided", RouteKind.SHEET, { StrProducts.photoTitle }, parent = "products/{id}", chrome = Chrome.OWN) { PhotoGuidedRoute(args["id"].orEmpty()) },
+    V3Route("products/{id}/photo/versions", RouteKind.PAGE, { StrImageChanges.versionsTitle }, parent = "products/{id}") { PhotoVersionsPage(args["id"].orEmpty()) },
     V3Route("products/{id}/photo/studio", RouteKind.PAGE, { StrProducts.studioTitle }, parent = "products/{id}", chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()
       val src = args.query("src")

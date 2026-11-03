@@ -117,6 +117,7 @@ object SettingsSearchIndex {
     L.PAY to kw("پرداخت صندوق نقد نسیه گرد کردن شیفت شمارش کور", "payments register cash credit rounding shift blind count", "تادیه صندوق نغد پور ګردول پټ شمېرل"),
     L.HESAB_SHOP to kw("حساب‌پی حساب پی پرداخت آنلاین", "hesabpay online payment", "حساب پی آنلاین تادیه"),
     L.TILL_RECEIVE to kw("دریافت قسط قرض F7", "receive payment instalment debt F7", "ترلاسه قسط پور"),
+    L.MULTI_DRAWER to kw("چند کشو صندوقدار شیفت شناور دخل جدا دستگاه دیگر", "multiple drawers cashiers floating shift till another device", "څو دخلونه صندوقدار ګرځنده شیفټ بله دستګاه"),
     L.PAY_FIX to kw("اصلاح روش پرداخت", "fix payment method", "د تادیې لاره سمول"),
     L.CREDIT_GATE to kw("سقف اعتبار قرض نسیه", "credit limit debt", "د اعتبار حد پور"),
     L.GIFT_CARD to kw("کارت هدیه اعتبار", "gift card store credit", "ډالۍ کارت اعتبار"),

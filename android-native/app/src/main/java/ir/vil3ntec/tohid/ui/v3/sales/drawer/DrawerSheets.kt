@@ -24,6 +24,7 @@ import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrDrawers
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.pay.ShiftCore
 import ir.vil3ntec.tohid.core.pay.ShiftReport
@@ -57,12 +58,27 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.SaleTotals
 
 /** `sales/drawer/open` — «پولِ اولِ صندوق» ⇒ «باز کن» */
 @Composable
-fun DrawerOpenSheet(onSubmit: (Double) -> Unit, onClose: () -> Unit, start: String = "") {
+fun DrawerOpenSheet(
+  onSubmit: (Double) -> Unit,
+  onClose: () -> Unit,
+  start: String = "",
+  /** PAY-17 («چند کشو» ِ روشن): نامِ کشو یا صندوقدار ⇒ کشوی نام‌دار؛ خالی ⇒ همان [onSubmit] (کشوی اصلی) */
+  onSubmitNamed: ((Double, String) -> Unit)? = null,
+) {
   var amount by remember { mutableStateOf(start) }
+  var name by remember { mutableStateOf("") }
+  fun submit() {
+    val v = DrawerModel.amount(amount) ?: Double.NaN
+    if (onSubmitNamed != null && name.isNotBlank()) onSubmitNamed(v, name) else onSubmit(v)
+  }
   V3Sheet(onDismiss = onClose, title = StrSale.openDrawer, detents = false) {
-    V3TextField(amount, { amount = it }, StrSale.openingCashField, kind = V3FieldKind.MONEY, imeAction = androidx.compose.ui.text.input.ImeAction.Done, onImeAction = { onSubmit(DrawerModel.amount(amount) ?: Double.NaN) })
+    if (onSubmitNamed != null) {
+      V3TextField(name, { name = it.take(ir.vil3ntec.tohid.core.pay.Drawers.LABEL_MAX) }, StrDrawers.drawerName, helper = StrDrawers.drawerNameHelp)
+      Spacer(Modifier.height(10.dp))
+    }
+    V3TextField(amount, { amount = it }, StrSale.openingCashField, kind = V3FieldKind.MONEY, imeAction = androidx.compose.ui.text.input.ImeAction.Done, onImeAction = { submit() })
     Spacer(Modifier.height(16.dp))
-    V3Button(StrSale.openIt, { onSubmit(DrawerModel.amount(amount) ?: Double.NaN) }, Modifier.fillMaxWidth(), haptic = true)
+    V3Button(StrSale.openIt, { submit() }, Modifier.fillMaxWidth(), haptic = true)
   }
 }
 

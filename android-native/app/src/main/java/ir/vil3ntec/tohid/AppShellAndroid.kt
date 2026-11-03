@@ -41,6 +41,7 @@ object AppStart {
     LocaleChoice.load(context)
     ShopDayChoice.load(context)
     ir.vil3ntec.tohid.data.ExpiryPref.load(context) // S22: روزِ هشدارِ انقضا
+    ir.vil3ntec.tohid.data.MultiDrawerPref.load(context) // PAY-17: کشوی برگزیدهٔ همین دستگاه (خاموش ⇒ کشوی اصلی)
     ir.vil3ntec.tohid.ui.theme.ThemeStore.load(context)
     ModeState.load(context)
   }

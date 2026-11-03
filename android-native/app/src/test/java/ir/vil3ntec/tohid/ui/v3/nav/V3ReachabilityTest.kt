@@ -50,6 +50,17 @@ class V3ReachabilityTest {
     Feature("PRD-20 ورود از xlsx/CSV با پیش‌نمایشِ کامل", "stock/import", s("ProductImportDialog")),
     Feature("PRD-20 سابقهٔ ورود از فایل", "stock/import/history", s("ProductImportHistoryDialog")),
     Feature("IMG-BANK بانکِ تصاویر", "products/{id}/photo/bank", s("ImageBankPicker"), s("BankPhotoSource")),
+    //  ── کمبودهای MISSING، دورِ ۳ (صفحه برای درهای سرورِ #882 و دو ردیفِ بی مانع) ──
+    Feature("IMG-PRO-17 تغییرِ دسته‌ایِ عکس‌ها و برگشتِ یک‌جا", "stock/images/changes", "ir.vil3ntec.tohid.ui.v3.stock.ImageChangesRoute"),
+    Feature("IMG-PRO-17 دستهٔ تازه", "stock/images/changes/new", "ir.vil3ntec.tohid.ui.v3.stock.ImageBatchRoute"),
+    Feature("IMG-PRO-17 پیش و پسِ یک دسته و برگشت", "stock/images/changes/{id}", "ir.vil3ntec.tohid.ui.v3.stock.ImageChangeRoute"),
+    Feature("IMG-PRO-16 نسخه‌های کوچک و بزرگِ عکس و سنجهٔ فشرده‌سازی", "products/{id}/photo/versions", "ir.vil3ntec.tohid.ui.v3.products.PhotoVersionsPage"),
+    Feature("RPT-18 گزارشِ همهٔ شعبه‌ها", "reports/branches", "ir.vil3ntec.tohid.ui.v3.analytics.BranchesReportPage"),
+    Feature(
+      "PAY-17 چند کشو و شیفتِ شناور (ردهٔ B، پیش‌فرض خاموش)", "settings/sales/multi-drawer",
+      "ir.vil3ntec.tohid.ui.v3.settings.sections.MultiDrawerScreen", pattern = "settings/{group}/{section}",
+    ),
+    Feature("PAY-17 کشوهای باز و «ادامه روی این دستگاه»", "sales/drawer", "ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerScreen"),
     Feature("دوربینِ راهنما", "products/{id}/photo/guided", "ir.vil3ntec.tohid.scan.GuidedCaptureDialog"),
     //  ── کارمندان و مدیریت ──
     Feature("STF تأییدکننده‌ها", "team", s("ApproverSetupSection")),
