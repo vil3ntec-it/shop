@@ -230,6 +230,7 @@ fun RouteScope.CheckoutRoute() {
           CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
             HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
           }
+          CheckoutSession.hesabEnv = hesabEnv
           nav.open(SalesPaths.HESAB)
         }
       },

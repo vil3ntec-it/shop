@@ -26,7 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
@@ -74,9 +73,9 @@ import kotlinx.coroutines.launch
 @Composable
 fun RouteScope.HesabTillRoute() {
   val ask = CheckoutSession.hesab
-  if (ask == null) { LaunchedEffect(Unit) { back() }; return }
-  val context = LocalContext.current
-  val env = remember { HesabPayEnv.of(context) }
+  //  محیطِ حساب‌پی را برگهٔ تسویه می‌دهد (همان نمونهٔ `HesabPayEnv.of`)؛ پیوندِ مستقیم بی تسویه ⇒ برگشت
+  val env = CheckoutSession.hesabEnv
+  if (ask == null || env == null) { LaunchedEffect(Unit) { back() }; return }
   HesabTillSheet(ask, env, onPaid = { st -> CheckoutSession.hesabPaid = st; CheckoutSession.hesab = null; back() }, onClose = { CheckoutSession.hesab = null; back() })
 }
 

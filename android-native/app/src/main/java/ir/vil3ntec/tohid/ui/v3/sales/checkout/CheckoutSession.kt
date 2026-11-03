@@ -35,6 +35,8 @@ object CheckoutSession {
   var creditApproval by mutableStateOf<CreditGate.Approval?>(null)
   /** برگهٔ «پرداخت با حساب‌پی (NFC/QR)» ِ باز (`sale/checkout/hesabpay`، PAY-21) */
   var hesab by mutableStateOf<HesabTillModel.Ask?>(null)
+  /** محیطِ حساب‌پیِ همان برگه (`HesabPayEnv.of`، از `CheckoutRoute`) */
+  var hesabEnv: ir.vil3ntec.tohid.pay.platform.HesabPayEnv? = null
   /** تسویهٔ تأییدشدهٔ حساب‌پی که هنوز ثبت نشده (ثبتِ ردشده ⇒ همان دوباره، بی پرداختِ دوم) */
   var hesabPaid by mutableStateOf<ir.vil3ntec.tohid.core.pay.Settlement?>(null)
 
