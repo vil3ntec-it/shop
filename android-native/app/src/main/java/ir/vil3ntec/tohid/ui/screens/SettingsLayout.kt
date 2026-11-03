@@ -147,6 +147,8 @@ object SettingsLayout {
   const val LABEL_TOOLS = "برچسب و بارکدِ داخلی"
   /** کد، نام‌های دیگر و محلِ قفسه (PRD-02/PRD-26، `ProductInfoPrefs`) */
   const val PRODUCT_INFO = "کد، نام‌های دیگر و محلِ قفسه"
+  /** پیشنهادِ دسته و نام در فرمِ کالا (AI-06، `ProductSuggestPref`) — ردهٔ A */
+  const val PRODUCT_SUGGEST = "پیشنهادِ دسته و نام"
   /** جست‌وجوی مقاومِ صندوق (POS-04، `PosSearchPrefs`) — فقط کامپیوتر */
   const val POS_SEARCH = "جست‌وجوی مقاومِ صندوق"
   /** قیمت‌پرسی در صندوق (POS-15، `PosPriceCheckPrefs`) — فقط کامپیوتر */
@@ -216,7 +218,7 @@ object SettingsLayout {
     Group(
       GOODS,
       listOf(
-        Part("goods", listOf(TILL_GOODS, PRODUCT_INFO, LABEL_TOOLS, PRODUCT_TOOLS)),
+        Part("goods", listOf(TILL_GOODS, PRODUCT_INFO, PRODUCT_SUGGEST, LABEL_TOOLS, PRODUCT_TOOLS)),
         Part("stock", listOf(STOCK_PLACES, COUNT_TOOLS, SHRINK_REPORT, STOCK_LEVELS, STOCK_INSIGHT, STOCK_MODE, SMART_FORECAST)),
       ),
     ),
@@ -341,6 +343,7 @@ object SettingsLayout {
     COUNT_TOOLS to "stock-count",
     LABEL_TOOLS to "labels",
     PRODUCT_INFO to "product-info",
+    PRODUCT_SUGGEST to "product-suggest",
     POS_SEARCH to "smart-search",
     POS_PRICE_CHECK to "price-check",
     POS_TOUCH to "touch-mode",
@@ -422,6 +425,7 @@ object SettingsLayout {
     COUNT_TOOLS -> ir.vil3ntec.tohid.core.i18n.StrCount.settingsTitle
     LABEL_TOOLS -> ir.vil3ntec.tohid.core.i18n.StrLabel.settingsTitle
     PRODUCT_INFO -> ir.vil3ntec.tohid.core.i18n.StrProduct.section
+    PRODUCT_SUGGEST -> ir.vil3ntec.tohid.core.i18n.StrProductSuggest.settingsTitle
     POS_SEARCH -> StrPos.smartSearch
     POS_PRICE_CHECK -> ir.vil3ntec.tohid.core.i18n.StrPriceCheck.section
     POS_TOUCH -> ir.vil3ntec.tohid.core.i18n.StrTouch.section

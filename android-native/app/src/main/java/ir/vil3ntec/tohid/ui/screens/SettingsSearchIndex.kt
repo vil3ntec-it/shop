@@ -148,6 +148,7 @@ object SettingsSearchIndex {
     //  کالا و انبار
     L.TILL_GOODS to kw("ثبت سریع واحد کارتن بسته", "quick add unit carton pack", "چټک ثبت واحد کارتن"),
     L.PRODUCT_INFO to kw("کد نام دیگر قفسه", "code alias shelf", "کوډ بل نوم الماری"),
+    L.PRODUCT_SUGGEST to kw("پیشنهاد دسته نام از متن چسباندن فهرست", "suggest category name paste text list", "وړاندیز ډله نوم له متن"),
     L.LABEL_TOOLS to kw("برچسب بارکد لیبل", "label barcode", "لیبل بارکوډ"),
     L.PRODUCT_TOOLS to kw("ابزار کالا", "product tools", "د توکو وسایل"),
     L.STOCK_PLACES to kw("محل جا انبار قفسه بسته‌بندی", "locations warehouse repack", "ځایونه ګدام بسته"),

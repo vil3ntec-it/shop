@@ -44,7 +44,7 @@ object SettingsTiers {
     SettingsLayout.CUSTOMER_CARD, SettingsLayout.SIMPLE_ASK, SettingsLayout.REPORT_KEYS, SettingsLayout.DOC_GAPS,
     SettingsLayout.PRICE_WHY, SettingsLayout.POS_NOTES, SettingsLayout.GIFT_RECEIPT,
     SettingsLayout.STOCK_INSIGHT, SettingsLayout.STOCK_LEVELS, SettingsLayout.COUNT_TOOLS, SettingsLayout.SHRINK_REPORT,
-    SettingsLayout.CHAT_GUARD,
+    SettingsLayout.CHAT_GUARD, SettingsLayout.PRODUCT_SUGGEST,
   )
 
   fun tier(key: String): Tier = when (key) {

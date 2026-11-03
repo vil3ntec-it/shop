@@ -14,6 +14,7 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.ContentPaste
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrProductSuggest
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -95,6 +97,10 @@ internal fun NewProductsScreen(
   val views = remember { HashMap<Int, BringIntoViewRequester>() }
   val focus = remember { HashMap<String, FocusRequester>() }
   val readyCount = ProductFormModel.readyCount(rows)
+  //  AI-06: پیشنهادِ دسته از نام و «افزودن از متن» (کلیدِ همین دستگاه؛ خاموش ⇒ همان فرمِ پیشین)
+  val suggest = rememberCategorySuggest(data)
+  val pasteOn = rememberPasteOn()
+  var pasting by remember { mutableStateOf(false) }
 
   fun update(key: Int, change: (ProductRowDraft) -> ProductRowDraft) { rows = ProductFormModel.update(rows, key, change) }
 
@@ -203,6 +209,7 @@ internal fun NewProductsScreen(
               section = CardSection,
               mode = Mode.NEW,
               nameHelper = if (index == 0 && rows.size == 1 && row.name.isBlank()) StrProducts.firstRowHint else null,
+              suggest = suggest,
             )
           }
         } }
@@ -220,9 +227,26 @@ internal fun NewProductsScreen(
         kind = V3ButtonKind.SECONDARY,
         icon = Icons.Outlined.Add,
       )
+      if (pasteOn) {
+        Spacer(Modifier.height(10.dp))
+        V3Button(StrProductSuggest.fromText, { pasting = true }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL, icon = Icons.Outlined.ContentPaste)
+      }
       Spacer(Modifier.height(16.dp))
     }
     V3SuccessCheck(done, Modifier.align(Alignment.Center), haptic = false)
+  }
+  if (pasting) {
+    PasteProductsSheet(
+      existing = remember(data.products) { data.products.map { it.name } },
+      onDismiss = { pasting = false },
+    ) { names ->
+      val first = seq
+      seq += names.size
+      rows = ProductFormModel.withPasted(rows, names, first)
+      banner = null
+      expanded = first
+      scope.launch { delay(MotionTokens.MEDIUM.toLong()); views[first]?.bringIntoView() }
+    }
   }
 }
 
