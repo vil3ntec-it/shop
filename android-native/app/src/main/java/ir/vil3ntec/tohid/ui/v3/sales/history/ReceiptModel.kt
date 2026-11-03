@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.history
 
+import ir.vil3ntec.tohid.data.LoyaltyPoints
 import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PayFlow
@@ -82,6 +83,15 @@ object ReceiptModel {
     add(TotalRow(StrSale.paid, s.paidAmount))
     add(TotalRow(StrSale.remaining, s.remaining, warn = s.remaining > 0))
     PayFlow.receiptLines(s).forEach { (label, amount) -> add(TotalRow(label, amount)) }
+  }
+
+  /**
+   *  زیرِ جمع‌ها، همان‌جا که نمای فاکتورِ کامپیوتر (`InvoiceDialog`) و رسیدِ چاپی (`Receipt`) دارند: امتیازِ مصرف‌شده و
+   *  کسب‌شدهٔ همین فاکتور (PRM-13، `LoyaltyPoints.receiptLines`) و یادداشتِ فاکتور (POS-11). بی هیچ‌کدام ⇒ خالی.
+   */
+  fun extras(d: ShopData, s: Sale): List<String> = buildList {
+    LoyaltyPoints.receiptLines(d, s.id).forEach { (label, amount) -> add(if (amount != null) "$label · ${PhoneSaleText.amount(amount)}" else label) }
+    s.note?.takeIf { it.isNotBlank() }?.let { add("${StrSale.invoiceNote}: $it") }
   }
 
   fun debtorName(d: ShopData, s: Sale): String? = s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name }

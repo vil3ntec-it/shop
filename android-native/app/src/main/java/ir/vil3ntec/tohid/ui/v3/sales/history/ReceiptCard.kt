@@ -84,6 +84,11 @@ fun ReceiptCard(
     val stamped = androidx.compose.runtime.remember { ir.vil3ntec.tohid.ui.PromoLive.stampOn(context) }
     V3InvoiceItems(ReceiptModel.lines(d, sale, stamped), title = StrSale.itemsWord)
     SaleTotals(ReceiptModel.totals(sale, d.saleItems.filter { it.saleId == sale.id }, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName))
+    //  امتیازِ همین فاکتور و یادداشتِ فاکتور — همان‌جا که نمای فاکتورِ کامپیوتر نشان می‌دهد
+    val extras = ReceiptModel.extras(d, sale)
+    if (extras.isNotEmpty()) V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 10.dp)) {
+      extras.forEach { Text(it, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)) }
+    }
   }
 }
 

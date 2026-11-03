@@ -59,6 +59,8 @@ internal fun RouteScope.DeliveryRoute() {
     onTab = { tab = it },
     onRefresh = DeskStore::refresh,
     onBack = backOrNull,
+    //  RPT-15 گزارشِ نقدِ پیک‌ها (تسویه‌گر) و DLV-18 امتیازِ تحویل‌ها (پرچمِ دکان)
+    overflow = deliveryExtras(cfg),
   ) { t, d, pad, header ->
     when (t) {
       DeliveryModel.ASSIGN -> AssignTab(d, cfg, writable, AssignActions(
@@ -171,7 +173,7 @@ internal fun RouteScope.DeliveryCodeRoute() {
   val shown = DeskStore.code.value
   LaunchedEffect(shown) { if (shown == null) back() }
   if (shown == null) return
-  CodeOnceSheet(shown.first, shown.second) { DeskStore.code.value = null; back() }
+  CodeOnceSheet(shown.first, shown.second, onDismiss = { DeskStore.code.value = null; back() }, qr = DeliveryGate.config.value?.picking == true)
 }
 
 @Composable

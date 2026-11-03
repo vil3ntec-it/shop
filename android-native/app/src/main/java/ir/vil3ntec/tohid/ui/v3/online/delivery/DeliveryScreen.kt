@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.delivery
 
+import ir.vil3ntec.tohid.ui.v3.V3MenuItem
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
@@ -43,6 +44,7 @@ internal fun DeliveryScreen(
   onTab: (String) -> Unit,
   onRefresh: () -> Unit,
   onBack: (() -> Unit)?,
+  overflow: List<V3MenuItem> = emptyList(),
   /** محتوای هر برگه؛ `header` (عددها و پیام‌ها) نخستین ردیفِ فهرستِ همان برگه است تا با آن بلغزد */
   pane: @Composable (tab: String, d: DeskData, pad: PaddingValues, header: @Composable () -> Unit) -> Unit,
 ) {
@@ -52,6 +54,7 @@ internal fun DeliveryScreen(
     subtitle = StrOnline.dlCaption,
     onBack = onBack,
     actions = listOf(V3Action(Icons.Outlined.Refresh, StrOnline.reload, onClick = onRefresh)),
+    overflow = overflow,
     chips = data?.let { d ->
       { DraftCountTabs(tabs.map { CountTab(it, DeliveryModel.label(it), DeliveryModel.count(it, d)) }, tab, onTab) }
     },

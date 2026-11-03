@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.delivery
 
+import ir.vil3ntec.tohid.ui.screens.HandoverQr
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -38,7 +39,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  (`dismissible = false`) تا با یک لمسِ بیرون گم نشود؛ فقط «دیدم» می‌بندد. «کپی» با لرزش.
  */
 @Composable
-fun CodeOnceSheet(orderNo: Long, code: String, onDismiss: () -> Unit) {
+fun CodeOnceSheet(orderNo: Long, code: String, qr: Boolean = false, onDismiss: () -> Unit) {
   val c = PhoneV3.colors
   val context = LocalContext.current
   val clipboard = LocalClipboardManager.current
@@ -51,6 +52,8 @@ fun CodeOnceSheet(orderNo: Long, code: String, onDismiss: () -> Unit) {
     ) {
       Text(code, style = V3Type.largeTitle.copy(fontSize = 38.sp, letterSpacing = 8.sp), color = c.ink, textAlign = TextAlign.Center)
     }
+    //  PCK-11 (با جمع‌آوری): QRِ همان کد تا مشتری عکسش را بگیرد و دکان با اسکن سفارش را پیدا کند
+    if (qr) Box(Modifier.fillMaxWidth().padding(top = 12.dp), contentAlignment = Alignment.Center) { HandoverQr(orderNo, code) }
     Spacer(Modifier.height(12.dp))
     Text(StrOnline.dlCodeHelp, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(20.dp))

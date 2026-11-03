@@ -84,7 +84,15 @@ internal class TeamActions(
  *  شناورِ «کدِ پیوستنِ تازه».
  */
 @Composable
-internal fun TeamContent(team: TeamData, signedIn: Boolean, isOwner: Boolean, rotating: Boolean, actions: TeamActions) {
+internal fun TeamContent(
+  team: TeamData,
+  signedIn: Boolean,
+  isOwner: Boolean,
+  rotating: Boolean,
+  actions: TeamActions,
+  /** بخش‌های مجوز و دستگاهِ کارمندان (STF؛ هر کدام پشتِ پرچمِ سرورِ خودش و بی آن هیچ) — `TeamStaffSections.kt` */
+  staff: @Composable () -> Unit = {},
+) {
   val c = PhoneV3.colors
   val stagger = rememberV3Stagger(team.loaded)
   V3Scaffold(
@@ -132,6 +140,7 @@ internal fun TeamContent(team: TeamData, signedIn: Boolean, isOwner: Boolean, ro
                 )
               }
             }
+            staff()
           }
         }
       }

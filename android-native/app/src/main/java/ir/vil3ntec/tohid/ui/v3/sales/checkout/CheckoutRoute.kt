@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.sales.checkout
 
+import ir.vil3ntec.tohid.ui.components.pos.rememberLoyaltyTill
+import ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar
+import ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill
+import ir.vil3ntec.tohid.data.TillSale
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -77,6 +81,10 @@ fun RouteScope.CheckoutRoute() {
     val promo = PromoLive.rememberOutcome(data, lines)
     val priced = PromoEngine.priced(lines, promo)
     val form = CheckoutSession.form ?: CheckoutModel.start(cart.debtorId.value, data.debtors, HeldSession.extras(cart).discount)
+    //  PRM-13: امتیازِ وفاداریِ مشتریِ همین فاکتور — همان `rememberLoyaltyTill` ِ صندوقِ کامپیوتر؛ جمع، سقفِ اعتبار و ثبت
+    //  با سبدِ پس از امتیاز (`TillSale.cart`)؛ قاعدهٔ خاموش یا بی مشتری ⇒ `null` و همان سبد
+    val loyalty = rememberLoyaltyTill(data, priced, form.debtorId)
+    val loyal = loyalty?.cart ?: priced
     //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
     val canDiscount = remember { ShopRole.mayDiscount(context) }
     val blockExpired = remember { ShopPolicy.blockExpired(context) }
@@ -92,7 +100,7 @@ fun RouteScope.CheckoutRoute() {
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
     val saleKey = remember(lines) { cart.saleKey() }
     val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep)
-    val n = CheckoutModel.numbers(data, priced, form, checkout)
+    val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)
     val discountError = CheckoutModel.discountError(form, canDiscount)
@@ -116,7 +124,7 @@ fun RouteScope.CheckoutRoute() {
       //  ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد). تأییدِ گرفته‌شده فقط همین مشتری و تا همین برد
       //  را می‌پوشاند؛ سبدِ بزرگ‌تر یا مشتریِ دیگر دوباره می‌پرسد. خاموش ⇒ همان ثبتِ امروز.
       val gated = options.copy(creditGate = creditGateOn)
-      val over = SalesEngine.creditOver(data, priced, gated)
+      val over = SalesEngine.creditOver(data, loyal, gated)
       val sale = CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)
       if (sale == null) {
         val o = over ?: return
@@ -132,12 +140,17 @@ fun RouteScope.CheckoutRoute() {
       submitted = true
       val d = data
       val count = lines.size
+      //  یادداشتِ فاکتور (POS-11) و امتیاز (PRM-13) همان لحظهٔ «ثبت»
+      val note = cart.note.value
+      val points = LoyaltyAtTill.points(context, loyalty)
       scope.launch {
         //  POS-14: یک ثبت در هر لحظه با کلیدِ فاکتور؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
         //  S2 (#375): با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور — پرچمِ `shop.promo_stamp` خاموش ⇒ همان
-        when (val posted = cart.post(store) { key -> PromoEngine.stamp(
-          SalesEngine.record(
-            d, priced, sale,
+        //  همان زنجیرهٔ صندوقِ کامپیوتر (`TillSale`): سبدِ پس از امتیاز و یادداشتِ فاکتور ⇒ ثبت ⇒ نشانِ تخفیفِ خودکار ⇒
+        //  ردیف‌های مصرف و کسبِ امتیاز در همان دفتر
+        when (val posted = cart.post(store) { key ->
+          TillSale.record(
+            d, priced, sale, note, promo, points,
             today = todayIso(),
             now = System.currentTimeMillis(),
             newId = Ulid::next,
@@ -146,7 +159,7 @@ fun RouteScope.CheckoutRoute() {
             saleId = key,
             //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
             receiptToken = Receipts.newToken(context),
-          ), promo)
+          )
         }) {
           SalePost.Outcome.Busy -> submitted = false
           SalePost.Outcome.NotSaved -> { submitted = false; error = SalePost.NOT_SAVED }
@@ -191,8 +204,8 @@ fun RouteScope.CheckoutRoute() {
     CheckoutView(
       form = form,
       numbers = n,
-      rows = CheckoutModel.rows(n, promo, payV2),
-      heroLine = CheckoutModel.heroLine(n, promo, PhoneSaleText::amount),
+      rows = CheckoutModel.rows(n, promo, payV2, loyalty?.points ?: 0, loyalty?.off ?: 0.0),
+      heroLine = CheckoutModel.heroLine(n, promo, PhoneSaleText::amount, loyalty?.off ?: 0.0),
       promo = promo,
       showCodes = PromoLive.snap.value.active && PromoLive.snap.value.hasCodes,
       coupons = PromoLive.coupons.value,
@@ -210,6 +223,7 @@ fun RouteScope.CheckoutRoute() {
       canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate),
       canAskApproval = !busy,
       giftLedger = data.takeIf { giftOn },
+      points = if (loyalty != null) ({ LoyaltyBar(loyalty) }) else null,
     ).also { last[0] = it }
   }
 

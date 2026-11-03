@@ -1,5 +1,22 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.foundation.layout.Box
+import androidx.compose.material.icons.outlined.AutoAwesome
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrShrink
+import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
+import ir.vil3ntec.tohid.data.ShrinkReportPref
+import ir.vil3ntec.tohid.data.ShopPolicy
+import ir.vil3ntec.tohid.data.DocGapsPref
+import ir.vil3ntec.tohid.data.SimpleAskPref
+import ir.vil3ntec.tohid.ui.screens.ReportFresh
+import ir.vil3ntec.tohid.ui.screens.PhoneFreshReports
+import ir.vil3ntec.tohid.ui.screens.shrinkSection
+import ir.vil3ntec.tohid.ui.screens.agingSection
+import ir.vil3ntec.tohid.ui.screens.rfmSection
+import ir.vil3ntec.tohid.ui.screens.gapsSection
+import ir.vil3ntec.tohid.ui.screens.simpleAskSection
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -80,9 +97,26 @@ fun ReportsScreen(
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val toasts = LocalV3Toasts.current
-  val tabs = ReportsModel.tabs(canSeeMoney)
-  var tabId by rememberSaveable(tabArg) { mutableStateOf(ReportsModel.tabOf(tabArg, canSeeMoney).id) }
-  val tab = ReportsModel.tabOf(tabId, canSeeMoney)
+  //  زبانه‌های اختیاری: همان تنظیم‌های گوشیِ پیشین (ضایعات قیمتِ خرید است ⇒ `pages` با `canSeeMoney`)
+  val extras = remember {
+    buildSet {
+      if (ShrinkReportPref.on(context)) add(ReportExtra.SHRINK)
+      if (ShopPolicy.crmReports(context)) { add(ReportExtra.AGING); add(ReportExtra.RFM) }
+      if (DocGapsPref.on(context)) add(ReportExtra.GAPS)
+      if (SimpleAskPref.on(context)) add(ReportExtra.ASK)
+    }
+  }
+  //  «گزارشِ تازه» (همان کلیدِ کامپیوتر، فقط همین دستگاه): روشن ⇒ صفحهٔ هستهٔ مشترکِ گزارش با کلیدِ برگشتِ خودش
+  LaunchedEffect(Unit) { ReportFresh.load(context) }
+  if (ReportFresh.on.value) {
+    V3Scaffold(title = Str.reports, onBack = onBack, bottomReserve = bottomReserve) { pad ->
+      Box(Modifier.fillMaxSize().padding(bottom = pad.calculateBottomPadding())) { PhoneFreshReports(d) }
+    }
+    return
+  }
+  val tabs = ReportsModel.pages(canSeeMoney, extras)
+  var tabId by rememberSaveable(tabArg) { mutableStateOf(ReportsModel.pageOf(tabArg, canSeeMoney, extras).id) }
+  val tab = ReportsModel.pageOf(tabId, canSeeMoney, extras)
   val now = remember(today) { SolarHijri.toSolar(today) }
   var rangeId by rememberSaveable(rangeArg) { mutableStateOf(ReportsModel.rangeId(ReportsModel.rangeOf(rangeArg))) }
   var year by rememberSaveable { mutableStateOf(now?.year ?: 1405) }
@@ -112,24 +146,28 @@ fun ReportsScreen(
     }
   }
   fun exportCsv() {
+    if (tab.csv.isEmpty()) { toasts?.show(StrReports.nothingToExport, V3Tone.INFO); return }
     val s = sheet()
     if (s.isEmpty) { toasts?.show(StrReports.nothingToExport, V3Tone.INFO); return }
     pending = s
     saveCsv.launch("${s.name}.csv")
   }
-  fun print() = ReportPrint.print(context, sheet(), tabLabel(tab))
+  fun print() { if (tab.csv.isNotEmpty()) ReportPrint.print(context, sheet(), tabLabel(tab)) }
 
   V3Scaffold(
     title = Str.reports,
     onBack = onBack,
     actions = listOf(V3Action(Icons.Outlined.Print, StrReports.print) { print() }),
-    overflow = listOf(V3MenuItem(Icons.Outlined.TableChart, StrReports.exportCsv) { exportCsv() }),
+    overflow = listOf(
+      V3MenuItem(Icons.Outlined.TableChart, StrReports.exportCsv) { exportCsv() },
+      V3MenuItem(Icons.Outlined.AutoAwesome, StrReach.freshOn) { ReportFresh.set(context, true) },
+    ),
     chips = {
       DraftTabStrip(tabs.map { tabLabel(it) }, tabs.indexOf(tab).coerceAtLeast(0), { tabId = tabs[it].id })
     },
     bottomReserve = bottomReserve,
   ) { pad ->
-    fun header(t: ReportTab): LazyListScope.() -> Unit = {
+    fun header(t: ReportPage): LazyListScope.() -> Unit = {
       item(key = "range") {
         if (t.ranged) RangeRow(period, from, to) { r ->
           rangeId = ReportsModel.rangeId(r)
@@ -143,7 +181,7 @@ fun ReportsScreen(
         V3Message(V3Tone.ERROR, StrReports.csvFailed, Modifier.padding(top = 12.dp).v3Shake(failures), body = StrReports.csvFailedBody, action = Str.close, onAction = { csvFailed = false })
       }
     }
-    V3PageSwitch(tab, { it.ordinal }, Modifier.fillMaxSize()) { t ->
+    V3PageSwitch(tab, { tabs.indexOf(it) }, Modifier.fillMaxSize()) { t ->
       val list = ReportListSpec(pad, header(t), onOpen, rememberV3Stagger(t))
       when (t) {
         ReportTab.PROFIT -> ProfitTab(d, from, to, list)
@@ -152,6 +190,18 @@ fun ReportsScreen(
         ReportTab.PURCHASES -> PurchasesTab(d, from, to, list)
         ReportTab.EXPIRY -> ExpiryTab(d, today, list)
         ReportTab.STOCK -> StockTab(d, list)
+        //  زبانه‌های اختیاری: همان بخش‌های گزارشِ گوشیِ پیشین (`ui/screens`)
+        ReportExtra.SHRINK -> ReportList(list) {
+          shrinkSection(this, d, period.range, from, to) { r ->
+            rangeId = ReportsModel.rangeId(r)
+            if (r == ReportEngine.Range.JMONTH || r == ReportEngine.Range.JYEAR) picker = r
+          }
+        }
+        ReportExtra.AGING -> ReportList(list) { agingSection(this, d, today) }
+        ReportExtra.RFM -> ReportList(list) { rfmSection(this, d, today) }
+        ReportExtra.GAPS -> ReportList(list) { gapsSection(this, d, today) }
+        ReportExtra.ASK -> ReportList(list) { simpleAskSection(this, d, canSeeMoney) }
+        else -> Unit
       }
     }
   }
@@ -185,13 +235,19 @@ internal fun ReportList(spec: ReportListSpec, content: LazyListScope.() -> Unit)
   }
 }
 
-internal fun tabLabel(t: ReportTab): String = when (t) {
+internal fun tabLabel(t: ReportPage): String = when (t) {
+  ReportExtra.SHRINK -> StrShrink.title
+  ReportExtra.AGING -> StrReach.tabAging
+  ReportExtra.RFM -> StrReach.tabRfm
+  ReportExtra.GAPS -> StrReports.gapsTab
+  ReportExtra.ASK -> StrSimpleAsk.tab
   ReportTab.PROFIT -> StrReports.tabProfit
   ReportTab.PRODUCTS -> StrReports.tabProducts
   ReportTab.DEBTORS -> StrReports.tabDebtors
   ReportTab.PURCHASES -> StrReports.tabPurchases
   ReportTab.EXPIRY -> StrReports.tabExpiry
   ReportTab.STOCK -> StrReports.tabStock
+  else -> t.id
 }
 
 /** ردیفِ بازه و زیرنویسِ «از … تا …» */

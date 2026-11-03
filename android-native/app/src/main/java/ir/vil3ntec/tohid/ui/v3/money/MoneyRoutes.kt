@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -56,6 +57,7 @@ object MoneyPaths {
   fun supplier(id: String) = "purchasing/suppliers/" + RoutePaths.encode(id)
   fun editSupplier(id: String) = supplier(id) + "/edit"
   fun paySupplier(id: String) = supplier(id) + "/pay"
+  fun returnSupplier(id: String) = supplier(id) + "/return"
   fun newPurchase(supplier: String? = null) = RoutePaths.withQuery("purchasing/new", "supplier" to supplier)
   const val EXPENSES = "expenses"
   fun expenses(month: String? = null, category: String? = null) = RoutePaths.withQuery(EXPENSES, "month" to month, "category" to category)
@@ -187,6 +189,7 @@ val MoneyModule = AppModule(
           onNewPurchase = { nav.open(MoneyPaths.newPurchase(id)) },
           onEdit = { nav.open(MoneyPaths.editSupplier(id)) },
           onDelete = { if (MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) != null) back() },
+          onReturn = { nav.open(MoneyPaths.returnSupplier(id)) },
         ),
       )
     },
@@ -194,6 +197,7 @@ val MoneyModule = AppModule(
       SupplierFormRoute(args["id"].orEmpty())
     },
     V3Route("purchasing/suppliers/{id}/pay", RouteKind.SHEET, { StrMoney.pay }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) { PayRoute() },
+    V3Route("purchasing/suppliers/{id}/return", RouteKind.SHEET, { StrReach.supplierReturn }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) { SupplierReturnRoute() },
     V3Route("purchasing/new", RouteKind.PAGE, { StrMoney.newPurchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val context = LocalContext.current
       PurchaseFormScreen(

@@ -35,7 +35,22 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrShrink
+import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
+import ir.vil3ntec.tohid.data.DebtReminderPref
+import ir.vil3ntec.tohid.data.DocGapsPref
+import ir.vil3ntec.tohid.data.DocGapsSheet
+import ir.vil3ntec.tohid.data.ReportKeysPref
+import ir.vil3ntec.tohid.data.ShopPolicy
+import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.ShrinkLoss
+import ir.vil3ntec.tohid.data.ShrinkReportPref
+import ir.vil3ntec.tohid.data.SimpleAskPref
+import ir.vil3ntec.tohid.ui.screens.DeskSimpleAsk
+import ir.vil3ntec.tohid.ui.screens.ReportCompareLine
+import ir.vil3ntec.tohid.ui.screens.ReportKeys
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ReportEngine
@@ -72,6 +87,15 @@ import kotlinx.coroutines.launch
 private enum class DeskRep(val key: String, val ranged: Boolean) {
   SALES("sales", true), PROFIT("profit", true), PURCHASES("purchases", true), EXPENSES("expenses", true),
   SELLERS("sellers", true), PRODUCTS("products", false), DEBTORS("debtors", false), STOCK("stock", false), EXPIRY("expiry", false),
+  //  زبانه‌های اختیاریِ گزارشِ کامپیوترِ پیشین (همان کلیدهای `ReportCsv`)، هر کدام پشتِ تنظیمِ خودش (`ReportsDesk`)؛
+  //  «پرسشِ ساده» جای جدول پانلِ پرسش است
+  INSIGHT("insight", true), REORDER("reorder", false), ASK("ask", false),
+  AGING("aging", false), RFM("rfm", false), DUPLICATES("duplicates", false), REMINDERS("reminders", false),
+  GAPS("gaps", false), SHRINK("shrink", true),
+  ;
+
+  /** همیشه هست (بی تنظیم) */
+  val base: Boolean get() = ordinal <= EXPIRY.ordinal
 }
 
 private enum class DeskSpan { TODAY, WEEK, MONTH, JMONTH, JYEAR, ALL, CUSTOM }
@@ -86,6 +110,15 @@ private fun DeskRep.label() = when (this) {
   DeskRep.DEBTORS -> StrReports.tabDebtors
   DeskRep.STOCK -> StrReports.tabStock
   DeskRep.EXPIRY -> StrReports.tabExpiry
+  DeskRep.INSIGHT -> StrReach.tabInsight
+  DeskRep.REORDER -> StrReach.tabReorder
+  DeskRep.ASK -> StrSimpleAsk.tab
+  DeskRep.AGING -> StrReach.tabAging
+  DeskRep.RFM -> StrReach.tabRfm
+  DeskRep.DUPLICATES -> StrReach.tabDuplicates
+  DeskRep.REMINDERS -> StrReach.tabReminders
+  DeskRep.GAPS -> StrReports.gapsTab
+  DeskRep.SHRINK -> StrShrink.title
 }
 
 private fun DeskSpan.label() = when (this) {
@@ -112,13 +145,31 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
   val scope = rememberCoroutineScope()
   val today = todayIso()
   val j = remember(today) { Jalali.ofIso(today) }
-  //  کامپیوتر امروز سدِ پول ندارد (همهٔ گزارش‌ها برای همه) — دست نخورد
-  val reps = DeskRep.entries
+  //  کامپیوتر امروز سدِ پول ندارد (همهٔ گزارش‌ها برای همه) — دست نخورد؛ زبانه‌های اختیاری همان تنظیم‌های گزارشِ
+  //  کامپیوترِ پیشین (ضایعات قیمتِ خرید است ⇒ فقط با `canSeeMoney`)
+  val canSeeMoney = remember { ShopRole.canSeeMoney(context) }
+  val enabled = remember(canSeeMoney) {
+    buildSet {
+      if (ShopPolicy.stockInsight(context)) add(DeskRep.INSIGHT)
+      if (ShopPolicy.stockLevels(context)) add(DeskRep.REORDER)
+      if (SimpleAskPref.on(context)) add(DeskRep.ASK)
+      if (ShopPolicy.crmReports(context)) addAll(listOf(DeskRep.AGING, DeskRep.RFM, DeskRep.DUPLICATES, DeskRep.REMINDERS))
+      if (DocGapsPref.on(context)) add(DeskRep.GAPS)
+      if (ShrinkReportPref.on(context) && canSeeMoney) add(DeskRep.SHRINK)
+    }
+  }
+  val reps = DeskRep.entries.filter { it.base || it in enabled }
   var rep by remember { mutableStateOf(DeskRep.SALES) }
   var span by remember { mutableStateOf(DeskSpan.MONTH) }
+  //  RPT-13: − / + دوره و Ctrl+Shift+C مقایسه — با `ReportKeysPref` (کلاسِ A، پیش‌فرض روشن)
+  val keys = remember { ReportKeysPref.on(context) }
+  var shift by remember(span) { mutableStateOf(0) }
+  var compare by remember { mutableStateOf(false) }
+  //  CRM-06: متنِ یادآوریِ همین دستگاه (نبودن = همان جملهٔ امروز)
+  val reminderTemplate = remember { DebtReminderPref.template(context) }
   var fromText by remember { mutableStateOf(j?.let { "%d/%02d/01".format(it.year, it.month) }.orEmpty()) }
   var toText by remember { mutableStateOf(formatDate(today)) }
-  val (from, to) = when (span) {
+  val (baseFrom, baseTo) = when (span) {
     DeskSpan.TODAY -> ReportEngine.rangeOf(ReportEngine.Range.TODAY, today)
     DeskSpan.WEEK -> ReportEngine.rangeOf(ReportEngine.Range.WEEK, today)
     DeskSpan.MONTH -> ReportEngine.rangeOf(ReportEngine.Range.MONTH, today)
@@ -127,15 +178,26 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
     DeskSpan.ALL -> ReportEngine.rangeOf(ReportEngine.Range.ALL, today)
     DeskSpan.CUSTOM -> (Jalali.parseTyped(fromText) ?: "0000-01-01") to (Jalali.parseTyped(toText) ?: "9999-12-31")
   }
-  val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today) }
-  fun print() = ReportPrint.print(context, sheet, sheet.name)
-  fun excel() { Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { scope.launch { snackbar.showSnackbar(StrReports.savedTo(it)) } } }
+  val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
+  val sheet = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate) }
+  //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
+  fun print() { if (rep != DeskRep.ASK) ReportPrint.print(context, sheet, sheet.name) }
+  fun excel() {
+    if (rep == DeskRep.ASK) return
+    Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { scope.launch { snackbar.showSnackbar(StrReports.savedTo(it)) } }
+  }
+  val shifting = keys && rep.ranged && span != DeskSpan.CUSTOM
+  fun step(by: Int) { if (ReportKeys.can(span.name, baseFrom, baseTo, shift + by, today)) shift += by }
 
   Row(
     Modifier.fillMaxSize().background(c.bg).onPreviewKeyEvent { e ->
       when {
         e.matches(KeyMap.GLOBAL_PRINT) -> { print(); true }
         e.matches(KeyMap.GLOBAL_EXPORT) -> { excel(); true }
+        //  «از … تا …» کادرِ نوشتنِ تاریخ دارد: − و + آن‌جا نوشته می‌شوند، نه دوره
+        shifting && e.matches(KeyMap.REPORTS_PREV_PERIOD) -> { step(-1); true }
+        shifting && e.matches(KeyMap.REPORTS_NEXT_PERIOD) -> { step(1); true }
+        keys && rep.ranged && e.matches(KeyMap.REPORTS_COMPARE) -> { compare = !compare; true }
         else -> false
       }
     }.padding(16.dp),
@@ -157,6 +219,10 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
         Spacer(Modifier.width(8.dp))
         V3Button("${StrReports.excel}  ${KeyMap.GLOBAL_EXPORT.hint}", ::excel, icon = Icons.Outlined.TableChart, height = 40.dp)
       }
+      if (rep == DeskRep.ASK) {
+        DeskSimpleAsk(d, canSeeMoney, Modifier.weight(1f))
+        return@Column
+      }
       if (rep.ranged) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           V3ChipRow(Modifier.weight(1f), contentPadding = PaddingValues(0.dp)) {
@@ -165,10 +231,16 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState) {
               V3TextField(fromText, { fromText = it }, StrReports.from, Modifier.width(150.dp))
               V3TextField(toText, { toText = it }, StrReports.to, Modifier.width(150.dp))
             }
+            if (shifting) {
+              V3Chip("${StrReach.prevPeriod}  ${KeyMap.REPORTS_PREV_PERIOD.hint}", false, { step(-1) })
+              V3Chip("${StrReach.nextPeriod}  ${KeyMap.REPORTS_NEXT_PERIOD.hint}", false, { step(1) })
+            }
+            if (keys) V3Chip("${StrReach.compare}  ${KeyMap.REPORTS_COMPARE.hint}", compare, { compare = !compare })
           }
           Text(if (ReportsModel.isAllTime(from)) StrReports.allDates else StrReports.rangeSpan(uiDateLong(from), uiDateLong(to)), style = V3Type.footnote, color = c.inkMuted)
         }
       } else Text(StrReports.rightNow, style = V3Type.footnote, color = c.inkMuted)
+      if (keys && compare && rep.ranged) ReportCompareLine(d, rep.key, span.name, from, to, today)
       DeskKpis(d, rep, from, to)
       SheetTable(sheet, Modifier.weight(1f).fillMaxWidth())
     }
@@ -229,6 +301,21 @@ private fun DeskKpis(d: ShopData, rep: DeskRep, from: String, to: String) {
         V3Stat(StrReports.totalReceivable, total, ::afn, m, hue = V3Hue.BLUE)
         V3Stat(StrReports.debtorsOwing, d.debtors.count { ShopStore.debt(d, it.id) > 0.5 }.toDouble(), count, m)
       }
+      DeskRep.GAPS -> {
+        val g = remember(d) { DocGapsSheet.report(d) }
+        V3Stat(StrReports.kpiMissing, g.missing.toDouble(), count, m, valueColor = if (g.missing > 0) PhoneV3.colors.negative else null)
+        V3Stat(StrReports.kpiJumped, g.jumped.toDouble(), count, m)
+        V3Stat(StrReports.kpiDuplicates, g.duplicates.toDouble(), count, m, hue = V3Hue.ORANGE)
+        V3Stat(StrReports.kpiCancelled, g.cancelled.toDouble(), count, m)
+      }
+      DeskRep.SHRINK -> {
+        val r = remember(d, from, to) { ShrinkLoss.report(d, from, to) }
+        V3Stat(StrShrink.wasteTotal, r.wasteMinor / 100.0, ::afn, m, hue = V3Hue.ORANGE)
+        V3Stat(StrShrink.shrinkTotal, r.shrinkMinor / 100.0, ::afn, m, valueColor = if (r.shrinkMinor > 0) PhoneV3.colors.negative else null)
+        V3Stat(StrShrink.netLoss, r.netLossMinor / 100.0, ::afn, m, valueColor = if (r.netLossMinor > 0) PhoneV3.colors.negative else null)
+      }
+      //  بقیهٔ زبانه‌های اختیاری: همهٔ عددها در جدولِ همان برگه
+      DeskRep.INSIGHT, DeskRep.REORDER, DeskRep.ASK, DeskRep.AGING, DeskRep.RFM, DeskRep.DUPLICATES, DeskRep.REMINDERS -> Unit
     }
   }
 }

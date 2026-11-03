@@ -26,5 +26,7 @@ object I18nTables {
     StrDevices, // «دستگاه‌ها» و اسکن در پس‌زمینه (۱۴۰۵/۰۸/۱۱)
     StrPayStatus, // PAY-07: وضعیتِ پرداخت
     StrQuickRegister, // S03/POS-17: ثبتِ سریعِ کالا در صندوقِ گوشیِ نسخهٔ ۳
+    StrReach, // درهای نسخهٔ ۳ به کارهای بی‌راه‌مانده پس از رابطِ قدیم (`V3ReachabilityTest`)
+    StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
   )
 }

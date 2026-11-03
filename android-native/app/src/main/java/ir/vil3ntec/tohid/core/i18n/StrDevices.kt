@@ -216,4 +216,31 @@ object StrDevices {
   )
   fun scannerSalesCount(n: Any): String = t("ثبت از اسکنر: ${asIs(n)} فاکتور", "Recorded from scanner: $n ${pl(n, "invoice", "invoices")}", "له سکنر ثبت: $n بلونه")
   fun scannerFromMemory(n: Any): String = t("${asIs(n)} از حافظهٔ بارکدخوان", "$n from scanner memory", "$n د بارکوډ لوستونکي له حافظې")
+  //  ── HW-08: وب‌کمِ کامپیوتر به‌عنوانِ بارکدخوان (B، پیش‌فرض خاموش) ─────────────────────────────
+  val webcamTitle: String get() = t("وب‌کم به‌عنوانِ بارکدخوان", "Webcam as barcode scanner", "ویب‌کم د بارکوډ لوستونکي په توګه")
+  val webcamNote: String get() = t(
+    "روشن ⇒ کادرِ اسکنِ کامپیوتر تصویرِ وب‌کم را نشان می‌دهد و بارکدِ جلوی آن را می‌خواند، با همان سدِ خوانشِ نصفه و تکرارِ دوربینِ گوشی. بارکدخوانِ USB یا بلوتوث کنارش کار می‌کند. خاموش ⇒ هیچ دوربینی باز نمی‌شود.",
+    "On ⇒ the computer's scan box shows the webcam picture and reads the barcode held in front of it, with the same half-read and repeat guard as the phone camera. A USB or Bluetooth scanner keeps working beside it. Off ⇒ no camera is opened.",
+    "روښانه ⇒ د کمپیوټر د سکن چوکاټ د ویب‌کم انځور ښيي او د هغې مخې ته نیول شوی بارکوډ لولي، د تلیفون د کمرې د نیمګړي لوست او تکرار هماغه ساتنه. USB یا بلوتوث بارکوډ لوستونکی ورسره کار کوي. بند ⇒ هېڅ کمره نه پرانیستل کېږي.",
+  )
+  val webcamPick: String get() = t("دوربین", "Camera", "کمره")
+  val webcamFirst: String get() = t("نخستین دوربینِ وصل", "First connected camera", "لومړۍ وصل کمره")
+  val webcamNone: String get() = t(
+    "هیچ وب‌کمی به این کامپیوتر وصل نیست. دوربین را وصل کنید و این صفحه را دوباره باز کنید.",
+    "No webcam is connected to this computer. Connect a camera and open this page again.",
+    "دې کمپیوټر ته هېڅ ویب‌کم نه دی وصل. کمره وصل کړئ او دا پاڼه بیا پرانیزئ.",
+  )
+  val webcamPhone: String get() = t(
+    "در گوشی، دوربینِ همان گوشی بارکد را می‌خواند؛ این کلید فقط برای کامپیوتر است.",
+    "On a phone, the phone's own camera reads barcodes; this switch is for computers only.",
+    "په تلیفون کې د تلیفون خپله کمره بارکوډ لولي؛ دا کلیډ یوازې د کمپیوټر لپاره دی.",
+  )
+  val webcamTip: String get() = t(
+    "بارکد را صاف و در نورِ کافی، یک وجب جلوی دوربین نگه دارید؛ بوق یعنی خوانده شد.",
+    "Hold the barcode flat, in good light, a hand's width from the camera; a beep means it was read.",
+    "بارکوډ برابر او په کافي رڼا کې، د یوې لوېشت په اندازه د کمرې مخې ته ونیسئ؛ ټک یعنې ولوستل شو.",
+  )
+  val webcamOpening: String get() = t("وب‌کم باز می‌شود…", "Opening the webcam…", "ویب‌کم پرانیستل کېږي…")
+  val webcamLive: String get() = t("وب‌کم آماده است — بارکد را جلوی دوربین بگیرید", "Webcam ready — hold the barcode in front of the camera", "ویب‌کم چمتو دی — بارکوډ د کمرې مخې ته ونیسئ")
+  fun webcamFailed(reason: Any): String = t("وب‌کم باز نشد: ${asIs(reason)}", "The webcam did not open: $reason", "ویب‌کم پرانیستل نه شو: $reason")
 }

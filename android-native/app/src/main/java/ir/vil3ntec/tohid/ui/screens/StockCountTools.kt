@@ -318,33 +318,3 @@ fun StockCountToolsSheet(
     }
   }
 }
-
-/** بخشِ «تنظیمات» — خواندن و نوشتنِ کلیدها در مرزِ پلتفرم است (`CountToolsSettingsWired`) */
-@Composable
-fun CountToolsSettings(on: Boolean, blind: Boolean, onChange: (Boolean) -> Unit, onBlind: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.Inventory2,
-    title = StrCount.settingsTitle,
-    subtitle = if (on) StrCount.settingsOn else StrCount.off,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrCount.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrCount.off, "on" to StrCount.on),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
-    if (on) {
-      Spacer(Modifier.height(14.dp))
-      Text(StrCount.blindTitle, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
-      Text(StrCount.blindNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-      Spacer(Modifier.height(8.dp))
-      SegmentedChoice(
-        options = listOf("off" to StrCount.off, "on" to StrCount.on),
-        selected = if (blind) "on" else "off",
-        onSelect = { onBlind(it == "on") },
-      )
-    }
-  }
-}

@@ -50,6 +50,12 @@ test('S117: گزارشِ خطای برنامه شمارهٔ کارت را در �
 });
 
 const CARD_FIELD = /card_?(number|no|num)\b|cardNumber|\bpan\b|\bcvv2?\b|\bcvc\b|card_?pin|شمار[هۀ]ٔ?\s?کارت|رمز[ِ\s]+دوم/i;
+//  استثنای دقیق (پرونده + همهٔ سطر)، نه الگوی سست‌تر: کدِ ISO 3166-2:AF ِ ولایتِ پنجشیر (`AF-PAN`) در فهرستِ ولایت‌های
+//  S109 نامِ ستون یا کلیدِ کارت نیست و همان کدی است که مهاجرتِ ۲۰۶ نگه می‌دارد. هر سطرِ دیگری با `pan` (و همین سطر اگر
+//  عوض شود) همچنان سرخ است، و استثنای بی‌کار هم سرخ است.
+const CARD_FIELD_EXACT_OK = new Set([
+  "server/src/lib/af-provinces.js|['PAN', 'پنجشیر', ['Panjshir', 'پنجشیر']],",
+]);
 const EXT = new Set(['.js', '.mjs', '.cjs', '.html', '.json', '.sql', '.kt', '.kts']);
 const SKIP_DIR = new Set(['node_modules', 'vendor', 'build', '.gradle', 'test', 'tests']);
 function walk(dir, out) {
@@ -70,10 +76,16 @@ test('S117: هیچ ستون، کلید یا کادری برای شمارهٔ ک�
   }
   assert.ok(files.length > 300, `فقط ${files.length} پرونده`);
   const hits = [];
+  const usedOk = new Set();
   for (const f of files) {
+    const rel = path.relative(root, f).split(path.sep).join('/');
     fs.readFileSync(f, 'utf8').split('\n').forEach((line, i) => {
-      if (CARD_FIELD.test(line)) hits.push(`${path.relative(root, f)}:${i + 1}: ${line.trim().slice(0, 120)}`);
+      if (!CARD_FIELD.test(line)) return;
+      const k = `${rel}|${line.trim()}`;
+      if (CARD_FIELD_EXACT_OK.has(k)) { usedOk.add(k); return; }
+      hits.push(`${rel}:${i + 1}: ${line.trim().slice(0, 120)}`);
     });
   }
   assert.deepEqual(hits, [], 'دادهٔ کارت فقط در صفحهٔ ارائه‌دهنده گرفته می‌شود (S117)');
+  assert.deepEqual([...CARD_FIELD_EXACT_OK].filter((k) => !usedOk.has(k)), [], 'استثنای بی‌کار در CARD_FIELD_EXACT_OK');
 });

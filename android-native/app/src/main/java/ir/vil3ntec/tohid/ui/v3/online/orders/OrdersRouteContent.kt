@@ -81,6 +81,8 @@ internal fun RouteScope.OrdersRoute() {
   val header: @Composable () -> Unit = {
     OrderDeskStrip(deskCtl)
     cfg?.let { c -> OrderAlertNotes(c, ::openOrder) }
+    //  قفسه و دستهٔ جمع‌آوری (PCK-10/12)، گزارش‌ها و نظرها (NTF-07/09) و «کالا به انبار برگشت؟» ِ بازپرداخت‌ها (RET-11)
+    OrderQueueExtras(cfg, onChanged = { ctl.reload() }, onOpen = ::openOrder)
     if (cfg?.bulk == true) Row { OrderBulkToggleV3(bulk, cfg) }
     OrderBulkBarV3(bulk, cfg, state.items, OrdersHub.repo(context), printer, { toasts.show(it) }) {
       ctl.reload()
@@ -211,6 +213,8 @@ internal fun RouteScope.OrderDetailRoute(id: String, embedded: Boolean = false) 
       }
       //  RSK-08: «پروندهٔ مدرک» — همان شرط و حالتِ رابطِ امروز (`orders.manage` و پرچمِ `shop.orders.dispute_file`)
       OrderEvidenceEntryV3(o.id, cfg?.permissions?.manage == true, remember(context) { Backend.api(context) })
+      //  جمع‌آوری (PCK)، ویرایش (ORD-14)، ترجیحِ تحویل (CHK-14)، جایگزینی (CHK-15/16)، پیام‌ها (ORD-16) و برگشتِ کالا (RET-11)
+      OrderDetailExtras(o, cfg)
     }
   }
   OrderDetailScreen(state, actions, onBack = if (embedded) null else backOrNull, extra = extra)
@@ -273,6 +277,7 @@ internal fun RouteScope.NewOrderRoute() {
     busy = busy,
     failure = failure,
     onBack = { back() },
+    extras = { form, onForm -> NewOrderExtras(OrdersLive.config.value, form, onForm) },
     onSubmit = { form ->
       when (val r = ir.vil3ntec.tohid.core.orders.OrderDraft.build(form)) {
         is ir.vil3ntec.tohid.core.orders.OrderDraft.Result.Error -> failure = r.message

@@ -39,8 +39,11 @@ class KeyMapTest {
     "android-native/app/src/main/java/$src/ui/screens",
   )
 
-  /** صفحه‌هایی که همهٔ میان‌برهایشان از `KeyMap` می‌آید — فقط زیاد شود */
-  private val migrated = listOf("DeskReports.kt")
+  /**
+   *  صفحه‌هایی که همهٔ میان‌برهایشان از `KeyMap` می‌آید — فقط زیاد شود. نسبت به `ui/screens`؛ `DeskReports.kt` ِ رابطِ
+   *  امروز در «پاک‌سازی، گامِ ۳» پاک شد و جانشینِ نسخهٔ ۳ ِ آن (`ReportsDesk`) همین قاعده را دارد.
+   */
+  private val migrated = listOf("../v3/analytics/ReportsDesk.kt")
 
   private val scopes = KeyMap.SCOPES.associateBy { it.id }
 

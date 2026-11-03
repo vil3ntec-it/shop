@@ -6,6 +6,8 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrLabel
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
@@ -13,6 +15,7 @@ import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.ui.screens.StockStrip
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3Hue
@@ -38,6 +41,15 @@ object StockPaths {
   fun deleteEntry(id: String, entryId: String) = item(id) + "/entries/" + RoutePaths.encode(entryId) + "/delete"
   const val COUNT = "stock/count"
   const val IMPORT = "stock/import"
+  //  کارهای افزوده‌ای که پس از رابطِ قدیم بی‌راه مانده بودند (`StockExtras`، `StockExtrasAndroid.kt`)
+  const val COUNT_TOOLS = "stock/count/tools"
+  const val PLACES = "stock/places"
+  const val LABELS = "stock/labels"
+  const val BOOK = "stock/book"
+  fun book(tab: String? = null) = StockExtras.bookPath(tab)
+  const val BULK_PRODUCTS = "stock/bulk-products"
+  const val IMAGES = "stock/images"
+  const val IMPORT_HISTORY = "stock/import/history"
 }
 
 /**
@@ -126,6 +138,9 @@ val StockModule = AppModule(
       )
     },
     V3Route(StockPaths.COUNT, RouteKind.PAGE, { StrStock.menuCount }, parent = StockPaths.LIST, chrome = Chrome.OWN) {
+      //  پیوندِ مستقیم (خانه، اسکن‌های در انتظار) همان راهِ دکمهٔ «انبارگردانی» را می‌رود
+      val target = rememberCountRoute()
+      if (target != StockPaths.COUNT) { LaunchedEffect(target) { nav.replace(target) }; return@V3Route }
       val writer = rememberStockWriter()
       val export = rememberCsvExport { ok -> if (ok) writer.info(StrStock.fileSaved) else writer.fail(StrStock.fileFailed) }
       StockCountScreen(
@@ -141,6 +156,8 @@ val StockModule = AppModule(
     },
     V3Route(StockPaths.IMPORT, RouteKind.PAGE, { StrStock.importTitle }, parent = StockPaths.LIST, chrome = Chrome.OWN) {
       val writer = rememberStockWriter()
+      //  PRD-20 (`ShopPolicy.productTools`): xlsx یا CSV، پیش‌نمایشِ کامل، فایلِ ردیف‌های رد و سابقه
+      if (rememberProductTools()) { ProductToolsImportRoute(writer); return@V3Route }
       StockImportRoute(
         data = data,
         onSave = { plan ->
@@ -150,6 +167,14 @@ val StockModule = AppModule(
         onBack = { back() },
       )
     },
+    //  ── کارهای افزوده (`StockExtras`) ──
+    V3Route(StockPaths.COUNT_TOOLS, RouteKind.SHEET, { StrStock.menuCount }, parent = StockPaths.LIST, chrome = Chrome.OWN) { CountToolsRoute() },
+    V3Route(StockPaths.PLACES, RouteKind.PAGE, { StrReach.places }, parent = StockPaths.LIST) { StockPlacesRoute() },
+    V3Route(StockPaths.LABELS, RouteKind.SHEET, { StrLabel.title }, parent = StockPaths.LIST, chrome = Chrome.OWN) { StockLabelsRoute() },
+    V3Route(StockPaths.BOOK, RouteKind.PAGE, { StrReach.stockBook }, parent = StockPaths.LIST, aliases = listOf("stockbook")) { StockBookRoute() },
+    V3Route(StockPaths.BULK_PRODUCTS, RouteKind.SHEET, { StrReach.bulkProducts }, parent = StockPaths.LIST, chrome = Chrome.OWN) { BulkProductsRoute() },
+    V3Route(StockPaths.IMAGES, RouteKind.SHEET, { StrReach.imageImport }, parent = StockPaths.LIST, chrome = Chrome.OWN) { ImageImportRoute() },
+    V3Route(StockPaths.IMPORT_HISTORY, RouteKind.SHEET, { StrReach.importHistory }, parent = StockPaths.IMPORT, chrome = Chrome.OWN) { ImportHistoryRoute() },
   ),
 )
 
@@ -162,17 +187,21 @@ private fun RouteScope.StockHome(selected: String?) {
   val twoPane = desk
   val writer = rememberStockWriter()
   val today = writer.today
+  val countRoute = rememberCountRoute()
   val listActions = StockListActions(
     //  کامپیوتر (دو ستون): کالای دیگر جای همین ستون می‌نشیند، نه پلهٔ تازه در پشته
     open = { id -> if (twoPane && selected != null) nav.replace(StockPaths.item(id)) else nav.open(StockPaths.item(id)) },
     entry = { nav.open(StockPaths.entry(product = it)) },
     adjust = { nav.open(StockPaths.adjust(it)) },
     scan = { nav.openForResult(SalesPaths.scan("stock")) { code -> code?.let { nav.open(StockListModel.scanTarget(data, it)) } } },
-    count = { nav.open(StockPaths.COUNT) },
+    count = { nav.open(countRoute) },
     import = { nav.open(StockPaths.IMPORT) },
     bulk = { nav.open(StockPaths.ENTRY_BULK) },
     newProduct = { nav.open(ProductsPaths.new()) },
     saveEntry = { draft -> writer.commit(WarehouseEngine.addEntry(data, draft, today, writer.now, writer.newId), StrStock.entrySaved) },
+    extras = rememberStockExtras(),
+    //  موتورِ تازه روشن ⇒ ارزش و وظیفه‌های بازِ «دفترِ موجودی» بالای فهرست (خاموش ⇒ هیچ)
+    header = { StockStrip(data) { nav.open(StockPaths.book()) } },
   )
   val itemActions = StockItemActions(
     edit = { nav.open(ProductsPaths.edit(it)) },

@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.online
 
+import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontMediaRoute
+import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontCampaignsRoute
+import ir.vil3ntec.tohid.ui.v3.online.delivery.DeliveryRatingsRoute
+import ir.vil3ntec.tohid.ui.v3.online.delivery.DeliveryCashReportRoute
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeliveryDining
 import androidx.compose.material.icons.outlined.Forum
@@ -8,6 +12,7 @@ import androidx.compose.material.icons.outlined.Storefront
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
@@ -35,6 +40,7 @@ import ir.vil3ntec.tohid.ui.v3.online.delivery.MissionActionRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.NewOrderRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrderActionRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrderDetailRoute
+import ir.vil3ntec.tohid.ui.v3.online.orders.OrderPickRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrdersRoute
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontModel
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontProductRoute
@@ -46,10 +52,14 @@ object OnlinePaths {
   fun orders(tab: String? = null) = RoutePaths.withQuery(ORDERS, "tab" to tab)
   fun order(id: String) = "orders/" + RoutePaths.encode(id)
   fun action(id: String, to: String) = RoutePaths.withQuery(order(id) + "/action", "to" to to)
+  /** PCK: برگهٔ جمع‌آوری و بسته‌بندیِ یک سفارش */
+  fun pick(id: String) = order(id) + "/pick"
   const val NEW_ORDER = "orders/new"
   const val STOREFRONT = "storefront"
   fun storefront(tab: String? = null) = RoutePaths.withQuery(STOREFRONT, "tab" to tab)
   fun storefrontProduct(id: String) = "storefront/products/" + RoutePaths.encode(id)
+  const val STOREFRONT_CAMPAIGNS = "storefront/campaigns"
+  const val STOREFRONT_MEDIA = "storefront/media"
   const val CHAT = "chat"
   fun conversation(id: String) = "chat/" + RoutePaths.encode(id)
   const val DELIVERY = "delivery"
@@ -58,6 +68,8 @@ object OnlinePaths {
   const val DELIVERY_AUTO = "delivery/auto"
   fun missionAction(id: String, act: String) = RoutePaths.withQuery("delivery/missions/" + RoutePaths.encode(id) + "/action", "act" to act)
   const val DELIVERY_CODE = "delivery/code"
+  const val DELIVERY_CASH_REPORT = "delivery/cash-report"
+  const val DELIVERY_RATINGS = "delivery/ratings"
   fun deliveryPickup(orderId: String) = "delivery/pickup/" + RoutePaths.encode(orderId)
   /** `kind`: settle · ledger · cap */
   fun courierSheet(id: String, kind: String) = "delivery/couriers/" + RoutePaths.encode(id) + "/" + kind
@@ -86,11 +98,14 @@ val OnlineModule = AppModule(
     V3Route("orders/{id}", RouteKind.PAGE, { StrOnline.ordersTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) {
       OrderDetailRoute(args["id"].orEmpty())
     },
+    V3Route("orders/{id}/pick", RouteKind.SHEET, { StrReach.pick }, parent = "orders/{id}", needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { OrderPickRoute(args["id"].orEmpty()) },
     V3Route("orders/{id}/action", RouteKind.SHEET, { StrOnline.ordersTitle }, parent = "orders/{id}", needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { OrderActionRoute() },
     V3Route(OnlinePaths.STOREFRONT, RouteKind.PAGE, { StrOnline.sfTitle }, needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) { StorefrontRoute() },
     V3Route("storefront/products/{id}", RouteKind.SHEET, { StrOnline.sfTitle }, parent = OnlinePaths.storefront(StorefrontModel.PRODUCTS), needs = setOf(Need.STOREFRONT), chrome = Chrome.OWN) {
       StorefrontProductRoute()
     },
+    V3Route(OnlinePaths.STOREFRONT_CAMPAIGNS, RouteKind.PAGE, { StrReach.campaigns }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontCampaignsRoute() },
+    V3Route(OnlinePaths.STOREFRONT_MEDIA, RouteKind.PAGE, { StrReach.media }, parent = OnlinePaths.STOREFRONT, needs = setOf(Need.STOREFRONT)) { StorefrontMediaRoute() },
     V3Route(OnlinePaths.CHAT, RouteKind.PAGE, { StrOnline.ctTitle }, needs = setOf(Need.CHAT), chrome = Chrome.OWN) { ChatRoute() },
     V3Route("chat/{conversationId}", RouteKind.PAGE, { StrOnline.ctTitle }, parent = OnlinePaths.CHAT, needs = setOf(Need.CHAT), chrome = Chrome.OWN) {
       ChatThreadRoute(args["conversationId"].orEmpty())
@@ -99,6 +114,8 @@ val OnlineModule = AppModule(
     V3Route("delivery/assign/{orderId}", RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryAssignRoute() },
     V3Route(OnlinePaths.DELIVERY_AUTO, RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryAutoRoute() },
     V3Route("delivery/missions/{id}/action", RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { MissionActionRoute() },
+    V3Route(OnlinePaths.DELIVERY_CASH_REPORT, RouteKind.SHEET, { StrReach.cashReport }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryCashReportRoute() },
+    V3Route(OnlinePaths.DELIVERY_RATINGS, RouteKind.SHEET, { StrReach.ratings }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryRatingsRoute() },
     V3Route(OnlinePaths.DELIVERY_CODE, RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryCodeRoute() },
     V3Route("delivery/pickup/{orderId}", RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { DeliveryPickupRoute() },
     V3Route("delivery/couriers/{id}/settle", RouteKind.SHEET, { StrOnline.dlTitle }, parent = OnlinePaths.DELIVERY, needs = setOf(Need.DELIVERY), chrome = Chrome.OWN) { CourierSheetRoute("settle") },

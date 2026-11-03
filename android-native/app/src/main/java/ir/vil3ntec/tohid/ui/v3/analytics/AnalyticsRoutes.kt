@@ -10,6 +10,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.ui.screens.rememberStaffTimeConfig
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
@@ -33,6 +35,8 @@ object AnalyticsPaths {
   fun stats(period: String? = null) = RoutePaths.withQuery("stats", "period" to period)
   fun audit(kind: String? = null) = RoutePaths.withQuery("audit", "kind" to kind)
   const val ADMIN = "admin"
+  /** STF-07/08: ساعتِ کار و پورسانت — فقط با پرچمِ `shop.staff_time` (`StaffTimeHub`) */
+  const val STAFF_TIME = "admin/staff-time"
 }
 
 /** پولِ دکان (سود، قیمتِ خرید) برای همین کاربر باز است؟ — همان `ShopRole.canSeeMoney` ِ امروز */
@@ -78,8 +82,10 @@ val AnalyticsModule = AppModule(
       AdminScreen(
         d = data, canSeeMoney = canSeeMoney(), canManage = Need.MANAGE in access.granted, canAudit = Need.AUDIT in access.granted,
         members = rememberAdminMembers(), onBack = backOrNull, onOpen = { nav.open(it) }, wide = desk,
+        staffTime = rememberStaffTimeConfig()?.enabled == true,
       )
     },
+    V3Route(AnalyticsPaths.STAFF_TIME, RouteKind.PAGE, { StrReach.staffTime }, parent = AnalyticsPaths.ADMIN) { StaffTimePage(data) },
     V3Route("reports/export", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
     V3Route("reports/print", RouteKind.SHEET, { Str.reports }, parent = AnalyticsPaths.REPORTS) { LandOn(AnalyticsPaths.REPORTS) },
   ),

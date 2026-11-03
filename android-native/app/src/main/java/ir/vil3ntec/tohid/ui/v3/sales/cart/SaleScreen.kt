@@ -95,6 +95,8 @@ fun SaleScreen(
   onHold: (() -> Unit)? = null,
   onHeldList: (() -> Unit)? = null,
   start: SaleStart = SaleStart(),
+  /** ابزارهای سبد (پیش‌فاکتور، سفارشِ ویژه، کارتِ هدیه، امانی، لیستِ قیمت، دریافتِ بدهی، ارسال) — `PhoneTillTools` */
+  tools: (@Composable () -> Unit)? = null,
 ) {
   var search by rememberSaveable { mutableStateOf(start.search) }
   var picked by rememberSaveable { mutableStateOf<String?>(null) }
@@ -207,6 +209,7 @@ fun SaleScreen(
                 trailing = { PhoneCartAmount(PhoneSaleText.amount(-p.discount)) },
               )
             }
+            tools?.invoke()
           }
         }
         Spacer(Modifier.height(16.dp))

@@ -33,15 +33,12 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrDeliver
-import ir.vil3ntec.tohid.core.i18n.StrShell
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.core.pos.DeliverLater
 import ir.vil3ntec.tohid.data.repo.OrdersRepository
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.AdaptiveSheet
-import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
-import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.screens.TohidButton
 import ir.vil3ntec.tohid.ui.screens.TohidSecondaryButton
 import ir.vil3ntec.tohid.ui.screens.TohidTextField
@@ -129,24 +126,5 @@ fun DeliverLaterSheet(
         TohidButton(StrDeliver.submit, onClick = { submit() }, modifier = Modifier.weight(1.5f), busy = busy, enabled = !busy && lines.isNotEmpty())
       }
     }
-  }
-}
-
-/** بخشِ تنظیمات — خودش نمی‌خواند و نمی‌نویسد: مقدار و نوشتن از صدازننده (`DeliverLaterPrefs`) */
-@Composable
-fun DeliverLaterSettings(on: Boolean, onChange: (Boolean) -> Unit) {
-  SettingsSection(
-    icon = Icons.Filled.LocalShipping,
-    title = StrDeliver.section,
-    subtitle = if (on) StrShell.switchOn else StrShell.switchOff,
-    tint = if (on) Shop.colors.success else Shop.colors.muted,
-  ) {
-    Text(StrDeliver.note, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-    Spacer(Modifier.height(8.dp))
-    SegmentedChoice(
-      options = listOf("off" to StrShell.switchOff, "on" to StrShell.switchOn),
-      selected = if (on) "on" else "off",
-      onSelect = { onChange(it == "on") },
-    )
   }
 }
