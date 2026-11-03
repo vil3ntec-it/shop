@@ -90,6 +90,8 @@ object SalesPaths {
   /** QRِ رسید برای برگشت (RET-01) */
   const val SCAN_RECEIPT = "receipt"
   const val HISTORY = "sales"
+  /** کامپیوتر: جدولِ اکسلیِ همهٔ فاکتورها (`DeskInvoicesScreen`) — از سربرگِ تاریخچه */
+  const val TABLE = "sales/table"
   fun history(filter: String? = null, q: String? = null) = RoutePaths.withQuery(HISTORY, "filter" to filter, "q" to q)
   fun invoice(saleId: String) = "sales/" + RoutePaths.encode(saleId)
   fun print(saleId: String) = invoice(saleId) + "/print"
@@ -159,9 +161,10 @@ val SalesModule = AppModule(
         else -> ScanScreen(onCode = { code -> nav.finish(code) }, onClose = { back() }, overlay = !desk)
       }
     },
-    V3Route(SalesPaths.HISTORY, RouteKind.TAB, { Str.salesHistory }, chrome = Chrome.OWN) {
-      if (desk) DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
-      else HistoryRoute()
+    //  تاریخچهٔ روز/ماه/سال در هر سه سکو؛ جدولِ اکسلیِ پیشینِ کامپیوتر یک دکمه آن‌سوتر (`sales/table`)
+    V3Route(SalesPaths.HISTORY, RouteKind.TAB, { Str.salesHistory }, chrome = Chrome.OWN) { HistoryRoute() },
+    V3Route(SalesPaths.TABLE, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrHistory.table }, parent = SalesPaths.HISTORY, chrome = Chrome.SHELL) {
+      DeskInvoicesScreen(store, cart, data, snackbar) { nav.switchTab(SalesPaths.SALE) }
     },
     V3Route(SalesPaths.DRAWER, RouteKind.PAGE, { StrSale.drawerWord }, parent = SalesPaths.HISTORY, chrome = Chrome.OWN) { DrawerRoute() },
     V3Route(SalesPaths.DRAWER_OPEN, RouteKind.SHEET, { StrSale.openDrawer }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerOpenRoute() },

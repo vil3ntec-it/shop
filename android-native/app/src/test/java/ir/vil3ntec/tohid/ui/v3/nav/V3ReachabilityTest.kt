@@ -99,6 +99,13 @@ class V3ReachabilityTest {
       pos("rememberLoyaltyTill"), pos("LoyaltyBar"), "ir.vil3ntec.tohid.data.TillSale", root = PHONE_CHECKOUT,
     ),
     Feature("POS-11 یادداشتِ فاکتورِ صندوقِ گوشی", "sale", pos("InvoiceNoteButton"), root = PHONE_SALE),
+    //  «تاریخچه» ِ روز/ماه/سال و چاپِ هر دوره از صفِ چاپ (خواستِ صاحب‌کار) — گوشی، تبلت و کامپیوتر از یک مسیر
+    Feature(
+      "تاریخچهٔ روز/ماه/سال، فیلتر و چاپِ خلاصه یا همهٔ فاکتورهای هر دوره", "sales",
+      "$HISTORY.HistoryScreen", "$HISTORY.PeriodCard", "$HISTORY.MoneySplit", "$HISTORY.FilterSheet",
+      "$HISTORY.HistoryPrintSheet", "$HISTORY.PrintBannerCard", "ir.vil3ntec.tohid.print.PeriodPrint",
+    ),
+    Feature("جدولِ اکسلیِ فاکتورهای کامپیوتر از سربرگِ تاریخچه", "sales/table", s("DeskInvoicesScreen")),
     //  ── سفارش و تحویل ──
     Feature("PCK جمع‌آوری و بسته‌بندیِ سفارش", "orders/{id}/pick", s("OrderPickHost"), s("OrderPickButton")),
     Feature("PCK-10/12 قفسه و دستهٔ جمع‌آوری", "orders", s("PickDeskEntry")),
@@ -271,6 +278,7 @@ class V3ReachabilityTest {
     const val PHONE_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsScreen"
     const val DESK_REPORTS = "ir.vil3ntec.tohid.ui.v3.analytics.ReportsDesk"
     const val MONEY = "ir.vil3ntec.tohid.ui.v3.money"
+    const val HISTORY = "ir.vil3ntec.tohid.ui.v3.sales.history"
     val repo: File = generateSequence(File("").absoluteFile) { it.parentFile }.first { File(it, "android-native").isDirectory }
     val graph: SourceGraph by lazy { SourceGraph.of(File(repo, "android-native/app/src/main/java")) }
     private val cache = HashMap<String, Set<String>>()
