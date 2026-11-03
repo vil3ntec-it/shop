@@ -53,7 +53,7 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps23-partial` (کمبودهای PARTIAL، دورِ ۲۳؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps23-partial`، PR #915 (کمبودهای PARTIAL، دورِ ۲۳؛ روی main پس از #911؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **DATA-04 / SEC-DATA-07** سرور جمعِ برگشت‌های هر فاکتور را با `finalTotal` + ۵۰ پول برای هر قلم می‌سنجد (`lib/return-sale-cap.js` از نگهبانِ `staff-approval.js`، v3 و v1، فاکتورِ همین دستهٔ v1 هم)،
   پشتِ پرچمِ خاموشِ `shop.returns.sale_cap` (`return-sale-cap.test.js`)؛ **S86** بازسازیِ مانده‌های موجودیِ سرور از دفتر (`stock.rebuild`، `npm run stock-rebuild`،
   پیش‌فرض فقط نمایش؛ `stock-rebuild.test.js`)؛ **PRM-15** «دادنِ اعتبارِ هدیه» در حسابِ مشتریِ گوشی (نسخهٔ ۳)، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ
