@@ -67,6 +67,14 @@
   نمی‌داشت)، POS-09 ِ نسخهٔ ۳ (بسته‌ها و قیمتِ بسته، بزرگ).
 - قدمِ بعدی: CI ِ همین PR و ادغام در دسته.
 
+### ۱۴۰۵/۰۸/۱۲ — شاخهٔ `claude/split-big-files` («شکستنِ فایل‌های بزرگ»، پیگیریِ سقف‌های موقتِ #690؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: بازسازیِ خالص، هر پرونده یک کامیت، همان خط‌ها جابه‌جا: `storefront.js` ۱۱۴۲⇐۷۸۰ (`storefront-ticket`، `storefront-owner`)،
+  `delivery.js` ۱۱۷۰⇐۷۳۵ (`delivery-views/recall/call/photos/settle`)، `catalog.js` ۹۱۸⇐۷۴۷ (`catalog-manual`)، `market.js` ۸۱۱⇐۷۳۸
+  (`market-cards`)، `otp.js` ۸۷۷⇐۷۲۸ (`otp-desk`)، `public/admin/app.js` ۲۴۳۶⇐۶۸۰ (`shops/platform/support/commerce/start.js`). شش سقفِ
+  موقت از baseline.json برداشته شد؛ هیچ سقفی بالا نرفت. مسیرها و فهرست‌هایشان دست نخورد؛ خروجیِ هر ماژول با main یکی.
+- نیمه‌کاره: `admin/index.html` (۱۳۸۷) شکسته نشد — HTML ِ ایستا بی بار کردنِ پویا شکستنی نیست. زبانهٔ پمپ در `admin/app.js` عمداً ماند.
+- قدمِ بعدی: CI ِ PR و مرج. پایگاهِ محلیِ 55432 (`shop_test`) SQL_ASCII است ⇒ آزمون‌های بازارچه رویش سرخ‌اند؛ برای PostgreSQL ِ محلی
+  پایگاهِ UTF8 با «test» در نام بسازید (ابزارِ بار بی آن رد می‌کند).
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps8-partial` (کمبودهای PARTIAL، دورِ ۸، و فهرستِ تصمیم‌های صاحب‌کار؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **PAY-19** Shift+F8 ِ صندوقِ کامپیوتر ⇐ پنجرهٔ دلیلِ «کشو بی فروش» (`PosKeys.noSaleDrawer`، `DrawerNoSale.keyGate`؛ keymap «partial»)؛
   **PRM-02** آزادِ خودکارِ کدهای سقف‌دار با لغو/اصلاحِ فاکتورِ نسخهٔ ۳ (`PromoLive.releaseOnVoid` + صفِ بی‌اینترنت، `PromoRedeem.release*`)؛
