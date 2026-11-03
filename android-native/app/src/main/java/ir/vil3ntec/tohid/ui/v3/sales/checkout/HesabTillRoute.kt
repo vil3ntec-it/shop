@@ -48,6 +48,7 @@ import ir.vil3ntec.tohid.ui.ProvideLang
 import ir.vil3ntec.tohid.ui.components.pos.CustomerPayScreen
 import ir.vil3ntec.tohid.ui.components.pos.QrImage
 import ir.vil3ntec.tohid.ui.components.pos.amountText
+import ir.vil3ntec.tohid.ui.theme.LightColors
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -198,9 +199,9 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
 @Composable
 private fun QrBox(payload: String?) {
   val rows = remember(payload) { payload?.takeIf { it.isNotBlank() }?.let { runCatching { QrCode.encode(it, QrCode.LARGE_MAX_VERSION) }.getOrNull() } }
-  //  کادرِ QR در هر دو تم روشن (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند) — همان `QrImage` ِ صندوق
-  Box(Modifier.size(240.dp).clip(RoundedCornerShape(16.dp)).background(androidx.compose.ui.graphics.Color.White), contentAlignment = Alignment.Center) {
-    if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp)) else Text("…", fontSize = 48.sp, color = androidx.compose.ui.graphics.Color.Black)
+  //  کادرِ QR در هر دو تم روشن (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند) — پالتِ روزِ Theme.kt، همان `HesabPaySheet`
+  Box(Modifier.size(240.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface), contentAlignment = Alignment.Center) {
+    if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp)) else Text("…", fontSize = 48.sp, color = LightColors.textPrimary)
   }
 }
 
