@@ -23,6 +23,8 @@ data class HomeShot(
   val reveal: Float = 0f,
   /** صفحهٔ کادرِ پنهان: ۰ صندوق، ۱ گاوصندوق */
   val drawerPage: Int = 0,
+  /** بازهٔ نمودارِ کادرِ بالا (HOME-V3) — پیش‌فرضِ برنامه هم «هفته» است، مثلِ تصویرِ صاحب‌کار */
+  val range: HomeHero.Range = HomeHero.Range.WEEK,
   val page: Int = 0,
   /** نامِ بلندِ دکان و عددهای درشت — آزمونِ جا شدن */
   val big: Boolean = false,

@@ -8,6 +8,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrHero
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.nav.Place
@@ -25,6 +26,9 @@ object ShellPaths {
   fun notifications(tab: String? = null) = RoutePaths.withQuery("notifications", "tab" to tab)
   fun search(q: String? = null, scan: Boolean = false) = RoutePaths.withQuery("search", "q" to q, "scan" to if (scan) "1" else null)
   const val PALETTE = "palette"
+  /** برگهٔ «+» ِ کادرِ بالای خانه (HOME-V3): `page` = `till` | `safe` */
+  const val HERO_MONEY = "home/money"
+  fun heroMoney(safe: Boolean) = RoutePaths.withQuery(HERO_MONEY, "page" to if (safe) "safe" else "till")
 }
 
 /** بخش‌های جست‌وجو که همین کاربر حق دارد باز کند (نقش، پرچمِ سرور، پرچمِ ماژول) */
@@ -69,6 +73,7 @@ val ShellModule = AppModule(
       if (desk) DeskHomeScreen(data, onOpen = { nav.open(it) })
       else HomeScreen(data, onOpen = { nav.open(it) }, bottomReserve = bottomReserve)
     },
+    V3Route(ShellPaths.HERO_MONEY, RouteKind.SHEET, { StrHero.addOrTake }, parent = ShellPaths.HOME, chrome = Chrome.OWN) { HeroMoneyRoute() },
     V3Route("notifications", RouteKind.PAGE, { StrKit.notifications }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       NotificationsScreen(data, args.query("tab"), onOpen = { nav.open(it) }, onBack = backOrNull)
     },

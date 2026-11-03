@@ -34,5 +34,6 @@ object I18nTables {
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
     StrSupplierBills, // PUR-14: فاکتورهای تأمین‌کننده در گوشیِ نسخهٔ ۳
+    StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
   )
 }
