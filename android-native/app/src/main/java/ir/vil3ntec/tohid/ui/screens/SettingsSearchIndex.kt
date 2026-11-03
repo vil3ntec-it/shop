@@ -114,7 +114,7 @@ object SettingsSearchIndex {
     L.FRAUD_TRAIL to kw("تقلب حذف سابقه", "fraud trail deleted lines", "درغلي ړنګ شوي"),
     L.ANOMALY to kw("ناهنجاری غیرعادی", "anomaly unusual activity", "غیرعادي"),
     //  فروش و پرداخت
-    L.PAY to kw("پرداخت صندوق نقد نسیه گرد کردن شیفت", "payments register cash credit rounding shift", "تادیه صندوق نغد پور ګردول"),
+    L.PAY to kw("پرداخت صندوق نقد نسیه گرد کردن شیفت شمارش کور", "payments register cash credit rounding shift blind count", "تادیه صندوق نغد پور ګردول پټ شمېرل"),
     L.HESAB_SHOP to kw("حساب‌پی حساب پی پرداخت آنلاین", "hesabpay online payment", "حساب پی آنلاین تادیه"),
     L.TILL_RECEIVE to kw("دریافت قسط قرض F7", "receive payment instalment debt F7", "ترلاسه قسط پور"),
     L.PAY_FIX to kw("اصلاح روش پرداخت", "fix payment method", "د تادیې لاره سمول"),

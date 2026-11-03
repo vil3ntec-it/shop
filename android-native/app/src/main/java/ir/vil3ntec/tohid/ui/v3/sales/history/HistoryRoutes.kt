@@ -64,7 +64,7 @@ fun RouteScope.HistoryRoute() {
   val context = LocalContext.current
   val v2 = returnsV2()
   val canCancel = remember { ShopRole.canCancelSale(context) }
-  val blind = remember { ShopPolicy.payV2(context) && ShopRole.isStaff(context) }
+  val blind = remember { ShopPolicy.payV2(context) && ShopPolicy.blindHere(context) } // PAY-13: شمارشِ کورِ اختیاریِ دکان
   val query = rememberSaveable(saver = HistoryQuerySaver) {
     HistoryQuery(HistoryFilter.of(args.query("filter")), args.query("q").orEmpty(), HistoryModel.ALL_MONTHS)
   }
@@ -216,6 +216,8 @@ fun RouteScope.CancelRoute() {
         is SalesEngine.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesEngine.Result.Ok -> {
           scope.launch { store.save(r.data) }
+          //  PRM-02: کدهای سقف‌دارِ این فاکتور پس از نشستنِ لغو در دفتر آزاد می‌شوند (بی اینترنت ⇒ صف)
+          ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.saleCancelled, V3Tone.SUCCESS)
         }
       }
@@ -249,6 +251,8 @@ fun RouteScope.FixRoute() {
         is SalesEngine.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesEngine.Result.Ok -> {
           scope.launch { store.save(r.data) }
+          //  PRM-02: فاکتورِ اصلاح‌شده لغو است ⇒ کدهایش آزاد؛ ثبتِ دوباره با کلیدِ تازه دوباره می‌گیرد
+          ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.fixDone, V3Tone.SUCCESS)
           cart.set(lines)
           cart.setDebtor(sale.debtorId)

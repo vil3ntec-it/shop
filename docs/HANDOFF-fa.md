@@ -53,6 +53,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps8-partial` (کمبودهای PARTIAL، دورِ ۸، و فهرستِ تصمیم‌های صاحب‌کار؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **PAY-19** Shift+F8 ِ صندوقِ کامپیوتر ⇐ پنجرهٔ دلیلِ «کشو بی فروش» (`PosKeys.noSaleDrawer`، `DrawerNoSale.keyGate`؛ keymap «partial»)؛
+  **PRM-02** آزادِ خودکارِ کدهای سقف‌دار با لغو/اصلاحِ فاکتورِ نسخهٔ ۳ (`PromoLive.releaseOnVoid` + صفِ بی‌اینترنت، `PromoRedeem.release*`)؛
+  **PAY-13** «شمارشِ کور» تنظیمِ دکان شد (`ShopPolicy.blindCount`، ردیف در `settings/sales/payments`، `ShiftSlip.blind`)؛ **SYN-14** عکس‌ها
+  قابلِ ادامه و پس از دفتر (`core/sync/PhotoSyncPlan`، `SyncV1Engine.ledgerBusy`). هر چهار PARTIAL ماندند (شاهدِ CI). بی مهاجرت.
+- **`docs/OWNER-DECISIONS-fa.md`**: ۳۰ تصمیمِ باز (D-xx و O-01..O-19) با پرسشِ ساده، گزینه‌ها، پیشنهاد و ردیف‌هایی که باز می‌کنند (۹۴ ردیف).
+- نیمه‌کاره / یافته: صندوقِ پرداختِ گوشیِ نسخهٔ ۳ (`CheckoutRoute`) کدِ سقف‌دار را پیش از ثبت از سرور نمی‌گیرد (`redeemGate` فقط در صندوقِ
+  کامپیوتر) — در «مانده» ِ PRM-02 آمد؛ چون #862 همان فایل را داشت در این PR دست نخورد.
+- قدمِ بعدی: CI ِ همین PR؛ `gate` ِ `redeemGate` در `CheckoutRoute` (#862 حالا مرج شده)؛ جوابِ صاحب‌کار به `OWNER-DECISIONS-fa.md`.
+
 ### ۱۴۰۵/۰۸/۱۲ — آیفون گامِ ۷، شاخهٔ `claude/ios-app-phase7` (روی main پس از #861 و دستهٔ ۱۵؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `ios-exclude.txt` ۱۳ ⇐ ۱۲ و هیچ سطرِ بی‌دلیل (۴ فقط-اندروید، ۸ همتای iOS؛ دلیلِ هر سطر در خودِ فایل و جدولِ
   `docs/IOS-PLAN-fa.md` §۰.۱۲). `data/DeviceLocation.kt` ِ اندروید با shim ِ `android.location` (CoreLocation) روی آیفون و

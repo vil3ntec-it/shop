@@ -13,6 +13,19 @@ object DrawerNoSale {
   const val NEED_REASON = "دلیل را بنویسید"
   const val NEED_APPROVAL = "باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد (APPROVAL_REQUIRED)"
 
+  const val NO_DRAWER_PRINTER = "چاپگرِ کشودار تعریف نشده — تنظیمات › دستگاه‌ها"
+
+  /**
+   *  Shift+F8 ِ صندوقِ کامپیوتر (`KeyMap.SALE_DRAWER`) پیش از پنجرهٔ دلیل: بی چاپگرِ پیش‌فرضِ کشودار پیام (پیش از مجوز،
+   *  تا شاگرد هم بداند چرا)، بی `drawer.open` همان [NEED_APPROVAL]؛ وگرنه `null` ⇒ پنجرهٔ دلیل و همان
+   *  `PrintSpooler.openDrawer` (که [refusal] را دوباره می‌سنجد). کلید هرگز بی پنجره کشو را باز نمی‌کند.
+   */
+  fun keyGate(hasDrawerPrinter: Boolean, allowed: Boolean): String? = when {
+    !hasDrawerPrinter -> NO_DRAWER_PRINTER
+    !allowed -> NEED_APPROVAL
+    else -> null
+  }
+
   /** پیشِ ضربه: دلیلِ خالی، یا نقشی که سیاستِ دکان اجازه نداده (`drawer.open`) ⇒ پیامِ رد؛ وگرنه `null` */
   fun refusal(reason: String, allowed: Boolean): String? = when {
     reason.trim().isEmpty() -> NEED_REASON

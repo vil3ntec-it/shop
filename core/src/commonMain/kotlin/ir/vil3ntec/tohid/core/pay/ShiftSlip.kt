@@ -24,6 +24,13 @@ object ShiftSlip {
    *  نمی‌مانند (ردیف‌ها فقط شمارِ رویدادها، [rows]). «نیازمند بررسی» و دلیل هم نه: یعنی «شمارشت نخواند».
    *  شمرده‌ها و اسکناس‌ها (ورودیِ خودِ او) می‌مانند.
    */
+  /**
+   *  PAY-13 — «شمارشِ کور» اختیاریِ دکان است، نه خودِ نقشِ شاگرد: کور فقط وقتی بیننده کارمند است (صاحب و مدیر
+   *  هرگز) **و** دکان آن را روشن گذاشته ([shopBlindCount]، پیش‌فرض روشن = همان رفتارِ پیشین). خاموش ⇒ شاگرد
+   *  هم «مورد انتظار» و اختلاف را می‌بیند. همهٔ درهای نمای کور (X، Z، بستن، یادداشتِ سابقه) همین را می‌پرسند.
+   */
+  fun blind(staff: Boolean, shopBlindCount: Boolean): Boolean = staff && shopBlindCount
+
   fun forViewer(r: ShiftReport, seesExpected: Boolean): ShiftReport =
     if (seesExpected) r
     else r.copy(
