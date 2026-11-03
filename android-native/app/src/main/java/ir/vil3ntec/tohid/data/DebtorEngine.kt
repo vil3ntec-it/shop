@@ -289,10 +289,9 @@ object DebtorEngine {
       id = newId(), type = "debt_tx_delete", date = today, refId = tx.debtorId, createdAt = now,
       notes = "حذفِ $kind ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date})",
     )
-    return Result.Ok(
-      d.copy(transactions = d.transactions.filter { it.id != id }, auditLog = d.auditLog + trace),
-      id = id,
-    )
+    val out = d.copy(transactions = d.transactions.filter { it.id != id }, auditLog = d.auditLog + trace)
+    //  PRM-13: رسیدِ دستیِ حذف‌شده امتیازی را که داده بود پس می‌گیرد (بی امتیاز ⇒ همان شیء)
+    return Result.Ok(if (tx.type == "receive" && tx.kind == null) LoyaltyPoints.afterPaymentDeleted(out, id, today, now) else out, id = id)
   }
 
   /* ------------------------------ حساب ------------------------------ */

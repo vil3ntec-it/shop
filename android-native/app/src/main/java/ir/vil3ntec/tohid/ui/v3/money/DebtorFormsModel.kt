@@ -122,5 +122,8 @@ internal object DebtorFormsModel {
       d, debtorId, f.kind, amountOf(f), f.date, f.notes, today, now, newId,
       dueDate = f.due.ifBlank { null }.takeIf { f.kind == DebtorEngine.Kind.GIVE },
       overLimit = overLimit,
-    )
+    ).let { r ->
+      //  PRM-13: رسیدِ مشتری امتیازِ سهمِ نسیهٔ پرداخت‌شده را در همان دفتر می‌دهد (همان `DebtEntry.change`)
+      if (r is DebtorEngine.Result.Ok && f.kind == DebtorEngine.Kind.RECEIVE) r.copy(data = ir.vil3ntec.tohid.data.LoyaltyPoints.afterPayment(r.data, r.id, null)) else r
+    }
 }
