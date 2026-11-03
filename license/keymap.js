@@ -51,7 +51,7 @@
     "sale.prevOpen": {"scope":"sale","title":"فاکتورِ بازِ قبلی","status":"partial","page":null,"web":[],"overrides":[]},
     "sale.receive": {"scope":"sale","title":"دریافتِ وجه یا قسط از مشتری","status":"partial","page":null,"web":[["R",false,false,true]],"overrides":[]},
     "sale.reprint": {"scope":"sale","title":"چاپِ دوبارهٔ آخرین رسید","status":"live","page":null,"web":[["P",false,false,true]],"overrides":[]},
-    "sale.drawer": {"scope":"sale","title":"باز کردنِ کشوی پول بدون فروش","status":"planned","page":null,"web":[],"overrides":[]},
+    "sale.drawer": {"scope":"sale","title":"باز کردنِ کشوی پول بدون فروش","status":"partial","page":null,"web":[],"overrides":[]},
     "sale.payPanel": {"scope":"sale","title":"پنلِ پرداخت (امروز F9 فروش را فوری می‌بندد)","status":"planned","page":null,"web":[["Enter",false,false,true]],"overrides":[]},
     "sale.returnMode": {"scope":"sale","title":"حالتِ برگشت","status":"planned","page":null,"web":[["Enter",false,true,true]],"overrides":[]},
     "sale.finishExact": {"scope":"sale","title":"پایانِ فوری با نقدِ دقیق","status":"live","page":null,"web":[["Enter",true,false,false]],"overrides":["global.save"]},

@@ -20,6 +20,13 @@ object StrShift {
     "Blind count: the expected amount is shown to a manager after closing",
     "پټ شمېرل: د تمې وړ مبلغ له بندولو وروسته مدیر ته ښودل کېږي",
   )
+  //  PAY-13: تنظیمِ «شمارشِ کور» (تنظیمات › فروش و پرداخت › پرداخت)
+  val blindSettingTitle: String get() = t("شمارشِ کورِ شاگرد", "Blind count for staff", "د شاګرد پټ شمېرل")
+  val blindSettingNote: String get() = t(
+    "روشن: شاگرد هنگامِ بستنِ صندوق و در گزارشِ X و Z نقدِ مورد انتظار و اختلاف را نمی‌بیند. خاموش: می‌بیند. صاحب و مدیر همیشه می‌بینند.",
+    "On: staff don't see the expected cash or the difference when closing the register or in the X and Z reports. Off: they do. The owner and managers always see them.",
+    "روښانه: شاګرد د صندوق د بندولو پر مهال او په X او Z راپور کې د تمې وړ نغدې او توپیر نه ویني. بند: ویني یې. خاوند او مدیر تل ویني.",
+  )
   fun skippedOuts(n: Any): String = t(
     "${asIs(n)} خروجِ دفتر بیش از نقدِ دخل — بررسیِ مدیر",
     "$n ledger ${pl(n, "withdrawal exceeds", "withdrawals exceed")} the cash in the drawer — manager review",

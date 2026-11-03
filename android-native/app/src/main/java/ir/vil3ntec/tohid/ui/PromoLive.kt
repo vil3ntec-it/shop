@@ -20,8 +20,14 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PromoRepository
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -231,6 +237,8 @@ object PromoLive {
       while (isActive) {
         ensure(context)
         if (System.currentTimeMillis() - bound.triedAt > REFRESH_MS) refresh(context)
+        //  PRM-02: لغوهایی که بی اینترنت ماندند
+        if (!isDemo && pending(context).isNotEmpty()) flushReleases(context)
         delay(60_000)
       }
     }
@@ -309,6 +317,66 @@ object PromoLive {
       ir.vil3ntec.tohid.core.promo.PromoRedeem.Decision.UNREACHABLE, null -> Unit
     }
     return out.message
+  }
+
+  /* ── PRM-02: آزادِ خودکار با لغوِ فاکتور ─────────────────────────────── */
+
+  private const val RELEASE = "release-v1"
+  private val releaseLock = Mutex()
+  /** بیرون از صفحه: برگهٔ لغو پس از تأیید بسته می‌شود و کارِ شبکه نباید با آن بمیرد */
+  private val background = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+  /** صفِ «حساب@دکان␉شناسهٔ فاکتور» ِ آزادنشده‌ها روی همین دستگاه (کهنه اول) */
+  private fun pending(context: Context): List<String> =
+    prefs(context).getString(RELEASE, null).orEmpty().split('\n').filter { it.isNotBlank() }
+
+  private fun savePending(context: Context, q: List<String>) {
+    prefs(context).edit().putString(RELEASE, q.joinToString("\n")).apply()
+  }
+
+  /**
+   *  PRM-02 — فاکتوری که لغو شد (برگهٔ «لغو» یا «اصلاحِ فاکتور» ِ نسخهٔ ۳): پس از نشستنِ لغو در دفتر، کدهای
+   *  سقف‌دارش در سرور آزاد می‌شوند تا ظرفیتِ کد برگردد. بی اینترنت در صفِ همین دستگاه می‌ماند و `Host` هر دقیقه
+   *  دوباره می‌فرستد. لغوی که ذخیره نشد (۳۰ ثانیه دفتر آن را لغوشده نشان نداد) چیزی آزاد نمی‌کند.
+   *  ⛔ دکانی که شمارشِ کد ندارد و فاکتوری که کدی ندارد هیچ پرسشی به سرور نمی‌فرستد (`PromoRedeem.releaseNeeded`).
+   */
+  fun releaseOnVoid(context: Context, store: ir.vil3ntec.tohid.data.ShopStore, sale: ir.vil3ntec.tohid.data.Sale) {
+    if (isDemo) return
+    val app = context.applicationContext ?: context
+    background.launch {
+      loadCache(app)
+      val key = account(app)
+      if (!ir.vil3ntec.tohid.core.promo.PromoRedeem.releaseNeeded(PromoEngine.forAccount(snap.value, key).redeem, sale.coupons)) return@launch
+      withTimeoutOrNull(30_000) {
+        store.data.first { d -> d.sales.any { it.id == sale.id && it.status == "cancelled" } }
+      } ?: return@launch
+      synchronized(this@PromoLive) {
+        savePending(app, ir.vil3ntec.tohid.core.promo.PromoRedeem.enqueue(pending(app), key + "\t" + sale.id))
+      }
+      flushReleases(app)
+    }
+  }
+
+  /** صفِ آزادنشده‌های همین حساب@دکان؛ نخستین «دوباره» می‌ایستد تا بارِ بعد */
+  suspend fun flushReleases(context: Context) = releaseLock.withLock {
+    if (isDemo || !Backend.isReady(context)) return@withLock
+    val key = account(context)
+    for (entry in pending(context)) {
+      val tab = entry.indexOf('\t')
+      if (tab < 0) { synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }; continue }
+      if (entry.substring(0, tab) != key) continue
+      val r = repository(context).release(entry.substring(tab + 1))
+      val f = (r as? ApiResult.Failure)?.error
+      when (ir.vil3ntec.tohid.core.promo.PromoRedeem.releaseDecision(f == null, f?.status ?: 0, f?.code.orEmpty())) {
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.RETRY -> return@withLock
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.DONE -> {
+          synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }
+          bound.triedAt = 0L // شمارِ مصرف عوض شد ⇒ تازه‌سازیِ بعدیِ `Host` زودتر
+        }
+        ir.vil3ntec.tohid.core.promo.PromoRedeem.Release.DROP ->
+          synchronized(this@PromoLive) { savePending(context, pending(context) - entry) }
+      }
+    }
   }
 
   /** کدهای سبد ⇒ حافظه و پیش‌نویسِ فاکتور (N3) */

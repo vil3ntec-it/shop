@@ -207,24 +207,6 @@ internal fun iosScanValue(raw: String, type: String?): Pair<String, CodeKind> = 
   else -> raw to CodeKind.OTHER
 }
 
-/** همان قاعدهٔ اندروید: یک کد در یک بازهٔ کوتاه یک بار */
-class ScanGate(private val windowMs: Long = 1200) {
-  private var lastCode: String? = null
-  private var lastAt = 0L
-
-  fun accept(code: String, now: Long = ir.vil3ntec.tohid.ios.jvm.System.currentTimeMillis()): Boolean {
-    if (code == lastCode && now - lastAt < windowMs) return false
-    lastCode = code
-    lastAt = now
-    return true
-  }
-
-  fun reset() {
-    lastCode = null
-    lastAt = 0
-  }
-}
-
 /**
  *  بازخوردِ اسکن — همان دو معنای اندروید:
  *   - «خواند» ⇐ همان بوقِ بارکدخوانِ دکان (`res/raw/scan_beep.mp3`، در بستهٔ برنامه) با AVAudioPlayer + لرزشِ «درست»؛

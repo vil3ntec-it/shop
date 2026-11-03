@@ -306,7 +306,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.P, alt = true)),
   )
   val SALE_DRAWER = KeyAction(
-    "sale.drawer", "sale", "باز کردنِ کشوی پول بدون فروش", KeyStatus.PLANNED,
+    "sale.drawer", "sale", "باز کردنِ کشوی پول بدون فروش", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.F8, shift = true)),
     web = emptyList(),
   )

@@ -15,6 +15,12 @@ if [ -n "$W" ]; then python3 $OPS/unwrap.py $W >/dev/null && git add $W && git c
 $FOOTER"; echo "unwrapped: $W"; fi
 [ -z "$PUMP_OK" ] && git diff --name-only origin/main HEAD | grep -qE '^server/src/lib/sync-v1\.js$|^server/src/routes/admin-pump\.js$|^server/src/routes/pump' && { echo "PUMP-SHARED FILE TOUCHED"; exit 1; }
 git diff origin/main HEAD -- server/src | grep -P '^[-+](?![-+])' | grep -vP '^[-+]\s*(//|\*|/\*)' | grep -q 'PUMP_TABLES' && { echo "PUMP_TABLES TOUCHED"; exit 1; }
+#  OPS-05 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۲): کدِ برنامه ⇒ سطرِ تازه در docs/WHATS-NEW-fa.md؛ تغییری که کاربر هیچ نمی‌بیند: WHATSNEW_OK=<دلیل>
+if [ -f tools/whatsnew/check.mjs ]; then
+  WN=$(node tools/whatsnew/check.mjs --base origin/main 2>&1); w=$?
+  [ $w = 2 ] && { echo "WHATS-NEW FORMAT"; echo "$WN" | head -6; exit 1; }
+  [ $w = 1 ] && [ -z "$WHATSNEW_OK" ] && { echo "WHATS-NEW MISSING"; echo "$WN" | head -4; exit 1; }
+fi
 node docs/spec/tools/spec.mjs check 2>&1 | grep -q '^سالم' || { echo "SPEC FAIL"; exit 1; }
 (cd server && node -e "require('./src/app')") || { echo "APP FAIL"; exit 1; }
 node tools/quality/quality.mjs --check migrations >/dev/null 2>&1 || { echo "MIGRATION NUMBER FAIL"; exit 1; }

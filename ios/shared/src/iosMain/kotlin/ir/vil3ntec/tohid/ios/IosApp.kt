@@ -2,18 +2,15 @@ package ir.vil3ntec.tohid.ios
 
 import android.content.Intent
 import android.content.IosContext
+import ir.vil3ntec.tohid.AppStart
 import androidx.work.WorkManager
-import ir.vil3ntec.tohid.core.nav.DeepLinks
 import ir.vil3ntec.tohid.data.AutoBackup
-import ir.vil3ntec.tohid.data.OrderNotify
 import ir.vil3ntec.tohid.data.Reminders
 import ir.vil3ntec.tohid.data.ShopChatSync
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.Watchman
 import ir.vil3ntec.tohid.sync.v1.LiveSocket
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
-import ir.vil3ntec.tohid.ui.OrdersLive
-import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.IO
@@ -58,20 +55,14 @@ object IosWork {
 }
 
 /**
- *  همگام‌سازی و سوکتِ زنده — همان بلوکِ «Sync v1» ِ `MainActivity.onCreate` (و `desktop/…/Main.kt`): کارِ
+ *  همگام‌سازی و سوکتِ زنده — همان `AppStart.startSync` ِ `MainActivity.onCreate` (و `desktop/…/Main.kt`): کارِ
  *  دوره‌ایِ پانزده‌دقیقه‌ای (`KEEP`) و سوکتِ «چیزی عوض شد» که Pull را به همان کارگر می‌سپارد. حالتِ پیک ⇐ هیچ.
  */
 object IosSync {
   private var live: LiveSocket? = null
 
   fun start() {
-    if (ShopRole.courierMode.value) {
-      runCatching { SyncV1Worker.cancel(IosContext) }
-    } else runCatching {
-      SyncV1Worker.schedule(IosContext)
-      live = LiveSocket(IosContext) { SyncV1Worker.now(IosContext) }
-      live?.connect()
-    }
+    live = AppStart.startSync(IosContext)
   }
 
   /**
@@ -85,25 +76,18 @@ object IosSync {
   }
 }
 
-/** پیوندِ `vill3n://app/…` و لمسِ اعلان — همان `handleLink` و `openNotice` ِ `MainActivity` */
+/** پیوندِ `vill3n://app/…` و لمسِ اعلان — همان `AppStart` ِ `MainActivity` (پس از بالا آمدنِ دفتر) */
 object IosLinks {
   private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
   fun open(url: String) {
     IosBoot.ready()
-    val link = DeepLinks.parse(url) ?: return
-    ModeState.pendingLink.value = link
-    if (link.mode in ModeState.available(IosContext) && ModeState.chosen.value != link.mode) {
-      ModeState.choose(IosContext, link.mode)
-    }
+    AppStart.openLink(IosContext, url)
   }
 
   fun openNotice(intent: Intent) {
     IosBoot.ready()
-    val orderId = runCatching { OrderNotify.fromIntent(IosContext, intent) }.getOrNull() ?: return
-    OrdersLive.openFromNotice(orderId)
-    //  رسید همان دم (اگر نت هست)؛ وگرنه در صف تا دورِ بعدیِ OrdersLive
-    scope.launch { runCatching { OrderNotify.flush(IosContext) } }
+    AppStart.openNotice(IosContext, intent, scope)
   }
 }
 

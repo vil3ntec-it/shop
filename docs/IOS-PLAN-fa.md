@@ -118,6 +118,7 @@ NSUserDefaults، همان نامِ پرونده‌ها و کلیدها)، `java.
 **وضع:** ۲-الف، ۲-ب، ۲-پ و ۲-ت در گامِ ۲ انجام شد (⇐ ۰.۷؛ ۲-ب با CommonCrypto + GCM ِ خالص، نه CryptoKit)؛ ۲-ث و بیشترِ ۲-ج در گامِ ۳ (⇐ ۰.۸؛
 بارکد با AVFoundation، نه VisionKit)؛ چاپ (AirPrint/PDF) در گامِ ۴ (⇐ ۰.۹)؛ از ۲-ج فقط تشخیصِ گفتار مانده است.
 گامِ ۶ (⇐ ۰.۱۱): ورود با اپل و قراردادِ مشترکِ «فراهم‌کننده»، و شش فایلِ دیگرِ اندروید خودشان روی آیفون (`ios-exclude.txt`: ۱۹ ⇐ ۱۳).
+گامِ ۷ (⇐ ۰.۱۲): هیچ سطرِ بی‌دلیل در `ios-exclude.txt` (۱۳ ⇐ ۱۲)؛ `DeviceLocation` ِ اندروید روی آیفون، پوستهٔ برنامه، `ScanGate` و قاعدهٔ نسخه مشترک.
 
 ترتیبِ صفحه‌ها همان خواستِ صاحب‌کار است: **۲-الف + ۲-ب + ۲-پ ⇐ ورود، صندوق/فروش، فهرستِ کالا**؛ سپس بقیه. هر برش با همان
 چرخه سنجیده می‌شود: `compileKotlinIosSimulatorArm64` روی لینوکس، سپس CI ِ macOS.
@@ -385,6 +386,64 @@ xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test` (۹ + 
 - تشخیصِ گفتار و App Attest — همان دلیلِ §۰.۱۰.
 
 **بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS با Compose 1.7.3 و بدل‌های محلیِ `androidx.lifecycle` (‎۰.۷‎؛ مخزنِ گوگل بسته، Maven Central ِ مستقیم ۴۲۹ ⇐ آینهٔ GCS ِ آن؛ init-script در مخزن نیست؛ تنها دگرگونیِ محلیِ دیگر: `HapticFeedbackType.GestureThresholdActivate` ِ ۱.۸ در کپیِ ساخته‌شده ⇐ `LongPress`): هر دو klib سبز (`compileKotlinIosSimulatorArm64`، `compileTestKotlinIosSimulatorArm64`؛ ۱۱۴۴ فایل = ۱۱۴۲ + دو فایلِ `core/src/jvmMain`)، `jvmTest` ِ `ios/shared` ۱۸/۱۸. سرور روی PGlite: `apple-signin` ۶/۶ و با `google-link`، `auth`، `sec-auth`، `log-secrets`، `route-authz-inventory`، `tenant-matrix`، `app-compat`، `platform`، `trial-single-source` روی‌هم ۸۶/۸۶؛ `codeql-models` ۴/۴. هسته `jvmTest` ۱۱۵۱/۱۱۵۱؛ کامپیوتر ۲۷۳۴/۲۷۴۷ (همان ۱۳ آزمونِ `ui.theme` که فقط محلی سرخ‌اند). فقط CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test`.
+
+### ۰.۱۲ گامِ ۷ — هیچ سطرِ بی‌دلیل در `ios-exclude.txt`: موقعیتِ اندروید روی آیفون، پوستهٔ مشترکِ برنامه، منطقِ خالصِ جایگزین‌ها در کدِ مشترک (۱۴۰۵/۰۸/۱۲، شاخهٔ `claude/ios-app-phase7`)
+
+> روی main پس از #861 (گامِ ۶) و دستهٔ ۱۵ (#866). باز هم **همان فایل‌های اندروید**؛ هیچ صفحه‌ای دوباره نوشته نشد. رفتارِ اندروید و
+> کامپیوتر همان است: کدی که از `MainActivity`، `BarcodeScanner`/`BarcodeScannerDesk` و `Updater`/`UpdaterDesk` بیرون آمد خط‌به‌خط
+> همان است و همان‌جا صدا زده می‌شود (ترتیبِ `onCreate` دست نخورد).
+
+**سنجش (فایل‌های `android-native/app/src/main/java` که برای iOS کامپایل می‌شوند؛ از گزارشِ `iosSources` ِ klib):**
+
+| | کامپایل برای iOS | همه | `ios-exclude.txt` | خطِ بیرون‌مانده |
+|---|---:|---:|---:|---:|
+| main پس از #861 (`3fccb68e`) | ۱۱۴۶ | ۱۱۵۹ | ۱۳ | — |
+| **پیش از این گام:** main پس از دستهٔ ۱۵ (`bb9a4332`) | ۱۱۵۱ | ۱۱۶۴ | ۱۳ (۱۲ جایگزین + `MainActivity.kt`) | ۳٬۲۳۹ |
+| **پس از این گام** | **۱۱۵۴** (۹۹٫۰٪) | ۱۱۶۶ (+۲ فایلِ مشترکِ تازه) | **۱۲** (۴ فقط-اندروید + ۸ همتا) | **۲٬۸۶۰** |
+
+جایگزین‌های iOS (`*Ios.kt` ِ هم‌API): ۱۲ فایل، ۷۷۴ خط ⇐ ۱۱ فایل، ۶۴۸ خط. ریشهٔ آیفون (`IosRoot.kt` + `IosApp.kt`): ۳۷۵ ⇐ ۲۴۰ خط.
+
+**تصمیم برای هر ۱۳ سطر** (خواستِ صاحب‌کار: یا منطق به کدِ مشترک، یا shim ِ iOS، یا دلیلِ «فقط اندروید»؛ هیچ سطرِ بی‌دلیل):
+
+| فایلِ اندروید | تصمیم | چه شد / چرا |
+|---|---|---|
+| `data/DeviceLocation.kt` | **shim** ⇐ از فهرست رفت | `android.location` ِ iOS روی CoreLocation (‎`android/location/Location.kt`‎): یک فراهم‌کننده (CoreLocation خودش GPS/Wi-Fi/دکل را می‌آمیزد)، `getLastKnownLocation` ⇐ `CLLocationManager.location` (از هر رشته؛ مدیر فقط روی رشتهٔ اصلی)، `requestLocationUpdates` ⇐ یک `requestLocation()`، برچسبِ نقطه از دقت (تا ۵۰ متر `gps`). با `java.lang.Double` و `java.util.function.Consumer` ِ shim خودِ فایلِ اندروید (تازگیِ ده‌دقیقه‌ای، پروندهٔ `tohid-location`، مهلتِ ۱۲ ثانیه، دقیق‌ترینِ تازه‌ها) روی آیفون است؛ `DeviceLocationIos.kt` پاک شد |
+| `MainActivity.kt` | فقط اندروید + منطق به کدِ مشترک | بدنهٔ `setContent`، `CrashNotice`، تنظیم‌های پیش از صفحه، پیوند، لمسِ اعلان و همگام‌سازی به `AppShellAndroid.kt` (`AppShell`، `AppStart`) رفت و **هم** `MainActivity` **هم** ریشهٔ آیفون همان را صدا می‌زنند (پیش‌تر ریشهٔ آیفون رونوشتِ آن‌ها بود و هر تغییرِ `MainActivity` بی‌صدا به آیفون نمی‌رسید). خودِ Activity (چرخهٔ عمر، `enableEdgeToEdge`، نامِ مستعارِ پیوند در مانیفست، سرویسِ اسکنِ پس‌زمینه) نقطهٔ ورودِ اندروید است؛ ورودِ آیفون `MainViewController` ⇐ `IosRoot` |
+| `data/Migration.kt` | فقط اندروید | کوچِ دفتر از برنامهٔ وبیِ قدیمیِ اندروید (WebView ِ همان بسته)؛ آیفون آن برنامه را هرگز نداشت |
+| `update/Updater.kt` | فقط اندروید + منطق به کدِ مشترک | دانلود/امضا/نصبِ APK؛ آیفون فقط App Store (۲.۵.۲). `versionOf`/`isNewer` که در اندروید، کامپیوتر و آیفون سه بار نوشته شده بود ⇐ `update/ReleaseVersion.kt` (هر سه همان API را نگه داشتند) |
+| `pay/platform/PayDevice.kt` | فقط اندروید | NFC ِ «شبیه‌سازیِ کارت» (HCE) و نمایشگرِ دومِ مشتری (`Presentation`)؛ iOS HCE را به برنامه‌ها نمی‌دهد (جز با مجوزِ ویژهٔ اپل در چند کشور) |
+| `data/AtRestKeys.kt` | همتا (`AtRestKeysIos`) | KEK ِ Android Keystore و متنِ صفحهٔ امنیت («سخت‌افزاری»، چرخشِ نام)؛ shim ِ `AndroidKeyStore` روی Keychain همان متن را روی آیفون دروغ می‌کرد |
+| `data/DiskWrite.kt` | همتا (`DiskWriteIos`) | شاخهٔ `java.nio` با سطحِ API است؛ با `SDK_INT = 0` ِ shim شاخهٔ بی fsync ِ پوشه گرفته می‌شد. همتا همان تضمین را با `fsync` + `rename(2)` دارد |
+| `data/GoogleSignIn.kt` | همتا (`GoogleSignInIos`) | Credential Manager؛ پیام‌های خطایش (SHA-1، «حسابِ گوگل به گوشی بیفزایید») روی آیفون غلط است. ورود با گوگل در همهٔ سکوها خاموش است؛ ورودِ آیفون اپل است (§۰.۱۱). روزی که گوگل روشن شود همتایش GoogleSignIn ِ iOS است، نه shim |
+| `hw/PrinterFinderAndroid.kt` | همتا (`PrinterFinderIos`) | از پیش فقط لایهٔ سکو (کارتِ شبکه، بلوتوثِ کلاسیک)؛ جست‌وجوی چاپگرِ شبکه مشترک است |
+| `scan/BarcodeScanner.kt` | همتا + منطق به کدِ مشترک | CameraX + ML Kit + MediaPlayer ⇐ AVFoundation. `ScanGate` (سدِ تکرارِ ۱۲۰۰ میلی‌ثانیه‌ای) که سه بار نوشته شده بود ⇐ `core/…/scan/ScanGate.kt` (همان بسته؛ صفحه‌های `Sale`/`SaleRoute` دست نخوردند) |
+| `scan/GuidedCapture.kt` | همتا (`GuidedCaptureIos`) | دوربینِ راهنمای CameraX؛ آیفون عکسِ کالا را با دوربینِ خودِ iOS (`TakePicture`) می‌گیرد |
+| `ui/Platform.kt` | همتا (`PlatformIos`) | «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) برای هر سکو جداست، مثلِ `PlatformDesk` |
+| `ui/screens/Haptics.kt` | همتا (`HapticsIos`) | الگوی `Vibrator`؛ آیفون بازخوردِ لمسیِ خودِ iOS را دارد (تصمیمِ گامِ ۶). یکی کردنِ الگو با Core Haptics تصمیمِ صاحب‌کار و آزمونِ گوشیِ واقعی می‌خواهد |
+
+**کارهای دستهٔ ۱۴ و ۱۵ روی آیفون:** امنیتِ حساب‌های پرداخت (اثرِ انگشتِ حسابِ گیرنده در حالتِ سادهٔ حساب‌پی، `HesabPayChangeNotice`)،
+دری (`I18n.pick` ⇐ `DariText`)، صندوقِ گوشی با امتیاز و یادداشت (`TillSale.record`)، راهِ نسخهٔ ۳ برای کارهای بی‌راه و
+فایل‌های تازهٔ `*Android.kt` ِ دستهٔ ۱۵ (`StockExtrasAndroid`، `WebcamPrefAndroid`، …) همه بی سطرِ تازه در `ios-exclude.txt` برای
+iOS کامپایل می‌شوند (klib ِ دستهٔ ۱۵ پیش از این گام هم سبز بود: ۱۱۵۱ فایل).
+
+**آزمونِ تازه:**
+- `src/iosTest/…/ios/Phase7IosTest` (۶) — نقطهٔ CoreLocation ⇐ `Location` ِ اندروید (برچسبِ gps/network از دقت، زمان، دقتِ نامعلوم)؛
+  `LocationManager` ِ `IosContext` و `DeviceLocation.remembered` ِ خودِ فایلِ اندروید روی پروندهٔ `tohid-location`؛ `AppStart.openLink`
+  (همان پیوندِ `MainActivity`)؛ `ScanGate` و `ReleaseVersion`/`Updater` ِ آیفون؛ حساب‌پیِ ساده با گیرنده و دری (دستهٔ ۱۴)؛ یادداشتِ
+  فاکتورِ `TillSale.record` (دستهٔ ۱۵). فقط روی شبیه‌ساز (کارِ `ios-app`).
+- هسته: `ScanGateTest` (۳).
+
+**هنوز نه (و چرا):**
+- شکستِ گرفتنِ موقعیت: جایگزینِ پیشین همان دم null می‌داد؛ حالا همان رفتارِ اندروید است (فراهم‌کنندهٔ بی‌جواب ⇐ مهلتِ ۱۲ ثانیه ⇐ null).
+  `granted` پیش از آن سنجیده می‌شود، پس فقط وقتی پیش می‌آید که اجازه هست ولی نقطه‌ای نمی‌آید.
+- `desktop/…/Main.kt` هنوز رونوشتِ خودش از پوسته را دارد؛ رفتنش به `AppShell` تغییرِ رفتارِ کامپیوتر (پنجره، سینی) را می‌سنجد و این گام دست نزد.
+- تشخیصِ گفتار و App Attest — همان دلیلِ §۰.۱۰؛ ۸ همتا و ۴ فقط-اندروید بالا.
+
+**بررسیِ محلی (لینوکس):** klib ِ iOS و klib ِ آزمونِ iOS با Compose 1.7.3 و همان بدل‌های محلیِ گامِ ۶ (‎۰.۱۱؛ init-script در مخزن نیست):
+پیش از گام ۱۱۵۱ + ۲ فایلِ `core/src/jvmMain` سبز؛ پس از گام هر دو klib سبز (`compileKotlinIosSimulatorArm64`،
+`compileTestKotlinIosSimulatorArm64`؛ ۱۱۵۴ + ۲). `jvmTest` ِ `ios/shared` ۱۸/۱۸؛ هسته `jvmTest` ۱۱۷۲/۱۱۷۲ (با `ScanGateTest`)؛ کامپیوتر ۲۷۷۴/۲۷۸۷ (همان ۱۳ آزمونِ `ui.theme` که فقط محلی سرخ‌اند؛ `UpdaterTest` سبز).
+فقط CI ِ macOS: پیوندِ چارچوب، xcodebuild، اجرا روی شبیه‌ساز و `iosSimulatorArm64Test`. اندروید روی این ماشین ساخته نمی‌شود (SDK نیست):
+`MainActivity` و `AppShellAndroid.kt` را CI ِ اندروید می‌سازد؛ خودِ `AppShellAndroid.kt` با کامپیوتر و آیفون هم کامپایل شد.
 
 ## ۱. خلاصه در پنج خط
 

@@ -114,7 +114,7 @@ object SettingsSearchIndex {
     L.FRAUD_TRAIL to kw("تقلب حذف سابقه", "fraud trail deleted lines", "درغلي ړنګ شوي"),
     L.ANOMALY to kw("ناهنجاری غیرعادی", "anomaly unusual activity", "غیرعادي"),
     //  فروش و پرداخت
-    L.PAY to kw("پرداخت صندوق نقد نسیه گرد کردن شیفت", "payments register cash credit rounding shift", "تادیه صندوق نغد پور ګردول"),
+    L.PAY to kw("پرداخت صندوق نقد نسیه گرد کردن شیفت شمارش کور", "payments register cash credit rounding shift blind count", "تادیه صندوق نغد پور ګردول پټ شمېرل"),
     L.HESAB_SHOP to kw("حساب‌پی حساب پی پرداخت آنلاین", "hesabpay online payment", "حساب پی آنلاین تادیه"),
     L.TILL_RECEIVE to kw("دریافت قسط قرض F7", "receive payment instalment debt F7", "ترلاسه قسط پور"),
     L.PAY_FIX to kw("اصلاح روش پرداخت", "fix payment method", "د تادیې لاره سمول"),
@@ -169,6 +169,7 @@ object SettingsSearchIndex {
     "داده‌ها" to kw("پشتیبان بک‌آپ بازگردانی", "backup restore", "بیک اپ بېرته راوستل"),
     L.ABOUT_APP to kw("نسخه به‌روزرسانی آپدیت", "version update", "نسخه تازه کول"),
     L.CHAT_GUARD to kw("گفت‌وگو چت جا", "chat storage", "خبرې اترې"),
+    L.WHATS_NEW to kw("تازه‌ها چه چیزی تازه است تغییرها به‌روزرسانی", "what's new changes update", "څه نوي دي بدلونونه"),
     L.SERVERS to kw("سرور دیگر شبکه دکان خانه نشانی", "server other network address home", "سرور شبکه پته"),
     L.OWNER_REPORT to kw("گزارش خودکار صاحب", "owner report", "د خاوند راپور"),
     L.TAX_QUARTER to kw("مالیات سه ماهه", "quarterly tax", "درې میاشتنۍ مالیه"),

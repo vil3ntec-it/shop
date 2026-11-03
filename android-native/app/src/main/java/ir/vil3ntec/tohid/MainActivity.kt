@@ -1,28 +1,17 @@
 package ir.vil3ntec.tohid
 
 import android.os.Bundle
-import androidx.compose.animation.AnimatedContent
-import ir.vil3ntec.tohid.core.nav.AppMode
-import ir.vil3ntec.tohid.core.nav.DeepLinks
-import ir.vil3ntec.tohid.core.nav.Move
-import ir.vil3ntec.tohid.ui.v3.V3Transitions
-import ir.vil3ntec.tohid.ui.v3.modes.ModeChooser
-import ir.vil3ntec.tohid.ui.v3.modes.ModeState
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.runtime.*
 import androidx.lifecycle.lifecycleScope
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.ui.AppRoot
-import ir.vil3ntec.tohid.ui.screens.Motion
-import ir.vil3ntec.tohid.ui.screens.WelcomeScreen
-import ir.vil3ntec.tohid.ui.theme.ThemeChoice
-import ir.vil3ntec.tohid.ui.theme.TohidTheme
 import kotlinx.coroutines.launch
-import androidx.compose.foundation.layout.padding
-import androidx.compose.ui.unit.dp
 
 /*
+ *  نقطهٔ ورودِ اندروید. بدنهٔ صفحه، پیوند، لمسِ اعلان، تنظیم‌های پیش از صفحه و همگام‌سازی در
+ *  `AppShellAndroid.kt` (`AppShell`، `AppStart`) است — همان که ریشهٔ آیفون هم صدا می‌زند؛ این‌جا فقط
+ *  چرخهٔ عمرِ Activity و آنچه فقط اندروید دارد.
+ *
  *  چرا `FragmentActivity` و نه `ComponentActivity`:
  *
  *  `BiometricPrompt` — که قفلِ برنامه با اثر انگشت را ممکن می‌کند —
@@ -45,14 +34,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     handleLink(intent)
   }
 
-  private fun openNotice(intent: android.content.Intent?) {
-    val orderId = runCatching { ir.vil3ntec.tohid.data.OrderNotify.fromIntent(applicationContext, intent) }.getOrNull()
-    if (orderId != null) {
-      ir.vil3ntec.tohid.ui.OrdersLive.openFromNotice(orderId)
-      //  رسید همان دم (اگر نت هست)؛ وگرنه در صف تا دورِ بعدیِ OrdersLive
-      lifecycleScope.launch { runCatching { ir.vil3ntec.tohid.data.OrderNotify.flush(applicationContext) } }
-    }
-  }
+  /** M6: لمسِ اعلانِ سفارش ⇒ همان سفارش؛ رسید همان دم (اگر نت هست)، وگرنه در صف تا دورِ بعدیِ OrdersLive */
+  private fun openNotice(intent: android.content.Intent?) = AppStart.openNotice(applicationContext, intent, lifecycleScope)
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -84,109 +67,18 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     //  M6: برنامه با لمسِ اعلانِ سفارش باز شد ⇒ رسید در صف و همان سفارش
     openNotice(intent)
 
-    // کلیدِ انیمیشن پیش از اولین کشیدنِ صفحه خوانده می‌شود
-    Motion.load(applicationContext)
-    LocaleChoice.load(applicationContext)
-    ShopDayChoice.load(applicationContext)
-    ir.vil3ntec.tohid.data.ExpiryPref.load(applicationContext) // S22: روزِ هشدارِ انقضا
-    ir.vil3ntec.tohid.ui.theme.ThemeStore.load(applicationContext)
-    ModeState.load(applicationContext)
+    // کلیدِ انیمیشن و بقیهٔ تنظیم‌ها پیش از اولین کشیدنِ صفحه خوانده می‌شوند
+    AppStart.loadSettings(applicationContext)
     //  «دستگاه‌ها»: بارکدخوانِ ثبت‌شده ⇒ سرویسِ اسکن در پس‌زمینه (بی بارکدخوان هیچ)
     runCatching { ir.vil3ntec.tohid.scan.ScanBackground.sync(applicationContext) }
     //  پیوندِ vill3n://app (رابطِ نسخهٔ ۳ تنها رابط است)
     syncLinkAlias()
 
-    /*
-     *  ── Sync v1: کارِ پس‌زمینه و سوکتِ زنده ──────────────────────────
-     *  `schedule` کارِ دورهٔ پانزده‌دقیقه‌ای را ثبت می‌کند (از قبل ثبت
-     *  شده باشد، `KEEP` دست نمی‌زند). سوکت فقط «چیزی عوض شد» را
-     *  می‌آورد و خودِ Pull کارِ همان Worker است.
-     *
-     *  ⚠️ هیچ‌کدام خطا بیرون نمی‌دهند: برنامه باید بی‌اینترنت و بی‌حساب
-     *  هم کامل بالا بیاید.
-     */
-    //  حالتِ پیک (DLV-01): دفترِ دکانی در کار نیست — نه کارِ دوره‌ای، نه سوکت
+    //  Sync v1 (کارِ دوره‌ای و سوکتِ زنده؛ هیچ‌کدام خطا بیرون نمی‌دهد). حالتِ پیک (DLV-01): دفترِ دکانی در کار نیست
     ir.vil3ntec.tohid.data.ShopRole.courierMode.value = ir.vil3ntec.tohid.data.ShopRole.isCourier(applicationContext)
-    if (ir.vil3ntec.tohid.data.ShopRole.courierMode.value) {
-      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext) }
-    } else runCatching {
-      ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)
-      live = ir.vil3ntec.tohid.sync.v1.LiveSocket(applicationContext) {
-        ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(applicationContext)
-      }
-      live?.connect()
-    }
+    live = AppStart.startSync(applicationContext)
 
-    setContent {
-      // انتخابِ ظاهر بین اجراها می‌ماند
-      val prefs = remember { getSharedPreferences("tohid", MODE_PRIVATE) }
-      var theme by remember {
-        mutableStateOf(
-          runCatching { ThemeChoice.valueOf(prefs.getString("theme", "SYSTEM")!!) }
-            .getOrDefault(ThemeChoice.SYSTEM)
-        )
-      }
-
-      // دروازهٔ ورود فقط بارِ اول می‌آید: یا وارد می‌شوید یا «ادامه بدون
-      // حساب» را می‌زنید. از آن به بعد سرِ راه کسی نمی‌ایستد.
-      var welcomed by remember { mutableStateOf(prefs.getBoolean("welcomed", false)) }
-      //  نقشِ نشست: «پیک» ⇒ حالتِ پیک به‌جای دکان — زنده، از هر راهی که نقش عوض شود
-      val courier by ir.vil3ntec.tohid.data.ShopRole.courierMode.collectAsState()
-      LaunchedEffect(courier) {
-        runCatching {
-          if (courier) ir.vil3ntec.tohid.sync.v1.SyncV1Worker.cancel(applicationContext)
-          else ir.vil3ntec.tohid.sync.v1.SyncV1Worker.schedule(applicationContext)   // KEEP: بی اثرِ دوم
-        }
-      }
-
-      //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
-      val chosen = ModeState.chosen.value
-      ModeState.onCourierSignedOut = {
-        //  خروج از حسابِ پیک ⇒ صفحهٔ ورود؛ دفترِ دکانِ این گوشی دست نخورده است
-        prefs.edit().putBoolean("welcomed", false).apply()
-        welcomed = false
-      }
-      ModeState.onStartShop = {
-        prefs.edit().putBoolean("welcomed", false).apply()
-        welcomed = false
-      }
-      val mode = remember(chosen, courier, welcomed) { ModeState.current(applicationContext) }
-      val screen = when {
-        !welcomed && chosen == null -> "choose"
-        !welcomed -> "welcome"
-        else -> mode.id
-      }
-
-      TohidTheme(theme) {
-        // زبانِ صفحه و جهتش: فارسی و پشتو راست‌به‌چپ (پیش‌فرض، مثلِ پیش)، انگلیسی چپ‌به‌راست
-        ir.vil3ntec.tohid.ui.ProvideLang {
-          CrashNotice()
-          //  عوض شدنِ حالت (سوییچرِ «حساب من»، پیوند) با محو و بزرگ‌شدنِ نرم
-          AnimatedContent(
-            targetState = screen,
-            transitionSpec = { V3Transitions.page(Move.NONE, ir.vil3ntec.tohid.ui.directionOf(LocaleChoice.lang)) },
-            label = "mode",
-          ) { s ->
-            when (s) {
-              "choose" -> ModeChooser { picked -> ModeState.choose(applicationContext, picked) }
-              "welcome" -> WelcomeScreen(store) {
-                prefs.edit().putBoolean("welcomed", true).apply()
-                welcomed = true
-              }
-              AppMode.COURIER.id -> ir.vil3ntec.tohid.ui.courier.CourierHome(onSignedOut = { ModeState.signedOutOfCourier() })
-              else -> AppRoot(
-                store = store,
-                theme = theme,
-                onTheme = {
-                  theme = it
-                  prefs.edit().putString("theme", it.name).apply()
-                },
-              )
-            }
-          }
-        }
-      }
-    }
+    setContent { AppShell(applicationContext, store) }
     handleLink(intent)
   }
 
@@ -204,55 +96,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     }
   }
 
-  /**
-   *  پیوندِ بیرونی (`vill3n://app/…`) ⇐ حالتِ همان پیوند و صفحهٔ دقیقش
-   *  (`DeepLinks`)؛ پوستهٔ همان حالت پیوند را پس از دروازه‌ها (قفل، ورود) باز
-   *  می‌کند. پیوندِ ویترین و QRِ دکان مالِ برنامهٔ خرید است و در مرورگر می‌ماند.
-   */
-  private fun handleLink(intent: android.content.Intent?) {
-    val link = DeepLinks.parse(intent?.dataString) ?: return
-    ModeState.pendingLink.value = link
-    if (link.mode in ModeState.available(applicationContext) && ModeState.chosen.value != link.mode) {
-      ModeState.choose(applicationContext, link.mode)
-    }
-  }
-
-  /**
-   *  OPS-03: برنامه دفعهٔ پیش ناگهان بسته شد ⇒ یک بار کدِ گزارش را بگو (برای تماس با پشتیبانی).
-   *  نخواندنِ صف یا هر خطای دیگر ⇒ هیچ.
-   */
-  @Composable
-  private fun CrashNotice() {
-    var code by remember {
-      mutableStateOf(runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.notice(applicationContext) }.getOrNull())
-    }
-    val shown = code ?: return
-    val done = {
-      runCatching { ir.vil3ntec.tohid.data.platform.CrashReporter.markShown(applicationContext, shown) }
-      code = null
-    }
-    androidx.compose.material3.AlertDialog(
-      onDismissRequest = done,
-      title = { androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashTitle) },
-      text = {
-        androidx.compose.foundation.layout.Column {
-          androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashBody)
-          androidx.compose.foundation.text.selection.SelectionContainer {
-            androidx.compose.material3.Text(
-              shown,
-              style = androidx.compose.material3.MaterialTheme.typography.titleMedium,
-              modifier = androidx.compose.ui.Modifier.padding(top = 8.dp),
-            )
-          }
-        }
-      },
-      confirmButton = {
-        androidx.compose.material3.TextButton(onClick = done) {
-          androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrShell.crashOk)
-        }
-      },
-    )
-  }
+  /** پیوندِ بیرونی (`vill3n://app/…`) ⇐ حالت و صفحهٔ دقیقش (`AppStart.openLink`) */
+  private fun handleLink(intent: android.content.Intent?) = AppStart.openLink(applicationContext, intent?.dataString)
 
   override fun onDestroy() {
     runCatching { live?.disconnect() }
