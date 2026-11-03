@@ -18,7 +18,6 @@ import androidx.compose.ui.test.hasText
 import androidx.compose.ui.test.isRoot
 import androidx.compose.ui.test.onFirst
 import androidx.compose.ui.test.performClick
-import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.printToString
 import androidx.lifecycle.Lifecycle
@@ -112,6 +111,10 @@ internal object Find {
 
   fun text(value: String, substring: Boolean = false) = hasText(value, substring = substring)
 
+  /** دکمهٔ گردِ نماد‌دار (توضیح = برچسب، نقشِ Button) — نه زبانهٔ هم‌نامِ نوارِ پایین */
+  fun iconButton(label: String) =
+    hasContentDescription(label) and SemanticsMatcher.expectValue(SemanticsProperties.Role, Role.Button) and hasClickAction()
+
   val back: SemanticsMatcher get() = button(StrKit.back)
 }
 
@@ -188,10 +191,35 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
     until("«$what» روی صفحه", timeoutMs) { shown(m) }
   }
 
+  /** تا چیزی از صفحه برود (برگه‌ای که با حرکت بسته می‌شود: زدن روی پرده‌اش در همان لحظه «بستنِ دوباره» است) */
+  fun gone(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
+    note("…رفتنِ «$what»")
+    until("رفتنِ «$what» از صفحه", timeoutMs) { !shown(m) }
+  }
+
+  /**
+   *  پیمایش تا چیز در قابِ پدرِ پیمایش‌پذیرش باشد — با کنشِ `ScrollBy` ِ همان پدر و ساعتی که راننده جلو می‌برد.
+   *  (`performScrollTo` ِ ui-test پیمایشِ انیمیشن‌دار را با ساعتِ ایستاده تا ابد منتظر می‌ماند: گیرِ اجرای چهارم.)
+   */
+  fun reveal(m: SemanticsMatcher) {
+    repeat(8) {
+      val node = ui.onAllNodes(m).onFirst().fetchSemanticsNode()
+      var parent = node.parent
+      while (parent != null && !parent.config.contains(SemanticsActions.ScrollBy)) parent = parent.parent
+      val box = parent ?: return
+      val view = box.boundsInRoot
+      val at = node.boundsInRoot
+      if (at.top >= view.top && at.bottom <= view.bottom - REVEAL_MARGIN) return
+      val dy = at.center.y - (view.top + view.height / 3)
+      box.config[SemanticsActions.ScrollBy].action?.invoke(0f, dy)
+      pump(500)
+    }
+  }
+
   fun tap(m: SemanticsMatcher, what: String, timeoutMs: Long = 20_000) {
     waitFor(m, what, timeoutMs)
+    reveal(m)
     val node = ui.onAllNodes(m).onFirst()
-    runCatching { node.performScrollTo() }
     pump(250)
     node.performClick()
     note("زدن: $what")
@@ -201,8 +229,8 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
   fun type(label: String, value: String) {
     val m = Find.field(label)
     waitFor(m, label)
+    reveal(m)
     val node = ui.onAllNodes(m).onFirst()
-    runCatching { node.performScrollTo() }
     node.performClick()
     pump(200)
     node.performTextReplacement(value)
@@ -279,6 +307,8 @@ internal class E2eDriver(private val ui: SkikoComposeUiTest, private val out: St
 
   private companion object {
     const val FRAME_MS = 16L
+    /** پایینِ قاب زیرِ نوارِ شناورِ گوشی است (۲۴۰ پیکسل در ۳x) */
+    const val REVEAL_MARGIN = 240f
   }
 }
 

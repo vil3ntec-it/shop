@@ -186,6 +186,8 @@ jobs:
           #  لاگِ گام‌ها و درختِ دسترس‌پذیریِ هر گامِ سرخ همین‌جا هم (بی دانلودِ مصنوع)
           if [ -f ios-e2e/shots/e2e.log ]; then echo "::group::e2e.log"; cat ios-e2e/shots/e2e.log; echo "::endgroup::"; fi
           for f in ios-e2e/shots/*FAIL*.txt; do [ -f "$f" ] && { echo "::group::$f"; head -400 "$f"; echo "::endgroup::"; }; done
+          #  درخواست‌هایی که سرورِ آزمون از برنامه گرفت (ورود، همگام‌سازی، …) — بی دانلودِ مصنوع
+          if [ -f ios-e2e/backend.log ]; then echo "::group::backend.log (پایان)"; tail -150 ios-e2e/backend.log; echo "::endgroup::"; fi
           ls -la ios-e2e/shots 2>/dev/null || true
           exit $rc
       #  کوچک‌شدهٔ هر عکس (JPEG ِ ۵۲۰ نقطه، base64 میانِ THUMB-BEGIN/THUMB-END) در لاگ: سیزن‌های Claude مصنوع را

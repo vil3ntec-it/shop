@@ -23,6 +23,10 @@ import ir.vil3ntec.tohid.ios.IosNetRoute
 import ir.vil3ntec.tohid.ios.IosRoot
 import ir.vil3ntec.tohid.ios.keychain.Keychain
 import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.AutoSync
+import kotlinx.coroutines.runBlocking
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.v3.modes.ModeState
@@ -42,9 +46,9 @@ import kotlin.test.assertTrue
  *  به آن می‌برد). هر گام با زدن و نوشتن روی خودِ صفحه، نه صدا زدنِ مستقیمِ کد؛ پس از هر گام عکسِ صفحهٔ گوشی
  *  (۳۹۰×۸۴۴، ۳x) و درختِ دسترس‌پذیری در `TOHID_E2E_SHOTS` (مصنوعِ `ios-e2e-shots` ِ CI).
  *
- *    ۰۱ بالا آمدن تا صفحهٔ ورود (انتخابِ «دکان دارم») ۰۲ ورود با ایمیل و رمز ۰۳ صندوق: کالای همگام‌شده ⇐ سبد ⇐ پرداختِ
- *    نقد ⇐ «ثبت فروش» (`CheckoutRoute` ⇐ `TillSale.record`) ⇐ فروش در دفتر و روی سرور ۰۴ «کالای تازه» ⇐ در دفتر و
- *    روی سرور ۰۵ «تازه‌ها» ۰۶ زبانِ دری (زبانه‌ها و فهرستِ «بیشتر» با واژهٔ دری).
+ *    ۰۱ بالا آمدن تا صفحهٔ ورود (انتخابِ «دکان دارم») ۰۲ ورود با ایمیل و رمز ۰۳ همگام‌سازی: کالای دستگاهِ دیگر روی دفترِ
+ *    آیفون ۰۴ صندوق: «قلمِ آزاد» ⇐ سبد ⇐ پرداختِ نقد ⇐ «ثبت فروش» (`CheckoutRoute` ⇐ `TillSale.record`) ⇐ فروش در دفتر و
+ *    روی سرور ۰۵ «کالای تازه» ⇐ در دفتر و روی سرور ۰۶ «تازه‌ها» ۰۷ زبانِ دری (فهرستِ «بیشتر» با واژهٔ دری).
  *
  *  سخت‌گیر: هر گامِ سرخ (یا اجرانشده چون پیش‌نیازش سرخ بود) آزمون را سرخ می‌کند؛ کارِ CI «گزارش» است، نه این آزمون.
  */
@@ -111,98 +115,119 @@ class CoreFlowsE2EIosTest {
         e.shot("02c-home")
       }
 
-      e.step("03-till", "صندوق: فروشِ نقدِ کالای همگام‌شده (TillSale.record)", needs = listOf("02-login")) {
-        //  کالای «دستگاهِ دیگرِ» دکان (backend.mjs) با همگام‌سازیِ پس از ورود به آیفون می‌رسد
-        e.until("کالای «${env.product}» از سرور به دفترِ آیفون", 90_000) {
-          store.data.value.products.any { it.name == env.product }
+      e.step("03-pull", "همگام‌سازی: کالای دستگاهِ دیگر از سرور به دفترِ آیفون", needs = listOf("02-login")) {
+        //  کالای «دستگاهِ دیگرِ» دکان (backend.mjs) را کارگرِ همگام‌سازی (`SyncV1Worker`، نمونهٔ `ShopStore` ِ خودش) پس از
+        //  ورود روی دیسکِ آیفون می‌نشاند — همان‌جا سنجیده می‌شود (نمونهٔ تازه، مثلِ خودِ کارگر). دفترِ صفحه با پرچمِ خاموشِ
+        //  `shop.ledger_merge` تا بازکردنِ دوبارهٔ برنامه همان دفترِ پیشین است (#407، همهٔ سکوها؛ §۰.۱۳)
+        e.until("کالای «${env.product}» در دفترِ دیسکِ آیفون", 90_000) {
+          e.pump(1_500)
+          diskLedger().products.any { it.name == env.product }
         }
+        e.note("همگام‌سازی: خطا=${AutoSync.lastError} — آخرین موفق=${AutoSync.lastOk}")
+      }
+
+      e.step("04-till", "صندوق: فروشِ نقدِ «قلمِ آزاد» (TillSale.record) و رسیدنش به سرور", needs = listOf("02-login")) {
         e.toTab(NavCatalog.SALE)
-        e.waitFor(Find.tile(env.product, StrSale.addOne), env.product, 30_000)
-        e.shot("03a-till")
+        //  صندوق نوارِ پایین ندارد: تا رفتنِ نوار صبر (دکمهٔ «بیشتر» ِ صندوق هم‌نامِ زبانهٔ «بیشتر» است)
+        e.gone(Find.tab(NavCatalog.HOME), "نوارِ پایین")
+        e.waitFor(Find.iconButton(StrKit.more), StrKit.more)
+        e.shot("04a-till")
         val before = store.data.value.sales.map { it.id }.toSet()
-        e.tap(Find.tile(env.product, StrSale.addOne), env.product)
+        e.tap(Find.iconButton(StrKit.more), StrKit.more)
+        e.tap(Find.button(StrSale.freeItem), StrSale.freeItem)
+        e.type(StrSale.nameLabel, FREE_LINE)
+        e.type(StrSale.unitPrice, FREE_PRICE.toInt().toString())
+        e.shot("04b-free-line")
+        e.tap(Find.button(StrKit.add) and isEnabled(), StrKit.add)
+        e.gone(Find.field(StrSale.nameLabel), StrSale.freeItem)
         e.tap(Find.clickLabel(StrSale.openCart), StrSale.openCart)
         e.waitFor(Find.button(StrSale.pay), StrSale.pay)
-        e.shot("03b-cart")
+        e.shot("04c-cart")
         e.tap(Find.button(StrSale.pay), StrSale.pay)
         e.waitFor(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
-        e.shot("03c-checkout")
+        e.shot("04d-checkout")
         e.tap(Find.button(StrSale.recordSale) and isEnabled(), StrSale.recordSale)
         e.waitFor(Find.button(StrSale.newSale), StrSale.newSale, 30_000)
-        e.shot("03d-receipt")
+        e.shot("04e-receipt")
         val sale = store.data.value.sales.singleOrNull { it.id !in before } ?: throw AssertionError("فروشِ تازه در دفتر نیست")
         assertEquals("cash", sale.paymentMethod, "روشِ پرداخت")
-        assertEquals(env.price, sale.finalTotal, "مبلغِ نهایی")
+        assertEquals(FREE_PRICE, sale.finalTotal, "مبلغِ نهایی")
         assertTrue(store.data.value.saleItems.any { it.saleId == sale.id }, "قلمِ فروش در دفتر نیست")
         //  همگام‌سازیِ آیفون فروش را به سرور می‌برد
-        e.until("فروشِ ${env.price} روی سرور (sync_rows)", 90_000) {
-          env.serverRows("sales").any { it["finalTotal"]?.jsonPrimitive?.doubleOrNull == env.price }
+        e.until("فروشِ $FREE_PRICE روی سرور (sync_rows)", 90_000) {
+          env.serverRows("sales").any { it["finalTotal"]?.jsonPrimitive?.doubleOrNull == FREE_PRICE }
         }
         e.tap(Find.button(StrSale.newSale), StrSale.newSale)
-        e.shot("03e-till-after")
+        e.gone(Find.button(StrSale.newSale), StrSale.newSale)
+        e.shot("04f-till-after")
       }
 
       val newProduct = "صابونِ آیفون"
-      e.step("04-product", "افزودنِ کالای تازه", needs = listOf("02-login")) {
+      e.step("05-product", "افزودنِ کالای تازه", needs = listOf("02-login")) {
         e.toTab(NavCatalog.PRODUCTS)
         e.waitFor(Find.button(StrProducts.newProduct), StrProducts.newProduct)
-        e.shot("04a-products")
+        e.shot("05a-products")
         e.tap(Find.button(StrProducts.newProduct), StrProducts.newProduct)
         e.type(StrProducts.name, newProduct)
-        //  دستهٔ تازه از برگهٔ دسته‌ها («دستهٔ تازه» ⇐ نام ⇐ «افزودن» ⇐ همان دسته برای همین ردیف)
+        //  دستهٔ تازه از برگهٔ دسته‌ها («دستهٔ تازه» ⇐ نام ⇐ «افزودن» ⇐ همان دسته برای همین ردیف). تا برگه کامل نرفته چیزی
+        //  زده نمی‌شود: زدن روی پردهٔ برگهٔ در حالِ رفتن «بستنِ دوباره» است و فرمِ زیرش را هم می‌بندد (اجرای چهارم)
         e.tap(Find.button(StrProducts.newCategory), StrProducts.newCategory)
         e.type(StrProducts.newCategory, "شوینده")
         e.tap(Find.button(StrKit.add) and isEnabled(), StrKit.add)
+        e.gone(Find.text(StrProducts.pickCategory), StrProducts.pickCategory)
         e.waitFor(Find.button("شوینده"), "شوینده")
         e.tap(Find.button("عدد"), "عدد")
         e.type(StrProducts.purchasePrice, "60")
         e.type(StrProducts.salePrice, "85")
-        e.shot("04b-new-product")
+        e.shot("05b-new-product")
         e.tap(Find.button(StrProducts.saveAll) and isEnabled(), StrProducts.saveAll)
         e.until("کالای «$newProduct» در دفتر", 20_000) { store.data.value.products.any { it.name == newProduct } }
         val p = store.data.value.products.first { it.name == newProduct }
         assertEquals(85.0, p.salePrice, "قیمتِ فروش")
         assertEquals("شوینده", p.category, "دسته")
-        e.shot("04c-saved")
+        e.shot("05c-saved")
         e.until("کالای «$newProduct» روی سرور (sync_rows)", 90_000) {
           env.serverRows("products").any { it["name"]?.jsonPrimitive?.content == newProduct }
         }
       }
 
-      e.step("05-whats-new", "«تازه‌ها»", needs = listOf("02-login")) {
+      e.step("06-whats-new", "«تازه‌ها»", needs = listOf("02-login")) {
         val sections = WhatsNew.bundled.sections
         assertTrue(sections.isNotEmpty(), "«تازه‌ها» ِ همراهِ برنامه خالی است")
         e.toTab(NavCatalog.MORE)
         e.waitFor(Find.button(StrSettings.whatsNew), StrSettings.whatsNew)
-        e.shot("05a-more")
+        e.shot("06a-more")
         e.tap(Find.button(StrSettings.whatsNew), StrSettings.whatsNew)
         val first = sections.first().titleIn(I18n.source().code)
         e.waitFor(Find.text(first, substring = true), first)
-        e.shot("05b-whats-new")
+        e.shot("06b-whats-new")
       }
 
-      e.step("06-dari", "زبانِ دری", needs = listOf("02-login")) {
+      e.step("07-dari", "زبانِ دری", needs = listOf("02-login")) {
         val faWarehouse = Str.warehouse
         e.toTab(NavCatalog.MORE)
         e.tap(Find.button(StrSettingsHome.look), StrSettingsHome.look)
         e.tap(Find.button(StrSettings.language), StrSettings.language)
         e.waitFor(Find.button(Lang.PRS.native), Lang.PRS.native)
-        e.shot("06a-language")
+        e.shot("07a-language")
         e.tap(Find.button(Lang.PRS.native), Lang.PRS.native)
         e.until("زبانِ برنامه دری شد", 10_000) { LocaleChoice.lang == Lang.PRS }
         val dariWarehouse = Str.warehouse
         assertNotEquals(faWarehouse, dariWarehouse, "«انبار» در دری همان ماند")
-        e.shot("06b-dari-selected")
+        e.shot("07b-dari-selected")
         //  فهرستِ «بیشتر» (و همهٔ صفحه‌ها) همان لحظه دری است: «${faWarehouse}» ⇐ «${dariWarehouse}»
         e.toTab(NavCatalog.MORE)
         e.waitFor(Find.button(dariWarehouse), dariWarehouse)
         assertTrue(!e.shown(Find.text(faWarehouse)), "«$faWarehouse» ِ فارسی هنوز روی صفحه است")
-        e.shot("06c-dari-more")
+        e.shot("07c-dari-more")
       }
 
       e.finish()
     }
   }
+
+  /** دفترِ روی دیسکِ آیفون — نمونهٔ تازهٔ `ShopStore`، همان کاری که `SyncV1Worker` پیش از هر دور می‌کند */
+  private fun diskLedger(): ShopData = runBlocking { ShopStore(IosContext).also { it.load() }.data.value }
 
   /** نوشتن، خواندن و پاک کردنِ یک قلمِ کلیددان؛ شکست ⇐ کلیددانِ درونِ حافظه (`Keychain.memory`) و دلیلش */
   private fun keychainProbe(): String {
@@ -222,5 +247,7 @@ class CoreFlowsE2EIosTest {
     const val HEIGHT = 844f
     const val SCALE = 3f
     const val WATCHDOG_S = 15 * 60L
+    const val FREE_LINE = "شارژِ آیفون"
+    const val FREE_PRICE = 120.0
   }
 }
