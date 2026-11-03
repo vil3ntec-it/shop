@@ -440,6 +440,6 @@ function stop() {
 
 module.exports = {
   FLAG_KEY, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
-  flagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, buildSummary, render,
+  flagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, buildSummary, render, timezoneOf,
   runShop, sweep, viewOf, start, stop,
 };

@@ -356,6 +356,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/order-notify', require('./routes/order-notify'));
     //  PAY-20/RPT-12: گزارشِ خودکار برای صاحبِ دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.owner_report`
     api.use('/shop/owner-report', require('./routes/owner-report'));
+    //  RPT-18: گزارشِ همهٔ شعبه‌ها (دکان‌های همین صاحب) در یک جا — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.branches_report`
+    api.use('/shop/branches-report', require('./routes/branches-report'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
     //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
@@ -404,6 +406,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/market', require('./routes/market-admin'));
     api.use('/market', require('./routes/market'));
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
+    //  IMG-PRO-17: تغییرِ دسته‌ایِ عکسِ کالاها و برگرداندنش — پیش از `/shop/images` (همان پرچم)
+    api.use('/shop/images/changes', require('./routes/shop-image-changes'));
     api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
