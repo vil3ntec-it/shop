@@ -52,12 +52,15 @@ jobs:
 
       #  OPS-05 (خواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۲): PR ِ کدِ برنامه بی سطرِ تازه در docs/WHATS-NEW-fa.md ⇒ هشدار روی PR.
       #  مرحلهٔ ۱ ِ همین ورک‌فلو فقط گزارش است؛ سدِ محلی `finish-pr.sh` و سنجشِ کاملِ قالب `WhatsNewFileTest` (توحید بومی).
+      #  آزمونِ خودِ سنجه در main هم اجرا می‌شود (شاهدِ main برای OPS-05)؛ خودِ سنجه فقط در PR معنا دارد.
+      - name: «تازه‌ها» — آزمونِ خودِ سنجه (گزارش)
+        continue-on-error: true
+        run: node --test tools/whatsnew/check.test.mjs
+
       - name: «تازه‌ها» — سطرِ تازه برای کدِ برنامه (گزارش)
         if: github.event_name == 'pull_request'
         continue-on-error: true
-        run: |
-          node --test tools/whatsnew/check.test.mjs
-          node tools/whatsnew/check.mjs --base HEAD^1
+        run: node tools/whatsnew/check.mjs --base HEAD^1
 
       - name: شمارهٔ مهاجرت‌ها (سد)
         if: always()

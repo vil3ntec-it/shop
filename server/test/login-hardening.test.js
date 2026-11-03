@@ -248,7 +248,7 @@ test('عوض کردنِ حساب: نشستِ نفرِ قبلی به نفرِ ت�
 test('توکنِ دستکاری‌شده، ساختگی و خالی همه رد می‌شوند', async () => {
   const user = await h.newUser('دستکاری');
 
-  const tampered = `${user.accessToken.slice(0, -3)}AAA`;
+  const tampered = h.tampered(user.accessToken, 'AAA');
   assert.equal((await h.get('/api/me', { token: tampered })).status, 401);
   assert.equal((await h.get('/api/me', { token: 'x'.repeat(40) })).status, 401);
   assert.equal((await h.get('/api/me')).status, 401);
