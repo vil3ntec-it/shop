@@ -336,8 +336,11 @@ object ApiEndpoints {
   object ShopChat {
     const val CONFIG = "/shop/chat/config"
     const val CONVERSATIONS = "/shop/chat/conversations"
+    const val SEARCH = "/shop/chat/search"
 
     fun conversation(id: String): String = "$CONVERSATIONS/${enc(id)}"
+    fun message(id: String, messageId: String): String = "${conversation(id)}/messages/${enc(messageId)}"
+    fun pin(id: String, messageId: String): String = "${conversation(id)}/pins/${enc(messageId)}"
   }
 
   /* ------------------------------ خریدار (بی‌توکن) ------------------------------ */

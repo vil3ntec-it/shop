@@ -14,6 +14,8 @@ data class ChatLimits(
   val imageMax: Long = 1536L * 1024,
   val thumbMax: Long = 64L * 1024,
   val audioMax: Long = 3072L * 1024,
+  /** مهلتِ ویرایشِ پیامِ خود (سرور: `CHAT_EDIT_WINDOW_MIN`)؛ سرورِ پیشین نمی‌فرستد ⇒ null (سرور خودش می‌سنجد) */
+  val editWindowMs: Long? = null,
 )
 
 @Serializable
@@ -78,6 +80,15 @@ data class ChatConversation(
   val customerBlockedShop: Boolean = false,
   val canSend: Boolean = true,
   val receipts: ChatReceipts = ChatReceipts(),
+  /** سنجاق‌های طرفِ دکان (CHAT-14، مهاجرتِ ۱۴۱) — همهٔ کارمندانِ همین دکان می‌بینند، مشتری نه */
+  val pinned: List<ChatPin> = emptyList(),
+)
+
+@Serializable
+data class ChatPin(
+  val messageId: String,
+  val seq: Long = 0,
+  val pinnedAt: Long = 0,
 )
 
 @Serializable
@@ -131,4 +142,21 @@ data class ChatChanges(
 data class ChatList(
   val conversations: List<ChatConversation> = emptyList(),
   val next: String? = null,
+)
+
+/** یک یافتهٔ `GET /search` (CHAT-14): پیامِ مجازِ همین دکان — پاک‌شده و «حذف برای من» نمی‌آیند */
+@Serializable
+data class ChatSearchHit(
+  val conversationId: String,
+  val id: String,
+  val seq: Long = 0,
+  val sender: String = "",
+  val kind: String = "text",
+  val body: String = "",
+  val createdAt: Long = 0,
+)
+
+@Serializable
+data class ChatSearchResult(
+  val results: List<ChatSearchHit> = emptyList(),
 )

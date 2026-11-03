@@ -209,13 +209,19 @@ async function threadFor({ app = 'shop', userId = '', shopId = '', stationId = '
  * می‌سازد.
  */
 async function post(threadId, { sender = 'user', senderId = '', senderName = '', body = '', kind = 'text', mediaId = null }) {
-  const text = String(body || '').trim();
+  let text = String(body || '').trim();
   const isMedia = MEDIA_KINDS.includes(kind);
   if (!text && !isMedia) throw badRequest('پیام خالی است', 'empty_message');
   if (text.length > MAX_BODY) throw badRequest('پیام خیلی بلند است', 'message_too_long');
 
   const thread = await one('SELECT * FROM support_threads WHERE id=$1', [threadId]);
   if (!thread) throw notFound('این گفت‌وگو پیدا نشد', 'thread_not_found');
+  /*
+   *  S117 — متنِ آزادِ پشتیبانیِ دکان (کاربر، پورتال و جوابِ مدیر) شمارهٔ کاملِ کارت را نگه نمی‌دارد: همان قاعدهٔ
+   *  `ops-errors.maskCards` (۱۵ تا ۱۹ رقم با Luhn ⇒ «[کارت]») پیش از نوشتن در دیتابیس، پیش‌نمایش و پوش.
+   *  ⛔ رشتهٔ پمپ دست نمی‌خورد (کدِ مشترک با پروژهٔ پمپ؛ O-19) — رفتارِ پیامِ پمپ بیت‌به‌بیت همان پیشین.
+   */
+  if (thread.app !== require('./tenancy').PUMP.app) text = require('./ops-errors').maskCards(text);
 
   /*
    *  پیامِ رسانه‌ای فقط به رسانه‌ای اشاره می‌کند که در **همین** رشته
