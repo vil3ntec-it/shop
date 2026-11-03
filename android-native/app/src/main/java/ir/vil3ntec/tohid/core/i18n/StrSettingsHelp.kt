@@ -169,6 +169,13 @@ object StrSettingsHelp {
     "For example, a customer pays 2,000 off their debt: take it at the till and give a receipt.",
     "د بېلګې په توګه، پېرودونکی له خپل پور ۲۰۰۰ ورکوي؛ په صندوق کې یې واخلئ او رسید ورکړئ.",
   )
+  //  PAY-17
+  val multiDrawerLine: String get() = t("صندوقِ جدا برای هر کشو یا صندوقدار، و ادامه روی دستگاهِ دیگر", "A separate till per drawer or cashier, continued on another device", "د هر دخل یا صندوقدار جلا صندوق، په بله دستګاه دوام")
+  val multiDrawerExample: String get() = t(
+    "مثلاً احمد و محمود هر کدام کشوی خودشان را با ۱۰۰۰ باز می‌کنند؛ احمد عصر به کامپیوتر می‌رود و همان صندوق را آن‌جا ادامه می‌دهد.",
+    "For example, Ahmad and Mahmood each open their own drawer with 1,000; in the evening Ahmad moves to the computer and continues the same till there.",
+    "د بېلګې په توګه، احمد او محمود هر یو خپل دخل په ۱۰۰۰ پرانیزي؛ احمد ماښام کمپیوټر ته ځي او همدا صندوق هلته دوام کوي.",
+  )
   val touchLine: String get() = t("دکمه‌های درشت برای صفحهٔ لمسیِ صندوق", "Bigger buttons for a touch-screen till", "د لمسي سکرین صندوق لپاره لویې تڼۍ")
   val touchExample: String get() = t(
     "مثلاً اگر نمایشگرِ صندوق لمسی است، تعداد و قیمت را با انگشت بزنید.",

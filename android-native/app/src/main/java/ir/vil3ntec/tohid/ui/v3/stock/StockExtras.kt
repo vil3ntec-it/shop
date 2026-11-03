@@ -17,6 +17,8 @@ enum class StockExtra(val route: String) {
   BULK_PRODUCTS(StockPaths.BULK_PRODUCTS),
   /** کارِ صاحب/مدیر */
   IMAGES(StockPaths.IMAGES),
+  /** IMG-PRO-17 — فقط با بانکِ تصاویرِ روشن (`shop.image_bank`) و نقشِ غیرِ شاگرد (`ImageChangesGate`) */
+  IMAGE_CHANGES(StockPaths.IMAGE_CHANGES),
 }
 
 object StockExtras {
@@ -27,6 +29,8 @@ object StockExtras {
     val staff: Boolean,
     val stockOn: Boolean,
     val labelTools: Boolean,
+    /** IMG-PRO-17: بانکِ تصاویر برای این دکان روشن است و کاربر شاگرد نیست */
+    val imageChanges: Boolean = false,
   )
 
   /** کارهای دیدنی، به ترتیبِ صفحهٔ انبارِ پیشین */
@@ -36,6 +40,7 @@ object StockExtras {
     if (f.stockOn) add(StockExtra.BOOK)
     add(StockExtra.BULK_PRODUCTS)
     if (!f.staff) add(StockExtra.IMAGES)
+    if (f.imageChanges && !f.staff) add(StockExtra.IMAGE_CHANGES)
   }
 
   /**

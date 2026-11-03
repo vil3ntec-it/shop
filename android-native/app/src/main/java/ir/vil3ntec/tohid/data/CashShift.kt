@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.pay.Drawers
 import ir.vil3ntec.tohid.money
 
 /**
@@ -125,8 +126,19 @@ object CashShift {
       .map { Shift(it, closes[it.id]) }
   }
 
-  /** صندوقِ باز — اگر دو دستگاه هم‌زمان باز کرده باشند، تازه‌ترین */
-  fun current(d: ShopData): Shift? = list(d).firstOrNull { it.isOpen }
+  /**
+   *  صندوقِ بازِ همین دستگاه — اگر دو دستگاه هم‌زمان باز کرده باشند، تازه‌ترین.
+   *  PAY-17: کشوی نام‌دارِ برگزیدهٔ همین دستگاه (`TillDrawer.picked`) اگر باز است؛ وگرنه کشوی اصلی (`shift_open` ِ بی
+   *  `drawer`). بی «چند کشو» هیچ کشوی نام‌داری نیست ⇒ همان صندوقِ امروز.
+   */
+  fun current(d: ShopData): Shift? {
+    val all = list(d)
+    TillDrawer.picked?.let { id -> all.firstOrNull { it.open.id == id && it.isOpen && it.open.drawer != null }?.let { return it } }
+    return all.firstOrNull { it.isOpen && it.open.drawer == null }
+  }
+
+  /** کشوی اصلی (بی نام) باز است؟ — جدا از کشوهای نام‌دار (PAY-17) */
+  fun mainOpen(d: ShopData): Boolean = list(d).any { it.isOpen && it.open.drawer == null }
 
   /**
    *  نقدی که این فاکتور به دخل آورد. با `payments` (PAY v3 A4) فقط ردیف‌های نوعِ نقد —
@@ -150,21 +162,31 @@ object CashShift {
    *  @param shiftId شناسهٔ `shift_open`؛ ورود/خروجِ نقد با `refId` = همین شمرده می‌شود
    *  (همان قاعدهٔ `PayFlow.ledgerEvents`). بی آن فقط پنجرهٔ زمانی.
    */
-  fun totals(d: ShopData, from: Long, to: Long, opening: Double, shiftId: String? = null): Totals {
-    fun inWindow(at: Long) = at in from..to
+  fun totals(d: ShopData, from: Long, to: Long, opening: Double, shiftId: String? = null, named: Boolean = false): Totals {
+    //  PAY-17 (`core/pay/Drawers`): کشوی اصلی ⇒ ردیف‌های بی مهرِ پنجره (بی «چند کشو» همهٔ ردیف‌ها، همان امروز)؛ کشوی
+    //  نام‌دار ⇒ فقط ردیف‌های مهرِ خودش و ورود/خروجِ صریحش — مصارف، خرید، تأمین‌کننده، کارتِ هدیه و بازپرداختِ ویژه/امانی نه.
+    //  بی [shiftId] (گردشِ نقدِ روز، خانه) ⇒ همهٔ کشوها با هم.
+    val drawers = TillDrawer.named(d)
+    val own = shiftId.takeIf { named }
+    fun counts(stamp: String?, at: Long): Boolean = when {
+      own != null -> Drawers.counts(stamp, at, own, isNamed = true, named = drawers, from = from, to = to)
+      shiftId == null -> at in from..to
+      else -> at in from..to && Drawers.owner(stamp, at, drawers) == null
+    }
+    fun inWindow(at: Long) = own == null && at in from..to
     val online = d.sales.filter(::isOnline).mapTo(HashSet()) { it.id }
     val moves = if (shiftId == null) emptyList() else d.auditLog.filter { it.type in MOVES && it.refId == shiftId && it.amount > 0 }
     val fixes = PayFixFlow.bySale(d)
     return Totals(
       opening = opening,
-      sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && inWindow(it.createdAt) }
+      sales = d.sales.filter { it.status != "cancelled" && !isOnline(it) && counts(it.shiftId, it.createdAt) }
         .sumOf { saleCash(it, fixes[it.id].orEmpty(), to) },
-      receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && inWindow(it.createdAt) }.sumOf { it.amount } +
+      receipts = d.transactions.filter { it.type == "receive" && isCashReceipt(it) && counts(it.shiftId, it.createdAt) }.sumOf { it.amount } +
         //  PAY-24/PRM-14: فروش و شارژِ کارتِ هدیه (نقد)؛ بی کارت ⇒ ۰
-        GiftCards.cashIn(d, from, to),
+        (if (own == null) GiftCards.cashIn(d, from, to) else 0.0),
       //  برگشتی که به کیف پول/کارت/حواله پس رفت (`toMethods`، فقط RET تازه) از دخل نیست؛
       //  ردیفِ قدیمی آن را ندارد ⇒ همان `amount`ِ امروز
-      returns = d.saleReturns.filter { inWindow(it.createdAt) && !isOnlineReturn(it, online) }.sumOf { ReturnFlow.drawerAmount(it) } +
+      returns = d.saleReturns.filter { counts(it.shiftId, it.createdAt) && !isOnlineReturn(it, online) }.sumOf { ReturnFlow.drawerAmount(it) } +
         //  POS-26: پیش‌پرداختِ سفارشِ ویژه که هنگامِ لغو نقد به مشتری پس رفت (`SpecialOrders.REFUND`)؛ POS-27: همهٔ
         //  پرداختیِ امانیِ لغوشده (`Layaways.REFUND`؛ پیش‌پرداخت و قسط‌ها خودشان رسیدند). بی امانی ⇒ همان جمع
         d.transactions.filter { (SpecialOrders.isRefund(it) || Layaways.isRefund(it)) && inWindow(it.createdAt) }.sumOf { it.amount },
@@ -177,17 +199,36 @@ object CashShift {
   }
 
   fun totalsOf(d: ShopData, s: Shift, now: Long): Totals =
-    totals(d, s.open.createdAt, s.close?.createdAt ?: now, s.open.amount, s.open.id)
+    totals(d, s.open.createdAt, s.close?.createdAt ?: now, s.open.amount, s.open.id, named = s.open.drawer != null)
 
   fun open(d: ShopData, opening: Double, by: String, today: String, now: Long, newId: () -> String): Result {
     if (opening.isNaN() || opening < 0) return Result.Failed("مبلغِ اولِ صندوق درست نیست")
-    if (current(d) != null) return Result.Failed("صندوق از قبل باز است")
+    if (mainOpen(d)) return Result.Failed("صندوق از قبل باز است")
     val who = by.trim()
     return Result.Ok(
       d.copy(
         auditLog = d.auditLog + AuditEntry(
           id = newId(), type = OPEN, date = today, amount = opening, createdAt = now,
           notes = "باز کردنِ صندوق با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",
+        )
+      )
+    )
+  }
+
+  /**
+   *  PAY-17 — بازکردنِ کشوی نام‌دار («چند کشو»، `TillDrawer`): همان ردیفِ `shift_open` با `drawer` = نامِ کشو یا
+   *  صندوقدار. نامِ تکراریِ کشوی بازِ دیگر رد می‌شود (دو صندوقِ هم‌نام در یک لحظه گیج می‌کند).
+   */
+  fun openNamed(d: ShopData, opening: Double, drawer: String, by: String, today: String, now: Long, newId: () -> String): Result {
+    if (opening.isNaN() || opening < 0) return Result.Failed("مبلغِ اولِ صندوق درست نیست")
+    val name = Drawers.label(drawer) ?: return Result.Failed("نامِ کشو (۱ تا ${Drawers.LABEL_MAX} نویسه) لازم است")
+    if (list(d).any { it.isOpen && it.open.drawer == name }) return Result.Failed("کشوی «$name» از قبل باز است")
+    val who = by.trim()
+    return Result.Ok(
+      d.copy(
+        auditLog = d.auditLog + AuditEntry(
+          id = newId(), type = OPEN, date = today, amount = opening, createdAt = now, drawer = name, by = who.ifEmpty { null },
+          notes = "باز کردنِ کشوی «$name» با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",
         )
       )
     )
