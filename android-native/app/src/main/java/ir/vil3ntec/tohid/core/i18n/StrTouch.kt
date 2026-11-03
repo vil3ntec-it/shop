@@ -40,4 +40,17 @@ object StrTouch {
   val zero: String get() = t("صفر پذیرفته نیست", "Zero isn't accepted", "صفر نه منل کېږي")
   val percentOver: String get() = t("تخفیف بیش از ۱۰۰٪ نمی‌شود", "A discount can't be over 100%", "تخفیف له ۱۰۰٪ نه زیات نه شي")
   val badNumber: String get() = t("عدد درست نیست", "Not a valid number", "شمېره سمه نه ده")
+
+  // صفحه‌کلیدِ حروف (POS-31، S18 گامِ ۳) — فقط کامپیوترِ لمسی
+  val letters: String get() = t("حروف", "Letters", "توري")
+  val lettersOpen: String get() = t("نشان دادنِ صفحه‌کلیدِ حروف برای جست‌وجو با نام", "Show the letter keyboard to search by name", "د نوم په واسطه د لټون لپاره د تورو تخته ښودل")
+  val lettersClose: String get() = t("بستنِ صفحه‌کلیدِ حروف", "Hide the letter keyboard", "د تورو تخته پټول")
+  val space: String get() = t("فاصله", "Space", "تشه")
+  val halfSpace: String get() = t("نیم‌فاصله", "Half space", "نیمه تشه")
+  val backLetter: String get() = t("پاک کردنِ حرفِ آخر", "Delete last letter", "وروستی توری پاکول")
+  val clearAll: String get() = t("پاک کردنِ همه", "Clear all", "ټول پاکول")
+  val layoutFa: String get() = t("فا/دری", "Persian/Dari", "فارسي/دري")
+  val layoutPs: String get() = t("پښتو", "Pashto", "پښتو")
+  val layoutLatin: String get() = t("لاتین", "ABC", "لاتین")
+  fun nextLayout(name: String): String = t("چیدمانِ بعد: ${asIs(name)}", "Next layout: $name", "بل ترتیب: $name")
 }

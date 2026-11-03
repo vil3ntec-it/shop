@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.sales.cart
 
+import ir.vil3ntec.tohid.core.pos.TillPins
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
@@ -54,7 +55,10 @@ object CatalogModel {
    */
   fun query(text: String): ir.vil3ntec.tohid.data.CartQuery.Parsed = ir.vil3ntec.tohid.data.CartQuery.parse(text)
 
-  /** کاشی‌های جورشده به ترتیبِ نمایش — با پیشوندِ شمار فقط بخشِ پس از ستاره جست‌وجو می‌شود */
+  /**
+   *  کاشی‌های جورشده به ترتیبِ نمایش — با پیشوندِ شمار فقط بخشِ پس از ستاره جست‌وجو می‌شود. [pins] (POS-06، `TillPins`
+   *  ِ همین دستگاه): بی جست‌وجو سنجاق‌شده‌ها اول؛ خالی ⇒ همان ترتیبِ امروز.
+   */
   fun items(
     d: ShopData,
     index: CatalogSearch.Index,
@@ -62,9 +66,12 @@ object CatalogModel {
     category: String?,
     inCart: Map<String, Double>,
     held: Map<String, Double> = emptyMap(),
+    pins: List<String> = emptyList(),
   ): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
-    return CatalogSearch.search(index, query(query).term, category).mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
+    val term = query(query).term
+    val ids = CatalogSearch.search(index, term, category).let { if (term.isBlank()) TillPins.arrange(it, pins) else it }
+    return ids.mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
   }
 
   /** «پرفروش‌ها» ِ سرِ کاتالوگ — کالایی که هرگز فروخته نشده نه */

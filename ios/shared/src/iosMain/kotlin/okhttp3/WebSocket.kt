@@ -134,7 +134,8 @@ private class IosWebSocket(
   override fun queueSize(): Long = 0L
 
   fun start() {
-    val url = NSURL.URLWithString(request.url)
+    //  آزمونِ سرتاسریِ شبیه‌ساز: همان میزبان ⇐ سرورِ آزمونِ همین مک (`IosNetRoute`؛ در برنامه دست‌نخورده)
+    val url = NSURL.URLWithString(ir.vil3ntec.tohid.ios.IosNetRoute.of(request.url))
     if (url == null) {
       fail(IOException("bad websocket url"))
       return

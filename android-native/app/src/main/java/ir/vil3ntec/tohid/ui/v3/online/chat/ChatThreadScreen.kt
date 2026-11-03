@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.ReceiptLong
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
@@ -37,6 +38,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
+import kotlinx.coroutines.launch
 
 /** آنچه یک گفت‌وگو نشان می‌دهد (از `ChatThreadController` یا دادهٔ نمایشی) */
 class ThreadView(
@@ -48,6 +50,10 @@ class ThreadView(
   val canModerate: Boolean,
   val imageOf: (ChatMessage) -> ImageBitmap?,
   val localImageOf: (OutboxItem) -> ImageBitmap?,
+  /** CHAT-14: سنجاق‌شده‌های طرفِ دکان، تازه‌ترین اول (`ChatActions.pinned`) */
+  val pinned: List<ChatMessage> = emptyList(),
+  /** CHAT-14: این پیام کاری (پاسخ، ویرایش، سنجاق) دارد؟ */
+  val hasActions: (ChatMessage) -> Boolean = { false },
 )
 
 class ThreadActions(
@@ -61,6 +67,8 @@ class ThreadActions(
   val onCancel: (OutboxItem) -> Unit,
   val loadThumb: suspend (ChatMessage) -> Unit,
   val loadLocal: suspend (OutboxItem) -> Unit,
+  /** CHAT-14: برگهٔ «کارهای این پیام» */
+  val onMore: (ChatMessage) -> Unit = {},
 )
 
 /**
@@ -113,10 +121,16 @@ fun ChatThreadScreen(
       }
     },
   ) { pad ->
-    Box(Modifier.fillMaxSize()) {
+    val scope = rememberCoroutineScope()
+    Column(Modifier.fillMaxSize()) {
+      //  CHAT-14: زدنِ سنجاق ⇐ همان پیام (پیش از پیام‌ها فقط نوار و «هنوز پیامی نیست» هست)
+      ChatPinnedStrip(view.pinned) { p ->
+        val i = view.server.indexOfFirst { it.id == p.id }
+        if (i >= 0) scope.launch { list.animateScrollToItem(i + (if (view.banner != null) 1 else 0)) }
+      }
       LazyColumn(
         state = list,
-        modifier = Modifier.fillMaxSize(),
+        modifier = Modifier.fillMaxWidth().weight(1f),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 8.dp, bottom = pad.calculateBottomPadding() + 8.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
       ) {
@@ -134,6 +148,8 @@ fun ChatThreadScreen(
               onImage = { actions.onImage(m) },
               onAudio = { actions.onAudio(m) },
               onReport = { actions.onReport(m.id) },
+              quote = m.replyTo?.let { id -> chatLine(view.server.firstOrNull { it.id == id }) },
+              onMore = if (view.hasActions(m)) ({ actions.onMore(m) }) else null,
             )
           }
         }

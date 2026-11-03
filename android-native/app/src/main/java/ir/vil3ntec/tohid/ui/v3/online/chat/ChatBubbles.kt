@@ -39,6 +39,7 @@ import ir.vil3ntec.tohid.core.chat.ChatMessage
 import ir.vil3ntec.tohid.core.chat.ChatQueue
 import ir.vil3ntec.tohid.core.chat.ChatReceipts
 import ir.vil3ntec.tohid.core.chat.OutboxItem
+import ir.vil3ntec.tohid.core.i18n.StrChat
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
@@ -61,12 +62,17 @@ fun ServerBubble(
   onImage: () -> Unit,
   onAudio: () -> Unit,
   onReport: () -> Unit,
+  /** CHAT-14: پیامی که این یکی پاسخِ آن است (`chatLine`)؛ null ⇒ بی نقل */
+  quote: String? = null,
+  /** CHAT-14: «کارها» (پاسخ، ویرایش، سنجاق)؛ null ⇒ بی دکمه */
+  onMore: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
   val mine = m.sender == "shop"
   Bubble(mine) {
     if (m.deleted) Text(StrOnline.ctThisDeleted, style = V3Type.footnote, color = c.inkMuted)
     else {
+      if (quote != null) ChatQuote(quote)
       when (m.kind) {
         "image" -> Photo(image, StrOnline.ctTapFull, onImage)
         "audio" -> MediaChip(Icons.Outlined.GraphicEq, (if (ChatMedia.voiceSupported) StrOnline.ctPlayVoice else StrOnline.ctSaveVoice) + (m.meta.durationMs?.let { " · " + ChatModel.mmss(it) }.orEmpty()), onAudio)
@@ -88,6 +94,10 @@ fun ServerBubble(
       if (!mine && !m.deleted) Text(
         StrOnline.ctReport, style = V3Type.caption, color = PhoneV3Roles.brandText(c),
         modifier = Modifier.v3Pressable(label = StrOnline.ctReport, onClick = onReport).padding(horizontal = 4.dp, vertical = 2.dp),
+      )
+      if (onMore != null) Text(
+        StrChat.actions, style = V3Type.caption, color = PhoneV3Roles.brandText(c),
+        modifier = Modifier.v3Pressable(label = StrChat.actionsTitle, onClick = onMore).padding(horizontal = 4.dp, vertical = 2.dp),
       )
     }
   }

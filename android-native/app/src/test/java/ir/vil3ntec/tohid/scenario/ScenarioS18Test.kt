@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.scenario
 
 import ir.vil3ntec.tohid.core.pay.CashKeys
 import ir.vil3ntec.tohid.core.pos.Keypad
+import ir.vil3ntec.tohid.core.pos.TouchKeyboard
 import ir.vil3ntec.tohid.core.pos.TouchMode
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -9,6 +10,7 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEntry
 import ir.vil3ntec.tohid.ui.components.pos.PosCartOps
+import ir.vil3ntec.tohid.ui.components.pos.PosCatalog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -18,9 +20,11 @@ import org.junit.Test
  *  S18 — حالتِ لمسی (POS-31، POS-06، POS-07) روی قاعده‌های هسته (`TouchMode`، `Keypad`، `CashKeys`) و افزودنِ کاشیِ
  *  صندوقِ کامپیوتر (`PosCartOps.addStep`)؛ در برنامه پشتِ تنظیمِ خاموشِ همین دستگاه (`PosTouchPrefs`).
  *
+ *  گامِ ۳ (جست‌وجوی کالا با نام فقط با صفحه‌کلیدِ روی‌صفحه): کلیدِ «حروف» ِ کادرِ اسکن (`TouchKeyboard`، فارسی/دری، پښتو،
+ *  لاتین) نوشته را می‌سازد و همان جست‌وجوی صندوق (`PosCatalog.matches`) کالا را می‌یابد.
+ *
  *  ماندهٔ سناریو (pending، نه سرخ):
- *   • صفحه‌کلیدِ **متنیِ** روی‌صفحه (دری، پشتو، لاتین) نیست ⇒ گامِ ۳ (جست‌وجوی کالا با نام) و گامِ ۴ (ثبتِ مشتریِ تازه با
- *     نامِ دری) بی کیبوردِ فیزیکی شدنی نیستند.
+ *   • گامِ ۴ (ثبتِ مشتریِ تازه با نامِ دری) در صندوقِ کامپیوتر برگه‌ای ندارد که صفحه‌کلیدِ حروف به آن وصل شود.
  *   • آزمونِ عملی روی کامپیوترِ لمسیِ واقعی (و شمارشِ لمس روی صفحهٔ واقعی) انجام نشده؛ شمارشِ زیر روی همان قاعده‌هاست.
  */
 class ScenarioS18Test {
@@ -43,6 +47,29 @@ class ScenarioS18Test {
     assertEquals(96, TouchMode.page(84, 12, 100, forward = true))
     assertEquals(84, TouchMode.page(96, 12, 100, forward = false))
     assertFalse(TouchMode.canPage(88, 12, 100, forward = true))
+  }
+
+  @Test
+  fun `S18 گامِ ۳ — جست‌وجوی کالا با نام فقط با صفحه‌کلیدِ حروفِ روی‌صفحه`() {
+    assertFalse("تنظیمِ خاموش ⇒ کلیدِ «حروف» نیست", TouchMode.touchExtras(desktop = true, on = false, active = true))
+    var layout = TouchKeyboard.initial("prs")
+    val keys = TouchKeyboard.rows(layout).flatten()
+    var query = ""
+    var touches = 1 // کلیدِ «حروف»
+    for (ch in "پنی") {
+      query = TouchKeyboard.apply(query, keys.single { it == TouchKeyboard.Key.Letter(ch.toString()) }); touches++
+    }
+    assertEquals("پنی", query)
+    assertEquals(listOf("p3"), PosCatalog.matches(d.products, query.trim(), false).map { it.id })
+    //  غلط ⇒ پاک کردنِ حرفِ آخر؛ «پاک کردنِ همه» کادر را خالی می‌کند
+    query = TouchKeyboard.apply(TouchKeyboard.apply(query, TouchKeyboard.Key.Letter("ز")), TouchKeyboard.Key.Backspace)
+    assertEquals("پنی", query)
+    assertEquals("", TouchKeyboard.apply(query, TouchKeyboard.Key.Clear))
+    //  نامِ پښتو با چیدمانِ پښتو (کلیدِ چیدمان یک بار)
+    layout = TouchKeyboard.next(layout)
+    assertEquals(TouchKeyboard.Layout.PS, layout)
+    assertTrue(TouchKeyboard.rows(layout).flatten().containsAll("ډړښ".map { TouchKeyboard.Key.Letter(it.toString()) }))
+    assertTrue("لمس‌ها: $touches", touches <= 5)
   }
 
   private var seq = 0

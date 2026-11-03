@@ -1,5 +1,7 @@
 import java.util.Properties
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
+import org.jetbrains.kotlin.gradle.plugin.mpp.TestExecutable
+import org.jetbrains.kotlin.gradle.targets.native.tasks.KotlinNativeSimulatorTest
 
 /*
  *  رابطِ کاربریِ مشترکِ آیفون — همان کدِ Compose ِ اندروید، روی iOS با Compose Multiplatform.
@@ -282,6 +284,27 @@ fun guardHeaderMacros(framework: File) {
  *  هدفِ jvm فقط برای آزمونِ منطقِ خالصِ `src/commonMain` (حالتِ GCM ِ دفترِ رمزدار) در برابرِ خودِ JDK —
  *  همان بایت‌ها، روی لینوکس، بی Xcode (`jvmTest`). نه برنامه‌ای می‌سازد، نه Compose دارد.
  */
+/*
+ *  گامِ ۸ (docs/IOS-PLAN-fa.md §۰.۱۳): آنچه `test.kexe` ِ شبیه‌ساز برای کشیدنِ رابطِ برنامه کنارِ خودش می‌خواهد — همان
+ *  پرونده‌های مرحلهٔ Resources ِ `ios/iosApp` (قلم‌ها، نشانِ برنامه، بوقِ اسکن) — و Info.plist ِ آزمون.
+ */
+val testBundleFiles = listOf(
+  "font/vazirmatn_regular.ttf", "font/vazirmatn_medium.ttf", "font/vazirmatn_semibold.ttf", "font/vazirmatn_bold.ttf",
+  "drawable-xxxhdpi/logo_mark.png", "raw/scan_beep.mp3",
+).map { android.resolve("app/src/main/res/$it") }
+val testInfoPlist = file("e2e/test-info.plist")
+val testEntitlements = file("e2e/test.entitlements")
+
+/*
+ *  سرورِ آزمونِ سرتاسری و پوشهٔ عکس‌ها (CI: `ios/e2e/backend.mjs`) ⇐ فرآیندِ آزمون روی شبیه‌ساز. `simctl spawn` فقط
+ *  متغیرهای `SIMCTL_CHILD_*` را به فرآیندِ درونِ شبیه‌ساز می‌دهد (بی پیشوند).
+ */
+tasks.withType<KotlinNativeSimulatorTest>().configureEach {
+  listOf("TOHID_E2E_BACKEND", "TOHID_E2E_SHOTS").forEach { k ->
+    providers.environmentVariable(k).orNull?.let { environment("SIMCTL_CHILD_$k", it) }
+  }
+}
+
 composeCompiler {
   targetKotlinPlatforms.set(setOf(KotlinPlatformType.native))
 }
@@ -296,6 +319,20 @@ kotlin {
         binaryOption("bundleId", "ir.vil3ntec.tohid.TohidShared")
         //  سرآیندِ ObjC بی برخورد با ماکروهای C (پایینِ همین فایل، `guardHeaderMacros`)
         linkTaskProvider.configure { doLast { guardHeaderMacros(outputFile.get()) } }
+      }
+      //  گامِ ۸ (آزمونِ سرتاسریِ شبیه‌ساز، `src/iosTest/…/e2e`): `test.kexe` هم «بستهٔ برنامه» ای دارد که ResFont و
+      //  PainterRes از آن می‌خوانند (`NSBundle.mainBundle` ِ فرآیندِ بی بسته = پوشهٔ خودِ kexe) و Info.plist ِ
+      //  کوچکِ خودش (`e2e/test-info.plist`، درونِ بخشِ __info_plist): ATS برای سرورِ آزمونِ http روی 127.0.0.1؛ و اجازهٔ
+      //  کلیددان (`e2e/test.entitlements`، بخشِ __entitlements ِ ساختِ شبیه‌ساز) برای توکنِ ورود و کلیدِ دفتر.
+      it.binaries.withType<TestExecutable>().configureEach {
+        linkerOpts("-sectcreate", "__TEXT", "__info_plist", testInfoPlist.absolutePath)
+        linkerOpts("-sectcreate", "__TEXT", "__entitlements", testEntitlements.absolutePath)
+        linkTaskProvider.configure {
+          inputs.file(testInfoPlist)
+          inputs.file(testEntitlements)
+          inputs.files(testBundleFiles)
+          doLast { testBundleFiles.forEach { f -> f.copyTo(outputDirectory.resolve(f.name), overwrite = true) } }
+        }
       }
     }
   }
@@ -320,6 +357,8 @@ kotlin {
           implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.10.2")
         }
       }
+      //  گامِ ۸: رانندهٔ Compose برای آزمونِ سرتاسری (زدن، نوشتن، عکس؛ `runSkikoComposeUiTest`) — همان نسخهٔ Compose
+      iosTest.dependencies { implementation("org.jetbrains.compose.ui:ui-test:1.9.3") }
     }
   }
   compilerOptions {
