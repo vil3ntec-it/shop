@@ -30,7 +30,7 @@ fun RouteScope.LineRoute() {
   //  POS-09: واحدهای کالا و بسته‌ها فقط با «واحدِ بزرگ در صندوق» ِ همین دستگاه (پیش‌فرض خاموش ⇒ برگهٔ امروز)
   val unitsOn = remember { TillGoodsPref.units(context) }
   val wholeOnly = remember { TillGoodsPref.wholePacks(context) }
-  val info = remember(line) { line?.let { LineModel.info(data, it, places = placesOn, units = unitsOn, wholeOnly = wholeOnly) } }
+  val info = remember(line) { line?.let { LineModel.withUnits(LineModel.info(data, it, places = placesOn), unitsOn, wholeOnly) } }
   if (line == null || info == null) {
     LaunchedEffect(Unit) { toasts.show(StrSale.lineGone, V3Tone.WARNING); back() }
     return

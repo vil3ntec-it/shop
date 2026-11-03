@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.data.WarehouseEntry
 import ir.vil3ntec.tohid.qty
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /**
@@ -124,4 +125,19 @@ class LineUnitsTest {
     val salt = Product(id = "salt", name = "نمک", unit = "عدد", salePrice = 20.0)
     assertNull(LineModel.info(d.copy(products = listOf(salt)), SalesEngine.CartLine("salt", 1.0), units = true).units)
   }
+
+  @Test fun `برگهٔ ردیفِ گوشی واحدها را فقط با تنظیمِ همین دستگاه می‌گیرد`() {
+    val route = src("ir/vil3ntec/tohid/ui/v3/sales/cart/CartSheetRoutes.kt")
+    assertTrue(route.contains("val unitsOn = remember { TillGoodsPref.units(context) }"))
+    assertTrue(route.contains("val wholeOnly = remember { TillGoodsPref.wholePacks(context) }"))
+    assertTrue(route.contains("LineModel.withUnits(LineModel.info(data, it, places = placesOn), unitsOn, wholeOnly)"))
+    assertTrue(src("ir/vil3ntec/tohid/ui/v3/sales/cart/LineSheet.kt").contains("if (info.units != null)"))
+    //  همان برنامه از هر دو راه
+    assertEquals(on(line(24.0), whole = true), LineModel.withUnits(LineModel.info(d, line(24.0)), true, true))
+    assertEquals(LineModel.info(d, line(1.0)), LineModel.withUnits(LineModel.info(d, line(1.0)), false, true))
+  }
+
+  private fun src(rel: String): String =
+    listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
 }

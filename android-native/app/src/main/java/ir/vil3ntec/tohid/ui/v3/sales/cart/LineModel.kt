@@ -73,7 +73,7 @@ object LineModel {
   fun info(d: ShopData, line: SalesEngine.CartLine, places: Boolean = false, units: Boolean = false, wholeOnly: Boolean = false): LineInfo {
     val p = d.products.find { it.id == line.productId }
     val base = if (line.free) line.unitPrice ?: 0.0 else p?.salePrice ?: 0.0
-    return LineInfo(
+    return withUnits(LineInfo(
       id = line.productId,
       name = if (line.free) line.label else p?.name.orEmpty(),
       unit = p?.unit.orEmpty(),
@@ -85,8 +85,14 @@ object LineModel {
       free = line.free,
       product = p,
       places = if (places && !line.free) PlaceStock.of(d, p) else emptyList(),
-      units = if (units && !line.free && p != null) UnitLine.plan(p, wholeOnly, line.quantity, line.unitPrice, next = false) else null,
-    )
+    ), units, wholeOnly)
+  }
+
+  /** POS-09 — برنامهٔ واحدهای ردیف روی [info] (`UnitLine.plan`)؛ خاموش، قلمِ آزاد یا کالای تک‌واحد ⇒ همان [info] */
+  fun withUnits(info: LineInfo, on: Boolean, wholeOnly: Boolean): LineInfo {
+    val p = info.product
+    if (!on || info.free || p == null) return info
+    return info.copy(units = UnitLine.plan(p, wholeOnly, info.quantity, info.unitPrice, next = false))
   }
 
   /** واحدِ [i] ِ برنامهٔ ردیف؛ بیرون از فهرست ⇒ پایه */
