@@ -39,7 +39,6 @@
     "server/src/lib/payment-intents.js": 855,
     "server/src/lib/shop-chat.js": 871,
     "server/src/lib/staff-approval.js": 1070,
-    "server/src/lib/storefront.js": 1142,
     "server/src/lib/sync-v3.js": 1193,
     "server/src/routes/auth.js": 1148,
     "server/src/routes/pump-device.js": 917
