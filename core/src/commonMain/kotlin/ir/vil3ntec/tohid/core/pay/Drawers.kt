@@ -52,4 +52,47 @@ object Drawers {
   /** شیفتِ باز برای مهرِ دستگاهی که [picked] را برگزیده؛ برگزیدهٔ بسته یا ناشناس ⇒ null (فروش بی مهر = کشوی اصلی) */
   fun stamp(picked: String?, named: Named): String? =
     picked?.takeIf { it in named && named.closedAt(it) == null }
+
+  // ── «همهٔ کشوها با هم» (X/Z ِ روز، PAY-17) ─────────────────────────────────────────────
+
+  /**
+   *  یک کشو در گزارشِ «همهٔ کشوها»، به پول (۱/۱۰۰ افغانی). [label] `null` ⇒ کشوی اصلی. [countedMinor] فقط کشوی بسته
+   *  (Z)؛ کشوی باز (X) فقط «موردِ انتظار» دارد و در جمعِ شمرده و اختلاف نمی‌آید.
+   */
+  data class Sum(val id: String, val label: String?, val open: Boolean, val openingMinor: Long, val expectedMinor: Long, val countedMinor: Long?)
+
+  /** جمعِ همهٔ کشوها؛ [varianceMinor] = جمعِ (شمرده − موردِ انتظار) فقط برای کشوهای بستهٔ شمرده‌شده */
+  data class Combined(
+    val drawers: List<Sum>,
+    val openingMinor: Long,
+    val expectedMinor: Long,
+    val countedMinor: Long,
+    val varianceMinor: Long,
+    val open: Int,
+    val closed: Int,
+  )
+
+  /** کشوی امروز: هنوز باز، یا بسته از [dayStart] به بعد (کشوی دیروز که امروز بسته شد هم) */
+  fun inDay(closeAt: Long?, dayStart: Long): Boolean = closeAt == null || closeAt >= dayStart
+
+  /**
+   *  جمعِ همهٔ کشوها — کشوی اصلی اول، سپس نام‌دارها به ترتیبِ نام؛ هر کشو یک بار (شناسهٔ تکراری نادیده). جمعِ «موردِ
+   *  انتظار» همهٔ کشوهاست (باز و بسته)؛ «شمرده» و «اختلاف» فقط از کشوهای بسته — کشوی باز هنوز شمرده نشده، پس اختلافش
+   *  صفر حساب نمی‌شود و جمع را دروغ نمی‌کند.
+   */
+  fun combine(list: List<Sum>): Combined {
+    val seen = HashSet<String>()
+    val rows = list.filter { seen.add(it.id) }
+      .sortedWith(compareBy<Sum>({ it.label != null }, { it.label.orEmpty() }, { it.id }))
+    val counted = rows.filter { !it.open && it.countedMinor != null }
+    return Combined(
+      drawers = rows,
+      openingMinor = rows.sumOf { it.openingMinor },
+      expectedMinor = rows.sumOf { it.expectedMinor },
+      countedMinor = counted.sumOf { it.countedMinor!! },
+      varianceMinor = counted.sumOf { it.countedMinor!! - it.expectedMinor },
+      open = rows.count { it.open },
+      closed = rows.count { !it.open },
+    )
+  }
 }

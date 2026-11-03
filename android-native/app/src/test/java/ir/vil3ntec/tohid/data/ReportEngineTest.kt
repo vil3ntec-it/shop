@@ -345,4 +345,21 @@ class ReportEngineTest {
     assertEquals(2, rows.size)
     assertTrue(ReportEngine.stockLedger(d, "p2").isEmpty())
   }
+
+  /* ------------------ RPT-13: ستونِ مقایسه در خودِ جدول ------------------ */
+
+  @Test
+  fun `مقایسه ستونِ دورهٔ قبل و تغییر را ردیف‌به‌ردیف کنارِ سود و زیان می‌گذارد`() {
+    val aug = sell(ledger(), "p1", 10.0, "2026-08-10").data            // ۳۰۰۰
+    val both = sell(aug, "p1", 4.0, "2026-09-05").data                  // ۱۲۰۰
+    val cur = ReportCsv.of("profit", both, "2026-09-01", "2026-09-30", "2026-09-30")
+    val prev = ReportCsv.of("profit", both, "2026-08-01", "2026-08-31", "2026-09-30")
+    val out = ReportCsv.compared("profit", cur, prev, "دورهٔ قبل", "تغییر")
+    assertEquals(listOf("شرح", "مبلغ", "دورهٔ قبل", "تغییر"), out.rows[0])
+    val net = out.rows.first { it[0] == "فروشِ خالص" }
+    assertEquals(listOf("فروشِ خالص", "1200", "3000", "-1800"), net)
+    //  برگهٔ فهرستیِ سند جفت نمی‌شود: جدول همان امروز
+    val sales = ReportCsv.of("sales", both, "2026-09-01", "2026-09-30", "2026-09-30")
+    assertTrue(ReportCsv.compared("sales", sales, ReportCsv.of("sales", both, "2026-08-01", "2026-08-31", "2026-09-30"), "p", "c") === sales)
+  }
 }

@@ -106,4 +106,17 @@ class PayFixFlowTest {
     assertFalse(s.contains("toMethod"))
     assertFalse(s.contains("payRef"))
   }
+
+  @Test fun `نشانِ اصلاح در ستونِ نوع ِ فهرستِ فاکتورها فقط برای فاکتورِ اصلاح‌شده`() {
+    assertTrue(PayFixFlow.fixedSales(base).isEmpty())
+    assertEquals("نقدی", PayFixFlow.kindLabel("نقدی", fixed = false))
+    val d = fixed(base)
+    assertEquals(setOf("s1"), PayFixFlow.fixedSales(d))
+    assertEquals("نقدی · اصلاح‌شده", PayFixFlow.kindLabel("نقدی", fixed = true))
+    //  فهرستِ فاکتورهای گوشی (نسخهٔ ۳) همان نشان را می‌گیرد؛ بی اصلاح همان نوشتهٔ امروز
+    val plain = ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel.row(d, cashSale, returnsV2 = false)
+    val marked = ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel.row(d, cashSale, returnsV2 = false, fixed = true)
+    assertFalse(plain.payLabel.contains("اصلاح"))
+    assertEquals(PayFixFlow.kindLabel(plain.payLabel, true), marked.payLabel)
+  }
 }

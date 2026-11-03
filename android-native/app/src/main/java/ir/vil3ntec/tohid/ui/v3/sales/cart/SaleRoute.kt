@@ -114,6 +114,8 @@ fun RouteScope.SaleRoute() {
   //  صندوق نوارِ پایین ندارد (نوارِ سبد جایش است) ⇒ برگشت همیشه هست؛ در ریشه ⇒ خانه
   val back: () -> Unit = backOrNull ?: { nav.back(); Unit }
   val mode = remember(context) { CatalogMode(context) }
+  //  POS-15: همان تنظیمِ «قیمت‌پرسی در صندوق» ِ کامپیوتر (ردهٔ A)
+  val priceCheckOn = remember { ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context); ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.on.value }
   var listMode by remember { mutableStateOf(mode.list()) }
 
   SaleScreen(
@@ -151,6 +153,8 @@ fun RouteScope.SaleRoute() {
       history = { nav.open(SalesPaths.HISTORY) },
       back = back,
       toggleMode = { listMode = !listMode; mode.save(listMode) },
+      tapCount = { item, n -> feedback.addCount(data, item.id, n) },
+      priceCheck = if (priceCheckOn) ({ nav.open(SalesPaths.PRICE_CHECK) }) else null,
     ),
   )
   HeldSheets(held, data)

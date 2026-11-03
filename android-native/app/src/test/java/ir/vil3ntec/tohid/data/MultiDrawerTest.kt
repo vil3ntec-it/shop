@@ -140,4 +140,37 @@ class MultiDrawerTest {
     assertEquals(id, made!!.transactions.first { it.id == "rcv-1" }.shiftId)
     assertFalse(d.auditLog.any { it.type == TillDrawer.RESUME })
   }
+
+  @Test
+  fun `همهٔ کشوهای امروز با هم — موردِ انتظارِ همه، شمرده و اختلاف فقط از کشوهای بسته`() {
+    var d = ok(CashShift.open(ledger(), 1000.0, "صاحب", "2026-11-03", 100, ::newId))
+    d = ok(CashShift.openNamed(d, 200.0, "کشوی احمد", "احمد", "2026-11-03", 101, ::newId))
+    val a = d.auditLog.last()
+    //  کشوی دیروز که دیروز بسته شد در «امروز» نیست
+    d = ok(CashShift.openNamed(d, 50.0, "دیروز", "", "2026-11-02", 10, ::newId))
+    val y = d.auditLog.last()
+    TillDrawer.picked = y.id
+    d = ok(CashShift.close(d, 50.0, "", "", "2026-11-02", 20, ::newId))
+    TillDrawer.picked = a.id
+    d = sell(d, 1.0, 110)                                   // ۳۰۰ ⇒ احمد
+    TillDrawer.picked = null
+    d = sell(d, 4.0, 112)                                   // ۱۲۰۰ ⇒ اصلی
+    TillDrawer.picked = a.id
+    d = ok(CashShift.close(d, 490.0, "", "احمد", "2026-11-03", 150, ::newId))   // موردِ انتظار ۵۰۰ ⇒ کسری ۱۰
+    TillDrawer.picked = null
+
+    val all = ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.allDrawers(d, 200, dayStart = 100, payV2 = false)
+    assertEquals(listOf(null, "کشوی احمد"), all.drawers.map { it.label })
+    assertEquals(listOf(true, false), all.drawers.map { it.open })
+    //  ۲۲۰۰ (اصلی) + ۵۰۰ (احمد)
+    assertEquals(2700_00L, all.expectedMinor)
+    assertEquals(1200_00L, all.openingMinor)
+    assertEquals(490_00L, all.countedMinor)
+    assertEquals(-10_00L, all.varianceMinor)
+    val lines = ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.allLines(all)
+    assertTrue(lines.any { it.label == ir.vil3ntec.tohid.core.i18n.StrDrawers.totalVariance && it.value.contains("10") })
+    assertFalse("کشوی دیروز", lines.any { it.label.contains("دیروز") })
+    //  صندوقِ شیفت (pay-core) همان موردِ انتظار را می‌دهد
+    assertEquals(2700_00L, ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerModel.allDrawers(d, 200, dayStart = 100, payV2 = true).expectedMinor)
+  }
 }

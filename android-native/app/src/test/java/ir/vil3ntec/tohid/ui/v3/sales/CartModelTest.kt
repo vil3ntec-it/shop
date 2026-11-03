@@ -83,4 +83,30 @@ class CartModelTest {
     assertEquals("3 عدد", CartModel.stockLeft(SalesTestLedger.soap, 3.0))
     assertEquals("2.5 کیلوگرم", CartModel.stockLeft(SalesTestLedger.rice, 2.5))
   }
+
+  @Test
+  fun `پیشوندِ ۳ستاره در جست‌وجو هر لمس را سه تا می‌کند و بی پیشوند همان یک پله`() {
+    val q = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.query("۲*صابون")
+    assertEquals(2.0, q.count, 1e-9)
+    assertEquals("صابون", q.term)
+    assertEquals(1.0, ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.query("صابون").count, 1e-9)
+    //  کاتالوگ با بخشِ پس از ستاره جور می‌شود
+    val index = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.index(ledger)
+    val all = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.items(ledger, index, "", null, emptyMap()).map { it.id }
+    val first = ledger.products.first { it.id == "soap" }.name
+    val withPrefix = ir.vil3ntec.tohid.ui.v3.sales.cart.CatalogModel.items(ledger, index, "3×$first", null, emptyMap()).map { it.id }
+    assertTrue(withPrefix.contains("soap"))
+    assertTrue(all.containsAll(withPrefix))
+
+    assertEquals(listOf(CartLine("soap", 2.0)), CartModel.addCount(ledger, emptyList(), "soap", 2.0).lines)
+    //  کالای وزنی: همان مقدار، بی صفحه‌کلید
+    assertEquals(1.5, CartModel.addCount(ledger, emptyList(), "rice", 1.5).lines!!.single().quantity, 1e-9)
+    //  اعشار برای کالای شمردنی، صفر یا منفی ⇒ همان یک پله
+    assertEquals(listOf(CartLine("soap", 1.0)), CartModel.addCount(ledger, emptyList(), "soap", 1.5).lines)
+    assertEquals(listOf(CartLine("soap", 1.0)), CartModel.addCount(ledger, emptyList(), "soap", 0.0).lines)
+    //  از موجودی جلو نمی‌زند (صابون ۳)
+    val capped = CartModel.addCount(ledger, emptyList(), "soap", 5.0)
+    assertTrue(capped.capped)
+    assertTrue(capped.note!!.isNotBlank())
+  }
 }

@@ -39,9 +39,6 @@ import ir.vil3ntec.tohid.data.BarcodeMatch
 import ir.vil3ntec.tohid.data.PriceCheckData
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
-import ir.vil3ntec.tohid.formatDate
-import ir.vil3ntec.tohid.money
-import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
 import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -106,37 +103,20 @@ fun PriceCheckDialog(d: ShopData, today: String, showCost: Boolean, onDismiss: (
 @Composable
 private fun PriceCard(v: PriceCheckData.View, showCost: Boolean) {
   val c = Shop.colors
-  val p = v.product
-  val unit = p.unit.ifBlank { "" }
   Spacer(Modifier.height(12.dp))
-  Text(p.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text)
+  Text(v.product.name, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text)
   Spacer(Modifier.height(6.dp))
-  CardRow(StrPriceCheck.retail, money(p.salePrice) + " ؋")
-  if (p.wholesalePrice > 0) CardRow(StrPriceCheck.wholesale, money(p.wholesalePrice) + " ؋")
-  if (showCost && p.purchasePrice > 0) {
-    CardRow(StrPriceCheck.cost, money(p.purchasePrice) + " ؋")
-    v.card.marginBp?.let { CardRow("", StrPriceCheck.margin((it / 100).toString()), if (it < 0) c.danger else c.muted) }
-  }
-  CardRow(StrPriceCheck.stock, (qty(v.stock) + " " + unit).trim(), if (v.stock <= 0) c.danger else c.text)
-  val last = v.card.last
-  CardRow(
-    StrPriceCheck.lastPurchase,
-    if (last == null) StrPriceCheck.noPurchase
-    else listOfNotNull(
-      formatDate(last.date),
-      v.supplier,
-      if (showCost) money(last.unitMinor / 100.0) + " ؋" else null,
-    ).joinToString(" · "),
-  )
-  val near = v.card.nearest
-  val days = v.card.nearestDays
-  CardRow(
-    StrPriceCheck.expiry,
-    if (near == null || days == null) StrPriceCheck.noExpiry else formatDate(near.expiry) + " · " + StrPriceCheck.daysLeft(days),
-    if (v.card.near) c.warning else c.text,
-  )
-  if (v.card.expiredMilli > 0) {
-    CardRow("", StrPriceCheck.expired((qty(v.card.expiredMilli / 1000.0) + " " + unit).trim()), c.danger)
+  //  همان سطرهای برگهٔ «قیمت‌پرسی» ِ گوشی (`PriceCheckData.lines`)
+  PriceCheckData.lines(v, showCost).forEach { l ->
+    CardRow(
+      l.label, l.value,
+      when (l.tone) {
+        PriceCheckData.Tone.NORMAL -> c.text
+        PriceCheckData.Tone.MUTED -> c.muted
+        PriceCheckData.Tone.WARN -> c.warning
+        PriceCheckData.Tone.DANGER -> c.danger
+      },
+    )
   }
 }
 

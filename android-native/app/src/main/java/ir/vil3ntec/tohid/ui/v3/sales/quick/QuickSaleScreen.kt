@@ -63,6 +63,8 @@ class QuickSaleActions(
   val newProduct: () -> Unit,
   val pay: () -> Unit,
   val openCart: () -> Unit,
+  /** POS-03: لمسِ کاشی با پیشوندِ «۳*» — همان شمار (وزنی هم) */
+  val tapCount: (productId: String, count: Double) -> Unit = { id, _ -> tap(id, false) },
 )
 
 /**
@@ -140,7 +142,10 @@ fun QuickSaleScreen(
           Box(Modifier.v3Stagger(stagger, item.id, i)) {
             PhoneTile(
               item,
-              onTap = { actions.tap(it.id, it.weighed) },
+              onTap = {
+                val q = CatalogModel.query(query)
+                if (q.count != 1.0) { actions.tapCount(it.id, q.count); query = "" } else actions.tap(it.id, it.weighed)
+              },
               onHold = { actions.hold(it.id) },
               onMinus = { actions.minus(it.id) },
             )

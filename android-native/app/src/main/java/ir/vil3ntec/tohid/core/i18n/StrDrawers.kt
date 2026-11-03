@@ -35,4 +35,19 @@ object StrDrawers {
     "This drawer counts only its own sales, returns, receipts and explicit cash moves.",
     "په دې دخل کې یوازې د همدې دخل پلور، ستنېدنې، ترلاسه کول او څرګند نغدي تګ راتګ شمېرل کېږي.",
   )
+
+  // ── «همهٔ کشوها با هم» (X/Z ِ روز) ──
+  val allTitle: String get() = t("همهٔ کشوها با هم", "All drawers together", "ټول دخلونه یوځای")
+  val allNote: String get() = t(
+    "هر کشوی باز و هر کشوی بستهٔ امروز با «موردِ انتظار» ِ نقد، و جمعِ همه. شمرده و اختلاف فقط از کشوهای بسته؛ کشوی باز هنوز شمرده نشده.",
+    "Every open drawer and every drawer closed today with its expected cash, and the total. Counted and difference come only from closed drawers; an open drawer is not counted yet.",
+    "هر پرانیستی دخل او د نن هر تړل شوی دخل د تمه شوې نغدې سره، او د ټولو مجموعه. شمېرل شوې او توپیر یوازې له تړل شویو دخلونو؛ پرانیستی دخل لا نه دی شمېرل شوی.",
+  )
+  fun drawerState(name: String, open: Boolean): String =
+    if (open) t("${asIs(name)} — باز", "$name — open", "$name — پرانیستی") else t("${asIs(name)} — بسته", "$name — closed", "$name — تړلی")
+  val varianceWord: String get() = t("اختلاف", "Difference", "توپیر")
+  val totalOpening: String get() = t("جمعِ اولِ صندوق‌ها", "Total opening cash", "د صندوقونو د پیل مجموعه")
+  val totalExpected: String get() = t("جمعِ موردِ انتظار", "Total expected", "د تمې مجموعه")
+  val totalCounted: String get() = t("جمعِ شمرده (کشوهای بسته)", "Total counted (closed drawers)", "د شمېرل شوو مجموعه (تړل شوي دخلونه)")
+  val totalVariance: String get() = t("جمعِ اختلاف", "Total difference", "د توپیر مجموعه")
 }

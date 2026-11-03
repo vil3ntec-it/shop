@@ -131,6 +131,8 @@ fun HistoryScreen(
   }
   val days = remember(shown) { HistoryModel.days(shown) }
   val stats = remember(d.sales) { HistoryModel.stats(d) }
+  //  POS-40: فاکتورهای «اصلاح‌شده» (روشِ پرداخت) برای نشانِ کنارِ نوع
+  val fixed = remember(d.auditLog) { ir.vil3ntec.tohid.data.PayFixFlow.fixedSales(d) }
   val stagger = rememberV3Stagger(query.filter, query.month)
 
   V3Scaffold(
@@ -199,7 +201,7 @@ fun HistoryScreen(
           )
         }
         itemsIndexed(day.sales, key = { _, s -> s.id }) { i, sale ->
-          val row = HistoryModel.row(d, sale, returnsV2)
+          val row = HistoryModel.row(d, sale, returnsV2, sale.id in fixed)
           val first = i == 0
           val last = i == day.sales.lastIndex
           Column(Modifier.v3Stagger(stagger, sale.id, di + i).clip(groupShape(first, last)).background(c.card)) {

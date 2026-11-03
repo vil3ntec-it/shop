@@ -183,6 +183,10 @@ object StrPos {
   val quoteStateSold: String get() = t("فروخته شد", "Sold", "وپلورل شو")
   val quoteToCart: String get() = t("به سبد (فروش)", "To cart (sell)", "ټوکرۍ ته (پلور)")
   val quotePrint: String get() = t("چاپ", "Print", "چاپ")
+  /** POS-25 «ارسال» ِ پیش‌فاکتور: گوشی برگهٔ اشتراک، کامپیوتر کپیِ متن */
+  val quoteShare: String get() = t("ارسال", "Send", "لېږل")
+  val quoteCopy: String get() = t("کپیِ متن", "Copy text", "متن کاپي")
+  val quoteCopied: String get() = t("متنِ پیش‌فاکتور کپی شد", "Quote text copied", "د مخکني بل متن کاپي شو")
   val quoteDelete: String get() = t("حذف", "Delete", "ړنګول")
   fun quoteInCart(n: Any): String = t("پیش‌فاکتور #${asIs(n)} با همان قیمت‌ها در سبد است", "Quote #$n is in the cart at its prices", "مخکنی بل #$n په خپلو بیو په ټوکرۍ کې دی")
   val quoteDeleted: String get() = t("پیش‌فاکتور حذف شد", "Quote deleted", "مخکنی بل ړنګ شو")

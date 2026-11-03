@@ -3,8 +3,10 @@ package ir.vil3ntec.tohid.ui.v3.sales.drawer
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
 import ir.vil3ntec.tohid.core.gateway.Payee
 import ir.vil3ntec.tohid.core.gateway.PayeeTotal
+import ir.vil3ntec.tohid.core.i18n.StrDrawers
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.pay.Drawers
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.ShiftReport
 import ir.vil3ntec.tohid.data.CashShift
@@ -127,6 +129,49 @@ object DrawerModel {
     if (seesExpected) rep else rep.copy(expected = null, variance = null)
 
   fun shown(m: Long?): String = PhoneSaleText.amount(PayFlow.major(m ?: 0))
+
+  private fun minor(v: Double): Long = if (v.isFinite()) kotlin.math.round(v * 100).toLong() else 0L
+
+  /**
+   *  PAY-17 — یک کشو برای «همهٔ کشوها با هم»: «موردِ انتظار» ِ نقد از همان راهِ صفحهٔ خودش — صندوقِ شیفت (`payV2`) از Z ِ
+   *  ذخیره‌شده یا X ِ همین حالا (`PayFlow.report`)، صندوقِ ساده (یا بستنِ بی Z) از `CashShift.totalsOf`؛ شمرده همان مبلغِ
+   *  ردیفِ بستن.
+   */
+  fun sumOf(d: ShopData, s: CashShift.Shift, now: Long, payV2: Boolean): Drawers.Sum {
+    val rep = if (!payV2) null
+    else s.close?.z?.let { PayFlow.reportOf(it) } ?: if (s.close == null) PayFlow.report(d, s.open, null, now).valueOrNull()?.report else null
+    val expected = rep?.expected?.get(PayFlow.CASH) ?: minor(CashShift.totalsOf(d, s, now).expected)
+    return Drawers.Sum(s.open.id, s.open.drawer, s.isOpen, minor(s.open.amount), expected, s.close?.let { minor(it.amount) })
+  }
+
+  /** PAY-17 — X/Z ِ همهٔ کشوهای امروز با هم: هر کشوی باز و هر کشوی بسته از [dayStart] (`core/pay/Drawers.combine`) */
+  fun allDrawers(d: ShopData, now: Long, dayStart: Long, payV2: Boolean): Drawers.Combined =
+    Drawers.combine(CashShift.list(d).filter { Drawers.inDay(it.close?.createdAt, dayStart) }.map { sumOf(d, it, now, payV2) })
+
+  /** اختلافِ یک کشو یا جمع — «بی اختلاف» زیرِ نیم افغانی (همان [diff]) */
+  fun varianceText(v: Long): String = when {
+    abs(v) < 50 -> StrSale.noDiff
+    v > 0 -> StrSale.overBy(shown(v))
+    else -> StrSale.shortBy(shown(-v))
+  }
+
+  /** ردیف‌های «همهٔ کشوها با هم»: هر کشو (باز ⇐ موردِ انتظار؛ بسته ⇐ موردِ انتظار، شمرده، اختلاف) و سپس جمع‌ها */
+  fun allLines(c: Drawers.Combined): List<ReportLine> = buildList {
+    c.drawers.forEach { s ->
+      add(ReportLine(StrDrawers.drawerState(s.label ?: StrDrawers.mainDrawer, s.open), shown(s.expectedMinor), strong = true))
+      add(ReportLine(StrSale.openingCash, shown(s.openingMinor)))
+      if (!s.open) {
+        add(ReportLine(StrSale.countedCash, s.countedMinor?.let(::shown) ?: StrSale.notCounted))
+        s.countedMinor?.let { add(ReportLine(StrDrawers.varianceWord, varianceText(it - s.expectedMinor))) }
+      }
+    }
+    add(ReportLine(StrDrawers.totalOpening, shown(c.openingMinor)))
+    add(ReportLine(StrDrawers.totalExpected, shown(c.expectedMinor), strong = true))
+    if (c.closed > 0) {
+      add(ReportLine(StrDrawers.totalCounted, shown(c.countedMinor)))
+      add(ReportLine(StrDrawers.totalVariance, varianceText(c.varianceMinor), strong = true))
+    }
+  }
 
   /** ردیف‌های گزارشِ X/Z — همان ترتیبِ `ShiftReportLines` ِ پیشین */
   fun report(rep: ShiftReport): List<ReportLine> = buildList {

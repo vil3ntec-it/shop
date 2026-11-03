@@ -9,6 +9,8 @@ package ir.vil3ntec.tohid.core.i18n
 @Suppress("unused")
 object StrPayFix {
   val menu: String get() = t("اصلاحِ روشِ پرداخت", "Correct payment method", "د ورکړې لاره سمول")
+  /** POS-40 — نشانِ ستونِ «نوع» ِ فاکتوری که روشِ پرداختش اصلاح شد */
+  fun fixedKind(kind: Any): String = t("${asIs(kind)} · اصلاح‌شده", "$kind · corrected", "$kind · سم شوی")
   fun title(invoice: Any): String = t("اصلاحِ روشِ پرداخت — فاکتور #${asIs(invoice)}", "Correct payment method — invoice #$invoice", "د ورکړې لاره سمول — بل #$invoice")
   val body: String get() = t(
     "فاکتور دست نمی‌خورد: یک سندِ اصلاح با نام، تأیید و دلیل در سابقه می‌ماند و جمعِ صندوق همان لحظه درست می‌شود. جمعِ فاکتور همان است.",

@@ -72,6 +72,8 @@ fun RouteScope.DrawerRoute() {
       shift = { nav.open(SalesPaths.drawerShift(it)) },
       back = backOrNull,
       pick = { sh -> if (sh == null) MultiDrawerPref.pick(context, null) else scope.launch { resumeHere(context, sh, me(context)) } },
+      //  PAY-17: «همهٔ کشوها با هم» — نه برای نمای کور (موردِ انتظار و اختلاف را لو می‌دهد)
+      all = if (multi && !blind) ({ nav.open(SalesPaths.DRAWER_ALL) }) else null,
     ),
   )
 }
