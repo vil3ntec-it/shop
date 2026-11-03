@@ -150,6 +150,12 @@ async function saveSettings(shopId, body, userId) {
     //  مهاجرتِ ۲۱۰: جدا از `v` تا به دفترِ تغییرهای بازار (S6) نرود
     if (has('payAfterAccept')) {
       await c.query('UPDATE storefronts SET pay_after_accept = $2 WHERE shop_id = $1', [shopId, bool(b.payAfterAccept, 'پرداخت پس از پذیرش')]);
+    } else if (!cur) {
+      //  مهاجرتِ ۲۱۱: نخستین ساختِ ویترین ⇒ پیش‌فرضِ همین دکان (تازه روشن، موجود خاموش)؛ بعد هرگز
+      await c.query(
+        `UPDATE storefronts SET pay_after_accept = COALESCE((SELECT pay_after_accept_default FROM shops WHERE id = $1), false)
+          WHERE shop_id = $1`, [shopId]
+      );
     }
     //  ۳۱.۲ بندِ ۱: تغییرِ ساعتِ کاری هم رویداد دارد
     if (has('timezone') || has('weeklyHours') || has('closedDates')) {

@@ -375,10 +375,11 @@ async function orderFor(shopId, input) {
 /**
  * @param {string} shopId از نشست
  * @param {{body:object, headerKey?:string, actor:{id:string}, returnUrl?:string}} p
- *   `returnUrl` فقط از کدِ سرور (ویترین)، هرگز از کاربر.
+ *   `returnUrl` فقط از کدِ سرور (ویترین)، هرگز از کاربر. `guard(c)` (فقط کدِ سرور): سنجشِ پایانی درونِ همان
+ *   تراکنش، درست پیش از ساختنِ قصدِ تازه (ویترین: `order-flow.guardOnlinePayIn` زیرِ قفلِ ردیفِ سفارش).
  * @returns {Promise<{intent:object, created:boolean}>}
  */
-async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = '' }) {
+async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = '', guard = null }) {
   const input = parseCreate(body, headerKey);
   if (input.kind === 'online_order') await orderFor(shopId, input);
   const ad = await gatewayFor(shopId);
@@ -417,6 +418,7 @@ async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = ''
       const gone = await casIn(c, live, 'expired', { status_reason: 'timeout' });
       if (gone) await orderPaymentIn(c, gone, 'failed', { reason: 'timeout' });
     }
+    if (guard) await guard(c);
     const id = newId('pi');
     const r = await c.query(
       `INSERT INTO payment_intents (id, shop_id, kind, ref_id, amount_minor, currency, status, provider,
@@ -774,6 +776,8 @@ async function createForStorefront(shopId, orderId, { key, returnUrl, descriptio
   return create(shopId, {
     body: { kind: 'online_order', refId: String(orderId), amount: Number(o.total_minor), currency: o.currency, idempotencyKey: `sf:${k}`, description },
     actor: { id: 'customer' }, returnUrl,
+    //  «پرداخت پس از پذیرش» و فاکتورِ نقدی دوباره، زیرِ قفلِ ردیفِ سفارش (همان قفلِ «به فاکتور»)
+    guard: (c) => require('./order-flow').guardOnlinePayIn(c, shopId, orderId),
   });
 }
 
