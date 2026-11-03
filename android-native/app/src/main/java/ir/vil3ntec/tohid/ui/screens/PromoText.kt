@@ -83,11 +83,13 @@ object PromoText {
     val s = r.scope
     val parts = buildList {
       if (s.categories.isNotEmpty()) add("دستهٔ " + s.categories.joinToString("، "))
+      if (s.brands.isNotEmpty()) add("برندِ " + s.brands.joinToString("، "))
       val ids = if (r.kind == "price") r.prices.map { it.productId } else s.products
       if (ids.isNotEmpty()) add(if (ids.size == 1) name(ids[0]) else "${ids.size} کالا")
     }
     var t = if (parts.isEmpty()) "همهٔ کالاها" else parts.joinToString(" + ")
     if (s.exProducts.isNotEmpty()) t += " (جز ${if (s.exProducts.size == 1) name(s.exProducts[0]) else "${s.exProducts.size} کالا"})"
+    if (s.exBrands.isNotEmpty()) t += " (جز برندِ ${s.exBrands.joinToString("، ")})"
     return t
   }
 
@@ -148,6 +150,9 @@ data class PromoForm(
   /** PRM-10 — «چند روز پیش از انقضا» */
   val nearDays: String = "7",
   val categories: Set<String> = emptySet(),
+  /** PRM-08: برندهای شامل و مستثنا (PRD-06، `Product.brand`) */
+  val brands: Set<String> = emptySet(),
+  val exBrands: Set<String> = emptySet(),
   val products: Set<String> = emptySet(),
   val exProducts: Set<String> = emptySet(),
   val days: Set<Long> = emptySet(),
@@ -189,6 +194,8 @@ data class PromoForm(
       bundlePrice = if (r.priceMinor > 0) num(r.priceMinor / 100.0) else "",
       nearDays = if (r.nearDays > 0) r.nearDays.toString() else "7",
       categories = r.scope.categories.toSet(),
+      brands = r.scope.brands.toSet(),
+      exBrands = r.scope.exBrands.toSet(),
       products = r.scope.products.toSet(),
       exProducts = r.scope.exProducts.toSet(),
       days = r.window.days.toSet(),
@@ -246,6 +253,8 @@ data class PromoForm(
       channels = base.channels,
       scope = base.scope.copy(
         categories = categories.sorted(),
+        brands = brands.sorted(),
+        exBrands = exBrands.sorted(),
         products = if (kind == "price") base.scope.products.takeIf { base.kind == "price" }.orEmpty() else products.sorted(),
         exProducts = exProducts.sorted(),
       ),

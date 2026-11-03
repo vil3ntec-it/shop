@@ -207,6 +207,9 @@ fun DeskSaleScreen(
   var returnMode by remember { mutableStateOf(false) }
   //  PAY-19: Shift+F8 ⇒ پنجرهٔ دلیلِ «کشو بی فروش» با چاپگرِ پیش‌فرضِ کشودار (همان `OpenDrawerDialog` ِ دستگاه‌ها)
   var noSaleDrawer by remember { mutableStateOf<ir.vil3ntec.tohid.print.PrinterRegistry.Saved?>(null) }
+  //  POS-18: Ctrl+R ⇒ نشانِ «لیستِ قیمت» (`PriceListAtPos`)؛ همان کلیدِ دستگاه که نشان را نشان می‌دهد
+  val priceListOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
+  var priceListToggles by remember { mutableIntStateOf(0) }
 
   val searchFocus = remember { FocusRequester() }
   val moreKeys = ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.isOn(context); val discountFocus = remember { FocusRequester() } // POS-41، خاموش ⇒ همان
@@ -802,6 +805,11 @@ fun DeskSaleScreen(
             ?.let(::toast) ?: run { noSaleDrawer = printer }
           return@onPreviewKeyEvent true
         }
+        //  POS-18: Ctrl+R ⇒ خرده ⇄ عمده، فقط با «لیستِ قیمت در صندوق» ِ روشن؛ خاموش ⇒ کلید مالِ صندوق نیست
+        if (PosKeys.priceList(keyName(e.key), e.isPrimaryModifier, e.isShiftPressed, e.isAltPressed, priceListOn)) {
+          priceListToggles++
+          return@onPreviewKeyEvent true
+        }
         when (ir.vil3ntec.tohid.ui.components.pos.PosMoreKeysPrefs.screen(moreKeys, e)) {
           ir.vil3ntec.tohid.core.pos.PosMoreKeys.Act.DISCOUNT_INVOICE -> { if (canDiscount) runCatching { discountFocus.requestFocus() } else toast(StrPos.discountForbidden); return@onPreviewKeyEvent true }
           //  POS-41: F5 ⇒ برگهٔ ردیفِ انتخاب‌شده با فوکوس روی «تخفیفِ ردیف»؛ بی ردیف کلید مالِ صندوق نیست
@@ -827,7 +835,7 @@ fun DeskSaleScreen(
   ) {
     ir.vil3ntec.tohid.ui.components.pos.HeldInvoiceBar(held, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.QuoteBar(d, cartStore, ::toast, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.SpecialOrderBar(d, store, cartDebtorId, ::toast, Modifier.padding(bottom = 8.dp)) // پیش‌فاکتور (POS-25، `QuotePref`) و سفارشِ ویژه (POS-26، `SpecialOrderPref`)
     ir.vil3ntec.tohid.ui.components.pos.GiftCardBar(d, store, ::toast, Modifier.padding(bottom = 8.dp)); ir.vil3ntec.tohid.ui.components.pos.LayawayBar(d, store, cartStore, ::toast, Modifier.padding(bottom = 8.dp)) // کارتِ هدیه (PAY-24، `GiftCardPref`) و فروشِ امانی (POS-27، `LayawayPref`)
-    ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId) // POS-18
+    ir.vil3ntec.tohid.ui.components.pos.PriceListAtPos(cartStore, d, cart, cartDebtorId, toggles = priceListToggles) // POS-18 (Ctrl+R)
     BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
       /*
        *  چیدمان (RTL): کاتالوگ راست و پهن، سبد چپ با پهنای پله‌ای (`PosLayout`).

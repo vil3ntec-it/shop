@@ -4,6 +4,7 @@ import android.content.Context
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.LedgerEngine
+import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -30,6 +31,12 @@ internal object MoneyWriter {
   fun ledger(store: ShopStore, toasts: V3Toasts?, context: Context?, result: LedgerEngine.Result, done: String): String? = when (result) {
     is LedgerEngine.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
     is LedgerEngine.Result.Ok -> { ok(store, toasts, context, result.data, done); result.id }
+  }
+
+  /** PUR-05: فاکتورِ خریدِ چندردیفه (`PurchaseBook.record`) — شمارهٔ فاکتور ⇐ ثبت شد؛ null ⇐ رد با پیامِ خودش */
+  fun purchase(store: ShopStore, toasts: V3Toasts?, context: Context?, result: PurchaseBook.Result, done: String): Int? = when (result) {
+    is PurchaseBook.Result.Failed -> { toasts?.show(result.message, V3Tone.ERROR); null }
+    is PurchaseBook.Result.Ok -> { ok(store, toasts, context, result.data, done); result.invoiceNo }
   }
 
   fun debtor(store: ShopStore, toasts: V3Toasts?, context: Context?, result: DebtorEngine.Result, done: String): String? = when (result) {

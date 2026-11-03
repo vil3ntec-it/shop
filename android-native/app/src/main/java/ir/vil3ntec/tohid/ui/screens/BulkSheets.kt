@@ -691,6 +691,22 @@ private fun RowEcho(text: String, warn: Boolean) {
 /* ============================ انبارگردانی ============================ */
 
 /** یک ردیفِ تراشهٔ صافی (INV-05): «همه» و هر گزینه؛ `null` ⇒ همه */
+/** INV-05: برچسبِ تراشهٔ قفسه — «راهرو ۲ · قفسه ۱» به زبانِ صفحه (`CountFilter.shelfKey`) */
+internal fun countShelfLabel(key: String): String {
+  val (aisle, shelf) = CountFilter.shelfParts(key)
+  return listOfNotNull(
+    aisle.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.aisleIs(it) },
+    shelf.takeIf { it.isNotEmpty() }?.let { ir.vil3ntec.tohid.core.i18n.StrProduct.shelfIs(it) },
+  ).joinToString(" · ")
+}
+
+/** INV-05: تراشه‌های برند و قفسه — هر کدام فقط وقتی دست‌کم یک کالا آن را دارد */
+@Composable
+internal fun CountBrandShelfChips(brands: List<String>, brand: String?, onBrand: (String?) -> Unit, shelves: List<String>, shelf: String?, onShelf: (String?) -> Unit) {
+  if (brands.isNotEmpty()) CountFilterChips(ir.vil3ntec.tohid.core.i18n.StrCount.allBrands, brands.map { it to it }, brand, onBrand)
+  if (shelves.isNotEmpty()) CountFilterChips(ir.vil3ntec.tohid.core.i18n.StrCount.allShelves, shelves.map { it to countShelfLabel(it) }, shelf, onShelf)
+}
+
 @Composable
 internal fun CountFilterChips(all: String, options: List<Pair<String, String>>, picked: String?, onPick: (String?) -> Unit) {
   Row(
@@ -727,6 +743,8 @@ fun StockCountSheet(
   //  INV-05: صافیِ دسته و تأمین‌کننده — فقط فهرستِ دیده‌شده؛ شمرده‌ها و ثبت همان (`CountFilter`)
   var category by remember { mutableStateOf<String?>(null) }
   var supplierId by remember { mutableStateOf<String?>(null) }
+  var brand by remember { mutableStateOf<String?>(null) }
+  var shelf by remember { mutableStateOf<String?>(null) }
 
   val parsed: Map<String, Double> = remember(counts) {
     counts.mapNotNull { (id, text) ->
@@ -737,9 +755,11 @@ fun StockCountSheet(
   val lines = remember(d, parsed) { WarehouseEngine.countLines(d, parsed.filterValues { !it.isNaN() && it >= 0 }) }
   val stock = remember(d) { d.products.associate { it.id to ShopStore.stock(d, it.id) } }
   val term = search.trim()
-  val shown = remember(d, term, category, supplierId) { CountFilter.shown(d.products, term, category, supplierId) }
+  val shown = remember(d, term, category, supplierId, brand, shelf) { CountFilter.shown(d.products, term, category, supplierId, brand, shelf) }
   val categories = remember(d) { CountFilter.categories(d.products) }
   val suppliers = remember(d) { CountFilter.suppliers(d.products, d.suppliers) }
+  val brands = remember(d) { CountFilter.brands(d.products) }
+  val shelves = remember(d) { CountFilter.shelves(d.products) }
 
   BulkFrame(
     title = "انبارگردانی",
@@ -776,6 +796,7 @@ fun StockCountSheet(
       )
       if (categories.isNotEmpty()) CountFilterChips("همهٔ دسته‌ها", categories.map { it to it }, category) { category = it }
       if (suppliers.isNotEmpty()) CountFilterChips("همهٔ تأمین‌کننده‌ها", suppliers.map { it.id to it.name.ifBlank { it.id } }, supplierId) { supplierId = it }
+      CountBrandShelfChips(brands, brand, { brand = it }, shelves, shelf, { shelf = it }) // INV-05: برند و قفسه
       Spacer(Modifier.height(8.dp))
       OutlinedTextField(
         value = note, onValueChange = { note = it },

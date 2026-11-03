@@ -695,6 +695,35 @@ const SUMMARY_SQL = `SELECT ${S.OPEN_TABS.map((tab) => `COUNT(*) FILTER (WHERE $
             (SELECT MAX(updated_at) FROM online_orders WHERE shop_id = $1) AS rev
        FROM online_orders WHERE shop_id = $1 AND status = ANY($3::text[])`;
 
+/**
+ * CRM-07 — سفارش‌های **هنوز تحویل‌نشده یا لغوشدهٔ** یک مشتری برای پروندهٔ او در برنامه (تحویل‌شده‌ها فروشِ عادیِ
+ * دفترند و همان‌جا دیده می‌شوند). شماره‌ها (یک یا دو، شمارهٔ اول و دومِ مشتری) با همان `validate.phone` ِ ثبتِ سفارش
+ * و همهٔ شکل‌های ذخیره‌شدنیِ همان گوشی (`phoneForms`)؛ شمارهٔ نادرست نادیده (نه ۴۰۰). تازه‌ترین بالا، حداکثر
+ * `CUSTOMER_LIMIT`؛ همان کارتِ فهرست (شمارهٔ کامل هرگز). نمایهٔ `ix_online_orders_shop_phone` (مهاجرتِ ۱۹۸).
+ */
+const CUSTOMER_LIMIT = 20;
+const CUSTOMER_OTHER = Object.freeze(['cancelled', 'cancelled_by_customer', 'rejected', 'auto_rejected', 'returned_to_store', 'restocked']);
+const CUSTOMER_STATUSES = Object.freeze([...OPEN_STATUSES, ...CUSTOMER_OTHER]);
+
+async function forCustomer(shopId, phones, viewer) {
+  const v = require('./validate');
+  const forms = new Set();
+  for (const raw of (Array.isArray(phones) ? phones : [phones]).slice(0, 2)) {
+    if (typeof raw !== 'string' || !raw.trim() || raw.length > 40) continue;
+    let p = null;
+    try { p = v.phone(raw); } catch { p = null; }
+    if (p) for (const f of v.phoneForms(p)) forms.add(f);
+  }
+  if (!forms.size) return { items: [], more: false };
+  const at = now();
+  const rows = await many(
+    `SELECT * FROM online_orders WHERE shop_id = $1 AND customer_phone = ANY($2::text[]) AND status = ANY($3::text[])
+      ORDER BY created_at DESC, id DESC LIMIT $4`,
+    [shopId, [...forms], CUSTOMER_STATUSES, CUSTOMER_LIMIT + 1]
+  );
+  return { items: rows.slice(0, CUSTOMER_LIMIT).map((r) => card(r, viewer, at)), more: rows.length > CUSTOMER_LIMIT };
+}
+
 /** شمارشِ برگه‌های باز + قدیمی‌ترین سفارشِ تازه (هشدارِ ORD-02) + نشانگرِ تغییر — یک پرس‌وجو. */
 async function summary(shopId) {
   const at = now();
@@ -707,4 +736,5 @@ module.exports = {
   FLAG_KEY, FEATURE_KEY, SUBSCRIBERS_FLAG, NOT_ACCEPTING, NOT_ACCEPTING_MESSAGE, KEY_RE, MAX_LINES, STAFF_SOURCES,
   flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary, OPEN_STATUSES, SUMMARY_SQL,
+  forCustomer, CUSTOMER_LIMIT, CUSTOMER_STATUSES,
 };
