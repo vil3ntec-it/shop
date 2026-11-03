@@ -68,6 +68,8 @@ const REINDEX_PER_PASS = 25;
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const text = (v, max) => stripControl(str(v)).slice(0, max);
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+//  کارتِ عمومیِ دکان، مختصاتِ درشت، فاصله و ترتیب — `lib/market-cards.js` (شرح همان‌جا)
+const { geoOf, distanceKm, categoryOf, cardOf, rank, matchesShop } = require('./market-cards')({ CATEGORIES });
 const m4 = require('./market-details')({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES });   // بازار M4
 const mine = require('./market-orders')({ storeOpen, filterAsync });   // «سفارش‌های من» (S138، S9)
 
@@ -250,82 +252,7 @@ async function eligible(at = now()) {
     .map((e) => ({ row: e.row, productCount: e.productCount, status: sf.presenceOf(e.row, at, e.lastSeen) }));
 }
 
-const ACCEPT_RANK = { accepting: 0, delayed: 1, later: 2 };
-const NEW_MS = 30 * 24 * 60 * 60 * 1000;
 const FIRST_MAX = 20;
-
-/** مختصاتِ درشت (یک‌صدمِ درجه) از ورودی — یا null. */
-function geoOf(lat, lng) {
-  if ((lat === undefined || lat === '' || lat === null) && (lng === undefined || lng === '' || lng === null)) return null;
-  const a = Number(lat);
-  const b = Number(lng);
-  if (!Number.isFinite(a) || !Number.isFinite(b) || Math.abs(a) > 90 || Math.abs(b) > 180) {
-    throw badRequest('موقعیت معتبر نیست', 'bad_location');
-  }
-  return { lat: Math.round(a * 100), lng: Math.round(b * 100) };
-}
-
-/** فاصلهٔ دو نقطهٔ درشت به کیلومتر، گردشده به نیم کیلومتر (کمینه ۰٫۵). */
-function distanceKm(a, b) {
-  const rad = (x) => (x / 100) * Math.PI / 180;
-  const dLat = rad(b.lat - a.lat);
-  const dLng = rad(b.lng - a.lng);
-  const h = Math.sin(dLat / 2) ** 2 + Math.cos(rad(a.lat)) * Math.cos(rad(b.lat)) * Math.sin(dLng / 2) ** 2;
-  const km = 2 * 6371 * Math.asin(Math.min(1, Math.sqrt(h)));
-  return Math.max(0.5, Math.round(km * 2) / 2);
-}
-
-function categoryOf(key) {
-  return CATEGORIES.find((c) => c.key === key) || null;
-}
-
-/** کارتِ عمومیِ دکان — بی شناسهٔ داخلی، شماره، صاحب یا مختصات. */
-function cardOf(e, near, at = now()) {
-  const r = e.row;
-  const s = e.status;
-  const cat = categoryOf(r.m_category);
-  const hasGeo = near && r.m_lat !== null && r.m_lat !== undefined && r.m_lng !== null && r.m_lng !== undefined;
-  return views.pub('shopCard', {
-    slug: r.slug,
-    title: r.title,
-    tagline: r.tagline,
-    accent: r.accent,
-    category: cat ? cat.key : '',
-    categoryLabel: cat ? cat.label : '',
-    area: r.m_area || '',
-    status: {
-      badge: s.badge, orderAcceptance: s.orderAcceptance, connection: s.connection,
-      lastConfirmedAt: s.lastConfirmedAt, declaredUntil: s.declaredUntil, timezone: s.timezone,
-      localTime: s.localTime, hoursSet: s.hoursSet, holiday: s.holiday, today: s.today, notice: s.notice,
-    },
-    fulfillment: { delivery: r.accept_delivery === true, pickup: r.accept_pickup === true },
-    deliveryFeeMinor: Number(r.delivery_fee_minor),
-    minOrderMinor: Number(r.min_order_minor),
-    currency: 'AFN',
-    productCount: e.productCount,
-    distanceKm: hasGeo ? distanceKm(near, { lat: Number(r.m_lat), lng: Number(r.m_lng) }) : null,
-    //  «تازه» فقط از تاریخِ واقعیِ ساختِ ویترین (بی امتیازِ ساختگی؛ امتیازِ واقعی هنوز نیست)
-    isNew: Number(r.created_at) > at - NEW_MS,
-  });
-}
-
-function rank(near) {
-  return (a, b) => {
-    const x = (ACCEPT_RANK[a.status.orderAcceptance] ?? 3) - (ACCEPT_RANK[b.status.orderAcceptance] ?? 3);
-    if (x) return x;
-    if (near) {
-      const da = a.distanceKm === null ? Infinity : a.distanceKm;
-      const db = b.distanceKm === null ? Infinity : b.distanceKm;
-      if (da !== db) return da - db;
-    }
-    return String(a.title).localeCompare(String(b.title), 'fa') || String(a.slug).localeCompare(String(b.slug));
-  };
-}
-
-function matchesShop(c, needle) {
-  if (!needle) return true;
-  return [c.title, c.tagline, c.area, c.categoryLabel].some((v) => sf.normalize(v).includes(needle));
-}
 
 /** نمای اولِ بازارچه: دسته‌ها با شمارِ دکانِ هر کدام. */
 async function overview(at = now()) {

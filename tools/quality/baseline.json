@@ -31,7 +31,6 @@
     "server/public/admin/app.js": 2436,
     "server/public/admin/index.html": 1387,
     "server/src/lib/image-bank.js": 1195,
-    "server/src/lib/market.js": 811,
     "server/src/lib/notices.js": 825,
     "server/src/lib/otp.js": 877,
     "server/src/lib/payment-intents.js": 855,
