@@ -53,6 +53,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps23-partial` (کمبودهای PARTIAL، دورِ ۲۳؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **DATA-04 / SEC-DATA-07** سرور جمعِ برگشت‌های هر فاکتور را با `finalTotal` + ۵۰ پول برای هر قلم می‌سنجد (`staff-approval.js` ‹`overSale`›، v3 و v1، فاکتورِ همین دستهٔ v1 هم)،
+  پشتِ پرچمِ خاموشِ `shop.returns.sale_cap` (`return-sale-cap.test.js`)؛ **S86** بازسازیِ مانده‌های موجودیِ سرور از دفتر (`stock.rebuild`، `npm run stock-rebuild`،
+  پیش‌فرض فقط نمایش؛ `stock-rebuild.test.js`)؛ **PRM-15** «دادنِ اعتبارِ هدیه» در پروندهٔ مشتریِ گوشی (نسخهٔ ۳) و کامپیوتر، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ
+  (`StoreCreditGrantTest`، `StoreCreditGrantFlowTest`). بی مسیرِ تازه، بی مهاجرت، بی تنظیمِ تازه. همه PARTIAL ماندند.
+- نیمه‌کاره: CI و مرجِ همین PR. قدمِ بعدی: روشن کردنِ `shop.returns.sale_cap` پس از همه‌گیر شدنِ نسخهٔ دارای `ReturnShare` (#586)؛ بازسازیِ projection ِ کاتالوگ و سفارش (S86)؛
+  «اعتبارِ هدیه» با «درخواستِ تأیید» (PIN ِ مدیر) برای نقشِ «نیازمندِ تأیید».
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/online-order-flow`، PR #910 (جریانِ کاملِ سفارشِ آنلاین: «چرا نمی‌رسد»، فاکتورِ یک‌ضرب، پرداخت پس از پذیرش؛ روی دستهٔ ۱۸ (#900)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - تشخیص: زنجیره ویترین/بازارچه ⇒ `POST /store/:slug/checkout` ⇒ `online_orders` ⇒ برنامه (`/shop/orders/config` ⇒ `summary` هر ۲۰ثانیه فقط
   جلوی چشم؛ FCM در برنامه نیست). سرور هیچ سفارشِ ثبت‌شده‌ای را گم نمی‌کرد؛ باگ «خاموشیِ بی‌صدا» بود: پرچمِ `shop.orders`، کلیدِ

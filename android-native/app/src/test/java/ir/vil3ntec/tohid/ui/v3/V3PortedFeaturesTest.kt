@@ -75,6 +75,24 @@ class V3PortedFeaturesTest {
     assertTrue(button.contains("if (!CustomerCrm.isActive(debtor)) return"))
   }
 
+  /** PRM-15 — «دادنِ اعتبارِ هدیه» در پروندهٔ مشتریِ گوشیِ نسخهٔ ۳ و کامپیوتر، یک جزء؛ خاموش، ادغام‌شده یا بی تخفیف ⇒ هیچ */
+  @Test
+  fun `پروندهٔ مشتری — دادنِ اعتبارِ هدیه در حسابِ گوشیِ نسخهٔ ۳ همان دکمهٔ کامپیوتر`() {
+    val extras = src("ui/v3/money/DebtorFileExtras.kt")
+    assertTrue(extras.contains("import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton"))
+    assertTrue(extras.contains("StoreCreditGrantButton(store, d, debtorId, toast,"))
+    assertTrue(src("ui/screens/DeskCustomers.kt").contains("StoreCreditGrantButton(store, d, id, ::toast,"))
+    val button = src("ui/screens/StoreCreditGrantAndroid.kt")
+    assertTrue(button.contains("val on = remember { GiftCardPref.on(context) }"))
+    assertTrue(button.contains("if (!on) return"))
+    assertTrue(button.contains("if (!CustomerCrm.isActive(debtor)) return"))
+    assertTrue(button.contains("ShopRole.mayDiscount(context) && ShopRole.canWrite(context, \"transactions\")"))
+    //  ثبت فقط با تصمیمِ همین مبلغ و فقط از راهِ دفترِ دیسک (نه `store.save`)
+    assertTrue(button.contains("ShopRole.decide(context, \"sales.discount\", mapOf(\"amount\" to m.toDouble())).decision"))
+    assertTrue(button.contains("GiftCardPref.grant(store, key, debtor.id, m, reason.trim(), decision,"))
+    assertFalse(button.contains("store.save("))
+  }
+
   @Test
   fun `پروندهٔ مشتری — شمارهٔ دوم و برچسب در کشوی حساب، صافیِ برچسب در فهرست`() {
     val parts = src("ui/v3/money/DebtorLedgerParts.kt")
