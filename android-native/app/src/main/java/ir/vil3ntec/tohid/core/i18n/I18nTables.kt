@@ -30,5 +30,8 @@ object I18nTables {
     StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
+    StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
+    StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
+    StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
   )
 }

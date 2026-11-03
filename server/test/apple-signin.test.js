@@ -162,7 +162,7 @@ test('توکن/nonce ِ نادرست: nonce ِ دیگر، nonce ِ ساختگی�
   const cases = [
     [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce: other }), nonce }, 403, 'bad_apple_nonce'],
     [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce }) }, 400, 'bad_apple_nonce'],
-    [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce: `${nonce.slice(0, -2)}AA` }), nonce: `${nonce.slice(0, -2)}AA` }, 403, 'bad_apple_nonce'],
+    [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce: h.tampered(nonce, 'AA') }), nonce: h.tampered(nonce, 'AA') }, 403, 'bad_apple_nonce'],
     [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce: 'v1.9999999999.abc.def' }), nonce: 'v1.9999999999.abc.def' }, 403, 'bad_apple_nonce'],
     [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce, key: stranger.privateKey }), nonce }, 403, 'bad_apple_token'],
     [{ idToken: appleToken({ sub: 's', email: 'e1@test.local', nonce, aud: 'com.other.app' }), nonce }, 403, 'bad_audience'],

@@ -91,6 +91,7 @@ object SettingsHelp {
     SettingsLayout.RETURNS -> H.returnsLine
     SettingsLayout.PAY_FIX -> H.payFixLine
     SettingsLayout.TILL_RECEIVE -> H.tillReceiveLine
+    SettingsLayout.MULTI_DRAWER -> H.multiDrawerLine
     SettingsLayout.POS_TOUCH -> H.touchLine
     SettingsLayout.POS_MORE_KEYS -> H.moreKeysLine
     SettingsLayout.TILL_SWITCH -> H.tillSwitchLine
@@ -152,6 +153,7 @@ object SettingsHelp {
     SettingsLayout.RETURNS -> H.returnsExample
     SettingsLayout.PAY_FIX -> H.payFixExample
     SettingsLayout.TILL_RECEIVE -> H.tillReceiveExample
+    SettingsLayout.MULTI_DRAWER -> H.multiDrawerExample
     SettingsLayout.POS_TOUCH -> H.touchExample
     SettingsLayout.POS_MORE_KEYS -> H.moreKeysExample
     SettingsLayout.TILL_SWITCH -> H.tillSwitchExample

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.InsertChart
+import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.SnackbarHostState
@@ -36,6 +37,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrBranches
 import ir.vil3ntec.tohid.core.i18n.StrOnlineReport
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrReports
@@ -143,6 +145,8 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
   val context = LocalContext.current
   //  RPT-14: «گزارشِ فروشِ اینترنتی» فقط با پرچمِ روشنِ سرور
   val online = rememberOnlineReportVisible()
+  //  RPT-18: «گزارشِ همهٔ شعبه‌ها» فقط با پرچمِ روشنِ سرور و فقط برای صاحب
+  val branches = rememberBranchesReportVisible()
   ReportFresh.load(context)
   if (ReportFresh.on.value) { DeskFreshReports(d, snackbar); return }
   val c = PhoneV3.colors
@@ -221,6 +225,10 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
         Spacer(Modifier.width(16.dp))
         if (online) {
           V3Button(StrOnlineReport.title, { onOpen(AnalyticsPaths.ONLINE_REPORT) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.InsertChart, height = 40.dp)
+          Spacer(Modifier.width(8.dp))
+        }
+        if (branches) {
+          V3Button(StrBranches.title, { onOpen(AnalyticsPaths.BRANCHES_REPORT) }, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Storefront, height = 40.dp)
           Spacer(Modifier.width(8.dp))
         }
         V3Button("${StrReports.printShort}  ${KeyMap.GLOBAL_PRINT.hint}", ::print, kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Print, height = 40.dp)

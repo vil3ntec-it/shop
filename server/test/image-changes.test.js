@@ -30,8 +30,10 @@ const C = (method, path, who, body) => h.api(method, '/api/shop/images/changes' 
 const S = (method, path, who, body) => h.api(method, '/api/shop/images' + path, { token: who.token, body });
 const shown = async (who, pid) => (await S('GET', `/products/${pid}`, who)).body;
 const pickOf = (r) => ({ source: r.source, image_id: r.image_id || '', version: Number(r.version || 0) });
+//  ردیف‌های سابقهٔ یک تراکنش اغلب همان میلی‌ثانیه‌اند و `id` ِ سابقه تصادفی است (`newId`)، پس `ORDER BY created_at, id`
+//  ترتیبِ کالاهای یک دسته را تصادفی می‌کرد (CI ِ #883: p3 پیش از p2). درونِ همان لحظه به ترتیبِ کالا، همان ترتیبِ نوشتن.
 const audits = (shopId, action) => many(
-  'SELECT target_id, detail FROM audit_logs WHERE shop_id=$1 AND action=$2 ORDER BY created_at, id', [shopId, action]);
+  'SELECT target_id, detail FROM audit_logs WHERE shop_id=$1 AND action=$2 ORDER BY created_at, target_id, id', [shopId, action]);
 const detailOf = (r) => (typeof r.detail === 'string' ? JSON.parse(r.detail) : r.detail);
 
 let y1 = ''; let y2 = ''; let central = '';

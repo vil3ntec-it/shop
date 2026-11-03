@@ -224,7 +224,7 @@ test('ABUSE-01: شکایت از سفارش ⇒ پرونده، مدرک، پاس�
   const tr = await pub(s.slug, 'GET', `/cases/${c0.token}`);
   assert.equal(tr.status, 200);
   assert.equal(tr.body.case.status, 'open');
-  assert.equal((await pub(s.slug, 'GET', `/cases/${c0.token.slice(0, -2)}xx`)).status, 404);
+  assert.equal((await pub(s.slug, 'GET', `/cases/${h.tampered(c0.token)}`)).status, 404);
   const mine = await pub(s.slug, 'GET', '/cases', null, t);
   assert.deepEqual(mine.body.cases.map((x) => x.token), [c0.token]);
 

@@ -228,8 +228,11 @@ const picture = (size) => async (req, res) => {
   const p = await sf.photo(req.store.shop_id, req.params.id, size);
   if (!p) throw notFound('عکس نیست', 'photo_not_found');
   const etag = `"${p.hash}"`;
-  //  پاسخ‌های JSON ِ ویترین کش نمی‌شوند؛ عکس با ETag ِ محتوا می‌شود
-  res.set('Cache-Control', 'public, max-age=300');
+  //  پاسخ‌های JSON ِ ویترین کش نمی‌شوند؛ عکس با ETag ِ محتوا می‌شود. IMG-12: `?v=` (همان `photoVersion` ِ کالا)
+  //  فقط وقتی همین عکسی است که سرو می‌شود یک روز می‌ماند — عکسِ تازه نشانیِ تازه دارد؛ یک روز (نه immutable، مثلِ
+  //  M3) تا برداشتن/پنهان کردن دیر یا زود به کشِ مشترک هم برسد. بی `v` یا `v` ِ کهنه (پیوند، سبد، SEO) ⇒ همان
+  //  عکسِ امروز با ۵ دقیقه، پس هیچ نشانیِ پیشینی نمی‌شکند و هیچ نشانی‌ای عکسِ دیگری را به‌درازا نگه نمی‌دارد.
+  res.set('Cache-Control', p.tag && req.query.v === p.tag ? 'public, max-age=86400' : 'public, max-age=300');
   res.set('ETag', etag);
   if (req.get('if-none-match') === etag) return res.status(304).end();
   res.type(p.mime || sniff(p.data) || 'application/octet-stream').send(p.data);

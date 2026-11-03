@@ -71,6 +71,15 @@ internal fun RouteScope.TillReceiveScreen(onBack: (() -> Unit)?) {
   }
 }
 
+/** `settings/sales/multi-drawer`: چند کشو یا چند صندوقدار و شیفتِ شناور (PAY-17)، پیش‌فرض خاموش، فقط همین دستگاه */
+@Composable
+internal fun RouteScope.MultiDrawerScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  ToggleScreen(SettingsLayout.MULTI_DRAWER, onBack, ir.vil3ntec.tohid.data.MultiDrawerPref.on(context), StrShell.switchOn, ir.vil3ntec.tohid.core.i18n.StrDrawers.settingsNote, deviceOnly = true) {
+    ir.vil3ntec.tohid.data.MultiDrawerPref.set(context, it)
+  }
+}
+
 /** `settings/sales/stock-insight`: تحلیلِ موجودی در گزارشِ کالاها (INV-15/16)، فقط همین دستگاه */
 @Composable
 internal fun RouteScope.StockInsightScreen(onBack: (() -> Unit)?) {

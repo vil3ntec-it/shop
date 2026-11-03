@@ -124,11 +124,14 @@ ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')
   const sel = '#products li[data-id="rice"] img';
   await page.waitForFunction((q) => { const i = document.querySelector(q); return Boolean(i && i.complete && i.naturalWidth > 0); }, sel, { timeout: 5000 }).catch(() => {});
   const img = await page.$eval(sel, (i) => ({ src: i.getAttribute('src'), lazy: i.getAttribute('loading'), w: i.naturalWidth }));
-  ok(/\/products\/rice\/thumb$/.test(img.src) && img.lazy === 'lazy' && img.w > 0, 'کارت: نسخهٔ کوچک (thumb) با بارگذاریِ تنبل (WEB-16)', JSON.stringify(img));
+  //  IMG-12: نشانی با نسخهٔ عکسِ همان کالا (`photoVersion` ِ API)
+  const riceV = (await call('GET', `/api/store/${slug}/products?ids=rice`)).body.items[0].photoVersion;
+  ok(/^[0-9a-f]{12}$/.test(String(riceV)) && img.src === `/api/store/${slug}/products/rice/thumb?v=${riceV}` && img.lazy === 'lazy' && img.w > 0,
+    'کارت: نسخهٔ کوچک (thumb) ِ نسخه‌دار با بارگذاریِ تنبل (WEB-16، IMG-12)', JSON.stringify({ ...img, riceV }));
   await page.evaluate(() => { location.hash = '#/p/rice'; });
   await page.waitForSelector('#ps-img img', { timeout: 5000 });
   const big = await page.getAttribute('#ps-img img', 'src');
-  ok(/\/products\/rice\/photo$/.test(big), 'برگهٔ کالا: اندازهٔ نمایش (photo) (WEB-16)', big);
+  ok(big === `/api/store/${slug}/products/rice/photo?v=${riceV}`, 'برگهٔ کالا: اندازهٔ نمایش (photo) ِ نسخه‌دار (WEB-16، IMG-12)', big);
   await page.evaluate(() => { location.hash = '#/'; });
   await page.waitForFunction(() => !document.querySelector('#product-sheet.open, #product-sheet[open]'), null, { timeout: 5000 }).catch(() => {});
 }
@@ -685,6 +688,86 @@ ok(!fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'store', 'ind
   await zp.keyboard.press('Escape');
   ok(ze.length === 0, 'پرونده‌های دیربارِ کیت: بی خطای جاوااسکریپت', ze.join(' | '));
   await zc.close();
+}
+
+//  IMG-12: عکسِ برنج عوض می‌شود ⇒ کارت، برگهٔ کالا و سبد (پس از تازه شدنِ سبد) نشانیِ تازه می‌گیرند و عکسِ تازه را
+//  نشان می‌دهند، نه عکسِ کشِ پیشین؛ نشانیِ نسخه‌دار یک روز در کش؛ نشانیِ کهنه (سبد/پیوندِ پیشین) هنوز عکس می‌دهد
+{
+  const P = `/api/store/${slug}/products/rice`;
+  const vOf = async () => (await call('GET', `/api/store/${slug}/products?ids=rice`)).body.items[0].photoVersion;
+  const v1 = await vOf();
+  const ic = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF', bypassCSP: Boolean(axeSrc) });
+  const ip = await ic.newPage();
+  const ie = [];
+  ip.on('pageerror', (e) => ie.push(String(e)));
+  const seen = new Map();
+  ip.on('response', (r) => { const u = new URL(r.url()); if (u.pathname.startsWith(P)) seen.set(u.pathname + u.search, r.headers()['cache-control']); });
+  const loaded = (q, src) => ip.waitForFunction(([sel, want]) => {
+    const i = document.querySelector(sel);
+    return Boolean(i && i.getAttribute('src') === want && i.complete && i.naturalWidth > 0);
+  }, [q, src], { timeout: 10000 }).then(() => true, () => false);
+  const srcOf = (q) => ip.$eval(q, (i) => i.getAttribute('src')).catch(() => null);
+  const CARD = '#products li[data-id="rice"] img';
+  const LINE = '#sheet-lines li img';
+
+  await ip.goto(`${base}/store/${slug}`);
+  await ip.waitForSelector(CARD, { timeout: 15000 });
+  ok(await loaded(CARD, `${P}/thumb?v=${v1}`), 'IMG-12: کارت با نشانیِ نسخه‌دار و عکس بار شد', await srcOf(CARD));
+  ok(seen.get(`${P}/thumb?v=${v1}`) === 'public, max-age=86400', 'IMG-12: نشانیِ نسخه‌دار یک روز در کش', String(seen.get(`${P}/thumb?v=${v1}`)));
+  await ip.locator('#products li[data-id="rice"]').getByRole('button', { name: /افزودن/ }).click();
+  await ip.waitForSelector('#cart-bar:not([hidden])', { timeout: 5000 });
+  await ip.click('#open-cart');
+  await ip.waitForSelector(LINE, { timeout: 5000 });
+  ok(await loaded(LINE, `${P}/thumb?v=${v1}`), 'IMG-12: سبد همان نشانیِ نسخه‌دار', await srcOf(LINE));
+  const kept = await ip.evaluate(() => {
+    for (let i = 0; i < localStorage.length; i++) {
+      try { const o = JSON.parse(localStorage.getItem(localStorage.key(i))); if (o && o.rice && o.rice.qtyMilli) return o.rice.photoVersion; } catch { /* بعدی */ }
+    }
+    return null;
+  });
+  ok(kept === v1, 'IMG-12: نسخهٔ عکس با قلمِ سبد روی دستگاه می‌ماند', String(kept));
+
+  //  عکسِ تازه از راهِ همگام‌سازیِ واقعی
+  const fresh = require('./image-fixtures').jpeg(320, 320, { seed: 10 });
+  const up = await call('PUT', '/api/sync/v1/photos/rice', { data: fresh.toString('base64') }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+  const v2 = await vOf();
+  ok(up.status === 200 && /^[0-9a-f]{12}$/.test(String(v2)) && v2 !== v1, 'IMG-12: عکسِ تازه ⇒ نسخهٔ تازه', `${v1} ⇒ ${v2}`);
+  await ip.goto(`${base}/store/${slug}`);
+  await ip.waitForSelector(CARD, { timeout: 15000 });
+  ok(await loaded(CARD, `${P}/thumb?v=${v2}`), 'IMG-12: پس از بازگشت، کارت عکسِ تازه را با نشانیِ تازه نشان می‌دهد (نه کشِ ۵ دقیقه‌ای)', await srcOf(CARD));
+  await ip.click('#open-cart');
+  await ip.waitForSelector(LINE, { timeout: 5000 });
+  ok(await loaded(LINE, `${P}/thumb?v=${v2}`), 'IMG-12: سبدِ ذخیره‌شده پس از تازه شدن نشانیِ تازه می‌گیرد', await srcOf(LINE));
+  await ip.goto(`${base}/store/${slug}#/p/rice`);
+  await ip.waitForSelector('#ps-img img', { timeout: 10000 });
+  ok(await loaded('#ps-img img', `${P}/photo?v=${v2}`), 'IMG-12: برگهٔ کالا اندازهٔ نمایشِ تازه', await srcOf('#ps-img img'));
+  //  نشانیِ کهنه (سبد یا پیوندِ پیشین) نمی‌شکند: همان عکسِ امروز، با کشِ کوتاه
+  const old = await fetch(`${base}${P}/thumb?v=${v1}`);
+  const oldBuf = Buffer.from(await old.arrayBuffer());
+  ok(old.status === 200 && old.headers.get('cache-control') === 'public, max-age=300' && oldBuf.equals(fresh),
+    'IMG-12: نشانیِ کهنه عکسِ امروز را با ۵ دقیقه می‌دهد', `${old.status} ${old.headers.get('cache-control')}`);
+  const plain = await fetch(`${base}${P}/thumb`);
+  ok(plain.status === 200 && Buffer.from(await plain.arrayBuffer()).equals(fresh), 'IMG-12: نشانیِ بی نسخه هم هنوز کار می‌کند');
+  if (axeSrc) {
+    await ip.goto(`${base}/store/${slug}#/cart`);
+    await ip.waitForSelector(LINE, { timeout: 10000 });
+    await loaded(LINE, `${P}/thumb?v=${v2}`);
+    //  پایانِ گذارِ بازشدنِ برگه (رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد). `cart-open` در requestAnimationFrame ِ پس از
+    //  نمایشِ سطرها می‌آید (`K.cartOpen`)، پس getAnimations ِ همان لحظه گاه هنوز خالی بود و axe برگهٔ نیمه‌پیدا را می‌سنجید
+    //  (CI ِ #881: `sum.colon` با کنتراستِ ۱٫۲۶)؛ پس تا برگه کامل پیدا و همهٔ گذارها تمام شوند صبر می‌شود.
+    await ip.waitForFunction(() => {
+      const sh = document.getElementById('cart-sheet');
+      return Boolean(sh) && !sh.hidden && getComputedStyle(sh).opacity === '1'
+        && (!document.body.classList.contains('phone-cart') || document.body.classList.contains('cart-open'))
+        && document.getAnimations().every((a) => a.playState === 'finished');
+    }, null, { timeout: 10000 });
+    await ip.addScriptTag({ content: axeSrc });
+    const v = await ip.evaluate(async () => (await window.axe.run(document, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] }))
+      .violations.map((x) => `${x.id}: ${x.nodes.slice(0, 3).map((n) => n.target.join(' ') + ' ' + (n.any[0] && n.any[0].message)).join(' ; ')}`));
+    ok(v.length === 0, 'دسترس‌پذیری (axe-core): سبد با عکسِ نسخه‌دار', v.join(' | '));
+  }
+  ok(ie.length === 0, 'IMG-12: بی خطای جاوااسکریپت', ie.join(' | '));
+  await ic.close();
 }
 
 await page.goto(`${base}/store/no-such-store`);

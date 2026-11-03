@@ -220,6 +220,7 @@ class SettingsTiersTest {
       SettingsLayout.RETURNS to listOf("data/ReturnSettings.kt" to "ENABLED"),
       SettingsLayout.PAY_FIX to listOf("data/PayFixAndroid.kt" to "KEY"),
       SettingsLayout.TILL_RECEIVE to listOf("data/TillReceiveAndroid.kt" to "KEY"),
+      SettingsLayout.MULTI_DRAWER to listOf("data/TillDrawerAndroid.kt" to "KEY"),
       SettingsLayout.POS_TOUCH to listOf("ui/components/pos/PosTouchPrefsAndroid.kt" to "ON"),
       SettingsLayout.POS_MORE_KEYS to listOf("ui/components/pos/PosMoreKeysPrefsAndroid.kt" to "KEY"),
       SettingsLayout.TILL_SWITCH to listOf("data/TillUserAndroid.kt" to "KEY"),

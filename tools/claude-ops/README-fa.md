@@ -72,6 +72,8 @@
 - **Kotlin:** نامِ آزمونِ backtick بی `: . ; [ ] / < > \` (`python3 $OPS/kt-names.py <wt>`)؛ وابستگیِ پلتفرم فقط در `*Android.kt`؛ هر `Str*` تازه در `core/i18n/I18nTables.kt`؛ هر نویسندهٔ تنظیم صفحهٔ v3 می‌خواهد (`SettingsPortTest.EXCEPTIONS` خالی است).
 - **حافظه:** کامپایلِ Kotlin با `-Pkotlin.compiler.execution.strategy=in-process` و `--no-daemon` (desk-check همین را دارد).
 - **رفع‌شده‌ها (دوباره نیاورید):** `tenant-matrix` (ردپای «الف» پس از آرام شدنِ نوشتن‌های بی‌await)، `web-store-zones.mjs` (`addRice` با کلیکِ DOM).
+  بلیت/توکنِ «دست‌خورده» با پسوندِ ثابت (`slice(0, -2)}xx`) یک بار در ۴۰۹۶ خودِ توکنِ درست است ⇒ فقط `h.tampered(token)` ِ `server/test/helpers.js`
+  (سرخیِ «زیرِ Electron» ِ `shop-chat` روی 83dcd9f2، run 41585590213).
 - **«آزمون‌های سرور زیرِ Electron»** گاه ۴۵ دقیقه گیر می‌کرد؛ PR ‏#838 (نگهبانِ پرونده + ساختنِ PGlite با حلقهٔ رویدادِ زنده) — باید CI ِ آن سبز و مرج شود.
 - **چک‌های آیفون** («رابطِ مشترکِ آیفون — klib» و «برنامهٔ آیفون — Xcode») `continue-on-error`اند؛ فایل‌های تازهٔ اندروید باید برای iOS شیم بگیرند، نه exclude.
   shim ِ هم‌نامِ ردهٔ زمانِ اجرای Kotlin/Native (`java.lang.Double`، `Long`، `Number`…) **`internal`** باشد، وگرنه پیوندِ چارچوب با
