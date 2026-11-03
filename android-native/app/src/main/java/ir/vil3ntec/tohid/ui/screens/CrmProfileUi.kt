@@ -32,7 +32,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
-import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.CustomerProfileForm
@@ -101,7 +100,7 @@ internal fun CrmListTools(d: ShopData, tag: String?, onTag: (String?) -> Unit, o
 @Composable
 internal fun CrmExtraLine(debtor: Debtor) {
   val on = ShopPolicy.crmReports(LocalContext.current)
-  val line = if (on) CustomerProfileForm.extraLine(debtor) else ""
+  val line = if (on) CustomerProfileForm.extraLine(debtor, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()) else ""
   if (line.isBlank()) return
   Spacer(Modifier.height(4.dp))
   Text(line, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
@@ -137,6 +136,7 @@ internal fun CrmProfileDialog(debtor: Debtor, onDismiss: () -> Unit, onSave: (ph
  */
 @Composable
 internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () -> Unit, toast: (String) -> Unit) {
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15: شمارهٔ مشتری بی مجوز پوشیده
   val scope = rememberCoroutineScope()
   val groups = remember(d) { CustomerMerge.duplicates(d) }
   val blocked = remember { store.mergeBlockedReason() }
@@ -195,7 +195,7 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
                   Row(Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                       Text(m.name, style = MaterialTheme.typography.bodyMedium, color = c.text)
-                      val phones = CustomerCrm.phones(m).joinToString(" · ") { LocaleText.phoneDisplay(it) }
+                      val phones = CustomerCrm.phones(m).joinToString(" · ") { ir.vil3ntec.tohid.ui.components.customerPhone(it, contacts) }
                       if (phones.isNotBlank()) Text(phones, style = MaterialTheme.typography.labelSmall, color = c.muted)
                     }
                     when {

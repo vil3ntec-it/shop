@@ -133,6 +133,12 @@
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,
     },
+    //  CRM-15: دیدنِ شماره و نشانیِ مشتری (کمترین اطلاعاتِ شخصی) — فقط نمایش (داده روی دستگاه هست)؛ سه نقشِ قدیم و
+    //  صندوق‌دار و حسابدار مثلِ امروز می‌بینند، انباردار و جمع‌آور نه؛ صاحب برای هر نقش یا کاربر تنگ یا باز می‌کند
+    'customers.contact': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'allow'),
+      edit: 'full', approvable: false, caps: [], display: true,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

@@ -462,7 +462,7 @@ fun DebtorTile(
       )
       //  تا دو خط، وسط‌چین: «۱٬۰۰۰ افغانی بدهکار» در کارتِ ۱۱۴dpِ گوشی کامل دیده می‌شود
       Text(
-        DebtorListModel.subtitle(row),
+        DebtorListModel.subtitle(row, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
         textAlign = TextAlign.Center,

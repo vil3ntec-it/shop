@@ -118,7 +118,7 @@ internal fun DebtorDrawer(
       val turn by animateFloatAsState(if (open) 180f else 0f, V3Springs.ui(), label = "drawerChevron")
       V3ListRow(
         title = StrMoney.actionsAndInfo,
-        subtitle = DebtorLedgerModel.summary(account.debtor.phone, account.since),
+        subtitle = DebtorLedgerModel.summary(account.debtor.phone, account.since, contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
         subtitleLines = 1,
         icon = Icons.Outlined.Tune,
         minHeight = 56.dp,
@@ -184,7 +184,8 @@ private fun DrawerInfo(account: DebtorEngine.Account, book: DebtBook.Book?) {
   val lines = remember(account, book) { DebtorLedgerModel.info(account, book) }
   val notes = account.debtor.notes
   //  CRM-02/11: شمارهٔ دوم و برچسب‌های پرونده (همان خطِ `CustomerProfileForm.extraLine` ِ پروندهٔ کامپیوتر)
-  val profile = remember(account.debtor) { ir.vil3ntec.tohid.data.CustomerProfileForm.extraLine(account.debtor) }
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15
+  val profile = remember(account.debtor, contacts) { ir.vil3ntec.tohid.data.CustomerProfileForm.extraLine(account.debtor, contacts) }
   //  CRM-09: نشانیِ تحویلِ پرونده (یک سطر: نشانه، ناحیه، دروازه، طبقه، Plus Code، کدِ پستی)
   val address = remember(account.debtor) { ir.vil3ntec.tohid.data.CustomerCrm.addressLine(account.debtor.deliveryAddress) }
   if (lines.isEmpty() && notes.isBlank() && profile.isBlank() && address.isBlank()) return

@@ -233,7 +233,7 @@ private fun CustomerCards(store: ShopStore, d: ShopData, snackbar: SnackbarHostS
           val r = list[i]
           when (c) {
             0 -> TCell(r.name, bold = true)
-            1 -> TCell(ir.vil3ntec.tohid.LocaleText.phoneDisplay(r.phone), Shop.colors.muted)
+            1 -> TCell(ir.vil3ntec.tohid.ui.components.customerPhone(r.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()), Shop.colors.muted)
             2 -> TCell(if (kotlin.math.abs(r.balance) < 0.5) "صاف" else money(r.balance), stateColor(r.balance), bold = true)
             3 -> TCell(r.debtDays?.toString().orEmpty(), if ((r.debtDays ?: 0) > 60) Shop.colors.danger else Shop.colors.muted)
             4 -> TCell(r.invoices.toString())
@@ -306,7 +306,7 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
       Spacer(Modifier.width(10.dp))
       Column(Modifier.weight(1f)) {
         Text(s.name, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(ir.vil3ntec.tohid.LocaleText.phoneDisplay(s.phone).ifBlank { "بی تلفن" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.ui.components.customerPhone(s.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()).ifBlank { "بی تلفن" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
     }
     Spacer(Modifier.weight(1f))
@@ -407,7 +407,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       Spacer(Modifier.width(12.dp))
       Column(Modifier.weight(1f)) {
         Text(debtor.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-        Text(listOf(ir.vil3ntec.tohid.LocaleText.phoneDisplay(debtor.phone), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
+        Text(listOf(ir.vil3ntec.tohid.ui.components.customerPhone(debtor.phone, ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()), DebtorEngine.stateText(s.balance), debtor.notes).filter { it.isNotBlank() }.joinToString(" · "),
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         CrmExtraLine(debtor)
       }
