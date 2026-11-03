@@ -51,11 +51,12 @@ class HomeTilesTest {
 
   @Test
   fun `نامِ دسترس‌پذیرِ کاشی شمار را می‌گوید`() {
-    assertTrue(StrOrdersHub.tileA11y(2, 5).contains("2") && StrOrdersHub.tileA11y(2, 5).contains("تازه"))
-    assertTrue(StrOrdersHub.tileA11y(0, 5).contains("5"))
-    assertEquals(StrOrdersHub.tile, StrOrdersHub.tileA11y(0, 0))
+    val a = HomeTiles.a11y(HomeTiles.Orders(fresh = 2, active = 5))
+    assertTrue(a.contains("2") && a.contains("تازه"))
+    assertTrue(HomeTiles.a11y(HomeTiles.Orders(0, 5)).contains("5"))
+    assertEquals(StrOrdersHub.tile, HomeTiles.a11y(HomeTiles.Orders(0, 0)))
     I18n.source = { Lang.EN }
-    assertEquals("Online orders, 2 new", StrOrdersHub.tileA11y(2, 5))
+    assertEquals("Online orders, 2 new", HomeTiles.a11y(HomeTiles.Orders(2, 5)))
   }
 
   @Test

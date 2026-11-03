@@ -126,7 +126,7 @@ internal fun HomeOrdersTile(o: HomeTiles.Orders, onClick: () -> Unit, modifier: 
   val accent = HomeAccents.color(s, HomeAccents.ORDERS)
   val awaiting = PhoneV3Roles.status(p, V3Status.AWAITING)
   val quiet = PhoneV3Roles.status(p, V3Status.INACTIVE)
-  val a11y = StrOrdersHub.tileA11y(o.fresh, o.active)
+  val a11y = HomeTiles.a11y(o)
   val shape = RoundedCornerShape(HomeCardSpec.tile)
   Column(
     modifier

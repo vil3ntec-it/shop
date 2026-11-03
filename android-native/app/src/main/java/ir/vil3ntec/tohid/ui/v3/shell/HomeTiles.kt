@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.shell
 
+import ir.vil3ntec.tohid.core.i18n.StrOrdersHub
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 
@@ -26,6 +27,13 @@ object HomeTiles {
     val fresh = (counts["new"] ?: 0).coerceAtLeast(0)
     val active = OrderStates.OPEN_TABS.filter { it != "new" }.sumOf { (counts[it] ?: 0).coerceAtLeast(0) }
     return Orders(fresh, active)
+  }
+
+  /** نامِ دسترس‌پذیرِ کاشی: شمارِ تازه‌ها، بی تازه شمارِ در-کارها، هیچ ⇒ همان نام */
+  fun a11y(o: Orders): String = when {
+    o.fresh > 0 -> StrOrdersHub.tileFresh(o.fresh)
+    o.active > 0 -> StrOrdersHub.tileActive(o.active)
+    else -> StrOrdersHub.tile
   }
 
   /** دکمهٔ شناورِ «فروشِ تازه» روی خانه: کاشیِ فروش رفته و نوار هم راهِ صندوق («فروش» یا «اسکن») ندارد */

@@ -10,11 +10,10 @@ object StrOrdersHub {
 
   // ── کاشیِ خانه ──
   val tile: String get() = t("سفارش‌های آنلاین", "Online orders", "آنلاین فرمایشونه")
-  fun tileA11y(fresh: Int, active: Int): String = when {
-    fresh > 0 -> t("سفارش‌های آنلاین، ${asIs(fresh)} سفارشِ تازه", "Online orders, $fresh new", "آنلاین فرمایشونه، $fresh نوي")
-    active > 0 -> t("سفارش‌های آنلاین، ${asIs(active)} سفارشِ در کار", "Online orders, $active in progress", "آنلاین فرمایشونه، $active په کار کې")
-    else -> tile
-  }
+  /** نامِ دسترس‌پذیرِ کاشی با سفارشِ تازه (انتخابِ متن: `HomeTiles.a11y`) */
+  fun tileFresh(n: Int): String = t("سفارش‌های آنلاین، ${asIs(n)} سفارشِ تازه", "Online orders, $n new", "آنلاین فرمایشونه، $n نوي")
+  /** … بی تازه، با سفارش‌های در کار */
+  fun tileActive(n: Int): String = t("سفارش‌های آنلاین، ${asIs(n)} سفارشِ در کار", "Online orders, $n in progress", "آنلاین فرمایشونه، $n په کار کې")
   val saleFab: String get() = t("فروشِ تازه", "New sale", "نوی پلور")
 
   // ── برگه‌های صف (نامِ صاحب‌کار؛ هسته و وب همان `OrderText` می‌مانند) ──
