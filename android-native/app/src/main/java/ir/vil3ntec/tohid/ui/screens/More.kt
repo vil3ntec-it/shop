@@ -28,6 +28,7 @@ import androidx.compose.material.icons.filled.Forum
 import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocalOffer
 import androidx.compose.material.icons.filled.LocalShipping
+import androidx.compose.material.icons.filled.NewReleases
 import androidx.compose.material.icons.filled.ManageSearch
 import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.ReceiptLong
@@ -193,6 +194,14 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
         tint = Shop.colors.warning,
         subtitle = StrNav.mySubscriptionSub,
         onClick = { onOpen("myplan") },
+      )
+      //  OPS-05: «تازه‌ها» — همهٔ تغییرهای هر نسخه، برای همه (برگهٔ یک‌باره پس از به‌روزرسانی در پوسته)
+      MoreCard(
+        title = ir.vil3ntec.tohid.core.i18n.StrSettings.whatsNew,
+        icon = Icons.Filled.NewReleases,
+        tint = Shop.colors.primary,
+        subtitle = ir.vil3ntec.tohid.core.i18n.StrSettings.whatsNewAll,
+        onClick = { onOpen(WHATS_NEW_ROUTE) },
       )
       /*
        *  گفت‌وگو با مشتری (v3 §۳۳) — ⛔ فقط وقتی سرور برای همین دکان پرچمِ

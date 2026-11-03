@@ -188,6 +188,7 @@ class SettingsTiersTest {
   companion object {
     /** A ⇐ پرونده و نامِ کلیدِ `getBoolean` (پیش‌فرض باید `true` باشد) */
     val A_PREFS: Map<String, List<Pair<String, String>>> = mapOf(
+      SettingsLayout.WHATS_NEW to listOf("data/WhatsNewPrefAndroid.kt" to "KEY_ON"),
       SettingsLayout.FRAUD_TRAIL to listOf("data/FraudTrailAndroid.kt" to "KEY"),
       SettingsLayout.POS_SEARCH to listOf("ui/components/pos/PosSearchPrefsAndroid.kt" to "KEY"),
       SettingsLayout.POS_PRICE_CHECK to listOf("ui/components/pos/PosPriceCheckPrefsAndroid.kt" to "KEY"),
