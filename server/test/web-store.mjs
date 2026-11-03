@@ -752,8 +752,15 @@ ok(!fs.readFileSync(path.join(import.meta.dirname, '..', 'public', 'store', 'ind
     await ip.goto(`${base}/store/${slug}#/cart`);
     await ip.waitForSelector(LINE, { timeout: 10000 });
     await loaded(LINE, `${P}/thumb?v=${v2}`);
-    //  پایانِ گذارِ بازشدنِ برگه (رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد)
-    await ip.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished.catch(() => null))));
+    //  پایانِ گذارِ بازشدنِ برگه (رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد). `cart-open` در requestAnimationFrame ِ پس از
+    //  نمایشِ سطرها می‌آید (`K.cartOpen`)، پس getAnimations ِ همان لحظه گاه هنوز خالی بود و axe برگهٔ نیمه‌پیدا را می‌سنجید
+    //  (CI ِ #881: `sum.colon` با کنتراستِ ۱٫۲۶)؛ پس تا برگه کامل پیدا و همهٔ گذارها تمام شوند صبر می‌شود.
+    await ip.waitForFunction(() => {
+      const sh = document.getElementById('cart-sheet');
+      return Boolean(sh) && !sh.hidden && getComputedStyle(sh).opacity === '1'
+        && (!document.body.classList.contains('phone-cart') || document.body.classList.contains('cart-open'))
+        && document.getAnimations().every((a) => a.playState === 'finished');
+    }, null, { timeout: 10000 });
     await ip.addScriptTag({ content: axeSrc });
     const v = await ip.evaluate(async () => (await window.axe.run(document, { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] }))
       .violations.map((x) => `${x.id}: ${x.nodes.slice(0, 3).map((n) => n.target.join(' ') + ' ' + (n.any[0] && n.any[0].message)).join(' ; ')}`));
