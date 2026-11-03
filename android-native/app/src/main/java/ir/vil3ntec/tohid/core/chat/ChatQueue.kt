@@ -42,6 +42,8 @@ data class OutboxItem(
   /** بارگذاری‌شده ⇒ تلاشِ بعدی دوباره نمی‌فرستد */
   val mediaId: String? = null,
   val thumbId: String? = null,
+  /** CHAT-14: پاسخ به این پیامِ سرور (همان `replyTo` ِ `POST …/messages`) */
+  val replyTo: String? = null,
   val state: String = ChatQueue.QUEUED,
   val attempts: Int = 0,
   val nextAt: Long = 0,
@@ -133,13 +135,14 @@ class ChatQueue(
     thumbKey: String? = null,
     size: Long = 0,
     clientId: String? = null,
+    replyTo: String? = null,
   ): OutboxItem {
     //  ترتیب حتی با دو پیام در یک میلی‌ثانیه؛ همان عدد در شناسه ⇒ یکتا
     val at = max(now(), (items.maxOfOrNull { it.createdAt } ?: 0) + 1)
     val item = OutboxItem(
       clientId = clientId?.takeIf { ChatIds.valid(it) } ?: ChatIds.next(at, random),
       convId = convId, kind = kind, body = body, meta = meta,
-      blobKey = blobKey, thumbKey = thumbKey, size = size, createdAt = at,
+      blobKey = blobKey, thumbKey = thumbKey, size = size, createdAt = at, replyTo = replyTo?.takeIf { it.isNotBlank() },
     )
     items += item
     persist()

@@ -146,7 +146,8 @@ open class HttpURLConnection internal constructor(url: URL) : URLConnection(url)
   private fun response(): Response = done ?: execute().also { done = it }
 
   private fun execute(): Response {
-    val request = NSMutableURLRequest.requestWithURL(url.ns)
+    //  آزمونِ سرتاسریِ شبیه‌ساز: همان میزبان ⇐ سرورِ آزمونِ همین مک (`IosNetRoute`؛ در برنامه دست‌نخورده)
+    val request = NSMutableURLRequest.requestWithURL(ir.vil3ntec.tohid.ios.IosNetRoute.url(url.ns))
     request.setHTTPMethod(requestMethod)
     val timeout = maxOf(connectTimeout, readTimeout)
     if (timeout > 0) request.setTimeoutInterval(timeout / 1000.0)

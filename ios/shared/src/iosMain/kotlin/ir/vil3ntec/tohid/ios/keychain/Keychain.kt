@@ -33,6 +33,7 @@ import platform.Security.kSecMatchLimit
 import platform.Security.kSecMatchLimitOne
 import platform.Security.kSecReturnData
 import platform.Security.kSecValueData
+import ir.vil3ntec.tohid.ios.jvm.synchronized
 import java.net.toByteArray
 import java.net.toNSData
 
@@ -47,7 +48,18 @@ class KeychainException(val status: Int, message: String) : Exception("$message 
 object Keychain {
   const val SERVICE = "ir.vil3ntec.tohid"
 
-  fun read(account: String): ByteArray? = memScoped {
+  /**
+   *  فقط آزمونِ سرتاسریِ شبیه‌ساز (گامِ ۸، `CoreFlowsE2EIosTest`): فرآیندِ بی بستهٔ آزمون (`test.kexe`) اگر اجازهٔ کلیددان
+   *  نداشت (errSecMissingEntitlement)، کلیددانی درونِ حافظهٔ همان فرآیند. در برنامه همیشه null و هر قلم در کلیددانِ iOS.
+   */
+  internal var memory: HashMap<String, ByteArray>? = null
+
+  fun read(account: String): ByteArray? {
+    memory?.let { m -> return synchronized(m) { m[account]?.copyOf() } }
+    return readKeychain(account)
+  }
+
+  private fun readKeychain(account: String): ByteArray? = memScoped {
     val q = query(account)
     CFDictionaryAddValue(q, kSecReturnData, kCFBooleanTrue)
     CFDictionaryAddValue(q, kSecMatchLimit, kSecMatchLimitOne)
@@ -63,6 +75,7 @@ object Keychain {
 
   /** فقط اگر نیست؛ بود ⇒ false (مقدارِ پیشین دست نمی‌خورد) */
   fun add(account: String, value: ByteArray): Boolean {
+    memory?.let { m -> return synchronized(m) { if (account in m) false else { m[account] = value.copyOf(); true } } }
     val q = query(account)
     val data = CFBridgingRetain(value.toNSData())
     CFDictionaryAddValue(q, kSecValueData, data)
@@ -83,6 +96,7 @@ object Keychain {
   }
 
   fun delete(account: String) {
+    memory?.let { m -> synchronized(m) { m.remove(account) }; return }
     val q = query(account)
     val rc = SecItemDelete(q)
     CFRelease(q)

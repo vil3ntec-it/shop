@@ -103,6 +103,8 @@ fun SaleScreen(
   tools: (@Composable () -> Unit)? = null,
   /** INV-03: مقدارِ هر کالا در فاکتورهای نگه‌داشته (`HeldStock.reserved`) ⇒ موجودیِ کاشی «قابل‌فروش» */
   held: Map<String, Double> = emptyMap(),
+  /** POS-06: کالاهای سنجاق‌شدهٔ همین دستگاه (`TillPinsPrefs`) سرِ شبکه؛ خالی ⇒ همان شبکهٔ امروز */
+  pins: List<String> = emptyList(),
 ) {
   var search by rememberSaveable { mutableStateOf(start.search) }
   var picked by rememberSaveable { mutableStateOf<String?>(null) }
@@ -120,7 +122,7 @@ fun SaleScreen(
 
   val index = remember(d.products, d.sales, d.saleItems) { CatalogModel.index(d) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
-  val items = remember(index, search, category, inCart, d, held) { CatalogModel.items(d, index, search, category, inCart, held) }
+  val items = remember(index, search, category, inCart, d, held, pins) { CatalogModel.items(d, index, search, category, inCart, held, pins) }
   val best = remember(index, inCart, d, held) { CatalogModel.bestsellers(d, index, inCart, held) }
   val rows = remember(cart, d.products) { CartSummary.rows(cart, d.products) }
 

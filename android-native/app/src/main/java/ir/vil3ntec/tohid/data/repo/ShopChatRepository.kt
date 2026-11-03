@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.chat.ChatConfig
 import ir.vil3ntec.tohid.core.chat.ChatConversation
 import ir.vil3ntec.tohid.core.chat.ChatList
 import ir.vil3ntec.tohid.core.chat.ChatMessage
+import ir.vil3ntec.tohid.core.chat.ChatSearchResult
 import ir.vil3ntec.tohid.core.chat.OutboxItem
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
@@ -64,6 +65,7 @@ class ShopChatRepository(private val api: ApiClient) {
       put("body", item.body)
       item.mediaId?.let { put("mediaId", it) }
       item.thumbId?.let { put("thumbId", it) }
+      item.replyTo?.let { put("replyTo", it) }
       if (!item.meta.isEmpty) put("meta", buildJsonObject {
         item.meta.durationMs?.let { put("durationMs", it) }
         item.meta.width?.let { put("width", it) }
@@ -98,6 +100,23 @@ class ShopChatRepository(private val api: ApiClient) {
   suspend fun setBlock(id: String, on: Boolean): ApiResult<ChatConversation> = result {
     val path = ApiEndpoints.ShopChat.conversation(id) + "/block"
     conv(if (on) api.put(path) else api.delete(path))
+  }
+
+  /** CHAT-14: ویرایشِ پیامِ خود در مهلت (`POST …/messages/:mid/edit` = همان PATCH ِ سرور؛ JVM ِ کامپیوتر PATCH نمی‌فرستد) */
+  suspend fun edit(convId: String, messageId: String, body: String): ApiResult<ChatMessage> = result {
+    val out = api.post(ApiEndpoints.ShopChat.message(convId, messageId) + "/edit", buildJsonObject { put("body", body) })
+    ApiJson.decodeAt<ChatMessage>(out, "message") ?: throw ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse()
+  }
+
+  /** CHAT-14: سنجاق/برداشتنِ سنجاقِ طرفِ دکان (`PUT|DELETE …/pins/:mid`) ⇒ گفت‌وگو با `pinned` ِ تازه */
+  suspend fun pin(convId: String, messageId: String, on: Boolean): ApiResult<ChatConversation> = result {
+    val path = ApiEndpoints.ShopChat.pin(convId, messageId)
+    conv(if (on) api.put(path) else api.delete(path))
+  }
+
+  /** CHAT-14: جست‌وجو در پیام‌های مجازِ همین دکان (`GET /search?q=`، دست‌کم دو نویسه) */
+  suspend fun search(q: String, limit: Int = 30): ApiResult<ChatSearchResult> = result {
+    ApiJson.decode<ChatSearchResult>(api.get(ApiEndpoints.withQuery(ApiEndpoints.ShopChat.SEARCH, mapOf("q" to q.trim(), "limit" to limit))))
   }
 
   /** @return true اگر همین مورد پیش‌تر گزارش شده بود */

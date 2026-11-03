@@ -247,3 +247,43 @@ test('مهاجرتِ ۱۴۱: برگشتِ نوشته‌شده در خودِ فا
   await query(sql);
   assert.equal(await exists(), true, 'فایل دوباره‌اجراشدنی است (IF NOT EXISTS)');
 });
+
+test('CHAT-14: ویرایش با POST …/edit (برنامهٔ کامپیوتر PATCH نمی‌فرستد) همان قاعدهٔ PATCH — فقط نویسنده؛ پاسخ و جست‌وجو برای برنامهٔ مدیریت', async () => {
+  const o = await chatShop('ویرایش');
+  const staff = await member(o.shopId, 'staff', 'شاگردِ ویرایش');
+  const me = customer(o.shopId, '+93790000351');
+  const conv = (await chat.open(me, {})).conversation.id;
+  const asked = (await chat.send(me, conv, { clientId: cid(), body: 'برنجِ سیلا دارید؟' })).message;
+  //  پاسخ به پیامِ مشتری (برنامه `replyTo` می‌فرستد)
+  const mine = await h.post(`${base}/conversations/${conv}/messages`, { clientId: cid(), body: 'بله، ده کیلو', replyTo: asked.id }, { token: o.token });
+  assert.equal(mine.status, 201, JSON.stringify(mine.body));
+  assert.equal(mine.body.message.replyTo, asked.id);
+
+  const edit = (token, mid, body) => h.post(`${base}/conversations/${conv}/messages/${mid}/edit`, { body }, { token });
+  const ok = await edit(o.token, mine.body.message.id, 'بله، بیست کیلو');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.message.body, 'بله، بیست کیلو');
+  assert.ok(ok.body.message.editedAt > 0);
+  assert.equal(ok.body.message.replyTo, asked.id);
+  //  کارمندِ دیگر پیامِ صاحب را ویرایش نمی‌کند؛ پیامِ مشتری را هیچ‌کس
+  assert.equal((await edit(staff.token, mine.body.message.id, 'دست‌کاری')).status, 403);
+  assert.equal((await edit(o.token, asked.id, 'دست‌کاری')).status, 403);
+  //  گفت‌وگو/پیامِ ناشناس ⇒ ۴۰۴
+  assert.equal((await h.post(`${base}/conversations/${conv}/messages/nope/edit`, { body: 'x' }, { token: o.token })).status, 404);
+  //  مهلت گذشت ⇒ ۴۰۳ `edit_window_passed`
+  await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE id = $1', [mine.body.message.id, 16 * 60 * 1000]);
+  const late = await edit(o.token, mine.body.message.id, 'دیر');
+  assert.equal(late.status, 403);
+  assert.equal(late.body.error.code, 'edit_window_passed');
+
+  //  جست‌وجو: متنِ تازهٔ ویرایش‌شده پیدا می‌شود، متنِ کهنه نه
+  const hit = await h.get(`${base}/search?q=${encodeURIComponent('بیست')}`, { token: staff.token });
+  assert.equal(hit.status, 200, JSON.stringify(hit.body));
+  assert.deepEqual(hit.body.results.map((r) => [r.conversationId, r.id]), [[conv, mine.body.message.id]]);
+  assert.equal((await h.get(`${base}/search?q=${encodeURIComponent('ده کیلو')}`, { token: staff.token })).body.results.length, 0);
+  assert.equal((await h.get(`${base}/search?q=x`, { token: staff.token })).status, 400);
+
+  //  پرچمِ خاموش ⇒ ۴۰۴
+  await setFlag(o.shopId, 'shop.chat', false);
+  assert.equal((await edit(o.token, mine.body.message.id, 'خاموش')).status, 404);
+});

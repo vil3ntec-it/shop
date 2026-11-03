@@ -21,8 +21,8 @@ const { rateLimit, refund } = require('../middleware/ratelimit');
 const { notFound } = require('../middleware/errors');
 
 const router = express.Router();
-//  رشته‌های پیشینِ همین مشتری (یک رشته برای هر سفارش، `lib/shop-chat-life.js`) — سطلِ IP پیش از احراز
-router.use('/conversations/:id/history', rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-history-ip' }));
+//  سطلِ IP ِ خودِ چت **پیش از** احراز (CodeQL `js/missing-rate-limiting`)؛ همان سقفِ `general` ِ سراسری ⇒ رفتار همان
+router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' }));
 router.use(requireUser, requireShop, requirePermission('chat.view'));
 
 const viewerOf = (req) => ({ side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role });
@@ -95,6 +95,11 @@ router.post('/conversations/:id/messages', on, reply, sendLimit, async (req, res
 });
 
 router.patch('/conversations/:id/messages/:mid', on, reply, async (req, res) => {
+  res.json(await chat.edit(viewerOf(req), req.params.id, req.params.mid, req.body));
+});
+
+//  CHAT-14: همان ویرایش با POST — `HttpURLConnection` ِ برنامهٔ کامپیوتر PATCH نمی‌فرستد (الگوی `orders.js`)
+router.post('/conversations/:id/messages/:mid/edit', on, reply, async (req, res) => {
   res.json(await chat.edit(viewerOf(req), req.params.id, req.params.mid, req.body));
 });
 

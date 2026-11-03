@@ -11,6 +11,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import ir.vil3ntec.tohid.core.chat.ChatActions
 import ir.vil3ntec.tohid.core.chat.ChatBackoff
 import ir.vil3ntec.tohid.core.chat.ChatConfig
 import ir.vil3ntec.tohid.core.chat.ChatConversation
@@ -60,6 +61,17 @@ internal class ChatThreadController(
   val full = mutableStateMapOf<String, Boolean>()
 
   val conversation: ChatConversation? get() = thread.conversation
+
+  /** CHAT-14: پیامی که پاسخِ بعدی به آن است (نوارِ بالای کادر) */
+  var replying by mutableStateOf<ChatMessage?>(null)
+  /** CHAT-14: پیامِ خودم که در کادر ویرایش می‌شود */
+  var editing by mutableStateOf<ChatMessage?>(null)
+
+  /** کارهای این پیام (پاسخ، ویرایش، سنجاق) — همان قاعدهٔ سرور، `ChatActions` */
+  fun actionsOf(m: ChatMessage): List<ChatActions.Action> =
+    ChatActions.of(m, conversation, cfg.permissions, cfg.limits.editWindowMs, now())
+
+  fun pinned(server: List<ChatMessage>): List<ChatMessage> = ChatActions.pinned(conversation, server)
 
   fun messages(): List<ChatMessage> = thread.list()
 
@@ -152,8 +164,26 @@ internal class ChatThreadController(
   fun sendText(body: String) {
     val b = body.trim()
     if (b.isEmpty()) return
-    queue?.add(convId, kind = "text", body = b)
+    queue?.add(convId, kind = "text", body = b, replyTo = replying?.id)
+    replying = null
     ShopChatSync.flush(context, convId)
+  }
+
+  /** CHAT-14: متنِ تازهٔ پیامِ خودم (`POST …/edit`)؛ @return true اگر سرور پذیرفت */
+  suspend fun saveEdit(m: ChatMessage, body: String): Boolean {
+    val b = body.trim()
+    if (b.isEmpty()) return false
+    var ok = false
+    repo.edit(convId, m.id, b)
+      .onSuccess { if (thread.add(it)) tick++; editing = null; ok = true }
+      .onFailure { banner = it.userMessage to true }
+    return ok
+  }
+
+  /** CHAT-14: سنجاق/برداشتنِ سنجاقِ طرفِ دکان */
+  suspend fun togglePin(m: ChatMessage) {
+    val on = conversation?.pinned.orEmpty().none { it.messageId == m.id }
+    repo.pin(convId, m.id, on).onSuccess(::changed).onFailure { banner = it.userMessage to true }
   }
 
   /** عکس روی همین دستگاه کوچک و چرخیده و بی EXIF می‌شود، بعد در صف می‌رود; @return true اگر رفت */
@@ -163,13 +193,14 @@ internal class ChatThreadController(
     var ok = false
     prepared.onSuccess { p ->
       val q = queue ?: return@onSuccess
-      val id = ChatIds.next(System.currentTimeMillis())
+      val id = ChatIds.next(now())
       ShopChatSync.putBlob(context, "$id-main", p.main)
       ShopChatSync.putBlob(context, "$id-thumb", p.thumb)
       q.add(
         convId, kind = "image", body = caption.trim(), meta = ChatMeta(width = p.width, height = p.height),
-        blobKey = "$id-main", thumbKey = "$id-thumb", size = p.main.size.toLong(), clientId = id,
+        blobKey = "$id-main", thumbKey = "$id-thumb", size = p.main.size.toLong(), clientId = id, replyTo = replying?.id,
       )
+      replying = null
       banner = StrOnline.ctPhotoReady(OnlineFmt.kb(p.main.size.toLong())) to false
       ShopChatSync.flush(context, convId)
       ok = true
@@ -179,9 +210,10 @@ internal class ChatThreadController(
 
   fun sendVoice(bytes: ByteArray, ms: Long) {
     val q = queue ?: return
-    val id = ChatIds.next(System.currentTimeMillis())
+    val id = ChatIds.next(now())
     ShopChatSync.putBlob(context, "$id-main", bytes)
-    q.add(convId, kind = "audio", meta = ChatMeta(durationMs = maxOf(1L, ms)), blobKey = "$id-main", size = bytes.size.toLong(), clientId = id)
+    q.add(convId, kind = "audio", meta = ChatMeta(durationMs = maxOf(1L, ms)), blobKey = "$id-main", size = bytes.size.toLong(), clientId = id, replyTo = replying?.id)
+    replying = null
     ShopChatSync.flush(context, convId)
   }
 
@@ -210,6 +242,8 @@ internal class ChatThreadController(
 
   companion object {
     private const val LONG_POLL_MS = 20_000L
+
+    private fun now(): Long = System.currentTimeMillis()
 
     /** صدا روی گوشی پخش می‌شود؛ کامپیوتر رمزگشای صدای پیام (ogg/aac) را ندارد ⇒ «ذخیرهٔ فایل» */
     private var player: ChatMedia.Player? = null

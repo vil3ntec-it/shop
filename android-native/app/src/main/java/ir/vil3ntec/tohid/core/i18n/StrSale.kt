@@ -530,4 +530,10 @@ object StrSale {
   fun feesBad(a: Any): String = t("این خط درست نیست، مبلغش صفر است یا کالایش پیدا نشد: ${asIs(a)}", "This line is wrong, has a zero amount or its item was not found: $a", "دا کرښه سمه نه ده، اندازه یې صفر ده یا یې توکی ونه موندل شو: $a")
   val feesSave: String get() = t("ذخیره", "Save", "ثبت")
   val feesSaved: String get() = t("ذخیره شد", "Saved", "ثبت شو")
+
+  // POS-06 — چیدمانِ کاشی‌های صندوقِ همین دستگاه
+  val pinFirst: String get() = t("سنجاق در صفحهٔ اولِ این صندوق", "Pin to this till's first page", "د دې صندوق لومړي مخ ته ټاکل")
+  val unpinFirst: String get() = t("برداشتن از صفحهٔ اولِ این صندوق", "Unpin from this till's first page", "د دې صندوق له لومړي مخ لرې کول")
+  fun pinnedFirst(name: String): String = t("«${asIs(name)}» سرِ کاشی‌های این صندوق نشست", "\"$name\" is now first on this till", "«$name» د دې صندوق د توکو سر ته ورغی")
+  fun unpinnedFirst(name: String): String = t("«${asIs(name)}» از سرِ کاشی‌ها برداشته شد", "\"$name\" is no longer pinned", "«$name» له سر څخه لرې شو")
 }

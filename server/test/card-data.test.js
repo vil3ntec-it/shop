@@ -89,3 +89,51 @@ test('S117: هیچ ستون، کلید یا کادری برای شمارهٔ ک�
   assert.deepEqual(hits, [], 'دادهٔ کارت فقط در صفحهٔ ارائه‌دهنده گرفته می‌شود (S117)');
   assert.deepEqual([...CARD_FIELD_EXACT_OK].filter((k) => !usedOk.has(k)), [], 'استثنای بی‌کار در CARD_FIELD_EXACT_OK');
 });
+
+/* ── متنِ آزادِ کاربر: گفت‌وگوی پشتیبانی و یادداشتِ درخواستِ خرید ─────────────────────────────── */
+
+test('S117: پیامِ پشتیبانیِ دکان (کاربر و جوابِ مدیر) بی شمارهٔ کاملِ کارت ذخیره می‌شود؛ رشتهٔ پمپ دست نمی‌خورد', async () => {
+  const { query, newId, now } = require('../src/db');
+  const support = require('../src/lib/support');
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'card-admin','پشتیبان',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+
+  //  کاربرِ دکان (مهمان با شناسهٔ دستگاه) کارت را در متن می‌نویسد
+  const sent = await h.post('/api/support/messages', {
+    deviceUid: 'card-guest-1', body: `کارتم ${VISA} است و رمزِ ۴۴۴۴ — شمارهٔ فاکتور 6261234567890`,
+  });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  assert.equal(sent.body.message.body, 'کارتم [کارت] است و رمزِ ۴۴۴۴ — شمارهٔ فاکتور 6261234567890');
+  const row = await one('SELECT m.body, t.last_message, t.id AS thread_id FROM support_messages m JOIN support_threads t ON t.id = m.thread_id WHERE m.id = $1', [sent.body.message.id]);
+  assert.ok(!row.body.includes(VISA) && !row.last_message.includes(VISA), JSON.stringify(row));
+  assert.ok(row.last_message.includes('[کارت]'));
+
+  //  جوابِ مدیر در همان رشته (شکلِ فاصله‌دار)
+  const login = await h.post('/api/admin/login', { username: 'card-admin', password: 'Admin!12345' });
+  const replied = await h.post(`/api/admin/support/threads/${row.thread_id}/messages`,
+    { body: `شمارهٔ ${AMEX.slice(0, 4)} ${AMEX.slice(4, 10)} ${AMEX.slice(10)} را ننویسید` }, { token: login.body.token });
+  assert.equal(replied.status, 201, JSON.stringify(replied.body));
+  assert.equal(replied.body.message.body, 'شمارهٔ [کارت] را ننویسید');
+  const back = await h.get('/api/support/thread?deviceUid=card-guest-1');
+  const seen = back.body.messages.map((m) => m.body.replace(/[ -]/g, '')).join('\n');
+  assert.ok(!seen.includes(VISA) && !seen.includes(AMEX), seen);
+
+  //  ⛔ رشتهٔ پمپ (کدِ مشترک با پروژهٔ پمپ) همان رفتارِ پیشین
+  const pump = await support.threadFor({ app: 'pump', userId: '', shopId: '', deviceUid: 'card-pump-1', who: 'پمپ', contact: '' });
+  const pm = await support.post(pump.id, { sender: 'user', body: `کارت ${VISA}` });
+  assert.equal((await one('SELECT body FROM support_messages WHERE id = $1', [pm.id])).body, `کارت ${VISA}`);
+});
+
+test('S117: یادداشتِ درخواستِ خرید بی شمارهٔ کاملِ کارت ذخیره می‌شود', async () => {
+  const u = await h.newUser('کارت‌نویس');
+  const shop = await h.post('/api/shop', { name: 'دکانِ کارت' }, { token: u.accessToken });
+  assert.ok(shop.status < 300, JSON.stringify(shop.body));
+  const r = await h.post('/api/v1/me/purchase-request', { plan: 'm6', note: `از کارتِ ${VISA.replace(/(\d{4})(?=\d)/g, '$1-')} پرداختم` }, { token: u.accessToken });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const row = await one('SELECT note FROM purchase_requests WHERE id = $1', [r.body.request.id]);
+  assert.equal(row.note, 'از کارتِ [کارت] پرداختم');
+});
