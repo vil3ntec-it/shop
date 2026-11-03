@@ -31,7 +31,8 @@ object CustomerPickerModel {
 
   fun rows(d: ShopData, query: String): List<CustomerRow> {
     val q = query.trim()
-    return d.debtors
+    //  ⛔ فقط مشتریانِ فعال (CRM-10): ادغام‌شده این‌جا نسیه‌ای می‌گرفت که در هیچ فهرستی دیده نمی‌شد (`CreditDebtor`)
+    return ir.vil3ntec.tohid.data.CustomerCrm.active(d)
       .filter { q.isEmpty() || it.name.contains(q, ignoreCase = true) }
       .map { CustomerRow(it.id, it.name, it.phone, ShopStore.debt(d, it.id)) }
   }
@@ -50,5 +51,5 @@ object CustomerPickerModel {
   }
 
   /** فهرست خالی است ⇒ کدام جمله */
-  fun emptyText(d: ShopData): String = if (d.debtors.isEmpty()) StrSale.noDebtorsYet else StrSale.debtorNotFound
+  fun emptyText(d: ShopData): String = if (ir.vil3ntec.tohid.data.CustomerCrm.active(d).isEmpty()) StrSale.noDebtorsYet else StrSale.debtorNotFound
 }

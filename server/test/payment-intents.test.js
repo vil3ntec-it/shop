@@ -112,19 +112,20 @@ test('ساختگی هرگز در تولید: PAYMENTS_PROVIDER=fake + NODE_ENV=p
 
 test('پیکربندی: بی کلید یا بی پرچم ⇒ خاموش و ساختن ۴۰۳ hesabpay_disabled', async () => {
   const off = await shop('بی‌پرچم', { flag: false });
-  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: off.t })).body, { hesabpay: { enabled: false, mode: 'off' } });
+  assert.deepEqual((await h.get('/api/v1/shop/payments/config', { token: off.t })).body, { hesabpay: { enabled: false, flag: false, mode: 'off' } });
   const r = await createPos(off);
   assert.equal(r.status, 403);
   assert.equal(r.body.error.code, 'hesabpay_disabled');
 
   const on = await shop('با‌پرچم');
-  assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: true, mode: 'off' } });
+  assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: true, flag: true, mode: 'off' } });
   //  حساب‌پیِ واقعی بی حسابِ خودِ دکان ⇒ «پیکربندی نشده»، حتی با پرچم — و ⛔ کلیدِ سکو (`HESABPAY_*`) هرگز جایگزین نیست
   const keep = { ...process.env };
   Object.assign(process.env, { PAYMENTS_PROVIDER: '', HESABPAY_API_KEY: 'platform-key-123', HESABPAY_WEBHOOK_SECRET: 'platform-secret-1',
     HESABPAY_CRED_KEY: 'cred-key-for-config-test-0123456789abcdef' });
   try {
-    assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: false, mode: 'off' } });
+    //  پرچم روشن است (`flag`) ولی درگاهِ خودکار نه (`enabled`) — درِ NFC ِ صندوقِ گوشی هم بی حسابِ دکان بسته است
+    assert.deepEqual((await h.get('/api/shop/payments/config', { token: on.t })).body, { hesabpay: { enabled: false, flag: true, mode: 'off' } });
     assert.equal((await createPos(on)).body.error.code, 'hesabpay_disabled');
   } finally {
     for (const k of ['PAYMENTS_PROVIDER', 'HESABPAY_API_KEY', 'HESABPAY_WEBHOOK_SECRET', 'HESABPAY_CRED_KEY']) {

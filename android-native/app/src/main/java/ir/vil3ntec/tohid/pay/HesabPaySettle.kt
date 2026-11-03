@@ -66,7 +66,9 @@ object HesabPaySettle {
     val due = (due(total, draft) as? Due.Amount)?.minor ?: return bad("TOTAL_MISMATCH")
     if (row.amountMinor != due) return bad("TOTAL_MISMATCH")
     val ref = row.ref?.trim()?.ifEmpty { null } ?: row.intentId ?: intent.id
-    return withRow(total, draft, PaymentRow(row.method, row.kind, row.amountMinor, ref, row.status, row.verification))
+    //  #853: اثرِ انگشتِ گیرنده (سرور) روی ردیف — گزارشِ «پول به کدام حساب رفت»؛ سرورِ کهنه ⇒ بی آن، مثلِ پیش
+    val payee = row.payee?.trim()?.ifEmpty { null } ?: intent.payeeFp.trim().ifEmpty { null }
+    return withRow(total, draft, PaymentRow(row.method, row.kind, row.amountMinor, ref, row.status, row.verification, payee))
   }
 
   /** حالتِ ساده: تأییدِ صندوقدار (نه درگاه) */

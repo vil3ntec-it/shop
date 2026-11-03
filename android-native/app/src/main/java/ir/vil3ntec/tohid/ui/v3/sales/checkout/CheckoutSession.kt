@@ -33,6 +33,10 @@ object CheckoutSession {
   var credit by mutableStateOf<CreditAsk?>(null)
   /** تأییدِ سقفِ اعتبار؛ فقط همان مشتری و تا همان برد را می‌پوشاند (`CreditGate.state` هر بار می‌سنجد) */
   var creditApproval by mutableStateOf<CreditGate.Approval?>(null)
+  /** برگهٔ «پرداخت با حساب‌پی (NFC/QR)» ِ باز (`sale/checkout/hesabpay`، PAY-21) */
+  var hesab by mutableStateOf<HesabTillModel.Ask?>(null)
+  /** تسویهٔ تأییدشدهٔ حساب‌پی که هنوز ثبت نشده (ثبتِ ردشده ⇒ همان دوباره، بی پرداختِ دوم) */
+  var hesabPaid by mutableStateOf<ir.vil3ntec.tohid.core.pay.Settlement?>(null)
 
   fun reset() {
     form = null
@@ -43,5 +47,7 @@ object CheckoutSession {
     ask = null
     credit = null
     creditApproval = null
+    hesab = null
+    hesabPaid = null
   }
 }

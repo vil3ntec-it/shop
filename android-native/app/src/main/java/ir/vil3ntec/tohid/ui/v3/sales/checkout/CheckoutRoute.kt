@@ -43,6 +43,13 @@ import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 import ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalAsk
 import ir.vil3ntec.tohid.ui.v3.sales.approval.ApprovalSheet
 import ir.vil3ntec.tohid.ui.v3.sales.approval.CreditApprovalSheet
+import ir.vil3ntec.tohid.core.gateway.TillHesab
+import ir.vil3ntec.tohid.core.i18n.StrPay
+import ir.vil3ntec.tohid.core.i18n.StrTillPay
+import ir.vil3ntec.tohid.core.pay.Settlement
+import ir.vil3ntec.tohid.pay.HesabPaySettle
+import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
+import androidx.compose.runtime.produceState
 import kotlinx.coroutines.launch
 
 /**
@@ -107,14 +114,22 @@ fun RouteScope.CheckoutRoute() {
     val discountError = CheckoutModel.discountError(form, canDiscount)
     val paidError = CheckoutModel.paidError(form, payV2)
     val debtor = form.debtorId?.let { id -> data.debtors.find { it.id == id } }
+    //  ⛔ نسیه بی مشتری (`CreditDebtor`): هر سهمِ نپرداخته مشتریِ موجود و فعال می‌خواهد ⇒ «ثبت» خاموش با «انتخابِ مشتری»
+    val split = if (payV2) ir.vil3ntec.tohid.data.PayFlow.preview(CheckoutSession.pay.draft(n.finalTotal, form.debtorId)).valueOrNull() else null
+    val creditBlock = CheckoutModel.creditBlock(data, form, n, payV2, split)
+    //  PAY-21: «پرداخت با حساب‌پی (NFC/QR)» — فقط با `pay.hesabpay`، گیرندهٔ معلوم و نت (`TillHesab.tillNfc`)؛ یک دقیقه در حافظه
+    val hesabEnv = remember { HesabPayEnv.of(context) }
+    val till by produceState(TillHesab.OFF, saleKey) { value = hesabEnv.till() }
 
-    fun submit() {
-      if (!CheckoutModel.canSubmit(busy, discountError, paidError, gate)) return
+    /** @param paid تسویهٔ تأییدشدهٔ حساب‌پی (`HesabTillRoute`): کلِ فاکتور یا باقیِ پنل را پرداخته ⇒ نه نسیه، نه «پرداختی» */
+    fun submit(paid: Settlement? = null) {
+      if (!CheckoutModel.canSubmit(busy, discountError, paidError.takeIf { paid == null }, gate, creditBlock.takeIf { paid == null })) return
       //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
       if (!HeldRules.shownIsCurrent(lines, cart.lines.value)) { error = StrPos.cartChangedRetry; return }
       //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد
       val signed = if (gate == DiscountGate.State.APPROVED) CheckoutSession.approval?.let(DiscountGate::json) else null
-      val options = if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
+      val options = if (paid != null) checkout.copy(settlement = paid, debtorId = form.debtorId, approval = signed)
+      else if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
       else when (val r = CheckoutStoredPay.settle(data, CheckoutSession.pay.draft(n.finalTotal, form.debtorId))) {
         is CheckoutStoredPay.Out.Ok -> checkout.copy(settlement = r.settlement, debtorId = form.debtorId, approval = signed)
         is CheckoutStoredPay.Out.Bad -> { payError = r.message; return }
@@ -172,6 +187,7 @@ fun RouteScope.CheckoutRoute() {
             val sold = posted.ok.data.sales.find { it.id == posted.ok.saleId }
             //  فروشِ سریع همان لحظه به بقیهٔ اعضای دکان خبر می‌داد — همان می‌ماند
             if (quick && sold != null) ShopNews.sale(context, sold.finalTotal, count)
+            CheckoutSession.hesabPaid = null
             CheckoutSession.done = CheckoutDone(posted.ok.data, posted.ok.saleId)
           }
         }
@@ -182,6 +198,9 @@ fun RouteScope.CheckoutRoute() {
     //  مشتری عوض شده و تأیید دیگر نمی‌پوشاند، `submit` دوباره می‌پرسد
     val freshCredit = CheckoutSession.creditApproval
     LaunchedEffect(freshCredit) { if (freshCredit != null && !submitted) submit() }
+    //  حساب‌پی تأیید شد ⇒ همان دم ثبت با همان تسویه؛ ثبتِ ردشده (سبد عوض شد، موجودی) ⇒ همان ردیف «ثبتِ فروش» می‌شود
+    val hesabPaid = CheckoutSession.hesabPaid
+    LaunchedEffect(hesabPaid) { if (hesabPaid != null && !submitted) submit(hesabPaid) }
 
     actions = CheckoutActions(
       form = { CheckoutSession.form = it },
@@ -201,8 +220,19 @@ fun RouteScope.CheckoutRoute() {
       },
       addCoupon = { PromoLive.addCoupon(it) },
       removeCoupon = { PromoLive.removeCoupon(it) },
-      submit = ::submit,
+      submit = { submit() },
       close = ::close,
+      hesabPay = {
+        if (hesabPaid != null) submit(hesabPaid)
+        else {
+          val draft = if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null
+          //  پیش از گرفتنِ پول: همین فاکتور همین حالا ثبت‌شدنی است؟ (موجودی، تکرار) — همان سنجشِ صندوقِ کامپیوتر
+          CheckoutSession.hesab = HesabTillModel.Ask(saleKey, n.finalTotal, draft, till) {
+            HesabTillModel.precheck(data, loyal, checkout.copy(debtorId = form.debtorId), saleKey, todayIso())
+          }
+          nav.open(SalesPaths.HESAB)
+        }
+      },
     )
     CheckoutView(
       form = form,
@@ -223,7 +253,14 @@ fun RouteScope.CheckoutRoute() {
       discountError = discountError,
       paidError = paidError,
       payError = payError,
-      canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate),
+      canSubmit = CheckoutModel.canSubmit(busy, discountError, paidError, gate, creditBlock),
+      creditBlock = creditBlock,
+      hesab = when {
+        hesabPaid != null -> HesabEntry(StrPay.recordSale, StrTillPay.confirmed, enabled = !busy)
+        till.tillNfc && HesabPaySettle.due(n.finalTotal, if (payV2) CheckoutSession.pay.draft(n.finalTotal, form.debtorId) else null) is HesabPaySettle.Due.Amount ->
+          HesabEntry(StrTillPay.entry, if (till.gateway) StrTillPay.entryAuto else StrTillPay.entrySimple, enabled = !busy && discountError == null && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED)
+        else -> null
+      },
       canAskApproval = !busy,
       giftLedger = data.takeIf { giftOn },
       points = if (loyalty != null) ({ LoyaltyBar(loyalty) }) else null,

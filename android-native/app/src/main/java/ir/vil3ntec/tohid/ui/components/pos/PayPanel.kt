@@ -64,6 +64,7 @@ import ir.vil3ntec.tohid.core.i18n.StrGiftCard
 import ir.vil3ntec.tohid.core.i18n.StrRounding
 import ir.vil3ntec.tohid.data.GiftCards
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.CreditDebtor
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.numericInput
@@ -344,6 +345,8 @@ fun PayPanelDialog(
   stored: Boolean = false,
   /** PAY-09 — پلهٔ گردکردنِ نقدی (`CashRoundPref`)؛ ۰ ⇒ همان پنلِ امروز */
   cashRounding: Long = 0L,
+  /** «انتخابِ مشتری (F2)» کنارِ پیامِ نسیهٔ بی مشتری (`CreditDebtor`)؛ `null` ⇒ فقط پیام */
+  onPickCustomer: (() -> Unit)? = null,
 ) {
   val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
   val cashFocus = remember { FocusRequester() }
@@ -381,12 +384,15 @@ fun PayPanelDialog(
           Spacer(Modifier.height(4.dp))
           Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger)
         }
+        //  ⛔ باقیِ پرداخت‌نشده بی مشتریِ موجود و فعال (`CreditDebtor`) ⇒ «ثبت» خاموش، پیام و «انتخابِ مشتری»
+        val creditBlock = ledger?.let { CreditDebtor.tillBlock(it, customerId, CreditDebtor.splitOwed(PayFlow.preview(state.draft(total, customerId)).valueOrNull()), split = true) }
+        CreditDebtorHint(creditBlock.takeIf { error == null }) { onPickCustomer?.invoke() }
         Spacer(Modifier.height(10.dp))
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f).height(48.dp)) { Text(StrPos.cancelEsc) }
-          Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.weight(1.6f).height(48.dp)) {
+          Button(onClick = { submit() }, enabled = !busy && creditBlock == null, modifier = Modifier.weight(1.6f).height(48.dp)) {
             Text(if (busy) StrSale.posting else StrPos.recordSaleEnter)
           }
         }

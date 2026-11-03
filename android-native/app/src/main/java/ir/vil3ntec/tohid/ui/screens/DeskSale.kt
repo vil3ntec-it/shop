@@ -385,6 +385,8 @@ fun DeskSaleScreen(
   val inputsFrom = listOf<Any?>(discountText, discountAmount, paidText, payment)
   val discountBad = canDiscount && numberInvalid(discountText)
   val paidBad = payment == SalesEngine.Payment.CREDIT && numberInvalid(paidText)
+  //  ⛔ نسیه بی مشتریِ موجود و فعال (`CreditDebtor`، همان قاعدهٔ `SalesEngine.record`) ⇒ F9 خاموش، پیام و F2 کنارِ «پرداختی»
+  val deskCredit = if (payV2) null else ir.vil3ntec.tohid.data.CreditDebtor.tillBlock(d, cartDebtorId, ir.vil3ntec.tohid.data.CreditDebtor.plainOwed(payment == SalesEngine.Payment.CREDIT, totals.finalTotal - (parseNumber(paidText) ?: 0.0).coerceIn(0.0, totals.finalTotal)), split = false)
 
   //  S08: تخفیفِ بیش از سقف ⇒ «درخواستِ تأیید» با PINِ مدیر — همان تصمیمِ سرور
   var approval by remember { mutableStateOf<ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip?>(null) }
@@ -427,7 +429,7 @@ fun DeskSaleScreen(
       toast(StrPos.cartChangedRetry); return
     }
     if (discountBad || (!payV2 && settled == null && paidBad)) { toast(StrSale.badNumber(if (discountBad) Str.discount else StrSale.received)); return }
-    if (!payV2 && settled == null && payment == SalesEngine.Payment.CREDIT && cartDebtorId == null) { toast(StrSale.creditNeedsCustomer); pickDebtor = true; return }
+    if (!payV2 && settled == null) deskCredit?.let { toast(it); pickDebtor = true; return }
     if (gate == DiscountGate.State.DENIED) { toast(StrPos.discountForbidden); return }
     if (gate == DiscountGate.State.NEEDS_APPROVAL) { askApproval = true; return }
     val signed = if (gate == DiscountGate.State.APPROVED) approval?.let(DiscountGate::json) else null
@@ -748,13 +750,11 @@ fun DeskSaleScreen(
           )
         } else {
           PaymentMethodGrid(PosPayments.configured(), payment, target) { m ->
-            if (m.payment != payment) {
-              payment = m.payment
-              if (m.needsCustomer && cartDebtorId == null) pickDebtor = true
-            }
+            if (m.payment != payment) { payment = m.payment; if (m.needsCustomer && cartDebtorId == null) pickDebtor = true }
           }
           if (payment == SalesEngine.Payment.CREDIT) {
             MiniNumberField(StrPos.paidNowShort, paidText, { paidText = numericInput(it) }, paidBad, "؋")
+            ir.vil3ntec.tohid.ui.components.pos.CreditDebtorHint(deskCredit) { pickDebtor = true }
           }
           //  PAY-21: حساب‌پی (کلِ فاکتور؛ با پنلِ ترکیبی در همان پنل و برای باقی‌مانده)
           ir.vil3ntec.tohid.ui.components.pos.CheckoutGateways(
@@ -768,7 +768,7 @@ fun DeskSaleScreen(
         OrderActions(
           postHint = KeyMap.SALE_PAY_PANEL.hint,
           printHint = KeyMap.SALE_REPRINT.hint,
-          canPost = cart.isNotEmpty(),
+          canPost = cart.isNotEmpty() && deskCredit == null,
           posting = posting,
           canPrint = lastInvoice != null,
           onPost = { if (payV2) payOpen = true else finish() },
@@ -1009,7 +1009,7 @@ fun DeskSaleScreen(
       busy = posting,
       target = target,
       onDismiss = { payOpen = false; refocus() },
-      onConfirm = { st -> finish(st) },
+      onConfirm = { st -> finish(st) }, onPickCustomer = { payOpen = false; pickDebtor = true },
       //  PAY-21: حساب‌پی برای باقی‌ماندهٔ پنل — نه با تخفیفِ تأییدنشده (پول گرفته و فروش رد نشود)
       gateways = gateways.takeIf { !discountBad && gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED },
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)

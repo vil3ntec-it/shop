@@ -99,6 +99,12 @@ class V3ReachabilityTest {
       pos("rememberLoyaltyTill"), pos("LoyaltyBar"), "ir.vil3ntec.tohid.data.TillSale", root = PHONE_CHECKOUT,
     ),
     Feature("POS-11 یادداشتِ فاکتورِ صندوقِ گوشی", "sale", pos("InvoiceNoteButton"), root = PHONE_SALE),
+    //  PAY-21: حساب‌پی (QR، NFC با HCE) فقط در `CheckoutDialog` ِ رابطِ قدیم بود؛ پس از دستهٔ ۱۳ صندوقِ گوشی راهی نداشت
+    Feature(
+      "PAY-21 «پرداخت با حساب‌پی (NFC/QR)» در صندوقِ گوشی", "sale/checkout/hesabpay",
+      "ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillRoute", "ir.vil3ntec.tohid.pay.HesabPayIntentFlow", "ir.vil3ntec.tohid.pay.HceSlot",
+    ),
+    Feature("PAY-21 درِ حساب‌پی در برگهٔ تسویهٔ گوشی", "sale/checkout", "ir.vil3ntec.tohid.ui.v3.sales.checkout.HesabTillModel", root = PHONE_CHECKOUT),
     //  ── سفارش و تحویل ──
     Feature("PCK جمع‌آوری و بسته‌بندیِ سفارش", "orders/{id}/pick", s("OrderPickHost"), s("OrderPickButton")),
     Feature("PCK-10/12 قفسه و دستهٔ جمع‌آوری", "orders", s("PickDeskEntry")),

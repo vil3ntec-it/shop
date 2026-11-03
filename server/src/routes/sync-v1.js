@@ -118,6 +118,11 @@ const ack = require('../lib/sync-v1-ack');
  *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
  */
 const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
+/*
+ *  دکان: فاکتورِ نسیهٔ بی مشتری (برنامهٔ کهنه) پذیرفته می‌شود ولی سابقهٔ `sale.credit_no_debtor` می‌گیرد — ‎lib/credit-debtor.js‎.
+ *  پس از نشستن (شکلِ نهاییِ ردیف در `sync_rows`)؛ پمپ بی هیچ پرسشی از آن رد می‌شود.
+ */
+const creditDebtor = require('../lib/credit-debtor');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
@@ -157,6 +162,7 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopSt
 
     //  فقط وقتی واقعاً چیزی نشست، بقیهٔ دستگاه‌ها را بیدار کن
     if (out.applied > 0) live.broadcast(req.sync, out.head, deviceId);
+    if (out.applied > 0) await creditDebtor.flagV1(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) });
     res.json({ ok: true, ...out, cursor: out.head });
   } catch (err) { next(err); }
 });
