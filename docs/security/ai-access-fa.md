@@ -150,7 +150,9 @@ secret‌مانندِ واقعیِ workspace (امروز: `tohid-release.jks`) �
 
 ## ۵. قراردادِ API برای کارِ بی سورسِ بک‌اند (گامِ ۴، پایهٔ SEC-AI-01) — #583
 
-- `node tools/api-contract/generate.cjs` ⇒ `docs/api/routes.json` (`--check` ⇒ کد ۱ اگر کهنه است). پیش‌نیاز: `server/node_modules`.
+- `node tools/api-contract/generate.cjs` ⇒ `docs/api/routes.json` (`--check` ⇒ کد ۱ اگر کهنه است، با فهرستِ مسیرهای افزوده/افتاده). پیش‌نیاز: `server/node_modules`.
+- **سدِ تازگی** (از ۱۴۰۵/۰۸/۱۲): `server/test/api-contract.test.js` در کارِ سرور (PostgreSQL و PGlite) همان `--check` را با envِ آلوده
+  می‌زند؛ هر PR ِ مسیرِ تازه بی بازسازیِ قرارداد سرخ است. پیش‌تر هیچ کارِ CI آن را اجرا نمی‌کرد (فقط پارسر) و از #605 تا این‌جا ۲۰۵ مسیر بیرون ماند.
 - درستیِ فهرست: سرورِ **واقعی** (`createApp()`) با PGlite ِ درونِ حافظه و env ِ **پاک** (DATABASE_URL ِ محیط هرگز به کار نمی‌رود؛ secretِ ساختگی)
   بالا می‌آید و ثبتِ هر مسیر در router ِ Express پاییده می‌شود ⇒ همان مسیرهایی که سرور سوار می‌کند، با فایلِ منبع.
 - هر مسیر: `method`، `path`، `area`، `auth` (`admin`/`user`/`device`/`optional`/`inline`/`none-detected`)، `guards`، `params`، `query`، `body`،
