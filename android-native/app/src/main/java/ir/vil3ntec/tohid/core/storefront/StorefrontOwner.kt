@@ -109,6 +109,23 @@ object StorefrontOwner {
     return c.timeInMillis
   }
 
+  /** WEB-24: آغازِ روزِ `yyyy-MM-dd` **به وقتِ دکان** (ms)؛ تاریخِ ناخوانا یا ناموجود (۳۱ آبان…) ⇒ null */
+  fun dayStartMs(iso: String, timezone: String): Long? {
+    if (!StorefrontRules.validDate(iso)) return null
+    val (y, m, d) = iso.split('-').map { it.toInt() }
+    return Calendar.getInstance(TimeZone.getTimeZone(timezone)).apply {
+      clear()
+      set(y, m - 1, d, 0, 0, 0)
+    }.timeInMillis
+  }
+
+  /** WEB-24: روزِ `yyyy-MM-dd` ِ یک لحظه به وقتِ دکان */
+  fun dayOfMs(at: Long, timezone: String): String {
+    val c = Calendar.getInstance(TimeZone.getTimeZone(timezone)).apply { timeInMillis = at }
+    return pad(c.get(Calendar.YEAR).toLong(), 4) + "-" + pad((c.get(Calendar.MONTH) + 1).toLong(), 2) + "-" +
+      pad(c.get(Calendar.DAY_OF_MONTH).toLong(), 2)
+  }
+
   fun toFa(s: String): String = StorefrontRules.toFa(s)
 
   /* ------------------------------ صفِ اعلام (PRES-02/08/09) ------------------------------ */

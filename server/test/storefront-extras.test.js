@@ -143,8 +143,14 @@ test('WEB-24 بنر: خاموش ۴۰۳/۴۰۴، بازهٔ اکنون، ناحی
   assert.equal((await h.put(adminUrl, { banners: [] }, { token: s.token })).status, 403);
   assert.equal((await pub()).status, 404);
   assert.equal('features' in (await h.get(`/api/store/${s.slug}`)).body, false, 'خاموش ⇒ پاسخِ ویترین همان پیشین');
+  //  برگهٔ «بنرها» ِ برنامهٔ مدیریت فقط با کلیدِ `banners` ِ `/storefront/config` (خاموش ⇒ همان پاسخِ پیشین)
+  const cfgOff = (await h.get('/api/shop/storefront/config', { token: s.token })).body;
+  assert.equal('banners' in cfgOff, false, 'خاموش ⇒ `/storefront/config` بی کلید');
 
   await flag(s.shopId, 'shop.storefront.banners', true);
+  const cfgOn = (await h.get('/api/shop/storefront/config', { token: s.token })).body;
+  assert.equal(cfgOn.banners, true, 'روشن ⇒ برگهٔ «بنرها» در برنامه');
+  assert.deepEqual(Object.keys(cfgOn).filter((k) => k !== 'banners').sort(), Object.keys(cfgOff).sort(), 'فقط همان یک کلید افزوده');
   assert.deepEqual((await h.get(`/api/store/${s.slug}`)).body.features, { banners: true }, 'روشن ⇒ بنرِ وب (`features.banners`)');
   const t = now();
   const H = 3600 * 1000;

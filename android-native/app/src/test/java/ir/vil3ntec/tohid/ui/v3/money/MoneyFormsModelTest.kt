@@ -120,8 +120,11 @@ class MoneyFormsModelTest {
     val f = DebtorForm(name = "زرغونه", phone = "0791112233", phone2 = "0702223344", tags = "عمده، همسایه", consent = true, consentSource = "حضوری")
     val ok = DebtorFormsModel.save(ledger, null, f, 1L) { "z" } as DebtorEngine.Result.Ok
     val z = ok.data.debtors.first { it.id == "z" }
+    //  CRM-02: ورودیِ 07… در برگهٔ نسخهٔ ۳ با قالبِ ‎+93 ذخیره می‌شود — هر دو شماره
+    assertEquals("+93791112233", z.phone)
     //  شمارهٔ دوم به شکلِ ذخیرهٔ برنامه (+93…)، همان `LocaleText.phoneForSave`
     assertEquals(LocaleText.phoneForSave("0702223344"), z.phone2)
+    assertEquals("+93702223344", z.phone2)
     assertEquals(listOf("عمده", "همسایه"), z.tags)
     assertEquals(true, z.marketingConsent)
     assertTrue(ok.data.auditLog.any { it.type == "marketing_consent" && it.refId == "z" })
