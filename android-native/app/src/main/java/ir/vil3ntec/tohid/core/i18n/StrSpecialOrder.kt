@@ -44,6 +44,8 @@ object StrSpecialOrder {
   val review: String get() = t("نیازمندِ بررسیِ مدیر", "Needs a manager's review", "د مدیر کتنې ته اړتیا لري")
   val markReady: String get() = t("آماده شد", "Mark ready", "چمتو شو")
   val deliver: String get() = t("تحویل", "Deliver", "سپارل")
+  /** POS-26 — رسیدِ چاپیِ پیش‌پرداخت (همان رسیدِ دفترِ قرض) */
+  val depositReceipt: String get() = t("رسیدِ پیش‌پرداخت", "Deposit receipt", "د مخکې تادیې رسید")
   val cancelOrder: String get() = t("لغو", "Cancel order", "لغوه")
   val readyDone: String get() = t("سفارش آماده شد", "Order marked ready", "فرمایش چمتو شو")
 

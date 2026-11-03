@@ -224,7 +224,7 @@ object StrSettingsHelp {
     "For example, one point per 100 afghani spent; 50 points take 50 afghani off.",
     "د بېلګې په توګه، په هرو ۱۰۰ افغانیو پېر یوه نمره؛ ۵۰ نمرې یعنې ۵۰ افغانۍ تخفیف.",
   )
-  val crmLine: String get() = t("گزارش‌های مشتری: قرض‌های کهنه و مشتریانِ پرخرید", "Customer reports: old debts and best customers", "د پېرودونکو راپورونه: زاړه پورونه او ښه پېرودونکي")
+  val crmLine: String get() = t("قرض‌های کهنه، مشتریانِ پرخرید، ادغامِ تکراری‌ها و صورت‌حساب", "Old debts, best customers, merging duplicates and statements", "زاړه پورونه، ښه پېرودونکي، د تکراریو یوځای کول او صورتحساب")
   val crmExample: String get() = t(
     "مثلاً ببینید کدام قرض‌ها بیش از ۹۰ روز مانده‌اند.",
     "For example, see which debts are over 90 days old.",

@@ -124,7 +124,7 @@ fun SaleScreen(
   var cartOpen by rememberSaveable { mutableStateOf(false) }
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) cartOpen = false }
   //  PRM: تخفیف‌های خودکار — کلیدِ دکان خاموش ⇒ null و `priced` همان `cart` است
-  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart)
+  val promo = ir.vil3ntec.tohid.ui.PromoLive.rememberOutcome(d, cart, cartDebtorId) // PRM-11: گروهِ مشتری
   val priced = ir.vil3ntec.tohid.data.PromoEngine.priced(cart, promo)
   //  POS-12: همان سبدی که `priced` از آن ساخته شد — ثبت با سبدِ عوض‌شده نه
   val pricedFrom = cart

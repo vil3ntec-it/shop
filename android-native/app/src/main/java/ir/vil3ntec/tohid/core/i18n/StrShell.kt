@@ -126,10 +126,11 @@ object StrShell {
   // مشتری ← ادغامِ تکراری‌ها (CRM-10)
   val mergeNotOnV3: String get() = t("روی همگام‌سازیِ تازه هنوز نیست", "Not available on the new sync yet", "په نوې همغږۍ کې لا نشته")
   val mergeNotSaved: String get() = t("ادغام ثبت نشد", "The merge wasn't saved", "یوځای کول ثبت نه شو")
-  // «گزارش‌های مشتری» در گوشی: پروندهٔ مشتری در «قرض‌داران» (CRM-02/10/11)
+  // «گزارش‌های مشتری» در گوشی (دورِ ۱۴): همان کلیدِ همین دستگاه؛ فقط کارهایی که گوشی واقعاً پشتِ آن دارد
+  val crmShownPhone: String get() = t("در «قرض‌داران» و «گزارش‌ها»", "In “Debtors” and “Reports”", "په «پوروړي» او «راپورونه» کې")
   val crmNotePhone: String get() = t(
-    "در «قرض‌داران»: شمارهٔ دوم و برچسب در فرمِ مشتری، صافیِ برچسب، و ادغامِ مشتریانِ تکراری. با ادغام هیچ ردیفی پاک نمی‌شود.",
-    "In “Debtors”: a second phone and tags on the customer form, a tag filter, and merging duplicate customers. Merging never deletes a record.",
-    "په «پوروړي» کې: د پیرودونکي په فورمه کې دویمه شمېره او ټګونه، د ټګ فلټر، او د تکراري پیرودونکو یوځای کول. یوځای کول هېڅ ریکارډ نه ړنګوي.",
+    "در «قرض‌داران»: «ادغامِ تکراری‌ها»؛ در پروندهٔ هر مشتری: «تصویرِ صورت‌حساب» و «گروه، لیستِ قیمت و رضایت»؛ در «گزارش‌ها»: «سنِ بدهی» و «تحلیلِ خرید (RFM)». با ادغام هیچ ردیفی پاک نمی‌شود؛ فروش یا قرضی که بعداً روی نامِ کهنه برسد پس از هر همگام‌سازی به همان مشتریِ ماندگار می‌رود. پس از تغییر، صفحه را دوباره باز کنید.",
+    "In “Debtors”: “Merge duplicates”; in each customer's file: “Statement image” and “Group, price list and consent”; in “Reports”: “Debt aging” and “Purchase analysis (RFM)”. Merging never deletes a record; a sale or credit that later arrives under the old name moves to the surviving customer after each sync. After changing this, reopen the page.",
+    "په «پوروړي» کې: «تکراري یوځای کول»؛ د هر پیرودونکي په دوسیه کې: «د صورتحساب انځور» او «ډله، د بیو لړ او رضایت»؛ په «راپورونه» کې: «د پور عمر» او «د پېرود شننه (RFM)». یوځای کول هېڅ ریکارډ نه ړنګوي؛ هغه پلور یا پور چې وروسته په زاړه نوم راشي له هرې همغږۍ وروسته پاتې پیرودونکي ته ځي. له بدلون وروسته، پاڼه بیا پرانیزئ.",
   )
 }

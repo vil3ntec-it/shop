@@ -62,14 +62,17 @@ fun SpecialOrderBar(d: ShopData, store: ShopStore, debtorId: String?, toast: (St
   val views = remember(d) { SpecialOrders.all(d) }
   var making by remember { mutableStateOf(false) }
   var listing by remember { mutableStateOf(false) }
+  //  POS-26: رسیدِ چاپیِ پیش‌پرداخت — همان رسیدِ دفترِ قرض (`DebtReceiptDialog`: «چاپ / PDF»)؛ (دفتر، مشتری، ردیف)
+  var receipt by remember { mutableStateOf<Triple<ShopData, String, String>?>(null) }
 
   Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
     OutlinedButton(onClick = { if (debtorId == null) toast(StrSpecialOrder.pickCustomerFirst) else making = true }) { Text(StrSpecialOrder.newOrder) }
     TextButton(onClick = { listing = true }) { Text(StrSpecialOrder.list(views.count { it.active })) }
   }
 
-  if (making && debtorId != null) SpecialOrderNewDialog(d, store, debtorId, toast) { making = false }
-  if (listing) SpecialOrderListDialog(d, store, views, toast) { listing = false }
+  if (making && debtorId != null) SpecialOrderNewDialog(d, store, debtorId, toast, onReceipt = { receipt = it }) { making = false }
+  if (listing) SpecialOrderListDialog(d, store, views, toast, onReceipt = { receipt = it }) { listing = false }
+  receipt?.let { (data, who, txId) -> ir.vil3ntec.tohid.ui.screens.DebtReceiptDialog(data, who, txId, onDismiss = { receipt = null }) }
 }
 
 /** کدِ ردِ `SpecialOrders`/هسته ⇐ پیامِ صفحه */
@@ -105,7 +108,14 @@ private fun wholeAfghani(text: String): Long? = text.toLongOrNull()?.takeIf { it
 private fun digits(raw: String, max: Int = 11): String = ir.vil3ntec.tohid.numericInput(raw).filter(Char::isDigit).take(max)
 
 @Composable
-private fun SpecialOrderNewDialog(d: ShopData, store: ShopStore, debtorId: String, toast: (String) -> Unit, onDismiss: () -> Unit) {
+private fun SpecialOrderNewDialog(
+  d: ShopData,
+  store: ShopStore,
+  debtorId: String,
+  toast: (String) -> Unit,
+  onReceipt: (Triple<ShopData, String, String>) -> Unit,
+  onDismiss: () -> Unit,
+) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
@@ -186,6 +196,10 @@ private fun SpecialOrderNewDialog(d: ShopData, store: ShopStore, debtorId: Strin
             .show(toast) { ok ->
               onDismiss()
               if (!ok.again) toast(StrSpecialOrder.saved(money(PayFlow.major(order.depositMinor ?: 0L))))
+              //  POS-26: پیش‌پرداختِ ثبت‌شده ⇒ همان دم رسیدش برای چاپ یا PDF (بی پیش‌پرداخت ⇒ هیچ)
+              val data = ok.data
+              val tx = data?.let { SpecialOrders.depositTx(it, key) }
+              if (data != null && tx != null) onReceipt(Triple(data, tx.debtorId, tx.id))
             }
           busy = false
         }
@@ -206,7 +220,14 @@ private fun stateLabel(v: SpecialOrders.View): String = when (v.status) {
 private const val CLOSED_SHOWN = 30
 
 @Composable
-private fun SpecialOrderListDialog(d: ShopData, store: ShopStore, views: List<SpecialOrders.View>, toast: (String) -> Unit, onDismiss: () -> Unit) {
+private fun SpecialOrderListDialog(
+  d: ShopData,
+  store: ShopStore,
+  views: List<SpecialOrders.View>,
+  toast: (String) -> Unit,
+  onReceipt: (Triple<ShopData, String, String>) -> Unit,
+  onDismiss: () -> Unit,
+) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
@@ -237,6 +258,10 @@ private fun SpecialOrderListDialog(d: ShopData, store: ShopStore, views: List<Sp
             style = MaterialTheme.typography.labelSmall,
             color = if (late || v.review) Shop.colors.danger else Shop.colors.muted,
           )
+          //  POS-26: رسیدِ پیش‌پرداخت (چاپِ دوباره) برای هر سفارشی که پیش‌پرداخت دارد، باز یا بسته
+          SpecialOrders.depositTx(d, v.id)?.let { tx ->
+            TextButton(onClick = { onReceipt(Triple(d, tx.debtorId, tx.id)) }) { Text(StrSpecialOrder.depositReceipt) }
+          }
           if (v.active) Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             if (v.status == SpecialOrder.Status.OPEN) TextButton(onClick = {
               val key = newId()

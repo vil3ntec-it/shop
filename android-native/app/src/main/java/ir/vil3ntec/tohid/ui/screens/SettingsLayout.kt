@@ -85,7 +85,7 @@ object SettingsLayout {
   const val HESAB_SHOP = "حساب‌پیِ دکان"
   /** سقفِ اعتبار در صندوق (CRM-03، `ShopPolicy.creditGate`) */
   const val CREDIT_GATE = "سقف اعتبار"
-  /** گزارش‌های مشتری (CRM-04/06/10/14، `ShopPolicy.crmReports`) — فقط کامپیوتر */
+  /** گزارش‌های مشتری (CRM-04/05/06/08/10/14، `ShopPolicy.crmReports`) — گوشی و کامپیوتر (ردهٔ B) */
   const val CRM_REPORTS = "گزارش‌های مشتری"
   /** دریافتِ وجه یا قسط از مشتری در صندوق (POS-39، `TillReceivePref`) */
   const val TILL_RECEIVE = "دریافت از مشتری"
@@ -534,11 +534,12 @@ object SettingsLayout {
   val DESK_HIDDEN: Set<String> = setOf(CAMERA, NAV_BAR)
 
   /**
-   *  بخش‌هایی که فقط کامپیوتر دارد — مثلِ رابطِ امروز: «گزارش‌های مشتری» فقط زبانه‌های «گزارش‌ها»ی
-   *  کامپیوتر را نشان/پنهان می‌کند و گوشی دکمهٔ بی‌اثر نمی‌گیرد؛ کلیدهای صندوق و گزارشِ کامپیوتر هم (همان
-   *  `Platform.DESKTOP` ِ رابطِ قدیمِ پاک‌شده). «شماره‌های جاافتاده» (RPT-17) زبانهٔ گوشی هم دارد و این‌جا نیست.
+   *  بخش‌هایی که فقط کامپیوتر دارد: کلیدهای صندوق و گزارشِ کامپیوتر (همان `Platform.DESKTOP` ِ رابطِ قدیمِ
+   *  پاک‌شده) — هیچ صفحهٔ گوشی پشتِ کلیدشان نیست. کلیدِ این‌ها روی همین دستگاه است، پس بخشی که کاری در گوشی پشتش
+   *  است نباید این‌جا باشد، وگرنه آن کار روی گوشی هرگز روشن نمی‌شود (`V3ReachabilityTest`). «گزارش‌های مشتری» (ادغامِ
+   *  تکراری‌ها، تصویرِ صورت‌حساب، گروه و لیستِ قیمت، سنِ بدهی و RFM) از دورِ ۱۴ و «شماره‌های جاافتاده» (RPT-17) گوشی هم دارند.
    */
-  val PHONE_HIDDEN: Set<String> = setOf(CRM_REPORTS, POS_SEARCH, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, WEBCAM)
+  val PHONE_HIDDEN: Set<String> = setOf(POS_SEARCH, POS_TOUCH, POS_MORE_KEYS, KEY_HELP, TILL_SWITCH, REPORT_KEYS, WEBCAM)
 
   /**
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ

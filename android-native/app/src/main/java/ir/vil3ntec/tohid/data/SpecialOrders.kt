@@ -113,6 +113,13 @@ object SpecialOrders {
     return open.sortedWith(compareBy<View>({ it.due }, { it.createdAt })) + closed.sortedByDescending { it.createdAt }
   }
 
+  /**
+   *  POS-26 — رسیدِ پیش‌پرداختِ یک سفارش (همان ردیفِ `receive` با `kind` = [DEPOSIT] و `refId` = سفارش) برای چاپ با
+   *  رسیدِ همان دفترِ قرض (`DebtBook.receipt`)؛ بی پیش‌پرداخت یا ردیفِ ناشناس ⇒ null.
+   */
+  fun depositTx(d: ShopData, orderId: String): DebtTransaction? =
+    d.transactions.firstOrNull { it.refId == orderId && it.type == "receive" && it.kind == DEPOSIT }
+
   fun find(d: ShopData, id: String): View? =
     d.auditLog.firstOrNull { it.id == id && isOrder(it) }?.let { view(d, it, Index(d, setOf(id))) }
 
