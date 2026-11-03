@@ -35,6 +35,8 @@ import ir.vil3ntec.tohid.ui.v3.sales.checkout.ApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CreditApprovalRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CheckoutRoute
 import ir.vil3ntec.tohid.ui.v3.sales.checkout.CustomerRoute
+import ir.vil3ntec.tohid.ui.v3.sales.cart.PriceCheckRoute
+import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerAllRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerCloseRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerMoveRoute
 import ir.vil3ntec.tohid.ui.v3.sales.drawer.DrawerOpenRoute
@@ -74,6 +76,8 @@ object SalesPaths {
   /** «تعداد و قیمت»ِ ردیفِ `i` ِ سبد */
   fun line(i: Int) = "sale/line/$i"
   const val FREE_LINE = "sale/free-line"
+  /** POS-15: قیمت‌پرسیِ صندوقِ گوشی (منوی «…»)؛ فقط می‌خواند */
+  const val PRICE_CHECK = "sale/price-check"
   /** S03 (POS-17): «ثبتِ سریعِ کالا» با همین بارکدِ ناشناس، در خودِ صندوق */
   const val QUICK_REGISTER = "sale/quick-register"
   fun quickRegister(code: String) = RoutePaths.withQuery(QUICK_REGISTER, "code" to code)
@@ -104,6 +108,8 @@ object SalesPaths {
   const val MOVE_NO_SALE = "no_sale"
   fun drawerMove(noSale: Boolean) = RoutePaths.withQuery("sales/drawer/move", "mode" to if (noSale) MOVE_NO_SALE else "cash")
   const val DRAWER_X = "sales/drawer/report"
+  /** PAY-17: X/Z ِ همهٔ کشوهای امروز با هم */
+  const val DRAWER_ALL = "sales/drawer/all"
   /** گزارشِ Z ِ همین بستن */
   val DRAWER_Z: String get() = RoutePaths.withQuery(DRAWER_X, "kind" to "z")
   fun drawerShift(openId: String) = "sales/drawer/shift/" + RoutePaths.encode(openId)
@@ -140,6 +146,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.APPROVE, RouteKind.SHEET, { StrSale.discountApproval }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { ApprovalRoute() },
     V3Route(SalesPaths.CREDIT, RouteKind.SHEET, { StrPos.creditOverTitle }, parent = SalesPaths.CHECKOUT, chrome = Chrome.OWN) { CreditApprovalRoute() },
     V3Route("sale/line/{i}", RouteKind.SHEET, { StrSale.lineDetails }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { LineRoute() },
+    V3Route(SalesPaths.PRICE_CHECK, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrPriceCheck.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { PriceCheckRoute() },
     V3Route(SalesPaths.FREE_LINE, RouteKind.SHEET, { StrSale.freeItem }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { FreeLineRoute() },
     V3Route(SalesPaths.QUICK_REGISTER, RouteKind.SHEET, { StrQuickRegister.title }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { QuickRegisterRoute() },
     V3Route("sale/keypad/{productId}", RouteKind.SHEET, { StrSale.typeQty }, parent = SalesPaths.SALE, chrome = Chrome.OWN) { KeypadRoute() },
@@ -161,6 +168,7 @@ val SalesModule = AppModule(
     V3Route(SalesPaths.DRAWER_CLOSE, RouteKind.SHEET, { StrSale.closeDrawer }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerCloseRoute() },
     V3Route("sales/drawer/move", RouteKind.SHEET, { StrSale.cashMove }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerMoveRoute() },
     V3Route(SalesPaths.DRAWER_X, RouteKind.SHEET, { StrSale.xReportTitle }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerXRoute() },
+    V3Route(SalesPaths.DRAWER_ALL, RouteKind.SHEET, { ir.vil3ntec.tohid.core.i18n.StrDrawers.allTitle }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerAllRoute() },
     V3Route("sales/drawer/shift/{id}", RouteKind.SHEET, { StrSale.drawerHistory }, parent = SalesPaths.DRAWER, chrome = Chrome.OWN) { DrawerShiftRoute() },
     V3Route(SalesPaths.RETURN_NONE, RouteKind.SHEET, { StrSale.noReceiptReturn }, parent = SalesPaths.HISTORY, chrome = Chrome.OWN) { NoReceiptReturnRoute() },
     V3Route("sales/returns/{docId}", RouteKind.SHEET, { StrSale.returnReceipts }, parent = SalesPaths.HISTORY, chrome = Chrome.OWN) { ReturnReceiptRoute() },

@@ -46,6 +46,22 @@ object ReportCsv {
       else -> stock(d, today)
     }
 
+  /**
+   *  RPT-13 — ستونی که «مقایسه با دورهٔ قبل» در خودِ جدول کنارش «دورهٔ قبل» و «تغییر» می‌گذارد؛ فقط برگه‌هایی که ستونِ
+   *  اولشان کلیدِ پایدار است (شرحِ سود و زیان، فروشنده). برگهٔ فهرستیِ سند (فاکتور، خرید، مصرف) ⇒ `null` (جدول همان امروز).
+   */
+  fun compareColumn(section: String): Int? = when (section) {
+    "profit" -> 1
+    "sellers" -> 2
+    else -> null
+  }
+
+  /** برگهٔ [cur] با دو ستونِ دورهٔ قبل از برگهٔ [prev] (`core/report/ReportCompare`)؛ جفت‌نشدنی ⇒ همان [cur] */
+  fun compared(section: String, cur: Sheet, prev: Sheet, prevTitle: String, changeTitle: String): Sheet {
+    val col = compareColumn(section) ?: return cur
+    return ir.vil3ntec.tohid.core.report.ReportCompare.column(cur.rows, prev.rows, col, prevTitle, changeTitle)?.let { cur.copy(rows = it) } ?: cur
+  }
+
   /** سود و زیانِ بازه — همان عددهای `ReportEngine.sales`، سطر به سطر */
   private fun profit(d: ShopData, from: String, to: String): Sheet {
     val r = ReportEngine.sales(d, from, to)

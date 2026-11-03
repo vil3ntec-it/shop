@@ -322,7 +322,8 @@ class SettingsPortTest {
 
     /** کلیدهایی که رابطِ قدیم فقط پشتِ `Platform.DESKTOP` داشت */
     private val DESK_ONLY: Set<String> = setOf(
-      SettingsLayout.POS_SEARCH, SettingsLayout.POS_PRICE_CHECK, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
+      //  POS-15: «قیمت‌پرسی در صندوق» از دورِ ۱۱ گوشی هم دارد (منوی «…» ِ صندوق) ⇒ فقط‌کامپیوتر نیست
+      SettingsLayout.POS_SEARCH, SettingsLayout.POS_TOUCH, SettingsLayout.POS_MORE_KEYS,
       SettingsLayout.KEY_HELP, SettingsLayout.TILL_SWITCH, SettingsLayout.REPORT_KEYS,
       //  HW-08: وب‌کم به‌عنوانِ بارکدخوان — گوشی دوربینِ خودش را دارد
       SettingsLayout.WEBCAM,

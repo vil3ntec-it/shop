@@ -85,6 +85,8 @@ fun SalesHistoryScreen(
   val canCancel = remember { ir.vil3ntec.tohid.data.ShopRole.canCancelSale(roleContext) }
   //  POS-40 — «اصلاحِ روشِ پرداخت» فقط با تنظیمِ روشنِ همین دستگاه (`PayFixPref`) و مجوزِ `sales.pay_fix` جز «ممنوع»
   val payFix = remember { ir.vil3ntec.tohid.data.PayFixPref.on(roleContext) && ir.vil3ntec.tohid.data.PayFixPref.decision(roleContext) != "deny" }
+  //  POS-40: نشانِ «اصلاح‌شده» در ستونِ «نوع» (از هر دستگاه؛ دفترِ بی اصلاح ⇒ هیچ)
+  val fixedSales = remember(d) { ir.vil3ntec.tohid.data.PayFixFlow.fixedSales(d) }
   //  RPT-09 — «سابقهٔ ضدتقلب» (`FraudTrailPref`، پیش‌فرض خاموش): نامِ همین کاربر روی لغو و مرجوعی؛ خاموش ⇒ null
   val trailBy = remember { ir.vil3ntec.tohid.data.FraudTrailPref.by(roleContext) }
   //  RET (v3 §۶.۸) — «برگشت و تعویضِ تازه»؛ خاموش ⇒ همان پنجرهٔ مرجوعیِ امروز
@@ -326,6 +328,7 @@ fun SalesHistoryScreen(
           onCancel = { if (canCancel) cancelFor = sale else toast(StrInvoices.cancelDenied) },
           onReopen = { if (canCancel) reopenFor = sale else toast(StrInvoices.cancelDenied) },
           onPayFix = if (payFix) ({ payFixFor = sale }) else null,
+          fixed = sale.id in fixedSales,
         )
       }
     }
@@ -581,6 +584,8 @@ private fun SaleRow(
   returnsV2: Boolean = false,
   onReturnReceipt: (String) -> Unit = {},
   onPayFix: (() -> Unit)? = null,
+  /** POS-40: روشِ پرداختِ این فاکتور اصلاح شد ⇒ نشان در ستونِ «نوع» */
+  fixed: Boolean = false,
 ) {
   val cancelled = sale.status == "cancelled"
   //  RET-12 — سندهای برگشتِ تازهٔ همین فاکتور، برای چاپِ دوبارهٔ رسید
@@ -620,7 +625,7 @@ private fun SaleRow(
         when {
           cancelled -> StrSale.cancelled
           online -> StrInvoices.online
-          else -> ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale)
+          else -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = Str.cashSale), fixed)
         },
         0.8f,
         tint = kindTint,

@@ -120,7 +120,8 @@ object HistoryModel {
   fun returnDocs(d: ShopData, s: Sale): List<String> =
     d.saleReturns.filter { it.saleId == s.id }.mapNotNull { it.docId }.distinct()
 
-  fun row(d: ShopData, s: Sale, returnsV2: Boolean): HistoryRow {
+  /** @param fixed POS-40: روشِ پرداختِ این فاکتور اصلاح شد (`PayFixFlow.fixedSales`) ⇒ نشان کنارِ نوع */
+  fun row(d: ShopData, s: Sale, returnsV2: Boolean, fixed: Boolean = false): HistoryRow {
     val state = ReceiptModel.state(s)
     val items = d.saleItems.count { it.saleId == s.id }
     return HistoryRow(
@@ -133,7 +134,7 @@ object HistoryModel {
       payLabel = when (state) {
         SaleState.CANCELLED -> StrSale.cancelled
         SaleState.ONLINE -> StrSale.online
-        SaleState.DONE -> ReceiptModel.payLabel(s)
+        SaleState.DONE -> ir.vil3ntec.tohid.data.PayFixFlow.kindLabel(ReceiptModel.payLabel(s), fixed)
       },
       credit = PayFlow.payGroup(s) == "credit",
       canReturn = canReturn(d, s),

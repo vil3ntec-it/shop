@@ -48,6 +48,16 @@ class CartFeedback(
     }
   }
 
+  /** POS-03 — لمسِ کاشی با پیشوندِ «۳*»: همان [addOne] با شمار */
+  fun addCount(d: ShopData, productId: String, count: Double) {
+    val step = CartModel.addCount(d, cart.lines.value, productId, count)
+    if (step.lines != null && !cart.set(step.lines)) { locked(); return }
+    if (step.capped) {
+      Haptics.confirm(context)
+      step.note?.let { toasts.show(it, V3Tone.WARNING) }
+    }
+  }
+
   fun minusOne(d: ShopData, productId: String) {
     CartModel.minusOne(d, cart.lines.value, productId)?.let(cart::set)
   }
