@@ -150,7 +150,8 @@ router.get('/plans', plansHandler);
 async function purchaseRequestHandler(req, res) {
   if (!req.shopId) return res.status(403).json({ error: { code: 'no_shop', message: 'اول دکان بسازید' } });
   const planCode = v.text(req.body?.plan ?? req.body?.planCode, { max: 20, required: true, field: 'پلن' });
-  const note = v.text(req.body?.note, { max: 300 });
+  //  S117: یادداشتِ آزادِ درخواست (کاربر گاهی جزئیاتِ پرداخت را این‌جا می‌نویسد) بی شمارهٔ کاملِ کارت ذخیره می‌شود
+  const note = require('../lib/ops-errors').maskCards(v.text(req.body?.note, { max: 300 }));
   const { newId } = require('../db');
   const row = await one(
     `INSERT INTO purchase_requests (id, shop_id, user_id, plan_code, note, status, created_at)

@@ -133,6 +133,7 @@ fun RouteScope.SaleRoute() {
     tools = { PhoneTillTools(lines, PromoEngine.priced(lines, promo), debtorId) },
     //  INV-03: آنچه در فاکتورهای نگه‌داشته کنار رفته از موجودیِ کاشی کم (بی نگه‌داشته ⇒ همان موجودی)
     held = heldQty,
+    pins = remember { TillPinsPrefs.load(context); TillPinsPrefs.pins }.value, // POS-06: چیدمانِ همین دستگاه
     modifier = Modifier.hidScanner { onCode(it, manual = true, fromPhone = false) },
     actions = SaleActions(
       tap = { item -> if (item.weighed) nav.open(SalesPaths.keypad(item.id)) else feedback.addOne(data, item.id) },

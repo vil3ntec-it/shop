@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrSale
@@ -60,14 +61,22 @@ fun RouteScope.FreeLineRoute() {
 /** صفحه‌کلیدِ مقدار/وزنِ یک کالا */
 @Composable
 fun RouteScope.KeypadRoute() {
+  val context = LocalContext.current
   val item = remember { KeypadModel.item(data, args["productId"].orEmpty(), cart.lines.value) }
   if (item == null) {
     LaunchedEffect(Unit) { toasts.show(StrSale.itemGone, V3Tone.WARNING); back() }
     return
   }
+  //  POS-06: «سنجاق در صفحهٔ اول» ِ همین دستگاه (`TillPinsPrefs`)
+  val pins by remember { TillPinsPrefs.load(context); TillPinsPrefs.pins }
   KeypadSheet(
     item = item,
     onConfirm = { q -> cart.set(KeypadModel.apply(cart.lines.value, item, q)) },
     onClose = { back() },
+    pinned = item.product.id in pins,
+    onPin = {
+      val on = TillPinsPrefs.toggle(context, item.product.id)
+      toasts.show(if (on) StrSale.pinnedFirst(item.product.name) else StrSale.unpinnedFirst(item.product.name), V3Tone.SUCCESS)
+    },
   )
 }

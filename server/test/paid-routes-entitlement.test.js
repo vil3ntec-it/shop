@@ -37,7 +37,7 @@ const FREE = [
     'POST /shop/approver-keys', 'DELETE /shop/approver-keys/:id']],
   ['چت و شکایت کلیدِ کاتالوگ ندارند؛ فقط پرچم', [
     'POST /shop/chat/conversations', 'PUT /shop/chat/conversations/:id/status', 'POST /shop/chat/conversations/:id/messages',
-    'PATCH /shop/chat/conversations/:id/messages/:mid', 'DELETE /shop/chat/conversations/:id/messages/:mid',
+    'PATCH /shop/chat/conversations/:id/messages/:mid', 'POST /shop/chat/conversations/:id/messages/:mid/edit', 'DELETE /shop/chat/conversations/:id/messages/:mid',
     'POST /shop/chat/conversations/:id/receipts', 'POST /shop/chat/conversations/:id/media',
     'PUT /shop/chat/conversations/:id/block', 'DELETE /shop/chat/conversations/:id/block', 'POST /shop/chat/conversations/:id/reports',
     'PUT /shop/chat/conversations/:id/pins/:mid', 'DELETE /shop/chat/conversations/:id/pins/:mid',

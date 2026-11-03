@@ -538,7 +538,7 @@ fun DeskSaleScreen(
   )
 
   //  POS-07 (فقط کامپیوترِ لمسی): صفحه‌کلیدِ عددی روی ردیفِ انتخاب‌شده — همان راهِ کادرِ ردیف (`PosKeypad`)
-  val pad = rememberTouchPad(remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) }, selected)
+  val pad = rememberTouchPad(remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.of(context) }, selected); val kb = ir.vil3ntec.tohid.ui.components.pos.rememberTouchKeyboard() // POS-31: صفحه‌کلیدِ حروف
 
   /* ─────────── کاتالوگ: کادرِ اسکن (تنها جست‌وجوی صفحه)، تراشهٔ دسته‌ها، کارت‌ها ─────────── */
   @Composable
@@ -583,10 +583,10 @@ fun DeskSaleScreen(
         //  POS-31: کلیدِ «حالتِ لمسی» فقط با تنظیمِ روشن (خاموش ⇒ همان نوارِ امروز)
         if (PosTouchPrefs.showToggle()) {
           Spacer(Modifier.width(10.dp))
-          TouchToggle(PosTouchPrefs.active.value, target) { PosTouchPrefs.setActive(context, it); refocus() }
+          TouchToggle(PosTouchPrefs.active.value, target) { PosTouchPrefs.setActive(context, it); refocus() }; ir.vil3ntec.tohid.ui.components.pos.TouchKeysToggle(kb, touchExtras, target) { refocus() }
         }
       }
-      Spacer(Modifier.height(12.dp))
+      ir.vil3ntec.tohid.ui.components.pos.TouchKeysPanel(kb, touchExtras, target) { query = ir.vil3ntec.tohid.core.pos.TouchKeyboard.apply(query, it); refocus() }; Spacer(Modifier.height(12.dp))
       if (term.isNotEmpty()) {
         //  با عبارت، نتیجه از همهٔ دسته‌هاست — تراشه‌ها جایشان را به همین خط می‌دهند
         Text(
