@@ -19,6 +19,10 @@
  */
 const core = require('./perm-core');
 const { can } = require('./permissions');
+const { SHOP } = require('./tenancy');
+
+/** بخشِ دکان با حسابِ دکان (حسابِ پمپ `station` است؛ `accountKind` ِ دکان همان نامِ بخش است) */
+const isShopSync = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
 
 const KEY = 'customers.contact';
 const DOT = '•';
@@ -71,7 +75,7 @@ async function allowed({ shopId, role, userId }, run = null) {
 
 /** بافتِ همگام‌سازی (`req.sync`) ⇐ پنهان؟ فقط حسابِ دکان؛ پمپ همیشه false و بی پرسش */
 async function hiddenForSync(ctx) {
-  if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return false;
+  if (!isShopSync(ctx)) return false;
   return !(await allowed({ shopId: ctx.accountId, role: ctx.role, userId: ctx.userId }));
 }
 
@@ -267,7 +271,7 @@ function mergeResults(fl, results) {
  */
 function v1Guard(req, res, next) {
   const ctx = req.sync;
-  if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop') return next();
+  if (!isShopSync(ctx)) return next();
   (async () => {
     const ops = req.body?.ops;
     if (!Array.isArray(ops) || !ops.length) return next();
@@ -276,7 +280,7 @@ function v1Guard(req, res, next) {
     ops.forEach((raw, i) => {
       if (!isObj(raw) || !isObj(raw.fields)) return;
       const rawTable = raw.table ?? raw.table_name ?? raw.tableName;
-      const table = tableOf('shop', rawTable);
+      const table = tableOf(SHOP.app, rawTable);
       const kind = raw.type ?? raw.op_type ?? raw.opType;
       const f = fieldsOf(table);
       if (!f || (kind !== 'insert' && kind !== 'update') || !f.some((k) => hasOwn(raw.fields, k))) return;
