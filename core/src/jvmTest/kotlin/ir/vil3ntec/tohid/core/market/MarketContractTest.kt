@@ -52,6 +52,7 @@ class MarketContractTest {
       "order" to (PublicOrder.serializer() to emptySet()),
       "orderLine" to (PublicOrderLine.serializer() to emptySet()),
       "orderEvent" to (PublicOrderEvent.serializer() to emptySet()),
+      "paymentStep" to (PaymentStep.serializer() to emptySet()),
       "delivery" to (PublicDelivery.serializer() to emptySet()),
     )
     for ((shape, model) in models) {

@@ -39,8 +39,10 @@ async function liveShop(label) {
   const shopId = (await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken })).body.shop.id;
   for (const k of ['shop.orders', 'shop.storefront']) await flag(shopId, k);
   const slug = `pay-${uniq()}`;
-  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: u.accessToken });
+  //  PAY-21: پرداخت از همان «تازه» ⇒ «پرداخت پس از پذیرش» صریح خاموش (از مهاجرتِ ۲۱۱ دکانِ تازه پیش‌فرض روشن است)
+  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001', payAfterAccept: false }, { token: u.accessToken });
   assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.equal(put.body.settings.payAfterAccept, false);
   const ops = [{ op_id: `op-${uniq()}`, ts: Date.now(), table: 'products', row_id: 'rice', type: 'insert', fields: { name: 'برنج', unit: 'کیلو', salePrice: 125 } }];
   const p = await h.api('POST', '/api/sync/v1/push', { token: u.accessToken, headers: { 'X-App': 'shop', 'X-Device': 'dev-pay' }, body: { device_id: 'dev-pay', schema_version: 2, ops } });
   assert.equal(p.status, 200, JSON.stringify(p.body));

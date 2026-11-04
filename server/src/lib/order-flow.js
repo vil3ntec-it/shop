@@ -3,7 +3,8 @@
  * جریانِ سفارشِ آنلاین پس از ثبت (درخواستِ صاحب‌کار ۱۴۰۵/۰۸/۱۳): «پرداخت پس از پذیرش» و «به فاکتور» ِ یک‌ضرب.
  * همان ماشینِ وضعیتِ `order-states.js` است — وضعیتِ تازه‌ای نیست؛ این پرونده فقط دو لایه رویش می‌گذارد.
  *
- *   پرداخت ─ تنظیمِ دکان `storefronts.pay_after_accept` (مهاجرتِ ۲۱۰، پیش‌فرض خاموش ⇒ رفتارِ PAY-21 ِ امروز):
+ *   پرداخت ─ تنظیمِ دکان `storefronts.pay_after_accept` (مهاجرتِ ۲۱۰؛ از ۲۱۱ دکانِ تازه روشن، دکانِ موجود خاموش ⇒
+ *            رفتارِ PAY-21 ِ پیشین؛ `shops.pay_after_accept_default` فقط در نخستین ساختِ ویترین خوانده می‌شود):
  *            روشن ⇒ سفارشِ ویترین تا «قبول» نشده پرداختِ آنلاین ندارد (`/pay` ⇒ ۴۰۹ `order_not_accepted`)؛ پس از
  *            قبول، پیگیریِ مشتری کارتِ «پرداخت» دارد: «نقد هنگامِ تحویل/برداشت» ([choose]) یا حساب‌پی (همان
  *            `/pay` وقتی برای همین دکان روشن است). انتخاب رویدادِ `note` با `detail.type = 'pay_choice'` است
@@ -17,7 +18,9 @@
  *            همان لغوِ فروشِ «برگشت به دکان» (`order-ledger.BACK_IN_SHOP`).
  *
  * ⛔ مشتری نه قیمت می‌گذارد نه سفارشِ خودش را قبول می‌کند: [choose] فقط «نقد» را می‌پذیرد و فقط پس از قبولِ
- *    فروشنده؛ مبلغ همیشه همان `total_minor` ِ سرور است. فاکتور فقط با `orders.manage` (درِ `routes/order-flow.js`).
+ *    فروشنده؛ مبلغ همیشه همان `total_minor` ِ سرور است. فاکتور فقط با `orders.manage` و اجازهٔ ثبتِ فروش (درِ
+ *    `routes/order-flow.js`). «فاکتور شد» و ساختنِ قصدِ حساب‌پی هر دو زیرِ قفلِ ردیفِ سفارش‌اند ([claimInvoice]،
+ *    [guardOnlinePayIn]) ⇒ فاکتورِ نقدی و پرداختِ آنلاین هرگز با هم نمی‌نشینند، در هیچ ترتیبی.
  * ⛔ shop_id فقط از نشست یا ویترینِ باز (`sf.open`) — هرگز از بدنه.
  */
 const { one, many, now, tx } = require('../db');
@@ -147,6 +150,23 @@ async function guardOnlinePay(shopId, orderId) {
 }
 
 /**
+ * همان [guardOnlinePay] درونِ تراکنشِ ساختنِ قصد (`payment-intents.create`، `guard`)، **زیرِ قفلِ ردیفِ سفارش** —
+ * همان قفلِ [claimInvoice]. سنجشِ بیرونِ قفل تنها نبود: `/pay` سنجش را می‌گذراند، فروشنده همان دم فاکتورِ نقدی
+ * می‌زد و قصدِ حساب‌پی پس از آن ساخته می‌شد (فاکتورِ نقدی + پرداختِ آنلاین).
+ * @param {import('pg').PoolClient} c
+ */
+async function guardOnlinePayIn(c, shopId, orderId) {
+  const o = (await c.query(
+    'SELECT id, status, source, payment_status FROM online_orders WHERE shop_id = $1 AND id = $2 FOR UPDATE',
+    [String(shopId), String(orderId || '')]
+  )).rows[0];
+  if (!o) return;
+  const invoiced = Boolean(await latestNote(c, o.id, 'invoice'));
+  const code = blockOf({ status: o.status, source: o.source, paymentStatus: o.payment_status, invoiced }, await modeOf(shopId));
+  if (code) throw conflict(BLOCK_MESSAGE[code], code);
+}
+
+/**
  * پیگیریِ مشتری: `blocked` (برای `onlinePay.available`) و `step` (کارتِ «پرداخت»؛ فقط با «پرداخت پس از
  * پذیرش» ِ روشن — خاموش ⇒ `undefined` و پاسخِ پیگیری همان پیشین).
  */
@@ -164,8 +184,11 @@ async function trackView(shopId, orderId) {
   };
 }
 
-/** رویدادِ `note` درونِ تراکنش + نسخهٔ تازهٔ ردیف (تا صفِ زندهٔ برنامه و پیگیری تازه شوند) */
-async function noteIn(c, shopId, row, actor, detail, at) {
+/**
+ * رویدادِ `note` درونِ تراکنش + نسخهٔ تازهٔ ردیف (تا صفِ زندهٔ برنامه و پیگیری تازه شوند). `touched` = `updated_at` ِ ردیف
+ * (پیش‌فرض همان `at`) — رویدادی که زمانش گذشته است (فاکتورِ پس از تحویل) ردیف را به عقب نمی‌برد.
+ */
+async function noteIn(c, shopId, row, actor, detail, at, touched = at) {
   const seq = Number((await c.query(
     'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id = $1', [row.id]
   )).rows[0].n);
@@ -176,7 +199,7 @@ async function noteIn(c, shopId, row, actor, detail, at) {
     [ulid(at), row.id, shopId, seq, row.status, actor.type, actor.id || '', JSON.stringify(detail), at]
   );
   await c.query('UPDATE online_orders SET version = version + 1, updated_at = $3 WHERE shop_id = $1 AND id = $2',
-    [shopId, row.id, at]);
+    [shopId, row.id, touched]);
 }
 
 const lockRow = async (c, shopId, id) => (await c.query(
@@ -214,7 +237,8 @@ async function choose(shopId, orderId, body) {
 
 /**
  * «فاکتور شد» ِ یک سفارش — یک بار، زیرِ قفلِ ردیف. دومین بار (همان دستگاه یا دیگری) همان را برمی‌گرداند.
- * @returns {Promise<{invoice:{saleId:string, at:number, by:string}, created:boolean}>}
+ * `handedOver`: «دریافت از دکان» ِ پرداخت‌نشده که همین فاکتور «مشتری گرفت» را هم زد.
+ * @returns {Promise<{invoice:{saleId:string, at:number, by:string}, created:boolean, handedOver?:boolean}>}
  */
 async function claimInvoice(shopId, orderId, actor) {
   return tx(async (c) => {
@@ -228,15 +252,42 @@ async function claimInvoice(shopId, orderId, actor) {
     if (!INVOICE_STATUSES.includes(row.status)) {
       throw withCurrent(conflict('فاکتور پس از «بسته شد» زده می‌شود؛ قلم‌ها تا آن‌جا عوض می‌شوند', 'invoice_not_ready'), row.status);
     }
-    if (row.payment_status === 'pending') throw conflict('پرداختِ آنلاینِ این سفارش در جریان است؛ پس از روشن شدنش فاکتور بزنید', 'payment_pending');
+    //  قصدِ حساب‌پیِ زنده هم «در جریان» است: `/pay` قصد را پیش از پاسخِ درگاه می‌سازد و سفارش فقط پس از آن «در انتظار»
+    //  می‌شود ⇒ فاکتورِ نقدیِ همان فاصله با پرداختِ آنلاینِ بعدی نمی‌خواند
     const at = now();
-    await noteIn(c, shopId, row, actor, { type: 'invoice', saleId: saleIdOf(row.id) }, at);
-    return { invoice: { saleId: saleIdOf(row.id), at, by: actor.id || '' }, created: true };
+    const live = row.payment_status !== 'pending' && (await c.query(
+      `SELECT 1 AS x FROM payment_intents WHERE shop_id = $1 AND kind = 'online_order' AND ref_id = $2
+          AND status IN ('created', 'pending') AND expires_at > $3 LIMIT 1`, [String(shopId), row.id, at]
+    )).rows[0];
+    if (row.payment_status === 'pending' || live) throw conflict('پرداختِ آنلاینِ این سفارش در جریان است؛ پس از روشن شدنش فاکتور بزنید', 'payment_pending');
+    //  «دریافت از دکان» ِ پرداخت‌نشده: نقد همان لحظهٔ تحویل سرِ پیشخوان به دخل می‌آید ⇒ فاکتور فقط همراهِ «مشتری گرفت»
+    //  (همان `OrderFlow.plan` ِ برنامه، حالا در سرور): از «بسته شد» ۴۰۹؛ از «آمادهٔ دریافت» همین تراکنش تحویل می‌دهد
+    //  (`orders.transitionIn`، راهِ یگانهٔ گذار)؛ زمانِ فاکتور = نخستین «مشتری گرفت» ⇒ زمانِ فروشِ نقدی = زمانِ تحویل.
+    let cur = row;
+    let invoiceAt = at;
+    let handedOver = false;
+    if (row.fulfillment === 'pickup' && !PAID.includes(row.payment_status)) {
+      if (row.status === 'packed') {
+        throw withCurrent(conflict('فاکتورِ «دریافت از دکان» ِ پرداخت‌نشده همراهِ «مشتری گرفت» زده می‌شود', 'invoice_at_handover'), row.status);
+      }
+      if (row.status === 'ready_for_pickup') {
+        await require('./orders').transitionIn(c, shopId, row.id, { to: 'picked_up' }, actor);
+        cur = { ...row, status: 'picked_up' };
+        handedOver = true;
+      }
+      const h = (await c.query(
+        `SELECT MIN(created_at)::bigint AS at FROM online_order_events
+          WHERE order_id = $1 AND kind = 'status' AND to_status = 'picked_up'`, [row.id]
+      )).rows[0];
+      if (h && h.at !== null) invoiceAt = Number(h.at);
+    }
+    await noteIn(c, shopId, cur, actor, { type: 'invoice', saleId: saleIdOf(row.id) }, invoiceAt, Math.max(invoiceAt, now()));
+    return { invoice: { saleId: saleIdOf(row.id), at: invoiceAt, by: actor.id || '' }, created: true, handedOver };
   });
 }
 
 module.exports = {
   INVOICE_STATUSES, PAY_OPEN, CHOICES, MODE_AFTER, MODE_ANY,
-  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, staffView, factsOf, trackView, guardOnlinePay,
+  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, staffView, factsOf, trackView, guardOnlinePay, guardOnlinePayIn,
   choose, claimInvoice,
 };
