@@ -146,7 +146,11 @@ object SettingsSearchIndex {
     L.KEY_HELP to kw("راهنما کلید", "key help shortcuts", "د کیلي لارښود"),
     L.STOREFRONT_ETA to kw("زمان تحویل ویترین", "delivery time storefront", "د سپارلو وخت"),
     L.PROMO_GUARD to kw("تخفیف اولین خرید", "first order discount", "لومړی پېرود تخفیف"),
-    L.ONLINE_ORDERS to kw("سفارش آنلاین نمی‌رسد ویترین پرداخت پس از پذیرش", "online orders not arriving storefront pay after accept", "آنلاین فرمایش نه راځي ویترین تادیه"),
+    L.ONLINE_ORDERS to kw(
+      "سفارش آنلاین نمی‌رسد ویترین پرداخت پس از پذیرش اعلان گوشی پوش برنامه بسته زنگ",
+      "online orders not arriving storefront pay after accept push phone notification closed app ring",
+      "آنلاین فرمایش نه راځي ویترین تادیه خبرتیا تلیفون تړلې برنامه زنګ",
+    ),
     //  کالا و انبار
     L.TILL_GOODS to kw("ثبت سریع واحد کارتن بسته", "quick add unit carton pack", "چټک ثبت واحد کارتن"),
     L.PRODUCT_INFO to kw("کد نام دیگر قفسه", "code alias shelf", "کوډ بل نوم الماری"),

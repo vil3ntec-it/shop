@@ -8,6 +8,17 @@ plugins {
   id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+/*
+ *  پوشِ گوشی با Firebase (FCM) — تصمیمِ O-01، راهنمای صاحب‌کار: `docs/FIREBASE-SETUP-fa.md`.
+ *
+ *  ⛔ افزونهٔ google-services **فقط** وقتی `app/google-services.json` کنارِ همین فایل است اعمال می‌شود. آن فایل هرگز
+ *  در مخزن نیست (`.gitignore`): CI آن را از secret ِ `GOOGLE_SERVICES_JSON` می‌نویسد و بی آن secret، و هر ساختِ
+ *  محلی، همان برنامهٔ بی‌پوش ساخته می‌شود (`BuildConfig.FCM_BUNDLED = false` ⇒ هیچ کدِ Firebase صدا زده نمی‌شود).
+ *  فایل باید هر دو بسته را داشته باشد: `ir.vil3ntec.tohid` و `ir.vil3ntec.tohid.preview` (نسخهٔ پیش‌نمایش).
+ */
+val googleServices = file("google-services.json").isFile
+if (googleServices) apply(plugin = "com.google.gms.google-services")
+
 android {
   namespace = "ir.vil3ntec.tohid"
   compileSdk = 35
@@ -131,6 +142,8 @@ android {
     buildConfigField("String", "STORE", "\"$store\"")
     //  نسخهٔ پیش‌نمایش (buildTypeِ `preview` در پایین) — در debug و release همیشه false
     buildConfigField("boolean", "PREVIEW", "false")
+    //  O-01: این ساخت کلیدِ Firebase دارد؟ (بالا: `google-services.json`)
+    buildConfigField("boolean", "FCM_BUNDLED", "$googleServices")
 
     /*
      *  نشانیِ سرور، در زمانِ ساخت — نه در رابط کاربری.
@@ -333,6 +346,9 @@ dependencies {
 
   //  منطقِ خالصِ مشترک با کامپیوتر — buildِ `../core` (includeBuild در settings.gradle.kts)
   implementation("ir.vil3ntec.tohid:core:1.0")
+  //  پوشِ گوشی (FCM، O-01) — بی `google-services.json` کامپایل می‌شود ولی هرگز راه نمی‌افتد (`FcmPushAndroid`)
+  implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+  implementation("com.google.firebase:firebase-messaging")
 
   implementation("androidx.core:core-ktx:1.15.0")
   implementation("androidx.activity:activity-compose:1.9.3")

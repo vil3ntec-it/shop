@@ -73,7 +73,12 @@ object Backend {
 
     val api = ApiClient(engine, tokens, onSessionLost = { onSessionLost?.invoke() })
 
-    val auth = AuthRepository(api, tokens)
+    //  O-01: پس از ورود توکنِ پوشِ این دستگاه ثبت می‌شود و پس از خروج باطل (`data/push/DevicePush`)
+    val auth = AuthRepository(
+      api, tokens,
+      onSignedIn = { ir.vil3ntec.tohid.data.push.DevicePush.syncSoon(app, force = true) },
+      onSignedOut = { ir.vil3ntec.tohid.data.push.DevicePush.signedOut(app) },
+    )
 
     //  ورود با کدِ شش‌رقمیِ ایمیلی — کنارِ `auth`، نه جایش
     val codeLogin = CodeLoginRepository(api, tokens)

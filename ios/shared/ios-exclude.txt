@@ -11,6 +11,7 @@
 
 #  ── الف) فقط اندروید، برای همیشه (iOS همتا نمی‌خواهد؛ همتای کوچکش فقط همان API را بی‌اثر نگه می‌دارد) ──
 MainActivity.kt  # نقطهٔ ورودِ اندروید (Activity، مانیفست، نامِ مستعارِ پیوند، سرویسِ اسکنِ پس‌زمینه). ورودِ آیفون: ios/IosRoot.kt ⇐ همان AppShell/AppStart ِ مشترک
+data/push/FcmPushAndroid.kt  # پوشِ Firebase (FCM) و سرویسِ پیامِ اندروید (O-01). آیفون APNs است: توکن از ios/IosPush.kt، فرستنده server/src/lib/apns.js؛ روزی که حسابِ اپل آمد (O-02) یک `PushPlatform` با provider = "apns" در data/push/DevicePush.kt می‌نشیند
 update/Updater.kt  # دانلود، سنجشِ امضا و نصبِ APK. iOS فقط App Store (قاعدهٔ ۲.۵.۲ ِ اپل) ⇐ update/UpdaterIos.kt؛ قاعدهٔ شماره‌ها مشترک (update/ReleaseVersion.kt)
 
 #  ── ب) همتای iOS (همان API، در ios/shared/src/iosMain؛ مثلِ «replaced» ِ desktop): سرویسِ سکو که shim ِ هم‌نام دروغ می‌گفت یا ضعیف‌تر بود ──

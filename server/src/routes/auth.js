@@ -921,8 +921,13 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
 router.post('/logout', sessionLimit, async (req, res) => {
   const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
   const access = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
+  //  O-01: همین دستگاه دیگر پوشِ این کس را نمی‌گیرد (کاربرِ دیگری بعداً روی همین گوشی وارد می‌شود)
+  const who = (access && await tokens.ownerOf(access, 'access')) || (refresh && await tokens.ownerOf(refresh, 'refresh')) || null;
   if (refresh) await tokens.revoke(refresh, 'refresh');
   if (access) await tokens.revoke(access, 'access');
+  if (who && who.device_id) {
+    await require('../lib/push').revokeDevice({ deviceId: who.device_id, userId: who.subject_id, app: who.app || 'shop', reason: 'logout' });
+  }
   res.json({ ok: true });
 });
 
@@ -936,6 +941,7 @@ router.post('/logout', sessionLimit, async (req, res) => {
 router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req, res) => {
   const app = req.appSection || 'shop';
   const n = await tokens.revokeAllForSubject(req.user.id, null, app);
+  await require('../lib/push').revokeUser(req.user.id, app, 'logout_all');
   await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
   res.json({ ok: true, sessions: n, app });
 });

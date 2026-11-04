@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 960,
+    "routes": 963,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 454,
+      "user": 457,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 670,
+      "extracted": 673,
       "empty": 288,
       "unresolved": 2
     }
@@ -795,6 +795,9 @@
     {"method":"POST","path":"/api/shop/purchase-orders/:id/receipts","area":"shop","source":"server/src/routes/purchase-orders.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'purchase-orders-ip' })","requireUser","requireShop","requirePermission('stock.view')","requirePermission('stock.move')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/purchase-orders/:id/send","area":"shop","source":"server/src/routes/purchase-orders.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'purchase-orders-ip' })","requireUser","requireShop","requirePermission('stock.view')","requirePermission('stock.adjust')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["changed","order"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/purchase-orders/config","area":"shop","source":"server/src/routes/purchase-orders.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'purchase-orders-ip' })","requireUser","requireShop","requirePermission('stock.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["enabled","limits","permissions"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/push/config","area":"shop","source":"server/src/routes/shop-push.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-push-ip' })","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["device","enabled","orderAlerts"]},"errors":[],"shape":"extracted"},
+    {"method":"DELETE","path":"/api/shop/push/devices","area":"shop","source":"server/src/routes/shop-push.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-push-ip' })","requireUser","requireShop"],"params":[],"query":["token"],"body":["token"],"response":{"statuses":[200],"keys":["ok","revoked"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/push/devices","area":"shop","source":"server/src/routes/shop-push.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-push-ip' })","requireUser","requireShop"],"params":[],"query":[],"body":["platform","provider","token"],"response":{"statuses":[201],"keys":["ok","registered"]},"errors":["400 bad_provider","400 bad_push_token","403 device_push_disabled"],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/receipt-profile","area":"shop","source":"server/src/routes/shop-receipt.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/shop/receipt-profile","area":"shop","source":"server/src/routes/shop-receipt.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/receipt-profile/config","area":"shop","source":"server/src/routes/shop-receipt.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["debtMinor","enabled"]},"errors":[],"shape":"extracted"},

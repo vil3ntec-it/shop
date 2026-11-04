@@ -43,7 +43,16 @@ const { badRequest, notFound } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.order_notify';
 const EVENT = 'order_created';
+/**
+ * رویدادهای یک‌بارهٔ همان صف (مهاجرتِ ۲۱۳، O-01): «پرداختِ آنلاین رسید» و «مشتری سفارشِ تازه را لغو کرد». یک پوش
+ * (با همان سقفِ تلاش)، بی یادآوری و بی کانالِ پشتیبان؛ پذیرفته ⇒ `delivered`. لغو همان اعلانِ «سفارشِ تازه» را در
+ * گوشی جایگزین می‌کند (همان `tag`)، تا کسی سفارشِ لغوشده را آماده نکند.
+ */
+const ONCE_EVENTS = Object.freeze(['order_paid', 'order_cancelled']);
+const EVENTS = Object.freeze([EVENT, ...ONCE_EVENTS]);
 const CHANNEL = 'orders';
+/** پوشِ سفارش پس از این دیگر به گوشیِ خاموش نمی‌رسد — خبرِ «سفارشِ تازه» ِ دیروز کمکی نمی‌کند (یادآوری هست) */
+const TTL_SECONDS = 2 * 3600;
 
 const num = (k, d) => { const v = Number(process.env[k]); return Number.isFinite(v) && v > 0 ? v : d; };
 
@@ -92,14 +101,15 @@ const flagOf = (shopId) => flagIn((t, p) => query(t, p), shopId);
  * سفارش ⇒ ردیفِ دوم ساخته نمی‌شود (یکتاییِ order_id + event).
  * @returns {Promise<string|null>} شناسهٔ اعلان
  */
-async function enqueueIn(run, { shopId, orderId, orderNo, at = now() }) {
+async function enqueueIn(run, { shopId, orderId, orderNo, at = now(), event = EVENT }) {
+  if (!EVENTS.includes(event)) throw new Error(`order-notify: رویدادِ ناشناخته ${event}`);
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO order_notify_outbox (id, shop_id, order_id, order_no, event, status,
                                       next_attempt_at, created_at, updated_at)
      VALUES ($1,$2,$3,$4,$5,'pending',$6,$6,$6)
      ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
-    [ulid(at), shopId, orderId, orderNo, EVENT, at]
+    [ulid(at), shopId, orderId, orderNo, event, at]
   );
   soon();
   return r.rows[0] ? r.rows[0].id : null;
@@ -149,18 +159,40 @@ async function escalate(row, lock, at, reason) {
 const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
 const faNum = (n) => String(n).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
 
-/** بی نام، تلفن، نشانی یا مبلغ — صفحهٔ قفل جای دادهٔ مشتری نیست. */
-function messageFor(row, reminder) {
+/**
+ * بی نام، تلفن، نشانی، کالا یا مبلغ — صفحهٔ قفل جای دادهٔ مشتری نیست (O-01): فقط شمارهٔ سفارش و شمارِ سفارش‌های
+ * تازهٔ منتظر. شناسه‌ها (`notifId`، `orderId`) مات‌اند و فقط برای «باز کن و از سرور بخوان».
+ * @param {number} [waiting] شمارِ سفارش‌های «تازه» ِ همین دکان (فقط سفارشِ تازه)
+ */
+function messageFor(row, reminder, waiting = 0) {
   const no = Number(row.order_no);
+  const event = row.event || EVENT;
+  const count = Math.max(0, Number(waiting) || 0);
+  const open = 'برای دیدنِ جزئیات باز کنید.';
+  const title = event === 'order_paid' ? `سفارشِ شمارهٔ ${faNum(no)} پرداخت شد`
+    : event === 'order_cancelled' ? `مشتری سفارشِ شمارهٔ ${faNum(no)} را لغو کرد`
+      : `سفارشِ تازه — شمارهٔ ${faNum(no)}`;
+  const body = event !== EVENT ? open
+    : reminder ? 'این سفارش هنوز باز نشده است.'
+      : count > 1 ? `${faNum(count)} سفارشِ تازه منتظرِ شماست. ${open}` : open;
   return {
-    title: `سفارشِ تازه — شمارهٔ ${faNum(no)}`,
-    body: reminder ? 'این سفارش هنوز باز نشده است.' : 'برای دیدنِ جزئیات باز کنید.',
+    title,
+    body,
     channel: CHANNEL,
+    //  «پرداخت شد» کنارِ اعلانِ سفارش می‌ماند؛ «لغو» همان اعلانِ «سفارشِ تازه» را جایگزین می‌کند
+    tag: event === 'order_paid' ? `order-${row.order_id}-paid` : `order-${row.order_id}`,
+    ttlSeconds: TTL_SECONDS,
     data: {
-      type: 'order_notify', notifId: row.id, orderId: row.order_id, orderNo: String(no),
-      shopId: row.shop_id, reminder: reminder ? '1' : '0',
+      type: 'order_notify', event, notifId: row.id, orderId: row.order_id, orderNo: String(no),
+      shopId: row.shop_id, reminder: reminder ? '1' : '0', count: String(count),
     },
   };
+}
+
+/** شمارِ سفارش‌های «تازه» ِ دکان — فقط عدد، برای متنِ اعلان */
+async function waitingCount(shopId) {
+  const r = await one(`SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1 AND status='new'`, [shopId]);
+  return r ? Number(r.n) : 0;
 }
 
 //  A16: `orders.manage` نه `orders.view` — حسابدار سفارش را می‌بیند ولی رسیدگی نمی‌کند،
@@ -194,7 +226,8 @@ async function recipientIds(shopId) {
 async function send(row, reminder) {
   try {
     const onlyUserIds = await recipientIds(row.shop_id);
-    const out = (await push.sendTo({ shopId: row.shop_id, app: 'shop', onlyUserIds }, messageFor(row, reminder))) || {};
+    const waiting = (row.event || EVENT) === EVENT && !reminder ? await waitingCount(row.shop_id) : 0;
+    const out = (await push.sendTo({ shopId: row.shop_id, app: 'shop', onlyUserIds }, messageFor(row, reminder, waiting))) || {};
     const sent = Number(out.sent || 0);
     const total = Number(out.total || 0);
     if (sent > 0) return { sent, total, result: 'ok', error: '' };
@@ -240,10 +273,25 @@ async function settle(row, lock, set) {
   return r.rows[0] || null;
 }
 
+/** رویدادِ یک‌باره: یک پوش با همان سقفِ تلاش؛ پذیرفته ⇒ `delivered`؛ بی یادآوری و بی کانالِ پشتیبان */
+async function processOnce(row, lock, at) {
+  if (!(await flagOf(row.shop_id))) {
+    return settle(row, lock, { status: 'cancelled', last_result: 'flag_off', updated_at: at });
+  }
+  const attempts = Number(row.attempts);
+  if (attempts > MAX_ATTEMPTS) return settle(row, lock, { status: 'failed', attempts: MAX_ATTEMPTS, updated_at: at });
+  const out = await send(row, false);
+  const base = { devices_total: out.total, devices_sent: out.sent, last_result: out.result, last_error: out.error, updated_at: at };
+  if (out.sent > 0) return settle(row, lock, { ...base, status: 'delivered', provider_accepted_at: at });
+  if (attempts >= MAX_ATTEMPTS) return settle(row, lock, { ...base, status: 'failed' });
+  return settle(row, lock, { ...base, status: 'pending', next_attempt_at: at + backoffMs(attempts) });
+}
+
 async function processRow(row, at) {
   const lock = Number(row.locked_at);
   const order = await one('SELECT status FROM online_orders WHERE id=$1 AND shop_id=$2', [row.order_id, row.shop_id]);
   if (!order) return settle(row, lock, { status: 'cancelled', last_result: 'order_missing', updated_at: at });
+  if ((row.event || EVENT) !== EVENT) return processOnce(row, lock, at);
   //  کسی سفارش را قبول/رد کرده (از هر دستگاهی) ⇒ دیگر زنگ لازم نیست
   if (order.status !== 'new') {
     return settle(row, lock, { status: 'acked', acked_at: at, ack_source: 'order_status', updated_at: at });
@@ -391,7 +439,7 @@ async function pending(shopId, { limit } = {}) {
   const cap = Math.min(Math.max(1, Number(limit) || MAX_LIST), MAX_LIST);
   const rows = await many(
     `SELECT x.* FROM order_notify_outbox x JOIN online_orders o ON o.id = x.order_id
-      WHERE x.shop_id=$1 AND x.status IN (${OPEN.map((s) => `'${s}'`).join(',')}) AND o.status='new'
+      WHERE x.shop_id=$1 AND x.event='${EVENT}' AND x.status IN (${OPEN.map((s) => `'${s}'`).join(',')}) AND o.status='new'
       ORDER BY x.created_at DESC LIMIT $2`,
     [shopId, cap]
   );
@@ -435,6 +483,6 @@ async function ack(shopId, notifId, { kind, userId = '', deviceUid = '' } = {}) 
 }
 
 module.exports = {
-  FLAG_KEY, EVENT, CHANNEL, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
+  FLAG_KEY, EVENT, EVENTS, ONCE_EVENTS, CHANNEL, TTL_SECONDS, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
   flagOf, enqueueIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
 };

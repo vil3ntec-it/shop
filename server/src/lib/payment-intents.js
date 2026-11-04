@@ -166,7 +166,7 @@ async function casIn(c, row, to, patch = {}, opts = {}) {
 async function orderPaymentIn(c, intent, to, detail = {}) {
   if (intent.kind !== 'online_order') return '';
   const o = (await c.query(
-    'SELECT id, status, payment_status, cod_status, total_minor FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE',
+    'SELECT id, order_no, status, payment_status, cod_status, total_minor FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE',
     [intent.shop_id, intent.ref_id]
   )).rows[0];
   if (!o) return to === 'paid' ? 'order_missing' : '';
@@ -213,6 +213,10 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
               version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`,
       [intent.shop_id, o.id, at]
     );
+    //  O-01: «پرداخت شد» به گوشیِ دکان (همان پرچمِ `shop.order_notify`؛ همین تراکنش، فرستادن بعداً)
+    await require('./order-notify').enqueueIn((t, p) => c.query(t, p), {
+      shopId: intent.shop_id, orderId: o.id, orderNo: o.order_no, at, event: 'order_paid',
+    });
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {

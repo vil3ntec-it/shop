@@ -585,6 +585,10 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
     );
     //  NTF-01: پیامِ وضعیت به مشتری (پرچمِ `shop.customer_notify`؛ فقط سفارشِ ویترین) — همین تراکنش
     await require('./customer-notify').onStatusIn(run, { shopId, order: row, to, at });
+    //  O-01: «مشتری لغو کرد» به گوشیِ دکان (همان پرچمِ `shop.order_notify`؛ همین تراکنش، فرستادن بعداً)
+    if (to === 'cancelled_by_customer') {
+      await require('./order-notify').enqueueIn(run, { shopId, orderId: row.id, orderNo: row.order_no, at, event: 'order_cancelled' });
+    }
     return { order: await loadDetail(run, shopId, row.id, actor), unchanged: false, from: row.status, to };
   }
 }
