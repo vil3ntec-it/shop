@@ -40,6 +40,8 @@ const { badRequest, forbidden, notFound, conflict } = require('../middleware/err
 const hlc = require('./hlc');
 const { rejectOps } = require('./v1-reject');
 const roleV1 = require('./staff-role-v1');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
+//  ⛔ ویرایشِ پولیِ سندِ ثبت‌شدهٔ v1 (update/`$inc`) و قاعدهٔ نقشِ خودِ v1 (`v1RoleReason`) — شرح همان‌جا
+const { isMoneyEdit, v1RoleReason, judgeEdits } = require('./staff-edit-v1');
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -47,8 +49,8 @@ const MAX_KEYS_PER_USER = 5;
 const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 
 const DENY_CODE = Object.freeze({
-  'sales.discount': 'discount_not_allowed',
-  'sales.cancel': 'cancel_not_allowed',
+  'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
+  'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
   'returns.create': 'return_not_allowed',
 });
 
@@ -592,18 +594,6 @@ function touchesDoc(p, op) {
 }
 
 /**
- * `authorizeOp`ِ v1 این opِ فروش را حتماً با نقش رد می‌کند؟ همان دو شرطِ خودش (با همان
- * `can`) و همان کد؛ حذف راهِ «حذفِ مالِ خودت» را دارد که به دفتر بسته است، پس این‌جا نه.
- */
-function v1RoleReason(role, op) {
-  if (op.table !== 'sales' || op.type === 'delete' || !isPlainObject(op.fields)) return null;
-  const { can } = require('./permissions');
-  if (Number(op.fields.discount) > 0 && !can(role, 'sales.discount')) return 'discount_not_allowed';
-  if (op.fields.status === 'cancelled' && !can(role, 'sales.cancel')) return 'cancel_not_allowed';
-  return null;
-}
-
-/**
  * سندهای ردشدهٔ دسته‌های پیشینِ **همین دستگاه** (بُرشِ دسته سند و همراه را جدا کرد):
  * فقط صندوقِ باز (رسیدگی‌شده/کنارگذاشته آزاد است)، حداکثر یک روز، و فقط سندی که هنوز در هیچ
  * دفتری (v1 یا v3) ننشسته. نشانی‌ها از `detail` ِ صندوق؛ «همان ثبت» در v1 ts ِ برابر و در v3
@@ -755,7 +745,7 @@ async function v1Guard(req, res, next) {
     });
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const offTable = await roleV1.offRole(ctx, valid, rejected);
-    const hasNeed = valid.some((x) => x.need);
+    const hasNeed = valid.some((x) => x.need || isMoneyEdit(x.op));
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
     if (!hasNeed && !held0.length && !offTable.length) return finish();
@@ -775,6 +765,8 @@ async function v1Guard(req, res, next) {
     }
 
     const reject = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
+    const edits = await judgeEdits(ctx, live, deviceId);     //  فقط همان op، بی همراه و بی برگه
+    for (const e of edits) reject(e.x, e.out.reason);
     const parents = [];
 
     //  ۱) سرِ سندها — فاکتور هر op جدا، برگشت هر سند یک بار با سقفِ تجمعیِ فاکتور
@@ -873,6 +865,7 @@ async function v1Guard(req, res, next) {
       };
       await boxV1(ctx, op, deviceId, { box: out.box, detail });
     }
+    for (const e of edits) await boxV1(ctx, e.x.op, deviceId, e.out);
 
     return finish();
 

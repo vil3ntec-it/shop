@@ -228,6 +228,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
         WHERE shop_id=$1 AND id=$2`,
       [shopId, row.id, subtotalMinor, discountMinor, totalMinor, pl.after.length, at]
     );
+    await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
     const detail = {
       type: EVENT_TYPE, addId: `ad_${ulid(at)}`, key, hash,
       lines: pl.changes.map(({ note: _n, ...x }) => x),

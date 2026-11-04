@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -59,7 +60,8 @@ fun V3TabBar(tabs: List<V3Tab>, current: String?, onPick: (String) -> Unit, modi
         .clip(shape)
         .background(v3GlassColor(c.card))
         .border(1.dp, c.hairline, shape)
-        .padding(horizontal = 6.dp),
+        .padding(horizontal = 6.dp)
+        .selectableGroup(),
       horizontalArrangement = Arrangement.SpaceEvenly,
       verticalAlignment = Alignment.CenterVertically,
     ) {

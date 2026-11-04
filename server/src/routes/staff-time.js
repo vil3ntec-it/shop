@@ -6,7 +6,7 @@
  *   POST /punches           زدنِ ورود یا خروج (خودِ عضو؛ برای عضوِ دیگر فقط صاحب و مدیر)
  *   GET  /punches           زدن‌های یک بازه (شاگرد فقط خودش)
  *   GET  /commission-plan   نرخ‌های پورسانت (صاحب و مدیر)
- *   PUT  /commission-plan   نوشتنِ نرخ‌ها با نسخهٔ فعلی (صاحب و مدیر)
+ *   PUT  /commission-plan   نوشتنِ نرخ‌ها با نسخهٔ فعلی (⛔ فقط صاحب: نرخ دستمزد است؛ مدیر پورسانتِ خودش را نمی‌سازد)
  *
  * ⛔ پیش‌فرض خاموش: بی `shop.staff_time` همه جز `/config` ⇒ ۴۰۳ `staff_time_disabled`.
  * ⛔ shop_id و عضو فقط از عضویتِ کاربرِ توکن. منطق در `lib/staff-time.js`.
@@ -52,7 +52,8 @@ router.get('/commission-plan', needFlag, requirePermission('members.view'), asyn
   res.json(await st.plan(req.shopId));
 });
 
-router.put('/commission-plan', needFlag, requirePermission('settings.write'), async (req, res) => {
+//  ⛔ `members.role` (فقط صاحب)، نه `settings.write`: مدیر نرخِ همه یا نامِ خودش را تا ۱۰۰٪ می‌برد (gaps26)
+router.put('/commission-plan', needFlag, requirePermission('members.role'), async (req, res) => {
   const p = await st.savePlan(req.shopId, actorOf(req), req.body || {});
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_time.commission_plan', detail: { version: p.version } });
   res.json(p);

@@ -36,10 +36,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.Sale
@@ -118,6 +121,8 @@ internal fun PeriodHero(p: SalesPeriods.Period, title: String, money: Boolean, c
     label = if (money) StrSale.salesTotal else null,
     caption = if (money) PeriodLabel.counts(t) + returns else StrHistory.countsOnly,
     chips = chips,
+    //  «چاپ» کنارِ «صندوق باز — … · نقدِ مورد انتظار: …» در گوشیِ ۳۶۰ و درشتیِ ×۱٫۳ جا نمی‌شد و مبلغ بریده می‌شد
+    wrapChips = true,
   )
 }
 
@@ -194,6 +199,7 @@ internal fun PeriodCard(
   val turn by animateFloatAsState(if (open) 180f else 0f, label = "periodChevron")
   val t = p.totals
   val counts = filteredCount?.let { StrHistory.shownOf(plain(it), plain(t.invoices + t.online + t.cancelled)) } ?: PeriodLabel.counts(t)
+  val chosen = selected
   Column(
     Modifier
       .padding(vertical = 5.dp)
@@ -206,6 +212,11 @@ internal fun PeriodCard(
       Modifier
         .fillMaxWidth()
         .v3Pressable(label = title, role = Role.Button, onClick = onToggle)
+        //  صفحه‌خوان: «باز/بسته» ِ گوشی یا «انتخاب‌شده» ِ دوستونی — نه فقط چرخشِ پیکان یا رنگِ مرز
+        .semantics {
+          if (toggle) stateDescription = if (open) StrA11y.expanded else StrA11y.collapsed
+          else if (chosen) this.selected = true
+        }
         .padding(horizontal = 14.dp, vertical = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {

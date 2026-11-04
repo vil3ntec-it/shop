@@ -155,6 +155,43 @@ class NavLayoutTest {
   }
 
   @Test
+  fun `یک جا بالاتر و پایین‌تر — همان کشیدن به اندازهٔ یک ردیف`() {
+    val l0 = NavLayouts.DEFAULT
+    val rows = NavLayouts.rows(l0, owner)
+    //  [شروع] جست‌وجو [قرص] خانه فروش کالاها بیشتر [پایان] حساب [بیرون] …
+    val home = rows.indexOf(Row.Item(HOME))
+    val products = rows.indexOf(Row.Item(PRODUCTS))
+    assertEquals(listOf(HOME, PRODUCTS, SALE, MORE), NavLayouts.step(l0, rows, products, -1, owner)?.layout?.pill)
+    assertEquals(listOf(SALE, HOME, PRODUCTS, MORE), NavLayouts.step(l0, rows, home, 1, owner)?.layout?.pill)
+    for (i in rows.indices) for (by in listOf(-1, 1)) {
+      val e = NavLayouts.step(l0, rows, i, by, owner) ?: continue
+      assertEquals("ردیفِ $i، $by", NavLayouts.move(l0, rows, i, i + by, owner), e)
+    }
+    //  از سرخط گذشتن: «خانه» بالاتر ⇒ دایرهٔ شروع (جست‌وجو بیرون)، «حساب» پایین‌تر ⇒ بیرون از نوار
+    val up = ok(NavLayouts.step(l0, rows, home, -1, owner)!!)
+    assertEquals(HOME, up.start)
+    assertEquals(listOf(SALE, PRODUCTS, MORE), up.pill)
+    assertEquals(Slot.OUT, NavLayouts.slotOf(up, SEARCH))
+    assertNull(ok(NavLayouts.step(l0, rows, rows.indexOf(Row.Item(ACCOUNT)), 1, owner)!!).end)
+  }
+
+  @Test
+  fun `یک جا بالاتر و پایین‌تر — کارِ بی‌اثر یا ردشده پیشنهاد نمی‌شود`() {
+    val l0 = NavLayouts.DEFAULT
+    val rows = NavLayouts.rows(l0, owner)
+    assertNull("سرخط", NavLayouts.step(l0, rows, 0, 1, owner))
+    assertNull("بالای ستون", NavLayouts.step(l0, rows, rows.indexOf(Row.Item(SEARCH)), -1, owner))
+    assertNull("تهِ ستون", NavLayouts.step(l0, rows, rows.lastIndex, 1, owner))
+    assertNull("بی جابه‌جایی", NavLayouts.step(l0, rows, 1, 0, owner))
+    val firstOut = rows.indexOf(Row.Header(Slot.OUT)) + 1
+    assertNull("درونِ «بیرون از نوار» ترتیبی نیست", NavLayouts.step(l0, rows, firstOut, 1, owner))
+    assertNull("«بیشتر» بیرون از قرص نمی‌رود", NavLayouts.step(l0, rows, rows.indexOf(Row.Item(MORE)), 1, owner))
+    val full = ok(NavLayouts.place(l0, DEBTORS, Slot.PILL, null, owner))
+    val fullRows = NavLayouts.rows(full, owner)
+    assertNull("قرصِ پر", NavLayouts.step(full, fullRows, fullRows.indexOf(Row.Item(ACCOUNT)), -1, owner))
+  }
+
+  @Test
   fun `چیدمانِ سفارشیِ عکس — قرض‌داران و گزارش‌ها در قرص، اسکن در شروع`() {
     var l = NavLayouts.DEFAULT
     l = ok(NavLayouts.place(l, SCAN, Slot.START, null, owner))

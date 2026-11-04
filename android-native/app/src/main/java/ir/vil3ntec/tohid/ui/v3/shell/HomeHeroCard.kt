@@ -228,7 +228,7 @@ private fun HeroCard(
         Modifier.size(38.dp).clip(CircleShape).background(hc.track).border(1.dp, hc.edge, CircleShape)
           .v3Pressable(label = StrHero.addOrTake, scale = 0.9f, haptic = true, onClick = onPlus),
         contentAlignment = Alignment.Center,
-      ) { Icon(Icons.Rounded.Add, contentDescription = null, tint = hc.ink, modifier = Modifier.size(22.dp)) }
+      ) { Icon(Icons.Rounded.Add, contentDescription = StrHero.addOrTake, tint = hc.ink, modifier = Modifier.size(22.dp)) }
     }
     Spacer(Modifier.height(4.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
@@ -255,10 +255,10 @@ private fun HeroCard(
   }
 }
 
-/** عددِ درشت با شمارنده؛ عددِ دراز کوچک‌تر می‌شود تا در یک خط بماند */
+/** عددِ درشت با شمارنده؛ عددِ دراز کوچک‌تر می‌شود تا در یک خط بماند. بلندی کمینه است تا با درشتیِ نوشته (×۱٫۳) بریده نشود */
 @Composable
 private fun HeroAmount(amount: Double?, hc: HeroColors) {
-  Row(Modifier.fillMaxWidth().height(54.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+  Row(Modifier.fillMaxWidth().heightIn(min = 54.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
     if (amount == null) {
       Text(StrHero.blindHidden, color = hc.muted, style = v3Text(15, FontWeight.SemiBold, 22), maxLines = 1)
       return@Row

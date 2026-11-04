@@ -180,3 +180,36 @@ test('CHAT-11: مشتری از ویترین — تکرارِ پیام سهمیه
     push.setDeliver(null);
   }
 });
+
+test('CHAT-11: ویرایشِ دکان، و حذف و بلاکِ مشتری هم از همان سقفِ ارسال می‌خورند — ویرایشِ پیاپی دورِ سقف نمی‌زند', {
+  skip: hasStorefront ? false : 'ویترین (lib/storefront.js) روی این شاخه نیست',
+}, async () => {
+  //  دکان: هر ویرایش متنِ دیده‌شدهٔ مشتری را عوض می‌کند و long-poll ِ او را بیدار ⇒ مثلِ پیامِ تازه شمرده می‌شود
+  const o = await shopOwner('سهمیهٔ ویرایش');
+  for (const k of ['shop.orders', 'shop.storefront', 'shop.chat']) await setFlag(o.shopId, k, true);
+  const conv = (await chat.open({ side: 'customer', shopId: o.shopId, phone: '+93790000104' }, {})).conversation.id;
+  const m = await h.post(`${base}/conversations/${conv}/messages`, { clientId: cid(), body: 'نسخهٔ یکم' }, { token: o.token }); // ۱ از ۳
+  assert.equal(m.status, 201, JSON.stringify(m.body));
+  const mid = m.body.message.id;
+  assert.equal((await h.api('PATCH', `${base}/conversations/${conv}/messages/${mid}`, { token: o.token, body: { body: 'نسخهٔ دوم' } })).status, 200); // ۲
+  assert.equal((await h.post(`${base}/conversations/${conv}/messages/${mid}/edit`, { body: 'نسخهٔ سوم' }, { token: o.token })).status, 200); // ۳
+  const over = await h.post(`${base}/conversations/${conv}/messages/${mid}/edit`, { body: 'نسخهٔ چهارم' }, { token: o.token });
+  assert.equal(over.status, 429, JSON.stringify(over.body));
+  assert.equal((await h.api('PATCH', `${base}/conversations/${conv}/messages/${mid}`, { token: o.token, body: { body: 'نسخهٔ پنجم' } })).status, 429);
+  assert.equal((await query('SELECT body FROM shop_chat_messages WHERE id=$1', [mid])).rows[0].body, 'نسخهٔ سوم');
+
+  //  مشتری: «حذف برای همه» و بلاک/برداشتنِ بلاک (هر کدام long-poll ِ دکان را بیدار می‌کند) سهمِ همان سقف
+  const slug = `quota-w-${uniq()}`;
+  assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'سهمیه', contactPhone: '0700000003' }, { token: o.token })).status, 200);
+  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790000105' });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790000105', code: start.body.devCode });
+  const pub = (method, path, body) => h.api(method, `/api/store/${slug}/chat${path}`, { body: body || null, headers: { 'X-Store-Ticket': check.body.ticket } });
+  const opened = await pub('POST', '/conversations', {}); // ۱ از ۳
+  assert.equal(opened.status, 201, JSON.stringify(opened.body));
+  const c2 = opened.body.conversation.id;
+  const mine = await pub('POST', `/conversations/${c2}/messages`, { clientId: cid(), body: 'پاک می‌شود' }); // ۲
+  assert.equal((await pub('PUT', `/conversations/${c2}/block`)).status, 200); // ۳
+  assert.equal((await pub('DELETE', `/conversations/${c2}/block`)).status, 429);
+  assert.equal((await pub('DELETE', `/conversations/${c2}/messages/${mine.body.message.id}?for=all`)).status, 429);
+  assert.equal((await query('SELECT deleted_at FROM shop_chat_messages WHERE id=$1', [mine.body.message.id])).rows[0].deleted_at, null);
+});

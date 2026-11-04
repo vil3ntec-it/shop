@@ -187,7 +187,7 @@ fun ScanScreen(
               .background(c.blackRaised)
               .v3Pressable(label = StrKit.close, scale = 0.92f) { leaving = true },
             contentAlignment = Alignment.Center,
-          ) { Icon(Icons.Outlined.Close, contentDescription = null, tint = c.onBlack, modifier = Modifier.size(22.dp)) }
+          ) { Icon(Icons.Outlined.Close, contentDescription = StrKit.close, tint = c.onBlack, modifier = Modifier.size(22.dp)) }
           Text(title, style = V3Type.headline, color = c.onBlack, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
           Spacer(Modifier.size(44.dp))
         }

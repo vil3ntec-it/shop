@@ -954,7 +954,7 @@ fun CartLineDialog(
   /** S45 — «درخواستِ تأیید» برای ردِ قاعدهٔ جهت یا سقفِ قلمِ آزاد (`PriceApproval`)؛ `null` ⇒ همان پیامِ رد */
   priceAsk: ir.vil3ntec.tohid.data.PriceAsk? = null,
   /** POS-41 — F5 («تخفیفِ ردیف»): فوکوس روی کادرِ تخفیفِ ردیف وقتی سیاست آن را نشان می‌دهد */
-  focusDiscount: Boolean = false,
+  focusDiscount: Boolean = false, pinned: Boolean? = null, onPin: () -> Unit = {}, // POS-06 — سنجاقِ کاشیِ همین صندوق (`TillPinsPrefs`)؛ `null` ⇒ بی دکمه
 ) {
   val policy = linePolicy
   var grant by remember { mutableStateOf<ir.vil3ntec.tohid.core.pos.PriceApproval.Grant?>(null) }
@@ -1105,7 +1105,7 @@ fun CartLineDialog(
           color = Shop.colors.text,
         )
         edit.net?.let { Text(ir.vil3ntec.tohid.core.i18n.StrLine.afterDiscount(money(it)), style = MaterialTheme.typography.titleSmall, color = Shop.colors.success) }
-        if (note != null) ir.vil3ntec.tohid.ui.components.pos.PosNoteField(noteText, { noteText = it }, ir.vil3ntec.tohid.core.i18n.StrSalePages.lineNote); if (serials != null) ir.vil3ntec.tohid.ui.components.pos.PosSerialField(serialText, { serialText = it }, parsedQty)
+        if (note != null) ir.vil3ntec.tohid.ui.components.pos.PosNoteField(noteText, { noteText = it }, ir.vil3ntec.tohid.core.i18n.StrSalePages.lineNote); if (serials != null) ir.vil3ntec.tohid.ui.components.pos.PosSerialField(serialText, { serialText = it }, parsedQty); if (pinned != null) TextButton(onClick = onPin) { Text(if (pinned) ir.vil3ntec.tohid.core.i18n.StrSale.unpinFirst else ir.vil3ntec.tohid.core.i18n.StrSale.pinFirst) } // POS-06
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {

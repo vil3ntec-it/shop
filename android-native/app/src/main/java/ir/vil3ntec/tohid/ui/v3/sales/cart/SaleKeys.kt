@@ -56,11 +56,12 @@ private fun SaleKey(k: Char, modifier: Modifier, enabled: Boolean, onPress: () -
   val label = if (k == KeypadInput.BACKSPACE) StrSale.backspace else k.toString()
   Box(
     modifier.height(KEY_HEIGHT).clip(shape).background(c.tile)
-      .v3Pressable(label = label, scale = 0.94f, onClick = { if (enabled) onPress() }),
+      //  صفحه‌کلیدِ خاموش برای صفحه‌خوان هم «غیرفعال» است، نه دکمه‌ای که کاری نمی‌کند
+      .v3Pressable(enabled = enabled, label = label, scale = 0.94f, onClick = { if (enabled) onPress() }),
     contentAlignment = Alignment.Center,
   ) {
     if (k == KeypadInput.BACKSPACE) {
-      Icon(Icons.AutoMirrored.Outlined.Backspace, contentDescription = null, tint = c.icon, modifier = Modifier.size(22.dp))
+      Icon(Icons.AutoMirrored.Outlined.Backspace, contentDescription = label, tint = c.icon, modifier = Modifier.size(22.dp))
     } else {
       Text(k.toString(), style = V3Type.title.copy(fontSize = 22.sp, fontWeight = FontWeight.SemiBold), color = c.ink)
     }

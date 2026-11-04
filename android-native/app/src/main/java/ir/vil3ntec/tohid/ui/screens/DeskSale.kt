@@ -250,9 +250,8 @@ fun DeskSaleScreen(
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
-  val shown: List<Product> = remember(term, category, d.products, matches) {
-    if (term.isNotEmpty()) matches else PosCatalog.byCategory(d.products, category)
-  }
+  val pins = remember { ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.load(context); ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.pins }.value // POS-06: سنجاقِ همین دستگاه سرِ شبکه، فقط بی جست‌وجو
+  val shown: List<Product> = remember(term, category, d.products, matches, pins) { if (term.isNotEmpty()) matches else ir.vil3ntec.tohid.core.pos.TillPins.arrangeBy(PosCatalog.byCategory(d.products, category), pins) { it.id } }
 
   /** `false` ⇒ سبد قفل بود و چیزی اضافه نشد (پیامِ «اضافه شد» نباید بیاید) */
   fun applyAdded(product: Product, added: SalesEngine.Added): Boolean {
@@ -269,6 +268,13 @@ fun DeskSaleScreen(
   }
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, product.id)))
+
+  /** PRD-04/S05: بارکدِ بسته ⇒ اندازهٔ بسته × [count]، با «واحدِ بزرگ در صندوق» قیمتِ لیستِ بسته (`PackScan`، همان گوشی)؛ `false` ⇒ بسته نیست */
+  fun addPack(code: String, count: Double, dd: ShopData, items: Map<String, String>): Boolean {
+    val r = ir.vil3ntec.tohid.data.PackScan.scan(dd, cartStore.lines.value, code, count, items, ir.vil3ntec.tohid.data.TillGoodsPref.units(context), ir.vil3ntec.tohid.data.TillGoodsPref.wholePacks(context)) ?: return false
+    if (r is ir.vil3ntec.tohid.data.PackScan.Result.Added) applyAdded(r.product, r.added) else { ScanFeedback.unknown(context); toast(ir.vil3ntec.tohid.data.PackScan.refusal(r)) }
+    return true
+  }
 
   /**
    *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
@@ -309,6 +315,7 @@ fun DeskSaleScreen(
     if (quick?.enter(query) == true) { query = ""; return } // S03: Enter پس از بارکدِ ناشناس ⇒ ثبتِ سریع
     if (scaleLabel(query, d)) { query = ""; return }
     if (payV2 && query.isBlank()) { if (pay) payOpen = true; return } // بی پنلِ پرداخت همان «هیچ کار» ِ امروز
+    if (addPack(parsed.second, parsed.first, d, index)) { query = ""; return } // PRD-04/S05: «۲*کارتن» با قیمتِ لیستِ بسته
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
@@ -333,18 +340,9 @@ fun DeskSaleScreen(
   fun fromScanner(code: String): Boolean {
     enterGate.mark(); val dd = latestD
     if (scaleLabel(code, dd)) return true
-    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
+    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته (S05: با «واحدِ بزرگ» قیمتِ لیستِ بسته)؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
     val items = ShopStore.barcodeIndex(dd)
-    when (val l = ShopStore.packIndex(dd).lookup(code) { PosSearch.isItemCode(it, items) }) {
-      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> {
-        ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(code.trim())); return true
-      }
-      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> dd.products.firstOrNull { it.id == l.hit.productId }?.let { p ->
-        if (!p.active) toast(StrSale.inactive(p.name)) else add(p, l.hit.pack.sizeMilli / 1000.0)
-        return true
-      }
-      else -> Unit
-    }
+    if (addPack(code, 1.0, dd, items)) return true
     when (val hit = BarcodeMatch.find(code, items)) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
@@ -957,6 +955,7 @@ fun DeskSaleScreen(
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
         focusDiscount = rowDiscount,
+        pinned = if (line.free || p == null) null else id in pins, onPin = { ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.toggleSay(context, id, p?.name.orEmpty())?.let(::toast) }, // POS-06، قلمِ آزاد نه
         onDismiss = { editLine = null; unitNext = false; rowDiscount = false; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)

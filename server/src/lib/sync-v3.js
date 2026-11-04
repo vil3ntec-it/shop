@@ -451,7 +451,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     if (can(role, 'data.delete.own') && own) return null;
     return 'cancel_not_allowed';
   }
-  return require('./doc-roles').judgeV3(c, ctx, op, row);   // کارت، امتیاز، امانی، سفارش، محل (`shop.sync.doc_roles`)
+  return require('./doc-roles').judgeV3(c, ctx, op, row, { deviceId, origin });   // کارت، امتیاز، امانی، سفارش، محل؛ پولِ صندوق (`till-guard`)
 }
 
 // ---------- اعمالِ یک op ----------

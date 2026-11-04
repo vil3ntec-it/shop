@@ -39,6 +39,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.onClick
+import androidx.compose.ui.semantics.paneTitle
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -112,12 +119,21 @@ fun V3Sheet(
     contentColor = c.ink,
     scrimColor = c.black.copy(alpha = if (c.isDark) 0.6f else 0.32f),
     dragHandle = {
-      Box(Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 38.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(c.hairline))
+      //  صفحه‌خوان کشیدن ندارد: دستگیره برایش دکمهٔ «بستن» است (فقط معنا؛ لمس و کشیدن همان می‌ماند)
+      Box(
+        Modifier.padding(top = 10.dp, bottom = 6.dp).size(width = 38.dp, height = 5.dp).clip(RoundedCornerShape(50)).background(c.hairline)
+          .then(
+            if (dismissible) Modifier.semantics { role = Role.Button; contentDescription = StrKit.close; onClick(StrKit.close) { closer.close(); true } }
+            else Modifier,
+          ),
+      )
     },
   ) {
     Column(
       Modifier
         .fillMaxWidth()
+        //  باز شدنِ برگه با نامش اعلام می‌شود، نه فقط «برگه»
+        .then(if (title != null) Modifier.semantics { paneTitle = title } else Modifier)
         .then(if (scroll) Modifier.verticalScroll(rememberScrollState()) else Modifier)
         .padding(start = 20.dp, end = 20.dp, bottom = 20.dp),
     ) {
@@ -127,7 +143,7 @@ fun V3Sheet(
           style = v3Text(17, FontWeight.SemiBold, 24),
           color = c.ink,
           textAlign = TextAlign.Center,
-          modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp),
+          modifier = Modifier.fillMaxWidth().padding(bottom = 14.dp).semantics { heading() },
         )
       }
       content(closer)
