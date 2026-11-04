@@ -51,6 +51,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
+import ir.vil3ntec.tohid.data.DebtReminderSend
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
@@ -239,15 +240,18 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
     DebtorTasks { action ->
       val (data, acc, acts) = latest
       val debtor = acc.debtor
-      fun open(uri: String, intent: String = android.content.Intent.ACTION_VIEW) {
-        runCatching { context.startActivity(android.content.Intent(intent, android.net.Uri.parse(uri))) }
-      }
+      /** `true` ⇒ برنامهٔ بیرونی (شماره‌گیر، پیامک، واتس‌اپ) باز شد */
+      fun open(uri: String, intent: String = android.content.Intent.ACTION_VIEW): Boolean =
+        runCatching { context.startActivity(android.content.Intent(intent, android.net.Uri.parse(uri))) }.isSuccess
       val number = DebtorLedgerModel.dialable(debtor.phone)
-      val message = DebtorLedgerModel.reminder(debtor.name, acc.balance)
+      //  CRM-06: متنِ دکان (`DebtReminderPref`) با سررسید، روزهای بدهی و نامِ دکان — همان متنِ «یادآوریِ امروز»
+      fun message() = DebtReminderSend.message(context, data, debtor.id, storeName(context))
       when (action) {
-        DebtorLedgerModel.Action.CALL -> open("tel:$number", android.content.Intent.ACTION_DIAL)
-        DebtorLedgerModel.Action.SMS -> open("smsto:$number?body=" + android.net.Uri.encode(message))
-        DebtorLedgerModel.Action.WHATSAPP -> open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message))
+        DebtorLedgerModel.Action.CALL -> { open("tel:$number", android.content.Intent.ACTION_DIAL) }
+        //  «فرستاده شد» فقط وقتی برنامهٔ پیام باز شد — همان ردی که زمان‌بندیِ «یادآوریِ امروز» می‌خواند
+        DebtorLedgerModel.Action.SMS -> if (open("smsto:$number?body=" + android.net.Uri.encode(message()))) acts.onReminded("sms")
+        DebtorLedgerModel.Action.WHATSAPP ->
+          if (open("https://wa.me/${DebtorLedgerModel.whatsappNumber(debtor.phone)}?text=" + android.net.Uri.encode(message()))) acts.onReminded("whatsapp")
         DebtorLedgerModel.Action.EDIT -> acts.onEdit()
         DebtorLedgerModel.Action.STATEMENT_CSV -> {
           val sheet = ReportCsv.statement(data, debtor.id, todayIso())

@@ -3,7 +3,9 @@ package ir.vil3ntec.tohid.data
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 /** یادآوریِ بدهی با قالب و زمان‌بندی — CRM-06 */
@@ -109,6 +111,62 @@ class DebtReminderTest {
     assertNull(DebtReminder.check("ا".repeat(DebtReminder.MAX_TEMPLATE_LENGTH)))
     assertEquals(DebtReminder.Problem.Unknown(listOf("ناشناس", "x")), DebtReminder.check("{نام} {ناشناس} {x} {ناشناس}"))
     assertEquals("جای‌نگهدارِ ناشناخته: {ناشناس}، {x}", DebtReminder.validate("{نام} {ناشناس} {x} {ناشناس}"))
+  }
+
+  /** CRM-06 — دکمه‌های «پیامک/واتس‌اپ» ِ حسابِ مشتری: قالبِ همین دستگاه با همهٔ جای‌نگهدارها، همان متنِ «یادآوریِ امروز» */
+  @Test fun `متنِ دکمه‌های حسابِ مشتری با قالبِ دکان و همان جای‌نگهدارهای فهرستِ امروز`() {
+    val tpl = "{نام} جان، {مبلغ} افغانی، سررسید {سررسید}، {روز} روز — {دکان}"
+    val late = DebtReminder.forDebtor(d0, "late", today, tpl, "دکانِ توحید", now)
+    assertEquals("سررسیدگذشته جان، ${money(300.0)} افغانی، سررسید ${formatDate("2026-10-15")}، 10 روز — دکانِ توحید", late)
+    //  همان متنِ فهرستِ «یادآوریِ امروز» برای همان مشتری
+    assertEquals(DebtReminder.due(d0, today, template = tpl, store = "دکانِ توحید", now = now).single { it.debtor.id == "late" }.message, late)
+    //  بی قالب ⇒ همان جملهٔ امروزِ دکمه‌ها، بیت‌به‌بیت
+    assertEquals(DebtReminder.message(DebtReminder.Vars("کهنه", 1000.0)), DebtReminder.forDebtor(d0, "old", today, now = now))
+    //  تسویه ⇒ فقط سلام؛ ناشناخته ⇒ خالی
+    assertEquals("سلام تسویه عزیز،", DebtReminder.forDebtor(d0, "paid", today, tpl, now = now))
+    assertEquals("", DebtReminder.forDebtor(d0, "x", today, tpl, now = now))
+  }
+
+  /** CRM-06 — «فرستاده شد» ِ دکمه‌ها: یک رد در روز برای هر راه؛ زدنِ دوباره همان روز چیزی نمی‌نویسد */
+  @Test fun `ردِ «فرستاده شد» یک بار در روز برای هر راه`() {
+    val a = DebtReminder.sent(d0, "old", "sms", today, now, ::newId)!!
+    assertEquals(1, a.auditLog.size)
+    assertEquals(today, DebtReminder.lastReminded(a, "old"))
+    assertEquals(listOf("late"), DebtReminder.due(a, today, now = now).map { it.debtor.id })
+    assertNull("زدنِ دوباره همان روز", DebtReminder.sent(a, "old", "sms", today, now + 1, ::newId))
+    val b = DebtReminder.sent(a, "old", "whatsapp", today, now, ::newId)!!
+    assertEquals(2, b.auditLog.size)
+    assertNull(DebtReminder.sent(b, "old", "whatsapp", today, now, ::newId))
+    assertEquals(3, DebtReminder.sent(b, "old", "sms", "2026-10-20", now, ::newId)!!.auditLog.size)
+    //  مشتریِ دیگر جدا؛ راه یا مشتریِ ناشناخته هیچ
+    assertEquals(3, DebtReminder.sent(b, "late", "sms", today, now, ::newId)!!.auditLog.size)
+    assertNull(DebtReminder.sent(d0, "old", "fax", today, now, ::newId))
+    assertNull(DebtReminder.sent(d0, "x", "sms", today, now, ::newId))
+    //  نامی که خودش ‹» با پیامک —› دارد راهِ ردِ دیگر را عوض نمی‌کند
+    val trick = ShopData(debtors = listOf(Debtor(id = "t", name = "علی» با پیامک — مانده", phone = "0700000009")))
+    val w = DebtReminder.sent(trick, "t", "whatsapp", today, now, ::newId)!!
+    assertEquals(2, DebtReminder.sent(w, "t", "sms", today, now, ::newId)!!.auditLog.size)
+  }
+
+  /** CRM-06 — حسابِ مشتریِ نسخهٔ ۳ (گوشی و کامپیوتر): متنِ دکان، و «فرستاده شد» فقط وقتی برنامهٔ پیام باز شد */
+  @Test fun `سیم‌کشیِ دکمه‌های پیامک و واتس‌اپ ِ حسابِ مشتری`() {
+    fun src(rel: String): String =
+      listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+        .map { java.io.File(it, "ir/vil3ntec/tohid/$rel") }.firstOrNull { it.isFile }?.readText()
+        ?: error("$rel پیدا نشد")
+    val parts = src("ui/v3/money/DebtorLedgerParts.kt")
+    assertTrue(parts.contains("DebtReminderSend.message(context, data, debtor.id, storeName(context))"))
+    assertTrue(parts.contains("DebtorLedgerModel.Action.SMS -> if (open(\"smsto:"))
+    assertTrue(parts.contains("acts.onReminded(\"sms\")"))
+    assertTrue(parts.contains("acts.onReminded(\"whatsapp\")"))
+    assertFalse("جملهٔ ثابتِ پیشین", parts.contains("DebtorLedgerModel.reminder("))
+    assertTrue(src("ui/v3/money/MoneyRoutes.kt").contains("onReminded = { channel -> remindScope.launch { DebtReminderSend.sent(store, id, channel) } }"))
+    //  روز و ساعتِ همین دستگاه فقط در لایهٔ پلتفرم؛ نوشتن فقط از راهِ `ShopStore.update`
+    val send = src("data/DebtReminderAndroid.kt")
+    assertTrue(send.contains("DebtReminder.forDebtor(d, debtorId, ir.vil3ntec.tohid.todayIso(), DebtReminderPref.template(context), shopName, System.currentTimeMillis())"))
+    assertTrue(send.contains("store.update { d -> DebtReminder.sent(d, debtorId, channel, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis()) }"))
+    //  متنی که دکمه‌های گوشی می‌فرستند روی خودِ گوشی هم نوشتنی است (همان کلیدِ «گزارش‌های مشتری»)
+    assertTrue(src("ui/v3/settings/sections/SalesToggleScreens.kt").contains("if (on) item(key = \"reminder\")"))
   }
 
   /** CRM-06 — برگهٔ «یادآوریِ امروز» (چاپ و اکسلِ کامپیوتر) با متنِ همین دستگاه؛ بی متن همان جملهٔ امروز */

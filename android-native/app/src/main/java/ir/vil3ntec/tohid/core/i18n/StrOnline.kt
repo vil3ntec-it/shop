@@ -742,9 +742,9 @@ object StrOnline {
 
   // ── CRM-07: سفارش‌های باز/لغوشدهٔ مشتری در پروندهٔ او (`CustomerOnlineOrdersPanel`) ──────────
   fun customerOrders(n: Any): String = t("سفارش‌های اینترنتیِ باز یا لغوشده (${asIs(n)})", "Open or cancelled online orders ($n)", "پرانیستي یا لغوه شوي آنلاین فرمایشونه ($n)")
-  fun customerOrderLine(no: Any, amount: Any, ago: Any): String =
-    t("#${asIs(no)} · ${asIs(amount)} ؋ · ${asIs(ago)}", "#$no · $amount ؋ · $ago", "#$no · $amount ؋ · $ago")
+  fun customerOrderLine(no: Any, amount: Any, ago: Any): String = t("#${asIs(no)} · ${asIs(amount)} ؋ · ${asIs(ago)}", "#$no · $amount ؋ · $ago", "#$no · $amount ؋ · $ago")
   val customerOrdersMore: String get() = t("سفارش‌های بیشتری هست — در «سفارش‌ها» ببینید", "There are more — see Orders", "نور هم شته — په «فرمایشونه» کې یې وګورئ")
+  val customerOrderOpen: String get() = t("دیدنِ همین سفارش", "Open this order", "همدا فرمایش وګورئ")
 
   // ── جدول‌های ترجمهٔ واژه‌های موتور ───────────────────────────────────────────
   private val STATUS_EN = mapOf(

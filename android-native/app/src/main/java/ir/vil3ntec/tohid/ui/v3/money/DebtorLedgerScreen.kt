@@ -69,6 +69,8 @@ internal class DebtorLedgerActions(
   /** فاکتور ⇐ `sales/{saleId}`؛ «قدیمی‌تر» ⇐ `sales?q=` */
   val onOpenSale: (String) -> Unit,
   val onOlderSales: () -> Unit,
+  /** CRM-06: «یادآوری فرستاده شد» (`sms`/`whatsapp`) پس از باز شدنِ برنامهٔ پیام — `DebtReminder.sent` */
+  val onReminded: (String) -> Unit = {},
 )
 
 /**

@@ -55,7 +55,8 @@ class V3PortedFeaturesTest {
     assertTrue(extras.contains("LayawayCustomerPanel(d, store, debtorId, toast)"))
     assertTrue(extras.contains("LoyaltyHistory(d, debtorId,"))
     assertTrue(extras.contains("CrmPricingButton(store, d, debtorId, toast,"))
-    assertTrue(src("ui/v3/money/MoneyRoutes.kt").contains("extras = { DebtorFileExtras(data, store, id) { toasts.show(it) } },"))
+    //  CRM-07: همان سیم‌کشی، با «باز کردنِ سفارش» ِ پرونده
+    assertTrue(src("ui/v3/money/MoneyRoutes.kt").contains("extras = { DebtorFileExtras(data, store, id, onOpenOrder = { nav.open(OnlinePaths.order(it)) }) { toasts.show(it) } },"))
     val ledger = src("ui/v3/money/DebtorLedgerScreen.kt")
     assertTrue(ledger.contains("if (extras != null) item(key = \"extras\") { extras() }"))
     assertEquals("هر دو چیدمان (باریک و دوستونه)", 2, Regex("""ledgerItems\(rows, book, account, actions, stagger, extras,""").findAll(ledger).count())

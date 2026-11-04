@@ -80,11 +80,7 @@ import kotlinx.coroutines.launch
  *  همهٔ عددها از `CustomerEngine` — از خودِ دفتر، هیچ عددی جدا ذخیره نمی‌شود.
  */
 @Composable
-fun DeskCustomersScreen(
-  store: ShopStore,
-  d: ShopData,
-  snackbar: SnackbarHostState,
-) {
+fun DeskCustomersScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, onOpenOrder: ((String) -> Unit)? = null) { // CRM-07: سفارشِ پرونده ⇐ `orders/{id}`
   var openId by remember { mutableStateOf<String?>(null) }
   //  عکس‌های خودکار (`DevShot`، فرمانِ cust:first) ⇐ پروندهٔ بدهکارترین مشتری
   val shotOpen = DeskCustomersShot.open.value
@@ -94,7 +90,7 @@ fun DeskCustomersScreen(
   }
   val open = openId?.let { id -> d.debtors.find { it.id == id } }
   if (open == null) CustomerCards(store, d, snackbar) { openId = it }
-  else CustomerFile(store, d, snackbar, open.id) { openId = null }
+  else CustomerFile(store, d, snackbar, open.id, onOpenOrder) { openId = null }
 }
 
 /** فقط برای عکس‌های خودکارِ CI (`desktop/.../DevShot.kt`) — در کارِ عادی دست نمی‌خورد */
@@ -340,7 +336,7 @@ private fun CustomerCard(s: CustomerEngine.Summary, onClick: () -> Unit) {
 private enum class FileTab(val label: String) { LEDGER("صورت‌حساب"), INVOICES("فاکتورها"), ITEMS("اقلامِ برداشته") }
 
 @Composable
-private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, id: String, onBack: () -> Unit) {
+private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostState, id: String, onOpenOrder: ((String) -> Unit)?, onBack: () -> Unit) {
   val context = LocalContext.current
   val scope = rememberCoroutineScope()
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
@@ -456,7 +452,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     //  PRM-13: مانده و سابقهٔ امتیازِ وفاداری (`LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)
     ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
     ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, id, ::toast) // POS-27: امانی‌های همین مشتری (`LayawayPref`)
-    CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp)) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
+    CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
     Spacer(Modifier.height(10.dp))
 
     //  زبانه‌ها
