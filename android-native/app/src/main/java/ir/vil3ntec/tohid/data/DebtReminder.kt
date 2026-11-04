@@ -8,8 +8,9 @@ import ir.vil3ntec.tohid.money
  *  یادآوریِ بدهی با قالب و زمان‌بندی (CRM-06).
  *
  *  ── قالب ─────────────────────────────────────────────────────────────
- *  متنِ امروزِ دکمه‌های «پیامک/واتس‌اپ» (`Debtors.kt` › `ReminderRow`) قالبِ پیش‌فرض
- *  است و `render` با آن **همان** جمله را می‌سازد (آزمونِ مرجعِ `DebtReminderTest`).
+ *  متنِ پیشینِ دکمه‌های «پیامک/واتس‌اپ» قالبِ پیش‌فرض است و `render` با آن **همان** جمله را می‌سازد
+ *  (آزمونِ مرجعِ `DebtReminderTest`). دکمه‌های حسابِ مشتریِ نسخهٔ ۳ متن را از [forDebtor] با قالبِ همین
+ *  دستگاه می‌گیرند و «فرستاده شد» را با [sent] ثبت می‌کنند.
  *  جای‌نگهدارها: {نام} {مبلغ} {دکان} {سررسید} {روز}. جای‌نگهدارِ ناشناخته دست نمی‌خورد.
  *
  *  ── زمان‌بندی ─────────────────────────────────────────────────────────
@@ -130,19 +131,41 @@ object DebtReminder {
     val balance = ShopStore.debt(d, c.id)
     if (balance < rule.minBalance || balance <= 0) return@mapNotNull null
     val days = DebtorEngine.debtDays(d, c.id, now)
-    val book = DebtBook.book(d, c.id, today)
-    val overdue = book?.overdue?.mapNotNull { it.dueDate }?.minOrNull().orEmpty()
+    val (overdue, due) = dueDates(DebtBook.book(d, c.id, today))
     if (overdue.isEmpty() && (days == null || days < rule.minDebtDays)) return@mapNotNull null
     val last = lastReminded(d, c.id)
     if (last != null) {
       val since = daysBetween(last, today)
       if (since != null && since < rule.everyDays) return@mapNotNull null
     }
-    val due = overdue.ifEmpty { book?.nextDue?.dueDate.orEmpty() }
     Due(c, balance, days, overdue, last, message(Vars(c.name, balance, store, due, days), template))
   }.sortedWith(
     compareBy<Due> { it.overdueSince.isEmpty() }.thenByDescending { it.balance }.thenBy { it.debtor.id },
   )
+
+  /** کهنه‌ترین سررسیدِ گذشتهٔ بردهای باز (خالی اگر نیست) و سررسیدی که در متن می‌آید: همان، یا سررسیدِ بعدی */
+  private fun dueDates(book: DebtBook.Book?): Pair<String, String> {
+    val overdue = book?.overdue?.mapNotNull { it.dueDate }?.minOrNull().orEmpty()
+    return overdue to overdue.ifEmpty { book?.nextDue?.dueDate.orEmpty() }
+  }
+
+  /**
+   *  متنِ دکمه‌های «پیامک/واتس‌اپ» ِ حسابِ یک مشتری (`DebtorLedgerParts`، گوشی و کامپیوترِ نسخهٔ ۳): همان `Vars` ِ
+   *  فهرستِ «یادآوریِ امروز» ([due]) — مانده، سررسیدِ گذشته یا بعدی، روزهای بدهی و نامِ دکان — با قالبِ همین دستگاه
+   *  (`DebtReminderPref`؛ بی قالب همان جملهٔ امروز). مشتریِ ناشناخته ⇒ «». روز و ساعت از صدازننده (`DebtReminderSend`).
+   */
+  fun forDebtor(
+    d: ShopData,
+    debtorId: String,
+    today: String,
+    template: String = DEFAULT_TEMPLATE,
+    store: String = "",
+    now: Long,
+  ): String {
+    val c = d.debtors.find { it.id == debtorId } ?: return ""
+    val due = dueDates(DebtBook.book(d, c.id, today)).second
+    return message(Vars(c.name, ShopStore.debt(d, c.id), store, due, DebtorEngine.debtDays(d, c.id, now)), template)
+  }
 
   const val TYPE = "debt_reminder"
 
@@ -162,6 +185,27 @@ object DebtReminder {
       notes = "یادآوریِ بدهی به «${c.name}» با $via — مانده ${money(ShopStore.debt(d, debtorId))} افغانی",
     )
     return DebtorEngine.Result.Ok(d.copy(auditLog = d.auditLog + trace), debtorId)
+  }
+
+  /**
+   *  «یادآوری فرستاده شد» از دکمهٔ «پیامک/واتس‌اپ» ِ حسابِ مشتری — همان ردِ [record]، ولی **یک بار در روز برای هر
+   *  راه** روی همین دفتر: زدنِ دوباره همان روز ردِ دوم نمی‌سازد ⇒ `null` (چیزی برای نوشتن نیست؛ برای `ShopStore.update`).
+   *  راه یا مشتریِ ناشناخته هم `null`. راهِ ردِ پیشین از پایانِ متنِ همان [record] خوانده می‌شود (پس از نام).
+   */
+  fun sent(
+    d: ShopData,
+    debtorId: String,
+    channel: String,
+    today: String,
+    now: Long,
+    newId: () -> String = ::auditId,
+  ): ShopData? {
+    val via = CHANNELS[channel] ?: return null
+    val again = d.auditLog.any {
+      it.type == TYPE && it.refId == debtorId && it.date == today && it.notes.substringAfterLast("» با ").startsWith("$via — ")
+    }
+    if (again) return null
+    return (record(d, debtorId, channel, today, now, newId) as? DebtorEngine.Result.Ok)?.data
   }
 
   fun dueSheet(d: ShopData, today: String, rule: Rule = Rule(), template: String = DEFAULT_TEMPLATE, store: String = ""): ReportCsv.Sheet {

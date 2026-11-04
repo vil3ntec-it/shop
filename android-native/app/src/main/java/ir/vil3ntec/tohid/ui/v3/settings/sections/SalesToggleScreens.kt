@@ -141,8 +141,9 @@ internal fun RouteScope.CrmReportsScreen(onBack: (() -> Unit)?) {
       }
       SettingsNote(if (desk) StrShell.crmNote else StrShell.crmNotePhone)
     }
-    //  CRM-06: متنِ یادآوری فقط وقتی زبانهٔ «یادآوریِ امروز» دیده می‌شود (فقط کامپیوتر، مثلِ رابطِ امروز)
-    if (on && desk) item(key = "reminder") {
+    //  CRM-06: متنِ یادآوری (همین دستگاه) — زبانهٔ «یادآوریِ امروز» ِ کامپیوتر و دکمه‌های «پیامک/واتس‌اپ» ِ حسابِ مشتری
+    //  در گوشی و کامپیوتر (`DebtReminder.forDebtor`)؛ پس روی هر دو سکو، فقط با همین کلیدِ روشن
+    if (on) item(key = "reminder") {
       var reminderText by remember { mutableStateOf(DebtReminderPref.template(context)) }
       SettingsBlock {
         DebtReminderTemplateEditor(
