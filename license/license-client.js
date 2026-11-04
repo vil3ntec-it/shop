@@ -653,15 +653,27 @@
       : '';
   }
 
+  /*  O-09: `device` ِ ورود، همان کارِ برنامه‌ها — بی آن سرور مرورگر را ثبت نمی‌کرد و صاحب در دکانِ پر `device_limit` می‌گرفت.
+   *  `uid` = `getDeviceUid()` (تصادفی، یک بار برای هر مرورگر، هرگز از دادهٔ کاربر)؛ نام همان ورودِ کدی؛ بی اثرِ انگشت.
+   *  شناسهٔ کهنه‌ای که `v.id` ِ سرور نمی‌پذیرد ⇒ بی `device` (همان پیشین؛ ورود نمی‌شکند). */
+  function loginDevice() {
+    const uid = getDeviceUid(), acc = window.TohidAccount;
+    if (!/^[A-Za-z0-9_.:-]{1,64}$/.test(uid)) return undefined;
+    return { uid, name: acc && acc.deviceName ? acc.deviceName() : deviceName(), platform: 'web' };
+  }
+  /** نشستِ تازه ⇒ `notify()`: قفل و نوارهای اشتراک (vip.js) همان لحظه از سرور می‌پرسند، نه ده دقیقه بعد */
+  function storeSession(r) {
+    writeStore({ accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt, refreshToken: r.refreshToken,
+      userId: r.user.id, userLabel: r.user.name || r.user.email || r.user.phone || '' });
+    notify();
+  }
+
   async function login(identifier, password) {
     const r = await api('/api/v1/auth/login', {
-      method: 'POST', auth: false, body: { identifier, password, app: appId(), appVersion: appVersion() },
+      method: 'POST', auth: false,
+      body: { identifier, password, app: appId(), appVersion: appVersion(), device: loginDevice() },
     });
-    writeStore({
-      accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
-      refreshToken: r.refreshToken, userId: r.user.id,
-      userLabel: r.user.name || r.user.email || r.user.phone || '',
-    });
+    storeSession(r);
     return r;
   }
 
@@ -697,15 +709,10 @@
   /** رمزِ تازه با کدی که به ایمیل رفته — و همان‌جا ورود */
   async function resetPassword({ email, code, password }) {
     const r = await api('/api/v1/auth/password/reset', {
-      method: 'POST', auth: false, body: { email, code, password, app: appId(), appVersion: appVersion() },
+      method: 'POST', auth: false,
+      body: { email, code, password, app: appId(), appVersion: appVersion(), device: loginDevice() },
     });
-    if (r && r.accessToken) {
-      writeStore({
-        accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
-        refreshToken: r.refreshToken, userId: r.user.id,
-        userLabel: r.user.name || r.user.email || r.user.phone || '',
-      });
-    }
+    if (r && r.accessToken) storeSession(r);
     return r;
   }
 
@@ -740,13 +747,7 @@
       method: 'POST', auth: false,
       body: { ticket, name, password, terms, location, device: devicePayload(), app: appId(), appVersion: appVersion() },
     });
-    if (r && r.accessToken) {
-      writeStore({
-        accessToken: r.accessToken, accessExpiresAt: r.accessExpiresAt,
-        refreshToken: r.refreshToken, userId: r.user.id,
-        userLabel: r.user.name || r.user.email || '',
-      });
-    }
+    if (r && r.accessToken) storeSession(r);
     return r;
   }
 
@@ -825,6 +826,13 @@
     return r;
   }
 
+  /** O-09: `warning` ِ صاحبِ بیرون از سقف ⇒ `{devices, maxDevices}`، فقط کنارِ مجوزِ واقعی (قرینهٔ `DeviceCap.overOf`) */
+  function deviceCapOf(r) {
+    const w = (r && r.license && r.warning) || {}, n = w.devices, max = w.maxDevices;
+    const ok = w.code === 'device_over_cap' && Number.isInteger(n) && Number.isInteger(max) && max > 0 && n > max;
+    return ok ? { devices: n, maxDevices: max } : null;
+  }
+
   async function storeLicense(r) {
     if (r.serverTime) Clock.syncWithServer(r.serverTime);
     /* سرور صریحاً مجوز نداد — «سقفِ دستگاه پر است» یا «اشتراکی نیست».
@@ -842,38 +850,22 @@
         licenseExpiresAt: r.expiresAt, lastSyncOkAt: Date.now(),
       });
     }
+    //  O-09: هر پاسخِ سرور هشدار را از نو می‌گوید — نبودش (زیرِ سقف، رد، کارمند) ⇒ پاک
+    writeStore({ deviceCap: deviceCapOf(r) });
     await evaluateLocal();
     Gate.apply();
     notify();
   }
 
   /**
-   *  خروج از حساب.
-   *
-   *  ── چه چیزی خراب بود ────────────────────────────────────────────
-   *  اینجا فقط `clearStore()` بود: توکن از `localStorage` پاک می‌شد و
-   *  سرور هیچ خبری نمی‌شد. یعنی همان نشست تا نود روز روی سرور **باز**
-   *  می‌ماند. روی یک مرورگرِ مشترک — کافی‌نت، رایانهٔ دکان — کافی بود
-   *  کسی پیش از پاک شدنِ حافظه توکن را بردارد تا بعد از «خروج» هم
-   *  واردِ حساب باشد.
-   *
-   *  حالا اول به سرور می‌گوییم هر دو توکن را باطل کند.
-   *
-   *  ⚠️ `await` عمداً نیست و خطا هم بلعیده می‌شود: کسی که «خروج» زده
-   *  باید همین حالا خارج شود، حتی اگر نت نباشد یا سرور بالا نباشد.
-   *  پاک کردنِ محلی هیچ‌وقت منتظرِ شبکه نمی‌ماند.
+   *  خروج از حساب. تا پیش‌تر فقط `clearStore()` بود و نشست تا نود روز روی سرور **باز** می‌ماند (مرورگرِ مشترک:
+   *  کافی‌نت، رایانهٔ دکان). حالا اول سرور هر دو توکن را باطل می‌کند — پیش از `clearStore()`، وگرنه چیزی برای
+   *  فرستادن نمی‌ماند؛ `auth: true` توکنِ دسترسی را در سرآیند و توکنِ تازه‌سازی را در بدنه می‌برد.
+   *  ⚠️ `await` عمداً نیست و خطا بلعیده می‌شود: «خروج» همین حالا است، حتی بی نت؛ پاک کردنِ محلی منتظرِ شبکه نمی‌ماند.
    */
   function logout() {
     const st = readStore();
     if (st && (st.accessToken || st.refreshToken)) {
-      /*
-       *  بی‌صدا و بی‌انتظار — نتیجه‌اش کارِ کاربر را عوض نمی‌کند.
-       *
-       *  `auth: true` عمدی است: توکنِ دسترسی را از همان حافظه در
-       *  سرآیند می‌گذارد و توکنِ تازه‌سازی در بدنه می‌رود. سرور هر دو
-       *  را باطل می‌کند. ترتیب هم مهم است — این پیش از `clearStore()`
-       *  صدا زده می‌شود، وگرنه چیزی برای فرستادن نمی‌ماند.
-       */
       api('/api/v1/auth/logout', {
         method: 'POST',
         body: { refreshToken: st.refreshToken || '' },
@@ -1323,6 +1315,9 @@
     /** رمزِ ردِ آخرِ سرور (`device_limit`، `no_subscription`، …) یا '' */
     deniedCode: () => (readStore().serverDenied || {}).code || '',
     deniedMessage: () => (readStore().serverDenied || {}).message || '',
+    //  O-09: `{devices, maxDevices}` ِ آخرین `license/sync` یا null؛ `loginDevice` برای فرمِ ورودِ `shop-ui.js`
+    deviceCapOver: () => deviceCapOf({ license: 1, warning: Object.assign({ code: 'device_over_cap' }, readStore().deviceCap) }),
+    loginDevice,
     isLoggedIn: () => !!readStore().accessToken,
     userLabel: () => readStore().userLabel || '',
     verifyLicense, evaluate: evaluateLocal,

@@ -23,6 +23,8 @@ fun ShellNotice() {
     if (desk || !home) SubscriptionNotice()
     //  «این من نبودم — لغو کن»: فقط صاحب، فقط وقتی حسابِ گیرندهٔ حساب‌پی در انتظار است (همهٔ صفحه‌ها)
     HesabPayChangeNotice()
+    //  O-09: صاحبِ دکانِ بیرون از سقفِ دستگاه — هشدار و راهِ برداشتن، در همهٔ صفحه‌ها (صندوق هم)
+    DeviceCapNotice()
     ClockSkewNotice()
     if (!desk) UpdateNotice()
   }

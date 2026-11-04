@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync
 
+import ir.vil3ntec.tohid.core.account.DeviceCap
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -161,6 +162,8 @@ class Syncer(
       ) {
         state.license = license
         state.serverDenied = null
+        //  O-09: صاحبِ دکانِ بیرون از سقف ⇒ مجوز با هشدار (نوارِ «دستگاه‌ها»)؛ زیرِ سقف ⇒ پاک
+        state.deviceCapOver = DeviceCap.encode(DeviceCap.overOf(body))
         LicenseGuard.changed()
       }
     } else {
@@ -179,9 +182,10 @@ class Syncer(
       val reason = body["reason"]
         ?.let { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
         .orEmpty()
-      if (reason == "no_subscription" || reason == "no_shop" || reason == "device_limit") {
+      if (reason == "no_subscription" || reason == "no_shop" || reason == DeviceCap.DENIED_DEVICE_LIMIT) {
         state.license = null
         state.serverDenied = reason
+        state.deviceCapOver = null
       }
     }
     return status()
