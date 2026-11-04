@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dlv02-courier-call` (پسرفتِ DLV-02 در پیکِ نسخهٔ ۳؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- تشخیص: خطِ «ناحیه · دروازهٔ رنگ» و دکمهٔ «تماس با مشتری» فقط در `CourierHomeLegacy.kt` بودند؛ دستهٔ ۱۳ (#855، 0a68b851) آن را
+  بی جانشین پاک کرد و `landmarkFirst`/`callNumber`/`openDialer` بی صدازننده ماندند (CI سبز، چون هیچ آزمونی صدازننده نمی‌سنجید).
+- انجام شد: کارتِ «مسیر» (به `CourierMissionCard.kt` جدا شد تا `CourierHome.kt` زیرِ سقف بماند؛ سقف ۹۵۹ ⇐ ۸۶۶) و جزئیاتِ
+  مأموریت هر دو را دارند؛ دروازه همان پیشین (`CourierExtras.canCall` = پرچمِ `shop.delivery_courier_call` + `CourierFlow.canCall`)؛
+  `landmarkFirst` برچسبِ ناحیه/دروازه را از `StrCourierApp` می‌گیرد (پیش‌فرض همان فارسی)؛ یک تماس در هر لحظه. آزمون: `CourierCallV3Test` ⇒ ۷/۷
+  (صدازننده از `AppRoot` با `SourceGraph`، دروازه، رفتار)، `MissionAddressTest` ⇒ ۵/۵؛ desk-check: هسته ۱۳۰۶/۱۳۰۶، کامپیوتر ۳۰۴۴ با همان ۱۳ ِ `ui.theme`؛ عکسِ `phone-v3-courier-call*`.
+  ⚠️ دیمنِ مشترکِ کاتلین زیرِ بارِ چند سیزن یک ساعت کامپایلِ core را نگه داشت؛ با `-Pkotlin.compiler.execution.strategy=in-process` ۱٫۵ دقیقه شد.
+- نیمه‌کاره: گوشیِ واقعی، آیفونِ بی سیم‌کارت و شماره‌گیرِ کامپیوتر آزموده نشد؛ نمای جدولیِ تبلت فقط نشانه دارد (جزئیات همه را).
+- قدمِ بعدی: در `ui/courier` چهار تابعِ دیگر هم بی صدازننده‌اند (`BagScanDialog`، `NearPinFlow`، `RouteSheet`، `RateDialog` در
+  `CourierChecksUi.kt`)؛ کارشان در نسخهٔ ۳ با برگه‌های `CourierChecksV3.kt` هست، پس کدِ مرده‌اند نه پسرفت — پاک کردن یا نگه داشتن با صاحب‌کار.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/online-order-flow`، PR #910 (جریانِ کاملِ سفارشِ آنلاین: «چرا نمی‌رسد»، فاکتورِ یک‌ضرب، پرداخت پس از پذیرش؛ روی دستهٔ ۱۸ (#900)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - تشخیص: زنجیره ویترین/بازارچه ⇒ `POST /store/:slug/checkout` ⇒ `online_orders` ⇒ برنامه (`/shop/orders/config` ⇒ `summary` هر ۲۰ثانیه فقط
   جلوی چشم؛ FCM در برنامه نیست). سرور هیچ سفارشِ ثبت‌شده‌ای را گم نمی‌کرد؛ باگ «خاموشیِ بی‌صدا» بود: پرچمِ `shop.orders`، کلیدِ

@@ -73,6 +73,17 @@ object StrCourierApp {
   val photoQueued: String get() = t("عکسِ بسته در صف است", "The parcel photo is queued", "د بستې انځور په کتار کې دی")
   val dialerFailed: String get() = t("شماره‌گیرِ گوشی باز نشد", "The phone dialer did not open", "د تلیفون شمېره‌ګیر خلاص نه شو")
   val shopPhoneMissing: String get() = t("شمارهٔ دکان هنوز ثبت نشده است", "The shop's number is not set yet", "د دوکان شمېره لا نه ده ثبت شوې")
+
+  // ── «تماس با مشتری» و خطِ «ناحیه · دروازه» (DLV-02؛ فارسی همان رابطِ پیشین) ──
+  val callCustomer: String get() = t("تماس با مشتری", "Call the customer", "پېرودونکي ته زنګ")
+  val customerPhoneMissing: String get() = t("شمارهٔ مشتری نیامد", "The customer's number did not come through", "د پېرودونکي شمېره رانغله")
+  val callOnlineOnly: String get() = t(
+    "تماس فقط با اینترنت — شماره روی گوشی نگه داشته نمی‌شود",
+    "Calling needs the internet — the number is not kept on the phone",
+    "زنګ یوازې له انټرنټ سره — شمېره په تلیفون کې نه ساتل کېږي",
+  )
+  fun areaLine(area: String): String = t("ناحیه: ${asIs(area)}", "Area: $area", "سیمه: $area")
+  fun gateLine(color: String): String = t("دروازهٔ ${asIs(color)}", "Gate: $color", "دروازه: $color")
   val sendingDots: String get() = t("در حالِ فرستادن…", "Sending…", "لېږل کېږي…")
   fun queuedOnPhone(n: String): String = t("${asIs(n)} کار در صفِ گوشی", "$n jobs queued on the phone", "$n کارونه د تلیفون په کتار کې")
   fun queuedShort(n: String): String = t("${asIs(n)} کار در صف", "$n jobs queued", "$n کارونه په کتار کې")
