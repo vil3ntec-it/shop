@@ -6,6 +6,12 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrPick
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrScanPages
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -38,20 +44,20 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
     AlertDialog(
       onDismissRequest = { PhoneScanner.photoRequest.value = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text("کامپیوتر عکس می‌خواهد", color = Shop.colors.text) },
-      text = { Text("عکسِ «${request.second.ifBlank { "کالا" }}» را بگیرید؛ همان لحظه در کامپیوتر باز می‌شود.", color = Shop.colors.muted) },
-      confirmButton = { TextButton(onClick = { pickFor = request; PhoneScanner.photoRequest.value = null }) { Text("گرفتنِ عکس") } },
-      dismissButton = { TextButton(onClick = { PhoneScanner.photoRequest.value = null }) { Text("بعداً") } },
+      title = { Text(StrScanPages.pcWantsPhoto, color = Shop.colors.text) },
+      text = { Text(StrScanPages.takePhotoOf(request.second.ifBlank { Str.product }), color = Shop.colors.muted) },
+      confirmButton = { TextButton(onClick = { pickFor = request; PhoneScanner.photoRequest.value = null }) { Text(StrPick.photoTake) } },
+      dismissButton = { TextButton(onClick = { PhoneScanner.photoRequest.value = null }) { Text(StrDevices.later) } },
     )
   }
   PhotoSourceSheet(
     open = pickFor != null,
     onDismiss = { pickFor = null },
-    note = "عکس برای کامپیوتر فرستاده می‌شود",
+    note = StrSettings.photoForPc,
   ) { uri ->
     val target = pickFor ?: return@PhotoSourceSheet
-    toast("در حالِ فرستادن به کامپیوتر…")
-    scope.launch { toast(PhoneScanner.sendPhoto(context, uri, target.first) ?: "عکس به کامپیوتر رسید") }
+    toast(StrScanPages.sendingToPc)
+    scope.launch { toast(PhoneScanner.sendPhoto(context, uri, target.first) ?: StrSettings.photoArrived) }
   }
 
   /* -------------------------- کامپیوتر -------------------------- */
@@ -60,7 +66,7 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
   LaunchedEffect(item?.id) {
     if (item != null) {
       uri = PhoneScanner.download(context, item)
-      if (uri == null) { toast("عکسِ گوشی دریافت نشد"); PhoneScanner.openNow.value = null }
+      if (uri == null) { toast(StrScanPages.phonePhotoNotReceived); PhoneScanner.openNow.value = null }
     }
   }
   val u = uri
@@ -68,7 +74,7 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
     val product = data.products.firstOrNull { it.id == item.productId }
     PhotoStudioDialog(source = u, onDismiss = { PhoneScanner.openNow.value = null }) { bitmap ->
       PhoneScanner.openNow.value = null
-      if (product == null) { toast("این کالا دیگر نیست"); return@PhotoStudioDialog }
+      if (product == null) { toast(StrProducts.missingTitle); return@PhotoStudioDialog }
       PhotoStore.saveBitmap(context, product.id, bitmap).onSuccess {
         scope.launch {
           store.save(data.copy(products = data.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
@@ -76,8 +82,8 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
         }
         PhotoSync.changed(context, product.id)
         PhotoSync.version.value = PhotoSync.version.value + 1
-        toast("عکسِ گوشی روی «${product.name}» نشست")
-      }.onFailure { toast("عکس ذخیره نشد") }
+        toast(StrScanPages.phonePhotoSet(product.name))
+      }.onFailure { toast(StrProducts.photoFailed) }
     }
   }
 }

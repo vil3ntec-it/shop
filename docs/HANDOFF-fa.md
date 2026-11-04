@@ -53,6 +53,31 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-5` (دریِ واقعی، دورِ ۵؛ روی `claude/dari-real-4` (#943)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۶۸ نوشتهٔ خامِ شش صفحهٔ زندهٔ کوچکِ `ui/screens` به دو جدولِ تازه رفت (فارسی بایت‌به‌بایت همان — بازسازیِ متن از جدول و
+  سنجش با نسخهٔ پیشین؛ انگلیسی و پشتو تازه): `ScanSheet`/`PhoneLinkHost`/`PackEditor` (`StrScanPages`)، `StorefrontMediaPanel`/
+  `HeatmapPanel`/`CustomerReportsPhone` (`StrPanelPages`)؛ ۳۹ نوشتهٔ تازه، ۲۴ کلیدِ جدول‌های پیشین. «بارکد را جلوی دوربین بگیرید…» با
+  `td(…)`؛ «گوشی/کامپیوتر» ِ `PhoneLinkHost` نامِ دستگاهِ آن سرِ کار است ⇒ `t(…)`. نامِ نوعِ لوگو/تصویرِ سر از جدول (`mediaKindName`، فارسی
+  همان `Kind.label`). آزمون: `DariCoverageTest` (سقفِ متنِ خامِ `ui/screens` ۲۰۵۲ ⇐ ۱۹۸۴، نگهبانِ ۶ پروندهٔ دورِ ۵ — پیش از جابه‌جایی
+  سرخ —، کفِ پوشش ۱۹٪، نمونه‌های بایت‌به‌بایت و عوض شدن با زبان و کامپیوتر). واژهٔ تازهٔ دری نه (سقفِ ۶۴).
+- نیمه‌کاره: #943 باید پیش از این PR مرج شود (پایهٔ همین شاخه).
+- قدمِ بعدی: تصمیمِ صاحب‌کار برای ستون‌های `DayEndModel`/`HeatmapModel` و برچسبِ `CustomerInsight` (صفحه و خروجیِ اکسل با هم)؛ سپس
+  `ReportFresh*` پس از #924/#936؛ بقیهٔ `ui/screens` بیشتر کلید و داده یا صفحه‌های نادیدنی است.
+
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-4` (دریِ واقعی، دورِ ۴؛ آغاز روی `ccr-3a0d593c-ac0jpj-batch-22` چون #934 تا ۲۰ دقیقه مرج نشد، سپس روی main پس از #934 با همان درخت؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۵۵۰ نوشتهٔ خامِ زندهٔ `ui/screens` در ۱۴ پرونده به چهار جدولِ تازه رفت (فارسی بایت‌به‌بایت همان — بازسازیِ متن از جدول و
+  سنجش با نسخهٔ پیشین؛ انگلیسی و پشتو تازه): `Servers`/`TeamStaff`/`EasySetupAndroid` (`StrSetupPages`)، `ImageBankPicker`/
+  `BankPhotoSource`/`ImageBulkImport` (`StrImagePages`)، `PromoText`/`StorefrontCampaigns`/`CrmProfileUi` (`StrMarketPages`)، `BulkSheets`/
+  `BulkPriceDialog`/`ProductListModel`/`ProductImportDialog`/`SupplierExtras` (`StrCatalogPages`)؛ ۳۶۱ نوشتهٔ تازه، ۱۷۷ جا جملهٔ جدول‌های
+  پیشین. جدول‌های `PromoText` و برچسبِ `enum` ِ وضعیت/زبانه هر بار خوانده می‌شوند؛ روزهای هفته از `StrReports.weekdaysShort`؛ کارتِ
+  «زمان‌دار» ِ `Promos` «همیشه» را با جدول می‌سنجد؛ عنوانِ «سرورها» از `StrReach.servers` (کلیدِ `SERVERS_SECTION_TITLE` داده ماند).
+  داده با «// داده:»: نامِ کلیدِ تأیید روی سرور، نامِ دو پیوندِ ثابتِ QR، واحدِ پیش‌فرض، دلیلِ حذف در سابقه، نامِ پروندهٔ ردیف‌های رد.
+  آزمون: `DariCoverageTest` (سقفِ متنِ خامِ `ui/screens` ۲۶۰۲ ⇐ ۲۰۵۲، نگهبانِ ۱۴ پروندهٔ دورِ ۴ — پیش از جابه‌جایی سرخ با ۵۵۰ نوشته —،
+  کفِ پوشش، نمونه‌های بایت‌به‌بایت و عوض شدنِ برچسب با زبان). واژهٔ تازهٔ دری نه (سقفِ ۶۴).
+- نیمه‌کاره: #924 (۳۲ متنِ خامِ `ReportFresh*`) با سقفِ تازه هم جور نیست ⇒ متن‌هایش پیش از دسته به جدول بروند.
+- قدمِ بعدی: دورِ ۵ برای صفحه‌های زندهٔ کوچک (`StorefrontMediaPanel`، `HeatmapPanel`، `PhoneLinkHost`، `PackEditor`، `CustomerReportsPhone`،
+  `ScanSheet`؛ دو تا `td(…)` می‌خواهند)؛ تصمیمِ صاحب‌کار برای `DayEndModel`/`HeatmapModel` (ستونِ خروجی) و سقفِ واژه‌های دری.
+
 ### ۱۴۰۵/۰۸/۱۴ — هماهنگ‌کنندهٔ حسابِ دوم (دسته‌های ۲۰ تا ۲۲؛ حساب به ۸۵٪ ِ سقف رسید)
 - انجام شد: مرجِ دستهٔ ۲۰ (#918)، #927، #932، دستهٔ ۲۱ (#923: #917/#919/#920/#921 + رفعِ امنیتیِ حذفِ حساب از نشستِ
   دکانِ دیگر ⇒ ۴۰۳ `owner_session_required`، ثبتِ مسیرها در `tenant-matrix`) و دستهٔ ۲۲ (#922 Firebase پشتِ پرچم،

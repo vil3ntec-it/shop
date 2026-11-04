@@ -138,7 +138,7 @@ object StrProducts {
   fun readySummary(ready: Int, total: Int): String = t("کالای آماده: ${asIs(ready)} از ${asIs(total)}", "Ready: $ready of $total", "چمتو توکي: $ready له $total")
   val saveAll: String get() = t("ذخیرهٔ همه", "Save all", "ټول خوندي کړئ")
   val saveChanges: String get() = t("ذخیرهٔ تغییرات", "Save changes", "بدلونونه خوندي کړئ")
-  fun rowIncomplete(n: Int): String = t(
+  fun rowIncomplete(n: Any): String = t(
     "ردیف ${asIs(n)} کامل نیست — نام، دسته، واحد و هر دو قیمت لازم است",
     "Row $n is incomplete — name, category, unit and both prices are required",
     "$n کتار بشپړ نه دی — نوم، ډله، واحد او دواړه بیې اړینې دي",

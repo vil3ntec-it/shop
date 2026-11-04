@@ -21,6 +21,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.image.StorefrontMediaSpec.Kind
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrPanelPages
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.StorefrontMediaPrep
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.StorefrontMediaDto
@@ -74,16 +79,16 @@ fun StorefrontMediaPanel(snackbar: SnackbarHostState) {
         val raw = withContext(Dispatchers.IO) {
           context.contentResolver.openInputStream(uri)?.use { s ->
             val buf = s.readNBytesCompat(StorefrontMediaPrep.MAX_INPUT_BYTES + 1)
-            require(buf.size <= StorefrontMediaPrep.MAX_INPUT_BYTES) { "فایل بیش از اندازه بزرگ است" }
+            require(buf.size <= StorefrontMediaPrep.MAX_INPUT_BYTES) { StrPanelPages.fileTooBig }
             buf
-          } ?: throw IllegalArgumentException("فایل خوانده نشد")
+          } ?: throw IllegalArgumentException(StrReach.fileUnreadable)
         }
         StorefrontMediaPrep.prepare(raw, kind)
       }
-      prepared.onFailure { snackbar.showSnackbar(it.message ?: "عکس آماده نشد") }
+      prepared.onFailure { snackbar.showSnackbar(it.message ?: StrOnline.ctPhotoFailed) }
       prepared.onSuccess { jpeg ->
         repo.upload(kind, jpeg)
-          .onSuccess { media = it; loadPreviews(it); snackbar.showSnackbar("${kind.label} ثبت شد") }
+          .onSuccess { media = it; loadPreviews(it); snackbar.showSnackbar(StrPanelPages.mediaSaved(mediaKindName(kind))) }
           .onFailure { snackbar.showSnackbar(it.userMessage) }
       }
       busy = null
@@ -95,12 +100,12 @@ fun StorefrontMediaPanel(snackbar: SnackbarHostState) {
   }
 
   Panel {
-    Text("لوگو و تصویرِ سرِ ویترین", style = MaterialTheme.typography.titleSmall)
-    Text("لوگو مربع و تصویرِ سر سه به یک بریده می‌شود (از وسطِ عکس). همین‌ها در ویترین و بازار دیده می‌شوند.",
+    Text(StrPanelPages.mediaTitle, style = MaterialTheme.typography.titleSmall)
+    Text(StrPanelPages.mediaNote,
       style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
     val m = media
     when {
-      m == null && error != null -> TohidErrorState("لوگو و تصویر باز نشد", error.orEmpty(), onRetry = { scope.launch { load() } })
+      m == null && error != null -> TohidErrorState(StrPanelPages.mediaLoadFailed, error.orEmpty(), onRetry = { scope.launch { load() } })
       m == null -> TohidLoadingState(rows = 2)
       else -> for (kind in Kind.values()) {
         val item = m.of(kind)
@@ -108,21 +113,21 @@ fun StorefrontMediaPanel(snackbar: SnackbarHostState) {
           val box = if (kind == Kind.LOGO) Modifier.size(64.dp) else Modifier.width(144.dp).height(48.dp)
           Box(box.clip(Shape.card).background(Shop.colors.surface2), contentAlignment = Alignment.Center) {
             val bmp = item?.let { previews[it.url] }
-            if (bmp != null) Image(bmp, contentDescription = kind.label, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
-            else Text(if (item == null) "ندارد" else "…", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+            if (bmp != null) Image(bmp, contentDescription = mediaKindName(kind), contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
+            else Text(if (item == null) StrOnline.dlNone else "…", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
           }
           Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(kind.label, style = MaterialTheme.typography.bodyMedium)
+            Text(mediaKindName(kind), style = MaterialTheme.typography.bodyMedium)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              TohidSecondaryButton(if (busy == kind) "در حالِ فرستادن…" else if (item == null) "انتخاب" else "عوض کردن", onClick = {
+              TohidSecondaryButton(if (busy == kind) StrOnline.sending else if (item == null) StrSale.chooseWord else StrPanelPages.change, onClick = {
                 picking = kind
                 runCatching { pick.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) }
               }, enabled = busy == null)
-              if (item != null) TohidDangerButton("برداشتن", onClick = {
+              if (item != null) TohidDangerButton(StrDevices.remove, onClick = {
                 busy = kind
                 scope.launch {
                   repo.remove(kind)
-                    .onSuccess { media = it; snackbar.showSnackbar("${kind.label} برداشته شد") }
+                    .onSuccess { media = it; snackbar.showSnackbar(StrPanelPages.mediaRemoved(mediaKindName(kind))) }
                     .onFailure { snackbar.showSnackbar(it.userMessage) }
                   busy = null
                 }
@@ -133,6 +138,12 @@ fun StorefrontMediaPanel(snackbar: SnackbarHostState) {
       }
     }
   }
+}
+
+/** نامِ هر نوع به زبانِ برنامه؛ فارسی همان `Kind.label` (پیامِ خطای `StorefrontMediaSpec`/`StorefrontMediaPrep` هنوز با آن، بیرون از صفحه) */
+internal fun mediaKindName(kind: Kind): String = when (kind) {
+  Kind.LOGO -> StrPanelPages.logo
+  Kind.HEADER -> StrPanelPages.headerImage
 }
 
 /** خواندنِ حداکثر `limit` بایت (readNBytes در API ِ قدیمیِ اندروید نیست) */
