@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.ScaleLabels
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.TillGoodsPref
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.ui.screens.Haptics
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -80,7 +81,10 @@ class CartFeedback(
         return CartNote(CartModel.scanNote(s), if (s.capped) V3Tone.WARNING else V3Tone.SUCCESS)
       }
     }
-    return when (val s = CartModel.scan(d, index, cart.lines.value, code, multiplier) ?: return null) {
+    //  PRD-04/S05: بارکدِ بسته؛ قیمتِ لیستِ بسته فقط با «واحدِ بزرگ در صندوق» (`TillGoodsPref.units`)
+    val packPrice = TillGoodsPref.units(context)
+    val wholeOnly = TillGoodsPref.wholePacks(context)
+    return when (val s = CartModel.scan(d, index, cart.lines.value, code, multiplier, packPrice, wholeOnly) ?: return null) {
       is CartModel.Scan.Added -> {
         if (!cart.set(s.lines)) { ScanFeedback.unknown(context); return CartNote(CartStore.NOT_ADDED, V3Tone.WARNING) }
         if (s.capped) ScanFeedback.unknown(context) else ScanFeedback.ok(context)
@@ -93,6 +97,18 @@ class CartFeedback(
       is CartModel.Scan.Inactive -> {
         ScanFeedback.unknown(context)
         CartNote(StrSale.inactiveActivate(s.product.name), V3Tone.WARNING)
+      }
+      is CartModel.Scan.Ambiguous -> {
+        ScanFeedback.unknown(context)
+        CartNote(StrSale.ambiguousBarcode(s.code), V3Tone.WARNING)
+      }
+      is CartModel.Scan.PackClash -> {
+        ScanFeedback.unknown(context)
+        CartNote(StrSale.packPriceClash(s.product.name, s.pack), V3Tone.WARNING)
+      }
+      is CartModel.Scan.PackPart -> {
+        ScanFeedback.unknown(context)
+        CartNote(StrSale.partPackRejected(s.pack), V3Tone.WARNING)
       }
       is CartModel.Scan.Unknown -> {
         //  CRM-16: کارتِ مشتری (`CustomerCardPref`، پیش‌فرض خاموش) — فقط کدی که هیچ کالایی نمی‌خواند
