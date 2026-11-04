@@ -191,10 +191,13 @@ function once(ctx, key, make) {
 /**
  * داوریِ یک opِ v3/v2 (`authorize` ِ `sync-v3.js`، پس از همهٔ داوری‌های دیگر). null یعنی بنشیند.
  * @param c  اتصالِ تراکنشِ push
- * @param row  ردیفِ فعلیِ v3 یا null
+ * @param row  ردیفِ فعلیِ v3 یا null؛ `at` = { deviceId, origin } ِ همان push (برای سابقهٔ برگهٔ `till-guard`)
  */
-async function judgeV3(c, ctx, op, row) {
+async function judgeV3(c, ctx, op, row, at = {}) {
   if (op.kind !== 'insert' || (row && row.inserted)) return null;
+  //  نگهبانِ پولِ صندوق (POS-40 اصلاحِ روشِ پرداخت، POS-26/27 سقفِ بازپرداخت؛ پرچم‌های خودش) — `till-guard.js`
+  const money = await require('./till-guard').judgeV3(c, ctx, op, at);
+  if (money !== undefined) return money;
   const need = needOf(op.table, op.fields);
   if (need === null) return null;
   const run = (sql, params) => c.query(sql, params);

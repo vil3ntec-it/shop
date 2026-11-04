@@ -105,6 +105,23 @@ class PayFixFlowTest {
     assertFalse(s.contains("fromMethod"))
     assertFalse(s.contains("toMethod"))
     assertFalse(s.contains("payRef"))
+    assertFalse(s.contains("approval\""))
+  }
+
+  @Test fun `برگهٔ تأییدِ مدیر همراهِ ردیف می‌رود تا سرور بسنجد و بی برگه ردیف همان امروز`() {
+    val slip = kotlinx.serialization.json.buildJsonObject {
+      put("perm", kotlinx.serialization.json.JsonPrimitive(PayFix.PERM))
+      put("doc", kotlinx.serialization.json.JsonPrimitive("auditLog/pf1"))
+      put("amount", kotlinx.serialization.json.JsonPrimitive(40_000))
+    }
+    val d = fixed(base, r = req(decision = "approve", approvedBy = "m2").copy(approval = slip))
+    val row = d.auditLog.last()
+    assertEquals(slip, row.approval)
+    assertTrue(Json.encodeToString(AuditEntry.serializer(), row).contains("\"approval\":{\"perm\":\"sales.pay_fix\""))
+    //  «مجاز» یا بی برگه ⇒ هیچ فیلدِ تازه‌ای در JSON (ردیفِ نسخهٔ پیشین بایت‌به‌بایت)
+    val plain = fixed(base).auditLog.last()
+    assertEquals(null, plain.approval)
+    assertFalse(Json { encodeDefaults = true }.encodeToString(AuditEntry.serializer(), plain).contains("approval\""))
   }
 
   @Test fun `نشانِ اصلاح در ستونِ نوع ِ فهرستِ فاکتورها فقط برای فاکتورِ اصلاح‌شده`() {

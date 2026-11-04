@@ -12,7 +12,8 @@
  *   drill(...)       پشتیبان را در دیتابیسی **جدا** برمی‌گرداند (PGlite در حافظه، یا دیتابیسِ تازهٔ
  *                    PostgreSQL)، اثرِ انگشتش را با `manifest` ِ همان پشتیبان (در `meta.json`، گرفته‌شده
  *                    در همان snapshot ِ pg_dump) می‌سنجد، زمانِ بازیابی (RTO) و سنِ پشتیبان (RPO) را
- *                    می‌گوید، و با `migrate` مهاجرت‌های این نسخه را روی همان کپی می‌زند و دوباره تطبیق می‌دهد.
+ *                    می‌گوید (و با هدفِ D-24 می‌سنجد: `targets`، `withinTargets`)، و با `migrate` مهاجرت‌های این
+ *                    نسخه را روی همان کپی می‌زند و دوباره تطبیق می‌دهد.
  *
  * ⛔ هرگز روی دیتابیسِ زنده نمی‌نویسد: هدف یا PGlite ِ تازه در حافظه است یا دیتابیسی که خودش می‌سازد
  *    (`shop_drill_<زمان>`) و در پایان می‌اندازد؛ نشانیِ هدفی که برابرِ DATABASE_URL باشد رد می‌شود.
@@ -219,6 +220,10 @@ async function drill({ file, expected = null, migrate = false, targetUrl = '', k
     //  پشتیبانی که هیچ جدولی برنمی‌گرداند هرگز «سالم» نیست، حتی اگر با manifest ِ خالی‌اش برابر باشد
     const empty = got.summary.tables === 0;
     const ok = !empty && (restore ? restore.equal : false) && (!migration || migration.equal);
+    //  D-24 (الف): RPO ≤ یک روز، RTO ≤ نصفِ روز (`config.backup`). سنِ نامعلوم ⇒ null، نه «سبز»؛ `ok` همان «برابر» می‌ماند
+    const backupAgeMs = meta?.createdAt ? Math.max(0, now() - Number(meta.createdAt)) : null;
+    const { rpoTargetMs: rpoMs, rtoTargetMs: rtoMs } = require('../config').backup;
+    const targets = { rpoMs, rtoMs, rpoMet: backupAgeMs === null ? null : backupAgeMs <= rpoMs, rtoMet: verifiedMs <= rtoMs };
     return {
       ok,
       empty,
@@ -228,7 +233,9 @@ async function drill({ file, expected = null, migrate = false, targetUrl = '', k
       restoredMs,
       verifiedMs,
       //  RPO ِ این پشتیبان: چقدر داده (به زمان) اگر همین الان لازم می‌شد از دست می‌رفت
-      backupAgeMs: meta?.createdAt ? Math.max(0, now() - Number(meta.createdAt)) : null,
+      backupAgeMs,
+      targets,
+      withinTargets: ok && targets.rpoMet === true && targets.rtoMet,
       manifest: want ? (meta?.manifest && !expected ? 'meta' : 'given') : 'none',
       consistent: meta?.manifestConsistent ?? null,
       summary: got.summary,

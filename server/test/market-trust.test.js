@@ -700,3 +700,41 @@ test('تاریخچهٔ پرونده به ترتیبِ ثبت است حتی در 
   const seen = (await pub(s.slug, 'GET', `/cases/${made.body.case.token}`)).body.case;
   assert.deepEqual(seen.history.filter((e) => e.type === 'shop_response').map((e) => e.body), bodies);
 });
+
+/* ══════════════════════════════════════════════════════════════════
+   TEN-03 / O-08 (گرفته‌شده ۱۴۰۵/۰۸/۱۳: ب، یک سال): پیگیریِ شکایت با پرچمِ `shop.storefront.link_expiry`
+   ══════════════════════════════════════════════════════════════════ */
+
+test('TEN-03: پرچمِ shop.storefront.link_expiry — پرونده‌ای که یک سال کاری نداشته با توکن ۴۱۰؛ خاموش یا کارِ تازه ⇒ باز', async () => {
+  const DAY = 24 * 60 * 60 * 1000;
+  const s = await liveStore('شکایتِ کهنه');
+  const PHONE = '0790000501';
+  const order = await placeOrder(s, PHONE);
+  const t = await ticketFor(s.slug, PHONE);
+  const made = await pub(s.slug, 'POST', '/complaints', { subject: 'order', orderNo: order.orderNo, category: 'damaged', body: 'برنج خراب رسید و عوض نشد' }, t);
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const tok = made.body.case.token;
+  const { id } = await one('SELECT id FROM trust_cases WHERE shop_id=$1', [s.shopId]);
+  const idle = (days) => query('UPDATE trust_cases SET created_at=$2, updated_at=$2 WHERE id=$1', [id, now() - days * DAY]);
+  const evidence = () => h.raw('POST', `/api/store/${s.slug}/trust/cases/${tok}/evidence`, jpegWithGps('k'), { headers: { 'Content-Type': 'image/jpeg' } });
+
+  //  پرچمِ خاموش (پیش‌فرض) ⇒ همان رفتارِ امروز، بی انقضا
+  await idle(400);
+  assert.equal((await pub(s.slug, 'GET', `/cases/${tok}`)).status, 200);
+
+  await setFlag(s.shopId, 'shop.storefront.link_expiry', true);
+  const old = await pub(s.slug, 'GET', `/cases/${tok}`);
+  assert.equal(old.status, 410, JSON.stringify(old.body));
+  assert.equal(old.body.error.code, 'link_expired');
+  assert.equal((await evidence()).status, 410, 'مدرکِ تازه روی لینکِ کهنه هم نه');
+  assert.equal(await rows('trust_evidence', s.shopId), 0);
+  //  توکنِ دست‌خورده همان ۴۰۴ (انقضا فقط به دارندهٔ توکنِ درست گفته می‌شود)
+  assert.equal((await pub(s.slug, 'GET', `/cases/${h.tampered(tok)}`)).status, 404);
+  //  شاکی با شمارهٔ تأییدشده‌اش پرونده را هنوز در فهرستش می‌بیند؛ پرونده پاک نشد
+  assert.deepEqual((await pub(s.slug, 'GET', '/cases', null, t)).body.cases.map((x) => x.token), [tok]);
+
+  //  کمتر از یک سال بی‌کاری ⇒ باز
+  await idle(300);
+  assert.equal((await pub(s.slug, 'GET', `/cases/${tok}`)).status, 200);
+  assert.equal((await evidence()).status, 201);
+});

@@ -17,13 +17,17 @@
  *      روز باید دوباره از سرور بگیرد و لغو اشتراک زود اثر می‌کند. تا آن
  *      وقت هم آفلاین کار می‌کند.
  *
- *  کلید یک بار ساخته می‌شود و در `app_config` می‌ماند. اگر
- *  `LICENSE_PRIVATE_KEY` در محیط باشد همان استفاده می‌شود — برای وقتی که
- *  چند سرور باید یک کلید داشته باشند.
+ *  کلید از کجا (به همین ترتیب): `LICENSE_PRIVATE_KEY` (PEM، یک‌خطیِ `\n` ِ .env هم)، `LICENSE_PRIVATE_KEY_FILE`
+ *  (نشانیِ فایلِ PEM)، ردیفِ `app_config` (رفتارِ پیشین، سازگاری). ⛔ کلیدِ تازه فقط در `NODE_ENV=development|test`
+ *  ساخته می‌شود (O-18): در production (و بی NODE_ENV) کلیدِ تازه یعنی مجوزِ همهٔ نصب‌ها و هر کدِ آفلاین بی‌صدا
+ *  باطل؛ پس ۵۰۳ ِ `license_key_missing` و یک خطِ خطا در راه‌اندازی. کلیدِ پیکربندی‌شدهٔ خراب هرگز به پایگاه‌داده یا
+ *  کلیدِ تازه برنمی‌گردد (`license_key_invalid`). بیرون آوردنِ کلیدِ امروز: `scripts/license-key.js`.
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
 const plans = require('./plans');
+const { ApiError } = require('../middleware/errors');
 
 const ISSUER = 'tohid-license-server';
 const AUDIENCE = 'tohid-shop-app';
@@ -44,43 +48,141 @@ const KEY_PRIVATE = 'license_private_key';
 const KEY_PUBLIC = 'license_public_key';
 
 let cached = null;
+let loading = null;
 
-/**
- *  جفت‌کلید سرور. یک بار ساخته و ذخیره می‌شود.
- *
- *  کلید عمومی هم ذخیره می‌شود تا برای هر درخواست از روی خصوصی حساب نشود.
- */
-async function keys() {
-  if (cached) return cached;
+const SOURCE_FA = { env: 'LICENSE_PRIVATE_KEY', file: 'LICENSE_PRIVATE_KEY_FILE', db: 'پایگاه‌داده (app_config)', generated: 'تازه‌ساخته (development/test)' };
+//  ⛔ پیام‌ها هیچ چیزی از خودِ کلید یا خطای خامِ رمز ندارند
+const missing = () => new ApiError(503, 'license_key_missing',
+  'کلیدِ امضای مجوز روی سرور تنظیم نیست؛ مدیرِ سرور باید همان کلیدِ پیشین را در LICENSE_PRIVATE_KEY بگذارد');
+const invalid = (source) => new ApiError(503, 'license_key_invalid',
+  `کلیدِ امضای مجوز (${SOURCE_FA[source]}) خوانده نشد یا ES256 (P-256) نیست`);
 
-  const fromEnv = process.env.LICENSE_PRIVATE_KEY;
-  if (fromEnv && fromEnv.trim()) {
-    const privateKey = crypto.createPrivateKey(fromEnv.trim());
-    cached = { privateKey, publicSpki: spkiOf(privateKey) };
-    return cached;
+/** فقط development/test کلید می‌سازند؛ بی NODE_ENV = production (همان قاعدهٔ SEC-AUTH-06 ِ `config.devCodes`) */
+const mayGenerate = () => ['development', 'test'].includes(String(process.env.NODE_ENV || '').trim());
+
+function parsePem(pem, source) {
+  let key;
+  try { key = crypto.createPrivateKey(pem); } catch { throw invalid(source); }
+  //  نامِ منحنی در OpenSSL و BoringSSL ِ Electron «prime256v1» است؛ «P-256» هم پذیرفته می‌شود
+  if (key.asymmetricKeyType !== 'ec' || !['prime256v1', 'P-256'].includes(key.asymmetricKeyDetails?.namedCurve)) throw invalid(source);
+  return key;
+}
+
+/** کلیدِ پیکربندی‌شده (محیط، سپس فایل)؛ `\n` ِ نوشتاریِ .env (بارگذارِ `config.js` آن را باز نمی‌کند) ⇒ خطِ تازه */
+function configured() {
+  const env = String(process.env.LICENSE_PRIVATE_KEY || '').trim();
+  if (env) return { pem: env.replace(/\\n/g, '\n'), source: 'env' };
+  const file = String(process.env.LICENSE_PRIVATE_KEY_FILE || '').trim();
+  if (!file) return null;
+  let pem = '';
+  try { pem = fs.readFileSync(file, 'utf8').trim(); } catch { throw invalid('file'); }
+  return { pem, source: 'file' };
+}
+
+/** کلیدِ موجود (محیط ⇐ فایل ⇐ پایگاه‌داده)؛ `generate` فقط برای development/test */
+async function load({ generate }) {
+  const conf = configured();
+  if (conf) {
+    const privateKey = parsePem(conf.pem, conf.source);
+    return { privateKey, publicSpki: spkiOf(privateKey), source: conf.source };
   }
 
   const stored = await plans.getConfig(KEY_PRIVATE, '');
   if (stored) {
-    const privateKey = crypto.createPrivateKey(stored);
+    const privateKey = parsePem(stored, 'db');
     const publicSpki = (await plans.getConfig(KEY_PUBLIC, '')) || spkiOf(privateKey);
-    cached = { privateKey, publicSpki };
-    return cached;
+    return { privateKey, publicSpki, source: 'db' };
   }
+  if (!generate) throw missing();
 
-  const pair = crypto.generateKeyPairSync('ec', {
+  const pem = newPem();
+  const privateKey = crypto.createPrivateKey(pem);
+  const publicSpki = spkiOf(privateKey);
+
+  await plans.setConfig(KEY_PRIVATE, pem);
+  await plans.setConfig(KEY_PUBLIC, publicSpki);
+  return { privateKey, publicSpki, source: 'generated' };
+}
+
+/** PEM ِ یک کلیدِ تازهٔ P-256 (pkcs8) — فقط `load` ِ development/test و `scripts/license-key.js generate` */
+function newPem() {
+  return crypto.generateKeyPairSync('ec', {
     namedCurve: 'prime256v1',
     privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
     publicKeyEncoding: { type: 'spki', format: 'pem' },
-  });
-  const privateKey = crypto.createPrivateKey(pair.privateKey);
-  const publicSpki = spkiOf(privateKey);
+  }).privateKey;
+}
 
-  await plans.setConfig(KEY_PRIVATE, pair.privateKey);
-  await plans.setConfig(KEY_PUBLIC, publicSpki);
+/**
+ *  جفت‌کلید سرور — یک بار خوانده (یا در development/test ساخته) و نگه داشته می‌شود.
+ *  دو درخواستِ هم‌زمانِ نخست یک بارگذاری را می‌بینند (پیش‌تر هر کدام کلیدِ خودش را می‌ساخت).
+ *  شکست نگه داشته نمی‌شود: کلیدی که با بازیابی به پایگاه‌داده برگشت، بی راه‌اندازیِ دوباره کار می‌کند.
+ */
+async function keys() {
+  if (cached) return cached;
+  if (!loading) {
+    loading = load({ generate: mayGenerate() })
+      .then((k) => { cached = k; return k; })
+      .finally(() => { loading = null; });
+  }
+  return loading;
+}
 
-  cached = { privateKey, publicSpki };
-  return cached;
+const kidOf = (spki) => crypto.createHash('sha256').update(Buffer.from(spki, 'base64')).digest('hex').slice(0, 16);
+
+/**
+ *  یک خطِ روشن در راه‌اندازی (`index.js`) — هرگز سرور را نمی‌خواباند و هرگز کلید را چاپ نمی‌کند.
+ *  نبودِ کلید در production ⇒ یک خطِ خطا (با kid ِ کلیدِ پیشین اگر ردیفِ عمومی مانده)؛ کلیدِ محیط/فایل که با
+ *  کلیدِ پیشینِ پایگاه‌داده یکی نیست ⇒ یک هشدار (چرخاندنِ عمدی؟ وگرنه مجوزِ نصب‌های امروز رد می‌شود).
+ */
+async function startupCheck(log = console) {
+  const previous = async () => { try { return await plans.getConfig(KEY_PUBLIC, ''); } catch { return ''; } };
+  let k;
+  try { k = await keys(); } catch (err) {
+    const code = err && err.code;
+    if (code !== 'license_key_missing' && code !== 'license_key_invalid') {
+      log.error(`[license] ⛔ کلیدِ امضای مجوز خوانده نشد (${(err && err.message) || err})`);
+      return { ok: false, code: 'license_key_unreadable' };
+    }
+    const prev = await previous();
+    log.error(`[license] ⛔ ${code}: ${err.message}. کلیدِ تازه ساخته نمی‌شود؛ صدورِ مجوز و کدِ اشتراکِ آفلاین تا آن ۵۰۳ است`
+      + `، بقیهٔ سرور کار می‌کند${prev ? `. کلیدِ پیشینِ این سرور kid=${kidOf(prev)} بود (سنجشِ مجوز و کدِ موجود با کلیدِ عمومیِ آن کار می‌کند)` : ''} (docs/RULES-fa.md «کلیدها»).`);
+    return { ok: false, code };
+  }
+  const kid = kidOf(k.publicSpki);
+  log.log(`[license] کلیدِ امضای مجوز از ${SOURCE_FA[k.source]} (kid=${kid})`);
+  if (k.source === 'env' || k.source === 'file') {
+    const prev = await previous();
+    if (prev && prev !== k.publicSpki) {
+      log.warn(`[license] ⚠️ این کلید (kid=${kid}) با کلیدِ پیشینِ پایگاه‌داده (kid=${kidOf(prev)}) یکی نیست؛ اگر چرخاندنِ عمدی`
+        + ' نیست، مجوزِ نصب‌های امروز رد می‌شود: متغیر را بردارید و سرور را دوباره روشن کنید.');
+    }
+  }
+  return { ok: true, source: k.source, kid };
+}
+
+/** کلیدِ موجود برای `scripts/license-key.js` — ⛔ هرگز نمی‌سازد، حتی در development */
+async function existing() {
+  const k = await load({ generate: false });
+  return { ...k, kid: kidOf(k.publicSpki) };
+}
+
+/**
+ * هر ردی از کلیدی که هست یا بوده (برای `scripts/license-key.js generate`): متغیرِ محیط، نشانیِ فایل (حتی نخواندنی)،
+ * ردیفِ خصوصی یا عمومیِ `app_config`. kid فقط وقتی ساختنی است؛ خطای پایگاه‌داده بالا می‌رود (نبودن را ثابت نمی‌کند).
+ */
+async function traces() {
+  const out = [];
+  const kidOfPem = (pem) => { try { return kidOf(spkiOf(crypto.createPrivateKey(pem))); } catch { return ''; } };
+  const env = String(process.env.LICENSE_PRIVATE_KEY || '').trim();
+  if (env) out.push({ source: 'env', kid: kidOfPem(env.replace(/\\n/g, '\n')) });
+  const file = String(process.env.LICENSE_PRIVATE_KEY_FILE || '').trim();
+  if (file) { let pem = ''; try { pem = fs.readFileSync(file, 'utf8'); } catch { /* نخواندنی هم رد است */ } out.push({ source: 'file', kid: kidOfPem(pem) }); }
+  const priv = await plans.getConfig(KEY_PRIVATE, '');
+  if (priv) out.push({ source: 'db', kid: kidOfPem(priv) });
+  const pub = await plans.getConfig(KEY_PUBLIC, '');
+  if (pub) out.push({ source: 'db-public', kid: kidOf(pub) });
+  return out;
 }
 
 /** کلید عمومی به شکل base64 از SPKI DER — همان چیزی که برنامه می‌خواهد */
@@ -91,8 +193,16 @@ function spkiOf(privateKey) {
     .toString('base64');
 }
 
+/**
+ * کلیدِ عمومی (base64 ِ SPKI). بی کلیدِ خصوصی (نبود یا خراب) از ردیفِ ماندهٔ `license_public_key`: سنجشِ مجوز و کدِ
+ * آفلاین فقط کلیدِ عمومی می‌خواهد، پس سرورِ بی کلیدِ خصوصی هنوز همان کدهای پیشین را می‌شناسد. هیچ‌کدام ⇒ همان ۵۰۳.
+ */
 async function publicKey() {
-  return (await keys()).publicSpki;
+  try { return (await keys()).publicSpki; } catch (err) {
+    const stored = err instanceof ApiError ? await plans.getConfig(KEY_PUBLIC, '') : '';
+    if (!stored) throw err;
+    return stored;
+  }
 }
 
 /**
@@ -105,8 +215,7 @@ async function publicKey() {
  * نمی‌خواهد و دو سرور با یک کلید یک `kid` دارند.
  */
 async function keyId() {
-  const spki = await publicKey();
-  return crypto.createHash('sha256').update(Buffer.from(spki, 'base64')).digest('hex').slice(0, 16);
+  return kidOf(await publicKey());
 }
 
 function b64url(buf) {
@@ -233,17 +342,22 @@ async function signBytes(buf) {
   return crypto.sign('sha256', Buffer.from(buf), { key: privateKey, dsaEncoding: 'ieee-p1363' });
 }
 
-/** سنجشِ همان امضا با کلیدِ عمومیِ همین سرور. هیچ‌وقت خطا نمی‌دهد. */
+/**
+ * سنجشِ همان امضا با کلیدِ عمومیِ همین سرور — فقط کلیدِ عمومی (`publicKey()`؛ بی کلیدِ خصوصی از ردیفِ ماندهٔ
+ * `license_public_key`). امضای بد ⇒ false. هیچ کلیدی (نه خصوصی، نه عمومی) ⇒ ۵۰۳؛ پیش‌تر همین حال کلیدِ تازه‌ای
+ * می‌ساخت که هیچ کدِ موجودی با آن نمی‌خواند (همیشه false).
+ */
 async function verifyBytes(buf, sig) {
+  const spki = await publicKey();
   try {
-    const { privateKey } = await keys();
-    return crypto.verify('sha256', Buffer.from(buf), {
-      key: crypto.createPublicKey(privateKey), dsaEncoding: 'ieee-p1363',
-    }, Buffer.from(sig));
+    const key = crypto.createPublicKey({ key: Buffer.from(spki, 'base64'), format: 'der', type: 'spki' });
+    return crypto.verify('sha256', Buffer.from(buf), { key, dsaEncoding: 'ieee-p1363' }, Buffer.from(sig));
   } catch { return false; }
 }
 
 module.exports = {
-  issue, publicKey, keyId, signBytes, verifyBytes,
+  issue, publicKey, keyId, signBytes, verifyBytes, startupCheck, existing, traces, newPem, kidOf,
   ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS,
+  /** فقط آزمون: کشِ کلید را خالی می‌کند */
+  _reset() { cached = null; loading = null; },
 };

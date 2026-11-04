@@ -1,13 +1,13 @@
 package ir.vil3ntec.tohid.core.cost
 
 /**
- *  روشِ بهای تمام‌شده برای سود و حاشیه (RPT-03) — راهبرد، نه تصمیم.
+ *  روشِ بهای تمام‌شده برای سود و حاشیه (RPT-03) — راهبرد.
  *
- *  تصمیمِ D-23 (روشِ بها و مهاجرتِ دادهٔ تاریخی با تأییدِ حسابدار/مالک) **هنوز باز است**
- *  (`docs/spec/BLOCKERS.md`، §۱۵.۴ بند ۴، §۲۸.۴). پس:
- *  • پیش‌فرض همان رفتارِ امروز است: بهای هر قلم = قیمتِ خریدِ ثبت‌شده روی همان قلم؛
- *  • روشِ دیگر فقط «پیش‌نمایش» است و هیچ روشی «مصوب» نیست ⇒ هر سودی «تقریبی» برچسب می‌خورد؛
- *  • روزی که D-23 تصمیم شد، فقط [DECIDED] (و در صورتِ نیاز [DEFAULT]) عوض می‌شود، نه صفحه‌ها.
+ *  D-23 گرفته‌شده به روشِ شرکت‌های بزرگ، قابلِ برگشت (۱۴۰۵/۰۸/۱۳، `docs/OWNER-DECISIONS-fa.md`، الف):
+ *  **میانگینِ موزون** (IAS 2 هر دو را می‌پذیرد؛ خرید و فروش می‌مانند و FIFO از همان داده حساب‌شدنی است). پس:
+ *  • [DEFAULT] و [DECIDED] هر دو میانگینِ موزون‌اند؛ صفحه `costApproved = approved(روش)` را به هسته می‌دهد؛
+ *  • «قیمت خرید روی قلم» (رفتارِ پیشین) انتخابیِ همین دستگاه می‌ماند و همیشه «تقریبی» است؛
+ *  • برگشتِ تصمیم فقط همین دو مقدار را عوض می‌کند، نه صفحه‌ها.
  *
  *  خالص (commonMain): نه دیسک، نه ساعت. شناسه‌ها همان `costing` ِ هستهٔ گزارش‌اند
  *  (`ReportCore.Costing` و `opts.costing` ِ `license/report-core.js`): `line` و `mavg`.
@@ -19,19 +19,19 @@ enum class CostMethod(val id: String, val label: String, val note: String) {
     "بهای هر قلم همان قیمتِ خریدی است که هنگامِ فروش روی قلم ثبت شد (رفتارِ پیشین).",
   ),
 
-  /** پیشنهادِ سند (§۳، «روش بهای تمام‌شدهٔ پیشنهادی»)؛ تا D-23 فقط پیش‌نمایش */
+  /** پیشنهادِ سند (§۳، «روش بهای تمام‌شدهٔ پیشنهادی») و روشِ مصوبِ D-23 */
   MOVING_AVERAGE(
-    "mavg", "میانگین موزون (پیش‌نمایش)",
+    "mavg", "میانگین موزون",
     "میانگینِ موزونِ متحرکِ هر کالا از ورودهای انبار، فروش و برگشت به ترتیبِ زمان؛ پیش از نخستین ورود همان قیمتِ روی قلم.",
   ),
 }
 
 object CostPolicy {
-  /** رفتارِ امروز — تا تصمیمِ D-23 عوض نمی‌شود */
-  val DEFAULT: CostMethod = CostMethod.PURCHASE_PRICE
+  /** پیش‌فرضِ هر دستگاهی که روشی نگزیده — همان روشِ مصوب */
+  val DEFAULT: CostMethod = CostMethod.MOVING_AVERAGE
 
-  /** روشِ مصوبِ D-23؛ null یعنی هنوز تصمیم نشده */
-  val DECIDED: CostMethod? = null
+  /** روشِ مصوبِ D-23 (۱۴۰۵/۰۸/۱۳)؛ null یعنی هنوز تصمیم نشده */
+  val DECIDED: CostMethod? = CostMethod.MOVING_AVERAGE
 
   /** مقدارِ ذخیره‌شدهٔ تنظیم ⇒ روش؛ نبود یا ناشناخته ⇒ [DEFAULT] (هرگز خطا) */
   fun parse(stored: String?): CostMethod = CostMethod.entries.firstOrNull { it.id == stored?.trim() } ?: DEFAULT
@@ -49,6 +49,9 @@ object CostPolicy {
   }
 
   /** یک جمله برای زیرِ کارت‌های سود: روش، و چرا تقریبی است */
-  fun explain(m: CostMethod, decided: CostMethod? = DECIDED): String =
-    m.note + if (approved(m, decided)) "" else " روشِ بهای تمام‌شده هنوز تصمیم نشده (D-23)؛ سود تقریبی است."
+  fun explain(m: CostMethod, decided: CostMethod? = DECIDED): String = m.note + when {
+    approved(m, decided) -> ""
+    decided == null -> " روشِ بهای تمام‌شده هنوز تصمیم نشده (D-23)؛ سود تقریبی است."
+    else -> " روشِ مصوبِ بها (D-23) «${decided.label}» است؛ این سود تقریبی است."
+  }
 }

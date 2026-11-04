@@ -202,6 +202,15 @@ object StrSale {
   //  POS-09 (S05) — واحدهای کالا در برگهٔ ردیفِ نسخهٔ ۳، فقط با «واحدِ بزرگ در صندوق» (`TillGoodsPref.units`)
   fun partPackRejected(u: Any): String = t("فروشِ بخشی از «${asIs(u)}» مجاز نیست — تعدادِ درست بنویسید", "Part of a “$u” can't be sold — enter a whole number", "د «$u» برخه نه شي پلورل کېدای — پوره شمېر ولیکئ")
   fun packListPrice(u: Any, a: Any): String = t("قیمتِ «${asIs(u)}» در لیستِ قیمت: ${asIs(a)}", "List price of a “$u”: $a", "د «$u» بیه په بیو لړلیک کې: $a")
+  //  PRD-04/S05: بارکدِ بسته در صندوقِ گوشی (`CartModel.scan` ⇐ `PackScan`)
+  fun packAdded(c: Any, u: Any, n: Any): String = t(
+    "${asIs(c)} ${asIs(u)} «${asIs(n)}» به سبد اضافه شد", "$c × $u of “$n” added to the cart", "$c $u «$n» ټوکرۍ ته اضافه شو",
+  )
+  fun packPriceClash(n: Any, u: Any): String = t(
+    "«${asIs(n)}» با قیمتِ دیگری در سبد است و قیمتِ «${asIs(u)}» از لیستِ قیمت با آن جمع نمی‌شود — به سبد نرفت. ردیف را باز کنید و واحدش را «${asIs(u)}» کنید",
+    "“$n” is already in the cart at another price, so the list price of a “$u” can't be added to it — nothing was added. Open the line and set its unit to “$u”",
+    "«$n» له بلې بیې سره په ټوکرۍ کې دی او د «$u» د بیو لړلیک بیه ورسره نه یوځای کېږي — ټوکرۍ ته ورنه غی. کرښه پرانیزئ او واحد یې «$u» کړئ",
+  )
   val lineTotal: String get() = t("جمع این ردیف", "Line total", "د دې کرښې ټول")
   val submit: String get() = t("ثبت", "Save", "ثبت")
   val removeFromCartAlt: String get() = t("برداشتن از سبد", "Remove from cart", "له ټوکرۍ لرې کړئ")

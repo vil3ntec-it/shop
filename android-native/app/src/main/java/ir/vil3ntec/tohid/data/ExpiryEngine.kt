@@ -70,11 +70,17 @@ object ExpiryEngine {
     val expired: Boolean get() = daysLeft < 0
   }
 
+  /**
+   *  ردیفی که محموله است: ورودِ واقعیِ کالا، و (INV-21) خروجیِ بسته‌بندیِ دوباره (`Repack`: دانه‌های کارتنِ شکسته یا
+   *  بستهٔ ساخته‌شده) که سری و انقضای همان کارتن/اجزا را دارد. ردیف‌های اصلاحِ دیگر محموله نیستند.
+   */
+  internal fun isLot(w: WarehouseEntry): Boolean = w.units > 0 && (!w.isAdjustment || w.adjKind == Repack.KIND)
+
   /** ماندهٔ هر محمولهٔ انقضادار، برای همهٔ کالاها */
   fun lots(d: ShopData, today: String): List<Lot> {
     val out = ArrayList<Lot>()
     val byProduct = d.warehouseEntries
-      .filter { !it.isAdjustment && it.units > 0 }
+      .filter(::isLot)
       .groupBy { it.productId }
     val products = d.products.associateBy { it.id }
     for ((productId, entries) in byProduct) {
@@ -96,6 +102,41 @@ object ExpiryEngine {
       }
     }
     return out.sortedBy { it.daysLeft }
+  }
+
+  /** یک تکه از برداشت: سری و انقضای محموله (خالی ⇒ بی انقضا یا بی محموله) و مقدار به هزارم */
+  data class Take(val expiryDate: String, val batch: String, val qtyMilli: Long)
+
+  /**
+   *  INV-21 — برداشتنِ [qtyMilli] از [productId] به همان FEFO ِ [lots]: موجودیِ امروز روی دیرترین محموله‌ها نشسته، پس
+   *  برداشت از **زودترین** ماندهٔ انقضادار است (هم‌انقضاها به ترتیبِ سری)، و بی‌انقضا و موجودیِ بی محموله آخر — یک تکهٔ
+   *  خالی. جمعِ تکه‌ها همیشه [qtyMilli] است؛ تکه‌های هم‌سری‌وهم‌انقضا یکی می‌شوند. فقط‌خواندنی.
+   */
+  fun take(d: ShopData, productId: String, qtyMilli: Long): List<Take> {
+    if (qtyMilli <= 0) return emptyList()
+    val entries = d.warehouseEntries.filter { it.productId == productId && isLot(it) }
+      .sortedWith(compareByDescending<WarehouseEntry> { it.expiryDate.isBlank() }.thenByDescending { it.expiryDate })
+    var left = Math.round(ShopStore.stock(d, productId) * 1000)
+    val held = LinkedHashMap<Pair<String, String>, Long>()
+    for (e in entries) {
+      if (left <= 0) break
+      val q = minOf(Math.round(e.units * 1000), left)
+      left -= q
+      if (e.expiryDate.isNotBlank() && q > 0) {
+        val k = e.expiryDate to e.batch.trim()
+        held[k] = (held[k] ?: 0L) + q
+      }
+    }
+    val out = ArrayList<Take>()
+    var need = qtyMilli
+    for ((k, q) in held.entries.sortedWith(compareBy({ it.key.first }, { it.key.second }))) {
+      if (need <= 0) break
+      val t = minOf(q, need)
+      out += Take(k.first, k.second, t)
+      need -= t
+    }
+    if (need > 0) out += Take("", "", need)
+    return out
   }
 
   /** ماندهٔ منقضی‌شدهٔ یک کالا (به FEFO) — برای سیاستِ «کالای منقضی فروخته نشود» */

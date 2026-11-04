@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.sales.checkout
 
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -199,7 +203,12 @@ private fun HesabTillSheet(ask: HesabTillModel.Ask, env: HesabPayEnv, onPaid: (i
 private fun QrBox(payload: String?) {
   val rows = remember(payload) { payload?.takeIf { it.isNotBlank() }?.let { runCatching { QrCode.encode(it, QrCode.LARGE_MAX_VERSION) }.getOrNull() } }
   //  کادرِ QR در هر دو تم روشن (QR ِ وارونه را بیشترِ دوربین‌ها نمی‌خوانند) — پالتِ روزِ Theme.kt، همان `HesabPaySheet`
-  Box(Modifier.size(240.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface), contentAlignment = Alignment.Center) {
+  Box(
+    Modifier.size(240.dp).clip(RoundedCornerShape(16.dp)).background(LightColors.surface)
+      //  QR فقط رسم است — صفحه‌خوان بی این نام چیزی نمی‌شنید
+      .semantics { contentDescription = StrA11y.payQr; role = Role.Image },
+    contentAlignment = Alignment.Center,
+  ) {
     if (rows != null) QrImage(rows, Modifier.fillMaxSize().padding(8.dp)) else Text("…", fontSize = 48.sp, color = LightColors.textPrimary)
   }
 }

@@ -5,10 +5,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -64,7 +67,11 @@ data class V3HeroChip(
  *  زمینه گرادیانِ تم (۱۳۵°، آینه در RTL) با دو دایرهٔ نرمِ تزئینی از رنگ‌های همراه — فقط رسم، بی blur —
  *  و پردهٔ خوانایی (`heroScrim`). متن همیشه سفیدِ کامل؛ زیرِ شیشهٔ تراشه سایهٔ تم (`heroChipShade`) تا
  *  برچسبِ ۱۲sp همه‌جا ≥ ۴٫۵:۱ بماند (`ThemeV2PaletteTest`). هیچ رنگِ خامی این‌جا نیست.
+ *
+ *  [wrapChips] (کادری که ورق‌زن نیست، مثلِ تاریخچه): تراشه‌ها به ردیفِ بعد می‌روند و نوشتهٔ تراشهٔ بلند چندخطی می‌شود؛
+ *  کادر دست‌کم همان بلندی است و به‌جای بریدن بلندتر می‌شود. پیش‌فرض همان یک ردیف و بلندیِ ثابت (خانه، ورق‌زن).
  */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun V3HeroCard(
   title: String,
@@ -80,6 +87,7 @@ fun V3HeroCard(
   onTitle: (() -> Unit)? = null,
   live: Boolean = false,
   valueForSize: String = value,
+  wrapChips: Boolean = false,
 ) {
   val s = Shop.colors
   val rtl = LocalLayoutDirection.current == LayoutDirection.Rtl
@@ -90,7 +98,7 @@ fun V3HeroCard(
   Column(
     modifier
       .fillMaxWidth()
-      .height(HERO_HEIGHT * fontScale)
+      .then(if (wrapChips) Modifier.heightIn(min = HERO_HEIGHT * fontScale) else Modifier.height(HERO_HEIGHT * fontScale))
       .clip(RoundedCornerShape(HERO_RADIUS))
       .drawWithCache {
         val w = size.width
@@ -162,7 +170,9 @@ fun V3HeroCard(
     }
     Spacer(Modifier.weight(1f))
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      if (wrapChips) FlowRow(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        chips.take(3).forEach { chip -> HeroChipView(chip, glass, s.heroChipShade, wrap = true) }
+      } else Row(Modifier.weight(1f), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         chips.take(3).forEach { chip -> HeroChipView(chip, glass, s.heroChipShade) }
       }
       PagerDots(pages, page, white, white.copy(alpha = 0.35f))
@@ -170,25 +180,25 @@ fun V3HeroCard(
   }
 }
 
-/** تراشهٔ شیشه‌ایِ سفید (سفید با آلفای ۱۶٪) روی سایهٔ تم */
+/** تراشهٔ شیشه‌ایِ سفید (سفید با آلفای ۱۶٪) روی سایهٔ تم؛ [wrap] ⇒ نوشتهٔ بلند چندخطی (گوشهٔ ۱۷ = همان قرصِ تک‌خط) */
 @Composable
-private fun HeroChipView(chip: V3HeroChip, glass: Color, shade: Float) {
+private fun HeroChipView(chip: V3HeroChip, glass: Color, shade: Float, wrap: Boolean = false) {
   val white = Color.White
-  val pill = RoundedCornerShape(percent = 50)
+  val pill = if (wrap) RoundedCornerShape(17.dp) else RoundedCornerShape(percent = 50)
   val onClick = chip.onClick
   Row(
     Modifier
       .then(if (onClick != null) Modifier.v3Pressable(label = chip.label, scale = 0.94f, haptic = chip.haptic, onClick = onClick) else Modifier)
-      .height(34.dp)
+      .then(if (wrap) Modifier.heightIn(min = 34.dp) else Modifier.height(34.dp))
       .clip(pill)
       .background(Color.Black.copy(alpha = shade))
       .background(glass)
       .border(1.dp, white.copy(alpha = 0.22f), pill)
-      .padding(horizontal = 12.dp),
+      .padding(horizontal = 12.dp, vertical = if (wrap) 6.dp else 0.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
     chip.icon?.let { Icon(it, contentDescription = null, tint = white, modifier = Modifier.size(16.dp)); Spacer(Modifier.width(6.dp)) }
-    Text(chip.label, style = v3Text(12, FontWeight.SemiBold, 16), color = white, maxLines = 1)
+    Text(chip.label, style = v3Text(12, FontWeight.SemiBold, 16), color = white, maxLines = if (wrap) Int.MAX_VALUE else 1)
   }
 }
 

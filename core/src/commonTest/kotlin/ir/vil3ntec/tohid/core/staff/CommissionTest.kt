@@ -44,9 +44,15 @@ class CommissionTest {
     val plan = Plan(500)
     val r = Commission.compute(listOf(Line("s1", null, af(2_000)), Line("s1", null, af(-500))), plan, afn)
     assertEquals(af(75), r.sellers.single().commission)
-    //  فقط برگشت در این دوره ⇒ پورسانتِ منفی (پس گرفتن)، نه صفرِ پنهان
+    //  تصمیمِ صاحب‌کار O-05 (ب): برگشت کم می‌شود ولی جمعِ دوره زیرِ صفر نمی‌رود — فقط برگشت در این دوره ⇒ پورسانتِ ۰،
+    //  و پایهٔ منفی دیده می‌ماند (نه پنهان)
     val back = Commission.compute(listOf(Line("s1", null, af(-500))), plan, afn)
-    assertEquals(af(-25), back.sellers.single().commission)
+    assertEquals(af(0), back.sellers.single().commission)
+    assertEquals(af(-500), back.sellers.single().base)
+    //  فروش و برگشتِ بیشتر از آن در یک دوره: همان ۰، نه بدهیِ فروشنده
+    val more = Commission.compute(listOf(Line("s1", null, af(200)), Line("s1", null, af(-700))), plan, afn)
+    assertEquals(af(0), more.sellers.single().commission)
+    assertEquals(af(-500), more.sellers.single().base)
   }
 
   @Test
@@ -102,5 +108,45 @@ class CommissionTest {
     val r = Commission.compute(listOf(Line("s1", null, af(1_000)), Line("s2", null, af(1_000))) + back, Plan(1_000), afn)
     assertEquals(listOf(af(70), af(80)), r.sellers.map { it.commission })
     assertEquals(af(-120), r.unassignedBase)
+  }
+
+  //  STF-08 — «نرخِ دسته»: فاکتور به تفکیکِ دستهٔ قلم‌ها، با پخشِ تخفیفِ فاکتور به نسبتِ مبلغ
+  @Test
+  fun saleLinesSplitTheFinalTotalByCategoryAfterTheInvoiceDiscount() {
+    fun item(cat: String?, a: Long) = Commission.Item(cat, af(a))
+    //  ۶۰۰ برنج + ۴۰۰ سیگار، تخفیفِ فاکتور ۱۰۰ ⇒ ۵۴۰ و ۳۶۰
+    val lines = Commission.saleLines("s1", af(900), listOf(item("rice", 600), item("cigarettes", 400)))
+    assertEquals(listOf(Line("s1", "rice", af(540)), Line("s1", "cigarettes", af(360))), lines)
+    val plan = Plan(defaultBp = 1_000, categoryBp = mapOf("cigarettes" to 0))
+    assertEquals(af(54), Commission.compute(lines, plan, afn).sellers.single().commission)
+    //  قلمِ هم‌دسته و بی‌دسته: یک ردیف برای هر کدام؛ جمعِ ردیف‌ها همیشه همان finalTotal (باقیِ خرد با بزرگ‌ترین باقی‌مانده)
+    val odd = Commission.saleLines("s1", Money(99_999, afn), listOf(item("rice", 333), item(null, 333), item("rice", 334)))
+    assertEquals(listOf("rice", null), odd.map { it.category })
+    assertEquals(99_999L, odd.sumOf { it.net.minor })
+  }
+
+  @Test
+  fun saleLinesFallBackToOneUncategorisedLineAsBefore() {
+    fun item(cat: String?, a: Long) = Commission.Item(cat, af(a))
+    val whole = listOf(Line("s1", null, af(900)))
+    assertEquals(whole, Commission.saleLines("s1", af(900), emptyList()))
+    assertEquals(whole, Commission.saleLines("s1", af(900), listOf(item(null, 600), item(" ", 400))))
+    //  فاکتورِ بیش از جمعِ قلم‌ها (هزینهٔ افزوده) یا جمعِ صفر ⇒ همان یک ردیف
+    assertEquals(whole, Commission.saleLines("s1", af(900), listOf(item("rice", 500))))
+    assertEquals(whole, Commission.saleLines("s1", af(900), listOf(item("rice", 0))))
+    //  بی نرخِ دسته، پورسانتِ تفکیک‌شده همان پورسانتِ یک‌ردیفه است
+    val split = Commission.saleLines("s1", af(900), listOf(item("rice", 600), item("tea", 400)))
+    assertEquals(Commission.compute(whole, Plan(333), afn), Commission.compute(split, Plan(333), afn))
+  }
+
+  @Test
+  fun returnsCarryTheirCategorySoAZeroRateCategoryIsNotClawedBackAtTheSellerRate() {
+    val origins = mapOf("a" to Commission.Origin("s1"))
+    val back = Commission.returnLines(listOf(Commission.Returned("a", af(400), "cigarettes"), Commission.Returned("a", af(100))), origins)
+    assertEquals(listOf(Line("s1", "cigarettes", af(-400)), Line("s1", null, af(-100))), back)
+    val plan = Plan(defaultBp = 1_000, categoryBp = mapOf("cigarettes" to 0))
+    val sold = Commission.saleLines("s1", af(1_000), listOf(Commission.Item("rice", af(600)), Commission.Item("cigarettes", af(400))))
+    //  ۶۰۰ × ۱۰٪ − ۱۰۰ × ۱۰٪ = ۵۰؛ برگشتِ سیگار ۰
+    assertEquals(af(50), Commission.compute(sold + back, plan, afn).sellers.single().commission)
   }
 }
