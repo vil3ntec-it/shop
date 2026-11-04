@@ -332,8 +332,11 @@ function card(row, viewer, at) {
   };
 }
 
-function detail(row, lines, events, viewer, at) {
-  const contact = can(viewer.role, 'orders.contact');
+/**
+ * `contact` = شمارهٔ کامل (`loadDetail`: `orders.contact` ِ نقش **و** `customers.contact` ِ دو لایه، CRM-15).
+ * نیامده ⇒ فقط `orders.contact` (رفتارِ پیشین).
+ */
+function detail(row, lines, events, viewer, at, contact = can(viewer.role, 'orders.contact')) {
   const c = card(row, viewer, at);
   return {
     ...c,
@@ -367,7 +370,9 @@ async function loadDetail(run, shopId, id, viewer) {
   if (!row) return null;
   const lines = (await run('SELECT * FROM online_order_lines WHERE order_id=$1 ORDER BY line_no', [id])).rows;
   const events = (await run('SELECT * FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id])).rows;
-  return detail(row, lines, events, viewer, now());
+  //  CRM-15: صاحب می‌تواند `customers.contact` را برای همین مدیر ببندد (‎lib/customer-contact.js‎)
+  const contact = await require('./customer-contact').ordersContact({ shopId, role: viewer?.role, userId: viewer?.id }, run);
+  return detail(row, lines, events, viewer, now(), contact);
 }
 
 const viaDb = (text, params) => db.query(text, params);

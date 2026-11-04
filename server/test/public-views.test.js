@@ -239,6 +239,8 @@ test('پاسخ‌های /store و /market: شکلِ قرارداد، بی شنا
   const tracked = await check(`/api/store/${slug}/orders/${orderToken}`, {}, [[(b) => b.order, 'order']]);
   //  PAY-21 (#529): پیگیری دکمهٔ پرداخت را با همین شکل دارد
   assert.deepEqual(Object.keys(tracked.order.onlinePay), ['available']);
+  //  دکانِ تازه (مهاجرتِ ۲۱۱) ⇒ «پرداخت پس از پذیرش» روشن ⇒ کارتِ «پرداخت» با همان شکلِ قرارداد
+  assert.deepEqual(Object.keys(tracked.order.paymentStep), ['state', 'choice', 'amountMinor', 'cash', 'canChoose', 'online']);
   assert.equal(tracked.order.orderNo, placed.body.order.orderNo);
   const re = await check(`/api/store/${slug}/orders/${orderToken}/reorder`, {}, [[(b) => b.lines, 'reorderLine']]);
   assert.equal(re.lines.length, 1);

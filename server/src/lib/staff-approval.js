@@ -426,7 +426,7 @@ function judgeGroup(q, ctx, g, { at, deviceId, path }) {
   if (!g.decided) {
     g.decided = (async () => {
       const before = g.sale ? await returnedTotal(q, ctx, g.sale) : 0;
-      return judge(q, ctx, cumulativeNeed(g, before), g.slip, { opId: g.rows[0].op.op_id, at, deviceId, path });
+      return (await require('./return-sale-cap').over(q, ctx, g, before, { path })) || judge(q, ctx, cumulativeNeed(g, before), g.slip, { opId: g.rows[0].op.op_id, at, deviceId, path });   //  SEC-DATA-07: اول پولِ خودِ فاکتور
     })();
   }
   return g.decided;
@@ -833,7 +833,7 @@ async function v1Guard(req, res, next) {
           if (!tally.has(g.sale)) tally.set(g.sale, await returnedTotal(null, ctx, g.sale));
           need = cumulativeNeed(g, tally.get(g.sale));
         }
-        out = await judge(null, ctx, need, slip, {
+        out = (g && g.sale && await require('./return-sale-cap').over(null, ctx, g, tally.get(g.sale), { batch: liveOps, path: 'v1' })) || await judge(null, ctx, need, slip, {
           //  opِ بی زمان (برنامهٔ خیلی قدیمی) ⇒ فقط سنجشِ زمان کنار می‌رود؛ برگه هنوز یک‌بارمصرف و بسته به سند است
           opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1',
         });

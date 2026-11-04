@@ -13,6 +13,7 @@
     "restore-drill": "node scripts/restore-drill.js",
     "verify-chain": "node scripts/verify-chain.js",
     "verify-data": "node scripts/verify-data.js",
+    "stock-rebuild": "node scripts/stock-rebuild.js",
     "test": "node scripts/test-run.js --test-concurrency=1 test/*.test.js && node scripts/test-run.js test/auto-backup.test.js",
     "test:pglite": "node scripts/test-pglite.js",
     "test:panel": "node test/admin-panel.mjs",
