@@ -175,6 +175,27 @@ object StorefrontOutbox {
     else -> SendOutcome.REJECTED
   }
 
+  /* ------------------------- اعلامِ حضور (برگهٔ «وضعیت» ِ v3) ------------------------- */
+
+  /**
+   *  ردیفِ صفِ یک اعلام، بسته به دکانِ همین نشست (PRES-02). دکانِ نامعلوم ⇒ null و هیچ‌چیز
+   *  نوشته نمی‌شود — اعلامِ بی‌دکان پس از عوض شدنِ حساب روی دکانِ دیگر می‌نشست.
+   */
+  fun presenceEntry(shopId: String, p: PresenceDeclaration): OutboxEntry? =
+    if (shopId.isBlank()) null
+    else OutboxEntry(p.eventId, StorefrontChange.PRESENCE, shopId, PresenceDeclaration.encode(p), "", p.clientEventAt)
+
+  /** اعلامِ نرسیدهٔ همین دکان؛ اعلامِ دکانِ دیگر هرگز دیده یا فرستاده نمی‌شود */
+  fun presenceFor(queue: List<OutboxEntry>, shopId: String): PresenceDeclaration? =
+    pendingOf(queue, shopId, StorefrontChange.PRESENCE)?.let { PresenceDeclaration.decode(it.body) }
+
+  /**
+   *  پاسخِ ناکامِ یک اعلام ⇒ در صف بماند؟ فقط ردِ ماندگار (REJECTED) بیرون می‌رود. بی‌نت، ۵xx،
+   *  نشستِ تمام‌شده، ۴۲۹ و حتی ۲xx ِ ناخوانا می‌مانند: همان `eventId` دوباره ⇒ سرور «تکراری» و رسیدِ خوانا.
+   */
+  fun presenceKept(status: Int, code: String, retryable: Boolean): Boolean =
+    classify(status, code, retryable) != SendOutcome.REJECTED
+
   /** یک خطِ وضعیت برای کاربر — هرگز «ثبت شد» */
   fun statusLine(e: OutboxEntry): String = when {
     e.conflict -> "${e.change.label}: ناسازگار با تغییرِ دستگاهِ دیگر — تصمیم با شما"

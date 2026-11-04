@@ -176,4 +176,39 @@ class StorefrontOutboxTest {
     //  تصادفِ منفی هم شناسهٔ مثبت و پایدار می‌دهد
     assertFalse(PresenceDeclaration.newEventId(1, -1).contains("--"))
   }
+
+  /** PRES-02: اعلامِ برگهٔ «وضعیت» به دکانِ همان نشست بسته است؛ دکانِ دیگر و نامعلوم هرگز */
+  @Test fun presenceIsBoundToItsShop() {
+    val p = PresenceDeclaration.create("closed", null, now = 1_760_000_000_000L, random = 7L)
+    assertNull(O.presenceEntry("", p), "دکانِ نامعلوم ⇒ هیچ ردیفی")
+    assertNull(O.presenceEntry("  ", p))
+    val row = O.presenceEntry("shop-a", p)!!
+    assertEquals(p.eventId, row.id)
+    assertEquals(StorefrontChange.PRESENCE, row.change)
+    val q = O.put(emptyList(), row)
+    assertEquals(p, O.presenceFor(q, "shop-a"))
+    assertNull(O.presenceFor(q, "shop-b"), "پس از عوض شدنِ حساب اعلامِ دکانِ پیشین دیده نمی‌شود")
+    assertNull(O.presenceFor(q, ""))
+    assertNull(O.next(q, "shop-b", now = Long.MAX_VALUE, force = true), "و فرستاده هم نمی‌شود")
+    //  ردیفِ خراب ⇒ بی اعلام، نه استثنا
+    assertNull(O.presenceFor(listOf(row.copy(body = "pres-x|hack||1")), "shop-a"))
+    //  اعلامِ تازهٔ همان دکان جای کهنه را می‌گیرد؛ دکانِ دیگر ردیفِ خودش را دارد
+    val p2 = PresenceDeclaration.create("online", null, now = 1_760_000_001_000L, random = 8L)
+    val q2 = O.put(O.put(q, O.presenceEntry("shop-a", p2)!!), O.presenceEntry("shop-b", p)!!)
+    assertEquals(p2, O.presenceFor(q2, "shop-a"))
+    assertEquals(p, O.presenceFor(q2, "shop-b"))
+    assertEquals(2, q2.size)
+  }
+
+  /** PRES-09: فقط ردِ ماندگار اعلام را از صف بیرون می‌برد؛ نشستِ تمام‌شده و ۴۲۹ هم می‌مانند */
+  @Test fun presenceKeptUnlessRejected() {
+    assertTrue(O.presenceKept(0, "offline", retryable = true))
+    assertTrue(O.presenceKept(503, "http_503", retryable = true))
+    assertTrue(O.presenceKept(401, "session_expired", retryable = false))
+    assertTrue(O.presenceKept(429, "rate_limited", retryable = false))
+    assertTrue(O.presenceKept(200, "invalid_response", retryable = false), "۲xx ِ ناخوانا با همان شناسه دوباره می‌رود")
+    assertFalse(O.presenceKept(400, "bad_mode", retryable = false))
+    assertFalse(O.presenceKept(403, "perm_denied", retryable = false))
+    assertFalse(O.presenceKept(404, "storefront_missing", retryable = false))
+  }
 }
