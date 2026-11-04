@@ -103,12 +103,13 @@ router.post('/conversations/:id/messages', on, reply, sendLimit, async (req, res
   res.status(out.replayed ? 200 : 201).json(out);
 });
 
-router.patch('/conversations/:id/messages/:mid', on, reply, async (req, res) => {
+//  ویرایش متنِ دیده‌شدهٔ مشتری را عوض می‌کند و long-poll ِ او را بیدار ⇒ از همان سقفِ ارسال (CHAT-11؛ پیش‌تر بی‌سقف)
+router.patch('/conversations/:id/messages/:mid', on, reply, sendLimit, async (req, res) => {
   res.json(await chat.edit(viewerOf(req), req.params.id, req.params.mid, req.body));
 });
 
 //  CHAT-14: همان ویرایش با POST — `HttpURLConnection` ِ برنامهٔ کامپیوتر PATCH نمی‌فرستد (الگوی `orders.js`)
-router.post('/conversations/:id/messages/:mid/edit', on, reply, async (req, res) => {
+router.post('/conversations/:id/messages/:mid/edit', on, reply, sendLimit, async (req, res) => {
   res.json(await chat.edit(viewerOf(req), req.params.id, req.params.mid, req.body));
 });
 

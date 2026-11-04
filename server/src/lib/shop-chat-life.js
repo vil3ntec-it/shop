@@ -180,8 +180,9 @@ module.exports = function lifeFor({ rowOf, viewOf, viewSql, conversationView, bl
     const args = [viewer.shopId, require('./validate').phoneForms(conv.customer_phone), conv.id];
     let who = 'c.customer_phone = ANY($2::text[])';
     if (conv.customer_id) { args.push(conv.customer_id); who = `(${who} OR c.customer_id = $4)`; }
+    const head = viewSql(viewer, args);   //  کلیدِ بیننده پس از $3/$4 (CHAT-08)
     const rows = await many(
-      `${viewSql(viewer)} WHERE c.shop_id = $1 AND ${who} AND c.id <> $3 AND (c.seq > 0 OR c.order_id <> '')
+      `${head} WHERE c.shop_id = $1 AND ${who} AND c.id <> $3 AND (c.seq > 0 OR c.order_id <> '')
         ORDER BY c.created_at DESC, c.id DESC LIMIT ${HISTORY_MAX}`,
       args
     );
