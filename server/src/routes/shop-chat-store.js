@@ -111,7 +111,8 @@ router.patch(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sen
   res.json(await chat.edit(v(req), req.params.id, req.params.mid, req.body));
 });
 
-router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, async (req, res) => {
+//  حذف و بلاک/برداشتن هم long-poll ِ دکان را بیدار می‌کنند ⇒ همان سقفِ (دکان، شماره) (CHAT-11؛ پیش‌تر فقط سطلِ IP)
+router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sendLimit, async (req, res) => {
   res.json(await chat.remove(v(req), req.params.id, req.params.mid, req.query.for));
 });
 
@@ -138,11 +139,11 @@ router.get(`${base}/conversations/:id/media/:mediaId`, readLimit, customer, asyn
   chat.sendMedia(res, await chat.getMedia(v(req), req.params.id, req.params.mediaId));
 });
 
-router.put(`${base}/conversations/:id/block`, readLimit, customer, async (req, res) => {
+router.put(`${base}/conversations/:id/block`, readLimit, customer, sendLimit, async (req, res) => {
   res.json({ conversation: await chat.setBlock(v(req), req.params.id, true) });
 });
 
-router.delete(`${base}/conversations/:id/block`, readLimit, customer, async (req, res) => {
+router.delete(`${base}/conversations/:id/block`, readLimit, customer, sendLimit, async (req, res) => {
   res.json({ conversation: await chat.setBlock(v(req), req.params.id, false) });
 });
 

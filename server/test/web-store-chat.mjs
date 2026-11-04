@@ -159,6 +159,73 @@ await page.click('#ct-send');
 await page.waitForFunction(() => /یک ساعت دیگر/.test(document.getElementById('ct-list').textContent), null, { timeout: 10000 });
 ok((await lastFrom(conv1.id, 'customer'))?.body === 'تا یک ساعت دیگر می‌آیم', 'پیامِ مشتری روی سرور، در همان رشته');
 
+//  ── CHAT-02/11: بی‌اینترنت ⇒ متن در صف می‌ماند و با وصل شدن خودش یک بار می‌رود؛ جوابِ گم‌شده + زدنِ دوباره ⇒ همان شناسه ──
+const countFrom = async (convId, body) => Number((await one(
+  "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND body=$2", [convId, body])).n);
+const bubbles = (text) => page.evaluate((x) => [...document.querySelectorAll('#ct-list .ct-msg')].filter((li) => li.textContent.includes(x)).length, text);
+const until = async (fn, ms = 15000) => {
+  for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 200))) if (await fn()) return true;
+  return false;
+};
+await ctx.setOffline(true);
+await page.fill('#ct-text', 'پیامِ بی‌اینترنت');
+await page.click('#ct-send');
+await page.waitForFunction(() => !document.getElementById('ct-msg').hidden, null, { timeout: 10000 });
+ok(await countFrom(conv1.id, 'پیامِ بی‌اینترنت') === 0 && (await page.inputValue('#ct-text')) === 'پیامِ بی‌اینترنت',
+  'بی‌اینترنت: متن در کادر و در صف می‌ماند', await page.textContent('#ct-msg'));
+await ctx.setOffline(false);
+ok(await until(async () => (await countFrom(conv1.id, 'پیامِ بی‌اینترنت')) === 1, 20000), 'وصل شد ⇒ خودش رفت، بی زدنِ دوباره');
+await page.waitForFunction(() => /بی‌اینترنت/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+ok((await page.inputValue('#ct-text')) === '' && await bubbles('پیامِ بی‌اینترنت') === 1, 'پس از رسیدن: کادر خالی و یک حباب');
+
+let drop = 1;
+const postUrl = `**/api/store/${slug}/chat/conversations/${conv1.id}/messages`;
+await page.route(postUrl, async (route) => {
+  if (route.request().method() !== 'POST' || drop < 1) return route.fallback();
+  drop--;
+  await route.fetch();            //  سرور ثبت می‌کند…
+  return route.abort('failed');   //  …و جواب به صفحه نمی‌رسد
+});
+await page.fill('#ct-text', 'جوابِ گم‌شده');
+await page.click('#ct-send');
+await page.waitForFunction(() => !document.getElementById('ct-msg').hidden, null, { timeout: 10000 });
+await page.click('#ct-send');     //  کاربر دوباره می‌زند
+await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+await new Promise((r) => setTimeout(r, 1500));
+ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles('جوابِ گم‌شده') === 1,
+  'جوابِ گم‌شده و زدنِ دوباره ⇒ یک پیام روی سرور و یک حباب', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')}`);
+await page.unroute(postUrl);
+
+//  ── CHAT-04: برگهٔ پنهانِ مرورگر «رسید» می‌دهد ولی «خواندم» نه؛ دیده شدن ⇒ «خواندم» ──
+const vis = (s) => page.evaluate((v) => {
+  Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
+  Object.defineProperty(document, 'hidden', { configurable: true, get: () => v === 'hidden' });
+  document.dispatchEvent(new Event('visibilitychange'));
+}, s);
+const marks = async () => one('SELECT customer_delivered_seq AS d, customer_read_seq AS r FROM shop_chat_conversations WHERE id=$1', [conv1.id]);
+await vis('hidden');
+const late = await call('POST', `/api/shop/chat/conversations/${conv1.id}/messages`, { clientId: `client-late-${Date.now()}`, body: 'تا ساعتِ پنج باز هستیم' }, T);
+const lateSeq = Number(late.body.message.seq);
+await page.waitForFunction(() => /ساعتِ پنج/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
+ok(await until(async () => Number((await marks()).d) >= lateSeq), 'برگهٔ پنهان: پیام رسید و «رسید» به سرور رفت');
+ok(Number((await marks()).r) < lateSeq, 'برگهٔ پنهان: «خواندم» نرفت', JSON.stringify(await marks()));
+await vis('visible');
+ok(await until(async () => Number((await marks()).r) >= lateSeq), 'برگه دیده شد ⇒ «خواندم» رفت', JSON.stringify(await marks()));
+
+//  ── CHAT-08: «حذف برای همه» ِ دکان همان دم به برگهٔ بازِ مشتری می‌رسد (long-poll)، فقط سنگِ قبر ──
+const gone = await call('DELETE', `/api/shop/chat/conversations/${conv1.id}/messages/${late.body.message.id}?for=all`, null, T);
+await page.waitForFunction(() => !/ساعتِ پنج/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
+ok(gone.status === 200 && await bubbles('این پیام پاک شد') === 1, '«حذف برای همه» ِ دکان ⇒ برگهٔ بازِ مشتری فقط «این پیام پاک شد»');
+
+//  ── CHAT-03، CHAT-01 و CHAT-08: صفحه از نو ⇒ پیام‌ها از سرور، هر کدام یک بار، و پاک‌شده همچنان پاک ──
+await page.reload();
+await page.waitForFunction(() => { const b = document.getElementById('o-chat-open'); return b && b.offsetParent !== null; }, null, { timeout: 15000 });
+await page.click('#o-chat-open');
+await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+ok(await bubbles('پیامِ بی‌اینترنت') === 1 && await bubbles('جوابِ گم‌شده') === 1 && await bubbles('یک ساعت دیگر') === 1,
+  'پس از بازکردنِ دوباره: پیام‌های مشتری از سرور، هر کدام یک بار');
+ok(await bubbles('ساعتِ پنج') === 0 && await bubbles('این پیام پاک شد') === 1, 'پس از بازکردنِ دوباره: پیامِ پاک‌شده فقط سنگِ قبر');
+
 //  ── دکان تحویل می‌دهد ⇒ همان برگهٔ باز «بسته شد» (long-poll) ⇒ «مشکل دارم» ⇒ همان رشته باز ──
 await move(o1.id, ['picked_up']);
 await call('POST', `/api/shop/chat/conversations/${conv1.id}/receipts`, { readSeq: 2 }, T);   //  بیدار کردنِ long-poll با رسیدِ واقعی
