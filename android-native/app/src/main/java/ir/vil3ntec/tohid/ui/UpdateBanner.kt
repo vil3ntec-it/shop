@@ -11,6 +11,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -58,7 +59,7 @@ private fun updateMessage(version: String, required: Boolean, progress: Int, rea
  */
 @Composable
 fun UpdateChip() {
-  if (BuildConfig.STORE == "bazaar") return
+  if (StoreChannel.storeManaged(BuildConfig.STORE)) return
   val context = LocalContext.current
   AutoCheck()
   val found = UpdateManager.release ?: return

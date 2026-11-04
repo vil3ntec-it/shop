@@ -35,15 +35,20 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrGrid
+import ir.vil3ntec.tohid.core.i18n.StrQuickRegister
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.data.QuickRegister
 import ir.vil3ntec.tohid.ui.screens.isPrimaryModifier
 import ir.vil3ntec.tohid.ui.theme.Radius
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /** پیامِ بارکدِ ناشناس در صندوق (S03) */
-const val QUICK_UNKNOWN = "این بارکد ثبت نیست"
-const val QUICK_ACTION = "ثبتِ سریع"
-const val QUICK_FREE_ACTION = "قلمِ آزاد"
+val QUICK_UNKNOWN: String get() = StrSalePages.quickUnknown
+val QUICK_ACTION: String get() = StrQuickRegister.action
+val QUICK_FREE_ACTION: String get() = StrSale.freeItemAlt
 
 /**
  *  «ثبتِ سریعِ کالا» — S03 (POS-17)، گوشی و کامپیوتر، پشتِ `TillGoodsPref.quickRegister` (پیش‌فرض خاموش).
@@ -64,35 +69,35 @@ fun QuickRegisterDialog(barcode: String, onDismiss: () -> Unit, onSave: (QuickRe
           if (e.type == KeyEventType.KeyDown && e.isPrimaryModifier && e.key == Key.S) { save(); true } else false
         },
       ) {
-        Text("ثبتِ سریعِ کالا", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
-        Text("بارکد: $barcode", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrQuickRegister.title, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrSalePages.barcodeLine(barcode), style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
-          value = draft.name, onValueChange = { draft = draft.copy(name = it) }, label = { Text("نامِ کالا") },
+          value = draft.name, onValueChange = { draft = draft.copy(name = it) }, label = { Text(StrQuickRegister.name) },
           singleLine = true, modifier = Modifier.fillMaxWidth().focusRequester(first),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           OutlinedTextField(
             value = draft.salePrice, onValueChange = { draft = draft.copy(salePrice = ir.vil3ntec.tohid.numericInput(it)) },
-            label = { Text("قیمتِ فروش") }, singleLine = true,
+            label = { Text(StrQuickRegister.price) }, singleLine = true,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.weight(1f),
           )
           OutlinedTextField(
-            value = draft.unit, onValueChange = { draft = draft.copy(unit = it) }, label = { Text("واحد") },
+            value = draft.unit, onValueChange = { draft = draft.copy(unit = it) }, label = { Text(StrGrid.unit) },
             singleLine = true, modifier = Modifier.weight(0.7f),
           )
         }
         OutlinedTextField(
           value = draft.stock, onValueChange = { draft = draft.copy(stock = ir.vil3ntec.tohid.numericInput(it)) },
-          label = { Text("موجودیِ همین که در دست است") }, singleLine = true,
+          label = { Text(StrQuickRegister.stock) }, singleLine = true,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Done),
           keyboardActions = KeyboardActions(onDone = { save() }), modifier = Modifier.fillMaxWidth(),
         )
         error?.let { Text(it, style = MaterialTheme.typography.labelMedium, color = Shop.colors.danger) }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-          TextButton(onClick = onDismiss) { Text("انصراف") }
-          Button(onClick = { save() }) { Text("ثبت و افزودن (Ctrl+S)") }
+          TextButton(onClick = onDismiss) { Text(Str.cancel) }
+          Button(onClick = { save() }) { Text(StrSalePages.saveAndAdd) }
         }
       }
     }

@@ -53,6 +53,7 @@
     <button class="tab" data-tab="support">پشتیبانی</button>
     <button class="tab" data-tab="notices">اعلان‌ها <span class="pill hidden" id="notice-count"></span></button>
     <button class="tab" data-tab="downloads">دانلود</button>
+    <button class="tab" data-tab="account">حذفِ حساب</button>
     <!-- شورا چ۳: فقط برای نمایندهٔ فروش دیده می‌شود (‎/api/rep/me‎ ۲۰۰) -->
     <button class="tab hidden" data-tab="rep" id="tab-btn-rep">نمایندگی</button>
   </nav>
@@ -126,6 +127,15 @@
     <div class="panel">
       <h2>آخرین نسخهٔ برنامه‌ها</h2>
       <div id="downloads-list"></div>
+    </div>
+  </section>
+
+  <!-- حذفِ حساب به دستِ خودِ کاربر — نشانیِ وبِ حذف برای Google Play (/portal/#delete-account) -->
+  <section id="tab-account" class="hidden">
+    <div class="panel">
+      <h2>حذفِ حساب</h2>
+      <div id="account-body"></div>
+      <div id="account-msg"></div>
     </div>
   </section>
 </div>

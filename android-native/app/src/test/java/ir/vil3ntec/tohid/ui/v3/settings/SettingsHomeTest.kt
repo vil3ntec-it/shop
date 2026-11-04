@@ -236,6 +236,19 @@ class SettingsHomeTest {
     assertTrue(SettingsSearchIndex.search(prs, "انبار").any { it.key == SettingsLayout.GOODS })
   }
 
+  /** Google Play — «حذفِ حساب» (پایینِ «حساب من» ⇐ ویرایش) و «حریمِ خصوصی» («درباره برنامه») با جست‌وجو پیدا می‌شوند */
+  @Test
+  fun `جست‌وجوی حذفِ حساب و حریمِ خصوصی`() {
+    val docs = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet())
+    fun keys(q: String) = SettingsSearchIndex.search(docs, q).map { it.key }
+    assertTrue(SettingsLayout.PROFILE in keys("حذف حساب"))
+    assertTrue(SettingsLayout.PROFILE in keys("delete account"))
+    assertTrue(SettingsLayout.PROFILE in keys("حساب ړنګول"))
+    assertTrue(SettingsLayout.ABOUT_APP in keys("حریم خصوصی"))
+    assertTrue(SettingsLayout.ABOUT_APP in keys("privacy"))
+    assertEquals("profile/edit", SettingsLayout.LINKS[SettingsLayout.PROFILE])
+  }
+
   /** PAY-13 — «شمارشِ کور» گزینهٔ صفحهٔ «پرداخت» است؛ جست‌وجو به همان صفحه می‌برد، به هر سه زبان */
   @Test
   fun `جست‌وجوی شمارشِ کور به صفحهٔ پرداخت می‌رسد`() {

@@ -22,6 +22,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.pos.SaleNotes
 import ir.vil3ntec.tohid.ui.theme.Shape
 
@@ -105,7 +107,7 @@ fun InvoiceNoteButton(note: String?, show: Boolean, onNote: (String?) -> Boolean
   TextButton(onClick = { open = true }) {
     androidx.compose.material3.Icon(Icons.Filled.Edit, contentDescription = null)
     Text(
-      note?.let { "یادداشت: $it" } ?: "یادداشتِ فاکتور",
+      note?.let { StrSalePages.noteLine(it) } ?: StrSalePages.invoiceNote,
       maxLines = 1,
       overflow = TextOverflow.Ellipsis,
     )
@@ -115,9 +117,9 @@ fun InvoiceNoteButton(note: String?, show: Boolean, onNote: (String?) -> Boolean
   AlertDialog(
     onDismissRequest = { open = false },
     shape = Shape.dialog,
-    title = { Text("یادداشتِ فاکتور") },
-    text = { Column { PosNoteField(text, { text = it }, "روی رسید چاپ می‌شود") } },
-    confirmButton = { TextButton(onClick = { if (onNote(SaleNotes.clean(text))) open = false }) { Text("ثبت") } },
-    dismissButton = { TextButton(onClick = { open = false }) { Text("انصراف") } },
+    title = { Text(StrSalePages.invoiceNote) },
+    text = { Column { PosNoteField(text, { text = it }, StrSalePages.printedOnReceipt) } },
+    confirmButton = { TextButton(onClick = { if (onNote(SaleNotes.clean(text))) open = false }) { Text(StrSalePages.record) } },
+    dismissButton = { TextButton(onClick = { open = false }) { Text(Str.cancel) } },
   )
 }

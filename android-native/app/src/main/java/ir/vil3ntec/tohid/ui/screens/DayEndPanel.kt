@@ -16,6 +16,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.common.PillTone
@@ -37,14 +40,13 @@ private fun toneOf(t: String) = when (t) {
 
 private fun af(v: Long) = "${money(v / 100.0)} ؋"
 
-private const val NOTE =
-  "هر شیفت مالِ روزی است که باز شد؛ Z ِ بسته ثابت است و پولی که هیچ شیفتی نشمرده جدا، در «بیرون از شیفت‌ها»، می‌آید."
+private val NOTE: String get() = StrSalePages.dayEndNote
 
 @Composable
 private fun StatusLine(b: DayEndModel.Built) {
   val r = b.report
   Row(verticalAlignment = Alignment.CenterVertically) {
-    if (r == null) StatusPill(b.error ?: "گزارش ساخته نشد", PillTone.DANGER)
+    if (r == null) StatusPill(b.error ?: StrSale.reportFailed, PillTone.DANGER)
     else {
       val (text, tone) = DayEndModel.status(r)
       StatusPill(text, toneOf(tone))
@@ -59,12 +61,12 @@ internal fun DayEndSummary(b: DayEndModel.Built) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (r != null) {
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("خالص شیفت‌ها", af(r.total.shifts.net), "فروش + رسید − برگشت", Modifier.weight(1f))
-        StatCard("اختلاف صندوق", r.total.variance?.let(::af) ?: "—", "شمرده − مورد انتظار", Modifier.weight(1f))
-        StatCard("بیرون از شیفت‌ها", af(r.total.outside), "دفتر − شیفت‌ها", Modifier.weight(1f))
+        StatCard(StrSalePages.shiftsNet, af(r.total.shifts.net), StrSalePages.shiftsNetHow, Modifier.weight(1f))
+        StatCard(StrSalePages.tillVariance, r.total.variance?.let(::af) ?: "—", StrSalePages.varianceHow, Modifier.weight(1f))
+        StatCard(StrSalePages.outsideShifts, af(r.total.outside), StrSalePages.outsideHow, Modifier.weight(1f))
         StatCard(
-          "شیفت‌ها", r.shifts.size.toString(),
-          if (r.openShifts > 0) "${r.openShifts} باز" else "همه بسته", Modifier.weight(1f),
+          StrSalePages.shifts, r.shifts.size.toString(),
+          if (r.openShifts > 0) StrSalePages.openCount(r.openShifts) else StrSalePages.allClosed, Modifier.weight(1f),
         )
       }
     }
@@ -81,18 +83,18 @@ internal fun DayEndSummary(b: DayEndModel.Built) {
 internal fun DayEndPhone(b: DayEndModel.Built) {
   val r = b.report
   Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-    Text("پایان امروز", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    Text(StrSalePages.endOfToday, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     StatusLine(b)
     if (r != null) {
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("خالص شیفت‌ها", af(r.total.shifts.net), "امروز", Modifier.weight(1f))
-        StatCard("اختلاف صندوق", r.total.variance?.let(::af) ?: "—", "شمرده − مورد انتظار", Modifier.weight(1f))
+        StatCard(StrSalePages.shiftsNet, af(r.total.shifts.net), Str.today, Modifier.weight(1f))
+        StatCard(StrSalePages.tillVariance, r.total.variance?.let(::af) ?: "—", StrSalePages.varianceHow, Modifier.weight(1f))
       }
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("بیرون از شیفت‌ها", af(r.total.outside), "دفتر − شیفت‌ها", Modifier.weight(1f))
+        StatCard(StrSalePages.outsideShifts, af(r.total.outside), StrSalePages.outsideHow, Modifier.weight(1f))
         StatCard(
-          "شیفت‌ها", r.shifts.size.toString(),
-          if (r.openShifts > 0) "${r.openShifts} باز" else "همه بسته", Modifier.weight(1f),
+          StrSalePages.shifts, r.shifts.size.toString(),
+          if (r.openShifts > 0) StrSalePages.openCount(r.openShifts) else StrSalePages.allClosed, Modifier.weight(1f),
         )
       }
     }
@@ -105,7 +107,7 @@ internal fun DayEndPhone(b: DayEndModel.Built) {
 internal fun DayEndDetailDialog(
   t: ReportTables.Table,
   /** RPT-13: ریزِ ردیفِ تفکیکِ فروش نوشتهٔ خودش را دارد */
-  note: String = "جمعِ این ریز همان «خالص دفتر» ِ همین روش است.",
+  note: String = StrSalePages.detailNote,
   onClose: () -> Unit,
 ) {
   AlertDialog(
@@ -117,6 +119,6 @@ internal fun DayEndDetailDialog(
         FreshTable(t, Modifier.fillMaxWidth().heightIn(max = 420.dp))
       }
     },
-    confirmButton = { TextButton(onClick = onClose) { Text("بستن") } },
+    confirmButton = { TextButton(onClick = onClose) { Text(Str.close) } },
   )
 }

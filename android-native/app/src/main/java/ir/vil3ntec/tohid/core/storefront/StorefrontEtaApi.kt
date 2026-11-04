@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.core.storefront
 
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -67,7 +70,10 @@ object StorefrontEtaApi {
     return s.toInt().takeIf { it in lo..hi }
   }
 
-  private fun range(lo: Int, hi: Int) = "عددِ صحیح از ${StorefrontRules.toFa(lo)} تا ${StorefrontRules.toFa(hi)}"
+  /** عددِ پیام: انگلیسی با رقمِ لاتین، فارسی/دری/پشتو همان رقمِ فارسیِ پیشین */
+  private fun num(v: Int): String = if (I18n.lang == Lang.EN) v.toString() else StorefrontRules.toFa(v)
+
+  private fun range(lo: Int, hi: Int) = StrSettingsPages.etaWholeRange(num(lo), num(hi))
 
   /**
    *  کادرها ⇒ بدنهٔ `PUT` یا خطای هر کادر (کلید: `prep`، `travel`، `parallel`، `zone:<شناسه>`).
@@ -82,7 +88,7 @@ object StorefrontEtaApi {
     val parallel = intIn(form.parallel, PARALLEL_MIN, PARALLEL_MAX)
     if (parallel == null) errors["parallel"] = range(PARALLEL_MIN, PARALLEL_MAX)
     val zoneTravel = LinkedHashMap<String, Int>()
-    if (zoneIds.size > MAX_ZONES) errors["zones"] = "بیش از ${StorefrontRules.toFa(MAX_ZONES)} ناحیه"
+    if (zoneIds.size > MAX_ZONES) errors["zones"] = StrSettingsPages.etaTooManyZones(num(MAX_ZONES))
     for (id in zoneIds) {
       val raw = form.zones[id].orEmpty()
       if (StorefrontRules.asciiDigits(raw).isEmpty()) continue
@@ -105,42 +111,42 @@ object StorefrontEtaApi {
 
   /** بازه ⇒ «۲۰ تا ۳۰ دقیقه» */
   fun rangeText(r: EtaRangeDto?): String? =
-    r?.let { "${StorefrontRules.toFa(it.minMinutes)} تا ${StorefrontRules.toFa(it.maxMinutes)} دقیقه" }
+    r?.let { StrSettingsPages.etaMinutes(num(it.minMinutes), num(it.maxMinutes)) }
 
   fun reasonLabel(reason: String): String = when (reason) {
-    "hidden" -> "نمایش خاموش است"
-    "paused" -> "پذیرشِ سفارش موقتاً متوقف است"
-    "closed" -> "دکان الان بسته است"
-    "unconfirmed" -> "اتصالِ دکان هنوز تأیید نشده"
-    else -> "الان عددی نشان داده نمی‌شود"
+    "hidden" -> StrSettingsPages.etaWhyHidden
+    "paused" -> StrSettingsPages.etaWhyPaused
+    "closed" -> StrSettingsPages.etaWhyClosed
+    "unconfirmed" -> StrSettingsPages.etaWhyUnconfirmed
+    else -> StrSettingsPages.etaWhyOther
   }
 
   /** خطِ پیش‌نمایشِ مشتری — همان‌چه ویترین الان نشان می‌دهد */
   fun previewLines(p: EtaPreviewDto?, zones: List<EtaZoneDto>): List<String> {
-    if (p == null) return listOf("ویترین هنوز ساخته نشده؛ پیش‌نمایشی نیست")
-    if (!p.available) return listOf("مشتری الان عددی نمی‌بیند: ${reasonLabel(p.reason)}")
+    if (p == null) return listOf(StrSettingsPages.etaNoStorefront)
+    if (!p.available) return listOf(StrSettingsPages.etaNoNumber(reasonLabel(p.reason)))
     val names = zones.associate { it.id to it.name }
     return buildList {
-      rangeText(p.delivery)?.let { add("ارسال: $it") }
-      rangeText(p.pickup)?.let { add("دریافت از دکان: $it") }
-      for (z in p.zones) add("${names[z.id] ?: "ناحیه"}: ${rangeText(EtaRangeDto(z.minMinutes, z.maxMinutes))}")
+      rangeText(p.delivery)?.let { add(StrSettingsPages.etaDelivery(it)) }
+      rangeText(p.pickup)?.let { add(StrSettingsPages.etaPickup(it)) }
+      for (z in p.zones) add("${names[z.id] ?: StrSettingsPages.etaZone}: ${rangeText(EtaRangeDto(z.minMinutes, z.maxMinutes))}")
     }
   }
 
   /** نشانه‌های همین لحظه (فقط برای خودِ دکان) */
   fun signalLine(s: EtaSignalsDto): String = buildString {
-    append("صف: ${StorefrontRules.toFa(s.queue)} سفارش")
-    append(" · آماده‌سازی: ${StorefrontRules.toFa(s.prepMinutes)} دقیقه")
-    append(if (s.prepFromHistory) " (از سفارش‌های اخیر)" else " (از تنظیم؛ هنوز سفارشِ کافی نیست)")
-    if (s.busyExtraMinutes > 0) append(" · شلوغ: +${StorefrontRules.toFa(s.busyExtraMinutes)} دقیقه")
-    if (s.couriers.couriers > 0) append(" · پیک: ${StorefrontRules.toFa(s.couriers.live)} در راه از ${StorefrontRules.toFa(s.couriers.cap)}")
+    append(StrSettingsPages.etaQueue(num(s.queue)))
+    append(StrSettingsPages.etaPrepNow(num(s.prepMinutes)))
+    append(if (s.prepFromHistory) StrSettingsPages.etaFromHistory else StrSettingsPages.etaFromSetting)
+    if (s.busyExtraMinutes > 0) append(StrSettingsPages.etaBusyNow(num(s.busyExtraMinutes)))
+    if (s.couriers.couriers > 0) append(StrSettingsPages.etaCouriersNow(num(s.couriers.live), num(s.couriers.cap)))
   }
 
   /** خطای سرور ⇒ متنِ فارسی؛ ناسازگاریِ نسخه پیامِ خودش را دارد، بقیه همان پیامِ فارسیِ سرور */
   fun errorText(code: String, serverMessage: String): String = when (code) {
-    "version_conflict" -> "تنظیم در این میان جای دیگری عوض شد؛ دوباره باز کنید"
-    "storefront_eta_disabled", "storefront_disabled" -> "زمانِ تقریبیِ تحویل برای این دکان روشن نیست"
-    else -> serverMessage.ifBlank { "ذخیره نشد؛ دوباره تلاش کنید" }
+    "version_conflict" -> StrSettingsPages.etaConflict
+    "storefront_eta_disabled", "storefront_disabled" -> StrSettingsPages.etaDisabled
+    else -> serverMessage.ifBlank { StrSettingsPages.saveFailed }
   }
 
   suspend fun load(api: ApiClient): ApiResult<EtaViewDto> = ApiResult.of { parse(api.get(ROOT)) }

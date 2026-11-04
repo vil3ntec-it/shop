@@ -1,5 +1,11 @@
 package ir.vil3ntec.tohid.ui.components.common
 
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+
 /**
  *  چیدمانِ نوارِ پایینِ گوشی — مدلِ خالص (بی Compose و بی اندروید)، phone v3 §F/§F2.
  *
@@ -42,23 +48,23 @@ object NavCatalog {
    *  موردهای ساخته‌شده — ترتیبِ فهرستِ ویرایشگر هم همین است. مقصدها مسیرهای
    *  نوع‌دارِ امروزند (`V3Modules`)؛ شناسه‌ها ماندگارند (در چیدمانِ کاربر ذخیره‌اند).
    */
-  val BUILT_IN: List<NavItemDef> = listOf(
-    NavItemDef(SEARCH, "جست‌وجو", "search"),
-    NavItemDef(HOME, "خانه", "home"),
-    NavItemDef(SALE, "فروش", "sale"),
-    NavItemDef(PRODUCTS, "کالاها", "products"),
-    NavItemDef(MORE, "بیشتر", "more"),
-    NavItemDef(ACCOUNT, "حساب", "profile"),
-    NavItemDef(SCAN, "اسکنِ بارکد", "sale?scan=1"),
-    NavItemDef(WAREHOUSE, "انبار", "stock"),
-    NavItemDef(DEBTORS, "قرض‌داران", "debtors"),
-    NavItemDef(ORDERS, "سفارش‌ها", "orders"),
-    NavItemDef(REPORTS, "گزارش‌ها", "reports"),
-    NavItemDef(EXPENSES, "مصارف", "expenses"),
-    NavItemDef(PURCHASING, "خرید", "purchasing"),
-    NavItemDef(HISTORY, "تاریخچهٔ فروش", "sales"),
-    NavItemDef(TEAM, "کارمندان", "team"),
-    NavItemDef(SETTINGS, "تنظیمات", "settings"),
+  val BUILT_IN: List<NavItemDef> get() = listOf(
+    NavItemDef(SEARCH, Str.search, "search"),
+    NavItemDef(HOME, Str.home, "home"),
+    NavItemDef(SALE, Str.sale, "sale"),
+    NavItemDef(PRODUCTS, StrHome.tileProducts, "products"),
+    NavItemDef(MORE, Str.more, "more"),
+    NavItemDef(ACCOUNT, StrNav.account, "profile"),
+    NavItemDef(SCAN, StrKit.scanBarcode, "sale?scan=1"),
+    NavItemDef(WAREHOUSE, Str.warehouse, "stock"),
+    NavItemDef(DEBTORS, Str.debtors, "debtors"),
+    NavItemDef(ORDERS, Str.orders, "orders"),
+    NavItemDef(REPORTS, Str.reports, "reports"),
+    NavItemDef(EXPENSES, Str.expenses, "expenses"),
+    NavItemDef(PURCHASING, Str.purchases, "purchasing"),
+    NavItemDef(HISTORY, Str.salesHistoryAlt, "sales"),
+    NavItemDef(TEAM, StrNav.staffShort, "team"),
+    NavItemDef(SETTINGS, Str.settings, "settings"),
   )
 
   /**
@@ -183,11 +189,16 @@ object NavLayouts {
   enum class Slot { START, PILL, END, OUT }
 
   /** چرا یک تغییر پذیرفته نشد — متنش همان است که ویرایشگر نشان می‌دهد */
-  enum class Problem(val message: String) {
-    MORE_LOCKED("«بیشتر» همیشه در قرص می‌ماند تا هیچ بخشی گم نشود"),
-    PILL_FULL("قرص حداکثر ${MAX_PILL} جا دارد"),
-    PILL_MIN("قرص دست‌کم ${MIN_PILL} جا می‌خواهد"),
-    NOT_ALLOWED("این مورد برای نقشِ شما باز نیست"),
+  enum class Problem {
+    MORE_LOCKED, PILL_FULL, PILL_MIN, NOT_ALLOWED;
+
+    /** متنِ همین زبان — فارسی همان پیامِ پیشین (`StrSettings.nav*`) */
+    val message: String get() = when (this) {
+      MORE_LOCKED -> StrSettings.navMoreLocked
+      PILL_FULL -> StrSettings.navPillFull(MAX_PILL)
+      PILL_MIN -> StrSettings.navPillMin(MIN_PILL)
+      NOT_ALLOWED -> StrSettings.navNotAllowed
+    }
   }
 
   sealed interface Edit {

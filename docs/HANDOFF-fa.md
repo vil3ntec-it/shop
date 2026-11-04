@@ -98,6 +98,52 @@
 - مانده (در STATUS ِ CRM-15): `phoneMasked` ِ ۴+۳ و نشانیِ سفارش/تحویل برای همهٔ `orders.view` (تصمیمِ صاحب، چون نمای جمع‌آور عوض
   می‌شود)، فهرست‌های پشتِ `settings.write` برای مدیرِ بسته، شمارهٔ ازپیش‌همگام‌شده روی دستگاه تا بازسازی، سابقهٔ دسترسی، چاپی، وب.
 - قدمِ بعدی: CI و مرجِ همین PR؛ تصمیمِ صاحب دربارهٔ `phoneMasked` ِ سفارش برای نقشِ بی مجوز.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dlv02-courier-call` (پسرفتِ DLV-02 در پیکِ نسخهٔ ۳؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- تشخیص: خطِ «ناحیه · دروازهٔ رنگ» و دکمهٔ «تماس با مشتری» فقط در `CourierHomeLegacy.kt` بودند؛ دستهٔ ۱۳ (#855، 0a68b851) آن را
+  بی جانشین پاک کرد و `landmarkFirst`/`callNumber`/`openDialer` بی صدازننده ماندند (CI سبز، چون هیچ آزمونی صدازننده نمی‌سنجید).
+- انجام شد: کارتِ «مسیر» (به `CourierMissionCard.kt` جدا شد تا `CourierHome.kt` زیرِ سقف بماند؛ سقف ۹۵۹ ⇐ ۸۶۶) و جزئیاتِ
+  مأموریت هر دو را دارند؛ دروازه همان پیشین (`CourierExtras.canCall` = پرچمِ `shop.delivery_courier_call` + `CourierFlow.canCall`)؛
+  `landmarkFirst` برچسبِ ناحیه/دروازه را از `StrCourierApp` می‌گیرد (پیش‌فرض همان فارسی)؛ یک تماس در هر لحظه. آزمون: `CourierCallV3Test` ⇒ ۷/۷
+  (صدازننده از `AppRoot` با `SourceGraph`، دروازه، رفتار)، `MissionAddressTest` ⇒ ۵/۵؛ desk-check: هسته ۱۳۰۶/۱۳۰۶، کامپیوتر ۳۰۴۴ با همان ۱۳ ِ `ui.theme`؛ عکسِ `phone-v3-courier-call*`.
+  ⚠️ دیمنِ مشترکِ کاتلین زیرِ بارِ چند سیزن یک ساعت کامپایلِ core را نگه داشت؛ با `-Pkotlin.compiler.execution.strategy=in-process` ۱٫۵ دقیقه شد.
+- نیمه‌کاره: گوشیِ واقعی، آیفونِ بی سیم‌کارت و شماره‌گیرِ کامپیوتر آزموده نشد؛ نمای جدولیِ تبلت فقط نشانه دارد (جزئیات همه را).
+- قدمِ بعدی: در `ui/courier` چهار تابعِ دیگر هم بی صدازننده‌اند (`BagScanDialog`، `NearPinFlow`، `RouteSheet`، `RateDialog` در
+  `CourierChecksUi.kt`)؛ کارشان در نسخهٔ ۳ با برگه‌های `CourierChecksV3.kt` هست، پس کدِ مرده‌اند نه پسرفت — پاک کردن یا نگه داشتن با صاحب‌کار.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-2` (دریِ واقعی، دورِ ۲؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: متنِ خامی که دورِ ۱ بیرون گذاشته بود به جدول رفت (فارسی بایت‌به‌بایت همان، انگلیسی و پشتو تازه): همهٔ `ui/components`
+  (۷۶)، صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند (فروش و چاپ، دریافتِ قرض، برگشت، دفترِ قرض، دستورِ تحویل، جمع‌آوری،
+  نقدِ پیک‌ها، پایانِ روز؛ جدول‌های `StrSalePages`/`StrReturnPages`/`StrDebtPages`/`StrOrderPages`/`StrShellPages`، ۲۴۲ جا جملهٔ
+  همان جدول‌های نسخهٔ ۳)، یاورهای `OwnerReportPlan`/`StorefrontEtaApi`/`PromoGuardApi` (۴۹، در `StrSettingsPages`)، نامِ ۹ بخشِ
+  تنظیمات (`SettingsLayout.labelOf`؛ کلیدِ فارسی همان) و ۱۳ خطای ورودیِ `CourierQueue` (ثابتِ `CourierInputText` ِ هسته ⇐
+  `StrCourierApp`). دری: ۹ واژه (آدرس، قبل از، کوشش، ختم …) و ۵ جملهٔ کامل، همه «نیاز به تأییدِ صاحب‌کار» در `DARI-REVIEW-fa.md` §۲ و §۵.
+  آزمون: `DariCoverageTest` (نگهبانِ متنِ خام روی `ui/components`، پرونده‌های جابه‌جاشده و یاورها، سقفِ چرخ‌دنده‌ایِ متنِ خامِ
+  `ui/screens`، کفِ پوششِ نوشته‌های جابه‌جاشده، خطای صفِ پیک)، `DariTextTest`، `dari-text.test.js`. پوشش: کارهای اصلی ۱۵٫۵٪ ⇐ ۱۶٫۵٪ (کف ۱۶)،
+  همه ۱۳٫۸٪ ⇐ ۱۵٫۰٪، نوشته‌های جابه‌جاشده ۰ ⇐ ۱۴٫۸٪ (کف ۱۴)، متنِ خامِ `ui/screens` ۴۰۳۲ ⇐ ۳۶۳۳. `desk-check`: هسته ۱۳۰۶/۰؛ کامپیوتر ۳۰۴۲ آزمون، جز ۱۳ ِ `ui.theme`
+  دو سرخ (`DariWordsTest`: «نشانی‌هاست»؛ `DesktopPhrasesTest`: عبارتِ «سیم» ⇐ «چاپگر سیستم») که رفع و با ۱۲۵ آزمونِ مربوط دوباره سبز شد.
+- نیمه‌کاره: بقیهٔ `ui/screens` (سقف ۳۶۳۳ نوشته: `DeskCustomers`، `DeskProducts`، `StockBook`، `DevicesHw`، خرید، تخفیف‌ها، گزارش‌ها؛
+  نمایهٔ جست‌وجوی تنظیمات و کلیدهای `SettingsLayout` داده‌اند)؛ ستون‌های `DayEndModel` به خروجی هم می‌روند ⇐ تصمیم لازم؛
+  «ناحیه/دروازه» ِ `MissionView` در هسته.
+- قدمِ بعدی: دورِ ۳ همان روش (سطرِ داده با «// داده: دلیل»، پرونده به `movedScreens`، سقف پایین)؛ بازبینیِ صاحب‌کار روی فهرست.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/missing-rows-1b` (کمبودهای MISSING ِ بی مانع؛ روی main پس از #916؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **S70** (MISSING ⇐ PARTIAL) — «همین کالا در دکان‌های دیگر» (`/api/market/same/:id`، پشتِ `market.product_details`) فقط با واحدِ هم‌سنج
+  مقایسه می‌کند: `lib/market-units.js` (اندازهٔ بی حدس: پایه‌ها یا بسته با یک عدد؛ «کارتن» ِ بی عدد، دو عدد، «1,000»، سیر/پاو/من ⇒ null)،
+  `perUnit`، `cheapest` (همان پایه، دست‌کم دو، روی همهٔ پیدا‌شده‌ها) و `compare`؛ ترتیبِ درونِ دکان با قیمتِ یک پایه. آزمون‌ها پیش از ساخت سرخ:
+  `market-units.test.js` ۵/۵، `market-same-units.test.js` ۱/۱؛ همهٔ `market-*` و public-views ۸۰/۸۰ روی PGlite. بی مهاجرت، بی مسیرِ تازه، بی کدِ برنامه.
+- ساخته نشد (دلیل): از ۳۵ ردیفِ MISSING فقط S70 بی تصمیم و بی وابستگیِ بیرونی بود. PAY-22 (QR ِ ملی): APS هنوز مشخصاتی منتشر نکرده و
+  ساختن یعنی پروتکلِ حدسی (همان قاعدهٔ کارت‌خوان در RULES) — بهتر است BLOCKED-EXTERNAL شود. S121 (شارژِ سیم‌کارت) قراردادِ اپراتور می‌خواهد؛
+  S122 و AI-09 مدلِ زبانی (O-16/D-16)؛ PUR-12/AI-10 موتورِ OCR (D-16)؛ GATE-NEW-03 دستگاه/شبکهٔ واقعی؛ بقیه در `OWNER-DECISIONS-fa.md`.
+- نیمه‌کاره: رابطِ «همین کالا» (وبِ بازارچه یا برنامهٔ خرید) هنوز نیست؛ «واحدِ فروشِ دوم» و «بسته‌ها» ِ کالا در اندازه به کار نمی‌روند
+  (ضریبِ نیامده در `detailsOf` پیش‌فرضِ ۱ می‌گیرد و «روشن» نیست). قدمِ بعدی: مرجِ همین PR؛ با رابطِ «همین کالا» همین `perUnit` نشان داده شود.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/play-readiness` (آمادگیِ Google Play؛ روی main پس از #916؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ممیزیِ Play با منبعِ رسمی (هدفِ API 36 از ۳۱ اوت ۲۰۲۶، ۱۶KB، حذفِ حساب، اجازه‌های محدود، تأییدِ توسعه‌دهنده…) و
+  چک‌لیستِ فارسیِ صاحب‌کار `docs/GOOGLE-PLAY-fa.md` (جوابِ فرمِ ایمنیِ داده، متن‌ها، نشانی‌ها، ریسک‌ها). `-Pstore=play`: قاعدهٔ بازار
+  (`StoreChannel.storeManaged` ِ core به‌جای `== "bazaar"`) + `compileSdk/targetSdk` ِ ۳۶ فقط برای Play؛ کارِ CI ِ «نسخهٔ Google Play
+  (AAB)» با `tools/play-check.py`. «حذفِ حساب»: برنامه (`profile/delete`، `DeleteAccountSheet`)، پورتالِ وب (`#delete-account`)،
+  سرور `routes/account-deletion.js` + `lib/self-delete.js` روی `lib/user-delete.js`، پرچمِ `account.self_delete` پیش‌فرض خاموش
+  (خاموش ⇒ درخواست به پشتیبانی؛ پمپ‌دار ⇒ ۴۰۹)، `privacy.html#delete-account` و پیوندِ «حریمِ خصوصی» در برنامه.
+- ⚠️ یافته: کلیدِ `tohid-release.jks` در مخزنِ عمومی است (برای Play کلیدِ بارگذاریِ تازه)؛ تحریم و حسابِ Play، Play Billing برای اشتراک.
+- نیمه‌کاره: CI و مرجِ همین PR (ساختِ AAB با compileSdk 36 روی AGP 8.7.3 فقط در CI سنجیده می‌شود). قدمِ بعدی: تصمیم‌های بخشِ ۱ ِ
+  `GOOGLE-PLAY-fa.md`، روشن کردنِ `account.self_delete` پیش از Production.
 ### ۱۴۰۵/۰۸/۱۳ — آیفون گامِ ۱۰، شاخهٔ `claude/ios-app-phase10` (روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `CoreFlowsE2EIosTest` ۷ ⇐ ۱۱ گام، همه با زدن روی صفحه در برابرِ سرورِ واقعی: **نسیه** (#906) — «نسیه» بی قرض‌دار «ثبت فروش»
   خاموش با پیام و زدنِ دکمهٔ خاموش هیچ نمی‌نویسد، «انتخابِ مشتری» ⇐ «قرض‌دارِ تازه» ⇐ نسیه با همان قرض‌دار (دفتر، بدهی، سرور)؛

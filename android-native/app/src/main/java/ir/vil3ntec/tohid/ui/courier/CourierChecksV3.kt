@@ -20,6 +20,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.courier.CourierChecks
+import ir.vil3ntec.tohid.core.courier.CourierFlow
 import ir.vil3ntec.tohid.core.courier.MissionCard
 import ir.vil3ntec.tohid.core.courier.RoutePlan
 import ir.vil3ntec.tohid.core.delivery.DeliveryRating
@@ -70,12 +71,23 @@ internal fun checkFor(a: CourierAction): CheckAsk? = when {
 }
 
 /** پرچم‌های دکان برای پیک (`/courier/me`؛ آفلاین همان آخرین پاسخ) و تحویل‌هایی که امتیازشان داده شده */
-internal data class CourierExtras(val routeEnabled: Boolean = false, val ratingsEnabled: Boolean = false, val rated: Set<String> = emptySet()) {
+internal data class CourierExtras(
+  val routeEnabled: Boolean = false,
+  val ratingsEnabled: Boolean = false,
+  val rated: Set<String> = emptySet(),
+  val callEnabled: Boolean = false,
+) {
   /** دکمهٔ امتیاز فقط با پرچم، فقط «تحویل شد» و یک بار */
   fun canRate(c: MissionCard): Boolean = ratingsEnabled && DeliveryRating.courierCanRate(c.status, c.id, rated)
 
+  /**
+   *  DLV-02: «تماس با مشتری» فقط با پرچمِ دکان (`shop.delivery_courier_call` از `/courier/me`) و فقط پس از «قبول» تا پایان
+   *  (`CourierFlow.CALLABLE`، همان `CALLABLE` ِ سرور) — همان دروازهٔ رابطِ پیشین؛ شماره را سرور با همان قاعده‌ها می‌دهد.
+   */
+  fun canCall(c: MissionCard): Boolean = callEnabled && CourierFlow.canCall(c.status)
+
   companion object {
-    fun of(store: CourierStore) = CourierExtras(store.routeEnabled, store.ratingsEnabled, store.rated())
+    fun of(store: CourierStore) = CourierExtras(store.routeEnabled, store.ratingsEnabled, store.rated(), store.callEnabled)
   }
 }
 

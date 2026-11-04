@@ -141,4 +141,215 @@ object StrSettingsPages {
   val delete: String get() = t("حذف", "Delete", "ړنګول")
   val newTemplate: String get() = t("قالبِ تازه", "New template", "نوې کېڼلاره")
   val add: String get() = t("افزودن", "Add", "زیاتول")
+
+  // <moved-raw-text>
+  // ── `OwnerReportPlan.kt` ──
+
+  // متنِ یاورِ «گزارشِ خودکارِ صاحب» (`OwnerReportPlan`) — پیش‌تر متنِ خام
+  val reportYesterday: String get() = t("دیروز (کامل)", "Yesterday (full)", "پرون (بشپړ)")
+  fun reportToday(hour: Any?): String = t("امروز تا ساعتِ ${asIs(hour)}", "Today until $hour", "نن تر $hour پورې")
+  fun reportWeekly(day: Any?, hour: Any?, span: Any?): String = t(
+    "هر ${asIs(day)} ساعتِ ${asIs(hour)}: هفت روزِ تا ${asIs(span)}",
+    "Every $day at $hour: seven days up to $span",
+    "هر $day په $hour: تر $span پورې اوه ورځې",
+  )
+  fun reportDaily(hour: Any?, span: Any?): String = t(
+    "هر روز ساعتِ ${asIs(hour)}: ${asIs(span)}",
+    "Every day at $hour: $span",
+    "هره ورځ په $hour: $span",
+  )
+
+  // ── `StorefrontEtaApi.kt` ──
+
+  // متنِ یاورِ «زمانِ تقریبیِ تحویل» (`StorefrontEtaApi`) — پیش‌تر متنِ خام
+  fun etaWholeRange(lo: Any?, hi: Any?): String = t(
+    "عددِ صحیح از ${asIs(lo)} تا ${asIs(hi)}",
+    "A whole number from $lo to $hi",
+    "له $lo څخه تر $hi پورې بشپړ عدد",
+  )
+  fun etaTooManyZones(n: Any?): String = t("بیش از ${asIs(n)} ناحیه", "More than $n zones", "له $n سیمو زیات")
+  fun etaMinutes(lo: Any?, hi: Any?): String = t("${asIs(lo)} تا ${asIs(hi)} دقیقه", "$lo to $hi minutes", "$lo تر $hi دقیقې")
+  val etaWhyHidden: String get() = t("نمایش خاموش است", "Display is off", "ښودنه بنده ده")
+  val etaWhyPaused: String get() = t("پذیرشِ سفارش موقتاً متوقف است", "Taking orders is paused for now", "د فرمایشونو منل لنډمهاله درول شوي دي")
+  val etaWhyClosed: String get() = t("دکان الان بسته است", "The shop is closed now", "دوکان اوس تړلی دی")
+  val etaWhyUnconfirmed: String get() = t(
+    "اتصالِ دکان هنوز تأیید نشده",
+    "The shop's connection is not confirmed yet",
+    "د دوکان نښلول لا نه دي تایید شوي",
+  )
+  val etaWhyOther: String get() = t("الان عددی نشان داده نمی‌شود", "No number is shown right now", "اوس هېڅ شمېره نه ښودل کېږي")
+  val etaNoStorefront: String get() = t(
+    "ویترین هنوز ساخته نشده؛ پیش‌نمایشی نیست",
+    "The storefront isn't built yet; there's no preview",
+    "ویترین لا نه دی جوړ شوی؛ مخکتنه نشته",
+  )
+  fun etaNoNumber(reason: Any?): String = t(
+    "مشتری الان عددی نمی‌بیند: ${asIs(reason)}",
+    "The customer sees no number right now: $reason",
+    "پېرودونکی اوس هېڅ شمېره نه ویني: $reason",
+  )
+  fun etaDelivery(range: Any?): String = t("ارسال: ${asIs(range)}", "Delivery: $range", "لېږل: $range")
+  fun etaPickup(range: Any?): String = t("دریافت از دکان: ${asIs(range)}", "Pickup at the shop: $range", "له دوکانه اخیستل: $range")
+  val etaZone: String get() = t("ناحیه", "Zone", "سیمه")
+  fun etaQueue(n: Any?): String = t("صف: ${asIs(n)} سفارش", "Queue: $n orders", "کتار: $n فرمایشونه")
+  fun etaPrepNow(n: Any?): String = t(" · آماده‌سازی: ${asIs(n)} دقیقه", " · Preparation: $n min", " · چمتووالی: $n دقیقې")
+  val etaFromHistory: String get() = t(" (از سفارش‌های اخیر)", " (from recent orders)", " (له وروستیو فرمایشونو)")
+  val etaFromSetting: String get() = t(
+    " (از تنظیم؛ هنوز سفارشِ کافی نیست)",
+    " (from the setting; not enough orders yet)",
+    " (له ترتیب څخه؛ لا کافي فرمایشونه نشته)",
+  )
+  fun etaBusyNow(n: Any?): String = t(" · شلوغ: +${asIs(n)} دقیقه", " · Busy: +$n min", " · ګڼه‌ګوڼه: +$n دقیقې")
+  fun etaCouriersNow(live: Any?, cap: Any?): String = t(
+    " · پیک: ${asIs(live)} در راه از ${asIs(cap)}",
+    " · Couriers: $live on the way of $cap",
+    " · سپارونکي: له $cap څخه $live په لار کې",
+  )
+  val etaConflict: String get() = t(
+    "تنظیم در این میان جای دیگری عوض شد؛ دوباره باز کنید",
+    "The setting changed elsewhere meanwhile; open it again",
+    "ترتیب په دې منځ کې بل ځای بدل شو؛ بیا یې خلاص کړئ",
+  )
+  val etaDisabled: String get() = t(
+    "زمانِ تقریبیِ تحویل برای این دکان روشن نیست",
+    "Approximate delivery time is not on for this shop",
+    "د سپارلو نږدې وخت د دې دوکان لپاره روښانه نه دی",
+  )
+  val saveFailed: String get() = t("ذخیره نشد؛ دوباره تلاش کنید", "Not saved; try again", "خوندي نه شو؛ بیا هڅه وکړئ")
+
+  // ── `PromoGuardApi.kt` ──
+
+  // متنِ یاورِ «اولین خرید و سدِ سوءاستفاده» (`PromoGuardApi`) — پیش‌تر متنِ خام
+  val guardAfsRange: String get() = t(
+    "افغانیِ درست، بی اعشار، تا ۱٬۰۰۰٬۰۰۰ (خالی = بی حد)",
+    "Whole afghanis, no decimals, up to 1,000,000 (empty = no limit)",
+    "پوره افغانۍ، بې اعشاریه، تر ۱٬۰۰۰٬۰۰۰ پورې (تش = بې حده)",
+  )
+  val guardPercentRange: String get() = t(
+    "درصد از ۰ تا ۱۰۰، با حداکثر دو رقمِ اعشار",
+    "A percent from 0 to 100, with at most two decimal places",
+    "سلنه له ۰ تر ۱۰۰، تر ټولو ډېر له دوو اعشاري رقمونو سره",
+  )
+  val guardCountRange: String get() = t(
+    "عددِ صحیح از ۰ تا ۱٬۰۰۰ (خالی = بی سقف)",
+    "A whole number from 0 to 1,000 (empty = no cap)",
+    "بشپړ عدد له ۰ تر ۱٬۰۰۰ (تش = بې سقفه)",
+  )
+  val guardPercentZero: String get() = t(
+    "برای اولین خریدِ روشن، درصد بیش از صفر باشد",
+    "With the first-order offer on, the percent must be above zero",
+    "کله چې د لومړي پېر تخفیف روښانه وي، سلنه باید له صفر زیاته وي",
+  )
+  val guardAmountZero: String get() = t(
+    "برای اولین خریدِ روشن، مبلغ بیش از صفر باشد",
+    "With the first-order offer on, the amount must be above zero",
+    "کله چې د لومړي پېر تخفیف روښانه وي، مبلغ باید له صفر زیات وي",
+  )
+  fun guardOneDevice(device: Any?, n: Any?): String = t(
+    "یک دستگاه (${asIs(device)}) با ${asIs(n)} شماره",
+    "One device ($device) with $n numbers",
+    "یوه وسیله ($device) له $n شمېرو سره",
+  )
+  fun guardOnePhone(phone: Any?, n: Any?): String = t(
+    "شمارهٔ ${asIs(phone)} روی ${asIs(n)} دستگاه",
+    "Number $phone on $n devices",
+    "شمېره $phone په $n وسیلو",
+  )
+  fun guardRule(n: Any?): String = t(
+    "${asIs(n)} شماره یا بیشتر از یک دستگاه، یا ${asIs(n)} دستگاه یا بیشتر برای یک شماره",
+    "$n or more numbers from one device, or $n or more devices for one number",
+    "له یوې وسیلې $n یا ډېرې شمېرې، یا د یوې شمېرې لپاره $n یا ډېرې وسیلې",
+  )
+  fun guardNoSuspects(rule: Any?): String = t(
+    "موردِ مشکوکی نیست (${asIs(rule)}، ۹۰ روزِ اخیر)",
+    "Nothing suspicious ($rule, last 90 days)",
+    "شکمن مورد نشته ($rule، وروستۍ ۹۰ ورځې)",
+  )
+  fun guardSuspects(n: Any?, rule: Any?): String = t("${asIs(n)} موردِ مشکوک (${asIs(rule)})", "$n suspicious ($rule)", "$n شکمن موارد ($rule)")
+  val promoKindFirst: String get() = t("اولین خرید", "First order", "لومړی پېر")
+  val promoKindCode: String get() = t("کد", "Code", "کوډ")
+  val promoKindAuto: String get() = t("خودکار", "Automatic", "اتومات")
+  val guardDisabled: String get() = t(
+    "سدِ تخفیفِ ویترین برای این دکان روشن نیست",
+    "The storefront discount guard is not on for this shop",
+    "د ویترین د تخفیف مخنیوی د دې دوکان لپاره روښانه نه دی",
+  )
+  val guardUnknownDevice: String get() = t("نامعلوم", "unknown", "نامعلوم")
+
+  // ── `SmartInsightsAndroid.kt` ──
+
+  // عنوان و خطِ بخش‌های تنظیمات که پیش‌تر خودِ کلیدِ فارسی یا متنِ خام بودند (`SettingsLayout.labelOf`)
+  val titleSmartForecast: String get() = t(
+    "پیش‌بینیِ تقاضا (آزمایشی)",
+    "Demand forecast (experimental)",
+    "د غوښتنې وړاندوینه (ازمایښتي)",
+  )
+  val titleAnomaly: String get() = t(
+    "تشخیصِ ناهنجاری (آزمایشی)",
+    "Anomaly detection (experimental)",
+    "د غیر عادي حالتونو موندنه (ازمایښتي)",
+  )
+  val smartForecastNote: String get() = t(
+    "در «پیشنهادِ سفارش»: کالای پرفروش با میانگینِ متحرکِ ۲۸ روز و روزِ هفته، کالای کم‌فروش با روشِ Croston؛ پیش‌بینیِ هر روزِ آینده، دلیل از همان عددها و اطمینان از درازای داده و نوسان. بی اینترنت، روی دفترِ همین دستگاه.",
+    "In \"suggested order\": fast sellers with a 28-day moving average and day of week, slow sellers with Croston's method; a forecast for each coming day, the reason from the same numbers, and confidence from the data length and swings. No internet needed, on this device's books.",
+    "په «وړاندیز شوي فرمایش» کې: ډېر پلورل کېدونکي توکي د ۲۸ ورځو له خوځنده منځني او د اونۍ له ورځې سره، لږ پلورل کېدونکي د Croston په لاره؛ د هرې راتلونکې ورځې وړاندوینه، دلیل له همغو شمېرو او باور د معلوماتو له اوږدوالي او بدلون څخه. بې انټرنټه، د همدې وسیلې په دفتر.",
+  )
+  val anomalyNote: String get() = t(
+    "در زبانهٔ «ضدتقلب» ِ گزارشِ تازه: لغو و تخفیف و کشوی هر صندوقدار، اختلافِ صندوق، کمِ موجودی با «اصلاح»، فروش زیرِ بها، فاکتورِ نیمه‌شب و روزهای بیرون از معمولِ برگشتی و تخفیف. هر مورد فقط «نیازمندِ بررسی» است و چیزی را نمی‌بندد.",
+    "In the \"anti-fraud\" tab of the new report: each cashier's voids, discounts and drawer opens, till differences, stock shortfalls with \"corrections\", sales below cost, midnight invoices and days with unusual returns and discounts. Each item is only \"needs review\" and blocks nothing.",
+    "د نوي راپور په «د درغلۍ ضد» برخه کې: د هر صندوقدار لغوه، تخفیف او دراز، د صندوق توپیر، د «سمون» سره د موجودۍ کمښت، له بیې ټیټ پلور، د نیمې شپې بلونه او هغه ورځې چې ستنېدنې او تخفیفونه یې له عادي بهر دي. هر مورد یوازې «کتنې ته اړتیا» ده او هېڅ شی نه بندوي.",
+  )
+
+  // ── `EasySetupSettingsAndroid.kt` ──
+  val titleEasySetup: String get() = t(
+    "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)",
+    "Easy printer and scanner setup (experimental)",
+    "د چاپګر او بارکوډ لوستونکي اسانه چمتو کول (ازمایښتي)",
+  )
+  val easySetupNote: String get() = t(
+    "در «دستگاه‌ها»: پیدا کردنِ خودکارِ چاپگرِ شبکه (فقط زیرشبکهٔ همین وای‌فای/LAN، درگاهِ ۹۱۰۰) و بلوتوثِ نزدیک، چاپِ شناسایی، برگهٔ بارکدِ آزمون و «آزمونِ بارکدخوان» که پیشوند و پسوندِ بارکدخوان را خودش پیدا می‌کند.",
+    "In \"Devices\": automatic discovery of network printers (only this Wi-Fi/LAN subnet, port 9100) and nearby Bluetooth, an identification print, a barcode test sheet and a \"scanner test\" that finds the scanner's prefix and suffix by itself.",
+    "په «وسیلو» کې: د شبکې د چاپګر اتومات موندل (یوازې د همدې وای‌فای/LAN فرعي شبکه، دروازه ۹۱۰۰) او نږدې بلوتوث، د پېژندنې چاپ، د بارکوډ ازموینې پاڼه او «د لوستونکي ازموینه» چې د لوستونکي مختاړی او وروستاړی پخپله پیدا کوي.",
+  )
+
+  // ── `StockPlacesSheet.kt` ──
+  val titleStockPlaces: String get() = t(
+    "محل‌ها و بسته‌بندیِ دوباره",
+    "Places and repacking",
+    "ځایونه او بیا بسته بندي",
+  )
+
+  // ── `TrainingAndroid.kt` ──
+  val titleTraining: String get() = t(
+    "حالتِ آموزشی",
+    "Training mode",
+    "د زده کړې حالت",
+  )
+
+  // ── `OwnerReportSettings.kt` ──
+  val titleOwnerReport: String get() = t(
+    "گزارشِ خودکار برای صاحب",
+    "Automatic report for the owner",
+    "خاوند ته اتومات راپور",
+  )
+
+  // ── `StorefrontOwnerSettings.kt` ──
+  val titleStorefrontEta: String get() = t(
+    "زمانِ تقریبیِ تحویلِ ویترین",
+    "Storefront approximate delivery time",
+    "د ویترین د سپارلو نږدې وخت",
+  )
+  val titlePromoGuard: String get() = t(
+    "تخفیفِ اولین خرید و سدِ سوءاستفاده",
+    "First-order discount and abuse guard",
+    "د لومړي پېر تخفیف او د ناوړه ګټې مخنیوی",
+  )
+
+  // ── `TillGoodsSettingsAndroid.kt` ──
+  val titleTillGoods: String get() = t(
+    "ثبتِ سریع و واحدِ بزرگ در صندوق",
+    "Quick add and big units at the till",
+    "په صندوق کې چټک ثبت او لوی واحد",
+  )
+  // </moved-raw-text>
 }

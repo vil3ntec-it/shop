@@ -306,6 +306,9 @@ function casesFor(I) {
   add('POST /api/me/backups', { url: '/api/me/backups?ext=json', raw: true });
   add('GET /api/me/backups/:id', { url: `/api/me/backups/${I.backup}`, own: ['backup'] });
   add('DELETE /api/me/backups/:id', { url: `/api/me/backups/${I.backup}` });
+  //  حذفِ حساب (#921): پیش‌نمایش فقط دکان‌های خودِ نشست را نام می‌برد؛ POST با تأییدِ نادرست ⇒ هیچ حذفی
+  add('GET /api/me/account/deletion', { url: '/api/me/account/deletion', own: ['shopName'] });
+  add('POST /api/me/account/deletion', { url: '/api/me/account/deletion', body: { confirm: 'نادرست' } });
 
   //  درگاهِ حساب
   add('GET /api/portal/me', { url: '/api/portal/me', own: ['shopName'] });
@@ -316,6 +319,8 @@ function casesFor(I) {
   add('DELETE /api/portal/devices/:id', { url: `/api/portal/devices/${I.deviceRow}` });
   add('GET /api/portal/support', { url: '/api/portal/support', own: ['support'] });
   add('POST /api/portal/support/messages', { url: '/api/portal/support/messages', body: { body: 'سلام از دیگری' } });
+  add('GET /api/portal/account/deletion', { url: '/api/portal/account/deletion', own: ['shopName'] });
+  add('POST /api/portal/account/deletion', { url: '/api/portal/account/deletion', body: { confirm: 'نادرست' } });
   add('GET /api/portal/notices', { url: '/api/portal/notices', own: ['notice'] });
   add('POST /api/portal/notices/:id/read', { url: `/api/portal/notices/${I.notice}/read`, body: {} });
   add('GET /api/portal/downloads', { url: '/api/portal/downloads' });

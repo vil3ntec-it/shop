@@ -19,6 +19,14 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrReturnPages
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnSettings
@@ -72,15 +80,15 @@ object ReturnApproval {
 
   fun whyText(reasons: List<String>): String = reasons.joinToString("، ") {
     when (it) {
-      ReturnFlow.WHY_NO_RECEIPT -> "بی رسید"
-      ReturnFlow.WHY_DAMAGED -> "ضایعات"
-      ReturnFlow.WHY_OVER_LIMIT -> "بالای سقف"
+      ReturnFlow.WHY_NO_RECEIPT -> StrSale.whyNoReceipt
+      ReturnFlow.WHY_DAMAGED -> StrSale.damagedWord
+      ReturnFlow.WHY_OVER_LIMIT -> StrSale.whyOverLimit
       ReturnFlow.WHY_POLICY -> ir.vil3ntec.tohid.core.i18n.StrRetPolicy.why
-      else -> "مجوز"
+      else -> StrSale.whyPermission
     }
   }
 
-  fun approverText(role: String): String = if (role == "owner") "صاحبِ دکان" else "مدیر یا صاحبِ دکان"
+  fun approverText(role: String): String = if (role == "owner") StrSale.shopOwner else StrSale.managerOrOwner
 }
 
 /**
@@ -171,7 +179,7 @@ fun ReturnFlowDialog(
       ) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
           Text(
-            if (sale != null) "برگشت — فاکتور #${sale.invoiceLabel() ?: "0"}" else "برگشتِ بی رسید",
+            if (sale != null) StrReturnPages.returnOfInvoice(sale.invoiceLabel() ?: "0") else StrSale.noReceiptReturn,
             style = MaterialTheme.typography.titleMedium, color = c.text,
           )
           if (sale != null) Text(
@@ -183,16 +191,16 @@ fun ReturnFlowDialog(
 
           if (sale?.status == "cancelled") {
             //  RET-13 — فاکتورِ لغوشده کلاً برگشته است
-            StatusPill("این فاکتور لغو شده است؛ برگشت نمی‌پذیرد", PillTone.DANGER)
+            StatusPill(StrSale.cancelledNoReturn, PillTone.DANGER)
             Spacer(Modifier.height(14.dp))
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("بستن") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(Str.close) }
             return@Column
           }
 
           /* ----------------------------- اقلام ----------------------------- */
-          Section("کالاهای برگشتی") {
+          Section(StrSale.returnedItems) {
             if (sale != null) {
-              if (items.isEmpty()) EmptyNote("همهٔ اقلامِ این فاکتور برگشته است.")
+              if (items.isEmpty()) EmptyNote(StrSale.allReturned)
               items.forEach { item ->
                 val left = SalesEngine.returnable(item)
                 val unit = d.products.find { it.id == item.productId }?.unit.orEmpty()
@@ -200,12 +208,12 @@ fun ReturnFlowDialog(
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                       Text(SalesEngine.itemName(d, item), style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                      Text("قابلِ برگشت: ${qty(left)} $unit · فی ${money(item.totalPrice / item.quantity.coerceAtLeast(1e-9))}", style = MaterialTheme.typography.labelSmall, color = c.muted)
+                      Text(StrReturnPages.returnable(qty(left), unit, money(item.totalPrice / item.quantity.coerceAtLeast(1e-9))), style = MaterialTheme.typography.labelSmall, color = c.muted)
                     }
                     NumberField(
                       value = qtys[item.id].orEmpty(),
                       onValueChange = { qtys = qtys + (item.id to it); error = null },
-                      label = "مقدار",
+                      label = StrMoney.quantity,
                       modifier = Modifier.width(110.dp),
                     )
                   }
@@ -217,24 +225,24 @@ fun ReturnFlowDialog(
                 val p = d.products.find { it.id == row.productId }
                 Column(Modifier.padding(vertical = 6.dp)) {
                   Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(p?.name ?: "(کالا)", style = MaterialTheme.typography.bodyMedium, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    TextButton(onClick = { free = free.filterIndexed { k, _ -> k != i } }) { Text("حذف") }
+                    Text(p?.name ?: StrSale.itemWord, style = MaterialTheme.typography.bodyMedium, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    TextButton(onClick = { free = free.filterIndexed { k, _ -> k != i } }) { Text(StrMoney.delete) }
                   }
                   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    NumberField(row.qty, { v -> free = free.mapIndexed { k, r -> if (k == i) r.copy(qty = v) else r } }, "مقدار", Modifier.weight(1f))
-                    NumberField(row.price, { v -> free = free.mapIndexed { k, r -> if (k == i) r.copy(price = v) else r } }, "فی (؋)", Modifier.weight(1f))
+                    NumberField(row.qty, { v -> free = free.mapIndexed { k, r -> if (k == i) r.copy(qty = v) else r } }, StrMoney.quantity, Modifier.weight(1f))
+                    NumberField(row.price, { v -> free = free.mapIndexed { k, r -> if (k == i) r.copy(price = v) else r } }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
                   }
                   DispositionTabs(row.disposition) { v -> free = free.mapIndexed { k, r -> if (k == i) r.copy(disposition = v) else r } }
                 }
               }
-              ProductPicker(d, hint = "افزودنِ کالا — نام یا بارکد") { p ->
+              ProductPicker(d, hint = StrSale.addReturnItem) { p ->
                 free = free + FreeRow(p.id, price = money(p.salePrice).replace(",", ""))
               }
             }
           }
 
           /* ----------------------------- دلیل ----------------------------- */
-          Section("دلیلِ برگشت (اجباری)") {
+          Section(StrSale.returnReasonRequired) {
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
               reasons.forEach { r ->
                 FilterChip(selected = reason == r, onClick = { reason = r }, label = { Text(r) }, shape = Shape.chip)
@@ -243,12 +251,12 @@ fun ReturnFlowDialog(
           }
 
           /* -------------------------- بازپرداخت -------------------------- */
-          Section("بازپرداخت") {
+          Section(StrSale.refundWord) {
             SegmentedTabs(
               tabs = buildList {
-                add(SegmentTab(ReturnFlow.ORIGINAL, if (sale != null) "روشِ اصلی" else "نقد"))
-                if (sale != null) add(SegmentTab(ReturnFlow.CASH, "نقد"))
-                add(SegmentTab(ReturnFlow.STORE_CREDIT, "اعتبارِ فروشگاه"))
+                add(SegmentTab(ReturnFlow.ORIGINAL, if (sale != null) StrSale.originalMethod else Str.cash))
+                if (sale != null) add(SegmentTab(ReturnFlow.CASH, Str.cash))
+                add(SegmentTab(ReturnFlow.STORE_CREDIT, StrSale.storeCredit))
               },
               selected = mode,
               onSelect = { mode = it },
@@ -259,24 +267,24 @@ fun ReturnFlowDialog(
             }
             if (split != null && total > 0) {
               Spacer(Modifier.height(8.dp))
-              if (split.account > 0) MoneyLine("کم از بدهیِ همین فاکتور", split.account)
-              if (split.credit > 0) MoneyLine("اعتبارِ فروشگاه (طلبِ مشتری)", split.credit)
-              split.methods.forEach { (m, a) -> MoneyLine("پس به ${ReturnFlow.methodName(m)} (نه از دخل)", a) }
-              if (split.cash > 0) MoneyLine("نقد از دخل", split.cash)
+              if (split.account > 0) MoneyLine(StrSale.offInvoiceDebt, split.account)
+              if (split.credit > 0) MoneyLine(StrSale.storeCreditOwed, split.credit)
+              split.methods.forEach { (m, a) -> MoneyLine(StrReturnPages.backToMethodNotDrawer(ReturnFlow.methodName(m)), a) }
+              if (split.cash > 0) MoneyLine(StrSale.cashFromDrawer, split.cash)
             }
           }
 
           /* ----------------------------- تعویض ----------------------------- */
           Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
-            Text("تعویض با کالای دیگر", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
+            Text(StrSale.exchangeToggle, style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
             Switch(checked = exchange, onCheckedChange = { exchange = it })
           }
-          if (exchange) Section("کالاهای تازه") {
+          if (exchange) Section(StrSale.newItems) {
             cart.forEach { line ->
               val p = d.products.find { it.id == line.productId }
               Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 4.dp)) {
                 Column(Modifier.weight(1f)) {
-                  Text(p?.name ?: "(کالا)", style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                  Text(p?.name ?: StrSale.itemWord, style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
                   Text("${money(SalesEngine.linePrice(d, line))} ؋", style = MaterialTheme.typography.labelSmall, color = c.muted)
                 }
                 val step = SalesEngine.cartStep(p?.unit.orEmpty())
@@ -285,7 +293,7 @@ fun ReturnFlowDialog(
                 OutlinedButton(onClick = { cart = SalesEngine.setCartQty(cart, line.productId, line.quantity + step) }, contentPadding = PaddingValues(0.dp), modifier = Modifier.size(40.dp)) { Text("+") }
               }
             }
-            ProductPicker(d, hint = "کالای تازه — نام یا بارکد") { p -> cart = SalesEngine.addToCart(cart, p.id, 1.0) }
+            ProductPicker(d, hint = StrSale.newItemSearch) { p -> cart = SalesEngine.addToCart(cart, p.id, 1.0) }
           }
 
           /* ----------------------------- جمع ----------------------------- */
@@ -293,11 +301,11 @@ fun ReturnFlowDialog(
           Column(
             Modifier.fillMaxWidth().clip(Shape.card).background(c.bg).padding(12.dp),
           ) {
-            MoneyLine("مبلغِ برگشت", total, strong = !exchange)
+            MoneyLine(StrReturnPages.returnAmount, total, strong = !exchange)
             if (exchange) {
-              MoneyLine("خریدِ تازه", cartTotal)
+              MoneyLine(StrSale.newPurchase, cartTotal)
               val due = cartTotal - (split?.cash ?: 0.0)
-              MoneyLine(if (due >= 0) "دریافت از مشتری" else "پرداخت به مشتری", kotlin.math.abs(due), strong = true)
+              MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true)
             }
             ReturnPolicyNotice(
               verdict, policy, verdict.blockedIds.map { id -> d.products.find { it.id == id }?.name ?: id }, ReturnFlow.roleOf(role) == "staff",
@@ -307,19 +315,19 @@ fun ReturnFlowDialog(
               val tone = if (gate.decision == "deny") PillTone.DANGER else if (approved) PillTone.SUCCESS else PillTone.AWAITING
               StatusPill(
                 when {
-                  gate.decision == "deny" -> "این برگشت برای شما مجاز نیست"
-                  approved -> "تأیید شد — ${approval?.by}"
-                  else -> "تأییدِ ${ReturnApproval.approverText(gate.approver)} لازم است (${ReturnApproval.whyText(gate.reasons)})"
+                  gate.decision == "deny" -> StrSale.returnDenied
+                  approved -> StrReturnPages.approvedBy(approval?.by)
+                  else -> StrReturnPages.approvalNeededWhy(ReturnApproval.approverText(gate.approver), ReturnApproval.whyText(gate.reasons))
                 },
                 tone,
               )
               if (gate.decision == "approve" && !approved) {
                 Spacer(Modifier.height(6.dp))
                 if (ReturnApproval.requester != null) {
-                  OutlinedButton(onClick = { asking = true }) { Text("درخواستِ تأیید") }
+                  OutlinedButton(onClick = { asking = true }) { Text(StrSale.askApproval) }
                 } else {
                   Text(
-                    "این برگشت را ${ReturnApproval.approverText(gate.approver)} با حسابِ خودش ثبت کند.",
+                    StrReturnPages.approverPosts(ReturnApproval.approverText(gate.approver)),
                     style = MaterialTheme.typography.labelSmall, color = c.muted,
                   )
                 }
@@ -334,7 +342,7 @@ fun ReturnFlowDialog(
 
           Spacer(Modifier.height(16.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
             Button(
               enabled = !saving && q != null && reason != null && approved && (!exchange || cart.isNotEmpty()),
               onClick = {
@@ -355,13 +363,13 @@ fun ReturnFlowDialog(
                     is ReturnFlow.Outcome.Bad -> { error = r.message; null }
                     is ReturnFlow.Outcome.Ok -> {
                       val due = r.value.due
-                      r.value.data to (if (due >= 0) "تعویض ثبت شد — دریافت ${money(due)} ؋" else "تعویض ثبت شد — پرداخت ${money(-due)} ؋")
+                      r.value.data to (if (due >= 0) StrReturnPages.exchangeReceive(money(due)) else StrReturnPages.exchangePay(money(-due)))
                     }
                   }
                 } else {
                   when (val r = ReturnFlow.post(d, req, todayIso(), now, ::newId)) {
                     is ReturnFlow.Outcome.Bad -> { error = r.message; null }
-                    is ReturnFlow.Outcome.Ok -> r.value.data to "برگشت ثبت شد — ${money(r.value.total)} ؋"
+                    is ReturnFlow.Outcome.Ok -> r.value.data to StrReturnPages.returnRecorded(money(r.value.total))
                   }
                 }
                 if (built != null) {
@@ -369,13 +377,13 @@ fun ReturnFlowDialog(
                   scope.launch {
                     //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
                     if (store.save(built.first)) onPosted(docId, built.second)
-                    else error = "ثبت نشد — دفتر نوشته نشد (اشتراک یا حافظه). چیزی ثبت نشده است."
+                    else error = StrSale.returnNotSaved
                     saving = false
                   }
                 }
               },
               modifier = Modifier.weight(1f),
-            ) { Text(if (exchange) "ثبتِ تعویض" else "ثبتِ برگشت") }
+            ) { Text(if (exchange) StrSale.recordExchange else StrSale.recordReturnV2) }
           }
         }
       }
@@ -404,7 +412,7 @@ private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) 
 private fun DispositionTabs(value: String, onChange: (String) -> Unit) {
   Spacer(Modifier.height(6.dp))
   SegmentedTabs(
-    tabs = listOf(SegmentTab(ReturnFlow.RESTOCK, "به موجودی"), SegmentTab(ReturnFlow.DAMAGED, "ضایعات")),
+    tabs = listOf(SegmentTab(ReturnFlow.RESTOCK, StrSale.toStock), SegmentTab(ReturnFlow.DAMAGED, StrSale.damagedWord)),
     selected = value,
     onSelect = onChange,
   )
@@ -434,7 +442,7 @@ private fun ProductPicker(d: ShopData, hint: String, onPick: (ir.vil3ntec.tohid.
   val t = ir.vil3ntec.tohid.latinDigits(term).trim()
   if (t.isNotEmpty()) {
     val hits = d.products.filter { it.active && (TextNormalizer.matches(it.name, t) || t in it.barcodes) }.take(6)
-    if (hits.isEmpty()) Text("کالایی پیدا نشد", style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(6.dp))
+    if (hits.isEmpty()) Text(StrSale.noProductFound, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(6.dp))
     hits.forEach { p ->
       Row(
         Modifier.fillMaxWidth().clip(Shape.button).clickable { onPick(p); term = "" }.padding(horizontal = 8.dp, vertical = 10.dp),
@@ -451,7 +459,7 @@ private fun ProductPicker(d: ShopData, hint: String, onPick: (ir.vil3ntec.tohid.
 private fun CustomerPicker(d: ShopData, selected: String?, onPick: (String) -> Unit) {
   val c = Shop.colors
   if (d.debtors.isEmpty()) {
-    Text("اول مشتری را در «قرض‌داران» بسازید.", style = MaterialTheme.typography.labelSmall, color = c.muted)
+    Text(StrSale.makeCustomerFirst, style = MaterialTheme.typography.labelSmall, color = c.muted)
     return
   }
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -464,7 +472,7 @@ private fun CustomerPicker(d: ShopData, selected: String?, onPick: (String) -> U
 /* ============================ تنظیمات ============================ */
 
 /** عنوانِ بخش — همان که ستونِ «تنظیمات»ِ کامپیوتر (`AppRoot`) فهرست می‌کند */
-const val RETURN_SETTINGS_TITLE = "برگشت و تعویض"
+const val RETURN_SETTINGS_TITLE = "برگشت و تعویض" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.RETURNS`)؛ نامِ صفحه `StrSettings.returnsRow`
 
 /**
  *  کلیدِ «برگشت و تعویضِ تازه» و سقفِ بی تأیید — فقط صاحب و مدیر (صفحهٔ تنظیمات
@@ -480,25 +488,25 @@ fun ReturnSettingsSection() {
   val c = Shop.colors
   SettingsSection(
     icon = Icons.Filled.SwapHoriz,
-    title = RETURN_SETTINGS_TITLE,
-    subtitle = if (on) "جریانِ تازه روشن است" else "همان مرجوعیِ ساده",
+    title = StrSettings.returnsRow,
+    subtitle = if (on) StrSettings.returnsOn else StrSettings.returnsOff,
     tint = if (on) c.success else c.muted,
   ) {
     Text(
-      "روشن: برگشت با اسکنِ QRِ رسید یا جست‌وجو، دلیلِ اجباری، «به موجودی» یا «ضایعات»، بازپرداخت به روشِ اصلی، نقد یا اعتبارِ فروشگاه، تعویض در یک سند، برگشتِ بی رسید با تأیید، و رسیدِ چاپیِ برگشت. رسیدِ فروش هم QR می‌گیرد. خاموش: همان پنجرهٔ مرجوعیِ امروز.",
+      StrSettings.returnsNote,
       style = MaterialTheme.typography.labelSmall,
       color = c.muted,
     )
     Spacer(Modifier.height(8.dp))
     SegmentedChoice(
-      options = listOf("off" to "خاموش", "on" to "روشن"),
+      options = listOf("off" to StrSettingsPages.off, "on" to StrSettingsPages.on),
       selected = if (on) "on" else "off",
       onSelect = { on = it == "on"; ReturnSettings.setEnabled(context, on) },
     )
     if (on) {
       Spacer(Modifier.height(12.dp))
       Text(
-        "سقفِ برگشت بی تأییدِ صاحبِ دکان (برای مدیر و شاگرد)؛ خالی = بی سقف. شاگرد برای برگشتِ بی رسید و ضایعات همیشه تأییدِ مدیر می‌خواهد.",
+        StrSettings.returnLimitNote,
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
       )
@@ -509,12 +517,12 @@ fun ReturnSettingsSection() {
           limit = v
           ReturnSettings.setLimit(context, v.toDoubleOrNull() ?: 0.0)
         },
-        label = "سقف (؋)",
+        label = StrReturnPages.limitAfn,
         modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(12.dp))
       Text(
-        "دلیل‌های برگشت — هر خط یک دلیل (حداکثر ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_COUNT}، هر کدام تا ${ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_LENGTH} نویسه). صندوق فقط از همین فهرست دلیل می‌پذیرد؛ خالی = فهرستِ پیش‌فرض.",
+        StrSettings.returnReasonsNote(ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_COUNT, ir.vil3ntec.tohid.core.returns.ReturnReasons.MAX_LENGTH),
         style = MaterialTheme.typography.labelSmall,
         color = c.muted,
       )
@@ -522,7 +530,7 @@ fun ReturnSettingsSection() {
       OutlinedTextField(
         value = reasonsText,
         onValueChange = { v -> reasonsText = v; ReturnSettings.setReasons(context, v) },
-        label = { Text("دلیل‌ها") },
+        label = { Text(StrSettings.returnReasonsLabel) },
         minLines = 3,
         modifier = Modifier.fillMaxWidth(),
       )
@@ -547,9 +555,9 @@ fun ReturnReceiptDialog(d: ShopData, docId: String, onDismiss: () -> Unit, onMes
     DialogEntry {
       Surface(color = c.surfaceSolid, shape = Shape.dialog, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("رسیدِ برگشت ${doc.label}", style = MaterialTheme.typography.titleMedium, color = c.text)
+          Text(StrReturnPages.returnReceiptOf(doc.label), style = MaterialTheme.typography.titleMedium, color = c.text)
           Text(
-            (doc.sale?.let { "از فاکتور #${it.invoiceLabel() ?: "0"}" } ?: "بی رسید") + " · " + ir.vil3ntec.tohid.formatDate(doc.date),
+            (doc.sale?.let { StrReturnPages.fromInvoice(it.invoiceLabel() ?: "0") } ?: StrSale.withoutReceipt) + " · " + ir.vil3ntec.tohid.formatDate(doc.date),
             style = MaterialTheme.typography.labelSmall, color = c.muted,
           )
           Spacer(Modifier.height(10.dp))
@@ -564,7 +572,7 @@ fun ReturnReceiptDialog(d: ShopData, docId: String, onDismiss: () -> Unit, onMes
           }
           doc.exchange?.let { ex ->
             HorizontalDivider(Modifier.padding(vertical = 8.dp), color = c.border)
-            Text("خریدِ تازه — فاکتور #${ex.invoiceLabel() ?: "0"}", style = MaterialTheme.typography.labelLarge, color = c.muted)
+            Text(StrReturnPages.newPurchaseInvoice(ex.invoiceLabel() ?: "0"), style = MaterialTheme.typography.labelLarge, color = c.muted)
             d.saleItems.filter { it.saleId == ex.id }.forEach { si ->
               Row(Modifier.fillMaxWidth().padding(vertical = 3.dp)) {
                 Text("${SalesEngine.itemName(d, si)} × ${qty(si.quantity)}", color = c.text, modifier = Modifier.weight(1f))
@@ -574,26 +582,26 @@ fun ReturnReceiptDialog(d: ShopData, docId: String, onDismiss: () -> Unit, onMes
           }
           Spacer(Modifier.height(8.dp))
           Column(Modifier.fillMaxWidth().clip(Shape.card).background(c.bg).padding(12.dp)) {
-            MoneyLine("مبلغِ برگشت", doc.total, strong = doc.exchange == null)
-            if (doc.split.account > 0) MoneyLine("کم از بدهی", doc.split.account)
-            if (doc.split.credit > 0) MoneyLine("اعتبارِ فروشگاه", doc.split.credit)
-            doc.split.methods.forEach { (m, a) -> MoneyLine("پس به ${ReturnFlow.methodName(m)}", a) }
-            if (doc.split.cash > 0) MoneyLine("نقد", doc.split.cash)
-            doc.due?.let { due -> MoneyLine(if (due >= 0) "دریافت از مشتری" else "پرداخت به مشتری", kotlin.math.abs(due), strong = true) }
+            MoneyLine(StrReturnPages.returnAmount, doc.total, strong = doc.exchange == null)
+            if (doc.split.account > 0) MoneyLine(StrPos.offDebt, doc.split.account)
+            if (doc.split.credit > 0) MoneyLine(StrSale.storeCredit, doc.split.credit)
+            doc.split.methods.forEach { (m, a) -> MoneyLine(StrReturnPages.backToMethod(ReturnFlow.methodName(m)), a) }
+            if (doc.split.cash > 0) MoneyLine(Str.cash, doc.split.cash)
+            doc.due?.let { due -> MoneyLine(if (due >= 0) StrSale.receiveFromCustomer else StrSale.payToCustomer, kotlin.math.abs(due), strong = true) }
           }
           Spacer(Modifier.height(6.dp))
-          Text("دلیل: ${doc.reason}", style = MaterialTheme.typography.labelSmall, color = c.muted)
-          if (doc.approvedBy.isNotBlank()) Text("تأیید: ${doc.approvedBy}", style = MaterialTheme.typography.labelSmall, color = c.muted)
+          Text(StrReturnPages.reasonOf(doc.reason), style = MaterialTheme.typography.labelSmall, color = c.muted)
+          if (doc.approvedBy.isNotBlank()) Text(StrReturnPages.approvedByLine(doc.approvedBy), style = MaterialTheme.typography.labelSmall, color = c.muted)
           Spacer(Modifier.height(14.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("بستن") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.close) }
             if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
               OutlinedButton(
                 onClick = { scope.launch { ir.vil3ntec.tohid.print.PrintJob.shareReturn(context, d, docId)?.let(onMessage) } },
                 modifier = Modifier.weight(1f),
-              ) { Text("فرستادن") }
+              ) { Text(StrAccount.send) }
             }
-            Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
+            Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text(StrMoney.print) }
           }
         }
       }
@@ -605,10 +613,10 @@ fun ReturnReceiptDialog(d: ShopData, docId: String, onDismiss: () -> Unit, onMes
       onDismiss = { printer = false },
       onPrint = { address, width ->
         printer = false
-        onMessage("در حال فرستادن به چاپگر…")
+        onMessage(StrSale.sendingToPrinter)
         scope.launch {
           val error = ir.vil3ntec.tohid.print.PrintJob.printReturn(context, d, docId, address, width)
-          onMessage(error ?: "رسیدِ برگشت به چاپگر فرستاده شد")
+          onMessage(error ?: StrSale.returnReceiptSent)
         }
       },
     )
