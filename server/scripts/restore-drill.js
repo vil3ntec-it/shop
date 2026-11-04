@@ -9,6 +9,10 @@
  *       --target <DATABASE_URL>   دیتابیسِ خالیِ PostgreSQL برای بازگرداندن (بی آن: shop_drill_* می‌سازد و می‌اندازد)
  *       --keep                    دیتابیسِ ساخته‌شده نگه داشته شود
  *       --json                    خروجیِ ماشینی
+ *       --no-record               ثبت نشود (پیش‌فرض: هر تمرین، موفق یا ناموفق، در `<BACKUP_PATH>/drills.jsonl`)
+ *
+ * OPS-02@29: عددِ RTO/RPO ِ هر تمرین ثبت می‌شود (فقط عدد؛ `lib/restore-drill.js` ⇐ `record`) و «سلامت» و
+ * `GET /api/admin/backups` آخرینش را نشان می‌دهند؛ تمرینِ ناموفق ⇒ «سلامت» زرد تا تمرینِ موفقِ بعدی.
  *
  * خروجی فقط عدد است (شمار، جمع، زمان) — بی هیچ دادهٔ دکان. کدِ خروج: ۰ برابر، ۱ نابرابر یا خطا.
  * ⛔ روی دیتابیسِ زنده نمی‌نویسد؛ پشتیبانِ PGlite در حافظه برمی‌گردد. پشتیبانِ رمزدار BACKUP_PASSPHRASE
@@ -19,12 +23,13 @@ const drill = require('../src/lib/restore-drill');
 const { closeDb } = require('../src/db');
 
 function args(argv) {
-  const o = { file: '', migrate: false, keep: false, json: false, targetUrl: '' };
+  const o = { file: '', migrate: false, keep: false, json: false, targetUrl: '', record: true };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--migrate') o.migrate = true;
     else if (a === '--keep') o.keep = true;
     else if (a === '--json') o.json = true;
+    else if (a === '--no-record') o.record = false;
     else if (a === '--target') o.targetUrl = argv[++i] || '';
     else if (!a.startsWith('--')) o.file = a;
     else throw new Error(`گزینهٔ ناشناخته: ${a}`);
@@ -41,13 +46,14 @@ async function main() {
     const made = await backup.run({ kind: 'manual' });
     o.file = made.file;
   }
-  const r = await drill.drill(o);
+  const r = await (o.record ? drill.drillAndRecord(o) : drill.drill(o));
   if (o.json) {
     console.log(JSON.stringify(r, null, 2));
   } else {
     console.log(`پشتیبان: ${r.file}  ⇒  ${r.where}`);
     console.log(`جدول‌ها ${r.summary.tables}، ردیف‌ها ${r.summary.rows}، ستونِ پول/مقدار ${r.summary.moneyColumns}، کلیدِ دفتر ${r.summary.ledgerKeys}`);
     console.log(`بازگرداندن (RTO): ${sec(r.restoredMs)} — با تطبیق: ${sec(r.verifiedMs)}؛ سنِ پشتیبان (RPO ِ همین فایل): ${age(r.backupAgeMs)}`);
+    if (o.record) console.log(r.recorded ? 'ثبت شد: «سلامت» و پنل همین تمرین را نشان می‌دهند' : '⚠️ تمرین ثبت نشد (پوشهٔ پشتیبان نوشتنی نیست)');
     if (r.empty) console.log('✖ این پشتیبان هیچ جدولی برنگرداند — پشتیبانِ خالی پشتیبان نیست.');
     if (!r.restore) console.log('⚠️ این پشتیبان manifest ندارد (پیش از این نسخه گرفته شده یا دیتابیس هنگامِ پشتیبان عوض شد): فقط «برگشت»، نه «برابر».');
     else if (r.restore.equal) console.log(`✔ برابر با manifest ِ لحظهٔ پشتیبان (digest ${r.digest.slice(0, 12)}…)`);
