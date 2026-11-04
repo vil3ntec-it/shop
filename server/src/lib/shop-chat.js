@@ -129,10 +129,7 @@ async function blocksOf(shopId, phone, c = null) {
   return { shop: rows.some((r) => r.blocker === 'shop'), customer: rows.some((r) => r.blocker === 'customer') };
 }
 
-/**
- * پرسشِ نمای گفت‌وگو — شمارِ نخوانده، شمارهٔ سفارش، نامِ دکان، بلاک‌ها و آخرین پیام. کلیدِ بیننده به `args` افزوده
- * می‌شود: «حذف برای من» ِ همین بیننده نه در شمارِ نخوانده می‌آید نه در پیش‌نمایش (CHAT-08).
- */
+/** پرسشِ نمای گفت‌وگو — شمارِ نخوانده، شمارهٔ سفارش، نامِ دکان، بلاک‌ها و آخرین پیام. کلیدِ بیننده به `args` افزوده می‌شود: «حذف برای من» ِ همین بیننده نه در شمارِ نخوانده می‌آید نه در پیش‌نمایش (CHAT-08). */
 function viewSql(viewer, args) {
   const mine = viewer.side === 'shop' ? 'shop' : 'customer';
   args.push(viewerKey(viewer));
@@ -209,8 +206,7 @@ function conversationView(viewer, r) {
 /** ردیفِ کاملِ نما (ستون‌های گفت‌وگو + شمارش‌ها) — همان قفلِ `rowOf`. */
 async function viewRow(viewer, id) {
   const row = await rowOf(viewer, id);
-  const args = [row.id, viewer.shopId];
-  return one(`${viewSql(viewer, args)} WHERE c.id = $1 AND c.shop_id = $2`, args);
+  const args = [row.id, viewer.shopId]; return one(`${viewSql(viewer, args)} WHERE c.id = $1 AND c.shop_id = $2`, args);
 }
 
 async function viewOf(viewer, id) {
@@ -703,10 +699,7 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
   return { mediaId: row.id, kind: row.kind, mime: row.mime, size: n(row.size), role: row.role, reused: !ins };
 }
 
-/**
- * یک رسانه از دیدِ بیننده: فقط در گفت‌وگوی خودش، و فقط اگر خودش فرستاده یا
- * پیامِ زنده‌ای به آن اشاره می‌کند. نبود ⇒ ۴۰۴ ِ `media_gone`.
- */
+/** یک رسانه از دیدِ بیننده: فقط در گفت‌وگوی خودش، و فقط اگر خودش فرستاده یا پیامِ زنده‌ای به آن اشاره می‌کند. نبود ⇒ ۴۰۴ ِ `media_gone`. */
 async function getMedia(viewer, id, mediaId) {
   const conv = await rowOf(viewer, id);
   const mid = String(mediaId || '');
@@ -767,10 +760,7 @@ async function setBlock(viewer, id, on) {
   return viewOf(viewer, conv.id);
 }
 
-/**
- * گزارشِ سوءاستفاده به مدیرِ سامانه — با رونوشتِ همان پیام در همان لحظه.
- * یک گزارش برای هر (پیام، طرف): تکرار ردیفِ دوم نمی‌سازد.
- */
+/** گزارشِ سوءاستفاده به مدیرِ سامانه — با رونوشتِ همان پیام در همان لحظه. یک گزارش برای هر (پیام، طرف): تکرار ردیفِ دوم نمی‌سازد. */
 async function report(viewer, id, body) {
   const b = obj(body);
   const reason = str(b.reason);
