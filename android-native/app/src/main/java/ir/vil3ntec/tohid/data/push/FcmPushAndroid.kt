@@ -16,6 +16,8 @@ import com.google.firebase.messaging.RemoteMessage
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.R
 import ir.vil3ntec.tohid.core.i18n.StrPush
+import ir.vil3ntec.tohid.core.orders.OrderNotice
+import ir.vil3ntec.tohid.core.orders.OrderNotifyAcks
 import ir.vil3ntec.tohid.core.push.PushPolicy
 import ir.vil3ntec.tohid.data.OrderNotify
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,9 +72,9 @@ object FcmPushAndroid : PushPlatform {
 
   /** کانال‌های پوشِ سرور (`message.channel`) — باید پیش از رسیدنِ نخستین پیام با برنامهٔ بسته باشند */
   fun ensureChannels(context: Context) {
-    OrderNotify.ensureChannel(context)
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val nm = context.getSystemService(NotificationManager::class.java) ?: return
+    OrderNotify.replaceOldChannel(nm)
     val high = NotificationManager.IMPORTANCE_HIGH
     for ((id, name, importance) in listOf(
       Triple("events", StrPush.channelEvents, high),
@@ -94,7 +96,7 @@ object FcmPushAndroid : PushPlatform {
     ensureChannels(context)
     val data = message.data
     val open = PushPolicy.openOf(data)
-    open?.notifId?.let { OrderNotify.markShown(context, it) }
+    open?.notifId?.let { id -> OrderNotify.update(context) { OrderNotifyAcks.fresh(it, listOf(OrderNotice(id, id, 0))).first } }
     val tag = n.tag ?: open?.let { OrderNotify.tagOf(it.orderId) } ?: message.messageId ?: title
     val launch = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

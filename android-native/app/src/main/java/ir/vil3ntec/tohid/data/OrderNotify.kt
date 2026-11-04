@@ -45,7 +45,6 @@ object OrderNotify {
   private const val KEY = "acks"
   /** همان کانالِ پوشِ سرور (`order-notify.CHANNEL`)، تا اعلانِ برنامهٔ باز و بسته یک تنظیم داشته باشند */
   const val CHANNEL = "orders"
-  /** کانالِ پیش از پوش — یک بار پاک می‌شود تا در تنظیماتِ گوشی دو «سفارشِ تازه» نماند */
   private const val OLD_CHANNEL = "tohid-orders"
   /** نشانِ پیامِ Firebase در extras ِ لمس (اعلانی که خودِ اندروید با برنامهٔ بسته ساخت) */
   private const val PUSH_MESSAGE_ID = "google.message_id"
@@ -66,7 +65,8 @@ object OrderNotify {
 
   private fun load(context: Context): AckState = OrderNotifyAcks.decode(prefs(context).getString(KEY, null))
 
-  private fun update(context: Context, fn: (AckState) -> AckState): AckState = synchronized(lock) {
+  /** `internal`: پوشِ برنامهٔ باز (`push/FcmPushAndroid.kt`) همین را «نشان‌داده‌شده» می‌کند تا دورِ بعدیِ `/pending` تکرارش نکند */
+  internal fun update(context: Context, fn: (AckState) -> AckState): AckState = synchronized(lock) {
     val cur = load(context)
     val next = fn(cur)
     if (next != cur) prefs(context).edit().putString(KEY, OrderNotifyAcks.encode(next)).apply()
@@ -96,20 +96,14 @@ object OrderNotify {
     return orderId.takeIf { OrderNotifyAcks.validId(it) }
   }
 
-  /** پوشِ همین اعلان همین حالا نشان داده شد ⇒ دورِ بعدیِ `/pending` دوباره نشانش نمی‌دهد */
-  fun markShown(context: Context, notifId: String) {
-    if (!OrderNotifyAcks.validId(notifId)) return
-    update(context) { OrderNotifyAcks.fresh(it, listOf(OrderNotice(notifId, notifId, 0))).first }
-  }
-
   /** کانالِ «سفارش‌های آنلاین» (اهمیتِ بالا) — اعلانِ برنامهٔ باز و پوشِ برنامهٔ بسته هر دو همین */
-  fun ensureChannel(context: Context) {
-    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
-    val nm = context.getSystemService(NotificationManager::class.java) ?: return
-    nm.createNotificationChannel(
-      NotificationChannel(CHANNEL, ir.vil3ntec.tohid.core.i18n.StrPush.channelOrders, NotificationManager.IMPORTANCE_HIGH)
-        .apply { description = "سفارشِ تازهٔ مشتری از ویترین" }
-    )
+  fun channel(): NotificationChannel =
+    NotificationChannel(CHANNEL, ir.vil3ntec.tohid.core.i18n.StrPush.channelOrders, NotificationManager.IMPORTANCE_HIGH)
+      .apply { description = "سفارشِ تازهٔ مشتری از ویترین" }
+
+  /** کانالِ پیش از پوش (`tohid-orders`) — پاک شود تا در تنظیماتِ گوشی دو «سفارشِ تازه» نماند */
+  fun replaceOldChannel(nm: NotificationManager) {
+    nm.createNotificationChannel(channel())
     runCatching { nm.deleteNotificationChannel(OLD_CHANNEL) }
   }
 
@@ -155,7 +149,9 @@ object OrderNotify {
 
   private fun show(context: Context, n: OrderNotice) {
     if (!allowed(context)) return
-    ensureChannel(context)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      context.getSystemService(NotificationManager::class.java)?.let { replaceOldChannel(it) }
+    }
     val noteId = NOTE_BASE + (n.id.hashCode() and 0xFFFF)
     val open = context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
       flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP

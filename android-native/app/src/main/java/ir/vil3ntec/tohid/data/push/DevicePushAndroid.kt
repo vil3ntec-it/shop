@@ -21,6 +21,11 @@ import kotlinx.serialization.json.booleanOrNull
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
+/*
+ *  پروندهٔ سکو (`*Android.kt`): `Context` و `SharedPreferences` ِ نشانِ «این توکن فرستاده شد»؛ همه‌جا ساخته می‌شود (کامپیوتر و
+ *  آیفون با shim) و منطقِ خالصش در `core/push/PushPolicy.kt` است. خودِ Firebase فقط در `FcmPushAndroid.kt`.
+ */
+
 /**
  *  سکوی پوشِ سرور — همان درزِ آیفون (APNs) برای بعد. اندروید: [FcmPushAndroid] (Firebase)؛ کامپیوتر: هیچ.
  *  آیفون امروز توکنِ APNs را خودش از `ios/IosPush.kt` به `/me/push` می‌دهد؛ روزی که حسابِ اپل آمد (O-02)، یک

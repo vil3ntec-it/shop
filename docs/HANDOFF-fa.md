@@ -60,7 +60,7 @@
   عضو، خروج، «خروج از همه» و از کار انداختنِ دستگاه ⇒ توکن کهنه؛ صفِ `order-notify` دو رویدادِ یک‌بارهٔ «پرداخت شد» و «مشتری لغو کرد»
   گرفت؛ پیام بی دادهٔ مشتری (شماره و شمار). مهاجرتِ ۲۱۳ + rollback. آزمون: `push-fcm` ۶/۶ (FCM ِ ساختگی)، `order-notify`، `push-delivery`،
   `paid-routes-entitlement`، `route-authz-inventory`، `shop-route-inventory` سبز. **اندروید** — `firebase-messaging` (BoM 33.7.0)؛ افزونهٔ
-  google-services فقط با `app/google-services.json`؛ `data/push/DevicePush.kt` (مشترک) + `FcmPushAndroid.kt` (فقط اندروید)، `core/push/PushPolicy`
+  google-services فقط با `app/google-services.json`؛ `data/push/DevicePushAndroid.kt` (مشترک) + `FcmPushAndroid.kt` (فقط اندروید)، `core/push/PushPolicy`
   (+ آزمون)؛ «تنظیمات ← سفارشِ آنلاین» حالِ پوش و دکمهٔ «اجازهٔ اعلان». CI: `android-native/tools/google-services.sh` با secret ِ
   `GOOGLE_SERVICES_JSON` (نبودش ساخت را نمی‌شکند). راهنمای صاحب‌کار: `docs/FIREBASE-SETUP-fa.md`؛ O-01 «تصمیم گرفته شد».
 - نیمه‌کاره: ساختِ APK ِ اندروید این‌جا ممکن نبود (بی Android SDK) — کامپایلِ Firebase و دروازهٔ حجمِ APK (±۵٪، PR فایلِ ساخت را عوض کرده)

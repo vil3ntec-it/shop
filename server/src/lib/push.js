@@ -296,6 +296,19 @@ async function revokeDevice({ deviceId, userId = '', app = '', reason = 'logout'
   return stale(where, args, reason);
 }
 
+/**
+ * `/auth/logout`: نشست باطل و همین دستگاه دیگر پوشِ این کس را نمی‌گیرد (کاربرِ دیگری بعداً روی همین گوشی وارد می‌شود).
+ * `tokens` = `lib/tokens.js` (از صدازننده، تا این‌جا وابستگیِ چرخشی نسازد).
+ */
+async function endSession(tokens, { access = '', refresh = '' } = {}) {
+  const who = (access && await tokens.ownerOf(access, 'access')) || (refresh && await tokens.ownerOf(refresh, 'refresh')) || null;
+  if (refresh) await tokens.revoke(refresh, 'refresh');
+  if (access) await tokens.revoke(access, 'access');
+  if (who && who.device_id) {
+    await revokeDevice({ deviceId: who.device_id, userId: who.subject_id, app: who.app || 'shop', reason: 'logout' });
+  }
+}
+
 /** «خروج از همه» ِ یک بخش ⇒ هیچ گوشیِ این کس در این بخش دیگر خبر نمی‌گیرد تا دوباره وارد شود */
 async function revokeUser(userId, app = 'shop', reason = 'logout_all') {
   if (!userId) return 0;
@@ -530,5 +543,5 @@ async function sendApns(sender, apnsRows, message) {
 
 module.exports = {
   current, save, masked, invalidate, register, unregister, sendTo, targetsFor, setDeliver,
-  unregisterOwn, revokeMember, revokeDevice, revokeUser, deviceRegistered, useFcmOrigin, fcmError, MAX_TOKENS_PER_USER,
+  unregisterOwn, revokeMember, revokeDevice, revokeUser, endSession, deviceRegistered, useFcmOrigin, fcmError, MAX_TOKENS_PER_USER,
 };

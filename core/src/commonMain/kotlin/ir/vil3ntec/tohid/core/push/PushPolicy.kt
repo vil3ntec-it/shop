@@ -4,7 +4,7 @@ package ir.vil3ntec.tohid.core.push
  *  پوشِ گوشی (FCM ِ اندروید؛ APNs ِ آیفون بعداً) — منطقِ خالص، بی اندروید و بی شبکه (تصمیمِ O-01).
  *
  *  سرور: `server/src/routes/shop-push.js` (`/api/shop/push/config|devices`) و `server/src/lib/order-notify.js` (دادهٔ پیام).
- *  برنامه: `data/push/DevicePush.kt` (همه‌جا) + `data/push/FcmPushAndroid.kt` (فقط اندروید، Firebase).
+ *  برنامه: `data/push/DevicePushAndroid.kt` (همه‌جا) + `data/push/FcmPushAndroid.kt` (فقط اندروید، Firebase).
  *
  *  ⛔ پیش‌فرض خاموش: تا سرور `enabled` نگوید (پرچمِ `shop.device_push`) هیچ توکنی ساخته یا فرستاده نمی‌شود.
  *  ⛔ دادهٔ پیام منبعِ داده نیست: فقط «کدام سفارش را باز کن» (شناسهٔ مات)؛ جزئیات همیشه از سرور با دسترسیِ همان لحظه.

@@ -162,6 +162,6 @@ O-02. کد برای آن روز آماده است (`ios/shared/.../IosPush.kt` �
 - سرور: `server/src/lib/push.js` (FCM HTTP v1؛ کلید از `FCM_SERVICE_ACCOUNT_FILE` یا `FCM_SERVICE_ACCOUNT`؛ بی کلید یک بار لاگ و
   هیچ)، `server/src/routes/shop-push.js` (`/api/shop/push/config|devices`، پرچمِ `shop.device_push`)، `server/src/lib/order-notify.js`
   (سفارشِ تازه/پرداخت/لغو، پرچمِ `shop.order_notify`)، مهاجرتِ `213_device_push.sql`؛ آزمون: `server/test/push-fcm.test.js`.
-- اندروید: `data/push/DevicePush.kt` (مشترک)، `data/push/FcmPushAndroid.kt` (فقط اندروید)، `core/push/PushPolicy.kt` (خالص)،
+- اندروید: `data/push/DevicePushAndroid.kt` (مشترک)، `data/push/FcmPushAndroid.kt` (فقط اندروید)، `core/push/PushPolicy.kt` (خالص)،
   افزونهٔ google-services فقط با `app/google-services.json` (`android-native/app/build.gradle.kts`)؛ CI: `android-native/tools/google-services.sh`.
 - قاعده‌ها: `docs/RULES-fa.md` ← «v3 · اعلان».

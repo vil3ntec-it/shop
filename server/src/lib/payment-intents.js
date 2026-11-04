@@ -211,12 +211,8 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
       `UPDATE online_orders SET payment_status='paid', payment_method='online',
               cod_status=CASE WHEN cod_status='to_collect' THEN '' ELSE cod_status END,
               version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`,
-      [intent.shop_id, o.id, at]
-    );
-    //  O-01: «پرداخت شد» به گوشیِ دکان (همان پرچمِ `shop.order_notify`؛ همین تراکنش، فرستادن بعداً)
-    await require('./order-notify').enqueueIn((t, p) => c.query(t, p), {
-      shopId: intent.shop_id, orderId: o.id, orderNo: o.order_no, at, event: 'order_paid',
-    });
+      [intent.shop_id, o.id, at]);
+    await require('./order-notify').enqueueIn((t, p) => c.query(t, p), { shopId: intent.shop_id, orderId: o.id, orderNo: o.order_no, at, event: 'order_paid' });   // O-01
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {

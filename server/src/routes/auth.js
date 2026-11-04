@@ -921,13 +921,7 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
 router.post('/logout', sessionLimit, async (req, res) => {
   const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
   const access = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  //  O-01: همین دستگاه دیگر پوشِ این کس را نمی‌گیرد (کاربرِ دیگری بعداً روی همین گوشی وارد می‌شود)
-  const who = (access && await tokens.ownerOf(access, 'access')) || (refresh && await tokens.ownerOf(refresh, 'refresh')) || null;
-  if (refresh) await tokens.revoke(refresh, 'refresh');
-  if (access) await tokens.revoke(access, 'access');
-  if (who && who.device_id) {
-    await require('../lib/push').revokeDevice({ deviceId: who.device_id, userId: who.subject_id, app: who.app || 'shop', reason: 'logout' });
-  }
+  await require('../lib/push').endSession(tokens, { access, refresh });   // + پوشِ همین دستگاه (O-01)
   res.json({ ok: true });
 });
 
