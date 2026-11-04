@@ -99,6 +99,45 @@ test('راه‌اندازی بی کلید: یک خطِ روشنِ خطا، بی 
   assert.equal(await dbKey(), '');
 });
 
+test('بی کلیدِ خصوصی، با کلیدِ عمومیِ مانده: مجوز و کدهای آفلاینِ پیشین (فروشگاه، پمپ ۱ و ۲) سنجیده می‌شوند؛ فقط امضا ۵۰۳', async () => {
+  const shopOffline = require('../src/lib/shop-offline-codes');
+  const pumpOffline = require('../src/lib/offline-codes');
+  const old = newPem();
+  //  کدها و مجوز با کلیدِ پیشین، وقتی هنوز بود (سرورِ خانگی/دسکتاپ بی NODE_ENV)
+  await scene({ LICENSE_PRIVATE_KEY: old });
+  const pc = pumpOffline.parseComputer(pumpOffline.computerOfFingerprint(`win-${'c'.repeat(32)}`));
+  const shopCode = await shopOffline.encode(shopOffline.body({ plan: 'sub', machine: pc.machine, account: Buffer.alloc(4),
+    serial: crypto.randomBytes(4), issuedDay: 1000, endDay: 5000 }), license.signBytes);
+  const pump2 = await pumpOffline.encode2(pumpOffline.body2({ plan: 'vip', machine: pc.machine, account: Buffer.alloc(4),
+    serial: crypto.randomBytes(4), issuedDay: 1000, endDay: 5000 }), license.signBytes);
+  const v1 = Buffer.alloc(pumpOffline.BODY_LEN);
+  v1[0] = 1; v1[1] = 2;
+  pc.machine.copy(v1, 2);
+  crypto.randomBytes(6).copy(v1, 12);
+  v1.writeUInt32BE(Math.floor(Date.now() / 1000), 18);
+  v1.writeUInt32BE(Math.floor(Date.now() / 1000) + 30 * 86400, 22);
+  Buffer.from(await license.keyId(), 'hex').subarray(0, 8).copy(v1, 26);
+  const pump1 = pumpOffline.b32encode(Buffer.concat([v1, await license.signBytes(Buffer.concat([Buffer.from('PYOC1\0', 'latin1'), v1]))]));
+  const lic = await license.issue({ deviceUid: 'D-1', accountId: 'u1', subscriptionEndsAt: Date.now() + 86400000 });
+
+  //  گامِ ۶ ِ OWNER-ACTIONS انجام شد و بعد متغیر گم شد: نه محیط، نه ردیفِ خصوصی؛ فقط `license_public_key`
+  for (const env of [{ NODE_ENV: 'production' }, {}]) {
+    await scene(env);
+    await plans.setConfig('license_public_key', spkiOf(old));
+    assert.equal((await shopOffline.verify(shopCode))?.plan, 'sub', 'کدِ آفلاینِ فروشگاه');
+    assert.equal((await pumpOffline.verify(pump2))?.version, 2, 'کدِ آفلاینِ پمپ ۲');
+    assert.equal((await pumpOffline.verify(pump1))?.version, 1, 'کدِ آفلاینِ پمپ ۱ (kid از کلیدِ عمومی)');
+    const [hd, pl, sg] = lic.token.split('.');
+    assert.equal(await license.verifyBytes(Buffer.from(`${hd}.${pl}`), Buffer.from(sg, 'base64url')), true, 'امضای مجوز');
+    assert.equal(await license.verifyBytes(Buffer.from('دست‌کاری'), Buffer.from(sg, 'base64url')), false);
+    const pk = await h.get('/api/license/public-key');
+    assert.equal(pk.status, 200, 'کلیدِ عمومیِ درست هنوز داده می‌شود');
+    assert.equal(pk.body.publicKey, spkiOf(old));
+    await assert.rejects(license.signBytes(Buffer.from('x')), (e) => e.code === 'license_key_missing');
+    assert.equal(await dbKey(), '', 'هنوز هیچ کلیدِ تازه‌ای ساخته نشد');
+  }
+});
+
 test('سازگاری: کلیدِ موجود در پایگاه‌داده در production همان می‌ماند و امضا می‌کند', async () => {
   await scene({ NODE_ENV: 'production' });
   const pem = newPem();
@@ -234,4 +273,67 @@ test('ابزارِ بیرون آوردن از خطِ فرمان: فقط نشان
   assert.ok(printed.includes(kidOf(pem)));
   noSecret(printed, pem);
   assert.ok(fs.existsSync(out));
+});
+
+test('generate: فقط سرورِ نو؛ هر ردِ کلید یا امضای پیشین ⇒ نمی‌سازد و فایلی نمی‌نویسد', async () => {
+  const { generateKey, exportKey } = require('../scripts/license-key');
+  const out = path.join(tmp, 'new.env');
+  const refuses = async (code, what) => {
+    await assert.rejects(generateKey(out), (e) => e.code === code, what);
+    assert.equal(fs.existsSync(out), false, `${what}: فایلی نوشته نشد`);
+    assert.equal(await dbKey(), '', `${what}: چیزی در پایگاه‌داده ننشست`);
+  };
+  const pem = newPem();
+  const file = path.join(tmp, 'gen.pem');
+  fs.writeFileSync(file, pem, { mode: 0o600 });
+  await query("DELETE FROM devices WHERE platform = 'license'");
+  await query('DELETE FROM pump_offline_codes');
+  await query('DELETE FROM shop_offline_codes');
+
+  await scene({ NODE_ENV: 'production', LICENSE_PRIVATE_KEY: pem });
+  await refuses('license_key_exists', 'کلید در محیط');
+  await scene({ NODE_ENV: 'production', LICENSE_PRIVATE_KEY_FILE: path.join(tmp, 'gone.pem') });
+  await refuses('license_key_exists', 'نشانیِ فایل، حتی نخواندنی');
+  await scene({ NODE_ENV: 'production' });
+  await plans.setConfig('license_public_key', spkiOf(pem));
+  await refuses('license_key_exists', 'فقط ردیفِ عمومیِ کلیدِ پیشین');
+  await scene({ NODE_ENV: 'production' });
+  await query(`INSERT INTO devices (id, user_id, device_uid, platform, created_at)
+               SELECT 'dev_gen', id, 'GEN-1', 'license', 0 FROM users LIMIT 1`);
+  await refuses('license_key_used', 'دستگاهی که با کلیدِ پیشین مجوز گرفته (جابه‌جایی)');
+  await query("DELETE FROM devices WHERE id = 'dev_gen'");
+  //  ردیفِ خصوصی: همان پیامِ «هست» با kid، و کلید دست نمی‌خورد
+  await plans.setConfig('license_private_key', pem);
+  await assert.rejects(generateKey(out), (e) => e.code === 'license_key_exists' && e.message.includes(kidOf(pem)));
+  assert.equal(await dbKey(), pem);
+  assert.equal(fs.existsSync(out), false);
+
+  //  سرورِ نو (هیچ رد): کلیدِ تازه فقط در فایلِ ۶۰۰؛ نه در پایگاه‌داده، نه چاپ
+  await scene({ NODE_ENV: 'production' });
+  const r = await generateKey(out);
+  assert.deepEqual(Object.keys(r), ['kid']);
+  if (process.platform !== 'win32') assert.equal(fs.statSync(out).mode & 0o777, 0o600);
+  const line = fs.readFileSync(out, 'utf8');
+  assert.match(line, /^LICENSE_PRIVATE_KEY="[^\n"]+"\n$/);
+  assert.equal(await dbKey(), '');
+  await scene({ NODE_ENV: 'production', LICENSE_PRIVATE_KEY: line.trim().slice('LICENSE_PRIVATE_KEY="'.length, -1) });
+  assert.equal((await license.startupCheck(logger())).kid, r.kid, 'همان خط در .env ⇒ همان kid');
+  await assert.rejects(generateKey(path.join(tmp, 'again.env')), (e) => e.code === 'license_key_exists', 'بارِ دوم نمی‌سازد');
+  await assert.rejects(exportKey(out), (e) => e.code === 'EEXIST');
+});
+
+test('generate از خطِ فرمان: پایگاه‌دادهٔ نخواندنی ⇒ نمی‌سازد؛ هیچ کلیدی چاپ نمی‌شود', () => {
+  const out = path.join(tmp, 'cli-gen.env');
+  let failed = null;
+  try {
+    //  pglite:memory بی مهاجرت ⇒ `app_config` نیست ⇒ نبودنِ کلید ثابت نمی‌شود
+    execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'license-key.js'), 'generate', out], {
+      cwd: path.join(__dirname, '..'),
+      env: { PATH: process.env.PATH, HOME: tmp, NODE_ENV: 'production', DATABASE_URL: 'pglite:memory' },
+      encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+    });
+  } catch (e) { failed = e; }
+  assert.ok(failed && failed.status === 1, 'باید با کدِ ۱ بایستد');
+  assert.equal(fs.existsSync(out), false);
+  assert.doesNotMatch(`${failed.stdout}${failed.stderr}`, /BEGIN|PRIVATE KEY/);
 });
