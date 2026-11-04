@@ -191,6 +191,39 @@ class PeriodSlipTest {
     assertEquals("#101 · $date · 9:00", (s.invoices[0][0] as ReceiptBlock.Text).text)
   }
 
+  /** سطر همان‌طور که در پاراگرافِ راست‌به‌چپ (یا چپ‌به‌راست) دیده می‌شود: از چپ به راست، بی LRM/RLM ِ نادیدنی */
+  private fun shown(text: String, rtl: Boolean = true): String {
+    val bidi = java.text.Bidi(text, if (rtl) java.text.Bidi.DIRECTION_RIGHT_TO_LEFT else java.text.Bidi.DIRECTION_LEFT_TO_RIGHT)
+    val levels = ByteArray(text.length) { bidi.getLevelAt(it).toByte() }
+    val chars = Array<Any>(text.length) { text[it] }
+    java.text.Bidi.reorderVisually(levels, 0, chars, 0, text.length)
+    return chars.joinToString("").filterNot { it == '\u200E' || it == '\u200F' }
+  }
+
+  @Test
+  fun `شمارهٔ حرف‌دارِ سفارشِ اینترنتی در کاغذِ راست‌به‌چپ — نشانِ شماره کنارِ خودش و ساعت پس از آن`() {
+    val b = book()
+    val src = PeriodSlip.source(b.look)
+    val day = PeriodSlip.sections(b.current(SalesPeriods.Unit.DAY), head, src, PrinterProfile.WIDTH_80MM, fmt, money = true)
+    val line = (day.invoices[3][0] as ReceiptBlock.Text).text
+    assertEquals("\u200E#W-7\u200F · 12:00", line)
+    //  چیدنِ دوجهته (همان الگوریتمِ Java2D ِ کامپیوتر و اندروید): از راست «#W-7» و سپس ساعت
+    assertEquals("12:00 · #W-7", shown(line))
+    //  بی نشانه همان خطای گزارش‌شده بود: «#» آن سرِ سطر و ساعت پیش از شماره
+    assertEquals("W-7 · 12:00#", shown("#W-7 · 12:00"))
+    //  ماه و سال: تاریخ میانِ شماره و ساعت، همان ترتیب
+    val month = PeriodSlip.sections(b.current(SalesPeriods.Unit.MONTH), head, src, PrinterProfile.WIDTH_58MM, fmt, money = true)
+    val monthLine = month.invoices.map { (it[0] as ReceiptBlock.Text).text }.single { it.contains("W-7") }
+    assertEquals("12:00 · $date · #W-7", shown(monthLine))
+    //  شمارهٔ فقط‌رقم دست نمی‌خورد و از پیش درست است
+    assertEquals("#101", PeriodSlip.numberTag("101"))
+    assertEquals("10:00 · #102", shown((day.invoices[1][0] as ReceiptBlock.Text).text.substringBefore(" · احمد")))
+    //  زبانِ چپ‌به‌راست بی نشانه (RLM آن‌جا ساعت را جابه‌جا می‌کرد)
+    I18n.source = { Lang.EN }
+    assertEquals("#W-7", PeriodSlip.numberTag("W-7"))
+    assertEquals("#W-7 · 12:00", shown("#W-7 · 12:00", rtl = false))
+  }
+
   @Test
   fun `دورهٔ بی فاکتور یک سند با سرخط و جمعِ صفر`() {
     val empty = SalesPeriods.Period("2026-11-01", SalesPeriods.Unit.DAY, "2026-11-01", "2026-11-01", SalesPeriods.Totals(), emptyList())
