@@ -77,10 +77,12 @@ object StrCourierApp {
   // ── «تماس با مشتری» و خطِ «ناحیه · دروازه» (DLV-02؛ فارسی همان رابطِ پیشین) ──
   val callCustomer: String get() = t("تماس با مشتری", "Call the customer", "پېرودونکي ته زنګ")
   val customerPhoneMissing: String get() = t("شمارهٔ مشتری نیامد", "The customer's number did not come through", "د پېرودونکي شمېره رانغله")
-  val callOnlineOnly: String get() = t(
+  val callOnlineOnly: String get() = td(
     "تماس فقط با اینترنت — شماره روی گوشی نگه داشته نمی‌شود",
     "Calling needs the internet — the number is not kept on the phone",
     "زنګ یوازې له انټرنټ سره — شمېره په تلیفون کې نه ساتل کېږي",
+    "Calling needs the internet — the number is not kept on this computer",
+    "زنګ یوازې له انټرنټ سره — شمېره په کمپیوټر کې نه ساتل کېږي",
   )
   fun areaLine(area: String): String = t("ناحیه: ${asIs(area)}", "Area: $area", "سیمه: $area")
   fun gateLine(color: String): String = t("دروازهٔ ${asIs(color)}", "Gate: $color", "دروازه: $color")
