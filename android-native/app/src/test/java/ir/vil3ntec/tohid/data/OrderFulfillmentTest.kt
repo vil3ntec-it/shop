@@ -116,6 +116,19 @@ class OrderFulfillmentTest {
   }
 
   @Test
+  fun `قیمتِ دفتر پس از سفارش عوض شد ⇒ فاکتور همان قیمتِ سفارش که مشتری دید و پذیرفت`() {
+    //  صاحب پس از ثبتِ سفارش قیمتِ برنج را ۱۲۰ ⇐ ۱۵۰ کرد؛ سفارش با ۱۲۰ ثبت شده بود (سرور قیمت را هنگامِ ثبت می‌خواند)
+    val dearer = ledger().let { d -> d.copy(products = d.products.map { if (it.id == "p1") it.copy(salePrice = 150.0) else it }) }
+    val d = ok(OrderFulfillment.fulfill(dearer, order(), "2026-10-19", 1_000L)).data
+    val sale = d.sales.single()
+    assertEquals(180.0, d.saleItems.first { it.productId == "p1" }.totalPrice, 1e-9)
+    assertEquals(120.0, d.saleItems.first { it.productId == "p1" }.unitPrice, 1e-9)
+    assertEquals(175.5, sale.finalTotal, 1e-9)
+    assertEquals(sale.finalTotal, sale.paidAmount, 1e-9)
+    assertEquals("قیمتِ دفتر دست نمی‌خورد", 150.0, d.products.first { it.id == "p1" }.salePrice, 1e-9)
+  }
+
+  @Test
   fun `تکرار، فروشِ دستگاهِ دیگر و فاکتورِ W ِ قدیمی ⇒ پیش‌تر ثبت شده، هیچ تغییری`() {
     val once = ok(OrderFulfillment.fulfill(ledger(), order(), "2026-10-19", 1L)).data
     val again = OrderFulfillment.fulfill(once, order(), "2026-10-19", 2L)
