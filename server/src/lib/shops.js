@@ -164,6 +164,8 @@ async function updateMember(shopId, memberId, patch) {
   if (status !== 'active') {
     await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
       [now(), m.user_id]);
+    //  O-01: گوشیِ او دیگر هیچ پوشی از این دکان نمی‌گیرد (کالا تمام شد، سفارشِ تازه…) — توکن کهنه با دلیل
+    await require('./push').revokeMember(shopId, m.user_id, status === 'suspended' ? 'member_suspended' : 'member_removed');
   }
   //  ⛔ S78: سوکتِ زندهٔ او هم در همین درخواست — برداشتن/تعلیق (نشست رفت) و
   //  تغییرِ نقش (دسترسی عوض شد) هر دو؛ دکان‌های دیگرش با همان نقش دست نمی‌خورند

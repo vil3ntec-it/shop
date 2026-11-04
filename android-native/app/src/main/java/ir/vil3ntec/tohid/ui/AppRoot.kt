@@ -202,6 +202,7 @@ private fun AppRootActive(
 
   //  همگام‌سازیِ خودکار هر بار که برنامه جلوی چشم می‌آید؛ در پس‌زمینه خاموش
   LifecycleEventEffect(Lifecycle.Event.ON_START) {
+    ir.vil3ntec.tohid.data.push.DevicePush.syncSoon(context)   //  O-01: پوشِ گوشی — حداکثر هر ۱۰ دقیقه، پرچمِ دکان
     if (loaded) {
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
       ir.vil3ntec.tohid.sync.AutoSync.startPolling(context, store)
@@ -502,6 +503,7 @@ private fun AppRootActive(
     navAllowed = navAllowed,
     afterSignIn = {
       askShop = true
+      ir.vil3ntec.tohid.data.push.DevicePush.syncSoon(context, force = true)
       ir.vil3ntec.tohid.sync.AutoSync.now(context, store)
     },
   )

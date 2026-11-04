@@ -14,3 +14,7 @@ test
 *.sql.gz*
 *.dump
 backups
+# کلیدِ Firebase و هر رازِ دیگرِ بیرون از مخزن (docs/FIREBASE-SETUP-fa.md) هرگز درونِ image نمی‌رود
+secrets
+*firebase-adminsdk*.json
+fcm-service-account*.json
