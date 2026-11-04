@@ -437,6 +437,13 @@ class DariCoverageTest {
   }
 
   @Test fun `فارسیِ نوشته‌های دورِ ۵ همان متنِ پیشین است و دری و زبان‌های دیگر عوض می‌شوند`() {
+    //  `LocaleChoice` روی کامپیوتر `I18n.desktop` را روشن می‌کند و آزمونِ دیگری در همین JVM شاید پیش‌تر آن را ساخته باشد
+    val wasDesk = I18n.desktop
+    I18n.desktop = false
+    try { round5Texts() } finally { I18n.desktop = wasDesk }
+  }
+
+  private fun round5Texts() {
     val kinds = ir.vil3ntec.tohid.core.image.StorefrontMediaSpec.Kind.entries
     val logo = ir.vil3ntec.tohid.core.image.StorefrontMediaSpec.Kind.LOGO
     I18n.source = { Lang.FA }
@@ -464,12 +471,8 @@ class DariCoverageTest {
     assertEquals("Pack barcodes (separated by “,”)", StrScanPages.packBarcodes(StrScanPages.pack))
     //  اسکنِ یک کادر: روی گوشی از دوربین، روی کامپیوتر از بارکدخوان (`td`)
     assertEquals("Hold the barcode up to the camera — the field fills on the first read", StrScanPages.scanOnce)
-    try {
-      I18n.desktop = true
-      assertEquals("Scan the barcode with the barcode scanner — the field fills on the first read", StrScanPages.scanOnce)
-    } finally {
-      I18n.desktop = false
-    }
+    I18n.desktop = true
+    assertEquals("Scan the barcode with the barcode scanner — the field fills on the first read", StrScanPages.scanOnce)
   }
 
   @Test fun `متنِ خامِ باقی‌ماندهٔ صفحه‌های قدیمی فقط کم می‌شود`() {
