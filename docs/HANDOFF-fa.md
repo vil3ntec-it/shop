@@ -90,6 +90,35 @@
 - نیمه‌کاره: ساختِ APK ِ اندروید این‌جا ممکن نبود (بی Android SDK) — کامپایلِ Firebase و دروازهٔ حجمِ APK (±۵٪، PR فایلِ ساخت را عوض کرده)
   فقط در CI ِ «توحید بومی» سنجیده می‌شود. آیفون فقط درز دارد (`PushPlatform`؛ APNs پس از O-02).
 - قدمِ بعدی: صاحب‌کار گام‌های `docs/FIREBASE-SETUP-fa.md` را برود؛ سپس آزمون با گوشیِ واقعی و ثبتِ NOTIF-02 تا ۰۵، NOTIF-12، NTF-05، ORD-02 و S36.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-3` (دریِ واقعی، دورِ ۳؛ پشته‌ای روی `claude/dari-real-2` ‏#919 ِ هنوز باز؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۱۰۱۲ نوشتهٔ خامِ زندهٔ `ui/screens` به هشت جدولِ تازه رفت (فارسی بایت‌به‌بایت همان — هر پرونده با بازسازیِ متن از جدول
+  با نسخهٔ پیشین سنجیده شد؛ انگلیسی و پشتو تازه): `DeskCustomers` (`StrCustomerPages`)، `StockBook` (`StrStockPages`)، `DevicesHw`
+  (`StrDevicePages`)، `DeskProducts` (`StrProductPages`)، خرید: `PurchaseOrders`/`PurchaseBills`/`PurchaseSuggestView`/`DeskPurchasing`
+  (`StrPurchasePages`)، `Promos` (`StrPromoPages`)، `HesabPayAccountSettings` (`StrPayPages`) و `ReportFresh` (`StrReportPages`)؛ ۳۵۲ جا
+  جملهٔ جدول‌های پیشین دوباره به کار رفت. ۱۹ نوشته داده است («// داده:»: برگهٔ اکسل و نامِ پروندهٔ خروجی، واحدِ پیش‌فرض، یادداشتِ
+  ذخیره‌شده، دلیلِ پیش‌فرضِ سابقه، برچسبِ نمونهٔ چاپی، سنجیدنِ «همیشه»). برچسبِ زبانه‌ها و صافی‌ها (`enum`) هر بار خوانده می‌شوند.
+  دری: واژهٔ تازه نه — فهرست به سقفِ ۶۴ ِ `DariTextTest` رسیده؛ «میانگین ⇐ اوسط» و «بیشینه ⇐ حداکثر» پیشنهاد برای صاحب‌کار
+  (`DARI-REVIEW-fa.md` §۶). آزمون: `DariCoverageTest` (سقفِ
+  متنِ خامِ `ui/screens` ۳۶۳۳ ⇐ ۲۶۰۲، نگهبانِ ۱۰ پروندهٔ دورِ ۳، کفِ پوششِ تازه، نمونه‌های بایت‌به‌بایت).
+- نیمه‌کاره: بقیهٔ `ui/screens` (۲۶۰۲): نمایهٔ جست‌وجو و کلیدهای `SettingsLayout` (۲۸۷، داده)، صفحه‌های مرده (`Storefront`، `DeliveryCash`،
+  `Orders`، `Reports`…)، و از صفحه‌های زنده `PromoText`، `Servers`، `TeamStaff`، `ImageBankPicker`، `EasySetupAndroid`، `ImageBulkImport`؛
+  ستون‌های `DayEndModel` (صفحه و خروجی) ⇐ تصمیمِ صاحب‌کار؛ `StockModeSection` ِ صدا‌زده‌نشده دست نخورد.
+- قدمِ بعدی: دورِ ۴ با همان ابزار (spec ⇐ جدول، بازسازی و سنجشِ فارسی، «// داده:»)؛ بازبینیِ صاحب‌کار روی فهرستِ دری و تصمیمِ سقفِ واژه‌ها.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-2` (دریِ واقعی، دورِ ۲؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: متنِ خامی که دورِ ۱ بیرون گذاشته بود به جدول رفت (فارسی بایت‌به‌بایت همان، انگلیسی و پشتو تازه): همهٔ `ui/components`
+  (۷۶)، صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند (فروش و چاپ، دریافتِ قرض، برگشت، دفترِ قرض، دستورِ تحویل، جمع‌آوری،
+  نقدِ پیک‌ها، پایانِ روز؛ جدول‌های `StrSalePages`/`StrReturnPages`/`StrDebtPages`/`StrOrderPages`/`StrShellPages`، ۲۴۲ جا جملهٔ
+  همان جدول‌های نسخهٔ ۳)، یاورهای `OwnerReportPlan`/`StorefrontEtaApi`/`PromoGuardApi` (۴۹، در `StrSettingsPages`)، نامِ ۹ بخشِ
+  تنظیمات (`SettingsLayout.labelOf`؛ کلیدِ فارسی همان) و ۱۳ خطای ورودیِ `CourierQueue` (ثابتِ `CourierInputText` ِ هسته ⇐
+  `StrCourierApp`). دری: ۹ واژه (آدرس، قبل از، کوشش، ختم …) و ۵ جملهٔ کامل، همه «نیاز به تأییدِ صاحب‌کار» در `DARI-REVIEW-fa.md` §۲ و §۵.
+  آزمون: `DariCoverageTest` (نگهبانِ متنِ خام روی `ui/components`، پرونده‌های جابه‌جاشده و یاورها، سقفِ چرخ‌دنده‌ایِ متنِ خامِ
+  `ui/screens`، کفِ پوششِ نوشته‌های جابه‌جاشده، خطای صفِ پیک)، `DariTextTest`، `dari-text.test.js`. پوشش: کارهای اصلی ۱۵٫۵٪ ⇐ ۱۶٫۵٪ (کف ۱۶)،
+  همه ۱۳٫۸٪ ⇐ ۱۵٫۰٪، نوشته‌های جابه‌جاشده ۰ ⇐ ۱۴٫۸٪ (کف ۱۴)، متنِ خامِ `ui/screens` ۴۰۳۲ ⇐ ۳۶۳۳. `desk-check`: هسته ۱۳۰۶/۰؛ کامپیوتر ۳۰۴۲ آزمون، جز ۱۳ ِ `ui.theme`
+  دو سرخ (`DariWordsTest`: «نشانی‌هاست»؛ `DesktopPhrasesTest`: عبارتِ «سیم» ⇐ «چاپگر سیستم») که رفع و با ۱۲۵ آزمونِ مربوط دوباره سبز شد.
+- نیمه‌کاره: بقیهٔ `ui/screens` (سقف ۳۶۳۳ نوشته: `DeskCustomers`، `DeskProducts`، `StockBook`، `DevicesHw`، خرید، تخفیف‌ها، گزارش‌ها؛
+  نمایهٔ جست‌وجوی تنظیمات و کلیدهای `SettingsLayout` داده‌اند)؛ ستون‌های `DayEndModel` به خروجی هم می‌روند ⇐ تصمیم لازم؛
+  «ناحیه/دروازه» ِ `MissionView` در هسته.
+- قدمِ بعدی: دورِ ۳ همان روش (سطرِ داده با «// داده: دلیل»، پرونده به `movedScreens`، سقف پایین)؛ بازبینیِ صاحب‌کار روی فهرست.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/crm15-server` (اجرای سرورِ `customers.contact`، CRM-15؛ روی main پس از #911؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `server/src/lib/customer-contact.js` — بی مجوز (انباردار/جمع‌آور، یا لایهٔ نقش/کاربرِ صاحب) `GET /api/debtors[/:id]` شمارهٔ
   پوشیده (همان `ContactMask`) و بی نشانی؛ pull/Snapshot/حذف‌شده‌های راهِ قدیم، v1 (فقط در `routes/sync-v1.js`؛ `lib/sync-v1.js` دست نخورد)

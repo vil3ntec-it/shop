@@ -52,7 +52,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrFields
+import ir.vil3ntec.tohid.core.i18n.StrGrid
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrLine
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
+import ir.vil3ntec.tohid.core.i18n.StrPlaces
+import ir.vil3ntec.tohid.core.i18n.StrProductPages
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrPromoPages
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrShrink
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -113,13 +130,13 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
 
   val columns = remember(d) {
     listOf(
-      TableColumn<PromoCore.Rule>("نام", 220.dp, sortKey = { it.name }) { it.name + if (it.code.isNotEmpty()) "  · ${it.code}" else "" },
-      TableColumn<PromoCore.Rule>("نوع", 130.dp, sortKey = { it.kind }) { PromoText.kindLabel(it.kind) },
-      TableColumn<PromoCore.Rule>("مقدار", 170.dp) { PromoText.valueText(it) },
-      TableColumn<PromoCore.Rule>("دامنه", 160.dp) { PromoText.scopeText(it, d) },
-      TableColumn<PromoCore.Rule>("زمان", 150.dp) { PromoText.windowText(it) },
-      TableColumn<PromoCore.Rule>("ترکیب", 100.dp, sortKey = { it.stack }) { PromoText.stackLabel(it.stack) },
-      TableColumn<PromoCore.Rule>("وضعیت", 110.dp, sortKey = { PromoText.status(it, today).ordinal },
+      TableColumn<PromoCore.Rule>(StrGrid.name, 220.dp, sortKey = { it.name }) { it.name + if (it.code.isNotEmpty()) "  · ${it.code}" else "" },
+      TableColumn<PromoCore.Rule>(StrInvoices.colKind, 130.dp, sortKey = { it.kind }) { PromoText.kindLabel(it.kind) },
+      TableColumn<PromoCore.Rule>(StrPlaces.amount, 170.dp) { PromoText.valueText(it) },
+      TableColumn<PromoCore.Rule>(StrPromoPages.scope, 160.dp) { PromoText.scopeText(it, d) },
+      TableColumn<PromoCore.Rule>(StrReports.when_, 150.dp) { PromoText.windowText(it) },
+      TableColumn<PromoCore.Rule>(StrPromoPages.stacking, 100.dp, sortKey = { it.stack }) { PromoText.stackLabel(it.stack) },
+      TableColumn<PromoCore.Rule>(StrMoney.status, 110.dp, sortKey = { PromoText.status(it, today).ordinal },
         tint = { r -> if (PromoText.status(r, today) == PromoText.Status.ACTIVE) Shop.colors.success else Shop.colors.muted }) {
         PromoText.status(it, today).label
       },
@@ -136,7 +153,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
       for (r in selectedRules) if (r.active != on && PromoLive.save(context, r.copy(active = on)) != null) failed++
       busy = false
       table.selected = emptySet()
-      say(if (failed == 0) "انجام شد" else "$failed قاعده ذخیره نشد")
+      say(if (failed == 0) StrKit.done else StrPromoPages.rulesNotSaved(failed))
     }
   }
 
@@ -145,13 +162,13 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
       item(key = "head") {
         //  نامِ صفحه را سربرگ می‌گوید؛ این‌جا فقط توضیح و «قاعدهٔ تازه» (بی تکرار)
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Text("قاعده‌های خودکار و کدهای تخفیفِ صندوق", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.muted)
-          if (snap.manage) Button(onClick = addNew) { Text("+ قاعدهٔ تازه") }
+          Text(StrPromoPages.subtitle, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = c.muted)
+          if (snap.manage) Button(onClick = addNew) { Text(StrPromoPages.newRuleBtn) }
         }
         Spacer(Modifier.height(Space.md))
       }
       if (!ready) {
-        item(key = "signin") { Panel { EmptyNote("تخفیف‌ها مالِ حسابِ دکان‌اند. برای دیدن و ساختنشان واردِ حسابِ دکان شوید.") } }
+        item(key = "signin") { Panel { EmptyNote(StrPromoPages.signInNote) } }
       }
       item(key = "switch") {
         Row(
@@ -159,10 +176,10 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(Modifier.weight(1f)) {
-            Text("تخفیف‌های خودکار در صندوق", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = c.text)
+            Text(StrPromoPages.autoAtTill, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = c.text)
             Text(
-              if (snap.enabled) "روشن: قاعده‌های فعال در سبدِ همهٔ دستگاه‌های این دکان حساب می‌شوند."
-              else "خاموش: صندوق دقیقاً همان جمعِ همیشه را حساب می‌کند.",
+              if (snap.enabled) StrPromoPages.autoOnNote
+              else StrPromoPages.autoOffNote,
               style = MaterialTheme.typography.bodySmall, color = c.muted,
             )
           }
@@ -174,7 +191,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
                 busy = true
                 val err = PromoLive.setEnabled(context, on)
                 busy = false
-                say(err ?: if (on) "تخفیف‌های خودکار روشن شد" else "تخفیف‌های خودکار خاموش شد")
+                say(err ?: if (on) StrPromoPages.autoTurnedOn else StrPromoPages.autoTurnedOff)
               }
             },
           )
@@ -184,11 +201,11 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
       item(key = "stats") {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
           val active = snap.rules.count { PromoText.status(it, today) == PromoText.Status.ACTIVE }
-          StatCard("فعال", active.toString(), "همین حالا", Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
+          StatCard(StrSettings.active, active.toString(), StrHome.justNow, Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
             selected = tab == PromoText.Tab.ACTIVE, onClick = { tab = PromoText.Tab.ACTIVE })
-          StatCard("با کد", snap.rules.count { it.code.isNotEmpty() }.toString(), "کدِ تخفیف", Modifier.weight(1f), icon = Icons.Filled.Sell)
-          StatCard("زمان‌دار", snap.rules.count { PromoText.windowText(it) != "همیشه" }.toString(), "ساعت یا روز", Modifier.weight(1f), icon = Icons.Filled.Schedule)
-          StatCard("همه", snap.rules.size.toString(), "قاعده", Modifier.weight(1f), icon = Icons.Filled.LocalOffer,
+          StatCard(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, Modifier.weight(1f), icon = Icons.Filled.Sell)
+          StatCard(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != "همیشه" }.toString(), StrPromoPages.hourOrDay, Modifier.weight(1f), icon = Icons.Filled.Schedule) // داده: سنجیدن با خروجیِ `PromoText.windowText` (منطق)
+          StatCard(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, Modifier.weight(1f), icon = Icons.Filled.LocalOffer,
             selected = tab == PromoText.Tab.ALL, onClick = { tab = PromoText.Tab.ALL })
         }
         Spacer(Modifier.height(Space.sm))
@@ -197,7 +214,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
         TableToolbar(
           query = query,
           onQuery = { query = it },
-          placeholder = "جست‌وجو در نام یا کد",
+          placeholder = StrPromoPages.searchNameCode,
           viewMode = view,
           tabs = {
             SegmentedTabs(
@@ -214,9 +231,9 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           Panel {
             EmptyNote(
               when {
-                loading -> "در حالِ خواندن…"
-                snap.rules.isEmpty() -> "هنوز قاعده‌ای نیست. با «قاعدهٔ تازه» اولی را بسازید."
-                else -> "چیزی با این جست‌وجو نیست."
+                loading -> StrReports.loading
+                snap.rules.isEmpty() -> StrPromoPages.noRulesYet
+                else -> StrPromoPages.noSearchMatch
               },
             )
           }
@@ -245,9 +262,9 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
       BulkActionBar(
         count = table.selected.size,
         actions = listOf(
-          BulkAction("فعال", Icons.Filled.CheckCircle) { bulkActive(true) },
-          BulkAction("غیرفعال", Icons.Filled.Block) { bulkActive(false) },
-          BulkAction("حذف", Icons.Filled.Delete, destructive = true) { deleting = selectedRules },
+          BulkAction(StrProducts.activate, Icons.Filled.CheckCircle) { bulkActive(true) },
+          BulkAction(StrProducts.deactivate, Icons.Filled.Block) { bulkActive(false) },
+          BulkAction(StrMoney.delete, Icons.Filled.Delete, destructive = true) { deleting = selectedRules },
         ),
         onClose = { table.selected = emptySet() },
         modifier = Modifier.align(Alignment.BottomCenter).padding(Space.md),
@@ -262,7 +279,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
       canBelowCost = snap.belowCost,
       isNew = snap.rules.none { it.id == r.id },
       onDismiss = { editing = null },
-      onSaved = { editing = null; say("قاعده ذخیره شد") },
+      onSaved = { editing = null; say(StrPromoPages.ruleSaved) },
     )
   }
 
@@ -271,11 +288,11 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
     val codes = deleting.mapNotNull { it.code.takeIf { c -> c.isNotEmpty() } }
     AlertDialog(
       onDismissRequest = { if (!busy) deleting = emptyList() },
-      title = { Text("حذفِ قاعده") },
+      title = { Text(StrPromoPages.deleteRule) },
       text = {
         Text(
-          "$names از صندوق برداشته می‌شود." +
-            if (codes.isNotEmpty()) " کدِ ${codes.joinToString("، ")} آزاد نمی‌شود و دوباره به کار نمی‌رود." else "",
+          StrPromoPages.removedFromTill(names) +
+            if (codes.isNotEmpty()) StrPromoPages.codesNotFreed(codes.joinToString("، ")) else "",
         )
       },
       confirmButton = {
@@ -287,11 +304,11 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
             busy = false
             deleting = emptyList()
             table.selected = emptySet()
-            say(if (failed == 0) "حذف شد" else "$failed قاعده حذف نشد")
+            say(if (failed == 0) StrStock.deleted else StrPromoPages.rulesNotDeleted(failed))
           }
-        }) { Text("حذف", color = Shop.colors.danger) }
+        }) { Text(StrMoney.delete, color = Shop.colors.danger) }
       },
-      dismissButton = { TextButton(enabled = !busy, onClick = { deleting = emptyList() }) { Text("انصراف") } },
+      dismissButton = { TextButton(enabled = !busy, onClick = { deleting = emptyList() }) { Text(Str.cancel) } },
     )
   }
 }
@@ -314,7 +331,7 @@ private fun PromoCard(
     Modifier
       .fillMaxWidth()
       .background(c.surfaceSolid, Shape.card)
-      .then(if (canEdit) Modifier.clickable(onClickLabel = "ویرایشِ قاعده", onClick = onEdit) else Modifier)
+      .then(if (canEdit) Modifier.clickable(onClickLabel = StrPromoPages.editRule, onClick = onEdit) else Modifier)
       .padding(Space.md),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -335,8 +352,8 @@ private fun PromoCard(
     )
     if (canEdit) {
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onEdit) { Text("ویرایش") }
-        TextButton(onClick = onDelete) { Text("حذف", color = c.danger) }
+        TextButton(onClick = onEdit) { Text(StrMoney.edit) }
+        TextButton(onClick = onDelete) { Text(StrMoney.delete, color = c.danger) }
       }
     }
   }
@@ -401,28 +418,28 @@ private fun PromoEditor(
         .padding(start = 18.dp, end = 18.dp, bottom = 28.dp),
       verticalArrangement = Arrangement.spacedBy(Space.sm),
     ) {
-      Text(if (isNew) "قاعدهٔ تازه" else "ویرایشِ قاعده", style = MaterialTheme.typography.titleMedium, color = c.text)
+      Text(if (isNew) StrPromoPages.newRule else StrPromoPages.editRule, style = MaterialTheme.typography.titleMedium, color = c.text)
       OutlinedTextField(
         value = f.name, onValueChange = { f = f.copy(name = it.take(80)) },
-        label = { Text("نام (روی سبد دیده می‌شود)") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
+        label = { Text(StrPromoPages.nameOnCart) }, singleLine = true, modifier = Modifier.fillMaxWidth(),
       )
       //  PRM-10: «نزدیکِ انقضا» فقط با پرچمِ `shop.promo_expiry` (یا قاعده‌ای که از پیش چنین است)
-      Choice("نوع", PromoText.kinds(PromoLive.snap.value.expiry || rule.kind == "expiry"), f.kind) { f = f.copy(kind = it, tiers = listOf("" to ""), tierAmount = false, pct = if (it == "bxgy") "100" else f.pct) }
+      Choice(StrInvoices.colKind, PromoText.kinds(PromoLive.snap.value.expiry || rule.kind == "expiry"), f.kind) { f = f.copy(kind = it, tiers = listOf("" to ""), tierAmount = false, pct = if (it == "bxgy") "100" else f.pct) }
 
       when (f.kind) {
-        "percent" -> NumField("درصدِ تخفیف", f.pct) { f = f.copy(pct = it) }
-        "amount" -> NumField("مبلغ از هر واحد (؋)", f.amount) { f = f.copy(amount = it) }
+        "percent" -> NumField(StrPromoPages.discountPercent, f.pct) { f = f.copy(pct = it) }
+        "amount" -> NumField(StrPromoPages.amountPerUnit, f.amount) { f = f.copy(amount = it) }
         "price" -> {
-          ProductPick("کالا", if (f.priceProduct.isEmpty()) emptySet() else setOf(f.priceProduct), d, single = true) {
+          ProductPick(StrMoney.item, if (f.priceProduct.isEmpty()) emptySet() else setOf(f.priceProduct), d, single = true) {
             f = f.copy(priceProduct = it.firstOrNull().orEmpty())
           }
-          NumField("قیمتِ ویژهٔ هر واحد (؋)", f.priceUnit) { f = f.copy(priceUnit = it) }
+          NumField(StrPromoPages.specialUnitPrice, f.priceUnit) { f = f.copy(priceUnit = it) }
         }
         "tiers", "threshold" -> {
           if (f.kind == "threshold") {
             Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-              FilterChip(selected = !f.tierAmount, onClick = { f = f.copy(tierAmount = false) }, label = { Text("درصد") })
-              FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text("مبلغ") })
+              FilterChip(selected = !f.tierAmount, onClick = { f = f.copy(tierAmount = false) }, label = { Text(StrLine.percent) })
+              FilterChip(selected = f.tierAmount, onClick = { f = f.copy(tierAmount = true) }, label = { Text(StrLine.amount) })
             }
           }
           //  POS-19: پلهٔ «قیمتِ ثابتِ هر واحد» فقط با پرچمِ `shop.promo_tier_price` (یا قاعده‌ای که از پیش چنین است)
@@ -434,39 +451,39 @@ private fun PromoEditor(
           }
           f.tiers.forEachIndexed { i, (a, b) ->
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-              NumField(if (f.kind == "threshold") "از مبلغِ (؋)" else "از تعدادِ", a, Modifier.weight(1f)) { v ->
+              NumField(if (f.kind == "threshold") StrPromoPages.fromAmount else StrPromoPages.fromCount, a, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) v to t.second else t })
               }
-              NumField(if (f.kind == "threshold" && f.tierAmount) "تخفیف (؋)" else if (f.tierAmount) StrLine.tierUnitPrice else "تخفیف (٪)", b, Modifier.weight(1f)) { v ->
+              NumField(if (f.kind == "threshold" && f.tierAmount) StrPromoPages.discountAfn else if (f.tierAmount) StrLine.tierUnitPrice else StrSale.discountPct, b, Modifier.weight(1f)) { v ->
                 f = f.copy(tiers = f.tiers.mapIndexed { j, t -> if (j == i) t.first to v else t })
               }
               if (f.tiers.size > 1) TextButton(onClick = { f = f.copy(tiers = f.tiers.filterIndexed { j, _ -> j != i }) }) { Text("✕") }
             }
           }
-          OutlinedButton(onClick = { f = f.copy(tiers = f.tiers + ("" to "")) }) { Text("+ پله") }
+          OutlinedButton(onClick = { f = f.copy(tiers = f.tiers + ("" to "")) }) { Text(StrPromoPages.addTier) }
         }
         "bxgy" -> {
           Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-            NumField("بخر", f.buy, Modifier.weight(1f)) { f = f.copy(buy = it) }
-            NumField("بگیر", f.get, Modifier.weight(1f)) { f = f.copy(get = it) }
-            NumField("تخفیفِ «بگیر» (٪)", f.pct, Modifier.weight(1f)) { f = f.copy(pct = it) }
+            NumField(StrPromoPages.buyN, f.buy, Modifier.weight(1f)) { f = f.copy(buy = it) }
+            NumField(StrPromoPages.getN, f.get, Modifier.weight(1f)) { f = f.copy(get = it) }
+            NumField(StrPromoPages.getDiscount, f.pct, Modifier.weight(1f)) { f = f.copy(pct = it) }
           }
-          Hint("ارزان‌ترین واحدهای دامنه تخفیف می‌گیرند — «هر ۵ تا، دو ارزان‌تر رایگان» = بخر ۳ بگیر ۲.")
+          Hint(StrPromoPages.bxgyHint)
         }
         "bundle" -> Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-          NumField("تعدادِ بسته", f.bundleQty, Modifier.weight(1f)) { f = f.copy(bundleQty = it) }
-          NumField("قیمتِ بسته (؋)", f.bundlePrice, Modifier.weight(1f)) { f = f.copy(bundlePrice = it) }
+          NumField(StrPlaces.count, f.bundleQty, Modifier.weight(1f)) { f = f.copy(bundleQty = it) }
+          NumField(StrPromoPages.bundlePrice, f.bundlePrice, Modifier.weight(1f)) { f = f.copy(bundlePrice = it) }
         }
         "expiry" -> {
           Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-            NumField("درصدِ تخفیف", f.pct, Modifier.weight(1f)) { f = f.copy(pct = it) }
-            NumField("چند روز پیش از انقضا", f.nearDays, Modifier.weight(1f)) { f = f.copy(nearDays = it) }
+            NumField(StrPromoPages.discountPercent, f.pct, Modifier.weight(1f)) { f = f.copy(pct = it) }
+            NumField(StrPromoPages.daysBeforeExpiry, f.nearDays, Modifier.weight(1f)) { f = f.copy(nearDays = it) }
           }
-          Hint("فقط واحدهایی که در محموله‌های تا این چند روز مانده به انقضا نشسته‌اند تخفیف می‌گیرند (اول آنچه زودتر تمام می‌شود). کالای منقضی تخفیف نمی‌گیرد.")
+          Hint(StrPromoPages.expiryHint)
         }
       }
 
-      Section("روی کدام کالاها")
+      Section(StrPromoPages.onWhichItems)
       if (categories.isNotEmpty()) {
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           categories.forEach { cat ->
@@ -479,7 +496,7 @@ private fun PromoEditor(
         }
       }
       if (brands.isNotEmpty()) {
-        Text("برند", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrProductPages.brand, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           brands.forEach { b ->
             FilterChip(
@@ -491,7 +508,7 @@ private fun PromoEditor(
         }
       }
       if (suppliers.isNotEmpty()) {
-        Text("تأمین‌کننده", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrMoney.supplierLabel, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           suppliers.forEach { id ->
             FilterChip(
@@ -502,10 +519,10 @@ private fun PromoEditor(
           }
         }
       }
-      if (f.kind != "price") ProductPick("کالاهای مشخص", f.products, d) { f = f.copy(products = it) }
-      ProductPick("جز این کالاها", f.exProducts, d) { f = f.copy(exProducts = it) }
+      if (f.kind != "price") ProductPick(StrPromoPages.specificItems, f.products, d) { f = f.copy(products = it) }
+      ProductPick(StrPromoPages.exceptItems, f.exProducts, d) { f = f.copy(exProducts = it) }
       if (brands.isNotEmpty()) {
-        Text("جز این برندها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrPromoPages.exceptBrands, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           brands.forEach { b ->
             FilterChip(
@@ -517,7 +534,7 @@ private fun PromoEditor(
         }
       }
       if (categories.isNotEmpty()) {
-        Text("جز این دسته‌ها", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrPromoPages.exceptCategories, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           categories.forEach { cat ->
             FilterChip(
@@ -529,7 +546,7 @@ private fun PromoEditor(
         }
       }
       if (suppliers.isNotEmpty()) {
-        Text("جز این تأمین‌کنندگان", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(StrPromoPages.exceptSuppliers, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
           suppliers.forEach { id ->
             FilterChip(
@@ -540,7 +557,7 @@ private fun PromoEditor(
           }
         }
       }
-      Hint("هیچ دسته یا کالایی نزنید ⇐ همهٔ کالاها. «جز» بر «شامل» مقدم است.")
+      Hint(StrPromoPages.scopeHint)
 
       if (groups.isNotEmpty()) {
         Section(ir.vil3ntec.tohid.core.i18n.StrLine.promoGroupsTitle)
@@ -556,7 +573,7 @@ private fun PromoEditor(
         Hint(ir.vil3ntec.tohid.core.i18n.StrLine.promoGroupsHint)
       }
 
-      Section("چه وقت")
+      Section(StrPromoPages.whenSection)
       FlowRow(horizontalArrangement = Arrangement.spacedBy(Space.xs), verticalArrangement = Arrangement.spacedBy(Space.xxs)) {
         PromoText.DAYS.forEach { (iso, label) ->
           FilterChip(
@@ -567,50 +584,50 @@ private fun PromoEditor(
         }
       }
       Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-        TextIn("از ساعت (۱۷:۰۰)", f.start, Modifier.weight(1f)) { f = f.copy(start = it) }
-        TextIn("تا ساعت (۱۹:۰۰)", f.end, Modifier.weight(1f)) { f = f.copy(end = it) }
+        TextIn(StrPromoPages.fromHour, f.start, Modifier.weight(1f)) { f = f.copy(start = it) }
+        TextIn(StrPromoPages.toHour, f.end, Modifier.weight(1f)) { f = f.copy(end = it) }
       }
       Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-        TextIn("از تاریخ (2026-10-01)", f.from, Modifier.weight(1f)) { f = f.copy(from = it) }
-        TextIn("تا تاریخ", f.to, Modifier.weight(1f)) { f = f.copy(to = it) }
+        TextIn(StrPromoPages.fromDate, f.from, Modifier.weight(1f)) { f = f.copy(from = it) }
+        TextIn(StrPromoPages.toDate, f.to, Modifier.weight(1f)) { f = f.copy(to = it) }
       }
-      Hint("هیچ‌کدام ⇐ همیشه. ساعتی که از نیمه‌شب رد شود (۲۲:۰۰ تا ۰۲:۰۰) به روزِ شروعش تعلق دارد.")
+      Hint(StrPromoPages.whenHint)
 
-      Section("ترکیب و کد")
-      Choice("ترکیب با تخفیف‌های دیگر", PromoText.STACKS, f.stack) { f = f.copy(stack = it) }
+      Section(StrPromoPages.stackCodeSection)
+      Choice(StrPromoPages.stackWithOthers, PromoText.STACKS, f.stack) { f = f.copy(stack = it) }
       Hint(PromoText.STACK_HINTS[f.stack].orEmpty())
       Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-        NumField("اولویت", f.priority, Modifier.weight(1f)) { f = f.copy(priority = it) }
-        TextIn("کدِ تخفیف (اختیاری)", f.code, Modifier.weight(2f)) { f = f.copy(code = it) }
+        NumField(StrPromoPages.priority, f.priority, Modifier.weight(1f)) { f = f.copy(priority = it) }
+        TextIn(StrPromoPages.codeOptional, f.code, Modifier.weight(2f)) { f = f.copy(code = it) }
       }
-      Hint("بی کد ⇐ خودکار. کد را صندوقدار در سبد می‌زند؛ کدِ هر قاعده در این دکان یکتاست.")
+      Hint(StrPromoPages.codeHint)
       val cap = f.maxUses
       if (cap != null && f.code.isNotBlank()) {
-        NumField("سقفِ مصرفِ کد (خالی = بی سقف)", cap) { f = f.copy(maxUses = it) }
+        NumField(StrPromoPages.codeCap, cap) { f = f.copy(maxUses = it) }
         Hint(
-          "سرور هر مصرف را می‌شمارد؛ کدِ سقف‌دار فقط با اینترنت در صندوق پذیرفته می‌شود." +
-            if (rule.uses > 0) " تا امروز ${rule.uses} بار مصرف شده." else "",
+          StrPromoPages.codeCapNote +
+            if (rule.uses > 0) StrPromoPages.usedSoFar(rule.uses) else "",
         )
       }
 
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = f.active, onCheckedChange = { f = f.copy(active = it) })
-        Text("فعال", color = c.text)
+        Text(StrSettings.active, color = c.text)
       }
       if (canBelowCost) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           Checkbox(checked = f.allowBelowCost, onCheckedChange = { f = f.copy(allowBelowCost = it) })
-          Text("اجازهٔ فروش زیرِ بهای خرید (فقط صاحبِ دکان)", color = c.text)
+          Text(StrPromoPages.belowCost, color = c.text)
         }
       } else if (lockedBelow) {
-        Hint("صاحبِ دکان برای این قاعده «زیرِ بهای خرید» را روشن کرده؛ ذخیره با نقشِ شما آن را خاموش می‌کند.")
+        Hint(StrPromoPages.belowCostOwner)
       }
-      Hint("بی آن، تخفیف هیچ کالایی را زیرِ بهای خریدش نمی‌برد.")
+      Hint(StrPromoPages.belowCostOff)
 
       if (error.isNotEmpty()) Text(error, color = c.danger, style = MaterialTheme.typography.bodySmall)
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(Space.xs, Alignment.End)) {
-        TextButton(enabled = !saving, onClick = onDismiss) { Text("انصراف") }
-        Button(enabled = !saving, onClick = { save() }) { Text(if (saving) "در حالِ ذخیره…" else "ذخیره") }
+        TextButton(enabled = !saving, onClick = onDismiss) { Text(Str.cancel) }
+        Button(enabled = !saving, onClick = { save() }) { Text(if (saving) StrOrderPages.saving else StrKit.save) }
       }
     }
   }
@@ -671,13 +688,13 @@ private fun ProductPick(label: String, selected: Set<String>, d: ShopData, singl
           InputChip(
             selected = true,
             onClick = { onChange(selected - id) },
-            label = { Text((d.products.firstOrNull { it.id == id }?.name ?: "کالای حذف‌شده") + "  ✕") },
+            label = { Text((d.products.firstOrNull { it.id == id }?.name ?: StrShrink.deletedProduct) + "  ✕") },
           )
         }
       }
     }
     OutlinedTextField(
-      value = q, onValueChange = { q = it }, label = { Text("$label — جست‌وجوی نام یا بارکد") },
+      value = q, onValueChange = { q = it }, label = { Text(StrPromoPages.searchFor(label)) },
       singleLine = true, modifier = Modifier.fillMaxWidth(),
     )
     val term = ir.vil3ntec.tohid.normalizeDigits(q).trim()
@@ -685,11 +702,11 @@ private fun ProductPick(label: String, selected: Set<String>, d: ShopData, singl
       val hits = d.products.asSequence()
         .filter { it.active && it.id !in selected && (it.name.contains(term, ignoreCase = true) || it.barcodes.any { b -> b.startsWith(term) }) }
         .take(8).toList()
-      if (hits.isEmpty()) Hint("کالایی پیدا نشد.")
+      if (hits.isEmpty()) Hint(StrPromoPages.noItemFound)
       hits.forEach { p ->
         Text(
           p.name,
-          Modifier.fillMaxWidth().clickable(onClickLabel = "افزودن") {
+          Modifier.fillMaxWidth().clickable(onClickLabel = StrFields.add) {
             onChange(if (single) setOf(p.id) else selected + p.id)
             q = ""
           }.padding(vertical = Space.xs, horizontal = Space.sm),

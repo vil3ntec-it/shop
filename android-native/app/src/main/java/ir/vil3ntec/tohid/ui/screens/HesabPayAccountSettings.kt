@@ -33,7 +33,14 @@ import ir.vil3ntec.tohid.core.gateway.AccountCall
 import ir.vil3ntec.tohid.core.gateway.HesabAccountView
 import ir.vil3ntec.tohid.core.gateway.HesabPayShop
 import ir.vil3ntec.tohid.core.gateway.PendingPayee
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrPay
+import ir.vil3ntec.tohid.core.i18n.StrPayPages
+import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.launch
@@ -56,22 +63,22 @@ import kotlinx.coroutines.launch
 /** وضعیت در یک خط («وصل است / وصل نیست») — زیرنویسِ ردیف و سرِ صفحه */
 fun hesabPayStatusLine(v: HesabAccountView?): String = when {
   v == null -> "…"
-  !v.connected -> "وصل نیست"
-  v.mode == HesabPayShop.SIMPLE -> "وصل است — ساده"
-  else -> "وصل است — خودکار"
+  !v.connected -> StrCourierApp.notConnected
+  v.mode == HesabPayShop.SIMPLE -> StrPayPages.connectedSimple
+  else -> StrPayPages.connectedAuto
 }
 
 /** پیامِ ردِ کارگزار: پیامِ خودِ سرور، و برای سنجشِ پیش از فرستادن متنِ همین‌جا */
 internal fun hesabPayRefusal(r: AccountCall.Refused): String = r.message.ifBlank {
   when (r.code) {
-    "hesabpay_pin_format" -> "رمزِ حساب‌پی باید ۶ رقم باشد."
-    "hesabpay_pin_weak" -> "این رمز ساده است (همه یکسان یا پشتِ سرِ هم)؛ رمزِ دیگری بگذارید."
-    "owner_only" -> "حساب‌پیِ دکان را فقط صاحبِ دکان می‌بیند و تنظیم می‌کند."
-    else -> "انجام نشد؛ دوباره بکوشید."
+    "hesabpay_pin_format" -> StrPayPages.pinFormat
+    "hesabpay_pin_weak" -> StrPayPages.pinWeak
+    "owner_only" -> StrPayPages.ownerOnly
+    else -> StrPayPages.notDoneRetry
   }
 }
 
-private const val HP_OFFLINE = "سرور در دسترس نیست؛ اینترنت را ببینید و دوباره بکوشید."
+private val HP_OFFLINE: String get() = StrPayPages.offline
 
 /** `ready` = واردشده، سرورِ آماده و نقشِ همین دستگاه صاحبِ دکان */
 @Composable
@@ -143,51 +150,51 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
     val v = view
     when {
-      !ready -> HpNote("فقط صاحبِ دکان، واردشده و با اینترنت، این بخش را می‌بیند.")
+      !ready -> HpNote(StrPayPages.ownerOnline)
       offline -> HpNote(HP_OFFLINE)
-      v == null -> HpNote("در حالِ خواندن…")
+      v == null -> HpNote(StrReports.loading)
       else -> {
         Text(hesabPayStatusLine(v), fontWeight = FontWeight.SemiBold, color = if (v.connected) c.success else c.muted)
         v.payee?.let { Text(StrPay.payeeLine(it.name.ifBlank { "—" }, it.last4), color = c.text) }
-        HpNote("پولِ حساب‌پی مستقیم به حسابِ خودِ همین دکان می‌رود؛ هیچ حسابِ دیگری جایش نمی‌نشیند.")
+        HpNote(StrPayPages.moneyDirect)
         v.pending?.let { p ->
           HpPendingCard(p, env.now(), busy) {
             act({ env.account.cancelPending() }) { show(it); env.forget(); toast(StrPay.changeCancelled) }
           }
         }
         v.sectionLockedUntil?.let {
-          HpNote("پس از «این من نبودم»، بخشِ حساب‌پی تا ${hpMinutesLeft(it, env.now())} دقیقهٔ دیگر بسته است؛ پول به همان حسابِ قبلیِ دکان می‌رود. پس از آن رمزِ حساب‌پی و رمزِ برنامه را عوض کنید.")
+          HpNote(StrPayPages.notMeLock(hpMinutesLeft(it, env.now())))
         }
         if (v.deviceTrusted == false) {
-          HpNote("این ورود هنوز برای عوض کردنِ حساب‌پی مطمئن نیست (دست‌کم ${v.trustDays} روز پس از ورود روی همین دستگاه، بی بیرون رفتن). دیدن شدنی است؛ برای تغییر از گوشی یا کمپیوترِ همیشگیِ خودتان بکوشید.")
+          HpNote(StrPayPages.notTrusted(v.trustDays))
         }
         when {
           !v.pinSet -> {
-            HpNote("برای این بخش یک رمزِ ۶ رقمیِ جدا بگذارید (غیر از رمزِ برنامه). بی این رمز هیچ‌کس حسابِ دکان را نمی‌بیند یا عوض نمی‌کند.")
-            v.holdUntil?.let { HpNote("پس از بازنشانیِ رمز، تا ${hpMinutesLeft(it, env.now())} دقیقهٔ دیگر حسابِ تازه پذیرفته نمی‌شود.") }
-            HpPinField(newPin, { newPin = it }, "رمزِ تازهٔ حساب‌پی (۶ رقم)")
-            HpPinField(newPin2, { newPin2 = it }, "تکرارِ رمز")
+            HpNote(StrPayPages.setPinNote)
+            v.holdUntil?.let { HpNote(StrPayPages.resetHold(hpMinutesLeft(it, env.now()))) }
+            HpPinField(newPin, { newPin = it }, StrPayPages.newPinField)
+            HpPinField(newPin2, { newPin2 = it }, StrPayPages.repeatPin)
             Button(
               onClick = {
-                if (newPin != newPin2) toast("دو رمز یکی نیستند.")
-                else act({ env.account.setPin(null, newPin) }) { show(it); newPin = ""; newPin2 = ""; toast("رمزِ حساب‌پی گذاشته شد.") }
+                if (newPin != newPin2) toast(StrPayPages.pinsDiffer)
+                else act({ env.account.setPin(null, newPin) }) { show(it); newPin = ""; newPin2 = ""; toast(StrPayPages.pinSet) }
               },
               enabled = !busy && newPin.isNotBlank(),
               modifier = Modifier.fillMaxWidth(),
-            ) { Text("گذاشتنِ رمز") }
+            ) { Text(StrPayPages.setPin) }
           }
           v.locked -> {
-            HpNote("رمزِ حساب‌پی چند بار اشتباه زده شد؛ حدودِ ${hpMinutesLeft(v.lockedUntil ?: 0L, env.now())} دقیقهٔ دیگر دوباره بکوشید.")
-            TextButton(onClick = { askReset = true }, enabled = !busy) { Text("رمز را فراموش کرده‌ام") }
+            HpNote(StrPayPages.pinLocked(hpMinutesLeft(v.lockedUntil ?: 0L, env.now())))
+            TextButton(onClick = { askReset = true }, enabled = !busy) { Text(StrPayPages.forgotPin) }
           }
           !v.opened -> {
-            HpPinField(pin, { pin = it }, "رمزِ حساب‌پی")
+            HpPinField(pin, { pin = it }, StrPayPages.pinField)
             Button(
               onClick = { act({ env.account.open(pin) }) { show(it) } },
               enabled = !busy && pin.isNotBlank(),
               modifier = Modifier.fillMaxWidth(),
-            ) { Text("باز کردن") }
-            TextButton(onClick = { askReset = true }, enabled = !busy) { Text("رمز را فراموش کرده‌ام") }
+            ) { Text(StrSettings.open) }
+            TextButton(onClick = { askReset = true }, enabled = !busy) { Text(StrPayPages.forgotPin) }
           }
           else -> HpOpened(
             v = v, busy = busy, mode = mode, onMode = { mode = it },
@@ -199,21 +206,21 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
             onSave = {
               val saved: (HesabAccountView) -> Unit = {
                 show(it); env.forget(); apiKey = ""; secret = ""
-                toast(if (it.pending != null) "حسابِ تازه ۲۴ ساعتِ دیگر فعال می‌شود؛ تا آن دم پول به همان حسابِ قبلی می‌رود." else "حساب‌پیِ دکان ذخیره شد.")
+                toast(if (it.pending != null) StrPayPages.newAccountIn24h else StrPayPages.accountSaved)
               }
               if (holder.isBlank()) {
-                toast("نامِ صاحبِ حساب را بنویسید (همان که در صندوق کنارِ QR دیده می‌شود).")
+                toast(StrPayPages.holderNeeded)
               } else if (mode == HesabPayShop.SIMPLE) {
                 val num = account.trim()
                 if (num.isNotEmpty() && HesabPayShop.normalizeAccount(num) == null) {
-                  toast("شمارهٔ حساب‌پی درست نیست (مثلِ 0799123456).")
+                  toast(StrPayPages.accountBad)
                 } else if (num.isEmpty() && qr.isBlank()) {
-                  toast("شمارهٔ حساب‌پیِ دکان یا QR ِ آن را بدهید.")
+                  toast(StrPayPages.accountOrQr)
                 } else {
                   act({ env.account.saveSimple(pin, holder, num, qr) }, saved)
                 }
               } else if (merchant.isBlank()) {
-                toast("شناسهٔ پذیرندهٔ حساب‌پیِ دکان را بنویسید.")
+                toast(StrPayPages.merchantNeeded)
               } else {
                 act({ env.account.saveAuto(pin, holder, apiKey, secret, merchant) }) { saved(it); merchant = "" }
               }
@@ -223,23 +230,23 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
         }
         if (v.opened) {
           if (changingPin) {
-            HpPinField(newPin, { newPin = it }, "رمزِ تازه (۶ رقم)")
-            HpPinField(newPin2, { newPin2 = it }, "تکرارِ رمزِ تازه")
+            HpPinField(newPin, { newPin = it }, StrPayPages.newPinShort)
+            HpPinField(newPin2, { newPin2 = it }, StrSettings.repeatPassword)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              OutlinedButton(onClick = { changingPin = false; newPin = ""; newPin2 = "" }, modifier = Modifier.weight(1f)) { Text("بی‌خیال") }
+              OutlinedButton(onClick = { changingPin = false; newPin = ""; newPin2 = "" }, modifier = Modifier.weight(1f)) { Text(StrPos.nevermind) }
               Button(
                 onClick = {
-                  if (newPin != newPin2) toast("دو رمز یکی نیستند.")
+                  if (newPin != newPin2) toast(StrPayPages.pinsDiffer)
                   else act({ env.account.setPin(pin, newPin) }) {
-                    show(v); pin = newPin; newPin = ""; newPin2 = ""; changingPin = false; toast("رمزِ حساب‌پی عوض شد.")
+                    show(v); pin = newPin; newPin = ""; newPin2 = ""; changingPin = false; toast(StrPayPages.pinChanged)
                   }
                 },
                 enabled = !busy && newPin.isNotBlank(),
                 modifier = Modifier.weight(1f),
-              ) { Text("عوض کردنِ رمز") }
+              ) { Text(StrPayPages.changePin) }
             }
           } else {
-            TextButton(onClick = { changingPin = true }, enabled = !busy) { Text("عوض کردنِ رمزِ حساب‌پی") }
+            TextButton(onClick = { changingPin = true }, enabled = !busy) { Text(StrPayPages.changeHpPin) }
           }
         }
         if (deps.noticeSupported && v.opened && v.mode == HesabPayShop.SIMPLE) {
@@ -256,37 +263,37 @@ fun HesabPayAccountSettings(ready: Boolean, toast: (String) -> Unit, onView: (He
   if (askReset) {
     AlertDialog(
       onDismissRequest = { askReset = false },
-      title = { Text("بازنشانیِ رمزِ حساب‌پی") },
-      text = { Text("رمز و حسابِ حساب‌پیِ دکان هر دو پاک می‌شوند و تا ۲۴ ساعت حسابِ تازه پذیرفته نمی‌شود. به دستگاه‌های صاحبِ دکان هم خبر می‌رود.") },
+      title = { Text(StrPayPages.resetPinTitle) },
+      text = { Text(StrPayPages.resetPinBody) },
       confirmButton = {
         TextButton(onClick = {
           askReset = false
-          act({ env.account.resetPin() }) { show(it); pin = ""; env.forget(); toast("رمز و حسابِ حساب‌پی پاک شد.") }
-        }) { Text("پاک کن") }
+          act({ env.account.resetPin() }) { show(it); pin = ""; env.forget(); toast(StrPayPages.pinReset) }
+        }) { Text(StrPos.clearIt) }
       },
-      dismissButton = { TextButton(onClick = { askReset = false }) { Text("بی‌خیال") } },
+      dismissButton = { TextButton(onClick = { askReset = false }) { Text(StrPos.nevermind) } },
     )
   }
   if (askRemove) {
     AlertDialog(
       onDismissRequest = { askRemove = false },
-      title = { Text("برداشتنِ حساب‌پیِ دکان") },
-      text = { Text("دکمهٔ حساب‌پی از صندوق برداشته می‌شود. رمزِ حساب‌پی می‌ماند.") },
+      title = { Text(StrPayPages.removeAccount) },
+      text = { Text(StrPayPages.removeAccountBody) },
       confirmButton = {
         TextButton(onClick = {
           askRemove = false
-          act({ env.account.remove(pin) }) { show(it); account = ""; qr = ""; env.forget(); toast("حساب‌پیِ دکان برداشته شد.") }
-        }) { Text("بردار") }
+          act({ env.account.remove(pin) }) { show(it); account = ""; qr = ""; env.forget(); toast(StrPayPages.accountRemoved) }
+        }) { Text(StrAccount.removeConfirm) }
       },
-      dismissButton = { TextButton(onClick = { askRemove = false }) { Text("بی‌خیال") } },
+      dismissButton = { TextButton(onClick = { askRemove = false }) { Text(StrPos.nevermind) } },
     )
   }
   if (scanning) HpQrScanDialog(onDismiss = { scanning = false }) { text ->
     scanning = false
     val parsed = HesabPayShop.parseQr(text)
-    if (parsed == null) toast("این QR خوانده نشد یا بلند است.")
-    else if (parsed.account.isEmpty()) toast("در این QR شمارهٔ حساب‌پی نیست؛ شمارهٔ حساب را بنویسید.")
-    else if (account.isNotBlank() && HesabPayShop.normalizeAccount(account) != parsed.account) toast("شمارهٔ درونِ این QR با شمارهٔ حساب یکی نیست.")
+    if (parsed == null) toast(StrPayPages.qrUnreadable)
+    else if (parsed.account.isEmpty()) toast(StrPayPages.qrNoAccount)
+    else if (account.isNotBlank() && HesabPayShop.normalizeAccount(account) != parsed.account) toast(StrPayPages.qrMismatch)
     else {
       qr = parsed.payload
       account = parsed.account
@@ -317,48 +324,48 @@ private fun HpOpened(
   onRemove: () -> Unit,
 ) {
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    for ((m, label) in listOf(HesabPayShop.SIMPLE to "ساده", HesabPayShop.AUTO to "خودکار")) {
+    for ((m, label) in listOf(HesabPayShop.SIMPLE to StrPayPages.simple, HesabPayShop.AUTO to StrSettings.auto)) {
       if (mode == m) Button(onClick = { onMode(m) }, modifier = Modifier.weight(1f)) { Text(label) }
       else OutlinedButton(onClick = { onMode(m) }, modifier = Modifier.weight(1f)) { Text(label) }
     }
   }
   OutlinedTextField(
-    value = holder, onValueChange = { onHolder(it.take(60)) }, label = { Text("نامِ صاحبِ حساب (در صندوق کنارِ QR دیده می‌شود)") },
+    value = holder, onValueChange = { onHolder(it.take(60)) }, label = { Text(StrPayPages.holderField) },
     singleLine = true, modifier = Modifier.fillMaxWidth(),
   )
-  if (v.connected) HpNote("حسابِ تازه ۲۴ ساعت پس از ذخیره فعال می‌شود و تا آن دم پول به همین حسابِ امروز می‌رود؛ به همهٔ دستگاه‌های صاحب خبر می‌رود.")
+  if (v.connected) HpNote(StrPayPages.newAccountNote)
   if (mode == HesabPayShop.SIMPLE) {
-    HpNote("شماره یا QR ِ حساب‌پیِ خودِ دکان. در صندوق همین QR با مبلغ و کدِ فاکتور نشان داده می‌شود و پول مستقیم به همین حساب می‌رود. صندوقدار فقط وقتی پول را در حساب دید «پول رسید» را می‌زند.")
+    HpNote(StrPayPages.simpleNote)
     OutlinedTextField(
-      value = account, onValueChange = onAccount, label = { Text("شمارهٔ حساب‌پیِ دکان (مثلِ 0799123456)") },
+      value = account, onValueChange = onAccount, label = { Text(StrPayPages.accountField) },
       singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone), modifier = Modifier.fillMaxWidth(),
     )
     OutlinedTextField(
-      value = qr, onValueChange = onQr, label = { Text("QR ِ حساب‌پیِ دکان (اختیاری)") },
+      value = qr, onValueChange = onQr, label = { Text(StrPayPages.qrField) },
       singleLine = true, modifier = Modifier.fillMaxWidth(),
     )
-    if (!Platform.DESKTOP) TextButton(onClick = onScan, enabled = !busy) { Text("اسکنِ QR ِ حساب‌پیِ دکان") }
+    if (!Platform.DESKTOP) TextButton(onClick = onScan, enabled = !busy) { Text(StrPayPages.scanQr) }
   } else {
     if (!v.autoAvailable) {
       HpNote(
-        if (v.autoReason == "server_not_ready") "سرور هنوز برای حالتِ خودکار آماده نیست؛ از حالتِ ساده استفاده کنید."
-        else "حالتِ خودکار برای این دکان هنوز روشن نشده؛ کلیدها ذخیره می‌شوند و با روشن شدن به کار می‌روند.",
+        if (v.autoReason == "server_not_ready") StrPayPages.serverNotReady
+        else StrPayPages.autoNotOn,
       )
     }
-    HpNote("کلید و رازِ پذیرندهٔ حساب‌پیِ خودِ دکان. پرداخت فقط وقتی خودکار تأیید می‌شود که حساب‌پی با امضای همین دکان کد و مبلغِ همان فاکتور را بفرستد. کلیدها پس از ذخیره دیگر نشان داده نمی‌شوند.")
+    HpNote(StrPayPages.autoNote)
     if (v.mode == HesabPayShop.AUTO) {
-      HpNote("کلیدِ فعلی: …${v.keyLast4}${if (v.merchantSet) " · شناسهٔ پذیرنده دارد" else ""}")
-      if (v.webhookUrl.isNotBlank()) HpNote("این نشانی را در داشبوردِ حساب‌پیِ دکان به‌عنوانِ وب‌هوک ثبت کنید: ${v.webhookUrl}")
+      HpNote(StrPayPages.currentKey(v.keyLast4, if (v.merchantSet) StrPayPages.merchantSet else ""))
+      if (v.webhookUrl.isNotBlank()) HpNote(StrPayPages.webhookNote(v.webhookUrl))
     }
-    HpSecretField(apiKey, onApiKey, "کلیدِ API")
-    HpSecretField(secret, onSecret, "رازِ وب‌هوک")
+    HpSecretField(apiKey, onApiKey, StrPayPages.apiKey)
+    HpSecretField(secret, onSecret, StrPayPages.webhookSecret)
     OutlinedTextField(
-      value = merchant, onValueChange = onMerchant, label = { Text("شناسهٔ پذیرنده (لازم؛ از داشبوردِ حساب‌پی)") },
+      value = merchant, onValueChange = onMerchant, label = { Text(StrPayPages.merchantField) },
       singleLine = true, modifier = Modifier.fillMaxWidth(),
     )
   }
-  Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("ذخیره") }
-  if (v.connected) OutlinedButton(onClick = onRemove, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text("برداشتنِ حساب‌پیِ دکان") }
+  Button(onClick = onSave, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(StrKit.save) }
+  if (v.connected) OutlinedButton(onClick = onRemove, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(StrPayPages.removeAccount) }
 }
 
 /** «حسابِ گیرنده در حالِ عوض شدن است» + «این من نبودم — لغو کن» (یک لمس؛ سرور تأییدِ دوبارهٔ ورود می‌خواهد) */
@@ -368,7 +375,7 @@ internal fun HpPendingCard(p: PendingPayee, now: Long, busy: Boolean, onCancel: 
   Surface(color = c.surface, shape = RoundedCornerShape(12.dp), modifier = Modifier.fillMaxWidth()) {
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
       Text(StrPay.changeNotice(p.name.ifBlank { "—" }, p.last4), color = c.warning, fontWeight = FontWeight.Bold)
-      HpNote("حدودِ ${maxOf(1L, hpMinutesLeft(p.until, now) / 60)} ساعتِ دیگر فعال می‌شود. ${StrPay.changeNoticeDetail}")
+      HpNote(StrPayPages.activeInHours(maxOf(1L, hpMinutesLeft(p.until, now) / 60), StrPay.changeNoticeDetail))
       Button(onClick = onCancel, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(StrPay.notMe) }
     }
   }
@@ -378,10 +385,10 @@ internal fun HpPendingCard(p: PendingPayee, now: Long, busy: Boolean, onCancel: 
 private fun HpHintRow(on: Boolean, granted: Boolean, onToggle: (Boolean) -> Unit) {
   Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
     Column(Modifier.weight(1f)) {
-      Text("پیشنهاد از اعلانِ حساب‌پی (فقط همین دستگاه)")
+      Text(StrPayPages.notifSuggest)
       HpNote(
-        "وقتی اعلانِ «پول رسید» ِ برنامهٔ حساب‌پی آمد، صندوق فقط پیشنهاد می‌دهد؛ تأیید باز هم با «پول رسید» ِ صندوقدار است. پیامک خوانده نمی‌شود." +
-          if (on && !granted) " اجازهٔ «دسترسی به اعلان» هنوز داده نشده." else "",
+        StrPayPages.notifNote +
+          if (on && !granted) StrPayPages.notifPermission else "",
       )
     }
     Switch(checked = on, onCheckedChange = onToggle)

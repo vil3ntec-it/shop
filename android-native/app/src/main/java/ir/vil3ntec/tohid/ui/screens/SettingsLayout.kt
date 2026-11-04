@@ -465,7 +465,7 @@ object SettingsLayout {
     TRAINING -> StrSettingsPages.titleTraining
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     MULTI_DRAWER -> ir.vil3ntec.tohid.core.i18n.StrDrawers.settingsTitle
-    STOCK_MODE -> STOCK_SETTINGS_TITLE
+    STOCK_MODE -> ir.vil3ntec.tohid.core.i18n.StrStockPages.settingsTitle
     STOCK_INSIGHT -> StrShell.stockInsight
     STOCK_LEVELS -> StrShell.stockLevels
     PRODUCT_TOOLS -> StrShell.productTools
