@@ -39,8 +39,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.disabled
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.toggleableState
+import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -119,7 +124,10 @@ private fun FieldIcon(icon: ImageVector, label: String, onClick: () -> Unit) {
   ) { Icon(icon, contentDescription = label, tint = c.icon, modifier = Modifier.size(20.dp)) }
 }
 
-/** ردیفِ کلید (روشن/خاموش) — زدنِ کلِ ردیف هم کلید را می‌زند */
+/**
+ *  ردیفِ کلید (روشن/خاموش) — زدنِ کلِ ردیف هم کلید را می‌زند. برای صفحه‌خوان کلِ ردیف **یک** کلید است با حالتِ
+ *  روشن/خاموش (نه «دکمه» و کنارش کلیدِ دوم بی نام و حالت)؛ کلیدِ کوچکِ پایان فقط نما است.
+ */
 @Composable
 fun V3ToggleRow(
   title: String,
@@ -133,12 +141,16 @@ fun V3ToggleRow(
 ) {
   V3ListRow(
     title = title,
-    modifier = modifier,
+    modifier = modifier.semantics(mergeDescendants = true) {
+      toggleableState = ToggleableState(checked)
+      if (!enabled) disabled()
+    },
     subtitle = subtitle,
     icon = icon,
     hue = hue,
     chevron = false,
-    trailing = { V3Toggle(checked, title, if (enabled) onCheckedChange else null) },
+    trailing = { Box(Modifier.clearAndSetSemantics {}) { V3Toggle(checked, title, null) } },
+    role = Role.Switch,
     onClick = if (enabled) ({ onCheckedChange(!checked) }) else null,
   )
 }

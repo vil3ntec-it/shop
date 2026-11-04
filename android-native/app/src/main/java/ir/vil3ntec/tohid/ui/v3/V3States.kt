@@ -50,7 +50,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -162,7 +164,10 @@ fun V3Message(
   }
   val shape = RoundedCornerShape(14.dp)
   Row(
-    modifier.fillMaxWidth().clip(shape).background(pair.bg).border(1.dp, pair.border, shape).padding(14.dp),
+    modifier.fillMaxWidth().clip(shape).background(pair.bg).border(1.dp, pair.border, shape)
+      //  WCAG 4.1.3: خطایی که پس از زدنِ دکمه می‌آید را صفحه‌خوان هم می‌گوید (نه فقط رنگ و جا)
+      .then(if (tone == V3Tone.ERROR) Modifier.semantics { liveRegion = LiveRegionMode.Polite } else Modifier)
+      .padding(14.dp),
     verticalAlignment = Alignment.Top,
   ) {
     Icon(icon, contentDescription = null, tint = PhoneV3Roles.toneIcon(c, tone), modifier = Modifier.size(22.dp))

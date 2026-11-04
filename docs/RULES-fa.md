@@ -588,6 +588,7 @@
 - مرجعِ ظاهر `docs/VISUAL-DIRECTION-fa.md` («Professional Retail OS») است و بر `DESIGN-PROMPT-fa.md` مقدم (#238).
 - صفحه‌های کار بی شیشه و آرورا؛ `decorative` فقط برای آغاز و ورود (#257).
 - وضعیت همیشه «متن + رنگ + نقطه» (`StatusPill`) (#256، #257).
+- دسترس‌پذیری (WCAG 2.1 AA، `V3A11yGuardTest`، `claude/a11y-v3`): دکمهٔ تک‌آیکنی نامِ صفحه‌خوان دارد (`contentDescription` ِ آیکن یا `semantics`؛ `label` ِ `v3Pressable` فقط نامِ کار است)؛ هر کشیدنِ دست‌ساز `customActions` یا راهِ زدنیِ نوشته در `ALTERNATIVES`؛ نوشتهٔ یک‌خطی با `width` ِ ثابت نه (`widthIn(min)`)، و کادرِ متن‌دار `heightIn(min)` تا ×۱٫۳/×۲ بریده نشود؛ باز/بسته با `stateDescription` ِ `StrA11y`، انتخاب با `selected`، خطا با `liveRegion` (`V3Message` خودش)؛ کلیدِ درونِ ردیف فقط نما (`V3ToggleRow`).
 - هر فهرستِ اصلی نمای کارتی/جدولی دارد که برای هر کاربر و هر صفحه روی همان دستگاه می‌ماند و همگام نمی‌شود؛ پیش‌فرض: فروش کارتی، مدیریت جدولی، گوشی کارتی؛ تغییرِ نما فیلتر و انتخاب را نگه می‌دارد (§۱٫۵، #239).
 - اجزای مشترک فقط از `ui/components/common` (`StatCard`، `StatusPill`، `SegmentedTabs`، `TableToolbar`، `BulkActionBar`، `ViewModePref`/`ViewModeToggle`)؛ دوباره نساز (#257).
 - کارِ گروهیِ خطرناک: پیش‌نمایشِ اثرِ هر ردیف، دلیلِ اجباری و گزارشِ هر ردیف با ناموفق‌ها اول (#257).

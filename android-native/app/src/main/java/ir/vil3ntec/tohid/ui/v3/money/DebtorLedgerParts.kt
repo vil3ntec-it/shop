@@ -46,9 +46,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -118,6 +121,8 @@ internal fun DebtorDrawer(
       val turn by animateFloatAsState(if (open) 180f else 0f, V3Springs.ui(), label = "drawerChevron")
       V3ListRow(
         title = StrMoney.actionsAndInfo,
+        //  صفحه‌خوان «باز/بسته» را می‌شنود، نه فقط چرخشِ پیکان
+        modifier = Modifier.semantics { stateDescription = if (open) StrA11y.expanded else StrA11y.collapsed },
         subtitle = DebtorLedgerModel.summary(account.debtor.phone, account.since, contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()),
         subtitleLines = 1,
         icon = Icons.Outlined.Tune,
