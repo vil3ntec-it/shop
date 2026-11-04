@@ -188,6 +188,54 @@ object GiftCards {
     return refundRows(d, sale.id, sale.id, "${sale.id}-x", gift, credit, sale.debtorId, notes, today, now, by, docs)
   }
 
+  // ── اعطای دستیِ اعتبار (PRM-15، «هدیه بی کارت») ─────────────────
+  /** `AuditEntry.type` ِ سابقهٔ اعطای دستیِ اعتبار (شناسه `<کلید>-g`، `refId` = ردیفِ رسید) */
+  const val CREDIT_GRANT = "store_credit_grant"
+
+  sealed interface Granted {
+    /** [again] ⇒ همین کلید با همین محتوا پیش‌تر نشسته بود: [data] همان دفترِ ورودی، بی ردیفِ دوم */
+    data class Ok(val data: ShopData, val again: Boolean = false) : Granted
+    data class Bad(val code: String) : Granted
+  }
+
+  /** کلیدِ اعطا (شناسهٔ ردیفِ رسید) پیش‌تر در دفتر هست؟ — کلیدِ «یک بار» ِ `GiftCardPref.grant` */
+  fun hasGrant(d: ShopData, key: String): Boolean = d.transactions.any { it.id == key }
+
+  /** پیش‌نمایشِ پنجره: ماندهٔ امروز و ماندهٔ پس از اعطای [amountMinor] (مثبت = بدهی، منفی = طلب) */
+  fun grantPreview(d: ShopData, debtorId: String, amountMinor: Long): Pair<Long, Long> =
+    balanceMinor(d, debtorId).let { it to StoreCredit.afterGrant(it, amountMinor) }
+
+  /**
+   *  PRM-15 — اعطای دستیِ اعتبارِ فروشگاه به مشتریِ [debtorId] با شناسهٔ [key] (پنجره هنگامِ باز شدن می‌سازد).
+   *  همان ردیفِ «برگشت به اعتبار»: رسیدِ `kind` = [CREDIT] ⇒ نقدِ دخل نیست (`CashShift.isCashReceipt`)، امتیازِ پرداخت
+   *  نمی‌دهد (`LoyaltyPoints.afterPayment` فقط `kind` ِ تهی) و به فاکتوری بسته نیست (`refId` تهی)؛ اول بدهیِ مشتری
+   *  را کم می‌کند، بقیه طلبِ خرج‌شدنی است. قاعده در `StoreCredit.grantProblem` (core): فقط با تصمیمِ «مجاز» ِ
+   *  `sales.discount` برای همین مبلغ ([decision])، مشتریِ موجود و فعال، مبلغِ درست و دلیل. سابقهٔ [CREDIT_GRANT] با
+   *  [by] و دلیل در همان دفتر. همان کلید با همان محتوا ⇒ `again`؛ با محتوای دیگر ⇒ `ID_CONFLICT`.
+   */
+  fun grantCredit(
+    cur: ShopData, key: String, debtorId: String, amountMinor: Long, reason: String?, decision: String,
+    today: String, now: Long, by: String?,
+  ): Granted {
+    val debtor = cur.debtors.firstOrNull { it.id == debtorId }
+    StoreCredit.grantProblem(debtor != null && CustomerCrm.isActive(debtor), amountMinor, reason, decision)?.let { return Granted.Bad(it) }
+    val prev = cur.transactions.firstOrNull { it.id == key }
+    if (prev != null) {
+      val same = prev.debtorId == debtorId && prev.type == "receive" && prev.kind == CREDIT && PayFlow.minor(prev.amount) == amountMinor
+      return if (same) Granted.Ok(cur, again = true) else Granted.Bad(GiftCard.Code.ID_CONFLICT)
+    }
+    val why = reason!!.trim()
+    val tx = DebtTransaction(
+      id = key, debtorId = debtorId, type = "receive", amount = PayFlow.major(amountMinor), date = today,
+      notes = "اعتبارِ هدیه — $why", createdAt = now, kind = CREDIT,
+    )
+    val log = AuditEntry(
+      id = "$key-g", type = CREDIT_GRANT, date = today, refId = key, createdAt = now, amount = PayFlow.major(amountMinor), by = by, reason = why,
+      notes = "اعتبارِ هدیه برای «${debtor!!.name}» — ${fmt(amountMinor)} افغانی (بی نقد)",
+    )
+    return Granted.Ok(cur.copy(transactions = cur.transactions + tx, auditLog = cur.auditLog + log))
+  }
+
   // ── فروشِ کارت ────────────────────────────────────────────────
   sealed interface Issued {
     /** [again] ⇒ همین کلید با همین محتوا پیش‌تر نشسته بود: [data] همان دفترِ ورودی، بی ردیفِ دوم */
@@ -294,6 +342,8 @@ object GiftCards {
     NO_CARD_ROWS -> StrGiftCard.errRefundOver
     NOT_ALLOWED -> StrGiftCard.errNotAllowed
     GiftCard.Code.REASON_REQUIRED -> StrGiftCard.errReason
+    GiftCard.Code.TEXT_TOO_LONG -> StrGiftCard.errTooLong
+    StoreCredit.GRANT_NOT_ALLOWED -> StrGiftCard.errGrantNotAllowed
     else -> StrGiftCard.errNotSaved
   }
 }

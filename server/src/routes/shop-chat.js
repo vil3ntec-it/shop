@@ -16,6 +16,7 @@ const config = require('../config');
 const chat = require('../lib/shop-chat');
 const { goneSignal } = require('../lib/chat-wait');
 const { can } = require('../lib/permissions');
+const contact = require('../lib/customer-contact');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, refund } = require('../middleware/ratelimit');
 const { notFound } = require('../middleware/errors');
@@ -24,8 +25,16 @@ const router = express.Router();
 //  سطلِ IP ِ خودِ چت **پیش از** احراز (CodeQL `js/missing-rate-limiting`)؛ همان سقفِ `general` ِ سراسری ⇒ رفتار همان
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' }));
 router.use(requireUser, requireShop, requirePermission('chat.view'));
+//  CRM-15: شمارهٔ کامل = `orders.contact` ِ نقش **و** `customers.contact` ِ دو لایه (صاحب می‌تواند برای همین مدیر ببندد);
+//  نقشِ بی `orders.contact` بی هیچ پرسشی — ‎lib/customer-contact.js‎
+router.use((req, res, next) => {
+  if (!can(req.role, 'orders.contact')) { req.customerContact = false; return next(); }
+  contact.hiddenForReq(req).then((hidden) => { req.customerContact = !hidden; next(); }).catch(next);
+});
 
-const viewerOf = (req) => ({ side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role });
+const viewerOf = (req) => ({
+  side: 'shop', shopId: req.shopId, userId: req.user.id, role: req.role, contact: req.customerContact === true,
+});
 const reply = requirePermission('chat.reply');
 const moderate = requirePermission('chat.moderate');
 //  تکرارِ همان پیام/همان بایت سهمیه را پس می‌دهد (CHAT-11) ⇒ `refundable`
@@ -48,7 +57,7 @@ router.get('/config', async (req, res) => {
     },
     reasons: chat.REASONS,
     permissions: Object.fromEntries(
-      ['reply', 'moderate'].map((k) => [k, can(req.role, `chat.${k}`)]).concat([['contact', can(req.role, 'orders.contact')]])
+      ['reply', 'moderate'].map((k) => [k, can(req.role, `chat.${k}`)]).concat([['contact', req.customerContact === true]])
     ),
   });
 });

@@ -167,6 +167,21 @@ data class PublicOrderLine(
 @Serializable
 data class PublicOrderEvent(val status: String, val at: Long)
 
+/**
+ *  کارتِ «پرداخت» ِ پیگیری وقتی دکان «پرداخت پس از پذیرش» را روشن دارد (`server/src/lib/order-flow.js`، #910):
+ *  [state] یکی از awaiting_accept · awaiting_choice · cash · online_pending · paid_online · cash_collected ·
+ *  cash_settled · refunded · closed؛ [choice] = '' یا cash؛ [cash] = delivery یا pickup؛ مبلغ همیشه از سرور.
+ */
+@Serializable
+data class PaymentStep(
+  val state: String = "",
+  val choice: String = "",
+  val amountMinor: Long = 0,
+  val cash: String = "",
+  val canChoose: Boolean = false,
+  val online: Boolean = false,
+)
+
 /** §۱.۷ — سفارش برای مشتری (پیگیری با توکنِ HMAC دار). */
 @Serializable
 data class PublicOrder(
@@ -199,6 +214,8 @@ data class PublicOrder(
   val timeline: List<PublicOrderEvent> = emptyList(),
   /** فقط در پیگیری (`GET /api/store/:slug/orders/:token`، PAY-21 #529) */
   val onlinePay: OnlinePayment? = null,
+  /** فقط در پیگیری و فقط با «پرداخت پس از پذیرش» ِ روشن ([PaymentStep]) */
+  val paymentStep: PaymentStep? = null,
 )
 
 /** §۱.۸ — پیک برای مشتری (S5 وصلش می‌کند؛ امروز سرور در پاسخی نمی‌دهد). */
