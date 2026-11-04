@@ -163,7 +163,7 @@ fun CheckoutDialog(
       modifier = Modifier.fillMaxWidth(),
     ) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text("تسویه فروش", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.settleSale, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))
         //  POS-21: کادرِ تخفیف پنهان است ولی قیمتِ ردیفی زیرِ فهرست مانده ⇒ چرا «ثبت» خاموش است
         if (!canDiscount && gate == DiscountGate.State.DENIED) {
@@ -173,10 +173,10 @@ fun CheckoutDialog(
 
         //  تخفیف فقط با صاحب و مدیر — `ShopRole.canDiscount`
         if (canDiscount) {
-        Text("نوع تخفیف", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.discountType, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
-          options = listOf("درصدی" to SalesEngine.DiscountType.PERCENT, "مبلغی" to SalesEngine.DiscountType.AMOUNT),
+          options = listOf(ir.vil3ntec.tohid.core.i18n.StrSale.percentWord to SalesEngine.DiscountType.PERCENT, ir.vil3ntec.tohid.core.i18n.StrSalePages.byAmount to SalesEngine.DiscountType.AMOUNT),
           selected = discountType,
           onSelect = { discountType = it },
         )
@@ -185,10 +185,10 @@ fun CheckoutDialog(
         OutlinedTextField(
           value = discountText,
           onValueChange = { discountText = numericInput(it) },
-          label = { Text(if (discountType == SalesEngine.DiscountType.PERCENT) "تخفیف (٪)" else "تخفیف (افغانی)") },
+          label = { Text(if (discountType == SalesEngine.DiscountType.PERCENT) ir.vil3ntec.tohid.core.i18n.StrSale.discountPct else ir.vil3ntec.tohid.core.i18n.StrSale.discountAmount) },
           singleLine = true,
           isError = discountBad,
-          supportingText = if (discountBad) { { Text("عدد درست نیست") } } else null,
+          supportingText = if (discountBad) { { Text(ir.vil3ntec.tohid.core.i18n.StrSale.badNumberShort) } } else null,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
           modifier = Modifier.fillMaxWidth(),
         )
@@ -197,22 +197,22 @@ fun CheckoutDialog(
           DiscountGate.State.NEEDS_APPROVAL -> {
             Spacer(Modifier.height(6.dp))
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              StatusPill("نیازمند تأیید", PillTone.AWAITING)
+              StatusPill(ir.vil3ntec.tohid.core.i18n.StrSale.needsApproval, PillTone.AWAITING)
               Text(
-                if (decision.cap == "maxPct") "بیش از سقفِ ${qty(decision.limit ?: 0.0)}٪ِ شما"
-                else "بیش از اختیارِ شما",
+                if (decision.cap == "maxPct") ir.vil3ntec.tohid.core.i18n.StrSalePages.overYourCap(qty(decision.limit ?: 0.0))
+                else ir.vil3ntec.tohid.core.i18n.StrSale.overYourRights,
                 style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted, modifier = Modifier.weight(1f),
               )
-              OutlinedButton(onClick = { askApproval = true }, enabled = saleKey != null && !busy) { Text("درخواستِ تأیید") }
+              OutlinedButton(onClick = { askApproval = true }, enabled = saleKey != null && !busy) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.askApproval) }
             }
           }
           DiscountGate.State.APPROVED -> {
             Spacer(Modifier.height(6.dp))
-            StatusPill("تأیید شد", PillTone.SUCCESS)
+            StatusPill(ir.vil3ntec.tohid.core.i18n.StrSale.approved, PillTone.SUCCESS)
           }
           DiscountGate.State.DENIED -> {
             Spacer(Modifier.height(6.dp))
-            StatusPill("این تخفیف برای شما ممنوع است", PillTone.DANGER)
+            StatusPill(ir.vil3ntec.tohid.core.i18n.StrSale.discountDenied, PillTone.DANGER)
           }
           DiscountGate.State.FREE -> Unit
         }
@@ -220,10 +220,10 @@ fun CheckoutDialog(
         Spacer(Modifier.height(14.dp))
         }
         if (!payV2) {
-        Text("نوع پرداخت", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.paymentType, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
-          options = listOf("نقدی" to SalesEngine.Payment.CASH, "نسیه" to SalesEngine.Payment.CREDIT),
+          options = listOf(ir.vil3ntec.tohid.core.i18n.StrSale.cashPay to SalesEngine.Payment.CASH, ir.vil3ntec.tohid.core.i18n.StrSale.creditPay to SalesEngine.Payment.CREDIT),
           selected = payment,
           onSelect = { payment = it },
         )
@@ -242,7 +242,7 @@ fun CheckoutDialog(
          */
         Spacer(Modifier.height(12.dp))
         Text(
-          if (payV2) "مشتری — باقی‌مانده به حسابش می‌رود" else if (payment == SalesEngine.Payment.CREDIT) "قرض‌دار" else "مشتری (اختیاری)",
+          if (payV2) ir.vil3ntec.tohid.core.i18n.StrSale.customerToAccount else if (payment == SalesEngine.Payment.CREDIT) ir.vil3ntec.tohid.core.i18n.Str.debtor else ir.vil3ntec.tohid.core.i18n.StrSale.customerOptional,
           style = MaterialTheme.typography.labelMedium,
           color = Shop.colors.muted,
         )
@@ -254,16 +254,16 @@ fun CheckoutDialog(
           ) {
             Text(
               debtorId?.let { id -> d.debtors.find { it.id == id }?.name }
-                ?: if (d.debtors.isEmpty()) "— هنوز کسی ثبت نشده —" else "انتخاب",
+                ?: if (d.debtors.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrSalePages.nobodyYet else ir.vil3ntec.tohid.core.i18n.StrSale.chooseWord,
             )
           }
           if (debtorId != null) {
-            TextButton(onClick = { debtorId = null }) { Text("برداشتن") }
+            TextButton(onClick = { debtorId = null }) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.remove) }
           }
         }
         if (debtorMenu) {
           SearchablePicker(
-            title = if (payment == SalesEngine.Payment.CREDIT) "انتخاب قرض‌دار" else "انتخاب مشتری",
+            title = if (payment == SalesEngine.Payment.CREDIT) ir.vil3ntec.tohid.core.i18n.StrSalePages.chooseDebtor else ir.vil3ntec.tohid.core.i18n.StrSalePages.chooseCustomer,
             //  ادغام‌شده دوباره انتخاب نمی‌شود (CRM-10)؛ بی ادغام همان فهرستِ امروز
             options = ir.vil3ntec.tohid.data.CustomerCrm.active(d),
             idOf = { it.id },
@@ -293,10 +293,10 @@ fun CheckoutDialog(
           OutlinedTextField(
             value = paidText,
             onValueChange = { paidText = numericInput(it) },
-            label = { Text("مبلغ پرداختی") },
+            label = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.paidAmount) },
             singleLine = true,
             isError = paidBad,
-            supportingText = if (paidBad) { { Text("عدد درست نیست") } } else null,
+            supportingText = if (paidBad) { { Text(ir.vil3ntec.tohid.core.i18n.StrSale.badNumberShort) } } else null,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
             modifier = Modifier.fillMaxWidth(),
           )
@@ -314,29 +314,29 @@ fun CheckoutDialog(
         Panel {
           //  S3: مثلِ خلاصهٔ صندوق — جمع پیش از تخفیف‌های خودکار، ردیفشان با نام، بعد تخفیفِ دستی
           if (promo != null && promo.stamp && promo.discount > 0) {
-            MoneyRow("جمع اقلام", promo.gross)
+            MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.itemsTotal, promo.gross)
             MoneyRow(SaleReceipt.promoLabel(promo.applied.map { it.name }), promo.discount, negative = true)
-          } else MoneyRow("جمع اقلام", totals.subtotal + pointsOff)
+          } else MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.itemsTotal, totals.subtotal + pointsOff)
           if (pointsOff > 0) MoneyRow(ir.vil3ntec.tohid.core.i18n.StrLoyalty.use, pointsOff, negative = true) // PRM-13
-          MoneyRow("تخفیف", totals.discount)
+          MoneyRow(ir.vil3ntec.tohid.core.i18n.Str.discount, totals.discount)
           if (rounding != 0.0) MoneyRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(rounding), negative = rounding < 0) // PAY-09
           HorizontalDivider(Modifier.padding(vertical = 6.dp), color = Shop.colors.border)
-          MoneyRow("مبلغ نهایی", due, strong = true)
+          MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.finalAmount, due, strong = true)
           if (!payV2) {
-          MoneyRow("مبلغ پرداختی", paid)
-          MoneyRow("باقی‌مانده", remaining, tint = if (remaining > 0) Shop.colors.warning else null)
+          MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.paidAmount, paid)
+          MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.remaining, remaining, tint = if (remaining > 0) Shop.colors.warning else null)
           }
         }
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) }
           Button(
             onClick = { confirm() },
             enabled = !busy && !discountBad && !paidBad &&
               gate != DiscountGate.State.NEEDS_APPROVAL && gate != DiscountGate.State.DENIED,
             modifier = Modifier.weight(1f),
-          ) { Text(if (busy) "در حالِ ثبت…" else "ثبت فروش") }
+          ) { Text(if (busy) ir.vil3ntec.tohid.core.i18n.StrSale.posting else ir.vil3ntec.tohid.core.i18n.StrSale.recordSale) }
         }
       }
     }
@@ -345,8 +345,8 @@ fun CheckoutDialog(
 
   if (askApproval && saleKey != null) {
     ApprovalDialog(
-      title = "تأییدِ تخفیف",
-      summary = "تخفیفِ ${money(basis.discount)} ؋ روی فاکتورِ ${money(basis.subtotal)} ؋",
+      title = ir.vil3ntec.tohid.core.i18n.StrSale.discountApproval,
+      summary = ir.vil3ntec.tohid.core.i18n.StrSalePages.discountOnInvoice(money(basis.discount), money(basis.subtotal)),
       shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
       requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
       need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
@@ -433,13 +433,13 @@ fun InvoiceDialog(
     ) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
         Text(
-          "فاکتور فروش #${sale.invoiceLabel() ?: "—"}",
+          ir.vil3ntec.tohid.core.i18n.StrSalePages.salesInvoiceNo(sale.invoiceLabel() ?: "—"),
           style = MaterialTheme.typography.titleMedium,
           color = Shop.colors.text,
         )
         Spacer(Modifier.height(4.dp))
         Text(
-          "${formatDate(sale.date)} — ${ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = "نقدی")}",
+          "${formatDate(sale.date)} — ${ir.vil3ntec.tohid.data.PayFlow.payLabel(sale, cash = ir.vil3ntec.tohid.core.i18n.StrSale.cashPay)}",
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
         )
@@ -472,13 +472,13 @@ fun InvoiceDialog(
         Spacer(Modifier.height(10.dp))
 
         //  «جمع اقلام» = جمعِ همان ستون؛ تخفیفِ خودکار فقط آگاهی است و دوباره کم نمی‌شود
-        MoneyRow("جمع اقلام", sale.total)
+        MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.itemsTotal, sale.total)
         SaleReceipt.included(sale, items, stamped, ir.vil3ntec.tohid.ui.PromoLive::ruleName)?.let { MoneyRow(it.label, it.amount) }
-        MoneyRow("تخفیف", sale.discount)
+        MoneyRow(ir.vil3ntec.tohid.core.i18n.Str.discount, sale.discount)
         ir.vil3ntec.tohid.data.PayFlow.rounding(sale)?.let { MoneyRow(ir.vil3ntec.tohid.core.i18n.StrRounding.line, kotlin.math.abs(it), negative = it < 0) } // PAY-09
-        MoneyRow("مبلغ نهایی", sale.finalTotal, strong = true)
-        MoneyRow("پرداختی", sale.paidAmount)
-        MoneyRow("باقی‌مانده", sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)
+        MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.finalAmount, sale.finalTotal, strong = true)
+        MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.paid, sale.paidAmount)
+        MoneyRow(ir.vil3ntec.tohid.core.i18n.StrSale.remaining, sale.remaining, tint = if (sale.remaining > 0) Shop.colors.warning else null)
         //  PAY (v3 A4): ردیف‌های پرداختِ ترکیبی — فقط فاکتوری که `payments` دارد
         ir.vil3ntec.tohid.data.PayFlow.receiptLines(sale).forEach { (label, amount) -> MoneyRow(label, amount) }
         //  PRM-13: امتیازِ مصرف‌شده و کسب‌شدهٔ همین فاکتور — بی امتیاز ⇒ هیچ
@@ -487,7 +487,7 @@ fun InvoiceDialog(
         }
         if (debtor != null) {
           Row(Modifier.fillMaxWidth().padding(vertical = 3.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text("قرض‌دار", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+            Text(ir.vil3ntec.tohid.core.i18n.Str.debtor, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
             Text(debtor.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           }
         }
@@ -495,13 +495,13 @@ fun InvoiceDialog(
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("بستن") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.Str.close) }
           //  گوشی: فاکتور به واتساپ/تلگرامِ مشتری — بی چاپگر هم (با پیوندِ آنلاین اگر باشد، POS-32)
           if (!ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
             OutlinedButton(
               onClick = { scope.launch { ir.vil3ntec.tohid.print.PrintJob.shareSale(context, d, sale)?.let(onMessage) } },
               modifier = Modifier.weight(1f),
-            ) { Text("فرستادن") }
+            ) { Text(ir.vil3ntec.tohid.core.i18n.StrAccount.send) }
           } else {
             //  POS-32، کامپیوتر: برگهٔ اشتراکِ سیستم نیست؛ پیوندِ فاکتورِ آنلاین کپی می‌شود تا در واتس‌اپ/تلگرامِ وب بنشیند.
             //  فقط فروشِ نسخهٔ ۲ با توکن و پرچمِ `shop.receipt_v2` (`Receipts.publicUrl`)؛ وگرنه دکمه‌ای نیست
@@ -511,12 +511,12 @@ fun InvoiceDialog(
             if (link != null) {
               val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
               OutlinedButton(
-                onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(link)); onMessage("پیوندِ فاکتورِ آنلاین کپی شد") },
+                onClick = { clipboard.setText(androidx.compose.ui.text.AnnotatedString(link)); onMessage(ir.vil3ntec.tohid.core.i18n.StrSalePages.linkCopied) },
                 modifier = Modifier.weight(1f),
-              ) { Text("کپیِ پیوند") }
+              ) { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.copyLink) }
             }
           }
-          Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text("چاپ") }
+          Button(onClick = { printer = true }, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.StrMoney.print) }
         }
         //  POS-32 (کامپیوتر: ذخیرهٔ تصویر/PDF ِ رسید) و POS-34 (پشتِ `GiftReceiptPrefs`، پیش‌فرض خاموش): رسیدِ هدیهٔ بی قیمت
         ir.vil3ntec.tohid.ui.components.pos.InvoiceSaveRow(d, sale, onMessage); ir.vil3ntec.tohid.ui.components.pos.GiftReceiptButton(d, sale, onMessage)
@@ -528,7 +528,7 @@ fun InvoiceDialog(
   //  HW-02: فاکتوری که پیش‌تر چاپ شده دوباره فقط با دلیل؛ چاپ از صفِ چاپ می‌رود و هرگز فروش نمی‌سازد
   var reprint by remember { mutableStateOf<Pair<String, Int>?>(null) }
   fun send(address: String, width: Int, reason: String?) {
-    onMessage("در حال فرستادن به چاپگر…")
+    onMessage(ir.vil3ntec.tohid.core.i18n.StrSale.sendingToPrinter)
     scope.launch { onMessage(ir.vil3ntec.tohid.print.PrintSpooler.printSale(context, d, sale, address, width, reason)) }
   }
   if (printer) {
@@ -550,16 +550,16 @@ fun InvoiceDialog(
 /** دلیلِ چاپِ دوباره — یکی از دلیل‌های رایج یا نوشتهٔ خودِ فروشنده */
 @Composable
 internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
-  val reasons = listOf("کاغذ گیر کرد یا بریده شد", "چاپ ناخوانا بود", "مشتری نسخهٔ دوم خواست")
+  val reasons = listOf(ir.vil3ntec.tohid.core.i18n.StrSale.reprintJam, ir.vil3ntec.tohid.core.i18n.StrSale.reprintFaint, ir.vil3ntec.tohid.core.i18n.StrSale.reprintCopy)
   var picked by remember { mutableStateOf<String?>(null) }
   var other by remember { mutableStateOf("") }
   val reason = picked ?: other.trim()
   AlertDialog(
     onDismissRequest = onDismiss,
-    title = { Text("این فاکتور پیش‌تر چاپ شده") },
+    title = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprintTitle) },
     text = {
       Column {
-        Text("برای چاپِ دوباره دلیل را بگویید. روی کاغذ «چاپِ دوباره» می‌آید و فروشِ تازه‌ای ساخته نمی‌شود.",
+        Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprintBody,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         Spacer(Modifier.height(8.dp))
         reasons.forEach { r ->
@@ -570,12 +570,12 @@ internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> U
         }
         OutlinedTextField(
           value = other, onValueChange = { other = it.take(80); picked = null }, singleLine = true,
-          label = { Text("دلیلِ دیگر") }, modifier = Modifier.fillMaxWidth(),
+          label = { Text(ir.vil3ntec.tohid.core.i18n.StrOrderOps.delayReasonOther) }, modifier = Modifier.fillMaxWidth(),
         )
       }
     },
-    confirmButton = { Button(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text("چاپِ دوباره") } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    confirmButton = { Button(onClick = { onConfirm(reason) }, enabled = reason.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.reprint) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
   )
 }
 
@@ -599,7 +599,7 @@ internal fun ReprintReasonDialog(onDismiss: () -> Unit, onConfirm: (String) -> U
 internal fun PrinterDialog(
   onDismiss: () -> Unit,
   /** «چاپ» در فروش؛ «ثبتِ چاپگر» در صفحهٔ دستگاه‌ها */
-  actionLabel: String = "چاپ",
+  actionLabel: String = ir.vil3ntec.tohid.core.i18n.StrMoney.print,
   /** در فروش، چاپگرِ انتخاب‌شده پیش‌فرض می‌شود و به فهرستِ چاپگرها می‌رود */
   makeDefault: Boolean = true,
   onPrint: (String, Int) -> Unit,
@@ -696,22 +696,22 @@ internal fun PrinterDialog(
     DialogEntry {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-        Text("چاپ فاکتور", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSale.printInvoice, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(12.dp))
 
-        Text("عرض کاغذ", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSale.paperWidth, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
-          options = listOf("۵۸ میلی‌متر" to ThermalPrinter.WIDTH_58MM, "۸۰ میلی‌متر" to ThermalPrinter.WIDTH_80MM),
+          options = listOf(ir.vil3ntec.tohid.core.i18n.StrSalePages.paper58 to ThermalPrinter.WIDTH_58MM, ir.vil3ntec.tohid.core.i18n.StrSalePages.paper80 to ThermalPrinter.WIDTH_80MM),
           selected = width,
           onSelect = { width = it; prefs.edit().putInt("printer_width", it).apply() },
         )
 
         Spacer(Modifier.height(16.dp))
-        Text("چاپگر با چه چیزی وصل است؟", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSale.connectedBy, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
         Spacer(Modifier.height(6.dp))
         Segmented(
-          options = listOf("بلوتوث" to "bt", "وای‌فای" to "net", "سیم" to "usb"),
+          options = listOf(ir.vil3ntec.tohid.core.i18n.StrSale.kindBluetooth to "bt", ir.vil3ntec.tohid.core.i18n.StrSale.kindWifi to "net", (if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) ir.vil3ntec.tohid.core.i18n.StrSale.kindSystem else ir.vil3ntec.tohid.core.i18n.StrSale.kindCable) to "usb"),
           selected = kind,
           onSelect = { kind = it },
         )
@@ -723,15 +723,15 @@ internal fun PrinterDialog(
           "bt" -> {
             if (!granted) {
               Text(
-                "برای دیدن چاپگرها، اجازهٔ بلوتوث لازم است.",
+                ir.vil3ntec.tohid.core.i18n.StrSale.btPermission,
                 style = MaterialTheme.typography.bodySmall,
                 color = Shop.colors.muted,
               )
               Spacer(Modifier.height(8.dp))
-              Button(onClick = { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }) { Text("اجازه دادن") }
+              Button(onClick = { ask.launch(Manifest.permission.BLUETOOTH_CONNECT) }) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.allow) }
             } else if (paired.isEmpty()) {
               Text(
-                "چاپگری پیدا نشد. اول چاپگر را در تنظیمات بلوتوث گوشی جفت کنید، بعد اینجا برگردید.",
+                ir.vil3ntec.tohid.core.i18n.StrSale.btEmpty,
                 style = MaterialTheme.typography.bodySmall,
                 color = Shop.colors.muted,
               )
@@ -750,7 +750,7 @@ internal fun PrinterDialog(
           /* ---------------- وای‌فای ---------------- */
           "net" -> {
             Text(
-              "نشانیِ چاپگر در شبکهٔ دکان. روی خودِ چاپگر یا در برگهٔ تنظیماتش نوشته شده.",
+              ir.vil3ntec.tohid.core.i18n.StrSale.netNote,
               style = MaterialTheme.typography.bodySmall,
               color = Shop.colors.muted,
             )
@@ -758,7 +758,7 @@ internal fun PrinterDialog(
             OutlinedTextField(
               value = host,
               onValueChange = { host = it },
-              label = { Text("نشانیِ IP") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.ipAddress) },
               placeholder = { Text("192.168.1.50") },
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -768,14 +768,14 @@ internal fun PrinterDialog(
             OutlinedTextField(
               value = port,
               onValueChange = { port = ir.vil3ntec.tohid.normalizeDigits(it).filter { c -> c in '0'..'9' }.take(5) },
-              label = { Text("درگاه") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.port) },
               singleLine = true,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.fillMaxWidth(),
             )
             Spacer(Modifier.height(6.dp))
             Text(
-              "تقریباً همهٔ چاپگرها روی ۹۱۰۰ گوش می‌دهند؛ تا وقتی چاپگرتان چیزِ دیگری نگفته، دست نزنید.",
+              ir.vil3ntec.tohid.core.i18n.StrSale.portHint,
               style = MaterialTheme.typography.labelSmall,
               color = Shop.colors.muted2,
             )
@@ -785,7 +785,7 @@ internal fun PrinterDialog(
           else -> {
             if (usbList.isEmpty()) {
               Text(
-                "چاپگرِ سیمی پیدا نشد. کابل را وصل کنید و همین برگه را دوباره باز کنید.",
+                ir.vil3ntec.tohid.core.i18n.StrSale.usbEmpty,
                 style = MaterialTheme.typography.bodySmall,
                 color = Shop.colors.muted,
               )
@@ -800,7 +800,7 @@ internal fun PrinterDialog(
               }
               Spacer(Modifier.height(6.dp))
               Text(
-                "اولین بار اندروید اجازه می‌خواهد؛ «همیشه» را بزنید تا هر بار نپرسد.",
+                ir.vil3ntec.tohid.core.i18n.StrSale.usbHint,
                 style = MaterialTheme.typography.labelSmall,
                 color = Shop.colors.muted2,
               )
@@ -810,7 +810,7 @@ internal fun PrinterDialog(
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) }
           Button(
             enabled = link != null,
             onClick = {
@@ -870,19 +870,19 @@ fun DebtorPicker(
   Dialog(onDismissRequest = onClose) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(16.dp).heightIn(max = 520.dp)) {
-        Text("انتخاب قرض‌دار", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.chooseDebtor, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
         OutlinedTextField(
           value = search,
           onValueChange = { search = it },
-          placeholder = { Text("نام قرض‌دار") },
+          placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.debtorNameHint) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(10.dp))
 
         if (shown.isEmpty()) {
-          EmptyNote(if (d.debtors.isEmpty()) "هنوز قرض‌داری ثبت نشده است" else "قرض‌داری پیدا نشد")
+          EmptyNote(if (d.debtors.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrSale.noDebtorsYet else ir.vil3ntec.tohid.core.i18n.StrSale.debtorNotFound)
         } else {
           LazyColumn(Modifier.weight(1f, fill = false)) {
             items(shown, key = { it.id }) { debtor ->
@@ -910,9 +910,9 @@ fun DebtorPicker(
 
         Spacer(Modifier.height(12.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text("بستن") }
+          OutlinedButton(onClick = onClose, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.Str.close) }
           if (selected != null) {
-            Button(onClick = { onPick(null) }, modifier = Modifier.weight(1f)) { Text("بدون قرض‌دار") }
+            Button(onClick = { onPick(null) }, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.StrSale.noDebtor) }
           }
         }
       }
@@ -1018,7 +1018,7 @@ fun CartLineDialog(
           Spacer(Modifier.height(8.dp))
         } else if (hasSaleUnit) {
           SegmentedChoice(
-            options = listOf("stock" to unit.ifBlank { "واحد" }, "sale" to saleUnit),
+            options = listOf("stock" to unit.ifBlank { ir.vil3ntec.tohid.core.i18n.StrGrid.unit }, "sale" to saleUnit),
             selected = if (inSaleUnit) "sale" else "stock",
             onSelect = { choice ->
               val wantSale = choice == "sale"
@@ -1036,7 +1036,7 @@ fun CartLineDialog(
         NumberField(
           value = qtyText,
           onValueChange = { qtyText = it },
-          label = (unitNow?.name ?: if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) "تعداد ($u)" else "تعداد" },
+          label = (unitNow?.name ?: if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) ir.vil3ntec.tohid.core.i18n.StrSalePages.qtyIn(u) else ir.vil3ntec.tohid.core.i18n.StrSale.qty },
           modifier = Modifier.fillMaxWidth(),
         )
         ir.vil3ntec.tohid.ui.components.pos.ScaleWeighButton(unit) { qtyText = qty(it); inSaleUnit = false; unitAt = 0 }
@@ -1044,7 +1044,7 @@ fun CartLineDialog(
           Spacer(Modifier.height(4.dp))
           Text(
             if (partBad) ir.vil3ntec.tohid.core.product.UnitSale.partMessage(unitNow.name)
-            else "= ${qty(parsedQty ?: 0.0)} $unit" + (unitNow.priceMinor?.let { " · ${unitNow.name} ${money(it / 100.0)} ؋ (لیستِ قیمت)" } ?: ""),
+            else "= ${qty(parsedQty ?: 0.0)} $unit" + (unitNow.priceMinor?.let { ir.vil3ntec.tohid.core.i18n.StrSalePages.listPriceTail(unitNow.name, money(it / 100.0)) } ?: ""),
             style = MaterialTheme.typography.labelSmall,
             color = if (partBad) Shop.colors.danger else Shop.colors.muted,
           )
@@ -1068,7 +1068,7 @@ fun CartLineDialog(
           )
           Spacer(Modifier.width(4.dp))
           Text(
-            "قیمت دستی برای این ردیف",
+            ir.vil3ntec.tohid.core.i18n.StrSalePages.manualPrice,
             style = MaterialTheme.typography.bodyMedium,
             color = Shop.colors.text,
           )
@@ -1079,11 +1079,11 @@ fun CartLineDialog(
           AmountField(
             value = priceText,
             onValueChange = { priceText = it },
-            label = "قیمت هر واحد",
+            label = ir.vil3ntec.tohid.core.i18n.StrSale.unitPrice,
           )
           Spacer(Modifier.height(4.dp))
           Text(
-            "قیمت خودِ کالا ${money(basePrice)} ؋ است. این تغییر فقط روی همین فاکتور اثر دارد.",
+            ir.vil3ntec.tohid.core.i18n.StrSalePages.ownPriceNote(money(basePrice)),
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted,
           )
@@ -1100,21 +1100,21 @@ fun CartLineDialog(
         Spacer(Modifier.height(14.dp))
         val shownPrice = if (manual) (parsedPrice ?: 0.0) else listPrice ?: basePrice
         Text(
-          "جمع این ردیف: ${money((parsedQty ?: 0.0) * shownPrice)} ؋",
+          ir.vil3ntec.tohid.core.i18n.StrSalePages.lineTotal(money((parsedQty ?: 0.0) * shownPrice)),
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )
         edit.net?.let { Text(ir.vil3ntec.tohid.core.i18n.StrLine.afterDiscount(money(it)), style = MaterialTheme.typography.titleSmall, color = Shop.colors.success) }
-        if (note != null) ir.vil3ntec.tohid.ui.components.pos.PosNoteField(noteText, { noteText = it }, "یادداشتِ ردیف"); if (serials != null) ir.vil3ntec.tohid.ui.components.pos.PosSerialField(serialText, { serialText = it }, parsedQty)
+        if (note != null) ir.vil3ntec.tohid.ui.components.pos.PosNoteField(noteText, { noteText = it }, ir.vil3ntec.tohid.core.i18n.StrSalePages.lineNote); if (serials != null) ir.vil3ntec.tohid.ui.components.pos.PosSerialField(serialText, { serialText = it }, parsedQty)
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
-          TextButton(onClick = onDismiss) { Text("انصراف") }
+          TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) }
           Button(
             enabled = ok,
             //  تخفیفِ ردیف ⇒ قیمتِ واحدِ پس از تخفیف؛ وگرنه همان قیمتِ دستیِ پیشین
             onClick = { onConfirm(parsedQty ?: 0.0, edit.netUnit ?: if (manual) parsedPrice else listPrice); note?.save?.invoke(noteText); serials?.save(serialText); if (firstEdit.problem != null) granted?.let { priceAsk?.onGranted?.invoke(it) } },
-          ) { Text("ثبت") }
+          ) { Text(ir.vil3ntec.tohid.core.i18n.StrSalePages.record) }
         }
       }
     }
@@ -1169,10 +1169,10 @@ fun FreeLineDialog(
       modifier = Modifier.fillMaxWidth(),
     ) {
       Column(Modifier.padding(18.dp)) {
-        Text("قلم آزاد", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrSale.freeItem, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(4.dp))
         Text(
-          "چیزی که در فهرست کالاها نیست. روی موجودی اثر نمی‌گذارد و کالای تازه‌ای هم ثبت نمی‌کند.",
+          ir.vil3ntec.tohid.core.i18n.StrSale.freeItemHint,
           style = MaterialTheme.typography.bodySmall,
           color = Shop.colors.muted,
         )
@@ -1181,18 +1181,18 @@ fun FreeLineDialog(
         OutlinedTextField(
           value = label,
           onValueChange = { label = it },
-          label = { Text("نام") },
-          placeholder = { Text("مثلاً: کیسه") },
+          label = { Text(ir.vil3ntec.tohid.core.i18n.StrGrid.name) },
+          placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrSale.freeNameHint) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(12.dp))
-        AmountField(value = priceText, onValueChange = { priceText = it }, label = "قیمت هر واحد")
+        AmountField(value = priceText, onValueChange = { priceText = it }, label = ir.vil3ntec.tohid.core.i18n.StrSale.unitPrice)
         Spacer(Modifier.height(12.dp))
         NumberField(
           value = qtyText,
           onValueChange = { qtyText = it },
-          label = "تعداد",
+          label = ir.vil3ntec.tohid.core.i18n.StrSale.qty,
           modifier = Modifier.fillMaxWidth(),
         )
 
@@ -1202,18 +1202,18 @@ fun FreeLineDialog(
         }
         Spacer(Modifier.height(14.dp))
         Text(
-          "جمع: ${money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))} ؋",
+          ir.vil3ntec.tohid.core.i18n.StrSalePages.total(money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))),
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )
 
         Spacer(Modifier.height(16.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.align(Alignment.End)) {
-          TextButton(onClick = onDismiss) { Text("انصراف") }
+          TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) }
           Button(
             enabled = ok,
             onClick = { onConfirm(label.trim(), parsedPrice ?: 0.0, parsedQty ?: 1.0) },
-          ) { Text("افزودن") }
+          ) { Text(ir.vil3ntec.tohid.core.i18n.StrFields.add) }
         }
       }
     }

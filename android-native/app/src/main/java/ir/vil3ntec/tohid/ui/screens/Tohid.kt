@@ -36,6 +36,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrShellPages
 import ir.vil3ntec.tohid.money
 import androidx.compose.ui.draw.shadow
 import ir.vil3ntec.tohid.ui.theme.Elevation
@@ -285,7 +289,7 @@ fun TohidSearchBar(
     trailingIcon = if (value.isEmpty()) null else {
       {
         IconButton(onClick = { onValueChange("") }) {
-          Icon(Icons.Filled.Close, contentDescription = "پاک کردن جستجو", tint = Shop.colors.muted)
+          Icon(Icons.Filled.Close, contentDescription = StrInvoices.clearSearch, tint = Shop.colors.muted)
         }
       }
     },
@@ -302,7 +306,7 @@ fun TohidDropdown(
   selected: String,
   onSelect: (String) -> Unit,
   modifier: Modifier = Modifier,
-  placeholder: String = "— انتخاب کنید —",
+  placeholder: String = StrShellPages.choosePlaceholder,
 ) {
   var open by remember { mutableStateOf(false) }
   ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }, modifier = modifier) {
@@ -434,7 +438,7 @@ fun TohidErrorState(
     )
     if (onRetry != null) {
       Spacer(Modifier.height(Space.md))
-      TohidSecondaryButton(text = "تلاش دوباره", onClick = onRetry)
+      TohidSecondaryButton(text = StrShellPages.tryAgain, onClick = onRetry)
     }
   }
 }
@@ -476,7 +480,7 @@ fun TohidLoadingState(rows: Int = 4, modifier: Modifier = Modifier) {
               )
             )
           }
-          .semantics { contentDescription = "در حال بارگذاری" }
+          .semantics { contentDescription = StrShellPages.loading }
       )
     }
   }
@@ -619,8 +623,8 @@ fun TohidTransactionRow(
 fun TohidConfirmDialog(
   title: String,
   message: String,
-  confirmText: String = "تأیید",
-  dismissText: String = "انصراف",
+  confirmText: String = StrAuth.confirm,
+  dismissText: String = Str.cancel,
   danger: Boolean = false,
   onConfirm: () -> Unit,
   onDismiss: () -> Unit,

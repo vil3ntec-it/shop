@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.components.staff
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ShopRole
@@ -25,9 +26,9 @@ fun ReturnApprovalRequest(need: ReturnApproval.Need, onResult: (ReturnFlow.Appro
   val context = LocalContext.current
   val requester = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountId }.getOrDefault("") }
   ApprovalDialog(
-    title = "تأییدِ برگشت",
-    summary = "برگشتِ ${money(need.amountMinor / 100.0)} ؋ (${ReturnApproval.whyText(need.reasons)}) — " +
-      "تأییدِ ${ReturnApproval.approverText(need.approver)} لازم است.",
+    title = StrReturnPages.approveReturn,
+    summary = StrReturnPages.returnOf(money(need.amountMinor / 100.0), ReturnApproval.whyText(need.reasons)) +
+      StrReturnPages.approvalNeeded(ReturnApproval.approverText(need.approver)),
     shopId = ShopRole.shopId(context),
     requesterUserId = requester,
     need = ApprovalSlip.Need(need.perm, need.doc, null, need.amountMinor),
