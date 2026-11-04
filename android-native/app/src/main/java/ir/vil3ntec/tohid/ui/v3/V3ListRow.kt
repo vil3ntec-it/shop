@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3
 
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -38,6 +39,7 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -56,6 +58,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
@@ -112,7 +115,8 @@ fun V3IconTile(icon: ImageVector, hue: V3Hue? = null, danger: Boolean = false, s
  *    کشیدنِ تا بیش از نیمه کارِ اولِ همان سو را اجرا می‌کند. همه برای صفحه‌خوان
  *    «کارِ سفارشی»اند.
  *  • `selected`: حالتِ انتخابِ گروهی — دایرهٔ تیک در آغاز (null = بی انتخاب).
- *  • `onLongClick`: نگه‌داشتن (معمولاً شروعِ انتخاب یا برگهٔ کارها).
+ *  • `onLongClick`: نگه‌داشتن (معمولاً شروعِ انتخاب یا برگهٔ کارها)؛ صفحه‌خوان آن را «کارهای بیشتر» می‌نامد.
+ *  • `role`: نقشِ ردیف برای صفحه‌خوان (`V3ToggleRow` ⇒ کلید).
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -136,6 +140,7 @@ fun V3ListRow(
   endActions: List<V3SwipeAction> = emptyList(),
   selected: Boolean? = null,
   onLongClick: (() -> Unit)? = null,
+  role: Role = Role.Button,
   onClick: (() -> Unit)? = null,
 ) {
   val c = PhoneV3.colors
@@ -147,7 +152,7 @@ fun V3ListRow(
         .heightIn(min = minHeight)
         .background(if (selected == true) PhoneV3Palette.selected(c) else c.card)
         .then(
-          if (onClick != null || onLongClick != null) Modifier.rowClick(c.pressed, title, onClick ?: {}, onLongClick?.let { l -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); l() } })
+          if (onClick != null || onLongClick != null) Modifier.rowClick(c.pressed, title, role, onClick ?: {}, onLongClick?.let { l -> { haptic.performHapticFeedback(HapticFeedbackType.LongPress); l() } })
           else Modifier,
         )
         .semantics { if (selected != null) this.selected = selected }
@@ -188,12 +193,15 @@ fun V3ListRow(
 
 /** پُرشدنِ نرمِ هنگامِ فشار (بی موجِ رنگی) با زدن و نگه‌داشتن */
 @OptIn(ExperimentalFoundationApi::class)
-private fun Modifier.rowClick(highlight: Color, label: String, onClick: () -> Unit, onLongClick: (() -> Unit)?): Modifier = composed {
+private fun Modifier.rowClick(highlight: Color, label: String, role: Role, onClick: () -> Unit, onLongClick: (() -> Unit)?): Modifier = composed {
   val src = remember { MutableInteractionSource() }
   val down by src.collectIsPressedAsState()
   val bg by animateColorAsState(if (down) highlight else highlight.copy(alpha = 0f), MotionSpec.tweenOf(120), label = "rowPress")
   this
-    .combinedClickable(interactionSource = src, indication = null, role = Role.Button, onClickLabel = label, onLongClick = onLongClick, onClick = onClick)
+    .combinedClickable(
+      interactionSource = src, indication = null, role = role, onClickLabel = label,
+      onLongClickLabel = if (onLongClick != null) StrA11y.moreActions else null, onLongClick = onLongClick, onClick = onClick,
+    )
     .background(bg)
 }
 
@@ -240,6 +248,8 @@ private fun V3Swipeable(
   val scope = rememberCoroutineScope()
   val haptic = LocalHapticFeedback.current
   fun settle(target: Float) = scope.launch { offset.animateTo(target, MotionSpec.sheet()) }
+  //  کارهای زیرِ ردیف تا کشیده نشده‌اند پنهان‌اند: نه صفحه‌خوان (همان «کارِ سفارشی» ِ ردیف را دارد) و نه Tab به آن‌ها نمی‌رسد
+  val covered by remember { derivedStateOf { offset.value == 0f } }
 
   Box(
     modifier
@@ -249,10 +259,10 @@ private fun V3Swipeable(
       },
   ) {
     //  کارهای پایان (پیدا با کشیدن به آغاز) و کارهای آغاز (با کشیدن به پایان)
-    Row(Modifier.matchParentSize().background(c.tile)) {
-      ActionCells(start) { a -> settle(0f); a.onClick() }
+    Row(Modifier.matchParentSize().background(c.tile).then(if (covered) Modifier.clearAndSetSemantics {} else Modifier)) {
+      ActionCells(start, enabled = !covered) { a -> settle(0f); a.onClick() }
       Spacer(Modifier.weight(1f))
-      ActionCells(end) { a -> settle(0f); a.onClick() }
+      ActionCells(end, enabled = !covered) { a -> settle(0f); a.onClick() }
     }
     Box(
       Modifier
@@ -291,7 +301,7 @@ private fun V3Swipeable(
 }
 
 @Composable
-private fun ActionCells(actions: List<V3SwipeAction>, onPick: (V3SwipeAction) -> Unit) {
+private fun ActionCells(actions: List<V3SwipeAction>, enabled: Boolean, onPick: (V3SwipeAction) -> Unit) {
   val c = PhoneV3.colors
   actions.forEach { a ->
     val pair = PhoneV3Roles.button(c, a.kind)
@@ -300,7 +310,7 @@ private fun ActionCells(actions: List<V3SwipeAction>, onPick: (V3SwipeAction) ->
         .width(ACTION_WIDTH)
         .fillMaxHeight()
         .background(pair.bg)
-        .v3Pressable(label = a.label, haptic = true) { onPick(a) },
+        .v3Pressable(enabled = enabled, label = a.label, haptic = true) { onPick(a) },
       horizontalAlignment = Alignment.CenterHorizontally,
       verticalArrangement = Arrangement.Center,
     ) {

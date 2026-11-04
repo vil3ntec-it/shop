@@ -402,6 +402,8 @@ fun PhoneSaleFrame(
               onClickLabel = StrSale.closeCart,
               onClick = onClose,
             )
+            //  صفحه‌خوان: «بستنِ سبد»، نه دکمهٔ بی نام
+            .semantics { contentDescription = StrSale.closeCart }
             .draggable(drag, Orientation.Vertical, onDragStopped = { settle(it) }),
         )
       }
