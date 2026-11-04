@@ -471,11 +471,65 @@ async function reconcile(shopId, { productId = '' } = {}) {
   return { ok: mismatches.length === 0, moves, mismatches, replay };
 }
 
+/**
+ * S86 (§۱۹.۱۲) — بازسازیِ projection ِ موجودی از دفتر: هر `stock_levels` ِ دکان = جمعِ `delta_on_hand_milli`
+ * ِ حرکت‌های همان کالا و مکان (همان تعریفِ بالای پرونده و همان سنجشِ `reconcile`).
+ *   • پیش‌فرض فقط نشان می‌دهد (`apply: false`) — هیچ نوشتنی؛
+ *   • ⛔ دفتر (`stock_moves`) هرگز دست نمی‌خورد؛ فقط مانده‌های ناهمخوانِ **همین** دکان (ماندهٔ بی حرکت ⇒ ۰،
+ *     ماندهٔ گم ⇒ ساخته)؛ رزرو بیرون است (`stock_reservations` دیگر نوشته نمی‌شود)؛
+ *   • پشتِ همان قفلِ موجودیِ دکان (`lock`) و در یک تراکنش با ردیفِ سابقهٔ `stock.rebuild` (`audit.logIn`)؛
+ *     بی ناهمخوانی هیچ نوشتن و هیچ سابقه‌ای ⇒ بارِ دوم بی‌اثر.
+ * @returns {{ok, applied, moves, fixed: Array<{productId, location, levelMilli, ledgerMilli}>}}
+ *          `ok` = پس از این کار مانده‌ها با دفتر می‌خوانند
+ */
+async function rebuild(shopId, { apply = false, by = '' } = {}) {
+  if (!shopId) throw badRequest('شناسهٔ دکان لازم است', 'shop_required');
+  const { tx } = require('../db');
+  return tx(async (c) => {
+    await lock(c, shopId);
+    const ledger = (await c.query(
+      `SELECT product_id, location, COALESCE(SUM(delta_on_hand_milli),0)::bigint AS on_hand, COUNT(*)::int AS n
+         FROM stock_moves WHERE shop_id=$1 AND location <> '' GROUP BY product_id, location`, [shopId]
+    )).rows;
+    const levels = (await c.query(
+      `SELECT product_id, location, on_hand_milli FROM stock_levels WHERE shop_id=$1 AND branch_id=''`, [shopId]
+    )).rows;
+    const key = (a, b) => `${a}\u0000${b}`;
+    const led = new Map(ledger.map((r) => [key(r.product_id, r.location), num(r.on_hand)]));
+    const lev = new Map(levels.map((r) => [key(r.product_id, r.location), num(r.on_hand_milli)]));
+    const moves = ledger.reduce((s, r) => s + num(r.n), 0);
+    const fixed = [];
+    for (const k of [...new Set([...lev.keys(), ...led.keys()])].sort()) {
+      const levelMilli = lev.get(k) || 0;
+      const ledgerMilli = led.get(k) || 0;
+      if (levelMilli === ledgerMilli) continue;
+      const [productId, location] = k.split('\u0000');
+      fixed.push({ productId, location, levelMilli, ledgerMilli });
+    }
+    if (!apply || !fixed.length) return { ok: !fixed.length, applied: false, moves, fixed };
+    const at = Date.now();
+    for (const f of fixed) {
+      await c.query(
+        `INSERT INTO stock_levels (shop_id, product_id, branch_id, location, on_hand_milli, updated_at)
+         VALUES ($1,$2,'',$3,$4,$5)
+         ON CONFLICT (shop_id, product_id, branch_id, location) DO UPDATE
+           SET on_hand_milli = excluded.on_hand_milli, updated_at = excluded.updated_at`,
+        [shopId, f.productId, f.location, f.ledgerMilli, at]
+      );
+    }
+    await require('./audit').logIn(c, {
+      shopId, actorType: 'system', userId: String(by || '').slice(0, 64), action: 'stock.rebuild', targetType: 'shop', targetId: shopId,
+      detail: { fixed: fixed.length, moves, items: fixed.slice(0, 50) },
+    });
+    return { ok: true, applied: true, moves, fixed };
+  });
+}
+
 module.exports = {
   FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
   flagOf, settingsOf, saveSettings, lock, decide,
   levelsOf, freeOf, sellableOnHand, onHandAt, fmtMilli,
   insertMove, postMove, openTask, checkProducts,
   check, outOfStock,
-  reconcile,
+  reconcile, rebuild,
 };

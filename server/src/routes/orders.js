@@ -29,6 +29,7 @@ const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('orders.view'));
 
 const actorOf = (req) => ({ type: 'user', id: req.user.id, role: req.role });
+const { requireOrdersContact } = require('../lib/customer-contact');
 
 /** پرچم لازم است (خواندن و نوشتن). */
 const needFlag = async (req, res, next) => {
@@ -468,7 +469,8 @@ const needRisk = async (req) => {
   }
 };
 
-router.get('/risk/lists', needFlag, requirePermission('orders.contact'), async (req, res) => {
+//  CRM-15: فهرستِ شماره‌های مشتری ⇒ `customers.contact` هم (صاحب می‌تواند برای همین مدیر ببندد)
+router.get('/risk/lists', needFlag, requirePermission('orders.contact'), requireOrdersContact, async (req, res) => {
   await needRisk(req);
   res.json(await riskLists().list(req.shopId));
 });
