@@ -111,6 +111,7 @@ private fun RouteScope.InvoiceCard(o: OrderDto, cfg: OrdersConfigDto?) {
           style = V3Type.footnote, color = PhoneV3.colors.inkMuted,
         )
         if (plan.packs) Text(StrOrderFlow.packFirst, style = V3Type.footnote, color = PhoneV3.colors.inkMuted)
+        if (OrderFlow.closesOnlineChoice(o.payStep?.state.orEmpty(), plan)) V3Message(V3Tone.WARNING, StrOrderFlow.invoiceBeforeChoice)
         if (!asking) {
           V3Button(
             when {

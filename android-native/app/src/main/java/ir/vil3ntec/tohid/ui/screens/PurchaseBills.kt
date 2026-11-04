@@ -27,6 +27,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDeliver
+import ir.vil3ntec.tohid.core.i18n.StrLoyalty
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.data.PoBillDto
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
@@ -57,28 +63,28 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
   var busy by remember { mutableStateOf(false) }
 
   fun submit() {
-    if (billNo.isBlank()) { error = "شمارهٔ فاکتورِ تأمین‌کننده را بنویسید"; return }
-    val lines = PurchaseOrderBook.billLines(rows) ?: run { error = "مقدار یا مبلغِ یک ردیف درست نیست"; return }
-    if (lines.isEmpty()) { error = "دست‌کم یک ردیف در فاکتور لازم است"; return }
+    if (billNo.isBlank()) { error = StrPurchasePages.billNoNeeded; return }
+    val lines = PurchaseOrderBook.billLines(rows) ?: run { error = StrPurchasePages.billRowBad; return }
+    if (lines.isEmpty()) { error = StrPurchasePages.billNeedRow; return }
     busy = true; error = null
     scope.launch {
       val r = repo.bill(order.id, billId, billNo.trim(), billDate.trim().ifEmpty { null }, note.trim(), lines)
       busy = false
       if (r.valueOrNull() == null) { error = r.errorMessage(); return@launch }
-      toast("فاکتورِ «${billNo.trim()}» ثبت شد")
+      toast(StrPurchasePages.billSaved(billNo.trim()))
       onDone()
     }
   }
 
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-    Text("فاکتورِ تأمین‌کننده — سفارشِ #${order.no} · ${order.supplierName}", style = MaterialTheme.typography.titleSmall, color = c.text)
-    Text("همان چیزی را بنویسید که روی فاکتورِ کاغذیِ تأمین‌کننده است؛ برنامه آن را با سفارش و رسیدها تطبیق می‌دهد.",
+    Text(StrPurchasePages.billTitle(order.no, order.supplierName), style = MaterialTheme.typography.titleSmall, color = c.text)
+    Text(StrPurchasePages.billNote,
       style = MaterialTheme.typography.labelSmall, color = c.muted)
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedTextField(value = billNo, onValueChange = { billNo = it.take(60); error = null }, label = { Text("شمارهٔ فاکتور") },
+      OutlinedTextField(value = billNo, onValueChange = { billNo = it.take(60); error = null }, label = { Text(StrPurchasePages.billNo) },
         singleLine = true, modifier = Modifier.weight(1f))
-      OutlinedTextField(value = billDate, onValueChange = { billDate = it.take(10); error = null }, label = { Text("تاریخ (YYYY-MM-DD)") },
+      OutlinedTextField(value = billDate, onValueChange = { billDate = it.take(10); error = null }, label = { Text(StrPurchasePages.dateIso) },
         singleLine = true, modifier = Modifier.weight(1f))
     }
     Spacer(Modifier.height(8.dp))
@@ -86,15 +92,15 @@ internal fun PoBill(d: ShopData, repo: PurchaseOrderRepository, order: PurchaseO
       Column(Modifier.padding(vertical = 4.dp)) {
         Text(r.name.ifBlank { names[r.productId] ?: r.productId }, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(r.qty, { v -> rows = rows.toMutableList().also { it[i] = r.copy(qty = v) }; error = null }, "مقدار (${r.unit})", Modifier.weight(1f))
-          NumberField(r.total, { v -> rows = rows.toMutableList().also { it[i] = r.copy(total = v) }; error = null }, "جمعِ ردیف (؋)", Modifier.weight(1f))
+          NumberField(r.qty, { v -> rows = rows.toMutableList().also { it[i] = r.copy(qty = v) }; error = null }, StrPurchasePages.qtyUnit(r.unit), Modifier.weight(1f))
+          NumberField(r.total, { v -> rows = rows.toMutableList().also { it[i] = r.copy(total = v) }; error = null }, StrPurchasePages.rowTotalAfn, Modifier.weight(1f))
         }
       }
     }
-    OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text("یادداشت") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.fillMaxWidth())
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.height(10.dp))
-    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "در حالِ ثبت…" else "ثبتِ فاکتور") }
+    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrPurchasePages.saveBill) }
   }
 }
 
@@ -107,7 +113,7 @@ internal fun PoBillsList(order: PurchaseOrderDto, manage: Boolean, busy: Boolean
   if (order.bills.isEmpty()) return
   val c = Shop.colors
   Spacer(Modifier.height(14.dp))
-  Text("فاکتورهای تأمین‌کننده", style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
+  Text(StrSupplierBills.title, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
   order.bills.forEach { b ->
     Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
@@ -116,9 +122,9 @@ internal fun PoBillsList(order: PurchaseOrderDto, manage: Boolean, busy: Boolean
           color = if (b.active) c.text else c.muted, style = MaterialTheme.typography.bodySmall,
           textDecoration = if (b.active) null else TextDecoration.LineThrough,
         )
-        b.voidReason?.takeIf { !b.active }?.let { Text("باطل: $it", style = MaterialTheme.typography.labelSmall, color = c.muted) }
+        b.voidReason?.takeIf { !b.active }?.let { Text(StrPurchasePages.voidedWhy(it), style = MaterialTheme.typography.labelSmall, color = c.muted) }
       }
-      if (PurchaseOrderBook.canVoid(b, manage)) TextButton(onClick = { onVoid(b) }, enabled = !busy) { Text("باطل", color = c.danger) }
+      if (PurchaseOrderBook.canVoid(b, manage)) TextButton(onClick = { onVoid(b) }, enabled = !busy) { Text(StrPurchasePages.voidBtn, color = c.danger) }
     }
   }
 }
@@ -152,17 +158,17 @@ internal fun PoBillVoidDialog(bill: PoBillDto, busy: Boolean, onDismiss: () -> U
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("باطل کردنِ فاکتورِ «${bill.billNo}»؟", color = c.text) },
+    title = { Text(StrPurchasePages.voidAsk(bill.billNo), color = c.text) },
     text = {
       Column {
-        Text("فاکتور پاک نمی‌شود؛ با دلیل خط می‌خورد و در تطبیق به حساب نمی‌آید. شماره‌اش برای فاکتورِ درست آزاد می‌شود.",
+        Text(StrPurchasePages.voidNote,
           style = MaterialTheme.typography.bodySmall, color = c.muted)
-        OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text("دلیل (لازم)") }, singleLine = true)
+        OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text(StrLoyalty.adjustReason) }, singleLine = true)
       }
     },
     confirmButton = {
-      TextButton(enabled = why.isNotBlank() && !busy, onClick = { onConfirm(why.trim()) }) { Text("باطل کن", color = c.danger) }
+      TextButton(enabled = why.isNotBlank() && !busy, onClick = { onConfirm(why.trim()) }) { Text(StrPurchasePages.voidIt, color = c.danger) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }

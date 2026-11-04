@@ -167,7 +167,7 @@ private fun HomePage(
   val navBottom = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
   val stagger = rememberV3Stagger()
   val orders = rememberHomeOrders()
-  val saleFab = HomeTiles.saleFab(orders != null, ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value.ids)
+  val saleFab = HomeTiles.saleFab(ordersTile = true, ir.vil3ntec.tohid.ui.components.common.PhoneNav.layout.value.ids)
 
   /* ---------- کادرِ بالا (HOME-V3): پنهان تا کششِ به‌زور از بالای صفحه؛ باز/پنهان ماندگار ---------- */
   val input = rememberHeroInput(d)

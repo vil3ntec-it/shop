@@ -20,6 +20,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDeliver
+import ir.vil3ntec.tohid.core.i18n.StrGrid
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrLayaway
+import ir.vil3ntec.tohid.core.i18n.StrLoyalty
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrPay
+import ir.vil3ntec.tohid.core.i18n.StrPlaces
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrReturnPages
+import ir.vil3ntec.tohid.core.i18n.StrSafe
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
@@ -68,7 +86,7 @@ fun PurchaseOrdersEntry(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
   LaunchedEffect(Unit) { config = repo.config().valueOrNull() }
   val cfg = config
   if (cfg == null || !cfg.enabled) return
-  OutlinedButton(onClick = { open = true }, modifier = modifier) { Text("سفارش‌های خرید") }
+  OutlinedButton(onClick = { open = true }, modifier = modifier) { Text(StrPurchasePages.purchaseOrders) }
   if (open) PurchaseOrdersDialog(store, d, host, cfg.permissions, toast) { open = false }
 }
 
@@ -105,9 +123,9 @@ private fun PurchaseOrdersDialog(
       ) {
         Column(Modifier.padding(16.dp)) {
           Row(verticalAlignment = Alignment.CenterVertically) {
-            if (mode != PoMode.Index) TextButton(onClick = { mode = PoMode.Index }) { Text("فهرست") }
-            Text("سفارش‌های خرید", style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
-            TextButton(onClick = onDismiss) { Text("بستن") }
+            if (mode != PoMode.Index) TextButton(onClick = { mode = PoMode.Index }) { Text(StrPurchasePages.list) }
+            Text(StrPurchasePages.purchaseOrders, style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.weight(1f))
+            TextButton(onClick = onDismiss) { Text(Str.close) }
           }
           Spacer(Modifier.height(8.dp))
           when (val m = mode) {
@@ -140,19 +158,19 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
     error = r.errorMessage()
   }
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-    listOf(null to "همه", "draft" to "پیش‌نویس", "sent" to "فرستاده/باز", "cancelled" to "لغو").forEach { (k, label) ->
+    listOf(null to Str.all, "draft" to StrPurchasePages.draft, "sent" to StrPurchasePages.sentOpen, "cancelled" to StrPay.cancel).forEach { (k, label) ->
       FilterChip(selected = state == k, onClick = { state = k }, label = { Text(label) }, shape = Shape.chip)
     }
     Spacer(Modifier.width(12.dp))
-    if (perms.manage) Button(onClick = onNew) { Text("+ سفارشِ خریدِ تازه") }
-    OutlinedButton(onClick = onSuggest) { Text("پیشنهادِ سفارش") }
+    if (perms.manage) Button(onClick = onNew) { Text(StrPurchasePages.newPo) }
+    OutlinedButton(onClick = onSuggest) { Text(StrPurchasePages.reorderSuggest) }
   }
   Spacer(Modifier.height(10.dp))
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
     when {
       error != null -> Text(error!!, color = c.danger, style = MaterialTheme.typography.bodySmall)
-      orders == null -> Text("در حالِ خواندن…", color = c.muted, style = MaterialTheme.typography.bodySmall)
-      orders!!.isEmpty() -> EmptyNote("هنوز سفارشِ خریدی نیست.")
+      orders == null -> Text(StrReports.loading, color = c.muted, style = MaterialTheme.typography.bodySmall)
+      orders!!.isEmpty() -> EmptyNote(StrPurchasePages.noPoYet)
       else -> orders!!.forEach { o ->
         val st = PurchaseOrderBook.status(o)
         Row(
@@ -160,10 +178,10 @@ private fun PoList(repo: PurchaseOrderRepository, perms: PoPermsDto, onOpen: (St
           verticalAlignment = Alignment.CenterVertically,
         ) {
           Column(Modifier.weight(1f)) {
-            Text("#${o.no} · ${o.supplierName.ifBlank { "تأمین‌کننده" }}", color = c.text, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(StrSupplierBills.orderTitle(o.no, o.supplierName.ifBlank { StrMoney.supplierLabel }), color = c.text, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(
-              "${o.lines.size} ردیف · سفارش ${money(PurchaseOrderBook.asAfn(o.totals.orderedMinor))} ؋ · باقی‌مانده ${money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))} ؋" +
-                (o.expectedDate?.let { " · رسیدن ${ir.vil3ntec.tohid.formatDate(it)}" } ?: ""),
+              StrPurchasePages.poLine(o.lines.size, money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))) +
+                (o.expectedDate?.let { StrPurchasePages.arrivesSuffix(ir.vil3ntec.tohid.formatDate(it)) } ?: ""),
               style = MaterialTheme.typography.labelSmall, color = c.muted,
             )
           }
@@ -212,7 +230,7 @@ private fun PoDetail(
   }
   val o = order
   if (o == null) {
-    Text(error ?: "در حالِ خواندن…", color = if (error != null) c.danger else c.muted, style = MaterialTheme.typography.bodySmall)
+    Text(error ?: StrReports.loading, color = if (error != null) c.danger else c.muted, style = MaterialTheme.typography.bodySmall)
     return
   }
   val st = PurchaseOrderBook.status(o)
@@ -224,7 +242,7 @@ private fun PoDetail(
     scope.launch {
       val r = block()
       busy = false
-      r.valueOrNull()?.let { order = it; toast(done) } ?: toast(r.errorMessage() ?: "نشد")
+      r.valueOrNull()?.let { order = it; toast(done) } ?: toast(r.errorMessage() ?: StrSupplierBills.failedShort)
     }
   }
 
@@ -234,7 +252,7 @@ private fun PoDetail(
    */
   fun printLabels(r: PoReceiptDto, a4: Boolean) {
     scope.launch {
-      if (!a4 && !host.hasLabelPrinter()) { toast("هنوز چاپگری «برچسبِ کالا» تعریف نشده — «A4» یا «دستگاه‌ها»"); return@launch }
+      if (!a4 && !host.hasLabelPrinter()) { toast(StrPurchasePages.noLabelPrinterShort); return@launch }
       var done = 0
       for (p in r.posted.filter { it.acceptedMilli > 0 }) {
         val line = o.lines.find { it.id == p.lineId } ?: continue
@@ -244,21 +262,21 @@ private fun PoDetail(
         host.printLabel(product, copies, a4)?.let(toast)
         done++
       }
-      if (done == 0) toast("کالای پذیرفته‌ای برای برچسب نیست")
+      if (done == 0) toast(StrPurchasePages.noAcceptedForLabel)
     }
   }
 
   fun postReceipt(r: PoReceiptDto) {
     scope.launch {
-      var msg = "ثبت نشد"
+      var msg = StrPlaces.notSaved
       val wrote = store.update { cur ->
         when (val p = PurchaseOrderBook.post(cur, o, r, todayIso(), host.now())) {
-          is PurchaseOrderBook.Posting.Ok -> { msg = "فاکتورِ خریدِ #${p.invoiceNo} در دفتر ثبت شد"; p.data }
-          PurchaseOrderBook.Posting.Already -> { msg = "این رسید پیش‌تر در دفتر ثبت شده است"; null }
+          is PurchaseOrderBook.Posting.Ok -> { msg = StrPurchasePages.billPosted(p.invoiceNo); p.data }
+          PurchaseOrderBook.Posting.Already -> { msg = StrPurchasePages.alreadyPosted; null }
           is PurchaseOrderBook.Posting.Failed -> { msg = p.message; null }
         }
       }
-      toast(if (wrote == false) "دفتر نوشته نشد (اشتراک یا دیسک)" else msg)
+      toast(if (wrote == false) StrPurchasePages.ledgerNotWritten else msg)
     }
   }
 
@@ -268,16 +286,16 @@ private fun PoDetail(
       StatusPill(PurchaseOrderBook.label(st), poTone(st))
     }
     val meta = listOfNotNull(
-      o.expectedDate?.let { "رسیدن: ${ir.vil3ntec.tohid.formatDate(it)}" },
+      o.expectedDate?.let { StrPurchasePages.arrivesOn(ir.vil3ntec.tohid.formatDate(it)) },
       o.note.takeIf { it.isNotBlank() },
-      o.cancelReason?.takeIf { st == PurchaseOrderCore.Status.CANCELLED }?.let { "دلیلِ لغو: $it" },
+      o.cancelReason?.takeIf { st == PurchaseOrderCore.Status.CANCELLED }?.let { StrPurchasePages.cancelReasonIs(it) },
     )
     if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = c.muted)
     Spacer(Modifier.height(10.dp))
 
     //  ردیف‌ها: سفارش، پذیرفته، خراب، باقی‌مانده (PUR-04)
     Row(Modifier.fillMaxWidth()) {
-      listOf("کالا" to 3f, "سفارش" to 1f, "پذیرفته" to 1f, "خراب" to 1f, "باقی" to 1f, "فی (؋)" to 1f).forEach { (h, w) ->
+      listOf(StrMoney.item to 3f, StrOnline.dlColOrder to 1f, StrPurchasePages.accepted to 1f, StrPurchasePages.damaged to 1f, StrInvoices.colBalance to 1f, StrReturnPages.unitPriceAfn to 1f).forEach { (h, w) ->
         Text(h, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.weight(w))
       }
     }
@@ -297,7 +315,7 @@ private fun PoDetail(
     HorizontalDivider(color = c.border)
     Spacer(Modifier.height(6.dp))
     Text(
-      "سفارش ${money(PurchaseOrderBook.asAfn(o.totals.orderedMinor))} ؋ · رسیده ${money(PurchaseOrderBook.asAfn(o.totals.acceptedMinor))} ؋ · باقی‌مانده ${money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))} ؋",
+      StrPurchasePages.poTotals(money(PurchaseOrderBook.asAfn(o.totals.orderedMinor)), money(PurchaseOrderBook.asAfn(o.totals.acceptedMinor)), money(PurchaseOrderBook.asAfn(o.totals.remainingMinor))),
       style = MaterialTheme.typography.bodySmall, color = c.text,
     )
 
@@ -305,20 +323,20 @@ private fun PoDetail(
     Spacer(Modifier.height(12.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       if (perms.receive && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.RECEIVE)) {
-        Button(onClick = { onReceive(o) }, enabled = !busy) { Text("دریافتِ کالا") }
+        Button(onClick = { onReceive(o) }, enabled = !busy) { Text(StrPurchasePages.receiveGoods) }
       }
       if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.SEND)) {
-        Button(onClick = { act({ repo.send(o.id) }, "سفارش فرستاده شد") }, enabled = !busy) { Text("فرستادن به تأمین‌کننده") }
+        Button(onClick = { act({ repo.send(o.id) }, StrPurchasePages.poSent) }, enabled = !busy) { Text(StrPurchasePages.sendToSupplier) }
       }
       if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.EDIT)) {
-        OutlinedButton(onClick = { onEdit(o) }, enabled = !busy) { Text("ویرایش") }
+        OutlinedButton(onClick = { onEdit(o) }, enabled = !busy) { Text(StrMoney.edit) }
       }
       if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.CANCEL)) {
-        OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text("لغو", color = c.danger) }
+        OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text(StrPay.cancel, color = c.danger) }
       }
       //  PUR-14: فاکتورِ کاغذیِ خودِ تأمین‌کننده، جدا از رسید (پس از فرستادن؛ فقط مدیر)
       if (PurchaseOrderBook.canBill(o, perms.manage)) {
-        OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text("فاکتورِ تأمین‌کننده") }
+        OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text(StrPurchasePages.supplierBill) }
       }
     }
 
@@ -328,7 +346,7 @@ private fun PoDetail(
     //  رسیدها و ثبت در دفترِ همین دستگاه
     if (o.receipts.isNotEmpty()) {
       Spacer(Modifier.height(14.dp))
-      Text("رسیدها", style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
+      Text(Str.receipts, style = MaterialTheme.typography.labelLarge, color = c.muted, fontWeight = FontWeight.SemiBold)
       o.receipts.forEach { r ->
         val posted = PurchaseOrderBook.isPosted(d, r)
         Row(Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -339,18 +357,18 @@ private fun PoDetail(
             )
             val dmg = r.posted.filter { it.damagedMilli > 0 }
             if (dmg.isNotEmpty()) Text(
-              "خراب و برگشت در همان رسید: " + dmg.joinToString("، ") { p ->
+              StrPurchasePages.damagedReturned + dmg.joinToString("، ") { p ->
                 "${o.lines.find { it.id == p.lineId }?.name.orEmpty()} ${qty(PurchaseOrderBook.units(p.damagedMilli))}"
               },
               style = MaterialTheme.typography.labelSmall, color = c.danger,
             )
           }
           if (r.posted.any { it.acceptedMilli > 0 }) {
-            TextButton(onClick = { printLabels(r, a4 = false) }) { Text("برچسب") }
+            TextButton(onClick = { printLabels(r, a4 = false) }) { Text(StrPurchasePages.labelBtn) }
             TextButton(onClick = { printLabels(r, a4 = true) }) { Text("A4") }
           }
-          if (posted) Text("در دفتر", style = MaterialTheme.typography.labelSmall, color = c.success)
-          else TextButton(onClick = { postReceipt(r) }) { Text("ثبت در دفتر") }
+          if (posted) Text(StrPurchasePages.inLedger, style = MaterialTheme.typography.labelSmall, color = c.success)
+          else TextButton(onClick = { postReceipt(r) }) { Text(StrPurchasePages.postToLedger) }
         }
       }
       //  PUR-14: سفارش ⇔ رسید ⇔ فاکتورِ تأمین‌کننده (یا فاکتورِ دفتر وقتی تأمین‌کننده فاکتوری نداده)
@@ -365,7 +383,7 @@ private fun PoDetail(
       scope.launch {
         val r = repo.voidBill(o.id, b.id, why)
         busy = false
-        r.valueOrNull()?.let { order = it.order; toast("فاکتور باطل شد") } ?: toast(r.errorMessage() ?: "نشد")
+        r.valueOrNull()?.let { order = it.order; toast(StrSupplierBills.voided) } ?: toast(r.errorMessage() ?: StrSupplierBills.failedShort)
       }
     }
   }
@@ -376,23 +394,23 @@ private fun PoDetail(
     AlertDialog(
       onDismissRequest = { cancelAsk = false },
       containerColor = c.surfaceSolid,
-      title = { Text("لغوِ سفارشِ #${o.no}؟", color = c.text) },
+      title = { Text(StrPurchasePages.cancelPoAsk(o.no), color = c.text) },
       text = {
         Column {
           Text(
-            if (needWhy) "باقی‌ماندهٔ سفارش بسته می‌شود؛ رسیدهای ثبت‌شده می‌مانند." else "پیش‌نویس کنار می‌رود.",
+            if (needWhy) StrPurchasePages.cancelOpenNote else StrPurchasePages.cancelDraftNote,
             style = MaterialTheme.typography.bodySmall, color = c.muted,
           )
-          OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text(if (needWhy) "دلیل (لازم)" else "دلیل") }, singleLine = true)
+          OutlinedTextField(value = why, onValueChange = { why = it.take(300) }, label = { Text(if (needWhy) StrLoyalty.adjustReason else StrSafe.reason) }, singleLine = true)
         }
       },
       confirmButton = {
         TextButton(enabled = !needWhy || why.isNotBlank(), onClick = {
           cancelAsk = false
-          act({ repo.cancel(o.id, why.trim()) }, "سفارش لغو شد")
-        }) { Text("لغو کن", color = c.danger) }
+          act({ repo.cancel(o.id, why.trim()) }, StrPurchasePages.poCancelled)
+        }) { Text(StrPurchasePages.cancelIt, color = c.danger) }
       },
-      dismissButton = { TextButton(onClick = { cancelAsk = false }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { cancelAsk = false }) { Text(Str.cancel) } },
     )
   }
 }
@@ -434,7 +452,7 @@ private fun PoEditor(
   var lastKey by remember { mutableStateOf<Int?>(null) }
 
   fun addProduct(p: Product, qtyMilli: Long? = null, priceMinor: Long? = null) {
-    if (rows.any { it.productId == p.id }) { error = "«${p.name}» پیش‌تر در سفارش هست"; return }
+    if (rows.any { it.productId == p.id }) { error = StrPurchasePages.alreadyInPo(p.name); return }
     val q = qtyMilli ?: PurchaseOrderBook.suggestedQtyMilli(d, p)
     val pr = priceMinor ?: PurchaseOrderBook.lastPriceMinor(d, supplierId, p)
     rows = rows + EditRow(seq++, p.id, p.name, p.unit, poNum(PurchaseOrderBook.units(q)), poNum(PurchaseOrderBook.asAfn(pr)))
@@ -443,39 +461,39 @@ private fun PoEditor(
 
   fun addPicks(onlyLow: Boolean) {
     val picks = PurchaseOrderBook.supplierPicks(d, supplierId, onlyLow).filter { pk -> rows.none { it.productId == pk.productId } }
-    if (picks.isEmpty()) { toast(if (onlyLow) "کالای کم‌موجودی از این تأمین‌کننده نیست" else "کالای تازه‌ای از این تأمین‌کننده نیست"); return }
+    if (picks.isEmpty()) { toast(if (onlyLow) StrPurchasePages.noLowFromSupplier else StrPurchasePages.noNewFromSupplier); return }
     rows = rows + picks.map { pk -> EditRow(seq++, pk.productId, pk.name, pk.unit, poNum(PurchaseOrderBook.units(pk.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pk.priceMinor))) }
   }
 
   fun addPlanned() {
     val plan = PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).filter { pl -> rows.none { it.productId == pl.pick.productId } }
-    if (plan.isEmpty()) { toast("با فروشِ ۳۰ روز و زمانِ تأمین، کالایی از این تأمین‌کننده سفارش نمی‌خواهد"); return }
+    if (plan.isEmpty()) { toast(StrPurchasePages.nothingToOrder); return }
     rows = rows + plan.map { pl ->
       EditRow(seq++, pl.pick.productId, pl.pick.name, pl.pick.unit, poNum(PurchaseOrderBook.units(pl.pick.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pl.pick.priceMinor)))
     }
   }
 
   fun save() {
-    val supplier = d.suppliers.find { it.id == supplierId } ?: run { error = "تأمین‌کننده را انتخاب کنید"; return }
+    val supplier = d.suppliers.find { it.id == supplierId } ?: run { error = StrPurchasePages.chooseSupplier; return }
     val lines = rows.mapIndexed { i, r ->
       val q = r.qty.toDoubleOrNull()
       val p = r.price.toDoubleOrNull()
-      if (q == null || q <= 0) { error = "ردیفِ ${i + 1}: مقدار درست نیست"; return }
-      if (p == null || p < 0) { error = "ردیفِ ${i + 1}: فی درست نیست"; return }
+      if (q == null || q <= 0) { error = StrPurchasePages.rowBadQty(i + 1); return }
+      if (p == null || p < 0) { error = StrPurchasePages.rowBadPrice(i + 1); return }
       PoLineDto(id = "l${i + 1}", productId = r.productId, name = r.name, unit = r.unit, qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p))
     }
     val check = PurchaseOrderCore.checkOrder(PurchaseOrderCore.Order(supplier.id, PurchaseOrderCore.State.DRAFT,
       lines.map { PurchaseOrderCore.Line(it.id, it.productId, it.qtyMilli, it.priceMinor) }))
-    if (check != null) { error = if (check.code == PurchaseOrderCore.Code.LINES_REQUIRED) "دست‌کم یک کالا لازم است" else "سفارش درست نیست (${check.code})"; return }
+    if (check != null) { error = if (check.code == PurchaseOrderCore.Code.LINES_REQUIRED) StrPurchasePages.needOneItem else StrPurchasePages.poInvalid(check.code); return }
     //  تاریخِ ذخیره‌شده همیشه ASCII `YYYY-MM-DD` (LOC-05)
     val exp = ir.vil3ntec.tohid.latinDigits(expected).trim().ifBlank { null }
-    if (exp != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(exp)) { error = "تاریخِ رسیدن را به شکلِ ۲۰۲۶-۱۱-۰۵ بنویسید"; return }
+    if (exp != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(exp)) { error = StrPurchasePages.arrivalDateFormat; return }
     val draft = PurchaseOrderRepository.Draft(supplier.id, supplier.name, lines, exp, note.trim())
     busy = true; error = null
     scope.launch {
       val r = if (base == null) repo.create(formKey, draft) else repo.update(base.id, base.version, draft)
       busy = false
-      r.valueOrNull()?.let { toast(if (base == null) "پیش‌نویسِ سفارشِ #${it.no} ساخته شد" else "ذخیره شد"); onSaved(it) }
+      r.valueOrNull()?.let { toast(if (base == null) StrPurchasePages.draftCreated(it.no) else StrOnline.saved); onSaved(it) }
         ?: run { error = r.errorMessage() }
     }
   }
@@ -492,9 +510,9 @@ private fun PoEditor(
       }
       .verticalScroll(rememberScrollState()),
   ) {
-    Text(if (base == null) "سفارشِ خریدِ تازه" else "ویرایشِ سفارشِ #${base.no}", style = MaterialTheme.typography.titleSmall, color = c.text)
+    Text(if (base == null) StrPurchasePages.newPoTitle else StrPurchasePages.editPo(base.no), style = MaterialTheme.typography.titleSmall, color = c.text)
     Spacer(Modifier.height(8.dp))
-    if (d.suppliers.isEmpty()) EmptyNote("اول یک تأمین‌کننده بسازید.")
+    if (d.suppliers.isEmpty()) EmptyNote(StrPurchasePages.makeSupplierFirst)
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
       d.suppliers.sortedBy { it.name }.forEach { s ->
         FilterChip(selected = supplierId == s.id, onClick = { supplierId = s.id }, label = { Text(s.name) }, shape = Shape.chip)
@@ -502,42 +520,42 @@ private fun PoEditor(
     }
     Spacer(Modifier.height(8.dp))
     Text(
-      lead.days?.let { if (lead.manual) "زمانِ تأمینِ این تأمین‌کننده: $it روز (دستی)" else "زمانِ تأمینِ این تأمین‌کننده: $it روز (میانهٔ ${lead.samples} سفارشِ رسیده)" }
-        ?: "زمانِ تأمینِ این تأمین‌کننده هنوز سنجیده نشده — ${ReorderCore.DEFAULT_LEAD_DAYS} روز فرض می‌شود",
+      lead.days?.let { if (lead.manual) StrPurchasePages.leadManual(it) else StrPurchasePages.leadMeasured(it, lead.samples) }
+        ?: StrPurchasePages.leadUnknown(ReorderCore.DEFAULT_LEAD_DAYS),
       style = MaterialTheme.typography.labelSmall, color = c.muted,
     )
     Spacer(Modifier.height(6.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedButton(onClick = { addPlanned() }, enabled = supplierId.isNotBlank()) { Text("پیشنهاد با فروش و زمانِ تأمین") }
-      OutlinedButton(onClick = { addPicks(onlyLow = true) }, enabled = supplierId.isNotBlank()) { Text("کم‌موجودهای این تأمین‌کننده") }
-      OutlinedButton(onClick = { addPicks(onlyLow = false) }, enabled = supplierId.isNotBlank()) { Text("همهٔ کالاهای این تأمین‌کننده") }
+      OutlinedButton(onClick = { addPlanned() }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.suggestBySales) }
+      OutlinedButton(onClick = { addPicks(onlyLow = true) }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.lowFromSupplier) }
+      OutlinedButton(onClick = { addPicks(onlyLow = false) }, enabled = supplierId.isNotBlank()) { Text(StrPurchasePages.allFromSupplier) }
     }
     Spacer(Modifier.height(8.dp))
     rows.forEachIndexed { i, r ->
       Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${i + 1}. ${r.name}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, "مقدار ${r.unit}", Modifier.width(120.dp))
-        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, "فی (؋)", Modifier.width(120.dp))
-        TextButton(onClick = { historyFor = r.productId }) { Text("تاریخچه") }
-        TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text("حذف") }
+        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(r.unit), Modifier.width(120.dp))
+        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, StrReturnPages.unitPriceAfn, Modifier.width(120.dp))
+        TextButton(onClick = { historyFor = r.productId }) { Text(StrHome.history) }
+        TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text(StrMoney.delete) }
       }
       //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
       val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
       Text(last, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(bottom = 4.dp))
     }
-    PoProductPicker(d, "افزودنِ کالا — نام یا بارکد") { addProduct(it) }
+    PoProductPicker(d, StrSale.addReturnItem) { addProduct(it) }
     Spacer(Modifier.height(8.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      OutlinedTextField(value = expected, onValueChange = { expected = it.take(10) }, label = { Text("تاریخِ رسیدن (اختیاری)") }, singleLine = true, modifier = Modifier.weight(1f))
-      OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text("یادداشت") }, singleLine = true, modifier = Modifier.weight(2f))
+      OutlinedTextField(value = expected, onValueChange = { expected = it.take(10) }, label = { Text(StrPurchasePages.arrivalOptional) }, singleLine = true, modifier = Modifier.weight(1f))
+      OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.weight(2f))
     }
     val total = rows.sumOf { (it.qty.toDoubleOrNull() ?: 0.0) * (it.price.toDoubleOrNull() ?: 0.0) }
     Spacer(Modifier.height(6.dp))
-    Text("جمعِ سفارش: ${money(total)} ؋ · ${rows.size} ردیف", style = MaterialTheme.typography.bodySmall, color = c.text)
+    Text(StrPurchasePages.poTotal(money(total), rows.size), style = MaterialTheme.typography.bodySmall, color = c.text)
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.height(10.dp))
     Button(onClick = { save() }, enabled = !busy && rows.isNotEmpty(), modifier = Modifier.fillMaxWidth()) {
-      Text(if (base == null) "ذخیرهٔ پیش‌نویس" else "ذخیره")
+      Text(if (base == null) StrPurchasePages.saveDraft else StrKit.save)
     }
   }
 
@@ -556,12 +574,12 @@ internal fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, pr
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("تاریخچهٔ قیمتِ «${d.products.find { it.id == productId }?.name.orEmpty()}»", color = c.text) },
+    title = { Text(StrPurchasePages.priceHistoryOf(d.products.find { it.id == productId }?.name.orEmpty()), color = c.text) },
     text = {
       Column(Modifier.verticalScroll(rememberScrollState())) {
-        if (rows.isEmpty()) EmptyNote("هنوز خریدی ثبت نشده است.")
+        if (rows.isEmpty()) EmptyNote(StrPurchasePages.noPurchaseYet)
         cheapest?.let {
-          Text("ارزان‌ترین آخرین فی: ${names[it.supplierId].orEmpty()} ${money(PurchaseOrderBook.asAfn(it.priceMinor))} ؋",
+          Text(StrPurchasePages.cheapestLast(names[it.supplierId].orEmpty(), money(PurchaseOrderBook.asAfn(it.priceMinor))),
             style = MaterialTheme.typography.labelSmall, color = c.success)
         }
         rows.forEach { p ->
@@ -575,7 +593,7 @@ internal fun PriceHistoryDialog(d: ShopData, buys: List<SupplierPricing.Buy>, pr
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
 
@@ -587,14 +605,14 @@ private fun PoProductPicker(d: ShopData, hint: String, onPick: (Product) -> Unit
   val t = ir.vil3ntec.tohid.latinDigits(term).trim()
   if (t.isNotEmpty()) {
     val hits = d.products.filter { it.active && (TextNormalizer.matches(it.name, t) || t in it.barcodes) }.take(6)
-    if (hits.isEmpty()) Text("کالایی پیدا نشد", style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(6.dp))
+    if (hits.isEmpty()) Text(StrSale.noProductFound, style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(6.dp))
     hits.forEach { p ->
       Row(
         Modifier.fillMaxWidth().clip(Shape.button).clickable { onPick(p); term = "" }.padding(horizontal = 8.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(p.name, color = c.text, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-        Text("موجودی ${qty(ShopStore.stock(d, p.id))} ${p.unit}", style = MaterialTheme.typography.labelSmall, color = c.muted)
+        Text(StrPurchasePages.stockOf(qty(ShopStore.stock(d, p.id)), p.unit), style = MaterialTheme.typography.labelSmall, color = c.muted)
       }
     }
   }
@@ -636,7 +654,7 @@ private fun PoReceive(
   fun scanned(code: String): Boolean {
     val pid = index[code.trim()]
     val line = order.lines.find { it.productId == pid }
-    if (line == null) { toast("«$code» در این سفارش نیست"); return true }
+    if (line == null) { toast(StrPurchasePages.notInPo(code)); return true }
     val cur = rows[line.id] ?: RecvRow()
     val next = (cur.received.toDoubleOrNull() ?: 0.0) + 1.0
     rows = rows + (line.id to cur.copy(received = poNum(next)))
@@ -658,43 +676,43 @@ private fun PoReceive(
       val rec = r.received.ifBlank { "0" }.toDoubleOrNull()
       val dmg = r.damaged.ifBlank { "0" }.toDoubleOrNull()
       val price = r.price.toDoubleOrNull()
-      if (rec == null || rec < 0 || dmg == null || dmg < 0) { error = "ردیفِ ${i + 1}: مقدار درست نیست"; return }
-      if (dmg > rec) { error = "ردیفِ ${i + 1}: خراب بیش از رسیده است"; return }
-      if (price == null || price < 0) { error = "ردیفِ ${i + 1}: فی درست نیست"; return }
+      if (rec == null || rec < 0 || dmg == null || dmg < 0) { error = StrPurchasePages.rowBadQty(i + 1); return }
+      if (dmg > rec) { error = StrPurchasePages.rowDamagedOver(i + 1); return }
+      if (price == null || price < 0) { error = StrPurchasePages.rowBadPrice(i + 1); return }
       if (rec == 0.0) continue
       lines += PoReceiptLineDto(l.id, PurchaseOrderBook.milli(rec), PurchaseOrderBook.milli(dmg), PurchaseOrderBook.minor(price))
     }
-    if (lines.isEmpty()) { error = "هیچ مقداری وارد نشده است"; return }
-    val freightMinor = PurchaseOrderBook.freightMinorOf(freight) ?: run { error = "کرایه درست نیست"; return }
+    if (lines.isEmpty()) { error = StrPurchasePages.nothingEntered; return }
+    val freightMinor = PurchaseOrderBook.freightMinorOf(freight) ?: run { error = StrPurchasePages.freightBad; return }
     busy = true; error = null
     scope.launch {
       val res = repo.receive(order.id, receiptId, lines, allowOver, note.trim(), freightMinor)
       val got = res.valueOrNull()
       if (got == null) { busy = false; error = res.errorMessage(); return@launch }
       //  رسید در سرور ثبت شد ⇒ فاکتورِ خریدِ دفتر (شناسه‌های قطعی؛ تکرار بی اثر)
-      var msg = "رسید ثبت شد"
+      var msg = StrPurchasePages.receiptSaved
       val wrote = store.update { cur ->
         when (val p = PurchaseOrderBook.post(cur, got.order, got.receipt, todayIso(), host.now())) {
-          is PurchaseOrderBook.Posting.Ok -> { msg = "رسید ثبت شد · فاکتورِ خریدِ #${p.invoiceNo} در دفتر"; p.data }
+          is PurchaseOrderBook.Posting.Ok -> { msg = StrPurchasePages.receiptPosted(p.invoiceNo); p.data }
           PurchaseOrderBook.Posting.Already -> null
-          is PurchaseOrderBook.Posting.Failed -> { msg = "رسید ثبت شد، ولی دفتر نه: ${p.message}"; null }
+          is PurchaseOrderBook.Posting.Failed -> { msg = StrPurchasePages.receiptNoLedger(p.message); null }
         }
       }
       busy = false
-      toast(if (wrote == false) "رسید ثبت شد، ولی دفتر نوشته نشد (اشتراک یا دیسک) — از «ثبت در دفتر» دوباره" else msg)
+      toast(if (wrote == false) StrPurchasePages.receiptLedgerFailed else msg)
       onDone()
     }
   }
 
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-    Text("دریافتِ کالا — سفارشِ #${order.no} · ${order.supplierName}", style = MaterialTheme.typography.titleSmall, color = c.text)
-    Text("کالا را اسکن کنید یا مقدار را بنویسید. خراب‌ها پذیرفته نمی‌شوند و باقی‌ماندهٔ سفارش باز می‌ماند.", style = MaterialTheme.typography.labelSmall, color = c.muted)
+    Text(StrPurchasePages.receiveTitle(order.no, order.supplierName), style = MaterialTheme.typography.titleSmall, color = c.text)
+    Text(StrPurchasePages.receiveNote, style = MaterialTheme.typography.labelSmall, color = c.muted)
     Spacer(Modifier.height(8.dp))
     OutlinedTextField(
       value = scan,
       onValueChange = { v -> if (v.contains('\n')) { scanned(v.trim()); scan = "" } else scan = v.take(64) },
       singleLine = false, maxLines = 1,
-      label = { Text("بارکد") },
+      label = { Text(StrGrid.barcode) },
       keyboardActions = androidx.compose.foundation.text.KeyboardActions(onDone = { if (scan.isNotBlank()) scanned(scan.trim()); scan = "" }),
       modifier = Modifier.fillMaxWidth(),
     )
@@ -703,27 +721,27 @@ private fun PoReceive(
       val r = rows[l.id] ?: RecvRow()
       val left = prog[l.id]?.remainingMilli ?: l.qtyMilli
       Column(Modifier.padding(vertical = 4.dp)) {
-        Text("${l.name} — باقی‌مانده ${qty(PurchaseOrderBook.units(left))} ${l.unit}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(StrPurchasePages.remainingOf(l.name, qty(PurchaseOrderBook.units(left)), l.unit), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(received = v)); error = null }, "رسیده", Modifier.weight(1f))
-          NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(damaged = v)); error = null }, "خراب", Modifier.weight(1f))
-          if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(price = v)); error = null }, "فی (؋)", Modifier.weight(1f))
+          NumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(received = v)); error = null }, StrPurchasePages.received, Modifier.weight(1f))
+          NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
+          if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
         }
       }
     }
     if (perms.manage) Row(verticalAlignment = Alignment.CenterVertically) {
       Checkbox(checked = allowOver, onCheckedChange = { allowOver = it })
-      Text("بیش از سفارش را هم می‌پذیرم (اختلافِ «اضافه» ثبت می‌شود)", style = MaterialTheme.typography.bodySmall, color = c.text)
+      Text(StrPurchasePages.acceptOver, style = MaterialTheme.typography.bodySmall, color = c.text)
     }
     if (perms.manage) {
-      NumberField(freight, { v -> freight = v; error = null }, "کرایهٔ این رسید (؋)", Modifier.fillMaxWidth())
-      Text("به حمل‌کننده، نه تأمین‌کننده: به نسبتِ ارزشِ کالاهای پذیرفته روی بهایشان پخش می‌شود و بدهیِ تأمین‌کننده را بالا نمی‌برد.",
+      NumberField(freight, { v -> freight = v; error = null }, StrPurchasePages.freightField, Modifier.fillMaxWidth())
+      Text(StrPurchasePages.freightNote,
         style = MaterialTheme.typography.labelSmall, color = c.muted)
     }
-    OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text("یادداشت") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.fillMaxWidth())
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
     Spacer(Modifier.height(10.dp))
-    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) "در حالِ ثبت…" else "ثبتِ رسید") }
+    Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrLayaway.payConfirm) }
   }
 }
 

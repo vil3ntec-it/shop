@@ -55,6 +55,9 @@ services:
       BACKUP_PATH: /app/data/backups
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
       DEFAULT_COUNTRY_CODE: ${DEFAULT_COUNTRY_CODE:-+93}
+      #  پوشِ گوشی (Firebase، O-01؛ docs/FIREBASE-SETUP-fa.md): مسیرِ کلیدِ حسابِ سرویس **درونِ** container —
+      #  فایل در ./secrets ِ کنارِ همین پرونده (هرگز در مخزن). خالی ⇒ پوشِ اندروید خاموش، بی هیچ خطا.
+      FCM_SERVICE_ACCOUNT_FILE: ${FCM_SERVICE_ACCOUNT_FILE:-}
     ports:
       #  فقط روی خودِ سرور باز می‌شود، نه روی اینترنت.
       #
@@ -67,6 +70,8 @@ services:
     volumes:
       # پشتیبان‌ها بیرون از container می‌مانند تا با پاک شدن آن از بین نروند
       - ${BACKUP_PATH:-./data/backups}:/app/data/backups
+      # کلیدهای بیرون از مخزن (مثلِ کلیدِ Firebase) — فقط خواندنی
+      - ${SECRETS_PATH:-./secrets}:/app/secrets:ro
 
   #  HTTPS خودکار روی دامنه‌ی خودتان.
   #

@@ -33,6 +33,8 @@ object ShellTargets {
   val NEW_ORDERS: String = OnlinePaths.orders(tab = "new")
   /** کاشیِ «سفارش‌های آنلاین» ِ خانه: صف با برگهٔ پیش‌فرض (جدید) */
   val ORDERS: String = OnlinePaths.ORDERS
+  /** همان کاشی وقتی بخشِ سفارش خاموش است: «تنظیمات ← سفارشِ آنلاین» — «چرا نمی‌رسد؟» و دکمهٔ هر کار (صف بی بخشِ روشن نیست) */
+  val ORDERS_SETUP: String = SettingsPaths.ROOT + "/sales/online-orders"
   val SUBSCRIPTION: String = AccountPaths.SUBSCRIPTION
   val PLANS: String = AccountPaths.PLANS
   fun stock(anyOut: Boolean): String = ProductsPaths.list(filter = if (anyOut) "out" else "low")

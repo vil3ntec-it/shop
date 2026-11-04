@@ -74,4 +74,11 @@ object OrderFlow {
 
   /** حال‌های پرداخت (`payStep.state` ِ سرور) که هنوز کاری از مشتری می‌خواهند */
   fun waitsForCustomer(state: String): Boolean = state == "awaiting_accept" || state == "awaiting_choice"
+
+  /**
+   *  «پرداخت پس از پذیرش» و مشتری هنوز روشِ پرداخت را برنگزیده (`awaiting_choice`)، ولی دکمه فروش را همین حالا با نقد
+   *  می‌نویسد ([Plan.recordNow]) ⇒ پس از آن سرور پرداختِ آنلاینِ مشتری را می‌بندد (`order_invoiced`) — فروشنده پیش از
+   *  زدن باید بداند. «دریافت از دکان» ِ نقدی (فاکتور همراهِ تحویل سرِ پیشخوان) نه: مشتری همان‌جا می‌پردازد.
+   */
+  fun closesOnlineChoice(payState: String, plan: Plan): Boolean = payState == "awaiting_choice" && plan.recordNow
 }
