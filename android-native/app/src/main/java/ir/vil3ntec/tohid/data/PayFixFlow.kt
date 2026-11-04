@@ -80,6 +80,8 @@ object PayFixFlow {
     val approvedBy: String?,
     val reason: String,
     val ref: String?,
+    /** برگهٔ امضاشدهٔ تأییدکننده (`ApprovalDialog`) ⇒ `AuditEntry.approval`، تا سرور بسنجد (`shop.sync.pay_fix`)؛ «مجاز» ⇒ `null` */
+    val approval: kotlinx.serialization.json.JsonObject? = null,
   )
 
   sealed interface Built {
@@ -100,7 +102,7 @@ object PayFixFlow {
     )
     return when (val c = PayFix.check(input)) {
       is PayResult.Err -> Built.Bad(c.code, c.method)
-      is PayResult.Ok -> Built.Ok(row(c.value, sale, today), c.value)
+      is PayResult.Ok -> Built.Ok(row(c.value, sale, today).copy(approval = r.approval.takeIf { r.decision == "approve" }), c.value)
     }
   }
 

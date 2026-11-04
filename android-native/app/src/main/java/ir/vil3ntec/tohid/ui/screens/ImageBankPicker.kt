@@ -47,6 +47,15 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDirection
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrImageChanges
+import ir.vil3ntec.tohid.core.i18n.StrImagePages
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrProductPages
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ImageBank
@@ -101,10 +110,10 @@ fun ImageBankPicker(
 
   fun search(more: Boolean) {
     val text = query.trim()
-    if (text.isEmpty()) { state = "بارکد را اسکن یا نامِ کالا را بنویسید"; stateTone = PillTone.NEUTRAL; items.clear(); next = null; empty = false; return }
+    if (text.isEmpty()) { state = StrImagePages.scanOrType; stateTone = PillTone.NEUTRAL; items.clear(); next = null; empty = false; return }
     loading = true
     empty = false
-    state = "در حالِ جست‌وجو…"; stateTone = PillTone.NEUTRAL
+    state = StrDevices.searching; stateTone = PillTone.NEUTRAL
     scope.launch {
       try {
         val page = ImageBank.search(context, text, hasImage, if (more) next else null)
@@ -112,28 +121,28 @@ fun ImageBankPicker(
         items += page.items
         next = page.next
         empty = items.isEmpty()
-        val note = if (page.barcodeValid == false) "این بارکد معتبر نیست — نتیجه‌ها با نام است. " else ""
-        state = note + if (items.isEmpty()) "چیزی پیدا نشد. می‌توانید عکسِ خودتان را بگذارید." else "${items.size} نتیجه" + if (next != null) " (بیشتر هم هست)" else ""
+        val note = if (page.barcodeValid == false) StrImagePages.badBarcode else ""
+        state = note + if (items.isEmpty()) StrImagePages.nothingFound else StrImagePages.resultsCount(items.size) + if (next != null) StrImagePages.moreExist else ""
         stateTone = if (page.barcodeValid == false) PillTone.WARNING else PillTone.NEUTRAL
         stale = page.stale
         if (page.stale) {
           //  ⛔ هرگز «جست‌وجوی زنده» نیست: سن و «آخرین همگام‌سازی» پیدا، و انتخاب فقط با اینترنت
-          state = "بی اینترنت — نتیجه‌های ذخیره‌شده از ${ago(System.currentTimeMillis() - page.savedAtMs)} (آخرین همگام‌سازی). " +
-            "ممکن است بانک از آن زمان عوض شده باشد؛ انتخاب فقط با اینترنت. " + state
+          state = StrImagePages.offlineCached(ago(System.currentTimeMillis() - page.savedAtMs)) +
+            StrImagePages.bankMayChanged + state
           stateTone = PillTone.WARNING
         }
       } catch (f: ApiFailure) {
         stateTone = PillTone.DANGER
         state = when {
-          f is ApiFailure.Offline || f is ApiFailure.Timeout -> { stale = false; "اینترنت قطع است یا سرور در دسترس نیست — برای این جست‌وجو نتیجهٔ ذخیره‌شده‌ای هم روی این دستگاه نیست." }
-          f is ApiFailure.Forbidden -> { ImageBank.enabled.value = false; "بانکِ تصاویر برای این دکان روشن نیست." }
-          else -> "خطای سرور: ${f.userMessage}"
+          f is ApiFailure.Offline || f is ApiFailure.Timeout -> { stale = false; StrImagePages.offlineNoCache }
+          f is ApiFailure.Forbidden -> { ImageBank.enabled.value = false; StrImageChanges.off }
+          else -> StrImagePages.serverError(f.userMessage)
         }
       } catch (c: CancellationException) {
         throw c
       } catch (e: Exception) {
         stateTone = PillTone.DANGER
-        state = "پاسخِ سرور خوانده نشد"
+        state = StrImagePages.replyUnread
       } finally {
         loading = false
       }
@@ -143,38 +152,38 @@ fun ImageBankPicker(
 
   AdaptiveSheet(onDismissRequest = onDismiss, containerColor = colors.bg) {
     Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
-      Text("انتخاب از بانکِ تصاویر", style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      Text(StrReach.photoBank, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
       Spacer(Modifier.height(Space.xs))
       val hit = open
       if (hit == null) {
         Row(verticalAlignment = Alignment.CenterVertically) {
           OutlinedTextField(
             value = query, onValueChange = { query = it }, singleLine = true,
-            label = { Text("بارکد یا نامِ کالا") }, modifier = Modifier.weight(1f),
+            label = { Text(StrImagePages.barcodeOrName) }, modifier = Modifier.weight(1f),
           )
           Spacer(Modifier.width(Space.xs))
           //  IMG-BANK-03: بارکد با دوربین (کامپیوتر: بارکدخوان) ⇒ همان جست‌وجو؛ فقط نتیجه باز می‌شود، چیزی ثبت نمی‌شود
-          TextButton(onClick = { scanOpen = true }, enabled = !loading) { Text("اسکن") }
-          Button(onClick = { search(false) }, enabled = !loading) { Text("جست‌وجو") }
+          TextButton(onClick = { scanOpen = true }, enabled = !loading) { Text(StrImagePages.scanBtn) }
+          Button(onClick = { search(false) }, enabled = !loading) { Text(Str.search) }
         }
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { hasImage = !hasImage; search(false) }) {
           Checkbox(checked = hasImage, onCheckedChange = { hasImage = it; search(false) })
-          Text("فقط کالاهایی که عکسِ تأییدشده دارند", style = MaterialTheme.typography.bodySmall, color = colors.text)
+          Text(StrImagePages.approvedOnly, style = MaterialTheme.typography.bodySmall, color = colors.text)
         }
         if (state.isNotEmpty()) {
           if (stateTone == PillTone.NEUTRAL) Text(state, style = MaterialTheme.typography.bodySmall, color = colors.muted)
           else StatusPill(state, stateTone)
-          if (stateTone == PillTone.DANGER) TextButton(onClick = { search(false) }) { Text("دوباره") }
+          if (stateTone == PillTone.DANGER) TextButton(onClick = { search(false) }) { Text(Str.again) }
         }
         Spacer(Modifier.height(Space.xs))
         //  IMG-BANK-10: بی نتیجه هیچ کالای نامرتبطی «نتیجه» نمی‌شود؛ راهِ روشن همین است
         if (empty && !loading && onUploadOwn != null) {
-          OutlinedButton(onClick = onUploadOwn) { Text("عکسِ خودم را می‌گذارم") }
+          OutlinedButton(onClick = onUploadOwn) { Text(StrImagePages.useOwnPhoto) }
         }
         Column(Modifier.heightIn(max = 440.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
           items.forEach { h -> HitCard(h) { open = h } }
           if (next != null) OutlinedButton(onClick = { search(true) }, enabled = !loading, modifier = Modifier.align(Alignment.CenterHorizontally)) {
-            Text("نتیجه‌های بیشتر")
+            Text(StrImagePages.moreResults)
           }
         }
       } else {
@@ -194,23 +203,23 @@ fun ImageBankPicker(
 private fun ago(ms: Long): String {
   val m = (ms.coerceAtLeast(0) / 60_000L)
   return when {
-    m < 1 -> "کمتر از یک دقیقه پیش"
-    m < 60 -> "$m دقیقه پیش"
-    m < 24 * 60 -> "${m / 60} ساعت پیش"
-    else -> "${m / (24 * 60)} روز پیش"
+    m < 1 -> StrImagePages.underMinute
+    m < 60 -> StrOnline.agoMinutes(m)
+    m < 24 * 60 -> StrOnline.agoHours(m / 60)
+    else -> StrOnline.agoDays(m / (24 * 60))
   }
 }
 
 private fun pills(h: ImageBank.Hit): List<Pair<String, PillTone>> = buildList {
-  if (h.certain) add("تطبیقِ دقیق: ${ImageBank.KIND[h.kind].orEmpty()}" to PillTone.SUCCESS)
-  else add("محتمل: ${ImageBank.KIND[h.kind] ?: "نامِ مشابه"}" to PillTone.WARNING)
-  if ("brand_match" in h.reasons) add("برندِ مشابه" to PillTone.NEUTRAL)
-  if (h.ambiguous) add("چند نوع — فرق در ${h.distinguish.joinToString("، ") { ImageBank.DIFF[it] ?: it }}" to PillTone.DANGER)
+  if (h.certain) add(StrImagePages.exactMatch(ImageBank.KIND[h.kind].orEmpty()) to PillTone.SUCCESS)
+  else add(StrImagePages.likelyMatch(ImageBank.KIND[h.kind] ?: StrImagePages.similarNameKind) to PillTone.WARNING)
+  if ("brand_match" in h.reasons) add(StrImagePages.similarBrand to PillTone.NEUTRAL)
+  if (h.ambiguous) add(StrImagePages.severalKinds(h.distinguish.joinToString("، ") { ImageBank.DIFF[it] ?: it }) to PillTone.DANGER)
 }
 
 private fun spec(h: ImageBank.Hit): String = listOfNotNull(
   h.brand.ifBlank { null }, h.variant.ifBlank { null }, h.size.ifBlank { null },
-  if (h.packCount > 1) "${h.packCount} عددی" else null, h.packaging.ifBlank { null },
+  if (h.packCount > 1) StrImagePages.packOf(h.packCount) else null, h.packaging.ifBlank { null },
 ).joinToString(" · ")
 
 /**
@@ -271,7 +280,7 @@ private fun HitCard(h: ImageBank.Hit, onOpen: () -> Unit) {
   ) {
     val img = h.images.firstOrNull()
     //  «بی عکس» فقط وقتی واقعاً عکسی نیست؛ عکسی که هنوز نیامده (یا بی اینترنت) «…» است
-    BankImage(img?.thumb ?: img?.display, 64.dp, if (img == null) "بی عکس" else "…")
+    BankImage(img?.thumb ?: img?.display, 64.dp, if (img == null) StrImageChanges.sourceNone else "…")
     Spacer(Modifier.width(Space.sm))
     Column(Modifier.weight(1f)) {
       Text(h.name, style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
@@ -308,9 +317,9 @@ private fun HitDetail(
   val needs = a.needsConfirm || forceConfirm
 
   Column(Modifier.heightIn(max = 560.dp).verticalScroll(rememberScrollState())) {
-    TextButton(onClick = onBack) { Text("بازگشت به نتیجه‌ها") }
+    TextButton(onClick = onBack) { Text(StrImagePages.backToResults) }
     val img = h.images.getOrNull(chosen)
-    BankImage(img?.display ?: img?.thumb, 220.dp, "این کالا در بانک عکسِ تأییدشده ندارد")
+    BankImage(img?.display ?: img?.thumb, 220.dp, StrImagePages.noApprovedPhoto)
     if (h.images.size > 1) {
       Spacer(Modifier.height(6.dp))
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -323,25 +332,25 @@ private fun HitDetail(
     }
     Spacer(Modifier.height(Space.xs))
     Text(h.name, style = MaterialTheme.typography.titleSmall, color = colors.text, fontWeight = FontWeight.Bold)
-    listOf("برند" to h.brand, "طعم/مدل" to h.variant, "وزن/حجم" to h.size,
-      "تعداد در بسته" to (if (h.packCount > 1) h.packCount.toString() else ""), "بسته‌بندی" to h.packaging, "بارکد" to h.gtin)
+    listOf(StrProductPages.brand to h.brand, StrImagePages.flavorModel to h.variant, StrImagePages.weightVolume to h.size,
+      StrImagePages.perPack to (if (h.packCount > 1) h.packCount.toString() else ""), StrImagePages.packaging to h.packaging, StrProducts.barcode to h.gtin)
       .filter { it.second.isNotBlank() }
       .forEach { (k, v) -> Text("$k: $v", style = MaterialTheme.typography.bodySmall, color = colors.text) }
     Spacer(Modifier.height(4.dp))
     pills(h).forEach { (t, tone) -> StatusPill(t, tone); Spacer(Modifier.height(3.dp)) }
     a.why.forEach { Text("• $it", style = MaterialTheme.typography.bodySmall, color = colors.warning) }
     Spacer(Modifier.height(6.dp))
-    Text("قیمت، موجودی، قفسه و SKUِ شما از بانک کپی نمی‌شود؛ فقط عکس.", style = MaterialTheme.typography.bodySmall, color = colors.muted)
-    if (hasPhoto) Text("این کالا الان عکس دارد؛ با انتخاب، این عکس جایش را می‌گیرد.", style = MaterialTheme.typography.bodySmall, color = colors.warning)
-    if (a.block.isNotEmpty()) StatusPill(a.block + " — انتخاب نمی‌شود", PillTone.DANGER)
+    Text(StrImagePages.photoOnly, style = MaterialTheme.typography.bodySmall, color = colors.muted)
+    if (hasPhoto) Text(StrImagePages.replacesPhoto, style = MaterialTheme.typography.bodySmall, color = colors.warning)
+    if (a.block.isNotEmpty()) StatusPill(a.block + StrImagePages.notSelectable, PillTone.DANGER)
     if (a.block.isEmpty() && needs) {
       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { confirm = !confirm }) {
         Checkbox(checked = confirm, onCheckedChange = { confirm = it })
-        Text("مشخصات را دیدم؛ این عکس واقعاً همین کالای من است", style = MaterialTheme.typography.bodySmall, color = colors.text)
+        Text(StrImagePages.iSawDetails, style = MaterialTheme.typography.bodySmall, color = colors.text)
       }
     }
     problem?.let { StatusPill(it, PillTone.DANGER) }
-    if (stale) StatusPill("این نتیجه از کشِ بی‌اینترنتی است؛ برای انتخاب، با اینترنت دوباره جست‌وجو کنید", PillTone.WARNING)
+    if (stale) StatusPill(StrImagePages.staleResult, PillTone.WARNING)
     Spacer(Modifier.height(Space.xs))
     Button(
       onClick = {
@@ -352,15 +361,15 @@ private fun HitDetail(
             onChosen(ImageBank.chooseCentral(context, productId, im, name, barcode, confirm))
           } catch (f: ApiFailure) {
             problem = when (f.code) {
-              "needs_confirmation" -> { forceConfirm = true; "تطبیق قطعی نیست — مشخصات را ببینید و تیک بزنید" }
-              "barcode_mismatch" -> "بارکدِ کالای شما با کالای این عکس فرق دارد"
-              "image_not_selectable", "version_not_approved" -> "این عکس دیگر در بانک قابلِ انتخاب نیست"
-              else -> if (f is ApiFailure.Offline || f is ApiFailure.Timeout) "اینترنت قطع است — دوباره امتحان کنید" else f.userMessage
+              "needs_confirmation" -> { forceConfirm = true; StrImagePages.notCertain }
+              "barcode_mismatch" -> StrImagePages.barcodeMismatch
+              "image_not_selectable", "version_not_approved" -> StrImagePages.noLongerSelectable
+              else -> if (f is ApiFailure.Offline || f is ApiFailure.Timeout) StrImagePages.offlineRetry else f.userMessage
             }
           } catch (c: CancellationException) {
             throw c
           } catch (e: Exception) {
-            problem = e.message ?: "عکس گرفته نشد"
+            problem = e.message ?: StrImagePages.photoNotTaken
           } finally {
             busy = false
           }
@@ -368,6 +377,6 @@ private fun HitDetail(
       },
       enabled = !busy && !stale && h.images.isNotEmpty() && a.block.isEmpty() && (!needs || confirm),
       modifier = Modifier.fillMaxWidth(),
-    ) { Text(if (busy) "در حالِ ثبت…" else "انتخاب این عکس") }
+    ) { Text(if (busy) StrSale.posting else StrImagePages.chooseThisPhoto) }
   }
 }

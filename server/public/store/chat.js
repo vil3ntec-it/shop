@@ -21,6 +21,8 @@
     var api = ctx.api;
     var base = '/api/store/' + encodeURIComponent(ctx.slug);
     var conv = null; var cursor = 0; var msgs = {}; var loop = 0; var want = null; var sheet = null;
+    //  پیامِ در راه { conv, body, key, wait } — تا رسیدن با همان شناسه (CHAT-02/11)؛ retry = زمان‌سنجِ تلاشِ دوباره
+    var out = null; var retry = 0;
     //  واژه‌نامه پیش از ساختنِ برگه (برگه هنوز نیست ⇒ ترجمهٔ دوباره لازم نیست؛ متن‌ها با t() از همین واژه‌نامه)
     var ready = K.part('chat', $('chat-sheet'));
 
@@ -186,8 +188,7 @@
         if (r.conversation) { conv = r.conversation; state(); }
         cursor = r.cursor;
         render(r.messages || []);
-        var seq = conv.seq || 0;
-        if (r.messages && r.messages.length) api(path(id, '/receipts'), { method: 'POST', body: { deliveredSeq: seq, readSeq: seq } }).catch(function () { /* بعدی */ });
+        if (r.messages && r.messages.length) receipt(id, conv.seq || 0);
         poll(my);
       }).catch(function (e) {
         if (my !== loop) return;
@@ -196,19 +197,49 @@
       });
     }
 
+    //  «خواندم» فقط وقتی برگه دیده می‌شود (CHAT-04)؛ برگهٔ پنهانِ مرورگر فقط «رسید»
+    function seen() { return document.visibilityState !== 'hidden'; }
+    function receipt(id, seq) {
+      api(path(id, '/receipts'), { method: 'POST', body: seen() ? { deliveredSeq: seq, readSeq: seq } : { deliveredSeq: seq } })
+        .then(function (r) { if (conv && r.conversation && conv.id === r.conversation.id) conv.receipts = r.conversation.receipts; })
+        .catch(function () { /* بعدی */ });
+    }
+    document.addEventListener('visibilitychange', function () {
+      if (!seen() || !conv || K.sheetOpen() !== sheet) return;
+      if (((conv.receipts || {}).myReadSeq || 0) < (conv.seq || 0)) receipt(conv.id, conv.seq);
+    });
+
     function send() {
-      var box = $('ct-text'); var body = box.value.trim();
+      var body = $('ct-text').value.trim();
       if (!body || !conv) return;
+      //  همان متن در همان رشته ⇒ همان شناسه: جوابِ گم‌شده یا اینترنتِ رفته پیامِ دوم نمی‌سازد (CHAT-02/11)
+      if (!out || out.conv !== conv.id || out.body !== body) {
+        out = { conv: conv.id, body: body, key: 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10), wait: 2000 };
+      }
+      push(out);
+    }
+    function push(my) {
+      clearTimeout(retry);
       var b = $('ct-send'); b.disabled = true;
-      var key = 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10);
-      api(path(conv.id, '/messages'), { method: 'POST', body: { clientId: key, body: body } }).then(function (r) {
-        box.value = ''; $('ct-msg').hidden = true;
-        put($('ct-list'), r.message, conv.id); $('ct-empty').hidden = true;
+      api(path(my.conv, '/messages'), { method: 'POST', body: { clientId: my.key, body: my.body } }).then(function (r) {
+        if (out === my) out = null;
+        if ($('ct-text').value.trim() === my.body) $('ct-text').value = '';
+        $('ct-msg').hidden = true;
+        if (conv && conv.id === my.conv) { put($('ct-list'), r.message, my.conv); $('ct-empty').hidden = true; }
       }).catch(function (e) {
+        if (e.status === 0 && out === my) {   //  بی‌اینترنت: در صف؛ با وصل شدن (`online`) یا پس از کمی، خودش با همان شناسه
+          K.note($('ct-msg'), 'warn', t('ct.queued'));
+          my.wait = Math.min(60000, my.wait * 2);
+          retry = setTimeout(function () { again(my); }, my.wait);
+          return;
+        }
         if (e.code === 'chat_closed' || e.code === 'chat_blocked') reload();
         fail(e);
       }).then(function () { b.disabled = false; });
     }
+    //  فقط همان پیام، همان رشتهٔ باز و همان متنِ کادر — متنِ عوض‌شده یعنی کاربر پیامِ دیگری می‌خواهد
+    function again(my) { if (out === my && conv && conv.id === my.conv && $('ct-text').value.trim() === my.body) push(my); }
+    window.addEventListener('online', function () { if (out) again(out); });
     function issue() {
       var b = $('ct-issue'); b.disabled = true;
       api(path(conv.id, '/issue'), { method: 'POST', body: {} }).then(function (r) {

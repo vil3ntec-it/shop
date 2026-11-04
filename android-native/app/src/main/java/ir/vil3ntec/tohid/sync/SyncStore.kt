@@ -155,6 +155,14 @@ class SyncStore(context: Context) {
     set(v) = prefs.edit().putString(DENIED, v).apply()
 
   /**
+   *  O-09: دکان بیرون از سقفِ دستگاه است ولی این دستگاهِ صاحب مجوز گرفت — «دستگاه/سقف»
+   *  (`DeviceCap.encode`)؛ نوارِ هشدارِ پوسته (`DeviceCapNotice`) از همین می‌خواند. هر پاسخِ مجوز بازنویسی‌اش می‌کند.
+   */
+  var deviceCapOver: String?
+    get() = prefs.getString(DEVICE_CAP, null)
+    set(v) = prefs.edit().putString(DEVICE_CAP, v).apply()
+
+  /**
    *  کلیدِ عمومیِ مجوز.
    *
    *  ── چرا خواندنش از این‌جا شروع نمی‌شود ────────────────────────────
@@ -314,6 +322,7 @@ class SyncStore(context: Context) {
     const val OFFLINE_REDEEMED = "offline_redeemed"
     const val OFFLINE_USED = "offline_used"
     const val DENIED = "license_denied"
+    const val DEVICE_CAP = "device_cap_over"
     const val PUBLIC_KEY = "public_key"
     const val SHADOW = "shadow"
     const val REV = "rev"

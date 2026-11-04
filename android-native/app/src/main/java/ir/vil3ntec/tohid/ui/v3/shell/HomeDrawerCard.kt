@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -31,10 +32,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.money
@@ -62,7 +67,8 @@ internal object DrawerPages {
 @Composable
 internal fun HomeHeader(view: HomeView, onOpen: (String) -> Unit, modifier: Modifier = Modifier) {
   val p = PhoneV3.colors
-  Row(modifier.fillMaxWidth().padding(horizontal = 12.dp).height(52.dp), verticalAlignment = Alignment.CenterVertically) {
+  //  بلندی کمینه است: با درشتیِ نوشتهٔ ×۲ نامِ دکان بریده نمی‌شود
+  Row(modifier.fillMaxWidth().padding(horizontal = 12.dp).heightIn(min = 52.dp), verticalAlignment = Alignment.CenterVertically) {
     Row(
       Modifier.weight(1f, fill = false).clip(RoundedCornerShape(12.dp)).v3Pressable(label = view.shopName) { onOpen(ShellTargets.PROFILE) }
         .padding(horizontal = 6.dp, vertical = 6.dp),
@@ -90,7 +96,7 @@ internal fun HomeHeader(view: HomeView, onOpen: (String) -> Unit, modifier: Modi
 /**
  *  نشانهٔ کادرِ پنهان: دستگیرهٔ ۳۶×۴ زیرِ سرخط و تا نخستین باز شدن یک بار «برای صندوق پایین
  *  بکشید». با کشیدن دستگیره کمی پهن می‌شود و راهنما محو (`progress`، فقط در draw). زدن هم
- *  کادر را باز/بسته می‌کند — برای کسی که کشیدن برایش سخت است.
+ *  کادر را باز/بسته می‌کند — برای کسی که کشیدن برایش سخت است. صفحه‌خوان: «صندوق، بسته/باز» (دستگیره بی نوشته است).
  */
 @Composable
 internal fun PullHandle(shown: Boolean, hint: Boolean, progress: () -> Float, onToggle: () -> Unit, modifier: Modifier = Modifier) {
@@ -99,6 +105,10 @@ internal fun PullHandle(shown: Boolean, hint: Boolean, progress: () -> Float, on
     modifier
       .fillMaxWidth()
       .v3Pressable(label = if (shown) StrHome.hideDrawer else StrHome.showDrawer, role = Role.Button, scale = 1f, onClick = onToggle)
+      .semantics {
+        contentDescription = StrHome.drawer
+        stateDescription = if (shown) StrA11y.expanded else StrA11y.collapsed
+      }
       .padding(top = 2.dp, bottom = 6.dp),
     horizontalAlignment = Alignment.CenterHorizontally,
   ) {

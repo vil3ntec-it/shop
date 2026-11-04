@@ -9,6 +9,7 @@
  * ⛔ «هنوز همگام نشده»، توکن یا نشانِ ناشناخته، فروشِ پاک‌شده، دکانِ غیرفعال و
  *    «QR خاموش» همه **یک** پاسخ‌اند (۴۰۴ ِ یکسان) — هیچ پیشگویی دربارهٔ وجودِ فروش نیست.
  * ⛔ فقط آن‌چه روی کاغذ است: نامِ قرض‌دار، شناسه‌ها، دستگاه و تلفنِ مشتری هرگز.
+ * • TEN-03 / O-08: با پرچمِ `shop.storefront.link_expiry` یک سال پس از رسیدنِ فروش ⇒ ۴۱۰ (`lib/paper-links.js`).
  * • خواندن از دفترِ Sync v1 (`sync_rows`) و، اگر v3 روشن است، `sync_v3_rows`
  *   (`Minor`/`Milli` با `toLegacy` به واحدِ دفتر). نمایه‌ها: مهاجرتِ ۱۱۹.
  * • عددها همین‌جا با هستهٔ مشترکِ متن و تقویم (`text-core.js`، `calendar-core.js`)
@@ -28,6 +29,7 @@ const C = require('./calendar-core');
 const schema = require('./sync-v3-schema');
 const { toLegacy } = require('./sync-v3-to-v1');
 const { notFound } = require('../middleware/errors');
+const paperLinks = require('./paper-links');
 
 const STORES = Object.freeze([
   Object.freeze({ fmt: 'v1', table: 'sync_rows', order: "(field_seq->>'saleId')::bigint" }),
@@ -97,7 +99,7 @@ async function findSale(tagRaw, tokenRaw) {
   hits.sort((a, b) => Number(a.created_at) - Number(b.created_at));
   const hit = hits[0];
   if (!hit || (hit.deleted_at !== null && hit.deleted_at !== undefined)) throw gone();
-  return { shopId: hit.account_id, saleId: hit.row_id, store: hit.store, sale: legacy(hit.store, 'sales', hit.data) };
+  return { shopId: hit.account_id, saleId: hit.row_id, store: hit.store, sale: legacy(hit.store, 'sales', hit.data), arrivedAt: hit.created_at };
 }
 
 async function itemsOf(store, shopId, saleId) {
@@ -270,11 +272,13 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
 
 /** دادهٔ صفحه — یا ۴۰۴ ِ یکسان */
 async function receiptOf(tag, tok) {
-  const { shopId, saleId, store, sale } = await findSale(tag, tok);
+  const { shopId, saleId, store, sale, arrivedAt } = await findSale(tag, tok);
   const shop = await one('SELECT name, status FROM shops WHERE id=$1', [shopId]);
   if (!shop || shop.status !== 'active') throw gone();
   const { profile } = await profiles.read(shopId);
   if (!profile.qr) throw gone();
+  //  TEN-03 / O-08: پس از همهٔ ۴۰۴ها — یک سال پس از رسیدنِ فروش به سرور (پرچمِ `shop.storefront.link_expiry`)
+  await paperLinks.assertFresh(shopId, arrivedAt, 'این لینکِ فاکتور پس از یک سال کهنه شده است؛ خودِ فاکتور در دفترِ دکان می‌ماند');
   const items = await itemsOf(store, shopId, saleId);
   const ids = [...new Set(items.map((i) => i.productId).filter((x) => typeof x === 'string' && x))];
   const [products, tz, stamp] = await Promise.all([

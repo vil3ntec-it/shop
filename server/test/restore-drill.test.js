@@ -246,3 +246,39 @@ test('SEC-DATA-05: پیامِ شکست نشانیِ دیتابیس و رمزش �
   assert.ok(!e.message.includes('hunter2-secret') && !e.message.includes('10.0.0.5'), e.message);
   assert.match(e.message, /<db>/);
 });
+
+test('D-24 (گرفته‌شده ۱۴۰۵/۰۸/۱۳، الف): هدفِ RPO یک روز و RTO نصفِ روز سنجیده می‌شود؛ بیرون از هدف «برابر» را نمی‌پوشاند', async () => {
+  const H = 3600 * 1000;
+  assert.equal(config.backup.rpoTargetMs, 24 * H);
+  assert.equal(config.backup.rtoTargetMs, 12 * H);
+  config.backup.passphrase = PASS;
+  try {
+    const out = await backup.run({ kind: 'manual' });
+    const r = await drill.drill({ file: out.file });
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.targets, { rpoMs: 24 * H, rtoMs: 12 * H, rpoMet: true, rtoMet: true });
+    assert.equal(r.withinTargets, true);
+
+    //  همان پشتیبان ۲۵ ساعت بعد: هنوز «برابر»، ولی بیرون از هدفِ RPO
+    const late = await drill.drill({ file: out.file, now: () => Date.now() + 25 * H });
+    assert.equal(late.ok, true);
+    assert.equal(late.targets.rpoMet, false);
+    assert.equal(late.targets.rtoMet, true);
+    assert.equal(late.withinTargets, false);
+
+    //  بازگرداندنی که (به ساعتِ ساختگی) ۱۴ ساعت تا پایانِ تطبیق می‌کشد ⇒ RTO ✖
+    let t = Date.now();
+    const slow = await drill.drill({ file: out.file, now: () => (t += 7 * H) });
+    assert.equal(slow.verifiedMs, 14 * H);
+    assert.equal(slow.targets.rtoMet, false);
+    assert.equal(slow.withinTargets, false);
+
+    //  پشتیبانِ بی meta.json: سنش نامعلوم ⇒ RPO نامعلوم (null)، نه «سبز»
+    await fs.rm(`${out.file}.meta.json`);
+    const bare = await drill.drill({ file: out.file });
+    assert.equal(bare.targets.rpoMet, null);
+    assert.equal(bare.withinTargets, false);
+  } finally {
+    config.backup.passphrase = '';
+  }
+});

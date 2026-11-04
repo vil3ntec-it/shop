@@ -20,6 +20,7 @@ object I18nTables {
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
     StrTaxQuarter, StrCustomerCard, StrOrderFeedback, StrLayaway, StrVisualSearch,
     StrTill, // S28b، S45، S46، S50
+    StrA11y, // صفحه‌خوان در نسخهٔ ۳: باز/بسته، کارِ نگه‌داشتن، QR ِ پرداخت، «نیاز به توجه»، ضبطِ صدا با زدن، جابه‌جاییِ نوار
     StrRounding, // PAY-09: گردکردنِ نقدی
     StrSettingsHelp, // تنظیماتِ کم (۱۴۰۵/۰۸/۱۱): خطِ ساده و «این چه می‌کند؟»
     StrSettingsHome, // تنظیماتِ نسخهٔ دوم (۱۴۰۵/۰۸/۱۱): جست‌وجو، شش دسته و «قابلیت‌ها»
@@ -44,5 +45,6 @@ object I18nTables {
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
+    StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
   )
 }

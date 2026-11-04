@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -91,7 +96,8 @@ internal fun LedgerRow(
     enableDismissFromStartToEnd = false,
     backgroundContent = {
       Box(Modifier.fillMaxSize().clip(shape).background(c.tile).padding(horizontal = 16.dp), contentAlignment = Alignment.CenterEnd) {
-        Icon(Icons.Outlined.DeleteOutline, contentDescription = StrMoney.delete, tint = LedgerTone.OWE.ink(), modifier = Modifier.size(20.dp))
+        //  فقط نما: صفحه‌خوان «حذف» را کارِ سفارشیِ خودِ ردیف می‌شنود، نه نوشتهٔ جدای زیرِ آن
+        Icon(Icons.Outlined.DeleteOutline, contentDescription = null, tint = LedgerTone.OWE.ink(), modifier = Modifier.size(20.dp))
       }
     },
   ) {
@@ -107,15 +113,19 @@ internal fun LedgerRow(
           indication = null,
           role = Role.Button,
           onClickLabel = StrMoney.details,
+          onLongClickLabel = StrA11y.moreActions,
           onLongClick = { haptic.performHapticFeedback(HapticFeedbackType.LongPress); onLongClick() },
           onClick = onClick,
         )
+        //  کشیدن برای حذف جایگزینِ صفحه‌خوان می‌خواهد (همان `onDelete` ِ کشیدن، با همان «برگرداندن»)
+        .semantics { customActions = listOf(CustomAccessibilityAction(StrMoney.delete) { onDelete(); true }) }
         .padding(horizontal = 12.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(if (up) Icons.Outlined.NorthEast else Icons.Outlined.SouthWest, contentDescription = kindLabel, tint = ink, modifier = Modifier.size(15.dp))
       Spacer(Modifier.width(8.dp))
-      Text(date, style = v3Text(12, FontWeight.Normal, 16), color = c.inkMuted, maxLines = 1, modifier = Modifier.width(74.dp))
+      //  پهنای کمینه: ستونِ تاریخ هم‌تراز می‌ماند و با درشتیِ نوشته بریده نمی‌شود
+      Text(date, style = v3Text(12, FontWeight.Normal, 16), color = c.inkMuted, maxLines = 1, modifier = Modifier.widthIn(min = 74.dp))
       Text(amount, style = v3Text(15, FontWeight.Bold, 20), color = ink, maxLines = 1, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
       if (after != null) Text(after, style = v3Text(12, FontWeight.Medium, 16), color = c.inkMuted, maxLines = 1)
     }

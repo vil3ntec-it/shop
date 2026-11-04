@@ -101,11 +101,8 @@
     trial: { used: false, active: false, daysLeft: 0 }, isPaid: false, message: '',
   };
 
-  /*
-   * تصمیم نهایی با سرور است. تا وقتی آدرس سروری تنظیم نشده، هیچ چیزی
-   * قفل نمی‌شود: قفلِ سمت مرورگر نه قابل اتکاست و نه راهی برای خرید
-   * باقی می‌گذارد. در این حالت فقط نشان و صفحه‌ی قیمت‌ها دیده می‌شود.
-   */
+  /* تصمیم نهایی با سرور است. بی آدرسِ سرور هیچ چیز قفل نمی‌شود (قفلِ مرورگر نه قابل اتکاست و نه راهِ خرید دارد)؛
+     فقط نشان و صفحه‌ی قیمت‌ها دیده می‌شود. */
   function enforcing() { return !!serverUrl(); }
 
   /** سرور گفته «سقفِ دستگاهِ این اشتراک پر است» — برای همین مرورگر */
@@ -122,15 +119,9 @@
     return (ENT.features || []).includes(key);
   }
 
-  /*
-   * پاسخِ `/api/v1/billing/status` ⇐ شکلِ ENT.
-   *
-   * ⛔ سرور (`routes/me.js` ‏`subscriptionHandler`) دسترسی را **تخت** می‌دهد:
-   * `{source, status, active, plan, endsAt, trial, features, …}`. این‌جا فقط
-   * `data.entitlement` خوانده می‌شد که هرگز نمی‌آید؛ پس ENT همیشه «مهمان» می‌ماند و
-   * صندوق و قرض‌داران برای دکانِ واردشده با آزمایشی یا اشتراکِ فعال هم قفل بود.
-   * شکلِ قدیمِ `{entitlement}` هم هنوز پذیرفته است.
-   */
+  /* پاسخِ `/api/v1/billing/status` ⇐ شکلِ ENT. ⛔ سرور (`routes/me.js` ‏`subscriptionHandler`) دسترسی را **تخت** می‌دهد
+     (`{source, status, active, plan, endsAt, trial, features, …}`)؛ خواندنِ فقط `data.entitlement` (که هرگز نمی‌آید) صندوق و
+     قرض‌دارانِ دکانِ آزمایشی/مشترک را قفل نگه می‌داشت. شکلِ قدیمِ `{entitlement}` هم هنوز پذیرفته است. */
   function entitlementFrom(data) {
     if (!data || typeof data !== 'object') return null;
     if (data.entitlement && Array.isArray(data.entitlement.features)) return data.entitlement;
@@ -150,12 +141,8 @@
     };
   }
 
-  /*
-   * ⛔ یک پرسش در هر زمان. `TohidLicense.sync()` در پایان `tohid:license-change`
-   * می‌فرستد و همین فایل با همان رویداد `refresh` می‌کرد: refresh ⇐ sync ⇐ رویداد ⇐
-   * refresh … حلقهٔ بی‌پایان، چند درخواست در ثانیه از هر برگهٔ واردشده تا سقفِ
-   * درخواستِ سرور پر شود. رویدادی که وسطِ همین پرسش برسد به همین پرسش می‌پیوندد.
-   */
+  /* ⛔ یک پرسش در هر زمان: `TohidLicense.sync()` در پایان `tohid:license-change` می‌فرستد و همین فایل با آن `refresh` می‌کند
+     (حلقهٔ بی‌پایان تا سقفِ درخواستِ سرور). رویدادی که وسطِ همین پرسش برسد به همین پرسش می‌پیوندد. */
   let inflight = null;
   function refresh() {
     if (!inflight) inflight = doRefresh().finally(() => { inflight = null; });
@@ -188,13 +175,8 @@
   }
 
   // ---------- پلن‌ها ----------
-  /*
-   * قیمت‌های پیش‌فرض — همان چیزی که سرور موقع نصب می‌نویسد.
-   * وقتی سرور وصل است، همیشه پاسخ سرور جای این می‌نشیند؛ پس تغییر قیمت
-   * از پنل مدیریت انجام می‌شود و این فهرست فقط برای وقتی است که سرور
-   * در دسترس نیست (مثلاً نسخه‌ی نمایشی روی گیت‌هاب) تا کاربر
-   * دست‌کم بداند اشتراک چند است.
-   */
+  /* قیمت‌های پیش‌فرض = همان که سرور موقعِ نصب می‌نویسد. با سرور همیشه پاسخِ سرور (پنلِ مدیریت) جای این می‌نشیند؛ این
+     فهرست فقط بی سرور است (نسخه‌ی نمایشی) تا کاربر دست‌کم بداند اشتراک چند است. */
   const FALLBACK_CURRENCY = 'افغانی';
   const FALLBACK_WHATSAPP = '0792236008';
   const FALLBACK_MESSAGE = 'سلام، می‌خواهم اشتراک برنامهٔ فروشگاه من را بخرم.';
@@ -221,12 +203,7 @@
     } catch { return ''; }
   }
 
-  /**
-   * توکنِ نشست — همان که در سرآیندِ Authorization می‌رود.
-   *
-   * `apiKey()` بالا «کلید حساب» است و فقط برای نشان دادن و گذاشتن در
-   * پیامِ واتساپ؛ با آن هر درخواستی ۴۰۱ می‌گیرد.
-   */
+  /** توکنِ نشست (سرآیندِ Authorization)؛ `apiKey()` ِ بالا فقط برای نمایش و واتساپ است و با آن هر درخواستی ۴۰۱ می‌گیرد. */
   function sessionToken() {
     try {
       if (window.TohidLicense && window.TohidLicense.getAccessToken) {
@@ -267,19 +244,8 @@
 
   let PLANS = null;
 
-  /**
-   * قیمت‌ها از سرور.
-   *
-   * ── چه چیزی این را می‌شکست ────────────────────────────────────────
-   * تا امروز `/billing/plans` صدا زده می‌شد — مسیری که **توکن می‌خواهد**
-   * — و بی‌توکن. یعنی همیشه ۴۰۱ می‌گرفت و بی‌صدا به فهرستِ قیمتِ داخلِ
-   * همین فایل برمی‌گشت. نتیجه: هر تغییرِ قیمتی که در پنل مدیریت داده
-   * می‌شد، روی سایت دیده نمی‌شد، و تخفیف هم هیچ‌وقت نمی‌رسید.
-   *
-   * حالا `/plans` که باز است. اگر سرورِ قدیمی آن را نداشت، همان مسیرِ
-   * قبلی با توکن امتحان می‌شود — پس نسخه‌ی تازه‌ی سایت روی سرورِ
-   * به‌روزنشده هم کار می‌کند.
-   */
+  /** قیمت‌ها از سرور: `/plans` ِ باز، و برای سرورِ قدیمی `/billing/plans` **با توکن** (بی توکن همیشه ۴۰۱ بود و بی‌صدا به
+   *  قیمتِ همین فایل برمی‌گشت؛ تغییرِ قیمت و تخفیفِ پنل هرگز روی سایت نمی‌رسید). */
   async function loadPlans() {
     if (PLANS) return PLANS;
     const base = serverUrl();
@@ -310,13 +276,7 @@
     return PLANS;
   }
 
-  /**
-   * هرچه سرور داد را به همان شکلی می‌آورد که این صفحه می‌فهمد.
-   *
-   * سرورِ تازه `pricePerDay` و `whatsappUrl` را خودش می‌سازد؛ سرورِ
-   * قدیمی نمی‌سازد و بی این، لینکِ واتساپ `undefined` می‌شد و قیمتِ
-   * روزانه اصلاً نمی‌آمد.
-   */
+  /** پاسخِ سرور به شکلِ این صفحه؛ سرورِ قدیمی `pricePerDay` و `whatsappUrl` نمی‌سازد (لینکِ واتساپ `undefined` می‌شد). */
   function normalizePlans(body) {
     const currency = body.currency || FALLBACK_CURRENCY;
     const number = (body.whatsapp && body.whatsapp.number) || FALLBACK_WHATSAPP;
@@ -364,6 +324,7 @@
     paintElements(locked);
     paintBadge();
     paintTrialBar();
+    paintDeviceBar();
   }
 
   function paintPages(locked) {
@@ -473,6 +434,31 @@
     }
     bar.className = 'vip-bar-' + tone;
     bar.querySelector('span').textContent = text;
+  }
+
+  /*  O-09: صاحبِ دکانِ بیرون از سقفِ دستگاه — این مرورگر کار می‌کند، دستگاهِ اضافهٔ دیگران نه. همان نوارِ زردِ پوستهٔ
+   *  برنامه (`DeviceCapNotice`)، فقط از `TohidLicense.deviceCapOver()`؛ دکمه ⇒ «اشتراکِ من» با فهرست و «ببند».
+   *  وبِ دکان واژه‌نامه ندارد: متن بی واژهٔ فهرستِ دری (`DariText.kt`) است، پس فارسی و دری یکی (`asIs`). */
+  const DEVICE_TEXT = {
+    over: (n, max) => `${fa(n)} دستگاه با اشتراکِ ${fa(max)} دستگاهی — دستگاهِ اضافهٔ دیگران بسته است`,
+    detail: 'دستگاهِ شما همیشه کار می‌کند؛ یک دستگاهِ کهنه را بردارید یا اشتراک را بزرگ‌تر کنید.', action: 'دستگاه‌ها',
+  };
+  function paintDeviceBar() {
+    const L = window.TohidLicense, content = $('.main .content');
+    const over = loggedIn() && L && L.deviceCapOver ? L.deviceCapOver() : null;
+    let bar = $('#vip-device-bar');
+    if (!over || !content) { if (bar) bar.remove(); return; }
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.id = 'vip-device-bar';
+      bar.setAttribute('role', 'status');
+      bar.innerHTML = '<div class="vip-device-text"><b></b><span></span></div><button type="button" class="vip-btn vip-btn-sm"></button>';
+      bar.querySelector('button').addEventListener('click', () => (window.TohidAccountUI ? window.TohidAccountUI.openPlan() : open()));
+      content.parentNode.insertBefore(bar, content);
+    }
+    bar.querySelector('b').textContent = DEVICE_TEXT.over(over.devices, over.maxDevices);
+    bar.querySelector('span').textContent = DEVICE_TEXT.detail;
+    bar.querySelector('button').textContent = DEVICE_TEXT.action;
   }
 
   // کلیک روی دکمه‌های قفل: به جای اجرا، پیشنهاد اشتراک

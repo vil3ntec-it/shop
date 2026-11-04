@@ -24,6 +24,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
@@ -34,8 +35,15 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.ui.components.common.NavCatalog
 import ir.vil3ntec.tohid.ui.components.common.NavLayout
@@ -54,6 +62,10 @@ private val ROW_H = 52.dp
  *  ستونِ پیوستهٔ ویرایشگرِ نوار: سرخطِ هر بخش و ردیف‌های هم‌قد. با دستگیره کشیده
  *  می‌شود؛ ردیف‌های میانه با فنر کنار می‌روند تا جای افتادن پیدا باشد، و رها کردن
  *  `NavLayouts.move` را صدا می‌زند. زدنِ ردیف ⇐ برگهٔ «جای X» (`onTap`).
+ *
+ *  صفحه‌خوان (WCAG 2.1 AA ‏2.5.1): هر ردیف جایش را می‌گوید («قرص، جای ۲ از ۴») و کارهای سفارشیِ «یک جا بالاتر/
+ *  پایین‌تر» همان جابه‌جاییِ کشیدن را می‌کنند (`NavLayouts.step`؛ کارِ بی‌اثر یا ردشده پیشنهاد نمی‌شود). ردیفی که با
+ *  این کارها جابه‌جا شد ناحیهٔ زنده است تا جای تازه‌اش خوانده شود؛ فقط همان یکی، تا جابه‌جاییِ همسایه‌ها پرحرف نشود.
  */
 @Composable
 internal fun NavSlotList(layout: NavLayout, rows: List<NavRow>, allowed: Set<String>, onEdit: (NavLayouts.Edit) -> Unit, onTap: (String) -> Unit) {
@@ -61,6 +73,7 @@ internal fun NavSlotList(layout: NavLayout, rows: List<NavRow>, allowed: Set<Str
   val rowPx = with(LocalDensity.current) { ROW_H.toPx() }
   var dragging by remember { mutableIntStateOf(-1) }
   var dragY by remember { mutableFloatStateOf(0f) }
+  var moved by remember { mutableStateOf<String?>(null) }
   val target = if (dragging < 0) -1 else (dragging + (dragY / rowPx).roundToInt()).coerceIn(1, rows.lastIndex)
   Column {
     rows.forEachIndexed { i, row ->
@@ -99,7 +112,7 @@ internal fun NavSlotList(layout: NavLayout, rows: List<NavRow>, allowed: Set<Str
                 divider = !(rows.getOrNull(i - 1) is NavRow.Header) && !lifted,
                 handle = Modifier.pointerInput(row) {
                   detectDragGestures(
-                    onDragStart = { dragging = index; dragY = 0f },
+                    onDragStart = { dragging = index; dragY = 0f; moved = null },
                     onDrag = { change, amount -> change.consume(); dragY += amount.y },
                     onDragEnd = {
                       val to = (index + (dragY / rowPx).roundToInt()).coerceIn(1, latestRows.lastIndex)
@@ -109,7 +122,13 @@ internal fun NavSlotList(layout: NavLayout, rows: List<NavRow>, allowed: Set<Str
                     onDragCancel = { dragging = -1; dragY = 0f },
                   )
                 },
-                onTap = { onTap(row.id) },
+                onTap = { moved = null; onTap(row.id) },
+                place = slotPlace(layout, row.id),
+                live = row.id == moved,
+                actions = listOfNotNull(
+                  NavLayouts.step(layout, rows, i, -1, allowed)?.let { e -> CustomAccessibilityAction(StrA11y.navUp) { moved = row.id; onEdit(e); true } },
+                  NavLayouts.step(layout, rows, i, 1, allowed)?.let { e -> CustomAccessibilityAction(StrA11y.navDown) { moved = row.id; onEdit(e); true } },
+                ),
               )
             }
           }
@@ -120,13 +139,28 @@ internal fun NavSlotList(layout: NavLayout, rows: List<NavRow>, allowed: Set<Str
 }
 
 @Composable
-private fun SlotRow(id: String, modifier: Modifier, divider: Boolean, handle: Modifier, onTap: () -> Unit) {
+private fun SlotRow(
+  id: String,
+  modifier: Modifier,
+  divider: Boolean,
+  handle: Modifier,
+  onTap: () -> Unit,
+  place: String,
+  live: Boolean,
+  actions: List<CustomAccessibilityAction>,
+) {
   val c = PhoneV3.colors
   val def = NavCatalog.of(id) ?: return
   Box(modifier.fillMaxSize()) {
     if (divider) Box(Modifier.align(Alignment.TopStart).padding(start = 52.dp).fillMaxWidth().height(1.dp).background(c.hairline))
     Row(
-      Modifier.fillMaxSize().v3Pressable(label = StrSettings.placeOf(def.label), onClick = onTap).padding(start = 16.dp),
+      Modifier.fillMaxSize().v3Pressable(label = StrSettings.placeOf(def.label), onClick = onTap)
+        .semantics {
+          stateDescription = place
+          customActions = actions
+          if (live) liveRegion = LiveRegionMode.Polite
+        }
+        .padding(start = 16.dp),
       verticalAlignment = Alignment.CenterVertically,
     ) {
       Icon(PhoneNav.icon(id, false), contentDescription = null, tint = c.icon, modifier = Modifier.size(22.dp))
@@ -138,4 +172,12 @@ private fun SlotRow(id: String, modifier: Modifier, divider: Boolean, handle: Mo
       }
     }
   }
+}
+
+/** جای ردیف برای صفحه‌خوان: «دایرهٔ شروع»، «قرص، جای ۲ از ۴»، «دایرهٔ پایان» یا «بیرون از نوار» */
+private fun slotPlace(l: NavLayout, id: String): String = when (NavLayouts.slotOf(l, id)) {
+  NavLayouts.Slot.START -> StrA11y.navStart
+  NavLayouts.Slot.PILL -> StrA11y.navPill(l.pill.indexOf(id) + 1, l.pill.size)
+  NavLayouts.Slot.END -> StrA11y.navEnd
+  NavLayouts.Slot.OUT -> StrSettings.slotOut
 }

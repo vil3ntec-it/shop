@@ -79,6 +79,11 @@ object StrHistory {
     "No receipt printer is set up. Add one in Devices.",
     "د بل چاپګر نه دی ثبت شوی. په «وسایل» کې یو ور زیات کړئ.",
   )
+  fun printIgnoresFilter(n: Any): String = t(
+    "فیلترِ فهرست در چاپ نیست: همهٔ ${asIs(n)} فاکتورِ این دوره چاپ می‌شود",
+    "List filters don't apply: all $n ${pl(n, "invoice", "invoices")} of this period are printed",
+    "د لېست فلټر په چاپ نه لګېږي: د دې مودې ټول $n بلونه چاپېږي",
+  )
   val printSummary: String get() = t("چاپِ خلاصه", "Print summary", "لنډیز چاپ کړه")
   fun printInvoices(n: Any): String = t("چاپِ ${asIs(n)} فاکتور", "Print $n ${pl(n, "invoice", "invoices")}", "$n بلونه چاپ کړه")
   fun printing(done: Any, total: Any): String = t("در حالِ چاپ: ${asIs(done)} از ${asIs(total)} تکه", "Printing: $done of $total parts", "چاپ کېږي: $done له $total برخو")

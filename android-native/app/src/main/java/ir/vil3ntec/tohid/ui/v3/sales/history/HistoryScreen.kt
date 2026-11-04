@@ -197,14 +197,17 @@ internal class RowCtx(
   val onMenu: (String) -> Unit,
 )
 
-/** کادرِ بالا: دورهٔ جاری (یا برگزیده در دوستونی) — مبلغ، شمار، و تراشه‌های چاپ، صندوق و بررسی */
+/**
+ *  کادرِ بالا: دورهٔ جاری (یا برگزیده در دوستونی) — مبلغ، شمار، و تراشه‌های چاپ، بررسی و صندوق. تراشه‌ها به ردیفِ بعد
+ *  می‌روند (`wrapChips`)؛ صندوقِ بلند واپسین است تا «چاپ» و «بررسی» با هم در ردیفِ نخست بمانند.
+ */
 @Composable
 private fun Top(p: SalesPeriods.Period, title: String, ctx: RowCtx, drawer: DrawerLine?, reviews: Int, money: Boolean) {
   val a = ctx.actions
   val chips = listOfNotNull(
     a.print?.let { print -> V3HeroChip(StrHistory.print, Icons.Outlined.Print, onClick = { print(p) }) },
-    drawer?.let { V3HeroChip(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
     a.payReview?.takeIf { reviews > 0 }?.let { V3HeroChip(StrPayStatus.reviewCount(plain(reviews)), Icons.Outlined.FactCheck, onClick = it) },
+    drawer?.let { V3HeroChip(it.text, Icons.Outlined.PointOfSale, onClick = a.drawer) },
   )
   Column(Modifier.padding(top = 4.dp, bottom = 8.dp)) {
     PeriodHero(p, title, money, chips)

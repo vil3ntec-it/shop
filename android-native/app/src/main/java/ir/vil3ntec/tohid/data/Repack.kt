@@ -139,8 +139,36 @@ object Repack {
     if (has(d, key)) return StockPlaces.Result.Already
     return when (val p = planBreak(d, fromId, packsMilli, toId, perPackMilli, location)) {
       is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId), key)
+      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId, breakOutputs(d, p.plan, perPackMilli)), key)
     }
+  }
+
+  /**
+   *  INV-21 — سری و انقضای دانه‌ها: کارتن‌هایی که شکسته می‌شوند به FEFO از زودترین ماندهٔ انقضادارِ کارتن برداشته می‌شوند
+   *  (`ExpiryEngine.take`، همان که موجودیِ کارتن پس از کار نشان می‌دهد)، پس دانه‌های هر تکه سری و انقضای همان محموله را
+   *  می‌گیرند — یک ردیفِ خروجی برای هر تکه، جمع دقیقاً همان دانه‌ها. کارتنِ بی انقضا ⇒ همان یک ردیفِ پیشین.
+   */
+  internal fun breakOutputs(d: ShopData, plan: Plan, perPackMilli: Long): List<ExpiryEngine.Take> {
+    val input = plan.inputs.single()
+    val taken = ExpiryEngine.take(d, input.productId, input.qtyMilli)
+    if (taken.all { it.expiryDate.isEmpty() && it.batch.isEmpty() }) return listOf(ExpiryEngine.Take("", "", plan.output.qtyMilli))
+    val out = ArrayList<ExpiryEngine.Take>()
+    var left = plan.output.qtyMilli
+    taken.forEachIndexed { i, t ->
+      val q = if (i == taken.lastIndex) left else minOf(left, StockCore.mulDivRound(t.qtyMilli, perPackMilli, 1000))
+      left -= q
+      if (q > 0) out += ExpiryEngine.Take(t.expiryDate, t.batch, q)
+    }
+    return out
+  }
+
+  /**
+   *  INV-21 — انقضای بستهٔ ساخته‌شده: زودترین انقضای اجزایی که برداشته می‌شوند (به FEFO)؛ بسته از سریِ اجزا ساخته
+   *  می‌شود، پس سریِ خودش را ندارد. هیچ جزءِ انقضادار ⇒ همان ردیفِ بی انقضای پیشین.
+   */
+  internal fun buildOutputs(d: ShopData, plan: Plan): List<ExpiryEngine.Take> {
+    val first = plan.inputs.flatMap { ExpiryEngine.take(d, it.productId, it.qtyMilli) }.map { it.expiryDate }.filter { it.isNotEmpty() }.minOrNull()
+    return listOf(ExpiryEngine.Take(first.orEmpty(), "", plan.output.qtyMilli))
   }
 
   fun build(
@@ -151,7 +179,7 @@ object Repack {
     if (has(d, key)) return StockPlaces.Result.Already
     return when (val p = planBuild(d, bundleId, countMilli, parts, location)) {
       is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BUILD, "ساختِ بسته", p.plan, location, note, user, today, now, newId), key)
+      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BUILD, "ساختِ بسته", p.plan, location, note, user, today, now, newId, buildOutputs(d, p.plan)), key)
     }
   }
 
@@ -168,6 +196,8 @@ object Repack {
   private fun write(
     d: ShopData, key: String, type: String, title: String, plan: Plan, location: String?, note: String,
     user: String, today: String, now: Long, newId: () -> String,
+    /** ردیف‌های خروجی با سری و انقضا (INV-21)؛ جمعِ مقدارها = `plan.output.qtyMilli` */
+    outputs: List<ExpiryEngine.Take> = listOf(ExpiryEngine.Take("", "", plan.output.qtyMilli)),
   ): ShopData {
     val byId = d.products.associateBy { it.id }
     val who = user.trim().ifEmpty { null }
@@ -175,12 +205,13 @@ object Repack {
     val why = listOf(title, note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
     val entries = ArrayList<WarehouseEntry>()
     val moves = ArrayList<StockMovement>()
-    fun row(l: Line, sign: Int) {
+    fun row(l: Line, sign: Int, qtyMilli: Long = l.qtyMilli, lot: ExpiryEngine.Take? = null) {
       val id = newId()
-      val units = sign * l.qtyMilli / 1000.0
+      val units = sign * qtyMilli / 1000.0
       entries += WarehouseEntry(
         id = id, productId = l.productId, units = units, unit = byId[l.productId]?.unit.orEmpty(), price = l.unitMinor / 100.0,
         date = today, notes = why, isAdjustment = true, refId = key, createdAt = now, locationId = loc, userId = who, adjKind = KIND,
+        expiryDate = lot?.expiryDate.orEmpty(), batch = lot?.batch.orEmpty(),
       )
       moves += StockMovement(
         id = newId(), productId = l.productId, type = MOVE, qty = units, date = today, notes = why, refId = id,
@@ -188,7 +219,8 @@ object Repack {
       )
     }
     plan.inputs.forEach { row(it, -1) }
-    row(plan.output, 1)
+    check(outputs.sumOf { it.qtyMilli } == plan.output.qtyMilli) { "repack outputs" }
+    outputs.forEach { row(plan.output, 1, it.qtyMilli, it) }
     fun txt(l: Line) = "${ir.vil3ntec.tohid.qty(l.qtyMilli / 1000.0)} «${byId[l.productId]?.name.orEmpty()}»"
     val audit = AuditEntry(
       id = key, type = type, date = today, refId = key, createdAt = now, by = who,

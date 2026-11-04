@@ -13,6 +13,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.long
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -34,8 +35,9 @@ class ReportFreshModelTest {
   }
 
   @Test
-  fun `سود و حاشیه فقط ستون‌های سود را دارد و برچسبِ تقریبی می‌خورد`() {
-    val v = ReportFreshModel.view(l, "profit", "month", "category", today, null)
+  fun `سود و حاشیه فقط ستون‌های سود را دارد و قیمت روی قلم برچسب تقریبی می‌خورد`() {
+    //  D-23: قیمتِ روی قلم (مصوب نیست) ⇒ همیشه «تقریبی»
+    val v = ReportFreshModel.view(l, "profit", "month", "category", today, null, ReportCore.Costing.LINE)
     val t = v.tables.single()
     assertEquals(listOf("name", "netSales", "cogs", "grossProfit", "marginBp"), t.columns.map { it.key })
     assertTrue(t.title.contains("تقریبی"))
@@ -43,16 +45,25 @@ class ReportFreshModelTest {
     //  جمعِ جدول همان جمعِ هسته است
     assertEquals(v.sales!!.totals.grossProfit, t.total!![3].long)
     assertEquals(v.sales!!.totals.netSales, t.total!![1].long)
+    //  پیش‌فرض (میانگینِ موزونِ مصوب): همان ستون‌ها، بی برچسبِ «تقریبی»
+    val d = ReportFreshModel.view(l, "profit", "month", "category", today, null).tables.single()
+    assertEquals(t.columns.map { it.key }, d.columns.map { it.key })
+    assertFalse(d.title.contains("تقریبی"))
   }
 
   @Test
   fun `کلیک روی کارتِ خانه همان عدد را در جمعِ فهرستِ مقصد نشان می‌دهد`() {
-    val home = ReportBoard.build(l, today)
-    for (k in home.kpis.filter { it.id == "netSales" || it.id == "grossProfit" }) {
-      val t = ReportFreshModel.view(l, k.target.tab, k.target.span, k.target.dim, today, null).tables.first()
-      val col = t.columns.indexOfFirst { it.key == k.id }
-      assertEquals(k.id, k.value, t.total!![col].long)
+    //  همان سیم‌کشیِ صفحه (`rememberHome`): کارت و فهرست با یک روش و یک تأیید — هر دو روش
+    for (m in CostMethod.entries) {
+      val c = ReportFreshModel.costingOf(m)
+      val home = ReportBoard.build(l, today, null, c, CostPolicy.approved(m))
+      for (k in home.kpis.filter { it.id == "netSales" || it.id == "grossProfit" }) {
+        val t = ReportFreshModel.view(l, k.target.tab, k.target.span, k.target.dim, today, null, c).tables.first()
+        val col = t.columns.indexOfFirst { it.key == k.id }
+        assertEquals("${m.id} ${k.id}", k.value, t.total!![col].long)
+      }
     }
+    val home = ReportBoard.build(l, today)
     val debts = home.kpis.first { it.id == "receivable" }
     val t = ReportFreshModel.view(l, debts.target.tab, debts.target.span, debts.target.dim, today, null).tables.first()
     assertEquals(debts.value, t.total!![1].long)
@@ -102,36 +113,38 @@ class ReportFreshModelTest {
   }
 
   /**
-   *  RPT-03 و D-23: روشِ بها راهبرد است. پیش‌فرض دقیقاً رفتارِ پیشین (قیمتِ خریدِ روی قلم)؛
-   *  میانگینِ موزون همان عددِ بردارِ مرجعِ `report-v1.json` (مورد «فروشِ بازه — میانگینِ موزونِ
-   *  متحرک»: بها ۹۲٬۶۰۵ در برابرِ ۹۹٬۰۰۰ ِ قیمتِ روی قلم) و هر دو «تقریبی».
+   *  RPT-03 و D-23 (گرفته‌شده ۱۴۰۵/۰۸/۱۳: میانگینِ موزون): پیش‌فرضِ صفحه همان روشِ مصوب و با `costApproved` ِ هسته؛
+   *  عددها همان بردارِ مرجعِ `report-v1.json` (مورد «فروشِ بازه — میانگینِ موزونِ متحرک»: بها ۹۲٬۶۰۵ در برابرِ
+   *  ۹۹٬۰۰۰ ِ قیمتِ روی قلم). قیمتِ روی قلم انتخابی می‌ماند و همیشه «تقریبی» است.
    */
   @Test
-  fun `روش بها راهبرد است و پیش‌فرض همان قیمت خرید روی قلم`() {
+  fun `روش بها راهبرد است و پیش‌فرض میانگین موزون مصوب است`() {
     val kabul = ReportClock.fixed(270, 240)
     val before = ReportFreshModel.view(l, "profit", "month", "product", today, kabul)
     val byDefault = ReportFreshModel.view(l, "profit", "month", "product", today, kabul, ReportFreshModel.costingOf(CostPolicy.DEFAULT))
     assertEquals(before, byDefault)
-    assertEquals("line", before.sales!!.costing)
-    assertEquals(99000L, before.sales!!.totals.cogs)
-    assertTrue(before.tables.single().title.endsWith("(تقریبی)"))
-
-    val mavg = ReportFreshModel.view(l, "profit", "month", "product", today, kabul, ReportFreshModel.costingOf(CostMethod.MOVING_AVERAGE))
-    assertEquals("mavg", mavg.sales!!.costing)
-    assertEquals(92605L, mavg.sales!!.totals.cogs)
-    assertEquals(ReportCore.sales(l, "2026-10-01", today, kabul, ReportCore.Costing.MAVG).totals, mavg.sales!!.totals)
-    assertEquals(before.sales!!.totals.netSales, mavg.sales!!.totals.netSales)
-    assertTrue(mavg.sales!!.totals.profitApproximate)
-    assertTrue(mavg.tables.single().title.contains("تقریبی"))
-    assertTrue(mavg.tables.single().title.contains("میانگین موزون"))
+    assertEquals("mavg", before.sales!!.costing)
+    assertEquals(92605L, before.sales!!.totals.cogs)
+    val core = ReportCore.sales(l, "2026-10-01", today, kabul, ReportCore.Costing.MAVG, costApproved = true).totals
+    assertEquals(core, before.sales!!.totals)
+    assertEquals("مصوب ⇒ فقط قلمِ بی‌بها تقریبی می‌کند", core.costEstimatedLines > 0, before.sales!!.totals.profitApproximate)
+    assertFalse(before.tables.single().title.contains("تقریبی"))
     //  جمعِ جدول همان جمعِ هسته با همان روش
-    assertEquals(mavg.sales!!.totals.grossProfit, mavg.tables.single().total!![3].long)
+    assertEquals(before.sales!!.totals.grossProfit, before.tables.single().total!![3].long)
 
-    //  زبانهٔ امروز هم با همان روش
-    val todayLine = ReportFreshModel.view(l, "today", "today", "", today, kabul)
-    val todayMavg = ReportFreshModel.view(l, "today", "today", "", today, kabul, ReportCore.Costing.MAVG)
+    val line = ReportFreshModel.view(l, "profit", "month", "product", today, kabul, ReportFreshModel.costingOf(CostMethod.PURCHASE_PRICE))
+    assertEquals("line", line.sales!!.costing)
+    assertEquals(99000L, line.sales!!.totals.cogs)
+    assertEquals(before.sales!!.totals.netSales, line.sales!!.totals.netSales)
+    assertTrue(line.sales!!.totals.profitApproximate)
+    assertTrue(line.tables.single().title.contains("تقریبی"))
+    assertTrue(line.tables.single().title.contains("قیمت خرید روی قلم"))
+
+    //  زبانهٔ امروز هم با همان روش و همان تأیید
+    val todayDefault = ReportFreshModel.view(l, "today", "today", "", today, kabul)
+    val todayLine = ReportFreshModel.view(l, "today", "today", "", today, kabul, ReportCore.Costing.LINE)
     val gp = todayLine.tables.single().columns.indexOfFirst { it.key == "grossProfit" }
-    assertEquals(ReportCore.today(l, today, kabul, ReportCore.Costing.MAVG).today.grossProfit, todayMavg.tables.single().rows[0][gp].long)
+    assertEquals(ReportCore.today(l, today, kabul, ReportCore.Costing.MAVG, 0, true).today.grossProfit, todayDefault.tables.single().rows[0][gp].long)
     assertEquals(ReportCore.today(l, today, kabul).today.grossProfit, todayLine.tables.single().rows[0][gp].long)
 
     //  هر شناسهٔ روش همان `costing` ِ هسته است

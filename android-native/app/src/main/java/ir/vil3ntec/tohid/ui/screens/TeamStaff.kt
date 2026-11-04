@@ -37,6 +37,14 @@ import androidx.compose.material3.TextButton
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
+import ir.vil3ntec.tohid.core.i18n.StrEvidence
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSetupPages
 import ir.vil3ntec.tohid.core.model.CatalogEntryDto
 import ir.vil3ntec.tohid.core.model.MemberPermsDto
 import ir.vil3ntec.tohid.core.perm.ApproverVault
@@ -74,14 +82,14 @@ import kotlinx.serialization.json.buildJsonObject
  */
 
 private fun permLabel(key: String): String = when (key) {
-  "settings.write" -> "تنظیماتِ دکان"
-  "audit.view" -> "سابقهٔ عملیات"
-  "reports.money" -> "دیدنِ عددهای مالی (درآمد، سود)"
-  "sales.discount" -> "تخفیف"
-  "sales.cancel" -> "لغوِ فاکتور"
-  "returns.create" -> "برگشت و بازپرداخت"
+  "settings.write" -> StrAccount.permSettings
+  "audit.view" -> StrAccount.permAudit
+  "reports.money" -> StrAccount.permMoney
+  "sales.discount" -> Str.discount
+  "sales.cancel" -> StrSetupPages.permVoid
+  "returns.create" -> StrSetupPages.permReturns
   "shift.report" -> ir.vil3ntec.tohid.core.i18n.StrShiftReview.permReports
-  "safe.move" -> "گاوصندوق: شمارش و جابه‌جاییِ پول"
+  "safe.move" -> StrSetupPages.permSafe
   else -> key
 }
 
@@ -117,16 +125,16 @@ fun MemberPermsSection(shops: ShopRepository, canEdit: Boolean, snackbar: Snackb
   val staff = p.members.filter { it.role != "owner" && it.role != "courier" }
   if (editable.isEmpty() || staff.isEmpty()) return
 
-  SectionTitle("مجوزِ کارمندان")
+  SectionTitle(StrAccount.permsTitle)
   Panel {
     Text(
-      "هر کلید فقط می‌تواند کمتر از نقش بدهد؛ «عددهای مالی» فقط نمایش است و داده روی دستگاه هست.",
+      StrAccount.permsHelper,
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
     staff.forEachIndexed { i, m ->
       if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.muted2.copy(alpha = 0.2f))
-      Text(m.name.ifBlank { "کارمند" }, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+      Text(m.name.ifBlank { StrAccount.staffMember }, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
       editable.forEach { entry ->
         //  کلیدِ restrict که نقش اصلاً ندارد، چیزی برای تغییر ندارد
         val roleDefault = entry.defaults[m.role] ?: "deny"
@@ -207,21 +215,21 @@ private fun ApprovableRow(
     Text(permLabel(entry.key), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
     Spacer(Modifier.height(4.dp))
     val options = buildList {
-      if (roleDefault == "allow") add("allow" to "مجاز")
-      add("approve" to "با تأییدِ مدیر")
-      add("deny" to "ممنوع")
+      if (roleDefault == "allow") add("allow" to StrSalePages.tillGoodsPartOk)
+      add("approve" to StrSetupPages.withManagerOk)
+      add("deny" to StrSetupPages.denied)
     }
     SegmentedChoice(options = options, selected = mode, onSelect = { if (enabled && it != mode) onSave(withMode(m, entry.key, it)) })
     if (mode == "allow" && entry.caps.isNotEmpty()) {
       Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         val caps = state?.caps.orEmpty()
         Text(
-          if (caps.isEmpty()) "بی سقف" else caps.entries.joinToString(" · ") { (n, v) ->
-            if (n == "maxPct") "حداکثر ${qty(v)}٪" else "حداکثر ${qty(v / 100.0)} ؋"
-          } + " — بیشتر از آن با تأییدِ مدیر",
+          if (caps.isEmpty()) StrSetupPages.noCap else caps.entries.joinToString(" · ") { (n, v) ->
+            if (n == "maxPct") StrSetupPages.capPct(qty(v)) else StrSetupPages.capAmount(qty(v / 100.0))
+          } + StrSetupPages.aboveNeedsOk,
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted, modifier = Modifier.weight(1f),
         )
-        TextButton(onClick = { editCaps = true }, enabled = enabled) { Text("سقف") }
+        TextButton(onClick = { editCaps = true }, enabled = enabled) { Text(StrCourierApp.cap) }
       }
     }
   }
@@ -250,12 +258,12 @@ private fun CapsDialog(
   Dialog(onDismissRequest = onDismiss) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp)) {
-        Text("سقفِ ${permLabel(entry.key)}", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrSetupPages.capOf(permLabel(entry.key)), style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(10.dp))
         if ("maxPct" in entry.caps) {
           OutlinedTextField(
             value = pct, onValueChange = { pct = numericInput(it) }, singleLine = true,
-            label = { Text("حداکثر درصد (خالی = بی سقف)") }, isError = pctBad,
+            label = { Text(StrSetupPages.maxPctField) }, isError = pctBad,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
           )
           Spacer(Modifier.height(8.dp))
@@ -263,13 +271,13 @@ private fun CapsDialog(
         if ("maxAmount" in entry.caps) {
           OutlinedTextField(
             value = amount, onValueChange = { amount = numericInput(it) }, singleLine = true,
-            label = { Text("حداکثر مبلغ به افغانی (خالی = بی سقف)") }, isError = amountBad,
+            label = { Text(StrSetupPages.maxAmountField) }, isError = amountBad,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal), modifier = Modifier.fillMaxWidth(),
           )
         }
         Spacer(Modifier.height(12.dp))
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-          TextButton(onClick = onDismiss) { Text("انصراف") }
+          TextButton(onClick = onDismiss) { Text(Str.cancel) }
           TextButton(
             enabled = !pctBad && !amountBad,
             onClick = {
@@ -278,7 +286,7 @@ private fun CapsDialog(
               if ("maxAmount" in entry.caps) out["maxAmount"] = amountVal?.takeIf { amount.isNotBlank() }?.let { Math.round(it * 100).toDouble() }
               onSave(out)
             },
-          ) { Text("ذخیره") }
+          ) { Text(StrKit.save) }
         }
       }
     }
@@ -305,7 +313,7 @@ fun ApproverSetupSection(shops: ShopRepository, snackbar: SnackbarHostState) {
   var rec by remember { mutableStateOf(store.get(userId)) }
   var setting by remember { mutableStateOf(false) }
   var busy by remember { mutableStateOf(false) }
-  val label = (sync.accountName.ifBlank { "دستگاه" } + " · " + if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) "کامپیوتر" else "گوشی").take(60)
+  val label = (sync.accountName.ifBlank { "دستگاه" } + " · " + if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) "کامپیوتر" else "گوشی").take(60) // داده: نامِ کلیدِ تأیید که روی سرور ثبت می‌شود
 
   suspend fun register(r: ApproverVault.Record) {
     shops.registerApproverKey(r.spki, label, sync.deviceUid)
@@ -313,16 +321,16 @@ fun ApproverSetupSection(shops: ShopRepository, snackbar: SnackbarHostState) {
         val next = r.copy(registered = id == r.keyId)
         store.put(next)
         rec = next
-        snackbar.showSnackbar(if (next.registered) "کلیدِ تأیید ثبت شد" else "پاسخِ سرور با این کلید نخواند")
+        snackbar.showSnackbar(if (next.registered) StrSetupPages.keyRegistered else StrSetupPages.keyMismatch)
       }
       .onFailure { snackbar.showSnackbar(it.userMessage) }
   }
 
-  SectionTitle("PIN و کلیدِ تأیید")
+  SectionTitle(StrSetupPages.pinAndKey)
   Panel {
     Text(
-      "با این PIN روی همین دستگاه تخفیف، لغو یا برگشتِ بیش از سقفِ کارمند را تأیید می‌کنید. " +
-        "PIN و کلیدِ خصوصی از این دستگاه بیرون نمی‌روند.",
+      StrSetupPages.pinIntro1 +
+        StrSetupPages.pinIntro2,
       style = MaterialTheme.typography.labelSmall,
       color = Shop.colors.muted2,
     )
@@ -330,20 +338,20 @@ fun ApproverSetupSection(shops: ShopRepository, snackbar: SnackbarHostState) {
     val r = rec
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       when {
-        r == null -> StatusPill("PIN ندارد", PillTone.NEUTRAL)
-        r.locked -> StatusPill("قفل پس از ${plain(PinGuard.MAX_FAILURES)} خطا", PillTone.DANGER)
-        r.registered -> StatusPill("آمادهٔ تأیید", PillTone.SUCCESS)
-        else -> StatusPill("کلید هنوز ثبت نشده", PillTone.WARNING)
+        r == null -> StatusPill(StrSetupPages.noPin, PillTone.NEUTRAL)
+        r.locked -> StatusPill(StrSetupPages.lockedAfter(plain(PinGuard.MAX_FAILURES)), PillTone.DANGER)
+        r.registered -> StatusPill(StrSetupPages.readyToApprove, PillTone.SUCCESS)
+        else -> StatusPill(StrSetupPages.keyNotYet, PillTone.WARNING)
       }
       Spacer(Modifier.weight(1f))
       if (r != null && !r.registered && !r.locked) {
         TohidSecondaryButton(
-          text = "ثبتِ کلید",
+          text = StrSetupPages.registerKey,
           enabled = !busy,
           onClick = { busy = true; scope.launch { register(r); busy = false } },
         )
       }
-      TohidSecondaryButton(text = if (r == null) "گذاشتنِ PIN" else "PINِ تازه", enabled = !busy, onClick = { setting = true })
+      TohidSecondaryButton(text = if (r == null) StrSetupPages.setPin else StrSetupPages.newPin, enabled = !busy, onClick = { setting = true })
     }
   }
   Spacer(Modifier.height(18.dp))
@@ -375,21 +383,21 @@ internal fun PinSetupDialog(onDismiss: () -> Unit, onDone: (String) -> Unit) {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         PinPad(
-          title = if (first == null) "PINِ تازه" else "دوباره همان PIN",
-          hint = "شش رقم؛ نه همه یکی و نه پشتِ سرِ هم",
+          title = if (first == null) StrSetupPages.newPin else StrSetupPages.samePinAgain,
+          hint = StrSetupPages.pinHint,
           error = error,
           onComplete = { pin ->
             val f = first
             when {
-              f == null && PinGuard.newPinProblem(pin) != null -> { error = "این PIN ساده است؛ شش رقمِ دیگری بزنید" }
+              f == null && PinGuard.newPinProblem(pin) != null -> { error = StrSetupPages.pinTooSimple }
               f == null -> { first = pin; error = null }
-              f != pin -> { first = null; error = "دو PIN یکی نبودند؛ از نو" }
+              f != pin -> { first = null; error = StrSetupPages.pinsDiffer }
               else -> { onDone(pin) }
             }
           },
         )
         Spacer(Modifier.height(8.dp))
-        TextButton(onClick = onDismiss) { Text("انصراف") }
+        TextButton(onClick = onDismiss) { Text(Str.cancel) }
       }
     }
   }
@@ -406,38 +414,38 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
   LaunchedEffect(Unit) { load() }
 
   val list = devices ?: return
-  SectionTitle("دستگاه‌ها")
+  SectionTitle(StrAccount.devicesTitle)
   Panel {
-    if (list.isEmpty()) EmptyNote("دستگاهی ثبت نشده است.")
+    if (list.isEmpty()) EmptyNote(StrAccount.noDevices)
     list.forEachIndexed { i, d ->
       if (i > 0) HorizontalDivider(Modifier.padding(vertical = 8.dp), color = Shop.colors.muted2.copy(alpha = 0.2f))
       val disabled = d.disabledAt != null
       Column(Modifier.fillMaxWidth()) {
         Text(
-          "${d.member.name.ifBlank { "کارمند" }} · ${d.name.ifBlank { d.platform.ifBlank { "دستگاه" } }}",
+          StrEvidence.step(d.member.name.ifBlank { StrAccount.staffMember }, d.name.ifBlank { d.platform.ifBlank { StrAccount.device } }),
           style = MaterialTheme.typography.bodyMedium,
           color = Shop.colors.text,
         )
         Spacer(Modifier.height(4.dp))
         //  وضعیت همیشه «متن + رنگ + نقطه» (VISUAL-DIRECTION ۱.۳)
         when {
-          d.current -> StatePill("همین دستگاه", Shop.colors.primary)
+          d.current -> StatePill(StrAccount.deviceThis, Shop.colors.primary)
           disabled -> StatePill(
-            "از کار افتاده" + if (d.blockedAttempts > 0) " · ${plain(d.blockedAttempts)} تلاشِ ردشده" else "",
+            StrAccount.deviceBlocked + if (d.blockedAttempts > 0) StrSetupPages.rejectedTries(plain(d.blockedAttempts)) else "",
             Shop.colors.danger,
           )
-          d.status != "active" -> StatePill("خارج‌شده", Shop.colors.muted)
-          else -> StatePill("فعال", Shop.colors.success)
+          d.status != "active" -> StatePill(StrAccount.deviceOut, Shop.colors.muted)
+          else -> StatePill(StrSettings.active, Shop.colors.success)
         }
         if (canEdit && !d.current && (disabled || d.status == "active")) {
           Row(horizontalArrangement = Arrangement.End, modifier = Modifier.fillMaxWidth()) {
             TohidSecondaryButton(
-              text = if (disabled) "برگرداندن" else "از کار انداختن",
+              text = if (disabled) StrAccount.unblock else StrAccount.block,
               onClick = {
                 if (disabled) {
                   scope.launch {
                     shops.enableDevice(d.id)
-                      .onSuccess { snackbar.showSnackbar("دستگاه برگشت؛ کارمند باید دوباره وارد شود"); load() }
+                      .onSuccess { snackbar.showSnackbar(StrAccount.deviceEnabled); load() }
                       .onFailure { snackbar.showSnackbar(it.userMessage) }
                   }
                 } else {
@@ -454,17 +462,17 @@ fun DevicesSection(shops: ShopRepository, canEdit: Boolean, snackbar: SnackbarHo
 
   confirm?.let { d ->
     TohidConfirmDialog(
-      title = "از کار انداختنِ این دستگاه",
-      message = "همهٔ نشست‌های این دستگاه بسته می‌شود و از این پس هیچ چیزی از آن پذیرفته نمی‌شود. " +
-        "فروش‌هایی که هنوز بالا نرفته‌اند روی خودِ دستگاه و در پشتیبانِ آن می‌مانند.",
-      confirmText = "از کار بینداز",
+      title = StrAccount.blockTitle,
+      message = StrSetupPages.blockNote1 +
+        StrSetupPages.blockNote2,
+      confirmText = StrAccount.blockConfirm,
       danger = true,
       onDismiss = { confirm = null },
       onConfirm = {
         confirm = null
         scope.launch {
           shops.disableDevice(d.id)
-            .onSuccess { snackbar.showSnackbar("دستگاه از کار افتاد"); load() }
+            .onSuccess { snackbar.showSnackbar(StrAccount.deviceDisabled); load() }
             .onFailure { snackbar.showSnackbar(it.userMessage) }
         }
       },

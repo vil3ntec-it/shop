@@ -13,16 +13,28 @@ import ir.vil3ntec.tohid.core.staff.TimeClock
 object StaffReport {
 
   /**
-   *  STF-08 — ردیف‌های پورسانتِ بازه (`from`..`to`، تاریخِ فاکتور): هر فاکتورِ لغونشده به نامِ فروشنده‌اش، و هر برگشتِ
-   *  همین بازه منفی به نامِ فروشندهٔ **فاکتورِ اصل** (`Commission.returnLines`)، حتی اگر فروش در ماهِ پیش بوده.
+   *  STF-08 — ردیف‌های پورسانتِ بازه (`from`..`to`، تاریخِ فاکتور): هر فاکتورِ لغونشده به نامِ فروشنده‌اش، به تفکیکِ
+   *  دستهٔ کالای قلم‌ها (`Commission.saleLines`، برای «نرخِ دسته»)، و هر برگشتِ همین بازه منفی به نامِ فروشندهٔ
+   *  **فاکتورِ اصل** (`Commission.returnLines`) با دستهٔ کالای برگشتی، حتی اگر فروش در ماهِ پیش بوده.
    */
   fun commissionLines(d: ShopData, from: String, to: String): List<Commission.Line> {
     fun inRange(date: String) = date >= from && date <= to
-    val sold = d.sales.filter { it.status != "cancelled" && inRange(it.date) }
-      .map { Commission.Line(it.seller.trim(), null, Money.fromLegacy(it.finalTotal, Currency.AFN)) }
+    fun legacy(v: Double) = Money.fromLegacy(v, Currency.AFN)
+    val categoryOf = d.products.associate { it.id to it.category.trim() }
+    val inRangeSales = d.sales.filter { it.status != "cancelled" && inRange(it.date) }
+    val returns = d.saleReturns.filter { inRange(it.date) }
+    //  فقط قلم‌های همین بازه (فاکتورِ بازه، یا قلمی که برگشتِ بازه نام می‌برد) — نه نگاشتِ همهٔ دفتر
+    val saleIds = inRangeSales.mapTo(HashSet()) { it.id }
+    val itemIds = returns.mapNotNullTo(HashSet()) { r -> r.saleItemId.takeIf { r.productId.isBlank() && it.isNotBlank() } }
+    val items = d.saleItems.filter { it.saleId in saleIds }.groupBy { it.saleId }
+    val productOfItem = d.saleItems.filter { it.id in itemIds }.associate { it.id to it.productId }
+    val sold = inRangeSales.flatMap { s ->
+      Commission.saleLines(s.seller.trim(), legacy(s.finalTotal), items[s.id].orEmpty().map { Commission.Item(categoryOf[it.productId], legacy(it.totalPrice)) })
+    }
     val origins = d.sales.associate { it.id to Commission.Origin(it.seller, it.status == "cancelled") }
-    val back = d.saleReturns.filter { inRange(it.date) }
-      .map { Commission.Returned(it.saleId, Money.fromLegacy(it.amount, Currency.AFN)) }
+    val back = returns.map {
+      Commission.Returned(it.saleId, legacy(it.amount), categoryOf[it.productId.ifBlank { productOfItem[it.saleItemId].orEmpty() }])
+    }
     return sold + Commission.returnLines(back, origins)
   }
 
