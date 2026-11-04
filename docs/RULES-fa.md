@@ -999,6 +999,15 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   (هشدار ⇒ `SyncStore.deviceCapOver` ⇒ `DeviceCapNotice` ِ پوسته در همهٔ صفحه‌ها، صندوق هم؛ `device_limit` ⇒ `LockedFeature`
   به «دستگاه‌های وصل» `AccountLinks.SESSIONS`، نه «قیمت‌ها»). صفحهٔ قفلِ صاحب هرگز بن‌بستِ «اشتراک بخرید» نیست. سنجه:
   `sec-sub-device-cap.test.js` (۷)، `DeviceCapTest`، `DeviceCapWiringTest`.
+- ⛔ **O-09 در وب — هر ورود `device` می‌فرستد:** `login`، `resetPassword` ِ `license/license-client.js` و فرمِ `shop-ui.js` در
+  بدنهٔ ورود `device = loginDevice()` = `{uid, name, platform:'web'}` دارند؛ `uid` همان `tohid-device-uid-v1` ِ `localStorage`
+  (۱۶ بایتِ `crypto.getRandomValues`، یک بار برای هر مرورگر، هرگز از دادهٔ کاربر؛ ورودِ کدی `account-code.js` همان را می‌فرستد).
+  بی آن، سرور ردیفِ دستگاهِ مرورگر را نمی‌سازد و صاحب در دکانِ پر `device_limit` می‌گیرد — برنگردد. ردیف را فقط ورود (رمز/کد)
+  می‌سازد، نه `license/sync`. پاسخِ `license/sync` ⇒ `deviceCap` ِ همان بسته (`deviceCapOf`، قرینهٔ `DeviceCap.overOf`؛ هر پاسخ از
+  نو، خروج پاک) ⇒ `TohidLicense.deviceCapOver()` ⇒ نوارِ `#vip-device-bar` ِ `vip.js` (دکمه ⇒ `TohidAccountUI.openPlan`). نسخهٔ
+  وبِ دکان واژه‌نامه ندارد: متنِ نوار بی واژهٔ فهرستِ دری است (فارسی = دری). نشستِ تازه ⇒ `notify()` تا قفل و نوار همان لحظه
+  از سرور بپرسند. سنجه: `sec-sub-device-cap-web.test.js` (همان license-client.js در vm با سرورِ واقعی؛ پیش از رفع ۰/۴ سبز،
+  پس از آن ۴/۴؛ جهشِ «صاحب بی شرطِ ردیف» ⇒ ۱ سرخ) و `web-device-cap.mjs` (کرومیوم، ۴؛ پیش از رفع ۳ سرخ).
 
 ### سنجشِ کارایی
 - **F0-26:** خطِ پایه در `docs/spec/bench/baseline-1405-07-22.md`. هر PR که کارایی را عوض می‌کند
