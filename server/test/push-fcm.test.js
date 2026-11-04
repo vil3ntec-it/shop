@@ -251,7 +251,8 @@ async function liveShop(label) {
   const a = await owner(label);
   for (const k of ['shop.orders', 'shop.storefront', 'pay.hesabpay', 'shop.order_notify', 'shop.device_push']) await flag(a.shopId, k);
   const slug = `push-${uniq()}`;
-  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001' }, { token: a.token });
+  //  پرداختِ آنلاین از همان «تازه» (مهاجرتِ ۲۱۱ پیش‌فرضِ دکانِ تازه را «پس از پذیرش» کرد)
+  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: `ویترینِ ${label}`, contactPhone: '0700000001', payAfterAccept: false }, { token: a.token });
   assert.ok(put.status < 300, JSON.stringify(put.body));
   const ops = [{ op_id: `op-${uniq()}`, ts: Date.now(), table: 'products', row_id: 'rice', type: 'insert', fields: { name: 'برنج', unit: 'کیلو', salePrice: 125 } }];
   const p = await h.api('POST', '/api/sync/v1/push', { token: a.token, headers: { 'X-App': 'shop', 'X-Device': 'dev-push' }, body: { device_id: 'dev-push', schema_version: 2, ops } });
