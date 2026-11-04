@@ -180,7 +180,8 @@ fun main() {
     }
 
     var shortcutsOpen by ir.vil3ntec.tohid.ui.AppNav.help
-    val windowHid = remember { ir.vil3ntec.tohid.scan.HidScan() }
+    //  HW-05: تنظیمِ بارکدخوانِ همین دستگاه پیش از نخستین کلید (پیش‌تر فقط با باز شدنِ «دستگاه‌ها»)
+    val windowHid = remember { ir.vil3ntec.tohid.scan.ScanPrefs.load(context); ir.vil3ntec.tohid.scan.HidScan() }
     Window(
       onCloseRequest = {
         //  بی سینی (بعضی میزکارهای لینوکس) بستن یعنی خروج
