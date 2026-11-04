@@ -1,5 +1,5 @@
 #  فایل‌های اندروید که هنوز به iOS نمی‌رسند — خوانندهٔ آن ios/shared/build.gradle.kts (`iosSources`).
-#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۴).
+#  شرح و طرحِ کوچک کردنش: docs/IOS-PLAN-fa.md، بخشِ ۰ (۰.۳، ۰.۴، ۰.۷ تا ۰.۱۵).
 #  هر سطر: مسیر زیرِ ir/vil3ntec/tohid/ (پوشه با «/» ِ پایانی)، پس از # دلیل.
 #  فایلِ تازه‌ای که این‌جا نیست خودبه‌خود برای iOS کامپایل می‌شود (کارِ ios-ui-klib در ios-spike.yml).
 #  ساختهٔ دستی نیست: سطرها از شمارشِ API و خطای کامپایلِ klib ِ iOS آمده‌اند؛ با کم شدنِ وابستگی پاک شوند.
@@ -8,6 +8,7 @@
 
 #  گامِ ۹ (§۰.۱۴): `data/Migration.kt` و `pay/platform/PayDevice.kt` خودشان روی آیفون (shimهای بی‌رفتارِ WebView، NFC و
 #  نمایشگرِ دوم؛ همان «دفترِ قدیمی نیست» و «NFC نیست» ِ همتاهای پاک‌شده).
+#  گامِ ۱۰ (§۰.۱۵): `Haptics` ماند — shim ِ Vibrator یا بی‌لرزش بود یا معنا را از زمان‌بندی حدس می‌زد؛ همتا اکنون نقشهٔ معناییِ UIKit است.
 
 #  ── الف) فقط اندروید، برای همیشه (iOS همتا نمی‌خواهد؛ همتای کوچکش فقط همان API را بی‌اثر نگه می‌دارد) ──
 MainActivity.kt  # نقطهٔ ورودِ اندروید (Activity، مانیفست، نامِ مستعارِ پیوند، سرویسِ اسکنِ پس‌زمینه). ورودِ آیفون: ios/IosRoot.kt ⇐ همان AppShell/AppStart ِ مشترک
@@ -21,4 +22,4 @@ hw/PrinterFinderAndroid.kt  # کارتِ شبکه (ConnectivityManager) و جس�
 scan/BarcodeScanner.kt  # CameraX + ML Kit + MediaPlayer؛ iOS: scan/BarcodeScannerIos.kt (AVFoundation). سدها مشترک‌اند: BarcodeGuard و ScanGate (core)
 scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/GuidedCaptureIos.kt (دکمه پنهان، عکسِ کالا با دوربینِ خودِ iOS از راهِ TakePicture)
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
-ui/screens/Haptics.kt  # الگوی لرزشِ Vibrator؛ iOS: ui/screens/HapticsIos.kt (بازخوردِ لمسیِ خودِ iOS: موفق/تأیید/خطا)
+ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)
