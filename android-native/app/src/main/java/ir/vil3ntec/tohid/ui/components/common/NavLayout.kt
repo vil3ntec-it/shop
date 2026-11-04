@@ -262,4 +262,15 @@ object NavLayouts {
     if (slot == slotOf(l, item.id) && slot != Slot.PILL) return Edit.Ok(l)
     return place(l, item.id, slot, index, allowed)
   }
+
+  /**
+   *  جایگزینِ کشیدن برای صفحه‌خوان (کارهای «یک جا بالاتر/پایین‌تر»): همان `move` ِ کشیدن به اندازهٔ یک ردیف
+   *  (`by` = ‎-1/+1)؛ از سرخط گذشتن یعنی رفتن به بخشِ همسایه. `null` = کاری نمی‌کند یا پذیرفته نمی‌شود (بالای ستون،
+   *  تهِ ستون، درونِ «بیرون از نوار»، «بیشتر» بیرون از قرص، قرصِ پر)، پس کارش پیشنهاد نمی‌شود.
+   */
+  fun step(l: NavLayout, rows: List<Row>, from: Int, by: Int, allowed: Set<String>): Edit.Ok? {
+    val to = from + by
+    if (by == 0 || rows.getOrNull(from) !is Row.Item || to !in 1..rows.lastIndex) return null
+    return (move(l, rows, from, to, allowed) as? Edit.Ok)?.takeIf { it.layout != l }
+  }
 }
