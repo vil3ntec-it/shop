@@ -15,8 +15,8 @@ import kotlinx.serialization.json.longOrNull
  *  «گزارشِ تازه» — کدام جدول برای کدام زبانه، بی Compose (آزمون: `ReportFreshModelTest`).
  *
  *  همهٔ عددها از `ReportCore`/`ReportTables`اند؛ این‌جا فقط انتخاب، برش و قالب است.
- *  سود همیشه با برچسبِ «تقریبی» می‌آید تا D-23 (v3 §۱۵.۴ بند ۴). روشِ بها (RPT-03) راهبردِ
- *  `CostPolicy` ِ core است: پیش‌فرض همان قیمتِ خریدِ روی قلم (رفتارِ پیشین)، میانگینِ موزون فقط پیش‌نمایش.
+ *  روشِ بها (RPT-03) راهبردِ `CostPolicy` ِ core است: پیش‌فرض و مصوب (D-23، ۱۴۰۵/۰۸/۱۳) میانگینِ موزون و
+ *  تأییدش (`approvedOf`) به هسته می‌رود؛ قیمتِ خریدِ روی قلم انتخابی و «تقریبی».
  */
 object ReportFreshModel {
   /** شاگرد (`canSeeMoney = false`) فقط سنِ بدهی را می‌بیند — همان قاعدهٔ صفحهٔ امروز */
@@ -50,23 +50,27 @@ object ReportFreshModel {
   fun costingOf(m: CostMethod): ReportCore.Costing =
     ReportCore.Costing.entries.firstOrNull { it.id == m.id } ?: ReportCore.Costing.LINE
 
+  /** روشِ این `costing` مصوب است؟ همان `costApproved` ِ هسته — هرگز `true` ِ ثابت */
+  fun approvedOf(c: ReportCore.Costing): Boolean = CostPolicy.approved(CostPolicy.parse(c.id))
+
   /** نتیجهٔ یک زبانه: جدول‌ها و اینکه سود تقریبی است یا نه */
   data class View(val tables: List<ReportTables.Table>, val sales: ReportCore.SalesReport?, val debts: ReportCore.DebtReport?, val fraud: ReportCore.FraudReport?)
 
   fun view(
     l: ReportLedger, tab: String, span: String, dim: String, today: String, clock: ReportClock?,
-    costing: ReportCore.Costing = ReportCore.Costing.LINE,
+    costing: ReportCore.Costing = costingOf(CostPolicy.DEFAULT),
   ): View {
     val r = ReportBoard.range(span, today)
+    val ok = approvedOf(costing)
     val d = if (dim in ReportBoard.DIMS) dim else "product"
     return when (tab) {
-      "today" -> View(ReportTables.today(ReportCore.today(l, today, clock, costing)), null, null, null)
+      "today" -> View(ReportTables.today(ReportCore.today(l, today, clock, costing, 0, ok)), null, null, null)
       "sales" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock, costing)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok)
         View(ReportTables.sales(s).filter { it.id == "sales.$d" }, s, null, null)
       }
       "profit" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock, costing)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok)
         val t = ReportTables.sales(s).first { it.id == "sales.$d" }
         val title = CostPolicy.label("سود و حاشیه به تفکیک ${ReportBoard.DIM_LABELS.getValue(d)}", CostPolicy.parse(costing.id))
         View(listOf(project(t, "profit", title, PROFIT_KEYS)), s, null, null)

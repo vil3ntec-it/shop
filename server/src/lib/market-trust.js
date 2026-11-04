@@ -376,6 +376,8 @@ async function caseByToken(store, token) {
   if (!id) throw gone();
   const row = await one('SELECT * FROM trust_cases WHERE id=$1 AND shop_id=$2', [id, store.shop_id]);
   if (!row) throw gone();
+  //  TEN-03 / O-08: یک سال پس از آخرین کارِ پرونده (پرچمِ `shop.storefront.link_expiry`، `lib/paper-links.js`)
+  await require('./paper-links').assertFresh(store.shop_id, row.updated_at || row.created_at, 'این لینکِ پیگیری پس از یک سال بی‌کاری کهنه شده است؛ پرونده‌های خود را با شمارهٔ خودتان ببینید');
   return row;
 }
 
