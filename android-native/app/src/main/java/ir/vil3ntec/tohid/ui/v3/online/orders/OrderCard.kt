@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.online.orders
 
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.animation.Animatable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -80,10 +82,17 @@ fun OrderCard(
     else glow.snapTo(edge)
   }
   val shape = RoundedCornerShape(PhoneV3.groupRadius)
+  val picked = checked
+  val open = selected
   Column(
     modifier
       .fillMaxWidth()
       .v3Pressable(label = StrOnline.orderTitle(o.orderNo), onClick = onOpen)
+      //  تیک و مرزِ رنگی برای صفحه‌خوان هم: «انتخاب‌شده» (در حالتِ چندتایی هر کارت، وگرنه فقط کارتِ بازِ کنار)
+      .semantics {
+        if (picked != null) this.selected = picked
+        else if (open) this.selected = true
+      }
       .clip(shape)
       .background(c.card)
       .border(if (selected || flash) 2.dp else 1.dp, glow.value, shape)

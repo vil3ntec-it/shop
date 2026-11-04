@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -147,7 +148,7 @@ internal fun HomeOrdersTile(o: HomeTiles.Orders, onClick: () -> Unit, modifier: 
       o.badgeText?.let { n ->
         val pair = if (o.pulse) awaiting else quiet
         Box(
-          Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-6).dp).widthIn(min = 20.dp).height(20.dp)
+          Modifier.align(Alignment.TopEnd).offset(x = 10.dp, y = (-6).dp).widthIn(min = 20.dp).heightIn(min = 20.dp)
             .clip(RoundedCornerShape(10.dp)).background(pair.bg).border(1.5.dp, p.bg, RoundedCornerShape(10.dp)).padding(horizontal = 5.dp),
           contentAlignment = Alignment.Center,
         ) { Text(n, color = pair.fg, style = v3Text(11, FontWeight.Bold, 13), maxLines = 1) }
