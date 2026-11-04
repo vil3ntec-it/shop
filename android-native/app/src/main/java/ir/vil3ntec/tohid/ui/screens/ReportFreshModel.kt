@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.report.ReportClock
 import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.core.report.ReportLedger
 import ir.vil3ntec.tohid.core.report.ReportTables
+import ir.vil3ntec.tohid.core.i18n.StrReportPages as S
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.longOrNull
@@ -107,13 +108,13 @@ object ReportFreshModel {
     val row = dimRows(s, dim).getOrNull(index) ?: return null
     val list = ReportCore.invoicesOf(l, s.from, s.to, dim, row.key, clock)
     return ReportTables.Table(
-      DRILL_ID, "ریزِ «${label.ifBlank { "—" }}» — ${list.size} فاکتور",
+      DRILL_ID, S.drillInvoices(label.ifBlank { "—" }, list.size),
       listOf(
-        ReportTables.Column("date", "روز", "date"), ReportTables.Column("doc", "فاکتور", "text"),
-        ReportTables.Column("qty", "مقدار", "qty"), ReportTables.Column("sales", "فروش", "money"),
+        ReportTables.Column("date", S.colDay, "date"), ReportTables.Column("doc", S.colInvoice, "text"),
+        ReportTables.Column("qty", S.colQty, "qty"), ReportTables.Column("sales", S.colSales, "money"),
       ),
       list.map { listOf(JsonPrimitive(it.date), JsonPrimitive(doc(it.saleId)), JsonPrimitive(it.qty), JsonPrimitive(it.sales)) },
-      listOf(JsonPrimitive("جمع"), JsonPrimitive(""), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
+      listOf(JsonPrimitive(S.drillTotal), JsonPrimitive(""), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
     )
   }
 
@@ -134,10 +135,10 @@ object ReportFreshModel {
     val date = row.getOrNull(TODAY_DATE_COL)?.takeIf { it !is JsonNull }?.content ?: return null
     val list = ReportCore.dayInvoices(l, date, clock)
     return ReportTables.Table(
-      DAY_DRILL_ID, "ریزِ «${row.first().content}» — ${list.size} فاکتور",
-      listOf(ReportTables.Column("doc", "فاکتور", "text"), ReportTables.Column("qty", "مقدار", "qty"), ReportTables.Column("sales", "فروش", "money")),
+      DAY_DRILL_ID, S.drillInvoices(row.first().content, list.size),
+      listOf(ReportTables.Column("doc", S.colInvoice, "text"), ReportTables.Column("qty", S.colQty, "qty"), ReportTables.Column("sales", S.colSales, "money")),
       list.map { listOf(JsonPrimitive(doc(it.saleId)), JsonPrimitive(it.qty), JsonPrimitive(it.sales)) },
-      listOf(JsonPrimitive("جمع"), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
+      listOf(JsonPrimitive(S.drillTotal), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
     )
   }
 
@@ -152,26 +153,26 @@ object ReportFreshModel {
     val open = ReportCore.openDebt(l, r.asOf, supplier, row.id, clock)
     val lines = open.lots.map {
       listOf(JsonPrimitive(it.date), JsonPrimitive(doc(it.docId)), JsonPrimitive(it.left), if (it.ageDays >= 0) JsonPrimitive(it.ageDays) else JsonNull)
-    } + if (open.credit != 0L) listOf(listOf(JsonNull, JsonPrimitive("پیش‌پرداخت"), JsonPrimitive(-open.credit), JsonNull)) else emptyList()
+    } + if (open.credit != 0L) listOf(listOf(JsonNull, JsonPrimitive(S.prepaid), JsonPrimitive(-open.credit), JsonNull)) else emptyList()
     return ReportTables.Table(
-      DEBT_DRILL_ID, "ریزِ «${label.ifBlank { "—" }}» — ${open.lots.size} سندِ باز",
+      DEBT_DRILL_ID, S.drillOpenDocs(label.ifBlank { "—" }, open.lots.size),
       listOf(
-        ReportTables.Column("date", "روز", "date"), ReportTables.Column("doc", "سند", "text"),
-        ReportTables.Column("left", "مانده", "money"), ReportTables.Column("age", "سن (روز)", "count"),
+        ReportTables.Column("date", S.colDay, "date"), ReportTables.Column("doc", S.colDoc, "text"),
+        ReportTables.Column("left", S.colLeft, "money"), ReportTables.Column("age", S.colAge, "count"),
       ),
       lines,
-      listOf(JsonPrimitive("جمع"), JsonPrimitive(""), JsonPrimitive(open.lots.sumOf { it.left } - open.credit), JsonNull),
+      listOf(JsonPrimitive(S.drillTotal), JsonPrimitive(""), JsonPrimitive(open.lots.sumOf { it.left } - open.credit), JsonNull),
     )
   }
 
   /** نامِ نوعِ رویدادِ ضدتقلب (`ReportCore.FraudEvent.kind`) */
   fun fraudKind(kind: String): String = when (kind) {
-    "discount" -> "تخفیف"
-    "approved" -> "فاکتورِ تأییدشده"
-    "return" -> "برگشتی"
-    "void" -> "لغو"
-    "line_delete" -> "حذف ردیف"
-    "no_sale" -> "باز کردن کشو بی فروش"
+    "discount" -> S.kindDiscount
+    "approved" -> S.kindApproved
+    "return" -> S.kindReturn
+    "void" -> S.kindVoid
+    "line_delete" -> S.kindLineDelete
+    "no_sale" -> S.kindNoSale
     else -> kind
   }
 
@@ -184,17 +185,17 @@ object ReportFreshModel {
   ): ReportTables.Table? {
     val row = r.rows.getOrNull(index) ?: return null
     val list = ReportCore.fraudEvents(l, r.from, r.to, row.key, clock)
-    fun who(s: String) = s.ifEmpty { "نامعلوم" }
+    fun who(s: String) = s.ifEmpty { S.unknownUser }
     return ReportTables.Table(
-      FRAUD_DRILL_ID, "ریزِ «${who(row.key)}» — ${list.size} رویداد",
+      FRAUD_DRILL_ID, S.drillEvents(who(row.key), list.size),
       listOf(
-        ReportTables.Column("date", "روز", "date"), ReportTables.Column("kind", "نوع", "text"), ReportTables.Column("doc", "سند", "text"),
-        ReportTables.Column("amount", "مبلغ", "money"), ReportTables.Column("approver", "تأییدکننده", "text"),
+        ReportTables.Column("date", S.colDay, "date"), ReportTables.Column("kind", S.colKind, "text"), ReportTables.Column("doc", S.colDoc, "text"),
+        ReportTables.Column("amount", S.colAmount, "money"), ReportTables.Column("approver", S.colApprover, "text"),
       ),
       list.map { e ->
         listOf(
           JsonPrimitive(e.date), JsonPrimitive(fraudKind(e.kind)), JsonPrimitive(if (e.docId.isEmpty()) "—" else doc(e.docId)), JsonPrimitive(e.amount),
-          JsonPrimitive(if (e.byOther) "تأییدِ کارِ «${who(e.user)}»" else e.approvedBy),
+          JsonPrimitive(if (e.byOther) S.approvedWorkOf(who(e.user)) else e.approvedBy),
         )
       },
       null,
@@ -220,7 +221,7 @@ object ReportFreshModel {
       "money" -> if (n != null) ir.vil3ntec.tohid.money(n / 100.0) else v.content
       "qty" -> if (n != null) ir.vil3ntec.tohid.qty(n / 1000.0) else v.content
       "bp" -> if (n != null) percent(n) else v.content
-      "flag" -> if (v.content == "true") "بله" else "نه"
+      "flag" -> if (v.content == "true") S.yes else S.no
       "date" -> date(v.content)
       else -> v.content
     }
