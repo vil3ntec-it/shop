@@ -40,8 +40,14 @@ const STRICT_CAP_FLAG = 'shop.device_cap';
  *  همه زیرِ قفلِ همان دکان (`shop-devices:<دکان>`) و در یک تراکنش — درخواست‌های هم‌زمان از سقف رد
  *  نمی‌شوند. ترتیبِ جاها = نخستین ثبت (`created_at`)؛ دستگاهِ ۹۰ روز ندیده شمرده نمی‌شود.
  *  پرچمِ خاموش ⇒ دستگاهی که از قبل ثبت شده (ورود) مثلِ پیش مجوز می‌گیرد، حتی بیرون از سقف.
+ *
+ *  ⛔ O-09 — صاحبِ دکان هرگز از دستگاهِ خودش بیرون نمی‌ماند: دستگاهی که **ردیفِ فعالِ حسابِ خودِ صاحب**
+ *  است (با «ورود» یا جای خالیِ پیشین ثبت شده) بیرون از سقف هم مجوز می‌گیرد، با `overCap` ⇒ هشدار و راهِ
+ *  برداشتن. شناسهٔ ثبت‌نشده با توکنِ صاحب همچنان فقط با جای خالی (SEC-CLI-01: ردیف فقط با رمز/کد یا
+ *  جای خالی ساخته می‌شود، پس شمارِ دستگاه‌های صاحب بی‌کران نمی‌شود). دستگاهِ کارمند مثلِ پیش رد می‌شود.
+ *  `devices` = شمارِ شمرده‌شده‌ها با همین دستگاه.
  */
-async function claimSlot({ shopId, userId, deviceUid, deviceName, maxDevices, strict, at, ip }) {
+async function claimSlot({ shopId, userId, deviceUid, deviceName, maxDevices, strict, owner, at, ip }) {
   return tx(async (c) => {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`shop-devices:${shopId}`]);
     const mine = (await c.query(
@@ -59,19 +65,50 @@ async function claimSlot({ shopId, userId, deviceUid, deviceName, maxDevices, st
     )).rows.map((r) => r.device_uid);
 
     const rank = slots.indexOf(deviceUid);
-    if (rank >= 0) return (!strict || rank < maxDevices) ? { ok: true } : { ok: false, reason: 'device_limit' };
-    if (slots.length >= maxDevices) return { ok: false, reason: 'device_limit' };
-
-    //  جای خالی ⇒ ثبت برای همین حساب (در «دستگاه‌های من» دیده و باطل‌شدنی است)
-    await c.query(
+    const devices = rank >= 0 ? slots.length : slots.length + 1;
+    //  جای خالی ⇒ ثبت برای همین حساب (در «دستگاه‌های من» دیده و باطل‌شدنی است)؛ ردیفِ کهنهٔ خودش ⇒ دوباره شمرده
+    const seat = () => c.query(
       `INSERT INTO devices (id, user_id, device_uid, name, platform, status, created_at, last_seen_at, last_ip)
        VALUES ($1,$2,$3,$4,'license','active',$5,$5,$6)
        ON CONFLICT (user_id, device_uid) DO UPDATE SET last_seen_at = excluded.last_seen_at
        WHERE devices.status = 'active'`,
       [newId('dev'), userId, deviceUid, String(deviceName || '').slice(0, 80), at, String(ip || '').slice(0, 60)]
     );
-    return { ok: true, registered: true };
+
+    if (rank >= 0 && (!strict || rank < maxDevices)) return { ok: true, devices };
+    if (rank < 0 && slots.length < maxDevices) {
+      await seat();
+      return { ok: true, registered: !mine, devices };
+    }
+    //  بیرون از سقف — فقط دستگاهِ ثبت‌شدهٔ خودِ صاحب می‌گذرد (O-09)
+    if (owner && mine) {
+      if (rank < 0) await seat();
+      return { ok: true, overCap: true, devices };
+    }
+    return { ok: false, reason: 'device_limit', devices };
   });
+}
+
+const FA_DIGITS = '۰۱۲۳۴۵۶۷۸۹';
+const faNum = (n) => String(n).replace(/[0-9]/g, (d) => FA_DIGITS[Number(d)]);
+
+/**
+ *  هشدارِ صاحبِ دکان بیرون از سقف (O-09) — دستگاه کار می‌کند، ولی صاحب باید بداند و راهِ برداشتن را ببیند.
+ *  با پرچمِ روشن هر دستگاهِ صاحب تا وقتی دکان بیرون از سقف است آن را می‌گیرد (کارمندانِ بیرون از سقف بسته‌اند)؛
+ *  با پرچمِ خاموش فقط وقتی خودِ این دستگاه با معافیتِ صاحب گذشت — پاسخِ بقیه بیت‌به‌بیت همان پیشین است.
+ *  `manage: 'devices'` ⇒ برنامه صفحهٔ دستگاه‌ها را باز می‌کند (`/api/me/devices`، `/api/shop/devices`).
+ */
+function ownerWarning(slot, { maxDevices, strict }) {
+  if (!(slot.devices > maxDevices) || !(slot.overCap || strict)) return null;
+  return {
+    code: 'device_over_cap',
+    devices: slot.devices,
+    maxDevices,
+    manage: 'devices',
+    message: `این دکان ${faNum(slot.devices)} دستگاه دارد و اشتراک برای ${faNum(maxDevices)} دستگاه است. ` +
+      'دستگاهِ صاحبِ دکان همیشه کار می‌کند، ولی دستگاهِ کارمندِ بیرون از سقف بسته می‌ماند. ' +
+      'یک دستگاهِ کهنه را از «دستگاه‌ها» بردارید یا اشتراک را بزرگ‌تر کنید.',
+  };
 }
 
 /** کلید عمومی — بدون ورود، چون برنامه پیش از ورود هم باید بتواند بسنجد */
@@ -132,8 +169,9 @@ router.post('/sync', async (req, res, next) => {
      */
     const maxDevices = Number(ent.subscription && ent.subscription.maxDevices) || DEFAULT_MAX_DEVICES;
     const strict = await require('../lib/orders').flagOf(req.shopId, STRICT_CAP_FLAG);
+    const owner = req.role === 'owner';
     const slot = await claimSlot({
-      shopId: req.shopId, userId: req.user.id, deviceUid, deviceName, maxDevices, strict, at, ip: clientIp(req),
+      shopId: req.shopId, userId: req.user.id, deviceUid, deviceName, maxDevices, strict, owner, at, ip: clientIp(req),
     });
     if (!slot.ok && slot.reason === 'device_revoked') {
       return res.json({
@@ -149,8 +187,9 @@ router.post('/sync', async (req, res, next) => {
       return res.json({
         license: null,
         reason: 'device_limit',
-        message: `اشتراکِ این دکان برای ${maxDevices} دستگاه است و همه پر شده‌اند. ` +
-          'یک دستگاهِ قدیمی را از «دستگاه‌های من» باطل کنید یا اشتراک را بزرگ‌تر کنید.',
+        message: `اشتراکِ این دکان برای ${faNum(maxDevices)} دستگاه است و همه پر شده‌اند. ` + (owner
+          ? 'از همین دستگاه یک بار خارج و دوباره وارد شوید، یا یک دستگاهِ کهنه را از «دستگاه‌ها» بردارید.'
+          : 'از صاحبِ دکان بخواهید یک دستگاهِ کهنه را از «دستگاه‌ها» بردارد یا اشتراک را بزرگ‌تر کند.'),
         maxDevices,
         source: ent.source,
         features: ent.features,
@@ -178,6 +217,7 @@ router.post('/sync', async (req, res, next) => {
       return res.json({ license: null, reason: 'expired', source: ent.source, features: ent.features, serverTime: at });
     }
 
+    const warning = owner ? ownerWarning(slot, { maxDevices, strict }) : null;
     res.json({
       license: issued.token,
       publicKey: await license.publicKey(),
@@ -186,6 +226,8 @@ router.post('/sync', async (req, res, next) => {
       expiresAt: issued.expiresAt,
       subscriptionEndsAt: issued.subscriptionEndsAt,
       serverTime: at,
+      //  نبودِ هشدار ⇒ `undefined` و کلید اصلاً در JSON نمی‌آید (پاسخِ بقیه همان پیشین)
+      warning: warning || undefined,
     });
   } catch (err) { next(err); }
 });
