@@ -21,6 +21,9 @@ const router = express.Router();
 
 router.use(requireUser, optionalShop);
 
+//  «حذفِ حساب» به دستِ خودِ کاربر (Google Play) — شرح: `routes/account-deletion.js`، پیش‌فرض خاموش (`account.self_delete`)
+router.use('/account/deletion', require('./account-deletion'));
+
 router.get('/', async (req, res) => {
   const ent = req.shopId ? await entitlementOf(req.shopId) : null;
   //  STF-01..03: فهرستِ قدیمی با لایه‌های دکان (هرگز بیش از نقش) + `policy` برای هستهٔ برنامه

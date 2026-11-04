@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.report
 
+import ir.vil3ntec.tohid.core.i18n.OnlineFmt
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -29,7 +31,6 @@ object OwnerReportPlan {
 
   /** ترتیبِ نمایشِ روزهای هفته: از شنبه */
   val WEEK_ORDER: List<Int> = listOf(6, 0, 1, 2, 3, 4, 5)
-  private val DAY_NAMES = listOf("یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")
 
   data class Settings(
     val active: Boolean = false,
@@ -58,16 +59,17 @@ object OwnerReportPlan {
     val reports: List<Report> = emptyList(),
   )
 
-  fun weekdayName(day: Int): String = DAY_NAMES.getOrElse(day) { "" }
+  /** نامِ روز به زبانِ صفحه (۰ = یکشنبه)؛ همان `StorefrontOwner.DAY_NAMES` در فارسی */
+  fun weekdayName(day: Int): String = if (day in 0..6) OnlineFmt.dayName(day) else ""
 
   fun hourLabel(hour: Int): String = hour.coerceIn(0, 23).toString().padStart(2, '0') + ":00"
 
   /** بازهٔ هر گزارش، همان قاعدهٔ `dueOf` ِ سرور */
   fun coverage(s: Settings): String {
     val morning = s.hour < MORNING_BEFORE
-    val day = if (morning) "دیروز (کامل)" else "امروز تا ساعتِ ${hourLabel(s.hour)}"
-    return if (s.frequency == WEEKLY) "هر ${weekdayName(s.weekday)} ساعتِ ${hourLabel(s.hour)}: هفت روزِ تا $day"
-    else "هر روز ساعتِ ${hourLabel(s.hour)}: $day"
+    val day = if (morning) StrSettingsPages.reportYesterday else StrSettingsPages.reportToday(hourLabel(s.hour))
+    return if (s.frequency == WEEKLY) StrSettingsPages.reportWeekly(weekdayName(s.weekday), hourLabel(s.hour), day)
+    else StrSettingsPages.reportDaily(hourLabel(s.hour), day)
   }
 
   /** روشن/خاموش کردنِ یک کانال؛ آخرین کانال برداشته نمی‌شود (سرور دست‌کم یکی می‌خواهد). ترتیب همان [CHANNELS]. */

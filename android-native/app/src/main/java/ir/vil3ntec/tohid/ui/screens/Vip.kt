@@ -536,7 +536,7 @@ fun VipScreen(onDismiss: () -> Unit) {
       /* ---------------------- گرفتنِ اشتراک ---------------------- */
       //  ⛔ نسخهٔ کافه‌بازار: پرداختِ بیرون از بازار ممنوع است ⇒ نه دکمهٔ خرید با
       //  واتساپ، نه «پرداخت از راهِ واتساپ». اشتراکِ حساب همین‌جا دیده می‌شود.
-      if (ir.vil3ntec.tohid.BuildConfig.STORE == "bazaar") {
+      if (ir.vil3ntec.tohid.core.platform.StoreChannel.storeManaged(ir.vil3ntec.tohid.BuildConfig.STORE)) {
         Spacer(Modifier.height(16.dp))
         Text(
           "اشتراکِ حسابِ شما خودکار همین‌جا دیده می‌شود؛ کار با انبار، کالا، خرید و مصارف همیشه رایگان است.",

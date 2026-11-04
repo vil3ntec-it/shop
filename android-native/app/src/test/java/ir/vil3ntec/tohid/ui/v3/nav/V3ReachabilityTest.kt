@@ -41,6 +41,8 @@ class V3ReachabilityTest {
   private fun pos(name: String) = "ir.vil3ntec.tohid.ui.components.pos.$name"
 
   private val features = listOf(
+    //  ── Google Play: «حذفِ حساب» در خودِ برنامه (حساب من ⇐ ویرایش ⇐ حذفِ حساب) ──
+    Feature("Google Play حذفِ حساب در برنامه", "profile/delete", "ir.vil3ntec.tohid.ui.v3.account.profile.DeleteAccountRoute"),
     //  ── انبار و کالا ──
     Feature("INV-20/21 محل‌ها و بسته‌بندیِ دوباره", "stock/places", s("StockPlacesEntry")),
     Feature("INV-06/07/08 انبارگردانیِ تازه (کلاسِ A، پیش‌فرض روشن)", "stock/count/tools", s("StockCountToolsWired")),

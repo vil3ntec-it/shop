@@ -12,6 +12,7 @@ import ir.vil3ntec.tohid.core.courier.PeriodStats
 import ir.vil3ntec.tohid.core.courier.QueueState
 import ir.vil3ntec.tohid.core.courier.UnsettledDelivery
 import ir.vil3ntec.tohid.ui.courier.CourierBoard
+import ir.vil3ntec.tohid.ui.courier.CourierExtras
 import ir.vil3ntec.tohid.ui.courier.CourierJoinScreen
 
 /**
@@ -21,8 +22,9 @@ import ir.vil3ntec.tohid.ui.courier.CourierJoinScreen
  *  این‌جا به صف یا سرور نمی‌روند (پیش‌نمایش است)، ولی صفحه همان `CourierBoard`ِ
  *  برنامهٔ گوشی است.
  *
- *  نوع‌ها: join · home · route · cash · cash0 · track · ship · stats · account · cod
- *  (`cash0`: سقفِ صفر = «نقد نگیرد»، ۵۷ تحویلِ تسویه‌نشده و «تازه نشد»)
+ *  نوع‌ها: join · home · route · cash · cash0 · track · ship · stats · account · cod · call · call-track
+ *  (`cash0`: سقفِ صفر = «نقد نگیرد»، ۵۷ تحویلِ تسویه‌نشده و «تازه نشد»؛ `call*`: پرچمِ «تماس با مشتری» ِ دکان روشن،
+ *  DLV-02 — دکمه روی کارتِ «مسیر» و جزئیاتِ مأموریتِ پذیرفته، نه روی کارِ تازه)
  */
 @Composable
 internal fun CourierPreview(kind: String) {
@@ -55,15 +57,16 @@ internal fun CourierPreview(kind: String) {
     onCallShop = {},
     onNavigate = {},
     onSignOut = {},
+    extras = CourierExtras(callEnabled = kind.startsWith("call")),
     initialTab = when (kind) {
-      "route" -> "route"
+      "route", "call" -> "route"
       "stats" -> "stats"
       "account" -> "account"
       else -> "home"
     },
     initialPage = if (kind == "cash" || kind == "cash0") "cash" else null,
     initialOpen = when (kind) {
-      "track", "ship" -> "demo-1043"
+      "track", "ship", "call-track" -> "demo-1043"
       "cod" -> "demo-1044"
       else -> null
     },
@@ -92,8 +95,9 @@ private val DEMO_QUEUE = QueueState(
 private val DEMO_ACTIVE = listOf(
   MissionCard(
     id = "demo-1043", orderNo = 1043, status = "picked_up",
-    landmark = "کنارِ داروخانهٔ شفا، دروازهٔ سبز",
+    landmark = "کنارِ داروخانهٔ شفا",
     addressText = "سرکِ دوم، کوچهٔ گل‌ها، خانهٔ 14، طبقهٔ دوم",
+    area = "کارتهٔ چهار", gateColor = "سبز",
     lat = 34.5, lng = 69.2,
     customerName = "حمیدالله نوری", phoneMasked = "0700•••581",
     callBeforeArrival = true, leaveWith = "نگهبانِ ساختمان",

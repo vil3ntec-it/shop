@@ -8,6 +8,7 @@
 const { many, query, now } = require('../db');
 const sf = require('./storefront');
 const details = require('./product-details');
+const units = require('./market-units');   //  S70: مقایسه فقط با واحدِ هم‌سنج
 const { badRequest, notFound } = require('../middleware/errors');
 
 module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES }) => {
@@ -73,6 +74,9 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
    * «همین کالا در دکان‌های دیگر»: کالاهای زندهٔ دکان‌های در فهرست که صاحبشان همان کالای بانکِ مرکزی
    * (`bank_product_id`) را برایش برگزیده. نامزد از نمایهٔ باریک، بعد سنجشِ زنده (منتشرشده، فعال، بی
    * جریمه، هنوز همان پیوند). پرچمِ `market.product_details` خاموش ⇒ ۴۰۴ (مثلِ نشانیِ ناموجود).
+   * S70: هر پیشنهاد `perUnit` (قیمتِ یک دانه/کیلو/لیتر/متر، فقط با اندازهٔ روشن؛ وگرنه null) و `cheapest`
+   * (فقط درونِ همان پایه، با دست‌کم دو پیشنهاد)؛ `compare` = گروه‌های هم‌سنج روی همهٔ پیدا‌شده‌ها، نه فقط
+   * صفحه. درونِ یک دکان ترتیب با قیمتِ یک پایه است، نه قیمتِ خامِ دو واحدِ ناهم‌سنج (`lib/market-units.js`).
    */
   async function sameProduct(bankProductId, { lat, lng, limit, exclude } = {}, at = now()) {
     if (!(await details.on())) throw notFound('پیدا نشد', 'not_found');
@@ -82,7 +86,7 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
     const lim = Math.min(MAX_PRODUCTS, Math.max(1, Number.parseInt(limit, 10) || 24));
     const skip = str(exclude);
     const list = (await eligible(at)).filter((e) => e.row.slug !== skip);
-    if (!list.length) return { bankProductId: bank, offers: [] };
+    if (!list.length) return { bankProductId: bank, offers: [], compare: [] };
     const bySlug = new Map(list.map((e) => [e.row.shop_id, cardOf(e, near, at)]));
     const rows = await many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
@@ -94,12 +98,15 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
     const found = rows.map((r) => ({ shop: bySlug.get(r.shop_id), shopId: r.shop_id, p: sf.productView(r) }))
       .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name);
     const extra = await details.load(found.map((x) => ({ shopId: x.shopId, id: x.p.id })));
-    const offers = found
+    const linked = found
       .filter((x) => (extra.get(details.pairKey(x.shopId, x.p.id)) || {}).bankProductId === bank)
-      .sort((a, b) => rank(near)(a.shop, b.shop) || a.p.priceMinor - b.p.priceMinor)
+      .map((x) => ({ ...x, per: units.perUnit(x.p.unit, x.p.priceMinor), priceMinor: x.p.priceMinor }));
+    const compare = units.compare(linked.map((x) => x.per));
+    const offers = linked
+      .sort((a, b) => rank(near)(a.shop, b.shop) || units.order(a, b))
       .slice(0, lim)
-      .map((x) => offerView(x, extra));
-    return { bankProductId: bank, offers };
+      .map((x) => ({ ...offerView(x, extra), perUnit: x.per, cheapest: units.cheapest(x.per, compare) }));
+    return { bankProductId: bank, offers, compare };
   }
 
   /** نگاشتِ دستهٔ آزادِ کالاها به دسته‌های ثابت در نمای «در بازارچه چگونه دیده شوم» — فقط با پرچم. */
