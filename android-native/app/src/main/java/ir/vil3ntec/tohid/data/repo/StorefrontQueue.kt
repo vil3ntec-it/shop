@@ -100,19 +100,6 @@ object StorefrontQueue {
     return StorefrontOutbox.pendingFor(entries.value, ShopRole.shopId(context))
   }
 
-  /** اعلامِ نرسیدهٔ دکانِ همین نشست (برگهٔ «وضعیت» ِ نسخهٔ ۳، PRES-02)؛ اعلامِ دکانِ دیگر هرگز */
-  fun presence(context: Context): PresenceDeclaration? {
-    load(context)
-    return StorefrontOutbox.presenceFor(entries.value, ShopRole.shopId(context))
-  }
-
-  /** گذاشتنِ اعلام در صفِ دکانِ همین نشست (شناسهٔ ردیف = `eventId`)؛ دکانِ نامعلوم ⇒ false و هیچ‌چیز نوشته نمی‌شود */
-  fun putPresence(context: Context, p: PresenceDeclaration): Boolean {
-    val e = StorefrontOutbox.presenceEntry(ShopRole.shopId(context), p) ?: return false
-    update(context) { StorefrontOutbox.put(it, e) }
-    return true
-  }
-
   /** گذاشتن در صف؛ دکانِ نامعلوم ⇒ null (چیزی نوشته نمی‌شود تا روی دکانِ اشتباه ننشیند) */
   fun enqueue(context: Context, change: StorefrontChange, body: String, base: String, id: String? = null): OutboxEntry? {
     val shop = ShopRole.shopId(context)
