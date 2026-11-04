@@ -242,6 +242,9 @@ const config = {
     keepWeekly: num(process.env.BACKUP_KEEP_WEEKLY, 8),
     keepMonthly:num(process.env.BACKUP_KEEP_MONTHLY, 12),
     intervalMs: num(process.env.BACKUP_INTERVAL_HOURS, 24) * 60 * 60 * 1000,
+    //  D-24 (گرفته‌شده ۱۴۰۵/۰۸/۱۳، الف): حداکثر یک روز داده و نصفِ روز توقف — `restore-drill` با این‌ها می‌سنجد
+    rpoTargetMs: num(process.env.BACKUP_RPO_HOURS, 24) * 60 * 60 * 1000,
+    rtoTargetMs: num(process.env.BACKUP_RTO_HOURS, 12) * 60 * 60 * 1000,
     enabled:    bool(process.env.BACKUP_ENABLED, true),
     passphrase: process.env.BACKUP_PASSPHRASE || '',   // اگر پر باشد، پشتیبان رمز می‌شود
     pgDump:     process.env.PG_DUMP_BIN || 'pg_dump',
@@ -395,6 +398,8 @@ const config = {
     customerSessionDays: num(process.env.STORE_CUSTOMER_SESSION_DAYS, 180),
     //  TEN-03 — لینکِ پیگیریِ سفارش (پرچمِ `shop.storefront.link_expiry`) چند روز پس از صدور کار می‌کند
     trackLinkTtlMs: num(process.env.STORE_TRACK_LINK_DAYS, 30) * 24 * 60 * 60 * 1000,
+    //  TEN-03 / O-08 — QR ِ فاکتورِ کاغذی و پیگیریِ شکایت (همان پرچم) چند روز کار می‌کنند (`lib/paper-links.js`)
+    paperLinkTtlMs: num(process.env.STORE_PAPER_LINK_DAYS, 365) * 24 * 60 * 60 * 1000,
     //  WEB-04 — زمانِ تقریبیِ عمومیِ ویترین (`GET /api/store/:slug/eta`) این‌قدر در حافظهٔ همین نمونه می‌ماند؛ ۰ ⇒ بی حافظه
     etaCacheMs: num(process.env.STORE_ETA_CACHE_MS, 30 * 1000),
   },

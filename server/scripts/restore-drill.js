@@ -10,7 +10,8 @@
  *       --keep                    دیتابیسِ ساخته‌شده نگه داشته شود
  *       --json                    خروجیِ ماشینی
  *
- * خروجی فقط عدد است (شمار، جمع، زمان) — بی هیچ دادهٔ دکان. کدِ خروج: ۰ برابر، ۱ نابرابر یا خطا.
+ * خروجی فقط عدد است (شمار، جمع، زمان) — بی هیچ دادهٔ دکان. کدِ خروج: ۰ برابر و در هدفِ D-24، ۱ نابرابر یا خطا،
+ * ۲ برابر ولی بیرون از هدف (RPO > `BACKUP_RPO_HOURS` ۲۴، RTO > `BACKUP_RTO_HOURS` ۱۲، یا سنِ پشتیبان نامعلوم).
  * ⛔ روی دیتابیسِ زنده نمی‌نویسد؛ پشتیبانِ PGlite در حافظه برمی‌گردد. پشتیبانِ رمزدار BACKUP_PASSPHRASE
  *    همان سرور را می‌خواهد (از محیط؛ هرگز در خطِ فرمان).
  */
@@ -48,6 +49,8 @@ async function main() {
     console.log(`پشتیبان: ${r.file}  ⇒  ${r.where}`);
     console.log(`جدول‌ها ${r.summary.tables}، ردیف‌ها ${r.summary.rows}، ستونِ پول/مقدار ${r.summary.moneyColumns}، کلیدِ دفتر ${r.summary.ledgerKeys}`);
     console.log(`بازگرداندن (RTO): ${sec(r.restoredMs)} — با تطبیق: ${sec(r.verifiedMs)}؛ سنِ پشتیبان (RPO ِ همین فایل): ${age(r.backupAgeMs)}`);
+    const mark = (v) => (v === true ? '✔' : v === false ? '✖' : '؟');
+    console.log(`هدفِ D-24: RPO ≤ ${age(r.targets.rpoMs)} ${mark(r.targets.rpoMet)}، RTO ≤ ${age(r.targets.rtoMs)} ${mark(r.targets.rtoMet)}`);
     if (r.empty) console.log('✖ این پشتیبان هیچ جدولی برنگرداند — پشتیبانِ خالی پشتیبان نیست.');
     if (!r.restore) console.log('⚠️ این پشتیبان manifest ندارد (پیش از این نسخه گرفته شده یا دیتابیس هنگامِ پشتیبان عوض شد): فقط «برگشت»، نه «برابر».');
     else if (r.restore.equal) console.log(`✔ برابر با manifest ِ لحظهٔ پشتیبان (digest ${r.digest.slice(0, 12)}…)`);
@@ -62,9 +65,9 @@ async function main() {
       else for (const d of r.migration.diffs.slice(0, 30)) console.log(`   ✖ ${d.part} ${d.key}: ${d.expected} ⇒ ${d.actual}`);
     }
   }
-  return r.ok;
+  return r.ok ? (r.withinTargets ? 0 : 2) : 1;
 }
 
 main()
-  .then(async (ok) => { await closeDb(); process.exit(ok ? 0 : 1); })
+  .then(async (code) => { await closeDb(); process.exit(code); })
   .catch(async (e) => { console.error('✖', e.message); await closeDb().catch(() => {}); process.exit(1); });
