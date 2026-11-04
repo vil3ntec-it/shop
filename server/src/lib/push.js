@@ -27,6 +27,11 @@ const apns = require('./apns');
 const PREFIX = 'push_';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const FCM_ORIGIN = 'https://fcm.googleapis.com';
+/** نشانیِ توکنِ گوگل — ثابت. `token_uri` ِ فایلِ حسابِ سرویس نادیده گرفته می‌شود: فایلِ دست‌خورده نباید امضای ورود را
+ *  به میزبانِ دیگری بفرستد (CodeQL «File data in outbound network request»). فقط آزمون با [useFcmOrigin] جایش را عوض می‌کند. */
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+/** شناسهٔ پروژهٔ Firebase (قاعدهٔ گوگل: ۶ تا ۳۰ نویسه، حرفِ کوچک، رقم و خط‌تیره) — جز این ⇒ هیچ درخواستی */
+const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
 /** سقفِ توکنِ فعالِ هر کس در هر برنامه — بیشتر ⇒ کهنه‌ترین‌ها کهنه (ثبتِ انبوهِ توکنِ ساختگی پوش را کند نمی‌کند) */
 const MAX_TOKENS_PER_USER = 10;
 
@@ -163,7 +168,7 @@ async function googleToken(sa) {
   const claim = b64url(JSON.stringify({
     iss: sa.client_email,
     scope: SCOPE,
-    aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
+    aud: tokenUrl(),
     iat,
     exp: iat + 3600,
   }));
@@ -172,7 +177,7 @@ async function googleToken(sa) {
   const signature = b64url(signer.sign(sa.private_key));
   const jwt = `${header}.${claim}.${signature}`;
 
-  const res = await fetch(sa.token_uri || 'https://oauth2.googleapis.com/token', {
+  const res = await fetch(tokenUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -384,6 +389,8 @@ function setDeliver(fn) { deliver = typeof fn === 'function' ? fn : null; }
  * واقعی، توکنِ گوگل و کنار گذاشتنِ توکنِ مرده بی شبکه سنجیده شود. ⛔ در کارِ عادی هیچ‌وقت صدا زده نمی‌شود.
  */
 let fcmOrigin = FCM_ORIGIN;
+/** گوگل در کارِ عادی؛ سرورِ ساختگیِ آزمون فقط وقتی [useFcmOrigin] صدا زده شده */
+function tokenUrl() { return fcmOrigin === FCM_ORIGIN ? GOOGLE_TOKEN_URL : `${fcmOrigin}/token`; }
 function useFcmOrigin(origin) {
   fcmOrigin = origin ? String(origin).replace(/\/+$/, '') : FCM_ORIGIN;
   accessToken = { token: '', expiresAt: 0 };
@@ -478,6 +485,7 @@ function fcmError(status, text) {
 }
 
 async function sendFcm(sa, fcmRows, message) {
+  if (!PROJECT_ID.test(String(sa.project_id || ''))) return { sent: 0, error: 'fcm_bad_project_id' };
   let bearer;
   try { bearer = await googleToken(sa); } catch (err) { return { sent: 0, error: err.message }; }
 
