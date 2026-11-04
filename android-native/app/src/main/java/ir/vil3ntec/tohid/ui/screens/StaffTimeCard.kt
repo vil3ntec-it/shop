@@ -47,7 +47,10 @@ data class StaffTimeUi(
   val periods: List<PeriodRow>,
   val commission: List<SellerRow>?,
   val unassigned: String?,
+  /** نرخ‌ها برای ویرایش — فقط صاحب (`null` ⇒ بی ویرایشگر) */
   val plan: Commission.Plan?,
+  /** دسته‌های کالا برای «نرخِ دسته» (STF-08) */
+  val categories: List<String> = emptyList(),
 )
 
 data class TeamRow(val memberId: String, val name: String, val worked: String, val open: Boolean)
@@ -112,36 +115,46 @@ fun StaffTimeCard(
         }
       }
       ui.unassigned?.let { StaffNote(StrStaffTime.unassigned(it)) }
-      ui.plan?.let { StaffRatesEditor(it, rows.map { r -> r.seller }, ui.busy, onSaveRates) }
+      ui.plan?.let { StaffRatesEditor(it, rows.map { r -> r.seller }, ui.categories, ui.busy, onSaveRates) }
     }
   }
 }
 
 @Composable
-private fun StaffRatesEditor(plan: Commission.Plan, sellers: List<String>, busy: Boolean, onSave: (Commission.Plan) -> Unit) {
+private fun StaffRatesEditor(plan: Commission.Plan, sellers: List<String>, categories: List<String>, busy: Boolean, onSave: (Commission.Plan) -> Unit) {
   var open by remember { mutableStateOf(false) }
   TextButton(onClick = { open = !open }) { Text(StrStaffTime.rates) }
-  if (open) StaffRatesFields(plan, sellers, busy, onSave)
+  if (open) StaffRatesFields(plan, sellers, categories, busy, onSave)
 }
 
 @Composable
-private fun StaffRatesFields(plan: Commission.Plan, sellers: List<String>, busy: Boolean, onSave: (Commission.Plan) -> Unit) {
+private fun StaffRatesFields(plan: Commission.Plan, sellers: List<String>, categories: List<String>, busy: Boolean, onSave: (Commission.Plan) -> Unit) {
   var all by remember(plan) { mutableStateOf(Commission.percentOf(plan.defaultBp)) }
-  val each = remember(plan, sellers) {
-    mutableStateMapOf<String, String>().apply { sellers.forEach { s -> plan.sellerBp[s]?.let { put(s, Commission.percentOf(it)) } } }
-  }
+  fun fields(keys: List<String>, rates: Map<String, Int>) =
+    mutableStateMapOf<String, String>().apply { keys.forEach { k -> rates[k]?.let { put(k, Commission.percentOf(it)) } } }
+  val each = remember(plan, sellers) { fields(sellers, plan.sellerBp) }
+  val byCat = remember(plan, categories) { fields(categories, plan.categoryBp) }
   var invalid by remember { mutableStateOf(false) }
   Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
     StaffRate(StrStaffTime.defaultRate, all) { all = it }
     sellers.forEach { s -> StaffRate(StrStaffTime.sellerRate(s), each[s].orEmpty()) { each[s] = it } }
+    //  STF-08: نرخِ دسته بر نرخِ فروشنده و نرخِ همه پیشی دارد؛ کادرِ خالی ⇒ نرخِ فروشنده
+    if (categories.isNotEmpty()) StaffNote(StrStaffTime.categoryHint)
+    categories.forEach { c -> StaffRate(StrStaffTime.categoryRate(c), byCat[c].orEmpty()) { byCat[c] = it } }
     if (invalid) StaffNote(StrStaffTime.rateInvalid, warning = true)
     Button(enabled = !busy, onClick = {
       val def = Commission.bpOfPercent(all)
-      //  کادرِ خالی ⇒ همان نرخِ همه، نه صفر
-      val per = each.filterValues { it.isNotBlank() }.mapValues { Commission.bpOfPercent(it.value) }
-      if (def == null || per.values.any { it == null }) { invalid = true; return@Button }
+      //  کادرِ خالی ⇒ همان نرخِ همه (یا نرخِ فروشنده برای دسته)، نه صفر
+      fun parsed(m: Map<String, String>) = m.filterValues { it.isNotBlank() }.mapValues { Commission.bpOfPercent(it.value) }
+      val per = parsed(each)
+      val cat = parsed(byCat)
+      if (def == null || per.values.any { it == null } || cat.values.any { it == null }) { invalid = true; return@Button }
       invalid = false
-      onSave(Commission.Plan(def, plan.sellerBp.filterKeys { it !in sellers } + per.mapValues { it.value!! }, plan.categoryBp))
+      onSave(Commission.Plan(
+        def,
+        plan.sellerBp.filterKeys { it !in sellers } + per.mapValues { it.value!! },
+        plan.categoryBp.filterKeys { it !in categories } + cat.mapValues { it.value!! },
+      ))
     }) { Text(StrStaffTime.save) }
   }
 }

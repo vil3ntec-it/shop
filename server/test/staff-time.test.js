@@ -8,7 +8,7 @@
  *  • شاگرد فقط برای خودش می‌زند و فقط خودش را می‌بیند؛ صاحب برای او «خروجِ جاافتاده» را می‌زند؛
  *  • دو زدنِ هم‌زمانِ هم‌نوع ⇒ دقیقاً یکی؛
  *  • دکانِ دیگر عضوِ این دکان را نمی‌شناسد؛
- *  • نرخ‌های پورسانت: فقط صاحب و مدیر، پایه‌امتیازِ ۰ تا ۱۰٬۰۰۰، قفلِ نسخه.
+ *  • نرخ‌های پورسانت: دیدن صاحب و مدیر، نوشتن فقط صاحب؛ پایه‌امتیازِ ۰ تا ۱۰٬۰۰۰، قفلِ نسخه.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -166,4 +166,28 @@ test('نرخ‌های پورسانت: فقط صاحب و مدیر، پایه‌�
   }
   assert.equal((await h.get('/api/shop/staff-time/commission-plan', { token: owner.token })).body.version, 1);
   assert.equal((await h.get('/api/shop/staff-time/commission-plan', { token: other.token })).body.version, 0, 'دکانِ دیگر جداست');
+});
+
+//  ⛔ STF-08 (gaps26): مدیر با `settings.write` نرخِ همه یا نرخِ نامِ خودش را تا ۱۰۰٪ بالا می‌برد و پورسانتِ خودش را
+//  می‌ساخت — نرخ دستمزد است، نه تنظیمِ دکان. پیش از درمان این آزمون سرخ بود (۲۰۰ و نسخهٔ تازه).
+test('پورسانت: مدیر نرخ‌ها را می‌بیند ولی نمی‌نویسد — نرخِ خودش را بالا نمی‌برد؛ فقط صاحب', async () => {
+  const code = (await h.post('/api/shop/invite', { role: 'manager' }, { token: owner.token })).body.code;
+  const m = await h.post('/api/auth/staff-login', { code, name: 'مدیر', device: { uid: `st-mgr-${Date.now()}`, name: 'گوشی', platform: 'android' } });
+  assert.equal(m.status, 201, JSON.stringify(m.body));
+  const mgr = { token: m.body.accessToken };
+  const cur = await h.get('/api/shop/staff-time/commission-plan', { token: mgr.token });
+  assert.equal(cur.status, 200, 'مدیر نرخ‌ها را می‌بیند');
+  for (const body of [
+    { version: cur.body.version, defaultBp: 10000 },
+    { version: cur.body.version, defaultBp: cur.body.defaultBp, sellerBp: { ...cur.body.sellerBp, 'مدیر': 10000 } },
+  ]) {
+    const r = await h.put('/api/shop/staff-time/commission-plan', body, { token: mgr.token });
+    assert.equal(r.status, 403, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'permission_denied');
+  }
+  const after = await h.get('/api/shop/staff-time/commission-plan', { token: owner.token });
+  assert.equal(after.body.version, cur.body.version);
+  assert.equal(after.body.defaultBp, cur.body.defaultBp);
+  const w = await h.put('/api/shop/staff-time/commission-plan', { version: cur.body.version, defaultBp: 150 }, { token: owner.token });
+  assert.equal(w.status, 200, JSON.stringify(w.body));
 });

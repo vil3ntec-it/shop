@@ -102,8 +102,9 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
 
   //  همان فاکتورهای «فروشنده‌ها»ی این ماه (`ReportEngine.bySeller`)، ولی فاکتورِ بی فروشنده جدا می‌ماند و
   //  برگشتِ این ماه از فروشندهٔ فاکتورِ اصل کم می‌شود (STF-08)
-  val result = if (!manager) null else plan?.let { p ->
-    Commission.compute(StaffReport.commissionLines(d, monthFrom, today), p.plan, Currency.AFN)
+  //  برگشتِ این ماه از فروشندهٔ فاکتورِ اصل کم می‌شود و «نرخِ دسته» روی دستهٔ کالای هر قلم است (STF-08)؛ یک بار برای هر دفتر و نرخ
+  val result = remember(d, plan, monthFrom, today, manager) {
+    if (!manager) null else plan?.let { p -> Commission.compute(StaffReport.commissionLines(d, monthFrom, today), p.plan, Currency.AFN) }
   }
   val periods = if (!manager) emptyList() else StaffReport.periods(spans, today, monthFrom)
 
@@ -153,7 +154,9 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
       },
       commission = result?.sellers?.sortedByDescending { it.commission.minor }?.map { SellerRow(it.sellerId, money(it.base.minor / 100.0), "${money(it.commission.minor / 100.0)} ؋") },
       unassigned = result?.unassignedBase?.takeIf { it.minor != 0L }?.let { "${money(it.minor / 100.0)} ؋" },
-      plan = if (manager) plan?.plan else null,
+      //  ویرایشِ نرخ فقط صاحب (سرور: `members.role`)؛ مدیر پورسانت را می‌بیند ولی نرخِ خودش را نمی‌سازد
+      plan = if (c.role == "owner") plan?.plan else null,
+      categories = if (c.role == "owner") commissionCategories(d, plan?.plan) else emptyList(),
     ),
     onPunch = { punch(null, if (myOpen != null) TimeClock.Kind.OUT else TimeClock.Kind.IN) },
     onClockOutFor = { row -> punch(row.memberId, TimeClock.Kind.OUT) },
@@ -170,6 +173,10 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
     },
   )
 }
+
+/** دسته‌های «نرخِ دسته» (STF-08): دسته‌های کالای دفتر به‌علاوهٔ دسته‌هایی که نرخ دارند، بی تکرار و مرتب */
+private fun commissionCategories(d: ShopData, plan: Commission.Plan?): List<String> =
+  (d.products.map { it.category.trim() } + plan?.categoryBp?.keys.orEmpty()).filter { it.isNotEmpty() }.distinct().sorted()
 
 /**
  *  نوبت‌های ۳۳ روزِ گذشته — آغازِ ماهِ جاری (حداکثر ۳۱ روز) و «۷ روزِ گذشته» (STF-07) هر دو در آن‌اند، و نوبتِ
