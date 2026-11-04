@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.Platform
@@ -90,7 +91,7 @@ fun ClockSkewNotice() {
 @Composable
 fun UpdateNotice() {
   //  ⛔ نسخهٔ کافه‌بازار فقط از بازار به‌روز می‌شود
-  if (BuildConfig.STORE == "bazaar") return
+  if (StoreChannel.storeManaged(BuildConfig.STORE)) return
   val context = LocalContext.current
   val nav = LocalV3Nav.current
   LaunchedEffect(Unit) {

@@ -103,7 +103,8 @@ object SettingsSearchIndex {
     L.LOOK to kw("ظاهر رنگ تم زبان تاریخ رقم", "look theme colour language date digits", "بڼه رنګ ژبه نېټه شمېرې"),
     FEATURES_KEY to kw("قابلیت امکانات ماژول افزونه", "features modules add-ons", "ځانګړنې ماډلونه"),
     //  دکان و امنیت
-    L.PROFILE to kw("حساب پروفایل نام دکان عکس", "account profile shop name photo", "حساب پروفایل د دوکان نوم"),
+    //  «حذفِ حساب» (قاعدهٔ Google Play) پایینِ همین صفحه است — جست‌وجوی «حذف حساب» به آن می‌برد
+    L.PROFILE to kw("حساب پروفایل نام دکان عکس حذف حساب پاک کردن حساب", "account profile shop name photo delete account", "حساب پروفایل د دوکان نوم حساب ړنګول"),
     "هشدارها" to kw("هشدار اعلان قرض سقف", "alerts notifications debt limit", "خبرتیا اعلان پور"),
     "قفل برنامه" to kw("قفل رمز پین اثر انگشت", "app lock pin passcode fingerprint", "قلف پټنوم پین ګوته"),
     "کد شاگرد" to kw("کد شاگرد کارمند ورود", "staff code employee login", "د شاګرد کوډ کارکوونکی"),
@@ -169,7 +170,7 @@ object SettingsSearchIndex {
     //  داده و پشتیبان
     "همگام‌سازی" to kw("همگام‌سازی سینک سرور", "sync server", "همغږي"),
     "داده‌ها" to kw("پشتیبان بک‌آپ بازگردانی", "backup restore", "بیک اپ بېرته راوستل"),
-    L.ABOUT_APP to kw("نسخه به‌روزرسانی آپدیت", "version update", "نسخه تازه کول"),
+    L.ABOUT_APP to kw("نسخه به‌روزرسانی آپدیت حریم خصوصی", "version update privacy policy", "نسخه تازه کول محرمیت"),
     L.CHAT_GUARD to kw("گفت‌وگو چت جا", "chat storage", "خبرې اترې"),
     L.WHATS_NEW to kw("تازه‌ها چه چیزی تازه است تغییرها به‌روزرسانی", "what's new changes update", "څه نوي دي بدلونونه"),
     L.SERVERS to kw("سرور دیگر شبکه دکان خانه نشانی", "server other network address home", "سرور شبکه پته"),

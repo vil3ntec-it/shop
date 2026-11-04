@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.model.AccountDeletionDto
 import ir.vil3ntec.tohid.core.model.DeviceDto
 import ir.vil3ntec.tohid.core.model.DevicesDto
 import ir.vil3ntec.tohid.core.model.MeDto
@@ -55,6 +56,21 @@ class AccountRepository(private val api: ApiClient) {
    */
   suspend fun requestPhoneCode(phone: String): ApiResult<Unit> = result {
     api.post(ApiEndpoints.Me.PHONE_CODE, buildJsonObject { put("phone", JsonPrimitive(phone.trim())) })
+    Unit
+  }
+
+  /* ------------------------------ حذفِ حساب ------------------------------ */
+
+  /** پیش‌نمایشِ «حذفِ حساب»، بی نوشتن — پرچم، سدِ پمپ، نشانیِ تأیید و دکان‌هایی که می‌روند */
+  suspend fun deletionInfo(): ApiResult<AccountDeletionDto> =
+    result { ApiJson.decode<AccountDeletionDto>(api.get(ApiEndpoints.Me.ACCOUNT_DELETION)) }
+
+  /**
+   *  حذفِ همیشگیِ حساب روی سرور (همان `lib/user-delete.js` ِ پنلِ مدیر). ۴۰۳ `reauth_required` را خودِ
+   *  `ApiClient` با پنجرهٔ رمز (`ReauthGate`) جواب می‌دهد و یک بار دوباره می‌فرستد.
+   */
+  suspend fun deleteAccount(confirm: String): ApiResult<Unit> = result {
+    api.post(ApiEndpoints.Me.ACCOUNT_DELETION, buildJsonObject { put("confirm", JsonPrimitive(confirm.trim())) })
     Unit
   }
 

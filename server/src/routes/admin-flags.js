@@ -36,6 +36,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.chat', scope: 'shop', default: false, what: 'گفت‌وگو با مشتری' },
   { key: 'shop.image_bank', scope: 'shop', default: false, what: 'بانکِ تصاویرِ دکان' },
   { key: 'image_bank.central', scope: 'all', default: false, what: 'پنلِ بانکِ تصاویرِ مدیر' },
+  { key: 'account.self_delete', scope: 'all', default: false, what: 'حذفِ حساب به دستِ خودِ کاربر در برنامه و پورتال (Google Play)' },
   { key: 'hashchain.audit', scope: 'security', default: false, what: 'زنجیرهٔ هشِ سابقه' },
   { key: 'beta.shops', scope: 'release', default: [], what: 'دکان‌های کانالِ آزمایشی' },
   { key: 'beta.devices', scope: 'release', default: [], what: 'دستگاه‌های کانالِ آزمایشی' },

@@ -739,6 +739,7 @@
 | `shop.promo_uses` | دکان / `all` | خاموش | دفترِ مصرفِ کدِ تخفیف (PRM-02، مهاجرتِ ۱۳۶): `maxUses` پذیرفته، `POST /api/shop/promos/redeem` و `/redeem/release` (خاموش ⇒ ۴۰۳ `promo_uses_disabled`)، `uses` از دفتر؛ برنامه از `redeem` ِ `GET /api/shop/promos` می‌خواند. ⚠️ پیش از روشن کردن همهٔ دستگاه‌های دکان باید نسخه‌ای باشند که پیش از ثبتِ فاکتور redeem می‌زنند (`PromoLive.redeemGate`)؛ نسخهٔ قدیم کدِ سقف‌دار را بی شمارش می‌پذیرد | #450 (سرور)، برنامه در PRِ پشتِ آن | باز |
 | `shop.promo_expiry` | دکان / `all` | خاموش | نوعِ قاعدهٔ «تخفیفِ نزدیکِ انقضا» (`kind: 'expiry'`، `bp` و `nearDays` ۱ تا ۳۶۵؛ PRM-10): خاموش ⇒ `PUT /api/shop/promos/rules/:id` ِ چنین قاعده‌ای ۴۰۳ `expiry_promo_disabled` و `GET /api/shop/promos` بی کلیدِ `expiry` (همان پاسخِ پیشین)؛ روشن ⇒ `expiry: true` و فرمِ برنامه این نوع را نشان می‌دهد. حساب فقط در صندوقِ برنامه: محموله‌ها به FEFO از `ExpiryEngine.lots` (`PromoEngine.lines`)، منقضی بی تخفیف؛ وب و ویترین محموله ندارند ⇒ هیچ (ویترین فهرستش هم نمی‌کند). برنامهٔ پیشین چنین قاعده‌ای را نامعتبر می‌بیند و نادیده می‌گیرد ⇒ پیش از روشن کردن همهٔ دستگاه‌های دکان تازه شوند | `claude/prm10-expiry-promo` | باز |
 | `shop.loyalty_rule` | دکان / `all` | خاموش | PRM-13، قاعدهٔ یکسانِ امتیازِ وفاداری برای همهٔ دستگاه‌های دکان (`lib/loyalty-rule.js`، مهاجرتِ ۲۰۲ `shop_loyalty_rules`): `GET /api/shop/loyalty` (خاموش ⇒ فقط `{enabled:false}`) و `PUT` (خاموش ⇒ ۴۰۳ `loyalty_rule_disabled`؛ فقط صاحب/مدیر با `settings.write`، هر عدد صحیح و در بازهٔ `Loyalty.Rule.valid`، `expectedVersion` ⇒ ۴۰۹). برنامه (`LoyaltyShop`، `LoyaltyRules.resolve`): قاعدهٔ ذخیره‌شدهٔ دکان (روشن/خاموش، قاعده، انقضا) بر تنظیمِ دستگاه (`LoyaltyPref`) برتر؛ بی‌اینترنت آخرین پاسخِ همان دکان، هرگز‌گرفته‌نشده یا `{enabled:false}` ⇒ قاعدهٔ دستگاه. با `shop.storefront.account_history` و قاعدهٔ روشن، «حسابِ من» کلیدِ `loyalty` (`points`، `tier`، `soon`، `soonAt`) را از ردیف‌های همگام‌شدهٔ `loyalty_*` ِ همان شماره (تطبیقِ دقیق) با انقضای FIFO ِ `lib/loyalty-balance.js` (همان `Loyalty.state`) می‌دهد؛ بی آن بایت‌به‌بایت همان پیشین | `claude/loyalty-complete` | باز |
+| `account.self_delete` | فقط `all` | خاموش | «حذفِ حساب» به دستِ خودِ کاربر (Google Play): `POST /api/me/account/deletion` و `POST /api/portal/account/deletion` (خاموش ⇒ ۴۰۳ `self_delete_disabled`؛ `GET` همیشه پیش‌نمایش با `enabled`)؛ برنامه و پورتال در خاموشی «درخواست از پشتیبانی» را می‌دهند. حذف همان `lib/user-delete.js`؛ تأییدِ دوباره در هر بخش و نوشتنِ نشانیِ حساب؛ حسابِ پمپ‌دار ⇒ ۴۰۹ `has_pump` | `claude/play-readiness` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `app.multi_server` = بخشِ «سرورها» و پروفایلِ سرور (خاموش ⇒ فقط نشانیِ
 زمانِ ساخت، بی‌کم‌وکاست؛ بخشِ «🌐 هر سرور»)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
@@ -3003,6 +3004,22 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
 - ⚠️ مانده برای صاحب: کلیدِ امضا (کلیدِ داخلِ مخزن یا کلیدِ تازه — انتخابِ اولین
   بارگذاری در بازار همیشگی است)، متغیرِ `TOHID_LICENSE_PUBLIC_KEY` در گیت‌هاب، و راهِ
   پرداخت در بازار (پولکی) یا نسخهٔ بی‌خرید.
+
+## 📲 نسخهٔ Google Play (از ۱۴۰۵/۰۸/۱۳، نسخه 2.14.5)
+
+چک‌لیستِ کاملِ صاحب‌کار (کنسول، فرمِ ایمنیِ داده، متن‌ها، منبع‌ها): `docs/GOOGLE-PLAY-fa.md`.
+
+- ⛔ **`-Pstore=play`** همان قاعدهٔ بازار است (`StoreChannel.storeManaged` ِ core: بی `REQUEST_INSTALL_PACKAGES`، بی
+  به‌روزرسانیِ داخلی، بی خرید با واتساپ) و فقط همین نسخه `compileSdk`/`targetSdk` ِ ۳۶ دارد (قاعدهٔ Play از ۳۱ اوت ۲۰۲۶).
+  APK ِ سایت و بازار روی ۳۵ می‌مانند. شرطِ تازهٔ فروشگاه‌محور = `StoreChannel.storeManaged(BuildConfig.STORE)`، نه `== "bazaar"`.
+- CI: کارِ جدای «نسخهٔ Google Play (AAB)» در `tohid-native.yml` — `bundleRelease -Pstore=play` و `tools/play-check.py`
+  (targetSdk ≥ ۳۶، بی اجازهٔ نصب، LOAD ِ ۱۶KB برای `.so` ِ ۶۴بیتی)؛ AAB فقط artifact است (`MyShop-Play`)، نه انتشار.
+- ⛔ **حذفِ حساب** (قاعدهٔ Play): برنامه «حساب من ← ویرایش ← حذفِ حساب» (`profile/delete`، `DeleteAccountSheet`)، وب
+  `/portal/#delete-account`، و `privacy.html#delete-account` (نشانیِ Play Console؛ `server/test/self-delete.test.js` می‌سنجد).
+  سرور `routes/account-deletion.js` + `lib/self-delete.js` روی همان `lib/user-delete.js`؛ پرچمِ `account.self_delete` پیش‌فرض
+  خاموش ⇒ «درخواست از پشتیبانی». پیوندِ «حریمِ خصوصی» در «درباره برنامه» و «ویرایش حساب».
+- ⚠️ کلیدِ `android-native/app/tohid-release.jks` در مخزنِ عمومی است؛ برای Play کلیدِ بارگذاریِ تازه (Play App Signing)،
+  نه این کلید. تصمیمِ صاحب‌کار در `docs/GOOGLE-PLAY-fa.md`.
 
 ## 🔑 کدِ اشتراکِ آفلاینِ «فروشگاه من» — بسته به یک کامپیوتر، یک بار (از ۱۴۰۵/۰۷/۲۰، نسخه 2.12.1)
 

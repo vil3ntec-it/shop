@@ -25,7 +25,8 @@ android {
   val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
 
   /*
-   *  کدام فروشگاه — `-Pstore=bazaar` نسخهٔ کافه‌بازار را می‌سازد.
+   *  کدام فروشگاه — `-Pstore=bazaar` نسخهٔ کافه‌بازار را می‌سازد و `-Pstore=play` نسخهٔ Google Play را
+   *  (همان قاعده‌های بازار، به‌اضافهٔ targetSdk ِ لازمِ Play؛ پایین‌تر). چک‌لیست: `docs/GOOGLE-PLAY-fa.md`.
    *
    *  ⛔ قانونِ بازار: «برنامه‌ای که از بازار گرفته شده فقط از بازار به‌روز
    *  می‌شود» و لینکِ پرداختِ بیرونی ممنوع است. پس نسخهٔ بازار:
@@ -36,7 +37,16 @@ android {
    *  بی این پرچم ⇒ «direct»: همان APKِ سایت و گیت‌هاب، مثلِ همیشه.
    */
   val store = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
-  if (store == "bazaar") {
+  //  همان `StoreChannel.storeManaged` ِ core: فروشگاهی که به‌روزرسانی و پرداخت را خودش می‌گرداند
+  val storeManaged = store == "bazaar" || store == "play"
+  /*
+   *  ⛔ Google Play: از ۳۱ اوت ۲۰۲۶ هر برنامهٔ تازه و هر به‌روزرسانی باید Android 16 (API 36) را هدف بگیرد
+   *  (developer.android.com/google/play/requirements/target-sdk). فقط نسخهٔ Play بالا می‌رود تا APK ِ سایت و
+   *  بازار — که روی گوشیِ دکان‌ها نصب است — بیت‌به‌بیت همان بماند؛ رفتارِ برگشتِ پیش‌نمای اندروید ۱۶ همان
+   *  است که نسخهٔ پیش‌نمایش از پیش دارد (`src/preview/AndroidManifest.xml`).
+   */
+  if (store == "play") compileSdk = 36
+  if (storeManaged) {
     val source = file("src/main/AndroidManifest.xml")
     val stripped = layout.buildDirectory.file("store-manifest/AndroidManifest.xml").get().asFile
     stripped.parentFile.mkdirs()
@@ -125,7 +135,7 @@ android {
     // سرِ جایشان می‌مانند تا وارد شوند.
     applicationId = "ir.vil3ntec.tohid"
     minSdk = 24
-    targetSdk = 35
+    targetSdk = if (store == "play") 36 else 35
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
     buildConfigField("String", "STORE", "\"$store\"")
