@@ -17,6 +17,10 @@
  * ⛔ رسانه‌ای که sha256 ِ بایت‌هایش با برچسبش نخواند، یا گفت‌وگویش نیست، نوشته
  *    نمی‌شود و در گزارش می‌آید — فایلِ دست‌خورده رابطهٔ غلط نمی‌سازد.
  * ⛔ دکانی که در دیتابیسِ مقصد نیست ⇒ خطا و هیچ ردیف (اول پشتیبانِ اصلی برگردد).
+ * ⛔ SEC-10: گفت‌وگویی که در مقصد با «حذفِ دادهٔ مشتری» بی‌نام شده (`erased:`) ولی در فایل هنوز
+ *    نام‌دار است (پشتیبانِ پیش از حذف) زنده نمی‌شود: پیام، «حذف برای من»، گزارش و سنجاقش نوشته
+ *    نمی‌شوند (`erased` = شمارِ ردیف‌های کنارگذاشته) و رسانه‌ای که هیچ پیامِ مقصد به آن اشاره ندارد
+ *    هم نه (`report.erased`). پشتیبانِ پس از حذف همان سنگِ قبرها را برمی‌گرداند.
  * ⛔ رمز: همان `BACKUP_PASSPHRASE` و همان قالبِ `lib/backup.js` (SHOPBK1،
  *    AES-256-GCM، scrypt)؛ خواندن با همان `backup.decode`. بی رمز ⇒ همان هشدارِ F0-08.
  * ⛔ متنِ پیام در لاگ نوشته نمی‌شود؛ فقط شمارها.
@@ -28,6 +32,7 @@ const { createCipheriv, createHash, randomBytes, scryptSync } = require('crypto'
 const config = require('../config');
 const { many, one, tx } = require('../db');
 const backup = require('./backup');
+const { ERASED_PREFIX } = require('./customer-erasure');
 
 const MESSAGES_FORMAT = 'shop-chat-messages';
 const MEDIA_FORMAT = 'shop-chat-media';
@@ -176,16 +181,36 @@ async function restoreMessages(file) {
     }
   }
   const restored = {};
+  let erased = 0;
   await tx(async (c) => {
     const run = (s, p) => c.query(s, p);
+    const gone = await erasedSince(c, convs);
+    const convOfMessage = new Map((doc.tables.shop_chat_messages || []).map((m) => [m.id, m.conversation_id]));
+    const convOf = (t, row) => (t.name === 'shop_chat_conversations' ? row.id
+      : t.viaMessage ? convOfMessage.get(row.message_id) : row.conversation_id);
     for (const t of TABLES) {
-      const rows = doc.tables[t.name];
-      if (!rows) continue;
+      const all = doc.tables[t.name];
+      if (!all) continue;
+      const rows = gone.size ? all.filter((row) => !gone.has(convOf(t, row))) : all;
+      erased += all.length - rows.length;
       if (t.optional && !(await tableExists(t.name, run))) { restored[t.name] = 0; continue; }
       restored[t.name] = await insertRows(c, t.name, rows, await columnsOf(t.name, run));
     }
   });
-  return { restored, media: (doc.media || []).length };
+  return { restored, erased, media: (doc.media || []).length };
+}
+
+const isErased = (phone) => String(phone || '').startsWith(ERASED_PREFIX);
+
+/** گفت‌وگوهای فایل که در مقصد حذف‌شده‌اند ولی در فایل هنوز نه — یعنی پشتیبان پیش از حذف است. */
+async function erasedSince(c, convs) {
+  const named = convs.filter((cv) => cv && cv.id && !isErased(cv.customer_phone)).map((cv) => String(cv.id));
+  if (!named.length) return new Set();
+  const r = await c.query(
+    'SELECT id FROM shop_chat_conversations WHERE id = ANY($1::text[]) AND customer_phone LIKE $2',
+    [named, `${ERASED_PREFIX}%`]
+  );
+  return new Set(r.rows.map((x) => x.id));
 }
 
 /**
@@ -198,14 +223,19 @@ async function restoreMedia(file) {
   try { head = JSON.parse(lines.shift() || '{}'); } catch (err) { if (!(err instanceof SyntaxError)) throw err; }
   if (!head || head.format !== MEDIA_FORMAT || head.version !== VERSION) throw new Error('این فایل پشتیبانِ رسانهٔ چت نیست');
   const cols = await columnsOf('shop_chat_media');
-  const report = { restored: 0, existing: 0, corrupt: [], noConversation: [] };
+  const report = { restored: 0, existing: 0, corrupt: [], noConversation: [], erased: [] };
   await tx(async (c) => {
     for (const line of lines) {
       const m = JSON.parse(line);
       const data = Buffer.from(String(m.data || ''), 'base64');
       if (sha256(data) !== m.sha256 || data.length !== Number(m.size)) { report.corrupt.push(m.id); continue; }
-      const conv = (await c.query('SELECT 1 AS x FROM shop_chat_conversations WHERE id=$1 AND shop_id=$2', [m.conversation_id, m.shop_id])).rows[0];
+      const conv = (await c.query('SELECT customer_phone FROM shop_chat_conversations WHERE id=$1 AND shop_id=$2', [m.conversation_id, m.shop_id])).rows[0];
       if (!conv) { report.noConversation.push(m.id); continue; }
+      //  SEC-10: گفت‌وگوی حذف‌شده فقط رسانه‌ای را پس می‌گیرد که پیامِ زندهٔ مقصد هنوز به آن اشاره دارد
+      if (isErased(conv.customer_phone) && !(await c.query(
+        'SELECT 1 AS x FROM shop_chat_messages WHERE conversation_id=$1 AND (media_id=$2 OR thumb_id=$2) LIMIT 1',
+        [m.conversation_id, m.id]
+      )).rows[0]) { report.erased.push(m.id); continue; }
       const n = await insertRows(c, 'shop_chat_media', [{ ...m, data }], cols);
       if (n) report.restored += 1; else report.existing += 1;
     }
