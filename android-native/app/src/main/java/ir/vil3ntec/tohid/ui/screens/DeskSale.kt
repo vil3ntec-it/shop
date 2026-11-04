@@ -270,22 +270,10 @@ fun DeskSaleScreen(
   fun add(product: Product, count: Double) =
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, product.id)))
 
-  /**
-   *  PRD-04/S05: بارکدِ بسته ⇒ اندازهٔ بسته × [count]؛ با «واحدِ بزرگ در صندوق» (`TillGoodsPref.units`) قیمتِ لیستِ همان بسته
-   *  (`PackScan`، همان صندوقِ گوشی). `false` ⇒ کد بارکدِ بسته نیست (راهِ همیشگی).
-   */
+  /** PRD-04/S05: بارکدِ بسته ⇒ اندازهٔ بسته × [count]، با «واحدِ بزرگ در صندوق» قیمتِ لیستِ بسته (`PackScan`، همان گوشی)؛ `false` ⇒ بسته نیست */
   fun addPack(code: String, count: Double, dd: ShopData, items: Map<String, String>): Boolean {
-    val r = ir.vil3ntec.tohid.data.PackScan.scan(
-      dd, cartStore.lines.value, code, count, items,
-      ir.vil3ntec.tohid.data.TillGoodsPref.units(context), ir.vil3ntec.tohid.data.TillGoodsPref.wholePacks(context),
-    ) ?: return false
-    when (r) {
-      is ir.vil3ntec.tohid.data.PackScan.Result.Added -> applyAdded(r.product, r.added)
-      is ir.vil3ntec.tohid.data.PackScan.Result.Inactive -> toast(StrSale.inactive(r.product.name))
-      is ir.vil3ntec.tohid.data.PackScan.Result.Ambiguous -> { ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(r.code)) }
-      is ir.vil3ntec.tohid.data.PackScan.Result.PartRejected -> { ScanFeedback.unknown(context); toast(StrSale.partPackRejected(r.pack.name)) }
-      is ir.vil3ntec.tohid.data.PackScan.Result.Clash -> { ScanFeedback.unknown(context); toast(StrSale.packPriceClash(r.product.name, r.pack.name)) }
-    }
+    val r = ir.vil3ntec.tohid.data.PackScan.scan(dd, cartStore.lines.value, code, count, items, ir.vil3ntec.tohid.data.TillGoodsPref.units(context), ir.vil3ntec.tohid.data.TillGoodsPref.wholePacks(context)) ?: return false
+    if (r is ir.vil3ntec.tohid.data.PackScan.Result.Added) applyAdded(r.product, r.added) else { ScanFeedback.unknown(context); toast(ir.vil3ntec.tohid.data.PackScan.refusal(r)) }
     return true
   }
 

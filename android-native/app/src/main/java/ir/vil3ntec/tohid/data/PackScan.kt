@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.core.product.UnitSale
 import kotlin.math.abs
@@ -72,6 +73,15 @@ object PackScan {
     val added = SalesEngine.addToCartCapped(lines, p.id, qty, ProductInfoMap.sellable(d, p.id))
     if (price == null || added.cart === lines) return Result.Added(added, p, hit.pack, count, priced = false)
     return Result.Added(added.copy(cart = SalesEngine.setLinePrice(added.cart, p.id, price)), p, hit.pack, count, priced = true)
+  }
+
+  /** پیامِ ردِ اسکنِ بسته (هر نتیجه‌ای جز [Result.Added]) — همان جمله‌های صندوقِ گوشی (`CartFeedback`) */
+  fun refusal(r: Result): String = when (r) {
+    is Result.Added -> ""
+    is Result.Inactive -> StrSale.inactive(r.product.name)
+    is Result.Ambiguous -> StrSale.ambiguousBarcode(r.code)
+    is Result.PartRejected -> StrSale.partPackRejected(r.pack.name)
+    is Result.Clash -> StrSale.packPriceClash(r.product.name, r.pack.name)
   }
 
   /**

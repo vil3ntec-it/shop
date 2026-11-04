@@ -96,6 +96,10 @@ class PackScanTest {
     assertEquals(listOf(CartLine("oil", 13.0)), added(CartModel.scan(d, index, single, "6260000000118")).lines)
     I18n.source = { Lang.FA }
     assertTrue(ir.vil3ntec.tohid.core.i18n.StrSale.packPriceClash("روغن", "کارتن").contains("به سبد نرفت"))
+    //  کامپیوتر همان جمله را از `PackScan.refusal` می‌گیرد
+    val carton = ShopStore.coreOf(oil.packs!!.first())
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrSale.packPriceClash("روغن", "کارتن"), PackScan.refusal(PackScan.Result.Clash(oil, carton)))
+    assertTrue(PackScan.refusal(PackScan.Result.Ambiguous("6260000000118")).contains("6260000000118"))
   }
 
   @Test
