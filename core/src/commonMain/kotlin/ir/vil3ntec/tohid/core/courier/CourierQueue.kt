@@ -140,6 +140,31 @@ data class QueueState(
   val rejected: List<RejectedEvent> = emptyList(),
 )
 
+/**
+ *  متنِ فارسیِ خطاهای ورودیِ صف (پیامِ [CourierInputError]). صفحهٔ پیک با همین ثابت‌ها نوشتهٔ همان زبان را از
+ *  جدولِ `StrCourierApp` می‌گیرد تا دری، انگلیسی و پشتو هم ببینند؛ فارسی همین است، بایت‌به‌بایت.
+ */
+object CourierInputText {
+  const val BAD_EVENT_ID = "شناسهٔ رویداد نامعتبر است"
+  const val NO_MISSION = "مأموریت پیدا نشد"
+  const val NOT_COURIER = "این کار با پیک نیست"
+  const val BAD_TRANSITION = "این تغییرِ وضعیت مجاز نیست"
+  const val QUEUE_FULL = "صفِ رویدادها پر است؛ اول به اینترنت وصل شوید"
+  const val REASON_REQUIRED = "دلیل لازم است"
+  const val BAD_REASON = "دلیل معتبر نیست"
+  const val NOTE_REQUIRED = "توضیح لازم است"
+  const val BAD_CASH = "مبلغِ گرفته‌شده معتبر نیست"
+  const val BAD_CASH_REASON = "دلیلِ اختلافِ نقد معتبر نیست"
+  const val BAD_BAGS = "برچسب‌های کیسه معتبر نیستند"
+  const val BAD_POSITION = "موقعیت معتبر نیست"
+  const val KEY_REUSED = "این شناسه در صف هست"
+
+  val ALL: List<String> = listOf(
+    BAD_EVENT_ID, NO_MISSION, NOT_COURIER, BAD_TRANSITION, QUEUE_FULL, REASON_REQUIRED, BAD_REASON, NOTE_REQUIRED,
+    BAD_CASH, BAD_CASH_REASON, BAD_BAGS, BAD_POSITION, KEY_REUSED,
+  )
+}
+
 /** ورودیِ نادرست — پیش از رفتن به صف رد می‌شود، نه بعد از رسیدن به سرور */
 class CourierInputError(val code: String, message: String) : IllegalArgumentException(message)
 
@@ -179,36 +204,36 @@ object CourierQueue {
     bags: List<String> = emptyList(),
     position: CourierChecks.Point? = null,
   ): Pair<QueueState, CourierEvent> {
-    if (!EVENT_ID.matches(eventId)) throw CourierInputError("bad_event_id", "شناسهٔ رویداد نامعتبر است")
-    if (assignmentId.isBlank()) throw CourierInputError("assignment_not_found", "مأموریت پیدا نشد")
-    if (type !in CourierFlow.COURIER_TARGETS) throw CourierInputError("bad_event_type", "این کار با پیک نیست")
+    if (!EVENT_ID.matches(eventId)) throw CourierInputError("bad_event_id", CourierInputText.BAD_EVENT_ID)
+    if (assignmentId.isBlank()) throw CourierInputError("assignment_not_found", CourierInputText.NO_MISSION)
+    if (type !in CourierFlow.COURIER_TARGETS) throw CourierInputError("bad_event_type", CourierInputText.NOT_COURIER)
     if (from.isNotEmpty() && !CourierFlow.canSend(from, type)) {
-      throw CourierInputError("invalid_transition", "این تغییرِ وضعیت مجاز نیست")
+      throw CourierInputError("invalid_transition", CourierInputText.BAD_TRANSITION)
     }
-    if (state.pending.size >= MAX_PENDING) throw CourierInputError("queue_full", "صفِ رویدادها پر است؛ اول به اینترنت وصل شوید")
+    if (state.pending.size >= MAX_PENDING) throw CourierInputError("queue_full", CourierInputText.QUEUE_FULL)
     val cleanReason = reason.trim()
     val cleanNote = note.trim().take(MAX_NOTE)
     if (type in setOf("rejected", "failed")) {
-      if (cleanReason.isEmpty()) throw CourierInputError("reason_required", "دلیل لازم است")
-      if (cleanReason !in CourierFlow.reasonsFor(type)) throw CourierInputError("bad_reason", "دلیل معتبر نیست")
-      if (cleanReason == "other" && cleanNote.isEmpty()) throw CourierInputError("note_required", "توضیح لازم است")
+      if (cleanReason.isEmpty()) throw CourierInputError("reason_required", CourierInputText.REASON_REQUIRED)
+      if (cleanReason !in CourierFlow.reasonsFor(type)) throw CourierInputError("bad_reason", CourierInputText.BAD_REASON)
+      if (cleanReason == "other" && cleanNote.isEmpty()) throw CourierInputError("note_required", CourierInputText.NOTE_REQUIRED)
     } else if (cleanReason.isNotEmpty() && !REASON.matches(cleanReason)) {
-      throw CourierInputError("bad_reason", "دلیل معتبر نیست")
+      throw CourierInputError("bad_reason", CourierInputText.BAD_REASON)
     }
     if (cashCollectedMinor != null && (cashCollectedMinor < 0 || cashCollectedMinor > MAX_MONEY_MINOR)) {
-      throw CourierInputError("bad_cash", "مبلغِ گرفته‌شده معتبر نیست")
+      throw CourierInputError("bad_cash", CourierInputText.BAD_CASH)
     }
     val cleanCashReason = cashReason.trim()
     if (cleanCashReason.isNotEmpty() && cleanCashReason !in CourierFlow.CASH_REASONS) {
-      throw CourierInputError("bad_reason", "دلیلِ اختلافِ نقد معتبر نیست")
+      throw CourierInputError("bad_reason", CourierInputText.BAD_CASH_REASON)
     }
     val cleanBags = if (type == "picked_up") bags.map { it.trim() } else emptyList()
-    if (cleanBags.size > MAX_BAGS || cleanBags.any { it.length > MAX_LABEL }) throw CourierInputError("bad_bags", "برچسب‌های کیسه معتبر نیستند")
+    if (cleanBags.size > MAX_BAGS || cleanBags.any { it.length > MAX_LABEL }) throw CourierInputError("bad_bags", CourierInputText.BAD_BAGS)
     val pos = if (type == "delivered") position else null
     if (pos != null && !(pos.lat.isFinite() && pos.lng.isFinite() && pos.lat in -90.0..90.0 && pos.lng in -180.0..180.0)) {
-      throw CourierInputError("bad_position", "موقعیت معتبر نیست")
+      throw CourierInputError("bad_position", CourierInputText.BAD_POSITION)
     }
-    if (state.pending.any { it.eventId == eventId }) throw CourierInputError("event_key_reused", "این شناسه در صف هست")
+    if (state.pending.any { it.eventId == eventId }) throw CourierInputError("event_key_reused", CourierInputText.KEY_REUSED)
     val ev = CourierEvent(
       eventId = eventId,
       assignmentId = assignmentId,
@@ -347,13 +372,18 @@ object MissionView {
    *  کارتِ «اول نشانه» (DLV-02، §۶.۱۸): خطِ اول نشانه (بی نشانه، نشانیِ متنی)،
    *  خطِ دوم «ناحیه · دروازهٔ رنگ»، خطِ سوم نشانیِ متنی وقتی نشانه هم هست.
    *  خطِ خالی نمی‌آید؛ پیک پیش از هر چیز چیزی را می‌بیند که از سرِ کوچه پیداست.
+   *  [areaLabel]/[gateLabel]: برچسبِ ناحیه و دروازه به زبانِ صفحه (`StrCourierApp.areaLine`/`gateLine`)؛ پیش‌فرض فارسی.
    */
-  fun landmarkFirst(card: MissionCard): List<String> {
+  fun landmarkFirst(
+    card: MissionCard,
+    areaLabel: (String) -> String = { "ناحیه: $it" },
+    gateLabel: (String) -> String = { "دروازهٔ $it" },
+  ): List<String> {
     val landmark = card.landmark.trim()
     val text = card.addressText.trim()
     val hint = listOf(
-      card.area.trim().takeIf { it.isNotEmpty() }?.let { "ناحیه: $it" },
-      card.gateColor.trim().takeIf { it.isNotEmpty() }?.let { "دروازهٔ $it" },
+      card.area.trim().takeIf { it.isNotEmpty() }?.let(areaLabel),
+      card.gateColor.trim().takeIf { it.isNotEmpty() }?.let(gateLabel),
     ).filterNotNull().joinToString(" · ")
     return listOf(landmark.ifEmpty { text }, hint, if (landmark.isNotEmpty()) text else "").filter { it.isNotEmpty() }
   }

@@ -125,6 +125,9 @@ object ApiEndpoints {
     /** AUTH-08: کدِ یک‌بارمصرف به شماره‌ای که به حساب افزوده می‌شود (پرچمِ سروریِ `auth.phone_add_code`) */
     const val PHONE_CODE = "/me/phone/code"
 
+    /** «حذفِ حساب» ِ خودِ کاربر: GET پیش‌نمایش، POST {confirm} حذف (پرچمِ سراسریِ `account.self_delete`) */
+    const val ACCOUNT_DELETION = "/me/account/deletion"
+
     /**
      *  تپشِ هر پانزده دقیقه — بندِ ۲۰.۷.
      *

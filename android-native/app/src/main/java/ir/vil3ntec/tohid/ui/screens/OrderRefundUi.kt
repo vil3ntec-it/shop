@@ -25,6 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.data.OrderFulfillment
@@ -44,9 +48,9 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 @Composable
 private fun RestockChecks(lines: List<Pair<Int, String>>, chosen: Set<Int>, onToggle: (Int) -> Unit) {
   val c = Shop.colors
-  Text("کالا به انبار برگشت؟", style = MaterialTheme.typography.labelLarge, color = c.muted)
+  Text(StrOrderPages.restockAsk, style = MaterialTheme.typography.labelLarge, color = c.muted)
   Text(
-    "فقط قلمی را بزنید که مشتری واقعاً پس آورد؛ بقیه پیشِ مشتری می‌ماند و موجودی دست نمی‌خورد.",
+    StrOrderPages.restockNote,
     style = MaterialTheme.typography.bodySmall, color = c.muted,
   )
   lines.forEach { (lineNo, name) ->
@@ -78,7 +82,7 @@ internal fun RestockDialog(
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("برگشتِ کالا — سفارش #${order.orderNo}", color = c.text) },
+    title = { Text(StrOrderPages.restockTitle(order.orderNo), color = c.text) },
     text = {
       Column(Modifier.verticalScroll(rememberScrollState())) {
         RestockChecks(lines, chosen) { n -> chosen = if (n in chosen) chosen - n else chosen + n }
@@ -86,10 +90,10 @@ internal fun RestockDialog(
     },
     confirmButton = {
       TextButton(onClick = { onConfirm(chosen) }, enabled = !busy) {
-        Text(if (chosen.isEmpty()) "هیچ کالایی برنگشت" else "به انبار برگرداند")
+        Text(if (chosen.isEmpty()) StrOrderPages.restockNone else StrOrderPages.restockDo)
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("بعداً") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(StrDevices.later) } },
   )
 }
 
@@ -100,9 +104,9 @@ internal fun RefundListNotices(ledger: ShopData, cfg: OrdersConfigDto, onOpen: (
   if (pending.isNotEmpty() && cfg.permissions.manage) {
     Spacer(Modifier.height(8.dp))
     FulfillNotice(
-      title = "${pending.size} سفارشِ بازپرداخت‌شده: کالا به انبار برگشت؟",
-      body = pending.take(3).joinToString("\n") { "سفارش #${it.orderNo ?: 0L} — فاکتور #${it.invoiceLabel() ?: "—"}" },
-      action = "بررسی",
+      title = StrOrderPages.restockPending(pending.size),
+      body = pending.take(3).joinToString("\n") { StrOrderPages.refundLine(it.orderNo ?: 0L, it.invoiceLabel() ?: "—") },
+      action = StrHome.actionCheck,
       onAction = { pending.first().orderId?.let(onOpen) },
     )
   }
@@ -110,9 +114,9 @@ internal fun RefundListNotices(ledger: ShopData, cfg: OrdersConfigDto, onOpen: (
   if (issues.isNotEmpty()) {
     Spacer(Modifier.height(8.dp))
     FulfillNotice(
-      title = "${issues.size} بازپرداخت هنوز در دفترِ دکان ننشسته — گزارش و صندوق تا آن‌وقت بیش از واقع",
+      title = StrOrderPages.refundUnposted(issues.size),
       body = issues.take(3).joinToString("\n") { it.message },
-      action = "دوباره",
+      action = Str.again,
       onAction = onRetry,
     )
   }
@@ -125,16 +129,16 @@ internal fun RefundDetailNotices(ledger: ShopData, cfg: OrdersConfigDto, o: Orde
     Spacer(Modifier.height(8.dp))
     val able = cfg.permissions.manage && OrdersLive.canRefund(cfg, o)
     FulfillNotice(
-      title = "برگشتِ کالا؟ — بازپرداختِ این سفارش در دفترِ دکان ثبت شد",
-      body = if (able) "کالایی که مشتری پس آورد به انبار برمی‌گردد؛ آن‌چه پیشِ مشتری ماند نه. تا جواب ندهید موجودی دست نمی‌خورد."
+      title = StrOrderPages.restockPosted,
+      body = if (able) StrOrderPages.restockPostedNote
       else OrdersLive.SKIPPED_REFUND_NOTE,
-      action = if (able) "برگشتِ کالا…" else null,
+      action = if (able) StrOrderPages.restockAction else null,
       onAction = onRestock,
     )
   }
   OrdersLive.refundIssues.value.firstOrNull { it.orderId == o.id }?.let { issue ->
     Spacer(Modifier.height(8.dp))
-    FulfillNotice(title = "بازپرداختِ این سفارش هنوز در دفترِ دکان ننشسته", body = issue.message, action = "دوباره", onAction = onRetry)
+    FulfillNotice(title = StrOrderPages.refundNotPosted, body = issue.message, action = Str.again, onAction = onRetry)
   }
 }
 
@@ -144,7 +148,7 @@ internal fun RefundDetailNotices(ledger: ShopData, cfg: OrdersConfigDto, o: Orde
  */
 internal suspend fun postRefundNotice(snackbar: SnackbarHostState, o: OrderDto, post: suspend () -> OrdersLive.Posted) {
   when (val r = post()) {
-    OrdersLive.Posted.Saved -> snackbar.showSnackbar("بازپرداختِ سفارش #${o.orderNo} در دفترِ دکان ثبت شد (سندِ برگشت)؛ گزارش و صندوق درست شدند")
+    OrdersLive.Posted.Saved -> snackbar.showSnackbar(StrOrderPages.refundPosted(o.orderNo))
     OrdersLive.Posted.Already -> Unit
     is OrdersLive.Posted.Skipped -> snackbar.showSnackbar(r.message)
     is OrdersLive.Posted.Failed -> snackbar.showSnackbar(r.message)
@@ -155,5 +159,5 @@ internal suspend fun postRefundNotice(snackbar: SnackbarHostState, o: OrderDto, 
 /** جوابِ «برگشتِ کالا؟» ِ دیرتر ⇒ `OrdersLive.restock`؛ نتیجه گفته می‌شود */
 internal suspend fun restockNotice(snackbar: SnackbarHostState, chosen: Set<Int>, save: suspend () -> String?) {
   val err = save()
-  snackbar.showSnackbar(err ?: if (chosen.isEmpty()) "ثبت شد: کالایی به انبار برنگشت" else "کالای زده‌شده به انبار برگشت و همگام می‌شود")
+  snackbar.showSnackbar(err ?: if (chosen.isEmpty()) StrOrderPages.restockNoneSaved else StrOrderPages.restockSaved)
 }

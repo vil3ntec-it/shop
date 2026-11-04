@@ -12,6 +12,7 @@ import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.ui.v3.V3Hue
+import ir.vil3ntec.tohid.ui.v3.account.profile.DeleteAccountRoute
 import ir.vil3ntec.tohid.ui.v3.account.profile.ProfileEditRoute
 import ir.vil3ntec.tohid.ui.v3.account.profile.ProfileRoute
 import ir.vil3ntec.tohid.ui.v3.account.profile.SignOutRoute
@@ -36,6 +37,8 @@ object AccountPaths {
   const val PROFILE = "profile"
   const val EDIT = "profile/edit"
   const val SIGN_OUT = "profile/signout"
+  /** «حذفِ حساب» (قاعدهٔ Google Play) — برگه‌ای روی «ویرایش حساب» */
+  const val DELETE = "profile/delete"
   const val TEAM = "team"
   const val NEW_CODE = "team/codes/new"
   const val REVEAL = "team/codes/reveal"
@@ -67,6 +70,7 @@ val AccountModule = AppModule(
     V3Route(AccountPaths.PROFILE, RouteKind.TAB, { Str.myAccount }, chrome = Chrome.OWN) { ProfileRoute() },
     V3Route(AccountPaths.EDIT, RouteKind.PAGE, { StrAccount.menuEdit }, parent = AccountPaths.PROFILE, chrome = Chrome.OWN) { ProfileEditRoute() },
     V3Route(AccountPaths.SIGN_OUT, RouteKind.SHEET, { StrAccount.menuSignOut }, parent = AccountPaths.PROFILE, chrome = Chrome.OWN) { SignOutRoute() },
+    V3Route(AccountPaths.DELETE, RouteKind.SHEET, { StrAccount.deleteAccount }, parent = AccountPaths.EDIT, chrome = Chrome.OWN) { DeleteAccountRoute() },
     V3Route(AccountPaths.TEAM, RouteKind.PAGE, { Str.staff }, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { TeamRoute() },
     V3Route(AccountPaths.NEW_CODE, RouteKind.SHEET, { StrAccount.newCodeTitle }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { NewCodeRoute() },
     V3Route(AccountPaths.REVEAL, RouteKind.SHEET, { StrAccount.revealTitle }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) { RevealRoute() },

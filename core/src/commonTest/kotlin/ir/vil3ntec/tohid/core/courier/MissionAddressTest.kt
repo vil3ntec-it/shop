@@ -31,6 +31,14 @@ class MissionAddressTest {
   }
 
   @Test
+  fun areaAndGateLabelsFollowTheScreenLanguage() {
+    val en = MissionView.landmarkFirst(card(), areaLabel = { "Area: $it" }, gateLabel = { "Gate: $it" })
+    assertEquals(listOf("پشتِ مسجدِ جامع", "Area: کارتهٔ چهار · Gate: سبز", "کوچهٔ سوم"), en)
+    //  بی ناحیه و دروازه برچسبی هم نمی‌آید
+    assertEquals(listOf("پشتِ مسجدِ جامع", "کوچهٔ سوم"), MissionView.landmarkFirst(card().copy(area = " ", gateColor = ""), { "Area: $it" }, { "Gate: $it" }))
+  }
+
+  @Test
   fun finishedMissionKeepsNoAreaGateOrCorrection() {
     val gone = MissionView.forDisplay(card("delivered"), QueueState())
     assertEquals("", gone.area)

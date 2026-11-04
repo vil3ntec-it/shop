@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import ir.vil3ntec.tohid.core.delivery.DeliveryText
 import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
 import ir.vil3ntec.tohid.data.repo.DeliveryWire
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -56,16 +57,16 @@ internal fun AddressFixDialog(
     val body = DeliveryWire.addressJson(landmark, area, gateColor, text, keepPin, m.version)
     scope.launch {
       repo.fixAddress(m.id, body, keys.of(body))
-        .onSuccess { onDone("سفارش #${m.orderNo}: نشانی اصلاح شد؛ پیک نشانیِ تازه را می‌بیند") }
+        .onSuccess { onDone(StrOrderPages.addrFixed(m.orderNo)) }
         .onFailure { f ->
-          if (f.code == "assignment_changed") onDone("این مأموریت همین حالا جای دیگری عوض شد؛ میز تازه شد.")
+          if (f.code == "assignment_changed") onDone(StrOrderPages.addrConflict)
           else err = f.userMessage
         }
       busy = false
     }
   }
 
-  TohidBottomSheet(title = "${DeskActions.label(DeskActions.Act.FIX_ADDRESS)} — سفارش #${m.orderNo}", onDismiss = onDismiss) {
+  TohidBottomSheet(title = StrOrderPages.addrTitle(DeskActions.label(DeskActions.Act.FIX_ADDRESS), m.orderNo), onDismiss = onDismiss) {
     SheetBody {
       Text(
         "${DeliveryText.mode(m.mode)} · ${DeliveryText.status(m.status)}" +
@@ -73,21 +74,21 @@ internal fun AddressFixDialog(
         style = MaterialTheme.typography.bodySmall, color = c.muted,
       )
       Text(
-        "نشانیِ درست را از مشتری بپرسید. پیک اول نشانه را می‌بیند، بعد ناحیه و رنگِ دروازه.",
+        StrOrderPages.addrAsk,
         style = MaterialTheme.typography.bodySmall, color = c.text,
       )
-      TohidTextField(landmark, { landmark = it.take(200) }, label = "نشانهٔ نزدیک", placeholder = "مثلاً «روبه‌روی نانوایی»")
-      TohidTextField(area, { area = it.take(80) }, label = "ناحیه (اختیاری)")
-      TohidTextField(gateColor, { gateColor = it.take(40) }, label = "رنگِ دروازه (اختیاری)")
-      TohidTextField(text, { text = it.take(300) }, label = "نشانی (اختیاری)", singleLine = false)
+      TohidTextField(landmark, { landmark = it.take(200) }, label = StrOrderPages.addrLandmark, placeholder = StrOrderPages.addrLandmarkEg)
+      TohidTextField(area, { area = it.take(80) }, label = StrOrderPages.addrArea)
+      TohidTextField(gateColor, { gateColor = it.take(40) }, label = StrOrderPages.addrGate)
+      TohidTextField(text, { text = it.take(300) }, label = StrOrderPages.addrText, singleLine = false)
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = keepPin, onCheckedChange = { keepPin = it })
         Text(
-          if (keepPin) "پینِ مشتری بماند" else "پینِ قبلی پاک شود (پین غلط بود)",
+          if (keepPin) StrOrderPages.addrKeepPin else StrOrderPages.addrClearPin,
           style = MaterialTheme.typography.bodySmall, color = c.text,
         )
       }
-      if (!valid) Text("نشانه یا نشانی لازم است.", style = MaterialTheme.typography.bodySmall, color = c.muted)
+      if (!valid) Text(StrOrderPages.addrNeedOne, style = MaterialTheme.typography.bodySmall, color = c.muted)
       ErrorLine(err)
       TohidButton(
         DeskActions.label(DeskActions.Act.FIX_ADDRESS), onClick = { send() }, busy = busy, enabled = valid && !busy,
