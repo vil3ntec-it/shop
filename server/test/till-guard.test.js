@@ -12,6 +12,8 @@ process.env.SYNC_V3_ENABLED = '1';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const fs = require('node:fs');
+const path = require('node:path');
 const h = require('./helpers');
 const { one } = require('../src/db');
 const hlc = require('../src/lib/hlc');
@@ -184,6 +186,52 @@ test('روشن: شکلِ بد، فاکتورِ لغوشده و برگشت‌خو
   await expect('owner', [fix('bad-r', 's-r', 100)], ['pay_fix_invalid']);
   await expect('owner', [fix('unk-o', 's-none', 999_999)], ['applied']);
   await expect('staff', [fix('unk-s', 's-none', 100)], ['approval_required']);
+  await live.remove(shopId, guard.PAY_FIX_FLAG);
+});
+
+//  «روزِ بسته» (دورِ ۳۶): همان `PayFix.closed` ِ برنامه — بردارِ مشترکِ `payFix.closed` در `core/test-vectors/pay-v1.json`
+test('روزِ بسته: همان قاعدهٔ برنامه (بردارِ مشترکِ payFix.closed)', () => {
+  const V = JSON.parse(fs.readFileSync(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'pay-v1.json'), 'utf8'));
+  assert.ok(V.payFix.closed.length >= 5);
+  for (const c of V.payFix.closed) assert.equal(guard.dayClosed(c.saleAt, c.saleDay, c.shifts), c.expect, c.name);
+});
+
+test('روشن: اصلاحِ فاکتورِ روزِ بسته (Z) برای همه رد، صاحب هم؛ پس از Z ِ روزِ باز و پیش از رسیدنِ Z می‌نشیند', async () => {
+  //  زمان‌های ساختگی و روزِ جدا تا فاکتورهای آزمون‌های دیگر در هیچ پنجره‌ای نیفتند
+  const D = '2026-10-30';
+  const audit = (id, f) => op3('auditLog', id, { date: D, notes: f.type, ...f });
+  await expect('owner', [
+    sale('z-in', { date: D, createdAt: 1_500_000 }),    //  در پنجرهٔ صندوقِ بسته
+    sale('z-pre', { date: D, createdAt: 500_000 }),     //  همان روز، پیش از آخرین Z
+    sale('z-post', { date: D, createdAt: 2_500_000 }),  //  پس از Z، روز هنوز باز
+    sale('z-late', { date: D, createdAt: 3_500_000 }),  //  در صندوقِ دومِ هنوز باز
+    sale('z-odd', { date: D, createdAt: 'دیروز' }),      //  زمانِ بدشکل ⇒ داوری نمی‌شود
+    sale('z-night', { date: '2026-10-31', createdAt: 1_800_000 }),  //  روزِ بعد، در همان صندوقِ شبانهٔ بسته
+    audit('sh-1', { type: 'shift_open', createdAt: 1_000_000, amountMinor: 0 }),
+    audit('sh-1z', { type: 'shift_close', refId: 'sh-1', createdAt: 2_000_000, amountMinor: 0 }),
+    audit('sh-2', { type: 'shift_open', createdAt: 3_000_000, amountMinor: 0 }),
+  ], ['applied', 'applied', 'applied', 'applied', 'applied', 'applied', 'applied', 'applied', 'applied']);
+  //  خاموش ⇒ همان امروز
+  await expect('owner', [fix('cl-off', 'z-in', 1000)], ['applied']);
+  await live.set(shopId, guard.PAY_FIX_FLAG, true);
+  const r = await expect('owner', [fix('cl-in', 'z-in', 1000)], ['pay_fix_closed']);
+  const box = await boxOf(r.body.results[0].op_id);
+  assert.equal(box.kind, 'perm_denied');
+  assert.equal(box.detail.reason_core, 'day_closed');
+  assert.equal(box.detail.sale, 'z-in');
+  assert.equal(await inV3('auditLog', 'cl-in'), undefined);
+  await expect('manager', [fix('cl-pre', 'z-pre', 1000)], ['pay_fix_closed']);
+  await expect('owner', [fix('cl-night', 'z-night', 1000)], ['pay_fix_closed']);
+  await expect('owner', [fix('cl-post', 'z-post', 1000)], ['applied']);
+  await expect('owner', [fix('cl-odd', 'z-odd', 1000)], ['applied']);
+  //  اصلاحی که پیش از Z در همان دسته رسید می‌نشیند؛ پس از Z دیگر نه
+  await expect('owner', [
+    fix('cl-late-1', 'z-late', 1000),
+    audit('sh-2z', { type: 'shift_close', refId: 'sh-2', createdAt: 4_000_000, amountMinor: 0 }),
+    fix('cl-late-2', 'z-late', 1000),
+  ], ['applied', 'applied', 'pay_fix_closed']);
+  //  پس از Z ِ صندوقِ دوم، فاکتورِ «پس از Z ِ اول» هم پیش از آخرین Z ِ همان روز است
+  await expect('owner', [fix('cl-post-2', 'z-post', 1000)], ['pay_fix_closed']);
   await live.remove(shopId, guard.PAY_FIX_FLAG);
 });
 
