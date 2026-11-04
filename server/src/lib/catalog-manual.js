@@ -76,8 +76,36 @@ function parseManual(body) {
       throw badRequest('مقدارِ شمرده‌شده باید عددِ صحیحِ نامنفی (هزارم) باشد', 'bad_qty');
     }
     out.countedMilli = q;
+    //  INV-10: لحظهٔ شمردن (اختیاری). بازه درونِ تراکنش با ساعتِ سرور سنجیده می‌شود (`countedAtOf`)
+    if (b.countedAt !== undefined && b.countedAt !== null) {
+      if (typeof b.countedAt !== 'number' || !Number.isSafeInteger(b.countedAt) || b.countedAt <= 0) throw badCountedAt();
+      out.countedAt = b.countedAt;
+    }
   }
   return out;
+}
+
+//  INV-10: شمارشی که با لحظهٔ شمردن می‌آید — ساعتِ دستگاه کمی جلوتر پذیرفته، کهنه‌تر از ۳۰ روز نه
+const COUNT_SKEW_MS = 5 * 60_000;
+const COUNT_MAX_AGE_MS = 30 * 86_400_000;
+const badCountedAt = () => badRequest('لحظهٔ شمارش نامعتبر است (نه آینده، نه کهنه‌تر از ۳۰ روز)', 'bad_counted_at');
+function countedAtOf(t, at) {
+  if (t === undefined) return null;
+  if (t > at + COUNT_SKEW_MS || t < at - COUNT_MAX_AGE_MS) throw badCountedAt();
+  return t;
+}
+
+/**
+ * INV-10 (S20): گردشِ همان کالا در همان مکان **پس از** لحظهٔ شمردن (فروشِ دستگاه با زمانِ خودِ فروش، انتقال، اصلاح…)
+ * که در عددِ شمرده نیست ولی در موجودیِ امروز هست ⇒ مورد انتظار = موجودیِ امروز − همین. هم‌لحظه پیش از شمردن است.
+ */
+async function movedAfter(c, shopId, productId, location, countedAt) {
+  const r = (await c.query(
+    `SELECT COALESCE(SUM(delta_on_hand_milli), 0) AS s FROM stock_moves
+      WHERE shop_id=$1 AND product_id=$2 AND branch_id='' AND location=$3 AND at > $4`,
+    [shopId, productId, location, countedAt]
+  )).rows[0];
+  return Number(r.s);
 }
 
 function hashOf(body) {
@@ -105,6 +133,7 @@ async function manualMove(shopId, { key, body, actor }) {
   const m = parseManual(body);
   const hash = hashOf(body);
   const at = now();
+  const countedAt = m.kind === 'count' ? countedAtOf(m.countedAt, at) : null;
   let ingested = null;
   const out = await tx(async (c) => {
     await stock.lock(c, shopId);
@@ -140,7 +169,8 @@ async function manualMove(shopId, { key, body, actor }) {
       plan.push({ ...base, location: m.location, type: 'adjustment', qtyMilli: m.qtyMilli, reason: m.reason });
     } else {
       const lv = (await stock.levelsOf(c, shopId, [m.productId])).get(m.productId);
-      const diff = m.countedMilli - stock.onHandAt(lv, m.location);
+      const after = countedAt === null ? 0 : await movedAfter(c, shopId, m.productId, m.location, countedAt);
+      const diff = m.countedMilli - (stock.onHandAt(lv, m.location) - after);
       if (diff === 0) return { moves: [], replayed: false, unchanged: true };
       plan.push({ ...base, location: m.location, type: 'count_adjust', qtyMilli: diff, reason: m.reason });
     }
