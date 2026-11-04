@@ -67,25 +67,25 @@ private class Shortcut(val label: String, val icon: ImageVector, val route: Stri
 
 /** نشانِ زندهٔ کاشیِ سفارش‌ها از صفِ همین برنامه (`OrdersLive`، هر ۲۰ ثانیه جلوی چشم)؛ بخشِ خاموش ⇒ null */
 @Composable
-internal fun rememberHomeOrders(): HomeTiles.Orders? = HomeTiles.orders(OrdersLive.enabled, OrdersLive.counts.value)
+internal fun rememberHomeOrders(): HomeTiles.Orders = HomeTiles.orders(OrdersLive.enabled, OrdersLive.counts.value)
 
 /**
  *  چهار میان‌بر در یک ردیف (HOME-V2 §۲٫۳) — بی کادرِ دورِ ردیف. هر کدام رنگِ همراهِ خودش
  *  (آیکنِ رنگی روی پس‌زمینهٔ نرمِ همان رنگ، کاشیِ ۱۴) و مستقیم فرمِ خودش (`ShellTargets`).
- *  نخستین: «سفارش‌های آنلاین» ([HomeOrdersTile]) وقتی بخشِ سفارش روشن است، وگرنه «فروشِ تازه» (`HomeTiles`).
+ *  نخستین همیشه «سفارش‌های آنلاین» ([HomeOrdersTile]) به جای «فروشِ تازه» (خواستِ صاحب‌کار؛ `HomeTiles`): بخشِ روشن ⇒ صف،
+ *  خاموش ⇒ «تنظیمات ← سفارشِ آنلاین». صندوق از نوار یا دکمهٔ شناورِ خانه ([HomeSaleFab]) می‌ماند.
  */
 @Composable
-internal fun HomeShortcuts(onOpen: (String) -> Unit, modifier: Modifier = Modifier, orders: HomeTiles.Orders? = rememberHomeOrders()) {
+internal fun HomeShortcuts(onOpen: (String) -> Unit, modifier: Modifier = Modifier, orders: HomeTiles.Orders = rememberHomeOrders()) {
   val p = PhoneV3.colors
   val s = Shop.colors
-  val items = listOfNotNull(
-    if (orders == null) Shortcut(StrHome.newSale, Icons.Outlined.AddShoppingCart, ShellTargets.NEW_SALE, HomeAccents.NEW_SALE, haptic = true) else null,
+  val items = listOf(
     Shortcut(StrHome.receive, Icons.Outlined.CallReceived, ShellTargets.RECEIVE, HomeAccents.RECEIVE),
     Shortcut(StrHome.stockEntry, Icons.Outlined.MoveToInbox, ShellTargets.STOCK_ENTRY, HomeAccents.STOCK_ENTRY),
     Shortcut(StrHome.history, Icons.Outlined.History, ShellTargets.HISTORY, HomeAccents.HISTORY),
   )
   Row(modifier.fillMaxWidth().padding(horizontal = 8.dp)) {
-    if (orders != null) HomeOrdersTile(orders, { onOpen(ShellTargets.ORDERS) }, Modifier.weight(1f))
+    HomeOrdersTile(orders, { onOpen(if (orders.off) ShellTargets.ORDERS_SETUP else ShellTargets.ORDERS) }, Modifier.weight(1f))
     items.forEach { sc ->
       Column(
         Modifier
@@ -117,7 +117,7 @@ internal fun HomeShortcuts(onOpen: (String) -> Unit, modifier: Modifier = Modifi
 /**
  *  کاشیِ «سفارش‌های آنلاین»: جدا از سه کاشیِ دیگر — کادرِ نرمِ رنگِ سفارش با خطِ دور، آیکنِ پُر روی همان رنگ، نشانِ
  *  شمار (تازه‌ها به رنگِ «در انتظارِ تأیید»، در-کارها خاکستری) و نقطهٔ تپنده فقط وقتی سفارشِ تازه هست (حرکتِ خاموش ⇒
- *  نقطهٔ ثابت). نامِ دسترس‌پذیر شمار را هم می‌گوید.
+ *  نقطهٔ ثابت). نامِ دسترس‌پذیر شمار را هم می‌گوید. بخشِ خاموش ([HomeTiles.Orders.off]) ⇒ همان کاشی کم‌رنگ و بی نشان.
  */
 @Composable
 internal fun HomeOrdersTile(o: HomeTiles.Orders, onClick: () -> Unit, modifier: Modifier = Modifier) {
@@ -133,7 +133,7 @@ internal fun HomeOrdersTile(o: HomeTiles.Orders, onClick: () -> Unit, modifier: 
       .padding(horizontal = 2.dp)
       .clip(shape)
       .background(HomeAccents.soft(s, HomeAccents.ORDERS))
-      .border(1.dp, accent.copy(alpha = if (o.pulse) 0.70f else 0.35f), shape)
+      .border(1.dp, accent.copy(alpha = if (o.pulse) 0.70f else if (o.off) 0.20f else 0.35f), shape)
       .semantics(mergeDescendants = true) { contentDescription = a11y }
       .v3Pressable(label = a11y, haptic = true, onClick = onClick)
       .padding(vertical = 6.dp),
@@ -141,7 +141,8 @@ internal fun HomeOrdersTile(o: HomeTiles.Orders, onClick: () -> Unit, modifier: 
   ) {
     Box(Modifier.size(52.dp)) {
       Box(
-        Modifier.size(52.dp).clip(RoundedCornerShape(HomeCardSpec.tile)).background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.80f)))),
+        Modifier.size(52.dp).graphicsLayer { alpha = if (o.off) 0.45f else 1f }.clip(RoundedCornerShape(HomeCardSpec.tile))
+          .background(Brush.linearGradient(listOf(accent, accent.copy(alpha = 0.80f)))),
         contentAlignment = Alignment.Center,
       ) { Icon(Icons.Outlined.ShoppingBasket, contentDescription = null, tint = Color.White, modifier = Modifier.size(24.dp)) }
       o.badgeText?.let { n ->

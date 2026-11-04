@@ -19,34 +19,51 @@ import org.junit.Test
 import java.io.File
 
 /**
- *  کاشیِ «سفارش‌های آنلاین» ِ خانه (خواستِ صاحب‌کار): جای «فروشِ تازه» فقط با بخشِ سفارشِ روشن، نشانِ زنده (تازه‌ها با نقطهٔ
- *  تپنده، بی تازه شمارِ در-کارها)، و صندوق که هرگز بی‌راه نمی‌ماند (نوار یا دکمهٔ شناورِ خانه).
+ *  کاشیِ «سفارش‌های آنلاین» ِ خانه (خواستِ صاحب‌کار): همیشه جای «فروشِ تازه» — بخشِ خاموش ⇒ کاشیِ کم‌رنگ و بی نشان که
+ *  «تنظیمات ← سفارشِ آنلاین» را باز می‌کند؛ نشانِ زنده (تازه‌ها با نقطهٔ تپنده، بی تازه شمارِ در-کارها)، و صندوق که هرگز
+ *  بی‌راه نمی‌ماند (نوار یا دکمهٔ شناورِ خانه).
  */
 class HomeTilesTest {
   @After fun reset() { I18n.source = { Lang.FA } }
 
   @Test
-  fun `بخشِ سفارشِ خاموش ⇒ کاشیِ «فروشِ تازه» می‌ماند و دکمهٔ شناوری نیست`() {
-    assertNull(HomeTiles.orders(enabled = false, counts = mapOf("new" to 4)))
+  fun `بخشِ سفارشِ خاموش ⇒ کاشیِ «سفارش‌های آنلاین» باز هم جای «فروشِ تازه» است، خاموش و بی نشان`() {
+    val off = HomeTiles.orders(enabled = false, counts = mapOf("new" to 4, "preparing" to 2))
+    assertTrue(off.off)
+    assertNull("شمارِ کهنه روی کاشیِ خاموش دیده نمی‌شود", off.badgeText)
+    assertFalse(off.pulse)
+    assertEquals(StrOrdersHub.tileOff, HomeTiles.a11y(off))
+    assertFalse("بخشِ روشن خاموش نیست", HomeTiles.orders(enabled = true, counts = emptyMap()).off)
+    //  کاشیِ فروش دیگر نیست ⇒ نوارِ بی «فروش»/«اسکن» دکمهٔ شناور می‌گیرد، هر حالی که بخشِ سفارش داشته باشد
+    assertTrue(HomeTiles.saleFab(ordersTile = true, navIds = emptyList()))
     assertFalse(HomeTiles.saleFab(ordersTile = false, navIds = emptyList()))
   }
 
   @Test
+  fun `خانه دیگر کاشیِ «فروشِ تازه» ندارد و کاشیِ خاموش سرِ تنظیماتِ سفارشِ آنلاین می‌رود`() {
+    val repo = generateSequence(File("").absoluteFile) { it.parentFile }.first { File(it, "android-native").isDirectory }
+    val src = File(repo, "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/shell/HomeShortcuts.kt").readText()
+    assertFalse("کاشیِ «فروشِ تازه» برگشته است", src.contains("Shortcut(StrHome.newSale"))
+    assertTrue(src.contains("if (orders.off) ShellTargets.ORDERS_SETUP else ShellTargets.ORDERS"))
+    assertEquals("settings/sales/online-orders", V3Modules.table.resolve(ShellTargets.ORDERS_SETUP)!!.match.path.substringBefore('?'))
+  }
+
+  @Test
   fun `نشان — تازه‌ها با نقطهٔ تپنده، بی تازه در-کارها، هیچ ⇒ بی نشان`() {
-    val fresh = HomeTiles.orders(true, mapOf("new" to 3, "preparing" to 2, "ready" to 1, "done" to 40))!!
+    val fresh = HomeTiles.orders(true, mapOf("new" to 3, "preparing" to 2, "ready" to 1, "done" to 40))
     assertEquals(3, fresh.fresh)
     assertEquals(3, fresh.active)
     assertTrue(fresh.pulse)
     assertEquals("3", fresh.badgeText)
-    val busy = HomeTiles.orders(true, mapOf("preparing" to 2, "on_the_way" to 1, "scheduled" to 1, "done" to 9))!!
+    val busy = HomeTiles.orders(true, mapOf("preparing" to 2, "on_the_way" to 1, "scheduled" to 1, "done" to 9))
     assertFalse(busy.pulse)
     assertEquals(4, busy.badge)
     assertEquals("4", busy.badgeText)
-    val idle = HomeTiles.orders(true, mapOf("done" to 12))!!
+    val idle = HomeTiles.orders(true, mapOf("done" to 12))
     assertNull("تمام‌شده‌ها نشان نمی‌گیرند", idle.badgeText)
     assertFalse(idle.pulse)
-    assertEquals("99+", HomeTiles.orders(true, mapOf("new" to 250))!!.badgeText)
-    assertEquals("شمارِ منفیِ خراب صفر است", null, HomeTiles.orders(true, mapOf("new" to -2))!!.badgeText)
+    assertEquals("99+", HomeTiles.orders(true, mapOf("new" to 250)).badgeText)
+    assertEquals("شمارِ منفیِ خراب صفر است", null, HomeTiles.orders(true, mapOf("new" to -2)).badgeText)
   }
 
   @Test
