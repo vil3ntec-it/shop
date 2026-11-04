@@ -23,6 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.*
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
@@ -77,8 +78,8 @@ object StockBookNav {
   val transfer = mutableStateOf(false)
 }
 
-private enum class BookTab(val id: String, val label: String) {
-  POS("pos", "جایگاه‌ها"), LEDGER("ledger", "دفترِ حرکت"), REVIEW("review", "بررسی"), COUNT("count", "شمارش")
+private enum class BookTab(val id: String, private val text: () -> String) {
+  POS("pos", { StrStockPages.tabPositions }), LEDGER("ledger", { StrStockPages.tabLedger }), REVIEW("review", { StrOnline.ffReview }), COUNT("count", { StrSafe.count }); val label: String get() = text()
 }
 
 private fun minorText(minor: Long): String {
@@ -114,17 +115,17 @@ fun StockBookScreen(
   if (!on) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.TopCenter) {
       Panel(Modifier.widthIn(max = 560.dp)) {
-        Text("موتورِ تازهٔ موجودی و بها خاموش است", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        Text(StrStockPages.engineOff, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
         Spacer(Modifier.height(6.dp))
         Text(
-          if (StockLedger.serverFlag) "بهای میانگینِ موزون، سری و انقضا، دفترِ حرکت، شمارش با بازبینی و انتقال بین محل‌ها با روشن کردنِ «موجودی و بهای تمام‌شده» در تنظیمات می‌آیند."
-          else "این بخش هنوز برای دکانِ شما باز نشده است؛ انبار و فروش مثلِ همیشه کار می‌کنند.",
+          if (StockLedger.serverFlag) StrStockPages.engineOffBody
+          else StrStockPages.notOpenYet,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
         //  پرچمِ `shop.stock_v2` خاموش ⇒ کارتِ تنظیمات پنهان است، پس دکمه‌اش هم نه
         if (StockLedger.serverFlag && ShopRole.canOpenSettings(context)) {
           Spacer(Modifier.height(12.dp))
-          Button(onClick = onSettings) { Text("رفتن به تنظیمات") }
+          Button(onClick = onSettings) { Text(StrOnline.sfGoSettings) }
         }
       }
     }
@@ -152,9 +153,9 @@ fun StockBookScreen(
     scope.launch {
       runCatching {
         withContext(Dispatchers.IO) {
-          context.contentResolver.openOutputStream(uri)?.use { it.write(ReportCsv.text(sheet).toByteArray(Charsets.UTF_8)) } ?: error("فایل ساخته نشد")
+          context.contentResolver.openOutputStream(uri)?.use { it.write(ReportCsv.text(sheet).toByteArray(Charsets.UTF_8)) } ?: error(StrReports.csvFailed)
         }
-      }.onSuccess { toast("خروجی ساخته شد") }.onFailure { toast("فایل ساخته نشد") }
+      }.onSuccess { toast(StrStockPages.exported) }.onFailure { toast(StrReports.csvFailed) }
     }
   }
 
@@ -170,24 +171,24 @@ fun StockBookScreen(
     Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text("دفترِ موجودی", style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
-        Text("بها به میانگینِ موزون و «تقریبی» است تا روشِ بها قطعی شود (D-23).", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Text(StrReach.stockBook, style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
+        Text(StrStockPages.costNote, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
       Button(onClick = { transferFor = "" }) {
         Icon(Icons.Filled.SwapHoriz, null, Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text("انتقال بین محل‌ها")
+        Text(StrPlaces.transferTitle)
       }
     }
     Spacer(Modifier.height(12.dp))
     Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      StatCard("ارزشِ موجودی", minorText(stats.valueMinor) + " ؋", "به بهای میانگین، تقریبی", Modifier.widthIn(min = 170.dp),
+      StatCard(StrStockPages.stockValue, minorText(stats.valueMinor) + " ؋", StrStockPages.atAvgApprox, Modifier.widthIn(min = 170.dp),
         selected = tab == BookTab.POS && posFilter == null) { tab = BookTab.POS; posFilter = null }
-      StatCard("کالای با موجودیِ منفی", stats.negative.toString(), "همین حالا", Modifier.widthIn(min = 150.dp),
+      StatCard(StrStockPages.negativeItems, stats.negative.toString(), StrHome.justNow, Modifier.widthIn(min = 150.dp),
         selected = tab == BookTab.POS && posFilter == "neg") { tab = BookTab.POS; posFilter = "neg" }
-      StatCard("وظیفهٔ بررسیِ باز", stats.openTasks.toString(), "موجودیِ منفی یا فروشِ منقضی", Modifier.widthIn(min = 150.dp),
+      StatCard(StrStockPages.openTasks, stats.openTasks.toString(), StrStockPages.negOrExpired, Modifier.widthIn(min = 150.dp),
         selected = tab == BookTab.REVIEW) { tab = BookTab.REVIEW }
-      StatCard("سریِ منقضیِ دارای موجودی", stats.expiredLots.toString(), "فروخته نمی‌شود", Modifier.widthIn(min = 150.dp),
+      StatCard(StrStockPages.expiredLots, stats.expiredLots.toString(), StrSettings.notSold, Modifier.widthIn(min = 150.dp),
         selected = tab == BookTab.POS && posFilter == "expired") { tab = BookTab.POS; posFilter = "expired" }
     }
     Spacer(Modifier.height(12.dp))
@@ -200,8 +201,8 @@ fun StockBookScreen(
       when (tab) {
         BookTab.POS -> PositionsTab(d, v, today, posFilter, onTransfer = { transferFor = it })
         BookTab.LEDGER -> LedgerTab(d, v) { sheet -> pendingCsv = sheet; saveCsv.launch("${sheet.name}.csv") }
-        BookTab.REVIEW -> ReviewTab(d, v) { ids -> save(StockActions.ack(d, v, ids, user, today, System.currentTimeMillis(), ::newId), "ثبت شد: بررسی شد") }
-        BookTab.COUNT -> CountTab(d, v, user, onSaved = { next, n -> save(next, "شمارش ثبت شد — $n اختلاف اصلاح شد") }, onFail = ::toast)
+        BookTab.REVIEW -> ReviewTab(d, v) { ids -> save(StockActions.ack(d, v, ids, user, today, System.currentTimeMillis(), ::newId), StrStockPages.reviewedSaved) }
+        BookTab.COUNT -> CountTab(d, v, user, onSaved = { next, n -> save(next, StrStockPages.countSaved(n)) }, onFail = ::toast)
       }
     }
   }
@@ -210,7 +211,7 @@ fun StockBookScreen(
     TransferDialog(d, v, pid.ifEmpty { null }, onDismiss = { transferFor = null }) { productId, from, to, q, lot, reason ->
       when (val r = StockActions.transfer(d, v, productId, from, to, q, lot, reason, user, today, System.currentTimeMillis(), ::newId)) {
         is StockActions.Result.Failed -> toast(r.message)
-        is StockActions.Result.Ok -> { save(r.data, "انتقال ثبت شد"); transferFor = null }
+        is StockActions.Result.Ok -> { save(r.data, StrPlaces.moved); transferFor = null }
       }
     }
   }
@@ -264,7 +265,7 @@ private fun PositionsTab(d: ShopData, v: StockLedger.View, today: String, filter
       val pv = StockLedger.productView(v, pid)
       if (p != null && !p.active && pv.qtyMilli == 0L) return@mapNotNull null
       if (pv.locations.isEmpty()) return@mapNotNull null
-      PosRow(pid, p?.name ?: "(کالای حذف‌شده)", p?.unit.orEmpty(), pv)
+      PosRow(pid, p?.name ?: StrHome.txDeletedItem, p?.unit.orEmpty(), pv)
     }.filter { r -> query.isBlank() || r.name.contains(query.trim(), ignoreCase = true) }
       .filter { r -> loc == null || r.pv.locations.any { it.location == loc && it.qtyMilli != 0L } }
       .filter { r ->
@@ -278,35 +279,35 @@ private fun PositionsTab(d: ShopData, v: StockLedger.View, today: String, filter
   }
   fun locText(pv: StockLedger.ProductView) =
     pv.locations.filter { it.qtyMilli != 0L }.joinToString(" · ") { "${StockActions.locationLabel(it.location)}: ${milliText(it.qtyMilli)}" }.ifEmpty { "—" }
-  fun unitText(pv: StockLedger.ProductView) = pv.unitCostMinor?.let { minorText(it) } ?: "نامعلوم"
+  fun unitText(pv: StockLedger.ProductView) = pv.unitCostMinor?.let { minorText(it) } ?: StrOnline.presShortUnknown
 
   val posColumns = listOf(
-    TableColumn<PosRow>("کالا", 220.dp, sortKey = { it.name }) { it.name },
-    TableColumn<PosRow>("موجودی", 110.dp, sortKey = { it.pv.qtyMilli }, numeric = true,
+    TableColumn<PosRow>(StrMoney.item, 220.dp, sortKey = { it.name }) { it.name },
+    TableColumn<PosRow>(StrSimpleAsk.vOnHand, 110.dp, sortKey = { it.pv.qtyMilli }, numeric = true,
       tint = { r -> if (r.pv.qtyMilli < 0) Shop.colors.danger else Shop.colors.text }) { "${milliText(it.pv.qtyMilli)} ${it.unit}".trim() },
-    TableColumn<PosRow>("بهای میانگینِ واحد", 130.dp, sortKey = { it.pv.unitCostMinor ?: Long.MIN_VALUE }, numeric = true) { unitText(it.pv) },
-    TableColumn<PosRow>("ارزش", 120.dp, sortKey = { it.pv.valueMinor }, numeric = true) { minorText(it.pv.valueMinor) },
-    TableColumn<PosRow>("محل‌ها", 200.dp) { locText(it.pv) },
-    TableColumn<PosRow>("سری‌ها (FEFO)", 220.dp) { r -> r.pv.lots.joinToString(" · ") { "${StockActions.lotLabel(it.lotId)} ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " (${formatDate(e)})" } ?: "") }.ifEmpty { "—" } },
+    TableColumn<PosRow>(StrStockPages.avgUnitCost, 130.dp, sortKey = { it.pv.unitCostMinor ?: Long.MIN_VALUE }, numeric = true) { unitText(it.pv) },
+    TableColumn<PosRow>(StrStockPages.value, 120.dp, sortKey = { it.pv.valueMinor }, numeric = true) { minorText(it.pv.valueMinor) },
+    TableColumn<PosRow>(StrStockPages.places, 200.dp) { locText(it.pv) },
+    TableColumn<PosRow>(StrStockPages.lotsFefo, 220.dp) { r -> r.pv.lots.joinToString(" · ") { "${StockActions.lotLabel(it.lotId)} ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " (${formatDate(e)})" } ?: "") }.ifEmpty { "—" } },
   )
   val posState = rememberTableState(posColumns)
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item {
       TableToolbar(
-        query = query, onQuery = { query = it }, placeholder = "جستجوی کالا…", viewMode = mode,
+        query = query, onQuery = { query = it }, placeholder = StrStockPages.searchItem, viewMode = mode,
         filter = {
-          FilterMenu("محل", locations.map { it to StockActions.locationLabel(it) }, loc, { loc = it }, "همهٔ محل‌ها")
+          FilterMenu(StrPlaces.place, locations.map { it to StockActions.locationLabel(it) }, loc, { loc = it }, StrStockPages.allPlaces)
         },
       )
       Spacer(Modifier.height(6.dp))
       Text(
-        "ترتیبِ برداشتِ فروش (FEFO): انقضای زودتر اول؛ سری‌های بی‌تاریخ بعد از تاریخ‌دارها و به ترتیبِ دریافت. سریِ منقضی فروخته نمی‌شود؛ سریِ اسکن‌شده سرِ صندوق اول برداشته می‌شود.",
+        StrStockPages.fefoNote,
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
       )
     }
     if (rows.isEmpty()) {
-      item { EmptyNote("کالایی با این فیلتر نیست") }
+      item { EmptyNote(StrStockPages.noItemsFilter) }
     } else if (mode.mode == ViewMode.TABLE) {
       dataTable(sortRows(rows, posColumns, posState), posColumns, posState, key = { it.id }, onOpen = { onTransfer(it.id) }, onMenu = { onTransfer(it.id) })
     } else {
@@ -314,17 +315,17 @@ private fun PositionsTab(d: ShopData, v: StockLedger.View, today: String, filter
         Panel(Modifier.fillMaxWidth()) {
           Row(verticalAlignment = Alignment.CenterVertically) {
             Text(r.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
-            if (r.pv.qtyMilli < 0) StatusPill("منفی", PillTone.DANGER)
+            if (r.pv.qtyMilli < 0) StatusPill(StrStockPages.negative, PillTone.DANGER)
           }
           Spacer(Modifier.height(6.dp))
-          KeyValue("موجودی", "${milliText(r.pv.qtyMilli)} ${r.unit}".trim())
-          KeyValue("بهای میانگینِ واحد", unitText(r.pv))
-          KeyValue("ارزش", minorText(r.pv.valueMinor))
-          KeyValue("محل‌ها", locText(r.pv))
+          KeyValue(StrSimpleAsk.vOnHand, "${milliText(r.pv.qtyMilli)} ${r.unit}".trim())
+          KeyValue(StrStockPages.avgUnitCost, unitText(r.pv))
+          KeyValue(StrStockPages.value, minorText(r.pv.valueMinor))
+          KeyValue(StrStockPages.places, locText(r.pv))
           Spacer(Modifier.height(6.dp))
           LotPills(r.pv.lots, today)
           Spacer(Modifier.height(4.dp))
-          TextButton(onClick = { onTransfer(r.id) }) { Text("انتقال") }
+          TextButton(onClick = { onTransfer(r.id) }) { Text(StrPlaces.transfer) }
         }
       }
     }
@@ -364,52 +365,52 @@ private fun LedgerTab(d: ShopData, v: StockLedger.View, onExport: (ReportCsv.She
     ).asReversed()
   }
   val users = remember(v) { v.rows.map { it.userId }.distinct().sorted() }
-  val prods = remember(v, names) { v.rows.map { it.productId }.distinct().map { it to (names[it] ?: "(کالای حذف‌شده)") }.sortedBy { it.second } }
+  val prods = remember(v, names) { v.rows.map { it.productId }.distinct().map { it to (names[it] ?: StrHome.txDeletedItem) }.sortedBy { it.second } }
   val locations = remember(d) { StockLedger.locations(d) }
 
   val ledgerColumns = listOf(
-    TableColumn<StockLedger.Row>("کالا", 200.dp) { names[it.productId] ?: "(کالای حذف‌شده)" },
-    TableColumn<StockLedger.Row>("روز", 100.dp) { formatDate(it.day) },
-    TableColumn<StockLedger.Row>("نوع", 130.dp) { StockActions.TYPE_LABEL[it.type] ?: it.type },
-    TableColumn<StockLedger.Row>("محل", 130.dp) { StockActions.locationLabel(it.location) },
-    TableColumn<StockLedger.Row>("مقدار", 90.dp, numeric = true, tint = { r -> if (r.qtyMilli < 0) Shop.colors.danger else Shop.colors.success }) {
+    TableColumn<StockLedger.Row>(StrMoney.item, 200.dp) { names[it.productId] ?: StrHome.txDeletedItem },
+    TableColumn<StockLedger.Row>(StrHistory.day, 100.dp) { formatDate(it.day) },
+    TableColumn<StockLedger.Row>(StrInvoices.colKind, 130.dp) { StockActions.TYPE_LABEL[it.type] ?: it.type },
+    TableColumn<StockLedger.Row>(StrPlaces.place, 130.dp) { StockActions.locationLabel(it.location) },
+    TableColumn<StockLedger.Row>(StrPlaces.amount, 90.dp, numeric = true, tint = { r -> if (r.qtyMilli < 0) Shop.colors.danger else Shop.colors.success }) {
       (if (it.qtyMilli > 0) "+" else "") + milliText(it.qtyMilli)
     },
-    TableColumn<StockLedger.Row>("بهای موقت", 110.dp, numeric = true) { minorText(it.costMinor) + if (it.costAdjustMinor != 0L) " (تعدیل ${minorText(it.costAdjustMinor)})" else "" },
-    TableColumn<StockLedger.Row>("کاربر", 110.dp) { StockActions.userLabel(it.userId) },
-    TableColumn<StockLedger.Row>("دلیل", 180.dp) { it.reason },
-    TableColumn<StockLedger.Row>("سری", 100.dp) { if (it.lotId.isEmpty()) "" else StockActions.lotLabel(it.lotId) },
+    TableColumn<StockLedger.Row>(StrStockPages.provisionalCost, 110.dp, numeric = true) { minorText(it.costMinor) + if (it.costAdjustMinor != 0L) StrStockPages.adjusted(minorText(it.costAdjustMinor)) else "" },
+    TableColumn<StockLedger.Row>(StrShift.user, 110.dp) { StockActions.userLabel(it.userId) },
+    TableColumn<StockLedger.Row>(StrSafe.reason, 180.dp) { it.reason },
+    TableColumn<StockLedger.Row>(StrReports.colSeries, 100.dp) { if (it.lotId.isEmpty()) "" else StockActions.lotLabel(it.lotId) },
   )
   val ledgerState = rememberTableState(ledgerColumns)
 
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp)) {
     item {
       Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-        FilterMenu("کالا", prods, product, { product = it }, "همهٔ کالاها")
-        FilterMenu("نوع", StockActions.TYPE_LABEL.entries.map { it.key to it.value }, type, { type = it }, "همهٔ نوع‌ها")
-        FilterMenu("کاربر", users.map { it to StockActions.userLabel(it) }, who, { who = it }, "همهٔ کاربرها")
-        FilterMenu("محل", locations.map { it to StockActions.locationLabel(it) }, loc, { loc = it }, "همهٔ محل‌ها")
-        OutlinedTextField(from, { from = it }, label = { Text("از") }, placeholder = { Text("۱۴۰۵/۰۷/۰۱") }, singleLine = true,
+        FilterMenu(StrMoney.item, prods, product, { product = it }, StrStockPages.allItems)
+        FilterMenu(StrInvoices.colKind, StockActions.TYPE_LABEL.entries.map { it.key to it.value }, type, { type = it }, StrStockPages.allTypes)
+        FilterMenu(StrShift.user, users.map { it to StockActions.userLabel(it) }, who, { who = it }, StrStockPages.allUsers)
+        FilterMenu(StrPlaces.place, locations.map { it to StockActions.locationLabel(it) }, loc, { loc = it }, StrStockPages.allPlaces)
+        OutlinedTextField(from, { from = it }, label = { Text(StrReports.from) }, placeholder = { Text("۱۴۰۵/۰۷/۰۱") }, singleLine = true,
           isError = from.isNotBlank() && fromIso == null, modifier = Modifier.width(140.dp))
-        OutlinedTextField(to, { to = it }, label = { Text("تا") }, singleLine = true,
+        OutlinedTextField(to, { to = it }, label = { Text(StrReports.to) }, singleLine = true,
           isError = to.isNotBlank() && toIso == null, modifier = Modifier.width(140.dp))
         OutlinedButton(enabled = rows.isNotEmpty(), onClick = {
           val sheetRows = listOf(StockLedger.EXPORT_HEADER) + StockLedger.exportRows(rows.asReversed()) { names[it] ?: it }
-          onExport(ReportCsv.Sheet("دفتر-حرکت-کالا-${todayIso()}", sheetRows))
-        }) { Text("خروجی CSV") }
+          onExport(ReportCsv.Sheet("دفتر-حرکت-کالا-${todayIso()}", sheetRows)) // داده: نامِ پروندهٔ CSV (خروجی)
+        }) { Text(StrStock.exportCsv) }
       }
       Spacer(Modifier.height(6.dp))
       Text(
-        "${rows.size} حرکت · فقط افزودنی: هیچ ردیفی ویرایش یا پاک نمی‌شود؛ اصلاح یک سندِ تازه است.",
+        StrStockPages.ledgerNote(rows.size),
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
       )
       Spacer(Modifier.height(6.dp))
     }
     if (rows.isEmpty()) {
-      item { EmptyNote("حرکتی با این فیلتر نیست") }
+      item { EmptyNote(StrStockPages.noMovesFilter) }
     } else {
       dataTable(rows.take(limit), ledgerColumns, ledgerState, key = { it.id }, onOpen = {}, onMenu = {})
-      if (rows.size > limit) item { TextButton(onClick = { limit += 300 }) { Text("${rows.size - limit} ردیفِ دیگر") } }
+      if (rows.size > limit) item { TextButton(onClick = { limit += 300 }) { Text(StrStockPages.moreRows(rows.size - limit)) } }
     }
   }
 }
@@ -426,21 +427,21 @@ private fun ReviewTab(d: ShopData, v: StockLedger.View, onAck: (Collection<Strin
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 120.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       item {
         Text(
-          "فروشِ ثبت‌شده هرگز رد نمی‌شود: وقتی موجودی منفی شد یا از سریِ منقضی فروخته شد، این‌جا یک وظیفه ساخته می‌شود تا مدیر بشمارد یا ورود را ثبت کند.",
+          StrStockPages.reviewNote,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
         Row(verticalAlignment = Alignment.CenterVertically) {
           Checkbox(checked = showAcked, onCheckedChange = { showAcked = it })
-          Text("بررسی‌شده‌ها هم", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+          Text(StrStockPages.alsoReviewed, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
         }
       }
-      if (tasks.isEmpty()) item { EmptyNote("وظیفهٔ بازی نیست — موجودیِ منفی یا فروشِ منقضی پیدا نشد") }
+      if (tasks.isEmpty()) item { EmptyNote(StrStockPages.noOpenTasks) }
       items(tasks, key = { it.id }) { t ->
         Panel(Modifier.fillMaxWidth()) {
           Row(verticalAlignment = Alignment.CenterVertically) {
             if (!t.acked) Checkbox(checked = t.id in selected, onCheckedChange = { selected = if (it) selected + t.id else selected - t.id })
-            Text(names[t.productId] ?: "(کالای حذف‌شده)", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
-            if (t.acked) StatusPill("بررسی شد", PillTone.SUCCESS)
+            Text(names[t.productId] ?: StrHome.txDeletedItem, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
+            if (t.acked) StatusPill(StrOnline.ffAck, PillTone.SUCCESS)
           }
           Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             t.reasons.forEach { r ->
@@ -448,12 +449,12 @@ private fun ReviewTab(d: ShopData, v: StockLedger.View, onAck: (Collection<Strin
             }
           }
           Spacer(Modifier.height(6.dp))
-          KeyValue("روز", formatDate(t.day))
-          KeyValue("محل", StockActions.locationLabel(t.location))
-          if (t.shortMilli != 0L) KeyValue("کمبود", milliText(t.shortMilli), Shop.colors.danger)
-          KeyValue("موجودی پس از سند", milliText(t.qtyAfterMilli))
+          KeyValue(StrHistory.day, formatDate(t.day))
+          KeyValue(StrPlaces.place, StockActions.locationLabel(t.location))
+          if (t.shortMilli != 0L) KeyValue(StrStockPages.shortage, milliText(t.shortMilli), Shop.colors.danger)
+          KeyValue(StrStockPages.stockAfterDoc, milliText(t.qtyAfterMilli))
           if (!t.acked) Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { onAck(listOf(t.id)) }) { Text("بررسی شد") }
+            TextButton(onClick = { onAck(listOf(t.id)) }) { Text(StrOnline.ffAck) }
           }
         }
       }
@@ -461,7 +462,7 @@ private fun ReviewTab(d: ShopData, v: StockLedger.View, onAck: (Collection<Strin
     if (selected.isNotEmpty()) {
       BulkActionBar(
         count = selected.size,
-        actions = listOf(BulkAction("بررسی شد", Icons.Filled.CheckCircle) { onAck(selected); selected = emptySet() }),
+        actions = listOf(BulkAction(StrOnline.ffAck, Icons.Filled.CheckCircle) { onAck(selected); selected = emptySet() }),
         onClose = { selected = emptySet() },
         modifier = Modifier.align(Alignment.BottomCenter).padding(12.dp),
       )
@@ -503,14 +504,14 @@ private fun CountTab(
   val dr = draft
   if (dr == null) {
     Panel(Modifier.fillMaxWidth()) {
-      Text("شمارشِ موجودی", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+      Text(StrStockPages.countTitle, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
       Spacer(Modifier.height(6.dp))
       Text(
-        "موجودیِ برنامهٔ همین لحظه یادداشت می‌شود و اختلاف نسبت به همان حساب می‌شود؛ پس فروش یا خریدِ وسطِ شمارش اختلافِ دروغ نمی‌سازد. می‌شود فقط یک دسته یا چند کالا را شمرد. کالاهای شمرده‌نشده دست نمی‌خورند.",
+        StrStockPages.countNote,
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
       )
       Spacer(Modifier.height(12.dp))
-      Button(onClick = { keep(StockActions.startCount(d, v, System.currentTimeMillis())) }) { Text("شروعِ شمارش") }
+      Button(onClick = { keep(StockActions.startCount(d, v, System.currentTimeMillis())) }) { Text(StrStockPages.startCount) }
     }
     return
   }
@@ -528,20 +529,20 @@ private fun CountTab(
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 96.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item {
       Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        StatCard("شمرده", review.lines.size.toString(), "شروع: ${ir.vil3ntec.tohid.spanText(dr.startedAt)}", Modifier.widthIn(min = 130.dp))
-        StatCard("منطبق", review.matched.toString(), "بی اختلاف", Modifier.widthIn(min = 120.dp))
-        StatCard("مغایر", review.variance.toString(), "ثبت می‌شود", Modifier.widthIn(min = 120.dp))
-        StatCard("شمرده‌نشده", review.uncounted.toString(), "دست نمی‌خورند", Modifier.widthIn(min = 130.dp))
-        StatCard("اثرِ مالی (تقریبی)", minorText(review.valueMinor) + " ؋", "+${minorText(review.gainMinor)} / −${minorText(review.lossMinor)}", Modifier.widthIn(min = 170.dp))
+        StatCard(StrStock.counted, review.lines.size.toString(), StrStockPages.startedAt(ir.vil3ntec.tohid.spanText(dr.startedAt)), Modifier.widthIn(min = 130.dp))
+        StatCard(StrStockPages.matched, review.matched.toString(), StrInvoices.noDifference, Modifier.widthIn(min = 120.dp))
+        StatCard(StrStockPages.variance, review.variance.toString(), StrStockPages.willSave, Modifier.widthIn(min = 120.dp))
+        StatCard(StrStockPages.uncounted, review.uncounted.toString(), StrStockPages.untouched, Modifier.widthIn(min = 130.dp))
+        StatCard(StrStockPages.financialEffect, minorText(review.valueMinor) + " ؋", "+${minorText(review.gainMinor)} / −${minorText(review.lossMinor)}", Modifier.widthIn(min = 170.dp))
       }
       Spacer(Modifier.height(8.dp))
       Row(verticalAlignment = Alignment.CenterVertically) {
-        SearchBox(query, { query = it }, "جستجو با نام یا بارکد…", Modifier.weight(1f))
+        SearchBox(query, { query = it }, StrStockPages.searchNameBarcode, Modifier.weight(1f))
         Spacer(Modifier.width(8.dp))
-        FilterMenu("دسته", cats.map { it to it }, cat, { cat = it }, "همهٔ دسته‌ها")
+        FilterMenu(StrGrid.category, cats.map { it to it }, cat, { cat = it }, StrCount.allCategories)
       }
       Spacer(Modifier.height(6.dp))
-      Text("کالاهای شمرده‌نشده دست نمی‌خورند؛ صفر کردنشان فقط با شمردنِ صفر.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
+      Text(StrStockPages.uncountedNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
     }
     items(list, key = { it.id }) { p ->
       val sys = byLine[p.id]?.systemMilli ?: dr.snapshot[p.id] ?: StockLedger.productView(v, p.id).qtyMilli
@@ -554,20 +555,20 @@ private fun CountTab(
         Column(Modifier.weight(1f)) {
           Text(p.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
           Text(
-            "برنامه: ${milliText(sys)} ${p.unit}" + (if (diff != null && diff != 0L) " · ${if (diff > 0) "+" else "−"}${qty(kotlin.math.abs(diff) / 1000.0)}" else ""),
+            StrCount.system(milliText(sys), p.unit) + (if (diff != null && diff != 0L) " · ${if (diff > 0) "+" else "−"}${qty(kotlin.math.abs(diff) / 1000.0)}" else ""),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
           )
         }
         when {
           diff == null -> {}
-          diff == 0L -> StatusPill("منطبق", PillTone.SUCCESS)
-          diff > 0 -> StatusPill("افزایش", PillTone.SUCCESS)
+          diff == 0L -> StatusPill(StrStockPages.matched, PillTone.SUCCESS)
+          diff > 0 -> StatusPill(StrStockPages.increase, PillTone.SUCCESS)
           else -> {
-            StatusPill("کسری", PillTone.DANGER)
+            StatusPill(StrOnline.dlShort, PillTone.DANGER)
             Spacer(Modifier.width(6.dp))
             FilterMenu(
-              "دلیل", StockActions.LOSS_KINDS, dr.reasons[p.id] ?: "count",
-              { k -> keep(dr.copy(reasons = dr.reasons + (p.id to (k ?: "count")))) }, "اصلاحِ شمارش",
+              StrSafe.reason, StockActions.LOSS_KINDS, dr.reasons[p.id] ?: "count",
+              { k -> keep(dr.copy(reasons = dr.reasons + (p.id to (k ?: "count")))) }, StrStockPages.countFix,
             )
           }
         }
@@ -575,7 +576,7 @@ private fun CountTab(
         OutlinedTextField(
           value = dr.counts[p.id].orEmpty(),
           onValueChange = { raw -> keep(dr.copy(counts = if (raw.isBlank()) dr.counts - p.id else dr.counts + (p.id to raw))) },
-          placeholder = { Text("شمرده") },
+          placeholder = { Text(StrStock.counted) },
           singleLine = true,
           isError = p.id in invalid,
           keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
@@ -584,11 +585,11 @@ private fun CountTab(
       }
     }
     item {
-      OutlinedTextField(dr.note, { keep(dr.copy(note = it)) }, label = { Text("یادداشت (اختیاری)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+      OutlinedTextField(dr.note, { keep(dr.copy(note = it)) }, label = { Text(StrInvoices.noteOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
       Spacer(Modifier.height(10.dp))
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        OutlinedButton(onClick = { confirm = "drop" }) { Text("کنار گذاشتنِ شمارش") }
-        Button(enabled = review.variance > 0 && invalid.isEmpty(), onClick = { confirm = "save" }) { Text("ثبتِ ${review.variance} اختلاف") }
+        OutlinedButton(onClick = { confirm = "drop" }) { Text(StrStockPages.dropCount) }
+        Button(enabled = review.variance > 0 && invalid.isEmpty(), onClick = { confirm = "save" }) { Text(StrStockPages.saveDiffs(review.variance)) }
       }
     }
   }
@@ -597,11 +598,11 @@ private fun CountTab(
     AlertDialog(
       onDismissRequest = { confirm = null },
       containerColor = Shop.colors.surfaceSolid,
-      title = { Text(if (what == "save") "ثبتِ ${review.variance} اختلافِ شمارش؟" else "شمارش کنار گذاشته شود؟", color = Shop.colors.text) },
+      title = { Text(if (what == "save") StrStockPages.saveDiffsAsk(review.variance) else StrStockPages.dropAsk, color = Shop.colors.text) },
       text = {
         Text(
-          if (what == "save") "اثرِ مالیِ تقریبی ${minorText(review.valueMinor)} افغانی. هر اختلاف یک سندِ اصلاح با کاربر، دلیل و زمان می‌شود. ${review.uncounted} کالای شمرده‌نشده دست نمی‌خورد."
-          else "عددهای شمرده‌شده پاک می‌شوند؛ چیزی در دفتر ثبت نشده است.",
+          if (what == "save") StrStockPages.saveDiffsBody(minorText(review.valueMinor), review.uncounted)
+          else StrStockPages.dropBody,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
       },
@@ -613,9 +614,9 @@ private fun CountTab(
             is StockActions.Result.Failed -> onFail(r.message)
             is StockActions.Result.Ok -> { keep(null); onSaved(r.data, r.id) }
           }
-        }) { Text(if (what == "save") "ثبت کن" else "کنار بگذار") }
+        }) { Text(if (what == "save") StrStockPages.saveIt else StrStockPages.setAside) }
       },
-      dismissButton = { TextButton(onClick = { confirm = null }) { Text("انصراف") } },
+      dismissButton = { TextButton(onClick = { confirm = null }) { Text(Str.cancel) } },
     )
   }
 }
@@ -647,18 +648,18 @@ private fun TransferDialog(
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = Shape.dialog, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("انتقال بین محل‌ها", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
-          Text("موجودیِ کلِ کالا عوض نمی‌شود؛ فقط جایش. بها به میانگینِ مبدأ می‌رود.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+          Text(StrPlaces.transferTitle, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrStockPages.transferNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           Spacer(Modifier.height(12.dp))
           val chosen = d.products.find { it.id == productId }
           if (chosen != null) {
             Row(verticalAlignment = Alignment.CenterVertically) {
               Text(chosen.name, style = MaterialTheme.typography.bodyLarge, color = Shop.colors.text, modifier = Modifier.weight(1f))
-              TextButton(onClick = { productId = null; lot = null }) { Text("کالای دیگر") }
+              TextButton(onClick = { productId = null; lot = null }) { Text(StrPlaces.otherProduct) }
             }
             pv?.let { Text(it.locations.filter { l -> l.qtyMilli != 0L }.joinToString(" · ") { l -> "${StockActions.locationLabel(l.location)}: ${milliText(l.qtyMilli)}" }, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted) }
           } else {
-            SearchBox(search, { search = it }, "نامِ کالا…", Modifier.fillMaxWidth())
+            SearchBox(search, { search = it }, StrPlaces.search, Modifier.fillMaxWidth())
             d.products.filter { it.active && (search.isBlank() || it.name.contains(search.trim(), ignoreCase = true)) }.sortedBy { it.name }.take(6).forEach { p ->
               Text(
                 p.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text,
@@ -668,31 +669,31 @@ private fun TransferDialog(
           }
           Spacer(Modifier.height(10.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("از", color = Shop.colors.muted)
-            FilterMenu("مبدأ", locations.map { it to StockActions.locationLabel(it) }, from, { from = it ?: StockLedger.MAIN; lot = null }, StockActions.MAIN_LABEL)
-            Text("به", color = Shop.colors.muted)
+            Text(StrPlaces.from, color = Shop.colors.muted)
+            FilterMenu(StrPlaces.origin, locations.map { it to StockActions.locationLabel(it) }, from, { from = it ?: StockLedger.MAIN; lot = null }, StockActions.MAIN_LABEL)
+            Text(StrPlaces.to, color = Shop.colors.muted)
             if (!newPlace) {
-              FilterMenu("مقصد", locations.map { it to StockActions.locationLabel(it) }, to, { to = it ?: StockLedger.MAIN }, StockActions.MAIN_LABEL)
+              FilterMenu(StrPlaces.destination, locations.map { it to StockActions.locationLabel(it) }, to, { to = it ?: StockLedger.MAIN }, StockActions.MAIN_LABEL)
             }
-            TextButton(onClick = { newPlace = !newPlace }) { Text(if (newPlace) "از فهرست" else "+ محلِ تازه") }
+            TextButton(onClick = { newPlace = !newPlace }) { Text(if (newPlace) StrStockPages.fromList else StrStockPages.newPlaceBtn) }
           }
           if (newPlace) {
-            OutlinedTextField(fresh, { fresh = it.take(40) }, label = { Text("نامِ محلِ تازه، مثلاً انبارِ پشتی") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(fresh, { fresh = it.take(40) }, label = { Text(StrPlaces.newPlace) }, singleLine = true, modifier = Modifier.fillMaxWidth())
           }
           Spacer(Modifier.height(8.dp))
-          NumberField(amount, { amount = it }, "مقدار", Modifier.fillMaxWidth())
+          NumberField(amount, { amount = it }, StrPlaces.amount, Modifier.fillMaxWidth())
           if (lots.isNotEmpty()) {
             Spacer(Modifier.height(8.dp))
             FilterMenu(
-              "سری", lots.map { it.lotId to "${StockActions.lotLabel(it.lotId)} · ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " · ${formatDate(e)}" } ?: "") },
-              lot, { lot = it }, "به ترتیبِ FEFO",
+              StrReports.colSeries, lots.map { it.lotId to "${StockActions.lotLabel(it.lotId)} · ${milliText(it.qtyMilli)}" + (it.expiryDate?.let { e -> " · ${formatDate(e)}" } ?: "") },
+              lot, { lot = it }, StrStockPages.byFefo,
             )
           }
           Spacer(Modifier.height(8.dp))
-          OutlinedTextField(reason, { reason = it.take(80) }, label = { Text("دلیل (اختیاری)") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+          OutlinedTextField(reason, { reason = it.take(80) }, label = { Text(StrInvoices.reasonOptional) }, singleLine = true, modifier = Modifier.fillMaxWidth())
           Spacer(Modifier.height(16.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
             Button(
               enabled = productId != null,
               onClick = {
@@ -700,7 +701,7 @@ private fun TransferDialog(
                 onSave(productId ?: return@Button, from, dest, amount.toDoubleOrNull() ?: 0.0, lot, reason)
               },
               modifier = Modifier.weight(1f),
-            ) { Text("انتقال") }
+            ) { Text(StrPlaces.transfer) }
           }
         }
       }
@@ -711,7 +712,7 @@ private fun TransferDialog(
 /* ============================== تنظیمات: کارتِ «موجودی و بها» ============================== */
 
 /** عنوانِ بخش — همان که `DeskSettings` در ستونِ چپ نشان می‌دهد (`AppRoot`) */
-const val STOCK_SETTINGS_TITLE = "موجودی و بها"
+const val STOCK_SETTINGS_TITLE = "موجودی و بها" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.STOCK_MODE`)؛ نامِ صفحه `StrStockPages.settingsTitle`
 
 /**
  *  تنظیمِ دکان (نه دستگاه): ردیفِ `stock_mode` در دفترچهٔ ثبت، پس با همگام‌سازی به همهٔ
@@ -787,8 +788,8 @@ fun StockStrip(d: ShopData, onOpen: () -> Unit) {
   val v = view ?: return
   val stats = remember(v, d) { bookStats(d, v, todayIso()) }
   Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-    StatCard("ارزشِ موجودی به بهای میانگین", minorText(stats.valueMinor) + " ؋", "تقریبی (D-23)", Modifier.widthIn(min = 190.dp), onClick = onOpen)
-    StatCard("وظیفهٔ بررسیِ باز", stats.openTasks.toString(), if (stats.openTasks > 0) "موجودیِ منفی یا فروشِ منقضی" else "همه بررسی شده", Modifier.widthIn(min = 160.dp), onClick = onOpen)
-    StatCard("سریِ منقضیِ دارای موجودی", stats.expiredLots.toString(), "فروخته نمی‌شود", Modifier.widthIn(min = 160.dp), onClick = onOpen)
+    StatCard(StrStockPages.stockValueAvg, minorText(stats.valueMinor) + " ؋", StrStockPages.approxD23, Modifier.widthIn(min = 190.dp), onClick = onOpen)
+    StatCard(StrStockPages.openTasks, stats.openTasks.toString(), if (stats.openTasks > 0) StrStockPages.negOrExpired else StrStockPages.allReviewed, Modifier.widthIn(min = 160.dp), onClick = onOpen)
+    StatCard(StrStockPages.expiredLots, stats.expiredLots.toString(), StrSettings.notSold, Modifier.widthIn(min = 160.dp), onClick = onOpen)
   }
 }

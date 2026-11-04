@@ -11,6 +11,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.purchase.DemandForecast
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SmartDemand
@@ -61,46 +65,46 @@ internal fun PoSuggest(
   fun oneKey(supplierId: String) {
     val supplier = d.suppliers.find { it.id == supplierId } ?: return
     val lines = PurchaseSuggest.draftLines(rows.orEmpty(), supplierId)
-    if (lines.isEmpty()) { toast("از این تأمین‌کننده کالایی سفارش نمی‌خواهد"); return }
-    PurchaseSuggest.check(supplierId, lines)?.let { error = "پیشنهاد درست نیست (${it.code})"; return }
+    if (lines.isEmpty()) { toast(StrPurchasePages.noNeedFromSupplier); return }
+    PurchaseSuggest.check(supplierId, lines)?.let { error = StrPurchasePages.suggestInvalid(it.code); return }
     val key = keys.getOrPut(supplierId) { newId() }
     busy = supplierId; error = null
     scope.launch {
-      val r = repo.create(key, PurchaseOrderRepository.Draft(supplier.id, supplier.name, lines, null, "از «پیشنهادِ سفارش»"))
+      val r = repo.create(key, PurchaseOrderRepository.Draft(supplier.id, supplier.name, lines, null, "از «پیشنهادِ سفارش»")) // داده: یادداشتی که با پیش‌نویسِ سفارش ذخیره می‌شود
       busy = null
-      r.valueOrNull()?.let { toast("پیش‌نویسِ سفارشِ #${it.no} ساخته شد — هنوز فرستاده نشده"); onCreated(it) }
+      r.valueOrNull()?.let { toast(StrPurchasePages.draftCreatedNotSent(it.no)); onCreated(it) }
         ?: run { error = r.errorMessage() }
     }
   }
 
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-    FilterChip(selected = onlyDue, onClick = { onlyDue = true }, label = { Text("نیاز به سفارش") }, shape = Shape.chip)
-    FilterChip(selected = !onlyDue, onClick = { onlyDue = false }, label = { Text("همه: چند روز کافی است") }, shape = Shape.chip)
+    FilterChip(selected = onlyDue, onClick = { onlyDue = true }, label = { Text(StrReach.tabReorder) }, shape = Shape.chip)
+    FilterChip(selected = !onlyDue, onClick = { onlyDue = false }, label = { Text(StrPurchasePages.allDaysLeft) }, shape = Shape.chip)
   }
   Text(
-    "از فروشِ ۹۰ روزِ اخیر (روزِ هفته و همین روزهای پارسال)، زمانِ تأمینِ هر تأمین‌کننده و «در راه». " +
-      "«ساختِ پیش‌نویس» فقط پیش‌نویس می‌سازد؛ فرستادن با خودتان است." +
-      (if (smart) " پیش‌بینیِ تقاضا روشن است: پرفروش با میانگینِ متحرکِ ۲۸ روز، کم‌فروش با Croston؛ اطمینان از درازای داده و نوسان." else ""),
+    StrPurchasePages.suggestNote1 +
+      StrPurchasePages.suggestNote2 +
+      (if (smart) StrPurchasePages.suggestNoteSmart else ""),
     style = MaterialTheme.typography.labelSmall, color = c.muted, modifier = Modifier.padding(vertical = 6.dp),
   )
   error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
     val all = rows
-    if (all == null) { Text("در حالِ خواندن…", color = c.muted, style = MaterialTheme.typography.bodySmall); return@Column }
+    if (all == null) { Text(StrReports.loading, color = c.muted, style = MaterialTheme.typography.bodySmall); return@Column }
     val shown = if (onlyDue) all.filter { it.due } else all
-    if (shown.isEmpty()) { EmptyNote(if (onlyDue) "امروز کالایی سفارش نمی‌خواهد." else "کالای فعالی نیست."); return@Column }
+    if (shown.isEmpty()) { EmptyNote(if (onlyDue) StrPurchasePages.nothingDueToday else StrPurchasePages.noActiveItems); return@Column }
     for ((sid, group) in shown.groupBy { it.supplierId }) {
-      val name = sid?.let { s -> d.suppliers.find { it.id == s }?.name } ?: "بی تأمین‌کننده"
+      val name = sid?.let { s -> d.suppliers.find { it.id == s }?.name } ?: StrPurchasePages.noSupplier
       val due = group.count { it.due }
       Row(Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(name, color = c.text, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (sid != null && perms.manage && due > 0) {
           Button(onClick = { oneKey(sid) }, enabled = busy == null) {
-            Text(if (busy == sid) "در حالِ ساختن…" else "ساختِ پیش‌نویس ($due کالا)")
+            Text(if (busy == sid) StrSettings.buildingDots else StrPurchasePages.createDraftN(due))
           }
         }
       }
-      if (sid == null) Text("تأمین‌کننده‌ای روی این کالاها نیست و از کسی خریده نشده‌اند؛ سفارش را دستی بسازید.", style = MaterialTheme.typography.labelSmall, color = c.muted)
+      if (sid == null) Text(StrPurchasePages.noSupplierNote, style = MaterialTheme.typography.labelSmall, color = c.muted)
       group.forEach { r -> SuggestRow(r) }
       HorizontalDivider(color = c.border)
     }
@@ -117,8 +121,8 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       StatusPill(DemandForecast.confidenceText(f.confidence), confidenceTone(f.confidence))
     }
     Text(
-      "کافی برای: ${DemandForecast.coverText(f, LocaleFormat.DIGITS_LATN)}" +
-        (if (r.due) " · پیشنهاد: ${qty(PurchaseOrderBook.units(f.qtyMilli))} ${r.product.unit}" else ""),
+      StrPurchasePages.enoughFor(DemandForecast.coverText(f, LocaleFormat.DIGITS_LATN)) +
+        (if (r.due) StrPurchasePages.suggestQty(qty(PurchaseOrderBook.units(f.qtyMilli)), r.product.unit) else ""),
       style = MaterialTheme.typography.bodySmall, color = if (r.due) c.text else c.muted,
     )
     Text(DemandForecast.why(f, LocaleFormat.DIGITS_LATN), style = MaterialTheme.typography.labelSmall, color = c.muted)
@@ -126,7 +130,7 @@ private fun SuggestRow(r: PurchaseSuggest.Row) {
       Row(verticalAlignment = Alignment.CenterVertically) {
         StatusPill(SmartDemand.methodText(s.method), PillTone.INFO)
         Spacer(Modifier.width(6.dp))
-        Text("۷ روزِ آینده: ${SmartDemand.nextDaysText(s, 7, LocaleFormat.DIGITS_LATN)}", style = MaterialTheme.typography.labelSmall, color = c.muted)
+        Text(StrPurchasePages.next7Days(SmartDemand.nextDaysText(s, 7, LocaleFormat.DIGITS_LATN)), style = MaterialTheme.typography.labelSmall, color = c.muted)
       }
     }
   }

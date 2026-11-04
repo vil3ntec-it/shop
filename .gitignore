@@ -22,3 +22,10 @@ keystore.properties
 *.sqlite
 *.sqlite3
 backups/
+
+# پوشِ گوشی (Firebase، O-01) — کلیدِ حسابِ سرویس و فایل‌های تنظیمِ Firebase هرگز در مخزن (docs/FIREBASE-SETUP-fa.md)
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
+fcm-service-account*.json
+server/secrets/
