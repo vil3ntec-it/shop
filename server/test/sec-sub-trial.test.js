@@ -12,6 +12,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, now } = require('../src/db');
+const plans = require('../src/lib/plans');
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -41,7 +42,7 @@ test('SEC-SUB-02: نصبِ دوباره، ساعتِ جلو/عقب، دکانِ 
   assert.ok(Math.abs(Number(row.created_at) - now()) < 60_000, 'آغاز از ساعتِ سرور، نه از بدنه');
   const t0 = await trialOf(u.accessToken);
   assert.equal(t0.source, 'trial');
-  assert.equal(t0.endsAt, Number(row.created_at) + 7 * DAY);
+  assert.equal(t0.endsAt, Number(row.created_at) + (await plans.trialDaysOf('shop')) * DAY);
 
   //  ساعتِ ادعاییِ برنامه (جلو و عقب) بی‌اثر
   for (const off of [3650 * DAY, -3650 * DAY]) {
@@ -69,7 +70,7 @@ test('SEC-SUB-02: نصبِ دوباره، ساعتِ جلو/عقب، دکانِ 
 test('SEC-SUB-02: پس از پایانِ آزمایشی — نصبِ دوباره، بازیابیِ پشتیبانِ محلی و Syncِ دست‌کاری‌شده چیزی باز نمی‌کنند', async () => {
   const u = await h.newUser('آزمایشی-تمام');
   const shopId = (await h.post('/api/shop', { name: 'دکان' }, { token: u.accessToken })).body.shop.id;
-  await query('UPDATE shops SET created_at=$2 WHERE id=$1', [shopId, now() - 8 * DAY]);
+  await query('UPDATE shops SET created_at=$2 WHERE id=$1', [shopId, now() - ((await plans.trialDaysOf('shop')) + 1) * DAY]);
   const ended = await trialOf(u.accessToken);
   assert.equal(ended.source, 'free');
   assert.equal(ended.active, false);

@@ -92,7 +92,7 @@ object ReportFresh {
 
   /**
    *  RPT-03: روشِ بهای سود و حاشیه (`CostPolicy` ِ core) — همین دستگاه، همگام نمی‌شود؛ پیش‌فرض
-   *  همان رفتارِ امروز (قیمتِ خریدِ روی قلم). تا D-23 هر روشی «تقریبی» است.
+   *  روشِ مصوبِ D-23 (میانگینِ موزون)؛ «قیمت خرید روی قلم» انتخابی و «تقریبی».
    */
   val cost = mutableStateOf(CostPolicy.DEFAULT)
   private var saveCost: (CostMethod) -> Unit = {}
@@ -165,7 +165,7 @@ private fun rememberHome(d: ShopData, showMoney: Boolean): ReportBoard.Home {
   val today = ir.vil3ntec.tohid.todayIso()
   val cost = ReportFresh.cost.value
   return remember(d, today, showMoney, cost) {
-    ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), money = showMoney)
+    ReportBoard.build(ReportBridge.ledgerOf(d), today, ReportBridge.deviceClock(), ReportFreshModel.costingOf(cost), CostPolicy.approved(cost), money = showMoney)
   }
 }
 
