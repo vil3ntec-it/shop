@@ -31,7 +31,19 @@ import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.calendar.ShopDay
 import ir.vil3ntec.tohid.core.cost.CostMethod
 import ir.vil3ntec.tohid.core.cost.CostPolicy
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrBranches
+import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrReportPages
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.core.i18n.StrRisk
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportTables
@@ -121,13 +133,13 @@ fun ReportFreshSwitch(modifier: Modifier = Modifier) {
   LaunchedEffect(Unit) { ReportFresh.load(context) }
   Row(modifier, verticalAlignment = Alignment.CenterVertically) {
     Column(Modifier.padding(end = 8.dp)) {
-      Text("گزارشِ تازه", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text, fontWeight = FontWeight.SemiBold)
-      Text("آزمایشی · فقط روی همین دستگاه", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text(StrReach.freshOn, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text, fontWeight = FontWeight.SemiBold)
+      Text(StrReportPages.trialThisDevice, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     Switch(
       checked = ReportFresh.on.value,
       onCheckedChange = { ReportFresh.set(context, it) },
-      modifier = Modifier.semantics { contentDescription = "گزارشِ تازه" },
+      modifier = Modifier.semantics { contentDescription = StrReach.freshOn },
     )
   }
 }
@@ -181,7 +193,7 @@ fun HomeKpis(d: ShopData, onOpen: (String) -> Unit, showMoney: Boolean, columns:
       home.pills.forEach { p ->
         StatusPill(
           p.text, tone(p.tone),
-          Modifier.clip(Shape.badge).clickable(role = Role.Button, onClickLabel = "نمایشِ فهرست") { ReportFresh.open(p.target, onOpen) },
+          Modifier.clip(Shape.badge).clickable(role = Role.Button, onClickLabel = Str.showList) { ReportFresh.open(p.target, onOpen) },
         )
       }
     }
@@ -243,11 +255,11 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
   val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
-  val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-')
+  val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-') // داده: نامِ پروندهٔ خروجی
 
   fun sheet() = ReportCsv.Sheet(name, ReportFreshModel.exportRows(tables))
   fun print() = ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet(), name)
-  fun excel() { Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar("ذخیره شد: $it") } } }
+  fun excel() { Platform.saveFile("$name.xlsx", Xlsx.of(sheet()))?.let { scope.launch { snackbar.showSnackbar(StrSale.savedTo(it)) } } }
   //  RPT-11: PDF ِ مستقیم — همان جدول‌های چاپ، بی پنجرهٔ چاپ (فقط در «گزارشِ تازه»، پشتِ `report_fresh`)
   //  کامپیوتر: پنجرهٔ ذخیره؛ گوشی: «فرستادن» (همان راهِ PDF ِ فاکتور). ساختنِ صفحه‌ها بیرون از نخِ صفحه.
   fun pdf() {
@@ -274,19 +286,19 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     /* ۱ ─ عنوان، توضیح، خروجی و عملِ اصلی */
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
-        Text("گزارش‌ها", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(Str.reports, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         Text(
-          "از هستهٔ مشترکِ گزارش (همان عددهای وب). سود تا تعیینِ روشِ بهای تمام‌شده تقریبی است.",
+          StrReportPages.sourceNote,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
       }
       ReportFreshSwitch()
       Spacer(Modifier.width(12.dp))
-      OutlinedButton(onClick = ::print) { Text("چاپ  ${KeyMap.GLOBAL_PRINT.hint}") }
+      OutlinedButton(onClick = ::print) { Text(StrReportPages.printKey(KeyMap.GLOBAL_PRINT.hint)) }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = ::pdf) { Text("PDF") }
       Spacer(Modifier.width(6.dp))
-      Button(onClick = ::excel) { Text("اکسل  ${KeyMap.GLOBAL_EXPORT.hint}") }
+      Button(onClick = ::excel) { Text(StrReportPages.excelKey(KeyMap.GLOBAL_EXPORT.hint)) }
     }
 
     /* ۲ ─ نوارِ ابزار: زبانه، بازه، تفکیک، نما */
@@ -313,7 +325,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     }
 
     /* ۴ ─ جدول‌ها */
-    if (tables.isEmpty()) Text("گزارشی برای نمایش نیست.", color = Shop.colors.muted)
+    if (tables.isEmpty()) Text(StrReportPages.noReport, color = Shop.colors.muted)
     tables.forEach { t ->
       if (tables.size > 1) Text(t.title, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
       val sales = view.sales
@@ -334,7 +346,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     DayEndDetailDialog(detail) { drill = null }
   }
   salesDrill?.let { t ->
-    DayEndDetailDialog(t, note = "جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ ردیف است؛ برگشتی جداست.") { salesDrill = null }
+    DayEndDetailDialog(t, note = StrReportPages.salesDrillNote) { salesDrill = null }
   }
 }
 
@@ -345,36 +357,36 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
   when (tab) {
     "today" -> HomeKpis(d, {}, showMoney, columns = 5)
     "sales" -> view.sales?.let { s ->
-      val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(s.from)} تا ${formatDate(s.to)}"
+      val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(s.from), formatDate(s.to))
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        card("فروش خالص", af(s.totals.netSales), p, Modifier.weight(1f))
-        card("فاکتور", s.totals.invoices.toString(), p, Modifier.weight(1f))
-        card("تخفیف", af(s.totals.discount), p, Modifier.weight(1f))
-        card("برگشتی", af(s.totals.returns), p, Modifier.weight(1f))
-        card("میانگین فاکتور", af(s.totals.avgTicket), p, Modifier.weight(1f))
+        card(StrReports.netSales, af(s.totals.netSales), p, Modifier.weight(1f))
+        card(StrInvoices.colInvoice, s.totals.invoices.toString(), p, Modifier.weight(1f))
+        card(Str.discount, af(s.totals.discount), p, Modifier.weight(1f))
+        card(StrBranches.returns, af(s.totals.returns), p, Modifier.weight(1f))
+        card(StrReportPages.avgTicket, af(s.totals.avgTicket), p, Modifier.weight(1f))
       }
     }
     "profit" -> view.sales?.let { s ->
-      val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(s.from)} تا ${formatDate(s.to)}"
+      val p = if (s.from == s.to) formatDate(s.from) else if (s.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(s.from), formatDate(s.to))
       //  RPT-03: روشِ بها همان که هسته با آن حساب کرد (`s.costing`)، نه حدسِ صفحه
       val m = CostPolicy.parse(s.costing)
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          card("فروش خالص", af(s.totals.netSales), p, Modifier.weight(1f))
-          card(CostPolicy.label("بهای تمام‌شده", m), af(s.totals.cogs), p, Modifier.weight(1f))
-          card(CostPolicy.label("سود ناخالص", m), af(s.totals.grossProfit), p, Modifier.weight(1f))
-          card(CostPolicy.label("حاشیه", m), s.totals.marginBp?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
+          card(StrReports.netSales, af(s.totals.netSales), p, Modifier.weight(1f))
+          card(CostPolicy.label(StrReportPages.cogs, m), af(s.totals.cogs), p, Modifier.weight(1f))
+          card(CostPolicy.label(StrReports.grossProfit, m), af(s.totals.grossProfit), p, Modifier.weight(1f))
+          card(CostPolicy.label(StrReportPages.margin, m), s.totals.marginBp?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
         }
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          Text("روش بها", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+          Text(StrReportPages.costMethod, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
           SegmentedTabs(CostMethod.entries.map { SegmentTab(it, it.label) }, m, { ReportFresh.setCost(it) })
         }
         Row(verticalAlignment = Alignment.CenterVertically) {
-          if (s.totals.profitApproximate) StatusPill("سود تقریبی", PillTone.WARNING) else StatusPill("سود قطعی", PillTone.SUCCESS)
+          if (s.totals.profitApproximate) StatusPill(StrReportPages.profitApprox, PillTone.WARNING) else StatusPill(StrReportPages.profitFinal, PillTone.SUCCESS)
           Spacer(Modifier.width(8.dp))
           Text(
             CostPolicy.explain(m) + " " +
-              (if (s.totals.costEstimatedLines > 0) "${s.totals.costEstimatedLines} قلم بی بهای خرید است." else ""),
+              (if (s.totals.costEstimatedLines > 0) StrReportPages.noCostLines(s.totals.costEstimatedLines) else ""),
             style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
           )
         }
@@ -383,14 +395,14 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
     "debts" -> view.debts?.let { x ->
       val late = x.customers.rows.count { (it.buckets.lastOrNull() ?: 0L) > 0 }
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        card("طلب از مشتریان", af(x.customers.totals.balance), "تا امروز", Modifier.weight(1f))
-        card("مشتریانِ بدهکار", x.customers.rows.count { it.balance > 0 }.toString(), "تا امروز", Modifier.weight(1f))
-        card("قرضِ بیش از ${x.buckets.lastOrNull() ?: 0} روز", late.toString(), "مشتری", Modifier.weight(1f))
-        card("بدهی به تأمین‌کنندگان", af(x.suppliers.totals.balance), "تا امروز", Modifier.weight(1f))
+        card(StrHome.receivablesCustomers, af(x.customers.totals.balance), StrReportPages.untilToday, Modifier.weight(1f))
+        card(StrReportPages.owingCustomers, x.customers.rows.count { it.balance > 0 }.toString(), StrReportPages.untilToday, Modifier.weight(1f))
+        card(StrReportPages.creditOver(x.buckets.lastOrNull() ?: 0), late.toString(), StrOnline.customer, Modifier.weight(1f))
+        card(StrReportPages.owedToSuppliers, af(x.suppliers.totals.balance), StrReportPages.untilToday, Modifier.weight(1f))
       }
     }
     "fraud" -> view.fraud?.let { f ->
-      val p = if (f.from == f.to) formatDate(f.from) else if (f.from == "0000-01-01") "همهٔ تاریخ‌ها" else "${formatDate(f.from)} تا ${formatDate(f.to)}"
+      val p = if (f.from == f.to) formatDate(f.from) else if (f.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(f.from), formatDate(f.to))
       val alerts = remember(f) { ReportBoard.alertsOf(f) }
       //  AI-08: تنظیمِ خاموشِ «تشخیصِ ناهنجاری» (`AnomalyPref`) ⇒ `null` و همان کادرِ RSK-10
       val anomalyOn = rememberAnomalyOn()
@@ -399,11 +411,11 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
       }
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          card("لغوِ فاکتور", f.totals.voidCount.toString(), p, Modifier.weight(1f))
-          card("برگشتی", f.totals.returnCount.toString(), p, Modifier.weight(1f))
-          card("حذفِ ردیف", f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
-          card("کشو بی فروش", f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
-          card("نیازمندِ تأیید", f.totals.overrideCount.toString(), p, Modifier.weight(1f))
+          card(StrReportPages.invoiceVoids, f.totals.voidCount.toString(), p, Modifier.weight(1f))
+          card(StrBranches.returns, f.totals.returnCount.toString(), p, Modifier.weight(1f))
+          card(StrStock.removeRow, f.totals.lineDeleteCount.toString(), p, Modifier.weight(1f))
+          card(StrSale.noSaleOpens, f.totals.noSaleCount.toString(), p, Modifier.weight(1f))
+          card(StrReportPages.needApproval, f.totals.overrideCount.toString(), p, Modifier.weight(1f))
         }
         if (findings != null) AnomalyBox(findings) else if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
@@ -451,10 +463,10 @@ private fun AnomalyBox(findings: List<Anomalies.Finding>) {
     verticalArrangement = Arrangement.spacedBy(6.dp),
   ) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      StatusPill(if (findings.isEmpty()) "موردی نیازمندِ بررسی نیست" else "${findings.size} مورد نیازمندِ بررسی", if (findings.isEmpty()) PillTone.SUCCESS else PillTone.WARNING)
+      StatusPill(if (findings.isEmpty()) StrReportPages.nothingToReview else StrReportPages.needReview(findings.size), if (findings.isEmpty()) PillTone.SUCCESS else PillTone.WARNING)
       Spacer(Modifier.width(8.dp))
       Text(
-        "تشخیصِ ناهنجاری (قاعده و آمار، روی دفترِ همین دستگاه): صندوقدار، اختلافِ صندوق، کمِ موجودی، زیرِ بها، ساعت و روزهای بیرون از معمول. فقط نشان می‌دهد.",
+        StrReportPages.anomalyNote,
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
       )
     }
@@ -468,7 +480,7 @@ private fun AnomalyBox(findings: List<Anomalies.Finding>) {
         )
       }
     }
-    if (findings.size > shown) Text("و ${findings.size - shown} موردِ دیگر", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    if (findings.size > shown) Text(StrReportPages.andMore(findings.size - shown), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
 
@@ -493,7 +505,7 @@ internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List
     val c = t.columns[i]
     Box(
       Modifier.width(colWidth(c.kind)).fillMaxHeight().border(0.5.dp, line)
-        .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = "مرتب‌سازی با ${c.label}", onClick = onClick) else Modifier)
+        .then(if (onClick != null) Modifier.clickable(role = Role.Button, onClickLabel = StrReportPages.sortBy(c.label), onClick = onClick) else Modifier)
         .padding(horizontal = 8.dp, vertical = 6.dp),
       contentAlignment = if (c.kind == "text" || c.kind == "date") Alignment.CenterStart else Alignment.CenterEnd,
     ) { content() }
@@ -510,13 +522,13 @@ internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List
       }
       LazyColumn(Modifier.weight(1f, fill = false)) {
         if (rows.isEmpty()) item {
-          Text("در این بازه چیزی نیست.", Modifier.width(width).padding(24.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
+          Text(StrReports.tableEmpty, Modifier.width(width).padding(24.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
         }
         items(rows.size) { r ->
           val drill = onRow?.let { open ->
             Modifier
               .onPreviewKeyEvent { e -> if (e.matches(KeyMap.REPORTS_DRILL)) { open(rows[r]); true } else false }
-              .clickable(role = Role.Button, onClickLabel = "ریزِ ${ReportFreshModel.display(rows[r].first(), t.columns[0].kind, ::formatDate)}") { open(rows[r]) }
+              .clickable(role = Role.Button, onClickLabel = StrReportPages.detailOf(ReportFreshModel.display(rows[r].first(), t.columns[0].kind, ::formatDate))) { open(rows[r]) }
           } ?: Modifier
           Row(Modifier.height(IntrinsicSize.Min).background(if (r % 2 == 1) Shop.colors.surface2.copy(alpha = 0.4f) else Shop.colors.surface).then(drill)) {
             rows[r].forEachIndexed { i, v ->
@@ -546,7 +558,7 @@ internal fun FreshTable(t: ReportTables.Table, modifier: Modifier, onRow: ((List
 private fun FreshCards(t: ReportTables.Table, modifier: Modifier) {
   val keys = remember(t.id) { ReportFreshModel.cardKeys(t.id).mapNotNull { k -> t.columns.indexOfFirst { it.key == k }.takeIf { it >= 0 } } }
   if (t.rows.isEmpty()) {
-    Text("در این بازه چیزی نیست.", modifier.padding(24.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
+    Text(StrReports.tableEmpty, modifier.padding(24.dp), color = Shop.colors.muted, textAlign = TextAlign.Center)
     return
   }
   LazyVerticalGrid(GridCells.Adaptive(220.dp), modifier, horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -606,17 +618,17 @@ fun PhoneFreshReports(d: ShopData) {
   LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     item {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("امروز و سنِ بدهی", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(StrReportPages.todayAging, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         ReportFreshSwitch()
       }
       Spacer(Modifier.height(8.dp))
       OutlinedButton(
         onClick = {
-          val name = "گزارش-امروز-و-بدهی-$today"
+          val name = "گزارش-امروز-و-بدهی-$today" // داده: نامِ پروندهٔ خروجی
           ir.vil3ntec.tohid.print.ReportPrint.print(context, ReportCsv.Sheet(name, ReportFreshModel.exportRows(todayTables + debts.tables + dayEnd?.tables.orEmpty())), name)
         },
         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
-      ) { Text("چاپ / PDF") }
+      ) { Text(StrMoney.printPdf) }
     }
     item { HomeKpis(d, {}, money, columns = 2) }
     dayEnd?.let { b -> item { DayEndPhone(b) } }
@@ -627,37 +639,37 @@ fun PhoneFreshReports(d: ShopData) {
 
 private fun phoneDebts(scope: LazyListScope, v: ReportFreshModel.View) {
   val x = v.debts ?: return
-  val labels = x.buckets.let { b -> var lo = 0L; b.map { hi -> "$lo–$hi روز".also { lo = hi + 1 } } + "$lo+ روز" }
+  val labels = x.buckets.let { b -> var lo = 0L; b.map { hi -> StrReportPages.dayRange(lo, hi).also { lo = hi + 1 } } + StrReportPages.daysPlus(lo) }
   scope.item {
-    Text("سنِ بدهیِ مشتری‌ها", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    Text(StrReportPages.customerAging, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     Spacer(Modifier.height(8.dp))
     labels.indices.chunked(2).forEach { line ->
       Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        line.forEach { i -> StatCard(labels[i], "${money(x.customers.totals.buckets[i] / 100.0)} ؋", "مانده", Modifier.weight(1f)) }
+        line.forEach { i -> StatCard(labels[i], "${money(x.customers.totals.buckets[i] / 100.0)} ؋", StrSimpleAsk.vDebtRemaining, Modifier.weight(1f)) }
         if (line.size == 1) Spacer(Modifier.weight(1f))
       }
       Spacer(Modifier.height(10.dp))
     }
   }
-  if (x.customers.rows.isEmpty()) scope.item { Text("هیچ مشتری‌ای قرض ندارد.", color = Shop.colors.muted) }
+  if (x.customers.rows.isEmpty()) scope.item { Text(StrReportPages.noCustomerOwes, color = Shop.colors.muted) }
   scope.items(x.customers.rows, key = { it.id }) { r ->
     val lastBucket = r.buckets.lastOrNull() ?: 0L
     Column(
       Modifier.fillMaxWidth().clip(Shape.card).background(Shop.colors.surfaceSolid).border(1.dp, Shop.colors.border, Shape.card).padding(14.dp),
     ) {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(r.name.ifBlank { "نامعلوم" }, Modifier.weight(1f), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(r.name.ifBlank { StrOnline.presShortUnknown }, Modifier.weight(1f), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text("${money(r.balance / 100.0)} ؋", fontWeight = FontWeight.Bold, color = Shop.colors.text)
       }
       Spacer(Modifier.height(6.dp))
       Row(verticalAlignment = Alignment.CenterVertically) {
         when {
-          r.balance <= 0 -> StatusPill("پیش‌پرداخت", PillTone.SUCCESS)
-          lastBucket > 0 -> StatusPill("بیش از ${x.buckets.lastOrNull() ?: 0} روز", PillTone.DANGER)
-          else -> StatusPill("در مهلت", PillTone.NEUTRAL)
+          r.balance <= 0 -> StatusPill(StrMoney.prepaid, PillTone.SUCCESS)
+          lastBucket > 0 -> StatusPill(StrReports.laterThan(x.buckets.lastOrNull() ?: 0), PillTone.DANGER)
+          else -> StatusPill(StrReportPages.onTime, PillTone.NEUTRAL)
         }
         Spacer(Modifier.width(8.dp))
-        if ((r.oldestDays ?: -1) >= 0) Text("قدیمی‌ترین: ${r.oldestDays} روز", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        if ((r.oldestDays ?: -1) >= 0) Text(StrReportPages.oldestDays(r.oldestDays), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       }
     }
   }

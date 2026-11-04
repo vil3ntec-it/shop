@@ -99,6 +99,8 @@ async function disable(shopId, deviceId, { byId = '', currentDeviceId = null, re
     [dev.id, t, String(byId || ''), shopId]
   );
   const sessions = await tokens.revokeAllForDevice(dev.id);
+  //  O-01: دستگاهِ از کار افتاده پوش هم نمی‌گیرد
+  await require('./push').revokeDevice({ deviceId: dev.id, reason: 'device_disabled' });
   await audit.log({
     shopId, actorType, userId: actorType === 'user' ? byId : '', action: 'device.disabled',
     targetType: 'device', targetId: dev.id,

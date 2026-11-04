@@ -19,12 +19,62 @@
  * دیده می‌شود؛ فقط زنگش را نمی‌زند. پس نصبِ بدونِ FCM هم کار می‌کند.
  */
 const { createSign } = require('crypto');
+const fs = require('fs');
 const { query, one, many, newId, now } = require('../db');
 const plans = require('./plans');
 const apns = require('./apns');
 
 const PREFIX = 'push_';
 const SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
+const FCM_ORIGIN = 'https://fcm.googleapis.com';
+/** نشانیِ توکنِ گوگل — ثابت. `token_uri` ِ فایلِ حسابِ سرویس نادیده گرفته می‌شود: فایلِ دست‌خورده نباید امضای ورود را
+ *  به میزبانِ دیگری بفرستد (CodeQL «File data in outbound network request»). فقط آزمون با [useFcmOrigin] جایش را عوض می‌کند. */
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+/** شناسهٔ پروژهٔ Firebase (قاعدهٔ گوگل: ۶ تا ۳۰ نویسه، حرفِ کوچک، رقم و خط‌تیره) — جز این ⇒ هیچ درخواستی */
+const PROJECT_ID = /^[a-z][a-z0-9-]{4,28}[a-z0-9]$/;
+/** سقفِ توکنِ فعالِ هر کس در هر برنامه — بیشتر ⇒ کهنه‌ترین‌ها کهنه (ثبتِ انبوهِ توکنِ ساختگی پوش را کند نمی‌کند) */
+const MAX_TOKENS_PER_USER = 10;
+
+/*
+ *  ⛔ «بی کلید، بی‌صدا ولی نه پنهان» (O-01، docs/FIREBASE-SETUP-fa.md): بی حسابِ سرویس هیچ پیامی نمی‌رود و هیچ
+ *  خطایی بیرون نمی‌آید؛ فقط **یک بار** در هر اجرای سرور در لاگ گفته می‌شود چرا — نه با هر سفارش.
+ *  ⛔ متنِ هشدار هیچ کلید، توکن یا محتوای فایل ندارد؛ فقط نامِ متغیر و دلیل.
+ */
+const warned = new Set();
+function warnOnce(key, text) {
+  if (warned.has(key)) return false;
+  warned.add(key);
+  console.warn(`[push] ${text}`);
+  return true;
+}
+
+/**
+ * حسابِ سرویس از محیطِ سرور: `FCM_SERVICE_ACCOUNT` (خودِ JSON) یا `FCM_SERVICE_ACCOUNT_FILE` (مسیرِ فایلِ JSON،
+ * مثلاً یک secret ِ Docker). ⛔ هرگز در مخزن نیست. فایلِ ناخوانا ⇒ همان «تنظیم نشده» و یک هشدار.
+ */
+function envServiceAccount() {
+  const inline = String(process.env.FCM_SERVICE_ACCOUNT || '').trim();
+  if (inline) return { text: inline, source: 'env' };
+  const file = String(process.env.FCM_SERVICE_ACCOUNT_FILE || '').trim();
+  if (!file) return { text: '', source: '' };
+  try {
+    return { text: fs.readFileSync(file, 'utf8').trim(), source: 'file' };
+  } catch (err) {
+    warnOnce('fcm_file', `FCM_SERVICE_ACCOUNT_FILE خوانده نشد (${(err && err.code) || 'error'}) — پوشِ اندروید خاموش می‌ماند`);
+    return { text: '', source: '' };
+  }
+}
+
+/** JSON ِ حسابِ سرویس ⇐ شیء، یا null با یک هشدار (بی محتوای فایل در لاگ) */
+function parseServiceAccount(text) {
+  if (!text) return null;
+  try {
+    const sa = JSON.parse(text);
+    if (sa && sa.client_email && sa.private_key && sa.project_id) return sa;
+  } catch { /* پایین */ }
+  warnOnce('fcm_bad_sa', 'حسابِ سرویسِ Firebase خراب یا ناقص است (client_email، private_key و project_id لازم است) — پوشِ اندروید خاموش می‌ماند');
+  return null;
+}
 
 let cache = { at: 0, value: null };
 const TTL_MS = 10 * 1000;
@@ -41,9 +91,13 @@ async function current() {
   const t = Date.now();
   if (cache.value && t - cache.at < TTL_MS) return cache.value;
   const rows = await plans.allConfig();
+  const stored = rows[PREFIX + 'service_account'] || '';
+  const env = stored ? { text: '', source: '' } : envServiceAccount();
   const out = {
     enabled: rows[PREFIX + 'enabled'] === '1',
-    serviceAccount: rows[PREFIX + 'service_account'] || process.env.FCM_SERVICE_ACCOUNT || '',
+    serviceAccount: stored || env.text,
+    //  از کجا: پنل (ذخیره در پایگاه) · env · file — برای «چرا خاموش است» ِ پنل، نه خودِ کلید
+    source: stored ? 'panel' : env.source,
   };
   cache = { at: t, value: out };
   return out;
@@ -81,6 +135,7 @@ async function masked() {
   return {
     enabled: s.enabled,
     configured: !!s.serviceAccount,
+    source: s.source || '',
     project,
     account,
     devices: counts.n,
@@ -113,7 +168,7 @@ async function googleToken(sa) {
   const claim = b64url(JSON.stringify({
     iss: sa.client_email,
     scope: SCOPE,
-    aud: sa.token_uri || 'https://oauth2.googleapis.com/token',
+    aud: tokenUrl(),
     iat,
     exp: iat + 3600,
   }));
@@ -122,7 +177,7 @@ async function googleToken(sa) {
   const signature = b64url(signer.sign(sa.private_key));
   const jwt = `${header}.${claim}.${signature}`;
 
-  const res = await fetch(sa.token_uri || 'https://oauth2.googleapis.com/token', {
+  const res = await fetch(tokenUrl(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -150,32 +205,129 @@ async function googleToken(sa) {
  */
 async function register({
   app = 'shop', token, provider = 'fcm',
-  userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', platform = '',
+  userId = '', adminId = '', shopId = '', stationId = '', deviceUid = '', platform = '', exclusive = false,
 }) {
   const clean = String(token || '').trim();
   if (!clean || clean.length > 500) return null;
   const t = now();
   const existing = await one('SELECT * FROM push_tokens WHERE app=$1 AND token=$2', [app, clean]);
+  let id;
   if (existing) {
     await query(
       `UPDATE push_tokens SET user_id=$2, admin_id=$3, device_uid=$4, platform=$5,
-              shop_id=$6, station_id=$7, status='active', updated_at=$8 WHERE id=$1`,
+              shop_id=$6, station_id=$7, status='active', stale_reason='', stale_at=NULL, updated_at=$8 WHERE id=$1`,
       [existing.id, userId, adminId, deviceUid, platform, shopId, stationId, t]
     );
-    return existing.id;
+    id = existing.id;
+  } else {
+    id = newId('psh');
+    await query(
+      `INSERT INTO push_tokens (id, app, token, provider, user_id, admin_id, shop_id, station_id,
+                                device_uid, platform, status, created_at, updated_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$11)`,
+      [id, app, clean, provider, userId, adminId, shopId, stationId, deviceUid, platform, t]
+    );
   }
-  const id = newId('psh');
-  await query(
-    `INSERT INTO push_tokens (id, app, token, provider, user_id, admin_id, shop_id, station_id,
-                              device_uid, platform, status, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,'active',$11,$11)`,
-    [id, app, clean, provider, userId, adminId, shopId, stationId, deviceUid, platform, t]
-  );
+  //  `exclusive` (درِ `/api/shop/push`): یک دستگاه، یک توکنِ زنده برای هر کس — FCM توکن را گاهی عوض می‌کند و
+  //  توکنِ پیشینِ همان دستگاه دیگر هیچ‌جا نمی‌رسد؛ بی این، هر پیام یک تلاشِ بی‌حاصلِ دیگر به گوگل بود تا
+  //  UNREGISTERED برگردد. درهای کهنه (`/me/push`، `/support/push`) همان رفتارِ پیشین را دارند.
+  if (exclusive && deviceUid && userId) {
+    await query(
+      `UPDATE push_tokens SET status='stale', stale_reason='replaced', stale_at=$5
+        WHERE app=$1 AND user_id=$2 AND device_uid=$3 AND provider=$6 AND id<>$4 AND status='active'`,
+      [app, userId, deviceUid, id, t, provider]
+    );
+  }
+  if (userId) {
+    await query(
+      `UPDATE push_tokens SET status='stale', stale_reason='over_cap', stale_at=$3
+        WHERE id IN (SELECT id FROM push_tokens WHERE app=$1 AND user_id=$2 AND status='active'
+                      ORDER BY updated_at DESC, id DESC OFFSET ${MAX_TOKENS_PER_USER})`,
+      [app, userId, t]
+    );
+  }
   return id;
 }
 
 async function unregister(token) {
-  await query(`UPDATE push_tokens SET status='stale' WHERE token=$1`, [String(token || '')]);
+  await query(`UPDATE push_tokens SET status='stale', stale_reason='unregistered', stale_at=$2 WHERE token=$1`,
+    [String(token || ''), now()]);
+}
+
+/* ---------------------------- کنار گذاشتن ---------------------------- */
+/*
+ *  ⛔ توکن هرگز پاک نمی‌شود، فقط «کهنه» با دلیل (`stale_reason`، مهاجرتِ ۲۱۳) — تا «چرا دیگر زنگ نمی‌زند»
+ *  جواب داشته باشد. ثبتِ دوبارهٔ همان توکن (برنامه پس از ورودِ دوباره) همان ردیف را زنده می‌کند.
+ */
+async function stale(where, args, reason) {
+  const a = [...args, String(reason || '').slice(0, 40), now()];
+  const r = await query(
+    `UPDATE push_tokens SET status='stale', stale_reason=$${a.length - 1}, stale_at=$${a.length}
+      WHERE status='active' AND ${where}`, a
+  );
+  return r.rowCount || 0;
+}
+
+/** خروجِ خودِ این کس از همین دستگاه: فقط توکن‌های خودش (و اگر داده شد، همین توکن اگر مالِ خودش است) */
+async function unregisterOwn({ app = 'shop', userId, deviceUid = '', token = '' }) {
+  if (!userId) return 0;
+  const clean = String(token || '').trim().slice(0, 500);
+  const parts = [];
+  const args = [app, String(userId)];
+  if (deviceUid) { args.push(String(deviceUid)); parts.push(`device_uid=$${args.length}`); }
+  if (clean) { args.push(clean); parts.push(`token=$${args.length}`); }
+  if (!parts.length) return 0;
+  return stale(`app=$1 AND user_id=$2 AND (${parts.join(' OR ')})`, args, 'unregistered');
+}
+
+/** عضوی که از دکان برداشته یا معلق شد: هیچ خبرِ دیگری از آن دکان به گوشی‌اش نمی‌رسد */
+async function revokeMember(shopId, userId, reason = 'member_removed') {
+  if (!shopId || !userId) return 0;
+  return stale(`app='shop' AND shop_id=$1 AND user_id=$2`, [String(shopId), String(userId)], reason);
+}
+
+/**
+ * خروج از یک دستگاه یا از کار انداختنش. `deviceId` شناسهٔ ردیفِ `devices` است؛ توکن با `device_uid` ِ برنامه یا
+ * همان شناسه ثبت شده (`routes/me.js`) ⇒ هر دو. `userId` داده شود ⇒ فقط توکن‌های همان کس روی آن دستگاه.
+ */
+async function revokeDevice({ deviceId, userId = '', app = '', reason = 'logout' }) {
+  if (!deviceId) return 0;
+  const dev = await one('SELECT id, device_uid FROM devices WHERE id=$1', [String(deviceId)]);
+  const keys = [...new Set([String(deviceId), dev && dev.device_uid ? String(dev.device_uid) : ''].filter(Boolean))];
+  const args = [keys];
+  let where = 'device_uid = ANY($1::text[])';
+  if (userId) { args.push(String(userId)); where += ` AND user_id=$${args.length}`; }
+  if (app) { args.push(String(app)); where += ` AND app=$${args.length}`; }
+  return stale(where, args, reason);
+}
+
+/**
+ * `/auth/logout`: نشست باطل و همین دستگاه دیگر پوشِ این کس را نمی‌گیرد (کاربرِ دیگری بعداً روی همین گوشی وارد می‌شود).
+ * `tokens` = `lib/tokens.js` (از صدازننده، تا این‌جا وابستگیِ چرخشی نسازد).
+ */
+async function endSession(tokens, { access = '', refresh = '' } = {}) {
+  const who = (access && await tokens.ownerOf(access, 'access')) || (refresh && await tokens.ownerOf(refresh, 'refresh')) || null;
+  if (refresh) await tokens.revoke(refresh, 'refresh');
+  if (access) await tokens.revoke(access, 'access');
+  if (who && who.device_id) {
+    await revokeDevice({ deviceId: who.device_id, userId: who.subject_id, app: who.app || 'shop', reason: 'logout' });
+  }
+}
+
+/** «خروج از همه» ِ یک بخش ⇒ هیچ گوشیِ این کس در این بخش دیگر خبر نمی‌گیرد تا دوباره وارد شود */
+async function revokeUser(userId, app = 'shop', reason = 'logout_all') {
+  if (!userId) return 0;
+  return stale('user_id=$1 AND app=$2', [String(userId), String(app || 'shop')], reason);
+}
+
+/** این دستگاهِ این کس توکنِ زنده دارد؟ (برای «پوش روشن است؟» ِ برنامه) */
+async function deviceRegistered({ app = 'shop', userId, shopId = '', deviceUid = '' }) {
+  if (!userId) return false;
+  const args = [app, String(userId)];
+  let sql = `SELECT 1 AS x FROM push_tokens WHERE status='active' AND app=$1 AND user_id=$2`;
+  if (shopId) { args.push(String(shopId)); sql += ` AND shop_id=$${args.length}`; }
+  if (deviceUid) { args.push(String(deviceUid)); sql += ` AND device_uid=$${args.length}`; }
+  return Boolean(await one(`${sql} LIMIT 1`, args));
 }
 
 /* ------------------------------ فرستادن ------------------------------ */
@@ -232,6 +384,20 @@ async function targetsFor({ userId = '', adminId = '', shopId = '', stationId = 
 let deliver = null;
 function setDeliver(fn) { deliver = typeof fn === 'function' ? fn : null; }
 
+/**
+ * نشانیِ FCM — فقط آزمون عوضش می‌کند (سرورِ HTTP ِ ساختگی روی همین ماشین، `test/push-fcm.test.js`)، تا فرستادنِ
+ * واقعی، توکنِ گوگل و کنار گذاشتنِ توکنِ مرده بی شبکه سنجیده شود. ⛔ در کارِ عادی هیچ‌وقت صدا زده نمی‌شود.
+ */
+let fcmOrigin = FCM_ORIGIN;
+/** گوگل در کارِ عادی؛ سرورِ ساختگیِ آزمون فقط وقتی [useFcmOrigin] صدا زده شده */
+function tokenUrl() { return fcmOrigin === FCM_ORIGIN ? GOOGLE_TOKEN_URL : `${fcmOrigin}/token`; }
+function useFcmOrigin(origin) {
+  fcmOrigin = origin ? String(origin).replace(/\/+$/, '') : FCM_ORIGIN;
+  accessToken = { token: '', expiresAt: 0 };
+  warned.clear();
+  invalidate();
+}
+
 async function sendTo(target, message) {
   //  راهِ آزمون: تنظیماتِ ابر و گوگل اصلاً لمس نمی‌شوند
   if (deliver) {
@@ -244,12 +410,11 @@ async function sendTo(target, message) {
   //  کلیدِ «پوش روشن» ِ پنل کلیدِ اصلیِ هر دو راه است؛ FCM حسابِ سرویس و APNs کلیدِ محیط را هم می‌خواهد
   const cfg = await current();
   const apnsSender = cfg.enabled ? apns.sender() : null;
-  const fcmOn = cfg.enabled && !!cfg.serviceAccount;
-  if (!fcmOn && !apnsSender) return { sent: 0, skipped: 'push_off' };
-
-  let sa = null;
-  if (fcmOn) {
-    try { sa = JSON.parse(cfg.serviceAccount); } catch { if (!apnsSender) return { sent: 0, skipped: 'bad_service_account' }; }
+  const sa = cfg.enabled ? parseServiceAccount(cfg.serviceAccount) : null;
+  if (!cfg.enabled) warnOnce('push_off', 'کلیدِ «پوش روشن» ِ پنل خاموش است — هیچ پوشی فرستاده نمی‌شود (docs/FIREBASE-SETUP-fa.md)');
+  else if (!cfg.serviceAccount) warnOnce('fcm_none', 'حسابِ سرویسِ Firebase تنظیم نشده (FCM_SERVICE_ACCOUNT_FILE یا FCM_SERVICE_ACCOUNT) — پوشِ اندروید فرستاده نمی‌شود');
+  if (!sa && !apnsSender) {
+    return { sent: 0, skipped: !cfg.enabled ? 'push_off' : cfg.serviceAccount ? 'bad_service_account' : 'push_off' };
   }
 
   const rows = await targetsFor(target);
@@ -282,7 +447,45 @@ async function sendTo(target, message) {
   return out;
 }
 
+/** پیامِ FCM HTTP v1 — `tag` اعلانِ پیشینِ همان سفارش را جایگزین می‌کند؛ `ttlSeconds` خبرِ کهنه را دیر نمی‌رساند */
+function fcmBody(token, message) {
+  const notification = { channel_id: message.channel || 'support' };
+  if (message.tag) notification.tag = String(message.tag).slice(0, 100);
+  const android = { priority: 'high', notification };
+  if (Number.isInteger(message.ttlSeconds) && message.ttlSeconds > 0) android.ttl = `${message.ttlSeconds}s`;
+  return {
+    message: {
+      token,
+      notification: { title: message.title, body: message.body },
+      data: Object.fromEntries(Object.entries(message.data || {}).map(([k, v]) => [k, String(v)])),
+      android,
+    },
+  };
+}
+
+/**
+ * پاسخِ خطای FCM ⇐ `{ code, dead, fatal }`. «مرده» فقط وقتی خطا خودِ توکن است: ۴۰۴/`UNREGISTERED` (برنامه پاک
+ * شد)، `SENDER_ID_MISMATCH` (توکنِ پروژهٔ Firebase ِ دیگر) و `INVALID_ARGUMENT` ای که دربارهٔ توکن است. ⛔
+ * `INVALID_ARGUMENT` ِ خودِ پیام (دادهٔ نادرست) توکن را کهنه نمی‌کند — وگرنه یک پیامِ خراب همهٔ گوشی‌ها را می‌برید.
+ * «کشنده» (۴۰۱، ۴۰۳ ِ دیگر، ۴۲۹) ⇒ بقیهٔ دسته فرستاده نمی‌شود: کلید خراب است یا سهمیه پر.
+ */
+function fcmError(status, text) {
+  let err = {};
+  try { err = (JSON.parse(text) || {}).error || {}; } catch { /* متنِ خام */ }
+  const details = Array.isArray(err.details) ? err.details : [];
+  const code = String((details.find((d) => d && d.errorCode) || {}).errorCode || err.status || '');
+  const aboutToken = /registration token|message\.token/i.test(`${err.message || ''} ${JSON.stringify(details)}`);
+  const dead = status === 404 || code === 'UNREGISTERED' || code === 'SENDER_ID_MISMATCH'
+    || (code === 'INVALID_ARGUMENT' && aboutToken);
+  const fatal = !dead && (status === 401 || status === 403 || status === 429);
+  const reason = code === 'UNREGISTERED' || status === 404 ? 'fcm_unregistered'
+    : code === 'SENDER_ID_MISMATCH' ? 'fcm_sender_mismatch' : 'fcm_invalid';
+  const note = `fcm ${status} ${code} ${String(err.message || '').slice(0, 160)}`.replace(/\s+/g, ' ').trim();
+  return { code, dead, fatal, reason, note };
+}
+
 async function sendFcm(sa, fcmRows, message) {
+  if (!PROJECT_ID.test(String(sa.project_id || ''))) return { sent: 0, error: 'fcm_bad_project_id' };
   let bearer;
   try { bearer = await googleToken(sa); } catch (err) { return { sent: 0, error: err.message }; }
 
@@ -290,35 +493,26 @@ async function sendFcm(sa, fcmRows, message) {
   for (const row of fcmRows) {
     try {
       const res = await fetch(
-        `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`,
+        `${fcmOrigin}/v1/projects/${encodeURIComponent(sa.project_id)}/messages:send`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${bearer}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            message: {
-              token: row.token,
-              notification: { title: message.title, body: message.body },
-              data: Object.fromEntries(
-                Object.entries(message.data || {}).map(([k, v]) => [k, String(v)])
-              ),
-              android: { priority: 'high', notification: { channel_id: message.channel || 'support' } },
-            },
-          }),
+          body: JSON.stringify(fcmBody(row.token, message)),
           signal: AbortSignal.timeout(15000),
         }
       );
       if (res.ok) {
         sent++;
         await query('UPDATE push_tokens SET last_ok_at=$2, last_error=$3 WHERE id=$1', [row.id, now(), '']);
-      } else {
-        const body = await res.text().catch(() => '');
-        //  ۴۰۴ یا UNREGISTERED یعنی این توکن مرده است
-        const dead = res.status === 404 || /UNREGISTERED|INVALID_ARGUMENT/.test(body);
-        await query(
-          `UPDATE push_tokens SET last_error=$2, status=$3 WHERE id=$1`,
-          [row.id, body.slice(0, 300), dead ? 'stale' : row.status]
-        );
+        continue;
       }
+      const e = fcmError(res.status, await res.text().catch(() => ''));
+      await query(
+        `UPDATE push_tokens SET last_error=$2, status=$3, stale_reason=$4, stale_at=$5 WHERE id=$1`,
+        [row.id, e.note.slice(0, 300), e.dead ? 'stale' : row.status, e.dead ? e.reason : row.stale_reason || '',
+          e.dead ? now() : row.stale_at || null]
+      );
+      if (e.fatal) return { sent, error: e.note };
     } catch (err) {
       await query('UPDATE push_tokens SET last_error=$2 WHERE id=$1', [row.id, String(err.message).slice(0, 300)]);
     }
@@ -355,4 +549,7 @@ async function sendApns(sender, apnsRows, message) {
   return { sent };
 }
 
-module.exports = { current, save, masked, invalidate, register, unregister, sendTo, targetsFor, setDeliver };
+module.exports = {
+  current, save, masked, invalidate, register, unregister, sendTo, targetsFor, setDeliver,
+  unregisterOwn, revokeMember, revokeDevice, revokeUser, endSession, deviceRegistered, useFcmOrigin, fcmError, MAX_TOKENS_PER_USER,
+};

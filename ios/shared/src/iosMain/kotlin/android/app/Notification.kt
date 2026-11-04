@@ -35,6 +35,9 @@ class NotificationManager internal constructor() {
   fun getNotificationChannel(id: String): NotificationChannel? = channels[id]
   fun areNotificationsEnabled(): Boolean = IosNotifications.enabled
   fun notify(id: Int, notification: Notification) = IosNotifications.post(id, notification.title, notification.text, notification.intent)
+  /** اندروید: (برچسب، شناسه) یک اعلان است ⇒ این‌جا یک شناسهٔ یکتا از هر دو */
+  fun notify(tag: String?, id: Int, notification: Notification) = notify(if (tag == null) id else tag.hashCode() * 31 + id, notification)
+  fun deleteNotificationChannel(id: String) { channels.remove(id) }
   fun cancel(id: Int) = IosNotifications.cancel(id)
 
   companion object {

@@ -168,6 +168,12 @@ object StrOrderFlow {
   val payOnline: String get() = t("پول: پرداخت‌شده آنلاین.", "Money: paid online.", "پیسې: آنلاین ورکړل شوې.")
   val payCounter: String get() = t("پول: نقدِ پیشخوان، همین حالا به دخل؛ کالا به مشتری داده می‌شود.", "Money: cash at the counter, into the drawer now; the goods go to the customer.", "پیسې: د کاونټر نغدې، همدا اوس صندوق ته؛ توکي پېرودونکي ته ورکول کېږي.")
   val packFirst: String get() = t("نخست «بسته شد» زده می‌شود؛ پس از بسته‌بندی هیچ قلمی عوض نمی‌شود.", "It marks the order packed first; no item changes after packing.", "لومړی «وتړل شو» کېږي؛ له تړلو وروسته هېڅ توکی نه بدلېږي.")
+  /** «پرداخت پس از پذیرش» و مشتری هنوز برنگزیده (`awaiting_choice`): فاکتورِ نقدی پرداختِ آنلاینِ او را می‌بندد (`order_invoiced`) */
+  val invoiceBeforeChoice: String get() = t(
+    "مشتری هنوز روشِ پرداخت را برنگزیده؛ فاکتورِ همین حالا با نقد ثبت می‌شود و پس از آن مشتری فقط نقد می‌تواند بپردازد.",
+    "The customer hasn't chosen how to pay yet; invoicing now records cash, and after that the customer can only pay cash.",
+    "پېرودونکي لا د تادیې لاره نه ده ټاکلې؛ که همدا اوس بل جوړ شي، نغدې ثبتېږي او له هغه وروسته پېرودونکی یوازې نغدې ورکولی شي.",
+  )
   val confirmInvoice: String get() = t("ثبتِ فاکتور", "Record invoice", "بل ثبتول")
   val notNow: String get() = t("نه، بعداً", "Not now", "نه، وروسته")
   fun invoiced(label: String, at: String): String = t("فاکتور شد: ${asIs(label)} · ${asIs(at)}", "Invoiced: $label · $at", "بل شو: $label · $at")

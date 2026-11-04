@@ -1,3 +1,9 @@
 # کلیدِ امضا هیچ‌وقت داخلِ مخزن نباشد — از secret می‌آید
 *.jks
 *.keystore
+
+# پوشِ گوشی (Firebase، O-01): فایلِ تنظیمِ Firebase و کلیدِ حسابِ سرویس هرگز در مخزن نیستند —
+# CI از secret ِ GOOGLE_SERVICES_JSON می‌نویسد؛ docs/FIREBASE-SETUP-fa.md
+google-services.json
+GoogleService-Info.plist
+*firebase-adminsdk*.json
