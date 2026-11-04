@@ -20,6 +20,7 @@
   "ct.empty": "No messages yet. Write your question.",
   "ct.text": "Your message",
   "ct.send": "Send",
+  "ct.queued": "Not sent yet; it will go by itself when the internet is back.",
   "ct.deleted": "This message was deleted",
   "ct.photo": "Photo from the shop",
   "ct.photo.big": "Enlarge photo",
