@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.hw.NciScale
 import ir.vil3ntec.tohid.core.hw.Scales
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.pos.ScaleSale
 import ir.vil3ntec.tohid.hw.HwPlatform
 import ir.vil3ntec.tohid.hw.ScaleReader
@@ -57,12 +58,12 @@ object ScaleAtPos {
   }
 
   fun readWhy(why: ScaleSale.ReadWhy): String = when (why) {
-    ScaleSale.ReadWhy.NOT_WEIGHED -> "این کالا کیلویی یا گرمی نیست"
-    ScaleSale.ReadWhy.ERROR -> "ترازو خطا می‌دهد"
-    ScaleSale.ReadWhy.OVER -> "بیش از ظرفیتِ ترازو"
-    ScaleSale.ReadWhy.UNDER -> "زیرِ ظرفیتِ ترازو — ترازو را صفر کنید"
-    ScaleSale.ReadWhy.MOTION -> "ترازو هنوز ایستا نیست — صبر کنید و دوباره بزنید"
-    ScaleSale.ReadWhy.NO_WEIGHT -> "وزنی روی ترازو نیست"
+    ScaleSale.ReadWhy.NOT_WEIGHED -> StrSalePages.scaleNotWeighed
+    ScaleSale.ReadWhy.ERROR -> StrSalePages.scaleError
+    ScaleSale.ReadWhy.OVER -> StrSalePages.scaleOver
+    ScaleSale.ReadWhy.UNDER -> StrSalePages.scaleUnder
+    ScaleSale.ReadWhy.MOTION -> StrSalePages.scaleMotion
+    ScaleSale.ReadWhy.NO_WEIGHT -> StrSalePages.scaleEmpty
   }
 }
 
@@ -95,7 +96,7 @@ fun ScaleWeighButton(unit: String, onWeight: (Double) -> Unit) {
         }
       }
     }
-  }) { Text(if (busy) "در حالِ خواندن…" else "وزن از ترازو") }
+  }) { Text(if (busy) StrSalePages.scaleReading else StrSalePages.scaleWeigh) }
   note?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning) }
 }
 
@@ -112,12 +113,12 @@ fun ScaleAtPosSettings(rules: List<WeightBarcode.Rule>, onRules: (List<WeightBar
     val first = rules.first()
     val kind = first.kind
     SegmentedTabs(
-      listOf(SegmentTab(WeightBarcode.Kind.WEIGHT, "برچسبِ وزنی"), SegmentTab(WeightBarcode.Kind.PRICE, "برچسبِ قیمتی")),
+      listOf(SegmentTab(WeightBarcode.Kind.WEIGHT, StrSalePages.labelWeight), SegmentTab(WeightBarcode.Kind.PRICE, StrSalePages.labelPrice)),
       kind,
       { k -> onRules(ScaleSale.rules(k, first.itemDigits, ScaleSale.decimalsFor(k).first())) },
     )
     SegmentedTabs(
-      ScaleSale.ITEM_DIGITS.map { SegmentTab(it, "کدِ کالا $it رقم") },
+      ScaleSale.ITEM_DIGITS.map { SegmentTab(it, StrSalePages.itemDigits(it)) },
       first.itemDigits,
       { n -> onRules(ScaleSale.rules(kind, n, first.decimals)) },
     )
@@ -128,17 +129,17 @@ fun ScaleAtPosSettings(rules: List<WeightBarcode.Rule>, onRules: (List<WeightBar
     )
     val sample = ScaleSale.sample(rules)
     Text(
-      (if (kind == WeightBarcode.Kind.PRICE) "مقدار = مبلغ ÷ قیمتِ کالا، و برچسبی که مبلغِ ردیف را دقیقاً همان نکند رد می‌شود. " else "") +
-        "${first.valueDigits} رقمِ مقدار پس از ${first.itemDigits} رقمِ کد" + (sample?.let { "؛ نمونه: $it" } ?: ""),
+      (if (kind == WeightBarcode.Kind.PRICE) StrSalePages.priceLabelNote else "") +
+        StrSalePages.digitsLayout(first.valueDigits, first.itemDigits) + (sample?.let { StrSalePages.sampleTail(it) } ?: ""),
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
     )
   }
   if (HwPlatform.serial == null) return
   Row(Modifier.fillMaxWidth().padding(vertical = Space.xxs), verticalAlignment = Alignment.CenterVertically) {
     Column(Modifier.weight(1f)) {
-      Text("وزن از ترازو در صندوق", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+      Text(StrSalePages.scaleAtTill, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
       Text(
-        "دکمهٔ «وزن از ترازو» در کادرِ ردیفِ کالای کیلویی و گرمی؛ فقط وزنِ ایستا. انتخابِ همین دستگاه است.",
+        StrSalePages.scaleAtTillNote,
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
       )
     }
@@ -147,8 +148,8 @@ fun ScaleAtPosSettings(rules: List<WeightBarcode.Rule>, onRules: (List<WeightBar
 }
 
 private fun decimalsLabel(kind: WeightBarcode.Kind, decimals: Int): String = when {
-  kind == WeightBarcode.Kind.PRICE && decimals == 0 -> "مبلغ به افغانی"
-  kind == WeightBarcode.Kind.PRICE -> "مبلغ با دو رقمِ پول"
-  decimals == 3 -> "وزن به گرم"
-  else -> "وزن به ده گرم"
+  kind == WeightBarcode.Kind.PRICE && decimals == 0 -> StrSalePages.valueAfn
+  kind == WeightBarcode.Kind.PRICE -> StrSalePages.valueMoney2
+  decimals == 3 -> StrSalePages.valueGram
+  else -> StrSalePages.valueTenGram
 }

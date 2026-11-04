@@ -17,6 +17,8 @@ class AccountRoutesTest {
   fun `پیوندِ سرد به جای درست و برگشتِ درست`() {
     assertEquals(listOf("profile", "profile/edit"), table.chain("profile/edit"))
     assertEquals(listOf("profile", "profile/signout"), table.chain("profile/signout"))
+    //  «حذفِ حساب» (Google Play) روی «ویرایش حساب»: پیوندِ سرد به همان برگه و برگشت به ویرایش
+    assertEquals(listOf("profile", "profile/edit", "profile/delete"), table.chain("profile/delete"))
     assertEquals(listOf("team", "team/members/7", "team/members/7/remove"), table.chain("team/members/7/remove"))
     assertEquals(listOf("team", "team/codes/reveal"), table.chain("team/codes/reveal"))
     assertEquals(listOf("subscription", "subscription/plans", "subscription/redeem"), table.chain("subscription/redeem"))
@@ -28,9 +30,10 @@ class AccountRoutesTest {
   fun `گونه‌ها و نقش`() {
     assertEquals(RouteKind.TAB, table.resolve("profile")!!.route.kind)
     assertEquals(RouteKind.SHEET, table.resolve("team/codes/new")!!.route.kind)
+    assertEquals(RouteKind.SHEET, table.resolve("profile/delete")!!.route.kind)
     assertEquals("7", table.resolve("team/members/7")!!.args["id"])
     val seller = Access(granted = Need.entries.toSet() - Need.MANAGE)
     for (p in listOf("team", "team/codes/new", "team/members/7", "team/devices/d/block")) assertFalse(p, table.resolve(p)!!.allowed(seller))
-    for (p in listOf("profile", "profile/edit", "subscription", "subscription/plans", "support")) assertTrue(p, table.resolve(p)!!.allowed(seller))
+    for (p in listOf("profile", "profile/edit", "profile/delete", "subscription", "subscription/plans", "support")) assertTrue(p, table.resolve(p)!!.allowed(seller))
   }
 }

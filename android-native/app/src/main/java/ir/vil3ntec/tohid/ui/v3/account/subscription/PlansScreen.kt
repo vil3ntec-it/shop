@@ -47,6 +47,7 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.model.PlansDto
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.LicenseGuard
@@ -82,7 +83,7 @@ internal data class PlansUi(
   val signedIn: Boolean,
   val salesNumber: String,
   /** نسخهٔ کافه‌بازار: پرداختِ بیرون از بازار ممنوع ⇒ نه خرید با واتساپ */
-  val storeBuild: Boolean = BuildConfig.STORE == "bazaar",
+  val storeBuild: Boolean = StoreChannel.storeManaged(BuildConfig.STORE),
 )
 
 internal class PlansActions(

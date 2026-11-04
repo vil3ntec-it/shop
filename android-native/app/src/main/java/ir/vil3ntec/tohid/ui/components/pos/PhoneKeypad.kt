@@ -57,6 +57,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import ir.vil3ntec.tohid.ui.screens.Motion
@@ -113,7 +115,7 @@ fun BoxScope.PhoneQtyKeypad(
         .clickable(
           interactionSource = remember { MutableInteractionSource() },
           indication = null,
-          onClickLabel = "بستن",
+          onClickLabel = Str.close,
           onClick = onDismiss,
         ),
     )
@@ -143,7 +145,7 @@ private fun KeypadSheet(
   val value = KeypadInput.value(text)
   val error = if (value > 0) problem(req, value) else null
   val ok = error == null && (value > 0 || req.inCart > 0)
-  val unit = req.unit.ifBlank { "عدد" }
+  val unit = req.unit.ifBlank { StrSale.unitFallback }
 
   Column(
     Modifier
@@ -171,7 +173,7 @@ private fun KeypadSheet(
       }
       Box(
         Modifier.size(40.dp).clip(CircleShape).background(v.bg).clickable(role = Role.Button, onClick = onDismiss)
-          .semantics { contentDescription = "بستن" },
+          .semantics { contentDescription = Str.close },
         contentAlignment = Alignment.Center,
       ) {
         Icon(Icons.Outlined.Close, contentDescription = null, tint = v.icon, modifier = Modifier.size(20.dp))
@@ -233,7 +235,7 @@ private fun KeypadSheet(
                   .then(if (k == ' ') Modifier else Modifier.background(v.bg).clickable(role = Role.Button) {
                     text = KeypadInput.press(text, k, req.weighed)
                   })
-                  .semantics { if (k == KeypadInput.BACKSPACE) contentDescription = "پاک کردن" },
+                  .semantics { if (k == KeypadInput.BACKSPACE) contentDescription = StrSale.backspace },
                 contentAlignment = Alignment.Center,
               ) {
                 when (k) {
@@ -250,9 +252,9 @@ private fun KeypadSheet(
     Spacer(Modifier.height(14.dp))
     PhoneCartPay(
       label = when {
-        req.inCart > 0 && value <= 0 -> "برداشتن از سبد"
-        req.inCart > 0 -> "ثبتِ مقدار"
-        else -> "افزودن به سبد"
+        req.inCart > 0 && value <= 0 -> StrSale.removeFromCartAlt
+        req.inCart > 0 -> StrSale.setQty
+        else -> StrSale.addToCart
       },
       onClick = { if (ok) onConfirm(req, value) },
       enabled = ok,

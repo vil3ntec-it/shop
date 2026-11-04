@@ -17,6 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.sale.PriceList
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -26,7 +28,7 @@ import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /** عنوانِ بخشِ تنظیمِ لیستِ قیمت — همان که ستونِ تنظیماتِ کامپیوتر (`DeskSettings` ِ `AppRoot`) نشان می‌دهد */
-const val PRICE_LIST_SETTINGS_TITLE = "لیستِ قیمت در صندوق (خرده/عمده)"
+const val PRICE_LIST_SETTINGS_TITLE = "لیستِ قیمت در صندوق (خرده/عمده)" // داده: کلیدِ بخشِ تنظیمات (`SettingsLayout.PRICE_LIST`)؛ نامِ صفحه `StrPos.priceListTitle`
 
 /*
  *  لیستِ قیمتِ فاکتور در صندوق — POS-18 (§۶.۱). همهٔ قاعده در `core/sale/PriceList`؛ این‌جا فقط مرزِ سکو
@@ -93,16 +95,16 @@ fun PriceListSettingsWired(context: Context) {
   var on by remember { mutableStateOf(PriceListPrefs.on(context)) }
   SettingsSection(
     icon = Icons.Filled.LocalOffer,
-    title = PRICE_LIST_SETTINGS_TITLE,
-    subtitle = if (on) "روشن" else "خاموش",
+    title = StrPos.priceListTitle,
+    subtitle = if (on) StrSettingsPages.on else StrSettingsPages.off,
     tint = if (on) Shop.colors.primary else Shop.colors.muted,
   ) {
     Text(
-      "روشن ⇒ مشتریِ «عمده» قیمتِ عمده می‌گیرد و نشانِ «لیستِ قیمت» در صندوق لیستِ همین فاکتور را عوض می‌کند؛ فیِ دستی دست نمی‌خورد.",
+      StrSalePages.priceListNote,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2,
     )
     SegmentedChoice(
-      options = listOf("off" to "خاموش", "on" to "روشن"),
+      options = listOf("off" to StrSettingsPages.off, "on" to StrSettingsPages.on),
       selected = if (on) "on" else "off",
       onSelect = { on = it == "on"; PriceListPrefs.set(context, on) },
     )

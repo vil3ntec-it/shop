@@ -67,6 +67,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.StrShellPages
 import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Colors
@@ -347,7 +348,7 @@ private fun RenewPill(days: Int, onRenew: () -> Unit) {
     verticalAlignment = Alignment.CenterVertically,
   ) {
     Text(
-      "تمدیدِ اشتراک",
+      StrShellPages.renewSubscription,
       color = p.onBlack,
       style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium),
       modifier = Modifier.weight(1f),
@@ -360,7 +361,7 @@ private fun RenewPill(days: Int, onRenew: () -> Unit) {
       Box(Modifier.size(8.dp).clip(CircleShape).background(p.negative))
       Spacer(Modifier.width(8.dp))
       Text(
-        if (days <= 0) "امروز تمام می‌شود" else "${days} روز مانده",
+        if (days <= 0) StrShellPages.endsToday else StrShellPages.daysLeft(days),
         color = p.onBlack,
         style = MaterialTheme.typography.labelLarge.copy(fontSize = 13.sp),
         maxLines = 1,

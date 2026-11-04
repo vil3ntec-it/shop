@@ -12,6 +12,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.fa
@@ -243,7 +244,7 @@ fun MoreScreen(store: ShopStore, d: ShopData, onOpen: (String) -> Unit) {
     }
 
     //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
-    if (BuildConfig.STORE != "bazaar") {
+    if (!StoreChannel.storeManaged(BuildConfig.STORE)) {
     Spacer(Modifier.height(20.dp))
     SectionTitle(StrNav.appUpdate)
     Panel { UpdateControls(repo) }
