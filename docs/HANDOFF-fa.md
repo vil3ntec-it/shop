@@ -53,6 +53,20 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-3` (دریِ واقعی، دورِ ۳؛ پشته‌ای روی `claude/dari-real-2` ‏#919 ِ هنوز باز؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۱۰۱۲ نوشتهٔ خامِ زندهٔ `ui/screens` به هشت جدولِ تازه رفت (فارسی بایت‌به‌بایت همان — هر پرونده با بازسازیِ متن از جدول
+  با نسخهٔ پیشین سنجیده شد؛ انگلیسی و پشتو تازه): `DeskCustomers` (`StrCustomerPages`)، `StockBook` (`StrStockPages`)، `DevicesHw`
+  (`StrDevicePages`)، `DeskProducts` (`StrProductPages`)، خرید: `PurchaseOrders`/`PurchaseBills`/`PurchaseSuggestView`/`DeskPurchasing`
+  (`StrPurchasePages`)، `Promos` (`StrPromoPages`)، `HesabPayAccountSettings` (`StrPayPages`) و `ReportFresh` (`StrReportPages`)؛ ۳۵۲ جا
+  جملهٔ جدول‌های پیشین دوباره به کار رفت. ۱۹ نوشته داده است («// داده:»: برگهٔ اکسل و نامِ پروندهٔ خروجی، واحدِ پیش‌فرض، یادداشتِ
+  ذخیره‌شده، دلیلِ پیش‌فرضِ سابقه، برچسبِ نمونهٔ چاپی، سنجیدنِ «همیشه»). برچسبِ زبانه‌ها و صافی‌ها (`enum`) هر بار خوانده می‌شوند.
+  دری: واژهٔ تازه نه — فهرست به سقفِ ۶۴ ِ `DariTextTest` رسیده؛ «میانگین ⇐ اوسط» و «بیشینه ⇐ حداکثر» پیشنهاد برای صاحب‌کار
+  (`DARI-REVIEW-fa.md` §۶). آزمون: `DariCoverageTest` (سقفِ
+  متنِ خامِ `ui/screens` ۳۶۳۳ ⇐ ۲۶۰۲، نگهبانِ ۱۰ پروندهٔ دورِ ۳، کفِ پوششِ تازه، نمونه‌های بایت‌به‌بایت).
+- نیمه‌کاره: بقیهٔ `ui/screens` (۲۶۰۲): نمایهٔ جست‌وجو و کلیدهای `SettingsLayout` (۲۸۷، داده)، صفحه‌های مرده (`Storefront`، `DeliveryCash`،
+  `Orders`، `Reports`…)، و از صفحه‌های زنده `PromoText`، `Servers`، `TeamStaff`، `ImageBankPicker`، `EasySetupAndroid`، `ImageBulkImport`؛
+  ستون‌های `DayEndModel` (صفحه و خروجی) ⇐ تصمیمِ صاحب‌کار؛ `StockModeSection` ِ صدا‌زده‌نشده دست نخورد.
+- قدمِ بعدی: دورِ ۴ با همان ابزار (spec ⇐ جدول، بازسازی و سنجشِ فارسی، «// داده:»)؛ بازبینیِ صاحب‌کار روی فهرستِ دری و تصمیمِ سقفِ واژه‌ها.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/dari-real-2` (دریِ واقعی، دورِ ۲؛ روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: متنِ خامی که دورِ ۱ بیرون گذاشته بود به جدول رفت (فارسی بایت‌به‌بایت همان، انگلیسی و پشتو تازه): همهٔ `ui/components`
   (۷۶)، صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند (فروش و چاپ، دریافتِ قرض، برگشت، دفترِ قرض، دستورِ تحویل، جمع‌آوری،
