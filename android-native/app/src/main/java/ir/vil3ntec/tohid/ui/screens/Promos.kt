@@ -204,7 +204,7 @@ fun PromosScreen(d: ShopData, snackbar: SnackbarHostState) {
           StatCard(StrSettings.active, active.toString(), StrHome.justNow, Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
             selected = tab == PromoText.Tab.ACTIVE, onClick = { tab = PromoText.Tab.ACTIVE })
           StatCard(StrPromoPages.withCode, snap.rules.count { it.code.isNotEmpty() }.toString(), StrSale.promoCode, Modifier.weight(1f), icon = Icons.Filled.Sell)
-          StatCard(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != "همیشه" }.toString(), StrPromoPages.hourOrDay, Modifier.weight(1f), icon = Icons.Filled.Schedule) // داده: سنجیدن با خروجیِ `PromoText.windowText` (منطق)
+          StatCard(StrPromoPages.timed, snap.rules.count { PromoText.windowText(it) != ir.vil3ntec.tohid.core.i18n.StrMarketPages.always }.toString(), StrPromoPages.hourOrDay, Modifier.weight(1f), icon = Icons.Filled.Schedule)
           StatCard(Str.all, snap.rules.size.toString(), StrPromoPages.ruleWord, Modifier.weight(1f), icon = Icons.Filled.LocalOffer,
             selected = tab == PromoText.Tab.ALL, onClick = { tab = PromoText.Tab.ALL })
         }

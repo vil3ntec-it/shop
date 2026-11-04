@@ -118,12 +118,12 @@ fun BulkProductSheet(
   }
 
   BulkFrame(
-    title = "محصول جدید",
-    subtitle = "چند کالا را با هم ثبت کنید — هر ردیف یک کالا",
+    title = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.newProductTitle,
+    subtitle = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.newProductsSub,
     error = error,
     summary = listOf(
-      "کالای آماده" to plain(ready.size),
-      "کل ردیف‌ها" to plain(rows.size),
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.readyItems to plain(ready.size),
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.allRows to plain(rows.size),
     ),
     saveEnabled = ready.isNotEmpty(),
     onAddRow = { rows = rows + ProductRow(key = seq++) },
@@ -132,9 +132,9 @@ fun BulkProductSheet(
       // ردیفِ نیمه‌پر خطاست، ردیفِ دست‌نخورده نه
       val broken = rows.indexOfFirst { !it.untouched && !it.ready }
       if (broken >= 0) {
-        error = "ردیف ${plain(broken + 1)} کامل نیست — نام، دسته، واحد و هر دو قیمت لازم است"
+        error = ir.vil3ntec.tohid.core.i18n.StrProducts.rowIncomplete(plain(broken + 1))
       } else if (ready.isEmpty()) {
-        error = "حداقل یک ردیف کامل لازم است"
+        error = ir.vil3ntec.tohid.core.i18n.StrProducts.needOneRow
       } else {
         error = null
         onSave(ready.map { it.draft() })
@@ -154,8 +154,8 @@ fun BulkProductSheet(
         EntryField(
           value = row.name,
           onValueChange = { v -> update(row.key) { it.copy(name = v) } },
-          label = "نام محصول",
-          placeholder = "مثلاً بیسکویت شکلاتی",
+          label = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.productName,
+          placeholder = ir.vil3ntec.tohid.core.i18n.StrProducts.namePlaceholder,
           modifier = Modifier.fillMaxWidth(),
         )
 
@@ -164,13 +164,13 @@ fun BulkProductSheet(
           EntryNumberField(
             value = row.purchase,
             onValueChange = { v -> update(row.key) { it.copy(purchase = v) } },
-            label = "قیمت خرید",
+            label = ir.vil3ntec.tohid.core.i18n.StrProducts.purchasePrice,
             modifier = Modifier.weight(1f),
           )
           EntryNumberField(
             value = row.sale,
             onValueChange = { v -> update(row.key) { it.copy(sale = v) } },
-            label = "قیمت فروش",
+            label = ir.vil3ntec.tohid.core.i18n.StrProducts.salePrice,
             modifier = Modifier.weight(1f),
           )
         }
@@ -180,8 +180,8 @@ fun BulkProductSheet(
           EntryField(
             value = row.barcode,
             onValueChange = { v -> update(row.key) { it.copy(barcode = v) } },
-            label = "بارکد",
-            placeholder = "اسکن یا تایپ",
+            label = ir.vil3ntec.tohid.core.i18n.StrProducts.barcode,
+            placeholder = ir.vil3ntec.tohid.core.i18n.StrProducts.barcodePlaceholder,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
             modifier = Modifier.weight(1f),
             trailing = { ScanIconButton { scanFor = row.key } },
@@ -189,27 +189,27 @@ fun BulkProductSheet(
           EntryNumberField(
             value = row.minStock,
             onValueChange = { v -> update(row.key) { it.copy(minStock = v) } },
-            label = "حداقل موجودی",
+            label = ir.vil3ntec.tohid.core.i18n.StrProducts.minStock,
             modifier = Modifier.weight(1f),
           )
         }
 
         Spacer(Modifier.height(12.dp))
         ChipPicker(
-          title = "واحد",
+          title = ir.vil3ntec.tohid.core.i18n.StrProducts.unit,
           options = d.productUnits,
           selected = row.unit,
           onSelect = { v -> update(row.key) { it.copy(unit = v) } },
-          placeholder = "واحد تازه",
+          placeholder = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.newUnit,
         )
 
         Spacer(Modifier.height(12.dp))
         ChipPicker(
-          title = "دسته‌بندی",
+          title = ir.vil3ntec.tohid.core.i18n.StrProducts.category,
           options = d.productCategories,
           selected = row.category,
           onSelect = { v -> update(row.key) { it.copy(category = v) } },
-          placeholder = "دسته‌بندی تازه",
+          placeholder = ir.vil3ntec.tohid.core.i18n.StrFields.newCategory,
         )
 
         // بازتابِ ردیف — همان `.bulk-echo` وب: سودِ هر واحد، همان‌جا
@@ -219,9 +219,9 @@ fun BulkProductSheet(
           Spacer(Modifier.height(10.dp))
           val text = buildString {
             append(row.name.trim())
-            if (row.unit.isNotBlank()) append(" — هر ${row.unit}")
+            if (row.unit.isNotBlank()) append(ir.vil3ntec.tohid.core.i18n.StrCatalogPages.eachUnit(row.unit))
             if (buy != null && sell != null && buy >= 0 && sell >= 0) {
-              append(" · سود هر ${row.unit.ifBlank { "واحد" }}: ${money(sell - buy)} ؋")
+              append(ir.vil3ntec.tohid.core.i18n.StrCatalogPages.profitPer(row.unit.ifBlank { ir.vil3ntec.tohid.core.i18n.StrProducts.unitWord }, money(sell - buy)))
             }
           }
           RowEcho(text, warn = row.unit.isBlank() || row.category.isBlank())
@@ -290,7 +290,7 @@ fun BulkEntrySheet(
 
   scanFor?.let { key ->
     BarcodeScanSheet(
-      title = "اسکن بارکد کالا",
+      title = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.scanProductBarcode,
       onDismiss = { scanFor = null },
       onCode = { code ->
         val hit = byBarcode[code]
@@ -318,13 +318,13 @@ fun BulkEntrySheet(
   }
 
   BulkFrame(
-    title = "ورود کالا به انبار",
-    subtitle = "چند قلم را با هم وارد کنید — تاریخ برای همهٔ ردیف‌ها یکی است",
+    title = ir.vil3ntec.tohid.core.i18n.StrStock.entryTitle,
+    subtitle = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.entrySub,
     error = error,
     summary = listOf(
-      "ردیف آماده" to plain(ready.size),
-      "مجموع مقدار" to money(ready.sumOf { it.amount }),
-      "ارزش کل" to "${money(ready.sumOf { it.value })} ؋",
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.readyRows to plain(ready.size),
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.totalQty to money(ready.sumOf { it.amount }),
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.totalValue to "${money(ready.sumOf { it.value })} ؋",
     ),
     saveEnabled = ready.isNotEmpty(),
     onAddRow = { rows = rows + EntryRow(key = seq++, unit = d.products.firstOrNull()?.unit.orEmpty()) },
@@ -332,9 +332,9 @@ fun BulkEntrySheet(
     onSave = {
       val broken = rows.indexOfFirst { !it.untouched && !it.ready }
       if (broken >= 0) {
-        error = "ردیف ${plain(broken + 1)} کامل نیست — محصول، مقدار و قیمت خرید لازم است"
+        error = ir.vil3ntec.tohid.core.i18n.StrStock.errRow(plain(broken + 1))
       } else if (ready.isEmpty()) {
-        error = "هیچ ردیف کاملی برای ثبت نیست"
+        error = ir.vil3ntec.tohid.core.i18n.StrStock.errNoRows
       } else {
         error = null
         onSave(
@@ -350,7 +350,7 @@ fun BulkEntrySheet(
               newProduct = if (!row.newProduct) null else WarehouseEngine.ProductDraft(
                 name = row.newName,
                 category = row.newCategory,
-                unit = row.unit.ifBlank { d.productUnits.firstOrNull() ?: "عدد" },
+                unit = row.unit.ifBlank { d.productUnits.firstOrNull() ?: "عدد" }, // داده: واحدِ پیش‌فرضِ کالای تازه (داده)
                 purchasePrice = row.price.toDoubleOrNull() ?: 0.0,
                 salePrice = 0.0,
                 barcode = row.newBarcode,
@@ -367,7 +367,7 @@ fun BulkEntrySheet(
       EntryDateField(
         value = date,
         onValueChange = { date = it },
-        label = "تاریخ همهٔ ردیف‌ها",
+        label = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.dateAllRows,
         modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(14.dp))
@@ -386,7 +386,7 @@ fun BulkEntrySheet(
         // انتخابِ محصول، یا ساختِ محصولِ تازه — همان دو حالتِ کشویی وب.
         // تراشه‌ها و کارشان دست‌نخورده‌اند؛ فقط داخلِ یک کادر نشسته‌اند تا
         // مثلِ بقیهٔ خانه‌های همین صفحه دیده شوند.
-        EntryFieldBox("انتخاب محصول", trailing = { ScanIconButton { scanFor = row.key } }) {
+        EntryFieldBox(ir.vil3ntec.tohid.core.i18n.Str.pickProduct, trailing = { ScanIconButton { scanFor = row.key } }) {
           Row(
             Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
@@ -412,14 +412,14 @@ fun BulkEntrySheet(
             FilterChip(
               selected = row.newProduct,
               onClick = { update(row.key) { it.copy(newProduct = !it.newProduct, productId = "") } },
-              label = { Text("+ محصول جدید") },
+              label = { Text(ir.vil3ntec.tohid.core.i18n.StrCatalogPages.plusNewProduct) },
             )
           }
         }
         if (scanMiss != null && row.newProduct && row.newBarcode == scanMiss) {
           Spacer(Modifier.height(6.dp))
           Text(
-            "این بارکد در دکان نبود — نامش را بنویسید تا ساخته شود",
+            ir.vil3ntec.tohid.core.i18n.StrStock.scanMiss,
             style = MaterialTheme.typography.labelSmall,
             color = Shop.colors.muted2,
           )
@@ -430,8 +430,8 @@ fun BulkEntrySheet(
           EntryField(
             value = row.newName,
             onValueChange = { v -> update(row.key) { it.copy(newName = v) } },
-            label = "نام محصول جدید",
-            placeholder = "مثلاً برنج",
+            label = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.newProductName,
+            placeholder = ir.vil3ntec.tohid.core.i18n.StrStock.newProductNameHint,
             modifier = Modifier.fillMaxWidth(),
           )
           Spacer(Modifier.height(12.dp))
@@ -439,14 +439,14 @@ fun BulkEntrySheet(
             EntryField(
               value = row.newCategory,
               onValueChange = { v -> update(row.key) { it.copy(newCategory = v) } },
-              label = "دسته‌بندی",
+              label = ir.vil3ntec.tohid.core.i18n.StrProducts.category,
               modifier = Modifier.weight(1f),
             )
             EntryField(
               value = row.newBarcode,
               onValueChange = { v -> update(row.key) { it.copy(newBarcode = v) } },
-              label = "بارکد",
-              placeholder = "اسکن یا تایپ",
+              label = ir.vil3ntec.tohid.core.i18n.StrProducts.barcode,
+              placeholder = ir.vil3ntec.tohid.core.i18n.StrProducts.barcodePlaceholder,
               keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
               modifier = Modifier.weight(1f),
               trailing = { ScanIconButton { scanFor = row.key } },
@@ -459,31 +459,31 @@ fun BulkEntrySheet(
           EntryNumberField(
             value = row.qty,
             onValueChange = { v -> update(row.key) { it.copy(qty = v) } },
-            label = "مقدار",
+            label = ir.vil3ntec.tohid.core.i18n.StrMoney.quantity,
             modifier = Modifier.weight(1f),
           )
           EntryNumberField(
             value = row.price,
             onValueChange = { v -> update(row.key) { it.copy(price = v) } },
-            label = "قیمت خرید (افغانی)",
+            label = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.purchasePriceAf,
             modifier = Modifier.weight(1f),
           )
         }
 
         Spacer(Modifier.height(12.dp))
         ChipPicker(
-          title = "واحد",
+          title = ir.vil3ntec.tohid.core.i18n.StrProducts.unit,
           options = d.productUnits,
           selected = row.unit,
           onSelect = { v -> update(row.key) { it.copy(unit = v) } },
-          placeholder = "واحد تازه",
+          placeholder = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.newUnit,
         )
 
         if (row.amount > 0) {
           Spacer(Modifier.height(10.dp))
           val text = buildString {
             append("${money(row.amount)} ${row.unit}".trim())
-            if (row.value > 0) append(" · ارزش ${money(row.value)} ؋")
+            if (row.value > 0) append(ir.vil3ntec.tohid.core.i18n.StrCatalogPages.valueOf(money(row.value)))
           }
           RowEcho(text, warn = row.unit.isBlank())
         }
@@ -511,7 +511,7 @@ private fun BulkFrame(
   onAddRow: (() -> Unit)?,
   onDismiss: () -> Unit,
   onSave: () -> Unit,
-  saveText: String = "ذخیره همه",
+  saveText: String = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.saveAll,
   extraAction: (@Composable () -> Unit)? = null,
   header: @Composable ColumnScope.() -> Unit = {},
   rows: androidx.compose.foundation.lazy.LazyListScope.() -> Unit,
@@ -559,7 +559,7 @@ private fun BulkFrame(
             Text(title, style = MaterialTheme.typography.titleLarge, color = Shop.colors.text)
             Text(subtitle, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           }
-          TextButton(onClick = onDismiss) { Text("انصراف") }
+          TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) }
         }
         Spacer(Modifier.height(12.dp))
         header()
@@ -570,7 +570,7 @@ private fun BulkFrame(
             OutlinedButton(onClick = onAddRow, modifier = Modifier.fillMaxWidth()) {
               Icon(Icons.Filled.Add, contentDescription = null, modifier = Modifier.size(17.dp))
               Spacer(Modifier.width(6.dp))
-              Text("افزودن ردیف")
+              Text(ir.vil3ntec.tohid.core.i18n.StrProducts.addRow)
             }
             Spacer(Modifier.height(8.dp))
           }
@@ -659,7 +659,7 @@ private fun BulkRow(
       IconButton(onClick = onDuplicate, modifier = Modifier.size(32.dp)) {
         Icon(
           Icons.Filled.ContentCopy,
-          contentDescription = "تکثیر ردیف",
+          contentDescription = ir.vil3ntec.tohid.core.i18n.StrProducts.duplicateRow,
           tint = Shop.colors.muted,
           modifier = Modifier.size(16.dp),
         )
@@ -667,7 +667,7 @@ private fun BulkRow(
       IconButton(onClick = onRemove, enabled = canRemove, modifier = Modifier.size(32.dp)) {
         Icon(
           Icons.Filled.DeleteOutline,
-          contentDescription = "حذف ردیف",
+          contentDescription = ir.vil3ntec.tohid.core.i18n.StrProducts.removeRow,
           tint = if (canRemove) Shop.colors.danger else Shop.colors.muted2,
           modifier = Modifier.size(17.dp),
         )
@@ -762,18 +762,18 @@ fun StockCountSheet(
   val shelves = remember(d) { CountFilter.shelves(d.products) }
 
   BulkFrame(
-    title = "انبارگردانی",
-    subtitle = "آنچه در قفسه هست را بنویسید؛ خانهٔ خالی یعنی شمرده نشد",
+    title = ir.vil3ntec.tohid.core.i18n.StrStock.menuCount,
+    subtitle = ir.vil3ntec.tohid.core.i18n.StrStock.countHelper,
     error = error,
     summary = listOf(
-      "شمرده" to plain(parsed.size),
-      "اختلاف" to plain(lines.size),
-      "ارزش اختلاف" to "${money(lines.sumOf { it.value })} ؋",
+      ir.vil3ntec.tohid.core.i18n.StrStock.counted to plain(parsed.size),
+      ir.vil3ntec.tohid.core.i18n.StrDrawers.varianceWord to plain(lines.size),
+      ir.vil3ntec.tohid.core.i18n.StrCatalogPages.diffValue to "${money(lines.sumOf { it.value })} ؋",
     ),
     saveEnabled = lines.isNotEmpty(),
     onAddRow = null,
     onDismiss = onDismiss,
-    saveText = "ثبت اختلاف‌ها",
+    saveText = ir.vil3ntec.tohid.core.i18n.StrCatalogPages.saveDiffsAll,
     extraAction = {
       OutlinedButton(onClick = { onExport(ReportCsv.stockCount(lines, todayIso())) }, enabled = lines.isNotEmpty()) {
         Text("CSV")
@@ -782,7 +782,7 @@ fun StockCountSheet(
     onSave = {
       val bad = parsed.entries.firstOrNull { it.value.isNaN() || it.value < 0 }
       if (bad != null) {
-        error = "عددِ «${d.products.find { it.id == bad.key }?.name.orEmpty()}» درست نیست"
+        error = ir.vil3ntec.tohid.core.i18n.StrStock.badNumber(d.products.find { it.id == bad.key }?.name.orEmpty())
       } else {
         error = null
         onSave(parsed, note)
@@ -791,16 +791,16 @@ fun StockCountSheet(
     header = {
       OutlinedTextField(
         value = search, onValueChange = { search = it },
-        placeholder = { Text("جستجوی کالا یا بارکد…") },
+        placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrStock.searchHint) },
         singleLine = true, modifier = Modifier.fillMaxWidth(),
       )
-      if (categories.isNotEmpty()) CountFilterChips("همهٔ دسته‌ها", categories.map { it to it }, category) { category = it }
-      if (suppliers.isNotEmpty()) CountFilterChips("همهٔ تأمین‌کننده‌ها", suppliers.map { it.id to it.name.ifBlank { it.id } }, supplierId) { supplierId = it }
+      if (categories.isNotEmpty()) CountFilterChips(ir.vil3ntec.tohid.core.i18n.StrCount.allCategories, categories.map { it to it }, category) { category = it }
+      if (suppliers.isNotEmpty()) CountFilterChips(ir.vil3ntec.tohid.core.i18n.StrCount.allSuppliers, suppliers.map { it.id to it.name.ifBlank { it.id } }, supplierId) { supplierId = it }
       CountBrandShelfChips(brands, brand, { brand = it }, shelves, shelf, { shelf = it }) // INV-05: برند و قفسه
       Spacer(Modifier.height(8.dp))
       OutlinedTextField(
         value = note, onValueChange = { note = it },
-        placeholder = { Text("یادداشت (مثلاً: قفسهٔ برنج)") },
+        placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrCount.note) },
         singleLine = true, modifier = Modifier.fillMaxWidth(),
       )
       Spacer(Modifier.height(10.dp))
@@ -821,7 +821,7 @@ fun StockCountSheet(
         Column(Modifier.weight(1f)) {
           Text(p.name, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, maxLines = 1)
           Text(
-            "برنامه: ${ir.vil3ntec.tohid.qty(sys)} ${p.unit}" + when {
+            ir.vil3ntec.tohid.core.i18n.StrCount.system(ir.vil3ntec.tohid.qty(sys), p.unit) + when {
               diff == null || kotlin.math.abs(diff) < 0.0005 -> ""
               diff > 0 -> " · +${ir.vil3ntec.tohid.qty(diff)}"
               else -> " · −${ir.vil3ntec.tohid.qty(-diff)}"
@@ -837,7 +837,7 @@ fun StockCountSheet(
         OutlinedTextField(
           value = counts[p.id].orEmpty(),
           onValueChange = { v -> counts = counts + (p.id to v) },
-          placeholder = { Text("شمرده") },
+          placeholder = { Text(ir.vil3ntec.tohid.core.i18n.StrStock.counted) },
           singleLine = true,
           isError = c != null && (c.isNaN() || c < 0),
           keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
