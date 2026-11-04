@@ -3034,6 +3034,8 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
   `/portal/#delete-account`، و `privacy.html#delete-account` (نشانیِ Play Console؛ `server/test/self-delete.test.js` می‌سنجد).
   سرور `routes/account-deletion.js` + `lib/self-delete.js` روی همان `lib/user-delete.js`؛ پرچمِ `account.self_delete` پیش‌فرض
   خاموش ⇒ «درخواست از پشتیبانی». پیوندِ «حریمِ خصوصی» در «درباره برنامه» و «ویرایش حساب».
+  ⛔ نشستِ بسته به دکانی که آدم صاحبش نیست (شاگرد/مدیرِ دکانِ دیگر، `/api/shop/active`) ⇒ هر دو در (`GET` و `POST`) ۴۰۳
+  `owner_session_required` — نه نامِ دکان‌های خودش، نه حذف (TEN-01؛ `tenant-matrix.test.js`، `self-delete.test.js`).
 - ⚠️ کلیدِ `android-native/app/tohid-release.jks` در مخزنِ عمومی است؛ برای Play کلیدِ بارگذاریِ تازه (Play App Signing)،
   نه این کلید. تصمیمِ صاحب‌کار در `docs/GOOGLE-PLAY-fa.md`.
 

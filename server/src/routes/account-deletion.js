@@ -14,6 +14,7 @@ const v = require('../lib/validate');
 const audit = require('../lib/audit');
 const reauth = require('../lib/reauth');
 const selfDelete = require('../lib/self-delete');
+const shops = require('../lib/shops');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { badRequest, forbidden, notFound, conflict, unauthorized } = require('../middleware/errors');
 
@@ -25,10 +26,25 @@ const runLimit = rateLimit({ max: 10, keyPrefix: 'self-delete' });
 const MESSAGES = {
   self_delete_disabled: 'حذفِ حساب از برنامه هنوز روشن نشده است؛ از «پشتیبانی» بخواهید تا حسابتان را پاک کنیم.',
   has_pump: 'این حساب پمپ هم دارد؛ حذفِ آن از «پشتیبانی» انجام می‌شود تا دادهٔ پمپ بی‌خبر پاک نشود.',
+  owner_session_required: 'این نشست به دکانِ دیگری بسته است؛ برای حذفِ حساب به دکانِ خودتان بروید یا از پورتالِ وب وارد شوید.',
 };
+
+/**
+ * ⛔ جداسازیِ دکان (TEN-01، `tenant-matrix.test.js`): نشستی که به دکانی بسته است (`/api/shop/active`) و آدم در آن صاحب
+ * نیست (شاگرد/مدیرِ دکانِ دیگری) نه نامِ دکان‌های خودش را می‌بیند و نه کلِ حساب را پاک می‌کند — دستگاهِ مشترکِ آن دکان
+ * راهِ حساب و دکان‌های دیگرِ او نیست. نشستِ بی‌دکان یا بسته به دکانِ خودش ⇒ null.
+ */
+async function foreignSession(req) {
+  const bound = shops.sessionShopOf(req.tokenRow);
+  if (!bound) return null;
+  const m = await shops.membershipOf(req.user.id, { shopId: bound });
+  return m && m.role === 'owner' ? null : forbidden(MESSAGES.owner_session_required, 'owner_session_required');
+}
 
 router.get('/', viewLimit, async (req, res, next) => {
   if (!req.user) return next(unauthorized());
+  const foreign = await foreignSession(req);
+  if (foreign) return next(foreign);
   const out = await selfDelete.view(req.user);
   if (!out) return next(notFound('حساب پیدا نشد'));
   res.json(out);
@@ -36,6 +52,8 @@ router.get('/', viewLimit, async (req, res, next) => {
 
 router.post('/', runLimit, async (req, res, next) => {
   if (!req.user) return next(unauthorized());
+  const foreign = await foreignSession(req);
+  if (foreign) return next(foreign);
   //  خودِ حساب را می‌گیرد ⇒ تازگی در هر بخش، مثلِ «گذاشتنِ نخستین رمز»
   await reauth.assertFresh(req, { allSections: true });
   const confirm = v.text(req.body?.confirm, { max: 200 });

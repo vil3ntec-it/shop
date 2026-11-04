@@ -107,6 +107,31 @@ test('پورتالِ وب همان در است — و حسابِ پمپ‌دار
   assert.equal(await one('SELECT id FROM users WHERE id=$1', [s.user.id]), null);
 });
 
+test('نشستِ بسته به دکانِ دیگری (شاگرد) ⇒ ۴۰۳ owner_session_required: نه نامِ دکانِ خودش، نه حذف', async () => {
+  await flag(true);
+  const a = await shopOwner('کارفرما');
+  const b = await shopOwner('شاگردِ دکان‌دار');
+  const t = Date.now();
+  await query(`INSERT INTO shop_members (id, shop_id, user_id, role, status, created_at, updated_at) VALUES ($1,$2,$3,'staff','active',$4,$4)`,
+    [`mem-sd-${t}`, a.shopId, b.user.id, t]);
+  const pick = await h.post('/api/shop/active', { shopId: a.shopId }, { token: b.accessToken });
+  assert.equal(pick.status, 200, JSON.stringify(pick.body));
+  for (const door of ['/api/me/account/deletion', '/api/portal/account/deletion']) {
+    const pv = await h.get(door, { token: b.accessToken });
+    assert.equal(pv.status, 403, door);
+    assert.equal(pv.body.error.code, 'owner_session_required');
+    assert.ok(!JSON.stringify(pv.body).includes('شاگردِ دکان‌دار'), 'نامِ دکانِ خودش از نشستِ دکانِ دیگر دیده نمی‌شود');
+    const run = await h.post(door, { confirm: b.email }, { token: b.accessToken });
+    assert.equal(run.status, 403, door);
+    assert.equal(run.body.error.code, 'owner_session_required');
+  }
+  assert.ok(await one('SELECT id FROM users WHERE id=$1', [b.user.id]), 'حساب سرِ جایش است');
+  //  برگشت به دکانِ خودش ⇒ همان پیش‌نمایشِ عادی
+  assert.equal((await h.post('/api/shop/active', { shopId: b.shopId }, { token: b.accessToken })).status, 200);
+  assert.equal((await h.get('/api/me/account/deletion', { token: b.accessToken })).status, 200);
+  await flag(false);
+});
+
 test('بی نشست ⇒ ۴۰۱', async () => {
   assert.equal((await h.get('/api/me/account/deletion')).status, 401);
   assert.equal((await h.post('/api/portal/account/deletion', { confirm: 'x' })).status, 401);
