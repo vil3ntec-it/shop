@@ -225,6 +225,9 @@ object StrHome {
   // نوارِ اشتراک و نسخهٔ تازه (جای `notice` ِ `V3Scaffold`)
   val subNoticeEnded: String get() = t("اشتراک تمام شده — فقط‌خواندنی؛ دفتر سرِ جایش است", "Subscription ended — read-only; your ledger is safe", "ګډون پای ته رسېدلی — یوازې لوستل؛ دفتر خوندي دی")
   fun subNoticeDays(n: Any): String = t("${asIs(n)} روز تا پایانِ اشتراک — هیچ داده‌ای پاک نمی‌شود", "$n ${pl(n, "day", "days")} left — no data is ever deleted", "$n ${pl(n, "ورځ", "ورځې")} پاتې — هېڅ معلومات نه ړنګېږي")
+  //  O-09: صاحبِ دکان بیرون از سقفِ دستگاه — این دستگاه کار می‌کند، دستگاهِ کارمندِ اضافه نه
+  fun deviceCapOver(devices: Any, max: Any): String = t("${asIs(devices)} دستگاه با اشتراکِ ${asIs(max)} دستگاهی — دستگاهِ کارمندِ اضافه بسته است", "$devices devices on a $max-device plan — extra staff devices are blocked", "$devices وسیلې د $max وسیلو ګډون سره — د کارکوونکي اضافي وسیله تړل شوې")
+  val deviceCapOverDetail: String get() = t("دستگاهِ شما همیشه کار می‌کند؛ یک دستگاهِ کهنه را بردارید یا اشتراک را بزرگ‌تر کنید.", "Your device always works; remove an old device or upgrade the plan.", "ستاسو وسیله تل کار کوي؛ یوه زړه وسیله لرې کړئ یا ګډون لوی کړئ.")
   fun updateNew(v: Any): String = t("نسخهٔ تازه ${asIs(v)}", "New version $v", "نوې نسخه $v")
   fun updateGetting(v: Any, p: Any): String = t("در حالِ گرفتنِ ${asIs(v)}… ${asIs(p)}٪", "Downloading $v… $p%", "$v راښکته کېږي… $p٪")
   fun updateReady(v: Any): String = t("نسخهٔ ${asIs(v)} آمادهٔ نصب است", "Version $v is ready to install", "$v نسخه د نصب لپاره چمتو ده")
