@@ -48,6 +48,12 @@ object StrStaffTime {
   val rates: String get() = t("نرخ‌های پورسانت", "Commission rates", "د کمېشن نرخونه")
   val defaultRate: String get() = t("نرخِ همه (٪)", "Rate for everyone (%)", "د ټولو نرخ (٪)")
   fun sellerRate(name: String): String = t("نرخِ ${asIs(name)} (٪)", "Rate for $name (%)", "د $name نرخ (٪)")
+  fun categoryRate(name: String): String = t("نرخِ دستهٔ ${asIs(name)} (٪)", "Rate for category $name (%)", "د $name ډلې نرخ (٪)")
+  val categoryHint: String get() = t(
+    "نرخِ دسته بر نرخِ فروشنده و نرخِ همه پیشی دارد؛ کادرِ خالی یعنی نرخِ فروشنده.",
+    "A category rate overrides the seller and everyone rates; leave it empty to use the seller rate.",
+    "د ډلې نرخ د پلورونکي او ټولو له نرخ څخه مخکې دی؛ تش ځای یعنې د پلورونکي نرخ.",
+  )
   val save: String get() = t("ذخیرهٔ نرخ‌ها", "Save rates", "نرخونه خوندي کړئ")
   val saved: String get() = t("نرخ‌ها ذخیره شد.", "Rates saved.", "نرخونه خوندي شول.")
   val rateInvalid: String get() = t(
