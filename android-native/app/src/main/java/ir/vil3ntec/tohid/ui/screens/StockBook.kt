@@ -484,7 +484,7 @@ private fun CountTab(
   var draft by remember { mutableStateOf(StockCountDraftStore.load(context)) }
   //  INV-10: هر عددِ تازه لحظهٔ خودش را می‌گیرد (`StockActions.stamp`) تا فروشِ وسطِ شمارش دو بار کم نشود
   fun keep(next: StockActions.CountDraft?) {
-    val n = next?.let { StockActions.stamp(draft, it, System.currentTimeMillis()) }
+    val n = next?.let { StockActions.stamp(draft, it, ir.vil3ntec.tohid.data.ReportBridge.nowMs()) }
     draft = n; StockCountDraftStore.save(context, n)
   }
   var query by rememberSaveable { mutableStateOf("") }
