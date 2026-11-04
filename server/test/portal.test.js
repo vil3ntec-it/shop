@@ -60,7 +60,8 @@ test('صفحهٔ پورتال روی /portal سرو می‌شود و راست‌
   assert.ok(html.includes('lang="fa"') && html.includes('dir="rtl"'), 'فارسی و راست‌به‌چپ');
   assert.ok(html.includes('portal.js') && html.includes('portal.css'));
   //  همهٔ تب‌های خواسته‌شده
-  for (const tab of ['اشتراک‌ها', 'پرداخت‌ها', 'دستگاه‌ها', 'پشتیبانی', 'اعلان‌ها', 'دانلود']) {
+  //  «حذفِ حساب»: نشانیِ وبِ حذف که Google Play می‌خواهد (`/portal/#delete-account`)
+  for (const tab of ['اشتراک‌ها', 'پرداخت‌ها', 'دستگاه‌ها', 'پشتیبانی', 'اعلان‌ها', 'دانلود', 'حذفِ حساب']) {
     assert.ok(html.includes(tab), `تبِ «${tab}» باید باشد`);
   }
   const css = fs.readFileSync(path.join(PUBLIC, 'portal.css'), 'utf8');
@@ -69,6 +70,7 @@ test('صفحهٔ پورتال روی /portal سرو می‌شود و راست‌
   const js = fs.readFileSync(path.join(PUBLIC, 'portal.js'), 'utf8');
   assert.ok(js.includes('/auth/otp/request') && js.includes('/auth/otp/verify'),
     'ورود با ایمیل + کدِ شش‌رقمی');
+  assert.ok(js.includes('/portal/account/deletion') && js.includes('#delete-account'), 'حذفِ حساب از وب، با پیوندِ مستقیم');
 });
 
 /* ══════════════════════════════════════════════════════════════════

@@ -16,8 +16,10 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AlternateEmail
+import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -36,9 +38,11 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.account.AccountDeletion
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -55,6 +59,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
+import ir.vil3ntec.tohid.ui.v3.account.AccountPaths
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
@@ -88,6 +93,8 @@ internal fun ProfileEditContent(
   onPhoto: () -> Unit,
   onSave: () -> Unit,
   onBack: (() -> Unit)?,
+  onPrivacy: () -> Unit = {},
+  onDelete: () -> Unit = {},
 ) {
   val c = PhoneV3.colors
   V3Form(
@@ -142,6 +149,12 @@ internal fun ProfileEditContent(
         chevron = false,
       )
     }
+
+    //  قاعدهٔ Google Play: حریمِ خصوصی و «حذفِ حساب» در خودِ برنامه، پیدا و یک لمس دورتر
+    V3Section(StrAccount.privacyPolicy, Modifier.v3Stagger(stagger, "privacy", 4)) {
+      V3ListRow(StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, onClick = onPrivacy)
+      V3ListRow(StrAccount.deleteAccount, subtitle = StrAccount.deleteAccountLine, icon = Icons.Outlined.DeleteForever, danger = true, onClick = onDelete)
+    }
     Spacer(Modifier.height(24.dp))
   }
 }
@@ -191,6 +204,7 @@ internal fun RouteScope.ProfileEditRoute() {
   var version by remember { mutableIntStateOf(0) }
   var sheet by remember { mutableStateOf(false) }
   val accountId = state.accountId.ifBlank { "local" }
+  val uri = LocalUriHandler.current
 
   val picker = rememberAvatarPicker { uri ->
     PhotoStore.saveAvatar(context, accountId, uri)
@@ -245,6 +259,8 @@ internal fun RouteScope.ProfileEditRoute() {
     onPhoto = { sheet = true },
     onSave = ::save,
     onBack = backOrNull,
+    onPrivacy = { runCatching { uri.openUri(AccountDeletion.PRIVACY_URL) } },
+    onDelete = { nav.open(AccountPaths.DELETE) },
   )
   if (sheet) AvatarSourceSheet(picker) { sheet = false }
 }

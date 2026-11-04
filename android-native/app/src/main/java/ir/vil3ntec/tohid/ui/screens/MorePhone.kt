@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -122,7 +123,7 @@ internal fun MoreAppPage(d: ShopData, onBack: () -> Unit) {
       Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
     ) {
       //  نسخهٔ بازار خودش را به‌روز نمی‌کند — به‌روزرسانی فقط از خودِ بازار (قانونِ بازار)
-      if (BuildConfig.STORE != "bazaar") {
+      if (!StoreChannel.storeManaged(BuildConfig.STORE)) {
         V3Section(StrNav.appUpdate, padding = PaddingValues(16.dp)) {
           //  دکمه‌های `UpdateControls` با رنگِ برندِ کیت
           MaterialTheme(colorScheme = MaterialTheme.colorScheme.copy(primary = c.accentDeep, onPrimary = c.onAccent)) {

@@ -69,6 +69,8 @@ const SELF = [
     'DELETE /api/portal/devices/:id', 'POST /api/portal/support/messages', 'POST /api/portal/notices/:id/read',
     'PUT /api/portal/settings', 'POST /api/portal/redeem', 'POST /api/portal/errors',
     'POST /api/license/sync', 'POST /api/billing/request']],
+  ['حذفِ حسابِ خودِ صدا زننده (Google Play): فقط `req.user.id`، تأییدِ دوباره در هر بخش، تایپِ نشانیِ همان حساب، پرچمِ خاموشِ `account.self_delete`', [
+    'POST /api/me/account/deletion', 'POST /api/portal/account/deletion']],
   ['ساختن یا پیوستن به دکان/پمپ: صاحبِ تازه خودِ صدا زننده است؛ پیوستن فقط با کد؛ دکانِ فعال فقط از عضویت‌های خودش', [
     'POST /api/shop', 'POST /api/shop/create', 'POST /api/shop/active', 'POST /api/shop/staff/join', 'POST /api/shop/join',
     'POST /api/pump', 'POST /api/pump/claim', 'POST /api/pump/device/bind']],

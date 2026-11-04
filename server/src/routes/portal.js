@@ -244,6 +244,9 @@ async function heartbeatHandler(app, req, res, next) {
 const router = express.Router();
 router.use(requireAnyUser);
 
+//  همان «حذفِ حساب» ِ `/api/me/account/deletion` — نشانیِ وبِ حذف برای Google Play (`routes/account-deletion.js`)
+router.use('/account/deletion', require('./account-deletion'));
+
 /** همه‌چیزِ صفحهٔ پورتال در یک درخواست. */
 router.get('/me', async (req, res, next) => {
   try {

@@ -286,7 +286,7 @@ fun DeskSaleScreen(
     val (pid, lot) = ir.vil3ntec.tohid.data.StockActions.lotForCode(dd, code) ?: return false
     val product = dd.products.firstOrNull { it.id == pid && it.active } ?: return false
     val added = SalesEngine.addToCartCapped(cartStore.lines.value, pid, 1.0, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(dd, pid))
-    if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast("${product.name} — سری $lot به سبد اضافه شد")
+    if (applyAdded(product, added.copy(cart = SalesEngine.setLineLot(added.cart, pid, lot))) && !added.capped) toast(ir.vil3ntec.tohid.core.i18n.StrSalePages.lotAdded(product.name, lot))
     return true
   }
 
@@ -912,7 +912,7 @@ fun DeskSaleScreen(
             val r = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, key, prepay)
             receiveBusy = false
             //  ضربهٔ دوم (`again`) پیامِ دوم نمی‌گیرد؛ «ثبت نشد» ِ قفل/دیسک از `AppRoot`
-            r.show(::toast, "دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L))} ؋ از «$name» ثبت شد") {
+            r.show(::toast, ir.vil3ntec.tohid.core.i18n.StrSalePages.received(money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L)), name)) {
               receiveFor = null; receiptOf = Triple(store.data.value, id, key)
             }
           }

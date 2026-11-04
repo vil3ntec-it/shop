@@ -24,6 +24,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.debt.TillReceive
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.money
@@ -50,22 +53,22 @@ internal fun TillReceiveDialog(
   val amountMinor = ir.vil3ntec.tohid.parseNumber(amountText)?.let(PayFlow::minor)
   val verdict = TillReceive.judge(balanceMinor, amountMinor)
   val prepay = (verdict as? TillReceive.Verdict.Ok)?.prepayMinor ?: 0L
-  fun show(m: Long) = money(PayFlow.major(m)) + " افغانی"
+  fun show(m: Long) = money(PayFlow.major(m)) + StrSalePages.afnSuffix
 
   Dialog(onDismissRequest = onDismiss) { gate {
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
       Column(Modifier.padding(18.dp)) {
-        Text("دریافت از «$name»", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        Text(StrSalePages.receiveFrom(name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
         Spacer(Modifier.height(4.dp))
         Text(
-          if (balanceMinor > 0) "بدهی: ${show(balanceMinor)}" else "بدهی ندارد" + if (balanceMinor < 0) " — پیش‌پرداخت: ${show(-balanceMinor)}" else "",
+          if (balanceMinor > 0) StrSalePages.owes(show(balanceMinor)) else StrMoney.noDebt + if (balanceMinor < 0) StrSalePages.prepaidTail(show(-balanceMinor)) else "",
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
         )
         Spacer(Modifier.height(12.dp))
-        AmountField(value = amountText, onValueChange = { amountText = it.take(16) }, label = "مبلغِ دریافتی")
+        AmountField(value = amountText, onValueChange = { amountText = it.take(16) }, label = StrSalePages.amountReceived)
         Spacer(Modifier.height(8.dp))
         OutlinedTextField(
-          value = notes, onValueChange = { notes = it.take(200) }, label = { Text("شرح (اختیاری)") },
+          value = notes, onValueChange = { notes = it.take(200) }, label = { Text(StrSalePages.descOptional) },
           singleLine = true, modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(8.dp))
@@ -74,20 +77,20 @@ internal fun TillReceiveDialog(
             Text(ir.vil3ntec.tohid.data.TillReceiveFlow.message(verdict.problem), style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
           }
           is TillReceive.Verdict.Ok -> Text(
-            if (prepay > 0) "${show(prepay)} بیش از بدهی است و پیش‌پرداختِ مشتری ثبت می‌شود."
-            else "مانده پس از دریافت: ${show(verdict.leftMinor)}",
+            if (prepay > 0) StrSalePages.overDebt(show(prepay))
+            else StrSalePages.leftAfter(show(verdict.leftMinor)),
             style = MaterialTheme.typography.labelSmall,
             color = if (prepay > 0) Shop.colors.warning else Shop.colors.muted,
           )
         }
         Spacer(Modifier.height(14.dp))
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+          OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
           Button(
             onClick = { onSubmit(amountMinor, notes, prepay > 0) },
             enabled = !busy && verdict is TillReceive.Verdict.Ok,
             modifier = Modifier.weight(1f),
-          ) { Text(if (prepay > 0) "ثبتِ پیش‌پرداخت" else "ثبتِ دریافت") }
+          ) { Text(if (prepay > 0) StrSalePages.recordPrepay else StrSalePages.recordReceipt) }
         }
       }
     }
