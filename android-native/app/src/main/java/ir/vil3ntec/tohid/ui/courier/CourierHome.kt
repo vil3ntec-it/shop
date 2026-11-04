@@ -16,8 +16,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -33,15 +31,11 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.Logout
-import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.GridView
 import androidx.compose.material.icons.outlined.LocalShipping
-import androidx.compose.material.icons.outlined.Lock
-import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Refresh
-import androidx.compose.material.icons.outlined.Star
 import androidx.compose.material.icons.outlined.TableRows
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
@@ -62,7 +56,6 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import ir.vil3ntec.tohid.core.courier.CourierChecks
@@ -88,14 +81,12 @@ import ir.vil3ntec.tohid.ui.screens.Motion
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
-import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3IconButton
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
-import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
 import ir.vil3ntec.tohid.ui.v3.V3SnackbarHost
@@ -245,7 +236,8 @@ fun CourierHome(onSignedOut: () -> Unit) {
   var syncing by remember { mutableStateOf(false) }
   var lastError by remember { mutableStateOf<String?>(null) }
   var summaryError by remember { mutableStateOf<String?>(null) }
-  var extras by remember { mutableStateOf(CourierExtras.of(store)) }   //  پرچم‌های مسیر و امتیاز (DLV-04/18)
+  var extras by remember { mutableStateOf(CourierExtras.of(store)) }   //  پرچم‌های مسیر، امتیاز و تماس (DLV-04/18/02)
+  var calling by remember { mutableStateOf(false) }   //  یک «تماس با مشتری» در هر لحظه (هر بار در سابقهٔ دکان می‌نشیند)
 
   fun reloadLocal() {
     queue = store.queue(); active = store.cards("active"); done = store.cards("done")
@@ -325,6 +317,9 @@ fun CourierHome(onSignedOut: () -> Unit) {
       if (!opened) scope.launch { snackbar.showSnackbar(StrCourierApp.dialerFailed) }
     },
     onNavigate = { c -> openMissionRoute(context, c) },   // DLV-05: پیوندهای سرور، وگرنه همان پیشین
+    onCallCustomer = { c ->   //  DLV-02: شماره همین لحظه از سرور ⇐ شماره‌گیر؛ نشد ⇒ نوارِ پیام
+      if (!calling) { calling = true; scope.launch { val text = try { callCustomerFrom(context, c) } finally { calling = false }; text?.let { snackbar.showSnackbar(it) } } }
+    },
     onSignOut = {
       scope.launch {
         runCatching { Backend.auth(context).signOut() }
@@ -368,6 +363,7 @@ internal fun CourierBoard(
   summaryError: String? = null,
   extras: CourierExtras = CourierExtras(),
   onRate: (MissionCard, Int, List<String>) -> Unit = { _, _, _ -> },
+  onCallCustomer: (MissionCard) -> Unit = {},
 ) {
   val p = PhoneV3.colors
   var tab by rememberSaveable { mutableStateOf(initialTab) }
@@ -397,6 +393,8 @@ internal fun CourierBoard(
   //  کارِ آماده: پیش‌شرط دارد (کیسه، موقعیت) ⇒ اول برگه‌اش، وگرنه همان دم به صف
   fun submit(a: CourierAction) { check = checkFor(a); if (check == null) onRecord(a) }
   val rateFor: (MissionCard) -> (() -> Unit)? = { c -> if (extras.canRate(c)) ({ check = CheckAsk.Rate(c) }) else null }
+  //  DLV-02: همان دروازهٔ رابطِ پیشین — پرچمِ دکان و پس از «قبول» تا پایان (کارتِ نمایشی: وضعیتِ صف هم حساب است)
+  val callFor: (MissionCard) -> (() -> Unit)? = { c -> if (extras.canCall(c)) ({ onCallCustomer(c) }) else null }
 
   fun act(c: MissionCard, to: String) {
     when (to) {
@@ -474,6 +472,7 @@ internal fun CourierBoard(
                   onNavigate = { onNavigate(c) },
                   seen = seen,
                   onRate = rateFor(c),
+                  onCall = callFor(c),
                 )
               }
             }
@@ -494,7 +493,7 @@ internal fun CourierBoard(
               },
               seen = seen, onRefresh = onRefresh, onDismissRejected = onDismissRejected,
               onOpen = { open(it) }, onAction = { c, to -> act(c, to) },
-              onRoutePlan = if (extras.routeEnabled) ({ check = CheckAsk.Route }) else null, rateFor = rateFor,
+              onRoutePlan = if (extras.routeEnabled) ({ check = CheckAsk.Route }) else null, rateFor = rateFor, callFor = callFor,
             )
             key == "t:stats" -> CourierStatsTab(
               summary = summary, week = statsWeek, onWeek = { statsWeek = it }, staleError = staleError,
@@ -586,6 +585,7 @@ private fun RouteTab(
   onAction: (MissionCard, String) -> Unit,
   onRoutePlan: (() -> Unit)?,
   rateFor: (MissionCard) -> (() -> Unit)?,
+  callFor: (MissionCard) -> (() -> Unit)?,
 ) {
   val p = PhoneV3.colors
   val list = if (routeTab == "active") live else finished
@@ -637,7 +637,7 @@ private fun RouteTab(
         val waiting = CourierQueue.pendingFor(queue, c.id).isNotEmpty()
         val itemMod = Modifier.animateItem().v3Stagger(seen, c.id, index)
         if (view == ViewMode.CARD) {
-          MissionCardView(c, waiting, itemMod, onOpen = { onOpen(c) }, onAction = { to -> onAction(c, to) }, onRate = rateFor(c))
+          MissionCardView(c, waiting, itemMod, onOpen = { onOpen(c) }, onAction = { to -> onAction(c, to) }, onRate = rateFor(c), onCall = callFor(c))
         } else {
           MissionRow(c, waiting, itemMod, onOpen = { onOpen(c) })
         }
@@ -744,99 +744,6 @@ internal fun StepTrack(status: String, onDark: Boolean = false) {
         )
       }
     }
-  }
-}
-
-@OptIn(ExperimentalLayoutApi::class)
-@Composable
-private fun MissionCardView(
-  c: MissionCard,
-  waiting: Boolean,
-  modifier: Modifier,
-  onOpen: () -> Unit,
-  onAction: (String) -> Unit,
-  onRate: (() -> Unit)? = null,
-) {
-  val p = PhoneV3.colors
-  val live = CourierFlow.isLive(c.status)
-  Column(
-    modifier.fillMaxWidth().courierCard(p).clip(CourierCardShape).clickable(onClick = onOpen).padding(18.dp),
-  ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-      Text(StrCourierApp.orderNo(c.orderNo.fa()), style = courierText(14.sp, FontWeight.Bold), color = p.ink, modifier = Modifier.weight(1f))
-      if (waiting) { QueuedPill(); Spacer(Modifier.width(6.dp)) }
-      MissionStatus(c.status)
-    }
-    if (c.recallRequested && live) {
-      Spacer(Modifier.height(10.dp))
-      V3Message(V3Tone.ERROR, RECALL_NOTE)
-    }
-    //  DLV-02: «اول نشانه»
-    if (c.landmark.isNotBlank()) {
-      Spacer(Modifier.height(10.dp))
-      Text(c.landmark, style = courierText(18.sp, FontWeight.Bold), color = p.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-    if (c.addressText.isNotBlank()) {
-      Spacer(Modifier.height(2.dp))
-      Text(c.addressText, style = courierText(14.sp), color = p.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-    }
-    val chips = live && (c.expectedCollectMinor > 0 || c.requiresCode) || !live && (c.cashCollectedMinor != null || c.fareMinor > 0)
-    if (chips) {
-      Spacer(Modifier.height(12.dp))
-      FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        if (live) {
-          if (c.expectedCollectMinor > 0) CourierInfoChip(Icons.Outlined.Payments, StrCourierApp.cashChip(afn(c.expectedCollectMinor)))
-          if (c.requiresCode) CourierInfoChip(Icons.Outlined.Lock, StrCourierApp.deliveryCode)
-        } else {
-          c.cashCollectedMinor?.let { CourierInfoChip(Icons.Outlined.CheckCircle, StrCourierApp.collectedChip(afn(it)), positive = true) }
-          if (c.fareMinor > 0) CourierInfoChip(Icons.Outlined.Payments, StrCourierApp.fareChip(afn(c.fareMinor)))
-        }
-      }
-    }
-    if (reached(c.status) >= 0 && live) {
-      Spacer(Modifier.height(14.dp))
-      StepTrack(c.status)
-    }
-    val actions = if (live) CourierFlow.actions(c.status) else emptyList()
-    if (actions.isNotEmpty()) {
-      Spacer(Modifier.height(16.dp))
-      val primary = actions.firstOrNull { !isNegative(it) }
-      if (c.status == "requested") {
-        //  کارِ تازه: قبول و رد کنارِ هم، هم‌اندازه
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-          primary?.let { StepButton(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f)) }
-          actions.filter { isNegative(it) }.forEach {
-            CourierSecondary(actionLabel(c.status, it), { onAction(it) }, Modifier.weight(1f), negative = true, height = 56.dp)
-          }
-        }
-      } else if (primary != null) {
-        //  یک دکمهٔ بزرگ برای پلهٔ بعد؛ «ناموفق» و بقیه در صفحهٔ جزئیات
-        StepButton(actionLabel(c.status, primary), { onAction(primary) }, Modifier.fillMaxWidth())
-      }
-    }
-    //  DLV-18: امتیازِ پیک به تحویلِ انجام‌شده — فقط با پرچمِ دکان و یک بار
-    if (onRate != null) {
-      Spacer(Modifier.height(14.dp))
-      CourierSecondary(StrCourier.rate, onRate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Star)
-    }
-  }
-}
-
-/** نمای جدولیِ فشرده (صفحهٔ بزرگ) — همان داده؛ زدنِ ردیف جزئیات را باز می‌کند */
-@Composable
-private fun MissionRow(c: MissionCard, waiting: Boolean, modifier: Modifier, onOpen: () -> Unit) {
-  val p = PhoneV3.colors
-  Row(
-    modifier.fillMaxWidth().courierCard(p, CourierGroupShape).clip(CourierGroupShape).clickable(onClick = onOpen)
-      .padding(horizontal = 16.dp, vertical = 12.dp),
-    verticalAlignment = Alignment.CenterVertically,
-    horizontalArrangement = Arrangement.spacedBy(10.dp),
-  ) {
-    Text(c.orderNo.fa(), style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.width(56.dp))
-    Text(c.landmark.ifBlank { "—" }, style = courierText(15.sp), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-    Text(if (c.expectedCollectMinor > 0) afn(c.expectedCollectMinor) else "—", style = courierText(13.sp), color = p.inkMuted)
-    if (waiting) QueuedPill()
-    MissionStatus(c.status)
   }
 }
 

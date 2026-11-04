@@ -3,11 +3,18 @@ package ir.vil3ntec.tohid.ui.courier
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import ir.vil3ntec.tohid.core.courier.MissionCard
+import ir.vil3ntec.tohid.data.repo.Backend
 
 /**
  * مرزِ پلتفرمِ «تماس با مشتری» (DLV-02): فقط صفحهٔ شماره‌گیرِ گوشی باز می‌شود و تماس را خودِ پیک
  * می‌زند. شماره جایی نگه داشته نمی‌شود. برنامهٔ تماس نباشد ⇒ استثنا، و فراخواننده پیام می‌دهد.
+ * آیفون: شیمِ `Context.startActivity` ⇐ `tel:` با `openURL` (نتواند ⇒ همان استثنا)؛ کامپیوتر: برنامهٔ `tel:` ِ سیستم.
  */
 internal fun openDialer(context: Context, phone: String) {
   context.startActivity(Intent(Intent.ACTION_DIAL, Uri.parse("tel:" + Uri.encode(phone))))
 }
+
+/** «تماس با مشتری» ِ کارت و جزئیات: شماره از سرور ⇐ همین شماره‌گیر. ⇒ پیام برای نوارِ پیام یا `null` (`callCustomer`) */
+internal suspend fun callCustomerFrom(context: Context, card: MissionCard): String? =
+  callCustomer(card, { Backend.courier(context).callNumber(it) }) { phone -> openDialer(context, phone) }

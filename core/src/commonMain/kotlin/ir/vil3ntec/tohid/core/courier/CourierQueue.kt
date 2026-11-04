@@ -347,13 +347,18 @@ object MissionView {
    *  کارتِ «اول نشانه» (DLV-02، §۶.۱۸): خطِ اول نشانه (بی نشانه، نشانیِ متنی)،
    *  خطِ دوم «ناحیه · دروازهٔ رنگ»، خطِ سوم نشانیِ متنی وقتی نشانه هم هست.
    *  خطِ خالی نمی‌آید؛ پیک پیش از هر چیز چیزی را می‌بیند که از سرِ کوچه پیداست.
+   *  [areaLabel]/[gateLabel]: برچسبِ ناحیه و دروازه به زبانِ صفحه (`StrCourierApp.areaLine`/`gateLine`)؛ پیش‌فرض فارسی.
    */
-  fun landmarkFirst(card: MissionCard): List<String> {
+  fun landmarkFirst(
+    card: MissionCard,
+    areaLabel: (String) -> String = { "ناحیه: $it" },
+    gateLabel: (String) -> String = { "دروازهٔ $it" },
+  ): List<String> {
     val landmark = card.landmark.trim()
     val text = card.addressText.trim()
     val hint = listOf(
-      card.area.trim().takeIf { it.isNotEmpty() }?.let { "ناحیه: $it" },
-      card.gateColor.trim().takeIf { it.isNotEmpty() }?.let { "دروازهٔ $it" },
+      card.area.trim().takeIf { it.isNotEmpty() }?.let(areaLabel),
+      card.gateColor.trim().takeIf { it.isNotEmpty() }?.let(gateLabel),
     ).filterNotNull().joinToString(" · ")
     return listOf(landmark.ifEmpty { text }, hint, if (landmark.isNotEmpty()) text else "").filter { it.isNotEmpty() }
   }
