@@ -1,0 +1,58 @@
+#!/usr/bin/env node
+'use strict';
+/**
+ * S86 — بازسازیِ مانده‌های موجودیِ یک دکان از دفترِ حرکت‌ها (`stock.rebuild`).
+ *
+ *   node scripts/stock-rebuild.js --shop <شناسهٔ دکان>               فقط نشان می‌دهد (هیچ نوشتنی)
+ *   node scripts/stock-rebuild.js --shop <شناسه> --apply [--by <نام>]   مانده = جمعِ دفتر، با سابقهٔ `stock.rebuild`
+ *   … --json                                                      خروجیِ ماشینی
+ *
+ * دفتر (`stock_moves`) هرگز دست نمی‌خورد. پیش از `--apply` پشتیبان بگیرید (`npm run backup`).
+ * کدِ خروج: ۰ مانده‌ها با دفتر می‌خوانند (یا با `--apply` درست شدند) · ۲ ناهمخوانی (بی `--apply`) · ۱ خطا
+ */
+
+function parseArgs(argv) {
+  const out = { shop: '', apply: false, by: '', json: false };
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--apply') out.apply = true;
+    else if (a === '--json') out.json = true;
+    else if (a === '--shop' && argv[i + 1]) out.shop = String(argv[++i]);
+    else if (a === '--by' && argv[i + 1]) out.by = String(argv[++i]);
+    else throw new Error(`گزینهٔ ناشناخته: ${a}`);
+  }
+  if (!out.shop) throw new Error('--shop <شناسهٔ دکان> لازم است');
+  return out;
+}
+
+/** ⇒ کدِ خروج. `print` برای آزمون جایگزین می‌شود. */
+async function main(argv, print = (s) => console.log(s)) {
+  const opts = parseArgs(argv);
+  const { one } = require('../src/db');
+  if (!(await one('SELECT 1 AS x FROM shops WHERE id=$1', [opts.shop]))) throw new Error(`دکانِ ${opts.shop} پیدا نشد`);
+  const stock = require('../src/lib/stock');
+  const r = await stock.rebuild(opts.shop, { apply: opts.apply, by: opts.by || 'cli' });
+  if (opts.json) {
+    print(JSON.stringify(r, null, 2));
+  } else if (!r.fixed.length) {
+    print(`✔ ${opts.shop} — مانده‌ها با دفتر می‌خوانند (${r.moves} حرکت)`);
+  } else {
+    print(`${r.applied ? '✔ درست شد' : '✖ ناهمخوان'}: ${r.fixed.length} مانده (${r.moves} حرکت)`);
+    for (const f of r.fixed.slice(0, 200)) print(`  ${f.productId} @ ${f.location}: ${f.levelMilli} ⇒ ${f.ledgerMilli}`);
+    if (!r.applied) print('برای درست کردن همان دستور را با --apply بزنید (پیش از آن پشتیبان بگیرید).');
+  }
+  return r.ok ? 0 : 2;
+}
+
+if (require.main === module) {
+  const { closeDb } = require('../src/db');
+  main(process.argv.slice(2))
+    .then(async (code) => { await closeDb(); process.exit(code); })
+    .catch(async (err) => {
+      console.error('✖', err.message);
+      try { await closeDb(); } catch { /* بسته بود */ }
+      process.exit(1);
+    });
+}
+
+module.exports = { main, parseArgs };

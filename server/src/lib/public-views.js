@@ -60,16 +60,19 @@ const FIELDS = Object.freeze({
   //  §۱.۴ — موجودی؛ عددها فقط با `show_qty = exact`
   stock: ['status', 'reason?', 'checkedAt?', 'unit?', 'prepMinutes?', 'sellableMilli?', 'readyMilli?', 'laterMilli?'],
   //  §۱.۷ — سفارش (پیگیری با توکن). افزوده به v1 از main (همان شکلِ main): `substitution` (CHK-15 #525)،
-  //  `smallBasketFeeMinor`/`slotFeeMinor` (CHK-06/07 #494)، `onlinePay` فقط در پیگیری (PAY-21 #529)
+  //  `smallBasketFeeMinor`/`slotFeeMinor` (CHK-06/07 #494)، `onlinePay` فقط در پیگیری (PAY-21 #529)، `paymentStep` فقط در
+  //  پیگیری و فقط با «پرداخت پس از پذیرش» ِ روشن (#910؛ از مهاجرتِ ۲۱۱ پیش‌فرضِ دکانِ تازه)
   order: ['token', 'orderNo', 'status', 'statusReason', 'substitution', 'fulfillment', 'paymentMethod', 'paymentStatus',
     'currency', 'itemsCount', 'lines', 'subtotalMinor', 'discountMinor', 'deliveryFeeMinor', 'totalMinor', 'readyAt',
     'scheduledFor', 'slotEndsAt', 'zoneName', 'smallBasketFeeMinor', 'slotFeeMinor', 'createdAt', 'updatedAt',
-    'canCancel', 'timeline', 'onlinePay?'],
+    'canCancel', 'timeline', 'onlinePay?', 'paymentStep?'],
   //  `substitution`/`substituteName` ِ هر قلم: CHK-16 #525
   orderLine: ['productId', 'name', 'unit', 'qtyMilli', 'unitPriceMinor', 'lineTotalMinor', 'note', 'substitution',
     'substituteName'],
   //  دکمهٔ «پرداخت با حساب‌پی» در پیگیری (PAY-21 #529)
   onlinePay: ['available'],
+  //  کارتِ «پرداخت» ِ پیگیری (`lib/order-flow.trackView`): حال، انتخابِ مشتری، مبلغِ سرور، نقدِ تحویل/برداشت
+  paymentStep: ['state', 'choice', 'amountMinor', 'cash', 'canChoose', 'online'],
   orderEvent: ['status', 'at'],
   //  فهرستِ «سفارش‌های من» (ویترین، حسابِ مشتری، بازار)
   orderSummary: ['orderNo', 'status', 'fulfillment?', 'totalMinor', 'itemsCount', 'createdAt', 'scheduledFor?',
@@ -88,7 +91,7 @@ const NESTED = Object.freeze({
   product: { stock: 'stock' },
   marketProduct: { stock: 'stock', shop: 'shopRef' },
   searchProduct: { shop: 'shopRef' },
-  order: { lines: 'orderLine', timeline: 'orderEvent', onlinePay: 'onlinePay' },
+  order: { lines: 'orderLine', timeline: 'orderEvent', onlinePay: 'onlinePay', paymentStep: 'paymentStep' },
   orderSummary: { store: 'storeRef' },
   reorderLine: { stock: 'stock' },
 });

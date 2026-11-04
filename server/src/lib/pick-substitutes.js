@@ -308,7 +308,7 @@ function parsePropose(body) {
   return { eventId, lineNo, productId, barcode, qtyMilli, waitMinutes };
 }
 
-/** لینکِ پیگیریِ مشتری (همان صفحهٔ سفارشِ ویترین) و واتس‌اپ — فقط سفارشِ ویترین؛ شماره فقط با `orders.contact` */
+/** لینکِ پیگیریِ مشتری (همان صفحهٔ سفارشِ ویترین) و واتس‌اپ — فقط سفارشِ ویترین؛ شماره فقط با `orders.contact` و `customers.contact` */
 async function customerLinks(shopId, order, actor) {
   if (!order || order.source !== 'storefront') return { link: '', whatsappUrl: '' };
   const sfRow = (await db.query('SELECT slug FROM storefronts WHERE shop_id=$1', [shopId])).rows[0];
@@ -320,7 +320,9 @@ async function customerLinks(shopId, order, actor) {
   const link = `${page}#/o/${encodeURIComponent(token)}`;
   const digits = String(order.customer_phone || '').replace(/[^0-9]/g, '').replace(/^0/, '93');
   //  متنِ پیام فقط خودِ لینک (بی‌زبان) — صفحه به زبانِ خودِ مشتری توضیح می‌دهد
+  //  CRM-15: شماره در لینک ⇒ `orders.contact` و `customers.contact` (‎lib/customer-contact.js‎)
   const whatsappUrl = digits && actor && can(actor.role, 'orders.contact')
+    && await require('./customer-contact').ordersContact({ shopId, role: actor.role, userId: actor.id })
     ? `https://wa.me/${digits}?text=${encodeURIComponent(link)}` : '';
   return { link, whatsappUrl };
 }

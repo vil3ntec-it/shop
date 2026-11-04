@@ -30,6 +30,11 @@ const { rateLimit } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const { forbidden, badRequest, notFoundHandler } = require('../middleware/errors');
 const v = require('../lib/validate');
+/*
+ *  CRM-15: اصلِ بی `customers.contact` شماره و نشانیِ مشتری را از pull و Snapshot نمی‌گیرد (صندوقِ تعارض پوشیده) و
+ *  push اش فیلدِ تماسِ ردیفِ موجود را عوض یا پاک نمی‌کند (`hideContact` ⇒ `applyOne`) — ‎lib/customer-contact.js‎
+ */
+const contact = require('../lib/customer-contact');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -90,6 +95,7 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       queued: b.queued,
       lastError: b.last_error,
       clockOffsetMs: b.clock_offset_ms,
+      hideContact: await contact.hiddenForReq(req),
     });
     out.results = newerFields.mergeResults(fl, out.results);
     await send(req, res, { ok: true, ...out, cursor: out.head });
@@ -115,12 +121,17 @@ router.get('/pull', async (req, res, next) => {
     //  §۹.۵: «دورانِ» سرور کنارِ هر pull — عوض شده ⇒ برنامه opهای گم‌شده را دوباره می‌فرستد
     //  (`lib/sync-epoch.js`، `SyncV3Engine.pullOnce`). خاموش ⇒ همان پاسخِ پیشین.
     if (config.syncEpoch.enabled) out.epoch = await syncEpoch.forAccount(req.sync, 'v3');
+    if (contact.touches(out.ops) && await contact.hiddenForReq(req)) out.ops = contact.omitV3Ops(out.ops);
     await send(req, res, { ok: true, ...out });
   } catch (err) { next(err); }
 });
 
 router.get('/snapshot', async (req, res, next) => {
-  try { await send(req, res, { ok: true, ...(await sync.snapshot(req.sync)) }); } catch (err) { next(err); }
+  try {
+    const snap = await sync.snapshot(req.sync);
+    if (await contact.hiddenForReq(req)) snap.tables = contact.omitTables(snap.tables);
+    await send(req, res, { ok: true, ...snap });
+  } catch (err) { next(err); }
 });
 
 /**
@@ -158,11 +169,12 @@ router.post('/report', async (req, res, next) => {
 
 router.get('/conflicts', async (req, res, next) => {
   try {
+    const conflicts = await sync.listConflicts(req.sync, {
+      status: req.query?.status === 'all' ? 'all' : 'open', limit: Number(req.query?.limit || 100),
+    });
     res.json({
       ok: true, server_time: Date.now(),
-      conflicts: await sync.listConflicts(req.sync, {
-        status: req.query?.status === 'all' ? 'all' : 'open', limit: Number(req.query?.limit || 100),
-      }),
+      conflicts: contact.touches(conflicts) && await contact.hiddenForReq(req) ? conflicts.map(contact.maskConflict) : conflicts,
     });
   } catch (err) { next(err); }
 });

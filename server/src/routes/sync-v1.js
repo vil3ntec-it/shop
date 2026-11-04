@@ -123,10 +123,17 @@ const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
  *  پس از نشستن (شکلِ نهاییِ ردیف در `sync_rows`)؛ پمپ بی هیچ پرسشی از آن رد می‌شود.
  */
 const creditDebtor = require('../lib/credit-debtor');
+/*
+ *  دکان: CRM-15 — اصلِ بی `customers.contact` شماره و نشانیِ مشتری را از pull، Snapshot، حذف‌شده‌ها و صندوقِ تعارض
+ *  نمی‌گیرد و push اش فیلدِ تماسِ ردیفِ موجود را عوض یا پاک نمی‌کند — ‎lib/customer-contact.js‎. فقط حسابِ دکان؛
+ *  پمپ بی هیچ پرسشی رد می‌شود و پاسخش بایت‌به‌بایت همان است. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد.
+ */
+const contact = require('../lib/customer-contact');
 
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
+//  `contact.v1Guard` (CRM-15) هم پالایش است (فیلدِ تماسِ ردیفِ موجود از اصلِ بی مجوز بیرون، hash ِ تازه) ⇒ پیش از نگهبان‌ها.
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, contact.v1Guard, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,
@@ -184,6 +191,7 @@ router.get('/pull', pumpServicesOnly, async (req, res, next) => {
     const keep = await syncKeep.pullExtras(req.sync, out.ops);
     const epoch = await epochFor(req.sync);
     const reply = { ok: true, ...out, ...(keep ? keep.body : {}), ...(epoch ? { epoch } : {}) };
+    if (contact.touches(reply.ops) && await contact.hiddenForReq(req)) reply.ops = contact.omitV1Ops(reply.ops);
     if (keep && keep.gzip && String(req.headers['accept-encoding'] || '').includes('gzip')) {
       const text = JSON.stringify(reply);
       if (Buffer.byteLength(text, 'utf8') > syncKeep.GZIP_MIN_BYTES) {
@@ -204,6 +212,7 @@ router.get('/snapshot', pumpServicesOnly, async (req, res, next) => {
     //  دورانِ پیش از Snapshot: دفترِ ساخته‌شده از آن دست‌کم همین دوران را دارد
     const epoch = await epochFor(req.sync);
     const snap = await sync.snapshot(req.sync);
+    if (await contact.hiddenForReq(req)) snap.tables = contact.omitTables(snap.tables);
     const body = JSON.stringify({ ok: true, ...snap, ...(epoch ? { epoch } : {}) });
     //  عکسِ کاملِ یک دفتر چند مگابایت می‌شود؛ روی اینترنتِ موبایل فشرده می‌رود
     if (String(req.headers['accept-encoding'] || '').includes('gzip')) {
@@ -232,19 +241,21 @@ router.get('/status', async (req, res, next) => {
 
 router.get('/conflicts', async (req, res, next) => {
   try {
+    const conflicts = await sync.listConflicts(req.sync, {
+      limit: Number(req.query?.limit || 100),
+      includeRestored: req.query?.all === '1',
+    });
     res.json({
       ok: true,
-      conflicts: await sync.listConflicts(req.sync, {
-        limit: Number(req.query?.limit || 100),
-        includeRestored: req.query?.all === '1',
-      }),
+      conflicts: contact.touches(conflicts) && await contact.hiddenForReq(req) ? conflicts.map(contact.maskConflict) : conflicts,
     });
   } catch (err) { next(err); }
 });
 
 router.get('/deleted', async (req, res, next) => {
   try {
-    res.json({ ok: true, rows: await sync.listDeleted(req.sync, { limit: Number(req.query?.limit || 100) }) });
+    const rows = await sync.listDeleted(req.sync, { limit: Number(req.query?.limit || 100) });
+    res.json({ ok: true, rows: contact.touches(rows) && await contact.hiddenForReq(req) ? contact.omitRows(rows) : rows });
   } catch (err) { next(err); }
 });
 

@@ -14,6 +14,7 @@ const sync = require('../lib/sync');
 const audit = require('../lib/audit');
 const { requireUser, requireShop, requireDataWrite } = require('../middleware/auth');
 const { entitlementOf } = require('../lib/entitlement');
+const contact = require('../lib/customer-contact');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -33,13 +34,15 @@ async function pushHandler(req, res) {
     field: 'شناسه عملیات', required: false, max: 80,
   });
   const changes = Array.isArray(req.body?.changes) ? req.body.changes : [];
+  //  CRM-15: ردیفِ کاملِ اصلِ بی `customers.contact` شماره و نشانیِ موجود را عوض یا پاک نمی‌کند (‎lib/customer-contact.js‎)
+  const hideContact = changes.some((c) => contact.fieldsOf(c?.collection)) && await contact.hiddenForReq(req);
 
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
     () => sync.pushChanges(
       //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد، هرگز رد (F0-02)
       { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role, finalized: 'log',
-        ip: require('../middleware/ratelimit').clientIp(req) },
+        ip: require('../middleware/ratelimit').clientIp(req), hideContact },
       changes
     )
   );
@@ -52,6 +55,10 @@ async function pullHandler(req, res) {
   const since = v.integer(req.query?.since, { field: 'since', min: 0, max: Number.MAX_SAFE_INTEGER, def: 0 });
   const limit = v.integer(req.query?.limit, { field: 'limit', min: 1, max: sync.MAX_LIMIT, def: 1000 });
   const out = await sync.pullChanges(req.shopId, since, limit);
+  //  CRM-15: بی `customers.contact` ردیفِ مشتری بی شماره و نشانی (نه پوشیده) — ‎lib/customer-contact.js‎
+  if (out.changes.some((c) => c.data && contact.fieldsOf(c.collection)) && await contact.hiddenForReq(req)) {
+    out.changes = out.changes.map((c) => (c.data ? { ...c, data: contact.omit(c.collection, c.data) } : c));
+  }
   await touchDevice(req, v.id(req.query?.deviceId, { required: false, max: 64 }));
   res.json(out);
 }

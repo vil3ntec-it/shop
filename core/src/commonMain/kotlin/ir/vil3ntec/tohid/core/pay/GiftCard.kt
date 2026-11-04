@@ -368,6 +368,8 @@ object StoreCredit {
   const val INVALID_AMOUNT = "INVALID_AMOUNT"
   const val NO_CUSTOMER = "NO_CUSTOMER"
   const val INSUFFICIENT_CREDIT = "INSUFFICIENT_CREDIT"
+  /** PRM-15 — اعطای دستی بی تصمیمِ «مجاز» ِ `sales.discount` برای همان مبلغ */
+  const val GRANT_NOT_ALLOWED = "GRANT_NOT_ALLOWED"
 
   /** طلبِ خرج‌شدنیِ مشتری از ماندهٔ [balanceMinor] */
   fun available(balanceMinor: Long): Long = if (balanceMinor < 0) -balanceMinor else 0L
@@ -379,4 +381,25 @@ object StoreCredit {
     amountMinor > available(balanceMinor) -> INSUFFICIENT_CREDIT
     else -> null
   }
+
+  /**
+   *  PRM-15 — اعطای دستیِ اعتبار (هدیه بی کارت): null یعنی پذیرفتنی. هدیه دادنِ پول بی نقد است، پس همان اجازهٔ تخفیف:
+   *  [decision] = تصمیمِ `sales.discount` برای **همین مبلغ** (`PermCore.evaluate`، با سقفِ مبلغِ نقش)؛ فقط «allow» —
+   *  «approve» (نیازمندِ تأیید) این‌جا پنجرهٔ PIN ندارد. بعد مشتریِ موجود و فعال، مبلغِ ۱ تا [GiftCard.MAX_AMOUNT] و دلیلِ
+   *  دست‌کم [GiftCard.REASON_MIN] نویسه (پس از trim) تا [GiftCard.MAX_TEXT].
+   */
+  fun grantProblem(hasCustomer: Boolean, amountMinor: Long, reason: String?, decision: String): String? {
+    val why = reason?.trim().orEmpty()
+    return when {
+      decision != "allow" -> GRANT_NOT_ALLOWED
+      !hasCustomer -> NO_CUSTOMER
+      amountMinor < 1 || amountMinor > GiftCard.MAX_AMOUNT -> INVALID_AMOUNT
+      why.length < GiftCard.REASON_MIN -> GiftCard.Code.REASON_REQUIRED
+      why.length > GiftCard.MAX_TEXT -> GiftCard.Code.TEXT_TOO_LONG
+      else -> null
+    }
+  }
+
+  /** ماندهٔ دفترِ مشتری پس از اعطای [amountMinor] — اعطا یک «رسید» است: اول بدهی کم می‌شود، بقیه طلب */
+  fun afterGrant(balanceMinor: Long, amountMinor: Long): Long = balanceMinor - amountMinor
 }

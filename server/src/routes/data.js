@@ -17,6 +17,7 @@ const audit = require('../lib/audit');
 const { requireUser, requireShop, requirePermission, requireDataWrite } = require('../middleware/auth');
 const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { can } = require('../lib/permissions');
+const contact = require('../lib/customer-contact');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -79,12 +80,14 @@ async function writeRecords(req, changes) {
   const operationId = v.id(req.body?.operationId || req.headers['idempotency-key'], {
     required: false, max: 80,
   });
+  //  CRM-15: PUT ِ ردیفِ پوشیده شماره و نشانی را بازنویسی نمی‌کند (‎lib/customer-contact.js‎)
+  const hideContact = changes.some((c) => contact.fieldsOf(c.collection)) && await contact.hiddenForReq(req);
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
     () => sync.pushChanges(
       //  S89: درِ مستقیمِ API — با پرچمِ `shop.doc_chain` ویرایش/حذفِ فاکتورِ ثبت‌شده ۴۰۹ (`sale_finalized_edit_forbidden`)
       { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role, finalized: 'enforce',
-        ip: require('../middleware/ratelimit').clientIp(req) }, changes
+        ip: require('../middleware/ratelimit').clientIp(req), hideContact }, changes
     )
   );
   return { ...result, replayed };
@@ -104,7 +107,10 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     const since = v.integer(req.query?.since, { min: 0, max: Number.MAX_SAFE_INTEGER, def: 0, field: 'since' });
     const cursor = v.integer(req.query?.cursor, { min: 0, max: Number.MAX_SAFE_INTEGER, def: 0, field: 'cursor' });
     const includeDeleted = v.bool(req.query?.includeDeleted, false);
-    res.json(await listRecords(req.shopId, collection, { limit, since, cursor, includeDeleted }));
+    const out = await listRecords(req.shopId, collection, { limit, since, cursor, includeDeleted });
+    //  CRM-15: بی `customers.contact` شماره پوشیده (قالبِ برنامه) و نشانی نه — ‎lib/customer-contact.js‎
+    if (contact.fieldsOf(collection) && await contact.hiddenForReq(req)) out.items = out.items.map((r) => contact.mask(collection, r));
+    res.json(out);
   });
 
   router.get(`/${path}/:id`, async (req, res, next) => {
@@ -115,10 +121,12 @@ for (const [path, collection] of Object.entries(ROUTES)) {
       [req.shopId, id]
     );
     if (!row || row.deleted) return next(notFound('این رکورد پیدا نشد'));
+    //  CRM-15: بی `customers.contact` شماره پوشیده (قالبِ برنامه) و نشانی نه — ‎lib/customer-contact.js‎
+    const data = contact.fieldsOf(collection) && await contact.hiddenForReq(req) ? contact.mask(collection, row.data) : row.data;
     res.json({
       id: row.id, rev: Number(row.rev), version: row.version,
       createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),
-      userId: row.user_id, ...row.data,
+      userId: row.user_id, ...data,
     });
   });
 
