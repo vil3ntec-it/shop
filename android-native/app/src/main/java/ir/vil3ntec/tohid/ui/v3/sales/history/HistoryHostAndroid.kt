@@ -145,6 +145,7 @@ internal fun RouteScope.HistoryHost() {
       onDevices = { nav.open(SettingsPaths.DEVICES) },
       onClose = { printing = null },
       toast = { toasts.show(it) },
+      filtered = query.filtered,
     )
   }
 }
@@ -169,21 +170,25 @@ private fun printBanner(): PrintBanner? {
 }
 
 /**
- *  برگهٔ «چاپ» ِ یک دوره: خلاصه (پیش‌فرض) یا همهٔ فاکتورها، با شمار و کاغذِ تخمینی و نامِ چاپگر و پهنای کاغذ؛ تأیید ⇐
- *  `PeriodPrint` (صفِ چاپ، در پس‌زمینه). سندها هم در پس‌زمینه ساخته می‌شوند؛ تا آماده‌اند دکمهٔ چاپ منتظر است.
+ *  برگهٔ «چاپ» ِ یک دوره: همهٔ فاکتورها (پیش‌فرض، خواستِ صاحب‌کار: «همهٔ فاکتورهای روز/ماه/سال یک‌جا») یا خلاصه، با شمار
+ *  و کاغذِ تخمینی و نامِ چاپگر و پهنای کاغذ؛ تأیید ⇐ `PeriodPrint` (صفِ چاپ، در پس‌زمینه). سندها هم در پس‌زمینه ساخته
+ *  می‌شوند؛ تا آماده‌اند دکمهٔ چاپ منتظر است. [filtered] ⇒ یک سطر که فیلترِ فهرست در چاپ نیست (چاپ همیشه همهٔ دوره است).
+ *  [demoPrinter] فقط عکسِ CI (`SalesShots`)؛ برنامه همیشه چاپگرِ پیش‌فرضِ همین دستگاه را می‌گیرد.
  */
 @Composable
-private fun HistoryPrintSheet(
+internal fun HistoryPrintSheet(
   book: HistoryBook,
   p: SalesPeriods.Period,
   money: Boolean,
   onDevices: () -> Unit,
   onClose: () -> Unit,
   toast: (String) -> Unit,
+  filtered: Boolean = false,
+  demoPrinter: PrinterRegistry.Saved? = null,
 ) {
   val context = LocalContext.current
   val c = PhoneV3.colors
-  val printer = remember { runCatching { PrinterRegistry.defaultSaved(context) }.getOrNull() }
+  val printer = remember { demoPrinter ?: runCatching { PrinterRegistry.defaultSaved(context) }.getOrNull() }
   val title = PeriodLabel.full(p, book.gregorian)
   V3Sheet(onDismiss = onClose, title = StrHistory.printTitle(title), detents = false) { closer ->
     if (printer == null) {
@@ -195,7 +200,7 @@ private fun HistoryPrintSheet(
     }
     val profile = printer.profile()
     val width = profile.paperDots
-    var all by remember { mutableStateOf(false) }
+    var all by remember { mutableStateOf(p.sales.isNotEmpty()) }
     val head = remember(p, title) {
       val shop = runCatching { ReceiptProfileStore.current(context).name }.getOrDefault("").ifBlank { Receipts.localName(context) }
       val range = if (p.unit == SalesPeriods.Unit.DAY || p.from.isEmpty()) null else displayDate(p.from) + " — " + displayDate(p.to)
@@ -209,8 +214,8 @@ private fun HistoryPrintSheet(
       }
     }
     val chosen = docs?.let { if (all) it.second else it.first }
-    Option(StrHistory.summary, StrHistory.summaryHint, Icons.Outlined.Summarize, selected = !all) { all = false }
     if (p.sales.isNotEmpty()) Option(StrHistory.allInvoices, StrHistory.allInvoicesHint, Icons.AutoMirrored.Outlined.ReceiptLong, selected = all) { all = true }
+    Option(StrHistory.summary, StrHistory.summaryHint, Icons.Outlined.Summarize, selected = !all) { all = false }
     val count = if (all) p.sales.size else p.totals.invoices
     val cm = chosen?.let { PeriodSlip.paperCm(it, profile.feedLines) }
     Text(
@@ -220,6 +225,7 @@ private fun HistoryPrintSheet(
     val mm = if (width >= PrinterProfile.WIDTH_80MM) 80 else 58
     Text(StrHistory.printerLine(printer.name, plain(mm)), style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
     if ((cm ?: 0) > LONG_CM) Text(StrHistory.longPaper, style = V3Type.footnote, color = c.negative, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
+    if (filtered && all) Text(StrHistory.printIgnoresFilter(plain(count)), style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp))
     Spacer(Modifier.height(14.dp))
     Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
       V3Button(Str.cancel, { closer.close(onClose) }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY)

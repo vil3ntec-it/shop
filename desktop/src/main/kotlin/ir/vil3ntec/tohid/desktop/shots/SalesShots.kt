@@ -1,15 +1,24 @@
 package ir.vil3ntec.tohid.desktop.shots
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.PromoEngine
+import ir.vil3ntec.tohid.data.ReportBridge
+import ir.vil3ntec.tohid.data.SalesPeriods
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.print.PrinterRegistry
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.components.pos.PayPanelState
@@ -40,6 +49,7 @@ import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryActions
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryBook
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryFilter
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryModel
+import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryPrintSheet
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryQuery
 import ir.vil3ntec.tohid.ui.v3.sales.history.HistoryScreen
 import ir.vil3ntec.tohid.ui.v3.sales.history.InvoiceActions
@@ -116,6 +126,10 @@ object SalesShots : GroupShots {
     Shot("scan-denied", content = { ScanScreen(onCode = {}, onClose = {}, camera = false, start = CameraAccess.DENIED) }),
     Shot("history", content = { HistoryShot(HistoryFilter.ALL) }),
     Shot("history-cancelled", content = { HistoryShot(HistoryFilter.CANCELLED) }),
+    Shot("history-month", content = { HistoryShot(HistoryFilter.ALL, SalesPeriods.Unit.MONTH) }),
+    Shot("history-year", content = { HistoryShot(HistoryFilter.ALL, SalesPeriods.Unit.YEAR) }),
+    Shot("history-print", content = { HistoryPrintShot() }),
+    Shot("history-360-large-text", content = { NarrowLargeText { HistoryShot(HistoryFilter.ALL) } }),
     Shot("invoice", content = { InvoiceShot() }),
     Shot("return", content = { OverInvoice { ReturnSheet(History.ledger(), History.sale(), onConfirm = { _, _ -> }, onClose = {}, start = mapOf("h1-a" to "1")) } }),
     Shot("return-v2", content = { OverInvoice { ReturnFlowSheet(History.ledger(), History.sale(), save = { true }, onPosted = { _, _ -> }, onClose = {}, prefill = true) } }),
@@ -248,18 +262,40 @@ private fun ApprovalShot() = Box(Modifier.fillMaxSize()) {
   )
 }
 
-private val noHistory = HistoryActions({}, {}, {}, {}, {}, {}, {}, {}, {}, null)
+/** کارهای بی‌اثر؛ «چاپ» هست تا تراشه‌اش کنارِ صندوق در کادرِ بالا دیده شود (همان برنامه) */
+private val noHistory = HistoryActions({}, {}, {}, {}, {}, {}, {}, {}, {}, null, print = {})
 
 @Composable
-private fun HistoryShot(filter: HistoryFilter) {
+private fun HistoryShot(filter: HistoryFilter, unit: SalesPeriods.Unit = SalesPeriods.Unit.DAY) {
   val d = History.ledger()
   HistoryScreen(
-    d, remember(d) { HistoryBook.build(d, ir.vil3ntec.tohid.data.ReportBridge.deviceClock(), History.now) },
+    d, remember(d) { HistoryBook.build(d, ReportBridge.deviceClock(), History.now) },
     returnsV2 = true, canCancel = true,
     drawer = DrawerModel.line(d, History.now, blind = false),
-    query = remember { HistoryQuery(filter, "") },
+    query = remember { HistoryQuery(filter, "", unit) },
     actions = noHistory,
   )
+}
+
+/** برگهٔ «چاپ» ِ امروز روی تاریخچه، با چاپگرِ نمایشیِ ۸۰ میلی‌متری (نه چاپگرِ ثبت‌شدهٔ این دستگاه) */
+@Composable
+private fun HistoryPrintShot() = Box(Modifier.fillMaxSize()) {
+  HistoryShot(HistoryFilter.ALL)
+  val d = History.ledger()
+  val book = remember(d) { HistoryBook.build(d, ReportBridge.deviceClock(), History.now) }
+  HistoryPrintSheet(
+    book, book.current(SalesPeriods.Unit.DAY), money = true, onDevices = {}, onClose = {}, toast = {},
+    demoPrinter = PrinterRegistry.Saved("demo", "XP-80 پیشخوان", "00:11:22:33:44:55", ThermalPrinter.WIDTH_80MM),
+  )
+}
+
+/** گوشیِ کوچکِ ۳۶۰ و درشتیِ نوشتهٔ ×۱٫۳ — هیچ تراشه‌ای در کادرِ بالا بریده نشود */
+@Composable
+private fun NarrowLargeText(content: @Composable () -> Unit) {
+  val base = LocalDensity.current
+  CompositionLocalProvider(LocalDensity provides Density(base.density, fontScale = 1.3f)) {
+    Box(Modifier.fillMaxHeight().width(360.dp)) { content() }
+  }
 }
 
 private val noInvoice = InvoiceActions({}, {}, {}, {}, {}, {}, {}, {})
