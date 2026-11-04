@@ -14,6 +14,8 @@ object StrOrdersHub {
   fun tileFresh(n: Int): String = t("سفارش‌های آنلاین، ${asIs(n)} سفارشِ تازه", "Online orders, $n new", "آنلاین فرمایشونه، $n نوي")
   /** … بی تازه، با سفارش‌های در کار */
   fun tileActive(n: Int): String = t("سفارش‌های آنلاین، ${asIs(n)} سفارشِ در کار", "Online orders, $n in progress", "آنلاین فرمایشونه، $n په کار کې")
+  /** … وقتی بخشِ سفارش برای این دکان خاموش است (کاشی می‌ماند و «تنظیمات ← سفارشِ آنلاین» را باز می‌کند) */
+  val tileOff: String get() = t("سفارش‌های آنلاین، هنوز روشن نیست", "Online orders, not turned on yet", "آنلاین فرمایشونه، لا نه دي فعال")
   val saleFab: String get() = t("فروشِ تازه", "New sale", "نوی پلور")
 
   // ── برگه‌های صف (نامِ صاحب‌کار؛ هسته و وب همان `OrderText` می‌مانند) ──
