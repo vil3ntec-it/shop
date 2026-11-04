@@ -747,7 +747,7 @@
 | `shop.purchase_orders` | دکان / `all` | خاموش | `/api/shop/purchase-orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `purchase_orders_disabled`)؛ سفارشِ خرید، فرستادن، لغو و رسیدِ دریافت (PUR-02/04) و فاکتورِ جدای تأمین‌کننده (PUR-14: `…/:id/bills`، `…/:id/bills/:billId/void`، مهاجرتِ ۲۰۸)؛ کلیدِ اشتراکِ `purchasing` رایگان است | #471 | باز |
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
-| `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
+| `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`) — **جز دستگاهِ ثبت‌شدهٔ خودِ صاحبِ دکان** (O-09: مجوز + `warning`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
@@ -988,6 +988,15 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   شناسه‌های پیاپی بی‌شمار مجوز می‌گرفت. «شمردن بی نشاندن» برنگردد. دستگاهِ ثبت‌شده با ورود بیرون از سقف فقط با
   پرچمِ `shop.device_cap` رد می‌شود (نقشهٔ پرچم‌ها). سنجه: `server/test/sec-sub-device-cap.test.js` (روی PostgreSQL، بی
   قفل ⇒ سرخ). شرح و بقیهٔ SEC-SUB: `docs/security/client-fa.md`.
+- ⛔ **O-09 / SUB-09 — صاحبِ دکان هرگز از دستگاهِ خودش بیرون نمی‌ماند:** در `claimSlot` دستگاهی که **ردیفِ فعالِ حسابِ
+  خودِ صاحب** است (`req.role === 'owner'`؛ ردیف فقط با رمز/کدِ ورود یا جای خالیِ پیشین ساخته می‌شود) بیرون از سقف هم
+  مجوز می‌گیرد — با پرچم یا بی آن — و پاسخ `warning = {code:'device_over_cap', devices, maxDevices, manage:'devices', message}`
+  دارد (پرچمِ روشن: هر دستگاهِ صاحب تا وقتی دکان بیرون از سقف است؛ خاموش: فقط وقتی همین معافیت به کار رفت، وگرنه پاسخ
+  بیت‌به‌بیت همان پیشین). شناسهٔ **ثبت‌نشده** با توکنِ صاحب همچنان فقط با جای خالی (SEC-CLI-01؛ جهشِ «صاحب بی شرطِ ردیف» ⇒
+  ۴ آزمون سرخ). دستگاهِ کارمندِ بیرون از سقف ⇒ `device_limit` با پیامِ «از صاحبِ دکان بخواهید…». برنامه: `core/…/account/DeviceCap.kt`
+  (هشدار ⇒ `SyncStore.deviceCapOver` ⇒ `DeviceCapNotice` ِ پوسته در همهٔ صفحه‌ها، صندوق هم؛ `device_limit` ⇒ `LockedFeature`
+  به «دستگاه‌های وصل» `AccountLinks.SESSIONS`، نه «قیمت‌ها»). صفحهٔ قفلِ صاحب هرگز بن‌بستِ «اشتراک بخرید» نیست. سنجه:
+  `sec-sub-device-cap.test.js` (۷)، `DeviceCapTest`، `DeviceCapWiringTest`.
 
 ### سنجشِ کارایی
 - **F0-26:** خطِ پایه در `docs/spec/bench/baseline-1405-07-22.md`. هر PR که کارایی را عوض می‌کند

@@ -1386,7 +1386,7 @@ fun VipGate(label: String, content: @Composable () -> Unit) {
   }
 
   //  بازسازیِ VILL3N (G7): همان سدِ بالا، ظاهرِ کیتِ نسخهٔ ۳ — بی طلا؛ کلید به مسیرِ دقیق
-  ir.vil3ntec.tohid.ui.v3.account.subscription.LockedFeature(label, signedIn)
+  ir.vil3ntec.tohid.ui.v3.account.subscription.LockedFeature(label, signedIn, state.serverDenied)
 }
 
 /**
