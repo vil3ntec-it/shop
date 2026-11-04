@@ -43,7 +43,7 @@ class ShellTargetsTest {
       ShellTargets.stock(true), ShellTargets.stock(false), ShellTargets.OVERDUE_DEBTS, ShellTargets.MOST_DEBT, ShellTargets.EXPIRING,
       ShellTargets.PURCHASING, ShellTargets.product("p1"), ShellTargets.newProduct("123"), ShellTargets.debtor("d1"),
       ShellTargets.supplier("s1"), ShellTargets.invoice("sale-1"), ShellTargets.SCAN, ShellTargets.notifications("news"),
-      ShellTargets.search("x"), TransactionPaths.LIST,
+      ShellTargets.search("x"), TransactionPaths.LIST, ShellTargets.ORDERS, ShellTargets.ORDERS_SETUP,
     ).forEach(::resolves)
     HomeSections.tiles(canManage = true, ordersLive = true).forEach { resolves(it.route) }
     HomeAlerts.build(

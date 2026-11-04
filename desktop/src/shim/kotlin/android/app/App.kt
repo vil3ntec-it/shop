@@ -36,6 +36,8 @@ class NotificationManager {
   fun getNotificationChannel(id: String): NotificationChannel? = channels[id]
   fun areNotificationsEnabled(): Boolean = true
   fun notify(id: Int, notification: Notification) = DesktopNotify.show(notification.title, notification.text)
+  fun notify(tag: String?, id: Int, notification: Notification) = notify(id, notification)
+  fun deleteNotificationChannel(id: String) { channels.remove(id) }
   fun cancel(id: Int) {}
 
   companion object {

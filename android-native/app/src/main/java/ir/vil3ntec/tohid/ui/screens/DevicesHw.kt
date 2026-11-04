@@ -28,7 +28,19 @@ import ir.vil3ntec.tohid.core.hw.NciScale
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.ReceiptCopies
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCount
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPages
+import ir.vil3ntec.tohid.core.i18n.StrDevicePages
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.i18n.StrOrderSlip
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrSafe
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
+import ir.vil3ntec.tohid.core.i18n.StrShift
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ScaleLabels
 import ir.vil3ntec.tohid.data.ShopData
@@ -71,15 +83,15 @@ import kotlinx.coroutines.withContext
 fun PrinterStatusPill(modifier: Modifier = Modifier) {
   val s by PrintSpooler.status
   val (text, tone) = when (val st = s) {
-    PrintQueue.Status.Idle -> "چاپ: آماده" to PillTone.SUCCESS
-    is PrintQueue.Status.Busy -> "در حالِ چاپ${waiting(st.waiting)}" to PillTone.NEUTRAL
-    is PrintQueue.Status.Retrying -> "تلاشِ دوبارهٔ چاپ (${LocaleText.digitsIn(st.job.attempts.toString(), LocaleChoice.digits)})${waiting(st.waiting)}" to PillTone.WARNING
-    is PrintQueue.Status.NeedsUser -> "چاپگر در دسترس نیست${waiting(st.waiting)}" to PillTone.DANGER
+    PrintQueue.Status.Idle -> StrDevicePages.printReady to PillTone.SUCCESS
+    is PrintQueue.Status.Busy -> StrDevicePages.printing(waiting(st.waiting)) to PillTone.NEUTRAL
+    is PrintQueue.Status.Retrying -> StrDevicePages.printRetrying(LocaleText.digitsIn(st.job.attempts.toString(), LocaleChoice.digits), waiting(st.waiting)) to PillTone.WARNING
+    is PrintQueue.Status.NeedsUser -> StrDevicePages.printerUnavailable(waiting(st.waiting)) to PillTone.DANGER
   }
   StatusPill(text, tone, modifier)
 }
 
-private fun waiting(n: Int) = if (n > 0) " · ${LocaleText.digitsIn(n.toString(), LocaleChoice.digits)} در صف" else ""
+private fun waiting(n: Int) = if (n > 0) StrDevicePages.inQueue(LocaleText.digitsIn(n.toString(), LocaleChoice.digits)) else ""
 
 /* ============================== صفِ چاپ ============================== */
 
@@ -93,17 +105,17 @@ object HwShot {
 
 /** پیش‌نمایشِ بی چاپگر: برگهٔ آزمون با پروفایلِ چاپگرِ پیش‌فرض، یا ۸۰ میلی‌مترِ معمولی */
 private fun dryRunPrinter(context: android.content.Context): PrinterRegistry.Saved =
-  PrinterRegistry.defaultSaved(context) ?: PrinterRegistry.Saved("dry", "بی چاپگر", "", ThermalPrinter.WIDTH_80MM)
+  PrinterRegistry.defaultSaved(context) ?: PrinterRegistry.Saved("dry", StrDevicePages.noPrinter, "", ThermalPrinter.WIDTH_80MM)
 
 private fun dryRun(context: android.content.Context, what: String): Pair<String, HwPages.Preview>? = when (what) {
   "receipt" -> {
     val s = dryRunPrinter(context)
-    "پیش‌نمایشِ برگهٔ آزمون — بی کاغذ" to HwPages.previewEscPos(HwPages.testBytes(context, s), s.profile().paperDots)
+    StrDevicePages.previewTestSheet to HwPages.previewEscPos(HwPages.testBytes(context, s), s.profile().paperDots)
   }
-  "label" -> HwPages.sampleLabel(context)?.let { "پیش‌نمایشِ برچسبِ ۴۰×۳۰" to HwPages.Preview(ThermalPrinter.toBitmap(it), listOf("label ${it.width}x${it.height}"), emptyList()) }
+  "label" -> HwPages.sampleLabel(context)?.let { StrDevicePages.previewLabel to HwPages.Preview(ThermalPrinter.toBitmap(it), listOf("label ${it.width}x${it.height}"), emptyList()) }
   "a4" -> HwPages.sampleLabel(context)?.let {
     val sheet = ir.vil3ntec.tohid.core.hw.Labels.A4.sheet(it, 24)
-    "پیش‌نمایشِ برگهٔ A4 (۳×۸)" to HwPages.Preview(ThermalPrinter.toBitmap(sheet), listOf("a4 ${sheet.width}x${sheet.height}"), emptyList())
+    StrDevicePages.previewA4 to HwPages.Preview(ThermalPrinter.toBitmap(sheet), listOf("a4 ${sheet.width}x${sheet.height}"), emptyList())
   }
   else -> null
 }
@@ -134,14 +146,14 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
 
   Panel {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("صفِ چاپ", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+      Text(StrDevicePages.printQueue, Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
       PrinterStatusPill()
     }
-    Text("فروش همیشه ثبت می‌شود؛ رسیدی که چاپ نشد این‌جا به ترتیب می‌ماند و دوباره تلاش می‌شود.",
+    Text(StrDevicePages.queueNote,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     if (jobs.isNotEmpty() && lastError != null) {
       Spacer(Modifier.height(Space.xs))
-      Text("آخرین خطا: $lastError", style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
+      Text(StrDevicePages.lastError(lastError), style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
     }
     jobs.forEachIndexed { i, j ->
       Row(
@@ -149,31 +161,31 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Column(Modifier.weight(1f)) {
-          Text(j.title + if (j.kind == PrintQueue.Kind.REPRINT) " — چاپِ دوباره" else "", style = MaterialTheme.typography.bodyMedium,
+          Text(j.title + if (j.kind == PrintQueue.Kind.REPRINT) StrDevicePages.reprintSuffix else "", style = MaterialTheme.typography.bodyMedium,
             color = Shop.colors.text, fontWeight = FontWeight.SemiBold)
           Text(
             listOfNotNull(
               PrinterRegistry.label(j.link),
-              if (j.attempts > 0) "${LocaleText.digitsIn(j.attempts.toString(), LocaleChoice.digits)} تلاش" else null,
+              if (j.attempts > 0) StrDevicePages.attempts(LocaleText.digitsIn(j.attempts.toString(), LocaleChoice.digits)) else null,
               j.lastError,
             ).joinToString(" · "),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
           )
         }
-        if (i == 0) TextButton(onClick = { PrintSpooler.retryNow() }) { Text("تلاشِ دوباره") }
-        TextButton(onClick = { PrintSpooler.discard(j.id); toast("از صف برداشته شد — فروش دست نخورد") }) {
-          Text("کنار گذاشتن", color = Shop.colors.danger)
+        if (i == 0) TextButton(onClick = { PrintSpooler.retryNow() }) { Text(StrCourierApp.acRetry) }
+        TextButton(onClick = { PrintSpooler.discard(j.id); toast(StrDevicePages.removedFromQueue) }) {
+          Text(StrDevices.discard, color = Shop.colors.danger)
         }
       }
     }
     Spacer(Modifier.height(Space.xs))
     if (canAdmin) {
-      HwSwitchRow("چاپِ خودکارِ فاکتور پس از هر فروش", "روی چاپگرِ پیش‌فرض. خاموش = مثلِ همیشه فقط با دکمهٔ «چاپ».", auto) {
+      HwSwitchRow(StrDevicePages.autoPrint, StrDevicePages.autoPrintNote, auto) {
         auto = it; PrintSpooler.setAutoPrint(context, it)
       }
       //  POS-35: شمارِ نسخهٔ همین دستگاه؛ ۱ = همان یک رسیدِ امروز. نسخهٔ دوم به بعد «نسخهٔ k از n» دارد
       if (auto) {
-        Text("تعدادِ نسخهٔ چاپِ خودکار", style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+        Text(StrDevicePages.autoCopies, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
           ReceiptCopies.plan(ReceiptCopies.MAX).forEach { n ->
             TohidFilterChip(LocaleText.digitsIn(n.toString(), LocaleChoice.digits), selected = copies == n, onClick = {
@@ -181,18 +193,18 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
             })
           }
         }
-        Text("نسخهٔ دوم به بعد روی کاغذ «نسخهٔ ۲ از …» دارد تا با اصل اشتباه نشود.",
+        Text(StrDevicePages.copiesNote,
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
       //  ORD-10: برگهٔ سفارش پس از قبول روی همین دستگاه — تنظیمِ همین دستگاه، پیش‌فرض خاموش
       HwSwitchRow(StrOrderSlip.setting, StrOrderSlip.settingNote, slipAuto) { slipAuto = it; OrderSlipPrint.setAuto(context, it) }
       //  ORD-10: برگهٔ سفارشی که «قبولِ خودکار» ِ سرور پذیرفت — روی یک دستگاه، پیش‌فرض خاموش
       HwSwitchRow(StrOrderSlip.serverSetting, StrOrderSlip.serverSettingNote, slipServer) { slipServer = it; OrderSlipPrint.setAutoServer(context, it) }
-      HwSwitchRow("چاپِ معوق", "روشن: تا چاپگر برگردد خودش هر دقیقه تلاش می‌کند. خاموش: پس از چند تلاش می‌ایستد و می‌پرسد.", deferred) {
+      HwSwitchRow(StrDevicePages.deferredPrint, StrDevicePages.deferredNote, deferred) {
         deferred = it; PrintSpooler.setDeferred(context, it)
       }
     } else {
-      Text("چاپِ خودکار: ${if (auto) "روشن" + (if (copies > 1) " (${LocaleText.digitsIn(copies.toString(), LocaleChoice.digits)} نسخه)" else "") else "خاموش"} · چاپِ معوق: ${if (deferred) "روشن" else "خاموش"} — تنظیمش با صاحب یا مدیرِ دکان است.",
+      Text(StrDevicePages.autoSummary(if (auto) StrCount.on + (if (copies > 1) StrDevicePages.copiesSuffix(LocaleText.digitsIn(copies.toString(), LocaleChoice.digits)) else "") else StrCount.off, if (deferred) StrCount.on else StrCount.off),
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     //  HW-03: کشو بی فروش — فقط با مجوز، با دلیل، و همیشه در سابقهٔ دکان
@@ -200,16 +212,16 @@ internal fun PrintQueuePanel(toast: (String) -> Unit, canAdmin: Boolean = false,
     var openDrawer by remember { mutableStateOf(false) }
     if (drawerPrinter != null) {
       Spacer(Modifier.height(Space.xs))
-      OutlinedButton(enabled = canDrawer, onClick = { openDrawer = true }) { Text("باز کردنِ کشو") }
-      if (!canDrawer) Text("باز کردنِ کشو بی فروش فقط برای صاحب و مدیر است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      OutlinedButton(enabled = canDrawer, onClick = { openDrawer = true }) { Text(StrDevicePages.openDrawer) }
+      if (!canDrawer) Text(StrDevicePages.openDrawerOwner, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     }
     if (openDrawer && drawerPrinter != null) OpenDrawerDialog(drawerPrinter, onDismiss = { openDrawer = false }, toast = toast)
     OutlinedButton(onClick = {
-      scope.launch { dry = withContext(Dispatchers.IO) { runCatching { dryRun(context, "receipt") }.getOrElse { toast("پیش‌نمایش ساخته نشد: ${it.message}"); null } } }
-    }) { Text("پیش‌نمایشِ برگهٔ آزمون (بی چاپگر)") }
+      scope.launch { dry = withContext(Dispatchers.IO) { runCatching { dryRun(context, "receipt") }.getOrElse { toast(StrDevicePages.previewFailed(it.message)); null } } }
+    }) { Text(StrDevicePages.previewTestNoPrinter) }
     if (reprints.isNotEmpty()) {
       Spacer(Modifier.height(Space.xs))
-      Text("چاپ‌های دوبارهٔ اخیر", style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+      Text(StrDevicePages.recentReprints, style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
       reprints.forEach { e ->
         Text("${ir.vil3ntec.tohid.formatMillis(e.at)} — ${e.reason}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
@@ -240,8 +252,8 @@ internal fun HwToolsSwitch() {
   val context = LocalContext.current
   LaunchedEffect(Unit) { HwTools.load(context) }
   HwSwitchRow(
-    "ابزارهای تازهٔ دستگاه (آزمایشی)",
-    "بررسیِ کاملِ چاپگر (درِ باز، آفلاین، تیغه، کاغذ) و «کدام روش؟» برای چاپگری که رسید را بی‌معنا می‌زند. انتخابِ همین دستگاه است.",
+    StrDevicePages.newHwTools,
+    StrDevicePages.newHwToolsNote,
     HwTools.on.value,
   ) { HwTools.set(context, it) }
 }
@@ -276,7 +288,7 @@ internal fun PrinterSettingsDialog(
   fun work(label: String, block: suspend () -> String?) {
     busy = true
     scope.launch {
-      val msg = runCatching { withContext(Dispatchers.IO) { block() } }.getOrElse { "خطا: ${it.message}" }
+      val msg = runCatching { withContext(Dispatchers.IO) { block() } }.getOrElse { StrDevicePages.errorIs(it.message) }
       busy = false
       toast(msg ?: label)
     }
@@ -287,45 +299,45 @@ internal fun PrinterSettingsDialog(
       Modifier.widthIn(max = 520.dp).clip(Shape.dialog).background(Shop.colors.surfaceSolid)
         .verticalScroll(rememberScrollState()).padding(Space.md),
     ) {
-      Text("تنظیمِ «${initial.name}»", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+      Text(StrDevicePages.setupOf(initial.name), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text)
       Text("${PrinterRegistry.kind(s.link)} · ${PrinterRegistry.label(s.link)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       Spacer(Modifier.height(Space.sm))
 
-      HwLabel("کارِ این چاپگر")
-      SegmentedTabs(listOf(SegmentTab(PrinterRegistry.ROLE_RECEIPT, "رسید"), SegmentTab(PrinterRegistry.ROLE_LABEL, "برچسبِ کالا")), s.role, { s = s.copy(role = it) })
+      HwLabel(StrDevicePages.printerJob)
+      SegmentedTabs(listOf(SegmentTab(PrinterRegistry.ROLE_RECEIPT, StrCustomerPages.receiptBtn), SegmentTab(PrinterRegistry.ROLE_LABEL, StrLabel.printTitle)), s.role, { s = s.copy(role = it) })
 
       if (s.isLabel) {
-        HwLabel("زبانِ چاپگرِ برچسب")
+        HwLabel(StrDevicePages.labelLanguage)
         SegmentedTabs(listOf(SegmentTab(PrinterRegistry.LANG_TSPL, "TSPL (TSC، Xprinter)"), SegmentTab(PrinterRegistry.LANG_ESCPOS, "ESC/POS")), s.labelLang,
           { s = s.copy(labelLang = it) })
-        Text("برچسبِ ۴۰×۳۰ میلی‌متر، ۲۰۳ نقطه در اینچ. نام و قیمت به‌صورتِ تصویر چاپ می‌شوند.",
+        Text(StrDevicePages.labelNote,
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       } else {
-        HwLabel("عرضِ کاغذ")
-        SegmentedTabs(listOf(SegmentTab(ThermalPrinter.WIDTH_58MM, "۵۸ میلی‌متر"), SegmentTab(ThermalPrinter.WIDTH_80MM, "۸۰ میلی‌متر")),
+        HwLabel(StrDevicePages.paperWidth)
+        SegmentedTabs(listOf(SegmentTab(ThermalPrinter.WIDTH_58MM, StrSalePages.paper58), SegmentTab(ThermalPrinter.WIDTH_80MM, StrSalePages.paper80)),
           if (s.width >= ThermalPrinter.WIDTH_80MM) ThermalPrinter.WIDTH_80MM else ThermalPrinter.WIDTH_58MM, { s = s.copy(width = it) })
-        HwLabel("راهِ فرستادنِ تصویر")
-        SegmentedTabs(listOf(SegmentTab("raster", "رستری GS v 0 (پیش‌فرض)"), SegmentTab("column", "ستونی ESC *")), s.mode, { s = s.copy(mode = it) })
-        Text(if (HwTools.on.value) "اگر چاپگر به‌جای رسید نویسه‌های بی‌معنا زد، «ستونی» را بزنید — یا «کدام روش؟» تا با یک برگه معلوم شود." else "اگر چاپگر به‌جای رسید نویسه‌های بی‌معنا زد، «ستونی» را بزنید.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+        HwLabel(StrDevicePages.imageMode)
+        SegmentedTabs(listOf(SegmentTab("raster", StrDevicePages.modeRaster), SegmentTab("column", StrDevicePages.modeColumn)), s.mode, { s = s.copy(mode = it) })
+        Text(if (HwTools.on.value) StrDevicePages.garbageHintTools else StrDevicePages.garbageHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         if (HwTools.on.value) OutlinedButton(enabled = !busy && s.link.isNotBlank(), onClick = {
           busy = true
           scope.launch {
-            val err = runCatching { withContext(Dispatchers.IO) { PrinterRegistry.modeTestPrint(context, s) } }.getOrElse { "خطا: ${it.message}" }
+            val err = runCatching { withContext(Dispatchers.IO) { PrinterRegistry.modeTestPrint(context, s) } }.getOrElse { StrDevicePages.errorIs(it.message) }
             busy = false
             if (err == null) modeAsk = true else toast(err)
           }
-        }) { Text("کدام روش؟ (برگهٔ دوروشی)") }
-        HwLabel("برشِ کاغذ")
-        SegmentedTabs(listOf(SegmentTab("partial", "نیمه"), SegmentTab("full", "کامل"), SegmentTab("none", "بی‌تیغه")), s.cut, { s = s.copy(cut = it) })
-        HwSwitchRow("باز کردنِ کشوی پول پس از فروشِ نقدی", "از راهِ چاپگر (ESC p). فروشِ نسیه کشو را باز نمی‌کند.", s.drawer) { s = s.copy(drawer = it) }
+        }) { Text(StrDevicePages.whichMethod) }
+        HwLabel(StrDevicePages.paperCut)
+        SegmentedTabs(listOf(SegmentTab("partial", StrDevicePages.cutPartial), SegmentTab("full", StrDevicePages.cutFull), SegmentTab("none", StrDevicePages.cutNone)), s.cut, { s = s.copy(cut = it) })
+        HwSwitchRow(StrDevicePages.drawerAfterCash, StrDevicePages.drawerAfterCashNote, s.drawer) { s = s.copy(drawer = it) }
         if (s.drawer) {
-          SegmentedTabs(listOf(SegmentTab(0, "پینِ ۲ (رایج)"), SegmentTab(1, "پینِ ۵")), s.drawerPin, { s = s.copy(drawerPin = it) })
+          SegmentedTabs(listOf(SegmentTab(0, StrDevicePages.pin2), SegmentTab(1, StrDevicePages.pin5)), s.drawerPin, { s = s.copy(drawerPin = it) })
         }
-        HwSwitchRow("نشانِ دکان بالای رسید", if (hasLogo) "نشان انتخاب شده است" else "اول یک تصویر انتخاب کنید", s.logo) { s = s.copy(logo = it) }
+        HwSwitchRow(StrDevicePages.logoOnReceipt, if (hasLogo) StrDevicePages.logoChosen else StrDevicePages.chooseImageFirst, s.logo) { s = s.copy(logo = it) }
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-          OutlinedButton(onClick = { pickLogo = true }) { Text(if (hasLogo) "عوض کردنِ نشان" else "انتخابِ نشان") }
+          OutlinedButton(onClick = { pickLogo = true }) { Text(if (hasLogo) StrDevicePages.changeLogo else StrDevicePages.chooseLogo) }
           if (hasLogo) TextButton(onClick = { HwPages.removeLogo(context); hasLogo = false; s = s.copy(logo = false) }) {
-            Text("برداشتنِ نشان", color = Shop.colors.danger)
+            Text(StrDevicePages.removeLogo, color = Shop.colors.danger)
           }
         }
       }
@@ -338,13 +350,13 @@ internal fun PrinterSettingsDialog(
             preview = withContext(Dispatchers.IO) {
               runCatching {
                 if (s.isLabel) {
-                  val img = HwPages.label(context, "برچسبِ آزمون", LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), HwPages.SAMPLE_EAN).image!!
+                  val img = HwPages.label(context, "برچسبِ آزمون", LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), HwPages.SAMPLE_EAN).image!! // داده: نامِ کالای نمونه روی برچسبِ چاپی (خروجی)
                   HwPages.Preview(ThermalPrinter.toBitmap(img), listOf("label ${img.width}x${img.height}"), emptyList())
                 } else HwPages.previewEscPos(HwPages.testBytes(context, s), s.profile().paperDots)
-              }.getOrElse { toast("پیش‌نمایش ساخته نشد: ${it.message}"); null }
+              }.getOrElse { toast(StrDevicePages.previewFailed(it.message)); null }
             }
           }
-        }) { Text("پیش‌نمایش") }
+        }) { Text(StrDevicePages.preview) }
         OutlinedButton(enabled = !busy, onClick = {
           busy = true
           scope.launch {
@@ -352,47 +364,47 @@ internal fun PrinterSettingsDialog(
               ThermalPrinter.Link.parse(s.link)?.let { ThermalPrinter.probe(context, it, full = HwTools.on.value) }
             }
             busy = false
-            probe = r?.message ?: "نشانیِ چاپگر خوانده نشد"
+            probe = r?.message ?: StrDevices.printerLinkBad
           }
-        }) { Text("بررسیِ اتصال") }
+        }) { Text(StrDevicePages.checkConnection) }
         //  آزمونِ کشو هم کشو را بی فروش باز می‌کند ⇒ همان «باز کردنِ کشو»: مجوز، دلیل، سابقه
-        if (!s.isLabel && s.drawer && canDrawer) OutlinedButton(enabled = !busy, onClick = { drawerTest = true }) { Text("آزمونِ کشو") }
-        OutlinedButton(enabled = !busy, onClick = { work("برگهٔ آزمون چاپ شد") { PrinterRegistry.testPrint(context, s) } }) { Text("برگهٔ آزمون") }
+        if (!s.isLabel && s.drawer && canDrawer) OutlinedButton(enabled = !busy, onClick = { drawerTest = true }) { Text(StrDevicePages.drawerTest) }
+        OutlinedButton(enabled = !busy, onClick = { work(StrDevicePages.testPrinted) { PrinterRegistry.testPrint(context, s) } }) { Text(StrDevicePages.testSheet) }
       }
       Spacer(Modifier.height(Space.sm))
       Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-        TextButton(onClick = onDismiss) { Text("انصراف") }
-        Button(onClick = { PrinterRegistry.update(context, s); onSaved() }) { Text("ذخیره") }
+        TextButton(onClick = onDismiss) { Text(Str.cancel) }
+        Button(onClick = { PrinterRegistry.update(context, s); onSaved() }) { Text(StrKit.save) }
       }
     }
   }
 
-  PhotoSourceSheet(open = pickLogo, onDismiss = { pickLogo = false }, note = "نشانِ سیاه‌وسفید بهتر چاپ می‌شود") { uri ->
+  PhotoSourceSheet(open = pickLogo, onDismiss = { pickLogo = false }, note = StrDevicePages.logoNote) { uri ->
     pickLogo = false
     val err = HwPages.saveLogo(context, uri)
     if (err == null) { hasLogo = true; s = s.copy(logo = true) } else toast(err)
   }
-  preview?.let { PrintPreviewDialog("پیش‌نمایشِ چاپ — بی کاغذ", it) { preview = null } }
-  if (drawerTest) OpenDrawerDialog(s, initialReason = "آزمونِ کشو", onDismiss = { drawerTest = false }, toast = toast)
+  preview?.let { PrintPreviewDialog(StrDevicePages.previewPrint, it) { preview = null } }
+  if (drawerTest) OpenDrawerDialog(s, initialReason = "آزمونِ کشو", onDismiss = { drawerTest = false }, toast = toast) // داده: دلیلِ پیش‌فرض که در سابقهٔ دکان ذخیره می‌شود
   if (modeAsk) {
     fun pick(columnOk: Boolean, rasterOk: Boolean) {
       modeAsk = false
       val m = ir.vil3ntec.tohid.core.hw.ModeProbe.choose(columnOk, rasterOk)
-      if (m == null) toast("هیچ‌کدام درست نبود — عرضِ کاغذ و اتصال را بررسی کنید؛ روش عوض نشد")
-      else { s = s.copy(mode = m.key); toast(if (m.key == "column") "«ستونی ESC *» انتخاب شد — «ذخیره» را بزنید" else "«رستری GS v 0» می‌ماند — «ذخیره» را بزنید") }
+      if (m == null) toast(StrDevicePages.noneWorked)
+      else { s = s.copy(mode = m.key); toast(if (m.key == "column") StrDevicePages.columnPicked else StrDevicePages.rasterKept) }
     }
     AlertDialog(
       onDismissRequest = { modeAsk = false },
-      title = { Text("کدام نمونه درست چاپ شد؟") },
-      text = { Text("برگه دو نمونه دارد: «۱» ستونی و «۲» رستری. نمونه‌ای درست است که نوشتهٔ دری و پشتو و خطِ سیاهِ تمام‌عرضش کامل آمده.") },
+      title = { Text(StrDevicePages.whichSample) },
+      text = { Text(StrDevicePages.whichSampleNote) },
       confirmButton = {
         Row(horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
-          TextButton(onClick = { pick(columnOk = true, rasterOk = true) }) { Text("هر دو") }
-          TextButton(onClick = { pick(columnOk = false, rasterOk = true) }) { Text("فقط ۲") }
-          TextButton(onClick = { pick(columnOk = true, rasterOk = false) }) { Text("فقط ۱") }
+          TextButton(onClick = { pick(columnOk = true, rasterOk = true) }) { Text(StrDevicePages.bothSamples) }
+          TextButton(onClick = { pick(columnOk = false, rasterOk = true) }) { Text(StrDevicePages.only2) }
+          TextButton(onClick = { pick(columnOk = true, rasterOk = false) }) { Text(StrDevicePages.only1) }
         }
       },
-      dismissButton = { TextButton(onClick = { pick(columnOk = false, rasterOk = false) }) { Text("هیچ‌کدام") } },
+      dismissButton = { TextButton(onClick = { pick(columnOk = false, rasterOk = false) }) { Text(StrProducts.noSupplier) } },
     )
   }
 }
@@ -409,14 +421,14 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
   var busy by remember { mutableStateOf(false) }
   AlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
-    title = { Text("باز کردنِ کشو بی فروش") },
+    title = { Text(StrShift.noSaleTitle) },
     text = {
       Column {
-        Text("در سابقهٔ دکان ثبت می‌شود: چه کسی، کی، از کدام دستگاه و چرا.",
+        Text(StrDevicePages.drawerLogNote,
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         Spacer(Modifier.height(Space.xs))
         OutlinedTextField(value = reason, onValueChange = { reason = it.take(80) }, singleLine = true,
-          label = { Text("دلیل") }, modifier = Modifier.fillMaxWidth())
+          label = { Text(StrSafe.reason) }, modifier = Modifier.fillMaxWidth())
       }
     },
     confirmButton = {
@@ -428,9 +440,9 @@ internal fun OpenDrawerDialog(printer: PrinterRegistry.Saved, initialReason: Str
           onDismiss()
           toast(msg)
         }
-      }) { Text("باز کردنِ کشو") }
+      }) { Text(StrDevicePages.openDrawer) }
     },
-    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("انصراف") } },
+    dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 
@@ -457,14 +469,14 @@ internal fun PrintPreviewDialog(title: String, p: HwPages.Preview, onDismiss: ()
           .clip(Shape.card).border(1.dp, Shop.colors.border.copy(alpha = 0.4f), Shape.card),
       ) {
         val bmp = p.bitmap
-        if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = "پیش‌نمایشِ کاغذ", Modifier.fillMaxWidth(),
+        if (bmp != null) Image(bmp.asImageBitmap(), contentDescription = StrDevicePages.paperPreview, Modifier.fillMaxWidth(),
           contentScale = ContentScale.FillWidth, filterQuality = FilterQuality.None)
-        else Text("چیزی برای چاپ نیست", Modifier.padding(Space.md), color = Shop.colors.muted)
+        else Text(StrDevicePages.nothingToPrint, Modifier.padding(Space.md), color = Shop.colors.muted)
       }
       Spacer(Modifier.height(Space.xs))
-      Text("دستورها: " + groupEvents(p.events).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-      if (p.unknown.isNotEmpty()) Text("بایتِ ناشناخته: ${p.unknown.take(5).joinToString()}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
-      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("بستن") } }
+      Text(StrDevicePages.commands + groupEvents(p.events).joinToString(" · "), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      if (p.unknown.isNotEmpty()) Text(StrDevicePages.unknownBytes(p.unknown.take(5).joinToString()), style = MaterialTheme.typography.labelSmall, color = Shop.colors.danger)
+      Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text(Str.close) } }
     }
   }
 }
@@ -500,12 +512,12 @@ internal fun LabelsPanel(d: ShopData, toast: (String) -> Unit) {
     HwPages.label(context, p.name, LocaleText.afghani(p.salePrice, LocaleChoice.digits, LocaleChoice.symbol), p.barcodes.firstOrNull().orEmpty())
 
   Panel {
-    Text("برچسبِ کالا", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-    Text("۴۰×۳۰ میلی‌متر: نامِ دری، قیمت و بارکدِ همان کالا (EAN-13 یا Code128).", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+    Text(StrLabel.printTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+    Text(StrDevicePages.labelSpec, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     Spacer(Modifier.height(Space.xs))
-    OutlinedTextField(term, { term = it.take(40); picked = null }, singleLine = true, label = { Text("نام یا بارکدِ کالا") }, modifier = Modifier.fillMaxWidth())
+    OutlinedTextField(term, { term = it.take(40); picked = null }, singleLine = true, label = { Text(StrDevicePages.nameOrBarcode) }, modifier = Modifier.fillMaxWidth())
     matches.forEach { p ->
-      Text(p.name + (p.barcodes.firstOrNull()?.let { " · $it" } ?: " · بی‌بارکد"),
+      Text(p.name + (p.barcodes.firstOrNull()?.let { " · $it" } ?: StrDevicePages.noBarcode),
         Modifier.fillMaxWidth().clip(Shape.card).clickable { picked = p; term = p.name }
           .background(if (picked?.id == p.id) Shop.colors.primaryTint else Shop.colors.surface2).padding(Space.xs),
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
@@ -513,7 +525,7 @@ internal fun LabelsPanel(d: ShopData, toast: (String) -> Unit) {
     }
     picked?.let { p ->
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("تعداد:", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+        Text(StrDevicePages.countColon, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
         TextButton(onClick = { copies = (copies - 1).coerceAtLeast(1) }) { Text("−") }
         Text(LocaleText.digitsIn(copies.toString(), LocaleChoice.digits), fontWeight = FontWeight.Bold, color = Shop.colors.text)
         TextButton(onClick = { copies = (copies + 1).coerceAtMost(99) }) { Text("+") }
@@ -523,34 +535,34 @@ internal fun LabelsPanel(d: ShopData, toast: (String) -> Unit) {
           scope.launch {
             val r = withContext(Dispatchers.IO) { build(p) }
             val img = r.image
-            if (img == null) toast(r.error ?: "برچسب ساخته نشد")
+            if (img == null) toast(r.error ?: StrDevicePages.labelFailed)
             else preview = HwPages.Preview(ThermalPrinter.toBitmap(img), listOf("label ${img.width}x${img.height}"), emptyList())
           }
-        }) { Text("پیش‌نمایش") }
+        }) { Text(StrDevicePages.preview) }
         Button(enabled = printer != null, onClick = {
           val pr = printer
           if (pr != null) scope.launch {
             val r = withContext(Dispatchers.IO) { build(p) }
-            val img = r.image ?: run { toast(r.error ?: "برچسب ساخته نشد"); return@launch }
-            toast(PrintSpooler.submitAndWait(context, PrintQueue.Kind.LABEL, pr.link, "برچسبِ ${p.name}", HwPages.labelBytes(pr, img, copies), done = "برچسب چاپ شد"))
+            val img = r.image ?: run { toast(r.error ?: StrDevicePages.labelFailed); return@launch }
+            toast(PrintSpooler.submitAndWait(context, PrintQueue.Kind.LABEL, pr.link, StrDevicePages.labelOf(p.name), HwPages.labelBytes(pr, img, copies), done = StrDevicePages.labelPrinted))
           }
-        }) { Text("چاپِ برچسب") }
+        }) { Text(StrLabel.title) }
         OutlinedButton(onClick = {
           scope.launch {
             val r = withContext(Dispatchers.IO) { build(p) }
-            val img = r.image ?: run { toast(r.error ?: "برچسب ساخته نشد"); return@launch }
+            val img = r.image ?: run { toast(r.error ?: StrDevicePages.labelFailed); return@launch }
             val sheet = withContext(Dispatchers.Default) { ir.vil3ntec.tohid.core.hw.Labels.A4.sheet(img, copies) }
-            ir.vil3ntec.tohid.print.LabelSheetPrint.print(context, sheet, "برچسبِ ${p.name}")
+            ir.vil3ntec.tohid.print.LabelSheetPrint.print(context, sheet, StrDevicePages.labelOf(p.name))
           }
-        }) { Text("برگهٔ A4") }
+        }) { Text(StrDevicePages.a4Sheet) }
       }
-      Text("برگهٔ A4: ۳ ستون × ۸ ردیف، تا ۲۴ برچسب در یک برگ؛ در پنجرهٔ چاپ «اندازهٔ واقعی / بی حاشیه» را بزنید.",
+      Text(StrDevicePages.a4Note,
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-      if (printer == null) Text("هنوز چاپگری «برچسبِ کالا» تعریف نشده — در «چاپگرها» یکی را تنظیم کنید.",
+      if (printer == null) Text(StrDevicePages.noLabelPrinter,
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
     }
   }
-  preview?.let { PrintPreviewDialog("پیش‌نمایشِ برچسب", it) { preview = null } }
+  preview?.let { PrintPreviewDialog(StrDevicePages.previewLabelTitle, it) { preview = null } }
 }
 
 /* ============================== ترازو ============================== */
@@ -564,30 +576,30 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
   val result = remember(test, rules, d.products) {
     if (test.isBlank()) null
     else when (val m = ScaleLabels.match(rules, test, ShopStore.barcodeIndex(d), d.products)) {
-      null -> "برچسبِ ترازو نیست (یا قاعده خاموش است) — بارکدِ معمولی خوانده می‌شود"
+      null -> StrDevicePages.notScaleLabel
       is ScaleLabels.Match.Rejected -> m.message
       is ScaleLabels.Match.Weighed -> "«${m.product.name}» — ${ir.vil3ntec.tohid.qty(m.quantity)} ${m.product.unit}"
     }
   }
   Panel {
-    Text("ترازو", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+    Text(StrDevices.kindScale, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
     HwSwitchRow(
-      "برچسبِ ترازو در صندوق",
-      "بارکدِ ۱۳ رقمیِ ۲۰ تا ۲۹ (پیش‌فرض: کدِ کالای ترازو ۵ رقم و وزن ۵ رقم به گرم؛ نوع و طول‌ها زیرِ همین کلید). کدِ ترازو را به بارکدهای همان کالا بیفزایید.",
+      StrDevicePages.scaleLabelAtTill,
+      StrDevicePages.scaleLabelNote,
       rules.isNotEmpty(),
     ) { on ->
       val next = if (on) WeightBarcode.standardRules() else emptyList()
       ScaleLabels.saveRules(context, next); rules = next
     }
     ir.vil3ntec.tohid.ui.components.pos.ScaleAtPosSettings(rules) { next -> ScaleLabels.saveRules(context, next); rules = next }
-    OutlinedTextField(test, { test = it.take(20) }, singleLine = true, label = { Text("آزمون: یک برچسبِ ترازو این‌جا اسکن کنید") },
+    OutlinedTextField(test, { test = it.take(20) }, singleLine = true, label = { Text(StrDevicePages.scaleTest) },
       modifier = Modifier.fillMaxWidth())
     result?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text) }
 
     Spacer(Modifier.height(Space.sm))
     val serial = HwPlatform.serial
     if (serial == null) {
-      Text("ترازوی سریال (NCI) فقط در برنامهٔ کامپیوتر است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+      Text(StrDevicePages.serialDesktopOnly, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     } else {
       val prefs = remember { context.getSharedPreferences("tohid", android.content.Context.MODE_PRIVATE) }
       var ports by remember { mutableStateOf(emptyList<ir.vil3ntec.tohid.hw.SerialPorts.Port>()) }
@@ -602,9 +614,9 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
           protoId = it; prefs.edit().putString("scale_protocol", it).apply()
         })
       }
-      Text("ترازوی سریال — پروتکلِ ${proto.title}، ${proto.serial.baud} و ${proto.serial.dataBits}${proto.serial.parity.take(1).uppercase()}${proto.serial.stopBits}. روی ترازوی واقعی آزموده نشده است.",
+      Text(StrDevicePages.serialScale(proto.title, proto.serial.baud, proto.serial.dataBits, proto.serial.parity.take(1).uppercase(), proto.serial.stopBits),
         style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
-      if (ports.isEmpty()) Text("درگاهِ سریالی پیدا نشد.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+      if (ports.isEmpty()) Text(StrDevicePages.noSerialPort, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
       ports.forEach { pt ->
         Row(verticalAlignment = Alignment.CenterVertically) {
           RadioButton(selected = port == pt.name, onClick = { port = pt.name; prefs.edit().putString("scale_port", pt.name).apply() })
@@ -616,15 +628,15 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
           reading = when (val r = withContext(Dispatchers.IO) { ScaleReader.read(port, proto) }) {
             is ScaleReader.Result.Failed -> r.message
             is ScaleReader.Result.Ok -> with(r.reading) {
-              val w = kg?.let { "${ir.vil3ntec.tohid.qty(it)} کیلو" } ?: "بی‌وزن"
+              val w = kg?.let { StrDevicePages.kg(ir.vil3ntec.tohid.qty(it)) } ?: StrDevicePages.noWeight
               w + listOfNotNull(
-                if (motion) "در حرکت" else null, if (zero) "روی صفر" else null,
-                if (over) "بیش از ظرفیت" else null, if (under) "زیرِ ظرفیت" else null, if (error) "خطای ترازو" else null,
-              ).joinToString("") { " · $it" } + if (usable) " · ایستا" else ""
+                if (motion) StrDevicePages.inMotion else null, if (zero) StrDevicePages.onZero else null,
+                if (over) StrDevicePages.overCapacity else null, if (under) StrDevicePages.underCapacity else null, if (error) StrDevicePages.scaleError else null,
+              ).joinToString("") { " · $it" } + if (usable) StrDevicePages.stable else ""
             }
           }
         }
-      }) { Text("خواندنِ وزن") }
+      }) { Text(StrDevicePages.readWeight) }
       reading?.let { Text(it, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Bold, color = Shop.colors.text) }
     }
   }
@@ -637,7 +649,7 @@ internal fun CustomerDisplayPanel() {
   if (!CustomerFacing.supported) return
   var open by CustomerFacing.open
   Panel {
-    HwSwitchRow("نمایشگرِ مشتری", "پنجرهٔ دوم رو به مشتری: اقلامِ سبد و جمع. پنجره را به صفحهٔ دوم ببرید.", open) { open = it }
+    HwSwitchRow(StrDevices.kindDisplay, StrDevicePages.displayNote, open) { open = it }
     if (HwTools.on.value) PolePanel()
   }
 }
@@ -656,11 +668,11 @@ private fun PolePanel() {
   var note by remember { mutableStateOf<String?>(null) }
   LaunchedEffect(Unit) { ir.vil3ntec.tohid.hw.Pole.load(context); port = ir.vil3ntec.tohid.hw.Pole.port; ports = withContext(Dispatchers.IO) { serial.list() } }
   Spacer(Modifier.height(Space.sm))
-  Text("نمایشگرِ قطبی (دوخطی، ۲۰ نویسه) — ۹۶۰۰ و 8N1. روی نمایشگرِ واقعی آزموده نشده است.",
+  Text(StrDevicePages.poleNote,
     style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
   Row(verticalAlignment = Alignment.CenterVertically) {
     RadioButton(selected = port.isBlank(), onClick = { port = ""; ir.vil3ntec.tohid.hw.Pole.save(context, "") })
-    Text("خاموش", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+    Text(StrCount.off, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
   }
   ports.forEach { pt ->
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -669,7 +681,7 @@ private fun PolePanel() {
     }
   }
   OutlinedButton(enabled = port.isNotBlank(), onClick = {
-    scope.launch { note = withContext(Dispatchers.IO) { ir.vil3ntec.tohid.hw.Pole.test(port) } ?: "فرستاده شد — «VILL3N TEST» روی نمایشگر است؟" }
-  }) { Text("آزمونِ نمایشگرِ قطبی") }
+    scope.launch { note = withContext(Dispatchers.IO) { ir.vil3ntec.tohid.hw.Pole.test(port) } ?: StrDevicePages.poleSent }
+  }) { Text(StrDevicePages.poleTest) }
   note?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text) }
 }

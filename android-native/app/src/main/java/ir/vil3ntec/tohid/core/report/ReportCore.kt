@@ -354,8 +354,11 @@ object ReportCore {
    */
   data class InvoiceShare(val saleId: String, val date: String, val createdAt: Long, val qty: Long, val sales: Long)
 
+  /** RPT-13: «همهٔ فاکتورها» برای [invoicesOf] — ریزِ یک روزِ «امروز» ([dayInvoices]) */
+  const val ALL = "all"
+
   fun invoicesOf(l: ReportLedger, from: String?, to: String?, dim: String, key: String, clock: ReportClock? = null): List<InvoiceShare> {
-    if (dim !in DIMS) return emptyList()
+    if (dim !in DIMS && dim != ALL) return emptyList()
     val f = from?.ifEmpty { null } ?: "0000-01-01"
     val t = to?.ifEmpty { null } ?: "9999-12-31"
     val out = ArrayList<InvoiceShare>()
@@ -377,6 +380,7 @@ object ReportCore {
           "user" -> s.seller
           "hour" -> hour
           "payment" -> s.method
+          ALL -> key
           else -> s.channel
         }
         if (k == key) { hit = true; qty += qtys[i]; sales += gross[i] - shares[i] }
@@ -385,6 +389,13 @@ object ReportCore {
     }
     return out.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.saleId }))
   }
+
+  /**
+   *  RPT-13 — ریزِ یک روزِ جدولِ «امروز» (امروز، دیروز، همان روزِ هفتهٔ پیش): هر فاکتورِ لغونشدهٔ همان روز با «فروش» ِ
+   *  خودش (پس از تخفیف) — جمع = ستونِ «فروش» و شمار = «فاکتور» ِ همان ردیف ([today]).
+   */
+  fun dayInvoices(l: ReportLedger, date: String, clock: ReportClock? = null): List<InvoiceShare> =
+    if (ReportDates.epochDay(date) == null) emptyList() else invoicesOf(l, date, date, ALL, "", clock)
 
   /* ---------------- داشبوردِ امروز (RPT-01) ---------------- */
 
@@ -424,32 +435,39 @@ object ReportCore {
 
   private class DebtEv(val id: String, val k: Int, val debit: Boolean, val amount: Long, val date: String, val createdAt: Long)
 
+  private class OpenX(val id: String, val date: String, var left: Long)
+
+  /** اولین‌وارد‌اولین‌پرداخت روی رویدادهای یک طرف ⇒ ماندهٔ بازِ هر سند و پیش‌پرداخت (همان `DebtorEngine.debtSince`) */
+  private fun fifo(group: List<DebtEv>): Pair<List<OpenX>, Long> {
+    val evs = group.sortedWith(compareBy<DebtEv>({ it.date }, { it.createdAt }, { it.k }, { it.id }))
+    val lots = ArrayDeque<OpenX>()
+    var credit = 0L
+    for (e in evs) {
+      if (e.debit) {
+        var left = e.amount
+        val used = min(credit, left)
+        credit -= used; left -= used
+        if (left > 0) lots.addLast(OpenX(e.id, e.date, left))
+      } else {
+        var pay = e.amount
+        while (pay > 0 && lots.isNotEmpty()) {
+          val take = min(pay, lots.first().left)
+          lots.first().left -= take; pay -= take
+          if (lots.first().left == 0L) lots.removeFirst()
+        }
+        credit += pay
+      }
+    }
+    return lots.toList() to credit
+  }
+
   private fun ageing(groups: Map<String, List<DebtEv>>, names: Map<String, String>, asOf: String, buckets: List<Long>): Ageing {
     val asOfDay = ReportDates.epochDay(asOf)!!
     val rows = ArrayList<AgeRow>()
     var tBalance = 0L; var tOpen = 0L; var tCredit = 0L
     val tBuckets = LongArray(buckets.size + 1)
     for (id in groups.keys.sorted()) {
-      val evs = groups.getValue(id).sortedWith(compareBy<DebtEv>({ it.date }, { it.createdAt }, { it.k }, { it.id }))
-      class Lot(val date: String, var left: Long)
-      val lots = ArrayDeque<Lot>()
-      var credit = 0L
-      for (e in evs) {
-        if (e.debit) {
-          var left = e.amount
-          val used = min(credit, left)
-          credit -= used; left -= used
-          if (left > 0) lots.addLast(Lot(e.date, left))
-        } else {
-          var pay = e.amount
-          while (pay > 0 && lots.isNotEmpty()) {
-            val take = min(pay, lots.first().left)
-            lots.first().left -= take; pay -= take
-            if (lots.first().left == 0L) lots.removeFirst()
-          }
-          credit += pay
-        }
-      }
+      val (lots, credit) = fifo(groups.getValue(id))
       var open = 0L
       var oldest: Long? = null
       val bk = LongArray(buckets.size + 1)
@@ -479,6 +497,11 @@ object ReportCore {
   fun debts(l: ReportLedger, asOf: String, buckets: List<Long> = listOf(30L, 60L, 90L), clock: ReportClock? = null): DebtReport {
     require(ReportDates.epochDay(asOf) != null) { "report-core: debts() needs opts.asOf" }
     val b = buckets.ifEmpty { listOf(30L, 60L, 90L) }
+    val (cust, sup) = debtGroups(l, asOf, clock)
+    return DebtReport(asOf, b, ageing(cust, l.debtors, asOf, b), ageing(sup, l.suppliers, asOf, b))
+  }
+
+  private fun debtGroups(l: ReportLedger, asOf: String, clock: ReportClock?): Pair<Map<String, List<DebtEv>>, Map<String, List<DebtEv>>> {
     fun inScope(d: String) = ReportDates.epochDay(d) == null || d <= asOf
     val cust = LinkedHashMap<String, MutableList<DebtEv>>()
     val sup = LinkedHashMap<String, MutableList<DebtEv>>()
@@ -498,7 +521,25 @@ object ReportCore {
       if (p.amount <= 0 || !inScope(d)) continue
       sup.getOrPut(p.supplierId) { ArrayList() } += DebtEv(p.id, 1, false, p.amount, d, p.createdAt)
     }
-    return DebtReport(asOf, b, ageing(cust, l.debtors, asOf, b), ageing(sup, l.suppliers, asOf, b))
+    return cust to sup
+  }
+
+  /** یک ماندهٔ بازِ سند: شناسهٔ سند (تراکنشِ قرض یا خرید)، روز، مانده و سن تا `asOf` (روزِ نامعلوم ⇒ -1) */
+  data class OpenLot(val docId: String, val date: String, val left: Long, val ageDays: Long)
+
+  /** ماندهٔ بازِ یک طرف: جمعِ `left` = `AgeRow.open` و [credit] = `AgeRow.credit` */
+  data class OpenDebt(val lots: List<OpenLot>, val credit: Long)
+
+  /**
+   *  RPT-13 — ریزِ یک ردیفِ «سنِ بدهی» (Enter یا کلیک): ماندهٔ بازِ هر سندِ همان مشتری (یا با [supplier] همان
+   *  تأمین‌کننده) به همان اولین‌وارد‌اولین‌پرداخت ِ [debts]، به ترتیبِ روز. فقط‌خواندنی.
+   */
+  fun openDebt(l: ReportLedger, asOf: String, supplier: Boolean, id: String, clock: ReportClock? = null): OpenDebt {
+    val asOfDay = ReportDates.epochDay(asOf) ?: return OpenDebt(emptyList(), 0L)
+    val (cust, sup) = debtGroups(l, asOf, clock)
+    val group = (if (supplier) sup else cust)[id] ?: return OpenDebt(emptyList(), 0L)
+    val (lots, credit) = fifo(group)
+    return OpenDebt(lots.map { x -> OpenLot(x.id, x.date, x.left, ReportDates.epochDay(x.date)?.let { max(0L, asOfDay - it) } ?: -1L) }, credit)
   }
 
   /* ---------------- ضدتقلب (RPT-09) ---------------- */
@@ -562,5 +603,60 @@ object ReportCore {
       tot.overrideCount += x.overrideCount; tot.approvalCount += x.approvalCount
     }
     return FraudReport(f, t, rows, tot.row())
+  }
+
+  /**
+   *  یک رویدادِ ضدتقلب: [kind] یکی از `discount` (فاکتورِ با تخفیف)، `approved` (فاکتورِ بی تخفیف که تأییدکننده دارد)،
+   *  `return`، `void` (لغو)، `line_delete`، `no_sale`؛ [docId] شناسهٔ فاکتور (خالی ⇒ بی فاکتور)؛ [byOther] = این ردیف
+   *  کارِ کاربرِ دیگری است که همین کاربر **تأییدش کرد** (`approvalCount`).
+   */
+  data class FraudEvent(
+    val kind: String, val docId: String, val date: String, val createdAt: Long, val amount: Long,
+    val user: String, val approvedBy: String, val byOther: Boolean,
+  )
+
+  /**
+   *  RPT-13 — ریزِ ردیفِ کاربرِ [key] در «ضدتقلب»: همان انتخابِ [fraud] (همان بازه، همان کاربرِ صریحِ رویداد و همان
+   *  `approvedBy`)، پس شمارِ هر نوع = ستونِ همان ردیف (`discountCount`، `returnCount`، `voidCount`، `lineDeleteCount`،
+   *  `noSaleCount`)، جمعِ مبلغ‌ها = `discount`/`returns`/`voids`/`lineDeletes`، رویدادهای خودِ او که تأییدکننده دارند =
+   *  `overrideCount` و [FraudEvent.byOther] = `approvalCount`. به ترتیبِ زمان؛ فقط‌خواندنی.
+   */
+  fun fraudEvents(l: ReportLedger, from: String?, to: String?, key: String, clock: ReportClock? = null): List<FraudEvent> {
+    val f = from?.ifEmpty { null } ?: "0000-01-01"
+    val t = to?.ifEmpty { null } ?: "9999-12-31"
+    fun inRange(d: String) = d >= f && d <= t
+    val out = ArrayList<FraudEvent>()
+    fun add(kind: String, doc: String, date: String, at: Long, amount: Long, user: String, approver: String) {
+      if (user == key) out += FraudEvent(kind, doc, date, at, amount, user, approver, byOther = false)
+      if (approver != "" && approver == key) out += FraudEvent(kind, doc, date, at, amount, user, approver, byOther = true)
+    }
+    val cancelEntry = HashMap<String, ReportLedger.Audit>()
+    l.audit.forEach { a -> if (a.type == "cancel_sale" && a.refId != "" && a.refId !in cancelEntry) cancelEntry[a.refId] = a }
+    for (s in l.sales) {
+      if (s.cancelled) {
+        val a = cancelEntry[s.id]
+        val d = if (a != null) posDate(a, clock) else posDate(s, clock)
+        if (!inRange(d)) continue
+        add("void", s.id, d, a?.createdAt ?: s.createdAt, s.finalTotal, if (s.cancelledBy != "") s.cancelledBy else a?.user ?: "", a?.approvedBy ?: "")
+        continue
+      }
+      val d = posDate(s, clock)
+      if (!inRange(d)) continue
+      if (s.discount > 0) add("discount", s.id, d, s.createdAt, s.discount, s.seller, s.approvedBy)
+      else if (s.approvedBy != "") add("approved", s.id, d, s.createdAt, 0L, s.seller, s.approvedBy)
+    }
+    for (r in l.returns) {
+      if (l.saleById[r.saleId]?.cancelled == true) continue
+      val d = posDate(r, clock)
+      if (!inRange(d)) continue
+      add("return", r.saleId, d, r.createdAt, r.amount, r.user, r.approvedBy)
+    }
+    for (a in l.audit) {
+      if (a.type != "line_delete" && a.type != "no_sale") continue
+      val d = posDate(a, clock)
+      if (!inRange(d)) continue
+      add(a.type, if (a.type == "line_delete") a.refId else "", d, a.createdAt, if (a.type == "line_delete") a.amount else 0L, a.user, a.approvedBy)
+    }
+    return out.sortedWith(compareBy({ it.date }, { it.createdAt }, { it.kind }, { it.docId }, { it.byOther }))
   }
 }

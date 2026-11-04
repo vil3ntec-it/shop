@@ -121,7 +121,7 @@ fun DeskProductsScreen(
   DisposableEffect(Unit) {
     ir.vil3ntec.tohid.scan.ScanRouter.register(owner) { code ->
       val id = ShopStore.barcodeIndex(latest)[code]
-      if (id != null) { openId = id; search = "" } else { incoming.value = code; toast("بارکدِ تازه — نام و قیمت را بنویسید و Enter بزنید") }
+      if (id != null) { openId = id; search = "" } else { incoming.value = code; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.newBarcode) }
       true
     }
     onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
@@ -171,27 +171,27 @@ fun DeskProductsScreen(
     /* ─────────── ۱. عنوان، توضیح و کارها ─────────── */
     Row(verticalAlignment = Alignment.CenterVertically) {
       //  نسخهٔ ۲: عنوانِ «محصولات» فقط در سربرگ است (نقدِ «همه‌چیز دو جا»)؛ این‌جا یک جملهٔ توضیح
-      Text("موجودی، قیمت و وضعیتِ کالاهای دکان — جست‌وجو، فیلتر و کارِ گروهی", Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
-      OutlinedButton(onClick = { onOpenWarehouse(null) }) { Text("ورودِ انبار") }
+      Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.subtitle, Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.muted)
+      OutlinedButton(onClick = { onOpenWarehouse(null) }) { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.stockIn) }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = {
         val sheet = ir.vil3ntec.tohid.data.ReportCsv.of("products", d, "", "", ir.vil3ntec.tohid.todayIso())
         ir.vil3ntec.tohid.print.ReportPrint.print(context, sheet, sheet.name)
-      }) { Text("چاپ") }
+      }) { Text(ir.vil3ntec.tohid.core.i18n.StrHistory.print) }
       Spacer(Modifier.width(6.dp))
       OutlinedButton(onClick = {
         val sheet = ir.vil3ntec.tohid.data.ReportCsv.of("products", d, "", "", ir.vil3ntec.tohid.todayIso())
-        ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))?.let { toast("ذخیره شد: $it") }
+        ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))?.let { toast(ir.vil3ntec.tohid.core.i18n.StrSale.savedTo(it)) }
       }) {
         Icon(Icons.Filled.FileDownload, null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text("خروجیِ اکسل")
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.excelExport)
       }
       Spacer(Modifier.width(8.dp))
       Button(onClick = focusAdd) {
         Icon(Icons.Filled.Add, null, modifier = Modifier.size(18.dp))
         Spacer(Modifier.width(6.dp))
-        Text("افزودن کالا  Ctrl+N")
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.addItemKey)
       }
     }
     Spacer(Modifier.height(12.dp))
@@ -199,22 +199,22 @@ fun DeskProductsScreen(
     /* ─────────── ۲. کارت‌های آماری — هر کدام زبانهٔ خودش را باز می‌کند ─────────── */
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
       StatCard(
-        "همهٔ کالاها", plain(kpis.total), "${plain(kpis.periodDays)} روزِ گذشته", Modifier.weight(1f),
+        ir.vil3ntec.tohid.core.i18n.StrStockPages.allItems, plain(kpis.total), ir.vil3ntec.tohid.core.i18n.StrHome.pastDays(plain(kpis.periodDays)), Modifier.weight(1f),
         icon = Icons.Filled.Inventory2,
-        delta = if (kpis.added > 0) StatDelta("${plain(kpis.added)} کالای تازه", Trend.UP) else StatDelta("کالای تازه‌ای نیامده", Trend.FLAT),
+        delta = if (kpis.added > 0) StatDelta(ir.vil3ntec.tohid.core.i18n.StrProductPages.newItems(plain(kpis.added)), Trend.UP) else StatDelta(ir.vil3ntec.tohid.core.i18n.StrProductPages.noNewItems, Trend.FLAT),
         selected = tab == ProductListModel.Tab.ALL,
         onClick = { showTab(ProductListModel.Tab.ALL) },
       )
       StatCard(
-        "فعال", plain(kpis.active), "اکنون", Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
+        ir.vil3ntec.tohid.core.i18n.StrSettings.active, plain(kpis.active), ir.vil3ntec.tohid.core.i18n.StrOnline.dlNow, Modifier.weight(1f), icon = Icons.Filled.CheckCircle,
         selected = tab == ProductListModel.Tab.ACTIVE, onClick = { showTab(ProductListModel.Tab.ACTIVE) },
       )
       StatCard(
-        "کم‌موجود", plain(kpis.low), "اکنون — زیرِ حدِ هشدار", Modifier.weight(1f), icon = Icons.Filled.WarningAmber,
+        ir.vil3ntec.tohid.core.i18n.Str.lowStock, plain(kpis.low), ir.vil3ntec.tohid.core.i18n.StrProductPages.nowBelowAlert, Modifier.weight(1f), icon = Icons.Filled.WarningAmber,
         selected = tab == ProductListModel.Tab.LOW, onClick = { showTab(ProductListModel.Tab.LOW) },
       )
       StatCard(
-        "ناموجود", plain(kpis.out), "اکنون — کالای فعال", Modifier.weight(1f), icon = Icons.Filled.RemoveShoppingCart,
+        ir.vil3ntec.tohid.core.i18n.Str.outOfStock, plain(kpis.out), ir.vil3ntec.tohid.core.i18n.StrProductPages.nowActiveItems, Modifier.weight(1f), icon = Icons.Filled.RemoveShoppingCart,
         selected = tab == ProductListModel.Tab.OUT, onClick = { showTab(ProductListModel.Tab.OUT) },
       )
     }
@@ -224,16 +224,16 @@ fun DeskProductsScreen(
     TableToolbar(
       query = search,
       onQuery = { search = it },
-      placeholder = "جست‌وجو در نام، دسته یا بارکد (Ctrl+F)",
+      placeholder = ir.vil3ntec.tohid.core.i18n.StrProductPages.searchHint,
       viewMode = view,
       searchFocus = searchFocus,
       filter = {
         FilterMenu(
-          label = "دسته",
-          options = categories.map { it to it.ifEmpty { "بی‌دسته" } },
+          label = ir.vil3ntec.tohid.core.i18n.StrGrid.category,
+          options = categories.map { it to it.ifEmpty { ir.vil3ntec.tohid.core.i18n.StrSale.uncategorized } },
           selected = category,
           onSelect = { category = it },
-          allLabel = "همهٔ دسته‌ها",
+          allLabel = ir.vil3ntec.tohid.core.i18n.StrCount.allCategories,
         )
       },
       tabs = {
@@ -256,17 +256,17 @@ fun DeskProductsScreen(
           val toggle: (String) -> Unit = { id -> selected = Selection.toggle(selected, id) }
           when {
             d.products.isEmpty() -> TohidEmptyState(
-              title = "هنوز کالایی نیست",
-              description = "در ردیفِ «کالای تازه» نام و قیمت را بنویسید و Enter بزنید، یا بارکد را بخوانید.",
+              title = ir.vil3ntec.tohid.core.i18n.StrProductPages.noItemsYet,
+              description = ir.vil3ntec.tohid.core.i18n.StrProductPages.noItemsHint,
               icon = Icons.Filled.Inventory2,
-              actionText = "افزودن کالا",
+              actionText = ir.vil3ntec.tohid.core.i18n.StrProductPages.addItem,
               onAction = focusAdd,
             )
             rows.isEmpty() -> TohidEmptyState(
-              title = "چیزی پیدا نشد",
-              description = "کالایی با این جست‌وجو، دسته یا زبانه نیست.",
+              title = ir.vil3ntec.tohid.core.i18n.StrKit.nothingFound,
+              description = ir.vil3ntec.tohid.core.i18n.StrProductPages.noMatch,
               icon = Icons.Filled.Search,
-              actionText = "پاک‌کردنِ جست‌وجو و فیلتر",
+              actionText = ir.vil3ntec.tohid.core.i18n.StrProductPages.clearSearchFilter,
               onAction = { showTab(ProductListModel.Tab.ALL) },
             )
             view.mode == ViewMode.TABLE -> ProductTable(
@@ -287,19 +287,19 @@ fun DeskProductsScreen(
             BulkActionBar(
               count = selected.size,
               actions = buildList {
-                add(BulkAction("خروجی", Icons.Filled.FileDownload) {
+                add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrSettings.exportTitle, Icons.Filled.FileDownload) {
                   val part = d.copy(products = d.products.filter { it.id in selected })
                   val sheet = ir.vil3ntec.tohid.data.ReportCsv.of("products", part, "", "", ir.vil3ntec.tohid.todayIso())
                   ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.xlsx", ir.vil3ntec.tohid.data.Xlsx.of(sheet))
-                    ?.let { toast("${plain(part.products.size)} کالا ذخیره شد: $it") }
+                    ?.let { toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.itemsSaved(plain(part.products.size), it)) }
                 })
                 //  PRD-21 (پیش‌فرض خاموش): قیمتِ گروهی با پیش‌نمایش، هشدار، تأیید و دلیل
-                if (productTools) add(BulkAction("قیمت", Icons.Filled.Sell) { priceOpen = true })
+                if (productTools) add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrSale.price, Icons.Filled.Sell) { priceOpen = true })
                 if (productTools) add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrGrid.open, Icons.Filled.TableChart) { gridIds = rows.map { it.id }.filter { it in selected } })
-                add(BulkAction("فعال", Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
-                add(BulkAction("غیرفعال", Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
-                if (levelsOn) add(BulkAction("حدِ موجودی", Icons.Filled.Tune) { levelsInput = true })
-                if (canDelete) add(BulkAction("حذف", Icons.Filled.Delete, destructive = true) { confirm = BulkKind.DELETE })
+                add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrProducts.activate, Icons.Filled.CheckCircle) { confirm = BulkKind.ACTIVATE })
+                add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrProducts.deactivate, Icons.Filled.Block) { confirm = BulkKind.DEACTIVATE })
+                if (levelsOn) add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrProductPages.stockLevels, Icons.Filled.Tune) { levelsInput = true })
+                if (canDelete) add(BulkAction(ir.vil3ntec.tohid.core.i18n.StrMoney.delete, Icons.Filled.Delete, destructive = true) { confirm = BulkKind.DELETE })
               },
               onClose = { selected = emptySet() },
               modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 12.dp),
@@ -307,7 +307,7 @@ fun DeskProductsScreen(
           }
         }
         Text(
-          "ردیفِ «کالای تازه»: Tab خانهٔ بعد · Enter ثبت · کلیک روی کالا ⇐ ویرایش کنارِ فهرست · Ctrl+F جست‌وجو · Esc لغوِ انتخاب",
+          ir.vil3ntec.tohid.core.i18n.StrProductPages.keysHint,
           Modifier.padding(top = 6.dp), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
         )
       }
@@ -336,7 +336,7 @@ fun DeskProductsScreen(
         is WarehouseEngine.Result.Failed -> toast(r.message)
         is WarehouseEngine.Result.Ok -> {
           scope.launch { store.save(r.data) }
-          toast("قیمتِ ${plain(selected.size)} کالا عوض شد")
+          toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.priceChanged(plain(selected.size)))
           selected = emptySet(); priceOpen = false
         }
       }
@@ -344,17 +344,17 @@ fun DeskProductsScreen(
   }
   confirm?.let { kind ->
     val hidden = Selection.hiddenCount(selected, rows.map { it.id })
-    val warnings = if (hidden > 0) listOf("${plain(hidden)} مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند ولی در این کار هستند.") else emptyList()
+    val warnings = if (hidden > 0) listOf(ir.vil3ntec.tohid.core.i18n.StrProductPages.hiddenSelected(plain(hidden))) else emptyList()
     when (kind) {
       BulkKind.ACTIVATE, BulkKind.DEACTIVATE -> {
         val on = kind == BulkKind.ACTIVATE
         val preview = remember(d, selected, on) { ProductListModel.previewActive(d.products, selected, on) }
         BulkConfirmDialog(
-          title = if (on) "فعال‌کردنِ ${plain(preview.size)} کالا" else "غیرفعال‌کردنِ ${plain(preview.size)} کالا",
-          confirmLabel = if (on) "فعال کن" else "غیرفعال کن",
+          title = if (on) ir.vil3ntec.tohid.core.i18n.StrProductPages.activateN(plain(preview.size)) else ir.vil3ntec.tohid.core.i18n.StrProductPages.deactivateN(plain(preview.size)),
+          confirmLabel = if (on) ir.vil3ntec.tohid.core.i18n.StrProductPages.activateIt else ir.vil3ntec.tohid.core.i18n.StrProductPages.deactivateIt,
           rows = preview,
-          note = if (on) "کالای فعال در فروش و جست‌وجوی فروش دیده می‌شود. برگشت‌پذیر است."
-          else "کالای غیرفعال فروخته نمی‌شود ولی سابقه و موجودی‌اش می‌ماند. برگشت‌پذیر است.",
+          note = if (on) ir.vil3ntec.tohid.core.i18n.StrProductPages.activeNote
+          else ir.vil3ntec.tohid.core.i18n.StrProductPages.inactiveNote,
           warnings = warnings,
           onDismiss = { confirm = null },
           onConfirm = { _ ->
@@ -362,7 +362,7 @@ fun DeskProductsScreen(
             val r = WarehouseEngine.bulkUpdate(d, ids, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = on) }
             val error = (r as? WarehouseEngine.Result.Failed)?.message
             if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(r.data) }; selected = emptySet() }
-            results = (if (on) "نتیجهٔ فعال‌کردن" else "نتیجهٔ غیرفعال‌کردن") to ProductListModel.resultActive(preview, on, error)
+            results = (if (on) ir.vil3ntec.tohid.core.i18n.StrProductPages.activateResult else ir.vil3ntec.tohid.core.i18n.StrProductPages.deactivateResult) to ProductListModel.resultActive(preview, on, error)
             confirm = null
           },
         )
@@ -370,11 +370,11 @@ fun DeskProductsScreen(
       BulkKind.DELETE -> {
         val preview = remember(d, selected) { ProductListModel.previewDelete(d.products, selected) { ShopStore.soldQty(d, it) } }
         BulkConfirmDialog(
-          title = "حذفِ ${plain(preview.size)} کالا",
-          confirmLabel = "حذف کن",
+          title = ir.vil3ntec.tohid.core.i18n.StrProductPages.deleteN(plain(preview.size)),
+          confirmLabel = ir.vil3ntec.tohid.core.i18n.StrProductPages.deleteIt,
           rows = preview,
           destructive = true,
-          note = "کالاها و سوابقِ ورودِ انبارشان حذف می‌شوند و برگشت ندارد. فاکتورهای قبلی می‌مانند. دلیل در سابقهٔ عملیات ثبت می‌شود.",
+          note = ir.vil3ntec.tohid.core.i18n.StrProductPages.deleteNote,
           warnings = warnings,
           onDismiss = { confirm = null },
           onConfirm = { reason ->
@@ -388,7 +388,7 @@ fun DeskProductsScreen(
               selected = emptySet()
               if (openId in ids) openId = null
             }
-            results = "نتیجهٔ حذف" to ProductListModel.resultDelete(preview, error)
+            results = ir.vil3ntec.tohid.core.i18n.StrProductPages.deleteResult to ProductListModel.resultDelete(preview, error)
             confirm = null
           },
         )
@@ -404,23 +404,23 @@ fun DeskProductsScreen(
     val names = remember(d) { d.products.associate { it.id to it.name } }
     val hidden = Selection.hiddenCount(selected, rows.map { it.id })
     BulkConfirmDialog(
-      title = "حدِ موجودیِ ${plain(plan.size)} کالا",
-      confirmLabel = "ذخیره کن",
+      title = ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsN(plain(plan.size)),
+      confirmLabel = ir.vil3ntec.tohid.core.i18n.StrProductPages.saveIt,
       rows = plan.map { BulkPreviewRow(it.id, names[it.id].orEmpty(), changes = it.changes, note = levelsNote(it)) },
-      note = "ترتیبِ درست: حد کم بودن ≤ نقطهٔ سفارش < بیشینه. کالایی که با این عددها جور نیست عوض نمی‌شود. برگشت‌پذیر است.",
-      warnings = if (hidden > 0) listOf("${plain(hidden)} مورد از انتخاب‌ها در فیلترِ فعلی دیده نمی‌شوند ولی در این کار هستند.") else emptyList(),
+      note = ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsNote,
+      warnings = if (hidden > 0) listOf(ir.vil3ntec.tohid.core.i18n.StrProductPages.hiddenSelected(plain(hidden))) else emptyList(),
       onDismiss = { levelsPatch = null },
       onConfirm = { _ ->
         val r = WarehouseEngine.bulkLevels(d, selected, patch, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
         val error = (r as? WarehouseEngine.Result.Failed)?.message
         if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(r.data) }; selected = emptySet() }
-        results = "نتیجهٔ حدِ موجودی" to plan.map { p ->
+        results = ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsResult to plan.map { p ->
           val label = names[p.id].orEmpty()
           when {
             !p.ok -> BulkRowResult(p.id, label, ok = false, note = p.problems.joinToString("، ") { it.fa })
             error != null && p.changes -> BulkRowResult(p.id, label, ok = false, note = error)
-            p.changes -> BulkRowResult(p.id, label, ok = true, note = "ذخیره شد — ${levelsNote(p)}")
-            else -> BulkRowResult(p.id, label, ok = true, note = "بی‌تغییر — از قبل همین است")
+            p.changes -> BulkRowResult(p.id, label, ok = true, note = ir.vil3ntec.tohid.core.i18n.StrProductPages.savedNote(levelsNote(p)))
+            else -> BulkRowResult(p.id, label, ok = true, note = ir.vil3ntec.tohid.core.i18n.StrProductPages.unchangedAlready)
           }
         }
         levelsPatch = null
@@ -435,11 +435,11 @@ private fun levelsNote(p: StockLevelRules.Planned): String {
   if (!p.ok) return p.problems.joinToString("، ") { it.fa }
   fun t(m: Long?) = m?.let { qty(it / 1000.0) } ?: "—"
   val parts = buildList {
-    if (p.before.minMilli != p.after.minMilli) add("حد کم بودن ${t(p.before.minMilli)} ⇐ ${t(p.after.minMilli)}")
-    if (p.before.reorderMilli != p.after.reorderMilli) add("نقطهٔ سفارش ${t(p.before.reorderMilli)} ⇐ ${t(p.after.reorderMilli)}")
-    if (p.before.maxMilli != p.after.maxMilli) add("بیشینه ${t(p.before.maxMilli)} ⇐ ${t(p.after.maxMilli)}")
+    if (p.before.minMilli != p.after.minMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.minChange(t(p.before.minMilli), t(p.after.minMilli)))
+    if (p.before.reorderMilli != p.after.reorderMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderChange(t(p.before.reorderMilli), t(p.after.reorderMilli)))
+    if (p.before.maxMilli != p.after.maxMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.maxChange(t(p.before.maxMilli), t(p.after.maxMilli)))
   }
-  return if (parts.isEmpty()) "از قبل همین است" else parts.joinToString("، ")
+  return if (parts.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrProductPages.alreadySo else parts.joinToString("، ")
 }
 
 /**
@@ -463,10 +463,10 @@ private fun LevelsInputDialog(count: Int, onDismiss: () -> Unit, onNext: (StockL
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
-    title = { Text("حدِ موجودی برای ${plain(count)} کالا", color = Shop.colors.text) },
+    title = { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsFor(plain(count)), color = Shop.colors.text) },
     text = {
       Column(Modifier.widthIn(min = 340.dp, max = 480.dp)) {
-        Text("کادرِ خالی دست نمی‌خورد. مقدار به واحدِ خودِ هر کالا است.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.emptyUntouched, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         Spacer(Modifier.height(8.dp))
         @Composable fun Line(v: String, set: (String) -> Unit, label: String, clear: Boolean, setClear: (Boolean) -> Unit) {
           Row(verticalAlignment = Alignment.CenterVertically) {
@@ -476,18 +476,18 @@ private fun LevelsInputDialog(count: Int, onDismiss: () -> Unit, onNext: (StockL
             )
             Spacer(Modifier.width(6.dp))
             Checkbox(checked = clear, onCheckedChange = setClear)
-            Text("پاک شود", style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
+            Text(ir.vil3ntec.tohid.core.i18n.StrSale.clearIt, style = MaterialTheme.typography.bodySmall, color = Shop.colors.text)
           }
           Spacer(Modifier.height(6.dp))
         }
-        Line(min, { min = it }, "حد کم بودن", clearMin) { clearMin = it }
-        Line(reorder, { reorder = it }, "نقطهٔ سفارش", clearReorder) { clearReorder = it }
-        Line(max, { max = it }, "بیشینهٔ موجودی", clearMax) { clearMax = it }
-        if (bad) Text("عدد درست نیست", style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
+        Line(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrStock.minStock, clearMin) { clearMin = it }
+        Line(reorder, { reorder = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderPoint, clearReorder) { clearReorder = it }
+        Line(max, { max = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.maxStock, clearMax) { clearMax = it }
+        if (bad) Text(ir.vil3ntec.tohid.core.i18n.StrSale.badNumberShort, style = MaterialTheme.typography.bodySmall, color = Shop.colors.danger)
       }
     },
-    confirmButton = { Button(onClick = { onNext(patch) }, enabled = !bad && !patch.isNoop) { Text("پیش‌نمایش") } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    confirmButton = { Button(onClick = { onNext(patch) }, enabled = !bad && !patch.isNoop) { Text(ir.vil3ntec.tohid.core.i18n.StrDevicePages.preview) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
   )
 }
 
@@ -509,10 +509,10 @@ object DeskProductsShot {
 }
 
 private fun pill(s: ProductListModel.Status): Pair<String, PillTone> = when (s) {
-  ProductListModel.Status.ACTIVE -> "فعال" to PillTone.SUCCESS
-  ProductListModel.Status.LOW -> "کم‌موجود" to PillTone.WARNING
-  ProductListModel.Status.OUT -> "ناموجود" to PillTone.DANGER
-  ProductListModel.Status.INACTIVE -> "غیرفعال" to PillTone.NEUTRAL
+  ProductListModel.Status.ACTIVE -> ir.vil3ntec.tohid.core.i18n.StrSettings.active to PillTone.SUCCESS
+  ProductListModel.Status.LOW -> ir.vil3ntec.tohid.core.i18n.Str.lowStock to PillTone.WARNING
+  ProductListModel.Status.OUT -> ir.vil3ntec.tohid.core.i18n.Str.outOfStock to PillTone.DANGER
+  ProductListModel.Status.INACTIVE -> ir.vil3ntec.tohid.core.i18n.StrProducts.filterInactive to PillTone.NEUTRAL
 }
 
 /** نمای جدولی — ستون‌ها مرتب‌شدنی، فهرستِ تنبل (فقط ردیف‌های دیده‌شده کشیده می‌شوند) */
@@ -543,7 +543,7 @@ private fun ProductTable(
           else -> ToggleableState.Off
         },
         onClick = onToggleAll,
-        modifier = Modifier.semantics { contentDescription = "انتخابِ همهٔ ردیف‌های دیده‌شده" },
+        modifier = Modifier.semantics { contentDescription = ir.vil3ntec.tohid.core.i18n.StrProductPages.selectAllVisible },
       )
       @Composable fun H(title: String, s: ProductListModel.Sort, mod: Modifier, end: Boolean = false) {
         Text(
@@ -554,16 +554,16 @@ private fun ProductTable(
         )
       }
       Row(Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-        H("نام", ProductListModel.Sort.NAME, Modifier)
-        H("/ دسته", ProductListModel.Sort.CATEGORY, Modifier)
+        H(ir.vil3ntec.tohid.core.i18n.StrGrid.name, ProductListModel.Sort.NAME, Modifier)
+        H(ir.vil3ntec.tohid.core.i18n.StrProductPages.slashCategory, ProductListModel.Sort.CATEGORY, Modifier)
       }
       //  ستونِ نام اولویت دارد (بازبینیِ ۱۴۰۵/۰۷/۲۷: نامِ بلند با «…» بریده می‌شد و بارکد جا داشت)
-      H("بارکد · تاریخ", ProductListModel.Sort.CODE, Modifier.width(COL_CODE))
-      H("خرید (؋)", ProductListModel.Sort.BUY, Modifier.width(COL_PRICE), end = true)
-      H("فروش (؋)", ProductListModel.Sort.SELL, Modifier.width(COL_PRICE), end = true)
-      H("موجودی", ProductListModel.Sort.STOCK, Modifier.width(COL_STOCK), end = true)
+      H(ir.vil3ntec.tohid.core.i18n.StrProductPages.barcodeDate, ProductListModel.Sort.CODE, Modifier.width(COL_CODE))
+      H(ir.vil3ntec.tohid.core.i18n.StrProductPages.buyAfn, ProductListModel.Sort.BUY, Modifier.width(COL_PRICE), end = true)
+      H(ir.vil3ntec.tohid.core.i18n.StrProductPages.sellAfn, ProductListModel.Sort.SELL, Modifier.width(COL_PRICE), end = true)
+      H(ir.vil3ntec.tohid.core.i18n.StrSale.stock, ProductListModel.Sort.STOCK, Modifier.width(COL_STOCK), end = true)
       Spacer(Modifier.width(12.dp))
-      H("وضعیت", ProductListModel.Sort.STATUS, Modifier.width(COL_STATUS))
+      H(ir.vil3ntec.tohid.core.i18n.StrMoney.status, ProductListModel.Sort.STATUS, Modifier.width(COL_STATUS))
     }
     LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(bottom = bottomSpace)) {
       itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
@@ -587,14 +587,14 @@ private fun ProductTable(
         ) {
           Checkbox(
             checked = isSel, onCheckedChange = { onToggle(p.id) },
-            modifier = Modifier.semantics { contentDescription = "انتخابِ ${p.name}" },
+            modifier = Modifier.semantics { contentDescription = ir.vil3ntec.tohid.core.i18n.StrProductPages.selectName(p.name) },
           )
           Box(Modifier.size(36.dp), contentAlignment = Alignment.Center) { ProductThumb(p.id, p.name, 36.dp, photos, tintKey = p.category) }
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
             //  نام تا دو خط می‌شکند، بریده نمی‌شود
             Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
-            Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = c.muted)
+            Text(p.category.ifBlank { ir.vil3ntec.tohid.core.i18n.StrSale.uncategorized }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
           Column(Modifier.width(COL_CODE).padding(horizontal = 4.dp)) {
             Text(p.barcodes.firstOrNull().orEmpty().ifEmpty { "—" }, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall, color = c.text)
@@ -654,7 +654,7 @@ private fun ProductGrid(
         Row(verticalAlignment = Alignment.CenterVertically) {
           Checkbox(
             checked = isSel, onCheckedChange = { onToggle(p.id) },
-            modifier = Modifier.semantics { contentDescription = "انتخابِ ${p.name}" },
+            modifier = Modifier.semantics { contentDescription = ir.vil3ntec.tohid.core.i18n.StrProductPages.selectName(p.name) },
           )
           Spacer(Modifier.weight(1f))
           val (t, tone) = pill(ProductListModel.status(p, stock))
@@ -666,7 +666,7 @@ private fun ProductGrid(
           Spacer(Modifier.width(10.dp))
           Column(Modifier.weight(1f)) {
             Text(p.name, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold, color = c.text)
-            Text(p.category.ifBlank { "بی‌دسته" }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
+            Text(p.category.ifBlank { ir.vil3ntec.tohid.core.i18n.StrSale.uncategorized }, maxLines = 1, style = MaterialTheme.typography.labelSmall, color = c.muted)
           }
         }
         Spacer(Modifier.height(6.dp))
@@ -674,7 +674,7 @@ private fun ProductGrid(
           Text("${money(p.salePrice)} ؋", Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text, maxLines = 1)
           Text("${qty(stock)} ${p.unit}", style = MaterialTheme.typography.bodySmall, color = c.text, maxLines = 1)
         }
-        Text("خرید: ${money(p.purchasePrice)} ؋", style = MaterialTheme.typography.labelSmall, color = c.muted, maxLines = 1)
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.buyPrice(money(p.purchasePrice)), style = MaterialTheme.typography.labelSmall, color = c.muted, maxLines = 1)
       }
     }
   }
@@ -737,7 +737,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
   var name by remember { mutableStateOf("") }
   var barcode by remember { mutableStateOf("") }
   var category by remember { mutableStateOf("") }
-  var unit by remember { mutableStateOf("دانه") }
+  var unit by remember { mutableStateOf("دانه") } // داده: واحدِ پیش‌فرضِ کالای تازه (داده)
   var buy by remember { mutableStateOf("") }
   var sell by remember { mutableStateOf("") }
   var count by remember { mutableStateOf("") }
@@ -757,7 +757,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
     val similar = similarIndex?.find(name).orEmpty()
     if (similar.isNotEmpty() && warnedFor != name.trim()) {
       warnedFor = name.trim()
-      toast("نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" } + " — اگر کالای دیگری است، دوباره Enter بزنید")
+      toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.similarName + similar.joinToString("، ") { "«${it.name}»" } + ir.vil3ntec.tohid.core.i18n.StrProductPages.enterAgain)
       return
     }
     val draft = WarehouseEngine.ProductDraft(
@@ -780,7 +780,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
           if (e is WarehouseEngine.Result.Ok) next = e.data else if (e is WarehouseEngine.Result.Failed) toast(e.message)
         }
         scope.launch { store.save(next) }
-        toast("«${name.trim()}» ثبت شد")
+        toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameRecorded(name.trim()))
         //  دسته و واحد برای کالای بعدی می‌مانند — معمولاً چند کالای یک دسته پشتِ هم ثبت می‌شوند
         name = ""; barcode = ""; buy = ""; sell = ""; count = ""
         runCatching { nameFocus.requestFocus() }
@@ -795,21 +795,21 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
     modifier = Modifier.fillMaxWidth().padding(2.dp).softCard(Shop.colors, Shape.card),
   ) {
     Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
-      QuickField(name, { name = it }, "کالای تازه", Modifier.weight(1f).focusRequester(nameFocus), ::save)
+      QuickField(name, { name = it }, ir.vil3ntec.tohid.core.i18n.StrHome.newItem, Modifier.weight(1f).focusRequester(nameFocus), ::save)
       Spacer(Modifier.width(6.dp))
-      QuickField(barcode, { barcode = it }, if (tools) "بارکدها (،)" else "بارکد", Modifier.width(150.dp), ::save)
+      QuickField(barcode, { barcode = it }, if (tools) ir.vil3ntec.tohid.core.i18n.StrProductPages.barcodesComma else ir.vil3ntec.tohid.core.i18n.StrGrid.barcode, Modifier.width(150.dp), ::save)
       Spacer(Modifier.width(6.dp))
-      QuickField(category, { category = it }, "دسته", Modifier.width(120.dp), ::save)
+      QuickField(category, { category = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.category, Modifier.width(120.dp), ::save)
       Spacer(Modifier.width(6.dp))
-      QuickField(unit, { unit = it }, "واحد", Modifier.width(80.dp), ::save)
+      QuickField(unit, { unit = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.unit, Modifier.width(80.dp), ::save)
       Spacer(Modifier.width(6.dp))
-      QuickField(buy, { buy = it }, "خرید", Modifier.width(95.dp), ::save, numeric = true)
+      QuickField(buy, { buy = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.buyShort, Modifier.width(95.dp), ::save, numeric = true)
       Spacer(Modifier.width(6.dp))
-      QuickField(sell, { sell = it }, "فروش", Modifier.width(95.dp), ::save, numeric = true)
+      QuickField(sell, { sell = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.sellShort, Modifier.width(95.dp), ::save, numeric = true)
       Spacer(Modifier.width(6.dp))
-      QuickField(count, { count = it }, "موجودی", Modifier.width(90.dp), ::save, numeric = true)
+      QuickField(count, { count = it }, ir.vil3ntec.tohid.core.i18n.StrSale.stock, Modifier.width(90.dp), ::save, numeric = true)
       Spacer(Modifier.width(6.dp))
-      Button(onClick = ::save, enabled = name.isNotBlank()) { Text("ثبت ↵") }
+      Button(onClick = ::save, enabled = name.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.saveKey) }
     }
   }
 }
@@ -878,7 +878,7 @@ private fun EditPanel(
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
-      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(r.data) }; toast("«${name.trim()}» ذخیره شد") }
+      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(r.data) }; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameSaved(name.trim())) }
     }
   }
 
@@ -901,10 +901,10 @@ private fun EditPanel(
   ) {
     Column(Modifier.padding(14.dp).verticalScroll(rememberScrollState())) {
       Row(verticalAlignment = Alignment.CenterVertically) {
-        Text("ویرایشِ کالا", Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
-        TextButton(onClick = onClose) { Text("بستن Esc") }
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.editItem, Modifier.weight(1f), style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+        TextButton(onClick = onClose) { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.closeEsc) }
       }
-      Text("موجودی: ${qty(stock)} ${p.unit}", style = MaterialTheme.typography.bodySmall, color = if (stock <= p.minStock) Shop.colors.danger else Shop.colors.muted)
+      Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.stockIs(qty(stock), p.unit), style = MaterialTheme.typography.bodySmall, color = if (stock <= p.minStock) Shop.colors.danger else Shop.colors.muted)
       Spacer(Modifier.height(10.dp))
       @Composable fun F(v: String, set: (String) -> Unit, label: String, numeric: Boolean = false) {
         OutlinedTextField(
@@ -913,56 +913,56 @@ private fun EditPanel(
         )
         Spacer(Modifier.height(6.dp))
       }
-      F(name, { name = it }, "نام")
+      F(name, { name = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.name)
       if (similar.isNotEmpty()) {
         Text(
-          "نامِ مشابه در دکان: " + similar.joinToString("، ") { "«${it.name}»" },
+          ir.vil3ntec.tohid.core.i18n.StrProductPages.similarName + similar.joinToString("، ") { "«${it.name}»" },
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning,
         )
         Spacer(Modifier.height(6.dp))
       }
-      F(barcode, { barcode = it }, if (tools) "بارکدها (با «،» جدا)" else "بارکد")
-      F(category, { category = it }, "دسته")
+      F(barcode, { barcode = it }, if (tools) ir.vil3ntec.tohid.core.i18n.StrProductPages.barcodesSep else ir.vil3ntec.tohid.core.i18n.StrGrid.barcode)
+      F(category, { category = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.category)
       if (tools) {
-        F(brand, { brand = it }, "برند")
-        F(tags, { tags = it }, "برچسب‌ها (با «،» جدا)")
+        F(brand, { brand = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.brand)
+        F(tags, { tags = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.tagsSep)
       }
-      F(unit, { unit = it }, "واحد")
+      F(unit, { unit = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.unit)
       if (tools) {
         PackEditor(packs, unit) { packs = it }
         Spacer(Modifier.height(6.dp))
       }
       Row {
-        Box(Modifier.weight(1f)) { F(buy, { buy = it }, "قیمتِ خرید", true) }
+        Box(Modifier.weight(1f)) { F(buy, { buy = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.buy, true) }
         Spacer(Modifier.width(6.dp))
-        Box(Modifier.weight(1f)) { F(sell, { sell = it }, "قیمتِ فروش", true) }
+        Box(Modifier.weight(1f)) { F(sell, { sell = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.sell, true) }
       }
       if (tools && (buy != qty(p.purchasePrice) || sell != qty(p.salePrice))) {
-        F(priceReason, { priceReason = it }, "دلیلِ تغییرِ قیمت (با نامِ شما در سابقه)")
+        F(priceReason, { priceReason = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.priceReason)
       }
-      F(min, { min = it }, "حدِ هشدارِ موجودی", true)
+      F(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.alertLevel, true)
       if (levelsOn) {
         Row {
-          Box(Modifier.weight(1f)) { F(reorder, { reorder = it }, "نقطهٔ سفارش", true) }
+          Box(Modifier.weight(1f)) { F(reorder, { reorder = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderPoint, true) }
           Spacer(Modifier.width(6.dp))
-          Box(Modifier.weight(1f)) { F(maxStock, { maxStock = it }, "بیشینهٔ موجودی", true) }
+          Box(Modifier.weight(1f)) { F(maxStock, { maxStock = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.maxStock, true) }
         }
       }
       Row(verticalAlignment = Alignment.CenterVertically) {
         Checkbox(checked = active, onCheckedChange = { active = it })
-        Text("فعال (در فروش دیده می‌شود)", style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+        Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.activeSeen, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
       }
       if (infoOn) {
         Spacer(Modifier.height(8.dp))
         ir.vil3ntec.tohid.ui.components.product.ProductInfoFields(info, d, p.id) { info = it }
       }
       Spacer(Modifier.height(10.dp))
-      Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text("ذخیره  (Enter / Ctrl+S)") }
+      Button(onClick = { save(); focus.clearFocus() }, modifier = Modifier.fillMaxWidth()) { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.saveKeys) }
       Spacer(Modifier.height(6.dp))
       Row {
-        OutlinedButton(onClick = onWarehouse, modifier = Modifier.weight(1f)) { Text("ورودِ انبار") }
+        OutlinedButton(onClick = onWarehouse, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.stockIn) }
         Spacer(Modifier.width(6.dp))
-        OutlinedButton(onClick = onDetail, modifier = Modifier.weight(1f)) { Text("جزئیات و عکس") }
+        OutlinedButton(onClick = onDetail, modifier = Modifier.weight(1f)) { Text(ir.vil3ntec.tohid.core.i18n.StrProductPages.detailsPhoto) }
       }
     }
   }

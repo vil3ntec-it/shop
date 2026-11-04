@@ -921,8 +921,7 @@ router.post('/refresh', sessionLimit, async (req, res, next) => {
 router.post('/logout', sessionLimit, async (req, res) => {
   const refresh = String(req.body?.refreshToken || req.body?.refresh_token || '');
   const access = (req.headers.authorization || '').replace(/^Bearer\s+/i, '').trim();
-  if (refresh) await tokens.revoke(refresh, 'refresh');
-  if (access) await tokens.revoke(access, 'access');
+  await require('../lib/push').endSession(tokens, { access, refresh });   // + پوشِ همین دستگاه (O-01)
   res.json({ ok: true });
 });
 
@@ -936,6 +935,7 @@ router.post('/logout', sessionLimit, async (req, res) => {
 router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req, res) => {
   const app = req.appSection || 'shop';
   const n = await tokens.revokeAllForSubject(req.user.id, null, app);
+  await require('../lib/push').revokeUser(req.user.id, app, 'logout_all');
   await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
   res.json({ ok: true, sessions: n, app });
 });

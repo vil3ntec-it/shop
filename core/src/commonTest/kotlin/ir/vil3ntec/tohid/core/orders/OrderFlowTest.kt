@@ -65,6 +65,24 @@ class OrderFlowTest {
   }
 
   @Test
+  fun rejectedOrWithdrawnOrdersHaveNoButton() {
+    for (s in listOf("rejected", "auto_rejected", "cancelled_by_customer")) {
+      assertNull(OrderFlow.plan(s, "delivery", "unpaid", isTest = false, invoiced = false, pack = pack), s)
+      assertNull(OrderFlow.plan(s, "pickup", "unpaid", isTest = false, invoiced = false, pack = null), s)
+    }
+  }
+
+  @Test
+  fun warnsWhenACashInvoiceWouldCloseTheCustomersChoice() {
+    val delivery = OrderFlow.plan("accepted", "delivery", "unpaid", isTest = false, invoiced = false, pack = pack)!!
+    assertTrue(OrderFlow.closesOnlineChoice("awaiting_choice", delivery), "فاکتورِ نقدیِ پیش از انتخابِ مشتری")
+    assertFalse(OrderFlow.closesOnlineChoice("cash", delivery), "مشتری خودش نقد را برگزید")
+    assertFalse(OrderFlow.closesOnlineChoice("", delivery), "«پرداخت پس از پذیرش» خاموش")
+    val counter = OrderFlow.plan("accepted", "pickup", "unpaid", isTest = false, invoiced = false, pack = pack)!!
+    assertFalse(OrderFlow.closesOnlineChoice("awaiting_choice", counter), "دریافت از دکان: مشتری سرِ پیشخوان می‌پردازد")
+  }
+
+  @Test
   fun fixCodesFromServer() {
     assertEquals(OrderFlow.Fix.SUPPORT, OrderFlow.fixOf("support"))
     assertEquals(OrderFlow.Fix.SUBSCRIBE, OrderFlow.fixOf("subscribe"))
