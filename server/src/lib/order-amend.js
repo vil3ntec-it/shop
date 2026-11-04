@@ -211,6 +211,7 @@ async function applyIn(c, shopId, row, p, at) {
       WHERE shop_id=$1 AND id=$2`,
     [shopId, row.id, p.subtotalMinor, p.totalMinor, p.itemsCount, at]
   );
+  await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
 }
 
 const amounts = (p) => ({
