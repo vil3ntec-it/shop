@@ -7,17 +7,22 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.NewReleases
+import androidx.compose.material.icons.outlined.PrivacyTip
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.core.account.AccountDeletion
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.SettingsLayout
 import ir.vil3ntec.tohid.ui.screens.openWhatsNew
@@ -53,7 +58,7 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
         Text(StrSettings.aboutText, style = V3Type.footnote, color = c.inkMuted, textAlign = TextAlign.Center)
       }
     }
-    if (BuildConfig.STORE != "bazaar") {
+    if (!StoreChannel.storeManaged(BuildConfig.STORE)) {
       item(key = "update") {
         V3Section(StrNav.appUpdate, padding = PaddingValues(16.dp)) { UpdateCard(rememberUpdateRepo()) }
       }
@@ -63,6 +68,16 @@ internal fun AboutScreen(data: ShopData, onBack: (() -> Unit)?) {
       val nav = LocalV3Nav.current
       V3Section(StrSettings.whatsNew) {
         V3ListRow(StrSettings.whatsNewAll, icon = Icons.Outlined.NewReleases, hue = V3Hue.BRAND, onClick = { openWhatsNew(nav) })
+      }
+    }
+    //  قاعدهٔ Google Play: صفحهٔ حریمِ خصوصی در خودِ برنامه، برای همه (مهمان و کارمند هم)
+    item(key = "privacy") {
+      val uri = LocalUriHandler.current
+      V3Section(StrAccount.privacyPolicy) {
+        V3ListRow(
+          StrAccount.privacyPolicy, subtitle = StrAccount.privacyLine, icon = Icons.Outlined.PrivacyTip, hue = V3Hue.BRAND,
+          onClick = { runCatching { uri.openUri(AccountDeletion.PRIVACY_URL) } },
+        )
       }
     }
     item(key = "status") {

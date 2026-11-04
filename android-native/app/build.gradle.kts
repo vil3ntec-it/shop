@@ -8,6 +8,17 @@ plugins {
   id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+/*
+ *  پوشِ گوشی با Firebase (FCM) — تصمیمِ O-01، راهنمای صاحب‌کار: `docs/FIREBASE-SETUP-fa.md`.
+ *
+ *  ⛔ افزونهٔ google-services **فقط** وقتی `app/google-services.json` کنارِ همین فایل است اعمال می‌شود. آن فایل هرگز
+ *  در مخزن نیست (`.gitignore`): CI آن را از secret ِ `GOOGLE_SERVICES_JSON` می‌نویسد و بی آن secret، و هر ساختِ
+ *  محلی، همان برنامهٔ بی‌پوش ساخته می‌شود (`BuildConfig.FCM_BUNDLED = false` ⇒ هیچ کدِ Firebase صدا زده نمی‌شود).
+ *  فایل باید هر دو بسته را داشته باشد: `ir.vil3ntec.tohid` و `ir.vil3ntec.tohid.preview` (نسخهٔ پیش‌نمایش).
+ */
+val googleServices = file("google-services.json").isFile
+if (googleServices) apply(plugin = "com.google.gms.google-services")
+
 android {
   namespace = "ir.vil3ntec.tohid"
   compileSdk = 35
@@ -25,7 +36,8 @@ android {
   val buildNumber = (project.findProperty("buildNumber") as String?)?.toIntOrNull() ?: 0
 
   /*
-   *  کدام فروشگاه — `-Pstore=bazaar` نسخهٔ کافه‌بازار را می‌سازد.
+   *  کدام فروشگاه — `-Pstore=bazaar` نسخهٔ کافه‌بازار را می‌سازد و `-Pstore=play` نسخهٔ Google Play را
+   *  (همان قاعده‌های بازار، به‌اضافهٔ targetSdk ِ لازمِ Play؛ پایین‌تر). چک‌لیست: `docs/GOOGLE-PLAY-fa.md`.
    *
    *  ⛔ قانونِ بازار: «برنامه‌ای که از بازار گرفته شده فقط از بازار به‌روز
    *  می‌شود» و لینکِ پرداختِ بیرونی ممنوع است. پس نسخهٔ بازار:
@@ -36,7 +48,17 @@ android {
    *  بی این پرچم ⇒ «direct»: همان APKِ سایت و گیت‌هاب، مثلِ همیشه.
    */
   val store = (project.findProperty("store") as String?)?.trim()?.ifBlank { null } ?: "direct"
-  if (store == "bazaar") {
+  //  همان `StoreChannel.storeManaged` ِ core: فروشگاهی که به‌روزرسانی و پرداخت را خودش می‌گرداند
+  val storeManaged = store == "bazaar" || store == "play"
+  /*
+   *  ⛔ Google Play: از ۳۱ اوت ۲۰۲۶ هر برنامهٔ تازه و هر به‌روزرسانی باید Android 16 (API 36) را هدف بگیرد
+   *  (developer.android.com/google/play/requirements/target-sdk). فقط نسخهٔ Play بالا می‌رود تا APK ِ سایت و
+   *  بازار — که روی گوشیِ دکان‌ها نصب است — بیت‌به‌بیت همان بماند؛ رفتارِ برگشتِ پیش‌نمای اندروید ۱۶ همان
+   *  است که نسخهٔ پیش‌نمایش از پیش دارد (`src/preview/AndroidManifest.xml`).
+   */
+  val playTargetSdk = 36
+  if (store == "play") compileSdk = playTargetSdk
+  if (storeManaged) {
     val source = file("src/main/AndroidManifest.xml")
     val stripped = layout.buildDirectory.file("store-manifest/AndroidManifest.xml").get().asFile
     stripped.parentFile.mkdirs()
@@ -126,11 +148,15 @@ android {
     applicationId = "ir.vil3ntec.tohid"
     minSdk = 24
     targetSdk = 35
+    //  نسخهٔ Play یک پله بالاتر (`playTargetSdk` بالا)؛ `LocalNetworkManifestTest` هر دو را با مانیفست می‌سنجد
+    if (store == "play") targetSdk = playTargetSdk
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
     buildConfigField("String", "STORE", "\"$store\"")
     //  نسخهٔ پیش‌نمایش (buildTypeِ `preview` در پایین) — در debug و release همیشه false
     buildConfigField("boolean", "PREVIEW", "false")
+    //  O-01: این ساخت کلیدِ Firebase دارد؟ (بالا: `google-services.json`)
+    buildConfigField("boolean", "FCM_BUNDLED", "$googleServices")
 
     /*
      *  نشانیِ سرور، در زمانِ ساخت — نه در رابط کاربری.
@@ -333,6 +359,9 @@ dependencies {
 
   //  منطقِ خالصِ مشترک با کامپیوتر — buildِ `../core` (includeBuild در settings.gradle.kts)
   implementation("ir.vil3ntec.tohid:core:1.0")
+  //  پوشِ گوشی (FCM، O-01) — بی `google-services.json` کامپایل می‌شود ولی هرگز راه نمی‌افتد (`FcmPushAndroid`)
+  implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+  implementation("com.google.firebase:firebase-messaging")
 
   implementation("androidx.core:core-ktx:1.15.0")
   implementation("androidx.activity:activity-compose:1.9.3")

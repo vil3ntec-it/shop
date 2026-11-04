@@ -1,13 +1,13 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
+
 /*
  *  HW-12 — بخشِ تنظیماتِ «راه‌اندازیِ آسانِ دستگاه‌ها» (همین دستگاه، پیش‌فرض خاموش). 
  *  کارِ اصلی در «دستگاه‌ها» است (`EasySetupAndroid.kt`).
  */
 
-const val EASY_SETUP_TITLE = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)"
+const val EASY_SETUP_TITLE = "راه‌اندازیِ آسانِ چاپگر و بارکدخوان (آزمایشی)" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrSettingsPages.titleEasySetup`
 
 /** توضیحِ بخش — یکی برای رابطِ امروز و صفحهٔ نسخهٔ ۳ (`settings/devices/easy-setup`) */
-const val EASY_SETUP_NOTE =
-  "در «دستگاه‌ها»: پیدا کردنِ خودکارِ چاپگرِ شبکه (فقط زیرشبکهٔ همین وای‌فای/LAN، درگاهِ ۹۱۰۰) و بلوتوثِ نزدیک، " +
-  "چاپِ شناسایی، برگهٔ بارکدِ آزمون و «آزمونِ بارکدخوان» که پیشوند و پسوندِ بارکدخوان را خودش پیدا می‌کند."
+val EASY_SETUP_NOTE: String get() = StrSettingsPages.easySetupNote

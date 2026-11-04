@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.core.i18n
 
 import ir.vil3ntec.tohid.core.text.DariText
 import org.junit.After
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
@@ -19,6 +21,13 @@ import java.lang.reflect.Modifier
  *     در فهرستِ زیر می‌ماند؛ نوشتهٔ تازهٔ صفحه ⇒ جدولِ `Str*` با `t(…)`.
  *
  *  اندازهٔ هر صفحه (پوشه) هم چاپ می‌شود: `dari-screen <پوشه> <کلید> <دری‌شده> <٪>`.
+ *
+ *  3. **دورِ ۲** (همان گله): همهٔ `ui/components`، صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند و متنشان به جدول رفت
+ *     ([movedScreens])، و یاورهای پیام ([movedHelpers]) هیچ متنِ خامی ندارند؛ سطری که داده است (یادداشتِ سابقه، کلیدِ
+ *     تنظیمات، برگهٔ خروجی) با «// داده: دلیل» نشان داده می‌شود. متنِ خامِ باقی‌ماندهٔ `ui/screens` سقفِ چرخ‌دنده‌ای دارد
+ *     ([maxRawOldScreens]) و خطای ورودیِ صفِ پیک (`CourierQueue` ِ هسته) از جدول می‌گذرد.
+ *  4. **دورِ ۳**: دفترِ مشتری و کالا و خریدِ کامپیوتر، دفترِ موجودی، چاپگر و ترازو، سفارش و فاکتورِ خرید، تخفیف‌ها، حساب‌پیِ
+ *     دکان و گزارشِ تازه ([movedScreens3]) هم متنِ خام ندارند؛ سقفِ `ui/screens` پایین‌تر آمد.
  */
 class DariCoverageTest {
 
@@ -37,8 +46,8 @@ class DariCoverageTest {
     StrSettingsHome, // خانهٔ تنظیمات
   )
 
-  /** کفِ پوشش (٪) — اندازهٔ همین کار؛ فقط بالا برود */
-  private val minCorePercent = 15
+  /** کفِ پوشش (٪) — دورِ ۱: ۱۵، دورِ ۲: ۱۶ (اندازه ۱۶٫۵٪)؛ فقط بالا برود */
+  private val minCorePercent = 16
 
   private class Row(val table: String, val key: String, val fa: String, val dari: String)
 
@@ -189,5 +198,175 @@ class DariCoverageTest {
     I18n.source = { Lang.FA }
     assertTrue(StrPos.pinWrong(3).contains("تلاش مانده"))
     assertTrue(DariText.PHRASES.keys.none { it.contains(DariText.OPEN) || it.contains(DariText.CLOSE) })
+  }
+
+  /* ---------- دورِ ۲: جزءهای `ui/components`، صفحه‌های قدیمیِ `ui/screens` و یاورهای پیام ---------- */
+
+  /** پرونده‌های `ui/screens` که همهٔ نوشتهٔ صفحه‌شان در جدول است (دورِ ۲)؛ متنِ خام فقط در سطرِ «// داده:» */
+  private val movedScreens = listOf(
+    "DayEndPanel.kt", "DebtBookUi.kt", "DebtorListModel.kt", "DeliveryAddressFix.kt", "DeliveryCashReport.kt", "DeskInvoices.kt",
+    "DeskSale.kt", "EasySetupSettingsAndroid.kt", "HandoverQr.kt", "HesabPayAccountAndroid.kt", "OrderDeliveryPrefsUi.kt",
+    "OrderRefundUi.kt", "OrderSubstitutionUi.kt", "PickSheet.kt", "ReturnsV2.kt", "SaleDialogs.kt", "SalesHistory.kt",
+    "ShiftV2.kt", "SmartInsightsAndroid.kt", "StatementImageButton.kt", "TillGoodsSettingsAndroid.kt", "TillReceiveDialog.kt",
+    "TillReceivePhoneAndroid.kt", "Tohid.kt",
+  )
+
+  /** یاورهای بی صفحه که پیامِ صفحه می‌سازند (پیش‌تر متنِ خام) */
+  private val movedHelpers = listOf(
+    "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
+  )
+
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲ */
+  private val maxRawOldScreens = 2602
+
+  /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
+  private val minMovedPercent = 14
+
+  private fun movedFiles(): List<File> =
+    app.resolve("ui/components").walkTopDown().filter { it.isFile && it.extension == "kt" }.toList() +
+      movedScreens.map { app.resolve("ui/screens/$it") } + movedHelpers.map { app.resolve(it) }
+
+  /** متنِ فارسیِ خامِ یک پرونده؛ سطرِ «// داده:» (دادهٔ ذخیره‌شده، کلید یا خروجی) شمرده نمی‌شود */
+  private fun raw(f: File): List<String> {
+    val text = f.readLines().filterNot { it.contains("// داده") }
+      .filterNot { it.trimStart().let { t -> t.startsWith("//") || t.startsWith("*") || t.startsWith("/*") } }
+      .joinToString("\n") { it.replace(Regex("""\s//\s.*$"""), "") }
+    return Regex(""""((?:[^"\\\n]|\\.)*)"""").findAll(text).map { it.groupValues[1] }.filter { letter.containsMatchIn(it) }.toList()
+  }
+
+  @Test fun `جزءهای ui_components و صفحه‌های قدیمیِ جابه‌جاشده و یاورها متنِ خامِ فارسی ندارند`() {
+    val bad = ArrayList<String>()
+    val files = movedFiles()
+    for (f in files) {
+      assertTrue("${f.path} دیگر نیست — از فهرست بردارید", f.isFile)
+      for (s in raw(f)) bad += "${f.relativeTo(app).invariantSeparatorsPath}: «$s»"
+    }
+    assertTrue("پرونده‌ای پیدا نشد", files.size > 60)
+    assertTrue(
+      "نوشتهٔ فارسیِ خام (دری و زبان‌های دیگر آن را نمی‌بینند) — به جدولِ Str* با t(…) ببرید؛ داده را با «// داده: دلیل» نشان بدهید:\n" +
+        bad.joinToString("\n"),
+      bad.isEmpty(),
+    )
+  }
+
+  /* ---------------- دورِ ۳: صفحه‌های بزرگِ کامپیوتر، گدام، خرید، تخفیف، حساب‌پی و گزارش ---------------- */
+
+  /** پرونده‌های `ui/screens` که دورِ ۳ همهٔ نوشتهٔ صفحه‌شان را به جدول برد؛ متنِ خام فقط در سطرِ «// داده:» (برگهٔ اکسل، نامِ پرونده، منطق) */
+  private val movedScreens3 = listOf(
+    "DeskCustomers.kt", "DeskProducts.kt", "DeskPurchasing.kt", "DevicesHw.kt", "HesabPayAccountSettings.kt", "Promos.kt",
+    "PurchaseBills.kt", "PurchaseOrders.kt", "PurchaseSuggestView.kt", "ReportFresh.kt",
+  )
+
+  /** کفِ پوششِ دریِ کلیدهای پرونده‌های دورِ ۳ (٪) — اندازهٔ همین کار (۱۴٫۸٪ = ۱۲۱ از ۸۱۶)؛ فقط بالا برود */
+  private val minMoved3Percent = 14
+
+  @Test fun `پرونده‌های جابه‌جاشدهٔ دورِ ۳ متنِ خامِ فارسی ندارند و پوششِ دری‌شان از کف پایین نمی‌آید`() {
+    val bad = ArrayList<String>()
+    val files = movedScreens3.map { app.resolve("ui/screens/$it") }
+    for (f in files) {
+      assertTrue("${f.path} دیگر نیست — از فهرست بردارید", f.isFile)
+      for (s in raw(f)) bad += "${f.name}: «$s»"
+    }
+    assertTrue(
+      "نوشتهٔ فارسیِ خام (دری و زبان‌های دیگر آن را نمی‌بینند) — به جدولِ Str* با t(…) ببرید؛ داده را با «// داده: دلیل» نشان بدهید:\n" +
+        bad.joinToString("\n"),
+      bad.isEmpty(),
+    )
+    val byKey = rows(I18nTables.all).groupBy { it.table + "." + it.key }.mapValues { (_, l) -> l.any { it.dari != it.fa } }
+    val keys = LinkedHashSet<String>()
+    for (f in files + app.resolve("ui/screens/StockBook.kt")) for (m in Regex("""\b(Str\w*)\.(\w+)""").findAll(code(f))) {
+      val k = m.groupValues[1] + "." + m.groupValues[2]
+      if (k in byKey) keys += k
+    }
+    val c = keys.count { byKey[it] == true }
+    val p = pct(c, keys.size)
+    println("dari-moved3 ${keys.size} $c ${"%.1f".format(p)}%")
+    assertTrue("جدولی خوانده نشد", keys.size > 400)
+    assertTrue("پوششِ دریِ نوشته‌های دورِ ۳ ${"%.1f".format(p)}٪ < $minMoved3Percent٪", p >= minMoved3Percent)
+  }
+
+  @Test fun `فارسیِ نوشته‌های دورِ ۳ همان متنِ پیشین است و دری و زبان‌های دیگر عوض می‌شوند`() {
+    I18n.source = { Lang.FA }
+    assertEquals("بهای میانگینِ واحد", StrStockPages.avgUnitCost)
+    assertEquals("شمارش ثبت شد — 3 اختلاف اصلاح شد", StrStockPages.countSaved(3))
+    assertEquals("بیشینهٔ موجودی", StrProductPages.maxStock)
+    assertEquals("«برنج» ثبت شد", StrProductPages.nameRecorded("برنج"))
+    assertEquals("فاکتورِ خرید #12 ثبت شد — 1,200 ؋، کالاها به انبار رفت", StrPurchasePages.purchaseSaved(12, "1,200"))
+    assertEquals("موجودی و بها", ir.vil3ntec.tohid.ui.screens.SettingsLayout.labelOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.STOCK_MODE))
+    I18n.source = { Lang.PRS }
+    //  واژه‌ای که در فهرستِ دری نیست همان فارسی می‌ماند
+    assertEquals("بهای میانگینِ واحد", StrStockPages.avgUnitCost)
+    assertEquals("شمارش ثبت گردید — 3 اختلاف اصلاح گردید", StrStockPages.countSaved(3))
+    assertEquals("نامِ مشابه در دکان: ", StrProductPages.similarName)
+    assertEquals("فیصدِ تخفیف", StrPromoPages.discountPercent)
+    assertEquals("فاکتورِ خرید #12 ثبت گردید — 1,200 ؋، کالاها به گدام رفت", StrPurchasePages.purchaseSaved(12, "1,200"))
+    //  نامِ کالا (داده) در دری همان می‌ماند، حتی اگر واژهٔ فهرست باشد
+    assertEquals("«انبار تازه» ثبت گردید", StrProductPages.nameRecorded("انبار تازه"))
+    I18n.source = { Lang.EN }
+    val layout = ir.vil3ntec.tohid.ui.screens.SettingsLayout
+    assertEquals("Stock & cost", layout.labelOf(layout.STOCK_MODE))
+    assertEquals(layout.STOCK_MODE, layout.keyOf(layout.labelOf(layout.STOCK_MODE)))
+    assertEquals("Save 1 difference", StrStockPages.saveDiffs(1))
+    assertEquals("Save 2 differences", StrStockPages.saveDiffs(2))
+  }
+
+  @Test fun `متنِ خامِ باقی‌ماندهٔ صفحه‌های قدیمی فقط کم می‌شود`() {
+    val files = app.resolve("ui/screens").walkTopDown().filter { it.isFile && it.extension == "kt" }.toList()
+    val n = files.sumOf { raw(it).size }
+    println("dari-old-raw ${files.size} $n")
+    assertTrue("صفحه‌ای پیدا نشد", files.size > 150)
+    assertTrue("متنِ خامِ تازه در ui/screens ($n > $maxRawOldScreens) — به جدولِ Str* ببرید", n <= maxRawOldScreens)
+  }
+
+  @Test fun `اندازهٔ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ چاپ می‌شود و از کف پایین نمی‌آید`() {
+    val byKey = rows(I18nTables.all).groupBy { it.table + "." + it.key }.mapValues { (_, l) -> l.any { it.dari != it.fa } }
+    val keys = LinkedHashSet<String>()
+    for (f in movedFiles()) for (m in Regex("""\b(Str\w*)\.(\w+)""").findAll(code(f))) {
+      val k = m.groupValues[1] + "." + m.groupValues[2]
+      if (k in byKey) keys += k
+    }
+    val c = keys.count { byKey[it] == true }
+    val p = pct(c, keys.size)
+    println("dari-moved ${keys.size} $c ${"%.1f".format(p)}%")
+    assertTrue("جدولی خوانده نشد", keys.size > 300)
+    assertTrue("پوششِ دریِ نوشته‌های جابه‌جاشده ${"%.1f".format(p)}٪ < $minMovedPercent٪", p >= minMovedPercent)
+  }
+
+  @Test fun `خطای ورودیِ صفِ پیک از جدول می‌گذرد و فارسی همان پیامِ هسته است`() {
+    for (m in ir.vil3ntec.tohid.core.courier.CourierInputText.ALL) {
+      I18n.source = { Lang.FA }
+      assertEquals(m, courierInputText(m))
+      I18n.source = { Lang.PRS }
+      assertEquals(DariText.of(m), courierInputText(m))
+      I18n.source = { Lang.EN }
+      val en = courierInputText(m).orEmpty()
+      assertTrue("$m: انگلیسی ندارد", en.isNotBlank() && !letter.containsMatchIn(en))
+    }
+    assertEquals("x", courierInputText("x"))
+    //  هسته پیامِ خامِ تازه‌ای کنارِ این ثابت‌ها نمی‌سازد
+    val core = DesktopPhrases.repo().resolve("core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/courier/CourierQueue.kt").readText()
+    assertFalse("CourierInputError با متنِ خام", Regex("""CourierInputError\("[^"]*",\s*"""").containsMatchIn(core))
+  }
+
+  @Test fun `فارسیِ نوشته‌های دورِ ۲ همان متنِ پیشین است و دری عوض می‌شود`() {
+    I18n.source = { Lang.FA }
+    assertEquals("دریافتِ 1,200 ؋ از «کریم» ثبت شد", StrSalePages.received("1,200", "کریم"))
+    assertEquals("نشانه یا نشانی لازم است.", StrOrderPages.addrNeedOne)
+    assertEquals(
+      "هر روز ساعتِ 21:00: امروز تا ساعتِ 21:00",
+      ir.vil3ntec.tohid.core.report.OwnerReportPlan.coverage(ir.vil3ntec.tohid.core.report.OwnerReportPlan.Settings(hour = 21)),
+    )
+    assertEquals("قرص حداکثر 5 جا دارد", ir.vil3ntec.tohid.ui.components.common.NavLayouts.Problem.PILL_FULL.message)
+    assertEquals("ثبتِ سریع و واحدِ بزرگ در صندوق", ir.vil3ntec.tohid.ui.screens.SettingsLayout.labelOf(ir.vil3ntec.tohid.ui.screens.SettingsLayout.TILL_GOODS))
+    I18n.source = { Lang.PRS }
+    assertEquals("دریافتِ 1,200 ؋ از «کریم» ثبت گردید", StrSalePages.received("1,200", "کریم"))
+    assertEquals("نشانه یا آدرس لازم است.", StrOrderPages.addrNeedOne)
+    assertEquals("ترازو هنوز ثابت نیست — صبر کنید و دوباره کوشش کنید", StrSalePages.scaleMotion)
+    //  نامِ مشتری با واژهٔ فهرست در دری همان می‌ماند
+    assertTrue(StrSalePages.received("1,200", "فروشگاه گوشی").contains("«فروشگاه گوشی»"))
+    I18n.source = { Lang.EN }
+    val layout = ir.vil3ntec.tohid.ui.screens.SettingsLayout
+    assertEquals("Quick add and big units at the till", layout.labelOf(layout.TILL_GOODS))
+    assertEquals(layout.TILL_GOODS, layout.keyOf(layout.labelOf(layout.TILL_GOODS)))
   }
 }

@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.pay.platform.HesabPayEnv
@@ -92,10 +94,10 @@ internal fun HpQrScanDialog(onDismiss: () -> Unit, onText: (String) -> Unit) {
             qrOnly = true,
           )
         } else {
-          Text("برای اسکن، اجازهٔ دوربین لازم است.", color = Shop.colors.muted)
+          Text(StrSalePages.cameraForScan, color = Shop.colors.muted)
         }
       }
-      OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("بستن") }
+      OutlinedButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text(Str.close) }
     }
   }
 }

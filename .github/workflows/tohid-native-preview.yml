@@ -69,6 +69,13 @@ jobs:
             echo "::warning::secret به نام TOHID_KEYSTORE_B64 تنظیم نشده — کلیدِ داخلِ مخزن استفاده می‌شود"
           fi
 
+      #  پوشِ گوشی (Firebase، O-01؛ docs/FIREBASE-SETUP-fa.md): `app/google-services.json` از secret ِ
+      #  GOOGLE_SERVICES_JSON. ⛔ نبودِ secret (یا فایلِ نادرست) ساخت را نمی‌شکند — همان برنامهٔ بی‌پوش، با یک هشدار.
+      - name: تنظیمِ Firebase (اختیاری)
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: bash android-native/tools/google-services.sh ir.vil3ntec.tohid.preview
+
       - name: ساختِ نسخهٔ پیش‌نمایش
         working-directory: android-native
         env:

@@ -87,6 +87,9 @@ const FREE = [
     'PUT /shop/staff-scope/members/:id']],
   ['«جست‌وجو با عکس» (AI-11) فقط‌خواندنی است، مثلِ جست‌وجوی متنیِ کالا، و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.visual_search', [
     'POST /shop/visual-search']],
+  ['پوشِ گوشی (O-01، FCM): ثبت و پاک کردنِ توکنِ دستگاهِ خودِ عضو — خبر و اعلان هیچ‌وقت پشتِ اشتراک نمی‌رود؛ '
+    + 'فقط پرچمِ shop.device_push (پاک کردن همیشه باز)', [
+    'POST /shop/push/devices', 'DELETE /shop/push/devices']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
@@ -115,6 +118,8 @@ FLAGS.push('shop.orders.late_apology');
 FLAGS.push('shop.loyalty_rule');
 //  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) با پرچمِ خودش
 FLAGS.push('shop.visual_search');
+//  O-01: پوشِ گوشی (`/shop/push/devices`، FREE) با پرچمِ خودش
+FLAGS.push('shop.device_push');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));

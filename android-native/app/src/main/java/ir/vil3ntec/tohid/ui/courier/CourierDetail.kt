@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ArrowBack
+import androidx.compose.material.icons.outlined.Call
 import androidx.compose.material.icons.outlined.Directions
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.Place
@@ -124,6 +125,7 @@ internal fun CourierDetailPage(
   onNavigate: () -> Unit,
   seen: V3StaggerState,
   onRate: (() -> Unit)? = null,
+  onCall: (() -> Unit)? = null,
 ) {
   val p = PhoneV3.colors
   val live = CourierFlow.isLive(c.status)
@@ -138,7 +140,7 @@ internal fun CourierDetailPage(
       )
       Spacer(Modifier.width(44.dp))
     }
-    RouteCard(c, shopName, live, onNavigate)
+    RouteCard(c, shopName, live, onNavigate, onCall)
     Spacer(Modifier.height(14.dp))
     //  برگهٔ تیرهٔ پایین (مرجع: Tracking Detail / Shipping Detail)
     Column(Modifier.weight(1f).fillMaxWidth().background(p.black, SheetTop).padding(top = 10.dp)) {
@@ -178,7 +180,7 @@ internal fun CourierDetailPage(
 
 /** «از دکان ⇐ به مقصد» روی سطحِ سرمه‌ای (مرجع: کارتِ From/To) */
 @Composable
-private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigate: () -> Unit) {
+private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigate: () -> Unit, onCall: (() -> Unit)?) {
   val p = PhoneV3.colors
   val dark = PhoneV3UiDark
   Column(Modifier.padding(horizontal = 16.dp).fillMaxWidth().courierDark(p).padding(16.dp)) {
@@ -199,8 +201,11 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
         Spacer(Modifier.height(10.dp))
         Text(StrCourierApp.to, style = courierText(12.sp), color = p.onBlackMuted)
         if (live) {
-          Text(c.landmark.ifBlank { "—" }, style = courierText(16.sp, FontWeight.Bold), color = p.onBlack)
-          if (c.addressText.isNotBlank()) Text(c.addressText, style = courierText(13.sp), color = p.onBlackMuted)
+          //  DLV-02: «اول نشانه» — نشانه، «ناحیه · دروازهٔ رنگ»، بعد نشانیِ متنی
+          val lines = landmarkLines(c).ifEmpty { listOf("—") }
+          lines.forEachIndexed { i, line ->
+            Text(line, style = if (i == 0) courierText(16.sp, FontWeight.Bold) else courierText(13.sp), color = if (i == 0) p.onBlack else p.onBlackMuted)
+          }
           //  S33: Plus Code از پینِ مقصد (نه ژئوکدر، نه شبکه) — برای نقشهٔ آفلاین یا گفتن با تلفن
           missionPlusCode(c)?.let { Text(StrCourier.plusCode(it), style = courierText(13.sp, FontWeight.Medium), color = p.onBlack) }
         } else {
@@ -211,6 +216,11 @@ private fun RouteCard(c: MissionCard, shopName: String, live: Boolean, onNavigat
     if (live && c.lat != null && c.lng != null) {
       Spacer(Modifier.height(14.dp))
       CourierOnDark { CourierSecondary(StrCourierApp.navigate, onNavigate, Modifier.fillMaxWidth(), icon = Icons.Outlined.Directions) }
+    }
+    //  DLV-02: «تماس با مشتری» — فقط با پرچمِ دکان و پس از «قبول» (`CourierExtras.canCall`)؛ شماره همان لحظه از سرور
+    if (onCall != null) {
+      Spacer(Modifier.height(10.dp))
+      CourierOnDark { CourierSecondary(StrCourierApp.callCustomer, onCall, Modifier.fillMaxWidth(), icon = Icons.Outlined.Call) }
     }
   }
 }

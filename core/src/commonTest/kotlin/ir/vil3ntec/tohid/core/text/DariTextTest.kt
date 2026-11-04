@@ -181,6 +181,22 @@ class DariTextTest {
   }
 
   @Test
+  fun secondRoundWordsAndTheirLimits() {
+    //  دورِ ۲ (نیاز به تأییدِ صاحب‌کار): «آدرس»، «قبل از»، «کوشش» و «ختم» ِ فعل
+    assertEquals("آدرسِ درست را بپرسید", DariText.of("نشانیِ درست را بپرسید"))
+    assertEquals("آدرس${zwnj}ها", DariText.of("نشانی${zwnj}ها"))
+    assertEquals("قبل از رسیدن زنگ بزنید", DariText.of("پیش از رسیدن زنگ بزنید"))
+    assertEquals("ذخیره نشد؛ دوباره کوشش کنید", DariText.of("ذخیره نشد؛ دوباره تلاش کنید"))
+    assertEquals("کوشش دوباره", DariText.of("تلاش دوباره"))
+    assertEquals("کالا ختم شده", DariText.of("کالا تمام شده"))
+    assertEquals("امروز ختم می${zwnj}شود", DariText.of("امروز تمام می${zwnj}شود"))
+    //  «تمام» = «همه» و «بهای تمام‌شده» همان؛ «نشانه» (نشانِ راه) واژهٔ دیگری است
+    for (s in listOf("تمامِ کالاها", "بهای تمام${zwnj}شده", "نشانهٔ نزدیک", "پیش${zwnj}از", "می${zwnj}پیوندد")) {
+      assertEquals(s, DariText.of(s), s)
+    }
+  }
+
+  @Test
   fun stripRemovesOnlyTheMarkers() {
     assertSame("گوشی", DariText.strip("گوشی"))
     assertEquals("کالای گوشی", DariText.strip("کالای ${p("گوشی")}"))

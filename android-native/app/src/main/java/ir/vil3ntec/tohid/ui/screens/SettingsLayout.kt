@@ -6,6 +6,7 @@ import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHome
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.i18n.StrShell
 
 /**
@@ -429,12 +430,12 @@ object SettingsLayout {
     SAFE_BOOK -> ir.vil3ntec.tohid.core.i18n.StrSafe.settingsTitle
     TAX_QUARTER -> ir.vil3ntec.tohid.core.i18n.StrTaxQuarter.settingsTitle
     CUSTOMER_CARD -> ir.vil3ntec.tohid.core.i18n.StrCustomerCard.settingsTitle
-    STOCK_PLACES -> STOCK_PLACES_TITLE
-    SMART_FORECAST -> SMART_FORECAST_TITLE
-    ANOMALY -> ANOMALY_TITLE
-    OWNER_REPORT -> OWNER_REPORT_TITLE
-    STOREFRONT_ETA -> STOREFRONT_ETA_TITLE
-    PROMO_GUARD -> PROMO_GUARD_TITLE
+    STOCK_PLACES -> StrSettingsPages.titleStockPlaces
+    SMART_FORECAST -> StrSettingsPages.titleSmartForecast
+    ANOMALY -> StrSettingsPages.titleAnomaly
+    OWNER_REPORT -> StrSettingsPages.titleOwnerReport
+    STOREFRONT_ETA -> StrSettingsPages.titleStorefrontEta
+    PROMO_GUARD -> StrSettingsPages.titlePromoGuard
     ONLINE_ORDERS -> ir.vil3ntec.tohid.core.i18n.StrOrderFlow.settingsTitle
     GIFT_RECEIPT -> ir.vil3ntec.tohid.core.i18n.StrGift.section
     DELIVER_LATER -> ir.vil3ntec.tohid.core.i18n.StrDeliver.section
@@ -454,17 +455,17 @@ object SettingsLayout {
     REPORT_KEYS -> ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys
     DOC_GAPS -> ir.vil3ntec.tohid.core.i18n.StrReports.docGaps
     LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
-    TILL_GOODS -> TILL_GOODS_TITLE
+    TILL_GOODS -> StrSettingsPages.titleTillGoods
     POS_NOTES -> StrPos.notesSection
     AUTO_FEES -> StrSale.feesTitle
     SIMPLE_ASK -> ir.vil3ntec.tohid.core.i18n.StrSimpleAsk.settingsTitle
-    EASY_SETUP -> EASY_SETUP_TITLE
+    EASY_SETUP -> StrSettingsPages.titleEasySetup
     SCAN_CASH -> ir.vil3ntec.tohid.core.i18n.StrDevices.cashCardTitle
     WEBCAM -> ir.vil3ntec.tohid.core.i18n.StrDevices.webcamTitle
-    TRAINING -> TRAINING_SETTINGS_TITLE
+    TRAINING -> StrSettingsPages.titleTraining
     TILL_RECEIVE -> StrSettings.tillReceiveTitle
     MULTI_DRAWER -> ir.vil3ntec.tohid.core.i18n.StrDrawers.settingsTitle
-    STOCK_MODE -> STOCK_SETTINGS_TITLE
+    STOCK_MODE -> ir.vil3ntec.tohid.core.i18n.StrStockPages.settingsTitle
     STOCK_INSIGHT -> StrShell.stockInsight
     STOCK_LEVELS -> StrShell.stockLevels
     PRODUCT_TOOLS -> StrShell.productTools

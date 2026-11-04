@@ -172,6 +172,28 @@
           android:resource="@xml/apduservice" />
     </service>
 
+    <!--
+      پوشِ گوشی با Firebase (FCM، تصمیمِ O-01؛ `data/push/FcmPushAndroid.kt`، `docs/FIREBASE-SETUP-fa.md`).
+      ساختِ خودکارِ توکن خاموش است: تا پرچمِ دکان (`shop.device_push`) روشن نشود Firebase هیچ توکنی نمی‌سازد و هیچ
+      داده‌ای به گوگل نمی‌فرستد؛ بی `google-services.json` هنگامِ ساخت اصلاً راه نمی‌افتد. اعلانی که با برنامهٔ بسته
+      می‌رسد را خودِ اندروید با همین کانال و نشان نشان می‌دهد.
+    -->
+    <service
+        android:name=".data.push.TohidMessagingService"
+        android:exported="false">
+      <intent-filter>
+        <action android:name="com.google.firebase.MESSAGING_EVENT" />
+      </intent-filter>
+    </service>
+    <meta-data android:name="firebase_messaging_auto_init_enabled" android:value="false" />
+    <meta-data android:name="firebase_analytics_collection_enabled" android:value="false" />
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_channel_id"
+        android:value="orders" />
+    <meta-data
+        android:name="com.google.firebase.messaging.default_notification_icon"
+        android:resource="@drawable/ic_launcher_monochrome" />
+
     <!-- «دستگاه‌ها»: اسکن در پس‌زمینه (`scan/ScanServiceAndroid.kt`) -->
     <service
         android:name=".scan.ScanCaptureService"

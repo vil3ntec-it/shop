@@ -25,6 +25,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDeliver
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.orders.DeliveryPrefs
@@ -53,21 +57,21 @@ internal fun OrderDeliveryPrefsSection(o: OrderDto, cfg: OrdersConfigDto, repo: 
   var editing by remember(o.id) { mutableStateOf(false) }
   val bits = listOfNotNull(
     o.address.text.takeIf { it.isNotEmpty() },
-    o.address.landmark.takeIf { it.isNotEmpty() }?.let { "نشانه: $it" },
-    if (o.address.lat != null && o.address.lng != null) "پین: ${o.address.lat}, ${o.address.lng}" else null,
+    o.address.landmark.takeIf { it.isNotEmpty() }?.let { StrOrderPages.prefLandmark(it) },
+    if (o.address.lat != null && o.address.lng != null) StrOrderPages.prefPin(o.address.lat, o.address.lng) else null,
   )
   Text(bits.joinToString(" · ").ifEmpty { "—" }, color = c.text)
   val d = o.delivery
   val lines = listOfNotNull(
-    "پیش از رسیدن زنگ بزنید".takeIf { d.callBeforeArrival },
-    d.leaveWith.takeIf { it.isNotBlank() }?.let { "تحویل به: $it" },
+    StrOrderPages.prefCallFirst.takeIf { d.callBeforeArrival },
+    d.leaveWith.takeIf { it.isNotBlank() }?.let { StrOrderPages.prefLeaveWith(it) },
   )
   if (lines.isNotEmpty()) Text(lines.joinToString(" · "), color = c.text, style = MaterialTheme.typography.bodySmall)
   d.cashTenderMinor?.let {
     Text(DeliveryPrefs.tenderLine(it, o.totalMinor), color = c.text, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
   }
   if (cfg.deliveryPrefs && cfg.permissions.manage && DeliveryPrefs.editable(o.status, o.fulfillment)) {
-    TextButton(onClick = { editing = true }) { Text("ویرایشِ دستورِ تحویل") }
+    TextButton(onClick = { editing = true }) { Text(StrOrderPages.prefEdit) }
   }
   if (editing) DeliveryPrefsDialog(o, repo, onDismiss = { editing = false }, onSaved = { editing = false; onUpdated(it) })
 }
@@ -77,8 +81,8 @@ internal fun OrderDeliveryPrefsSection(o: OrderDto, cfg: OrdersConfigDto, repo: 
 internal fun CashTenderField(show: Boolean, value: String, onChange: (String) -> Unit) {
   if (!show) return
   TohidTextField(
-    value, { onChange(it.take(14)) }, label = "مشتری با چه مبلغی می‌پردازد؟ (افغانی، اختیاری)",
-    supporting = "تا پیک پول خرد بیاورد؛ مثلاً ۱۰۰۰",
+    value, { onChange(it.take(14)) }, label = StrOrderPages.prefTenderOpt,
+    supporting = StrOrderPages.prefTenderNote,
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
   )
 }
@@ -123,20 +127,20 @@ private fun DeliveryPrefsDialog(o: OrderDto, repo: OrdersRepository, onDismiss: 
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("دستورِ تحویل — سفارش #${o.orderNo}", color = c.text) },
+    title = { Text(StrOrderPages.prefTitle(o.orderNo), color = c.text) },
     text = {
       Column(Modifier.verticalScroll(rememberScrollState())) {
         Row(
           Modifier.fillMaxWidth().heightIn(min = Space.xxl + Space.md).clickable { call = !call },
           verticalAlignment = Alignment.CenterVertically,
         ) {
-          Text("پیش از رسیدن زنگ بزنید", Modifier.weight(1f), color = c.text)
+          Text(StrOrderPages.prefCallFirst, Modifier.weight(1f), color = c.text)
           Switch(checked = call, onCheckedChange = { call = it })
         }
-        TohidTextField(leaveWith, { leaveWith = it.take(80) }, label = "تحویل به (عضوِ خانواده، دربان…)")
-        TohidTextField(landmark, { landmark = it.take(200) }, label = "نشانه")
+        TohidTextField(leaveWith, { leaveWith = it.take(80) }, label = StrOrderPages.prefLeaveWithField)
+        TohidTextField(landmark, { landmark = it.take(200) }, label = StrDeliver.landmark)
         TohidTextField(
-          tender, { tender = it.take(14) }, label = "مشتری با چه مبلغی می‌پردازد؟ (افغانی)",
+          tender, { tender = it.take(14) }, label = StrOrderPages.prefTender,
           keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
         )
         if (error != null) {
@@ -145,7 +149,7 @@ private fun DeliveryPrefsDialog(o: OrderDto, repo: OrdersRepository, onDismiss: 
         }
       }
     },
-    confirmButton = { TextButton(onClick = { save() }, enabled = !busy) { Text(if (busy) "در حالِ ذخیره…" else "ذخیره") } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    confirmButton = { TextButton(onClick = { save() }, enabled = !busy) { Text(if (busy) StrOrderPages.saving else StrKit.save) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }

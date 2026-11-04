@@ -117,6 +117,8 @@ val replaced = listOf(
   "pay/platform/HesabPayHceService.kt",
   //  «حساب‌پیِ دکان»: پیشنهاد از اعلانِ برنامهٔ حساب‌پی فقط اندروید؛ کامپیوتر: ‎pay/platform/HesabPayNoticeDesk.kt‎
   "pay/platform/HesabPayNoticeAndroid.kt",
+  //  O-01: پوشِ گوشی با Firebase (FCM) فقط اندروید؛ کامپیوتر جایگزین ندارد (`DevicePush.platform` تهی ⇒ «پشتیبانی نمی‌شود»)
+  "data/push/FcmPushAndroid.kt",
 ).map { "ir/vil3ntec/tohid/$it" }
 
 val generated = layout.buildDirectory.dir("generated/tohid")
@@ -189,7 +191,6 @@ val phrases: List<Pair<String, String>> = listOf(
   "آزمایش دوربین" to "آزمایش بارکدخوان",
   "گرفتنِ عکسِ تازه" to "عکسی که با گوشی یا وب‌کم گرفته‌اید",
   "انتخاب از عکس‌های گوشی" to "انتخاب از پوشه‌های کامپیوتر",
-  "\"سیم\" to \"usb\"" to "\"چاپگر سیستم\" to \"usb\"",
   "چاپگرِ سیمی پیدا نشد. کابل را وصل کنید و همین برگه را دوباره باز کنید." to
     "چاپگری در سیستم نصب نیست. چاپگر را در تنظیماتِ ویندوز یا مک اضافه کنید و همین برگه را دوباره باز کنید.",
   "اولین بار اندروید اجازه می‌خواهد؛ «همیشه» را بزنید تا هر بار نپرسد." to

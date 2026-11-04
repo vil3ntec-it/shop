@@ -21,6 +21,9 @@ const router = express.Router();
 
 router.use(requireUser, optionalShop);
 
+//  «حذفِ حساب» به دستِ خودِ کاربر (Google Play) — شرح: `routes/account-deletion.js`، پیش‌فرض خاموش (`account.self_delete`)
+router.use('/account/deletion', require('./account-deletion'));
+
 router.get('/', async (req, res) => {
   const ent = req.shopId ? await entitlementOf(req.shopId) : null;
   //  STF-01..03: فهرستِ قدیمی با لایه‌های دکان (هرگز بیش از نقش) + `policy` برای هستهٔ برنامه
@@ -184,6 +187,8 @@ router.delete('/devices/:id', async (req, res) => {
   if (r.rowCount) {
     await query('UPDATE tokens SET revoked_at=$1 WHERE device_id=$2 AND subject_id=$3 AND revoked_at IS NULL',
       [now(), id, req.user.id]);
+    //  O-01: دستگاهی که از آن بیرون رفت دیگر پوشِ این کس را نمی‌گیرد
+    await require('../lib/push').revokeDevice({ deviceId: id, userId: req.user.id, reason: 'logout' });
     //  ⛔ S78: سوکتِ زندهٔ همان دستگاه هم در همین درخواست
     await require('../lib/sync-v1-live').accessChanged({ userId: req.user.id });
   }

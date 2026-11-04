@@ -41,6 +41,7 @@ class NotificationCompat {
 
 class NotificationManagerCompat private constructor() {
   fun notify(id: Int, n: Notification) = DesktopNotify.show(n.title, n.text)
+  fun notify(tag: String?, id: Int, n: Notification) = notify(id, n)
   fun areNotificationsEnabled() = true
   fun cancel(id: Int) {}
   companion object { fun from(context: Context) = NotificationManagerCompat() }

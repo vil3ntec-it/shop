@@ -216,6 +216,8 @@ FLAGS.push('shop.orders.dispute_file');
 FLAGS.push('shop.loyalty_rule');
 //  AI-11: «جست‌وجو با عکس» (`POST /shop/visual-search`) — فقط کالاهای دکانِ توکن
 FLAGS.push('shop.visual_search');
+//  O-01: پوشِ گوشی (`/shop/push/devices`) — «ب» فقط توکنِ خودش را ثبت/پاک می‌کند، هرگز توکنِ «الف»
+FLAGS.push('shop.device_push');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

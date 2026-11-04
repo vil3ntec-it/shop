@@ -10,6 +10,8 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.core.i18n.StrDebtPages
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.print.StatementImage
@@ -41,5 +43,5 @@ internal fun StatementImageButton(d: ShopData, debtorId: String, onMessage: (Str
       }
     },
     modifier = modifier,
-  ) { Text(if (Platform.DESKTOP) "تصویرِ صورت‌حساب (PNG)" else "تصویرِ صورت‌حساب") }
+  ) { Text(if (Platform.DESKTOP) StrDebtPages.statementPng else StrMoney.statementImage) }
 }
