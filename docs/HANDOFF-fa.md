@@ -90,6 +90,13 @@
   `invoice_at_handover`؛ از «آمادهٔ دریافت» تحویل در همان تراکنش؛ زمانِ فاکتور = زمانِ تحویل) — خواستِ هماهنگ‌کننده، با آزمونِ سرخ.
 - نیمه‌کاره: آزمون‌های مرورگر (`test:web-store`، `test:e2e`) و Gradle ِ `:core:jvmTest` این‌جا اجرا نشد (مرورگر نیست، صفِ Gradle) ⇒ CI.
 - قدمِ بعدی: مرجِ همین PR پس از CI ِ سبز.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/gaps23-partial`، PR #915 (کمبودهای PARTIAL، دورِ ۲۳؛ روی main پس از #911؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **DATA-04 / SEC-DATA-07** سرور جمعِ برگشت‌های هر فاکتور را با `finalTotal` + ۵۰ پول برای هر قلم می‌سنجد (`lib/return-sale-cap.js` از نگهبانِ `staff-approval.js`، v3 و v1، فاکتورِ همین دستهٔ v1 هم)،
+  پشتِ پرچمِ خاموشِ `shop.returns.sale_cap` (`return-sale-cap.test.js`)؛ **S86** بازسازیِ مانده‌های موجودیِ سرور از دفتر (`stock.rebuild`، `npm run stock-rebuild`،
+  پیش‌فرض فقط نمایش؛ `stock-rebuild.test.js`)؛ **PRM-15** «دادنِ اعتبارِ هدیه» در حسابِ مشتریِ گوشی (نسخهٔ ۳)، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ
+  (`StoreCreditGrantTest`، `StoreCreditGrantFlowTest`). بی مسیرِ تازه، بی مهاجرت، بی تنظیمِ تازه. همه PARTIAL ماندند.
+- نیمه‌کاره: CI و مرجِ همین PR. قدمِ بعدی: روشن کردنِ `shop.returns.sale_cap` پس از همه‌گیر شدنِ نسخهٔ دارای `ReturnShare` (#586)؛ بازسازیِ projection ِ کاتالوگ و سفارش (S86)؛
+  همان دکمه در پروندهٔ مشتریِ کامپیوتر (`DeskCustomers` به سقفِ اندازه رسیده — اول تکه کردنش)؛ «اعتبارِ هدیه» با «درخواستِ تأیید» (PIN ِ مدیر).
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/ci-evidence-12` (ممیزیِ شاهدِ CI، دورِ ۱۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: ردیف‌هایی که دسته‌های #900 (1eecbdaa) و #909 (9e28d1eb) دست زدند با CI ِ main سنجیده شدند (#910 ردیفی را دست نزد).
   **PRM-08** (`PromoBrandTest`، `PromoCoreTest`، `promo-core` ۷۲/۷۲: 41701433394، 41701433313، «سرور» 41701433334)، **PRM-13**، **DLV-09** و **MKT-11**

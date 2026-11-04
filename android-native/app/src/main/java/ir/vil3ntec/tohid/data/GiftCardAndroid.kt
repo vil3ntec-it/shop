@@ -46,6 +46,35 @@ object GiftCardPref {
     return append(store, key) { cur, k -> GiftCards.void(cur, k, code, reason, allowed, today, now, by) }
   }
 
+  /**
+   *  PRM-15 — اعطای دستیِ اعتبار (`GiftCards.grantCredit`)، همان راهِ [issue]: زیرِ قفلِ موتور روی دفترِ همین لحظهٔ دیسک و
+   *  با کلیدِ پنجره ⇒ دو ضربه یک ردیف. [decision] تصمیمِ `sales.discount` برای همین مبلغ (`ShopRole.decide`)؛ جز «مجاز»
+   *  هیچ چیز نوشته نمی‌شود.
+   */
+  suspend fun grant(
+    store: ShopStore, key: String, debtorId: String, amountMinor: Long, reason: String, decision: String,
+    today: String, now: Long, by: String?,
+  ): Saved {
+    var bad: String? = null
+    var again = false
+    val out = AppendOnce.append<ShopData>(
+      key, GiftCards::hasGrant,
+      { cur, k ->
+        when (val g = GiftCards.grantCredit(cur, k, debtorId, amountMinor, reason, decision, today, now, by)) {
+          is GiftCards.Granted.Ok -> { again = g.again; g.data.takeUnless { g.again } }
+          is GiftCards.Granted.Bad -> { bad = g.code; null }
+        }
+      },
+    ) { t -> store.update { mem -> t(DebtEntry.ledgerNow(store, mem)) } }
+    return when (out) {
+      is AppendOnce.Outcome.Wrote -> Saved.Ok(again = false, code = null)
+      AppendOnce.Outcome.Already -> Saved.Ok(again = true, code = null)
+      AppendOnce.Outcome.Skipped -> bad?.let { Saved.Bad(it) } ?: if (again) Saved.Ok(again = true, code = null) else Saved.NotSaved
+      AppendOnce.Outcome.Unread -> Saved.Bad("UNREAD")
+      AppendOnce.Outcome.Unsaved -> Saved.NotSaved
+    }
+  }
+
   private suspend fun append(store: ShopStore, key: String, op: (ShopData, String) -> GiftCards.Issued): Saved {
     var bad: String? = null
     var made: String? = null
