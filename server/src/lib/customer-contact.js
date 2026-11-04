@@ -208,49 +208,72 @@ function maskConflict(cf) {
 
 /* -------------------------------------------------------------- نوشتن */
 
-/**
- * فیلدهای op از اصلِ بی مجوز. ردیفِ موجود (`exists`) ⇐ هر فیلدِ تماس کنار؛ ردیفِ تازه ⇐ فقط مقدارِ پوشیده کنار.
- * @returns {{fields: object, ignored: string[]}} — `ignored` خالی ⇐ همان شیءِ ورودی
+/*
+ *  ⛔ نوشتن از اصلِ بی مجوز **هیچ شیءِ تازه‌ای از کلیدهای کاربر نمی‌سازد** (نه `{...fields}`، نه `obj[k] = …` با کلیدِ
+ *  درخواست): فقط کلیدهای ثابتِ `FIELDS` از همان op/ردیف پاک یا نوشته می‌شوند، و opی که نامِ فیلدِ ناامن دارد
+ *  (`isSafeFieldName`: `__proto__`، `constructor`، `prototype` یا بیرون از `[A-Za-z_][A-Za-z0-9_]{0,63}`) کلاً رد
+ *  می‌شود (`bad_field_name`، همان نامِ ردِ کلیدِ نادرست در ‎lib/sync-v1.js‎ و ‎lib/sync-v3.js‎) — CodeQL
+ *  js/remote-property-injection (#914).
  */
-function guard(table, fields, exists) {
+const SAFE_FIELD = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
+const RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
+function isSafeFieldName(k) {
+  return typeof k === 'string' && SAFE_FIELD.test(k) && !RESERVED.has(k);
+}
+/** همهٔ نام‌های فیلدِ این شیء امن‌اند؟ */
+function safeFields(fields) {
+  return isObj(fields) && Object.keys(fields).every(isSafeFieldName);
+}
+
+/**
+ * کدام فیلدهای تماس از اصلِ بی مجوز کنار می‌روند — کلیدها فقط از فهرستِ ثابتِ `FIELDS`.
+ * ردیفِ موجود (`exists`) ⇐ هر فیلدِ تماس؛ ردیفِ تازه ⇐ فقط مقدارِ پوشیده.
+ */
+function ignoredOf(table, fields, exists) {
   const f = fieldsOf(table);
-  const ignored = [];
-  if (!f || !isObj(fields)) return { fields, ignored };
-  for (const k of Object.keys(fields)) {
-    if (f.includes(k) && (exists || isMasked(fields[k]))) ignored.push(k);
-  }
-  if (!ignored.length) return { fields, ignored };
-  const out = { ...fields };
-  for (const k of ignored) delete out[k];
-  return { fields: out, ignored };
+  const out = [];
+  if (!f || !isObj(fields)) return out;
+  for (const k of f) if (hasOwn(fields, k) && (exists || isMasked(fields[k]))) out.push(k);
+  return out;
+}
+
+/** همان op، بی فیلدهای `ignored` (در جا؛ کلیدهای ثابت) ⇐ آیا چیزی ماند؟ */
+function dropIn(fields, ignored) {
+  for (const k of ignored) delete fields[k];
+  return Object.keys(fields).length > 0;
 }
 
 /**
  * v3 (`applyOne` ِ ‎lib/sync-v3.js‎، زیرِ قفلِ حساب، پس «موجود» همان است که merge می‌بیند): فقط opِ خودِ دستگاه
- * (`v3`/`v2`) — نه پلِ v1 و نه opِ سرور — و نه حذف/لغو.
- * @returns {null | {op, ignored, noop?}} — null ⇐ همان op؛ `noop` ⇐ چیزی برای دفتر نماند (پاسخِ «applied» بی ثبت)
+ * (`v3`/`v2`) — نه پلِ v1 و نه opِ سرور — و نه حذف/لغو. فیلدها در جا کم می‌شوند (همان شیءِ op).
+ * @returns {null | {op, ignored, noop?}} — null ⇐ همان op؛ `noop` ⇐ پاسخِ نهایی بی ثبت («applied» ِ تهی، یا ردِ نامِ ناامن)
  */
 function guardV3(op, row, origin) {
   if ((origin !== 'v3' && origin !== 'v2') || op.kind === 'delete' || op.kind === 'cancel') return null;
-  const g = guard(op.table, op.fields, !!row);
-  if (!g.ignored.length) return null;
-  if (!Object.keys(g.fields).length) {
-    return { op, ignored: g.ignored, noop: { op_id: op.op_id, status: 'applied', server_seq: null, ignored: g.ignored } };
+  if (!fieldsOf(op.table) || !isObj(op.fields)) return null;
+  if (!safeFields(op.fields)) {
+    return { op, ignored: [], noop: { op_id: op.op_id, status: 'rejected', reason: 'bad_field_name' } };
   }
-  return { op: { ...op, fields: g.fields }, ignored: g.ignored };
+  const ignored = ignoredOf(op.table, op.fields, !!row);
+  if (!ignored.length) return null;
+  if (!dropIn(op.fields, ignored)) return { op, ignored, noop: { op_id: op.op_id, status: 'applied', server_seq: null, ignored } };
+  return { op, ignored };
 }
 
 /**
- * راهِ قدیم (ردیفِ کامل جایگزین می‌شود): فیلدهای تماسِ ردیفِ موجود دقیقاً همانِ سرور می‌مانند —
- * هرچه دستگاه فرستاده (پوشیده، خالی یا هیچ) کنار. ردیفِ تازه ⇐ همان `guard`.
+ * راهِ قدیم و REST (ردیفِ کامل جایگزین می‌شود)، در جا: فیلدهای تماسِ ردیفِ موجود دقیقاً همانِ سرور می‌مانند —
+ * هرچه دستگاه فرستاده (پوشیده، خالی یا هیچ) کنار؛ ردیفِ تازه فقط مقدارِ پوشیده را از دست می‌دهد.
+ * @returns {object|null} همان `data`؛ null ⇐ نامِ فیلدِ ناامن (صدازننده ردیف را کنار می‌گذارد)
  */
 function keepServer(table, data, serverData) {
   const f = fieldsOf(table);
   if (!f || !isObj(data)) return data;
-  if (!serverData) return guard(table, data, false).fields;
-  const out = { ...omit(table, data) };
-  for (const k of f) if (hasOwn(serverData, k)) out[k] = serverData[k];
-  return out;
+  if (!safeFields(data)) return null;
+  for (const k of f) {
+    if (serverData && hasOwn(serverData, k)) data[k] = serverData[k];
+    else if (hasOwn(data, k) && (serverData || isMasked(data[k]))) delete data[k];
+  }
+  return data;
 }
 
 /** پاسخِ دستهٔ پالایش‌شده ⇒ به ترتیبِ دستهٔ ورودی؛ opِ کوتاه‌شده `ignored` می‌گیرد (همان شکلِ `newer-fields`) */
@@ -266,8 +289,10 @@ function mergeResults(fl, results) {
 /**
  * میان‌افزارِ `POST /sync/v1/push` — فقط حسابِ دکان؛ پس از `v1NewerFields` و پیش از نگهبان‌های دیگر (همه همان
  * دسته‌ای را می‌بینند که به ‎lib/sync-v1.js‎ ِ مشترک با پمپ می‌رسد؛ آن پرونده دست نمی‌خورد).
- * اصلِ بی `customers.contact`: فیلدِ تماسِ ردیفی که در `sync_rows` هست کنار می‌رود (op ِ تهی‌شده نمی‌رود و
- * «applied» با `ignored` برمی‌گردد)، ردیفِ تازه فقط مقدارِ پوشیده را از دست می‌دهد؛ اثرِ انگشتِ op دوباره ساخته می‌شود.
+ * اصلِ بی `customers.contact`، هر opِ درج/ویرایشِ جدولِ تماس: نامِ فیلدِ ناامن ⇐ رد (`bad_field_name`)؛ فیلدِ تماسِ
+ * ردیفی که در `sync_rows` هست کنار (op ِ تهی‌شده نمی‌رود و «applied» با `ignored` برمی‌گردد)؛ ردیفِ تازه فقط
+ * مقدارِ پوشیده را از دست می‌دهد. ⛔ همه در جا روی همان آرایه و همان opها (`splice`، `delete` با کلیدِ ثابت) —
+ * `req.body.ops` دوباره نوشته نمی‌شود و هیچ opِ تازه‌ای از دادهٔ درخواست ساخته نمی‌شود؛ اثرِ انگشت از نو.
  */
 function v1Guard(req, res, next) {
   const ctx = req.sync;
@@ -282,8 +307,7 @@ function v1Guard(req, res, next) {
       const rawTable = raw.table ?? raw.table_name ?? raw.tableName;
       const table = tableOf(SHOP.app, rawTable);
       const kind = raw.type ?? raw.op_type ?? raw.opType;
-      const f = fieldsOf(table);
-      if (!f || (kind !== 'insert' && kind !== 'update') || !f.some((k) => hasOwn(raw.fields, k))) return;
+      if (!fieldsOf(table) || (kind !== 'insert' && kind !== 'update')) return;
       hits.push({ i, raw, rawTable, table, kind, rowId: String(raw.row_id ?? raw.rowId ?? raw.id ?? '') });
     });
     if (!hits.length || !(await hiddenForReq(req))) return next();
@@ -295,23 +319,26 @@ function v1Guard(req, res, next) {
     );
     const exists = new Set(found.map((r) => `${r.table_name}\u0000${r.row_id}`));
     const fl = { length: ops.length, dropped: new Map(), trimmed: new Map() };
-    const out = ops.slice();
-    for (const x of hits) {
-      const g = guard(x.table, x.raw.fields, exists.has(`${x.table}\u0000${x.rowId}`));
-      if (!g.ignored.length) continue;
+    //  از آخر به اول: `splice` شمارهٔ opهای پیشین را جابه‌جا نمی‌کند
+    for (let j = hits.length - 1; j >= 0; j--) {
+      const x = hits[j];
       const opId = String(x.raw.op_id ?? x.raw.opId ?? '');
-      if (!Object.keys(g.fields).length) {
-        fl.dropped.set(x.i, { op_id: opId, status: 'applied', server_seq: null, ignored: g.ignored, reason: 'contact_ignored' });
-        out[x.i] = undefined;
+      if (!safeFields(x.raw.fields)) {
+        fl.dropped.set(x.i, { op_id: opId, status: 'rejected', reason: 'bad_field_name' });
+        ops.splice(x.i, 1);
         continue;
       }
-      fl.trimmed.set(opId, g.ignored);
-      const next = { ...x.raw, fields: g.fields };
-      if (x.raw.hash) next.hash = hashOf({ table: x.rawTable, row_id: x.rowId, type: x.kind, fields: g.fields });
-      out[x.i] = next;
+      const ignored = ignoredOf(x.table, x.raw.fields, exists.has(`${x.table}\u0000${x.rowId}`));
+      if (!ignored.length) continue;
+      if (!dropIn(x.raw.fields, ignored)) {
+        fl.dropped.set(x.i, { op_id: opId, status: 'applied', server_seq: null, ignored, reason: 'contact_ignored' });
+        ops.splice(x.i, 1);
+        continue;
+      }
+      fl.trimmed.set(opId, ignored);
+      if (x.raw.hash) x.raw.hash = hashOf({ table: x.rawTable, row_id: x.rowId, type: x.kind, fields: x.raw.fields });
     }
     if (!fl.dropped.size && !fl.trimmed.size) return next();
-    req.body.ops = out.filter((o) => o !== undefined);
     const send = res.json.bind(res);
     res.json = (body) => {
       if (body && body.ok && Array.isArray(body.results)) body.results = mergeResults(fl, body.results);
@@ -324,6 +351,6 @@ function v1Guard(req, res, next) {
 module.exports = {
   KEY, DOT, FIELDS, maskPhone, isMasked, fieldsOf,
   allowed, hiddenForSync, hiddenForReq, ordersContact, requireOrdersContact,
-  omit, mask, maskValue, maskConflict, guard, keepServer,
+  omit, mask, maskValue, maskConflict, isSafeFieldName, safeFields, ignoredOf, keepServer,
   touches, omitV1Ops, omitV3Effect, omitV3Ops, omitTables, omitRows, mergeResults, v1Guard, guardV3,
 };

@@ -318,6 +318,62 @@ test('v3: صندوقِ تعارض (lww ِ شماره و «مشتریِ تکرا�
   }
 });
 
+/* ------------------------------------------------- نامِ فیلدِ ناامن (#914) */
+
+test('⛔ نامِ فیلدِ ناامن (__proto__، constructor) از اصلِ بی مجوز رد می‌شود و دادهٔ ردیف دست نمی‌خورد — v1، v3، راهِ قدیم، REST', async () => {
+  //  کلیدِ «خودی» ِ __proto__ فقط با JSON.parse ساخته می‌شود (در شیءِ نوشته‌شده نمونهٔ اولیه را عوض می‌کند)
+  const evil = (extra) => JSON.parse(`{"name":"دستکاری","phone":"","polluted":"no",${extra}}`);
+  const PROTO = '"__proto__":{"isAdmin":true,"phone":"0700000099"}';
+  const CTOR = '"constructor":{"prototype":{"isAdmin":true}}';
+
+  //  v1: هر دو op رد، ردیف همان
+  const v1 = await v1push('cashierX', 'v1-cx', [
+    v1op('d-v1', evil(PROTO), 'update'), v1op('d-v1', evil(CTOR), 'update'), v1op('d-v1evil', evil(PROTO)),
+  ]);
+  assert.equal(v1.status, 200, JSON.stringify(v1.body));
+  assert.deepEqual(v1.body.results.map((r) => [r.status, r.reason]),
+    [['rejected', 'bad_field_name'], ['rejected', 'bad_field_name'], ['rejected', 'bad_field_name']], JSON.stringify(v1.body));
+  const rows1 = await v1snap('owner');
+  const d1 = rows1.find((r) => r.id === 'd-v1').data;
+  assert.equal(d1.name, 'حسنِ تازه');
+  assert.equal(d1.polluted, undefined);
+  assert.equal(d1.isAdmin, undefined);
+  seesContact('owner', d1);
+  assert.equal(rows1.find((r) => r.id === 'd-v1evil'), undefined);
+
+  //  v3: همان
+  for (const extra of [PROTO, CTOR]) {
+    const r = await v3push('cashierX', 'v3-cx', [v3op('cx', 'd-v3', evil(extra), 'update')]);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.equal(r.body.results[0].status, 'rejected', JSON.stringify(r.body));
+    assert.equal(r.body.results[0].reason, 'bad_field_name');
+  }
+  const d3 = (await v3snap('owner')).find((x) => x.id === 'd-v3').data;
+  assert.equal(d3.name, 'کریمِ تازه');
+  assert.equal(d3.polluted, undefined);
+  seesContact('owner', d3);
+
+  //  راهِ قدیم و REST: ردیف کنار می‌رود (`bad_field_name`)
+  const legacy = await h.post('/api/sync', { changes: [
+    { collection: 'debtors', id: 'd-rest', updatedAt: Date.now() + 9000, data: evil(PROTO) },
+  ] }, tok('cashierX'));
+  assert.equal(legacy.status, 200, JSON.stringify(legacy.body));
+  assert.equal(legacy.body.applied, 0);
+  assert.deepEqual(legacy.body.conflicts.map((c) => c.reason), ['bad_field_name']);
+  const put = await h.put('/api/debtors/d-put', { data: evil(CTOR), updatedAt: Date.now() + 9000 }, tok('cashierX'));
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.deepEqual(put.body.conflicts.map((c) => c.reason), ['bad_field_name']);
+  for (const id of ['d-rest', 'd-put']) {
+    const back = (await h.get(`/api/debtors/${id}`, tok('owner'))).body;
+    assert.notEqual(back.name, 'دستکاری', id);
+    assert.equal(back.polluted, undefined, id);
+    assert.equal(back.isAdmin, undefined, id);
+    seesContact('owner', back);
+  }
+  //  و هیچ چیزی به نمونهٔ اولیهٔ اشیا نرسید
+  assert.equal({}.isAdmin, undefined);
+});
+
 /* ------------------------------------------------------- سفارش و گفت‌وگو */
 
 test('سفارش و گفت‌وگو: شمارهٔ کامل = orders.contact و customers.contact؛ پیش‌فرضِ صاحب و مدیر همان', async () => {

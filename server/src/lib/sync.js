@@ -182,9 +182,11 @@ async function pushChanges(ctx, changes) {
       });
 
       //  ⛔ CRM-15: راهِ قدیم کلِ ردیف را جایگزین می‌کند؛ اصلِ بی `customers.contact` شماره و نشانیِ ردیفِ موجود را
-      //  نه عوض می‌کند نه پاک (همان سرور می‌ماند، هرچه فرستاده — پوشیده، خالی یا هیچ)؛ ردیفِ تازه بی مقدارِ پوشیده
+      //  نه عوض می‌کند نه پاک (همان سرور می‌ماند، هرچه فرستاده — پوشیده، خالی یا هیچ)؛ ردیفِ تازه بی مقدارِ پوشیده.
+      //  نامِ فیلدِ ناامن (`__proto__`، `constructor`…) ⇐ همان ردیف کنار (`bad_field_name`)
       if (ctx.hideContact && !deleted && contact.fieldsOf(collection)) {
         data = contact.keepServer(collection, data, existing ? existing.data : null);
+        if (!data) { conflicts.push({ collection, id: recordId, reason: 'bad_field_name' }); skipped++; continue; }
         json = JSON.stringify(data);
         if (Buffer.byteLength(json, 'utf8') > MAX_RECORD_BYTES) { skipped++; continue; }
       }
