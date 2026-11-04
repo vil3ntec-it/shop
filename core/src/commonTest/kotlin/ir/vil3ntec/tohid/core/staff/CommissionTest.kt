@@ -44,9 +44,15 @@ class CommissionTest {
     val plan = Plan(500)
     val r = Commission.compute(listOf(Line("s1", null, af(2_000)), Line("s1", null, af(-500))), plan, afn)
     assertEquals(af(75), r.sellers.single().commission)
-    //  فقط برگشت در این دوره ⇒ پورسانتِ منفی (پس گرفتن)، نه صفرِ پنهان
+    //  تصمیمِ صاحب‌کار O-05 (ب): برگشت کم می‌شود ولی جمعِ دوره زیرِ صفر نمی‌رود — فقط برگشت در این دوره ⇒ پورسانتِ ۰،
+    //  و پایهٔ منفی دیده می‌ماند (نه پنهان)
     val back = Commission.compute(listOf(Line("s1", null, af(-500))), plan, afn)
-    assertEquals(af(-25), back.sellers.single().commission)
+    assertEquals(af(0), back.sellers.single().commission)
+    assertEquals(af(-500), back.sellers.single().base)
+    //  فروش و برگشتِ بیشتر از آن در یک دوره: همان ۰، نه بدهیِ فروشنده
+    val more = Commission.compute(listOf(Line("s1", null, af(200)), Line("s1", null, af(-700))), plan, afn)
+    assertEquals(af(0), more.sellers.single().commission)
+    assertEquals(af(-500), more.sellers.single().base)
   }
 
   @Test

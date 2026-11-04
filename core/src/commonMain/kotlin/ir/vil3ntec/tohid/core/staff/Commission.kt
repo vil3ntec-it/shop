@@ -11,7 +11,8 @@ import ir.vil3ntec.tohid.core.money.mulExact
  *
  *  • پایه = مبلغِ **خالصِ** ردیف (پس از سهمِ تخفیفِ فاکتور، `Rounding.allocateDiscount`)؛ ردیفِ
  *    برگشت منفی است و به نامِ **فروشندهٔ فاکتورِ اصل** می‌آید (POS-23)، نه کسی که برگشت را زد.
- *    پس برگشت پورسانتِ همان فروش را پس می‌گیرد و پورسانتِ دوره می‌تواند منفی باشد.
+ *    پس برگشت پورسانتِ همان فروش را پس می‌گیرد، ولی **جمعِ دوره زیرِ صفر نمی‌رود** (تصمیمِ صاحب‌کار O-05، ب: فروشنده
+ *    به دکان بدهکار نمی‌شود)؛ پایهٔ منفی (`base`) دیده می‌ماند.
  *  • نرخ به «پایه‌امتیاز» است (۱ = ۰٫۰۱٪، ۰ تا ۱۰٬۰۰۰): نرخِ دسته > نرخِ فروشنده > نرخِ پیش‌فرض.
  *    دستهٔ کم‌سود با نرخِ ۰ از پورسانت بیرون می‌ماند.
  *  • گرد کردن یک بار و در پایان، روی جمعِ هر فروشنده (نیمه به سمتِ +∞، به پلهٔ ارز)؛ پس جمعِ
@@ -143,7 +144,8 @@ object Commission {
     }
     val step = currency.stepMinor
     val sellers = base.keys.sorted().map { id ->
-      val c = mulExact(Rounding.roundHalfUp(scaled.getValue(id), mulExact(FULL_BP.toLong(), step)), step)
+      //  O-05 (ب): جمعِ دوره زیرِ صفر نمی‌رود
+      val c = mulExact(Rounding.roundHalfUp(scaled.getValue(id), mulExact(FULL_BP.toLong(), step)), step).coerceAtLeast(0L)
       SellerTotal(id, Money(base.getValue(id), currency), Money(c, currency))
     }
     return Result(sellers, unassigned)

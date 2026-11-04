@@ -59,10 +59,11 @@
   `server/src/lib/staff-edit-v1.js` در `v1Guard` (`v1RoleReason` هم به آن‌جا رفت تا `staff-approval.js` زیرِ سقفِ ۱۰۷۰ خط بماند)؛
   `staff-edit-v1.test.js` ۴/۴ (پیش از درمان ۳ سرخ). (۲) **مدیر پورسانتِ خودش را می‌ساخت** (STF-08): `PUT …/staff-time/commission-plan`
   فقط صاحب (`members.role`)، برنامه ویرایشگر را فقط به صاحب نشان می‌دهد؛ `staff-time.test.js` ۸/۸. و «نرخِ دسته» ِ پورسانت
-  (`Commission.saleLines`، `Returned.category`، کادرِ نرخِ هر دسته): CommissionTest ۱۰/۱۰، StaffReportTest ۳/۳. شاهدِ CI ِ main برای STF-01 و STF-07 در STATUS.
+  (`Commission.saleLines`، `Returned.category`، کادرِ نرخِ هر دسته) و تصمیمِ O-05 (ب، #932): پورسانتِ دوره زیرِ صفر نمی‌رود —
+  CommissionTest ۱۰/۱۰، StaffReportTest ۳/۳. شاهدِ CI ِ main برای STF-01 و STF-07 در STATUS.
 - نیمه‌کاره/مانده (در STATUS): STF-03 سقفِ فروشِ قرضی و قاعدهٔ قیمت در سرور (طرح: مجوزِ `sales.credit` با `maxAmount` روی `debtGiven` در درج،
   دلتای v3 و update ِ v1 — همین `staff-edit-v1.js` — همراه‌ها و پیش‌سنجیِ صندوق)؛ STF-01 نقشِ سفارشی؛ STF-06 و STF-09 دست نخوردند.
-- تصمیم‌های صاحب‌کار: D-17 (STF-02)؛ نامِ کاربرِ صندوق در سرور (STF-04)؛ «پورسانتِ منفی» (STF-08)؛ زدنِ خودِ کارمند تا ۷ روز عقب (STF-07).
+- تصمیم‌های صاحب‌کار: D-17 (STF-02، گرفته‌شده: پس از O-15)؛ نامِ کاربرِ صندوق در سرور (STF-04)؛ زدنِ خودِ کارمند تا ۷ روز عقب (STF-07).
 - قدمِ بعدی: CI و مرجِ همین PR؛ سپس `sales.credit` (P0) یا نقشِ سفارشی.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/owner-decisions-bigtech` (سند: تصمیم‌های صاحب‌کار به روشِ شرکت‌های بزرگ؛ روی main پس از #918؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: صاحب‌کار گفت «ببین شرکت‌های بزرگ فناوری چه می‌کنند». `docs/OWNER-DECISIONS-fa.md` از نو چیده شد و هیچ شناسه یا متنی
