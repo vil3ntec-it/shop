@@ -210,9 +210,8 @@ async function orderPaymentIn(c, intent, to, detail = {}) {
     await c.query(
       `UPDATE online_orders SET payment_status='paid', payment_method='online',
               cod_status=CASE WHEN cod_status='to_collect' THEN '' ELSE cod_status END,
-              version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`,
-      [intent.shop_id, o.id, at]
-    );
+              version=version+1, updated_at=$3 WHERE shop_id=$1 AND id=$2`, [intent.shop_id, o.id, at]);
+    await require('./delivery-due').syncIn(c, intent.shop_id, o.id, at);   //  DLV-11: پیکِ سپرده‌شده دیگر نقد نمی‌گیرد
     if (CLOSED_ORDER.includes(o.status)) return 'order_closed_paid';
     if (Number(o.total_minor) !== Number(intent.amount_minor)) return 'order_total_changed';
   } else {
