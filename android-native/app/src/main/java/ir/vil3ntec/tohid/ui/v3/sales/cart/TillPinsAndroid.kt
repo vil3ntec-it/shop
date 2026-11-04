@@ -34,6 +34,9 @@ object TillPinsPrefs {
     return change
   }
 
+  /** سنجاق یا برداشتن و پیامِ همان کار (صندوقِ کامپیوتر)؛ null ⇒ هیچ */
+  fun toggleSay(context: android.content.Context, id: String, name: String): String? = message(toggle(context, id), name)
+
   /** پیامِ همان کار (گوشی و کامپیوتر یکی)؛ null ⇒ هیچ */
   fun message(change: TillPins.Change, name: String): String? = when (change) {
     TillPins.Change.PINNED -> ir.vil3ntec.tohid.core.i18n.StrSale.pinnedFirst(name)

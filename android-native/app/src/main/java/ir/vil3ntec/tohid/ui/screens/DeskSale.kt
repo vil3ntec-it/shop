@@ -250,11 +250,8 @@ fun DeskSaleScreen(
   LaunchedEffect(term) { hint = 0 }
   val categories = remember(d.products, d.productCategories, ir.vil3ntec.tohid.LocaleChoice.lang) { PosCatalog.categories(d) }
   LaunchedEffect(categories) { if (category != null && categories.none { it.name == category }) category = null }
-  //  POS-06: کالاهای سنجاق‌شدهٔ همین دستگاه (`TillPinsPrefs`، همان گوشی) سرِ شبکه — فقط بی جست‌وجو؛ بی سنجاق ⇒ همان امروز
-  val pins = remember { ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.load(context); ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.pins }.value
-  val shown: List<Product> = remember(term, category, d.products, matches, pins) {
-    if (term.isNotEmpty()) matches else ir.vil3ntec.tohid.core.pos.TillPins.arrangeBy(PosCatalog.byCategory(d.products, category), pins) { it.id }
-  }
+  val pins = remember { ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.load(context); ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.pins }.value // POS-06: سنجاقِ همین دستگاه سرِ شبکه، فقط بی جست‌وجو
+  val shown: List<Product> = remember(term, category, d.products, matches, pins) { if (term.isNotEmpty()) matches else ir.vil3ntec.tohid.core.pos.TillPins.arrangeBy(PosCatalog.byCategory(d.products, category), pins) { it.id } }
 
   /** `false` ⇒ سبد قفل بود و چیزی اضافه نشد (پیامِ «اضافه شد» نباید بیاید) */
   fun applyAdded(product: Product, added: SalesEngine.Added): Boolean {
@@ -958,12 +955,7 @@ fun DeskSaleScreen(
         why = if (ir.vil3ntec.tohid.ui.components.pos.priceWhyOn()) ir.vil3ntec.tohid.data.PriceWhyLine.rows(d, cart, priced, promo, id) else null,
         note = ir.vil3ntec.tohid.ui.components.pos.posLineNote(line.note) { n -> cartStore.set(ir.vil3ntec.tohid.data.CartNotes.set(cartStore.lines.value, id, n)) }, serials = ir.vil3ntec.tohid.ui.components.pos.posLineSerials(d, line) { s -> cartStore.set(ir.vil3ntec.tohid.data.CartSerials.set(cartStore.lines.value, id, s)) }, // POS-28
         focusDiscount = rowDiscount,
-        //  POS-06: «سنجاق در صفحهٔ اولِ این صندوق» — همان `TillPinsPrefs` ِ گوشی؛ قلمِ آزاد کاشی ندارد
-        pinned = if (line.free || p == null) null else id in pins,
-        onPin = {
-          val change = ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.toggle(context, id)
-          ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.message(change, p?.name.orEmpty())?.let(::toast)
-        },
+        pinned = if (line.free || p == null) null else id in pins, onPin = { ir.vil3ntec.tohid.ui.v3.sales.cart.TillPinsPrefs.toggleSay(context, id, p?.name.orEmpty())?.let(::toast) }, // POS-06، قلمِ آزاد نه
         onDismiss = { editLine = null; unitNext = false; rowDiscount = false; refocus() },
         onConfirm = { quantity, price ->
           var next = SalesEngine.setCartQty(cart, id, quantity)
