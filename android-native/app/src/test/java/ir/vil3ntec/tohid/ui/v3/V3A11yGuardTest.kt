@@ -13,9 +13,10 @@ import java.io.File
  *     `toggleable`) که درونش فقط آیکن/تصویر است، یا خودِ `Icon`/`Image` ِ زدنی، باید نامی برای صفحه‌خوان داشته باشد
  *     (`contentDescription` ِ آیکن یا `semantics`). `onClickLabel` ِ `v3Pressable` نامِ **کار** است («دوبار بزنید
  *     تا …»)، نه نامِ دکمه؛ بی نام TalkBack می‌گوید «دکمهٔ بی‌برچسب» (نمونه: «+» ِ کادرِ صندوقِ خانه، بستنِ اسکن).
- *  2. **کشیدن جایگزین دارد**: هر کشیدن/ورقِ دست‌ساز (`draggable`، `SwipeToDismissBox`، `detectDragGestures`، …)
- *     یا «کارِ سفارشی» (`customActions`) ِ صفحه‌خوان در همان پرونده دارد، یا در `ALTERNATIVES` با راهِ جایگزینِ
- *     نوشته (دکمه یا زدن). فهرست فقط کوتاه می‌شود: ردیفی که دیگر کشیدن ندارد یا کارِ سفارشی گرفته، سرخ می‌شود.
+ *  2. **کشیدن و نگه‌داشتن جایگزین دارند**: هر کشیدن/ورقِ دست‌ساز (`draggable`، `SwipeToDismissBox`،
+ *     `detectDragGestures`، …) و هر «نگه دار تا …» (`tryAwaitRelease`، مثلِ ضبطِ صدای گفت‌وگو) یا «کارِ سفارشی»
+ *     (`customActions`) ِ صفحه‌خوان در همان پرونده دارد، یا در `ALTERNATIVES` با راهِ جایگزینِ نوشته (دکمه یا زدن).
+ *     فهرست فقط کوتاه می‌شود: ردیفی که دیگر کشیدن ندارد یا کارِ سفارشی گرفته، سرخ می‌شود.
  *  3. **نوشتهٔ یک‌خطی با پهنای ثابت نه**: `Text(… maxLines = 1 … Modifier.width(N.dp))` با درشتیِ نوشتهٔ ×۱٫۳/×۲
  *     بریده می‌شود؛ `widthIn(min = …)` همان هم‌ترازی را نگه می‌دارد.
  *  4. سیم‌کشی‌های همین ممیزی در اجزای مشترک برنگردند (برگه، ردیف، کلید، پیام).
@@ -67,13 +68,19 @@ class V3A11yGuardTest {
   /** کشیدنی که کارِ سفارشیِ صفحه‌خوان ندارد، با راهِ جایگزینش (فهرست فقط کوتاه می‌شود) */
   private val ALTERNATIVES = mapOf(
     "v3/shell/HomeScreen.kt" to "کششِ کادرِ صندوقِ خانه: دستگیرهٔ زدنیِ «صندوق، باز/بسته» (PullHandle) و کارهای سفارشیِ «پنهان کردن/صفحهٔ بعد/پیش» ِ خودِ کادر (HomeHeroCard)",
-    "v3/settings/sections/NavSlotList.kt" to "جابه‌جاییِ میان‌برهای نوار با کشیدنِ دستگیره: زدنِ ردیف برگهٔ «جای X» را باز می‌کند و همان جابه‌جایی را می‌کند",
     "components/pos/PhoneCart.kt" to "کشیدنِ سبدِ صندوق: زدنِ نوارِ سبد بازش می‌کند و زدنِ تکهٔ پیدای کالاها («بستنِ سبد») می‌بنددش",
   )
 
   private val GESTURE = Regex(
-    """SwipeToDismissBox\(|\.draggable\(|\.anchoredDraggable\(|\.swipeable\(|detectDragGestures|detectHorizontalDragGestures|detectVerticalDragGestures|detectTransformGestures|awaitEachGesture""",
+    """SwipeToDismissBox\(|\.draggable\(|\.anchoredDraggable\(|\.swipeable\(|detectDragGestures|detectHorizontalDragGestures|detectVerticalDragGestures|detectTransformGestures|awaitEachGesture|\btryAwaitRelease\b|\bawaitRelease\b""",
   )
+
+  @Test fun `نگهبانِ کشیدن نگه‌داشتن را هم می‌گیرد و زدنِ ساده را نه`() {
+    val hold = "detectTapGestures(onPress = { state.start(); tryAwaitRelease(); state.stop() })"
+    val tap = "detectTapGestures(onTap = { open() }, onDoubleTap = { zoom() })"
+    assertTrue(GESTURE.containsMatchIn(hold))
+    assertTrue(!GESTURE.containsMatchIn(tap))
+  }
 
   @Test fun `هر کشیدنِ دست‌ساز جایگزینی برای صفحه‌خوان دارد`() {
     val missing = ArrayList<String>()
@@ -119,6 +126,16 @@ class V3A11yGuardTest {
     assertTrue("ردیفِ کلید برای صفحه‌خوان یک کلید با حالت است", "role = Role.Switch" in inputs && "toggleableState" in inputs)
     val states = src("v3/V3States.kt")
     assertTrue("خطای کادرِ پیام خوانده می‌شود (WCAG 4.1.3)", "liveRegion = LiveRegionMode.Polite" in states)
+    val voice = src("v3/online/chat/VoiceBar.kt")
+    assertTrue(
+      "ضبطِ صدا با زدن هم هست (کارهای VoiceFlow و دوبار زدن) و حالتش در ناحیهٔ زنده خوانده می‌شود",
+      "VoiceFlow.actions(" in voice && "customActions" in voice && "onClick(" in voice && "liveRegion = LiveRegionMode.Polite" in voice,
+    )
+    val nav = src("v3/settings/sections/NavSlotList.kt")
+    assertTrue(
+      "ردیفِ نوار «یک جا بالاتر/پایین‌تر» دارد (همان منطقِ کشیدن) و جایش را می‌گوید",
+      "NavLayouts.step(" in nav && "StrA11y.navUp" in nav && "StrA11y.navDown" in nav && "stateDescription" in nav,
+    )
   }
 
   /* ------------------------------- ابزار ------------------------------- */

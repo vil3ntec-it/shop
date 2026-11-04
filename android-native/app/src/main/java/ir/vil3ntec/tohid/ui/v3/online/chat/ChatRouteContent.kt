@@ -166,7 +166,7 @@ internal fun RouteScope.ChatThreadRoute(id: String, embedded: Boolean = false) {
           if (e == null) { ctl.sendText(draft); draft = "" } else scope.launch { if (ctl.saveEdit(e, draft)) draft = "" }
         },
         onPhoto = { pickImage.launch("image/*") },
-        mic = if (ChatMedia.voiceSupported) ({ VoiceMic(voice, ctl.canWrite) { ctl.banner = it } }) else null,
+        mic = if (ChatMedia.voiceSupported) ({ VoiceMic(voice, ctl.canWrite, cfg.limits.audioMax, { ctl.banner = it }) { bytes, ms -> ctl.sendVoice(bytes, ms) } }) else null,
         status = {
           ChatReplyBar(ctl.replying, ctl.editing) { if (ctl.editing != null) draft = ""; ctl.editing = null; ctl.replying = null }
           VoiceStatus(voice, cfg.limits.audioMax, ctl.canWrite) { bytes, ms -> ctl.sendVoice(bytes, ms) }
