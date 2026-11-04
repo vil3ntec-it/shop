@@ -121,6 +121,8 @@ internal fun PeriodHero(p: SalesPeriods.Period, title: String, money: Boolean, c
     label = if (money) StrSale.salesTotal else null,
     caption = if (money) PeriodLabel.counts(t) + returns else StrHistory.countsOnly,
     chips = chips,
+    //  «چاپ» کنارِ «صندوق باز — … · نقدِ مورد انتظار: …» در گوشیِ ۳۶۰ و درشتیِ ×۱٫۳ جا نمی‌شد و مبلغ بریده می‌شد
+    wrapChips = true,
   )
 }
 
