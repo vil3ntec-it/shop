@@ -29,6 +29,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrImageChanges
+import ir.vil3ntec.tohid.core.i18n.StrImagePages
 import ir.vil3ntec.tohid.core.image.BankPhotoCard
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ImageBank
@@ -73,10 +77,10 @@ fun BankPhotoSource(
     } catch (c: CancellationException) {
       throw c
     } catch (f: ApiFailure) {
-      problem = if (f is ApiFailure.Offline || f is ApiFailure.Timeout) "منبعِ عکس خوانده نشد — اینترنت قطع است" else f.userMessage
+      problem = if (f is ApiFailure.Offline || f is ApiFailure.Timeout) StrImagePages.sourceOffline else f.userMessage
       null
     } catch (e: Exception) {
-      problem = "منبعِ عکس خوانده نشد"
+      problem = StrImagePages.sourceUnread
       null
     }
   }
@@ -92,15 +96,15 @@ fun BankPhotoSource(
         throw c
       } catch (f: ApiFailure) {
         problem = when (f.code) {
-          "needs_confirmation" -> "تطبیق قطعی نیست — از «انتخاب از بانکِ تصاویر» با دیدنِ مشخصات انتخاب کنید"
-          "barcode_mismatch" -> "بارکدِ کالای شما با کالای این عکس فرق دارد"
-          "image_not_selectable" -> "این عکس دیگر در بانک قابلِ انتخاب نیست"
-          "version_not_approved" -> "آن نسخهٔ عکس تأییدشده نیست"
-          "consent_required" -> "اجازهٔ صریح لازم است"
-          else -> if (f is ApiFailure.Offline || f is ApiFailure.Timeout) "اینترنت قطع است — دوباره امتحان کنید" else f.userMessage
+          "needs_confirmation" -> StrImagePages.notCertainUseBank
+          "barcode_mismatch" -> StrImagePages.barcodeMismatch
+          "image_not_selectable" -> StrImagePages.noLongerSelectable
+          "version_not_approved" -> StrImagePages.versionNotApproved
+          "consent_required" -> StrImagePages.consentNeeded
+          else -> if (f is ApiFailure.Offline || f is ApiFailure.Timeout) StrImagePages.offlineRetry else f.userMessage
         }
       } catch (e: Exception) {
-        problem = e.message ?: "انجام نشد"
+        problem = e.message ?: StrImagePages.notDone
       } finally {
         busy = false
       }
@@ -113,10 +117,10 @@ fun BankPhotoSource(
       .border(BorderStroke(1.dp, colors.border), RoundedCornerShape(12.dp))
       .background(colors.surface).padding(10.dp),
   ) {
-    Text("منبعِ عکس", style = MaterialTheme.typography.labelMedium, color = colors.muted)
+    Text(StrImagePages.photoSource, style = MaterialTheme.typography.labelMedium, color = colors.muted)
     if (s == null) {
-      Text(problem ?: "در حالِ خواندن…", style = MaterialTheme.typography.bodySmall, color = if (problem != null) colors.warning else colors.muted)
-      if (problem != null) TextButton(onClick = { reload++ }) { Text("دوباره") }
+      Text(problem ?: StrAccount.reading, style = MaterialTheme.typography.bodySmall, color = if (problem != null) colors.warning else colors.muted)
+      if (problem != null) TextButton(onClick = { reload++ }) { Text(Str.again) }
     } else {
       val card = remember(s, owner) { BankPhotoCard.card(s.resolved, s.proposals, owner) }
       Text(headline(card), style = MaterialTheme.typography.bodyMedium, color = colors.text, fontWeight = FontWeight.SemiBold)
@@ -130,17 +134,17 @@ fun BankPhotoSource(
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { consent = !consent }) {
               Checkbox(checked = consent, onCheckedChange = { consent = it })
               Text(
-                "اجازه می‌دهم VILL3N این عکس را بررسی کند و اگر پذیرفت، در بانکِ مرکزی برای دکان‌های دیگر هم بگذارد",
+                StrImagePages.consentText,
                 style = MaterialTheme.typography.bodySmall, color = colors.text,
               )
             }
-            OutlinedButton(onClick = { perform(a) }, enabled = !busy && consent) { Text("پیشنهاد به بانکِ مرکزی") }
+            OutlinedButton(onClick = { perform(a) }, enabled = !busy && consent) { Text(StrImagePages.proposeCentral) }
           }
           is BankPhotoCard.Action.RevertToCentral ->
-            OutlinedButton(onClick = { perform(a) }, enabled = !busy) { Text("بازگشت به عکسِ مرکزی") }
+            OutlinedButton(onClick = { perform(a) }, enabled = !busy) { Text(StrImagePages.backToCentral) }
           is BankPhotoCard.Action.UseCentralVersion ->
             OutlinedButton(onClick = { perform(a) }, enabled = !busy) {
-              Text(if (a.newer) "گذاشتنِ نسخهٔ تازهٔ مرکزی (${a.version})" else "بازگشت به نسخهٔ قبلی (${a.version})")
+              Text(if (a.newer) StrImagePages.newerCentral(a.version) else StrImagePages.previousVersion(a.version))
             }
         }
       }
@@ -149,19 +153,19 @@ fun BankPhotoSource(
 }
 
 private fun headline(c: BankPhotoCard.Card): String = when (c.source) {
-  BankPhotoCard.Source.CENTRAL -> "عکسِ بانکِ مرکزی، نسخهٔ ${c.version}"
-  BankPhotoCard.Source.SHOP -> "عکسِ خودِ دکان"
-  BankPhotoCard.Source.LEGACY -> "عکسِ همین دستگاه (بیرون از بانک)"
-  BankPhotoCard.Source.NONE -> "بی عکس"
+  BankPhotoCard.Source.CENTRAL -> StrImagePages.centralVersion(c.version)
+  BankPhotoCard.Source.SHOP -> StrImageChanges.sourceShop
+  BankPhotoCard.Source.LEGACY -> StrImagePages.thisDevicePhoto
+  BankPhotoCard.Source.NONE -> StrImageChanges.sourceNone
 }
 
 private fun note(n: BankPhotoCard.Note): Pair<String, PillTone> = when (n) {
-  BankPhotoCard.Note.SHOWN_IN_STOREFRONT -> "همین عکس در ویترینِ مشتری دیده می‌شود" to PillTone.INFO
-  BankPhotoCard.Note.PLACEHOLDER -> "ویترین جای خالی نشان می‌دهد، نه عکسِ کالای دیگر" to PillTone.NEUTRAL
-  BankPhotoCard.Note.LEGACY_DEVICE -> "از راهِ همگام‌سازیِ همیشگی؛ در بانکِ تصاویر نیست" to PillTone.NEUTRAL
-  BankPhotoCard.Note.USER_CONFIRMED -> "تطبیق با بارکد نبود؛ خودتان تأیید کردید" to PillTone.WARNING
-  BankPhotoCard.Note.ARCHIVED -> "از بانک بایگانی شده؛ همین‌جا می‌ماند ولی دیگر انتخاب‌شدنی نیست" to PillTone.WARNING
-  BankPhotoCard.Note.CENTRAL_KEPT -> "عکسِ مرکزیِ قبلی برای بازگشت نگه داشته شده" to PillTone.NEUTRAL
-  BankPhotoCard.Note.PROPOSAL_PENDING -> "پیشنهاد به بانکِ مرکزی در انتظارِ بررسی است" to PillTone.REVIEW
-  BankPhotoCard.Note.PROPOSAL_APPROVED -> "پیشنهادتان در بانکِ مرکزی پذیرفته شد" to PillTone.SUCCESS
+  BankPhotoCard.Note.SHOWN_IN_STOREFRONT -> StrImagePages.shownInStore to PillTone.INFO
+  BankPhotoCard.Note.PLACEHOLDER -> StrImagePages.placeholderNote to PillTone.NEUTRAL
+  BankPhotoCard.Note.LEGACY_DEVICE -> StrImagePages.viaSync to PillTone.NEUTRAL
+  BankPhotoCard.Note.USER_CONFIRMED -> StrImagePages.userConfirmed to PillTone.WARNING
+  BankPhotoCard.Note.ARCHIVED -> StrImagePages.archivedInBank to PillTone.WARNING
+  BankPhotoCard.Note.CENTRAL_KEPT -> StrImagePages.centralKept to PillTone.NEUTRAL
+  BankPhotoCard.Note.PROPOSAL_PENDING -> StrImagePages.proposalPending to PillTone.REVIEW
+  BankPhotoCard.Note.PROPOSAL_APPROVED -> StrImagePages.proposalApproved to PillTone.SUCCESS
 }

@@ -31,6 +31,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCatalogPages
+import ir.vil3ntec.tohid.core.i18n.StrLine
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.data.ProductImport
 import ir.vil3ntec.tohid.data.ShopData
@@ -81,17 +86,17 @@ fun BulkPriceDialog(
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("قیمتِ ${plain(ids.size)} کالا", color = c.text) },
+    title = { Text(StrCatalogPages.priceOfN(plain(ids.size)), color = c.text) },
     text = {
       Column(Modifier.widthIn(min = 360.dp, max = 560.dp)) {
         SegmentedChoice(
-          options = listOf("sale" to "قیمت فروش", "purchase" to "قیمت خرید"),
+          options = listOf("sale" to StrProducts.salePrice, "purchase" to StrProducts.purchasePrice),
           selected = field,
           onSelect = { field = it; ack = false },
         )
         Spacer(Modifier.height(6.dp))
         SegmentedChoice(
-          options = listOf("percent" to "درصد", "add" to "افزودن/کاستن", "set" to "همه یک مبلغ"),
+          options = listOf("percent" to StrLine.percent, "add" to StrCatalogPages.addOrSubtract, "set" to StrCatalogPages.allOneAmount),
           selected = mode,
           onSelect = { mode = it; ack = false },
         )
@@ -99,18 +104,18 @@ fun BulkPriceDialog(
         OutlinedTextField(
           value = amount,
           onValueChange = { amount = it; ack = false },
-          label = { Text(if (mode == "percent") "درصد (مثلاً ۱۰ یا -۵)" else "افغانی (منفی یعنی کم)") },
+          label = { Text(if (mode == "percent") StrCatalogPages.pctField else StrCatalogPages.afField) },
           singleLine = true,
           isError = amount.isNotBlank() && op == null,
           modifier = Modifier.fillMaxWidth(),
         )
-        Text("گرد به یک افغانی. ردیفِ منفی اعمال نمی‌شود.", style = MaterialTheme.typography.labelSmall, color = c.muted)
+        Text(StrCatalogPages.roundNote, style = MaterialTheme.typography.labelSmall, color = c.muted)
         if (preview != null) {
           Spacer(Modifier.height(6.dp))
           Row(verticalAlignment = Alignment.CenterVertically) {
-            StatusPill("${plain(preview.changed)} عوض می‌شود", PillTone.INFO)
-            if (preview.warned > 0) { Spacer(Modifier.width(6.dp)); StatusPill("${plain(preview.warned)} هشدار", PillTone.WARNING) }
-            if (preview.blocked > 0) { Spacer(Modifier.width(6.dp)); StatusPill("${plain(preview.blocked)} رد", PillTone.DANGER) }
+            StatusPill(StrCatalogPages.changesN(plain(preview.changed)), PillTone.INFO)
+            if (preview.warned > 0) { Spacer(Modifier.width(6.dp)); StatusPill(StrCatalogPages.warningsN(plain(preview.warned)), PillTone.WARNING) }
+            if (preview.blocked > 0) { Spacer(Modifier.width(6.dp)); StatusPill(StrCatalogPages.rejectedN(plain(preview.blocked)), PillTone.DANGER) }
           }
           Spacer(Modifier.height(6.dp))
           LazyColumn(Modifier.fillMaxWidth().heightIn(max = 260.dp).border(1.dp, c.border, Shape.card)) {
@@ -134,7 +139,7 @@ fun BulkPriceDialog(
           if (preview.needsConfirm) {
             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable { ack = !ack }) {
               Checkbox(checked = ack, onCheckedChange = { ack = it })
-              Text("هشدارها را دیدم؛ همین قیمت‌ها را بگذار", style = MaterialTheme.typography.bodySmall, color = c.text)
+              Text(StrCatalogPages.sawWarnings, style = MaterialTheme.typography.bodySmall, color = c.text)
             }
           }
         }
@@ -142,7 +147,7 @@ fun BulkPriceDialog(
         OutlinedTextField(
           value = reason,
           onValueChange = { reason = it },
-          label = { Text("دلیل (اجباری؛ با نامِ شما در سابقه می‌ماند)") },
+          label = { Text(StrCatalogPages.reasonRequired) },
           singleLine = true,
           modifier = Modifier.fillMaxWidth(),
         )
@@ -160,9 +165,9 @@ fun BulkPriceDialog(
           )
         },
         enabled = ready,
-      ) { Text("بگذار") }
+      ) { Text(StrSettings.put) }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 
@@ -174,8 +179,8 @@ private fun toneOf(t: BulkPrice.Tone): PillTone = when (t) {
 }
 
 private fun warnText(w: BulkPrice.Warn): String = when (w) {
-  BulkPrice.Warn.NEGATIVE -> "منفی می‌شود — اعمال نمی‌شود"
-  BulkPrice.Warn.ZERO -> "صفر می‌شود"
-  BulkPrice.Warn.BELOW_COST -> "زیرِ بهای خرید"
-  BulkPrice.Warn.BIG_CHANGE -> "تغییرِ ۵۰٪ یا بیشتر"
+  BulkPrice.Warn.NEGATIVE -> StrCatalogPages.warnNegative
+  BulkPrice.Warn.ZERO -> StrCatalogPages.warnZero
+  BulkPrice.Warn.BELOW_COST -> StrCatalogPages.warnBelowCost
+  BulkPrice.Warn.BIG_CHANGE -> StrCatalogPages.warnBigChange
 }
