@@ -302,6 +302,17 @@
   انباردار و جمع‌آور deny؛ در `SERVER_EDITABLE`. هر صفحه‌ای که شمارهٔ **مشتری** نشان می‌دهد فقط از `customerPhone(phone, rememberCanSeeContacts())`
   (`ui/components/ContactPrivacy.kt` و مرزِ سکوی `ContactPrivacyAndroid.kt` ⇐ `core/text/ContactMask`) — نه `LocaleText.phoneDisplay` ِ مستقیم؛ بی مجوز تماس/پیامک/واتس‌اپ ِ
   پرونده هم نیست (`DebtorLedgerModel.actions(contacts=)`). سنجه: `ContactPrivacyTest`، `ContactMaskTest`، `staff-perms.test.js` «CRM-15…».
+- ⛔ CRM-15 در **سرور** هم (`server/src/lib/customer-contact.js`، `claude/crm15-server`): اصلِ بی `customers.contact` (صاحب همیشه دارد؛
+  دو لایه با `staff-perms.layersFor`) از REST شمارهٔ **پوشیده** با همان قالبِ `ContactMask` (`maskPhone`) و بی نشانی می‌گیرد، و از
+  pull/Snapshot/حذف‌شده‌های راهِ قدیم، v1 و v3 فیلدهای `FIELDS` (امروز `debtors`: `phone`، `phone2`، `deliveryAddress`) را **اصلاً**
+  نمی‌گیرد (نه پوشیده — دستگاه مقدارِ پوشیده را در دفتر نمی‌نشاند)؛ صندوقِ تعارض پوشیده. ⛔ نوشتنِ همان اصل (push ِ v1/v3، راهِ قدیم،
+  PUT ِ REST) فیلدِ تماسِ ردیفِ **موجود** را هرگز عوض یا پاک نمی‌کند (پوشیده، خالی، null یا نبودن ⇐ `ignored`؛ راهِ قدیم ⇐ همانِ سرور)؛
+  ردیفِ تازه فقط مقدارِ پوشیده را از دست می‌دهد. پالایشِ v1 فقط در `routes/sync-v1.js` (`contact.v1Guard` پس از `v1NewerFields`)؛
+  پمپ بی پرسش رد می‌شود و ⛔ `lib/sync-v1.js` دست نمی‌خورد. پلِ v1⇒v3 (`origin: 'v1'`) و opِ سرور نگهبان نمی‌خورند. فیلدِ تماسِ تازه
+  (یا جدولِ تازهٔ مشتری) ⇐ `FIELDS` + همین آزمون. شمارهٔ کاملِ سفارش/گفت‌وگو/واتس‌اپ و درهای فهرستِ سیاه و «سفارش‌های یک مشتری» =
+  `orders.contact` **و** `customers.contact` (`ordersContact`، `requireOrdersContact`)؛ پیش‌فرضِ همه همان. ⛔ نگهبانِ نوشتن هرگز شیء/opِ تازه از کلیدهای درخواست نمی‌سازد
+  (نه `{...fields}`، نه `req.body.ops = …`): فقط کلیدهای ثابتِ `FIELDS` در جا پاک/نوشته می‌شوند و opِ با نامِ ناامن (`isSafeFieldName`) رد
+  (`bad_field_name`) — CodeQL js/remote-property-injection روی `lib/sync-v1.js`. سنجه: `customer-contact.test.js`.
 - `shift.report` (PAY-15، گزارشِ X و Z ِ صندوقِ شیفت): پیش‌فرض همه allow (همان امروز؛ شاگرد نمای کور)، `restrict`، بی تأیید و فقط نمایشی؛ در `SERVER_EDITABLE` مثلِ `reports.money` تا «کارمندان» نشانش دهد؛ برنامه با `ShopRole.allows(…, "shift.report")` دکمهٔ X، Zِ پس از بستن و «گزارش Z» را می‌بندد، نه خودِ بستن (`claude/part-PAY-3`).
 - ⛔ STF-06 (پرچمِ خاموشِ `shop.staff_scope`، `lib/staff-scope.js`، `core/staff/StaffScope.kt`): «مکان» = قفسه یا انبار ِ موجودیِ سرور (شعبه در داده نیست). کارِ عضوِ محدود باید همهٔ مکان‌هایی را که نام می‌برد در محدوده داشته باشد و دست‌کم یکی («خراب» و «در مسیر» مکان نیستند) ⇒ وگرنه ۴۰۳ `location_out_of_scope`؛ ارسال از مبدأ، دریافت و رد در مقصد. مالک هرگز محدود نیست؛ خالی یا همهٔ مکان‌ها = همه (ردیف پاک می‌شود)؛ محدوده در هر درخواست از نو خوانده می‌شود. پرچم خاموش ⇒ هیچ خواندنی از `shop_member_scopes` و پاسخ‌ها بایت‌به‌بایت همان (`staff-scope.test.js`).
 - مجوز با هستهٔ سه‌حالتهٔ `perm-core` (allow/deny/approve، سقفِ `maxPct`/`maxAmount`) و بردارِ `core/test-vectors/perm-v1.json` (#243).
