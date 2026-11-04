@@ -23,23 +23,33 @@ class LocalNetworkManifestTest {
     return m.single().groupValues[1].toInt()
   }
 
+  /** هدفِ نسخهٔ Google Play (`-Pstore=play`) — همان مانیفست را دارد، پس همان قاعده */
+  private fun playTargetSdk(): Int {
+    val gradle = app.resolve("build.gradle.kts").readText()
+    val m = Regex("""(?m)^\s*val playTargetSdk\s*=\s*(\d+)""").findAll(gradle).toList()
+    assertEquals("یک و فقط یک playTargetSdk در build.gradle.kts", 1, m.size)
+    return m.single().groupValues[1].toInt()
+  }
+
   private fun declared(): Boolean =
     app.resolve("src/main/AndroidManifest.xml").readText().contains("android:name=\"${LocalNetworkAccess.PERMISSION}\"")
 
   @Test fun `اجازهٔ شبکهٔ محلی در مانیفست همان است که هدف می‌خواهد`() {
-    val t = targetSdk()
-    assertEquals(
-      "targetSdk = $t: ACCESS_LOCAL_NETWORK " + (if (LocalNetwork.declare(t)) "باید در مانیفست باشد" else "نباید در مانیفست باشد"),
-      LocalNetwork.declare(t), declared(),
-    )
+    for (t in listOf(targetSdk(), playTargetSdk())) {
+      assertEquals(
+        "targetSdk = $t: ACCESS_LOCAL_NETWORK " + (if (LocalNetwork.declare(t)) "باید در مانیفست باشد" else "نباید در مانیفست باشد"),
+        LocalNetwork.declare(t), declared(),
+      )
+    }
   }
 
   @Test fun `با هدفِ امروز اجازه ضمنی است و چاپگرِ شبکه بسته نمی‌شود`() {
-    val t = targetSdk()
-    if (LocalNetwork.declare(t)) return
-    for (device in listOf(24, 35, 36, 37, 40)) {
-      assertFalse(LocalNetwork.needsPermission(t, device))
-      assertFalse(LocalNetwork.blocked(t, device, granted = false, host = "192.168.1.50"))
+    for (t in listOf(targetSdk(), playTargetSdk())) {
+      if (LocalNetwork.declare(t)) continue
+      for (device in listOf(24, 35, 36, 37, 40)) {
+        assertFalse(LocalNetwork.needsPermission(t, device))
+        assertFalse(LocalNetwork.blocked(t, device, granted = false, host = "192.168.1.50"))
+      }
     }
   }
 

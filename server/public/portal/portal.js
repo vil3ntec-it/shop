@@ -96,6 +96,7 @@ async function verifyCode() {
     sessionStorage.setItem(TOKEN_KEY, token);
     show();
     await refresh();
+    openDeepTab();
   } catch (err) { msg(node, err.message, 'bad'); }
 }
 
@@ -358,9 +359,57 @@ async function loadDownloads() {
   }
 }
 
+/* ---------- حذفِ حساب (Google Play: راهِ وبِ حذف) — `/api/portal/account/deletion` ---------- */
+async function askSupportToDelete() {
+  try {
+    await call('POST', '/portal/support/messages', { body: 'درخواستِ حذفِ حساب: لطفاً حسابِ من و داده‌هایش را از سرور پاک کنید.' });
+    openTab('support');
+  } catch (err) { msg($('account-msg'), err.message, 'bad'); }
+}
+
+async function loadAccount() {
+  const box = $('account-body');
+  box.innerHTML = '';
+  msg($('account-msg'), '');
+  const out = await call('GET', '/portal/account/deletion');
+  box.appendChild(el('p', null, 'با حذفِ حساب، خودِ حساب، دکان‌هایی که صاحبشان هستید با همهٔ دادهٔ روی سرورشان (کالا، فروش، مشتری، قرض، همگام‌سازی و پشتیبان) و همهٔ نشست‌ها و دستگاه‌ها برای همیشه پاک می‌شود. برگشت ندارد.'));
+  box.appendChild(el('p', 'muted', 'می‌ماند: سندِ پرداخت‌های اشتراک (دفترِ مالیِ سامانه)، سابقهٔ خودِ حذف بی ایمیل و شماره، و نسخه‌های پشتیبانِ کلِ سرور تا پایانِ دورهٔ نگه‌داری‌شان. داده‌ای که فقط روی گوشی است با پاک کردنِ برنامه پاک می‌شود.'));
+  for (const s of out.shops || []) {
+    const warn = s.otherMembers ? ` — ${fa(s.otherMembers)} کارمند دیگر هم دسترسی‌شان را از دست می‌دهند` : '';
+    box.appendChild(el('div', 'msg msg-bad', `دکانِ «${s.name}» هم پاک می‌شود${warn}.`));
+  }
+  if (out.blocked || !out.enabled) {
+    box.appendChild(el('p', null, out.blocked === 'has_pump'
+      ? 'این حساب پمپ هم دارد؛ حذفش را پشتیبانی انجام می‌دهد تا دادهٔ پمپ بی‌خبر پاک نشود.'
+      : 'حذف از این صفحه هنوز روشن نشده است؛ درخواستتان را به پشتیبانی بفرستید تا حساب را پاک کنیم.'));
+    const b = el('button', 'btn', 'درخواستِ حذف از پشتیبانی');
+    b.onclick = askSupportToDelete;
+    box.appendChild(b);
+    return;
+  }
+  const what = { email: 'ایمیلِ', phone: 'شمارهٔ', id: 'شناسهٔ' }[out.confirmWith] || 'ایمیلِ';
+  box.appendChild(el('label', null, `برای تأیید، ${what} همین حساب را بنویسید: ${out.confirmValue}`));
+  const input = el('input');
+  input.type = 'text'; input.dir = 'ltr'; input.autocomplete = 'off';
+  box.appendChild(input);
+  const go = el('button', 'btn btn-danger', 'حذفِ همیشگیِ حساب');
+  go.style.marginTop = '12px';
+  go.onclick = async () => {
+    if (!input.value.trim()) { msg($('account-msg'), `${what} حساب را بنویسید.`, 'bad'); return; }
+    if (!confirm('حساب و همهٔ داده‌هایش برای همیشه پاک شود؟')) return;
+    go.disabled = true;
+    try {
+      await call('POST', '/portal/account/deletion', { confirm: input.value.trim() });
+      msg($('account-msg'), 'حساب و داده‌هایش از سرور پاک شد.', 'ok');
+      setTimeout(logout, 2500);
+    } catch (err) { msg($('account-msg'), err.message, 'bad'); go.disabled = false; }
+  };
+  box.appendChild(go);
+}
+
 const LOADERS = {
   subs: async () => renderSubs(), payments: loadPayments, devices: loadDevices,
-  support: loadSupport, notices: loadNotices, downloads: loadDownloads, rep: loadRep,
+  support: loadSupport, notices: loadNotices, downloads: loadDownloads, rep: loadRep, account: loadAccount,
 };
 function openTab(name) {
   for (const tab of document.querySelectorAll('.tab')) tab.classList.toggle('active', tab.dataset.tab === name);
@@ -385,6 +434,11 @@ document.addEventListener('DOMContentLoaded', () => {
   for (const tab of document.querySelectorAll('.tab')) tab.onclick = () => openTab(tab.dataset.tab);
   if (token) {
     show();
-    refresh().catch(() => logout());
+    refresh().then(openDeepTab).catch(() => logout());
   }
 });
+
+/** `/portal/#delete-account` (نشانیِ حذف در Google Play) ⇒ پس از ورود همان برگه */
+function openDeepTab() {
+  if (location.hash === '#delete-account') openTab('account');
+}

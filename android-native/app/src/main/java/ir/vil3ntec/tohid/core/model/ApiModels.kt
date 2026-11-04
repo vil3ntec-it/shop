@@ -82,6 +82,26 @@ data class MeDto(
 @Serializable
 data class UserWrapDto(val user: UserDto = UserDto())
 
+/**
+ *  «حذفِ حساب» به دستِ خودِ کاربر — پیش‌نمایشِ بی نوشتنِ `GET /api/me/account/deletion`
+ *  (`server/src/routes/account-deletion.js`؛ مرحله‌ها و سنجشِ نشانی: `AccountDeletion` ِ core).
+ */
+@Serializable
+data class AccountDeletionDto(
+  /** پرچمِ سراسریِ `account.self_delete` (پیش‌فرض خاموش ⇒ راهِ پشتیبانی) */
+  val enabled: Boolean = false,
+  /** `has_pump` ⇒ فقط از پشتیبانی؛ null یعنی می‌شود */
+  val blocked: String? = null,
+  /** `email`، `phone` یا `id` — کدام نشانیِ حساب باید نوشته شود */
+  val confirmWith: String = "email",
+  val confirmValue: String = "",
+  /** دکان‌هایی که با حساب می‌روند */
+  val shops: List<Shop> = emptyList(),
+) {
+  @Serializable
+  data class Shop(val name: String = "", val otherMembers: Int = 0)
+}
+
 /* ------------------------------ کد یک‌بارمصرف ------------------------------ */
 
 @Serializable

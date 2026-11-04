@@ -99,6 +99,16 @@
   S122 و AI-09 مدلِ زبانی (O-16/D-16)؛ PUR-12/AI-10 موتورِ OCR (D-16)؛ GATE-NEW-03 دستگاه/شبکهٔ واقعی؛ بقیه در `OWNER-DECISIONS-fa.md`.
 - نیمه‌کاره: رابطِ «همین کالا» (وبِ بازارچه یا برنامهٔ خرید) هنوز نیست؛ «واحدِ فروشِ دوم» و «بسته‌ها» ِ کالا در اندازه به کار نمی‌روند
   (ضریبِ نیامده در `detailsOf` پیش‌فرضِ ۱ می‌گیرد و «روشن» نیست). قدمِ بعدی: مرجِ همین PR؛ با رابطِ «همین کالا» همین `perUnit` نشان داده شود.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/play-readiness` (آمادگیِ Google Play؛ روی main پس از #916؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ممیزیِ Play با منبعِ رسمی (هدفِ API 36 از ۳۱ اوت ۲۰۲۶، ۱۶KB، حذفِ حساب، اجازه‌های محدود، تأییدِ توسعه‌دهنده…) و
+  چک‌لیستِ فارسیِ صاحب‌کار `docs/GOOGLE-PLAY-fa.md` (جوابِ فرمِ ایمنیِ داده، متن‌ها، نشانی‌ها، ریسک‌ها). `-Pstore=play`: قاعدهٔ بازار
+  (`StoreChannel.storeManaged` ِ core به‌جای `== "bazaar"`) + `compileSdk/targetSdk` ِ ۳۶ فقط برای Play؛ کارِ CI ِ «نسخهٔ Google Play
+  (AAB)» با `tools/play-check.py`. «حذفِ حساب»: برنامه (`profile/delete`، `DeleteAccountSheet`)، پورتالِ وب (`#delete-account`)،
+  سرور `routes/account-deletion.js` + `lib/self-delete.js` روی `lib/user-delete.js`، پرچمِ `account.self_delete` پیش‌فرض خاموش
+  (خاموش ⇒ درخواست به پشتیبانی؛ پمپ‌دار ⇒ ۴۰۹)، `privacy.html#delete-account` و پیوندِ «حریمِ خصوصی» در برنامه.
+- ⚠️ یافته: کلیدِ `tohid-release.jks` در مخزنِ عمومی است (برای Play کلیدِ بارگذاریِ تازه)؛ تحریم و حسابِ Play، Play Billing برای اشتراک.
+- نیمه‌کاره: CI و مرجِ همین PR (ساختِ AAB با compileSdk 36 روی AGP 8.7.3 فقط در CI سنجیده می‌شود). قدمِ بعدی: تصمیم‌های بخشِ ۱ ِ
+  `GOOGLE-PLAY-fa.md`، روشن کردنِ `account.self_delete` پیش از Production.
 ### ۱۴۰۵/۰۸/۱۳ — آیفون گامِ ۱۰، شاخهٔ `claude/ios-app-phase10` (روی main پس از #910؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `CoreFlowsE2EIosTest` ۷ ⇐ ۱۱ گام، همه با زدن روی صفحه در برابرِ سرورِ واقعی: **نسیه** (#906) — «نسیه» بی قرض‌دار «ثبت فروش»
   خاموش با پیام و زدنِ دکمهٔ خاموش هیچ نمی‌نویسد، «انتخابِ مشتری» ⇐ «قرض‌دارِ تازه» ⇐ نسیه با همان قرض‌دار (دفتر، بدهی، سرور)؛
