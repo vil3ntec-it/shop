@@ -41,6 +41,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrImagePages
+import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.BulkMatch
 import ir.vil3ntec.tohid.data.ImageBank
@@ -89,14 +94,14 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
   val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
     if (uris.isEmpty()) return@rememberLauncherForActivityResult
     scope.launch {
-      message = "در حالِ آماده‌سازیِ ${uris.size} فایل…"
+      message = StrImagePages.preparingFiles(uris.size)
       try {
-        job = ImageBulk.add(context, job, uris, store.data.value) { i, n -> message = "در حالِ آماده‌سازیِ عکسِ $i از $n…" }
+        job = ImageBulk.add(context, job, uris, store.data.value) { i, n -> message = StrImagePages.preparingPhoto(i, n) }
         message = null
       } catch (c: CancellationException) {
         throw c
       } catch (e: Exception) {
-        message = "خواندنِ فایل‌ها نیمه‌کاره ماند — دوباره انتخاب کنید"
+        message = StrImagePages.readHalfDone
       }
       tick++
     }
@@ -116,12 +121,12 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
           } catch (c: CancellationException) {
             throw c
           } catch (f: Exception) {
-            if (ImageBank.transient(f)) { message = "اینترنت قطع شد — ورود متوقف شد؛ بعداً «ادامهٔ ورود» را بزنید"; break }
+            if (ImageBank.transient(f)) { message = StrImagePages.netLostStopped; break }
             r.status = BulkJob.Status.FAILED
-            r.note = f.message ?: "خطا"
+            r.note = f.message ?: StrOnline.error
           } catch (_: OutOfMemoryError) {
             r.status = BulkJob.Status.FAILED
-            r.note = "حافظهٔ دستگاه برای این عکس کافی نبود"
+            r.note = StrImagePages.lowMemory
           }
           ImageBulk.save(context, j)
           ImageBulk.tidy(context, j)
@@ -150,41 +155,41 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
     AlertDialog(
       onDismissRequest = { confirmReplace = 0 },
       containerColor = colors.surfaceSolid,
-      title = { Text("$confirmReplace عکس جایگزین می‌شود", color = colors.text) },
+      title = { Text(StrImagePages.replaceCount(confirmReplace), color = colors.text) },
       text = {
         Text(
-          "عکسِ فعلیِ $confirmReplace کالا با عکسِ تازه جایگزین می‌شود و عکسِ قبلی برنمی‌گردد.",
+          StrImagePages.replaceNote(confirmReplace),
           color = colors.muted, style = MaterialTheme.typography.bodySmall,
         )
       },
-      confirmButton = { Button(onClick = { confirmReplace = 0; run() }) { Text("جایگزین کن") } },
-      dismissButton = { TextButton(onClick = { confirmReplace = 0 }) { Text("انصراف") } },
+      confirmButton = { Button(onClick = { confirmReplace = 0; run() }) { Text(StrImagePages.replaceBtn) } },
+      dismissButton = { TextButton(onClick = { confirmReplace = 0 }) { Text(Str.cancel) } },
     )
   }
 
   AdaptiveSheet(onDismissRequest = { stop = true; onDismiss() }, containerColor = colors.bg) {
     @Suppress("UNUSED_VARIABLE") val refresh = tick
     Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 24.dp)) {
-      Text("ورودِ گروهیِ عکسِ کالاها", style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
+      Text(StrImagePages.bulkTitle, style = MaterialTheme.typography.titleMedium, color = colors.text, fontWeight = FontWeight.Bold)
       Spacer(Modifier.height(4.dp))
       Text(
-        "نامِ هر فایل را بارکد یا نامِ دقیقِ کالا بگذارید (مثلاً 6261234567890.jpg)، یا یک CSV با ستون‌های barcode/name و image_filename کنارشان انتخاب کنید. فایلِ مبهم یا بی‌تطبیق حدس زده نمی‌شود.",
+        StrImagePages.bulkHelp,
         style = MaterialTheme.typography.bodySmall, color = colors.muted,
       )
       Text(
-        if (ImageBank.enabled.value == true) "هر عکس روی دستگاه کوچک می‌شود (۱۲۰۰ و ۴۰۰ پیکسل، بی EXIF/مکان)، عکسِ کالا می‌شود و در بانکِ تصاویرِ همین دکان هم ثبت می‌شود."
-        else "هر عکس روی دستگاه کوچک می‌شود (بی EXIF/مکان) و عکسِ کالا می‌شود؛ مثلِ همیشه با حساب همگام می‌شود.",
+        if (ImageBank.enabled.value == true) StrImagePages.shrinkBank
+        else StrImagePages.shrinkSync,
         style = MaterialTheme.typography.bodySmall, color = colors.muted,
       )
       val j = job
       if (resumed && j != null && j.startable() && !running) {
         Spacer(Modifier.height(6.dp))
-        StatusPill("ورودِ قبلی نیمه‌کاره ماند — ${j.counts().waiting} ردیف مانده", PillTone.WARNING)
+        StatusPill(StrImagePages.prevHalfDone(j.counts().waiting), PillTone.WARNING)
       }
       message?.let { Spacer(Modifier.height(6.dp)); StatusPill(it, PillTone.WARNING) }
       Spacer(Modifier.height(Space.xs))
       Row(verticalAlignment = Alignment.CenterVertically) {
-        OutlinedButton(onClick = { pick.launch("*/*") }, enabled = !running) { Text("انتخابِ عکس‌ها (و CSV)") }
+        OutlinedButton(onClick = { pick.launch("*/*") }, enabled = !running) { Text(StrImagePages.choosePhotos) }
       }
       Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.clickable(enabled = !running) {
         val jj = job ?: BulkJob("job-${System.currentTimeMillis()}").also { job = it }
@@ -193,20 +198,20 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
         jj.plan(photoOf); ImageBulk.save(context, jj); tick++
       }) {
         Checkbox(checked = job?.replace == true, onCheckedChange = null, enabled = !running)
-        Text("عکسِ کالاهایی که از قبل عکس دارند هم جایگزین شود", style = MaterialTheme.typography.bodySmall, color = colors.text)
+        Text(StrImagePages.replaceExisting, style = MaterialTheme.typography.bodySmall, color = colors.text)
       }
       if (j != null && j.rows.isNotEmpty()) {
         val c = j.counts()
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), modifier = Modifier.padding(vertical = 6.dp)) {
-          StatusPill("${c.done} موفق", PillTone.SUCCESS)
-          StatusPill("${c.failed} ناموفق", PillTone.DANGER)
-          StatusPill("${c.duplicate} تکراری", PillTone.NEUTRAL)
+          StatusPill(Str.okCount(c.done), PillTone.SUCCESS)
+          StatusPill(Str.failedCount(c.failed), PillTone.DANGER)
+          StatusPill(StrImagePages.dupCount(c.duplicate), PillTone.NEUTRAL)
         }
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-          StatusPill("${c.ambiguous} مبهم", PillTone.WARNING)
-          StatusPill("${c.unmatched} بی‌تطبیق", PillTone.WARNING)
-          StatusPill("${c.hasPhoto} عکس دارد", PillTone.NEUTRAL)
-          StatusPill("${c.waiting} مانده", PillTone.NEUTRAL)
+          StatusPill(StrImagePages.ambiguousCount(c.ambiguous), PillTone.WARNING)
+          StatusPill(StrImagePages.unmatchedCount(c.unmatched), PillTone.WARNING)
+          StatusPill(StrImagePages.hasPhotoCount(c.hasPhoto), PillTone.NEUTRAL)
+          StatusPill(StrSale.leftQty(c.waiting), PillTone.NEUTRAL)
         }
         Spacer(Modifier.height(Space.xs))
         Column(Modifier.heightIn(max = 380.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -219,18 +224,18 @@ fun ImageBulkImportSheet(store: ShopStore, d: ShopData, onDismiss: () -> Unit) {
         }
       } else {
         Spacer(Modifier.height(Space.xs))
-        Text("هنوز فایلی انتخاب نشده.", style = MaterialTheme.typography.bodySmall, color = colors.muted)
+        Text(StrImagePages.noFileYet, style = MaterialTheme.typography.bodySmall, color = colors.muted)
       }
       Spacer(Modifier.height(Space.sm))
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        if (running) OutlinedButton(onClick = { stop = true }) { Text("توقف") }
+        if (running) OutlinedButton(onClick = { stop = true }) { Text(StrNav.stop) }
         else if (j != null && j.startable()) {
           Button(onClick = { start() }) {
-            Text(if (j.rows.any { it.status == BulkJob.Status.DONE || it.status == BulkJob.Status.PENDING_BANK }) "ادامهٔ ورود" else "شروعِ ورود")
+            Text(if (j.rows.any { it.status == BulkJob.Status.DONE || it.status == BulkJob.Status.PENDING_BANK }) StrImagePages.continueImport else StrImagePages.startImport)
           }
         }
         if (!running && j != null && j.rows.isNotEmpty()) {
-          TextButton(onClick = { ImageBulk.clear(context); job = null; resumed = false; tick++ }) { Text("پاک کردنِ فهرست") }
+          TextButton(onClick = { ImageBulk.clear(context); job = null; resumed = false; tick++ }) { Text(StrImagePages.clearList) }
         }
       }
     }
@@ -248,8 +253,8 @@ private fun BulkRowCard(r: BulkJob.Row, d: ShopData, running: Boolean, onChoose:
     else -> PillTone.NEUTRAL
   }
   val how = mapOf(
-    "barcode" to "بارکد در نامِ فایل", "name" to "نامِ کاملِ کالا", "csv_barcode" to "بارکدِ ردیفِ CSV",
-    "csv_name" to "نامِ ردیفِ CSV", "manual" to "انتخابِ شما",
+    "barcode" to StrImagePages.howFileBarcode, "name" to StrImagePages.howFullName, "csv_barcode" to StrImagePages.howCsvBarcode,
+    "csv_name" to StrImagePages.howCsvName, "manual" to StrImagePages.howManual,
   )
   Column(
     Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).border(BorderStroke(1.dp, colors.border), RoundedCornerShape(10.dp))
@@ -263,7 +268,7 @@ private fun BulkRowCard(r: BulkJob.Row, d: ShopData, running: Boolean, onChoose:
     if (p != null) Text("${p.name} — ${how[r.how].orEmpty()}", style = MaterialTheme.typography.labelSmall, color = colors.muted)
     if (r.note.isNotEmpty()) Text(r.note, style = MaterialTheme.typography.labelSmall, color = colors.muted)
     if (!running && r.status == BulkJob.Status.AMBIGUOUS) {
-      Text("کدام کالا؟", style = MaterialTheme.typography.labelSmall, color = colors.text)
+      Text(StrImagePages.whichProduct, style = MaterialTheme.typography.labelSmall, color = colors.text)
       r.candidates.mapNotNull { id -> d.products.firstOrNull { it.id == id } }.forEach { c ->
         TextButton(onClick = { onChoose(c.id) }) { Text(c.name + (c.barcodes.firstOrNull()?.let { " — $it" } ?: "")) }
       }
@@ -273,15 +278,15 @@ private fun BulkRowCard(r: BulkJob.Row, d: ShopData, running: Boolean, onChoose:
       var miss by remember(r.key) { mutableStateOf(false) }
       Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(value = code, onValueChange = { code = it; miss = false }, singleLine = true,
-          label = { Text("بارکد یا نامِ دقیق") }, modifier = Modifier.weight(1f))
+          label = { Text(StrImagePages.barcodeOrExact) }, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(6.dp))
         OutlinedButton(onClick = {
           val m = BulkMatch.match(code.trim() + ".jpg", ImageBulk.items(d))
           if (m.status == BulkMatch.Status.MATCHED) onChoose(m.productId) else miss = true
-        }) { Text("تطبیق") }
+        }) { Text(StrImagePages.matchBtn) }
       }
-      if (miss) Text("کالایی با این بارکد یا نام پیدا نشد (یا بیش از یکی بود)", style = MaterialTheme.typography.labelSmall, color = colors.danger)
+      if (miss) Text(StrImagePages.noSuchProduct, style = MaterialTheme.typography.labelSmall, color = colors.danger)
     }
-    if (!running && r.status == BulkJob.Status.FAILED) TextButton(onClick = onRetry) { Text("دوباره") }
+    if (!running && r.status == BulkJob.Status.FAILED) TextButton(onClick = onRetry) { Text(Str.again) }
   }
 }

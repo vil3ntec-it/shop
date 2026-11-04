@@ -25,7 +25,15 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.PrintQueue
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrDevicePages
 import ir.vil3ntec.tohid.core.i18n.StrLabel
+import ir.vil3ntec.tohid.core.i18n.StrMarketPages
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrPick
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.marketing.CampaignLinks
 import ir.vil3ntec.tohid.core.qr.QrCode
 import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
@@ -90,24 +98,24 @@ internal fun CampaignsPane(storeTitle: String, snackbar: SnackbarHostState) {
   Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
     when (gate) {
       null -> TohidLoadingState(rows = 3)
-      Gate.ERROR -> TohidErrorState("پیوندها باز نشد", loadError.ifBlank { "اتصال را بررسی کنید." }, onRetry = { scope.launch { reload() } })
-      Gate.OFF -> TohidEmptyState("پیوند و QR هنوز روشن نیست", "این بخش پس از روشن شدن از طرفِ سامانه دیده می‌شود.", icon = Icons.Filled.QrCode)
-      Gate.NO_PERMISSION -> TohidEmptyState("فقط اعضای دکان", "دیدنِ پیوندها اجازهٔ خواندنِ دادهٔ دکان را می‌خواهد.", icon = Icons.Filled.QrCode)
+      Gate.ERROR -> TohidErrorState(StrMarketPages.linksNotOpened, loadError.ifBlank { StrOnline.checkConnection }, onRetry = { scope.launch { reload() } })
+      Gate.OFF -> TohidEmptyState(StrMarketPages.linksOff, StrOnline.sfOffBody, icon = Icons.Filled.QrCode)
+      Gate.NO_PERMISSION -> TohidEmptyState(StrMarketPages.membersOnly, StrMarketPages.linksNeedRead, icon = Icons.Filled.QrCode)
       Gate.READY -> {
-        Text("هر پیوند نشان می‌دهد مشتری از کجا آمده. شمارها مالِ ${days.fa()} روزِ اخیرند و هیچ نام یا شماره‌ای ندارند.",
+        Text(StrMarketPages.linksIntro(days.fa()),
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
         if (manage) {
           QuickQrRow(repo, snackbar, items) { replace(it); shown = it }
           NewCampaignForm(repo, snackbar) { replace(it) }
         }
         if (items.isEmpty()) {
-          TohidEmptyState("هنوز پیوندی نیست", if (manage) "با «QR ِ دیوار» یا فرمِ بالا نخستین پیوند را بسازید." else "صاحب دکان یا مدیر پیوند می‌سازد.", icon = Icons.Filled.QrCode)
+          TohidEmptyState(StrMarketPages.noLinksYet, if (manage) StrMarketPages.makeFirstLink else StrMarketPages.ownerMakesLinks, icon = Icons.Filled.QrCode)
         }
         items.forEach { c ->
           CampaignRow(c, manage, onShow = { shown = c }, onArchive = { archived ->
             scope.launch {
               repo.setArchived(c.id, archived)
-                .onSuccess { replace(it); snackbar.showSnackbar(if (archived) "بایگانی شد" else "برگشت") }
+                .onSuccess { replace(it); snackbar.showSnackbar(if (archived) StrMarketPages.archivedDone else StrMarketPages.restoredDone) }
                 .onFailure { snackbar.showSnackbar(it.userMessage) }
             }
           })
@@ -119,7 +127,7 @@ internal fun CampaignsPane(storeTitle: String, snackbar: SnackbarHostState) {
   shown?.let { c ->
     val url = CampaignLinks.publicUrl(base, c.path)
     if (url == null) {
-      LaunchedEffect(c.id) { snackbar.showSnackbar("نشانیِ این پیوند خوانده نشد"); shown = null }
+      LaunchedEffect(c.id) { snackbar.showSnackbar(StrMarketPages.linkUrlUnread); shown = null }
     } else {
       QrDialog(c, url, storeTitle, snackbar) { shown = null }
     }
@@ -142,8 +150,8 @@ private fun QuickQrRow(repo: CampaignLinksRepository, snackbar: SnackbarHostStat
     }
   }
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    Button(enabled = !busy, onClick = { open(CampaignLinks.WALL_CLIENT_ID, "QR ِ دیوار و پیشخوان", CampaignLinks.Source.QR_WALL) }) { Text("QR ِ دیوار") }
-    OutlinedButton(enabled = !busy, onClick = { open(CampaignLinks.RECEIPT_CLIENT_ID, "QR ِ رسید", CampaignLinks.Source.QR_RECEIPT) }) { Text("QR ِ رسید") }
+    Button(enabled = !busy, onClick = { open(CampaignLinks.WALL_CLIENT_ID, "QR ِ دیوار و پیشخوان", CampaignLinks.Source.QR_WALL) }) { Text(StrMarketPages.wallQr) } // داده: نامِ دو پیوندِ ثابتِ QR که روی سرور ذخیره می‌شود
+    OutlinedButton(enabled = !busy, onClick = { open(CampaignLinks.RECEIPT_CLIENT_ID, StrMarketPages.receiptQr, CampaignLinks.Source.QR_RECEIPT) }) { Text("QR ِ رسید") } // داده: نامِ پیوندِ ثابتِ QR که روی سرور ذخیره می‌شود
   }
 }
 
@@ -161,10 +169,10 @@ private fun NewCampaignForm(repo: CampaignLinksRepository, snackbar: SnackbarHos
 
   Column(Modifier.fillMaxWidth().border(1.dp, Shop.colors.borderCard, MaterialTheme.shapes.medium).padding(12.dp),
     verticalArrangement = Arrangement.spacedBy(8.dp)) {
-    Text("پیوندِ تازه", fontWeight = FontWeight.Bold)
+    Text(StrMarketPages.newLink, fontWeight = FontWeight.Bold)
     OutlinedTextField(
       value = name, onValueChange = { name = it; touched = true },
-      label = { Text("نام (مثلاً «اینستاگرام» یا «تراکتِ محله»)") },
+      label = { Text(StrMarketPages.linkNameField) },
       singleLine = true, isError = error != null,
       supportingText = { if (error != null) Text(error) },
       modifier = Modifier.fillMaxWidth(),
@@ -183,12 +191,12 @@ private fun NewCampaignForm(repo: CampaignLinksRepository, snackbar: SnackbarHos
           .onSuccess {
             onCreated(it)
             name = ""; touched = false; clientId = Ulid.next()
-            snackbar.showSnackbar("ثبت شد")
+            snackbar.showSnackbar(StrOnline.evCreated)
           }
           .onFailure { snackbar.showSnackbar(it.userMessage) }
         saving = false
       }
-    }) { Text(if (saving) "در حالِ ثبت…" else "ساختنِ پیوند") }
+    }) { Text(if (saving) StrSale.posting else StrMarketPages.makeLink) }
   }
 }
 
@@ -202,18 +210,18 @@ private fun CampaignRow(c: CampaignDto, manage: Boolean, onShow: () -> Unit, onA
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {
         Text(c.name, fontWeight = FontWeight.Bold, color = if (c.archived) Shop.colors.muted else Color.Unspecified)
-        Text(CampaignLinks.Source.of(c.source).label + if (c.archived) " · بایگانی‌شده" else "",
+        Text(CampaignLinks.Source.of(c.source).label + if (c.archived) StrMarketPages.archivedMark else "",
           style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
       }
-      TextButton(onClick = onShow) { Text("QR و پیوند") }
+      TextButton(onClick = onShow) { Text(StrMarketPages.qrAndLink) }
     }
     if (s != null) {
-      Text("بازدید ${s.visits.fa()} · سفارش ${s.orders.fa()} · تحویل‌شده ${s.doneOrders.fa()} (${money(s.doneMinor / 100.0)} افغانی)",
+      Text(StrMarketPages.linkStats(s.visits.fa(), s.orders.fa(), s.doneOrders.fa(), money(s.doneMinor / 100.0)),
         style = MaterialTheme.typography.bodySmall)
     }
     if (manage) {
       TextButton(onClick = { onArchive(!c.archived) }) {
-        Text(if (c.archived) "برگرداندن" else "بایگانی (QR ِ چاپ‌شده هنوز به ویترین می‌برد)")
+        Text(if (c.archived) StrAccount.unblock else StrMarketPages.archiveLink)
       }
     }
   }
@@ -239,10 +247,10 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
         Text(CampaignLinks.displayUrl(url), style = MaterialTheme.typography.bodySmall)
         Text(CampaignLinks.SCAN_HINT, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-          OutlinedButton(onClick = { clipboard.setText(AnnotatedString(url)); report("پیوند کپی شد") }) { Text("کپیِ پیوند") }
+          OutlinedButton(onClick = { clipboard.setText(AnnotatedString(url)); report(StrMarketPages.linkCopied) }) { Text(StrSalePages.copyLink) }
           OutlinedButton(enabled = !busy, onClick = {
             val pr = PrinterRegistry.defaultSaved(context)
-            if (pr == null) { report("چاپگرِ رسید تنظیم نشده است"); return@OutlinedButton }
+            if (pr == null) { report(StrPick.noPrinter); return@OutlinedButton }
             busy = true
             scope.launch {
               val msg = runCatching {
@@ -252,11 +260,11 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
                   EscPos.document(img, profile)
                 }
                 PrintSpooler.submitAndWait(context, PrintQueue.Kind.TEST, pr.link, "QR ِ ${c.name}", bytes)
-              }.getOrElse { it.message ?: "چاپ نشد" }
+              }.getOrElse { it.message ?: StrMarketPages.notPrinted }
               busy = false
               report(msg)
             }
-          }) { Text("چاپ روی رسید") }
+          }) { Text(StrMarketPages.printOnReceipt) }
           OutlinedButton(enabled = !busy, onClick = {
             busy = true
             scope.launch {
@@ -265,10 +273,10 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
                   CampaignLinks.page(ReceiptRaster.compose(CampaignLinks.poster(storeTitle, url), ReceiptPainter(context)))
                 }
                 LabelSheetPrint.print(context, page, "QR ِ ${c.name}")
-              }.onFailure { report(it.message ?: "برگه ساخته نشد") }
+              }.onFailure { report(it.message ?: StrMarketPages.sheetNotMade) }
               busy = false
             }
-          }) { Text("برگهٔ A4") }
+          }) { Text(StrDevicePages.a4Sheet) }
           //  MKT-10: پیوندِ «QR ِ رسید» ⇒ زیرِ هر فاکتورِ فروشِ همین دستگاه (پیش‌فرض خاموش)
           if (CampaignLinks.Source.of(c.source) == CampaignLinks.Source.QR_RECEIPT && !c.archived) {
             var onReceipt by remember(url) { mutableStateOf(ReceiptStoreQr.url(context) == url) }
@@ -281,7 +289,7 @@ private fun QrDialog(c: CampaignDto, url: String, storeTitle: String, snackbar: 
         }
       }
     },
-    confirmButton = { TextButton(onClick = onClose) { Text("بستن") } },
+    confirmButton = { TextButton(onClick = onClose) { Text(Str.close) } },
   )
 }
 
