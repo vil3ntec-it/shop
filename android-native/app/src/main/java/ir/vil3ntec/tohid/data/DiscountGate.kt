@@ -74,6 +74,8 @@ object DiscountGate {
       if (line.free || !(line.quantity > 0)) continue
       if (promo?.tags?.get(line.productId)?.promo?.isNotEmpty() == true) continue
       val p = d.products.find { it.id == line.productId } ?: continue
+      //  S05: قیمتِ لیستِ بسته برای مضربِ درستِ همان بسته کاهش نیست (`PackScan.packListed`)
+      if (PackScan.packListed(p, unit, line.quantity)) continue
       sum += LinePricing.reductionMinor(minor(ProductPlansMap.price(p)), minor(unit), (line.quantity * 1000).roundToLong())
     }
     return sum

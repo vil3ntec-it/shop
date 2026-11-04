@@ -240,6 +240,13 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   var drill by remember(day) { mutableStateOf<String?>(null) }
   //  RPT-13: ریزِ ردیفِ تفکیکِ فروش («فروش» و «سود و حاشیه»؛ کلیک یا Enter) ⇐ فاکتورهای همان ردیف
   var salesDrill by remember(def.id, span, dim) { mutableStateOf<ReportTables.Table?>(null) }
+  //  RPT-13: ریزِ ردیفِ «امروز» (فاکتورهای همان روز)، «بدهی‌ها» (سندهای باز) و «تقلب» (رویدادهای همان کاربر)؛ جدول و یادداشت
+  var rowDrill by remember(def.id, span) { mutableStateOf<Pair<ReportTables.Table, String>?>(null) }
+  fun saleDoc(id: String) = DayEndModel.docLabel(d, "sale:$id")
+  fun debtDoc(id: String): String =
+    d.transactions.find { it.id == id }?.let { t -> t.refId?.let { r -> d.sales.find { it.id == r } }?.let { saleDoc(it.id) } ?: t.notes.trim().ifEmpty { "قرض" } }
+      ?: d.purchases.find { it.id == id }?.let { p -> "خرید" + p.notes.trim().let { if (it.isEmpty()) "" else " — $it" } }
+      ?: ""
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
   val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
@@ -321,7 +328,18 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
         dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
         sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
           val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
-          salesDrill = ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock) { DayEndModel.docLabel(d, it) }
+          salesDrill = ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
+        }
+        t.id == "today" -> { row ->
+          ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to "جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ همین روز است؛ برگشتی جداست." }
+        }
+        view.debts != null && t.id.startsWith("debts.") -> { row ->
+          ReportFreshModel.debtDrill(ledger, view.debts, t.id == "debts.suppliers", t.rows.indexOf(row), row.first().content, clock, ::debtDoc)
+            ?.let { rowDrill = it to "سندهای باز به ترتیبِ «اولین قرض، اولین پرداخت»؛ جمع همان «مانده» ِ همین ردیف است." }
+        }
+        view.fraud != null && t.id == "fraud" -> { row ->
+          ReportFreshModel.fraudDrill(ledger, view.fraud, t.rows.indexOf(row), clock, ::saleDoc)
+            ?.let { rowDrill = it to "شمارِ هر نوع همان ستونِ همین ردیف است؛ «تأییدِ کارِ …» کارِ دیگری است که این کاربر تأیید کرد." }
         }
         else -> null
       }
@@ -336,6 +354,7 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   salesDrill?.let { t ->
     DayEndDetailDialog(t, note = "جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ ردیف است؛ برگشتی جداست.") { salesDrill = null }
   }
+  rowDrill?.let { (t, note) -> DayEndDetailDialog(t, note = note) { rowDrill = null } }
 }
 
 @Composable

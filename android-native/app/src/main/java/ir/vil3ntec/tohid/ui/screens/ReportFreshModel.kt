@@ -117,6 +117,90 @@ object ReportFreshModel {
     )
   }
 
+  /* ---------------- RPT-13: ریزِ ردیفِ «امروز»، «بدهی‌ها» و «تقلب» ---------------- */
+
+  const val DAY_DRILL_ID = "today.drill"
+  const val DEBT_DRILL_ID = "debts.drill"
+  const val FRAUD_DRILL_ID = "fraud.drill"
+
+  /** ستونِ «روز» ِ جدولِ «امروز» (`ReportTables.today`: روز، تاریخ، …) */
+  private const val TODAY_DATE_COL = 1
+
+  /**
+   *  ردیفِ «امروز»/«دیروز»/«هفتهٔ پیش» ⇒ فاکتورهای همان روز (`ReportCore.dayInvoices`): جمعِ «فروش» = ستونِ «فروش» و
+   *  شمار = «فاکتور» ِ همان ردیف. ردیف یا تاریخِ بی‌جا ⇒ null.
+   */
+  fun dayDrill(l: ReportLedger, row: List<JsonPrimitive>, clock: ReportClock?, doc: (String) -> String): ReportTables.Table? {
+    val date = row.getOrNull(TODAY_DATE_COL)?.takeIf { it !is JsonNull }?.content ?: return null
+    val list = ReportCore.dayInvoices(l, date, clock)
+    return ReportTables.Table(
+      DAY_DRILL_ID, "ریزِ «${row.first().content}» — ${list.size} فاکتور",
+      listOf(ReportTables.Column("doc", "فاکتور", "text"), ReportTables.Column("qty", "مقدار", "qty"), ReportTables.Column("sales", "فروش", "money")),
+      list.map { listOf(JsonPrimitive(doc(it.saleId)), JsonPrimitive(it.qty), JsonPrimitive(it.sales)) },
+      listOf(JsonPrimitive("جمع"), JsonPrimitive(list.sumOf { it.qty }), JsonPrimitive(list.sumOf { it.sales })),
+    )
+  }
+
+  /**
+   *  ردیفِ [index] از «سنِ بدهی» ([supplier] ⇒ «طلبِ تأمین‌کنندگان») ⇒ ماندهٔ بازِ هر سندِ همان طرف به اولین‌وارد‌اولین‌پرداخت
+   *  (`ReportCore.openDebt`)، با پیش‌پرداخت در ردیفِ جدا؛ «مانده» ِ پایانی = ستونِ «مانده» ِ همان ردیف. [doc] نامِ سند.
+   */
+  fun debtDrill(
+    l: ReportLedger, r: ReportCore.DebtReport, supplier: Boolean, index: Int, label: String, clock: ReportClock?, doc: (String) -> String,
+  ): ReportTables.Table? {
+    val row = (if (supplier) r.suppliers else r.customers).rows.getOrNull(index) ?: return null
+    val open = ReportCore.openDebt(l, r.asOf, supplier, row.id, clock)
+    val lines = open.lots.map {
+      listOf(JsonPrimitive(it.date), JsonPrimitive(doc(it.docId)), JsonPrimitive(it.left), if (it.ageDays >= 0) JsonPrimitive(it.ageDays) else JsonNull)
+    } + if (open.credit != 0L) listOf(listOf(JsonNull, JsonPrimitive("پیش‌پرداخت"), JsonPrimitive(-open.credit), JsonNull)) else emptyList()
+    return ReportTables.Table(
+      DEBT_DRILL_ID, "ریزِ «${label.ifBlank { "—" }}» — ${open.lots.size} سندِ باز",
+      listOf(
+        ReportTables.Column("date", "روز", "date"), ReportTables.Column("doc", "سند", "text"),
+        ReportTables.Column("left", "مانده", "money"), ReportTables.Column("age", "سن (روز)", "count"),
+      ),
+      lines,
+      listOf(JsonPrimitive("جمع"), JsonPrimitive(""), JsonPrimitive(open.lots.sumOf { it.left } - open.credit), JsonNull),
+    )
+  }
+
+  /** نامِ نوعِ رویدادِ ضدتقلب (`ReportCore.FraudEvent.kind`) */
+  fun fraudKind(kind: String): String = when (kind) {
+    "discount" -> "تخفیف"
+    "approved" -> "فاکتورِ تأییدشده"
+    "return" -> "برگشتی"
+    "void" -> "لغو"
+    "line_delete" -> "حذف ردیف"
+    "no_sale" -> "باز کردن کشو بی فروش"
+    else -> kind
+  }
+
+  /**
+   *  ردیفِ [index] از «ضدتقلب» ⇒ رویدادهای همان کاربر (`ReportCore.fraudEvents`، همان بازه): شمارِ هر نوع = ستونِ همان
+   *  ردیف؛ کارِ دیگران که همین کاربر تأیید کرد با «تأییدِ کارِ …» در ستونِ «تأییدکننده».
+   */
+  fun fraudDrill(
+    l: ReportLedger, r: ReportCore.FraudReport, index: Int, clock: ReportClock?, doc: (String) -> String,
+  ): ReportTables.Table? {
+    val row = r.rows.getOrNull(index) ?: return null
+    val list = ReportCore.fraudEvents(l, r.from, r.to, row.key, clock)
+    fun who(s: String) = s.ifEmpty { "نامعلوم" }
+    return ReportTables.Table(
+      FRAUD_DRILL_ID, "ریزِ «${who(row.key)}» — ${list.size} رویداد",
+      listOf(
+        ReportTables.Column("date", "روز", "date"), ReportTables.Column("kind", "نوع", "text"), ReportTables.Column("doc", "سند", "text"),
+        ReportTables.Column("amount", "مبلغ", "money"), ReportTables.Column("approver", "تأییدکننده", "text"),
+      ),
+      list.map { e ->
+        listOf(
+          JsonPrimitive(e.date), JsonPrimitive(fraudKind(e.kind)), JsonPrimitive(if (e.docId.isEmpty()) "—" else doc(e.docId)), JsonPrimitive(e.amount),
+          JsonPrimitive(if (e.byOther) "تأییدِ کارِ «${who(e.user)}»" else e.approvedBy),
+        )
+      },
+      null,
+    )
+  }
+
   /** «12.3٪» — یک رقمِ اعشار، بی علامتِ مثبت */
   fun percent(bp: Long): String {
     val a = if (bp < 0) -bp else bp

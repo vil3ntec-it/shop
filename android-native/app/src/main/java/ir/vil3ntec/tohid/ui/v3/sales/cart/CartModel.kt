@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.sales.cart
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.BarcodeMatch
+import ir.vil3ntec.tohid.data.PackScan
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ProductInfoMap
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -91,6 +92,9 @@ object CartModel {
       val available: Double,
       /** برچسبِ ترازو: مقدارِ وزن‌شده (null ⇒ بارکدِ کالا) */
       val weighed: Double? = null,
+      /** PRD-04: بارکدِ بسته — نامِ بسته («کارتن») و تعدادِ بسته‌ها؛ null ⇒ بارکدِ خودِ کالا */
+      val pack: String? = null,
+      val packCount: Double = 0.0,
     ) : Scan
 
     /** هیچ کالایی این بارکد را ندارد ⇒ «ثبتِ کالا» با همین کد */
@@ -101,11 +105,22 @@ object CartModel {
 
     /** کالا هست ولی غیرفعال */
     data class Inactive(val product: Product) : Scan
+
+    /** PRD-04: هم بارکدِ بسته و هم بارکدِ کالا (تعارضِ آفلاین) ⇒ هیچ‌کدام به سبد نمی‌رود */
+    data class Ambiguous(val code: String) : Scan
+
+    /** S05: کالا با قیمتِ دیگری در سبد است و قیمتِ لیستِ بسته با آن جمع نمی‌شود (`PackScan.Result.Clash`) */
+    data class PackClash(val product: Product, val pack: String) : Scan
+
+    /** «فقط بستهٔ کامل»: تعدادِ اعشاری از بسته */
+    data class PackPart(val pack: String) : Scan
   }
 
   /**
-   *  یک بارکد ⇒ سبد: شناختن با `BarcodeMatch` (کامل، و اگر نشد از نیمه، فقط وقتی یکتاست)
+   *  یک بارکد ⇒ سبد: اول بارکدِ بسته (PRD-04، `PackScan`: «کارتن» ⇒ اندازهٔ بسته × `multiplier`، و با [packPrice]
+   *  قیمتِ لیستِ همان بسته — S05)، بعد شناختن با `BarcodeMatch` (کامل، و اگر نشد از نیمه، فقط وقتی یکتاست)
    *  و افزودنِ `multiplier` تا موجودی — همان قاعدهٔ صندوقِ امروز.
+   *  @param packPrice «واحدِ بزرگ در صندوق» (`TillGoodsPref.units`) @param wholeOnly «فقط بستهٔ کامل»
    */
   fun scan(
     d: ShopData,
@@ -113,8 +128,19 @@ object CartModel {
     lines: List<SalesEngine.CartLine>,
     raw: String,
     multiplier: Double = 1.0,
+    packPrice: Boolean = false,
+    wholeOnly: Boolean = false,
   ): Scan? {
     val code = raw.trim().takeIf { it.isNotEmpty() } ?: return null
+    when (val k = PackScan.scan(d, lines, code, multiplier, index, packPrice, wholeOnly)) {
+      null -> Unit
+      is PackScan.Result.Added ->
+        return Scan.Added(k.added.cart, k.product, whole = true, capped = k.added.capped, available = k.added.available, pack = k.pack.name, packCount = k.count)
+      is PackScan.Result.Inactive -> return Scan.Inactive(k.product)
+      is PackScan.Result.Ambiguous -> return Scan.Ambiguous(k.code)
+      is PackScan.Result.Clash -> return Scan.PackClash(k.product, k.pack.name)
+      is PackScan.Result.PartRejected -> return Scan.PackPart(k.pack.name)
+    }
     return when (val hit = BarcodeMatch.find(code, index)) {
       is BarcodeMatch.Hit.Several -> Scan.Several(code, hit.count)
       is BarcodeMatch.Hit.Product -> {
@@ -140,6 +166,7 @@ object CartModel {
   fun scanNote(s: Scan.Added): String = when {
     s.capped -> StrSale.onlyLeftOf(s.product.name, stockLeft(s.product, s.available))
     s.weighed != null -> StrSale.weighedAdded(s.product.name, stockLeft(s.product, s.weighed))
+    s.pack != null -> StrSale.packAdded(qty(s.packCount), s.pack, s.product.name)
     s.whole -> StrSale.addedToCart(s.product.name)
     else -> StrSale.halfBarcode(s.product.name)
   }

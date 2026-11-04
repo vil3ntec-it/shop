@@ -271,6 +271,25 @@ fun DeskSaleScreen(
     applyAdded(product, SalesEngine.addToCartCapped(cartStore.lines.value, product.id, count, ir.vil3ntec.tohid.data.ProductInfoMap.sellable(d, product.id)))
 
   /**
+   *  PRD-04/S05: بارکدِ بسته ⇒ اندازهٔ بسته × [count]؛ با «واحدِ بزرگ در صندوق» (`TillGoodsPref.units`) قیمتِ لیستِ همان بسته
+   *  (`PackScan`، همان صندوقِ گوشی). `false` ⇒ کد بارکدِ بسته نیست (راهِ همیشگی).
+   */
+  fun addPack(code: String, count: Double, dd: ShopData, items: Map<String, String>): Boolean {
+    val r = ir.vil3ntec.tohid.data.PackScan.scan(
+      dd, cartStore.lines.value, code, count, items,
+      ir.vil3ntec.tohid.data.TillGoodsPref.units(context), ir.vil3ntec.tohid.data.TillGoodsPref.wholePacks(context),
+    ) ?: return false
+    when (r) {
+      is ir.vil3ntec.tohid.data.PackScan.Result.Added -> applyAdded(r.product, r.added)
+      is ir.vil3ntec.tohid.data.PackScan.Result.Inactive -> toast(StrSale.inactive(r.product.name))
+      is ir.vil3ntec.tohid.data.PackScan.Result.Ambiguous -> { ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(r.code)) }
+      is ir.vil3ntec.tohid.data.PackScan.Result.PartRejected -> { ScanFeedback.unknown(context); toast(StrSale.partPackRejected(r.pack.name)) }
+      is ir.vil3ntec.tohid.data.PackScan.Result.Clash -> { ScanFeedback.unknown(context); toast(StrSale.packPriceClash(r.product.name, r.pack.name)) }
+    }
+    return true
+  }
+
+  /**
    *  موتورِ تازهٔ موجودی (روشن): کدی که «سری»ِ یک کالاست ⇒ همان کالا به سبد، و فروش اول از همین
    *  سری برداشته می‌شود (`StockActions.lotForCode`). خاموش یا ناشناس ⇒ false (رفتارِ امروز).
    */
@@ -309,6 +328,7 @@ fun DeskSaleScreen(
     if (quick?.enter(query) == true) { query = ""; return } // S03: Enter پس از بارکدِ ناشناس ⇒ ثبتِ سریع
     if (scaleLabel(query, d)) { query = ""; return }
     if (payV2 && query.isBlank()) { if (pay) payOpen = true; return } // بی پنلِ پرداخت همان «هیچ کار» ِ امروز
+    if (addPack(parsed.second, parsed.first, d, index)) { query = ""; return } // PRD-04/S05: «۲*کارتن» با قیمتِ لیستِ بسته
     when (val hit = PosSearch.resolve(query, index, d.products, matches, hint, packIndex)) {
       PosHit.None -> Unit
       is PosHit.Inactive -> toast(StrSale.inactive(hit.product.name))
@@ -333,18 +353,9 @@ fun DeskSaleScreen(
   fun fromScanner(code: String): Boolean {
     enterGate.mark(); val dd = latestD
     if (scaleLabel(code, dd)) return true
-    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
+    //  PRD-04: بارکدِ بسته ⇒ اندازهٔ بسته (S05: با «واحدِ بزرگ» قیمتِ لیستِ بسته)؛ همان کد بارکدِ کالا هم (تعارضِ آفلاین) ⇒ مبهم، هیچ‌کدام
     val items = ShopStore.barcodeIndex(dd)
-    when (val l = ShopStore.packIndex(dd).lookup(code) { PosSearch.isItemCode(it, items) }) {
-      ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Ambiguous -> {
-        ScanFeedback.unknown(context); toast(StrSale.ambiguousBarcode(code.trim())); return true
-      }
-      is ir.vil3ntec.tohid.core.product.PackBarcodes.Lookup.Pack -> dd.products.firstOrNull { it.id == l.hit.productId }?.let { p ->
-        if (!p.active) toast(StrSale.inactive(p.name)) else add(p, l.hit.pack.sizeMilli / 1000.0)
-        return true
-      }
-      else -> Unit
-    }
+    if (addPack(code, 1.0, dd, items)) return true
     when (val hit = BarcodeMatch.find(code, items)) {
       is BarcodeMatch.Hit.Product -> dd.products.firstOrNull { it.id == hit.id }?.let {
         if (!it.active) toast(StrSale.inactive(it.name)) else add(it, 1.0)
