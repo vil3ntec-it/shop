@@ -9,7 +9,7 @@ object StrPush {
 
   // ── یک خط برای هر حالِ `PushPolicy.State` (نگاشت در `OnlineOrdersSettingsAndroid.pushLine`) ──
   val active: String get() = t(
-    "اعلانِ گوشی روشن است: برنامه بسته هم باشد، سفارشِ تازه، پرداخت و لغوِ مشتری روی گوشی خبر داده می‌شود.",
+    "اعلانِ گوشی روشن است: برنامه بسته هم باشد، سفارشِ تازه، پرداخت و لغوِ مشتری خبر داده می‌شود.",
     "Phone notifications are on: even with the app closed, new orders, payments and customer cancellations ring on this phone.",
     "د تلیفون خبرتیا فعاله ده: که برنامه تړلې هم وي، نوی فرمایش، تادیه او د پېرودونکي لغوه پر تلیفون خبر ورکول کېږي.",
   )
