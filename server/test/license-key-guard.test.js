@@ -14,6 +14,8 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { execFileSync } = require('child_process');
+//  زیرِ «آزمون‌های سرور زیرِ Electron» `process.execPath` خودِ Electron است ⇒ فرزند باید Node باشد (همان قاعدهٔ sec-auth)
+const asNode = process.env.ELECTRON_RUN_AS_NODE ? { ELECTRON_RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE } : {};
 const h = require('./helpers');
 const { query, one } = require('../src/db');
 const plans = require('../src/lib/plans');
@@ -266,7 +268,7 @@ test('ابزارِ بیرون آوردن از خطِ فرمان: فقط نشان
   const out = path.join(tmp, 'cli.env');
   const run = (args) => execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'license-key.js'), ...args], {
     cwd: path.join(__dirname, '..'),
-    env: { PATH: process.env.PATH, HOME: tmp, NODE_ENV: 'production', DATABASE_URL: 'pglite:memory', LICENSE_PRIVATE_KEY: pem },
+    env: { ...asNode, PATH: process.env.PATH, HOME: tmp, NODE_ENV: 'production', DATABASE_URL: 'pglite:memory', LICENSE_PRIVATE_KEY: pem },
     encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
   });
   const printed = run(['export', out]) + run(['status']);
@@ -329,7 +331,7 @@ test('generate از خطِ فرمان: پایگاه‌دادهٔ نخواندن�
     //  pglite:memory بی مهاجرت ⇒ `app_config` نیست ⇒ نبودنِ کلید ثابت نمی‌شود
     execFileSync(process.execPath, [path.join(__dirname, '..', 'scripts', 'license-key.js'), 'generate', out], {
       cwd: path.join(__dirname, '..'),
-      env: { PATH: process.env.PATH, HOME: tmp, NODE_ENV: 'production', DATABASE_URL: 'pglite:memory' },
+      env: { ...asNode, PATH: process.env.PATH, HOME: tmp, NODE_ENV: 'production', DATABASE_URL: 'pglite:memory' },
       encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
     });
   } catch (e) { failed = e; }
