@@ -374,11 +374,11 @@ async function orderFor(shopId, input) {
 
 /**
  * @param {string} shopId از نشست
- * @param {{body:object, headerKey?:string, actor:{id:string}, returnUrl?:string}} p
- *   `returnUrl` فقط از کدِ سرور (ویترین)، هرگز از کاربر.
+ * @param {{body:object, headerKey?:string, actor:{id:string}, returnUrl?:string, guard?:Function}} p
+ *   `returnUrl` و `guard(c)` (سنجشِ پایانی در همان تراکنش، درست پیش از قصدِ تازه) فقط از کدِ سرور، هرگز از کاربر.
  * @returns {Promise<{intent:object, created:boolean}>}
  */
-async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = '' }) {
+async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = '', guard = null }) {
   const input = parseCreate(body, headerKey);
   if (input.kind === 'online_order') await orderFor(shopId, input);
   const ad = await gatewayFor(shopId);
@@ -417,12 +417,12 @@ async function create(shopId, { body, headerKey = '', actor = {}, returnUrl = ''
       const gone = await casIn(c, live, 'expired', { status_reason: 'timeout' });
       if (gone) await orderPaymentIn(c, gone, 'failed', { reason: 'timeout' });
     }
-    const id = newId('pi');
+    if (guard) await guard(c);   //  ویترین: `order-flow.guardOnlinePayIn` زیرِ قفلِ ردیفِ سفارش (همان قفلِ «به فاکتور»)
     const r = await c.query(
       `INSERT INTO payment_intents (id, shop_id, kind, ref_id, amount_minor, currency, status, provider,
          idempotency_key, request_hash, expires_at, created_by, created_at, updated_at, payee_fp)
        VALUES ($1,$2,$3,$4,$5,$6,'created',$7,$8,$9,$10,$11,$12,$12,$13) RETURNING *`,
-      [id, shopId, input.kind, input.refId, input.amount, input.currency, name, input.key, hash,
+      [newId('pi'), shopId, input.kind, input.refId, input.amount, input.currency, name, input.key, hash,
         at + 15 * 60 * 1000, String(actor.id || ''), at, String(ad.payeeFp || '')]
     );
     return { row: r.rows[0], replayed: false };
@@ -773,7 +773,7 @@ async function createForStorefront(shopId, orderId, { key, returnUrl, descriptio
   if (!o) throw notFound('سفارش پیدا نشد', 'order_not_found');
   return create(shopId, {
     body: { kind: 'online_order', refId: String(orderId), amount: Number(o.total_minor), currency: o.currency, idempotencyKey: `sf:${k}`, description },
-    actor: { id: 'customer' }, returnUrl,
+    actor: { id: 'customer' }, returnUrl, guard: (c) => require('./order-flow').guardOnlinePayIn(c, shopId, orderId),
   });
 }
 

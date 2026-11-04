@@ -181,7 +181,8 @@ function conversationView(viewer, r) {
       },
     };
   }
-  const contact = can(viewer.role, 'orders.contact');
+  //  CRM-15: `viewer.contact` (درِ دکان: `orders.contact` و `customers.contact`)؛ نیامده ⇒ فقط `orders.contact`
+  const contact = can(viewer.role, 'orders.contact') && viewer.contact !== false;
   return {
     ...base,
     orderId: r.order_id || null,
@@ -243,7 +244,7 @@ async function list(viewer, { cursor, limit, status, q } = {}) {
       args.push(like);
       const byName = `c.customer_name ILIKE $${args.length} ESCAPE '\\'`;
       const digits = term.replace(/\D/g, '');
-      if (can(viewer.role, 'orders.contact') && digits.length >= 4) {
+      if (can(viewer.role, 'orders.contact') && viewer.contact !== false && digits.length >= 4) {
         args.push(`%${digits}%`);
         where.push(`(${byName} OR c.customer_phone LIKE $${args.length})`);
       } else {

@@ -115,4 +115,26 @@ object StrGiftCard {
   val errNotSaved: String get() = t("ثبت نشد", "Not saved", "ثبت نشو")
   val errNotAllowed: String get() = t("باطل کردنِ کارت اجازهٔ صاحب یا مدیر می‌خواهد", "Voiding a card needs the owner's or a manager's permission", "د کارت باطلول د خاوند یا مدیر اجازه غواړي")
   val errReason: String get() = t("دلیل را بنویسید (دست‌کم سه حرف)", "Write the reason (at least three letters)", "لامل ولیکئ (لږ تر لږه درې توري)")
+  val errTooLong: String get() = t("متن بیش از اندازه بلند است", "The text is too long", "متن ډېر اوږد دی")
+  val errGrantNotAllowed: String get() = t(
+    "دادنِ اعتبارِ هدیه اجازهٔ تخفیف به همین اندازه می‌خواهد (صاحب یا مدیر)",
+    "Giving store credit needs permission to discount this much (owner or a manager)",
+    "د ډالۍ اعتبار ورکول د همدومره تخفیف اجازه غواړي (خاوند یا مدیر)",
+  )
+
+  //  PRM-15 — اعطای دستیِ اعتبار در پروندهٔ مشتری (`StoreCreditGrantButton`)
+  val grantTitle: String get() = t("دادنِ اعتبارِ هدیه", "Give store credit", "د ډالۍ اعتبار ورکول")
+  val grantReason: String get() = t("دلیل (مثلاً هدیه یا جبرانِ تأخیر)", "Reason (for example a gift or making up for a delay)", "لامل (د بېلګې په توګه ډالۍ یا د ځنډ جبران)")
+  val grantNote: String get() = t(
+    "اعتبار بی نقد داده می‌شود و دخل دست نمی‌خورد؛ اگر مشتری بدهکار است، اول از بدهی‌اش کم می‌شود. با نامِ شما و دلیل در سابقه می‌ماند.",
+    "The credit is given without cash and the drawer is not touched; if the customer owes money, it first reduces the debt. It stays in the log with your name and the reason.",
+    "اعتبار بې نغدو ورکول کېږي او دخل ته لاس نه وړل کېږي؛ که پېرودونکی پوروړی وي، لومړی یې له پور کمېږي. ستاسو له نوم او لامل سره په سابقه کې پاتې کېږي.",
+  )
+  val grantSave: String get() = t("ثبتِ اعتبار", "Give credit", "اعتبار ثبت کړه")
+  fun debtNow(amount: Any): String = t("بدهیِ مشتری: ${asIs(amount)}", "Customer owes: $amount", "د پېرودونکي پور: $amount")
+  fun afterCredit(amount: Any): String = t("پس از آن اعتبارِ مشتری: ${asIs(amount)}", "Afterwards the customer's credit: $amount", "وروسته د پېرودونکي اعتبار: $amount")
+  fun afterDebt(amount: Any): String = t("پس از آن بدهیِ مشتری: ${asIs(amount)}", "Afterwards the customer owes: $amount", "وروسته د پېرودونکي پور: $amount")
+  fun granted(name: Any, amount: Any): String = t(
+    "به «${asIs(name)}» ${asIs(amount)} افغانی اعتبار داده شد", "$amount afghani of credit given to “$name”", "«$name» ته $amount افغانۍ اعتبار ورکړل شو",
+  )
 }

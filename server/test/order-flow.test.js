@@ -5,12 +5,13 @@
  * آن‌چه قفل می‌شود:
  *   ۱) `arrival` ِ `GET /shop/orders/config`: هر دروازهٔ میانِ ویترین و برنامهٔ دکان با کدِ پایدار — حتی وقتی بخش
  *      خاموش است (پیش‌تر فقط `enabled: false` و بخشِ پنهان) — و با برداشتنِ هر دروازه از فهرست می‌رود.
- *   ۲) «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، پیش‌فرض خاموش ⇒ پاسخِ پیگیری و `/pay` همان پیشین): روشن ⇒ پیش از
+ *   ۲) «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰؛ از ۲۱۱ دکانِ تازه روشن، موجود خاموش ⇒ خاموش: پاسخِ پیگیری و `/pay` همان پیشین): روشن ⇒ پیش از
  *      قبول نه حساب‌پی و نه انتخاب؛ پس از قبول «نقد» یک بار (تکرار بی رویداد)؛ مشتری قبول نمی‌کند و مبلغ نمی‌گذارد.
- *   ۳) `POST /shop/orders/:id/invoice`: فقط از «بسته شد» به بعد، یک بار زیرِ قفل (تکرار و دو درخواستِ هم‌زمان ⇒
+ *   ۳) `POST /shop/orders/:id/invoice`: فقط از «بسته شد» به بعد («دریافت از دکان» ِ پرداخت‌نشده فقط همراهِ «مشتری گرفت»)، یک بار زیرِ قفل (تکرار و دو درخواستِ هم‌زمان ⇒
  *      همان فاکتور و همان زمان)، سفارشِ آزمایشی و دکانِ دیگر نه؛ فاکتورِ نقدی پرداختِ آنلاینِ بعدی را می‌بندد.
  *   ۴) سفارشِ فاکتورشده که پیش از بیرون رفتن لغو شود ⇒ در `reversals` ِ `GET /handover` (لغوِ همان فروش)؛ بی فروش نه.
- *   ۵) rollback ِ مهاجرتِ ۲۱۰.
+ *   ۵) rollback ِ مهاجرتِ ۲۱۰ و ۲۱۱؛ پیش‌فرضِ روشنِ دکانِ تازه (۲۱۱) و خاموشِ دکانِ موجود.
+ *   ۶) امنیت: «به فاکتور» با همان اجازهٔ ثبتِ فروش؛ فاکتورِ نقدی و قصدِ حساب‌پی زیرِ یک قفل (هیچ‌کدام از دو ترتیبِ مسابقه).
  */
 process.env.PAYMENTS_PROVIDER = 'fake';
 process.env.PAYMENTS_FAKE_SECRET = 'test-only-fake-secret-order-flow';
@@ -97,6 +98,9 @@ async function staffOrder(s, over = {}) {
   return r.body.order;
 }
 
+/** سفارشِ دستیِ «ارسال» ِ نقدی — فاکتورش از «بسته شد» (نقدِ پیک امانت است، نه دخل) */
+const DELIVERY = { fulfillment: 'delivery', address: { landmark: 'کنارِ مسجد' } };
+
 async function walk(s, id, steps) {
   for (const to of steps) {
     const body = to === 'cancelled' ? { to, reason: 'customer_request' } : { to };
@@ -161,8 +165,9 @@ test('«چرا سفارش نمی‌رسد؟» — هر دروازه با کد، 
   assert.notEqual(ck.status, 201);
 });
 
-test('«پرداخت پس از پذیرش» خاموش (پیش‌فرض) ⇒ پیگیری و انتخاب همان پیشین', async () => {
-  const s = await liveShop('پیش‌فرض');
+test('«پرداخت پس از پذیرش» خاموش (صریح) ⇒ پیگیری و انتخاب همان پیشین', async () => {
+  //  از مهاجرتِ ۲۱۱ دکانِ تازه پیش‌فرض روشن است ⇒ خاموش را صریح می‌گذاریم، نه با تکیه بر پیش‌فرض
+  const s = await liveShop('خاموشِ صریح', { settings: { payAfterAccept: false } });
   assert.equal(s.settings.payAfterAccept, false);
   const o = await storeOrder(s);
   const tr = (await track(s, o.token)).body.order;
@@ -173,6 +178,36 @@ test('«پرداخت پس از پذیرش» خاموش (پیش‌فرض) ⇒ پ�
   const d = await detail(s, o.id);
   assert.deepEqual(d.payStep, { mode: 'any', state: 'cash', choice: '' });
   assert.equal(d.invoice, null);
+});
+
+test('مهاجرتِ ۲۱۱: دکانِ تازه «پرداخت پس از پذیرش» را روشن می‌گیرد، دکانِ موجود خاموش؛ تنظیمِ صاحب جلو می‌افتد', async () => {
+  //  دکانِ تازه (پس از ۲۱۱) ⇒ ویترینِ نخست روشن؛ پیش از قبول نه حساب‌پی، نه `/pay`
+  const fresh = await liveShop('تازه');
+  assert.equal(fresh.settings.payAfterAccept, true, 'پیش‌فرضِ دکانِ تازه');
+  await hesabpay(fresh);
+  const o = await storeOrder(fresh, { fulfillment: 'delivery' });
+  assert.equal((await track(fresh, o.token)).body.order.paymentStep.state, 'awaiting_accept');
+  assert.equal((await pay(fresh, o.token)).body.error.code, 'order_not_accepted');
+  //  ذخیرهٔ بعدیِ ویترین بی کلید ⇒ همان مقدار (پیش‌فرض فقط در نخستین ساخت)
+  assert.equal((await h.put('/api/shop/storefront', { payAfterAccept: false }, { token: fresh.token })).body.settings.payAfterAccept, false);
+  assert.equal((await h.put('/api/shop/storefront', { title: 'نامِ تازه' }, { token: fresh.token })).body.settings.payAfterAccept, false);
+
+  //  دکانِ موجود (ردیفِ پیش از ۲۱۱ ⇒ `pay_after_accept_default = false`، همان کارِ مهاجرت) ⇒ ویترینِ نخست خاموش
+  const old = await newShop('موجود');
+  for (const k of ['shop.orders', 'shop.storefront']) await flag(old.shopId, k);
+  await query('UPDATE shops SET pay_after_accept_default = false WHERE id = $1', [old.shopId]);
+  const put = await h.put('/api/shop/storefront', { slug: `ex-${uniq()}`, enabled: false, title: 'ویترین' }, { token: old.token });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  assert.equal(put.body.settings.payAfterAccept, false, 'دکانِ موجود رفتارِ امروزش را نگه می‌دارد');
+  //  و ویترینِ موجودِ روشن‌شده با دستِ صاحب، با ذخیرهٔ بعدی خاموش نمی‌شود
+  assert.equal((await h.put('/api/shop/storefront', { payAfterAccept: true }, { token: old.token })).body.settings.payAfterAccept, true);
+  assert.equal((await h.put('/api/shop/storefront', { title: 'دوباره' }, { token: old.token })).body.settings.payAfterAccept, true);
+
+  //  دکانِ تازه که صاحبش در نخستین ساخت خودش «خاموش» گفت ⇒ همان
+  const own = await newShop('انتخابِ صاحب');
+  for (const k of ['shop.orders', 'shop.storefront']) await flag(own.shopId, k);
+  const p2 = await h.put('/api/shop/storefront', { slug: `ow-${uniq()}`, enabled: false, title: 'ویترین', payAfterAccept: false }, { token: own.token });
+  assert.equal(p2.body.settings.payAfterAccept, false);
 });
 
 test('«پرداخت پس از پذیرش» روشن: پیش از قبول نه حساب‌پی نه انتخاب؛ پس از قبول «نقد» یک بار؛ مشتری قبول نمی‌کند', async () => {
@@ -240,7 +275,7 @@ test('«پرداخت پس از پذیرش» روشن: پیش از قبول نه 
 test('«به فاکتور»: فقط از «بسته شد»؛ یک بار زیرِ قفل (تکرار و هم‌زمان ⇒ همان)؛ آزمایشی و دکانِ دیگر نه', async () => {
   const s = await liveShop('فاکتور');
   const other = await liveShop('فاکتورِ دیگر');
-  const o = await staffOrder(s);
+  const o = await staffOrder(s, DELIVERY);
   let r = await invoice(s, o.id);
   assert.equal(r.status, 409, JSON.stringify(r.body));
   assert.equal(r.body.error.code, 'invoice_not_ready');
@@ -264,7 +299,7 @@ test('«به فاکتور»: فقط از «بسته شد»؛ یک بار زیر�
   assert.deepEqual((await detail(s, o.id)).invoice, r.body.invoice);
 
   //  دو دستگاه هم‌زمان ⇒ یک «فاکتور شد»
-  const o2 = await staffOrder(s);
+  const o2 = await staffOrder(s, DELIVERY);
   await walk(s, o2.id, ['accepted', 'picking', 'packed']);
   const both = await Promise.all([invoice(s, o2.id), invoice(s, o2.id)]);
   assert.deepEqual(both.map((x) => x.status).sort(), [200, 201]);
@@ -281,7 +316,7 @@ test('«به فاکتور»: فقط از «بسته شد»؛ یک بار زیر�
 });
 
 test('فاکتورِ نقدی ⇒ پرداختِ آنلاینِ بعدی بسته (فاکتور با پول بخواند)', async () => {
-  const s = await liveShop('فاکتورِ نقدی');
+  const s = await liveShop('فاکتورِ نقدی', { settings: { payAfterAccept: false } });
   await hesabpay(s);
   const o = await storeOrder(s, { fulfillment: 'delivery' });
   assert.equal((await track(s, o.token)).body.order.onlinePay.available, true, 'رفتارِ پیشین: از «تازه»');
@@ -297,8 +332,8 @@ test('سفارشِ فاکتورشده که پیش از بیرون رفتن لغ�
   const s = await liveShop('لغوِ فاکتور');
   const since = (await h.get('/api/shop/orders/config?caps=saleOnHandover', { token: s.token })).body.handoverSince;
   assert.ok(since > 0);
-  const o = await staffOrder(s);
-  const bare = await staffOrder(s);
+  const o = await staffOrder(s, DELIVERY);
+  const bare = await staffOrder(s, DELIVERY);
   for (const x of [o, bare]) await walk(s, x.id, ['accepted', 'picking', 'packed']);
   assert.equal((await invoice(s, o.id)).status, 201);
   //  برنامه فروشِ `o-<سفارش>` را نوشت و همگام کرد (`OrderFulfillment.fulfill`)
@@ -332,6 +367,138 @@ test('مهاجرتِ ۲۱۰: rollback ستون را برمی‌دارد و دو�
   await query(up);
   await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
   assert.equal(await col(), 1);
+});
+
+/** عضوِ تازه با نقشِ [role] در دکانِ [s] — نشستِ واقعی */
+async function member(s, role) {
+  const inv = await h.post('/api/shop/invite', { role }, { token: s.token });
+  assert.equal(inv.status, 201, JSON.stringify(inv.body));
+  const u = await h.newUser(`کارمندِ ${role}`, 'shop');
+  const j = await h.post('/api/shop/join', { code: inv.body.code }, { token: u.accessToken });
+  assert.ok([200, 201].includes(j.status), JSON.stringify(j.body));
+  return (await h.signIn(u, 'shop')).accessToken;
+}
+
+const invoiceNotes = (id) => many(`SELECT 1 FROM online_order_events WHERE order_id=$1 AND kind='note' AND detail->>'type'='invoice'`, [id]);
+
+test('امنیت: «به فاکتور» همان اجازهٔ ثبتِ فروشِ برنامه را می‌خواهد — جمع‌آور با تماسِ مستقیم نه', async () => {
+  const s = await liveShop('اجازهٔ فاکتور');
+  const picker = await member(s, 'picker');
+  const o = await staffOrder(s, DELIVERY);
+  await walk(s, o.id, ['accepted', 'picking', 'packed']);
+  const perms = (await h.get('/api/shop/orders/config', { token: picker })).body.permissions;
+  assert.equal(perms.manage, true, 'جمع‌آور سفارش را می‌گرداند');
+  assert.equal(perms.recordSale, false, 'ولی فروش نمی‌نویسد ⇒ دکمهٔ «به فاکتور» ِ برنامه پنهان است');
+  const r = await h.post(`/api/shop/orders/${o.id}/invoice`, {}, { token: picker });
+  assert.equal(r.status, 403, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'permission_denied');
+  assert.equal((await invoiceNotes(o.id)).length, 0, 'هیچ «فاکتور شد»ی ننشست');
+  assert.equal((await invoice(s, o.id)).status, 201, 'صاحب همان سفارش را فاکتور می‌زند');
+});
+
+test('امنیت: قصدِ حساب‌پیِ زنده (پیش از «در انتظار» شدنِ سفارش) فاکتورِ نقدی را می‌بندد', async () => {
+  const s = await liveShop('مسابقهٔ قصد', { settings: { payAfterAccept: false } });
+  await hesabpay(s);
+  const o = await storeOrder(s, { fulfillment: 'delivery' });
+  await walk(s, o.id, ['accepted', 'picking', 'packed']);
+  assert.equal((await pay(s, o.token)).status, 201);
+  //  همان لحظهٔ `/pay` میانِ دو تراکنشش: قصد ساخته شده و درگاه هنوز جلسه را برنگردانده ⇒ سفارش هنوز «پرداخت‌نشده»
+  await query(`UPDATE payment_intents SET status='created' WHERE ref_id=$1`, [o.id]);
+  await query(`UPDATE online_orders SET payment_status='unpaid' WHERE id=$1`, [o.id]);
+  const inv = await invoice(s, o.id);
+  assert.equal(inv.status, 409, JSON.stringify(inv.body));
+  assert.equal(inv.body.error.code, 'payment_pending');
+  assert.equal((await invoiceNotes(o.id)).length, 0);
+});
+
+test('امنیت: فاکتورِ نقدی که میانِ سنجشِ `/pay` و ساختنِ قصد نشست ⇒ قصدی ساخته نمی‌شود', async () => {
+  const s = await liveShop('مسابقهٔ پرداخت', { settings: { payAfterAccept: false } });
+  await hesabpay(s);
+  const o = await storeOrder(s, { fulfillment: 'delivery' });
+  await walk(s, o.id, ['accepted', 'picking', 'packed']);
+  //  `/pay` سنجشِ `guardOnlinePay` را گذراند (هنوز فاکتوری نبود)…
+  const flow = require('../src/lib/order-flow');
+  await flow.guardOnlinePay(s.shopId, o.id);
+  //  …و همان دم فروشنده «به فاکتور» زد
+  assert.equal((await invoice(s, o.id)).status, 201);
+  //  ادامهٔ همان `/pay`
+  await assert.rejects(
+    require('../src/lib/payment-intents').createForStorefront(s.shopId, o.id, { key: `race-${uniq()}-key`, returnUrl: 'https://x.invalid/' }),
+    (e) => e.code === 'order_invoiced'
+  );
+  assert.equal(await one('SELECT 1 AS x FROM payment_intents WHERE ref_id=$1', [o.id]), null, 'هیچ قصدِ حساب‌پی پس از فاکتورِ نقدی');
+  assert.equal((await detail(s, o.id)).paymentStatus, 'unpaid');
+});
+
+test('مهاجرتِ ۲۱۱: ردیف‌های موجود خاموش، INSERT ِ تازه روشن؛ rollback ستون را برمی‌دارد و دوباره نشستن همان', async () => {
+  const dir = path.join(__dirname, '..', 'migrations');
+  const down = fs.readFileSync(path.join(dir, 'rollback', '211_order_pay_after_accept_default.down.sql'), 'utf8');
+  const up = fs.readFileSync(path.join(dir, '211_order_pay_after_accept_default.sql'), 'utf8');
+  const col = async () => (await query(
+    "SELECT column_name FROM information_schema.columns WHERE table_name='shops' AND column_name='pay_after_accept_default'"
+  )).rows.length;
+  const s = await liveShop('پیش از rollback');
+  const sfBefore = (await one('SELECT pay_after_accept FROM storefronts WHERE shop_id=$1', [s.shopId])).pay_after_accept;
+  assert.equal((await one('SELECT pay_after_accept_default AS d FROM shops WHERE id=$1', [s.shopId])).d, true);
+  const mark = await one("SELECT * FROM schema_migrations WHERE version='211_order_pay_after_accept_default.sql'");
+  assert.ok(mark, 'مهاجرت نشسته است');
+
+  await query(down);
+  assert.equal(await col(), 0);
+  assert.equal(await one("SELECT 1 AS x FROM schema_migrations WHERE version='211_order_pay_after_accept_default.sql'"), null);
+
+  await query(up);
+  await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
+  assert.equal(await col(), 1);
+  assert.equal((await one('SELECT pay_after_accept_default AS d FROM shops WHERE id=$1', [s.shopId])).d, false, 'ردیفِ موجود ⇒ خاموش');
+  assert.equal((await one('SELECT pay_after_accept FROM storefronts WHERE shop_id=$1', [s.shopId])).pay_after_accept, sfBefore,
+    'ویترینِ موجود دست نخورد');
+  const n = await newShop('پس از دوباره نشستن');
+  assert.equal((await one('SELECT pay_after_accept_default AS d FROM shops WHERE id=$1', [n.shopId])).d, true, 'دکانِ تازه ⇒ روشن');
+});
+
+const handoverAt = async (id) => Number((await one(
+  `SELECT MIN(created_at)::bigint AS at FROM online_order_events WHERE order_id=$1 AND kind='status' AND to_status='picked_up'`, [id]
+)).at);
+
+test('«دریافت از دکان» ِ پرداخت‌نشده: فاکتور فقط همراهِ «مشتری گرفت» (سرور، نه فقط برنامه) — زمانِ فاکتور = زمانِ تحویل', async () => {
+  const s = await liveShop('تحویلِ پیشخوان');
+  const o = await staffOrder(s);   //  دریافت از دکان، نقد، پرداخت‌نشده
+  await walk(s, o.id, ['accepted', 'picking', 'packed']);
+  let r = await invoice(s, o.id);
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.equal(r.body.error.code, 'invoice_at_handover');
+  assert.equal(r.body.error.current, 'packed');
+  assert.equal((await invoiceNotes(o.id)).length, 0, 'فاکتورِ نقدیِ پیش از رسیدنِ پول نه');
+
+  //  «آمادهٔ دریافت» ⇒ فاکتور و «مشتری گرفت» در یک تراکنش، یک زمان
+  await walk(s, o.id, ['ready_for_pickup']);
+  r = await invoice(s, o.id);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.order.status, 'picked_up', 'تحویل همراهِ فاکتور');
+  assert.equal(r.body.invoice.at, await handoverAt(o.id), 'زمانِ فروشِ نقدیِ پیشخوان = زمانِ تحویل');
+  //  گامِ بعدیِ برنامه («مشتری گرفت») تکرار است، نه خطا
+  const t = await h.post(`/api/shop/orders/${o.id}/transition`, { to: 'picked_up' }, { token: s.token });
+  assert.equal(t.status, 200, JSON.stringify(t.body));
+  assert.equal(t.body.unchanged, true);
+  assert.deepEqual((await invoice(s, o.id)).body.invoice, r.body.invoice, 'تکرار ⇒ همان فاکتور');
+
+  //  پیش‌تر تحویل‌شده و فاکتورنشده ⇒ زمانِ فاکتور همان زمانِ تحویل، نه حالا
+  const o2 = await staffOrder(s);
+  await walk(s, o2.id, ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']);
+  const handed = await handoverAt(o2.id);
+  r = await invoice(s, o2.id);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.invoice.at, handed);
+  assert.ok(r.body.order.updatedAt >= handed, 'نسخهٔ ردیف به عقب نمی‌رود (صفِ زنده)');
+
+  //  پرداخت‌شدهٔ آنلاین ⇒ همان قاعدهٔ پیشین: از «بسته شد»
+  const o3 = await staffOrder(s);
+  await walk(s, o3.id, ['accepted', 'picking', 'packed']);
+  await query(`UPDATE online_orders SET payment_status='paid', payment_method='online', cod_status='' WHERE id=$1`, [o3.id]);
+  r = await invoice(s, o3.id);
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.equal(r.body.order.status, 'packed', 'پرداخت‌شده تحویل نمی‌خورد');
 });
 
 test('آینهٔ کاتلین (`core/orders/OrderFlow.kt`) همان وضعیت‌های فاکتورپذیرِ سرور را دارد', () => {
