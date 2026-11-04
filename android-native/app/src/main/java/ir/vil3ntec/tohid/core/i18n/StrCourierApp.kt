@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.i18n
 
+import ir.vil3ntec.tohid.core.courier.CourierInputText
+
 /**
  *  حالتِ پیک (پوشهٔ `ui/courier`): خانه، مسیر، آمار، حساب، «نقدِ من»، جزئیاتِ سفارش، تحویل و ورود.
  *  این نوشته‌ها پیش‌تر متنِ خامِ فارسی در خودِ صفحه‌ها بودند و از هیچ زبانی نمی‌گذشتند (دری، انگلیسی و پشتو
@@ -328,4 +330,40 @@ object StrCourierApp {
     "یوازې بسته؛ انځور دوکان ته له رسېدو وروسته له دې تلیفون څخه پاکېږي",
   )
   val photoUnread: String get() = t("عکس خوانده نشد؛ دوباره بگیرید", "The photo could not be read; take it again", "انځور ونه لوستل شو؛ بیا یې واخلئ")
+
+  // ── خطای ورودیِ صفِ پیک (`CourierQueue` ِ هسته) — فارسی همان ثابتِ `CourierInputText`، بایت‌به‌بایت ──
+  val errEventId: String get() = t(CourierInputText.BAD_EVENT_ID, "The event id is not valid", "د پېښې پېژند سم نه دی")
+  val errNoMission: String get() = t(CourierInputText.NO_MISSION, "Delivery job not found", "دنده ونه موندل شوه")
+  val errNotCourier: String get() = t(CourierInputText.NOT_COURIER, "This action isn't the courier's", "دا کار د سپارونکي نه دی")
+  val errTransition: String get() = t(CourierInputText.BAD_TRANSITION, "This status change is not allowed", "د حالت دا بدلون اجازه نه لري")
+  val errQueueFull: String get() = t(CourierInputText.QUEUE_FULL, "The event queue is full; connect to the internet first", "د پېښو کتار ډک دی؛ لومړی له انټرنټ سره ونښلئ")
+  val errReasonRequired: String get() = t(CourierInputText.REASON_REQUIRED, "A reason is required", "دلیل اړین دی")
+  val errReason: String get() = t(CourierInputText.BAD_REASON, "The reason is not valid", "دلیل سم نه دی")
+  val errNoteRequired: String get() = t(CourierInputText.NOTE_REQUIRED, "A note is required", "توضیح اړینه ده")
+  val errCash: String get() = t(CourierInputText.BAD_CASH, "The collected amount is not valid", "اخیستل شوی مبلغ سم نه دی")
+  val errCashReason: String get() = t(CourierInputText.BAD_CASH_REASON, "The cash difference reason is not valid", "د نغدو د توپیر دلیل سم نه دی")
+  val errBags: String get() = t(CourierInputText.BAD_BAGS, "The bag labels are not valid", "د کڅوړو لیبلونه سم نه دي")
+  val errPosition: String get() = t(CourierInputText.BAD_POSITION, "The location is not valid", "ځای سم نه دی")
+  val errKeyReused: String get() = t(CourierInputText.KEY_REUSED, "This id is already in the queue", "دا پېژند دمخه په کتار کې دی")
+}
+
+/**
+ *  پیامِ [ir.vil3ntec.tohid.core.courier.CourierInputError] به زبانِ صفحه. فارسی همان پیامِ هسته است (ثابت‌های
+ *  `CourierInputText`)؛ پیامِ ناشناخته همان‌طور که آمده.
+ */
+fun courierInputText(message: String?): String? = when (message) {
+  CourierInputText.BAD_EVENT_ID -> StrCourierApp.errEventId
+  CourierInputText.NO_MISSION -> StrCourierApp.errNoMission
+  CourierInputText.NOT_COURIER -> StrCourierApp.errNotCourier
+  CourierInputText.BAD_TRANSITION -> StrCourierApp.errTransition
+  CourierInputText.QUEUE_FULL -> StrCourierApp.errQueueFull
+  CourierInputText.REASON_REQUIRED -> StrCourierApp.errReasonRequired
+  CourierInputText.BAD_REASON -> StrCourierApp.errReason
+  CourierInputText.NOTE_REQUIRED -> StrCourierApp.errNoteRequired
+  CourierInputText.BAD_CASH -> StrCourierApp.errCash
+  CourierInputText.BAD_CASH_REASON -> StrCourierApp.errCashReason
+  CourierInputText.BAD_BAGS -> StrCourierApp.errBags
+  CourierInputText.BAD_POSITION -> StrCourierApp.errPosition
+  CourierInputText.KEY_REUSED -> StrCourierApp.errKeyReused
+  else -> message
 }

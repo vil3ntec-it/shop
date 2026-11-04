@@ -21,6 +21,11 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.Jalali
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrDebtPages
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.formatDate
@@ -44,12 +49,12 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 internal fun DebtBookBanner(book: DebtBook.Book) {
   val lines = buildList {
     if (book.overdue.isNotEmpty()) {
-      add("${book.overdue.size} برد از سررسید گذشته — ${DebtBook.show(book.overdueAmount)} افغانی" to Shop.colors.danger)
+      add(StrDebtPages.overdueBanner(book.overdue.size, DebtBook.show(book.overdueAmount)) to Shop.colors.danger)
     }
-    book.nextDue?.let { add("سررسیدِ بعدی ${formatDate(it.dueDate!!)} — ${DebtBook.show(it.open)} افغانی" to Shop.colors.primary) }
+    book.nextDue?.let { add(StrDebtPages.nextDueBanner(formatDate(it.dueDate!!), DebtBook.show(it.open)) to Shop.colors.primary) }
     book.credit?.let { c ->
-      if (c.over) add("${DebtBook.show(c.excess)} افغانی بیش از سقفِ اعتبار (${DebtBook.show(c.limit)})" to Shop.colors.danger)
-      else add("سقفِ اعتبار ${DebtBook.show(c.limit)} — تا سقف ${DebtBook.show(c.headroom)} افغانی" to Shop.colors.muted)
+      if (c.over) add(StrDebtPages.overLimitBanner(DebtBook.show(c.excess), DebtBook.show(c.limit)) to Shop.colors.danger)
+      else add(StrDebtPages.limitBanner(DebtBook.show(c.limit), DebtBook.show(c.headroom)) to Shop.colors.muted)
     }
   }
   if (lines.isEmpty()) return
@@ -71,41 +76,41 @@ internal fun DebtEntryDetail(book: DebtBook.Book, e: DebtBook.Entry, maxLines: I
       val unit = if (l.unit.isNotBlank()) " ${l.unit}" else ""
       Text(
         "• ${l.name} — ${qty(l.quantity)}$unit × ${DebtBook.show(l.unitPrice)} = ${DebtBook.show(l.total)}" +
-          if (l.returned > 0) " (مرجوعی ${qty(l.returned)})" else "",
+          if (l.returned > 0) StrDebtPages.returnedTail(qty(l.returned)) else "",
         style = small, color = Shop.colors.muted,
       )
     }
-    if (e.lines.size > maxLines) Text("+${e.lines.size - maxLines} قلمِ دیگر — در رسید", style = small, color = Shop.colors.muted2)
+    if (e.lines.size > maxLines) Text(StrDebtPages.moreLines(e.lines.size - maxLines), style = small, color = Shop.colors.muted2)
     e.sale?.takeIf { e.give && e.lines.isNotEmpty() }?.let { s ->
       val bits = listOfNotNull(
-        s.discount.takeIf { it > 0 }?.let { "تخفیف ${DebtBook.show(DebtBook.minor(it))}" },
-        s.paidAmount.takeIf { it > 0 }?.let { "پرداختِ همان لحظه ${DebtBook.show(DebtBook.minor(it))}" },
+        s.discount.takeIf { it > 0 }?.let { StrDebtPages.discountOf(DebtBook.show(DebtBook.minor(it))) },
+        s.paidAmount.takeIf { it > 0 }?.let { StrDebtPages.paidOnSpot(DebtBook.show(DebtBook.minor(it))) },
       )
       if (bits.isNotEmpty()) Text(bits.joinToString(" · "), style = small, color = Shop.colors.muted)
     }
     if (e.give && e.amount.minor > 0) {
       Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
         e.dueDate?.let { due ->
-          DebtPill("سررسید ${formatDate(due)}${if (e.overdue) " — گذشته" else ""}", if (e.overdue) Shop.colors.danger else Shop.colors.primary)
+          DebtPill(StrDebtPages.dueOn(formatDate(due), if (e.overdue) StrDebtPages.overdueTail else ""), if (e.overdue) Shop.colors.danger else Shop.colors.primary)
         }
         DebtPill(
-          if (e.paid) "تسویه شد" else "باز ${DebtBook.show(e.open)}",
+          if (e.paid) StrMoney.paidOff else StrDebtPages.openAmount(DebtBook.show(e.open)),
           if (e.paid) Shop.colors.success else Shop.colors.warning,
         )
       }
     }
     if (!e.give && e.allocations.isNotEmpty()) {
       Text(
-        "بابتِ " + e.allocations.joinToString("، ") { a ->
+        StrDebtPages.forPrefix + e.allocations.joinToString("، ") { a ->
           val g = book.entry(a.txId)
-          val what = g?.invoiceLabel?.let { "فاکتور #$it" } ?: "برد ${g?.tx?.date?.let(::formatDate).orEmpty()}"
+          val what = g?.invoiceLabel?.let { StrDebtPages.invoiceNo(it) } ?: StrDebtPages.creditSaleOn(g?.tx?.date?.let(::formatDate).orEmpty())
           "$what (${DebtBook.show(a.amount)})"
         },
         style = small, color = Shop.colors.muted,
       )
     }
-    if (!e.give && e.open.minor > 0) Text("پیش‌پرداخت ${DebtBook.show(e.open)}", style = small, color = Shop.colors.success)
-    Text("مانده پس از این ردیف: ${DebtBook.state(e.balanceAfter)}", style = small, color = Shop.colors.muted2)
+    if (!e.give && e.open.minor > 0) Text(StrDebtPages.prepaidAmount(DebtBook.show(e.open)), style = small, color = Shop.colors.success)
+    Text(StrDebtPages.balanceAfterLine(DebtBook.state(e.balanceAfter)), style = small, color = Shop.colors.muted2)
   }
 }
 
@@ -167,11 +172,11 @@ internal fun DebtReceiptDialog(
           Spacer(Modifier.height(16.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Button(onClick = { ReportPrint.print(context, receipt.sheet(), receipt.title) }, modifier = Modifier.weight(1f)) {
-              Text("چاپ / PDF")
+              Text(StrMoney.printPdf)
             }
             if (Platform.DESKTOP) {
               OutlinedButton(onClick = { clipboard.setText(AnnotatedString(receipt.text())); copied = true }, modifier = Modifier.weight(1f)) {
-                Text(if (copied) "کپی شد" else "کپیِ متن")
+                Text(if (copied) StrMoney.copied else StrMoney.copyText)
               }
             } else {
               OutlinedButton(
@@ -182,17 +187,17 @@ internal fun DebtReceiptDialog(
                       putExtra(Intent.EXTRA_SUBJECT, receipt.title)
                       putExtra(Intent.EXTRA_TEXT, receipt.text())
                     }
-                    context.startActivity(Intent.createChooser(send, "فرستادنِ رسید").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    context.startActivity(Intent.createChooser(send, StrMoney.sendReceiptTitle).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                   }
                 },
                 modifier = Modifier.weight(1f),
-              ) { Text("فرستادن") }
+              ) { Text(StrAccount.send) }
             }
           }
           Spacer(Modifier.height(6.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (onDue != null) OutlinedButton(onClick = onDue, modifier = Modifier.weight(1f)) { Text("سررسید") }
-            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("بستن") }
+            if (onDue != null) OutlinedButton(onClick = onDue, modifier = Modifier.weight(1f)) { Text(StrMoney.due) }
+            TextButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.close) }
           }
         }
       }
@@ -224,7 +229,7 @@ internal fun DueDateField(value: String, onValueChange: (String) -> Unit) {
   val broken = text.isNotBlank() && Jalali.parseTyped(text) == null
   //  نمونه با همان `formatDate` ِ بقیهٔ صفحه (رقمِ لاتین؛ تنظیمِ رقمِ برنامه با قلم نشانش می‌دهد)
   val sample = remember { formatDate(plusDays(todayIso(), 7)) }
-  Text("سررسید (اختیاری)", style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  Text(StrMoney.dueField, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   Spacer(Modifier.height(6.dp))
   OutlinedTextField(
     value = text,
@@ -237,15 +242,15 @@ internal fun DueDateField(value: String, onValueChange: (String) -> Unit) {
     isError = broken,
     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
     supportingText = {
-      Text(if (broken) "تاریخ خوانده نشد — مثل $sample بنویسید" else "خالی یعنی سررسید ندارد", style = MaterialTheme.typography.labelSmall)
+      Text(if (broken) StrDebtPages.badDate(sample) else StrMoney.dueHelper, style = MaterialTheme.typography.labelSmall)
     },
     modifier = Modifier.fillMaxWidth(),
   )
   Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-    listOf(7 to "یک هفته", 14 to "دو هفته", 30 to "یک ماه").forEach { (n, label) ->
+    listOf(7 to StrMoney.dueWeek, 14 to StrMoney.dueTwoWeeks, 30 to StrMoney.dueMonth).forEach { (n, label) ->
       TextButton(onClick = { onValueChange(plusDays(todayIso(), n)) }) { Text(label) }
     }
-    if (value.isNotBlank()) TextButton(onClick = { onValueChange("") }) { Text("بی سررسید", color = Shop.colors.muted) }
+    if (value.isNotBlank()) TextButton(onClick = { onValueChange("") }) { Text(StrMoney.dueNone, color = Shop.colors.muted) }
   }
 }
 
@@ -257,18 +262,18 @@ internal fun DueDateDialog(entry: DebtBook.Entry, onDismiss: () -> Unit, onSave:
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp)) {
-          Text("سررسیدِ برد", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrMoney.dueTitle, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Text(
-            "${formatDate(entry.tx.date)} — ${DebtBook.show(entry.amount)} افغانی" +
-              (entry.invoiceLabel?.let { " — فاکتور #$it" } ?: ""),
+            StrDebtPages.entryLine(formatDate(entry.tx.date), DebtBook.show(entry.amount)) +
+              (entry.invoiceLabel?.let { StrDebtPages.invoiceTail(it) } ?: ""),
             style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
           )
           Spacer(Modifier.height(12.dp))
           DueDateField(due) { due = it }
           Spacer(Modifier.height(14.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
-            Button(onClick = { onSave(due.ifBlank { null }) }, modifier = Modifier.weight(1f)) { Text("ذخیره") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
+            Button(onClick = { onSave(due.ifBlank { null }) }, modifier = Modifier.weight(1f)) { Text(StrKit.save) }
           }
         }
       }
@@ -282,24 +287,24 @@ internal fun OverLimitDialog(credit: DebtBook.Credit, onConfirm: () -> Unit, onD
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = Shop.colors.surfaceSolid,
-    title = { Text("بیش از سقفِ اعتبار", color = Shop.colors.danger) },
+    title = { Text(StrMoney.overLimitTitle, color = Shop.colors.danger) },
     text = {
       Text(
-        DebtBook.overLimitText(credit) + ".\nاگر ثبت شود، در «دفترچهٔ ثبت» با همین مبلغ می‌ماند.",
+        DebtBook.overLimitText(credit) + StrDebtPages.overLimitTail,
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
       )
     },
-    confirmButton = { TextButton(onClick = onConfirm) { Text("باز هم ثبت شود", color = Shop.colors.danger) } },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("انصراف") } },
+    confirmButton = { TextButton(onClick = onConfirm) { Text(StrDebtPages.recordAnyway, color = Shop.colors.danger) } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.cancel) } },
   )
 }
 
 /** کادرِ سقفِ اعتبار — خالی یعنی بی سقف (همان رفتارِ همیشه) */
 @Composable
 internal fun CreditLimitField(value: String, onValueChange: (String) -> Unit) {
-  AmountField(value, onValueChange, "سقفِ اعتبار (اختیاری)")
+  AmountField(value, onValueChange, StrMoney.creditLimitField)
   Text(
-    "خالی یعنی بی سقف. بردِ بیش از سقف فقط با تأیید ثبت می‌شود.",
+    StrDebtPages.limitNote,
     style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
   )
 }

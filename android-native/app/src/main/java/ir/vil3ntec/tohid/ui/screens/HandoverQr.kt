@@ -12,6 +12,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.pick.HandoverCode
 import ir.vil3ntec.tohid.core.qr.QrCode
 
@@ -23,7 +24,7 @@ import ir.vil3ntec.tohid.core.qr.QrCode
 @Composable
 internal fun HandoverQr(orderNo: Long, code: String, modifier: Modifier = Modifier, side: Dp = 168.dp) {
   val rows = remember(orderNo, code) { HandoverCode.matrix(orderNo, code) } ?: return
-  QrMatrix(rows, "QRِ کدِ سفارش #$orderNo", modifier, side)
+  QrMatrix(rows, StrOrderPages.handoverQr(orderNo), modifier, side)
 }
 
 /**

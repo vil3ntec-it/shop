@@ -28,7 +28,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCourierApp
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.i18n.StrPick
+import ir.vil3ntec.tohid.core.i18n.StrProduct
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
 import ir.vil3ntec.tohid.core.model.PickLineDto
@@ -114,18 +118,18 @@ internal fun PickSheet(
             note = false to r.message.ifBlank { PickText.reject(r.code) }
           }
         }
-        .onFailure { note = false to "${it.userMessage} — دوباره بزنید؛ همان کار یک بار حساب می‌شود" }
+        .onFailure { note = false to StrOrderPages.pickRetry(it.userMessage) }
       busy = false
     }
   }
 
-  TohidBottomSheet(title = "جمع‌آوری — سفارش #$orderNo", onDismiss = onClose) {
+  TohidBottomSheet(title = StrOrderPages.pickTitle(orderNo), onDismiss = onClose) {
     SheetBody {
       val s = sheet
       if (s == null) {
         if (loadError != null) {
           ErrorLine(loadError)
-          TohidButton("دوباره", onClick = { load() })
+          TohidButton(Str.again, onClick = { load() })
         } else {
           TohidLoadingState(rows = 3)
         }
@@ -136,16 +140,16 @@ internal fun PickSheet(
 
       Row(verticalAlignment = Alignment.CenterVertically) {
         Text(
-          "${s.progress.done} از ${s.progress.total} قلم",
+          StrOrderPages.pickProgress(s.progress.done, s.progress.total),
           Modifier.weight(1f), style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text,
         )
         StatusPill(
-          when (s.status) { "packed" -> "بسته‌بندی‌شده"; "picking" -> "در حال جمع‌آوری"; else -> OrderText.status(s.orderStatus) },
+          when (s.status) { "packed" -> StrOrderPages.pickPacked; "picking" -> StrOrderPages.pickPicking; else -> OrderText.status(s.orderStatus) },
           if (s.status == "packed") PillTone.SUCCESS else PillTone.PREPARING,
         )
       }
       if (!open && s.status == "picking") {
-        Text("سفارش دیگر «در حال جمع‌آوری» نیست (${OrderText.status(s.orderStatus)}).", style = MaterialTheme.typography.bodySmall, color = c.warning)
+        Text(StrOrderPages.pickNotPicking(OrderText.status(s.orderStatus)), style = MaterialTheme.typography.bodySmall, color = c.warning)
       }
 
       if (open && current != null) {
@@ -161,14 +165,14 @@ internal fun PickSheet(
           OutlinedTextField(
             value = scan,
             onValueChange = { scan = it.take(64) },
-            label = { Text("اسکن یا بارکد — «${line.name}»") },
+            label = { Text(StrOrderPages.pickScanField(line.name)) },
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send),
             keyboardActions = KeyboardActions(onSend = { submitScan() }, onDone = { submitScan() }, onGo = { submitScan() }),
             modifier = Modifier.weight(1f),
           )
           Spacer(Modifier.width(8.dp))
-          TohidSecondaryButton("ثبت", onClick = { submitScan() }, enabled = !busy && scan.isNotBlank())
+          TohidSecondaryButton(StrCourierApp.save, onClick = { submitScan() }, enabled = !busy && scan.isNotBlank())
         }
       }
       note?.let { (ok, text) -> Text(text, style = MaterialTheme.typography.bodySmall, color = if (ok) c.success else c.danger) }
@@ -190,7 +194,7 @@ internal fun PickSheet(
           onLocation = if (l.productId.isBlank()) null else { a, sh, lv ->
             scope.launch {
               repo.setLocation(l.productId, a, sh, lv)
-                .onSuccess { note = true to "جای «${l.name}» برای جمع‌آوری‌های بعدی ثبت شد" }
+                .onSuccess { note = true to StrOrderPages.pickPlaceSaved(l.name) }
                 .onFailure { note = false to it.userMessage }
             }
           },
@@ -202,25 +206,25 @@ internal fun PickSheet(
       Spacer(Modifier.height(4.dp))
       val t = s.totals
       Text(
-        if (s.status == "packed") "جمعِ نهایی: ${afn(t.totalMinor)}" else "جمعِ تا این‌جا: ${afn(t.totalMinor)}",
+        if (s.status == "packed") StrOrderPages.pickFinalTotal(afn(t.totalMinor)) else StrOrderPages.pickTotalSoFar(afn(t.totalMinor)),
         style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = c.text,
       )
       if (t.deductedMinor > 0) {
         Text(
-          "از ${afn(t.originalTotalMinor)} ِ سفارش ${afn(t.deductedMinor)} کم می‌شود (قلمِ پیدانشده یا کم) — نقدِ صندوق و پیک همین جمعِ تازه است.",
+          StrOrderPages.pickDeducted(afn(t.originalTotalMinor), afn(t.deductedMinor)),
           style = MaterialTheme.typography.bodySmall, color = c.muted,
         )
       }
 
       if (open) {
         Row(verticalAlignment = Alignment.CenterVertically) {
-          Text("کیسه‌ها", Modifier.weight(1f), color = c.text)
+          Text(StrOrderPages.pickBags, Modifier.weight(1f), color = c.text)
           TohidSecondaryButton("−", onClick = { if (bags > 1) bags-- }, enabled = bags > 1 && !busy)
           Text("$bags", Modifier.width(40.dp), color = c.text, fontWeight = FontWeight.Bold)
           TohidSecondaryButton("+", onClick = { if (bags < 50) bags++ }, enabled = bags < 50 && !busy)
         }
         TohidButton(
-          if (s.progress.pending > 0) "${s.progress.pending} قلم مانده" else "بسته‌بندی شد",
+          if (s.progress.pending > 0) StrOrderPages.pickLeft(s.progress.pending) else StrOrderPages.pickPackedDone,
           busy = busy,
           enabled = !busy && s.progress.pending == 0,
           modifier = Modifier.fillMaxWidth(),
@@ -229,7 +233,7 @@ internal fun PickSheet(
             note = null
             scope.launch {
               repo.pack(orderId, bags, packKey.of(PickingRepository.packJson(bags)))
-                .onSuccess { sheet = it; buzz(true); note = true to "بسته‌بندی شد؛ برچسبِ کیسه‌ها پایین است"; onChanged() }
+                .onSuccess { sheet = it; buzz(true); note = true to StrOrderPages.pickPackedLabels; onChanged() }
                 .onFailure { note = false to it.userMessage }
               busy = false
             }
@@ -238,12 +242,12 @@ internal fun PickSheet(
       }
 
       if (s.labels.isNotEmpty()) {
-        Text("برچسبِ کیسه‌ها", style = MaterialTheme.typography.labelLarge, color = c.text)
+        Text(StrOrderPages.pickBagLabels, style = MaterialTheme.typography.labelLarge, color = c.text)
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
           for (lb in s.labels) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
               QrBox(lb.qr, side = 120.dp)
-              Text("#${s.orderNo} · کیسهٔ ${lb.bag} از ${lb.of}", style = MaterialTheme.typography.labelSmall, color = c.text)
+              Text(StrOrderPages.pickBagLabel(s.orderNo, lb.bag, lb.of), style = MaterialTheme.typography.labelSmall, color = c.text)
             }
           }
         }
@@ -297,8 +301,8 @@ private fun PickLineCard(
     }
     Text(PickText.location(l.location.aisle, l.location.shelf, l.location.level), style = MaterialTheme.typography.bodySmall, color = c.muted)
     Text(
-      "سفارش: ${PickText.qty(l.orderedQtyMilli, l.unit)} · برداشته: ${PickText.qty(l.pickedQtyMilli, l.unit)}" +
-        if (l.wrongScans > 0) " · اسکنِ اشتباه: ${l.wrongScans}" else "",
+      StrOrderPages.pickLineQty(PickText.qty(l.orderedQtyMilli, l.unit), PickText.qty(l.pickedQtyMilli, l.unit)) +
+        if (l.wrongScans > 0) StrOrderPages.pickWrongScans(l.wrongScans) else "",
       style = MaterialTheme.typography.bodySmall, color = c.text,
     )
     if (!open) return@TohidCard
@@ -306,8 +310,8 @@ private fun PickLineCard(
       val milli = PickText.weightMilli(weight)
       val hint = milli?.let { PickText.weighHint(l.orderedQtyMilli, it, l.unit, toleranceBp) }
       TohidTextField(
-        weight, onWeight, label = "وزنِ واقعی (${l.unit.ifBlank { "کیلو" }})",
-        supporting = hint ?: "اول کالا را اسکن کنید، سپس وزنِ ترازو",
+        weight, onWeight, label = StrOrderPages.pickWeight(l.unit.ifBlank { StrOrderPages.kilo }),
+        supporting = hint ?: StrOrderPages.pickWeightHint,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
       )
       //  PCK-04: «وزن از ترازو» — همان دکمهٔ صندوق، فقط با تنظیمِ روشنِ همین دستگاه و درگاهِ سریال
@@ -317,23 +321,23 @@ private fun PickLineCard(
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
       if (pending && l.weighed) {
         val milli = PickText.weightMilli(weight)
-        TohidButton("ثبتِ وزن", onClick = { if (milli != null) onWeigh(milli) }, enabled = !busy && milli != null)
+        TohidButton(StrOrderPages.pickSaveWeight, onClick = { if (milli != null) onWeigh(milli) }, enabled = !busy && milli != null)
       } else if (pending) {
-        TohidSecondaryButton("برداشتم (بی بارکد)", onClick = onPick, enabled = !busy)
+        TohidSecondaryButton(StrOrderPages.pickTookNoCode, onClick = onPick, enabled = !busy)
       }
       //  PCK-03: «پیدا نکردم» همیشه روی قلمِ باز
-      if (pending) TohidDangerButton("پیدا نکردم", onClick = onNotFound, enabled = !busy)
-      if (!pending || l.pickedQtyMilli > 0 || l.scans > 0) TohidSecondaryButton("از نو", onClick = onReset, enabled = !busy)
+      if (pending) TohidDangerButton(StrPick.notFound, onClick = onNotFound, enabled = !busy)
+      if (!pending || l.pickedQtyMilli > 0 || l.scans > 0) TohidSecondaryButton(StrOrderPages.pickRestart, onClick = onReset, enabled = !busy)
       onSubstitute?.let { TohidSecondaryButton(StrPick.substitute, onClick = it, enabled = !busy) }
-      if (onLocation != null) TohidSecondaryButton(if (editLoc) "بستنِ جا" else "جای قفسه", onClick = { editLoc = !editLoc })
+      if (onLocation != null) TohidSecondaryButton(if (editLoc) StrOrderPages.pickPlaceClose else StrOrderPages.pickPlaceShelf, onClick = { editLoc = !editLoc })
     }
     if (editLoc && onLocation != null) {
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-        TohidTextField(aisle, { aisle = it.take(20) }, label = "راهرو", modifier = Modifier.weight(1f))
-        TohidTextField(shelf, { shelf = it.take(20) }, label = "قفسه", modifier = Modifier.weight(1f))
-        TohidTextField(level, { level = it.take(20) }, label = "طبقه", modifier = Modifier.weight(1f))
+        TohidTextField(aisle, { aisle = it.take(20) }, label = StrProduct.aisle, modifier = Modifier.weight(1f))
+        TohidTextField(shelf, { shelf = it.take(20) }, label = StrProduct.shelf, modifier = Modifier.weight(1f))
+        TohidTextField(level, { level = it.take(20) }, label = StrProduct.level, modifier = Modifier.weight(1f))
       }
-      TohidButton("ثبتِ جا", onClick = { onLocation(aisle, shelf, level); editLoc = false }, enabled = !busy)
+      TohidButton(StrOrderPages.pickPlaceSave, onClick = { onLocation(aisle, shelf, level); editLoc = false }, enabled = !busy)
     }
   }
 }

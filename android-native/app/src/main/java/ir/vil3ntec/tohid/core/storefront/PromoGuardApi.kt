@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.core.storefront
 
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Lang
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -118,14 +121,17 @@ object PromoGuardApi {
 
   data class Checked(val errors: Map<String, String>, val settings: PromoGuardSettingsDto?)
 
-  private const val AFS_RANGE = "افغانیِ درست، بی اعشار، تا ۱٬۰۰۰٬۰۰۰ (خالی = بی حد)"
+  private val AFS_RANGE: String get() = StrSettingsPages.guardAfsRange
+
+  /** عددِ پیام: انگلیسی با رقمِ لاتین، فارسی/دری/پشتو همان رقمِ فارسیِ پیشین */
+  private fun num(v: Int): String = if (I18n.lang == Lang.EN) v.toString() else StorefrontRules.toFa(v)
 
   /** کادرها ⇒ تنظیمِ کامل (همان بدنه‌ای که سرور جایگزین می‌کند) یا خطای هر کادر */
   fun check(f: Form): Checked {
     val e = LinkedHashMap<String, String>()
     val percent = f.kind == PERCENT
     val bp = if (percent) parseBp(f.percent) else 0
-    if (bp == null) e["percent"] = "درصد از ۰ تا ۱۰۰، با حداکثر دو رقمِ اعشار"
+    if (bp == null) e["percent"] = StrSettingsPages.guardPercentRange
     val amount = if (!percent) parseAfghani(f.amount) else 0L
     if (amount == null) e["amount"] = AFS_RANGE
     val max = parseAfghani(f.max)
@@ -133,14 +139,14 @@ object PromoGuardApi {
     val minSub = parseAfghani(f.minSubtotal)
     if (minSub == null) e["minSubtotal"] = AFS_RANGE
     val perPhone = parseCount(f.codePerPhone)
-    if (perPhone == null) e["codePerPhone"] = "عددِ صحیح از ۰ تا ۱٬۰۰۰ (خالی = بی سقف)"
+    if (perPhone == null) e["codePerPhone"] = StrSettingsPages.guardCountRange
     val perDevice = parseCount(f.codePerDevice)
-    if (perDevice == null) e["codePerDevice"] = "عددِ صحیح از ۰ تا ۱٬۰۰۰ (خالی = بی سقف)"
+    if (perDevice == null) e["codePerDevice"] = StrSettingsPages.guardCountRange
     val maxDiscount = parseAfghani(f.maxDiscount)
     if (maxDiscount == null) e["maxDiscount"] = AFS_RANGE
     //  همان قاعدهٔ سرور: اولین خریدِ روشن بی مقدار ⇒ ۴۰۰
-    if (f.enabled && percent && bp == 0) e["percent"] = "برای اولین خریدِ روشن، درصد بیش از صفر باشد"
-    if (f.enabled && !percent && amount == 0L) e["amount"] = "برای اولین خریدِ روشن، مبلغ بیش از صفر باشد"
+    if (f.enabled && percent && bp == 0) e["percent"] = StrSettingsPages.guardPercentZero
+    if (f.enabled && !percent && amount == 0L) e["amount"] = StrSettingsPages.guardAmountZero
     if (e.isNotEmpty()) return Checked(e, null)
     return Checked(
       emptyMap(),
@@ -176,28 +182,28 @@ object PromoGuardApi {
   /** فهرستِ «مشکوک» ⇒ ردیف‌ها (اول دستگاه‌ها، بعد شماره‌ها)؛ هیچ ⇒ فهرستِ خالی */
   fun suspectRows(s: SuspiciousDto): List<SuspectRow> =
     s.devices.map { d ->
-      SuspectRow("یک دستگاه (${d.device.ifBlank { "نامعلوم" }}) با ${StorefrontRules.toFa(d.count)} شماره", d.phones.joinToString("، "))
+      SuspectRow(StrSettingsPages.guardOneDevice(d.device.ifBlank { StrSettingsPages.guardUnknownDevice }, num(d.count)), d.phones.joinToString("، "))
     } + s.phones.map { p ->
-      SuspectRow("شمارهٔ ${p.phone} روی ${StorefrontRules.toFa(p.count)} دستگاه", p.devices.joinToString("، "))
+      SuspectRow(StrSettingsPages.guardOnePhone(p.phone, num(p.count)), p.devices.joinToString("، "))
     }
 
   /** سرخطِ فهرستِ «مشکوک» — آستانه از خودِ سرور */
   fun suspectSummary(s: SuspiciousDto): String {
     val n = s.devices.size + s.phones.size
-    val rule = "${StorefrontRules.toFa(s.threshold)} شماره یا بیشتر از یک دستگاه، یا ${StorefrontRules.toFa(s.threshold)} دستگاه یا بیشتر برای یک شماره"
-    return if (n == 0) "موردِ مشکوکی نیست ($rule، ۹۰ روزِ اخیر)" else "${StorefrontRules.toFa(n)} موردِ مشکوک ($rule)"
+    val rule = StrSettingsPages.guardRule(num(s.threshold))
+    return if (n == 0) StrSettingsPages.guardNoSuspects(rule) else StrSettingsPages.guardSuspects(num(n), rule)
   }
 
   fun kindLabel(kind: String): String = when (kind) {
-    "first_order" -> "اولین خرید"
-    "code" -> "کد"
-    "auto" -> "خودکار"
+    "first_order" -> StrSettingsPages.promoKindFirst
+    "code" -> StrSettingsPages.promoKindCode
+    "auto" -> StrSettingsPages.promoKindAuto
     else -> kind
   }
 
   fun errorText(code: String, serverMessage: String): String = when (code) {
-    "promo_guard_disabled" -> "سدِ تخفیفِ ویترین برای این دکان روشن نیست"
-    else -> serverMessage.ifBlank { "ذخیره نشد؛ دوباره تلاش کنید" }
+    "promo_guard_disabled" -> StrSettingsPages.guardDisabled
+    else -> serverMessage.ifBlank { StrSettingsPages.saveFailed }
   }
 
   suspend fun load(api: ApiClient): ApiResult<PromoGuardViewDto> = ApiResult.of { parse(api.get(ROOT)) }

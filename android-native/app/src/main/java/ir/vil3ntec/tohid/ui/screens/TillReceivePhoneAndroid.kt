@@ -19,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.money
@@ -50,7 +51,7 @@ internal fun TillReceivePhone(d: ShopData, store: ShopStore, cartDebtorId: Strin
   ) {
     Icon(Icons.Filled.Payments, contentDescription = null)
     Spacer(Modifier.width(6.dp))
-    Text("دریافتِ وجه یا قسط از مشتری")
+    Text(StrSalePages.receiveTitle)
   }
 
   if (pick) {
@@ -71,7 +72,7 @@ internal fun TillReceivePhone(d: ShopData, store: ShopStore, cartDebtorId: Strin
           scope.launch {
             val r = ir.vil3ntec.tohid.data.TillReceivePref.record(store, id, amount, notes, k, prepay)
             busy = false
-            r.show(toast, "دریافتِ ${money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L))} ؋ از «$name» ثبت شد") {
+            r.show(toast, StrSalePages.received(money(ir.vil3ntec.tohid.data.PayFlow.major(amount ?: 0L)), name)) {
               forId = null; receiptOf = Triple(store.data.value, id, k)
             }
           }

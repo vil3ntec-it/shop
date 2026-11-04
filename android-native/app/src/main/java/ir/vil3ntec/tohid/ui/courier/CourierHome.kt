@@ -269,7 +269,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
       queue = next
       scope.launch { sync() }
     } catch (e: CourierInputError) {
-      scope.launch { snackbar.showSnackbar(e.message ?: StrCourierApp.notSaved) }
+      scope.launch { snackbar.showSnackbar(ir.vil3ntec.tohid.core.i18n.courierInputText(e.message) ?: StrCourierApp.notSaved) }
     }
   }
 

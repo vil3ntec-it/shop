@@ -8,6 +8,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.model.OrderLineDto
 import ir.vil3ntec.tohid.core.orders.OrderSubstitution
 import ir.vil3ntec.tohid.ui.theme.Shop
@@ -37,7 +38,7 @@ internal fun OrderLineExtras(l: OrderLineDto) {
 @Composable
 internal fun OrderSubstitutionPicker(show: Boolean, selected: String, onPick: (String) -> Unit) {
   if (!show) return
-  Text("اگر کالایی نبود", style = MaterialTheme.typography.labelLarge, color = Shop.colors.muted)
+  Text(StrOrderPages.subIfMissing, style = MaterialTheme.typography.labelLarge, color = Shop.colors.muted)
   Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Space.xs)) {
     OrderSubstitution.ORDER_CODES.forEach { code ->
       TohidFilterChip(label = OrderSubstitution.label(code), selected = selected == code, onClick = { onPick(code) })
