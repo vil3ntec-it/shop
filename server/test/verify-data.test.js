@@ -414,6 +414,83 @@ test('append_only.hash_chain: حلقه‌ای که متنش با هشش نمی�
   assert.equal(c.count, 1);
 });
 
+/**
+ * PUR-05/PUR-08: دکانی با فاکتورِ خریدِ دوردیفه (هر ردیف با ورودِ انبارش، پرداختِ بخشی، مقدارِ اعشاری)، یک سندِ کسر
+ * (خریدِ منفی با ورودِ منفی) و پرداختِ بعدی — همان شکلِ `PurchaseBook.record`/`supplierReturn` ِ برنامه و `addPurchase` ِ وب.
+ * بی پرچمِ دفترِ موجودیِ سرور، تا فقط بررسی‌های دفترِ همگام‌سازی سنجیده شوند.
+ */
+async function purchaseShop(label) {
+  const u = await h.newUser(label, 'shop');
+  const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const o = { token: u.accessToken, shopId: made.body.shop.id };
+  const p = await push(o.token, [
+    op('products', 'p1', { name: 'برنج', unit: 'کیلوگرم', salePrice: 130, purchasePrice: 100.4 }),
+    op('products', 'p2', { name: 'روغن', unit: 'عدد', salePrice: 600, purchasePrice: 550 }),
+    op('suppliers', 'su1', { name: 'عمده‌فروش' }),
+    op('warehouseEntries', 'pw1', { productId: 'p1', cartons: 0, perCarton: 0, units: 2.5, unit: 'کیلوگرم', price: 100.4, date: '2026-10-02', notes: 'فاکتورِ خرید #1', purchaseId: 'pu1', createdAt: 3 }),
+    op('purchases', 'pu1', { productId: 'p1', supplierId: 'su1', quantity: 2.5, unit: 'کیلوگرم', purchasePrice: 100.4, totalAmount: 251, date: '2026-10-02', notes: 'فاکتورِ خرید #1', paidAmount: 251, debt: 0, warehouseEntryId: 'pw1', createdAt: 3, invoiceNo: 1 }),
+    op('warehouseEntries', 'pw2', { productId: 'p2', cartons: 0, perCarton: 0, units: 2, unit: 'عدد', price: 550, date: '2026-10-02', notes: 'فاکتورِ خرید #1', purchaseId: 'pu2', createdAt: 3 }),
+    op('purchases', 'pu2', { productId: 'p2', supplierId: 'su1', quantity: 2, unit: 'عدد', purchasePrice: 550, totalAmount: 1100, date: '2026-10-02', notes: 'فاکتورِ خرید #1', paidAmount: 49.5, debt: 1050.5, warehouseEntryId: 'pw2', createdAt: 3, invoiceNo: 1 }),
+    op('warehouseEntries', 'rt1-w', { productId: 'p2', cartons: 0, perCarton: 0, units: -1, unit: 'عدد', price: 550, date: '2026-10-04', notes: 'برگشت', purchaseId: 'rt1', isAdjustment: true, adjKind: 'supplier_return', createdAt: 4 }),
+    op('purchases', 'rt1', { productId: 'p2', supplierId: 'su1', quantity: -1, unit: 'عدد', purchasePrice: 550, totalAmount: -550, date: '2026-10-04', notes: 'سندِ کسر', paidAmount: 0, debt: -550, warehouseEntryId: 'rt1-w', createdAt: 4 }),
+    op('supplierPayments', 'sp1', { supplierId: 'su1', amount: 200, date: '2026-10-05', notes: '', createdAt: 5 }),
+  ], `dev-pur-${uniq()}`);
+  assert.equal(p.status, 200, JSON.stringify(p.body));
+  assert.ok(p.body.results.every((r) => r.status === 'applied'), JSON.stringify(p.body.results));
+  return o;
+}
+
+const PURCHASE_CHECKS = ['sum.purchase_paid', 'sum.purchase_line', 'sum.purchase_stock_in', 'orphan.purchase_entry'];
+
+test('PUR-05: خریدِ سالم (چندردیفه، پرداختِ بخشی، اعشار، سندِ کسر) هیچ تخلفی نمی‌سازد و بررسی‌های خرید هستند', async () => {
+  const ids = new Set(vd.listChecks().map((c) => c.id));
+  for (const id of PURCHASE_CHECKS) assert.ok(ids.has(id) && ids.has(`${id}@v3`), `بررسیِ ${id} نیست`);
+  const o = await purchaseShop('خریدِ سالم');
+  const rep = await vd.verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((c) => c.count > 0), []);
+  assert.equal(rep.ok, true);
+});
+
+test('sum.purchase_paid: پرداخت + بدهی با جمعِ خرید نمی‌خواند، یا پرداخت بیش از جمع است', async () => {
+  const o = await purchaseShop('خرید-پرداخت');
+  await setField(o.shopId, 'purchases', 'pu2', '{debt}', '1000');
+  const c = await expectOnly(o.shopId, 'sum.purchase_paid');
+  assert.deepEqual(c.samples.map((s) => s.ref), ['purchases/pu2']);
+  const o2 = await purchaseShop('خرید-پرداخت۲');
+  await setField(o2.shopId, 'purchases', 'pu1', '{paidAmount}', '300');
+  await setField(o2.shopId, 'purchases', 'pu1', '{debt}', '-49');
+  assert.deepEqual((await expectOnly(o2.shopId, 'sum.purchase_paid')).samples.map((s) => s.ref), ['purchases/pu1']);
+});
+
+test('sum.purchase_line: جمعِ ردیفِ خرید با «مقدار × فی» نمی‌خواند (هشدار)', async () => {
+  const o = await purchaseShop('خرید-ردیف');
+  await setField(o.shopId, 'purchases', 'pu2', '{purchasePrice}', '500');
+  const c = await expectOnly(o.shopId, 'sum.purchase_line');
+  assert.equal(c.severity, 'warn');
+  assert.equal(c.samples[0].ref, 'purchases/pu2');
+});
+
+test('sum.purchase_stock_in: ورودِ انبارِ خرید مقدار یا کالای دیگری دارد', async () => {
+  const o = await purchaseShop('خرید-ورود');
+  await setField(o.shopId, 'warehouseEntries', 'pw2', '{units}', '3');
+  const c = await expectOnly(o.shopId, 'sum.purchase_stock_in');
+  assert.equal(c.severity, 'error');
+  assert.deepEqual(c.samples.map((s) => s.ref), ['purchases/pu2']);
+  const o2 = await purchaseShop('خرید-ورود۲');
+  await setField(o2.shopId, 'warehouseEntries', 'pw1', '{productId}', '"p2"');
+  assert.deepEqual((await expectOnly(o2.shopId, 'sum.purchase_stock_in')).samples.map((s) => s.ref), ['purchases/pu1']);
+});
+
+test('orphan.purchase_entry: ورودِ انبارِ خرید جدا پاک شده و بدهی مانده (هشدارِ دفترِ کهنه)', async () => {
+  const o = await purchaseShop('خرید-بی‌ورود');
+  const del = await push(o.token, [op('warehouseEntries', 'pw1', null, 'delete')], `dev-pur-${uniq()}`);
+  assert.equal(del.status, 200, JSON.stringify(del.body));
+  const c = await expectOnly(o.shopId, 'orphan.purchase_entry');
+  assert.equal(c.severity, 'warn');
+  assert.deepEqual(c.samples.map((s) => s.ref), ['purchases/pu1']);
+});
+
 test('خطِ فرمان: --list، --json، --check و کدِ خروجِ ۲ برای خطا', async () => {
   const o = await cleanShop('خط‌فرمان');
   const listed = [];

@@ -222,6 +222,8 @@ object LedgerEngine {
     paid = minOf(paid, totalAmount)
 
     val purchaseId = newId()
+    //  شناسهٔ ساخته از کلیدِ فرم (`PurchaseBook.record(key)`، `keyedIds`) که پیش‌تر نشسته ⇒ همان خرید دوباره (PUR-05)
+    if (d.purchases.any { it.id == purchaseId }) return Result.Failed(PurchaseBook.ALREADY_RECORDED)
     val entryId = newId()
 
     var products = d.products
@@ -327,11 +329,18 @@ object LedgerEngine {
     today: String,
     now: Long,
     newId: () -> String,
+    /**
+     *  کلیدِ یکتای همین پرداخت (برگه یک بار می‌سازد، PUR-07): شناسهٔ پرداخت و سابقه‌اش از آن ساخته می‌شود، پس دو
+     *  لمسِ پشتِ‌سرِهم یک پرداخت است — با دفترِ کهنه همان شناسه (ادغام یکی‌اش می‌کند)، با دفترِ تازه رد. `null` = پیشین.
+     */
+    key: String? = null,
   ): Result {
+    val k = key?.trim()?.ifEmpty { null }
+    if (k != null && d.supplierPayments.any { it.id == k }) return Result.Failed(ALREADY_PAID)
     val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed("تأمین‌کننده پیدا نشد")
     if (amount.isNaN() || amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
 
-    val id = newId()
+    val id = k ?: newId()
     val when_ = date.ifBlank { today }
     return Result.Ok(
       d.copy(
@@ -344,7 +353,7 @@ object LedgerEngine {
           createdAt = now,
         ),
         auditLog = d.auditLog + AuditEntry(
-          id = newId(),
+          id = if (k != null) "$k-a" else newId(),
           type = "supplier_payment",
           date = when_,
           refId = id,
@@ -355,6 +364,9 @@ object LedgerEngine {
       id = id,
     )
   }
+
+  /** همان کلیدِ پرداخت به تأمین‌کننده دوباره (دو لمس، PUR-07) — پرداخت یک بار ثبت شده است */
+  const val ALREADY_PAID = "همین پرداخت پیش‌تر ثبت شده است"
 
   /* ============================== خلاصه‌ها ============================== */
 
