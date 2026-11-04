@@ -48,6 +48,7 @@ class NotificationCompat {
 
 class NotificationManagerCompat private constructor() {
   fun notify(id: Int, n: Notification) = android.app.NotificationManager.ios.notify(id, n)
+  fun notify(tag: String?, id: Int, n: Notification) = android.app.NotificationManager.ios.notify(tag, id, n)
   fun areNotificationsEnabled() = android.app.NotificationManager.ios.areNotificationsEnabled()
   fun cancel(id: Int) = android.app.NotificationManager.ios.cancel(id)
 

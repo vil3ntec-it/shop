@@ -77,6 +77,19 @@
   هیچ ردیفِ IMPLEMENTED-VERIFIED نقض نشد (از 9e28d1eb هیچ آزمونی پاک، جابه‌جا یا skip نشد). جدول بی تغییر: ۳۸۴ / ۳۰۷ / ۳۵ / ۱۲ / ۲۶. فقط STATUS و HANDOFF.
 - نیمه‌کاره: CI و مرجِ همین PR. دستهٔ ۲۱ (#923: DLV-02 و S70) هنوز باز است و در این دور نیست.
 - قدمِ بعدی: پس از مرجِ #923 و سبزیِ CI ِ main ِ آن، دورِ ۱۴ برای DLV-02 (دکمهٔ تماسِ پیک، #917) و S70.
+### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/push-fcm` (اعلانِ سفارش با برنامهٔ بسته از راهِ Firebase؛ تصمیمِ O-01؛ روی main پس از #911؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (همه آماده و **خاموش**؛ بی کلید هیچ رفتاری عوض نمی‌شود): **سرور** — `lib/push.js` کلید را از `FCM_SERVICE_ACCOUNT_FILE`/
+  `FCM_SERVICE_ACCOUNT` هم می‌خواند، بی کلید یک بار در لاگ می‌گوید و هیچ نمی‌فرستد، توکنِ مرده را با دلیل کهنه می‌کند (`stale_reason`)؛
+  `routes/shop-push.js` (`/api/shop/push/config|devices`، پرچمِ تازهٔ `shop.device_push`، سطلِ IP پیش از احراز، SUB-10: FREE)؛ برداشتنِ
+  عضو، خروج، «خروج از همه» و از کار انداختنِ دستگاه ⇒ توکن کهنه؛ صفِ `order-notify` دو رویدادِ یک‌بارهٔ «پرداخت شد» و «مشتری لغو کرد»
+  گرفت؛ پیام بی دادهٔ مشتری (شماره و شمار). مهاجرتِ ۲۱۳ + rollback. آزمون: `push-fcm` ۶/۶ (FCM ِ ساختگی)، `order-notify`، `push-delivery`،
+  `paid-routes-entitlement`، `route-authz-inventory`، `shop-route-inventory` سبز. **اندروید** — `firebase-messaging` (BoM 33.7.0)؛ افزونهٔ
+  google-services فقط با `app/google-services.json`؛ `data/push/DevicePushAndroid.kt` (مشترک) + `FcmPushAndroid.kt` (فقط اندروید)، `core/push/PushPolicy`
+  (+ آزمون)؛ «تنظیمات ← سفارشِ آنلاین» حالِ پوش و دکمهٔ «اجازهٔ اعلان». CI: `android-native/tools/google-services.sh` با secret ِ
+  `GOOGLE_SERVICES_JSON` (نبودش ساخت را نمی‌شکند). راهنمای صاحب‌کار: `docs/FIREBASE-SETUP-fa.md`؛ O-01 «تصمیم گرفته شد».
+- نیمه‌کاره: ساختِ APK ِ اندروید این‌جا ممکن نبود (بی Android SDK) — کامپایلِ Firebase و دروازهٔ حجمِ APK (±۵٪، PR فایلِ ساخت را عوض کرده)
+  فقط در CI ِ «توحید بومی» سنجیده می‌شود. آیفون فقط درز دارد (`PushPlatform`؛ APNs پس از O-02).
+- قدمِ بعدی: صاحب‌کار گام‌های `docs/FIREBASE-SETUP-fa.md` را برود؛ سپس آزمون با گوشیِ واقعی و ثبتِ NOTIF-02 تا ۰۵، NOTIF-12، NTF-05، ORD-02 و S36.
 ### ۱۴۰۵/۰۸/۱۳ — شاخهٔ `claude/crm15-server` (اجرای سرورِ `customers.contact`، CRM-15؛ روی main پس از #911؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `server/src/lib/customer-contact.js` — بی مجوز (انباردار/جمع‌آور، یا لایهٔ نقش/کاربرِ صاحب) `GET /api/debtors[/:id]` شمارهٔ
   پوشیده (همان `ContactMask`) و بی نشانی؛ pull/Snapshot/حذف‌شده‌های راهِ قدیم، v1 (فقط در `routes/sync-v1.js`؛ `lib/sync-v1.js` دست نخورد)

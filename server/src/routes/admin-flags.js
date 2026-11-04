@@ -52,6 +52,9 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.eta', scope: 'shop', default: false, what: 'زمانِ تقریبیِ تحویلِ ویترین (WEB-04)' },
   { key: 'shop.storefront.account_history', scope: 'shop', default: false, what: '«حسابِ من» ِ ویترین: خریدِ حضوری و مانده' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
+  //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
+  { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
+  { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },
 ]);
 
 router.get('/', async (req, res) => {

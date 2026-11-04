@@ -50,6 +50,8 @@ class MainActivity : androidx.fragment.app.FragmentActivity() {
     ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(applicationContext)
     store = ShopStore(applicationContext)
     lifecycleScope.launch { store.loadAndSummarize() }
+    //  O-01: پوشِ گوشی (Firebase) — فقط نشاندنِ سکو؛ تا پرچمِ دکان روشن نشود هیچ کارِ Firebase ای نیست
+    ir.vil3ntec.tohid.data.push.FcmPushAndroid.install()
 
     /*
      *  شستنِ توکن‌هایی که نسخه‌های قبلی روی گوشی جا گذاشته‌اند.

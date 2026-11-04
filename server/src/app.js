@@ -354,6 +354,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/purchase-orders', require('./routes/purchase-orders'));
     //  اعلانِ سفارش (v3 §۳۰) — پیش از `/shop` به همان دلیلِ `/shop/orders`؛ پیش‌فرض خاموش
     api.use('/shop/order-notify', require('./routes/order-notify'));
+    //  پوشِ گوشی (FCM، O-01) — ثبتِ توکنِ هر عضو و دستگاه؛ پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.device_push`
+    api.use('/shop/push', require('./routes/shop-push'));
     //  PAY-20/RPT-12: گزارشِ خودکار برای صاحبِ دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.owner_report`
     api.use('/shop/owner-report', require('./routes/owner-report'));
     //  RPT-18: گزارشِ همهٔ شعبه‌ها (دکان‌های همین صاحب) در یک جا — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.branches_report`

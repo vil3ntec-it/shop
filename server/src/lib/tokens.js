@@ -214,6 +214,14 @@ function liveRecheck(subjectId) {
   return require('./sync-v1-live').accessChanged({ userId: String(subjectId) });
 }
 
+/** صاحبِ یک توکن (کاربر، دستگاه، بخش) — بی اثر؛ برای «خروج ⇒ پوشِ همین دستگاه هم برود» */
+async function ownerOf(token, kind) {
+  const r = await query(
+    'SELECT subject_id, device_id, app FROM tokens WHERE token_hash = $1 AND kind = $2', [hashToken(token), kind]
+  );
+  return r.rows[0] || null;
+}
+
 async function revoke(token, kind) {
   const r = await query(
     'UPDATE tokens SET revoked_at = $1 WHERE token_hash = $2 AND kind = $3 AND revoked_at IS NULL RETURNING subject_id',
@@ -287,6 +295,6 @@ function safeEqual(a, b) {
 module.exports = {
   COURIER_SCOPE, scopeFor,
   rotateRefresh, markRotated, revokeFamily, findRefresh, GRACE_MS,
-  generateToken, hashToken, issue, verify, revoke,
+  generateToken, hashToken, issue, verify, revoke, ownerOf,
   revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
 };
