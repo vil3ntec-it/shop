@@ -49,8 +49,8 @@ const MAX_KEYS_PER_USER = 5;
 const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 
 const DENY_CODE = Object.freeze({
-  'sales.discount': 'discount_not_allowed',
-  'sales.cancel': 'cancel_not_allowed',
+  'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
+  'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
   'returns.create': 'return_not_allowed',
 });
 
