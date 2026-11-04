@@ -274,6 +274,8 @@ private fun NewPurchaseInvoice(
   val context = androidx.compose.ui.platform.LocalContext.current
   val lines = remember { mutableStateListOf(Draft()) }
   val no = remember(d) { PurchaseBook.nextNo(d) }
+  //  PUR-05: یک کلید برای همین فرم — F9 یا Ctrl+Enter ِ پشتِ‌سرِهم (تکرارِ کلید) یک فاکتور است
+  val saveKey = remember { newId() }
   //  PUR-09: آخرین فیِ همین تأمین‌کننده زیرِ هر ردیف و Ctrl+I تاریخچهٔ کالای آخرین ردیفِ دست‌خورده
   val buys = remember(d) { ir.vil3ntec.tohid.data.PurchaseOrderBook.buys(d) }
   var touched by remember { mutableStateOf<Draft?>(null) }
@@ -309,7 +311,7 @@ private fun NewPurchaseInvoice(
     val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast(StrPurchasePages.landedBad)
     val user = if (stockOn) runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull() else null
     val dueIso = if (!stockOn || due.isBlank()) null else ir.vil3ntec.tohid.Jalali.parseTyped(due) ?: return toast(StrPurchasePages.dueBad(formatDate(today)))
-    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso)) {
+    when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso, key = saveKey)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
         scope.launch { store.save(r.data) }
@@ -604,9 +606,11 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
       Spacer(Modifier.height(8.dp))
       val focus = remember { FocusRequester() }
       LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+      //  PUR-07: یک کلید برای همین ردیفِ پرداخت — Enter ِ پشتِ‌سرِهم یک پرداخت است
+      val payKey = remember { newId() }
       fun pay() {
         val a = amount.toDoubleOrNull() ?: return
-        when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
+        when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
           is LedgerEngine.Result.Failed -> toast(r.message)
           is LedgerEngine.Result.Ok -> { scope.launch { store.save(r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
         }
