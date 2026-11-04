@@ -773,13 +773,11 @@ data class AuditEntry(
   /*  PAY (v3 A4) — فقط ردیف‌های صندوقِ پرچم‌دار (`cash_in`، `cash_out`، `no_sale` و `shift_close`ِ با شمارش) و `pay_fix` (POS-40).
    *  همان نام‌های رویدادِ pay-core و `ReportLedger`؛ `null` نوشته نمی‌شود تا ردیف‌های قدیمی op ِ تازه نسازند. */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val by: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val approvedBy: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val approvedBy: String? = null,
+  /** POS-40 — فقط `pay_fix` ِ «نیازمند تأیید»: برگهٔ امضاشدهٔ مدیر (`auditLog/<شناسه>`، همان مبلغ) که سرور با `shop.sync.pay_fix` می‌سنجد */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val approval: kotlinx.serialization.json.JsonObject? = null,
   /** دلیل: `deposit`/`owner_withdrawal`/`petty_expense`/`other`، دلیلِ کشو بی فروش، یا دلیلِ اختلاف */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val reason: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: String? = null,
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val note: String? = null,

@@ -91,7 +91,7 @@ fun PayFixHost(d: ShopData, store: ShopStore, sale: Sale, me: String, toast: (St
       onApproved = { slip ->
         val who = StaffPins(context).get(slip.by)?.name?.ifBlank { null } ?: slip.by
         asking = null
-        save(r.copy(approvedBy = who))
+        save(r.copy(approvedBy = who, approval = ir.vil3ntec.tohid.data.DiscountGate.json(slip)))   //  سرور می‌سنجد (`till-guard.js`)
       },
       onDismiss = { asking = null },
     )
