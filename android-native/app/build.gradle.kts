@@ -45,7 +45,8 @@ android {
    *  بازار — که روی گوشیِ دکان‌ها نصب است — بیت‌به‌بیت همان بماند؛ رفتارِ برگشتِ پیش‌نمای اندروید ۱۶ همان
    *  است که نسخهٔ پیش‌نمایش از پیش دارد (`src/preview/AndroidManifest.xml`).
    */
-  if (store == "play") compileSdk = 36
+  val playTargetSdk = 36
+  if (store == "play") compileSdk = playTargetSdk
   if (storeManaged) {
     val source = file("src/main/AndroidManifest.xml")
     val stripped = layout.buildDirectory.file("store-manifest/AndroidManifest.xml").get().asFile
@@ -135,7 +136,9 @@ android {
     // سرِ جایشان می‌مانند تا وارد شوند.
     applicationId = "ir.vil3ntec.tohid"
     minSdk = 24
-    targetSdk = if (store == "play") 36 else 35
+    targetSdk = 35
+    //  نسخهٔ Play یک پله بالاتر (`playTargetSdk` بالا)؛ `LocalNetworkManifestTest` هر دو را با مانیفست می‌سنجد
+    if (store == "play") targetSdk = playTargetSdk
     versionCode = 100 + buildNumber
     versionName = "$versionBase.$buildNumber"
     buildConfigField("String", "STORE", "\"$store\"")
