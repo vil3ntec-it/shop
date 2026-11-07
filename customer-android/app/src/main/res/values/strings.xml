@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+  <!-- نامِ زیرِ آیکون؛ متنِ درونِ برنامه از core/.../shopper/ShopperText.kt (fa، دری، en، ps) -->
+  <string name="app_name">خرید</string>
+</resources>

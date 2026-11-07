@@ -1,0 +1,208 @@
+package ir.vil3ntec.tohid.customer.ui
+
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Checkbox
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.shopper.CartRules
+import ir.vil3ntec.tohid.core.shopper.CheckoutForm
+import ir.vil3ntec.tohid.core.shopper.CheckoutRules
+import ir.vil3ntec.tohid.core.shopper.DeliverySlot
+import ir.vil3ntec.tohid.core.shopper.ShopperText
+import ir.vil3ntec.tohid.core.shopper.StorePage
+
+/**
+ *  ثبتِ سفارش — همان قاعده‌های وب: روش‌های خودِ دکان، تأییدِ شماره با کد، نشانی یا نشانهٔ نزدیک، ناحیه و
+ *  بازه (اگر دکان دارد)، فقط نقد بی گامِ دوبارهٔ انتخاب (یافتهٔ ۳ ِ ممیزی) و جمعی که سرور دوباره می‌سنجد.
+ */
+@Composable
+fun CheckoutScreen(model: CustomerModel, slug: String) {
+  val page = model.store.valueOrNull()
+  Column(Modifier.fillMaxSize()) {
+    TopBar(ShopperText.checkout, onBack = { model.back() })
+    if (page == null) {
+      (model.store as? Load.Failed)?.let { ErrorBox(it.error, onRetry = { model.loadStore(slug) }) } ?: BusyBox()
+      return@Column
+    }
+    val f = model.form
+    val set = { x: CheckoutForm -> model.updateForm(x) }
+    val ful = CheckoutRules.fulfillmentOf(page.shop, f)
+    Column(
+      Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(16.dp),
+      verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+      if (CheckoutRules.closed(page.shop)) Note(page.shop.ordering?.message?.takeIf { it.isNotBlank() } ?: ShopperText.notAccepting, Tone.WARN)
+
+      // ── روشِ دریافت ──
+      val options = CheckoutRules.fulfillments(page.shop)
+      if (options.size > 1) {
+        options.forEach { o ->
+          Choice(if (o == CheckoutRules.DELIVERY) ShopperText.shipToMe else ShopperText.pickup, ful == o) { set(f.copy(fulfillment = o)) }
+        }
+      } else if (options.isNotEmpty()) Text(if (ful == CheckoutRules.PICKUP) ShopperText.pickup else ShopperText.shipToMe, style = MaterialTheme.typography.titleMedium)
+
+      // ── شما و تأییدِ شماره ──
+      SectionTitle(ShopperText.you)
+      Field(ShopperText.name, f.name) { set(f.copy(name = it.take(80))) }
+      Verify(model, page)
+
+      // ── نشانی ──
+      if (ful == CheckoutRules.DELIVERY) {
+        SectionTitle(ShopperText.address)
+        Field(ShopperText.address, f.addressText, ShopperText.addressHint) { set(f.copy(addressText = it.take(300))) }
+        Field(ShopperText.landmark, f.landmark, ShopperText.landmarkHint) { set(f.copy(landmark = it.take(200))) }
+        Field(ShopperText.area, f.area) { set(f.copy(area = it.take(80))) }
+        Field(ShopperText.gate, f.gateColor) { set(f.copy(gateColor = it.take(40))) }
+        CheckoutRules.zones(page)?.let { zones ->
+          SectionTitle(ShopperText.zone)
+          val sub = CartRules.subtotal(model.cartOf(slug))
+          zones.forEach { z -> Choice(ShopperText.zoneOption(z.name, CheckoutRules.zoneFee(z, sub)), f.zoneId == z.id) { set(f.copy(zoneId = z.id)) } }
+        }
+        Check(ShopperText.callBefore, f.callBeforeArrival) { set(f.copy(callBeforeArrival = it)) }
+        Field(ShopperText.leaveWith, f.leaveWith) { set(f.copy(leaveWith = it.take(80))) }
+      }
+
+      // ── زمانِ تحویل (CHK-12) ──
+      if (CheckoutRules.scheduled(page, ful)) Slots(model, f)
+
+      Field(ShopperText.note, f.note, single = false) { set(f.copy(note = it.take(500))) }
+
+      // ── پرداخت: فقط نقد، بی پرسش (سرور هم فقط `cod` می‌پذیرد) ──
+      SectionTitle(ShopperText.pay)
+      Text(if (ful == CheckoutRules.PICKUP) ShopperText.payCashPickup else ShopperText.payCash, style = MaterialTheme.typography.bodyLarge)
+
+      // ── پول (برآورد؛ جمعِ نهایی را سرور هنگامِ ثبت می‌سنجد) ──
+      val s = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage())
+      Column {
+        MoneyRow(ShopperText.itemsTotal, ShopperText.money(s.subtotalMinor))
+        if (ful == CheckoutRules.DELIVERY) {
+          MoneyRow(ShopperText.deliveryFee, s.deliveryFeeMinor?.let { if (it > 0) ShopperText.money(it) else ShopperText.free } ?: "—")
+          if (s.deliveryFeeMinor == null) Text(ShopperText.zoneAfter, style = MaterialTheme.typography.bodySmall)
+          if (s.smallBasketFeeMinor > 0) Text(ShopperText.zoneSmall(s.smallBasketFeeMinor, CheckoutRules.zoneOf(page, f)?.minOrderMinor ?: 0), style = MaterialTheme.typography.bodySmall)
+          s.freeLeftMinor?.let { Text(ShopperText.freeLeft(it), style = MaterialTheme.typography.bodySmall) }
+        }
+        MoneyRow(ShopperText.total, ShopperText.money(s.totalMinor), strong = true)
+        if (s.shortOfMinMinor > 0) Note(ShopperText.minLeft(s.shortOfMinMinor, s.minOrderMinor), Tone.WARN)
+      }
+    }
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      model.placeNote?.let { Note(it, if (model.placing) Tone.INFO else Tone.WARN) }
+      val total = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage()).totalMinor
+      MainButton(if (model.repriced) ShopperText.accept(total) else ShopperText.submit(total), enabled = !model.placing) { model.placeOrder() }
+    }
+  }
+}
+
+@Composable
+private fun Verify(model: CustomerModel, page: StorePage) {
+  val f = model.form
+  if (!page.verificationAvailable) {
+    Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
+    Note(ShopperText.verifyOff, Tone.WARN)
+    return
+  }
+  val ok = CheckoutRules.verified(f, model.saved.ticket, model.now())
+  if (ok) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Text(f.phone + " — " + ShopperText.verified, Modifier.weight(1f), style = MaterialTheme.typography.bodyLarge)
+      TextButton(onClick = { model.otherNumber() }) { Text(ShopperText.otherNumber) }
+    }
+    return
+  }
+  Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
+  Text(ShopperText.verifyText, style = MaterialTheme.typography.bodySmall)
+  OutlinedButton(onClick = { model.sendCode() }, enabled = !model.verifyBusy, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.sendCode) }
+  if (model.codeSent != null) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      OutlinedTextField(
+        value = model.code, onValueChange = { model.code = it.take(8) }, singleLine = true, label = { Text(ShopperText.code) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword), modifier = Modifier.weight(1f),
+      )
+      OutlinedButton(onClick = { model.checkCode() }, enabled = !model.verifyBusy) { Text(ShopperText.check) }
+    }
+  }
+  model.verifyNote?.let { Note(it) }
+}
+
+@Composable
+private fun Slots(model: CustomerModel, f: CheckoutForm) {
+  SectionTitle(ShopperText.slot)
+  when (val l = model.slots[f.fulfillment]) {
+    is Load.Ready -> {
+      val page = l.value
+      if (page.allowAsap) Choice(ShopperText.asap, f.slotStartsAt == null) { model.updateForm(f.copy(slotStartsAt = null)) }
+      if (page.slots.none { it.available }) Note(ShopperText.slotNone, Tone.WARN)
+      page.slots.forEach { s -> Choice(slotLabel(s), f.slotStartsAt == s.startsAt, enabled = s.available) { model.updateForm(f.copy(slotStartsAt = s.startsAt)) } }
+    }
+    is Load.Failed -> ErrorBox(l.error, onRetry = null)
+    else -> BusyBox(Modifier.fillMaxWidth())
+  }
+}
+
+private fun slotLabel(s: DeliverySlot): String {
+  val extra = when {
+    !s.available -> " — " + ShopperText.slotFull
+    s.few -> " — " + ShopperText.slotFew
+    else -> ""
+  }
+  val fee = if (s.feeMinor > 0) " (+" + ShopperText.money(s.feeMinor) + ")" else ""
+  return ShopperText.slot(s.date, s.startMin, s.endMin) + fee + extra
+}
+
+@Composable
+private fun Field(
+  label: String,
+  value: String,
+  hint: String? = null,
+  keyboard: KeyboardType = KeyboardType.Text,
+  single: Boolean = true,
+  onChange: (String) -> Unit,
+) {
+  OutlinedTextField(
+    value = value, onValueChange = onChange, label = { Text(label) }, modifier = Modifier.fillMaxWidth(),
+    placeholder = if (hint != null) { { Text(hint) } } else null, singleLine = single, minLines = if (single) 1 else 2,
+    keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+  )
+}
+
+@Composable
+private fun Choice(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+  Row(
+    Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick).padding(vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    RadioButton(selected = selected, onClick = null, enabled = enabled)
+    Text(text, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyLarge)
+  }
+}
+
+@Composable
+private fun Check(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+  Row(
+    Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange).padding(vertical = 4.dp),
+    verticalAlignment = Alignment.CenterVertically,
+  ) {
+    Checkbox(checked = checked, onCheckedChange = null)
+    Text(text, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyLarge)
+  }
+}
