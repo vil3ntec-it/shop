@@ -29,6 +29,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrRemoteApproval
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.core.perm.ApproverVault
@@ -41,6 +42,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
+import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3Segmented
 import ir.vil3ntec.tohid.ui.v3.V3Sheet
@@ -71,10 +73,13 @@ fun ApprovalSheet(
   val context = LocalContext.current
   val store = remember { StaffPins(context) }
   val approvers = remember { runCatching { store.approvers(requesterUserId) }.getOrDefault(emptyList()) }
+  //  STF-02 «پرسیدن از مدیر»: فقط با پرچمِ روشنِ سرور؛ وگرنه همان PIN ِ امروز
+  val remote = ir.vil3ntec.tohid.ui.components.staff.rememberRemoteAsk(ask.need, shopId)
   ApprovalBody(
     ask = ask,
     approvers = approvers,
     block = ApprovalModel.block(shopId, approvers),
+    remote = remote,
     onPin = { who, pin, reason ->
       val r = store.get(who)
       if (r == null) null to null
@@ -102,7 +107,8 @@ fun ApprovalBody(
   onApproved: (ApprovalSlip.Slip) -> Unit,
   onClose: () -> Unit,
   start: ApprovalStart = ApprovalStart(),
-) = ApprovalPinBody(ask.title, ask.summary, approvers, block, onPin, onApproved, onClose, start)
+  remote: ir.vil3ntec.tohid.ui.components.staff.RemoteAsk? = null,
+) = ApprovalPinBody(ask.title, ask.summary, approvers, block, onPin, onApproved, onClose, start, remote, { slip, _ -> onApproved(slip) })
 
 /**
  *  همان بدنه برای هر نتیجهٔ تأیید: برگهٔ امضاشدهٔ تخفیف (`ApprovalSlip.Slip`) یا تأییدِ سقفِ اعتبار
@@ -118,6 +124,9 @@ internal fun <T : Any> ApprovalPinBody(
   onApproved: (T) -> Unit,
   onClose: () -> Unit,
   start: ApprovalStart = ApprovalStart(),
+  /** STF-02 «پرسیدن از مدیر» (`RemoteAsk.offered` ⇒ دیده می‌شود؛ null یا خاموش ⇒ همان امروز) */
+  remote: ir.vil3ntec.tohid.ui.components.staff.RemoteAsk? = null,
+  onRemote: (ApprovalSlip.Slip, ir.vil3ntec.tohid.core.perm.RemoteApproval.Request) -> Unit = { _, _ -> },
 ) {
   val c = PhoneV3.colors
   val scope = rememberCoroutineScope()
@@ -139,10 +148,25 @@ internal fun <T : Any> ApprovalPinBody(
     Text(summary, style = V3Type.body, color = c.ink)
     Spacer(Modifier.height(14.dp))
 
-    if (block != null) {
+    val asking = remote?.offered == true
+    if (block != null && !(asking && block == ApprovalBlock.NO_APPROVER)) {
       V3Message(V3Tone.INFO, ApprovalModel.blockText(block))
       Spacer(Modifier.height(12.dp))
       V3TextButton(StrKit.close, { closer.close() }, Modifier.align(Alignment.End))
+      return@V3Sheet
+    }
+    //  تأییدکننده‌ای روی همین دستگاه نیست ولی «پرسیدن از مدیر» روشن است ⇒ فقط دلیل و پرسیدن
+    if (block != null && remote != null) {
+      V3TextField(
+        value = reason,
+        onValueChange = { reason = it.replace('\n', ' ').take(ApprovalSlip.MAX_REASON) },
+        label = StrSale.approvalReason,
+        enabled = !remote.active,
+      )
+      Spacer(Modifier.height(12.dp))
+      RemoteAskBlock(remote, reason, pinToo = false) { slip, r -> chosen[0] = true; closer.close { onRemote(slip, r) } }
+      Spacer(Modifier.height(12.dp))
+      V3TextButton(StrKit.cancel, { closer.close() }, Modifier.align(Alignment.End))
       return@V3Sheet
     }
 
@@ -160,9 +184,13 @@ internal fun <T : Any> ApprovalPinBody(
       value = reason,
       onValueChange = { reason = it.replace('\n', ' ').take(ApprovalSlip.MAX_REASON) },
       label = StrSale.approvalReason,
-      enabled = !busy,
+      enabled = !busy && remote?.active != true,
     )
     Spacer(Modifier.height(14.dp))
+    if (asking && remote != null) {
+      RemoteAskBlock(remote, reason, pinToo = true) { slip, r -> chosen[0] = true; closer.close { onRemote(slip, r) } }
+      Spacer(Modifier.height(14.dp))
+    }
 
     val blocked = locked || reason.isBlank() || busy
     PinDots(pin.length, PinGuard.NEW_LEN, Modifier.align(Alignment.CenterHorizontally).v3Shake(shake.takeIf { it > 0 }))
@@ -201,6 +229,46 @@ internal fun <T : Any> ApprovalPinBody(
     })
     Spacer(Modifier.height(12.dp))
     V3TextButton(StrKit.cancel, { if (!busy) closer.close() }, Modifier.align(Alignment.End))
+  }
+}
+
+/**
+ *  «پرسیدن از مدیر» درونِ برگه: دکمه (با دلیل)، سپس حالِ انتظار با زمانِ مانده و «پس گرفتن»؛ رد/گذشت/خطا ⇒ متن و
+ *  «دوباره بپرس». [pinToo] ⇒ زیرش «یا مدیرِ کنارِ صندوق PIN بزند».
+ */
+@Composable
+private fun RemoteAskBlock(
+  remote: ir.vil3ntec.tohid.ui.components.staff.RemoteAsk,
+  reason: String,
+  pinToo: Boolean,
+  onApproved: (ApprovalSlip.Slip, ir.vil3ntec.tohid.core.perm.RemoteApproval.Request) -> Unit,
+) {
+  val c = PhoneV3.colors
+  val scope = rememberCoroutineScope()
+  val status = remote.statusText()
+  if (remote.active) {
+    V3StatusPill(V3Status.AWAITING, status.orEmpty())
+    Spacer(Modifier.height(6.dp))
+    V3TextButton(StrRemoteApproval.withdraw, { remote.withdraw() })
+  } else {
+    V3Button(
+      if (remote.wait == null) StrRemoteApproval.ask else StrRemoteApproval.askAgain,
+      onClick = { scope.launch { remote.run(reason, onApproved) } },
+      kind = ir.vil3ntec.tohid.ui.theme.V3ButtonKind.SECONDARY,
+      enabled = ir.vil3ntec.tohid.core.perm.RemoteApproval.reasonOk(reason),
+      modifier = Modifier.fillMaxWidth(),
+    )
+    Spacer(Modifier.height(6.dp))
+    Text(
+      status ?: StrRemoteApproval.askHint,
+      style = V3Type.subhead,
+      color = if (status != null) PhoneV3Roles.errorText(c) else c.inkMuted,
+      modifier = Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite },
+    )
+  }
+  if (pinToo) {
+    Spacer(Modifier.height(8.dp))
+    Text(StrRemoteApproval.orPin, style = V3Type.subhead, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
   }
 }
 

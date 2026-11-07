@@ -29,6 +29,8 @@ object ShellPaths {
   /** برگهٔ «+» ِ کادرِ بالای خانه (HOME-V3): `page` = `till` | `safe` */
   const val HERO_MONEY = "home/money"
   fun heroMoney(safe: Boolean) = RoutePaths.withQuery(HERO_MONEY, "page" to if (safe) "safe" else "till")
+  /** STF-02: «درخواست‌های تأیید» ِ صاحب/مدیر — راهش نوارِ پوسته و پوشِ سرور است (پرچمِ خاموش ⇒ هیچ‌جا دیده نمی‌شود) */
+  const val APPROVALS = "approvals"
 }
 
 /** بخش‌های جست‌وجو که همین کاربر حق دارد باز کند (نقش، پرچمِ سرور، پرچمِ ماژول) */
@@ -78,6 +80,9 @@ val ShellModule = AppModule(
       NotificationsScreen(data, args.query("tab"), onOpen = { nav.open(it) }, onBack = backOrNull)
     },
     V3Route("search", RouteKind.TAB, { Str.search }, chrome = Chrome.OWN) { Search() },
+    V3Route(ShellPaths.APPROVALS, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrRemoteApproval.inboxTitle }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
+      ApprovalInboxRoute()
+    },
     V3Route(TransactionPaths.LIST, RouteKind.PAGE, { StrHome.transactions }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       TransactionsScreen(
         data,

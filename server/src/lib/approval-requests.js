@@ -23,6 +23,8 @@
  *   • بی‌خطرِ تکرار: (دکان، درخواست‌کننده، `key`) یکتاست؛ همان کلید با همان محتوا همان ردیف، با محتوای دیگر ۴۰۹.
  *     درخواستِ تازه برای همان کار و سند درخواستِ بازِ پیشینِ همان کاربر را «جایگزین‌شده» لغو می‌کند.
  *   • هر تغییرِ حال در همان تراکنش یک ردیفِ `audit_log` دارد (`approval_request.*`).
+ *   • درخواستِ تازه (نه تکرار) پس از commit یک پوش به صاحبان/مدیرانِ فعال (جز خودش) می‌فرستد ([notifyApprovers])؛
+ *     بی‌انتظار، و شکستش کار را برنمی‌گرداند.
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.approval_requests` همهٔ درها جز `/config` ۴۰۳ و opِ با `request` همان
  *    `approval_invalid` ِ امروز (برگهٔ بدشکل) را می‌گیرد — رفتارِ امروز بایت‌به‌بایت همان.
@@ -75,9 +77,15 @@ function shape(r, t = now()) {
     status: stateOf(r, t), requesterId: r.requester_id, requesterName: r.requester_name || undefined,
     createdAt: Number(r.created_at), expiresAt: Number(r.expires_at),
     decidedBy: r.decided_by || null, decidedAt: optInt(r.decided_at), note: r.decision_note || '',
+    //  نام و نقشِ تأییدکننده برای صندوق (برگشت نقشِ تأییدکننده را می‌سنجد، `ReturnFlow.canApprove`) — فقط در get/list
+    deciderName: r.decider_name || undefined, deciderRole: r.decider_role || undefined,
     usedOpId: r.used_op_id || null, usedAt: optInt(r.used_at),
   };
 }
+
+const DECIDER_COLS = 'd.name AS decider_name, dm.role AS decider_role';
+const DECIDER_JOIN = `LEFT JOIN users d ON d.id = r.decided_by
+      LEFT JOIN shop_members dm ON dm.shop_id = r.shop_id AND dm.user_id = r.decided_by AND dm.status = 'active'`;
 
 /** درخواستِ عددی برای `PermCore.evaluate` — همان شکلِ `approval-core.evalReq` */
 function evalReq(r) {
@@ -134,7 +142,7 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
     const code = require('./staff-approval').DENY_CODE[p.perm] || 'perm_denied';
     throw forbidden('این کار برای نقشِ شما ممنوع است', code);
   }
-  return inTx(async (c, log) => {
+  const out = await inTx(async (c, log) => {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`approval-requests:${shopId}:${actor.userId}`]);
     const prev = (await c.query(
       'SELECT * FROM shop_approval_requests WHERE shop_id=$1 AND requester_id=$2 AND request_key=$3', [shopId, actor.userId, p.key]
@@ -168,6 +176,36 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
     });
     return { request: shape(row, t), duplicate: false };
   });
+  if (!out.duplicate) notifyApprovers(shopId, actor.userId, out.request);
+  return out;
+}
+
+const PERM_LABEL = Object.freeze({ 'sales.discount': 'تخفیف', 'sales.cancel': 'لغوِ فاکتور', 'returns.create': 'برگشت' });
+
+/**
+ * خبرِ پوش به صاحبان و مدیرانِ فعالِ همین دکان (جز خودِ درخواست‌کننده) — همان `push.sendTo` ِ هشدارِ حساب‌پی.
+ * ⛔ بی‌انتظار و بی‌اثر بر کار: شکستِ پوش (یا خاموش بودنش) درخواست را برنمی‌گرداند؛ صندوقِ تأییدِ برنامه هم می‌پرسد.
+ * ⛔ فقط آگاهی است: تأیید هنوز با `POST /:id/approve` ِ دستگاهِ خودِ مدیر و سنجشِ اختیارش در سرور است.
+ */
+function notifyApprovers(shopId, requesterId, request) {
+  const T = require('./text-core');
+  const fa = (n) => T.displayDigits(String(n), 'fa');
+  return (async () => {
+    const ids = (await query(
+      `SELECT user_id FROM shop_members WHERE shop_id=$1 AND status='active' AND role = ANY($2::text[]) AND user_id <> $3`,
+      [shopId, APPROVER_ROLES, String(requesterId || '')]
+    )).rows.map((r) => r.user_id);
+    if (!ids.length) return { sent: 0 };
+    const who = (await one('SELECT name FROM users WHERE id=$1', [requesterId]))?.name || 'کارمند';
+    const money = request.amount === null ? '' : `${fa((request.amount / 100).toLocaleString('en-US')).split(',').join('٬')} افغانی`;
+    const pct = request.pctBp === null ? '' : `${fa(request.pctBp / 100)}٪`;
+    const what = [PERM_LABEL[request.perm] || request.perm, [pct, money].filter(Boolean).join(' — ')].filter(Boolean).join(' ');
+    return require('./push').sendTo({ shopId, app: 'shop', onlyUserIds: ids }, {
+      title: 'درخواستِ تأیید', body: `${who}: ${what}. پاسخ در «درخواست‌های تأیید» ِ برنامه.`,
+      data: { type: 'approval_request', id: request.id }, tag: `apr:${request.id}`,
+      ttlSeconds: Math.max(60, Math.round((request.expiresAt - now()) / 1000)),
+    });
+  })().catch((err) => { console.warn('[approval-requests] خبر به مدیر نرسید:', err.message); return null; });
 }
 
 /** صاحب و مدیر همه را می‌بینند؛ بقیه فقط درخواست‌های خودشان. `status=open` (پیش‌فرض) = در انتظار و نگذشته. */
@@ -177,7 +215,8 @@ async function list(shopId, actor, { status = 'open', limit = 100 } = {}) {
   const all = isApprover(actor.role);
   const t = now();
   const rows = await many(
-    `SELECT r.*, u.name AS requester_name FROM shop_approval_requests r LEFT JOIN users u ON u.id = r.requester_id
+    `SELECT r.*, u.name AS requester_name, ${DECIDER_COLS} FROM shop_approval_requests r LEFT JOIN users u ON u.id = r.requester_id
+      ${DECIDER_JOIN}
       WHERE r.shop_id=$1 AND ($2::boolean OR r.requester_id=$3)
         AND ($4 <> 'open' OR (r.status='pending' AND r.expires_at >= $5))
       ORDER BY r.created_at DESC LIMIT $6`,
@@ -190,7 +229,8 @@ async function list(shopId, actor, { status = 'open', limit = 100 } = {}) {
 /** فقط درخواست‌کننده یا صاحب/مدیرِ همان دکان؛ بقیه همان ۴۰۴ (بودنِ درخواست هم نشت نمی‌کند) */
 async function get(shopId, actor, id) {
   const r = ID_RE.test(String(id || '')) ? await one(
-    `SELECT r.*, u.name AS requester_name FROM shop_approval_requests r LEFT JOIN users u ON u.id = r.requester_id
+    `SELECT r.*, u.name AS requester_name, ${DECIDER_COLS} FROM shop_approval_requests r LEFT JOIN users u ON u.id = r.requester_id
+      ${DECIDER_JOIN}
       WHERE r.id=$1 AND r.shop_id=$2`, [id, shopId]
   ) : null;
   if (!r || (r.requester_id !== actor.userId && !isApprover(actor.role))) throw notFound('درخواست پیدا نشد', 'request_not_found');
@@ -317,5 +357,5 @@ async function accept(q, ctx, need, ref, { opId, at, deviceId, path }) {
 
 module.exports = {
   FLAG, APPROVER_ROLES, TTL_DEFAULT_MS, TTL_MIN_MS, TTL_MAX_MS, MAX_PENDING,
-  enabled, stateOf, create, list, get, decide, cancel, isRef, accept,
+  enabled, stateOf, create, list, get, decide, cancel, isRef, accept, notifyApprovers,
 };
