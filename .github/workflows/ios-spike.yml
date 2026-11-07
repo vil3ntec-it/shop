@@ -180,8 +180,22 @@ jobs:
           TOHID_E2E_SHOTS: ${{ github.workspace }}/ios-e2e/shots
         run: |
           set +e
+          #  گیرِ رشتهٔ اصلی (نگهبانِ آزمون فقط «کدام گام» را می‌گوید): e2e.log سه دقیقه بی‌حرکت ⇐ پشتهٔ همهٔ رشته‌های
+          #  test.kexe با `sample`، پیش از آن‌که نگهبانِ ۲۰ دقیقه‌ای فرآیند را ببندد — کدام قفل، کدام تابع، کدام رشته
+          (
+            while sleep 20; do
+              f=ios-e2e/shots/e2e.log
+              [ -f "$f" ] || continue
+              [ $(( $(date +%s) - $(stat -f %m "$f") )) -lt 180 ] && continue
+              for p in $(pgrep -f 'test\.kexe'); do sudo sample "$p" 3 -file "ios-e2e/shots/hang-sample-$p.txt" >/dev/null 2>&1; done
+              break
+            done
+          ) &
+          hang=$!
           ./desktop/gradlew --no-daemon -p ios/shared -Pios=true iosSimulatorArm64Test
           rc=$?
+          kill "$hang" 2>/dev/null
+          for f in ios-e2e/shots/hang-sample-*.txt; do [ -f "$f" ] && { echo "::group::$f"; cat "$f"; echo "::endgroup::"; }; done
           grep -ho '<testsuite [^>]*' ios/shared/build/test-results/iosSimulatorArm64Test/*.xml
           if [ -s ios-e2e/shots/summary.md ]; then cat ios-e2e/shots/summary.md >> "$GITHUB_STEP_SUMMARY"; cat ios-e2e/shots/summary.md; else echo "::warning::جدولِ آزمونِ سرتاسری نیست (ios-e2e/shots/summary.md)"; fi
           #  لاگِ گام‌ها و درختِ دسترس‌پذیریِ هر گامِ سرخ همین‌جا هم (بی دانلودِ مصنوع)
