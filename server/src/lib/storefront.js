@@ -260,10 +260,11 @@ async function catalog(shopId, { q, category, cursor, limit, sort, contactPhone 
   const from = await sfc.productFrom(shopId);
   const count = ((w, a) => () => one(`SELECT count(*) AS n FROM ${from} WHERE ${w}`, a))(where, [...params]);
   const pg = browse.pageOf(sort, cursor, params, lim);
-  params.push(lim + 1);
+  const limAt = params.push(lim + 1);
+  const tail = pg.offset ? ` OFFSET $${params.push(pg.offset)}` : '';
   const rows = await many(
     `SELECT ${PRODUCT_COLS} FROM ${from} WHERE ${where}${pg.where}
-      ORDER BY ${pg.order}COALESCE(r.data->>'name', ''), r.row_id LIMIT $${params.length}${pg.tail}`,
+      ORDER BY ${pg.order}COALESCE(r.data->>'name', ''), r.row_id LIMIT $${limAt}${tail}`,
     params
   );
   const more = rows.length > lim;

@@ -26,15 +26,21 @@ const memo = new Map();   //  مسیر ⇒ { mtimeMs, size, v }
 function versionOf(abs) {
   const file = path.resolve(abs);
   if (!file.startsWith(PUB + path.sep)) return '';
-  let st;
-  try { st = fs.statSync(file); } catch { return ''; }
-  if (!st.isFile()) return '';
-  const m = memo.get(file);
-  if (m && m.mtimeMs === st.mtimeMs && m.size === st.size) return m.v;
-  const v = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('base64url').slice(0, 12);
-  if (memo.size > 2000) memo.clear();
-  memo.set(file, { mtimeMs: st.mtimeMs, size: st.size, v });
-  return v;
+  //  همان پروندهٔ بازشده هم سنجیده و هم خوانده می‌شود (بی فاصله میانِ stat و read)
+  let fd;
+  try { fd = fs.openSync(file, 'r'); } catch { return ''; }
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) return '';
+    const m = memo.get(file);
+    if (m && m.mtimeMs === st.mtimeMs && m.size === st.size) return m.v;
+    const v = crypto.createHash('sha256').update(fs.readFileSync(fd)).digest('base64url').slice(0, 12);
+    if (memo.size > 2000) memo.clear();
+    memo.set(file, { mtimeMs: st.mtimeMs, size: st.size, v });
+    return v;
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 /** `setHeaders` ِ `express.static`: پیش از سرآیندِ پیش‌فرض صدا زده می‌شود و آن را جایگزین می‌کند */

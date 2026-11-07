@@ -566,6 +566,8 @@ async function createApp({ runMigrations = true } = {}) {
     ? res.type('html').send(assets.versioned(require('node:fs').readFileSync(path.join(dir, 'index.html'), 'utf8')))
     : res.sendFile('index.html', { root: dir }));
   const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
+  //  `?lang=` فقط یکی از زبان‌های سئو، وگرنه fa: همان کارِ `langOf` ِ درونِ store-seo، این‌جا پیش از رسیدن به HTML
+  const seoLang = (v) => (typeof v === 'string' && storeSeo.LANGS.includes(v) ? v : 'fa');
   const storePage = async (slug, res, lang, onHost = false) => {
     let status = 200;
     let sf = null;
@@ -576,7 +578,7 @@ async function createApp({ runMigrations = true } = {}) {
       return res.set('Cache-Control', 'no-store')
         .redirect(301, onHost ? `//${moved}.${config.storefront.domain}/` : `/store/${moved}`);
     }
-    const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
+    const seoPage = sf ? await storeSeo.page(sf, { lang: seoLang(lang) }) : null;
     if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(shell(seoPage.body));
     sendShell(res.status(status).set('Cache-Control', 'no-cache'), storeDir);
   };
@@ -620,7 +622,7 @@ async function createApp({ runMigrations = true } = {}) {
       return seoLimit(req, res, (err) => (err ? next(err) : fn(sf, req, res).catch(next)));
     }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
   };
-  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
+  const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: seoLang(req.query.lang) })
     .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(shell(p.body))));
   const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));

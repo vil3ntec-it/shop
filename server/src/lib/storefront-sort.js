@@ -36,13 +36,13 @@ module.exports = ({ PRODUCT_ID_RE, MAX_PRICE_MINOR }) => {
 
   /**
    * برنامهٔ یک صفحه: `where` (شرطِ نشانگرِ نام، با پارامترِ افزوده به `params`)، `order` (پیشوندِ ORDER BY)،
-   * `tail` (OFFSET) و `next(last)` ⇒ نشانگرِ صفحهٔ بعد.
+   * `offset` (عددِ OFFSET؛ فراخواننده آن را پارامتری می‌فرستد، نه درونِ متنِ SQL) و `next(last)` ⇒ نشانگرِ صفحهٔ بعد.
    */
   function pageOf(sortQ, cursor, params, lim) {
     const sort = Object.prototype.hasOwnProperty.call(SORTS, String(sortQ || '')) ? String(sortQ) : '';
     if (sort) {
       const off = cursor ? dec(cursor, (x) => x[0] === 'o' && Number.isSafeInteger(x[1]) && x[1] > 0 && x[1] <= MAX_OFFSET)[1] : 0;
-      return { where: '', order: SORTS[sort], tail: off ? ` OFFSET ${off}` : '', next: () => enc(['o', off + lim]) };
+      return { where: '', order: SORTS[sort], offset: off, next: () => enc(['o', off + lim]) };
     }
     let where = '';
     if (cursor) {
@@ -50,7 +50,7 @@ module.exports = ({ PRODUCT_ID_RE, MAX_PRICE_MINOR }) => {
       params.push(name, id);
       where = ` AND (COALESCE(r.data->>'name', ''), r.row_id) > ($${params.length - 1}, $${params.length})`;
     }
-    return { where, order: '', tail: '', next: (last) => enc([String((last.data && last.data.name) || ''), last.id]) };
+    return { where, order: '', offset: 0, next: (last) => enc([String((last.data && last.data.name) || ''), last.id]) };
   }
 
   /** «قیمتِ پیشینِ خط‌خورده» روی کارت‌ها از ردیف‌های همان صفحه */
