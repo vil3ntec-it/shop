@@ -277,6 +277,11 @@ class CustomerModel(
       r.valueOrNull()?.let { page ->
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
+        //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
+        if (route is Route.Checkout) {
+          form = form.copy(fulfillment = CheckoutRules.fulfillmentOf(page.shop, form).orEmpty())
+          loadSlots()
+        }
       }
     }
   }

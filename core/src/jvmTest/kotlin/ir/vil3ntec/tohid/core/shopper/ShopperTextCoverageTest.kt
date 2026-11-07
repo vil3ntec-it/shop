@@ -18,8 +18,11 @@ class ShopperTextCoverageTest {
     ShopperText.audit = null
   }
 
-  /** پارامترهایی که کد است، نه مقدارِ نمایشی (وضعیت، حالت، روش) — در آزمونِ دری کنار */
-  private val codeParams = setOf("presence", "stock", "step", "status", "payState", "payCashButton")
+  /** پارامترشان کد است، نه مقدارِ نمایشی (وضعیت، حالت، روش) — با کدِ شناخته صدا زده می‌شوند و در آزمونِ دری کنار */
+  private val codeParams = mapOf(
+    "presence" to "open_online", "stock" to "in_stock", "step" to "placed", "status" to "new",
+    "payState" to "awaiting_accept", "payCashButton" to "pickup",
+  )
 
   private fun texts(): List<Method> = ShopperText::class.java.declaredMethods.filter {
     Modifier.isPublic(it.modifiers) && !it.isSynthetic && it.returnType == String::class.java &&
@@ -35,7 +38,8 @@ class ShopperTextCoverageTest {
     else -> ShopperError(400, "otp_wrong")
   }
 
-  private fun call(m: Method, text: String): String = m.invoke(ShopperText, *m.parameterTypes.map { arg(it, text) }.toTypedArray()) as String
+  private fun call(m: Method, text: String): String =
+    m.invoke(ShopperText, *m.parameterTypes.map { arg(it, codeParams[m.name] ?: text) }.toTypedArray()) as String
 
   @Test fun everyTextHasFaEnPsAndEnglishHasNoPersianLetters() {
     val methods = texts()
@@ -58,7 +62,7 @@ class ShopperTextCoverageTest {
     ShopperText.lang = ShopperLang.PRS
     //  «فروشگاه» ⇒ «دکان» و «خیابان» ⇒ «سرک» در متنِ برنامه؛ همین در نامِ مشتری باید بماند
     val value = "فروشگاه خیابان"
-    val withText = texts().filter { m -> m.name !in codeParams && m.parameterTypes.any { it == String::class.java } }
+    val withText = texts().filter { m -> m.name !in codeParams.keys && m.parameterTypes.any { it == String::class.java } }
     assertTrue(withText.size >= 10, withText.joinToString { it.name })
     for (m in withText) {
       val out = call(m, value)
