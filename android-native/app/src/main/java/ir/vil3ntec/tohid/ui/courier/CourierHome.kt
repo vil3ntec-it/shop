@@ -273,13 +273,10 @@ fun CourierHome(onSignedOut: () -> Unit) {
     }
   }
 
-  //  باز شدن و هر نیم دقیقه تا صفحه باز است (بی سرویسِ پس‌زمینه — §۳.۱۱)
-  LaunchedEffect(Unit) {
-    while (true) {
-      sync()
-      delay(30_000)
-    }
-  }
+  //  باز شدن و هر نیم دقیقه تا صفحه باز است (همگام‌سازی بی سرویسِ پس‌زمینه — §۳.۱۱)
+  LaunchedEffect(Unit) { while (true) { sync(); delay(30_000) } }
+  //  DLV-16: تنها سرویسِ پیش‌زمینهٔ پیک — موقعیت فقط برای مأموریتِ «در راه» که سرور خواست (`CourierLiveTrackAndroid.kt`)
+  CourierLiveTrack(active, queue)
 
   CourierBoard(
     name = name,
@@ -323,6 +320,7 @@ fun CourierHome(onSignedOut: () -> Unit) {
     onSignOut = {
       scope.launch {
         runCatching { Backend.auth(context).signOut() }
+        CourierTrackPlatform.sync(context, false)   //  DLV-16: خروج ⇒ هیچ موقعیتی
         store.wipe()
         ir.vil3ntec.tohid.data.ShopRole.forget(context)
         onSignedOut()

@@ -68,6 +68,12 @@
   -->
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
   <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+  <!--
+    DLV-16 (§۳.۱۱): سرویسِ پیش‌روی نوعِ location ِ پیک (`ui/courier/CourierTrackAndroid.kt`) — فقط وقتی مأموریتی «در راه»
+    است و دکان هر دو پرچمِ موقعیت را روشن کرده؛ از صفحهٔ بازِ برنامه شروع می‌شود (مکانِ «هنگامِ استفاده»، همان دو اجازهٔ
+    مکانِ بالا) و با «رسیدم» بسته می‌شود. اجازهٔ مکانِ پس‌زمینه خواسته نمی‌شود.
+  -->
+  <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
   <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
   <!--
@@ -194,6 +200,11 @@
         android:name="com.google.firebase.messaging.default_notification_icon"
         android:resource="@drawable/ic_launcher_monochrome" />
 
+    <!-- DLV-16: موقعیتِ پیک فقط در زمانِ مأموریت (`ui/courier/CourierTrackAndroid.kt`) -->
+    <service
+        android:name=".ui.courier.CourierTrackService"
+        android:exported="false"
+        android:foregroundServiceType="location" />
     <!-- «دستگاه‌ها»: اسکن در پس‌زمینه (`scan/ScanServiceAndroid.kt`) -->
     <service
         android:name=".scan.ScanCaptureService"

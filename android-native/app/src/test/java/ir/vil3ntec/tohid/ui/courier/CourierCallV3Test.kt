@@ -111,6 +111,19 @@ class CourierCallV3Test {
     assertEquals("این مأموریت تمام شده است", callCustomer(card, { ApiResult.Failure(ApiFailure.Conflict("این مأموریت تمام شده است", "not_live")) }, never))
   }
 
+  @Test fun `نمای جدولیِ تبلت هم ناحیه و دروازه را دارد، نه فقط نشانه`() {
+    val c = MissionCard("a", 1, "moving", landmark = "پشتِ مسجد", addressText = "کوچهٔ سوم", area = "کارتهٔ چهار", gateColor = "سبز")
+    assertEquals(listOf("پشتِ مسجد", "ناحیه: کارتهٔ چهار · دروازهٔ سبز"), rowLines(c))
+    //  بی نشانه ⇒ نشانیِ متنی در خطِ اول (پیش‌تر «—»)
+    assertEquals(listOf("کوچهٔ سوم", "ناحیه: کارتهٔ چهار · دروازهٔ سبز"), rowLines(c.copy(landmark = "")))
+    assertEquals(listOf("پشتِ مسجد"), rowLines(c.copy(area = "", gateColor = "")))
+    assertEquals(emptyList<String>(), rowLines(MissionCard("b", 2, "delivered")))
+    val row = body("CourierMissionCard.kt", "internal fun MissionRow(")
+    assertTrue("ردیف از همان کمک‌کار", row.contains("val lines = rowLines(c)"))
+    assertTrue(row.contains("lines.getOrNull(1)?.let"))
+    assertTrue(body("CourierCall.kt", "internal fun rowLines(").contains("landmarkLines("))
+  }
+
   @Test fun `برچسبِ ناحیه و دروازه به زبانِ صفحه است و مقدار دست نمی‌خورد`() {
     val c = MissionCard("a", 1, "moving", landmark = "پشتِ مسجد", addressText = "کوچهٔ سوم", area = "کارتهٔ چهار", gateColor = "سبز")
     assertEquals(listOf("پشتِ مسجد", "ناحیه: کارتهٔ چهار · دروازهٔ سبز", "کوچهٔ سوم"), landmarkLines(c))

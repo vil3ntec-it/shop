@@ -13,13 +13,16 @@
  *                 بی دلیل رد، با دلیل ثبت و اختلاف در سندِ تسویه و گزارش می‌ماند.
  *   E2E-DLV-08    ناموفق از گوشی ⇐ دوباره ⇐ ناموفق ⇐ دکان بسته را پس می‌گیرد ⇐ قفسه؛ فروشِ تحویلِ برنامه
  *                 یک بار لغو، پولی گرفته نشده، نقدِ پیک و تسویه دست‌نخورده.
+ *   DLV-16        سرویسِ موقعیتِ برنامهٔ پیک (`LiveTrack`): بی پرچم هیچ؛ با هر دو پرچم فقط پس از «گرفتم» و فقط
+ *                 «در راه»، نه تندتر از نوبت، بی صف (بی اینترنت ⇒ دور)، نقطهٔ کهنه نه، «رسیدم» ِ نرفته همان دم
+ *                 می‌بندد؛ مشتری فقط نقطهٔ گرد و تقریبی، پس از «رسیدم» هیچ.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery.
  * اجرا:  node test/e2e/courier.e2e.mjs
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
-import { CourierApp, KT, canSend, enqueue } from './lib/courier.mjs';
+import { CourierApp, KT, LT, Pacer, canSend, enqueue } from './lib/courier.mjs';
 
 const require = createRequire(import.meta.url);
 const D = require('../../src/lib/delivery-states');
@@ -265,6 +268,70 @@ await E.step('E2E-DLV-08.app', 'ناموفق از برنامهٔ پیک (بی د
   const cs = E.ok(await A.api('GET', '/shop/delivery/couriers'), 'پیک‌ها').items.find((c) => c.id === c2);
   assert.equal(cs.cashHeldMinor, 0, 'نقدِ پیک برای سفارشِ برگشتی');
   assert.match((await track(o.token)).status, /restocked|returned_to_store/);
+}, { needs: ['DEL-01'] });
+
+await E.step('DLV-16.app', 'موقعیت فقط «در راه» از سرویسِ برنامهٔ پیک: بی پرچم هیچ؛ با پرچم پس از «گرفتم»، بی صف، نقطهٔ کهنه نه؛ «رسیدم» ِ نرفته می‌بندد؛ مشتری فقط تقریبی', async () => {
+  const DL = require('../../src/lib/delivery-live');   //  پس از boot: `db` ِ همان PGlite
+  //  قاعدهٔ گوشی همان قاعدهٔ سرور است و هر «دیگر نه» ِ درِ موقعیت را می‌شناسد
+  assert.deepEqual([...LT.ON_THE_WAY].sort(), [...DL.ON_THE_WAY].sort());
+  for (const code of ['not_on_the_way', 'assignment_not_found', 'live_location_disabled', 'courier_inactive']) assert.ok(LT.STOP_CODES.includes(code), code);
+  assert.ok(LT.PERIOD_MS >= DL.LOCATION_MIN_INTERVAL_MS, 'گوشی تندتر از سرور نمی‌فرستد');
+  const o = await deliveryOrder(1, 'کنارِ نانوایی');
+  await packed(o.id);
+  const a = (await assign(o.id, c1)).assignment.id;
+  await flushed(K1);
+  K1.record(a, 'assigned').record(a, 'picked_up');
+  await flushed(K1);
+  const pacer = new Pacer();
+  const t0 = Date.now();
+  const at = (lat, when) => ({ lat, lng: 69.1712, accuracyM: 12, at: when });
+  const rows = async () => (await db.one('SELECT COUNT(*)::int AS n FROM delivery_locations WHERE assignment_id=$1', [a])).n;
+  //  پرچم‌ها خاموش ⇒ کارت بی `tracking` ⇒ سرویس هدفی ندارد، هیچ درخواستی
+  assert.equal('tracking' in K1.cards.active.find((c) => c.id === a), false);
+  let r = await K1.trackTick(pacer, t0, at(34.5312, t0));
+  assert.deepEqual([r.left, r.sent.length], [0, 0]);
+  for (const k of [DL.VIEW_FLAG, DL.LOCATION_FLAG]) await E.flag(owner.shopId, k, true);
+  try {
+    await flushed(K1);
+    assert.deepEqual(K1.cards.active.find((c) => c.id === a).tracking, { location: true, minIntervalMs: DL.LOCATION_MIN_INTERVAL_MS });
+    r = await K1.trackTick(pacer, t0, at(34.5312, t0 - 1_000));
+    assert.deepEqual(r.sent, [{ id: a, ok: true, code: '' }], JSON.stringify(r.sent));
+    let d = (await track(o.token)).delivery;
+    assert.deepEqual([d.status, d.location.lat, d.location.lng, d.location.approximate], ['on_the_way', 34.531, 69.171, true], 'مشتری نقطهٔ گرد می‌بیند');
+    assert.equal(JSON.stringify(d).includes('34.5312'), false, 'نقطهٔ دقیق به مشتری رسید');
+    //  نوبت نرسیده ⇒ هیچ (گوشی نقطه نمی‌پرسد)
+    r = await K1.trackTick(pacer, t0 + 1_000, at(34.6, t0 + 1_000));
+    assert.equal(r.sent.length, 0);
+    //  بی اینترنت ⇒ نقطه دور ریخته، هیچ صفی؛ مأموریت هدف می‌ماند
+    K1.dev.offline = true;
+    r = await K1.trackTick(pacer, t0 + LT.PERIOD_MS, at(34.6, t0 + LT.PERIOD_MS));
+    K1.dev.offline = false;
+    assert.deepEqual([r.left, r.sent.map((x) => x.code)], [1, ['offline']]);
+    assert.equal(K1.queue.pending.length, 0, 'نقطه به صفِ رویدادها رفت');
+    //  نقطهٔ کهنه ⇒ فرستاده نمی‌شود
+    r = await K1.trackTick(pacer, t0 + LT.PERIOD_MS, at(34.6, t0 + LT.PERIOD_MS - LT.MAX_FIX_AGE_MS - 1));
+    assert.deepEqual([r.left, r.sent.length], [1, 0]);
+    //  «در راه» ⇒ همچنان؛ سرور فقط آخرین نقطه را دارد
+    K1.record(a, 'moving');
+    await flushed(K1);
+    r = await K1.trackTick(pacer, t0 + 2 * LT.PERIOD_MS, at(34.54, t0 + 2 * LT.PERIOD_MS));
+    assert.deepEqual(r.sent.map((x) => x.ok), [true]);
+    assert.equal(await rows(), 1, 'بیش از آخرین نقطه نگه داشته شد');
+    //  «رسیدم» ِ هنوز نرفته ⇒ همان دم هیچ هدفی (حتی با نقطهٔ تازه و نوبتِ رسیده)
+    K1.record(a, 'arrived');
+    r = await K1.trackTick(pacer, t0 + 4 * LT.PERIOD_MS, at(34.55, t0 + 4 * LT.PERIOD_MS));
+    assert.deepEqual([r.left, r.sent.length], [0, 0]);
+    await flushed(K1);
+    assert.equal(K1.cards.active.find((c) => c.id === a).tracking.location, false);
+    d = (await track(o.token)).delivery;
+    assert.deepEqual([d.status, d.location], ['arrived', null], 'پس از «رسیدم» مشتری نقطه‌ای نمی‌بیند');
+    //  کارتِ کهنه یا دستگاهِ دیگر: سرور خودش می‌بندد و گوشی آن کد را «دیگر نه» می‌داند
+    const late = await K1.dev.api('POST', `/courier/missions/${a}/location`, { lat: 34.55, lng: 69.17, deviceTime: Date.now() });
+    assert.equal(late.status, 409);
+    assert.ok(LT.STOP_CODES.includes(late.body.error.code), late.body.error.code);
+  } finally {
+    for (const k of [DL.VIEW_FLAG, DL.LOCATION_FLAG]) await E.flag(owner.shopId, k, false);
+  }
 }, { needs: ['DEL-01'] });
 
 await E.finish();

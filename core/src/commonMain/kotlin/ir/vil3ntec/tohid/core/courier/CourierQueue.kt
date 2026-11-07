@@ -346,6 +346,13 @@ data class MissionCard(
   val nearPinMaxM: Int? = null,
   /** DLV-05: پیوندهای مسیریابِ سرور (`navigation`، فقط با پرچمِ `shop.delivery_map` و فقط تا مأموریت زنده است) */
   val navigation: MissionNav? = null,
+  /**
+   *  DLV-16: سرور موقعیتِ همین مأموریت را می‌خواهد (`tracking.location`، فقط با هر دو پرچمِ موقعیتِ دکان و فقط
+   *  «در راه»)؛ سرویسِ پیش‌زمینه فقط با همین روشن است (`LiveTrack.targets`)
+   */
+  val trackLocation: Boolean = false,
+  /** DLV-16: کمترین فاصلهٔ دو نقطه که سرور می‌پذیرد (`tracking.minIntervalMs`)؛ ۰ ⇒ نگفته */
+  val trackMinIntervalMs: Long = 0,
 )
 
 object MissionView {
