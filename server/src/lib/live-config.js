@@ -31,6 +31,16 @@ const MAX_KEYS = 200;
 
 /** scope → نسخه؛ خالی ⇒ از دیتابیس. تنها جای نگه‌داری در حافظه. */
 const versions = new Map();
+/*
+ *  چند نمونهٔ سرور (`CLUSTER_ENABLED`، `lib/cluster.js`): هر نوشتن نسخهٔ تازه را به نمونه‌های دیگر هم
+ *  می‌گوید (همان `raise` ِ فقط-بالارونده)، و پس از وصلِ دوبارهٔ گذرگاه حافظه پاک می‌شود تا از دیتابیس
+ *  خوانده شود. بی آن، پمپی که به نمونهٔ دیگر وصل بود تغییرِ پیکربندی را تا راه‌اندازیِ دوباره نمی‌دید.
+ */
+const cluster = require('./cluster');
+cluster.subscribe('live-config', (d) => { if (d.s && Number.isFinite(Number(d.v))) raise(String(d.s), Number(d.v)); });
+cluster.onResync(() => versions.clear());
+/** پرچم‌های حافظهٔ کوتاهِ `orders.flagOf` (`lib/hot-cache.js`): `all` ⇒ همه، دکان ⇒ همان دکان */
+const flagsChanged = (s) => require('./hot-cache').invalidate('flag', s === ALL ? '' : `${s}\u0000`);
 
 const { badRequest: badInput, conflict } = require('../middleware/errors');
 
@@ -182,6 +192,8 @@ async function set(scope, key, value, by = '', meta = {}) {
     version = await bump(client, s);
   });
   raise(s, version);
+  cluster.publish('live-config', { s, v: version });
+  flagsChanged(s);
   return { scope: s, key: k, value, version };
 }
 
@@ -206,7 +218,7 @@ async function setOnce(scope, key, value, by = '') {
     version = await bump(client, s);
     return true;
   });
-  if (inserted) raise(s, version);
+  if (inserted) { raise(s, version); cluster.publish('live-config', { s, v: version }); flagsChanged(s); }
   return { inserted };
 }
 
@@ -224,6 +236,8 @@ async function remove(scope, key, by = '', meta = {}) {
     }
   });
   raise(s, version);
+  cluster.publish('live-config', { s, v: version });
+  flagsChanged(s);
   return { scope: s, key: k, removed, version };
 }
 

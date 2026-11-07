@@ -139,7 +139,10 @@ function view(r) {
 //  گذار (compare-and-set) و اثرش روی سفارش
 // ════════════════════════════════════════════════════════════════════
 
-const nudge = (id) => setImmediate(() => bus.emit(id));
+//  چند نمونهٔ سرور (`CLUSTER_ENABLED`): همان بیدارباش به منتظرهای نمونه‌های دیگر هم (بی آن، هر ۳ ثانیه می‌خوانند)
+const cluster = require('./cluster');
+const nudge = (id) => { cluster.publish('pay-intent', { id: String(id) }); setImmediate(() => bus.emit(id)); };
+cluster.subscribe('pay-intent', (d) => { if (d.id) setImmediate(() => bus.emit(String(d.id))); });
 
 /**
  * گذارِ قصد درونِ تراکنشِ `c`. `from` همان وضعیتی است که خوانده شد؛ اگر دیگر نیست null برمی‌گردد

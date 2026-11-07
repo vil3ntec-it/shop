@@ -57,6 +57,11 @@ function decode(v) {
 
 /** پرچمِ دکان: مقدارِ خودِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است. */
 async function flagOf(shopId, c) {
+  //  بیرون از تراکنش: حافظهٔ کوتاهِ `HOT_CACHE_MS` (پیش‌فرض خاموش؛ `lib/hot-cache.js`، باطل با نوشتنِ پرچم)
+  if (!c) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${FLAG_KEY}\u0000p`, () => readFlag(shopId, null));
+  return readFlag(shopId, c);
+}
+async function readFlag(shopId, c) {
   const rows = (await runOf(c)(
     'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [FLAG_KEY, 'all', String(shopId)]
   )).rows;

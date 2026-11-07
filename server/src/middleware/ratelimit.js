@@ -1,8 +1,21 @@
 'use strict';
 /**
- * محدودیت نرخ درخواست — پنجره‌ی لغزان در حافظه.
- * برای یک سرور خانگی تک‌نمونه‌ای کافی است و وابستگی بیرونی نمی‌خواهد.
+ * محدودیت نرخ درخواست — پنجره‌ی لغزان.
+ *
+ * دو انبار، یک قرارداد (`RATE_LIMIT_STORE`؛ docs/SCALING-fa.md):
+ *   • `memory` (پیش‌فرضِ تک‌نمونه) — همان فهرستِ زمان‌ها در حافظهٔ همین فرآیند، دقیق و بی هیچ پرسش.
+ *   • `pg` (پیش‌فرضِ `CLUSTER_ENABLED=1`) — شمارنده‌های مشترکِ همهٔ نمونه‌ها در جدولِ UNLOGGED ِ
+ *     `rate_limit_hits` (مهاجرتِ ۲۱۵): هر پنجره ۶۰ برش (برشِ ربع‌ساعت = ۱۵ ثانیه)، یک upsert ِ شرطی برای هر
+ *     درخواست. پذیرفتن یا رد در **همان یک دستور** و زیرِ قفلِ ردیفِ برشِ جاری ⇒ درخواست‌های هم‌زمان از چند
+ *     نمونه از سقف نمی‌گذرند. ردشده شمرده نمی‌شود (همان رفتارِ حافظه)؛ `refund` همان برش را یکی کم می‌کند.
+ *     فرقِ تنها: هر درخواست تا پایانِ برشِ خودش شمرده می‌ماند (حداکثر یک برش دیرتر، سخت‌گیرتر نه
+ *     آسان‌تر). کلید با sha256 درهم می‌شود (ایمیل/شماره در پایگاه نمی‌نشیند). خطای پایگاه ⇒ همان
+ *     درخواست با انبارِ حافظه سنجیده می‌شود (باز نه، بسته نه: سقفِ همین نمونه) و هر دقیقه یک خط لاگ.
+ *
+ * ⛔ ترتیبِ میان‌افزارها همان است: سقفِ IP پیش از احراز (`router.use(rateLimit(…))`)، سقفِ حساب پس از
+ *    آن — CodeQL ِ `js/missing-rate-limiting` همین `rateLimit` را می‌شناسد (`.github/codeql/extensions`).
  */
+const crypto = require('node:crypto');
 const config = require('../config');
 const { tooMany } = require('./errors');
 
@@ -79,26 +92,94 @@ function trustedPeer(addr) {
 function rateLimit({ max, windowMs = config.rateLimit.windowMs, keyPrefix = '', key: keyFn = null, refundable = false }) {
   return function (req, res, next) {
     const key = `${keyPrefix}:${keyFn ? (keyFn(req) || clientIp(req)) : clientIp(req)}`;
-    const t = Date.now();
-    let hits = buckets.get(key);
-    if (!hits) { hits = []; buckets.set(key, hits); }
-    windows.set(key, windowMs);
-    // حذف درخواست‌های خارج از پنجره
-    while (hits.length && hits[0] <= t - windowMs) hits.shift();
-    if (hits.length >= max) {
-      res.set('Retry-After', String(Math.ceil((hits[0] + windowMs - t) / 1000)));
-      return next(tooMany());
-    }
-    hits.push(t);
-    if (refundable) {
-      if (!req.rateLimitTaken) req.rateLimitTaken = new Map();
-      req.rateLimitTaken.set(keyPrefix, () => {
-        const i = hits.lastIndexOf(t);
-        if (i >= 0) hits.splice(i, 1);
-      });
-    }
-    next();
+    if (config.rateLimit.store === 'pg' && !pgDown()) return pgHit(req, res, next, { key, max, windowMs, keyPrefix, refundable });
+    return memoryHit(req, res, next, { key, max, windowMs, keyPrefix, refundable });
   };
+}
+
+function memoryHit(req, res, next, { key, max, windowMs, keyPrefix, refundable }) {
+  const t = Date.now();
+  let hits = buckets.get(key);
+  if (!hits) { hits = []; buckets.set(key, hits); }
+  windows.set(key, windowMs);
+  // حذف درخواست‌های خارج از پنجره
+  while (hits.length && hits[0] <= t - windowMs) hits.shift();
+  if (hits.length >= max) {
+    res.set('Retry-After', String(Math.ceil((hits[0] + windowMs - t) / 1000)));
+    return next(tooMany());
+  }
+  hits.push(t);
+  if (refundable) {
+    if (!req.rateLimitTaken) req.rateLimitTaken = new Map();
+    req.rateLimitTaken.set(keyPrefix, () => {
+      const i = hits.lastIndexOf(t);
+      if (i >= 0) hits.splice(i, 1);
+    });
+  }
+  next();
+}
+
+// ── انبارِ مشترک (PostgreSQL) ───────────────────────────────────────────────
+/** برش‌های هر پنجره؛ برشِ کوچک‌تر از یک ثانیه نه */
+const SLOTS = 60;
+const slotMsOf = (windowMs) => Math.max(1000, Math.ceil(windowMs / SLOTS));
+/** پیشوند خوانا می‌ماند (کدام سطل)، بقیه درهم — ایمیل، شماره و IP در پایگاه نمی‌نشیند */
+function storeKey(key) {
+  const i = key.indexOf(':');
+  const prefix = i >= 0 ? key.slice(0, i) : '';
+  return `${prefix.slice(0, 48)}:${crypto.createHash('sha256').update(key).digest('base64url')}`;
+}
+/*
+ *  یک دستور: جمعِ برش‌های پیشینِ پنجره (پایدار، پیش از این نوشته شده‌اند) + برشِ جاری زیرِ قفلِ ردیف
+ *  (`ON CONFLICT DO UPDATE` آخرین نسخهٔ ردیف را قفل و همان را می‌سنجد). ردیف برگشت ⇒ پذیرفته؛ نه ⇒ رد.
+ */
+const HIT_SQL = `
+  WITH older AS (
+    SELECT COALESCE(sum(n), 0)::int AS s FROM rate_limit_hits WHERE key = $1 AND slot >= $3 AND slot < $2
+  )
+  INSERT INTO rate_limit_hits AS r (key, slot, n, expires_at)
+  SELECT $1, $2, 1, $5 FROM older WHERE older.s < $4
+  ON CONFLICT (key, slot) DO UPDATE SET n = r.n + 1
+    WHERE r.n + (SELECT s FROM older) < $4
+  RETURNING r.n`;
+let downUntil = 0;
+let lastWarn = 0;
+const pgDown = () => downUntil > Date.now();
+function pgFailed(err) {
+  //  پایگاه در دسترس نیست ⇒ ۵ ثانیه همه با حافظه، تا هر درخواست پشتِ اتصالِ مرده نماند
+  downUntil = Date.now() + 5000;
+  if (Date.now() - lastWarn > 60_000) {
+    lastWarn = Date.now();
+    console.error('[ratelimit] انبارِ مشترک در دسترس نیست؛ موقتاً سقفِ همین نمونه (حافظه):', err && err.message);
+  }
+}
+function pgHit(req, res, next, o) {
+  const db = require('../db');
+  const t = Date.now();
+  const slotMs = slotMsOf(o.windowMs);
+  const cur = Math.floor(t / slotMs);
+  const lo = Math.floor((t - o.windowMs) / slotMs);
+  const k = storeKey(o.key);
+  const exp = (cur + 1) * slotMs + o.windowMs;
+  db.query(HIT_SQL, [k, cur, lo, o.max, exp]).then(async (r) => {
+    if (r.rows.length) {
+      if (o.refundable) {
+        if (!req.rateLimitTaken) req.rateLimitTaken = new Map();
+        req.rateLimitTaken.set(o.keyPrefix, () => {
+          db.query('UPDATE rate_limit_hits SET n = n - 1 WHERE key = $1 AND slot = $2 AND n > 0', [k, cur])
+            .catch((err) => pgFailed(err));
+        });
+      }
+      return next();
+    }
+    const row = await db.one('SELECT min(slot) AS s FROM rate_limit_hits WHERE key = $1 AND slot >= $2 AND n > 0', [k, lo]);
+    const first = row && row.s != null ? Number(row.s) : cur;
+    res.set('Retry-After', String(Math.max(1, Math.ceil(((first + 1) * slotMs + o.windowMs - t) / 1000))));
+    return next(tooMany());
+  }, (err) => {
+    pgFailed(err);
+    memoryHit(req, res, next, o);
+  }).catch((err) => next(err));
 }
 
 /**
@@ -127,9 +208,18 @@ function sweep(t = Date.now()) {
     if (!hits.length) { buckets.delete(k); windows.delete(k); }
   }
 }
-const sweeper = setInterval(() => sweep(), 60_000);
+/** برش‌های گذشته از پنجره (انبارِ مشترک) — فقط یک نمونه (رهبر)؛ نمایهٔ `expires_at` */
+async function sweepStore(t = Date.now()) {
+  if (config.rateLimit.store !== 'pg') return 0;
+  const r = await require('../db').query('DELETE FROM rate_limit_hits WHERE expires_at < $1', [t]);
+  return r.rowCount;
+}
+const sweeper = setInterval(() => {
+  sweep();
+  if (config.rateLimit.store === 'pg' && require('../lib/cluster').runsJobs()) sweepStore().catch((err) => pgFailed(err));
+}, 60_000);
 if (sweeper.unref) sweeper.unref();
 
-function resetAll() { buckets.clear(); windows.clear(); }
+function resetAll() { buckets.clear(); windows.clear(); downUntil = 0; }
 
-module.exports = { rateLimit, refund, clientIp, trustedPeer, resetAll, sweep };
+module.exports = { rateLimit, refund, clientIp, trustedPeer, resetAll, sweep, sweepStore, storeKey, SLOTS };

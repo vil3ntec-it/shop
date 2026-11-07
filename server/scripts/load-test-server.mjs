@@ -87,6 +87,8 @@ async function stats({ gc = false } = {}) {
     pg: await pgActivity(),
     //  دروازهٔ push ِ v3: منتظر (صفِ دکان + سقفِ push، بی اتصال) و push ِ دارای جا
     gate: (({ on, waiting, inflight }) => ({ on, waiting, inflight }))(gate.stats()),
+    //  `--instances`: رهبرِ خوشه (کارگرها) و خبرهای گذرگاه
+    cluster: cluster.enabled() ? (({ leader, published, received }) => ({ leader, published, received }))(cluster.stats()) : null,
     slowLines,
   };
   loop.reset();
@@ -106,7 +108,14 @@ if (!CFG.follower) await require(path.join(SERVER, 'src', 'lib', 'sync-v1.js')).
 
 //  کارگرهای پس‌زمینهٔ `index.js` (soak بی آن‌ها نیمه است)؛ هر کدام بی پرچمش تقریباً بیکار است
 const workers = [];
-if (CFG.workers !== false) {
+const cluster = require(path.join(SERVER, 'src', 'lib', 'cluster.js'));
+if (cluster.enabled()) {
+  //  `--instances` (`CLUSTER_ENABLED=1`): همان فهرستِ `src/index.js` و فقط روی رهبر؛ گذرگاه و سوکتِ زنده هم
+  require(path.join(SERVER, 'src', 'lib', 'sync-v1-live.js')).attach(h.server());
+  cluster.jobs(require(path.join(SERVER, 'src', 'workers.js')).backgroundJobs());
+  await cluster.start();
+  workers.push('cluster');
+} else if (CFG.workers !== false) {
   for (const [mod, fn] of [['login-outbox', 'start'], ['order-notify', 'start'], ['customer-notify', 'start'], ['order-timeout', 'start'],
     ['order-desk', 'start'], ['order-start-alert', 'start'], ['owner-report', 'start'], ['storefront-alerts', 'start'],
     ['payment-intents', 'startReconciler'], ['ops-alerts', 'start']]) {

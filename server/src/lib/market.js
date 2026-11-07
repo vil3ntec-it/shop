@@ -78,9 +78,12 @@ const mine = require('./market-orders')({ storeOpen, filterAsync });   // «سف
 // ════════════════════════════════════════════════════════════════════
 
 async function globalFlag(key) {
-  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
-  if (!r) return false;
-  try { return JSON.parse(r.value) === true; } catch { return false; }
+  //  حافظهٔ کوتاهِ `HOT_CACHE_MS` (پیش‌فرض خاموش؛ `lib/hot-cache.js`)؛ نوشتنِ `all` همه را باطل می‌کند
+  return require('./hot-cache').get('flag', `all\u0000${key}\u0000g`, async () => {
+    const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
+    if (!r) return false;
+    try { return JSON.parse(r.value) === true; } catch { return false; }
+  });
 }
 
 const directoryOn = () => globalFlag(FLAG_KEY);

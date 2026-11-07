@@ -62,6 +62,11 @@ function decode(text) {
  * `service` = همین کلید) هر مقداری را می‌بُرد — در همین یک پرسش، بی رفت‌وبرگشتِ دوم.
  */
 async function flagOf(shopId, key = FLAG_KEY, run = null) {
+  //  بیرون از تراکنش: حافظهٔ کوتاهِ `HOT_CACHE_MS` (پیش‌فرض خاموش؛ `lib/hot-cache.js`) — باطل با هر نوشتنِ پرچم/حالتِ دکان
+  if (!run) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${key}\u0000h`, () => readFlag(shopId, key, null));
+  return readFlag(shopId, key, run);
+}
+async function readFlag(shopId, key, run) {
   //  `run` = اتصالِ تراکنشِ جاری (`(sql, params) ⇒ {rows}`): درونِ تراکنش از همان اتصال، نه استخر — وگرنه
   //  ثبت‌های هم‌زمانِ پشتِ یک قفل همهٔ اتصال‌ها را نگه می‌دارند و این پرسش اتصال نمی‌گیرد (RSK-07 روی PostgreSQL)
   const sql = `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
