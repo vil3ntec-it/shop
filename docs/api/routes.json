@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 967,
+    "routes": 974,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 461,
+      "user": 468,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 675,
-      "empty": 290,
+      "extracted": 679,
+      "empty": 293,
       "unresolved": 2
     }
   },
@@ -601,6 +601,13 @@
     {"method":"POST","path":"/api/shop","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["name"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('shop.update')"],"params":[],"query":[],"body":["name"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/active","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["refreshToken","refresh_token","shopId","shop_id"],"response":{"statuses":[200],"keys":["activeShopId","ok","shop"]},"errors":["403 not_member"],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/approval-requests","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":["limit","status"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/approval-requests","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/approval-requests/:id","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/approval-requests/:id/approve","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/approval-requests/:id/cancel","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/approval-requests/:id/deny","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/approval-requests/config","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["approver","enabled","ttlMs"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approvals","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('audit.view')"],"params":[],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["approvals"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["keys"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":["deviceId","device_id","label","publicKey","public_key"],"response":{"statuses":[201],"keys":["key"]},"errors":[],"shape":"extracted"},

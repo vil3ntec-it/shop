@@ -103,10 +103,14 @@ export function load(text = readFileSync(PATHS.json, 'utf8')) {
     ids.add(a.id);
     if (!STATUSES.includes(a.status)) throw new Error(`وضعیتِ نادرست برای ${a.id}: ${a.status}`);
     if (!Array.isArray(a.keys) || !a.keys.length) throw new Error(`${a.id} کلید ندارد`);
+    //  وضعیتِ وب جدا از کامپیوتر (#960: Alt+I «قیمت‌پرسی» در وب نیست ولی status ِ کامپیوتر partial است)
+    const webStatus = a.webStatus ?? 'planned';
+    if (!STATUSES.includes(webStatus)) throw new Error(`وضعیتِ وبِ نادرست برای ${a.id}: ${webStatus}`);
+    if (webStatus !== 'planned' && !(a.web ?? []).length) throw new Error(`${a.id} در وب ${webStatus} است ولی کلیدِ وب ندارد`);
     return {
       id: a.id, scope: a.scope, title: a.title, status: a.status, page: a.page ?? null,
       keys: a.keys.map(parseChord), keysRaw: a.keys,
-      web: (a.web ?? []).map(parseChord), webRaw: a.web ?? [],
+      web: (a.web ?? []).map(parseChord), webRaw: a.web ?? [], webStatus,
       overrides: a.overrides ?? [],
     };
   });
@@ -170,13 +174,14 @@ export function js(m) {
   const chord = (c) => [c.key, c.mod, c.shift, c.alt];
   const actions = {};
   for (const a of m.actions) {
-    actions[a.id] = { scope: a.scope, title: a.title, status: a.status, page: a.page, web: a.web.map(chord), overrides: a.overrides };
+    actions[a.id] = { scope: a.scope, title: a.title, status: a.status, webStatus: a.webStatus, page: a.page, web: a.web.map(chord), overrides: a.overrides };
   }
   const scopes = Object.fromEntries(m.scopes.map((s) => [s.id, { kind: s.kind, title: s.title, parent: s.parent }]));
   return `/* ${HEADER(`node ${GEN}`)}
  * نقشهٔ کلیدهای وب (ستونِ «وب»ِ جدولِ ۵.۲ و MASTER-SPEC ۳.۱۶). کلید با e.code خوانده می‌شود،
  * پس با چیدمانِ فارسی و پشتو هم کار می‌کند؛ Mod یعنی Ctrl یا Cmd.
  * هر کلید: [نام، Mod، Shift، Alt]. استفاده: TohidKeymap.matches(event, 'global.page1')
+ * status = وضعیتِ برنامهٔ کامپیوتر؛ webStatus = وضعیتِ همین کلید در وب. راهنمای وب فقط از help(scope) — نه از status.
  */
 (function (root) {
   'use strict';
@@ -204,7 +209,9 @@ ${Object.entries(actions).map(([id, a]) => `    ${JSON.stringify(id)}: ${JSON.st
   /** برچسبِ نخستین کلیدِ وب: «Alt+1»، روی مک «Cmd+K» */
   function label(id, mac) {
     var c = action(id).web[0];
-    if (!c) return '';
+    return c ? chordLabel(c, mac) : '';
+  }
+  function chordLabel(c, mac) {
     var p = [];
     if (c[1]) p.push(mac ? 'Cmd' : 'Ctrl');
     if (c[3]) p.push(mac ? 'Option' : 'Alt');
@@ -212,7 +219,26 @@ ${Object.entries(actions).map(([id, a]) => `    ${JSON.stringify(id)}: ${JSON.st
     p.push(LABELS[c[0]]);
     return p.join('+');
   }
-  var api = { CODES: CODES, SCOPES: SCOPES, ACTIONS: ACTIONS, matches: matches, label: label };
+  /**
+   * فهرستِ راهنمای وب برای یک دامنه: خودش، پدرانش و «همه‌جا» — فقط کلیدهایی که **وب** پیاده کرده
+   * (webStatus ِ live/partial و کلیدِ وب)؛ status ِ کامپیوتر این‌جا هیچ نقشی ندارد.
+   * هر ردیف: { id, scope, title, keys: [برچسب] }
+   */
+  function help(scope, mac) {
+    var want = {};
+    for (var s = scope; s && SCOPES[s]; s = SCOPES[s].parent) want[s] = true;
+    for (var g in SCOPES) if (SCOPES[g].kind === 'global') want[g] = true;
+    var out = [];
+    for (var id in ACTIONS) {
+      var a = ACTIONS[id];
+      if (!want[a.scope] || a.webStatus === 'planned' || !a.web.length) continue;
+      var keys = [];
+      for (var i = 0; i < a.web.length; i++) keys.push(chordLabel(a.web[i], mac));
+      out.push({ id: id, scope: a.scope, title: a.title, keys: keys });
+    }
+    return out;
+  }
+  var api = { CODES: CODES, SCOPES: SCOPES, ACTIONS: ACTIONS, matches: matches, label: label, help: help };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.TohidKeymap = api;
 })(typeof window !== 'undefined' ? window : globalThis);

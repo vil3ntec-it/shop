@@ -137,4 +137,10 @@ object StrGiftCard {
   fun granted(name: Any, amount: Any): String = t(
     "به «${asIs(name)}» ${asIs(amount)} افغانی اعتبار داده شد", "$amount afghani of credit given to “$name”", "«$name» ته $amount افغانۍ اعتبار ورکړل شو",
   )
+  /** PRM-15 «درخواستِ تأیید»: خلاصهٔ پنجرهٔ PIN ِ مدیر/صاحب */
+  fun grantApproval(name: Any, amount: Any): String = t(
+    "${asIs(amount)} افغانی اعتبارِ هدیه برای «${asIs(name)}» تأییدِ مدیر یا صاحبِ دکان را می‌خواهد.",
+    "$amount afghani of store credit for “$name” needs the manager's or the owner's approval.",
+    "د «$name» لپاره $amount افغانۍ د ډالۍ اعتبار د مدیر یا د دوکان د خاوند تایید غواړي.",
+  )
 }

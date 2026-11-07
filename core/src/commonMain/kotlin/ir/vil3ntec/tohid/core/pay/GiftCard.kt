@@ -383,15 +383,34 @@ object StoreCredit {
   }
 
   /**
-   *  PRM-15 — اعطای دستیِ اعتبار (هدیه بی کارت): null یعنی پذیرفتنی. هدیه دادنِ پول بی نقد است، پس همان اجازهٔ تخفیف:
-   *  [decision] = تصمیمِ `sales.discount` برای **همین مبلغ** (`PermCore.evaluate`، با سقفِ مبلغِ نقش)؛ فقط «allow» —
-   *  «approve» (نیازمندِ تأیید) این‌جا پنجرهٔ PIN ندارد. بعد مشتریِ موجود و فعال، مبلغِ ۱ تا [GiftCard.MAX_AMOUNT] و دلیلِ
-   *  دست‌کم [GiftCard.REASON_MIN] نویسه (پس از trim) تا [GiftCard.MAX_TEXT].
+   *  PRM-15 «درخواستِ تأیید» (STF-02): مدیر یا صاحب روی همین دستگاه با PIN و دلیل (`PinApprovalDialog`) اعطای «نیازمندِ تأیید» را
+   *  تأیید کرد. [by] نامِ تأییدکننده، [role] نقشش و [approverDecision] تصمیمِ **خودِ او** برای همین مبلغ (`PermCore.evaluate`
+   *  با نقشِ او) — فقط «allow» می‌پوشاند: مدیرِ کم‌اختیار تأییدِ بیشتر از اختیارِ خودش نمی‌دهد.
    */
-  fun grantProblem(hasCustomer: Boolean, amountMinor: Long, reason: String?, decision: String): String? {
+  data class Approval(val by: String, val role: String, val reason: String, val approverDecision: String)
+
+  /** نقش‌هایی که تأیید می‌دهند — همان `APPROVER_ROLES` ِ سرور */
+  private val APPROVERS = setOf("owner", "manager")
+
+  /** آیا [a] اعطای «نیازمندِ تأیید» ِ [requester] را می‌پوشاند؟ کسی کارِ خودش را تأیید نمی‌کند. */
+  fun approves(a: Approval?, requester: String?): Boolean =
+    a != null && a.by.isNotBlank() && a.role.trim().lowercase() in APPROVERS && a.approverDecision == "allow" &&
+      a.reason.trim().isNotEmpty() && a.reason.length <= GiftCard.MAX_TEXT && a.by.trim() != requester?.trim()
+
+  /**
+   *  PRM-15 — اعطای دستیِ اعتبار (هدیه بی کارت): null یعنی پذیرفتنی. هدیه دادنِ پول بی نقد است، پس همان اجازهٔ تخفیف:
+   *  [decision] = تصمیمِ `sales.discount` برای **همین مبلغ** (`PermCore.evaluate`، با سقفِ مبلغِ نقش)؛ «allow» بی‌واسطه،
+   *  «approve» (نیازمندِ تأیید) فقط با [approval] ِ معتبرِ کسی جز [requester] ([approves])؛ «deny» هرگز. بعد مشتریِ موجود و
+   *  فعال، مبلغِ ۱ تا [GiftCard.MAX_AMOUNT] و دلیلِ دست‌کم [GiftCard.REASON_MIN] نویسه (پس از trim) تا [GiftCard.MAX_TEXT].
+   */
+  fun grantProblem(
+    hasCustomer: Boolean, amountMinor: Long, reason: String?, decision: String,
+    approval: Approval? = null, requester: String? = null,
+  ): String? {
     val why = reason?.trim().orEmpty()
+    val allowed = decision == "allow" || (decision == "approve" && approves(approval, requester))
     return when {
-      decision != "allow" -> GRANT_NOT_ALLOWED
+      !allowed -> GRANT_NOT_ALLOWED
       !hasCustomer -> NO_CUSTOMER
       amountMinor < 1 || amountMinor > GiftCard.MAX_AMOUNT -> INVALID_AMOUNT
       why.length < GiftCard.REASON_MIN -> GiftCard.Code.REASON_REQUIRED

@@ -35,6 +35,29 @@ class StoreCreditGrantFlowTest {
 
   private fun drawer(d: ShopData): Double = CashShift.totals(d, 50, 700, 500.0, "open1").expected
 
+  @Test fun `PRM-15 درخواستِ تأیید - نیازمندِ تأیید فقط با PIN ِ مدیر، و سابقه نامِ هر دو را دارد`() {
+    val by = StoreCredit.Approval("مدیرِ دکان", "manager", "جبرانِ تأخیر", "allow")
+    //  بی تأیید: هیچ ردیفی
+    assertEquals(GiftCards.Granted.Bad(StoreCredit.GRANT_NOT_ALLOWED),
+      GiftCards.grantCredit(base, "ga", "d1", 50_000, "هدیه", "approve", today, 200, "شاگرد"))
+    //  با تأییدِ مدیری که خودش این مبلغ را مجاز ندارد: باز هیچ
+    assertEquals(GiftCards.Granted.Bad(StoreCredit.GRANT_NOT_ALLOWED),
+      GiftCards.grantCredit(base, "ga", "d1", 50_000, "هدیه", "approve", today, 200, "شاگرد", by.copy(approverDecision = "approve")))
+    val r = GiftCards.grantCredit(base, "ga", "d1", 50_000, "هدیه", "approve", today, 200, "شاگرد", by) as GiftCards.Granted.Ok
+    assertEquals(50_000L, GiftCards.creditOf(r.data, "d1"))
+    val log = r.data.auditLog.single { it.type == GiftCards.CREDIT_GRANT }
+    assertEquals("شاگرد", log.by)
+    assertEquals("مدیرِ دکان", log.approvedBy)
+    assertTrue(log.notes, log.notes.contains("تأیید: مدیرِ دکان (جبرانِ تأخیر)"))
+    //  همان کلید دوباره ⇒ یک ردیف
+    val again = GiftCards.grantCredit(r.data, "ga", "d1", 50_000, "هدیه", "approve", today, 201, "شاگرد", by) as GiftCards.Granted.Ok
+    assertTrue(again.again)
+    assertSame(r.data, again.data)
+    //  «مجاز» (همان امروز): بی تأییدکننده، حتی اگر تأییدی همراه بیاید
+    val plain = (GiftCards.grantCredit(base, "gb", "d1", 10_000, "هدیه", "allow", today, 200, "صاحب", by) as GiftCards.Granted.Ok).data
+    assertNull(plain.auditLog.single { it.type == GiftCards.CREDIT_GRANT }.approvedBy)
+  }
+
   @Test fun `PRM-15 اعطای دستیِ اعتبار طلبِ مشتری می‌شود، نقدِ دخل نیست و در فاکتورِ بعدی خرج می‌شود`() {
     val r = grant(base) as GiftCards.Granted.Ok
     assertFalse(r.again)
