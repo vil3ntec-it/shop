@@ -40,6 +40,30 @@ class StaffReportTest {
     assertEquals(af(500), r.unassignedBase)
   }
 
+  //  STF-08 — «نرخِ دسته»: هر قلم با دستهٔ کالایش (پس از سهمِ تخفیفِ فاکتور) و برگشت با دستهٔ کالای برگشتی
+  @Test
+  fun categoryRatesApplyPerLineAndToReturnsOfThatCategory() {
+    val shop = ShopData(
+      products = listOf(Product(id = "p-rice", category = "rice"), Product(id = "p-cig", category = "cigarettes")),
+      sales = listOf(Sale(id = "s1", seller = "Ahmad", finalTotal = 900.0, date = "2026-10-05")),
+      saleItems = listOf(
+        SaleItem(id = "i1", saleId = "s1", productId = "p-rice", totalPrice = 600.0),
+        SaleItem(id = "i2", saleId = "s1", productId = "p-cig", totalPrice = 400.0),
+      ),
+      saleReturns = listOf(
+        SaleReturn(id = "r1", saleId = "s1", productId = "p-cig", amount = 100.0, date = "2026-10-06"),
+        SaleReturn(id = "r2", saleId = "s1", saleItemId = "i1", amount = 40.0, date = "2026-10-07"),
+      ),
+    )
+    val lines = StaffReport.commissionLines(shop, "2026-10-01", "2026-10-31")
+    val r = Commission.compute(lines, Commission.Plan(1_000, categoryBp = mapOf("cigarettes" to 0)), Currency.AFN)
+    //  برنج ۵۴۰ − ۴۰ (برگشتِ قلمِ i1) = ۵۰۰ × ۱۰٪ = ۵۰؛ سیگار ۳۶۰ − ۱۰۰ با نرخِ ۰
+    assertEquals(af(760), r.sellers.single().base)
+    assertEquals(af(50), r.sellers.single().commission)
+    //  بی نرخِ دسته همان پورسانتِ یک‌ردیفهٔ پیشین: (۹۰۰ − ۱۴۰) × ۱۰٪
+    assertEquals(af(76), Commission.compute(lines, Commission.Plan(1_000), Currency.AFN).sellers.single().commission)
+  }
+
   @Test
   fun periodsSplitTheLastSevenDaysFromTheMonth() {
     fun span(staff: String, date: String, minutes: Long, issue: TimeClock.Issue? = null) =

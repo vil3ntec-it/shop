@@ -55,6 +55,8 @@ async function main() {
   }
 
   const app = await createApp();
+  //  O-18: کلیدِ امضای مجوز — یک خطِ روشن؛ نبودنش در production فقط صدورِ مجوز را ۵۰۳ می‌کند، نه کلِ سرور را
+  await require('./lib/license').startupCheck();
   //  HTTPS ِ مستقیم فقط با `TLS_*` (سرورِ شبکهٔ دکان)؛ بی آن همان http ِ امروز (پشتِ تونل/Caddy)
   const tlsListener = require('./lib/tls-listener');
   const tlsOpts = tlsListener.options(config.tls);

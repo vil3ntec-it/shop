@@ -12,15 +12,17 @@
  *   • تنها پیش‌فرض: `plans.TRIAL_DEFAULT` — همان که کاشته می‌شود
  *   • تنها خواننده: `plans.trialDaysOf(app)`
  *
- * ⚠️ مقدار عوض نشده: دکان ۷ روز (همان که کاشته می‌شد)، پمپ ۳۰ روز. خودِ
- * عدد منتظرِ تصمیمِ D-03 است.
+ * D-03 (گرفته‌شده ۱۴۰۵/۰۸/۱۳، OWNER-DECISIONS): دکان ۱۴ روز، پمپ ۳۰ روز. مهاجرتِ ۲۱۴ عددِ کاشته‌شدهٔ
+ * پیشین (۷) را ۱۴ می‌کند و عددی را که پنلِ مدیر گذاشته دست نمی‌زند (آزمونِ ۴).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
 const plans = require('../src/lib/plans');
 const config = require('../src/config');
-const { query } = require('../src/db');
+const fs = require('node:fs');
+const path = require('node:path');
+const { query, one } = require('../src/db');
 
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
@@ -28,8 +30,8 @@ test.after(async () => { await h.stop(); });
 test('F0-13 ۱) یک پیش‌فرض: آن‌چه کاشته می‌شود همان پشتوانهٔ trialDaysOf است', () => {
   assert.equal(plans.DEFAULT_CONFIG.trial_days, plans.TRIAL_DEFAULT.shop);
   assert.equal(plans.DEFAULT_CONFIG.pump_trial_days, plans.TRIAL_DEFAULT.pump);
-  //  ⛔ رفتارِ موجود: دکان هفت روز، پمپ یک ماه — تا تصمیمِ D-03
-  assert.equal(plans.TRIAL_DEFAULT.shop, '7');
+  //  ⛔ D-03: دکان چهارده روز، پمپ یک ماه
+  assert.equal(plans.TRIAL_DEFAULT.shop, '14');
   assert.equal(plans.TRIAL_DEFAULT.pump, '30');
 });
 
@@ -53,7 +55,7 @@ test('F0-13 ۳) همهٔ پاسخ‌ها یک عدد می‌گویند — با 
   const u = await h.newUser('آزمایشی-یک-منبع');
 
   //  نصبِ عادی: ردیف کاشته شده است
-  for (const [app, days] of [['shop', 7], ['pump', 30]]) {
+  for (const [app, days] of [['shop', 14], ['pump', 30]]) {
     const s = await shown(app, u.accessToken);
     for (const [where, n] of Object.entries(s)) assert.equal(n, days, `${app} ${where}: ${JSON.stringify(s)}`);
   }
@@ -61,7 +63,7 @@ test('F0-13 ۳) همهٔ پاسخ‌ها یک عدد می‌گویند — با 
   //  ردیف نیست (پاک شده): هیچ مسیری نباید «۰» یا عددِ دیگری بگوید
   await query(`DELETE FROM app_config WHERE key IN ('trial_days','pump_trial_days')`);
   try {
-    for (const [app, days] of [['shop', 7], ['pump', 30]]) {
+    for (const [app, days] of [['shop', 14], ['pump', 30]]) {
       const s = await shown(app, u.accessToken);
       for (const [where, n] of Object.entries(s)) assert.equal(n, days, `${app} ${where}: ${JSON.stringify(s)}`);
     }
@@ -76,5 +78,40 @@ test('F0-13 ۳) همهٔ پاسخ‌ها یک عدد می‌گویند — با 
     for (const [where, n] of Object.entries(s)) assert.equal(n, 10, `shop ${where}: ${JSON.stringify(s)}`);
   } finally {
     await plans.setConfig('trial_days', plans.TRIAL_DEFAULT.shop);
+  }
+});
+
+test('F0-13 ۴) مهاجرتِ ۲۱۴ (D-03): فقط ۷ ِ کاشته‌شده ۱۴ می‌شود؛ عددِ پنل و پمپ دست نمی‌خورند؛ rollback برمی‌گرداند', async () => {
+  const dir = path.join(__dirname, '..', 'migrations');
+  const up = fs.readFileSync(path.join(dir, '214_shop_trial_14_days.sql'), 'utf8');
+  const down = fs.readFileSync(path.join(dir, 'rollback', '214_shop_trial_14_days.down.sql'), 'utf8');
+  const value = async (key) => (await one('SELECT value FROM app_config WHERE key=$1', [key]))?.value ?? null;
+  assert.ok(await one("SELECT 1 AS x FROM schema_migrations WHERE version='214_shop_trial_14_days.sql'"), 'مهاجرت نشسته است');
+  try {
+    await plans.setConfig('trial_days', '7');
+    await plans.setConfig('pump_trial_days', '7');
+    await query(up);
+    assert.equal(await value('trial_days'), '14', 'عددِ کاشتهٔ پیشین ⇒ ۱۴');
+    assert.equal(await value('pump_trial_days'), '7', 'پمپ دست نمی‌خورد');
+    assert.equal(await plans.trialDaysOf('shop'), 14);
+
+    await plans.setConfig('trial_days', '10');
+    await query(up);
+    assert.equal(await value('trial_days'), '10', 'عددی که مدیر گذاشته دست نمی‌خورد');
+
+    await query(`DELETE FROM app_config WHERE key='trial_days'`);
+    await query(up);
+    assert.equal(await value('trial_days'), null, 'ردیفی نساخت؛ پیش‌فرض همان TRIAL_DEFAULT');
+    assert.equal(await plans.trialDaysOf('shop'), 14);
+
+    await plans.setConfig('trial_days', '14');
+    const mark = await one("SELECT * FROM schema_migrations WHERE version='214_shop_trial_14_days.sql'");
+    await query(down);
+    assert.equal(await value('trial_days'), '7', 'rollback ⇒ همان هفت روزِ پیشین');
+    assert.equal(await one("SELECT 1 AS x FROM schema_migrations WHERE version='214_shop_trial_14_days.sql'"), null);
+    await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
+  } finally {
+    await plans.setConfig('trial_days', plans.TRIAL_DEFAULT.shop);
+    await plans.setConfig('pump_trial_days', plans.TRIAL_DEFAULT.pump);
   }
 });

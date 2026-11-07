@@ -82,7 +82,11 @@ class SubscriptionModelTest {
     val trial = PlansModel.state(License.State.NONE, 0, 0, null, true, 5, true, 0, 7)
     assertTrue(trial.title.startsWith("دورهٔ آزمایشی"))
     val invite = PlansModel.state(null, 0, 0, null, false, 0, false, 0, 7)
-    assertEquals(V3Tone.INFO, invite.tone); assertEquals("7 روز رایگان", invite.title)
+    //  D-03: سرور عدد نگفت (آفلاین) ⇒ همان پیش‌فرضِ سرور (`plans.TRIAL_DEFAULT.shop`)، ۱۴ روز
+    assertEquals(V3Tone.INFO, invite.tone); assertEquals("14 روز رایگان", invite.title)
+    assertTrue(invite.body.contains("14 روز"))
+    //  عددِ سرور همیشه جلوتر است
+    assertEquals("10 روز رایگان", PlansModel.state(null, 0, 0, null, false, 0, false, 10, 7).title)
   }
 
   @Test

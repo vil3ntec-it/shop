@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.Check
@@ -164,7 +165,7 @@ fun V3Segmented(
         .clip(RoundedCornerShape(10.dp))
         .background(c.card),
     )
-    Row(Modifier.fillMaxWidth().fillMaxHeight()) {
+    Row(Modifier.fillMaxWidth().fillMaxHeight().selectableGroup()) {
       options.forEachIndexed { i, label ->
         val on = i == selected
         val ink by animateColorAsState(if (on) c.ink else c.inkMuted, MotionSpec.tweenOf(MotionTokens.SHORT), label = "segInk")

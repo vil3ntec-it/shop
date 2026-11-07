@@ -116,7 +116,8 @@ object PlansModel {
       body = if (serverTrial) StrAccount.trialBody else StrAccount.activeBody,
     )
     else -> {
-      val n = if (trialDays > 0) trialDays else 7
+      //  D-03 (۱۴۰۵/۰۸/۱۳): سرور عدد نگفت (آفلاین) ⇒ همان پیش‌فرضِ سرور، `plans.TRIAL_DEFAULT.shop`
+      val n = if (trialDays > 0) trialDays else 14
       StateCard(V3Tone.INFO, StrAccount.trialInviteTitle(n), StrAccount.trialInviteBody(n))
     }
   }

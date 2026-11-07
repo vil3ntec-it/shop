@@ -69,4 +69,54 @@ object StrReportPages {
   val noCustomerOwes: String get() = t("هیچ مشتری‌ای قرض ندارد.", "No customer owes anything.", "هېڅ پېرودونکی پور نه لري.")
   val onTime: String get() = t("در مهلت", "On time", "په وخت")
   fun oldestDays(n: Any?): String = t("قدیمی‌ترین: ${asIs(n)} روز", "Oldest: $n ${pl(n ?: 0, "day", "days")}", "تر ټولو زوړ: $n ورځې")
+
+  // ریزِ ردیف (RPT-13: `ReportFreshModel.drill`/`dayDrill`/`debtDrill`/`fraudDrill`) — فقط پنجرهٔ ریز، نه پروندهٔ خروجی
+  val colDay: String get() = t("روز", "Day", "ورځ")
+  val colInvoice: String get() = t("فاکتور", "Invoice", "بل")
+  val colQty: String get() = t("مقدار", "Quantity", "مقدار")
+  val colSales: String get() = t("فروش", "Sales", "پلور")
+  val colDoc: String get() = t("سند", "Document", "سند")
+  val colLeft: String get() = t("مانده", "Balance", "پاتې")
+  val colAge: String get() = t("سن (روز)", "Age (days)", "عمر (ورځې)")
+  val colKind: String get() = t("نوع", "Type", "ډول")
+  val colAmount: String get() = t("مبلغ", "Amount", "مبلغ")
+  val colApprover: String get() = t("تأییدکننده", "Approver", "تاییدوونکی")
+  val drillTotal: String get() = t("جمع", "Total", "ټول")
+  val prepaid: String get() = t("پیش‌پرداخت", "Prepaid", "مخکې ورکړه")
+  val unknownUser: String get() = t("نامعلوم", "Unknown", "نامعلوم")
+  val yes: String get() = t("بله", "Yes", "هو")
+  val no: String get() = t("نه", "No", "نه")
+  fun drillInvoices(label: Any?, n: Any?): String = t(
+    "ریزِ «${asIs(label)}» — ${asIs(n)} فاکتور", "Details of “$label” — $n ${pl(n ?: 0, "invoice", "invoices")}", "د «$label» جزئیات — $n بلونه",
+  )
+  fun drillOpenDocs(label: Any?, n: Any?): String = t(
+    "ریزِ «${asIs(label)}» — ${asIs(n)} سندِ باز", "Details of “$label” — $n open ${pl(n ?: 0, "document", "documents")}", "د «$label» جزئیات — $n خلاص سندونه",
+  )
+  fun drillEvents(label: Any?, n: Any?): String = t(
+    "ریزِ «${asIs(label)}» — ${asIs(n)} رویداد", "Details of “$label” — $n ${pl(n ?: 0, "event", "events")}", "د «$label» جزئیات — $n پېښې",
+  )
+  val kindDiscount: String get() = t("تخفیف", "Discount", "تخفیف")
+  val kindApproved: String get() = t("فاکتورِ تأییدشده", "Approved invoice", "تایید شوی بل")
+  val kindReturn: String get() = t("برگشتی", "Return", "بېرته راغلی")
+  val kindVoid: String get() = t("لغو", "Void", "لغوه")
+  val kindLineDelete: String get() = t("حذف ردیف", "Line deleted", "د کرښې لرې کول")
+  val kindNoSale: String get() = t("باز کردن کشو بی فروش", "Drawer opened without a sale", "بې پلور د دخل پرانیستل")
+  fun approvedWorkOf(user: Any?): String = t("تأییدِ کارِ «${asIs(user)}»", "Approved work of “$user”", "د «$user» د کار تایید")
+  val docDebt: String get() = t("قرض", "Credit", "پور")
+  val docPurchase: String get() = t("خرید", "Purchase", "پېرود")
+  val dayDrillNote: String get() = t(
+    "جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ همین روز است؛ برگشتی جداست.",
+    "The “Sales” total of these invoices is this day's “Sales” column; returns are separate.",
+    "د دې بلونو د «پلور» ټولټال د همدې ورځې د «پلور» ستون دی؛ بېرته راغلي جلا دي.",
+  )
+  val debtDrillNote: String get() = t(
+    "سندهای باز به ترتیبِ «اولین قرض، اولین پرداخت»؛ جمع همان «مانده» ِ همین ردیف است.",
+    "Open documents in “first debt, first paid” order; the total is this row's “Balance”.",
+    "خلاص سندونه د «لومړی پور، لومړی تادیه» په ترتیب؛ ټولټال د همدې قطار «پاتې» دی.",
+  )
+  val fraudDrillNote: String get() = t(
+    "شمارِ هر نوع همان ستونِ همین ردیف است؛ «تأییدِ کارِ …» کارِ دیگری است که این کاربر تأیید کرد.",
+    "The count of each type is this row's column; “Approved work of …” is someone else's action that this user approved.",
+    "د هر ډول شمېر د همدې قطار ستون دی؛ «د … د کار تایید» د بل چا کار دی چې دې کارن تایید کړ.",
+  )
 }

@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyName
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.core.product.UnitSale
+import ir.vil3ntec.tohid.data.PackScan
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ProductPack
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -131,5 +132,22 @@ class ScenarioS05Test {
     assertEquals(18.0, UnitSale.toBase(1.5, carton, wholeOnly = false)!!, 0.0)
     assertFalse(UnitSale.partRejected(1.5, UnitLine.units(oil)[0], wholeOnly = true))
     assertTrue(UnitLine.plan(oil, wholeOnly = true, quantity = 1.0, unitPrice = null, next = true)!!.wholeOnly)
+  }
+  @Test
+  fun `S05 — اسکنِ کارتن با «۲*» در گوشی و کامپیوتر قیمتِ کارتن را از لیست می‌گیرد`() {
+    //  همان راهِ `CartModel.scan` (گوشی) و `DeskSale.addPack` (کامپیوتر) با «واحدِ بزرگ در صندوق»
+    val withList = d.copy(products = listOf(listed))
+    val r = PackScan.scan(withList, emptyList(), "6260000000118", 2.0, ShopStore.barcodeIndex(withList), listPrice = true, wholeOnly = false)
+    val cart = (r as PackScan.Result.Added).added.cart
+    assertTrue(r.priced)
+    assertEquals(3400.0, SalesEngine.cartTotal(withList, cart), 1e-6)
+    val after = sell(withList, cart)
+    assertEquals(36.0, ShopStore.stock(after, "oil"), 0.0)
+    assertEquals(3400.0, after.sales.single().finalTotal, 1e-6)
+    //  بی قیمتِ لیست ⇒ ۱۲ × قیمتِ دانه
+    val plain = PackScan.scan(d, emptyList(), "6260000000118", 2.0, ShopStore.barcodeIndex(d), listPrice = true, wholeOnly = false) as PackScan.Result.Added
+    assertEquals(3600.0, SalesEngine.cartTotal(d, plain.added.cart), 1e-6)
+    //  فقط بستهٔ کامل ⇒ ۱٫۵ کارتن رد
+    assertTrue(PackScan.scan(d, emptyList(), "6260000000118", 1.5, ShopStore.barcodeIndex(d), listPrice = false, wholeOnly = true) is PackScan.Result.PartRejected)
   }
 }

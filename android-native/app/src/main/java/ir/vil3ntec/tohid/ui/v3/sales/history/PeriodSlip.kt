@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.sales.history
 
 import ir.vil3ntec.tohid.core.hw.PrintBatch
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrHistory
 import ir.vil3ntec.tohid.core.i18n.StrShift
 import ir.vil3ntec.tohid.core.receipt.PaperLength
@@ -18,9 +19,10 @@ import ir.vil3ntec.tohid.data.SalesPeriods
 /**
  *  کاغذِ «چاپ» ِ یک روز، ماه یا سالِ تاریخچه — خالص (بلوک‌های `ReceiptDoc`؛ کشیدن با `ReceiptRaster` ِ همان فاکتور).
  *
- *  • **خلاصه** (پیش‌فرض): شمارِ فاکتور، فروشِ هر روشِ پرداخت، برگشت، خالص و دریافتِ بدهی — عددها همان
+ *  • **خلاصه**: شمارِ فاکتور، فروشِ هر روشِ پرداخت، برگشت، خالص و دریافتِ بدهی — عددها همان
  *    `SalesPeriods.Totals` (یعنی همان دفترِ X/Z و پایانِ روز)؛ لغوشده و سفارشِ اینترنتی جدا و «بیرون از جمع».
- *  • **همهٔ فاکتورها**: هر فاکتور با اقلامش پشتِ سرِ هم، لغوشده و اینترنتی نشان‌دار؛ پایانش همان جمع‌های خلاصه.
+ *  • **همهٔ فاکتورها** (پیش‌فرض، خواستِ صاحب‌کار): هر فاکتور با اقلامش پشتِ سرِ هم، لغوشده و اینترنتی نشان‌دار؛
+ *    پایانش همان جمع‌های خلاصه.
  *    ۸۰ میلی‌متر: هر قلم یک سطر («نام × مقدار ــ مبلغ»)؛ ۵۸ میلی‌متر: نام در یک سطر و «مقدار × فی ــ مبلغ» زیرش.
  *    کاغذِ بلند تکه‌تکه به صف می‌رود ([parts] با `PrintBatch.plan`) تا «لغو» در میانه ممکن باشد.
  *  • بی حقِ دیدنِ «مورد انتظار» (شمارشِ کور، PAY-13) هیچ جمعِ پولی چاپ نمی‌شود — فقط شمارها، مثلِ X/Z ِ کور.
@@ -92,11 +94,22 @@ object PeriodSlip {
     return ReceiptDoc(w, ReceiptMetrics.of(w), head(h, StrHistory.slipSummary) + totals(p.totals, fmt, money, methodName))
   }
 
+  /**
+   *  «#شماره» ِ سرِ هر فاکتور در سطرِ راست‌به‌چپ. شمارهٔ حرف‌دار (سفارشِ اینترنتی «W-71»، سریِ دستگاه «A1-5») حرفِ لاتینِ
+   *  قوی دارد: بی نشانه «#» به آن سرِ سطر می‌رفت و ساعتِ پس از آن هم چپ‌به‌راست می‌شد («W-71 · 11:30#»). LRM پیش از «#»
+   *  و RLM پس از شماره آن را یک تکهٔ چپ‌به‌راست می‌کنند و بقیهٔ سطر راست‌به‌چپ می‌ماند. ایزوله (LRI/PDI) نه: وزیرمتن
+   *  نویسه‌اش را ندارد و Java2D ِ پیش از JDK 21 (کامپیوتر با ۱۷ ساخته می‌شود) آن را نادیدنی نمی‌گیرد ⇒ جعبه روی کاغذ؛
+   *  LRM/RLM در خودِ قلم هست (پهنای صفر) و هر دو سکو نادیدنی‌اش می‌کشند. کاغذ تصویر است (`ReceiptPainter`، نه متنِ
+   *  ESC/POS). شمارهٔ فقط‌رقم و زبانِ چپ‌به‌راست درست بودند و دست نمی‌خورند.
+   */
+  fun numberTag(number: String, rtl: Boolean = I18n.lang.rtl): String =
+    if (rtl && !number.all { it.isDigit() }) "\u200E#$number\u200F" else "#$number"
+
   /** یک فاکتور: «#۱۲۴۵ · ساعت · مشتری»، نشانِ لغو/اینترنتی، اقلام (به پهنای کاغذ) و جمعِ همان فاکتور */
   fun invoice(s: Sale, src: Source, widthDots: Int, fmt: ReceiptFormat, withDate: Boolean): List<ReceiptBlock> = buildList {
     val wide = PrinterProfile.paper(widthDots) >= PrinterProfile.WIDTH_80MM
     val day = if (withDate && s.date.isNotBlank()) fmt.date(s.date) else ""
-    val head = listOf("#" + ReceiptModel.number(s), day, SaleTime.clock(s.createdAt), src.customer(s).orEmpty())
+    val head = listOf(numberTag(ReceiptModel.number(s)), day, SaleTime.clock(s.createdAt), src.customer(s).orEmpty())
       .filter { it.isNotBlank() }.joinToString(" · ")
     add(ReceiptBlock.Text(fmt.digits(head), TextStyle.BODY, center = false))
     when {

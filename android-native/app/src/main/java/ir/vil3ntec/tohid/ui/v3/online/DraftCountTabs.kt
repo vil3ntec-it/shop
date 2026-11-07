@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.online
 
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import ir.vil3ntec.tohid.core.i18n.StrA11y
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateDpAsState
@@ -101,6 +104,11 @@ fun DraftCountTabs(tabs: List<CountTab>, selected: String, onSelect: (String) ->
                 with(density) { bounds[tab.id] = lc.positionInParent().x.toDp() to lc.size.width.toDp() }
               }
               .selectable(selected = on, role = Role.Tab, onClick = { onSelect(tab.id) })
+              //  رنگ و نقطهٔ «نیازِ توجه» ِ شمار برای صفحه‌خوان هم نوشته می‌شود («تازه، ۳، نیاز به توجه»)
+              .then(
+                if (tab.attention && tab.count > 0) Modifier.clearAndSetSemantics { contentDescription = StrA11y.tabNeedsAttention(tab.label, tab.count) }
+                else Modifier,
+              )
               .padding(horizontal = 14.dp, vertical = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
           ) {

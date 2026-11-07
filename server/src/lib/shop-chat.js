@@ -129,20 +129,22 @@ async function blocksOf(shopId, phone, c = null) {
   return { shop: rows.some((r) => r.blocker === 'shop'), customer: rows.some((r) => r.blocker === 'customer') };
 }
 
-/** پرسشِ نمای گفت‌وگو — شمارِ نخوانده، شمارهٔ سفارش، نامِ دکان، بلاک‌ها و آخرین پیام. */
-function viewSql(viewer) {
+/** پرسشِ نمای گفت‌وگو — شمارِ نخوانده، شمارهٔ سفارش، نامِ دکان، بلاک‌ها و آخرین پیام. کلیدِ بیننده به `args` افزوده می‌شود: «حذف برای من» ِ همین بیننده نه در شمارِ نخوانده می‌آید نه در پیش‌نمایش (CHAT-08). */
+function viewSql(viewer, args) {
   const mine = viewer.side === 'shop' ? 'shop' : 'customer';
+  args.push(viewerKey(viewer));
+  const seen = `NOT EXISTS (SELECT 1 FROM shop_chat_hidden h WHERE h.message_id = m.id AND h.viewer = $${args.length})`;
   return `SELECT c.*, s.name AS shop_name, o.order_no,
       (SELECT COUNT(*)::int FROM shop_chat_messages m
         WHERE m.conversation_id = c.id AND m.sender = '${peerOf(mine)}'
-          AND m.deleted_at IS NULL AND m.seq > c.${mine}_read_seq) AS unread,
+          AND m.deleted_at IS NULL AND m.seq > c.${mine}_read_seq AND ${seen}) AS unread,
       EXISTS (SELECT 1 FROM shop_chat_blocks b WHERE b.shop_id = c.shop_id
                AND b.customer_phone = c.customer_phone AND b.blocker = 'shop') AS blocked_by_shop,
       EXISTS (SELECT 1 FROM shop_chat_blocks b WHERE b.shop_id = c.shop_id
                AND b.customer_phone = c.customer_phone AND b.blocker = 'customer') AS blocked_by_customer,
       (SELECT json_build_object('kind', m.kind, 'body', LEFT(m.body, 80), 'sender', m.sender,
                                 'deleted', m.deleted_at IS NOT NULL, 'at', m.created_at)
-         FROM shop_chat_messages m WHERE m.conversation_id = c.id ORDER BY m.seq DESC LIMIT 1) AS last,
+         FROM shop_chat_messages m WHERE m.conversation_id = c.id AND ${seen} ORDER BY m.seq DESC LIMIT 1) AS last,
       ${life.ORDER_COLS}, ${pins.pinnedSql(mine)}
     FROM shop_chat_conversations c
     JOIN shops s ON s.id = c.shop_id
@@ -204,7 +206,7 @@ function conversationView(viewer, r) {
 /** ردیفِ کاملِ نما (ستون‌های گفت‌وگو + شمارش‌ها) — همان قفلِ `rowOf`. */
 async function viewRow(viewer, id) {
   const row = await rowOf(viewer, id);
-  return one(`${viewSql(viewer)} WHERE c.id = $1 AND c.shop_id = $2`, [row.id, viewer.shopId]);
+  const args = [row.id, viewer.shopId]; return one(`${viewSql(viewer, args)} WHERE c.id = $1 AND c.shop_id = $2`, args);
 }
 
 async function viewOf(viewer, id) {
@@ -257,9 +259,10 @@ async function list(viewer, { cursor, limit, status, q } = {}) {
     args.push(cur.at, cur.id);
     where.push(`(c.updated_at < $${args.length - 1} OR (c.updated_at = $${args.length - 1} AND c.id < $${args.length}))`);
   }
+  const head = viewSql(viewer, args);
   args.push(lim + 1);
   const rows = await many(
-    `${viewSql(viewer)} WHERE ${where.join(' AND ')} ORDER BY c.updated_at DESC, c.id DESC LIMIT $${args.length}`,
+    `${head} WHERE ${where.join(' AND ')} ORDER BY c.updated_at DESC, c.id DESC LIMIT $${args.length}`,
     args
   );
   const page = rows.slice(0, lim);
@@ -696,10 +699,7 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
   return { mediaId: row.id, kind: row.kind, mime: row.mime, size: n(row.size), role: row.role, reused: !ins };
 }
 
-/**
- * یک رسانه از دیدِ بیننده: فقط در گفت‌وگوی خودش، و فقط اگر خودش فرستاده یا
- * پیامِ زنده‌ای به آن اشاره می‌کند. نبود ⇒ ۴۰۴ ِ `media_gone`.
- */
+/** یک رسانه از دیدِ بیننده: فقط در گفت‌وگوی خودش، و فقط اگر خودش فرستاده یا پیامِ زنده‌ای به آن اشاره می‌کند. نبود ⇒ ۴۰۴ ِ `media_gone`. */
 async function getMedia(viewer, id, mediaId) {
   const conv = await rowOf(viewer, id);
   const mid = String(mediaId || '');
@@ -760,10 +760,7 @@ async function setBlock(viewer, id, on) {
   return viewOf(viewer, conv.id);
 }
 
-/**
- * گزارشِ سوءاستفاده به مدیرِ سامانه — با رونوشتِ همان پیام در همان لحظه.
- * یک گزارش برای هر (پیام، طرف): تکرار ردیفِ دوم نمی‌سازد.
- */
+/** گزارشِ سوءاستفاده به مدیرِ سامانه — با رونوشتِ همان پیام در همان لحظه. یک گزارش برای هر (پیام، طرف): تکرار ردیفِ دوم نمی‌سازد. */
 async function report(viewer, id, body) {
   const b = obj(body);
   const reason = str(b.reason);

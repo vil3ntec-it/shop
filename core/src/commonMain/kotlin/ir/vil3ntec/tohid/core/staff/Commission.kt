@@ -11,7 +11,8 @@ import ir.vil3ntec.tohid.core.money.mulExact
  *
  *  • پایه = مبلغِ **خالصِ** ردیف (پس از سهمِ تخفیفِ فاکتور، `Rounding.allocateDiscount`)؛ ردیفِ
  *    برگشت منفی است و به نامِ **فروشندهٔ فاکتورِ اصل** می‌آید (POS-23)، نه کسی که برگشت را زد.
- *    پس برگشت پورسانتِ همان فروش را پس می‌گیرد و پورسانتِ دوره می‌تواند منفی باشد.
+ *    پس برگشت پورسانتِ همان فروش را پس می‌گیرد، ولی **جمعِ دوره زیرِ صفر نمی‌رود** (تصمیمِ صاحب‌کار O-05، ب: فروشنده
+ *    به دکان بدهکار نمی‌شود)؛ پایهٔ منفی (`base`) دیده می‌ماند.
  *  • نرخ به «پایه‌امتیاز» است (۱ = ۰٫۰۱٪، ۰ تا ۱۰٬۰۰۰): نرخِ دسته > نرخِ فروشنده > نرخِ پیش‌فرض.
  *    دستهٔ کم‌سود با نرخِ ۰ از پورسانت بیرون می‌ماند.
  *  • گرد کردن یک بار و در پایان، روی جمعِ هر فروشنده (نیمه به سمتِ +∞، به پلهٔ ارز)؛ پس جمعِ
@@ -76,8 +77,48 @@ object Commission {
   /** فاکتورِ اصلِ یک برگشت: فروشنده‌اش و این‌که لغو شده یا نه */
   data class Origin(val sellerId: String, val cancelled: Boolean = false)
 
-  /** یک ردیفِ برگشت: شناسهٔ فاکتورِ اصل و مبلغِ پس‌داده (مثبت) */
-  data class Returned(val saleId: String, val amount: Money)
+  /** یک ردیفِ برگشت: شناسهٔ فاکتورِ اصل، مبلغِ پس‌داده (مثبت) و دستهٔ کالای برگشتی (برای «نرخِ دسته»؛ نامعلوم ⇒ null) */
+  data class Returned(val saleId: String, val amount: Money, val category: String? = null)
+
+  /** یک قلمِ فاکتور برای `saleLines`: دستهٔ کالا (بی دسته ⇒ null یا خالی) و مبلغِ ناخالصِ قلم */
+  data class Item(val category: String?, val gross: Money)
+
+  /**
+   *  STF-08 — یک فاکتور ⇒ ردیف‌های پورسانت به تفکیکِ دسته، تا «نرخِ دسته» اثر کند. پایهٔ کل همان `finalTotal` ِ
+   *  فاکتور است (همان پیشین) و تفاوتِ جمعِ قلم‌ها با آن (تخفیفِ فاکتور) به نسبتِ مبلغِ قلم‌ها، به واحدِ خرد و با
+   *  «بزرگ‌ترین باقی‌مانده» (همان روشِ `Rounding.allocateDiscount`، بی پلهٔ ارز)، از قلم‌ها کم می‌شود؛ قلم‌های
+   *  هم‌دسته یک ردیف‌اند، به ترتیبِ نخستین قلم. بی دسته در همهٔ قلم‌ها، بی قلم، جمعِ صفر، ارزِ دیگر، قلمِ منفی،
+   *  فاکتورِ بیش از جمعِ قلم‌ها یا عددِ بیرون از بازهٔ دقیق ⇒ همان یک ردیفِ بی دسته (رفتارِ پیشین). پس بی `categoryBp`
+   *  پورسانت همان پیشین است.
+   */
+  fun saleLines(sellerId: String, finalTotal: Money, items: List<Item>): List<Line> {
+    val whole = listOf(Line(sellerId, null, finalTotal))
+    val cur = finalTotal.currency
+    if (items.all { it.category.isNullOrBlank() } || items.any { it.gross.currency.code != cur.code || it.gross.minor < 0 }) return whole
+    return try {
+      val sum = items.fold(0L) { acc, i -> addExact(acc, i.gross.minor) }
+      val off = sum - finalTotal.minor
+      if (sum <= 0L || off < 0L) return whole
+      val share = LongArray(items.size)
+      val rem = LongArray(items.size)
+      var given = 0L
+      items.forEachIndexed { i, it ->
+        val num = mulExact(off, it.gross.minor)
+        share[i] = num / sum
+        rem[i] = num % sum
+        given += share[i]
+      }
+      items.indices.sortedWith(compareByDescending<Int> { rem[it] }.thenBy { it }).take((off - given).toInt()).forEach { share[it] += 1 }
+      val net = LinkedHashMap<String?, Long>()
+      items.forEachIndexed { i, it ->
+        val c = it.category?.trim()?.takeIf(String::isNotEmpty)
+        net[c] = addExact(net[c] ?: 0L, it.gross.minor - share[i])
+      }
+      net.map { (c, m) -> Line(sellerId, c, Money(m, cur)) }
+    } catch (_: ArithmeticException) {
+      whole
+    }
+  }
 
   /**
    *  ردیف‌های **منفیِ** برگشت برای `compute`، به نامِ فروشندهٔ فاکتورِ اصل (نه کسی که برگشت را زد؛ POS-23)،
@@ -88,7 +129,7 @@ object Commission {
   fun returnLines(returns: List<Returned>, origins: Map<String, Origin>): List<Line> =
     returns.mapNotNull { r ->
       val o = origins[r.saleId]
-      if (o?.cancelled == true) null else Line(o?.sellerId?.trim().orEmpty(), null, -r.amount)
+      if (o?.cancelled == true) null else Line(o?.sellerId?.trim().orEmpty(), r.category?.trim()?.takeIf(String::isNotEmpty), -r.amount)
     }
 
   fun compute(lines: List<Line>, plan: Plan, currency: Currency): Result {
@@ -103,7 +144,8 @@ object Commission {
     }
     val step = currency.stepMinor
     val sellers = base.keys.sorted().map { id ->
-      val c = mulExact(Rounding.roundHalfUp(scaled.getValue(id), mulExact(FULL_BP.toLong(), step)), step)
+      //  O-05 (ب): جمعِ دوره زیرِ صفر نمی‌رود
+      val c = mulExact(Rounding.roundHalfUp(scaled.getValue(id), mulExact(FULL_BP.toLong(), step)), step).coerceAtLeast(0L)
       SellerTotal(id, Money(base.getValue(id), currency), Money(c, currency))
     }
     return Result(sellers, unassigned)

@@ -232,7 +232,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
     )).rows[0];
     if (live) throw conflict('این سفارش همین حالا مأموریتِ زنده دارد', 'already_assigned');
 
-    const expected = order.payment_method === 'cod' && order.payment_status !== 'paid' ? Number(order.total_minor) : 0;
+    const expected = require('./delivery-due').dueOf(order);   //  همان بدهی که ویرایش و پرداختِ بعدی نگه می‌دارند
     const codeBy = codeRule.requires(codePolicy, { mode, totalMinor: Number(order.total_minor), expectedCollectMinor: expected });   //  DLV-08؛ خاموش ⇒ ''
 
     let overCap = false; let overLive = false;

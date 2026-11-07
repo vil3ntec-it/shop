@@ -62,7 +62,8 @@ class ReportDrillTest {
     val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { File(it, "ir/vil3ntec/tohid/ui/screens/ReportFresh.kt") }.firstOrNull { it.isFile }?.readText() ?: error("ReportFresh.kt پیدا نشد")
     assertTrue(src.contains("""sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->"""))
-    assertTrue(src.contains("ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock) { DayEndModel.docLabel(d, it) }"))
+    //  نامِ فاکتور با `sale:` (شناسهٔ خام در `docLabel` خالی بود؛ `ReportRowDrillTest`)
+    assertTrue(src.contains("ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)"))
     //  همان جدول و همان Enter ِ `reports.drill`
     assertTrue(src.contains("FreshTable(t, Modifier.weight(1f).fillMaxWidth(), onRow)"))
     assertTrue(src.contains("e.matches(KeyMap.REPORTS_DRILL)"))
