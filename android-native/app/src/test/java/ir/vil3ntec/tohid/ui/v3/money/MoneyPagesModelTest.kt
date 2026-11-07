@@ -196,9 +196,69 @@ class MoneyPagesModelTest {
     val routes = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
       .map { java.io.File(it, "ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt") }.first { it.isFile }.readText()
     //  PUR-05 (دورِ ۳۱): همان فراخوانی با کلیدِ همین فرم — دو لمسِ «ثبت» یک فاکتور است؛ تک‌ردیفه هم با شناسه‌های همان کلید
-    assertTrue(routes.contains("ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = saveKey)"))
+    //  (PUR-05، هزینهٔ جانبی و سررسید: همان فراخوانی، با `extras` ِ فرم پیش از کلید)
+    assertTrue(routes.contains("ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey)"))
     assertTrue(routes.contains("LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey))"))
     assertTrue(routes.contains("val saveKey = remember { moneyId() }"))
+  }
+
+  /** PUR-05 (مانده): «هزینهٔ جانبی» (PUR-06) و «سررسید» (PUR-07) در فرمِ «ثبت خرید» ِ گوشیِ نسخهٔ ۳ — همان `PurchaseBook.record` ِ کامپیوتر */
+  @Test
+  fun `فرمِ خرید — هزینهٔ جانبی روی بهای ردیف‌ها و سررسید روی فاکتور می‌نشیند، نه روی بدهیِ تأمین‌کننده`() {
+    val p = ledger.products.first()
+    val due = ir.vil3ntec.tohid.Jalali.parseTyped("1405-08-20")!!
+    val one = PurchaseForm(supplierId = "s3", productId = p.id, quantity = "10", price = "100", paid = "", date = "2026-10-20")
+    //  خالی ⇒ همان فرمِ پیشین: بی خطا، تک‌ردیفه، بی سررسید
+    assertFalse(PurchaseFormModel.errors(one).any)
+    assertFalse(PurchaseFormModel.multi(one))
+    assertNull(PurchaseFormModel.draft(one, "کیلو").dueDate)
+    assertEquals(PurchaseFormModel.Extras(), PurchaseFormModel.extras(one, on = true))
+    //  نادرست ⇒ خطای درجای خودش و ثبت نمی‌شود
+    assertNotNull(PurchaseFormModel.errors(one.copy(landed = "-5")).landed)
+    assertNotNull(PurchaseFormModel.errors(one.copy(landed = "x")).landed)
+    assertNotNull(PurchaseFormModel.errors(one.copy(due = "1405-13-40")).due)
+    assertEquals(ir.vil3ntec.tohid.data.PurchaseBook.DUE_BEFORE_DATE, PurchaseFormModel.errors(one.copy(due = "1405-07-01")).due)
+    assertTrue(PurchaseFormModel.errors(one.copy(due = "1405-07-01")).any)
+    //  سررسیدِ درست: تک‌ردیفه همان `addPurchase` با سررسید
+    val withDue = one.copy(due = "1405-08-20")
+    assertFalse(PurchaseFormModel.errors(withDue).any)
+    assertFalse(PurchaseFormModel.multi(withDue))
+    assertEquals(due, PurchaseFormModel.draft(withDue, "کیلو").dueDate)
+    //  هزینهٔ جانبی فقط با `PurchaseBook` روی بها پخش می‌شود ⇒ تک‌ردیفه هم فاکتورِ دفترِ خرید
+    val f = PurchaseFormModel.setRow(PurchaseFormModel.addRow(withDue.copy(landed = "300")), 0, PurchaseRow(p.id, "5", "40"))
+    assertTrue(PurchaseFormModel.multi(withDue.copy(landed = "300")))
+    assertFalse(PurchaseFormModel.errors(f).any)
+    //  موتورِ تازهٔ موجودی خاموش ⇒ کادرها پنهان و هیچ اثری (همان شرطِ کامپیوتر)
+    assertEquals(PurchaseFormModel.Extras(), PurchaseFormModel.extras(f, on = false))
+    val ex = PurchaseFormModel.extras(f, on = true)
+    assertEquals(PurchaseFormModel.Extras(300.0, due), ex)
+    var n = 0
+    val r = ir.vil3ntec.tohid.data.PurchaseBook.record(
+      ledger, "s3", PurchaseFormModel.lines(f) { "کیلو" }, PurchaseFormModel.paid(f), f.date, "", "2026-10-20", 1L, { "pur5x-${n++}" },
+      landedTotal = ex.landedTotal, dueDate = ex.dueDate,
+    ) as ir.vil3ntec.tohid.data.PurchaseBook.Result.Ok
+    val added = r.data.purchases.filter { it.supplierId == "s3" }
+    assertEquals(2, added.size)
+    //  ۳۰۰ به نسبتِ جمعِ ردیف‌ها (۱۰۰۰ و ۲۰۰) ⇒ ۲۵۰ و ۵۰؛ بدهیِ تأمین‌کننده فقط جمعِ کالا (۱۲۰۰)
+    assertEquals(listOf(250.0, 50.0), added.sortedByDescending { it.totalAmount }.map { it.landedCost })
+    assertEquals(1200.0, ir.vil3ntec.tohid.data.ShopStore.supplierDebt(r.data, "s3"), 0.0)
+    assertEquals(listOf(due, due), added.map { it.dueDate })
+    assertEquals(due, ir.vil3ntec.tohid.data.PurchaseBook.invoices(r.data, "s3").single().dueDate)
+  }
+
+  @Test
+  fun `فرمِ خرید — هزینهٔ جانبی و سررسید فقط با موتورِ تازه دیده می‌شوند و با چرخشِ صفحه نمی‌روند`() {
+    fun src(rel: String) = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.first { it.isFile }.readText()
+    val screen = src("ir/vil3ntec/tohid/ui/v3/money/PurchaseFormScreen.kt")
+    assertTrue(screen.contains("+ listOf(it.landed, it.due) }"))
+    assertTrue(screen.contains(".let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }"))
+    assertTrue(screen.indexOf("if (extrasOn) {") in 0 until screen.indexOf("label = StrPurchasePages.landedAfn"))
+    assertTrue(screen.contains("PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),"))
+    val routes = src("ir/vil3ntec/tohid/ui/v3/money/MoneyRoutes.kt")
+    assertTrue(routes.contains("extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },"))
+    //  همان شرطِ کامپیوتر
+    assertTrue(src("ir/vil3ntec/tohid/ui/screens/DeskPurchasing.kt").contains("ir.vil3ntec.tohid.data.StockLedger.isOn(d)"))
   }
 
   /* ------------------------------ مصارف ------------------------------ */
