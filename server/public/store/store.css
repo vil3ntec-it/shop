@@ -133,3 +133,25 @@
 .sum-lines .lp { flex-basis: 100%; }
 .lp .btn-sm { justify-self: start; }
 .lp-hits { flex-wrap: wrap; }
+
+/* CHK-08/10 (ممیزیِ ویترین): فرمِ ارسالِ کوتاه — اختیاری‌ها زیرِ «جزئیاتِ بیشتر»؛ گزینش‌گرها همان شکلِ خانه‌ها */
+.more-box > summary { display: flex; align-items: center; gap: var(--s2); min-height: 44px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--link); list-style: none; }
+.more-box > summary::-webkit-details-marker { display: none; }
+.more-box > summary::before { content: '+'; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--selected); }
+.more-box[open] > summary::before { content: '−'; }
+.more-box > summary:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-ctl); }
+#view-checkout .field select {
+  width: 100%; min-height: 48px; padding: 10px var(--s3); border: 1px solid var(--field-line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text); font-size: 15px;
+}
+#view-checkout .field select:focus { outline: none; border-color: var(--brand); box-shadow: var(--shadow-focus); }
+
+/* CHK-03/04 (ممیزیِ ویترین): سبدِ گوشی — «− ۱ +» همیشه پیدا، جمعِ پول روی نوار، نوارِ پایینِ برنامه زیرِ سبدِ باز پنهان */
+.cline .stepper { display: inline-flex; }
+/* سرخطِ برگه فقط برای جای تمرکز است (نه کنترل) ⇒ قابِ تمرکز روی آن به ایراد می‌ماند */
+.sheet h2[tabindex="-1"]:focus, .sheet h2[tabindex="-1"]:focus-visible { outline: none; box-shadow: none; }
+@media (max-width: 599px) {
+  body.phone-cart .cartbar .sum { display: flex; }
+  body.phone-cart .cartbar .sum small { display: none; }
+  body.phone-cart.cart-open .bnav { visibility: hidden; }
+}

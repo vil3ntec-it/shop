@@ -47,15 +47,22 @@
         K.js('/store/line-prefs.js').then(function () { return window.StoreLines({}); })
           .then(function (m) { m.receipt(ul, o); }, function () { /* بی واژه‌نامه ⇒ همان فهرست */ });
       }
-      var paid =o.paymentStatus === 'paid' ? o.totalMinor : 0;
       var rows = [['od.sub', K.money(o.subtotalMinor)]];
       if (o.discountMinor) rows.push(['od.disc', K.money(o.discountMinor)]);
       if (o.fulfillment === 'delivery') rows.push(['ck.fee', o.deliveryFeeMinor ? K.money(o.deliveryFeeMinor) : t('free')]);
-      rows.push(['od.total', K.money(o.totalMinor)], ['od.paid', K.money(paid)], ['od.due', K.money(o.totalMinor - paid)]);
+      rows.push(['od.total', K.money(o.totalMinor)]);
+      //  CHK-20/ORD-15/PCK-07: یک خلاصهٔ پولِ سازگار برای هر حال — بسته (رد، لغو، برگشت به دکان) ⇒ فقط جمع؛ رسیده به
+      //  دستِ مشتری با نقد ⇒ «پرداخت‌شده (نقد…)» = جمع (بازپرداخت جدا در بخشِ خودش)؛ باز ⇒ «پرداخت‌شده» فقط برای آنلاینِ
+      //  پرداخت‌شده و «مانده» فقط وقتی هنوز چیزی مانده — هرگز «پرداخت‌شده ۰» یا «مانده» کنارِ «پرداختی لازم نیست»
+      var online = ['paid', 'partially_refunded', 'refunded'].indexOf(o.paymentStatus) >= 0;
+      var done = ['delivered', 'picked_up', 'return_requested', 'refunded_partial', 'refunded_full'].indexOf(o.status) >= 0;
+      if (online) rows.push(['od.paid', K.money(o.totalMinor)]);
+      else if (done) rows.push(['od.paid', K.money(o.totalMinor), t('od.paid') + ' (' + t('cod') + ')']);
+      else if (!/^(rejected|auto_rejected|cancelled|cancelled_by_customer|returned_to_store|restocked)$/.test(o.status)) rows.push(['od.due', K.money(o.totalMinor)]);
       var tt = K.clear($('o-totals'));
       rows.forEach(function (r) {
         var g = r[0] === 'od.total';
-        tt.append(el('span', { class: g ? 'grand' : '', text: t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
+        tt.append(el('span', { class: g ? 'grand' : '', text: r[2] || t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
       });
       $('o-cancel').hidden = !o.canCancel;
       $('o-reorder').hidden = false;

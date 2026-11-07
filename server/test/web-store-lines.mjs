@@ -9,6 +9,8 @@
  *   • با `shop.orders.substitution`: گزینشِ کلی زیرِ «یادداشت برای دکان»، و گزینشِ قلم **فقط** برای قلمِ کم‌موجود
  *     (موجودیِ اعلام‌شده کمتر از دو برابرِ سبد)؛ «کالای مشخص» بی کالا ⇒ پیامِ روشن و هیچ سفارش؛ جست‌وجو ⇒ کالای همین ویترین؛
  *   • ثبت ⇒ ردیفِ سرور: یادداشت، «کالای مشخص» با نامِ دفتر، ترجیحِ کلی برای قلمِ دیگر؛ پیگیری همان را زیرِ قلم نشان می‌دهد؛
+ *   • ممیزیِ ویترین: سبدِ گوشی «− ۱ +» ِ همیشه‌پیدا، جمع روی نوار و نوارِ پایینِ پنهان زیرِ سبدِ باز، و تغییرِ تعداد یادداشت را
+ *     نگه می‌دارد؛ متنِ پرداخت فقط «نقد…»؛ خلاصهٔ پول: باز ⇒ «مانده»، ردشده ⇒ فقط جمع، گرفته‌شده با نقد ⇒ «پرداخت‌شده (نقد…)»؛
  *   • پرچمِ جایگزینی خاموش ⇒ نه گزینشِ کلی، نه گزینشِ قلم (یادداشت می‌ماند)؛ بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -130,9 +132,27 @@ await page.waitForFunction(() => document.querySelectorAll('#cart-lines li .lp')
 const kept = await li('روغن').locator('input[type="text"]').inputValue();
 ok(kept === 'سرِ تازه', 'یادداشتِ قلم پس از بارِ دوباره همان‌جا', kept);
 
+//  ── سبدِ گوشی (CHK-03/04، ممیزیِ ویترین): «− ۱ +» همیشه پیدا، جمع روی نوار، نوارِ پایین زیرِ سبدِ باز پنهان ──
+await page.goto(`${base}/store/${slug}?r=${++loads}#/`);
+await page.waitForSelector('#cart-bar:not([hidden])', { timeout: 15000 });
+const barSum = await page.locator('#cart-bar .sum').isVisible() && await page.textContent('#bar-total');
+ok(/۱٬۱۵۰|۱,۱۵۰|1,150/.test(barSum || ''), 'نوارِ سبدِ گوشی جمعِ پول را نشان می‌دهد', barSum);
+await page.click('#cart-bar');
+await page.waitForFunction(() => document.body.classList.contains('cart-open'), null, { timeout: 5000 });
+const more = page.locator('#sheet-lines li', { hasText: 'روغن' }).getByRole('button', { name: /یکی بیشتر/ });
+ok(await more.isVisible(), '«+» ِ قلم بی لمسِ سطر پیداست');
+ok(!(await page.locator('.bnav').first().isVisible()), 'نوارِ پایینِ برنامه زیرِ سبدِ باز پنهان');
+await more.click();
+const q2 = await page.evaluate((s) => JSON.parse(localStorage.getItem(`store-cart:${s}`)).oil, slug);
+ok(q2.qtyMilli === 2000 && q2.note === 'سرِ تازه', 'تغییرِ تعداد یادداشتِ قلم را نگه می‌دارد', JSON.stringify(q2));
+await page.locator('#sheet-lines li', { hasText: 'روغن' }).getByRole('button', { name: /یکی کمتر/ }).click();
+await openCheckout();
+
 //  ── «اگر نبود…» (CHK-15): کلی همیشه با پرچم، قلم فقط برای کم‌موجود ──
 await page.waitForSelector('#cart-lines li select', { timeout: 10000 });
 ok(await page.isVisible('#ck-sub select'), 'گزینشِ کلی زیرِ «یادداشت برای دکان»');
+const payText = await page.textContent('label.pay-opt');
+ok(!/هنوز|درگاه/.test(payText) && /نقد/.test(payText), 'پرداخت: فقط «نقد…» بی «پرداختِ آنلاین هنوز فعال نیست» (CHK-13)', payText);
 const flourSel = li('آرد').locator('select');
 const oilSel = li('روغن').locator('select');
 ok(await flourSel.count() === 1 && await flourSel.isVisible() && await oilSel.count() === 0,
@@ -169,6 +189,29 @@ const oLines = await page.textContent('#o-lines');
 const oSub = await page.textContent('#o-sub');
 ok(/یادداشت: سرِ تازه/.test(oLines) && /اگر نبود: جایگزین: «شکرِ سفید»/.test(oLines) && /بازپرداخت/.test(oSub),
   'پیگیری: یادداشت و «اگر نبود» زیرِ قلم، ترجیحِ کلی زیرِ فهرست', `${oLines} | ${oSub}`);
+
+//  ── خلاصهٔ پول (CHK-20/ORD-15/PCK-07، ممیزیِ ویترین): باز ⇒ «مانده»، ردشده ⇒ فقط جمع، گرفته‌شده با نقد ⇒ «پرداخت‌شده (نقد…)» ──
+const totals = () => page.textContent('#o-totals');
+const t0 = await totals();
+ok(/مانده/.test(t0) && !/پرداخت‌شده/.test(t0), 'سفارشِ باز: «مانده» و بی «پرداخت‌شده ۰»', t0);
+const rej = await call('POST', `/api/shop/orders/${order.id}/transition`, { to: 'rejected', reason: 'out_of_stock' }, T);
+ok(rej.status === 200, 'فروشنده رد کرد', JSON.stringify(rej.body).slice(0, 120));
+await page.reload();
+await page.waitForFunction(() => document.querySelectorAll('#o-lines li').length > 0, null, { timeout: 15000 });
+const t1 = await totals();
+ok(!/مانده|پرداخت‌شده/.test(t1) && /مبلغِ نهایی/.test(t1), 'ردشده: فقط جمع، نه «مانده» نه «پرداخت‌شده»', t1);
+const ck2 = await call('POST', `/api/store/${slug}/checkout`, { fulfillment: 'pickup', customer: { name: 'مشتری', phone },
+  lines: [{ productId: 'oil', qtyMilli: 1000 }] }, null, { 'Idempotency-Key': `lines-2-${Date.now()}`, 'X-Store-Ticket': vc.body.ticket });
+ok(ck2.status === 201, 'سفارشِ دوم (دریافت از دکان) ثبت شد', JSON.stringify(ck2.body).slice(0, 120));
+const id2 = (await one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [shopId, ck2.body.order.orderNo])).id;
+for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
+  const r = await call('POST', `/api/shop/orders/${id2}/transition`, { to }, T);
+  if (r.status !== 200) ok(false, `گذار به ${to}`, JSON.stringify(r.body).slice(0, 160));
+}
+await page.goto(`${base}/store/${slug}?r=${++loads}#/o/${encodeURIComponent(ck2.body.order.token)}`);
+await page.waitForFunction(() => document.querySelectorAll('#o-lines li').length > 0, null, { timeout: 15000 });
+const t2 = await totals();
+ok(/پرداخت‌شده \(نقد/.test(t2) && /۲۵۰/.test(t2) && !/مانده/.test(t2), 'گرفته‌شده با نقد: «پرداخت‌شده (نقد…)» = جمع، بی «مانده»', t2);
 
 //  ── پرچمِ جایگزینی خاموش ⇒ فقط یادداشت ──
 await flag('shop.orders.substitution', false);

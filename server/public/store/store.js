@@ -257,10 +257,11 @@
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
     if (milli <= 0) delete cart[id];
     else {
-      cart[id] = {
+      //  CHK-15/16: یادداشت و «اگر نبود» ِ قلم (line-prefs.js) با تغییرِ تعداد می‌مانند
+      cart[id] = Object.assign({}, line, {
         qtyMilli: milli, name: src.name, unit: src.unit || '', priceMinor: src.priceMinor,
         maxQtyMilli: src.maxQtyMilli || null, photo: Boolean(src.photo), photoVersion: src.photoVersion, unavailable: line ? line.unavailable === true : false,
-      };
+      });
     }
     saveCart();
     if (catalog.items[id]) refreshCard(id);

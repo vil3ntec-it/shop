@@ -25,7 +25,7 @@
   "ch.rf.s.in_progress": "Part of the money has been returned; the shop has not closed it yet.",
   "ch.rf.s.partial": "Refund closed (part of the amount).",
   "ch.rf.s.full": "Refund complete.",
-  "ch.rf.sum": "Returned: {a} · Remaining: {b}",
+  "ch.rf.sum": "Refunded to you: {a}",
   "ch.rf.cash": "Cash",
   "ch.rf.other": "Other method",
   "ch.rf.asked": "Return requested: {d}"
