@@ -1,6 +1,15 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLine
+import ir.vil3ntec.tohid.core.i18n.StrMarketPages
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrReports
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
+import ir.vil3ntec.tohid.core.i18n.StrShrink
+import ir.vil3ntec.tohid.core.i18n.StrStockPages
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -12,43 +21,41 @@ import kotlin.math.roundToLong
  */
 object PromoText {
 
-  val KINDS: List<Pair<String, String>> = listOf(
-    "percent" to "درصدی",
-    "amount" to "مبلغ از هر واحد",
-    "price" to "قیمتِ ویژه",
-    "tiers" to "پله‌ای بر تعداد",
-    "bxgy" to "بخر X بگیر Y",
-    "bundle" to "بسته با قیمتِ ثابت",
-    "threshold" to "آستانهٔ مبلغِ خرید",
-    "expiry" to "تخفیفِ نزدیکِ انقضا",
+  val KINDS: List<Pair<String, String>> get() = listOf(
+    "percent" to StrSale.percentWord,
+    "amount" to StrMarketPages.kindAmount,
+    "price" to StrMarketPages.kindPrice,
+    "tiers" to StrMarketPages.kindTiers,
+    "bxgy" to StrMarketPages.kindBxgy,
+    "bundle" to StrMarketPages.kindBundle,
+    "threshold" to StrMarketPages.kindThreshold,
+    "expiry" to StrMarketPages.kindExpiry,
   )
 
   /** PRM-10 — نوع‌های فرم: «نزدیکِ انقضا» فقط با پرچمِ `expiry` ِ سرور (یا قاعده‌ای که از پیش چنین است) */
   fun kinds(expiry: Boolean): List<Pair<String, String>> = if (expiry) KINDS else KINDS.filter { it.first != "expiry" }
-  val STACKS: List<Pair<String, String>> = listOf(
-    "best" to "بهترین قیمت",
-    "combine" to "ترکیبی",
-    "exclusive" to "انحصاری",
+  val STACKS: List<Pair<String, String>> get() = listOf(
+    "best" to StrMarketPages.stackBest,
+    "combine" to StrMarketPages.stackCombine,
+    "exclusive" to StrSettingsPages.stackExclusive,
   )
-  val STACK_HINTS: Map<String, String> = mapOf(
-    "best" to "از میانِ «بهترین قیمت»ها فقط پرسودترین برای مشتری",
-    "combine" to "روی بقیه هم اعمال می‌شود",
-    "exclusive" to "اگر اعمال شود، هیچ تخفیفِ دیگری نه",
+  val STACK_HINTS: Map<String, String> get() = mapOf(
+    "best" to StrMarketPages.hintBest,
+    "combine" to StrMarketPages.hintCombine,
+    "exclusive" to StrMarketPages.hintExclusive,
   )
   /** روزهای هفته به ترتیبِ دکان (شنبه اول) ⇒ شمارهٔ ISO */
-  val DAYS: List<Pair<Long, String>> = listOf(
-    6L to "شنبه", 7L to "یکشنبه", 1L to "دوشنبه", 2L to "سه‌شنبه", 3L to "چهارشنبه", 4L to "پنجشنبه", 5L to "جمعه",
-  )
-  val ERRORS: Map<String, String> = mapOf(
-    "id" to "شناسه لازم است", "name" to "نام لازم است", "kind" to "نوعِ تخفیف را انتخاب کنید",
-    "stack" to "شیوهٔ ترکیب نادرست است", "priority" to "اولویت باید بینِ ‎-۱۰۰۰ و ۱۰۰۰ باشد",
-    "code" to "کد باید ۳ تا ۳۲ حرف یا رقمِ لاتین باشد", "uses" to "سقفِ مصرف نادرست است",
-    "channel" to "کانال نادرست است", "window" to "بازهٔ زمانی نادرست است (از ≤ تا، ساعتِ شروع ≠ پایان)",
-    "bp" to "درصد باید بیش از ۰ و حداکثر ۱۰۰ باشد", "amount" to "مبلغ باید مثبت و افغانیِ کامل باشد",
-    "prices" to "کالا و قیمتِ ویژه را بدهید", "tiers" to "پله‌ها باید صعودی باشند — هم آستانه، هم تخفیف؛ قیمتِ ثابتِ هر پله کمتر از پلهٔ پیش",
-    "bxgy" to "«بخر» و «بگیر» دست‌کم ۱، تخفیفِ بخشِ «بگیر» بینِ ۱ تا ۱۰۰٪",
-    "bundle" to "بسته دست‌کم ۲ قلم و قیمتِ افغانیِ کامل",
-    "expiry" to "روزِ پیش از انقضا باید ۱ تا ۳۶۵ باشد",
+  val DAYS: List<Pair<Long, String>> get() = listOf(6L, 7L, 1L, 2L, 3L, 4L, 5L).map { it to StrReports.weekdaysShort[(it - 1).toInt()] }
+  val ERRORS: Map<String, String> get() = mapOf(
+    "id" to StrMarketPages.errId, "name" to StrMarketPages.errName, "kind" to StrMarketPages.errKind,
+    "stack" to StrMarketPages.errStack, "priority" to StrMarketPages.errPriority,
+    "code" to StrMarketPages.errCode, "uses" to StrMarketPages.errUses,
+    "channel" to StrMarketPages.errChannel, "window" to StrMarketPages.errWindow,
+    "bp" to StrMarketPages.errBp, "amount" to StrMarketPages.errAmount,
+    "prices" to StrMarketPages.errPrices, "tiers" to StrMarketPages.errTiers,
+    "bxgy" to StrMarketPages.errBxgy,
+    "bundle" to StrMarketPages.errBundle,
+    "expiry" to StrMarketPages.errExpiry,
   )
 
   fun kindLabel(k: String): String = KINDS.firstOrNull { it.first == k }?.second ?: k
@@ -68,38 +75,38 @@ object PromoText {
   /** «۱۰٪»، «بخر ۲ بگیر ۱ رایگان»، … */
   fun valueText(r: PromoCore.Rule): String = when (r.kind) {
     "percent" -> pct(r.bp)
-    "amount" -> "${af(r.amountMinor)} ؋ از هر واحد"
-    "price" -> r.prices.firstOrNull()?.let { "${af(it.unitMinor)} ؋ هر واحد" } ?: "—"
+    "amount" -> StrMarketPages.amountEach(af(r.amountMinor))
+    "price" -> r.prices.firstOrNull()?.let { StrLine.tierUnitText(af(it.unitMinor)) } ?: "—"
     "tiers" -> r.tiers.joinToString("، ") { "${qty(it.min)}+ ⇐ " + if (it.unitMinor >= 0) StrLine.tierUnitText(af(it.unitMinor)) else pct(it.bp) }
-    "bxgy" -> "بخر ${r.buy} بگیر ${r.get}" + if (r.bp >= 10_000) " رایگان" else " با ${pct(r.bp)} تخفیف"
-    "bundle" -> "${r.qty} تا ${af(r.priceMinor)} ؋"
-    "threshold" -> r.tiers.joinToString("، ") { t -> "از ${af(t.min)} ⇐ " + if (t.amountMinor > 0) "${af(t.amountMinor)} ؋" else pct(t.bp) }
-    "expiry" -> "${pct(r.bp)} تا ${r.nearDays} روز پیش از انقضا"
+    "bxgy" -> StrMarketPages.buyGet(r.buy, r.get) + if (r.bp >= 10_000) StrMarketPages.freeWord else StrMarketPages.withPctOff(pct(r.bp))
+    "bundle" -> StrMarketPages.bundleFor(r.qty, af(r.priceMinor))
+    "threshold" -> r.tiers.joinToString("، ") { t -> StrMarketPages.fromAmount(af(t.min)) + if (t.amountMinor > 0) "${af(t.amountMinor)} ؋" else pct(t.bp) }
+    "expiry" -> StrMarketPages.nearExpiryText(pct(r.bp), r.nearDays)
     else -> "—"
   }
 
   fun scopeText(r: PromoCore.Rule, d: ShopData): String {
-    fun name(id: String) = d.products.firstOrNull { it.id == id }?.name ?: "کالای حذف‌شده"
+    fun name(id: String) = d.products.firstOrNull { it.id == id }?.name ?: StrShrink.deletedProduct
     val s = r.scope
     val parts = buildList {
-      if (s.categories.isNotEmpty()) add("دستهٔ " + s.categories.joinToString("، "))
-      if (s.brands.isNotEmpty()) add("برندِ " + s.brands.joinToString("، "))
-      if (s.suppliers.isNotEmpty()) add("تأمین‌کنندهٔ " + s.suppliers.joinToString("، ") { supplierName(it, d) })
+      if (s.categories.isNotEmpty()) add(StrMarketPages.categoryPrefix + s.categories.joinToString("، "))
+      if (s.brands.isNotEmpty()) add(StrMarketPages.brandPrefix + s.brands.joinToString("، "))
+      if (s.suppliers.isNotEmpty()) add(StrMarketPages.supplierPrefix + s.suppliers.joinToString("، ") { supplierName(it, d) })
       val ids = if (r.kind == "price") r.prices.map { it.productId } else s.products
-      if (ids.isNotEmpty()) add(if (ids.size == 1) name(ids[0]) else "${ids.size} کالا")
+      if (ids.isNotEmpty()) add(if (ids.size == 1) name(ids[0]) else Str.itemsCount(ids.size))
     }
-    var t = if (parts.isEmpty()) "همهٔ کالاها" else parts.joinToString(" + ")
-    if (s.exProducts.isNotEmpty()) t += " (جز ${if (s.exProducts.size == 1) name(s.exProducts[0]) else "${s.exProducts.size} کالا"})"
-    if (s.exBrands.isNotEmpty()) t += " (جز برندِ ${s.exBrands.joinToString("، ")})"
-    if (s.exCategories.isNotEmpty()) t += " (جز دستهٔ ${s.exCategories.joinToString("، ")})"
-    if (s.exSuppliers.isNotEmpty()) t += " (جز تأمین‌کنندهٔ ${s.exSuppliers.joinToString("، ") { supplierName(it, d) }})"
+    var t = if (parts.isEmpty()) StrStockPages.allItems else parts.joinToString(" + ")
+    if (s.exProducts.isNotEmpty()) t += StrMarketPages.exceptOf(if (s.exProducts.size == 1) name(s.exProducts[0]) else Str.itemsCount(s.exProducts.size))
+    if (s.exBrands.isNotEmpty()) t += StrMarketPages.exceptBrand(s.exBrands.joinToString("، "))
+    if (s.exCategories.isNotEmpty()) t += StrMarketPages.exceptCategory(s.exCategories.joinToString("، "))
+    if (s.exSuppliers.isNotEmpty()) t += StrMarketPages.exceptSupplier(s.exSuppliers.joinToString("، ") { supplierName(it, d) })
     //  PRM-11: قاعدهٔ «فقط این گروه‌های مشتری»
     if (r.groups.isNotEmpty()) t += " · " + ir.vil3ntec.tohid.core.i18n.StrLine.promoOnlyGroups(r.groups.joinToString("، "))
     return t
   }
 
   /** PRM-08 — نامِ تأمین‌کننده از شناسه؛ حذف‌شده ⇒ برچسبِ ثابت (شناسه به کاربر نشان داده نمی‌شود) */
-  fun supplierName(id: String, d: ShopData): String = d.suppliers.firstOrNull { it.id == id }?.name?.trim()?.ifEmpty { null } ?: "(حذف‌شده)"
+  fun supplierName(id: String, d: ShopData): String = d.suppliers.firstOrNull { it.id == id }?.name?.trim()?.ifEmpty { null } ?: StrMarketPages.deletedMark
 
   fun hm(m: Long): String = if (m < 0) "" else "${(m / 60 % 24).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}"
 
@@ -108,11 +115,11 @@ object PromoText {
     return buildList {
       if (w.days.isNotEmpty()) add(DAYS.filter { it.first in w.days }.joinToString("، ") { it.second })
       if (w.start >= 0 && w.end >= 0) add("${hm(w.start)}–${hm(w.end)}")
-      if (w.from.isNotEmpty() || w.to.isNotEmpty()) add("${w.from.ifEmpty { "…" }} تا ${w.to.ifEmpty { "…" }}")
-    }.joinToString(" · ").ifEmpty { "همیشه" }
+      if (w.from.isNotEmpty() || w.to.isNotEmpty()) add(StrReports.rangeSpan(w.from.ifEmpty { "…" }, w.to.ifEmpty { "…" }))
+    }.joinToString(" · ").ifEmpty { StrMarketPages.always }
   }
 
-  enum class Status(val label: String) { ACTIVE("فعال"), OFF("غیرفعال"), ENDED("تمام‌شده"), SCHEDULED("زمان‌بندی‌شده") }
+  enum class Status(private val text: () -> String) { ACTIVE({ StrSettings.active }), OFF({ StrProducts.filterInactive }), ENDED({ StrMarketPages.ended }), SCHEDULED({ StrMarketPages.scheduled }); val label: String get() = text() }
 
   fun status(r: PromoCore.Rule, today: String): Status = when {
     !r.active -> Status.OFF
@@ -121,7 +128,7 @@ object PromoText {
     else -> Status.ACTIVE
   }
 
-  enum class Tab(val label: String) { ALL("همه"), ACTIVE("فعال"), OFF("غیرفعال") }
+  enum class Tab(private val text: () -> String) { ALL({ Str.all }), ACTIVE({ StrSettings.active }), OFF({ StrProducts.filterInactive }); val label: String get() = text() }
 
   fun filter(rules: List<PromoCore.Rule>, query: String, tab: Tab, today: String): List<PromoCore.Rule> {
     val q = ir.vil3ntec.tohid.normalizeDigits(query).trim().lowercase()

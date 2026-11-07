@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Devices
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.SystemUpdate
@@ -38,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.BuildConfig
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.platform.StoreChannel
 import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.ui.AppNav
@@ -47,6 +49,7 @@ import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.nav.LocalV3Nav
+import ir.vil3ntec.tohid.ui.v3.settings.SettingsPaths
 import ir.vil3ntec.tohid.ui.v3.v3Pressable
 import ir.vil3ntec.tohid.update.ReleaseFeed
 import ir.vil3ntec.tohid.update.UpdateManager
@@ -73,6 +76,27 @@ fun SubscriptionNotice() {
     action = Str.mySubscription,
     onAction = { openRoute(nav, ShellTargets.SUBSCRIPTION) },
     onClick = { openRoute(nav, ShellTargets.SUBSCRIPTION) },
+  )
+}
+
+/**
+ *  O-09: صاحبِ دکانِ بیرون از سقفِ دستگاه — این دستگاه مجوز دارد (هرگز بسته نمی‌شود)، ولی دستگاهِ کارمندِ
+ *  اضافه بسته است. زرد، با راهِ برداشتن: «دستگاه‌های وصل». از `rememberDeviceCapOver` (`DeviceCapAndroid.kt`)؛
+ *  زیرِ سقف ⇒ هیچ.
+ */
+@Composable
+fun DeviceCapNotice() {
+  val nav = LocalV3Nav.current
+  val over = rememberDeviceCapOver() ?: return
+  val devices = SettingsPaths.section("دستگاه‌های وارد شده")
+  DraftNoticeBar(
+    tone = V3Tone.WARNING,
+    icon = Icons.Outlined.Devices,
+    text = StrHome.deviceCapOver(over.devices, over.maxDevices),
+    detail = StrHome.deviceCapOverDetail,
+    action = StrSettings.sessionsRow,
+    onAction = { openRoute(nav, devices) },
+    onClick = { openRoute(nav, devices) },
   )
 }
 

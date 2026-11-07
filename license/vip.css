@@ -74,6 +74,17 @@
 @media (min-width:900px){ #vip-trial-bar{ inset-inline-start:auto; max-width:520px; } }
 @media (max-width:899px){ #vip-trial-bar{ bottom:calc(var(--bottomnav-space, 76px) + 10px); } }
 
+/* ---------- O-09: دستگاه‌های دکان بیرون از سقفِ اشتراک (فقط صاحبِ دکان می‌بیند) ---------- */
+#vip-device-bar{
+  display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px;
+  margin:10px 14px 0; padding:10px 13px; border-radius:var(--radius-sm,10px);
+  background:var(--warning-tint,#fef3c7); color:var(--warning,#92400e);
+  font-size:13px; line-height:1.8;
+}
+#vip-device-bar .vip-device-text{ flex:1 1 220px; min-width:0; display:flex; flex-direction:column; }
+#vip-device-bar b{ font-weight:800; }
+#vip-device-bar .vip-btn{ flex:none; }
+
 /* ---------- پوشش صفحه‌های قفل ---------- */
 .vip-overlay{
   position:absolute; inset:0; z-index:22;

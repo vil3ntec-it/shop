@@ -210,8 +210,9 @@ object ReportEngine {
    *    پایهٔ «پرفروش‌ترین» در `salesIndex`، ولی فقط در بازه. تخفیفِ کلِ فاکتور پخش نمی‌شود (برای
    *    رتبه‌بندی بس است و عددِ فروشِ گزارشِ فروش را عوض نمی‌کند).
    *  - کالاها: فعال‌ها، و غیرفعالی که در بازه فروش یا امروز موجودی دارد.
-   *  - بها = `purchasePrice` ِ کالا (همان پایهٔ «ارزش موجودی» ِ امروز). ⚠️ روشِ بهای تمام‌شده
-   *    هنوز تصمیمِ باز است (D-23)؛ پس عدد «تقریبی» است و صفحه همین را می‌گوید.
+   *  - بها: موتورِ تازهٔ موجودی روشن ⇒ بهای میانگینِ موزونِ همان دفتر (D-23 = الف؛ نامعلوم ⇒ `purchasePrice`)؛
+   *    خاموش ⇒ `purchasePrice` ِ کالا (همان پایهٔ «ارزش موجودی» ِ امروز)؛ صفحه عدد را «تقریبی» می‌گوید.
+   *  - کیت موجودیِ خودش را ندارد (اجزایش شمرده می‌شوند) ⇒ در ارزش نمی‌آید؛ فروشش در ABC می‌ماند.
    *  - فقط خواندن؛ هیچ داده‌ای نوشته نمی‌شود.
    */
   fun stockInsight(d: ShopData, from: String, to: String): StockInsight {
@@ -228,8 +229,12 @@ object ReportEngine {
     val products = d.products.filter { it.active || (perProduct[it.id] ?: 0.0) > 0.0 || stock.stock(it.id) > 0.0 }
     val byId = products.associateBy { it.id }
     val abc = StockAnalysis.abc(products.map { StockAnalysis.AbcInput(it.id, minorOf(perProduct[it.id] ?: 0.0)) })
+    val avg = if (StockLedger.isOn(d)) StockLedger.replay(d, products.map { it.id }) else null
     val valuation = StockAnalysis.valuation(
-      products.map { StockAnalysis.ValueLine(it.id, milliOf(stock.stock(it.id)), minorOf(it.purchasePrice), minorOf(it.salePrice)) },
+      products.map {
+        val cost = avg?.let { v -> StockLedger.productView(v, it.id).unitCostMinor } ?: minorOf(it.purchasePrice)
+        StockAnalysis.ValueLine(it.id, if (it.kit.isNullOrEmpty()) milliOf(stock.stock(it.id)) else 0L, cost, minorOf(it.salePrice))
+      },
     )
     val rows = abc.rows.mapNotNull { r ->
       val p = byId[r.id] ?: return@mapNotNull null

@@ -178,7 +178,28 @@ object StockActions {
     /** دلیلِ کسری برای هر کالا: count · damage · lost · expired */
     val reasons: Map<String, String> = emptyMap(),
     val note: String = "",
+    /**
+     *  INV-10: لحظهٔ آخرین تغییرِ عددِ هر کالا ([stamp]). کالای دارای لحظه با «موجودیِ امروز − گردشِ پس از همان لحظه»
+     *  سنجیده می‌شود (`core/stock/CountDuringSales`)، نه با [snapshot]: کالایی که پس از فروشِ وسطِ شمارش شمرده شد آن
+     *  فروش را دو بار کم نمی‌کند و فروشِ آفلاینِ دیررسیده اختلافِ دروغ نمی‌سازد. پیش‌نویسِ نسخهٔ پیشین (بی این کلید) همان [snapshot].
+     */
+    val countedAt: Map<String, Long> = emptyMap(),
   )
+
+  /**
+   *  INV-10: [next] با لحظهٔ [now] برای هر کالایی که عددش نسبت به [prev] (همان شمارش) عوض شد؛ عددِ دست‌نخورده لحظه‌اش را
+   *  نگه می‌دارد (کالای بی‌لحظهٔ پیش‌نویسِ پیشین بی‌لحظه می‌ماند)، عددِ پاک‌شده لحظه‌اش را می‌برد. ساعتِ پیش از آغاز ⇒ لحظهٔ آغاز.
+   */
+  fun stamp(prev: CountDraft?, next: CountDraft, now: Long): CountDraft {
+    val old = prev?.takeIf { it.startedAt == next.startedAt }
+    val at = maxOf(now, next.startedAt)
+    val out = HashMap<String, Long>()
+    for ((pid, raw) in next.counts) {
+      if (old != null && old.counts[pid] == raw) (next.countedAt[pid] ?: old.countedAt[pid])?.let { out[pid] = it }
+      else out[pid] = at
+    }
+    return if (out == next.countedAt) next else next.copy(countedAt = out)
+  }
 
   fun startCount(d: ShopData, view: StockLedger.View, now: Long): CountDraft =
     CountDraft(startedAt = now, snapshot = d.products.associate { it.id to StockLedger.productView(view, it.id).qtyMilli })
@@ -197,7 +218,7 @@ object StockActions {
   fun invalidCounts(draft: CountDraft): List<String> = draft.counts.filter { (_, v) -> parseCount(v) == -1L }.keys.toList()
 
   fun countReview(d: ShopData, view: StockLedger.View, draft: CountDraft): StockLedger.CountReview =
-    StockLedger.countReview(view, d.products.filter { it.active }.map { it.id }, counted(draft), draft.snapshot)
+    StockLedger.countReview(view, d.products.filter { it.active }.map { it.id }, counted(draft), draft.snapshot, draft.countedAt)
 
   fun saveCount(
     d: ShopData,

@@ -66,6 +66,8 @@ object AccountLinks {
   const val DEBTORS = "debtors"
   /** دستگاه‌های جانبی (چاپگر، اسکنر) — مقصدِ امروزِ ردیفِ «دستگاه‌ها» */
   const val DEVICES = "devices"
+  /** «دستگاه‌های وصل» ِ همین حساب (`SettingsPaths.section`، `DeviceCapWiringTest`) — جا باز کردن در سقفِ دستگاه (O-09) */
+  const val SESSIONS = "settings/shop/sessions"
   const val SETTINGS = "settings"
   const val CODE_SIGN_IN = "auth/code"
   val STATS: String get() = RoutePaths.withQuery("reports", "tab" to "profit", "range" to "month")

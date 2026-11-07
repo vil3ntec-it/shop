@@ -11,6 +11,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCatalogPages
+import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -43,9 +48,9 @@ fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) ->
   val names = remember(d) { d.suppliers.associate { it.id to it.name } }
   Panel(Modifier.fillMaxWidth()) {
     Row(verticalAlignment = Alignment.CenterVertically) {
-      Text("سررسیدِ پرداخت به تأمین‌کننده", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
-      if (late.isNotEmpty()) StatusPill("${late.size} گذشته — ${money(late.sumOf { it.remaining })} ؋", PillTone.DANGER)
-      if (soon.isNotEmpty()) { Spacer(Modifier.width(6.dp)); StatusPill("${soon.size} تا هفتهٔ بعد", PillTone.WARNING) }
+      Text(StrCatalogPages.supplierDue, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
+      if (late.isNotEmpty()) StatusPill(StrCatalogPages.lateN(late.size, money(late.sumOf { it.remaining })), PillTone.DANGER)
+      if (soon.isNotEmpty()) { Spacer(Modifier.width(6.dp)); StatusPill(StrCatalogPages.soonN(soon.size), PillTone.WARNING) }
     }
     Spacer(Modifier.height(6.dp))
     (late + soon).take(6).forEach { due ->
@@ -58,7 +63,7 @@ fun SupplierDueReminder(d: ShopData, today: String, onOpenSupplier: ((String) ->
         verticalAlignment = Alignment.CenterVertically,
       ) {
         Text(
-          "${names[inv.supplierId] ?: "—"} · ${if (inv.no > 0) "فاکتورِ #${inv.no}" else "خرید"} · سررسید ${formatDate(inv.dueDate ?: "")}",
+          StrCatalogPages.dueRow(names[inv.supplierId] ?: "—", if (inv.no > 0) StrCatalogPages.invoiceNo(inv.no) else StrCatalogPages.purchaseWord, formatDate(inv.dueDate ?: "")),
           style = MaterialTheme.typography.bodySmall, color = Shop.colors.text, modifier = Modifier.weight(1f),
         )
         Text("${money(due.remaining)} ؋", style = MaterialTheme.typography.bodySmall, color = if (overdue) Shop.colors.danger else Shop.colors.warning)
@@ -97,17 +102,17 @@ fun SupplierReturnDialog(
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = Shape.dialog, modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("برگشت به تأمین‌کننده", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrReach.supplierReturn, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Text(
-            "${supplier?.name.orEmpty()} — کالا از انبار بیرون می‌رود و سندِ کسر از بدهیِ ما به او کم می‌کند. صندوق دست نمی‌خورد.",
+            StrCatalogPages.returnNote(supplier?.name.orEmpty()),
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted,
           )
           Spacer(Modifier.height(12.dp))
           if (options.isEmpty()) {
-            EmptyNote("از این تأمین‌کننده خریدی ثبت نشده است")
+            EmptyNote(StrCatalogPages.noPurchasesFrom)
           } else {
             ChipPicker(
-              title = "کالا",
+              title = Str.product,
               options = options.map { it.name },
               selected = product?.name.orEmpty(),
               onSelect = { name -> productId = options.firstOrNull { it.name == name }?.id },
@@ -115,25 +120,25 @@ fun SupplierReturnDialog(
               allowNew = false,
             )
             product?.let {
-              Text("موجودی: ${qty(ShopStore.stock(d, it.id))} ${it.unit} · قابلِ برگشت به همین تأمین‌کننده: ${qty(PurchaseBook.returnable(d, supplierId, it.id))}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Text(StrCatalogPages.stockReturnable(qty(ShopStore.stock(d, it.id)), it.unit, qty(PurchaseBook.returnable(d, supplierId, it.id))), style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             }
             Spacer(Modifier.height(10.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-              NumberField(amount, { amount = it }, "مقدار", Modifier.weight(1f))
-              NumberField(price, { price = it }, "قیمتِ هر واحد", Modifier.weight(1f))
+              NumberField(amount, { amount = it }, StrMoney.quantity, Modifier.weight(1f))
+              NumberField(price, { price = it }, StrCatalogPages.unitPrice, Modifier.weight(1f))
             }
             if (total > 0) {
               Spacer(Modifier.height(6.dp))
-              Text("سندِ کسر: ${money(total)} ؋", style = MaterialTheme.typography.bodySmall, color = Shop.colors.success)
+              Text(StrCatalogPages.creditNote(money(total)), style = MaterialTheme.typography.bodySmall, color = Shop.colors.success)
             }
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(reason, { reason = it }, label = { Text("دلیل (الزامی) — مثلاً خراب رسید") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(reason, { reason = it }, label = { Text(StrCatalogPages.returnReason) }, singleLine = true, modifier = Modifier.fillMaxWidth())
             Spacer(Modifier.height(10.dp))
-            OutlinedTextField(date, { date = it }, label = { Text("تاریخ") }, singleLine = true, modifier = Modifier.fillMaxWidth())
+            OutlinedTextField(date, { date = it }, label = { Text(StrMoney.date) }, singleLine = true, modifier = Modifier.fillMaxWidth())
           }
           Spacer(Modifier.height(16.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
             Button(
               enabled = productId != null && !saving,
               onClick = {
@@ -145,7 +150,7 @@ fun SupplierReturnDialog(
                 saving = false
               },
               modifier = Modifier.weight(1f),
-            ) { Text("ثبتِ برگشت") }
+            ) { Text(StrSale.recordReturnV2) }
           }
         }
       }

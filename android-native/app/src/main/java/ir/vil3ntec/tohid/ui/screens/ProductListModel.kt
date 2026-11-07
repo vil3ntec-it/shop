@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCatalogPages
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.components.common.BulkPreviewRow
@@ -24,12 +29,13 @@ object ProductListModel {
   /** نشانِ وضعیتِ هر کالا — مهم‌ترین حالت برنده است */
   enum class Status { ACTIVE, LOW, OUT, INACTIVE }
 
-  enum class Tab(val label: String) {
-    ALL("همه"),
-    ACTIVE("فعال"),
-    LOW("کم‌موجود"),
-    OUT("ناموجود"),
-    INACTIVE("غیرفعال"),
+  enum class Tab(private val text: () -> String) {
+    ALL({ Str.all }),
+    ACTIVE({ StrSettings.active }),
+    LOW({ Str.lowStock }),
+    OUT({ Str.outOfStock }),
+    INACTIVE({ StrProducts.filterInactive });
+    val label: String get() = text()
   }
 
   enum class Sort { NAME, CODE, CATEGORY, BUY, SELL, STOCK, STATUS }
@@ -143,8 +149,8 @@ object ProductListModel {
   /** فعال/غیرفعال کردن: کدام ردیف عوض می‌شود و کدام از قبل همان است */
   fun previewActive(products: List<Product>, selected: Set<String>, active: Boolean): List<BulkPreviewRow> =
     products.filter { it.id in selected }.map { p ->
-      if (p.active == active) BulkPreviewRow(p.id, p.name, changes = false, note = if (active) "از قبل فعال است" else "از قبل غیرفعال است")
-      else BulkPreviewRow(p.id, p.name, changes = true, note = if (active) "فعال می‌شود" else "غیرفعال می‌شود — در فروش دیده نمی‌شود")
+      if (p.active == active) BulkPreviewRow(p.id, p.name, changes = false, note = if (active) StrCatalogPages.alreadyActive else StrCatalogPages.alreadyInactive)
+      else BulkPreviewRow(p.id, p.name, changes = true, note = if (active) StrCatalogPages.willActivate else StrCatalogPages.willDeactivate)
     }
 
   /**
@@ -155,8 +161,8 @@ object ProductListModel {
     preview.map { r ->
       when {
         error != null -> BulkRowResult(r.id, r.label, ok = false, note = error)
-        r.changes -> BulkRowResult(r.id, r.label, ok = true, note = if (active) "فعال شد" else "غیرفعال شد")
-        else -> BulkRowResult(r.id, r.label, ok = true, note = "بی‌تغییر — ${r.note}")
+        r.changes -> BulkRowResult(r.id, r.label, ok = true, note = if (active) StrCatalogPages.activated else StrCatalogPages.deactivated)
+        else -> BulkRowResult(r.id, r.label, ok = true, note = StrCatalogPages.unchangedNote(r.note))
       }
     }
 
@@ -166,15 +172,15 @@ object ProductListModel {
       val sold = soldOf(p.id)
       BulkPreviewRow(
         p.id, p.name, changes = true,
-        note = if (sold > 0) "فروش داشته — فاکتورهای قبلی می‌مانند و نامش «حذف‌شده» نشان داده می‌شود"
-        else "کالا و سوابقِ ورودِ انبارش حذف می‌شود",
+        note = if (sold > 0) StrCatalogPages.hadSales
+        else StrCatalogPages.deletesWithEntries,
       )
     }
 
   fun resultDelete(preview: List<BulkPreviewRow>, error: String?): List<BulkRowResult> =
     preview.map { r ->
       if (error != null) BulkRowResult(r.id, r.label, ok = false, note = error)
-      else BulkRowResult(r.id, r.label, ok = true, note = "حذف شد")
+      else BulkRowResult(r.id, r.label, ok = true, note = StrStock.deleted)
     }
 
   /**
@@ -187,7 +193,7 @@ object ProductListModel {
     if (why.isEmpty()) return d
     return d.copy(
       auditLog = d.auditLog.map { a ->
-        if (a.type == "delete_product" && a.createdAt == now && a.refId in ids) a.copy(notes = "${a.notes} — دلیل: $why") else a
+        if (a.type == "delete_product" && a.createdAt == now && a.refId in ids) a.copy(notes = "${a.notes} — دلیل: $why") else a // داده: دلیلِ حذف که در سابقهٔ دکان ذخیره می‌شود
       },
     )
   }

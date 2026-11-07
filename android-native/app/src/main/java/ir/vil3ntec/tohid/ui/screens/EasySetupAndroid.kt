@@ -33,6 +33,12 @@ import ir.vil3ntec.tohid.core.hw.NetScan
 import ir.vil3ntec.tohid.core.hw.ScannerDetect
 import ir.vil3ntec.tohid.core.hw.ScannerSheet
 import ir.vil3ntec.tohid.core.hw.Subnet
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrDevices
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrSalePages
+import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.i18n.StrSetupPages
 import ir.vil3ntec.tohid.hw.LocalNetworkAccess
 import ir.vil3ntec.tohid.hw.PrinterFinderPlatform
 import ir.vil3ntec.tohid.print.HwPages
@@ -58,10 +64,10 @@ import kotlinx.coroutines.launch
 /* ============================ پیدا کردنِ خودکارِ چاپگر ============================ */
 
 private fun viaLabel(f: FoundPrinter): String = when (f.via) {
-  FoundPrinter.Via.NETWORK -> "شبکه · درگاهِ ۹۱۰۰ باز است"
-  FoundPrinter.Via.BT_PAIRED -> "بلوتوث · جفت‌شده"
-  FoundPrinter.Via.BT_NEARBY -> "بلوتوث · نزدیک، هنوز جفت نشده"
-} + if (f.printerLike) "" else " · شاید چاپگر نباشد"
+  FoundPrinter.Via.NETWORK -> StrSetupPages.viaNetwork
+  FoundPrinter.Via.BT_PAIRED -> StrSetupPages.viaBtPaired
+  FoundPrinter.Via.BT_NEARBY -> StrSetupPages.viaBtNearby
+} + if (f.printerLike) "" else StrSetupPages.maybeNotPrinter
 
 /** پنجرهٔ «پیدا کردنِ خودکار»: شبکه (۹۱۰۰) و بلوتوث؛ هر یافته «چاپِ شناسایی» و «افزودن» دارد */
 @Composable
@@ -89,42 +95,42 @@ internal fun PrinterFinderDialog(onDismiss: () -> Unit, onAdded: (String) -> Uni
   fun startBt() {
     if (btBusy) return
     btBusy = true
-    btMessage = "جست‌وجوی بلوتوث… چاپگر را روشن و نزدیک نگه دارید"
+    btMessage = StrSetupPages.btSearching
     scope.launch {
       val before = found.size
       val err = PrinterFinderPlatform.bluetoothNearby(context, PrinterFinderPlatform.BLUETOOTH_SCAN_MS) { add(listOf(it)) }
       btBusy = false
-      btMessage = err ?: if (found.size > before) "جست‌وجوی بلوتوث تمام شد" else
-        "دستگاهِ بلوتوثیِ تازه‌ای پیدا نشد — چاپگر روشن است و دکمهٔ جفت‌سازی‌اش را زده‌اید؟"
+      btMessage = err ?: if (found.size > before) StrSetupPages.btDone else
+        StrSetupPages.btNoneNew
     }
   }
   val askBt = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { r ->
     if (r.values.all { it } && PrinterFinderPlatform.bluetoothGranted(context)) startBt()
-    else btMessage = "بی اجازهٔ «دستگاه‌های نزدیک» جست‌وجوی بلوتوث ممکن نیست"
+    else btMessage = StrSetupPages.btNeedsNearby
   }
 
   Dialog(onDismissRequest = { netJob?.cancel(); onDismiss() }) {
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("پیدا کردنِ خودکارِ چاپگر", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrReach.findPrinter, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Spacer(Modifier.height(6.dp))
-          Text("عرضِ کاغذِ چاپگری که افزوده می‌شود (بعداً در «تنظیم» هم عوض می‌شود):",
+          Text(StrSetupPages.paperWidthNote,
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
           SegmentedChoice(
-            options = listOf(ThermalPrinter.WIDTH_58MM.toString() to "۵۸ میلی‌متر", ThermalPrinter.WIDTH_80MM.toString() to "۸۰ میلی‌متر"),
+            options = listOf(ThermalPrinter.WIDTH_58MM.toString() to StrSalePages.paper58, ThermalPrinter.WIDTH_80MM.toString() to StrSalePages.paper80),
             selected = width.toString(),
             onSelect = { width = it.toIntOrNull() ?: ThermalPrinter.WIDTH_58MM },
           )
 
           /* ---------------- شبکه ---------------- */
           Spacer(Modifier.height(14.dp))
-          Text("شبکه (وای‌فای / LAN)", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+          Text(StrSetupPages.netWifiLan, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
           if (lans.isEmpty()) {
-            Text("این دستگاه به وای‌فای یا شبکهٔ سیمیِ خصوصی وصل نیست؛ جست‌وجوی شبکه فقط زیرشبکهٔ خودِ دکان را می‌گردد.",
+            Text(StrSetupPages.noPrivateNet,
               style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           } else {
-            Text(lans.joinToString(" · ") { "${it.ip}/${it.prefix}" } + " — فقط همین زیرشبکه، درگاهِ ۹۱۰۰؛ چیزی به چاپگر فرستاده نمی‌شود.",
+            Text(lans.joinToString(" · ") { "${it.ip}/${it.prefix}" } + StrSetupPages.subnetOnly,
               style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             if (netBlocked) LocalNetworkNotice(context)
             val running = progress?.finished == false
@@ -136,7 +142,7 @@ internal fun PrinterFinderDialog(onDismiss: () -> Unit, onAdded: (String) -> Uni
                   scope.launch { progress = p; add(hits.map { FoundPrinter.network(it) }) }
                 }
               }
-            }) { Text(if (running) "در حالِ جست‌وجو…" else "جست‌وجوی شبکه") }
+            }) { Text(if (running) StrDevices.searching else StrSetupPages.netSearch) }
             progress?.let { p ->
               if (!p.finished && p.total > 0) LinearProgressIndicator(progress = { p.fraction }, modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
               Text(p.message, style = MaterialTheme.typography.bodySmall,
@@ -146,23 +152,23 @@ internal fun PrinterFinderDialog(onDismiss: () -> Unit, onAdded: (String) -> Uni
 
           /* ---------------- بلوتوث ---------------- */
           Spacer(Modifier.height(14.dp))
-          Text("بلوتوث", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+          Text(StrSettings.kindBluetooth, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
           if (PrinterFinderPlatform.bluetoothScan()) {
             OutlinedButton(enabled = !btBusy, onClick = {
               if (PrinterFinderPlatform.bluetoothGranted(context)) startBt()
               else askBt.launch(PrinterFinderPlatform.bluetoothPermissions().toTypedArray())
-            }) { Text(if (btBusy) "در حالِ جست‌وجو…" else "جست‌وجوی بلوتوثِ نزدیک (۱۲ ثانیه)") }
+            }) { Text(if (btBusy) StrDevices.searching else StrSetupPages.btSearch12) }
             if (btBusy) LinearProgressIndicator(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp))
             btMessage?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted) }
           } else {
-            Text("چاپگرِ بلوتوثی را در تنظیماتِ بلوتوثِ سیستم جفت کنید؛ درگاهِ COM ِ آن در فهرستِ پایین می‌آید.",
+            Text(StrSetupPages.btPairInSystem,
               style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           }
 
           /* ---------------- یافته‌ها ---------------- */
           Spacer(Modifier.height(14.dp))
-          Text("یافته‌ها", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
-          if (found.isEmpty()) Text("هنوز چیزی پیدا نشده.", style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+          Text(StrSetupPages.findings, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold, color = Shop.colors.text)
+          if (found.isEmpty()) Text(StrSetupPages.nothingYet, style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           found.forEach { f ->
             val known = Discovery.known(f, saved)
             Column(
@@ -172,23 +178,23 @@ internal fun PrinterFinderDialog(onDismiss: () -> Unit, onAdded: (String) -> Uni
               Text("${viaLabel(f)} · ${PrinterRegistry.label(f.link)}", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
               Row(verticalAlignment = Alignment.CenterVertically) {
                 if (f.via != FoundPrinter.Via.BT_NEARBY) TextButton(onClick = {
-                  toast("چاپِ شناسایی به «${f.name}» رفت…")
-                  scope.launch { toast(NetPrinterScan.identify(context, f.link) ?: "چاپِ شناسایی انجام شد — نشانی روی کاغذ است") }
-                }) { Text("چاپِ شناسایی") }
+                  toast(StrSetupPages.idPrintSent(f.name))
+                  scope.launch { toast(NetPrinterScan.identify(context, f.link) ?: StrSetupPages.idPrintDone) }
+                }) { Text(StrSetupPages.idPrint) }
                 Spacer(Modifier.weight(1f))
-                if (known) Text("ثبت شده", style = MaterialTheme.typography.labelSmall, color = Shop.colors.success)
+                if (known) Text(StrSetupPages.registered, style = MaterialTheme.typography.labelSmall, color = Shop.colors.success)
                 else TextButton(onClick = {
                   val mac = f.link.removePrefix("bt:")
                   if (f.via == FoundPrinter.Via.BT_NEARBY) PrinterFinderPlatform.bond(context, mac)
                   PrinterRegistry.add(context, f.name, f.link, width)
                   saved = PrinterRegistry.list(context).map { it.link }
                   onAdded(f.name)
-                }) { Text(if (f.via == FoundPrinter.Via.BT_NEARBY) "جفت کردن و افزودن" else "افزودن") }
+                }) { Text(if (f.via == FoundPrinter.Via.BT_NEARBY) StrSetupPages.pairAndAdd else StrDevices.add) }
               }
             }
           }
           Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = { netJob?.cancel(); onDismiss() }) { Text("بستن") }
+            TextButton(onClick = { netJob?.cancel(); onDismiss() }) { Text(Str.close) }
           }
         }
       }
@@ -205,23 +211,23 @@ internal fun ScannerSetupTools(canAdmin: Boolean, toast: (String) -> Unit) {
   val scope = rememberCoroutineScope()
   var testing by remember { mutableStateOf(false) }
   var preview by remember { mutableStateOf<HwPages.Preview?>(null) }
-  Text("راه‌اندازیِ آسانِ بارکدخوان", style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
-  Text("برگهٔ بارکدِ آزمون را چاپ کنید (یا از روی صفحه اسکن کنید) و «آزمونِ بارکدخوان» را بزنید؛ پیشوند، پسوند و Enter خودکار پیدا می‌شود.",
+  Text(StrSetupPages.scannerEasySetup, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
+  Text(StrSetupPages.scannerSetupNote,
     style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
   Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-    OutlinedButton(onClick = { testing = true }) { Text("آزمونِ بارکدخوان") }
+    OutlinedButton(onClick = { testing = true }) { Text(StrSetupPages.scannerTest) }
     OutlinedButton(onClick = {
       val s = PrinterRegistry.defaultSaved(context)
       val w = s?.profile()?.paperDots ?: ThermalPrinter.WIDTH_58MM
       preview = runCatching { HwPages.previewEscPos(ScannerSheetPrint.bytes(context, s ?: PrinterRegistry.savedFor(context, "", w)), w) }
-        .getOrElse { toast("برگه کشیده نشد: ${it.message}"); null }
-    }) { Text("پیش‌نمایشِ برگه") }
+        .getOrElse { toast(StrSetupPages.sheetNotDrawn(it.message)); null }
+    }) { Text(StrSetupPages.sheetPreview) }
   }
   OutlinedButton(onClick = {
-    toast("برگهٔ بارکدخوان به چاپگرِ پیش‌فرض رفت…")
-    scope.launch { toast(ScannerSheetPrint.print(context) ?: "برگهٔ بارکدخوان چاپ شد") }
-  }) { Text("چاپِ برگهٔ بارکدخوان") }
-  preview?.let { p -> PrintPreviewDialog("برگهٔ راه‌اندازیِ بارکدخوان", p) { preview = null } }
+    toast(StrSetupPages.sheetSent)
+    scope.launch { toast(ScannerSheetPrint.print(context) ?: StrSetupPages.sheetPrinted) }
+  }) { Text(StrSetupPages.printSheet) }
+  preview?.let { p -> PrintPreviewDialog(StrSetupPages.setupSheet, p) { preview = null } }
   if (testing) ScannerDetectDialog(canAdmin, onDismiss = { testing = false }, toast = toast)
 }
 
@@ -255,21 +261,21 @@ private fun ScannerDetectDialog(canAdmin: Boolean, onDismiss: () -> Unit, toast:
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("آزمونِ بارکدخوان", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrSetupPages.scannerTest, style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Spacer(Modifier.height(6.dp))
-          Text("این بارکد را (از روی برگه یا همین صفحه) اسکن کنید؛ برنامه می‌بیند بارکدخوان پیش و پس از «${code.data}» چه می‌فرستد.",
+          Text(StrSetupPages.scanThis(code.data),
             style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
           Spacer(Modifier.height(8.dp))
           bitmap?.let {
             //  بی زمینهٔ ثابت: خودِ تصویر سفید/سیاهِ کدر است (HardcodedColorsTest)
-            Image(it.asImageBitmap(), contentDescription = "بارکدِ آزمون", Modifier.fillMaxWidth().heightIn(max = 140.dp),
+            Image(it.asImageBitmap(), contentDescription = StrSetupPages.testBarcode, Modifier.fillMaxWidth().heightIn(max = 140.dp),
               contentScale = ContentScale.Fit, filterQuality = FilterQuality.None)
           }
           Spacer(Modifier.height(8.dp))
           OutlinedTextField(
             value = field,
             onValueChange = { field = it.takeLast(64) },
-            label = { Text("این‌جا بزنید و اسکن کنید") },
+            label = { Text(StrSetupPages.tapAndScan) },
             singleLine = false, maxLines = 2,
             modifier = Modifier.fillMaxWidth().focusRequester(focus).onPreviewKeyEvent { e ->
               if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -289,24 +295,24 @@ private fun ScannerDetectDialog(canAdmin: Boolean, onDismiss: () -> Unit, toast:
             Text(r.message, color = if (r.ok) Shop.colors.success else Shop.colors.danger, style = MaterialTheme.typography.bodyMedium)
             val now = ScanPrefs.saved.value
             if (r.ok && !ScannerDetect.changes(now, r)) {
-              Text("تنظیمِ کنونیِ بارکدخوانِ همین دستگاه همین است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Text(StrSetupPages.currentSetup, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             } else if (r.ok && canAdmin) {
               OutlinedButton(onClick = {
                 ScanPrefs.save(context, ScannerDetect.apply(now, r))
-                toast("پیشوند و پسوندِ بارکدخوان ذخیره شد")
-              }) { Text("ذخیرهٔ همین پیشوند و پسوند") }
+                toast(StrSetupPages.affixSaved)
+              }) { Text(StrSetupPages.saveAffix) }
             } else if (r.ok) {
-              Text("ذخیرهٔ تنظیم فقط برای صاحب و مدیرِ دکان است.", style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+              Text(StrSetupPages.ownerOnlySave, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
             }
             if (r.ok && !HwTools.on.value) {
-              Text("پیشوند و پسوندِ ذخیره‌شده وقتی به کار می‌رود که «ابزارهای تازهٔ دستگاه» (بالای همین صفحه) روشن باشد.",
+              Text(StrSetupPages.affixWhen,
                 style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
             }
           }
           Spacer(Modifier.height(4.dp))
-          Text("کدِ تنظیمِ سازنده‌ها در برنامه نیست (برای هر سازنده جداست و کدِ حدسی ساخته نمی‌شود)؛ Enter و پیشوند را از دفترچهٔ خودِ بارکدخوان تنظیم کنید.",
+          Text(StrSetupPages.noMakerCodes,
             style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
-          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text("بستن") } }
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) { TextButton(onClick = onDismiss) { Text(Str.close) } }
         }
       }
     }
