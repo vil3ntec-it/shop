@@ -42,7 +42,12 @@
         ul.appendChild(el('li', {}, el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.unitPriceMinor) })),
           el('span', { class: 'amt num', text: K.money(l.lineTotalMinor) })));
       });
-      var paid = o.paymentStatus === 'paid' ? o.totalMinor : 0;
+      //  CHK-16/15: یادداشت و «اگر نبود» ِ مشتری زیرِ همان قلم (store/line-prefs.js ِ دیربار، فقط وقتی هست)
+      if (o.substitution || o.lines.some(function (l) { return l.note || l.substitution; })) {
+        K.js('/store/line-prefs.js').then(function () { return window.StoreLines({}); })
+          .then(function (m) { m.receipt(ul, o); }, function () { /* بی واژه‌نامه ⇒ همان فهرست */ });
+      }
+      var paid =o.paymentStatus === 'paid' ? o.totalMinor : 0;
       var rows = [['od.sub', K.money(o.subtotalMinor)]];
       if (o.discountMinor) rows.push(['od.disc', K.money(o.discountMinor)]);
       if (o.fulfillment === 'delivery') rows.push(['ck.fee', o.deliveryFeeMinor ? K.money(o.deliveryFeeMinor) : t('free')]);

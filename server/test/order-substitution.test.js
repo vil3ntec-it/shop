@@ -120,6 +120,10 @@ test('⛔ پرچمِ خاموش: ویترین ترجیح نمی‌گیرد؛ ک�
   const s = await liveStore('جایگزینیِ خاموش', { substitution: false });
   const cfg = await h.get('/api/shop/orders/config', { token: s.token });
   assert.equal(cfg.body.substitution, false);
+  //  فرمِ ثبتِ وب (`store/line-prefs.js`) «اگر نبود…» را نشان نمی‌دهد: کلیدِ `features.substitution` نیست
+  const pub = await h.get(`/api/store/${s.slug}`);
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  assert.equal((pub.body.features || {}).substitution, undefined);
 
   const t = await ticketFor(s.slug, PHONE);
   //  حتی «کالای مشخص» ِ ساختگی هم سنجیده نمی‌شود — کلیدها خوانده نمی‌شوند
@@ -182,6 +186,10 @@ test('CHK-15 کارمند: قلمِ بی ترجیح ترجیحِ کلی را م�
 
 test('CHK-15/16 ویترین: ترجیحِ قلم و کلی، جایگزینِ مشخص با نامِ سرور، یادداشتِ هر قلم — مشتری و کارمند هر دو می‌بینند', async () => {
   const s = await liveStore('جایگزینیِ ویترین', { substitution: true });
+  //  پرچمِ روشن ⇒ فرمِ ثبتِ وب گزینشِ کلی و قلمِ کم‌موجود را نشان می‌دهد
+  const pub = await h.get(`/api/store/${s.slug}`);
+  assert.equal(pub.status, 200, JSON.stringify(pub.body));
+  assert.equal(pub.body.features.substitution, true);
   const t = await ticketFor(s.slug, PHONE);
   //  نامِ ساختگیِ مشتری خوانده نمی‌شود؛ نام از دفترِ همان لحظه
   const a = await checkout(s.slug, storeBody({

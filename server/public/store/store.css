@@ -126,3 +126,10 @@
 .ct-form { display: flex; gap: var(--s2); align-items: flex-end; }
 .ct-form textarea { flex: 1 1 auto; min-height: 48px; max-height: 140px; resize: vertical; }
 .ct-form .btn-accent { min-height: 48px; padding-inline: var(--s4); }
+
+/* CHK-15/16: یادداشت و «اگر نبود…» ِ هر قلم در برگهٔ ثبت (store/line-prefs.js ِ دیربار) */
+.sum-lines li.lp-li { flex-wrap: wrap; }
+.lp, .lp-g { display: grid; gap: var(--s2); }
+.sum-lines .lp { flex-basis: 100%; }
+.lp .btn-sm { justify-self: start; }
+.lp-hits { flex-wrap: wrap; }
