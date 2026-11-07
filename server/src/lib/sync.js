@@ -112,6 +112,13 @@ async function pushChanges(ctx, changes) {
   const safeOn = changes.some((r) => V1_ONLY.has(String(r?.collection || '')))
     && await require('./safe-flag').enabledFor(shopId);
 
+  //  STF-03 (پرچمِ خاموشِ `shop.credit_cap`): بالا بردنِ `debtGiven` ِ فاکتور بیش از سقفِ `sales.credit` ⇒ کلِ دسته
+  //  ۴۰۳ (‎lib/credit-cap.js‎)؛ پرچم و لایه‌ها فقط وقتی ردیفِ فاکتورِ قرض‌دار هست و نقش صاحب نیست
+  const creditCtx = { accountId: shopId, role };
+  const creditLayers = role !== 'owner'
+    && changes.some((ch) => ch?.collection === 'sales' && ch?.deleted !== true && Number(ch?.data?.debtGiven) > 0)
+    && await require('./credit-cap').on(creditCtx)
+    ? await require('./staff-perms').layersFor(shopId, role, userId) : null;
   //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
   const guard = ctx.finalized
     ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, ip: ctx.ip || '' }, ctx.finalized, changes)
@@ -214,6 +221,10 @@ async function pushChanges(ctx, changes) {
           table: collection, rowId: recordId, type: deleted ? 'delete' : 'update', fields: data, full: true,
         }, existing && !existing.deleted ? existing.data : null);
         if (g && g.reject) throw require('./finalized-sales').forbiddenError();
+      }
+      if (creditLayers && collection === 'sales' && !deleted) {
+        const bad = await require('./credit-cap').judgeLegacy({ role }, recordId, data, existing, creditLayers);
+        if (bad) throw bad;
       }
 
       rev++;

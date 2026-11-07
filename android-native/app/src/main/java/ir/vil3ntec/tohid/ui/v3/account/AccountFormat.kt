@@ -42,19 +42,28 @@ object AccountFormat {
   /** نقش‌های دکان (`ShopRole`) */
   enum class Role { OWNER, MANAGER, STAFF, COURIER }
 
+  /** چهار نقشِ A16 (و نقشِ پایهٔ نقش‌های سفارشی، STF-01) کارمندند، نه صاحب دکان */
+  private val STAFF_KINDS = setOf("staff", "cashier", "storekeeper", "picker", "accountant")
+
   fun roleOf(raw: String): Role = when (raw.trim().lowercase()) {
     "manager" -> Role.MANAGER
-    "staff" -> Role.STAFF
+    in STAFF_KINDS -> Role.STAFF
     "courier" -> Role.COURIER
     else -> Role.OWNER
   }
 
-  /** نامِ نقش در فهرستِ کارمندان: صاحب دکان / مدیر / شاگرد / پیک */
-  fun teamRole(raw: String): String = when (roleOf(raw)) {
-    Role.OWNER -> StrAccount.roleOwner
-    Role.MANAGER -> StrAccount.roleManager
-    Role.STAFF -> StrAccount.roleStaff
-    Role.COURIER -> StrAccount.roleCourier
+  /** نامِ نقش در فهرستِ کارمندان: صاحب دکان / مدیر / شاگرد / پیک — و نامِ هر نقشِ A16 */
+  fun teamRole(raw: String): String = when (raw.trim().lowercase()) {
+    "cashier" -> StrAccount.roleCashier
+    "storekeeper" -> StrAccount.roleStorekeeper
+    "picker" -> StrAccount.rolePicker
+    "accountant" -> StrAccount.roleAccountant
+    else -> when (roleOf(raw)) {
+      Role.OWNER -> StrAccount.roleOwner
+      Role.MANAGER -> StrAccount.roleManager
+      Role.STAFF -> StrAccount.roleStaff
+      Role.COURIER -> StrAccount.roleCourier
+    }
   }
 }
 

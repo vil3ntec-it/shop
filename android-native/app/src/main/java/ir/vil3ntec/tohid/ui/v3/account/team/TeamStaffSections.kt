@@ -15,6 +15,8 @@ import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 @Composable
 internal fun RouteScope.TeamStaffSections(shops: ShopRepository, isOwner: Boolean) {
   ApproverSetupSection(shops, snackbar = snackbar)
+  //  STF-01: نقش‌های سفارشی (پرچمِ `shop.custom_roles`؛ بی آن هیچ نمی‌کشد)
+  CustomRolesSection(shops, isOwner)
   MemberPermsSection(shops, canEdit = isOwner, snackbar = snackbar)
   StaffScopeSection(shops, canEdit = isOwner, snackbar = snackbar)
   DevicesSection(shops, canEdit = isOwner, snackbar = snackbar)

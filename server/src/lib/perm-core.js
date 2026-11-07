@@ -101,6 +101,13 @@
       defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
     },
+    //  STF-03: فروشِ قرضی (بردِ «به حساب» ِ فاکتور، `debtGiven`) — امروز هر نویسندهٔ فاکتور قرض می‌دهد، پس پیش‌فرض
+    //  همان `returns.create`؛ صاحب برای نقش، نقشِ سفارشی یا کاربر سقفِ مبلغ (`maxAmount`، Minor) یا «نیازمند تأیید»
+    //  می‌گذارد. سرور فقط با پرچمِ خاموشِ `shop.credit_cap` می‌سنجد (`server/src/lib/credit-cap.js`)
+    'sales.credit': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
+    },
     'settings.write': {
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,

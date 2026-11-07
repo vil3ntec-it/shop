@@ -24,6 +24,21 @@ data class MemberPermsDto(
   /** لایهٔ همین کاربر، همان‌طور که ذخیره شده */
   val layer: JsonObject = JsonObject(emptyMap()),
   val effective: Map<String, PermStateDto> = emptyMap(),
+  /** STF-01: نقشِ سفارشیِ مؤثر (فقط با پرچمِ `shop.custom_roles`) */
+  val customRole: CustomRoleRefDto? = null,
+)
+
+@Serializable
+data class CustomRoleRefDto(val id: String = "", val name: String = "")
+
+/** STF-01 — نقشِ سفارشی: نام + نقشِ پایه + لایهٔ مجوز (قالبِ `PermCore`)؛ `members` = شناسهٔ کاربرها */
+@Serializable
+data class CustomRoleDto(
+  val id: String = "",
+  val name: String = "",
+  val baseRole: String = "staff",
+  val perms: JsonObject = JsonObject(emptyMap()),
+  val members: List<String> = emptyList(),
 )
 
 @Serializable
@@ -44,6 +59,8 @@ data class ShopPermsDto(
   val v: Int = 1,
   val catalog: List<CatalogEntryDto> = emptyList(),
   val members: List<MemberPermsDto> = emptyList(),
+  /** STF-01: `null` ⇐ پرچمِ `shop.custom_roles` خاموش (یا سرورِ قدیمی) — بخش دیده نمی‌شود */
+  val customRoles: List<CustomRoleDto>? = null,
 )
 
 @Serializable

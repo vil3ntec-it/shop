@@ -34,6 +34,7 @@ const schema = require('./sync-v3-schema');
 const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
+const creditCap = require('./credit-cap');
 const permCore = require('./perm-core');
 
 const PROTOCOL = 3;
@@ -162,10 +163,18 @@ function validate(raw, origin = 'v3', ctx = undefined) {
     }
     approval = r.approval;
   }
+  //  STF-03: برگهٔ جدای قرضِ فاکتور (`sales.credit`، ‎lib/credit-cap.js‎) — همان شکل؛ فقط وقتی آمده در op می‌ماند
+  const extra = {};
+  if (r.creditApproval !== undefined && r.creditApproval !== null) {
+    if (!isPlainObject(r.creditApproval) || Buffer.byteLength(JSON.stringify(r.creditApproval), 'utf8') > MAX_APPROVAL_BYTES) {
+      return bad('bad_approval');
+    }
+    extra.creditApproval = r.creditApproval;
+  }
   return {
     ok: true,
     op: { op_id: opId, table: spec.name, spec, row_id: r.row_id, kind: r.kind, hlc: stamp, fields, reason, tx: txId,
-      fromDelete: relaxed && r.fromDelete === true, approval },
+      fromDelete: relaxed && r.fromDelete === true, approval, ...extra },
   };
 }
 
@@ -434,6 +443,11 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
   if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row, (s, p) => c.query(s, p));   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
+  //  STF-03: سقفِ فروشِ قرضی (پرچمِ خاموشِ `shop.credit_cap`) — جمعِ قرضِ فاکتور پس از همین درج یا دلتا (‎lib/credit-cap.js‎)
+  const credit = creditCap.touchesV3(op) && await creditCap.on(ctx, (s, p) => c.query(s, p)) ? creditCap.needV3(op, row) : null;
+  const judgeCredit = () => approvals.judge(c, ctx, credit, creditCap.slipOf(op, !!need), {
+    opId: op.op_id, at: approvals.wallOf(op.hlc), deviceId, path: origin,
+  });
   if (need) {
     //  برگشت: سقف روی جمعِ سند (docId یا tx)، یک داوری برای همهٔ ردیف‌هایش
     const g = need.perm === 'returns.create' && groups ? groups.get(op) : null;
@@ -441,9 +455,14 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     //  قاعدهٔ امروزِ v1 برای نقشی که لغو ندارد (شاگرد): «حذفِ فاکتورِ خودت» از راهِ حذفِ v2
     const fallback = need.perm === 'sales.cancel' && op.fromDelete && own && can(role, 'data.delete.own')
       && permCore.defaultMode(role, 'sales.cancel') === 'deny';
-    return approvals.judge(c, ctx, need, approvals.slipOf(op), {
+    const out = await approvals.judge(c, ctx, need, approvals.slipOf(op), {
       opId: op.op_id, at: approvals.wallOf(op.hlc), deviceId, path: origin, fallback,
     });
+    return out || !credit ? out : judgeCredit();
+  }
+  if (credit) {
+    const out = await judgeCredit();
+    if (out) return out;
   }
   if (op.kind === 'cancel') {
     if (can(role, op.spec.cancel)) return null;
@@ -754,7 +773,9 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  سندهای برگشتِ این دسته (یک برگه و یک تصمیم؛ سقفِ تجمعیِ فاکتور)، و برنامهٔ کهنهٔ بی tx:
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
-  const plan = approvals.bundleV3(units, groups);
+  //  STF-03: فاکتورِ قرض‌دار فقط با پرچمِ `shop.credit_cap` سندِ پولی است (پرچم فقط وقتی opی قرض دارد)
+  const credit = units.some((u) => u.items.some((it) => it.ops.some(creditCap.touchesV3))) && await creditCap.on(ctx);
+  const plan = approvals.bundleV3(units, groups, { credit });
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 
