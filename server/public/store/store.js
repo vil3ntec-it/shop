@@ -240,6 +240,7 @@
     if (K.cartIsOpen()) renderSheet();
     if (checkout && !$('view-checkout').hidden) checkout.render();
     if (more) more.cart();
+    if (acct) acct.push();
   }
   function addOne(p) {
     var cur = cart[p.id] ? cart[p.id].qtyMilli : 0;
@@ -434,7 +435,7 @@
         short: short, hasShort: hasShort, shortText: shortText, thumb: thumb, setQty: setQty, saveCart: saveCart,
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
         empty: function () { cart = {}; cap = {}; saveCart(); },
-        campaign: campaign,
+        campaign: campaign, acct: account,
         //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی ⇒ «ثبت» بسته با همان پیام
         closed: closed, renderHead: renderHead,
       });
@@ -452,7 +453,7 @@
   var orderView = null; var ov = null;
   function loadOrderView() {
     //  واژه‌نامهٔ order.<زبان>.json و یاورهای پیگیری (kit/order-kit.js) هم‌زمان؛ واژه‌نامه نیامد ⇒ متنِ HTML
-    orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, store: store, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); return ov; })
+    orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, store: store, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); }, acct: account }); return ov; })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
@@ -502,6 +503,12 @@
     return accountView;
   }
 
+  // CHK-01/03/09، WEB-14: acct.js
+  var acct = null;
+  function account() {
+    return store.features.webAccount ? K.js('/store/acct.js').then(function () { return (acct = acct || window.StoreAcct({ api: api, slug: slug, store: store, cart: function () { return cart; }, set: function (x) { cart = sanitize(x); saveCart(); refreshCart(); } })); }) : Promise.reject();
+  }
+
   // ── سفارش‌های من در همین دکان ──
   function openOrders() {
     show('view-orders');
@@ -523,7 +530,8 @@
     };
     draw(K.load(KEY_ORDERS, []) || []);
     //  S138: با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاه
-    if (K.ticket()) api('/orders').then(function (r) { if (r.orders.length) draw(r.orders); }).catch(function () { /* همان محلی */ });
+    if (K.ticket() || K.sess()) api('/orders').then(function (r) { if (r.orders.length) draw(r.orders); }).catch(function () { /* همان محلی */ });
+    account().then(function (a) { a.mine(); }, function () {});
     // CRM-13
     var acc = Boolean(store.features.accountHistory && K.ticket());
     if ($('my-account')) $('my-account').hidden = !acc;
@@ -593,6 +601,7 @@
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
+      if (K.sess()) account().catch(function () {});
       return Promise.all([loadProducts(false), refreshCart(), loadMore(r)]);
     }).then(route).catch(function (e) {
       if (e.status === 404) {

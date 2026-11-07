@@ -409,6 +409,8 @@
       clearTimeout(poll);
       var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(fail); };
       var o = renderOrder(order, token);
+      //  CHK-01: پیشنهادِ ساختنِ حساب پس از ثبت (acct.js، فقط با `features.webAccount` و بی نشست)
+      if (ctx.acct) ctx.acct().then(function (a) { a.offer(token); }, function () {});
       var pend = o.paymentStatus === 'pending';
       if (pend || FINAL.indexOf(o.status) < 0) poll = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else poll = setTimeout(load, 20000); }, pend ? 5000 : 20000);
     }

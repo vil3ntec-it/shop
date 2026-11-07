@@ -154,6 +154,8 @@
     return t && t.ticket && t.expiresAt > Date.now() ? t : null;
   };
   K.setTicket = function (t) { K.save(KEY_TICKET, t ? { phone: t.phone, ticket: t.ticket, expiresAt: t.expiresAt } : null); };
+  // CHK-01: نشستِ حساب (acct.js)
+  K.sess = function () { var s = K.load('store-session', null); return s && s.token && s.expiresAt > Date.now() ? s : null; };
   K.localPhone = function (p) { return String(p || '').replace(/^\+93/, '0'); };
 
   // ── API: پیامِ خطای شناخته از واژه‌نامه (نه متنِ خامِ فارسیِ سرور در en/ps) ──
@@ -163,6 +165,7 @@
     if (opts.body) headers['Content-Type'] = 'application/json';
     var t = K.ticket();
     if (t) headers['X-Store-Ticket'] = t.ticket;
+    if (K.sess()) headers['X-Store-Session'] = K.sess().token;
     if (opts.key) headers['Idempotency-Key'] = opts.key;
     return fetch(url, {
       method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined,
