@@ -7,6 +7,7 @@
  *   کی ──── فقط [AMEND_STATUSES] (تازه، قبول‌شده) — پیش از «شروعِ جمع‌آوری» (برگهٔ جمع‌آوری
  *           هنوز ساخته نشده و پیکی سپرده نشده: سپردن پس از «بسته‌بندی» است). فقط سفارشِ
  *           **پرداخت‌نشده** (نقد هنگامِ تحویل)؛ پرداخت‌شده ⇒ ۴۰۹ `amend_paid_order`.
+ *           ORD-13: «در حال جمع‌آوری» ِ **بی برگه** هم، فقط کم/برداشتن ([SHEETLESS_STATUS]).
  *   چه ──── مقدارِ تازهٔ قلم‌های موجود؛ ۰ = برداشتنِ قلم؛ دست‌کم یک قلم می‌ماند (همه را برداشتن =
  *           لغو). افزودنِ قلم CHK-21 است (`order-add-items.js`، همین قفل و دروازه). قیمتِ واحد همان قیمتِ ثبت است — هرگز از کلاینت.
  *           مبلغ: همان `S.lineTotalMinor` ِ ساختِ سفارش؛ تخفیف و هزینهٔ ارسال دست نمی‌خورند؛
@@ -40,6 +41,15 @@ const { badRequest, forbidden, notFound, conflict } = require('../middleware/err
 
 const FLAG_KEY = 'shop.orders.amend';
 const AMEND_STATUSES = Object.freeze(['new', 'accepted']);
+/**
+ * ORD-13 — ناموجودی وسطِ آماده‌سازیِ سفارشِ **بی برگهٔ جمع‌آوری** (دکانی که «جمع‌آوری» را روشن نکرده): همین
+ * ویرایش با همان رضایت (پیوندِ پیگیری برای ویترین، راهِ رضایتِ ثبت‌شده برای کارمند) در «در حال جمع‌آوری» هم باز
+ * است، ولی فقط **کم کردن یا برداشتن** ([reduceOnly]) — افزودن همان CHK-21 است و پس از شروع بسته می‌ماند.
+ * برگهٔ جمع‌آوری که باشد همان راهِ جایگزین/«پیدا نشد» ِ برگه (`pick-substitutes`) است و این‌جا ۴۰۹ می‌ماند.
+ * «بی برگه» درونِ همان قفلِ ردیفِ سفارش سنجیده می‌شود (`start` ِ جمع‌آوری هم همان ردیف را قفل می‌کند).
+ * درهای دیگرِ [blockerOf] (افزودنِ قلم، روشِ تحویل) بی [sheetless] همان پیشین‌اند.
+ */
+const SHEETLESS_STATUS = 'picking';
 const REASONS = Object.freeze(['out_of_stock', 'customer_request', 'price_error', 'other']);
 const CONSENT_VIA = Object.freeze(['phone', 'in_person', 'telegram', 'whatsapp']);
 const TTL_MS = 30 * 60_000;
@@ -53,8 +63,9 @@ const AMEND_ID_RE = /^am_[0-9A-Z]{26}$/;
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG_KEY);
 const paidFlagOf = (shopId) => orders.flagOf(shopId, PAID_FLAG_KEY);
 /** آنچه برنامه برای «ویرایشِ سفارش» لازم دارد (`GET /orders/config`، فقط با پرچم). */
-const configOf = () => ({
-  statuses: [...AMEND_STATUSES], reasons: [...REASONS], consentVia: [...CONSENT_VIA], ttlMinutes: TTL_MS / 60_000,
+const configOf = (pickingOn = true) => ({
+  //  ORD-13: بی «جمع‌آوری» ِ دکان هیچ سفارشی برگه نمی‌گیرد ⇒ «در حال جمع‌آوری» هم (فقط کم/برداشتن، سرور می‌سنجد)
+  statuses: pickingOn ? [...AMEND_STATUSES] : [...AMEND_STATUSES, SHEETLESS_STATUS], reasons: [...REASONS], consentVia: [...CONSENT_VIA], ttlMinutes: TTL_MS / 60_000,
 });
 const str = (v) => (typeof v === 'string' ? v.trim() : '');
 const clean = (v, max) => stripControl(str(v)).slice(0, max);
@@ -176,9 +187,21 @@ async function event(c, shopId, row, actor, detail, { reason = '', note = '' } =
   );
 }
 
-/** دلیلِ «دیگر نمی‌شود» برای سفارشِ همین حالا؛ `null` = ویرایش‌پذیر. */
-function blockerOf(row, paidOn = false) {
-  if (!AMEND_STATUSES.includes(row.status)) return 'amend_not_allowed';
+/** ORD-13 — سفارشِ «در حال جمع‌آوری» که برگهٔ جمع‌آوری ندارد (درونِ تراکنشِ قفل‌شدهٔ [lockOrder]) */
+async function sheetlessIn(c, row) {
+  if (row.status !== SHEETLESS_STATUS) return false;
+  return !(await c.query('SELECT 1 FROM order_picks WHERE order_id=$1', [row.id])).rows[0];
+}
+
+/** ORD-13 — هر تغییر فقط کم یا برداشتن است */
+const reduceOnly = (changes) => changes.every((ch) => Number(ch.toQtyMilli) < Number(ch.fromQtyMilli));
+
+/**
+ * دلیلِ «دیگر نمی‌شود» برای سفارشِ همین حالا؛ `null` = ویرایش‌پذیر.
+ * [sheetless] (ORD-13، فقط ویرایشِ همین پرونده): «در حال جمع‌آوری» ِ بی برگه هم ویرایش‌پذیر است.
+ */
+function blockerOf(row, paidOn = false, sheetless = false) {
+  if (!AMEND_STATUSES.includes(row.status) && !(sheetless && row.status === SHEETLESS_STATUS)) return 'amend_not_allowed';
   if (row.payment_status !== 'unpaid' && !(paidOn && row.payment_status === 'paid')) return 'amend_paid_order';
   return null;
 }
@@ -191,6 +214,7 @@ function settlementOf(row, p) {
 }
 const BLOCK_MESSAGE = {
   amend_not_allowed: 'این سفارش دیگر ویرایش‌پذیر نیست (جمع‌آوری شروع شده یا پایان یافته)',
+  amend_reduce_only: 'سفارشِ در حالِ آماده‌سازی فقط کم یا برداشته می‌شود؛ افزودن پیش از شروع است',
   amend_paid_order: 'سفارشِ پرداخت‌شده این‌جا ویرایش نمی‌شود',
 };
 
@@ -274,7 +298,8 @@ async function propose(shopId, id, { key, body, actor }) {
         return { replayed: true, amendId: d.amendId };
       }
     }
-    const blocked = blockerOf(row, paidOn);
+    const sheetless = await sheetlessIn(c, row);
+    const blocked = blockerOf(row, paidOn, sheetless);
     if (blocked) {
       const err = conflict(BLOCK_MESSAGE[blocked], blocked);
       err.current = row.status;
@@ -285,6 +310,11 @@ async function propose(shopId, id, { key, body, actor }) {
     if (storefront && p.consent) throw badRequest('مشتریِ ویترین خودش با پیوندِ پیگیری می‌پذیرد', 'consent_via_link');
     if (!storefront && !p.consent) throw badRequest('رضایتِ مشتری (راه و توضیح) را ثبت کنید', 'consent_required');
     const pl = plan(row, lines, p.changes);
+    if (sheetless && !reduceOnly(pl.changes)) {
+      const err = conflict(BLOCK_MESSAGE.amend_reduce_only, 'amend_reduce_only');
+      err.current = row.status;
+      throw err;
+    }
     const amendId = `am_${ulid(at)}`;
     const common = { amendId, key, hash, reason: p.reason, ...amounts(pl) };
     if (storefront) {
@@ -340,7 +370,9 @@ async function decide(shopId, id, amendId, decision, actor) {
       await close(wanted);
       return { status: wanted, unchanged: false };
     }
-    if (blockerOf(row, paidOn) || fingerprint(row, lines) !== it.base) {
+    //  ORD-13: پیشنهادی که پیش از «شروع» افزایش داشت، پس از آن (بی برگه) هم «کهنه» است — فقط کم/برداشتن می‌گذرد
+    const sheetless = await sheetlessIn(c, row);
+    if (blockerOf(row, paidOn, sheetless) || (sheetless && !reduceOnly(it.changes)) || fingerprint(row, lines) !== it.base) {
       await close('stale');
       return { status: 'stale', unchanged: false, code: 'order_changed' };
     }
@@ -460,7 +492,7 @@ async function settlementsOf(shopId, w) {
 }
 
 module.exports = {
-  FLAG_KEY, PAID_FLAG_KEY, AMEND_STATUSES, REASONS, CONSENT_VIA, SETTLE_METHODS, TTL_MS, TYPES,
+  FLAG_KEY, PAID_FLAG_KEY, AMEND_STATUSES, SHEETLESS_STATUS, REASONS, CONSENT_VIA, SETTLE_METHODS, TTL_MS, TYPES,
   flagOf, paidFlagOf, configOf, parse, plan, ledgerOf, propose, decide, settle, settlementsOf, staffOf, withAmendment,
   //  CHK-21 (`order-add-items.js`) همین قفل، دروازه و رویداد را به کار می‌برد — نسخهٔ دوم نه
   lockOrder, event, blockerOf, BLOCK_MESSAGE,

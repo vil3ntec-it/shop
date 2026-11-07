@@ -327,7 +327,7 @@ object KeyMap {
     overrides = listOf("global.save"),
   )
   val SALE_PRICE_CHECK = KeyAction(
-    "sale.priceCheck", "sale", "قیمت‌پرسی بدون افزودن", KeyStatus.PLANNED,
+    "sale.priceCheck", "sale", "قیمت‌پرسی بدون افزودن", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.I, mod = true)),
     web = listOf(Chord(KeyName.I, alt = true)),
   )

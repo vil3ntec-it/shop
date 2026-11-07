@@ -60,6 +60,7 @@ router.get('/config', async (req, res) => {
   const handoverSince = caps.includes(ledger.SALE_CAP)
     ? await ledger.claimFloor(req.shopId, req.user.id)
     : await ledger.sinceOf(req.shopId);
+  const pickingOn = await require('../lib/order-picking').flagOf(req.shopId);
   res.json({
     ...st,
     //  «چرا سفارش نمی‌رسد؟» — هر دروازهٔ میانِ ویترین و این برنامه با کد و «چه کسی درستش می‌کند» (lib/order-arrival)
@@ -67,7 +68,7 @@ router.get('/config', async (req, res) => {
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
     refundLedger: await refunds.flagOf(req.shopId),
     //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
-    picking: await require('../lib/order-picking').flagOf(req.shopId),
+    picking: pickingOn,
     //  «با اسکناسِ … پرداخت می‌کنم» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24) — پیش‌فرض خاموش
     deliveryPrefs: await require('../lib/delivery-prefs').flagOn(req.shopId),
     //  ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی و نامِ «کالای مشخص» (CHK-15) — پیش‌فرض خاموش
@@ -82,7 +83,7 @@ router.get('/config', async (req, res) => {
     //  ORD-14 ویرایشِ سفارش (پرچمِ `shop.orders.amend`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
     //  + سفارشِ پرداخت‌شده (پرچمِ جدای `shop.orders.amend_paid`): `paid` و روشِ تسویه؛ خاموش ⇒ همان شیءِ پیشین
     ...((await amend.flagOf(req.shopId))
-      ? { amend: { ...amend.configOf(), ...((await amend.paidFlagOf(req.shopId)) ? { paid: true, settleMethods: [...amend.SETTLE_METHODS] } : {}) } }
+      ? { amend: { ...amend.configOf(pickingOn), ...((await amend.paidFlagOf(req.shopId)) ? { paid: true, settleMethods: [...amend.SETTLE_METHODS] } : {}) } }
       : {}),
     //  ORD-19 کارِ گروهی (پرچمِ `shop.orders.bulk`) — خاموش ⇒ کلید نیست و برنامه انتخابِ چندتایی نمی‌سازد
     ...((await require('../lib/order-bulk').flagOf(req.shopId)) ? { bulk: true } : {}),
@@ -393,7 +394,7 @@ router.post('/:id/amendments', needFlag, requirePermission('orders.manage'), nee
   try {
     out = await amend.propose(req.shopId, req.params.id, { key, body: req.body, actor: actorOf(req) });
   } catch (err) {
-    if (err.code === 'amend_not_allowed' || err.code === 'amend_paid_order') {
+    if (err.code === 'amend_not_allowed' || err.code === 'amend_paid_order' || err.code === 'amend_reduce_only') {
       return res.status(409).json({ error: { code: err.code, message: err.message, current: err.current } });
     }
     throw err;
