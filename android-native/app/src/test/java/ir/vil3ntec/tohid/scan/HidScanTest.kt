@@ -110,4 +110,18 @@ class HidScanTest {
     val (_, code) = scan("ABC-9911", gapMs = 8)
     assertEquals("ABC-9911", code)
   }
+
+  @Test
+  fun `بارکدخوانِ لرزان - پژواکِ همان کد به سبد نمی‌رود و بی پرچم همان امروز`() {
+    fun twice(cfg: ir.vil3ntec.tohid.core.hw.ScanConfig): List<String?> {
+      val hid = HidScan { cfg }
+      var t = 1_000L
+      return List(2) {
+        for (ch in "6260100120014") { hid.feed(ch, t); t += 8 }
+        hid.submit(t).also { t += 150 }
+      }
+    }
+    assertEquals(listOf("6260100120014", null), twice(ir.vil3ntec.tohid.core.hw.ScanConfig(steady = true)))
+    assertEquals(listOf("6260100120014", "6260100120014"), twice(ir.vil3ntec.tohid.core.hw.ScanConfig()))
+  }
 }

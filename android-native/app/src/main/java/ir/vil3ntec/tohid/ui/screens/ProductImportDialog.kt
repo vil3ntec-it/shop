@@ -27,6 +27,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrCatalogPages
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.product.ProductImportPlan.Status
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.ProductImport
@@ -75,7 +79,7 @@ fun ProductImportDialog(
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("ورود کالا از فایل", color = c.text) },
+    title = { Text(StrStock.importTitle, color = c.text) },
     text = {
       Column(Modifier.fillMaxWidth().heightIn(max = 460.dp).verticalScroll(rememberScrollState())) {
         Text(file.name, style = MaterialTheme.typography.labelSmall, color = c.muted)
@@ -83,28 +87,28 @@ fun ProductImportDialog(
         plan.problem?.let { Line(it, c.danger); return@Column }
 
         previous?.let { p ->
-          Line("همین داده ${formatDate(p.date)} وارد شده بود — آنچه ثبت شده دوباره ثبت نمی‌شود.", c.warning)
+          Line(StrCatalogPages.alreadyImported(formatDate(p.date)), c.warning)
           Spacer(Modifier.height(4.dp))
         }
         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-          StatusPill("${plain(fresh)} تازه", PillTone.SUCCESS)
-          if (updates > 0) StatusPill("${plain(updates)} به‌روز", PillTone.INFO)
-          if (kept > 0) StatusPill("${plain(kept)} در دکان، دست نمی‌خورد", PillTone.WARNING)
+          StatusPill(StrCatalogPages.freshN(plain(fresh)), PillTone.SUCCESS)
+          if (updates > 0) StatusPill(StrCatalogPages.updatedN(plain(updates)), PillTone.INFO)
+          if (kept > 0) StatusPill(StrCatalogPages.keptN(plain(kept)), PillTone.WARNING)
           val same = plan.count(Status.SAME)
-          if (same > 0) StatusPill("${plain(same)} بی تغییر", PillTone.NEUTRAL)
-          if (errors.isNotEmpty()) StatusPill("${plain(errors.size)} رد", PillTone.DANGER)
+          if (same > 0) StatusPill(StrCatalogPages.sameN(plain(same)), PillTone.NEUTRAL)
+          if (errors.isNotEmpty()) StatusPill(StrCatalogPages.rejectedN(plain(errors.size)), PillTone.DANGER)
         }
         if (plan.ignored.isNotEmpty()) {
           Spacer(Modifier.height(4.dp))
-          Line("ستون‌های نادیده: ${plan.ignored.joinToString("، ")}", c.muted)
+          Line(StrCatalogPages.ignoredCols(plan.ignored.joinToString("، ")), c.muted)
         }
 
         if (!staff && (kept > 0 || updates > 0)) {
           Spacer(Modifier.height(6.dp))
-          Tick(update, "کالاهای موجود را هم به‌روز کن") { update = it }
+          Tick(update, StrCatalogPages.alsoUpdate) { update = it }
           Line(
-            "فقط قیمت، دسته، حداقلِ موجودی و بارکدِ تازه؛ خانهٔ خالی، واحد و نام دست نمی‌خورند و چیزی پاک نمی‌شود. " +
-              "هر تغییرِ قیمت با نامِ شما و نامِ فایل در سابقه می‌ماند.",
+            StrCatalogPages.updateNote1 +
+              StrCatalogPages.updateNote2,
             c.muted,
           )
         }
@@ -113,43 +117,43 @@ fun ProductImportDialog(
         if (changed.isNotEmpty()) {
           Spacer(Modifier.height(6.dp))
           Line(
-            if (updates > 0) "تغییرهای کالاهای موجود:" else "در دکان هست و فایل چیزِ دیگری می‌گوید — دست نمی‌خورد:",
+            if (updates > 0) StrCatalogPages.existingChanges else StrCatalogPages.conflictKept,
             if (updates > 0) c.text else c.muted,
           )
           changed.take(50).forEach { r ->
             Line(
-              "ردیف ${plain(r.line)} «${r.name}»: ${r.changes.joinToString("، ") { ProductImport.describe(it) }}",
+              StrCatalogPages.rowChanges(plain(r.line), r.name, r.changes.joinToString("، ") { ProductImport.describe(it) }),
               if (updates > 0) c.info else c.muted,
             )
             r.notes.forEach { Line(it, c.warning) }
           }
           More(changed.size, 50)
-          if (updates > 0) Tick(ack, "تغییرها را دیدم؛ همین‌ها را بگذار") { ack = it }
+          if (updates > 0) Tick(ack, StrCatalogPages.sawChanges) { ack = it }
         }
         //  واحدِ متفاوتِ کالایی که جز آن تغییری ندارد هم گفته شود
         plan.rows.filter { it.status == Status.SAME && it.notes.isNotEmpty() }.take(20).forEach { r ->
-          Line("ردیف ${plain(r.line)} «${r.name}»: ${r.notes.joinToString("، ")}", c.warning)
+          Line(StrCatalogPages.rowChanges(plain(r.line), r.name, r.notes.joinToString("، ")), c.warning)
         }
 
         if (errors.isNotEmpty()) {
           Spacer(Modifier.height(6.dp))
-          Line("${plain(errors.size)} ردیف ثبت نمی‌شود:", c.text)
+          Line(StrCatalogPages.rowsNotSaved(plain(errors.size)), c.text)
           errors.take(50).forEach { r ->
-            Line("ردیف ${plain(r.line)}${if (r.name.isNotBlank()) " «${r.name.take(60)}»" else ""}: ${r.reason}", c.danger)
+            Line(StrCatalogPages.rowReason(plain(r.line), if (r.name.isNotBlank()) " «${r.name.take(60)}»" else "", r.reason), c.danger)
           }
           More(errors.size, 50)
           TextButton(onClick = {
-            val base = file.name.substringBeforeLast('.').ifBlank { "کالا" }
-            onErrorReport(ProductImport.errorWorkbook(plan), "$base - ردیف‌های رد.xlsx")
-          }) { Text("دریافتِ فایلِ ردیف‌های رد (برای اصلاح و ورودِ دوباره)") }
+            val base = file.name.substringBeforeLast('.').ifBlank { "کالا" } // داده: نامِ پروندهٔ خروجیِ ردیف‌های رد
+            onErrorReport(ProductImport.errorWorkbook(plan), "$base - ردیف‌های رد.xlsx") // داده: نامِ پروندهٔ خروجیِ ردیف‌های رد
+          }) { Text(StrCatalogPages.rejectedFile) }
         }
 
         //  PRD-19: ثبت می‌شوند، ولی شاید همان کالای دیگرند
         if (plan.similar.isNotEmpty()) {
           Spacer(Modifier.height(6.dp))
-          Line("${plain(plan.similar.size)} ردیف ثبت می‌شود ولی نامش مشابه است — اگر همان کالاست، از فایل بردارید:", c.warning)
+          Line(StrCatalogPages.similarRows(plain(plan.similar.size)), c.warning)
           plan.similar.take(50).forEach { sm ->
-            Line("ردیف ${plain(sm.line)} «${sm.name}» ≈ «${sm.other}»${if (sm.inFile) " (در همین فایل)" else ""}", c.warning)
+            Line(StrCatalogPages.similarRow(plain(sm.line), sm.name, sm.other, if (sm.inFile) StrCatalogPages.inThisFile else ""), c.warning)
           }
         }
       }
@@ -168,14 +172,14 @@ fun ProductImportDialog(
       ) {
         Text(
           when {
-            updates > 0 && fresh > 0 -> "ثبت ${plain(fresh)} کالا و به‌روزرسانیِ ${plain(updates)}"
-            updates > 0 -> "به‌روزرسانیِ ${plain(updates)} کالا"
-            else -> "ثبت ${plain(fresh)} کالا"
+            updates > 0 && fresh > 0 -> StrCatalogPages.saveAndUpdate(plain(fresh), plain(updates))
+            updates > 0 -> StrCatalogPages.updateN(plain(updates))
+            else -> StrStock.importSave(plain(fresh))
           }
         )
       }
     },
-    dismissButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+    dismissButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
 
@@ -186,10 +190,10 @@ fun ProductImportHistoryDialog(entries: List<AuditEntry>, onDismiss: () -> Unit)
   AlertDialog(
     onDismissRequest = onDismiss,
     containerColor = c.surfaceSolid,
-    title = { Text("سابقهٔ ورود از فایل", color = c.text) },
+    title = { Text(StrReach.importHistory, color = c.text) },
     text = {
       Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
-        if (entries.isEmpty()) Line("هنوز کالایی از فایل وارد نشده", c.muted)
+        if (entries.isEmpty()) Line(StrCatalogPages.noImportYet, c.muted)
         entries.take(200).forEach { e ->
           Text(
             formatDate(e.date) + (e.by?.let { " · $it" } ?: ""),
@@ -201,7 +205,7 @@ fun ProductImportHistoryDialog(entries: List<AuditEntry>, onDismiss: () -> Unit)
         }
       }
     },
-    confirmButton = { TextButton(onClick = onDismiss) { Text("بستن") } },
+    confirmButton = { TextButton(onClick = onDismiss) { Text(Str.close) } },
   )
 }
 
@@ -212,7 +216,7 @@ private fun Line(text: String, color: Color) {
 
 @Composable
 private fun More(total: Int, shown: Int) {
-  if (total > shown) Line("و ${plain(total - shown)} ردیفِ دیگر", Shop.colors.muted)
+  if (total > shown) Line(StrStock.moreSkipped(plain(total - shown)), Shop.colors.muted)
 }
 
 @Composable

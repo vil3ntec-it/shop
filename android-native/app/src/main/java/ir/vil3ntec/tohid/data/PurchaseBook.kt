@@ -52,7 +52,15 @@ object PurchaseBook {
     userId: String? = null,
     /** سررسیدِ پرداختِ کلِ فاکتور (`yyyy-MM-dd`، PUR-07)؛ `null` = ندارد */
     dueDate: String? = null,
+    /**
+     *  کلیدِ یکتای همین فاکتور (فرم یک بار می‌سازد، PUR-05): شناسهٔ هر ردیف و همهٔ اثرهایش از آن ساخته می‌شود
+     *  (`کلید-ردیف-n`)، پس دو کلیک یا F9 ِ پشتِ‌سرِهم یک فاکتور است — با دفترِ کهنه همان شناسه‌ها (ادغام یکی‌شان
+     *  می‌کند)، با دفترِ تازه رد ([ALREADY_RECORDED])؛ نه موجودیِ دوم، نه بدهیِ دوم. `null` = رفتارِ پیشین.
+     */
+    key: String? = null,
   ): Result {
+    val k = key?.trim()?.ifEmpty { null }
+    if (k != null && d.purchases.any { it.id.startsWith("$k-") }) return Result.Failed(ALREADY_RECORDED)
     if (d.suppliers.none { it.id == supplierId }) return Result.Failed("تأمین‌کننده را انتخاب کنید")
     if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed("هزینهٔ جانبی درست نیست")
     val due = dueDate?.trim()?.ifEmpty { null }
@@ -74,6 +82,7 @@ object PurchaseBook {
       val lt = lineTotal(l)
       val pay = minOf(left, lt)
       left -= pay
+      val lineIds = if (k == null) newId else keyedIds(k, i + 1)
       val r = LedgerEngine.addPurchase(
         cur,
         LedgerEngine.PurchaseDraft(
@@ -83,7 +92,7 @@ object PurchaseBook {
           expiryDate = l.expiryDate,
           dueDate = dueDate,
         ),
-        today, now, newId,
+        today, now, lineIds,
       )
       when (r) {
         is LedgerEngine.Result.Failed -> return Result.Failed("ردیفِ ${i + 1}: ${r.message}")
@@ -137,11 +146,19 @@ object PurchaseBook {
     val dueDate: String? get() = lines.mapNotNull { it.dueDate?.takeIf { d -> d.isNotBlank() } }.minOrNull()
   }
 
-  /** همهٔ فاکتورهای خرید، تازه‌ترین بالا */
+  /**
+   *  همهٔ فاکتورهای خرید، تازه‌ترین بالا. هر فاکتور = (شماره، تأمین‌کننده): دو دستگاهِ بی همگام‌سازی هر کدام [nextNo]
+   *  را روی دفترِ خودش می‌گیرد، پس پس از همگام‌سازی یک شماره ممکن است مالِ دو تأمین‌کننده باشد — هرگز یکی نمی‌شوند
+   *  (وگرنه یادآورِ سررسید بدهیِ یکی را به نامِ دیگری می‌گذاشت). کلید «#n» است و فقط وقتی همان شماره مالِ چند
+   *  تأمین‌کننده است «#n·تأمین‌کننده» — از کلِ دفتر، پس کلیدِ فهرستِ یک تأمین‌کننده همان کلیدِ فهرستِ همه است.
+   */
   fun invoices(d: ShopData, supplierId: String? = null): List<Invoice> {
+    val shared = d.purchases.filter { it.invoiceNo > 0 }.groupBy { it.invoiceNo }
+      .filterValues { ls -> ls.mapTo(HashSet()) { it.supplierId }.size > 1 }.keys
     val list = d.purchases.filter { supplierId == null || it.supplierId == supplierId }
-    val grouped = list.filter { it.invoiceNo > 0 }.groupBy { it.invoiceNo }.map { (no, ls) ->
-      Invoice("#$no", no, ls.first().supplierId, ls.minOf { it.date }, ls.sortedBy { it.createdAt })
+    val grouped = list.filter { it.invoiceNo > 0 }.groupBy { it.invoiceNo to it.supplierId }.map { (k, ls) ->
+      val (no, sid) = k
+      Invoice(if (no in shared) "#$no·$sid" else "#$no", no, sid, ls.minOf { it.date }, ls.sortedBy { it.createdAt })
     }
     val singles = list.filter { it.invoiceNo <= 0 }.map { Invoice(it.id, 0, it.supplierId, it.date, listOf(it)) }
     return (grouped + singles).sortedWith(compareByDescending<Invoice> { it.date }.thenByDescending { it.createdAt })
@@ -308,6 +325,29 @@ object PurchaseBook {
   }
 
   const val ALREADY_RETURNED = "همین برگشت پیش‌تر ثبت شده است"
+
+  /**
+   *  شناسه‌های ردیفِ [line] ِ فاکتوری با کلیدِ [key] (`کلید-ردیف-n`، به ترتیبِ ساختنِ `LedgerEngine.addPurchase`) — همان
+   *  کلید همیشه همان شناسه‌ها؛ فرمِ تک‌ردیفهٔ گوشی هم با همین به `addPurchase` می‌دهد تا دو لمس یک خرید باشد.
+   */
+  fun keyedIds(key: String, line: Int = 1): () -> String {
+    var n = 0
+    return { "$key-$line-${n++}" }
+  }
+
+  /**
+   *  PUR-05: ورودِ انبارِ یک ردیفِ خرید (فاکتورِ خرید، رسیدِ سفارشِ خرید یا سندِ کسرِ برگشت) — موجودی و بدهیِ تأمین‌کننده
+   *  از همان یک سند آمده‌اند، پس `WarehouseEngine` آن را جدا حذف نمی‌کند (بی [productId]/[units]) و کالا یا مقدارش را عوض
+   *  نمی‌کند (وب و برنامهٔ پیشین می‌کردند و بدهی بی کالا می‌ماند). اصلاح: «برگشت به تأمین‌کننده» که هر دو را با هم کم می‌کند.
+   */
+  fun fixedEntry(d: ShopData, entry: WarehouseEntry, productId: String? = null, units: Double? = null): Boolean =
+    entry.purchaseId?.let { pid -> d.purchases.any { it.id == pid } } == true &&
+      (productId == null || productId != entry.productId || units != entry.units)
+
+  const val PURCHASE_ENTRY = "این ورود از فاکتورِ خرید آمده و جدا حذف یا عوض نمی‌شود — برای اصلاح «برگشت به تأمین‌کننده» بزنید تا موجودی و بدهی با هم کم شوند"
+
+  /** همان کلیدِ فاکتورِ خرید دوباره (دو کلیک، PUR-05) — فاکتور یک بار ثبت شده است */
+  const val ALREADY_RECORDED = "همین فاکتورِ خرید پیش‌تر ثبت شده است"
 
   /** سررسید پیش از تاریخِ فاکتور معنی ندارد (PUR-07) */
   const val DUE_BEFORE_DATE = "سررسید نباید پیش از تاریخِ خرید باشد"

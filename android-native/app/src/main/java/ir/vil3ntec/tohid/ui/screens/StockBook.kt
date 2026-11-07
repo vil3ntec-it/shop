@@ -482,7 +482,11 @@ private fun CountTab(
 ) {
   val context = LocalContext.current
   var draft by remember { mutableStateOf(StockCountDraftStore.load(context)) }
-  fun keep(next: StockActions.CountDraft?) { draft = next; StockCountDraftStore.save(context, next) }
+  //  INV-10: هر عددِ تازه لحظهٔ خودش را می‌گیرد (`StockActions.stamp`) تا فروشِ وسطِ شمارش دو بار کم نشود
+  fun keep(next: StockActions.CountDraft?) {
+    val n = next?.let { StockActions.stamp(draft, it, ir.vil3ntec.tohid.data.ReportBridge.nowMs()) }
+    draft = n; StockCountDraftStore.save(context, n)
+  }
   var query by rememberSaveable { mutableStateOf("") }
   var cat by rememberSaveable { mutableStateOf<String?>(null) }
   var confirm by remember { mutableStateOf<String?>(null) }
@@ -541,7 +545,7 @@ private fun CountTab(
       Text(StrStockPages.uncountedNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.warning)
     }
     items(list, key = { it.id }) { p ->
-      val sys = dr.snapshot[p.id] ?: StockLedger.productView(v, p.id).qtyMilli
+      val sys = byLine[p.id]?.systemMilli ?: dr.snapshot[p.id] ?: StockLedger.productView(v, p.id).qtyMilli
       val line = byLine[p.id]
       val diff = line?.diffMilli
       Row(

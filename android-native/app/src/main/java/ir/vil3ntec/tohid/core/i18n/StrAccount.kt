@@ -293,6 +293,9 @@ object StrAccount {
   fun lockedNeedPlan(label: Any): String = t("«${asIs(label)}» با اشتراک باز می‌شود", "“$label” opens with a subscription", "«$label» په ګډون پرانیستل کېږي")
   val lockedAccountBody: String get() = t("ساختنِ حساب مجانی است و هفت روز آزمایشی دارد — با آن همه‌چیز باز می‌شود. بقیهٔ برنامه هم بدونِ حساب باز است: انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری.", "Creating an account is free and comes with a seven-day trial that opens everything. The rest of the app works without an account: warehouse, expenses, purchases, reports and backups.", "حساب جوړول وړیا دي او اوه ورځې ازمایښت لري — ټول شیان پرانیزي. پاتې اپ بې حسابه هم پرانیستی دی: ګدام، لګښتونه، پېرود، راپورونه او بیک اپ.")
   val lockedPlanBody: String get() = t("بقیهٔ برنامه — انبار، مصارف، خرید، گزارش‌ها و پشتیبان‌گیری — باز است و همیشه باز می‌ماند.", "The rest of the app — warehouse, expenses, purchases, reports and backups — is open and always stays open.", "پاتې اپ — ګدام، لګښتونه، پېرود، راپورونه او بیک اپ — پرانیستی دی او تل پرانیستی پاتې کېږي.")
+  //  O-09: اشتراک هست ولی جای دستگاه نیست (`device_limit`) — راه «دستگاه‌ها» است، نه خریدِ اشتراک
+  fun lockedDeviceFull(label: Any): String = t("«${asIs(label)}» روی این دستگاه بسته است", "“$label” is closed on this device", "«$label» په دې وسیله تړل شوی")
+  val lockedDeviceBody: String get() = t("اشتراکِ دکان برای همهٔ دستگاه‌هایش پر است. صاحبِ دکان یک دستگاهِ کهنه را برمی‌دارد تا این‌جا باز شود؛ بقیهٔ برنامه همیشه باز است.", "The shop's plan has no free device slot. The shop owner removes an old device to open it here; the rest of the app always stays open.", "د دوکان ګډون د ټولو وسایلو لپاره ډک دی. د دوکان خاوند یوه زړه وسیله لرې کوي څو دلته پرانیستل شي؛ پاتې اپ تل پرانیستی دی.")
 
   // پشتیبانی
   val supportSubtitle: String get() = t("معمولاً همان روز جواب می‌گیرید", "You usually get an answer the same day", "معمولاً همدا ورځ ځواب ترلاسه کوئ")

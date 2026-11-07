@@ -545,4 +545,5 @@ object StrSale {
   val unpinFirst: String get() = t("برداشتن از صفحهٔ اولِ این صندوق", "Unpin from this till's first page", "د دې صندوق له لومړي مخ لرې کول")
   fun pinnedFirst(name: String): String = t("«${asIs(name)}» سرِ کاشی‌های این صندوق نشست", "\"$name\" is now first on this till", "«$name» د دې صندوق د توکو سر ته ورغی")
   fun unpinnedFirst(name: String): String = t("«${asIs(name)}» از سرِ کاشی‌ها برداشته شد", "\"$name\" is no longer pinned", "«$name» له سر څخه لرې شو")
+  val pinsFull: String get() = t("صفحهٔ اولِ این صندوق پُر است؛ نخست یکی را بردارید", "This till's first page is full; unpin one first", "د دې صندوق لومړی مخ ډک دی؛ لومړی یو لرې کړئ")
 }

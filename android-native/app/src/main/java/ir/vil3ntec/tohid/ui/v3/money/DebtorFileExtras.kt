@@ -24,17 +24,24 @@ import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton
  *  - «کارتِ مشتری» (CRM-16، `CustomerCardButton` — همان دکمهٔ پروندهٔ کامپیوتر، پشتِ `CustomerCardPref`؛ مشتریِ ادغام‌شده نه)؛
  *  - «دادنِ اعتبارِ هدیه» (PRM-15، `StoreCreditGrantButton`، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ)؛
  *  - سفارش‌های اینترنتیِ باز یا لغوشده (CRM-07، `CustomerOnlineOrdersPanel` — همان بخشِ کامپیوتر، فقط با بخشِ سفارشِ
- *    روشن و اجازهٔ «تماس»).
+ *    روشن و اجازهٔ «تماس»؛ هر ردیف همان سفارش را باز می‌کند).
  *  هر کدام خاموش یا بی ردیف ⇒ هیچ چیز کشیده نمی‌شود.
  */
 @Composable
-internal fun DebtorFileExtras(d: ShopData, store: ShopStore, debtorId: String, toast: (String) -> Unit) {
+internal fun DebtorFileExtras(
+  d: ShopData,
+  store: ShopStore,
+  debtorId: String,
+  /** CRM-07: ردیفِ سفارش ⇐ همان سفارش (`orders/{id}`)؛ null ⇒ ردیف فقط خواندنی */
+  onOpenOrder: ((String) -> Unit)? = null,
+  toast: (String) -> Unit,
+) {
   Column(Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
     LayawayCustomerPanel(d, store, debtorId, toast)
     LoyaltyHistory(d, debtorId, Modifier.padding(top = 12.dp), store, toast)
     CrmPricingButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     CustomerCardButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     StoreCreditGrantButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
-    CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp))
+    CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp), onOpen = onOpenOrder)
   }
 }

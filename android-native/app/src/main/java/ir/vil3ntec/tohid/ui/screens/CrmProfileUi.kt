@@ -32,6 +32,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrMarketPages
+import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.CustomerProfileForm
@@ -57,12 +61,12 @@ import kotlinx.coroutines.launch
 @Composable
 internal fun CrmProfileFields(phone2: String, onPhone2: (String) -> Unit, tags: String, onTags: (String) -> Unit) {
   OutlinedTextField(
-    phone2, onPhone2, label = { Text("شمارهٔ دوم (اختیاری)") },
+    phone2, onPhone2, label = { Text(StrMoney.phone2Optional) },
     singleLine = true, modifier = Modifier.fillMaxWidth(),
   )
   Spacer(Modifier.height(10.dp))
   OutlinedTextField(
-    tags, onTags, label = { Text("برچسب‌ها (با «،» جدا؛ اختیاری)") },
+    tags, onTags, label = { Text(StrMarketPages.tagsField) },
     singleLine = true, modifier = Modifier.fillMaxWidth(),
   )
 }
@@ -76,7 +80,7 @@ internal fun CrmTagChips(d: ShopData, selected: String?, onSelect: (String?) -> 
     modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
     horizontalArrangement = Arrangement.spacedBy(6.dp),
   ) {
-    FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text("همهٔ برچسب‌ها") })
+    FilterChip(selected = selected == null, onClick = { onSelect(null) }, label = { Text(StrMoney.allTags) })
     tags.forEach { (tag, count) ->
       FilterChip(
         selected = selected == tag,
@@ -92,7 +96,7 @@ internal fun CrmTagChips(d: ShopData, selected: String?, onSelect: (String?) -> 
 internal fun CrmListTools(d: ShopData, tag: String?, onTag: (String?) -> Unit, onMerge: () -> Unit) {
   CrmTagChips(d, tag, onTag)
   val dupes = remember(d) { CustomerMerge.duplicates(d).size }
-  if (dupes > 0) TextButton(onClick = onMerge) { Text("ادغامِ مشتریانِ تکراری ($dupes)") }
+  if (dupes > 0) TextButton(onClick = onMerge) { Text(StrMarketPages.mergeDupesN(dupes)) }
   Spacer(Modifier.height(6.dp))
 }
 
@@ -115,13 +119,13 @@ internal fun CrmProfileDialog(debtor: Debtor, onDismiss: () -> Unit, onSave: (ph
     DialogEntry {
       Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).verticalScroll(rememberScrollState())) {
-          Text("پروندهٔ «${debtor.name}»", style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
+          Text(StrMarketPages.profileOf(debtor.name), style = MaterialTheme.typography.titleMedium, color = Shop.colors.text)
           Spacer(Modifier.height(14.dp))
           CrmProfileFields(phone2, { phone2 = it }, tags, { tags = it })
           Spacer(Modifier.height(18.dp))
           Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text("انصراف") }
-            Button(onClick = { onSave(phone2, tags) }, modifier = Modifier.weight(1f)) { Text("ذخیره") }
+            OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(Str.cancel) }
+            Button(onClick = { onSave(phone2, tags) }, modifier = Modifier.weight(1f)) { Text(StrKit.save) }
           }
         }
       }
@@ -148,38 +152,38 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
     DialogEntry {
       Surface(color = c.surfaceSolid, shape = RoundedCornerShape(Radius.lg), modifier = Modifier.fillMaxWidth()) {
         Column(Modifier.padding(18.dp).heightIn(max = 620.dp).verticalScroll(rememberScrollState())) {
-          Text("ادغامِ مشتریانِ تکراری", style = MaterialTheme.typography.titleMedium, color = c.text)
+          Text(StrMarketPages.mergeDupes, style = MaterialTheme.typography.titleMedium, color = c.text)
           Spacer(Modifier.height(10.dp))
           val p = pending
           when {
             p != null -> {
-              Text("«${p.drop.name}» در «${p.keep.name}» ادغام شود؟", style = MaterialTheme.typography.bodyLarge, color = c.text)
+              Text(StrMarketPages.mergeAsk(p.drop.name, p.keep.name), style = MaterialTheme.typography.bodyLarge, color = c.text)
               Spacer(Modifier.height(8.dp))
               Text(
-                "${p.transactions} ردیفِ حساب و ${p.sales} فاکتور به «${p.keep.name}» می‌رود و ماندهٔ او ${money(p.balanceAfter)} ؋ می‌شود. " +
-                  "هیچ ردیفی پاک نمی‌شود؛ «${p.drop.name}» فقط از فهرست‌ها بیرون می‌رود.",
+                StrMarketPages.mergeMoves(p.transactions, p.sales, p.keep.name, money(p.balanceAfter)) +
+                  StrMarketPages.mergeKeepsRows(p.drop.name),
                 style = MaterialTheme.typography.bodySmall, color = c.muted,
               )
               Spacer(Modifier.height(14.dp))
               Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedButton(onClick = { pending = null }, enabled = !busy, modifier = Modifier.weight(1f)) { Text("برگشت") }
+                OutlinedButton(onClick = { pending = null }, enabled = !busy, modifier = Modifier.weight(1f)) { Text(Str.back) }
                 Button(
                   enabled = !busy,
                   onClick = {
                     busy = true
                     scope.launch {
                       when (val r = store.mergeCustomers(p.keep.id, p.drop.id)) {
-                        is CustomerMerge.Result.Ok -> { toast("«${p.drop.name}» در «${p.keep.name}» ادغام شد"); pending = null }
+                        is CustomerMerge.Result.Ok -> { toast(StrMoney.merged(p.drop.name, p.keep.name)); pending = null }
                         is CustomerMerge.Result.Failed -> toast(r.message)
                       }
                       busy = false
                     }
                   },
                   modifier = Modifier.weight(1f),
-                ) { Text("ادغام") }
+                ) { Text(StrMoney.mergeAction) }
               }
             }
-            groups.isEmpty() -> Text("مشتریِ تکراری پیدا نشد.", style = MaterialTheme.typography.bodyMedium, color = c.muted)
+            groups.isEmpty() -> Text(StrMarketPages.noDupes, style = MaterialTheme.typography.bodyMedium, color = c.muted)
             else -> {
               blocked?.let {
                 Text(it, style = MaterialTheme.typography.bodySmall, color = c.muted)
@@ -188,7 +192,7 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
               groups.forEachIndexed { gi, g ->
                 if (gi > 0) HorizontalDivider(color = c.border, modifier = Modifier.padding(vertical = 8.dp))
                 Text(
-                  if (g.strong) "شمارهٔ یکسان" else "نامِ یکسان — شاید دو نفرِ جدا",
+                  if (g.strong) StrMoney.mergeSamePhone else StrMoney.mergeSameName,
                   style = MaterialTheme.typography.labelLarge, color = c.muted,
                 )
                 g.members.forEach { m ->
@@ -199,10 +203,10 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
                       if (phones.isNotBlank()) Text(phones, style = MaterialTheme.typography.labelSmall, color = c.muted)
                     }
                     when {
-                      m.id == g.keep.id -> Text("ماندگار", style = MaterialTheme.typography.labelMedium, color = c.muted)
+                      m.id == g.keep.id -> Text(StrMoney.mergeKeep, style = MaterialTheme.typography.labelMedium, color = c.muted)
                       blocked == null -> TextButton(onClick = {
                         pending = (CustomerMerge.preview(d, g.keep.id, m.id) as? CustomerMerge.Result.Ok)?.preview
-                      }) { Text("ادغام در ماندگار") }
+                      }) { Text(StrMarketPages.mergeIntoKept) }
                     }
                   }
                 }
@@ -211,7 +215,7 @@ internal fun CustomerMergeDialog(d: ShopData, store: ShopStore, onDismiss: () ->
           }
           Spacer(Modifier.height(12.dp))
           Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-            TextButton(onClick = onDismiss, enabled = !busy) { Text("بستن") }
+            TextButton(onClick = onDismiss, enabled = !busy) { Text(Str.close) }
           }
         }
       }
