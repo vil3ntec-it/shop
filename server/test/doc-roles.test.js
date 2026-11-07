@@ -37,6 +37,8 @@ const device = {
   places: (role) => role !== 'staff',
   //  LoyaltyPoints.adjust: `may` = صاحب/مدیر (PRM-13، #815)
   manage: (role) => role === 'owner' || role === 'manager',
+  //  INV-11 `StockTransferFlag.canMove` = `permissions.move` ِ `GET /api/shop/catalog/config` (همان `can(role, 'stock.move')` ِ سرور)
+  move: (role) => require('../src/lib/permissions').can(role, 'stock.move'),
   //  بی سنجشِ نقش: ساختِ امانی/سفارش، «آماده»، پیش‌پرداخت و قسط
   open: () => true,
 };
@@ -81,6 +83,10 @@ const CASES = {
   stock_place: ['auditLog', () => ({ type: 'stock_place', refId: 'قفسهٔ ۲', reason: 'add' }), 'places'],
   stock_repack: ['auditLog', (id) => ({ type: 'stock_repack', refId: id, refIds: ['warehouseEntries/w1'] }), 'places'],
   stock_assembly: ['auditLog', (id) => ({ type: 'stock_assembly', refId: id, refIds: ['warehouseEntries/w2'] }), 'places'],
+  stock_transfer: ['auditLog', () => ({
+    type: 'stock_transfer', notes: 'انتقال: قفسه ⇐ انبار',
+    xfer: { v: 1, step: 'send', from: 'shop_floor', to: 'warehouse', lines: [{ productId: 'p-1', qtyMilli: 2000 }], note: '' },
+  }), 'move'],
   'pay_status:confirmed': ['auditLog', payRow('pending', 'confirmed'), 'sell'],
   'pay_status:flag': ['auditLog', payRow('confirmed', 'needs_review'), 'manage'],
   'pay_status:fail': ['auditLog', payRow('confirmed', 'failed'), 'manage'],
@@ -154,6 +160,8 @@ test('شکل: نمونه‌های بدِ هر خانواده BAD، نوع‌ها
   bad('auditLog', { ...base('layaway_status:delivered'), layaway: { to: 'open' } });
   bad('auditLog', { ...base('special_order_status:ready'), specialOrder: { to: 'lost' } });
   bad('auditLog', { ...base('stock_place'), reason: 'rename' });
+  bad('auditLog', { ...base('stock_transfer'), xfer: { step: 'move' } });
+  bad('auditLog', { ...base('stock_transfer'), xfer: undefined });
   for (const k of ['layaway_deposit', 'layaway_refund', 'special_order_deposit']) {
     bad('transactions', { ...base(k), amountMinor: 0 });
     bad('transactions', { ...base(k), type: base(k).type === 'give' ? 'receive' : 'give' });
@@ -282,6 +290,10 @@ test('روشن: فروش، محل و برگشت فقط برای نقشی که ب
   await expectEach('picker', ofGate('sell', 'back', 'cancel', 'void').filter((n) => AUDIT_NAMES.includes(n)), 'no-p', 'doc_not_allowed');
   //  شاگرد محل و بسته‌بندی ندارد (`StockPlacesEntry`)
   await expectEach('staff', ofGate('places'), 'no-s', 'doc_not_allowed');
+  //  INV-11: گامِ انتقال فقط با `stock.move` — شاگرد آری، صندوق‌دار و جمع‌آور نه
+  await expectEach('staff', ofGate('move'), 'ok-sm', 'applied');
+  await expectEach('cashier', ofGate('move'), 'no-cm', 'doc_not_allowed');
+  await expectEach('picker', ofGate('move'), 'no-pm', 'doc_not_allowed');
   //  صندوق‌دار با برگشتِ «ممنوع» (و بی لغو) ⇒ برگشت به کارت و برگشتِ امتیاز رد؛ «با تأیید» (PIN) ⇒ می‌نشیند
   await staffPerms.setRoleLayer(shopId, 'cashier', { 'returns.create': { mode: 'deny' } }, 'test');
   await expectEach('cashier', ofGate('back'), 'no-cr', 'doc_not_allowed');

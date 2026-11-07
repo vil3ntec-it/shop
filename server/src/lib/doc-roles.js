@@ -29,6 +29,7 @@
  *           برگشتِ امتیاز `LoyaltyPoints.afterReturn/afterCancel`): برگشت ⇐ `returns` نوشتنی و `returns.create`
  *           نه «ممنوع» (`ReturnFlow.permDecision`: allow، یا approve با PIN)، یا لغو ⇐ CANCEL
  *   PLACES  `StockPlacesEntry`: هر نقش جز `staff` (شاگرد) — محل‌ها و بسته‌بندیِ دوباره
+ *   MOVE    INV-11 گامِ انتقالِ موجودیِ سرور (`stock_transfer`): `stock.move` ِ سرور (`permissions.move` ِ `/catalog/config`)
  *   MANAGE  فقط صاحب و مدیر: اصلاحِ دستیِ امتیاز (PRM-13)؛ و PAY-07 `pay_status` (اصلاحِ ثبتِ دستیِ «تأییدشده» به
  *           «نیازمند بررسی»/«ناموفق»/«لغو» و حلِ بررسی) جز «در انتظار ⇐ تأییدشده/نیازمند بررسی» که SELL است
  *           (`PayStatus.need` ِ هسته، صفحهٔ وضعیتِ پرداختِ فاکتور: `PayStatusRoute`)
@@ -49,6 +50,8 @@ const BACK = 'back';
 const PLACES = 'places';
 /** فقط صاحب و مدیر — همان `may` ِ `LoyaltyPoints.adjust` */
 const MANAGE = 'manage';
+/** INV-11: گامِ انتقالِ موجودیِ سرور — همان `stock.move` ِ `/api/shop/catalog/transfers` (`permissions.move` ِ `/config` که برنامه می‌سنجد) */
+const MOVE = 'move';
 const OPEN = '';
 /** شکلِ نادرست */
 const BAD = 'bad';
@@ -104,6 +107,8 @@ const payStatus = (f) => {
     && typeof f.toStatus === 'string' && own(PAY_MOVES, move) && zeroOk(f.amountMinor) ? PAY_MOVES[move] : BAD;
 };
 const placed = (f) => (text(f.refId) && (f.reason === 'add' || f.reason === 'archive') ? PLACES : BAD);
+/** INV-11 (`StockTransferBook`): شیءِ `xfer` با گامِ شناخته؛ داوریِ خودِ گام (موجودی، وضعیت) با سرور هنگامِ خواندنِ دفتر */
+const transferred = (f) => (isObj(f.xfer) && ['send', 'receive', 'reject'].includes(f.xfer.step) ? MOVE : BAD);
 const repacked = (f) => (text(f.refId) ? PLACES : BAD);
 
 /** `auditLog.type` ⇒ (fields) ⇒ اجازهٔ لازم یا BAD */
@@ -126,6 +131,7 @@ const AUDIT = Object.freeze({
   stock_repack: repacked,
   stock_assembly: repacked,
   pay_status: payStatus,
+  stock_transfer: transferred,
 });
 
 /** `transactions.kind` ⇒ [type، اجازه] — مبلغِ مثبت و `refId` = سند */
@@ -176,6 +182,7 @@ function permits(need, role, layers) {
   }
   if (need === PLACES) return role !== 'staff';
   if (need === MANAGE) return role === 'manager';
+  if (need === MOVE) return require('./permissions').can(role, 'stock.move');
   return false;
 }
 
@@ -208,4 +215,4 @@ async function judgeV3(c, ctx, op, row, at = {}) {
   return permits(need, ctx.role, layers) ? null : 'doc_not_allowed';
 }
 
-module.exports = { FLAG, SELL, CANCEL, VOID, BACK, PLACES, MANAGE, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3 };
+module.exports = { FLAG, SELL, CANCEL, VOID, BACK, PLACES, MANAGE, MOVE, OPEN, BAD, AUDIT, RECEIPT, needOf, permits, judgeV3 };

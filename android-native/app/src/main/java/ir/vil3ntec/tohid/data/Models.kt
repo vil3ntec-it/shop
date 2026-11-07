@@ -806,6 +806,8 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toStatus: String? = null,
   /** PAY-17 — فقط `shift_open` ِ کشوی نام‌دار («چند کشو»، `TillDrawer`): نامِ کشو یا صندوقدار. کشوی اصلی `null` و `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val drawer: String? = null,
+  /** INV-11 — فقط `stock_transfer` (`StockTransferBook`): گامِ انتقالِ موجودیِ سرور (`StockTransfer.Step.xfer`). `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val xfer: kotlinx.serialization.json.JsonObject? = null,
 )
 
 /**
