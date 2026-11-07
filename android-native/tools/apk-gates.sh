@@ -2,7 +2,8 @@
 #
 #  دروازه‌های APK — معیارِ «قدم صفر»ِ بخشِ ۳.۳ِ مشخصات (docs/spec/03-architecture.md).
 #
-#  APKِ تازه با آخرین نسخهٔ منتشرشده (انتشارِ آزمایشی، وگرنه پایدار) سنجیده می‌شود:
+#  APKِ تازه با آخرین نسخهٔ منتشرشده (انتشارِ آزمایشی، وگرنه پایدار) سنجیده می‌شود — و اگر مرجع آزمایشی بود،
+#  گواهی و versionCode با پایدار هم (گوشی‌های پایدار همان را دارند):
 #    • applicationId همان `ir.vil3ntec.tohid`               — همیشه سخت
 #    • versionCode همان «۱۰۰ + شمارهٔ ساخت» — همیشه سخت؛ کمتر از منتشرشده نیست — سخت بیرون از PR
 #      (در PR فقط هشدار: شمارهٔ ساختِ PR ِ مانده در صف از آخرین انتشار عقب می‌افتد)
@@ -132,6 +133,28 @@ else
   echo "::warning::نسخهٔ منتشرشده‌ای برای سنجش پیدا نشد — فقط applicationId و versionCode سنجیده شد"
 fi
 
+#  ⛔ گوشی‌هایی که پایدار دارند فقط APK ِ همان گواهی را روی نصبشان می‌پذیرند. مرجعِ بالا آزمایشی است (اگر هست)؛
+#  پس گواهی و versionCode با پایدارِ منتشرشده هم سنجیده می‌شوند: کلیدِ دیگری در secret (یا آزمایشی‌ای که با کلیدِ
+#  دیگری امضا شده) پیش از انتشارِ پایدار همین‌جا سرخ می‌شود، نه «App not installed» روی گوشیِ همهٔ دکان‌ها.
+st_code="—"; st_fp="—"
+if [ "${ref_from:-}" = tohid-native-beta ]; then
+  st_dir=$(mktemp -d)
+  if gh release download tohid-native -R "$GITHUB_REPOSITORY" -p 'Tohid-Native.apk' -D "$st_dir" 2>/dev/null && [ -s "$st_dir/Tohid-Native.apk" ]; then
+    st_code=$(field versionCode "$(badge "$st_dir/Tohid-Native.apk")")
+    st_fp=$(cert "$st_dir/Tohid-Native.apk")
+    [ "$st_fp" = "$fp" ] || err "اثر انگشتِ امضا با نسخهٔ پایدارِ منتشرشده ($st_fp) یکی نیست — به‌روزرسانی روی گوشی‌های پایدار نصب نمی‌شود"
+    if [[ "$st_code" =~ ^[0-9]+$ ]] && [ "$code" -lt "$st_code" ]; then
+      if [ -n "${PR_NUMBER:-}" ]; then
+        echo "::warning::versionCode ($code) از نسخهٔ پایدار ($st_code) کمتر است — فقط PR"
+      else
+        err "versionCode ($code) از نسخهٔ پایدارِ منتشرشده ($st_code) کمتر است"
+      fi
+    fi
+  else
+    echo "::warning::نسخهٔ پایدارِ منتشرشده (tohid-native) برای سنجشِ امضا پیدا نشد"
+  fi
+fi
+
 tests="—"
 if [ -n "$results" ] && ls "$results"/*.xml >/dev/null 2>&1; then
   tests=$(grep -ho '<testsuite [^>]*' "$results"/*.xml | awk '
@@ -150,6 +173,7 @@ fi
   echo "| امضا SHA-256 | \`$fp\` | \`$ref_fp\` |"
   echo "| حجم (بایت) | $size | $ref_size |"
   echo "| اختلافِ حجم | ${ratio}٪ (مرزِ سخت: $([ "$strict" = 1 ] && echo بله || echo خیر))${exception_note:+ — $exception_note} | |"
+  echo "| پایدارِ منتشرشده (tohid-native) | | versionCode $st_code · امضا \`$st_fp\` |"
   echo "| آزمون‌ها | $tests | |"
 } >> "$summary"
 

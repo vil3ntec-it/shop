@@ -159,3 +159,51 @@ test('برگشت: نسخهٔ پیش روی پایگاهِ مهاجرت‌شده 
     await db.query('ALTER TABLE oplog DROP COLUMN rh_required');
   }
 });
+
+/*
+ * «تا آخرین شماره»: seed ِ بالا روی پایگاهی است که `h.start` با **همهٔ** پرونده‌های `migrations/` ساخت؛ این‌جا
+ * سنجیده می‌شود که واقعاً همه (تا بزرگ‌ترین شماره) اعمال شده‌اند، و دُمِ تازهٔ مهاجرت‌ها — از آخرین پرونده به عقب،
+ * هر کدام که `rollback/<نام>.down.sql` دارد — یک بار برگشت و دوباره **روی همین دادهٔ seed** اجرا می‌شود؛ همان راهِ
+ * «سرورِ نسخهٔ پیش ⇐ `npm run migrate` ِ نسخهٔ تازه» ِ ورک‌فلوی staging، بی نسخهٔ دوم. آخرین مهاجرت باید در این
+ * دُم باشد (بی rollback ⇒ سرخ با نامِ پرونده). جدول/ستونِ تازه آزاد است؛ ردیفِ گم‌شده، ستونِ برداشته یا دست بردن در
+ * جدولِ حیاتی خطا. (آخرِ پرونده: آزمون‌های بالا اثرِ انگشتِ خودشان را دارند؛ دودآزمایی فقط دکانِ نخست، دومی عمداً خراب است.)
+ */
+test('مهاجرت‌ها تا آخرین شماره: همه اعمال شده‌اند و دُمِ تازه روی دادهٔ seed دوباره بالا می‌آید', async () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const migrate = require('../src/migrate');
+  const files = migrate.files();
+  const latest = files[files.length - 1];
+  const applied = (await q('SELECT version FROM schema_migrations ORDER BY version')).map((r) => r.version);
+  assert.deepEqual(applied, files, 'پایگاهِ تمرین همهٔ پرونده‌های migrations را ندارد');
+
+  const dir = path.join(__dirname, '..', 'migrations', 'rollback');
+  const tail = [];
+  for (const f of [...files].reverse()) {
+    const down = path.join(dir, f.replace(/\.sql$/, '.down.sql'));
+    if (!fs.existsSync(down)) break;
+    tail.push({ f, down });
+  }
+  assert.equal(tail[0]?.f, latest, `آخرین مهاجرت (${latest}) پروندهٔ rollback/${latest.replace(/\.sql$/, '.down.sql')} ندارد`);
+
+  //  شمارِ op ِ دکانِ نخست پیش از برگشت (آزمونِ «برگشت» یک فروش افزوده بود)
+  const shop = state.shops[0];
+  const ops = Number((await db.one('SELECT COUNT(*)::int AS n FROM oplog WHERE account_id = $1', [shop.shopId])).n);
+  assert.ok(ops >= shop.ops);
+
+  for (const { down } of tail) await db.query(fs.readFileSync(down, 'utf8'));
+  const back = (await q('SELECT version FROM schema_migrations ORDER BY version')).map((r) => r.version);
+  assert.deepEqual(back, files.slice(0, files.length - tail.length), 'rollback ردیفِ schema_migrations ِ خودش را برنداشت');
+
+  const old = await rh.fingerprint(q);
+  const done = await migrate.run();
+  assert.deepEqual(done, tail.map((t) => t.f).reverse());
+  const after = await rh.fingerprint(q, { columnsOf: columnsOf(old) });
+  const r = rh.compare(old, after);
+  assert.deepEqual(r.errors, [], r.errors.join(' | '));
+  assert.deepEqual((await q('SELECT version FROM schema_migrations ORDER BY version')).map((x) => x.version), files);
+  //  پس از دوباره بالا آمدن همان سرور همهٔ opهای دکان را پس می‌دهد
+  assert.deepEqual(await rh.smoke(h.base(), { ...state, shops: [{ ...shop, ops }] }), []);
+  //  و بارِ دوم چیزی نمی‌زند
+  assert.deepEqual(await migrate.run(), []);
+});

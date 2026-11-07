@@ -8,3 +8,4 @@
 -- ============================================================
 
 ALTER TABLE purchase_receipts DROP COLUMN IF EXISTS freight_minor;
+DELETE FROM schema_migrations WHERE version = '201_purchase_receipt_freight.sql';
