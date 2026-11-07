@@ -67,4 +67,11 @@ class LocalNetworkManifestTest {
     fun sigs(s: String) = api.findAll(s).map { it.groupValues[1] + "(" + it.groupValues[2] + "): " + it.groupValues[3] }.toSet()
     assertEquals(sigs(android), sigs(desk))
   }
+
+  @Test fun `رلهٔ هاب محلی پیش از هر تماس اجازهٔ شبکهٔ محلی را می‌پرسد`() {
+    val s = app.resolve("src/main/java/ir/vil3ntec/tohid/platform/HubRelayAndroid.kt").readText()
+    val gate = s.indexOf("if (ir.vil3ntec.tohid.hw.LocalNetworkAccess.blocked(app, host)) return HubRelay.Outcome(refused = LOCAL_NETWORK_DENIED)")
+    assertTrue("HW-13: هاب هم مثلِ چاپگرِ شبکه از LocalNetworkAccess می‌گذرد", gate > 0)
+    assertTrue("پیش از نخستین تماس (hello)", gate < s.indexOf("call(\"GET\""))
+  }
 }

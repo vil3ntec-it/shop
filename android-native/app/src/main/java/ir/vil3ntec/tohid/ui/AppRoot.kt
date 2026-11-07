@@ -413,7 +413,7 @@ private fun AppRootActive(
   LaunchedEffect(Unit) { runCatching { DeliveryGate.refresh(context) } }
   LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.sync.PhoneScanner.load(context)
-    PhotoPrefs.load(context)
+    PhotoPrefs.load(context); ir.vil3ntec.tohid.scan.ScanPrefs.load(context) // HW-05: تنظیمِ بارکدخوان پیش از نخستین کلید
     ir.vil3ntec.tohid.data.ShopChatSync.refreshConfig(context)
   }
   //  گوشیِ جفت‌شده بارکد فرستاد ⇒ صندوق باز می‌شود و کالا به سبد می‌رود

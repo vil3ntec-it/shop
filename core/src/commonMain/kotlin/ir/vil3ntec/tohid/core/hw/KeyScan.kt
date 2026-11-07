@@ -13,6 +13,10 @@ package ir.vil3ntec.tohid.core.hw
  *    • **هرگز در کادرِ قیمت یا تعداد**: `FieldScanGuard` مقدارِ کادر را پیش از هجومِ نویسه‌ها نگه می‌دارد و
  *      وقتی معلوم شد اسکن بود، همان را برمی‌گرداند و کد را جدا تحویل می‌دهد.
  *
+ *    • **بارکدخوانِ لرزان** (`steady`، فقط با «ابزارهای تازهٔ دستگاه»، پیش‌فرض خاموش): وقفهٔ کوتاهِ بلوتوث وسطِ
+ *      کد آن را نمی‌شکند، تهِ اسکنِ شکسته هرگز کد نیست (کالای اشتباه بدتر از اسکنِ دوباره است) و پژواکِ
+ *      بارکدخوان (همان کد در کمتر از `ECHO_MS`) با `ScanEcho` شناخته می‌شود.
+ *
  *  خالص است: زمان از بیرون می‌آید تا بی بارکدخوان سنجیده شود. روی بارکدخوانِ واقعی آزموده نشده.
  */
 data class ScanConfig(
@@ -20,6 +24,12 @@ data class ScanConfig(
   val minLength: Int = DEFAULT_MIN_LENGTH,
   val prefix: String = "",
   val suffix: String = "",
+  /**
+   *  «بارکدخوانِ لرزان»: اسکنی که دست‌کم `STEADY_RUN` نویسهٔ تند آمده (آدم چنین نمی‌نویسد) از وقفه‌ای تا
+   *  [bridgeMs] نمی‌شکند؛ اسکنِ جاافتاده‌ای که بی Enter رها شد هجومِ پس از خودش را تا `TAIL_MS` «ته» می‌کند
+   *  (کد نیست)؛ و پژواک با `ScanEcho`. خاموش ⇒ دقیقاً رفتارِ پیشین.
+   */
+  val steady: Boolean = false,
 ) {
   /** مقدارِ امن: آستانه در بازه، فقط نویسهٔ دیدنیِ ASCII در پیشوند/پسوند، هر کدام تا ۸ نویسه */
   fun normalized(): ScanConfig = ScanConfig(
@@ -27,7 +37,11 @@ data class ScanConfig(
     minLength = minLength.coerceIn(1, 64),
     prefix = clean(prefix),
     suffix = clean(suffix),
+    steady = steady,
   )
+
+  /** بیشترین وقفهٔ پذیرفته وسطِ اسکنِ جاافتاده: چهار برابرِ آستانه تا `MAX_GAP_MS`، هرگز کمتر از خودِ آستانه */
+  val bridgeMs: Long get() = maxOf(maxGapMs, minOf(maxGapMs * 4, MAX_GAP_MS))
 
   companion object {
     const val DEFAULT_GAP_MS = 50L
@@ -36,6 +50,12 @@ data class ScanConfig(
     const val MAX_GAP_MS = 300L
     /** کدِ پیشونددار تا این مدت از نویسهٔ اول اسکن شمرده می‌شود، هر قدر هم کند */
     const val PREFIXED_WINDOW_MS = 3_000L
+    /** `steady`: چند نویسهٔ تندِ پیاپی اسکن را «جاافتاده» می‌کند (بیست نویسه در ثانیه از دستِ آدم نمی‌آید) */
+    const val STEADY_RUN = 4
+    /** `steady`: هجومی که تا این مدت پس از رها شدنِ اسکنِ جاافتاده آغاز شود، تهِ همان است */
+    const val TAIL_MS = 1_000L
+    /** `steady`: همان کد دوباره تا این مدت (پنجرهٔ لغزان) پژواکِ بارکدخوان است */
+    const val ECHO_MS = 300L
 
     private fun clean(s: String) = s.filter { it.code in 33..126 }.take(8)
   }
@@ -47,25 +67,37 @@ class KeyScan(config: ScanConfig = ScanConfig()) {
   private val buf = StringBuilder()
   private var lastAt = 0L
   private var startAt = 0L
+  /** `steady`: هجومِ کنونی تهِ اسکنی است که شکست — هرگز کد نمی‌دهد */
+  private var tail = false
 
   private fun prefixed(): Boolean = config.prefix.isNotEmpty() && buf.startsWith(config.prefix)
   private fun withinPrefixWindow(now: Long) = prefixed() && now - startAt <= ScanConfig.PREFIXED_WINDOW_MS
 
+  /** `steady`: اسکنِ جاافتاده (چند نویسهٔ تند) از وقفهٔ کوتاه نمی‌شکند */
+  private fun settled(): Boolean = config.steady && buf.length >= ScanConfig.STEADY_RUN
+  private fun bridges(gap: Long): Boolean = settled() && gap <= config.bridgeMs
+
   /** نویسهٔ بعدی اسکنِ تازه‌ای را آغاز می‌کند؟ (آنچه در بافر است کهنه یا تایپِ آدم بوده) */
-  fun startsNew(now: Long): Boolean = buf.isEmpty() || (now - lastAt > config.maxGapMs && !withinPrefixWindow(now))
+  fun startsNew(now: Long): Boolean =
+    buf.isEmpty() || (now - lastAt > config.maxGapMs && !withinPrefixWindow(now) && !bridges(now - lastAt))
 
   /**
    *  یک نویسه رسید. اگر پسوندِ تنظیم‌شده اسکن را تمام کرد، کد (بی پیشوند و پسوند)؛ وگرنه `null`.
    */
   fun feed(char: Char, now: Long): String? {
-    if (startsNew(now)) { buf.setLength(0); startAt = now }
+    if (startsNew(now)) {
+      //  `steady`: اسکنِ جاافتاده‌ای که بی Enter رها می‌شود ⇒ هجومِ پسِ آن (تا `TAIL_MS`) تهِ همان است، نه کد
+      tail = settled() && now - lastAt <= ScanConfig.TAIL_MS
+      buf.setLength(0); startAt = now
+    }
     lastAt = now
     buf.append(char)
     val sfx = config.suffix
     if (sfx.isNotEmpty() && buf.length > sfx.length && buf.endsWith(sfx)) {
       val raw = buf.toString()
-      buf.setLength(0)
-      return strip(raw)
+      val broken = tail
+      buf.setLength(0); tail = false
+      return if (broken) null else strip(raw)
     }
     return null
   }
@@ -73,9 +105,11 @@ class KeyScan(config: ScanConfig = ScanConfig()) {
   /** Enter رسید: کدِ کامل اگر تند (یا پیشونددار در مهلت) و به‌قدرِ کافی بلند بود؛ وگرنه `null` */
   fun submit(now: Long): String? {
     val raw = buf.toString()
-    val ok = raw.isNotEmpty() && (now - lastAt <= config.maxGapMs || withinPrefixWindow(now))
+    val gap = now - lastAt
+    val ok = raw.isNotEmpty() && !tail && (gap <= config.maxGapMs || withinPrefixWindow(now) || bridges(gap))
     buf.setLength(0)
     lastAt = now
+    tail = false
     return if (ok) strip(raw) else null
   }
 
@@ -86,7 +120,7 @@ class KeyScan(config: ScanConfig = ScanConfig()) {
     return s.takeIf { it.length >= config.minLength }
   }
 
-  fun reset() { buf.setLength(0); lastAt = 0; startAt = 0 }
+  fun reset() { buf.setLength(0); lastAt = 0; startAt = 0; tail = false }
 
   /** وسطِ یک اسکن؟ — صفحه با این تصمیم می‌گیرد نویسه را بخورد یا به کادر بدهد */
   val busy: Boolean get() = buf.isNotEmpty()
@@ -98,21 +132,44 @@ class KeyScan(config: ScanConfig = ScanConfig()) {
  *  (کند) هیچ‌وقت `Hit` نمی‌سازد و کادر دست نمی‌خورد.
  */
 class FieldScanGuard(config: ScanConfig = ScanConfig()) {
-  data class Hit(val code: String, val restore: String)
+  /** @property echo پژواکِ بارکدخوان (`steady`): کادر برمی‌گردد ولی کد دوباره به سبد نمی‌رود */
+  data class Hit(val code: String, val restore: String, val echo: Boolean = false)
 
   private val scan = KeyScan(config)
+  private val echo = ScanEcho()
   private var before = ""
+
+  private fun hit(code: String, now: Long) = Hit(code, before, echo = scan.config.steady && echo.echo(code, now))
 
   /** نویسه پیش از رسیدن به کادر؛ `value` متنِ کادر در همین لحظه (پیش از این نویسه) */
   fun key(char: Char, now: Long, value: String): Hit? {
     if (scan.startsNew(now)) before = value
-    return scan.feed(char, now)?.let { Hit(it, before) }
+    return scan.feed(char, now)?.let { hit(it, now) }
   }
 
   /** Enter پیش از رسیدن به کادر */
-  fun enter(now: Long): Hit? = scan.submit(now)?.let { Hit(it, before) }
+  fun enter(now: Long): Hit? = scan.submit(now)?.let { hit(it, now) }
 
   fun reset() = scan.reset()
+}
+
+/**
+ *  HW-05 — پژواکِ بارکدخوان: بعضی بارکدخوان‌ها (به‌ویژه حالتِ خودکار/ایستاده) همان کد را پشتِ هم دو بار
+ *  می‌فرستند. همان کد تا `ScanConfig.ECHO_MS` پس از خواندنِ قبلیِ همان کد پژواک است؛ پنجره لغزان است تا کالای
+ *  ایستاده پیشِ بارکدخوان هر چند بار خوانده شود یک بار بشمارد. کدِ دیگر یا ساعتِ پس‌رفته هرگز پژواک نیست.
+ *  فقط با `ScanConfig.steady` به کار می‌رود.
+ */
+class ScanEcho(private val windowMs: Long = ScanConfig.ECHO_MS) {
+  private var last: String? = null
+  private var at = 0L
+
+  /** `true` ⇒ پژواک؛ هر خواندن (پژواک یا نه) لحظهٔ تازهٔ همان کد است */
+  fun echo(code: String, now: Long): Boolean {
+    val dup = code == last && now - at in 0..windowMs
+    last = code
+    at = now
+    return dup
+  }
 }
 
 /**
