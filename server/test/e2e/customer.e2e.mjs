@@ -362,8 +362,9 @@ await E.step('S136', 'رسید: اقلام، مقدار، قیمتِ هر قلم
   const cells = await page.$$eval('#o-totals > span', (xs) => xs.map((x) => x.textContent.trim()));
   const rows = Object.fromEntries(cells.reduce((a, c, i) => (i % 2 ? a[a.length - 1].push(c) : a.push([c]), a), []));
   assert.deepEqual(rows, {
+    //  نقدِ هنگامِ تحویل، پیش از تحویل: «پرداخت‌شده ۰» دیگر نمی‌آید؛ فقط «مانده» (خلاصهٔ پولِ سازگار، #955)
     'جمعِ کالاها': '۶۰۰ افغانی', 'هزینهٔ ارسال': '۵۰ افغانی', 'مبلغِ نهایی': '۶۵۰ افغانی',
-    'پرداخت‌شده': '۰ افغانی', 'مانده (نقد هنگامِ تحویل)': '۶۵۰ افغانی',
+    'مانده (نقد هنگامِ تحویل)': '۶۵۰ افغانی',
   });
   assert.match(await page.textContent('#o-title'), new RegExp(Number(o.orderNo).toLocaleString('fa-AF')));
   await E.shot(G, 'S136-receipt');
