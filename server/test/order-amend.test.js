@@ -137,7 +137,8 @@ test('⛔ پرچمِ خاموش: درِ کارمند ۴۰۳، درِ مشتری 
 test('سفارشِ کارمند: رضایتِ ثبت‌شده لازم؛ با آن همان دم — مقدار، مبلغ، برداشتن، جمع؛ تکرار بی اثرِ دوم', async () => {
   const s = await shop('کارمند');
   const cfg = await h.get('/api/shop/orders/config', { token: s.token });
-  assert.deepEqual(cfg.body.amend, { statuses: ['new', 'accepted'], reasons: ['out_of_stock', 'customer_request', 'price_error', 'other'], consentVia: ['phone', 'in_person', 'telegram', 'whatsapp'], ttlMinutes: 30 });
+  //  ORD-13: «جمع‌آوری» ِ دکان خاموش ⇒ هیچ سفارشی برگه ندارد ⇒ «در حال جمع‌آوری» هم (فقط کم/برداشتن)
+  assert.deepEqual(cfg.body.amend, { statuses: ['new', 'accepted', 'picking'], reasons: ['out_of_stock', 'customer_request', 'price_error', 'other'], consentVia: ['phone', 'in_person', 'telegram', 'whatsapp'], ttlMinutes: 30 });
   const o = await staffOrder(s);
   assert.equal(o.totalMinor, 24000 + 33300 + 2000);
   const body = { changes: [{ lineNo: 1, qtyMilli: 1500 }, { lineNo: 3, qtyMilli: 0 }], reason: 'out_of_stock', note: 'نمک تمام شد', consent: { via: 'phone', note: 'تلفنی پذیرفت' } };
@@ -198,14 +199,15 @@ test('سفارشِ کارمند: رضایتِ ثبت‌شده لازم؛ با آ
   const d = await h.get(`/api/shop/orders/${o.id}`, { token: s.token });
   assert.equal(d.body.order.amendment.id, r.body.amendment.id);
 
-  //  پس از «شروعِ جمع‌آوری» دیگر نه
+  //  پس از «بسته‌بندی» دیگر نه («در حال جمع‌آوری» ِ بی برگه: ORD-13، آزمونِ پایین)
   await move(s, o.id, 'accepted');
   assert.equal((await propose(s, o.id, { ...body, changes: [{ lineNo: 1, qtyMilli: 1000 }] })).status, 201, 'قبول‌شده هنوز ویرایش‌پذیر');
   await move(s, o.id, 'picking');
+  await move(s, o.id, 'packed');
   const late = await propose(s, o.id, { ...body, changes: [{ lineNo: 1, qtyMilli: 500 }] });
   assert.equal(late.status, 409);
   assert.equal(late.body.error.code, 'amend_not_allowed');
-  assert.equal(late.body.error.current, 'picking');
+  assert.equal(late.body.error.current, 'packed');
 });
 
 test('تخفیفِ بیش از جمعِ تازه و سفارشِ پرداخت‌شده ⇒ ۴۰۹ بی تغییر', async () => {
@@ -311,15 +313,72 @@ test('مهلت گذشته ⇒ «منقضی» یک بار ثبت و هیچ تغی
   assert.deepEqual(await linesOf(so.id), before);
   assert.equal((await amendEvents(so.id)).filter((e) => e.detail.outcome === 'expired').length, 1, 'یک بار');
 
-  //  کهنه: سفارش به «جمع‌آوری» رفت ⇒ پذیرفتن هیچ چیزی را عوض نمی‌کند
+  //  کهنه: سفارش به «بسته‌بندی» رفت ⇒ پذیرفتن هیچ چیزی را عوض نمی‌کند
   const b = (await propose(s, so.id, { changes: [{ lineNo: 1, qtyMilli: 1000 }] })).body.amendment;
   await move(s, so.id, 'accepted');
   await move(s, so.id, 'picking');
+  await move(s, so.id, 'packed');
   const r = await decide(s, so.token, b.id, 'accept');
   assert.equal(r.status, 409);
   assert.equal(r.body.error.code, 'order_changed');
   assert.equal(r.body.order.amendment.status, 'stale');
   assert.deepEqual(await linesOf(so.id), before);
+});
+
+test('ORD-13: ناموجودی وسطِ آماده‌سازیِ بی برگه — کم/برداشتن با رضایت، نه افزودن؛ با برگهٔ جمع‌آوری نه', async () => {
+  const s = await shop('بی‌برگه');
+  const consent = { via: 'phone', note: 'تلفنی پذیرفت' };
+  const o = await staffOrder(s);
+  await move(s, o.id, 'accepted');
+  await move(s, o.id, 'picking');
+  //  افزودن پس از شروع نه (همان CHK-21)؛ هیچ تغییری
+  const more = await propose(s, o.id, { changes: [{ lineNo: 1, qtyMilli: 3000 }], reason: 'customer_request', consent });
+  assert.equal(more.status, 409, JSON.stringify(more.body));
+  assert.equal(more.body.error.code, 'amend_reduce_only');
+  assert.equal(more.body.error.current, 'picking');
+  const mixed = await propose(s, o.id, { changes: [{ lineNo: 1, qtyMilli: 3000 }, { lineNo: 3, qtyMilli: 0 }], reason: 'out_of_stock', consent });
+  assert.equal(mixed.body.error.code, 'amend_reduce_only');
+  assert.equal(Number((await orderRow(o.id)).total_minor), 59300);
+  //  برداشتنِ قلمِ ناموجود با رضایتِ ثبت‌شده ⇒ همان دم؛ جمعِ تازه، وضعیت همان «در حال جمع‌آوری»
+  const r = await propose(s, o.id, { changes: [{ lineNo: 3, qtyMilli: 0 }], reason: 'out_of_stock', note: 'نمک تمام شد', consent });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  assert.deepEqual((await linesOf(o.id)).map((l) => Number(l.line_no)), [1, 2]);
+  const row = await orderRow(o.id);
+  assert.equal(row.status, 'picking');
+  assert.equal(Number(row.total_minor), 57300);
+  assert.equal((await amendEvents(o.id)).filter((e) => e.detail.type === 'amend_applied').length, 1);
+
+  //  ویترین: پیشنهادِ کم کردن پیش از «قبول»، پذیرش پس از «شروعِ» بی برگه ⇒ اعمال
+  const so = await storeOrder(s);
+  const a = (await propose(s, so.id, { changes: [{ lineNo: 1, qtyMilli: 1000 }] })).body.amendment;
+  await move(s, so.id, 'accepted');
+  await move(s, so.id, 'picking');
+  const ok = await decide(s, so.token, a.id, 'accept');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(Number((await linesOf(so.id))[0].qty_milli), 1000);
+  //  پیشنهادِ افزایش پیش از شروع، پذیرش پس از آن ⇒ «کهنه» و هیچ تغییری
+  const so2 = await storeOrder(s, '0791112244');
+  const up = (await propose(s, so2.id, { changes: [{ lineNo: 1, qtyMilli: 5000 }] })).body.amendment;
+  await move(s, so2.id, 'accepted');
+  await move(s, so2.id, 'picking');
+  const before2 = await linesOf(so2.id);
+  const stale = await decide(s, so2.token, up.id, 'accept');
+  assert.equal(stale.status, 409);
+  assert.equal(stale.body.error.code, 'order_changed');
+  assert.deepEqual(await linesOf(so2.id), before2);
+
+  //  دکانِ با «جمع‌آوری»: config همان دو وضعیت؛ سفارشِ دارای برگه ⇒ ۴۰۹ و هیچ تغییری (راهِ برگه همان جایگزین/«پیدا نشد»)
+  const p = await shop('با‌برگه');
+  await setFlag(p.shopId, 'shop.orders.picking', true);
+  assert.deepEqual((await h.get('/api/shop/orders/config', { token: p.token })).body.amend.statuses, ['new', 'accepted']);
+  const po = await staffOrder(p);
+  await move(p, po.id, 'accepted');
+  const st = await h.post(`/api/shop/orders/${po.id}/pick/start`, {}, { token: p.token, headers: { 'Idempotency-Key': key() } });
+  assert.ok([200, 201].includes(st.status), JSON.stringify(st.body));
+  const blocked = await propose(p, po.id, { changes: [{ lineNo: 3, qtyMilli: 0 }], reason: 'out_of_stock', consent });
+  assert.equal(blocked.status, 409);
+  assert.equal(blocked.body.error.code, 'amend_not_allowed');
+  assert.equal((await linesOf(po.id)).length, 3);
 });
 
 test('جداسازی: توکنِ سفارشِ دیگر، دکانِ دیگر و شناسهٔ ساختگی هیچ پیشنهادی را نمی‌بندند', async () => {

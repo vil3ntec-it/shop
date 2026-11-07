@@ -178,7 +178,7 @@ fun DeskSaleScreen(
   //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
   val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
   val cashStep = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) } // PAY-09: گردکردنِ نقدی، پیش‌فرض خاموش
-  //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض خاموش): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
+  //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض روشن): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
   var priceCheck by remember { mutableStateOf(false) }
   //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
