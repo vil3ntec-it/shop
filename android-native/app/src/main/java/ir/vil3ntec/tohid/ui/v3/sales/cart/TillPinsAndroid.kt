@@ -23,19 +23,32 @@ object TillPinsPrefs {
     runCatching { pins.value = TillPins.decode(context.getSharedPreferences(PREFS, 0).getString(KEY, null)) }
   }
 
-  /** سنجاق یا برداشتن؛ @return حالا سنجاق‌شده است؟ */
-  fun toggle(context: android.content.Context, id: String): Boolean {
+  /** سنجاق یا برداشتن؛ @return چه شد (`TillPins.change`: پُر ⇒ بی تغییر، برای پیامِ درست) */
+  fun toggle(context: android.content.Context, id: String): TillPins.Change {
     load(context)
+    val change = TillPins.change(pins.value, id)
     val next = TillPins.toggle(pins.value, id)
+    if (next == pins.value) return change
     pins.value = next
     runCatching { context.getSharedPreferences(PREFS, 0).edit().putString(KEY, TillPins.encode(next)).apply() }
-    return id in next
+    return change
+  }
+
+  /** سنجاق یا برداشتن و پیامِ همان کار (صندوقِ کامپیوتر)؛ null ⇒ هیچ */
+  fun toggleSay(context: android.content.Context, id: String, name: String): String? = message(toggle(context, id), name)
+
+  /** پیامِ همان کار (گوشی و کامپیوتر یکی)؛ null ⇒ هیچ */
+  fun message(change: TillPins.Change, name: String): String? = when (change) {
+    TillPins.Change.PINNED -> ir.vil3ntec.tohid.core.i18n.StrSale.pinnedFirst(name)
+    TillPins.Change.UNPINNED -> ir.vil3ntec.tohid.core.i18n.StrSale.unpinnedFirst(name)
+    TillPins.Change.FULL -> ir.vil3ntec.tohid.core.i18n.StrSale.pinsFull
+    TillPins.Change.NONE -> null
   }
 }
 
-/** برگه‌ای که Context ندارد (`KeypadRoute`): سنجاق‌ها بار می‌شوند و این تابع سنجاق/برداشتن را می‌کند؛ @return حالا سنجاق است؟ */
+/** برگه‌ای که Context ندارد (`KeypadRoute`): سنجاق‌ها بار می‌شوند و این تابع سنجاق/برداشتن را می‌کند؛ @return چه شد */
 @Composable
-fun rememberTillPinToggle(): (String) -> Boolean {
+fun rememberTillPinToggle(): (String) -> TillPins.Change {
   val context = LocalContext.current
   return remember(context) { TillPinsPrefs.load(context); { id: String -> TillPinsPrefs.toggle(context, id) } }
 }

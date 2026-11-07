@@ -15,6 +15,10 @@
  *   ۴) fingerprint  دوباره، پیش از روشن شدنِ سرورِ تازه (پس فقط مهاجرت‌ها چیزی عوض کرده‌اند).
  *   ۵) check        مقایسه + `verify-data` ِ نسخهٔ تازه + دودآزمایی روی سرورِ تازه: `/api/ready`،
  *                   ورودِ همهٔ صاحبانِ seed و دریافتِ همهٔ opها از صفر با دستگاهِ تازه.
+ *   ۶) rollback     برگشت: سرورِ تازه خاموش ⇒ سرورِ **نسخهٔ پیش** روی همان پایگاهِ مهاجرت‌شده (طرحِ برگشتِ
+ *                   سرور همین است). همان دودآزمایی، و هر دکان یک فروشِ تازه از راهِ نسخهٔ پیش (نوشتن) که باید
+ *                   پذیرفته و پس گرفته شود. ستونِ NOT NULL ِ بی پیش‌فرض یا تغییرِ دیگری که نسخهٔ پیش را از
+ *                   نوشتن بیندازد ⇒ خطا («به‌روزرسانی‌ای که برنمی‌گردد»).
  *
  * قاعدهٔ مقایسه (`compare`): جدول یا ستونِ برداشته‌شده، کم شدنِ ردیف، و عوض شدنِ محتوای ستون‌های
  * پیشینِ جدول‌های حیاتی (دفترِ همگام‌سازی، حساب، دکان، سفارش، پول) ⇒ خطا. عوض شدنِ محتوای جدولِ
@@ -26,6 +30,7 @@
  *   node scripts/upgrade-rehearsal.js seed --url http://127.0.0.1:4100 --out state.json [--shops 3 --products 60 --sales 300]
  *   node scripts/upgrade-rehearsal.js fingerprint --out fp.json            (DATABASE_URL)
  *   node scripts/upgrade-rehearsal.js check --before a.json --after b.json --state state.json --url http://127.0.0.1:4100
+ *   node scripts/upgrade-rehearsal.js rollback --state state.json --url http://127.0.0.1:4100      (سرورِ نسخهٔ پیش)
  * کدِ خروج: ۰ سالم · ۲ خطای تمرین · ۱ خطای اجرا.
  */
 const fs = require('node:fs');
@@ -212,6 +217,41 @@ async function smoke(base, state) {
   return errors;
 }
 
+/* ── ۶) برگشت: نسخهٔ پیش روی پایگاهِ مهاجرت‌شده ─────────────────────────── */
+
+/** شمارهٔ op ِ برگشت (بیرون از بازهٔ seed)؛ تکرار ⇒ همان op ⇒ «تکراری»، نه فروشِ دوم */
+const ROLLBACK_N = 900000;
+
+/**
+ * سرورِ `base` باید نسخهٔ **پیش** باشد که روی پایگاهِ مهاجرت‌شده بالا آمده. هر دکان: ورود، یک فروشِ تازه
+ * (push)، و سپس همان دودآزمایی (همهٔ opها با دستگاهِ تازه، با فروشِ تازه). نوشتنِ پذیرفته‌شده در `state`
+ * شمرده می‌شود (`ops + 1`)؛ شکست‌خورده نه. ⇒ فهرستِ خطا (خالی = برگشت سالم).
+ */
+async function rollback(base, state, { tag = 1 } = {}) {
+  const errors = [];
+  for (const [i, s] of state.shops.entries()) {
+    const device = `rh-rollback-${s.shopId}`;
+    const login = await http(base, 'POST', '/api/auth/login', {
+      body: { identifier: s.email, password: s.password, app: 'shop', device: { deviceId: device, name: 'برگشت', platform: 'test' } },
+    });
+    if (login.status !== 200 || !login.body?.accessToken) { errors.push(`ورودِ ${s.email} روی نسخهٔ پیش: ${login.status}`); continue; }
+    const n = ROLLBACK_N + tag;
+    const op = { op_id: opId(i + 1, n), ts: Date.UTC(2026, 9, 2) + n, table: 'sales', row_id: `rb${tag}`, type: 'insert',
+      fields: { total: 1250, items: 1, paid: 1250 } };
+    const r = await http(base, 'POST', '/api/sync/v1/push', {
+      token: login.body.accessToken, headers: { 'X-Device': device },
+      body: { device_id: device, schema_version: 2, ops: [op] },
+    });
+    const res = r.status === 200 ? (r.body?.results || [])[0] : null;
+    if (!res || res.status === 'rejected') {
+      errors.push(`نوشتنِ نسخهٔ پیش روی دکانِ ${s.shopId}: ${r.status} ${res ? res.reason : JSON.stringify(r.body).slice(0, 200)}`);
+    } else if (res.status === 'applied') {
+      s.ops += 1;
+    }
+  }
+  return [...errors, ...(await smoke(base, state))];
+}
+
 /* ── خطِ فرمان ──────────────────────────────────────────────────────── */
 
 async function main(argv) {
@@ -251,7 +291,15 @@ async function main(argv) {
     console.log(bad ? `\n✖ تمرینِ ارتقا: ${bad} خطا` : `\n✔ تمرینِ ارتقا سالم${res.warnings.length ? ` (${res.warnings.length} هشدار)` : ''}`);
     return bad ? 2 : 0;
   }
-  throw new Error('کاربرد: seed | fingerprint | check (شرح در سرِ همین فایل)');
+  if (cmd === 'rollback') {
+    const errors = await rollback(arg('--url'), readJson(arg('--state')));
+    for (const m of errors) console.log(`  ✖ ${m}`);
+    console.log(errors.length
+      ? `\n✖ برگشت به نسخهٔ پیش: ${errors.length} خطا — این به‌روزرسانی با «نسخهٔ پیش روی همان پایگاه» برنمی‌گردد`
+      : '\n✔ برگشت به نسخهٔ پیش سالم: نسخهٔ پیش روی پایگاهِ مهاجرت‌شده همهٔ opها را می‌خواند و فروشِ تازه می‌نویسد');
+    return errors.length ? 2 : 0;
+  }
+  throw new Error('کاربرد: seed | fingerprint | check | rollback (شرح در سرِ همین فایل)');
 }
 
 if (require.main === module) {
@@ -261,4 +309,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { CRITICAL, fingerprint, compare, seed, seedOps, smoke, guardDatabase, main };
+module.exports = { CRITICAL, fingerprint, compare, seed, seedOps, smoke, rollback, guardDatabase, main };

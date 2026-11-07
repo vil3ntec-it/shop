@@ -143,6 +143,8 @@ fun V3TextField(
       keyboardActions = KeyboardActions(onAny = { onImeAction?.invoke() }),
       modifier = Modifier
         .fillMaxWidth()
+        //  HW-05: اسکن در کادرِ عدد/پول نمی‌نشیند (فقط با «ابزارهای تازهٔ دستگاه»؛ `V3ScanGuard.kt`)
+        .v3ScanGuard(kind, value, onValueChange)
         .semantics {
           contentDescription = label
           if (error != null) error(error)

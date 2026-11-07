@@ -20,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrPanelPages
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.SalesHeatmap
 import ir.vil3ntec.tohid.money
@@ -36,9 +37,9 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 internal fun HeatmapSummary(h: SalesHeatmap) {
   Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      StatCard("پرفروش‌ترین ساعت", HeatmapModel.peakLabel(h) ?: "—", h.peak?.let { "${h.maxCount} فروش" } ?: "بی فروش", Modifier.weight(1f))
-      StatCard("شمارِ فروش", h.total.count.toString(), "در این بازه", Modifier.weight(1f))
-      StatCard("خالصِ مبلغ", "${money(h.total.totalMinor / 100.0)} ؋", "فروش − برگشت", Modifier.weight(1f))
+      StatCard(StrPanelPages.peakHour, HeatmapModel.peakLabel(h) ?: "—", h.peak?.let { StrPanelPages.salesN(h.maxCount) } ?: StrPanelPages.noSales, Modifier.weight(1f))
+      StatCard(StrPanelPages.salesCount, h.total.count.toString(), StrPanelPages.inThisRange, Modifier.weight(1f))
+      StatCard(StrPanelPages.netAmount, "${money(h.total.totalMinor / 100.0)} ؋", StrPanelPages.salesLessReturns, Modifier.weight(1f))
     }
     HeatGrid(h)
   }
@@ -54,8 +55,8 @@ internal fun HeatmapPhone(h: SalesHeatmap, span: String, onSpan: (String) -> Uni
     Text(HeatmapModel.TAB.label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     SegmentedTabs(HeatmapModel.PHONE_SPANS.map { SegmentTab(it, ReportBoard.SPAN_LABELS.getValue(it)) }, span, onSpan)
     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-      StatCard("پرفروش‌ترین ساعت", HeatmapModel.peakLabel(h) ?: "—", h.peak?.let { "${h.maxCount} فروش" } ?: "بی فروش", Modifier.weight(1f))
-      StatCard("شمارِ فروش", h.total.count.toString(), "در این بازه", Modifier.weight(1f))
+      StatCard(StrPanelPages.peakHour, HeatmapModel.peakLabel(h) ?: "—", h.peak?.let { StrPanelPages.salesN(h.maxCount) } ?: StrPanelPages.noSales, Modifier.weight(1f))
+      StatCard(StrPanelPages.salesCount, h.total.count.toString(), StrPanelPages.inThisRange, Modifier.weight(1f))
     }
     Box(Modifier.horizontalScroll(rememberScrollState())) { HeatGrid(h, cell = 11.dp, label = 52.dp, every = 6) }
   }

@@ -253,3 +253,50 @@ test('CHAT-12: verify رسانهٔ گفت‌وگوی دیگر، نقشِ غلط 
   assert.equal((await chatBackup.verify({ shopId: other.shopId })).ok, true);
   assert.ok(!JSON.stringify(v).includes('نانِ تازه'), 'گزارش بی متنِ پیام');
 });
+
+//  SEC-10 (بازگردانیِ پشتیبانِ پیش از حذف): گفت‌وگویی که در مقصد با «حذفِ دادهٔ مشتری» بی‌نام شده با
+//  پشتیبانِ کهنه‌تر زنده نمی‌شود — نه رسانه (حذف همه را پاک کرده بود)، نه پیامِ هرس‌شده (نگهداری)، نه
+//  سنجاق؛ گفت‌وگوی دیگرِ همان فایل کامل برمی‌گردد و پشتیبانِ پس از حذف همان سنگِ قبرها را برمی‌گرداند.
+test('SEC-10: پشتیبانِ پیش از حذف گفت‌وگوی حذف‌شده را زنده نمی‌کند؛ گفت‌وگوی دیگر و پشتیبانِ پس از حذف کامل', async () => {
+  const erasure = require('../src/lib/customer-erasure');
+  const s = await seed('حذف و پشتیبان');
+  const ali = { side: 'customer', shopId: s.shopId, phone: '+93790000401' };
+  await chat.pin(ali, s.c1, s.ids.text, true);
+  const pre = await chatBackup.exportChat({ dir: tmpDir(), shopId: s.shopId });
+
+  const e = await erasure.erase(s.shopId, { phone: ali.phone }, { by: 'owner', userId: s.userId });
+  assert.equal(e.counts.conversations, 1);
+  assert.equal(e.counts.chatMedia, 3, 'عکس، پیش‌نمایش و صدای گفت‌وگوی علی');
+  const post = await chatBackup.exportChat({ dir: tmpDir(), shopId: s.shopId });
+  const erasedState = await snapshot(s.shopId);
+
+  //  نگهداری پیام‌های کهنه را برد (همان DELETE ِ `sweep`) و رسانهٔ گفت‌وگوی رضا گم شد
+  await query('DELETE FROM shop_chat_messages WHERE conversation_id=$1', [s.c1]);
+  await query('DELETE FROM shop_chat_media WHERE conversation_id=$1', [s.c2]);
+
+  const rm = await chatBackup.restoreMessages(pre.messages.file);
+  const rd = await chatBackup.restoreMedia(pre.media.file);
+  const c1 = await one(`SELECT customer_phone, customer_name, customer_id FROM shop_chat_conversations WHERE id=$1`, [s.c1]);
+  assert.match(c1.customer_phone, /^erased:/);
+  assert.equal(c1.customer_name, '');
+  assert.equal(c1.customer_id, null);
+  const c1Messages = await many('SELECT body FROM shop_chat_messages WHERE conversation_id=$1', [s.c1]);
+  assert.deepEqual(c1Messages, [], 'پیامِ هرس‌شدهٔ گفت‌وگوی حذف‌شده از پشتیبانِ کهنه برنمی‌گردد');
+  assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1', [s.c1])).n), 0,
+    'رسانهٔ گفت‌وگوی حذف‌شده برنمی‌گردد');
+  assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_pins WHERE conversation_id=$1', [s.c1])).n), 0);
+  assert.deepEqual(rd.erased.sort(), [s.media.pic, s.media.thumb, s.media.voice].sort());
+  assert.equal(rd.restored, 1, 'فقط PDF ِ گفت‌وگوی رضا');
+  assert.ok(rm.erased >= 3, JSON.stringify(rm));
+  assert.ok(Object.values(rm.restored).every((n) => Number.isInteger(n)));
+  const all = await many('SELECT body FROM shop_chat_messages WHERE shop_id=$1', [s.shopId]);
+  assert.ok(!all.some((m) => /نان/.test(m.body)), 'هیچ متنی از گفت‌وگوی علی برنگشت');
+  assert.equal((await chatBackup.verify({ shopId: s.shopId })).ok, true, 'رابطهٔ پیام ⇐ رسانهٔ رضا سالم');
+
+  //  پشتیبانِ پس از حذف همان وضعِ پس از حذف را برمی‌گرداند (سنگِ قبرها و شمارِ پیام)
+  await wipe(s.shopId);
+  const again = await chatBackup.restoreMessages(post.messages.file);
+  await chatBackup.restoreMedia(post.media.file);
+  assert.equal(again.erased, 0);
+  assert.deepEqual(await snapshot(s.shopId), erasedState);
+});

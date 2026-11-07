@@ -11,6 +11,8 @@
  *                        هدیه)، مبلغِ صحیحِ مثبت، دلیلِ یک‌خطیِ ۳ تا ۱۲۰ نویسه؛ و فاکتورِ لغوشده، اینترنتی یا برگشت‌خورده
  *    pay_fix_exceeds     مبلغ از ماندهٔ «روشِ پیشین» پس از اصلاح‌های ثبت‌شدهٔ سرور بیشتر است — همان `payFixApply` ِ
  *                        `license/pay-core.js`؛ دو دستگاه یک پول را دو بار جابه‌جا نمی‌کنند (صندوقِ تعارض `perm_denied`)
+ *    pay_fix_closed      روزِ فاکتور بسته است (`dayClosed` = `PayFix.closed`، از `shift_open`/`shift_close` ِ سرور): برای همه،
+ *                        صاحب هم (صندوقِ تعارض `perm_denied`) — Z ِ بسته با اصلاحِ دیررسِ دستگاهِ دیگر عوض نمی‌شود
  *    مجوز                `sales.pay_fix` با `staff-approval.judge` (نقش + لایه + «برگهٔ امضاشده»ی `fields.approval` برای
  *                        `auditLog/<ردیف>` تا همان مبلغ): ممنوع ⇒ `pay_fix_not_allowed`؛ «نیازمند تأیید» بی برگه ⇒
  *                        `approval_required`؛ برگهٔ نادرست ⇒ کدِ همان نگهبان. برنامهٔ پیش از (2.14.5) برگه را نمی‌فرستاد ⇒
@@ -98,6 +100,42 @@ function applyFixes(rows, fixes) {
   return sums;
 }
 
+/**
+ * روزِ فاکتور بسته است؟ — همان `PayFix.closed` (core) و `payFixClosed` (pay-core.js)، بردارِ `payFix.closed` ِ
+ * `pay-v1.json`: فاکتور در پنجرهٔ صندوقِ بسته‌ای است، یا پیش از آخرین بستنِ (Z) صندوق‌هایی که همان روز باز شدند.
+ * @param shifts [{ openedAt, closedAt (null ⇒ باز), day }]
+ */
+function dayClosed(saleAt, saleDay, shifts) {
+  const day = text(saleDay);
+  let last = null;
+  for (const w of shifts || []) {
+    if (w.closedAt === null || w.closedAt === undefined) continue;
+    if (saleAt >= w.openedAt && saleAt <= w.closedAt) return true;
+    if (day && text(w.day) === day && (last === null || w.closedAt > last)) last = w.closedAt;
+  }
+  return last !== null && saleAt <= last;
+}
+
+const at = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : null);
+
+/**
+ * پنجره‌های صندوق از سابقهٔ هر دو دفتر — همان `CashShift.list`: `shift_open` و `shift_close` با `refId` = شناسهٔ
+ * بازکردن (همهٔ دستگاه‌ها و کشوها؛ opهای پیشینِ همین دسته هم). دو بستن برای یک صندوق ⇒ دیرترین (سخت‌گیرانه). زمانِ
+ * بدشکل ⇒ آن ردیف کنار می‌رود.
+ */
+async function shiftWindows(c, ctx) {
+  const rows = await rowsOf(c, ctx, 'auditLog', `data->>'type' IN ('shift_open','shift_close')`, []);
+  const closes = new Map();
+  for (const r of rows) {
+    const t = at(r.data.createdAt);
+    const ref = text(r.data.refId);
+    if (r.data.type !== 'shift_close' || t === null || !ref) continue;
+    if (!closes.has(ref) || t > closes.get(ref)) closes.set(ref, t);
+  }
+  return rows.filter((r) => r.data.type === 'shift_open' && at(r.data.createdAt) !== null)
+    .map((r) => ({ openedAt: r.data.createdAt, closedAt: closes.has(r.id) ? closes.get(r.id) : null, day: text(r.data.date) }));
+}
+
 async function judgePayFix(c, ctx, op, { deviceId, origin }) {
   const f = op.fields;
   const bad = payFixShape(f);
@@ -108,6 +146,15 @@ async function judgePayFix(c, ctx, op, { deviceId, origin }) {
     const d = sale.data;
     if (d.status === 'cancelled' || d.channel === 'online' || text(d.series) === 'W') return 'pay_fix_invalid';
     if ((await rowsOf(c, ctx, 'returns', `data->>'saleId'=$3`, [saleId])).length) return 'pay_fix_invalid';
+    //  روزِ بسته: Z ثابت می‌ماند — دستگاهِ بی‌اینترنت یا کهنه پس از Z ِ دستگاهِ دیگر پول را میانِ روش‌ها جابه‌جا نمی‌کند
+    const saleAt = at(d.createdAt);
+    if (saleAt !== null && dayClosed(saleAt, d.date, await shiftWindows(c, ctx))) {
+      return {
+        reason: 'pay_fix_closed', box: 'perm_denied',
+        detail: { perm: PERM, decision: 'deny', reason_core: 'day_closed', requester: ctx.userId || '', role: ctx.role || '',
+          amount: f.amountMinor, sale: saleId, day: text(d.date), path: origin || 'v3' },
+      };
+    }
     const prior = (await rowsOf(c, ctx, 'auditLog', `data->>'type'='pay_fix' AND data->>'refId'=$3`, [saleId]))
       .filter((r) => r.id !== op.row_id)
       .map((r) => ({ id: r.id, at: pul(r.data.createdAt), from: text(r.data.fromMethod), to: text(r.data.toMethod), amount: moneyOf(r, 'amount') }));
@@ -170,4 +217,4 @@ async function judgeV3(c, ctx, op, { deviceId = '', origin = 'v3' } = {}) {
   return (await judgeRefund(c, ctx, { ...op, fields: f }, { origin })) || undefined;
 }
 
-module.exports = { PAY_FIX_FLAG, REFUND_FLAG, payFixShape, postedRows, applyFixes, judgeV3 };
+module.exports = { PAY_FIX_FLAG, REFUND_FLAG, payFixShape, postedRows, applyFixes, dayClosed, judgeV3 };

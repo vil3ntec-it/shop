@@ -44,6 +44,10 @@ class HidScan(
   private var scan: ir.vil3ntec.tohid.core.hw.KeyScan? = null
   private fun s(): ir.vil3ntec.tohid.core.hw.KeyScan = scan ?: ir.vil3ntec.tohid.core.hw.KeyScan(config()).also { scan = it }
 
+  /** HW-05 «بارکدخوانِ لرزان» (`ScanConfig.steady`): همان کد در کمتر از ۳۰۰ میلی‌ثانیه پژواک است و به سبد نمی‌رود */
+  private var echo = ir.vil3ntec.tohid.core.hw.ScanEcho()
+  private fun pass(code: String, now: Long): String? = code.takeUnless { s().config.steady && echo.echo(it, now) }
+
   /**
    *  یک نویسه رسید.
    *
@@ -51,7 +55,7 @@ class HidScan(
    *  @return اگر پسوندِ تنظیم‌شده یک بارکدِ کامل را تمام کرده باشد (بارکدخوانی که Enter نمی‌زند)، خودِ
    *    بارکد؛ وگرنه `null`.
    */
-  fun feed(char: Char, now: Long): String? = s().feed(char, now)?.also { seen() }
+  fun feed(char: Char, now: Long): String? = s().feed(char, now)?.let { pass(it, now) }?.also { seen() }
 
   /**
    *  Enter رسید — یعنی «تمام شد».
@@ -59,7 +63,7 @@ class HidScan(
    *  @return بارکد (بی پیشوند و پسوند)، اگر آنچه جمع شده به‌قدرِ کافی بلند و به‌قدرِ کافی سریع آمده
    *    باشد (یا پیشوندِ تنظیم‌شده را داشته باشد)؛ وگرنه `null` و بافر پاک می‌شود.
    */
-  fun submit(now: Long): String? = s().submit(now)?.also { seen() }
+  fun submit(now: Long): String? = s().submit(now)?.let { pass(it, now) }?.also { seen() }
 
   /** «دستگاه‌ها»: بارکدخوانِ حالتِ صفحه‌کلید روی همین دستگاه کار می‌کند ⇒ راهنمای حالتِ SPP برای پس‌زمینه */
   private fun seen() { if (!ScanInbox.keyboardSeen.value) ScanInbox.keyboardSeen.value = true }
@@ -68,6 +72,7 @@ class HidScan(
   fun reset() {
     scan?.reset()
     scan = null
+    echo = ir.vil3ntec.tohid.core.hw.ScanEcho()
   }
 
   /**

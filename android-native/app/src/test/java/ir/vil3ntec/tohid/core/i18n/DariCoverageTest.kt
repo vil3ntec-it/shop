@@ -3,6 +3,8 @@ package ir.vil3ntec.tohid.core.i18n
 import ir.vil3ntec.tohid.core.text.DariText
 import ir.vil3ntec.tohid.ui.screens.ProductListModel
 import ir.vil3ntec.tohid.ui.screens.PromoText
+import ir.vil3ntec.tohid.ui.screens.crmTabs
+import ir.vil3ntec.tohid.ui.screens.mediaKindName
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -32,6 +34,8 @@ import java.lang.reflect.Modifier
  *     دکان و گزارشِ تازه ([movedScreens3]) هم متنِ خام ندارند؛ سقفِ `ui/screens` پایین‌تر آمد.
  *  5. **دورِ ۴**: سرورها، کارمندان، چاپگر و بارکدخوان، بانکِ تصاویر، متنِ تخفیف و پیوند، ادغامِ مشتری و کارِ گروهی روی کالا
  *     ([movedScreens4]) هم متنِ خام ندارند؛ جدول و برچسبِ `PromoText`/`ProductListModel` هر بار خوانده می‌شوند؛ سقف باز پایین آمد.
+ *  6. **دورِ ۵**: صفحه‌های زندهٔ کوچک — لوگوی ویترین، نقشهٔ ساعت و روز، دوربینِ گوشی برای کامپیوتر، بسته‌ها و بارکدِ هر واحد، گزارشِ
+ *     مشتریِ گوشی و اسکنِ بارکد ([movedScreens5]) هم متنِ خام ندارند؛ «دوربین/گوشی» ِ اسکن با `td(…)`؛ سقف باز پایین آمد.
  */
 class DariCoverageTest {
 
@@ -220,8 +224,8 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲ */
-  private val maxRawOldScreens = 2052
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴ */
+  private val maxRawOldScreens = 1984
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14
@@ -390,6 +394,85 @@ class DariCoverageTest {
     assertEquals("Save 2 items and update 1", StrCatalogPages.saveAndUpdate(2, 1))
     assertEquals("1 warning", StrCatalogPages.warningsN(1))
     assertEquals("3 warnings", StrCatalogPages.warningsN(3))
+  }
+
+  /* ---------------- دورِ ۵: لوگوی ویترین، نقشهٔ ساعت و روز، دوربینِ گوشی، بسته‌ها، گزارشِ مشتریِ گوشی، اسکنِ بارکد ---------------- */
+
+  /** پرونده‌های زندهٔ کوچکِ `ui/screens` که دورِ ۵ همهٔ نوشتهٔ صفحه‌شان را به جدول برد (`HeatmapModel`/`DayEndModel` نه: ستونِ خروجی) */
+  private val movedScreens5 = listOf(
+    "CustomerReportsPhone.kt", "HeatmapPanel.kt", "PackEditor.kt", "PhoneLinkHost.kt", "ScanSheet.kt", "StorefrontMediaPanel.kt",
+  )
+
+  @Test fun `پرونده‌های جابه‌جاشدهٔ دورِ ۵ متنِ خامِ فارسی ندارند`() {
+    val bad = ArrayList<String>()
+    for (f in movedScreens5.map { app.resolve("ui/screens/$it") }) {
+      assertTrue("${f.path} دیگر نیست — از فهرست بردارید", f.isFile)
+      for (s in raw(f)) bad += "${f.name}: «$s»"
+    }
+    assertTrue(
+      "نوشتهٔ فارسیِ خام (دری و زبان‌های دیگر آن را نمی‌بینند) — به جدولِ Str* با t(…) ببرید؛ داده را با «// داده: دلیل» نشان بدهید:\n" +
+        bad.joinToString("\n"),
+      bad.isEmpty(),
+    )
+  }
+
+  /**
+   *  کفِ پوششِ دریِ کلیدهای پرونده‌های دورِ ۵ (٪) — اندازهٔ همین کار روی کامپیوتر (۱۹٫۰٪ = ۱۲ از ۶۳؛ روی کامپیوتر جدولِ `phrases`
+   *  «تنظیمات گوشی» ِ `StrSale.cameraPermissionDenied` را پیشاپیش «تنظیمات سیستم» کرده، پس دری چیزی برای عوض کردن ندارد)؛ فقط بالا برود
+   */
+  private val minMoved5Percent = 19
+
+  @Test fun `پوششِ دریِ نوشته‌های دورِ ۵ چاپ می‌شود و از کف پایین نمی‌آید`() {
+    val byKey = rows(I18nTables.all).groupBy { it.table + "." + it.key }.mapValues { (_, l) -> l.any { it.dari != it.fa } }
+    val keys = LinkedHashSet<String>()
+    for (f in movedScreens5.map { app.resolve("ui/screens/$it") }) for (m in Regex("""\b(Str\w*)\.(\w+)""").findAll(code(f))) {
+      val k = m.groupValues[1] + "." + m.groupValues[2]
+      if (k in byKey) keys += k
+    }
+    val c = keys.count { byKey[it] == true }
+    val p = pct(c, keys.size)
+    println("dari-moved5 ${keys.size} $c ${"%.1f".format(p)}%")
+    assertTrue("جدولی خوانده نشد", keys.size > 50)
+    assertTrue("پوششِ دریِ نوشته‌های دورِ ۵ ${"%.1f".format(p)}٪ < $minMoved5Percent٪", p >= minMoved5Percent)
+  }
+
+  @Test fun `فارسیِ نوشته‌های دورِ ۵ همان متنِ پیشین است و دری و زبان‌های دیگر عوض می‌شوند`() {
+    //  `LocaleChoice` روی کامپیوتر `I18n.desktop` را روشن می‌کند و آزمونِ دیگری در همین JVM شاید پیش‌تر آن را ساخته باشد
+    val wasDesk = I18n.desktop
+    I18n.desktop = false
+    try { round5Texts() } finally { I18n.desktop = wasDesk }
+  }
+
+  private fun round5Texts() {
+    val kinds = ir.vil3ntec.tohid.core.image.StorefrontMediaSpec.Kind.entries
+    val logo = ir.vil3ntec.tohid.core.image.StorefrontMediaSpec.Kind.LOGO
+    I18n.source = { Lang.FA }
+    //  نامِ نوع همان برچسبِ فارسیِ `Kind.label` است که پیامِ خطای هسته هنوز با آن ساخته می‌شود
+    for (k in kinds) assertEquals(k.label, mediaKindName(k))
+    assertEquals("لوگو ثبت شد", StrPanelPages.mediaSaved(mediaKindName(logo)))
+    assertEquals("12 فروش", StrPanelPages.salesN(12))
+    assertEquals(" — کهنه‌ترین 30 روز", StrPanelPages.oldestDays(30L))
+    assertEquals("3 خرید · 1,200 ؋ · آخرین خرید 5 روز پیش", StrPanelPages.rfmLine(3, "1,200", 5L))
+    assertEquals(listOf("سنِ بدهی", "تحلیلِ خرید (RFM)"), crmTabs(crmOn = true, canSeeMoney = true).values.toList())
+    assertEquals("چند عدد", StrScanPages.howMany("عدد"))
+    assertEquals("بارکدهای بسته (با «،» جدا)", StrScanPages.packBarcodes(StrScanPages.pack))
+    assertEquals("عکسِ «برنج» را بگیرید؛ همان لحظه در کامپیوتر باز می‌شود.", StrScanPages.takePhotoOf("برنج"))
+    I18n.source = { Lang.PRS }
+    assertEquals("بدون فروش", StrPanelPages.noSales)
+    assertEquals("لوگو ثبت گردید", StrPanelPages.mediaSaved(mediaKindName(logo)))
+    //  نامِ کالا (داده) در دری همان می‌ماند، حتی اگر واژهٔ فهرست باشد
+    assertEquals("عکسِ مبایل روی «گوشی سامسونگ» نشست", StrScanPages.phonePhotoSet("گوشی سامسونگ"))
+    I18n.source = { Lang.EN }
+    assertEquals(listOf("Logo", "Header image"), kinds.map { mediaKindName(it) })
+    assertEquals("Logo saved", StrPanelPages.mediaSaved(mediaKindName(logo)))
+    assertEquals("1 sale", StrPanelPages.salesN(1))
+    assertEquals("12 sales", StrPanelPages.salesN(12))
+    assertEquals(listOf("Debt aging", "Purchase analysis (RFM)"), crmTabs(crmOn = true, canSeeMoney = true).values.toList())
+    assertEquals("Pack barcodes (separated by “,”)", StrScanPages.packBarcodes(StrScanPages.pack))
+    //  اسکنِ یک کادر: روی گوشی از دوربین، روی کامپیوتر از بارکدخوان (`td`)
+    assertEquals("Hold the barcode up to the camera — the field fills on the first read", StrScanPages.scanOnce)
+    I18n.desktop = true
+    assertEquals("Scan the barcode with the barcode scanner — the field fills on the first read", StrScanPages.scanOnce)
   }
 
   @Test fun `متنِ خامِ باقی‌ماندهٔ صفحه‌های قدیمی فقط کم می‌شود`() {
