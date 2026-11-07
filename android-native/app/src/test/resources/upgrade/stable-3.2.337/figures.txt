@@ -1,0 +1,16 @@
+stock p1 88.75
+stock p2 11.0
+stock p3 5.0
+debt d1 600.0
+debt d2 0.0
+supplierDebt su1 2000.0
+supplierDebt su2 0.0
+sales count 2.0
+sales gross 1706.25
+sales discount 82.75
+sales net 1623.5
+sales cogs 1496.875
+sales grossProfit 101.625
+sales expenses 5320.5
+sales netProfit -5218.875
+sales returnAmount 190.0

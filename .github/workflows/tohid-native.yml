@@ -31,6 +31,13 @@ on:
         type: choice
         options: [beta, stable]
         default: beta
+      #  پایدار همان کامیتی را بسازد که در آزمایشی آزموده شد: main با هر مرج جلو می‌رود و Run workflow همیشه
+      #  سرِ main را می‌سازد. پر ⇒ اگر سرِ main این کامیت نیست، کار پیش از ساخت می‌ایستد (docs/RELEASE-STABLE-fa.md).
+      sha:
+        description: 'اختیاری (پایدار): کامیتِ آزموده‌شده — پایینِ انتشارِ tohid-native-beta. سرِ main چیزِ دیگری باشد ⇒ ایست. خالی ⇒ بی سنجش'
+        type: string
+        required: false
+        default: ''
 
 concurrency:
   #  انتشارِ پایدار با pushِ بعدی لغو نشود. PR: pushِ تازه اجرای قبلیِ همان PR را لغو می‌کند؛
@@ -65,7 +72,19 @@ jobs:
       - name: کانال
         env:
           INPUT_CHANNEL: ${{ inputs.channel }}
+          INPUT_SHA: ${{ inputs.sha }}
         run: |
+          if [ -n "$INPUT_SHA" ]; then
+            want=$(printf '%s' "$INPUT_SHA" | tr -d '[:space:]' | tr 'A-F' 'a-f')
+            case "$want" in
+              *[!0-9a-f]*) echo "::error::sha فقط نویسهٔ هگز: «$INPUT_SHA»"; exit 1 ;;
+            esac
+            if [ ${#want} -lt 7 ] || [ ${#want} -gt 40 ]; then echo "::error::sha باید ۷ تا ۴۰ نویسه باشد: «$INPUT_SHA»"; exit 1; fi
+            case "$GITHUB_SHA" in
+              "$want"*) echo "کامیتِ خواسته‌شده همان سرِ main است: $GITHUB_SHA" ;;
+              *) echo "::error::سرِ main ($GITHUB_SHA) همان کامیتِ آزموده‌شده ($want) نیست — main پس از آزمایشی جلو رفته؛ نسخهٔ آزمایشیِ تازه را بیازمایید یا sha ِ تازه را بدهید"; exit 1 ;;
+            esac
+          fi
           if [ "$GITHUB_REF" != "refs/heads/main" ]; then
             echo "PUBLISH=false" >> "$GITHUB_ENV"
           elif [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ] && [ "$INPUT_CHANNEL" = "stable" ]; then
