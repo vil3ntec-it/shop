@@ -29,6 +29,7 @@ object I18nTables {
     StrQuickRegister, // S03/POS-17: ثبتِ سریعِ کالا در صندوقِ گوشیِ نسخهٔ ۳
     StrReach, // درهای نسخهٔ ۳ به کارهای بی‌راه‌مانده پس از رابطِ قدیم (`V3ReachabilityTest`)
     StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
+    StrCourierArea, // S83: محدودهٔ خدمتِ هر پیک (فرمِ پیک، کارت و سپردنِ دستی)
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها

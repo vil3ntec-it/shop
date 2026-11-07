@@ -139,6 +139,21 @@ class DeliveryWireTest {
     assertEquals(setOf("active"), DeliveryWire.courierUpdateJson(active = false).keys)
   }
 
+  /** S83 — همان شکلِ `server/test/courier-area.test.js` */
+  @Test fun `S83 — محدودهٔ خدمت — areas و areaChoices، بدنهٔ ویرایش فقط اگر آمد، overrideArea فقط برای پیکِ دکان`() {
+    val c = DeliveryWire.courier(obj("""{"id":"C1","name":"پیک","areas":["کارته","شهرنو",3]}"""))!!
+    assertEquals(listOf("کارته", "شهرنو"), c.areas)
+    assertEquals(emptyList<String>(), DeliveryWire.courier(obj("""{"id":"C2"}"""))!!.areas)
+    assertEquals(listOf("کارته"), DeliveryWire.config(obj("""{"areaChoices":["کارته"]}""")).areaChoices)
+    assertEquals("کلیدِ ناجور ⇒ خالی، نه کرش", emptyList<String>(), DeliveryWire.config(obj("""{"areaChoices":"کارته"}""")).areaChoices)
+    assertFalse("areas" in DeliveryWire.courierUpdateJson(cashCapMinor = 1).keys)
+    assertEquals("[]", DeliveryWire.courierUpdateJson(areas = emptyList())["areas"].toString())
+    assertEquals("[\"خیر‌خانه\"]", DeliveryWire.courierUpdateJson(areas = listOf(" خیر‌خانه ", "خیر خانه", "  "))["areas"].toString())
+    assertEquals(setOf("mode", "courierId", "overrideArea"), DeliveryWire.assignJson("shop_courier", courierId = "C", overrideArea = true).keys)
+    assertEquals(setOf("mode", "courierId"), DeliveryWire.assignJson("shop_courier", courierId = "C").keys)
+    assertEquals(setOf("mode", "externalName"), DeliveryWire.assignJson("external", externalName = "X", overrideArea = true).keys)
+  }
+
   /** RPT-15 — همان شکلِ `server/test/delivery-cash-report.test.js` */
   @Test fun `گزارش نقد پیک‌ها - ردیف‌ها، جمع و هم‌خوانی`() {
     val r = DeliveryWire.cashReport(obj("""

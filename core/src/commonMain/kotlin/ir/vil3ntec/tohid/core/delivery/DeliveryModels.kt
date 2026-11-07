@@ -35,6 +35,8 @@ data class DeskConfig(
   val picking: Boolean = false,
   /** پرچمِ خاموشِ `shop.delivery_ratings` (DLV-18): دکمهٔ «امتیازِ تحویل‌ها» برای صاحب و مدیر */
   val ratings: Boolean = false,
+  /** S83: نامِ ناحیه‌های ارسالِ ویترینِ دکان — گزینه‌های «محدودهٔ خدمت» در فرمِ پیک */
+  val areaChoices: List<String> = emptyList(),
 )
 
 /** پیکِ دکان با نقدِ در دستش (DLV-11) */
@@ -54,6 +56,8 @@ data class CourierRow(
   val liveExpectedMinor: Long = 0,
   /** سقفِ کارِ هم‌زمانِ همین پیک (DLV-03، سرور: `max_live`)؛ null = بی‌سقف */
   val maxLive: Int? = null,
+  /** محدودهٔ خدمت (S83، سرور: `areas`): نامِ ناحیه‌ها؛ خالی = همه‌جا (`CourierArea`) */
+  val areas: List<String> = emptyList(),
 )
 
 /** یک مأموریتِ تحویل از دیدِ دکان (`staffView` + نامِ مشتری و وضعیتِ سفارش) */

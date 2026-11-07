@@ -10,8 +10,10 @@ import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.model.OrderAddressDto
 import ir.vil3ntec.tohid.core.model.OrderCustomerDto
 import ir.vil3ntec.tohid.core.model.OrderDto
+import ir.vil3ntec.tohid.core.model.OrderZoneDto
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -109,6 +111,28 @@ class DeliveryModelTest {
     assertFalse(DeliveryForms.assignValid(DeliveryForms.Assign("external"), desk.couriers, 0))
     assertTrue(DeliveryForms.assignValid(DeliveryForms.Assign("external", company = "پیک‌رسان", fare = "۱۵۰"), desk.couriers, 0))
     assertFalse(DeliveryForms.assignValid(DeliveryForms.Assign("external", company = "پیک‌رسان", fare = "x"), desk.couriers, 0))
+  }
+
+  /** S83: ناحیهٔ سفارش (ویترین مقدم)، پیک‌های در محدوده اول، و بیرون از محدوده فقط با تیکِ آگاهانه */
+  @Test
+  fun courierAreaInManualAssign() {
+    val north = CourierRow("n", name = "شمال", cashCapMinor = 100_000, areas = listOf("خیرخانه"))
+    val any = CourierRow("a", name = "همه‌جا", cashCapMinor = 100_000)
+    val o = order("z", "packed").copy(address = OrderAddressDto(landmark = "پشتِ مسجد", area = "کارته", zone = OrderZoneDto("خیر خانه")))
+    assertEquals("خیر خانه", DeliveryModel.area(o))
+    assertEquals("کارته", DeliveryModel.area(o.copy(address = o.address.copy(zone = null))))
+    assertEquals("خیر خانه", DeliveryModel.candidate(o).area)
+    val far = o.copy(address = OrderAddressDto(area = "کارته"))
+    val farArea = DeliveryModel.area(far)
+    assertEquals(listOf("a", "n"), DeliveryForms.byArea(listOf(north, any), farArea).map { it.id })
+    assertEquals(listOf("n", "a"), DeliveryForms.byArea(listOf(north, any), DeliveryModel.area(o)).map { it.id })
+    val pick = DeliveryForms.Assign("shop_courier", courierId = "n")
+    assertTrue(DeliveryForms.outOfArea(pick, listOf(north, any), farArea))
+    assertFalse(DeliveryForms.assignValid(pick, listOf(north, any), 0, farArea))
+    assertTrue(DeliveryForms.assignValid(pick.copy(overrideArea = true), listOf(north, any), 0, farArea))
+    assertTrue(DeliveryForms.assignValid(pick, listOf(north, any), 0, DeliveryModel.area(o)))
+    assertTrue("سفارشِ بی ناحیه", DeliveryForms.assignValid(pick, listOf(north, any), 0, ""))
+    assertFalse(DeliveryForms.outOfArea(pick.copy(courierId = "a"), listOf(north, any), farArea))
   }
 
   @Test

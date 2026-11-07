@@ -210,7 +210,7 @@ internal fun RouteScope.CourierSheetRoute(kind: String) {
       finished(StrOnline.dlSettled(s.settleNo, gap))
     })
     "ledger" -> LedgerSheet(cr, repo, onDismiss = { back() })
-    else -> CourierCapSheet(cr, repo, onDismiss = { back() }, onDone = { finished(StrOnline.dlSavedFor(cr.name)) })
+    else -> CourierCapSheet(cr, DeliveryGate.config.value?.areaChoices.orEmpty(), repo, onDismiss = { back() }, onDone = { finished(StrOnline.dlSavedFor(cr.name)) })
   }
 }
 

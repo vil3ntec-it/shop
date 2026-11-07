@@ -16,6 +16,9 @@
  *   DLV-16        سرویسِ موقعیتِ برنامهٔ پیک (`LiveTrack`): بی پرچم هیچ؛ با هر دو پرچم فقط پس از «گرفتم» و فقط
  *                 «در راه»، نه تندتر از نوبت، بی صف (بی اینترنت ⇒ دور)، نقطهٔ کهنه نه، «رسیدم» ِ نرفته همان دم
  *                 می‌بندد؛ مشتری فقط نقطهٔ گرد و تقریبی، پس از «رسیدم» هیچ.
+ *   S83           محدودهٔ خدمتِ پیک: سفارشِ ویترین با «ناحیه» ِ بیرون از محدودهٔ پیکِ اول ⇒ سپردن ۴۰۹ و هیچ کارتی در
+ *                 گوشی‌اش؛ همان نام با نوشتنِ دیگر در محدوده است؛ سپردنِ آگاهانه در رویداد ثبت و کارت می‌رسد؛ برداشتنِ
+ *                 محدوده ⇒ دوباره همه‌جا.
  *
  * پرچم‌ها فقط برای همین دکان (live_config): shop.orders، shop.storefront، shop.delivery.
  * اجرا:  node test/e2e/courier.e2e.mjs
@@ -39,11 +42,11 @@ const order = (id) => db.one('SELECT status, cod_status, total_minor FROM online
 let A; let K1; let K2; let rice; let c1; let c2; let ticket;
 const placed = {};
 
-async function deliveryOrder(qty, landmark) {
+async function deliveryOrder(qty, landmark, more = {}) {
   const r = E.ok(await E.post(`/api/store/${SLUG}/checkout`, {
     fulfillment: 'delivery', paymentMethod: 'cod', customer: { name: 'مشتریِ پیک', phone: PHONE },
     lines: [{ productId: rice, qtyMilli: qty * 1000 }],
-    address: { text: 'خیرخانه، سرکِ اول', landmark }, delivery: { callBeforeArrival: true },
+    address: { text: 'خیرخانه، سرکِ اول', landmark, ...more }, delivery: { callBeforeArrival: true },
   }, null, { 'X-Store-Ticket': ticket, 'Idempotency-Key': E.key('web') }), 'ثبتِ سفارشِ ارسال', 201);
   const row = await db.one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [owner.shopId, r.order.orderNo]);
   return { ...r.order, id: row.id };
@@ -332,6 +335,43 @@ await E.step('DLV-16.app', 'موقعیت فقط «در راه» از سرویس�
   } finally {
     for (const k of [DL.VIEW_FLAG, DL.LOCATION_FLAG]) await E.flag(owner.shopId, k, false);
   }
+}, { needs: ['DEL-01'] });
+
+await E.step('S83.app', 'محدودهٔ خدمتِ پیک: بیرون از محدوده ⇒ سپردن ۴۰۹ و هیچ کارتی در گوشیِ پیک؛ آگاهانه ⇒ در رویداد و کارت می‌رسد؛ بی محدوده همه‌جا', async () => {
+  const setAreas = async (areas) => E.ok(await A.api('POST', `/shop/delivery/couriers/${c1}`, { areas }), 'محدودهٔ پیک').courier.areas;
+  assert.deepEqual(await setAreas(['شهر نو', 'شهرنو']), ['شهر نو'], 'نامِ تکراری یکی شد');
+  const far = await deliveryOrder(1, 'نزدیکِ پارک', { area: 'خیرخانه' });
+  await packed(far.id);
+  const denied = await A.api('POST', `/shop/delivery/orders/${far.id}/assign`, { mode: 'shop_courier', courierId: c1, fareMinor: 5000 },
+    { headers: { 'Idempotency-Key': E.key('asg') } });
+  assert.equal(denied.status, 409, JSON.stringify(denied.body));
+  assert.equal(denied.body.error.code, 'courier_out_of_area');
+  assert.equal(Number((await db.one('SELECT COUNT(*)::int AS n FROM delivery_assignments WHERE order_id=$1', [far.id])).n), 0, 'مأموریت ساخته شد');
+  assert.equal((await order(far.id)).status, 'packed', 'سفارش در صفِ سپردنِ دستی نماند');
+  await flushed(K1);
+  assert.equal(K1.cards.active.some((c) => c.orderId === far.id), false, 'کارتِ بیرون از محدوده به گوشیِ پیک رسید');
+
+  const near = await deliveryOrder(1, 'نزدیکِ پارک', { area: 'شهرنو' });
+  await packed(near.id);
+  const inArea = (await assign(near.id, c1)).assignment.id;
+  const forced = (await assign(far.id, c1, { overrideArea: true })).assignment.id;
+  const detail = async (id) => {
+    const ev = await db.one(`SELECT detail FROM delivery_events WHERE assignment_id=$1 AND kind='created'`, [id]);
+    return typeof ev.detail === 'string' ? JSON.parse(ev.detail) : ev.detail;
+  };
+  assert.equal((await detail(inArea)).outOfArea, undefined);
+  assert.equal((await detail(forced)).outOfArea, true, 'سپردنِ آگاهانه در رویداد نیامد');
+  await flushed(K1);
+  for (const id of [inArea, forced]) assert.equal(K1.view(id)?.status, 'requested', `کارتِ ${id} در گوشیِ پیک نیست`);
+  //  پیک هر دو را با دلیل رد می‌کند تا مأموریتِ زنده‌ای نماند؛ برداشتنِ محدوده ⇒ همه‌جا
+  K1.record(inArea, 'rejected', { reason: 'busy' }).record(forced, 'rejected', { reason: 'busy' });
+  await flushed(K1);
+  assert.deepEqual(await setAreas([]), []);
+  const again = (await assign(far.id, c1)).assignment.id;
+  assert.equal((await detail(again)).outOfArea, undefined, 'بی محدوده هنوز بیرون از محدوده شمرده شد');
+  await flushed(K1);
+  K1.record(again, 'rejected', { reason: 'busy' });
+  await flushed(K1);
 }, { needs: ['DEL-01'] });
 
 await E.finish();

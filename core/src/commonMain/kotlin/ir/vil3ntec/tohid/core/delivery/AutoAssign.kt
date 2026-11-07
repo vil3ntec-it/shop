@@ -8,6 +8,8 @@ import ir.vil3ntec.tohid.core.orders.OrderText
  *  ⛔ پیکی که با این سفارش از سقفِ نقدش می‌گذرد هرگز انتخاب نمی‌شود — و
  *     «آگاهانه بالای سقف» فقط در سپردنِ دستیِ مدیر هست، نه این‌جا.
  *  ⛔ پیکِ غیرفعال کارِ تازه نمی‌گیرد.
+ *  ⛔ پیکی که ناحیهٔ سفارش در محدودهٔ خدمتش نیست (S83، `CourierArea`) هرگز انتخاب نمی‌شود؛ سفارش «جا نشد»
+ *     با دلیل در صفِ سپردنِ دستی می‌ماند (آن‌جا مدیر آگاهانه می‌پذیرد). محدودهٔ خالی = همه‌جا.
  *  • «نزدیک‌ترین پیک» هنوز داده ندارد (موقعیتِ پیک، DLV-16، ساخته نشده)؛ پس
  *    کم‌کارترین پیک انتخاب می‌شود: کمترین مأموریتِ زنده، بعد کمترین نقدِ
  *    درگیر، بعد نام — تا کار پخش شود و نتیجه همیشه یکی باشد.
@@ -28,6 +30,8 @@ object AutoAssign {
     val orderNo: Long,
     val expectedCollectMinor: Long,
     val createdAt: Long,
+    /** ناحیهٔ سفارش (`CourierArea.orderArea`)؛ خالی ⇒ هر پیک */
+    val area: String = "",
   )
 
   data class Pick(val orderId: String, val orderNo: Long, val courierId: String, val courierName: String)
@@ -56,7 +60,7 @@ object AutoAssign {
 
     for (o in queue) {
       val best = loads.values
-        .filter { CourierCash.fits(it, o.expectedCollectMinor) && hasRoom(it, maxLive) }
+        .filter { CourierArea.covers(it, o.area) && CourierCash.fits(it, o.expectedCollectMinor) && hasRoom(it, maxLive) }
         .minWithOrNull(compareBy<CourierRow>({ it.liveCount }, { CourierCash.committed(it) }, { it.name }, { it.id }))
       if (best == null) {
         unplaced += Unplaced(o.orderId, o.orderNo, whyNot(o, loads.values, maxLive))
@@ -79,8 +83,11 @@ object AutoAssign {
     return Plan(picks, unplaced, blocked)
   }
 
-  private fun whyNot(o: Candidate, loads: Collection<CourierRow>, maxLive: Int?): String {
-    if (loads.isEmpty()) return "هیچ پیکِ فعالی نیست"
+  private fun whyNot(o: Candidate, all: Collection<CourierRow>, maxLive: Int?): String {
+    if (all.isEmpty()) return "هیچ پیکِ فعالی نیست"
+    //  S83: فقط پیک‌هایی که ناحیهٔ سفارش در محدوده‌شان است؛ بی محدوده یا بی ناحیه ⇒ همان همه (پیام‌های پیشین)
+    val loads = all.filter { CourierArea.covers(it, o.area) }
+    if (loads.isEmpty()) return "ناحیهٔ «${o.area}» در محدودهٔ خدمتِ هیچ پیکِ فعالی نیست — دستی بسپارید"
     val free = loads.filter { hasRoom(it, maxLive) }
     if (free.isEmpty()) {
       return if (maxLive != null && loads.all { liveCapOf(it, maxLive) == maxLive }) "همهٔ پیک‌ها به سقفِ کارِ هم‌زمان ($maxLive) رسیده‌اند"

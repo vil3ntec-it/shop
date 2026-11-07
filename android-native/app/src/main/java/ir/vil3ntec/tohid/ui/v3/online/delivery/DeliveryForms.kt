@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.online.delivery
 
+import ir.vil3ntec.tohid.core.delivery.CourierArea
 import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskActions
@@ -19,6 +20,8 @@ object DeliveryForms {
     val mode: String,
     val courierId: String = "",
     val override: Boolean = false,
+    /** S83: پیکِ انتخاب‌شده بیرون از محدوده است و مدیر آگاهانه می‌سپارد (`overrideArea`) */
+    val overrideArea: Boolean = false,
     val company: String = "",
     val ref: String = "",
     val fare: String = "",
@@ -33,12 +36,20 @@ object DeliveryForms {
   fun overCap(a: Assign, couriers: List<CourierRow>, expected: Long): Boolean =
     couriers.firstOrNull { it.id == a.courierId }?.let { !CourierCash.fits(it, expected) } ?: false
 
-  fun assignValid(a: Assign, couriers: List<CourierRow>, expected: Long): Boolean {
+  /** پیکِ انتخاب‌شده ناحیهٔ این سفارش را در محدوده‌اش ندارد؟ (S83؛ سرور بی `overrideArea` ۴۰۹ می‌دهد) */
+  fun outOfArea(a: Assign, couriers: List<CourierRow>, area: String): Boolean =
+    couriers.firstOrNull { it.id == a.courierId }?.let { !CourierArea.covers(it, area) } ?: false
+
+  /** پیک‌های فهرستِ سپردن: آن‌ها که ناحیهٔ سفارش در محدوده‌شان است اول (ترتیبِ میز در هر گروه می‌ماند) */
+  fun byArea(couriers: List<CourierRow>, area: String): List<CourierRow> = couriers.sortedBy { if (CourierArea.covers(it, area)) 0 else 1 }
+
+  fun assignValid(a: Assign, couriers: List<CourierRow>, expected: Long, area: String = ""): Boolean {
     if (minorOf(a.fare) == null) return false
     return when (a.mode) {
       "shop_courier" -> {
         val chosen = couriers.firstOrNull { it.id == a.courierId }
-        chosen != null && chosen.active && (CourierCash.fits(chosen, expected) || a.override)
+        chosen != null && chosen.active && (CourierCash.fits(chosen, expected) || a.override) &&
+          (CourierArea.covers(chosen, area) || a.overrideArea)
       }
       else -> a.company.isNotBlank()
     }

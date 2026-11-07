@@ -20,6 +20,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeliveryDining
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -35,6 +36,8 @@ import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
+import ir.vil3ntec.tohid.core.i18n.StrCourierArea
+import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -57,7 +60,8 @@ class CouriersActions(val onSettle: (CourierRow) -> Unit, val onLedger: (Courier
 /**
  *  برگهٔ «پیک‌ها و نقد» (DLV-11/12): هر پیک یک کارت — وضعیت (آماده/به سقف رسیده/بالای سقف/غیرفعال)،
  *  نوارِ پرشدنِ سقف با درصد، «در دست»، «گرفتنی از مأموریت‌های زنده»، «سقف · جای خالی»، دلیلِ «خودکار
- *  نمی‌گیرد»، و تسویه / دفترِ نقد (فقط صاحب و مدیر) و سقف و وضعیت (`delivery.couriers`).
+ *  نمی‌گیرد»، محدودهٔ خدمت (S83، فقط اگر هست)، و تسویه / دفترِ نقد (فقط صاحب و مدیر) و سقف، محدوده و وضعیت
+ *  (`delivery.couriers`).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -89,10 +93,15 @@ internal fun CouriersTab(d: DeskData, cfg: DeskConfig, writable: Boolean, action
           Spacer(Modifier.height(8.dp))
           DraftTag(it, tone = V3Tone.WARNING)
         }
+        //  S83: محدودهٔ خدمت فقط وقتی هست (خالی = همه‌جا، همان کارتِ پیشین)
+        if (cr.areas.isNotEmpty()) {
+          Spacer(Modifier.height(8.dp))
+          DraftTag(StrCourierArea.tag(cr.areas.joinToString(StrHome.listSep)), Icons.Outlined.Place, V3Tone.INFO)
+        }
         val buttons = buildList<Pair<String, () -> Unit>> {
           if (cfg.perms.settle && writable) add(StrOnline.dlSettle to { actions.onSettle(cr) })
           if (cfg.perms.settle) add(StrOnline.dlLedger to { actions.onLedger(cr) })
-          if (cfg.perms.couriers && writable) add(StrOnline.dlCapAndState to { actions.onCap(cr) })
+          if (cfg.perms.couriers && writable) add(StrCourierArea.button to { actions.onCap(cr) })
         }
         if (buttons.isNotEmpty()) {
           Spacer(Modifier.height(12.dp))

@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.DeliveryDining
 import androidx.compose.material.icons.outlined.WarningAmber
+import androidx.compose.material.icons.outlined.WrongLocation
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -22,10 +23,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.delivery.AutoAssign
+import ir.vil3ntec.tohid.core.delivery.CourierArea
 import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.Mission
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
+import ir.vil3ntec.tohid.core.i18n.StrCourierArea
+import ir.vil3ntec.tohid.core.i18n.StrHome
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.data.repo.DeliveryRepository
@@ -53,6 +57,8 @@ import kotlinx.coroutines.launch
  *  سپردنِ دستی (DLV-03، `delivery/assign/{orderId}`): پیکِ دکان (کارتِ انتخاب با شمارِ زنده، نوارِ
  *  «نقدِ درگیر از سقف»، هشدارِ گذشتن از سقف و تیکِ آگاهانه) یا شرکتِ بیرونی (نام، رهگیری)، با
  *  کرایهٔ همین تحویل. یک کلیدِ یکتایی برای همین فرم — پاسخِ گم‌شده با دوباره زدن همان کار است.
+ *  S83: پیک‌هایی که ناحیهٔ سفارش در محدودهٔ خدمتشان است اول می‌آیند و پیشنهاد فقط از میانِ آن‌هاست؛ پیکِ
+ *  بیرون از محدوده برچسب دارد و فقط با تیکِ آگاهانه (`overrideArea`) سپرده می‌شود.
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -67,8 +73,10 @@ internal fun AssignSheet(
   val c = PhoneV3.colors
   val scope = rememberCoroutineScope()
   val expected = DeliveryModel.expected(order)
+  val area = DeliveryModel.area(order)
+  val couriers = remember(d.couriers, area) { DeliveryForms.byArea(d.couriers, area) }
   val suggested = remember(order.id, d.couriers) {
-    AutoAssign.plan(listOf(AutoAssign.Candidate(order.id, order.orderNo, expected, order.createdAt)), d.couriers).picks.firstOrNull()?.courierId
+    AutoAssign.plan(listOf(DeliveryModel.candidate(order)), d.couriers).picks.firstOrNull()?.courierId
   }
   val modes = DeliveryForms.modes(cfg)
   var form by remember { mutableStateOf(DeliveryForms.Assign(DeliveryForms.startMode(cfg, d.couriers), courierId = suggested.orEmpty())) }
@@ -77,6 +85,7 @@ internal fun AssignSheet(
   val keys = remember { DeliveryRepository.OnceKey() }
   val fareMinor = minorOf(form.fare)
   val over = DeliveryForms.overCap(form, d.couriers, expected)
+  val outside = DeliveryForms.outOfArea(form, d.couriers, area)
 
   V3Sheet(onDismiss = onDismiss, title = StrOnline.dlAssignTitle(order.orderNo)) { _ ->
     Text(
@@ -84,6 +93,7 @@ internal fun AssignSheet(
       style = V3Type.callout, color = c.ink,
     )
     DeliveryModel.landmark(order).takeIf { it.isNotEmpty() }?.let { Text(it, style = V3Type.footnote, color = c.inkMuted) }
+    if (area.isNotEmpty()) Text(StrCourierArea.orderArea(area), style = V3Type.footnote, color = c.inkMuted)
     if (modes.size > 1) {
       Spacer(Modifier.height(14.dp))
       V3Segmented(modes.map(StrOnline::deliveryMode), modes.indexOf(form.mode).coerceAtLeast(0), { form = form.copy(mode = modes[it]); err = null })
@@ -92,21 +102,27 @@ internal fun AssignSheet(
     if (form.mode == "shop_courier") {
       if (d.couriers.isEmpty()) V3Message(V3Tone.INFO, StrOnline.dlNoCouriersInline)
       else V3Card(padding = PaddingValues(vertical = 4.dp)) {
-        d.couriers.forEachIndexed { i, cr ->
+        couriers.forEachIndexed { i, cr ->
           if (i > 0) V3Divider(start = 16.dp)
           val fits = CourierCash.fits(cr, expected)
+          val inArea = CourierArea.covers(cr, area)
           V3ListRow(
             cr.name,
             subtitle = if (cr.active) StrOnline.dlCourierLine(cr.liveCount, OnlineFmt.afn(CourierCash.committed(cr)), OnlineFmt.afn(cr.cashCapMinor), OnlineFmt.afn(CourierCash.headroom(cr))) else StrOnline.dlInactive,
             icon = Icons.Outlined.DeliveryDining,
             hue = V3Hue.SKY,
             selected = cr.id == form.courierId,
-            trailing = if (cr.id == suggested) ({ DraftTag(StrOnline.dlSuggest, tone = V3Tone.SUCCESS) }) else null,
-            onClick = if (cr.active) ({ form = form.copy(courierId = cr.id, override = false) }) else null,
+            trailing = when {
+              cr.id == suggested -> ({ DraftTag(StrOnline.dlSuggest, tone = V3Tone.SUCCESS) })
+              cr.active && !inArea -> ({ DraftTag(StrCourierArea.outOfArea, Icons.Outlined.WrongLocation, V3Tone.WARNING) })
+              else -> null
+            },
+            onClick = if (cr.active) ({ form = form.copy(courierId = cr.id, override = false, overrideArea = false) }) else null,
           )
           if (cr.active) Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp)) {
             DraftCapBar(CourierCash.usePercent(cr), CourierCash.atCap(cr), OnlineFmt.afn(cr.cashCapMinor))
             if (!fits) { Spacer(Modifier.height(6.dp)); DraftTag(StrOnline.dlWouldExceed, Icons.Outlined.WarningAmber, V3Tone.WARNING) }
+            if (cr.areas.isNotEmpty()) { Spacer(Modifier.height(6.dp)); Text(StrCourierArea.tag(cr.areas.joinToString(StrHome.listSep)), style = V3Type.caption, color = c.inkMuted) }
           }
         }
       }
@@ -114,6 +130,12 @@ internal fun AssignSheet(
         Spacer(Modifier.height(10.dp))
         V3Card(padding = PaddingValues(0.dp)) {
           V3ToggleRow(StrOnline.dlOverride, form.override, { form = form.copy(override = it) }, icon = Icons.Outlined.WarningAmber, hue = V3Hue.AMBER)
+        }
+      }
+      if (outside) {
+        Spacer(Modifier.height(10.dp))
+        V3Card(padding = PaddingValues(0.dp)) {
+          V3ToggleRow(StrCourierArea.assignAnyway(area), form.overrideArea, { form = form.copy(overrideArea = it) }, icon = Icons.Outlined.WrongLocation, hue = V3Hue.AMBER)
         }
       }
     } else {
@@ -147,14 +169,14 @@ internal fun AssignSheet(
         scope.launch {
           val body = DeliveryWire.assignJson(
             mode = form.mode, courierId = form.courierId, externalName = form.company, externalRef = form.ref,
-            fareMinor = fareMinor ?: 0L, overrideCashCap = form.override,
+            fareMinor = fareMinor ?: 0L, overrideCashCap = form.override, overrideArea = form.overrideArea && outside,
           )
           repo.assign(order.id, body, keys.of(body)).onSuccess { onDone(it.mission, it.code) }.onFailure { err = it.userMessage }
           busy = false
         }
       },
       Modifier.fillMaxWidth(),
-      enabled = DeliveryForms.assignValid(form, d.couriers, expected) && !busy,
+      enabled = DeliveryForms.assignValid(form, d.couriers, expected, area) && !busy,
       loading = busy,
       haptic = true,
     )
