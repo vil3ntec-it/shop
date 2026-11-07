@@ -28,6 +28,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrStorePlace
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -72,6 +73,15 @@ fun SettingsPane(
           AccentSwatch(form.accent, Modifier.padding(start = 10.dp, top = 30.dp))
         }
         V3TextField(form.notice, { onChange(form.copy(notice = it)) }, StrOnline.sfNotice, modifier = Modifier.fillMaxWidth())
+        //  ممیزیِ ویترین (مشکلِ ۶): نشانی و پینِ دکان برای مشتریِ «دریافت از دکان»
+        V3TextField(
+          form.address, { onChange(form.copy(address = it)) }, StrStorePlace.address, helper = StrStorePlace.addressHelper,
+          singleLine = false, modifier = Modifier.fillMaxWidth(),
+        )
+        V3TextField(
+          form.pin, { onChange(form.copy(pin = it)) }, StrStorePlace.pin, placeholder = "34.5281, 69.1723", helper = StrStorePlace.pinHelper,
+          error = errors["pin"], modifier = Modifier.fillMaxWidth(),
+        )
       }
       V3Divider(start = 64.dp)
       V3ToggleRow(StrOnline.sfEnabled, form.enabled, { onChange(form.copy(enabled = it)) }, icon = Icons.Outlined.Storefront, hue = V3Hue.BRAND)

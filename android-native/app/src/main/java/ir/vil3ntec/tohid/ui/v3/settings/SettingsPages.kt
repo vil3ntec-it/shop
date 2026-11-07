@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.outlined.Dns
+import androidx.compose.material.icons.outlined.Place
 import ir.vil3ntec.tohid.ui.v3.settings.sections.ServersScreen
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AccountBalanceWallet
@@ -253,6 +254,7 @@ internal object SettingsPages {
     SettingsLayout.PRINTER -> Icons.Outlined.Print
     SettingsLayout.PERIPHERALS -> Icons.Outlined.Devices
     SettingsLayout.PROFILE -> Icons.Outlined.AccountCircle
+    SettingsLayout.STORE_PLACE -> Icons.Outlined.Place
     SettingsLayout.SHOP -> Icons.Outlined.Shield
     SettingsLayout.SALES -> Icons.Outlined.PointOfSale
     SettingsLayout.GOODS -> Icons.Outlined.Inventory2

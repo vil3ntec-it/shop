@@ -18,7 +18,8 @@
       "categories",
       "delivery?",
       "media?",
-      "ordering?"
+      "ordering?",
+      "place?"
     ],
     "ordering": [
       "accepting",
@@ -79,7 +80,8 @@
       "productCount",
       "distanceKm",
       "isNew",
-      "cover?"
+      "cover?",
+      "logo?"
     ],
     "shopRef": [
       "slug",

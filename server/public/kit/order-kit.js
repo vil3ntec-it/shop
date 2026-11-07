@@ -7,6 +7,18 @@
   'use strict';
   var K = window.K;
 
+  /**
+   * WEB-02/CHK-11 (ممیزیِ ویترین ۱۴۰۵/۰۸/۱۷، مشکلِ ۶): نشانی و «مسیر روی نقشه» ِ دکان (`store.place`، مهاجرتِ ۲۱۵؛ پیوند را
+   * سرور می‌سازد) برای سربرگ، «دریافت از دکان» و پیگیریِ سفارشِ دریافتی. نبود ⇒ null. فقط پیوندِ https.
+   */
+  K.ICONS.pin = K.ICONS.pin || 'M12 21s-7-6.2-7-12a7 7 0 0 1 14 0c0 5.8-7 12-7 12z M12 11.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z';
+  K.place = function (s) {
+    var p = s && s.place;
+    if (!p || (!p.text && !p.map)) return null;
+    return K.el('p', { class: 'place' }, K.icon('pin'), p.text ? K.el('span', { text: p.text }) : null,
+      /^https:\/\//.test(p.map || '') ? K.el('a', { text: K.t('sh.map'), attrs: { href: p.map, target: '_blank', rel: 'noopener' } }) : null);
+  };
+
   K.normPhone = function (v) {
     var s = String(v || '').replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); })
       .replace(/[٠-٩]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); }).replace(/[\s\-().]/g, '').replace(/^00/, '+');

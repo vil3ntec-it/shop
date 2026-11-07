@@ -145,6 +145,11 @@ object SettingsSearchIndex {
     L.POS_SEARCH to kw("جست‌وجو صندوق", "till search", "لټون"),
     L.POS_PRICE_CHECK to kw("قیمت پرسی", "price check", "بیه پوښتنه"),
     L.KEY_HELP to kw("راهنما کلید", "key help shortcuts", "د کیلي لارښود"),
+    L.STORE_PLACE to kw(
+      "نشانی دکان آدرس نقشه پین مسیر دریافت از دکان ویترین موقعیت",
+      "shop address map pin directions pickup storefront location",
+      "د دوکان پته نقشه پن لار له دوکانه اخیستل ویترین ځای",
+    ),
     L.STOREFRONT_ETA to kw("زمان تحویل ویترین", "delivery time storefront", "د سپارلو وخت"),
     L.PROMO_GUARD to kw("تخفیف اولین خرید", "first order discount", "لومړی پېرود تخفیف"),
     L.ONLINE_ORDERS to kw(

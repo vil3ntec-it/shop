@@ -275,6 +275,8 @@ object StorefrontQueue {
       weeklyHours = hours, closedDates = closed,
       fulfillment = StorefrontFulfillmentDto(bool("acceptDelivery", base.fulfillment.delivery), bool("acceptPickup", base.fulfillment.pickup)),
       deliveryFeeMinor = long("deliveryFeeMinor", base.deliveryFeeMinor), minOrderMinor = long("minOrderMinor", base.minOrderMinor),
+      pickupAddress = str("pickupAddress", base.pickupAddress),
+      pickupPin = if (b.containsKey("pickupPin")) storefrontPinOf(b["pickupPin"]) else base.pickupPin,
     )
   }
 
