@@ -140,17 +140,17 @@ test('مشکلِ ۵: کارتِ بازارچه لوگوی خودِ دکان را
 
 test('مهاجرتِ ۲۱۵: rollback ستون‌ها را برمی‌دارد و دوباره نشستن همان', async () => {
   const dir = path.join(__dirname, '..', 'migrations');
-  const down = fs.readFileSync(path.join(dir, 'rollback', '215_storefront_place.down.sql'), 'utf8');
-  const up = fs.readFileSync(path.join(dir, '215_storefront_place.sql'), 'utf8');
+  const down = fs.readFileSync(path.join(dir, 'rollback', '230_storefront_place.down.sql'), 'utf8');
+  const up = fs.readFileSync(path.join(dir, '230_storefront_place.sql'), 'utf8');
   const cols = async () => (await query(
     "SELECT column_name FROM information_schema.columns WHERE table_name='storefronts' AND column_name IN ('pickup_address','pickup_lat','pickup_lng')"
   )).rows.length;
   assert.equal(await cols(), 3);
-  const mark = await one("SELECT * FROM schema_migrations WHERE version='215_storefront_place.sql'");
+  const mark = await one("SELECT * FROM schema_migrations WHERE version='230_storefront_place.sql'");
   assert.ok(mark, 'مهاجرت نشسته است');
   await query(down);
   assert.equal(await cols(), 0);
-  assert.equal(await one("SELECT 1 AS x FROM schema_migrations WHERE version='215_storefront_place.sql'"), null);
+  assert.equal(await one("SELECT 1 AS x FROM schema_migrations WHERE version='230_storefront_place.sql'"), null);
   await query(up);
   await query('INSERT INTO schema_migrations (version, checksum, applied_at) VALUES ($1,$2,$3)', [mark.version, mark.checksum, mark.applied_at]);
   assert.equal(await cols(), 3);
