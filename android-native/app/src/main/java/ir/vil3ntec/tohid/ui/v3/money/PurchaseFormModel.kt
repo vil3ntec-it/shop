@@ -2,10 +2,13 @@ package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseBook
+import ir.vil3ntec.tohid.formatDate
+import ir.vil3ntec.tohid.todayIso
 
 /** نوشته‌های فرمِ «ثبت خرید» — همه متنِ خامِ کادرها (عدد بی جداکننده) */
 internal data class PurchaseForm(
@@ -20,6 +23,13 @@ internal data class PurchaseForm(
   val more: List<PurchaseRow> = emptyList(),
   /** PUR-05: تاریخِ انقضای ردیفِ نخست، همان‌طور که تایپ شد (شمسی؛ خالی = بی انقضا) */
   val expiry: String = "",
+  /**
+   *  PUR-05/PUR-06: هزینهٔ جانبیِ کلِ فاکتور (کرایه، گمرک) — روی بهای ردیف‌ها، نه بدهیِ تأمین‌کننده؛ خالی = ندارد.
+   *  فقط با موتورِ تازهٔ موجودی (`StockLedger.isOn`، همان شرطِ کامپیوتر) دیده می‌شود.
+   */
+  val landed: String = "",
+  /** PUR-05/PUR-07: سررسیدِ پرداختِ کلِ فاکتور، همان‌طور که تایپ شد (شمسی؛ خالی = ندارد)؛ همان شرطِ [landed] */
+  val due: String = "",
 )
 
 /** یک ردیفِ افزوده‌شدهٔ فاکتورِ خرید (PUR-05) — همان متنِ خامِ کادرها؛ [expiry] مثلِ ردیفِ نخست */
@@ -44,8 +54,21 @@ internal object PurchaseFormModel {
   /** جمعِ خرید = جمعِ مقدار × قیمتِ هر ردیف، هر ردیف گردشده مثلِ موتور (`PurchaseBook.lineTotal`)؛ تک‌ردیفه همان امروز */
   fun total(f: PurchaseForm): Double = rowTotal(f.quantity, f.price) + f.more.sumOf { rowTotal(it.quantity, it.price) }
 
-  /** PUR-05: فاکتورِ چندردیفه؟ (تک‌ردیفه ⇒ همان `LedgerEngine.addPurchase` ِ امروز) */
-  fun multi(f: PurchaseForm): Boolean = f.more.isNotEmpty()
+  /**
+   *  PUR-05: فاکتورِ دفترِ خرید (`PurchaseBook.record`)؟ چندردیفه، یا تک‌ردیفه با هزینهٔ جانبی (که فقط `PurchaseBook` روی بها
+   *  پخش می‌کند). وگرنه ⇒ همان `LedgerEngine.addPurchase` ِ امروز (سررسید را خودش می‌گیرد).
+   */
+  fun multi(f: PurchaseForm): Boolean = f.more.isNotEmpty() || (landedTotal(f) ?: 0.0) > 0
+
+  /** PUR-06: هزینهٔ جانبی ⇒ عدد؛ خالی ⇒ ۰؛ نادرست یا منفی ⇒ null (خطای درجا، ثبت نمی‌شود) */
+  fun landedTotal(f: PurchaseForm): Double? =
+    if (f.landed.isBlank()) 0.0 else num(f.landed)?.takeIf { !it.isNaN() && it >= 0 }
+
+  /** PUR-07: سررسیدِ تایپ‌شده ⇒ `yyyy-MM-dd`؛ خالی ⇒ "" (ندارد)؛ نادرست ⇒ null — همان قاعدهٔ کامپیوتر (`Jalali.parseTyped`) */
+  fun dueIso(f: PurchaseForm): String? = expiryIso(f.due)
+
+  /** سررسیدِ پیش‌نویس برای موتور: ندارد یا نادرست ⇒ null (نادرست پیش‌تر خطای درجا دارد) */
+  private fun dueOrNull(f: PurchaseForm): String? = dueIso(f)?.ifEmpty { null }
 
   /** ردیفِ تازهٔ خالی؛ پس از سقف همان فرم */
   fun addRow(f: PurchaseForm): PurchaseForm = if (f.more.size + 1 >= MAX_ROWS) f else f.copy(more = f.more + PurchaseRow())
@@ -91,8 +114,11 @@ internal object PurchaseFormModel {
     /** هم‌اندازهٔ `PurchaseForm.more` */
     val rows: List<RowErrors> = emptyList(),
     val expiry: String? = null,
+    /** PUR-06/PUR-07 */
+    val landed: String? = null,
+    val due: String? = null,
   ) {
-    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry).any { it != null } || rows.any { it.any }
+    val any: Boolean get() = listOf(supplier, product, quantity, price, paid, expiry, landed, due).any { it != null } || rows.any { it.any }
   }
 
   private fun quantityError(text: String): String? = num(text).let { if (it == null || it <= 0) StrMoney.invalidNumber else null }
@@ -119,6 +145,13 @@ internal object PurchaseFormModel {
       )
     },
     expiry = expiryError(f.expiry),
+    landed = if (landedTotal(f) == null) StrPurchasePages.landedBad else null,
+    //  همان دو شرطِ موتور (`PurchaseBook.record`/`LedgerEngine.addPurchase`): تاریخِ درست و نه پیش از تاریخِ خرید
+    due = when (val iso = dueIso(f)) {
+      null -> StrPurchasePages.dueBad(formatDate(f.date.ifBlank { todayIso() }))
+      "" -> null
+      else -> if (f.date.isNotBlank() && iso < f.date) PurchaseBook.DUE_BEFORE_DATE else null
+    },
   )
 
   /** چیزی نوشته یا عوض شده ⇒ «برگشت» اول «دور ریخته شود؟» */
@@ -136,7 +169,18 @@ internal object PurchaseFormModel {
     notes = f.notes.trim(),
     //  PUR-05: انقضای محموله روی ورودِ انبار (FEFO و هشدارِ انقضا)؛ خالی ⇒ همان خریدِ امروز
     expiryDate = expiryIso(f.expiry).orEmpty(),
+    //  PUR-07: سررسیدِ پرداخت (یادآورِ بدهی)؛ خالی ⇒ همان خریدِ امروز
+    dueDate = dueOrNull(f),
   )
+
+  /**
+   *  PUR-05: فاکتور برای `PurchaseBook.record` — هزینهٔ جانبی (PUR-06، روی بهای ردیف‌ها پخش می‌شود) و سررسید (PUR-07)؛
+   *  [on] = موتورِ تازهٔ موجودی (همان شرطِ کامپیوتر): خاموش ⇒ ۰ و بی سررسید، همان فاکتورِ پیشین.
+   */
+  data class Extras(val landedTotal: Double = 0.0, val dueDate: String? = null)
+
+  fun extras(f: PurchaseForm, on: Boolean): Extras =
+    if (!on) Extras() else Extras(landedTotal(f) ?: 0.0, dueOrNull(f))
 
   /**
    *  PUR-05: ردیف‌های فاکتورِ چندردیفه برای `PurchaseBook.record` (همان فاکتورِ چندردیفهٔ کامپیوتر): ردیفِ نخست، سپس

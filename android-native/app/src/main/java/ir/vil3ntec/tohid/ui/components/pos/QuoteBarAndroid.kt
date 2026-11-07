@@ -42,7 +42,6 @@ import ir.vil3ntec.tohid.data.QuoteBook
 import ir.vil3ntec.tohid.data.QuotePref
 import ir.vil3ntec.tohid.data.QuoteStore
 import ir.vil3ntec.tohid.data.Quotes
-import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.SavedQuote
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.displayDate
@@ -50,7 +49,7 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.print.HwPages
 import ir.vil3ntec.tohid.print.PrintSpooler
 import ir.vil3ntec.tohid.print.PrinterRegistry
-import ir.vil3ntec.tohid.qty
+import ir.vil3ntec.tohid.print.QuoteFile
 import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
 import ir.vil3ntec.tohid.ui.screens.SettingsSection
 import ir.vil3ntec.tohid.ui.screens.newId
@@ -134,6 +133,13 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
           context.startActivity(android.content.Intent.createChooser(send, StrPos.quoteShare).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
         }.onFailure { toast(StrPos.quoteErrNotSaved) }
       },
+      //  POS-25 «ارسالِ PDF»: گوشی و آیفون ⇐ برگهٔ اشتراک با پروندهٔ PDF؛ کامپیوتر ⇐ «ذخیره در…» (برگهٔ اشتراک ندارد)
+      onPdf = { q ->
+        scope.launch {
+          if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) toast(QuoteFile.save(context, d, q))
+          else QuoteFile.share(context, d, q)?.let(toast)
+        }
+      },
       onConvert = { q ->
         val today = ir.vil3ntec.tohid.todayIso()
         when (val r = Quotes.convert(book, q.id, d, cart.snapshot().key, cart.lines.value.isEmpty(), today)) {
@@ -202,6 +208,7 @@ private fun QuoteListDialog(
   d: ShopData, book: QuoteBook, cartKey: String?, today: String,
   onPrint: (SavedQuote) -> Unit, onConvert: (SavedQuote) -> Unit, onDelete: (SavedQuote) -> Unit, onDismiss: () -> Unit,
   onShare: (SavedQuote) -> Unit = {},
+  onPdf: (SavedQuote) -> Unit = {},
 ) {
   AlertDialog(
     onDismissRequest = onDismiss,
@@ -221,6 +228,7 @@ private fun QuoteListDialog(
           Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
             TextButton(onClick = { onPrint(q) }) { Text(StrPos.quotePrint) }
             TextButton(onClick = { onShare(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quoteCopy else StrPos.quoteShare) }
+            TextButton(onClick = { onPdf(q) }) { Text(if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) StrPos.quotePdfSave else StrPos.quotePdfSend) }
             if (st == Quote.State.VALID || st == Quote.State.IN_CART) TextButton(onClick = { onConvert(q) }) { Text(StrPos.quoteToCart) }
             TextButton(onClick = { onDelete(q) }) { Text(StrPos.quoteDelete, color = Shop.colors.danger) }
           }
@@ -239,19 +247,8 @@ private suspend fun printQuote(context: android.content.Context, d: ShopData, q:
   val bytes = withContext(Dispatchers.IO) {
     runCatching {
       val p = printer.profile()
-      val rows = q.lines.map { l ->
-        val name = l.label.ifBlank { d.products.find { it.id == l.productId }?.name.orEmpty() }
-        val price = l.unitPrice ?: 0.0
-        HwPages.reportLine(StrPos.quoteSlipLine(name, qty(l.quantity), money(price), money(SalesEngine.lineTotal(price, l.quantity))))
-      }
-      val lines = listOf(HwPages.Line(title, HwPages.Style.TITLE)) +
-        HwPages.reportLine(StrPos.quoteSlipDate(displayDate(q.createdDay))) +
-        HwPages.reportLine(StrPos.quoteValidTo(displayDate(q.validUntil)), strong = true) +
-        HwPages.reportLine(StrPos.quoteSlipCustomer(customer(d, q))) + rows +
-        HwPages.reportLine(StrPos.quoteSlipTotal(money(PayFlow.major(q.totalMinor))), strong = true) +
-        listOfNotNull(q.note?.let { HwPages.reportLine(it) }) +
-        HwPages.Line(StrPos.quoteSlipFooter, HwPages.Style.SMALL)
-      EscPos.document(HwPages.text(context, p.paperDots, lines), p)
+      //  همان سطرهای PDF (`QuoteFile.lines`) — چاپ و PDF یک متن‌اند
+      EscPos.document(HwPages.text(context, p.paperDots, QuoteFile.lines(q, d)), p)
     }
   }.getOrElse { return StrPos.quoteNotPrinted(it.message ?: Str.unknownReason) }
   return PrintSpooler.submitAndWait(context, PrintQueue.Kind.REPORT, printer.link, title, bytes, done = StrPos.quotePrinted)

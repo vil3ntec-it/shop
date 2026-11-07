@@ -231,14 +231,16 @@ val MoneyModule = AppModule(
         onSave = { draft ->
           MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
         },
-        //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)
-        onSaveMany = { supplierId, lines, paid, date, notes ->
+        //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
+        onSaveMany = { supplierId, lines, paid, date, notes, extras ->
           MoneyWriter.purchase(
             store, toasts, context,
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = saveKey),
+            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey),
             StrMoney.purchaseSaved,
           ) != null
         },
+        //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
+        extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },
       )
     },
 

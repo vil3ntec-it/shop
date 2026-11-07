@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -23,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.LedgerEngine
@@ -49,12 +51,14 @@ import ir.vil3ntec.tohid.ui.v3.v3Shake
 private enum class PurchasePicker { SUPPLIER, PRODUCT }
 
 private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
-  //  هشت کادرِ ردیفِ نخست (با انقضا)، سپس چهارتایی‌های ردیف‌های افزوده (PUR-05)
+  //  هشت کادرِ ردیفِ نخست (با انقضا)، سپس چهارتایی‌های ردیف‌های افزوده (PUR-05)، و در پایان دوتاییِ «هزینهٔ جانبی» و
+  //  «سررسید» — چهارتایی نیست، پس `chunked(4)` ِ ردیف‌ها کنارش می‌گذارد و همان‌جا خوانده می‌شود
   save = { listOf(it.supplierId.orEmpty(), it.productId.orEmpty(), it.quantity, it.price, it.paid, it.date, it.notes, it.expiry) +
-    it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price, r.expiry) } },
+    it.more.flatMap { r -> listOf(r.productId.orEmpty(), r.quantity, r.price, r.expiry) } + listOf(it.landed, it.due) },
   restore = { v ->
     PurchaseForm(v[0].ifEmpty { null }, v[1].ifEmpty { null }, v[2], v[3], v[4], v[5], v[6], expiry = v[7],
       more = v.drop(8).chunked(4).filter { it.size == 4 }.map { r -> PurchaseRow(r[0].ifEmpty { null }, r[1], r[2], r[3]) })
+      .let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }
   },
 )
 
@@ -86,13 +90,23 @@ internal fun PurchaseFormScreen(
   onNewProduct: () -> Unit,
   /** `true` ⇐ موتور پذیرفت (صفحه بسته می‌شود)؛ ردِ موتور پیامِ خودش را دارد */
   onSave: (LedgerEngine.PurchaseDraft) -> Boolean,
-  /** PUR-05: فاکتورِ چندردیفه (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح) ⇒ `PurchaseBook.record`؛ `true` ⇐ پذیرفته */
-  onSaveMany: (String, List<PurchaseBook.Line>, Double, String, String) -> Boolean,
+  /**
+   *  PUR-05: فاکتورِ دفترِ خرید (تأمین‌کننده، ردیف‌ها، پرداخت، تاریخ، توضیح، هزینهٔ جانبی و سررسید) ⇒ `PurchaseBook.record`؛
+   *  `true` ⇐ پذیرفته
+   */
+  onSaveMany: (String, List<PurchaseBook.Line>, Double, String, String, PurchaseFormModel.Extras) -> Boolean,
+  /**
+   *  موتورِ تازهٔ موجودی (`StockLedger.isOn`) ⇒ کادرهای «هزینهٔ جانبی» (PUR-06) و «سررسیدِ پرداخت» (PUR-07) — همان شرطِ
+   *  فرمِ خریدِ کامپیوتر (`DeskPurchasing`)؛ خاموش ⇒ همان فرمِ پیشین
+   */
+  extrasOn: Boolean = false,
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
   var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormSaver) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
+  //  کادرهای پنهان (موتورِ تازه خاموش) هیچ اثری ندارند — نوشتهٔ برگشته از چرخشِ صفحه هم پاک می‌شود
+  LaunchedEffect(extrasOn) { if (!extrasOn && (form.landed.isNotEmpty() || form.due.isNotEmpty())) form = form.copy(landed = "", due = "") }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
   //  کالای کدام ردیف انتخاب می‌شود: -1 = ردیفِ نخست، وگرنه شمارهٔ ردیفِ افزوده (PUR-05)
@@ -122,7 +136,7 @@ internal fun PurchaseFormScreen(
       else if (onSaveMany(
           form.supplierId.orEmpty(),
           PurchaseFormModel.lines(form) { id -> d.products.find { it.id == id }?.unit.orEmpty() },
-          PurchaseFormModel.paid(form), form.date, form.notes.trim(),
+          PurchaseFormModel.paid(form), form.date, form.notes.trim(), PurchaseFormModel.extras(form, extrasOn),
         )) onBack()
     },
     onBack = onBack,
@@ -237,6 +251,26 @@ internal fun PurchaseFormScreen(
         LiveLine(StrMoney.remainingLabel, MoneyText.afn(left), if (left > 0) LedgerTone.OWE else LedgerTone.SETTLED)
         Spacer(Modifier.height(12.dp))
         V3DateField(form.date, { form = form.copy(date = it) }, StrMoney.date)
+        if (extrasOn) {
+          //  PUR-06: کرایه/گمرک روی بهای ردیف‌ها (نه بدهیِ تأمین‌کننده)؛ PUR-07: سررسیدِ کلِ فاکتور برای یادآورِ بدهی
+          Spacer(Modifier.height(12.dp))
+          V3TextField(
+            value = form.landed,
+            onValueChange = { form = form.copy(landed = it) },
+            label = StrPurchasePages.landedAfn,
+            kind = V3FieldKind.MONEY,
+            helper = StrPurchasePages.landedNote,
+            error = shownErrors.landed,
+          )
+          Spacer(Modifier.height(12.dp))
+          V3TextField(
+            form.due, { form = form.copy(due = it) }, StrPurchasePages.payDue, Modifier.fillMaxWidth(),
+            kind = V3FieldKind.DATE,
+            placeholder = StrStock.datePlaceholder,
+            helper = PurchaseFormModel.dueIso(form)?.takeIf { it.isNotEmpty() }?.let(::formatDate) ?: StrPurchasePages.optionalReminder,
+            error = shownErrors.due,
+          )
+        }
       }
       V3Section(StrMoney.notesSection, padding = PaddingValues(16.dp)) {
         V3TextField(form.notes, { form = form.copy(notes = it) }, StrMoney.notesField, singleLine = false)
