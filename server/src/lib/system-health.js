@@ -200,8 +200,10 @@ async function backups(t) {
   //  SEC-DATA-05: شکستِ آخر پس از آخرین پشتیبانِ موفق ⇒ قرمز، نه فقط «دیر شده»
   const failure = backup.status().lastFailure;
   const failing = !!failure && (!last || Number(failure.at) > Number(last.createdAt));
+  const drill = await drillState(t);
+  const drillBad = !!drill && (drill.failing || drill.stale);
   return {
-    status: failing ? 'down' : !enabled ? 'warn' : late ? 'warn' : 'ok',
+    status: failing ? 'down' : !enabled ? 'warn' : late ? 'warn' : drillBad ? 'warn' : 'ok',
     lastFailure: failing ? { at: failure.at, kind: failure.kind, message: failure.message } : null,
     enabled,
     //  فقط «رمز دارد یا نه» — خودِ عبارتِ عبور هرگز
@@ -209,6 +211,31 @@ async function backups(t) {
     count: list.length,
     last: last ? { at: Number(last.createdAt), kind: last.kind, bytes: last.bytes, encrypted: last.encrypted === true } : null,
     ageMs,
+    drill,
+  };
+}
+
+/**
+ * OPS-02@29: آخرین تمرینِ بازیابیِ ثبت‌شده (`lib/restore-drill.js` ⇐ `drills.jsonl`). هیچ تمرین ⇒ null و
+ * هیچ اثری روی وضع. آخرینِ ناموفق ⇒ زرد (پشتیبانی که برنمی‌گردد پشتیبان نیست)؛ آخرینِ موفقِ کهنه‌تر از
+ * `BACKUP_DRILL_MAX_DAYS` (۳۱ = «ماهانه» ِ D-24؛ ۰ = خاموش) هم زرد. فقط عدد.
+ */
+async function drillState(t) {
+  const h = await require('./restore-drill').history().catch(() => null);
+  if (!h) return null;
+  const maxDays = Number(config.backup.drillMaxDays) || 0;
+  const pick = (x) => ({
+    at: Number(x.at), ok: x.ok === true, restoredMs: x.restoredMs ?? null, verifiedMs: x.verifiedMs ?? null,
+    backupAgeMs: x.backupAgeMs ?? null, migrate: x.migrate === true, withinTargets: x.withinTargets ?? null,
+    error: x.error || null,
+  });
+  return {
+    last: pick(h.last),
+    lastOkAt: h.lastOkAt,
+    failing: h.last.ok !== true,
+    stale: maxDays > 0 && (h.lastOkAt == null || ageOf(h.lastOkAt, t) > maxDays * 24 * 3600e3),
+    maxDays,
+    count: h.count,
   };
 }
 

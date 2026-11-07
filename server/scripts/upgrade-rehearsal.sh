@@ -73,3 +73,9 @@ echo "── ۷) سرورِ نسخهٔ تازه، مقایسه و دودآزما
 up "$HEAD" "$HEAD_PORT" "$OUT/head-server.log"
 node "$TOOL" check --before "$OUT/before.json" --after "$OUT/after.json" --state "$OUT/state.json" \
   --url "http://127.0.0.1:$HEAD_PORT" | tee "$OUT/check.log"
+
+echo "── ۸) برگشت: سرورِ نسخهٔ پیش روی همان پایگاهِ مهاجرت‌شده (خواندن و نوشتن)"
+#  طرحِ برگشتِ سرور «نسخهٔ پیش روی همان پایگاه» است (RULES ‹v3 · به‌روزرسانی و انتشار›)؛ این‌جا سنجیده می‌شود
+stop
+up "$BASE" "$BASE_PORT" "$OUT/rollback-server.log"
+node "$TOOL" rollback --state "$OUT/state.json" --url "http://127.0.0.1:$BASE_PORT" | tee "$OUT/rollback.log"

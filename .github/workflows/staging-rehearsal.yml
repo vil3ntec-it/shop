@@ -5,7 +5,8 @@ name: تمرینِ ارتقا (staging)
 # PostgreSQL 16 بالا می‌آید، فقط از راهِ HTTP دادهٔ واقعی‌نما می‌گیرد (ثبت‌نام، دکان، کالا، فروش، `$inc`،
 # قرض‌دار، ویرایش و حذف)، خاموش می‌شود، مهاجرت‌های نسخهٔ تازه روی **همان داده** اجرا می‌شوند (با زمان)،
 # و سپس: اثرِ انگشتِ پیش و پس، `verify-data` ِ نسخهٔ تازه، و دودآزمایی روی سرورِ تازه (ورود و دریافتِ
-# همهٔ opها). جدول/ستونِ برداشته، ردیفِ گم‌شده یا دست بردن در دفتر ⇒ قرمز. شرح: server/scripts/upgrade-rehearsal.js.
+# همهٔ opها). جدول/ستونِ برداشته، ردیفِ گم‌شده یا دست بردن در دفتر ⇒ قرمز. سپس برگشت: سرورِ نسخهٔ پیش روی
+# همان پایگاهِ مهاجرت‌شده می‌خواند و یک فروشِ تازه می‌نویسد؛ نشد ⇒ قرمز. شرح: server/scripts/upgrade-rehearsal.js.
 # ⛔ هیچ دادهٔ واقعی؛ هیچ استقرار. این «staging ِ یک‌بارمصرف» است، نه سرورِ staging ِ ماندگار.
 
 on:
@@ -79,6 +80,7 @@ jobs:
             [ -f rehearsal-out/migrate-ms.txt ] && echo "- زمانِ مهاجرت روی دادهٔ seed: $(cat rehearsal-out/migrate-ms.txt)ms"
             echo '```'
             cat rehearsal-out/migrate.log rehearsal-out/check.log 2>/dev/null || echo 'تمرین پیش از مقایسه ایستاد — لاگِ گام را ببینید'
+            cat rehearsal-out/rollback.log 2>/dev/null || echo 'برگشت به نسخهٔ پیش اجرا نشد — لاگِ گام را ببینید'
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

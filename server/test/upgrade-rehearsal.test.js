@@ -130,3 +130,32 @@ test('خطِ فرمان: check ⇒ کدِ ۲ برای خطا، ۰ برای سا�
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+/*
+ * «به‌روزرسانی‌ای که برنمی‌گردد» (OPS-03@29): طرحِ برگشتِ سرور «نسخهٔ پیش روی همان پایگاه» است. پس نسخهٔ
+ * پیش باید روی پایگاهِ مهاجرت‌شده هم بخواند و هم **بنویسد**. ستونِ NOT NULL ِ بی پیش‌فرض که نسخهٔ تازه پر
+ * می‌کند و نسخهٔ پیش نمی‌شناسد، هر نوشتنِ نسخهٔ پیش را می‌شکند — دودآزماییِ «فقط خواندن» آن را نمی‌دید.
+ * این‌جا «نسخهٔ پیش» همین کد است و «مهاجرتِ تازه» ستونی که این کد نمی‌شناسد. (آخرِ پرونده و فقط دکانِ
+ * نخست: آزمون‌های بالا اثرِ انگشتِ «پیش» را با پایگاهِ بی نوشتنِ تازه می‌سنجند و دکانِ دوم را عمداً خراب کرده‌اند.)
+ */
+test('برگشت: نسخهٔ پیش روی پایگاهِ مهاجرت‌شده می‌خواند و می‌نویسد؛ ستونِ NOT NULL ِ بی پیش‌فرض ⇒ سرخ', async () => {
+  const one = { ...state, shops: [{ ...state.shops[0] }] };
+  const ops = one.shops[0].ops;
+  assert.deepEqual(await rh.rollback(h.base(), one), []);
+  //  دکان یک op ِ تازه از «نسخهٔ پیش» گرفت و دودآزمایی همان را هم پس گرفت
+  assert.equal(one.shops[0].ops, ops + 1);
+  //  دوباره ⇒ همان op (تکراری)، نه op ِ دوم
+  assert.deepEqual(await rh.rollback(h.base(), one), []);
+  assert.equal(one.shops[0].ops, ops + 1);
+
+  await db.query(`ALTER TABLE oplog ADD COLUMN rh_required text NOT NULL DEFAULT 'x'`);
+  await db.query('ALTER TABLE oplog ALTER COLUMN rh_required DROP DEFAULT');
+  try {
+    const errors = await rh.rollback(h.base(), one, { tag: 2 });
+    assert.ok(errors.length >= 1, 'نوشتنِ نسخهٔ پیش شکست و برگشت سرخ نشد');
+    assert.match(errors.join(' | '), /نوشتنِ نسخهٔ پیش/);
+    assert.equal(one.shops[0].ops, ops + 1, 'نوشتنِ شکست‌خورده شمرده نمی‌شود');
+  } finally {
+    await db.query('ALTER TABLE oplog DROP COLUMN rh_required');
+  }
+});

@@ -447,7 +447,10 @@ async function restore(file, { databaseUrl = config.db.url } = {}) {
   }
   const sql = await decode(file);
   return new Promise((resolve, reject) => {
-    const psql = spawn(config.backup.pgRestore, [databaseUrl, '-v', 'ON_ERROR_STOP=1', '-q', '-f', '-'],
+    //  ⛔ همه یا هیچ (`--single-transaction`): بی آن هر دستور جدا commit می‌شد و خطا وسطِ فایل (دیسکِ پر،
+    //  فایلِ بریده، مقصدِ ناخالی) نیمی از جدول‌ها را می‌نشاند — روی مقصدِ ناخالی ۱۴۹ جدول (`backup.test.js`).
+    const psql = spawn(config.backup.pgRestore,
+      [databaseUrl, '-v', 'ON_ERROR_STOP=1', '--single-transaction', '-q', '-f', '-'],
       { stdio: ['pipe', 'pipe', 'pipe'] });
     let err = '';
     psql.stderr.on('data', d => { err += d.toString(); });
