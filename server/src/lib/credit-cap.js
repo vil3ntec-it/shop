@@ -93,6 +93,38 @@ function slipOf(op, withDiscount = false) {
 }
 
 /**
+ * v3 (`sync-v3.authorize`): پرچم، نیاز و داوری با همان `staff-approval.judge` ⇒ null یا همان شکلِ ردِ `authorize`.
+ * `withDiscount` = همین op نیازِ تخفیفِ پذیرفته‌شده داشت (برگهٔ قرض فقط `creditApproval`).
+ */
+async function judgeV3(c, ctx, op, row, { withDiscount = false, deviceId = '', origin = 'v3' } = {}) {
+  if (!touchesV3(op) || !(await on(ctx, (s, p) => c.query(s, p)))) return null;
+  const n = needV3(op, row);
+  if (!n) return null;
+  const sa = require('./staff-approval');
+  return sa.judge(c, ctx, n, slipOf(op, withDiscount), { opId: op.op_id, at: sa.wallOf(op.hlc), deviceId, path: origin });
+}
+
+/** v3: پرچم برای بسته‌بندیِ برنامهٔ کهنهٔ بی tx (`bundleV3`) — فقط وقتی opی قرض دارد */
+async function onUnits(ctx, units) {
+  return units.some((u) => u.items.some((it) => it.ops.some(touchesV3))) && on(ctx);
+}
+
+/**
+ * v1 (`v1Guard`): قرضِ درجِ فاکتور — سندِ بی تخفیفِ تأییدخواه همان نیاز را می‌گیرد (`x.need`)، وگرنه پس از تخفیف
+ * داوری می‌شود (`x.credit`). ⇒ پرچم (برای `isMoneyEdit` / `judgeEdits` ِ همان دسته)
+ */
+async function markV1(ctx, valid) {
+  const credit = valid.some((x) => touchesV1(x.op)) && await on(ctx);
+  if (!credit) return false;
+  for (const x of valid) {
+    const n = needV1(x.op);
+    if (!n) continue;
+    if (x.need) x.credit = n; else x.need = n;
+  }
+  return true;
+}
+
+/**
  * راهِ قدیم و REST (`sync.pushChanges`): ردیفِ کاملِ فاکتور. بالا بردنِ `debtGiven` از مقدارِ سرور ⇒ سنجش؛
  * کاهش و بی‌تغییر آزاد. ⇒ null، یا خطای ۴۰۳ (کلِ دسته در همان تراکنش برمی‌گردد).
  */
@@ -116,4 +148,9 @@ function editNeedV1(rowId, was, now) {
   return need(rowId, a1);
 }
 
-module.exports = { FLAG, PERM, on, needV3, needV1, touchesV1, touchesV3, slipOf, judgeLegacy, editNeedV1, minor };
+/** سندِ «درجِ فاکتور» در `staff-approval` — همراه‌ها، نگه‌داشتن و دفترِ پایه یکی (تخفیف و قرض) */
+const SALE_INSERT_PERMS = new Set(['sales.discount', PERM]);
+
+module.exports = {
+  FLAG, PERM, SALE_INSERT_PERMS, on, onUnits, needV3, needV1, touchesV1, touchesV3, slipOf, judgeV3, markV1, judgeLegacy, editNeedV1, minor,
+};

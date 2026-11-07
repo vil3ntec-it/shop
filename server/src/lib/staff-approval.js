@@ -45,8 +45,7 @@ const roleV1 = require('./staff-role-v1');
 const remote = require('./approval-requests');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
 //  ⛔ ویرایشِ پولیِ سندِ ثبت‌شدهٔ v1 (update/`$inc`) و قاعدهٔ نقشِ خودِ v1 (`v1RoleReason`) — شرح همان‌جا
 const { isMoneyEdit, v1RoleReason, judgeEdits } = require('./staff-edit-v1');
-//  STF-03: سقفِ فروشِ قرضی (پرچمِ خاموشِ `shop.credit_cap`)
-const creditCap = require('./credit-cap');
+const creditCap = require('./credit-cap');   //  STF-03: سقفِ فروشِ قرضی (پرچمِ خاموشِ `shop.credit_cap`)
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -56,11 +55,9 @@ const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
-  'returns.create': 'return_not_allowed',
-  'sales.credit': 'credit_not_allowed',     //  STF-03، فقط با پرچمِ `shop.credit_cap` (‎lib/credit-cap.js‎)
+  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed',   //  قرض: STF-03 (‎lib/credit-cap.js‎)
 });
-/** سندِ «درجِ فاکتور» — همراه‌ها، نگه‌داشتن و دفترِ پایه یکی (تخفیف و قرض، STF-03) */
-const SALE_INSERT_PERMS = new Set(['sales.discount', 'sales.credit']);
+const { SALE_INSERT_PERMS } = creditCap;
 
 const MESSAGES = {
   bad_public_key: 'کلیدِ عمومی باید ECDSA P-256 (SPKI، base64) باشد',
@@ -754,16 +751,7 @@ async function v1Guard(req, res, next) {
       }
     });
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
-    //  STF-03 (پرچمِ خاموشِ `shop.credit_cap`): قرضِ درجِ فاکتور — سندِ بی تخفیفِ تأییدخواه همان نیاز را می‌گیرد،
-    //  وگرنه پس از تخفیف داوری می‌شود (‎lib/credit-cap.js‎)؛ ویرایشِ بالابرنده در `judgeEdits`
-    const credit = valid.some((x) => creditCap.touchesV1(x.op)) && await creditCap.on(ctx);
-    if (credit) {
-      for (const x of valid) {
-        const c = creditCap.needV1(x.op);
-        if (!c) continue;
-        if (x.need) x.credit = c; else x.need = c;
-      }
-    }
+    const credit = await creditCap.markV1(ctx, valid);   //  STF-03: قرضِ درجِ فاکتور (`x.need`/`x.credit`)؛ ویرایش در `judgeEdits`
     const offTable = await roleV1.offRole(ctx, valid, rejected);
     const hasNeed = valid.some((x) => x.need || isMoneyEdit(x.op, credit));
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
@@ -850,12 +838,7 @@ async function v1Guard(req, res, next) {
           opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1',
         });
         //  STF-03: تخفیفِ پذیرفته ⇒ حالا قرضِ همان فاکتور (برگهٔ جدا در `creditApproval`)
-        if (!out && x.credit) {
-          need = x.credit;
-          out = await judge(null, ctx, need, creditCap.slipOf(x.op, true), {
-            opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1',
-          });
-        }
+        if (!out && x.credit) out = await judge(null, ctx, (need = x.credit), creditCap.slipOf(x.op, true), { opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1' });
         if (!out) {
           if (g && g.sale) tally.set(g.sale, tally.get(g.sale) + g.amount);
           continue;
@@ -934,8 +917,7 @@ function bundleV3(units, groups, { credit = false } = {}) {
   entries.forEach((e, k) => e.it.ops.forEach((op, j) => {
     let perm = null;
     if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
-    //  STF-03 (پرچمِ `shop.credit_cap`): فاکتورِ قرض‌دار هم با همراه‌هایش یک واحد است
-    else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';
+    else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';   //  STF-03
     else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
     else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
     if (!perm) return;
@@ -1061,32 +1043,12 @@ async function heldTxs(q, ctx, deviceId, txs) {
   return out;
 }
 
-// ---------- سابقه ----------
-
-async function listApprovals(shopId, { limit = 100 } = {}) {
-  const cap = Math.min(Math.max(1, Number(limit) || 100), 500);
-  const rows = await many(
-    `SELECT a.*, ua.name AS approver_name, ur.name AS requester_name
-       FROM shop_approvals a
-       LEFT JOIN users ua ON ua.id = a.approver_id
-       LEFT JOIN users ur ON ur.id = a.requester_id
-      WHERE a.shop_id=$1 ORDER BY a.used_at DESC LIMIT $2`,
-    [shopId, cap]
-  );
-  return rows.map((r) => ({
-    nonce: r.nonce, opId: r.op_id, doc: r.doc, perm: r.perm,
-    pctBp: r.pct_bp === null ? null : Number(r.pct_bp), amount: r.amount === null ? null : Number(r.amount),
-    approverId: r.approver_id, approverName: r.approver_name || '',
-    requesterId: r.requester_id, requesterName: r.requester_name || '',
-    keyId: r.key_id, deviceId: r.device_id, path: r.path, reason: r.reason,
-    issuedAt: Number(r.issued_at), usedAt: Number(r.used_at),
-  }));
-}
+//  سابقهٔ تأییدهای پذیرفته (`GET /api/shop/approvals`): ‎lib/approval-log.js‎
 
 module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
-  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
+  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };
