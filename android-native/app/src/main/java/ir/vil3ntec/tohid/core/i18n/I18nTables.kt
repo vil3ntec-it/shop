@@ -46,6 +46,7 @@ object I18nTables {
     StrPush, // پوشِ گوشی (Firebase، O-01): حالِ «سفارشِ آنلاین»، «اجازهٔ اعلان» و نامِ کانال‌های اعلان
     StrTillPay, // نسیه فقط با مشتری؛ حساب‌پی با NFC/QR در صندوقِ گوشیِ نسخهٔ ۳ (PAY-21)
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
+    StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴

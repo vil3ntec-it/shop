@@ -330,3 +330,51 @@ test('پرچمِ خاموش پس از تأیید: ارجاع دیگر پذیرف
   assert.equal(r.body.results[0].reason, 'approval_invalid');
   assert.equal((await reqRow(id)).status, 'approved');
 });
+
+test('پوش به مدیر: درخواستِ تازه به صاحب و مدیرِ فعال می‌رسد (نه خودش، نه دکانِ دیگر)؛ تکرارِ همان کلید پوشِ دوم ندارد', async () => {
+  const push = require('../src/lib/push');
+  const got = [];
+  await flag(true);
+  push.setDeliver((row, message) => { got.push({ userId: row.user_id, shopId: row.shop_id, message }); });
+  try {
+    for (const [who, tag] of [[owner, 'o'], [manager, 'm'], [staff, 's'], [other, 'x']]) {
+      await push.register({ app: 'shop', token: `push-ar-${tag}`, userId: who.user.id, shopId: who === other ? '' : shopId, deviceUid: `d-ar-${tag}` });
+    }
+    const body = { key: key(), reason: 'مشتریِ همیشگی', perm: 'sales.discount', doc: 'sales/s-push', pctBp: 2000, amount: 250000 };
+    resetAll();
+    const r = await h.post(BASE, body, { token: staff.accessToken });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    for (let i = 0; i < 50 && got.length < 2; i++) await new Promise((res) => setTimeout(res, 20));
+    const to = got.map((g) => g.userId).sort();
+    assert.deepEqual(to, [manager.user.id, owner.user.id].sort(), JSON.stringify(got));
+    const m = got[0].message;
+    assert.equal(m.data.type, 'approval_request');
+    assert.equal(m.data.id, r.body.request.id);
+    assert.match(m.body, /تخفیف/);
+    assert.match(m.body, /۲٬۵۰۰/);
+    assert.ok(!/cardNumber|شمارهٔ کارت/.test(JSON.stringify(m)));
+    //  همان کلید و همان محتوا ⇒ همان درخواست، بی پوشِ دوم
+    resetAll();
+    const again = await h.post(BASE, body, { token: staff.accessToken });
+    assert.equal(again.status, 200);
+    await new Promise((res) => setTimeout(res, 60));
+    assert.equal(got.length, 2);
+  } finally {
+    push.setDeliver(null);
+  }
+});
+
+test('نام و نقشِ تأییدکننده در get/list برای صندوق (برگشت نقش را می‌سنجد)', async () => {
+  await flag(true);
+  const id = (await ask(staff, { perm: 'sales.discount', doc: 'sales/s-who', pctBp: 2000, amount: 2000 })).body.request.id;
+  const before = await h.get(`${BASE}/${id}`, { token: staff.accessToken });
+  assert.equal(before.body.request.deciderRole, undefined);
+  assert.equal((await act(owner, id, 'approve')).status, 200);
+  const after = await h.get(`${BASE}/${id}`, { token: staff.accessToken });
+  assert.equal(after.body.request.status, 'approved');
+  assert.equal(after.body.request.decidedBy, owner.user.id);
+  assert.equal(after.body.request.deciderRole, 'owner');
+  assert.ok(after.body.request.deciderName);
+  const listed = (await h.get(`${BASE}?status=approved`, { token: owner.accessToken })).body.requests.find((r) => r.id === id);
+  assert.equal(listed.deciderRole, 'owner');
+});
