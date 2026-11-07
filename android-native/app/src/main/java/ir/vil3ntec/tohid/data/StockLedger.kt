@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.Lot
 import ir.vil3ntec.tohid.core.stock.LotRef
 import ir.vil3ntec.tohid.core.stock.Pick
@@ -692,8 +693,21 @@ object StockLedger {
     val lossMinor: Long,
   )
 
-  /** بازبینیِ شمارش (INV-09/10، D-19): snapshot = موجودیِ لحظهٔ شروع؛ شمرده‌نشده دست نمی‌خورد */
-  fun countReview(view: View, productIds: List<String>, counts: Map<String, Long>, snapshot: Map<String, Long>?): CountReview {
+  /**
+   *  بازبینیِ شمارش (INV-09/10، D-19): شمرده‌نشده دست نمی‌خورد. کالای دارای لحظه ([countedAt]) ⇒ موجودیِ امروز − گردشِ
+   *  همان کالا در [View.rows] پس از آن لحظه (`CountDuringSales`)؛ بی لحظه ⇒ snapshot = موجودیِ لحظهٔ شروع.
+   */
+  fun countReview(
+    view: View,
+    productIds: List<String>,
+    counts: Map<String, Long>,
+    snapshot: Map<String, Long>?,
+    countedAt: Map<String, Long> = emptyMap(),
+  ): CountReview {
+    val at = countedAt.filterKeys { it in counts }
+    val after = if (at.isEmpty()) emptyMap() else CountDuringSales.movedAfter(
+      at, view.rows.filter { it.productId in at }.map { CountDuringSales.Move(it.productId, it.at, it.qtyMilli) },
+    )
     val lines = ArrayList<CountLine>()
     var matched = 0
     var variance = 0
@@ -705,7 +719,7 @@ object StockLedger {
       val counted = counts[pid]
       if (counted == null) { uncounted++; continue }
       val pv = productView(view, pid)
-      val sys = snapshot?.get(pid) ?: pv.qtyMilli
+      val sys = if (pid in at) pv.qtyMilli - (after[pid] ?: 0L) else snapshot?.get(pid) ?: pv.qtyMilli
       val diff = counted - sys
       val dv = diffValueMinor(pv, diff)
       if (diff == 0L) matched++ else variance++

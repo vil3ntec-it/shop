@@ -141,7 +141,10 @@
     const identifier = $('#shop-id', el).value.trim();
     const password = $('#shop-pw', el).value;
     if (!identifier || !password) throw new Error('نام کاربری و رمز عبور را وارد کنید');
-    const r = await S().api('/api/v1/auth/login', { method: 'POST', auth: false, body: { identifier, password } });
+    //  O-09: همان `device` ِ ورودِ اصلیِ وب (`license-client.js`) — بی آن، مرورگرِ صاحب در دکانِ پر بسته می‌ماند
+    const L = window.TohidLicense;
+    const device = L && L.loginDevice ? L.loginDevice() : undefined;
+    const r = await S().api('/api/v1/auth/login', { method: 'POST', auth: false, body: { identifier, password, device } });
     const store = JSON.parse(lsGet('tohid-license-v1') || '{}');
     Object.assign(store, {
       accessToken: r.accessToken, refreshToken: r.refreshToken, userId: r.user.id,
