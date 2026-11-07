@@ -86,6 +86,14 @@ object StrCourierApp {
     "Calling needs the internet — the number is not kept on this computer",
     "زنګ یوازې له انټرنټ سره — شمېره په کمپیوټر کې نه ساتل کېږي",
   )
+  // ── اعلانِ همیشگیِ سرویسِ موقعیت (DLV-16؛ فقط اندروید، فقط «در راه») ──
+  val trackChannel: String get() = t("موقعیتِ پیک در راه", "Courier location on the way", "په لار کې د رسوونکي ځای")
+  val trackTitle: String get() = t("موقعیتِ شما برای همین سفارش", "Your location for this order", "ستاسو ځای د همدې فرمایش لپاره")
+  val trackLine: String get() = t(
+    "فقط تا «رسیدم» و تقریبی به دکان و مشتری می‌رود",
+    "Shared roughly with the shop and customer only until “I've arrived”",
+    "یوازې تر «ورسېدم» پورې او نږدې‌والي سره دوکان او پېرودونکي ته ځي",
+  )
   fun areaLine(area: String): String = t("ناحیه: ${asIs(area)}", "Area: $area", "سیمه: $area")
   fun gateLine(color: String): String = t("دروازهٔ ${asIs(color)}", "Gate: $color", "دروازه: $color")
   val sendingDots: String get() = t("در حالِ فرستادن…", "Sending…", "لېږل کېږي…")

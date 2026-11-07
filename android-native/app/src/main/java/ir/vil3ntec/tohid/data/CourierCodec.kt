@@ -89,6 +89,8 @@ object CourierCodec {
     .put("nearPinMaxM", c.nearPinMaxM ?: JSONObject.NULL)
     //  DLV-05: فقط پیوندهای مختصات؛ کارتِ پایان‌یافته پیش از ذخیره بی آن است (`MissionView.forStorage`)
     .put("navigation", c.navigation?.let { JSONObject().put("geo", it.geo).put("google", it.google).put("osmand", it.osmand) } ?: JSONObject.NULL)
+    //  DLV-16: سرویسِ پیش‌زمینه پس از بسته شدنِ صفحه هم از همین کارت‌های نگه‌داشته می‌خواند
+    .put("trackLocation", c.trackLocation).put("trackMinIntervalMs", c.trackMinIntervalMs)
 
   fun card(o: JSONObject): MissionCard = MissionCard(
     id = o.optString("id"),
@@ -127,6 +129,9 @@ object CourierCodec {
     nearPinMaxM = if (o.isNull("nearPinMaxM")) null else o.optInt("nearPinMaxM"),
     //  دوباره از همان سنجه می‌گذرد: پروندهٔ دست‌کاری‌شدهٔ گوشی هم برنامهٔ دیگری باز نمی‌کند
     navigation = o.optJSONObject("navigation")?.let { MissionNav.of(it.optString("geo"), it.optString("google"), it.optString("osmand")) },
+    //  کارتِ کهنه‌تر این کلیدها را ندارد ⇒ بی موقعیت
+    trackLocation = o.optBoolean("trackLocation"),
+    trackMinIntervalMs = o.optLong("trackMinIntervalMs").coerceAtLeast(0L),
   )
 
   /** «نقدِ من» و آمار، برای دیدن بی اینترنت (آخرین پاسخِ سرور) */

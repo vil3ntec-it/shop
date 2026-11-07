@@ -234,6 +234,8 @@ object ApiEndpoints {
     fun call(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/call"
     /** امتیازِ پیک به تحویل (DLV-18) */
     fun rating(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/rating"
+    /** آخرین نقطهٔ پیک «در راه» (DLV-16) — فقط با هر دو پرچمِ موقعیتِ دکان */
+    fun location(assignmentId: String) = "$MISSIONS/${enc(assignmentId)}/location"
   }
 
   /* ------------------------------ همگام‌سازی ------------------------------ */

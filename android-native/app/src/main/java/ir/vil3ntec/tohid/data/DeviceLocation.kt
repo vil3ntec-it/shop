@@ -105,10 +105,12 @@ object DeviceLocation {
    *  @param force نقطهٔ ذخیره‌شده نادیده گرفته شود و از دستگاه پرسیده شود
    *  @param maxAgeMs آخرین نقطهٔ دستگاه از این کهنه‌تر نباشد (پیش‌فرض همان ۱۰ دقیقه؛ «تحویل شد» ِ پیک
    *    نزدیکِ پین ــ DLV-17 ــ نقطهٔ همین لحظه را می‌خواهد، نه نقطهٔ دکان)
+   *  @param keep نقطه برای «نمایشِ فوری» ِ بعدی روی گوشی نگه داشته شود؛ سرویسِ موقعیتِ پیک (DLV-16) هر نیم دقیقه
+   *    می‌پرسد و رد پایِ پیک را روی گوشی نمی‌نویسد (`false`)
    *  @return `null` یعنی اجازه نبود، لوکیشن خاموش بود یا در مهلت جواب نداد
    *    — هیچ‌کدام خطا نیست و هیچ‌کدام نباید جلوی کارِ کاربر را بگیرد.
    */
-  suspend fun current(context: Context, force: Boolean = false, maxAgeMs: Long = FRESH_MS): LocationFix? {
+  suspend fun current(context: Context, force: Boolean = false, maxAgeMs: Long = FRESH_MS, keep: Boolean = true): LocationFix? {
     if (!granted(context)) return null
     if (!force) {
       remembered(context)?.let { if (System.currentTimeMillis() - it.at < FRESH_MS) return it }
@@ -118,11 +120,11 @@ object DeviceLocation {
       context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager
     }.getOrNull() ?: return null
 
-    lastKnown(manager, maxAgeMs)?.let { fix -> remember(context, fix); return fix }
+    lastKnown(manager, maxAgeMs)?.let { fix -> if (keep) remember(context, fix); return fix }
 
     //  چیزی در دست نیست: یک نقطهٔ تازه می‌خواهیم، ولی نه بیشتر از ۱۲ ثانیه
     val fresh = withTimeoutOrNull(12_000) { requestOnce(context, manager) }
-    fresh?.let { remember(context, it) }
+    if (keep) fresh?.let { remember(context, it) }
     return fresh
   }
 
