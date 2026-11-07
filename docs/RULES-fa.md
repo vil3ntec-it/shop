@@ -886,6 +886,8 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۱۷۴: سبدِ سروریِ حسابِ مشتری `store_customer_carts` (CHK-03، `claude/part-chk-1`)؛ پیش از گرفتن، بزرگ‌ترینِ main و PRهای باز ۱۷۳ بود.
 - ۲۰۸ (`208_purchase_bills.sql`: `purchase_bills` — PUR-14 فاکتورِ جدای تأمین‌کننده برای تطبیقِ سه‌طرفه، `claude/gaps12-partial`؛ ۱۴۰۵/۰۸/۱۳ پس از سنجشِ main، PRهای باز و ۴۰ شاخهٔ تازه: بزرگ‌ترین ۲۰۷ بود؛ rollback در `server/migrations/rollback/`).
 - ۲۰۹ (`209_shop_chat_threads.sql`: `shop_chat_conversations.issue_opened_at` و `session_at` — یک رشتهٔ چت برای هر سفارش، «مشکل دارم» و دورِ تازهٔ گفت‌وگوی عمومی، `claude/home-orders`؛ ۱۴۰۵/۰۸/۱۲ پس از سنجشِ main و PRهای باز: بزرگ‌ترین ۲۰۸ بود؛ rollback در `server/migrations/rollback/`).
+- ۲۱۵ (`215_cluster_state.sql`: جدول‌های UNLOGGED ِ `rate_limit_hits` (سقفِ نرخِ مشترکِ چند نمونه، `RATE_LIMIT_STORE=pg`) و `live_ticket_uses` (بلیتِ سوکتِ یک‌بارمصرفِ خوشه)، `CLUSTER_ENABLED`، `claude/scale-1`؛ ۱۴۰۵/۰۸/۱۷ پس از سنجشِ main و PRهای باز: بزرگ‌ترین ۲۱۴).
+- ۲۱۶ (`216_perf_category_index.sql`: فقط نمایه — `ix_sync_rows_shop_product_category` برای «کالاهای هم‌دسته» و مرورِ دستهٔ ویترین، `claude/scale-1`).
 
 ### v3 · تعارض‌های حل‌شده
 
