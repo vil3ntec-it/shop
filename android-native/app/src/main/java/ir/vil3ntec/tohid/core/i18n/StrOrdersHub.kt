@@ -67,7 +67,9 @@ object StrOrdersHub {
     "سفارش تمام شده و این گفت‌وگو فقط خواندنی است. مشتری تا ${asIs(until)} می‌تواند «مشکل دارم» بزند و همین گفت‌وگو دوباره باز شود.",
     "The order is complete and this chat is read-only. Until $until the customer can tap “I have a problem” to reopen it.",
     "فرمایش بشپړ شوی او دا خبرې یوازې د لوستلو دي. پېرودونکی تر $until پورې «ستونزه لرم» کېکاږلی شي او همدا خبرې بیا پرانیستل کېږي.",
-  ) else t(
+  ) else closedOrderLate
+  /** همان «بسته» بی تاریخ (مهلتِ «مشکل دارم» گذشته) — جدا تا آزمون‌های جدول هر دو شاخه را ببینند */
+  val closedOrderLate: String get() = t(
     "سفارش تمام شده و مهلتِ «مشکل دارم» گذشته است؛ این گفت‌وگو فقط خواندنی است.",
     "The order is complete and the problem window has passed; this chat is read-only.",
     "فرمایش بشپړ شوی او د «ستونزه لرم» موده تېره شوې؛ دا خبرې یوازې د لوستلو دي.",

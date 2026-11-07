@@ -67,7 +67,7 @@ object MoreLayout {
     flags: Set<String> = emptySet(),
   ): List<Group> {
     val access = access(canManage, ordersOn, chatOn, storefrontOn, deliveryOn, flags)
-    val badges = buildMap { if (newOrders > 0) put("orders", "$newOrders تازه") }
+    val badges = buildMap { if (newOrders > 0) put("orders", ir.vil3ntec.tohid.core.i18n.StrCatalogPages.freshN(newOrders)) }
     val fromModules = V3Modules.moreGroups(access).map { (g, entries) ->
       val items = entries.map { e -> Item(e.id, e.label(), e.route, badges[e.id] ?: e.badge?.invoke(), icon = e.icon, hue = ir.vil3ntec.tohid.ui.v3.nav.V3Modules.hueOf(e)) }
       Group(g.title.text, if (g == MoreGroup.ACCOUNT) items + appItem(version) else items)

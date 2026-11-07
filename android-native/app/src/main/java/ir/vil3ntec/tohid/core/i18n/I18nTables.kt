@@ -52,5 +52,6 @@ object I18nTables {
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
     StrScanPages, StrPanelPages, // همان، دورِ ۵ (صفحه‌های زندهٔ کوچک)
+    StrDebtor, // دورِ ۶: حسابِ قرض‌دار (پیش‌تر `t` ِ فقط‌فارسیِ محلی، بی هیچ زبانی)
   )
 }

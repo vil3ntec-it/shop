@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.StrDebtor
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.data.isOnlineOrder
 import androidx.compose.foundation.background

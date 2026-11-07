@@ -1,15 +1,13 @@
-package ir.vil3ntec.tohid.ui.screens
+package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  نوشته‌های صفحهٔ حسابِ قرض‌دار — به شکلِ جدولِ سه‌زبانهٔ `core/i18n` (`object StrX`،
- *  هر نوشته `t(fa, en, ps)`).
+ *  نوشته‌های صفحهٔ حسابِ قرض‌دار (فرمِ قرض‌دارِ نسخهٔ ۳، دفترِ مشتریِ کامپیوتر و صفحه‌های قدیمیِ قرض‌داران).
  *
- *  تا جدولِ مشترک (#348) به این شاخه برسد، `t` ِ پایینِ همین فایل فارسی را برمی‌گرداند؛
- *  پس از ادغام فقط آن سه خط حذف و `ir.vil3ntec.tohid.core.i18n.t` وارد می‌شود و
- *  `StrDebtor` به `I18nTables.all` اضافه می‌شود — هیچ صفحه‌ای عوض نمی‌شود.
+ *  تا دورِ ۵ ِ دری این جدول در `ui/screens` بود با یک `t` ِ محلی که همیشه فارسی برمی‌گرداند: دری، انگلیسی و
+ *  پشتو هم فارسی می‌دیدند و هیچ مقداری از `asIs` نمی‌گذشت. از دورِ ۶ (LOC-08) همان `t` ِ همهٔ جدول‌هاست و در
+ *  `I18nTables` ثبت است؛ فارسی همان متنِ پیشین است.
  */
-@Suppress("unused")
-internal object StrDebtor {
+object StrDebtor {
   val back: String get() = t("بازگشت", "Back", "شاته")
   val actions: String get() = t("کارها", "Actions", "کړنې")
   val actionsAndInfo: String get() = t("کارها و اطلاعات", "Actions & info", "کړنې او معلومات")
@@ -21,12 +19,12 @@ internal object StrDebtor {
   val statementCsv: String get() = t("صورت‌حساب CSV", "Statement CSV", "صورتحساب CSV")
   val statementImage: String get() = t("تصویرِ صورت‌حساب", "Statement image", "د صورتحساب انځور")
   val print: String get() = t("چاپ", "Print", "چاپ")
-  fun printTitle(name: String): String = t("صورت‌حسابِ $name", "Statement — $name", "صورتحساب — $name")
+  fun printTitle(name: String): String = t("صورت‌حسابِ ${asIs(name)}", "Statement — $name", "صورتحساب — $name")
   val notes: String get() = t("یادداشت", "Note", "یادښت")
 
   fun daysInDebt(span: String, since: String): String =
-    t("$span است که بدهکار است — از $since", "In debt for $span — since $since", "$span راهیسې پوروړی دی — له $since")
-  fun inDebtShort(span: String): String = t("$span بدهکار", "$span in debt", "$span پوروړی")
+    t("${asIs(span)} است که بدهکار است — از ${asIs(since)}", "In debt for $span — since $since", "$span راهیسې پوروړی دی — له $since")
+  fun inDebtShort(span: String): String = t("${asIs(span)} بدهکار", "$span in debt", "$span پوروړی")
   val noDebt: String get() = t("بدهی ندارد", "No debt", "پور نه لري")
 
   val given: String get() = t("کل برد", "Total given", "ټول ورکړل شوي")
@@ -37,17 +35,17 @@ internal object StrDebtor {
   val transactions: String get() = t("تراکنش‌ها", "Transactions", "راکړې ورکړې")
   val details: String get() = t("جزئیات", "Details", "جزئیات")
   val receiptPrint: String get() = t("رسید / چاپ", "Receipt / print", "رسید / چاپ")
-  fun balanceAfterShort(amount: String): String = t("مانده $amount", "Bal. $amount", "پاتې $amount")
+  fun balanceAfterShort(amount: String): String = t("مانده ${asIs(amount)}", "Bal. $amount", "پاتې $amount")
   val balanceAfter: String get() = t("مانده پس از این ردیف", "Balance after this entry", "له دې وروسته پاتې")
   val date: String get() = t("تاریخ", "Date", "نېټه")
   val due: String get() = t("سررسید", "Due date", "د ورکړې نېټه")
   val noDue: String get() = t("سررسید ندارد", "No due date", "د ورکړې نېټه نه لري")
   val setDue: String get() = t("سررسید", "Due date", "د ورکړې نېټه")
   val status: String get() = t("وضعیت", "Status", "حالت")
-  fun openAmount(amount: String): String = t("باز $amount", "$amount open", "$amount پاتې")
+  fun openAmount(amount: String): String = t("باز ${asIs(amount)}", "$amount open", "$amount پاتې")
   val paidOff: String get() = t("تسویه شد", "Paid off", "تصفیه شو")
   val items: String get() = t("اقلام", "Items", "توکي")
-  fun invoiceNo(label: String): String = t("فاکتور #$label", "Invoice #$label", "بل #$label")
+  fun invoiceNo(label: String): String = t("فاکتور #${asIs(label)}", "Invoice #$label", "بل #$label")
   val showInvoice: String get() = t("نمایشِ فاکتور", "Show invoice", "بل ښکاره کړئ")
   val forWhat: String get() = t("بابتِ", "Applied to", "د")
   val prepaid: String get() = t("پیش‌پرداخت", "Prepaid", "مخکې ورکړه")
@@ -59,17 +57,20 @@ internal object StrDebtor {
   val noTxHint: String get() = t("نخستین برد یا رسیدِ این حساب را ثبت کنید.", "Record this account's first give or payment.", "د دې حساب لومړۍ ورکړه یا رسید ثبت کړئ.")
   val firstTx: String get() = t("ثبتِ نخستین تراکنش", "Add first transaction", "لومړۍ راکړه ورکړه ثبت کړئ")
 
-  fun invoices(n: Int): String = t("فاکتورهای این مشتری ($n)", "This customer's invoices ($n)", "د دې پیرودونکي بلونه ($n)")
-  fun olderInvoices(n: Int): String = t("$n فاکتورِ قدیمی‌تر در «فروش‌ها»", "$n older invoices in Sales", "$n زاړه بلونه په «پلور» کې")
+  fun invoices(n: Int): String = t("فاکتورهای این مشتری (${asIs(n)})", "This customer's invoices ($n)", "د دې پیرودونکي بلونه ($n)")
+  fun olderInvoices(n: Int): String = t("${asIs(n)} فاکتورِ قدیمی‌تر در «فروش‌ها»", "$n older invoices in Sales", "$n زاړه بلونه په «پلور» کې")
   val invoice: String get() = t("فاکتور", "Invoice", "بل")
   val cancelled: String get() = t("لغوشده", "cancelled", "لغوه شوی")
   /** CRM-07: نشانِ فاکتورِ سفارشِ اینترنتی (`Sale.isOnlineOrder`) در پروندهٔ مشتری */
   val online: String get() = t("اینترنتی", "online", "انلاین")
-  /** سطرِ فاکتور در «فاکتورهای این مشتری»: شماره، نشانِ «اینترنتی» و «لغوشده» */
-  fun invoiceTitle(label: String, online: Boolean, cancelled: Boolean): String =
-    invoice + " " + label +
-      (if (online) " · " + this.online else "") + (if (cancelled) " (" + this.cancelled + ")" else "")
-  fun remaining(amount: String): String = t("مانده $amount", "$amount due", "پاتې $amount")
+  /** سطرِ فاکتور در «فاکتورهای این مشتری»: شماره، نشانِ «اینترنتی» و «لغوشده» (هر حالت یک نوشته، همان متنِ پیشینِ کنارِ هم) */
+  fun invoiceTitle(label: String, online: Boolean, cancelled: Boolean): String = when {
+    online && cancelled -> t("فاکتور ${asIs(label)} · اینترنتی (لغوشده)", "Invoice $label · online (cancelled)", "بل $label · انلاین (لغوه شوی)")
+    online -> t("فاکتور ${asIs(label)} · اینترنتی", "Invoice $label · online", "بل $label · انلاین")
+    cancelled -> t("فاکتور ${asIs(label)} (لغوشده)", "Invoice $label (cancelled)", "بل $label (لغوه شوی)")
+    else -> t("فاکتور ${asIs(label)}", "Invoice $label", "بل $label")
+  }
+  fun remaining(amount: String): String = t("مانده ${asIs(amount)}", "$amount due", "پاتې $amount")
 
   val newTx: String get() = t("ثبتِ تراکنش", "New transaction", "نوې راکړه ورکړه")
   val newTxHint: String get() = t("مبلغ را بنویسید و برد یا رسید را انتخاب کنید", "Enter an amount, then pick give or receive", "مبلغ ولیکئ او ورکړه یا رسید وټاکئ")
@@ -82,7 +83,7 @@ internal object StrDebtor {
   val settleAll: String get() = t("تسویهٔ کامل", "Settle in full", "بشپړ تصفیه")
 
   val txDeleted: String get() = t("تراکنش حذف شد", "Transaction deleted", "راکړه ورکړه ړنګه شوه")
-  fun debtorDeleted(name: String): String = t("«$name» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
+  fun debtorDeleted(name: String): String = t("«${asIs(name)}» حذف شد", "“$name” deleted", "«$name» ړنګ شو")
   val undo: String get() = t("برگرداندن", "Undo", "بېرته")
   val deleteDebtorTitle: String get() = t("حذفِ قرض‌دار؟", "Delete this debtor?", "پوروړی ړنګ شي؟")
   val cancel: String get() = t("انصراف", "Cancel", "لغوه")
@@ -94,6 +95,3 @@ internal object StrDebtor {
   val save: String get() = t("ذخیره", "Save", "خوندي کول")
 }
 
-/** همان شکلِ `ir.vil3ntec.tohid.core.i18n.t` — تا ادغامِ جدولِ مشترک، فارسی */
-@Suppress("UNUSED_PARAMETER")
-private fun t(fa: String, en: String, ps: String): String = fa
