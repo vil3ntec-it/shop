@@ -45,14 +45,15 @@ import kotlinx.coroutines.launch
  *  سپردنِ خودکار (`delivery/auto`، DLV-03): پیش‌نمایشِ نقشهٔ `AutoAssign` — چه سفارشی به چه پیکی،
  *  چه سفارشی جا نشد و چرا، کدام پیک خودکار نمی‌گیرد — با سقفِ کارِ هم‌زمان و کرایهٔ هر تحویل، و فقط
  *  با «تأیید» فرستاده می‌شود. اگر سرور میانِ کار «سقف پر شد» گفت، پیک‌ها تازه و باقی دوباره نقشه
- *  می‌شوند (تا سه دور) — همان کارِ پنجرهٔ پیشین.
+ *  می‌شوند (تا سه دور) — همان کارِ پنجرهٔ پیشین. S83: پیکِ بیرون از محدودهٔ ناحیهٔ سفارش انتخاب نمی‌شود؛
+ *  آن سفارش «جا نشد» با دلیل می‌ماند تا دستی سپرده شود (همین برای «محدوده عوض شد» ِ سرور).
  */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AutoAssignSheet(orders: List<OrderDto>, d: DeskData, repo: DeliveryRepository, onDismiss: () -> Unit, onFinished: () -> Unit) {
   val c = PhoneV3.colors
   val scope = rememberCoroutineScope()
-  val cands = remember(orders) { orders.map { AutoAssign.Candidate(it.id, it.orderNo, DeliveryModel.expected(it), it.createdAt) } }
+  val cands = remember(orders) { orders.map(DeliveryModel::candidate) }   //  S83: با ناحیهٔ سفارش
   var maxLive by remember { mutableStateOf<Int?>(null) }
   var fare by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -81,7 +82,8 @@ internal fun AutoAssignSheet(orders: List<OrderDto>, d: DeskData, repo: Delivery
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
           is ApiResult.Failure -> {
-            if (r.error.code == "cash_cap_exceeded") { replan = true; break@picks }
+            //  نقد یا محدودهٔ پیک میانِ کار عوض شد (دستگاهِ دیگر) ⇒ پیک‌ها تازه و دوباره نقشه
+            if (r.error.code in REPLAN) { replan = true; break@picks }
             bad += "#${pick.orderNo}: ${r.error.userMessage}"
             remaining = remaining.filter { it.orderId != pick.orderId }
           }
@@ -152,3 +154,4 @@ private fun Lines(title: String?, lines: List<Pair<String, String?>>, icon: andr
 }
 
 private const val MAX_ROUNDS = 3
+private val REPLAN = setOf("cash_cap_exceeded", "courier_out_of_area")

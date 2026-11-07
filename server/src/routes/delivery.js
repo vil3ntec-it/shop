@@ -60,6 +60,8 @@ router.get('/config', async (req, res) => {
     picking: await require('../lib/order-picking').flagOf(req.shopId),
     //  DLV-18: «امتیازِ تحویل‌ها» برای صاحب و مدیر — پشتِ پرچمِ خاموشِ `shop.delivery_ratings`
     ratings: await require('../lib/orders').flagOf(req.shopId, require('../lib/delivery-ratings').FLAG),
+    //  S83: نامِ ناحیه‌های ارسالِ ویترینِ همین دکان — گزینه‌های «محدودهٔ خدمت» در فرمِ پیک
+    areaChoices: st.readable ? await require('../lib/delivery-courier-area').choicesOf(req.shopId) : [],
     permissions: Object.fromEntries(
       ['view', 'assign', 'handover', 'couriers', 'settle', 'photo'].map((k) => [k, can(req.role, `delivery.${k}`)])
     ),
@@ -77,7 +79,7 @@ router.get('/couriers', async (req, res) => {
 router.post('/couriers', requirePermission('delivery.couriers'), needWrite, async (req, res) => {
   const courier = await delivery.createCourier(req.shopId, req.body, delivery.staffActor(req));
   await log(req, 'delivery.courier.create', 'shop_courier', courier.id, {
-    userId: courier.userId, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+    userId: courier.userId, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive, areas: courier.areas.join('، '),
   });
   res.status(201).json({ courier });
 });
@@ -85,7 +87,7 @@ router.post('/couriers', requirePermission('delivery.couriers'), needWrite, asyn
 const updateCourier = async (req, res) => {
   const courier = await delivery.updateCourier(req.shopId, req.params.id, req.body);
   await log(req, 'delivery.courier.update', 'shop_courier', courier.id, {
-    active: courier.active, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive,
+    active: courier.active, cashCapMinor: courier.cashCapMinor, maxLive: courier.maxLive, areas: courier.areas.join('، '),
   });
   res.json({ courier });
 };

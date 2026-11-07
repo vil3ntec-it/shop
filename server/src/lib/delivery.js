@@ -25,6 +25,7 @@ const { can } = require('./permissions');
 const { sniff, MAX_BYTES: PHOTO_MAX_BYTES } = require('./product-photos');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 const liveCap = require('./delivery-live-cap');   //  DLV-03: سقفِ کارِ هم‌زمانِ هر پیک (مهاجرتِ ۱۴۸)
+const courierArea = require('./delivery-courier-area');   //  S83: محدودهٔ خدمتِ هر پیک (مهاجرتِ ۲۵۰)؛ خالی = همه‌جا
 const courierChecks = require('./courier-checks');   //  DLV-07/17: کیسه‌ها هنگامِ گرفتن و «تحویل شد» نزدیکِ پین
 
 const FLAG_KEY = 'shop.delivery';
@@ -103,9 +104,10 @@ async function createCourier(shopId, body, actor) {
   const at = now();
   const id = ulid(at);
   const r = await db.query(
-    `INSERT INTO shop_couriers (id, shop_id, user_id, name, phone, cash_cap_minor, max_live, active, created_by, created_at, updated_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,true,$8,$9,$9) ON CONFLICT (shop_id, user_id) DO NOTHING RETURNING *`,
-    [id, shopId, userId, name, phone, cap, b.maxLive === undefined ? null : liveCap.parse(b.maxLive), actor.userId || '', at]
+    `INSERT INTO shop_couriers (id, shop_id, user_id, name, phone, cash_cap_minor, max_live, areas, active, created_by, created_at, updated_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8::jsonb,true,$9,$10,$10) ON CONFLICT (shop_id, user_id) DO NOTHING RETURNING *`,
+    [id, shopId, userId, name, phone, cap, b.maxLive === undefined ? null : liveCap.parse(b.maxLive),
+      JSON.stringify(b.areas === undefined ? [] : courierArea.parse(b.areas)), actor.userId || '', at]
   );
   if (!r.rows[0]) throw conflict('این عضو پیش‌تر پیک ثبت شده است', 'courier_exists');
   return courierRowView(r.rows[0]);
@@ -149,9 +151,10 @@ async function updateCourier(shopId, id, body) {
   if (b.active !== undefined && typeof b.active !== 'boolean') throw badRequest('فعال/غیرفعال نامعتبر است', 'bad_active');
   const active = b.active !== undefined ? b.active : c.active;
   const r = await one(
-    `UPDATE shop_couriers SET name=$3, phone=$4, cash_cap_minor=$5, active=$6, max_live=$8, updated_at=$7
+    `UPDATE shop_couriers SET name=$3, phone=$4, cash_cap_minor=$5, active=$6, max_live=$8, areas=$9::jsonb, updated_at=$7
       WHERE shop_id=$1 AND id=$2 RETURNING *`,
-    [shopId, c.id, name, phone, cap, active, now(), b.maxLive !== undefined ? liveCap.parse(b.maxLive) : c.max_live]   //  maxLive: null ⇒ بی‌سقف
+    [shopId, c.id, name, phone, cap, active, now(), b.maxLive !== undefined ? liveCap.parse(b.maxLive) : c.max_live,   //  maxLive: null ⇒ بی‌سقف
+      JSON.stringify(b.areas !== undefined ? courierArea.parse(b.areas) : courierArea.view(c))]   //  areas: [] یا null ⇒ همه‌جا
   );
   return courierRowView(r, await cashStats(viaDb, shopId, c.id));
 }
@@ -196,7 +199,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
   if (mode === 'external' && !externalName) throw badRequest('نامِ شرکتِ پیک لازم است', 'external_name_required');
   const externalRef = mode === 'external' ? text(b.externalRef, 80) : '';
   const requireCode = mode === 'pickup' || b.requireCode === true;
-  if ([b.overrideCashCap, b.overrideLiveCap].some((x) => x !== undefined && typeof x !== 'boolean')) throw badRequest('نامعتبر', 'bad_override');
+  if ([b.overrideCashCap, b.overrideLiveCap, b.overrideArea].some((x) => x !== undefined && typeof x !== 'boolean')) throw badRequest('نامعتبر', 'bad_override');
   const reqHash = hashOf({ orderId: String(orderId || ''), mode, fareMinor, courierId, externalName, externalRef, requireCode });
   const codePolicy = await codeRule.policyOf(shopId);
   const rebuildable = (requireCode || codePolicy.on) && await orders.flagOf(shopId, VIEW_FLAG);
@@ -235,13 +238,14 @@ async function assign(shopId, orderId, body, actor, key = '') {
     const expected = require('./delivery-due').dueOf(order);   //  همان بدهی که ویرایش و پرداختِ بعدی نگه می‌دارند
     const codeBy = codeRule.requires(codePolicy, { mode, totalMinor: Number(order.total_minor), expectedCollectMinor: expected });   //  DLV-08؛ خاموش ⇒ ''
 
-    let overCap = false; let overLive = false;
+    let overCap = false; let overLive = false; let outOfArea = false;
     if (mode === 'shop_courier') {
       const cr = (await c.query(
         'SELECT * FROM shop_couriers WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, courierId]
       )).rows[0];
       if (!cr) throw notFound('پیک پیدا نشد', 'courier_not_found');
       if (!cr.active) throw conflict('این پیک غیرفعال است', 'courier_inactive');
+      outOfArea = courierArea.check(cr, order, b.overrideArea);   //  S83: زیرِ قفلِ سفارش و پیک؛ پذیرشِ آگاهانه در رویداد
       const st = await cashStats((t, p) => c.query(t, p), shopId, courierId);
       overCap = st.held + st.live_expected + expected > Number(cr.cash_cap_minor);
       //  DLV-11 / S40: بالای سقفِ نقد کار به پیک نمی‌رود، مگر مدیر آگاهانه بپذیرد
@@ -269,7 +273,7 @@ async function assign(shopId, orderId, body, actor, key = '') {
       actorType: 'user', actorId: actor.userId, deviceId: actor.deviceId,
       detail: { mode, courierId, externalName, fareMinor, expectedCollectMinor: expected, requireCode: requireCode || Boolean(codeBy),
         ...(codeBy ? { codeRule: codeBy } : {}),
-        ...(overCap ? { overCashCap: true } : {}), ...(overLive ? { overLiveCap: true } : {}) },
+        ...(overCap ? { overCashCap: true } : {}), ...(overLive ? { overLiveCap: true } : {}), ...(outOfArea ? { outOfArea: true } : {}) },
     }, at);
     return { assignment: staffView(a), code, replayed: false };
   });

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.delivery.CashReport
 import ir.vil3ntec.tohid.core.delivery.CashReportRow
+import ir.vil3ntec.tohid.core.delivery.CourierArea
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeliveryRating
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
@@ -61,8 +62,13 @@ object DeliveryWire {
       ),
       picking = bool(o, "picking"),
       ratings = bool(o, "ratings"),
+      areaChoices = texts(o, "areaChoices"),
     )
   }
+
+  /** آرایهٔ متن (S83)؛ نبود یا کلیدِ نادرست ⇒ خالی */
+  private fun texts(o: JsonObject, key: String): List<String> =
+    (o[key] as? JsonArray).orEmpty().mapNotNull { (it as? JsonPrimitive)?.takeIf { p -> p.isString }?.content }
 
   /** `GET /shop/delivery/ratings` (DLV-18) ⇒ جمعِ هر پیک و تازه‌ها؛ کلیدِ نادرست ⇒ رد نه، خالی */
   fun ratings(o: JsonObject): DeliveryRating.Board {
@@ -98,6 +104,7 @@ object DeliveryWire {
       liveCount = (long(o, "liveCount") ?: 0L).toInt(),
       liveExpectedMinor = long(o, "liveExpectedMinor") ?: 0L,
       maxLive = long(o, "maxLive")?.toInt(),
+      areas = texts(o, "areas"),
     )
   }
 
@@ -274,12 +281,15 @@ object DeliveryWire {
     externalRef: String = "",
     fareMinor: Long = 0,
     overrideCashCap: Boolean = false,
+    /** S83: سپردنِ آگاهانه به پیکِ بیرون از محدوده (سرور بی آن ۴۰۹ `courier_out_of_area`) */
+    overrideArea: Boolean = false,
   ): JsonObject = buildJsonObject {
     put("mode", JsonPrimitive(mode))
     if (mode != "pickup" && fareMinor > 0) put("fareMinor", JsonPrimitive(fareMinor))
     if (mode == "shop_courier") {
       put("courierId", JsonPrimitive(courierId))
       if (overrideCashCap) put("overrideCashCap", JsonPrimitive(true))
+      if (overrideArea) put("overrideArea", JsonPrimitive(true))
     }
     if (mode == "external") {
       put("externalName", JsonPrimitive(externalName.trim()))
@@ -358,15 +368,18 @@ object DeliveryWire {
   /**
    *  `maxLive` (DLV-03): عدد = سقفِ کارِ هم‌زمان؛ `clearMaxLive` = بی‌سقف (`null` ِ سرور)؛
    *  هیچ‌کدام = همان قبلی (کلید فرستاده نمی‌شود).
+   *  `areas` (S83): فهرستِ محدودهٔ خدمت (`[]` = همه‌جا)؛ null = همان قبلی.
    */
   fun courierUpdateJson(
     cashCapMinor: Long? = null,
     active: Boolean? = null,
     maxLive: Int? = null,
     clearMaxLive: Boolean = false,
+    areas: List<String>? = null,
   ): JsonObject = buildJsonObject {
     cashCapMinor?.let { put("cashCapMinor", JsonPrimitive(it)) }
     active?.let { put("active", JsonPrimitive(it)) }
     if (clearMaxLive) put("maxLive", JsonNull) else maxLive?.let { put("maxLive", JsonPrimitive(it)) }
+    areas?.let { list -> put("areas", JsonArray(CourierArea.clean(list).map { JsonPrimitive(it) })) }
   }
 }
