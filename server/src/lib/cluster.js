@@ -49,6 +49,7 @@ let leaderClient = null;
 let listenTimer = null;
 let leaderTimer = null;
 let beatTimer = null;
+let listenBeat = null;
 
 function enabled() { return Boolean(config.cluster.enabled) && !db.isPglite(); }
 
@@ -115,6 +116,8 @@ async function listen() {
     if (listenClient !== c) return;
     listenClient = null;
     state.listening = false;
+    clearInterval(listenBeat);
+    listenBeat = null;
     c.end().catch(() => {});
     if (!state.stopping) {
       listenTimer = setTimeout(() => { state.reconnects++; listen(); }, config.cluster.leaderRetryMs);
@@ -130,6 +133,9 @@ async function listen() {
     await c.query(`LISTEN ${CHANNEL}`);
     const wasListening = state.reconnects > 0;
     state.listening = true;
+    //  اتصالِ بیکارِ شنونده بی صدا هم می‌میرد (keepalive ِ سیستم ساعت‌هاست) ⇒ تپشِ خودش؛ نرسید ⇒ وصلِ دوباره + resync
+    listenBeat = setInterval(() => { c.query('SELECT 1').catch((err) => { if (listenClient === c) c.emit('error', err); }); }, config.cluster.heartbeatMs);
+    if (listenBeat.unref) listenBeat.unref();
     //  خبرهای میانِ قطع و وصل گم شده‌اند ⇒ همه دوباره بسنجند (نخستین وصل هیچ چیزی برای جبران ندارد)
     if (wasListening) for (const fn of resyncs) { try { fn(); } catch (err) { console.error('[cluster] resync:', err.message); } }
   } catch (err) {
@@ -231,7 +237,9 @@ async function stop() {
   clearTimeout(listenTimer);
   clearTimeout(leaderTimer);
   clearInterval(beatTimer);
+  clearInterval(listenBeat);
   beatTimer = null;
+  listenBeat = null;
   stepDown('خاموش شدن');
   const cs = [listenClient, leaderClient].filter(Boolean);
   listenClient = null;

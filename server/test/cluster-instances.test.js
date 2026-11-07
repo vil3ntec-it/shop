@@ -187,6 +187,50 @@ test('بیدارباشِ long-poll ِ چت از نمونهٔ دیگر', { skip: 
   assert.ok(r.ms < 4000, `بیدارباش ${r.ms}ms`);
 });
 
+test('گذرگاه پس از کشته شدنِ اتصالش دوباره وصل می‌شود و خبر باز می‌رسد', { skip: PGLITE && 'فقط PostgreSQL' }, async () => {
+  const { Client } = require('pg');
+  const admin = new Client({ connectionString: process.env.DATABASE_URL });
+  await admin.connect();
+  try {
+    const before = await B.ask({ type: 'stats' });
+    //  هر دو اتصالِ خوشهٔ B (شنونده و قفلِ رهبر) — همان قطعِ شبکه یا راه‌اندازیِ دوبارهٔ PostgreSQL
+    const r = await admin.query("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE application_name = 'shop-cluster:test-b'");
+    assert.ok(r.rowCount >= 1, 'اتصالِ خوشهٔ B پیدا نشد');
+    const t0 = Date.now();
+    let st;
+    for (;;) {
+      st = await B.ask({ type: 'stats' });
+      if ((st.listening && st.reconnects > before.reconnects) || Date.now() - t0 > 10_000) break;
+      await new Promise((res) => setTimeout(res, 100));
+    }
+    assert.ok(st.listening && st.reconnects > before.reconnects, `دوباره وصل نشد: ${JSON.stringify(st)}`);
+    //  و همان خبر (بیدارباشِ چت) از A دوباره به B می‌رسد
+    const conv = `conv-re-${Date.now()}`;
+    const listening = new Promise((resolve) => {
+      const onMsg = (m) => { if (m.type === 'listening') { B.child.off('message', onMsg); resolve(); } };
+      B.child.on('message', onMsg);
+    });
+    const waited = B.ask({ type: 'chatWait', conv, ms: 8000 });
+    await listening;
+    await A.ask({ type: 'chatNotify', conv });
+    const w = await waited;
+    assert.equal(w.woke, true);
+    assert.ok(w.ms < 4000, `بیدارباش ${w.ms}ms`);
+    //  یک رهبر می‌ماند (B اگر رهبر بود رها کرد؛ یکی دوباره می‌گیرد)
+    const t1 = Date.now();
+    let leaders = 0;
+    while (Date.now() - t1 < 10_000) {
+      const [sa, sb] = await Promise.all([A.ask({ type: 'stats' }), B.ask({ type: 'stats' })]);
+      leaders = [sa.leader, sb.leader].filter(Boolean).length;
+      if (leaders === 1) break;
+      await new Promise((res) => setTimeout(res, 100));
+    }
+    assert.equal(leaders, 1, 'دقیقاً یک رهبر پس از قطع');
+  } finally {
+    await admin.end();
+  }
+});
+
 test('کارگرهای پس‌زمینه فقط روی رهبر؛ رهبر بیفتد ⇒ دیگری', { skip: PGLITE && 'فقط PostgreSQL' }, async () => {
   const [sa, sb] = await Promise.all([A.ask({ type: 'stats' }), B.ask({ type: 'stats' })]);
   assert.equal([sa.leader, sb.leader].filter(Boolean).length, 1, `دقیقاً یک رهبر: ${JSON.stringify([sa, sb])}`);
