@@ -90,12 +90,24 @@ async function modeOf(shopId) {
   return r && r.pay_after_accept === true ? MODE_AFTER : MODE_ANY;
 }
 
+/**
+ * «برگزیدنِ روشِ پرداخت» فقط وقتی معنا دارد که جز نقد راهی هست (حساب‌پیِ همین دکان، PAY-21). دکانِ فقط‌نقد با تنظیمِ
+ * روشن ⇒ `any` برای کارتِ مشتری، جزئیاتِ کارمند و [choose]: نه «لطفاً روشِ پرداخت را انتخاب کنید»، نه «همین‌جا انتخاب
+ * می‌کنید» و نه هشدارِ «مشتری هنوز برنگزیده» — نقدی که در ثبت گفته شد همان می‌ماند (ممیزیِ ویترین با چشمِ مشتری،
+ * CHK-13/20). سدِ `/pay` ([blockOf]) همان تنظیمِ خام را می‌خواند: آن‌جا حساب‌پی به‌هرحال روشن است.
+ */
+async function askModeOf(shopId) {
+  if ((await modeOf(shopId)) !== MODE_AFTER) return MODE_ANY;
+  const online = await require('./payment-intents').storefrontPayment(shopId);   //  دیر: payment-intents این پرونده را می‌خواند
+  return online.online.available ? MODE_AFTER : MODE_ANY;
+}
+
 /** فقط سفارشِ ویترین «پرداخت پس از پذیرش» دارد؛ سفارشِ دستیِ کارمند همان نقدِ امروز */
 const modeFor = (mode, source) => (source === 'storefront' ? mode : MODE_ANY);
 
 /** `payStep` و `invoice` ِ جزئیاتِ کارمند (`GET /shop/orders/:id`) */
 async function staffView(shopId, order) {
-  const mode = modeFor(await modeOf(shopId), order.source);
+  const mode = modeFor(await askModeOf(shopId), order.source);
   const choice = choiceOf(order);
   return {
     invoice: invoiceOf(order),
@@ -173,7 +185,7 @@ async function guardOnlinePayIn(c, shopId, orderId) {
 async function trackView(shopId, orderId) {
   const [f, mode] = await Promise.all([factsOf(shopId, orderId), modeOf(shopId)]);
   const blocked = Boolean(blockOf(f, mode));
-  if (!f || modeFor(mode, f.source) !== MODE_AFTER) return { blocked, step: undefined };
+  if (!f || modeFor(mode, f.source) !== MODE_AFTER || (await askModeOf(shopId)) !== MODE_AFTER) return { blocked, step: undefined };
   return {
     blocked,
     step: {
@@ -220,7 +232,7 @@ const withCurrent = (err, current) => Object.assign(err, { data: { current } });
 async function choose(shopId, orderId, body) {
   const method = typeof body?.method === 'string' ? body.method.trim() : '';
   if (!CHOICES.includes(method)) throw badRequest('روشِ پرداخت معتبر نیست', 'bad_payment_choice');
-  if ((await modeOf(shopId)) !== MODE_AFTER) throw notFound('پیدا نشد', 'not_found');
+  if ((await askModeOf(shopId)) !== MODE_AFTER) throw notFound('پیدا نشد', 'not_found');
   return tx(async (c) => {
     const row = await lockRow(c, shopId, orderId);
     if (!row || row.source !== 'storefront') throw notFound('سفارش پیدا نشد', 'order_not_found');
@@ -288,6 +300,6 @@ async function claimInvoice(shopId, orderId, actor) {
 
 module.exports = {
   INVOICE_STATUSES, PAY_OPEN, CHOICES, MODE_AFTER, MODE_ANY,
-  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, staffView, factsOf, trackView, guardOnlinePay, guardOnlinePayIn,
+  saleIdOf, invoiceOf, choiceOf, payStateOf, blockOf, modeOf, askModeOf, staffView, factsOf, trackView, guardOnlinePay, guardOnlinePayIn,
   choose, claimInvoice,
 };

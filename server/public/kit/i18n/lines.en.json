@@ -1,0 +1,23 @@
+{
+  "lp.note.add": "+ Note",
+  "lp.note.l": "Note for {name}",
+  "lp.note.ph": "e.g. “green bananas”",
+  "lp.sub.order": "If an item is out of stock:",
+  "lp.sub.l": "Running low — if out of stock:",
+  "lp.sub.line": "If {name} is out of stock",
+  "lp.s.shop": "Whatever the shop thinks best",
+  "lp.s.same": "Same as the whole order",
+  "lp.s.best": "Closest match",
+  "lp.s.specific": "A specific item",
+  "lp.s.none": "No replacement",
+  "lp.s.refund": "Refund",
+  "lp.find.ph": "Type the replacement’s name",
+  "lp.find.none": "No item found",
+  "lp.pick": "Choose the replacement from the list",
+  "lp.chosen": "Replacement: “{name}”",
+  "lp.pick.need": "Choose the replacement for “{name}”",
+  "lp.r.note": "Note: {note}",
+  "lp.r.sub": "If out of stock: {s}",
+  "err.substitute_unavailable": "The chosen replacement is no longer in this shop; please choose again.",
+  "err.bad_substitution": "The “if out of stock” choice is not valid; please choose again."
+}

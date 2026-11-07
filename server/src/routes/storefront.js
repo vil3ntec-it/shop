@@ -133,6 +133,8 @@ async function featuresOf(shopId, sf) {
     ...((await extras.favoritesOn(shopId)) ? { favorites: true } : {}),
     //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در فرمِ ثبتِ وب با پرچمِ `shop.orders.delivery_prefs` (همان درِ `delivery.cashTenderMinor`)
     ...((await require('../lib/delivery-prefs').flagOn(shopId)) ? { deliveryPrefs: true } : {}),
+    //  CHK-15: «اگر کالایی نبود…» (کلی و قلم‌های کم‌موجود) در فرمِ ثبتِ وب (`store/line-prefs.js`) با همان پرچمِ `shop.orders.substitution` ِ ثبت
+    ...((await require('../lib/order-substitution').flagOn(shopId)) ? { substitution: true } : {}),
     //  WEB-24: نمایشِ بنر در وب (`GET /:slug/banners`) با پرچمِ `shop.storefront.banners`
     ...((await extras.bannersOn(shopId)) ? { banners: true } : {}),
     //  WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» ِ وب (`store/filters.js` ِ دیربار) با `shop.storefront.filters`/`.alerts`

@@ -19,8 +19,8 @@
   "promo.hours.1": "1 hour left",
   "promo.mins.1": "1 minute left",
   "ck.phone2.l": "Second phone (optional)",
-  "ck.plus.l": "Plus Code (optional)",
-  "ck.plus.ph": "e.g. 9G8F+6W Kabul",
+  "ck.plus.l": "Google Plus Code (optional)",
+  "ck.plus.ph": "9G8F+6W",
   "ck.prov.l": "Province (optional)",
   "ck.street.l": "Street or lane (optional)",
   "ck.house.l": "House and floor (optional)",
@@ -45,5 +45,6 @@
   "err.bad_cash_tender": "The banknote amount is not valid; please choose again.",
   "ck.eta": "Approximate delivery: {a} to {b} minutes",
   "ck.eta.pickup": "Ready for pickup, approximately: {a} to {b} minutes",
-  "ck.eta.none": "Delivery time cannot be estimated right now"
+  "ck.eta.none": "Delivery time cannot be estimated right now",
+  "ck.more": "More details (optional)"
 }

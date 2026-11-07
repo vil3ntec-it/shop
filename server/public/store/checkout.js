@@ -91,6 +91,15 @@
       method.then(function (m) { if (m) m.checkout(fulfillment(), dm); });
     }
 
+    // ── CHK-16/15: یادداشت و «اگر نبود…» ِ هر قلم (store/line-prefs.js ِ دیربار، واژه‌نامهٔ `lines`) ──
+    //  یادداشت همیشه؛ «اگر نبود» فقط با `features.substitution`. نیامد ⇒ همان سبدِ بی این دو، و بازشدنِ بعد دوباره.
+    var lp = null; var lpP = null;
+    function loadLines() {
+      lpP = lpP || K.js('/store/line-prefs.js').then(function () { return window.StoreLines({ api: api, c: c, render: renderCheckout }); })
+        .then(function (m) { lp = m; return m; }, function () { lpP = null; return null; });
+      lpP.then(function (m) { if (m && !$('view-checkout').hidden) { m.open(); renderCheckout(); } });
+    }
+
     // ── CHK-14: «با اسکناسِ … پرداخت می‌کنم» (فقط با `features.deliveryPrefs`، پرچمِ `shop.orders.delivery_prefs`؛ ارسال و نقد) ──
     //  گزینه‌ها همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ کامل، و پول خرد کمتر از یک اسکناسِ ۱۰۰۰.
     //  جمع عوض شد و اسکناسِ برگزیده دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند فرستاده نمی‌شود.
@@ -223,6 +232,7 @@
     function verifiedFor(phone) { var tk = K.ticket(); return Boolean(tk && phone && tk.phone === K.normPhone(phone)); }
 
     function renderCheckout() {
+      var keep = lp ? lp.hold() : null;
       var ul = K.clear($('cart-lines'));
       ids().forEach(function (id) {
         var l = c.cart[id];
@@ -233,8 +243,10 @@
           li.appendChild(el('button', { class: 'btn btn-soft btn-sm fit', attrs: { type: 'button' }, on: { click: function () { setQty(id, c.cap[id]); renderCheckout(); } } },
             t('line.fit', { q: K.qty(c.cap[id]) })));
         }
+        if (lp) lp.decorate(li, id);
         ul.appendChild(li);
       });
+      if (keep) keep();
       $('cart-empty').hidden = ids().length > 0;
       var f = fulfillment();
       var sub = subtotal(); var fee = feeFor(f) + slotFee(f);
@@ -358,12 +370,17 @@
         fulfillment: f, paymentMethod: 'cod',
         customer: { name: $('c-name').value.trim(), phone: $('c-phone').value.trim() },
         //  CHK-17/S32: فیِ هر قلم که مشتری دید — ناهمخوان ⇒ ۴۰۹ `price_changed` حتی اگر جمع از قضا برابر بماند
-        lines: ids().map(function (id) { return { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor }; }),
+        //  CHK-16/15: یادداشت و «اگر نبود» ِ همان قلم (line-prefs.js)
+        lines: ids().map(function (id) {
+          var x = { productId: id, qtyMilli: c.cart[id].qtyMilli, expectedUnitPriceMinor: c.cart[id].priceMinor };
+          return lp ? lp.line(id, x) : x;
+        }),
         note: $('c-note').value.trim(),
         expectedTotalMinor: subtotal() - discount() + feeFor(f) + slotFee(f),
         //  NTF-03: پیامِ وضعیتِ سفارش به همین زبان
         lang: K.lang,
       };
+      if (lp) lp.order(body);
       if (c.campaign) body.campaign = c.campaign;
       if (slotOf(f)) body.slotStartsAt = slotAt;
       if (promos && promos.guard && deviceId()) body.deviceId = deviceId();   //  MKT-02: «یک بار برای هر دستگاه»
@@ -392,6 +409,8 @@
       if (body.fulfillment === 'delivery' && !body.address.text && !body.address.landmark && !pin) {
         K.note(msg, 'err', t('ck.addr')); $('a-text').focus(); return;
       }
+      var miss = lp ? lp.missing() : '';
+      if (miss) { K.note(msg, 'err', miss); return; }
       var btn = $('submit-order');
       btn.disabled = true;
       K.note(msg, 'info', t('ck.sending'));
@@ -444,6 +463,9 @@
         } else if (/^slot_/.test(e.code) && Array.isArray(d.slots) && slots[body.fulfillment]) {
           slots[body.fulfillment].slots = d.slots; slotAt = 0; drawn = null;
           K.note(msg, 'err', e.message);
+        } else if (e.code === 'substitute_unavailable' && lp) {
+          lp.drop(d.productId);
+          K.note(msg, 'err', e.message);
         } else if (e.code === 'store_not_accepting_orders') {
           c.store.ordering = { accepting: false };
           if (c.renderHead) c.renderHead();
@@ -479,6 +501,7 @@
         if (!$('a-landmark').value && me.landmark) $('a-landmark').value = me.landmark;
       }
       loadPromos();
+      loadLines();
       //  ظرفیتِ بازه‌ها هر بار تازه
       slots = {}; drawn = null;
       renderCheckout();
