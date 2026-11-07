@@ -75,6 +75,29 @@ const config = {
     ssl:              bool(process.env.PGSSL, false),
   },
 
+  /**
+   * چند نمونهٔ سرور پشتِ load balancer روی یک PostgreSQL (`lib/cluster.js`، docs/SCALING-fa.md).
+   * پیش‌فرض خاموش ⇒ همان سرورِ تک‌نمونه، بیت‌به‌بیت. روشن ⇒ گذرگاهِ LISTEN/NOTIFY (سوکت‌ها، long-poll،
+   * نسخهٔ پیکربندی)، کارگرهای پس‌زمینه فقط روی رهبر (قفلِ advisory)، سقفِ نرخِ مشترک (`RATE_LIMIT_STORE=pg`)،
+   * بلیتِ سوکتِ مشترک و قفلِ گاوصندوقِ پایگاه (`SAFE_LOCK_SCOPE=db`) — هر کدام با متغیرِ خودش برگشت‌پذیر.
+   * فقط PostgreSQL؛ با PGlite `validate()` رد می‌کند. هر نمونه دو اتصالِ همیشگیِ بیرون از استخر دارد.
+   */
+  /** حافظهٔ کوتاهِ پرچم‌های دکان و تقویم (`lib/hot-cache.js`)؛ ۰ = خاموش (پیش‌فرض). پیشنهادِ تولید: ۲۰۰۰ */
+  hotCache: {
+    ttlMs: Math.max(0, Math.floor(num(process.env.HOT_CACHE_MS, 0))),
+  },
+
+  cluster: {
+    enabled:       bool(process.env.CLUSTER_ENABLED, false),
+    instanceId:    String(process.env.INSTANCE_ID || '').trim().slice(0, 64),
+    //  گذرگاه (LISTEN) و قفلِ رهبر اتصالِ **نشستی** می‌خواهند: پشتِ PgBouncer ِ حالتِ transaction، نشانیِ مستقیمِ
+    //  PostgreSQL را این‌جا بدهید (خالی ⇒ همان DATABASE_URL)
+    dbUrl:         String(process.env.CLUSTER_DATABASE_URL || '').trim(),
+    //  رهبر افتاد ⇒ نمونهٔ دیگر حداکثر پس از همین فاصله رهبر می‌شود؛ تپشِ اتصالِ قفل
+    leaderRetryMs: Math.max(200, num(process.env.CLUSTER_LEADER_RETRY_MS, 5000)),
+    heartbeatMs:   Math.max(200, num(process.env.CLUSTER_HEARTBEAT_MS, 5000)),
+  },
+
   /** رازها — بدون این‌ها سرور در حالت production بالا نمی‌آید. */
   secrets: {
     api:  process.env.API_SECRET || '',
@@ -278,6 +301,9 @@ const config = {
   },
 
   rateLimit: {
+    //  `memory` (تک‌نمونه) یا `pg` (مشترکِ همهٔ نمونه‌ها، مهاجرتِ ۲۱۵) — `middleware/ratelimit.js`
+    store: ((v) => (v === 'pg' || v === 'memory' ? v : (bool(process.env.CLUSTER_ENABLED, false) ? 'pg' : 'memory')))(
+      String(process.env.RATE_LIMIT_STORE || '').trim().toLowerCase()),
     windowMs:     num(process.env.RATE_WINDOW_MS, 15 * 60 * 1000),
     authMax:      num(process.env.RATE_AUTH_MAX, 10),
     otpMax:       num(process.env.RATE_OTP_MAX, 5),
@@ -385,6 +411,9 @@ const config = {
    * ریشه صفحهٔ ویترین را می‌گیرد. خالی ⇒ فقط نشانیِ `/store/<slug>`.
    */
   storefront: {
+    //  پوستهٔ ویترین/بازار با نشانیِ نسخه‌دارِ پرونده‌ها (`?v=<هش>`، یک سال و immutable؛ `lib/asset-versions.js`).
+    //  پیش‌فرض خاموش ⇒ پوسته بایت‌به‌بایت همان پرونده. با CDN جلوی ویترین روشن کنید.
+    assetVersions: bool(process.env.ASSET_VERSIONS, false),
     domain: String(process.env.STOREFRONT_DOMAIN ?? 'vill3n.top').trim().toLowerCase().replace(/^\.+|\.+$/g, ''),
     /*
      *  ۳۱.۲ بندِ ۴ — «اتصالِ تأییدشده» از آخرین تماسِ دستگاه‌های دکان:
@@ -549,7 +578,9 @@ const config = {
    * روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). روی PGlite همیشه `local`.
    */
   accountLock: {
-    scope: String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase() === 'db' ? 'db' : 'local',
+    //  خوشه (`CLUSTER_ENABLED`) ⇒ پیش‌فرض `db`؛ `SAFE_LOCK_SCOPE=local` همچنان برمی‌گرداند
+    scope: ((v) => (v === 'db' || (v !== 'local' && bool(process.env.CLUSTER_ENABLED, false)) ? 'db' : 'local'))(
+      String(process.env.SAFE_LOCK_SCOPE || '').trim().toLowerCase()),
     poolMax: Math.max(1, Math.floor(num(process.env.SAFE_LOCK_POOL_MAX, 10))),
   },
   /*
@@ -570,6 +601,9 @@ const config = {
 function validate() {
   const problems = [];
   if (!config.db.url) problems.push('DATABASE_URL تنظیم نشده است');
+  if (config.cluster.enabled && /^pglite:/i.test(String(config.db.url || ''))) {
+    problems.push('CLUSTER_ENABLED فقط با PostgreSQL است (PGlite درونِ یک فرآیند است)');
+  }
   if (config.tls.certFile && !config.tls.keyFile) problems.push('TLS_CERT_FILE بی TLS_KEY_FILE است');
   if (config.tls.keyFile && !config.tls.certFile) problems.push('TLS_KEY_FILE بی TLS_CERT_FILE است');
   if (config.env === 'production') {

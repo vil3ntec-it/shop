@@ -54,10 +54,22 @@
  * ⚠️ روی همان سرورِ HTTP سوار می‌شود (`attach(server)`) و `app.js`
  * خودش `app.listen` را می‌پیچد، پس `index.js` و سنجه‌ها هر دو بی هیچ
  * کارِ اضافه‌ای آن را دارند.
+ *
+ * ── چند نمونهٔ سرور (`CLUSTER_ENABLED=1`، `lib/cluster.js`) ───────────
+ * سوکت‌ها در حافظهٔ همان نمونه‌اند که دستگاه به آن وصل است؛ پس:
+ *   • «changed»، رله (scan/photos/…)، `accessChanged` و `closeRoom` ِ حسابِ **دکان** با گذرگاهِ
+ *     LISTEN/NOTIFY به نمونه‌های دیگر هم می‌رسد و هر نمونه با همان قاعده‌های بالا به سوکت‌های خودش
+ *     می‌رساند (همان لایهٔ ۲، همان `check`). خبر فقط شناسهٔ اتاق و همان پیامِ کوچک است.
+ *   • بلیت (`?ticket=`) رمزشده و خودبسنده است (AES-256-GCM با کلیدِ برگرفته از `API_SECRET`) تا
+ *     نمونه‌ای جز صادرکننده هم بازش کند؛ «یک‌بارمصرف» با هشِ بلیت در `live_ticket_uses` (مهاجرتِ ۲۱۵).
+ *   • ⛔ اتاقِ **پمپ** خبرِ میانِ نمونه‌ها نمی‌گیرد (همان قاعدهٔ «کدِ مشترکِ پمپ بی اجازه نه»، #615): کامپیوترِ
+ *     پمپ روی نمونهٔ دیگر با pull ِ ۳۰ثانیه‌ای ِ خودش درست می‌ماند. docs/SCALING-fa.md.
+ *   تک‌نمونه (پیش‌فرض) ⇒ هیچ‌کدام: همان بلیتِ حافظه و همان رساندنِ محلی.
  */
 const crypto = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const { resolveToken, resolveSession, contextOfRow, appAlias } = require('./sync-v1-auth');
+const cluster = require('./cluster');
 
 const PATHS = ['/sync/live', '/api/sync/live', '/api/sync/v1/live', '/api/v1/sync/v1/live'];
 const PING_MS = 30_000;
@@ -70,6 +82,7 @@ const TICKET_MAX = 20_000;          // سقفِ حافظه — پرتر شد، �
 const tickets = new Map();
 
 function issueTicket(token) {
+  if (cluster.enabled()) return issueShared(token);
   const now = Date.now();
   for (const [k, v] of tickets) { if (v.exp > now) break; tickets.delete(k); }
   while (tickets.size >= TICKET_MAX) tickets.delete(tickets.keys().next().value);
@@ -85,6 +98,36 @@ function takeTicket(ticket) {
   if (!e) return '';
   tickets.delete(ticket);
   return e.exp > Date.now() ? e.token : '';
+}
+
+/* ---------------------------------- بلیتِ خوشه (چند نمونه؛ `CLUSTER_ENABLED`) */
+const SHARED_PREFIX = 'c1.';
+function ticketKey() {
+  const config = require('../config');
+  //  production بی `API_SECRET` بالا نمی‌آید (`config.validate`)؛ بیرون از آن فقط آزمون/توسعه
+  return crypto.createHash('sha256').update(`sync-live-ticket:${config.secrets.api || 'dev-only-secret'}`).digest();
+}
+function issueShared(token) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', ticketKey(), iv);
+  const body = Buffer.concat([c.update(JSON.stringify({ t: token, e: Date.now() + TICKET_MS }), 'utf8'), c.final()]);
+  return { ticket: SHARED_PREFIX + Buffer.concat([iv, body, c.getAuthTag()]).toString('base64url'), expires_in: TICKET_MS / 1000 };
+}
+/** بلیتِ خوشه ⇒ توکن یا ''؛ «یک بار» با درجِ هشِ بلیت (نمونهٔ دوم همان بلیت را رد می‌کند) */
+async function takeShared(ticket) {
+  let out;
+  try {
+    const raw = Buffer.from(ticket.slice(SHARED_PREFIX.length), 'base64url');
+    if (raw.length < 12 + 16 + 2) return '';
+    const d = crypto.createDecipheriv('aes-256-gcm', ticketKey(), raw.subarray(0, 12));
+    d.setAuthTag(raw.subarray(raw.length - 16));
+    out = JSON.parse(Buffer.concat([d.update(raw.subarray(12, raw.length - 16)), d.final()]).toString('utf8'));
+  } catch { return ''; }
+  if (!out || typeof out.t !== 'string' || !(Number(out.e) > Date.now())) return '';
+  const hash = crypto.createHash('sha256').update(ticket).digest('base64url');
+  const r = await require('../db').query(
+    'INSERT INTO live_ticket_uses (ticket_hash, expires_at) VALUES ($1, $2) ON CONFLICT DO NOTHING RETURNING 1', [hash, Number(out.e)]);
+  return r.rowCount ? out.t : '';
 }
 
 /* ----------------------------------------------- لغوِ دسترسی (S78) */
@@ -394,6 +437,11 @@ async function accessChanged(target = {}) {
   const kind = String((target && target.accountKind) || '');
   const accountId = String((target && target.accountId) || '');
   if (!userId && !accountId) return 0;
+  //  نمونه‌های دیگر هم (سوکت‌های پمپ آن‌جا هم بیرون از این تابع‌اند؛ هدفِ «station» اصلاً نمی‌رود)
+  if (kind !== 'station') cluster.publish('live', { op: 'access', u: userId, k: kind, a: accountId });
+  return accessChangedHere(userId, kind, accountId);
+}
+async function accessChangedHere(userId, kind, accountId) {
   epoch++;
   const hits = [];
   for (const ws of sockets) {
@@ -427,6 +475,10 @@ function broadcast(ctx, cursor, exceptDevice = '') {
  * (`resolveToken` ⇒ بی حساب). @returns {number} چند سوکت بسته شد
  */
 function closeRoom(ctx, code = 4403, reason = 'account_blocked') {
+  if (shopRoom(ctx)) cluster.publish('live', { op: 'close', c: roomOf(ctx), code, reason });
+  return closeRoomHere(ctx, code, reason);
+}
+function closeRoomHere(ctx, code, reason) {
   const room = rooms.get(roomKey(ctx));
   if (!room) return 0;
   //  همان `kill` ِ TEN-02: همان لحظه از اتاق و فهرستِ سوکت‌ها بیرون، و قطعِ کامل اگر کلاینت جواب نداد
@@ -464,8 +516,12 @@ function cleanRelay(msg) {
   return null;
 }
 
-/** فرستادنِ یک رخدادِ دلخواه (از فهرستِ بالا) به دستگاه‌های دیگرِ حساب */
+/** فرستادنِ یک رخدادِ دلخواه (از فهرستِ بالا) به دستگاه‌های دیگرِ حساب — شمارِ سوکت‌های همین نمونه */
 function relay(ctx, payload, exceptDevice = '') {
+  if (shopRoom(ctx)) cluster.publish('live', { op: 'relay', c: roomOf(ctx), p: payload, x: exceptDevice || '' });
+  return relayHere(ctx, payload, exceptDevice);
+}
+function relayHere(ctx, payload, exceptDevice = '') {
   const room = rooms.get(roomKey(ctx));
   if (!room) return 0;
   let n = 0;
@@ -476,6 +532,27 @@ function relay(ctx, payload, exceptDevice = '') {
   }
   return n;
 }
+
+/* ---- گذرگاهِ خوشه: فقط اتاقِ دکان (`app` = shop)؛ پمپ همان رساندنِ محلیِ پیشین ---- */
+const shopRoom = (ctx) => s78(ctx) && Boolean(ctx.accountId);
+const roomOf = (ctx) => ({ app: ctx.app, accountKind: ctx.accountKind, accountId: ctx.accountId });
+cluster.subscribe('live', (d) => {
+  const c = d.c && typeof d.c === 'object' ? { app: String(d.c.app || ''), accountKind: String(d.c.accountKind || ''), accountId: String(d.c.accountId || '') } : null;
+  if (d.op === 'relay' && shopRoom(c) && d.p && typeof d.p === 'object') relayHere(c, d.p, String(d.x || ''));
+  else if (d.op === 'close' && shopRoom(c)) closeRoomHere(c, Number(d.code) || 4403, String(d.reason || 'account_blocked').slice(0, 60));
+  else if (d.op === 'access' && String(d.k || '') !== 'station') {
+    accessChangedHere(String(d.u || ''), String(d.k || ''), String(d.a || '')).catch(() => {});
+  }
+});
+//  شنوندهٔ گذرگاه دوباره وصل شد ⇒ خبرهای میانه گم شده‌اند: هر اتاقِ دکانِ این نمونه سرِ دفترش را می‌گیرد
+cluster.onResync(() => {
+  for (const room of rooms.values()) {
+    const ws = room.values().next().value;
+    const ctx = ws && ws.sync && ws.sync.ctx;
+    if (!shopRoom(ctx)) continue;
+    headOf(ctx).then((cursor) => relayHere(ctx, { event: 'changed', cursor }));
+  }
+});
 
 /** چند سوکت در اتاقِ این حساب زنده است — برای `/status` و پنل. */
 function listeners(ctx) {
@@ -498,14 +575,16 @@ function attach(server) {
     const h = req.headers.authorization || '';
     const m = /^Bearer\s+(.+)$/i.exec(h.trim());
     const ticket = url.searchParams.get('ticket');
-    const token = ticket != null ? takeTicket(ticket)
+    //  بلیتِ خوشه (`c1.`، فقط با `CLUSTER_ENABLED`) با پایگاه مصرف می‌شود؛ بقیه همان راهِ همیشگی
+    const shared = ticket != null && cluster.enabled() && ticket.startsWith(SHARED_PREFIX) ? takeShared(ticket) : null;
+    const token = shared ? '' : ticket != null ? takeTicket(ticket)
       : m ? m[1].trim() : (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
     //  S78: کلاینتی که پس از 4403 با توکنِ تازه برمی‌گردد، `caps=expiry` می‌فرستد
     const caps = String(url.searchParams.get('caps') || '').slice(0, 64).split(',').map((c) => c.trim());
     const seen = epoch;
 
-    resolveSession(token).then(async (out) => {
+    (shared ? shared.then(resolveSession) : resolveSession(token)).then(async (out) => {
       const ctx = out && out.ctx;
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);
@@ -524,6 +603,11 @@ function attach(server) {
       try { ws.ping(); } catch { /* رفته */ }
     }
     dropRevoked(wss).catch((err) => console.error('[sync-live] نشست‌های باطل:', err.message));
+    //  خوشه: بلیت‌های مصرف‌شدهٔ گذشته از ۶۰ ثانیه (فقط رهبر)
+    if (cluster.enabled() && cluster.runsJobs()) {
+      require('../db').query('DELETE FROM live_ticket_uses WHERE expires_at < $1', [Date.now()])
+        .catch((err) => console.error('[sync-live] بلیت‌های کهنه:', err.message));
+    }
   }, PING_MS);
   if (timer.unref) timer.unref();
   server.on('close', () => {

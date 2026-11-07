@@ -558,6 +558,13 @@ async function createApp({ runMigrations = true } = {}) {
   //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با
   //  برچسب‌های Open Graph، hreflang و JSON-LD؛ خاموش ⇒ همان پروندهٔ ایستا، بیت‌به‌بیت.
   const storeSeo = require('./lib/store-seo');
+  //  نشانیِ نسخه‌دارِ پرونده‌های ایستا (CDN): `?v=` ِ درست ⇒ یک سال immutable؛ پوستهٔ نسخه‌دار فقط با `ASSET_VERSIONS`
+  const assets = require('./lib/asset-versions');
+  const staticOpts = { index: false, maxAge: 0, etag: true, setHeaders: assets.immutableIfVersioned };
+  const shell = (html) => (config.storefront.assetVersions ? assets.versioned(html) : html);
+  const sendShell = (res, dir) => (config.storefront.assetVersions
+    ? res.type('html').send(assets.versioned(require('node:fs').readFileSync(path.join(dir, 'index.html'), 'utf8')))
+    : res.sendFile('index.html', { root: dir }));
   const seoLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-seo' });
   const storePage = async (slug, res, lang, onHost = false) => {
     let status = 200;
@@ -570,8 +577,8 @@ async function createApp({ runMigrations = true } = {}) {
         .redirect(301, onHost ? `//${moved}.${config.storefront.domain}/` : `/store/${moved}`);
     }
     const seoPage = sf ? await storeSeo.page(sf, { lang }) : null;
-    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(seoPage.body);
-    res.status(status).set('Cache-Control', 'no-cache').sendFile('index.html', { root: storeDir });
+    if (seoPage) return res.status(seoPage.status).set('Cache-Control', 'no-cache').type('html').send(shell(seoPage.body));
+    sendShell(res.status(status).set('Cache-Control', 'no-cache'), storeDir);
   };
   //  S3: پیوندِ پایدار (تبلیغ، API) — `/store?id=<ULID>` ⇒ نشانیِ امروز؛ نبود ⇒ همان راهِ امروز (پیش از static، که `/store` را به `/store/` می‌برد)
   app.get('/store', (req, res, next) => (typeof req.query.id !== 'string' ? next()
@@ -614,13 +621,13 @@ async function createApp({ runMigrations = true } = {}) {
     }, (err) => (err.status === 404 ? next() : next(err))).catch(next);
   };
   const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: req.query.lang })
-    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(p.body)));
+    .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(shell(p.body))));
   const sitemapOf = (sf, req, res) => storeSeo.sitemap(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('application/xml').send(x));
   const robotsOf = (sf, req, res) => storeSeo.robots(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
   const hostSlug = (req) => storefront.slugFromHost(req.hostname);
-  app.use('/store', storeHeaders, express.static(storeDir, { index: false, maxAge: 0, etag: true }));
+  app.use('/store', storeHeaders, express.static(storeDir, staticOpts));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
   app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
   app.get('/store/:slug/sitemap.xml', seoOnly((req) => req.params.slug, sitemapOf));
@@ -653,11 +660,11 @@ async function createApp({ runMigrations = true } = {}) {
   const kitDir = path.join(__dirname, '..', 'public', 'kit');
   const marketDir = path.join(__dirname, '..', 'public', 'market');
   const market = require('./lib/market');
-  app.use('/kit', storeHeaders, express.static(kitDir, { index: false, maxAge: 0, etag: true }));
+  app.use('/kit', storeHeaders, express.static(kitDir, staticOpts));
   app.get(['/market', '/market/'], storeHeaders, (req, res, next) => market.directoryOn().then((on) => {
-    res.status(on ? 200 : 404).set('Cache-Control', 'no-cache').sendFile('index.html', { root: marketDir });
+    sendShell(res.status(on ? 200 : 404).set('Cache-Control', 'no-cache'), marketDir);
   }).catch(next));
-  app.use('/market', storeHeaders, express.static(marketDir, { index: false, maxAge: 0, etag: true }));
+  app.use('/market', storeHeaders, express.static(marketDir, staticOpts));
 
   // ---- فاکتورِ عمومی (QRِ هر فاکتور، `/r/<نشانِ دکان>/<توکن>`) ----
   //  همان CSP ِ سختِ ویترین، به‌علاوهٔ noindex و بی کش. پوسته همیشه همان است و
@@ -685,6 +692,8 @@ async function createApp({ runMigrations = true } = {}) {
   const beat = require('./lib/job-beat');
   const beatFail = (err) => beat.failed('housekeeping', err);
   const housekeeping = setInterval(() => {
+    //  چند نمونه (`CLUSTER_ENABLED`): خانه‌تکانی فقط روی رهبر (`lib/cluster.js`)؛ تک‌نمونه ⇒ همیشه، مثلِ پیش
+    if (!require('./lib/cluster').runsJobs()) return;
     beat.ran('housekeeping', HOUSEKEEPING_MS);
     pruneExpired().catch(err => { beatFail(err); console.error('[housekeeping]', err.message); });
     //  S6: جریانِ تغییرِ بازار فقط MARKET_CHANGES_KEEP_DAYS روز می‌ماند (`lib/market-changes.js`)
