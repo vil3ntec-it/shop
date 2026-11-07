@@ -67,7 +67,7 @@ internal fun RouteScope.StorefrontRoute() {
   val tz = settings?.timezone ?: "Asia/Kabul"
 
   //  وضعیت: صفِ اعلامِ نرسیده همان لحظهٔ باز شدن دوباره فرستاده می‌شود (PRES-08)
-  val sender = remember(context) { PresenceSender(context, repo) }
+  val sender = remember(context) { PresenceSender(context) { repo.declare(it, "") } }
   LaunchedEffect(Unit) { if (sender.pending != null) sender.flush(tz) }
 
   //  تنظیمات: فرم بیرون از برگه تا با عوضِ برگه گم نشود؛ نوشتهٔ ذخیره‌نشده با برگشت می‌پرسد

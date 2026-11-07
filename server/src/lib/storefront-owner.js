@@ -192,10 +192,13 @@ async function declarePresence(shopId, body, { userId = '', deviceId = '' } = {}
   const row = await tx(async (c) => {
     const sf = (await c.query('SELECT * FROM storefronts WHERE shop_id = $1 FOR UPDATE', [shopId])).rows[0];
     if (!sf) throw notFound('هنوز ویترینی ساخته نشده است', 'storefront_missing');
+    //  PRES-08: ترتیب با زمانِ دستگاه ولی هرگز دیرتر از رسیدن به سرور — ساعتِ جلوافتاده (فردا) وگرنه
+    //  تا فردا هر اعلامِ دیگر را «کهنه» می‌کرد. زمانِ خام برای ممیزی دست‌نخورده نوشته می‌شود.
     const newer = clientEventAt === null ? null : (await c.query(
       `SELECT 1 FROM storefront_presence_events WHERE shop_id = $1 AND kind = 'presence'
-          AND (detail->>'applied') = 'true' AND COALESCE(client_event_at, server_received_at) > $2 LIMIT 1`,
-      [shopId, clientEventAt]
+          AND (detail->>'applied') = 'true'
+          AND LEAST(COALESCE(client_event_at, server_received_at), server_received_at) > $2 LIMIT 1`,
+      [shopId, Math.min(clientEventAt, at)]
     )).rows[0];
     const applied = !newer;
     const inserted = await recordEvent(c, shopId, {
