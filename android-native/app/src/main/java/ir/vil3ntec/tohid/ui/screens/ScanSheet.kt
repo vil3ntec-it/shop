@@ -37,6 +37,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrScanPages
 import ir.vil3ntec.tohid.scan.CameraScanner
 import ir.vil3ntec.tohid.scan.ScanFeedback
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -58,7 +62,7 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 fun BarcodeScanSheet(
   onDismiss: () -> Unit,
   onCode: (String) -> Unit,
-  title: String = "اسکن بارکد",
+  title: String = StrScanPages.scanBarcode,
   /** RET-01 — QRِ رسید هم خوانده شود */
   qr: Boolean = false,
 ) {
@@ -70,7 +74,7 @@ fun BarcodeScanSheet(
         PackageManager.PERMISSION_GRANTED
     )
   }
-  var status by remember { mutableStateOf("در حال آماده‌سازی دوربین…") }
+  var status by remember { mutableStateOf(StrSale.preparingCamera) }
   var statusError by remember { mutableStateOf(false) }
   // بعد از اولین خواندن، فریم‌های بعدی نادیده گرفته می‌شوند تا تا لحظهٔ
   // بسته شدن، کادر دوباره عوض نشود
@@ -81,7 +85,7 @@ fun BarcodeScanSheet(
   ) { ok ->
     granted = ok
     if (!ok) {
-      status = "اجازهٔ دوربین داده نشد — از تنظیمات گوشی اجازه دهید"
+      status = StrSale.cameraPermissionDenied
       statusError = true
     }
   }
@@ -115,7 +119,7 @@ fun BarcodeScanSheet(
             color = Shop.colors.text,
             modifier = Modifier.weight(1f),
           )
-          TextButton(onClick = onDismiss) { Text("انصراف") }
+          TextButton(onClick = onDismiss) { Text(Str.cancel) }
         }
         Spacer(Modifier.height(12.dp))
 
@@ -168,14 +172,14 @@ fun BarcodeScanSheet(
               modifier = Modifier.padding(24.dp),
             ) {
               Text(
-                "برای اسکن، به دوربین اجازه بدهید",
+                StrKit.cameraNeeded,
                 style = MaterialTheme.typography.bodyMedium,
                 color = Shop.colors.muted,
                 textAlign = TextAlign.Center,
               )
               Spacer(Modifier.height(10.dp))
               TohidButton(
-                text = "اجازهٔ دوربین",
+                text = StrKit.cameraAllow,
                 onClick = { askCamera.launch(Manifest.permission.CAMERA) },
               )
             }
@@ -184,7 +188,7 @@ fun BarcodeScanSheet(
 
         Spacer(Modifier.height(12.dp))
         Text(
-          "بارکد را جلوی دوربین بگیرید — با اولین خواندن، کادر پر می‌شود",
+          StrScanPages.scanOnce,
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted2,
           textAlign = TextAlign.Center,
@@ -201,7 +205,7 @@ fun ScanIconButton(onClick: () -> Unit) {
   IconButton(onClick = onClick, modifier = Modifier.size(34.dp)) {
     Icon(
       Icons.Filled.QrCodeScanner,
-      contentDescription = "اسکن بارکد",
+      contentDescription = StrScanPages.scanBarcode,
       tint = Shop.colors.primary,
       modifier = Modifier.size(21.dp),
     )
