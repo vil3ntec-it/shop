@@ -15,6 +15,7 @@
  */
 const { one, many, now, tx } = require('../db');
 const pipeline = require('./image-pipeline');
+const store = require('./image-store');
 const { ApiError, badRequest } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.storefront.media';
@@ -110,24 +111,29 @@ async function logoUrls(list) {
 /** بارگذاری: نسخهٔ تازه ⇒ جاری. همان محتوای نسخهٔ جاری ⇒ همان، بی ردیفِ تازه. */
 async function put(shopId, kind, buf, userId) {
   const { clean, info, hash } = check(kind, buf);
-  return tx(async (c) => {
+  //  بایت در `data` یا انبارِ شیء (`lib/image-store.js`)؛ نسخه‌های کهنه‌ای که پاک می‌شوند شیءشان پس از تراکنش
+  let gone = [];
+  const out = await store.withStaged(store.shopTenant(shopId), clean, (s) => tx(async (c) => {
     //  دو بارگذاریِ هم‌زمانِ یک دکان/نوع پشتِ سرِ هم ⇒ شمارهٔ نسخه یکتا و یک جاری
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sf-media:${shopId}:${kind}`]);
     const cur = (await c.query(
       'SELECT version, hash FROM storefront_media WHERE shop_id=$1 AND kind=$2 AND current', [shopId, kind])).rows[0];
     if (cur && cur.hash === hash) return { kind, version: Number(cur.version), replayed: true };
+    s.used = true;
     const last = (await c.query(
       'SELECT COALESCE(MAX(version),0) AS v FROM storefront_media WHERE shop_id=$1 AND kind=$2', [shopId, kind])).rows[0];
     const version = Number(last.v) + 1;
     await c.query('UPDATE storefront_media SET current=false WHERE shop_id=$1 AND kind=$2 AND current', [shopId, kind]);
     await c.query(
-      `INSERT INTO storefront_media (shop_id, kind, version, mime, width, height, bytes, hash, data, current, created_by, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,true,$10,$11)`,
-      [shopId, kind, version, info.mime, info.width, info.height, clean.length, hash, clean, String(userId || ''), now()]);
-    await c.query('DELETE FROM storefront_media WHERE shop_id=$1 AND kind=$2 AND version<=$3',
-      [shopId, kind, version - KEEP]);
+      `INSERT INTO storefront_media (shop_id, kind, version, mime, width, height, bytes, hash, data, store_key, current, created_by, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$12,true,$10,$11)`,
+      [shopId, kind, version, info.mime, info.width, info.height, clean.length, hash, s.data, String(userId || ''), now(), s.key]);
+    gone = (await c.query('DELETE FROM storefront_media WHERE shop_id=$1 AND kind=$2 AND version<=$3 RETURNING store_key',
+      [shopId, kind, version - KEEP])).rows.map((r) => r.store_key);
     return { kind, version, replayed: false };
-  });
+  }));
+  await store.drop(store.shopTenant(shopId), gone);
+  return out;
 }
 
 /** برداشتن: هیچ نسخه‌ای جاری نیست (ردیف‌ها تا بارگذاریِ بعدی می‌مانند). */
@@ -142,9 +148,10 @@ async function file(shopId, kind, version, { onlyCurrent = false } = {}) {
   const v = Number(version);
   if (!Number.isInteger(v) || v < 1 || v > 1e9) return null;
   const r = await one(
-    `SELECT mime, hash, data FROM storefront_media WHERE shop_id=$1 AND kind=$2 AND version=$3${onlyCurrent ? ' AND current' : ''}`,
+    `SELECT mime, hash, data, store_key FROM storefront_media WHERE shop_id=$1 AND kind=$2 AND version=$3${onlyCurrent ? ' AND current' : ''}`,
     [shopId, kind, v]);
-  return r ? { mime: r.mime, hash: r.hash, data: Buffer.from(r.data) } : null;
+  const data = await store.bytes(store.shopTenant(shopId), r);
+  return data ? { mime: r.mime, hash: r.hash, data } : null;
 }
 
 module.exports = { FLAG_KEY, SPECS, KINDS, MIMES, MAX_BYTES, flagOn, kindOf, check, staffView, publicView, logoUrls, put, remove, file };

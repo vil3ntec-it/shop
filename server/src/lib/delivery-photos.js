@@ -9,6 +9,7 @@ const { one, many, now, tx } = require('../db');
 const { ulid } = require('./ulid');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 const { eventKey, optInt, asJson, n } = require('./delivery-input');
+const imgStore = require('./image-store');
 
 module.exports = ({ appendEvent, sniff, PHOTO_MAX_BYTES, MAX_PHOTOS }) => {
 /**
@@ -32,7 +33,8 @@ async function putPhoto(shopId, assignmentId, body, actor) {
   const hash = crypto.createHash('sha256').update(buf).digest('hex');
   const deviceTime = optInt(b.deviceTime, 'زمانِ دستگاه', { min: 0, max: 4102444800000 });
 
-  return tx(async (c) => {
+  //  بایت در `data` یا انبارِ شیء (`lib/image-store.js`)؛ تکرار یا رد ⇒ شیءِ آماده همان دم پاک
+  return imgStore.withStaged(imgStore.shopTenant(shopId), buf, (s) => tx(async (c) => {
     const a = (await c.query(
       'SELECT * FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(assignmentId || '')]
     )).rows[0];
@@ -54,12 +56,13 @@ async function putPhoto(shopId, assignmentId, body, actor) {
     const at = now();
     const id = ulid(at);
     const consent = { customer: true, parcelOnly: true };
+    s.used = true;
     await c.query(
       `INSERT INTO delivery_photos (id, shop_id, assignment_id, order_id, courier_id, event_key, mime, size, hash,
-         data, consent, device_time, created_by, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11::jsonb,$12,$13,$14)`,
-      [id, shopId, a.id, a.order_id, a.courier_id, key, mime, buf.length, hash, buf, JSON.stringify(consent),
-        deviceTime, actor.userId || '', at]
+         data, store_key, consent, device_time, created_by, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$15,$11::jsonb,$12,$13,$14)`,
+      [id, shopId, a.id, a.order_id, a.courier_id, key, mime, buf.length, hash, s.data, JSON.stringify(consent),
+        deviceTime, actor.userId || '', at, s.key]
     );
     await appendEvent(c, a, {
       key: `photo:${key}`, hash, kind: 'photo', from: a.status, to: a.status,
@@ -67,7 +70,7 @@ async function putPhoto(shopId, assignmentId, body, actor) {
       detail: { photoId: id, size: buf.length, mime },
     }, at);
     return { photoId: id, replayed: false };
-  });
+  }));
 }
 
 async function listPhotos(shopId, assignmentId) {
@@ -87,9 +90,10 @@ async function listPhotos(shopId, assignmentId) {
 }
 
 async function getPhoto(shopId, photoId) {
-  const r = await one('SELECT mime, data, order_id FROM delivery_photos WHERE shop_id=$1 AND id=$2', [shopId, String(photoId || '')]);
-  if (!r) throw notFound('عکس پیدا نشد', 'photo_not_found');
-  return { mime: r.mime, data: Buffer.from(r.data), orderId: r.order_id };
+  const r = await one('SELECT mime, data, store_key, order_id FROM delivery_photos WHERE shop_id=$1 AND id=$2', [shopId, String(photoId || '')]);
+  const data = await imgStore.bytes(imgStore.shopTenant(shopId), r);
+  if (!data) throw notFound('عکس پیدا نشد', 'photo_not_found');
+  return { mime: r.mime, data, orderId: r.order_id };
 }
 
   return { putPhoto, listPhotos, getPhoto };

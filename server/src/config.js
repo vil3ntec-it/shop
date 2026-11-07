@@ -585,6 +585,27 @@ const config = {
   },
 
   /**
+   * انبارِ عکس (`lib/image-store.js`، docs/SCALING-fa.md §۳). `IMAGE_STORE` جای نوشتنِ بایت‌های تازه است:
+   * `db` (پیش‌فرض، بیت‌به‌بیت پیشین) | `disk` (`IMAGE_STORE_DIR`) | `s3` (هر انبارِ S3-سازگار). `IMAGE_STORE_READ`
+   * (`disk`|`s3`) فقط برای `db`: ردیف‌هایی که بایتشان در انبار است هنوز خوانده شوند (پنجرهٔ برگشت).
+   * ⛔ رازِ S3 این‌جا نیست: فقط از env ِ `IMAGE_STORE_S3_ACCESS_KEY_ID`/`…SECRET_ACCESS_KEY`/`…SESSION_TOKEN`
+   * (یا `AWS_*` ِ همتا) و فقط درونِ `lib/image-store-adapters.js` خوانده می‌شود.
+   */
+  imageStore: {
+    mode: String(process.env.IMAGE_STORE || 'db').trim().toLowerCase(),
+    read: String(process.env.IMAGE_STORE_READ || '').trim().toLowerCase(),
+    dir: String(process.env.IMAGE_STORE_DIR || '').trim(),
+    s3: {
+      endpoint: String(process.env.IMAGE_STORE_S3_ENDPOINT || '').trim().replace(/\/+$/, ''),
+      bucket: String(process.env.IMAGE_STORE_S3_BUCKET || '').trim(),
+      region: String(process.env.IMAGE_STORE_S3_REGION || 'us-east-1').trim(),
+      prefix: String(process.env.IMAGE_STORE_S3_PREFIX || '').trim().replace(/^\/+/, ''),
+      pathStyle: bool(process.env.IMAGE_STORE_S3_PATH_STYLE, true),
+    },
+    timeoutMs: Math.max(1000, Math.floor(num(process.env.IMAGE_STORE_TIMEOUT_MS, 10000))),
+  },
+
+  /**
    * قفلِ حسابِ گاوصندوق (`lib/account-lock.js`): صفِ فرآیند همیشه؛ پیش‌فرض `local` (سرورِ تک‌نمونه،
    * بی اتصالِ اضافه). فقط با `SAFE_LOCK_SCOPE=db` (چند نمونهٔ سرور روی یک پایگاه) قفلِ advisory هم،
    * روی استخرِ جدای `poolMax` اتصال (هر push ِ گاوصندوقِ هم‌زمان یکی). روی PGlite همیشه `local`.
@@ -619,6 +640,7 @@ function validate() {
   if (config.db.replicaUrl && /^pglite:/i.test(String(config.db.url || ''))) {
     problems.push('DATABASE_REPLICA_URL فقط با PostgreSQL است (PGlite نسخهٔ خواندنی ندارد)');
   }
+  problems.push(...require('./lib/image-store-adapters').problems(config.imageStore));
   if (config.tls.certFile && !config.tls.keyFile) problems.push('TLS_CERT_FILE بی TLS_KEY_FILE است');
   if (config.tls.keyFile && !config.tls.certFile) problems.push('TLS_KEY_FILE بی TLS_CERT_FILE است');
   if (config.env === 'production') {

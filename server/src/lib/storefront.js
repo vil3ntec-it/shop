@@ -217,9 +217,9 @@ function productView(row) {
 
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
   EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
-            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo,
+            AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS has_photo,
   (SELECT ph.hash FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
-            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS photo_hash`;
+            AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS photo_hash`;
 //  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
 //  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
 const NOT_HIDDEN = `NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
