@@ -38,8 +38,34 @@
    * برمی‌گرداند { picks, seen, card, cart }: `picks()` ردیف‌ها را پر می‌کند و هرگز رد نمی‌شود؛ `seen(p)` کالای برگهٔ
    * باز؛ `card(li, p)` ♥ ِ کارت؛ `cart()` پس از هر تغییرِ سبد.
    */
+  //  WEB-11 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱): کیت ♥ نداشت و به‌جایش ⓘ کشیده می‌شد (همان نشانهٔ بازارچه)
+  K.ICONS.heart = K.ICONS.heart || 'M12 20s-7.5-4.6-9-9.2C2 7.6 4.2 5 7 5c2 0 3.3 1.1 5 3 1.7-1.9 3-3 5-3 2.8 0 5 2.6 4 5.8-1.5 4.6-9 9.2-9 9.2z';
+
   window.StoreCatalog = function (ctx) {
     var api = ctx.api; var rail = ctx.rail;
+
+    /**
+     * سربرگِ دکان، دیربار (بودجهٔ بارِ نخست): WEB-01 (مشکلِ ۵) لوگو و تصویرِ سرِ خودِ دکان (`store.media`، پرچمِ
+     * `shop.storefront.media`؛ نبود ⇒ همان حرفِ نخست)، WEB-02/CHK-11 (مشکلِ ۶) نشانی و «مسیر روی نقشه» (`K.place`،
+     * kit/order-kit.js فقط وقتی دکان نشانی یا پین دارد). store.js پس از هر `renderHead` دوباره صدا می‌زند.
+     */
+    function head() {
+      var s = ctx.store; var m = s.media || {};
+      if (m.logo) {
+        ['store-avatar', 'bar-avatar', 'nav-avatar'].forEach(function (id) {
+          var a = $(id) && $(id).firstChild;
+          if (!a || a.classList.contains('logo')) return;
+          a.textContent = ''; a.removeAttribute('style'); a.classList.add('logo');
+          a.appendChild(el('img', { attrs: { src: m.logo.url, alt: '' } }));
+        });
+      }
+      if (m.header && !$('store-cover').firstChild) {
+        $('store-cover').appendChild(el('img', { attrs: { src: m.header.url, alt: '', width: String(m.header.width), height: String(m.header.height) } }));
+      }
+      $('store-cover').hidden = !m.header;
+      if (s.place) K.js('/kit/order-kit.js').then(function () { K.clear($('store-place')).appendChild(K.place(s)); }, function () { /* بی نشانی */ });
+    }
+    head();
 
     //  WEB-13: فقط با کلیدِ `recent` ِ سرور؛ کالایی که پیش از رسیدنِ recent.js دیده شد در صف می‌ماند
     var recent = null;
@@ -211,6 +237,7 @@
     }
 
     return {
+      head: head,
       picks: picks,
       seen: function (p) {
         if (recent) recent.then(function (r) { r.seen(p); }, function () { /* بی فهرستِ اخیر */ });

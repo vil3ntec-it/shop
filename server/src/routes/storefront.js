@@ -206,7 +206,7 @@ router.get('/:slug/products', readLimit, store, async (req, res) => {
   const out = req.query.ids !== undefined
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {
-      q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit,
+      q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit, sort: req.query.sort,
       contactPhone: req.store.contact_phone,
       //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)
       filters: await finder.parse(req.store.shop_id, req.query),

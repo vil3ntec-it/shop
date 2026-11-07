@@ -243,7 +243,8 @@ class SettingsPortTest {
   fun `بخش‌های پشتِ پرچمِ سرور تا پاسخِ روشن ردیف ندارند`() {
     assertEquals(
       //  «سفارشِ آنلاین» (۱۴۰۵/۰۸/۱۳): پشتِ پاسخِ `/shop/orders/config` (`onlineOrdersRow`)، نه پرچم
-      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD, SettingsLayout.ONLINE_ORDERS),
+      //  «نشانی و نقشهٔ دکان» (ممیزیِ ویترین ۱۴۰۵/۰۸/۱۷): پیوند به «ویترین ⇐ تنظیمات»، پشتِ همان درِ «سفارشِ آنلاین»
+      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD, SettingsLayout.ONLINE_ORDERS, SettingsLayout.STORE_PLACE),
       SettingsLayout.SERVER_GATED,
     )
     SettingsLayout.SERVER_GATED.forEach { key ->

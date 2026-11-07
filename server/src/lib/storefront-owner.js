@@ -25,6 +25,9 @@ function settingsView(sf, status = null) {
     declaredUntil: sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until),
     //  «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، `lib/order-flow.js`) — تنظیمِ خصوصیِ دکان، نه نمای عمومی
     payAfterAccept: sf.pay_after_accept === true,
+    //  مهاجرتِ ۲۱۵ — خامِ خانه‌های تنظیم برای برنامهٔ صاحب (عمومی فقط `place`)
+    pickupAddress: sf.pickup_address || '',
+    pickupPin: Number.isFinite(sf.pickup_lat) && Number.isFinite(sf.pickup_lng) ? { lat: sf.pickup_lat, lng: sf.pickup_lng } : null,
     updatedAt: Number(sf.updated_at),
   };
 }
@@ -90,6 +93,17 @@ async function recordEvent(c, shopId, e) {
   return r.rows.length > 0;
 }
 
+/** پینِ دکان: null (برداشتن) یا {lat, lng} ِ درجه — هر دو با هم */
+function pinOf(v) {
+  if (v === null) return null;
+  const p = obj(v);
+  const lat = Number(p.lat); const lng = Number(p.lng);
+  if (typeof p.lat !== 'number' || typeof p.lng !== 'number' || !(Math.abs(lat) <= 90) || !(Math.abs(lng) <= 180)) {
+    throw badRequest('پینِ دکان معتبر نیست', 'bad_pin');
+  }
+  return { lat: Math.round(lat * 1e6) / 1e6, lng: Math.round(lng * 1e6) / 1e6 };
+}
+
 /** تنظیمِ ویترین — فقط فیلدهای آمده عوض می‌شوند. */
 async function saveSettings(shopId, body, userId) {
   const b = obj(body);
@@ -147,6 +161,12 @@ async function saveSettings(shopId, body, userId) {
         JSON.stringify(v.weekly_hours), JSON.stringify(v.closed_dates), v.accept_delivery, v.accept_pickup,
         v.delivery_fee_minor, v.min_order_minor, userId || '', at]
     ).then(() => require('./market-changes').record(c, shopId, { entity: 'shop', kind: cur ? 'update' : 'create', state: v, at }));   //  S6: همان تراکنش
+    //  مهاجرتِ ۲۱۵: نشانی و پینِ دکان (برای مشتریِ «دریافت از دکان»)، مثلِ ۲۱۰ جدا از `v`
+    if (has('pickupAddress')) await c.query('UPDATE storefronts SET pickup_address = $2 WHERE shop_id = $1', [shopId, text(b.pickupAddress, 200)]);
+    if (has('pickupPin')) {
+      const p = pinOf(b.pickupPin);
+      await c.query('UPDATE storefronts SET pickup_lat = $2, pickup_lng = $3 WHERE shop_id = $1', [shopId, p ? p.lat : null, p ? p.lng : null]);
+    }
     //  مهاجرتِ ۲۱۰: جدا از `v` تا به دفترِ تغییرهای بازار (S6) نرود
     if (has('payAfterAccept')) {
       await c.query('UPDATE storefronts SET pay_after_accept = $2 WHERE shop_id = $1', [shopId, bool(b.payAfterAccept, 'پرداخت پس از پذیرش')]);

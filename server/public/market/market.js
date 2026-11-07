@@ -78,8 +78,9 @@
     if (s.fulfillment.delivery) meta.appendChild(el('span', {}, K.icon('truck'), s.deliveryFeeMinor > 0 ? t('ship.fee', { fee: K.money(s.deliveryFeeMinor) }) : t('ship.free')));
     else if (s.fulfillment.pickup) meta.appendChild(el('span', {}, K.icon('box'), t('pickup')));
     if (s.distanceKm !== null && s.distanceKm !== undefined) meta.appendChild(el('span', {}, K.icon('pin'), t('dist', { n: K.fa(s.distanceKm, 1) })));
-    var cover = el('span', { class: 'cover' + (s.cover ? ' tile' : '') });
-    if (s.cover) cover.appendChild(el('img', { attrs: { src: photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '84', height: '84' } }));
+    //  WEB-01 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۵): لوگوی خودِ دکان، پیش از عکسِ یکی از کالاها
+    var cover = el('span', { class: 'cover' + (s.logo ? ' logo' : s.cover ? ' tile' : '') });
+    if (s.logo || s.cover) cover.appendChild(el('img', { attrs: { src: s.logo || photo(s.slug, s.cover), alt: '', loading: 'lazy', decoding: 'async', width: '84', height: '84' } }));
     else cover.appendChild(K.avatar(s.title, s.accent, s.slug));
     var pills = el('div', { class: 'pills' });
     if (s.isNew) pills.appendChild(el('span', { class: 'pill plain new', text: t('shop.new') }));

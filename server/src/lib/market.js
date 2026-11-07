@@ -269,6 +269,12 @@ async function overview(at = now()) {
   };
 }
 
+/** WEB-01 (ممیزیِ ۱۴۰۵/۰۸/۱۷): لوگوی خودِ دکان روی کارت (پرچمِ `shop.storefront.media`)، پیش از جلدِ کالا ⇒ `{ logo }` یا {} */
+async function logosOf(list) {
+  const m = await require('./storefront-media').logoUrls(list.map((x) => ({ id: x.id, slug: x.c.slug })));
+  return (x) => (m.has(x.id) ? { logo: m.get(x.id) } : {});
+}
+
 /**
  * فهرستِ دکان‌ها: جست‌وجو در نام/شعار/ناحیه، دسته، «نزدیکِ من» اختیاری، و `first` (تا ۲۰
  * نشانیِ دلخواهِ همان مرورگر، اول؛ ذخیره نمی‌شود). جلدِ هر کارت عکسِ یکی از کالاهای خودِ
@@ -291,8 +297,9 @@ async function shops({ q, category, lat, lng, limit, offset, first } = {}, at = 
   //  ⛔ جلد هم زنده سنجیده می‌شود (منتشرشده، زنده، بی جریمه)
   const cand = page.map((x, j) => ({ shopId: x.id, ids: sh[j].filter((p) => p.photo).slice(0, 2).map((p) => p.id) }));
   const live = await liveViews(cand.flatMap((c) => c.ids.map((id) => ({ shopId: c.shopId, id }))));
+  const logos = await logosOf(page);
   return {
-    shops: page.map((x, j) => views.pub('shopCard', { ...x.c, cover: cand[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
+    shops: page.map((x, j) => views.pub('shopCard', { ...x.c, cover: cand[j].ids.find((id) => live.has(pairKey(x.id, id))) || null, ...logos(x) })),
     total: cards.length, nextOffset: off + lim < cards.length ? off + lim : null,
   };
 }
@@ -640,7 +647,8 @@ async function feed({ category, lat, lng, limit, only } = {}, at = now()) {
     popular: popular.map(out),
     deals: dealList.map(out),
     windowDays: POPULAR_DAYS,
-    shops: top.slice(0, 6).map((x, j) => views.pub('shopCard', { ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null })),
+    shops: await logosOf(top.slice(0, 6)).then((logos) => top.slice(0, 6).map((x, j) => views.pub('shopCard', {
+      ...x.c, cover: covers[j].ids.find((id) => live.has(pairKey(x.id, id))) || null, ...logos(x) }))),
     shopTotal: inCat.length,
   };
 }
