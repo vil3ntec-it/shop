@@ -255,6 +255,7 @@ internal object SettingsPages {
     SettingsLayout.PERIPHERALS -> Icons.Outlined.Devices
     SettingsLayout.PROFILE -> Icons.Outlined.AccountCircle
     SettingsLayout.STORE_PLACE -> Icons.Outlined.Place
+    SettingsLayout.STORE_STOCK -> Icons.Outlined.Inventory2
     SettingsLayout.SHOP -> Icons.Outlined.Shield
     SettingsLayout.SALES -> Icons.Outlined.PointOfSale
     SettingsLayout.GOODS -> Icons.Outlined.Inventory2

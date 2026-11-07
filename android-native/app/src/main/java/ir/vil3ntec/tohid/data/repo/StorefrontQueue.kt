@@ -277,6 +277,7 @@ object StorefrontQueue {
       deliveryFeeMinor = long("deliveryFeeMinor", base.deliveryFeeMinor), minOrderMinor = long("minOrderMinor", base.minOrderMinor),
       pickupAddress = str("pickupAddress", base.pickupAddress),
       pickupPin = if (b.containsKey("pickupPin")) storefrontPinOf(b["pickupPin"]) else base.pickupPin,
+      hideOutOfStock = bool("hideOutOfStock", base.hideOutOfStock),
     )
   }
 

@@ -39,6 +39,8 @@ object StorefrontSettingsModel {
     /** نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (ممیزیِ ویترین، مهاجرتِ ۲۱۵) — پین «عرض، طول» */
     val address: String = "",
     val pin: String = "",
+    /** WEB-09: کالای ناموجود در ویترین پنهان شود؟ (پیش‌فرض خاموش = «ناموجود» با «خبرم کن» دیده می‌شود) */
+    val hideOutOfStock: Boolean = false,
   )
 
   data class Result(val errors: Map<String, String>, val body: JsonObject?)
@@ -64,6 +66,7 @@ object StorefrontSettingsModel {
       closed = s.closedDates.joinToString("، "),
       address = s.pickupAddress,
       pin = s.pickupPin?.let { "${it.lat}, ${it.lng}" }.orEmpty(),
+      hideOutOfStock = s.hideOutOfStock,
     )
   }
 
@@ -121,6 +124,7 @@ object StorefrontSettingsModel {
         put("minOrderMinor", minMinor)
         put("pickupAddress", f.address.trim())
         put("pickupPin", pin?.let { p -> buildJsonObject { put("lat", p.lat); put("lng", p.lng) } } ?: JsonNull)
+        put("hideOutOfStock", f.hideOutOfStock)
       },
     )
   }

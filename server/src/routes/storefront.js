@@ -104,7 +104,7 @@ router.get('/', (req, res, next) => next(typeof req.query.id === 'string' ? unde
 
 router.get('/:slug', readLimit, store, async (req, res) => {
   const [cats, status, delivery, seo, media, pid] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
+    sf.categories(req.store.shop_id, { hide: req.store.hide_out_of_stock === true }), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
     storeSeo.publicInfo(req.store), sfm.publicView(req.store), sf.publicIdOn(req.store.shop_id),
   ]);
   res.json({
@@ -214,8 +214,9 @@ router.get('/:slug/products', readLimit, store, replicaReads, async (req, res) =
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit, sort: req.query.sort,
       contactPhone: req.store.contact_phone,
-      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)
-      filters: await finder.parse(req.store.shop_id, req.query),
+      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)؛
+      //  WEB-09: «ناموجود را پنهان کن» ِ دکان (مهاجرتِ ۲۴۰؛ خاموش ⇒ همان). `?ids=` (سبد) و صفحهٔ کالا راستش را می‌گیرند.
+      filters: finder.hiding(await finder.parse(req.store.shop_id, req.query), req.store.hide_out_of_stock === true),
     });
   //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
   if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {

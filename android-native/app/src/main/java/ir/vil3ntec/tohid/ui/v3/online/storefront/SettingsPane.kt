@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.Store
 import androidx.compose.material.icons.outlined.TwoWheeler
@@ -29,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrStorePlace
+import ir.vil3ntec.tohid.core.i18n.StrStoreStock
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
@@ -42,7 +44,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
 
 /**
  *  برگهٔ «تنظیمات» ِ ویترین: نشانی و نام (پسوندِ «.vill3n.top»)، رنگ با نمونهٔ کوچک، روشن/خاموش،
- *  ارسال/دریافت (دست‌کم یکی) و پول، ساعتِ کاریِ هر روز و تعطیلی‌ها. خطای هر کادر زیرِ خودش؛ «ذخیره»
+ *  ارسال/دریافت (دست‌کم یکی) و پول، کالای ناموجود (WEB-09: نشان بده یا پنهان کن)، ساعتِ کاریِ هر روز و تعطیلی‌ها. خطای هر کادر زیرِ خودش؛ «ذخیره»
  *  نوارِ چسبانِ پایینِ صفحه است (مسیر). حالتِ فرم بیرون از این‌جاست تا با عوضِ برگه گم نشود.
  */
 @Composable
@@ -96,6 +98,14 @@ fun SettingsPane(
         V3TextField(form.fee, { onChange(form.copy(fee = it)) }, StrOnline.deliveryFee, kind = V3FieldKind.MONEY, error = errors["fee"], modifier = Modifier.fillMaxWidth())
         V3TextField(form.minOrder, { onChange(form.copy(minOrder = it)) }, StrOnline.sfMinOrder, kind = V3FieldKind.MONEY, error = errors["min"], modifier = Modifier.fillMaxWidth())
       }
+    }
+
+    //  WEB-09: سیاستِ کالای ناموجود — پیش‌فرض خاموش؛ سرور پالایش می‌کند (مهاجرتِ ۲۴۰، `storefront-filters.hiding`)
+    V3Section(StrStoreStock.section, footer = StrStoreStock.help) {
+      V3ToggleRow(
+        StrStoreStock.hide, form.hideOutOfStock, { onChange(form.copy(hideOutOfStock = it)) },
+        icon = Icons.Outlined.Inventory2, hue = V3Hue.CORAL,
+      )
     }
 
     V3Section(StrOnline.sfHours, footer = StrOnline.sfHoursHelp) {

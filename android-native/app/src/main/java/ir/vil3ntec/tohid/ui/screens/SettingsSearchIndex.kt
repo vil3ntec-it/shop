@@ -150,6 +150,11 @@ object SettingsSearchIndex {
       "shop address map pin directions pickup storefront location",
       "د دوکان پته نقشه پن لار له دوکانه اخیستل ویترین ځای",
     ),
+    L.STORE_STOCK to kw(
+      "ناموجود تمام شده پنهان مخفی کالای ناموجود ویترین موجودی نشان نده",
+      "out of stock sold out hide hidden storefront stock",
+      "نشته توکي پټ ویترین موجودي",
+    ),
     L.STOREFRONT_ETA to kw("زمان تحویل ویترین", "delivery time storefront", "د سپارلو وخت"),
     L.PROMO_GUARD to kw("تخفیف اولین خرید", "first order discount", "لومړی پېرود تخفیف"),
     L.ONLINE_ORDERS to kw(

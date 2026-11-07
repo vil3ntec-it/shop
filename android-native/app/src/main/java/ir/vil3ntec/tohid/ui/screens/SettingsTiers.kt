@@ -126,6 +126,7 @@ object SettingsHelp {
     SettingsLayout.PERIPHERALS -> H.peripheralsLine
     SettingsLayout.PROFILE -> ir.vil3ntec.tohid.core.i18n.StrSettingsHome.profileLine
     SettingsLayout.STORE_PLACE -> ir.vil3ntec.tohid.core.i18n.StrStorePlace.line
+    SettingsLayout.STORE_STOCK -> ir.vil3ntec.tohid.core.i18n.StrStoreStock.line
     LATE_APOLOGY -> H.lateApologyLine
     else -> null
   }
