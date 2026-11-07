@@ -53,6 +53,20 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۷ — شاخهٔ `claude/customer-app-2` (برنامهٔ خریدِ مشتری، مرحلهٔ ۲؛ روی `claude/customer-app-1` = #964؛ سیزنِ `session_01GcPTALbaroEADJph5to8Qj`)
+- انجام شد (همه روی درهای امروزِ سرور، بی درِ تازه و بی مهاجرت): نشانی‌های من با پین (CHK-08/09/10: «موقعیتِ من» یا پیوند/مختصاتِ
+  برنامهٔ نقشه با `PinText`، «نمایش روی نقشه» با `geo:`، ناحیه از پین، ۱۰ نشانی روی دستگاه با قاعدهٔ `parseAddress`؛ کارخواهِ
+  `/:slug/account/addresses` آماده و روی سرورِ واقعی آزموده)، گفت‌وگو با دکان (CHAT-02/06: صفِ دیسکیِ `ChatOutbox` با یک clientId،
+  long-poll، رسید، عکس با جهتِ EXIF و بی EXIF از `ShopperPhoto`، «مشکل دارم»/«گفت‌وگوی تازه» از `life` ِ سرور)، نظر و امتیاز
+  (NTF-09، DLV-18)، کدِ تخفیف و تخفیفِ خودکار (MKT-01/09؛ عددِ سرور در `expectedTotalMinor`)، سفارشِ تکرارشونده روی دستگاه
+  (MKT-08 ⇒ PARTIAL؛ ثبت همیشه با تأییدِ مشتری)، پیوندِ عمیق (`tohidshop://`، `vill3n.top/store/…`، `<slug>.vill3n.top`، QR ِ
+  کمپین با `campaign` در ثبت)، و پوستهٔ آیفون از همان صفحه‌ها (`customer-ios/shared` + `customer-ios/iosApp`؛ CI: `customer-ios.yml`
+  دو کارِ «(گزارش)»). آزمون: `gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.shopper.*'`، فاز ۲ ِ `server/test/shopper-live.mjs`
+  (`ShopperStage2LiveTest`)، و صفحه‌ها + `CustomerModelTest`/`CustomerStage2Test` روی Compose Desktop.
+- نیمه‌کاره: کامپایلِ اندروید و iOS فقط در CI (این‌جا `dl.google.com` ۴۰۳ و Kotlin/Native نیست). MKT-03/04/05/06/07 ساخته نشد:
+  Push (O-01)، رضایت و حسابِ مشتری (D-09) و قاعدهٔ پاداش تصمیمِ صاحب‌کارند (شرح در STATUS).
+- قدمِ بعدی: ورود و نشستِ بلندِ مشتری پس از D-09 (همگام‌سازیِ همین نشانی‌ها با حساب، Keystore/Keychain)، Push (O-01)، امضا و
+  انتشارِ برنامهٔ خرید (اجازه، `OWNER-TODO` §۱۰-ب)، نقشهٔ درون‌برنامه (تصمیمِ صاحب‌کار)، و پس از چند دورِ سبز «(گزارش)» ⇐ سد.
 ### ۱۴۰۵/۰۸/۱۷ — شاخهٔ `claude/customer-app-1` (برنامهٔ خریدِ مشتری، مرحلهٔ ۱؛ O-04 «ب»؛ روی main ‏8c22f3f4؛ سیزنِ `session_01GcPTALbaroEADJph5to8Qj`)
 - انجام شد: کارخواهِ تایپ‌شدهٔ ویترین و بازارچه در `core/src/commonMain/.../core/shopper` (همان درهای عمومی، بی درِ تازه در سرور)،
   قاعده‌های سبد و ثبت (همان `store.js`/`checkout.js` ِ وب و `forCheckout` ِ سرور)، کلیدِ یکتاییِ ثبت، پیگیری، نوشته‌های

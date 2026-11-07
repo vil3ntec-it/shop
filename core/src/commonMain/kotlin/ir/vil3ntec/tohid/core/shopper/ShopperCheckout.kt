@@ -5,7 +5,7 @@ import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import kotlinx.serialization.Serializable
 
-/** برگهٔ ثبت، همان کادرهای `server/public/store/checkout.js` (بی پین و بی کادرهای پرچم‌دارِ CHK-08 در مرحلهٔ ۱). */
+/** برگهٔ ثبت، همان کادرهای `server/public/store/checkout.js` (بی کادرهای پرچم‌دارِ CHK-08؛ پین از مرحلهٔ ۲). */
 @Serializable
 data class CheckoutForm(
   /** `delivery` یا `pickup`؛ خالی ⇒ پیش‌فرضِ دکان ([CheckoutRules.fulfillmentOf]) */
@@ -22,7 +22,22 @@ data class CheckoutForm(
   val note: String = "",
   val callBeforeArrival: Boolean = false,
   val leaveWith: String = "",
-)
+  /** CHK-08: پینِ تحویل (منبعِ اصلی)؛ هر دو یا هیچ. با پین ناحیه را سرور از پین می‌گوید (`zoneId` نمی‌رود) */
+  val pinLat: Double? = null,
+  val pinLng: Double? = null,
+  val pinAccuracyM: Int? = null,
+  /** نشانیِ ذخیره‌شده‌ای که برگه از آن پُر شد (فقط برای نشانِ «برگزیده» در صفحه) */
+  val addressId: String? = null,
+) {
+  val pin: GeoPin? get() = if (pinLat != null && pinLng != null) GeoPin(pinLat, pinLng, pinAccuracyM) else null
+}
+
+/**
+ *  تخفیفی که سرور برای همین سبد گفت (`POST /:slug/promos/quote`، MKT-01/09): [discountMinor] در جمعِ دیده‌شده کم
+ *  می‌شود و [code] (اگر هست) در بدنه می‌رود؛ سرور در همان تراکنشِ ثبت دوباره می‌سنجد و کدِ اعمال‌نشده ⇒ ۴۰۹
+ *  `promo_code_rejected` (هرگز سفارشِ بی‌صدا با قیمتِ دیگر). [deviceId] فقط وقتی دکان سدِ «یک بار» دارد (MKT-02).
+ */
+data class AppliedPromo(val discountMinor: Long, val code: String = "", val deviceId: String? = null)
 
 /** چرا «ثبت» هنوز بسته است — هر کدام یک پیامِ روشن در [ShopperText.problem] دارد. */
 enum class CheckoutProblem { CLOSED, EMPTY, UNAVAILABLE_LINES, NO_FULFILLMENT, NAME, PHONE, VERIFY, ADDRESS, ZONE, SLOT, BELOW_MIN }
@@ -146,7 +161,8 @@ object CheckoutRules {
     if (phoneOf(form) == null) out += CheckoutProblem.PHONE
     else if (!verified(form, ticket, now)) out += CheckoutProblem.VERIFY
     if (f == DELIVERY) {
-      if (form.addressText.isBlank() && form.landmark.isBlank()) out += CheckoutProblem.ADDRESS
+      //  همان سرور: پین بس است؛ بی پین نشانی یا نشانه (CHK-08)
+      if (form.addressText.isBlank() && form.landmark.isBlank() && form.pin == null) out += CheckoutProblem.ADDRESS
       if (zones(page) != null && zoneOf(page, form) == null) out += CheckoutProblem.ZONE
     }
     if (needsSlot(page, f, slots, form.slotStartsAt)) out += CheckoutProblem.SLOT
@@ -155,8 +171,8 @@ object CheckoutRules {
     return out
   }
 
-  /** بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت. */
-  fun request(page: StorePage, cart: Cart, form: CheckoutForm, phone: String, lang: String, slots: SlotsPage?): CheckoutRequest {
+  /** بدنهٔ `POST /checkout` (همان `orderBody` ِ وب). [phone] همان E.164 ِ بلیت؛ [promo] تخفیفِ گفتهٔ سرور برای همین سبد. */
+  fun request(page: StorePage, cart: Cart, form: CheckoutForm, phone: String, lang: String, slots: SlotsPage?, promo: AppliedPromo? = null): CheckoutRequest {
     val f = fulfillmentOf(page.shop, form) ?: DELIVERY
     val s = summary(page, cart, form, slots)
     val slot = slotOf(slots, form.slotStartsAt)
@@ -165,14 +181,18 @@ object CheckoutRules {
       customer = CheckoutCustomer(form.name.trim().take(80), phone),
       lines = cart.lines.map { CheckoutLine(it.productId, it.qtyMilli, it.priceMinor) },
       note = form.note.trim().take(500),
-      expectedTotalMinor = s.totalMinor,
+      expectedTotalMinor = s.totalMinor - (promo?.discountMinor ?: 0),
       lang = lang,
       slotStartsAt = slot?.startsAt,
       address = if (f != DELIVERY) null else CheckoutAddress(
         text = form.addressText.trim().take(300), landmark = form.landmark.trim().take(200),
         area = form.area.trim().take(80), gateColor = form.gateColor.trim().take(40),
-        zoneId = if (zones(page) != null) zoneOf(page, form)?.id else null,
+        //  بی پین ⇒ ناحیهٔ برگزیده (`source: customer`)؛ با پین ناحیه را سرور از پین می‌گوید (همان وب)
+        zoneId = if (zones(page) != null && form.pin == null) zoneOf(page, form)?.id else null,
+        lat = form.pin?.let { AddressRules.round6(it.lat) }, lng = form.pin?.let { AddressRules.round6(it.lng) },
       ),
+      promoCode = promo?.code?.takeIf { it.isNotBlank() },
+      deviceId = promo?.deviceId,
       delivery = if (f != DELIVERY) null else CheckoutDelivery(form.callBeforeArrival, form.leaveWith.trim().take(80)),
     )
   }

@@ -1,0 +1,5 @@
+// ⛔ BLOCKED-EXTERNAL (docs/IOS-PLAN-fa.md §۰.۶): شناسهٔ تیم و شناسهٔ نهاییِ برنامهٔ خرید را فقط صاحب‌کار از حسابِ
+// Apple Developer ِ خودش می‌دهد. تا آن روز فقط ساختِ شبیه‌ساز، بی امضا (CI: کارِ «برنامهٔ خرید روی آیفون (گزارش)»).
+TEAM_ID=
+BUNDLE_ID=ir.vil3ntec.tohid.customer
+APP_NAME=خرید

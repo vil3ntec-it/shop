@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
@@ -57,9 +58,13 @@ fun HomeScreen(model: CustomerModel) {
           Text(ShopperText.homeTitle, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
           Text(ShopperText.homeSub, style = MaterialTheme.typography.bodyMedium)
         }
+        IconButton(onClick = { model.go(Route.Addresses) }) { Icon(Icons.Filled.LocationOn, contentDescription = ShopperText.myAddresses) }
         IconButton(onClick = { model.go(Route.Settings) }) { Icon(Icons.Filled.Settings, contentDescription = ShopperText.settings) }
       }
     }
+    model.linkNote?.let { n -> item { Note(n, Tone.WARN) } }
+    //  MKT-08: سفارش‌های تکراریِ رسیده به موعد (یادآوری درونِ برنامه؛ ثبت با خودِ مشتری)
+    items(model.duePlans(), key = { "due-" + it.token }) { p -> DuePlanCard(model, p) }
     item {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(

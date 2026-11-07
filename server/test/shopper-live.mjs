@@ -8,6 +8,11 @@
  * `SHOPPER_LIVE_BASE`/`SHOPPER_LIVE_SLUG` همان کارخواهی را می‌زند که برنامهٔ اندروید می‌زند: بازارچه، کاتالوگ،
  * جست‌وجو، کالا، تأییدِ شماره، ثبت با کلیدِ یکتایی (و تکرارش)، پیگیری، لغو، ۴۰۹ ِ قیمتِ عوض‌شده و دریافت از دکان.
  *
+ * فاز ۲ (برنامهٔ خرید، مرحلهٔ ۲): پس از سبز شدنِ همان آزمون، پرچم‌های گفت‌وگو، نظر، امتیازِ پیک و تخفیفِ ویترین روشن،
+ * کدِ `VIP10` ساخته و یک سفارشِ «دریافت از دکان» از راهِ واقعی تا «تحویل شد» برده می‌شود؛ سپس `ShopperStage2LiveTest`
+ * (`SHOPPER_LIVE_DELIVERED`): تخفیفِ سرور در ثبت، پیگیری با `review`/`chat`، نظر و امتیاز، «خریدِ دوباره»، گفت‌وگو با
+ * clientId و عکس، و نشانی‌های حسابِ مشتری (سقفِ ۱۰، بسته به همان مشتری). فاز ۱ دست نخورده و پیش از این پرچم‌هاست.
+ *
  * Gradle در فرآیندِ جدا و **ناهم‌گام** (spawn) اجرا می‌شود تا همین فرآیند پاسخ بدهد. `SHOPPER_GRADLE_ARGS`
  * پارامترهای افزوده (مثلاً `--offline --init-script …/offline.init.gradle` در کانتینرِ بی‌اینترنت).
  */
@@ -22,6 +27,9 @@ process.env.API_SECRET = 'test-secret-test-secret-test-sec';
 process.env.OTP_SECRET = 'test-otp-secret-test-otp-secret1';
 process.env.BACKUP_ENABLED = 'false';
 process.env.RATE_GENERAL_MAX = '100000';
+//  فاز ۲ نوشتنِ ویترین (ثبت، حساب، ۱۲ نشانی) را از یک IP زیاد می‌زند؛ سقف‌ها این‌جا آزموده نمی‌شوند
+process.env.RATE_STORE_CHECKOUT_MAX = '100000';
+process.env.RATE_VERIFY_MAX = '100000';
 process.env.OTP_RESEND_SECONDS = '0';
 process.env.OTP_UNIFORM_MS = '0';
 
@@ -87,22 +95,48 @@ const repo = path.join(import.meta.dirname, '..', '..');
 const extra = (process.env.SHOPPER_GRADLE_ARGS || '').split(/\s+/).filter(Boolean);
 const args = ['-p', 'core', '--no-daemon', ...extra, 'jvmTest', '--rerun', '--tests', 'ir.vil3ntec.tohid.core.shopper.ShopperLiveTest'];
 console.log(`gradle ${args.join(' ')}`);
-const code = await new Promise((resolve) => {
-  const child = spawn(process.env.GRADLE || 'gradle', args, {
+const gradle = (testClass, env) => new Promise((resolve) => {
+  const child = spawn(process.env.GRADLE || 'gradle', [...args.slice(0, -1), testClass], {
     cwd: repo, stdio: 'inherit',
-    env: { ...process.env, SHOPPER_LIVE_BASE: base, SHOPPER_LIVE_SLUG: slug },
+    env: { ...process.env, SHOPPER_LIVE_BASE: base, SHOPPER_LIVE_SLUG: slug, ...env },
   });
   child.on('error', (e) => { console.error(e.message); resolve(127); });
   child.on('exit', (c) => resolve(c ?? 1));
 });
+const code = await gradle('ir.vil3ntec.tohid.core.shopper.ShopperLiveTest', {});
 ok(code === 0, 'ShopperLiveTest (کارخواهِ برنامهٔ خرید) روی سرورِ واقعی سبز', `gradle ⇒ ${code}`);
 
 //  ShopperLiveTest رد شده (skip) سبز نیست: نتیجهٔ XML ِ همان اجرا باید یک آزمونِ بی skip و بی شکست بگوید
 const fs = await import('node:fs');
-const xml = path.join(repo, 'core', 'build', 'test-results', 'jvmTest', 'TEST-ir.vil3ntec.tohid.core.shopper.ShopperLiveTest.xml');
-const report = fs.existsSync(xml) ? fs.readFileSync(xml, 'utf8') : '';
-ok(/tests="1"/.test(report) && /skipped="0"/.test(report) && /failures="0"/.test(report) && /errors="0"/.test(report),
-  'گزارشِ JUnit: یک آزمون، بی skip و بی شکست', report.slice(0, 200).replace(/\s+/g, ' '));
+const junit = (name) => {
+  const xml = path.join(repo, 'core', 'build', 'test-results', 'jvmTest', `TEST-ir.vil3ntec.tohid.core.shopper.${name}.xml`);
+  const report = fs.existsSync(xml) ? fs.readFileSync(xml, 'utf8') : '';
+  ok(/tests="1"/.test(report) && /skipped="0"/.test(report) && /failures="0"/.test(report) && /errors="0"/.test(report),
+    `گزارشِ JUnit ِ ${name}: یک آزمون، بی skip و بی شکست`, report.slice(0, 200).replace(/\s+/g, ' '));
+};
+junit('ShopperLiveTest');
+
+//  ── فاز ۲: گفت‌وگو، نظر، امتیاز، تخفیف و سفارشِ تحویل‌شده (پس از فاز ۱، تا آن را عوض نکند) ──
+for (const key of ['shop.chat', 'shop.orders.reviews', 'shop.delivery_ratings', 'shop.storefront.promos', 'shop.promo_uses']) await flag(shopId, key);
+const rule = await call('PUT', '/api/shop/promos/rules/vip', { rule: {
+  name: 'vip', stack: 'best', active: true, kind: 'percent', bp: 1000, channels: ['online'], code: 'VIP10',
+} }, T);
+ok(rule.status === 200, 'کدِ تخفیفِ VIP10 ساخته شد', JSON.stringify(rule.body).slice(0, 120));
+const dPhone = '0700999888';
+const dStart = await call('POST', `/api/store/${slug}/verify/start`, { phone: dPhone });
+const dCheck = await call('POST', `/api/store/${slug}/verify/check`, { phone: dPhone, code: dStart.body.devCode });
+const dOrder = await call('POST', `/api/store/${slug}/checkout`, {
+  fulfillment: 'pickup', customer: { name: 'مشتریِ تحویل', phone: dPhone }, lines: [{ productId: 'rice', qtyMilli: 1000 }], lang: 'fa',
+}, null, { 'Idempotency-Key': 'live-delivered-1', 'X-Store-Ticket': dCheck.body.ticket });
+ok(dOrder.status === 201, 'سفارشِ «دریافت از دکان» ثبت شد', JSON.stringify(dOrder.body).slice(0, 120));
+const dRow = (await query('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [shopId, dOrder.body.order.orderNo])).rows[0];
+for (const to of ['accepted', 'picking', 'packed', 'ready_for_pickup', 'picked_up']) {
+  const tr = await call('POST', `/api/shop/orders/${dRow.id}/transition`, { to }, T);
+  ok(tr.status === 200, `گذارِ سفارش به ${to}`, JSON.stringify(tr.body).slice(0, 100));
+}
+const code2 = await gradle('ir.vil3ntec.tohid.core.shopper.ShopperStage2LiveTest', { SHOPPER_LIVE_DELIVERED: dOrder.body.order.token });
+ok(code2 === 0, 'ShopperStage2LiveTest (نشانی، گفت‌وگو، نظر، تخفیف) روی سرورِ واقعی سبز', `gradle ⇒ ${code2}`);
+junit('ShopperStage2LiveTest');
 
 server.close();
 await closeDb();

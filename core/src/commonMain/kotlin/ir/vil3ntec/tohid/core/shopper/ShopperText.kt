@@ -306,11 +306,161 @@ object ShopperText {
     CheckoutProblem.NAME -> t("نام را بنویسید.", "Please enter your name.", "خپل نوم ولیکئ.")
     CheckoutProblem.PHONE -> t("شمارهٔ موبایل درست نیست.", "That mobile number isn't valid.", "د موبایل شمېره سمه نه ده.")
     CheckoutProblem.VERIFY -> t("برای ثبت، اول همین شماره را تأیید کنید.", "Please verify this number before ordering.", "د ثبت لپاره لومړی همدا شمېره تایید کړئ.")
-    CheckoutProblem.ADDRESS -> t("نشانی یا نشانهٔ نزدیک را بنویسید.", "Please give an address or a nearby landmark.", "پته یا نږدې نښه ورکړئ.")
+    CheckoutProblem.ADDRESS -> t("نشانی، نشانهٔ نزدیک یا پینِ موقعیت را بدهید.", "Please give an address, a nearby landmark or a map pin.", "پته، نږدې نښه یا د ځای پن ورکړئ.")
     CheckoutProblem.ZONE -> t("ناحیهٔ ارسال را برگزینید.", "Choose your delivery area.", "د لېږد سیمه وټاکئ.")
     CheckoutProblem.SLOT -> t("یک بازهٔ زمانی را برگزینید.", "Choose a time slot.", "یو وخت وټاکئ.")
     CheckoutProblem.BELOW_MIN -> t("برای ادامه، سبد به حداقلِ سفارش برسد.", "Reach the minimum order to continue.", "د دوام لپاره ټوکرۍ باید لږ تر لږه فرمایش ته ورسېږي.")
   }
+
+  // ── مرحلهٔ ۲: نشانی‌های من و پین (CHK-08/09/10) ──
+  val myAddresses get() = t("نشانی‌های من", "My addresses", "زما پتې")
+  val addAddress get() = t("نشانیِ تازه", "New address", "نوې پته")
+  val editAddress get() = t("ویرایشِ نشانی", "Edit address", "پته سمول")
+  val noAddresses get() = t(
+    "هنوز نشانی‌ای ذخیره نکرده‌اید. نشانی با پین، ثبتِ بعدی را تند می‌کند.",
+    "No saved addresses yet. An address with a pin makes your next order quicker.",
+    "لا مو پته نه ده خوندي کړې. د پن سره پته راتلونکی فرمایش ګړندی کوي.",
+  )
+  val addressLabel get() = t("نامِ نشانی (مثلاً خانه، دفتر)", "Name (e.g. Home, Work)", "د پتې نوم (لکه کور، دفتر)")
+  val pinTitle get() = t("پینِ موقعیت", "Map pin", "د ځای پن")
+  val pinMine get() = t("موقعیتِ فعلیِ من", "Use my current location", "زما اوسنی ځای")
+  val pinWait get() = t("در حالِ گرفتنِ موقعیت…", "Getting your location…", "ځای اخیستل کېږي…")
+  val pinPaste get() = t("پیوند یا مختصات از برنامهٔ نقشه", "Link or coordinates from a maps app", "د نقشې له اپ څخه لینک یا مختصات")
+  val pinPasteHint get() = t("مثلاً 34.5281, 69.1723", "e.g. 34.5281, 69.1723", "لکه 34.5281, 69.1723")
+  val pinUse get() = t("گذاشتنِ پین", "Set pin", "پن ولګوئ")
+  val pinBad get() = t(
+    "از این متن مختصات پیدا نشد. در برنامهٔ نقشه جای خانه را نگه دارید و مختصات یا پیوندِ کامل را بچسبانید.",
+    "No coordinates found. In your maps app, press and hold your place, then paste the coordinates or the full link.",
+    "له دې متن څخه مختصات ونه موندل شول. د نقشې په اپ کې خپل ځای ونیسئ او مختصات یا بشپړ لینک کېږدئ.",
+  )
+  val pinNone get() = t("موقعیت در دسترس نیست؛ اجازهٔ موقعیت یا GPS را ببینید، یا پیوندِ نقشه را بچسبانید.",
+    "Location isn't available — check the location permission or GPS, or paste a map link.",
+    "ځای نشته؛ د ځای اجازه یا GPS وګورئ، یا د نقشې لینک کېږدئ.")
+  fun pinSet(coords: String) = t("پین: ${asIs(digits(coords))}", "Pin: $coords", "پن: ${digits(coords)}")
+  fun pinAccuracy(m: Int) = t("دقت حدودِ ${asIs(num(m.toLong()))} متر", "Accurate to about $m m", "دقت شاوخوا ${num(m.toLong())} متره")
+  val pinShow get() = t("نمایش روی نقشه", "Show on map", "په نقشه کې ښودل")
+  val pinClear get() = t("برداشتنِ پین", "Remove pin", "پن لرې کړئ")
+  val pinZoneWait get() = t("ناحیه از روی پین سنجیده می‌شود…", "Checking the delivery area for this pin…", "د دې پن سیمه کتل کېږي…")
+  fun pinZone(name: String) = t("پین در ناحیهٔ «${asIs(name)}» است.", "The pin is in the “$name” area.", "پن د «$name» په سیمه کې دی.")
+  val pinOutside get() = t(
+    "این پین بیرون از محدودهٔ ارسالِ دکان است؛ «دریافت از دکان» را برگزینید یا پینِ دیگری بگذارید.",
+    "This pin is outside the shop's delivery area — choose pickup or set another pin.",
+    "دا پن د دوکان د لېږد له سیمې بهر دی؛ «له دوکانه اخیستل» وټاکئ یا بل پن ولګوئ.",
+  )
+  val useSaved get() = t("از نشانی‌های من", "From my addresses", "زما له پتو")
+  val saveThisAddress get() = t("ذخیرهٔ همین نشانی", "Save this address", "دا پته خوندي کړئ")
+  fun addressSaved(label: String) = t("«${asIs(label)}» ذخیره شد.", "“$label” saved.", "«$label» خوندي شوه.")
+  fun deleteAddress(label: String) = t("پاک کردنِ «${asIs(label)}»", "Delete “$label”", "«$label» ړنګول")
+  fun addressProblem(p: AddressProblem): String = when (p) {
+    AddressProblem.LABEL -> t("نامی برای نشانی بنویسید (مثلاً «خانه»).", "Give the address a name (e.g. “Home”).", "پتې ته یو نوم ورکړئ (لکه «کور»).")
+    AddressProblem.PIN -> t("پین درست نیست؛ دوباره بگذارید.", "That pin isn't valid — set it again.", "پن سم نه دی؛ بیا یې ولګوئ.")
+    AddressProblem.EMPTY -> problem(CheckoutProblem.ADDRESS)
+    AddressProblem.FULL -> t("حداکثر ۱۰ نشانی؛ یکی را پاک کنید.", "Up to 10 addresses — delete one first.", "تر ۱۰ پتو؛ لومړی یوه ړنګه کړئ.")
+  }
+  val addressesLocal get() = t(
+    "این نشانی‌ها فقط روی همین گوشی‌اند؛ با آمدنِ حسابِ مشتری به همه‌جا می‌روند.",
+    "These addresses are on this phone only; they will follow you once customer accounts arrive.",
+    "دا پتې یوازې په دې موبایل کې دي؛ د پیرودونکي حساب سره به هر ځای درسره وي.",
+  )
+
+  // ── گفت‌وگو با دکان (CHAT-02/06) ──
+  val chatShop get() = t("پرسش از دکان", "Ask the shop", "له دوکانه پوښتنه")
+  val chatOrder get() = t("گفت‌وگو دربارهٔ این سفارش", "Chat about this order", "د دې فرمایش په اړه خبرې")
+  fun chatTitle(shop: String) = t("گفت‌وگو با ${asIs(shop)}", "Chat with $shop", "له $shop سره خبرې")
+  val chatHint get() = t("پیامِ خود را بنویسید…", "Type your message…", "خپل پیغام ولیکئ…")
+  val chatSend get() = t("فرستادن", "Send", "لېږل")
+  val chatPhoto get() = t("فرستادنِ عکس", "Send a photo", "انځور لېږل")
+  val chatEmpty get() = t("هنوز پیامی نیست؛ پرسش خود را بنویسید.", "No messages yet — ask your question.", "لا پیغام نشته؛ خپله پوښتنه ولیکئ.")
+  val chatVerify get() = t("برای گفت‌وگو با دکان، شمارهٔ خود را تأیید کنید.", "Verify your number to chat with the shop.", "له دوکان سره د خبرو لپاره خپله شمېره تایید کړئ.")
+  val chatQueued get() = t("در صف — با وصل شدنِ اینترنت خودش می‌رود", "Queued — it will send when you're back online", "په کتار کې — د انټرنېټ سره به پخپله ولاړ شي")
+  val chatSending get() = t("در حالِ فرستادن…", "Sending…", "لېږل کېږي…")
+  val chatWaitVerify get() = t("منتظرِ تأییدِ دوبارهٔ شماره", "Waiting for you to verify your number again", "د شمېرې بیا تایید ته انتظار")
+  val chatFailed get() = t("نرفت", "Not sent", "ونه لېږل شو")
+  val chatRetry get() = t("دوباره", "Retry", "بیا")
+  val chatCancel get() = t("لغو", "Cancel", "لغوه")
+  val chatSent get() = t("رفت", "Sent", "ولاړ")
+  val chatDelivered get() = t("رسید", "Delivered", "ورسېد")
+  val chatRead get() = t("خوانده شد", "Read", "ولوستل شو")
+  val chatDeleted get() = t("این پیام پاک شد", "This message was deleted", "دا پیغام ړنګ شو")
+  val chatEdited get() = t("ویرایش‌شده", "edited", "سمه شوې")
+  val chatClosed get() = t("این گفت‌وگو بسته شد و فقط خواندنی است.", "This chat is closed and read-only.", "دا خبرې بندې دي او یوازې لوستل کېږي.")
+  val chatIssue get() = t("مشکل دارم", "I have a problem", "ستونزه لرم")
+  val chatRestart get() = t("گفت‌وگوی تازه", "New chat", "نوې خبرې")
+  val chatBlocked get() = t("این دکان پیامِ شما را نمی‌پذیرد.", "This shop isn't accepting your messages.", "دا دوکان ستاسو پیغامونه نه مني.")
+  val chatShopSide get() = t("دکان", "Shop", "دوکان")
+  val chatPhotoBusy get() = t("آماده کردنِ عکس…", "Preparing the photo…", "انځور چمتو کېږي…")
+  val chatPhotoBad get() = t("این عکس خوانده نشد؛ عکسِ دیگری برگزینید (JPG، PNG یا WebP).", "That photo couldn't be read — choose another (JPG, PNG or WebP).", "دا انځور ونه لوستل شو؛ بل انځور وټاکئ (JPG، PNG یا WebP).")
+  val chatImage get() = t("عکس", "Photo", "انځور")
+
+  // ── نظر و امتیاز (NTF-09، DLV-18) ──
+  val reviewTitle get() = t("نظرِ شما دربارهٔ این خرید", "Your review of this order", "د دې پېرود په اړه ستاسو نظر")
+  fun stars(n: Int) = t("${asIs(num(n.toLong()))} ستاره از ۵", "$n out of 5 stars", "له ۵ څخه ${num(n.toLong())} ستوري")
+  val reviewHint get() = t("چه چیزی خوب بود یا بهتر شود؟ (اختیاری)", "What was good, or could be better? (optional)", "څه ښه وو یا باید ښه شي؟ (اختیاري)")
+  val reviewSend get() = t("فرستادنِ نظر", "Send review", "نظر لېږل")
+  val reviewThanks get() = t("سپاس! نظرِ شما پس از بررسیِ دکان دیده می‌شود.", "Thank you! Your review appears after the shop checks it.", "مننه! ستاسو نظر د دوکان له کتنې وروسته ښکاري.")
+  fun reviewMine(n: Int) = t("نظرِ شما: ${asIs(num(n.toLong()))} ستاره", "Your review: $n stars", "ستاسو نظر: ${num(n.toLong())} ستوري")
+  val reviewPickStars get() = t("اول ستاره‌ها را بزنید.", "Tap the stars first.", "لومړی ستوري ووهئ.")
+  val rateCourier get() = t("امتیاز به رساننده", "Rate the delivery", "رسونکي ته نمره")
+  val rateSend get() = t("فرستادنِ امتیاز", "Send rating", "نمره لېږل")
+  fun rateMine(n: Int) = t("امتیازِ شما به رساننده: ${asIs(num(n.toLong()))} ستاره", "Your delivery rating: $n stars", "رسونکي ته ستاسو نمره: ${num(n.toLong())} ستوري")
+  fun rateTag(tag: String): String = when (tag) {
+    "on_time" -> t("به‌موقع", "On time", "پر وخت")
+    "polite" -> t("مؤدب", "Polite", "مؤدب")
+    "careful" -> t("با دقت", "Careful", "په پاملرنه")
+    "late" -> t("دیر", "Late", "ناوخته")
+    "rude" -> t("بی‌ادب", "Rude", "بې‌ادبه")
+    "damaged" -> t("آسیب‌دیده", "Damaged", "زیانمن")
+    else -> t("دیگر", "Other", "نور")
+  }
+  fun shopRating(tenths: Int, count: Int): String {
+    val (a, b) = ReviewRules.average(tenths)
+    val avg = digits("$a.$b").replace('.', if (lang == ShopperLang.EN) '.' else '٫')
+    return t("★ ${asIs(avg)} از ${asIs(num(count.toLong()))} نظر", "★ $avg from $count reviews", "★ $avg له ${num(count.toLong())} نظرونو")
+  }
+
+  // ── تخفیف (MKT-01/09) ──
+  val promoTitle get() = t("تخفیف", "Discount", "تخفیف")
+  val promoCode get() = t("کدِ تخفیف", "Discount code", "د تخفیف کوډ")
+  val promoApply get() = t("اعمال", "Apply", "پلي کول")
+  val promoClear get() = t("برداشتنِ کد", "Remove code", "کوډ لرې کړئ")
+  val promoChecking get() = t("تخفیف از دکان پرسیده می‌شود…", "Checking discounts with the shop…", "له دوکانه تخفیف پوښتل کېږي…")
+  fun promoOk(code: String, d: Long) = t("کدِ ${asIs(code)} اعمال شد: ${asIs(money(d))} کمتر", "Code $code applied: ${money(d)} off", "د $code کوډ پلي شو: ${money(d)} کم")
+  fun promoEnds(name: String, days: Long) = t("${asIs(name)} — تا ${asIs(num(days))} روزِ دیگر", "$name — ${days} more days", "$name — نورې ${num(days)} ورځې")
+  fun promoStatus(status: String): String = when (status) {
+    "unknown" -> t("این کدِ تخفیف در این ویترین نیست.", "That code isn't valid in this shop.", "دا کوډ په دې دوکان کې نشته.")
+    "inactive" -> t("این کدِ تخفیف الان فعال نیست.", "That code isn't active right now.", "دا کوډ اوس فعال نه دی.")
+    "used_up" -> t("ظرفیتِ این کدِ تخفیف پر شده است.", "That code has been used up.", "د دې کوډ ظرفیت ډک شوی.")
+    "no_effect" -> t("این کد روی کالاهای این سبد اثری ندارد.", "That code doesn't apply to the items in this cart.", "دا کوډ د دې ټوکرۍ پر توکو اغېز نه لري.")
+    "limit_reached" -> t("سهمِ شما از این کدِ تخفیف تمام شده است.", "You've already used this code as many times as allowed.", "تاسو دا کوډ څومره چې اجازه وه کارولی دی.")
+    else -> t("این کدِ تخفیف پذیرفته نشد.", "That code wasn't accepted.", "دا کوډ ونه منل شو.")
+  }
+
+  // ── سفارشِ تکرارشونده (MKT-08) ──
+  val repeatTitle get() = t("تکرارِ این سفارش", "Repeat this order", "دا فرمایش تکرار کړئ")
+  fun repeatEvery(days: Int): String = when (days) {
+    7 -> t("هر هفته", "Every week", "هره اونۍ")
+    14 -> t("هر دو هفته", "Every two weeks", "هرې دوه اونۍ")
+    else -> t("هر ${asIs(num(days.toLong()))} روز", "Every $days days", "هرې ${num(days.toLong())} ورځې")
+  }
+  val repeatOff get() = t("بی تکرار", "Don't repeat", "تکرار مه کوئ")
+  val repeatHow get() = t(
+    "موعد که رسید، همین‌جا یادآوری می‌شود و با یک لمس سبد با قیمتِ امروز پُر می‌شود؛ ثبت همیشه با خودِ شماست.",
+    "When it's due you'll see a reminder here, and one tap fills the cart at today's prices — you always confirm the order yourself.",
+    "کله چې وخت یې راشي، همدلته یادونه کېږي او په یوه ټک ټوکرۍ د نن ورځې په بیو ډکېږي؛ ثبت تل ستاسو په لاس دی.",
+  )
+  val repeatDue get() = t("وقتِ سفارشِ دوباره", "Time to reorder", "د بیا فرمایش وخت")
+  fun repeatOf(shop: String, no: Long) = t("${asIs(shop)} — سفارشِ ${asIs(num(no))}", "$shop — order $no", "$shop — فرمایش ${num(no)}")
+  val repeatFill get() = t("پُر کردنِ سبد", "Fill the cart", "ټوکرۍ ډکول")
+  val repeatLater get() = t("فردا یادم بینداز", "Remind me tomorrow", "سبا مې رایاد کړئ")
+  val repeatSkip get() = t("این بار نه", "Skip this time", "دا ځل نه")
+  fun repeatGone(n: Int) = t(
+    "${asIs(num(n.toLong()))} قلم دیگر فروختنی نیست و به سبد نیامد.",
+    "$n ${if (n == 1) "item is" else "items are"} no longer for sale and weren't added.",
+    "${num(n.toLong())} توکي نور د پلور نه دي او ټوکرۍ ته رانغلل.",
+  )
+
+  // ── پیوند ──
+  val linkBad get() = t("این پیوند برای برنامهٔ خرید نیست.", "This link isn't for the shopping app.", "دا لینک د پېرود اپ لپاره نه دی.")
 
   // ── پس از ثبت و پیگیری ──
   val placedTitle get() = t("سفارش ثبت شد", "Order placed", "فرمایش ثبت شو")
@@ -449,6 +599,17 @@ object ShopperText {
     "out_of_stock" -> t("موجودیِ برخی کالاها کم است؛ مقدار را کم کنید.", "Not enough stock for some items — lower the quantity.", "د ځینو توکو زېرمه کمه ده؛ شمېر یې کم کړئ.")
     "idempotency_key_reused" -> t("این سفارش پیش‌تر با محتوای دیگری فرستاده شده؛ دوباره بزنید.", "This order was already sent with different contents — please try again.", "دا فرمایش مخکې له بل منځپانګې سره لېږل شوی؛ بیا هڅه وکړئ.")
     ShopperError.PRICE_CHANGED -> t("قیمت عوض شده است.", "Prices have changed.", "بیه بدله شوې ده.")
+    "promo_code_rejected" -> promoStatus("")
+    "too_many_addresses" -> addressProblem(AddressProblem.FULL)
+    "chat_closed" -> chatClosed
+    "chat_blocked" -> chatBlocked
+    "chat_disabled" -> t("گفت‌وگو برای این دکان روشن نیست.", "Chat isn't turned on for this shop.", "د دې دوکان لپاره خبرې فعالې نه دي.")
+    "issue_window_passed" -> t("مهلتِ «مشکل دارم» برای این سفارش گذشته است؛ با دکان تماس بگیرید.", "It's too late to report a problem here — please call the shop.", "د «ستونزه لرم» وخت تېر شوی؛ دوکان ته زنګ ووهئ.")
+    "too_large" -> t("فایل بزرگ است؛ عکسِ کوچک‌تری برگزینید.", "That file is too large — choose a smaller photo.", "دوتنه لویه ده؛ کوچنی انځور وټاکئ.")
+    "unsupported_media" -> chatPhotoBad
+    "not_delivered" -> t("نظر و امتیاز پس از تحویل باز می‌شود.", "Reviews open once the order is delivered.", "نظر او نمره له سپارلو وروسته پرانیستل کېږي.")
+    "already_reviewed", "already_rated" -> t("نظرِ شما پیش‌تر ثبت شده است.", "You've already sent your review.", "ستاسو نظر مخکې ثبت شوی.")
+    "rating_closed" -> t("مهلتِ امتیاز دادن گذشته است.", "The time to rate this delivery has passed.", "د نمرې ورکولو وخت تېر شوی.")
     else -> null
   }
 }

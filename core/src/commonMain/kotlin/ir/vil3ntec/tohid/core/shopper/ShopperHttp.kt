@@ -8,16 +8,23 @@ package ir.vil3ntec.tohid.core.shopper
  *  (`ShopperApiTest`) یا JDK (`ShopperLiveTest`). نشانیِ سرور (`https://api…`) هم با فرستنده است؛ این‌جا فقط مسیر.
  */
 
-/** یک درخواست: روش، مسیر از ریشهٔ سرور (`/api/store/…?…`)، سرآیندها و بدنهٔ JSON. */
-data class ShopperRequest(
+/**
+ *  یک درخواست: روش، مسیر از ریشهٔ سرور (`/api/store/…?…`)، سرآیندها و بدنهٔ JSON — یا بایت‌های خام ([bytes]، مثلاً
+ *  عکسِ گفت‌وگو با `Content-Type` ِ خودش). [binary] ⇒ فرستنده بایت‌های پاسخ را هم در [ShopperResponse.bytes] بدهد.
+ */
+class ShopperRequest(
   val method: String,
   val path: String,
   val headers: Map<String, String> = emptyMap(),
   val body: String? = null,
-)
+  val bytes: ByteArray? = null,
+  val binary: Boolean = false,
+) {
+  override fun toString(): String = "ShopperRequest($method $path)"
+}
 
 /** پاسخ: کد، بدنهٔ خام (JSON یا خالی) و سرآیندها (نامِ سرآیند بی‌حساس به بزرگی). */
-class ShopperResponse(val status: Int, val body: String, val headers: Map<String, String> = emptyMap()) {
+class ShopperResponse(val status: Int, val body: String, val headers: Map<String, String> = emptyMap(), val bytes: ByteArray? = null) {
   fun header(name: String): String? = headers.entries.firstOrNull { it.key.equals(name, ignoreCase = true) }?.value
 }
 

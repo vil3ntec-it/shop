@@ -47,6 +47,9 @@ class ShopperError(
   /** `slot_*` و `bad_zone`/`zone_required`: فهرستِ تازهٔ بازه‌ها یا ناحیه‌ها در همان پاسخ */
   fun slots(): List<DeliverySlot>? = (data?.get("slots") as? JsonArray)?.let { a -> a.mapNotNull { decodeOrNull(DeliverySlot.serializer(), it) } }
 
+  /** ۴۰۹ ِ `promo_code_rejected` (MKT-01): وضعیتِ کد (`unknown`، `inactive`، `used_up`، `no_effect`، `limit_reached`) */
+  fun promoStatus(): String? = ((data?.get("promo") as? JsonObject)?.get("status") as? JsonPrimitive)?.contentOrNull
+
   override fun toString(): String = "ShopperError($status, $code)"
 
   companion object {
@@ -54,6 +57,7 @@ class ShopperError(
     const val BAD_RESPONSE = "bad_response"
     const val STORE_MOVED = "store_moved"
     const val PRICE_CHANGED = "price_changed"
+    const val PROMO_REJECTED = "promo_code_rejected"
   }
 }
 
@@ -96,7 +100,8 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     val store = root["store"] as? JsonObject ?: return@call null
     val shop = decodeOrNull(PublicShop.serializer(), store) ?: return@call null
     val delivery = store["delivery"]?.let { decodeOrNull(StoreDelivery.serializer(), it) } ?: StoreDelivery()
-    StorePage(shop, delivery, flag(root, "verification"), flag(root, "market"))
+    val features = (root["features"] as? JsonObject)?.let { decodeOrNull(StoreFeatures.serializer(), it) } ?: StoreFeatures()
+    StorePage(shop, delivery, flag(root, "verification"), flag(root, "market"), features)
   }
 
   /** کاتالوگ: جست‌وجو (`q`، حداکثر ۶۰ نویسه، مثلِ سرور)، دسته و صفحهٔ بعد (`cursor`). */
@@ -151,6 +156,134 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   fun payCash(slug: String, token: String): ShopperResult<PublicOrder> =
     order("POST", base(slug) + "/orders/" + ShopperUrl.encode(token) + "/pay-choice", obj("method" to "cash"))
 
+  /** پیگیری با کلیدهای پرچم‌دارِ همان پاسخ (`review`، `chat`) که در قراردادِ بازار نیستند */
+  fun trackPage(slug: String, token: String): ShopperResult<TrackPage> =
+    call("GET", base(slug) + "/orders/" + ShopperUrl.encode(token), null) { root ->
+      val o = root["order"] as? JsonObject ?: return@call null
+      val order = decodeOrNull(PublicOrder.serializer(), o) ?: return@call null
+      TrackPage(order, decodeOrNull(OrderExtras.serializer(), o) ?: OrderExtras())
+    }
+
+  /** WEB-12: «خریدِ دوباره» — قلم‌های همان سفارش با قیمت و موجودیِ امروز (فقط خواندن) */
+  fun reorder(slug: String, token: String): ShopperResult<ReorderPage> =
+    get(base(slug) + "/orders/" + ShopperUrl.encode(token) + "/reorder", ReorderPage.serializer())
+
+  /** QR/پیوندِ کمپین (MKT-10/11): `GET /store/go/<کد>` با JSON ⇒ slug ِ امروزِ دکان و کدِ کمپینِ زنده */
+  fun campaign(code: String): ShopperResult<CampaignTarget> = call("GET", "/store/go/" + ShopperUrl.encode(code), null) { root ->
+    val st = root["store"] as? JsonObject ?: return@call null
+    val slug = (st["slug"] as? JsonPrimitive)?.contentOrNull ?: return@call null
+    CampaignTarget(slug, (root["campaign"] as? JsonPrimitive)?.contentOrNull)
+  }
+
+  // ── نظر و امتیاز (NTF-09، DLV-18) — اجازه همان توکنِ پیگیری ──
+
+  fun review(slug: String, token: String, stars: Int, comment: String): ShopperResult<ReviewSubmitted> =
+    call("POST", base(slug) + "/orders/" + ShopperUrl.encode(token) + "/review", json(
+      "stars" to JsonPrimitive(stars), "comment" to JsonPrimitive(ReviewRules.cleanComment(comment)),
+    )) { decodeOrNull(ReviewSubmitted.serializer(), it) }
+
+  fun rating(slug: String, token: String): ShopperResult<RatingState> =
+    get(base(slug) + "/orders/" + ShopperUrl.encode(token) + "/rating", RatingState.serializer())
+
+  fun rate(slug: String, token: String, stars: Int, tags: List<String>): ShopperResult<RatingSubmitted> =
+    call("POST", base(slug) + "/orders/" + ShopperUrl.encode(token) + "/rating", json(
+      "stars" to JsonPrimitive(stars), "tags" to JsonArray(tags.map { JsonPrimitive(it) }),
+    )) { decodeOrNull(RatingSubmitted.serializer(), it) }
+
+  /** نظرهای تأییدشدهٔ دکان (۴۰۴ ⇒ پرچم خاموش) */
+  fun shopReviews(slug: String): ShopperResult<ShopReviews> = get(base(slug) + "/reviews", ShopReviews.serializer())
+
+  // ── تخفیف (MKT-01/02/09) ──
+
+  /** تخفیف‌های خودکارِ زنده و «کد پذیرفته می‌شود؟» (۴۰۴ ِ `promos_disabled` ⇒ این دکان تخفیفِ ویترین ندارد) */
+  fun promos(slug: String): ShopperResult<PromoList> = get(base(slug) + "/promos", PromoList.serializer())
+
+  /** پیش‌نمایشِ همان حسابِ ثبت (بی ثبت و بی مصرف)؛ [ticket] فقط وقتی دکان سدِ «اولین خرید» دارد خوانده می‌شود */
+  fun promoQuote(slug: String, lines: List<PromoQuoteLine>, code: String, deviceId: String?, ticket: String?): ShopperResult<PromoQuote> {
+    val body = json(
+      "lines" to JsonArray(lines.map { JsonObject(mapOf("productId" to JsonPrimitive(it.productId), "qtyMilli" to JsonPrimitive(it.qtyMilli))) }),
+      *listOfNotNull(code.takeIf { it.isNotBlank() }?.let { "promoCode" to JsonPrimitive(it) }, deviceId?.let { "deviceId" to JsonPrimitive(it) }).toTypedArray(),
+    )
+    return call("POST", base(slug) + "/promos/quote", body, ticketHeader(ticket)) { decodeOrNull(PromoQuote.serializer(), it) }
+  }
+
+  // ── نشانی‌های حسابِ مشتری (CHK-09) — نشستِ `X-Store-Session`؛ هر خواندن و نوشتن به همان `customer_id` بسته است ──
+  //  ⛔ ساختنِ نشست (ورودِ مشتری و نشستِ بلند) پیامکِ واقعی می‌خواهد (CHK-02، D-09) و این‌جا نیست.
+
+  fun addresses(slug: String, session: String): ShopperResult<List<SavedAddress>> =
+    call("GET", base(slug) + "/account/addresses", null, sessionHeader(session)) { decodeOrNull(AddressList.serializer(), it)?.addresses }
+
+  fun addAddress(slug: String, session: String, input: AddressInput): ShopperResult<SavedAddress> =
+    call("POST", base(slug) + "/account/addresses", ShopperJson.encodeToString(AddressInput.serializer(), input), sessionHeader(session)) { address(it) }
+
+  fun updateAddress(slug: String, session: String, id: String, input: AddressInput): ShopperResult<SavedAddress> =
+    call("PUT", base(slug) + "/account/addresses/" + ShopperUrl.encode(id), ShopperJson.encodeToString(AddressInput.serializer(), input), sessionHeader(session)) { address(it) }
+
+  fun removeAddress(slug: String, session: String, id: String): ShopperResult<Boolean> =
+    call("DELETE", base(slug) + "/account/addresses/" + ShopperUrl.encode(id), null, sessionHeader(session)) { root ->
+      (root["deleted"] as? JsonPrimitive)?.booleanOrNull
+    }
+
+  // ── گفت‌وگو با دکان (CHAT-02/06) — هویت همان شمارهٔ تأییدشده (`X-Store-Ticket`، مثلِ `store/chat.js` ِ وب) ──
+
+  fun chats(slug: String, ticket: String): ShopperResult<List<ChatConversation>> =
+    call("GET", chatBase(slug) + "/conversations", null, ticketHeader(ticket)) { root ->
+      (root["conversations"] as? JsonArray)?.mapNotNull { decodeOrNull(ChatConversation.serializer(), it) }
+    }
+
+  /** گفت‌وگوی همین سفارش ([orderNo]) یا گفت‌وگوی عمومی (null)؛ همان رشته اگر هست (دورِ تازهٔ عمومیِ بسته با سرور) */
+  fun chatOpen(slug: String, ticket: String, orderNo: Long?, name: String): ShopperResult<ChatConversation> {
+    val body = json(*listOfNotNull(orderNo?.let { "orderNo" to JsonPrimitive(it) }, name.trim().takeIf { it.isNotEmpty() }?.let { "name" to JsonPrimitive(it.take(60)) }).toTypedArray())
+    return call("POST", chatBase(slug) + "/conversations", body, ticketHeader(ticket)) { root ->
+      root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) }
+    }
+  }
+
+  /** تغییرها پس از [after] (rev)؛ [waitMs] > ۰ ⇒ long-poll ِ سرور (حداکثر ۲۵ ثانیه) */
+  fun chatChanges(slug: String, ticket: String, convId: String, after: Long, waitMs: Int = 0): ShopperResult<ChatChanges> =
+    call("GET", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/messages" + ShopperUrl.query(
+      "after" to after.toString(), "wait" to waitMs.takeIf { it > 0 }?.toString(),
+    ), null, ticketHeader(ticket)) { decodeOrNull(ChatChanges.serializer(), it) }
+
+  /** ارسال با `clientId` ِ صف: تکرار ⇒ همان پیام (`replayed`)، نه پیامِ دوم */
+  fun chatSend(slug: String, ticket: String, item: ChatOutItem): ShopperResult<ChatSent> =
+    call("POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(item.convId) + "/messages", ChatOutbox.body(item), ticketHeader(ticket)) {
+      decodeOrNull(ChatSent.serializer(), it)
+    }
+
+  /** بارگذاریِ بایت‌های عکس (نوع را سرور از بایت می‌شناسد و EXIF را پاک می‌کند)؛ تکرارِ همان بایت ⇒ همان رسانه */
+  fun chatUpload(slug: String, ticket: String, convId: String, bytes: ByteArray, thumb: Boolean): ShopperResult<ChatUpload> =
+    call(
+      "POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/media" + ShopperUrl.query("role" to if (thumb) "thumb" else "main"),
+      null, ticketHeader(ticket) + ("Content-Type" to (ShopperPhoto.mimeOf(bytes) ?: "application/octet-stream")), bytes = bytes,
+    ) { decodeOrNull(ChatUpload.serializer(), it) }
+
+  /** بایت‌های یک رسانهٔ همین گفت‌وگو (عکس با بلیت خوانده می‌شود، مثلِ وب) */
+  fun chatMedia(slug: String, ticket: String, convId: String, mediaId: String): ShopperResult<ByteArray> {
+    val res = try {
+      http.send(ShopperRequest("GET", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/media/" + ShopperUrl.encode(mediaId),
+        mapOf("Accept-Language" to lang()) + ticketHeader(ticket), binary = true))
+    } catch (e: CancellationException) {
+      throw e
+    } catch (_: Exception) {
+      return ShopperResult.Fail(ShopperError(0, ShopperError.NETWORK))
+    }
+    val bytes = res.bytes
+    return if (res.status == 200 && bytes != null && bytes.isNotEmpty()) ShopperResult.Ok(bytes) else ShopperResult.Fail(ShopperError(res.status, ShopperError.BAD_RESPONSE))
+  }
+
+  /** «رسید» و «خواندم» تا [readSeq] (یکنواخت؛ سرور هرگز پایین نمی‌آورد) */
+  fun chatReceipts(slug: String, ticket: String, convId: String, deliveredSeq: Long, readSeq: Long): ShopperResult<ChatConversation> =
+    call("POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/receipts", json(
+      "deliveredSeq" to JsonPrimitive(deliveredSeq), "readSeq" to JsonPrimitive(readSeq),
+    ), ticketHeader(ticket)) { root -> root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) } }
+
+  /** «مشکل دارم»: رشتهٔ سفارشِ بسته تا مهلتِ سرور دوباره باز می‌شود (پس از آن ۴۰۹ ِ `issue_window_passed`) */
+  fun chatIssue(slug: String, ticket: String, convId: String): ShopperResult<ChatConversation> =
+    call("POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/issue", "{}", ticketHeader(ticket)) { root ->
+      root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) }
+    }
+
   /** نشانیِ عکس (نسبت به ریشهٔ سرور): کارت ⇒ `thumb`، برگهٔ کالا ⇒ `photo`؛ `?v=` همان `photoVersion` (IMG-12). */
   fun photoPath(slug: String, productId: String, version: String?, thumb: Boolean): String =
     base(slug) + "/products/" + ShopperUrl.encode(productId) + (if (thumb) "/thumb" else "/photo") + ShopperUrl.query("v" to version)
@@ -158,6 +291,16 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   // ── درون ──
 
   private fun base(slug: String) = "/api/store/" + ShopperUrl.encode(slug)
+
+  private fun chatBase(slug: String) = base(slug) + "/chat"
+
+  private fun ticketHeader(ticket: String?): Map<String, String> = if (ticket.isNullOrEmpty()) emptyMap() else mapOf("X-Store-Ticket" to ticket)
+
+  private fun sessionHeader(session: String): Map<String, String> = mapOf("X-Store-Session" to session)
+
+  private fun address(root: JsonObject): SavedAddress? = root["address"]?.let { decodeOrNull(SavedAddress.serializer(), it) }
+
+  private fun json(vararg kv: Pair<String, JsonElement>): String = ShopperJson.encodeToString(JsonObject.serializer(), JsonObject(kv.toMap()))
 
   private fun order(method: String, path: String, body: String?): ShopperResult<PublicOrder> =
     call(method, path, body) { root -> root["order"]?.let { decodeOrNull(PublicOrder.serializer(), it) } }
@@ -177,6 +320,7 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     path: String,
     body: String?,
     extra: Map<String, String> = emptyMap(),
+    bytes: ByteArray? = null,
     read: (JsonObject) -> T?,
   ): ShopperResult<T> {
     val headers = buildMap {
@@ -186,7 +330,7 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
       putAll(extra)
     }
     val res = try {
-      http.send(ShopperRequest(method, path, headers, body))
+      http.send(ShopperRequest(method, path, headers, body, bytes))
     } catch (e: CancellationException) {
       throw e   //  لغوِ کوروتینِ صفحه «خطای شبکه» نیست
     } catch (_: Exception) {
