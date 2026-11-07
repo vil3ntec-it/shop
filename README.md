@@ -2,6 +2,10 @@
 
 برنامه‌ی مدیریت فروشگاه — نسخه‌ی وب، برنامه‌ی اندروید، برنامه‌ی کامپیوتر و سرور.
 
+- **ادامهٔ کار بی ما (برنامه‌نویس یا هوشِ مصنوعی):** [`docs/MAINTAINER-fa.md`](docs/MAINTAINER-fa.md)
+- **کارهایی که فقط صاحب‌کار می‌تواند:** [`docs/OWNER-TODO-fa.md`](docs/OWNER-TODO-fa.md)
+- **پرسش‌های بزرگ (ظرفیت، امنیت، داده، آیفون…) با شاهد:** [`docs/QA-BIG-QUESTIONS-fa.md`](docs/QA-BIG-QUESTIONS-fa.md)
+
 ```
 برنامه اندروید ──┐
 برنامه کامپیوتر ─┼─→  REST API  →  Node.js  →  PostgreSQL
