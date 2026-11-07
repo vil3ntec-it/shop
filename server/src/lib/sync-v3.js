@@ -154,18 +154,17 @@ function validate(raw, origin = 'v3', ctx = undefined) {
   }
   const txId = r.tx === undefined || r.tx === null ? '' : String(r.tx);
   if (txId.length > 80) return bad('bad_tx');
-  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) — فقط همراه است؛ سنجشش در `authorize`
-  let approval = null;
-  if (r.approval !== undefined && r.approval !== null) {
-    if (!isPlainObject(r.approval) || Buffer.byteLength(JSON.stringify(r.approval), 'utf8') > MAX_APPROVAL_BYTES) {
-      return bad('bad_approval');
-    }
-    approval = r.approval;
+  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) و برگهٔ جدای قرض (`creditApproval`، STF-03) — فقط همراه‌اند؛ سنجش در `authorize`
+  const slips = { approval: null };
+  for (const k of ['approval', 'creditApproval']) {
+    if (r[k] === undefined || r[k] === null) continue;
+    if (!isPlainObject(r[k]) || Buffer.byteLength(JSON.stringify(r[k]), 'utf8') > MAX_APPROVAL_BYTES) return bad('bad_approval');
+    slips[k] = r[k];
   }
   return {
     ok: true,
     op: { op_id: opId, table: spec.name, spec, row_id: r.row_id, kind: r.kind, hlc: stamp, fields, reason, tx: txId,
-      fromDelete: relaxed && r.fromDelete === true, approval },
+      fromDelete: relaxed && r.fromDelete === true, ...slips },
   };
 }
 
@@ -441,10 +440,11 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     //  قاعدهٔ امروزِ v1 برای نقشی که لغو ندارد (شاگرد): «حذفِ فاکتورِ خودت» از راهِ حذفِ v2
     const fallback = need.perm === 'sales.cancel' && op.fromDelete && own && can(role, 'data.delete.own')
       && permCore.defaultMode(role, 'sales.cancel') === 'deny';
-    return approvals.judge(c, ctx, need, approvals.slipOf(op), {
+    return (await approvals.judge(c, ctx, need, approvals.slipOf(op), {
       opId: op.op_id, at: approvals.wallOf(op.hlc), deviceId, path: origin, fallback,
-    });
+    })) || require('./credit-cap').judgeV3(c, ctx, op, row, { withDiscount: true, deviceId, origin });   //  STF-03: قرضِ همان فاکتور
   }
+  { const cr = await require('./credit-cap').judgeV3(c, ctx, op, row, { deviceId, origin }); if (cr) return cr; }   //  STF-03: قرض/دلتای قرض (‎lib/credit-cap.js‎)
   if (op.kind === 'cancel') {
     if (can(role, op.spec.cancel)) return null;
     //  همان قاعدهٔ v1: «حذفِ ردیفِ خودت» — برای سندِ غیرِ فاکتور
@@ -754,7 +754,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  سندهای برگشتِ این دسته (یک برگه و یک تصمیم؛ سقفِ تجمعیِ فاکتور)، و برنامهٔ کهنهٔ بی tx:
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
-  const plan = approvals.bundleV3(units, groups);
+  const plan = approvals.bundleV3(units, groups, { credit: await require('./credit-cap').onUnits(ctx, units) });   //  STF-03: فاکتورِ قرض‌دار هم
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 

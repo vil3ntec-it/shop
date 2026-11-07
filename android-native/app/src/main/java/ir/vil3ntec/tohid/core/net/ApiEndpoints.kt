@@ -169,6 +169,10 @@ object ApiEndpoints {
     const val STAFF_SCOPE_CONFIG = "/shop/staff-scope/config"
     const val STAFF_SCOPE_MEMBERS = "/shop/staff-scope/members"
     fun staffScope(id: String) = "$STAFF_SCOPE_MEMBERS/${enc(id)}"
+    /** STF-01: نقشِ سفارشی (پرچمِ خاموشِ `shop.custom_roles`) */
+    const val CUSTOM_ROLES = "/shop/custom-roles"
+    fun customRole(id: String) = "$CUSTOM_ROLES/${enc(id)}"
+    fun customRoleMember(id: String) = "$CUSTOM_ROLES/members/${enc(id)}"
     fun approverKey(id: String) = "$APPROVER_KEYS/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"

@@ -50,7 +50,7 @@ const DOC_RE = /^[A-Za-z][A-Za-z0-9_]{0,40}\/[A-Za-z0-9_.:-]{1,120}$/;
 const ID_RE = /^apr_[0-9a-f]{24}$/;
 const LINE_BREAK = /[\r\n]/;
 /** کارهایی که بی مقدار معنا ندارند */
-const NEEDS_VALUE = new Set(['sales.discount', 'returns.create']);
+const NEEDS_VALUE = new Set(['sales.discount', 'returns.create', 'sales.credit']);
 const STATUSES = Object.freeze(['open', 'pending', 'approved', 'denied', 'cancelled', 'used', 'expired', 'all']);
 
 const enabled = (shopId) => flagOf(shopId, FLAG);

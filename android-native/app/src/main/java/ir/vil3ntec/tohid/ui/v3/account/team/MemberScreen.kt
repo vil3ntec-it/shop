@@ -39,6 +39,8 @@ import ir.vil3ntec.tohid.ui.v3.V3Divider
 import ir.vil3ntec.tohid.ui.v3.V3EmptyState
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3MenuItem
+import ir.vil3ntec.tohid.ui.v3.V3PickerRow
+import ir.vil3ntec.tohid.ui.v3.V3PickerSheet
 import ir.vil3ntec.tohid.ui.v3.V3Scaffold
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3Skeleton
@@ -62,6 +64,8 @@ internal class MemberActions(
   val remove: () -> Unit,
   /** STF-06: کلیدِ یک مکان */
   val place: (place: String, on: Boolean) -> Unit = { _, _ -> },
+  /** STF-01: دادن (شناسه) یا برداشتنِ (null) نقشِ سفارشی */
+  val customRole: (roleId: String?) -> Unit = {},
 )
 
 /**
@@ -91,7 +95,11 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
               Spacer(Modifier.width(6.dp))
               V3StatusPill(if (row.active) V3Status.DELIVERED else V3Status.INACTIVE, if (row.active) StrAccount.stateActive else StrAccount.stateClosed)
             }
-            val perms = MemberModel.permRows(team.perms, MemberModel.permsOf(team.perms, member))
+            val permsOf = MemberModel.permsOf(team.perms, member)
+            if (CustomRoleModel.visibleFor(team.perms, permsOf)) {
+              CustomRoleRow(team, permsOf, canEdit && !busy, actions.customRole)
+            }
+            val perms = MemberModel.permRows(team.perms, permsOf)
             if (perms.isNotEmpty()) {
               V3Section(StrAccount.permsTitle, footer = if (canEdit) StrAccount.permsHelper else StrAccount.permsOwnerOnly) {
                 perms.forEachIndexed { i, p ->
@@ -147,6 +155,32 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
   }
 }
 
+/** STF-01: «نقشِ سفارشی» ِ همین عضو — صاحب از برگهٔ انتخاب عوض می‌کند (نقشِ عضو ⇐ نقشِ پایه) */
+@Composable
+private fun CustomRoleRow(team: TeamData, m: ir.vil3ntec.tohid.core.model.MemberPermsDto?, enabled: Boolean, onPick: (String?) -> Unit) {
+  val roles = team.perms?.customRoles.orEmpty()
+  val choices = CustomRoleModel.choices(roles)
+  val current = CustomRoleModel.currentOf(team.perms, m)
+  var picking by remember { mutableStateOf(false) }
+  V3Section(StrAccount.customRoleSection, footer = StrAccount.customRoleMemberHelper) {
+    V3PickerRow(
+      label = StrAccount.customRoleSection,
+      value = choices.firstOrNull { it.id == current }?.label ?: StrAccount.customRoleNone,
+      onClick = { if (enabled) picking = true },
+    )
+  }
+  if (picking) {
+    V3PickerSheet(
+      title = StrAccount.customRoleSection,
+      options = choices.map { it.label },
+      selected = choices.firstOrNull { it.id == current }?.label ?: StrAccount.customRoleNone,
+      onPick = { label -> picking = false; val id = choices.firstOrNull { it.label == label }?.id; if (id != current) onPick(id) },
+      onDismiss = { picking = false },
+      allowNew = false,
+    )
+  }
+}
+
 /** مسیرِ `team/members/{id}`: همان فراخوان‌های `MemberPermsSection`/`DevicesSection` ِ پیشین */
 @Composable
 internal fun RouteScope.MemberRoute(id: String) {
@@ -181,6 +215,18 @@ internal fun RouteScope.MemberRoute(id: String) {
           TeamSession.scope.launch {
             shops.setStaffScope(member.id, next)
               .onSuccess { team.scope = shops.staffScopeMembers() }
+              .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+            busy = false
+          }
+        }
+      },
+      customRole = { roleId ->
+        val layer = member?.let { MemberModel.permsOf(team.perms, it) }
+        if (layer != null) {
+          busy = true
+          TeamSession.scope.launch {
+            shops.assignCustomRole(layer.id, roleId)
+              .onSuccess { toasts.show(StrAccount.customRoleAssigned, V3Tone.SUCCESS); team.reload(shops, canEdit) }
               .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
             busy = false
           }

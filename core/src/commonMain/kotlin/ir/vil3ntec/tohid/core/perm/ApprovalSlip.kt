@@ -19,8 +19,9 @@ object ApprovalSlip {
 
   const val VERSION = 1
   const val HEADER = "tohid-approval/1"
+  //  `sales.credit` (STF-03): فروشِ قرضی بیش از سقفِ کارمند — سرور با پرچمِ `shop.credit_cap` می‌سنجد
   //  `sales.pay_fix` (POS-40): برگه فقط روی همان دستگاه، برای «نیازمند تأیید» ِ اصلاحِ روشِ پرداخت؛ سرور هنوز opی با آن نمی‌سنجد
-  val PERMS: List<String> = listOf("returns.create", "sales.cancel", "sales.discount", "sales.pay_fix")
+  val PERMS: List<String> = listOf("returns.create", "sales.cancel", "sales.credit", "sales.discount", "sales.pay_fix")
 
   /** بیشترین عمرِ برگه: از PINِ مدیر تا بستنِ فاکتور */
   const val TTL_MAX_MS: Long = 15 * 60 * 1000L

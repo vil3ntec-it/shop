@@ -18,13 +18,7 @@ import kotlinx.serialization.json.buildJsonObject
  */
 object MemberModel {
 
-  fun permLabel(key: String): String = when (key) {
-    "settings.write" -> StrAccount.permSettings
-    "audit.view" -> StrAccount.permAudit
-    "reports.money" -> StrAccount.permMoney
-    "customers.contact" -> StrAccount.permContacts
-    else -> key
-  }
+  fun permLabel(key: String): String = CustomRoleModel.permLabel(key)
 
   data class PermRow(val key: String, val label: String, val on: Boolean)
 
