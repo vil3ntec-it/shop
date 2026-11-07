@@ -8,7 +8,7 @@
 --  جدا از `market_listings` (جای تقریبیِ بازارچه) — این را صاحب برای مشتریِ همین دکان می‌گذارد.
 --
 --  فقط افزودنی؛ هیچ ردیفی عوض نمی‌شود (پیش‌فرض: بی نشانی، بی پین = رفتارِ امروز).
---  rollback: migrations/rollback/215_storefront_place.down.sql (آزموده در test/storefront-audit.test.js)
+--  rollback: migrations/rollback/230_storefront_place.down.sql (آزموده در test/storefront-audit.test.js)
 -- ============================================================
 
 ALTER TABLE storefronts ADD COLUMN IF NOT EXISTS pickup_address text NOT NULL DEFAULT '';
