@@ -38,3 +38,16 @@ object DebtReminderPref {
     prefs(context).edit().remove(KEY).apply()
   }
 }
+
+/**
+ *  CRM-06 — دکمه‌های «پیامک/واتس‌اپ» ِ حسابِ مشتری (`DebtorLedgerParts`) با روز و ساعتِ همین دستگاه: متن از قالبِ همین
+ *  دستگاه ([DebtReminderPref])، و «فرستاده شد» فقط از راهِ `ShopStore.update` (`DebtReminder.sent`: یک رد در روز برای هر راه).
+ */
+object DebtReminderSend {
+  fun message(context: Context, d: ShopData, debtorId: String, shopName: String): String =
+    DebtReminder.forDebtor(d, debtorId, ir.vil3ntec.tohid.todayIso(), DebtReminderPref.template(context), shopName, System.currentTimeMillis())
+
+  /** null ⇒ همان روز همان راه ثبت شده بود (هیچ نوشتن)؛ true نوشته شد؛ false قفلِ نرم یا دیسک */
+  suspend fun sent(store: ShopStore, debtorId: String, channel: String): Boolean? =
+    store.update { d -> DebtReminder.sent(d, debtorId, channel, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis()) }
+}

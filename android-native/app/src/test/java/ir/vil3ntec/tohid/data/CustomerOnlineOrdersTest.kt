@@ -56,8 +56,8 @@ class CustomerOnlineOrdersTest {
 
   @Test
   fun `هر دو پرونده و درِ سرور`() {
-    assertTrue(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp))"))
-    assertTrue(src("ui/screens/DeskCustomers.kt").contains("CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp))"))
+    assertTrue(src("ui/v3/money/DebtorFileExtras.kt").contains("CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp), onOpen = onOpenOrder)"))
+    assertTrue(src("ui/screens/DeskCustomers.kt").contains("CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder)"))
     val panel = src("ui/screens/CustomerOnlineOrdersAndroid.kt")
     //  دروازه پیش از هر پرسش؛ خطای شبکه یا فهرستِ خالی ⇒ هیچ
     assertTrue(panel.indexOf("if (!CustomerOnlineOrders.canAsk(OrdersLive.config.value)) return") in 0 until panel.indexOf("forCustomer(phones)"))
@@ -66,5 +66,23 @@ class CustomerOnlineOrdersTest {
     val repo = src("data/repo/OrdersRepository.kt")
     assertTrue(repo.contains("val q = phones.take(2).joinToString(\"&\") { \"phone=\" + enc(it) }"))
     assertTrue(repo.contains("api.get(\"\$ROOT/customer?\$q\")"))
+  }
+
+  /** CRM-07 — هر ردیفِ سفارش در پرونده همان سفارش را باز می‌کند (`orders/{id}`، همان دروازهٔ بخشِ سفارش) */
+  @Test
+  fun `ردیفِ سفارش در پروندهٔ گوشی و کامپیوتر همان سفارش را باز می‌کند`() {
+    val panel = src("ui/screens/CustomerOnlineOrdersAndroid.kt")
+    assertTrue(panel.contains("onOpen: ((String) -> Unit)? = null"))
+    assertTrue(panel.contains("Modifier.clickable(onClickLabel = StrOnline.customerOrderOpen) { open(o.id) }"))
+    //  بی صدازننده ردیف کلیک‌پذیر نیست (همان امروز)
+    assertTrue(panel.contains("val open = onOpen"))
+    val money = src("ui/v3/money/MoneyRoutes.kt")
+    assertTrue(money.contains("onOpenOrder = { nav.open(OnlinePaths.order(it)) }"))
+    assertTrue(money.contains("DebtorFileExtras(data, store, id, onOpenOrder = { nav.open(OnlinePaths.order(it)) })"))
+    assertTrue(money.contains("DeskCustomersScreen(store, data, snackbar, onOpenOrder = { nav.open(OnlinePaths.order(it)) })"))
+    val desk = src("ui/screens/DeskCustomers.kt")
+    assertTrue(desk.contains("CustomerFile(store, d, snackbar, open.id, onOpenOrder) { openId = null }"))
+    //  همان مسیرِ صفحهٔ سفارش، پشتِ همان «سفارش‌های زنده»
+    assertTrue(src("ui/v3/online/OnlineRoutes.kt").contains("V3Route(\"orders/{id}\", RouteKind.PAGE, { StrOnline.ordersTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE)"))
   }
 }
