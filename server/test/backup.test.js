@@ -215,3 +215,36 @@ test('SEC-07: پرچمِ رمزِ اجباری روی pg_dump — رد بی رم
     await sql(process.env.DATABASE_URL, `DELETE FROM live_config WHERE scope='security' AND key='backup.require_encryption'`);
   }
 });
+
+/*
+ * ⛔ بازیابی «همه یا هیچ» (OPS-02@29، دادهٔ امن): `psql` بی `--single-transaction` هر دستور را جدا commit
+ * می‌کرد. خطا وسطِ فایل (دیسکِ پر، فایلِ بریده، دیتابیسِ مقصدِ ناخالی) ⇒ نیمی از جدول‌ها نشسته و بقیه نه؛
+ * سرورِ بعدی روی همان پایگاه با `schema_migrations` ِ برگشته بالا می‌آمد و جدول‌های کم را نمی‌دید.
+ */
+test('بازیابیِ نیمه‌کاره هیچ اثری نمی‌گذارد: خطا وسطِ فایل ⇒ دیتابیسِ مقصد همان پیش', async () => {
+  config.backup.passphrase = '';
+  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`);
+  await sql(adminUrl, `CREATE DATABASE ${RESTORE_DB}`);
+  await fs.mkdir(BACKUP_DIR, { recursive: true });
+  const file = path.join(BACKUP_DIR, 'half-broken.sql.gz');
+  await fs.writeFile(file, require('zlib').gzipSync(Buffer.from(
+    'CREATE TABLE half_a (x int);\nINSERT INTO half_a VALUES (1);\nCREATE TABLE half_b (x int REFERENCES nowhere (id));\n')));
+  await assert.rejects(() => backup.restore(file, { databaseUrl: restoreUrl }), /بازیابی شکست خورد/);
+  const t = await sql(restoreUrl, `SELECT to_regclass('public.half_a') AS t`);
+  assert.equal(t.rows[0].t, null, 'نیمی از پشتیبان نباید بنشیند');
+});
+
+test('بازیابی روی دیتابیسِ ناخالی (دادهٔ تازه‌تر) رد می‌شود و هیچ چیزش عوض نمی‌شود', async () => {
+  config.backup.passphrase = '';
+  const out = await backup.run({ kind: 'manual' });
+  await sql(adminUrl, `DROP DATABASE IF EXISTS ${RESTORE_DB}`);
+  await sql(adminUrl, `CREATE DATABASE ${RESTORE_DB}`);
+  //  مقصد از پیش «shops» با یک ردیفِ تازه‌تر دارد (مثلاً سرورِ تازه یک بار بالا آمده و دکان ساخته)
+  await sql(restoreUrl, `CREATE TABLE shops (id text PRIMARY KEY, name text); INSERT INTO shops VALUES ('newer', 'تازه‌تر')`);
+  await assert.rejects(() => backup.restore(out.file, { databaseUrl: restoreUrl }), /بازیابی شکست خورد/);
+  const rows = await sql(restoreUrl, 'SELECT id FROM shops');
+  assert.deepEqual(rows.rows.map((r) => r.id), ['newer'], 'دادهٔ تازه‌تر دست نخورد');
+  const tables = await sql(restoreUrl,
+    `SELECT count(*)::int AS n FROM information_schema.tables WHERE table_schema = 'public' AND table_name <> 'shops'`);
+  assert.equal(tables.rows[0].n, 0, 'هیچ جدولی از پشتیبان نیمه‌کاره ننشست');
+});

@@ -40,6 +40,10 @@ internal class HubRelayAndroid private constructor(private val app: Context) : H
     //  همهٔ شرط‌های بی شبکه پیش از هر تماس (HUB_UNREACHABLE یعنی فقط `hello` مانده)
     val pre = HubRoute.choose(true, profile, cloudReachable = false, hubUrl = url, hubPin = pin, hub = null)
     if (pre.why != HubRoute.Why.HUB_UNREACHABLE) return HubRelay.Outcome(why = pre.why)
+    //  HW-13: با هدفِ API 37 بی `ACCESS_LOCAL_NETWORK` وصل شدن به هابِ شبکهٔ دکان مهلت می‌خورد ⇒ همان دم، بی تماس
+    //  (هدفِ امروز ۳۵ ⇒ هرگز بسته نیست؛ همان قاعدهٔ چاپگرِ شبکه، `LocalNetworkAccess`)
+    val host = (ir.vil3ntec.tohid.core.server.ServerAddress.check(url!!, lanAllowed = true) as? ir.vil3ntec.tohid.core.server.ServerAddress.Verdict.Ok)?.parts?.host.orEmpty()
+    if (ir.vil3ntec.tohid.hw.LocalNetworkAccess.blocked(app, host)) return HubRelay.Outcome(refused = LOCAL_NETWORK_DENIED)
     val token = Backend.tokens(app).accessToken ?: return HubRelay.Outcome(refused = "hub_no_session")
     val device = (body["device_id"] as? JsonPrimitive)?.content.orEmpty()
     val base = url!!.trimEnd('/')
@@ -98,6 +102,8 @@ internal class HubRelayAndroid private constructor(private val app: Context) : H
     /** همان `PREFS` ِ `ServerSwitchAndroid` */
     private const val SERVER_PREFS = "tohid-servers"
     private const val MAX_REPLY = 1024 * 1024
+    /** HW-13: اجازهٔ «شبکهٔ محلی» داده نشده — موتور فقط `pending` را می‌شمارد، پس صف دست نمی‌خورد */
+    const val LOCAL_NETWORK_DENIED = "hub_local_network_denied"
 
     /** پرچمِ `app.multi_server` خاموش ⇒ `null` ⇒ موتور همان امروز (پرچم فقط در شروعِ فرآیند عوض می‌شود) */
     fun of(context: Context): HubRelayAndroid? =

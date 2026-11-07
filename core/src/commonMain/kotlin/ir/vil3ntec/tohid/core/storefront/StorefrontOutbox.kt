@@ -175,6 +175,15 @@ object StorefrontOutbox {
     else -> SendOutcome.REJECTED
   }
 
+  /* ------------------------- اعلامِ حضور (برگهٔ «وضعیت» ِ v3) ------------------------- */
+
+  /**
+   *  پاسخِ ناکامِ یک اعلام ⇒ در صف بماند؟ فقط ردِ ماندگار (REJECTED) بیرون می‌رود. بی‌نت، ۵xx،
+   *  نشستِ تمام‌شده، ۴۲۹ و حتی ۲xx ِ ناخوانا می‌مانند: همان `eventId` دوباره ⇒ سرور «تکراری» و رسیدِ خوانا.
+   */
+  fun presenceKept(status: Int, code: String, retryable: Boolean): Boolean =
+    classify(status, code, retryable) != SendOutcome.REJECTED
+
   /** یک خطِ وضعیت برای کاربر — هرگز «ثبت شد» */
   fun statusLine(e: OutboxEntry): String = when {
     e.conflict -> "${e.change.label}: ناسازگار با تغییرِ دستگاهِ دیگر — تصمیم با شما"

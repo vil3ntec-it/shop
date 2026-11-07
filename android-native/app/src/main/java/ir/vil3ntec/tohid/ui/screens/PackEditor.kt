@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrScanPages
+import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.ui.theme.Shop
 
@@ -26,13 +29,13 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 @Composable
 fun PackEditor(packs: List<PackBarcodes.Draft>, unit: String, onChange: (List<PackBarcodes.Draft>) -> Unit) {
   val c = Shop.colors
-  val u = unit.trim().ifEmpty { "واحد" }
+  val u = unit.trim().ifEmpty { StrProducts.unitWord }
   fun set(i: Int, p: PackBarcodes.Draft) = onChange(packs.mapIndexed { j, old -> if (j == i) p else old })
   Column(Modifier.fillMaxWidth()) {
-    Text("بسته‌ها و بارکدِ هر واحد (اختیاری)", style = MaterialTheme.typography.labelMedium, color = c.muted)
+    Text(StrScanPages.packsTitle, style = MaterialTheme.typography.labelMedium, color = c.muted)
     Text(
-      "مثلاً «کارتن» = ۲۴ $u با بارکدِ روی کارتن؛ اسکنِ آن ۲۴ $u به سبد می‌برد و قیمت همان قیمتِ هر $u است. " +
-        "قیمتِ بسته (اختیاری) وقتی است که در صندوق واحدِ ردیف «کارتن» شود؛ خالی ⇒ اندازه × قیمتِ هر $u.",
+      StrScanPages.packHelp1(u) +
+        StrScanPages.packHelp2(u),
       style = MaterialTheme.typography.labelSmall,
       color = c.muted,
     )
@@ -42,38 +45,38 @@ fun PackEditor(packs: List<PackBarcodes.Draft>, unit: String, onChange: (List<Pa
         OutlinedTextField(
           value = p.name,
           onValueChange = { set(i, p.copy(name = it)) },
-          label = { Text("نامِ بسته") },
+          label = { Text(StrScanPages.packName) },
           singleLine = true,
           modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
           value = p.size,
           onValueChange = { set(i, p.copy(size = ir.vil3ntec.tohid.numericInput(it))) },
-          label = { Text("چند $u") },
+          label = { Text(StrScanPages.howMany(u)) },
           singleLine = true,
           modifier = Modifier.weight(0.8f),
         )
-        TextButton(onClick = { onChange(packs.filterIndexed { j, _ -> j != i }) }) { Text("حذف") }
+        TextButton(onClick = { onChange(packs.filterIndexed { j, _ -> j != i }) }) { Text(StrSettings.remove) }
       }
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(
           value = p.barcodes,
           onValueChange = { set(i, p.copy(barcodes = it)) },
-          label = { Text("بارکدهای ${p.name.trim().ifEmpty { "بسته" }} (با «،» جدا)") },
+          label = { Text(StrScanPages.packBarcodes(p.name.trim().ifEmpty { StrScanPages.pack })) },
           singleLine = true,
           modifier = Modifier.weight(1f),
         )
         OutlinedTextField(
           value = p.price,
           onValueChange = { set(i, p.copy(price = ir.vil3ntec.tohid.numericInput(it))) },
-          label = { Text("قیمتِ ${p.name.trim().ifEmpty { "بسته" }}") },
+          label = { Text(StrScanPages.packPrice(p.name.trim().ifEmpty { StrScanPages.pack })) },
           singleLine = true,
           modifier = Modifier.weight(0.6f),
         )
       }
     }
     if (packs.size < PackBarcodes.MAX_PACKS) {
-      TextButton(onClick = { onChange(packs + PackBarcodes.Draft()) }) { Text("+ بسته (کارتن، شل، …)") }
+      TextButton(onClick = { onChange(packs + PackBarcodes.Draft()) }) { Text(StrScanPages.addPack) }
     }
   }
 }
