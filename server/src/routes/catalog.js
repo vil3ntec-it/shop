@@ -148,11 +148,18 @@ router.post('/moves', needFlag, async (req, res) => {
 
 /**
  * انتقالِ دومرحله‌ای با «در مسیر» و قبول یا رد در مقصد (INV-11، `lib/stock-transfers.js`).
- * هر سه نوشتن اجازهٔ `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ کسری و رد دلیل.
+ * هر سه نوشتن اجازهٔ `stock.move` و کلیدِ یکتایی (`Idempotency-Key`) می‌خواهند؛ کسری و رد دلیل؛
+ * دریافت با `final: false` ناقص است (بقیه در مسیر می‌ماند).
+ * خواندن اول دفترِ دستگاه را می‌خواند (گام‌های بی‌اینترنتِ برنامه همان‌جا می‌نشینند)؛ `?keys=a,b` نتیجهٔ همان گام‌ها
+ * (ثبت/رد با کد) را هم می‌دهد — بی `keys` پاسخ همان شکلِ پیشین است.
  */
 router.get('/transfers', needFlag, async (req, res) => {
   const places = await scope.scopeOfReq(req);
-  res.json({ transfers: await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit, places }) });
+  await catalog.refresh(req.shopId);
+  const list = await transfers.list(req.shopId, { status: req.query.status, limit: req.query.limit, places });
+  const keys = typeof req.query.keys === 'string' && req.query.keys ? req.query.keys.split(',').slice(0, transfers.MAX_KEYS) : null;
+  if (!keys) return res.json({ transfers: list });
+  res.json({ transfers: list, steps: await transfers.steps(req.shopId, keys) });
 });
 
 async function transferDone(req, res, action, out) {

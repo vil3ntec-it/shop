@@ -57,6 +57,10 @@ class V3ReachabilityTest {
     Feature("IMG-PRO-17 تغییرِ دسته‌ایِ عکس‌ها و برگشتِ یک‌جا", "stock/images/changes", "ir.vil3ntec.tohid.ui.v3.stock.ImageChangesRoute"),
     Feature("IMG-PRO-17 دستهٔ تازه", "stock/images/changes/new", "ir.vil3ntec.tohid.ui.v3.stock.ImageBatchRoute"),
     Feature("IMG-PRO-17 پیش و پسِ یک دسته و برگشت", "stock/images/changes/{id}", "ir.vil3ntec.tohid.ui.v3.stock.ImageChangeRoute"),
+    //  ── INV-11: انتقالِ موجودیِ سرور (پشتِ پرچمِ `shop.catalog`) ──
+    Feature("INV-11 انتقالِ موجودی با «در مسیر»", "stock/transfers", "ir.vil3ntec.tohid.ui.v3.stock.TransferListRoute"),
+    Feature("INV-11 پیش‌نویس و ارسالِ انتقال", "stock/transfers/new", "ir.vil3ntec.tohid.ui.v3.stock.TransferDraftRoute"),
+    Feature("INV-11 دریافت با اسکن، ناقص و رد", "stock/transfers/{key}", "ir.vil3ntec.tohid.ui.v3.stock.TransferReceiveRoute"),
     Feature("IMG-PRO-16 نسخه‌های کوچک و بزرگِ عکس و سنجهٔ فشرده‌سازی", "products/{id}/photo/versions", "ir.vil3ntec.tohid.ui.v3.products.PhotoVersionsPage"),
     Feature("RPT-18 گزارشِ همهٔ شعبه‌ها", "reports/branches", "ir.vil3ntec.tohid.ui.v3.analytics.BranchesReportPage"),
     Feature(

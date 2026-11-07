@@ -28,7 +28,9 @@ const { toMinor, toMilli } = require('./sync-v3-convert');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
-const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems'];
+const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems', 'auditLog'];
+//  از `auditLog` فقط گام‌های انتقال (INV-11، `stock-transfers.ingestDevice`)؛ بقیهٔ سابقه هرگز خوانده نمی‌شود
+const DEVICE_ROWS = "(table_name <> 'auditLog' OR data->>'type' = 'stock_transfer')";
 const PAGE = 5000;
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
 const MAX_LIST = 100;
@@ -130,11 +132,12 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   const track = await require('./market-changes').enabled(shopId, c);   //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
   let products = 0;
   let moves = 0;
+  const transfers = { applied: 0, refused: 0 };
   const touched = new Set();
   for (;;) {
     const page = (await c.query(
       `SELECT table_name, row_id, data, deleted_at, updated_seq FROM ${T}
-        WHERE ${ACC} AND table_name = ANY($2::text[]) AND updated_seq > $3
+        WHERE ${ACC} AND table_name = ANY($2::text[]) AND ${DEVICE_ROWS} AND updated_seq > $3
         ORDER BY updated_seq, table_name, row_id LIMIT $4`,
       [shopId, DEVICE_TABLES, wm, PAGE]
     )).rows;
@@ -150,7 +153,9 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     const entries = [];
     const items = new Map();
     const cancelledSales = [];
+    const steps = [];
     for (const r of rows) {
+      if (r.table_name === 'auditLog') { steps.push(r); continue; }
       if (r.table_name === 'products') { await upsertProduct(c, shopId, r, fmt, at, track); products += 1; }
       else if (r.table_name === 'warehouseEntries') entries.push(r);
       else if (r.table_name === 'saleItems') items.set(r.row_id, r);
@@ -240,6 +245,12 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
         }
       }
     }
+    //  INV-11: گام‌های انتقالِ بی‌اینترنت پس از ورود و فروشِ همین صفحه، به ترتیبِ رسیدن (یک بار برای هر ردیف)
+    if (steps.length) {
+      const x = await require('./stock-transfers').ingestDevice(c, shopId, steps, settings, at);
+      transfers.applied += x.applied;
+      transfers.refused += x.refused;
+    }
     wm = num(rows[rows.length - 1].updated_seq);
     if (page.length < PAGE) break;
   }
@@ -250,7 +261,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
     [shopId, fmt, wm, at]
   );
   if (touched.size) await stock.checkProducts(c, shopId, [...touched].sort(), settings, at);
-  return { products, moves, source: fmt, retired: retiredNow };
+  return { products, moves, source: fmt, retired: retiredNow, ...(transfers.applied || transfers.refused ? { transfers } : {}) };
 }
 
 /**
@@ -275,7 +286,7 @@ async function hasNewer(shopId) {
   if (st.source !== fmt) return true;
   const r = await one(
     `SELECT 1 AS x FROM ${TABLES[fmt]} WHERE app='shop' AND account_kind='shop' AND account_id=$1
-        AND table_name = ANY($2::text[]) AND updated_seq > $3 LIMIT 1`,
+        AND table_name = ANY($2::text[]) AND ${DEVICE_ROWS} AND updated_seq > $3 LIMIT 1`,
     [shopId, DEVICE_TABLES, num(st.watermark)]
   );
   return !!r;
