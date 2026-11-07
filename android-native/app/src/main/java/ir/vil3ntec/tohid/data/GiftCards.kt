@@ -212,13 +212,15 @@ object GiftCards {
    *  را کم می‌کند، بقیه طلبِ خرج‌شدنی است. قاعده در `StoreCredit.grantProblem` (core): فقط با تصمیمِ «مجاز» ِ
    *  `sales.discount` برای همین مبلغ ([decision])، مشتریِ موجود و فعال، مبلغِ درست و دلیل. سابقهٔ [CREDIT_GRANT] با
    *  [by] و دلیل در همان دفتر. همان کلید با همان محتوا ⇒ `again`؛ با محتوای دیگر ⇒ `ID_CONFLICT`.
+   *  «درخواستِ تأیید» (STF-02): تصمیمِ «نیازمندِ تأیید» فقط با [approval] ِ مدیر/صاحبِ دیگر؛ سابقه `approvedBy` و دلیلِ او را دارد.
    */
   fun grantCredit(
     cur: ShopData, key: String, debtorId: String, amountMinor: Long, reason: String?, decision: String,
-    today: String, now: Long, by: String?,
+    today: String, now: Long, by: String?, approval: StoreCredit.Approval? = null,
   ): Granted {
     val debtor = cur.debtors.firstOrNull { it.id == debtorId }
-    StoreCredit.grantProblem(debtor != null && CustomerCrm.isActive(debtor), amountMinor, reason, decision)?.let { return Granted.Bad(it) }
+    StoreCredit.grantProblem(debtor != null && CustomerCrm.isActive(debtor), amountMinor, reason, decision, approval, by)
+      ?.let { return Granted.Bad(it) }
     val prev = cur.transactions.firstOrNull { it.id == key }
     if (prev != null) {
       val same = prev.debtorId == debtorId && prev.type == "receive" && prev.kind == CREDIT && PayFlow.minor(prev.amount) == amountMinor
@@ -229,9 +231,13 @@ object GiftCards {
       id = key, debtorId = debtorId, type = "receive", amount = PayFlow.major(amountMinor), date = today,
       notes = "اعتبارِ هدیه — $why", createdAt = now, kind = CREDIT,
     )
+    //  «allow» ⇒ بی تأییدکننده (همان امروز)؛ «approve» ⇒ نام و دلیلِ مدیر/صاحب در همان ردیف
+    val ok = approval?.takeIf { decision == "approve" }
     val log = AuditEntry(
       id = "$key-g", type = CREDIT_GRANT, date = today, refId = key, createdAt = now, amount = PayFlow.major(amountMinor), by = by, reason = why,
-      notes = "اعتبارِ هدیه برای «${debtor!!.name}» — ${fmt(amountMinor)} افغانی (بی نقد)",
+      notes = "اعتبارِ هدیه برای «${debtor!!.name}» — ${fmt(amountMinor)} افغانی (بی نقد)" +
+        (ok?.let { " — تأیید: ${it.by.trim()} (${it.reason.trim()})" } ?: ""),
+      approvedBy = ok?.by?.trim(),
     )
     return Granted.Ok(cur.copy(transactions = cur.transactions + tx, auditLog = cur.auditLog + log))
   }

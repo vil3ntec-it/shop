@@ -39,7 +39,9 @@ const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
 const { rejectOps } = require('./v1-reject');
-const roleV1 = require('./staff-role-v1');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
+const roleV1 = require('./staff-role-v1');
+//  STF-02: «درخواستِ تأیید» از راهِ دور (پرچمِ خاموشِ `shop.approval_requests`) — op با `approval: {v:1, request}`
+const remote = require('./approval-requests');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
 //  ⛔ ویرایشِ پولیِ سندِ ثبت‌شدهٔ v1 (update/`$inc`) و قاعدهٔ نقشِ خودِ v1 (`v1RoleReason`) — شرح همان‌جا
 const { isMoneyEdit, v1RoleReason, judgeEdits } = require('./staff-edit-v1');
 
@@ -232,6 +234,8 @@ const dbq = { query: (s, p) => query(s, p) };
  * @returns {Promise<null | string>} کدِ خطا یا null
  */
 async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
+  //  تأییدِ صاحب/مدیر روی دستگاهِ خودش (سرور تصمیم گرفته، نه امضا) — پرچمِ خاموش ⇒ همان `approval_invalid` ِ برگهٔ بدشکل
+  if (remote.isRef(slip)) return remote.accept(q, ctx, need, slip, { opId, at, deviceId, path });
   const c = q || dbq;
   const shape = slipCore.check(slip);
   if (shape) return 'approval_invalid';

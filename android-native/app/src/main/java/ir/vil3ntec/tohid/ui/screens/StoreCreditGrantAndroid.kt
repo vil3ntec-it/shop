@@ -44,6 +44,9 @@ import kotlinx.coroutines.launch
  *  `sales.discount` برای **همین مبلغ** (سقفِ مبلغِ نقش هم) — قاعده در `StoreCredit.grantProblem` (core) و
  *  `GiftCards.grantCredit`؛ نوشتن با `GiftCardPref.grant` (دفترِ همین لحظهٔ دیسک، کلیدِ پنجره ⇒ دو ضربه یک ردیف).
  *  پنجره ماندهٔ امروز و پس از اعطا را نشان می‌دهد (بدهی اول کم می‌شود).
+ *  «درخواستِ تأیید» (STF-02): تصمیمِ «نیازمندِ تأیید» برای کاربری که خودش تأییدکننده نیست ⇒ همان `PinApprovalDialog` ِ
+ *  فروشِ نسیه و تغییرِ قیمت (مدیر/صاحب روی همین دستگاه با PIN و دلیل)؛ تأیید فقط وقتی می‌پوشاند که خودِ تأییدکننده همین مبلغ
+ *  را «مجاز» داشته باشد (`StoreCredit.approves`). مدیرِ بالای سقفِ خودش خودش را تأیید نمی‌کند (همان ردِ امروز).
  */
 @Composable
 fun StoreCreditGrantButton(store: ShopStore, d: ShopData, debtorId: String, onMessage: (String) -> Unit, modifier: Modifier = Modifier) {
@@ -68,6 +71,9 @@ private fun StoreCreditGrantDialog(store: ShopStore, d: ShopData, debtor: Debtor
   val scope = rememberCoroutineScope()
   val me = remember { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   val key = remember { newId() }
+  val selfRole = remember { ShopRole.current(context) }
+  /** مبلغی که منتظرِ PIN ِ مدیر/صاحب است */
+  var asking by remember { mutableStateOf<Long?>(null) }
   var amount by remember { mutableStateOf("") }
   var reason by remember { mutableStateOf("") }
   var busy by remember { mutableStateOf(false) }
@@ -75,6 +81,17 @@ private fun StoreCreditGrantDialog(store: ShopStore, d: ShopData, debtor: Debtor
   val minor = wholeAfghani(amount)
   val (now, after) = GiftCards.grantPreview(d, debtor.id, minor ?: 0L)
   val shown = { m: Long -> money(PayFlow.major(m)) }
+  fun save(m: Long, decision: String, approval: StoreCredit.Approval?) {
+    busy = true
+    scope.launch {
+      when (val r = GiftCardPref.grant(store, key, debtor.id, m, reason.trim(), decision, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), me.ifBlank { null }, approval)) {
+        is GiftCardPref.Saved.Ok -> { onDismiss(); if (!r.again) toast(StrGiftCard.granted(debtor.name, shown(m))) }
+        is GiftCardPref.Saved.Bad -> error = if (r.code == "UNREAD") DebtEntry.NOT_REREAD else GiftCards.message(r.code)
+        GiftCardPref.Saved.NotSaved -> Unit
+      }
+      busy = false
+    }
+  }
 
   AlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
@@ -110,19 +127,27 @@ private fun StoreCreditGrantDialog(store: ShopStore, d: ShopData, debtor: Debtor
       TextButton(enabled = !busy, onClick = {
         val m = minor ?: run { error = GiftCards.message(StoreCredit.INVALID_AMOUNT); return@TextButton }
         if (reason.trim().length < GiftCard.REASON_MIN) { error = GiftCards.message(GiftCard.Code.REASON_REQUIRED); return@TextButton }
-        //  همان هستهٔ مجوزِ سرور: «نیازمندِ تأیید» یا سقفِ مبلغِ کمتر ⇒ این‌جا نه
+        //  همان هستهٔ مجوزِ سرور: «نیازمندِ تأیید» ⇒ PIN ِ مدیر/صاحب (نه برای خودِ تأییدکننده)؛ «ممنوع» ⇒ نه
         val decision = ShopRole.decide(context, "sales.discount", mapOf("amount" to m.toDouble())).decision
-        busy = true
-        scope.launch {
-          when (val r = GiftCardPref.grant(store, key, debtor.id, m, reason.trim(), decision, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), me.ifBlank { null })) {
-            is GiftCardPref.Saved.Ok -> { onDismiss(); if (!r.again) toast(StrGiftCard.granted(debtor.name, shown(m))) }
-            is GiftCardPref.Saved.Bad -> error = if (r.code == "UNREAD") DebtEntry.NOT_REREAD else GiftCards.message(r.code)
-            GiftCardPref.Saved.NotSaved -> Unit
-          }
-          busy = false
-        }
+        if (decision == "approve" && !ir.vil3ntec.tohid.core.credit.CreditGate.canApprove(selfRole)) { asking = m; return@TextButton }
+        save(m, decision, null)
       }) { Text(StrGiftCard.grantSave) }
     },
     dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(StrGiftCard.cancel) } },
   )
+  asking?.let { m ->
+    ir.vil3ntec.tohid.ui.components.staff.PinApprovalDialog(
+      title = StrGiftCard.grantTitle,
+      summary = StrGiftCard.grantApproval(debtor.name, shown(m)),
+      selfRole = selfRole, selfName = ir.vil3ntec.tohid.data.TillUser.me(context),
+      requesterUserId = ir.vil3ntec.tohid.data.TillUser.meId(context),
+      onApproved = { by, role, why ->
+        asking = null
+        //  تصمیمِ خودِ تأییدکننده برای همین مبلغ (نقشِ او) — مدیرِ کم‌اختیار بیش از اختیارش تأیید نمی‌دهد
+        val own = ir.vil3ntec.tohid.core.perm.PermCore.evaluate(role, null, "sales.discount", mapOf("amount" to m.toDouble())).decision
+        save(m, "approve", StoreCredit.Approval(by, role, why, own))
+      },
+      onDismiss = { asking = null },
+    )
+  }
 }

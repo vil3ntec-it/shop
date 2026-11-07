@@ -27,6 +27,25 @@ class StoreCreditGrantTest {
   }
 
   @Test
+  fun anApproveDecisionNeedsTheApprovalOfAnotherManagerWhoIsAllowedTheSameAmount() {
+    val mgr = StoreCredit.Approval("مدیرِ دکان", "manager", "مشتریِ عمده", "allow")
+    assertNull(StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr, "شاگرد"))
+    assertNull(StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr.copy(role = "owner"), "شاگرد"))
+    //  بی تأیید، با تأییدکننده‌ای که خودش این مبلغ را «مجاز» ندارد، با نقشِ دیگر، بی دلیل یا خودتأیید ⇒ نه
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", null, "شاگرد"))
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr.copy(approverDecision = "approve"), "شاگرد"))
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr.copy(role = "staff"), "شاگرد"))
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr.copy(reason = "  "), "شاگرد"))
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr, " مدیرِ دکان "))
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "approve", mgr.copy(by = ""), "شاگرد"))
+    //  تأیید «ممنوع» را باز نمی‌کند؛ و پس از تأیید هم مشتری، مبلغ و دلیل سرِ جایشان
+    assertEquals(StoreCredit.GRANT_NOT_ALLOWED, StoreCredit.grantProblem(true, 50_000, "هدیه", "deny", mgr, "شاگرد"))
+    assertEquals(StoreCredit.NO_CUSTOMER, StoreCredit.grantProblem(false, 50_000, "هدیه", "approve", mgr, "شاگرد"))
+    assertEquals(StoreCredit.INVALID_AMOUNT, StoreCredit.grantProblem(true, 0, "هدیه", "approve", mgr, "شاگرد"))
+    assertEquals(GiftCard.Code.REASON_REQUIRED, StoreCredit.grantProblem(true, 50_000, "ab", "approve", mgr, "شاگرد"))
+  }
+
+  @Test
   fun customerAmountAndReasonAreRequired() {
     assertEquals(StoreCredit.NO_CUSTOMER, StoreCredit.grantProblem(false, 50_000, "هدیه", "allow"))
     assertEquals(StoreCredit.INVALID_AMOUNT, StoreCredit.grantProblem(true, 0, "هدیه", "allow"))

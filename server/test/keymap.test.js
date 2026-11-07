@@ -75,3 +75,34 @@ test('ترتیبِ Alt+۱ تا ۹ همان KEY_PAGESِ index.html است', () =>
   assert.deepEqual(fromMap, pages);
   pages.forEach((p, i) => assert.equal(km.ACTIONS[`global.page${i + 1}`].page, p));
 });
+
+test('#960: راهنمای وب فقط کلیدهایی را دارد که وب پیاده کرده — Alt+I «قیمت‌پرسی» نه', async () => {
+  //  status ِ کامپیوتر partial است (Ctrl+I در F1 ِ کامپیوتر)، ولی وب قیمت‌پرسی ندارد
+  assert.equal(km.ACTIONS['sale.priceCheck'].status, 'partial');
+  assert.equal(km.ACTIONS['sale.priceCheck'].webStatus, 'planned');
+  const sale = km.help('sale');
+  const ids = sale.map((r) => r.id);
+  assert.ok(!ids.includes('sale.priceCheck'), 'Alt+I در راهنمای وب آمد');
+  assert.ok(!sale.some((r) => r.keys.includes('Alt+I')), 'Alt+I در راهنمای وب آمد');
+  //  هیچ کلیدی که وب پیاده نکرده — هر دامنه، با status ِ کامپیوترِ live یا partial — در راهنمای وب نیست
+  for (const scope of Object.keys(km.SCOPES)) {
+    for (const r of km.help(scope)) {
+      assert.notEqual(km.ACTIONS[r.id].webStatus, 'planned', `${scope}: ${r.id}`);
+      assert.ok(km.ACTIONS[r.id].web.length, `${scope}: ${r.id} بی کلیدِ وب`);
+    }
+  }
+  //  آنچه index.html واقعاً دارد: Alt+۱ تا ۹، «/» و Esc
+  assert.deepEqual(km.help('reports').map((r) => r.keys.join('/')),
+    ['Alt+1', 'Alt+2', 'Alt+3', 'Alt+4', 'Alt+5', 'Alt+6', 'Alt+7', 'Alt+8', 'Alt+9', '/', 'Esc']);
+  assert.equal(km.help('sale', true)[0].keys[0], 'Option+1');
+  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
+  assert.ok(!/KeyI|e\.key === 'i'/.test(html.slice(html.indexOf('const KEY_PAGES'), html.indexOf('wireExpiryPolicy'))),
+    'اگر وب قیمت‌پرسی گرفت، webStatus ِ sale.priceCheck را هم عوض کنید');
+  //  generator وضعیتِ وبِ نادرست و «live بی کلیدِ وب» را رد می‌کند
+  const gen = await import(GEN);
+  const base = JSON.parse(fs.readFileSync(gen.PATHS.json, 'utf8'));
+  const bad = (mutate) => { const j = structuredClone(base); mutate(j); return () => gen.load(JSON.stringify(j)); };
+  const zoom = (j) => j.actions.find((a) => a.id === 'global.zoomIn');
+  assert.throws(bad((j) => { zoom(j).webStatus = 'live'; }), /کلیدِ وب ندارد/);
+  assert.throws(bad((j) => { j.actions[0].webStatus = 'soon'; }), /وضعیتِ وبِ نادرست/);
+});
