@@ -176,4 +176,37 @@ class StorefrontOutboxTest {
     //  تصادفِ منفی هم شناسهٔ مثبت و پایدار می‌دهد
     assertFalse(PresenceDeclaration.newEventId(1, -1).contains("--"))
   }
+
+  /** PRES-02: اعلامِ برگهٔ «وضعیت» (ردیفی که `StorefrontQueue.enqueue` می‌سازد) به دکانِ همان نشست بسته است */
+  @Test fun presenceIsBoundToItsShop() {
+    val p = PresenceDeclaration.create("closed", null, now = 1_760_000_000_000L, random = 7L)
+    fun row(shop: String, d: PresenceDeclaration) =
+      OutboxEntry(d.eventId, StorefrontChange.PRESENCE, shop, PresenceDeclaration.encode(d), "", d.clientEventAt)
+    val q = O.put(emptyList(), row("shop-a", p))
+    assertEquals(p, O.pendingOf(q, "shop-a", StorefrontChange.PRESENCE)?.let { PresenceDeclaration.decode(it.body) })
+    assertNull(O.pendingOf(q, "shop-b", StorefrontChange.PRESENCE), "پس از عوض شدنِ حساب اعلامِ دکانِ پیشین دیده نمی‌شود")
+    assertNull(O.pendingOf(q, "", StorefrontChange.PRESENCE))
+    assertNull(O.next(q, "shop-b", now = Long.MAX_VALUE, force = true), "و فرستاده هم نمی‌شود")
+    //  اعلامِ تازهٔ همان دکان جای کهنه را می‌گیرد؛ دکانِ دیگر ردیفِ خودش را دارد
+    val p2 = PresenceDeclaration.create("online", null, now = 1_760_000_001_000L, random = 8L)
+    val pb = PresenceDeclaration.create("offline", null, now = 1_760_000_002_000L, random = 9L)
+    val q2 = O.put(O.put(q, row("shop-a", p2)), row("shop-b", pb))
+    assertEquals(p2.eventId, O.pendingOf(q2, "shop-a", StorefrontChange.PRESENCE)?.id)
+    assertEquals(pb.eventId, O.pendingOf(q2, "shop-b", StorefrontChange.PRESENCE)?.id)
+    assertEquals(2, q2.size)
+    //  پاسخِ دیررسِ اعلامِ کهنه اعلامِ تازه را پاک نمی‌کند (تطبیق با `eventId`)
+    assertEquals(p2.eventId, O.pendingOf(O.discard(q2, p.eventId), "shop-a", StorefrontChange.PRESENCE)?.id)
+  }
+
+  /** PRES-09: فقط ردِ ماندگار اعلام را از صف بیرون می‌برد؛ نشستِ تمام‌شده و ۴۲۹ هم می‌مانند */
+  @Test fun presenceKeptUnlessRejected() {
+    assertTrue(O.presenceKept(0, "offline", retryable = true))
+    assertTrue(O.presenceKept(503, "http_503", retryable = true))
+    assertTrue(O.presenceKept(401, "session_expired", retryable = false))
+    assertTrue(O.presenceKept(429, "rate_limited", retryable = false))
+    assertTrue(O.presenceKept(200, "invalid_response", retryable = false), "۲xx ِ ناخوانا با همان شناسه دوباره می‌رود")
+    assertFalse(O.presenceKept(400, "bad_mode", retryable = false))
+    assertFalse(O.presenceKept(403, "perm_denied", retryable = false))
+    assertFalse(O.presenceKept(404, "storefront_missing", retryable = false))
+  }
 }

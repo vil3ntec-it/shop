@@ -231,13 +231,11 @@ object StrOnline {
     "“Saved” only appears once the server has it. Offline, the change waits here and customers don't see it.",
     "«ثبت شو» یوازې هغه وخت ښکاري چې سرور یې ترلاسه کړي. بې انټرنېټه بدلون دلته پاتې کېږي او پېرودونکي ته نه بدلېږي.",
   )
-  val presenceNotConfirmed: String get() = t(
-    ir.vil3ntec.tohid.core.storefront.StorefrontOwner.NOT_CONFIRMED,
-    "This change hasn't reached the server yet; your online status isn't confirmed for customers.",
-    "دا بدلون لا سرور ته نه دی رسېدلی؛ ستاسو آنلاین حالت پېرودونکو ته نه دی تایید شوی.",
-  )
+  val presenceNotConfirmed: String get() = t(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.NOT_CONFIRMED, "This change hasn't reached the server yet; your online status isn't confirmed for customers.", "دا بدلون لا سرور ته نه دی رسېدلی؛ ستاسو آنلاین حالت پېرودونکو ته نه دی تایید شوی.")
   val presenceOverridden: String get() = t("ثبت شد، ولی وضعیتِ تازه‌تری از دستگاهِ دیگر جلوتر است؛ همان می‌ماند.", "Saved, but a newer status from another device wins; that one stays.", "ثبت شو، خو له بلې وسیلې نوی حالت مخکې دی؛ هماغه پاتې کېږي.")
   fun presenceReceipt(time: String): String = t("ثبت شد — زمانِ سرور: ${asIs(time)}", "Saved — server time: $time", "ثبت شو — د سرور وخت: $time")
+  //  PRES-02: اعلام فقط بسته به دکانِ همین نشست در صف می‌نشیند؛ دکانِ نامعلوم ⇒ نه صف، نه فرستادن
+  val presenceNoShop: String get() = t("دکانِ این نشست معلوم نیست؛ یک بار از حساب بیرون و دوباره وارد شوید.", "This session's shop isn't known; sign out and back in once.", "د دې ناستې دوکان معلوم نه دی؛ یو ځل له حساب څخه ووځئ او بیا ننوځئ.")
   val resend: String get() = t("دوباره بفرست", "Send again", "بیا یې ولېږه")
   val sending: String get() = t("در حالِ فرستادن…", "Sending…", "لېږل کېږي…")
 
@@ -742,9 +740,9 @@ object StrOnline {
 
   // ── CRM-07: سفارش‌های باز/لغوشدهٔ مشتری در پروندهٔ او (`CustomerOnlineOrdersPanel`) ──────────
   fun customerOrders(n: Any): String = t("سفارش‌های اینترنتیِ باز یا لغوشده (${asIs(n)})", "Open or cancelled online orders ($n)", "پرانیستي یا لغوه شوي آنلاین فرمایشونه ($n)")
-  fun customerOrderLine(no: Any, amount: Any, ago: Any): String =
-    t("#${asIs(no)} · ${asIs(amount)} ؋ · ${asIs(ago)}", "#$no · $amount ؋ · $ago", "#$no · $amount ؋ · $ago")
+  fun customerOrderLine(no: Any, amount: Any, ago: Any): String = t("#${asIs(no)} · ${asIs(amount)} ؋ · ${asIs(ago)}", "#$no · $amount ؋ · $ago", "#$no · $amount ؋ · $ago")
   val customerOrdersMore: String get() = t("سفارش‌های بیشتری هست — در «سفارش‌ها» ببینید", "There are more — see Orders", "نور هم شته — په «فرمایشونه» کې یې وګورئ")
+  val customerOrderOpen: String get() = t("دیدنِ همین سفارش", "Open this order", "همدا فرمایش وګورئ")
 
   // ── جدول‌های ترجمهٔ واژه‌های موتور ───────────────────────────────────────────
   private val STATUS_EN = mapOf(

@@ -12,6 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.CustomerInsight
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPages
+import ir.vil3ntec.tohid.core.i18n.StrPanelPages
+import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.theme.Radius
@@ -28,8 +32,8 @@ import ir.vil3ntec.tohid.ui.theme.Shop
 /** زبانه‌های مشتریِ گوشی؛ تنظیم خاموش ⇒ هیچ */
 internal fun crmTabs(crmOn: Boolean, canSeeMoney: Boolean): Map<String, String> = when {
   !crmOn -> emptyMap()
-  canSeeMoney -> linkedMapOf("aging" to "سنِ بدهی", "rfm" to "تحلیلِ خرید (RFM)")
-  else -> linkedMapOf("aging" to "سنِ بدهی")
+  canSeeMoney -> linkedMapOf("aging" to StrReach.tabAging, "rfm" to StrReach.tabRfm)
+  else -> linkedMapOf("aging" to StrReach.tabAging)
 }
 
 private val cardShape = RoundedCornerShape(Radius.md)
@@ -37,7 +41,7 @@ private val cardShape = RoundedCornerShape(Radius.md)
 internal fun agingSection(scope: LazyListScope, d: ShopData, today: String) = with(scope) {
   val a = CustomerInsight.aging(d, today)
   item {
-    StatTile("ماندهٔ کل", "${money(a.balance)} ؋", Shop.colors.warning, modifier = Modifier.fillMaxWidth())
+    StatTile(StrPanelPages.totalBalance, "${money(a.balance)} ؋", Shop.colors.warning, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(8.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       CustomerInsight.BUCKET_LABELS.zip(a.totals).forEach { (label, v) ->
@@ -48,7 +52,7 @@ internal fun agingSection(scope: LazyListScope, d: ShopData, today: String) = wi
   }
   val open = a.lines.filter { it.balance > 0.5 || it.credit > 0.5 }
   if (open.isEmpty()) {
-    item { Panel { EmptyNote("بدهیِ بازی نیست") } }
+    item { Panel { EmptyNote(StrPanelPages.noOpenDebt) } }
   } else {
     items(open, key = { it.id }) { l ->
       Column(
@@ -58,7 +62,7 @@ internal fun agingSection(scope: LazyListScope, d: ShopData, today: String) = wi
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
           Text(l.name, style = MaterialTheme.typography.titleSmall, color = Shop.colors.text)
           Text(
-            if (l.balance > 0.5) "${money(l.balance)} ؋" else "${money(l.credit)} ؋ پیش‌پرداخت",
+            if (l.balance > 0.5) "${money(l.balance)} ؋" else StrReports.prepaid(money(l.credit)),
             style = MaterialTheme.typography.titleSmall,
             color = if (l.balance > 0.5) Shop.colors.warning else Shop.colors.success,
           )
@@ -66,8 +70,8 @@ internal fun agingSection(scope: LazyListScope, d: ShopData, today: String) = wi
         Spacer(Modifier.height(4.dp))
         Text(
           CustomerInsight.BUCKET_LABELS.zip(l.buckets).filter { it.second > 0.5 }.joinToString(" · ") { (k, v) -> "$k: ${money(v)}" }
-            .ifEmpty { "بی بردِ باز" } +
-            (l.oldestDays?.takeIf { it >= 0 }?.let { " — کهنه‌ترین $it روز" } ?: ""),
+            .ifEmpty { StrPanelPages.nothingOpen } +
+            (l.oldestDays?.takeIf { it >= 0 }?.let { StrPanelPages.oldestDays(it) } ?: ""),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
         )
@@ -80,17 +84,17 @@ internal fun agingSection(scope: LazyListScope, d: ShopData, today: String) = wi
 internal fun rfmSection(scope: LazyListScope, d: ShopData, today: String) = with(scope) {
   val rows = CustomerInsight.rfm(d, today)
   item {
-    Text("مشتریانِ خریدارِ یک سالِ گذشته: امتیازِ ۱ تا ۵ برای تازگی (R)، دفعات (F) و مبلغ (M).",
+    Text(StrPanelPages.rfmNote,
       style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
     Spacer(Modifier.height(8.dp))
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      StatTile("خریدار", "${rows.size}", Shop.colors.primary, modifier = Modifier.weight(1f))
+      StatTile(StrCustomerPages.buyers, "${rows.size}", Shop.colors.primary, modifier = Modifier.weight(1f))
       CustomerInsight.segmentCounts(rows).take(3).forEach { (s, n) -> StatTile(s.label, "$n", Shop.colors.text, modifier = Modifier.weight(1f)) }
     }
     Spacer(Modifier.height(12.dp))
   }
   if (rows.isEmpty()) {
-    item { Panel { EmptyNote("در یک سالِ گذشته خریدی به نامِ مشتری ثبت نشده") } }
+    item { Panel { EmptyNote(StrPanelPages.noBuyersYear) } }
   } else {
     items(rows, key = { it.id }) { x ->
       Column(
@@ -103,7 +107,7 @@ internal fun rfmSection(scope: LazyListScope, d: ShopData, today: String) = with
         }
         Spacer(Modifier.height(4.dp))
         Text(
-          "${x.frequency} خرید · ${money(x.monetary)} ؋ · آخرین خرید ${x.recencyDays} روز پیش",
+          StrPanelPages.rfmLine(x.frequency, money(x.monetary), x.recencyDays),
           style = MaterialTheme.typography.labelSmall,
           color = Shop.colors.muted,
         )

@@ -249,6 +249,9 @@ const config = {
     passphrase: process.env.BACKUP_PASSPHRASE || '',   // اگر پر باشد، پشتیبان رمز می‌شود
     pgDump:     process.env.PG_DUMP_BIN || 'pg_dump',
     pgRestore:  process.env.PSQL_BIN || 'psql',
+    //  OPS-02@29: «سلامت» زرد اگر آخرین تمرینِ بازیابیِ موفق کهنه‌تر از این چند روز است (`npm run restore-drill`).
+    //  ۳۱ = «تمرینِ ماهانه» ِ D-24 (گرفته‌شده ۱۴۰۵/۰۸/۱۳، الف)؛ ۰ = خاموش. سرورِ بی هیچ تمرینِ ثبت‌شده زرد نمی‌شود.
+    drillMaxDays: num(process.env.BACKUP_DRILL_MAX_DAYS, 31),
 
     /*
      *  پشتیبانِ **هر حساب** — چیزی جدا از `pg_dump`ِ بالا.

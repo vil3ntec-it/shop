@@ -29,6 +29,7 @@ import ir.vil3ntec.tohid.scan.scanChar
  *  @param onBareEnter Enter ِ بی اسکن (صفحه‌کلیدِ بیرونی)؛ `true` ⇒ خورده شد (S11، [bareEnterPays])
  */
 fun Modifier.hidScanner(onBareEnter: () -> Boolean = { false }, onCode: (String) -> Unit): Modifier = composed {
+  //  HW-05: تنظیمِ بارکدخوان (`ScanPrefs`) را `AppRoot` در آغاز می‌خواند؛ `HidScan` آن را در نخستین کلید برمی‌دارد
   val hid = remember { HidScan() }
   val focus = remember { FocusRequester() }
   val latest by rememberUpdatedState(onCode)

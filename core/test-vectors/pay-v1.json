@@ -540,7 +540,9 @@
       {"name": "پس از Z، در صندوقِ بازِ تازهٔ همان روز", "saleAt": 6000, "saleDay": "2026-11-01", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": "2026-11-01"}, {"openedAt": 5500, "closedAt": null, "day": "2026-11-01"}], "expect": false},
       {"name": "پیش از Z ِ نخست، با صندوقِ بازِ تازه", "saleAt": 500, "saleDay": "2026-11-01", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": "2026-11-01"}, {"openedAt": 5500, "closedAt": null, "day": "2026-11-01"}], "expect": true},
       {"name": "بی روزِ فاکتور فقط پنجره", "saleAt": 500, "saleDay": "", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": "2026-11-01"}], "expect": false},
-      {"name": "روزِ صندوق با فاصله‌های دور", "saleAt": 500, "saleDay": " 2026-11-01 ", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": " 2026-11-01"}], "expect": true}
+      {"name": "روزِ صندوق با فاصله‌های دور", "saleAt": 500, "saleDay": " 2026-11-01 ", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": " 2026-11-01"}], "expect": true},
+      {"name": "صندوقِ شبانه: فاکتورِ روزِ بعد در پنجرهٔ بسته (فقط قاعدهٔ پنجره)", "saleAt": 3000, "saleDay": "2026-11-02", "shifts": [{"openedAt": 1000, "closedAt": 5000, "day": "2026-11-01"}], "expect": true},
+      {"name": "صندوقِ شبانهٔ هنوز باز: روزِ بعد باز است", "saleAt": 3000, "saleDay": "2026-11-02", "shifts": [{"openedAt": 1000, "closedAt": null, "day": "2026-11-01"}], "expect": false}
     ]
   }
 }

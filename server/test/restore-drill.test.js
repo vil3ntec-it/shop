@@ -282,3 +282,121 @@ test('D-24 (گرفته‌شده ۱۴۰۵/۰۸/۱۳، الف): هدفِ RPO یک 
     config.backup.passphrase = '';
   }
 });
+/* ── OPS-02@29: «restore drill و زمانِ واقعیِ RPO/RTO ثبت شود» ─────────────────────────────── */
+
+const DRILL_LOG = () => path.join(config.backup.dir, drill.LOG_FILE);
+async function asRoot() {
+  const { newId, now } = require('../src/db');
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'drill-root','ارشد',$2,'superadmin','active',$3) ON CONFLICT DO NOTHING`,
+    [newId('adm'), await pw.hashPassword('Root!12345'), now()]
+  );
+  return (await h.api('POST', '/api/admin/login', { body: { username: 'drill-root', password: 'Root!12345' } })).body.token;
+}
+
+test('OPS-02@29: هر تمرین با RTO/RPO ِ اندازه‌گرفته ثبت می‌شود، شکست هم؛ «سلامت» و پنل آخرینش را می‌بینند', async () => {
+  const health = require('../src/lib/system-health');
+  await fs.rm(DRILL_LOG(), { force: true });
+  const enabled = config.backup.enabled;
+  config.backup.enabled = true;               //  تا «وضع» فقط از پشتیبان و تمرین بیاید، نه از خاموشیِ آزمون
+  try {
+    //  هیچ تمرینی ثبت نشده ⇒ بی تمرین و همان وضعِ امروز (هیچ سرورِ بی‌تمرینی زرد نمی‌شود)
+    config.backup.passphrase = PASS;
+    const out = await backup.run({ kind: 'manual' });
+    const none = (await health.snapshot()).backups;
+    assert.equal(none.drill, null);
+    assert.equal(none.status, 'ok');
+
+    const r = await drill.drillAndRecord({ file: out.file });
+    assert.equal(r.ok, true);
+    const ok = (await health.snapshot()).backups;
+    assert.equal(ok.status, 'ok');
+    assert.equal(ok.drill.last.ok, true);
+    assert.equal(ok.drill.last.restoredMs, r.restoredMs);
+    assert.equal(ok.drill.last.verifiedMs, r.verifiedMs);
+    assert.equal(ok.drill.last.backupAgeMs, r.backupAgeMs);
+    assert.equal(ok.drill.lastOkAt, ok.drill.last.at);
+    assert.equal(ok.drill.failing, false);
+
+    //  عبارتِ اشتباه ⇒ پشتیبان برنمی‌گردد ⇒ ثبت با «ناموفق» و «سلامت» زرد (پشتیبانی که برنمی‌گردد پشتیبان نیست)
+    config.backup.passphrase = 'wrong-passphrase-for-this-test';
+    await assert.rejects(() => drill.drillAndRecord({ file: out.file }));
+    config.backup.passphrase = PASS;
+    const bad = (await health.snapshot()).backups;
+    assert.equal(bad.drill.last.ok, false);
+    assert.equal(bad.drill.failing, true);
+    assert.equal(bad.drill.last.error, 'passphrase', 'فقط گونهٔ شکست، نه متنِ خطا');
+    assert.equal(bad.drill.lastOkAt, ok.drill.last.at, 'آخرین تمرینِ موفق گم نمی‌شود');
+    assert.equal(bad.status, 'warn');
+
+    //  پنل همان را می‌بیند (فقط خواندن؛ بی هیچ مسیرِ تازه)
+    const root = await asRoot();
+    const panel = await h.api('GET', '/api/admin/backups', { token: root });
+    assert.equal(panel.status, 200);
+    assert.equal(panel.body.drill.last.ok, false);
+    assert.equal(panel.body.drill.lastOkAt, ok.drill.last.at);
+    assert.ok(Array.isArray(panel.body.drill.recent) && panel.body.drill.recent.length === 2);
+
+    //  تمرینِ موفقِ بعدی ⇒ دوباره سبز
+    await drill.drillAndRecord({ file: out.file });
+    const again = (await health.snapshot()).backups;
+    assert.equal(again.status, 'ok');
+    assert.equal(again.drill.failing, false);
+
+    //  دفترِ تمرین فقط عدد است: نه نامِ دکان، نه ایمیل، نه عبارتِ عبور، نه نشانیِ دیتابیس
+    const text = await fs.readFile(DRILL_LOG(), 'utf8');
+    for (const bad of ['دکانِ A', '@', PASS, 'wrong-passphrase', 'postgres://', 'shoppass']) {
+      assert.ok(!text.includes(bad), `دفترِ تمرین «${bad}» دارد`);
+    }
+  } finally {
+    config.backup.enabled = enabled;
+    config.backup.passphrase = '';
+  }
+});
+
+test('OPS-02@29: تمرینِ موفقِ کهنه‌تر از یک ماه (D-24: «تمرینِ ماهانه») ⇒ زرد؛ BACKUP_DRILL_MAX_DAYS=0 خاموشش می‌کند', async () => {
+  const health = require('../src/lib/system-health');
+  const enabled = config.backup.enabled;
+  const maxDays = config.backup.drillMaxDays;
+  config.backup.enabled = true;
+  try {
+    assert.equal(config.backup.drillMaxDays, 31, 'پیش‌فرض: ماهانه (D-24، الف)');
+    await fs.rm(DRILL_LOG(), { force: true });
+    await backup.run({ kind: 'manual' });
+    const DAY = 24 * 3600e3;
+    await drill.record({ ok: true, restoredMs: 1200, verifiedMs: 1300, backupAgeMs: 5000, summary: { tables: 9, rows: 99 } },
+      { at: Date.now() - 40 * DAY });
+    const stale = (await health.snapshot()).backups;
+    assert.equal(stale.drill.stale, true);
+    assert.equal(stale.drill.maxDays, 31);
+    assert.equal(stale.status, 'warn');
+    config.backup.drillMaxDays = 0;
+    assert.equal((await health.snapshot()).backups.status, 'ok', '۰ = خاموش');
+    config.backup.drillMaxDays = maxDays;
+    await drill.record({ ok: true, restoredMs: 1100, verifiedMs: 1200, backupAgeMs: 4000, summary: { tables: 9, rows: 99 } });
+    assert.equal((await health.snapshot()).backups.status, 'ok', 'تمرینِ تازه ⇒ دوباره سبز');
+  } finally {
+    config.backup.enabled = enabled;
+    config.backup.drillMaxDays = maxDays;
+  }
+});
+
+test('OPS-02@29: دفترِ تمرین کران‌دار است و سطرِ خراب «سلامت» را نمی‌اندازد', async () => {
+  await fs.rm(DRILL_LOG(), { force: true });
+  await fs.mkdir(config.backup.dir, { recursive: true });
+  await fs.writeFile(DRILL_LOG(), '{نیمه‌کاره\n');
+  for (let i = 0; i < drill.LOG_MAX + 15; i++) {
+    await drill.record({ ok: i % 2 === 0, restoredMs: i, verifiedMs: i, backupAgeMs: i, summary: { tables: 1, rows: i } }, { at: 1_700_000_000_000 + i });
+  }
+  const lines = (await fs.readFile(DRILL_LOG(), 'utf8')).trim().split('\n');
+  assert.equal(lines.length, drill.LOG_MAX);
+  const hist = await drill.history();
+  assert.equal(hist.last.restoredMs, drill.LOG_MAX + 14);
+  assert.equal(hist.last.ok, true);
+  assert.equal(hist.recent.length, 10);
+  assert.equal(hist.last.withinTargets, null, 'تمرینی که هدف نسنجیده «نامعلوم» است، نه «سبز»');
+  await drill.record({ ok: true, withinTargets: false, restoredMs: 1, verifiedMs: 1, backupAgeMs: 1, summary: { tables: 1, rows: 1 } });
+  assert.equal((await drill.history()).last.withinTargets, false);
+});

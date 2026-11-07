@@ -10,6 +10,7 @@ import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.PeopleOutline
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
@@ -17,6 +18,7 @@ import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.data.CustomerCrm
+import ir.vil3ntec.tohid.data.DebtReminderSend
 import ir.vil3ntec.tohid.data.DebtorEngine
 import ir.vil3ntec.tohid.data.LedgerEngine
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -34,8 +36,10 @@ import ir.vil3ntec.tohid.ui.v3.nav.ModuleEntry
 import ir.vil3ntec.tohid.ui.v3.nav.RouteKind
 import ir.vil3ntec.tohid.ui.v3.nav.RouteScope
 import ir.vil3ntec.tohid.ui.v3.nav.V3Route
+import ir.vil3ntec.tohid.ui.v3.online.OnlinePaths
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
+import kotlinx.coroutines.launch
 
 /** مسیرهای گروهِ پول (G4) */
 object MoneyPaths {
@@ -95,7 +99,8 @@ val MoneyModule = AppModule(
       val crm = ShopPolicy.crmReports(LocalContext.current)
       val duplicates = remember(data, crm, MoneyUndo.hiddenDebtors) { DebtorMergeModel.groups(data, crm, MoneyUndo.hiddenDebtors).size }
       VipGate(Str.debtors) {
-        if (desk) DeskCustomersScreen(store, data, snackbar)
+        //  CRM-07: سفارشِ باز/لغوشدهٔ پروندهٔ مشتری ⇐ همان صفحهٔ سفارش
+        if (desk) DeskCustomersScreen(store, data, snackbar, onOpenOrder = { nav.open(OnlinePaths.order(it)) })
         else DebtorsListScreen(
           d = data,
           sortArg = args.query("sort"),
@@ -115,6 +120,7 @@ val MoneyModule = AppModule(
     V3Route("debtors/{id}", RouteKind.PAGE, { Str.debtor }, parent = MoneyPaths.DEBTORS, chrome = Chrome.OWN) {
       //  پیوندِ کهنه به مشتریِ ادغام‌شده (#330) همان مشتریِ ماندگار را باز می‌کند
       val id = CustomerCrm.resolve(data, args["id"].orEmpty())
+      val remindScope = rememberCoroutineScope()
       VipGate(Str.debtors) {
         DebtorLedgerScreen(
           id = id,
@@ -129,8 +135,10 @@ val MoneyModule = AppModule(
             onDeleteTx = { MoneyUndo.deleteLater(store, snackbar, PendingDelete.Transaction(it), StrMoney.txDeleted) },
             onOpenSale = { nav.open(SalesPaths.invoice(it)) },
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
+            //  CRM-06: یک ردِ `debt_reminder` در روز برای هر راه (زمان‌بندیِ «یادآوریِ امروز»)
+            onReminded = { channel -> remindScope.launch { DebtReminderSend.sent(store, id, channel) } },
           ),
-          extras = { DebtorFileExtras(data, store, id) { toasts.show(it) } },
+          extras = { DebtorFileExtras(data, store, id, onOpenOrder = { nav.open(OnlinePaths.order(it)) }) { toasts.show(it) } },
         )
       }
     },
@@ -213,19 +221,21 @@ val MoneyModule = AppModule(
     V3Route("purchasing/suppliers/{id}/return", RouteKind.SHEET, { StrReach.supplierReturn }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) { SupplierReturnRoute() },
     V3Route("purchasing/new", RouteKind.PAGE, { StrMoney.newPurchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val context = LocalContext.current
+      //  PUR-05: یک کلید برای همین فرم — دو لمسِ «ثبت» پیش از بسته شدن یک خرید است (`PurchaseBook.record(key)`)
+      val saveKey = remember { moneyId() }
       PurchaseFormScreen(
         d = data,
         supplierArg = args.query("supplier"),
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
         onSave = { draft ->
-          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId), StrMoney.purchaseSaved) != null
+          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
         },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)
         onSaveMany = { supplierId, lines, paid, date, notes ->
           MoneyWriter.purchase(
             store, toasts, context,
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId),
+            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = saveKey),
             StrMoney.purchaseSaved,
           ) != null
         },
@@ -440,12 +450,14 @@ private fun RouteScope.PayRoute() {
   val id = args["id"].orEmpty()
   val supplier = data.suppliers.find { it.id == id }
   if (supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
+  //  PUR-07: یک کلید برای همین برگه — دو لمسِ «ثبتِ پرداخت» پیش از بسته شدن یک پرداخت است
+  val payKey = remember(id) { moneyId() }
   SupplierPaySheet(
     supplier = supplier,
     debt = ir.vil3ntec.tohid.data.ShopStore.supplierDebt(data, id),
     onClose = { back() },
     onSave = { f ->
-      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId)
+      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = payKey)
       MoneyWriter.ledger(store, toasts, context, result, StrMoney.saved) != null
     },
     onSaved = { back() },

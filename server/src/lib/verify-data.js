@@ -18,7 +18,8 @@
  *                     دارند و آخرین رویدادِ وضعیت همان وضعیتِ سفارش است؛ زنجیرهٔ هش سالم است.
  *   sum.*             جمع‌ها: جمعِ فاکتور = جمعِ قلم‌ها، نهایی = جمع − تخفیف (+ ردیفِ گردِ نقدی `roundingMinor`، PAY-09)، پرداخت + مانده
  *                     = نهایی، مرجوعی = جمعِ برگشت‌ها، جمعِ سفارش = جمعِ ردیف‌ها، موجودیِ هر جا
- *                     = جمعِ حرکت‌های دفترِ موجودی، رزروِ باز = جمعِ حرکتِ رزرو/آزادسازی، …
+ *                     = جمعِ حرکت‌های دفترِ موجودی، رزروِ باز = جمعِ حرکتِ رزرو/آزادسازی، خرید: پرداخت + بدهی = جمع
+ *                     و ورودِ انبارش همان کالا و مقدار (PUR-05)، …
  *
  * شدت: `error` = دادهٔ خراب یا ناسازگار (کدِ خروجِ ۲)؛ `warn` = خلافِ سیاست در دفترِ
  * قدیمی که هنوز راهِ درستش ساخته نشده (فقط گزارش).
@@ -124,6 +125,19 @@ function ledgerChecks(src) {
                 AND (NOT rel.alive OR p.deleted_at IS NULL))`,
     },
     {
+      //  PUR-05: برنامهٔ قدیم و وب ورودِ انبارِ یک خرید را جدا پاک می‌کردند و بدهیِ تأمین‌کننده می‌ماند؛ برنامهٔ امروز رد
+      //  می‌کند (`WarehouseEngine.deleteEntry`) ⇒ فقط دفترِ کهنه این را دارد ⇒ `warn` (اصلاح: سندِ کسر با دلیل)
+      id: 'orphan.purchase_entry', severity: 'warn',
+      title: 'ردیفِ خریدِ زنده‌ای که ورودِ انبارش پاک شده یا نیست — بدهیِ تأمین‌کننده مانده ولی کالا وارد نیست',
+      sql: `SELECT p.account_id, 'purchases/' || p.row_id AS ref, p.data->>'warehouseEntryId' AS value
+          FROM ${R} p
+         WHERE ${sumWhere('p')} AND p.table_name = 'purchases' AND COALESCE(p.data->>'warehouseEntryId', '') <> ''
+           AND NOT EXISTS (
+             SELECT 1 FROM ${R} w
+              WHERE w.app = p.app AND w.account_kind = p.account_kind AND w.account_id = p.account_id
+                AND w.table_name = 'warehouseEntries' AND w.row_id = p.data->>'warehouseEntryId' AND w.deleted_at IS NULL)`,
+    },
+    {
       //  صاحب‌کار ۱۴۰۵/۰۸/۱۳ (`CreditDebtor` ِ برنامه، ‎lib/credit-debtor.js‎): فاکتوری با سهمِ «به حساب» و بی مشتری —
       //  بدهی به هیچ‌کس نرفت. برنامهٔ تازه نمی‌سازد؛ دفترِ کهنه شاید دارد ⇒ `warn` (اصلاح: مشتری روی همان فاکتور)
       id: 'orphan.credit_no_debtor', severity: 'warn',
@@ -221,6 +235,48 @@ function ledgerChecks(src) {
            AND (abs(COALESCE(${num('i', 'returnedQty')}, 0) - COALESCE(r.sum, 0)) >= 0.0005
              OR COALESCE(${num('i', 'returnedQty')}, 0) < 0
              OR COALESCE(${num('i', 'returnedQty')}, 0) > ${num('i', 'quantity')})`,
+    },
+    /*
+     *  PUR-05: فاکتورِ خرید (هر ردیف = `Purchase` ِ برنامه، `LedgerEngine.addPurchase` / `PurchaseBook.record` / وب):
+     *  بدهیِ تأمین‌کننده (`totalAmount − paidAmount`) و ورودِ انبار از یک سند می‌آیند. سندِ کسر (برگشت، PUR-08) همان
+     *  شکل با علامتِ منفی است (پرداخت ۰، بدهی = جمع، ورودِ منفی) و هر سه بررسی آن را هم سالم می‌بینند.
+     */
+    {
+      id: 'sum.purchase_paid', severity: 'error',
+      title: 'ردیفِ خرید: پرداخت + بدهی ≠ جمع، یا پرداختِ خریدِ مثبت منفی یا بیش از جمع است',
+      sql: `SELECT p.account_id, 'purchases/' || p.row_id AS ref,
+                   concat_ws(' ', p.data->>'totalAmount', p.data->>'paidAmount', p.data->>'debt') AS value
+          FROM ${R} p
+         WHERE ${sumWhere('p')} AND p.table_name = 'purchases'
+           AND ${isNum('p', 'totalAmount')} AND ${isNum('p', 'paidAmount')}
+           AND ((${isNum('p', 'debt')}
+                 AND abs(${num('p', 'paidAmount')} + ${num('p', 'debt')} - ${num('p', 'totalAmount')}) >= 0.005)
+             OR (${num('p', 'totalAmount')} >= 0
+                 AND (${num('p', 'paidAmount')} < 0 OR ${num('p', 'paidAmount')} > ${num('p', 'totalAmount')} + 0.004)))`,
+    },
+    {
+      id: 'sum.purchase_line', severity: 'warn',
+      title: 'ردیفِ خرید: جمع با «مقدار × فی» بیش از یک افغانی فرق دارد',
+      sql: `SELECT p.account_id, 'purchases/' || p.row_id AS ref,
+                   concat_ws(' ', p.data->>'quantity', '×', p.data->>'purchasePrice', '≠', p.data->>'totalAmount') AS value
+          FROM ${R} p
+         WHERE ${sumWhere('p')} AND p.table_name = 'purchases'
+           AND ${isNum('p', 'quantity')} AND ${isNum('p', 'purchasePrice')} AND ${isNum('p', 'totalAmount')}
+           AND abs(${num('p', 'totalAmount')} - ${num('p', 'quantity')} * ${num('p', 'purchasePrice')}) > 1`,
+    },
+    {
+      //  موجودی = جمعِ `units` ِ ورودها (`ShopStore.StockIndex`)؛ ورودِ هر خرید همان کالا و همان مقدار است
+      id: 'sum.purchase_stock_in', severity: 'error',
+      title: 'ردیفِ خرید با ورودِ انبارش نمی‌خواند: کالا یا مقدارِ ورود با خرید یکی نیست',
+      sql: `SELECT p.account_id, 'purchases/' || p.row_id AS ref,
+                   concat_ws(' ', p.data->>'productId', p.data->>'quantity', '≠', w.data->>'productId', w.data->>'units') AS value
+          FROM ${R} p
+          JOIN ${R} w ON w.app = p.app AND w.account_kind = p.account_kind AND w.account_id = p.account_id
+                     AND w.table_name = 'warehouseEntries' AND w.row_id = p.data->>'warehouseEntryId' AND w.deleted_at IS NULL
+         WHERE ${sumWhere('p')} AND p.table_name = 'purchases' AND COALESCE(p.data->>'warehouseEntryId', '') <> ''
+           AND (COALESCE(w.data->>'productId', '') <> COALESCE(p.data->>'productId', '')
+             OR (${isNum('p', 'quantity')} AND ${isNum('w', 'units')}
+                 AND abs(${num('w', 'units')} - ${num('p', 'quantity')}) >= 0.0005))`,
     },
   ].map((c) => ({ ...c, id: src.name === 'v1' ? c.id : `${c.id}@v3`, source: src }));
 }

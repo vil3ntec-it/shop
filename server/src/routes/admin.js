@@ -727,6 +727,8 @@ router.get('/backups', async (req, res) => {
       configured, required,
       warning: configured ? '' : (required ? backup.REFUSED_WARNING : backup.UNENCRYPTED_WARNING),
     },
+    //  OPS-02@29: تمرین‌های بازیابیِ ثبت‌شده با RTO/RPO ِ اندازه‌گرفته (فقط عدد؛ `npm run restore-drill`)
+    drill: await require('../lib/restore-drill').history().catch(() => null),
   });
 });
 

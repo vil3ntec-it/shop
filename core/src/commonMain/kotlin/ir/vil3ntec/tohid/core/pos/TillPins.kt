@@ -24,6 +24,17 @@ object TillPins {
     else -> pins + id
   }
 
+  /** نتیجهٔ [toggle] برای پیامِ دکمه: سنجاق شد، برداشته شد، صفحهٔ اول پُر بود (بی تغییر)، یا هیچ */
+  enum class Change { PINNED, UNPINNED, FULL, NONE }
+
+  /** همان تصمیمِ [toggle] پیش از انجام — `toggle(before, id)` دقیقاً همین را می‌کند */
+  fun change(before: List<String>, id: String): Change = when {
+    id.isBlank() -> Change.NONE
+    id in before -> Change.UNPINNED
+    before.size >= MAX -> Change.FULL
+    else -> Change.PINNED
+  }
+
   /** سنجاق‌شده‌ای [id] اول شود (جابه‌جاییِ چیدمان)؛ سنجاق‌نشده ⇒ بی تغییر */
   fun first(pins: List<String>, id: String): List<String> = if (id in pins) listOf(id) + (pins - id) else pins
 
@@ -35,6 +46,20 @@ object TillPins {
     if (head.isEmpty()) return ids
     val pinned = head.toSet()
     return head + ids.filter { it !in pinned }
+  }
+
+  /**
+   *  همان [arrange] روی خودِ کالاها (صندوقِ کامپیوتر، `DeskSale`): سنجاق‌شده‌های حاضر به ترتیبِ سنجاق اول، بقیه به
+   *  همان ترتیب؛ هیچ کالایی گم یا تکرار نمی‌شود. بی سنجاقِ حاضر ⇒ همان فهرست.
+   */
+  fun <T> arrangeBy(items: List<T>, pins: List<String>, id: (T) -> String): List<T> {
+    if (pins.isEmpty()) return items
+    val byId = LinkedHashMap<String, T>()
+    items.forEach { byId.getOrPut(id(it)) { it } }
+    val head = pins.distinct().mapNotNull { byId[it] }
+    if (head.isEmpty()) return items
+    val pinned = head.map(id).toSet()
+    return head + items.filter { id(it) !in pinned }
   }
 
   /** نوشتن روی دستگاه: هر شناسه یک خط */

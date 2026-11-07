@@ -248,4 +248,95 @@ async function drill({ file, expected = null, migrate = false, targetUrl = '', k
   }
 }
 
-module.exports = { fingerprint, compare, drill, restoreIsolated, normNum, MONEY_COLUMN };
+/* ── OPS-02@29: «restore drill و زمانِ واقعیِ RPO/RTO ثبت شود» ─────────────────────────────────
+ *
+ * تا این‌جا عددِ RTO/RPO فقط روی صفحهٔ خطِ فرمان می‌آمد و با بسته شدنِ پنجره گم می‌شد. حالا هر تمرین
+ * (موفق یا شکست‌خورده) یک سطر در `<BACKUP_PATH>/drills.jsonl` می‌گذارد — کنارِ خودِ پشتیبان‌ها، نه در
+ * دیتابیسِ زنده (ثبت هیچ نوشتنی روی دیتابیسِ زنده نمی‌افزاید و بی دیتابیسِ زنده هم کار می‌کند).
+ * فقط عدد و نشان: زمان، برابر/نابرابر، RTO، RPO، شمارِ جدول/ردیف، شمارِ تفاوت و گونهٔ شکست (`errorKind`،
+ * هرگز متنِ خطا). «سلامت» (`system-health`) و `GET /api/admin/backups` آخرینش را می‌خوانند.
+ * کران‌دار: فقط `LOG_MAX` سطرِ آخر می‌ماند؛ سطرِ خراب نادیده گرفته می‌شود.
+ */
+const LOG_FILE = 'drills.jsonl';
+const LOG_MAX = 100;
+const logPath = () => path.join(require('../config').backup.dir, LOG_FILE);
+const ms = (x) => (Number.isFinite(Number(x)) && x !== null && x !== undefined ? Math.max(0, Math.round(Number(x))) : null);
+/**
+ * فقط **گونهٔ** شکست، نه پیامش: خطای psql ممکن است تکه‌ای از ردیف (`CONTEXT: COPY users, line 3: "…"`)
+ * داشته باشد. پیامِ کامل همان دم روی خطِ فرمانِ اجراکننده می‌آید و این‌جا نمی‌ماند.
+ */
+function errorKind(err) {
+  const m = String(err?.message || err || '');
+  if (/BACKUP_PASSPHRASE|authenticate data|bad decrypt/i.test(m)) return 'passphrase';
+  if (/ENOENT|no such file/i.test(m)) return 'missing_file';
+  if (/incorrect header|unexpected end|Z_DATA_ERROR|invalid (stored|block)/i.test(m)) return 'corrupt';
+  if (/psql|بازیابی شکست خورد/.test(m)) return 'restore_failed';
+  return 'error';
+}
+
+/** یک سطرِ تمرین؛ `r` خروجیِ `drill()` یا `{ ok:false, error }` */
+async function record(r, { at = Date.now(), migrate = false } = {}) {
+  const row = {
+    at: Number(at),
+    ok: r?.ok === true,
+    empty: r?.empty === true,
+    where: String(r?.where || '').split(':')[0] || null,
+    restoredMs: ms(r?.restoredMs),
+    verifiedMs: ms(r?.verifiedMs),
+    backupAgeMs: ms(r?.backupAgeMs),
+    tables: r?.summary ? ms(r.summary.tables) : null,
+    rows: r?.summary ? ms(r.summary.rows) : null,
+    manifest: r?.manifest || null,
+    diffs: r?.restore ? r.restore.diffs.length : null,
+    migrate: Boolean(migrate || r?.migration),
+    migrationOk: r?.migration ? r.migration.equal === true : null,
+    //  هدفِ D-24 اگر خودِ تمرین سنجیده باشد (`targets`/`withinTargets`)؛ وگرنه نامعلوم
+    withinTargets: typeof r?.withinTargets === 'boolean' ? r.withinTargets : null,
+    error: r?.error ? errorKind(r.error) : null,
+  };
+  const file = logPath();
+  await fsp.mkdir(path.dirname(file), { recursive: true });
+  const kept = (await fsp.readFile(file, 'utf8').catch(() => '')).split('\n').filter((l) => l.trim());
+  const lines = [...kept, JSON.stringify(row)].slice(-LOG_MAX);
+  //  جابه‌جاییِ اتمی: خوانندهٔ «سلامت» هرگز فایلِ نیمه‌نوشته نمی‌بیند
+  const tmp = `${file}.${process.pid}.tmp`;
+  await fsp.writeFile(tmp, `${lines.join('\n')}\n`);
+  await fsp.rename(tmp, file);
+  return row;
+}
+
+/** ⇒ { last, lastOkAt, recent: [تازه‌ترین اول، ≤۱۰], count } یا null اگر هیچ تمرینی ثبت نشده */
+async function history() {
+  const text = await fsp.readFile(logPath(), 'utf8').catch(() => '');
+  const rows = [];
+  for (const l of text.split('\n')) {
+    if (!l.trim()) continue;
+    try {
+      const o = JSON.parse(l);
+      if (o && Number.isFinite(Number(o.at))) rows.push(o);
+    } catch { /* سطرِ خراب */ }
+  }
+  if (!rows.length) return null;
+  rows.sort((a, b) => Number(a.at) - Number(b.at));
+  const last = rows[rows.length - 1];
+  const lastOk = [...rows].reverse().find((x) => x.ok === true) || null;
+  return { last, lastOkAt: lastOk ? Number(lastOk.at) : null, recent: rows.slice(-10).reverse(), count: rows.length };
+}
+
+/** تمرین + ثبت؛ شکست هم ثبت می‌شود و دوباره بالا می‌رود. ثبت‌نشدن هرگز خودِ تمرین را نمی‌اندازد. */
+async function drillAndRecord(o = {}) {
+  let r;
+  try {
+    r = await drill(o);
+  } catch (err) {
+    await record({ ok: false, error: err }, { migrate: o.migrate }).catch(() => {});
+    throw err;
+  }
+  r.recorded = await record(r, { migrate: o.migrate }).then(() => true, () => false);
+  return r;
+}
+
+module.exports = {
+  fingerprint, compare, drill, restoreIsolated, normNum, MONEY_COLUMN,
+  LOG_FILE, LOG_MAX, record, history, drillAndRecord, errorKind,
+};
