@@ -79,8 +79,10 @@ fun RouteScope.KeypadRoute() {
     onClose = { back() },
     pinned = item.product.id in pins,
     onPin = {
-      val on = togglePin(item.product.id)
-      toasts.show(if (on) StrSale.pinnedFirst(item.product.name) else StrSale.unpinnedFirst(item.product.name), V3Tone.SUCCESS)
+      val change = togglePin(item.product.id)
+      TillPinsPrefs.message(change, item.product.name)?.let {
+        toasts.show(it, if (change == ir.vil3ntec.tohid.core.pos.TillPins.Change.FULL) V3Tone.WARNING else V3Tone.SUCCESS)
+      }
     },
   )
 }
