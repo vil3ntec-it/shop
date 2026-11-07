@@ -88,7 +88,56 @@
       renderChat(o);
       renderAdd(o, token);
       renderApology(o);
+      renderAlt(o);
+      renderPlace(o);
       return o;
+    }
+
+    //  ORD-13/PCK-05 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱۰): سفارشِ ردشده/لغوشده به‌خاطرِ «ناموجود» ⇒ کالاهای مشابهِ فروختنیِ همین
+    //  دکان (همان «مشابه» ِ برگهٔ کالا، `GET /products/:id`) به‌جای تنها «خریدِ دوباره» ِ همان کالای ناموجود. «+» ⇒ سبد.
+    var altFor = '';
+    function renderAlt(o) {
+      var box = $('o-alt');
+      var want = o.statusReason === 'out_of_stock' && K.orderKind(o.status) === 'err';
+      if (!want) { if (box) box.hidden = true; return; }
+      if (altFor === o.token) return;
+      altFor = o.token;
+      var had = {}; o.lines.forEach(function (l) { had[l.productId] = true; });
+      Promise.all(o.lines.slice(0, 3).map(function (l) {
+        return api('/products/' + encodeURIComponent(l.productId)).then(function (r) { return r.similar || []; }, function () { return []; });
+      })).then(function (lists) {
+        var seen = {}; var list = [];
+        lists.forEach(function (xs) {
+          xs.forEach(function (p) { if (!had[p.id] && !seen[p.id] && K.stockOf(p).orderable && list.length < 6) { seen[p.id] = true; list.push(p); } });
+        });
+        if (!list.length) return;
+        if (!box) {
+          box = el('div', { class: 'card card-lg', attrs: { id: 'o-alt' } }, el('h2', { text: t('ps.similar') }), el('ul', { class: 'rail products section', attrs: { id: 'o-alt-list' } }));
+          $('o-subs').parentNode.insertBefore(box, $('o-subs').nextSibling);
+        }
+        var ul = K.clear($('o-alt-list'));
+        list.forEach(function (p) {
+          ul.appendChild(K.productCard(p, {
+            href: '#/p/' + encodeURIComponent(p.id), qty: 0,
+            photo: '/api/store/' + encodeURIComponent(ctx.slug) + '/products/' + encodeURIComponent(p.id) + '/thumb' + (p.photoVersion ? '?v=' + encodeURIComponent(p.photoVersion) : ''),
+            onAdd: function (x) { ctx.reorder({ lines: [{ productId: x.id, qtyMilli: 1000 }] }); },
+          }));
+        });
+        box.hidden = false;
+      });
+    }
+
+    //  CHK-11 (ممیزی، مشکلِ ۶): سفارشِ «دریافت از دکان» ⇒ نشانی و «مسیر روی نقشه» ِ دکان (نبود ⇒ هیچ)
+    function renderPlace(o) {
+      var box = $('o-place');
+      var node = o.fulfillment === 'pickup' && K.orderKind(o.status) !== 'err' && K.place(ctx.store);
+      if (!node) { if (box) box.hidden = true; return; }
+      if (!box) {
+        box = el('div', { attrs: { id: 'o-place' } });
+        $('o-meta').parentNode.insertBefore(box, $('o-meta').nextSibling);
+      }
+      K.clear(box).appendChild(node);
+      box.hidden = false;
     }
 
     //  بخشِ پرچم‌دار فقط وقتی سرور کلیدش را داد ساخته می‌شود (پیش از «خریدِ دوباره») — خاموش ⇒ همان صفحهٔ امروز

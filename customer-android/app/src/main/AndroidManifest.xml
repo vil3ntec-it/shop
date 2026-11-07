@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+  <!-- فقط اینترنت: نه دوربین، نه موقعیت، نه پیامک (پین و نشانی‌های ذخیره‌شده مرحلهٔ ۲) -->
+  <uses-permission android:name="android.permission.INTERNET" />
+
+  <!--
+       allowBackup=false: سبد، بلیتِ شماره و پیوندِ پیگیری فقط روی همین گوشی می‌مانند و به پشتیبانِ ابری
+       نمی‌روند (بلیت کوتاه‌عمر است؛ نشستِ بلندِ مشتری با Keystore مرحلهٔ ۲).
+  -->
+  <application
+    android:allowBackup="false"
+    android:icon="@drawable/ic_launcher"
+    android:roundIcon="@drawable/ic_launcher"
+    android:label="@string/app_name"
+    android:supportsRtl="true"
+    android:theme="@style/Theme.Customer">
+    <activity
+      android:name=".MainActivity"
+      android:exported="true"
+      android:windowSoftInputMode="adjustResize">
+      <intent-filter>
+        <action android:name="android.intent.action.MAIN" />
+        <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+    </activity>
+  </application>
+</manifest>

@@ -1,10 +1,13 @@
 package ir.vil3ntec.tohid.ui.v3.online.storefront
 
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrStorePlace
 import ir.vil3ntec.tohid.core.storefront.StorefrontOwner
+import ir.vil3ntec.tohid.data.repo.StorefrontPinDto
 import ir.vil3ntec.tohid.data.repo.StorefrontRepository
 import ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -33,6 +36,9 @@ object StorefrontSettingsModel {
     val timezone: String = "Asia/Kabul",
     val days: Map<Int, String> = emptyMap(),
     val closed: String = "",
+    /** نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (ممیزیِ ویترین، مهاجرتِ ۲۱۵) — پین «عرض، طول» */
+    val address: String = "",
+    val pin: String = "",
   )
 
   data class Result(val errors: Map<String, String>, val body: JsonObject?)
@@ -56,8 +62,24 @@ object StorefrontSettingsModel {
       timezone = s.timezone,
       days = (0..6).associateWith { d -> StorefrontOwner.formatDay(s.weeklyHours[d.toString()].orEmpty().map { it[0] to it[1] }) },
       closed = s.closedDates.joinToString("، "),
+      address = s.pickupAddress,
+      pin = s.pickupPin?.let { "${it.lat}, ${it.lng}" }.orEmpty(),
     )
   }
+
+  private val PIN = Regex("^\\s*(-?\\d{1,2}(?:\\.\\d+)?)\\s*[,،]\\s*(-?\\d{1,3}(?:\\.\\d+)?)\\s*$")
+
+  /** «۳۴٫۵۲۸۱، ۶۹٫۱۷۲۳» یا «34.5281, 69.1723» ⇒ پین؛ خالی ⇒ null؛ نادرست ⇒ [IllegalArgumentException] */
+  fun parsePin(raw: String): StorefrontPinDto? {
+    val s = raw.map { c -> if (c in '۰'..'۹') '0' + (c - '۰') else if (c in '٠'..'٩') '0' + (c - '٠') else if (c == '٫') '.' else c }.joinToString("")
+    if (s.isBlank()) return null
+    val m = PIN.matchEntire(s) ?: throw IllegalArgumentException(StrStorePlace.pinError)
+    val lat = m.groupValues[1].toDouble()
+    val lng = m.groupValues[2].toDouble()
+    require(lat in -90.0..90.0 && lng in -180.0..180.0) { StrStorePlace.pinError }
+    return StorefrontPinDto(lat, lng)
+  }
+
 
   /** همان `build()` ِ صفحهٔ پیشین: خطاها، یا بدنهٔ ذخیره */
   fun build(f: Form): Result {
@@ -78,6 +100,7 @@ object StorefrontSettingsModel {
     }
     val (closedList, closedErr) = StorefrontOwner.parseClosedDates(f.closed)
     closedErr?.let { errors["closed"] = it }
+    val pin = runCatching { parsePin(f.pin) }.getOrElse { errors["pin"] = StrStorePlace.pinError; null }
     if (errors.isNotEmpty()) return Result(errors, null)
     return Result(
       emptyMap(),
@@ -96,6 +119,8 @@ object StorefrontSettingsModel {
         put("acceptPickup", f.pickup)
         put("deliveryFeeMinor", feeMinor)
         put("minOrderMinor", minMinor)
+        put("pickupAddress", f.address.trim())
+        put("pickupPin", pin?.let { p -> buildJsonObject { put("lat", p.lat); put("lng", p.lng) } } ?: JsonNull)
       },
     )
   }

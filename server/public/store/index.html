@@ -63,6 +63,7 @@
       <section id="view-catalog" hidden>
         <div class="wrap">
           <div class="shop-hero card card-lg">
+            <div id="store-cover" class="shop-cover" hidden></div>
             <div class="shop-id">
               <span id="store-avatar"></span>
               <div class="grow">
@@ -71,15 +72,24 @@
               </div>
             </div>
             <div id="store-status" class="status-line" role="status" aria-live="polite"></div>
+            <div id="store-place"></div>
             <div id="store-meta" class="meta"></div>
           </div>
 
-          <section id="banners" class="section" hidden>
-            <ul id="banners-list" class="banners"></ul>
-          </section>
+          <div class="toolbar section">
+            <form id="search-form" class="search" role="search">
+              <label for="q" class="sr-only" data-t="s.label">جست‌وجوی کالا در این دکان</label>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
+              <input id="q" type="search" data-tp="s.ph" placeholder="جست‌وجوی کالا در همین دکان…" autocomplete="off" enterkeyhint="search" maxlength="60">
+            </form>
+            <div id="cats" class="chips" role="group" data-ta="a.cats" aria-label="دسته‌ها"></div>
+          </div>
           <section id="picks" class="section" hidden aria-labelledby="picks-title">
             <div class="section-head"><h2 id="picks-title" data-i="flame" data-t="picks.title">پیشنهادِ همین دکان</h2><p id="picks-why"></p></div>
             <ul id="picks-list" class="rail products"></ul>
+          </section>
+          <section id="banners" class="section" hidden>
+            <ul id="banners-list" class="banners"></ul>
           </section>
           <section id="deals" class="section" hidden aria-labelledby="deals-title">
             <div class="section-head"><h2 id="deals-title" data-t="deals.title">ارزان‌تر از قیمتِ دکان</h2></div>
@@ -111,13 +121,10 @@
             <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
             <ul id="recent-list" class="rail products"></ul>
           </section>
-          <div class="toolbar section">
-            <form id="search-form" class="search" role="search">
-              <label for="q" class="sr-only" data-t="s.label">جست‌وجوی کالا در این دکان</label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
-              <input id="q" type="search" data-tp="s.ph" placeholder="جست‌وجوی کالا در همین دکان…" autocomplete="off" enterkeyhint="search" maxlength="60">
-            </form>
-            <div id="cats" class="chips" role="group" data-ta="a.cats" aria-label="دسته‌ها"></div>
+          <div class="cat-head section">
+            <p id="cat-count" class="muted" role="status"></p>
+            <label class="sort"><span data-t="sort.l">مرتب‌سازی</span>
+              <select id="sort"><option value="" data-t="sort.az">الفبا</option><option value="price" data-t="sort.low">ارزان‌ترین</option><option value="-price" data-t="sort.high">گران‌ترین</option><option value="new" data-t="sort.new">تازه‌ترین</option></select></label>
           </div>
           <details id="filters" class="filters section" hidden>
             <summary><span data-t="fl.title">فیلتر</span> <span id="fl-count" class="pill plain"></span></summary>
@@ -193,6 +200,7 @@
                   </details>
                   <label class="field" id="tender-row" hidden><span data-t="ck.tender.l">با کدام اسکناس پرداخت می‌کنید؟ (اختیاری، تا پیک پول خرد بیاورد)</span><select id="d-tender"></select></label>
                 </div>
+                <div id="pickup-place" hidden></div>
                 <div id="slot-box" class="stack" hidden>
                   <label class="field"><span data-t="slot.l">زمانِ تحویل</span><select id="slot-pick"></select></label>
                   <div id="slot-msg" class="note" role="status" hidden></div>

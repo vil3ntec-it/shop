@@ -32,8 +32,9 @@
       $('fl-attr-l').hidden = !attrs.length;
       $('fl-price').hidden = !x.price;
       if (x.price) {
-        $('fl-min').placeholder = String(Math.floor(x.price.minMinor / 100));
-        $('fl-max').placeholder = String(Math.ceil(x.price.maxMinor / 100));
+        //  رقمِ همان زبانِ صفحه (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۹)؛ خواندن هر دو رقم را می‌پذیرد (`afn`)
+        $('fl-min').placeholder = K.fa(Math.floor(x.price.minMinor / 100), 0);
+        $('fl-max').placeholder = K.fa(Math.ceil(x.price.maxMinor / 100), 0);
       }
       $('fl-stock-l').hidden = !x.inStock;
       $('filters').hidden = !(brands.length || attrs.length || x.price || x.inStock);
@@ -41,7 +42,7 @@
     function afn(id) {
       var v = String($(id).value || '').trim();
       if (!v) return null;
-      var n = Number(v.replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); }));
+      var n = Number(v.replace(/[٬,\s]/g, '').replace(/[۰-۹]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); }));
       return Number.isSafeInteger(n) && n >= 0 && n <= 1000000000 ? n * 100 : NaN;
     }
     function apply(e) {

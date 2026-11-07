@@ -93,6 +93,20 @@ async function publicView(sf) {
   return out;
 }
 
+/**
+ * لوگوی جاریِ چند دکان برای کارتِ بازارچه (WEB-01، ممیزیِ ۱۴۰۵/۰۸/۱۷ مشکلِ ۵): `[{ id, slug }]` ⇒ Map(shopId ⇒ نشانی)؛
+ * فقط دکانِ پرچم‌روشن با لوگو (همان قاعدهٔ `publicView`).
+ */
+async function logoUrls(list) {
+  const on = [];
+  for (const x of list) if (await flagOn(x.id)) on.push(x);
+  if (!on.length) return new Map();
+  const rows = await many(
+    `SELECT shop_id, version FROM storefront_media WHERE kind = 'logo' AND current AND shop_id = ANY($1::text[])`, [on.map((x) => x.id)]);
+  const slug = new Map(on.map((x) => [x.id, x.slug]));
+  return new Map(rows.map((r) => [r.shop_id, `/api/store/${encodeURIComponent(slug.get(r.shop_id))}/media/logo/${Number(r.version)}`]));
+}
+
 /** بارگذاری: نسخهٔ تازه ⇒ جاری. همان محتوای نسخهٔ جاری ⇒ همان، بی ردیفِ تازه. */
 async function put(shopId, kind, buf, userId) {
   const { clean, info, hash } = check(kind, buf);
@@ -133,4 +147,4 @@ async function file(shopId, kind, version, { onlyCurrent = false } = {}) {
   return r ? { mime: r.mime, hash: r.hash, data: Buffer.from(r.data) } : null;
 }
 
-module.exports = { FLAG_KEY, SPECS, KINDS, MIMES, MAX_BYTES, flagOn, kindOf, check, staffView, publicView, put, remove, file };
+module.exports = { FLAG_KEY, SPECS, KINDS, MIMES, MAX_BYTES, flagOn, kindOf, check, staffView, publicView, logoUrls, put, remove, file };

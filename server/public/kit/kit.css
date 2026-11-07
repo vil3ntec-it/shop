@@ -378,6 +378,9 @@ html[data-i18n="wait"] body { visibility: hidden; }
 .shop-card .top { display: flex; align-items: flex-start; gap: var(--s4); }
 .shop-card .cover { flex: none; width: 84px; height: 84px; border-radius: var(--r-card); overflow: hidden; display: grid; place-items: center; background: var(--surface-2); }
 .shop-card .cover.tile { padding: 6px; background: var(--tile); }
+.shop-card .cover.logo { border: 1px solid var(--divider); background: var(--surface); }
+.shop-card .cover img { width: 100%; height: 100%; object-fit: cover; }
+.shop-card .cover.tile img { object-fit: contain; }
 .shop-card .cover .avatar { width: 84px; height: 84px; border-radius: var(--r-card); font-size: 32px; }
 .shop-card .grow { padding-top: 2px; }
 .shop-card h3 { font-size: 17px; line-height: 1.5; }

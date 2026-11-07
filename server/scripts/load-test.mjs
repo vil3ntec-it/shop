@@ -6,6 +6,8 @@
  *   node scripts/load-test.mjs --db … --profile soak --soak 600              # ثانیه (پیش‌فرض ۳۰۰)
  *   node scripts/load-test.mjs --db … --profile overload             # PERF-04: استخرِ ۲ اتصال زیرِ ۴ برابرِ بار
  *   node scripts/load-test.mjs --profile smoke --no-budget            # PGlite در حافظه، چند ثانیه
+ *   node scripts/load-test.mjs --db … --profile knee,knee-store --steps 1,2,3,4,6   # نقطهٔ شکست: پله‌های ۲۰ثانیه‌ای
+ *   node scripts/load-test.mjs --db … --profile knee --instances 2   # دو نمونهٔ سرور روی همان پایگاه (CLUSTER_ENABLED=1)
  *   … --rate 40 --shops 20 --devices 3 --scale 0.1 --json out.json
  *
  * ⛔ پایگاه داده را **پاک می‌کند** (`resetDatabase`ِ آزمون‌ها): فقط `pglite:memory`/`pglite:<پوشه>`
@@ -45,6 +47,12 @@ const JSON_OUT = arg('--json', '');
 const BUDGET_ON = !has('--no-budget');
 const QUIET = has('--quiet');
 const SEED = Number(arg('--seed', 20261102));
+//  knee: ضریب‌های `--rate` برای پله‌های پیاپی (هر پله `--duration` یا ۲۰ ثانیه)
+const STEPS = arg('--steps', '1,1.5,2,2.5,3,4,5').split(',').map(Number).filter((x) => Number.isFinite(x) && x > 0);
+//  چند نمونهٔ سرور روی **همان** پایگاه (نخستین می‌کارد، بقیه فقط بالا می‌آیند)؛ بار به نوبت میانشان پخش می‌شود.
+//  بیش از یکی ⇒ `CLUSTER_ENABLED=1` (سقفِ نرخِ مشترک، گذرگاهِ LISTEN/NOTIFY، کارگرِ تک‌رهبر) مگر `--no-cluster`
+const INSTANCES = Math.max(1, Math.min(8, Number(arg('--instances', 1)) || 1));
+const CLUSTER = INSTANCES > 1 && !has('--no-cluster');
 //  opهای v3 ِ پیشینِ دکانِ بزرگ (هر دکانِ کوچک ۱۵۰) — pull و push روی دفترِ پر
 const HISTORY = Number(arg('--history', Math.round(60000 * Math.max(SCALE, 0.02))));
 
@@ -78,6 +86,8 @@ const MIX = Object.freeze({
 });
 //  پس از «قطعِ سراسری»: دستگاه‌ها با صفِ پر برمی‌گردند (§۹.۳ بندِ ۹، §۱۵.۹ بندِ ۲)
 const BURST_MIX = Object.freeze({ ...MIX, 'sync3.push': 30, 'sync3.pull': 30 });
+//  فقط سمتِ مشتری (ویترین): «میلیون‌ها مشتری» همین آمیزه است — بی همگام‌سازی، میز و ورود
+const STORE_MIX = Object.freeze({ 'store.home': 6, 'store.products': 16, 'store.search': 12, 'store.product': 14, 'store.checkout': 4, 'store.track': 6 });
 const sec = (d) => (DURATION ?? d);
 const PROFILE_DEFS = {
   smoke: () => ({ phases: [{ sec: sec(3), rps: RATE }], sampleSec: 1 }),
@@ -87,6 +97,9 @@ const PROFILE_DEFS = {
   soak: () => ({ phases: [{ sec: SOAK_SEC, rps: RATE }], sampleSec: 5, gcEverySec: 60, soak: true }),
   //  PERF-04: استخرِ ۲ اتصال و مهلتِ اتصالِ ۱ ثانیه زیرِ ۴ برابرِ بار — رفتارِ کنترل‌شده می‌خواهیم، نه سرعت
   overload: () => ({ serverEnv: { PG_POOL_MAX: 2, PG_CONNECT_TIMEOUT_MS: 1000 }, phases: [{ sec: sec(15), rps: RATE * 4 }], overload: true }),
+  //  نقطهٔ شکست: پله‌های پیاپی بی مکث؛ هر پله جدا گزارش می‌شود و «زانو» = آخرین پلهٔ سبز (بودجهٔ کلی سنجیده نمی‌شود)
+  knee: () => ({ phases: STEPS.map((k) => ({ sec: sec(20), rps: RATE * k })), knee: true }),
+  'knee-store': () => ({ phases: STEPS.map((k) => ({ sec: sec(20), rps: RATE * k, mix: STORE_MIX })), knee: true }),
 };
 for (const p of PROFILES) if (!PROFILE_DEFS[p]) { console.error(`نمایهٔ ناشناخته: ${p} (${Object.keys(PROFILE_DEFS).join('، ')})`); process.exit(2); }
 
@@ -111,6 +124,8 @@ function summarize(xs) {
 
 // ── ثبتِ درخواست‌ها ──
 let base = '';
+let bases = [];   //  `--instances`: نشانیِ هر نمونه؛ هر درخواست به نوبت
+let baseRR = 0;
 let rec = null;   //  نمایهٔ در حالِ اجرا؛ null ⇒ گرم‌کردن (ثبت نمی‌شود)
 function newRec(name) {
   return { name, t0: performance.now(), ends: 0, by: new Map(), timeline: [], dropped: 0, scheduled: 0, lagMaxMs: 0, recovery: null };
@@ -122,16 +137,17 @@ function record(label, ms, status, err, bytes, startedAt) {
   e.lat.push(ms);
   //  زمانِ **آغازِ** درخواست: پنجره بر پایهٔ پایان، کُندهای جامانده پس از پایانِ بار را در پنجرهٔ آخر جمع می‌کرد
   e.at.push((startedAt - rec.t0) / 1000);
+  (e.phase ||= []).push(rec.phase || 0);
   const code = err || String(status);
   e.codes[code] = (e.codes[code] || 0) + 1;
-  if (err || status < 200 || status >= 300) e.errors++;
+  if (err || status < 200 || status >= 300) { e.errors++; (e.errAt ||= []).push(rec.phase || 0); }
   e.bytes += bytes;
 }
 async function hit(label, method, p, { token, body, headers = {} } = {}) {
   const t0 = performance.now();
   let status = 0, err = '', json = null, bytes = 0, text = '';
   try {
-    const res = await fetch(base + p, {
+    const res = await fetch((bases.length > 1 ? bases[(baseRR++) % bases.length] : base) + p, {
       method,
       headers: { 'Content-Type': 'application/json', 'X-App': 'shop', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -290,13 +306,14 @@ const SCENARIO = {
 const inflight = new Set();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 function launch(fn) {
-  if (inflight.size >= MAX_INFLIGHT) { if (rec) rec.dropped++; return; }
+  if (inflight.size >= MAX_INFLIGHT) { if (rec) { rec.dropped++; (rec.droppedBy ||= {})[rec.phase || 0] = ((rec.droppedBy || {})[rec.phase || 0] || 0) + 1; } return; }
   const p = Promise.resolve().then(fn).catch((e) => { if (rec) rec.generatorErrors = (rec.generatorErrors || 0) + 1, rec.generatorError ||= String(e && e.stack || e); });
   inflight.add(p);
   p.finally(() => inflight.delete(p));
 }
 async function runPhases(phases) {
-  for (const ph of phases) {
+  for (const [pi, ph] of phases.entries()) {
+    if (rec) rec.phase = pi;
     const next = weighted(ph.mix || MIX);
     if (ph.stampede) for (const d of devices) launch(async () => { if (d.busy) return; d.busy = true; try { await push(d, true, 'sync3.pushLarge'); await pull(d); } finally { d.busy = false; } });
     const t0 = performance.now();
@@ -338,6 +355,7 @@ function report(r, server) {
     driftBy[label] = drift.map((w) => { const x = summarize(ws[w.fromSec / win] || []); return [x.p50 ?? null, x.p95 ?? null]; });
   }
   const gcd = server.filter((s) => s.gc);
+  const knee = r.phases ? kneeOf(r) : null;
   const out = {
     profile: r.name, durationSec: r1(durSec), scheduled: r.scheduled, dropped: r.dropped, generatorLagMaxMs: r1(r.lagMaxMs),
     ...(r.noTicket ? { noTicket: r.noTicket } : {}), ...(r.generatorErrors ? { generatorErrors: r.generatorErrors, generatorError: r.generatorError } : {}),
@@ -356,11 +374,56 @@ function report(r, server) {
       loopMaxMs: Math.max(...server.map((s) => s.loopMaxMs)), cpuMaxPct: Math.max(...server.map((s) => s.cpuPct)),
     },
     ...(r.recovery ? { recovery: r.recovery } : {}),
+    ...(knee ? { steps: knee.steps, knee: knee.knee } : {}),
   };
   return out;
 }
+/*
+ *  knee: هر پله جدا. «سبز» = بی خطا و p95 ِ هر مسیر ≤ بودجه — جز دو استثنای شناخته‌شدهٔ همیشگی (ورود با
+ *  scrypt ِ p=5 و push ِ بزرگ ِ ۲۰۰ تا ۵۰۰ op، PERF-LOAD «مانده» ۱ و ۲) که جدا نشان داده می‌شوند.
+ */
+const KNEE_EXEMPT = new Set(['auth.login', 'sync3.pushLarge']);
+const KNEE_GROUPS = Object.freeze({
+  'store.read': ['store.home', 'store.products', 'store.search', 'store.product'],
+  'store.checkout': ['store.checkout'], 'store.track': ['store.track'], 'sync3.push': ['sync3.push'], 'sync3.pull': ['sync3.pull'],
+  desk: ['desk.list', 'desk.summary'], 'auth.refresh': ['auth.refresh'], 'auth.login': ['auth.login'], 'sync3.pushLarge': ['sync3.pushLarge'],
+});
+function kneeOf(r) {
+  const steps = r.phases.map((ph, pi) => {
+    const by = {};
+    let all = [], errors = 0, exemptErrors = 0, worst = 0, worstLabel = '';
+    for (const [label, e] of r.by.entries()) {
+      const xs = [];
+      let errs = 0;
+      e.phase.forEach((p, i) => {
+        if (p !== pi) return;
+        xs.push(e.lat[i]);
+      });
+      if (e.errAt) e.errAt.forEach((p) => { if (p === pi) errs++; });
+      by[label] = { ...summarize(xs), errors: errs };
+      all = all.concat(xs);
+      if (KNEE_EXEMPT.has(label)) { exemptErrors += errs; continue; }
+      errors += errs;
+      if (xs.length && by[label].p95 > worst) { worst = by[label].p95; worstLabel = label; }
+    }
+    const groups = {};
+    for (const [g, labels] of Object.entries(KNEE_GROUPS)) {
+      const xs = [];
+      for (const l of labels) { const e = r.by.get(l); if (e) e.phase.forEach((p, i) => { if (p === pi) xs.push(e.lat[i]); }); }
+      if (xs.length) { const s = summarize(xs); groups[g] = { n: s.n, rps: r1(s.n / ph.sec), p95: s.p95 }; }
+    }
+    const t = summarize(all);
+    const dropped = (r.droppedBy && r.droppedBy[pi]) || 0;
+    return { offeredRps: ph.rps, rps: r1(t.n / ph.sec), n: t.n, p50: t.p50, p95: t.p95, p99: t.p99, errors, exemptErrors, dropped,
+      worst: { label: worstLabel, p95: worst }, ok: errors === 0 && dropped === 0 && worst <= BUDGET.p95Ms, groups };
+  });
+  let knee = null;
+  for (const st of steps) { if (!st.ok) break; knee = st; }
+  return { steps, knee: knee ? { offeredRps: knee.offeredRps, rps: knee.rps, groups: knee.groups } : null };
+}
 function evaluate(o, def) {
   const fails = [];
+  if (def.knee) return fails;   //  نتیجه همان «زانو» است، نه سبز/سرخ
   const heap = o.server;
   const heapLimit = heap.heapAfterGcStartMB != null ? heap.heapAfterGcStartMB + Math.max(BUDGET.heapGrowthMB, heap.heapAfterGcStartMB * BUDGET.heapGrowthPct / 100) : null;
   const heapCheck = () => {
@@ -399,6 +462,14 @@ function print(o, fails) {
   console.log(`  سرور: RSS ≤ ${s.rssMaxMB}MB، heap ≤ ${s.heapMaxMB}MB، heap پس از GC ${s.heapAfterGcStartMB} ⇐ ${s.heapAfterGcEndMB}MB، CPU ≤ ${s.cpuMaxPct}%، حلقهٔ رویداد ≤ ${s.loopMaxMs}ms، استخر ≤ ${s.poolTotalMax} اتصال، صفِ انتظار ≤ ${s.poolWaitingMax}، اتصالِ پشتِ قفل ≤ ${s.pgLockWaitMax}، idle-in-tx ≤ ${s.pgIdleInTxMax}، دروازهٔ push: منتظر ≤ ${s.gateWaitingMax}، در کار ≤ ${s.gateInflightMax}`);
   if (o.drift.length > 1) console.log(`  p95 در هر ${o.windowSec}s: ${o.drift.map((w) => w.p95).join(' ')}`);
   if (o.recovery) console.log(`  بازگشت: ${o.recovery.ok ? '✅' : '❌'} ${o.recovery.detail}`);
+  if (o.steps) {
+    console.log(`  پله‌ها (خواسته ⇒ رسیده/s، p95 ِ همه، بدترین مسیر، خطا [+استثنا]، جاافتاده؛ p95 ِ گروه‌ها):`);
+    for (const st of o.steps) {
+      const g = Object.entries(st.groups).map(([k, v]) => `${k} ${v.rps}/s ${v.p95}`).join('، ');
+      console.log(`   ${st.ok ? '✅' : '❌'} ${pad(st.offeredRps, 5)} ⇒ ${pad(st.rps, 6)}/s  p95 ${pad(st.p95, 7)}  ${st.worst.label} ${st.worst.p95}  خطا ${st.errors}${st.exemptErrors ? ` [+${st.exemptErrors}]` : ''}  جاافتاده ${st.dropped}  | ${g}`);
+    }
+    console.log(o.knee ? `  زانو: ${o.knee.offeredRps}/s خواسته (${o.knee.rps}/s رسیده)` : '  زانو: حتی نخستین پله سبز نبود');
+  }
   if (BUDGET_ON) console.log(fails.length ? `  ❌ بودجه:\n    - ${fails.join('\n    - ')}` : '  ✅ همهٔ بودجه‌ها');
 }
 
@@ -419,7 +490,8 @@ const result = {
   at: new Date().toISOString(),
   env: { cpu: os.cpus()[0]?.model, cores: os.cpus().length, memGB: Math.round(os.totalmem() / 2 ** 30), os: `${os.platform()} ${os.release()}`, node: process.version,
     driver: /^pglite:/i.test(DB) ? 'pglite' : 'postgres', loadAvg: os.loadavg().map(r1) },
-  options: { rate: RATE, shops: SHOPS, devices: DEVICES, scale: SCALE, smallScale: SMALL_SCALE, history: HISTORY, timeoutMs: TIMEOUT, seed: SEED, warmupSec: WARMUP },
+  options: { rate: RATE, shops: SHOPS, devices: DEVICES, scale: SCALE, smallScale: SMALL_SCALE, history: HISTORY, timeoutMs: TIMEOUT, seed: SEED, warmupSec: WARMUP,
+    instances: INSTANCES, cluster: CLUSTER, steps: STEPS },
   budget: BUDGET, setups: [], profiles: [],
 };
 const genLoop = monitorEventLoopDelay({ resolution: 10 });
@@ -429,10 +501,16 @@ let failed = false, invalid = false;
 for (const defs of groups.values()) {
   const checkoutShopsN = Math.min(SHOPS, 4);
   const phonesPerShop = Math.max(3, Math.ceil((plannedCheckouts(defs) * 1.3 + checkoutShopsN * 4) / checkoutShopsN / 9));
-  const srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv: defs[0].serverEnv || {} });
+  const serverEnv = { ...(CLUSTER ? { CLUSTER_ENABLED: 1 } : {}), ...(defs[0].serverEnv || {}) };
+  const srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv });
   const tReady = performance.now();
   const ready = await srv.ready;
   base = ready.base;
+  //  `--instances`: نمونه‌های دیگر پس از کاشتن، روی همان پایگاه (بی پاک کردن و بی کاشتن)
+  const followers = [];
+  for (let i = 1; i < INSTANCES; i++) followers.push(startServer({ db: DB, follower: true, serverEnv }));
+  bases = [base, ...(await Promise.all(followers.map((f) => f.ready))).map((m) => m.base)];
+  const servers = [srv, ...followers];
   shops = ready.shops;
   checkoutShops = shops.slice(0, checkoutShopsN);
   for (const sh of checkoutShops) for (const t of sh.tickets) t.used = 0;
@@ -481,12 +559,17 @@ for (const defs of groups.values()) {
   for (const def of defs) {
     await sleep(1000);
     const samples = [];
-    const sampleOnce = async (gc) => { const m = await srv.ask({ type: 'stats', gc }); samples.push({ t: rec ? r1((performance.now() - rec.t0) / 1000) : 0, ...m.stats }); };
-    await srv.ask({ type: 'stats' });   //  پنجرهٔ CPU/حلقه از همین لحظه
+    const sampleOnce = async (gc) => {
+      const t = rec ? r1((performance.now() - rec.t0) / 1000) : 0;
+      const ms = await Promise.all(servers.map((x) => x.ask({ type: 'stats', gc })));
+      ms.forEach((m, inst) => samples.push({ t, ...(servers.length > 1 ? { inst } : {}), ...m.stats }));
+    };
+    await Promise.all(servers.map((x) => x.ask({ type: 'stats' })));   //  پنجرهٔ CPU/حلقه از همین لحظه
     genLoop.reset();
     const loadStart = os.loadavg().map(r1);
     rec = newRec(def.name);
     rec.soak = !!def.soak;
+    if (def.knee) rec.phases = def.phases;
     await sampleOnce(true);
     let lastGc = performance.now();
     const timer = setInterval(() => {
@@ -526,14 +609,16 @@ for (const defs of groups.values()) {
     const fails = evaluate(o, def);
     o.budgetFails = fails;
     //  در `overload` جاافتادن خودش نتیجه است (سقفِ درخواستِ باز پر شد چون سرور پس نمی‌زند)، نه اشباعِ بارساز
-    if (!def.overload && o.dropped > o.scheduled * 0.01) { invalid = true; fails.push(`بارساز اشباع شد: ${o.dropped} از ${o.scheduled} درخواست جا افتاد (عدد معتبر نیست)`); }
+    if (!def.overload && !def.knee && o.dropped > o.scheduled * 0.01) { invalid = true; fails.push(`بارساز اشباع شد: ${o.dropped} از ${o.scheduled} درخواست جا افتاد (عدد معتبر نیست)`); }
     if (fails.length) failed = true;
     result.profiles.push(o);
     print(o, fails);
     if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));
   }
-  srv.child.removeAllListeners('exit');
-  await new Promise((resolve) => { srv.child.once('exit', resolve); srv.child.send({ type: 'stop' }); setTimeout(() => { srv.child.kill('SIGKILL'); resolve(); }, 15000).unref(); });
+  for (const x of [...followers, srv]) {
+    x.child.removeAllListeners('exit');
+    await new Promise((resolve) => { x.child.once('exit', resolve); x.child.send({ type: 'stop' }); setTimeout(() => { x.child.kill('SIGKILL'); resolve(); }, 15000).unref(); });
+  }
 }
 
 if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));

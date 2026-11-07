@@ -62,8 +62,8 @@ function canTransition(from, to, { confirmedLate = false } = {}) {
   return to === 'paid' && confirmedLate && LATE_PAID_FROM.includes(from);
 }
 
-const bus = new EventEmitter();
-bus.setMaxListeners(0);
+const bus = new EventEmitter().setMaxListeners(0);
+require('./cluster').subscribe('pay-intent', (d) => { if (d.id) setImmediate(() => bus.emit(String(d.id))); });   //  CLUSTER_ENABLED: بیدارباشِ `nudge` ِ نمونه‌های دیگر
 
 // ════════════════════════════════════════════════════════════════════
 //  پرچم و پیکربندی
@@ -139,7 +139,7 @@ function view(r) {
 //  گذار (compare-and-set) و اثرش روی سفارش
 // ════════════════════════════════════════════════════════════════════
 
-const nudge = (id) => setImmediate(() => bus.emit(id));
+const nudge = (id) => { require('./cluster').publish('pay-intent', { id: String(id) }); setImmediate(() => bus.emit(id)); };
 
 /**
  * گذارِ قصد درونِ تراکنشِ `c`. `from` همان وضعیتی است که خوانده شد؛ اگر دیگر نیست null برمی‌گردد

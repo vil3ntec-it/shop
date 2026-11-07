@@ -33,6 +33,7 @@
 | سرور | `server/` | Node 22 + Express روی PostgreSQL یا PGlite (`DATABASE_URL=pglite:<پوشه>`)؛ ۱۱۳ پروندهٔ مسیر، ۲۸۱ پروندهٔ `lib`، ۱۵۴ مهاجرت | فعال؛ `api.vill3n.top` (سرورِ خانگی پشتِ تونل) |
 | ویترینِ وب (خریدِ مشتری) | `server/public/store` + `server/public/kit` | JS ِ بی‌چارچوب، CSP ِ سخت | فعال |
 | بازارچه | `server/public/market` | فهرستِ دکان‌ها (`market.js`) | فعال |
+| برنامهٔ خریدِ مشتری (اندروید؛ آیفون از همان کد در مرحلهٔ ۲) | `customer-android/` + `core/src/commonMain/.../core/shopper` | Compose؛ کارخواهِ تایپ‌شدهٔ همان درهای ویترین/بازارچه، سبدِ روی دستگاه، ثبت با کلیدِ یکتایی، پیگیری (O-04 «ب»، مرحلهٔ ۱) | فقط ساختِ debug در CI (کارِ «برنامهٔ خریدِ مشتری (گزارش)»)؛ بستهٔ `ir.vil3ntec.tohid.customer`؛ بی امضا و بی انتشار |
 | پورتال، رسید، SDK | `server/public/portal`، `receipt`، `sdk` | حذفِ حساب، رسیدِ عمومی، API برای دیگران | فعال |
 | پنلِ وبِ مدیرِ سکو | `server/public/admin` + برنامهٔ `admin-android/` | پرچم‌ها، انتشار، عملیات، پشتیبانی | نگه‌داری؛ پنلِ مرکزیِ تازهٔ مالک در ریپوی جدای `vil3ntec-it/server` (`homelab-panel`) |
 | وبِ مدیریتِ دکان (PWA ِ قدیم) | `index.html`، `license/*`، `sw.js` | — | **منجمد** از ۱۴۰۵/۰۷/۲۷ (STATUS، یادداشت‌ها): نه حذف، نه قابلیتِ تازه؛ سقفِ اندازه‌اش در `tools/quality` |
@@ -191,6 +192,11 @@ gradle -p core jvmTest --no-daemon
 gradle -p desktop test --no-daemon -Pdev=true -Pkotlin.compiler.execution.strategy=in-process
 cd android-native && gradle --no-daemon testReleaseUnitTest assembleRelease   # همان CI؛ اینترنت (dl.google.com) می‌خواهد
 
+# ── برنامهٔ خریدِ مشتری ───────────────────────────────
+gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.shopper.*'   # کارخواه، سبد، ثبت، پیگیری، نوشته‌ها (بی سرور)
+(cd server && TEST_DATABASE_URL=pglite:memory node test/shopper-live.mjs)  # همان کارخواه روی سرورِ واقعی (ShopperLiveTest)
+cd customer-android && gradle --no-daemon testDebugUnitTest assembleDebug  # اینترنت (dl.google.com) می‌خواهد؛ فقط debug
+
 # ── آیفون (لینوکس، فقط klib) ─────────────────────────
 desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پیوند و Xcode فقط روی macOS (CI)
 ```
@@ -229,7 +235,7 @@ desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پی
 | `server.yml` «سرور» | push/PR | کارهای `pg` (PostgreSQL)، `pglite`، `electron` (سرور زیرِ Electron)، `browser` (پنل، وب، ویترین، بازارچه)، `e2e` (سناریوهای سرتاسری)؛ کارِ جمع «آزمون‌های سرور» فقط وقتی همه سبزند سبز است | **سد** |
 | `quality.yml` «کیفیتِ کد» | هر PR و push به main | سقف‌ها، ESLint، «تازه‌ها»، پوشش ⇐ گزارش؛ **شمارهٔ مهاجرت** و **قاعده‌های دسترسیِ عامل‌ها** (`tools/ai-access`) | دو گامِ سد، بقیه گزارش |
 | `spec.yml` «مشخصاتِ جامع» | تغییرِ `docs/spec/**` | `spec.mjs check` | **سد** |
-| `tohid-native.yml` «توحید بومی» | تغییرِ `android-native/**`، `core/**`، `docs/WHATS-NEW-fa.md` (PR) | آزمون‌های واحد + `:core:jvmTest`، APK، دروازه‌های APK و `artifact-gate`، AAB ِ Play (`tools/play-check.py`)؛ روی main انتشارِ beta | **سد** (ساخت) |
+| `tohid-native.yml` «توحید بومی» | تغییرِ `android-native/**`، `core/**`، `docs/WHATS-NEW-fa.md` (PR)؛ `customer-android/**` فقط در PR | آزمون‌های واحد + `:core:jvmTest`، APK، دروازه‌های APK و `artifact-gate`، AAB ِ Play (`tools/play-check.py`)؛ روی main انتشارِ beta. کارِ جدای «برنامهٔ خریدِ مشتری (گزارش)»: `testDebugUnitTest assembleDebug` ِ `customer-android` و `server/test/shopper-live.mjs` | **سد** (ساخت)؛ کارِ مشتری **گزارش** (`continue-on-error`) |
 | `tohid-native-preview.yml` | push به main + PR | APK ِ بستهٔ `ir.vil3ntec.tohid.preview` ⇐ برچسبِ `tohid-native-preview` | **سد** |
 | `tohid-desktop.yml` «فروشگاه من — کامپیوتر» | `desktop/**`، `android-native/app/src/**`، `core/**`، `install.ps1` | کامپایل و آزمون، دیسکِ ویندوز، نصاب‌ها، انتشارِ beta | **سد** |
 | `tohid-admin.yml` «توحید مدیریت» | `admin-android` | ساخت و انتشار ⇐ برچسبِ `tohid-admin` | سد |
@@ -306,7 +312,7 @@ BROKEN ۰ ⇒ حدودِ ۷۱٪** (V = ۱، P = ۰٫۵). PRهای باز (§۶.�
 | PCK جمع‌آوری | ۱۴ | ۱۱ / ۳ / ۰ / ۰ / ۰ | PCK-05، 07، 11 | `core/.../core/pick`؛ `lib/pick-*.js`، `order-picking.js` |
 | CHK ثبتِ سفارشِ ویترین | ۲۴ | ۱۲ / ۱۱ / ۰ / ۰ / ۱ | CHK-02 کدِ ورودِ واقعی (D-09)؛ CHK-15/16 (PR ‏#955 باز)؛ CHK-01، 03، 08، 09، 10، 14، 18، 20 | `server/public/store/{checkout,pay-step,store}.js`؛ `lib/storefront-*.js`، `store-cart.js` |
 | WEB ویترین | ۲۵ | ۱۲ / ۱۱ / ۰ / ۰ / ۲ | WEB-21 تلگرام و WEB-22 واتس‌اپ (حسابِ بیرونی، D-09)؛ WEB-09، 15، 16، 17 | `server/public/{store,kit}`؛ `lib/storefront*.js`، `store-seo.js` |
-| MKT بازاریابی | ۱۲ | ۳ / ۲ / ۶ / ۰ / ۱ | MKT-03…08 ساخته نشده‌اند (سبدِ رهاشده، برگرداندنِ مشتری، گروه‌بندی، خریدِ دوباره، معرفی، سفارشِ تکرارشونده)؛ بازاریابی تعویق دارد (O-04) | `core/.../core/{marketing,market}`؛ `lib/market-*.js`، `campaigns.js`، `storefront-promos.js`؛ `server/public/market` |
+| MKT بازاریابی | ۱۲ | ۳ / ۲ / ۶ / ۰ / ۱ | MKT-03…08 ساخته نشده‌اند (سبدِ رهاشده، برگرداندنِ مشتری، گروه‌بندی، خریدِ دوباره، معرفی، سفارشِ تکرارشونده)؛ O-04 «ب» (۱۴۰۵/۰۸/۱۶): پایهٔ برنامهٔ خرید (مرحلهٔ ۱، `customer-android`) هست، این ردیف‌ها روی حساب و Push ِ مرحلهٔ ۲ | `core/.../core/{marketing,market}`؛ `lib/market-*.js`، `campaigns.js`، `storefront-promos.js`؛ `server/public/market` |
 | CHAT گفت‌وگو | ۱۵ | ۴ / ۱۱ / ۰ / ۰ / ۰ | همه PARTIAL ِ P2: رابطِ نسخهٔ ۳ و شاهدِ CI | `core/.../core/chat`؛ `lib/shop-chat*.js`، `chat-*.js`؛ `store/chat.js` |
 | HW سخت‌افزار | ۱۳ | ۲ / ۱۱ / ۰ / ۰ / ۰ | چاپِ حرارتی، صفِ چاپ، کشو (HW-01…03)، ترازو و دستگاه‌ها روی دستگاهِ واقعی؛ HW-08؛ PR ‏#952 باز | `core/.../core/{hw,terminal,nfc}`، `android-native/.../{hw,print,scan}`؛ `docs/RULES-fa.md` «چاپگر و بارکدخوان» |
 | SEC امنیت | ۱۱ | ۶ / ۴ / ۱ / ۰ / ۰ | SEC-08 کلیدِ امضای تازه (D-02، کارِ صاحب‌کار)؛ SEC-01 رمزِ دفترِ دستگاه پیش‌فرض خاموش؛ SEC-10 حذفِ دادهٔ مشتری پشتِ پرچم | `core/.../core/{audit,keys}`؛ `lib/{hash-chain,doc-chain,totp,reauth}.js`؛ `docs/security/*.md` |

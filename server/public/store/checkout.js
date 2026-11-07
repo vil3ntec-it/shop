@@ -261,6 +261,10 @@
       $('t-total').textContent = K.money(sub - disc + fee);
       if (!(f === 'delivery' && c.zones() && !c.zone)) renderTender(f, sub - disc + fee); else renderTender('', 0);
       $('address-box').hidden = f !== 'delivery';
+      //  CHK-11 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۶): «دریافت از دکان» ⇒ نشانی و «مسیر روی نقشه» ِ دکان (`K.place`؛ نبود ⇒ هیچ)
+      var place = f === 'pickup' && K.place(c.store);
+      $('pickup-place').hidden = !place;
+      if (place && !$('pickup-place').firstChild) $('pickup-place').appendChild(place);
       $('addr-extra').hidden = !c.store.addressExtra;
       var min = c.minFor(f);
       var below = min > sub;
