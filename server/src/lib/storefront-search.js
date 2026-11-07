@@ -127,7 +127,7 @@ async function miss({ shopId, raw, cat, lim, contactPhone, decorate }) {
       params.push(cat);
       where += ` AND r.data->>'category' = $${params.length}`;
     }
-    const rows = await require('../db').many(
+    const rows = await require('./read-replica').many(
       `SELECT ${sf.PRODUCT_COLS} FROM ${sf.PRODUCT_FROM} WHERE ${where}
         ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT ${FUZZY_SCAN}`,
       params
@@ -159,7 +159,11 @@ async function plan(shopId, raw, cat, { categories, normalize, SQL_NAME }) {
   const smart = raw ? await enabled(shopId) : false;
   const jump = smart && !cat ? categoryOf(raw, await categories(shopId)) : '';
   const base = jump ? '' : normalize(raw);
-  return { smart, jump, needle: smart && base ? needle(base) : base, name: smart ? sqlName(SQL_NAME) : SQL_NAME };
+  const n = smart && base ? needle(base) : base;
+  //  نمایهٔ سه‌حرفیِ ۲۲۶ روی همان `SQL_NAME` است. واژهٔ بی [0-9.,] با `sqlName` و بی آن **یک** نتیجه دارد:
+  //  `translate` فقط رقمِ فارسی/عربی و «٫٬» را به [0-9.,] می‌برد (هم‌طول، بی حذف) و واژه هیچ‌کدام را ندارد ⇒
+  //  هر جای جور در نامِ ترجمه‌شده همان نویسه‌های نامِ پیشین است و وارونه. پس فقط واژهٔ رقم‌دار `sqlName` می‌خواهد.
+  return { smart, jump, needle: n, name: smart && /[0-9.,]/.test(n) ? sqlName(SQL_NAME) : SQL_NAME };
 }
 
 /** پس از پرس‌وجو: پرچمِ خاموش ⇒ همان صفحه؛ وگرنه `match` (دسته، دقیق) یا «بی نتیجه» ِ `miss`. */

@@ -94,6 +94,7 @@ async function main() {
     cluster.stopJobs();
     await cluster.stop().catch(() => {});
     server.close(async () => {
+      await require('./lib/read-replica').stop();
       await closeDb();
       console.log('خاموش شد.');
       process.exit(0);

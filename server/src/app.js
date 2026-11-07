@@ -18,6 +18,8 @@ async function createApp({ runMigrations = true } = {}) {
   if (config.trustProxy) app.set('trust proxy', (addr) => require('./middleware/ratelimit').trustedPeer(addr));
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
+  //  نسخهٔ خواندنی: سنجشِ زنده‌بودن و تأخیر از همین حالا (بی `DATABASE_REPLICA_URL` هیچ)
+  require('./lib/read-replica').start();
   await plans.seedDefaults();
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
@@ -214,6 +216,9 @@ async function createApp({ runMigrations = true } = {}) {
   // ---- API ----
   function apiRouter() {
     const api = express.Router();
+    //  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش ⇒ فقط `next()`): هر درخواستِ نوشتنی ⇒ خواندن‌های
+    //  همان مشتری/کاربر تا `REPLICA_STICKY_MS` از پایگاهِ اصلی (`lib/read-replica.js`)
+    api.use(require('./lib/read-replica').writes);
     api.get('/health', health);
     api.get('/ready', ready);
 

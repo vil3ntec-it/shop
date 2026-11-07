@@ -22,6 +22,10 @@
  *      هر ردیف را با «ادعا»ی اتمی برمی‌دارند (`UPDATE … WHERE status … RETURNING`، `ON CONFLICT DO NOTHING`،
  *      قفلِ advisory ِ هر کار) ⇒ هم‌پوشانیِ کوتاهِ دو رهبر در جابه‌جایی کارِ دوباره نمی‌سازد.
  *
+ *   ۳) **نبضِ نمونه** (مهاجرتِ ۲۲۷، `cluster_instances`) — هر `CLUSTER_HEARTBEAT_MS` یک ردیف: آخرین تپش، «رهبرم؟» و
+ *      برشِ `job-beat` ِ همین نمونه ⇒ پنلِ مرکزی ۴.۹ همهٔ نمونه‌ها، رهبر و کارگرهای رهبر را از هر نمونه‌ای می‌بیند
+ *      (`ops-overview.clusterView`). خطای نوشتنِ تپش فقط لاگ می‌شود و هیچ چیزِ دیگری را نمی‌خواباند.
+ *
  * ⛔ هیچ رازی، توکنی یا دادهٔ مشتری در خبر نمی‌رود — فقط شناسه‌ها (حساب، گفت‌وگو) و شمارنده‌ها.
  */
 const os = require('node:os');
@@ -33,6 +37,9 @@ const CHANNEL = 'shop_cluster';
 /** کلیدِ دوبخشیِ قفلِ رهبر: «shop» و ۱ — با `hashtext` ِ کارهای دیگر برخورد ندارد (آن‌ها کلیدِ تک‌بخشی‌اند) */
 const LEADER_LOCK = [0x73686f70, 1];
 const MAX_PAYLOAD = 7900;
+/** ردیفِ نمونه‌ای که این‌قدر تپش نداشته (مرده، بی خاموشیِ تمیز) را رهبر برمی‌دارد */
+const INSTANCE_PRUNE_MS = 10 * 60_000;
+const startedAt = Date.now();
 
 const instanceId = config.cluster.instanceId
   || `${os.hostname().slice(0, 32)}-${process.pid}-${crypto.randomBytes(3).toString('hex')}`;
@@ -42,7 +49,7 @@ const resyncs = new Set();    //  fn() پس از وصلِ دوبارهٔ شنو�
 const jobList = [];           //  [{ name, start, stop, on }]
 const state = {
   started: false, stopping: false, listening: false, leader: false, leaderSince: 0,
-  published: 0, received: 0, dropped: 0, reconnects: 0, elections: 0,
+  published: 0, received: 0, dropped: 0, reconnects: 0, elections: 0, beats: 0, beatFails: 0,
 };
 let listenClient = null;
 let leaderClient = null;
@@ -50,6 +57,9 @@ let listenTimer = null;
 let leaderTimer = null;
 let beatTimer = null;
 let listenBeat = null;
+let rowTimer = null;
+let rowWriting = null;
+let rowAgain = false;
 
 function enabled() { return Boolean(config.cluster.enabled) && !db.isPglite(); }
 
@@ -150,6 +160,32 @@ function startJobs() {
     if (j.on) continue;
     try { j.state = j.start(); j.on = true; } catch (err) { console.error(`[cluster] کارگرِ ${j.name}:`, err.message); }
   }
+  if (enabled() && state.started) writeBeat();
+}
+
+// ── نبضِ نمونه (`cluster_instances`) ──────────────────────────────────────────
+/** ردیفِ همین نمونه، تازه؛ هم‌زمان فقط یکی. رهبر ردیف‌های مرده را هم برمی‌دارد. */
+function writeBeat() {
+  //  در حینِ نوشتن (مثلاً رهبری همین حالا عوض شد) ⇒ یک بارِ دیگر پس از آن، با حالتِ تازه
+  if (rowWriting) { rowAgain = true; return rowWriting; }
+  const t = Date.now();
+  let version = '';
+  try { version = String(require('../../package.json').version || ''); } catch { /* بی‌اهمیت */ }
+  rowWriting = db.query(
+    `INSERT INTO cluster_instances (instance_id, started_at, beat_at, leader, leader_since, version, jobs)
+     VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb)
+     ON CONFLICT (instance_id) DO UPDATE SET beat_at = EXCLUDED.beat_at, leader = EXCLUDED.leader,
+       leader_since = EXCLUDED.leader_since, version = EXCLUDED.version, jobs = EXCLUDED.jobs`,
+    [instanceId, startedAt, t, state.leader, state.leaderSince || null, version.slice(0, 40),
+      JSON.stringify(require('./job-beat').snapshot(t))]
+  ).then(() => (state.leader ? db.query('DELETE FROM cluster_instances WHERE beat_at < $1', [t - INSTANCE_PRUNE_MS]) : null))
+    .then(() => { state.beats++; })
+    .catch((err) => { state.beatFails++; console.error('[cluster] تپشِ نمونه نوشته نشد:', err.message); })
+    .finally(() => {
+      rowWriting = null;
+      if (rowAgain && !state.stopping) { rowAgain = false; writeBeat(); }
+    });
+  return rowWriting;
 }
 function stopJobs() {
   for (const j of jobList) {
@@ -164,6 +200,7 @@ function stepDown(why) {
     state.leader = false;
     state.leaderSince = 0;
     stopJobs();
+    if (enabled() && state.started && !state.stopping) writeBeat();
   }
 }
 async function elect() {
@@ -229,6 +266,9 @@ async function start() {
   state.stopping = false;
   await listen();
   await elect();
+  await writeBeat();
+  rowTimer = setInterval(writeBeat, config.cluster.heartbeatMs);
+  if (rowTimer.unref) rowTimer.unref();
   return true;
 }
 
@@ -238,9 +278,17 @@ async function stop() {
   clearTimeout(leaderTimer);
   clearInterval(beatTimer);
   clearInterval(listenBeat);
+  clearInterval(rowTimer);
   beatTimer = null;
   listenBeat = null;
+  rowTimer = null;
   stepDown('خاموش شدن');
+  //  خاموشیِ تمیز ⇒ پنل این نمونه را «رفته» می‌بیند، نه «کهنه»
+  if (state.started) {
+    await rowWriting;
+    await db.query('DELETE FROM cluster_instances WHERE instance_id = $1', [instanceId])
+      .catch((err) => console.error('[cluster] ردیفِ نمونه پاک نشد:', err.message));
+  }
   const cs = [listenClient, leaderClient].filter(Boolean);
   listenClient = null;
   leaderClient = null;
@@ -253,4 +301,6 @@ function stats() {
   return { enabled: enabled(), instanceId, ...state, jobs: jobList.filter((j) => j.on).map((j) => j.name) };
 }
 
-module.exports = { enabled, runsJobs, subscribe, onResync, publish, jobs, stopJobs, start, stop, stats, instanceId, CHANNEL };
+module.exports = {
+  enabled, runsJobs, subscribe, onResync, publish, jobs, stopJobs, start, stop, stats, writeBeat, instanceId, CHANNEL, LEADER_LOCK,
+};
