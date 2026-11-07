@@ -105,7 +105,8 @@ async function seedDefaults() {
     for (const p of DEFAULT_PLANS) {
       await query(
         `INSERT INTO plans (id,code,title,amount,unit,price_afn,negotiable,features,max_devices,badge,sort_order,active,created_at,updated_at,app)
-         VALUES ($1,$2,$3,$4,$5,$6,false,'[]'::jsonb,10,$7,$8,true,$9,$9,$10)`,
+         VALUES ($1,$2,$3,$4,$5,$6,false,'[]'::jsonb,10,$7,$8,true,$9,$9,$10)
+         ON CONFLICT DO NOTHING`,   //  دو نمونهٔ خوشه که هم‌زمان روی پایگاهِ تازه بالا می‌آیند (`CLUSTER_ENABLED`)
         [newId('plan'), p.code, p.title, p.amount, p.unit, p.price, p.badge, p.sort, t, app]
       );
     }

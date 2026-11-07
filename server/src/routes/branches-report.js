@@ -18,7 +18,8 @@ router.use(rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'branches-report
 router.use(requireUser, requireShop);
 router.use(rateLimit({ max: 20, windowMs: 60 * 1000, keyPrefix: 'branches-report', key: (req) => req.user && req.user.id }));
 
-router.get('/', async (req, res) => {
+//  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش): دفترِ بازه (`owner-report` ⇐ `lib/read-replica.js`)
+router.get('/', require('../lib/read-replica').reads, async (req, res) => {
   res.set('Cache-Control', 'private, no-store');
   res.json(await br.reportFor(req.user.id, req.member, req.query || {}));
 });

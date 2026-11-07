@@ -4,7 +4,8 @@
  *
  * همان `createApp` ِ آزمون‌ها (`helpers.start({ reset: false })`: پدر پایگاه را ساخته)، همان سوکتِ زنده و
  * همان فهرستِ کارگرهای `src/index.js` (`src/workers.js`) از راهِ `cluster.jobs`، با `CLUSTER_ENABLED=1`.
- * پدر با IPC می‌پرسد: حالِ خوشه (رهبر؟ کدام کارگرها؟) و long-poll ِ چت (صبر این‌جا، بیدارباش از نمونهٔ دیگر).
+ * پدر با IPC می‌پرسد: حالِ خوشه (رهبر؟ کدام کارگرها؟)، پاسخِ سلامتِ پنل (نمای خوشه) و long-poll ِ چت (صبر این‌جا،
+ * بیدارباش از نمونهٔ دیگر).
  */
 const h = require('../helpers');
 const config = require('../../src/config');
@@ -25,6 +26,8 @@ process.on('disconnect', () => process.exit(0));
     let out;
     try {
       if (m.type === 'stats') out = cluster.stats();
+      //  پنلِ مرکزی ۴.۹: همان پاسخِ `GET /api/admin/ops/health` (نمای خوشه، کارهای رهبر)
+      else if (m.type === 'health') out = await require('../../src/lib/ops-overview').health();
       else if (m.type === 'chatWait') {
         const t0 = Date.now();
         const w = chatWait.listen(m.conv, m.ms);

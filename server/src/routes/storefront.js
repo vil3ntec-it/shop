@@ -39,6 +39,7 @@ const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
+const { reads: replicaReads } = require('../lib/read-replica');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
@@ -206,7 +207,8 @@ router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (
   res.json(await areas.withdraw(req.store, req.verifiedPhone));
 });
 
-router.get('/:slug/products', readLimit, store, async (req, res) => {
+//  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش): فقط کاتالوگ/دسته/جست‌وجوی همین مسیر (`lib/read-replica.js`)
+router.get('/:slug/products', readLimit, store, replicaReads, async (req, res) => {
   const out = req.query.ids !== undefined
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {

@@ -34,7 +34,7 @@
  */
 const crypto = require('crypto');
 const db = require('../db');
-const { one, many, now } = db;
+const { one, many, now } = db, rr = require('./read-replica');   //  نسخهٔ خواندنی (پیش‌فرض خاموش): فقط کاتالوگ و دسته‌های عمومی
 const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
@@ -229,7 +229,7 @@ const PRODUCT_FROM = `storefront_products sp
 const sfc = require('./storefront-catalog')({ SHOP_ROWS, PRODUCT_FROM, NOT_HIDDEN, PRODUCT_ID_RE, MAX_PRICE_MINOR, MAX_QTY_MILLI, obj, int, bool, text, isActive, priceOf });   //  S1 و M2 (شرح همان‌جا)
 
 async function categories(shopId) {
-  const rows = await many(
+  const rows = await rr.many(
     `SELECT DISTINCT r.data->>'category' AS c FROM ${await sfc.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''
       ORDER BY 1 LIMIT 60`,
@@ -262,7 +262,7 @@ async function catalog(shopId, { q, category, cursor, limit, sort, contactPhone 
   const pg = browse.pageOf(sort, cursor, params, lim);
   const limAt = params.push(lim + 1);
   const tail = pg.offset ? ` OFFSET $${params.push(pg.offset)}` : '';
-  const rows = await many(
+  const rows = await rr.many(
     `SELECT ${PRODUCT_COLS} FROM ${from} WHERE ${where}${pg.where}
       ORDER BY ${pg.order}COALESCE(r.data->>'name', ''), r.row_id LIMIT $${limAt}${tail}`,
     params

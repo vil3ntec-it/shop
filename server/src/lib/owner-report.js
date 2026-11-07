@@ -25,6 +25,8 @@
  */
 const config = require('../config');
 const { query, one, many, now } = require('../db');
+//  دفترِ بازه از نسخهٔ خواندنی فقط وقتی مسیر داوطلب است (`GET /api/shop/branches-report`)؛ کارگرِ گزارش همان اصلی
+const replicaQuery = require('./read-replica').query;
 const { ulid } = require('./ulid');
 const { badRequest, conflict } = require('../middleware/errors');
 const R = require('./report-core');
@@ -194,7 +196,7 @@ const CREATED = "(CASE WHEN data->>'createdAt' ~ '^[0-9]{1,15}$' THEN (data->>'c
 const TABLE_SQL = Object.freeze({ sales: "'sales'", saleItems: "'saleItems'", returns: "'returns'", products: "'products'" });
 
 async function rowsInWindow(T0, table, shopId, w) {
-  return (await query(
+  return (await replicaQuery(
     `SELECT row_id, data, deleted_at FROM ${T0}
       WHERE ${ACC} AND table_name=${TABLE_SQL[table]}
         AND ((${CREATED} >= $2 AND ${CREATED} < $3) OR (${CREATED} = 0 AND data->>'date' >= $4 AND data->>'date' <= $5))
@@ -206,7 +208,7 @@ async function rowsInWindow(T0, table, shopId, w) {
 async function rowsById(T0, table, shopId, ids, bySale = false) {
   if (!ids.length) return [];
   const where = bySale ? "data->>'saleId' = ANY($2::text[])" : 'row_id = ANY($2::text[])';
-  return (await query(
+  return (await replicaQuery(
     `SELECT row_id, data, deleted_at FROM ${T0} WHERE ${ACC} AND table_name=${TABLE_SQL[table]} AND ${where}
       ORDER BY row_id LIMIT ${MAX_ROWS + 1}`,
     [shopId, ids]

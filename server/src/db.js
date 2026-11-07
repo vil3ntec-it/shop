@@ -45,10 +45,10 @@ let shuttingDown = false;
 
 // ── PostgreSQL ──────────────────────────────────────────────────────────────
 
-/** گزینه‌های هر استخرِ PostgreSQL — استخرِ اصلی و استخرهای کوچکِ کمکی ([extraPool]) */
-function poolOptions(max) {
+/** گزینه‌های هر استخرِ PostgreSQL — استخرِ اصلی، استخرهای کوچکِ کمکی ([extraPool]) و استخرِ نسخهٔ خواندنی */
+function poolOptions(max, url = config.db.url) {
   return {
-    connectionString: config.db.url,
+    connectionString: url,
     max,
     idleTimeoutMillis: config.db.idleTimeoutMs,
     connectionTimeoutMillis: config.db.connectTimeoutMs,
@@ -87,6 +87,24 @@ function getPool() {
 let lite = null;
 let litePromise = null;
 const txStore = new AsyncLocalStorage();
+//  «درونِ تراکنشِ PostgreSQL» — فقط برای `inTransaction()` (خواندن از نسخهٔ خواندنی هرگز درونِ تراکنش نیست)
+const pgTxStore = new AsyncLocalStorage();
+
+/**
+ * دامنهٔ «خواندنِ مجاز از نسخهٔ خواندنی» (`lib/read-replica.js`): مسیرِ GET ِ داوطلب آن را باز می‌کند و
+ * هر نوشتن یا تراکنشی در همان درخواست `wrote` را روشن می‌کند ⇒ خواندن‌های بعدی همان درخواست از پایگاهِ اصلی.
+ * بیرون از این دامنه (همهٔ کد جز همان چند مسیر) هیچ چیزی عوض نمی‌شود.
+ */
+const readScope = new AsyncLocalStorage();
+//  فقط SELECT ِ ساده «خواندن» است؛ قفل، شمارنده، advisory، NOTIFY و set_config نوشتن به حساب می‌آیند
+const READ_ONLY_RE = /^\s*select\b/i;
+const NOT_PURE_READ_RE = /\bfor\s+(update|share|no\s+key\s+update|key\s+share)\b|\b(nextval|setval|pg_advisory\w*|pg_try_advisory\w*|pg_notify|set_config)\s*\(/i;
+function noteStatement(text) {
+  const s = readScope.getStore();
+  if (!s || s.wrote) return;
+  const t = String(text || '');
+  if (!READ_ONLY_RE.test(t) || NOT_PURE_READ_RE.test(t)) s.wrote = true;
+}
 
 async function getLite() {
   if (lite) return lite;
@@ -151,6 +169,7 @@ function litePool() {
 
 /** اجرای یک کوئری پارامتری. */
 async function query(text, params = []) {
+  noteStatement(text);
   if (isPglite()) {
     const inTx = txStore.getStore();
     return liteQuery(inTx || await getLite(), text, params);
@@ -175,6 +194,8 @@ async function many(text, params = []) {
  * اگر هر بخشی شکست بخورد، همه‌چیز برمی‌گردد و دیتابیس نیمه‌کاره نمی‌ماند.
  */
 async function tx(fn) {
+  const scope = readScope.getStore();
+  if (scope) scope.wrote = true;
   if (isPglite()) {
     const db = await getLite();
     return db.transaction((t) => {
@@ -185,7 +206,7 @@ async function tx(fn) {
   const client = await admit(getPool()).connect();
   try {
     await client.query('BEGIN');
-    const out = await fn(client);
+    const out = await pgTxStore.run(true, () => fn(client));
     await client.query('COMMIT');
     return out;
   } catch (err) {
@@ -195,6 +216,9 @@ async function tx(fn) {
     client.release();
   }
 }
+
+/** آیا همین کد درونِ `tx()` اجرا می‌شود (هر دو راه‌انداز). */
+function inTransaction() { return Boolean(txStore.getStore() || pgTxStore.getStore()); }
 
 async function healthy() {
   try {
@@ -254,15 +278,15 @@ async function pruneExpired() {
  * استخرِ کوچکِ جدا (مثلاً برای قفلِ نشستی که تا پایانِ یک درخواست می‌ماند) تا اتصالِ استخرِ
  * اصلی گرفته نماند. فقط PostgreSQL؛ روی PGlite null. با `closeDb` بسته نمی‌شود — `allowExitOnIdle`.
  */
-function extraPool(max) {
+function extraPool(max, url = config.db.url) {
   if (isPglite()) return null;
   const { Pool } = require('pg');
-  const p = new Pool(poolOptions(max));
+  const p = new Pool(poolOptions(max, url));
   p.on('error', (err) => console.error('[db] اتصالِ بیکارِ استخرِ کمکی خطا داد:', err.message));
   return p;
 }
 
 module.exports = {
   getPool, extraPool, query, one, many, tx, healthy, closeDb, newId, now, pruneExpired,
-  isPglite, pgliteDir, driverName, dumpPglite,
+  isPglite, pgliteDir, driverName, dumpPglite, inTransaction, readScope,
 };

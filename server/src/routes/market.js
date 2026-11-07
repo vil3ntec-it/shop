@@ -22,6 +22,8 @@ const sf = require('../lib/storefront');
 const customers = require('../lib/store-customers');
 const audit = require('../lib/audit');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
+//  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش): خانه و جست‌وجوی بازار (`lib/read-replica.js`)
+const { reads: replicaReads } = require('../lib/read-replica');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const views = require('../lib/public-views');
@@ -56,12 +58,12 @@ router.get('/shops', readLimit, on, async (req, res) => {
 });
 
 //  خانه: قفسهٔ دکان‌ها، «پرفروش» و «ارزان‌تر» ِ واقعی؛ `only=lists` ⇒ فقط دو فهرست
-router.get('/products', feedBurst, readLimit, on, async (req, res) => {
+router.get('/products', feedBurst, readLimit, on, replicaReads, async (req, res) => {
   const { category, lat, lng, limit, only } = req.query;
   res.json(await market.feed({ category, lat, lng, limit, only }));
 });
 
-router.get('/search', searchBurst, searchLimit, on, async (req, res) => {
+router.get('/search', searchBurst, searchLimit, on, replicaReads, async (req, res) => {
   const { q, lat, lng, limit } = req.query;
   res.json(await market.search({ q, lat, lng, limit }));
 });
