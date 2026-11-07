@@ -765,7 +765,7 @@ object WarehouseEngine {
     if (left < 0) {
       return Result.Failed("این تغییر موجودی را منفی می‌کند: ${money(-left)} واحد از این ورودی فروخته شده است")
     }
-
+    if (PurchaseBook.fixedEntry(d, existing, draft.productId, draft.units)) return Result.Failed(PurchaseBook.PURCHASE_ENTRY) // PUR-05: انقضا و یادداشت آزاد
     val updated = existing.copy(
       productId = draft.productId,
       cartons = draft.cartons,
@@ -806,7 +806,7 @@ object WarehouseEngine {
    */
   fun deleteEntry(d: ShopData, id: String, today: String, now: Long, newId: () -> String): Result {
     val entry = d.warehouseEntries.find { it.id == id } ?: return Result.Failed("ورودی پیدا نشد")
-
+    if (PurchaseBook.fixedEntry(d, entry)) return Result.Failed(PurchaseBook.PURCHASE_ENTRY) // PUR-05: ورودِ خرید/سندِ کسر
     val after = ShopStore.stock(d, entry.productId) - entry.units
     if (after < 0) {
       val shortage = -after

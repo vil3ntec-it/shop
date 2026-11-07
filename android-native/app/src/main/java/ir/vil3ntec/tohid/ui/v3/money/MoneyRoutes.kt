@@ -221,19 +221,21 @@ val MoneyModule = AppModule(
     V3Route("purchasing/suppliers/{id}/return", RouteKind.SHEET, { StrReach.supplierReturn }, parent = "purchasing/suppliers/{id}", chrome = Chrome.OWN) { SupplierReturnRoute() },
     V3Route("purchasing/new", RouteKind.PAGE, { StrMoney.newPurchase }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val context = LocalContext.current
+      //  PUR-05: یک کلید برای همین فرم — دو لمسِ «ثبت» پیش از بسته شدن یک خرید است (`PurchaseBook.record(key)`)
+      val saveKey = remember { moneyId() }
       PurchaseFormScreen(
         d = data,
         supplierArg = args.query("supplier"),
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
         onSave = { draft ->
-          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId), StrMoney.purchaseSaved) != null
+          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
         },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)
         onSaveMany = { supplierId, lines, paid, date, notes ->
           MoneyWriter.purchase(
             store, toasts, context,
-            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId),
+            ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = saveKey),
             StrMoney.purchaseSaved,
           ) != null
         },
@@ -448,12 +450,14 @@ private fun RouteScope.PayRoute() {
   val id = args["id"].orEmpty()
   val supplier = data.suppliers.find { it.id == id }
   if (supplier == null) { LandOn(MoneyPaths.PURCHASING); return }
+  //  PUR-07: یک کلید برای همین برگه — دو لمسِ «ثبتِ پرداخت» پیش از بسته شدن یک پرداخت است
+  val payKey = remember(id) { moneyId() }
   SupplierPaySheet(
     supplier = supplier,
     debt = ir.vil3ntec.tohid.data.ShopStore.supplierDebt(data, id),
     onClose = { back() },
     onSave = { f ->
-      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId)
+      val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = payKey)
       MoneyWriter.ledger(store, toasts, context, result, StrMoney.saved) != null
     },
     onSaved = { back() },
