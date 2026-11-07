@@ -43,6 +43,7 @@
  */
 const { tx, one, newId, now } = require('../db');
 const audit = require('./audit');
+const imgStore = require('./image-store');
 const S = require('./order-states');
 const v = require('./validate');
 const { flagOf } = require('./orders');
@@ -160,8 +161,10 @@ class DryRun extends Error {
 async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' } = {}) {
   const erasureId = newId('era');
   const placeholder = ERASED_PREFIX + erasureId;
+  //  شیءهای عکس‌های پاک‌شده (انبارِ عکس، `lib/image-store.js`) فقط پس از نشستنِ تراکنش پاک می‌شوند
+  const gone = [];
   try {
-    return await tx(async (c) => {
+    const res = await tx(async (c) => {
       const t = await resolveTarget(c, shopId, target);
       const orders = (await c.query(
         `SELECT id, status FROM online_orders
@@ -179,6 +182,11 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       const at = now();
       const counts = Object.fromEntries(COUNT_KEYS.map((k) => [k, 0]));
       const q = async (sql, params) => (await c.query(sql, params)).rows.length;
+      const qk = async (sql, params) => {
+        const { rows } = await c.query(sql, params);
+        gone.push(...rows.map((r) => r.store_key));
+        return rows.length;
+      };
 
       if (orderIds.length) {
         counts.orders = await q(
@@ -198,8 +206,8 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         );
         counts.orderEvents = await scrubEvents(c, 'online_order_events', shopId, orderIds);
         counts.deliveryEvents = await scrubEvents(c, 'delivery_events', shopId, orderIds);
-        counts.deliveryPhotos = await q('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING id', [shopId, orderIds]);
-        counts.pickPhotos = await q('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING id', [shopId, orderIds]);
+        counts.deliveryPhotos = await qk('DELETE FROM delivery_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
+        counts.pickPhotos = await qk('DELETE FROM order_pick_photos WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING store_key', [shopId, orderIds]);
         counts.deliveryLocations = await q(
           `DELETE FROM delivery_locations WHERE shop_id=$1 AND assignment_id IN (
              SELECT id FROM delivery_assignments WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING assignment_id`,
@@ -212,9 +220,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
           [shopId, orderIds, at]
         );
         if (await has(c, 'order_issues')) {
-          counts.issuePhotos = await q(
+          counts.issuePhotos = await qk(
             `DELETE FROM order_issue_photos WHERE shop_id=$1 AND issue_id IN (
-               SELECT id FROM order_issues WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING id`, [shopId, orderIds]);
+               SELECT id FROM order_issues WHERE shop_id=$1 AND order_id = ANY($2::text[])) RETURNING store_key`, [shopId, orderIds]);
           counts.issues = await q(
             `UPDATE order_issues SET body='', reply='' WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND (body <> '' OR reply <> '') RETURNING id`,
             [shopId, orderIds]);
@@ -287,6 +295,8 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       });
       return { ...out, erasureId };
     });
+    await imgStore.drop(imgStore.shopTenant(shopId), gone);
+    return res;
   } catch (err) {
     if (err instanceof DryRun) return err.out;
     throw err;

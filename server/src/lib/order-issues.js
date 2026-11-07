@@ -23,6 +23,7 @@ const orders = require('./orders');
 const { ulid } = require('./ulid');
 const bytes = require('./image-bytes');
 const chatMedia = require('./chat-media');
+const imgStore = require('./image-store');
 const { MAX_BYTES } = require('./product-photos');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
@@ -160,7 +161,8 @@ async function addPhoto(store, token, issueId, body) {
   const iid = String(issueId || '');
   if (!ID_RE.test(iid)) throw notFound('گزارش پیدا نشد', 'issue_not_found');
   const p = parsePhoto(body);
-  return db.tx(async (c) => {
+  //  بایت در `data` یا انبارِ شیء (`lib/image-store.js`)؛ تکرار یا رد ⇒ شیءِ آماده همان دم پاک
+  return imgStore.withStaged(imgStore.shopTenant(store.shop_id), p.data, (s) => db.tx(async (c) => {
     const run = (sql, args) => c.query(sql, args);
     const issue = (await run('SELECT id, status FROM order_issues WHERE id=$1 AND order_id=$2 AND shop_id=$3 FOR UPDATE',
       [iid, orderId, store.shop_id])).rows[0];
@@ -170,12 +172,13 @@ async function addPhoto(store, token, issueId, body) {
     if (issue.status !== 'open') throw conflict('این گزارش بسته شده است', 'issue_closed');
     if ((await photoCount(run, iid)) >= MAX_PHOTOS) throw conflict(`حداکثر ${MAX_PHOTOS} عکس برای هر گزارش`, 'too_many_photos');
     const at = now();
+    s.used = true;
     const row = (await run(
-      `INSERT INTO order_issue_photos (id, shop_id, issue_id, mime, size, width, height, hash, data, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10) RETURNING id, mime, size, width, height, created_at`,
-      [ulid(at), store.shop_id, iid, p.mime, p.data.length, p.width, p.height, p.hash, p.data, at])).rows[0];
+      `INSERT INTO order_issue_photos (id, shop_id, issue_id, mime, size, width, height, hash, data, store_key, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$11,$10) RETURNING id, mime, size, width, height, created_at`,
+      [ulid(at), store.shop_id, iid, p.mime, p.data.length, p.width, p.height, p.hash, s.data, at, s.key])).rows[0];
     return { photo: photoView(row), replayed: false };
-  });
+  }));
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -225,9 +228,10 @@ async function photoOf(shopId, issueId, photoId) {
   const iid = String(issueId || '');
   const pid = String(photoId || '');
   if (!ID_RE.test(iid) || !ID_RE.test(pid)) throw notFound('عکس پیدا نشد', 'photo_not_found');
-  const r = await db.one('SELECT id, mime, data FROM order_issue_photos WHERE shop_id=$1 AND issue_id=$2 AND id=$3', [shopId, iid, pid]);
-  if (!r) throw notFound('عکس پیدا نشد', 'photo_not_found');
-  return { id: r.id, kind: 'image', mime: r.mime, data: Buffer.from(r.data) };
+  const r = await db.one('SELECT id, mime, data, store_key FROM order_issue_photos WHERE shop_id=$1 AND issue_id=$2 AND id=$3', [shopId, iid, pid]);
+  const data = await imgStore.bytes(imgStore.shopTenant(shopId), r);
+  if (!data) throw notFound('عکس پیدا نشد', 'photo_not_found');
+  return { id: r.id, kind: 'image', mime: r.mime, data };
 }
 
 /** «رسیدگی شد» با پاسخ ⇒ `{issue, unchanged}`؛ همان پاسخ دوباره بی‌اثر، پاسخِ دیگر ⇒ ۴۰۹. */

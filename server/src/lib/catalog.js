@@ -503,7 +503,7 @@ async function productsOf(shopId, ids) {
   if (!ids.length) return new Map();
   const rows = (await query(
     `SELECT cp.*, EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app='shop' AND ph.account_id=cp.shop_id
-                            AND ph.product_id=cp.product_id AND ph.data IS NOT NULL) AS has_photo
+                            AND ph.product_id=cp.product_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS has_photo
        FROM catalog_products cp WHERE cp.shop_id=$1 AND cp.product_id = ANY($2::text[])`, [shopId, ids]
   )).rows;
   return new Map(rows.map((r) => [r.product_id, r]));

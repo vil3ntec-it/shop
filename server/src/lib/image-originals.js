@@ -19,6 +19,7 @@ const crypto = require('crypto');
 const { now } = require('../db');
 const bytes = require('./image-bytes');
 const quality = require('./image-quality');
+const store = require('./image-store');
 const { ApiError, badRequest } = require('../middleware/errors');
 
 const MIN_SIDE = 300;            // کوچک‌تر ⇒ نشانِ «too_small» برای بازبین
@@ -44,24 +45,35 @@ function checkOriginal(buf, max, withQuality = false) {
   return { info, flags: [...flags, ...q.flags], metrics: q.metrics, dhash: q.dhash || '-' };
 }
 
-/** `dhash`: '' = هنوز سنجیده نشده (پیش‌فرضِ ستون)، '-' = سنجیده ولی بی هش. */
+/**
+ * `dhash`: '' = هنوز سنجیده نشده (پیش‌فرضِ ستون)، '-' = سنجیده ولی بی هش. بایت در `data` یا انبارِ شیء
+ * (`lib/image-store.js`)؛ در حالتِ شیء بلابِ موجود دوباره فرستاده نمی‌شود.
+ */
 async function putBlob(c, buf, info, dhash = '') {
   const hash = sha256(buf);
-  await c.query(
-    `INSERT INTO image_blobs (hash, mime, size, width, height, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (hash) DO NOTHING`,
-    [hash, info.mime, buf.length, info.width, info.height, buf, now()]
-  );
+  const had = store.objectMode() && (await c.query('SELECT 1 FROM image_blobs WHERE hash=$1', [hash])).rows.length > 0;
+  if (!had) {
+    await store.withStaged(store.BLOBS, buf, async (s) => {
+      const r = await c.query(
+        `INSERT INTO image_blobs (hash, mime, size, width, height, data, store_key, created_at)
+         VALUES ($1,$2,$3,$4,$5,$6,$8,$7) ON CONFLICT (hash) DO NOTHING RETURNING hash`,
+        [hash, info.mime, buf.length, info.width, info.height, s.data, now(), s.key]
+      );
+      s.used = r.rows.length > 0;
+    });
+  }
   if (dhash) await c.query(`UPDATE image_blobs SET dhash=$2 WHERE hash=$1 AND dhash=''`, [hash, dhash]);
   return hash;
 }
 
 /** dHash ِ بلاب؛ بلابِ پیش از روشن شدنِ پرچم (دسته‌ای، پیشنهاد) همین‌جا یک بار سنجیده می‌شود. */
 async function blobHash(c, hash) {
-  const b = (await c.query('SELECT dhash, data, mime, width, height FROM image_blobs WHERE hash=$1', [hash])).rows[0];
+  const b = (await c.query('SELECT dhash, data, store_key, mime, width, height FROM image_blobs WHERE hash=$1', [hash])).rows[0];
   if (!b) return '-';
   if (b.dhash) return b.dhash;
-  const dh = quality.analyze(Buffer.from(b.data), { mime: b.mime, width: b.width, height: b.height }).dhash || '-';
+  const buf = await store.bytes(store.BLOBS, b);
+  if (!buf) return '-';
+  const dh = quality.analyze(buf, { mime: b.mime, width: b.width, height: b.height }).dhash || '-';
   await c.query(`UPDATE image_blobs SET dhash=$2 WHERE hash=$1 AND dhash=''`, [hash, dh]);
   return dh;
 }
@@ -100,4 +112,10 @@ const nearOut = (r) => {
   return v.length ? v : undefined;
 };
 
-module.exports = { checkOriginal, putBlob, near, saveNear, nearOut, tooLarge, sha256, MIN_SIDE };
+/** ردیفِ `image_blobs` (`data`، `store_key`، `mime`، `hash`) ⇒ `{data, mime, hash}` از پایگاه یا انبار — یا null. */
+async function blobFile(r) {
+  const data = await store.bytes(store.BLOBS, r);
+  return data ? { data, mime: r.mime, hash: r.hash } : null;
+}
+
+module.exports = { checkOriginal, putBlob, blobFile, near, saveNear, nearOut, tooLarge, sha256, MIN_SIDE };

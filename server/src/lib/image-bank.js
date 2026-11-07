@@ -192,11 +192,11 @@ async function putDerivative(c, img, version, size, buf) {
 
 async function readFile(imageId, version, size) {
   const r = size === 'original'
-    ? await one(`SELECT b.data, b.mime, b.hash FROM image_versions v JOIN image_blobs b ON b.hash=v.blob_hash
+    ? await one(`SELECT b.data, b.store_key, b.mime, b.hash FROM image_versions v JOIN image_blobs b ON b.hash=v.blob_hash
                   WHERE v.image_id=$1 AND v.version=$2`, [imageId, version])
-    : await one(`SELECT b.data, b.mime, b.hash FROM image_derivatives d JOIN image_blobs b ON b.hash=d.blob_hash
+    : await one(`SELECT b.data, b.store_key, b.mime, b.hash FROM image_derivatives d JOIN image_blobs b ON b.hash=d.blob_hash
                   WHERE d.image_id=$1 AND d.version=$2 AND d.size=$3`, [imageId, version, size]);
-  return r ? { data: Buffer.from(r.data), mime: r.mime, hash: r.hash } : null;
+  return QS.blobFile(r);
 }
 
 async function imageRow(id) {
@@ -607,7 +607,7 @@ async function resolve(shopId, productId, base = '') {
   if (!row) {
     //  رفتارِ امروز: عکسِ همگام‌شدهٔ ۰۴۵ — هیچ عکسِ مرکزی خودکار نمی‌نشیند
     const legacy = await one(
-      `SELECT hash FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND data IS NOT NULL`, [shopId, pid]);
+      `SELECT hash FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND ${photos.HAS}`, [shopId, pid]);
     return legacy
       ? { product_id: pid, source: 'legacy_photo', hash: legacy.hash, url: `/api/sync/v1/photos/${pid}`, placeholder: false }
       : { product_id: pid, source: 'none', placeholder: true };
