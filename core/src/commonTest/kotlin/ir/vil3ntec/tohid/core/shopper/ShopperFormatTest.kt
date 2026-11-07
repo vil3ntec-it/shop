@@ -46,6 +46,18 @@ class ShopperFormatTest {
     assertTrue(name in ShopperText.nothingFound(name))
   }
 
+  @Test fun dariErrorsAreWholeDariSentences() {
+    //  LOC-08 دورِ ۶: «دوباره بزنید»، «اینترنت را ببینید» و «مهلت» جملهٔ کاملِ دری می‌گیرند (`DariText.PHRASES`)؛ فارسی همان
+    ShopperText.lang = ShopperLang.PRS
+    assertEquals("اتصال برقرار نشد؛ انترنت را بررسی کنید و دوباره کوشش کنید.", ShopperText.error(ShopperError(0, ShopperError.NETWORK)))
+    assertEquals("میعادِ این کد ختم شده است؛ کدِ جدید بخواهید.", ShopperText.error(ShopperError(400, "otp_expired")))
+    assertEquals("خطا؛ دوباره کوشش کنید.", ShopperText.error(ShopperError(400, "brand_new_code")))
+    assertEquals("دوباره کوشش کنید", ShopperText.retry)
+    ShopperText.lang = ShopperLang.FA
+    assertEquals("اتصال برقرار نشد؛ اینترنت را ببینید و دوباره بزنید.", ShopperText.error(ShopperError(0, ShopperError.NETWORK)))
+    assertEquals("دوباره بزنید", ShopperText.retry)
+  }
+
   @Test fun errorsUseOwnWordsThenServerMessageThenGeneric() {
     ShopperText.lang = ShopperLang.EN
     assertEquals("No connection — check your internet and try again.", ShopperText.error(ShopperError(0, ShopperError.NETWORK)))

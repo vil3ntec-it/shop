@@ -199,7 +199,8 @@ object StrSettingsPages {
     " (from the setting; not enough orders yet)",
     " (له ترتیب څخه؛ لا کافي فرمایشونه نشته)",
   )
-  fun etaBusyNow(n: Any?): String = t(" · شلوغ: +${asIs(n)} دقیقه", " · Busy: +$n min", " · ګڼه‌ګوڼه: +$n دقیقې")
+  //  بی « · » ِ آغاز (آن را `StorefrontEtaApi.signalLine` می‌گذارد) تا متنِ فارسی کلیدِ جملهٔ کاملِ دری شود (`DariText.PHRASES`)
+  fun etaBusyNow(n: Any?): String = t("شلوغ: +${asIs(n)} دقیقه", "Busy: +$n min", "ګڼه‌ګوڼه: +$n دقیقې")
   fun etaCouriersNow(live: Any?, cap: Any?): String = t(
     " · پیک: ${asIs(live)} در راه از ${asIs(cap)}",
     " · Couriers: $live on the way of $cap",

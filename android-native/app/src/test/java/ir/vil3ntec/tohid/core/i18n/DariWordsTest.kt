@@ -169,10 +169,20 @@ class DariWordsTest {
     val all = rows()
     //  کلیدِ با `{}` همان متنِ دری‌شدهٔ ردیف است که هر مقدارِ asIs در آن `{}` شده (`DariText.shape`)
     val fa = all.map { it.fa }.toSet() + all.map { DariText.shape(it.faOfDari) }.toSet()
-    for (k in DariText.PHRASES.keys) assertTrue("عبارتِ «$k» دیگر در جدول‌ها نیست", k in fa)
+    //  دورِ ۶: همان لایه برنامهٔ خرید (`ShopperText`) و ویترینِ وب (`kit/dari.js` از همین PHRASES) را هم می‌گرداند؛
+    //  کلیدی که فقط آن‌جا زنده است هم پذیرفته است، ولی باز هر کلید باید جایی زنده باشد (کلیدِ مرده نه)
+    val shopper = DariSources.shopperTexts()
+    val web = DariSources.webTexts()
+    for (k in DariText.PHRASES.keys) assertTrue("عبارتِ «$k» دیگر در جدول‌ها، برنامهٔ خرید و ویترین نیست", k in fa || k in shopper || k in web)
     //  و هر جملهٔ کامل واقعاً در خروجیِ دری می‌نشیند (کلیدِ مرده یا جای خالیِ بی asIs نه)
     val used = all.filter { DariText.PHRASES.containsKey(it.fa) || DariText.PHRASES.containsKey(DariText.shape(it.faOfDari)) }
     for (r in used) assertTrue("${r.key}: جملهٔ کامل ننشست: «${r.outDari}»", r.outDari != r.outFa)
+    //  کلیدِ برنامهٔ خرید و وب با همان شمارِ مقدار (هر `{}` یک مقدارِ asIs) هم می‌نشیند
+    for (k in DariText.PHRASES.keys.filter { it !in fa }) {
+      var i = 0
+      val marked = k.split("{}").reduce { a, b -> a + DariText.protect("v${i++}") + b }
+      assertTrue("«$k»: جملهٔ کامل ننشست", DariText.of(marked) != DariText.strip(marked))
+    }
   }
 
   @Test fun `جملهٔ کاملِ دری عبارتِ جدولِ کامپیوتر را ندارد (کلید روی کامپیوتر هم همان است)`() {
@@ -290,5 +300,61 @@ class DariWordsTest {
     println("dari: $seen text placeholders checked")
     assertTrue("جای خالیِ متنی پیدا نشد", seen > 300)
     assertTrue("دادهٔ کاربر در دری عوض شد (asIs جا افتاده):\n" + bad.joinToString("\n"), bad.isEmpty())
+  }
+}
+
+/**
+ *  متن‌های دو جای دیگری که همان لایهٔ `DariText` را می‌گذرانند (دورِ ۶): برنامهٔ خرید (`ShopperText`) و ویترینِ وب.
+ *  از خودِ پرونده‌ها خوانده می‌شوند (نه بازتاب) تا هر شاخهٔ `when` ِ پیامِ خطا هم بیاید.
+ */
+internal object DariSources {
+  /** متنِ فارسیِ هر `t(…)` ِ `ShopperText` (برنامهٔ خرید) با `{}` به‌جای هر `${…}` — از خودِ پرونده، تا همهٔ شاخه‌های `when` بیایند */
+  fun shopperTexts(): Set<String> {
+    val src = DesktopPhrases.repo().resolve("core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/shopper/ShopperText.kt").readText()
+    val out = HashSet<String>()
+    for (m in Regex("""(?<![\w.])t\(\s*"""").findAll(src)) out += kotlinLiteral(src, m.range.last)
+    assertTrue("نوشته‌های برنامهٔ خرید خوانده نشد (${out.size})", out.size > 150)
+    return out
+  }
+
+  /** یک رشتهٔ کاتلین از `"` ِ آغاز: هر `${…}` یا `$نام` ⇒ `{}`؛ `"…" + "…"` پشتِ هم یکی می‌شود */
+  private fun kotlinLiteral(src: String, start: Int): String {
+    val sb = StringBuilder()
+    var i = start
+    while (true) {
+      i++
+      while (src[i] != '"') {
+        when {
+          src[i] == '\\' -> { sb.append(src[i + 1]); i += 2 }
+          src[i] == '$' && src[i + 1] == '{' -> {
+            var depth = 0
+            while (true) { if (src[i] == '{') depth++ else if (src[i] == '}' && --depth == 0) break; i++ }
+            sb.append("{}"); i++
+          }
+          src[i] == '$' && (src[i + 1].isLetter() || src[i + 1] == '_') -> {
+            i++
+            while (src[i].isLetterOrDigit() || src[i] == '_') i++
+            sb.append("{}")
+          }
+          else -> { sb.append(src[i]); i++ }
+        }
+      }
+      val next = Regex("""^\s*\+\s*"""").find(src.substring(i + 1, minOf(src.length, i + 200))) ?: return sb.toString()
+      i += next.range.last + 1
+    }
+  }
+
+  /** متنِ فارسیِ واژه‌نامه‌های ویترینِ وب (`server/public/kit/i18n`، پرونده‌های `fa.json` و `<بخش>.fa.json`) با `{}` به‌جای هر {جای‌خالی} */
+  fun webTexts(): Set<String> {
+    val dir = DesktopPhrases.repo().resolve("server/public/kit/i18n")
+    val files = dir.listFiles().orEmpty().filter { Regex("""^(fa|[a-z]+\.fa)\.json$""").matches(it.name) }
+    assertTrue("واژه‌نامهٔ وب پیدا نشد", files.size >= 10)
+    val out = HashSet<String>()
+    for (f in files) for (m in Regex(""""(?:[^"\\]|\\.)*"\s*:\s*"((?:[^"\\]|\\.)*)"""").findAll(f.readText())) {
+      val v = Regex("""\\u([0-9a-fA-F]{4})""").replace(m.groupValues[1]) { it.groupValues[1].toInt(16).toChar().toString() }
+        .replace("\\\"", "\"").replace("\\n", "\n").replace("\\\\", "\\")
+      out += v.replace(Regex("""\{\w+\}"""), "{}")
+    }
+    return out
   }
 }
