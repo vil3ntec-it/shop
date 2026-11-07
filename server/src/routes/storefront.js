@@ -49,6 +49,8 @@ const RECENT_FLAG = 'shop.storefront.recent';
 const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
 //  CHK-08: شمارهٔ دوم و Plus Code در فرمِ نشانیِ وب (پیش‌فرض خاموش ⇒ همان فرم)
 const ADDRESS_EXTRA_FLAG = 'shop.storefront.address_extra';
+//  CHK-01/09، WEB-14: حسابِ مشتری در وبِ ویترین (`store/acct.js` ِ دیربار: پیشنهادِ حساب پس از ثبت، نشانی‌های نام‌دار، همگامیِ سبد)
+const WEB_ACCOUNT_FLAG = 'shop.storefront.web_account';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -148,6 +150,8 @@ async function featuresOf(shopId, sf) {
     ...((await require('../lib/visual-search').storeFlagOn(shopId)) ? { visualSearch: true } : {}),
     //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
+    //  CHK-01/09، WEB-14: «حسابِ من» ِ وب (همان درهای `/:slug/account…`)؛ سبدِ حساب (`accountCart`) فقط با `shop.storefront.cart` هم
+    ...((await orders.flagOf(shopId, WEB_ACCOUNT_FLAG)) ? { webAccount: true, ...((await cart.flagOn(shopId)) ? { accountCart: true } : {}) } : {}),
     //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`
     ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
   };

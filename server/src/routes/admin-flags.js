@@ -52,6 +52,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.sync.pay_fix', scope: 'shop', default: false, what: 'سرور «اصلاحِ روشِ پرداخت» را می‌سنجد: مجوز و برگهٔ تأیید، و بیش از ماندهٔ روش رد (POS-40)' },
   { key: 'shop.sync.refund_cap', scope: 'shop', default: false, what: 'بازپرداختِ سفارشِ ویژه و امانی بیش از پیش‌پرداختِ نگه‌داشته رد می‌شود (POS-26، POS-27)' },
   { key: 'shop.storefront.eta', scope: 'shop', default: false, what: 'زمانِ تقریبیِ تحویلِ ویترین (WEB-04)' },
+  { key: 'shop.storefront.web_account', scope: 'shop', default: false, what: 'حسابِ مشتری در وبِ ویترین: پیشنهاد پس از ثبت، نشانی‌های نام‌دار و همگامیِ سبد (CHK-01/09، WEB-14)' },
   { key: 'shop.storefront.account_history', scope: 'shop', default: false, what: '«حسابِ من» ِ ویترین: خریدِ حضوری و مانده' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند

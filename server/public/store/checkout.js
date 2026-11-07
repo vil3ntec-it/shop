@@ -24,6 +24,7 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    var ac = null;              // CHK-09: نشانی‌های حساب (acct.js)
     //  روش‌های دریافت و نشانهٔ پرداخت فقط در همین صفحه‌اند ⇒ این‌جا، نه در بارِ نخستِ store.js
     $('opt-delivery').hidden = !c.store.fulfillment.delivery;
     $('opt-pickup').hidden = !c.store.fulfillment.pickup;
@@ -229,7 +230,11 @@
       var r = document.querySelector('input[name="fulfillment"]:checked');
       return r ? r.value : '';
     }
-    function verifiedFor(phone) { var tk = K.ticket(); return Boolean(tk && phone && tk.phone === K.normPhone(phone)); }
+    //  بلیت، یا نشستِ حسابِ همان شماره (CHK-01، acct.js) — سرور هر دو را می‌پذیرد
+    function verifiedFor(phone) {
+      var tk = K.ticket(); var s = K.sess(); var n = phone && K.normPhone(phone);
+      return Boolean(n && ((tk && tk.phone === n) || (s && s.phone === n)));
+    }
 
     function renderCheckout() {
       var keep = lp ? lp.hold() : null;
@@ -354,6 +359,13 @@
         area.done = true; renderCheckout();
       }).catch(function (e) { K.note($('zone-msg'), 'err', e.message); });
     }
+    //  CHK-09: پینِ نشانیِ نام‌دارِ برگزیده (acct.js)؛ null ⇒ بی پین
+    function setPin(p, text) {
+      pin = p; area = null;
+      $('pin-text').textContent = p ? text : t('pin.hint');
+      $('pin-btn').textContent = p ? t('pin.again') : t('pin.btn');
+      if (p) locate(); else renderCheckout();
+    }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
       $('pin-text').textContent = t('pin.wait');
@@ -428,6 +440,7 @@
         K.saveS('placed:' + r.order.token, true);
         //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
         K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
+        if (ac) ac.placed(body);   //  CHK-09: «این نشانی را با نام نگه دار»
         quoteNote = ''; c.empty();
         msg.hidden = true;
         location.hash = '#/o/' + encodeURIComponent(r.order.token);
@@ -479,7 +492,7 @@
         } else if (e.code === 'below_min_order') {
           K.note(msg, 'err', t('err.below_min_order') + ' (' + K.money(d.minOrderMinor) + ')');
         } else if (e.code === 'verification_required' || e.code === 'phone_not_verified') {
-          K.setTicket(null);
+          K.setTicket(null); if (e.code === 'verification_required') K.save('store-session', null);
           K.note(msg, 'err', e.message);
         } else {
           K.note(msg, 'err', e.message);
@@ -496,9 +509,11 @@
         var r = document.querySelector('input[name="fulfillment"][value="' + f + '"]');
         if (r) r.checked = true;
       }
-      var tk = K.ticket();
+      var tk = K.ticket() || K.sess();
       if (tk && !$('c-phone').value) $('c-phone').value = K.localPhone(tk.phone);
-      var me = K.load('store-customer', null);
+      var me = K.load('store-customer', null) || (K.sess() && { name: K.sess().name });
+      //  CHK-09: نشانی‌های نام‌دارِ حساب (acct.js، فقط با `features.webAccount` و نشست)
+      if (c.acct) c.acct().then(function (a) { ac = a.checkout({ pin: setPin }); }, function () { ac = null; });
       if (me) {
         if (!$('c-name').value && me.name) $('c-name').value = me.name;
         if (!$('a-text').value && me.addressText) $('a-text').value = me.addressText;
