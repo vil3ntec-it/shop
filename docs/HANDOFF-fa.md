@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۷ — شاخهٔ `claude/customer-app-1` (برنامهٔ خریدِ مشتری، مرحلهٔ ۱؛ O-04 «ب»؛ روی main ‏8c22f3f4؛ سیزنِ `session_01GcPTALbaroEADJph5to8Qj`)
+- انجام شد: کارخواهِ تایپ‌شدهٔ ویترین و بازارچه در `core/src/commonMain/.../core/shopper` (همان درهای عمومی، بی درِ تازه در سرور)،
+  قاعده‌های سبد و ثبت (همان `store.js`/`checkout.js` ِ وب و `forCheckout` ِ سرور)، کلیدِ یکتاییِ ثبت، پیگیری، نوشته‌های
+  fa/en/ps + دری با `asIs`؛ برنامهٔ جدای `customer-android` (بستهٔ `ir.vil3ntec.tohid.customer`، فقط debug): خانه/بازارچه،
+  دکان با جست‌وجو و دسته، کالا، سبد، ثبت (ارسال/دریافت، ناحیه، بازه، تأییدِ شماره)، ثبت‌شد، پیگیری و لغو؛ راست‌چین و تیره.
+  آزمون: `gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.shopper.*'` و `server/test/shopper-live.mjs` (کارخواه روی سرورِ
+  واقعیِ PGlite). CI: کارِ گزارشیِ «برنامهٔ خریدِ مشتری (گزارش)» در `tohid-native.yml`. تصمیم در `OWNER-DECISIONS-fa.md` (O-04).
+- نیمه‌کاره: کامپایلِ اندرویدِ `customer-android` فقط در CI (این‌جا `dl.google.com` ۴۰۳)؛ صفحه‌ها روی Compose Desktop کامپایل و
+  `CustomerModelTest` روی JVM سنجیده شد.
+- قدمِ بعدی (مرحلهٔ ۲): حساب/ورودِ مشتری و نشستِ بلند (CHK-02، D-09)، نشانی‌های ذخیره‌شده با پین، Push (FCM پس از O-01)،
+  گفت‌وگو (CHAT-02/06)، نظر، پوستهٔ آیفون از همین کد، و MKT-03…08 روی همین پایه؛ پس از چند دورِ سبز، کارِ CI سد شود.
 ### ۱۴۰۵/۰۸/۱۴ — شاخهٔ `claude/web-device-id` (O-09 در وب؛ روی `claude/owner-device-cap` = #942؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: ورودِ با رمزِ وب (`login`، `resetPassword` ِ `license/license-client.js` و فرمِ `shop-ui.js`) حالا `device` =
   `{uid, name, platform:'web'}` می‌فرستد؛ `uid` همان شناسهٔ تصادفیِ `tohid-device-uid-v1` است (ورودِ کدی هم همان را
