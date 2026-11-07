@@ -30,7 +30,13 @@ import ir.vil3ntec.tohid.core.shopper.ShopperText
 import ir.vil3ntec.tohid.core.shopper.SlotsPage
 import ir.vil3ntec.tohid.core.shopper.StorePage
 import ir.vil3ntec.tohid.core.shopper.TrackRules
+import ir.vil3ntec.tohid.core.shopper.AddressBook
+import ir.vil3ntec.tohid.core.shopper.GeoPin
+import ir.vil3ntec.tohid.core.shopper.OrderExtras
+import ir.vil3ntec.tohid.core.shopper.PinText
+import ir.vil3ntec.tohid.core.shopper.SavedAddress
 import ir.vil3ntec.tohid.core.text.LocaleFormat
+import kotlin.random.Random
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -48,6 +54,10 @@ sealed class Route {
   data class Placed(val slug: String, val token: String) : Route()
   data class Track(val slug: String, val token: String) : Route()
   object Settings : Route()
+  /** مرحلهٔ ۲: نشانی‌های من (CHK-09)، برگهٔ نشانی، و گفت‌وگو با دکان (CHAT؛ [orderNo] null ⇒ گفت‌وگوی عمومی) */
+  object Addresses : Route()
+  data class AddressEdit(val id: String?, val fromCheckout: Boolean = false) : Route()
+  data class Chat(val slug: String, val orderNo: Long?) : Route()
 }
 
 /** حالِ یک بارگیری — صفحه هر چهار را نشان می‌دهد (هیچ «در حالِ بار» ِ بی‌پایان یا خطای بی‌متن). */
@@ -70,20 +80,24 @@ private fun <T> ShopperResult<T>.load(): Load<T> = when (this) {
  *  می‌شود و آزمونِ JVM دارد (`CustomerModelTest`). هر قاعدهٔ پول، سبد و ثبت در core است (`core/.../shopper`)؛
  *  این‌جا فقط ترتیبِ کارها، حالِ صفحه و نگه‌داری.
  *
- *  [io] نخِ درخواست‌ها (اندروید: `Dispatchers.IO`)؛ [debounceMs] مکثِ جست‌وجو (آزمون: ۰).
+ *  [io] نخِ درخواست‌ها (اندروید: `Dispatchers.IO`)؛ [debounceMs] مکثِ جست‌وجو (آزمون: ۰)؛ [locator] موقعیتِ گوشی؛
+ *  [secureRandom] مولّدِ امنِ سکو (شناسهٔ دستگاهِ MKT-02)؛ [chatWaitMs] long-poll ِ گفت‌وگو (آزمون: ۰).
  */
 class CustomerModel(
-  private val api: ShopperApi,
+  internal val api: ShopperApi,
   private val kv: ShopperKeyValue,
   private val scope: CoroutineScope,
   private val io: CoroutineDispatcher,
-  private val clock: () -> Long,
+  internal val clock: () -> Long,
   private val debounceMs: Long = 350,
+  private val locator: Locator = Locator { it(null) },
+  secureRandom: (Int) -> ByteArray = { Random.nextBytes(it) },
+  chatWaitMs: Int = 20_000,
 ) {
-  var saved: ShopperState by mutableStateOf(ShopperMemory.load(kv))
+  var saved: ShopperState by mutableStateOf(ShopperMemory.withDevice(ShopperMemory.load(kv)) { secureRandom(16) })
     private set
   var stack: List<Route> by mutableStateOf(listOf(Route.Home))
-    private set
+    internal set
   val route: Route get() = stack.last()
   val canGoBack: Boolean get() = stack.size > 1
   var lang: ShopperLang by mutableStateOf(ShopperLang.of(saved.lang))
@@ -149,21 +163,44 @@ class CustomerModel(
   var orderNote: String? by mutableStateOf(null)
     private set
 
+  /** کلیدهای پرچم‌دارِ پیگیری (`review`، `chat`) */
+  var orderExtras: OrderExtras by mutableStateOf(OrderExtras())
+    private set
+  /** CHK-10: پین بیرونِ محدودهٔ ارسال است (فقط پیام؛ ثبتِ ارسال را سرور هم می‌بندد) */
+  var pinOutside: Boolean by mutableStateOf(false)
+    private set
+  var pinBusy: Boolean by mutableStateOf(false)
+    private set
+  var pinNote: String? by mutableStateOf(null)
+    private set
+  var linkNote: String? by mutableStateOf(null)
+    internal set
+
+  // ── مرحلهٔ ۲: بخش‌های جدا (هر کدام فایلِ خودش) ──
+  val promo = PromoModel(api, scope, io)
+  val feedback = FeedbackModel(api, scope, io)
+  val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
+  val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs)
+  /** MKT-11: کدِ کمپینِ پیوند/QR که مشتری با آن به هر دکان آمد (فقط همین اجرا، مثلِ «همین نشست» ِ وب) */
+  internal val campaigns = HashMap<String, String>()
+
   private var shopsJob: Job? = null
   private var searchJob: Job? = null
   private var pollJob: Job? = null
 
   init {
     ShopperText.lang = lang
+    ShopperMemory.save(kv, saved)
     enter(Route.Home)
+    chat.drain()
   }
 
   fun now(): Long = clock()
 
-  private fun <T> request(call: () -> ShopperResult<T>, done: (ShopperResult<T>) -> Unit): Job =
+  internal fun <T> request(call: () -> ShopperResult<T>, done: (ShopperResult<T>) -> Unit): Job =
     scope.launch { done(withContext(io) { call() }) }
 
-  private fun persist(s: ShopperState) {
+  internal fun persist(s: ShopperState) {
     saved = s
     ShopperMemory.save(kv, s)
   }
@@ -187,8 +224,9 @@ class CustomerModel(
     enter(Route.Home, returning = true)
   }
 
-  private fun enter(r: Route, returning: Boolean = false) {
+  internal fun enter(r: Route, returning: Boolean = false) {
     if (r !is Route.Track) pollJob?.cancel()
+    if (r !is Route.Chat) chat.leave()
     notice = null
     when (r) {
       Route.Home -> if (market !is Load.Ready && market !is Load.Busy) loadHome()
@@ -204,12 +242,18 @@ class CustomerModel(
       is Route.Checkout -> prepareCheckout(r.slug)
       is Route.Placed -> Unit
       is Route.Track -> loadOrder(r.slug, r.token, quiet = returning && order.valueOrNull()?.token == r.token)
-      Route.Settings -> Unit
+      Route.Settings, Route.Addresses -> Unit
+      is Route.AddressEdit -> if (!returning) {
+        if (r.fromCheckout) book.start(null, Triple(form.addressText, form.landmark, form.pin))
+        else book.start(saved.addresses.firstOrNull { it.id == r.id })
+      }
+      is Route.Chat -> chat.open(r.slug, r.orderNo, saved.name.ifBlank { form.name })
     }
   }
 
   /** برنامه دوباره پیش آمد: پیگیری و سبد از سرور تازه می‌شوند */
   fun resumed() {
+    chat.online()
     when (val r = route) {
       is Route.Track -> loadOrder(r.slug, r.token, quiet = true)
       is Route.CartPage -> refreshCart(r.slug)
@@ -277,6 +321,7 @@ class CustomerModel(
       r.valueOrNull()?.let { page ->
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
+        if (page.features.reviews) feedback.loadShop(slug)
         //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
         if (route is Route.Checkout) {
           form = form.copy(fulfillment = CheckoutRules.fulfillmentOf(page.shop, form).orEmpty())
@@ -375,6 +420,7 @@ class CustomerModel(
       val fresh = r.valueOrNull() ?: return@request
       val out = CartRules.refresh(cartOf(slug), fresh.items, clock())
       if (out.cart != cartOf(slug)) setCart(out.cart)
+      if (route is Route.Checkout) requotePromo()
       cartNote = listOfNotNull(
         ShopperText.repricedCount(out.repriced).takeIf { out.repriced > 0 },
         ShopperText.goneCount(out.gone).takeIf { out.gone > 0 },
@@ -397,6 +443,88 @@ class CustomerModel(
     store.valueOrNull()?.let { page -> form = form.copy(fulfillment = CheckoutRules.fulfillmentOf(page.shop, form).orEmpty()) }
     loadSlots()
     refreshCart(slug)
+    promo.load(slug) { requotePromo() }
+  }
+
+  /** MKT-01/09: پیش‌نمایشِ تخفیفِ همین سبد از سرور (خاموش ⇒ هیچ) */
+  fun requotePromo() = promo.requote(cartOf(storeSlug), saved.ticket, saved.deviceId)
+
+  fun applyPromo() = promo.apply(cartOf(storeSlug), saved.ticket, saved.deviceId)
+
+  fun clearPromo() = promo.clear(cartOf(storeSlug), saved.ticket, saved.deviceId)
+
+  // ── پین و نشانی‌های من در برگهٔ ثبت (CHK-08/09/10) ──
+
+  fun takePin() {
+    pinBusy = true
+    pinNote = null
+    locator.locate { p ->
+      pinBusy = false
+      if (p == null) pinNote = ShopperText.pinNone else setPin(p)
+    }
+  }
+
+  fun pastePin(text: String): Boolean {
+    val p = PinText.parse(text) ?: run { pinNote = ShopperText.pinBad; return false }
+    setPin(p)
+    return true
+  }
+
+  fun clearPin() {
+    form = form.copy(pinLat = null, pinLng = null, pinAccuracyM = null, addressId = null)
+    pinOutside = false
+    pinNote = null
+  }
+
+  /** گزینشِ دستیِ ناحیه پین را برمی‌دارد (همان وب: پینِ ناجور سفارش را رد می‌کرد) */
+  fun pickZone(id: String) {
+    form = form.copy(zoneId = id, pinLat = null, pinLng = null, pinAccuracyM = null)
+    pinOutside = false
+  }
+
+  fun useAddress(a: SavedAddress) {
+    form = AddressBook.fill(form, a)
+    pinOutside = false
+    pinNote = null
+    locatePin()
+  }
+
+  private fun setPin(p: GeoPin) {
+    form = form.copy(pinLat = p.lat, pinLng = p.lng, pinAccuracyM = p.accuracyM, addressId = null)
+    locatePin()
+  }
+
+  /** «کدام ناحیه؟» از سرور برای همین پین، بی ذخیره (`GET /:slug/delivery`)؛ ناحیهٔ پین جای گزینشِ دستی را می‌گیرد */
+  private fun locatePin() {
+    val pin = form.pin ?: return
+    val page = store.valueOrNull() ?: return
+    pinOutside = false
+    if (CheckoutRules.zones(page) == null) return
+    pinBusy = true
+    request({ api.locate(storeSlug, pin.lat, pin.lng) }) { r ->
+      pinBusy = false
+      if (form.pin != pin) return@request
+      val v = r.valueOrNull()
+      when {
+        v == null -> pinNote = r.errorOrNull()?.let { ShopperText.error(it) }
+        v.zoned && !v.inZone -> { pinOutside = true; form = form.copy(zoneId = null) }
+        else -> form = form.copy(zoneId = v.zone?.id)
+      }
+    }
+  }
+
+  /** برگهٔ «نشانیِ تازه/ویرایش» ذخیره شد ⇒ برگشت (از برگهٔ ثبت ⇒ همان نشانیِ برگزیده) */
+  fun saveAddress() {
+    val from = route as? Route.AddressEdit ?: return
+    val a = book.save() ?: return
+    if (from.fromCheckout) form = form.copy(addressId = a.id)
+    notice = ShopperText.addressSaved(a.label)
+    back()
+  }
+
+  fun deleteAddress(id: String) {
+    book.remove(id)
+    if (form.addressId == id) form = form.copy(addressId = null)
   }
 
   fun updateForm(f: CheckoutForm) {
@@ -447,6 +575,8 @@ class CustomerModel(
           codeSent = null
           code = ""
           verifyNote = ShopperText.verified
+          chat.reverified()
+          if (route is Route.Checkout) requotePromo()
         }
         is ShopperResult.Fail -> verifyNote = ShopperText.error(r.error)
       }
@@ -472,7 +602,14 @@ class CustomerModel(
       return
     }
     val ticket = saved.ticket ?: return
-    val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage())
+    if (promo.pending(cart, ticket)) {
+      //  تا پیش‌نمایشِ تخفیفِ همین سبد نرسیده «ثبت» بسته است (همان وب)
+      placeNote = ShopperText.promoChecking
+      requotePromo()
+      return
+    }
+    val req = CheckoutRules.request(page, cart, form, ticket.phone, lang.code, slotsPage(), promo.applied(ticket, saved.deviceId))
+      .copy(campaign = campaigns[slug])
     //  CHK-19: همان بدنه ⇒ همان کلید (پیش از فرستادن نگه داشته می‌شود؛ بستنِ برنامه وسطِ کار سفارشِ دوم نمی‌سازد)
     val memo = CheckoutKeys.keyFor(saved.keys[slug], req)
     persist(saved.copy(keys = saved.keys + (slug to memo)))
@@ -508,6 +645,11 @@ class CustomerModel(
       is CheckoutFlow.After.Repriced -> {
         setCart(after.cart)
         repriced = true
+        requotePromo()
+      }
+      is CheckoutFlow.After.PromoRejected -> {
+        promo.rejected(after.status)
+        requotePromo()
       }
       is CheckoutFlow.After.Unavailable -> setCart(after.cart)
       is CheckoutFlow.After.Capped -> setCart(after.cart)
@@ -535,13 +677,15 @@ class CustomerModel(
       order = Load.Busy
       orderNote = null
     }
-    request({ api.track(slug, token) }) { r ->
+    request({ api.trackPage(slug, token) }) { r ->
       val here = route as? Route.Track
       if (here == null || here.token != token) return@request
       when (r) {
         is ShopperResult.Ok -> {
-          order = Load.Ready(r.value)
-          poll(here, r.value)
+          order = Load.Ready(r.value.order)
+          orderExtras = r.value.extras
+          feedback.bind(slug, r.value.order, r.value.extras)
+          poll(here, r.value.order)
         }
         is ShopperResult.Fail -> if (quiet && order is Load.Ready) orderNote = ShopperText.error(r.error) else order = Load.Failed(r.error)
       }
@@ -617,5 +761,6 @@ private fun Route.withSlug(from: String, to: String): Route = when (this) {
   is Route.Checkout -> if (slug == from) copy(slug = to) else this
   is Route.Placed -> if (slug == from) copy(slug = to) else this
   is Route.Track -> if (slug == from) copy(slug = to) else this
+  is Route.Chat -> if (slug == from) copy(slug = to) else this
   else -> this
 }

@@ -17,10 +17,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import ir.vil3ntec.tohid.core.shopper.ChatPhoto
 
 /**
  *  مرزِ سکو برای صفحه‌ها (همهٔ آن‌چه اندروید/آیفون فرق دارد): عکس، تماس، نشانیِ سرور و نسخه.
  *  [photo] مسیرِ نسبی (`/api/store/…/thumb?v=…`) می‌گیرد؛ پیاده‌سازیِ اندروید `ImagesAndroid.Photo` است.
+ *  مرحلهٔ ۲: [openMap] پیوندِ `geo:` ِ پین را به برنامهٔ نقشهٔ گوشی می‌دهد؛ [pickPhoto] عکسی از گالری می‌گیرد و
+ *  **آماده** برمی‌گرداند (چرخیده با EXIF، شفافیت روی سفید، ≤ ۱۶۰۰px، JPEG ِ تازه بی EXIF — `ShopperPhoto`)؛
+ *  [picture] بایت‌های عکسِ گفت‌وگو را می‌کشد.
  */
 class Platform(
   val photo: @Composable (path: String, modifier: Modifier) -> Unit,
@@ -28,6 +32,10 @@ class Platform(
   val server: () -> String,
   val setServer: (String) -> Unit,
   val version: String,
+  val openMap: (geoUri: String) -> Unit = {},
+  val canPickPhoto: Boolean = false,
+  val pickPhoto: (done: (ChatPhoto?) -> Unit) -> Unit = { it(null) },
+  val picture: @Composable (bytes: ByteArray, modifier: Modifier) -> Unit = { _, m -> Box(m) },
 )
 
 val LocalPlatform = staticCompositionLocalOf<Platform> { error("Platform داده نشده") }
@@ -68,6 +76,9 @@ fun CustomerApp(model: CustomerModel, platform: Platform) {
               is Route.Placed -> PlacedScreen(model, r.slug, r.token)
               is Route.Track -> TrackScreen(model, r.slug, r.token)
               Route.Settings -> SettingsScreen(model)
+              Route.Addresses -> AddressesScreen(model)
+              is Route.AddressEdit -> AddressEditScreen(model, r.id)
+              is Route.Chat -> ChatScreen(model, r.slug, r.orderNo)
             }
           }
         }

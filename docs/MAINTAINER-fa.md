@@ -33,7 +33,7 @@
 | سرور | `server/` | Node 22 + Express روی PostgreSQL یا PGlite (`DATABASE_URL=pglite:<پوشه>`)؛ ۱۱۳ پروندهٔ مسیر، ۲۸۱ پروندهٔ `lib`، ۱۵۴ مهاجرت | فعال؛ `api.vill3n.top` (سرورِ خانگی پشتِ تونل) |
 | ویترینِ وب (خریدِ مشتری) | `server/public/store` + `server/public/kit` | JS ِ بی‌چارچوب، CSP ِ سخت | فعال |
 | بازارچه | `server/public/market` | فهرستِ دکان‌ها (`market.js`) | فعال |
-| برنامهٔ خریدِ مشتری (اندروید؛ آیفون از همان کد در مرحلهٔ ۲) | `customer-android/` + `core/src/commonMain/.../core/shopper` | Compose؛ کارخواهِ تایپ‌شدهٔ همان درهای ویترین/بازارچه، سبدِ روی دستگاه، ثبت با کلیدِ یکتایی، پیگیری (O-04 «ب»، مرحلهٔ ۱) | فقط ساختِ debug در CI (کارِ «برنامهٔ خریدِ مشتری (گزارش)»)؛ بستهٔ `ir.vil3ntec.tohid.customer`؛ بی امضا و بی انتشار |
+| برنامهٔ خریدِ مشتری (اندروید و آیفون از یک کد) | `customer-android/` (صفحه‌ها در `ui/`، بی android.*) + `customer-ios/` (پوستهٔ Compose Multiplatform و SwiftUI) + `core/src/commonMain/.../core/shopper` | Compose؛ کارخواهِ تایپ‌شدهٔ همان درهای ویترین/بازارچه، سبدِ روی دستگاه، ثبت با کلیدِ یکتایی، پیگیری (مرحلهٔ ۱)؛ نشانی‌های من با پین، گفت‌وگو با صفِ بی‌اینترنت و عکس، نظر و امتیاز، کدِ تخفیف، سفارشِ تکرارشونده، پیوندِ عمیق (مرحلهٔ ۲) | فقط ساختِ debug ِ اندروید و شبیه‌سازِ آیفون در CI (کارهای «(گزارش)»)؛ بستهٔ `ir.vil3ntec.tohid.customer`؛ بی امضا و بی انتشار |
 | پورتال، رسید، SDK | `server/public/portal`، `receipt`، `sdk` | حذفِ حساب، رسیدِ عمومی، API برای دیگران | فعال |
 | پنلِ وبِ مدیرِ سکو | `server/public/admin` + برنامهٔ `admin-android/` | پرچم‌ها، انتشار، عملیات، پشتیبانی | نگه‌داری؛ پنلِ مرکزیِ تازهٔ مالک در ریپوی جدای `vil3ntec-it/server` (`homelab-panel`) |
 | وبِ مدیریتِ دکان (PWA ِ قدیم) | `index.html`، `license/*`، `sw.js` | — | **منجمد** از ۱۴۰۵/۰۷/۲۷ (STATUS، یادداشت‌ها): نه حذف، نه قابلیتِ تازه؛ سقفِ اندازه‌اش در `tools/quality` |
@@ -196,6 +196,7 @@ cd android-native && gradle --no-daemon testReleaseUnitTest assembleRelease   # 
 gradle -p core jvmTest --tests 'ir.vil3ntec.tohid.core.shopper.*'   # کارخواه، سبد، ثبت، پیگیری، نوشته‌ها (بی سرور)
 (cd server && TEST_DATABASE_URL=pglite:memory node test/shopper-live.mjs)  # همان کارخواه روی سرورِ واقعی (ShopperLiveTest)
 cd customer-android && gradle --no-daemon testDebugUnitTest assembleDebug  # اینترنت (dl.google.com) می‌خواهد؛ فقط debug
+./desktop/gradlew -p customer-ios/shared -Pios=true compileKotlinIosSimulatorArm64   # آیفونِ برنامهٔ خرید (klib؛ مک برای پیوند و Xcode)
 
 # ── آیفون (لینوکس، فقط klib) ─────────────────────────
 desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پیوند و Xcode فقط روی macOS (CI)
@@ -239,6 +240,7 @@ desktop/gradlew -p ios/shared -Pios=true compileKotlinIosSimulatorArm64   # پی
 | `tohid-native-preview.yml` | push به main + PR | APK ِ بستهٔ `ir.vil3ntec.tohid.preview` ⇐ برچسبِ `tohid-native-preview` | **سد** |
 | `tohid-desktop.yml` «فروشگاه من — کامپیوتر» | `desktop/**`، `android-native/app/src/**`، `core/**`، `install.ps1` | کامپایل و آزمون، دیسکِ ویندوز، نصاب‌ها، انتشارِ beta | **سد** |
 | `tohid-admin.yml` «توحید مدیریت» | `admin-android` | ساخت و انتشار ⇐ برچسبِ `tohid-admin` | سد |
+| `customer-ios.yml` | `customer-android/**`، `customer-ios/**`، `core/.../core/shopper/**` (فقط PR) | «برنامهٔ خرید روی آیفون — klib» (لینوکس) و «— چارچوب، Xcode و شبیه‌ساز» (مک، با پیوندِ عمیقِ `tohidshop://` و عکس) | هر دو **گزارش** (`continue-on-error`) |
 | `ios-spike.yml` | `core/**`، `ios/**` | `core-native` (linuxX64)، `ios` (core روی شبیه‌ساز)، «رابطِ مشترکِ آیفون — klib»، «برنامهٔ آیفون — Xcode» با آزمونِ سرتاسریِ ۱۱ گام (مصنوعِ `ios-e2e-shots`) | سه کار `continue-on-error` (**گزارش**) |
 | `codeql.yml` «CodeQL (گزارش)» | `server/src/**`، `server/public/**`، `license/**`، ورک‌فلوها؛ هفتگی | تحلیلِ JS | گزارش |
 | `security.yml` «امنیت — زنجیرهٔ تأمین» | push/PR/هفتگی | اسکنِ secret، `npm audit` (critical ⇐ سد)، actionlint (گزارش) | بخشی سد |

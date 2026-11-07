@@ -332,11 +332,12 @@ jobs:
   #  برنامهٔ خریدِ مشتری (O-04 «ب»، مرحلهٔ ۱؛ `customer-android/`، بستهٔ `ir.vil3ntec.tohid.customer`): کارِ جدا و
   #  **گزارشی** (`continue-on-error`) — نه `needs` ِ کارِ دیگری است و نه انتشار دارد، پس هرگز ساخت یا انتشارِ برنامهٔ
   #  دکان را نمی‌شکند. فقط آزمون‌های واحد، APK ِ debug (بی امضای انتشار، بی انتشار) و کارخواهِ core روی سرورِ واقعی
-  #  (PGlite، `server/test/shopper-live.mjs` ⇐ `ShopperLiveTest`). پس از چند دورِ سبز، سد شدنش تصمیمِ بعد است.
+  #  (PGlite، `server/test/shopper-live.mjs` ⇐ `ShopperLiveTest`، و فاز ۲ ⇐ `ShopperStage2LiveTest`: نشانی، گفت‌وگو، نظر و
+  #  تخفیف). پس از چند دورِ سبز، سد شدنش تصمیمِ بعد است.
   customer:
     name: برنامهٔ خریدِ مشتری (گزارش)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     continue-on-error: true
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0

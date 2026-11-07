@@ -17,7 +17,8 @@ data class RecentShop(val slug: String, val title: String, val at: Long)
 
 /**
  *  هر چه برنامهٔ خرید روی دستگاه نگه می‌دارد — فقط همین دستگاه، هرگز همگام نمی‌شود (مثلِ `localStorage` ِ وب).
- *  ⛔ بلیتِ شماره کوتاه‌عمر است (`ticketTtlMs` ِ سرور) و نشستِ بلند/حسابِ مشتری مرحلهٔ ۲ است (Keystore/Keychain).
+ *  ⛔ بلیتِ شماره کوتاه‌عمر است (`ticketTtlMs` ِ سرور) و نشستِ بلند/حسابِ مشتری پس از پیامکِ واقعی (CHK-02، D-09) با
+ *  Keystore/Keychain می‌آید. نشانی‌های ذخیره‌شده تا آن روز فقط همین‌جایند (همان مدل و سقفِ سرور، [AddressBook]).
  */
 @Serializable
 data class ShopperState(
@@ -34,6 +35,12 @@ data class ShopperState(
   val lang: String = "fa",
   /** system · light · dark */
   val theme: String = "system",
+  /** CHK-09: نشانی‌های نام‌دار با پین (حداکثر ۱۰، [AddressRules.MAX]) */
+  val addresses: List<SavedAddress> = emptyList(),
+  /** MKT-08: سفارش‌های تکرارشونده ([RepeatPlans]) */
+  val plans: List<RepeatPlan> = emptyList(),
+  /** MKT-02: شناسهٔ تصادفیِ همین نصب (۳۲ hex) — فقط وقتی دکان سدِ «یک بار برای هر دستگاه» دارد فرستاده می‌شود */
+  val deviceId: String = "",
 )
 
 /** خواندن و نوشتنِ [ShopperState] با سقف‌های روشن (هیچ فهرستی بی‌پایان بزرگ نمی‌شود). */
@@ -72,7 +79,15 @@ object ShopperMemory {
     orders = s.orders.map { if (it.slug == from) it.copy(slug = to) else it },
     recent = s.recent.map { if (it.slug == from) it.copy(slug = to) else it }.distinctBy { it.slug },
     keys = s.keys.mapKeys { if (it.key == from) to else it.key },
+    plans = RepeatPlans.moved(s.plans, from, to),
   )
+
+  /** همان الگوی `deviceId` ِ وب (`^[A-Za-z0-9_-]{8,128}$`)؛ نبود ⇒ تازه از [random] (مولّدِ امنِ سکو) */
+  fun withDevice(s: ShopperState, random: () -> ByteArray): ShopperState {
+    if (Regex("^[A-Za-z0-9_-]{8,128}$").matches(s.deviceId)) return s
+    val hex = random().take(16).joinToString("") { (it.toInt() and 0xFF).toString(16).padStart(2, '0') }
+    return if (hex.length == 32) s.copy(deviceId = hex) else s
+  }
 }
 
 /** نشانیِ دکان از هر چه مشتری می‌چسباند یا QR می‌دهد: `golestan`، `…/store/golestan`، `…/store/golestan#/p/rice`. */
