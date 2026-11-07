@@ -97,12 +97,12 @@ async function stats({ gc = false } = {}) {
 process.on('disconnect', () => process.exit(0));
 const tStart = performance.now();
 const step = (label) => console.error(`  [سرورِ بار] ${label} — ${Math.round((performance.now() - tStart) / 1000)}s`);
-const base = await h.start();
-step('پایگاه و migrationها');
+const base = await h.start({ reset: !CFG.follower });
+step(CFG.follower ? 'نمونهٔ دیگر روی همان پایگاه' : 'پایگاه و migrationها');
 //  همان مهلت‌های `src/index.js` — بی آن keepAliveِ پیش‌فرضِ ۵ثانیه‌ای اتصال‌های بارساز را می‌بُرد
 h.server().keepAliveTimeout = 65_000;
 h.server().headersTimeout = 70_000;
-await require(path.join(SERVER, 'src', 'lib', 'sync-v1.js')).syncSchemaTable();
+if (!CFG.follower) await require(path.join(SERVER, 'src', 'lib', 'sync-v1.js')).syncSchemaTable();
 
 //  کارگرهای پس‌زمینهٔ `index.js` (soak بی آن‌ها نیمه است)؛ هر کدام بی پرچمش تقریباً بیکار است
 const workers = [];
@@ -114,137 +114,141 @@ if (CFG.workers !== false) {
   }
 }
 
-async function call(method, p, { token, body, headers = {} } = {}) {
-  const res = await fetch(base + p, {
-    method,
-    headers: { 'Content-Type': 'application/json', 'X-App': 'shop', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  const text = await res.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch { /* بی JSON */ }
-  if (res.status >= 300) throw new Error(`${method} ${p} ⇒ ${res.status} ${text.slice(0, 300)}`);
-  return json;
-}
-
-// ── مدیر، دکان‌ها و ویترین‌ها ──
-const tSetup = performance.now();
-await db.query(
-  `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
-   VALUES ($1,'loadtest','loadtest',$2,'superadmin','active',$3)`,
-  [db.newId('adm'), await pw.hashPassword('Load!12345'), db.now()]
-);
-const admin = (await call('POST', '/api/admin/login', { body: { username: 'loadtest', password: 'Load!12345' } })).token;
-
-const shops = [];
-for (let s = 0; s < CFG.shops; s++) {
-  const u = await h.newUser(`صاحبِ دکانِ بار ${s}`, 'shop');
-  const shopId = (await call('POST', '/api/shop', { token: u.accessToken, body: { name: `دکانِ بار ${s}` } })).shop.id;
-  for (const key of ['shop.orders', 'shop.storefront']) {
-    await call('PUT', '/api/admin/pump/live-config', { token: admin, body: { scope: shopId, key, value: true } });
+//  نمونهٔ دوم به بعدِ `--instances` (`CFG.follower`): همان پایگاهِ کاشته‌شده، بی پاک کردن و بی کاشتن
+async function seedAll() {
+  async function call(method, p, { token, body, headers = {} } = {}) {
+    const res = await fetch(base + p, {
+      method,
+      headers: { 'Content-Type': 'application/json', 'X-App': 'shop', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const text = await res.text();
+    let json = null;
+    try { json = JSON.parse(text); } catch { /* بی JSON */ }
+    if (res.status >= 300) throw new Error(`${method} ${p} ⇒ ${res.status} ${text.slice(0, 300)}`);
+    return json;
   }
-  const owner = await h.signIn(u, 'shop');
-  const slug = `load-${s}-${shopId.slice(-6).toLowerCase().replace(/[^a-z0-9]/g, 'x')}`;
-  await call('PUT', '/api/shop/storefront', { token: owner.accessToken, body: { slug, enabled: true, title: `ویترینِ بار ${s}`, contactPhone: '0700000001' } });
-  shops.push({ index: s, shopId, slug, token: owner.accessToken, email: u.email, password: u.password });
-}
 
-step(`${shops.length} دکان و ویترین`);
-// ── دادهٔ دفتر: دکانِ ۰ بزرگ (مقیاسِ دادهٔ مرجع)، بقیه کوچک ──
-//  همان کاشتنِ مستقیمِ `bench/server.mjs` (شکلِ ردیفی که `applyOp`ِ sync v1 می‌نویسد)
-const schema = migrations.currentVersion('shop');
-async function seedRows(shopId, rows) {
-  const at = db.now();
-  for (let i = 0; i < rows.length; i += 5000) {
-    const batch = rows.slice(i, i + 5000).map((r) => ({ t: r.table, i: r.id, d: r.data }));
-    await db.query(
-      `WITH src AS (
-         SELECT x->>'t' AS t, x->>'i' AS i, x->'d' AS d, ord
-           FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS a(x, ord)
-       ), ins AS (
-         INSERT INTO oplog (id, app, account_kind, account_id, device_id, op_id, client_ts, table_name, row_id,
-                            op_type, fields, hash, schema_version, received_at)
-         SELECT 'op_seed_' || $2 || '_' || t || '_' || i, 'shop', 'shop', $2, 'seed', 'seed-' || $2 || '-' || t || '-' || i, 0, t, i,
-                'insert', d, '', $3, $4
-           FROM src ORDER BY ord
-         RETURNING table_name, row_id, server_seq, fields
-       )
-       INSERT INTO sync_rows (app, account_kind, account_id, table_name, row_id, data, field_seq, field_src,
-                              deleted_at, updated_seq, created_at, updated_at)
-       SELECT 'shop', 'shop', $2, table_name, row_id, fields,
-              (SELECT COALESCE(jsonb_object_agg(k, server_seq), '{}'::jsonb) FROM jsonb_object_keys(fields) k),
-              (SELECT COALESCE(jsonb_object_agg(k, jsonb_build_object('d', 'seed', 'o', 'seed-' || table_name || '-' || row_id)), '{}'::jsonb)
-                 FROM jsonb_object_keys(fields) k),
-              NULL, server_seq, $4, $4
-         FROM ins`,
-      [JSON.stringify(batch), shopId, schema, at]
-    );
-  }
-  //  ویترین: همهٔ کالاها منتشرشده — بدترین حالتِ کاتالوگ
+  // ── مدیر، دکان‌ها و ویترین‌ها ──
+  const tSetup = performance.now();
   await db.query(
-    `INSERT INTO storefront_products (shop_id, product_id, published, updated_by, updated_at)
-     SELECT account_id, row_id, true, 'loadtest', $2 FROM sync_rows
-      WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='products'`, [shopId, at]);
-}
-const scaleOf = (k) => Object.fromEntries(Object.entries(REFERENCE).map(([key, v]) => [key, key === 'days' ? v : Math.max(1, Math.round(v * k))]));
-const dataset = { big: scaleOf(CFG.scale), small: scaleOf(CFG.smallScale), rows: 0 };
-const tSeed = performance.now();
-const ledgers = {};
-for (const sh of shops) {
-  const kind = sh.index === 0 ? 'big' : 'small';
-  const ledger = ledgers[kind] ||= makeReference(dataset[kind]);
-  const rows = [...syncRowsOf(ledger)];
-  dataset.rows += rows.length;
-  await seedRows(sh.shopId, rows);
-  //  نمونه‌ای از کالاها برای «صفحهٔ کالا»، سبد و opهای فروش (همه منتشرشده و قیمت‌دار)
-  sh.products = ledger.products.filter((p) => p.salePrice > 0).slice(0, 400)
-    .map((p) => ({ id: p.id, name: p.name, priceMinor: Math.round(p.salePrice * 100), buyMinor: Math.round(p.purchasePrice * 100) }));
-  sh.terms = [...new Set(ledger.products.slice(0, 2000).map((p) => String(p.name).split(/\s+/)[0]).filter(Boolean))].slice(0, 40);
-}
-dataset.seedMs = Math.round(performance.now() - tSeed);
-step(`${dataset.rows} ردیفِ دفتر کاشته شد`);
-if (!db.isPglite()) await db.query('ANALYZE');
-else {
-  try { await require(path.join(SERVER, 'src', 'lib', 'pglite-stats.js')).analyzeNow(); } catch { /* بی آن */ }
-}
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'loadtest','loadtest',$2,'superadmin','active',$3)`,
+    [db.newId('adm'), await pw.hashPassword('Load!12345'), db.now()]
+  );
+  const admin = (await call('POST', '/api/admin/login', { body: { username: 'loadtest', password: 'Load!12345' } })).token;
 
-//  پلِ v1 ⇒ v3: دفترِ کاشته‌شده در v1 است و نخستین pull ِ v3 هر دکان تا ۳×۱۰۰۰ op ِ آن را درونِ
-//  همان درخواست تبدیل می‌کند (`catchUp`ِ lib/sync-v3). دکانِ واقعی این را یک بار هنگامِ رفتن به v3
-//  می‌پردازد؛ این‌جا پیش از بار و جدا سنجیده می‌شود تا بارِ پایدار با پلِ تمام‌شده باشد.
-const sync3 = require(path.join(SERVER, 'src', 'lib', 'sync-v3.js'));
-const tBridge = performance.now();
-let bridged = 0;
-for (const sh of shops) {
-  const ctx = { app: 'shop', accountKind: 'shop', accountId: sh.shopId };
-  for (let i = 0; i < 100000; i++) {
-    const r = await sync3.bridge(ctx, { max: 2000 });
-    bridged += r.imported || 0;
-    if (!r.behind) break;
+  const shops = [];
+  for (let s = 0; s < CFG.shops; s++) {
+    const u = await h.newUser(`صاحبِ دکانِ بار ${s}`, 'shop');
+    const shopId = (await call('POST', '/api/shop', { token: u.accessToken, body: { name: `دکانِ بار ${s}` } })).shop.id;
+    for (const key of ['shop.orders', 'shop.storefront']) {
+      await call('PUT', '/api/admin/pump/live-config', { token: admin, body: { scope: shopId, key, value: true } });
+    }
+    const owner = await h.signIn(u, 'shop');
+    const slug = `load-${s}-${shopId.slice(-6).toLowerCase().replace(/[^a-z0-9]/g, 'x')}`;
+    await call('PUT', '/api/shop/storefront', { token: owner.accessToken, body: { slug, enabled: true, title: `ویترینِ بار ${s}`, contactPhone: '0700000001' } });
+    shops.push({ index: s, shopId, slug, token: owner.accessToken, email: u.email, password: u.password });
   }
-}
-dataset.bridge = { ops: bridged, ms: Math.round(performance.now() - tBridge) };
-dataset.bridge.opsPerSec = Math.round(bridged / Math.max(0.001, dataset.bridge.ms / 1000));
-step(`پلِ v1⇒v3: ${bridged} op، ${dataset.bridge.opsPerSec} op/s`);
 
-// ── شماره‌های تأییدشدهٔ مشتری (هر شماره ۱۰ سفارش در ساعت در هر دکان: RSK-07) ──
-let phoneSeq = 0;
-const checkoutShops = shops.slice(0, CFG.checkoutShops);
-for (const sh of checkoutShops) {
-  sh.tickets = [];
-  for (let i = 0; i < CFG.phonesPerShop; i++) {
-    const phone = `079${String(1000000 + (++phoneSeq)).slice(-7)}`;
-    const st = await call('POST', `/api/store/${sh.slug}/verify/start`, { body: { phone } });
-    const ck = await call('POST', `/api/store/${sh.slug}/verify/check`, { body: { phone, code: st.devCode } });
-    sh.tickets.push({ phone, ticket: ck.ticket });
+  step(`${shops.length} دکان و ویترین`);
+  // ── دادهٔ دفتر: دکانِ ۰ بزرگ (مقیاسِ دادهٔ مرجع)، بقیه کوچک ──
+  //  همان کاشتنِ مستقیمِ `bench/server.mjs` (شکلِ ردیفی که `applyOp`ِ sync v1 می‌نویسد)
+  const schema = migrations.currentVersion('shop');
+  async function seedRows(shopId, rows) {
+    const at = db.now();
+    for (let i = 0; i < rows.length; i += 5000) {
+      const batch = rows.slice(i, i + 5000).map((r) => ({ t: r.table, i: r.id, d: r.data }));
+      await db.query(
+        `WITH src AS (
+           SELECT x->>'t' AS t, x->>'i' AS i, x->'d' AS d, ord
+             FROM jsonb_array_elements($1::jsonb) WITH ORDINALITY AS a(x, ord)
+         ), ins AS (
+           INSERT INTO oplog (id, app, account_kind, account_id, device_id, op_id, client_ts, table_name, row_id,
+                              op_type, fields, hash, schema_version, received_at)
+           SELECT 'op_seed_' || $2 || '_' || t || '_' || i, 'shop', 'shop', $2, 'seed', 'seed-' || $2 || '-' || t || '-' || i, 0, t, i,
+                  'insert', d, '', $3, $4
+             FROM src ORDER BY ord
+           RETURNING table_name, row_id, server_seq, fields
+         )
+         INSERT INTO sync_rows (app, account_kind, account_id, table_name, row_id, data, field_seq, field_src,
+                                deleted_at, updated_seq, created_at, updated_at)
+         SELECT 'shop', 'shop', $2, table_name, row_id, fields,
+                (SELECT COALESCE(jsonb_object_agg(k, server_seq), '{}'::jsonb) FROM jsonb_object_keys(fields) k),
+                (SELECT COALESCE(jsonb_object_agg(k, jsonb_build_object('d', 'seed', 'o', 'seed-' || table_name || '-' || row_id)), '{}'::jsonb)
+                   FROM jsonb_object_keys(fields) k),
+                NULL, server_seq, $4, $4
+           FROM ins`,
+        [JSON.stringify(batch), shopId, schema, at]
+      );
+    }
+    //  ویترین: همهٔ کالاها منتشرشده — بدترین حالتِ کاتالوگ
+    await db.query(
+      `INSERT INTO storefront_products (shop_id, product_id, published, updated_by, updated_at)
+       SELECT account_id, row_id, true, 'loadtest', $2 FROM sync_rows
+        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='products'`, [shopId, at]);
   }
-}
+  const scaleOf = (k) => Object.fromEntries(Object.entries(REFERENCE).map(([key, v]) => [key, key === 'days' ? v : Math.max(1, Math.round(v * k))]));
+  const dataset = { big: scaleOf(CFG.scale), small: scaleOf(CFG.smallScale), rows: 0 };
+  const tSeed = performance.now();
+  const ledgers = {};
+  for (const sh of shops) {
+    const kind = sh.index === 0 ? 'big' : 'small';
+    const ledger = ledgers[kind] ||= makeReference(dataset[kind]);
+    const rows = [...syncRowsOf(ledger)];
+    dataset.rows += rows.length;
+    await seedRows(sh.shopId, rows);
+    //  نمونه‌ای از کالاها برای «صفحهٔ کالا»، سبد و opهای فروش (همه منتشرشده و قیمت‌دار)
+    sh.products = ledger.products.filter((p) => p.salePrice > 0).slice(0, 400)
+      .map((p) => ({ id: p.id, name: p.name, priceMinor: Math.round(p.salePrice * 100), buyMinor: Math.round(p.purchasePrice * 100) }));
+    sh.terms = [...new Set(ledger.products.slice(0, 2000).map((p) => String(p.name).split(/\s+/)[0]).filter(Boolean))].slice(0, 40);
+  }
+  dataset.seedMs = Math.round(performance.now() - tSeed);
+  step(`${dataset.rows} ردیفِ دفتر کاشته شد`);
+  if (!db.isPglite()) await db.query('ANALYZE');
+  else {
+    try { await require(path.join(SERVER, 'src', 'lib', 'pglite-stats.js')).analyzeNow(); } catch { /* بی آن */ }
+  }
 
-step(`${CFG.phonesPerShop} شمارهٔ تأییدشده در ${checkoutShops.length} ویترین`);
-dataset.setupMs = Math.round(performance.now() - tSetup);
-dataset.server = db.isPglite() ? 'pglite' : (await db.one('SHOW server_version')).server_version;
-dataset.poolMax = db.isPglite() ? 1 : Number(process.env.PG_POOL_MAX || 10);
-dataset.workers = workers;
-dataset.gc = !!global.gc;
+  //  پلِ v1 ⇒ v3: دفترِ کاشته‌شده در v1 است و نخستین pull ِ v3 هر دکان تا ۳×۱۰۰۰ op ِ آن را درونِ
+  //  همان درخواست تبدیل می‌کند (`catchUp`ِ lib/sync-v3). دکانِ واقعی این را یک بار هنگامِ رفتن به v3
+  //  می‌پردازد؛ این‌جا پیش از بار و جدا سنجیده می‌شود تا بارِ پایدار با پلِ تمام‌شده باشد.
+  const sync3 = require(path.join(SERVER, 'src', 'lib', 'sync-v3.js'));
+  const tBridge = performance.now();
+  let bridged = 0;
+  for (const sh of shops) {
+    const ctx = { app: 'shop', accountKind: 'shop', accountId: sh.shopId };
+    for (let i = 0; i < 100000; i++) {
+      const r = await sync3.bridge(ctx, { max: 2000 });
+      bridged += r.imported || 0;
+      if (!r.behind) break;
+    }
+  }
+  dataset.bridge = { ops: bridged, ms: Math.round(performance.now() - tBridge) };
+  dataset.bridge.opsPerSec = Math.round(bridged / Math.max(0.001, dataset.bridge.ms / 1000));
+  step(`پلِ v1⇒v3: ${bridged} op، ${dataset.bridge.opsPerSec} op/s`);
+
+  // ── شماره‌های تأییدشدهٔ مشتری (هر شماره ۱۰ سفارش در ساعت در هر دکان: RSK-07) ──
+  let phoneSeq = 0;
+  const checkoutShops = shops.slice(0, CFG.checkoutShops);
+  for (const sh of checkoutShops) {
+    sh.tickets = [];
+    for (let i = 0; i < CFG.phonesPerShop; i++) {
+      const phone = `079${String(1000000 + (++phoneSeq)).slice(-7)}`;
+      const st = await call('POST', `/api/store/${sh.slug}/verify/start`, { body: { phone } });
+      const ck = await call('POST', `/api/store/${sh.slug}/verify/check`, { body: { phone, code: st.devCode } });
+      sh.tickets.push({ phone, ticket: ck.ticket });
+    }
+  }
+
+  step(`${CFG.phonesPerShop} شمارهٔ تأییدشده در ${checkoutShops.length} ویترین`);
+  dataset.setupMs = Math.round(performance.now() - tSetup);
+  dataset.server = db.isPglite() ? 'pglite' : (await db.one('SHOW server_version')).server_version;
+  dataset.poolMax = db.isPglite() ? 1 : Number(process.env.PG_POOL_MAX || 10);
+  dataset.workers = workers;
+  dataset.gc = !!global.gc;
+  return { dataset, shops };
+}
 
 process.on('message', async (m) => {
   try {
@@ -260,5 +264,6 @@ process.on('message', async (m) => {
     process.send({ type: 'error', id: m.id, error: String(e && e.message) });
   }
 });
+const seeded = CFG.follower ? { dataset: null, shops: [] } : await seedAll();
 await stats();
-process.send({ type: 'ready', base, dataset, shops });
+process.send({ type: 'ready', base, ...seeded });
