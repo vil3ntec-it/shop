@@ -11,6 +11,16 @@ const { conflict } = require('../middleware/errors');
 
 const PUBLIC_ID_FLAG = 'market.public_id';
 const PUBLIC_ID_RE = /^[0-9A-HJKMNP-TV-Z]{26}$/;
+/**
+ * ضدِ جعلِ نشانی (ممیزیِ امنیتِ ویترین ۱۴۰۵/۰۸/۱۶): نشانیِ رهاشدهٔ دکان (QR ِ چاپی، پیوندِ پیگیری،
+ * نشانک) همان دم به دستِ دکانِ دیگر می‌افتاد و مشتری بی‌خبر در ویترینِ او سفارش می‌داد. با این پرچم
+ * (پیش‌فرض خاموش ⇒ همان S3: «نشانیِ زنده مقدم است»، تصمیمِ صاحب محصول) برای **دکانِ پیشین** ⇒ سه
+ * نشانیِ تازه‌ترِ پیشینش یک سال برای خودش نگه داشته می‌شود (دکانِ دیگر ⇒ همان ۴۰۹ `slug_taken`).
+ * سه، تا دکانی با عوض کردنِ پیاپیِ نشانی نام‌ها را احتکار نکند؛ کهنه‌ترها و پس از یک سال آزادند.
+ */
+const SLUG_HOLD_FLAG = 'market.slug_hold';
+const SLUG_HOLD_MS = 365 * 24 * 60 * 60 * 1000;
+const SLUG_HOLD_PER_SHOP = 3;
 
 module.exports = ({ open, str, SLUG_RE }) => {
 /** پرچمِ S3 برای این دکان — خاموش ⇒ پاسخ‌ها همان امروزند. */
@@ -60,7 +70,7 @@ async function byPublicId(publicId) {
  */
 async function claimSlug(c, shopId, oldSlug, slug, at) {
   const taken = (await c.query('SELECT 1 FROM storefronts WHERE slug = $1 AND shop_id <> $2', [slug, shopId])).rows[0];
-  if (taken) throw conflict('این نشانی را دکانِ دیگری گرفته است', 'slug_taken');
+  if (taken || await heldByOther(c, shopId, slug, at)) throw conflict('این نشانی را دکانِ دیگری گرفته است', 'slug_taken');
   await c.query('DELETE FROM storefront_slug_redirects WHERE old_slug = $1', [slug]);
   if (oldSlug && oldSlug !== slug) {
     await c.query(
@@ -71,5 +81,17 @@ async function claimSlug(c, shopId, oldSlug, slug, at) {
   }
 }
 
-return { PUBLIC_ID_FLAG, PUBLIC_ID_RE, publicIdOn, movedTo, byPublicId, claimSlug };
+/** نشانیِ پیشینِ دکانِ دیگر که هنوز برایش نگه داشته است (`SLUG_HOLD_FLAG` ِ همان دکان)؟ درونِ همان تراکنش. */
+async function heldByOther(c, shopId, slug, at) {
+  const r = (await c.query(
+    `SELECT r.shop_id FROM storefront_slug_redirects r JOIN storefronts sf ON sf.shop_id = r.shop_id
+      WHERE r.old_slug = $1 AND r.shop_id <> $2 AND r.created_at > $3
+        AND (SELECT COUNT(*) FROM storefront_slug_redirects x WHERE x.shop_id = r.shop_id
+              AND (x.created_at > r.created_at OR (x.created_at = r.created_at AND x.old_slug > r.old_slug))) < $4`,
+    [slug, shopId, at - SLUG_HOLD_MS, SLUG_HOLD_PER_SHOP]
+  )).rows[0];
+  return Boolean(r) && orders.flagOf(r.shop_id, SLUG_HOLD_FLAG, (t, p) => c.query(t, p));
+}
+
+return { PUBLIC_ID_FLAG, PUBLIC_ID_RE, SLUG_HOLD_FLAG, publicIdOn, movedTo, byPublicId, claimSlug };
 };

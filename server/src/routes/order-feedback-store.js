@@ -27,7 +27,8 @@ const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'stor
 const writeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-feedback-write' });
 const orderLimit = rateLimit({
   max: config.rateLimit.storeFeedbackMax, windowMs: 60 * 60 * 1000, keyPrefix: 'store-feedback-order',
-  key: (req) => `${req.params.slug}:${req.params.token}`,
+  //  نشانیِ بهنجار (همان trim و کوچک کردنِ `sf.open`)، وگرنه `/ABC/` یا `/abc%20/` ِ همان سفارش سطلِ تازه می‌گرفت
+  key: (req) => `${String(req.params.slug || '').trim().toLowerCase()}:${req.params.token}`,
 });
 
 const store = async (req, res, next) => {
