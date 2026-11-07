@@ -100,7 +100,8 @@ class EasySetupWiringTest {
     //  بارکدخوانِ صندوق دست نمی‌خورد: همان HwTools
     val scan = main.resolve("scan/ScanPrefs.kt").readText()
     assertFalse(scan.contains("EasySetup"))
-    assertTrue(scan.contains("fun current(): ScanConfig = if (HwTools.on.value) saved.value else ScanConfig()"))
+    //  HW دورِ ۳۴ (#952): همان دروازهٔ HwTools، با «پایدار» ِ همیشگی برای صندوق — هنوز بی وابستگی به EasySetup
+    assertTrue(scan.contains("fun current(): ScanConfig = if (HwTools.on.value) saved.value.copy(steady = true) else ScanConfig()"))
   }
 
   @Test fun `بارکدهای برگه در کاغذِ ۵۸ و ۸۰ میلی‌متری جا می‌شوند`() {
