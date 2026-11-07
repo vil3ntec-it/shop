@@ -237,7 +237,22 @@ await page.waitForTimeout(400);
   const q = await rect('#q');
   const hit = await rect('#products li.p-card');
   ok(await page.isHidden('#banners') && await page.isHidden('#picks'), 'با تایپ بنرها و ردیف‌ها کنار می‌روند (WEB-05)');
-  ok(q && hit && hit.top < 760 && hit.top - q.bottom < 200, 'نتیجهٔ جست‌وجو درست زیرِ کادر، در صفحهٔ اول', JSON.stringify({ q, hit }));
+  //  «درست زیرِ کادر» = میانِ کادر و نخستین نتیجه فقط ابزارهای خودِ فهرست است (دسته‌ها، فیلتر، شمار و مرتب‌سازی، یادداشتِ
+  //  موجودی)، نه بنر یا ردیف. فاصلهٔ پیکسلی جایگزینِ این نیست: پیچیدنِ تراشه‌ها به خطِ دوم میانِ کرومیومِ محلی و CI فرق دارد.
+  const between = await page.evaluate(() => {
+    const qb = document.querySelector('#q').getBoundingClientRect().bottom;
+    const ht = document.querySelector('#products li.p-card').getBoundingClientRect().top;
+    const ids = new Set();
+    for (const el of document.querySelectorAll('#view-catalog *')) {
+      const r = el.getBoundingClientRect();
+      if (r.height < 1 || r.top < qb - 1 || r.bottom > ht + 1) continue;
+      const a = el.closest('[id]');
+      ids.add(a ? a.id : '?');
+    }
+    return [...ids];
+  });
+  const tools = new Set(['cats', 'filters', 'fl-price', 'fl-count', 'stock-note', 'cat-count', 'sort']);
+  ok(q && hit && hit.top < 760 && between.every((id) => tools.has(id)), 'نتیجهٔ جست‌وجو درست زیرِ کادر، در صفحهٔ اول', JSON.stringify({ q, hit, between }));
   await shot('03-search-results-phone');
   await page.fill('#q', '');
   await page.waitForFunction(() => document.querySelectorAll('#products li.p-card').length === 12, null, { timeout: 8000 }).catch(() => {});
