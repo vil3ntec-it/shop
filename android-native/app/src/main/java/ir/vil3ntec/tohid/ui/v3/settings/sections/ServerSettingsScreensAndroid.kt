@@ -84,6 +84,8 @@ internal fun rememberServerSections(): Set<String> {
     if (online) add(SettingsLayout.ONLINE_ORDERS)
     //  نشانی و نقشهٔ دکان (ممیزیِ ویترین): همان درِ «سفارشِ آنلاین» — دکانِ بی ویترین این ردیف را نمی‌بیند
     if (online) add(SettingsLayout.STORE_PLACE)
+    //  WEB-09: «کالای ناموجود در ویترین» — همان در؛ پیوند به «ویترین ⇐ تنظیمات»
+    if (online) add(SettingsLayout.STORE_STOCK)
   }
 }
 

@@ -169,6 +169,8 @@ data class StorefrontSettingsDto(
   /** نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (مهاجرتِ ۲۱۵)؛ سرورِ پیشین ⇒ خالی */
   val pickupAddress: String = "",
   val pickupPin: StorefrontPinDto? = null,
+  /** WEB-09 (مهاجرتِ ۲۴۰): «کالای ناموجود را در ویترین پنهان کن» — سرور پالایش می‌کند؛ سرورِ پیشین ⇒ خاموش */
+  val hideOutOfStock: Boolean = false,
   val updatedAt: Long = 0,
 )
 

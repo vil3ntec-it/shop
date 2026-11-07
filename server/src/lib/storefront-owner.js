@@ -25,6 +25,8 @@ function settingsView(sf, status = null) {
     declaredUntil: sf.declared_until === null || sf.declared_until === undefined ? null : Number(sf.declared_until),
     //  «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، `lib/order-flow.js`) — تنظیمِ خصوصیِ دکان، نه نمای عمومی
     payAfterAccept: sf.pay_after_accept === true,
+    //  WEB-09 (مهاجرتِ ۲۴۰): «کالای ناموجود را در ویترین پنهان کن» — پیش‌فرض خاموش؛ پالایه فقط در سرور (`storefront-filters.hiding`)
+    hideOutOfStock: sf.hide_out_of_stock === true,
     //  مهاجرتِ ۲۱۵ — خامِ خانه‌های تنظیم برای برنامهٔ صاحب (عمومی فقط `place`)
     pickupAddress: sf.pickup_address || '',
     pickupPin: Number.isFinite(sf.pickup_lat) && Number.isFinite(sf.pickup_lng) ? { lat: sf.pickup_lat, lng: sf.pickup_lng } : null,
@@ -166,6 +168,10 @@ async function saveSettings(shopId, body, userId) {
     if (has('pickupPin')) {
       const p = pinOf(b.pickupPin);
       await c.query('UPDATE storefronts SET pickup_lat = $2, pickup_lng = $3 WHERE shop_id = $1', [shopId, p ? p.lat : null, p ? p.lng : null]);
+    }
+    //  مهاجرتِ ۲۴۰ (WEB-09): مثلِ ۲۱۰ جدا از `v`؛ نیامدنِ کلید (برنامهٔ پیشین) ⇒ همان مقدارِ پیشین
+    if (has('hideOutOfStock')) {
+      await c.query('UPDATE storefronts SET hide_out_of_stock = $2 WHERE shop_id = $1', [shopId, bool(b.hideOutOfStock, 'پنهان کردنِ کالای ناموجود')]);
     }
     //  مهاجرتِ ۲۱۰: جدا از `v` تا به دفترِ تغییرهای بازار (S6) نرود
     if (has('payAfterAccept')) {

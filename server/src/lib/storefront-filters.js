@@ -85,20 +85,53 @@ function validate(query) {
   return f.brand || f.minPrice !== null || f.maxPrice !== null || f.inStock || f.attr ? f : null;
 }
 
-/** شرطِ «فقط موجود» در SQL — یا `AND FALSE` وقتی موجودی نامعلوم است (هرگز «موجود» ِ ساختگی). */
-async function stockWhere(shopId, params) {
+/** سیاستِ موجودیِ دکان وقتی موجودی دانسته است (پرچمِ `shop.catalog` و دفترِ تازه) — وگرنه null. */
+async function knownStock(shopId) {
   const stock = require('./stock');
   const catalog = require('./catalog');
-  if (!(await stock.flagOf(shopId))) return ' AND FALSE';
+  if (!(await stock.flagOf(shopId))) return null;
   const at = now();
   await catalog.refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
-  if (!(await catalog.freshness(shopId, settings, at)).fresh) return ' AND FALSE';
+  return (await catalog.freshness(shopId, settings, at)).fresh ? settings : null;
+}
+
+/** شرطِ «فقط موجود» در SQL — یا `AND FALSE` وقتی موجودی نامعلوم است (هرگز «موجود» ِ ساختگی). */
+async function stockWhere(shopId, params) {
+  const settings = await knownStock(shopId);
+  return settings ? sellableSql(settings, params) : ' AND FALSE';
+}
+
+/** همان شرطِ نشانِ «موجود/در انبار» ِ `catalog.badgeOf` (کالای فعالِ کاتالوگ + جمعِ مکان‌های فروختنی > ۰) */
+function sellableSql(settings, params) {
   params.push(settings.sellableLocations);
   return ` AND EXISTS (SELECT 1 FROM catalog_products cpx WHERE cpx.shop_id = sp.shop_id AND cpx.product_id = sp.product_id
       AND cpx.active AND NOT cpx.deleted)
     AND (SELECT COALESCE(SUM(sl.on_hand_milli), 0) FROM stock_levels sl WHERE sl.shop_id = sp.shop_id AND sl.branch_id = ''
       AND sl.product_id = sp.product_id AND sl.location = ANY($${params.length}::text[])) > 0`;
+}
+
+/**
+ * WEB-09: «کالای ناموجود را در ویترین پنهان کن» (`storefronts.hide_out_of_stock`، مهاجرتِ ۲۴۰، پیش‌فرض خاموش) روی
+ * پالایه‌های WEB-07 (`base`، شاید null). ⛔ فقط ناموجودِ **دانسته** کنار می‌رود — همان `suggestable` ِ قفسه (نشانِ
+ * `out_of_stock`/`unavailable` ِ کارت، «پیدا نکردم» ِ جمع‌آور هم)؛ موجودیِ نامعلوم (پرچمِ `shop.catalog` خاموش یا دفترِ
+ * کهنه) هرگز پنهان نمی‌شود، پس دکانِ بی دفتر هیچ کالایی گم نمی‌کند. پیش‌پالایه در SQL همان «فقط موجود» است وقتی دفتر
+ * تازه است ⇒ صفحه‌ها پُر و نشانگر همان (از آخرین ردیفِ خوانده‌شده). خاموش ⇒ همان `base`، بیت‌به‌بیت.
+ */
+function hiding(base, on) {
+  if (!on) return base;
+  const { suggestable } = require('./storefront-shelf');
+  return {
+    ...(base || {}),
+    where: async (sid, params) => `${base ? await base.where(sid, params) : ''}${await hideWhere(sid, params)}`,
+    keep: (items) => (base ? base.keep(items) : items).filter(suggestable),
+  };
+}
+
+/** پیش‌پالایهٔ WEB-09 در SQL: موجودیِ دانسته ⇒ همان «فقط موجود»؛ نامعلوم ⇒ هیچ (هیچ کالایی پنهان نمی‌شود). */
+async function hideWhere(shopId, params) {
+  const settings = await knownStock(shopId);
+  return settings ? sellableSql(settings, params) : '';
 }
 
 /** پالایهٔ نهایی روی کارت‌ها (پس از نشانِ موجودی): قیمتِ دقیقِ `priceOf` و نشانِ «موجود» ِ همان کارت. */
@@ -159,4 +192,4 @@ async function facets(shopId) {
   };
 }
 
-module.exports = { FLAG_KEY, MAX_BRANDS, MAX_ATTR_NAMES, MAX_ATTR_VALUES, SELLABLE, flagOn, validate, parse, facets, BRAND_SQL, PRICE_SQL };
+module.exports = { FLAG_KEY, MAX_BRANDS, MAX_ATTR_NAMES, MAX_ATTR_VALUES, SELLABLE, flagOn, validate, parse, facets, hiding, hideWhere, BRAND_SQL, PRICE_SQL };

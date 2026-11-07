@@ -244,7 +244,8 @@ class SettingsPortTest {
     assertEquals(
       //  «سفارشِ آنلاین» (۱۴۰۵/۰۸/۱۳): پشتِ پاسخِ `/shop/orders/config` (`onlineOrdersRow`)، نه پرچم
       //  «نشانی و نقشهٔ دکان» (ممیزیِ ویترین ۱۴۰۵/۰۸/۱۷): پیوند به «ویترین ⇐ تنظیمات»، پشتِ همان درِ «سفارشِ آنلاین»
-      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD, SettingsLayout.ONLINE_ORDERS, SettingsLayout.STORE_PLACE),
+      //  «کالای ناموجود در ویترین» (WEB-09): همان پیوند و همان در
+      setOf(SettingsLayout.OWNER_REPORT, SettingsLayout.STOREFRONT_ETA, SettingsLayout.PROMO_GUARD, SettingsLayout.ONLINE_ORDERS, SettingsLayout.STORE_PLACE, SettingsLayout.STORE_STOCK),
       SettingsLayout.SERVER_GATED,
     )
     SettingsLayout.SERVER_GATED.forEach { key ->

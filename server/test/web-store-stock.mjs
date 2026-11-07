@@ -10,6 +10,8 @@
  *     هیچ «ناموجود»؛ یادداشتِ «در حال بررسی» پنهان (وضعیت دانسته است)؛
  *   • برگهٔ کالا همان متن و دکمهٔ افزودنِ باز؛ با `showQty = hidden` وضعیت همان؛
  *   • کالای بی موجودی در همان صفحه «ناموجود» و دکمه‌اش بسته — مرزِ مقابل؛
+ *   • WEB-09: «کالای ناموجود را پنهان کن» ِ دکان ⇒ کارتش نیست، کالای موجود هست، پیوندِ مستقیمش «ناموجود» با دکمهٔ
+ *     بسته؛ خاموش ⇒ دوباره دیده می‌شود (پالایه فقط در سرور، بی JS ِ تازه)؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -123,6 +125,21 @@ ok(await page.isEnabled('#ps-add'), 'برگهٔ کالا: دکمهٔ افزود�
 await call('PUT', '/api/shop/catalog/settings', { showQty: 'hidden' }, T);
 ({ card, text } = await look());
 ok(text.includes('در انبار، آماده‌سازی ~۴۵ دقیقه') && !text.includes('ناموجود'), 'showQty = hidden ⇒ همان «در انبار»');
+
+//  WEB-09: «کالای ناموجود را پنهان کن» ِ دکان (مهاجرتِ ۲۴۰) — سرور پالایش می‌کند، صفحه همان را می‌کشد (بی JS ِ تازه)
+const hid = await call('PUT', '/api/shop/storefront', { hideOutOfStock: true }, T);
+ok(hid.status === 200 && hid.body.settings.hideOutOfStock === true, 'WEB-09: دکان «کالای ناموجود را پنهان کن» را روشن کرد');
+({ card, text } = await look());
+ok(await page.locator('#products li[data-id="oil"]').count() === 0, 'WEB-09 روشن: کارتِ کالای ناموجود در ویترین نیست');
+ok(text.includes('در انبار، آماده‌سازی ~۴۵ دقیقه'), 'WEB-09 روشن: کالای موجود همان‌جاست');
+await page.goto(`${base}/store/${slug}#/p/oil`);   //  پیوندِ کالا (`/p/<id>` با سئو هم به همین `#/p/` می‌رسد)
+await page.waitForSelector('#product-sheet:not([hidden]) #ps-stock .pill', { timeout: 10000 });
+ok((await page.textContent('#ps-stock')).includes('ناموجود') && await page.isDisabled('#ps-add'),
+  'WEB-09 روشن: پیوندِ مستقیمِ کالای پنهان همان «ناموجود» با دکمهٔ بسته (پیوند نمی‌شکند)');
+const shown = await call('PUT', '/api/shop/storefront', { hideOutOfStock: false }, T);
+ok(shown.status === 200 && shown.body.settings.hideOutOfStock === false, 'WEB-09: دوباره «نشان بده»');
+await look();
+ok(await page.locator('#products li[data-id="oil"]').count() === 1, 'WEB-09 خاموش: کالای ناموجود دوباره با «ناموجود» دیده می‌شود');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));

@@ -228,12 +228,14 @@ const PRODUCT_FROM = `storefront_products sp
   JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id AND ${NOT_HIDDEN}`;
 const sfc = require('./storefront-catalog')({ SHOP_ROWS, PRODUCT_FROM, NOT_HIDDEN, PRODUCT_ID_RE, MAX_PRICE_MINOR, MAX_QTY_MILLI, obj, int, bool, text, isActive, priceOf });   //  S1 و M2 (شرح همان‌جا)
 
-async function categories(shopId) {
+async function categories(shopId, { hide = false } = {}) {
+  const params = [shopId];
+  const hidden = hide ? await require('./storefront-filters').hideWhere(shopId, params) : '';   //  WEB-09: دستهٔ همه‌ناموجود نه
   const rows = await many(
     `SELECT DISTINCT r.data->>'category' AS c FROM ${await sfc.productFrom(shopId)}
-      WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''
+      WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''${hidden}
       ORDER BY 1 LIMIT 60`,
-    [shopId]
+    params
   );
   return rows.map((r) => text(r.c, 80)).filter(Boolean);
 }
