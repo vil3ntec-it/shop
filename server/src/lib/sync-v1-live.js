@@ -534,7 +534,7 @@ function relayHere(ctx, payload, exceptDevice = '') {
 }
 
 /* ---- گذرگاهِ خوشه: فقط اتاقِ دکان (`app` = shop)؛ پمپ همان رساندنِ محلیِ پیشین ---- */
-const shopRoom = (ctx) => Boolean(ctx && ctx.app === 'shop' && ctx.accountId);
+const shopRoom = (ctx) => s78(ctx) && Boolean(ctx.accountId);
 const roomOf = (ctx) => ({ app: ctx.app, accountKind: ctx.accountKind, accountId: ctx.accountId });
 cluster.subscribe('live', (d) => {
   const c = d.c && typeof d.c === 'object' ? { app: String(d.c.app || ''), accountKind: String(d.c.accountKind || ''), accountId: String(d.c.accountId || '') } : null;
