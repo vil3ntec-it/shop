@@ -246,12 +246,13 @@ await page.waitForTimeout(400);
     for (const el of document.querySelectorAll('#view-catalog *')) {
       const r = el.getBoundingClientRect();
       if (r.height < 1 || r.top < qb - 1 || r.bottom > ht + 1) continue;
-      const a = el.closest('[id]');
-      ids.add(a ? a.id : '?');
+      //  ردیفِ «N کالا · مرتب‌سازی» (`.cat-head`) شناسه ندارد؛ با نامِ خودش، نه با `view-catalog` ِ بالادست
+      const a = el.closest('[id], .cat-head');
+      ids.add(a ? (a.id || 'cat-head') : '?');
     }
     return [...ids];
   });
-  const tools = new Set(['cats', 'filters', 'fl-price', 'fl-count', 'stock-note', 'cat-count', 'sort']);
+  const tools = new Set(['cats', 'filters', 'fl-price', 'fl-count', 'stock-note', 'cat-head', 'cat-count', 'sort']);
   ok(q && hit && hit.top < 760 && between.every((id) => tools.has(id)), 'نتیجهٔ جست‌وجو درست زیرِ کادر، در صفحهٔ اول', JSON.stringify({ q, hit, between }));
   await shot('03-search-results-phone');
   await page.fill('#q', '');
