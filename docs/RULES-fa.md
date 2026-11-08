@@ -1053,8 +1053,12 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 
 ### برنامه: دیسک، شناسه و همگام‌سازی (Sync v1)
 - ⛔ **F0-01 (#193):** هر نوشتنِ دفتر، بایگانیِ دفتر و پشتیبانِ خودکار روی دیسک فقط از `data/DiskWrite.kt` (فایلِ
-  کناری + fsync ⇐ `Files.move(ATOMIC_MOVE, REPLACE_EXISTING)` ⇐ جایگزینِ `REPLACE_EXISTING` با سه تلاش ⇐ fsyncِ
-  پوشه؛ شکست = `IOException`). `tmp.renameTo(file)`ِ بی‌بررسی برنمی‌گردد — روی ویندوز فایلِ موجود را جایگزین
+  کناری + fsync ⇐ `Files.move(ATOMIC_MOVE, REPLACE_EXISTING)` ⇐ جایگزینِ `REPLACE_EXISTING`، تا پنج دور با درنگِ
+  ۵۰/۱۰۰/۲۰۰/۴۰۰ میلی‌ثانیه برای قفلِ ضدویروسِ ویندوز ⇐ fsyncِ پوشه — روی ویندوز تلاش نمی‌شود و هیچ‌جا نوشتن را
+  نمی‌شکند؛ شکست = `IOException`). نسخهٔ پیشین (`.prev`) پیوندِ سخت است و روی دیسکِ بی پیوند (FAT/exFAT، درایوِ شبکه)
+  **رونوشت با همان زمانِ فایل** (`LedgerRecovery.best` با زمان می‌چیند). تنظیماتِ کامپیوتر (`DesktopPrefs`، `.bak`)،
+  جابه‌جاییِ پشتیبانِ پوشه (`BackupMirror`) و هاب هم فقط از همین. خطای ویندوز در آزمون **ساختگی** است
+  (`DiskWrite.fs`، `WindowsDiskFaultsTest`)؛ کارِ `disk-windows` روی ویندوز و مکِ واقعی همان را می‌دواند. `tmp.renameTo(file)`ِ بی‌بررسی برنمی‌گردد — روی ویندوز فایلِ موجود را جایگزین
   نمی‌کند. دفترِ حافظه **فقط پس از** نشستن روی دیسک عوض می‌شود، دفترِ دیسک‌نشده op نمی‌سازد، `save` شکست را
   `false` می‌دهد و `ShopStore.diskError` پیامِ «ذخیره نشد» را نشان می‌دهد. سنجه: `ShopStoreDiskTest` (کارِ
   `disk-windows` روی `windows-latest` در `tohid-desktop.yml`) و `DiskWriteTest`.

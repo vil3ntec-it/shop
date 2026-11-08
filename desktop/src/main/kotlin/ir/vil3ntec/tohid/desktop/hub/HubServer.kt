@@ -19,6 +19,7 @@ import ir.vil3ntec.tohid.core.hub.HubQueue
 import ir.vil3ntec.tohid.core.hub.HubQueueState
 import ir.vil3ntec.tohid.core.hub.HubRoute
 import ir.vil3ntec.tohid.core.hub.HubVerdict
+import ir.vil3ntec.tohid.data.DiskWrite
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -30,8 +31,6 @@ import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.nio.ByteBuffer
 import java.nio.charset.CodingErrorAction
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
@@ -355,7 +354,8 @@ internal object HubFiles {
       out.fd.sync()
     }
     ownerOnly(tmp)
-    Files.move(tmp.toPath(), f.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+    //  همان جابه‌جاییِ دفتر (F0-01): قفلِ لحظه‌ایِ ضدویروسِ ویندوز ⇒ چند دورِ دیگر با درنگ، نه شکستِ بی‌درنگ
+    DiskWrite.move(tmp, f)
   }
 
   fun ownerOnly(f: File) {
