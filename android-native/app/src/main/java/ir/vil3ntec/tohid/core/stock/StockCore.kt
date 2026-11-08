@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.stock
 
+import ir.vil3ntec.tohid.core.text.JsText
 import java.math.BigInteger
 
 /**
@@ -208,8 +209,9 @@ object StockCore {
 
   /** round(a × b / c) با نیمه به سمتِ +∞ (همان Math.round) = floorDiv(2ab + c, 2c)؛ c > 0 */
   fun mulDivRound(a: Long, b: Long, c: Long): Long {
-    require(c > 0) { "stock-core: mulDivRound needs c > 0" }
-    return try {
+    //  همان JS: ورودی و حاصل فقط درونِ ±(۲^۵۳−۱)؛ بیرون ⇒ خطا، نه عددِ بزرگ‌تر (§۲۸.۴)
+    require(safe(a) && safe(b) && safe(c) && c > 0) { "stock-core: mulDivRound needs safe integers and c > 0" }
+    val out = try {
       val n = Math.addExact(Math.multiplyExact(Math.multiplyExact(a, b), 2L), c)
       Math.floorDiv(n, Math.multiplyExact(c, 2L))
     } catch (e: ArithmeticException) {
@@ -220,11 +222,14 @@ object StockCore {
       if (q.bitLength() > 63) throw ArithmeticException("stock-core: overflow")
       q.toLong()
     }
+    if (!safe(out)) throw ArithmeticException("stock-core: overflow")
+    return out
   }
 
   // ---------------------------------------------------------------- تاریخ
 
-  private val ISO = Regex("""^(\d{4})-(\d{2})-(\d{2})$""")
+  //  `[0-9]` نه `\d`: روی اندروید (ICU) `\d` رقمِ فارسی را هم می‌گیرد و JS نه
+  private val ISO = Regex("""^([0-9]{4})-([0-9]{2})-([0-9]{2})$""")
 
   fun isoDateOk(s: String): Boolean {
     val m = ISO.matchEntire(s) ?: return false
@@ -243,13 +248,14 @@ object StockCore {
 
   /** نخستین ایرادِ سند، یا null — ترتیبِ بررسی همان `validate`ِ JS است */
   fun validate(doc: StockDoc): String? {
-    if (doc.id.isBlank()) return "id_required"
+    //  «خالی» همان `s.trim() === ""` ِ JS (BOM خالی است، U+001F نه) — JsText
+    if (JsText.isBlank(doc.id)) return "id_required"
     val spec = TYPES[doc.type] ?: return "unknown_type"
-    if (doc.productId.isBlank()) return "product_required"
-    if (doc.warehouseId.isBlank()) return "warehouse_required"
-    if (doc.userId.isBlank()) return "user_required"
+    if (JsText.isBlank(doc.productId)) return "product_required"
+    if (JsText.isBlank(doc.warehouseId)) return "warehouse_required"
+    if (JsText.isBlank(doc.userId)) return "user_required"
     if (doc.at <= 0 || !safe(doc.at)) return "time_required"
-    if (spec.reason && doc.reason.isNullOrBlank()) return "reason_required"
+    if (spec.reason && JsText.isBlank(doc.reason)) return "reason_required"
 
     val q = doc.qtyMilli
     when {
@@ -264,7 +270,7 @@ object StockCore {
     if (spec.cost == CostRule.REQUIRED && doc.costMinor == null) return "cost_required"
 
     doc.lot?.let { lot ->
-      if (lot.lotId.isBlank()) return "bad_lot"
+      if (JsText.isBlank(lot.lotId)) return "bad_lot"
       val pd = normDate(lot.productionDate)
       val ed = normDate(lot.expiryDate)
       if (pd != null && !isoDateOk(pd)) return "bad_date"

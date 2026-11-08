@@ -423,7 +423,7 @@ const val ONLINE_SERIES = "W"
  *  `null` اگر فاکتور شماره ندارد. شماره‌های قبلی همان‌طور می‌مانند.
  */
 fun Sale.invoiceLabel(): String? =
-  invoiceNumber?.let { n -> series?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it-$n" } ?: n.toString() }
+  invoiceNumber?.let { n -> series?.let(ir.vil3ntec.tohid.core.text.JsText::trim)?.takeIf { it.isNotEmpty() }?.let { "$it-$n" } ?: n.toString() }  // trim ِ JS (saleLabel)
 
 @Serializable
 data class SaleItem(

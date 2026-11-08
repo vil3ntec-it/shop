@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import ir.vil3ntec.tohid.core.calendar.BusinessDay
 import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.text.JsText
 import kotlin.math.floor
 
 /**
@@ -73,12 +74,12 @@ class ReportLedger private constructor() {
   companion object {
     fun parse(raw: JsonObject): ReportLedger {
       val l = ReportLedger()
-      raw.list("products").forEach { p -> l.products[p.s("id")] = Product(p.s("id"), p.s("name"), p.s("category").trim()) }
+      raw.list("products").forEach { p -> l.products[p.s("id")] = Product(p.s("id"), p.s("name"), JsText.trim(p.s("category"))) }
       raw.list("sales").forEach { s ->
         val x = Sale(
           id = s.s("id"), total = money(s, "total"), discount = money(s, "discount"), finalTotal = money(s, "finalTotal"),
-          method = s.s("paymentMethod"), cancelled = s.s("status") == "cancelled", seller = s.s("seller").trim(),
-          cancelledBy = s.s("cancelledBy").trim(), approvedBy = s.s("approvedBy").trim(), channel = s.s("channel").ifEmpty { "pos" },
+          method = s.s("paymentMethod"), cancelled = s.s("status") == "cancelled", seller = JsText.trim(s.s("seller")),
+          cancelledBy = JsText.trim(s.s("cancelledBy")), approvedBy = JsText.trim(s.s("approvedBy")), channel = s.s("channel").ifEmpty { "pos" },
           date = s.s("date"), createdAt = ms(s, "createdAt"),
         )
         l.sales += x; l.saleById[x.id] = x
@@ -96,7 +97,7 @@ class ReportLedger private constructor() {
         l.returns += Return(
           id = r.s("id"), saleId = r.s("saleId"), saleItemId = r.s("saleItemId"), productId = r.s("productId"),
           //  `by` همان فیلدِ `SaleReturn` ِ برنامه (جریانِ تازهٔ برگشت و «سابقهٔ ضدتقلب»)؛ `user` شکلِ دفترِ وب
-          qty = milli(r, "quantity"), amount = money(r, "amount"), user = r.s("by").ifEmpty { r.s("user") }.trim(), approvedBy = r.s("approvedBy").trim(),
+          qty = milli(r, "quantity"), amount = money(r, "amount"), user = JsText.trim(r.s("by").ifEmpty { r.s("user") }), approvedBy = JsText.trim(r.s("approvedBy")),
           date = r.s("date"), createdAt = ms(r, "createdAt"),
         )
       }
@@ -122,7 +123,7 @@ class ReportLedger private constructor() {
       raw.list("auditLog").forEach { a ->
         //  `by`/`at`/`approvedBy` همان شکلِ رویدادِ صندوقِ pay-core (#237) است؛ `user`/`createdAt` شکلِ سابقهٔ امروز
         l.audit += Audit(
-          a.s("id"), a.s("type"), a.s("refId"), a.s("by").ifEmpty { a.s("user") }.trim(), a.s("approvedBy").trim(),
+          a.s("id"), a.s("type"), a.s("refId"), JsText.trim(a.s("by").ifEmpty { a.s("user") }), JsText.trim(a.s("approvedBy")),
           money(a, "amount"), a.s("date"), ms(a, "createdAt").takeIf { it != 0L } ?: ms(a, "at"),
         )
       }
@@ -138,7 +139,8 @@ class ReportLedger private constructor() {
     private fun num(o: JsonObject, k: String): Double {
       val p = o[k] as? JsonPrimitive ?: return 0.0
       if (p is JsonNull) return 0.0
-      val d = if (p.isString) (if (p.content.isEmpty()) 0.0 else p.content.toDoubleOrNull()) else p.content.toDoubleOrNull()
+      //  رشته با همان `Number()` ِ JS (0x1F ⇒ ۳۱، 5d ⇒ NaN، فاصلهٔ نشکن بریده)، نه `toDoubleOrNull`
+      val d = if (p.isString) JsText.toNumber(p.content) else p.content.toDoubleOrNull()
       return if (d == null || d.isNaN() || d.isInfinite()) 0.0 else d
     }
 

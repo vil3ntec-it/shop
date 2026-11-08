@@ -76,11 +76,16 @@ object CustomerEngine {
   fun summaries(d: ShopData, now: Long = System.currentTimeMillis()): List<Summary> =
     d.debtors.map { summary(d, it, now) }
 
+  /** `\s` ِ JS (WhiteSpace ∪ LineTerminator) */
+  private const val JS_SPACE = "\\t\\n\\u000B\\f\\r \\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF"
+
   /**
    *  «فاکتور #۱۲» یا «فاکتور #B1-12» در شرحِ ردیف.
    *  سری (F0-03) اختیاری است: شرح‌های پیش از سری همان عدد را دارند.
    */
-  private val INVOICE = Regex("""فاکتور\s*#\s*(?:([A-Z][1-9][0-9]{0,3})-)?(\d+)""")  // داده: کلید یا سنجشِ منطق
+  //  همان `/فاکتور\s*#\s*…(\d+)/` ِ JS (`license/debt-book.js`): `\s` ِ JS فاصلهٔ نشکن و BOM را هم می‌گیرد و `\d` فقط لاتین است؛
+  //  `\s`/`\d` ِ Java/ICU نه (JVM فاصلهٔ نشکن را نمی‌گیرد، اندروید رقمِ فارسی را می‌گیرد) — پس کلاسِ صریح
+  private val INVOICE = Regex("""فاکتور[$JS_SPACE]*#[$JS_SPACE]*(?:([A-Z][1-9][0-9]{0,3})-)?([0-9]+)""")  // داده: کلید یا سنجشِ منطق
 
   fun invoiceNumberOf(notes: String): Int? = INVOICE.find(notes)?.groupValues?.get(2)?.toIntOrNull()
 

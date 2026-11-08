@@ -1,6 +1,6 @@
 {
  "version": 1,
- "about": "آزمون‌های مرجعِ هستهٔ گزارش (RPT-01/02/03/06/09/11). همین فایل را license/report-core.js (server/test/report-core.test.js) و core/report/ReportCore.kt (ReportCoreVectorsTest) می‌دوانند. پول = واحدِ کوچک (۱ افغانی = ۱۰۰)، مقدار = هزارم، درصد = بیسیس‌پوینت. clock = {offsetMinutes, dayStartMinute}؛ null یعنی date ذخیره‌شده. ورودی همان شکلِ دفترِ وب است. expect را با دست عوض نکن: هر تفاوت «تغییرِ رفتار» است.",
+ "about": "آزمون‌های مرجعِ هستهٔ گزارش (RPT-01/02/03/06/09/11). همین فایل را license/report-core.js (server/test/report-core.test.js) و core/report/ReportCore.kt (ReportCoreVectorsTest) می‌دوانند. پول = واحدِ کوچک (۱ افغانی = ۱۰۰)، مقدار = هزارم، درصد = بیسیس‌پوینت. clock = {offsetMinutes, dayStartMinute}؛ null یعنی date ذخیره‌شده. ورودی همان شکلِ دفترِ وب است. expect را با دست عوض نکن: هر تفاوت «تغییرِ رفتار» است. webOnly: دفترهایی که فقط شکلِ وب نگه می‌دارد (عدد به‌صورتِ متن)؛ ReportBridgeParityTest آن‌ها را نمی‌خواند.",
  "ledgers": {
   "kabul": {
    "products": [
@@ -1047,6 +1047,142 @@
      "by": "احمد",
      "date": "2026-10-11",
      "createdAt": 1791700060000
+    }
+   ]
+  },
+  "returnFirst": {
+   "products": [
+    {
+     "id": "p1",
+     "name": "چای",
+     "category": ""
+    }
+   ],
+   "warehouseEntries": [
+    {
+     "id": "w1",
+     "productId": "p1",
+     "units": 10,
+     "price": 100,
+     "date": "2026-10-01"
+    }
+   ],
+   "sales": [
+    {
+     "id": "s1",
+     "invoiceNumber": 1,
+     "total": 300,
+     "discount": 0,
+     "finalTotal": 300,
+     "paymentMethod": "cash",
+     "status": "completed",
+     "date": "2026-10-05"
+    }
+   ],
+   "saleItems": [
+    {
+     "id": "i1",
+     "saleId": "s1",
+     "productId": "p1",
+     "quantity": 2,
+     "unitPrice": 150,
+     "purchasePrice": 100,
+     "totalPrice": 300,
+     "returnedQty": 1
+    }
+   ],
+   "returns": [
+    {
+     "id": "r1",
+     "saleId": "s1",
+     "saleItemId": "i1",
+     "productId": "p1",
+     "quantity": 1,
+     "amount": 150,
+     "date": "2026-10-04"
+    }
+   ]
+  },
+  "messy": {
+   "products": [
+    {
+     "id": "p1",
+     "name": "چای",
+     "category": "﻿نوشیدنی"
+    },
+    {
+     "id": "p2",
+     "name": "نان",
+     "category": "خوراکی\u001f"
+    }
+   ],
+   "sales": [
+    {
+     "id": "s1",
+     "invoiceNumber": 1,
+     "total": " 300",
+     "discount": "1d",
+     "finalTotal": " 300",
+     "paymentMethod": "cash",
+     "status": "completed",
+     "seller": "﻿احمد",
+     "date": "2026-10-05"
+    },
+    {
+     "id": "s2",
+     "invoiceNumber": 2,
+     "total": 200,
+     "discount": 0,
+     "finalTotal": "0xC8",
+     "paymentMethod": "cash",
+     "status": "completed",
+     "seller": "احمد",
+     "date": "2026-10-06"
+    }
+   ],
+   "saleItems": [
+    {
+     "id": "i1",
+     "saleId": "s1",
+     "productId": "p1",
+     "quantity": 2,
+     "unitPrice": 150,
+     "purchasePrice": 100,
+     "totalPrice": " 300"
+    },
+    {
+     "id": "i2",
+     "saleId": "s2",
+     "productId": "p2",
+     "quantity": 1,
+     "unitPrice": 200,
+     "purchasePrice": "0x32",
+     "totalPrice": 200
+    }
+   ],
+   "debtors": [
+    {
+     "id": "d1",
+     "name": "رحیم"
+    }
+   ],
+   "transactions": [
+    {
+     "id": "t1",
+     "debtorId": "d1",
+     "type": "give",
+     "amount": " 3215",
+     "date": "2026-09-01"
+    }
+   ],
+   "auditLog": [
+    {
+     "id": "a1",
+     "type": "line_delete",
+     "refId": "s1",
+     "by": "\u001fکریم",
+     "amount": 10,
+     "date": "2026-10-05"
     }
    ]
   }
@@ -5019,6 +5155,415 @@
     "from": "2026-10-01",
     "to": "2026-10-14",
     "costing": "line"
+   }
+  },
+  {
+   "name": "برگشتیِ پیش از فروشش با میانگینِ موزون — بهای ثبت‌شده، نه NaN/خطا (فازِ تفاضلی)",
+   "fn": "sales",
+   "ledger": "returnFirst",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-09",
+    "clock": null,
+    "costing": "mavg"
+   },
+   "expect": {
+    "totals": {
+     "invoices": 1,
+     "returnCount": 1,
+     "gross": 30000,
+     "discount": 0,
+     "sales": 30000,
+     "returns": 15000,
+     "netSales": 15000,
+     "cogs": 10000,
+     "grossProfit": 5000,
+     "marginBp": 3333,
+     "avgTicket": 30000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "چای",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "category": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "user": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 15000,
+      "netSales": 15000,
+      "cogs": 10000,
+      "grossProfit": 5000,
+      "marginBp": 3333
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-09",
+    "costing": "mavg"
+   }
+  }
+ ],
+ "webOnly": [
+  {
+   "name": "نامِ فروشنده و دسته با BOM و U+001F، مبلغِ رشته‌ای (فاصلهٔ نشکن، 0x، 1d) — همان trim و Number ِ JS (فازِ تفاضلی)",
+   "fn": "sales",
+   "ledger": "messy",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-31",
+    "clock": null,
+    "costing": "line"
+   },
+   "expect": {
+    "totals": {
+     "invoices": 2,
+     "returnCount": 0,
+     "gross": 50000,
+     "discount": 0,
+     "sales": 50000,
+     "returns": 0,
+     "netSales": 50000,
+     "cogs": 25000,
+     "grossProfit": 25000,
+     "marginBp": 5000,
+     "avgTicket": 25000,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "چای",
+      "invoices": 1,
+      "qty": 2000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 0,
+      "netSales": 30000,
+      "cogs": 20000,
+      "grossProfit": 10000,
+      "marginBp": 3333
+     },
+     {
+      "key": "p2",
+      "name": "نان",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 20000,
+      "discount": 0,
+      "sales": 20000,
+      "returns": 0,
+      "netSales": 20000,
+      "cogs": 5000,
+      "grossProfit": 15000,
+      "marginBp": 7500
+     }
+    ],
+    "category": [
+     {
+      "key": "نوشیدنی",
+      "name": "نوشیدنی",
+      "invoices": 1,
+      "qty": 2000,
+      "gross": 30000,
+      "discount": 0,
+      "sales": 30000,
+      "returns": 0,
+      "netSales": 30000,
+      "cogs": 20000,
+      "grossProfit": 10000,
+      "marginBp": 3333
+     },
+     {
+      "key": "خوراکی\u001f",
+      "name": "خوراکی\u001f",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 20000,
+      "discount": 0,
+      "sales": 20000,
+      "returns": 0,
+      "netSales": 20000,
+      "cogs": 5000,
+      "grossProfit": 15000,
+      "marginBp": 7500
+     }
+    ],
+    "user": [
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 2,
+      "qty": 3000,
+      "gross": 50000,
+      "discount": 0,
+      "sales": 50000,
+      "returns": 0,
+      "netSales": 50000,
+      "cogs": 25000,
+      "grossProfit": 25000,
+      "marginBp": 5000
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 3000,
+      "gross": 50000,
+      "discount": 0,
+      "sales": 50000,
+      "returns": 0,
+      "netSales": 50000,
+      "cogs": 25000,
+      "grossProfit": 25000,
+      "marginBp": 5000
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 2,
+      "qty": 3000,
+      "gross": 50000,
+      "discount": 0,
+      "sales": 50000,
+      "returns": 0,
+      "netSales": 50000,
+      "cogs": 25000,
+      "grossProfit": 25000,
+      "marginBp": 5000
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 2,
+      "qty": 3000,
+      "gross": 50000,
+      "discount": 0,
+      "sales": 50000,
+      "returns": 0,
+      "netSales": 50000,
+      "cogs": 25000,
+      "grossProfit": 25000,
+      "marginBp": 5000
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-31",
+    "costing": "line"
+   }
+  },
+  {
+   "name": "ماندهٔ رشته‌ای با فاصلهٔ نشکن (فازِ تفاضلی)",
+   "fn": "debts",
+   "ledger": "messy",
+   "opts": {
+    "asOf": "2026-10-20"
+   },
+   "expect": {
+    "asOf": "2026-10-20",
+    "buckets": [
+     30,
+     60,
+     90
+    ],
+    "customers": {
+     "rows": [
+      {
+       "id": "d1",
+       "name": "رحیم",
+       "balance": 321500,
+       "open": 321500,
+       "credit": 0,
+       "buckets": [
+        0,
+        321500,
+        0,
+        0
+       ],
+       "oldestDays": 49
+      }
+     ],
+     "totals": {
+      "balance": 321500,
+      "open": 321500,
+      "credit": 0,
+      "buckets": [
+       0,
+       321500,
+       0,
+       0
+      ]
+     }
+    },
+    "suppliers": {
+     "rows": [],
+     "totals": {
+      "balance": 0,
+      "open": 0,
+      "credit": 0,
+      "buckets": [
+       0,
+       0,
+       0,
+       0
+      ]
+     }
+    }
+   }
+  },
+  {
+   "name": "کاربرِ رویداد با U+001F جداست (فازِ تفاضلی)",
+   "fn": "fraud",
+   "ledger": "messy",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-31"
+   },
+   "expect": {
+    "from": "2026-10-01",
+    "to": "2026-10-31",
+    "rows": [
+     {
+      "key": "\u001fکریم",
+      "invoices": 0,
+      "gross": 0,
+      "discountCount": 0,
+      "discount": 0,
+      "discountBp": null,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 1,
+      "lineDeletes": 1000,
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 0
+     },
+     {
+      "key": "احمد",
+      "invoices": 2,
+      "gross": 50000,
+      "discountCount": 0,
+      "discount": 0,
+      "discountBp": 0,
+      "returnCount": 0,
+      "returns": 0,
+      "voidCount": 0,
+      "voids": 0,
+      "lineDeleteCount": 0,
+      "lineDeletes": 0,
+      "noSaleCount": 0,
+      "overrideCount": 0,
+      "approvalCount": 0
+     }
+    ],
+    "totals": {
+     "key": "",
+     "invoices": 2,
+     "gross": 50000,
+     "discountCount": 0,
+     "discount": 0,
+     "discountBp": 0,
+     "returnCount": 0,
+     "returns": 0,
+     "voidCount": 0,
+     "voids": 0,
+     "lineDeleteCount": 1,
+     "lineDeletes": 1000,
+     "noSaleCount": 0,
+     "overrideCount": 0,
+     "approvalCount": 0
+    }
    }
   }
  ]

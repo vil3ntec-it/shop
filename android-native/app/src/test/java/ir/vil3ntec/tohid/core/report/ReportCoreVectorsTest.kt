@@ -84,6 +84,18 @@ class ReportCoreVectorsTest {
     assertTrue(failures.joinToString("\n"), failures.isEmpty())
   }
 
+  /** دفترهایی که فقط شکلِ وب نگه می‌دارد (عدد به‌صورتِ متن، BOM/U+001F در نام) — همان `trim` و `Number()` ِ JS (فازِ تفاضلی) */
+  @Test
+  fun `آزمون‌های مرجعِ فقط-وب عیناً برابرِ JS`() {
+    val cases = vectors.getValue("webOnly").jsonArray
+    assertTrue(cases.size >= 3)
+    val failures = cases.map { it.jsonObject }.mapNotNull { c ->
+      val got = run(c)
+      if (got == c.getValue("expect")) null else "${c.getValue("name").jsonPrimitive.content}\n  want: ${c.getValue("expect")}\n  got:  $got"
+    }
+    assertTrue(failures.joinToString("\n"), failures.isEmpty())
+  }
+
   @Test
   fun `تخصیص و گرد کردن`() {
     assertEquals(listOf(982L, 524L, 44L), ReportCore.allocate(1550, listOf(22500, 12000, 1000)))
