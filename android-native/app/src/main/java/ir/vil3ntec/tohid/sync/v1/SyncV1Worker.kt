@@ -45,6 +45,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     if (!Backend.isReady(app)) return Result.success()
     //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
     if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()
+    //  تنظیماتِ دکان (`shop.settings_sync`، پیش‌فرض خاموش): تغییرِ صاحب/مدیر روی همین دستگاه با همین دور می‌رود
+    //  (حداکثر هر دقیقه یک بار؛ جدا از دفتر و بی اثر بر نتیجهٔ این دور)
+    ir.vil3ntec.tohid.data.ShopSettingsSync.kick(app)
 
     val store = ShopStore(app)
     store.load()

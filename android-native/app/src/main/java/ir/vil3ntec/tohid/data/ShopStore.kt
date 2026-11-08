@@ -277,7 +277,7 @@ class ShopStore(
    *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
    */
   suspend fun save(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
-    //  ⛔ پرچمِ `shop.ledger_merge` خاموش (پیش‌فرض) ⇒ همان رفتارِ `main`: دفترِ صفحه کامل نوشته می‌شود.
+    //  ⛔ پرچمِ `shop.ledger_merge` خاموش (فقط با `false` ِ صریحِ سرور؛ پیش‌فرض روشن) ⇒ رفتارِ پیشین: دفترِ صفحه کامل نوشته می‌شود.
     //  [replace] («پاک کردنِ همه») هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
     if (!follow.on || replace) {
       if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
@@ -293,11 +293,11 @@ class ShopStore(
       _notice.tryEmit(STALE_BASE)
       return@withContext false
     }
-    //  A16: نقشی که این بخشِ دفتر را نمی‌نویسد (صندوق‌دار خرید، انباردار فروش،
-    //  حسابدار هیچ) ⇐ پیش از دیسک و پیش از op می‌ایستد؛ سرور هم ردش می‌کرد و
-    //  دفترِ این دستگاه از دکان جدا می‌ماند. صاحب، مدیر و شاگرد هرگز.
+    //  A16: نقشی که این بخشِ دفتر را نمی‌نویسد (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ) ⇐ پیش از دیسک و op؛ سرور هم
+    //  ردش می‌کرد و دفترِ این دستگاه از دکان جدا می‌ماند. صاحب، مدیر و شاگرد هرگز. ⛔ تغییرِ خودِ صفحه (پایه ⇐ [next])، نه دفترِ
+    //  همین حالا: خریدی که کارگر از دستگاهِ دیگر آورد «خریدِ صندوق‌دار» نیست (پیش‌تر فروشِ صندوق‌دار پس از هر Pull رد می‌شد).
     val role = ShopRole.current(context)
-    RoleGate.blocked(role, _data.value, next)?.let { table ->
+    RoleGate.blocked(role, base, next)?.let { table ->
       _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
       return@withContext false
     }
@@ -321,11 +321,11 @@ class ShopStore(
         return@synchronized false
       }
       val merged = outcome.data
-      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد.
-      //  ⛔ خودِ [next] پایه نمی‌شود: ذخیرهٔ دومی که صفحه هم‌زمان از همان پایه ساخته (دو کلیکِ پیاپی) با آن هم‌امتیاز
-      //  است و ردیف‌های این ذخیره را «حذفِ کاربر» می‌دید — DELETE روی همهٔ دستگاه‌ها
+      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد. ⛔ خودِ [next] فقط با
+      //  نشانهٔ یک‌سویه پایه می‌شود (`LedgerFollow.submitted`، صفحه‌ای که از همین ادامه داد): ذخیرهٔ دومی که هم‌زمان از همان
+      //  پایه ساخته شد (دو کلیک) ردیف‌های این ذخیره را «حذفِ کاربر» می‌دید — DELETE روی همهٔ دستگاه‌ها
       if (merged !== next) follow.remember(theirs)
-      val ok = writeLocked(engine, merged)
+      val ok = writeLocked(engine, merged).also { if (it && merged !== next) follow.submitted(next) }
       //  ⛔ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست بی‌صدا گم نمی‌شود
       if (ok && outcome.dropped.isNotEmpty()) _notice.tryEmit(editsDropped(outcome.dropped.size))
       ok
@@ -639,7 +639,7 @@ class ShopStore(
    */
   private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
     //  جایگزینیِ کامل (بازیابی، بازسازی): صفحه‌ای که هنوز با دفترِ پیشین می‌سازد، روی همین می‌نشیند
-    follow.remember(_data.value)
+    follow.remember(_data.value).also { follow.replaced() }
     writer().save(next)
   }
 

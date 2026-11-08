@@ -273,6 +273,8 @@ private class AppLivePort(private val app: Context) : LivePort {
     }
     //  پرچمِ موتورِ تازهٔ موجودی (`shop.stock_v2`، پیش‌فرض خاموش)
     if (event == "hello") ir.vil3ntec.tohid.data.StockFlag.kick(app)
+    //  تنظیماتِ دکان (`shop.settings_sync`، پیش‌فرض خاموش): هر وصل، و فوری وقتی دستگاهِ دیگری قاعده‌ای را عوض کرد
+    if (event == "hello" || event == "settings") ir.vil3ntec.tohid.data.ShopSettingsSync.kick(app, force = event == "settings")
     if (event == "inbox") runCatching {
       val o = JSONObject(text)
       ir.vil3ntec.tohid.sync.PhoneScanner.inboxArrived(o.optString("id"), o.optString("pair"), o.optString("product_id"))
