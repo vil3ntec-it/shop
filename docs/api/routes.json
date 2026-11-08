@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 982,
+    "routes": 983,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 476,
+      "user": 477,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 687,
-      "empty": 293,
+      "extracted": 685,
+      "empty": 296,
       "unresolved": 2
     }
   },
@@ -340,15 +340,16 @@
     {"method":"POST","path":"/api/auth/password","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":["currentPassword","newPassword"],"response":{"statuses":[200],"keys":["closedSessions","ok"]},"errors":["400 weak_password","401 bad_credentials"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/password/forgot","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["email","identifier"],"response":{"statuses":[200],"keys":["...","email","ok","resendSeconds","sent"]},"errors":["400 email_required"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/password/reset","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","device","email","password"],"response":{"statuses":[200],"keys":[]},"errors":["400 weak_password","403 account_disabled","404 user_not_found"],"shape":"extracted"},
-    {"method":"POST","path":"/api/auth/reauth","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":["code","password"],"response":{"statuses":[200],"keys":["freshUntil","ok"]},"errors":["400 reauth_proof_required","401 bad_credentials"],"shape":"extracted"},
+    {"method":"POST","path":"/api/auth/reauth","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":["code","password"],"response":{"statuses":[200],"keys":["freshUntil","ok"]},"errors":["400 reauth_proof_required"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/reauth/code","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","ok","resendSeconds","sent"]},"errors":["400 no_destination"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/refresh","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["refreshToken","refresh_token"],"response":{"statuses":[200],"keys":["accessExpiresAt","accessToken","access_expires_in","ok","refreshExpiresAt","refreshToken","refresh_expires_in","refresh_token"]},"errors":["401 invalid_token","401 refresh_reused"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/register","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["403 registration_closed","403 verification_required"],"shape":"empty"},
     {"method":"POST","path":"/api/auth/register/complete","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["device","location","terms","termsAccepted","ticket"],"response":{"statuses":[201],"keys":["...","created","location"]},"errors":["400 terms_required","401 register_ticket_invalid","403 registration_closed"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/register/start","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["...","email","name","ok","step"]},"errors":["403 registration_closed"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/register/verify","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","email"],"response":{"statuses":[200],"keys":["email","ok","step","terms","ticket","ticketExpiresAt"]},"errors":["403 registration_closed"],"shape":"extracted"},
-    {"method":"POST","path":"/api/auth/staff","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","device","name"],"response":{"statuses":[201],"keys":[]},"errors":["403 user_disabled"],"shape":"extracted"},
-    {"method":"POST","path":"/api/auth/staff-login","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","device","name"],"response":{"statuses":[201],"keys":[]},"errors":["403 user_disabled"],"shape":"extracted"},
+    {"method":"POST","path":"/api/auth/staff","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/auth/staff-login","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/auth/staff/device-key","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/auth/terms","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["sections","title","version"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/billing/plans","area":"billing","source":"server/src/app.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["currency","plans","whatsapp"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/billing/request","area":"billing","source":"server/src/app.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":["note","plan","planCode"],"response":{"statuses":[201,403],"keys":["error","request"]},"errors":[],"shape":"extracted"},
@@ -607,7 +608,7 @@
     {"method":"POST","path":"/api/shop/approval-requests/:id/approve","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/approval-requests/:id/cancel","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/approval-requests/:id/deny","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/approval-requests/config","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["approver","enabled","ttlMs"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/approval-requests/config","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["approver","enabled","ttlMs","v3"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approvals","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('audit.view')"],"params":[],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["approvals"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["keys"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":["deviceId","device_id","label","publicKey","public_key"],"response":{"statuses":[201],"keys":["key"]},"errors":[],"shape":"extracted"},

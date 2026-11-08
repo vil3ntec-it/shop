@@ -32,6 +32,8 @@ object ApiEndpoints {
     const val LOGIN = "/auth/login"
     //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
     const val STAFF = "/auth/staff"
+    /** رازِ دستگاهِ شاگرد برای نشستِ بازی که پیش از ۲.۱۴.۵ وارد شد (`AuthRepository.ensureStaffDeviceKey`) */
+    const val STAFF_DEVICE_KEY = "/auth/staff/device-key"
     const val GOOGLE = "/auth/google"
     const val GOOGLE_LINK_CODE = "/auth/google/link-code"
     //  ورود با اپل (فقط آیفون): nonce ِ یک‌بارمصرفِ سرور ⇐ پنجرهٔ اپل ⇐ توکن + nonce

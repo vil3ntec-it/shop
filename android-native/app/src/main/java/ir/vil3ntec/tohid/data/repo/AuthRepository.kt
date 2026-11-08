@@ -296,8 +296,12 @@ class AuthRepository(
    *  شاگرد می‌سازد و روی همان دکان می‌نشاندش. دفعه‌ی بعد که همین
    *  دستگاه همان کد را بزند، همان حساب برمی‌گردد — نه یک عضو تازه.
    *
-   *  @param deviceUid همان شناسه‌ای که همگام‌سازی با آن کار می‌کند؛
-   *    همین است که «همان گوشی، همان حساب» را ممکن می‌کند.
+   *  ⛔ «همان دستگاه» را **رازِ دستگاه** ثابت می‌کند، نه شناسه‌اش (شناسه راز نیست؛ همکار در همگام‌سازی می‌بیندش):
+   *  رازی که سرور در نخستین پیوستن (`deviceKey`) یا از نشستِ باز ([ensureStaffDeviceKey]) داده، در حافظهٔ امنِ
+   *  [TokenStorage.staffDeviceKey] می‌ماند و هر بار همراهِ کد می‌رود. `keyVersion` به سرور می‌گوید این نسخه راز را
+   *  نگه می‌دارد (نسخهٔ کهنه رازی نمی‌گیرد که دور بریزد).
+   *
+   *  @param deviceUid همان شناسه‌ای که همگام‌سازی با آن کار می‌کند.
    */
   suspend fun loginWithStaffCode(
     code: String,
@@ -305,21 +309,44 @@ class AuthRepository(
     deviceUid: String,
     deviceName: String,
   ): ApiResult<SessionDto> = result {
-    keep(
-      api.postPublic(
-        ApiEndpoints.Auth.STAFF,
-        buildJsonObject {
-          put("code", JsonPrimitive(code.trim().uppercase()))
-          put("name", JsonPrimitive(name.trim()))
-          putApp()
-          put("device", buildJsonObject {
-            put("uid", JsonPrimitive(deviceUid))
-            put("name", JsonPrimitive(deviceName))
-            put("platform", JsonPrimitive("android"))
-          })
-        },
-      )
+    val key = runCatching { tokens.staffDeviceKey }.getOrNull()
+    val body = api.postPublic(
+      ApiEndpoints.Auth.STAFF,
+      buildJsonObject {
+        put("code", JsonPrimitive(code.trim().uppercase()))
+        put("name", JsonPrimitive(name.trim()))
+        putApp()
+        put("device", buildJsonObject {
+          put("uid", JsonPrimitive(deviceUid))
+          put("name", JsonPrimitive(deviceName))
+          put("platform", JsonPrimitive("android"))
+          put("keyVersion", JsonPrimitive(STAFF_KEY_VERSION))
+          if (!key.isNullOrBlank()) put("key", JsonPrimitive(key))
+        })
+      },
     )
+    val session = keep(body)
+    keepStaffDeviceKey(body)
+    session
+  }
+
+  /**
+   *  رازِ دستگاه برای نشستِ بازِ شاگردی که پیش از ۲.۱۴.۵ وارد شد (رازی نگرفته بود) — بی آن، پس از خروج دیگر با همان
+   *  کد به حسابِ خودش برنمی‌گشت. سرور فقط برای حسابِ کدِ شاگرد و فقط دستگاهِ همین نشست می‌دهد، و اگر رازی هست
+   *  هیچ (`reason`)؛ پس بی‌خطر بارها صدا زده می‌شود. `true` یعنی رازی هست (از قبل یا همین حالا).
+   */
+  suspend fun ensureStaffDeviceKey(): ApiResult<Boolean> = result {
+    if (!runCatching { tokens.staffDeviceKey }.getOrNull().isNullOrBlank()) return@result true
+    if (!tokens.signedIn) return@result false
+    keepStaffDeviceKey(api.post(ApiEndpoints.Auth.STAFF_DEVICE_KEY))
+  }
+
+  /** `deviceKey` ِ پاسخ ⇒ حافظهٔ امن؛ نبودنش یعنی «همان رازِ قبلی بماند» (ورودِ دوبارهٔ موفق راز را نمی‌چرخاند) */
+  private fun keepStaffDeviceKey(body: JsonObject): Boolean {
+    val fresh = (body["deviceKey"] as? JsonPrimitive)?.takeIf { it.isString }?.content?.trim().orEmpty()
+    if (fresh.isEmpty()) return false
+    tokens.staffDeviceKey = fresh
+    return true
   }
 
   /**
@@ -584,6 +611,11 @@ class AuthRepository(
     //  نمی‌کند. به کار می‌آید وقتی گزارشی می‌رسد و باید فهمید آن گوشی
     //  چه نسخه‌ای داشت.
     put("appVersion", JsonPrimitive(ir.vil3ntec.tohid.core.config.AppConfig.appVersion))
+  }
+
+  private companion object {
+    /** قراردادِ رازِ دستگاهِ شاگرد با سرور (`device.keyVersion`، `server/src/lib/staff-device-keys.js`) */
+    const val STAFF_KEY_VERSION = 1
   }
 
   private inline fun destinationBody(

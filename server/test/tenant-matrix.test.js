@@ -81,6 +81,7 @@ const NO_TENANT = {
   'GET /api/releases/:tag/file/:name': 'فایلِ انتشارِ عمومی',
   'GET /api/receipt/:tag/:token': 'رسیدِ QR با توکنِ HMAC — receipt-public.test.js، receipt-token.test.js',
   'POST /api/auth/staff': 'پیوستن با کد — staff-code.test.js', 'POST /api/auth/staff-login': 'ورودِ شاگرد با کد — staff-login.test.js',
+  'POST /api/auth/staff/device-key': 'رازِ دستگاهِ شاگرد برای نشستِ خودش؛ دکان از عضویتِ خودِ توکن، دستگاه از ردیفِ توکن — staff-session-guard.test.js',
   'POST /api/auth/register': 'ثبت‌نام (بسته)', 'POST /api/auth/register/start': 'ثبت‌نام', 'POST /api/auth/register/verify': 'ثبت‌نام',
   'POST /api/auth/register/complete': 'ثبت‌نام', 'GET /api/auth/terms': 'شرایط', 'POST /api/auth/login': 'ورود',
   'POST /api/auth/otp/request': 'کدِ ورود', 'POST /api/auth/otp/verify': 'کدِ ورود', 'POST /api/auth/google': 'ورود با گوگل',

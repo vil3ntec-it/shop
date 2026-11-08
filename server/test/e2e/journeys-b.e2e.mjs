@@ -124,9 +124,21 @@ await E.step('JB1', 'برگشت و لغو: شاگرد زیرِ سقف؛ بالا
   await syncAll();
 
   //  S ِ واقعی (دفترِ برگشتِ هم‌زمان را دارد که سرور نپذیرفت) همان نیست ⇒ از سرور دوباره ساخته (نصبِ دوباره)
+  const before = S.user.id;
   S = new NativeDevice(E, 'S-staff-phone', { deviceId: S.deviceId, seller: 'علی' });
+  //  ⛔ ۲.۱۴.۵: نصبِ تازه رازِ دستگاه را ندارد ⇒ شناسهٔ همان گوشی حسابِ پیشین را نمی‌دهد (کدِ ثابت ⇒ «کدِ تازه از
+  //  صاحبِ دکان بگیرید»)؛ کدِ تازهٔ صاحب ⇒ عضوِ تازه با رازِ تازه، هرگز ربودنِ حسابِ پیشین
+  const standing = E.ok(await A.api('GET', '/shop/staff-code'), 'کدِ ثابت').code;
+  await assert.rejects(() => S.loginStaff(standing, 'علی'), (e) => e.code === 'staff_device_unverified');
   const code2 = E.ok(await A.api('POST', '/shop/staff-code', { role: 'staff', maxUses: 1 }), 'کدِ شاگرد', [200, 201]).code;
   await S.loginStaff(code2, 'علی');
+  assert.notEqual(S.user.id, before, 'کدِ تازه حسابِ پیشینِ همان شناسه را نمی‌دهد');
+  assert.ok(S.staffKey, 'رازِ دستگاه نیامد');
+  //  خروج و ورودِ دوباره روی همان نصب: رازِ همان دستگاه ⇒ همان حساب، کدِ یک‌بارِ خودش دوباره خرج نمی‌شود
+  const mine = S.user.id;
+  assert.equal((await S.logout()).blocked, false);
+  await S.loginStaff(code2, 'علی');
+  assert.equal(S.user.id, mine, 'ورودِ دوباره با رازِ دستگاه همان حساب');
   assert.equal((await S.firstSync()).ok, true);
   await S.ensureSeries();
   const t = await assertSameEverywhere('JB1', [A, B, S], {

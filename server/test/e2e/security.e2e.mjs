@@ -160,10 +160,11 @@ await E.step('SYN-10.logout', 'خروج پس از همگام‌سازی: سرو�
   assert.equal(N.stock(product), A.stock(product));
 }, { needs: ['#246'] });
 
-await E.step('SYN-10.staff-code', 'کدِ شاگرد روی دستگاهِ تازه (بی ایمیل): دکانِ همان صاحب با نقشِ شاگرد و Snapshot ِ کامل؛ کدِ تمام‌شده حسابِ شبح نمی‌سازد', async () => {
+await E.step('SYN-10.staff-code', 'کدِ شاگرد روی دستگاهِ تازه (بی ایمیل): دکانِ همان صاحب با نقشِ شاگرد و Snapshot ِ کامل؛ کدِ تمام‌شده حسابِ شبح نمی‌سازد؛ '
+  + 'ورودِ دوباره فقط با رازِ همان دستگاه — شناسهٔ دستگاه به تنهایی نشستِ کسی را نمی‌دهد', async () => {
   const sales = A.ledger.sales.map((s) => s.id).sort();
   const code = E.ok(await E.post('/api/shop/staff-code', {}, (await E.device('A2-owner-one', one.email)).token), 'کدِ شاگرد').code;
-  const login = await E.post('/api/auth/staff', { code, name: 'شاگردِ کد', device: { uid: 'C-staff-code-phone', name: 'گوشیِ شاگرد' } });
+  const login = await E.post('/api/auth/staff', { code, name: 'شاگردِ کد', device: { uid: 'C-staff-code-phone', name: 'گوشیِ شاگرد', keyVersion: 1 } });
   assert.equal(login.status, 201, JSON.stringify(login.body));
   assert.equal(login.body.shop.id, one.shopId, 'شاگرد به دکانِ کارفرما نرسید');
   assert.equal(login.body.shop.role, 'staff');
@@ -178,6 +179,21 @@ await E.step('SYN-10.staff-code', 'کدِ شاگرد روی دستگاهِ تا�
   const wrong = await E.post('/api/auth/staff', { code: 'XXXX-XXXX-XXXX', device: { uid: 'ghost-phone' } });
   assert.equal(wrong.body.error.code, 'bad_code');
   assert.equal(Number((await db.one('SELECT COUNT(*)::int AS n FROM users')).n), users, 'کدِ غلط حسابِ شبح ساخت');
+
+  //  ⛔ ۲.۱۴.۵ (یافتهٔ CodeQL): پس از خروج، همکاری که همان کد و شناسهٔ همین دستگاه را دارد نشستِ شاگرد را نمی‌گیرد؛
+  //  خودِ شاگرد با رازِ همین دستگاه (`deviceKey` ِ پیوستن) همان حساب را برمی‌گیرد، کد دوباره خرج نمی‌شود
+  assert.equal(typeof login.body.deviceKey, 'string', 'رازِ دستگاه نیامد');
+  const out = await E.post('/api/auth/logout', { refreshToken: login.body.refreshToken });
+  assert.ok(out.status < 300, JSON.stringify(out.body));
+  const thief = await E.post('/api/auth/staff', { code, device: { uid: 'C-staff-code-phone', name: 'گوشیِ همکار' } });
+  assert.equal(thief.status, 403, `ربودنِ نشست: ${JSON.stringify(thief.body)}`);
+  assert.equal(thief.body.error.code, 'staff_device_unverified');
+  assert.match(thief.body.error.message, /کدِ تازه از صاحبِ دکان بگیرید/);
+  const back = await E.post('/api/auth/staff', { code, device: { uid: 'C-staff-code-phone', key: login.body.deviceKey, keyVersion: 1 } });
+  assert.equal(back.status, 201, JSON.stringify(back.body));
+  assert.equal(back.body.user.id, login.body.user.id, 'همان حساب');
+  assert.equal(back.body.shop.role, 'staff');
+  assert.equal(Number((await db.one('SELECT COUNT(*)::int AS n FROM users')).n), users, 'ورودِ دوباره حسابِ تازه ساخت');
 }, { needs: ['SYN-10.logout'] });
 
 await E.finish();
