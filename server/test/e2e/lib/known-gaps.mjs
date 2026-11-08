@@ -10,7 +10,15 @@
  *   • باگِ واقعی فقط با PR ِ اصلاحِ باز (شماره در `ref`) یا blocker ِ صریح (مثلاً پروندهٔ
  *     ممنوعِ مشترک با پمپ) این‌جا می‌آید؛ پس از مرجِ اصلاح «xpass» می‌شود و ردیف پاک.
  */
-export const KNOWN_GAPS = [];
+export const KNOWN_GAPS = [
+  {
+    scenario: 'journeys-a',
+    step: 'J5.default',
+    //  دستگاهی که دیرتر رسید، opِ کهنه‌ترِ دیگری را روی نوشتهٔ تازه‌ترِ خودش می‌نشاند (pull به ترتیبِ سرور)
+    match: /J5\.default · Y-owner-laptop\/products\/[^:]+: محتوا با سرور فرق دارد/,
+    ref: '#501 — اصلاح هست ولی پشتِ پرچمِ خاموشِ `sync.pull_own_newer` (روشن کردنش برای همهٔ دکان‌ها تصمیمِ صاحب‌کار است؛ docs/JOURNEYS-fa.md)',
+  },
+];
 
 /**
  * @returns {{status:'pass'|'fail'|'known-gap'|'xpass', ref?:string}}

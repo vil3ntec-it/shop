@@ -270,6 +270,17 @@
   ⇒ فقط کلیدهای نبودهٔ `tohid-policy`/`tohid-receipt`/`tohid-modules` و عکس‌های نبوده؛ دفترِ درونِ پشتیبان نشانده نمی‌شود.
 - ⛔ `/auth/staff`: دستگاهِ تازه ⇒ `staffCodes.preflight` (همان سنجه‌ها و کدهای `redeem`، فقط خواندنی) **پیش از** ساختنِ حساب؛ `redeem` ِ
   ناموفقِ حسابی که همین درخواست ساخت ⇒ حساب و هویتش پاک (هیچ «حسابِ شبح»). پیامِ برنامه برای هر کد: `StaffJoinErrors`.
+- ⛔ **شناسهٔ همگام‌سازی مالِ حساب روی دستگاه است** (سفرِ J2b، ۱۴۰۵/۰۸/۱۸): `device_id` ِ push/pull/سری/سوکت فقط
+  `SyncV1Engine.deviceId()` (`core/sync/SyncReplica.kt`، `SyncStateV1.replica`، `SyncStore.replicaOwner`)؛ هرگز
+  `SyncStore.deviceUid` ِ خام. نخستین حساب و هر حسابی که پیش‌تر با شناسهٔ خام push کرده همان خام؛ حسابِ دیگری که از این
+  دستگاه هرگز push نکرده `<خام>-<FNV(حساب)>`. وگرنه pull opهای «همین دستگاه» را به حسابِ دیگرِ همان گوشی نمی‌داد و
+  «حذفِ ردیفِ خودش» ردیفِ صاحب را مالِ شاگرد می‌دید. SEC-AUTH-14 همان یک شناسه را برای همان کاربر می‌پذیرد
+  (`server/src/lib/sync-replica.js`). سنجه: `SyncReplicaTest`، `sync-device-bind.test.js`، `journeys-a.e2e.mjs` J2b.
+- ⛔ شمارهٔ فاکتور فقط `InvoiceNumber.next(d, series)` (‎data/InvoiceNumber.kt‎): هرگز پایین‌تر از بلندترین شمارهٔ **همان سری** + ۱
+  (`nextInvoiceNo` همگام نمی‌شود؛ دفترِ Snapshot ِ نصبِ دوباره یا حسابِ دیگر از ۱ می‌شمرد). سنجه: `InvoiceSeriesTest`،
+  `lib/journey.mjs` (`assertNoDuplicates`).
+- ⛔ **سفرهای واقعی** (`server/test/e2e/journeys-*.e2e.mjs`، جدول: `docs/JOURNEYS-fa.md`): هر سفرِ تازهٔ چنددستگاهی
+  پایانش `assertSameEverywhere` (همان شناسه‌ها و محتوا روی هر دستگاه و Snapshot ِ سرور، بی تکرار، همان جمع‌ها) دارد.
 - حالِ همگام‌سازی (منتظر، آخرین موفق، خطای آخر) فقط از `SyncV1Engine.status` / `TohidSync.status()` خوانده شود؛ عددِ ساختگی نه (SYN-08، #230).
 - pull ِ v1 با `sync.pull_own_newer` (پیش‌فرض خاموش، فقط دکان) نوشتهٔ تازه‌ترِ **خودِ** دستگاه را با opِ کهنه‌ترِ دیگری بازنویسی نمی‌کند: فیلدِ غیرِ
   `$inc` که آخرین نویسنده‌اش همین دستگاه با شمارهٔ بزرگ‌تر است برداشته می‌شود، opِ تهی‌شده نمی‌رود، حذفِ دیگری روی ردیفی که همین

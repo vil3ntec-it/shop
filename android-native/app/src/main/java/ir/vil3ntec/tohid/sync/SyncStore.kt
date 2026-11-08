@@ -119,6 +119,14 @@ class SyncStore(context: Context) {
     set(v) = prefs.edit().putString(ACCOUNT_ID, v).apply()
 
   /**
+   *  حسابی که شناسهٔ خامِ همین دستگاه ([deviceUid]) را در همگام‌سازی گرفته است (`core/sync/SyncReplica.kt`).
+   *  مالِ دستگاه است، نه حساب: خروج پاکش نمی‌کند و با پشتیبانِ اندروید جابه‌جا نمی‌شود (`tohid-sync.xml`).
+   */
+  var replicaOwner: String
+    get() = prefs.getString(REPLICA_OWNER, "") ?: ""
+    set(v) = prefs.edit().putString(REPLICA_OWNER, v).apply()
+
+  /**
    *  کدِ اشتراکِ آفلاینِ زده‌شده (‎OfflineCode‎) — بی اینترنت اشتراک را باز
    *  می‌کند؛ با اینترنت یک بار به سرور می‌رود (`offlineRedeemed`).
    */
@@ -316,6 +324,7 @@ class SyncStore(context: Context) {
     const val PHONE = "account_phone"
     const val CREATED = "account_created"
     const val ACCOUNT_ID = "account_id"
+    const val REPLICA_OWNER = "replica_owner"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
     const val OFFLINE_CODE = "offline_code"

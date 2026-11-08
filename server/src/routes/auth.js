@@ -15,7 +15,7 @@
  * حساب‌ها هرگز خودبه‌خود در هم ادغام نمی‌شوند.
  */
 const express = require('express');
-const { query, one, tx, newId, now } = require('../db');
+const { query, one, newId, now } = require('../db');
 const config = require('../config');
 const v = require('../lib/validate');
 const pw = require('../lib/password');

@@ -245,7 +245,14 @@ const bodyOf = (name, src = LEDGER_DIFF_KT) => {
   const end = src.indexOf('\n  }\n', at);
   return src.slice(at, end < 0 ? undefined : end);
 };
+const SALES_ENGINE_KT = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'SalesEngine.kt'), 'utf8');
 export const KOTLIN = {
+  //  شمارهٔ فاکتور: `InvoiceNumber.next(d, series)` (ِ `SalesEngine.record`) — هرگز شماره‌ای که در همان سری در دفتر هست (پس از Snapshot،
+  //  ورودِ حسابِ دیگر روی همان دستگاه، یا فاکتورِ رسیده از همگام‌سازی). نبودش ⇒ همان `nextInvoiceNo` ِ پیشین (سفرِ J-SERIES سرخ)
+  invoiceBySeries: /val invoiceNumber = InvoiceNumber\.next\(d, series\)/.test(SALES_ENGINE_KT),
+  //  `SyncV1Engine.deviceId` ⇐ `V1ReplicaAndroid.kt` (`core/sync/SyncReplica.kt`): حسابِ دومِ تازه روی همان گوشی `device_id` ِ خودش را دارد.
+  //  نبودش ⇒ همان شناسهٔ دستگاه برای هر حساب (سفرِ J2b سرخ: فروشِ شاگرد به دفترِ صاحب روی همان گوشی نمی‌رسد)
+  replicaPerAccount: /fun deviceId\(\): String = V1Replica\.id\(/.test(SYNC_V1_ENGINE_KT) && /SyncReplica\.choose\(/.test(KT('V1ReplicaAndroid.kt')),
   applyRemoteShaped: /fromJson\(|modelTree\(/.test(bodyOf('applyRemote')),
   snapshotShaped: /modelTree\(/.test(bodyOf('writeShadow', SYNC_V1_ENGINE_KT)),
   keepsUnknownFields: /isModelField\(/.test(bodyOf('changedFields')),
@@ -320,6 +327,21 @@ const todayOf = (t) => {
 const money = (n) => Math.round(n).toLocaleString('en-US');
 const roundHalfUp = (x) => Math.round(x);   //  `roundToLong()` ِ کاتلین برای عددهای مثبتِ این دفتر
 
+/** `SyncReplica.choose` ِ برنامه (core/sync/SyncReplica.kt) — همان `server/src/lib/sync-replica.js` (بردارهای مشترک در دو آزمون) */
+const replicaChoose = require(path.join(ROOT, 'server', 'src', 'lib', 'sync-replica.js')).choose;
+
+/**
+ * `InvoiceNumber.next` (‎data/InvoiceNumber.kt‎): `nextInvoiceNo` ِ دفتر، ولی هرگز نه پایین‌تر از بلندترین شمارهٔ **همان سری** + ۱
+ * (سریِ خالی = فاکتورهای بی سری). `nextInvoiceNo` همگام نمی‌شود؛ دفتری که از Snapshot ساخته شد (نصبِ دوباره، حسابِ
+ * دیگر روی همان دستگاه با همان سری) یا فاکتورِ همان سری را از همگام‌سازی گرفت، بی این شمارهٔ تکراری می‌ساخت.
+ */
+export function nextInvoiceNumber(d, series = '') {
+  const s = String(series || '').trim();
+  let top = 0;
+  for (const x of d.sales || []) if (String(x.series || '').trim() === s) top = Math.max(top, Number(x.invoiceNumber) || 0);
+  return Math.max(Number(d.nextInvoiceNo) || 1, top + 1);
+}
+
 export class NetworkDown extends Error { constructor() { super('به سرور نرسیدیم (حالتِ هواپیما)'); this.code = 'offline'; } }
 
 /* ═══════════════════════════ دستگاه ═══════════════════════════ */
@@ -336,7 +358,7 @@ export class NativeDevice {
    *                               `PRE_A00` = ساختِ نصب‌شدهٔ پیش از A00
    * @param {boolean} [o.raw]      دفترِ JSON ِ خام بی مدل — همان وب (`license/sync-core.js`)
    */
-  constructor(E, label, { deviceId = null, seller = '', appVersion = APP_VERSION, kotlin = KOTLIN, raw = false } = {}) {
+  constructor(E, label, { deviceId = null, seller = '', appVersion = APP_VERSION, kotlin = KOTLIN, raw = false, phone = null } = {}) {
     this.E = E;
     this.label = label;
     this.appVersion = appVersion;
@@ -371,6 +393,13 @@ export class NativeDevice {
     //  `SyncState.serverSchema`: پله‌ای که سرور در push/pull گفته (۰ = هنوز نمی‌دانیم)
     this.serverSchema = 0;
     this.requests = [];
+    //  `DocSeries.current`: سریِ سندِ همین دستگاه در همین دکان (خالی تا `ensureSeries`)
+    this.series = '';
+    //  حالِ مالِ **گوشی** (نه حساب) که میانِ حساب‌های همان گوشی مشترک است: `SyncStore.replicaOwner`
+    this.phone = phone || { replicaOwner: '' };
+    //  `SyncStateV1.replica` ِ همین حساب (یک بار انتخاب) و `lastPushAt`
+    this.syncId = '';
+    this.lastPushAt = 0;
   }
 
   /** `LedgerDiff.wireSchema(state.serverSchema)`: پلهٔ همان سرور روی سیم، نه بیشتر (پرچمِ گاوصندوق) */
@@ -437,6 +466,51 @@ export class NativeDevice {
     this.user = v.body.user;
     this.email = email;
     return this;
+  }
+
+  /**
+   * `AuthRepository.loginWithStaffCode`: شاگرد فقط با کدِ صاحب (`POST /auth/staff`) — بی ایمیل و رمز. همان دستگاه
+   * (`device.uid` = `deviceId`) و همان دکان ⇒ همان حساب، نه عضوِ تازه. خطا ⇒ `Error` با `status` و `code` ِ سرور.
+   */
+  async loginStaff(code, name) {
+    const r = await this.api('POST', '/auth/staff', {
+      code: String(code).trim().toUpperCase(), name: String(name).trim(), app: 'shop',
+      device: { uid: this.deviceId, name: this.label, platform: 'android' },
+    });
+    if (r.status !== 201 && r.status !== 200) {
+      const e = new Error(`${this.label}: ورودِ شاگرد ${r.status} ${JSON.stringify(r.body)}`);
+      e.status = r.status;
+      e.code = r.body?.error?.code || r.body?.code || '';
+      throw e;
+    }
+    this.token = r.body.access_token || r.body.accessToken;
+    this.refreshToken = r.body.refresh_token || r.body.refreshToken;
+    this.user = r.body.user;
+    this.shop = r.body.shop;
+    return this;
+  }
+
+  /**
+   * `SyncV1Engine.deviceId`: `device_id` ِ همین حساب روی همین گوشی برای push/pull/سری — نخستین حساب (یا حسابی با
+   * حالِ همگام‌سازی) شناسهٔ خامِ گوشی؛ حسابِ دیگری که تازه روی همین گوشی شروع می‌کند `<خام>-<برچسب>`.
+   */
+  replica() {
+    if (this.syncId) return this.syncId;
+    const account = String(this.user?.id || '').trim();
+    if (!this.kotlin.replicaPerAccount || !account) return this.deviceId;
+    const fresh = this.lastPushAt === 0;   //  `SyncStateV1.lastPushAt == 0`: هرگز از این گوشی push نکرده
+    const id = replicaChoose(this.deviceId, account, this.phone.replicaOwner, fresh);
+    if (id === this.deviceId && !this.phone.replicaOwner) this.phone.replicaOwner = account;
+    this.syncId = id;
+    return id;
+  }
+
+  /** `DocSeries.ensure`: سریِ این دستگاه (`POST /shop/series`)؛ سرور برای همان دستگاه همیشه همان را می‌دهد */
+  async ensureSeries() {
+    if (this.series) return this.series;
+    const r = await this.api('POST', '/shop/series', { deviceId: this.replica() });
+    if (r.status === 200 && /^[A-Z][1-9][0-9]{0,3}$/.test(String(r.body?.series || ''))) this.series = r.body.series;
+    return this.series;
   }
 
   /** `LogoutGuard.decide(queued)` (core/sync/SyncGuard.kt) — صفِ پُر ⇒ بسته */
@@ -543,7 +617,7 @@ export class NativeDevice {
       //  A00 (`caps`) — جز دسته‌ای که opِ دوباره‌فرستاده دارد (شاید از ساختِ پیش از A00): §۹.۵، `SyncV1Engine.pushAll`
       const known = new Set(this.sent.map((x) => x.id));
       const marks = !this.raw && batch.some((o) => known.has(o.op_id)) ? {} : this.marks();
-      const r = await this.api('POST', '/sync/v1/push', { device_id: this.deviceId, schema_version: this.wireSchema(), queued: this.queue.length, ops: batch, ...marks });
+      const r = await this.api('POST', '/sync/v1/push', { device_id: this.replica(), schema_version: this.wireSchema(), queued: this.queue.length, ops: batch, ...marks });
       if (r.status === 426) {
         //  `SyncV1Engine.pushQueue`: پلهٔ بالاتر از پایه را سرور دیگر نمی‌شناسد ⇒ بارِ بعد با پایه
         if (this.wireSchema() > core.BASE_SCHEMA) this.serverSchema = 0;
@@ -551,6 +625,7 @@ export class NativeDevice {
       }
       if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
       this.holding = false;
+      this.lastPushAt = Date.now();
       this.serverSchema = Number(r.body.schema_version || 0);
       const res = r.body.results || [];
       const ok = new Set(res.filter((x) => x.status === 'applied' || x.status === 'duplicate').map((x) => x.op_id));
@@ -576,7 +651,7 @@ export class NativeDevice {
       if (step) return step;
       if (this.restorePending && !this.queue.length && await this.rebuild() && (step = await this.pushAll())) return step;
       for (let i = 0; !this.restorePending && i < 50; i++) {
-        const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.deviceId)}&since=${this.cursor}`);
+        const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.replica())}&since=${this.cursor}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         const ops = r.body.ops || [];
         //  `ReplayBook.seen`: گرفته‌ها با شماره و دستگاه — پیش از نشاندن؛ opِ خودِ سرور نه
@@ -802,11 +877,12 @@ export class NativeDevice {
     if (payment === 'credit' && remaining > 0 && !debtorId) return { ok: false, message: 'برای فروش نسیه، قرض‌دار را انتخاب کنید' };
     const onCredit = payment === 'credit' && remaining > 0;
     const id = saleId || core.ulid(now);
-    const invoiceNumber = d.nextInvoiceNo || 1;
+    const invoiceNumber = this.kotlin.invoiceBySeries ? nextInvoiceNumber(d, this.series) : (d.nextInvoiceNo || 1);
     d.sales.push(row('Sale', {
       id, invoiceNumber, total: subtotal, discountType: discountType === 'percent' ? 'percent' : 'amount', discountValue: value, discount, finalTotal,
       paymentMethod: payment === 'cash' ? 'cash' : 'credit', debtorId: debtorId || null, paidAmount: p0, remaining, status: 'completed',
       debtGiven: onCredit ? remaining : 0, debtSettled: 0, createdAt: now, date: today, syncStatus: 'pending', seller: this.seller,
+      ...(this.series ? { series: this.series } : {}),
       ...(approval ? { approval } : {}),
     }));
     for (const l of lines) {
@@ -979,6 +1055,126 @@ export class NativeDevice {
     return this.api('GET', '/shop/orders/config?caps=saleOnHandover');
   }
 
+  /**
+   * `SalesEngine.cancel` (`cancelPlain`؛ بی کارتِ هدیه و امتیاز): وضعیت ⇒ لغو، بدهیِ بازِ همان فاکتور با رسیدِ سیستمی
+   * (`kind = sale_cancel`، پولی به دخل نیامده) بسته، جنسِ نبرگشته با حرکتِ `sale_cancel` به گردشِ انبار، و سابقه.
+   */
+  cancelSale(saleId, reason = '', by = null) {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const today = todayOf(now);
+    const sale = d.sales.find((s) => s.id === saleId);
+    if (!sale) return { ok: false, message: 'فاکتور پیدا نشد' };
+    if (sale.status === 'cancelled') return { ok: false, message: 'این فاکتور قبلاً لغو شده است' };
+    if (sale.channel === 'online' || String(sale.series || '').trim() === 'W') return { ok: false, message: 'فاکتورِ سفارشِ اینترنتی لغو نمی‌شود' };
+    const why = reason.trim();
+    const label = sale.series ? `${sale.series}-${sale.invoiceNumber}` : String(sale.invoiceNumber);
+    if (sale.debtorId) {
+      const outstanding = sale.debtGiven - sale.debtSettled;
+      if (outstanding > 0) {
+        d.transactions.push(row('DebtTransaction', {
+          id: core.ulid(now), debtorId: sale.debtorId, type: 'receive', amount: outstanding, date: today,
+          notes: `لغو فروش — فاکتور #${label}`, createdAt: now, refId: sale.id, kind: 'sale_cancel',
+        }));
+        sale.debtSettled += outstanding;
+      }
+    }
+    for (const it of d.saleItems.filter((x) => x.saleId === saleId && x.productId && x.quantity - x.returnedQty > 0)) {
+      d.stockMovements.push(row('StockMovement', {
+        id: core.ulid(now), productId: it.productId, type: 'sale_cancel', qty: it.quantity - it.returnedQty, date: today,
+        notes: `لغو فروش — فاکتور #${label}`, refId: saleId, createdAt: now,
+      }));
+    }
+    Object.assign(sale, { status: 'cancelled', cancelReason: why });
+    d.auditLog.push(row('AuditEntry', {
+      id: core.ulid(now), type: 'cancel_sale', date: today, refId: saleId,
+      notes: `لغو فروش فاکتور #${label}${why ? ` — دلیل: ${why}` : ''}`, createdAt: now, ...(by ? { by } : {}),
+    }));
+    this.save(d);
+    return { ok: true, saleId };
+  }
+
+  /** `LedgerEngine.addSupplier` */
+  addSupplier(name, phone = '') {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const id = core.ulid(now);
+    d.suppliers.push(row('Supplier', { id, name: name.trim(), phone, address: '', notes: '', createdAt: now }));
+    this.save(d);
+    return id;
+  }
+
+  /**
+   * `LedgerEngine.addPurchase` — یک کار، چهار اثر: ورودِ انبار، حرکتِ `purchase_in`، ماندهٔ مبلغ به حسابِ تأمین‌کننده،
+   * و قیمتِ خریدِ تازه روی کالا با تاریخچه.
+   */
+  purchase({ supplierId, productId, quantity, price, paid = 0, notes = '' }) {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const today = todayOf(now);
+    const supplier = d.suppliers.find((x) => x.id === supplierId);
+    if (!supplier) return { ok: false, message: 'تأمین‌کننده را انتخاب کنید' };
+    const product = d.products.find((x) => x.id === productId);
+    if (!product) return { ok: false, message: 'کالا را انتخاب کنید' };
+    if (!(quantity > 0)) return { ok: false, message: 'مقدار درست نیست' };
+    if (!(price >= 0)) return { ok: false, message: 'قیمت درست نیست' };
+    const unit = product.unit;
+    const totalAmount = Math.round(quantity * price);
+    const p0 = Math.min(Math.max(0, Number(paid) || 0), totalAmount);
+    const purchaseId = core.ulid(now);
+    const entryId = core.ulid(now);
+    if (product.purchasePrice !== price) {
+      d.priceHistory.push(row('PriceChange', { id: core.ulid(now), productId, oldPrice: product.purchasePrice, newPrice: price, date: today, createdAt: now }));
+      d.auditLog.push(row('AuditEntry', {
+        id: core.ulid(now), type: 'price_change', date: today, refId: productId,
+        notes: `تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(price)} افغانی`, createdAt: now,
+      }));
+      product.purchasePrice = price;
+    }
+    d.auditLog.push(row('AuditEntry', {
+      id: core.ulid(now), type: 'purchase', date: today, refId: purchaseId,
+      notes: `ثبت خرید ${money(quantity)} ${unit} از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی`, createdAt: now,
+    }));
+    d.warehouseEntries.push(row('WarehouseEntry', {
+      id: entryId, productId, cartons: 0, perCarton: 0, units: quantity, unit, price, date: today,
+      notes: notes || 'خرید از تأمین‌کننده', purchaseId, createdAt: now, expiryDate: '', productionDate: '',
+    }));
+    d.purchases.push(row('Purchase', {
+      id: purchaseId, productId, supplierId, quantity, unit, purchasePrice: price, totalAmount, date: today, notes,
+      paidAmount: p0, debt: totalAmount - p0, warehouseEntryId: entryId, createdAt: now,
+    }));
+    d.stockMovements.push(row('StockMovement', {
+      id: core.ulid(now), productId, type: 'purchase_in', qty: quantity, date: today, notes: notes || 'ثبت خرید', refId: purchaseId, createdAt: now,
+    }));
+    this.save(d);
+    return { ok: true, purchaseId, totalAmount, debt: totalAmount - p0 };
+  }
+
+  /** `LedgerEngine.paySupplier` (با کلید ⇒ دو لمس یک پرداخت) */
+  paySupplier(supplierId, amount, key = null) {
+    const d = clone(this.ledger);
+    const now = this.now();
+    if (key && d.supplierPayments.some((x) => x.id === key)) return { ok: false, message: 'این پرداخت ثبت شده است' };
+    const supplier = d.suppliers.find((x) => x.id === supplierId);
+    if (!supplier) return { ok: false, message: 'تأمین‌کننده پیدا نشد' };
+    if (!(amount > 0)) return { ok: false, message: 'مبلغ درست نیست' };
+    const id = key || core.ulid(now);
+    d.supplierPayments.push(row('SupplierPayment', { id, supplierId, amount, date: todayOf(now), notes: '', createdAt: now }));
+    d.auditLog.push(row('AuditEntry', {
+      id: key ? `${key}-a` : core.ulid(now), type: 'supplier_payment', date: todayOf(now), refId: id,
+      notes: `پرداخت به «${supplier.name}» به مبلغ ${money(amount)} افغانی`, createdAt: now,
+    }));
+    this.save(d);
+    return { ok: true, id };
+  }
+
+  /** `ShopStore.supplierDebt`: Σ خرید − Σ پیش‌پرداخت − Σ پرداخت */
+  supplierDebt(supplierId, d = this.ledger) {
+    const mine = d.purchases.filter((x) => x.supplierId === supplierId);
+    return mine.reduce((s, x) => s + x.totalAmount, 0) - mine.reduce((s, x) => s + x.paidAmount, 0)
+      - d.supplierPayments.filter((x) => x.supplierId === supplierId).reduce((s, x) => s + x.amount, 0);
+  }
+
   /** `DebtorEngine.addTransaction(kind = RECEIVE)` */
   receive(debtorId, amount) {
     const d = clone(this.ledger);
@@ -1059,7 +1255,7 @@ export class NativeDevice {
    * picks: {saleItemId: {qty, disposition: 'restock' | 'damaged'}}
    * @returns {{ok:true, docId:string, amount:number, cash:number, account:number} | {ok:false, code:string}}
    */
-  returnFlow(saleId, picks, { reason = '', mode = 'original', docId = null, by = '' } = {}) {
+  returnFlow(saleId, picks, { reason = '', mode = 'original', docId = null, by = '', approval = null } = {}) {
     const d = clone(this.ledger);
     const now = this.now();
     const today = todayOf(now);
@@ -1110,6 +1306,8 @@ export class NativeDevice {
         id: rowId, saleId, saleItemId: l.item.id, productId: l.item.productId, quantity: l.q, amount: l.amount, reason: why,
         date: today, createdAt: now, docId: doc, disposition: l.disposition, refund: mode,
         toAccount: accM > 0 ? accM / 100 : null, by: by.trim() || null,
+        //  `SaleReturn.approval`: فقط روی نخستین ردیفِ سند (سند = `returns/<docId>`)
+        ...(approval && l === lines[0] ? { approval } : {}),
       }));
       l.item.returnedQty += l.q;
       if (!l.item.productId) continue;

@@ -56,7 +56,9 @@ object DocSeries {
     if (account.isBlank()) return ""
     val res = Backend.api(context).post(
       ApiEndpoints.Shop.SERIES,
-      buildJsonObject { put("deviceId", JsonPrimitive(SyncStore(context).deviceUid)) },
+      //  سری مالِ «شناسهٔ همگام‌سازیِ» همین حساب روی همین دستگاه (`SyncReplica`): حسابِ دوم روی همان گوشی سریِ خودش را
+      //  می‌گیرد؛ حسابِ نخست همان سریِ پیشین (همان شناسهٔ خام)
+      buildJsonObject { put("deviceId", JsonPrimitive(ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).deviceId())) },
     )
     val got = (res["series"] as? JsonPrimitive)?.content.orEmpty()
     if (!valid(got)) return ""
