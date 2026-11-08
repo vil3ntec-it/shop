@@ -165,6 +165,10 @@ async function reindex(sigs, ids, from) {
   const stale = [...sigs].filter(([id, sig]) => known.get(id) !== sig).slice(0, REINDEX_PER_PASS);
   for (const [id, sig] of stale) {
     await tx(async (c) => {
+      //  دو نمونهٔ سرور (یا برشِ باطل‌شده و برشِ تازه) همان دکان را با هم از نو می‌نویسند: بی این قفل هر دو
+      //  پیش از کامیتِ دیگری DELETE می‌زدند و INSERT ِ دومی به کلیدِ `(shop_id, product_id)` می‌خورد (23505 ⇒
+      //  بازارِ ۵۰۰) — فقط روی PostgreSQL؛ PGlite تراکنش‌ها را پشتِ هم می‌گذارد. دومی پس از کامیتِ اولی می‌خواند.
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`market-search:${id}`]);
       await c.query('DELETE FROM market_search WHERE shop_id = $1', [id]);
       await m4.indexShop(c, id, from);   // M4: برند، بارکد و `bank_product_id` کنارِ نام؛ S1: از همان منبعِ کالا
       await c.query(
