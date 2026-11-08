@@ -28,6 +28,8 @@ const account = (r) => store.accountTenant(r.app, r.account_id);
 /** هر جدولِ بایت (مهاجرتِ ۲۵۵ و ۲۷۵): کلیدِ ردیف، ستون‌های tenant، tenant ِ انبار و سنجهٔ نوع (پیش‌فرض عکس). */
 const TABLES = [
   { table: 'product_photos', pk: ['app', 'account_id', 'product_id'], extra: [], tenant: account },
+  //  نسخهٔ کارتِ همان عکس (مهاجرتِ ۳۵۰) — بی این `gc` شیءِ کارت را «بی ردیف» می‌دید و پاک می‌کرد
+  { table: 'product_photo_thumbs', pk: ['app', 'account_id', 'product_id'], extra: [], tenant: account },
   { table: 'photo_inbox', pk: ['id'], extra: ['app', 'account_id'], tenant: account },
   { table: 'storefront_media', pk: ['shop_id', 'kind', 'version'], extra: [], tenant: shop },
   { table: 'image_blobs', pk: ['hash'], extra: [], tenant: () => store.BLOBS },

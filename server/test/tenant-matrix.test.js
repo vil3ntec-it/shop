@@ -160,6 +160,7 @@ async function seedShop(label) {
   assert.equal(ph.status, 200, JSON.stringify(ph.body));
   M.photoHash = ph.body.hash;
   assert.ok(M.photoHash, JSON.stringify(ph.body));
+  I.photoHash = M.photoHash;   //  `of` ِ درِ کارتِ ویترین (WEB-15، مهاجرتِ ۳۵۰)
   const inbox = await h.post('/api/sync/v1/photo-inbox', { data: jpegB64(label.length + 9), pair: PAIR, product_id: I.v1prod, device_id: I.device }, { token: o.token });
   assert.equal(inbox.status, 200, JSON.stringify(inbox.body));
   I.inbox = inbox.body.id;
@@ -251,6 +252,7 @@ function casesFor(I) {
   add('GET /api/sync/v1/photos', { url: '/api/sync/v1/photos?since=0', own: ['photoHash'] });
   add('GET /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}`, own: ['photoHash'] });
   add('PUT /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}`, body: () => ({ data: jpegB64(77) }) });
+  add('PUT /api/sync/v1/photos/:productId/thumb', { url: `/api/sync/v1/photos/${I.v1prod}/thumb`, body: () => ({ data: jpegB64(79), of: I.photoHash }) });
   add('DELETE /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}` });
   add('POST /api/sync/v1/photo-inbox', { url: '/api/sync/v1/photo-inbox', body: () => ({ data: jpegB64(78), pair: PAIR, product_id: I.v1prod }) });
   add('GET /api/sync/v1/photo-inbox', { url: `/api/sync/v1/photo-inbox?pair=${PAIR}`, own: ['inboxId'] });

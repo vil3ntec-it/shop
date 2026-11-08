@@ -2,6 +2,9 @@
  * دکانِ آزمایشیِ سنجشِ کارایی ِ ویترین (WEB-15): سرورِ واقعی روی پایگاهِ آزمون، پشتِ همان `encode gzip` ِ
  * `server/Caddyfile`، با ۱۲ کالای منتشرشده در سه دسته و ۱۰ عکسِ JPEG ِ واقعی‌نما (۶۰۰×۶۰۰، ~۳۰KB، ساختهٔ همان کرومیوم
  * با دانهٔ ثابت ⇒ همان بایت‌ها در هر اجرا). دادهٔ ساختگی، نه دکانِ واقعی.
+ * هر عکس مثلِ برنامهٔ امروز نسخهٔ کارتش را همراه دارد (`core/image/PhotoThumb`: ۳۲۰px، JPEG ِ ۷۰؛ رمزگذارِ JPEG ِ
+ * کرومیوم همان libjpeg-turbo ِ `Bitmap.compress` ِ اندروید است) و با همان `PUT /sync/v1/photos/:id` (`thumb`) می‌رود.
+ * `VITALS_NO_THUMBS=1` ⇒ عکس بی کارت (دکانی که هنوز کارت نگرفته؛ فقط برای مقایسهٔ پیش/پس، هرگز در CI).
  *
  * `test/web-store-vitals.mjs` (آزمون) و `bench/lighthouse-store.mjs` (Lighthouse ِ اختیاری) هر دو همین را می‌سازند.
  *
@@ -114,18 +117,26 @@ export async function startVitalsStore(browser) {
         g.fillStyle = `hsla(${Math.floor(rnd() * 360)}, 55%, ${Math.floor(30 + rnd() * 50)}%, 0.55)`;
         g.beginPath(); g.arc(rnd() * 600, rnd() * 600, 4 + rnd() * 40, 0, Math.PI * 2); g.fill();
       }
-      out.push(c.toDataURL('image/jpeg', 0.72).split(',')[1]);
+      //  نسخهٔ کارت: همان `PhotoThumb.EDGE` (۳۲۰) و `PhotoThumb.QUALITY` (۷۰) ِ برنامه
+      const t = document.createElement('canvas'); t.width = 320; t.height = 320;
+      const tg = t.getContext('2d');
+      tg.imageSmoothingQuality = 'high';
+      tg.drawImage(c, 0, 0, 320, 320);
+      out.push([c.toDataURL('image/jpeg', 0.72).split(',')[1], t.toDataURL('image/jpeg', 0.70).split(',')[1]]);
     }
     return out;
   }, WITH_PHOTO.length);
   await ctx.close();
+  const withThumbs = process.env.VITALS_NO_THUMBS !== '1';
   let sizes = [];
   for (let k = 0; k < photos.length; k++) {
-    const r = await call('PUT', `/api/sync/v1/photos/${WITH_PHOTO[k]}`, { data: photos[k] }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
-    if (r.status !== 200) sizes = null;
-    else if (sizes) sizes.push(Math.round(Buffer.from(photos[k], 'base64').length / 1024));
+    const [data, thumb] = photos[k];
+    const r = await call('PUT', `/api/sync/v1/photos/${WITH_PHOTO[k]}`, { data, ...(withThumbs && { thumb }) }, T, { 'X-App': 'shop', 'X-Device': 'dev-owner' });
+    if (r.status !== 200 || (r.body && r.body.thumb) !== withThumbs) sizes = null;
+    else if (sizes) sizes.push(`${Math.round(Buffer.from(data, 'base64').length / 1024)}${withThumbs ? `/${(Buffer.from(thumb, 'base64').length / 1024).toFixed(1)}` : ''}`);
   }
-  checks.push([Boolean(sizes), 'ده عکسِ واقعی‌نما همگام شد', sizes ? `${sizes.join('، ')} KB` : 'ناکام']);
+  checks.push([Boolean(sizes), withThumbs ? 'ده عکسِ واقعی‌نما با نسخهٔ کارت همگام شد (اصل/کارت)' : 'ده عکسِ واقعی‌نما همگام شد (بی کارت)',
+    sizes ? `${sizes.join('، ')} KB` : 'ناکام']);
 
   return {
     base: `http://127.0.0.1:${gz.server.address().port}`, slug, checks,

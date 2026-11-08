@@ -2,9 +2,13 @@ package ir.vil3ntec.tohid.sync
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.net.ApiClient
+import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.sync.PhotoSyncPlan
+import ir.vil3ntec.tohid.core.sync.PhotoThumbBackfill
 import ir.vil3ntec.tohid.data.PhotoStore
 import ir.vil3ntec.tohid.data.repo.Backend
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -34,6 +38,8 @@ import kotlinx.serialization.json.longOrNull
  *    • سوکتِ زنده `{"event":"photos"}` می‌آورد ⇒ فهرستِ تغییرها پس از
  *      آخرین `rev` گرفته و فقط عکس‌هایی که hashشان فرق دارد دانلود می‌شوند
  *    • بارِ اول، همهٔ عکس‌های موجودِ این دستگاه یک بار فرستاده می‌شوند
+ *    • WEB-15: هر عکس نسخهٔ کارتِ ویترینش (۳۲۰px) را همراه می‌برد؛ عکسِ کهنهٔ بی کارت سرِ فرصت کارت می‌گیرد
+ *      (`PhotoThumbBackfill`) — اصل دوباره بالا نمی‌رود
  *  همه روی نخِ IO، پشتِ یک قفل — کار هیچ‌وقت دوبار هم‌زمان نمی‌رود و
  *  برنامه کند نمی‌شود.
  *
@@ -103,17 +109,20 @@ object PhotoSync {
     }
 
     //  SYN-14: اولویتِ پایین‌تر از دفتر — تا همگام‌سازیِ دفتر مشغول است صبر (رویهم حداکثر یک دقیقه در هر دور)
-    var waited = yieldToLedger(context, 0L)
+    val waitedUp = yieldToLedger(context, 0L)
 
-    //  ۱) فرستادن
+    //  ۱) فرستادن — WEB-15: همراهِ نسخهٔ کارتِ ویترین (`PhotoStore.thumb`)؛ کارتِ ردشده (`thumb_*`) ⇒ همان اصل بی کارت
     for (id in (p.getStringSet("up", emptySet()) ?: emptySet()).toList()) {
       val bytes = PhotoStore.bytes(context, id)
       if (bytes == null) { edit(context, "up", remove = id); continue }
+      val thumb = PhotoStore.thumb(bytes)
       val ok = runCatching {
-        val r = api.put("/sync/v1/photos/" + enc(id), buildJsonObject {
-          put("data", JsonPrimitive(b64(bytes)))
-          put("device_id", JsonPrimitive(device))
-        })
+        val r = try {
+          upload(api, id, bytes, thumb, device)
+        } catch (e: ApiFailure) {
+          if (thumb == null || !e.code.startsWith("thumb_")) throw e
+          upload(api, id, bytes, null, device)
+        }
         r["hash"]?.jsonPrimitive?.contentOrNull?.let { p.edit().putString("h:$id", it).apply() }
       }.isSuccess
       if (ok) edit(context, "up", remove = id) else return@withLock
@@ -125,46 +134,118 @@ object PhotoSync {
 
     //  ۲) گرفتن — SYN-14: نشانه فقط تا پیش از نخستین عکسِ ناتمام جلو می‌رود (`PhotoSyncPlan.cursor`) تا دانلودِ
     //  قطع‌شده دورِ بعد از همان‌جا ادامه یابد؛ عکسی که `MAX_TRIES` بار نشد رد می‌شود تا صف بسته نماند
-    var since = p.getLong("rev", 0L)
-    var got = 0
-    repeat(40) {
-      waited = yieldToLedger(context, waited)
-      val page: JsonObject = runCatching { api.get("/sync/v1/photos?since=$since") }.getOrNull() ?: return@withLock arrived(context, got)
-      val items = page["items"] as? JsonArray ?: JsonArray(emptyList())
-      val done = ArrayList<PhotoSyncPlan.Item>(items.size)
-      for (el in items) {
-        val o = el.jsonObject
-        val rev = o["rev"]?.jsonPrimitive?.longOrNull ?: since
-        val id = o["product_id"]?.jsonPrimitive?.contentOrNull
-        if (id == null) { done += PhotoSyncPlan.Item(rev, true); continue }
-        val hash = o["hash"]?.jsonPrimitive?.contentOrNull.orEmpty()
-        val deleted = o["deleted"]?.jsonPrimitive?.booleanOrNull == true
-        //  کاری که خودِ این دستگاه هنوز نفرستاده بر نسخهٔ سرور جلو است
-        if (id in (p.getStringSet("up", emptySet()) ?: emptySet())) { done += PhotoSyncPlan.Item(rev, true); continue }
-        if (deleted) {
-          PhotoStore.delete(context, id); p.edit().remove("h:$id").apply(); got++
-          done += PhotoSyncPlan.Item(rev, true)
-        } else if (hash.isNotEmpty() && (p.getString("h:$id", "") != hash || !PhotoStore.exists(context, id))) {
-          val data = runCatching { api.get("/sync/v1/photos/" + enc(id)) }.getOrNull()?.get("data")?.jsonPrimitive?.contentOrNull
-          val ok = data != null && runCatching { PhotoStore.saveBytes(context, id, unb64(data)).isSuccess }.getOrDefault(false)
-          if (ok) {
-            p.edit().putString("h:$id", hash).apply(); got++
+    var waited = waitedUp
+    val got = kotlin.run pull@{
+      var since = p.getLong("rev", 0L)
+      var n = 0
+      repeat(40) {
+        waited = yieldToLedger(context, waited)
+        val page: JsonObject = runCatching { api.get("/sync/v1/photos?since=$since") }.getOrNull() ?: return@pull n
+        val items = page["items"] as? JsonArray ?: JsonArray(emptyList())
+        val done = ArrayList<PhotoSyncPlan.Item>(items.size)
+        for (el in items) {
+          val o = el.jsonObject
+          val rev = o["rev"]?.jsonPrimitive?.longOrNull ?: since
+          val id = o["product_id"]?.jsonPrimitive?.contentOrNull
+          if (id == null) { done += PhotoSyncPlan.Item(rev, true); continue }
+          val hash = o["hash"]?.jsonPrimitive?.contentOrNull.orEmpty()
+          val deleted = o["deleted"]?.jsonPrimitive?.booleanOrNull == true
+          //  کاری که خودِ این دستگاه هنوز نفرستاده بر نسخهٔ سرور جلو است
+          if (id in (p.getStringSet("up", emptySet()) ?: emptySet())) { done += PhotoSyncPlan.Item(rev, true); continue }
+          if (deleted) {
+            PhotoStore.delete(context, id); p.edit().remove("h:$id").apply(); n++
             done += PhotoSyncPlan.Item(rev, true)
+          } else if (hash.isNotEmpty() && (p.getString("h:$id", "") != hash || !PhotoStore.exists(context, id))) {
+            val data = runCatching { api.get("/sync/v1/photos/" + enc(id)) }.getOrNull()?.get("data")?.jsonPrimitive?.contentOrNull
+            val ok = data != null && runCatching { PhotoStore.saveBytes(context, id, unb64(data)).isSuccess }.getOrDefault(false)
+            if (ok) {
+              p.edit().putString("h:$id", hash).apply(); n++
+              done += PhotoSyncPlan.Item(rev, true)
+            } else {
+              val (stuckRev, tries) = PhotoSyncPlan.failed(p.getLong("stuck_rev", -1L), p.getInt("stuck_tries", 0), rev)
+              p.edit().putLong("stuck_rev", stuckRev).putInt("stuck_tries", tries).apply()
+              done += PhotoSyncPlan.Item(rev, PhotoSyncPlan.giveUp(stuckRev, tries, rev))
+              if (!done.last().done) break
+            }
           } else {
-            val (stuckRev, tries) = PhotoSyncPlan.failed(p.getLong("stuck_rev", -1L), p.getInt("stuck_tries", 0), rev)
-            p.edit().putLong("stuck_rev", stuckRev).putInt("stuck_tries", tries).apply()
-            done += PhotoSyncPlan.Item(rev, PhotoSyncPlan.giveUp(stuckRev, tries, rev))
-            if (!done.last().done) break
+            done += PhotoSyncPlan.Item(rev, true)
           }
-        } else {
-          done += PhotoSyncPlan.Item(rev, true)
         }
+        since = PhotoSyncPlan.cursor(since, done, page["head"]?.jsonPrimitive?.longOrNull ?: since)
+        p.edit().putLong("rev", since).apply()
+        if (PhotoSyncPlan.stopped(done) || page["has_more"]?.jsonPrimitive?.booleanOrNull != true) return@pull n
       }
-      since = PhotoSyncPlan.cursor(since, done, page["head"]?.jsonPrimitive?.longOrNull ?: since)
-      p.edit().putLong("rev", since).apply()
-      if (PhotoSyncPlan.stopped(done) || page["has_more"]?.jsonPrimitive?.booleanOrNull != true) return@withLock arrived(context, got)
+      n
     }
     arrived(context, got)
+
+    //  ۳) WEB-15: کارتِ ویترین برای عکس‌های پیش از این قابلیت — سرِ فرصت و با سقف (`PhotoThumbBackfill`)
+    backfill(context)
+  }
+
+  private suspend fun upload(api: ApiClient, id: String, bytes: ByteArray, thumb: ByteArray?, device: String): JsonObject =
+    api.put("/sync/v1/photos/" + enc(id), buildJsonObject {
+      put("data", JsonPrimitive(b64(bytes)))
+      if (thumb != null) put("thumb", JsonPrimitive(b64(thumb)))
+      put("device_id", JsonPrimitive(device))
+    })
+
+  /**
+   *  WEB-15: نسخهٔ کارت برای عکسی که این دستگاه **همان** اصلش را دارد (`h:<id>` = hash ِ سرور) و سرور کارتش را ندارد.
+   *  نشانهٔ جدا (`trev`)، حداکثر `BATCH` در هر دور با فاصله، و اگر کار ماند دورِ بعد `NEXT_RUN_MS` بعد. سرورِ کهنه که
+   *  `thumb` را در فهرست نمی‌دهد ⇒ هیچ کاری (نشانه هم جلو نمی‌رود تا پس از به‌روزرسانیِ سرور از همان‌جا).
+   */
+  private suspend fun backfill(context: Context) {
+    val api = Backend.api(context)
+    val p = prefs(context)
+    var waited = 0L
+    val io = object : PhotoThumbBackfill.Io {
+      override suspend fun page(since: Long): PhotoThumbBackfill.Page? {
+        waited = yieldToLedger(context, waited)
+        val o = runCatching { api.get("/sync/v1/photos?since=$since") }.getOrNull() ?: return null
+        val items = o["items"] as? JsonArray ?: return null
+        val rows = ArrayList<PhotoThumbBackfill.Row>(items.size)
+        for (el in items) {
+          val x = el as? JsonObject ?: continue
+          val thumb = x["thumb"]?.jsonPrimitive?.booleanOrNull ?: return null
+          rows += PhotoThumbBackfill.Row(
+            productId = x["product_id"]?.jsonPrimitive?.contentOrNull ?: continue,
+            hash = x["hash"]?.jsonPrimitive?.contentOrNull.orEmpty(),
+            rev = x["rev"]?.jsonPrimitive?.longOrNull ?: continue,
+            deleted = x["deleted"]?.jsonPrimitive?.booleanOrNull == true,
+            thumb = thumb,
+          )
+        }
+        return PhotoThumbBackfill.Page(rows, o["head"]?.jsonPrimitive?.longOrNull ?: since, o["has_more"]?.jsonPrimitive?.booleanOrNull == true)
+      }
+
+      override fun localHash(productId: String): String? =
+        p.getString("h:$productId", null)?.takeIf {
+          PhotoStore.exists(context, productId) && productId !in (p.getStringSet("up", emptySet()) ?: emptySet())
+        }
+
+      override fun build(productId: String): ByteArray? = PhotoStore.bytes(context, productId)?.let { PhotoStore.thumb(it) }
+
+      override suspend fun send(productId: String, of: String, thumb: ByteArray): Int = try {
+        api.put("/sync/v1/photos/" + enc(productId) + "/thumb", buildJsonObject {
+          put("data", JsonPrimitive(b64(thumb)))
+          put("of", JsonPrimitive(of))
+        })
+        200
+      } catch (e: CancellationException) {
+        throw e
+      } catch (e: ApiFailure) {
+        e.status
+      } catch (_: Exception) {
+        0
+      }
+
+      override suspend fun pause(ms: Long) = delay(ms)
+
+      override fun save(cursor: Long) { p.edit().putLong("trev", cursor).apply() }
+    }
+    val out = PhotoThumbBackfill.run(p.getLong("trev", 0L), io)
+    if (out.more) scope.launch { delay(PhotoThumbBackfill.NEXT_RUN_MS); runCatching { run(context) } }
   }
 
   /** عکسی رسید ⇒ صفحه‌ها تازه و ربات (اگر روشن است) فقط تازه‌ها را */

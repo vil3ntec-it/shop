@@ -292,9 +292,30 @@ router.put('/photos/:productId', requireSyncWrite, async (req, res, next) => {
       return res.status(413).json({ ok: false, error: 'TOO_LARGE', message: 'عکس بزرگ‌تر از ۶۰۰ کیلوبایت است' });
     }
     const deviceId = String(req.body?.device_id || req.headers['x-device'] || '').slice(0, 64);
-    const out = await photos.put(req.sync, req.params.productId, Buffer.from(b64, 'base64'), deviceId);
+    //  نسخهٔ کارتِ ویترین (اختیاری، مهاجرتِ ۳۵۰) در همان تراکنش؛ نادرست ⇒ `thumb_*` و هیچ نوشتنی
+    const out = await photos.put(req.sync, req.params.productId, Buffer.from(b64, 'base64'), deviceId,
+      { thumb: thumbBytes(req.body?.thumb, true) });
     live.relay(req.sync, { event: 'photos', rev: out.rev }, deviceId);
     res.json({ ok: true, ...out });
+  } catch (err) { next(err); }
+});
+
+/** base64 ِ نسخهٔ کارت ⇒ بایت؛ نبود و `optional` ⇒ null. فقط رشته (نه آرایه/شیء)، و سقف پیش از رمزگشایی */
+function thumbBytes(b64, optional = false) {
+  const { ApiError } = require('../middleware/errors');
+  if ((b64 === undefined || b64 === null) && optional) return null;
+  if (typeof b64 !== 'string' || !b64) throw new ApiError(400, 'thumb_empty', 'نسخهٔ کارت خالی است');
+  if (b64.length > Math.ceil(photos.THUMB_MAX_BYTES * 4 / 3) + 8) {
+    throw new ApiError(413, 'thumb_too_large', 'نسخهٔ کارت بزرگ‌تر از ۶۴ کیلوبایت است');
+  }
+  return Buffer.from(b64, 'base64');
+}
+
+//  فقط نسخهٔ کارتِ اصلِ امروز (`of` = همان `hash` ِ فهرست) — عکس‌های پیش از ۳۵۰ را برنامه سرِ فرصت می‌سازد.
+//  `rev` بالا نمی‌رود و چیزی به دستگاه‌های دیگر خبر داده نمی‌شود (کارت فقط برای ویترین است).
+router.put('/photos/:productId/thumb', requireSyncWrite, async (req, res, next) => {
+  try {
+    res.json({ ok: true, ...(await photos.putThumb(req.sync, req.params.productId, thumbBytes(req.body?.data), req.body?.of)) });
   } catch (err) { next(err); }
 });
 
