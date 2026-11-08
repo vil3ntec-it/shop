@@ -37,6 +37,18 @@ class TokenStore(context: Context) : TokenStorage {
 
   override val signedIn: Boolean get() = accessToken != null
 
+  /**
+   *  رازِ دستگاهِ شاگرد — رمزشده با همان `SecretBox` (کلیدِ فایلِ فقط-صاحب، همان روشِ `AtRestKeysDesk`)، کنارِ
+   *  توکن‌ها؛ `clear()` ِ خروج نگهش می‌دارد تا شاگرد با همان کد به حسابِ خودش برگردد.
+   */
+  override var staffDeviceKey: String?
+    get() = read(STAFF_KEY)
+    set(value) {
+      val e = prefs.edit()
+      if (value.isNullOrBlank()) e.remove(STAFF_KEY) else e.putString(STAFF_KEY, seal(value))
+      e.apply()
+    }
+
   override fun save(access: String?, refresh: String?, expiresAt: Long) {
     val editor = prefs.edit()
     editor.putString(ACCESS, seal(access))
@@ -57,26 +69,28 @@ class TokenStore(context: Context) : TokenStorage {
   fun stashTo(scope: String) {
     val tag = "@srv:" + scope.ifEmpty { "default" }
     val e = prefs.edit()
-    for (k in listOf(ACCESS, REFRESH)) {
+    for (k in listOf(ACCESS, REFRESH, STAFF_KEY)) {
       val v = prefs.getString(k, null)
       if (v != null) e.putString(k + tag, v) else e.remove(k + tag)
     }
     if (prefs.contains(EXPIRES)) e.putLong(EXPIRES + tag, prefs.getLong(EXPIRES, 0)) else e.remove(EXPIRES + tag)
-    e.remove(ACCESS).remove(REFRESH).remove(EXPIRES).commit()
+    e.remove(ACCESS).remove(REFRESH).remove(EXPIRES).remove(STAFF_KEY).commit()
   }
 
   /** نشستِ بایگانی‌شدهٔ یک سرور — نبود ⇒ بی نشست (ورودِ تازه) */
   fun openFrom(scope: String) {
     val tag = "@srv:" + scope.ifEmpty { "default" }
-    val e = prefs.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRES)
-    for (k in listOf(ACCESS, REFRESH)) prefs.getString(k + tag, null)?.let { e.putString(k, it) }
+    val e = prefs.edit().remove(ACCESS).remove(REFRESH).remove(EXPIRES).remove(STAFF_KEY)
+    for (k in listOf(ACCESS, REFRESH, STAFF_KEY)) prefs.getString(k + tag, null)?.let { e.putString(k, it) }
     if (prefs.contains(EXPIRES + tag)) e.putLong(EXPIRES, prefs.getLong(EXPIRES + tag, 0))
-    e.remove(ACCESS + tag).remove(REFRESH + tag).remove(EXPIRES + tag).commit()
+    e.remove(ACCESS + tag).remove(REFRESH + tag).remove(EXPIRES + tag).remove(STAFF_KEY + tag).commit()
   }
 
   private companion object {
     const val ACCESS = "access_token"
     const val REFRESH = "refresh_token"
     const val EXPIRES = "access_expires_at"
+    /** رازِ دستگاهِ شاگرد (`staffDeviceKey`) — مثلِ توکن‌ها برای هر سرور جدا (`stashTo`/`openFrom`) */
+    const val STAFF_KEY = "staff_device_key"
   }
 }

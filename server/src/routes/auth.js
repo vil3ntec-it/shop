@@ -30,7 +30,7 @@ const audit = require('../lib/audit');
 const reauth = require('../lib/reauth');
 const hardening = require('../lib/auth-session-hardening');
 const { membershipOf } = require('../lib/shops');
-const staffCodes = require('../lib/staff-codes');
+const staffLogin = require('../lib/staff-login');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireAnyUser } = require('../middleware/auth');
 const { badRequest, unauthorized, forbidden, conflict, tooMany, notFound } = require('../middleware/errors');
@@ -52,7 +52,8 @@ const authLimit = rateLimit({ max: config.rateLimit.authMax, keyPrefix: 'auth' }
 const sessionLimit = rateLimit({ max: config.rateLimit.sessionMax, keyPrefix: 'session' });
 //  کد شاگرد خودش رمز است، پس مثل رمز محدود می‌شود
 const joinLimit = rateLimit({ max: config.rateLimit.joinMax, keyPrefix: 'staff-login' });
-/**
+//  ⛔ سطلِ دوم به‌ازای **هر کد** کنارِ `joinLimit` ِ هر IP (کلید HMAC ِ کد، نه خودش — `lib/staff-login.codeKey`)
+const staffCodeLimit = rateLimit({ max: config.rateLimit.joinCodeMax, keyPrefix: 'staff-login-code', key: staffLogin.codeKey });/**
  * کلیدِ سطلِ کد همان مقصد است — شماره یا ایمیل. تا دیروز فقط شماره بود، پس ثبت‌نامِ ایمیلی روی IP
  * جمع می‌شد و یک اینترنت مشترک (کافی‌نت، دکانِ چند نفره) همه را با هم می‌بست.
  * شماره با کلیدِ یکتا (RSK-07): ‎0700…‎، ‎+93700…‎، ‎0093700…‎ و ‎+9300700…‎ یک سطل‌اند، نه چهار.
@@ -306,77 +307,36 @@ async function loginPayload(user, session) {
  * شاگردی که ایمیل ندارد اصلاً وارد نمی‌شد.
  *
  * ── همان دستگاه، همان حساب ─────────────────────────────────────────
- * شناسه‌ی دستگاه با شناسه‌ی دکان یک هویت پایدار می‌سازد
- * (`user_identities` با provider='staff'). پس شاگردی که فردا دوباره
- * وارد می‌شود همان حساب قبلی را می‌گیرد، نه یک عضو تازه — وگرنه هر
- * ورود یک صندلی از ظرفیت دکان می‌خورد و کد هم زودتر تمام می‌شد.
+ * شاگردی که فردا دوباره وارد می‌شود همان حساب قبلی را می‌گیرد، نه یک
+ * عضو تازه — وگرنه هر ورود یک صندلی از ظرفیت دکان می‌خورد و کد هم
+ * زودتر تمام می‌شد. ⛔ «همان دستگاه» با **رازِ دستگاه** ثابت می‌شود
+ * (`lib/staff-device-keys`، مهاجرتِ ۳۲۰)، نه با شناسه‌اش: شناسه راز
+ * نیست و پیش‌تر «کد + شناسهٔ دستگاهِ عضوِ دیگر» نشستِ همان عضو را می‌داد.
+ * هویتِ `user_identities` (provider='staff') فقط می‌گوید این شناسه به
+ * حسابی بسته است.
  *
  * ── امنیت ──────────────────────────────────────────────────────────
- * کد خودش رمز است، پس مثل رمز با آن رفتار می‌شود: محدودیت نرخ روی
- * همین مسیر، و صاحب دکان هر وقت بخواهد کد را باطل یا عوض می‌کند و
- * دسترسی همان لحظه بسته می‌شود.
+ * کد خودش رمز است، پس مثل رمز با آن رفتار می‌شود: سقفِ نرخ به‌ازای هر IP
+ * و هر کد، و صاحب دکان هر وقت بخواهد کد را باطل یا عوض می‌کند و همان
+ * کد دیگر کسی را — عضوِ موجود را هم — وارد نمی‌کند (نشستِ باز می‌ماند).
+ * هر ورود (موفق و هر دلیلِ شکست) در سابقه است: `staff_login.ok` و
+ * `staff_login.failed`. کلیدِ اضطراری: پرچمِ `auth.staff_session_guard`
+ * (پیش‌فرض روشن؛ فقط `false` ِ صریح).
  */
-router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
+router.post(['/staff', '/staff-login'], joinLimit, staffCodeLimit, async (req, res, next) => {
   try {
-    const rawCode = v.text(req.body?.code, { max: 40, required: true, field: 'کد شاگرد' });
-    const name = v.text(req.body?.name, { max: 80 });
-    const device = req.body?.device || {};
-    const deviceUid = v.id(device?.uid || device?.deviceId || '', {
-      field: 'شناسه دستگاه', required: false, max: 64,
-    });
-    const ip = clientIp(req);
+    res.status(201).json(await staffLogin.login(req, { issueSession, loginPayload }));
+  } catch (err) { next(err); }
+});
 
-    const shopId = await staffCodes.shopIdOf(rawCode);
-    const subject = deviceUid ? `${shopId}:${deviceUid}` : '';
-
-    //  همان دستگاه پیش از این آمده؟ همان حساب را برمی‌گردانیم
-    let user = null;
-    if (subject) {
-      const found = await one(
-        `SELECT u.* FROM user_identities i JOIN users u ON u.id = i.user_id
-          WHERE i.provider='staff' AND i.subject=$1`, [subject]
-      );
-      if (found) user = found;
-    }
-
-    const t = now();
-    if (!user && await staffCodes.preflight(rawCode)) {  // دستگاهِ تازه ⇒ کد پیش از ساختنِ حساب (بی «حسابِ شبح»)
-      user = await one(
-        `INSERT INTO users (id, name, kind, status, created_at, updated_at)
-         VALUES ($1,$2,'staff','active',$3,$3) RETURNING *`,
-        [newId('usr'), name || 'شاگرد', t]
-      );
-      if (subject) {
-        await query(
-          `INSERT INTO user_identities (id, user_id, provider, subject, created_at)
-           VALUES ($1,$2,'staff',$3,$4) ON CONFLICT (provider, subject) DO NOTHING`,
-          [newId('idn'), user.id, subject, t]
-        );
-      }
-    } else if (name && name !== user.name) {
-      await query('UPDATE users SET name=$2, updated_at=$3 WHERE id=$1', [user.id, name, t]);
-      user.name = name;
-    }
-
-    if (user.status !== 'active') {
-      return next(forbidden('این حساب غیرفعال شده است', 'user_disabled'));
-    }
-
-    /*
-     *  عضوِ فعالِ همین دکان است؟ کد دوباره خرج نمی‌شود.
-     *
-     *  بدون این، هر بار باز کردن برنامه یک استفاده از کد می‌خورد و
-     *  کدی که «یک بار مصرف» ساخته شده، دفعه‌ی دوم کار نمی‌کرد.
-     */
-    const member = await membershipOf(user.id);
-    if (!member || member.shop_id !== shopId) {
-      await staffCodes.redeem(rawCode, user.id, ip, { freshAt: t });  // ناموفق ⇒ حسابِ ساخته‌شده در همین لحظه پاک
-    }
-
-    //  کدِ شاگرد مالِ دفترِ دکان است، پس نشستش هم همان بخش است.
-    //  بخشِ پمپ راهِ پیوستنِ خودش را دارد.
-    const session = await issueSession(user, { ...device, uid: deviceUid }, ip, 'shop');
-    res.status(201).json(await loginPayload(user, session));
+/**
+ * ⛔ رازِ دستگاه برای نشستِ **بازِ** شاگرد که پیش از ۲.۱۴.۵ وارد شده (مهاجرتِ آرام، بی بیرون انداختن) — فقط حسابِ
+ * کدِ شاگرد، فقط دستگاهِ همین توکن، فقط وقتی رازِ زنده‌ای نیست (`lib/staff-login.enrollDevice`).
+ */
+router.post('/staff/device-key', sessionLimit, requireAnyUser, async (req, res, next) => {
+  try {
+    const out = await staffLogin.enrollDevice(req);
+    res.status(out.deviceKey ? 201 : 200).json(out);
   } catch (err) { next(err); }
 });
 

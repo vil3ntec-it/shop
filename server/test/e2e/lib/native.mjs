@@ -371,6 +371,8 @@ export class NativeDevice {
     this.offline = false;
     this.token = '';
     this.refreshToken = '';
+    //  `TokenStorage.staffDeviceKey`: رازِ دستگاهِ شاگرد — مثلِ Keystore با نصبِ تازه (دستگاهِ نو) نمی‌آید و با خروج نمی‌رود
+    this.staffKey = '';
     this.refreshes = 0;
     this.ledger = emptyLedger();
     this.shadow = {};
@@ -470,12 +472,14 @@ export class NativeDevice {
 
   /**
    * `AuthRepository.loginWithStaffCode`: شاگرد فقط با کدِ صاحب (`POST /auth/staff`) — بی ایمیل و رمز. همان دستگاه
-   * (`device.uid` = `deviceId`) و همان دکان ⇒ همان حساب، نه عضوِ تازه. خطا ⇒ `Error` با `status` و `code` ِ سرور.
+   * و همان دکان ⇒ همان حساب، نه عضوِ تازه — ⛔ از ۲.۱۴.۵ با **رازِ دستگاه** (`keyVersion: 1`، `key`)، نه فقط
+   * `device.uid`؛ `deviceKey` ِ پاسخ نگه داشته می‌شود. خطا ⇒ `Error` با `status` و `code` ِ سرور.
    */
   async loginStaff(code, name) {
+    const device = { uid: this.deviceId, name: this.label, platform: 'android', keyVersion: 1 };
+    if (this.staffKey) device.key = this.staffKey;
     const r = await this.api('POST', '/auth/staff', {
-      code: String(code).trim().toUpperCase(), name: String(name).trim(), app: 'shop',
-      device: { uid: this.deviceId, name: this.label, platform: 'android' },
+      code: String(code).trim().toUpperCase(), name: String(name).trim(), app: 'shop', device,
     });
     if (r.status !== 201 && r.status !== 200) {
       const e = new Error(`${this.label}: ورودِ شاگرد ${r.status} ${JSON.stringify(r.body)}`);
@@ -487,6 +491,7 @@ export class NativeDevice {
     this.refreshToken = r.body.refresh_token || r.body.refreshToken;
     this.user = r.body.user;
     this.shop = r.body.shop;
+    if (typeof r.body.deviceKey === 'string' && r.body.deviceKey) this.staffKey = r.body.deviceKey;
     return this;
   }
 

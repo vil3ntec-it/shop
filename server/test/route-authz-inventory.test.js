@@ -62,6 +62,9 @@ const CUSTOMER = /^(POST|PUT|PATCH|DELETE) \/api\/(store|market)\//;
 const SELF = [
   ['هویتِ خودِ صدا زننده: رمز، تأییدِ دوباره و خروج از همه (requireAnyUser)', [
     'POST /api/auth/logout-all', 'POST /api/auth/reauth/code', 'POST /api/auth/reauth', 'POST /api/auth/password']],
+  ['رازِ دستگاهِ شاگرد برای نشستِ بازِ خودش: فقط حسابِ کدِ شاگرد، فقط دستگاهِ همین توکن (نه بدنه)، فقط وقتی رازِ زنده‌ای نیست '
+    + '(staff-session-guard.test.js)', [
+    'POST /api/auth/staff/device-key']],
   ['صفحهٔ «من» و پرتال: فقط ردیف‌های همین کاربر (دستگاهِ دیگری ⇒ S15، رمزِ دوباره ⇒ reauth)', [
     'POST /api/me/notices/:id/read', 'PUT /api/me/settings', 'POST /api/me/redeem', 'POST /api/me/errors',
     'POST /api/me/purchase-request', 'DELETE /api/me/devices/:id', 'PUT /api/me', 'POST /api/me/push', 'DELETE /api/me/push',
