@@ -18,6 +18,10 @@
  *   • CHAT-07: پیامِ صوتیِ دکان ⇒ پخش‌کننده (پخش/توقف، زمان، پیشرفت)؛ بایت فقط با زدنِ «پخش» و با بلیت؛ پخش از blob:
  *     (readyState ≥ ۲ و زمانِ پیش‌رونده)؛ بی‌اینترنت ⇒ «تلاشِ دوباره»؛ نوعِ ناشناخته (AMR) بی درخواست ⇒ پیامِ روشن؛
  *     پیامِ پاک‌شده در برگهٔ عقب‌مانده ⇒ «پاک شده یا مهلتش گذشته» و سپس سنگِ قبر؛ بستنِ برگه صدا را می‌ایستاند؛
+ *   • CHAT-05: مشتری عکس می‌فرستد — PNG ِ بزرگ ⇒ پیش‌نمایش (data:) ⇒ ۱۶۰۰px زیرِ ۱٫۵MB و پیش‌نمایشِ ۳۲۰px زیرِ ۶۴KB روی سرور،
+ *     بی EXIF/«مکان»؛ JPEG ِ خوابیده با جهتِ ۶ ⇒ عمودی؛ شفافیت روی سفید؛ رویدادهای پیشرفتِ XHR؛ «لغو» بارگذاری را می‌بُرد؛
+ *     افتادنِ شبکه در میانِ بارگذاری و پیام + «تلاشِ دوباره» ⇒ یک پیام؛ بی‌اینترنت ⇒ صف و رفتنِ خودکار؛ دکان عکس را می‌بیند؛
+ *     کدِ عکس دیربار؛ axe ِ کنترل‌های تازه (با دوربینِ گوشیِ لمسی)؛
  *   • پرچمِ `shop.chat` خاموش ⇒ نه دکمه، نه اسکریپت؛ بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -620,6 +624,207 @@ if (axeSrc) {
     { runOnly: ['color-contrast', 'button-name', 'aria-allowed-attr', 'aria-progressbar-name', 'nested-interactive'] })).violations
     .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
   ok(v.length === 0, 'دسترس‌پذیری (axe-core): پخش‌کنندهٔ صدا', v.join(' | '));
+  await ac.close();
+}
+
+//  ── CHAT-05: مشتری از ویترین عکس می‌فرستد ──
+//  نمونه‌ها در خودِ آزمون ساخته می‌شوند: PNG ِ بزرگ (۲۰۰۰×۱۵۰۰، چند مگابایت، eXIf و tEXt با «مکان»)، JPEG ِ واقعیِ
+//  خوابیده با EXIF ِ جهتِ ۶ (+ XMP و COM با «مکان»)، PNG ِ نیمه‌شفاف و یک JPEG ِ کوچک.
+const SECRET = 'GPS-SECRET-34.5,69.1';
+const seg = (m, body) => { const hd = Buffer.from([0xff, m, 0, 0]); hd.writeUInt16BE(body.length + 2, 2); return Buffer.concat([hd, body]); };
+const tiffOrient = (o) => {
+  const tf = Buffer.alloc(26); tf.write('MM', 0, 'latin1'); tf.writeUInt16BE(42, 2); tf.writeUInt32BE(8, 4); tf.writeUInt16BE(1, 8);
+  tf.writeUInt16BE(0x0112, 10); tf.writeUInt16BE(3, 12); tf.writeUInt32BE(1, 14); tf.writeUInt16BE(o, 18);
+  return tf;
+};
+const hash = (x, y) => { let v = (Math.imul(x, 374761393) + Math.imul(y, 668265263)) | 0; v = Math.imul(v ^ (v >>> 13), 1274126177); return (v ^ (v >>> 16)) & 255; };
+const bigRaw = F.pngImage(2000, 1500, (x, y) => [x & 255, hash(x, y), y & 255], { mode: 'rgb' });   //  یک کانالِ نوفه ⇒ چند مگابایت
+const bigPng = Buffer.concat([bigRaw.subarray(0, 33),
+  F.pngChunk('eXIf', Buffer.concat([Buffer.from([0x4d, 0x4d, 0, 42, 0, 0, 0, 8, 0, 0, 0, 0, 0, 0]), Buffer.from(SECRET, 'latin1')])),
+  F.pngChunk('tEXt', Buffer.from(`Comment\0${SECRET}`, 'latin1')), bigRaw.subarray(33)]);
+const plain = F.jpegImage(416, 208, (x) => (x < 208 ? [220, 30, 30] : [30, 30, 220]), { color: true });
+const rotated = Buffer.concat([plain.subarray(0, 2), seg(0xe1, Buffer.concat([Buffer.from('Exif\0\0', 'latin1'), tiffOrient(6)])),
+  seg(0xe1, Buffer.from(`http://ns.adobe.com/xap/1.0/\0<x:xmpmeta>${SECRET}</x:xmpmeta>`, 'latin1')), seg(0xfe, Buffer.from(SECRET, 'latin1')), plain.subarray(2)]);
+const clear = F.pngImage(300, 200, (x) => (x < 150 ? [0, 0, 0, 0] : [20, 160, 60, 255]), { mode: 'rgba' });
+const small = F.jpegImage(320, 320, (x, y) => [(x * 3) & 255, 120, (y * 3) & 255], { color: true });
+const chatMedia = require('../src/lib/chat-media');
+ok(bigPng.length > 1536 * 1024, `PNG ِ آزمون از سقفِ سرور بزرگ‌تر است (${Math.round(bigPng.length / 1024)}KB، ۲۰۰۰×۱۵۰۰)`);
+
+const o4 = await checkout();
+await move(o4.id, ['accepted', 'picking', 'packed', 'ready_for_pickup']);
+const conv4 = (await call('POST', '/api/shop/chat/conversations', { orderId: o4.id }, T)).body.conversation;
+const photos = async () => Number((await one(
+  "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND kind='image' AND deleted_at IS NULL", [conv4.id])).n);
+const mediaRows = async () => Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1', [conv4.id])).n);
+const mine = () => page.evaluate(() => document.querySelectorAll('#ct-list .ct-msg.mine img.ct-img').length);
+const phState = () => page.evaluate(() => { const b = document.getElementById('ct-ph'); return b && !b.hidden ? b.getAttribute('data-st') : 'gone'; });
+const lastPhoto = async () => {
+  const r = await call('GET', `/api/shop/chat/conversations/${conv4.id}/messages?after=0&limit=200`, null, T);
+  const m = (r.body.messages || []).filter((x) => x.kind === 'image' && x.sender === 'customer').pop();
+  const get = async (id) => Buffer.from(await (await fetch(`${base}/api/shop/chat/conversations/${conv4.id}/media/${encodeURIComponent(id)}`,
+    { headers: { Authorization: `Bearer ${T}` } })).arrayBuffer());
+  return { m, main: await get(m.media.id), thumb: await get(m.media.thumbId) };
+};
+const pixels = (buf, pts) => page.evaluate(async ({ b64, pts: at }) => {
+  const bin = atob(b64); const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  const bm = await createImageBitmap(new Blob([u], { type: 'image/jpeg' }));
+  const c = document.createElement('canvas'); c.width = bm.width; c.height = bm.height;
+  const x = c.getContext('2d'); x.drawImage(bm, 0, 0);
+  return at.map(([fx, fy]) => Array.from(x.getImageData(Math.floor(fx * (bm.width - 1)), Math.floor(fy * (bm.height - 1)), 1, 1).data.slice(0, 3)));
+}, { b64: buf.toString('base64'), pts });
+const clean = (b) => { const s = b.toString('latin1'); return !s.includes('Exif') && !s.includes(SECRET) && !s.includes('xmpmeta'); };
+const attach = async (buffer, name, mimeType) => {
+  await page.setInputFiles('#ct-file', { name, mimeType, buffer });
+  await page.waitForFunction(() => { const b = document.getElementById('ct-ph'); return b && !b.hidden && /^(ready|err)$/.test(b.getAttribute('data-st')); }, null, { timeout: 20000 });
+};
+
+await openOrder(o4);
+await page.click('#o-chat-open');
+await page.waitForFunction(() => { const f = document.getElementById('ct-form'); return f && !f.hidden; }, null, { timeout: 15000 });
+const inputs = await page.evaluate(() => ['ct-file', 'ct-cam'].map((id) => { const i = document.getElementById(id); return i && [i.type, i.accept, i.getAttribute('capture')]; }));
+ok(JSON.stringify(inputs) === JSON.stringify([['file', 'image/*', null], ['file', 'image/*', 'environment']]) && Boolean(await page.getAttribute('#ct-ph-add', 'aria-label')),
+  'گزینشِ عکس: دکمهٔ «افزودنِ عکس» (accept=image/*) و دوربینِ گوشی (capture=environment)', JSON.stringify(inputs));
+ok(await page.$('script[src="/store/chat-photo.js"]') === null, 'کدِ کوچک‌کردنِ عکس پیش از برگزیدنِ عکس بار نشده (دیربار)');
+await page.evaluate(() => {
+  window.__up = { progress: 0, aborts: 0, sends: 0, last: null };
+  const send = XMLHttpRequest.prototype.send;
+  XMLHttpRequest.prototype.send = function (b) {
+    window.__up.sends++;
+    this.upload.addEventListener('progress', (e) => { window.__up.progress++; window.__up.last = [e.loaded, e.total]; });
+    this.addEventListener('abort', () => { window.__up.aborts++; });
+    return send.call(this, b);
+  };
+});
+
+//  ۱. PNG ِ بزرگ ⇒ پیش‌نمایش ⇒ «فرستادن» ⇒ ≤ ۱۶۰۰px و زیرِ سقف، بی EXIF؛ دکان همان عکس را می‌بیند
+await attach(bigPng, 'big.png', 'image/png');
+const prev1 = await page.evaluate(() => { const i = document.getElementById('ct-ph-img'); return { st: document.getElementById('ct-ph').getAttribute('data-st'), src: i.src.slice(0, 15), w: i.naturalWidth, h: i.naturalHeight, shown: !i.hidden }; });
+ok(prev1.st === 'ready' && prev1.src === 'data:image/jpeg' && prev1.shown && prev1.w <= 320 && prev1.h <= 320,
+  'PNG ِ بزرگ ⇒ پیش‌نمایش (data:، ≤ ۳۲۰px) و دکمهٔ «فرستادنِ عکس»', JSON.stringify(prev1));
+ok(await page.$('script[src="/store/chat-photo.js"]') !== null, 'کدِ عکس فقط با برگزیدنِ عکس آمد');
+await page.click('#ct-ph-send');
+await page.waitForFunction(() => document.getElementById('ct-ph').hidden, null, { timeout: 20000 });
+ok(await until(async () => (await photos()) === 1) && await until(async () => (await mine()) === 1), 'عکس رفت: یک پیامِ عکس روی سرور و یک حباب «عکسِ شما»');
+const up1 = await page.evaluate(() => window.__up);
+ok(up1.progress >= 2 && up1.last && up1.last[0] === up1.last[1] && up1.sends === 2, 'پیشرفت از رویدادهای بارگذاریِ XHR (پیش‌نمایش و اصل)', JSON.stringify(up1));
+const p1 = await lastPhoto();
+const pd1 = chatMedia.dimsOf(p1.main, 'image/jpeg'); const pt1 = chatMedia.dimsOf(p1.thumb, 'image/jpeg');
+ok(pd1.width === 1600 && pd1.height === 1200 && p1.main.length <= 1536 * 1024 && pt1.width === 320 && pt1.height === 240 && p1.thumb.length <= 64 * 1024,
+  'روی سرور: اصل ۱۶۰۰×۱۲۰۰ زیرِ ۱٫۵MB و پیش‌نمایش ۳۲۰×۲۴۰ زیرِ ۶۴KB', `${JSON.stringify(pd1)} ${p1.main.length} / ${JSON.stringify(pt1)} ${p1.thumb.length}`);
+ok(clean(p1.main) && clean(p1.thumb) && p1.m.meta.width === 1600 && p1.m.media.mime === 'image/jpeg', 'EXIF/eXIf/tEXt و «مکان» رفته؛ دکان JPEG ِ تازه را می‌بیند');
+await page.waitForFunction(() => /^data:image\/jpeg;/.test((document.querySelector('#ct-list .ct-msg.mine img.ct-img') || {}).src || ''), null, { timeout: 10000 });
+ok(await page.getAttribute('#ct-list .ct-msg.mine img.ct-img', 'alt') === 'عکسِ شما', 'حبابِ عکسِ مشتری با متنِ جایگزینِ «عکسِ شما»');
+
+//  ۲. JPEG ِ خوابیده با جهتِ ۶ ⇒ عمودی و درست‌چرخیده روی سرور، بی EXIF؛ چرخشِ دستی (مرورگرِ بی چرخشِ خودکار) جدا سنجیده می‌شود
+await attach(rotated, 'rotated.jpg', 'image/jpeg');
+await page.click('#ct-ph-send');
+ok(await until(async () => (await photos()) === 2), 'عکسِ چرخیده رفت');
+const p2 = await lastPhoto();
+const pd2 = chatMedia.dimsOf(p2.main, 'image/jpeg');
+const [top2, bottom2] = await pixels(p2.main, [[0.5, 0.1], [0.5, 0.9]]);
+ok(pd2.width === 208 && pd2.height === 416 && top2[0] > 150 && top2[2] < 100 && bottom2[2] > 150 && bottom2[0] < 100 && clean(p2.main),
+  'جهتِ EXIF پیش از فشرده‌سازی: ۴۱۶×۲۰۸ ِ خوابیده ⇒ ۲۰۸×۴۱۶، لبهٔ چپ بالا؛ بی EXIF/XMP/COM', `${JSON.stringify(pd2)} ${top2} ${bottom2}`);
+const manual = await page.evaluate((b64) => {
+  const P = window.StoreChatPhoto;
+  const src = document.createElement('canvas'); src.width = 4; src.height = 2;
+  const x = src.getContext('2d'); x.fillStyle = '#f00'; x.fillRect(0, 0, 2, 2); x.fillStyle = '#00f'; x.fillRect(2, 0, 2, 2);
+  const px = (c, a, b) => (c.getContext('2d').getImageData(a, b, 1, 1).data[0] > 128 ? 'r' : 'b');
+  const out = {};
+  for (const o of [1, 2, 3, 6, 8]) { const c = P.draw(src, 4, 2, o, 1600); out[o] = `${c.width}x${c.height}:${px(c, 0, 0)}${px(c, c.width - 1, c.height - 1)}`; }
+  const bin = atob(b64); const u = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+  out.exif = P.orientationOf(u);
+  return out;
+}, rotated.toString('base64'));
+ok(JSON.stringify(manual) === JSON.stringify({ 1: '4x2:rb', 2: '4x2:br', 3: '4x2:br', 6: '2x4:rb', 8: '2x4:br', exif: 6 }),
+  'چرخش/آینهٔ دستی (۲، ۳، ۶، ۸) و جهتِ ۶ از بایت‌های JPEG', JSON.stringify(manual));
+
+//  ۳. «لغو» در میانِ بارگذاری ⇒ XHR بریده، هیچ پیامی نمی‌رود
+const mainUp = (u) => u.pathname === `/api/store/${slug}/chat/conversations/${conv4.id}/media` && !u.search.includes('role=thumb');
+const held4 = [];
+await page.route(mainUp, (route) => { held4.push(route); });
+await attach(clear, 'clear.png', 'image/png');
+await page.click('#ct-ph-send');
+ok(await until(async () => held4.length === 1, 10000), 'بارگذاریِ اصل در راه است (نگه داشته شد)');
+ok(await page.isEnabled('#ct-ph-cancel') && await page.isVisible('#ct-ph-bar'), 'در میانِ بارگذاری: نوارِ پیشرفت پیدا و «لغو» زدنی');
+await page.click('#ct-ph-cancel');
+await page.waitForTimeout(1200);
+const up3 = await page.evaluate(() => window.__up);
+ok(up3.aborts === 1 && (await phState()) === 'gone' && (await photos()) === 2, '«لغو» ⇒ بارگذاری بریده شد و هیچ پیامی نرفت', JSON.stringify(up3));
+await held4[0].abort().catch(() => { /* درخواستِ بریده */ });
+await page.unroute(mainUp);
+
+//  ۴. شبکه در میانه می‌افتد (سرور گرفت، جواب گم شد) — اول بارگذاریِ اصل، سپس خودِ پیام ⇒ «تلاشِ دوباره» ⇒ یک پیام، یک حباب
+let dropUp = 1; let dropMsg = 1; let ups = 0; let posts = 0;
+const msgPost = (u) => u.pathname === `/api/store/${slug}/chat/conversations/${conv4.id}/messages`;
+await page.route(mainUp, async (route) => {
+  ups++;
+  if (dropUp-- < 1) return route.fallback();
+  await route.fetch();
+  return route.abort('failed');
+});
+await page.route(msgPost, async (route) => {
+  if (route.request().method() !== 'POST') return route.fallback();
+  posts++;
+  if (dropMsg-- < 1) return route.fallback();
+  await route.fetch();
+  return route.abort('failed');
+});
+const rowsBefore = await mediaRows();
+await attach(clear, 'clear.png', 'image/png');
+await page.click('#ct-ph-send');
+await page.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'queued', null, { timeout: 15000 });
+ok(/اینترنت/.test(await page.textContent('#ct-ph-st')) && await page.isVisible('#ct-ph-retry'), 'جوابِ بارگذاری گم شد ⇒ «در صف» و «تلاشِ دوباره»', await page.textContent('#ct-ph-st'));
+await page.click('#ct-ph-retry');
+await page.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'queued' && document.getElementById('ct-ph').getAttribute('aria-busy') === null, null, { timeout: 15000 });
+await page.click('#ct-ph-retry');
+await page.waitForFunction(() => document.getElementById('ct-ph').hidden, null, { timeout: 15000 });
+await page.waitForTimeout(1200);
+ok(ups === 2 && posts === 2 && (await photos()) === 3 && (await mine()) === 3 && (await mediaRows()) === rowsBefore + 1,
+  'تلاشِ دوباره پس از افتادنِ شبکه ⇒ همان بایت (همان رسانه) و همان clientId ⇒ یک پیام و یک حباب', `ups=${ups} posts=${posts} photos=${await photos()} bubbles=${await mine()} rows=${await mediaRows()}-${rowsBefore}`);
+await page.unroute(mainUp);
+await page.unroute(msgPost);
+const p4 = await lastPhoto();
+const [left4, right4] = await pixels(p4.main, [[0.1, 0.5], [0.9, 0.5]]);
+ok(left4.every((c) => c > 235) && right4[1] > 120 && right4[0] < 80, 'شفافیت روی سفید', `${left4} ${right4}`);
+
+//  ۵. بی‌اینترنت ⇒ همان صفِ متن: عکس می‌ماند و با وصل شدن خودش یک بار می‌رود
+await ctx.setOffline(true);
+await attach(small, 'small.jpg', 'image/jpeg');
+await page.click('#ct-ph-send');
+await page.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'queued', null, { timeout: 15000 });
+ok((await photos()) === 3, 'بی‌اینترنت: عکس «در صف» می‌ماند', await page.textContent('#ct-ph-st'));
+await ctx.setOffline(false);
+ok(await until(async () => (await photos()) === 4, 20000) && await until(async () => (await phState()) === 'gone'), 'وصل شد ⇒ عکس خودش رفت، بی زدنِ دوباره');
+await page.waitForTimeout(800);
+ok((await photos()) === 4 && (await mine()) === 4, 'پس از رسیدن: یک پیام و یک حباب');
+await page.keyboard.press('Escape');
+
+if (axeSrc) {
+  //  گوشی (لمسی) ⇒ دکمهٔ دوربین هم؛ axe در دو حالت: «آماده» و «در صف» (نوار و «تلاشِ دوباره»)
+  const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true, hasTouch: true, isMobile: true });
+  await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
+    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+  const ap = await ac.newPage();
+  await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o4.token)}`);
+  await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
+  await ap.click('#o-chat-open');
+  await ap.waitForFunction(() => { const f = document.getElementById('ct-form'); return f && !f.hidden; }, null, { timeout: 15000 });
+  const cam = await ap.getAttribute('#ct-ph-cam', 'aria-label').catch(() => null);
+  ok(Boolean(cam), 'گوشیِ لمسی: دکمهٔ «عکس با دوربین»', String(cam));
+  await ap.setInputFiles('#ct-file', { name: 'small.jpg', mimeType: 'image/jpeg', buffer: small });
+  await ap.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'ready', null, { timeout: 20000 });
+  await ap.addScriptTag({ content: axeSrc });
+  const rules = ['color-contrast', 'button-name', 'label', 'image-alt', 'aria-allowed-attr', 'aria-progressbar-name', 'nested-interactive', 'aria-allowed-role'];
+  const run = () => ap.evaluate(async (r) => (await window.axe.run(document.getElementById('chat-sheet'), { runOnly: r })).violations
+    .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`), rules);
+  const vReady = await run();
+  await ac.setOffline(true);
+  await ap.click('#ct-ph-send');
+  await ap.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'queued', null, { timeout: 15000 });
+  const vQueued = await run();
+  ok(vReady.length === 0 && vQueued.length === 0, 'دسترس‌پذیری (axe-core): افزودنِ عکس، دوربین، پیش‌نمایش، نوارِ پیشرفت، «تلاشِ دوباره» و «لغو»', [...vReady, ...vQueued].join(' | '));
   await ac.close();
 }
 
