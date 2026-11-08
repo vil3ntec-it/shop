@@ -132,6 +132,8 @@
       var x = {
         id: str(i.id), saleId: str(i.saleId), productId: str(i.productId), name: str(i.name),
         qty: milli(i.quantity), unitCost: money(i.purchasePrice), total: money(i.totalPrice),
+        //  POS-23 — فروشندهٔ ردیف؛ خالی ⇒ فروشندهٔ فاکتور. فقط با `opts.lineSeller` دیده می‌شود
+        seller: str(i.seller).trim(),
       };
       L.items.push(x); L.itemById[x.id] = x;
       (L.itemsBySale[x.saleId] = L.itemsBySale[x.saleId] || []).push(x);
@@ -306,18 +308,28 @@
     return out;
   }
 
-  function aggregate(L, from, to, clock, costs, withDims) {
+  /**
+   * POS-23 — «کاربر» ِ یک ردیف: با `lineSeller` (تنظیمِ خاموشِ دکان `line_seller`) فروشندهٔ ردیف و نبودش فروشندهٔ
+   * فاکتور؛ بی آن همیشه فروشندهٔ فاکتور (همان پیشین). همان `userOf` ِ `ReportCore.kt`.
+   */
+  function userOf(item, sale, lineSeller) {
+    if (lineSeller && item && item.seller !== '') return item.seller;
+    return sale ? sale.seller : '';
+  }
+
+  function aggregate(L, from, to, clock, costs, withDims, lineSeller) {
     var T = { invoices: 0, returnCount: 0, gross: 0, discount: 0, sales: 0, returns: 0, cogs: 0, est: 0 };
     var acc = {};
     DIMS.forEach(function (d) { acc[d] = {}; });
     function productName(pid, fallback) { var p = L.products[pid]; return p && p.name !== '' ? p.name : fallback; }
     function categoryOf(pid) { var p = L.products[pid]; return p ? p.category : ''; }
     function row(dim, key, name) { return acc[dim][key] || (acc[dim][key] = blankRow(key, name)); }
-    function keysFor(pid, itemName, sale, hour) {
+    function keysFor(pid, itemName, sale, hour, item) {
+      var user = userOf(item, sale, lineSeller === true);
       return {
         product: [pid, pid === '' ? '' : productName(pid, itemName)],
         category: [categoryOf(pid), categoryOf(pid)],
-        user: [sale ? sale.seller : '', sale ? sale.seller : ''],
+        user: [user, user],
         hour: [hour, hour],
         payment: [sale ? sale.method : '', sale ? sale.method : ''],
         channel: [sale ? sale.channel : '', sale ? sale.channel : ''],
@@ -330,7 +342,7 @@
       T.invoices++; T.gross += s.total; T.discount += s.discount; T.sales += s.finalTotal;
       var items = L.itemsBySale[s.id] || [];
       var lines = items.map(function (it) {
-        return { pid: it.productId, name: it.name, qty: it.qty, gross: it.total, cost: costs.line[it.id], est: costs.est[it.id] === true };
+        return { pid: it.productId, name: it.name, qty: it.qty, gross: it.total, cost: costs.line[it.id], est: costs.est[it.id] === true, item: it };
       });
       if (!lines.length) lines.push({ pid: '', name: '', qty: 0, gross: s.total, cost: 0, est: true });
       var sum = 0;
@@ -341,7 +353,7 @@
         T.cogs += ln.cost;
         if (ln.est) T.est++;
         if (!withDims) return;
-        var keys = keysFor(ln.pid, ln.name, s, hour);
+        var keys = keysFor(ln.pid, ln.name, s, hour, ln.item || null);
         DIMS.forEach(function (dim) {
           var r = row(dim, keys[dim][0], keys[dim][1]);
           r._inv[s.id] = true; r.qty += ln.qty; r.gross += ln.gross; r.sales += ln.gross - shares[i]; r.cogs += ln.cost;
@@ -357,7 +369,8 @@
       T.returnCount++; T.returns += r.amount; T.cogs -= c;
       if (!withDims) return;
       var it = L.itemById[r.saleItemId];
-      var keys = keysFor(it ? it.productId : r.productId, it ? it.name : '', s, posHour(r, clock));
+      //  POS-23: برگشت از فروشندهٔ **ردیفِ اصل** کم می‌شود (با `lineSeller`)
+      var keys = keysFor(it ? it.productId : r.productId, it ? it.name : '', s, posHour(r, clock), it || null);
       DIMS.forEach(function (dim) {
         var x = row(dim, keys[dim][0], keys[dim][1]);
         x.qty -= r.qty; x.returns += r.amount; x.cogs -= c;
@@ -388,12 +401,14 @@
    * RPT-02/03 — فروشِ بازهٔ `from..to` (روزِ کاری، شامل هر دو سر) به تفکیکِ
    * کالا، دسته، کاربر (فروشنده)، ساعت، روشِ پرداخت و کانال؛ با سودِ ناخالص و حاشیه.
    * جمعِ `sales` هر تفکیک دقیقاً برابرِ `totals.sales` است.
+   * `opts.lineSeller === true` (POS-23، تنظیمِ خاموشِ `line_seller`): تفکیکِ «کاربر» به فروشندهٔ هر ردیف و برگشت از
+   * فروشندهٔ ردیفِ اصل؛ نبودش ⇒ بیت‌به‌بیت پیشین.
    */
   function sales(raw, opts) {
     opts = opts || {};
     var L = ledger(raw);
     var r = aggregate(L, str(opts.from) || '0000-01-01', str(opts.to) || '9999-12-31', clockOf(opts.clock),
-      costsOf(L, opts.costing, opts.costApproved), true);
+      costsOf(L, opts.costing, opts.costApproved), true, opts.lineSeller === true);
     r.from = str(opts.from) || '0000-01-01'; r.to = str(opts.to) || '9999-12-31';
     r.costing = opts.costing === 'mavg' ? 'mavg' : 'line';
     return r;

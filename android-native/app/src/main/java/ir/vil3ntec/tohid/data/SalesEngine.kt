@@ -55,6 +55,7 @@ object SalesEngine {
     val lotId: String? = null,
     val note: String? = null, // یادداشتِ ردیف (POS-11، `CartNotes`) — به `SaleItem.note` می‌رود
     val serials: List<String>? = null, // سریال‌های ردیف (POS-28، `CartSerials`) — به `SaleItem.serials` می‌رود
+    val seller: String? = null, // فروشندهٔ ردیف (POS-23، `CartSellers`) — با `Checkout.lineSellers` به `SaleItem.seller` می‌رود
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -134,6 +135,8 @@ object SalesEngine {
     val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
     /** POS-11 — یادداشتِ فاکتور (`CartStore.note`)؛ `null` ⇒ فاکتورِ بی یادداشت، همان امروز */
     val note: String? = null,
+    /** POS-23 — `LineSellerPref` (خاموش، و هر ثبتِ بیرون از صندوق ⇒ `CartLine.seller` نادیده، همان امروز) */
+    val lineSellers: Boolean = false,
     /**
      *  PAY-09 — پلهٔ گردکردنِ نقدیِ صندوق به پول (`CashRoundPref`، فقط ۰/۵۰۰/۱۰۰۰). فقط نقدِ کامل (`payment = CASH`)
      *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق) ⇒ همان امروز.
@@ -536,6 +539,7 @@ object SalesEngine {
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
           note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
+          seller = ir.vil3ntec.tohid.core.staff.LineSeller.stored(checkout.lineSellers, line.seller, checkout.seller),
         )
         return@forEachIndexed
       }
@@ -555,6 +559,7 @@ object SalesEngine {
         returnedQty = 0.0, parts = ProductPlansMap.parts(p), serials = SerialSale.forItem(line, p),
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
+        seller = ir.vil3ntec.tohid.core.staff.LineSeller.stored(checkout.lineSellers, line.seller, checkout.seller),
       )
       movements += StockMovement(
         id = newId(),

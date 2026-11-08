@@ -75,6 +75,7 @@ import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Storage
 import ir.vil3ntec.tohid.ui.v3.settings.sections.TillReceiveScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.LineSellerScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.MultiDrawerScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StockModeScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.StockInsightScreen
@@ -201,6 +202,7 @@ internal object SettingsPages {
     Page(SettingsLayout.DELIVER_LATER, Icons.Outlined.PendingActions) { DeliverLaterScreen(it) },
     Page(SettingsLayout.GIFT_RECEIPT, Icons.Outlined.Celebration) { GiftReceiptScreen(it) },
     Page(SettingsLayout.TILL_RECEIVE, Icons.Outlined.PointOfSale) { TillReceiveScreen(it) },
+    Page(SettingsLayout.LINE_SELLER, Icons.Outlined.Badge) { LineSellerScreen(it) },
     Page(SettingsLayout.MULTI_DRAWER, Icons.Outlined.PointOfSale) { MultiDrawerScreen(it) },
     Page(SettingsLayout.POS_SEARCH, Icons.Outlined.Search) { PosSearchScreen(it) },
     Page(SettingsLayout.POS_PRICE_CHECK, Icons.Outlined.PriceCheck) { PosPriceCheckScreen(it) },

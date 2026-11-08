@@ -186,6 +186,8 @@ fun DeskSaleScreen(
   var payOpen by remember { mutableStateOf(false) }
   val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() } // S11 (§۵.۲): Enter در کادرِ خالی ⇒ پنل، ≥ ۵۰۰ ms پس از اسکن/Enter
   val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
+  val lineSellerOn = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: خاموش ⇒ بی دکمه و Shift+F2 همان «مشتری»
+  var lineSellerOpen by remember { mutableStateOf(false) }; var lineSellerFor by remember { mutableStateOf<String?>(null) }
   var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
   var discountText by remember { mutableStateOf("") }
   //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`،
@@ -367,6 +369,7 @@ fun DeskSaleScreen(
 
   val checkout = SalesEngine.Checkout(
     seller = seller,
+    lineSellers = lineSellerOn, // POS-23: خاموش ⇒ قلم بی فروشندهٔ ردیف، همان امروز
     discountType = if (discountAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT,
     //  F0-06: خالی ⇐ صفر؛ نامعتبر ⇐ خطای کنارِ کادر و `finish` ثبت نمی‌کند
     discountValue = if (canDiscount) parseNumber(discountText) ?: 0.0 else 0.0,
@@ -691,6 +694,7 @@ fun DeskSaleScreen(
           onRemove = { cartStore.setDebtor(null); payment = SalesEngine.Payment.CASH; refocus() },
         )
         ir.vil3ntec.tohid.ui.components.pos.InvoiceNoteButton(cartStore.note.collectAsState().value, cart.isNotEmpty()) { cartStore.setNote(it).also { refocus() } }
+        ir.vil3ntec.tohid.ui.components.pos.LineSellerButton(cart.isNotEmpty()) { lineSellerFor = selected; lineSellerOpen = true } // POS-23 (Shift+F2)
         ir.vil3ntec.tohid.ui.components.pos.LoyaltyBar(loyalty, Modifier.padding(top = 6.dp)) // PRM-13
       },
       items = {
@@ -830,6 +834,9 @@ fun DeskSaleScreen(
             ?.let(::toast) ?: run { noSaleDrawer = printer }
           return@onPreviewKeyEvent true
         }
+        //  POS-23: Shift+F2 ⇒ فروشندهٔ ردیفِ انتخاب‌شده (بی ردیف ⇒ همهٔ ردیف‌ها)، فقط با «فروشندهٔ هر ردیف» ِ روشن
+        if (PosKeys.lineSeller(keyName(e.key), e.isPrimaryModifier, e.isShiftPressed, e.isAltPressed, lineSellerOn)) {
+          if (cart.isNotEmpty()) { lineSellerFor = selected; lineSellerOpen = true }; return@onPreviewKeyEvent true }
         //  POS-18: Ctrl+R ⇒ خرده ⇄ عمده، فقط با «لیستِ قیمت در صندوق» ِ روشن؛ خاموش ⇒ کلید مالِ صندوق نیست
         if (PosKeys.priceList(keyName(e.key), e.isPrimaryModifier, e.isShiftPressed, e.isAltPressed, priceListOn)) {
           priceListToggles++
@@ -951,6 +958,8 @@ fun DeskSaleScreen(
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
     })
   }
+  if (lineSellerOpen && lineSellerOn) ir.vil3ntec.tohid.ui.components.pos.LineSellerSheet(d, cart, seller, lineSellerFor, onClose = { lineSellerOpen = false; refocus() }) { next ->
+    cartStore.set(next).also { if (!it) toast(StrPos.cartChangedRetry) } } // POS-23 — همان برگهٔ صندوقِ گوشی
   ir.vil3ntec.tohid.ui.components.pos.QuickTillDialog(quick, store, cartStore) { m -> m?.let(::toast); refocus() } // S03
   if (freeLine) {
     FreeLineDialog(onDismiss = { freeLine = false; refocus() }, onConfirm = { label, price, count ->

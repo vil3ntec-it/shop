@@ -129,6 +129,7 @@ object SettingsSearchIndex {
     L.HELD to kw("چند فاکتور نگه‌داشته", "multiple held invoices", "څو بلونه"),
     "کالای منقضی" to kw("منقضی تاریخ انقضا", "expired items expiry date", "تېر شوي توکي"),
     L.LINE_PRICING to kw("تخفیف قیمت ردیف", "discount line price", "تخفیف بیه"),
+    L.LINE_SELLER to kw("فروشنده ردیف پورسانت کارمند Shift+F2", "seller line commission staff Shift+F2", "پلورونکی کرښه کمیشن کارکوونکی"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.AUTO_FEES to kw("هزینه خودکار کیسه بسته‌بندی مصرف خودکار", "automatic charges fee bag", "اتومات لګښت"),
     L.QUOTE to kw("پیش فاکتور قیمت‌دهی", "quote estimate", "مخکینی بل"),
     L.SPECIAL_ORDER to kw("سفارش ویژه پیش پرداخت", "special order deposit", "ځانګړی فرمایش"),

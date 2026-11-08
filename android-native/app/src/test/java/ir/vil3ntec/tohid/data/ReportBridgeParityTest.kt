@@ -45,7 +45,9 @@ class ReportBridgeParityTest {
   private fun opts(c: JsonObject) = c["opts"] as? JsonObject ?: JsonObject(emptyMap())
   private fun today(l: ReportLedger, o: JsonObject) =
     ReportCore.today(l, s(o, "date"), clock(o), costing(o), (o["now"] as? JsonPrimitive)?.longOrNull ?: 0L, s(o, "costApproved") == "true")
-  private fun sales(l: ReportLedger, o: JsonObject) = ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), s(o, "costApproved") == "true")
+  //  POS-23: `lineSeller` ِ همان opts (نبودش ⇒ خاموش، همان پیشین) — فروشندهٔ ردیف از `SaleItem.seller` ِ مدلِ برنامه
+  private fun sales(l: ReportLedger, o: JsonObject) =
+    ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), s(o, "costApproved") == "true", lineSeller = s(o, "lineSeller") == "true")
   private fun debts(l: ReportLedger, o: JsonObject) =
     ReportCore.debts(l, s(o, "asOf")!!, (o["buckets"] as? JsonArray)?.map { it.jsonPrimitive.long } ?: listOf(30L, 60L, 90L), clock(o))
 

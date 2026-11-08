@@ -298,14 +298,57 @@ object ReportEngine {
 
   /* ------------------------- فروشِ هر کاربر ------------------------- */
 
-  data class SellerStat(val seller: String, val count: Int, val net: Double, val discount: Double)
+  /** [returns] (POS-23) فقط با فروشندهٔ هر ردیف پر می‌شود؛ خاموش ⇒ ۰ و همان سه عددِ پیشین */
+  data class SellerStat(val seller: String, val count: Int, val net: Double, val discount: Double, val returns: Double = 0.0)
 
-  /** فاکتورهای لغونشدهٔ بازه به تفکیکِ فروشنده — بیشترین فروش اول */
-  fun bySeller(d: ShopData, from: String, to: String): List<SellerStat> =
-    d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
+  /**
+   *  فاکتورهای لغونشدهٔ بازه به تفکیکِ فروشنده — بیشترین فروش اول.
+   *  [lineSeller] (POS-23، تنظیمِ خاموشِ دکان `LineSellerPref`): هر فاکتور میانِ فروشنده‌های ردیف‌هایش پخش می‌شود
+   *  (`core/staff/LineSeller.split`: خالص پس از سهمِ تخفیفِ فاکتور، جمع همیشه همان `finalTotal`)، «تعدادِ فاکتور» یعنی
+   *  فاکتورهایی که آن فروشنده در آن ردیفی دارد، و برگشتِ بازه (روزِ خودِ برگشت) از فروشندهٔ **ردیفِ اصل** کم می‌شود
+   *  (`returns`)؛ برگشتِ فاکتورِ لغوشده بیرون است. `false` ⇒ بیت‌به‌بیت پیشین.
+   */
+  fun bySeller(d: ShopData, from: String, to: String, lineSeller: Boolean = false): List<SellerStat> {
+    if (lineSeller) return byLineSeller(d, from, to)
+    return d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
       .groupBy { it.seller.trim().ifEmpty { StrGoods.unknownSeller } }
       .map { (who, rows) -> SellerStat(who, rows.size, rows.sumOf { it.finalTotal }, rows.sumOf { it.discount }) }
       .sortedByDescending { it.net }
+  }
+
+  private class SellerAcc { val invoices = HashSet<String>(); var net = 0.0; var discount = 0.0; var returns = 0.0 }
+
+  private fun byLineSeller(d: ShopData, from: String, to: String): List<SellerStat> {
+    fun minor(v: Double) = Money.fromLegacy(v, Currency.AFN).minor
+    fun name(s: String) = s.trim().ifEmpty { StrGoods.unknownSeller }
+    val acc = LinkedHashMap<String, SellerAcc>()
+    fun of(who: String) = acc.getOrPut(name(who)) { SellerAcc() }
+    val sales = d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
+    val ids = sales.mapTo(HashSet()) { it.id }
+    val items = d.saleItems.filter { it.saleId in ids }.groupBy { it.saleId }
+    for (s in sales) {
+      val lines = items[s.id].orEmpty()
+      val shares = ir.vil3ntec.tohid.core.staff.LineSeller.split(
+        s.seller, minor(s.finalTotal), minor(s.discount), lines.map { ir.vil3ntec.tohid.core.staff.LineSeller.Item(it.seller, minor(it.totalPrice)) },
+      )
+      if (shares.size == 1) {
+        //  یک فروشنده ⇒ همان عددهای خودِ فاکتور، بی گردِ دوباره
+        of(shares.single().seller).apply { invoices += s.id; net += s.finalTotal; discount += s.discount }
+      } else {
+        shares.forEach { sh -> of(sh.seller).apply { invoices += s.id; net += sh.net / 100.0; discount += sh.discount / 100.0 } }
+      }
+    }
+    val saleById = d.sales.associateBy { it.id }
+    val back = d.saleReturns.filter { it.date >= from && it.date <= to }
+    val needed = back.mapTo(HashSet()) { it.saleItemId }
+    val itemById = d.saleItems.filter { it.id in needed }.associateBy { it.id }
+    for (r in back) {
+      val origin = saleById[r.saleId]
+      if (origin?.status == "cancelled") continue
+      of(ir.vil3ntec.tohid.core.staff.LineSeller.of(itemById[r.saleItemId]?.seller, origin?.seller.orEmpty())).returns += r.amount
+    }
+    return acc.map { (who, a) -> SellerStat(who, a.invoices.size, a.net, a.discount, a.returns) }.sortedByDescending { it.net }
+  }
 
   /* ------------------------- گردشِ موجودی ------------------------- */
 

@@ -137,7 +137,8 @@ fun ReportsScreen(
   var failures by remember { mutableStateOf(0) }
   val (from, to) = ReportsModel.bounds(period, today)
 
-  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today)
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23
+  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
   //  نوشتن با انتخابگرِ خودِ اندروید — بی اجازهٔ ذخیره‌سازی (همان راهِ امروز)
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->

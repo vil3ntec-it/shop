@@ -58,9 +58,10 @@ object ReportFreshModel {
   /** نتیجهٔ یک زبانه: جدول‌ها و اینکه سود تقریبی است یا نه */
   data class View(val tables: List<ReportTables.Table>, val sales: ReportCore.SalesReport?, val debts: ReportCore.DebtReport?, val fraud: ReportCore.FraudReport?)
 
+  /** [lineSeller] POS-23 — «فروشندهٔ هر ردیف» (`LineSellerPref`): تفکیکِ «کاربر» به فروشندهٔ ردیف؛ `false` همان امروز */
   fun view(
     l: ReportLedger, tab: String, span: String, dim: String, today: String, clock: ReportClock?,
-    costing: ReportCore.Costing = costingOf(CostPolicy.DEFAULT),
+    costing: ReportCore.Costing = costingOf(CostPolicy.DEFAULT), lineSeller: Boolean = false,
   ): View {
     val r = ReportBoard.range(span, today)
     val ok = approvedOf(costing)
@@ -68,11 +69,11 @@ object ReportFreshModel {
     return when (tab) {
       "today" -> View(ReportTables.today(ReportCore.today(l, today, clock, costing, 0, ok)), null, null, null)
       "sales" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok, lineSeller)
         View(ReportTables.sales(s).filter { it.id == "sales.$d" }, s, null, null)
       }
       "profit" -> {
-        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok)
+        val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok, lineSeller)
         val t = ReportTables.sales(s).first { it.id == "sales.$d" }
         val title = CostPolicy.label(StrAppData.profitBy(ReportBoard.DIM_LABELS.getValue(d)), CostPolicy.parse(costing.id))
         View(listOf(project(t, "profit", title, PROFIT_KEYS)), s, null, null)
@@ -109,9 +110,15 @@ object ReportFreshModel {
    */
   fun drill(
     l: ReportLedger, s: ReportCore.SalesReport, dim: String, index: Int, label: String, clock: ReportClock?, doc: (String) -> String,
+  ): ReportTables.Table? = drill(l, s, dim, index, label, clock, lineSeller = false, doc = doc)
+
+  /** همان [drill] با POS-23: [lineSeller] ⇒ ریزِ ردیفِ «کاربر» به فروشندهٔ هر ردیف (همان کلیدِ `ReportCore.sales`) */
+  fun drill(
+    l: ReportLedger, s: ReportCore.SalesReport, dim: String, index: Int, label: String, clock: ReportClock?,
+    lineSeller: Boolean, doc: (String) -> String,
   ): ReportTables.Table? {
     val row = dimRows(s, dim).getOrNull(index) ?: return null
-    val list = ReportCore.invoicesOf(l, s.from, s.to, dim, row.key, clock)
+    val list = ReportCore.invoicesOf(l, s.from, s.to, dim, row.key, clock, lineSeller)
     return ReportTables.Table(
       DRILL_ID, S.drillInvoices(label.ifBlank { "—" }, list.size),
       listOf(

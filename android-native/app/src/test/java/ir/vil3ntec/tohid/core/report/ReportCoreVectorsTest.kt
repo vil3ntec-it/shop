@@ -40,7 +40,9 @@ class ReportCoreVectorsTest {
     l, s(o, "date"), clock(o), costing(o), (o["now"] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: 0L, approved(o),
   )
 
-  private fun sales(l: ReportLedger, o: JsonObject) = ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), approved(o))
+  //  POS-23: `lineSeller` ِ همان opts ِ JS (نبودش ⇒ خاموش، همان پیشین)
+  private fun sales(l: ReportLedger, o: JsonObject) =
+    ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), approved(o), lineSeller = s(o, "lineSeller") == "true")
 
   private fun debts(l: ReportLedger, o: JsonObject) =
     ReportCore.debts(l, s(o, "asOf")!!, (o["buckets"] as? JsonArray)?.map { it.jsonPrimitive.long } ?: emptyList(), clock(o))

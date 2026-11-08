@@ -235,8 +235,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   }
   val def = tabs.firstOrNull { it.id == tab } ?: tabs.first()
   val cost = ReportFresh.cost.value
-  val view = remember(ledger, def.id, span, dim, today, cost) {
-    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost))
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: «کاربر» به فروشندهٔ هر ردیف
+  val view = remember(ledger, def.id, span, dim, today, cost, lineSeller) {
+    ReportFreshModel.view(ledger, def.id, span, dim, today, clock, ReportFreshModel.costingOf(cost), lineSeller)
   }
   //  RPT-04: «پایانِ روز» از شیفت‌ها و دفتر (نه فقط `ReportLedger`)
   val dayEnd = remember(d, def.id, day) {
@@ -340,7 +341,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
         dayEnd != null && t.id == DayEndModel.METHODS_ID -> { row -> DayEndModel.methodOf(dayEnd.report, row.first().content)?.let { drill = it } }
         sales != null && (t.id.startsWith("sales.") || t.id == "profit") -> { row ->
           val dimNow = if (dim in ReportBoard.DIMS) dim else "product"
-          salesDrill = ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
+          //  POS-23: «فروشندهٔ هر ردیف» ⇒ ریزِ «کاربر» به فروشندهٔ ردیف؛ خاموش ⇒ همان فراخوانِ امروز
+          salesDrill = if (lineSeller) ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, lineSeller = true, doc = ::saleDoc)
+          else ReportFreshModel.drill(ledger, sales, dimNow, t.rows.indexOf(row), row.first().content, clock, ::saleDoc)
         }
         t.id == "today" -> { row ->
           ReportFreshModel.dayDrill(ledger, row, clock, ::saleDoc)?.let { rowDrill = it to StrReportPages.dayDrillNote }

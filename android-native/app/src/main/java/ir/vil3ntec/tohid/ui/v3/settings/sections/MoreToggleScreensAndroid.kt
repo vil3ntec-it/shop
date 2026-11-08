@@ -72,6 +72,18 @@ internal fun RouteScope.TillReceiveScreen(onBack: (() -> Unit)?) {
   }
 }
 
+/**
+ *  `settings/sales/line-seller`: فروشندهٔ هر ردیف — پایهٔ پورسانت (POS-23/STF-08)، تنظیمِ دکان، پیش‌فرض خاموش.
+ *  خاموش ⇒ صندوق، ثبت و گزارش‌ها بیت‌به‌بیت همان پیشین (`LineSellerPref`).
+ */
+@Composable
+internal fun RouteScope.LineSellerScreen(onBack: (() -> Unit)?) {
+  val context = LocalContext.current
+  ToggleScreen(SettingsLayout.LINE_SELLER, onBack, ir.vil3ntec.tohid.data.LineSellerPref.on(context), StrShell.switchOn, ir.vil3ntec.tohid.core.i18n.StrLineSeller.settingsNote) {
+    ir.vil3ntec.tohid.data.LineSellerPref.set(context, it)
+  }
+}
+
 /** `settings/sales/multi-drawer`: چند کشو یا چند صندوقدار و شیفتِ شناور (PAY-17)، پیش‌فرض خاموش، فقط همین دستگاه */
 @Composable
 internal fun RouteScope.MultiDrawerScreen(onBack: (() -> Unit)?) {

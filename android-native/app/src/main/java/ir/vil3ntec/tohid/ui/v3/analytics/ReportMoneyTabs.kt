@@ -48,7 +48,10 @@ import ir.vil3ntec.tohid.ui.v3.sales.SalesPaths
 @Composable
 internal fun ProfitTab(d: ShopData, from: String, to: String, spec: ReportListSpec) {
   val r = remember(d, from, to) { ReportEngine.sales(d, from, to) }
-  val sellers = remember(d, from, to) { ReportEngine.bySeller(d, from, to) }
+  //  POS-23: «فروشندهٔ هر ردیف» (تنظیمِ خاموشِ دکان) ⇒ هر ردیف به نامِ فروشندهٔ خودش و برگشت از همان فروشنده
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
+  val sellers = remember(d, from, to, lineSeller) { ReportEngine.bySeller(d, from, to, lineSeller) }
   val loss = r.netProfit < 0
   val empty = r.count == 0 && r.expenses == 0.0 && r.returnAmount == 0.0
   ReportList(spec) {
@@ -83,7 +86,8 @@ internal fun ProfitTab(d: ShopData, from: String, to: String, spec: ReportListSp
       V3Section(StrReports.bySeller, spec.appear("sellers", 2)) {
         sellers.forEachIndexed { i, s ->
           if (i > 0) V3Divider(start = 64.dp)
-          V3ListRow(s.seller, subtitle = Str.invoicesCount(s.count), icon = Icons.Outlined.Person, hue = V3Hue.BRAND, value = afn(s.net), valueColor = PhoneV3.colors.ink)
+          val sub = Str.invoicesCount(s.count) + if (s.returns > 0) " · " + ir.vil3ntec.tohid.core.i18n.StrLineSeller.returnsOf(afn(s.returns)) else ""
+          V3ListRow(s.seller, subtitle = sub, icon = Icons.Outlined.Person, hue = V3Hue.BRAND, value = afn(s.net), valueColor = PhoneV3.colors.ink)
         }
       }
     }
