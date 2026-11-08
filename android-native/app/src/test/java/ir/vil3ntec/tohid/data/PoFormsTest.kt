@@ -1,9 +1,13 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
+import ir.vil3ntec.tohid.money
+import ir.vil3ntec.tohid.qty
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -12,7 +16,8 @@ import org.junit.Test
 
 /**
  *  منطقِ فرم‌های سفارشِ خرید که کامپیوتر و گوشیِ نسخهٔ ۳ هر دو صدا می‌زنند (`PoForms`؛ PUR-02/03/04/14): پالایهٔ فهرست،
- *  شمارشِ رسید (جزئی، اضافهٔ ردشده، خراب)، اختلاف‌های تطبیق، سدِ دو بار زدن، مجوزِ هر کار و درِ صفحه.
+ *  شمارشِ رسید (جزئی، اضافهٔ ردشده، خراب)، اختلاف‌های تطبیق، سدِ دو بار زدن، مجوزِ هر کار و درِ صفحه؛ PRD-07 (ردیف به واحدِ
+ *  خرید، اسکنِ بارکدِ واحد، دریافت به واحد با موجودی = مقدار × ضریب و ارزشِ دقیق، و پرچمِ خاموش = همان بدنه) و PUR-13 (شمارشِ برچسب).
  */
 class PoFormsTest {
 
@@ -232,6 +237,155 @@ class PoFormsTest {
     //  ویرایش: ردیف‌های همان پیش‌نویس
     val base = partial.copy(state = "draft", status = "draft")
     assertEquals(listOf(PoForms.EditRow(0, "pA", "کالای A", "عدد", "10", "100"), PoForms.EditRow(1, "pB", "کالای B", "عدد", "10", "200")), PoForms.rowsOf(base))
+  }
+
+  /* ── PRD-07: واحدِ خرید ── */
+
+  /** چای با واحدِ پایهٔ «دانه»: کارتنِ ۱۲ (تأمین‌کنندهٔ s1، بارکدِ ۴۴۴) و کارتنِ ۲۴ (بارکدِ ۵۵۵)؛ بارکدِ خودِ دانه ۳۳۳ */
+  private val tea = Product(
+    id = "tea", name = "چای", unit = "دانه", purchasePrice = 40.0, salePrice = 50.0, barcodes = listOf("333"),
+    purchaseUnits = listOf(PurchaseUnit("کارتن ۱۲", 12_000, "s1", "444"), PurchaseUnit("کارتن ۲۴", 24_000, null, "555")),
+  )
+  private val du = d0.copy(products = d0.products + tea)
+
+  /** سفارشِ فرستاده: ۲ کارتنِ ۲۴ چای به ۱٬۰۰۰ و ۱۰ عدد B به ۲۰۰ */
+  private val unitPo = PurchaseOrderDto(
+    id = "po2", no = 8, supplierId = "s1", supplierName = "شرکتِ نمونه", state = "sent", status = "sent", allowed = listOf("cancel", "receive"),
+    lines = listOf(
+      PoLineDto("l1", "tea", "چای", "کارتن ۲۴", 2_000, 100_000, factorMilli = 24_000),
+      PoLineDto("l2", "pB", "کالای B", "عدد", 10_000, 20_000),
+    ),
+  )
+
+  @Test fun `ردیف به واحدِ خرید — فی به نسبتِ ضریب، مقدار و فی به همان واحد و ضریب روی ردیفِ سفارش`() {
+    val base = PoForms.addProduct(du, emptyList(), "s1", tea)!!.single().copy(qty = "2", price = "40")
+    assertNull(base.unitName)
+    val carton = PoForms.pickUnit(du, base, "کارتن ۲۴")
+    assertEquals(PoForms.EditRow(base.key, "tea", "چای", "دانه", "2", "960", "کارتن ۲۴"), carton)
+    assertEquals("کارتن ۲۴", PoForms.unitOf(carton))
+    assertEquals(1920.0, PoForms.lineTotal(carton), 1e-9)
+    assertEquals(StrPurchaseUnits.lineBase(qty(48.0), "دانه", money(40.0)), PoForms.unitLine(du, carton))
+    assertNull("ردیفِ پایه زیرنویسِ واحد ندارد", PoForms.unitLine(du, base))
+    //  کارتنِ ۲۴ ⇒ ۱۲: فیِ هر دانه همان ۴۰؛ برگشت به پایه همان ۴۰؛ واحدی که روی کالا نیست بی اثر
+    assertEquals("480", PoForms.pickUnit(du, carton, "کارتن ۱۲").price)
+    assertEquals(base, PoForms.pickUnit(du, carton, null))
+    assertEquals(carton, PoForms.pickUnit(du, carton, "بوری"))
+    assertEquals(listOf("کارتن ۱۲", "کارتن ۲۴"), PoForms.purchaseUnits(du, "tea").map { it.name })
+    assertTrue(PoForms.purchaseUnits(du, "pA").isEmpty())
+
+    val ok = PoForms.draft(du, "s1", listOf(carton.copy(price = "1000")), "", "") as PoForms.DraftCheck.Ok
+    val line = ok.draft.lines.single()
+    assertEquals(PoLineDto("l1", "tea", "چای", "کارتن ۲۴", 2_000, 100_000, factorMilli = 24_000), line)
+    assertEquals(
+      """{"supplierId":"s1","supplierName":"شرکتِ نمونه","note":"","lines":[{"id":"l1","productId":"tea","name":"چای","unit":"کارتن ۲۴","qtyMilli":2000,"priceMinor":100000,"factorMilli":24000}]}""",
+      ok.draft.json(null).toString(),
+    )
+    //  ویرایشِ همان پیش‌نویس: واحد و واحدِ پایه برمی‌گردند (بی `d` همان نامِ ردیف)
+    val draft = unitPo.copy(state = "draft", status = "draft")
+    assertEquals(PoForms.EditRow(0, "tea", "چای", "دانه", "2", "1000", "کارتن ۲۴"), PoForms.rowsOf(draft, du)[0])
+    assertEquals("کارتن ۲۴", PoForms.rowsOf(draft)[0].unit)
+    assertEquals(PoForms.EditRow(1, "pB", "کالای B", "عدد", "10", "200"), PoForms.rowsOf(draft, du)[1])
+
+    //  همان سنجشِ فاکتورِ خرید: ۰٫۰۱ کارتنِ ۲۴ = ۰٫۲۴ دانه (دانه اعشار نمی‌گیرد)، واحدی که دیگر روی کالا نیست
+    assertEquals(
+      PoForms.DraftCheck.Bad(StrGoods.rowOfWhy(1, StrPurchaseUnits.wholeBase("دانه"))),
+      PoForms.draft(du, "s1", listOf(carton.copy(qty = "0.01")), "", ""),
+    )
+    assertEquals(
+      PoForms.DraftCheck.Bad(StrGoods.rowOfWhy(1, StrPurchaseUnits.unknownUnit)),
+      PoForms.draft(du, "s1", listOf(carton.copy(unitName = "بوری")), "", ""),
+    )
+  }
+
+  @Test fun `اسکنِ بارکدِ واحدِ خرید همان واحد را می‌شمارد و بی پرچم همان اسکنِ پیشین است`() {
+    val index = ShopStore.barcodeIndex(du)
+    val units = ShopStore.purchaseUnitIndex(du)
+    val rows0 = PoForms.recvRows(unitPo)
+    //  کارتنِ ۲۴ روی ردیفِ کارتنِ ۲۴ ⇒ +۱، کارتنِ ۱۲ ⇒ +۰٫۵، دانه (بارکدِ کالا) ⇒ +۱ ِ واحدِ ردیف
+    val a = PoForms.scan(unitPo, rows0, index, "555", units) as PoForms.Scan.Added
+    assertEquals("l1", a.lineId)
+    assertEquals("1", a.received)
+    assertEquals("کارتن ۲۴", a.unit)
+    val b = PoForms.scan(unitPo, a.rows, index, "۴۴۴", units) as PoForms.Scan.Added
+    assertEquals("1.5", b.received)
+    assertEquals("کارتن ۱۲", b.unit)
+    val c = PoForms.scan(unitPo, b.rows, index, "333", units) as PoForms.Scan.Added
+    assertEquals("2.5", c.received)
+    assertNull(c.unit)
+    //  ردیفِ همان کالا به واحدِ پایه: کارتنِ ۲۴ ⇒ +۲۴
+    val basePo = unitPo.copy(lines = listOf(PoLineDto("l1", "tea", "چای", "دانه", 48_000, 4_000), unitPo.lines[1]))
+    assertEquals("24", (PoForms.scan(basePo, PoForms.recvRows(basePo), index, "555", units) as PoForms.Scan.Added).received)
+    //  پرچمِ خاموش (`units` = null): بارکدِ واحد ناشناس، همان پیشین؛ بارکدِ کالا همان +۱
+    assertEquals(PoForms.Scan.NotInPo("555"), PoForms.scan(unitPo, rows0, index, "555"))
+    assertEquals(PoForms.scan(unitPo, rows0, index, "333", null), PoForms.scan(unitPo, rows0, index, "333"))
+    assertEquals("1", (PoForms.scan(unitPo, rows0, index, "333") as PoForms.Scan.Added).received)
+  }
+
+  @Test fun `دریافت به واحدِ خرید — موجودی مقدار × ضریب، ارزشِ دقیقِ ردیف و برچسب به واحدِ پایه`() {
+    val rows = PoForms.recvRows(unitPo) + ("l1" to PoForms.RecvRow(received = "2", price = "1000")) + ("l2" to PoForms.RecvRow(received = "10", price = "200"))
+    assertEquals("1000", PoForms.recvRows(unitPo).getValue("l1").price)
+    assertEquals(StrPurchaseUnits.toStock(qty(48.0), "دانه"), PoForms.toStock(du, unitPo.lines[0], rows.getValue("l1")))
+    assertEquals(StrPurchaseUnits.toStock(qty(36.0), "دانه"), PoForms.toStock(du, unitPo.lines[0], PoForms.RecvRow(received = "2", damaged = "0.5")))
+    assertNull("ردیفِ پایه", PoForms.toStock(du, unitPo.lines[1], rows.getValue("l2")))
+    assertNull("خراب بیش از رسیده", PoForms.toStock(du, unitPo.lines[0], PoForms.RecvRow(received = "1", damaged = "2")))
+
+    val chk = PoForms.receipt(unitPo, rows, rid, allowOver = false) as PoForms.ReceiptCheck.Ok
+    assertEquals(listOf(PoReceiptLineDto("l1", 2_000, 0, 100_000), PoReceiptLineDto("l2", 10_000, 0, 20_000)), chk.lines)
+    assertEquals(200_000L + 200_000L, chk.totalMinor)
+    val rdto = PoReceiptDto(
+      id = rid, poId = unitPo.id, lines = chk.lines, totalMinor = chk.totalMinor,
+      posted = chk.posted.map { PoPostedDto(it.lineId, it.expectedMilli, it.receivedMilli, it.damagedMilli, it.acceptedMilli, it.shortMilli, it.overMilli, it.priceMinor, it.totalMinor) },
+    )
+    val d = (PurchaseOrderBook.post(du, unitPo.copy(status = "complete", receipts = listOf(rdto)), rdto, "2026-11-02", 1) as PurchaseOrderBook.Posting.Ok).data
+    //  ۲ کارتنِ ۲۴ ⇒ ۴۸ دانه؛ بهای هر دانه ۴۱٫۶۷ ولی ارزشِ انبار و بدهی دقیقاً ۲٬۰۰۰ (نه ۲٬۰۰۰٫۱۶)
+    assertEquals(48.0, ShopStore.stock(d, "tea"), 1e-9)
+    assertEquals(10.0, ShopStore.stock(d, "pB"), 1e-9)
+    assertEquals(200_000L, d.warehouseEntries.first { it.productId == "tea" }.costMinor)
+    assertNull(d.warehouseEntries.first { it.productId == "pB" }.costMinor)
+    assertEquals(2000.0 + 2000.0, ShopStore.supplierDebt(d, "s1"), 1e-9)
+
+    //  PUR-13: برچسب به واحدِ پایه (۴۸، A4 تا ۲۴)؛ ردیفِ پایه همان شمارشِ پیشین
+    assertEquals(listOf("tea" to 48, "pB" to 10), PoForms.labels(du, unitPo, rdto, a4 = false).map { it.product.id to it.copies })
+    assertEquals(listOf("tea" to 24, "pB" to 10), PoForms.labels(du, unitPo, rdto, a4 = true).map { it.product.id to it.copies })
+  }
+
+  @Test fun `برچسبِ رسید — هر واحد یکی تا سقف، وزنی یکی، پذیرفتهٔ صفر و کالای بیرون از دفتر کنار`() {
+    val rice = Product(id = "rice", name = "برنج", unit = "کیلو", purchasePrice = 80.0)
+    val d = d0.copy(products = d0.products + rice)
+    val o = partial.copy(lines = partial.lines + PoLineDto("l3", "rice", "برنج", "کیلو", 25_000, 8_000) + PoLineDto("l4", "gone", "پاک‌شده", "عدد", 1_000, 100))
+    val r = r1.copy(
+      posted = listOf(
+        PoPostedDto("l1", acceptedMilli = 150_000), PoPostedDto("l2", acceptedMilli = 2_500), PoPostedDto("l3", acceptedMilli = 25_000),
+        PoPostedDto("l4", acceptedMilli = 1_000), PoPostedDto("l2", acceptedMilli = 0),
+      ),
+    )
+    assertEquals(listOf("pA" to 99, "pB" to 3, "rice" to 1), PoForms.labels(d, o, r, a4 = false).map { it.product.id to it.copies })
+    assertEquals(listOf("pA" to 24, "pB" to 3, "rice" to 1), PoForms.labels(d, o, r, a4 = true).map { it.product.id to it.copies })
+    assertTrue(PoForms.labels(d, o, r1, a4 = false).isEmpty())
+  }
+
+  @Test fun `پرچمِ خاموش — کالای واحددار و بی واحد همان بدنهٔ پیش‌نویسِ پیشین را می‌سازند`() {
+    //  بی انتخاب (پرچم خاموش ⇒ صفحه انتخاب را نمی‌کشد): ردیفِ همان کالای واحددار همان ردیفِ واحدِ پایه است
+    val row = PoForms.addProduct(du, emptyList(), "s1", tea)!!.single().copy(qty = "2", price = "40")
+    val withUnits = PoForms.draft(du, "s1", listOf(row), "", "") as PoForms.DraftCheck.Ok
+    val noUnits = PoForms.draft(du.copy(products = du.products.map { it.copy(purchaseUnits = null) }), "s1", listOf(row), "", "") as PoForms.DraftCheck.Ok
+    val body = """{"supplierId":"s1","supplierName":"شرکتِ نمونه","note":"","lines":[{"id":"l1","productId":"tea","name":"چای","unit":"دانه","qtyMilli":2000,"priceMinor":4000}]}"""
+    assertEquals(body, withUnits.draft.json(null).toString())
+    assertEquals(body, noUnits.draft.json(null).toString())
+    assertEquals(PoLineDto("l1", "tea", "چای", "دانه", 2_000, 4_000), withUnits.draft.lines.single())
+    //  کالای بی واحدِ خرید: همان ردیف‌ها و همان بدنه، با و بی [ShopData] در `rowsOf`
+    val base = partial.copy(state = "draft", status = "draft")
+    assertEquals(PoForms.rowsOf(base), PoForms.rowsOf(base, du))
+    val again = PoForms.draft(du, "s1", PoForms.rowsOf(base, du), "", "") as PoForms.DraftCheck.Ok
+    assertEquals(
+      """{"supplierId":"s1","supplierName":"شرکتِ نمونه","note":"","lines":[{"id":"l1","productId":"pA","name":"کالای A","unit":"عدد","qtyMilli":10000,"priceMinor":10000},{"id":"l2","productId":"pB","name":"کالای B","unit":"عدد","qtyMilli":10000,"priceMinor":20000}]}""",
+      again.draft.json(null).toString(),
+    )
+    //  اسکن بی نمایهٔ واحد (پرچم خاموش) برای هر بارکد همان نتیجهٔ پیشین
+    val index = ShopStore.barcodeIndex(du)
+    for (code in listOf("111", "222", "333", "444", "555", "999")) {
+      assertEquals(code, PoForms.scan(partial, PoForms.recvRows(partial), index, code), PoForms.scan(partial, PoForms.recvRows(partial), index, code, null))
+    }
   }
 
   /* ── مجوز و درِ صفحه ── */

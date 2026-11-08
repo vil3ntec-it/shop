@@ -48,6 +48,12 @@ object StrPurchaseUnits {
     "“$product” in “$unit”",
     "«$product» په «$unit» واحد",
   )
+  /** زیرِ ردیفِ رسیدِ سفارش به واحدِ خرید: آنچه همین رسید به موجودی می‌برد (به واحدِ پایه) */
+  fun toStock(qty: String, base: String): String = t(
+    "به موجودی: +${asIs(qty)} ${asIs(base)}",
+    "To stock: +$qty $base",
+    "موجودۍ ته: +$qty $base",
+  )
   val unknownUnit: String get() = t("این واحدِ خرید دیگر روی کالا نیست", "This purchase unit is no longer on the product", "دا د پېرلو واحد نور په توکي نشته")
   fun wholeBase(base: String): String = t(
     "این مقدار به «${asIs(base)}» عددِ درست نمی‌شود — «${asIs(base)}» اعشار نمی‌گیرد",

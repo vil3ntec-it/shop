@@ -7,7 +7,12 @@ import ir.vil3ntec.tohid.LocaleChoice
 import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.hw.Labels
 import ir.vil3ntec.tohid.core.hw.PrintQueue
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.data.PoForms
+import ir.vil3ntec.tohid.data.PoReceiptDto
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.PurchaseOrderDto
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.PurchaseOrderRepository
 import ir.vil3ntec.tohid.print.HwPages
@@ -37,6 +42,18 @@ interface PurchaseOrderHost {
    *  [a4] یا بی چاپگر ⇒ برگهٔ A4 ِ ۳×۸. پیامِ نتیجه برای نمایش (`null` = پنجرهٔ چاپِ سیستم باز شد).
    */
   suspend fun printLabel(product: Product, copies: Int, a4: Boolean): String?
+}
+
+/**
+ *  PUR-13: برچسبِ اقلامِ پذیرفتهٔ رسیدِ [r] — یک راهِ چاپ برای پنجرهٔ کامپیوتر و گوشیِ نسخهٔ ۳: شمارش از `PoForms.labels`
+ *  (هر واحد یکی، وزنی یکی، واحدِ خرید به واحدِ پایه)، چاپ از [PurchaseOrderHost.printLabel]. [a4] ⇒ برگهٔ ۳×۸ ِ سیستم؛
+ *  وگرنه چاپگرِ برچسب لازم. هر پیام (بی چاپگر، چیزی برای برچسب نیست، نتیجهٔ هر کالا) به [say].
+ */
+suspend fun PurchaseOrderHost.printReceiptLabels(d: ShopData, o: PurchaseOrderDto, r: PoReceiptDto, a4: Boolean, say: (String) -> Unit) {
+  if (!a4 && !hasLabelPrinter()) { say(StrPurchasePages.noLabelPrinterShort); return }
+  val jobs = PoForms.labels(d, o, r, a4)
+  if (jobs.isEmpty()) { say(StrPurchasePages.noAcceptedForLabel); return }
+  for (j in jobs) printLabel(j.product, j.copies, a4)?.let(say)
 }
 
 /** پیاده‌سازیِ اندروید و کامپیوتر (همان `Context` ِ صفحه) */
