@@ -109,7 +109,9 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
     for (k in keys) for (l in ls) runCatching { l.onSharedPreferenceChanged(this, k) }
   }
 
-  private fun encode(): String = buildJsonObject {
+  //  PERF-LEDGER: همان `toString()` ِ kotlinx نویسه‌به‌نویسه (`LedgerDiff.text`)، بی رونوشت‌های تودرتو — سایهٔ همگام‌سازی
+  //  (کلِ دفتر) در همین فایل است و هر `apply`/`commit` همه را از نو می‌نویسد (`docs/PERF-LEDGER-fa.md`)
+  private fun encode(): String = ir.vil3ntec.tohid.sync.v1.LedgerDiff.text(buildJsonObject {
     for ((k, v) in map) {
       put(k, buildJsonObject {
         when (v) {
@@ -122,7 +124,7 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
         }
       })
     }
-  }.toString()
+  })
 
   private val lock = Any()
 

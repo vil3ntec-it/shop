@@ -54,8 +54,11 @@ object LedgerMerge {
 
   fun mergeReport(base: ShopData, ours: ShopData, theirs: ShopData): Outcome {
     if (theirs === base || ours === base) return Outcome(if (ours === base) theirs else ours, emptyList())
-    val b = LedgerDiff.toJson(base)
-    val o = LedgerDiff.toJson(ours)
+    //  PERF-LEDGER: پایه و مالِ ما بیشترِ ردیف‌ها را **همان شیء** دارند — یک بار رمزگذاری (`LedgerTrees`، همان درختِ
+    //  `LedgerDiff.toJson`)، و مقایسهٔ `o == b` روی همان شاخه‌ها بی گشتن در محتوا
+    val trees = ir.vil3ntec.tohid.sync.v1.LedgerTrees()
+    val b = trees.toJson(base)
+    val o = trees.toJson(ours)
     val t = LedgerDiff.toJson(theirs)
     //  دیسک همان پایه است (مثلاً همان دفتر از نو رمز/خوانده شد) ⇒ همان دفترِ صفحه، بی شیءِ تازه
     if (t == b) return Outcome(ours, emptyList())
@@ -158,14 +161,48 @@ object LedgerMerge {
       val y = f(b)
       if (x === y) { n += 1 + x.size; continue }
       if (x.isEmpty() || y.isEmpty()) continue
-      val mine: MutableSet<Any?> = Collections.newSetFromMap(IdentityHashMap<Any?, Boolean>(y.size))
-      mine.addAll(y)
-      //  ⛔ رشته نشانه نیست: نام‌های پیش‌فرض (`DEFAULT_UNITS`…) و رشته‌ای که از درختِ JSON خوانده شد
-      //  در دو دفترِ جدا همان شیء‌اند — دفترِ بی هیچ ردیفِ مشترک «خویش» دیده می‌شد و پایهٔ رفته پنهان می‌ماند
-      for (r in x) if (r !is String && r in mine) n++
+      n += shared(x, y)
     }
     return n
   }
+
+  /**
+   *  چند ردیفِ [x] (جز رشته) همان شیءِ ردیفی از [y] است — همان شمارشِ مجموعهٔ همان‌شیء، بی ساختنِ مجموعه در کارِ رایج.
+   *
+   *  PERF-LEDGER: ذخیرهٔ یک فروش (`d.sales + sale`) فهرستی می‌سازد که پیشوندش **جابه‌جا همان** فهرستِ پیشین است؛ پیش‌تر
+   *  هر ذخیره برای هر فهرستِ عوض‌شده (فاکتورها، اقلام، حرکت‌ها، تراکنش‌ها، سابقه) مجموعهٔ همان‌شیء ِ کلِ آن را می‌ساخت.
+   *  ردیفِ پیشوند ([x]`[i] === `[y]`[i]`) بی‌گمان در [y] هست؛ فقط بقیهٔ [x] پرسیده می‌شود — چند ردیف با گشتنِ خطی، بیشتر
+   *  با همان مجموعه. شمار همان است (`LedgerPerfEquivalenceTest`).
+   */
+  private fun shared(x: List<Any?>, y: List<Any?>): Long {
+    val m = minOf(x.size, y.size)
+    var i = 0
+    var n = 0L
+    while (i < m && x[i] === y[i]) {
+      //  ⛔ رشته نشانه نیست: نام‌های پیش‌فرض (`DEFAULT_UNITS`…) و رشته‌ای که از درختِ JSON خوانده شد
+      //  در دو دفترِ جدا همان شیء‌اند — دفترِ بی هیچ ردیفِ مشترک «خویش» دیده می‌شد و پایهٔ رفته پنهان می‌ماند
+      if (x[i] !is String) n++
+      i++
+    }
+    if (i == x.size) return n
+    if ((x.size - i).toLong() * y.size <= LINEAR_BUDGET) {
+      for (k in i until x.size) {
+        val r = x[k]
+        if (r !is String && y.any { it === r }) n++
+      }
+      return n
+    }
+    val mine: MutableSet<Any?> = Collections.newSetFromMap(IdentityHashMap<Any?, Boolean>(y.size))
+    mine.addAll(y)
+    for (k in i until x.size) {
+      val r = x[k]
+      if (r !is String && r in mine) n++
+    }
+    return n
+  }
+
+  /** بیشترین مقایسهٔ همان‌شیء در گشتنِ خطی پیش از ساختنِ مجموعه (چند ردیفِ تازه × کلِ فهرست) */
+  private const val LINEAR_BUDGET = 8_000_000L
 
   private const val INVOICE_COUNTER = "nextInvoiceNo"
 
