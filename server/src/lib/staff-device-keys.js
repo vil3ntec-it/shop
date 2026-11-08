@@ -275,12 +275,15 @@ async function logoutMember({ shopId, memberId, by = '', ip = '' }) {
   if (!m || m.status === 'removed') throw notFound('این عضو در دکان شما نیست', 'member_not_found');
   if (m.role === 'owner') throw badRequest('صاحب دکان را نمی‌توان تغییر داد', 'owner_immutable');
   const out = await tx(async (c) => {
+    //  راز پیش از نشست‌ها (همان ترتیبِ [revokeDevice]): ورودِ هم‌زمان با همین راز پس از نوشتنِ نشستش راز را دوباره
+    //  می‌سنجد (`staff-login`)؛ قفلِ ردیفِ راز از همین‌جا تا کامیت ⇒ یا او منتظر می‌ماند و رد می‌شود، یا نشستش پیش از
+    //  `UPDATE tokens` ِ پایین نوشته شده و همان‌جا بسته می‌شود
+    const keys = await revokeIn(c, { shopId, userIds: [m.user_id], reason: 'owner_logout_all', by, ip });
     const s = await c.query(
       `UPDATE tokens SET revoked_at=$1
         WHERE subject_id=$2 AND revoked_at IS NULL AND COALESCE(app,'shop')='shop' AND (shop_id IS NULL OR shop_id=$3)`,
       [now(), m.user_id, shopId]
     );
-    const keys = await revokeIn(c, { shopId, userIds: [m.user_id], reason: 'owner_logout_all', by, ip });
     return { keys, sessions: s.rowCount || 0 };
   });
   await out.keys.afterCommit();

@@ -100,6 +100,14 @@ async function settle(shopId, courierId, body, actor, key) {
     }
     const cr = await courierInShop(run, shopId, courierId);
     const ph = ids.map((_, i) => `$${i + 3}`).join(',');
+    //  ترتیبِ قفل «سفارش ⇐ مأموریت» (`delivery.lockOrderOf`): پیش‌تر مأموریت‌ها پیش از سفارش‌ها (در `codIn`) قفل
+    //  می‌شدند و رویدادِ دوبارهٔ پیک (صفِ بی‌اینترنتِ گوشی «تحویل شد» را دوباره می‌فرستد) سفارش ⇐ مأموریت ⇒ بن‌بستِ
+    //  PostgreSQL (`40P01`، تسویه یا رویداد ۵۰۰). سفارش‌ها به ترتیبِ شناسه، پیش از مأموریت‌ها.
+    await c.query(
+      `SELECT o.id FROM delivery_assignments a JOIN online_orders o ON o.id = a.order_id AND o.shop_id = a.shop_id
+        WHERE a.shop_id=$1 AND a.courier_id=$2 AND a.id IN (${ph}) ORDER BY o.id FOR UPDATE OF o`,
+      [shopId, cr.id, ...ids]
+    );
     const rows = (await c.query(
       `${SETTLE_ROWS} WHERE a.shop_id=$1 AND a.courier_id=$2 AND a.id IN (${ph}) ORDER BY a.delivered_at, a.id FOR UPDATE OF a`,
       [shopId, cr.id, ...ids]
