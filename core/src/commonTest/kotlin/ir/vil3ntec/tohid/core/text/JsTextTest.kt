@@ -18,6 +18,16 @@ class JsTextTest {
     assertFalse(JsText.isBlank("\u001F"))
   }
 
+  /** خروجیِ `toLowerCase()` ِ Node 22 */
+  @Test fun lowercaseLikeJs() {
+    val cases = listOf(
+      "ΑΣ" to "ας", "ΑΣ " to "ας ", "ΑΣع" to "αςع", "ΑΣa" to "ασa", "ΑΣ1" to "ας1", "ΑΣ." to "ας.", "Σ" to "σ",
+      "ΑΣ\u0301ع" to "ας\u0301ع", "aΣb" to "aσb", "ΑΣΑ" to "ασα", "ΑΣ\u200c" to "ας\u200c", "ΑΣ\u2019a" to "ασ\u2019a",
+      "ΑΣ'a" to "ασ'a", "ΑΣ\u0640ع" to "ας\u0640ع", "ΑΣعددgram" to "αςعددgram", "İ" to "i\u0307", "DRINKS" to "drinks", "" to "",
+    )
+    for ((s, want) in cases) assertEquals(want, JsText.lowercase(s), s)
+  }
+
   @Test fun numberLikeJs() {
     val cases = listOf(
       "0x1F" to 31.0, " 5" to 5.0, "\u00A05" to 5.0, " 7 " to 7.0, "" to 0.0, "  " to 0.0, "0b101" to 5.0, "0o17" to 15.0,

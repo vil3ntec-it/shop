@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.pay
 
 import ir.vil3ntec.tohid.core.money.addExact
+import ir.vil3ntec.tohid.core.text.JsText
 
 /**
  *  POS-40 — اصلاحِ روشِ پرداخت پس از فروش («نقد زدم، ولی HesabPay داد»).
@@ -93,9 +94,9 @@ object PayFix {
    */
   fun closed(saleAt: Long, saleDay: String?, shifts: List<Window>): Boolean {
     if (shifts.any { it.closedAt != null && saleAt >= it.openedAt && saleAt <= it.closedAt }) return true
-    val day = saleDay?.trim().orEmpty()
+    val day = saleDay?.let(JsText::trim).orEmpty()
     if (day.isEmpty()) return false
-    val last = shifts.filter { it.closedAt != null && it.day.trim() == day }.maxOfOrNull { it.closedAt!! } ?: return false
+    val last = shifts.filter { it.closedAt != null && JsText.trim(it.day) == day }.maxOfOrNull { it.closedAt!! } ?: return false
     return saleAt <= last
   }
 
@@ -127,14 +128,14 @@ object PayFix {
   }
 
   fun check(input: Input): PayResult<Fix> {
-    val id = input.id.trim()
+    val id = JsText.trim(input.id)
     if (id.isEmpty()) return PayResult.Err("ID_REQUIRED")
     val sale = input.sale
-    val saleId = sale.id.trim()
+    val saleId = JsText.trim(sale.id)
     if (saleId.isEmpty()) return PayResult.Err("SALE_REQUIRED")
-    val by = input.by?.trim().orEmpty()
-    val reason = input.reason?.trim().orEmpty()
-    val refText = input.ref?.trim().orEmpty()
+    val by = input.by?.let(JsText::trim).orEmpty()
+    val reason = input.reason?.let(JsText::trim).orEmpty()
+    val refText = input.ref?.let(JsText::trim).orEmpty()
     input.existing.firstOrNull { it.id == id }?.let { old ->
       val same = old.saleId == saleId && old.from == input.from && old.to == input.to && old.amount == input.amount &&
         old.by == by && old.reason == reason && (old.ref ?: "") == refText
@@ -147,7 +148,7 @@ object PayFix {
     val decision = input.decision
     if (decision != "allow" && decision != "approve") return PayResult.Err("PERM_DENIED")
     if (by.isEmpty()) return PayResult.Err("BY_REQUIRED")
-    val approver = input.approvedBy?.trim().orEmpty()
+    val approver = input.approvedBy?.let(JsText::trim).orEmpty()
     if (decision == "approve") {
       if (approver.isEmpty()) return PayResult.Err("APPROVAL_REQUIRED")
       if (approver == by) return PayResult.Err("SELF_APPROVAL")

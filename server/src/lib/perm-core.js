@@ -156,6 +156,8 @@
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }
+  /** مشخصِ یک مجوز — فقط کلیدِ خودِ فهرست («__proto__»، «constructor» و … مجوزِ ناشناخته‌اند، نه پروتوتایپ؛ فازِ تفاضلی) */
+  function specOf(key) { return typeof key === 'string' && has(CATALOG, key) ? CATALOG[key] : null; }
 
   /*
    *  جدول‌های همگام‌سازی که هر نقش می‌نویسد (نام‌های Sync v1/v3، همان
@@ -410,7 +412,7 @@
 
   /** حالتِ پیش‌فرضِ یک نقش — یا null برای نقش/مجوزِ ناشناخته */
   function defaultMode(role, key) {
-    var spec = CATALOG[key];
+    var spec = specOf(key);
     if (!spec || !has(spec.defaults, role)) return null;
     //  مقدارِ نامعتبر (undefined، غلطِ املایی) ⇐ null ⇐ «deny» — بسته‌به‌خطا
     return MODES.indexOf(spec.defaults[role]) >= 0 ? spec.defaults[role] : null;
@@ -424,7 +426,7 @@
    *  @returns {{mode: string, caps: Object}}
    */
   function resolve(role, layers, key) {
-    var spec = CATALOG[key];
+    var spec = specOf(key);
     var base = defaultMode(role, key);
     if (!spec || base === null) return { mode: 'deny', caps: {} };
     if (role === 'owner') return { mode: 'allow', caps: {} };
@@ -466,7 +468,7 @@
     var r = resolve(role, layers, key);
     if (r.mode === 'deny') return { decision: 'deny', reason: 'denied' };
     if (r.mode === 'approve') return { decision: 'approve', reason: 'needs_approval' };
-    var spec = CATALOG[key];
+    var spec = specOf(key);
     for (var i = 0; i < spec.caps.length; i++) {
       var name = spec.caps[i];
       if (!has(r.caps, name)) continue;
@@ -515,7 +517,7 @@
    *  @returns {null|string} کدِ خطا
    */
   function validate(role, key, o) {
-    var spec = CATALOG[key];
+    var spec = specOf(key);
     if (!spec) return 'unknown_permission';
     if (role === 'owner') return 'owner_fixed';
     var base = defaultMode(role, key);

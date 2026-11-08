@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.audit
 
+import ir.vil3ntec.tohid.core.text.JsText
+
 /**
  * SEC-03 — سندِ ثبت‌شده ویرایش نمی‌شود؛ اصلاح فقط با سندِ معکوس.
  *
@@ -36,7 +38,8 @@ object PostedDocument {
     return EditCheck(false, "posted_immutable")
   }
 
-  fun findReversal(docs: List<Map<String, Any?>>, id: String?): Map<String, Any?>? =
+  /** شناسهٔ سند هر مقدارِ JSON است (عدد هم)، همان `===` ِ JS — نه فقط رشته (فازِ تفاضلی: سندِ ۷ دو بار معکوس می‌شد) */
+  fun findReversal(docs: List<Map<String, Any?>>, id: Any?): Map<String, Any?>? =
     if (id == null) null else docs.firstOrNull { it["reverses"] == id }
 
   private fun negated(o: Map<*, *>): Map<String, Any?> {
@@ -59,8 +62,9 @@ object PostedDocument {
   ): Map<String, Any?> {
     if (!isPosted(orig)) throw HashChainException("not_posted", "فقط سندِ ثبت‌شده معکوس می‌شود")
     if (orig["reverses"] != null) throw HashChainException("is_reversal", "سندِ معکوس دوباره معکوس نمی‌شود")
-    if (findReversal(existing, orig["id"] as? String) != null) throw HashChainException("already_reversed")
-    if (req.id.isBlank() || req.reason.isBlank() || req.by.isBlank() || req.no < 1 ||
+    if (findReversal(existing, orig["id"]) != null) throw HashChainException("already_reversed")
+    //  «خالی» همان `trim()` ِ JS (BOM خالی است، U+001F نه) — `JsText`
+    if (JsText.isBlank(req.id) || JsText.isBlank(req.reason) || JsText.isBlank(req.by) || req.no < 1 ||
       req.no > HashChain.MAX_SAFE || req.postedAt > HashChain.MAX_SAFE || req.postedAt < -HashChain.MAX_SAFE
     ) {
       throw HashChainException("bad_opts", "id، no، postedAt، reason و by لازم‌اند")
@@ -76,8 +80,8 @@ object PostedDocument {
     m["no"] = req.no
     m["postedAt"] = req.postedAt
     m["status"] = "posted"
-    val origId = orig["id"]
-    if (origId != null) m["reverses"] = origId else m.remove("reverses")
+    //  `reverses = orig.id` ِ JS: شناسهٔ null همان null می‌ماند (در هش می‌آید)؛ فقط سندِ بی شناسه کلید ندارد
+    if (orig.containsKey("id")) m["reverses"] = orig["id"] else m.remove("reverses")
     m["reason"] = req.reason
     m["by"] = req.by
     return m

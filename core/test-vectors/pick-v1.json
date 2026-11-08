@@ -69,7 +69,8 @@
     { "orderedMilli": 1000, "actualMilli": 1500, "toleranceBp": 9000, "want": "ok" },
     { "orderedMilli": 1000, "actualMilli": 1501, "toleranceBp": 9000, "want": "over" },
     { "orderedMilli": 333, "actualMilli": 366, "toleranceBp": 1000, "want": "ok" },
-    { "orderedMilli": 333, "actualMilli": 367, "toleranceBp": 1000, "want": "over" }
+    { "orderedMilli": 333, "actualMilli": 367, "toleranceBp": 1000, "want": "over" },
+    {"orderedMilli": 9007199254740991, "actualMilli": 9007199254513296, "toleranceBp": 1500, "want": "ok"}
   ],
   "settle": [
     {

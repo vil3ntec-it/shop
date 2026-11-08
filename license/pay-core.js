@@ -99,11 +99,18 @@
     return r + 0;
   }
   function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+  /** نقشهٔ شناسه ⇐ مقدار بی پروتوتایپ: «__proto__» و «constructor» شناسهٔ ساده‌اند (همان Kotlin؛ فازِ تفاضلی) */
+  function idMap() { return Object.create(null); }
+  /** همان، در شیءِ سادهٔ خروجی (گزارشِ شیفت): ویژگیِ خودِ شیء، نه انتسابی که پروتوتایپ را عوض کند */
+  function setKey(o, k, v) {
+    Object.defineProperty(o, k, { value: v, enumerable: true, writable: true, configurable: true });
+    return v;
+  }
 
   // ── روش‌های پرداخت (PAY-06) ────────────────────────────
   function defineMethods(list) {
     if (!Array.isArray(list)) return fail('BAD_METHOD', { index: -1 });
-    var seen = {}, cash = 0, out = [];
+    var seen = idMap(), cash = 0, out = [];
     for (var i = 0; i < list.length; i++) {
       var x = list[i] || {};
       var id = text(x.id), name = text(x.name);
@@ -121,7 +128,7 @@
   function table(list) {
     var r = list === undefined || list === null ? { ok: true, methods: DEFAULT_METHODS } : defineMethods(list);
     if (!r.ok) return r;
-    var by = {}, cashId = null, creditId = null;
+    var by = idMap(), cashId = null, creditId = null;
     r.methods.forEach(function (x) {
       by[x.id] = x;
       if (x.kind === 'cash') cashId = x.id;
@@ -290,7 +297,7 @@
     for (i = pays.length - 1; i >= 0; i--) if (pays[i].method !== ACCOUNT) order.push(i);
 
     var fallback = mode === 'store_credit' ? t.creditId : t.cashId;
-    var payouts = [], at = {}, rest = input.amount, used = pays.map(function () { return 0; });
+    var payouts = [], at = idMap(), rest = input.amount, used = pays.map(function () { return 0; });
     function pay(method, amount) {
       if (amount <= 0) return;
       if (has(at, method)) { payouts[at[method]].amount = add(payouts[at[method]].amount, amount); return; }
@@ -438,7 +445,7 @@
     var methods = {}, moves = { in: 0, out: 0 };
     var events = { sales: 0, refunds: 0, receipts: 0, cashIn: 0, cashOut: 0, noSale: 0 };
     function bucket(id) {
-      if (!has(methods, id)) methods[id] = { sales: 0, refunds: 0, receipts: 0, net: 0 };
+      if (!has(methods, id)) setKey(methods, id, { sales: 0, refunds: 0, receipts: 0, net: 0 });
       return methods[id];
     }
     s.events.forEach(function (e) {
@@ -455,10 +462,10 @@
       else if (e.type === 'no_sale') events.noSale++;
     });
     var expected = {};
-    expected[t.cashId] = add(add(s.float, has(methods, t.cashId) ? methods[t.cashId].net : 0), moves.in - moves.out);
+    setKey(expected, t.cashId, add(add(s.float, has(methods, t.cashId) ? methods[t.cashId].net : 0), moves.in - moves.out));
     Object.keys(methods).forEach(function (id) {
       var kind = kindOf(t, id);
-      if (id !== t.cashId && has(COUNTABLE, kind)) expected[id] = methods[id].net;
+      if (id !== t.cashId && has(COUNTABLE, kind)) setKey(expected, id, methods[id].net);
     });
     return { methods: methods, moves: moves, events: events, expected: expected, t: t };
   }
@@ -498,7 +505,7 @@
       var kind = kindOf(t, k);
       if (!kind || k === t.cashId || !has(COUNTABLE, kind)) return fail('UNKNOWN_METHOD', { method: k });
       if (!nonNeg(mc[k])) return fail('INVALID_COUNT');
-      methodCounts[k] = mc[k];
+      setKey(methodCounts, k, mc[k]);
     }
     return {
       ok: true, t: t, cash: cash,
@@ -523,15 +530,15 @@
     b = buildClose(s, c, id);
     if (!b.ok) return b;
     var op = b.op, counted = {};
-    counted[b.t.cashId] = b.cash;
-    Object.keys(op.methodCounts).forEach(function (m) { counted[m] = op.methodCounts[m]; });
+    setKey(counted, b.t.cashId, b.cash);
+    Object.keys(op.methodCounts).forEach(function (m) { setKey(counted, m, op.methodCounts[m]); });
     var rep = reportOf(s, 'Z', op.at, op.by);
     var variance = {}, over = false, review = false;
     Object.keys(rep.expected).concat(Object.keys(counted)).forEach(function (m) {
       if (has(variance, m)) return;
-      if (!has(counted, m)) { variance[m] = null; return; }
+      if (!has(counted, m)) { setKey(variance, m, null); return; }
       var v = add(counted[m], -(has(rep.expected, m) ? rep.expected[m] : 0));
-      variance[m] = v;
+      setKey(variance, m, v);
       if (v !== 0) review = true;
       if (Math.abs(v) > s.threshold) over = true;
     });
@@ -580,13 +587,13 @@
 
   /** ردیف‌های فاکتور پس از اصلاح‌های تا `until` به ترتیبِ (زمان، شناسه)؛ اصلاحِ بی‌جا کنار می‌رود */
   function payFixApply(saleId, rows, fixes, until) {
-    var order = [], sums = {};
+    var order = [], sums = idMap();
     function put(k, v) { if (!has(sums, k)) { order.push(k); sums[k] = 0; } sums[k] = add(sums[k], v); }
     (rows || []).forEach(function (r) { if (r.amount > 0) put(r.method, r.amount); });
     var lim = until === null || until === undefined ? Infinity : until;
     var list = (fixes || []).filter(function (f) { return f.saleId === saleId && f.at <= lim; }).slice();
     list.sort(function (a, b) { return a.at !== b.at ? a.at - b.at : (a.id < b.id ? -1 : a.id > b.id ? 1 : 0); });
-    var applied = [], skipped = [], seen = {};
+    var applied = [], skipped = [], seen = idMap();
     list.forEach(function (f) {
       if (has(seen, f.id)) return;
       seen[f.id] = 1;

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.core.pay
 import ir.vil3ntec.tohid.core.money.Currency
 import ir.vil3ntec.tohid.core.money.addExact
 import ir.vil3ntec.tohid.core.money.mulExact
+import ir.vil3ntec.tohid.core.text.JsText
 
 /*
  *  هستهٔ شیفت و صندوق — PAY-11..16، 19 (بخشِ ۳.۷ و ۴.۲ِ مشخصات، D-14).
@@ -145,12 +146,13 @@ object ShiftCore {
     "cash_out" to listOf("owner_withdrawal", "petty_expense", "other"),
   )
 
-  private fun clean(s: String?): String? = s?.trim()?.ifEmpty { null }
+  /** `text(v) || null` ِ JS: «trim» همان JS (`JsText`؛ BOM خالی است، U+001F نه — فازِ تفاضلی: تأییدکنندهٔ «فقط BOM» کشو را باز می‌کرد) */
+  private fun clean(s: String?): String? = s?.let(JsText::trim)?.ifEmpty { null }
 
   /** PAY-11 */
   fun open(p: OpenShiftInput): PayResult<Shift> {
     val id = clean(p.id) ?: return PayResult.Err("ID_REQUIRED")
-    val cur = try { Currency.of(p.currency) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
+    val cur = try { Currency.of(p.currency.ifEmpty { "AFN" }) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
     if (!nonNegExact(p.at)) return PayResult.Err("INVALID_TIME")
     if (!nonNegExact(p.float)) return PayResult.Err("INVALID_AMOUNT")
     if (!nonNegExact(p.threshold)) return PayResult.Err("BAD_CONFIG")
@@ -171,7 +173,7 @@ object ShiftCore {
   /** سنجش و یک‌دست‌کردنِ رویداد، بی نگاه به حالتِ شیفت */
   private fun build(s: Shift, id: String, e: ShiftEventInput): PayResult<ShiftEvent> {
     // PAY-10: شیفت یک ارز دارد؛ رویدادِ ارزِ دیگر پذیرفته نمی‌شود
-    if ((e.currency ?: s.currency) != s.currency) return PayResult.Err("CURRENCY_MISMATCH")
+    if ((e.currency?.ifEmpty { null } ?: s.currency) != s.currency) return PayResult.Err("CURRENCY_MISMATCH")
     return buildChecked(s.table, id, e)
   }
 

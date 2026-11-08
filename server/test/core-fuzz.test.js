@@ -7,8 +7,11 @@
  *     (`CoreFuzzTest.kt` و `CoreFuzzAppTest.kt`) باید عیناً همان را بدهد (روشِ «الف»: JS = expect).
  *  ۲) قاعده‌های گردکردن با BigInt ِ مستقل از هسته (بخشِ ۳.۴ و ۳.۶): نیمه به +∞ با floorDiv،
  *     رد کردنِ هر عددِ بیرون از ۲^۵۳−۱، پخشِ تخفیف بی یک پول کم و زیاد، رفت‌وبرگشتِ تقویم.
+ *  ۳) دورِ دوم: نسخهٔ سرورِ زنجیرهٔ هش (`server/src/lib/hash-chain.js`، crypto ِ Node) همان canonicalJson، هش و
+ *     سنجشِ نسخهٔ `license/` را می‌دهد؛ ضرب‌وتقسیمِ سفارشِ خرید و مبلغِ قلمِ جمع‌آوری با BigInt ِ مستقل.
  *  اجرای ژرف (بیرون از CI):
- *     CORE_FUZZ_CASES=20000 [CORE_FUZZ_SEED=…] [CORE_FUZZ_OUT=/tmp/deep.json] node --test test/core-fuzz.test.js
+ *     CORE_FUZZ_CASES=20000 [CORE_FUZZ_SEED=…] [CORE_FUZZ_ONLY=perm,approval] [CORE_FUZZ_OUT=/tmp/deep.json] node --test test/core-fuzz.test.js
+ *     (بی CORE_FUZZ_ONLY هر دور N مورد؛ با آن فقط همان خانواده‌ها، N مورد روی هم)
  *     سپس همان پرونده: CORE_FUZZ_CORPUS=/tmp/deep.json برای jvmTest ِ core و test ِ desktop.
  */
 const test = require('node:test');
@@ -55,6 +58,16 @@ function oracle(c) {
       const out = floorDiv(2n * B(x.a) * B(x.b) + B(x.c), 2n * B(x.c));
       return safe(out) ? Number(out) : refuse;
     }
+    case 'po.mul': {
+      if (![x.a, x.b, x.c].every((v) => safe(B(v))) || x.c <= 0 || x.c > 2147483647) return refuse;
+      const out = floorDiv(2n * B(x.a) * B(x.b) + B(x.c), 2n * B(x.c));
+      return safe(out) ? Number(out) : refuse;
+    }
+    case 'pick.line': {
+      if (![x.q, x.p].every(isInt)) return refuse;
+      const out = floorDiv(B(x.q) * B(x.p) + 50000n, 100000n) * 100n;
+      return safe(out) ? Number(out) : refuse;
+    }
     default: return undefined;
   }
 }
@@ -76,6 +89,10 @@ function invariants(c, msg) {
   }
   if (c.fn === 'money.returnShare') assert.ok(Number.isInteger(o), msg);  // همیشه افغانیِ کامل
   if (c.fn === 'stock.ledger') for (const p of o.positions) assert.ok(p.reconciles, `${msg} ${p.productId}/${p.warehouseId}`);
+  //  زنجیرهٔ هش: نسخهٔ سرور همان نسخهٔ license (همان قرارداد، SHA-256 ِ دیگر)
+  const server = F.R2.runChainServer(c.fn, x);
+  if (server !== undefined) assert.deepEqual(JSON.parse(JSON.stringify(server)), o, `${msg} (server/src/lib/hash-chain.js)`);
+  if (c.fn === 'pick.settle' && !o.throws) assert.equal(o.totalMinor, o.subtotalMinor - o.discountMinor + o.deliveryFeeMinor, msg);
 }
 
 function check(corpus) {
@@ -97,9 +114,10 @@ test('پیکرهٔ فاز همان خروجیِ امروزِ مولّد و هس�
 
 test('پیکره: همهٔ خانواده‌ها هستند و هر دو سو چیزی برای رد کردن دارند', () => {
   const corpus = JSON.parse(fs.readFileSync(F.CORPUS, 'utf8'));
-  assert.equal(corpus.cases.length, F.COUNT);
+  assert.equal(corpus.cases.length, 2 * F.COUNT);
   const fams = new Set(corpus.cases.map((c) => c.fn.split('.')[0]));
-  assert.deepEqual([...fams].sort(), ['cal', 'cap', 'debt', 'money', 'promo', 'report', 'stock', 'text']);
+  assert.deepEqual([...fams].sort(), [...F.FAMILY_NAMES].sort());
+  assert.deepEqual([...fams].sort(), ['approval', 'board', 'cal', 'cap', 'chain', 'debt', 'money', 'pay', 'perm', 'pick', 'po', 'promo', 'report', 'stock', 'text']);
   assert.ok(corpus.cases.filter((c) => c.out && c.out.throws).length >= 5);
 });
 
@@ -116,7 +134,8 @@ test('مولّد قطعی است: یک دانه، یک پیکره', () => {
 const deep = Number(process.env.CORE_FUZZ_CASES) || 0;
 test(`اجرای ژرف (CORE_FUZZ_CASES=${deep || '—'})`, { skip: deep ? false : 'فقط محلی' }, () => {
   const seed = Number(process.env.CORE_FUZZ_SEED) || F.SEED;
-  const corpus = F.generate(seed, deep);
+  const only = (process.env.CORE_FUZZ_ONLY || '').split(',').filter(Boolean);
+  const corpus = F.generate(seed, deep, only);
   const n = check(corpus);
   if (process.env.CORE_FUZZ_OUT) fs.writeFileSync(process.env.CORE_FUZZ_OUT, F.serialize(corpus));
   assert.ok(n > 0);

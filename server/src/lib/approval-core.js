@@ -98,18 +98,25 @@
   }
 
   /**
+   *  نیازِ عددی که برگه نمی‌پوشاند: بی نیاز (null، undefined یا صحیحِ ≤ ۰) ⇐ نه؛ عددِ نادرست (بیرون از
+   *  ±(۲^۵۳−۱)، اعشاری، NaN) ⇐ هرگز پوشیده نمی‌شود — بسته‌به‌خطا. پیش‌تر نیازِ ۲^۵۳ نادیده می‌ماند و هر برگه‌ای
+   *  آن را می‌پوشاند (فازِ تفاضلی؛ Kotlin رد می‌کرد).
+   */
+  function uncovered(need, cap) {
+    if (need === null || need === undefined || (isInt(need) && need <= 0)) return false;
+    return !isInt(need) || !isInt(cap) || need > cap;
+  }
+
+  /**
    *  آیا برگه همین کار را می‌پوشاند؟ null یعنی بله، وگرنه کدِ خطا.
    *  @param need {perm, doc, pct_bp?, amount?, at}  — at = زمانِ op (میلی‌ثانیه)
    */
   function covers(s, need) {
     if (!need || s.perm !== need.perm || s.doc !== need.doc) return 'approval_mismatch';
-    if (isInt(need.pct_bp) && need.pct_bp > 0) {
-      if (!isInt(s.pct_bp) || need.pct_bp > s.pct_bp) return 'approval_too_small';
-    }
-    if (isInt(need.amount) && need.amount > 0) {
-      if (!isInt(s.amount) || need.amount > s.amount) return 'approval_too_small';
-    }
-    if (isInt(need.at) && (need.at < s.iat - SKEW_MS || need.at > s.exp + SKEW_MS)) return 'approval_expired';
+    if (uncovered(need.pct_bp, s.pct_bp)) return 'approval_too_small';
+    if (uncovered(need.amount, s.amount)) return 'approval_too_small';
+    if (need.at !== null && need.at !== undefined &&
+        (!isInt(need.at) || need.at < s.iat - SKEW_MS || need.at > s.exp + SKEW_MS)) return 'approval_expired';
     return null;
   }
 

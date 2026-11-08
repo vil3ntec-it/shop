@@ -40,6 +40,8 @@ function build() {
     ['lone high surrogate', '\ud800', 'lone_surrogate'],
     ['lone low surrogate', 'a\udc00b', 'lone_surrogate'],
     ['lone surrogate in key', { '\ud800': 1 }, 'lone_surrogate'],
+    //  فازِ تفاضلی (دورِ ۲): نخستین خطا به ترتیبِ مرتبِ کلیدها — Kotlin همهٔ کلیدها را پیش از مقدارها می‌سنجید
+    ['first failure in sorted key order wins (number before a later lone-surrogate key)', { b: 1.5, '\ud800': 1 }, 'not_integer'],
   ];
   const sale = (id, no, extra) => Object.assign({
     id, series: 'K2', no, type: 'sale', status: 'posted', postedAt: 1760400000000 + no,
@@ -107,6 +109,11 @@ function build() {
     { name: 'who reversed required', doc: docs[0], opts: { id: opts.id, no: 1, postedAt: opts.postedAt, reason: 'x' }, error: 'bad_opts' },
     { name: 'fraction in document', doc: { ...docs[0], lines: [{ productId: 'p', qty: 1, unitPrice: 5, amount: 2.5 }] }, opts, error: 'not_integer' },
     { name: 'quantity as text', doc: { ...docs[0], lines: [{ productId: 'p', qty: '2', unitPrice: 5, amount: 10 }] }, opts, error: 'not_integer' },
+    //  فازِ تفاضلی (دورِ ۲)؛ Kotlin هر چهار را جورِ دیگر می‌داد
+    { name: 'numeric id: reversed only once (Kotlin skipped the check for a non-text id)', doc: { ...docs[0], id: 7 }, opts, existing: [{ id: 'K2-R-000009', reverses: 7, status: 'posted' }], error: 'already_reversed' },
+    { name: 'reason of only BOM is empty (JS trim)', doc: docs[0], opts: { ...opts, reason: '\uFEFF' }, error: 'bad_opts' },
+    { name: 'U+001F is not space in JS, so the reason is not empty', doc: docs[0], opts: { ...opts, reason: '\u001F' } },
+    { name: 'id null: reverses stays null (it is hashed)', doc: { ...docs[0], id: null }, opts },
   ].map((c) => {
     let out;
     try {

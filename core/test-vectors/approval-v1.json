@@ -482,6 +482,101 @@
         "sig": ""
       },
       "out": "bad_sig"
+    },
+    {
+      "why": "فاز: نسخهٔ ۲^۳۲+۱ (Kotlin با toInt ِ بی\u200cمرز نسخهٔ ۱ می\u200cخواند)",
+      "slip": {
+        "v": 4294967297,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_version"
+    },
+    {
+      "why": "فاز: مبلغِ ۲^۶۰ بیرون از بازهٔ امن",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 1152921504606847000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_value"
+    },
+    {
+      "why": "فاز: exp ِ ۲^۵۳ (Kotlin بی مرزِ ۲^۵۳ می\u200cپذیرفت)",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 9007199254740000,
+        "exp": 9007199254740992,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "out": "bad_time"
+    },
+    {
+      "why": "فاز: دلیلِ فقط BOM خالی است (trim ِ JS)",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "\ufeff",
+        "sig": "x"
+      },
+      "out": "bad_reason"
+    },
+    {
+      "why": "فاز: U+001F در JS فاصله نیست، پس دلیل خالی نیست",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "\u001f",
+        "sig": "x"
+      },
+      "out": null
     }
   ],
   "covers": [
@@ -798,6 +893,106 @@
         "doc": "returns/r-0001",
         "amount": 120001,
         "at": 1760000001000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "why": "فاز: نیازِ ۲^۵۳ پوشیده نمی\u200cشود (پیش\u200cتر JS نادیده\u200cاش می\u200cگرفت و هر برگه می\u200cپوشاند)",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "pct_bp": 9007199254740992,
+        "at": 1760000000000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "why": "فاز: مبلغِ نیازِ ۲^۵۳",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "amount": 9007199254740992,
+        "at": 1760000000000
+      },
+      "out": "approval_too_small"
+    },
+    {
+      "why": "فاز: زمانِ ۲^۶۰ ⇐ منقضی (پیش\u200cتر سنجشِ زمان کنار می\u200cرفت)",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 50000,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "amount": 100,
+        "at": 1152921504606847000
+      },
+      "out": "approval_expired"
+    },
+    {
+      "why": "فاز: سقفِ ۲^۵۳ ِ برگه سقف نیست (Kotlin می\u200cپوشاند)",
+      "slip": {
+        "v": 1,
+        "shop": "shp_test",
+        "doc": "sales/s-0001",
+        "perm": "sales.discount",
+        "pct_bp": 1000,
+        "amount": 9007199254740992,
+        "by": "usr_manager",
+        "key": "ak_7ea833d85856fc32ba38d95e",
+        "iat": 1760000000000,
+        "exp": 1760000600000,
+        "nonce": "n0nce-AAAABBBBCCCC",
+        "reason": "مشتریِ همیشگی",
+        "sig": "x"
+      },
+      "need": {
+        "perm": "sales.discount",
+        "doc": "sales/s-0001",
+        "amount": 100,
+        "at": 1760000000000
       },
       "out": "approval_too_small"
     }
