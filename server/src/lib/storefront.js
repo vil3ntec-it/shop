@@ -215,7 +215,8 @@ function productView(row) {
     priceMinor: priceOf(row),
     maxQtyMilli: row.max_qty_milli === null || row.max_qty_milli === undefined ? null : Number(row.max_qty_milli),
     photo: row.has_photo === true,
-    //  IMG-12: نسخهٔ عکسِ همگام‌شده برای `?v=` ِ نشانیِ عکس (بانک در `withBank` جایش را می‌گیرد)؛ بی عکس ⇒ بی کلید
+    //  IMG-12: نسخهٔ عکسِ همگام‌شده برای `?v=` ِ نشانیِ عکس (بانک در `withBank` جایش را می‌گیرد)؛ بی عکس ⇒ بی کلید.
+    //  WEB-15: `photo_hash` = «اصل» یا «اصل:کارت» (مهاجرتِ ۳۵۰) — همان `version` ِ `product-photos.forStore`
     ...(row.has_photo === true && row.photo_hash && { photoVersion: shelf.photoTag(`l:${row.photo_hash}`) }),
     //  MKT-06: چرخهٔ مصرف (روزِ صحیحِ ۱ تا ۳۶۵) — نبود یا نادرست ⇒ بی کلید (پاسخِ پیشین بی‌کم‌وکاست)
     ...cycleOf(d),
@@ -227,7 +228,10 @@ function productView(row) {
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
   EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
             AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS has_photo,
-  (SELECT ph.hash FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
+  (SELECT ph.hash || COALESCE(':' || th.hash, '') FROM product_photos ph
+     LEFT JOIN product_photo_thumbs th ON th.app = ph.app AND th.account_id = ph.account_id
+                                      AND th.product_id = ph.product_id AND th.of_hash = ph.hash
+    WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
             AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS photo_hash`;
 //  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
 //  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
@@ -425,7 +429,8 @@ async function catalogByIds(shopId, raw) {
 /**
  * عکسِ کالای منتشرشده — یا null. `size` = `display` (صفحهٔ کالا) یا `thumb`
  * (کارت): اول نسخهٔ همان اندازه از بانکِ تصاویر (پرچمِ دکان)، وگرنه عکسِ
- * همگام‌شدهٔ امروز.
+ * همگام‌شدهٔ امروز — برای کارت نسخهٔ کارتِ همان عکس (۳۲۰px ِ ساختهٔ برنامه، مهاجرتِ ۳۵۰) و
+ * اگر نیست همان عکسِ کامل (هرگز عکسِ شکسته یا کارتِ عکسِ پیشین).
  */
 async function photo(shopId, productId, size = 'display') {
   if (!PRODUCT_ID_RE.test(String(productId || ''))) return null;
@@ -436,8 +441,8 @@ async function photo(shopId, productId, size = 'display') {
   if (!live) return null;
   const banked = await shelf.bankImage(shopId, productId, size === 'thumb' ? 'thumb' : 'display');
   if (banked) return banked;
-  const legacy = await require('./product-photos').get({ app: 'shop', accountId: shopId }, productId);
-  return legacy && { ...legacy, tag: shelf.photoTag(`l:${legacy.hash}`) };
+  const legacy = await require('./product-photos').forStore({ app: 'shop', accountId: shopId }, productId, size);
+  return legacy && { data: legacy.data, hash: legacy.hash, mime: legacy.mime, tag: shelf.photoTag(`l:${legacy.version}`) };
 }
 
 // ════════════════════════════════════════════════════════════════════

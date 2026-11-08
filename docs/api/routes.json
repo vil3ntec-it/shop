@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 991,
+    "routes": 992,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 485,
+      "user": 486,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 691,
+      "extracted": 692,
       "empty": 298,
       "unresolved": 2
     }
@@ -1005,6 +1005,7 @@
     {"method":"DELETE","path":"/api/sync/v1/photos/:productId","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req","requireSyncWrite"],"params":["productId"],"query":["device_id"],"body":[],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/sync/v1/photos/:productId","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req"],"params":["productId"],"query":[],"body":[],"response":{"statuses":[200,404],"keys":["data","error","hash","message","ok","type"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/sync/v1/photos/:productId","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req","requireSyncWrite"],"params":["productId"],"query":[],"body":["data","device_id"],"response":{"statuses":[200,413],"keys":["...","error","message","ok"]},"errors":[],"shape":"extracted"},
+    {"method":"PUT","path":"/api/sync/v1/photos/:productId/thumb","area":"sync","source":"server/src/routes/sync-photo-thumbs.js","auth":"user","guards":["requireSyncAccount","requireSyncWrite"],"params":["productId"],"query":[],"body":["data","of"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/sync/v1/pull","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req"],"params":[],"query":["deviceId","device_id","limit","since"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/sync/v1/push","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req","requireSyncWrite","v1Guard","v1SafeGuard"],"params":[],"query":[],"body":["deviceId","device_id","ops","queued","schemaVersion","schema_version","since"],"response":{"statuses":[200,426],"keys":["...","cursor","error","message","ok","schema_version"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/sync/v1/snapshot","area":"sync","source":"server/src/routes/sync-v1.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.syncIpMax, keyPrefix: 'syncip' })","requireSyncAccount","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'sync', key: (req) => (req"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
