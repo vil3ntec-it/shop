@@ -175,7 +175,7 @@ internal fun RouteScope.StockModeScreen(onBack: (() -> Unit)?) {
       onConfirm = {
         ask = null
         val user = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
-        scope.launch { store.save(StockActions.setMode(data, next, user, todayIso(), System.currentTimeMillis(), ::newId)) }
+        scope.launch { store.save(data, StockActions.setMode(data, next, user, todayIso(), System.currentTimeMillis(), ::newId)) }
       },
     )
   }

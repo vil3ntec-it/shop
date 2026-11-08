@@ -830,6 +830,7 @@
 | `storefront.catalog_source` | فقط `all` | خاموش | S1 ِ قراردادِ بازار: ویترین، فهرستِ «در ویترین» ِ صاحب دکان، انتشارِ کالا (تکی و گروهیِ M2، `ledgerSource`)، بازار و ثبتِ سفارش کالا را از `catalog_products` می‌خوانند (نه `sync_rows`)؛ کاتالوگ فقط بخشِ کالا و مستقل از `shop.catalog` از دفترِ v1 یا v3 ِ دکان پر می‌شود (`catalog-products.refreshProducts`؛ منبع = `catalog_settings.sync_source` اگر هست، وگرنه v3 اگر کالای v3 دارد). scope ِ دکان اثری ندارد تا ویترین و جست‌وجوی چنددکانی یک منبع بخوانند | S1 | باز |
 | `shop.storefront.bulk` | دکان / `all` | خاموش | M2 ِ قراردادِ بازار: `PUT /api/shop/storefront/products` (تا ۵۰۰ کالا، `Idempotency-Key` اجباری) و `notLive` در فهرستِ کالای کارمند؛ کالا از همان منبعِ ویترین (`ledgerSource`) ⇒ با `storefront.catalog_source` دکانِ v3 هم | M2، #425 | باز |
 | `shop.ledger_merge` | دکان / `all` | **روشن** برای برنامهٔ تازه (`?v=2`، از ۱۴۰۵/۰۸/۱۸)؛ برنامهٔ کهنه (بی `v`) خاموش | ذخیرهٔ کهنه در برنامه: همتاها (`LedgerPeers`)، سنجشِ دیسک پیش از نوشتن و ادغامِ سه‌طرفهٔ `ShopStore.save` (`LedgerMerge`)؛ برنامه از `GET /api/shop/ledger-merge/config?v=2` می‌خواند (`LedgerMergeFlag`، پیش‌فرضِ برنامه روشن)؛ فقط `false` ِ صریح (دکان بر `all`) یا نگه‌داشتِ «غیرفعال کردنِ سرویس» خاموش ⇒ همان رفتارِ پیشین | #407، `docs/DATA-SAFETY-fa.md` | main |
+| `shop.save_base` | دکان / `all` | ⛔ **روشن** (فقط `false` ِ صریح یا نگه‌داشتِ سرویس خاموش می‌کند) | پایهٔ صریحِ ذخیرهٔ برنامه (`ShopStore.save(base, next)`): دو ذخیره از یک صفحهٔ کهنه هیچ‌کدام را نمی‌برند و سدِ نقش با `shop.ledger_merge` ِ خاموش هم؛ برنامه از پاسخِ `?v=3` ِ `GET /api/shop/ledger-merge/config` (فیلدِ `base`) می‌خواند (`LedgerMergeFlag.base`)؛ پاسخِ `v=2` و بی `v` بی تغییر. فقط خاموش‌کنِ اضطراری ⇒ همان ذخیرهٔ پیشین (`saveGuessed`) | DATA-SAFETY، `claude/stale-save` | باز |
 | `shop.settings_sync` | دکان / `all` | خاموش | همگام‌سازیِ زندهٔ کلیدهای «مالِ دکان» ِ `tohid-policy` (`ShopSettingsKeys`، DATA-SAFETY §۶): `GET`/`PUT /api/shop/settings-sync` (خاموش ⇒ `{enabled:false}` و ۴۰۳ `settings_sync_disabled`)، مهاجرتِ ۳۰۰، خبرِ سوکتِ `settings`؛ آخرین نویسنده با ساعتِ سرور هر کلید جدا، فقط صاحب/مدیر | DATA-SAFETY | باز |
 | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
@@ -1085,6 +1086,20 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   (`emptyList()` یکی است) و هرگز در دو کلیکِ هم‌زمان؛ جایگزینیِ کامل (بازیابی، «پاک کردنِ همه») همه را پاک می‌کند. پرچم:
   برنامه با `?v=2` می‌پرسد و پیش‌فرضش روشن است؛ پاسخِ بی `v` (سرورِ کهنه) فقط «روشن» ِ صریح را می‌نویسد؛ کلیدِ `on2:` (نه
   `on:` ِ کهنه). برنامهٔ بی `v` از سرور همان پیش‌فرضِ خاموشِ پیشین را می‌گیرد. سنجه: `LedgerMergeOnTest`.
+- ⛔ **پایهٔ صریحِ ذخیره (از ۱۴۰۵/۰۸/۱۸، `claude/stale-save`؛ پرچمِ `shop.save_base` پیش‌فرض روشن):** تنها درِ نوشتنِ صفحه
+  `ShopStore.save(base, next)` است — `base` همان دفتری که `next` از آن ساخته شد (همان `data`/`d` ای که به موتور رفت، **یک بار**
+  خوانده؛ درونِ `launch` از نو نخوان). پایه دیگر از شیءهای مشترک حدس زده نمی‌شود: دو ذخیره از یک دفترِ کهنهٔ صفحه بی Pull ِ
+  میانه (دو کلیک، یا `appendAudit`/`update` ِ همین نمونه در میانه) دومی اولی را می‌برد و DELETE می‌فرستاد. دفترِ همین حالا ===
+  پایه ⇒ خودِ `next` (همان رفتار و همان صف)؛ جلوتر ⇒ `LedgerMerge` روی آن، **در هر دو حالتِ `shop.ledger_merge`** (خاموش ⇒
+  فقط نوشتن‌های همین نمونه). سدِ نقش (A16) و قفلِ نرم در هر دو حالت روی (پایه ⇐ `next`). هر درِ مشترکِ نوشتن پایه را همراهِ
+  نتیجه می‌گیرد (`MoneyWriter.*`، `StockWriter.commit`، `persist`، `ProductOps.commit`، `CartStore.post`، `ReturnFlowSheet.save`،
+  `commitWarehouse`، `QuickRegister.Result.Ok.base`). `ShopStore` هیچ `save` ِ تک‌دفتری ندارد؛ «پاک کردنِ همه» فقط
+  `replaceAll`؛ راهِ پیشین (`saveGuessed`) فقط برای خاموش‌کن و پسوندِ آزمونیِ `LegacySave` ِ آزمون‌های پیشین. ⛔ `save(…data.value, …)`
+  ِ همان لحظه ممنوع. پرچم: پاسخِ `?v=3` ِ `/api/shop/ledger-merge/config` فیلدِ `base` (`lib/default-on-flag.js`؛ فقط `false` ِ
+  صریح یا نگه‌داشت)؛ پاسخ‌های `v=2` و بی `v` بایت‌به‌بایت همان. سنجه: `SaveBaseTest` (کامپیوتر)، `SaveBaseGuardTest` (نگهبان:
+  بازتاب + پویشِ متنِ کد)، `shop-ledger-merge.test.js`.
+- ⛔ **دکمهٔ «برگشت» ِ فهرستِ فاکتورها (از ۱۴۰۵/۰۸/۱۸):** همان حسابِ پنجرهٔ برگشت — `ReturnLeft.canReturn` (فهرستِ بلند:
+  `ReturnLeft.Index` در `RowLookup`)، نه `SalesEngine.returnable`/شمارندهٔ تنها (`ReturnButtonTest`).
 
 - ⛔ **S76/S77 — سوکتِ زندهٔ برنامه (`sync/v1/LiveSocket.kt`، از ۱۴۰۵/۰۸/۱۲):** هر وابستگیِ بیرونی (راهِ سوکت، بلیت، ساعت،
   زمان‌بند، نشانِ «زنده/آفلاین»، کارهای سکو پس از پیام) فقط از `LivePort`؛ سازندهٔ عمومی همان `AppLivePort` ِ واقعی را

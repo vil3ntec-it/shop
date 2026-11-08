@@ -190,7 +190,7 @@ fun RouteScope.CheckoutRoute() {
         //  ردیف‌های مصرف و کسبِ امتیاز در همان دفتر
         //  PRM-02: پیش از ساختنِ فاکتور، زیرِ همان قفل و با کلیدِ همین فاکتور، کدِ سقف‌دار از سرور — همان دروازهٔ صندوقِ
         //  کامپیوتر (`PromoLive.redeemGate` ⇐ `TillSale.redeem`)؛ رد یا بی اینترنت ⇒ همان پیام بالای برگه و هیچ ثبتی
-        when (val posted = cart.post(store, gate = { key -> PromoLive.redeemGate(context, key, promo) }) { key ->
+        when (val posted = cart.post(store, d, gate = { key -> PromoLive.redeemGate(context, key, promo) }) { key ->
           //  STF-03: آخرین سد — فاکتوری که سرور بی خبر رد می‌کرد نوشته نمی‌شود (صفحه پیش‌تر پرسیده است)
           SaleCapGate.guard(capRules, TillSale.record(
             d, priced, sale, note, promo, points,

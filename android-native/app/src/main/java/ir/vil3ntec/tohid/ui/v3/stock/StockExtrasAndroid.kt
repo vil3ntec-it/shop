@@ -134,7 +134,7 @@ internal fun RouteScope.CountToolsRoute() {
     onSave = { counted, at, note ->
       val shift = CountShift.of(data, at)
       val n = WarehouseEngine.countLines(data, counted, shift).size
-      writer.commit(
+      writer.commit(data, 
         WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, shift, WarehouseEngine.AdjustKind.COUNT, userId = writer.user),
         StrStock.countSaved(money(n.toDouble())),
       ).let { failed -> if (failed != null) writer.fail(failed) else back() }
@@ -158,7 +158,7 @@ internal fun RouteScope.StockPlacesRoute() {
 internal fun RouteScope.StockLabelsRoute() {
   val context = LocalContext.current
   val writer = rememberStockWriter()
-  LabelSheetWired(context, data, onDismiss = { back() }) { result, done -> writer.commit(result, done)?.let(writer::fail) }
+  LabelSheetWired(context, data, onDismiss = { back() }) { result, done -> writer.commit(data, result, done)?.let(writer::fail) }
 }
 
 /** دفترِ موجودی (موتورِ تازه): `?tab=count` ⇒ همان زبانه */
@@ -174,7 +174,7 @@ internal fun RouteScope.StockBookRoute() {
 internal fun RouteScope.BulkProductsRoute() {
   val writer = rememberStockWriter()
   BulkProductSheet(data, onDismiss = { back() }) { drafts ->
-    val failed = writer.commit(WarehouseEngine.addProducts(data, drafts, writer.now, writer.newId), StrStock.imported(money(drafts.size.toDouble())))
+    val failed = writer.commit(data, WarehouseEngine.addProducts(data, drafts, writer.now, writer.newId), StrStock.imported(money(drafts.size.toDouble())))
     if (failed != null) writer.fail(failed) else back()
   }
 }
@@ -262,7 +262,7 @@ internal fun RouteScope.ProductToolsImportRoute(writer: StockWriter) {
       onErrorReport = { bytes, name -> pendingReport = bytes; saveReport.launch(name) },
       onDone = { result ->
         file = null
-        val failed = writer.commit(result, StrReach.imported)
+        val failed = writer.commit(data, result, StrReach.imported)
         if (failed != null) writer.fail(failed) else back()
       },
     )

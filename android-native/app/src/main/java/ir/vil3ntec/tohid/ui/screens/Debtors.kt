@@ -136,7 +136,7 @@ fun DebtorsScreen(
     when (result) {
       is DebtorEngine.Result.Failed -> toast(result.message)
       is DebtorEngine.Result.Ok -> {
-        scope.launch { store.save(result.data) }
+        scope.launch { store.save(d, result.data) }
         toast(done)
         after()
       }
@@ -150,9 +150,10 @@ fun DebtorsScreen(
   }
   fun commit(p: DebtorLedgerModel.PendingDelete) {
     pendingDeletes = pendingDeletes - p
-    when (val r = deleteResult(latestData.value, p)) {
+    val base = latestData.value
+    when (val r = deleteResult(base, p)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
-      is DebtorEngine.Result.Ok -> scope.launch { store.save(r.data) }
+      is DebtorEngine.Result.Ok -> scope.launch { store.save(base, r.data) }
     }
   }
   /** پنهان کن، پیامِ «برگرداندن» بده؛ بی‌پاسخ ⇒ حذف، «برگرداندن» ⇒ هیچ چیز پاک نشده است */
@@ -167,7 +168,8 @@ fun DebtorsScreen(
   val pendingNow = rememberUpdatedState(pendingDeletes)
   DisposableEffect(Unit) {
     onDispose {
-      var data = latestData.value
+      val start = latestData.value
+      var data = start
       var changed = false
       pendingNow.value.forEach { p ->
         (deleteResult(data, p) as? DebtorEngine.Result.Ok)?.let { data = it.data; changed = true }
@@ -175,7 +177,7 @@ fun DebtorsScreen(
       if (changed) {
         val final = data
         @OptIn(kotlinx.coroutines.DelicateCoroutinesApi::class)
-        kotlinx.coroutines.GlobalScope.launch { store.save(final) }
+        kotlinx.coroutines.GlobalScope.launch { store.save(start, final) }
       }
     }
   }

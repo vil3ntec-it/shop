@@ -123,6 +123,7 @@ internal class BackupController(
       }.onSuccess {
         val cur = store.data.value
         store.save(
+          cur,
           cur.copy(
             auditLog = cur.auditLog + AuditEntry(
               id = auditId(), type = "data_export", date = todayIso(),
@@ -219,7 +220,7 @@ internal class BackupController(
   /** فشرده کردنِ دفتر — یک‌طرفه و دستی (شرحش سرِ `LedgerArchive`) */
   fun compact(d: ShopData) = scope.launch {
     withContext(Dispatchers.IO) { LedgerArchive.compact(context, d) }
-      .onSuccess { store.save(it.data); toasts.show(StrSettings.archived(it.moved.total)) }
+      .onSuccess { store.save(d, it.data); toasts.show(StrSettings.archived(it.moved.total)) }
       .onFailure { toasts.show(StrSettings.compactFailed(failText(it))) }
   }
 
@@ -230,7 +231,7 @@ internal class BackupController(
   }
 
   fun wipe() = scope.launch {
-    store.save(ShopData())
+    store.replaceAll(ShopData())
     toasts.show(StrSettings.wiped)
   }
 }

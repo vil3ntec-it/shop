@@ -38,7 +38,7 @@ internal fun RouteScope.SupplierReturnRoute() {
       is PurchaseBook.Result.Ok -> {
         back()
         after.launch {
-          if (!store.save(r.data)) return@launch
+          if (!store.save(d, r.data)) return@launch
           val credit = PurchaseBook.invoices(r.data, supplierId).filter { it.isReturn }.maxByOrNull { it.createdAt }
           val asked = toasts.host.showSnackbar(V3SnackVisuals(StrReach.returnSaved, V3Tone.SUCCESS, if (credit != null) StrReach.printCreditNote else null))
           if (asked == SnackbarResult.ActionPerformed && credit != null) {

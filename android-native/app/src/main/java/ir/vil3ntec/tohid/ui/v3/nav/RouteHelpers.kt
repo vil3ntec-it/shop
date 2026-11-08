@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.nav
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -22,6 +23,8 @@ fun RouteScope.LandOn(path: String) {
  */
 internal fun RouteScope.commitWarehouse(
   scope: CoroutineScope,
+  /** دفتری که [result] از آن ساخته شد — پایهٔ صریحِ `ShopStore.save` */
+  base: ShopData,
   result: WarehouseEngine.Result,
   done: String,
   after: (WarehouseEngine.Result.Ok) -> Unit = {},
@@ -29,7 +32,7 @@ internal fun RouteScope.commitWarehouse(
   when (result) {
     is WarehouseEngine.Result.Failed -> toasts.show(result.message)
     is WarehouseEngine.Result.Ok -> {
-      scope.launch { store.save(result.data) }
+      scope.launch { store.save(base, result.data) }
       toasts.show(done)
       after(result)
     }

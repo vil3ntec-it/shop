@@ -66,13 +66,13 @@ import kotlinx.coroutines.launch
  *  همان حساب و همان ترتیب: با رسید ([sale]) یا بی رسید، مقدار و «به موجودی | ضایعات» برای هر
  *  قلم، دلیلِ اجباری، بازپرداخت (روشِ اصلی، نقد، اعتبارِ فروشگاه)، تعویضِ اختیاری، و سدِ تأیید
  *  (`ReturnFlow.gate`). شناسه‌های سند و فروشِ تعویض پیش از نخستین تلاش ساخته می‌شوند؛ «ثبت شد»
- *  فقط پس از نوشتنِ واقعیِ دفتر (`save`).
+ *  فقط پس از نوشتنِ واقعیِ دفتر (`save`؛ پایهٔ صریح همان [d] است که سند از آن ساخته شد).
  */
 @Composable
 fun ReturnFlowSheet(
   d: ShopData,
   sale: Sale?,
-  save: suspend (ShopData) -> Boolean,
+  save: suspend (base: ShopData, next: ShopData) -> Boolean,
   onPosted: (docId: String, note: String) -> Unit,
   onClose: () -> Unit,
   /** فقط عکسِ CI: یک واحد از قلمِ اول و دلیلِ اول از پیش پر */
@@ -146,7 +146,7 @@ fun ReturnFlowSheet(
     saving = true
     scope.launch {
       //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
-      if (save(built.first)) { chosen[0] = true; closer.close { onPosted(docId, built.second) } }
+      if (save(d, built.first)) { chosen[0] = true; closer.close { onPosted(docId, built.second) } }
       else error = StrSale.returnNotSaved
       saving = false
     }
