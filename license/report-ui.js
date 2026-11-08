@@ -261,7 +261,7 @@
     var def = tabs.filter(function (t) { return t.id === state.tab; })[0];
     if (B.SPANS.indexOf(state.span) < 0) state.span = 'month';
     var v = compute(E);
-    last = { v: v, name: ('گزارش-' + def.label + '-' + E.today).replace(/ /g, '-') };
+    last = { v: v, name: ('گزارش-' + def.label + '-' + E.today).replace(/ /g, '-') };  // داده: نامِ پروندهٔ خروجی
     var mode = viewMode();
     var html = '<div class="rf-head"><div><h2>گزارش‌ها</h2><p>از هستهٔ مشترکِ گزارش (همان عددهای برنامهٔ نصبی). سود تا تعیینِ روشِ بهای تمام‌شده تقریبی است.</p></div>' +
       '<div class="rf-actions"><button type="button" class="btn btn-secondary btn-sm" data-act="print">چاپ</button>' +

@@ -70,21 +70,21 @@
     if (t === 'boolean') return value ? 'true' : 'false';
     if (t === 'string') return quote(value);
     if (t === 'number') {
-      if (!Number.isSafeInteger(value)) throw fail('not_integer', 'عدد باید صحیح باشد: ' + value);
+      if (!Number.isSafeInteger(value)) throw fail('not_integer', 'عدد باید صحیح باشد: ' + value);  // داده: خطای برنامه‌نویس (سند و زنجیره)
       return String(value === 0 ? 0 : value);
     }
-    if (t !== 'object') throw fail('bad_value', 'نوعِ ' + t + ' در سند نمی‌آید');
+    if (t !== 'object') throw fail('bad_value', 'نوعِ ' + t + ' در سند نمی‌آید');  // داده: خطای برنامه‌نویس (سند و زنجیره)
     var i;
     if (Array.isArray(value)) {
       var parts = [];
       for (i = 0; i < value.length; i++) {
-        if (value[i] === undefined) throw fail('bad_value', 'undefined در آرایه');
+        if (value[i] === undefined) throw fail('bad_value', 'undefined در آرایه');  // داده: خطای برنامه‌نویس (سند و زنجیره)
         parts.push(canonicalJson(value[i]));
       }
       return '[' + parts.join(',') + ']';
     }
     var proto = Object.getPrototypeOf(value);
-    if (proto !== Object.prototype && proto !== null) throw fail('bad_value', 'فقط شیءِ ساده');
+    if (proto !== Object.prototype && proto !== null) throw fail('bad_value', 'فقط شیءِ ساده');  // داده: خطای برنامه‌نویس (سند و زنجیره)
     var keys = Object.keys(value).sort();
     var out = [];
     for (i = 0; i < keys.length; i++) {
@@ -155,7 +155,7 @@
     for (var k = 0; k < NEGATED_KEYS.length; k++) {
       var key = NEGATED_KEYS[k];
       if (!Object.prototype.hasOwnProperty.call(obj, key) || obj[key] === null) continue;
-      if (!Number.isSafeInteger(obj[key])) throw fail('not_integer', key + ' باید صحیح باشد');
+      if (!Number.isSafeInteger(obj[key])) throw fail('not_integer', key + ' باید صحیح باشد');  // داده: خطای برنامه‌نویس (سند و زنجیره)
       obj[key] = obj[key] === 0 ? 0 : -obj[key];
     }
   }
@@ -166,13 +166,13 @@
    */
   function reverseDoc(orig, opts) {
     opts = opts || {};
-    if (!isPosted(orig)) throw fail('not_posted', 'فقط سندِ ثبت‌شده معکوس می‌شود');
-    if (orig.reverses !== undefined && orig.reverses !== null) throw fail('is_reversal', 'سندِ معکوس دوباره معکوس نمی‌شود');
-    if (findReversal(opts.existing, orig.id)) throw fail('already_reversed', 'این سند پیش‌تر معکوس شده');
+    if (!isPosted(orig)) throw fail('not_posted', 'فقط سندِ ثبت‌شده معکوس می‌شود');  // داده: خطای برنامه‌نویس (سند و زنجیره)
+    if (orig.reverses !== undefined && orig.reverses !== null) throw fail('is_reversal', 'سندِ معکوس دوباره معکوس نمی‌شود');  // داده: خطای برنامه‌نویس (سند و زنجیره)
+    if (findReversal(opts.existing, orig.id)) throw fail('already_reversed', 'این سند پیش‌تر معکوس شده');  // داده: خطای برنامه‌نویس (سند و زنجیره)
     var nonEmpty = function (s) { return typeof s === 'string' && s.trim() !== ''; };
     if (!nonEmpty(opts.id) || !nonEmpty(opts.reason) || !nonEmpty(opts.by)
         || !Number.isSafeInteger(opts.no) || opts.no < 1 || !Number.isSafeInteger(opts.postedAt)) {
-      throw fail('bad_opts', 'id، no، postedAt، reason و by لازم‌اند');
+      throw fail('bad_opts', 'id، no، postedAt، reason و by لازم‌اند');  // داده: خطای برنامه‌نویس (سند و زنجیره)
     }
     canonicalJson(orig); // فقط سندِ معتبر
     var rev = JSON.parse(JSON.stringify(orig));

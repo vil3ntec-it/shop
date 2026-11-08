@@ -34,6 +34,7 @@
   var FORMAT_VERSION = 1;
   var MAX_ROWS = 1048575;
   var MAX_CELL_TEXT = 32767;
+  // <داده: نامِ برگه و سرستون‌های پروندهٔ خروجی — بایت‌به‌بایت همان OwnerExport.kt (HEADERS)؛ به زبانِ صفحه عوض نمی‌شود>
   var INFO_SHEET = 'اطلاعات خروجی';
   var ARCHIVE_PREFIX = 'بایگانی — ';
   var XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
@@ -236,6 +237,7 @@
     //  انتقالِ موجودیِ سرور (INV-11، #975): همان ستونِ `xfer` ِ `OwnerExport.HEADERS` ِ برنامه
     xfer: 'گامِ انتقالِ موجودی'
   };
+  // </داده>
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */
   var HEAD = { format: 1, formatVersion: 1, exportedAt: 1, source: 1, counts: 1, settings: 1, archive: 1 };
@@ -298,6 +300,7 @@
 
   /* ------------------------------ برگه‌ها ------------------------------ */
 
+  // <داده: محتوای پروندهٔ خروجی (خانه، برگهٔ «اطلاعات») — همان OwnerExport.kt ِ برنامه، به زبانِ صفحه عوض نمی‌شود>
   //  یک خانه: {t:'s'|'n'|'b'|'d', v} — نوع را خودِ داده می‌گوید، نه حدس
   function cell(key, e) {
     if (e === null || e === undefined) return null;
@@ -376,6 +379,7 @@
     rows.push([s('عکس‌ها'), s('در این خروجی نیستند؛ «پشتیبان کامل» آن‌ها را دارد')]);
     return rows;
   }
+  // </داده>
 
   /* ------------------------------ نویسندهٔ ‎.xlsx‎ ------------------------------ */
 
