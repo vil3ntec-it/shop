@@ -14,10 +14,10 @@
  */
 const express = require('express');
 const config = require('../config');
-const { many } = require('../db');
 const { requireUser, requireShop } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/ratelimit');
 const { flagOf } = require('../lib/orders');
+const { defaultOn } = require('../lib/default-on-flag');
 
 const FLAG_KEY = 'shop.ledger_merge';
 /** نسخهٔ پرسشی که پیش‌فرضِ روشن را می‌فهمد (`LedgerMergeFlag.decide`) */
@@ -27,23 +27,8 @@ const router = express.Router();
 router.use(rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-ledger-merge-ip' }));
 router.use(requireUser, requireShop);
 
-const decode = (text) => { try { return JSON.parse(text); } catch { return null; } };
-
 /** پیش‌فرض روشن: فقط `false` ِ صریح (دکان بر `all`) یا نگه‌داشتِ «غیرفعال کردنِ سرویس» خاموش است */
-async function enabledByDefault(shopId) {
-  const rows = await many(
-    `SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)
-      UNION ALL
-     SELECT '#hold', 'false' FROM shop_holds
-      WHERE shop_id=$3 AND kind='service_disabled' AND service=$1 AND lifted_at IS NULL`,
-    [FLAG_KEY, 'all', String(shopId)],
-  );
-  if (rows.some((r) => r.scope === '#hold')) return false;
-  let v;
-  for (const r of rows) if (r.scope === 'all') v = decode(r.value);
-  for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
-  return v !== false;
-}
+const enabledByDefault = (shopId) => defaultOn(shopId, FLAG_KEY);
 
 router.get('/config', async (req, res) => {
   const v = Number.parseInt(typeof req.query.v === 'string' ? req.query.v : '', 10);

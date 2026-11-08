@@ -161,6 +161,17 @@ class LedgerMergeOnTest {
     assertEquals(old.transactions, disk.transactions)
   }
 
+  @Test fun `ذخیرهٔ صفحه‌ای که پیش از بار شدنِ دفتر ساخت هیچ ردیفی از دیسک را حذف نمی‌کند`() {
+    screen()
+    //  نمونه‌ای که هنوز `load` نشده (صفحهٔ زودرس): دفترِ حافظه‌اش خالیِ پیش‌فرض است
+    val early = ShopStore(ctx)
+    val saved = runBlocking { early.save(early.data.value.copy(sales = listOf(sale("lmon-early")))) }
+    //  پرچمِ خاموش این دفترِ خالی را کامل می‌نوشت (DELETE ِ همهٔ کالاها)؛ روشن ⇒ دفترِ حسابِ ناشناخته، هیچ نوشتنی
+    assertFalse(saved)
+    assertFalse(queued().toString(), queued().any { it.endsWith(":delete") })
+    assertEquals(listOf("lmon-p1"), open().data.value.products.map { it.id })
+  }
+
   /* --------------------------------- نقشِ کارمند --------------------------------- */
 
   @Test fun `صندوق‌دار — فروشِ صفحهٔ کهنه پس از Pull ِ خریدِ دستگاهِ دیگر ثبت می‌شود، نه «اجازهٔ خرید ندارید»`() {

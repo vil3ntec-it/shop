@@ -44,6 +44,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.promo_stamp', scope: 'shop', default: false, what: 'نشانِ تخفیفِ خودکار روی فاکتور' },
   { key: 'shop.loyalty_rule', scope: 'shop', default: false, what: 'قاعدهٔ یکسانِ امتیازِ وفاداری برای همهٔ دستگاه‌ها و امتیاز در «حسابِ من» (PRM-13)' },
   { key: 'shop.ledger_merge', scope: 'shop', default: true, what: 'ذخیرهٔ کهنه: ادغامِ سه‌طرفهٔ دفترِ برنامه (#407) — روشن برای برنامهٔ تازه؛ فقط false خاموش' },
+  { key: 'sync.pull_own_newer', scope: 'shop', default: true, what: 'pull ِ v1 نوشتهٔ تازه‌ترِ خودِ دستگاه را با opِ کهنه‌ترِ دیگری بازنویسی نمی‌کند (#501) — فقط false خاموش' },
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },

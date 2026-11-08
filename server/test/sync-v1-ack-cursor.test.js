@@ -169,9 +169,18 @@ test('۱) «۳-ب» ِ #449 با پرچمِ روشن: پاسخِ pull ِ گم‌
   //  برنده همان «آخری که رسید» است — پرچم داوری را عوض نمی‌کند، فقط ردِ بازنده را نگه می‌دارد
   assert.equal((await rowData(shop.shopId, 'p-lost')).price, 300);
 
-  //  دستگاه دوباره با همان since می‌کشد ⇒ تغییرِ A دوباره می‌آید (opِ خودِ B نه)
+  //  دستگاه دوباره با همان since می‌کشد. از ۱۴۰۵/۰۸/۱۸ `sync.pull_own_newer` پیش‌فرض روشن است: قیمتِ ۲۰۰ ِ A که B پس از آن
+  //  نوشت **نمی‌آید** (وگرنه B با ۲۰۰ از سرورِ ۳۰۰ جدا می‌شد — J5) ولی cursor همان پیشین است
+  const kept = await ok(pull(shop.token, 'dev-b', first.cursor));
+  assert.deepEqual(kept.ops.map((o) => [o.device_id, o.fields.price]), [], 'opِ کهنه‌ترِ A روی نوشتهٔ تازه‌ترِ B نمی‌آید');
+  assert.equal(kept.has_more, false);
+  //  همان سنجهٔ cursor با `sync.pull_own_newer` ِ خاموشِ صریح (پاسخِ همان op): تغییرِ A دوباره می‌آید (opِ خودِ B نه)
+  await db.query(
+    `INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'sync.pull_own_newer','false',1)
+     ON CONFLICT (scope, key) DO UPDATE SET value = excluded.value`, [shop.shopId]);
   const again = await ok(pull(shop.token, 'dev-b', first.cursor));
   assert.deepEqual(again.ops.map((o) => [o.device_id, o.fields.price]), [['dev-a', 200]]);
+  assert.equal(again.cursor, kept.cursor, 'cursor ِ پاسخ با هر دو یکی است');
   assert.equal(again.has_more, false);
   //  cursor ِ ذخیره‌شده همان since ِ همین pull است؛ pull ِ بعدی (since = again.cursor) آن را جلو می‌برد
   assert.equal(await storedCursor('shop', shop.shopId, 'dev-b'), first.cursor);

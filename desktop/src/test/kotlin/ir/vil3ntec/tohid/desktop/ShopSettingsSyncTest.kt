@@ -143,7 +143,7 @@ class ShopSettingsSyncTest {
   private val rw = "tohid-policy/return_window_days"
   private val lo = "tohid-policy/loyalty"
 
-  @Test fun `نقشه — آخرین نویسنده هر کلید جدا: تغییرِ این دستگاه می‌رود، بقیه مقدارِ سرور`() {
+  @Test fun `نقشه — آخرین نویسنده هر کلید جدا، تغییرِ این دستگاه می‌رود و بقیه مقدارِ سرور`() {
     val shadow = mapOf(cr to l(500), rw to i(7))
     val local = mapOf(cr to l(1000), rw to i(7))                    // این دستگاه گردکردن را عوض کرد
     val remote = listOf(r("cash_rounding", "l", JsonPrimitive(250), 5), r("return_window_days", "i", JsonPrimitive(14), 6))
@@ -153,7 +153,7 @@ class ShopSettingsSyncTest {
     assertEquals(i(14), plan.shadow[rw])
   }
 
-  @Test fun `نقشه — نخستین بار: کلیدِ سرور گرفته می‌شود و فقط کلیدِ نبوده کاشته`() {
+  @Test fun `نقشه — نخستین بار کلیدِ سرور گرفته می‌شود و فقط کلیدِ نبوده کاشته`() {
     val local = mapOf(cr to l(1000), lo to b(true))
     val remote = listOf(r("cash_rounding", "l", JsonPrimitive(500), 1))
     val plan = ShopSettingsPlan.plan(local, emptyMap(), remote, first = true, canWrite = true)
@@ -182,7 +182,7 @@ class ShopSettingsSyncTest {
     assertEquals(emptyMap<String, Value?>(), plan.push)
   }
 
-  @Test fun `نقشه — Float ِ برابر با عددِ سرور (2 و 2.0) تغییر نیست`() {
+  @Test fun `نقشه — Float ِ برابر با عددِ صحیحِ سرور تغییر نیست`() {
     val k = ShopSettingsKeys.KEYS.first { it.name == "return_limit" }
     val mine = ShopSettingsKeys.encode(k, 2.0f)!!
     val theirs = ShopSettingsKeys.decode(k, "f", JsonPrimitive(2))!!

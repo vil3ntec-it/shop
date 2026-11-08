@@ -1,6 +1,6 @@
 'use strict';
 /**
- * Pull با نوشته‌های تازه‌ترِ خودِ دستگاه — پرچمِ دکانِ `sync.pull_own_newer` (پیش‌فرض خاموش؛ #501).
+ * Pull با نوشته‌های تازه‌ترِ خودِ دستگاه — پرچمِ دکانِ `sync.pull_own_newer` (#501؛ از ۱۴۰۵/۰۸/۱۸ پیش‌فرض روشن).
  *
  * ── چه چیزی نبود ─────────────────────────────────────────────────────
  * داوری «آخری که رسید» است، ولی pull همهٔ opهای دیگران پس از cursor را **به ترتیبِ سرور** می‌داد،
@@ -42,9 +42,14 @@ const isInc = (v) => isPlainObject(v) && Object.keys(v).length === 1 && Number.i
 /** حسابِ دکان (حسابِ پمپ `station` است) */
 const isShop = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && ctx.accountId);
 
+/**
+ *  ⛔ از ۱۴۰۵/۰۸/۱۸ **پیش‌فرض روشن** (`lib/default-on-flag.js`): فقط `false` ِ صریحِ `live_config` (دکان بر `all`) یا
+ *  «غیرفعال کردنِ سرویس» خاموشش می‌کند. پمپ (و هر حسابِ غیرِ دکان) پیش از خواندنِ پرچم بیرون است — همان آرایه.
+ *  برنامهٔ کهنه چیزی لازم ندارد: پاسخ همان شکل است و فقط opِ کهنه‌تری که خودش رویش نوشته نمی‌آید.
+ */
 async function on(ctx) {
   if (!isShop(ctx)) return false;
-  return require('./orders').flagOf(ctx.accountId, FLAG);
+  return require('./default-on-flag').defaultOn(ctx.accountId, FLAG);
 }
 
 /**
