@@ -38,8 +38,8 @@ import kotlinx.serialization.json.longOrNull
  *    • سوکتِ زنده `{"event":"photos"}` می‌آورد ⇒ فهرستِ تغییرها پس از
  *      آخرین `rev` گرفته و فقط عکس‌هایی که hashشان فرق دارد دانلود می‌شوند
  *    • بارِ اول، همهٔ عکس‌های موجودِ این دستگاه یک بار فرستاده می‌شوند
- *    • WEB-15: هر عکس نسخهٔ کارتِ ویترینش (۳۲۰px) را همراه می‌برد؛ عکسِ کهنهٔ بی کارت سرِ فرصت کارت می‌گیرد
- *      (`PhotoThumbBackfill`) — اصل دوباره بالا نمی‌رود
+ *    • WEB-15: پس از هر عکس نسخهٔ کارتِ ویترینش (۳۲۰px) با درِ جدای کارت می‌رود؛ عکسِ کهنهٔ بی کارت سرِ فرصت
+ *      کارت می‌گیرد (`PhotoThumbBackfill`) — اصل دوباره بالا نمی‌رود
  *  همه روی نخِ IO، پشتِ یک قفل — کار هیچ‌وقت دوبار هم‌زمان نمی‌رود و
  *  برنامه کند نمی‌شود.
  *
@@ -111,19 +111,20 @@ object PhotoSync {
     //  SYN-14: اولویتِ پایین‌تر از دفتر — تا همگام‌سازیِ دفتر مشغول است صبر (رویهم حداکثر یک دقیقه در هر دور)
     val waitedUp = yieldToLedger(context, 0L)
 
-    //  ۱) فرستادن — WEB-15: همراهِ نسخهٔ کارتِ ویترین (`PhotoStore.thumb`)؛ کارتِ ردشده (`thumb_*`) ⇒ همان اصل بی کارت
+    //  ۱) فرستادن — WEB-15: درست پس از رسیدنِ اصل، نسخهٔ کارتِ ویترینش (`PhotoStore.thumb`) با درِ جدای کارت؛
+    //  کارت نشد ⇒ اصل همان رسیده است و `backfill` سرِ فرصت دوباره می‌فرستد
     for (id in (p.getStringSet("up", emptySet()) ?: emptySet()).toList()) {
       val bytes = PhotoStore.bytes(context, id)
       if (bytes == null) { edit(context, "up", remove = id); continue }
-      val thumb = PhotoStore.thumb(bytes)
       val ok = runCatching {
-        val r = try {
-          upload(api, id, bytes, thumb, device)
-        } catch (e: ApiFailure) {
-          if (thumb == null || !e.code.startsWith("thumb_")) throw e
-          upload(api, id, bytes, null, device)
+        val r = api.put("/sync/v1/photos/" + enc(id), buildJsonObject {
+          put("data", JsonPrimitive(b64(bytes)))
+          put("device_id", JsonPrimitive(device))
+        })
+        r["hash"]?.jsonPrimitive?.contentOrNull?.let { h ->
+          p.edit().putString("h:$id", h).apply()
+          PhotoStore.thumb(bytes)?.let { sendThumb(api, id, h, it) }
         }
-        r["hash"]?.jsonPrimitive?.contentOrNull?.let { p.edit().putString("h:$id", it).apply() }
       }.isSuccess
       if (ok) edit(context, "up", remove = id) else return@withLock
     }
@@ -183,12 +184,23 @@ object PhotoSync {
     backfill(context)
   }
 
-  private suspend fun upload(api: ApiClient, id: String, bytes: ByteArray, thumb: ByteArray?, device: String): JsonObject =
-    api.put("/sync/v1/photos/" + enc(id), buildJsonObject {
-      put("data", JsonPrimitive(b64(bytes)))
-      if (thumb != null) put("thumb", JsonPrimitive(b64(thumb)))
-      put("device_id", JsonPrimitive(device))
+  /**
+   *  WEB-15: `PUT /sync/v1/photos/:id/thumb` (فقط دکان، جدا از درِ عکسِ مشترک با پمپ) با `of` = hash ِ همان اصل ⇒ کدِ HTTP؛
+   *  `0` ⇒ شبکه نشد. هرگز خطا نمی‌اندازد (جز لغوِ کوروتین): کارت هیچ‌وقت فرستادنِ عکس را نمی‌خواباند.
+   */
+  private suspend fun sendThumb(api: ApiClient, id: String, of: String, thumb: ByteArray): Int = try {
+    api.put("/sync/v1/photos/" + enc(id) + "/thumb", buildJsonObject {
+      put("data", JsonPrimitive(b64(thumb)))
+      put("of", JsonPrimitive(of))
     })
+    200
+  } catch (e: CancellationException) {
+    throw e
+  } catch (e: ApiFailure) {
+    e.status
+  } catch (_: Exception) {
+    0
+  }
 
   /**
    *  WEB-15: نسخهٔ کارت برای عکسی که این دستگاه **همان** اصلش را دارد (`h:<id>` = hash ِ سرور) و سرور کارتش را ندارد.
@@ -226,19 +238,7 @@ object PhotoSync {
 
       override fun build(productId: String): ByteArray? = PhotoStore.bytes(context, productId)?.let { PhotoStore.thumb(it) }
 
-      override suspend fun send(productId: String, of: String, thumb: ByteArray): Int = try {
-        api.put("/sync/v1/photos/" + enc(productId) + "/thumb", buildJsonObject {
-          put("data", JsonPrimitive(b64(thumb)))
-          put("of", JsonPrimitive(of))
-        })
-        200
-      } catch (e: CancellationException) {
-        throw e
-      } catch (e: ApiFailure) {
-        e.status
-      } catch (_: Exception) {
-        0
-      }
+      override suspend fun send(productId: String, of: String, thumb: ByteArray): Int = sendThumb(api, productId, of, thumb)
 
       override suspend fun pause(ms: Long) = delay(ms)
 

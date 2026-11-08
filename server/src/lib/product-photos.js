@@ -4,9 +4,9 @@
  *
  *   list(ctx, since)        ⇒ تغییرهای پس از rev (فقط نشانه، نه خودِ عکس)
  *   get(ctx, productId)     ⇒ { data, hash } یا null
- *   put(ctx, productId, buf, deviceId, { thumb })   ⇒ همراهِ نسخهٔ کارت (اختیاری) در همان تراکنش
- *   putThumb(ctx, productId, buf, of)               ⇒ فقط نسخهٔ کارتِ اصلِ امروز (ساختِ بعدیِ برنامه)
- *   forStore(ctx, productId, size)                  ⇒ ویترین: کارت (`thumb`) یا صفحه، با نسخهٔ نشانی
+ *   put(ctx, productId, buf, deviceId)
+ *   putThumb(ctx, productId, buf, of)   ⇒ فقط دکان: نسخهٔ کارتِ اصلِ امروز (`routes/sync-photo-thumbs.js`)
+ *   forStore(ctx, productId, size)      ⇒ ویترین: کارت (`thumb`) یا صفحه، با نسخهٔ نشانی
  *   remove(ctx, productId, deviceId)
  *
  * ⛔ فقط JPEG/PNG/WebP و حداکثر ۶۰۰ کیلوبایت — برنامه پیش از فرستادن عکس را
@@ -14,10 +14,12 @@
  * ⛔ سقفِ ۲۰٬۰۰۰ عکس برای هر دکان: جلوی پر کردنِ دیسکِ سرور.
  * ⛔ نسخهٔ کارت (مهاجرتِ ۳۵۰): سرور رمزگشا ندارد (`image-pipeline` ِ `resize` = missing)؛ برنامه ۳۲۰ پیکسلی می‌سازد و
  *    این‌جا همان زنجیره می‌سنجد (`checkThumb`). نسخه فقط برای همان اصلی سرو می‌شود که از آن ساخته شد (`of_hash`).
+ *    فقط دکان (قیدِ جدول هم): پمپ همان پرس‌وجوها و همان پاسخِ پیش از ۳۵۰ را دارد (`isShop`).
  */
 const crypto = require('crypto');
 const { one, many, tx } = require('../db');
 const store = require('./image-store');
+const { SHOP } = require('./tenancy');
 const { ApiError, badRequest: apiBad, notFound, conflict } = require('../middleware/errors');
 
 const MAX_BYTES = 600 * 1024;
@@ -26,6 +28,12 @@ const MAX_PHOTOS = 20000;
 const THUMB_MAX_BYTES = 64 * 1024;
 const THUMB_MAX_SIDE = 400;
 const sha32 = (b) => crypto.createHash('sha256').update(b).digest('hex').slice(0, 32);
+/** کارت فقط برای عکسِ دکان (`tenancy.SHOP.app`)؛ پمپ هیچ پرس‌وجو یا کلیدِ تازه‌ای نمی‌بیند */
+const isShop = (ctx) => !!ctx && ctx.app === SHOP.app;
+//  «کارتِ همین اصل هست؟» برای فهرست (فقط دکان) — ستون‌ها بی نامِ مستعار تا متنِ پرس‌وجوی پمپ همان بماند
+const THUMB_COL = `, EXISTS (SELECT 1 FROM product_photo_thumbs t WHERE t.app = product_photos.app
+      AND t.account_id = product_photos.account_id AND t.product_id = product_photos.product_id
+      AND t.of_hash = product_photos.hash AND product_photos.hash <> '') AS thumb`;
 
 function badRequest(message) { const e = new Error(message); e.status = 400; return e; }
 
@@ -43,16 +51,14 @@ function checkId(productId) {
 
 async function list(ctx, since = 0, limit = 500) {
   const rows = await many(
-    `SELECT p.product_id, p.hash, p.size, p.rev, p.updated_at, (p.data IS NULL AND p.store_key = '') AS deleted,
-            EXISTS (SELECT 1 FROM product_photo_thumbs t WHERE t.app = p.app AND t.account_id = p.account_id
-                      AND t.product_id = p.product_id AND t.of_hash = p.hash AND p.hash <> '') AS thumb
-       FROM product_photos p WHERE p.app=$1 AND p.account_id=$2 AND p.rev > $3
-      ORDER BY p.rev ASC LIMIT $4`,
+    `SELECT product_id, hash, size, rev, updated_at, (data IS NULL AND store_key = '') AS deleted${isShop(ctx) ? THUMB_COL : ''}
+       FROM product_photos WHERE app=$1 AND account_id=$2 AND rev > $3
+      ORDER BY rev ASC LIMIT $4`,
     [ctx.app, ctx.accountId, Number(since) || 0, Math.min(1000, Math.max(1, Number(limit) || 500))],
   );
   const items = rows.map(r => ({
     product_id: r.product_id, hash: r.hash, size: Number(r.size), rev: Number(r.rev),
-    updated_at: Number(r.updated_at), deleted: !!r.deleted, thumb: r.thumb === true,
+    updated_at: Number(r.updated_at), deleted: !!r.deleted, ...(isShop(ctx) && { thumb: r.thumb === true }),
   }));
   return { items, head: items.length ? items[items.length - 1].rev : Number(since) || 0, has_more: items.length >= limit };
 }
@@ -66,13 +72,11 @@ async function get(ctx, productId) {
   return data ? { data, hash: r.hash } : null;
 }
 
-async function put(ctx, productId, buf, deviceId = '', { thumb = null } = {}) {
+async function put(ctx, productId, buf, deviceId = '') {
   const id = checkId(productId);
   if (!Buffer.isBuffer(buf) || buf.length < 100) throw badRequest('عکس خالی است');
   if (buf.length > MAX_BYTES) throw badRequest('عکس بزرگ‌تر از ۶۰۰ کیلوبایت است');
   if (!sniff(buf)) throw badRequest('فقط عکسِ JPG، PNG یا WebP');
-  //  نسخهٔ کارتِ نادرست ⇒ هیچ نوشتنی (نه اصل، نه کارت)؛ برنامه همان اصل را بی کارت دوباره می‌فرستد
-  const t = thumb === null || thumb === undefined ? null : checkThumb(thumb, buf);
   const count = await one(
     `SELECT COUNT(*)::int AS n FROM product_photos WHERE app=$1 AND account_id=$2 AND ${HAS}`,
     [ctx.app, ctx.accountId],
@@ -82,9 +86,9 @@ async function put(ctx, productId, buf, deviceId = '', { thumb = null } = {}) {
       [ctx.app, ctx.accountId, id]);
     if (!exists) throw badRequest('سقفِ عکس‌های این دکان پر است');
   }
-  const hash = sha32(buf);
+  const hash = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 32);
   //  شیءِ عکسِ پیشین (اگر بود) پس از نوشتنِ ردیف پاک می‌شود؛ کلیدش در همان تراکنش و با قفلِ ردیف خوانده می‌شود
-  const row = await store.withStaged(tenantOf(ctx), buf, (s) => stageThumb(tenantOf(ctx), t, (ts) => tx(async (c) => {
+  const row = await store.withStaged(tenantOf(ctx), buf, (s) => tx(async (c) => {
     const old = (await c.query('SELECT store_key FROM product_photos WHERE app=$1 AND account_id=$2 AND product_id=$3 FOR UPDATE',
       [ctx.app, ctx.accountId, id])).rows[0];
     const r = (await c.query(
@@ -97,24 +101,16 @@ async function put(ctx, productId, buf, deviceId = '', { thumb = null } = {}) {
       [ctx.app, ctx.accountId, id, s.data, hash, buf.length, Date.now(), String(deviceId || '').slice(0, 64), s.key],
     )).rows[0];
     s.used = true;
-    //  کارت: تازه ⇒ جایگزین؛ بی کارت ⇒ کارتِ اصلِ پیشین برداشته می‌شود (همان اصل دوباره ⇒ کارتش می‌ماند)
-    const had = (await c.query('SELECT store_key, of_hash FROM product_photo_thumbs WHERE app=$1 AND account_id=$2 AND product_id=$3 FOR UPDATE',
-      [ctx.app, ctx.accountId, id])).rows[0];
-    let thumbKey = '';
-    let hasThumb = !!had && had.of_hash === hash;
-    if (t) {
-      await writeThumb(c, ctx, id, hash, t, ts);
-      ts.used = true;
-      hasThumb = true;
-      if (had && had.store_key && had.store_key !== ts.key) thumbKey = had.store_key;
-    } else if (had && had.of_hash !== hash) {
-      await c.query('DELETE FROM product_photo_thumbs WHERE app=$1 AND account_id=$2 AND product_id=$3', [ctx.app, ctx.accountId, id]);
-      thumbKey = had.store_key;
-    }
-    return { rev: r.rev, old_key: old ? old.store_key : '', thumb_key: thumbKey, thumb: hasThumb };
-  })));
-  await store.drop(tenantOf(ctx), [row.old_key, row.thumb_key]);
-  return { product_id: id, hash, size: buf.length, rev: Number(row.rev), thumb: row.thumb };
+    //  WEB-15 (فقط دکان): کارتِ اصلِ پیشین با اصلِ تازه می‌رود (همان اصل دوباره ⇒ کارتش می‌ماند)؛ کارتِ تازه پس از
+    //  همین با `putThumb` می‌آید
+    const th = isShop(ctx) ? (await c.query(
+      `DELETE FROM product_photo_thumbs WHERE app=$1 AND account_id=$2 AND product_id=$3 AND of_hash <> $4 RETURNING store_key`,
+      [ctx.app, ctx.accountId, id, hash])).rows[0] : null;
+    return { rev: r.rev, old_key: old ? old.store_key : '', thumb_key: th ? th.store_key : '' };
+  }));
+  if (row.old_key) await store.drop(tenantOf(ctx), [row.old_key]);
+  if (row.thumb_key) await store.drop(tenantOf(ctx), [row.thumb_key]);
+  return { product_id: id, hash, size: buf.length, rev: Number(row.rev) };
 }
 
 async function remove(ctx, productId, deviceId = '') {
@@ -128,11 +124,12 @@ async function remove(ctx, productId, deviceId = '') {
         WHERE app=$1 AND account_id=$2 AND product_id=$3 RETURNING rev`,
       [ctx.app, ctx.accountId, id, Date.now(), String(deviceId || '').slice(0, 64)],
     )).rows[0];
-    const th = (await c.query('DELETE FROM product_photo_thumbs WHERE app=$1 AND account_id=$2 AND product_id=$3 RETURNING store_key',
-      [ctx.app, ctx.accountId, id])).rows[0];
+    const th = isShop(ctx) ? (await c.query('DELETE FROM product_photo_thumbs WHERE app=$1 AND account_id=$2 AND product_id=$3 RETURNING store_key',
+      [ctx.app, ctx.accountId, id])).rows[0] : null;
     return { rev: r.rev, old_key: old.store_key, thumb_key: th ? th.store_key : '' };
   });
-  if (row) await store.drop(tenantOf(ctx), [row.old_key, row.thumb_key]);
+  if (row && row.old_key) await store.drop(tenantOf(ctx), [row.old_key]);
+  if (row && row.thumb_key) await store.drop(tenantOf(ctx), [row.thumb_key]);
   return { product_id: id, rev: row ? Number(row.rev) : 0, removed: !!row };
 }
 
@@ -140,7 +137,7 @@ async function remove(ctx, productId, deviceId = '') {
 //  شرح: ‎migrations/350_product_photo_thumbs.sql‎. همان زنجیرهٔ `lib/image-pipeline.js`: `validate` (نوعِ واقعی از
 //  محتوا، ساختارِ قطعه‌ها، CRC ِ PNG، سقفِ پیکسل/بمبِ فشرده) و `strip_metadata` (EXIF/GPS/XMP/IPTC؛ ICC می‌ماند)،
 //  به‌علاوهٔ سقفِ بایت و ضلع، جهتِ اعمال‌شده، «بزرگ‌تر از اصل نه» و نسبتِ ابعادِ اصل (۲٪، همان بانکِ تصاویر).
-//  همهٔ خطاها با پیشوندِ `thumb_` تا برنامه بداند «فقط کارت» نشد و اصل را بی آن بفرستد.
+//  همهٔ خطاهای کارت با پیشوندِ `thumb_` (برنامه همان ردیف را رد می‌کند و حلقه نمی‌زند).
 
 /** ابعادِ ایستادهٔ اصل (EXIF ِ ۵ تا ۸ ⇒ جابه‌جا) — اصلِ ناخوانا ⇒ null (سنجشِ نسبت کنار می‌رود، بقیه نه) */
 function uprightDims(original) {
@@ -184,11 +181,6 @@ function checkThumb(buf, original) {
   return { buf: pipeline.run('strip_metadata', buf), mime: info.mime, width: info.width, height: info.height };
 }
 
-/** همان `withStaged` برای کارتِ اختیاری: بی کارت ⇒ فقط `fn` */
-function stageThumb(tenant, t, fn) {
-  return t ? store.withStaged(tenant, t.buf, fn) : fn({ data: null, key: '', used: false });
-}
-
 async function writeThumb(c, ctx, id, ofHash, t, s) {
   await c.query(
     `INSERT INTO product_photo_thumbs (app, account_id, product_id, of_hash, data, store_key, hash, mime, width, height, size, updated_at)
@@ -206,6 +198,7 @@ async function writeThumb(c, ctx, id, ofHash, t, s) {
  * `rev` بالا نمی‌رود: دستگاه‌های دیگر کارت را نمی‌گیرند (عکسِ کاملِ خودشان را دارند).
  */
 async function putThumb(ctx, productId, buf, of) {
+  if (!isShop(ctx)) throw new ApiError(403, 'shop_only', 'نسخهٔ کارتِ ویترین فقط برای دکان است');
   const id = checkId(productId);
   const want = typeof of === 'string' && /^[0-9a-f]{32}$/.test(of) ? of : '';
   if (!want) throw apiBad('نشانهٔ عکسِ اصل (of) درست نیست', 'thumb_bad_of');

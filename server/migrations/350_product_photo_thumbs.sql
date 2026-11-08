@@ -8,6 +8,7 @@
 --  ⛔ `of_hash` = همان `product_photos.hash` ِ اصلی که این نسخه از آن ساخته شد. نسخه فقط وقتی سرو می‌شود که با
 --     اصلِ امروز یکی باشد؛ اصلِ تازه بی نسخهٔ کوچک ⇒ همان عکسِ کامل (هرگز نسخهٔ کوچکِ عکسِ پیشین).
 --  ⛔ هر پرس‌وجو `app` و `account_id` را شرط می‌کند (مثلِ ۰۴۵)؛ بایت مثلِ ۲۵۵ در `data` یا انبارِ شیء (`store_key`).
+--  ⛔ فقط دکان (`app = 'shop'`، قیدِ پایین): عکسِ پمپ کارت ندارد و درِ کارت (`routes/sync-photo-thumbs.js`) پمپ را ۴۰۳ می‌کند.
 --  ⛔ فقط افزودنی: جدولِ تازه، هیچ ستونی از ۰۴۵ دست نمی‌خورد.
 --  برگشت: migrations/rollback/350_product_photo_thumbs.down.sql (آزموده در test/product-photo-thumbs.test.js)
 -- ============================================================
@@ -27,6 +28,7 @@ CREATE TABLE IF NOT EXISTS product_photo_thumbs (
   updated_at  bigint  NOT NULL,
   PRIMARY KEY (app, account_id, product_id),
   FOREIGN KEY (app, account_id, product_id) REFERENCES product_photos (app, account_id, product_id) ON DELETE CASCADE,
+  CONSTRAINT product_photo_thumbs_shop CHECK (app = 'shop'),
   CONSTRAINT product_photo_thumbs_bytes CHECK (data IS NOT NULL OR store_key <> ''),
   CONSTRAINT product_photo_thumbs_dims CHECK (width BETWEEN 1 AND 400 AND height BETWEEN 1 AND 400),
   CONSTRAINT product_photo_thumbs_size CHECK (size BETWEEN 1 AND 65536),
