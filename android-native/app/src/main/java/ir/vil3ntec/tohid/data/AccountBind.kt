@@ -1,0 +1,80 @@
+package ir.vil3ntec.tohid.data
+
+import android.content.Context
+import ir.vil3ntec.tohid.sync.SyncStore
+import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
+import ir.vil3ntec.tohid.sync.v1.SyncV1Keys
+import kotlinx.coroutines.launch
+
+/**
+ *  **تنها** درِ «این حساب روی این دستگاه وارد شد» — همهٔ راه‌های ورود (رمز، کدِ ایمیلی، کدِ یک‌بار، گوگل، اپل،
+ *  ثبت‌نام، کدِ شاگرد، پیوستنِ حسابِ واردشده) از همین می‌گذرند.
+ *
+ *  ── ریشهٔ گم شدنِ داده که این می‌بندد ─────────────────────────────────────
+ *  دفترِ روی میز (`LedgerOwner`) و کلیدِ همگام‌سازی (`SyncStateV1.currentAccount`) را راه‌های ورودِ مختلف
+ *  جداجدا می‌نوشتند (برگهٔ کدِ ایمیلی فقط دومی را، بقیه فقط اولی را). پس از «خروج ⇒ ورود با حسابِ دیگر» یا
+ *  برگشتن، دفترِ یک حساب با سایهٔ حسابِ دیگر تفاضل می‌گرفت: شاگرد دکانِ خالی می‌دید و نخستین ذخیره برای هر
+ *  ردیف DELETE می‌ساخت؛ دفترِ واقعیِ صاحب در بایگانی می‌ماند. شرح سرِ `core/sync/AccountSafety.kt`.
+ *  ──────────────────────────────────────────────────────────────────────────
+ *
+ *  ترتیب: ۱) دفترِ روی میز مالِ همین حساب@دکان (`LedgerOwner`) ۲) کلیدِ صف/سایه/cursor = شناسهٔ همین حساب
+ *  (`SyncV1Keys.bind`، با آوردنِ حالِ کهنهٔ **همین** حساب) ۳) تغییرهای رمزدارِ خروجِ اجباریِ همین حساب جلوی صف
+ *  (`SignOutVault`). همگام‌سازی فقط **پس از** این‌ها راه می‌افتد.
+ */
+object AccountBind {
+
+  /**
+   *  @param shopId دکانِ نشست؛ `null` یعنی نامعلوم (برگهٔ کدِ ایمیلی و سرور جواب نداد) ⇒ دفتر فقط وقتی
+   *    جابه‌جا می‌شود که حساب عوض شده باشد؛ دکانِ واقعی را `AppRoot` با `LedgerOwner.shopChanged` می‌نشاند.
+   *  @param display نامِ نمایشیِ حساب (کلیدِ کهنهٔ همگام‌سازی پیش از این اصلاح)
+   */
+  suspend fun signedIn(
+    context: Context,
+    store: ShopStore,
+    userId: String,
+    shopId: String?,
+    display: String,
+  ): LedgerOwner.Result {
+    val app = context.applicationContext
+    val user = userId.trim()
+    if (user.isBlank()) return LedgerOwner.Result.SAME
+    val before = LedgerOwner.currentUser(app)
+    val result = when {
+      shopId != null -> LedgerOwner.signedIn(app, store, user, shopId)
+      //  همان حساب، دکانِ نامعلوم ⇒ دفتر سرِ جایش (هرگز «حساب@خالی» ِ تازه جای دفترِ دکان)
+      before == user -> LedgerOwner.Result.SAME
+      else -> LedgerOwner.signedIn(app, store, user, "")
+    }
+    val sameDesk = result == LedgerOwner.Result.SAME || (result == LedgerOwner.Result.ADOPTED && before == user)
+    SyncV1Keys.bind(app, user, display, sameDesk)
+    runCatching { SyncV1Engine.of(app).restoreSealedFor(user) }
+    SyncStore(app).accountId = user
+    return result
+  }
+
+  private val background = kotlinx.coroutines.CoroutineScope(
+    kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+  )
+
+  /**
+   *  دفترِ روی میز خالی است (شاگردِ تازه، گوشیِ نو، نصبِ دوباره) ⇒ Snapshot ِ دکان **همین حالا** در پس‌زمینه
+   *  (`SyncV1Engine.prepare`: دفترِ خالی ⇒ همهٔ ردیف‌های سرور، سایه و cursor با هم) و بعد دورِ عادی.
+   *
+   *  ⛔ صفحه منتظرش نمی‌ماند: پیش‌تر نخستین دادهٔ دکان فقط از کارگرِ زمان‌بندی‌شده می‌آمد که پیش از Snapshot
+   *  سه درخواستِ دیگر (تپش، سری سند، زنجیرهٔ سند) می‌زد. `prepare` زیرِ قفلِ موتور و یک‌باره است، پس اجرای
+   *  هم‌زمان با کارگر چیزی را دو بار نمی‌نشاند.
+   */
+  fun bootstrapSoon(context: Context, store: ShopStore) {
+    val app = context.applicationContext
+    if (store.training || !store.deskEmpty()) {
+      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
+      return
+    }
+    background.launch {
+      runCatching {
+        SyncV1Engine.of(app).prepare(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
+      }
+      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
+    }
+  }
+}

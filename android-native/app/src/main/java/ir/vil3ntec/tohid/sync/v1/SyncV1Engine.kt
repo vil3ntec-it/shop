@@ -104,10 +104,120 @@ class SyncV1Engine private constructor(context: Context) {
       .ifBlank { store.deviceUid },
   )
 
+  /** کلیدِ دامنه‌دارِ همین حالای صف و حال — `SyncV1Keys.bind` */
+  fun currentKey(): String = accountKey
+
+  /**
+   *  نتیجهٔ «همه را بفرست» پیش از خروج — شرح سرِ [flushForSignOut].
+   *  @param rejected opهایی که سرور **در همین تلاش** نپذیرفت (از صف بیرون رفتند، به سرور نرسیدند)
+   */
+  data class SignOutFlush(
+    val queued: Int,
+    val rejected: Int,
+    val online: Boolean,
+    val signedIn: Boolean,
+    val error: String,
+    val reconciled: Boolean,
+  )
+
+  /**
+   *  پیش از هر خروج از حساب: هر تغییرِ دفتر op شود، دفترِ هرگز‌هم‌ترازنشده یک بار با سرور هم‌تراز شود، و صف
+   *  تا ته برود — و بگوید سرور **همه** را گرفت یا نه. هیچ چیزی پاک نمی‌کند.
+   *
+   *  ⛔ پیش‌تر خروج فقط شمارِ صفِ همین کلید را می‌دید: تغییری که هنوز op نشده بود (تفاضلِ دفتر با سایه) و دفتری
+   *  که هرگز به سرور نرسیده بود «صفر» شمرده می‌شدند و خروج آزاد بود.
+   *
+   *  @param read دفترِ همین حالا؛ `null` ⇒ دفتر خوانده نمی‌شود (رمزدارِ باز‌نشده) و فقط صف می‌رود
+   */
+  suspend fun flushForSignOut(read: (() -> ShopData)?, write: (ShopData) -> Unit): SignOutFlush {
+    if (SyncChoice.isV3(app)) {
+      val queued = runCatching { SyncV3Runner.of(app).asV1Status()?.queued ?: 0 }.getOrDefault(0)
+      return SignOutFlush(queued, 0, Backend.isOnline(app), Backend.isReady(app), "", reconciled = true)
+    }
+    //  ۱) تغییرِ محلیِ op‌نشده ⇒ op (زیرِ همان قفلِ `record`)؛ دفترِ خالی روی سایهٔ پر هیچ op نمی‌سازد
+    var rows = 0
+    if (read != null) {
+      val ledger = runCatching { read() }.getOrNull()
+      if (ledger != null) {
+        val tree = LedgerDiff.toJson(ledger)
+        rows = LedgerDiff.COLLECTIONS.sumOf { (tree[it] as? JsonArray)?.size ?: 0 }
+        runCatching { record(ledger) }
+      }
+    }
+    val signedIn = Backend.isReady(app)
+    val online = Backend.isOnline(app)
+    if (!signedIn || !online) {
+      publish()
+      return SignOutFlush(queue.size(), 0, online, signedIn, "", reconciled = rows == 0 || everSynced() || state.reconciledAt > 0)
+    }
+    //  ۲) دفتری که هرگز هم‌تراز نشده (آفلاین ساخته شد، یا پیش از v1): ردیف‌هایی که سرور ندارد به صف
+    var error = ""
+    if (read != null && rows > 0 && state.reconciledAt == 0L) {
+      runCatching { prepare(read, write) }.onFailure { error = it.message ?: "هم‌ترازی با سرور نشد" }  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+    }
+    //  ۳) صف تا ته
+    var rejected = 0
+    gate.withLock {
+      busy = true
+      publish()
+      try {
+        synchronized(this) { commit.queueRecorded() }
+        val before = queue.droppedCount()
+        try {
+          pushQueue(pushClient(), store.deviceUid)
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+          throw cancelled
+        } catch (e: Throwable) {
+          error = e.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+          state.lastError = error
+        }
+        rejected = (queue.droppedCount() - before).coerceAtLeast(0)
+      } finally {
+        busy = false
+        publish()
+      }
+    }
+    return SignOutFlush(queue.size(), rejected, true, true, error, reconciled = rows == 0 || state.reconciledAt > 0)
+  }
+
+  /**
+   *  خروجِ اجباری: opهای نرفتهٔ همین حساب از صفِ ساده به گاوصندوقِ رمزدارِ همان حساب (`SignOutVault`) می‌روند.
+   *  فقط وقتی از صف بیرون می‌آیند که گاوصندوق نوشته **و دوباره خوانده** شد؛ وگرنه صف دست نمی‌خورد.
+   *
+   *  @return چند op اکنون در گاوصندوق است؛ `-1` اگر رمز در دسترس نبود (صفِ ساده سرِ جایش)
+   */
+  @Synchronized
+  fun sealQueueFor(userId: String, shopId: String): Int {
+    if (SyncChoice.isV3(app)) return -1
+    if (commit.pending()) runCatching { commit.queueRecorded() }
+    val ops = queue.all()
+    if (ops.isEmpty()) return 0
+    if (!SignOutVault.seal(app, userId, shopId, ops)) return -1
+    queue.ack(ops.map { it.opId })
+    publish()
+    return ops.size
+  }
+
+  /**
+   *  ورودِ دوبارهٔ همان حساب: opهای گاوصندوق با **همان op_id** جلوی صف (سرور تکراری‌ها را `duplicate` می‌شمارد).
+   *  گاوصندوق فقط پس از نشستنِ opها در صف پاک می‌شود.
+   */
+  @Synchronized
+  fun restoreSealedFor(userId: String): Int {
+    if (SyncChoice.isV3(app)) return 0
+    val ops = SignOutVault.open(app, userId) ?: return 0
+    val added = queue.pushFront(ops)
+    val have = queue.all().mapTo(HashSet()) { it.opId }
+    if (ops.all { it.opId in have }) SignOutVault.drop(app, userId)
+    publish()
+    return added
+  }
+
   /** پس از ورود یا خروج صدا زده می‌شود — کلیدها عوض می‌شوند. */
-  fun rebind() {
+  fun rebind(force: Boolean = false) {
     val fresh = keyOf()
-    if (fresh == accountKey) return
+    //  `force`: همان کلید ولی پرونده‌هایش جابه‌جا شدند (`SyncV1Keys.switchShop`) ⇒ صف و ژورنال از نو خوانده شوند
+    if (fresh == accountKey && !force) return
     accountKey = fresh
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
@@ -159,6 +269,13 @@ class SyncV1Engine private constructor(context: Context) {
      */
     val made = try {
       commit.record(data)
+    } catch (empty: SyncCommit.EmptyLedger) {
+      //  دفترِ خالی روی سایهٔ پر: هیچ DELETE نمی‌رود؛ دورِ بعد دفتر از Snapshot ِ سرور ساخته می‌شود
+      //  (`prepare` با دفترِ خالی) و سایه همان سرور می‌شود — نه «همه حذف شد»
+      state.reconciledAt = 0L
+      state.lastError = empty.message.orEmpty()
+      publish()
+      return 0
     } catch (e: Exception) {
       //  صف (یا ژورنالش) روی حافظه ننشست — معمولاً حافظهٔ پر. دفتر پیش‌تر نشسته و سایه جلو نرفته، پس
       //  همین تغییر با ثبتِ بعدی دوباره op می‌شود؛ ولی بی‌صدا نه (هیچ opی هم دور ریخته نمی‌شود: `OpBacklog`)
