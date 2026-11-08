@@ -61,6 +61,7 @@ import ir.vil3ntec.tohid.ui.components.common.StatusPill
 import ir.vil3ntec.tohid.ui.theme.Shape
 import ir.vil3ntec.tohid.ui.theme.Shop
 import ir.vil3ntec.tohid.ui.platform.PurchaseOrderHost
+import ir.vil3ntec.tohid.ui.platform.printReceiptLabels
 import ir.vil3ntec.tohid.ui.platform.rememberPurchaseOrderHost
 import kotlinx.coroutines.launch
 
@@ -247,22 +248,10 @@ private fun PoDetail(
 
   /**
    *  PUR-13: برچسبِ اقلامِ پذیرفتهٔ یک رسید (S19: همان برچسب روی برگهٔ A4 ِ ۳×۸ هم). هر واحدِ شمارشی یک
-   *  برچسب (تا ۹۹؛ برگهٔ A4 تا ۲۴)، کالای وزنی یکی. چاپ از مرزِ سکو (`PurchaseOrderHost.printLabel`).
+   *  برچسب (تا ۹۹؛ برگهٔ A4 تا ۲۴)، کالای وزنی یکی — شمارش و چاپ همان گوشیِ نسخهٔ ۳ (`printReceiptLabels` ⇐ `PoForms.labels`).
    */
   fun printLabels(r: PoReceiptDto, a4: Boolean) {
-    scope.launch {
-      if (!a4 && !host.hasLabelPrinter()) { toast(StrPurchasePages.noLabelPrinterShort); return@launch }
-      var done = 0
-      for (p in r.posted.filter { it.acceptedMilli > 0 }) {
-        val line = o.lines.find { it.id == p.lineId } ?: continue
-        val product = d.products.find { it.id == line.productId } ?: continue
-        val units = ((p.acceptedMilli + 999) / 1000).toInt()
-        val copies = if (line.unit in PurchaseOrderBook.WEIGHED_UNITS) 1 else units.coerceIn(1, if (a4) 24 else 99)
-        host.printLabel(product, copies, a4)?.let(toast)
-        done++
-      }
-      if (done == 0) toast(StrPurchasePages.noAcceptedForLabel)
-    }
+    scope.launch { host.printReceiptLabels(d, o, r, a4, toast) }
   }
 
   fun postReceipt(r: PoReceiptDto) {
@@ -430,8 +419,10 @@ private fun PoEditor(
   val scope = rememberCoroutineScope()
   //  کلیدِ یکتای همین فرم: دو بار زدن یا قطعِ نت همان سفارش است، نه دومی
   val formKey = remember { newId() }
+  //  PRD-07: انتخابِ واحدِ خریدِ ردیف فقط با `ShopPolicy.productTools` (پیش‌فرض خاموش ⇒ همان فرمِ پیشین)
+  val unitsOn = purchaseUnitsOn()
   var supplierId by remember { mutableStateOf(base?.supplierId ?: d.suppliers.firstOrNull()?.id.orEmpty()) }
-  var rows by remember { mutableStateOf(PoForms.rowsOf(base)) }
+  var rows by remember { mutableStateOf(PoForms.rowsOf(base, d)) }
   var expected by remember { mutableStateOf(base?.expectedDate.orEmpty()) }
   var note by remember { mutableStateOf(base?.note.orEmpty()) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -513,10 +504,17 @@ private fun PoEditor(
     rows.forEachIndexed { i, r ->
       Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${i + 1}. ${r.name}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(r.unit), Modifier.width(120.dp))
-        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, StrReturnPages.unitPriceAfn, Modifier.width(120.dp))
+        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(PoForms.unitOf(r)), Modifier.width(120.dp))
+        NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, r.unitName?.let(ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits::priceIn) ?: StrReturnPages.unitPriceAfn, Modifier.width(120.dp))
         TextButton(onClick = { historyFor = r.productId }) { Text(StrHome.history) }
         TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text(StrMoney.delete) }
+      }
+      //  PRD-07: واحدِ خریدِ ردیف؛ فی به نسبتِ ضریب جابه‌جا می‌شود (`PoForms.pickUnit`، فیِ هر واحدِ پایه همان می‌ماند)
+      val product = if (unitsOn) d.products.find { it.id == r.productId } else null
+      if (product != null && !product.purchaseUnits.isNullOrEmpty()) {
+        PurchaseUnitPicker(product, r.unitName, r.qty, PoForms.lineTotal(r)) { u ->
+          rows = rows.map { if (it.key == r.key) PoForms.pickUnit(d, it, u) else it }
+        }
       }
       //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
       val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
@@ -624,10 +622,13 @@ private fun PoReceive(
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
+  //  PRD-07: بارکدِ واحدِ خرید (کارتنِ ۲۴) همان واحد را می‌شمارد — فقط با `ShopPolicy.productTools`
+  val unitsOn = purchaseUnitsOn()
+  val unitIndex = remember(d, unitsOn) { if (unitsOn) ShopStore.purchaseUnitIndex(d) else null }
 
   /** اسکن: یک واحدِ کالای همان بارکد به «رسیده» (`PoForms.scan`، همان اسکنِ گوشی) */
   fun scanned(code: String): Boolean {
-    when (val s = PoForms.scan(order, rows, index, code)) {
+    when (val s = PoForms.scan(order, rows, index, code, unitIndex)) {
       is PoForms.Scan.NotInPo -> toast(StrPurchasePages.notInPo(s.code))
       is PoForms.Scan.Added -> { rows = s.rows; error = null }
     }
@@ -691,6 +692,8 @@ private fun PoReceive(
           NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
           if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
         }
+        //  PRD-07: ردیفِ به واحدِ خرید ⇒ آنچه به موجودی می‌رود به واحدِ پایه (مقدار × ضریب)
+        PoForms.toStock(d, l, r)?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = c.muted) }
       }
     }
     if (perms.manage) Row(verticalAlignment = Alignment.CenterVertically) {

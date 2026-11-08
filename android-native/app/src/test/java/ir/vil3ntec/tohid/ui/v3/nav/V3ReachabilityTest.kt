@@ -106,6 +106,8 @@ class V3ReachabilityTest {
     Feature("PUR-02 ویرایشِ پیش‌نویس (گوشی)", "purchasing/orders/{id}/edit", "$MONEY.PoEditorForm", root = "$MONEY.PurchaseOrderEditRoute"),
     Feature("PUR-04 دریافتِ کامل/جزئی با اسکن، خراب و باقی‌ماندهٔ باز (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiveForm", root = "$MONEY.PurchaseOrderReceiveRoute"),
     Feature("PUR-14 تطبیقِ سفارش، رسید و فاکتور (گوشی)", "purchasing/orders/{id}/match", "$MONEY.PurchaseOrderMatchRoute", root = "$MONEY.PurchaseOrderMatchRoute"),
+    Feature("PUR-13 برچسبِ اقلامِ رسیده پس از دریافت (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiptLabels", "ir.vil3ntec.tohid.ui.platform.printReceiptLabels", root = "$MONEY.PurchaseOrderReceiveRoute"),
+    Feature("PUR-13 برچسبِ هر رسید در جزئیاتِ سفارش (گوشی)", "purchasing/orders/{id}", "$MONEY.PoReceiptLabels", root = "$MONEY.PurchaseOrderRoute"),
     Feature("POS-39 دریافتِ بدهی در صندوقِ گوشی", "sale", s("TillReceivePhone"), root = PHONE_SALE),
     Feature(
       "POS-25/26/27/18، PAY-24، POS-38 ابزارهای سبدِ صندوقِ گوشی", "sale",

@@ -59,7 +59,8 @@ object PurchaseBook {
   /** همان قاعدهٔ اعشارِ بسته‌ها و واحدهای خرید: واحدِ وزنی یا واحدِ فروشِ دوم */
   private fun wholeOk(p: Product) = SalesEngine.isFractionalUnit(p.unit) || p.saleUnit.isNotBlank()
 
-  private fun unitWhy(p: Product, name: String, quantity: Double): String =
+  /** چرا [inUnitOf] null داد — پیامِ ردیف (همان فاکتورِ خرید و سفارشِ خرید، `PoForms.draft`) */
+  internal fun unitWhy(p: Product, name: String, quantity: Double): String =
     if (ir.vil3ntec.tohid.core.product.PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), name) == null) ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits.unknownUnit
     else if (quantity.isNaN() || quantity <= 0) StrStock.errAmount
     else ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits.wholeBase(p.unit)

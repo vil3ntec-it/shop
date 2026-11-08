@@ -122,4 +122,11 @@ object StrPurchaseOrders {
   )
   fun differences(n: Int): String = t("${asIs(n)} ردیف اختلاف دارد", "$n ${pl(n, "row differs", "rows differ")}", "$n قطارونه توپیر لري")
   val flagged: String get() = t("اختلاف", "Difference", "توپیر")
+
+  // PUR-13: برچسبِ اقلامِ رسیده (پس از ثبتِ رسید و کنارِ هر رسید)
+  val labelsNote: String get() = t(
+    "برای اقلامِ پذیرفتهٔ همین رسید برچسب چاپ کنید: هر واحد یکی، کالای وزنی یکی؛ «A4» برگهٔ ۳×۸ است.",
+    "Print labels for the accepted items of this receipt: one per unit, one for weighed goods; “A4” is a 3×8 sheet.",
+    "د دې رسید منل شوو توکو لپاره لیبل چاپ کړئ: هر واحد یو، وزني توکي یو؛ «A4» د ۳×۸ پاڼه ده.",
+  )
 }

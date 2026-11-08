@@ -12,6 +12,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoveToInbox
+import androidx.compose.material.icons.outlined.Print
 import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -28,6 +29,7 @@ import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrDeliver
+import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrLayaway
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
@@ -35,14 +37,18 @@ import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.PoPermsDto
+import ir.vil3ntec.tohid.data.PoReceiptDto
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.scan.ScanRouter
 import ir.vil3ntec.tohid.ui.platform.PurchaseOrderHost
+import ir.vil3ntec.tohid.ui.platform.printReceiptLabels
 import ir.vil3ntec.tohid.ui.platform.rememberPurchaseOrderHost
+import ir.vil3ntec.tohid.ui.screens.purchaseUnitsOn
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
+import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
@@ -64,6 +70,8 @@ import kotlinx.coroutines.launch
 /*
  *  PUR-04 و PUR-14 روی گوشیِ نسخهٔ ۳ — دریافت با اسکن و تطبیقِ سه‌طرفهٔ «سفارش‌های خرید». درِ صفحه، بارگذاری و ثبتِ رسید در
  *  دفتر همان `PurchaseOrderPages.kt` است؛ منطق در `data/PoForms` (مشترکِ کامپیوتر) و `core/purchase`.
+ *  PUR-13: پس از ثبتِ رسید (و کنارِ هر رسید در جزئیات) «برچسب» و «A4» ِ اقلامِ پذیرفته — همان شمارش (`PoForms.labels`) و همان
+ *  راهِ چاپِ کامپیوتر (`PurchaseOrderHost.printReceiptLabels` ⇐ `printLabel`). PRD-07: اسکنِ بارکدِ واحدِ خرید و «به موجودی».
  */
 
 /* ══════════════════════════ دریافت (PUR-04) ══════════════════════════ */
@@ -99,11 +107,16 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
   var message by remember { mutableStateOf<Pair<V3Tone, String>?>(null) }
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
+  //  PUR-13: رسیدِ تازه با کالای پذیرفته ⇒ همین صفحه «برچسب» را می‌دهد تا «بازگشت»
+  var saved by remember(o.id) { mutableStateOf<Pair<PurchaseOrderDto, PoReceiptDto>?>(null) }
   val index = remember(data) { ShopStore.barcodeIndex(data) }
+  //  PRD-07: بارکدِ واحدِ خرید (کارتنِ ۲۴) همان واحد را می‌شمارد — فقط با `ShopPolicy.productTools`
+  val unitsOn = purchaseUnitsOn()
+  val unitIndex = remember(data, unitsOn) { if (unitsOn) ShopStore.purchaseUnitIndex(data) else null }
 
   fun scan(raw: String) {
     if (raw.isBlank()) return
-    message = when (val s = PoForms.scan(o, rows, index, raw)) {
+    message = when (val s = PoForms.scan(o, rows, index, raw, unitIndex)) {
       is PoForms.Scan.NotInPo -> V3Tone.ERROR to StrPurchasePages.notInPo(s.code)
       is PoForms.Scan.Added -> { rows = s.rows; error = null; V3Tone.SUCCESS to StrPurchaseOrders.scanned(s.name, s.received) }
     }
@@ -139,8 +152,20 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
         is PurchaseOrderBook.Posting.Failed -> toasts.show(StrPurchasePages.receiptNoLedger(p.message), V3Tone.WARNING)
         null -> toasts.show(StrPurchasePages.receiptLedgerFailed, V3Tone.ERROR)
       }
-      nav.finish(o.id)
+      //  سد باز نمی‌شود: همین رسید دوباره فرستاده نمی‌شود
+      if (got.receipt.posted.any { it.acceptedMilli > 0 }) { busy = false; saved = got.order to got.receipt } else nav.finish(o.id)
     }
+  }
+
+  val done = saved
+  if (done != null) {
+    val (order, receipt) = done
+    Text(StrPurchasePages.receiveTitle(o.no, o.supplierName), style = V3Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
+    V3Message(V3Tone.SUCCESS, StrPurchasePages.receiptSaved, modifier = Modifier.padding(top = 12.dp))
+    Text(StrPurchaseOrders.labelsNote, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 8.dp))
+    PoReceiptLabels(host, order, receipt, Modifier.padding(top = 12.dp))
+    V3Button(StrKit.back, { nav.finish(o.id) }, Modifier.fillMaxWidth().padding(top = 12.dp), kind = V3ButtonKind.SECONDARY)
+    return
   }
 
   Text(StrPurchasePages.receiveTitle(o.no, o.supplierName), style = V3Type.title, color = c.ink, modifier = Modifier.semantics { heading() })
@@ -182,6 +207,8 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
         }
         Text(text, style = V3Type.footnote, color = PhoneV3Roles.tone(c, tone).fg, modifier = Modifier.padding(top = 6.dp))
       }
+      //  PRD-07: ردیفِ به واحدِ خرید ⇒ آنچه به موجودی می‌رود به واحدِ پایه (مقدار × ضریب)
+      PoForms.toStock(data, l, r)?.let { Text(it, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 2.dp)) }
     }
   }
   if (perms.manage) {
@@ -198,6 +225,34 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
     StrLayaway.payConfirm, { submit() },
     Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.MoveToInbox, loading = busy, haptic = true,
   )
+}
+
+/* ══════════════════════════ برچسب (PUR-13) ══════════════════════════ */
+
+/**
+ *  «برچسب» (چاپگرِ برچسب، هر واحد یکی تا ۹۹) و «A4» (برگهٔ ۳×۸ ِ سیستم، تا ۲۴) برای اقلامِ پذیرفتهٔ رسیدِ [r] — همان شمارش و
+ *  راهِ چاپِ پنجرهٔ کامپیوتر (`printReceiptLabels`)؛ پیام‌ها با `toasts`. تا چاپ تمام نشده دکمه‌ها دوباره نمی‌فرستند.
+ */
+@Composable
+internal fun RouteScope.PoReceiptLabels(host: PurchaseOrderHost, o: PurchaseOrderDto, r: PoReceiptDto, modifier: Modifier = Modifier) {
+  val scope = rememberCoroutineScope()
+  var printing by remember(r.id) { mutableStateOf(false) }
+
+  fun print(a4: Boolean) {
+    if (printing) return
+    printing = true
+    scope.launch {
+      try { host.printReceiptLabels(data, o, r, a4) { toasts.show(it) } } finally { printing = false }
+    }
+  }
+
+  Row(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    V3Button(
+      StrPurchasePages.labelBtn, { print(a4 = false) }, Modifier.weight(1f),
+      kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.Print, loading = printing,
+    )
+    V3Button("A4", { print(a4 = true) }, Modifier.weight(1f), kind = V3ButtonKind.SECONDARY, enabled = !printing)
+  }
 }
 
 /* ══════════════════════════ تطبیق (PUR-14) ══════════════════════════ */
