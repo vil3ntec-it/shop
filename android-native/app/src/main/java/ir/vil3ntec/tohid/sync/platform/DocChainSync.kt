@@ -58,6 +58,16 @@ object DocChainSync {
   private const val PATH = "/sync/v1/chain"
   private val lock = Mutex()
 
+  /**
+   *  پرچمِ `shop.doc_chain` ِ همین حساب و دکان — همان پاسخِ آخرین پرسشِ [cycle] (نپرسیده ⇐ خاموش). زنجیرهٔ هشِ
+   *  سابقهٔ عملیات (STF-09، `AuditSeal`) هم پشتِ همین است تا همهٔ زنجیره‌های دستگاه یک کلید داشته باشند.
+   */
+  fun enabled(context: Context): Boolean = runCatching {
+    val app = context.applicationContext ?: context
+    val key = safe(SyncStateV1.currentAccount(app)) + "@" + safe(LedgerOwner.currentShop(app))
+    app.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getBoolean("on:$key", false)
+  }.getOrDefault(false)
+
   /** یک دور؛ صدازننده (`SyncV1Worker`) شکست را نمی‌بیند */
   suspend fun cycle(context: Context, data: ShopData) {
     //  OPS-07: زنجیرهٔ سریِ واقعیِ دستگاه در حالتِ آموزشی جلو نمی‌رود
