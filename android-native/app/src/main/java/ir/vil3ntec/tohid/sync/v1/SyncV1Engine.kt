@@ -164,7 +164,7 @@ class SyncV1Engine private constructor(context: Context) {
         synchronized(this) { commit.queueRecorded() }
         val before = queue.droppedCount()
         try {
-          pushQueue(pushClient(), store.deviceUid)
+          pushQueue(pushClient(), deviceId())
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
           throw cancelled
         } catch (e: Throwable) {
@@ -352,7 +352,7 @@ class SyncV1Engine private constructor(context: Context) {
         //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
         if (commit.pending()) synchronized(this) { commit.recover(read()) }
         val client = pushClient()
-        val device = store.deviceUid
+        val device = deviceId()
 
         //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
         checkEpoch(client)
@@ -476,9 +476,9 @@ class SyncV1Engine private constructor(context: Context) {
       if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
       if (refused.isNotEmpty()) {
         //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
-        //  می‌کند — ولی بی‌صدا نه.
+        //  می‌کند — ولی بی‌صدا نه: دلیلِ خودِ سرور (approval_required، tx_rejected…) کنارِ هر op، نه «rejected» (سفرِ JB1)
         val ids = refused.map { it.opId }.toHashSet()
-        queue.drop(batch.filter { it.opId in ids }, "rejected")
+        refused.groupBy { it.reason.ifBlank { "rejected" } }.forEach { (why, rs) -> rs.map { it.opId }.toSet().let { m -> queue.drop(batch.filter { it.opId in m }, why) } }
         queue.ack(ids)
       }
       state.lastPushAt = clock()
@@ -506,7 +506,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
       synchronized(this) { commit.queueRecorded() }
-      pushQueue(pushClient(), store.deviceUid)
+      pushQueue(pushClient(), deviceId())
       Result.success(queue.size())
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
       throw cancelled
@@ -534,7 +534,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       synchronized(this) { commit.queueRecorded() }
       val client = pushClient()
-      val device = store.deviceUid
+      val device = deviceId()
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
       //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد
       checkEpoch(client)
@@ -831,7 +831,7 @@ class SyncV1Engine private constructor(context: Context) {
   fun droppedOps(): List<JsonObject> = queue.dropped()
   fun errorReports(): Boolean = state.errorReports
   fun setErrorReports(on: Boolean) { state.errorReports = on }
-  fun deviceId(): String = store.deviceUid
+  fun deviceId(): String = V1Replica.id(this, app, store, state)  // `device_id` ِ همین حساب روی همین دستگاه (V1ReplicaAndroid)
 
   private fun readShadow(): JsonObject? {
     val raw = state.shadow

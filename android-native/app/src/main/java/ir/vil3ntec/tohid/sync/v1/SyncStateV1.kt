@@ -89,6 +89,11 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getString(k("lastError"), "").orEmpty()
     set(v) = prefs.edit().putString(k("lastError"), v).apply()
 
+  /** `device_id` ِ همین حساب روی همین دستگاه برای سرور، یک بار انتخاب و نگه داشته (`V1ReplicaAndroid.kt`) */
+  var replica: String
+    get() = prefs.getString(k("replica"), "").orEmpty()
+    set(v) = prefs.edit().putString(k("replica"), v).apply()
+
   /** سرور از برنامه عقب‌تر است (۴۲۶): opها نگه داشته می‌شوند. */
   var holding: Boolean
     get() = prefs.getBoolean(k("holding"), false)

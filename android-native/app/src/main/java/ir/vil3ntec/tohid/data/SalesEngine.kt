@@ -470,7 +470,7 @@ object SalesEngine {
     }
 
     val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
-    val invoiceNumber = d.nextInvoiceNo
+    val invoiceNumber = InvoiceNumber.next(d, series)
 
     val sale = Sale(
       id = saleId,
