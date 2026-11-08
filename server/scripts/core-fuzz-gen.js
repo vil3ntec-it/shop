@@ -521,5 +521,5 @@ function runReport(x) {
 module.exports = {
   ROOT, M, STOCK, REPORT, PROMO, DEBT, CAL, TEXT, CAP, MAX, S53, rng,
   D, J, anyInt, legacyDouble, boundedDouble, EDGE_DATES, BAD_DATES, nearDate, baseDate, kabulMs, WS, messy,
-  money, runMoney, cap, runCap, stock, runStock, report, runReport,
+  money, runMoney, cap, runCap, stock, runStock, report, runReport, reportLedger,
 };

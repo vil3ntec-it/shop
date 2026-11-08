@@ -106,7 +106,8 @@ test('وب SEC-03: اصلاح فقط با سندِ معکوس', () => {
     const rev = web.reverseDoc(c.doc, opts);
     assert.equal(web.canonicalJson(rev), web.canonicalJson(c.expected), c.name);
     assert.equal(web.canonicalJson(c.doc), before, 'سندِ اصلی دست نخورد');
-    assert.equal(web.findReversal([c.doc, rev], c.doc.id), rev);
+    //  سندِ بی شناسه (null) معکوسش پیدا نمی‌شود — `findReversal` ِ هر دو هسته برای شناسهٔ null همان null است
+    assert.equal(web.findReversal([c.doc, rev], c.doc.id), c.doc.id == null ? null : rev);
     //  جمعِ سند و معکوسش صفر است
     assert.equal(c.doc.total + rev.total, 0);
     assert.equal(rev.lines.reduce((s, l) => s + l.amount, 0) + c.doc.lines.reduce((s, l) => s + l.amount, 0), 0);

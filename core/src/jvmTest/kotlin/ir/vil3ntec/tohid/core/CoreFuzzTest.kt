@@ -33,33 +33,42 @@ import kotlin.test.Test
 import kotlin.test.assertTrue
 
 /*
- *  فازِ تفاضلی — دوندهٔ Kotlin ِ هسته‌های `core/` (پول، سقفِ برگشت، تخفیف، تقویم، متن).
+ *  فازِ تفاضلی — دوندهٔ Kotlin ِ هسته‌های `core/` (پول، سقفِ برگشت، تخفیف، تقویم، متن؛ و دورِ دوم در `CoreFuzzTwins`:
+ *  برگهٔ تأیید، مجوز، زنجیرهٔ هش، پرداخت، جمع‌آوری، سفارشِ خرید).
  *  پیکره (`core/test-vectors/core-fuzz-v1.json`) را `server/scripts/core-fuzz.js` با هسته‌های JS می‌سازد:
  *  `out` خروجیِ JS است و این‌جا باید عیناً همان باشد (عدد با مقدار سنجیده می‌شود: 2 = 2.0).
  *  موجودی، گزارش و دفترِ قرض را `CoreFuzzAppTest` (android-native، روی کامپیوتر هم) می‌دواند.
- *  اجرای ژرف: CORE_FUZZ_CORPUS=<پیکرهٔ بزرگ> (سازنده: server/test/core-fuzz.test.js با CORE_FUZZ_OUT).
+ *  اجرای ژرف: CORE_FUZZ_CORPUS=<پیکرهٔ بزرگ>[:<پیکرهٔ بعدی>…] (سازنده: server/test/core-fuzz.test.js با CORE_FUZZ_OUT)؛
+ *  چند پیکره (مثلاً یکی برای هر جفت با CORE_FUZZ_ONLY) پشتِ هم، هر بار یکی در حافظه.
  */
 class CoreFuzzTest {
 
-  private val corpus: JsonObject by lazy {
-    val deep = System.getenv("CORE_FUZZ_CORPUS")?.takeIf { it.isNotBlank() }?.let(::File)
-    val file = deep ?: generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
+  private val deep: List<File>? = System.getenv("CORE_FUZZ_CORPUS")?.takeIf { it.isNotBlank() }?.split(File.pathSeparator)?.map(::File)
+
+  private fun corpora(): List<File> = deep ?: listOf(
+    generateSequence(File(System.getProperty("user.dir")).absoluteFile) { it.parentFile }
       .map { File(it, "core/test-vectors/core-fuzz-v1.json") }.firstOrNull { it.isFile }
-      ?: error("core/test-vectors/core-fuzz-v1.json پیدا نشد")
-    Json.parseToJsonElement(file.readText()).jsonObject
-  }
+      ?: error("core/test-vectors/core-fuzz-v1.json پیدا نشد"),
+  )
 
   @Test
-  fun `فاز — هر موردِ پول، سقفِ برگشت، تخفیف، تقویم و متن همان خروجیِ JS`() {
-    val cases = corpus.getValue("cases").jsonArray.map { it.jsonObject }
-    val mine = cases.filter { it.fn().substringBefore('.') in FAMILIES }
-    assertTrue(mine.size >= cases.size / 3, "موردها ${mine.size} از ${cases.size}")
+  fun `فاز — هر موردِ پول، سقفِ برگشت، تخفیف، تقویم، متن و هم‌زادهای دورِ دوم همان خروجیِ JS`() {
     val dump = System.getenv("CORE_FUZZ_DUMP")?.takeIf { it.isNotBlank() }?.let { File(it).bufferedWriter() }  // برای کمینه‌سازی: خروجیِ Kotlin ِ هر تفاوت
-    val failures = mine.mapNotNull { c ->
-      val want = c.getValue("out")
-      val got = try { run(c.fn(), c.getValue("in").jsonObject) } catch (e: Exception) { THROWS }
-      if (dump != null && !same(want, got)) dump.write("{\"id\":${c["id"]},\"got\":$got}\n")
-      if (same(want, got)) null else c.fn() to "#${c["id"]} ${c.fn()} ${c["in"].toString().take(400)}\n  JS:     $want\n  Kotlin: $got"
+    val failures = corpora().flatMap { file ->
+      val cases = Json.parseToJsonElement(file.readText()).jsonObject.getValue("cases").jsonArray.map { it.jsonObject }
+      val mine = cases.filter { it.fn().substringBefore('.') in FAMILIES }
+      //  پیکرهٔ مخزن هر خانواده را دست‌کم ۵ بار دارد؛ پیکرهٔ ژرفِ یک جفت (CORE_FUZZ_ONLY) شاید هیچ‌کدامِ این‌ها را نداشته باشد
+      if (deep == null) {
+        val count = mine.groupingBy { it.fn().substringBefore('.') }.eachCount()
+        assertTrue(FAMILIES.all { (count[it] ?: 0) >= 5 }, "موردهای هر خانواده: $count")
+      }
+      mine.mapNotNull { c ->
+        val want = c.getValue("out")
+        val got = try { run(c.fn(), c.getValue("in").jsonObject) } catch (e: Exception) { THROWS }
+        val ok = same(want, got) || CoreFuzzTwins.bothRefuse(c.fn(), want, got)
+        if (dump != null && !ok) dump.write("{\"file\":\"${file.name}\",\"id\":${c["id"]},\"got\":$got}\n")
+        if (ok) null else c.fn() to "#${c["id"]} ${c.fn()} ${c["in"].toString().take(400)}\n  JS:     $want\n  Kotlin: $got"
+      }
     }
     dump?.close()
     val byFn = failures.groupBy({ it.first }, { it.second })
@@ -68,7 +77,7 @@ class CoreFuzzTest {
 
   // ── اجرا ─────────────────────────────────────────────
 
-  private fun run(fn: String, x: JsonObject): JsonElement = when (fn) {
+  private fun run(fn: String, x: JsonObject): JsonElement = if (fn.substringBefore('.') in CoreFuzzTwins.FAMILIES) CoreFuzzTwins.run(fn, x) else when (fn) {
     "money.lineTotalMinor" -> n(Rounding.lineTotalMinor(x.l("q"), x.l("p"), x.l("step")))
     "money.roundHalfUp" -> n(Rounding.roundHalfUp(x.l("n"), x.l("d")))
     "money.allocateDiscount" -> {
@@ -230,7 +239,7 @@ class CoreFuzzTest {
   }
 
   companion object {
-    private val FAMILIES = setOf("money", "cap", "promo", "cal", "text")
+    private val FAMILIES = setOf("money", "cap", "promo", "cal", "text") + CoreFuzzTwins.FAMILIES
     private val THROWS = JsonObject(mapOf("throws" to JsonPrimitive(true)))
 
     /**

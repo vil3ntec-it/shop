@@ -395,12 +395,14 @@ object PermCore {
   /**
    *  درصدِ تخفیف به «صدمِ درصد» (۵٪ = ۵۰۰) — همان `discountBp`ِ JS.
    *  تخفیفِ گردشده تا نیم افغانی بخشیده می‌شود؛ جمعِ صفر با تخفیف ⇐ ۱۰۰٪.
+   *  حساب با Double، عیناً `Math.floor(forgiven * 10000 / total)` ِ JS: `forgiven * 10_000L` ِ Long از ۹٫۲×۱۰^۱۴ به بعد
+   *  سرریز می‌کرد و درصدِ منفی یا کوچک (۸۱۱ به‌جای ۱۰۰۰۰) می‌داد — نیازِ تأییدِ گوشی کمتر از سرور (فازِ تفاضلی).
    */
   fun discountBp(discountMinor: Long, totalMinor: Long): Long {
     if (discountMinor <= 0) return 0
     if (totalMinor <= 0) return 10_000
     val forgiven = maxOf(0L, discountMinor - ROUNDING_MINOR)
-    return minOf(10_000L, forgiven * 10_000L / totalMinor)
+    return minOf(10_000.0, kotlin.math.floor(forgiven.toDouble() * 10_000.0 / totalMinor.toDouble())).toLong()
   }
 
   fun discountPct(discountMinor: Long, totalMinor: Long): Double = discountBp(discountMinor, totalMinor) / 100.0

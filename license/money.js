@@ -69,9 +69,10 @@
     USD: makeCurrency('USD', 2, 1),   // فقط برای تبادل (PAY-10)
   });
 
-  /* ارز از جدول؛ پله برای هر دکان قابلِ تنظیم است */
+  /* ارز از جدول؛ پله برای هر دکان قابلِ تنظیم است. فقط کلیدِ خودِ جدول: «constructor» و «__proto__» ارزِ ناشناخته‌اند،
+     نه تابع/شیءِ پروتوتایپ (فازِ تفاضلی: پرداخت با ارزِ «constructor» پذیرفته می‌شد و Kotlin رد می‌کرد) */
   function currency(code, stepMinor) {
-    var c = CURRENCIES[code];
+    var c = typeof code === 'string' && Object.prototype.hasOwnProperty.call(CURRENCIES, code) ? CURRENCIES[code] : null;
     if (!c) throw new RangeError('ارزِ ناشناخته: ' + code);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return stepMinor === undefined ? c : makeCurrency(c.code, c.decimals, stepMinor);
   }

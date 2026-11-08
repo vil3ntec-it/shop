@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.pick
 
+import ir.vil3ntec.tohid.core.text.JsText
+
 /**
  *  جایگزینی هنگامِ جمع‌آوری (PCK-05/06، v3 §۶.۱۷؛ S37) — دوقلوی بخشِ «PCK-05/06» ِ
  *  `server/src/lib/pick-core.js`.
@@ -38,14 +40,14 @@ object PickSubstitute {
   /** همان `\s` ِ JS (فاصله‌های یونیکد هم) — مثلِ `PickCore` */
   private val SPACES = Regex("[\\s\\u00A0\\u1680\\u2000-\\u200A\\u2028\\u2029\\u202F\\u205F\\u3000\\uFEFF]+")
 
-  /** `halal`، `non_halal` یا '' (نامعلوم) */
-  fun halalOf(v: String): String = when (val s = v.trim().lowercase()) {
+  /** `halal`، `non_halal` یا '' (نامعلوم) — «trim» همان JS (`JsText`): «U+FEFF halal» حلال است و «halal U+001F» نامعلوم */
+  fun halalOf(v: String): String = when (val s = JsText.lowercase(JsText.trim(v))) {
     "halal", "non_halal" -> s
     else -> ""
   }
 
   /** دسته برای سنجش: رقمِ لاتین، یک فاصله، بی فاصلهٔ دو سر، حروفِ کوچک */
-  fun normCategory(v: String): String = PickCore.latin(v).replace(SPACES, " ").trim { it == ' ' }.lowercase()
+  fun normCategory(v: String): String = JsText.lowercase(PickCore.latin(v).replace(SPACES, " ").trim { it == ' ' })
 
   /** ⇒ null (مجاز) یا کدِ دلیل — همان کدهای سرور */
   fun block(orig: Item, cand: Item?): String? {
@@ -60,7 +62,8 @@ object PickSubstitute {
     if (halalOf(orig.halal) != halalOf(cand.halal)) return "halal_mismatch"
     if (PickCore.isWeighedUnit(orig.unit) != PickCore.isWeighedUnit(cand.unit)) return "unit_mismatch"
     val p = cand.priceMinor
-    if (p == null || p <= 0L) return "no_price"
+    //  همان `Number.isSafeInteger` ِ JS: بهای ۲^۶۰ «بی قیمت» است، نه جایگزینِ پیشنهادی (فازِ تفاضلی)
+    if (p == null || p <= 0L || p > 9_007_199_254_740_991L) return "no_price"
     return null
   }
 

@@ -142,6 +142,14 @@
         "\ud800": 1
       },
       "error": "lone_surrogate"
+    },
+    {
+      "name": "first failure in sorted key order wins (number before a later lone-surrogate key)",
+      "input": {
+        "b": 1.5,
+        "\ud800": 1
+      },
+      "error": "not_integer"
     }
   ],
   "hash": [
@@ -2125,6 +2133,277 @@
         "by": "u_owner"
       },
       "error": "not_integer"
+    },
+    {
+      "name": "numeric id: reversed only once (Kotlin skipped the check for a non-text id)",
+      "doc": {
+        "id": 7,
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "existing": [
+        {
+          "id": "K2-R-000009",
+          "reverses": 7,
+          "status": "posted"
+        }
+      ],
+      "error": "already_reversed"
+    },
+    {
+      "name": "reason of only BOM is empty (JS trim)",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "﻿",
+        "by": "u_owner"
+      },
+      "error": "bad_opts"
+    },
+    {
+      "name": "U+001F is not space in JS, so the reason is not empty",
+      "doc": {
+        "id": "K2-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "\u001f",
+        "by": "u_owner"
+      },
+      "expected": {
+        "id": "K2-R-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400099000,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": -2,
+            "unitPrice": 5000,
+            "amount": -10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": -1,
+            "unitPrice": 12550,
+            "amount": -12550
+          }
+        ],
+        "discount": -550,
+        "total": -22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -20000
+          },
+          {
+            "method": "credit",
+            "amount": -2000
+          }
+        ],
+        "reverses": "K2-000001",
+        "reason": "\u001f",
+        "by": "u_owner"
+      }
+    },
+    {
+      "name": "id null: reverses stays null (it is hashed)",
+      "doc": {
+        "id": null,
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400000001,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": 2,
+            "unitPrice": 5000,
+            "amount": 10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": 1,
+            "unitPrice": 12550,
+            "amount": 12550
+          }
+        ],
+        "discount": 550,
+        "total": 22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": 20000
+          },
+          {
+            "method": "credit",
+            "amount": 2000
+          }
+        ]
+      },
+      "opts": {
+        "id": "K2-R-000001",
+        "no": 1,
+        "postedAt": 1760400099000,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      },
+      "expected": {
+        "id": "K2-R-000001",
+        "series": "K2",
+        "no": 1,
+        "type": "sale",
+        "status": "posted",
+        "postedAt": 1760400099000,
+        "customerId": "c_01",
+        "currency": "AFN",
+        "lines": [
+          {
+            "productId": "p_rice",
+            "qty": -2,
+            "unitPrice": 5000,
+            "amount": -10000
+          },
+          {
+            "productId": "p_oil",
+            "qty": -1,
+            "unitPrice": 12550,
+            "amount": -12550
+          }
+        ],
+        "discount": -550,
+        "total": -22000,
+        "payments": [
+          {
+            "method": "cash",
+            "amount": -20000
+          },
+          {
+            "method": "credit",
+            "amount": -2000
+          }
+        ],
+        "reverses": null,
+        "reason": "اشتباه در مقدار",
+        "by": "u_owner"
+      }
     }
   ]
 }

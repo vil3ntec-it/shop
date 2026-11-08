@@ -51,7 +51,7 @@ object HashChain {
       is Number -> out.append(integerValue(v).toString())
       is Map<*, *> -> {
         val keys = v.keys.map { k -> k as? String ?: throw HashChainException("bad_value", "کلیدِ شیء باید رشته باشد") }
-        keys.forEach { checkSurrogates(it) }
+        //  نیم‌جفتِ تنهای کلید همان‌جا که JS می‌بیند (`quote` ِ همان کلید، به ترتیبِ مرتب) — نه همهٔ کلیدها پیش از مقدارها
         out.append('{')
         keys.sorted().forEachIndexed { i, k ->
           if (i > 0) out.append(',')

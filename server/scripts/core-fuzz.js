@@ -6,7 +6,9 @@
  *   node scripts/core-fuzz.js                ⇐ فقط می‌سنجد که فایلِ پیکره با خروجیِ امروزِ JS یکی است
  *   node scripts/core-fuzz.js --write        ⇐ پیکره را از نو می‌نویسد (پس از تغییرِ عمدیِ رفتار)
  *   CORE_FUZZ_CASES=20000 CORE_FUZZ_SEED=7 node scripts/core-fuzz.js --out /tmp/deep.json
- *                                            ⇐ اجرای ژرف: پیکرهٔ بزرگ بیرون از مخزن
+ *                                            ⇐ اجرای ژرف: پیکرهٔ بزرگ بیرون از مخزن (هر دور N مورد)
+ *   CORE_FUZZ_ONLY=perm,approval CORE_FUZZ_CASES=20000 node scripts/core-fuzz.js --out /tmp/perm.json
+ *                                            ⇐ اجرای ژرفِ فقط همین خانواده‌ها (N مورد روی هم)
  *
  * روش (الف): **خروجیِ JS همان expect است**. مولّدِ دانه‌دار (mulberry32، بی Date.now و بی Math.random)
  * دفترهای واقعی می‌سازد — خرید با بها و واحدِ گوناگون، فروش با تخفیف و قاعدهٔ تخفیف، برگشتِ بخشی و
@@ -19,6 +21,8 @@
  *     `android-native/app/src/test/.../CoreFuzzAppTest.kt` (موجودی، گزارش، دفترِ قرض؛ همتاهای Kotlin
  *     آن‌ها هنوز در `android-native` اند، پس روی کامپیوتر/اندروید دویده می‌شوند): هر `out` را با
  *     هستهٔ Kotlin می‌سنجند. با `CORE_FUZZ_CORPUS=<مسیر>` همان آزمون‌ها پیکرهٔ ژرف را می‌خوانند.
+ * دورِ دوم (`core-fuzz-gen2.js` و `core-fuzz-gen3.js`، دانهٔ SEED + 1، پس از ۲۰۰ موردِ دورِ اول و بی جابه‌جا کردنِ آن‌ها): برگهٔ تأیید،
+ * مجوز، زنجیرهٔ هش، پرداخت، جمع‌آوری، سفارشِ خرید و تابلوی گزارش — همه در `CoreFuzzTest` جز تابلو (`CoreFuzzAppTest`).
  * خطا (پرتابِ JS / Exception ِ Kotlin) یعنی `{"throws": true}` — دو سو باید با هم رد کنند.
  * ورودیِ اعشاری که JSON ندارد با رشته می‌آید: "NaN"، "Infinity"، "-Infinity"، "-0" (تابعِ D).
  * هر تفاوت: کمینه کن ⇐ سوی درست را از قاعده‌ها پیدا کن ⇐ همان را درست کن ⇐ موردِ کمینه را به
@@ -30,6 +34,7 @@ const path = require('path');
 const ROOT = path.join(__dirname, '..', '..');
 const CORPUS = path.join(ROOT, 'core', 'test-vectors', 'core-fuzz-v1.json');
 const SEED = 20261108;
+/** موردهای هر دور در پیکرهٔ مخزن (دو دور ⇒ ۴۰۰) */
 const COUNT = 200;
 const VERSION = 1;
 
@@ -38,6 +43,7 @@ const {
   PROMO, DEBT, CAL, TEXT, MAX, rng, D, J, legacyDouble, BAD_DATES, EDGE_DATES, nearDate, baseDate, kabulMs, messy,
   money, runMoney, cap, runCap, stock, runStock, report, runReport,
 } = require('./core-fuzz-gen.js');
+const R2 = Object.assign({}, require('./core-fuzz-gen2.js'), require('./core-fuzz-gen3.js'));
 
 /* ---------- تخفیف: license/promo-core.js ⇄ core/promo/PromoCore.kt ---------- */
 
@@ -341,10 +347,23 @@ const FAMILIES = [
   [24, calendar, runCal],
   [14, text, runText],
 ];
+/** دورِ دوم: هم‌زادهایی که دورِ اول نداشت (`core-fuzz-gen2.js`) */
+const FAMILIES2 = [
+  [14, R2.approval, R2.runApproval],
+  [22, R2.perm, R2.runPerm],
+  [16, R2.chain, R2.runChain],
+  [26, R2.pay, R2.runPay],
+  [24, R2.pick, R2.runPick],
+  [20, R2.po, R2.runPo],
+  [14, R2.board, R2.runBoard],
+];
 /** سهمِ بیشتر درونِ خانواده برای دفترهای چندگامی */
-const BOOST = { 'stock.ledger': 3, 'promo.evaluate': 3, 'money.allocateDiscount': 2, 'money.returnShare': 2, 'cap.check': 2 };
+const BOOST = {
+  'stock.ledger': 3, 'promo.evaluate': 3, 'money.allocateDiscount': 2, 'money.returnShare': 2, 'cap.check': 2,
+  'perm.rows': 2, 'perm.resolve': 2, 'pay.settle': 2, 'pay.fix': 2, 'po.flow': 3, 'chain.verify': 2, 'board.build': 2,
+};
 const RUNNERS = {};
-for (const [, gens, run] of FAMILIES) for (const fn of Object.keys(gens)) RUNNERS[fn] = run;
+for (const [, gens, run] of FAMILIES.concat(FAMILIES2)) for (const fn of Object.keys(gens)) RUNNERS[fn] = run;
 
 /** خروجیِ JS برای یک مورد؛ پرتاب ⇒ {throws: true} */
 function runCase(fn, input) {
@@ -355,11 +374,11 @@ function runCase(fn, input) {
   return out === undefined ? null : JSON.parse(JSON.stringify(out));
 }
 
-function generate(seed = SEED, count = COUNT) {
+/** `count` مورد از خانواده‌های `families` با دانهٔ `seed`؛ شناسه‌ها از `from` */
+function round(families, seed, count, from, cases) {
   const r = rng(seed);
-  const cases = [];
   const list = [];
-  for (const [w, gens] of FAMILIES) {
+  for (const [w, gens] of families) {
     const fns = Object.keys(gens);
     const parts = fns.reduce((a, fn) => a + (BOOST[fn] || 1), 0);
     for (const fn of fns) list.push([(w * (BOOST[fn] || 1)) / parts, [fn, gens[fn]]]);
@@ -367,9 +386,30 @@ function generate(seed = SEED, count = COUNT) {
   for (let i = 0; i < count; i++) {
     const [fn, gen] = r.weighted(list);
     const input = JSON.parse(JSON.stringify(gen(r)));
-    cases.push({ id: i, fn, in: input, out: runCase(fn, input) });
+    cases.push({ id: from + i, fn, in: input, out: runCase(fn, input) });
   }
-  return { version: VERSION, seed, count, cases };
+  return cases;
+}
+
+/** نامِ خانواده‌ها (پیشوندِ fn) */
+const familyOf = ([, gens]) => Object.keys(gens)[0].split('.')[0];
+const FAMILY_NAMES = FAMILIES.concat(FAMILIES2).map(familyOf);
+
+/**
+ *  دورِ اول (`seed`، `count`) و پسِ آن دورِ دوم (`seed + 1`، `count`) — پس ۲۰۰ موردِ نخستِ پیکرهٔ مخزن همان دورِ اول‌اند.
+ *  `only` (فهرستِ نامِ خانواده‌ها) ⇒ فقط همان‌ها، یک دور، `count` مورد روی هم (اجرای ژرفِ یک جفت).
+ */
+function generate(seed = SEED, count = COUNT, only = null) {
+  const cases = [];
+  if (only && only.length) {
+    const unknown = only.filter((f) => !FAMILY_NAMES.includes(f));
+    if (unknown.length) throw new Error('core-fuzz: خانوادهٔ ناشناخته ' + unknown.join(','));  // داده: خطای برنامه‌نویس
+    round(FAMILIES.concat(FAMILIES2).filter((f) => only.includes(familyOf(f))), seed, count, 0, cases);
+  } else {
+    round(FAMILIES, seed, count, 0, cases);
+    round(FAMILIES2, seed + 1, count, count, cases);
+  }
+  return { version: VERSION, seed, count: cases.length, cases };
 }
 
 /** نویسه‌های نادیدنی (فاصله‌ها، BOM، جهت‌نما) در پیکره با \\uXXXX، تا پرونده خوانا و بی نویسهٔ پنهان بماند */
@@ -386,20 +426,21 @@ function serialize(c) {
     c.cases.map((x) => '    ' + JSON.stringify(x)).join(',\n') + '\n  ]\n}\n');
 }
 
-module.exports = { CORPUS, SEED, COUNT, generate, serialize, runCase, rng, D, J };
+module.exports = { CORPUS, SEED, COUNT, FAMILY_NAMES, generate, serialize, runCase, rng, D, J, R2 };
 
 if (require.main === module) {
   const args = process.argv.slice(2);
   const outAt = args.indexOf('--out');
   const count = Number(process.env.CORE_FUZZ_CASES) || COUNT;
   const seed = Number(process.env.CORE_FUZZ_SEED) || SEED;
-  const text = serialize(generate(seed, count));
+  const only = (process.env.CORE_FUZZ_ONLY || '').split(',').filter(Boolean);
+  const text = serialize(generate(seed, count, only));
   if (outAt >= 0) {
     fs.writeFileSync(args[outAt + 1], text);
-    console.log(`core-fuzz: ${count} مورد (دانهٔ ${seed}) ⇐ ${args[outAt + 1]}`);
+    console.log(`core-fuzz: ${only.length ? count : count * 2} مورد (دانهٔ ${seed}${only.length ? '، فقط ' + only : ''}) ⇐ ${args[outAt + 1]}`);
   } else if (args.includes('--write')) {
     fs.writeFileSync(CORPUS, text);
-    console.log(`core-fuzz: ${count} مورد ⇐ ${path.relative(ROOT, CORPUS)}`);
+    console.log(`core-fuzz: ${count * 2} مورد ⇐ ${path.relative(ROOT, CORPUS)}`);
   } else {
     const same = fs.existsSync(CORPUS) && fs.readFileSync(CORPUS, 'utf8') === text;
     console.log(same ? 'core-fuzz: پیکره با خروجیِ امروز یکی است' : 'core-fuzz: پیکره کهنه است — node server/scripts/core-fuzz.js --write');

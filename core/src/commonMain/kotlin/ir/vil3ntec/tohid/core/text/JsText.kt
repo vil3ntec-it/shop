@@ -28,6 +28,41 @@ object JsText {
   /** `s.trim() === ''` ِ JS */
   fun isBlank(s: String?): Boolean = s == null || s.all(::isSpace)
 
+  /**
+   *  `s.toLowerCase()` ِ JS. تنها قاعدهٔ وابسته به بافت (بی زبان) سیگمای پایانی است و `lowercase()` ِ JVM آن را جورِ دیگر
+   *  می‌بیند: «ΑΣعدد…g» ⇐ JS «ας…» (حرفِ عربی حرفِ حالت‌دار نیست) و JVM «ασ…»؛ «ΑΣ’a» برعکس (فازِ تفاضلی، دسته‌ی کالای جمع‌آوری).
+   *  پس هر «Σ» با قاعدهٔ Unicode ِ Final_Sigma (همان V8/ICU) و میانِ آن‌ها همان `lowercase()`.
+   */
+  fun lowercase(s: String): String {
+    if ('Σ' !in s) return s.lowercase()
+    val out = StringBuilder(s.length)
+    var from = 0
+    for (i in s.indices) {
+      if (s[i] != 'Σ') continue
+      out.append(s.substring(from, i).lowercase()).append(if (finalSigma(s, i)) 'ς' else 'σ')
+      from = i + 1
+    }
+    return out.append(s.substring(from).lowercase()).toString()
+  }
+
+  /** پیش از آن حرفِ حالت‌دار (با نویسه‌های بی‌حالتِ میانی) و پس از آن نه */
+  private fun finalSigma(s: String, at: Int): Boolean {
+    var i = at - 1
+    while (i >= 0 && caseIgnorable(s[i])) i--
+    if (i < 0 || !cased(s[i])) return false
+    i = at + 1
+    while (i < s.length && caseIgnorable(s[i])) i++
+    return i >= s.length || !cased(s[i])
+  }
+
+  private fun cased(c: Char) = c.isUpperCase() || c.isLowerCase() || c.isTitleCase()
+
+  /** Case_Ignorable ِ Unicode: Mn، Me، Cf، Lm، Sk و نشانه‌های MidLetter/MidNumLet/Single_Quote */
+  private fun caseIgnorable(c: Char): Boolean = when (c.category) {
+    CharCategory.NON_SPACING_MARK, CharCategory.ENCLOSING_MARK, CharCategory.FORMAT, CharCategory.MODIFIER_LETTER, CharCategory.MODIFIER_SYMBOL -> true
+    else -> c in "'.:\u00B7\u0387\u055F\u05F4\u2018\u2019\u2024\u2027\uFE13\uFE52\uFE55\uFF07\uFF0E\uFF1A"
+  }
+
   private val DECIMAL = Regex("^[+-]?([0-9]+(\\.[0-9]*)?|\\.[0-9]+)([eE][+-]?[0-9]+)?$")
 
   /**

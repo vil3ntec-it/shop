@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core
 
+import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportClock
 import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.core.report.ReportLedger
@@ -12,6 +13,7 @@ import ir.vil3ntec.tohid.core.stock.StockDoc
 import ir.vil3ntec.tohid.core.stock.StockMode
 import ir.vil3ntec.tohid.core.stock.StockResult
 import ir.vil3ntec.tohid.core.money.Money
+import ir.vil3ntec.tohid.core.risk.CashierAlerts
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.serialization.json.Json
@@ -35,35 +37,41 @@ import java.math.BigDecimal
 
 /**
  *  فازِ تفاضلی — دوندهٔ Kotlin ِ هسته‌هایی که هنوز در `android-native` اند: موجودی (`StockCore`)،
- *  گزارش (`ReportCore`) و دفترِ قرض (`DebtBook`). همان پیکرهٔ `core/test-vectors/core-fuzz-v1.json`
- *  که `server/scripts/core-fuzz.js` با هسته‌های JS ساخته (`out` = خروجیِ JS) و `CoreFuzzTest` ِ core
- *  بقیه‌اش را می‌دواند. روی اندروید (`app/`) و کامپیوتر (`desktop/`) اجرا می‌شود.
- *  اجرای ژرف: CORE_FUZZ_CORPUS=<پیکرهٔ بزرگ>.
+ *  گزارش (`ReportCore`)، دفترِ قرض (`DebtBook`) و (دورِ دوم) تابلوی گزارش (`ReportBoard` + `CashierAlerts`).
+ *  همان پیکرهٔ `core/test-vectors/core-fuzz-v1.json` که `server/scripts/core-fuzz.js` با هسته‌های JS ساخته
+ *  (`out` = خروجیِ JS) و `CoreFuzzTest` ِ core بقیه‌اش را می‌دواند. روی اندروید (`app/`) و کامپیوتر (`desktop/`) اجرا می‌شود.
+ *  اجرای ژرف: CORE_FUZZ_CORPUS=<پیکرهٔ بزرگ>[:<پیکرهٔ بعدی>…] (پشتِ هم، هر بار یکی در حافظه).
  */
 class CoreFuzzAppTest {
 
-  private val corpus: JsonObject by lazy {
-    val deep = System.getenv("CORE_FUZZ_CORPUS")?.takeIf { it.isNotBlank() }?.let(::File)
-    val file = deep ?: generateSequence(File(".").absoluteFile) { it.parentFile }
+  private val deep: List<File>? = System.getenv("CORE_FUZZ_CORPUS")?.takeIf { it.isNotBlank() }?.split(File.pathSeparator)?.map(::File)
+
+  private fun corpora(): List<File> = deep ?: listOf(
+    generateSequence(File(".").absoluteFile) { it.parentFile }
       .map { File(it, "core/test-vectors/core-fuzz-v1.json") }.firstOrNull { it.isFile }
-      ?: error("core/test-vectors/core-fuzz-v1.json پیدا نشد (cwd=${File(".").absoluteFile})")
-    Json.parseToJsonElement(file.readText()).jsonObject
-  }
+      ?: error("core/test-vectors/core-fuzz-v1.json پیدا نشد (cwd=${File(".").absoluteFile})"),
+  )
 
   private val json = Json { encodeDefaults = true }
   private val shop = Json { ignoreUnknownKeys = true; isLenient = true }
 
   @Test
-  fun `فاز — هر موردِ موجودی، گزارش و دفترِ قرض همان خروجیِ JS`() {
-    val cases = corpus.getValue("cases").jsonArray.map { it.jsonObject }
-    val mine = cases.filter { it.fn().substringBefore('.') in FAMILIES }
-    assertTrue("موردها ${mine.size} از ${cases.size}", mine.size >= cases.size / 4)
+  fun `فاز — هر موردِ موجودی، گزارش، دفترِ قرض و تابلوی گزارش همان خروجیِ JS`() {
     val dump = System.getenv("CORE_FUZZ_DUMP")?.takeIf { it.isNotBlank() }?.let { File(it).bufferedWriter() }  // برای کمینه‌سازی: خروجیِ Kotlin ِ هر تفاوت
-    val failures = mine.mapNotNull { c ->
-      val want = c.getValue("out")
-      val got = try { run(c.fn(), c.getValue("in").jsonObject) } catch (e: Exception) { THROWS }
-      if (dump != null && !same(want, got)) dump.write("{\"id\":${c["id"]},\"got\":$got}\n")
-      if (same(want, got)) null else c.fn() to "#${c["id"]} ${c.fn()} ${c["in"].toString().take(300)}\n  JS:     $want\n  Kotlin: $got"
+    val failures = corpora().flatMap { file ->
+      val cases = Json.parseToJsonElement(file.readText()).jsonObject.getValue("cases").jsonArray.map { it.jsonObject }
+      val mine = cases.filter { it.fn().substringBefore('.') in FAMILIES }
+      //  پیکرهٔ مخزن هر خانواده را دست‌کم ۵ بار دارد؛ پیکرهٔ ژرفِ یک جفت (CORE_FUZZ_ONLY) شاید هیچ‌کدامِ این‌ها را نداشته باشد
+      if (deep == null) {
+        val count = mine.groupingBy { it.fn().substringBefore('.') }.eachCount()
+        assertTrue("موردهای هر خانواده: $count", FAMILIES.all { (count[it] ?: 0) >= 5 })
+      }
+      mine.mapNotNull { c ->
+        val want = c.getValue("out")
+        val got = try { run(c.fn(), c.getValue("in").jsonObject) } catch (e: Exception) { THROWS }
+        if (dump != null && !same(want, got)) dump.write("{\"file\":\"${file.name}\",\"id\":${c["id"]},\"got\":$got}\n")
+        if (same(want, got)) null else c.fn() to "#${c["id"]} ${c.fn()} ${c["in"].toString().take(300)}\n  JS:     $want\n  Kotlin: $got"
+      }
     }
     dump?.close()
     val byFn = failures.groupBy({ it.first }, { it.second })
@@ -113,6 +121,36 @@ class CoreFuzzAppTest {
     }
     "report.run" -> report(x)
     "debt.book" -> debt(x)
+    "board.range" -> json.encodeToJsonElement(ReportBoard.Range.serializer(), ReportBoard.range(x.str("span")!!, x.str("today")!!))
+    "board.pct" -> sn(ReportBoard.pct(x.lOrNull("bp")))
+    "board.sort" -> JsonArray(
+      ReportBoard.sortRows(x.getValue("rows").jsonArray.map { r -> r.jsonArray.map { it.jsonPrimitive } }, x.l("col").toInt(), x.getValue("desc").jsonPrimitive.booleanOrNull!!)
+        .map { JsonArray(it) },
+    )
+    "board.alerts" -> {
+      val p = x["policy"] as? JsonObject
+      val rows = x.getValue("rows").jsonArray.map { it.jsonObject }.map {
+        CashierAlerts.Counts(it.str("key") ?: "", it.l("invoices"), it.l("voids"), it.l("discounts"), it.l("noSales"))
+      }
+      JsonArray(
+        CashierAlerts.alerts(rows, CashierAlerts.Policy(p?.lOrNull("minCount") ?: 3, p?.lOrNull("factorPct") ?: 200)).map {
+          obj(
+            "key" to s(it.key), "kind" to s(it.kind.id), "count" to n(it.count), "invoices" to n(it.invoices),
+            "peerCount" to n(it.peerCount), "peerInvoices" to n(it.peerInvoices), "ratioPct" to n(it.ratioPct),
+          )
+        },
+      )
+    }
+    "board.build" -> {
+      val o = x.getValue("opts").jsonObject
+      val clock = (o["clock"] as? JsonObject)?.let { ReportClock.fixed(it.getValue("offsetMinutes").jsonPrimitive.int, it.getValue("dayStartMinute").jsonPrimitive.int) }
+      val home = ReportBoard.build(
+        ReportLedger.parse(x.getValue("ledger").jsonObject), o.str("date")!!, clock,
+        if (o.str("costing") == "mavg") ReportCore.Costing.MAVG else ReportCore.Costing.LINE,
+        o.str("costApproved") == "true", o.str("money") != "false",
+      )
+      json.encodeToJsonElement(ReportBoard.Home.serializer(), home)
+    }
     else -> error("تابعِ ناشناخته: $fn")
   }
 
@@ -240,7 +278,7 @@ class CoreFuzzAppTest {
   private fun obj(vararg kv: Pair<String, JsonElement>) = JsonObject(linkedMapOf(*kv))
 
   companion object {
-    private val FAMILIES = setOf("stock", "report", "debt")
+    private val FAMILIES = setOf("stock", "report", "debt", "board")
     private val THROWS = JsonObject(mapOf("throws" to JsonPrimitive(true)))
     private val SAFE = BigDecimal("9007199254740991")
 
