@@ -39,7 +39,7 @@ val OnboardingModule = AppModule(
       TermsPage(accepting = false, onClose = { back() }, onAccept = { back() })
     },
     V3Route(OnboardingPaths.CODE, RouteKind.SHEET, { StrAuth.emailSignIn }, chrome = Chrome.OWN) {
-      EmailCodeSheet(onClose = { back() }, onSignedIn = { shell.afterSignIn() })
+      EmailCodeSheet(onClose = { back() }, onSignedIn = { shell.afterSignIn() }, store = store)
     },
     V3Route(OnboardingPaths.SHOP_SETUP, RouteKind.GATE, { StrAuth.setupShop }, chrome = Chrome.OWN) {
       ShopSetupGate(store) { nav.passGate() }

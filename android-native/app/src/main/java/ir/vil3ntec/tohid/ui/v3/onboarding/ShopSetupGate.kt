@@ -117,7 +117,7 @@ fun ShopSetupGate(store: ShopStore, onDone: () -> Unit) {
               it.role?.let { role -> ShopRole.remember(context, role) }
               settle(it.shop?.id.orEmpty())
             }
-            .onFailure { fail(it.userText(StrAuth.joinFailed)) }
+            .onFailure { fail(StaffJoinErrors.message(it)) }
           busy = false
         }
       }

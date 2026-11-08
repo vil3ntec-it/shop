@@ -227,7 +227,8 @@ private class AppLivePort(private val app: Context) : LivePort {
     //  سرورِ شبکهٔ دکان با گواهیِ سنجاق‌شده (پرچمِ `app.multi_server`)؛ وگرنه همان کلاینت.
     //  بلیت از `ApiClient` می‌رود که `HttpEngine` ِ آن همان گواهی را می‌سنجد (`ServerSwitchAndroid.prepare`)
     val http = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.okHttp(client, base)
-    val device = runCatching { ir.vil3ntec.tohid.sync.SyncStore(app).deviceUid }.getOrDefault("")
+    //  همان `device_id` ِ push (`SyncReplica`) تا سرور push ِ همین حساب را به سوکتِ خودش برنگرداند
+    val device = runCatching { SyncV1Engine.of(app).deviceId() }.getOrDefault("")
     return LiveTarget(token, base, device, AppConfig.appId) { url, listener ->
       http.newWebSocket(Request.Builder().url(url).build(), listener)
     }

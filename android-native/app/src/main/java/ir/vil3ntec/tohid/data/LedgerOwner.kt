@@ -159,6 +159,22 @@ object LedgerOwner {
      *     همان لحظه از دستش می‌گرفتیم.
      */
     val adopting = previousUser.isBlank() || (previousUser == user && previousShop.isBlank())
+    /*
+     *  همان حساب از «بی‌دکان» به دکانی رسید که دفترش از پیش **بایگانی** شده (ورودی که دکان را نمی‌دانست
+     *  `حساب@خالی` ِ خالی باز کرده بود) ⇒ دفترِ واقعیِ آن دکان باز می‌شود، نه آن‌که دفترِ خالی سندِ دکان بخورد
+     *  و دفترِ واقعی برای همیشه در بایگانی بماند.
+     */
+    if (adopting && previousUser == user && shop.isNotBlank()) {
+      val scope = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scope(context)
+      val to = key(scope, user, shop)
+      if (store.deskEmpty() && store.hasVault(to)) {
+        store.openFrom(to)
+        runCatching { PhotoStore.openFrom(context, to) }
+        state.accountId = user
+        remember(context, user, shop)
+        return Result.SWITCHED
+      }
+    }
     if (adopting) {
       state.accountId = user
       remember(context, user, shop)
@@ -172,6 +188,8 @@ object LedgerOwner {
 
     store.stashTo(from)
     state.forgetAccountState()
+    //  همان حساب، دکانِ دیگر ⇒ صف/سایه/cursor ِ دکانِ پیشین هم کنارِ دفترش (کلیدِ v1 شناسهٔ حساب است، نه دکان)
+    if (previousUser == user) runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Keys.switchShop(context, user, previousShop, shop) }
     store.openFrom(to)
 
     /*

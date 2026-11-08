@@ -184,6 +184,7 @@ function isPhotoWrite(req) {
  *  فقط شناسه‌ای که مالِ **کاربرِ دیگری** ثبت شده رد می‌شود.
  */
 const DEVICE_FLAG = 'sync.device_bind';
+const replica = require('./sync-replica');
 const DEVICE_MISMATCH = 'این شناسهٔ دستگاه مالِ این نشست نیست. از برنامه خارج و دوباره وارد شوید.';
 
 /** همهٔ شناسه‌هایی که درخواست برای «دستگاهِ من» آورده — هر مسیر یکی از این‌ها را می‌خواند. */
@@ -237,7 +238,9 @@ async function checkDevice(req, ctx) {
   const claims = claimedDevices(req);
   if (!claims.length) return null;
   if (ctx.deviceUid) {
-    const other = claims.find((c) => c !== ctx.deviceUid);
+    //  حسابِ دوم روی همان دستگاه (`lib/sync-replica.js`): همان دستگاه + برچسبِ **همین** کاربر، نه کسِ دیگر
+    const own = ctx.accountKind === SHOP.app && ctx.userId ? replica.scoped(ctx.deviceUid, ctx.userId) : null;
+    const other = claims.find((c) => c !== ctx.deviceUid && c !== own);
     if (!other) return null;
     const enforced = await bindEnforced(ctx);
     await noteMismatch(req, ctx, other, enforced);

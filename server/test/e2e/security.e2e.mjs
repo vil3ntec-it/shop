@@ -14,6 +14,7 @@
  */
 import { createHash } from 'node:crypto';
 import { boot, assert } from './lib/harness.mjs';
+import { NativeDevice } from './lib/native.mjs';
 
 const E = await boot({ name: 'security' });
 const { db } = E;
@@ -158,5 +159,25 @@ await E.step('SYN-10.logout', 'خروج پس از همگام‌سازی: سرو�
   assert.deepEqual(N.ledger.sales.map((s) => s.id).sort(), sales, 'پس از خروج چیزی گم شد');
   assert.equal(N.stock(product), A.stock(product));
 }, { needs: ['#246'] });
+
+await E.step('SYN-10.staff-code', 'کدِ شاگرد روی دستگاهِ تازه (بی ایمیل): دکانِ همان صاحب با نقشِ شاگرد و Snapshot ِ کامل؛ کدِ تمام‌شده حسابِ شبح نمی‌سازد', async () => {
+  const sales = A.ledger.sales.map((s) => s.id).sort();
+  const code = E.ok(await E.post('/api/shop/staff-code', {}, (await E.device('A2-owner-one', one.email)).token), 'کدِ شاگرد').code;
+  const login = await E.post('/api/auth/staff', { code, name: 'شاگردِ کد', device: { uid: 'C-staff-code-phone', name: 'گوشیِ شاگرد' } });
+  assert.equal(login.status, 201, JSON.stringify(login.body));
+  assert.equal(login.body.shop.id, one.shopId, 'شاگرد به دکانِ کارفرما نرسید');
+  assert.equal(login.body.shop.role, 'staff');
+  const C = new NativeDevice(E, 'C-staff-code', { deviceId: 'C-staff-code-phone' });
+  C.token = login.body.accessToken;
+  C.refreshToken = login.body.refreshToken;
+  C.user = login.body.user;
+  assert.equal((await C.firstSync()).ok, true);
+  assert.deepEqual(C.ledger.sales.map((s) => s.id).sort(), sales, 'شاگرد دفترِ کاملِ دکان را نگرفت');
+  assert.equal(C.stock(product), A.stock(product));
+  const users = Number((await db.one('SELECT COUNT(*)::int AS n FROM users')).n);
+  const wrong = await E.post('/api/auth/staff', { code: 'XXXX-XXXX-XXXX', device: { uid: 'ghost-phone' } });
+  assert.equal(wrong.body.error.code, 'bad_code');
+  assert.equal(Number((await db.one('SELECT COUNT(*)::int AS n FROM users')).n), users, 'کدِ غلط حسابِ شبح ساخت');
+}, { needs: ['SYN-10.logout'] });
 
 await E.finish();

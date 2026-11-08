@@ -881,6 +881,16 @@ class ShopStore(
 
   private fun vault(key: String) = File(home, "ledger-${safeKey(key)}.json")
 
+  /** آیا دفترِ حسابی زیرِ این نام بایگانی شده (`LedgerOwner`: «بی‌دکان ⇒ دکانِ بایگانی‌شده») */
+  fun hasVault(key: String): Boolean = vault(key).exists()
+
+  /** دفترِ روی میز هیچ ردیفِ شناسه‌داری ندارد (فهرست‌های نامیِ پیش‌فرض شمرده نمی‌شوند) */
+  fun deskEmpty(): Boolean = _data.value.let { d ->
+    d.products.isEmpty() && d.sales.isEmpty() && d.saleItems.isEmpty() && d.debtors.isEmpty() &&
+      d.transactions.isEmpty() && d.expenses.isEmpty() && d.warehouseEntries.isEmpty() && d.suppliers.isEmpty() &&
+      d.purchases.isEmpty() && d.supplierPayments.isEmpty() && d.saleReturns.isEmpty() && d.stockMovements.isEmpty()
+  }
+
   /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
   suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
     if (TrainingMode.on) return@withContext   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)

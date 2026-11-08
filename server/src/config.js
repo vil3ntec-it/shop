@@ -582,6 +582,11 @@ const config = {
       waitMs: Math.max(0, num(process.env.SYNC_V3_GATE_WAIT_MS, 8000)),
       queueMax: Math.max(0, Math.floor(num(process.env.SYNC_V3_GATE_QUEUE_MAX, 200))),
     },
+    /**
+     * ⛔ پیش‌فرض خاموش. اعمالِ دسته‌ایِ push (`lib/sync-v3-batch.js`): تکراری‌ها، ردیف‌ها و شمارهٔ دفترِ همهٔ
+     * دسته یک‌جا، و نوشتنِ op/ردیف/تعارض در یک دستور — همان پاسخ و همان دفتر که راهِ تک‌تک (`sync-v3-batch.test.js`).
+     */
+    batch: bool(process.env.SYNC_V3_BATCH, false),
   },
 
   /**

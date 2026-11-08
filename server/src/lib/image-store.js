@@ -77,8 +77,11 @@ function warn(code, err) {
   console.warn(`[image-store] ${code}${err ? `: ${err.message}` : ''}`);
 }
 
-/** شیءِ یک کلید پس از سنجشِ مالکیت، درستی و نوع — یا null. */
-async function fetchObject(tenant, key) {
+/**
+ * شیءِ یک کلید پس از سنجشِ مالکیت، درستی و نوع — یا null. [check] نوع از روی بایت (پیش‌فرض JPEG/PNG/WebP؛ رسانهٔ
+ * چت/پشتیبانی سنجهٔ خودش را دارد: `lib/media-store.js`).
+ */
+async function fetchObject(tenant, key, check = sniff) {
   if (!owns(tenant, key)) { warn('foreign_key'); return null; }
   const a = current();
   if (!a) { warn('no_backend'); return null; }
@@ -86,17 +89,17 @@ async function fetchObject(tenant, key) {
   try { buf = await a.get(key); } catch (e) { warn('read_failed', e); return null; }
   counters.reads++;
   if (!buf) { counters.readMisses++; return null; }
-  if (sha256(buf).slice(0, 16) !== key.slice(-16) || !sniff(buf)) { warn('integrity'); return null; }
+  if (sha256(buf).slice(0, 16) !== key.slice(-16) || !check(buf)) { warn('integrity'); return null; }
   return buf;
 }
 
 /** بایت‌های یک ردیف (`{data, store_key}`) — یا null. */
-async function bytes(tenant, row) {
+async function bytes(tenant, row, check = sniff) {
   if (!row) return null;
   const inDb = row.data === null || row.data === undefined ? null : Buffer.from(row.data);
   const key = row.store_key || '';
   if (key && (objectMode() || !inDb)) {
-    const b = await fetchObject(tenant, key);
+    const b = await fetchObject(tenant, key, check);
     if (b) return b;
   }
   return inDb;
@@ -105,12 +108,14 @@ async function bytes(tenant, row) {
 /**
  * نوشتن: بایت را آماده می‌کند و `fn({data, key})` را صدا می‌زند تا ردیف را بنویسد (`data` = بایت یا null،
  * `key` = '' یا نشانیِ شیء) و `s.used = true` بگذارد. حالتِ `db` ⇒ فقط `{data: buf, key: ''}`. حالتِ شیء ⇒ اول شیء
- * (بیرون از تراکنشِ پایگاه)؛ اگر `fn` خطا داد یا ردیف را ننوشت (تکرار) شیء همان دم پاک می‌شود.
+ * (بیرون از تراکنشِ پایگاه)؛ اگر `fn` خطا داد یا ردیف را ننوشت (تکرار) شیء همان دم پاک می‌شود. [check] همان سنجهٔ
+ * نوعِ `fetchObject`؛ نوعِ ناشناس ⇒ خطا، مگر `keepUnknown` (رسانهٔ پشتیبانی: بایت همان‌جا در پایگاه، مثلِ پیش).
  */
-async function withStaged(tenant, buf, fn) {
+async function withStaged(tenant, buf, fn, { check = sniff, keepUnknown = false } = {}) {
   if (!objectMode()) return fn({ data: buf, key: '', used: false });
-  const mime = sniff(buf);
-  if (!mime) throw new Error('image-store: only JPEG/PNG/WebP');
+  const mime = check(buf);
+  if (!mime && keepUnknown) return fn({ data: buf, key: '', used: false });
+  if (!mime) throw new Error(check === sniff ? 'image-store: only JPEG/PNG/WebP' : 'image-store: unsupported type');
   const s = { data: null, key: keyFor(tenant, buf), used: false };
   await current().put(s.key, buf, mime);
   counters.writes++;

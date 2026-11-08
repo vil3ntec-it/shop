@@ -40,7 +40,7 @@ async function shopWithStaff(label) {
   //  شاگرد برای نوشتن `multi_device` می‌خواهد — اشتراکِ دکان از پنل
   const g = await h.post('/api/admin/subscriptions', { shopId, plan: 'pro', days: 30 }, { token: admin, headers: { 'Idempotency-Key': `g-${Date.now()}-${seq++}` } });
   assert.ok(g.status < 300, JSON.stringify(g.body));
-  return { shopId, owner: owner.accessToken, ownerDev, staff: staff.accessToken, staffDev };
+  return { shopId, owner: owner.accessToken, ownerDev, staff: staff.accessToken, staffDev, ownerAcct: o, staffAcct: s };
 }
 
 test.before(async () => {
@@ -105,6 +105,29 @@ test('SEC-AUTH-14: نشستِ بی دستگاه با پرچمِ روشن شنا�
   assert.equal((await one('SELECT device_id FROM tokens WHERE kind=$1 AND token_hash=$2', ['access', require('../src/lib/tokens').hashToken(bare)])).device_id, null);
   assert.equal((await push(bare, c.ownerDev, [ins('x-' + seq)])).status, 403);
   assert.equal((await push(bare, 'fresh-unbound-install', [ins('y-' + seq)])).status, 200);
+});
+
+test('حسابِ دوم روی همان گوشی (`lib/sync-replica.js`): شناسهٔ «دستگاه-برچسبِ همین کاربر» پذیرفته (پرچم روشن)، برچسبِ کسِ دیگر نه؛ pull opهای صاحبِ همان گوشی را می‌دهد و ردیفِ صاحب مالِ شاگرد نیست', async () => {
+  const replica = require('../src/lib/sync-replica');
+  //  همان بردارهای `SyncReplicaTest.kt` ِ برنامه
+  assert.equal(replica.tag('usr_abc'), '39gjg7qg46c1q');
+  assert.equal(replica.tag('حسن'), '4srrna9nrxwo');
+  const e = await shopWithStaff('ه');
+  await flag(e.shopId, true);
+  assert.equal((await push(e.owner, e.ownerDev, [ins('tea')])).status, 200);
+  //  صاحب خارج شد؛ شاگرد روی **همان گوشی** وارد می‌شود ⇒ توکنش به همان دستگاه بسته است
+  const same = (await h.post('/api/auth/login', { identifier: e.staffAcct.email, password: e.staffAcct.password, device: { deviceId: e.ownerDev, name: 'گوشیِ صاحب', platform: 'android' } })).body.accessToken;
+  const mine = replica.scoped(e.ownerDev, e.staffAcct.user.id);
+  const ok = await push(same, mine, [ins('sugar')], { 'X-Device': e.ownerDev });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const pulled = await h.get(`/api/sync/v1/pull?device_id=${mine}&since=0`, { token: same, headers: { 'X-App': 'shop', 'X-Device': e.ownerDev } });
+  assert.equal(pulled.status, 200, JSON.stringify(pulled.body));
+  assert.ok(pulled.body.ops.some((o) => o.row_id === 'tea'), 'opِ صاحب از همان گوشی به حسابِ شاگرد رسید');
+  const del0 = await push(same, mine, [del('tea')]);
+  assert.equal(del0.body.results[0].reason, 'delete_not_allowed', JSON.stringify(del0.body));
+  //  برچسبِ کاربرِ دیگر (صاحب) یا دستگاهِ دیگر با برچسبِ خودش ⇒ ناجور
+  assert.equal((await push(same, replica.scoped(e.ownerDev, e.ownerAcct.user.id), [ins('salt')])).status, 403);
+  assert.equal((await push(same, replica.scoped(e.staffDev, e.staffAcct.user.id), [ins('salt')])).status, 403);
 });
 
 test('SEC-AUTH-14: کامپیوترِ پمپ (توکنِ دستگاه) هم فقط با شناسهٔ خودش', async () => {
