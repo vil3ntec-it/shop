@@ -679,7 +679,7 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
   if (ro === 'thumb' && s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'پیش‌نمایش باید عکس باشد');
   const cap = capOf(s.kind, ro);
   if (buf.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
-  const data = s.kind === 'image' ? chatMedia.stripImageMetadata(buf, s.mime) : buf;
+  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, ro) : buf;   //  سقفِ ابعاد از سرآیند (CHAT-05)
   const hash = sha256(data);
   const ins = await mediaStore.chat.put(conv.shop_id, s.mime, data, async (st) => (st.used = await one(
     `INSERT INTO shop_chat_media (id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, data, created_at, store_key)

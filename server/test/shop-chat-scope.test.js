@@ -192,3 +192,68 @@ test('CHAT-10: درِ مشتری (ویترین) هم فایلِ اجرایی، M
   assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1', [conv])).n), 0);
   assert.equal((await h.api('GET', `/api/store/${slug}/chat/conversations/${conv}`, { headers })).status, 200, 'سرویس سرپاست');
 });
+
+test('CHAT-05: عکسِ مشتری از ویترین — سقف‌ها با گشودنِ گفت‌وگو؛ بمبِ ابعاد (PNG/JPEG/WebP، پیش‌نمایشِ بزرگ) پیش از ذخیره ۴۱۳ از هر دو طرف؛ عکسِ درست بی EXIF، تکرارِ همان بایت همان رسانه و همان پیام', async () => {
+  const F = require('./image-fixtures');
+  const o = await chatShop('عکسِ ویترین');
+  for (const key of ['shop.orders', 'shop.storefront']) {
+    const r = await h.put('/api/admin/pump/live-config', { scope: o.shopId, key, value: true }, { token: admin });
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+  }
+  const slug = `photo-${uniq()}`;
+  assert.equal((await h.put('/api/shop/storefront', { slug, enabled: true, title: 'عکسِ ویترین', contactPhone: '0700000026' }, { token: o.token })).status, 200);
+  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790002626' });
+  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790002626', code: start.body.devCode });
+  assert.equal(check.status, 200, JSON.stringify(check.body));
+  const headers = { 'X-Store-Ticket': check.body.ticket };
+  const opened = await h.api('POST', `/api/store/${slug}/chat/conversations`, { body: {}, headers });
+  assert.equal(opened.status, 201, JSON.stringify(opened.body));
+  assert.deepEqual(opened.body.limits, { imageMax: 1536 * 1024, thumbMax: 64 * 1024 }, 'ویترین سقفِ سرور را می‌گیرد، نه عددِ ثابتِ خودش');
+  const conv = opened.body.conversation.id;
+  const up = (buf, role = 'main') => h.raw('POST', `/api/store/${slug}/chat/conversations/${conv}/media?role=${role}`, buf, { headers: { ...headers, 'Content-Type': 'image/jpeg' } });
+  const media = async () => Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1', [conv])).n);
+
+  const bombs = [
+    [F.pngBomb(16000, 16000), 'main', 'PNG ِ یک‌بیتیِ ۱۶۰۰۰² (چند ده KB، ۱ گیگابایت پس از رمزگشایی)'],
+    [F.jpeg(100, 100, { sof: [20000, 100] }), 'main', 'JPEG با دو SOF (رمزگشا اولی را می‌خواند)'],
+    [F.webp(50, 40, { bits: [12000, 9000] }), 'main', 'WebP ِ بومِ کوچک با جریانِ بزرگ'],
+    [F.jpeg(7000, 7000), 'main', 'JPEG ِ ۴۹ مگاپیکسل'],
+    [F.jpeg(2000, 1500), 'thumb', 'پیش‌نمایشِ ۲۰۰۰px'],
+  ];
+  for (const [buf, role, what] of bombs) {
+    const r = await up(buf, role);
+    assert.equal(r.status, 413, `${what}: ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'image_too_large_dimensions', what);
+  }
+  const shopBomb = await h.raw('POST', `${base}/conversations/${conv}/media`, F.pngBomb(16000, 16000), { token: o.token });
+  assert.equal(shopBomb.status, 413, 'همان سقف برای کارمند هم');
+  assert.equal(await media(), 0, 'هیچ ردیفِ رسانه‌ای از بمب نماند');
+
+  //  همان شکلِ خروجیِ ویترین: ≤ ۱۶۰۰px و پیش‌نمایشِ ۳۲۰px؛ EXIF ِ GPS و توضیح را سرور هم برمی‌دارد
+  const main = F.jpeg(1600, 1200, { gps: true, seed: 7 });
+  const a = await up(main);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const again = await up(main);
+  assert.equal(again.status, 201);
+  assert.ok(again.body.reused && again.body.mediaId === a.body.mediaId, 'بارگذاریِ دوبارهٔ همان بایت ⇒ همان رسانه (سهم پس داده می‌شود)');
+  const thumb = await up(F.jpeg(320, 240, { seed: 8 }), 'thumb');
+  assert.equal(thumb.status, 201, JSON.stringify(thumb.body));
+  assert.equal(await media(), 2);
+  const msg = { clientId: cid(), kind: 'image', mediaId: a.body.mediaId, thumbId: thumb.body.mediaId, meta: { width: 1600, height: 1200 } };
+  const s1 = await h.api('POST', `/api/store/${slug}/chat/conversations/${conv}/messages`, { body: msg, headers });
+  const s2 = await h.api('POST', `/api/store/${slug}/chat/conversations/${conv}/messages`, { body: msg, headers });
+  assert.equal(s1.status, 201, JSON.stringify(s1.body));
+  assert.equal(s2.status, 200, 'تلاشِ دوباره با همان clientId ⇒ همان پیام');
+  assert.equal(s2.body.message.id, s1.body.message.id);
+  assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1', [conv])).n), 1);
+
+  const seen = await h.get(`${base}/conversations/${conv}/messages?after=0`, { token: o.token });
+  const m = seen.body.messages.find((x) => x.id === s1.body.message.id);
+  assert.ok(m && m.kind === 'image' && m.media.thumbId === thumb.body.mediaId && m.meta.width === 1600, JSON.stringify(m));
+  const bytes = await h.download(`${base}/conversations/${conv}/media/${m.media.id}`, { token: o.token });
+  assert.equal(bytes.status, 200);
+  assert.equal(bytes.headers.get('content-type'), 'image/jpeg');
+  const text = bytes.buffer.toString('latin1');
+  assert.ok(!text.includes('Exif') && !text.includes('34.5,69.1'), 'دکان عکس را بی EXIF و بی توضیحِ مکان می‌گیرد');
+  assert.deepEqual(require('../src/lib/chat-media').dimsOf(bytes.buffer, 'image/jpeg'), { width: 1600, height: 1200 });
+});
