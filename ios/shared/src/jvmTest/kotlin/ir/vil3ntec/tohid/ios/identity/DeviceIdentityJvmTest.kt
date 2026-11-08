@@ -227,9 +227,6 @@ class DeviceIdentityJvmTest {
     //  تازه می‌برد ([K.V1_SUITE])، cursor و سایه‌اش را حصارِ کدِ مشترک (`V1Replica.fence`) — پس «فقط همین دستگاه» نیست ولی در فهرست هست
     for (section in listOf("cloud-backup", "device-transfer")) {
       val body = xml.substringAfter("<$section>").substringBefore("</$section>")
-      //  `K.V1_SUITE` = `tohid-sync-v1` (replica و cursor ِ هر حساب) را اندروید از پشتیبان بیرون می‌گذارد (DATA-06، `claude/android-restore-id`)؛
-      //  روی آیفون پاک نمی‌شود، چون حصارِ مشترکِ `V1ReplicaAndroid` + `core/sync/RestoredDevice` (در ios-exclude نیست) همان حال را
-      //  به `device_uid` ِ امروز می‌بندد و پس از بازیابی پیش از هر Pull «بازسازی از سرور» می‌کند — همان تضمین، بی پاک کردن
       assertEquals((K.DEVICE_ONLY + K.V1_SUITE).toSet(), rule.findAll(body).map { it.groupValues[1] }.toSet(), section)
     }
   }
