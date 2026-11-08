@@ -30,8 +30,8 @@
       "optional": 1
     },
     "byShape": {
-      "extracted": 692,
-      "empty": 297,
+      "extracted": 691,
+      "empty": 298,
       "unresolved": 2
     }
   },
@@ -715,7 +715,7 @@
     {"method":"POST","path":"/api/shop/invite","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('staffcode.create')","requireFeature('multi_device')"],"params":[],"query":[],"body":["expiresInDays","maxUses","role"],"response":{"statuses":[201],"keys":["code","expiresAt","id","maxUses","role"]},"errors":["400 courier_invite_expiry","400 courier_invite_single_use","403 subscription_required","404 delivery_disabled"],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/join","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["code"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/leave","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok"]},"errors":["400 owner_cannot_leave"],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/ledger-merge/config","area":"shop","source":"server/src/routes/shop-ledger-merge.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-ledger-merge-ip' ","requireUser","requireShop"],"params":[],"query":["v"],"body":[],"response":{"statuses":[200],"keys":["base","enabled","v"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/ledger-merge/config","area":"shop","source":"server/src/routes/shop-ledger-merge.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-ledger-merge-ip' ","requireUser","requireShop"],"params":[],"query":["v"],"body":[],"response":{"statuses":[200],"keys":["base","enabled","shadowFile","v"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/loyalty","area":"shop","source":"server/src/routes/shop-loyalty.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-loyalty-ip' })","requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","permissions"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/loyalty","area":"shop","source":"server/src/routes/shop-loyalty.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-loyalty-ip' })","requireUser","requireShop","requirePermission('settings.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","permissions"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/market","area":"shop","source":"server/src/routes/market-admin.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["directory","listing"]},"errors":[],"shape":"extracted"},
@@ -850,7 +850,7 @@
     {"method":"GET","path":"/api/shop/staff-time/punches","area":"shop","source":"server/src/routes/staff-time.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":["from","member","to"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/staff-time/punches","area":"shop","source":"server/src/routes/staff-time.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":["deviceUid"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/staff/join","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["code"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/stock-ledger/config","area":"shop","source":"server/src/routes/shop-stock-ledger.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["enabled"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/stock-ledger/config","area":"shop","source":"server/src/routes/shop-stock-ledger.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/shop/storefront","area":"shop","source":"server/src/routes/storefront-admin.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["settings"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/storefront/area-requests","area":"shop","source":"server/src/routes/storefront-admin.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/storefront/area-requests/:id/notified","area":"shop","source":"server/src/routes/storefront-admin.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
