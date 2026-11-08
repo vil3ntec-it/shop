@@ -273,7 +273,8 @@ object PromoCore {
 
   // ── تاریخ ───────────────────────────────────────────────
 
-  private val DATE_RE = Regex("^(\\d{4})-(\\d{2})-(\\d{2})$")
+  //  `[0-9]` نه `\d`: روی اندروید (ICU) `\d` رقمِ فارسی را هم می‌گیرد و JS نه
+  private val DATE_RE = Regex("^([0-9]{4})-([0-9]{2})-([0-9]{2})$")
 
   /** «YYYY-MM-DD» ⇒ شمارهٔ روز از ۱۹۷۰-۰۱-۰۱؛ نادرست ⇒ null */
   private fun epochDay(s: String): Long? {

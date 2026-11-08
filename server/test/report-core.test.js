@@ -33,6 +33,11 @@ test('آزمون‌های مرجع: هر مورد عیناً همان expect', (
   }
 });
 
+test('آزمون‌های مرجعِ فقط-وب (عدد به‌صورتِ متن، BOM در نام): هر مورد عیناً همان expect — همان Kotlin (فازِ تفاضلی)', () => {
+  assert.ok(vectors.webOnly.length >= 3);
+  for (const c of vectors.webOnly) assert.deepEqual(JSON.parse(JSON.stringify(run(c))), c.expect, c.name);
+});
+
 test('ES5: بی let/const/arrow/backtick — همان قیدِ sync-core برای گوشی‌های قدیمی', () => {
   const src = fs.readFileSync(file, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '');
   assert.doesNotMatch(src, /=>|`|\blet\s|\bconst\s|\bclass\s/);

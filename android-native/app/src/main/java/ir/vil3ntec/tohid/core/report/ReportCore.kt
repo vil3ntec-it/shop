@@ -208,7 +208,10 @@ object ReportCore {
           val r = x.r!!
           val item = l.itemById[r.saleItemId]
           if (item == null || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0L; continue }
-          val c = rnd(line.getValue(item.id).toDouble() * r.qty.toDouble() / item.qty.toDouble())
+          //  برگشتیِ پیش از فروشش (ساعتِ دستگاهِ عقب، دادهٔ کهنه): بهای قلم هنوز معلوم نیست ⇒ بهای ثبت‌شده، مثلِ LINE
+          val known = line[item.id]
+          val c = if (known == null) rnd(item.unitCost.toDouble() * r.qty.toDouble() / 1000.0)
+          else rnd(known.toDouble() * r.qty.toDouble() / item.qty.toDouble())
           ret[r.id] = c
           if (item.productId != "") put(pool(item.productId), r.qty, c)
         }

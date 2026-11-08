@@ -256,7 +256,8 @@
       } else {
         var r = x.r, item = L.itemById[r.saleItemId];
         if (!item || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0; return; }
-        var c = rnd(line[item.id] * r.qty / item.qty);
+        //  برگشتیِ پیش از فروشش (ساعتِ دستگاهِ عقب، دادهٔ کهنه): بهای قلم هنوز معلوم نیست ⇒ بهای ثبت‌شده، مثلِ 'line'
+        var c = line[item.id] === undefined ? rnd(item.unitCost * r.qty / 1000) : rnd(line[item.id] * r.qty / item.qty);
         ret[r.id] = c;
         if (item.productId !== '') put(pool(item.productId), r.qty, c);
       }

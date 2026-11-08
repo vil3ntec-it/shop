@@ -128,6 +128,18 @@ class StockCoreVectorsTest {
   }
 
   @Test
+  fun `mulDivRound — ورودی یا حاصلِ بیرون از بازهٔ امن رد می‌شود`() {
+    //  همان JS: پیش‌تر Kotlin 2^54 را برمی‌گرداند و 2^53 را می‌پذیرفت (فازِ تفاضلی)
+    val rows = vectors["mulDivRoundRefuse"]!!.jsonArray
+    assertTrue(rows.size >= 5)
+    for (row in rows) {
+      val (a, b, c) = row.jsonArray.map { it.jsonPrimitive.longOrNull!! }
+      val r = runCatching { StockCore.mulDivRound(a, b, c) }
+      assertTrue("mulDivRound($a, $b, $c) = ${r.getOrNull()}", r.isFailure)
+    }
+  }
+
+  @Test
   fun `FEFO`() {
     for (fc in vectors["fefo"]!!.jsonArray.map { it.jsonObject }) {
       val today = fc.str("today")
@@ -203,5 +215,7 @@ class StockCoreVectorsTest {
     }
     assertEquals(plain(v["exportHeader"]), StockCore.EXPORT_HEADER)
     assertEquals(plain(v["exportRows"]), StockCore.exportRows(docs))
+    val blank = v["exportBlank"]!!.jsonObject
+    assertEquals(plain(blank["rows"]), StockCore.exportRows(blank["docs"]!!.jsonArray.map { doc(it.jsonObject) }))
   }
 }

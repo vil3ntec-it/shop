@@ -28,6 +28,10 @@
     [-9007199254740991, 4503599627370496, 9007199254740991, -4503599627370496],
     [4503599627370497, 3, 6, 2251799813685249]
   ],
+  "mulDivRoundRefuse": [
+    [9007199254740992, 1, 1], [1, -9007199254740992, 1], [1, 1, 9007199254740992], [4503599627370496, 4, 1],
+    [-9007199254740991, 9007199254740991, 1], [1, 1, 0], [3, 3, -1]
+  ],
   "fefo": [
     {
       "name": "same expiry falls back to receipt sequence; no expiry last; expired skipped",
@@ -298,7 +302,11 @@
         {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "productionDate": "2026-05-01", "expiryDate": "2026-04-01"}}, "expect": {"ok": false, "error": "bad_date"}},
         {"doc": {"type": "cost_adjust", "valueMinor": 0, "reason": "x"}, "expect": {"ok": false, "error": "bad_cost"}},
         {"doc": {"type": "cost_adjust", "valueMinor": 100, "qtyMilli": 5, "reason": "x"}, "expect": {"ok": false, "error": "bad_qty"}},
-        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}}
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}},
+        {"doc": {"type": "sale", "qtyMilli": 1000, "userId": "\ufeff"}, "expect": {"ok": false, "error": "user_required"}},
+        {"doc": {"type": "sale", "qtyMilli": 0, "userId": "\u001f"}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"doc": {"type": "damage", "qtyMilli": 1000, "reason": "\ufeff\u00a0"}, "expect": {"ok": false, "error": "reason_required"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "expiryDate": "۲۰۲۶-۰۵-۰۱"}}, "expect": {"ok": false, "error": "bad_date"}}
       ],
       "final": {"positions": [], "totals": {"purchasesMinor": 0, "cogsMinor": 0}}
     }
@@ -334,6 +342,10 @@
       ["d5", 5000, "transfer_out", "P1", "W1", -1000, "", "u1", "", "", "T1"],
       ["d6", 6000, "reserve", "P1", "W1", 0, "", "u3", "", "", ""],
       ["d7", 7000, "cost_adjust", "P1", "W1", 0, 50, "u1", "حمل", "", ""]
-    ]
+    ],
+    "exportBlank": {
+      "docs": [{"id": "x1", "type": "cost_adjust", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 1, "reason": "حمل"}],
+      "rows": [["x1", 1, "cost_adjust", "P1", "W1", 0, "", "u1", "حمل", "", ""]]
+    }
   }
 }

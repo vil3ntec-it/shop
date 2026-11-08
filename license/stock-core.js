@@ -584,7 +584,7 @@
     return docs.map(function (d) {
       var amount = '';
       var spec = specOf(d.type);
-      if (spec && spec.value) amount = d.valueMinor;
+      if (spec && spec.value) amount = present(d.valueMinor) ? d.valueMinor : '';  // بی مبلغ ⇒ خالی، نه undefined (همان Kotlin)
       else if (present(d.costMinor)) amount = d.costMinor + (d.type === 'purchase_receipt' ? (d.landedMinor || 0) : 0);
       var lotId = d.lot && d.lot.lotId ? d.lot.lotId : (d.lotId || '');
       return [d.id, d.at, d.type, d.productId, d.warehouseId, signedQtyMilli(d), amount,

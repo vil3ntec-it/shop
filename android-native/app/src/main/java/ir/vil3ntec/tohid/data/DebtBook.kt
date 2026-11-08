@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.text.JsText
 import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.money.Currency
@@ -171,7 +172,7 @@ object DebtBook {
 
     val entries = raws.mapIndexed { i, r ->
       val give = r.tx.type == "give"
-      val due = if (give) r.tx.dueDate?.trim()?.takeIf { it.isNotEmpty() } else null
+      val due = if (give) r.tx.dueDate?.let(JsText::trim)?.takeIf { it.isNotEmpty() } else null  // همان trim ِ JS
       val left = if (give) open[r.tx.id] ?: ZERO else leftOver[r.tx.id] ?: ZERO
       Entry(
         tx = r.tx,
@@ -245,7 +246,8 @@ object DebtBook {
 
   /* ------------------------------ سررسید ------------------------------ */
 
-  private val ISO = Regex("""^(\d{4})-(\d{2})-(\d{2})$""")
+  //  `[0-9]` نه `\d`: روی اندروید (ICU) `\d` رقمِ فارسی را هم می‌گیرد و JS نه
+  private val ISO = Regex("""^([0-9]{4})-([0-9]{2})-([0-9]{2})$""")
 
   /** `yyyy-MM-dd` با ماه و روزِ درست */
   fun isIsoDate(s: String): Boolean {
