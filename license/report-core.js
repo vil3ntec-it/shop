@@ -183,8 +183,8 @@
         //  هزینهٔ جانبیِ کلِ ردیف (PUR-06): `landedCostMinor` ِ دقیق، وگرنه `landedCost` ِ افغانی؛ منفی یا نادرست ⇒ ۰
         landed: landedOf(e),
         adjustment: e.isAdjustment === true, date: str(e.date), createdAt: ms(e.createdAt),
-        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها، همان پیشین (همتای `ReportLedger.Entry.value`)
-        value: Number.isSafeInteger(e.costMinor) ? e.costMinor : null,
+        //  ارزشِ دقیقِ ورود (`costMinor`) فقط جایی که StockLedger می‌خواند: خرید (PRD-07) و ردیفِ تولید (INV-21، `adjKind` = repack)؛ نبود ⇒ null (`ReportLedger.Entry.value`)
+        value: Number.isSafeInteger(e.costMinor) && (e.isAdjustment !== true || str(e.adjKind) === 'repack') ? e.costMinor : null,
       });
     });
     arr(raw.auditLog).forEach(function (a) {
@@ -203,7 +203,7 @@
   /*
    * میانگینِ موزونِ متحرک (D-23، الف) با **همان** هستهٔ موجودی (`stock-core.js`، حالتِ `recorded`)، یک جایگاه برای
    * هر کالا (انتقال بینِ محل‌ها اثری ندارد). ترتیب: (زمان، ورود < فروش < برگشت، شناسه). ورودِ عادی `purchase_receipt`
-   * (+ هزینهٔ جانبی)، اصلاحِ مثبت به قیمتش یا میانگینِ همان لحظه، ورودِ منفی `count_adjust`؛ فروش `sale` (کمبود ⇒ تخمینی؛
+   * (+ هزینهٔ جانبی)، اصلاحِ مثبت به قیمتش یا میانگینِ همان لحظه (خروجیِ تولید به `costMinor`)، ورودِ منفی `count_adjust`؛ فروش `sale` (کمبود ⇒ تخمینی؛
    * بی هیچ بهای معلوم ⇒ آن بخش به `purchasePrice` ِ قلم)؛ برگشتی `customer_return` به همان بهایی که رفت؛ لغوشده بیرون؛
    * شمارشِ مثبتِ کالای بی‌بها ⇒ پایهٔ نامعلوم تا تمام شدنِ موجودی. سندِ ردشده نادیده؛ فروشِ ردشده به بهای قلم و تخمینی.
    * شرحِ کامل: `docs/RULES-fa.md` «v3 · گزارش»؛ دوقلو: `ReportCore.mavg`؛ بردار: `core/test-vectors/cost-v1.json`.
@@ -245,7 +245,7 @@
         if (e.productId === '' || e.qty === 0) return;
         d = doc(x.t, e.adjustment || e.qty < 0 ? 'count_adjust' : 'purchase_receipt', e.productId, 'e:' + e.id, e.qty);
         if (d.type === 'count_adjust') d.reason = 'adjustment';
-        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0) && (d.costMinor = !e.adjustment && e.value !== null && e.value >= 0 ? e.value : mdr(e.qty, e.unitCost, 1000)) === null) return;
+        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0 || e.value !== null) && (d.costMinor = e.value !== null && e.value >= 0 ? e.value : mdr(e.qty, e.unitCost, 1000)) === null) return;
         if (d.type === 'purchase_receipt' && e.landed > 0) d.landedMinor = e.landed;
         p = posOf(e.productId);
         var blind = e.qty > 0 && d.costMinor === undefined && !(p && (p.qtyMilli > 0 || p.lastCost));

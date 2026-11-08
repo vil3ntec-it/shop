@@ -56,7 +56,7 @@ class CostVectorsTest {
   @Test
   fun `پوشش و قالب`() {
     assertEquals("cost-v1", vectors.getValue("format").jsonPrimitive.content)
-    assertEquals(listOf("A", "B", "C", "D", "D2", "E", "F"), cases.map { it.getValue("id").jsonPrimitive.content })
+    assertEquals(listOf("A", "B", "C", "D", "D2", "E", "F", "G"), cases.map { it.getValue("id").jsonPrimitive.content })
   }
 
   @Test

@@ -40,13 +40,13 @@ class ReportLedger private constructor() {
   class Tx(val id: String, val debtorId: String, val give: Boolean, val amount: Long, override val date: String, override val createdAt: Long) : Dated
   class Purchase(val id: String, val supplierId: String, val total: Long, val paid: Long, override val date: String, override val createdAt: Long) : Dated
   class Payment(val id: String, val supplierId: String, val amount: Long, override val date: String, override val createdAt: Long) : Dated
-  /** `value`: ارزشِ دقیقِ ورود (PRD-07، `costMinor` ِ ردیف)؛ `null` = مقدار × `unitCost` ِ پیشین */
+  /** `value`: ارزشِ دقیقِ ورود (`costMinor` ِ ردیف) فقط برای خرید (PRD-07) و ردیفِ تولید (INV-21)؛ `null` = مقدار × `unitCost` ِ پیشین */
   class Entry(
     val id: String, val productId: String, val qty: Long, val unitCost: Long, val adjustment: Boolean,
     override val date: String, override val createdAt: Long,
     /** هزینهٔ جانبیِ کلِ ردیف (PUR-06)، واحدِ کوچک، ≥ ۰ — همان `landedOf` ِ JS */
     val landed: Long = 0L,
-    /** PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها */
+    /** ارزشِ دقیقِ ورود (`costMinor`) فقط جایی که `StockLedger` می‌خواند: خرید (PRD-07) و اصلاحِ `adjKind` = repack (INV-21، سندِ `production`)؛ نبود ⇒ null = مقدار × بها */
     val value: Long? = null,
   ) : Dated
   class Audit(
@@ -113,11 +113,12 @@ class ReportLedger private constructor() {
         l.supplierPayments += Payment(p.s("id"), p.s("supplierId"), money(p, "amount"), p.s("date"), ms(p, "createdAt"))
       }
       raw.list("warehouseEntries").forEach { e ->
+        val adjustment = (e["isAdjustment"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true
         l.entries += Entry(
           e.s("id"), e.s("productId"), milli(e, "units"), money(e, "price"),
-          (e["isAdjustment"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true,
+          adjustment,
           e.s("date"), ms(e, "createdAt"), landedOf(e),
-          (e["costMinor"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull(),
+          (e["costMinor"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull()?.takeIf { !adjustment || e.s("adjKind") == "repack" },
         )
       }
       raw.list("auditLog").forEach { a ->

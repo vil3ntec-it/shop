@@ -211,9 +211,10 @@ object ReportCore {
           val e = x.e!!
           if (e.productId == "" || e.qty == 0L) continue
           val adjust = e.adjustment || e.qty < 0
-          val priced = e.qty > 0 && (!e.adjustment || e.unitCost > 0)
-          //  PRD-07: ورودِ خرید به واحدِ خرید ارزشِ دقیقِ خودش را دارد (`costMinor`)، نه مقدار × بهای گردشده
-          val exact = if (!e.adjustment && e.value != null && e.value >= 0) e.value else null
+          //  ارزشِ دقیقِ ردیف (`costMinor`)، نه مقدار × بهای گردشده: خرید (PRD-07) و خروجیِ تولید (INV-21، جمعِ بهای اجزا — همان
+          //  سندِ `production` ِ `StockLedger`)؛ `value` فقط همین دو را دارد (`ReportLedger.parse`)
+          val priced = e.qty > 0 && (!e.adjustment || e.unitCost > 0 || e.value != null)
+          val exact = if (e.value != null && e.value >= 0) e.value else null
           val cost = if (priced) exact ?: mdr(e.qty, e.unitCost, 1000) ?: continue else null
           val p = posOf(e.productId)
           val blind = e.qty > 0 && cost == null && !(p != null && (p.qtyMilli > 0 || p.lastCost != null))
