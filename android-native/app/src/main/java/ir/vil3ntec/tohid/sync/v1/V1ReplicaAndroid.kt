@@ -118,7 +118,8 @@ internal object V1Replica {
     return if (RestoredDevice.mintedOverHistory(owner, files)) System.currentTimeMillis() else 0L
   }
 
-  private fun rowsOf(d: ShopData): Int {
+  /** شمارِ ردیف‌های دفتر (همهٔ مجموعه‌های همگام) — حصارِ v3 هم (`sync/v3/V3State.kt`) */
+  fun rowsOf(d: ShopData): Int {
     val tree = LedgerDiff.toJson(d)
     return LedgerDiff.COLLECTIONS.sumOf { (tree[it] as? JsonArray)?.size ?: 0 }
   }

@@ -11,6 +11,7 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
 import ir.vil3ntec.tohid.sync.v1.SyncOp
@@ -20,6 +21,7 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.sync.v3.FileV3Store
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
 import ir.vil3ntec.tohid.sync.v3.V3Meta
+import ir.vil3ntec.tohid.sync.v3.V3StateDir
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -59,6 +61,7 @@ class SaveBaseTest {
     ctx.filesDir.listFiles().orEmpty()
       .filter { it.name.startsWith("shop-data.json") || it.name.startsWith("sync-v3-sbase") }
       .forEach { it.deleteRecursively() }
+    File(ctx.filesDir, V3StateDir.DIR).listFiles().orEmpty().filter { it.name.startsWith("sbase") }.forEach { it.deleteRecursively() }
   }
 
   @Before fun before() {
@@ -252,8 +255,9 @@ class SaveBaseTest {
   /* ---------------------------------- Sync v3 ---------------------------------- */
 
   @Test fun `Sync v3 — دو ذخیره از یک صفحهٔ کهنه هر دو فروش را در صف می‌گذارند`() {
+    //  جای ساختِ پیشین (حال به `sync-v3/` می‌رود، صف همین‌جا می‌ماند — `V3StateDir`)؛ حالِ همین دستگاه (`V3Meta.device`، DATA-06)
     val dir = File(ctx.filesDir, "sync-v3-${OpQueue.fileKey(account)}")
-    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(seed).toString(), cursor = 7))
+    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(seed).toString(), cursor = 7, device = SyncStore(ctx).deviceUid))
     assertEquals("", SyncChoice.set(ctx, SyncChoice.V3, 0))
     AtRest.writeText(ctx, ledger, Json.encodeToString(ShopData.serializer(), seed))
     val ui = open()

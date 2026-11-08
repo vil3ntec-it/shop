@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync.v3
 import ir.vil3ntec.tohid.core.hub.HubRelayPort
 import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoredDevice
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.v3.HlcClock
 import ir.vil3ntec.tohid.data.ShopData
@@ -85,34 +86,7 @@ data class V3Queue(
   val seq: Long = 0,
 )
 
-@Serializable
-data class V3Meta(
-  val initialized: Boolean = false,
-  val shadow: String = "",
-  val cursor: Long = 0,
-  val clock: String = "",
-  val offsetMs: Long = 0,
-  val lastOkAt: Long = 0,
-  val lastPushAt: Long = 0,
-  val lastPullAt: Long = 0,
-  val lastError: String = "",
-  val lastErrorAt: Long = 0,
-  val attempt: Int = 0,
-  val upgradeProtocol: Int = 0,
-  val upgradeMessage: String = "",
-  val conflictsOpen: Int = 0,
-  val conflictsDirty: Boolean = false,
-  val pushBytes: Int = SyncV3Engine.MIN_BYTES,
-  val pullBytes: Int = SyncV3Engine.MIN_BYTES,
-  /** «دورانِ بازیابیِ» سروری که آخرین بار دیده شد — §۹.۵، `core/sync/RestoreReplay.kt` */
-  val epoch: String = "",
-  /** سرور برگشته و دفتر هنوز از Snapshot از نو ساخته نشده — تا آن وقت Pull نه */
-  val restorePending: Boolean = false,
-  /** دفترچه همهٔ پنجرهٔ پس از پایه را نداشت — هشدار تا `RESTORE_NOTICE_MS` */
-  val restoreNoticeAt: Long = 0,
-  /** A00: بزرگ‌ترین شناسهٔ صف در نخستین شروع پس از ساختِ پیش از A00 — شرح سرِ `SyncCommit.start` */
-  val legacyOpsUpTo: String = "",
-)
+/** `V3Meta` و حصارِ DATA-06 در `V3State.kt` */
 
 /** انبارِ محلی؛ هر `save` یک نوشتنِ اتمی (فایلِ کناری + fsync + جابه‌جایی). */
 internal interface V3Store {
@@ -123,6 +97,8 @@ internal interface V3Store {
   val journal: SyncCommit.Journal
   /** ورودی‌های پذیرفته‌شده برای دوباره فرستادن پس از بازیابیِ سرور (§۹.۵)؛ null ⇒ نیست */
   val replay: ReplayBook? get() = null
+  /** DATA-06: حال یا صف روی دیسک خوانده نشد (فایلِ خراب کنار رفت) ⇒ حصار هیچ تصمیمی نمی‌گیرد (`V3Fence`) */
+  val unreadable: Boolean get() = false
 }
 
 /** SYN-08 و بخشِ ۲۹.۵ بندِ ۸: «روی دستگاه ثبت شد» جدا از «سرور تأیید کرد». */
@@ -178,7 +154,7 @@ internal class SyncV3Engine(
   /** SYN-09: هابِ محلی (`platform/HubRelayAndroid`)؛ `null` (پرچمِ خاموش) ⇒ همان امروز */
   private val hub: HubRelayPort? = null,
 ) {
-  val deviceId: String = deviceId.replace(Regex("[^A-Za-z0-9_.-]"), "-").take(64).ifEmpty { "device" }
+  val deviceId: String = v3Node(deviceId).ifEmpty { "device" }
 
   var meta: V3Meta = V3Meta()
     private set
@@ -295,6 +271,22 @@ internal class SyncV3Engine(
     //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
     //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
     return commit.start(onDisk) { upTo -> save(meta.copy(legacyOpsUpTo = upTo)) }.outcome
+  }
+
+  /**
+   *  DATA-06: حالِ این حساب مالِ دستگاهِ دیگر است؟ (`V3Fence`، `RestoredDevice.decide`) — هنگامِ باز شدنِ دفتر، پس از ورود و
+   *  پیش از هر دور (`SyncV3Runner`). یک نوشتنِ اتمیِ `state.json` یا هیچ؛ ننشست ⇒ پرتاب (دور نرود). ژورنالِ باز ⇒ هیچ تصمیمی.
+   *  @param device شناسهٔ خامِ همین دستگاه (`SyncStore.deviceUid`)؛ خالی ⇒ ناخوانا
+   */
+  fun fence(device: String, restoredAt: Long, ledger: ShopData): RestoredDevice.Verdict {
+    var verdict = RestoredDevice.Verdict.UNDECIDED
+    withLock {
+      if (commit.pending()) return@withLock
+      val p = V3Fence.plan(meta, if (device.isBlank()) "" else deviceId, restoredAt, store.unreadable, ledger, queued())
+      p.next?.let { save(it) }
+      verdict = p.verdict
+    }
+    return verdict
   }
 
   fun queued(): Int = queue.outbox.sumOf { it.size }
@@ -648,7 +640,7 @@ internal class SyncV3Engine(
           val (next, shadow) = RestoreMerge.merge(legacy, LedgerDiff.toJson(current), gone, archived())
           try {
             val written = commit.rebuild(next, shadow, current, cursor) { ledger.write(it) }
-            save(meta.copy(restorePending = false, lastOkAt = now()))
+            save(meta.copy(restorePending = false, restoredRebuild = false, lastOkAt = now()))
             //  ردیف‌های تنهای این دستگاه ⇒ «درج»
             commit.record(written)
           } catch (e: Exception) {

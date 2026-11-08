@@ -2,7 +2,7 @@ package ir.vil3ntec.tohid.core.sync
 
 /**
  *  DATA-06 — گوشی‌ای که از پشتیبان یا انتقالِ گوشیِ **دیگر** بالا آمد (منطقِ خالصِ مشترکِ گوشی، کامپیوتر و آیفون؛
- *  پیاده‌سازیِ اندروید: `sync/v1/V1ReplicaAndroid.kt`).
+ *  پیاده‌سازیِ اندروید: `sync/v1/V1ReplicaAndroid.kt`؛ Sync v3: `sync/v3/V3State.kt` با همین [decide]).
  *
  *  ── اشکالی که این می‌بندد ───────────────────────────────────────────
  *  ۱) از #991 `replica` ِ هر حساب (`device_id` ِ push/pull و سریِ سند) در `tohid-sync-v1.xml` بود و آن پرونده با پشتیبان
@@ -23,8 +23,8 @@ object RestoredDevice {
   /** سقفِ `device_id` روی سرور — همان `SyncReplica` */
   private const val MAX = 64
 
-  /** پرونده‌های `filesDir` که فقط با کار کردنِ همگام‌سازی ساخته می‌شوند (صف، ژورنال، دفترچهٔ §۹.۵) */
-  private val SYNC_FILES = listOf("oplog-", "sync-journal-", "sync-replay-")
+  /** پرونده‌های `filesDir` که فقط با کار کردنِ همگام‌سازی ساخته می‌شوند (صف، ژورنال، دفترچهٔ §۹.۵، حالِ v3: `sync-v3/` و `sync-v3-*`) */
+  private val SYNC_FILES = listOf("oplog-", "sync-journal-", "sync-replay-", "sync-v3")
 
   /**
    *  شناسهٔ دستگاه همین حالا **ساخته شد** (پروندهٔ «فقط همین دستگاه» نبود) — آیا ردِ کارِ پیشین هست؟ هست ⇒ پشتیبانِ گوشیِ
