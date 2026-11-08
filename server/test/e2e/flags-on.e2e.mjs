@@ -3,8 +3,13 @@
  * پرچم‌های خاموش که باید بیت‌به‌بیت همان رفتارِ پیشین را داشته باشد. چک‌لیستِ صاحب‌کار: docs/FLAGS-ON-fa.md.
  *
  * دکانِ «الف» (همه روشن): shop.approval_requests · shop.credit_cap · shop.custom_roles · shop.catalog ·
- *   shop.storefront.web_account · market.slug_hold · «پنهان کردنِ ناموجود» (`hideOutOfStock`) · محدودهٔ پیک.
- * دکانِ «ب» (همان کارها، پرچم‌های تازه خاموش): فقط پیش‌نیازهای قدیمیِ هر دو دکان (سفارش، ویترین، پیک، ناحیه، رسانه).
+ *   shop.storefront.web_account · market.slug_hold · «پنهان کردنِ ناموجود» (`hideOutOfStock`) · محدودهٔ پیک؛ و پرچم‌های
+ *   سرورِ دسته‌های ۲۸ تا ۳۱ (`FLAGS_ON_BATCH` ِ `lib/harness.mjs`، صریحاً `true` حتی پیش‌فرض‌روشن‌ها): auth.staff_session_guard ·
+ *   shop.save_base · shop.ledger_merge · sync.pull_own_newer · shop.returns.line_cap · shop.sync_shadow_file ·
+ *   shop.settings_sync · shop.count_absorb (گامِ FLAGS.B31). `desk.keystore` پرچمِ هر کامپیوتر است، نه سرور
+ *   (`KekVaultTest`، `SessionKeyVaultTest`، `docs/FLAGS-ON-fa.md` §۱۰).
+ * دکانِ «ب» (همان کارها، پرچم‌های تازه خاموش): فقط پیش‌نیازهای قدیمیِ هر دو دکان (سفارش، ویترین، پیک، ناحیه، رسانه)؛
+ *   حالتِ «همه روشن» ِ کلِ مجموعه (`E2E_FLAGS_ON`) هم به آن نمی‌رسد.
  * سرور با همان تنظیم‌های تولیدیِ پیشنهادی: CLUSTER_ENABLED=1 · HOT_CACHE_MS=2000 · IMAGE_STORE=disk؛ روی PostgreSQL
  * (`E2E_DATABASE_URL`) DATABASE_REPLICA_URL هم (همان پایگاه = نسخهٔ بی‌تأخیر). روی PGlite خوشه و نسخهٔ خواندنی
  * خودشان خاموش می‌مانند (`cluster.enabled()`، `read-replica.configured()`) و همین در گامِ نخست سنجیده می‌شود.
@@ -21,7 +26,8 @@ import crypto from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { boot, assert } from './lib/harness.mjs';
+import { boot, assert, FLAGS_ON_BATCH } from './lib/harness.mjs';
+import { NativeDevice } from './lib/native.mjs';
 
 const PG = /^postgres/i.test(process.env.E2E_DATABASE_URL || '');
 const IMG = fs.mkdtempSync(path.join(os.tmpdir(), 'e2e-flags-img-'));
@@ -56,7 +62,8 @@ const cashA = await E.staff(ownerA, 'cash-a-flags@e2e.local', 'صندوق‌دا
 const cash2A = await E.staff(ownerA, 'cash2-a-flags@e2e.local', 'صندوق‌دارِ دومِ الف');
 const k1A = await E.staff(ownerA, 'k1-a-flags@e2e.local', 'پیکِ خیرخانه');
 const k2A = await E.staff(ownerA, 'k2-a-flags@e2e.local', 'پیکِ کارته‌سه');
-const ownerB = await E.owner('owner-b-flags@e2e.local', 'صاحبِ ب', 'دکانِ ب');
+//  دکانِ شاهدِ خاموش: حالتِ «همه روشن» ِ کلِ مجموعه (`E2E_FLAGS_ON`) هم به آن نمی‌رسد
+const ownerB = await E.owner('owner-b-flags@e2e.local', 'صاحبِ ب', 'دکانِ ب', { flagsOn: false });
 const cashB = await E.staff(ownerB, 'cash-b-flags@e2e.local', 'صندوق‌دارِ ب');
 const kB = await E.staff(ownerB, 'k-b-flags@e2e.local', 'پیکِ ب');
 
@@ -91,7 +98,7 @@ await E.step('FLAGS.0', 'سرور با تنظیم‌های چندسرور؛ پر
   if (PG) assert.equal(cluster.runsJobs(), true, 'تک نمونه ⇒ همین نمونه رهبر است و کارگرها می‌دوند');
 
   for (const k of BASE_FLAGS) { await E.flag(ownerA.shopId, k, true); await E.flag(ownerB.shopId, k, true); }
-  for (const k of NEW_FLAGS) await E.flag(ownerA.shopId, k, true);
+  for (const k of new Set([...NEW_FLAGS, ...FLAGS_ON_BATCH])) await E.flag(ownerA.shopId, k, true);
   //  پرچمِ تازه‌نوشته همان دم دیده می‌شود (حافظهٔ کوتاه با نوشتنِ پنل باطل می‌شود، نه پس از ۲ ثانیه)
   assert.equal(E.ok(await E.get('/api/shop/approval-requests/config', ownerA.token), 'config').enabled, true);
   assert.equal(E.ok(await E.get('/api/shop/approval-requests/config', ownerB.token), 'config').enabled, false);
@@ -184,6 +191,7 @@ await E.step('FLAGS.ROLE', 'نقشِ سفارشی: «صندوق‌دارِ بی�
   const r = E.ok(await E.post('/api/shop/custom-roles', { name: 'صندوق‌دارِ بی‌برگشت', baseRole: 'staff', perms: { 'returns.create': { mode: 'deny' } } }, ownerA.token), 'نقشِ سفارشی', 201).role;
   //  گشادتر از نقشِ پایه پذیرفته نیست
   assert.equal((await E.post('/api/shop/custom-roles', { name: 'شاگردِ همه‌کاره', baseRole: 'staff', perms: { 'sales.cancel': { mode: 'allow' } } }, ownerA.token)).body.error.code, 'exceeds_role');
+  A.noReturns = r.id;
   E.ok(await E.put(`/api/shop/custom-roles/members/${cashA.user.id}`, { roleId: r.id }, ownerA.token), 'دادنِ نقش');
   const pol = E.ok(await A.cash.api('GET', '/shop/permissions'), 'مجوزهای صندوق‌دار').policy;
   assert.equal(pol.layers.length, 3, '[نقش، نقشِ سفارشی، کاربر]');
@@ -324,6 +332,81 @@ await E.step('FLAGS.SLUG', 'نگه‌داشتنِ نشانی: «الف» نشا�
   B.slug = nextB;
 }, { needs: ['FLAGS.0'] });
 
+/* ═════════════════════════════ «الف»: پرچم‌های دسته‌های ۲۸ تا ۳۱ با هم ═════════════════════════════ */
+
+await E.step('FLAGS.B31', 'پرچم‌های تازه با هم: هر کدام از درِ خودش؛ شمارش + فروشِ دیررس + انتقال روی دفترِ سرور؛ تنظیماتِ دکان با نقشِ سفارشی؛ ورودِ دوبارهٔ شاگرد با نقشِ سفارشی', async () => {
+  const orders = require('../../src/lib/orders');
+  for (const k of FLAGS_ON_BATCH) assert.equal(await orders.flagOf(ownerA.shopId, k), true, k);
+  //  ۱) هر پرچم از درِ خودش (همان پرسشِ برنامه)
+  assert.deepEqual(E.ok(await A.owner.api('GET', '/shop/ledger-merge/config?v=3'), 'ادغامِ دفتر'), { enabled: true, v: 2, base: true, shadowFile: true });
+  for (const dev of [A.owner, A.cash, A.cash2]) assert.equal(await dev.stockFlags(), true, `${dev.label}: countAbsorb`);
+
+  //  ۲) INV-10 با دفترِ سرور و انتقال: صندوق‌دارِ دوم آفلاین ۲ برنج می‌فروشد ⇐ صاحب قفسه را می‌شمارد (عددِ درست) ⇐
+  //     ۵ برنج به گدام می‌رود ⇐ فروشِ دیررس می‌رسد ⇒ هیچ‌جا دو بار کم نیست؛ قفسه = شمرده − انتقال؛ دفتر = مانده‌ها
+  for (const dev of [A.owner, A.cash, A.cash2]) await dev.drain();
+  await A.owner.drain();
+  await fresh(ownerA.shopId);
+  const rice0 = A.owner.stock(A.rice);
+  assert.deepEqual(await levels(ownerA, A.rice), { floor: rice0 * 1000, wh: 0, transit: 0, sellable: rice0 * 1000 }, 'پیش از شمارش: سرور = دستگاه');
+  A.cash2.offline = true;
+  const late = A.cash2.sell({ lines: [{ id: A.rice, qty: 2 }] });
+  assert.equal(late.ok, true, JSON.stringify(late));
+  await new Promise((r) => setTimeout(r, 5));
+  const counted = rice0 - 2;
+  assert.equal(A.owner.count({ [A.rice]: counted }, { [A.rice]: Date.now() }), 1);
+  await A.owner.drain();
+  await fresh(ownerA.shopId);
+  assert.equal((await levels(ownerA, A.rice)).floor, counted * 1000, 'شمارش در سرور');
+  const t = E.ok(await xfer(ownerA, '', { from: 'shop_floor', to: 'warehouse', lines: [{ productId: A.rice, qtyMilli: 5000 }], note: 'پس از شمارش' }), 'ارسال', 201).transfer;
+  E.ok(await xfer(ownerA, `/${t.id}/receive`, { lines: [{ productId: A.rice, receivedMilli: 5000 }] }), 'دریافت');
+  A.cash2.offline = false;
+  await A.cash2.drain();
+  for (const dev of [A.owner, A.cash, A.cash2]) await dev.drain();
+  await fresh(ownerA.shopId);
+  assert.deepEqual(why(A.cash2, late.saleId), []);
+  assert.ok(await serverRow(ownerA.shopId, 'sales', late.saleId), 'فروش در دفترِ سرور');
+  for (const dev of [A.owner, A.cash, A.cash2]) assert.equal(dev.stock(A.rice), counted, `${dev.label}: همان شمرده`);
+  assert.deepEqual(await levels(ownerA, A.rice), { floor: (counted - 5) * 1000, wh: 5000, transit: 0, sellable: counted * 1000 }, 'هیچ‌جا دو بار کم نیست');
+  const mv = E.ok(await A.owner.api('GET', `/shop/catalog/moves?productId=${A.rice}&limit=200`), 'حرکت‌ها').items;
+  assert.deepEqual(mv.filter((m) => m.reason === 'count_absorb').map((m) => m.deltaOnHandMilli), [2000]);
+  const rep = E.ok(await E.get('/api/shop/catalog/report', ownerA.token), 'تطبیق');
+  assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
+
+  //  ۳) تنظیماتِ دکان + نقشِ سفارشی: مدیری که «تنظیمات» برایش بسته است می‌خواند، `write: false` می‌گیرد و PUT ۴۰۳ —
+  //     همان پاسخ از دو در (پیش‌تر GET فقط نقش را می‌دید ⇒ `true` و برنامه قاعدهٔ دکان را هرگز نمی‌نشاند)
+  A.mgr ||= await E.device('A-manager', managerA.email);
+  const P = (key, t, v) => ({ store: 'tohid-policy', key, t, v });
+  const put1 = E.ok(await A.owner.api('PUT', '/shop/settings-sync', { entries: [P('return_window_days', 'i', 7)], device_id: A.owner.deviceId }), 'تنظیمِ صاحب');
+  assert.equal(put1.applied.length, 1);
+  const noSettings = E.ok(await E.post('/api/shop/custom-roles', { name: 'مدیرِ بی‌تنظیمات', baseRole: 'manager', perms: { 'settings.write': { mode: 'deny' } } }, ownerA.token), 'نقشِ سفارشیِ مدیر', 201).role;
+  E.ok(await E.put(`/api/shop/custom-roles/members/${managerA.user.id}`, { roleId: noSettings.id }, ownerA.token), 'دادنِ نقش به مدیر');
+  const seen = E.ok(await A.mgr.api('GET', '/shop/settings-sync'), 'تنظیماتِ مدیر');
+  assert.deepEqual([seen.enabled, seen.permissions.write], [true, false], 'مدیرِ بسته‌شده فقط می‌خواند');
+  assert.deepEqual(seen.rows.filter((x) => x.key === 'return_window_days').map((x) => x.v), [7]);
+  const mgrPut = await A.mgr.api('PUT', '/shop/settings-sync', { entries: [P('return_window_days', 'i', 30)] });
+  assert.deepEqual([mgrPut.status, mgrPut.body.error?.code], [403, 'permission_denied']);
+  for (const dev of [A.cash, A.cash2]) {
+    assert.equal(E.ok(await dev.api('GET', '/shop/settings-sync'), 'تنظیماتِ صندوق‌دار').permissions.write, false);
+    assert.equal((await dev.api('PUT', '/shop/settings-sync', { entries: [P('return_window_days', 'i', 30)] })).status, 403);
+  }
+  E.ok(await E.put(`/api/shop/custom-roles/members/${managerA.user.id}`, { roleId: null }, ownerA.token), 'برداشتنِ نقش');
+  assert.equal(E.ok(await A.mgr.api('GET', '/shop/settings-sync'), 'تنظیماتِ مدیر').permissions.write, true, 'نقشِ پایه ⇒ می‌نویسد');
+
+  //  ۴) ورودِ دوبارهٔ شاگرد (رازِ دستگاه) + نقشِ سفارشی: همان حساب، همان نقشِ «بی‌برگشت»؛ همان شناسهٔ گوشی بی راز ⇒ رد
+  const code = E.ok(await A.owner.api('POST', '/shop/staff-code', { role: 'staff', maxUses: 1 }), 'کدِ شاگرد', [200, 201]).code;
+  const K = new NativeDevice(E, 'A-code-staff');
+  await K.loginStaff(code, 'رحیم');
+  assert.ok(K.staffKey, 'رازِ دستگاه');
+  E.ok(await E.put(`/api/shop/custom-roles/members/${K.user.id}`, { roleId: A.noReturns }, ownerA.token), 'نقشِ بی‌برگشت برای شاگردِ کد');
+  const id = K.user.id;
+  assert.equal((await K.logout()).blocked, false);
+  await K.loginStaff(code, 'رحیم');
+  assert.equal(K.user.id, id, 'رازِ دستگاه ⇒ همان حساب');
+  assert.equal(E.ok(await K.api('GET', '/shop/permissions'), 'مجوزهای شاگردِ کد').policy.effective['returns.create'].mode, 'deny', 'نقشِ سفارشی سرِ جایش');
+  const thief = new NativeDevice(E, 'A-code-thief', { deviceId: K.deviceId });
+  await assert.rejects(() => thief.loginStaff(code, 'رحیم'), (e) => [401, 403].includes(e.status), 'همان شناسهٔ گوشی بی راز');
+}, { needs: ['FLAGS.0', 'FLAGS.ROLE'] });
+
 /* ═════════════════════════════ «ب»: پرچم‌ها خاموش ⇒ همان پیشین ═════════════════════════════ */
 
 await E.step('FLAGS.OFF', 'دکانِ «ب» با پرچم‌های خاموش: همان کارها همان پاسخ‌های پیشین را می‌گیرند', async () => {
@@ -393,6 +476,13 @@ await E.step('FLAGS.OFF', 'دکانِ «ب» با پرچم‌های خاموش: 
 
   //  پرچم‌های «الف» به «ب» نرسید
   for (const k of NEW_FLAGS) assert.equal(await require('../../src/lib/orders').flagOf(ownerB.shopId, k), false, k);
+  //  پرچم‌های دسته‌های ۲۸ تا ۳۱ بی هیچ ردیف: پیش‌فرض‌روشن‌ها روشن، پیش‌فرض‌خاموش‌ها همان پیشین
+  assert.deepEqual(E.ok(await B.owner.api('GET', '/shop/ledger-merge/config?v=3'), 'ادغامِ دفترِ «ب»'), { enabled: true, v: 2, base: true, shadowFile: false });
+  assert.deepEqual(E.ok(await B.owner.api('GET', '/shop/ledger-merge/config'), 'ادغامِ دفترِ «ب» (برنامهٔ کهنه)'), { enabled: false });
+  assert.equal(await B.cash.stockFlags(), false, 'countAbsorb ِ «ب»');
+  assert.deepEqual(E.ok(await B.owner.api('GET', '/shop/settings-sync'), 'تنظیماتِ «ب»'), { enabled: false });
+  const ssB = await B.owner.api('PUT', '/shop/settings-sync', { entries: [{ store: 'tohid-policy', key: 'return_window_days', t: 'i', v: 7 }] });
+  assert.deepEqual([ssB.status, ssB.body.error?.code], [403, 'settings_sync_disabled']);
 }, { needs: ['FLAGS.0'] });
 
 await E.step('FLAGS.CACHE', 'حافظهٔ کوتاهِ پرچم: خاموش کردنِ پرچم از پنل همان دم اثر دارد (نه پس از ۲ ثانیه)', async () => {

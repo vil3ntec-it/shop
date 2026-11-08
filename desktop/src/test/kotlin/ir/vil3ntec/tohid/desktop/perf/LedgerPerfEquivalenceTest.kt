@@ -259,7 +259,7 @@ class LedgerPerfEquivalenceTest {
       val e = prefs.edit()
       prefs.all.keys.filter { it.startsWith("$a.") || it.startsWith("$b.") }.forEach { e.remove(it) }
       e.commit()
-      ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("sync-shadow-perfeq") && it.name.contains(n) }.forEach { it.delete() }
+      ShadowStore.dirOf(ctx).listFiles().orEmpty().filter { it.name.startsWith("sync-shadow-perfeq") && it.name.contains(n) }.forEach { it.delete() }
       ShadowStore.restartForTest()
     }
   }

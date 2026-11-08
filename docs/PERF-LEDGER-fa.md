@@ -218,7 +218,7 @@
 **کد:** `sync/v1/ShadowFileAndroid.kt` (قالب)، `sync/v1/ShadowStoreAndroid.kt` (کدام منبع، کوچ، برگشت)، `SyncStateV1` (همان
 API: `shadow`، `cursor`، `commitShadow`)، پرچم `sync/v1/ShadowFileFlagAndroid.kt` (از همان `GET /shop/ledger-merge/config?v=3`).
 
-**قالب:** یک فایل برای هر کلیدِ حساب، `filesDir/sync-shadow-<کلید>-<شماره>.dat`:
+**قالب:** یک فایل برای هر کلیدِ حساب، `filesDir/sync-shadow/sync-shadow-<کلید>-<شماره>.dat` (پوشه بیرون از پشتیبانِ خودکارِ اندروید، مثلِ `tohid-sync-v1`؛ فایلِ ساختِ پیشین در خودِ `filesDir` در نخستین خواندن به پوشه می‌رود):
 سرِ پرونده (`TOHID-SYNC-SHADOW 1`) ⇐ بایت‌های UTF-8 ِ همان متنِ سایه (`ShadowText`، بی هیچ تبدیل) ⇐ سطرِ پایان
 `{"v":1,"gen","cursor","bytes","sha","check"}`؛ `sha` همان SHA-256 ِ `SyncCommit.sha` ِ متن و `check` اثرِ انگشتِ
 `v|gen|cursor|bytes|sha`. نوشتن همان `DiskWrite.stream(keepPrevious = true)` ِ دفتر (کناری ⇐ `fsync` ⇐ `.prev` با پیوندِ سخت

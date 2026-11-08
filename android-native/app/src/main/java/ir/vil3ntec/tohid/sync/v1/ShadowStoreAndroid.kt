@@ -18,6 +18,10 @@ import java.io.IOException
  *  ── روشن ─────────────────────────────────────────────────────────────
  *  سایه و cursor در **یک فایل و یک نوشتن** (`ShadowFile`، همان `DiskWrite` با `.prev`). نامِ فایل در نشانِ prefs
  *  (`<کلید>.shadowStore`) است، پس جابه‌جاییِ حالِ حساب (`SyncV1Keys.move`) همان یک `commit` ِ prefs می‌ماند.
+ *   • جا: `filesDir/sync-shadow/` ([DIR]) — بیرون از پشتیبانِ خودکارِ اندروید (`backup_rules*.xml`)، مثلِ `tohid-sync-v1`
+ *     که سایه پیش‌تر در آن بود: نشانِ فایل با پشتیبان نمی‌رود، پس گوشیِ بازیابی‌شده (`RestoredDevice`) آن را هرگز
+ *     نمی‌خواند، و فایلی هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد (پشتیبانِ کلِ برنامه می‌افتاد). فایلِ
+ *     ساختِ پیشین در خودِ `filesDir` در نخستین خواندن به پوشه می‌رود ([located]).
  *   • نشانِ `copy` (پس از کوچ): نسخهٔ prefs هنوز هست و همان فایلِ همان نشان است؛ نخستین نوشتنِ موفقِ فایل آن را
  *     برمی‌دارد (نشانِ `file`) و XML کوچک می‌شود.
  *   • cursor ِ prefs فقط **آینه** است (نوار و برنامهٔ کهنه‌تر)، هرگز منبعِ این ساخت.
@@ -33,6 +37,7 @@ internal class ShadowStore private constructor(context: Context, private val key
 
   private val app = context.applicationContext
   private val prefs: SharedPreferences = app.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+  private val dir: File by lazy { dirOf(app) }
   private fun k(name: String) = "$key.$name"
 
   private enum class Mode { PREFS, FILE }
@@ -109,7 +114,7 @@ internal class ShadowStore private constructor(context: Context, private val key
   @Synchronized fun reset() {
     val named = prefs.getString(k(MARKER), null)?.let { Marker.parse(it) }
     if (named != null) prefs.edit().remove(k(MARKER)).commit()
-    named?.let { ShadowFile(File(app.filesDir, it.name)).delete() }
+    named?.let { ShadowFile(File(dir, it.name)).delete(); ShadowFile(File(app.filesDir, it.name)).delete() }
     file?.delete()
     clear()
   }
@@ -130,7 +135,7 @@ internal class ShadowStore private constructor(context: Context, private val key
     var first = false
     if (f == null) {
       gen = nextGen()
-      f = ShadowFile(File(app.filesDir, nameFor(gen)))
+      f = ShadowFile(File(dir, nameFor(gen)))
       first = true
     }
     val g = gen + 1
@@ -171,7 +176,7 @@ internal class ShadowStore private constructor(context: Context, private val key
     //  نشانِ ناشناخته مالِ ساختِ تازه‌تری است — هرگز حدس نه
     val m = Marker.parse(raw) ?: fail(ShadowFile.Corrupt("marker", raw.take(80)))
     noteMainThread()
-    val f = ShadowFile(File(app.filesDir, m.name))
+    val f = located(m.name)
     val prefsShadow = prefs.getString(k("shadow"), null)
     //  پس از برداشتنِ نسخهٔ prefs، سایهٔ prefs فقط از ساختِ کهنه‌تری آمده که پس از ما نوشت (برگشتِ نسخه) ⇒ آن منبع است
     if (!m.copy && prefsShadow != null) return prefsWin(f, on)
@@ -223,7 +228,7 @@ internal class ShadowStore private constructor(context: Context, private val key
     }
     noteMainThread()
     val g = nextGen()
-    val f = ShadowFile(File(app.filesDir, nameFor(g)))
+    val f = ShadowFile(File(dir, nameFor(g)))
     val ok = runCatching {
       val sha = f.write(s, c, g)
       crash?.invoke(Step.MIGRATE_WRITTEN)
@@ -271,7 +276,7 @@ internal class ShadowStore private constructor(context: Context, private val key
   private fun sweep(now: Long) {
     val named = prefs.all.values.mapNotNullTo(HashSet()) { (it as? String)?.let(Marker::parse)?.name }
     val prefix = "$FILE_PREFIX${OpQueue.fileKey(key)}-"
-    app.filesDir.listFiles().orEmpty().forEach { x ->
+    (dir.listFiles().orEmpty().toList() + app.filesDir.listFiles().orEmpty().toList()).forEach { x ->
       if (!x.name.startsWith(prefix) || x.name.contains(".corrupt-")) return@forEach
       val base = x.name.substringBefore(".dat") + ".dat"
       val at = base.removePrefix(prefix).removeSuffix(".dat").toLongOrNull() ?: return@forEach
@@ -280,6 +285,22 @@ internal class ShadowStore private constructor(context: Context, private val key
   }
 
   private fun nameFor(g: Long) = "$FILE_PREFIX${OpQueue.fileKey(key)}-$g.dat"
+
+  /**
+   *  فایلِ نشان: در [dir]؛ ساختِ پیش از پوشه آن را در خودِ `filesDir` می‌گذاشت (داخلِ پشتیبانِ خودکار) ⇒ اول `.prev` و بعد
+   *  اصل به پوشه (rename ِ همان دیسک). برق میانِ دو گام ⇒ بارِ بعد اصلِ مانده را می‌برد؛ rename نشد ⇒ همان جای پیشین
+   *  برای این اجرا (هیچ چیزی گم یا دو تا نمی‌شود).
+   */
+  private fun located(name: String): ShadowFile {
+    val here = File(dir, name)
+    val old = File(app.filesDir, name)
+    if (here.isFile || (!old.isFile && !File(old.path + ".prev").isFile)) return ShadowFile(here)
+    for (suffix in listOf(".prev", "")) {
+      val from = File(old.path + suffix)
+      if (from.isFile && !from.renameTo(File(here.path + suffix))) return ShadowFile(old)
+    }
+    return ShadowFile(here)
+  }
 
   private fun noteMainThread() {
     if (!onMainThread()) return
@@ -292,7 +313,7 @@ internal class ShadowStore private constructor(context: Context, private val key
     fun text() = "v1;${if (copy) "copy" else "file"};$name;$gen"
 
     companion object {
-      //  نامِ ساده در `filesDir` (کلیدِ `OpQueue.fileKey` حرفِ فارسی هم دارد) — نه پوشه، نه `..`
+      //  نامِ ساده در [DIR] (کلیدِ `OpQueue.fileKey` حرفِ فارسی هم دارد) — نه پوشه، نه `..`
       private val NAME = Regex("""sync-shadow-[^/\\;]+\.dat""")
 
       fun parse(s: String): Marker? {
@@ -315,6 +336,11 @@ internal class ShadowStore private constructor(context: Context, private val key
     private const val PREFS = "tohid-sync-v1"
     const val MARKER = "shadowStore"
     const val FILE_PREFIX = "sync-shadow-"
+    /** پوشهٔ فایل‌های سایه زیرِ `filesDir` — همین نام در `backup_rules.xml`، `backup_rules_legacy.xml` و `AtRestScope.syncState` */
+    const val DIR = "sync-shadow"
+
+    /** `filesDir/sync-shadow/` (ساخته اگر نیست) */
+    fun dirOf(context: Context): File = File(context.applicationContext.filesDir, DIR).apply { mkdirs() }
     private const val NOT_WRITTEN = "سایهٔ همگام‌سازی روی دیسک ننشست"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     private val slots = HashMap<String, ShadowStore>()

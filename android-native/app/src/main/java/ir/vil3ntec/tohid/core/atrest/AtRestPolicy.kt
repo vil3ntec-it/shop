@@ -12,7 +12,7 @@ package ir.vil3ntec.tohid.core.atrest
  *   • دفترچهٔ §۹.۵ (`sync-replay-*-sent.jsonl`، `ReplayBook`): همان opها پس از پذیرش — برای
  *     دوباره فرستادن اگر سرور از پشتیبان برگشت؛ «بازسازی از سرور» هم پیش از Snapshot آن را می‌خواند.
  *   • سایه و cursorِ Sync v1 (`shared_prefs/tohid-sync-v1.xml`، یا با پرچمِ `shop.sync_shadow_file` فایلِ
- *     `sync-shadow-*.dat` و `.prev` ِ آن — `sync/v1/ShadowStore`).
+ *     `sync-shadow/sync-shadow-*.dat` و `.prev` ِ آن — `sync/v1/ShadowStore`؛ ساختِ پیشین: در خودِ `filesDir`).
  *   • `ledger-summary.json` (چند عدد برای نگهبانِ پس‌زمینه) و `sale-draft.json` (سبدِ نیمه‌کاره).
  */
 object AtRestScope {
@@ -34,13 +34,16 @@ object AtRestScope {
   /** حالِ همگام‌سازی که روی دیسک ساده می‌ماند و به سایه/cursor/دفتر بسته است */
   fun syncState(rel: String): Boolean =
     rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-") || rel.startsWith("sync-replay-") ||
-      rel.startsWith("sync-shadow-")
+      rel.startsWith("sync-shadow-") || rel == SHADOW_DIR || rel.startsWith("$SHADOW_DIR/")
 
   /** فایلی که کنار گذاشته شد و دیگر بکار نمی‌رود — برای فهرستِ صفحهٔ امنیت */
   fun leftover(rel: String): Boolean =
     rel.contains(".unreadable-") || rel.contains(".lost-") || rel.contains(".corrupt-") ||
       rel.endsWith(AtRestMigration.SIDECAR_SUFFIX) || rel.endsWith(".rebuild") || rel.endsWith(".rebuild-pending") ||
       rel.endsWith(AtRestKeyring.SUSPECT_SUFFIX)
+
+  /** پوشهٔ سایهٔ همگام‌سازی (`ShadowStore.DIR`) */
+  private const val SHADOW_DIR = "sync-shadow"
 
   /** نامِ prefsی که سایه، cursor و شناسهٔ حسابِ همگام‌سازی را دارد */
   val SYNC_PREFS: Set<String> = setOf("tohid-sync-v1.xml")

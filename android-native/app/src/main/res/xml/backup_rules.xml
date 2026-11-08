@@ -23,6 +23,9 @@
      می‌روند؛ گوشیِ بازیابی‌شده با `V1Replica.fence` شناسهٔ خودش را می‌گیرد و پیش از هر Pull یک بار «بازسازی از
      سرور» می‌کند (صف اول) — `core/sync/RestoredDevice.kt`. قاعدهٔ همین فایل هنگامِ **بازیابی** هم بر پشتیبانِ کهنه‌تر
      اجرا می‌شود (`BackupAgent.onRestoreFile`)، پس پشتیبانِ نسخه‌های پیشین هم این پرونده را برنمی‌گرداند.
+     پوشهٔ `sync-shadow/` (`file`) همان حالِ `tohid-sync-v1` است وقتی پرچمِ `shop.sync_shadow_file` روشن است
+     (`sync/v1/ShadowStore`: سایه و cursor در فایلِ خودشان): نشانش با پشتیبان نمی‌رود، پس در گوشیِ بازیابی‌شده هیچ
+     بکار نمی‌آمد، و فایلی هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد ⇒ بیرون.
 
      SEC-01: وقتی «رمزگذاریِ دفتر» در کار است، `TohidBackupAgent` به‌جای این
      قاعده‌ها همان دو دامنه را می‌فرستد منهای دفترِ رمزدار، کلیددان و حالِ
@@ -39,6 +42,7 @@
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="file" path="sync-shadow" />
   </cloud-backup>
   <device-transfer>
     <include domain="file" path="." />
@@ -49,5 +53,6 @@
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="file" path="sync-shadow" />
   </device-transfer>
 </data-extraction-rules>

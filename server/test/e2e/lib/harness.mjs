@@ -14,7 +14,8 @@
  *     خوانده می‌شود؛
  *   • پرچم‌ها فقط با `live_config`، فقط برای همان دکانِ همان سناریو و از درِ پنلِ مدیر
  *     (`PUT /api/admin/pump/live-config`) — هیچ پیکربندیِ تولیدی دست نمی‌خورد؛
- *   • گام‌ها با شناسهٔ سند، شکاف‌های شناخته (`known-gaps.mjs`) و نتیجه برای `run.mjs`.
+ *   • گام‌ها با شناسهٔ سند، شکاف‌های شناخته (`known-gaps.mjs`) و نتیجه برای `run.mjs`؛
+ *   • حالتِ «همه روشن» ِ کلِ مجموعه با `E2E_FLAGS_ON` (پایین‌تر، `flagsOnList`).
  */
 import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
@@ -30,6 +31,34 @@ const require = createRequire(import.meta.url);
 export { assert };
 export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 export const fa = (n) => String(n).replace(/[0-9]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'[+d]);
+
+/**
+ * «همه روشن» برای کلِ مجموعه (QA ِ دستهٔ ۳۱، `docs/FLAGS-ON-fa.md`) — متغیرِ `E2E_FLAGS_ON`:
+ *   • تهی یا `0` ⇒ هیچ: همان پیش‌فرض‌های تولیدی.
+ *   • `1` ⇒ `FLAGS_ON_BATCH` (پرچم‌های سرورِ دسته‌های ۲۸ تا ۳۱ و پیش‌نیازشان).
+ *   • `all` ⇒ هر پرچمِ بولیِ دکان در `KNOWN` ِ `routes/admin-flags.js`.
+ *   • `k1,k2,…` ⇒ فقط همین‌ها (برای جدا کردنِ ترکیبِ مقصر).
+ * هر دکانی که `E.owner` می‌سازد همان دم پس از ساختن این پرچم‌ها را از همان درِ پنل (`E.flag`) می‌گیرد، مگر سناریو
+ * آن را دکانِ شاهدِ خاموش بخواهد (`E.owner(…, { flagsOn: false })`).
+ * ⛔ هیچ پیش‌فرضِ تولیدی عوض نمی‌شود: فقط ردیفِ `live_config` ِ همان دکان. هر مقداری که سناریو خودش بعداً می‌نویسد
+ * (حتی `false`) بر این حالت جلو است. کلیدِ ناشناخته ⇒ خطا پیش از نخستین گام.
+ */
+export const FLAGS_ON_BATCH = Object.freeze([
+  'auth.staff_session_guard', 'shop.save_base', 'shop.ledger_merge', 'sync.pull_own_newer', 'shop.returns.line_cap',
+  'shop.sync_shadow_file', 'shop.settings_sync', 'shop.count_absorb',
+  'shop.catalog',   //  پیش‌نیازِ سمتِ سرورِ `shop.count_absorb` (دفترِ موجودیِ سرور)
+]);
+
+/** فهرستِ پرچم‌های حالتِ «همه روشن» از روی `E2E_FLAGS_ON` و `KNOWN` */
+export function flagsOnList(raw = process.env.E2E_FLAGS_ON, known = require('../../../src/routes/admin-flags').KNOWN) {
+  const v = String(raw || '').trim();
+  if (!v || v === '0') return [];
+  const bool = known.filter((k) => k.scope === 'shop' && typeof k.default === 'boolean').map((k) => k.key);
+  const list = v === '1' ? [...FLAGS_ON_BATCH] : v === 'all' ? bool : v.split(',').map((x) => x.trim()).filter(Boolean);
+  const bad = list.filter((k) => !bool.includes(k));
+  if (bad.length) throw new Error(`E2E_FLAGS_ON: پرچمِ بولیِ دکان نیست: ${bad.join(', ')}`);
+  return list;
+}
 
 /**
  * سرور را بالا می‌آورد.
@@ -94,7 +123,9 @@ export async function boot({ name, env = {}, port = 0 }) {
   const cluster = require('../../../src/lib/cluster');
   await cluster.start();
   const apiBase = `http://127.0.0.1:${api.address().port}`;
-  return new Harness({ name, db, apiBase, inbox, api, outbox, tmp, cluster });
+  const flagsOn = flagsOnList();
+  if (flagsOn.length) console.log(`E2E_FLAGS_ON: هر دکانِ تازه ⇐ ${flagsOn.join(' ')}`);
+  return new Harness({ name, db, apiBase, inbox, api, outbox, tmp, cluster, flagsOn });
 }
 
 class Harness {
@@ -151,11 +182,12 @@ class Harness {
     return { email, name, password, token: d.accessToken, refreshToken: d.refreshToken, user: d.user };
   }
 
-  /** صاحبِ دکان: ثبت‌نام + ساختنِ دکان */
-  async owner(email, name, shopName) {
+  /** صاحبِ دکان: ثبت‌نام + ساختنِ دکان (+ پرچم‌های `E2E_FLAGS_ON`، مگر `flagsOn: false` برای دکانِ شاهدِ خاموش) */
+  async owner(email, name, shopName, { flagsOn = true } = {}) {
     const a = await this.register(email, name);
     const r = this.ok(await this.post('/api/shop', { name: shopName }, a.token), `ساختنِ دکانِ ${shopName}`);
     a.shopId = r.shop.id;
+    if (flagsOn) for (const k of this.flagsOn) await this.flag(a.shopId, k, true);
     return a;
   }
 

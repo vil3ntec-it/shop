@@ -473,6 +473,9 @@ await E.step('JB6', 'صندوقِ سندهای ردشده: ردِ قرضِ با�
 
 await E.step('JB7', 'بازیابیِ پشتیبانِ گوشیِ صاحب روی گوشیِ دوم ⇐ شناسه و سریِ تازه، فروشِ پیش از ورود می‌رسد، هیچ چیزی دو بار نیست، همه یکی', async () => {
   await syncAll();
+  //  دفترِ ردشدهٔ S از JB6 می‌ماند (حلِ «کنار بگذار/اصلاح» آن را در `setAside` می‌برد، از دفترِ رد پاک نمی‌کند) ⇒ این سفر
+  //  باید **هیچ ردِ تازه‌ای** نیاورد: S دقیقاً همان دفتر، سه دستگاهِ دیگر هیچ
+  const book0 = S.dropped.map((x) => x.op_id);
   const s = sale(A, A.sell({ lines: [{ id: rice, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));   // ۹۰۰ قرض
   await syncAll();
   const [rice0, tea0, oil0, debt0] = [A.stock(rice), A.stock(tea), A.stock(oil), A.debt(ahmad)];
@@ -528,7 +531,10 @@ await E.step('JB7', 'بازیابیِ پشتیبانِ گوشیِ صاحب رو�
       stock: { [rice]: rice0 + 1 - 1 - 1, [tea]: tea0 - 1 - 2, [oil]: oil0 - 1 },
       debt: { [ahmad]: debt0 - 300 },
     },
+    dropped: book0.length,
   });
+  for (const d of [A, B, A2]) assert.deepEqual(d.dropped.map((x) => `${x.table}/${x.row_id}: ${x.why}`), [], `JB7 · ${d.label}: op ِ ردشده`);
+  assert.deepEqual(S.dropped.map((x) => x.op_id), book0, 'JB7 · S: فقط دفترِ ردشدهٔ JB6، هیچ ردِ تازه');
 }, { needs: ['JB.0'] });
 
 await E.finish();

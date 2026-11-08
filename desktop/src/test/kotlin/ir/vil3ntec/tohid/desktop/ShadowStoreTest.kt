@@ -44,8 +44,10 @@ class ShadowStoreTest {
   private fun key(tag: String) = "shadowt$tag$n".also { keys += it }
   private fun state(k: String) = SyncStateV1(ctx, k)
   private fun marker(k: String) = prefs.getString("$k.${ShadowStore.MARKER}", null)
-  private fun mainOf(k: String) = File(ctx.filesDir, marker(k)!!.split(';')[2])
-  private fun files(k: String) = ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("${ShadowStore.FILE_PREFIX}${OpQueue.fileKey(k)}-") }
+  private val dir get() = ShadowStore.dirOf(ctx)
+  private fun mainOf(k: String) = File(dir, marker(k)!!.split(';')[2])
+  private fun files(k: String) = (dir.listFiles().orEmpty().toList() + ctx.filesDir.listFiles().orEmpty().toList())
+    .filter { it.name.startsWith("${ShadowStore.FILE_PREFIX}${OpQueue.fileKey(k)}-") }
   private fun seedPrefs(k: String, shadow: String, cursor: Long) =
     assertTrue(prefs.edit().putString("$k.shadow", shadow).putLong("$k.cursor", cursor).commit())
 
@@ -211,13 +213,13 @@ class ShadowStoreTest {
     //  نخستین سنجشِ `recoverArchive` (پیش از هر تفاضل) خودش بار می‌کند و نشان می‌گذارد
     assertTrue(state(k).recoverArchive)
     assertEquals(shadowOf(1) to 5L, state(k).shadow to state(k).cursor)
-    assertTrue(ctx.filesDir.listFiles().orEmpty().any { it.name.startsWith(main.name + ".corrupt-") })
+    assertTrue(dir.listFiles().orEmpty().any { it.name.startsWith(main.name + ".corrupt-") })
     //  هم‌ترازی (`recoverArchived` ⇐ `commit.rebuild`) جفتِ تازه را می‌نشاند؛ `.prev` همان نسخهٔ سالمِ پیشین می‌ماند
     assertTrue(state(k).commitShadow(shadowOf(3), 9))
     assertEquals(shadowOf(1), ShadowFile(File(main.path + ".prev")).readMain()!!.shadow)
     restart(on = true)
     assertEquals(shadowOf(3) to 9L, state(k).shadow to state(k).cursor)
-    ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith(main.name + ".corrupt-") }.forEach { it.delete() }
+    dir.listFiles().orEmpty().filter { it.name.startsWith(main.name + ".corrupt-") }.forEach { it.delete() }
   }
 
   @Test fun `هیچ نسخهٔ سالمی نیست ⇒ پرتاب (نه سایهٔ خالی)؛ نوار و ردِ حال نمی‌افتند`() {
@@ -251,7 +253,55 @@ class ShadowStoreTest {
     assertEquals(shadowOf(1) to 11L, state(k).shadow to state(k).cursor)
     assertTrue(marker(k)!!.startsWith("v1;copy;"))
     assertNotEquals(first.name, mainOf(k).name)
-    ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith(first.name) }.forEach { it.delete() }
+    dir.listFiles().orEmpty().filter { it.name.startsWith(first.name) }.forEach { it.delete() }
+  }
+
+  /* ------------------------------ جا: بیرون از پشتیبانِ خودکار ------------------------------ */
+
+  @Test fun `فایلِ سایه در پوشهٔ sync-shadow است و هر سه قاعدهٔ پشتیبانِ اندروید آن پوشه را بیرون می‌گذارند`() {
+    val k = key("dir")
+    restart(on = true)
+    assertTrue(state(k).commitShadow(shadowOf(1), 3))
+    val main = mainOf(k)
+    assertEquals(File(ctx.filesDir, ShadowStore.DIR).canonicalPath, main.parentFile.canonicalPath)
+    assertTrue(main.isFile)
+    assertTrue("هیچ فایلِ سایه در خودِ filesDir", files(k).none { it.parentFile.canonicalPath == ctx.filesDir.canonicalPath })
+    //  نشانِ فایل در `tohid-sync-v1` با پشتیبان نمی‌رود ⇒ فایلِ بی‌نشان در گوشیِ بازیابی‌شده هیچ بکار نمی‌آمد و هم‌اندازهٔ
+    //  دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد
+    val res = "../android-native/app/src/main/res/xml"
+    val rules = File("$res/backup_rules.xml").readText()
+    val exclude = Regex("<exclude\\s+domain=\"file\"\\s+path=\"${ShadowStore.DIR}/?\"\\s*/>")
+    for ((where, xml) in listOf(
+      "cloud-backup" to rules.substringAfter("<cloud-backup>").substringBefore("</cloud-backup>"),
+      "device-transfer" to rules.substringAfter("<device-transfer>").substringBefore("</device-transfer>"),
+      "backup_rules_legacy" to File("$res/backup_rules_legacy.xml").readText(),
+    )) assertTrue("$where: پوشهٔ ${ShadowStore.DIR} بیرون", exclude.containsMatchIn(xml))
+  }
+
+  @Test fun `فایلِ ساختِ پیشین در خودِ filesDir — به پوشه می‌رود با همان سایه و cursor و prev`() {
+    val k = key("old")
+    restart(on = true)
+    assertTrue(state(k).commitShadow(shadowOf(1), 4))
+    assertTrue(state(k).commitShadow(shadowOf(2), 5))
+    val main = mainOf(k)
+    val prev = File(main.path + ".prev")
+    assertTrue(prev.isFile)
+    //  همان جای ساختِ پیشین
+    val oldMain = File(ctx.filesDir, main.name)
+    assertTrue(main.renameTo(oldMain) && prev.renameTo(File(oldMain.path + ".prev")))
+    restart(on = true)
+    assertEquals(shadowOf(2) to 5L, state(k).shadow to state(k).cursor)
+    assertTrue(main.isFile && prev.isFile)
+    assertFalse(oldMain.isFile || File(oldMain.path + ".prev").isFile)
+    assertFalse(state(k).recoverArchive)
+    //  برق میانِ دو گامِ جابه‌جایی (`.prev` رفته، اصل مانده): بارِ بعد اصل را می‌برد
+    assertTrue(main.renameTo(oldMain))
+    restart(on = true)
+    assertEquals(shadowOf(2) to 5L, state(k).shadow to state(k).cursor)
+    assertTrue(main.isFile && !oldMain.isFile)
+    assertTrue(state(k).commitShadow(shadowOf(3), 6))
+    restart(on = true)
+    assertEquals(shadowOf(3) to 6L, state(k).shadow to state(k).cursor)
   }
 
   /* ------------------------------ کوچ ------------------------------ */
