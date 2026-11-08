@@ -83,4 +83,11 @@ object StrSync {
     "The server went back to a backup and this device hadn't kept all the work done after that backup; this device's new sales and rows were sent, but check the edits before that against the ledger once.",
     "سرور بک‌اپ ته ستون شو او دې وسیلې له بک‌اپ وروسته ټول کارونه نه وو ساتلي؛ د همدې وسیلې نوي پلورونه او کرښې ولېږل شوې، خو له هغې مخکې سمونونه یو ځل له دفتر سره پرتله کړئ.",
   )
+
+  // DATA-SAFETY: دفترِ کنارِ تغییرهای ردشده (`OpQueue.drop`)
+  val rejectedBookNotWritten: String get() = t(
+    "فهرستِ تغییرهای ردشده روی حافظه نوشته نشد؛ همان تغییرها در صف می‌مانند",
+    "The list of rejected changes wasn't written to storage; those changes stay in the queue",
+    "د رد شویو بدلونونو لېست په حافظه کې ونه لیکل شو؛ هماغه بدلونونه په کتار کې پاتې کېږي",
+  )
 }

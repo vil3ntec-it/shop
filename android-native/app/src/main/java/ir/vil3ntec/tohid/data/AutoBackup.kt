@@ -49,6 +49,9 @@ object AutoBackup {
   private const val LOCAL_WORK = "tohid-auto-backup-local"
   private const val DIR = "auto-backups"
 
+  /** همان تنظیمِ خواندنِ `ShopStore` — برای سنجیدنِ دفتر پیش از نسخه و پشتیبان ([LedgerRecovery.readable]) */
+  private val parseJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true }
+
   /** نسخهٔ محلی هر چند دقیقه (فقط اگر دفتر عوض شده) — OPS-02: «هر ۱۵ تا ۳۰ دقیقه» */
   const val LOCAL_EVERY_MINUTES = 30L
 
@@ -134,7 +137,9 @@ object AutoBackup {
   fun take(context: Context, today: String): Result<File?> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
     val time = java.text.SimpleDateFormat("HHmmss", java.util.Locale.US).format(java.util.Date())
-    val made = LocalSnapshots.takeIfChanged(ledger, dir(context), "${LocalSnapshots.PREFIX}$today-$time${LocalSnapshots.SUFFIX}")
+    val made = LocalSnapshots.takeIfChanged(ledger, dir(context), "${LocalSnapshots.PREFIX}$today-$time${LocalSnapshots.SUFFIX}") {
+      LedgerRecovery.readable(it, parseJson) { f -> AtRest.readText(context, f) }
+    }
     prune(context)
     made
   }
@@ -178,6 +183,8 @@ object AutoBackup {
       //  SEC-01: دفترِ رمزدار باز می‌شود — پشتیبانِ بیرون‌رفته با کلیدِ دستگاه
       //  رمز نمی‌شود (بند ۱۰٫۳)؛ دفترِ خوانده‌نشده هم هیچ‌وقت «پشتیبان» نمی‌شود
       val ledgerJson = AtRest.readText(context, ledger)
+      //  ⛔ DATA-SAFETY: دفترِ خراب هرگز پشتیبانِ ابری نمی‌شود (نسخهٔ سالمِ پیشین روی سرور می‌ماند)
+      if (LedgerRecovery.decode(ledgerJson, parseJson) !is LedgerRecovery.Read.Ok) return false
 
       val bytes = java.io.ByteArrayOutputStream().use { out ->
         BackupBundle.write(context, out, ledgerJson).getOrThrow()

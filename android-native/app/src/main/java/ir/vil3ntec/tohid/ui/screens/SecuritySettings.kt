@@ -234,6 +234,15 @@ val REBUILD: String get() = StrSecurity.rebuild
 val PLAIN_IN_PHASE_1: String get() = StrSecurity.plainInPhase1
 
 /** همان متن در صفحهٔ «رمزگذاری دفتر»ِ نسخهٔ ۳ (`EncryptionScreen`) */
+/** DATA-SAFETY: متنِ دفترِ ساده‌ای که خوانده نشد — [at] زمانِ نسخهٔ سالمی که پیدا شد */
+internal fun damagedText(damage: ir.vil3ntec.tohid.data.LedgerRecovery.Damage, at: Long?): String = when (damage) {
+  ir.vil3ntec.tohid.data.LedgerRecovery.Damage.READ_ERROR -> StrSecurity.damagedRead
+  ir.vil3ntec.tohid.data.LedgerRecovery.Damage.NEWER_FORMAT ->
+    StrSecurity.damagedNewer + (at?.let { StrSecurity.damagedCopyAt(ir.vil3ntec.tohid.displayMillis(it)) } ?: "")
+  ir.vil3ntec.tohid.data.LedgerRecovery.Damage.CORRUPT ->
+    at?.let { StrSecurity.damagedCorrupt(ir.vil3ntec.tohid.displayMillis(it)) } ?: StrSecurity.damagedNoCopy(REBUILD)
+}
+
 internal fun unreadableText(kind: AtRestException.Kind?): String = when (kind) {
   AtRestException.Kind.KEY_UNAVAILABLE -> StrSecurity.unreadableKeyUnavailable(REBUILD)
   AtRestException.Kind.KEY_MISSING ->
@@ -283,21 +292,44 @@ fun UnreadableLedgerDialog(
   val colors = Shop.colors
   val scope = rememberCoroutineScope()
   val kind by store.unreadable.collectAsState()
+  //  DATA-SAFETY: دفترِ **ساده**ای که خوانده نشد (`LedgerRecovery`) — متن و راهِ برگشتِ خودش
+  val damage by store.guard.damage.collectAsState()
+  val copy by store.guard.recovery.collectAsState()
   var busy by remember { mutableStateOf(false) }
   var ask by remember { mutableStateOf(false) }
+  /** برگرداندن از نسخهٔ سالم یا «دوباره امتحان» ِ خطای خواندن — بی پنجرهٔ دوم (هیچ‌کدام چیزی پاک نمی‌کند) */
+  fun direct(run: suspend () -> String?) {
+    busy = true
+    scope.launch {
+      val msg = run()
+      busy = false
+      if (msg != null) toast(msg)
+    }
+  }
   AlertDialog(
     onDismissRequest = { if (!busy) onDismiss() },
     containerColor = colors.bg,
-    title = { Text(StrSecurity.unreadableTitle, color = colors.text) },
+    title = { Text(if (damage != null) StrSecurity.damagedTitle else StrSecurity.unreadableTitle, color = colors.text) },
     text = {
       Text(
-        StrSecurity.recordingBlocked + unreadableText(kind),
+        StrSecurity.recordingBlocked + (damage?.let { damagedText(it, copy?.at) } ?: unreadableText(kind)),
         color = colors.muted,
       )
     },
     confirmButton = {
-      TextButton(enabled = !busy, onClick = { ask = true }) {
-        Text(if (busy) StrSecurity.rebuilding else REBUILD, color = colors.primary)
+      when {
+        damage == ir.vil3ntec.tohid.data.LedgerRecovery.Damage.READ_ERROR ->
+          TextButton(enabled = !busy, onClick = {
+            direct { if (store.retryRead()) { onDismiss(); StrSecurity.ledgerOpened } else StrSecurity.stillNotOpened }
+          }) { Text(StrSecurity.retry, color = colors.primary) }
+        damage != null && copy != null ->
+          TextButton(enabled = !busy, onClick = {
+            direct { store.recoverFromCopy().also { if (it.ok) onDismiss() }.message }
+          }) { Text(if (busy) StrSecurity.rebuilding else StrSecurity.recoverFromCopy, color = colors.primary) }
+        else ->
+          TextButton(enabled = !busy, onClick = { ask = true }) {
+            Text(if (busy) StrSecurity.rebuilding else REBUILD, color = colors.primary)
+          }
       }
     },
     dismissButton = {

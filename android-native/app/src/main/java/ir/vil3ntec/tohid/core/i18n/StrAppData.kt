@@ -421,4 +421,21 @@ object StrAppData {
     "Google sign-in isn't on the computer app — sign in with email",
     "د کمپیوټر په پروګرام کې د ګوګل ننوتل نشته — په برېښنالیک ننوځئ",
   )
+
+  // ── DATA-SAFETY: فایلِ خراب «خالی» نیست (`LedgerRecovery.strict`، `BackupMirror`) ──
+  fun notReadKept(name: Any?): String = t(
+    "«${asIs(name)}» خوانده نشد؛ برای اینکه رونویسی نشود، کاری انجام نشد",
+    "«$name» couldn't be read; nothing was done so it isn't overwritten",
+    "«$name» ونه لوستل شو؛ د دې لپاره چې له سره ونه لیکل شي، هېڅ کار ونه شو",
+  )
+  fun damagedSetAside(name: Any?, copy: Any?): String = t(
+    "«${asIs(name)}» خراب است (رونوشتش کنار رفت: ${asIs(copy)})؛ کاری انجام نشد",
+    "«$name» is damaged (a copy was set aside: $copy); nothing was done",
+    "«$name» خراب دی (کاپي یې یوې خوا ته شوه: $copy)؛ هېڅ کار ونه شو",
+  )
+  val mirrorSkippedDamaged: String get() = t(
+    "دفتر خراب خوانده شد؛ پشتیبانِ پوشه گرفته نشد تا پشتیبان‌های سالم بمانند",
+    "The ledger read as damaged; no folder backup was made so the good backups stay",
+    "دفتر خراب ولوستل شو؛ د فولډر بک‌اپ ونه نیول شو چې روغ بک‌اپونه پاتې شي",
+  )
 }

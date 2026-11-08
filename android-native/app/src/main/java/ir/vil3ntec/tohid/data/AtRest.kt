@@ -97,8 +97,9 @@ object AtRest {
   }
 
   /** همان `DiskWrite.text`، با رمز اگر روشن است */
-  fun writeText(context: Context, f: File, text: String) =
-    DiskWrite.bytes(f, encode(context, text.toByteArray(Charsets.UTF_8)))
+  /** @param keepPrevious نسخهٔ پیشین به نامِ `<نام>.prev` می‌ماند (`DiskWrite.bytes`) — برای دفترِ روی میز */
+  fun writeText(context: Context, f: File, text: String, keepPrevious: Boolean = false) =
+    DiskWrite.bytes(f, encode(context, text.toByteArray(Charsets.UTF_8)), keepPrevious)
 
   /** فایل‌هایی که فاز ۱ پوشش می‌دهد — دفترِ روی میز اول */
   fun files(context: Context): List<File> {
@@ -107,7 +108,8 @@ object AtRest {
       it.isFile && it.name.startsWith("ledger-") && it.name.endsWith(".json") && it.name != "ledger-summary.json"
     }.sortedBy { it.name }
     val snaps = runCatching { AutoBackup.list(context).map { it.file } }.getOrDefault(emptyList())
-    return listOf(File(dir, "shop-data.json"), File(dir, "before-restore.json")) + vaults + snaps
+    //  DATA-SAFETY: نسخهٔ پیشینِ دفتر (`shop-data.json.prev`) همان رمزِ دفتر را می‌گیرد
+    return listOf(File(dir, "shop-data.json"), File(dir, "before-restore.json"), File(dir, "shop-data.json.prev")) + vaults + snaps
   }
 
   /**
