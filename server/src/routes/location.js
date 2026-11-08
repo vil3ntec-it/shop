@@ -23,7 +23,7 @@ const tokens = require('../lib/tokens');
 const { one, many } = require('../db');
 const config = require('../config');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
-const { requireUser } = require('../middleware/auth');
+const { requireUser, bearer } = require('../middleware/auth');
 const { badRequest } = require('../middleware/errors');
 
 const router = express.Router();
@@ -38,9 +38,9 @@ const locationLimit = rateLimit({
 
 /** اگر توکن آمده و درست بود، کاربرش را برمی‌گرداند؛ وگرنه هیچ. */
 async function userIfAny(req) {
-  const m = /^Bearer\s+(.+)$/i.exec((req.headers.authorization || '').trim());
-  if (!m) return null;
-  const row = await tokens.verify(m[1].trim(), 'access');
+  const token = bearer(req);   //  پارسرِ خطی با سقفِ طول (`lib/bearer.js`)
+  if (!token) return null;
+  const row = await tokens.verify(token, 'access');
   if (!row) return null;
   const user = await one('SELECT id, status FROM users WHERE id=$1', [row.subject_id]);
   return user && user.status === 'active' ? user : null;

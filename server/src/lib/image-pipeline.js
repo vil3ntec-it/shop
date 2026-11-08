@@ -29,11 +29,17 @@ const STEPS = [
   { id: 'inpainting', status: 'blocked_external', note: 'ترمیم با مدل — provider ندارد' },
 ];
 
-const LOCAL = {
-  validate: (buf) => bytes.inspect(buf),
-  strip_metadata: (buf) => bytes.stripMetadata(buf),
-  dedupe_hash: (buf) => require('crypto').createHash('sha256').update(buf).digest('hex'),
-};
+/**
+ * فهرستِ بستهٔ کارِ مرحله‌های `available` — `Map`، نه شیءِ ساده. نامِ مرحله از بدنهٔ درخواست می‌آید
+ * (`POST /api/shop/images/:id/process`)؛ `stepOf` پیش‌تر هم آن را به STEPS می‌بست، ولی `LOCAL[id]` ِ
+ * شیءِ ساده این را نشان نمی‌داد (CodeQL `js/unvalidated-dynamic-method-call`: `__proto__`، `constructor`).
+ * حالا کار با `s.id` ِ خودِ سرور از `Map` گرفته می‌شود که جز همین سه هیچ ندارد.
+ */
+const LOCAL = new Map([
+  ['validate', (buf) => bytes.inspect(buf)],
+  ['strip_metadata', (buf) => bytes.stripMetadata(buf)],
+  ['dedupe_hash', (buf) => require('crypto').createHash('sha256').update(buf).digest('hex')],
+]);
 
 function describe() {
   return STEPS.map((s) => ({ ...s }));
@@ -56,7 +62,10 @@ function run(id, buf) {
     e.state = s.status;
     throw e;
   }
-  return LOCAL[id](buf);
+  const work = LOCAL.get(s.id);
+  //  مرحلهٔ `available` ِ بی کار (ناهم‌خوانیِ STEPS و LOCAL) همان ۵۰۳ است، نه TypeError
+  if (typeof work !== 'function') throw new ApiError(503, 'step_unavailable', 'این پردازش روی سرور در دسترس نیست');
+  return work(buf);
 }
 
 module.exports = { STEPS, describe, stepOf, run };

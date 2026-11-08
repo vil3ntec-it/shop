@@ -21,6 +21,7 @@ const { notifyPanel } = require('./panel-live');
 const push = require('./push');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
 const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)
+const { bufferOf } = require('./raw-body');
 
 const MAX_BODY = 4000;
 
@@ -306,13 +307,15 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
 async function putMedia({ threadId, uploader, mime, buf }) {
   const kind = mediaKindOf(mime);
   if (!kind) throw badRequest('فقط عکس، ویدیو و صدا', 'bad_media');
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
-  if (buf.length > MAX_MEDIA) throw new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است');
+  //  ⛔ نوع با typeof/Array.isArray (`lib/raw-body.js`)؛ CodeQL `Buffer.isBuffer` را نگهبان نمی‌شناسد (type confusion)
+  const bytes = bufferOf(buf, null);
+  if (!bytes || !bytes.length) throw badRequest('فایل خالی است', 'bad_media');
+  if (bytes.length > MAX_MEDIA) throw new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است');
   if (uploader !== 'user' && uploader !== 'admin') throw badRequest('فرستنده نامعتبر است');
-  const row = await mediaStore.support.put(threadId, buf, async (st) => (st.used = await one(
+  const row = await mediaStore.support.put(threadId, bytes, async (st) => (st.used = await one(
     `INSERT INTO support_media (id, thread_id, uploader, mime, size, data, created_at, store_key)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, mime, size`,
-    [newId('smd'), threadId, uploader, String(mime).toLowerCase().split(';')[0].trim().slice(0, 80), buf.length, st.data, now(), st.key]
+    [newId('smd'), threadId, uploader, String(mime).toLowerCase().split(';')[0].trim().slice(0, 80), bytes.length, st.data, now(), st.key]
   )));
   return { mediaId: row.id, kind, mime: row.mime, size: Number(row.size) };
 }

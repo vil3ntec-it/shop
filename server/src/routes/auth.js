@@ -708,34 +708,54 @@ const readProfileOf = (p) => async (req, res, next) => {
   next();
 };
 
+/*
+ *  ── سنجشِ رازِ حساب: فقط سرور «ثابت شد» می‌گوید ───────────────────────
+ *  `proveExistingMethod` و `/reauth` هر دو رمز یا کد می‌پذیرند. بدنه فقط می‌گوید
+ *  **کدام** راز آمده؛ «ثابت شد» فقط از این دو تابع می‌آید که راز را با دادهٔ خودِ
+ *  سرور می‌سنجند (هشِ رمزِ همان حساب / کدِ ثبت‌شدهٔ همان مقصد و هدف)، هر دو پشتِ
+ *  قفلِ تلاشِ ناموفقِ ورودِ عادی، و ناموفق ⇒ خطا. هیچ پرچم یا سرآیندی از درخواست
+ *  سنجش را جا نمی‌اندازد؛ نبودِ هر دو راز رد است. (CodeQL `js/user-controlled-bypass`
+ *  شاخه‌زدن روی «کدام راز آمد» را دورزدن می‌خواند؛ سنجش برای همین این‌جا بی شرطِ بیرونی است.)
+ */
+
+/** رمز با هشِ همان حساب؛ حسابِ بی‌رمز همان زمان را می‌سوزاند و رد می‌شود. */
+async function provePassword(user, password, lockId, ip, { message, clear = false }) {
+  await assertNotLocked('user', lockId, ip);
+  let ok = false;
+  if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
+  else await pw.burnTime(password);
+  await noteAttempt('user', lockId, ip, ok);
+  if (!ok) throw unauthorized(message, 'bad_credentials');
+  if (clear) await clearAttempts('user', lockId);
+}
+
+/** کدِ یک‌بارمصرف با ردیفِ ثبت‌شدهٔ همان مقصد و همان هدف (`purpose`). */
+async function proveCode(to, code, ip, { purpose, clear = false }) {
+  await assertNotLocked('otp', to, ip);
+  try {
+    await otp.verify(to, code, { purpose });
+  } catch (err) {
+    await noteAttempt('otp', to, ip, false);
+    throw err;
+  }
+  await noteAttempt('otp', to, ip, true);
+  if (clear) await clearAttempts('otp', to);
+}
+
 /**
  *  اثباتِ روشِ قبلیِ حساب — رمز یا کدِ ایمیل. هر دو پشتِ همان قفلِ تلاشِ
  *  ناموفقِ ورودِ عادی‌اند، پس این در راهِ تازه‌ای برای حدس زدنِ رمز نیست.
- *  @returns {Promise<'password'|'email_code'|null>}
+ *  @returns {Promise<'password'|'email_code'|null>} null ⇒ هیچ رازی نیامد (فراخوان ۴۰۹ ِ «اثبات لازم» می‌دهد)
  */
 async function proveExistingMethod(user, body, ip) {
   const password = typeof body?.password === 'string' ? body.password : '';
   const code = String(body?.code || body?.emailCode || '').trim();
   if (password) {
-    await assertNotLocked('user', user.email, ip);
-    let ok = false;
-    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
-    else await pw.burnTime(password);
-    await noteAttempt('user', user.email, ip, ok);
-    if (!ok) throw unauthorized('رمزِ همین حساب درست نیست', 'bad_credentials');
-    await clearAttempts('user', user.email);
+    await provePassword(user, password, user.email, ip, { message: 'رمزِ همین حساب درست نیست', clear: true });
     return 'password';
   }
   if (code) {
-    await assertNotLocked('otp', user.email, ip);
-    try {
-      await otp.verify(user.email, code, { purpose: 'link' });
-    } catch (err) {
-      await noteAttempt('otp', user.email, ip, false);
-      throw err;
-    }
-    await noteAttempt('otp', user.email, ip, true);
-    await clearAttempts('otp', user.email);
+    await proveCode(user.email, code, ip, { purpose: 'link', clear: true });
     return 'email_code';
   }
   return null;
@@ -967,28 +987,22 @@ router.post('/reauth', requireAnyUser, sessionLimit, passwordSessionLimit, async
   const ip = clientIp(req);
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const code = String(req.body?.code || '').trim();
+  //  قفل و مقصدِ کد از خودِ حساب (`req.user` ِ توکن)، نه از بدنه
+  const lockId = user.email || user.phone || user.id;
+  const to = reauthDestination(user);
   let method = '';
-  if (password) {
-    const id = user.email || user.phone || user.id;
-    await assertNotLocked('user', id, ip);
-    let ok = false;
-    if (user.password_hash) ok = await pw.verifyPassword(password, user.password_hash);
-    else await pw.burnTime(password);
-    await noteAttempt('user', id, ip, ok);
-    if (!ok) return next(unauthorized('رمز درست نیست', 'bad_credentials'));
-    method = 'password';
-  } else if (code) {
-    const to = reauthDestination(user);
-    await assertNotLocked('otp', to, ip);
-    try {
-      await otp.verify(to, code, { purpose: 'reauth' });
-    } catch (err) {
-      await noteAttempt('otp', to, ip, false);
-      return next(err);
+  try {
+    if (password) {
+      await provePassword(user, password, lockId, ip, { message: 'رمز درست نیست' });
+      method = 'password';
+    } else if (code) {
+      await proveCode(to, code, ip, { purpose: 'reauth' });
+      method = 'code';
     }
-    await noteAttempt('otp', to, ip, true);
-    method = 'code';
-  } else {
+  } catch (err) {
+    return next(err);
+  }
+  if (!method) {
     return next(badRequest('رمز یا کد لازم است', 'reauth_proof_required'));
   }
   await reauth.markFresh({ tokenHash: req.tokenRow.token_hash, ip });

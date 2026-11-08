@@ -18,6 +18,8 @@ const { one, many, now } = require('../db');
 const { sectionOf, SHOP } = require('./tenancy');
 const { can } = require('./permissions');
 const { unauthorized, forbidden } = require('../middleware/errors');
+const { bearerToken } = require('./bearer');
+const { redactPath, oneLine } = require('./log-redact');
 
 /** نام‌های برنامه در پرامپت (`dukan`) هم پذیرفته می‌شوند. */
 function appAlias(raw) {
@@ -111,9 +113,8 @@ async function resolveToken(token) {
 }
 
 function tokenOf(req) {
-  const h = req.headers?.authorization || '';
-  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
-  if (m) return m[1].trim();
+  const b = bearerToken(req.headers?.authorization);   //  پارسرِ خطی با سقفِ طول (`lib/bearer.js`)
+  if (b) return b;
   const q = req.query?.token;
   return typeof q === 'string' ? q.trim() : '';
 }
@@ -222,8 +223,10 @@ async function noteMismatch(req, ctx, claimed, enforced) {
   if (!(warned.get(key) > t)) {
     if (warned.size > 5000) warned.clear();
     warned.set(key, t + 3_600_000);
+    //  ⛔ `claimed` و مسیر از درخواست‌اند: CR/LF ِ خام هرگز به لاگ نمی‌رسد (log injection: سطرِ ساختگی)؛
+    //  مسیر همان `redactPath` ِ لاگِ درخواست (بی querystring، بی توکن)
     console.warn(`[sync] شناسهٔ دستگاهِ ناجور ${enforced ? '(رد شد)' : '(فقط ثبت؛ پرچمِ sync.device_bind خاموش)'}: ` +
-      `account=${ctx.accountId} bound=${ctx.deviceUid || '-'} claimed=${claimed} path=${String(req.originalUrl || '').split('?')[0]}`);
+      `account=${ctx.accountId} bound=${ctx.deviceUid || '-'} claimed=${oneLine(claimed)} path=${redactPath(req.originalUrl)}`);
   }
   await require('./audit').log({
     shopId: ctx.accountKind === 'shop' ? ctx.accountId : '', actorType: ctx.via === 'device' ? 'system' : 'user',
