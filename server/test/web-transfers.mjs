@@ -130,6 +130,8 @@ const pushed = await post('/api/sync/v1/push', {
     op('warehouseEntries', 'rice-e', { productId: 'rice', units: 10, cartons: 0, perCarton: 0, unit: 'بوجی', price: 40, createdAt: Date.now() }),
     op('products', 'oil', { name: 'روغن', unit: 'قوطی', salePrice: 90, purchasePrice: 70, active: true, barcodes: ['222'], createdAt: Date.now() }),
     op('warehouseEntries', 'oil-e', { productId: 'oil', units: 4, cartons: 0, perCarton: 0, unit: 'قوطی', price: 70, createdAt: Date.now() }),
+    //  نامِ کالا دادهٔ دفتر است (از هر دستگاه) ⇒ همیشه متن، هرگز HTML
+    op('products', 'xss', { name: 'زهر <img src=x id="xss-probe">', unit: 'دانه', salePrice: 1, purchasePrice: 1, active: true, barcodes: [], createdAt: Date.now() }),
   ],
 }, owner.accessToken, { 'X-App': 'shop', 'X-Device': 'dev-xfr-on' });
 assert.equal(pushed.status, 200, JSON.stringify(pushed.body));
@@ -190,6 +192,11 @@ await step('پیش‌نویس: جست‌وجو، افزودن، مقدار با 
   await page.waitForSelector('#xfr-draft');
   assert.equal(await page.locator('#xfr-draft select[name="from"]').inputValue(), 'shop_floor');
   assert.equal(await page.locator('#xfr-draft select[name="to"]').inputValue(), 'warehouse');
+  await page.fill('#xfr-draft input[name="q"]', 'زهر');
+  await page.click('[data-xfr="find"]');
+  await page.waitForSelector('.xfr-found li');
+  assert.equal(await page.locator('#xss-probe').count(), 0, 'نامِ کالا HTML نشد');
+  assert.match(await page.locator('.xfr-found').innerText(), /<img src=x/);
   await page.fill('#xfr-draft input[name="q"]', 'برنج');
   await page.click('[data-xfr="find"]');
   await page.waitForSelector('.xfr-found [data-xfr="add"]');

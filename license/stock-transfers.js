@@ -129,7 +129,9 @@
   const API = '/api/v1/shop/catalog';
   const DRAFT_KEY = 'tohid-stock-transfer-draft-v1';
   const $ = (id) => document.getElementById(id);
-  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  //  همان escapeHtml ِ خودِ برنامهٔ وب (SEC-API-01، index.html) — نسخهٔ دوم ساخته نمی‌شود؛ نبودش ⇒ صفحه ساخته نمی‌شود
+  const escOk = () => typeof root.escapeHtml === 'function';
+  const esc = (s) => root.escapeHtml(String(s == null ? '' : s));
   const shop = () => root.TohidShop;
   const call = (path, opts) => shop().apiAuth(API + path, opts);
   const toast = (m) => { try { shop()._toast(m); } catch { /* no toast */ } };
@@ -189,7 +191,7 @@
   const ICON = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h13l-3-3M20 17H7l3 3"/></svg>';
 
   function mount() {
-    if ($('xfr-btn')) return;
+    if ($('xfr-btn') || !escOk()) return;
     const bar = document.querySelector('#page-warehouse .toolbar-actions');
     if (!bar) return;
     if (!document.querySelector('link[data-xfr-css]')) {
