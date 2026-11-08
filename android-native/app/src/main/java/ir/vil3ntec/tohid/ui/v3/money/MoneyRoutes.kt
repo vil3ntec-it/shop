@@ -121,6 +121,7 @@ val MoneyModule = AppModule(
       //  پیوندِ کهنه به مشتریِ ادغام‌شده (#330) همان مشتریِ ماندگار را باز می‌کند
       val id = CustomerCrm.resolve(data, args["id"].orEmpty())
       val remindScope = rememberCoroutineScope()
+      val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store) // CRM-15
       VipGate(Str.debtors) {
         DebtorLedgerScreen(
           id = id,
@@ -137,6 +138,8 @@ val MoneyModule = AppModule(
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
             //  CRM-06: یک ردِ `debt_reminder` در روز برای هر راه (زمان‌بندیِ «یادآوریِ امروز»)
             onReminded = { channel -> remindScope.launch { DebtReminderSend.sent(store, id, channel) } },
+            //  CRM-15: «چه کسی پرونده را دید» در دفترِ همین دستگاه (همگام می‌شود)
+            onViewed = { kind -> viewed(id, kind) },
           ),
           extras = { DebtorFileExtras(data, store, id, onOpenOrder = { nav.open(OnlinePaths.order(it)) }) { toasts.show(it) } },
         )

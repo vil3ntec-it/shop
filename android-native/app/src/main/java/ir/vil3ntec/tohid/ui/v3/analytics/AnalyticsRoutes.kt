@@ -64,11 +64,20 @@ val AnalyticsModule = AppModule(
   ),
   routes = listOf(
     V3Route(AnalyticsPaths.REPORTS, RouteKind.TAB, { Str.reports }, chrome = Chrome.OWN) {
-      if (desk) ReportsDesk(data, snackbar) { nav.open(it) }
-      else ReportsScreen(
-        d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
-        onBack = backOrNull, bottomReserve = bottomReserve, onOpen = { nav.open(it) },
-      )
+      //  CRM-15: خروجی/چاپِ برگهٔ مشتریان ⇐ «خروجیِ همهٔ مشتریان» در «چه کسی پرونده را دید» ِ هر پرونده
+      val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store)
+      val exported: (String) -> Unit = { key ->
+        if (key in ir.vil3ntec.tohid.core.crm.CustomerAccess.CUSTOMER_SHEETS) {
+          viewed(ir.vil3ntec.tohid.core.crm.CustomerAccess.ALL, ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.EXPORT)
+        }
+      }
+      androidx.compose.runtime.CompositionLocalProvider(ir.vil3ntec.tohid.ui.screens.LocalReportExport provides exported) {
+        if (desk) ReportsDesk(data, snackbar) { nav.open(it) }
+        else ReportsScreen(
+          d = data, canSeeMoney = canSeeMoney(), tabArg = args.query("tab"), rangeArg = args.query("range"),
+          onBack = backOrNull, bottomReserve = bottomReserve, onOpen = { nav.open(it) },
+        )
+      }
     },
     //  گوشی: صفحهٔ دومِ ورقِ خانه (`HomePager.page = 1`) با همان دوره؛ کامپیوتر ورقِ خانه ندارد ⇒ صفحهٔ خودش
     V3Route("stats", RouteKind.PAGE, { StrReports.statsTitle }, chrome = Chrome.OWN) {

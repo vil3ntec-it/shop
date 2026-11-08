@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 982,
+    "routes": 983,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 476,
+      "user": 477,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 687,
+      "extracted": 688,
       "empty": 293,
       "unresolved": 2
     }
@@ -656,6 +656,7 @@
     {"method":"PUT","path":"/api/shop/custom-roles/:id","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')","requireRecentAuth"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["role"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/custom-roles/config","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["baseRoles","enabled","max"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/custom-roles/members/:id","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')","requireRecentAuth"],"params":["id"],"query":[],"body":["roleId"],"response":{"statuses":[200],"keys":["baseRole","role","userId"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/customer-access","area":"shop","source":"server/src/routes/shop-customer-access.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'customer-access-ip' })","requireUser","requireShop","limit","requirePermission('audit.view')"],"params":[],"query":["customerId","limit"],"body":[],"response":{"statuses":[200],"keys":["customerId","entries","retentionDays"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/customer-erasure","area":"shop","source":"server/src/routes/shop-customer-erasure.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'customer-erasure-ip' }","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["403 owner_only"],"shape":"empty"},
     {"method":"GET","path":"/api/shop/delivery/assignments","area":"shop","source":"server/src/routes/delivery.js","auth":"user","guards":["requireUser","requireShop","requirePermission('delivery.view')"],"params":[],"query":["before","limit","scope"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/delivery/assignments/:id/address","area":"shop","source":"server/src/routes/delivery.js","auth":"user","guards":["requireUser","requireShop","requirePermission('delivery.view')","requirePermission('delivery.assign')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
@@ -757,7 +758,7 @@
     {"method":"POST","path":"/api/shop/orders/:id/transition","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":["id"],"query":[],"body":["to"],"response":{"statuses":[200,409],"keys":["error","order","unchanged"]},"errors":["409 refund_via_ledger"],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/bulk/transition","area":"shop","source":"server/src/routes/order-bulk.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/orders/config","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":["caps"],"body":[],"response":{"statuses":[200],"keys":["...","handoverSince","permissions","presence","reasons","sources","tabs"]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/orders/customer","area":"shop","source":"server/src/routes/order-customer.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-customer-ip' })","requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')","requireOrdersContact"],"params":[],"query":["phone"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/orders/customer","area":"shop","source":"server/src/routes/order-customer.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-customer-ip' })","requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')","requireOrdersContact"],"params":[],"query":["customerId","phone"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/orders/desk","area":"shop","source":"server/src/routes/order-desk.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","pauseReasons","permissions"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/orders/desk/busy","area":"shop","source":"server/src/routes/order-desk.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/desk/pause","area":"shop","source":"server/src/routes/order-desk.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.manage')"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},

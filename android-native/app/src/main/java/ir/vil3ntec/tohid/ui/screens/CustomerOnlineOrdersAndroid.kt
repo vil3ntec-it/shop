@@ -50,7 +50,7 @@ fun CustomerOnlineOrdersPanel(
   val rev = OrdersLive.rev.value
   var page by remember(debtorId, phones) { mutableStateOf<OrderCustomerPageDto?>(null) }
   LaunchedEffect(debtorId, phones, rev) {
-    OrdersLive.repository(context).forCustomer(phones).valueOrNull()?.let { page = it }
+    OrdersLive.repository(context).forCustomer(phones, customerId = debtorId).valueOrNull()?.let { page = it }
   }
   val shown = page ?: return
   val rows = CustomerOnlineOrders.rows(shown.items)

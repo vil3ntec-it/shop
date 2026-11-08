@@ -25,6 +25,7 @@ import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton
  *  - «دادنِ اعتبارِ هدیه» (PRM-15، `StoreCreditGrantButton`، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ)؛
  *  - سفارش‌های اینترنتیِ باز یا لغوشده (CRM-07، `CustomerOnlineOrdersPanel` — همان بخشِ کامپیوتر، فقط با بخشِ سفارشِ
  *    روشن و اجازهٔ «تماس»؛ هر ردیف همان سفارش را باز می‌کند).
+ *  - «چه کسی این پرونده را دید» (CRM-15، `CustomerAccessPanel` — همان بخشِ کامپیوتر، فقط صاحب و `audit.view`).
  *  هر کدام خاموش یا بی ردیف ⇒ هیچ چیز کشیده نمی‌شود.
  */
 @Composable
@@ -43,5 +44,7 @@ internal fun DebtorFileExtras(
     CustomerCardButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     StoreCreditGrantButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp), onOpen = onOpenOrder)
+    //  CRM-15: «چه کسی این پرونده را دید» — فقط صاحب و `audit.view`
+    ir.vil3ntec.tohid.ui.screens.CustomerAccessPanel(d, debtorId, Modifier.padding(top = 16.dp))
   }
 }

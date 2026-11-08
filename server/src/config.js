@@ -487,6 +487,14 @@ const config = {
   },
 
   /**
+   * CRM-15 — «سابقهٔ دسترسی» (`lib/customer-access.js`): چند روز می‌ماند. ۰ (پیش‌فرض) = همان قاعدهٔ
+   * `audit_logs` و `CHAT_SHOP_RETENTION_DAYS`: تا عددِ نگه‌داری تصویب نشده، سرور خودش پاک نمی‌کند.
+   */
+  customerAccess: {
+    retentionDays: num(process.env.CUSTOMER_ACCESS_RETENTION_DAYS, 0),
+  },
+
+  /**
    * چتِ مشتری ↔ دکان (v3 §۳۳) — پشتِ پرچمِ `shop.chat`، پیش‌فرض خاموش.
    *
    * سقفِ رسانه: برنامه پیش از فرستادن عکس را کوچک و فشرده می‌کند (سرور

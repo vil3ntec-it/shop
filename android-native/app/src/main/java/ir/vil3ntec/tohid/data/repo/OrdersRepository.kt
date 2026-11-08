@@ -54,8 +54,10 @@ class OrdersRepository(private val api: ApiClient) {
    *  CRM-07: سفارش‌های هنوز تحویل‌نشده یا لغوشدهٔ یک مشتری (تا دو شماره، اول و دوم) برای پروندهٔ او؛
    *  فقط صاحب و مدیر (`orders.contact`)، پاسخ همان کارتِ فهرست با شمارهٔ پوشیده.
    */
-  suspend fun forCustomer(phones: List<String>): ApiResult<OrderCustomerPageDto> = result {
-    val q = phones.take(2).joinToString("&") { "phone=" + enc(it) }
+  suspend fun forCustomer(phones: List<String>, customerId: String? = null): ApiResult<OrderCustomerPageDto> = result {
+    val q = phones.take(2).joinToString("&") { "phone=" + enc(it) } +
+      //  CRM-15: شناسهٔ پرونده ⇐ ردیفِ «چه کسی پرونده را دید» ِ سرور زیرِ همین پرونده (بی آن کلیدِ یک‌طرفهٔ شماره)
+      (customerId?.takeIf { it.isNotBlank() }?.let { "&customerId=" + enc(it) } ?: "")
     ApiJson.decode<OrderCustomerPageDto>(api.get("$ROOT/customer?$q"))
   }
 

@@ -375,8 +375,15 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     FileTab.INVOICES -> CustomerEngine.invoicesSheet(d, debtor, today)
     FileTab.ITEMS -> CustomerEngine.itemsSheet(d, debtor, today)
   }
-  fun print() { sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }
-  fun excel() { val sh = sheet(); Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { toast(ir.vil3ntec.tohid.core.i18n.StrSale.savedTo(it)) } }
+  //  CRM-15: «چه کسی پرونده را دید» — باز شدن (شمارهٔ کامل در سرِ پرونده ⇒ «شماره») و هر چاپ/اکسل
+  val viewed = rememberCustomerAccessNote(store)
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts()
+  LaunchedEffect(id) { viewed(id, ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, debtor)) }
+  fun print() { viewed(id, ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.EXPORT); sheet().let { ir.vil3ntec.tohid.print.ReportPrint.print(context, it, it.name) } }
+  fun excel() {
+    val sh = sheet()
+    Platform.saveFile("${sh.name}.xlsx", Xlsx.of(sh))?.let { viewed(id, ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.EXPORT); toast(ir.vil3ntec.tohid.core.i18n.StrSale.savedTo(it)) }
+  }
 
   Column(
     Modifier
@@ -455,6 +462,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory(d, id, Modifier.padding(top = 8.dp).heightIn(max = 220.dp).verticalScroll(rememberScrollState()), store, ::toast)
     ir.vil3ntec.tohid.ui.components.pos.LayawayCustomerPanel(d, store, id, ::toast) // POS-27: امانی‌های همین مشتری (`LayawayPref`)
     CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder) // CRM-07: سفارش‌های اینترنتیِ باز/لغوشده (بخشِ سفارش و اجازهٔ «تماس»)
+    CustomerAccessPanel(d, id, Modifier.padding(top = 8.dp).heightIn(max = 180.dp).verticalScroll(rememberScrollState())) // CRM-15: فقط صاحب و `audit.view`
     Spacer(Modifier.height(10.dp))
 
     //  زبانه‌ها

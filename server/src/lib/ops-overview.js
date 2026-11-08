@@ -229,6 +229,8 @@ async function health() {
     ...(replica.configured ? { replica } : {}),
     sync,
     serverErrors: { ...serverErrors, status: serverErrStatus, limits: { warnPerHour: 20 } },
+    //  CRM-15: نوشتنِ «سابقهٔ دسترسی» که نشد (خواندن نیفتاد؛ فقط شمرده شد) — `lib/customer-access.js`
+    customerAccessLog: require('./customer-access').stats(),
     eventLoop: loop,
     schema,
     definitions: DEFINITIONS,
