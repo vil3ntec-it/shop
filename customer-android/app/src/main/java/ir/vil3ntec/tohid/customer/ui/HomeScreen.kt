@@ -65,6 +65,8 @@ fun HomeScreen(model: CustomerModel) {
     model.linkNote?.let { n -> item { Note(n, Tone.WARN) } }
     //  MKT-08: سفارش‌های تکراریِ رسیده به موعد (یادآوری درونِ برنامه؛ ثبت با خودِ مشتری)
     items(model.duePlans(), key = { "due-" + it.token }) { p -> DuePlanCard(model, p) }
+    //  MKT-06: «وقتِ دوباره خریدن؟» — کالاهای مصرفی که چرخه‌شان رسیده (قیمت هنگامِ افزودن از سرور)
+    items(model.refillCards(), key = { "refill-" + it.slug }) { c -> RefillCardView(model, c) }
     item {
       Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         OutlinedTextField(

@@ -174,6 +174,7 @@ object OwnerExport {
     "brand" to "برند",
     "reorderPoint" to "نقطهٔ سفارش",
     "maxStock" to "حداکثر موجودی",
+    "consumptionDays" to "چرخهٔ مصرف (روز)",   //  MKT-06
     "brand" to "برند",
     "packs" to "بسته‌ها",
     "cartons" to "تعداد کارتن",

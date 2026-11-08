@@ -451,7 +451,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     if (can(role, 'data.delete.own') && own) return null;
     return 'cancel_not_allowed';
   }
-  return require('./doc-roles').judgeV3(c, ctx, op, row, { deviceId, origin });   // کارت، امتیاز، امانی، سفارش، محل؛ پولِ صندوق (`till-guard`)
+  return require('./transfer-step-scope').markV3(c, ctx, op, row, await require('./doc-roles').judgeV3(c, ctx, op, row, { deviceId, origin }));   // کارت، امتیاز، امانی، سفارش، محل؛ پولِ صندوق (`till-guard`)؛ پذیرفته ⇒ STF-06 ِ گامِ انتقال (۲۸۰)
 }
 
 // ---------- اعمالِ یک op ----------
