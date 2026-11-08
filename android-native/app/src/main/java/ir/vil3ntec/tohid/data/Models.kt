@@ -455,6 +455,13 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val note: String? = null,
+  /**
+   *  منبعِ قیمتِ همین قلم برای رسید و سابقه (POS-18): فقط `"special"` (قیمتِ خاصِ مشتری، `CustomerPrice.stamp`).
+   *  `null` = لیست/دستی، همان رفتارِ همیشه، و نوشته نمی‌شود — پرچمِ خاموش ⇒ قلم بایت‌به‌بایت همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceSource: String? = null,
 )
 
 @Serializable
@@ -599,6 +606,24 @@ data class Debtor(
   val cardCode: String? = null,
   /** نشانیِ تحویل (CRM-09) — شرح سرِ `DeliveryAddress`؛ `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val deliveryAddress: DeliveryAddress? = null,
+  /**
+   *  قیمت‌های خاصِ همین مشتری (POS-18) — هر کالا یک ردیف؛ نوشتن فقط از `CustomerPrices` (پشتِ `CustomerPricePrefs`).
+   *  یک فیلدِ قرض‌دار است، پس همان راهِ همگام‌سازی و همان ادغامِ `Debtor.priceList` را دارد (v1 ردیف، v3 ‹master›
+   *  فیلدبه‌فیلد). `null` = بی قیمتِ خاص، همان رفتارِ همیشه، و ⛔ نوشته نمی‌شود (`EncodeDefault.NEVER`).
+   */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialPrices: List<SpecialPrice>? = null,
+)
+
+/**
+ *  یک قیمتِ خاصِ مشتری (POS-18، هسته `core/sale/CustomerPrice.Entry`): کالا، قیمتِ واحدِ پایه به **یک‌صدمِ افغانی** و
+ *  بازهٔ اختیاری (`yyyy-MM-dd`، دو سر داخل). سرِ خالی نوشته نمی‌شود.
+ */
+@Serializable
+data class SpecialPrice(
+  val productId: String = "",
+  val priceMinor: Long = 0,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val from: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val to: String? = null,
 )
 
 @Serializable
