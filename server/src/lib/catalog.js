@@ -304,21 +304,45 @@ const REFRESH_THROTTLE_MS = (() => {
   return Number.isSafeInteger(v) && v >= 0 ? v : 500;
 })();
 const lastCheck = new Map();
+/** خواندنِ ویترینی که همین حالا در همین فرایند برای هر دکان در جریان است (`refresh` با `maxAgeMs`) */
+const inflight = new Map();
 
 /**
  * همگام‌سازیِ کاتالوگ در تراکنشِ خودش. `maxAgeMs` (خواندنِ ویترین/بازار) ⇒ فقط وقتی
  * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود، و برای هر دکان حداکثر هر
  * [REFRESH_THROTTLE_MS] یک بار پرسیده می‌شود؛ پس فروشِ رسیده حداکثر همین‌قدر بعد در
  * ویترین است و خواندنِ پیاپیِ بی‌تغییر بار ندارد.
+ *
+ * ⛔ خواندنِ هم‌زمان (ویترین از #1010 کالاها، دکان و برجسته‌ها را با هم می‌خواهد): درخواستی که در
+ * پنجرهٔ [REFRESH_THROTTLE_MS] می‌رسد و خواندنِ همان دکان هنوز تمام نشده، **منتظرِ همان** می‌ماند
+ * و نه بی‌صبر رد می‌شود — وگرنه کالایی که همین حالا رسیده پیش از کامیت خوانده می‌شود و «قابلِ سفارش
+ * نیست» (`unavailable`) می‌گیرد. خطای آن خواندن به این درخواست نمی‌رسد (همان رفتارِ «رد شد» ِ پیشین).
  */
 async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttle = true } = {}) {
   if (maxAgeMs > 0 && !full) {
     const t = Date.now();
-    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) return { skipped: true, throttled: true };
+    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) {
+      const running = inflight.get(shopId);
+      if (running) await running.catch(() => {});
+      return { skipped: true, throttled: true, ...(running ? { joined: true } : {}) };
+    }
     lastCheck.set(shopId, t);
     if (lastCheck.size > 10_000) lastCheck.clear();
-    if (!(await hasNewer(shopId))) return { skipped: true };
+    const run = (async () => {
+      if (!(await hasNewer(shopId))) return { skipped: true };
+      return ingest(shopId, at, full);
+    })();
+    inflight.set(shopId, run);
+    try {
+      return await run;
+    } finally {
+      if (inflight.get(shopId) === run) inflight.delete(shopId);
+    }
   }
+  return ingest(shopId, at, full);
+}
+
+async function ingest(shopId, at, full) {
   const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
   await afterIngest(shopId, out);
   return out;
