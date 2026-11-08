@@ -50,6 +50,9 @@ class BigLedgerBenchTest {
   private val engine get() = SyncV1Engine.of(ctx)
   private lateinit var account: String
 
+  /** `TOHID_BIG_LEDGER_SHADOW=prefs`: سایه در prefs (راهِ پیش از `ShadowStore`)؛ پیش‌فرض فایلِ سایه (پرچمِ روشن) */
+  private val shadowFile = System.getenv("TOHID_BIG_LEDGER_SHADOW") != "prefs"
+
   /** همان پیکربندیِ `ShopStore.json` — بایت‌های دیسک همین‌اند */
   private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true }
 
@@ -64,6 +67,7 @@ class BigLedgerBenchTest {
     clean()
     SyncChoice.set(ctx, SyncChoice.V1, 0)
     account = "bench-${System.nanoTime()}"
+    ir.vil3ntec.tohid.sync.v1.ShadowFileFlag.override = shadowFile
     SyncStateV1.setCurrentAccount(ctx, account)
     engine.rebind()
   }
@@ -74,6 +78,7 @@ class BigLedgerBenchTest {
     SyncStateV1(ctx, account).reset()
     OpQueue(ctx, account).clear()
     SyncStateV1.setCurrentAccount(ctx, "")
+    ir.vil3ntec.tohid.sync.v1.ShadowFileFlag.override = null
     engine.rebind()
     clean()
   }
@@ -162,6 +167,7 @@ class BigLedgerBenchTest {
     val out = LinkedHashMap<String, Any>()
     out["size"] = size.label
     out["sales"] = size.sales
+    out["shadowStore"] = if (shadowFile) "file" else "prefs"
     try {
       if (prepare(size, rows, out)) measure(size, singles, rows, out)
     } catch (e: OutOfMemoryError) {
@@ -303,10 +309,26 @@ class BigLedgerBenchTest {
     rows += Row("  · old: sha256 ×2 (journal)", sh)
     if (SyncStateV1(ctx, account).shadow == shadowText) {
       val (_, pc) = ms { SyncStateV1(ctx, account).commitShadow(shadowText, null) }
-      rows += Row("  · sync: prefs commit (shadow)", pc)
+      rows += Row("  · sync: ${if (shadowFile) "shadow file" else "prefs"} commit (shadow)", pc)
+      scratchFormats(shadowText, rows, out)
     }
 
     uiPath(cur, next, rows, out)
+  }
+
+  /** هر دو قالب روی همان متن، جدا از حالِ آزمون (فقط با دیسک): prefs ِ کامپیوتر (`DesktopPrefs`) و فایلِ سایه (`ShadowFile`) */
+  private fun scratchFormats(shadowText: String, rows: MutableList<Row>, out: MutableMap<String, Any>) {
+    val scratchPrefs = File(ctx.filesDir, "bench-prefs.json")
+    val (_, pp) = ms { ir.vil3ntec.tohid.desktop.DesktopPrefs(scratchPrefs).edit().putString("k.shadow", shadowText).commit() }
+    rows += Row("  · old: prefs commit (DesktopPrefs, scratch)", pp, "%.1f MB".format(Locale.ROOT, scratchPrefs.length() / 1e6))
+    val scratchShadow = ir.vil3ntec.tohid.sync.v1.ShadowFile(File(ctx.filesDir, "bench-shadow.dat"))
+    val (_, sf) = ms { scratchShadow.write(shadowText, 1, 1) }
+    rows += Row("  · new: shadow file write (scratch)", sf, "%.1f MB".format(Locale.ROOT, scratchShadow.file.length() / 1e6))
+    val (_, sr) = ms { scratchShadow.readMain() }
+    rows += Row("  · new: shadow file read + verify (start)", sr)
+    out["prefsCommitMs"] = pp
+    out["shadowFileWriteMs"] = sf
+    out["shadowFileReadMs"] = sr
   }
 
   /** راهِ تازهٔ همان ذخیره (PERF-LEDGER): درختِ هم‌شیء، diff، متنِ سایه با رونوشتِ تکه‌ها، نوشتنِ تکه‌تکهٔ فایل */

@@ -676,7 +676,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
    *  ردیفی که در پشتیبان هست و سرور ندارد شاید حذف‌شده باشد و `prepare` زنده‌اش می‌کرد.
    */
-  fun everSynced(): Boolean = state.cursor > 0 || state.reconciledAt > 0 || state.snapshotAt > 0
+  fun everSynced(): Boolean = state.reconciledAt > 0 || state.snapshotAt > 0 || state.cursor > 0
 
   /** اثرِ سایهٔ همین حالا — برای `SyncRebuild.atLoad` */
   fun shadowSha(): String = SyncRebuild.sha(state.shadow)
@@ -734,8 +734,7 @@ class SyncV1Engine private constructor(context: Context) {
         if (localRows == 0) {
           val next = LedgerDiff.fromSnapshot(body, local)
           write(LedgerDiff.fromJson(next))
-          writeShadow(next)
-          state.cursor = serverCursor
+          writeShadow(next, serverCursor)
           state.snapshotAt = clock()
         } else {
           val missing = LedgerDiff.diff(server, local).filter { it.type == SyncOp.INSERT }
@@ -744,8 +743,7 @@ class SyncV1Engine private constructor(context: Context) {
             val next = LedgerDiff.unionRows(local, server)
             write(LedgerDiff.fromJson(next))
             val shadow = readShadow()
-            writeShadow(if (shadow != null) LedgerDiff.unionRows(shadow, server) else next)
-            state.cursor = serverCursor
+            writeShadow(if (shadow != null) LedgerDiff.unionRows(shadow, server) else next, serverCursor)
           }
         }
         state.reconciledAt = clock()
@@ -814,9 +812,7 @@ class SyncV1Engine private constructor(context: Context) {
     restore.pulled(epoch)
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
-    writeShadow(next)
-    state.cursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
-      ?.content?.toLongOrNull() ?: 0L
+    writeShadow(next, (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L)
     state.snapshotAt = clock()
     state.lastOkAt = clock()
     state.lastError = ""
@@ -874,7 +870,7 @@ class SyncV1Engine private constructor(context: Context) {
       ),
       queued = queued,
       dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
-      cursor = state.cursor,
+      cursor = state.cursorSeen,  // PERF-LEDGER: نوار فایلِ سایه را نمی‌خواند (رشتهٔ صفحه)
       lastOkAt = state.lastOkAt,
       //  §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی چراغ را قرمز نمی‌کند
       //  صفِ بزرگ (`OpBacklog.WARN_AT`): «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ
@@ -934,11 +930,10 @@ class SyncV1Engine private constructor(context: Context) {
    *  سایهٔ Snapshot (`prepare`، `restoreFromServer`) — ⛔ A00: از درِ مدلِ همین ساخت
    *  (`LedgerDiff.modelTree`)، مثلِ `SyncV3Engine.shape`. ردیفِ خامِ سرور کلیدهایی دارد که
    *  دفترِ این ساخت نمی‌تواند نگه دارد؛ اگر در سایه می‌ماندند، پس از به‌روزرسانی به ساختی
-   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد.
+   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد. سایه و cursor با هم (یک نوشتن، F0-05).
    */
-  private fun writeShadow(tree: JsonObject) {
-    state.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString()
-  }
+  private fun writeShadow(tree: JsonObject, cursor: Long) =
+    state.commitShadowOrThrow(LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString(), cursor)
 
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
@@ -954,6 +949,7 @@ class SyncV1Engine private constructor(context: Context) {
         "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     @Volatile private var instance: SyncV1Engine? = null
+    fun peek(): SyncV1Engine? = instance  // ساخته شده؟ (`rememberSyncV1Status`: ساختن بیرون از رشتهٔ صفحه)
 
     fun of(context: Context): SyncV1Engine =
       instance ?: synchronized(this) {

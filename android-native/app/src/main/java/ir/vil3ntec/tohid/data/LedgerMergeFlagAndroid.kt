@@ -19,7 +19,7 @@ import kotlinx.serialization.json.jsonPrimitive
  *  `save` دفترِ صفحه را کامل می‌نویسد.
  *
  *  ── سازگاری ──────────────────────────────────────────────────────
- *  • برنامه با `?v=2` می‌پرسد؛ سرورِ تازه برای همین درخواست پیش‌فرضِ روشن را می‌گوید و پاسخ `v: 2` دارد. برنامهٔ
+ *  • برنامه با `?v=3` می‌پرسد (سرور `v >= 2` را یکی می‌بیند؛ `v=3` فقط `shadowFile` را می‌افزاید)؛ سرورِ تازه برای همین درخواست پیش‌فرضِ روشن را می‌گوید و پاسخ `v: 2` دارد. برنامهٔ
  *    کهنه (بی `v`) از سرور همان پیش‌فرضِ خاموشِ پیشین را می‌گیرد — رفتارش بیت‌به‌بیت همان می‌ماند.
  *  • سرورِ کهنه (پاسخِ بی `v`، یا ۴۰۴) پیش‌فرضِ خاموشِ خودش را می‌گوید؛ آن «خاموش» تصمیمِ صاحب‌کار نیست ⇒ همان
  *    پیش‌فرضِ روشن. فقط `enabled: true` ِ صریح از سرورِ کهنه نوشته می‌شود.
@@ -31,7 +31,8 @@ import kotlinx.serialization.json.jsonPrimitive
 object LedgerMergeFlag {
 
   private const val PREFS = "tohid-ledger-merge"
-  private const val CONFIG = "/shop/ledger-merge/config?v=2"
+  //  `v=3`: همان پاسخِ `v=2` و کلیدِ `shadowFile` (پرچمِ `shop.sync_shadow_file`، `sync/v1/ShadowFileFlag`)
+  private const val CONFIG = "/shop/ledger-merge/config?v=3"
 
   /** هر چند وقت یک بار «روشن است؟» دوباره پرسیده شود */
   const val CHECK_MS = 10 * 60_000L
@@ -71,6 +72,7 @@ object LedgerMergeFlag {
     prefs(app).edit().putLong(at, now).apply()
     scope.launch {
       val body = runCatching { Backend.api(app).get(CONFIG) }.getOrNull() ?: return@launch
+      if (body["enabled"] != null) ir.vil3ntec.tohid.sync.v1.ShadowFileFlag.set(app, ir.vil3ntec.tohid.sync.v1.ShadowFileFlag.decide(body))
       val on = decide(body["enabled"]?.jsonPrimitive?.booleanOrNull, body["v"]?.jsonPrimitive?.intOrNull) ?: return@launch
       set(app, on)
     }

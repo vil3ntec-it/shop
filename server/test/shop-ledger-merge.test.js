@@ -83,6 +83,39 @@ test('برنامهٔ تازه (?v=2): پیش‌فرض روشن؛ فقط false ِ
   await query("DELETE FROM shop_holds WHERE service='shop.ledger_merge'");
 });
 
+test('?v=3: همان enabled ِ v=2 و shadowFile ِ shop.sync_shadow_file — پیش‌فرض خاموش؛ فقط true؛ دکان بر all؛ نگه‌داشت می‌بُرد', async () => {
+  const C3 = `${C}?v=3`;
+  const shadow = (scope, value) => query(
+    "INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.sync_shadow_file',$2,1) "
+    + 'ON CONFLICT (scope, key) DO UPDATE SET value=EXCLUDED.value',
+    [String(scope), value],
+  );
+  const a = await shop('ه');
+  const b = await shop('و');
+  assert.equal((await h.get(C3)).status, 401);
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: true, v: 3, shadowFile: false });
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: true, v: 2 }, 'v=2 همان پاسخِ پیشین');
+
+  await shadow(a.shopId, 'true');
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: true, v: 3, shadowFile: true });
+  assert.deepEqual((await h.get(C3, { token: b.token })).body, { enabled: true, v: 3, shadowFile: false }, 'دکانِ دیگر خاموش');
+  await shadow('all', 'true');
+  await shadow(b.shopId, 'false');
+  assert.equal((await h.get(C3, { token: b.token })).body.shadowFile, false, 'مقدارِ دکان بر all جلو می‌افتد');
+  await shadow(b.shopId, '"yes"');
+  assert.equal((await h.get(C3, { token: b.token })).body.shadowFile, false, 'فقط true روشن است');
+  await flag(a.shopId, 'false');
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: false, v: 3, shadowFile: true }, 'دو پرچم جدا');
+
+  await query(
+    "INSERT INTO shop_holds (id, shop_id, kind, service, reason, placed_by, placed_at) VALUES ($1,$2,'service_disabled','shop.sync_shadow_file','آزمون','admin',1)",
+    [newId('hold'), a.shopId],
+  );
+  assert.equal((await h.get(C3, { token: a.token })).body.shadowFile, false, '«غیرفعال کردنِ سرویس» می‌بُرد');
+  await query("DELETE FROM shop_holds WHERE service='shop.sync_shadow_file'");
+  await query("DELETE FROM live_config WHERE key IN ('shop.sync_shadow_file','shop.ledger_merge')");
+});
+
 test('جدایی از پمپ: نشستِ برنامهٔ پمپ به این در نمی‌رسد و هیچ پرچمی نمی‌گیرد', async () => {
   const u = await h.newUser('صاحبِ پمپ', 'pump');
   const made = await h.post('/api/pump', { name: 'پمپ آزمون', code: 'lmerge-pump' }, { token: u.accessToken });

@@ -631,6 +631,28 @@ shim ِ بی‌لرزش (بدتر از امروز) می‌خواست یا shimی
 و بقیه. از لاگ: «زدنِ دکمهٔ خاموش: کنشِ کلیک فرستاده شد» (و هیچ فروشی ننشست)، کشیدن ۴۲۸ ⇐ ۱۵۲۸ پیکسل در ۹۰۰ میلی‌ثانیه، سفارشِ
 ویترینِ #1 (۱۸۰ ؋). klib ِ لینوکس با Compose 1.9.3 ِ CI: «۱۲۳۲ فایلِ مشترک کپی شد، ۱۰ سطرِ بیرون‌مانده» (۱۲۳۰ از ۱۲۴۰ فایلِ اندروید).
 
+
+### ۰.۱۶ سایهٔ همگام‌سازی بیرون از NSUserDefaults (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/shadow-file`، روی #1006)
+
+**مشکل:** سایه و cursor ِ Sync v1 (کلِ دفتر؛ ≈ ۳٫۵ KB برای هر فاکتور، ۵۰هزار فاکتور ≈ ۸۷ MB ِ UTF-8) در prefs ِ
+`tohid-sync-v1` بود؛ روی آیفون همان پرونده یک suite ِ NSUserDefaults است (`iosMain/…/android/content/SharedPreferences.kt`).
+NSUserDefaults برای چنین اندازه‌ای ساخته نشده (سقفِ عملیِ ~۴ مگ؛ کلِ suite در حافظه و با هر تغییر نوشته می‌شود) و `commit()` ِ
+shim **همیشه `true`** برمی‌گرداند — سایه‌ای که ننشست «نشست» شمرده می‌شد و ژورنالِ `SyncCommit` پاک می‌شد.
+
+**اکنون (پشتِ پرچمِ دکانِ `shop.sync_shadow_file`، پیش‌فرض خاموش):** همان کدِ مشترک (`sync/v1/ShadowStoreAndroid.kt`،
+`ShadowFileAndroid.kt`) سایه و cursor را در **یک فایل و یک نوشتن** می‌گذارد (`sync-shadow-<کلید>-<شماره>.dat` در `filesDir`)،
+روی آیفون با `DiskWriteIos` (نوشتن در `.tmp`، `fsync`، `link(2)` به `.prev`، `rename(2)`، `fsync` ِ پوشه) — همان تضمینِ دفتر.
+NSUserDefaults فقط نشانِ کوچکِ «کدام فایل» (`<کلید>.shadowStore`) و آینهٔ cursor را دارد. خواندن: اصل ⇐ `.prev` ⇐ نسخهٔ prefs ِ
+کوچ، هرگز «خالی»؛ برگشت به نسخهٔ کهنه‌تر ⇐ `recoverArchive`. shim ِ `Looper` حالا `isCurrentThread` (`NSThread.isMainThread`)
+دارد تا خواندنِ فایل روی رشتهٔ اصلی شمرده شود (`ShadowStore.mainThreadReads`)؛ خانه و نوارِ پایین موتور را بیرون از رشتهٔ
+اصلی می‌سازند (`rememberSyncV1Status`). shimِ تازه‌ای لازم نشد: `File.readBytes`، `MessageDigest.update(…, off, len)`،
+`OutputStream.write(ByteArray)` و `prefs.all` از پیش بودند.
+
+- ساختِ آیفون فقط در CI است؛ روی این ماشین **ساخته نشد** — نتیجهٔ «رابطِ مشترکِ آیفون — klib» و «برنامهٔ آیفون — Xcode» ِ همین PR را ببینید.
+- پرچم خاموش ⇒ آیفون هنوز همان NSUserDefaults است. **پیشنهاد:** پیش از نخستین دکانِ واقعی روی آیفون پرچم را برای آن دکان
+  روشن کنید (آیفون کاربرِ نصب‌شده ندارد، پس کوچی هم ندارد).
+- مانده: آزمونِ سرتاسریِ شبیه‌ساز (`CoreFlowsE2EIosTest`) هنوز با پرچمِ خاموش می‌دود؛ آزمونِ JVM ِ همان کد: `ShadowStoreTest`.
+
 ## ۱. خلاصه در پنج خط
 
 1. کدِ برنامه **۳۴۲ فایلِ Kotlin و ۸۹٬۸۷۲ خط** است. از این‌ها **۱۲۰ فایل** فقط Kotlin/Compose/kotlinx دارند، **۵۸ فایل** فقط به JDK تکیه دارند (`java.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized`…) و **۱۶۴ فایل** به اندروید وابسته‌اند (`android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `R.`، کتابخانه‌های گوگل، OkHttp).
