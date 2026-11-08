@@ -44,6 +44,50 @@
   /** تکهٔ نوشتن — بافرِ این چاپگرها کوچک است و یک‌جا نمی‌پذیرد */
   const CHUNK = 512;
 
+  /* ============================ زبان ============================ */
+
+  /*
+   *  زبانِ کاغذ همان زبانِ صفحه است (`license/web-i18n.js`، همان کارِ `Receipts.labels()` ِ برنامه). هیچ متنِ فارسی
+   *  این‌جا نیست: برچسب‌ها از `license/i18n/receipt.<زبان>.json` (ساختهٔ `StrReceipt.kt`) و پیام‌ها از `lang.<زبان>.json`.
+   *  فارسی ⇒ همان کاغذِ دیروز، بایت‌به‌بایت. ⛔ داده (نامِ دکان، کالا، واحد، قرض‌دار) هرگز ترجمه نمی‌شود: فقط برچسب‌هایی
+   *  که `receipt.web.json` می‌شناسد عوض می‌شوند.
+   */
+  const I18N = () => (typeof window !== 'undefined' && window.TohidWebI18n) || null;
+  const isRtl = () => { const I = I18N(); return I ? I.rtl() : true; };
+  function msg(key) {
+    const I = I18N();
+    const v = I ? I.ui(`thermal.${key}`) : null;
+    return v && v !== `thermal.${key}` ? v : key;
+  }
+  /** رقمِ فارسی/عربی ⇒ لاتین (فقط خانهٔ مبلغ، وقتی صفحه می‌گوید رقم لاتین است) */
+  const latin = (s) => String(s).replace(/[\u06F0-\u06F9]/g, (d) => String(d.charCodeAt(0) - 0x06F0))
+    .replace(/[\u0660-\u0669]/g, (d) => String(d.charCodeAt(0) - 0x0660)).replace(/\u066C/g, ',');
+
+  /**
+   *  همان فاکتورِ آماده، به زبانِ صفحه. فقط برچسب: عنوانِ پیش‌فرضِ دکان، سطرِ شماره و «لغو»، برچسبِ جمع‌ها، «نسیه/نقدی»،
+   *  کالای حذف‌شده و پانویس. مبلغ در انگلیسی رقمِ لاتین. هر چیزِ دیگر همان‌طور که آمده.
+   */
+  function localize(receipt) {
+    const I = I18N();
+    if (!receipt || !I || I.lang() === 'fa') return receipt;
+    const tr = (section, v) => {
+      if (v == null || v === '') return v;
+      const out = I.receiptText(section, String(v));
+      return out == null ? v : out;
+    };
+    const numeric = (v) => /^[\s\d\u06F0-\u06F9\u0660-\u0669,.\u066B\u066C+-]+$/.test(String(v));
+    const latn = I.digits() === 'latn';
+    const num = (v) => (latn && v != null && numeric(v) ? latin(v) : v);
+    return Object.assign({}, receipt, {
+      title: tr('title', receipt.title),
+      meta: (receipt.meta || []).map((m) => { const v = tr('meta', m); return latn && v != null ? latin(v) : v; }),
+      rows: (receipt.rows || []).map((r) => Object.assign({}, r, { right: tr('item', r.right), left: num(r.left) })),
+      //  «نوع» ⇒ «نسیه/نقدی» ترجمه می‌شود؛ نامِ قرض‌دار داده است (`receiptText` دادهٔ دفتر را نمی‌گرداند)
+      totals: (receipt.totals || []).map((t) => Object.assign({}, t, { right: tr('label', t.right), left: num(tr('kind', t.left)) })),
+      footer: (receipt.footer || []).map((f) => tr('footer', f)),
+    });
+  }
+
   /* ============================ مرورگر چه می‌تواند ============================ */
 
   /**
@@ -80,7 +124,9 @@
    *   }
    * @param {number} width عرض بر حسب نقطه
    */
-  function renderCanvas(receipt, width) {
+  function renderCanvas(input, width) {
+    const receipt = localize(input);
+    const rtl = isRtl();
     const w = width === WIDTH_80MM ? WIDTH_80MM : WIDTH_58MM;
     const pad = Math.round(w * 0.04);
     const inner = w - pad * 2;
@@ -107,26 +153,28 @@
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = '#000';
     ctx.textBaseline = 'top';
-    ctx.direction = 'rtl';
+    //  انگلیسی چپ‌به‌راست (برچسب چپ، مبلغ راست) — همان `ReceiptPainter` ِ برنامه؛ بقیه راست‌به‌چپ، همان دیروز
+    ctx.direction = rtl ? 'rtl' : 'ltr';
 
     const family = '"Vazirmatn", system-ui, sans-serif';
     let y = pad;
 
     function text(str, size, bold, align) {
       ctx.font = `${bold ? '700' : '400'} ${size}px ${family}`;
-      ctx.textAlign = align || 'right';
-      const x = align === 'center' ? w / 2 : (align === 'left' ? pad : w - pad);
+      const a = align || (rtl ? 'right' : 'left');
+      ctx.textAlign = a;
+      const x = a === 'center' ? w / 2 : (a === 'left' ? pad : w - pad);
       ctx.fillText(String(str == null ? '' : str), x, y, inner);
       y += Math.round(size * 1.65);
     }
 
-    /** دو ستون: راست و چپ، در یک سطر */
+    /** دو ستون در یک سطر: برچسب (`right`) سرِ خط، مبلغ (`left`) تهِ خط — در راست‌به‌چپ راست و چپ، در انگلیسی وارونه */
     function pair(right, left, size, bold) {
       ctx.font = `${bold ? '700' : '400'} ${size}px ${family}`;
-      ctx.textAlign = 'right';
-      ctx.fillText(String(right == null ? '' : right), w - pad, y, inner * 0.62);
-      ctx.textAlign = 'left';
-      ctx.fillText(String(left == null ? '' : left), pad, y, inner * 0.36);
+      ctx.textAlign = rtl ? 'right' : 'left';
+      ctx.fillText(String(right == null ? '' : right), rtl ? w - pad : pad, y, inner * 0.62);
+      ctx.textAlign = rtl ? 'left' : 'right';
+      ctx.fillText(String(left == null ? '' : left), rtl ? pad : w - pad, y, inner * 0.36);
       y += Math.round(size * 1.65);
     }
 
@@ -236,7 +284,7 @@
 
   async function sendBluetooth(bytes) {
     if (!capabilities().bluetooth) {
-      throw new Error('این مرورگر چاپِ بلوتوثی ندارد. روی آیفون این راه اصلاً نیست — «چاپ معمولی» را بزنید.');
+      throw new Error(msg('bt'));
     }
     const device = await navigator.bluetooth.requestDevice({
       acceptAllDevices: true,
@@ -256,7 +304,7 @@
     }
     if (!target) {
       try { device.gatt.disconnect(); } catch (e) { /* رفته */ }
-      throw new Error('روی این دستگاه راهی برای فرستادن پیدا نشد — چاپگرِ BLE است؟');
+      throw new Error(msg('noWrite'));
     }
 
     try {
@@ -281,7 +329,7 @@
    */
   async function sendUsb(bytes) {
     if (!capabilities().usb) {
-      throw new Error('این مرورگر چاپِ سیمی ندارد. روی آیفون این راه اصلاً نیست — «چاپ معمولی» را بزنید.');
+      throw new Error(msg('usb'));
     }
     const device = await navigator.usb.requestDevice({ filters: [{ classCode: 7 }] });
     await device.open();
@@ -299,7 +347,7 @@
         }
         if (endpoint !== null) break;
       }
-      if (endpoint === null) throw new Error('راهِ فرستادن روی این چاپگر پیدا نشد');
+      if (endpoint === null) throw new Error(msg('noOut'));
 
       await device.claimInterface(ifaceNumber);
       try {
@@ -328,7 +376,7 @@
 
   window.TohidThermal = {
     WIDTH_58MM, WIDTH_80MM,
-    capabilities, renderCanvas, toEscPos, print,
+    capabilities, renderCanvas, toEscPos, print, localize,
     sendBluetooth, sendUsb,
   };
 })();

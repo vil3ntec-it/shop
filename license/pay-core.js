@@ -34,7 +34,7 @@
 })(function (M) {
   'use strict';
 
-  if (!M) throw new Error('license/money.js باید پیش از pay-core.js بار شود');
+  if (!M) throw new Error('license/money.js باید پیش از pay-core.js بار شود');  // داده: خطای برنامه‌نویس
 
   // ── ثابت‌ها ─────────────────────────────────────────────
   var ACCOUNT = 'account';            // روشِ رزرو: باقی‌ماندهٔ پرداختِ جزئی به حسابِ مشتری
@@ -66,16 +66,16 @@
   /* PAY-06 — جدولِ پیش‌فرض؛ هر دکان می‌تواند فهرستِ خودش را بدهد (`defineMethods`).
      اعتبارِ فروشگاه و کارتِ هدیه تا دفترشان (PAY-24) خاموش‌اند. سقفِ ATOMA Pay بخشِ ۴.۲. */
   var DEFAULT_METHODS = Object.freeze([
-    m('cash', 'cash', 'نقد', false, null, true),
+    m('cash', 'cash', 'نقد', false, null, true),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
     m('hesabpay', 'wallet', 'HesabPay', true, null, true),
     m('e_money', 'wallet', 'e& money', true, null, true),
     m('my_money', 'wallet', 'My Money', true, null, true),
     m('atoma_pay', 'wallet', 'ATOMA Pay', true, 1500000, true),
     m('m_paisa', 'wallet', 'M-Paisa', true, null, true),
-    m('afpay_card', 'card', 'کارت AfPay', true, null, true),
-    m('hawala', 'transfer', 'حواله', true, null, true),
-    m('store_credit', 'store_credit', 'اعتبار فروشگاه', false, null, false),
-    m('gift_card', 'gift_card', 'کارت هدیه', true, null, false),
+    m('afpay_card', 'card', 'کارت AfPay', true, null, true),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
+    m('hawala', 'transfer', 'حواله', true, null, true),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
+    m('store_credit', 'store_credit', 'اعتبار فروشگاه', false, null, false),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
+    m('gift_card', 'gift_card', 'کارت هدیه', true, null, false),  // داده: نامِ روشِ پیش‌فرض (Pay.DEFAULT_METHODS، ذخیره و همگام می‌شود)
   ]);
 
   // ── کمک‌ها ──────────────────────────────────────────────
@@ -90,12 +90,12 @@
   function text(v) { return typeof v === 'string' ? v.trim() : ''; }
   function exactMul(a, b) {
     var r = a * b;
-    if (!Number.isSafeInteger(r)) throw new RangeError('ضرب بیرون از بازهٔ دقیق: ' + a + ' × ' + b);
+    if (!Number.isSafeInteger(r)) throw new RangeError('ضرب بیرون از بازهٔ دقیق: ' + a + ' × ' + b);  // داده: خطای برنامه‌نویس
     return r + 0;
   }
   function add(a, b) {
     var r = a + b;
-    if (!Number.isSafeInteger(r)) throw new RangeError('جمع بیرون از بازهٔ دقیق: ' + a + ' + ' + b);
+    if (!Number.isSafeInteger(r)) throw new RangeError('جمع بیرون از بازهٔ دقیق: ' + a + ' + ' + b);  // داده: خطای برنامه‌نویس
     return r + 0;
   }
   function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }

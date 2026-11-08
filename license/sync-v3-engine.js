@@ -40,7 +40,7 @@
     if (typeof require === 'function') {
       try { return require(file); } catch (e) { /* مرورگر */ }
     }
-    throw new Error(name + ' بار نشده است (' + file + ')');
+    throw new Error(name + ' بار نشده است (' + file + ')');  // داده: خطای برنامه‌نویس
   }
   function Money() { return dep('TohidMoney', './money.js'); }
   function Core() { return dep('TohidSyncCore', './sync-core.js'); }
@@ -574,7 +574,7 @@
    *  @param o {transport, store, deviceId, ledger:{read, write}, now?, random?, protocol?, failpoint?}
    */
   function Engine(o) {
-    if (!o || !o.transport || !o.store || !o.ledger) throw new Error('transport، store و ledger لازم است');
+    if (!o || !o.transport || !o.store || !o.ledger) throw new Error('transport، store و ledger لازم است');  // داده: خطای برنامه‌نویس
     this.transport = o.transport;
     this.store = o.store;
     this.ledger = o.ledger;

@@ -195,7 +195,7 @@
     //  محیطی که تصادفِ امن ندارد وجود ندارد (Node ۲۰ به بالا و هر
     //  مرورگرِ امروزی دارند). ولی بی‌صدا به `Math.random` برگشتن یعنی
     //  شناسه‌ای که به نظر امن می‌آید و نیست — پس صریح می‌گوییم.
-    throw new Error('این محیط تصادفِ امن ندارد؛ ULID ساخته نمی‌شود');
+    throw new Error('این محیط تصادفِ امن ندارد؛ ULID ساخته نمی‌شود');  // داده: خطای محیط برای برنامه‌نویس
   }
 
   var lastUlidMs = -1;
@@ -276,7 +276,7 @@
 
   function utf8Bytes(str) {
     if (typeof TextEncoder !== 'undefined') return new TextEncoder().encode(str);
-    throw new Error('این محیط TextEncoder ندارد');
+    throw new Error('این محیط TextEncoder ندارد');  // داده: خطای محیط برای برنامه‌نویس
   }
 
   function sha256Hex(text) {
