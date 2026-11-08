@@ -434,6 +434,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
     //  STF-01: نقشِ سفارشی (نام + نقشِ پایه + لایهٔ مجوز؛ اجرا در `staff-perms.layersFor`) — پشتِ `shop.custom_roles`، پیش‌فرض خاموش
     api.use('/shop/custom-roles', require('./routes/shop-custom-roles'));
+    //  دستگاه‌های شناختهٔ کارمندان (رازِ دستگاهِ ورود با کد): فهرست، «باطل کردنِ این دستگاه»، «خروج از همه» ِ یک عضو — مهاجرتِ ۳۴۵
+    api.use('/shop/staff-keys', require('./routes/shop-staff-keys'));
     //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
     api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛

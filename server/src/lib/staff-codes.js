@@ -183,12 +183,27 @@ async function list(shopId) {
   );
 }
 
-async function revoke(shopId, codeId) {
-  const r = await one(
-    `UPDATE staff_codes SET status='revoked' WHERE id=$1 AND shop_id=$2 AND status='active' RETURNING id`,
-    [codeId, shopId]
-  );
-  if (!r) throw notFound('کد پیدا نشد یا از قبل باطل شده است', 'code_not_found');
+/**
+ * باطل کردنِ کد به دستِ صاحب. ⛔ کدِ **شماره‌دارِ** غیرِ ثابت مالِ کسی است که خرجش کرد (`assertValidForMember`) ⇒
+ * رازهای دستگاهِ همان عضو(ها) در همین دکان در **همان تراکنش** باطل می‌شوند (`staff-device-keys.revokeIn`): دستگاه
+ * فقط با کدِ تازه برمی‌گردد، نه با رازِ پیشین + کدِ ثابتِ دکان. کدِ ثابت مالِ همه است ⇒ هیچ رازی.
+ */
+async function revoke(shopId, codeId, { by = '', ip = '' } = {}) {
+  const deviceKeys = require('./staff-device-keys');
+  const keys = await tx(async (c) => {
+    const r = (await c.query(
+      `UPDATE staff_codes SET status='revoked' WHERE id=$1 AND shop_id=$2 AND status='active'
+       RETURNING id, standing, max_uses`,
+      [codeId, shopId]
+    )).rows[0];
+    if (!r) throw notFound('کد پیدا نشد یا از قبل باطل شده است', 'code_not_found');
+    if (r.standing || !(Number(r.max_uses) > 0)) return deviceKeys.NONE;
+    const users = (await c.query('SELECT DISTINCT user_id FROM staff_code_uses WHERE staff_code_id=$1', [r.id]))
+      .rows.map((x) => x.user_id);
+    return deviceKeys.revokeIn(c, { shopId, userIds: users, reason: 'code_revoked', by, ip, detail: { invite: r.id } });
+    //  («invite» نه «code…»: کلیدِ «code» در سابقه پاک می‌شود — `audit.scrub`)
+  });
+  await keys.afterCommit();
   return true;
 }
 

@@ -148,7 +148,7 @@ async function updateMemberRoute(req, res) {
     role: req.body?.role ? v.oneOf(req.body.role, STAFF_ROLES, { field: 'نقش' }) : undefined,
     status: req.body?.status ? v.oneOf(req.body.status, ['active', 'suspended'], { field: 'وضعیت' }) : undefined,
   };
-  const row = await shops.updateMember(req.shopId, id, patch);
+  const row = await shops.updateMember(req.shopId, id, patch, { by: req.user.id, ip: clientIp(req) });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.updated', targetType: 'member', targetId: id, detail: patch });
   res.json({ member: { id: row.id, role: row.role, status: row.status } });
 }
@@ -168,7 +168,7 @@ router.put('/members/:id', requireShop, requirePermission('members.role'), requi
  */
 async function removeMember(req, res) {
   const id = v.id(req.params.id, { field: 'شناسه عضو' });
-  await shops.updateMember(req.shopId, id, { status: 'removed' });
+  await shops.updateMember(req.shopId, id, { status: 'removed' }, { by: req.user.id, ip: clientIp(req) });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.removed', targetType: 'member', targetId: id });
   res.json({ ok: true });
 }
@@ -179,7 +179,7 @@ router.post('/members/:id/remove', requireShop, requirePermission('members.manag
 /** خروج داوطلبانه‌ی شاگرد از دکان. */
 router.post('/leave', requireShop, async (req, res, next) => {
   if (req.member.role === 'owner') return next(badRequest('صاحب دکان نمی‌تواند از دکان خودش بیرون برود', 'owner_cannot_leave'));
-  await shops.updateMember(req.shopId, req.member.id, { status: 'removed' });
+  await shops.updateMember(req.shopId, req.member.id, { status: 'removed' }, { by: req.user.id, ip: clientIp(req) });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'member.left' });
   res.json({ ok: true });
 });
@@ -271,7 +271,7 @@ router.post(['/staff-code', '/invite'], requireShop, requirePermission('staffcod
 
 router.delete('/staff-codes/:id', requireShop, requirePermission('staffcode.revoke'), async (req, res) => {
   const id = v.id(req.params.id, { field: 'شناسه کد' });
-  await staffCodes.revoke(req.shopId, id);
+  await staffCodes.revoke(req.shopId, id, { by: req.user.id, ip: clientIp(req) });
   await audit.log({ shopId: req.shopId, userId: req.user.id, action: 'staff_code.revoked', targetType: 'staff_code', targetId: id });
   res.json({ ok: true });
 });

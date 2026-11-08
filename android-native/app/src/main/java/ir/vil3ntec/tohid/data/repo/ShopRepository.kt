@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.model.ShopDevicesDto
 import ir.vil3ntec.tohid.core.model.ShopStateDto
 import ir.vil3ntec.tohid.core.model.StaffCodeDto
 import ir.vil3ntec.tohid.core.model.StaffCodesDto
+import ir.vil3ntec.tohid.core.model.StaffKeysDto
 import ir.vil3ntec.tohid.core.model.StaffScopeConfigDto
 import ir.vil3ntec.tohid.core.model.StaffScopeMembersDto
 import ir.vil3ntec.tohid.core.net.ApiClient
@@ -186,6 +187,21 @@ class ShopRepository(
 
   suspend fun enableDevice(deviceId: String): ApiResult<Unit> =
     result { api.post(ApiEndpoints.Shop.deviceEnable(deviceId)); Unit }
+
+  /**
+   *  دستگاه‌های شناختهٔ کارمندان (رازِ ورود با کد) و «شاید همان عضوِ کهنه». سرورِ قدیمی این مسیر را ندارد ⇒ `null`
+   *  (بخش دیده نمی‌شود، بقیهٔ صفحه سالم).
+   */
+  suspend fun staffKeys(): StaffKeysDto? =
+    result { ApiJson.decode<StaffKeysDto>(api.get(ApiEndpoints.Shop.STAFF_KEYS)) }.valueOrNull()
+
+  /** «باطل کردنِ این دستگاه»: راز و نشست‌های همان دستگاه — دوباره‌زدنی */
+  suspend fun revokeStaffKey(keyId: String): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Shop.staffKeyRevoke(keyId)); Unit }
+
+  /** «خروج از همهٔ دستگاه‌ها» برای یک کارمند: نشست‌ها و رازهای دستگاهش در همین دکان */
+  suspend fun logoutMemberEverywhere(memberId: String): ApiResult<Unit> =
+    result { api.post(ApiEndpoints.Shop.staffKeysLogoutAll(memberId)); Unit }
 
   suspend fun rotateStandingCode(): ApiResult<IssuedCodeDto> =
     result { ApiJson.decode<IssuedCodeDto>(api.post(ApiEndpoints.Shop.STAFF_CODE_ROTATE)) }

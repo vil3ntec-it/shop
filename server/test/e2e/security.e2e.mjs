@@ -196,4 +196,52 @@ await E.step('SYN-10.staff-code', 'کدِ شاگرد روی دستگاهِ تا�
   assert.equal(Number((await db.one('SELECT COUNT(*)::int AS n FROM users')).n), users, 'ورودِ دوباره حسابِ تازه ساخت');
 }, { needs: ['SYN-10.logout'] });
 
+await E.step('SYN-10.staff-key-life', 'عمرِ رازِ دستگاه: «خروج از همه» ⇒ رازِ همان دستگاه رد؛ کدِ تازه ⇒ عضوِ تازه (هرگز همان) و صاحب '
+  + '«شاید همان <نام> است با دستگاهِ تازه» را می‌بیند؛ برداشتنِ عضوِ کهنه داده‌اش را پاک نمی‌کند', async () => {
+  const owner = (await E.device('A3-owner-one', one.email)).token;
+  const once = () => E.post('/api/shop/staff-code', { role: 'staff', maxUses: 1 }, owner).then((r) => E.ok(r, 'کدِ یک‌بار').code);
+  const uid = 'K-staff-life-phone';
+  const first = E.ok(await E.post('/api/auth/staff', {
+    code: await once(), name: 'کریم', device: { uid, name: 'گوشیِ کریم', platform: 'android', keyVersion: 1 },
+  }), 'پیوستنِ کریم');
+  const key = first.deviceKey;
+  assert.equal(typeof key, 'string', 'رازِ دستگاه نیامد');
+
+  //  «خروج از همه» از خودِ دستگاه ⇒ نشست‌ها و رازِ دستگاه در یک تراکنش
+  const out = E.ok(await E.post('/api/auth/logout-all', {}, first.accessToken), 'خروج از همه');
+  assert.equal(out.deviceKeys, 1, JSON.stringify(out));
+  const standing = E.ok(await E.get('/api/shop/staff-code', owner), 'کدِ ثابت').code;
+  const refused = await E.post('/api/auth/staff', { code: standing, device: { uid, key, keyVersion: 1 } });
+  assert.equal(refused.status, 403, `رازِ باطل پذیرفته شد: ${JSON.stringify(refused.body)}`);
+  assert.equal(refused.body.error.code, 'staff_device_unverified');
+  assert.match(refused.body.error.message, /کدِ تازه از صاحبِ دکان بگیرید/);
+
+  //  کدِ تازهٔ صاحب ⇒ عضوِ تازه با رازِ تازه؛ عضوِ کهنه دست‌نخورده (هیچ یکی شدنِ خودکاری نیست)
+  const again = E.ok(await E.post('/api/auth/staff', {
+    code: await once(), name: 'کریم', device: { uid, key, name: 'گوشیِ کریم', platform: 'android', keyVersion: 1 },
+  }), 'کدِ تازه');
+  assert.notEqual(again.user.id, first.user.id, 'کدِ تازه حسابِ پیشین را داد');
+  assert.notEqual(again.deviceKey, key);
+  const members = E.ok(await E.get('/api/shop/members', owner), 'اعضا').members;
+  const oldM = members.find((m) => m.userId === first.user.id);
+  const newM = members.find((m) => m.userId === again.user.id);
+  assert.ok(oldM && newM, 'هر دو عضو در فهرست');
+  const view = E.ok(await E.get('/api/shop/staff-keys', owner), 'دستگاه‌های کارمندان');
+  const hint = view.hints.find((x) => x.memberId === newM.id);
+  assert.ok(hint, `نشانهٔ «شاید همان» نیامد: ${JSON.stringify(view.hints)}`);
+  assert.equal(hint.oldMemberId, oldM.id);
+  assert.equal(hint.oldName, 'کریم');
+  assert.equal(hint.sameName, true);
+  assert.ok(!JSON.stringify(view).includes(uid) && !JSON.stringify(view).includes(again.deviceKey), 'شناسهٔ کامل یا راز در پاسخ');
+
+  //  «برداشتنِ عضوِ کهنه» (همان درِ امروز) ⇒ نشانه می‌رود؛ حساب و سابقهٔ کهنه می‌ماند
+  E.ok(await E.post(`/api/shop/members/${oldM.id}/remove`, {}, owner), 'برداشتنِ عضوِ کهنه');
+  assert.ok(!E.ok(await E.get('/api/shop/staff-keys', owner), 'دوباره').hints.some((x) => x.memberId === newM.id));
+  assert.ok(await db.one('SELECT 1 AS x FROM users WHERE id=$1', [first.user.id]), 'حسابِ کهنه پاک شد');
+  const trail = await db.one(
+    `SELECT detail FROM audit_logs WHERE action='staff_device_key.revoked' AND target_id=$1 ORDER BY created_at LIMIT 1`, [first.user.id]);
+  assert.equal(trail.detail.reason, 'logout_all');
+  assert.ok(!JSON.stringify(trail.detail).includes(key), 'راز در سابقه');
+}, { needs: ['SYN-10.staff-code'] });
+
 await E.finish();

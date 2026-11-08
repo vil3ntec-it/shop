@@ -178,6 +178,10 @@ object ApiEndpoints {
     fun approverKey(id: String) = "$APPROVER_KEYS/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"
+    /** دستگاه‌های شناختهٔ کارمندان (رازِ ورود با کد، مهاجرتِ ۳۴۵): فهرست، «باطل کردنِ این دستگاه»، «خروج از همه» ِ یک عضو */
+    const val STAFF_KEYS = "/shop/staff-keys"
+    fun staffKeyRevoke(id: String) = "$STAFF_KEYS/${enc(id)}/revoke"
+    fun staffKeysLogoutAll(memberId: String) = "$STAFF_KEYS/members/${enc(memberId)}/logout-all"
 
     /**
      *  وضعیتِ تحویل و پیکِ دکان (`readable`/`entitled`) — صفحهٔ کارمندان با

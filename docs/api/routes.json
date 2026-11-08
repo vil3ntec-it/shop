@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 983,
+    "routes": 986,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 477,
+      "user": 480,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 685,
+      "extracted": 688,
       "empty": 296,
       "unresolved": 2
     }
@@ -334,7 +334,7 @@
     {"method":"POST","path":"/api/auth/google/link-code","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","email","ok","resendSeconds","sent"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/login","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["device","email","identifier","password","phone"],"response":{"statuses":[200],"keys":[]},"errors":["400 identifier_required","400 password_required","401 bad_credentials","403 account_disabled"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/logout","area":"auth","source":"server/src/routes/auth.js","auth":"inline","guards":[],"params":[],"query":[],"body":["refreshToken","refresh_token"],"response":{"statuses":[200],"keys":["ok"]},"errors":[],"shape":"extracted"},
-    {"method":"POST","path":"/api/auth/logout-all","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["app","ok","sessions"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/auth/logout-all","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["app","deviceKeys","ok","sessions"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/otp/request","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","destination","ok"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/otp/verify","area":"auth","source":"server/src/routes/auth.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":["code","device","name"],"response":{"statuses":[],"keys":[]},"errors":["403 account_disabled","403 registration_closed"],"shape":"extracted"},
     {"method":"POST","path":"/api/auth/password","area":"auth","source":"server/src/routes/auth.js","auth":"user","guards":["requireAnyUser"],"params":[],"query":[],"body":["currentPassword","newPassword"],"response":{"statuses":[200],"keys":["closedSessions","ok"]},"errors":["400 weak_password","401 bad_credentials"],"shape":"extracted"},
@@ -833,6 +833,9 @@
     {"method":"POST","path":"/api/shop/staff-code/rotate","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('staffcode.create')","requireFeature('multi_device')","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["code","generation","id","role","standing"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/staff-codes","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('staffcode.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["codes"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/shop/staff-codes/:id","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser","requireShop","requirePermission('staffcode.revoke')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/staff-keys","area":"shop","source":"server/src/routes/shop-staff-keys.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'staff-keys-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","canRevoke"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/staff-keys/:id/revoke","area":"shop","source":"server/src/routes/shop-staff-keys.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'staff-keys-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok","revoked","sessions"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/staff-keys/members/:id/logout-all","area":"shop","source":"server/src/routes/shop-staff-keys.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'staff-keys-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok","revoked","sessions"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/staff-scope/config","area":"shop","source":"server/src/routes/staff-scope.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["enabled","mine","places"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/staff-scope/members","area":"shop","source":"server/src/routes/staff-scope.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["members","places"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/staff-scope/members/:id","area":"shop","source":"server/src/routes/staff-scope.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.role')","requireRecentAuth"],"params":["id"],"query":[],"body":["places"],"response":{"statuses":[200],"keys":["members","places","userId"]},"errors":[],"shape":"extracted"},
