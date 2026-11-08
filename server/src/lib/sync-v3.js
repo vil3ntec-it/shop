@@ -35,6 +35,7 @@ const convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
 const store = require('./sync-v3-store');
+const batch = require('./sync-v3-batch');
 const { validate, merge, normPhone, isPlainObject } = require('./sync-v3-merge');
 const { SERVER_DEVICE, clock, ready, resetClock, applyOne, applyServerOp } = require('./sync-v3-apply');
 const { BRIDGE_BATCH, importV1, openToV1, drainToV1 } = require('./sync-v3-bridge');
@@ -194,7 +195,8 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       }
     }
 
-    const s = store.direct(c);
+    //  پرچمِ `SYNC_V3_BATCH` (پیش‌فرض خاموش): همان واحدها و همان داوری با رفت‌وبرگشتِ کمتر (`sync-v3-batch.js`)
+    const s = batch.on() ? await batch.open(c, ctx, plan) : store.direct(c);
     for (const unit of plan) {
       if (unit.broken) {
         for (const it of unit.items) results[it.i] = { op_id: it.ops[0].op_id, status: 'rejected', reason: 'tx_rejected' };
