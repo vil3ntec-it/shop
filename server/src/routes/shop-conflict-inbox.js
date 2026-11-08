@@ -32,7 +32,9 @@ router.get('/', requirePermission(inbox.RESOLVE_PERMISSION), async (req, res) =>
 });
 
 router.get('/mine', async (req, res) => {
-  res.json(await inbox.mine(req.shopId, actorOf(req), { limit: req.query.limit }));
+  //  ⛔ CRM-15: `settle.base` مقدارِ امروزِ سرورِ ردیف‌هایی است که opهای خودِ او زدند — بی `customers.contact` بی شماره و نشانی
+  const hideContact = await require('../lib/customer-contact').hiddenForReq(req);
+  res.json(await inbox.mine(req.shopId, actorOf(req), { limit: req.query.limit, hideContact }));
 });
 
 router.get('/:id', requirePermission(inbox.RESOLVE_PERMISSION), async (req, res) => {
