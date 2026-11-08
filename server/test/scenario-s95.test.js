@@ -53,7 +53,16 @@ function lowDisk(pct) {
   return () => { fsp.statfs = orig; };
 }
 
+/**
+ *  دیسکِ «سالم» هم تزریقی است، نه دیسکِ واقعیِ میزبان: روی ماشینی با کمتر از ۲٪ جای خالی (CI یا سیزنِ محلیِ تنگ)
+ *  S95.0 و S95.recover سرخ می‌شدند، چون بیرون از پنجره‌های `lowDisk` همان `statfs` ِ واقعی خوانده می‌شد. حالا کلِ
+ *  این پرونده روی ۵۰٪ ِ ساختگی است و `lowDisk` فقط موقتاً عوضش می‌کند؛ قاعدهٔ آستانه (`storage()` ِ `system-health`) همان.
+ */
+const HEALTHY_PCT = 50;
+let realDisk = null;
+
 test.before(async () => {
+  realDisk = lowDisk(HEALTHY_PCT);
   h = require('./helpers');
   await h.start();
   db = require('../src/db');
@@ -71,13 +80,30 @@ test.before(async () => {
   await live.set('ops', 'ops.critical_alerts', true, 'test');
   paging._setTransport(capture);
 });
-test.after(async () => { paging._setTransport(null); paging.stop(); await h.stop(); });
+test.after(async () => { paging._setTransport(null); paging.stop(); await h.stop(); realDisk?.(); });
+
+test('S95.limit: آستانه‌های واقعیِ دیسک — زیرِ ۲٪ «down»، زیرِ ۱۰٪ «warn»، لبه‌ها دقیق', async () => {
+  const { LIMITS } = require('../src/lib/system-health');
+  assert.deepEqual([LIMITS.diskDownPct, LIMITS.diskWarnPct], [2, 10]);
+  //  bfree به هزارم: ۱٫۹ ⇒ down، ۲ ⇒ warn، ۹٫۹ ⇒ warn، ۱۰ ⇒ ok
+  for (const [pct, want] of [[1.9, 'down'], [2, 'warn'], [9.9, 'warn'], [10, 'ok']]) {
+    const undo = lowDisk(pct);
+    try {
+      const r = await health();
+      assert.equal(r.body.storage.status, want, `${pct}%`);
+      assert.equal(r.body.storage.freePct, pct);
+    } finally {
+      undo();
+    }
+  }
+});
 
 test('S95.0: پیش از خطا دیتابیس و دیسک سالم‌اند و هشدارِ «از کار افتاده» ِ آن‌ها نیست', async () => {
   const r = await health();
   assert.equal(r.status, 200, JSON.stringify(r.body));
   assert.equal(r.body.database.status, 'ok');
-  assert.notEqual(r.body.storage.status, 'down');
+  assert.equal(r.body.storage.status, 'ok');
+  assert.equal(r.body.storage.freePct, HEALTHY_PCT, 'دیسکِ سالمِ تزریقی، نه دیسکِ واقعیِ میزبان');
   await alerts.evaluate({ force: true });
   assert.equal(await alertOf('database'), null);
   assert.equal(await alertOf('storage'), null);
