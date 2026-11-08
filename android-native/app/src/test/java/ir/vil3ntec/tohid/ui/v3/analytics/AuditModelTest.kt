@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.core.audit.AuditAnchor
 import ir.vil3ntec.tohid.core.audit.AuditChain
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.AuditEntry
@@ -127,5 +128,29 @@ class AuditModelTest {
     assertEquals("b", AuditModel.brokenId(report))
     //  حذف ⇐ «پاک شده»
     assertTrue(AuditModel.chainLine(AuditSeal.verify(rows.filter { it.id != "b" }, savedAnchors), me).body!!.contains(StrReports.chainDeleted))
+  }
+
+  @Test
+  fun `حکمِ سرور وقتی همین دفتر سالم است به گفتهٔ سرور می‌آید و شکستِ همین دفتر جلوتر است`() {
+    val rows = sealed(e("a", "sale"), e("b", "sale"), e("c", "sale"))
+    val local = AuditSeal.verify(rows, savedAnchors)
+    //  سرور سالم یا بی حکم (پرچمِ خاموش، بی‌اینترنت) ⇐ همان سالمِ محلی
+    assertEquals(AuditModel.chainLine(local, me), AuditModel.chainLine(local, me, AuditAnchor.Verdict(true)))
+    assertEquals(StrReports.chainOk, AuditModel.chainLine(local, me, null).title)
+    //  دُمِ همگام‌نشدهٔ دستگاهِ دیگر بریده شد ⇐ شکسته به گفتهٔ سرور، با دستگاهِ همان زنجیره
+    val cut = AuditAnchor.Verdict(false, AuditChain.Break("ffeedd00112233/1", 5, "truncated"))
+    val line = AuditModel.chainLine(local, me, cut)
+    assertEquals(false, line.ok)
+    assertEquals(StrReports.chainServerBroken(5), line.title)
+    assertTrue(line.body!!.contains(StrReports.chainDeleted))
+    assertTrue(line.body!!.contains(StrReports.deviceShort("ffeedd")))
+    assertNull(AuditModel.brokenId(local, cut))
+    //  ردیفی که سرور می‌شناسد نشان می‌خورد؛ حذفِ نرم و بازنویسیِ سرور هم زبانِ خودشان را دارند
+    assertEquals("b", AuditModel.brokenId(local, AuditAnchor.Verdict(false, AuditChain.Break("$me/1", 2, "rewritten", "b"))))
+    assertEquals(StrReports.chainEdited, AuditModel.reasonText("rewritten"))
+    assertEquals(StrReports.chainDeleted, AuditModel.reasonText("deleted"))
+    //  شکستِ همین دفتر بر حکمِ سرور جلو است
+    val edited = rows.toMutableList().also { it[1] = it[1].copy(notes = "دست‌خورده") }
+    assertEquals(StrReports.chainBroken(2), AuditModel.chainLine(AuditSeal.verify(edited, savedAnchors), me, cut).title)
   }
 }

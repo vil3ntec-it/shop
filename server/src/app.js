@@ -333,6 +333,9 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/auth', require('./routes/auth'));
     api.use('/auth/:app', require('./routes/app-auth'));
+    //  STF-09: سرِ زنجیرهٔ سابقهٔ دستگاه (`/sync/v1/audit-anchor`) — فقط دکان، جدا از `routes/sync-v1.js` ِ مشترک با
+    //  پمپ؛ پیش از آن و فقط همان درها (زنجیره روی خودِ در، نه `router.use`) ⇒ هیچ درخواستِ دیگری از آن نمی‌گذرد
+    api.use('/sync/v1', require('./routes/audit-anchor'));
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));

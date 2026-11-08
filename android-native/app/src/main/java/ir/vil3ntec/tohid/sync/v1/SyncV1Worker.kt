@@ -110,6 +110,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       write = { next -> store.applyFromServerNow(next) },
     )
     sweepAfterPull(store)
+    //  STF-09: سرِ زنجیرهٔ سابقهٔ همین دستگاه پس از هر دور، فقط وقتی عوض شده — ردیف‌های هنوز نرفته هم (بریدنشان روی
+    //  سرور دیده می‌شود). پرچمِ خاموشِ shop.doc_chain ⇒ هیچ؛ شکستش بی‌صدا و دورِ بعد دوباره (`AuditAnchorSync`)
+    runCatching { ir.vil3ntec.tohid.sync.platform.AuditAnchorSync.cycle(app) }
     return if (outcome.isSuccess) Result.success() else Result.retry()
   }
 

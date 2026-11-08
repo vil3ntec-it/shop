@@ -8,10 +8,15 @@
  *
  * ── لنگرِ سرور ────────────────────────────────────────────────────────
  * ردیف‌های `auditLog` از همان راهِ همیشگیِ همگام‌سازی (`sync_rows`) می‌رسند و این‌جا هیچ چیزی نوشته
- * نمی‌شود. لنگر خودِ همان رونوشت است: حذف در `sync_rows` نرم است (`deleted_at`، داده می‌ماند) و
- * `field_seq` می‌گوید هر فیلد آخرین بار کِی نوشته شد. پس پس از همگام‌سازی:
+ * نمی‌شود. رونوشت خودش شاهد است: حذف در `sync_rows` نرم است (`deleted_at`، داده می‌ماند) و
+ * `field_seq` می‌گوید هر فیلد آخرین بار کِی نوشته شد. کنارش سرِ گزارش‌شدهٔ هر زنجیره (`device_audit_anchors`،
+ * مهاجرتِ ۴۱۰، `lib/device-audit-anchor.js`) — دستگاه تا کجا نوشته بود، همگام‌شده یا نه. پس پس از همگام‌سازی:
  *   ویرایش ⇐ hash_mismatch · حذف ⇐ deleted · جابه‌جایی/درج ⇐ prev_mismatch/seq_gap/fork
  *   بازنویسیِ فیلدِ مُهر یا حلقه پس از رسیدن ⇐ rewritten (بریدن یا دست‌کاریِ دُمِ همگام‌شده)
+ *   ردیفِ شمارهٔ لنگر با هشِ دیگر ⇐ anchor_mismatch · دو هش برای یک شمارهٔ لنگر ⇐ fork · سرِ عقب‌رفته ⇐ rollback
+ *   دُمِ زیرِ لنگر که نرسید ⇐ truncated — وقتی دورهٔ تازه‌ترِ همان دستگاه هست (دورهٔ کهنه هرگز ادامه نمی‌یابد،
+ *   همان قاعدهٔ `AuditChain.resume`) یا لنگر بیش از [GRACE_MS] پیر است؛ وگرنه «در راه» (`pending`، صفِ دستگاه).
+ *   دورهٔ تازه از ۱ (بازیابی، نصبِ دوباره) شکست نیست؛ دورهٔ کهنه تا لنگرِ خودش سنجیده می‌شود.
  * سنجش فقط خواندنی است: `npm run verify-chain -- --device-audit [<دکان>]`.
  * ⛔ `lib/sync-v1.js` و `routes/sync-v1.js` دست نمی‌خورند (مشترک با پمپ).
  */
@@ -26,6 +31,8 @@ const HEAD = Object.freeze(['id', 'type', 'date', 'refId', 'createdAt', 'amount'
 const NOT_DETAIL = new Set([...HEAD, ...STAMP, ...LINK]);
 const MAX_CHAIN = 200;
 const PAGE = 2000;
+/** ردیف‌های زیرِ لنگرِ دورهٔ جاری تا این‌قدر «در راه»اند (صفِ دستگاه، بی‌اینترنتی) پیش از «بریده» */
+const GRACE_MS = 3 * 24 * 60 * 60 * 1000;
 
 /** دلیلِ هر شکست، برای چاپ */
 const REASONS = Object.freeze({
@@ -39,6 +46,7 @@ const REASONS = Object.freeze({
   anchor_mismatch: 'با لنگر نمی‌خواند',
   deleted: 'ردیفِ زنجیره‌دار حذف شده',
   rewritten: 'مُهر یا پیوندِ ردیف پس از رسیدن بازنویسی شده',
+  rollback: 'دستگاه سرِ زنجیره را عقب‌تر از لنگرِ پیشین گزارش کرد',
 });
 
 function bitsHex(x) {
@@ -235,12 +243,70 @@ function verify(rows, { anchors = null, strict = false, known = 1 } = {}) {
   };
 }
 
+const deviceOfChain = (c) => c.slice(0, Math.max(0, c.lastIndexOf('/')));
+const epochOfChain = (c) => { const n = Number(c.slice(c.lastIndexOf('/') + 1)); return Number.isSafeInteger(n) ? n : 0; };
+
+/**
+ * لنگرهای سرور (`device_audit_anchors`) روی رونوشت ⇐ { breaks, heads }. هر لنگر: ردیفِ همان شماره (اگر رسیده) همان
+ * هش را دارد، وگرنه `anchor_mismatch`؛ `fork`/`rollback` ِ ثبت‌شده هنگامِ گزارش همان‌جا شکست است. بزرگ‌ترین لنگرِ
+ * هر زنجیره جلوتر از بزرگ‌ترین ردیفِ رسیده ⇐ `truncated` اگر دوره بسته است (دورهٔ تازه‌ترِ همان دستگاه در ردیف‌ها یا
+ * لنگرها) یا لنگر پیرتر از [GRACE_MS]؛ وگرنه `pending` (هنوز در صفِ دستگاه).
+ */
+function anchorCheck(stored, anchors, now) {
+  const seen = new Map();
+  const latest = new Map();
+  const bump = (chain) => {
+    const d = deviceOfChain(chain);
+    const e = epochOfChain(chain);
+    if (e > (latest.get(d) || 0)) latest.set(d, e);
+  };
+  for (const s of stored) {
+    let l;
+    try { l = linkOf(s.data || {}); } catch { continue; }
+    if (!l) continue;
+    if (!seen.has(l.chain)) seen.set(l.chain, new Map());
+    const m = seen.get(l.chain);
+    if (!m.has(l.seq)) m.set(l.seq, new Set());
+    m.get(l.seq).add(l.hash);
+    bump(l.chain);
+  }
+  const byChain = new Map();
+  for (const a of anchors) {
+    if (!byChain.has(a.chain)) byChain.set(a.chain, []);
+    byChain.get(a.chain).push(a);
+    bump(a.chain);
+  }
+  const breaks = [];
+  const heads = {};
+  for (const [chain, list] of byChain) {
+    list.sort((x, y) => x.seq - y.seq);
+    const rows = seen.get(chain) || new Map();
+    for (const a of list) {
+      if (a.problem === 'fork' || a.problem === 'rollback') breaks.push({ chain, seq: a.seq, reason: a.problem, id: null });
+      const have = rows.get(a.seq);
+      if (have && !have.has(a.hash)) breaks.push({ chain, seq: a.seq, reason: 'anchor_mismatch', id: null });
+    }
+    const last = list[list.length - 1];
+    let top = 0;
+    for (const k of rows.keys()) if (k > top) top = k;
+    let pending = 0;
+    if (last.seq > top) {
+      const closed = epochOfChain(chain) < (latest.get(deviceOfChain(chain)) || 0);
+      if (closed || now - last.reportedAt > GRACE_MS) breaks.push({ chain, seq: top + 1, reason: 'truncated', id: null });
+      else pending = last.seq - top;
+    }
+    heads[chain] = { seq: last.seq, hash: last.hash, pending };
+  }
+  return { breaks, heads };
+}
+
 /**
  * سنجشِ رونوشتِ سرور: `[{ data, deleted, rewritten }]` (همان `sync_rows`). بر [verify] (strict، همهٔ سطح‌ها)
  * دو شکستِ فقط‌سرور می‌افزاید: ردیفِ زنجیره‌دارِ حذف‌شده (`deleted`) و فیلدِ مُهر/حلقه‌ای که پس از رسیدن
- * دوباره نوشته شد (`rewritten`). نخستین شکست به ترتیبِ (زنجیره، شماره).
+ * دوباره نوشته شد (`rewritten`)؛ و با [anchors] (ردیف‌های `device_audit_anchors`) شکست‌های لنگر ([anchorCheck]).
+ * نخستین شکست به ترتیبِ (زنجیره، شماره). هر زنجیره `anchor` (بزرگ‌ترین لنگر) و `pending` دارد.
  */
-function verifyStored(stored) {
+function verifyStored(stored, { anchors = [], now = Date.now() } = {}) {
   const rep = verify(stored.map((s) => s.data || {}), { strict: true, known: Infinity });
   const extra = [];
   for (const s of stored) {
@@ -251,9 +317,22 @@ function verifyStored(stored) {
     if (s.deleted) extra.push({ chain: l.chain, seq: l.seq, reason: 'deleted', id });
     else if (s.rewritten) extra.push({ chain: l.chain, seq: l.seq, reason: 'rewritten', id });
   }
+  const anc = anchorCheck(stored, anchors, now);
+  extra.push(...anc.breaks);
+  const anchorOf = (chain) => (anc.heads[chain] ? { seq: anc.heads[chain].seq, hash: anc.heads[chain].hash } : null);
+  const chains = rep.chains.map((c) => ({ ...c, anchor: anchorOf(c.chain), pending: anc.heads[c.chain] ? anc.heads[c.chain].pending : 0 }));
+  for (const chain of Object.keys(anc.heads)) {
+    if (!chains.some((c) => c.chain === chain)) {
+      chains.push({ chain, from: 0, seq: 0, head: hc.GENESIS, rows: 0, broken: null, anchor: anchorOf(chain), pending: anc.heads[chain].pending });
+    }
+  }
+  chains.sort((x, y) => cmp(x.chain, y.chain));
   const all = [...rep.bad, ...rep.chains.filter((c) => c.broken).map((c) => c.broken), ...extra]
     .sort((x, y) => cmp(x.chain, y.chain) || (x.seq - y.seq));
-  return { ...rep, extra, ok: rep.ok && extra.length === 0, broken: all[0] || null };
+  return {
+    ...rep, chains, extra, ok: rep.ok && extra.length === 0, broken: all[0] || null,
+    pending: chains.reduce((n, c) => n + c.pending, 0),
+  };
 }
 
 /** فیلدِ مُهر یا حلقه‌ای که دیرتر از نخستین نوشتنِ ردیف نوشته شد (`field_seq` ِ `sync_rows`) */
@@ -265,8 +344,8 @@ function rewrittenOf(fieldSeq) {
   return [...STAMP, ...LINK].some((k) => k in fieldSeq && Number(fieldSeq[k]) > first);
 }
 
-/** ردیف‌های `auditLog` ِ یک دکان در `sync_rows` (حذف‌شده‌ها هم) ⇒ گزارشِ [verifyStored] */
-async function verifyShop(shopId) {
+/** ردیف‌های `auditLog` ِ یک دکان در `sync_rows` (حذف‌شده‌ها هم) و لنگرهایش ⇒ گزارشِ [verifyStored] */
+async function verifyShop(shopId, { now = Date.now() } = {}) {
   const stored = [];
   let after = '';
   for (;;) {
@@ -284,27 +363,29 @@ async function verifyShop(shopId) {
     if (r.rows.length < PAGE) break;
     after = r.rows[r.rows.length - 1].row_id;
   }
-  return { shopId: String(shopId), ...verifyStored(stored) };
+  const anchors = await require('./device-audit-anchor').anchorsOf(shopId);
+  return { shopId: String(shopId), ...verifyStored(stored, { anchors, now }) };
 }
 
-/** همهٔ دکان‌هایی که دست‌کم یک ردیفِ زنجیره‌دار دارند (یا فقط [shops]) */
-async function verifyAllShops({ shops = [] } = {}) {
+/** همهٔ دکان‌هایی که دست‌کم یک ردیفِ زنجیره‌دار یا یک لنگر دارند (یا فقط [shops]) */
+async function verifyAllShops({ shops = [], now = Date.now() } = {}) {
   let ids = shops.map(String);
   if (!ids.length) {
     const r = await db.query(
-      `SELECT DISTINCT account_id FROM sync_rows
+      `SELECT account_id AS id FROM sync_rows
         WHERE app = 'shop' AND account_kind = 'shop' AND table_name = 'auditLog' AND data ? 'hash'
-        ORDER BY account_id`,
+       UNION SELECT shop_id AS id FROM device_audit_anchors
+       ORDER BY id`,
     );
-    ids = r.rows.map((x) => x.account_id);
+    ids = r.rows.map((x) => x.id);
   }
   const results = [];
-  for (const id of ids) results.push(await verifyShop(id));
+  for (const id of ids) results.push(await verifyShop(id, { now }));
   return { ok: results.every((x) => x.ok), results };
 }
 
 module.exports = {
-  FORMAT, V, STAMP, LINK, REASONS,
+  FORMAT, V, STAMP, LINK, REASONS, GRACE_MS,
   norm, prune, detail, detailHash, amountMinor, doc, hashOf, linked, stamped, linkOf,
-  verify, verifyStored, rewrittenOf, verifyShop, verifyAllShops,
+  verify, anchorCheck, verifyStored, rewrittenOf, verifyShop, verifyAllShops,
 };
