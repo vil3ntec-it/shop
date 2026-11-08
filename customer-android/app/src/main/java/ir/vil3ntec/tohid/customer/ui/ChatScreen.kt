@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -18,6 +19,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.AddCircle
+import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,9 +33,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.shopper.ChatAct
+import ir.vil3ntec.tohid.core.shopper.ChatDeleteScope
 import ir.vil3ntec.tohid.core.shopper.ChatMessage
 import ir.vil3ntec.tohid.core.shopper.ChatOutItem
 import ir.vil3ntec.tohid.core.shopper.ChatOutbox
@@ -42,7 +49,8 @@ import ir.vil3ntec.tohid.core.shopper.ShopperText
 /**
  *  گفت‌وگو با دکان (CHAT-02/06): رشتهٔ پیام‌ها از سرور (long-poll)، پیام‌های صف زیرِ رشته با حالِ روشن («در صف»،
  *  «در حالِ فرستادن»، «منتظرِ تأیید»، «نرفت» با «دوباره/لغو»)، رسیدِ پیامِ خودم، و فرستادنِ عکس (چرخیده و بی EXIF).
- *  «بسته/مشکل دارم/گفت‌وگوی تازه» فقط از `life` ِ سرور.
+ *  «بسته/مشکل دارم/گفت‌وگوی تازه» فقط از `life` ِ سرور. «کارهای این پیام» ⇐ «حذف برای من/برای همه» با پرسشِ تأیید
+ *  (CHAT-08؛ قاعده‌ها در `ChatDeletes` ِ core، این‌جا فقط کشیدن).
  */
 @Composable
 fun ChatScreen(model: CustomerModel, slug: String, orderNo: Long?) {
@@ -83,6 +91,8 @@ private fun ThreadView(model: CustomerModel, t: ChatThread, modifier: Modifier) 
     items(queued, key = { "q-" + it.clientId }) { q -> QueuedBubble(model, q) }
   }
   c.note?.let { Note(it, Tone.WARN, Modifier.fillMaxWidth().padding(horizontal = 12.dp)) }
+  c.deletedNote?.let { Note(it, Tone.OK, Modifier.fillMaxWidth().padding(horizontal = 12.dp).semantics { liveRegion = LiveRegionMode.Polite }) }
+  c.act?.let { a -> t.messages.firstOrNull { it.id == a.messageId }?.let { m -> ActionsDialog(model.chat, a, m) } }
   if (!conv.canSend) {
     Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       Note(if (conv.life.state == "closed") ShopperText.chatClosed else ShopperText.chatBlocked, Tone.INFO)
@@ -133,9 +143,52 @@ private fun Bubble(model: CustomerModel, m: ChatMessage, status: String?) {
         //  `ChatThread.statusOf`: status ِ پیام یا رسیدِ تازه‌ترِ دکان (long-poll ِ بی پیام) — زنده، هرگز عقب (CHAT-04)
         when (status) { "read" -> ShopperText.chatRead; "delivered" -> ShopperText.chatDelivered; "sent" -> ShopperText.chatSent; else -> null }.takeIf { mine },
       )
-      if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall)
+      Row(verticalAlignment = Alignment.CenterVertically) {
+        if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall, modifier = Modifier.weight(1f, fill = false))
+        //  IconButton ⇒ هدفِ لمسِ ۴۸dp؛ نام برای صفحه‌خوان
+        IconButton(onClick = { model.chat.actions(m) }, enabled = model.chat.act?.busy != true) {
+          Icon(Icons.Filled.MoreVert, contentDescription = ShopperText.chatActions)
+        }
+      }
     }
   }
+}
+
+/** فهرستِ کارها، سپس پرسشِ تأیید؛ تا پاسخ همه خاموش (دوبار زدن یک درخواست) و خطا همین‌جا روشن */
+@Composable
+private fun ActionsDialog(c: ChatModel, a: ChatAct, m: ChatMessage) {
+  val big = Modifier.heightIn(min = 48.dp)
+  AlertDialog(
+    onDismissRequest = { c.closeActions() },
+    title = { Text(ShopperText.chatActions) },
+    text = {
+      Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        when (a.ask) {
+          null -> {
+            TextButton(onClick = { c.askDelete(ChatDeleteScope.ME) }, modifier = big.fillMaxWidth()) { Text(ShopperText.chatDeleteMe) }
+            if (c.canDeleteForAll(m)) {
+              TextButton(onClick = { c.askDelete(ChatDeleteScope.ALL) }, modifier = big.fillMaxWidth()) { Text(ShopperText.chatDeleteAll) }
+            }
+          }
+          ChatDeleteScope.ALL -> Text(ShopperText.chatDeleteAllAsk)
+          ChatDeleteScope.ME -> Text(ShopperText.chatDeleteMeAsk)
+        }
+        a.note?.let { Note(it, Tone.ERROR, Modifier.fillMaxWidth().semantics { liveRegion = LiveRegionMode.Polite }) }
+      }
+    },
+    confirmButton = {
+      if (a.ask != null) {
+        TextButton(onClick = { c.confirmDelete() }, enabled = !a.busy, modifier = big) {
+          Text(if (a.busy) ShopperText.chatDeleteBusy else ShopperText.chatDeleteYes, color = MaterialTheme.colorScheme.error)
+        }
+      }
+    },
+    dismissButton = {
+      TextButton(onClick = { if (a.ask != null) c.askDelete(null) else c.closeActions() }, enabled = !a.busy, modifier = big) {
+        Text(if (a.ask != null) ShopperText.no else ShopperText.chatCancel)
+      }
+    },
+  )
 }
 
 @Composable

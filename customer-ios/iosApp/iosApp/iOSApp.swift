@@ -16,7 +16,8 @@ struct iOSApp: SwiftUI.App {
                 .onOpenURL { url in MainViewControllerKt.openUrl(url: url.absoluteString) }
         }
         .onChange(of: phase) { now in
-            if now == .active { MainViewControllerKt.resumed() }
+            // جلوی چشم ⇒ «خواندم» ِ گفت‌وگوی باز؛ inactive/background ⇒ فقط «رسید» (CHAT-04)
+            if now == .active { MainViewControllerKt.resumed() } else { MainViewControllerKt.paused() }
         }
     }
 }

@@ -116,6 +116,12 @@ class MainActivity : ComponentActivity() {
     if (::model.isInitialized) model.resumed()
   }
 
+  //  بیرون از RESUMED (پس‌زمینه، پنجرهٔ دیگر جلو) پیامِ گفت‌وگو «دیده» حساب نمی‌شود — فقط «رسید» (CHAT-04)
+  override fun onPause() {
+    if (::model.isInitialized) model.paused()
+    super.onPause()
+  }
+
   private companion object {
     const val SERVER_KEY = "shopper.server"
   }
