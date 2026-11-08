@@ -331,9 +331,9 @@ router.post(['/staff', '/staff-login'], joinLimit, staffCodeLimit, async (req, r
 
 /**
  * ⛔ رازِ دستگاه برای نشستِ **بازِ** شاگرد که پیش از ۲.۱۴.۵ وارد شده (مهاجرتِ آرام، بی بیرون انداختن) — فقط حسابِ
- * کدِ شاگرد، فقط دستگاهِ همین توکن، فقط وقتی رازِ زنده‌ای نیست (`lib/staff-login.enrollDevice`).
+ * کدِ شاگرد، فقط دستگاهِ همین توکن، فقط وقتی رازِ زنده‌ای نیست (`lib/staff-login.enrollDevice`). سقف: سطلِ IP پیش از احراز و سطلِ **هر حساب** (`deviceKeyMax`) پس از آن — توکنِ دزدیده از IP های تازه هم بسته (بازبینیِ درهای دستهٔ ۳۲).
  */
-router.post('/staff/device-key', sessionLimit, requireAnyUser, async (req, res, next) => {
+router.post('/staff/device-key', sessionLimit, requireAnyUser, rateLimit({ max: config.rateLimit.deviceKeyMax, keyPrefix: 'staff-device-key', key: (req) => (req.user ? `u:${req.user.id}` : null) }), async (req, res, next) => {
   try {
     const out = await staffLogin.enrollDevice(req);
     res.status(out.deviceKey ? 201 : 200).json(out);

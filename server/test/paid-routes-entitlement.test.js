@@ -217,6 +217,12 @@ const SYNC_FREE = {
     body: { device_id: dev, format: 'tohid-audit-chain-v1', heads: [{ chain: `${dev}/1`, seq: ++seq, hash: 'a'.repeat(64) }] } }),
 };
 const freeOk = (res) => res.status < 300 && res.body?.enabled === true && !/^subscription_/.test(code(res));
+/**
+ * ⛔ لنگرِ سابقه فقط برای دستگاهِ همین نشست (`device-audit-anchor.ownDevice`، بازبینیِ درهای دستهٔ ۳۲) ⇒ FREE با
+ * همان `device_uid` ِ ثبت‌شدهٔ نشستِ هر نفر، نه شناسهٔ ساختگی (پیش‌تر `dev-staff`/`dev-owner` با پرچمِ خاموشِ
+ * `sync.device_bind` فقط ثبت می‌شد)
+ */
+const ownDev = async (u) => (await query('SELECT device_uid FROM devices WHERE user_id=$1 ORDER BY created_at LIMIT 1', [u.user.id])).rows[0].device_uid;
 
 test('SUB-10: هر مسیرِ نوشتنیِ /api/shop دقیقاً یک دسته دارد و دروازهٔ سورس با دسته می‌خواند', () => {
   const all = writes();
@@ -246,8 +252,8 @@ test('SUB-10: با اشتراکِ فعال هیچ مسیرِ PAID برای صا�
     if (res.status >= 300) bad.push(`شاگرد ${k} ⇒ ${res.status} ${code(res)}`);
   }
   for (const [k, call] of Object.entries(SYNC_FREE)) {
-    for (const [who, t, dev] of [['شاگرد', s.staff.accessToken, 'dev-staff'], ['صاحب', s.owner.accessToken, 'dev-owner']]) {
-      const res = await call(t, dev);
+    for (const [who, t, u] of [['شاگرد', s.staff.accessToken, s.staff], ['صاحب', s.owner.accessToken, s.owner]]) {
+      const res = await call(t, await ownDev(u));
       if (!freeOk(res)) bad.push(`FREE ${who} ${k} ⇒ ${res.status} ${code(res)} ${JSON.stringify(res.body).slice(0, 120)}`);
     }
   }
@@ -286,8 +292,8 @@ for (const [name, apply] of Object.entries(STATES)) {
     }
     //  ۵) FREE ِ بیرون از /api/shop: شاگرد هم (برخلافِ دادهٔ دکان) باز است
     for (const [k, call] of Object.entries(SYNC_FREE)) {
-      for (const [who, t, dev] of [['شاگرد', s.staff.accessToken, 'dev-staff'], ['صاحب', s.owner.accessToken, 'dev-owner']]) {
-        const res = await call(t, dev);
+      for (const [who, t, u] of [['شاگرد', s.staff.accessToken, s.staff], ['صاحب', s.owner.accessToken, s.owner]]) {
+        const res = await call(t, await ownDev(u));
         if (!freeOk(res)) bad.push(`FREE ${who} ${k} ⇒ ${res.status} ${code(res)}`);
       }
     }

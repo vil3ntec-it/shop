@@ -12,7 +12,12 @@
  * `routes/sync-v1.js` مشترک با پمپ است. سر شاملِ ردیف‌هایی هم هست که هنوز همگام نشده‌اند ⇒ بریدنشان دیده می‌شود.
  *
  * قاعده‌ها (همان روحِ `doc-chain.report` و `AuditChain.resume`):
- *   - زنجیره فقط مالِ همین دستگاه است (`<device_id>/<دوره>`؛ `device_id` را `requireSyncAccount` با نشست می‌سنجد).
+ *   - زنجیره فقط مالِ همین دستگاه است (`<device_id>/<دوره>`). ⛔ `device_id` ِ بدنه باید **همان** دستگاهِ نشست باشد
+ *     (`req.sync.deviceUid` ⇐ `tokens.device_id` ⇐ `devices.device_uid`) — همیشه، مستقل از پرچمِ `sync.device_bind`
+ *     ِ `requireSyncAccount` (که خاموشش فقط ثبت می‌کند): بی این، هر عضوِ دکان با شناسهٔ دستگاهِ دیگری سر می‌نشاند و
+ *     «انشعاب»/«عقب‌گرد» ِ دروغ روی صفحهٔ صاحب می‌ساخت یا پیش از خودِ آن دستگاه جای سرش را می‌گرفت ([ownDevice]).
+ *     نشستِ بی دستگاه (نسخه‌ای که هنگامِ ورود شناسه نفرستاد) ⇐ ۴۰۳ `device_unbound`: لنگر نمی‌گیرد تا دوباره وارد شود
+ *     (برنامه شکست را می‌بلعد و همگام‌سازی نمی‌خوابد)؛ پذیرفتنش همان جعل را برای هر نشستِ بی دستگاه باز می‌گذاشت.
  *   - همان شماره و همان هش ⇐ هیچ نوشتنی (تکرار، پاسخِ گم‌شده، تلاشِ دوباره).
  *   - همان شماره با هشِ دیگر ⇐ `fork` (تاریخچهٔ دستگاه بازنویسی شد).
  *   - سرِ عقب‌تر از بزرگ‌ترین سرِ ثبت‌شدهٔ همان دوره، یا ادامهٔ دوره‌ای کهنه پس از دورهٔ تازه‌تر ⇐ `rollback`
@@ -28,7 +33,7 @@
 const db = require('../db');
 const hc = require('./hash-chain');
 const audit = require('./audit');
-const { badRequest } = require('../middleware/errors');
+const { badRequest, forbidden } = require('../middleware/errors');
 
 const FLAG = 'shop.doc_chain';
 const ACTION = 'security.audit_chain';
@@ -109,10 +114,24 @@ async function markFork(ctx, deviceId, ip, head, have) {
   return { chain: head.chain, seq: head.seq, problem: 'fork' };
 }
 
+const UNBOUND = 'این نشست به دستگاهی بسته نیست؛ برای پاسبانیِ سابقه از برنامه خارج و دوباره وارد شوید.';
+const MISMATCH = 'این شناسهٔ دستگاه مالِ این نشست نیست. از برنامه خارج و دوباره وارد شوید.';
+
+/**
+ * ⛔ گزارش فقط برای دستگاهِ همین نشست (`ctx.deviceUid`) — پیش از پرچم و پیش از هر خواندن؛ دقیقاً همان رشته (نه
+ * شکلِ دیگرِ حروف، نه شناسهٔ همگام‌سازیِ حسابِ دوم: `AuditAnchorSync` همان `SyncStore.deviceUid` ِ خام را می‌فرستد).
+ */
+function ownDevice(ctx, deviceId) {
+  const bound = typeof ctx?.deviceUid === 'string' ? ctx.deviceUid : '';
+  if (!bound) throw forbidden(UNBOUND, 'device_unbound');
+  if (deviceId !== bound) throw forbidden(MISMATCH, 'device_mismatch');
+}
+
 /**
  * گزارشِ یک دستگاه. `ctx` همان `req.sync` (فقط دکان). مشکلِ زنجیره هرگز خطا نیست — در `problems` برمی‌گردد.
  */
 async function report(ctx, deviceId, input, { ip = '' } = {}) {
+  ownDevice(ctx, deviceId);
   const shopId = ctx.accountId;
   if (!(await enabled(shopId))) return { enabled: false };
   const heads = parseReport(input, deviceId);
@@ -188,4 +207,4 @@ async function status(ctx) {
   };
 }
 
-module.exports = { FLAG, ACTION, FORMAT, PROBLEMS, MAX_HEADS, MAX_EPOCH_STEP, epochOf, parseReport, report, anchorsOf, status };
+module.exports = { FLAG, ACTION, FORMAT, PROBLEMS, MAX_HEADS, MAX_EPOCH_STEP, epochOf, parseReport, ownDevice, report, anchorsOf, status };
