@@ -2,7 +2,12 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.stock.Lot
+import ir.vil3ntec.tohid.core.stock.Pick
+import ir.vil3ntec.tohid.core.stock.StockBook
 import ir.vil3ntec.tohid.core.stock.StockCore
+import ir.vil3ntec.tohid.core.stock.StockDoc
+import ir.vil3ntec.tohid.core.stock.StockMode
 
 /**
  *  INV-21 — بسته‌بندیِ دوباره و تولید: **شکستنِ کارتن** (یک کالای «کارتن» ⇒ N دانه از کالای دیگر) و **ساختِ بسته**
@@ -23,6 +28,14 @@ import ir.vil3ntec.tohid.core.stock.StockCore
  *
  *  ⛔ کیت (موجودیِ ساختگی) و کالای خدماتی نه ورودی‌اند نه خروجی؛ ورودی بیش از موجودی رد می‌شود (همان نگهبانِ `adjustStock`).
  *  ⛔ پشتِ تنظیمِ دستگاه (`StockPlacesPref.repack`، پیش‌فرض خاموش). منطقِ خالص؛ آزمون: `RepackTest`.
+ *
+ *  ── سری و بهای میانگین در سندِ تولید (`lots = true`؛ «دستورِ ساخت و سریِ تولید» = `StockPlacesPref.bom`، پیش‌فرض خاموش) ──
+ *  ورودیِ هر جزء از سری‌های همان محل برداشته می‌شود — FEFO (`StockCore.pickFefo`: انقضای زودتر اول، منقضی هم، بی انقضا آخر)
+ *  یا سری‌های برگزیده (همان قاعدهٔ `StockPlaces.pickFrom`) — یک ردیفِ منفی برای هر سری با `lotId`، انقضا و سری‌اش، تا
+ *  موتورِ تازه (`StockLedger`) و موتورِ امروز (`ExpiryEngine.isLotUse`) همان سری را کم کنند. بها = بهای میانگینِ موزونِ همان
+ *  محل (همان هستهٔ `StockCore` روی دفترهای [books]، به ترتیبِ همان ردیف‌ها) و بهای خروجی دقیقاً جمعِ آن‌ها (`costMinor`).
+ *  دانه‌ها سری و انقضای هر تکهٔ کارتن را می‌گیرند (بی انقضا هم)؛ بستهٔ ساخته‌شده زودترین انقضای سری‌های برداشته‌شده را.
+ *  خاموش ⇒ همان ردیف‌های امروز، بایت‌به‌بایت (`RepackBomTest`).
  */
 object Repack {
 
@@ -40,7 +53,17 @@ object Repack {
   /** یک ردیفِ کار: کالا، مقدار (هزارم، ورودی مثبت نوشته می‌شود)، بهای یک واحد و کلِ ردیف (یک‌صدم)، و موجودیِ پیش از کار */
   data class Line(val productId: String, val qtyMilli: Long, val unitMinor: Long, val totalMinor: Long, val haveMilli: Long)
 
-  data class Plan(val inputs: List<Line>, val output: Line)
+  /** INV-21 — یک ردیفِ مصرف با سری (`lots`): سریِ هسته (`""` = بی سری)، انقضا و سریِ ردیف، مقدار و بهای میانگینِ همان ردیف */
+  data class Use(val productId: String, val lotId: String, val expiryDate: String, val batch: String, val qtyMilli: Long, val costMinor: Long)
+
+  /** INV-21 — یک ردیفِ خروجی با سری (`lots`): [lotId] `""` = بی سری، [OWN] = سریِ تازهٔ خودِ همان ردیف (`w:` + شناسه) */
+  data class Out(val lotId: String, val expiryDate: String, val batch: String, val qtyMilli: Long, val costMinor: Long)
+
+  /** [uses]/[outs] فقط با `lots`؛ `null` ⇒ همان ردیف‌های امروز */
+  data class Plan(val inputs: List<Line>, val output: Line, val uses: List<Use>? = null, val outs: List<Out>? = null)
+
+  /** سریِ تازهٔ خروجی: همان `w:` + شناسهٔ ردیف ِ `StockLedger.lotRefOf` */
+  const val OWN = "w:"
 
   sealed interface Planned {
     data class Ok(val plan: Plan) : Planned
@@ -92,7 +115,13 @@ object Repack {
    *  شکستنِ [packsMilli] از کالای [fromId] (مثلاً کارتن) به [perPackMilli] × همان، از کالای [toId] (مثلاً دانه).
    *  [location] `null` ⇒ موجودیِ کل (محل‌ها خاموش)، وگرنه موجودیِ همان محل و ردیف‌ها با همان محل.
    */
-  fun planBreak(d: ShopData, fromId: String, packsMilli: Long, toId: String, perPackMilli: Long, location: String? = null): Planned {
+  fun planBreak(
+    d: ShopData, fromId: String, packsMilli: Long, toId: String, perPackMilli: Long, location: String? = null,
+    /** INV-21 — سری و بهای میانگین در سندِ تولید (`StockPlacesPref.bom`)؛ `false` ⇒ همان امروز */
+    lots: Boolean = false,
+    /** سری‌های برگزیدهٔ کارتن (سری، هزارم)؛ `null` ⇒ FEFO */
+    chosen: List<Pick>? = null,
+  ): Planned {
     val from = d.products.find { it.id == fromId }
     val to = d.products.find { it.id == toId }
     stockProblem(from, StrGoods.packedItemBox)?.let { return Planned.Bad(it) }
@@ -104,11 +133,25 @@ object Repack {
     val stock = location?.let { StockPlaces.stockAt(d) }
     val input = line(d, stock, location, from!!, packsMilli)
     shortage(d, listOf(input), location)?.let { return Planned.Bad(it) }
-    return Planned.Ok(Plan(listOf(input), outLine(d, stock, location, to!!, outQ, input.totalMinor)))
+    if (!lots) return Planned.Ok(Plan(listOf(input), outLine(d, stock, location, to!!, outQ, input.totalMinor)))
+    return lotted(d, stock, location, listOf(input), chosen?.let { mapOf(fromId to it) }.orEmpty(), to!!, outQ) { uses, total ->
+      breakOuts(uses, packsMilli, outQ, total)
+    }
   }
 
   /** ساختِ [countMilli] بسته از کالای [bundleId]؛ [parts] مقدارِ هر جزء برای **یک** بسته */
-  fun planBuild(d: ShopData, bundleId: String, countMilli: Long, parts: List<Part>, location: String? = null): Planned {
+  fun planBuild(
+    d: ShopData, bundleId: String, countMilli: Long, parts: List<Part>, location: String? = null,
+    lots: Boolean = false,
+    /** سری‌های برگزیدهٔ هر جزء (کالا ⇒ سری‌ها)؛ نبودِ کالا ⇒ FEFO */
+    chosen: Map<String, List<Pick>> = emptyMap(),
+  ): Planned = planWith(d, bundleId, countMilli, parts, location, lots, chosen) { times(it, countMilli) }
+
+  /** همان [planBuild] با قاعدهٔ مقدارِ کلِ هر جزء از مقدارِ یک بسته ([need]؛ `null` ⇒ نادرست) — دستورِ ساخت (`Bom`) با اتلاف */
+  internal fun planWith(
+    d: ShopData, bundleId: String, countMilli: Long, parts: List<Part>, location: String?, lots: Boolean,
+    chosen: Map<String, List<Pick>>, need: (Long) -> Long?,
+  ): Planned {
     val bundle = d.products.find { it.id == bundleId }
     stockProblem(bundle, StrGoods.packedItem)?.let { return Planned.Bad(it) }
     if (countMilli <= 0 || countMilli > MAX_MILLI) return Planned.Bad(StrGoods.packCountBad)
@@ -124,23 +167,118 @@ object Repack {
       val p = byId[pt.productId]
       stockProblem(p, StrGoods.part)?.let { return Planned.Bad(it) }
       if (pt.qtyMilli <= 0 || pt.qtyMilli > MAX_MILLI) return Planned.Bad(StrLedger.qtyOfBad(p!!.name))
-      val need = times(pt.qtyMilli, countMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad(StrLedger.qtyOfBad(p!!.name))
-      inputs += line(d, stock, location, p!!, need)
+      val q = need(pt.qtyMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad(StrLedger.qtyOfBad(p!!.name))
+      inputs += line(d, stock, location, p!!, q)
     }
     shortage(d, inputs, location)?.let { return Planned.Bad(it) }
     val total = inputs.fold(0L) { s, l -> s + l.totalMinor }
-    return Planned.Ok(Plan(inputs, outLine(d, stock, location, bundle!!, countMilli, total)))
+    if (!lots) return Planned.Ok(Plan(inputs, outLine(d, stock, location, bundle!!, countMilli, total)))
+    return lotted(d, stock, location, inputs, chosen, bundle!!, countMilli) { uses, sum ->
+      //  بسته از سری‌های اجزا ساخته می‌شود ⇒ سریِ خودش، با زودترین انقضای سری‌های برداشته‌شده؛ هیچ ⇒ بی سری
+      val first = uses.mapNotNull { it.expiryDate.ifEmpty { null } }.minOrNull()
+      listOf(Out(if (first != null) OWN else "", first.orEmpty(), "", countMilli, sum))
+    }
+  }
+
+  /* ---------------------------------------------- INV-21 · سری و بهای میانگین */
+
+  /** دفترهای بها و سریِ تولید: موتورِ تازه روشن ⇒ همان نمای `StockLedger.replay`، وگرنه دفترهای محلِ موتورِ امروز (`StockPlaces.booksAt`) */
+  internal fun books(d: ShopData, ids: Set<String>): Map<String, StockBook> =
+    if (StockLedger.isOn(d)) StockLedger.replay(d, ids).books else StockPlaces.booksAt(d, ids)
+
+  /** سری‌های یک کالا در یک محل از همان [books] (FEFO؛ `""` = بی سری) — پیش‌نمایش و «انتخابِ سری» ِ پنجره */
+  fun lotsOf(d: ShopData, productId: String, location: String?): List<Lot> =
+    StockCore.position(books(d, setOf(productId))[productId] ?: StockBook(), productId, StockLedger.wid(location.orEmpty()))?.fefoLots.orEmpty()
+      .filter { it.qtyMilli > 0 }
+
+  private fun batchOf(lotId: String): String = if (lotId.startsWith(OWN)) "" else lotId
+
+  /** هم‌سری‌ها یکی، صفرها کنار، به ترتیبِ نخستین دیدن */
+  private fun merged(picks: List<Pick>): List<Pick> {
+    val m = LinkedHashMap<String, Long>()
+    for (p in picks) if (p.qtyMilli > 0) m[p.lotId] = (m[p.lotId] ?: 0L) + p.qtyMilli
+    return m.map { Pick(it.key, it.value) }
+  }
+
+  /**
+   *  ردیف‌های مصرفِ هر جزء: سری‌های همان محل به FEFO (`StockCore.pickFefo` ِ خروجِ غیرِ فروش: منقضی هم، بی انقضا آخر؛ کمبود ⇒
+   *  بی سری) یا [chosen] با همان قاعدهٔ `StockPlaces.pickFrom`؛ بهای هر ردیف همان که هسته به همین ترتیب می‌دهد (میانگینِ موزون).
+   *  خروجی‌ها ([outs]) از جمعِ همین بهاها؛ ورودی و خروجی با بهای میانگین (ارزشِ دفتر بی تغییر).
+   */
+  private fun lotted(
+    d: ShopData, stock: Map<String, Map<String, Long>>?, location: String?, inputs: List<Line>, chosen: Map<String, List<Pick>>,
+    outP: Product, outQ: Long, outs: (List<Use>, Long) -> List<Out>,
+  ): Planned {
+    val wid = StockLedger.wid(location.orEmpty())
+    val books = books(d, inputs.mapTo(HashSet()) { it.productId })
+    val byId = d.products.associateBy { it.id }
+    val uses = ArrayList<Use>()
+    val lines = ArrayList<Line>()
+    for (l in inputs) {
+      var book = books[l.productId] ?: StockBook()
+      val pool = StockCore.position(book, l.productId, wid)?.lots.orEmpty().filter { it.qtyMilli > 0 }
+      val want = chosen[l.productId]
+      val picks = if (want == null) {
+        val r = StockCore.pickFefo(pool, l.qtyMilli, null, includeExpired = true)
+        merged(r.picks + Pick("", r.shortMilli))
+      } else when (val got = StockPlaces.pickFrom(pool, byId.getValue(l.productId), location.orEmpty(), l.qtyMilli, want)) {
+        StockPlaces.Picked.Plain -> listOf(Pick("", l.qtyMilli))
+        is StockPlaces.Picked.Bad -> return Planned.Bad(got.message)
+        is StockPlaces.Picked.Lots -> got.picks
+      }
+      var sum = 0L
+      picks.forEachIndexed { i, pk ->
+        val doc = StockDoc(
+          id = "plan:$i", type = MOVE, productId = l.productId, warehouseId = wid, userId = "plan", at = StockCore.MAX_SAFE,
+          qtyMilli = -pk.qtyMilli, lotId = pk.lotId.ifEmpty { null },
+        )
+        val r = StockCore.apply(book, doc, StockMode.RECORDED, null)
+        book = r.book
+        val lot = if (pk.lotId.isEmpty()) null else pool.firstOrNull { it.lotId == pk.lotId }
+        uses += Use(l.productId, pk.lotId, lot?.expiryDate.orEmpty(), batchOf(pk.lotId), pk.qtyMilli, r.result.costMinor)
+        sum += r.result.costMinor
+      }
+      lines += l.copy(unitMinor = StockCore.mulDivRound(sum, 1000, l.qtyMilli), totalMinor = sum)
+    }
+    val total = lines.fold(0L) { a, l -> StockCore.add(a, l.totalMinor) }
+    val rows = outs(uses, total)
+    check(rows.sumOf { it.qtyMilli } == outQ && rows.sumOf { it.costMinor } == total) { "repack lots" }
+    return Planned.Ok(Plan(lines, outLine(d, stock, location, outP, outQ, total), uses, rows))
+  }
+
+  /** دانه‌های هر تکهٔ کارتن با سری و انقضای همان تکه؛ مقدار و بها با جمعِ تجمعی (`mulDivRound`) تا جمع دقیقاً همان بماند */
+  private fun breakOuts(uses: List<Use>, inQ: Long, outQ: Long, total: Long): List<Out> {
+    val out = ArrayList<Out>()
+    var cum = 0L
+    var q0 = 0L
+    var c0 = 0L
+    for (u in uses) {
+      cum += u.qtyMilli
+      val q = StockCore.mulDivRound(outQ, cum, inQ) - q0
+      q0 += q
+      val c = StockCore.mulDivRound(total, q0, outQ) - c0
+      c0 += c
+      if (q > 0) out += Out(if (u.lotId.startsWith(OWN)) OWN else u.lotId, u.expiryDate, u.batch, q, c)
+    }
+    return out
   }
 
   fun breakPack(
     d: ShopData, key: String, fromId: String, packsMilli: Long, toId: String, perPackMilli: Long, location: String?,
     note: String, user: String, today: String, now: Long, newId: () -> String,
+    /** INV-21 — «دستورِ ساخت و سریِ تولید» (`StockPlacesPref.bom`)؛ `false` ⇒ همان ردیف‌های امروز */
+    lots: Boolean = false,
+    chosen: List<Pick>? = null,
   ): StockPlaces.Result {
     if (key.isBlank()) return StockPlaces.Result.Failed(StrGoods.opIdEmpty)
     if (has(d, key)) return StockPlaces.Result.Already
-    return when (val p = planBreak(d, fromId, packsMilli, toId, perPackMilli, location)) {
+    return when (val p = planBreak(d, fromId, packsMilli, toId, perPackMilli, location, lots, chosen)) {
       is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId, breakOutputs(d, p.plan, perPackMilli)), key)  // داده: نامِ کار درونِ یادداشتِ سابقه
+      is Planned.Ok -> StockPlaces.Result.Ok(
+        if (p.plan.uses != null) write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId)  // داده: نامِ کار درونِ یادداشتِ سابقه
+        else write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId, breakOutputs(d, p.plan, perPackMilli)),  // داده: نامِ کار درونِ یادداشتِ سابقه
+        key,
+      )
     }
   }
 
@@ -175,13 +313,24 @@ object Repack {
   fun build(
     d: ShopData, key: String, bundleId: String, countMilli: Long, parts: List<Part>, location: String?,
     note: String, user: String, today: String, now: Long, newId: () -> String,
+    lots: Boolean = false,
+    chosen: Map<String, List<Pick>> = emptyMap(),
   ): StockPlaces.Result {
     if (key.isBlank()) return StockPlaces.Result.Failed(StrGoods.opIdEmpty)
     if (has(d, key)) return StockPlaces.Result.Already
-    return when (val p = planBuild(d, bundleId, countMilli, parts, location)) {
-      is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BUILD, "ساختِ بسته", p.plan, location, note, user, today, now, newId, buildOutputs(d, p.plan)), key)  // داده: نامِ کار درونِ یادداشتِ سابقه
-    }
+    return built(d, key, planBuild(d, bundleId, countMilli, parts, location, lots, chosen), location, note, user, today, now, newId)
+  }
+
+  /** ثبتِ ساختِ بسته از یک برنامهٔ آماده — [build] و دستورِ ساخت (`Bom.build`) */
+  internal fun built(
+    d: ShopData, key: String, planned: Planned, location: String?, note: String, user: String, today: String, now: Long, newId: () -> String,
+  ): StockPlaces.Result = when (planned) {
+    is Planned.Bad -> StockPlaces.Result.Failed(planned.message)
+    is Planned.Ok -> StockPlaces.Result.Ok(
+      if (planned.plan.uses != null) write(d, key, BUILD, "ساختِ بسته", planned.plan, location, note, user, today, now, newId)  // داده: نامِ کار درونِ یادداشتِ سابقه
+      else write(d, key, BUILD, "ساختِ بسته", planned.plan, location, note, user, today, now, newId, buildOutputs(d, planned.plan)),  // داده: نامِ کار درونِ یادداشتِ سابقه
+      key,
+    )
   }
 
   /** اجزای آخرین ساختِ همین بسته (برای پر کردنِ فرم)، مقدار برای یک بسته؛ نبود ⇒ خالی */
@@ -219,9 +368,37 @@ object Repack {
         createdAt = now, userId = who, reason = why,
       )
     }
-    plan.inputs.forEach { row(it, -1) }
-    check(outputs.sumOf { it.qtyMilli } == plan.output.qtyMilli) { "repack outputs" }
-    outputs.forEach { row(plan.output, 1, it.qtyMilli, it) }
+    val uses = plan.uses
+    val outs = plan.outs
+    if (uses != null && outs != null) {
+      //  INV-21 (`lots`): یک ردیف برای هر سری با `lotId`، انقضا و سری؛ خروجی با بهای دقیق (`costMinor`). دفتر ردیف‌های یک لحظه
+      //  را به ترتیبِ شناسه می‌خواند ⇒ شناسه‌های هر کالا مرتب و به ترتیبِ همان برداشت، تا بهای هسته همان بهای [lotted] باشد.
+      val unit = plan.inputs.associate { it.productId to it.unitMinor }
+      fun lotRow(id: String, pid: String, qtyMilli: Long, unitMinor: Long, lotId: String?, exp: String, batch: String, cost: Long?) {
+        val units = qtyMilli / 1000.0
+        entries += WarehouseEntry(
+          id = id, productId = pid, units = units, unit = byId[pid]?.unit.orEmpty(), price = unitMinor / 100.0,
+          date = today, notes = why, isAdjustment = true, refId = key, createdAt = now, locationId = loc, userId = who, adjKind = KIND,
+          expiryDate = exp, batch = batch, lotId = lotId, costMinor = cost,
+        )
+        moves += StockMovement(
+          id = newId(), productId = pid, type = MOVE, qty = units, date = today, notes = why, refId = id,
+          createdAt = now, userId = who, reason = why,
+        )
+      }
+      for ((pid, us) in uses.groupBy { it.productId }) {
+        val ids = List(us.size) { newId() }.sorted()
+        us.forEachIndexed { i, u -> lotRow(ids[i], pid, -u.qtyMilli, unit[pid] ?: 0L, u.lotId.ifEmpty { null }, u.expiryDate, u.batch, null) }
+      }
+      for (o in outs) {
+        val id = newId()
+        lotRow(id, plan.output.productId, o.qtyMilli, plan.output.unitMinor, if (o.lotId == OWN) OWN + id else o.lotId.ifEmpty { null }, o.expiryDate, o.batch, o.costMinor)
+      }
+    } else {
+      plan.inputs.forEach { row(it, -1) }
+      check(outputs.sumOf { it.qtyMilli } == plan.output.qtyMilli) { "repack outputs" }
+      outputs.forEach { row(plan.output, 1, it.qtyMilli, it) }
+    }
     fun txt(l: Line) = "${ir.vil3ntec.tohid.qty(l.qtyMilli / 1000.0)} «${byId[l.productId]?.name.orEmpty()}»"
     val audit = AuditEntry(
       id = key, type = type, date = today, refId = key, createdAt = now, by = who,

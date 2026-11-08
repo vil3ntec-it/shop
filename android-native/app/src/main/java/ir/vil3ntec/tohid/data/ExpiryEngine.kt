@@ -76,6 +76,32 @@ object ExpiryEngine {
    */
   internal fun isLot(w: WarehouseEntry): Boolean = w.units > 0 && (!w.isAdjustment || w.adjKind == Repack.KIND)
 
+  /**
+   *  INV-21 — مصرفِ سری‌دارِ تولید: ردیفِ منفیِ بسته‌بندی (`Repack`) با `lotId` ِ ناتهی — فقط با «دستورِ ساخت و سریِ تولید»
+   *  نوشته می‌شود — از **همان** محموله (انقضا و سری ِ همان ردیف) کم می‌شود، نه به FEFO؛ همان سری که `StockLedger` برمی‌دارد.
+   */
+  internal fun isLotUse(w: WarehouseEntry): Boolean = w.units < 0 && w.isAdjustment && w.adjKind == Repack.KIND && !w.lotId.isNullOrEmpty()
+
+  /**
+   *  گنجایشِ هر محموله پس از مصرفِ سری‌دار ([isLotUse]): مصرفِ هر (انقضا، سری) از نخستین ردیف‌های همان کلید کم می‌شود
+   *  (هرگز زیرِ صفر). بی چنین ردیفی ⇒ همان `units` (همان حسابِ امروز، عددبه‌عدد).
+   */
+  private fun capacities(d: ShopData, productId: String, entries: List<WarehouseEntry>): List<Pair<WarehouseEntry, Double>> {
+    val use = HashMap<Pair<String, String>, Double>()
+    for (w in d.warehouseEntries) if (w.productId == productId && isLotUse(w)) {
+      val k = w.expiryDate to w.batch.trim()
+      use[k] = (use[k] ?: 0.0) - w.units
+    }
+    if (use.isEmpty()) return entries.map { it to it.units }
+    return entries.map { e ->
+      val k = e.expiryDate to e.batch.trim()
+      val u = use[k] ?: 0.0
+      val cut = minOf(e.units, u)
+      if (cut > 0) use[k] = u - cut
+      e to (e.units - maxOf(0.0, cut))
+    }
+  }
+
   /** ماندهٔ هر محمولهٔ انقضادار، برای همهٔ کالاها */
   fun lots(d: ShopData, today: String): List<Lot> {
     val out = ArrayList<Lot>()
@@ -89,12 +115,12 @@ object ExpiryEngine {
       var left = ShopStore.stock(d, productId)
       if (left <= 0) continue
       //  از دیرترین به زودترین؛ بی‌انقضا دیرتر از همه
-      val ordered = entries.sortedWith(
-        compareByDescending<WarehouseEntry> { it.expiryDate.isBlank() }.thenByDescending { it.expiryDate }
+      val ordered = capacities(d, productId, entries).sortedWith(
+        compareByDescending<Pair<WarehouseEntry, Double>> { it.first.expiryDate.isBlank() }.thenByDescending { it.first.expiryDate }
       )
-      for (e in ordered) {
+      for ((e, cap) in ordered) {
         if (left <= 0) break
-        val take = minOf(e.units, left)
+        val take = minOf(cap, left)
         left -= take
         if (e.expiryDate.isNotBlank() && take > 0) {
           out += Lot(e, product, take, daysLeft(e.expiryDate, today))
@@ -114,13 +140,13 @@ object ExpiryEngine {
    */
   fun take(d: ShopData, productId: String, qtyMilli: Long): List<Take> {
     if (qtyMilli <= 0) return emptyList()
-    val entries = d.warehouseEntries.filter { it.productId == productId && isLot(it) }
-      .sortedWith(compareByDescending<WarehouseEntry> { it.expiryDate.isBlank() }.thenByDescending { it.expiryDate })
+    val entries = capacities(d, productId, d.warehouseEntries.filter { it.productId == productId && isLot(it) })
+      .sortedWith(compareByDescending<Pair<WarehouseEntry, Double>> { it.first.expiryDate.isBlank() }.thenByDescending { it.first.expiryDate })
     var left = Math.round(ShopStore.stock(d, productId) * 1000)
     val held = LinkedHashMap<Pair<String, String>, Long>()
-    for (e in entries) {
+    for ((e, cap) in entries) {
       if (left <= 0) break
-      val q = minOf(Math.round(e.units * 1000), left)
+      val q = minOf(Math.round(cap * 1000), left)
       left -= q
       if (e.expiryDate.isNotBlank() && q > 0) {
         val k = e.expiryDate to e.batch.trim()

@@ -150,10 +150,16 @@ object StockPlaces {
    *  خودش، بی پخش — و جمعِ هر محل در پایان دقیقاً [stock] (`stockAt`؛ اجزای کیت و هر چه آن دفتر نمی‌بیند): کم ⇒ FEFO
    *  از همان محل، زیاد ⇒ بی سری. فقط‌خواندنی؛ نمای موتورِ تازه (`StockLedger.replay`) دست نمی‌خورد.
    */
-  fun lotsAt(d: ShopData, productIds: Set<String>, stock: Map<String, Map<String, Long>> = stockAt(d)): Map<String, Map<String, List<Lot>>> {
+  fun lotsAt(d: ShopData, productIds: Set<String>, stock: Map<String, Map<String, Long>> = stockAt(d)): Map<String, Map<String, List<Lot>>> =
+    booksAt(d, productIds, stock).mapValues { (_, book) ->
+      StockCore.positions(book).associate { StockLedger.locOf(it.warehouseId) to it.fefoLots }.filterValues { it.isNotEmpty() }
+    }
+
+  /** همان دفترهای [lotsAt] (هر کالا، هر محل: مقدار، ارزش و سری‌ها) — بهای میانگینِ تولید (INV-21، `Repack`) هم از همین‌هاست */
+  internal fun booksAt(d: ShopData, productIds: Set<String>, stock: Map<String, Map<String, Long>> = stockAt(d)): Map<String, StockBook> {
     if (productIds.isEmpty()) return emptyMap()
     val books = StockLedger.placeBooks(d, productIds)
-    val out = HashMap<String, Map<String, List<Lot>>>()
+    val out = HashMap<String, StockBook>()
     for (pid in productIds) {
       var book = books[pid] ?: StockBook()
       val want = stock[pid].orEmpty()
@@ -168,7 +174,7 @@ object StockPlaces {
         val r = StockCore.apply(book, fix, StockMode.RECORDED, null)
         if (r.result.ok) book = r.book
       }
-      out[pid] = StockCore.positions(book).associate { StockLedger.locOf(it.warehouseId) to it.fefoLots }.filterValues { it.isNotEmpty() }
+      out[pid] = book
     }
     return out
   }
@@ -176,7 +182,7 @@ object StockPlaces {
   /** FEFO ِ [qtyMilli] از سری‌های یک محل — همان `StockCore.pickFefo` ِ `transfer_out` ِ هسته (منقضی هم، بی سری آخر) */
   fun fefo(lots: List<Lot>, qtyMilli: Long): PickResult = StockCore.pickFefo(lots.filter { it.qtyMilli > 0 }, qtyMilli, null, includeExpired = true)
 
-  private sealed interface Picked {
+  internal sealed interface Picked {
     /** مبدأ هیچ سری‌ای ندارد ⇒ همان یک جفتِ بی سریِ امروز */
     data object Plain : Picked
     data class Lots(val picks: List<Pick>) : Picked
@@ -188,8 +194,12 @@ object StockPlaces {
    *  وگرنه همان سری‌ها و مقدارها — هیچ سری‌ای بیش از ماندهٔ خودش در مبدأ نه، جمع همان [qtyMilli]. بی سری (`""`) فقط وقتی
    *  همهٔ سری‌های مبدأ کامل برداشته شده‌اند، چون ردیفِ بی `lotId` را دفتر به FEFO می‌خواند.
    */
-  private fun pick(d: ShopData, stock: Map<String, Map<String, Long>>, p: Product, src: String, qtyMilli: Long, chosen: List<Pick>?): Picked {
-    val pool = lotsAt(d, p.id, stock)[src].orEmpty().filter { it.qtyMilli > 0 }
+  private fun pick(d: ShopData, stock: Map<String, Map<String, Long>>, p: Product, src: String, qtyMilli: Long, chosen: List<Pick>?): Picked =
+    pickFrom(lotsAt(d, p.id, stock)[src].orEmpty(), p, src, qtyMilli, chosen)
+
+  /** همان [pick] روی سری‌های داده‌شدهٔ یک محل — تولید (INV-21، `Repack`) همان قاعده را برای هر جزء می‌خواند */
+  internal fun pickFrom(lots: List<Lot>, p: Product, src: String, qtyMilli: Long, chosen: List<Pick>?): Picked {
+    val pool = lots.filter { it.qtyMilli > 0 }
     if (pool.none { it.lotId.isNotEmpty() }) {
       return if (chosen == null || chosen.all { it.lotId.isEmpty() }) Picked.Plain else Picked.Bad(StrGoods.transferImpossible)
     }

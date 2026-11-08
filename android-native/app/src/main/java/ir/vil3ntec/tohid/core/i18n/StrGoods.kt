@@ -200,6 +200,17 @@ object StrGoods {
     "Of «$name»$where there is only $have $unit, this job needs $need",
     "له «$name»$where یوازې $have $unit شته، دا کار $need غواړي",
   )
+  /** INV-21 — دستورِ ساخت (`Bom`): کالایی که دستورِ ثبت‌شده ندارد */
+  fun noBom(name: Any?): String = t(
+    "برای «${asIs(name)}» دستورِ ساخت ثبت نشده است",
+    "No recipe is saved for «$name»",
+    "د «$name» لپاره د جوړولو لارښود نه دی ثبت شوی",
+  )
+  fun bomLossBad(max: Any?): String = t(
+    "اتلاف بیش از ${asIs(max)} درصد نمی‌شود",
+    "Expected loss can't be over $max percent",
+    "ضایع له $max سلنې زیات نه شي",
+  )
   val packedItemBox: String get() = t("کالای بسته (کارتن)", "packed item (carton)", "بسته توکی (کارتن)")
   val looseItem: String get() = t("کالای دانه", "single item", "دانه‌يي توکی")
   val looseSame: String get() = t(

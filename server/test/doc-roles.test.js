@@ -83,6 +83,7 @@ const CASES = {
   stock_place: ['auditLog', () => ({ type: 'stock_place', refId: 'قفسهٔ ۲', reason: 'add' }), 'places'],
   stock_repack: ['auditLog', (id) => ({ type: 'stock_repack', refId: id, refIds: ['warehouseEntries/w1'] }), 'places'],
   stock_assembly: ['auditLog', (id) => ({ type: 'stock_assembly', refId: id, refIds: ['warehouseEntries/w2'] }), 'places'],
+  stock_bom: ['auditLog', () => ({ type: 'stock_bom', refId: 'p-1', bom: { parts: [{ productId: 'p-2', qtyMilli: 2000 }], lossBp: 250 } }), 'places'],
   stock_transfer: ['auditLog', () => ({
     type: 'stock_transfer', notes: 'انتقال: قفسه ⇐ انبار',
     xfer: { v: 1, step: 'send', from: 'shop_floor', to: 'warehouse', lines: [{ productId: 'p-1', qtyMilli: 2000 }], note: '' },

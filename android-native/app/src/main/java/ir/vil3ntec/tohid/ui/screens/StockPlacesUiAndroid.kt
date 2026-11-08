@@ -20,6 +20,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
+import ir.vil3ntec.tohid.data.Bom
 import ir.vil3ntec.tohid.data.Repack
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
@@ -42,6 +43,8 @@ import kotlinx.coroutines.launch
 fun StockPlacesEntry(context: android.content.Context, store: ShopStore, d: ShopData, stockOn: Boolean, toast: (String) -> Unit) {
   val placesOn = remember { StockPlacesPref.places(context) } && !stockOn
   val repackOn = remember { StockPlacesPref.repack(context) }
+  //  INV-21 — «دستورِ ساخت و سریِ تولید»: فقط همراهِ بسته‌بندی؛ خاموش ⇒ همان پنجره و همان ردیف‌های امروز
+  val bomOn = remember { StockPlacesPref.bom(context) } && repackOn
   if (!placesOn && !repackOn) return
   if (remember { ShopRole.current(context) } == ShopRole.STAFF) return
   val scope = rememberCoroutineScope()
@@ -94,11 +97,27 @@ fun StockPlacesEntry(context: android.content.Context, store: ShopStore, d: Shop
       d,
       places = if (placesOn) remember(d) { StockPlaces.places(d) } else null,
       onDismiss = { openRepack = false },
-      onBreak = { from, packs, to, per, loc, note ->
-        write(Repack::has, StrPlaces.savedRepack) { cur, k -> Repack.breakPack(cur, k, from, packs, to, per, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId) }
+      onBreak = { from, packs, to, per, loc, note, lots ->
+        write(Repack::has, StrPlaces.savedRepack) { cur, k ->
+          if (bomOn) Repack.breakPack(cur, k, from, packs, to, per, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId, lots = true, chosen = lots)
+          else Repack.breakPack(cur, k, from, packs, to, per, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId)
+        }
       },
-      onBuild = { bundle, n, parts, loc, note ->
-        write(Repack::has, StrPlaces.savedRepack) { cur, k -> Repack.build(cur, k, bundle, n, parts, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId) }
+      onBuild = { bundle, n, parts, loc, note, lossBp ->
+        write(Repack::has, StrPlaces.savedRepack) { cur, k ->
+          if (bomOn) Bom.buildParts(cur, k, bundle, n, parts, lossBp, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId)
+          else Repack.build(cur, k, bundle, n, parts, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId)
+        }
+      },
+      bomOn = bomOn,
+      onBuildBom = { pid, n, loc, note ->
+        write(Repack::has, StrPlaces.savedRepack) { cur, k -> Bom.build(cur, k, pid, n, loc, note, user, todayIso(), System.currentTimeMillis(), ::newId) }
+      },
+      onSaveBom = { pid, parts, lossBp ->
+        write(Bom::has, StrPlaces.bomSaved) { cur, k -> Bom.save(cur, k, pid, parts, lossBp, user, todayIso(), System.currentTimeMillis()) }
+      },
+      onRemoveBom = { pid ->
+        write(Bom::has, StrPlaces.bomRemoved) { cur, k -> Bom.remove(cur, k, pid, user, todayIso(), System.currentTimeMillis()) }
       },
     )
   }

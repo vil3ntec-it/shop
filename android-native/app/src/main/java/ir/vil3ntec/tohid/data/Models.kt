@@ -198,6 +198,8 @@ data class WarehouseEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val lotId: String? = null,
+  /** INV-21 — بهای دقیقِ کلِ ردیفِ خروجیِ تولید (صدمِ افغانی، `Repack` ِ `lots`)؛ `null` = از `units × price`، نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val costMinor: Long? = null,
 )
 
 @Serializable
@@ -802,6 +804,7 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
   /** POS-27 — فقط `layaway` (سند) و `layaway_status` (وضعیتِ تازه)؛ `Layaways`. `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val layaway: LayawayDoc? = null,
+  /** INV-21 — فقط `stock_bom` (`Bom`): دستورِ ساختِ کالای `refId`؛ `null` نوشته نمی‌شود */ @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val bom: BomDoc? = null,
   /** PRM-13 — فقط ردیف‌های `loyalty_*` (`LoyaltyPoints`): شمارِ امتیاز (همیشه مثبت؛ نوع علامت را می‌گوید). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val points: Long? = null,
   /** PAY-07 — فقط `pay_status` (`PayStatusFlow`؛ `refId` = فاکتور، `amount` = مبلغِ ردیف): جای ردیف در `payments`، روشش،

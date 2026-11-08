@@ -11,6 +11,7 @@ object StockPlacesPref {
 
   private const val PLACES = "stock_places"
   private const val REPACK = "stock_repack"
+  private const val BOM = "stock_bom"
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences("tohid-policy", Context.MODE_PRIVATE)
 
@@ -24,6 +25,16 @@ object StockPlacesPref {
 
   fun setRepack(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(REPACK, on).apply()
+  }
+
+  /**
+   *  INV-21 — «دستورِ ساخت و سریِ تولید» (`stock_bom`، مالِ دکان): دستورِ ساختِ ثبت‌شده (`Bom`) و سری و بهای میانگین در سندِ
+   *  بسته‌بندی (`Repack` ِ `lots`). فقط همراهِ [repack]؛ پیش‌فرض **خاموش** ⇒ پنجره و ردیف‌ها همان امروز.
+   */
+  fun bom(context: Context): Boolean = runCatching { prefs(context).getBoolean(BOM, false) }.getOrDefault(false)
+
+  fun setBom(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(BOM, on).apply()
   }
 
   sealed interface Saved {
