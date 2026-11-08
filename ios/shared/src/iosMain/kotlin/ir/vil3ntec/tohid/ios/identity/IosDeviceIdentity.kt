@@ -7,11 +7,9 @@ import ir.vil3ntec.tohid.ios.keychain.Keychain
 import ir.vil3ntec.tohid.ios.keychain.KeychainException
 import java.io.File
 import java.io.IOException
+import ir.vil3ntec.tohid.ios.backup.BackupExclusion
 import java.security.SecureRandom
-import platform.Foundation.NSNumber
 import platform.Foundation.NSThread
-import platform.Foundation.NSURL
-import platform.Foundation.NSURLIsExcludedFromBackupKey
 import platform.UIKit.UIApplication
 
 /**
@@ -52,15 +50,11 @@ internal object IosDeviceIdentity {
   internal fun markerFile(): File = File(markerDir(), DeviceIdentityKeys.MARKER_FILE)
   private fun logFile(): File = File(markerDir(), "events.log")
 
-  /** `NSURLIsExcludedFromBackupKey` ِ همین مسیر */
-  internal fun excludedFromBackup(f: File): Boolean {
-    val values = NSURL.fileURLWithPath(f.path).resourceValuesForKeys(listOf(NSURLIsExcludedFromBackupKey), null)
-    return (values?.get(NSURLIsExcludedFromBackupKey) as? NSNumber)?.boolValue == true
-  }
+  /** `NSURLIsExcludedFromBackupKey` ِ همین مسیر (همان کمکِ پوشه‌های `sync-shadow/` و `sync-v3/`: ‎ios/backup/IosNoBackupDirs.kt‎) */
+  internal fun excludedFromBackup(f: File): Boolean = BackupExclusion.isExcluded(f)
 
   private fun exclude(f: File) {
-    val ok = NSURL.fileURLWithPath(f.path).setResourceValue(true, forKey = NSURLIsExcludedFromBackupKey, error = null)
-    if (!ok || !excludedFromBackup(f)) throw IOException("بیرون گذاشتن از پشتیبان نشد: ${f.name}")
+    if (!BackupExclusion.exclude(f)) throw IOException("بیرون گذاشتن از پشتیبان نشد: ${f.name}")
   }
 
   internal object Store : DeviceIdentityGuard.Io {

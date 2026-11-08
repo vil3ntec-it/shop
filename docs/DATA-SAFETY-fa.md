@@ -156,7 +156,7 @@
     شک: شناسهٔ دستگاه یا حالِ ناخوانا (`FileV3Store` فایلِ خراب را کنار گذاشت) ⇒ هیچ تصمیمی؛ به‌روزرسانیِ همین دستگاه ⇒ فقط
     بستن (همان cursor، بی بازسازی)؛ صفِ بی حال با `restoredAt` ِ صفر ⇒ بستن ولی با همان بازسازی (نه `initialize`: Snapshot ِ
     پیش از صف دفتر را بی اثرِ آن opها می‌گذاشت). دفتر هرگز پاک نمی‌شود، صف و ردشده‌ها هرگز دور ریخته نمی‌شوند. کامپیوتر همین
-    کد است (رونوشتِ خامِ پوشهٔ داده)؛ آیفون هم (`ios/shared`، بی رفع در پشتیبانِ iCloud — پایین). **آزمون:** `SyncV3EngineTest`
+    کد است (رونوشتِ خامِ پوشهٔ داده)؛ آیفون هم (`ios/shared`؛ پوشه از پشتیبانِ iCloud هم بیرون — پایین). **آزمون:** `SyncV3EngineTest`
     (۳۷/۳۷؛ بخشِ DATA-06، ۶ آزمونِ تازه: حالِ دستگاهِ دیگر ⇒ گرهٔ تازه، cursor ۰، «اول صف، بعد Snapshot، Pull پس از آن»، قرض/برگشت/
     موجودی همان سرور و `$inc` یک بار + شاهدِ دو بار؛ بازیابیِ عادی بی حال با کالای پاک‌شده که زنده نمی‌شود؛ صفِ گوشیِ از کار
     افتاده یک بار؛ به‌روزرسانی بی چرخش و ناخوانا بی تصمیم؛ بسته شدن میانِ حصار و میانِ بازسازی؛ صفِ بی حال)؛
@@ -167,8 +167,14 @@
     E2E: هارنسِ `journeys-b` (`NativeDevice`) فقط v1 ِ برنامه را بازی می‌کند و `lib/v3-devices.mjs` موتورِ وب (بی حصار) است ⇒
     گونهٔ v3 ِ JB7 ساختنی نیست؛ پوششِ v3 همان آزمون‌های JVM با موتورِ واقعیِ کاتلین.
     **مانده:** (الف) بازیابیِ واقعی روی دو گوشیِ واقعی (ابری و انتقالِ مستقیم) — کارِ دستیِ صاحب محصول؛ (ب) ~~Sync v3 ِ cursor ِ
-    پشتیبان~~ بسته شد (بالا) — جز اینکه آیفون (`ios/shared`) پوشهٔ `sync-v3/` را از پشتیبانِ iCloud بیرون نمی‌گذارد (حصار آن‌جا
-    هم همین کد است) و بازیابیِ واقعیِ v3 روی دو گوشی مثلِ (الف) دستی است؛ (ج) ابزارِ انتقالی که `tohid-sync.xml` را هم خام کپی کند (دو گوشی، یک `device_uid`) در نرم‌افزار
+    پشتیبان~~ بسته شد (بالا) — جز بازیابیِ واقعیِ v3 روی دو گوشی که مثلِ (الف) دستی است. ~~آیفون پوشهٔ `sync-v3/` را از پشتیبانِ
+    iCloud بیرون نمی‌گذارد~~ **بسته شد (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/ios-backup-dirs`؛ `docs/IOS-PLAN-fa.md` §۰.۱۶.۲):** `sync-v3/` و
+    `sync-shadow/` (همان `exclude domain="file"` ِ اندروید؛ فهرست: `ios/shared/…/backup/NoBackupDirs.kt`) روی آیفون
+    `NSURLIsExcludedFromBackupKey` می‌گیرند — هنگامِ ساخت (نخستین `filesDir` ِ هر فرآیند، پیش از هر نوشتنِ کدِ مشترک) و در هر
+    آغاز برای نصبِ پیشین. دفتر، `oplog-*` و صفِ v3 (`sync-v3-<کلید>/`) با پشتیبان می‌مانند. حصار همان‌جا می‌ماند: پشتیبانِ
+    گرفته‌شده پیش از این نسخه هنوز این پوشه‌ها را دارد. آزمون: `NoBackupDirsJvmTest` (فهرست = هر دو بخشِ `backup_rules.xml`،
+    `backup_rules_legacy.xml`، `TohidBackupAgent.EXCLUDED_DIRS` و `ShadowStore.DIR`/`V3StateDir.DIR`؛ کمک برای هر پوشه) و
+    `NoBackupDirsIosTest` (ویژگی روی پوشهٔ واقعی، **فقط CI** ِ macOS)؛ (ج) ابزارِ انتقالی که `tohid-sync.xml` را هم خام کپی کند (دو گوشی، یک `device_uid`) در نرم‌افزار
     شناختنی نیست؛ (د) آیفون: همین بستگی در کدِ مشترک است، پس آیفونی که نگهبانِ #1012 شناسه‌اش را چرخاند هم حصار و بازسازی
     می‌گیرد — فقط برای پشتیبانی که با این نسخه گرفته شد (پیش از آن بستگی نیست ⇒ همان «مانده» ِ §۰.۱۶.۱)؛ (ه) با
     `shop.ledger_merge` خاموشِ صریح بازسازیِ کارگر (نمونهٔ دیگرِ دفتر) به صفحهٔ باز نمی‌رسد — برای همین اول از `bootstrapSoon` با
@@ -209,8 +215,8 @@
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مانده | `tohid-staff-pins` | دوباره گذاشته می‌شود (بالا، بند ۵) |
-| مالِ همین دستگاه (عمداً) | حالِ Sync v3 ِ هر حساب در `sync-v3/<کلید>/` (`state.json`: cursor، سایه، ساعت، بستگی؛ `journal.json`؛ `replay-sent.jsonl`) — DATA-06: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` و `TohidBackupAgent.EXCLUDED_DIRS`؛ با رمز `AtRestScope.syncState`). صفِ v3 (`sync-v3-<کلید>/queue.json`) مثلِ `oplog-*` با پشتیبان می‌رود و گوشیِ دوم اول آن را می‌فرستد | از سرور (حصار ⇐ صف اول ⇐ Snapshot)؛ ساختِ پیشین همه را در `sync-v3-<کلید>/` داشت ⇐ کوچ در نخستین خواندن |
-| مالِ همین دستگاه (عمداً) | فایلِ سایهٔ همگام‌سازی `sync-shadow/sync-shadow-*.dat` (+ `.prev`؛ فقط با پرچمِ `shop.sync_shadow_file`) — همان حالِ `tohid-sync-v1`: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` پوشه را بیرون می‌گذارد؛ با رمزِ روشن `AtRestScope.syncState`). پیش‌تر در خودِ `filesDir` بود و بی رمز با پشتیبان می‌رفت: بی نشانش در گوشیِ بازیابی‌شده بی‌کار، و هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد | از سرور (Snapshot)؛ prefs نیست، پس `DataSafetyGuardTest` آن را نمی‌شمارد |
+| مالِ همین دستگاه (عمداً) | حالِ Sync v3 ِ هر حساب در `sync-v3/<کلید>/` (`state.json`: cursor، سایه، ساعت، بستگی؛ `journal.json`؛ `replay-sent.jsonl`) — DATA-06: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` و `TohidBackupAgent.EXCLUDED_DIRS`؛ با رمز `AtRestScope.syncState`) و آیفون (`NSURLIsExcludedFromBackupKey`، `ios/…/backup/NoBackupDirs.kt`). صفِ v3 (`sync-v3-<کلید>/queue.json`) مثلِ `oplog-*` با پشتیبان می‌رود و گوشیِ دوم اول آن را می‌فرستد | از سرور (حصار ⇐ صف اول ⇐ Snapshot)؛ ساختِ پیشین همه را در `sync-v3-<کلید>/` داشت ⇐ کوچ در نخستین خواندن |
+| مالِ همین دستگاه (عمداً) | فایلِ سایهٔ همگام‌سازی `sync-shadow/sync-shadow-*.dat` (+ `.prev`؛ فقط با پرچمِ `shop.sync_shadow_file`) — همان حالِ `tohid-sync-v1`: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` پوشه را بیرون می‌گذارد؛ با رمزِ روشن `AtRestScope.syncState`) و آیفون (`NSURLIsExcludedFromBackupKey` روی پوشه). پیش‌تر در خودِ `filesDir` بود و بی رمز با پشتیبان می‌رفت: بی نشانش در گوشیِ بازیابی‌شده بی‌کار، و هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد | از سرور (Snapshot)؛ prefs نیست، پس `DataSafetyGuardTest` آن را نمی‌شمارد |
 | بایگانی | `ledger-archive.json` (ردیف‌های بیش از ۴۰۰ روز) | روی سرور می‌مانند (`forgetArchived` فقط سایه را هرس می‌کند) |
 
 ## ۶. تنظیماتِ دکان: کدام کلید مالِ دکان، کدام مالِ همین دستگاه (۱۴۰۵/۰۸/۱۸)
