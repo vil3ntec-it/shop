@@ -9,6 +9,8 @@
  *           «گفت‌وگوی تازه». تصمیم فقط با سرور (`life`)؛ ۴۰۹ ِ سرور ⇒ خواندنِ دوباره، نه حدس.
  * ⛔ هر متن فقط با textContent (`K.el`)؛ عکس با بلیت خوانده و data: می‌شود (CSP: img-src 'self' data:).
  * ⛔ شماره فقط با کدِ یک‌بارمصرف (`/verify`)؛ بلیتِ منقضی ⇒ همان فرمِ تأیید.
+ * ⛔ پیامِ صوتی (CHAT-07): هیچ بایتی پیش از «پخش»؛ بایت با بلیت از همان درِ رسانه و پخش از blob: ِ همین صفحه
+ *   (CSP: media-src 'self' blob:) — <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ امضاشده ندارد (S118).
  */
 (function () {
   'use strict';
@@ -148,6 +150,7 @@
       if (m.deleted) li.appendChild(el('p', { class: 'muted', text: t('ct.deleted') }));
       else {
         if (m.kind === 'image' && m.media) li.appendChild(photo(cid, m.media));
+        if (m.kind === 'audio' && m.media) li.appendChild(voice(cid, m));
         if (m.body) li.appendChild(el('p', { text: m.body }));
       }
       li.appendChild(el('small', { class: 'muted num', text: K.clock(m.createdAt) }));
@@ -168,6 +171,94 @@
       load(media.thumbId || media.id).catch(function () { img.alt = t('ct.err'); });
       btn.onclick = function () { btn.classList.add('big'); if (media.thumbId) load(media.id).catch(function () { /* همان پیش‌نمایش */ }); };
       return btn;
+    }
+
+    // ── پیامِ صوتی (CHAT-07): پیش از «پخش» نه <audio>، نه درخواست؛ نوعی که این مرورگر نمی‌شناسد اصلاً بار نمی‌شود ──
+    //  ۴۰۴ ⇒ پاک‌شده یا سرآمده (بی «دوباره»)؛ بی‌اینترنت، ۴۲۹ یا ۵xx ⇒ «دوباره»؛ ۴۰۱ ⇒ فرمِ تأیید. <audio> ِ حبابِ برداشته
+    //  (حذف برای همه) خودش می‌ایستد؛ blob اش با بارِ بعدی یا بستنِ برگه آزاد می‌شود.
+    K.ICONS.play = 'M8 5.5v13l10.5-6.5z';
+    K.ICONS.pause = 'M8.5 5.5v13 M15.5 5.5v13';
+    var blobs = []; var probe = null;
+    function free() {
+      blobs = blobs.filter(function (b) { if (b.au.isConnected) return true; URL.revokeObjectURL(b.url); return false; });
+    }
+    function hush() { if (sheet) [].forEach.call(sheet.querySelectorAll('audio'), function (a) { a.pause(); }); free(); }
+    function mmss(ms) {
+      var s = Math.max(0, Math.round(ms / 1000)); var r = s % 60;
+      return K.fa(Math.floor(s / 60), 0) + ':' + (r < 10 ? K.fa(0, 0) : '') + K.fa(r, 0);
+    }
+    function voice(cid, m) {
+      var media = m.media; var known = Number((m.meta || {}).durationMs) || 0;
+      var au = null; var busy = false;
+      var btn = el('button', { class: 'btn btn-icon ct-play', attrs: { type: 'button', 'aria-label': t('ct.au.play') } }, K.icon('play'));
+      var bar = el('progress', { class: 'ct-bar', attrs: { max: '1', value: '0', 'aria-label': t('ct.au') } });
+      var time = el('span', { class: 'num ct-time', text: known ? mmss(known) : '' });
+      var note = el('small', { class: 'ct-aerr', hidden: true });
+      var box = el('div', { class: 'ct-voice', attrs: { role: 'group', 'aria-label': t('ct.au'), 'data-st': 'idle' } }, btn, bar, time, note);
+      function mode(st, icon, label) {
+        box.setAttribute('data-st', st);
+        if (st === 'loading') box.setAttribute('aria-busy', 'true'); else box.removeAttribute('aria-busy');
+        btn.replaceChild(K.icon(icon), btn.firstChild);
+        btn.setAttribute('aria-label', label);
+      }
+      function stop(text, again) {
+        busy = false; btn.disabled = !again;
+        note.textContent = text; note.hidden = false;
+        mode('err', 'play', t(again ? 'ct.au.retry' : 'ct.au.play'));
+      }
+      function tick() {
+        var d = au && isFinite(au.duration) && au.duration > 0 ? au.duration * 1000 : known;
+        var c = au && !au.ended ? au.currentTime * 1000 : 0;
+        bar.value = d ? Math.min(1, c / d) : 0;
+        time.textContent = (c > 0 ? mmss(c) + ' / ' : '') + (d ? mmss(d) : '');
+      }
+      function go() {
+        var p = au.play();
+        //  Safari پخش پس از fetch را بی لمسِ تازه نمی‌پذیرد ⇒ آماده، «پخش» ِ دوباره
+        if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotAllowedError') mode('ready', 'play', t('ct.au.play')); });
+      }
+      function broke() {
+        if (au && au.parentNode) au.parentNode.removeChild(au);
+        au = null; free();
+        stop(t('ct.au.codec'), false);
+      }
+      function load() {
+        var h = {}; var tk = K.ticket(); var ss = K.sess();
+        if (tk) h['X-Store-Ticket'] = tk.ticket;
+        if (ss) h['X-Store-Session'] = ss.token;
+        var no = function (s) { var e = new Error('media'); e.status = s; return e; };
+        busy = true; note.hidden = true; free();
+        mode('loading', 'play', t('ct.au.play'));
+        fetch(base + path(cid, '/media/' + encodeURIComponent(media.id)), { headers: h, credentials: 'omit', cache: 'no-store' })
+          .then(function (res) { if (!res.ok) throw no(res.status); return res.blob(); }, function () { throw no(0); })
+          .then(function (b) {
+            var url = URL.createObjectURL(b);
+            au = el('audio', { attrs: { preload: 'auto' }, on: {
+              play: function () { mode('playing', 'pause', t('ct.au.pause')); tick(); },
+              pause: function () { mode('ready', 'play', t('ct.au.play')); tick(); },
+              ended: tick, timeupdate: tick, durationchange: tick, error: broke,
+            } });
+            au.src = url;
+            box.appendChild(au);
+            blobs.push({ au: au, url: url });
+            busy = false;
+            go();
+          })
+          .catch(function (e) {
+            var s = e && e.status;
+            if (s === 401) { busy = false; mode('idle', 'play', t('ct.au.play')); fail(e); }
+            else if (s === 404 || s === 410) stop(t('ct.au.gone'), false);
+            else stop(t(s === 0 ? 'err.network' : s === 429 ? 'err.rate' : 'err.generic'), true);
+          });
+      }
+      btn.addEventListener('click', function () {
+        if (busy) return;
+        if (au) { if (au.paused) go(); else au.pause(); return; }
+        probe = probe || el('audio');
+        if (media.mime && !probe.canPlayType(media.mime)) { stop(t('ct.au.codec'), false); return; }
+        load();
+      });
+      return box;
     }
     function render(list) {
       var l = conv.life || {};
@@ -251,7 +342,7 @@
     function openWith(body) {
       return ready.then(function () {
         build();
-        K.openSheet(sheet, function () { loop++; });
+        K.openSheet(sheet, function () { loop++; hush(); });
         return start(body);
       });
     }

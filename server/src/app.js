@@ -555,13 +555,15 @@ async function createApp({ runMigrations = true } = {}) {
   }));
   // ---- ویترینِ اینترنتی (فاز ۴؛ D-06: `{slug}.vill3n.top`) ----
   //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
+  //  `media-src blob:` فقط برای پیامِ صوتیِ چت (CHAT-07): <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ
+  //  امضاشده ندارد (S118) ⇒ بایت با fetch ِ بلیت‌دار و پخش از blob: ِ همین صفحه؛ blob را فقط اسکریپتِ همین مبدأ می‌سازد. نه data:.
   //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
   const storefront = require('./lib/storefront');
   const storeHeaders = (req, res, next) => {
     res.set('Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; " +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();
