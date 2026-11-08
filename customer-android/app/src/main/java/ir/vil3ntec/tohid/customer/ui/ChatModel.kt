@@ -3,11 +3,17 @@ package ir.vil3ntec.tohid.customer.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ir.vil3ntec.tohid.core.shopper.ChatAct
 import ir.vil3ntec.tohid.core.shopper.ChatChanges
+import ir.vil3ntec.tohid.core.shopper.ChatConversation
+import ir.vil3ntec.tohid.core.shopper.ChatDeleteScope
+import ir.vil3ntec.tohid.core.shopper.ChatDeletes
 import ir.vil3ntec.tohid.core.shopper.ChatFailure
+import ir.vil3ntec.tohid.core.shopper.ChatMessage
 import ir.vil3ntec.tohid.core.shopper.ChatOutItem
 import ir.vil3ntec.tohid.core.shopper.ChatOutbox
 import ir.vil3ntec.tohid.core.shopper.ChatPhoto
+import ir.vil3ntec.tohid.core.shopper.ChatReceiptNeed
 import ir.vil3ntec.tohid.core.shopper.ChatThread
 import ir.vil3ntec.tohid.core.shopper.PhoneTicket
 import ir.vil3ntec.tohid.core.shopper.ShopperApi
@@ -54,6 +60,12 @@ class ChatModel(
   /** با هر عکسِ تازه‌رسیده بالا می‌رود تا صفحه دوباره بکشد */
   var mediaRev: Int by mutableStateOf(0)
     private set
+  /** نوارِ کارهای یک پیام (CHAT-08)؛ null ⇒ بسته */
+  var act: ChatAct? by mutableStateOf(null)
+    private set
+  /** «پاک شد» پس از حذف */
+  var deletedNote: String? by mutableStateOf(null)
+    private set
 
   private val photos = HashMap<String, ChatPhoto>()
   private val media = LinkedHashMap<String, ByteArray>()
@@ -62,6 +74,13 @@ class ChatModel(
   private var pollJob: Job? = null
   private var wakeJob: Job? = null
   private var draining = false
+  /**
+   *  برنامه پیش است (Activity در RESUMED: `onResume`..`onPause`؛ آیفون: `scenePhase == .active`) — با صفحهٔ بازِ گفت‌وگو
+   *  یعنی پیام‌ها دیده می‌شوند ⇒ «خواندم»؛ وگرنه فقط «رسید» (CHAT-04). برنامه با پیش آمدن ساخته می‌شود.
+   */
+  private var foreground = true
+  private var asked: ChatReceiptNeed? = null
+  private val deletes = ChatDeletes()
 
   private fun putOutbox(list: List<ChatOutItem>) {
     outbox = list
@@ -102,6 +121,14 @@ class ChatModel(
   fun leave() {
     pollJob?.cancel()
     at = null
+    act = null
+    deletedNote = null
+  }
+
+  /** برنامه پیش آمد/پس رفت؛ پیش آمدن با صفحهٔ باز ⇒ «خواندم» تا آخرین پیامِ رسیده (همان `visibilitychange` ِ وب) */
+  fun visible(on: Boolean) {
+    foreground = on
+    if (on) receipts()
   }
 
   private fun poll(slug: String, convId: String) {
@@ -138,12 +165,30 @@ class ChatModel(
     //  جوابِ گم‌شده: سرور پیام را دارد ⇒ از صف بیرون، بی ارسالِ دوم
     val arrived = outbox.filter { it.convId == c.conversation.id && next.arrived(it.clientId) }
     if (arrived.isNotEmpty()) putOutbox(outbox.filter { it !in arrived })
-    //  «رسید» و «خواندم» برای پیام‌های دکان که همین حالا روی صفحه‌اند
-    val seen = next.lastShopSeq()
-    val tk = ticket()
-    if (tk != null && seen > next.conversation.receipts.myReadSeq) {
-      scope.launch { withContext(io) { api.chatReceipts(slug, tk.ticket, c.conversation.id, seen, seen) } }
+    receipts()
+  }
+
+  /**
+   *  «رسید» همیشه، «خواندم» فقط وقتی صفحه دیده می‌شود (`ChatThread.receiptNeed`، CHAT-04)؛ یکی در راه ⇒ تکرار نه.
+   *  پاسخِ سرور (رسیدهای واقعی، فقط جلو) در رشته می‌نشیند.
+   */
+  private fun receipts() {
+    val cur = current() ?: return
+    val slug = at?.first ?: return
+    val tk = ticket() ?: return
+    val need = cur.receiptNeed(foreground, asked) ?: return
+    asked = need
+    val convId = cur.conversation.id
+    scope.launch {
+      val r = withContext(io) { api.chatReceipts(slug, tk.ticket, convId, need.deliveredSeq, need.readSeq) }
+      if (asked == need) asked = null
+      r.valueOrNull()?.let(::conversation)
     }
+  }
+
+  /** گفت‌وگوی تازه از سرور (رسید، «مشکل دارم») — همان رشته، رسیدها فقط جلو */
+  private fun conversation(c: ChatConversation) {
+    current()?.takeIf { it.conversation.id == c.id }?.let { thread = Load.Ready(it.merge(ChatChanges(c, emptyList(), it.cursor))) }
   }
 
   fun send() {
@@ -276,7 +321,76 @@ class ChatModel(
 
   fun issue() = convAction { slug, tk, id -> api.chatIssue(slug, tk, id) }
 
-  private fun convAction(call: (String, String, String) -> ShopperResult<ir.vil3ntec.tohid.core.shopper.ChatConversation>) {
+  // ── حذف (CHAT-08): نوار ⇐ پرسشِ تأیید ⇐ یک درخواست؛ قاعده‌ها در `ChatDeletes` ِ core ──
+
+  /** «حذف برای همه» برای این پیام نشان داده شود؟ (خودم، زنده، پیش از `deleteUntil`، رشتهٔ باز) */
+  fun canDeleteForAll(m: ChatMessage): Boolean = current()?.let { deletes.canForAll(it, m, clock()) } == true
+
+  fun actions(m: ChatMessage) {
+    if (act?.busy == true) return
+    deletedNote = null
+    act = ChatAct(m.id)
+  }
+
+  /** فهرست (null) یا پرسشِ تأییدِ [scope] */
+  fun askDelete(scope: ChatDeleteScope?) {
+    val a = act ?: return
+    if (a.busy) return
+    val cur = current() ?: return
+    val m = cur.messages.firstOrNull { it.id == a.messageId } ?: run { act = null; return }
+    act = deletes.ask(cur, m, scope, clock())
+  }
+
+  fun closeActions() {
+    if (act?.busy != true) act = null
+  }
+
+  /** «بله، پاک کن»: یک درخواست برای هر (پیام، دامنه)؛ دوبار زدن هیچ */
+  fun confirmDelete() {
+    val a = act ?: return
+    val what = a.ask ?: return
+    if (a.busy) return
+    val cur = current() ?: return
+    val slug = at?.first ?: return
+    val convId = cur.conversation.id
+    val m = cur.messages.firstOrNull { it.id == a.messageId } ?: run { act = null; return }
+    if (what == ChatDeleteScope.ALL && !deletes.canForAll(cur, m, clock())) { act = deletes.ask(cur, m, what, clock()); return }
+    val tk = ticket() ?: run { act = null; return lost() }
+    if (!deletes.begin(m.id, what)) return
+    val busy = a.copy(busy = true, note = null)
+    act = busy
+    scope.launch {
+      val r = withContext(io) { api.chatDelete(slug, tk.ticket, convId, m.id, what) }
+      val e = r.errorOrNull()
+      val back = deletes.end(busy, what, e)
+      when {
+        e == null -> {
+          //  همان پیام با `rev` ِ تازه: «برای من» ⇒ `hidden` (از رشته می‌رود)، «برای همه» ⇒ سنگِ قبر
+          r.valueOrNull()?.let { msg -> current()?.takeIf { it.conversation.id == convId }?.let { thread = Load.Ready(it.merge(ChatChanges(it.conversation, listOf(msg), it.cursor))) } }
+          if (act?.messageId == m.id) act = null
+          val done = if (what == ChatDeleteScope.ALL) ShopperText.chatDeleteAllDone else ShopperText.chatDeleteMeDone
+          deletedNote = done
+          delay(4_000)
+          if (deletedNote == done) deletedNote = null
+        }
+        ChatOutbox.failureOf(e) == ChatFailure.VERIFY -> { act = null; lost() }
+        else -> {
+          if (act?.messageId == m.id) act = back
+          //  رشته همین حالا بسته شد ⇒ حالِ تازهٔ گفت‌وگو (کادرِ نوشتن و «حذف برای همه» می‌روند)
+          if (e.code == "chat_closed") refresh(slug, convId)
+        }
+      }
+    }
+  }
+
+  /** یک بار خواندنِ تغییرها بی صبر (long-poll ِ باز ممکن است هنوز منتظر باشد) */
+  private fun refresh(slug: String, convId: String) {
+    val tk = ticket() ?: return
+    val cur = current()?.takeIf { it.conversation.id == convId } ?: return
+    scope.launch { withContext(io) { api.chatChanges(slug, tk.ticket, convId, cur.cursor, 0) }.valueOrNull()?.let { merge(slug, it) } }
+  }
+
+  private fun convAction(call: (String, String, String) -> ShopperResult<ChatConversation>) {
     val cur = current() ?: return
     val slug = at?.first ?: return
     val tk = ticket() ?: return lost()
