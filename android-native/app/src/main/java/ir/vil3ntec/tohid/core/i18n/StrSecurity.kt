@@ -146,6 +146,40 @@ object StrSecurity {
     "The encrypted ledger file is damaged and didn't open. Nothing has been deleted; “$r” rebuilds the ledger from the server.",
     "د رمزي دفتر فایل خراب دی او پرانیستل نه شو. هېڅ شی نه دی ړنګ شوی؛ «$r» دفتر له سرور څخه جوړوي.",
   )
+  // DATA-SAFETY: دفترِ ساده‌ای که خوانده نشد (`LedgerRecovery`)
+  val damagedTitle: String get() = t("دفترِ این دستگاه درست خوانده نشد", "This device's ledger couldn't be read", "د دې وسیلې دفتر سم ونه لوستل شو")
+  fun damagedCorrupt(at: Any): String = t(
+    "فایلِ دفتر خراب است. هیچ چیزی پاک نشده: فایلِ خراب کنار گذاشته می‌شود، نه پاک. «برگرداندن از نسخهٔ سالم» دفتر را از نسخهٔ سالمِ ${asIs(at)} برمی‌گرداند؛ اگر وارد شده‌اید، تغییرهای پس از آن از سرور می‌آیند.",
+    "The ledger file is damaged. Nothing has been deleted: the damaged file is set aside, not deleted. “Restore from the good copy” brings the ledger back from the good copy of $at; if you're signed in, changes after that come from the server.",
+    "د دفتر فایل خراب دی. هېڅ شی نه دی ړنګ شوی: خراب فایل یوې خوا ته کېږي، نه ړنګېږي. «له روغې نسخې بېرته راوړل» دفتر د $at له روغې نسخې بېرته راوړي؛ که ننوتي یاست، له هغې وروسته بدلونونه له سرور څخه راځي.",
+  )
+  fun damagedNoCopy(r: Any): String = t(
+    "فایلِ دفتر خراب است و نسخهٔ سالمی کنارش پیدا نشد. هیچ چیزی پاک نشده؛ «${asIs(r)}» دفتر را از سرور می‌سازد، یا از «تنظیمات ← پشتیبان» یک پشتیبان را برگردانید.",
+    "The ledger file is damaged and no good copy was found next to it. Nothing has been deleted; “$r” rebuilds the ledger from the server, or restore a backup from “Settings → Backup”.",
+    "د دفتر فایل خراب دی او تر څنګ یې روغه نسخه ونه موندل شوه. هېڅ شی نه دی ړنګ شوی؛ «$r» دفتر له سرور څخه جوړوي، یا له «تنظیمات ← بیک‌اپ» یو بیک‌اپ بېرته راوړئ.",
+  )
+  val damagedNewer: String get() = t(
+    "این دفتر را نسخهٔ تازه‌ترِ برنامه نوشته است. برنامه را به‌روز کنید؛ هیچ چیزی پاک نشده و دفتر سرِ جایش است.",
+    "A newer version of the app wrote this ledger. Update the app; nothing has been deleted and the ledger is still in place.",
+    "دا دفتر د اپ نوې نسخې لیکلی دی. اپ تازه کړئ؛ هېڅ شی نه دی ړنګ شوی او دفتر په خپل ځای دی.",
+  )
+  fun damagedCopyAt(at: Any): String = t(
+    " اگر به‌روزرسانی ممکن نیست، «برگرداندن از نسخهٔ سالم» نسخهٔ ${asIs(at)} را برمی‌گرداند.",
+    " If updating isn't possible, “Restore from the good copy” brings back the copy of $at.",
+    " که تازه کول شوني نه وي، «له روغې نسخې بېرته راوړل» د $at نسخه بېرته راوړي.",
+  )
+  val damagedRead: String get() = t(
+    "فایلِ دفتر همین حالا خوانده نشد (دیسک یا برنامهٔ دیگری جلویش را گرفت). هیچ چیزی پاک نشده؛ «دوباره امتحان» را بزنید.",
+    "The ledger file couldn't be read just now (the disk or another program blocked it). Nothing has been deleted; press “Try again”.",
+    "د دفتر فایل همدا اوس ونه لوستل شو (ډیسک یا بل پروګرام مخه ونیوله). هېڅ شی نه دی ړنګ شوی؛ «بیا هڅه» ووهئ.",
+  )
+  val recoverFromCopy: String get() = t("برگرداندن از نسخهٔ سالم", "Restore from the good copy", "له روغې نسخې بېرته راوړل")
+  fun recoveredAuto(at: Any): String = t(
+    "دفترِ این دستگاه خراب بود و از نسخهٔ سالمِ ${asIs(at)} برگردانده شد. فایلِ خراب پاک نشده و کنار گذاشته شد.",
+    "This device's ledger was damaged and was restored from the good copy of $at. The damaged file wasn't deleted; it was set aside.",
+    "د دې وسیلې دفتر خراب و او د $at له روغې نسخې بېرته راوړل شو. خراب فایل نه دی ړنګ شوی، یوې خوا ته شو.",
+  )
+
   /** نامِ دستگاه در «انتقال به … تازه» — با کسرهٔ اضافه در فارسی */
   val newComputerOf: String get() = t("کامپیوترِ", "computer", "کمپیوټر")
   val newPhoneOf: String get() = t("گوشیِ", "phone", "موبایل")

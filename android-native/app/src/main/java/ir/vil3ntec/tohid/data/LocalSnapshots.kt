@@ -50,10 +50,12 @@ object LocalSnapshots {
    *  رونوشتِ دفتر با نامِ `name`، اگر دفتر هست و با تازه‌ترین نسخه فرق دارد.
    *  نسخهٔ ساخته‌شده را برمی‌گرداند، یا null اگر کاری نبود.
    */
-  fun takeIfChanged(ledger: File, dir: File, name: String): File? = synchronized(lock) {
+  fun takeIfChanged(ledger: File, dir: File, name: String, valid: (File) -> Boolean = { true }): File? = synchronized(lock) {
     if (!ledger.exists() || ledger.length() == 0L) return null
     val newest = list(dir).firstOrNull()
     if (newest != null && same(ledger, newest.file)) return null
+    //  ⛔ DATA-SAFETY: دفترِ خراب نسخهٔ خودکار نمی‌شود — نسخه‌های سالم را از «۶ آخر» بیرون نمی‌راند
+    if (!valid(ledger)) return null
     val target = File(dir, name)
     DiskWrite.stream(target) { out -> openShared(ledger).use { it.copyTo(out) } }
     target

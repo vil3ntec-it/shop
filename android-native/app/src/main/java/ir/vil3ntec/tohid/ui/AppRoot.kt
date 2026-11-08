@@ -305,6 +305,17 @@ private fun AppRootActive(
       snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
     }
   }
+  //  DATA-SAFETY: دفترِ خرابی که هنگامِ باز شدن خودکار از نسخهٔ سالم برگشت (`LedgerRecovery.Guard.recovered`) — یک بار گفته می‌شود
+  val recovered by store.guard.recovered.collectAsState()
+  LaunchedEffect(recovered) {
+    val found = recovered ?: return@LaunchedEffect
+    store.guard.ack()
+    snackbar.currentSnackbarData?.dismiss()
+    snackbar.showSnackbar(
+      ir.vil3ntec.tohid.core.i18n.StrSecurity.recoveredAuto(ir.vil3ntec.tohid.displayMillis(found.at)),
+      duration = SnackbarDuration.Indefinite, withDismissAction = true,
+    )
+  }
 
   //  دروازه‌های خودکار: تا یکی باز است پیوندهای بیرونی نگه داشته می‌شوند
   val syncState = remember { ir.vil3ntec.tohid.sync.SyncStore(context) }

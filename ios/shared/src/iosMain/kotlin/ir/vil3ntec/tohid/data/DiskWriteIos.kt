@@ -14,9 +14,11 @@ import platform.posix.O_WRONLY
 import platform.posix.close
 import platform.posix.errno
 import platform.posix.fsync
+import platform.posix.link
 import platform.posix.open
 import platform.posix.rename
 import platform.posix.strerror
+import platform.posix.unlink
 import platform.posix.write
 import kotlinx.cinterop.toKString
 
@@ -30,9 +32,25 @@ object DiskWrite {
 
   fun bytes(target: File, data: ByteArray) = stream(target) { it.write(data) }
 
+  /** همان `DiskWrite.bytes(target, data, keepPrevious)` ِ اندروید: نسخهٔ پیشین با `link(2)` به `<نام>.prev` */
+  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) {
+    if (!keepPrevious) return bytes(target, data)
+    stream(target, before = {
+      if (target.isFile) {
+        val prev = previousOf(target)
+        unlink(prev.path)
+        link(target.path, prev.path)
+      }
+    }) { it.write(data) }
+  }
+
+  fun previousOf(target: File): File = File(target.absoluteFile.parentFile, target.name + ".prev")
+
   fun copy(source: File, target: File) = bytes(target, source.readBytes())
 
-  fun stream(target: File, write: (OutputStream) -> Unit) {
+  fun stream(target: File, write: (OutputStream) -> Unit) = stream(target, before = {}, write = write)
+
+  private fun stream(target: File, before: () -> Unit, write: (OutputStream) -> Unit) {
     val dir = target.absoluteFile.parentFile ?: throw IOException("پوشهٔ «$target» معلوم نیست")
     if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException("پوشهٔ «$dir» ساخته نشد")
     val tmp = File(dir, target.name + ".tmp")
@@ -40,6 +58,7 @@ object DiskWrite {
       val buf = ByteArrayOutputStream()
       write(buf)
       writeDurably(tmp, buf.toByteArray())
+      before()
       move(tmp, target)
     } catch (e: Throwable) {
       tmp.delete()

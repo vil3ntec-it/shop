@@ -126,21 +126,50 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
 
   private val lock = Any()
 
+  /**
+   *  ⛔ DATA-SAFETY: فایلِ کناری **`fsync`** می‌شود و نسخهٔ پیشین (`.bak`) پیش از جابه‌جایی می‌ماند. پیش‌تر
+   *  کناری بی `fsync` جابه‌جا می‌شد: قطعِ برق پس از جابه‌جایی فایلِ صفربایتی یا نیمه جا می‌گذاشت، [load]
+   *  آن را بی‌صدا «هیچ تنظیمی» می‌خواند و نخستین `apply` رویش می‌نوشت — سایه و cursor ِ همگام‌سازی، حساب و
+   *  همهٔ تنظیم‌های دکان با هم می‌رفتند.
+   */
   private fun write(text: String): Boolean = synchronized(lock) {
     runCatching {
       file.parentFile?.mkdirs()
       val tmp = File(file.parentFile, file.name + ".tmp")
-      tmp.writeText(text, Charsets.UTF_8)
-      Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-    }.recoverCatching {
-      val tmp = File(file.parentFile, file.name + ".tmp")
-      Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      java.io.FileOutputStream(tmp).use { out ->
+        out.write(text.toByteArray(Charsets.UTF_8))
+        out.flush()
+        out.fd.sync()
+      }
+      //  نسخهٔ پیشین: پیوندِ سخت (بی رونوشت)؛ سیستمی که نمی‌دهد ⇒ رونوشت
+      if (file.isFile) runCatching {
+        Files.deleteIfExists(backup.toPath())
+        runCatching { Files.createLink(backup.toPath(), file.toPath()) }
+          .getOrElse { Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING) }
+      }
+      runCatching {
+        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
+      }.getOrElse {
+        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
+      }
+      Unit
     }.isSuccess
   }
 
+  /** نسخهٔ پیشینِ همین فایل — [write] می‌گذارد، [load] اگر اصل خراب بود می‌خواند */
+  private val backup: File get() = File(file.parentFile, file.name + ".bak")
+
+  /**
+   *  ⛔ DATA-SAFETY: فایلِ خراب دیگر «هیچ تنظیمی» نیست: کنار گذاشته می‌شود (`.corrupt-<زمان>`، پاک نه) و
+   *  نسخهٔ پیشین ([backup]) یا فایلِ کناریِ کامل (`.tmp`) جایش خوانده می‌شود.
+   */
   private fun load() {
-    if (!file.isFile) return
-    val root = runCatching { Json.parseToJsonElement(file.readText(Charsets.UTF_8)).jsonObject }.getOrNull() ?: return
+    val root = parse(file) ?: run {
+      if (!file.isFile && !backup.isFile) return
+      val alt = parse(File(file.parentFile, file.name + ".tmp")) ?: parse(backup)
+      if (file.isFile) runCatching { file.copyTo(File(file.parentFile, "${file.name}.corrupt-${System.currentTimeMillis()}")) }
+      alt ?: return
+    }
     for ((k, e) in root) {
       val o = e as? JsonObject ?: continue
       val t = o["t"]?.jsonPrimitive?.contentOrNull
@@ -159,6 +188,10 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
       if (value != null) map[k] = value
     }
   }
+
+  private fun parse(f: File): JsonObject? =
+    if (!f.isFile || f.length() == 0L) null
+    else runCatching { Json.parseToJsonElement(f.readText(Charsets.UTF_8)).jsonObject }.getOrNull()
 
   private companion object {
     /** یک رشته برای همهٔ نوشتن‌ها — ترتیبِ `apply`ها حفظ می‌شود */
