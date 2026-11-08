@@ -158,12 +158,21 @@ object PoForms {
 
   private fun nextKey(rows: List<EditRow>): Int = (rows.maxOfOrNull { it.key } ?: -1) + 1
 
-  /** کالای تازه با مقدارِ پیشنهادی (تا «حدِ کم») و آخرین فیِ همین تأمین‌کننده؛ کالای پیش‌تر در سفارش ⇒ `null` */
-  fun addProduct(d: ShopData, rows: List<EditRow>, supplierId: String, p: Product): List<EditRow>? {
+  /**
+   *  کالای تازه با مقدارِ پیشنهادی (تا «حدِ کم») و آخرین فیِ همین تأمین‌کننده؛ کالای پیش‌تر در سفارش ⇒ `null`.
+   *  PRD-07 ([unitsOn] = `ShopPolicy.productTools` ِ صفحه): واحدی که تأمین‌کنندهٔ پیش‌فرضش همین تأمین‌کننده است پیش‌گزیده می‌شود
+   *  (`PurchaseUnits.defaultFor`، همان فاکتورِ خرید) — فی با [pickUnit] به همان واحد و مقدارِ پیشنهادی به واحدِ درستِ همان
+   *  واحد، رو به بالا (۳۰ دانه کم ⇒ ۲ کارتنِ ۲۴)؛ کاربر می‌تواند عوضش کند. نبود یا پرچمِ خاموش ⇒ همان ردیفِ پیشین.
+   */
+  fun addProduct(d: ShopData, rows: List<EditRow>, supplierId: String, p: Product, unitsOn: Boolean = false): List<EditRow>? {
     if (rows.any { it.productId == p.id }) return null
     val q = PurchaseOrderBook.suggestedQtyMilli(d, p)
     val pr = PurchaseOrderBook.lastPriceMinor(d, supplierId, p)
-    return rows + EditRow(nextKey(rows), p.id, p.name, p.unit, num(PurchaseOrderBook.units(q)), num(PurchaseOrderBook.asAfn(pr)))
+    val row = EditRow(nextKey(rows), p.id, p.name, p.unit, num(PurchaseOrderBook.units(q)), num(PurchaseOrderBook.asAfn(pr)))
+    val def = if (unitsOn) PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId) else null
+    if (def == null || def.factorMilli <= 0) return rows + row
+    val whole = ((q + def.factorMilli - 1) / def.factorMilli).coerceAtLeast(1)
+    return rows + pickUnit(d, row, def.name).copy(qty = num(whole.toDouble()))
   }
 
   /** ردیف از پیشنهادها (`supplierPicks`/`planned`)؛ کالای پیش‌تر در سفارش کنار؛ هیچ تازه ⇒ همان ردیف‌ها */
@@ -196,11 +205,21 @@ object PoForms {
     val units = p.purchaseUnits?.map(ShopStore::coreOf)
     val to = PurchaseUnits.find(units, unitName)
     if (unitName != null && to == null) return row
-    val from = PurchaseUnits.find(units, row.unitName)?.factorMilli ?: PurchaseUnits.MILLI
     val next = row.copy(unit = p.unit, unitName = to?.name)
-    val price = parse(row.price)?.takeIf { it >= 0 } ?: return next
-    val minor = PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(price), to?.factorMilli ?: PurchaseUnits.MILLI, from)
-    return next.copy(price = num(PurchaseOrderBook.asAfn(minor)))
+    return repriced(p, row.price, row.unitName, to?.name)?.let { next.copy(price = it) } ?: next
+  }
+
+  /**
+   *  فیِ [price] (متنِ کادر) از واحدِ [from] به واحدِ [to] ِ کالای [p] (نام‌ها؛ `null` یا ناشناخته = پایه): × ضریبِ تازه ÷ پیشین با
+   *  `PurchaseOrderCore.mulDivRound` به صدمِ افغانی، تا فیِ هر واحدِ پایه همان بماند. همان حساب برای ردیفِ سفارشِ خرید ([pickUnit])
+   *  و ردیفِ فاکتورِ خریدِ گوشی (`PurchaseFormModel`). فیِ نادرست یا منفی ⇒ null (کادر دست نمی‌خورد).
+   */
+  fun repriced(p: Product, price: String, from: String?, to: String?): String? {
+    val units = p.purchaseUnits?.map(ShopStore::coreOf)
+    val f = PurchaseUnits.find(units, from)?.factorMilli ?: PurchaseUnits.MILLI
+    val t = PurchaseUnits.find(units, to)?.factorMilli ?: PurchaseUnits.MILLI
+    val v = parse(price)?.takeIf { it >= 0 } ?: return null
+    return runCatching { num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(v), t, f))) }.getOrNull()
   }
 
   /**

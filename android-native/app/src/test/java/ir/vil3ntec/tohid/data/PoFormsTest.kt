@@ -388,6 +388,27 @@ class PoFormsTest {
     }
   }
 
+  @Test fun `کالای واحددار در سفارش — واحدِ پیش‌فرضِ همین تأمین‌کننده پیش‌گزیده و قابلِ عوض کردن`() {
+    val d = du.copy(
+      products = du.products.map { if (it.id == "tea") it.copy(minStock = 30.0) else it },
+      suppliers = du.suppliers + Supplier(id = "s2", name = "دیگر"),
+    )
+    val tea30 = d.products.first { it.id == "tea" }
+    //  تأمین‌کنندهٔ پیش‌فرضِ کارتنِ ۱۲ همین s1 است ⇒ همان واحد؛ ۳۰ دانه کم ⇒ ۳ کارتنِ ۱۲ (رو به بالا)، فی ۴۰ × ۱۲ = ۴۸۰
+    val row = PoForms.addProduct(d, emptyList(), "s1", tea30, unitsOn = true)!!.single()
+    assertEquals(PoForms.EditRow(0, "tea", "چای", "دانه", "3", "480", "کارتن ۱۲"), row)
+    assertEquals(StrPurchaseUnits.lineBase(qty(36.0), "دانه", money(40.0)), PoForms.unitLine(d, row))
+    //  کاربر عوضش می‌کند: پایه ⇒ همان عدد و فیِ هر دانه
+    assertEquals(PoForms.EditRow(0, "tea", "چای", "دانه", "3", "40"), PoForms.pickUnit(d, row, null))
+    //  تأمین‌کنندهٔ بی واحدِ پیش‌فرض، یا پرچمِ خاموش ⇒ همان ردیفِ پیشین به واحدِ پایه
+    val plain = PoForms.EditRow(0, "tea", "چای", "دانه", "30", "40")
+    assertEquals(plain, PoForms.addProduct(d, emptyList(), "s2", tea30, unitsOn = true)!!.single())
+    assertEquals(plain, PoForms.addProduct(d, emptyList(), "s1", tea30)!!.single())
+    //  کالای بی واحدِ خرید همان ردیفِ پیشین
+    val pA = d.products.first { it.id == "pA" }
+    assertEquals(PoForms.addProduct(d, emptyList(), "s1", pA), PoForms.addProduct(d, emptyList(), "s1", pA, unitsOn = true))
+  }
+
   /* ── مجوز و درِ صفحه ── */
 
   @Test fun `مجوزِ هر کار همان سرور — مدیر می‌سازد و می‌فرستد، شاگرد فقط دریافت`() {

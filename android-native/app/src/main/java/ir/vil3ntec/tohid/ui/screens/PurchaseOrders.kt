@@ -437,7 +437,7 @@ private fun PoEditor(
 
   //  ردیف‌ها، سنجش و پیش‌نویس از `PoForms` (همان فرمِ گوشیِ نسخهٔ ۳)
   fun addProduct(p: Product) {
-    rows = PoForms.addProduct(d, rows, supplierId, p) ?: run { error = StrPurchasePages.alreadyInPo(p.name); return }
+    rows = PoForms.addProduct(d, rows, supplierId, p, unitsOn) ?: run { error = StrPurchasePages.alreadyInPo(p.name); return }
     error = null
   }
 

@@ -666,7 +666,7 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
     EditorSheet.PRODUCT -> V3Sheet(onDismiss = { sheet = null }, title = StrPurchaseOrders.addItem, scroll = false) { closer ->
       ProductPickerList(d, null, onPick = { p ->
         closer.close {
-          rows = PoForms.addProduct(d, rows, supplierId, p) ?: run { toasts.show(StrPurchasePages.alreadyInPo(p.name), V3Tone.INFO); rows }
+          rows = PoForms.addProduct(d, rows, supplierId, p, unitsOn) ?: run { toasts.show(StrPurchasePages.alreadyInPo(p.name), V3Tone.INFO); rows }
         }
       }, onNew = null)
     }
@@ -676,7 +676,7 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
 
 /** PRD-07: «واحدِ خرید» ِ یک ردیف — واحدِ پایه یا یکی از واحدهای خریدِ کالا ([unit] نامِ برگزیده؛ null = پایه) */
 @Composable
-private fun PoUnitChips(units: List<PurchaseUnits.Item>, baseUnit: String, unit: String?, onPick: (String?) -> Unit) {
+internal fun PoUnitChips(units: List<PurchaseUnits.Item>, baseUnit: String, unit: String?, onPick: (String?) -> Unit) {
   val c = PhoneV3.colors
   val chosen = PurchaseUnits.find(units, unit)
   Text(StrPurchaseUnits.unit, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 8.dp))

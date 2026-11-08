@@ -12,10 +12,12 @@ import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.LocalShipping
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -25,6 +27,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.data.LedgerEngine
@@ -32,7 +35,10 @@ import ir.vil3ntec.tohid.data.PurchaseBook
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.scan.ScanRouter
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.screens.purchaseUnitsOn
 import ir.vil3ntec.tohid.ui.screens.v3Text
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -46,6 +52,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Message
 import ir.vil3ntec.tohid.ui.v3.V3PickerRow
 import ir.vil3ntec.tohid.ui.v3.V3Section
 import ir.vil3ntec.tohid.ui.v3.V3TextField
+import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.v3Shake
 
 private enum class PurchasePicker { SUPPLIER, PRODUCT }
@@ -61,6 +68,40 @@ private val PurchaseFormSaver = listSaver<PurchaseForm, String>(
       .let { f -> if ((v.size - 8) % 4 == 2) f.copy(landed = v[v.size - 2], due = v[v.size - 1]) else f }
   },
 )
+
+/**
+ *  PRD-07: واحدِ خریدِ ردیفِ نخست و هر ردیفِ افزوده کنارِ همان قالبِ [PurchaseFormSaver] (که دست نمی‌خورد):
+ *  `[قالبِ پیشین…] + [واحدِ ردیفِ نخست، واحدِ هر ردیف…] + [اندازهٔ قالبِ پیشین]`؛ خالی = واحدِ پایه.
+ */
+private val PurchaseFormUnitsSaver = listSaver<PurchaseForm, String>(
+  save = { f ->
+    @Suppress("UNCHECKED_CAST")
+    val base = with(PurchaseFormSaver) { save(f) } as List<String>
+    base + listOf(f.unitName.orEmpty()) + f.more.map { it.unitName.orEmpty() } + listOf(base.size.toString())
+  },
+  restore = { v ->
+    val n = v.lastOrNull()?.toIntOrNull()?.takeIf { it in 1 until v.size }
+    val f = PurchaseFormSaver.restore(if (n == null) v else v.take(n))
+    val u = if (n == null) emptyList() else v.subList(n, v.size - 1)
+    f?.copy(unitName = u.getOrNull(0)?.ifEmpty { null }, more = f.more.mapIndexed { i, r -> r.copy(unitName = u.getOrNull(i + 1)?.ifEmpty { null }) })
+  },
+)
+
+/**
+ *  PRD-07: واحدِ خریدِ یک ردیف — همان تراشه‌های سفارشِ خرید ([PoUnitChips]) — و زیرش مقدارِ پایه و بهای هر واحدِ پایه از
+ *  همان حسابِ ثبت (`PurchaseFormModel.unitLine`)؛ کالای بی واحدِ خرید ⇒ هیچ.
+ */
+@Composable
+private fun RowUnit(d: ShopData, productId: String?, unitName: String?, quantity: String, price: String, error: String?, onPick: (String?) -> Unit) {
+  val units = PurchaseFormModel.units(d, productId)
+  if (units.isEmpty()) return
+  PoUnitChips(units, d.products.find { it.id == productId }?.unit.orEmpty(), unitName, onPick)
+  PurchaseFormModel.unitLine(d, productId, unitName, quantity, price)?.let {
+    Text(it, style = V3Type.footnote, color = PhoneV3.colors.inkMuted, modifier = Modifier.padding(top = 4.dp))
+  }
+  error?.let { V3Message(V3Tone.ERROR, it, modifier = Modifier.padding(top = 8.dp)) }
+  Spacer(Modifier.height(12.dp))
+}
 
 /** PUR-05: تاریخِ انقضای محموله — همان کادرِ «ورودِ کالا» ِ انبار (شمسی، اختیاری) */
 @Composable
@@ -100,18 +141,40 @@ internal fun PurchaseFormScreen(
    *  فرمِ خریدِ کامپیوتر (`DeskPurchasing`)؛ خاموش ⇒ همان فرمِ پیشین
    */
   extrasOn: Boolean = false,
+  /** پیامِ بارکدخوان (بارکدِ ناشناخته، واحدِ خریدِ خوانده‌شده، فاکتورِ پر) — صفحه آن را در نوارِ پایین نشان می‌دهد */
+  notify: (V3Tone, String) -> Unit = { _, _ -> },
 ) {
   val initial = remember(supplierArg) { PurchaseFormModel.initial(supplierArg?.takeIf { id -> d.suppliers.any { it.id == id } }, todayIso()) }
   //  نوشته‌ها با چرخشِ گوشی و برگشت از «کالای تازه» نمی‌روند
-  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormSaver) { mutableStateOf(initial) }
+  var form by rememberSaveable(supplierArg, stateSaver = PurchaseFormUnitsSaver) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   //  کادرهای پنهان (موتورِ تازه خاموش) هیچ اثری ندارند — نوشتهٔ برگشته از چرخشِ صفحه هم پاک می‌شود
   LaunchedEffect(extrasOn) { if (!extrasOn && (form.landed.isNotEmpty() || form.due.isNotEmpty())) form = form.copy(landed = "", due = "") }
+  //  PRD-07: واحدِ خریدِ ردیف فقط با `ShopPolicy.productTools` (همان فاکتور و سفارشِ خریدِ کامپیوتر)؛ خاموش ⇒ همه به واحدِ پایه،
+  //  پس ردیف‌ها و بدنهٔ فاکتور همان پیشین‌اند
+  val unitsOn = purchaseUnitsOn()
+  LaunchedEffect(unitsOn) { if (!unitsOn && PurchaseFormModel.hasUnits(form)) form = PurchaseFormModel.withoutUnits(form, d) }
+  //  بارکدخوانِ وصل یا گوشیِ جفت‌شده تا این صفحه باز است همین‌جا (نه صندوق) — همان راهِ دریافتِ سفارشِ خرید؛ فقط با همان
+  //  پرچم (خاموش ⇒ همان صفحهٔ پیشین، بی بارکدخوان)
+  val barcodes = remember(d) { ShopStore.barcodeIndex(d) }
+  val unitIndex = remember(d, unitsOn) { if (unitsOn) ShopStore.purchaseUnitIndex(d) else null }
+  val onScan by rememberUpdatedState<(String) -> Unit> { code ->
+    when (val r = PurchaseFormModel.scan(form, d, code, barcodes, unitIndex)) {
+      is PurchaseFormModel.Scan.Added -> { form = r.form; r.unit?.let { notify(V3Tone.SUCCESS, StrPurchaseUnits.scanned(r.name, it)) } }
+      is PurchaseFormModel.Scan.Unknown -> notify(V3Tone.ERROR, StrPurchasePages.barcodeUnknown(r.code))
+      PurchaseFormModel.Scan.Full -> notify(V3Tone.ERROR, StrMoney.purchaseRowsFull(PurchaseFormModel.MAX_ROWS))
+    }
+  }
+  val scanOwner = remember { Any() }
+  DisposableEffect(unitsOn) {
+    if (unitsOn) ScanRouter.register(scanOwner) { code -> onScan(code); true }
+    onDispose { if (unitsOn) ScanRouter.unregister(scanOwner) }
+  }
   var shake by remember { mutableStateOf(0) }
   var picker by remember { mutableStateOf<PurchasePicker?>(null) }
   //  کالای کدام ردیف انتخاب می‌شود: -1 = ردیفِ نخست، وگرنه شمارهٔ ردیفِ افزوده (PUR-05)
   var pickRow by remember { mutableStateOf(-1) }
-  val errors = PurchaseFormModel.errors(form)
+  val errors = PurchaseFormModel.errors(form, d)
   val shownErrors = if (tried) errors else PurchaseFormModel.Errors()
   val product = d.products.find { it.id == form.productId }
   val supplier = d.suppliers.find { it.id == form.supplierId }
@@ -177,20 +240,23 @@ internal fun PurchaseFormScreen(
           label = StrMoney.quantity,
           kind = V3FieldKind.NUMBER,
           required = true,
-          suffix = product?.unit?.takeIf { it.isNotBlank() },
+          suffix = (form.unitName ?: product?.unit)?.takeIf { it.isNotBlank() },
           error = shownErrors.quantity,
         )
         Spacer(Modifier.height(12.dp))
         V3TextField(
           value = form.price,
           onValueChange = { form = form.copy(price = it) },
-          label = StrMoney.unitPrice,
+          label = form.unitName?.let(StrPurchaseUnits::priceIn) ?: StrMoney.unitPrice,
           kind = V3FieldKind.MONEY,
           required = true,
           helper = lastPrice,
           error = shownErrors.price,
         )
         Spacer(Modifier.height(12.dp))
+        if (unitsOn) RowUnit(d, form.productId, form.unitName, form.quantity, form.price, shownErrors.unit) { u ->
+          form = PurchaseFormModel.pickUnit(form, d, -1, u)
+        }
         ExpiryField(form.expiry, { form = form.copy(expiry = it) }, shownErrors.expiry)
         LiveLine(StrMoney.purchaseTotal, MoneyText.afn(total))
       }
@@ -214,19 +280,22 @@ internal fun PurchaseFormScreen(
             label = StrMoney.quantity,
             kind = V3FieldKind.NUMBER,
             required = true,
-            suffix = rowProduct?.unit?.takeIf { it.isNotBlank() },
+            suffix = (row.unitName ?: rowProduct?.unit)?.takeIf { it.isNotBlank() },
             error = rowErrors.quantity,
           )
           Spacer(Modifier.height(12.dp))
           V3TextField(
             value = row.price,
             onValueChange = { form = PurchaseFormModel.setRow(form, i, row.copy(price = it)) },
-            label = StrMoney.unitPrice,
+            label = row.unitName?.let(StrPurchaseUnits::priceIn) ?: StrMoney.unitPrice,
             kind = V3FieldKind.MONEY,
             required = true,
             error = rowErrors.price,
           )
           Spacer(Modifier.height(12.dp))
+          if (unitsOn) RowUnit(d, row.productId, row.unitName, row.quantity, row.price, rowErrors.unit) { u ->
+            form = PurchaseFormModel.pickUnit(form, d, i, u)
+          }
           ExpiryField(row.expiry, { form = PurchaseFormModel.setRow(form, i, row.copy(expiry = it)) }, rowErrors.expiry)
           Spacer(Modifier.height(12.dp))
           V3Button(StrMoney.removePurchaseRow, { form = PurchaseFormModel.removeRow(form, i) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
@@ -295,7 +364,7 @@ internal fun PurchaseFormScreen(
         selected = current,
         onPick = { id ->
           d.products.find { it.id == id }?.let { p ->
-            form = if (pickRow < 0) PurchaseFormModel.pickProduct(form, p) else PurchaseFormModel.pickRowProduct(form, pickRow, p)
+            form = if (pickRow < 0) PurchaseFormModel.pickProduct(form, p, unitsOn) else PurchaseFormModel.pickRowProduct(form, pickRow, p, unitsOn)
           }
         },
         onDismiss = { picker = null },
