@@ -5,6 +5,10 @@ import ir.vil3ntec.tohid.core.atrest.AtRestException
 import ir.vil3ntec.tohid.core.atrest.AtRestKek
 import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.desktop.DesktopContext
+import ir.vil3ntec.tohid.desktop.keystore.DeskKeystoreFlag
+import ir.vil3ntec.tohid.desktop.keystore.KekVault
+import ir.vil3ntec.tohid.desktop.keystore.OsKeyStore
+import ir.vil3ntec.tohid.desktop.keystore.OsKeyStores
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -19,13 +23,15 @@ import javax.crypto.spec.SecretKeySpec
 /**
  *  کلیدِ اصلیِ رمزِ دفتر روی کامپیوتر — جایگزینِ `AtRestKeys.kt`ِ اندروید.
  *
- *  ⚠️ **PARTIAL (فاز ۱)**: کلید در فایلِ فقط-صاحبِ `<پوشهٔ داده>/keys/atrest-kek.key`
+ *  ⚠️ **PARTIAL**: فاز ۱ (پیش‌فرض) — کلید در فایلِ فقط-صاحبِ `<پوشهٔ داده>/keys/atrest-kek.key`
  *  است — همان روشِ `SecretBox` برای توکن. این از بیرون رفتنِ تنهای فایلِ دفتر
  *  (کپی، همگام‌سازِ ابریِ پوشه، فرستادنِ اشتباهی) محافظت می‌کند، ولی کسی که
- *  کلِ پوشهٔ داده یا دیسک را دارد کلید را هم دارد. فاز ۲: پیچیدنِ همین کلید
- *  با DPAPI ویندوز / Keychain مک / libsecret لینوکس.
+ *  کلِ پوشهٔ داده یا دیسک را دارد کلید را هم دارد.
+ *  فاز ۲ پشتِ پرچمِ `desk.keystore` (پیش‌فرض **خاموش**، `DeskKeystoreFlag`): همان کلید با DPAPI ویندوز /
+ *  Keychain مک / Secret Service ِ لینوکس — کوچ، برگشت و همهٔ شکست‌ها در `desktop/keystore/KekVault.kt`.
+ *  بایت‌ها و شناسهٔ KEK عوض نمی‌شوند، پس کلیددانِ دفتر هرگز دوباره پیچیده نمی‌شود.
  *
- *  ⛔ فایلِ کلید فقط هنگامِ **ساختنِ** کلیددان ساخته می‌شود؛ نبودنش هنگامِ
+ *  ⛔ فایلِ کلید فقط هنگامِ **ساختنِ** کلیددان ساخته می‌شود؛ نبودنش (و نبودِ نشانِ کلیددانِ سیستم) هنگامِ
  *  باز کردن یعنی `KEY_MISSING` — هرگز کلیدِ تازه‌ای که دفترِ قبلی را باز نمی‌کند.
  *
  *  اجازه‌ها (بازبینیِ #331): مک/لینوکس `600` (پوشه `700`)؛ ویندوز ACLِ «صاحب + SYSTEM +
@@ -33,7 +39,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object AtRestKeys {
 
-  val WHERE: String get() = StrAppData.deskWhere
+  val WHERE: String get() = (vault.status as? KekVault.Status.Protected)?.let { StrAppData.deskOsWhere(OsKeyStores.label(it.store)) } ?: StrAppData.deskWhere
   const val HARDWARE_BACKED: Boolean = false
 
   /** `true`/`false` پس از نخستین تلاش روی ویندوز؛ `null` یعنی ACL در کار نیست (مک/لینوکس) یا هنوز تلاشی نشده */
@@ -42,6 +48,19 @@ object AtRestKeys {
 
   /** جای کلید و آنچه از آن برمی‌آید — بی تعارف، برای صفحهٔ امنیت */
   fun note(): String = buildString {
+    when (val s = vault.status) {
+      is KekVault.Status.Protected -> {
+        append(StrAppData.deskOsNote(OsKeyStores.label(s.store)))
+        when (s.plain) {
+          KekVault.Plain.KEPT -> append(StrAppData.deskOsPlainPending)
+          KekVault.Plain.STRAY -> append(StrAppData.deskOsPlainStray)
+          KekVault.Plain.NONE -> Unit
+        }
+        return@buildString
+      }
+      is KekVault.Status.Fallback -> append(StrAppData.deskOsFallback(s.reason))
+      else -> Unit
+    }
     append(StrAppData.deskNote1)
     append(StrAppData.deskNote2)
     append(StrAppData.deskNote3)
@@ -107,38 +126,30 @@ object AtRestKeys {
     }
   }
 
+  /** آزمون: کلیددانِ ساختگی (یا «هیچ») به‌جای کلیددانِ سیستم؛ خودِ `null` ⇒ همان سیستم */
+  @Volatile internal var storeOverride: (() -> OsKeyStore?)? = null
+
+  /** جای کلید — یک نمونه در هر اجرای برنامه (کوچِ `desk.keystore` و «اجرای بعدیِ موفق» به همین بسته‌اند) */
+  internal val vault: KekVault by lazy {
+    KekVault(
+      dir = File(DesktopContext.root, "keys"),
+      flag = { DeskKeystoreFlag.on(DesktopContext.root) },
+      store = { storeOverride.let { if (it != null) it() else OsKeyStores.forThisOs() } },
+      restrict = { restrict(it) },
+    )
+  }
+
+  /** آزمون: «برنامه بسته و دوباره باز شد» برای جای کلید */
+  internal fun relaunchForTest() = vault.relaunch()
+
   fun kek(@Suppress("UNUSED_PARAMETER") context: Context): AtRestKek = FileKek
 
   private object FileKek : AtRestKek {
     override val id: String = "desktop-file:keys/atrest-kek.key"
     private val random = SecureRandom()
 
-    private val file: File get() = File(File(DesktopContext.root, "keys"), "atrest-kek.key")
-
-    /** کلیدِ ساختِ پیشین (پیش از ACL) هم یک بار در هر اجرا محدود می‌شود */
-    @Volatile private var restricted = false
-
-    private fun existing(): SecretKeySpec? {
-      val f = file
-      if (!f.isFile) return null
-      if (!restricted) { restricted = true; runCatching { restrict(f) } }
-      val bytes = f.readBytes()
-      if (bytes.size != 32) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyBroken)
-      return SecretKeySpec(bytes, "AES")
-    }
-
-    private fun create(): SecretKeySpec {
-      val f = file
-      f.parentFile.mkdirs()
-      val bytes = ByteArray(32).also { random.nextBytes(it) }
-      DiskWrite.bytes(f, bytes)
-      runCatching { restrict(f) }
-      restricted = true
-      return SecretKeySpec(bytes, "AES")
-    }
-
     override fun wrap(dek: ByteArray): ByteArray = guard {
-      val key = existing() ?: create()
+      val key = SecretKeySpec(vault.forWrite(), "AES")
       val iv = ByteArray(IV).also { random.nextBytes(it) }
       val c = Cipher.getInstance("AES/GCM/NoPadding")
       c.init(Cipher.ENCRYPT_MODE, key, GCMParameterSpec(128, iv))
@@ -148,11 +159,21 @@ object AtRestKeys {
     override fun unwrap(blob: ByteArray, kekId: String): ByteArray = guard {
       if (kekId != id) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyChanged(kekId))
       if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keyCut)
-      val key = existing()
-        ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyMissing)
-      val c = Cipher.getInstance("AES/GCM/NoPadding")
-      c.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, blob, 0, IV))
-      c.doFinal(blob, IV, blob.size - IV)
+      //  کلیدِ درست اول؛ فایلِ سادهٔ ناهمخوان (اگر هست) فقط نامزدِ دوم — برچسبِ GCM داور است
+      var bad: AEADBadTagException? = null
+      for (raw in vault.forRead()) {
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(Cipher.DECRYPT_MODE, SecretKeySpec(raw, "AES"), GCMParameterSpec(128, blob, 0, IV))
+        val dek = try {
+          c.doFinal(blob, IV, blob.size - IV)
+        } catch (e: AEADBadTagException) {
+          bad = e
+          continue
+        }
+        vault.opened(raw)
+        return@guard dek
+      }
+      throw bad ?: AEADBadTagException()
     }
 
     private inline fun <T> guard(block: () -> T): T = try {

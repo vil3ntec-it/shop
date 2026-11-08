@@ -283,6 +283,9 @@ dependencies {
   //  HW-08: وب‌کمِ کامپیوتر به‌عنوانِ بارکدخوان — گرفتنِ فریم (openpnp-capture، MIT، کتابخانهٔ بومیِ ویندوز/مک/لینوکس
   //  درونِ همان jar، روی JNA) و خواندنِ بارکد از تصویر (ZXing، Apache-2.0، جاوای خالص، بی سرویسِ بیرونی)
   implementation("org.openpnp:openpnp-capture-java:0.0.28-0")
+  //  SEC-01 فاز ۲ (`desk.keystore`): DPAPI ویندوز و Keychain مک با همان JNA که openpnp-capture از پیش می‌آورد —
+  //  همان نسخه، فقط آشکار تا برداشتنِ وب‌کم کلیدِ رمزِ دفتر را بی‌صدا نشکند (‎desktop/keystore/‎)؛ وابستگیِ بومیِ تازه‌ای نیست
+  implementation("net.java.dev.jna:jna:5.13.0")
   implementation("com.google.zxing:core:3.5.3")
   //  `org.json` روی اندروید درونِ سیستم است؛ این‌جا باید آورده شود
   implementation("org.json:json:20250517")
