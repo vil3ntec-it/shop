@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.perm.PermCore
 import ir.vil3ntec.tohid.core.product.DecimalText
 
@@ -11,7 +12,7 @@ import ir.vil3ntec.tohid.core.product.DecimalText
 object QuickRegister {
 
   /** یادداشتِ ردیفِ موجودیِ نخست */
-  const val ENTRY_NOTE = "ثبتِ سریع در صندوق"
+  const val ENTRY_NOTE = "ثبتِ سریع در صندوق"  // داده: یادداشتِ ذخیره‌شدهٔ ورودِ انبار
 
   /**
    *  نقشی که کالا ثبت می‌کند — همان `canWrite(role, "products")` ِ سرور (`PermCore`): صاحب، مدیر، شاگرد و انباردار
@@ -50,7 +51,7 @@ object QuickRegister {
     else -> Next.NONE
   }
 
-  data class Draft(val name: String = "", val salePrice: String = "", val unit: String = "عدد", val stock: String = "1")
+  data class Draft(val name: String = "", val salePrice: String = "", val unit: String = "عدد", val stock: String = "1")  // داده: واحدِ پیش‌فرضِ ذخیره‌شده
 
   sealed interface Result {
     /** @param quantity آنچه به فاکتور می‌رود: یک واحد، یا کمتر اگر موجودیِ نوشته‌شده کمتر است */
@@ -60,12 +61,12 @@ object QuickRegister {
 
   fun register(d: ShopData, barcode: String, draft: Draft, today: String, now: Long, newId: () -> String): Result {
     val code = barcode.trim()
-    if (code.isEmpty()) return Result.Failed("بارکد خالی است")
-    val price = DecimalText.scaled(draft.salePrice, 2)?.takeIf { it > 0 } ?: return Result.Failed("قیمتِ فروش را بنویسید")
+    if (code.isEmpty()) return Result.Failed(StrLedger.barcodeEmpty)
+    val price = DecimalText.scaled(draft.salePrice, 2)?.takeIf { it > 0 } ?: return Result.Failed(StrLedger.salePriceNeeded)
     val unit = draft.unit.trim()
-    if (unit.isEmpty()) return Result.Failed("واحد را بنویسید")
+    if (unit.isEmpty()) return Result.Failed(StrLedger.unitNeeded)
     val stock = if (draft.stock.isBlank()) 0L else DecimalText.scaled(draft.stock, 3)?.takeIf { it >= 0 }
-      ?: return Result.Failed("موجودی را با عدد بنویسید")
+      ?: return Result.Failed(StrLedger.stockAsNumber)
     val made = when (val r = WarehouseEngine.addProduct(
       d, WarehouseEngine.ProductDraft(name = draft.name, unit = unit, salePrice = price / 100.0, barcode = code), now, newId,
     )) {

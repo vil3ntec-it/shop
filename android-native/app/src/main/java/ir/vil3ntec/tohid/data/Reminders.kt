@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.nav.DeepLinks
 import androidx.work.Constraints
 import androidx.work.CoroutineWorker
@@ -75,9 +76,9 @@ object Reminders {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
     val channel = NotificationChannel(
       CHANNEL,
-      "یادآوری دکان",
+      StrAppData.remChannel,
       NotificationManager.IMPORTANCE_DEFAULT,
-    ).apply { description = "موجودی تمام‌شده و قرض‌های سررسیده" }
+    ).apply { description = StrAppData.remChannelAbout }
     val manager = context.getSystemService(NotificationManager::class.java)
     manager?.createNotificationChannel(channel)
   }
@@ -100,16 +101,16 @@ object Reminders {
     if (out.isEmpty() && low.isEmpty() && owed.isEmpty()) return null
 
     val title = when {
-      out.isNotEmpty() -> "${out.size} کالا تمام شده"
-      low.isNotEmpty() -> "${low.size} کالا رو به اتمام است"
-      else -> "طلب از مشتریان"
+      out.isNotEmpty() -> StrAppData.remOut(out.size)
+      low.isNotEmpty() -> StrAppData.remLow(low.size)
+      else -> StrAppData.remOwed
     }
 
     val lines = buildList {
-      out.take(2).forEach { add("${it.name}: تمام شد") }
-      low.take(2).forEach { add("${it.name}: ${qty(it.left)} مانده") }
+      out.take(2).forEach { add(StrAppData.remItemOut(it.name)) }
+      low.take(2).forEach { add(StrAppData.remItemLeft(it.name, qty(it.left))) }
       if (owed.isNotEmpty()) {
-        add("${money(owed.sumOf { it.amount })} افغانی طلب از ${owed.size} نفر")
+        add(StrAppData.remOwedSum(money(owed.sumOf { it.amount }), owed.size))
       }
     }
     return title to lines.joinToString(" • ")

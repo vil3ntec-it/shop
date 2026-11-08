@@ -90,8 +90,11 @@ export async function boot({ name, env = {}, port = 0 }) {
   outbox.start();
   await syncV1.syncSchemaTable();
   live.attach(api);
+  //  `CLUSTER_ENABLED=1` روی PostgreSQL: گذرگاه و رهبری مثلِ `src/index.js` (تک‌نمونه یا PGlite ⇒ هیچ، false)
+  const cluster = require('../../../src/lib/cluster');
+  await cluster.start();
   const apiBase = `http://127.0.0.1:${api.address().port}`;
-  return new Harness({ name, db, apiBase, inbox, api, outbox, tmp });
+  return new Harness({ name, db, apiBase, inbox, api, outbox, tmp, cluster });
 }
 
 class Harness {
@@ -258,8 +261,11 @@ class Harness {
     for (const pg of this.pages) await pg.ctx.close().catch(() => {});
     if (this._browser) await this._browser.close().catch(() => {});
     this.outbox.stop();
+    //  همان خاموشیِ `src/index.js`: رهبری و گذرگاه (اگر خوشه است)، استخرِ نسخهٔ خواندنی (اگر هست)
+    await this.cluster.stop().catch(() => {});
     this.api.closeAllConnections?.();
     await new Promise((r) => this.api.close(r));
+    await require('../../../src/lib/read-replica').stop().catch(() => {});
     await this.db.closeDb().catch(() => {});
     const failed = this.results.filter((r) => r.status === 'fail').length;
     const out = process.env.E2E_RESULTS_DIR;

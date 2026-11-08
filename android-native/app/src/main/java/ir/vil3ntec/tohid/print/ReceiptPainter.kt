@@ -62,7 +62,7 @@ class ReceiptPainter(context: Context) : ReceiptRaster.TextRenderer {
         block.notes.forEach { line(it, small, Layout.Alignment.ALIGN_NORMAL) }
         y += metrics.gap / 2
       }
-      else -> error("بلوکِ نوشته نیست: $block")
+      else -> error("بلوکِ نوشته نیست: $block")  // داده: خطای برنامه‌نویس (بلوکِ نادرستِ کد، نه کاربر)
     }
     return draw(placed, widthDots, y.coerceAtLeast(1))
   }

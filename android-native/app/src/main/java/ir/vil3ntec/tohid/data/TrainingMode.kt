@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,7 +32,7 @@ object TrainingMode {
   const val LEDGER = "shop-data.json"
 
   /** مهرِ فاکتور و رسید — `Receipts` */
-  const val WATERMARK = "آموزشی"
+  val WATERMARK: String get() = StrLedger.trainingMark
 
   /** کدِ خطای `ApiFailure` وقتی درخواستی در حالتِ آموزشی خواسته شد */
   const val NETWORK_CODE = "training_mode"

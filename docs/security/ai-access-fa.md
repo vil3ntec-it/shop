@@ -100,7 +100,7 @@ secret‌مانندِ واقعیِ workspace (امروز: `tohid-release.jks`) �
 |---|---|---|---|
 | ریختنِ کلِ env در ترنسکریپتِ عامل | متوسط | Bash | بسته (`env`، `printenv`، `export -p`) — 05a |
 | `create-admin.js` رمزِ ساخته‌شده را چاپ می‌کند وقتی رمز داده نشود | پایین | `server/scripts/create-admin.js:44` | عمداً برای اپراتور (RULES، «سرور: پشتیبانِ بی‌رمز و ورودِ دومرحله‌ایِ مدیر»)؛ رفتار عوض نشد. اجرا به‌دستِ عامل بسته شد (سه شکلِ رایج؛ شکل‌های دیگر را نمی‌گیرد) — 05a |
-| `send-test-sms.js` | اطلاع | `server/scripts/send-test-sms.js:29-35` | کلید را فقط با طول نشان می‌دهد؛ آدرس را **الگو** (`{key}`) چاپ می‌کند — اگر اپراتور کلید را خامِ درونِ `SMS_API_URL` بگذارد چاپ می‌شود. با `OTP_PROVIDER=log` کد را چاپ می‌کند (ابزارِ آزمون) |
+| `send-test-sms.js` | اطلاع | `server/scripts/send-test-sms.js:29-35` | از کلید فقط «تنظیم شده / نشده» را نشان می‌دهد، نه حتی طولش (CodeQL)؛ آدرس را **الگو** (`{key}`) چاپ می‌کند — اگر اپراتور کلید را خامِ درونِ `SMS_API_URL` بگذارد چاپ می‌شود. با `OTP_PROVIDER=log` کد را چاپ می‌کند (ابزارِ آزمون) |
 | لاگِ درخواستِ سرور | — | `server/src/lib/log-redact.js` | توکنِ مسیر `:tok` می‌شود و querystring هرگز؛ کدِ ورود از لاگِ production در #493 رفت (حوزهٔ `sec-api-web`) |
 | ورک‌فلوهای CI | — | `.github/workflows/*.yml` | secretها فقط از env به فایلِ `$RUNNER_TEMP` می‌روند (`base64 -d >`، `printf >`)؛ نه `set -x`، نه `printenv`، نه چاپِ env؛ `GITHUB_TOKEN` ِ `desktop-shots.yml` درونِ URL ِ git است و Actions پنهانش می‌کند. `android-release.yml` کلید را در `android/app/release.keystore` ِ کارگاه باز می‌کند ولی فقط `out/*.apk` بالا می‌رود — 05b |
 | ابزارهای این شاخه | — | `tools/ai-access/*`، `tools/api-contract/*` | فقط نامِ مسیر، دستور و حکم چاپ می‌کنند؛ مولدِ قرارداد secretِ ساختگی و envِ پاک دارد |

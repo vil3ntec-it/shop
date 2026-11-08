@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import kotlin.math.abs
 
 /**
@@ -60,23 +61,23 @@ object StockPlaces {
   fun hasPlace(d: ShopData, key: String): Boolean = d.auditLog.any { it.id == key }
 
   fun addPlace(d: ShopData, key: String, raw: String, user: String, today: String, now: Long): Result {
-    if (key.isBlank()) return Result.Failed("شناسهٔ کار خالی است")
+    if (key.isBlank()) return Result.Failed(StrGoods.opIdEmpty)
     if (hasPlace(d, key)) return Result.Already
     val name = clean(raw)
-    if (name.isEmpty()) return Result.Failed("نامِ محل را بنویسید")
-    if (name.length > MAX_NAME) return Result.Failed("نامِ محل حداکثر $MAX_NAME حرف است")
-    if (registered(d).any { it.equals(name, ignoreCase = true) }) return Result.Failed("«$name» از پیش هست")
-    return Result.Ok(d.copy(auditLog = d.auditLog + placeRow(key, name, ADD, user, today, now, "محلِ نگه‌داریِ «$name» افزوده شد")), key)
+    if (name.isEmpty()) return Result.Failed(StrGoods.placeNameNeeded)
+    if (name.length > MAX_NAME) return Result.Failed(StrGoods.placeNameTooLong(MAX_NAME))
+    if (registered(d).any { it.equals(name, ignoreCase = true) }) return Result.Failed(StrGoods.placeExists(name))
+    return Result.Ok(d.copy(auditLog = d.auditLog + placeRow(key, name, ADD, user, today, now, "محلِ نگه‌داریِ «$name» افزوده شد")), key)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
   }
 
   /** بایگانی فقط وقتی هیچ کالایی در آن محل نمانده؛ ردیف‌های گذشته دست نمی‌خورند */
   fun archivePlace(d: ShopData, key: String, name: String, user: String, today: String, now: Long): Result {
-    if (key.isBlank()) return Result.Failed("شناسهٔ کار خالی است")
+    if (key.isBlank()) return Result.Failed(StrGoods.opIdEmpty)
     if (hasPlace(d, key)) return Result.Already
-    if (name !in registered(d)) return Result.Failed("این محل در فهرست نیست")
+    if (name !in registered(d)) return Result.Failed(StrGoods.placeNotListed)
     val left = stockAt(d).values.count { (it[name] ?: 0L) != 0L }
-    if (left > 0) return Result.Failed("در «$name» هنوز $left کالا هست — اول جابه‌جا کنید")
-    return Result.Ok(d.copy(auditLog = d.auditLog + placeRow(key, name, ARCHIVE, user, today, now, "محلِ نگه‌داریِ «$name» بایگانی شد")), key)
+    if (left > 0) return Result.Failed(StrGoods.placeNotEmpty(name, left))
+    return Result.Ok(d.copy(auditLog = d.auditLog + placeRow(key, name, ARCHIVE, user, today, now, "محلِ نگه‌داریِ «$name» بایگانی شد")), key)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
   }
 
   private fun placeRow(id: String, name: String, op: String, user: String, today: String, now: Long, note: String) = AuditEntry(
@@ -144,20 +145,20 @@ object StockPlaces {
     now: Long,
     newId: () -> String,
   ): Result {
-    if (key.isBlank()) return Result.Failed("شناسهٔ کار خالی است")
+    if (key.isBlank()) return Result.Failed(StrGoods.opIdEmpty)
     if (has(d, key)) return Result.Already
-    val p = d.products.find { it.id == productId } ?: return Result.Failed("کالا را انتخاب کنید")
-    if (ProductPlansMap.isKit(p)) return Result.Failed("«${p.name}» کیت است و موجودیِ خودش را ندارد")
-    if (p.stockless == true) return Result.Failed("«${p.name}» خدماتی است و موجودی ندارد")
+    val p = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.pickItem)
+    if (ProductPlansMap.isKit(p)) return Result.Failed(StrGoods.isKit(p.name))
+    if (p.stockless == true) return Result.Failed(StrGoods.isService(p.name))
     val src = clean(from)
     val dest = clean(to)
-    if (src == dest) return Result.Failed("مقصد باید با مبدأ فرق کند")
-    if (dest.length > MAX_NAME) return Result.Failed("نامِ محل حداکثر $MAX_NAME حرف است")
-    if (qtyMilli <= 0L) return Result.Failed("مقدار درست نیست")
+    if (src == dest) return Result.Failed(StrGoods.destSame)
+    if (dest.length > MAX_NAME) return Result.Failed(StrGoods.placeNameTooLong(MAX_NAME))
+    if (qtyMilli <= 0L) return Result.Failed(StrGoods.qtyBad)
     //  همان نگهبانِ `adjustStock`: مبدأ منفی نمی‌شود
     val have = at(stockAt(d), productId, src)
     if (qtyMilli > have) {
-      return Result.Failed("در «${label(src)}» فقط ${ir.vil3ntec.tohid.qty(maxOf(0L, have) / 1000.0)} ${p.unit} هست")
+      return Result.Failed(StrGoods.onlyAt(label(src), ir.vil3ntec.tohid.qty(maxOf(0L, have) / 1000.0), p.unit))
     }
     return Result.Ok(StockActions.transferRows(d, p, src, dest, qtyMilli, null, reason, user, today, now, key, newId), key)
   }

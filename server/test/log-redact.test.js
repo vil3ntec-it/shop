@@ -29,6 +29,16 @@ test('redactPath: بخشِ توکن‌مانند ⇒ `:tok`؛ نامِ مسیر�
   assert.equal(redactPath(''), '');
 });
 
+test('⛔ redactPath: CR/LF ِ خام هرگز به لاگ نمی‌رسد (log injection)؛ `%0A` ِ رمزشده و مسیرِ عادی همان‌اند', () => {
+  assert.equal(redactPath('/api/x\r\n200 GET /api/admin 1ms'), '/api/x200 GET /api/admin 1ms');
+  assert.equal(redactPath('/a\nb/c\rd'), '/ab/cd');
+  assert.ok(!/[\r\n]/.test(redactPath(`/x/${'\n'.repeat(300)}`)));
+  assert.equal(redactPath('/api/x%0D%0Ay'), '/api/x%0D%0Ay');
+  assert.equal(redactPath('/api/shop/storefront/products/rice'), '/api/shop/storefront/products/rice');
+  //  سقفِ ۱۲۰ نویسه پس از پاک‌سازی
+  assert.equal(redactPath(`/${'\n'.repeat(50)}${'a/'.repeat(100)}`).length, 120);
+});
+
 test('⛔ لاگِ ۴۰۴ ِ پیگیریِ سفارش توکن را ندارد', async () => {
   await h.start();
   const lines = [];

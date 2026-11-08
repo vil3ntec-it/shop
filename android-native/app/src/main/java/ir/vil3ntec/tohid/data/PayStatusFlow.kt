@@ -172,8 +172,8 @@ object PayStatusFlow {
 
   /** نامِ فارسیِ وضعیت در متنِ سابقه (داده؛ همگام می‌شود و با زبانِ صفحه عوض نمی‌شود) */
   private val LOG_NAMES = mapOf(
-    PayStatus.PENDING to "در انتظار", PayStatus.CONFIRMED to "تأییدشده", PayStatus.FAILED to "ناموفق",
-    PayStatus.CANCELLED to "لغو", PayStatus.NEEDS_REVIEW to "نیازمند بررسی",
+    PayStatus.PENDING to "در انتظار", PayStatus.CONFIRMED to "تأییدشده", PayStatus.FAILED to "ناموفق",  // داده: نامِ حالت درونِ یادداشتِ سابقه
+    PayStatus.CANCELLED to "لغو", PayStatus.NEEDS_REVIEW to "نیازمند بررسی",  // داده: نامِ حالت درونِ یادداشتِ سابقه
   )
 
   /** ردیفِ سابقهٔ یک تغییر */
@@ -181,8 +181,8 @@ object PayStatusFlow {
     val amount = sale.payments?.getOrNull(c.index)?.amountMinor ?: 0L
     return AuditEntry(
       id = c.id, type = PayStatus.TYPE, date = today, refId = c.saleId, amount = PayFlow.major(amount), createdAt = c.at,
-      notes = "وضعیتِ پرداختِ فاکتور #${sale.invoiceLabel() ?: "0"}: ${PayFlow.methodName(c.method)} " +
-        "${ir.vil3ntec.tohid.money(PayFlow.major(amount))} افغانی، ${LOG_NAMES[c.from] ?: c.from} ⇐ ${LOG_NAMES[c.to] ?: c.to}" +
+      notes = "وضعیتِ پرداختِ فاکتور #${sale.invoiceLabel() ?: "0"}: ${PayFlow.methodName(c.method)} " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        "${ir.vil3ntec.tohid.money(PayFlow.major(amount))} افغانی، ${LOG_NAMES[c.from] ?: c.from} ⇐ ${LOG_NAMES[c.to] ?: c.to}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         (c.note?.let { " — $it" } ?: ""),
       by = c.by, note = c.note, payRow = c.index, payMethod = c.method, fromStatus = c.from, toStatus = c.to,
     )

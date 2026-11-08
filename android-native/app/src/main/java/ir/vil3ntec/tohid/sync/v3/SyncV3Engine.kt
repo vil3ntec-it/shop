@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v3
 
 import ir.vil3ntec.tohid.core.hub.HubRelayPort
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.v3.HlcClock
@@ -352,7 +353,7 @@ internal class SyncV3Engine(
   private fun errorMessage(status: Int, body: JsonObject?): String {
     (body?.get("message") as? JsonPrimitive)?.content?.takeIf { it.isNotEmpty() }?.let { return it }
     (((body?.get("error") as? JsonObject)?.get("message")) as? JsonPrimitive)?.content?.let { return it }
-    return if (status == 0) "به سرور نرسیدیم" else "خطای سرور ($status)"
+    return if (status == 0) "به سرور نرسیدیم" else "خطای سرور ($status)"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
   }
 
   /** همان فرمولِ v1 (`SyncV1Engine.backoffMs`، `sync-core.js → backoffMs`): ۲ث تا ۵دق، ±۲۵٪ */
@@ -786,14 +787,12 @@ internal class SyncV3Engine(
     const val MIN_BACKOFF_MS = 2000L
     const val MAX_BACKOFF_MS = 5 * 60 * 1000L
     val DONE = setOf("applied", "partial", "conflict", "duplicate")
-    const val UPGRADE_MESSAGE = "همگام‌سازی نگه داشته شد: برنامه را به‌روز کنید. تغییرهای شما روی همین دستگاه مانده‌اند."
+    const val UPGRADE_MESSAGE = "همگام‌سازی نگه داشته شد: برنامه را به‌روز کنید. تغییرهای شما روی همین دستگاه مانده‌اند."  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     /** §۹.۵: سقفِ `POST /api/sync/v3/deleted` (`sync-epoch.MAX_ASK`) */
     const val DELETED_CHUNK = 500
-    const val INCOMPLETE_MESSAGE = "سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند."
+    const val INCOMPLETE_MESSAGE = "سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند."  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
-    const val RESTORE_NOTICE =
-      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
-        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
+    val RESTORE_NOTICE: String get() = StrSync.restoreNotice
   }
 }

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.sync
 
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import java.security.KeyFactory
 import java.security.MessageDigest
 import java.security.Signature
@@ -41,7 +42,7 @@ object OfflineCode {
     val body: ByteArray,
     val sig: ByteArray,
   ) {
-    val planTitle: String get() = if (permanent) "اشتراکِ دائمی (کدِ آفلاین)" else "اشتراک (کدِ آفلاین)"
+    val planTitle: String get() = if (permanent) StrSync.planForever else StrSync.planOffline
   }
 
   sealed interface Verdict {
@@ -120,14 +121,14 @@ object OfflineCode {
 
   /** پیامِ فارسیِ هر دلیل */
   fun reasonText(reason: String): String = when (reason) {
-    "format" -> "کد کامل یا درست نیست — همهٔ ۱۳۸ نویسه را بچسبانید"
-    "signature" -> "این کد از سرورِ «فروشگاه من» نیست یا دست خورده است"
-    "computer" -> "این کد برای کامپیوترِ دیگری ساخته شده است"
-    "account" -> "این کد برای حسابِ دیگری ساخته شده است"
-    "expired" -> "مهلتِ این کد تمام شده است"
-    "used" -> "این کد یک بار در این برنامه استفاده شده است"
-    "no_key" -> "کلیدِ مجوز در این نسخه نیست؛ یک بار با اینترنت وارد شوید"
-    else -> "کد پذیرفته نشد"
+    "format" -> StrSync.codeFormat
+    "signature" -> StrSync.codeSignature
+    "computer" -> StrSync.codeComputer
+    "account" -> StrSync.codeAccount
+    "expired" -> StrSync.codeExpired
+    "used" -> StrSync.codeUsed
+    "no_key" -> StrSync.codeNoKey
+    else -> StrSync.codeRejected
   }
 
   /* ── base32ِ کراکفورد ─────────────────────────────────────────────── */

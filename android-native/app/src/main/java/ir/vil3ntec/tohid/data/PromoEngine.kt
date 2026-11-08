@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import kotlin.math.roundToLong
 
@@ -320,10 +321,10 @@ object PromoEngine {
 
   /** پیامِ فارسیِ وضعیتِ یک کدِ واردشده */
   fun codeText(status: String): String = when (status) {
-    "applied" -> "اعمال شد"
-    "no_effect" -> "روی این سبد اثری ندارد"
-    "used_up" -> "ظرفیتِ این کد پر شده است"
-    "inactive" -> "این کد الآن فعال نیست"
-    else -> "این کد پیدا نشد"
+    "applied" -> StrGoods.promoApplied
+    "no_effect" -> StrGoods.promoNoEffect
+    "used_up" -> StrGoods.promoUsedUp
+    "inactive" -> StrGoods.promoInactive
+    else -> StrGoods.promoNotFound
   }
 }

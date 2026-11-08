@@ -59,17 +59,17 @@ object TaxQuarter {
   /** برگهٔ CSV/چاپ: یک ردیف برای هر بند؛ عدد لاتین و به افغانی (همان `ShrinkLoss.afn`) */
   fun sheet(r: Report, startMonth: Int): ReportCsv.Sheet {
     val s = r.summary
-    val rows = mutableListOf(listOf("بند", "تعداد سند", "مبلغ (افغانی)"))
-    rows += listOf("دوره", monthsLabel(r.quarter, startMonth), "${s.from} تا ${s.to}")
-    rows += listOf("فروشِ مشمول", "${s.salesCount}", ShrinkLoss.afn(s.salesMinor))
-    rows += listOf("برگشتِ فروش", "${s.returnsCount}", ShrinkLoss.afn(s.returnsMinor))
-    rows += listOf("درآمدِ ناخالصِ خالص", "", ShrinkLoss.afn(s.netMinor))
-    rows += listOf("نرخ (درصد)", "", QuarterTax.rateText(s.rateBp))
-    rows += listOf("مالیاتِ فروش", "", ShrinkLoss.afn(s.salesTaxMinor))
-    rows += listOf("مالیاتِ برگشت", "", ShrinkLoss.afn(s.returnsTaxMinor))
-    rows += listOf("مالیاتِ خالصِ دوره", "", ShrinkLoss.afn(s.netTaxMinor))
-    rows += listOf("خرید (مالیاتِ خرید ثبت نمی‌شود)", "${s.purchasesCount}", ShrinkLoss.afn(s.purchasesMinor))
-    rows += listOf("سررسید", "", r.dueIso.orEmpty())
-    return ReportCsv.Sheet("مالیات-سه‌ماهه-${r.quarter.fiscalYear}-Q${r.quarter.q}", rows)
+    val rows = mutableListOf(listOf("بند", "تعداد سند", "مبلغ (افغانی)"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("دوره", monthsLabel(r.quarter, startMonth), "${s.from} تا ${s.to}")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("فروشِ مشمول", "${s.salesCount}", ShrinkLoss.afn(s.salesMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("برگشتِ فروش", "${s.returnsCount}", ShrinkLoss.afn(s.returnsMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("درآمدِ ناخالصِ خالص", "", ShrinkLoss.afn(s.netMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("نرخ (درصد)", "", QuarterTax.rateText(s.rateBp))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("مالیاتِ فروش", "", ShrinkLoss.afn(s.salesTaxMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("مالیاتِ برگشت", "", ShrinkLoss.afn(s.returnsTaxMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("مالیاتِ خالصِ دوره", "", ShrinkLoss.afn(s.netTaxMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("خرید (مالیاتِ خرید ثبت نمی‌شود)", "${s.purchasesCount}", ShrinkLoss.afn(s.purchasesMinor))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("سررسید", "", r.dueIso.orEmpty())  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    return ReportCsv.Sheet("مالیات-سه‌ماهه-${r.quarter.fiscalYear}-Q${r.quarter.q}", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

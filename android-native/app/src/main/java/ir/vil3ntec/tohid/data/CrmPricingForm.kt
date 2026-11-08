@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 
 /**
@@ -45,7 +46,7 @@ object CrmPricingForm {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
     val profile = CustomerCrm.profileOf(c).copy(group = input.group, priceList = input.priceList)
     val first = CustomerCrm.setProfile(d, id, profile, today, now, newId)
     if (first !is DebtorEngine.Result.Ok) return first

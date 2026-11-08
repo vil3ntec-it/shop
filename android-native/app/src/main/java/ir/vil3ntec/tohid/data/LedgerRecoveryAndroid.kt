@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.atrest.AtRestException
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
@@ -182,12 +183,12 @@ object LedgerRecovery {
     } catch (e: AtRestException) {
       throw e
     } catch (e: Exception) {
-      throw IOException("«${file.name}» خوانده نشد؛ برای اینکه رونویسی نشود، کاری انجام نشد", e)
+      throw IOException(StrAppData.notReadKept(file.name), e)
     }
     return runCatching { decode(text) }.getOrElse { e ->
       val keep = File(file.absoluteFile.parentFile, "${file.name}.corrupt-${file.length()}")
       if (!keep.exists()) runCatching { DiskWrite.copy(file, keep) }
-      throw IOException("«${file.name}» خراب است (رونوشتش کنار رفت: ${keep.name})؛ کاری انجام نشد", e)
+      throw IOException(StrAppData.damagedSetAside(file.name, keep.name), e)
     }
   }
 

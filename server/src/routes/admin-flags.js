@@ -55,6 +55,13 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.web_account', scope: 'shop', default: false, what: 'حسابِ مشتری در وبِ ویترین: پیشنهاد پس از ثبت، نشانی‌های نام‌دار و همگامیِ سبد (CHK-01/09، WEB-14)' },
   { key: 'shop.storefront.account_history', scope: 'shop', default: false, what: '«حسابِ من» ِ ویترین: خریدِ حضوری و مانده' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
+  //  دستهٔ ۲۷ (چک‌لیستِ روشن کردن: docs/FLAGS-ON-fa.md) — بی ردیفِ این‌جا زبانهٔ «پرچم‌ها» آن‌ها را نشان نمی‌داد و مقدارِ
+  //  نادرست (مثلاً «"true"» ِ رشته‌ای) بی‌صدا هیچ اثری نداشت
+  { key: 'shop.approval_requests', scope: 'shop', default: false, what: 'درخواستِ تأیید از راهِ دور: کارمند می‌پرسد، صاحب/مدیر روی گوشیِ خودش تأیید می‌کند (STF-02)' },
+  { key: 'shop.credit_cap', scope: 'shop', default: false, what: 'سقفِ فروشِ قرضیِ کارمند در سرور (`sales.credit`، STF-03)' },
+  { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
+  { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
+  { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },

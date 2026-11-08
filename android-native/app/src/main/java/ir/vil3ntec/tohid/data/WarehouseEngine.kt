@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.product.BulkPrice
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 import ir.vil3ntec.tohid.core.money.Qty
@@ -98,15 +102,15 @@ object WarehouseEngine {
 
   /** هزینهٔ جانبیِ نادرست — `null` یعنی درست یا نیامده */
   private fun landedProblem(draft: EntryDraft): String? =
-    draft.landedCost?.takeIf { it.isNaN() || it < 0 }?.let { "هزینهٔ جانبی درست نیست" }
+    draft.landedCost?.takeIf { it.isNaN() || it < 0 }?.let { StrPurchasePages.landedBad }
 
   /** تاریخِ تولید درست است و از انقضا جلوتر نیست — `null` یعنی درست */
   private fun datesProblem(draft: EntryDraft): String? {
-    if (!ExpiryEngine.validDate(draft.expiryDate)) return "تاریخِ انقضا درست نیست"
-    if (!ExpiryEngine.validDate(draft.productionDate)) return "تاریخِ تولید درست نیست"
+    if (!ExpiryEngine.validDate(draft.expiryDate)) return StrStock.errExpiry
+    if (!ExpiryEngine.validDate(draft.productionDate)) return StrStock.errMade
     val made = draft.productionDate.trim()
     val exp = draft.expiryDate.trim()
-    if (made.isNotEmpty() && exp.isNotEmpty() && made > exp) return "تاریخِ تولید بعد از انقضا است"
+    if (made.isNotEmpty() && exp.isNotEmpty() && made > exp) return StrGoods.madeAfterExpiry
     return null
   }
 
@@ -150,10 +154,10 @@ object WarehouseEngine {
     /** INV-02 — کاربرِ ثبت‌کننده روی هر حرکت؛ `null` ⇒ مثلِ پیش */
     userId: String? = null,
   ): Result {
-    if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed("مقدارِ شمرده‌شده نمی‌تواند منفی باشد")
+    if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed(StrGoods.countedNegative)
     val lines = countLines(d, counted, shift)
-    if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
-    val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")
+    if (lines.isEmpty()) return Result.Failed(StrGoods.noDifference)
+    val why = listOf("انبارگردانی", note.trim()).filter { it.isNotEmpty() }.joinToString(" — ")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     var data = d
     var lastId = ""
     for (l in lines) {
@@ -200,27 +204,27 @@ object WarehouseEngine {
 
   /** فهرستِ خوانای تغییرها — قیمتِ خرید جدا در `price_change` ثبت می‌شود */
   internal fun productChanges(a: Product, b: Product): List<String> = buildList {
-    if (a.name != b.name) add("نام «${a.name}» ⇐ «${b.name}»")
-    if (a.salePrice != b.salePrice) add("قیمت فروش ${money(a.salePrice)} ⇐ ${money(b.salePrice)}")
-    if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")
-    if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")
-    if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")
-    if (a.reorderPoint != b.reorderPoint) add("نقطهٔ سفارش ${levelText(a.reorderPoint)} ⇐ ${levelText(b.reorderPoint)}")
-    if (a.maxStock != b.maxStock) add("حداکثر موجودی ${levelText(a.maxStock)} ⇐ ${levelText(b.maxStock)}")
-    if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")
-    if (a.barcodes != b.barcodes) add("بارکد عوض شد")
+    if (a.name != b.name) add("نام «${a.name}» ⇐ «${b.name}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.salePrice != b.salePrice) add("قیمت فروش ${money(a.salePrice)} ⇐ ${money(b.salePrice)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.reorderPoint != b.reorderPoint) add("نقطهٔ سفارش ${levelText(a.reorderPoint)} ⇐ ${levelText(b.reorderPoint)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.maxStock != b.maxStock) add("حداکثر موجودی ${levelText(a.maxStock)} ⇐ ${levelText(b.maxStock)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.active != b.active) add(if (b.active) "فعال شد" else "غیرفعال شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.barcodes != b.barcodes) add("بارکد عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     //  PRD-02/PRD-26 — فقط وقتی فرمِ همین بخش چیزی را عوض کرد (خاموش ⇒ هرگز)
     if (a.namePs != b.namePs || a.nameEn != b.nameEn || a.synonyms != b.synonyms || a.keywords != b.keywords) {
-      add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")
+      add("نام‌های دیگر یا واژه‌های جست‌وجو عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     }
     addAll(ProductInfoMap.changes(a, b)) // محلِ قفسه، جایگزین، فیلدِ سفارشی؛ PRD-03/09: کد و خدماتی
-    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
-    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
-    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")
-    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")
+    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.brand.orEmpty() != b.brand.orEmpty()) add("برند «${a.brand.orEmpty()}» ⇐ «${b.brand.orEmpty()}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.tags.orEmpty() != b.tags.orEmpty()) add("برچسب‌ها «${a.tags.orEmpty().joinToString("، ")}» ⇐ «${b.tags.orEmpty().joinToString("، ")}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     if (a.packs.orEmpty() != b.packs.orEmpty()) {
-      add(if (b.packs.isNullOrEmpty()) "بسته‌ها برداشته شد"
-        else "بسته‌ها «${b.packs.joinToString("، ") { PackBarcodes.label(ShopStore.coreOf(it), b.unit) }}»")
+      add(if (b.packs.isNullOrEmpty()) "بسته‌ها برداشته شد"  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+        else "بسته‌ها «${b.packs.joinToString("، ") { PackBarcodes.label(ShopStore.coreOf(it), b.unit) }}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     }
   }
 
@@ -270,31 +274,31 @@ object WarehouseEngine {
   private fun unitProblem(unit: String, saleUnit: String?, factor: Double?): String? {
     val su = saleUnit?.trim().orEmpty()
     if (su.isEmpty()) return null
-    if (su == unit.trim()) return "واحدِ فروش همان واحدِ موجودی است — خالی بگذارید"
-    val f = factor ?: return "ضریبِ تبدیل را بنویسید"
-    if (f.isNaN() || f.isInfinite() || f <= 0) return "ضریبِ تبدیل باید عددی بزرگ‌تر از صفر باشد"
+    if (su == unit.trim()) return StrGoods.saleUnitSame
+    val f = factor ?: return StrGoods.factorNeeded
+    if (f.isNaN() || f.isInfinite() || f <= 0) return StrGoods.factorPositive
     return null
   }
 
   fun addProduct(d: ShopData, draft: ProductDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
+    if (name.isEmpty()) return Result.Failed(StrGoods.nameNeeded)
     //  کالای هم‌نام، موجودی و گزارش را دو تکه می‌کند و فروشنده نمی‌داند کدام را بزند
-    duplicateName(d, name)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    duplicateName(d, name)?.let { return Result.Failed(StrGoods.nameTaken(it.name)) }
     unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
-    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed(StrGoods.salePriceBad)
+    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrGoods.buyPriceBad)
     val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
     if (draft.editLevels) levelsProblem(minStock, draft.reorderPoint, draft.maxStock)?.let { return Result.Failed(it) }
 
     val barcode = draft.barcode.trim()
     val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
       ?: (if (barcode.isEmpty()) emptyList() else listOf(barcode))
-    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed(StrGoods.maxBarcodes(plain(ProductBarcodes.MAX)))
     // بارکدِ تکراری، کالای قبلی را از دسترسِ اسکنر بیرون می‌برد — بارکدِ بستهٔ کالای دیگر هم (PRD-04)
     val index = ShopStore.codeOwners(d)
     ProductBarcodes.conflict(codes, null) { index[it] }?.let {
-      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) StrGoods.barcodeTaken else StrGoods.barcodeNTaken(it))
     }
     val (packs, packProblem) = packsOf(draft.packs, null, draft.unit, draft.saleUnit.orEmpty(), codes, null, index)
     (packProblem ?: draft.info?.let { ProductInfoMap.skuProblem(d, it, null, null) })?.let { return Result.Failed(it) } // PRD-03: کد یکتا
@@ -342,14 +346,14 @@ object WarehouseEngine {
     now: Long,
     newId: () -> String,
   ): Result {
-    val existing = d.products.find { it.id == id } ?: return Result.Failed("کالا پیدا نشد")
+    val existing = d.products.find { it.id == id } ?: return Result.Failed(StrGoods.productNotFound)
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام کالا را بنویسید")
-    duplicateName(d, name, exceptId = id)?.let { return Result.Failed("کالایی به نامِ «${it.name}» از قبل هست") }
+    if (name.isEmpty()) return Result.Failed(StrGoods.nameNeeded)
+    duplicateName(d, name, exceptId = id)?.let { return Result.Failed(StrGoods.nameTaken(it.name)) }
     unitProblem(draft.unit, draft.saleUnit ?: existing.saleUnit, draft.unitFactor ?: existing.unitFactor)
       ?.let { return Result.Failed(it) }
-    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed("قیمت فروش درست نیست")
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید درست نیست")
+    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed(StrGoods.salePriceBad)
+    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrGoods.buyPriceBad)
     //  حدِ کم بودن همیشه از فرم می‌آید؛ نقطهٔ سفارش و بیشینه فقط وقتی فرم آن‌ها را دارد — ترتیبِ هر سه با هم سنجیده می‌شود
     val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
     val reorderPoint = if (draft.editLevels) draft.reorderPoint else existing.reorderPoint
@@ -362,13 +366,13 @@ object WarehouseEngine {
     //  فرمِ تک‌بارکدی فقط بارکدِ نخست را عوض می‌کند؛ بقیه نمی‌افتند (رفعِ از دست رفتنِ داده، #476؛ PRD-04)
     val codes = draft.barcodes?.let { it.flatMap(ProductBarcodes::parse).distinct() }
       ?: ProductBarcodes.mergePrimary(barcode, existing.barcodes)
-    if (codes.size > ProductBarcodes.MAX) return Result.Failed("حداکثر ${plain(ProductBarcodes.MAX)} بارکد برای یک کالا")
+    if (codes.size > ProductBarcodes.MAX) return Result.Failed(StrGoods.maxBarcodes(plain(ProductBarcodes.MAX)))
     // بارکدِ تکراری فقط وقتی ایراد دارد که مالِ کالای دیگری باشد — و فقط بارکدِ **تازه** سنجیده می‌شود:
     // تعارضِ آفلاینِ قدیمی (§۳.۴) ویرایشِ نام یا قیمت را قفل نمی‌کند
     val index = ShopStore.codeOwners(d)
     //  فرمِ تک‌بارکدی (`barcodes == null`) همان پیامِ همیشگی را می‌گیرد، هر چند بارکدِ دیگر هم کالا داشته باشد (#476)
     ProductBarcodes.conflict(codes.filter { it !in existing.barcodes }, id) { index[it] }?.let {
-      return Result.Failed(if (draft.barcodes == null || codes.size == 1) "این بارکد قبلاً برای کالای دیگری ثبت شده" else "بارکدِ $it قبلاً برای کالای دیگری ثبت شده")
+      return Result.Failed(if (draft.barcodes == null || codes.size == 1) StrGoods.barcodeTaken else StrGoods.barcodeNTaken(it))
     }
     val unitNow = draft.unit
     val (packs, packProblem) = packsOf(draft.packs, existing.packs, unitNow, draft.saleUnit ?: existing.saleUnit, codes, id, index)
@@ -376,11 +380,11 @@ object WarehouseEngine {
     (packProblem ?: draft.info?.let { ProductInfoMap.skuProblem(d, it, id, existing.sku) })?.let { return Result.Failed(it) }
     //  PRD-04: بارکدِ تازهٔ کالا بارکدِ بستهٔ خودش نباشد — وگرنه یک اسکن هم «۱» بود هم «۲۴»
     packs.orEmpty().firstNotNullOfOrNull { pk -> codes.firstOrNull { it in pk.barcodes && it !in existing.barcodes }?.let { it to pk } }?.let { (code, pk) ->
-      return Result.Failed("بارکدِ $code بارکدِ بستهٔ «${pk.name}» همین کالاست")
+      return Result.Failed(StrGoods.barcodeIsPack(code, pk.name))
     }
     //  واحدِ موجودی عوض شد ⇒ اندازهٔ بسته‌ها (به همان واحد) دیگر معنا ندارد
     if (packs != null && draft.packs == null && unitNow != existing.unit) {
-      return Result.Failed("این کالا بسته دارد؛ پیش از عوض کردنِ واحد، بسته‌ها را بردارید یا دوباره بنویسید")
+      return Result.Failed(StrGoods.hasPacks)
     }
 
     val updated = existing.copy(
@@ -411,7 +415,7 @@ object WarehouseEngine {
     var audit = d.auditLog
     val by = draft.changedBy?.trim()?.ifEmpty { null }
     val why = draft.reason?.trim()?.ifEmpty { null }
-    val whySuffix = why?.let { " — دلیل: $it" }.orEmpty()
+    val whySuffix = why?.let { " — دلیل: $it" }.orEmpty()  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     if (existing.purchasePrice != draft.purchasePrice) {
       history = history + PriceChange(
         id = newId(),
@@ -428,7 +432,7 @@ object WarehouseEngine {
         type = "price_change",
         date = today,
         refId = id,
-        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی$whySuffix",
+        notes = "تغییر قیمت خرید از ${money(existing.purchasePrice)} به ${money(draft.purchasePrice)} افغانی$whySuffix",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
         by = by,
       )
@@ -441,7 +445,7 @@ object WarehouseEngine {
         type = "product_edit",
         date = today,
         refId = id,
-        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice) whySuffix else "",
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice) whySuffix else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
         by = by,
       )
@@ -467,7 +471,7 @@ object WarehouseEngine {
    * می‌کند. فقط خودِ کالا و ورودی‌های انبارش می‌روند.
    */
   fun deleteProduct(d: ShopData, id: String, today: String, now: Long, newId: () -> String): Result {
-    val product = d.products.find { it.id == id } ?: return Result.Failed("کالا پیدا نشد")
+    val product = d.products.find { it.id == id } ?: return Result.Failed(StrGoods.productNotFound)
     return Result.Ok(
       d.copy(
         products = d.products.filter { it.id != id },
@@ -492,7 +496,7 @@ object WarehouseEngine {
           type = "delete_product",
           date = today,
           refId = id,
-          notes = "حذف محصول «${product.name}»",
+          notes = "حذف محصول «${product.name}»",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
         ),
       ),
@@ -515,7 +519,7 @@ object WarehouseEngine {
     newId: () -> String,
     change: (Product) -> Product,
   ): Result {
-    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    if (ids.isEmpty()) return Result.Failed(StrGoods.noneSelected)
     val audit = ArrayList<AuditEntry>()
     val products = d.products.map { p ->
       if (p.id !in ids) return@map p
@@ -524,12 +528,12 @@ object WarehouseEngine {
       if (changes.isNotEmpty()) {
         audit += AuditEntry(
           id = newId(), type = "product_edit", date = today, refId = p.id,
-          notes = "ویرایشِ گروهیِ «${p.name}»: ${changes.joinToString("، ")}", createdAt = now,
+          notes = "ویرایشِ گروهیِ «${p.name}»: ${changes.joinToString("، ")}", createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         )
       }
       next
     }
-    if (audit.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    if (audit.isEmpty()) return Result.Failed(StrGoods.nothingChanged)
     val categories = products.filter { it.id in ids }.map { it.category }.fold(d.productCategories) { acc, c -> withCategory(acc, c) }
     return Result.Ok(d.copy(products = products, productCategories = categories, auditLog = d.auditLog + audit), id = ids.first())
   }
@@ -556,18 +560,18 @@ object WarehouseEngine {
     d: ShopData, ids: Set<String>, field: BulkPrice.Field, op: BulkPrice.Op, roundToMinor: Long,
     confirmed: Boolean, by: String, reason: String, today: String, now: Long, newId: () -> String,
   ): Result {
-    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
-    if (!BulkPrice.valid(op)) return Result.Failed("مقدار درست نیست")
+    if (ids.isEmpty()) return Result.Failed(StrGoods.noneSelected)
+    if (!BulkPrice.valid(op)) return Result.Failed(StrGoods.qtyBad)
     val why = reason.trim()
-    if (why.isEmpty()) return Result.Failed("دلیلِ تغییرِ قیمت را بنویسید")
+    if (why.isEmpty()) return Result.Failed(StrGoods.priceReasonNeeded)
     val preview = bulkPricePreview(d, ids, field, op, roundToMinor)
-    if (preview.changed == 0) return Result.Failed("چیزی عوض نشد")
-    if (preview.needsConfirm && !confirmed) return Result.Failed("هشدارهای پیش‌نمایش را ببینید و تأیید کنید")
+    if (preview.changed == 0) return Result.Failed(StrGoods.nothingChanged)
+    if (preview.needsConfirm && !confirmed) return Result.Failed(StrGoods.confirmPreview)
     val who = by.trim().ifEmpty { null }
     val rows = preview.rows.filter { it.applies }.associateBy { it.id }
     val audit = ArrayList<AuditEntry>()
     val history = ArrayList<PriceChange>()
-    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"
+    val label = if (field == BulkPrice.Field.SALE) "قیمت فروش" else "قیمت خرید"  // داده: تکهٔ یادداشتِ سابقه
     val products = d.products.map { p ->
       val r = rows[p.id] ?: return@map p
       val value = r.newMinor / 100.0
@@ -578,7 +582,7 @@ object WarehouseEngine {
       }
       audit += AuditEntry(
         id = newId(), type = if (field == BulkPrice.Field.PURCHASE) "price_change" else "product_edit", date = today, refId = p.id,
-        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,
+        notes = "قیمتِ گروهیِ «${p.name}»: $label ${money(old)} ⇐ ${money(value)} — دلیل: $why", createdAt = now, by = who,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
       if (field == BulkPrice.Field.SALE) p.copy(salePrice = value) else p.copy(purchasePrice = value)
     }
@@ -622,7 +626,7 @@ object WarehouseEngine {
 
   /** پیامِ نخستین ایرادِ حدها (فارسی) یا `null` */
   fun levelsProblem(minStock: Double, reorderPoint: Double?, maxStock: Double?): String? {
-    if (listOfNotNull(minStock, reorderPoint, maxStock).any { !it.isFinite() }) return "عددِ حدِ موجودی درست نیست"
+    if (listOfNotNull(minStock, reorderPoint, maxStock).any { !it.isFinite() }) return StrGoods.levelBad
     val l = StockLevels(
       minMilli = minStock.takeIf { it != 0.0 }?.let { milliOrNull(it) },
       reorderMilli = milliOrNull(reorderPoint),
@@ -649,7 +653,7 @@ object WarehouseEngine {
     newId: () -> String,
   ): Result {
     val apply = previewLevels(d, ids, patch).filter { it.changes }.associate { it.id to it.after }
-    if (apply.isEmpty()) return Result.Failed("چیزی عوض نشد")
+    if (apply.isEmpty()) return Result.Failed(StrGoods.nothingChanged)
     return bulkUpdate(d, apply.keys, today, now, newId) { p -> apply[p.id]?.let { withLevels(p, it) } ?: p }
   }
 
@@ -679,7 +683,7 @@ object WarehouseEngine {
 
   /** حذفِ چند کالا — همان `deleteProduct` برای هر کدام، یا همه یا هیچ */
   fun bulkDelete(d: ShopData, ids: Set<String>, today: String, now: Long, newId: () -> String): Result {
-    if (ids.isEmpty()) return Result.Failed("کالایی انتخاب نشده")
+    if (ids.isEmpty()) return Result.Failed(StrGoods.noneSelected)
     var data = d
     for (id in ids) {
       when (val r = deleteProduct(data, id, today, now, newId)) {
@@ -694,18 +698,18 @@ object WarehouseEngine {
     val product = d.products.find { it.id == id } ?: return ""
     val sold = ShopStore.soldQty(d, id)
     return if (sold > 0) {
-      "از «${product.name}» تا کنون ${money(sold)} واحد فروخته شده است. فاکتورهای قبلی حفظ می‌شوند ولی نام این کالا در آن‌ها «حذف‌شده» نشان داده می‌شود و از گزارش سود محصولات کنار می‌رود."
+      StrGoods.deleteSoldWarn(product.name, money(sold))
     } else {
-      "محصول «${product.name}» و سوابق ورود آن از انبار حذف خواهد شد."
+      StrGoods.deleteWarn(product.name)
     }
   }
 
   /* --------------------------- ورودِ کالا --------------------------- */
 
   fun addEntry(d: ShopData, draft: EntryDraft, today: String, now: Long, newId: () -> String): Result {
-    if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
-    if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
-    if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    if (d.products.none { it.id == draft.productId }) return Result.Failed(StrStock.errPickProduct)
+    if (draft.units.isNaN() || draft.units <= 0) return Result.Failed(StrStock.errUnits)
+    if (draft.price.isNaN() || draft.price < 0) return Result.Failed(StrStock.errPrice)
     datesProblem(draft)?.let { return Result.Failed(it) }
     landedProblem(draft)?.let { return Result.Failed(it) }
 
@@ -738,7 +742,7 @@ object WarehouseEngine {
           type = "purchase_in",
           qty = draft.units,
           date = date,
-          notes = draft.notes.ifBlank { "ثبت ورود کالا" },
+          notes = draft.notes.ifBlank { "ثبت ورود کالا" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           refId = id,
           createdAt = now,
         ),
@@ -752,10 +756,10 @@ object WarehouseEngine {
    * ویرایشِ ورودی. حرکتِ انبارِ قبلی سرِ جایش می‌ماند — عیناً مثل نسخهٔ وب.
    */
   fun editEntry(d: ShopData, id: String, draft: EntryDraft, today: String): Result {
-    val existing = d.warehouseEntries.find { it.id == id } ?: return Result.Failed("ورودی پیدا نشد")
-    if (d.products.none { it.id == draft.productId }) return Result.Failed("ابتدا یک محصول انتخاب یا اضافه کنید")
-    if (draft.units.isNaN() || draft.units <= 0) return Result.Failed("تعداد واحد معتبر وارد کنید")
-    if (draft.price.isNaN() || draft.price < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
+    val existing = d.warehouseEntries.find { it.id == id } ?: return Result.Failed(StrGoods.entryNotFound)
+    if (d.products.none { it.id == draft.productId }) return Result.Failed(StrStock.errPickProduct)
+    if (draft.units.isNaN() || draft.units <= 0) return Result.Failed(StrStock.errUnits)
+    if (draft.price.isNaN() || draft.price < 0) return Result.Failed(StrStock.errPrice)
     datesProblem(draft)?.let { return Result.Failed(it) }
     landedProblem(draft)?.let { return Result.Failed(it) }
     //  کم کردنِ ورودی‌ای که جنسش فروخته شده، موجودی را منفی می‌کرد —
@@ -763,7 +767,7 @@ object WarehouseEngine {
     val left = ShopStore.stock(d, existing.productId) - existing.units +
       (if (draft.productId == existing.productId) draft.units else 0.0)
     if (left < 0) {
-      return Result.Failed("این تغییر موجودی را منفی می‌کند: ${money(-left)} واحد از این ورودی فروخته شده است")
+      return Result.Failed(StrGoods.wouldGoNegative(money(-left)))
     }
     if (PurchaseBook.fixedEntry(d, existing, draft.productId, draft.units)) return Result.Failed(PurchaseBook.PURCHASE_ENTRY) // PUR-05: انقضا و یادداشت آزاد
     val updated = existing.copy(
@@ -805,14 +809,13 @@ object WarehouseEngine {
    *  ردیفِ سابقه ثبت می‌شود تا معلوم بماند چه کسی چه چیزی را برداشت.
    */
   fun deleteEntry(d: ShopData, id: String, today: String, now: Long, newId: () -> String): Result {
-    val entry = d.warehouseEntries.find { it.id == id } ?: return Result.Failed("ورودی پیدا نشد")
+    val entry = d.warehouseEntries.find { it.id == id } ?: return Result.Failed(StrGoods.entryNotFound)
     if (PurchaseBook.fixedEntry(d, entry)) return Result.Failed(PurchaseBook.PURCHASE_ENTRY) // PUR-05: ورودِ خرید/سندِ کسر
     val after = ShopStore.stock(d, entry.productId) - entry.units
     if (after < 0) {
       val shortage = -after
       return Result.Failed(
-        "این ورودی قابل حذف نیست: ${money(shortage)} واحد از آن فروخته شده است. " +
-          "ابتدا فروش‌های مربوطه را لغو یا مرجوع کنید."
+        StrGoods.entryInUse(money(shortage))
       )
     }
 
@@ -826,7 +829,7 @@ object WarehouseEngine {
           type = "delete_entry",
           date = today,
           refId = id,
-          notes = "حذف ورود انبار «${product?.name ?: "محصول حذف‌شده"}» به مقدار ${money(entry.units)}",
+          notes = "حذف ورود انبار «${product?.name ?: "محصول حذف‌شده"}» به مقدار ${money(entry.units)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
         ),
       ),
@@ -839,7 +842,7 @@ object WarehouseEngine {
     val entry = d.warehouseEntries.find { it.id == id } ?: return ""
     val product = d.products.find { it.id == entry.productId }
     val now = ShopStore.stock(d, entry.productId)
-    return "موجودی «${product?.name ?: "محصول"}» از ${money(now)} به ${money(now - entry.units)} کاهش می‌یابد."
+    return StrGoods.entryDeleteWarn(product?.name ?: StrGoods.productWord, money(now), money(now - entry.units))
   }
 
   /* ------------------------- اصلاحِ موجودی ------------------------- */
@@ -867,21 +870,21 @@ object WarehouseEngine {
     adjKind: String? = null,
     userId: String? = null,
   ): Result {
-    val product = d.products.find { it.id == productId } ?: return Result.Failed("ابتدا یک محصول اضافه کنید")
-    if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
+    val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.addProductFirst)
+    if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
     val why = reason.trim()
-    if (why.isEmpty()) return Result.Failed("دلیل اصلاح را بنویسید")
+    if (why.isEmpty()) return Result.Failed(StrStock.errReason)
 
     val delta = if (increase) quantity else -quantity
     //  کاهش بیش از موجودی، موجودی را منفی و گزارشِ انبار را دروغ می‌کند —
     //  همان نگهبانِ `deleteEntry`
     val stockNow = ShopStore.stock(d, productId)
     if (delta < 0 && stockNow + delta < 0) {
-      return Result.Failed("فقط ${ir.vil3ntec.tohid.qty(max(0.0, stockNow))} ${product.unit} موجود است")
+      return Result.Failed(StrGoods.onlyInStock(ir.vil3ntec.tohid.qty(max(0.0, stockNow)), product.unit))
     }
     val id = newId()
     val date = today
-    val label = when (kind) { AdjustKind.SUPPLIER_RETURN -> "برگشت به تأمین‌کننده"; AdjustKind.COUNT -> "اصلاحِ شمارش"; else -> "اصلاح موجودی" }
+    val label = when (kind) { AdjustKind.SUPPLIER_RETURN -> "برگشت به تأمین‌کننده"; AdjustKind.COUNT -> "اصلاحِ شمارش"; else -> "اصلاح موجودی" }  // داده: تکهٔ یادداشتِ سابقه
     val stockKind: String? = when {
       kind == AdjustKind.COUNT -> "count"
       adjKind == null -> null
@@ -927,7 +930,7 @@ object WarehouseEngine {
           type = if (kind == AdjustKind.SUPPLIER_RETURN) "supplier_return" else "stock_adjustment",
           date = date,
           refId = id,
-          notes = "$label «${product.name}» به مقدار ${if (increase) "+" else "−"}${money(quantity)} — دلیل: $why",
+          notes = "$label «${product.name}» به مقدار ${if (increase) "+" else "−"}${money(quantity)} — دلیل: $why",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
         ),
       ),
@@ -962,12 +965,12 @@ object WarehouseEngine {
     now: Long,
     newId: () -> String,
   ): Result {
-    if (drafts.isEmpty()) return Result.Failed("حداقل یک ردیف کامل لازم است")
+    if (drafts.isEmpty()) return Result.Failed(StrProducts.needOneRow)
     var data = d
     var lastId = ""
     drafts.forEachIndexed { index, draft ->
       when (val step = addProduct(data, draft, now, newId)) {
-        is Result.Failed -> return Result.Failed("ردیف ${plain(index + 1)}: ${step.message}")
+        is Result.Failed -> return Result.Failed(StrGoods.rowWhy(plain(index + 1), step.message))
         is Result.Ok -> { data = step.data; lastId = step.id }
       }
     }
@@ -996,11 +999,11 @@ object WarehouseEngine {
     newId: () -> String,
   ): Result {
     val plan = ProductImport.planOf(d, rows, previewed.update)
-    if (plan != previewed) return Result.Failed("کالاهای دکان در این فاصله عوض شد — پیش‌نمایش را دوباره ببینید")
+    if (plan != previewed) return Result.Failed(StrGoods.goodsChanged)
     plan.problem?.let { return Result.Failed(it) }
-    if (plan.writes == 0) return Result.Failed("چیزی برای ثبت نیست — کالاهای این فایل از قبل در دکان‌اند")
+    if (plan.writes == 0) return Result.Failed(StrGoods.nothingToSave)
     val who = by.trim().ifEmpty { null }
-    val file = fileName.trim().ifEmpty { "بی‌نام" }
+    val file = fileName.trim().ifEmpty { "بی‌نام" }  // داده: نامِ پرونده درونِ یادداشتِ سابقه
     var data = d
     var lastId = ""
     for (r in plan.rows) {
@@ -1016,7 +1019,7 @@ object WarehouseEngine {
         ), now, newId)
         ProductImportPlan.Status.UPDATE -> {
           val p = data.products.firstOrNull { it.id == r.existingId }
-            ?: return Result.Failed("ردیفِ ${plain(r.line)}: کالا پیدا نشد")
+            ?: return Result.Failed(StrGoods.rowNoProduct(plain(r.line)))
           var category = p.category
           var buy = p.purchasePrice
           var sell = p.salePrice
@@ -1031,20 +1034,20 @@ object WarehouseEngine {
           }
           editProduct(data, p.id, ProductDraft(
             name = p.name, category = category, unit = p.unit, purchasePrice = buy, salePrice = sell, minStock = min,
-            barcodes = codes, changedBy = who, reason = "ورود از فایلِ «$file»",
+            barcodes = codes, changedBy = who, reason = "ورود از فایلِ «$file»",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           ), today, now, newId)
         }
         else -> continue
       }
       when (step) {
-        is Result.Failed -> return Result.Failed("ردیفِ ${plain(r.line)}: ${step.message}")
+        is Result.Failed -> return Result.Failed(StrGoods.rowOfWhy(plain(r.line), step.message))
         is Result.Ok -> { data = step.data; lastId = step.id }
       }
     }
     val n = { s: ProductImportPlan.Status -> plain(plan.count(s)) }
-    val notes = "ورود از فایلِ «$file»: ${n(ProductImportPlan.Status.NEW)} کالای تازه، ${n(ProductImportPlan.Status.UPDATE)} به‌روز، " +
-      "${plain(plan.count(ProductImportPlan.Status.SAME) + plan.count(ProductImportPlan.Status.KEPT))} از پیش در دکان، " +
-      "${n(ProductImportPlan.Status.ERROR)} ردیفِ رد"
+    val notes = "ورود از فایلِ «$file»: ${n(ProductImportPlan.Status.NEW)} کالای تازه، ${n(ProductImportPlan.Status.UPDATE)} به‌روز، " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      "${plain(plan.count(ProductImportPlan.Status.SAME) + plan.count(ProductImportPlan.Status.KEPT))} از پیش در دکان، " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      "${n(ProductImportPlan.Status.ERROR)} ردیفِ رد"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     return Result.Ok(
       data.copy(auditLog = data.auditLog + AuditEntry(
         id = newId(), type = ProductImport.AUDIT_TYPE, date = today, refId = ProductImport.refOf(plan.fingerprint),
@@ -1068,7 +1071,7 @@ object WarehouseEngine {
     now: Long,
     newId: () -> String,
   ): Result {
-    if (rows.isEmpty()) return Result.Failed("هیچ ردیف کاملی برای ثبت نیست")
+    if (rows.isEmpty()) return Result.Failed(StrStock.errNoRows)
     var data = d
     var lastId = ""
     rows.forEachIndexed { index, row ->
@@ -1076,12 +1079,12 @@ object WarehouseEngine {
       var productId = row.entry.productId
       if (row.newProduct != null) {
         when (val made = addProduct(data, row.newProduct, now, newId)) {
-          is Result.Failed -> return Result.Failed("ردیف $no: ${made.message}")
+          is Result.Failed -> return Result.Failed(StrGoods.rowNoWhy(no, made.message))
           is Result.Ok -> { data = made.data; productId = made.id }
         }
       }
       when (val step = addEntry(data, row.entry.copy(productId = productId), today, now, newId)) {
-        is Result.Failed -> return Result.Failed("ردیف $no: ${step.message}")
+        is Result.Failed -> return Result.Failed(StrGoods.rowNoWhy(no, step.message))
         is Result.Ok -> { data = step.data; lastId = step.id }
       }
     }
@@ -1095,7 +1098,7 @@ object WarehouseEngine {
    */
   fun addCategory(d: ShopData, name: String): Result {
     val v = name.trim()
-    if (v.isEmpty()) return Result.Failed("نام دسته‌بندی را بنویسید")
+    if (v.isEmpty()) return Result.Failed(StrGoods.categoryNeeded)
     if (d.productCategories.contains(v)) return Result.Ok(d, v)
     return Result.Ok(d.copy(productCategories = d.productCategories + v), v)
   }
@@ -1108,7 +1111,7 @@ object WarehouseEngine {
    *  اگر کاربر دوباره همان دسته را ساخت، کالاها سرِ جایشان برگردند.
    */
   fun removeCategory(d: ShopData, name: String): Result {
-    if (!d.productCategories.contains(name)) return Result.Failed("این دسته‌بندی وجود ندارد")
+    if (!d.productCategories.contains(name)) return Result.Failed(StrGoods.categoryMissing)
     return Result.Ok(d.copy(productCategories = d.productCategories.filterNot { it == name }), name)
   }
 

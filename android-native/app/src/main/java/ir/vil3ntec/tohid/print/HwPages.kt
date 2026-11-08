@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.EscPosPreview
 import ir.vil3ntec.tohid.core.hw.Labels
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.data.ReceiptFlag
 import ir.vil3ntec.tohid.data.ReceiptProfileStore
 import ir.vil3ntec.tohid.data.Sale
@@ -81,7 +82,7 @@ object HwPages {
   /** چند تصویر زیرِ هم، هر کدام وسطِ کاغذ. تکهٔ پهن‌تر از کاغذ بی‌صدا بریده نمی‌شود — خطا می‌دهد. */
   fun stack(width: Int, parts: List<MonoImage>, gap: Int = 8): MonoImage {
     parts.firstOrNull { it.width > width }?.let {
-      throw IllegalArgumentException("پهنای تکه (${it.width} نقطه) از پهنای کاغذ ($width نقطه) بیشتر است")
+      throw IllegalArgumentException(StrPrint.pieceTooWide(it.width, width))
     }
     val h = parts.sumOf { it.height } + gap * (parts.size - 1).coerceAtLeast(0)
     val out = MonoImage(width, h.coerceAtLeast(1))
@@ -137,17 +138,17 @@ object HwPages {
     val w = p.paperDots
     val mm = if (w >= ir.vil3ntec.tohid.core.hw.PrinterProfile.WIDTH_80MM) "۸۰" else "۵۸"
     val head = text(context, w, listOf(
-      Line("برگهٔ آزمونِ چاپگر", Style.TITLE),
+      Line(StrPrint.testTitle, Style.TITLE),
       Line(s.name, Style.HEAD),
-      Line(if (s.link.isBlank()) "پیش‌نمایش — بی چاپگر" else "${PrinterRegistry.kind(s.link)} · ${PrinterRegistry.label(s.link)}", Style.SMALL),
-      Line("کاغذ $mm میلی‌متر ($w نقطه) · ${if (p.mode.key == "column") "ستونی ESC *" else "رستری GS v 0"} · برش: ${cutLabel(p.cut.key)}", Style.SMALL),
-      Line("کشو: ${if (p.drawer) "پس از فروشِ نقدی" else "خاموش"}", Style.SMALL),
+      Line(if (s.link.isBlank()) StrPrint.previewNoPrinter else "${PrinterRegistry.kind(s.link)} · ${PrinterRegistry.label(s.link)}", Style.SMALL),
+      Line(StrPrint.testPaper(mm, w, if (p.mode.key == "column") StrPrint.modeColumn else StrPrint.modeRaster, cutLabel(p.cut.key)), Style.SMALL),
+      Line(if (p.drawer) StrPrint.drawerAfterCash else StrPrint.drawerOff, Style.SMALL),
       Line(ir.vil3ntec.tohid.formatMillis(System.currentTimeMillis()), Style.SMALL),
     ))
     val ruler = ruler(w)
     val samples = text(context, w, listOf(
-      Line("دری: سلام، به دکانِ ما خوش آمدید — ۱۲۳۴۵۶۷۸۹۰", Style.BODY, Layout.Alignment.ALIGN_NORMAL),
-      Line("پښتو: ښه راغلاست — ټ ډ ړ ږ ښ ګ ڼ ې ۍ", Style.BODY, Layout.Alignment.ALIGN_NORMAL),
+      Line("دری: سلام، به دکانِ ما خوش آمدید — ۱۲۳۴۵۶۷۸۹۰", Style.BODY, Layout.Alignment.ALIGN_NORMAL),  // داده: نمونهٔ خطِ دری برای سنجشِ قلمِ چاپگر (خودِ نمونه)
+      Line("پښتو: ښه راغلاست — ټ ډ ړ ږ ښ ګ ڼ ې ۍ", Style.BODY, Layout.Alignment.ALIGN_NORMAL),  // داده: نمونهٔ خطِ پشتو برای سنجشِ قلمِ چاپگر (خودِ نمونه)
       Line("Latin 0123456789 — ABC xyz", Style.BODY, Layout.Alignment.ALIGN_NORMAL),
     ))
     val ean = Barcodes.forProduct(SAMPLE_EAN)!!
@@ -156,7 +157,7 @@ object HwPages {
     val cImg = Barcodes.render(c128.modules, Labels.moduleDots(c128.modules.size, w).coerceAtLeast(2), 64)
     val tail = text(context, w, listOf(
       Line("$SAMPLE_EAN (EAN-13) · $SAMPLE_128 (Code128)", Style.SMALL),
-      Line("اگر دو سرِ خطِ سیاه بریده نشده و نوشته‌ها کامل‌اند، چاپگر درست تنظیم است.", Style.SMALL),
+      Line(StrPrint.testOk, Style.SMALL),
     ))
     return stack(w, listOfNotNull(
       if (p.logo) logoMono(context, w) else null,
@@ -167,7 +168,7 @@ object HwPages {
   const val SAMPLE_EAN = "5901234123457"
   const val SAMPLE_128 = "TOHID-123"
 
-  private fun cutLabel(key: String) = when (key) { "full" -> "کامل"; "none" -> "بی‌برش"; else -> "نیمه" }
+  private fun cutLabel(key: String) = when (key) { "full" -> StrPrint.cutFull; "none" -> StrPrint.cutNone; else -> StrPrint.cutHalf }
 
   /** نوارِ تمام‌عرض و درجه‌های هر میلی‌متر (هر ۱۰ میلی‌متر بلندتر) */
   private fun ruler(width: Int): MonoImage {
@@ -186,8 +187,8 @@ object HwPages {
   /** بایت‌های برگهٔ آزمون — چاپگرِ برچسب یک برچسبِ نمونه می‌گیرد */
   fun testBytes(context: Context, s: PrinterRegistry.Saved): ByteArray {
     if (s.isLabel) {
-      val img = label(context, "برچسبِ آزمون — ${s.name}", LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), SAMPLE_EAN).image
-        ?: error("برچسبِ آزمون کشیده نشد")
+      val img = label(context, StrPrint.testLabel(s.name), LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), SAMPLE_EAN).image
+        ?: error(StrPrint.testLabelFailed)
       return labelBytes(s, img, 1)
     }
     return EscPos.document(testImage(context, s), s.profile())
@@ -202,10 +203,10 @@ object HwPages {
     val p = s.profile()
     val w = p.paperDots
     fun sample(no: String, how: String): MonoImage = stack(w, listOf(
-      text(context, w, listOf(Line("نمونهٔ $no", Style.TITLE), Line("$how — دری و پښتو: ښه راغلاست ۱۲۳", Style.BODY))),
+      text(context, w, listOf(Line("نمونهٔ $no", Style.TITLE), Line("$how — دری و پښتو: ښه راغلاست ۱۲۳", Style.BODY))),  // داده: نمونهٔ سنجشِ حالتِ چاپگر با خطِ دری و پشتو (خودِ نمونه)
       ruler(w),
     ), gap = 6)
-    return ir.vil3ntec.tohid.core.hw.ModeProbe.page(sample("۱", "ستونی ESC *"), sample("۲", "رستری GS v 0"), p)
+    return ir.vil3ntec.tohid.core.hw.ModeProbe.page(sample("۱", "ستونی ESC *"), sample("۲", "رستری GS v 0"), p)  // داده: نامِ فنیِ حالت روی نمونهٔ سنجش
   }
 
   /* ============================ برچسبِ کالا ============================ */
@@ -222,10 +223,10 @@ object HwPages {
     val h = size.heightDots
     val clean = ir.vil3ntec.tohid.normalizeDigits(code.trim())
     val symbol = Barcodes.forProduct(clean)
-      ?: return LabelResult(null, if (clean.isEmpty()) "این کالا بارکد ندارد" else "بارکدِ «$clean» در Code128 نمی‌گنجد (فقط حرف و رقمِ لاتین)")
+      ?: return LabelResult(null, if (clean.isEmpty()) StrPrint.noBarcode else StrPrint.notCode128(clean))
     val quiet = 10
     val md = Labels.moduleDots(symbol.modules.size, w - 8, quiet)
-    if (md == 0) return LabelResult(null, "بارکدِ «$clean» برای برچسبِ ${size.widthMm} میلی‌متری بلند است")
+    if (md == 0) return LabelResult(null, StrPrint.barcodeTooLong(clean, size.widthMm))
     val bars = Barcodes.render(symbol.modules, md, 84, quiet)
     val shortName = if (name.length > 38) name.take(37) + "…" else name
     val top = text(context, w, listOf(Line(shortName, Style.HEAD), Line(price, Style.TITLE)), scale = 1.5f)
@@ -240,7 +241,7 @@ object HwPages {
 
   /** برچسبِ نمونه برای پیش‌نمایش و برگهٔ آزمون */
   fun sampleLabel(context: Context): MonoImage? =
-    label(context, "برچسبِ نمونه", LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), SAMPLE_EAN).image
+    label(context, StrPrint.sampleLabel, LocaleText.afghani(120.0, LocaleChoice.digits, LocaleChoice.symbol), SAMPLE_EAN).image
 
   fun labelBytes(s: PrinterRegistry.Saved, image: MonoImage, copies: Int): ByteArray =
     if (s.labelLang == PrinterRegistry.LANG_ESCPOS) Labels.escPos(image, copies)
@@ -259,12 +260,12 @@ object HwPages {
   fun saveLogo(context: Context, uri: Uri): String? = runCatching {
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     context.contentResolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, bounds) }
-    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return "تصویر خوانده نشد"
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return StrPrint.imageUnread
     var sample = 1
     while (bounds.outWidth / (sample * 2) >= 576) sample *= 2
     val src = context.contentResolver.openInputStream(uri)
       ?.use { BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = sample }) }
-      ?: return "تصویر خوانده نشد"
+      ?: return StrPrint.imageUnread
     val w = minOf(src.width, 576)
     val h = (src.height.toFloat() * w / src.width).toInt().coerceAtLeast(1)
     val scaled = if (w == src.width) src else Bitmap.createScaledBitmap(src, w, h, true)
@@ -276,7 +277,7 @@ object HwPages {
     }
     synchronized(logoCache) { logoCache.clear() }
     null
-  }.getOrElse { "نشان ذخیره نشد: ${it.message}" }
+  }.getOrElse { StrPrint.logoNotSaved(it.message) }
 
   fun removeLogo(context: Context) {
     logoFile(context).delete()

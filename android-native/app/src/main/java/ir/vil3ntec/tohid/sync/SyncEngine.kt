@@ -167,7 +167,7 @@ object SyncEngine {
       var nameless = 0
       for (row in rows) {
         val rowId = row.jsonObject["id"]?.jsonPrimitive?.contentOrNullSafe()
-        if (rowId == null) table["\u0000بی‌شناسه-${nameless++}"] = row else table[rowId] = row
+        if (rowId == null) table["\u0000بی‌شناسه-${nameless++}"] = row else table[rowId] = row  // داده: کلید یا سنجشِ منطق
       }
 
       for (change in incoming) {

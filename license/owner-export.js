@@ -129,6 +129,7 @@
     brand: 'برند',
     reorderPoint: 'نقطهٔ سفارش',
     maxStock: 'حداکثر موجودی',
+    consumptionDays: 'چرخهٔ مصرف (روز)',
     brand: 'برند',
     packs: 'بسته‌ها',
     cartons: 'تعداد کارتن',

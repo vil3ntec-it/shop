@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import ir.vil3ntec.tohid.core.hw.LogoDither
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.data.repo.Backend
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,7 +178,7 @@ object ReceiptProfileStore {
         dir.mkdirs()
         val tmp = File(dir, "$hash.tmp")
         tmp.writeBytes(bytes)
-        if (!tmp.renameTo(file)) { tmp.delete(); error("لوگو ذخیره نشد") }
+        if (!tmp.renameTo(file)) { tmp.delete(); error(StrAppData.logoNotSaved) }
       }
     }
     dir.listFiles()?.forEach { if (it.name != next.logoHash) it.delete() }
@@ -209,7 +210,7 @@ object ReceiptProfileStore {
 
   private fun logoFile(context: Context, hash: String) = File(logoDir(context), hash)
 
-  private fun message(t: Throwable): String = t.message ?: "سربرگِ فاکتور به‌روز نشد"
+  private fun message(t: Throwable): String = t.message ?: StrAppData.headerNotUpdated
 
   private val HASH = Regex("^[0-9a-f]{64}$")
 }

@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.sync
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import kotlinx.coroutines.channels.Channel
 import org.json.JSONObject
 
@@ -156,9 +158,9 @@ object PhoneScanner {
    *  @return پیامِ خطا یا `null` اگر رفت
    */
   suspend fun sendPhoto(context: Context, source: android.net.Uri, productId: String): String? {
-    val pair = sendCode.value ?: return "اول در «دستگاه‌های جانبی» کدِ کامپیوتر را بزنید"
-    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return "برای فرستادن باید وارد حساب باشید"
-    val bmp = ir.vil3ntec.tohid.data.PhotoStore.decode(context, source) ?: return "عکس خوانده نشد"
+    val pair = sendCode.value ?: return StrSync.enterPcCode
+    if (!ir.vil3ntec.tohid.data.repo.Backend.isReady(context)) return StrSync.signInToSend
+    val bmp = ir.vil3ntec.tohid.data.PhotoStore.decode(context, source) ?: return StrGoods.photoUnread
     val img = ir.vil3ntec.tohid.data.PhotoStudio.fitWithin(ir.vil3ntec.tohid.data.PhotoStore.toStudio(bmp), 1600)
     val bytes = java.io.ByteArrayOutputStream().use { out ->
       ir.vil3ntec.tohid.data.PhotoStore.fromStudio(img).compress(android.graphics.Bitmap.CompressFormat.JPEG, 85, out)
@@ -173,7 +175,7 @@ object PhoneScanner {
         put("device_id", kotlinx.serialization.json.JsonPrimitive(device))
       })
       null
-    }.getOrElse { "نرفت: ${it.message ?: "اینترنت؟"}" }
+    }.getOrElse { StrSync.notSent(it.message ?: StrSync.internetQ) }
   }
 
   /** از سوکت: فقط اگر کدِ همین گیرنده باشد */

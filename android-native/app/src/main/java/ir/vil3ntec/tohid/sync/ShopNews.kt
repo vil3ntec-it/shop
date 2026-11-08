@@ -116,8 +116,8 @@ object ShopNews {
     post(
       context,
       kind = "sale",
-      title = "فروش تازه",
-      body = "${ir.vil3ntec.tohid.money(total)} افغانی — ${items.fa()} قلم",
+      title = "فروش تازه",  // داده: خبرِ دکان که به سرور فرستاده و برای همهٔ اعضا نشان داده می‌شود
+      body = "${ir.vil3ntec.tohid.money(total)} افغانی — ${items.fa()} قلم",  // داده: خبرِ دکان که به سرور فرستاده و برای همهٔ اعضا نشان داده می‌شود
     )
   }
 
@@ -142,7 +142,7 @@ object ShopNews {
     val fresh = out - known
     if (fresh.isNotEmpty()) {
       data.products.filter { it.id in fresh }.forEach { product ->
-        post(app, kind = "stock_out", title = "${product.name} تمام شد", body = "موجودی صفر است")
+        post(app, kind = "stock_out", title = "${product.name} تمام شد", body = "موجودی صفر است")  // داده: خبرِ دکان که به سرور فرستاده و برای همهٔ اعضا نشان داده می‌شود
       }
     }
     if (out != known) prefs(app).edit().putStringSet(LAST_STOCK, out).apply()

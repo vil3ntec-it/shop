@@ -26,6 +26,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrProducts
+import ir.vil3ntec.tohid.data.ProductCycle
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -103,7 +104,7 @@ internal fun EditProductScreen(
     if (first != null) {
       touched = touched.copy(all = true)
       shake++
-      if (first == ProductFormModel.Field.UNIT_FACTOR) more = true
+      if (first == ProductFormModel.Field.UNIT_FACTOR || first == ProductFormModel.Field.CYCLE) more = true
       scope.launch { delay(120); runCatching { focus[first.name]?.requestFocus() } }
       return
     }
@@ -112,7 +113,7 @@ internal fun EditProductScreen(
       is WarehouseEngine.Result.Failed -> { banner = r.message; shake++ }
       is WarehouseEngine.Result.Ok -> {
         banner = null
-        persist(scope, store, r.data)
+        persist(scope, store, ProductCycle.apply(r.data, productId, row.cycle))   //  MKT-06
         Haptics.success(context)
         toasts.show(StrProducts.editSaved)
         done = true
@@ -154,4 +155,4 @@ internal fun EditProductScreen(
 
 /** «بیشتر» از آغاز باز است وقتی کالا چیزی در آن دارد */
 private fun hasMore(r: ProductRowDraft): Boolean =
-  r.subcategory.isNotBlank() || r.saleUnit.isNotBlank() || r.supplierId.isNotBlank() || !r.active
+  r.subcategory.isNotBlank() || r.saleUnit.isNotBlank() || r.supplierId.isNotBlank() || !r.active || r.cycle.isNotBlank()

@@ -7,6 +7,7 @@ import android.security.keystore.KeyPermanentlyInvalidatedException
 import ir.vil3ntec.tohid.core.atrest.AtRestException
 import ir.vil3ntec.tohid.core.atrest.AtRestKeyFailure
 import ir.vil3ntec.tohid.core.atrest.AtRestKek
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.security.KeyStore
 import javax.crypto.AEADBadTagException
 import javax.crypto.Cipher
@@ -45,8 +46,7 @@ object AtRestKeys {
 
   /** جای کلید و آنچه از آن برمی‌آید — یک جمله برای صفحهٔ امنیت */
   fun note(): String =
-    "کلید در $WHERE است و از برنامه بیرون نمی‌آید. با پشتیبانِ خودکار یا انتقالِ اندروید به گوشیِ تازه نمی‌رود؛ " +
-      "برای همین وقتی رمز روشن است، دفتر و حالِ همگام‌سازی هم در آن پشتیبان نمی‌روند و گوشیِ تازه دفتر را از سرور می‌گیرد."
+    StrAppData.keyNote(WHERE)
 
   fun kek(@Suppress("UNUSED_PARAMETER") context: Context): AtRestKek = Keystore
 
@@ -99,10 +99,10 @@ object AtRestKeys {
     }
 
     override fun unwrap(blob: ByteArray, kekId: String): ByteArray = guard {
-      if (!kekId.startsWith(PREFIX)) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ اصلیِ دستگاه عوض شده ($kekId)")
-      if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ پیچیده بریده است")
+      if (!kekId.startsWith(PREFIX)) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keyChanged(kekId))
+      if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keyCut)
       val key = existing(kekId.removePrefix(PREFIX))
-        ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ Keystore روی این دستگاه نیست")
+        ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keystoreMissing)
       val c = Cipher.getInstance("AES/GCM/NoPadding")
       c.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, blob, 0, IV))
       c.doFinal(blob, IV, blob.size - IV)
@@ -123,12 +123,12 @@ object AtRestKeys {
     } catch (e: AtRestException) {
       throw e
     } catch (e: AEADBadTagException) {
-      throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ Keystore با کلیددان نمی‌خواند", e)
+      throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keystoreMismatch, e)
     } catch (e: Exception) {
       if (permanent(e)) {
-        throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ Keystore برای همیشه از کار افتاده: ${e.javaClass.simpleName}", e)
+        throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keystoreDead(e.javaClass.simpleName), e)
       }
-      throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, "Keystore جواب نداد: ${e.javaClass.simpleName}", e)
+      throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, StrAppData.keystoreNoAnswer(e.javaClass.simpleName), e)
     }
 
     private const val IV = 12

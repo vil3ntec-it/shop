@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.product.UnitSale
 import kotlin.math.abs
 
@@ -37,6 +38,6 @@ object UnitLine {
 
   /** «کارتن (۱۲ دانه)» */
   fun label(u: UnitSale.Unit, base: String): String =
-    if (u.sizeMilli == 1000L) u.name.ifBlank { "واحد" }
+    if (u.sizeMilli == 1000L) u.name.ifBlank { StrGoods.unitWord }
     else "${u.name} (${ir.vil3ntec.tohid.core.product.PackBarcodes.sizeText(u.sizeMilli)}${if (base.isBlank()) "" else " $base"})"
 }

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.crm.CustomerCard
 import ir.vil3ntec.tohid.core.i18n.StrCustomerCard
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.product.PackBarcodes
 
 /**
@@ -79,8 +80,8 @@ object CustomerCards {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
-    if (!CustomerCrm.isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    if (!CustomerCrm.isActive(c)) return DebtorEngine.Result.Failed(StrLedger.customerMerged)
     val code = when (val p = CustomerCard.pick(id, manual, c.cardCode, { clash(d, id, it) })) {
       is CustomerCard.Check.Ok -> p.code
       is CustomerCard.Check.Bad -> return DebtorEngine.Result.Failed(reasonText(p.reason))
@@ -97,7 +98,7 @@ object CustomerCards {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
     if (c.cardCode == null) return DebtorEngine.Result.Ok(d, id)
     return write(d, c, null, today, now, newId)
   }
@@ -105,7 +106,7 @@ object CustomerCards {
   private fun write(d: ShopData, c: Debtor, code: String?, today: String, now: Long, newId: () -> String): DebtorEngine.Result {
     val trace = AuditEntry(
       id = newId(), type = AUDIT_TYPE, date = today, refId = c.id, createdAt = now,
-      notes = "کارتِ مشتریِ «${c.name}»: ${c.cardCode ?: "—"} ⇐ ${code ?: "—"}",
+      notes = "کارتِ مشتریِ «${c.name}»: ${c.cardCode ?: "—"} ⇐ ${code ?: "—"}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return DebtorEngine.Result.Ok(
       d.copy(

@@ -8,6 +8,9 @@ import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrImagePages
+import ir.vil3ntec.tohid.core.i18n.StrProductPages
 import ir.vil3ntec.tohid.core.image.BankPhotoCard
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.ImagePrep
@@ -96,12 +99,12 @@ object ImageBank {
     val stale: Boolean = false, val savedAtMs: Long = 0L,
   )
 
-  val KIND = mapOf(
-    "barcode_exact" to "بارکدِ دقیق", "sku_exact" to "SKUِ دقیق", "name_exact" to "نامِ کاملِ یکسان",
-    "name_words" to "همهٔ کلمه‌های نام", "spelling_tolerant" to "املای نزدیک",
+  val KIND: Map<String, String> get() = mapOf(
+    "barcode_exact" to StrGoods.matchBarcode, "sku_exact" to StrGoods.matchSku, "name_exact" to StrGoods.matchName,
+    "name_words" to StrGoods.matchWords, "spelling_tolerant" to StrGoods.matchSpelling,
   )
-  val DIFF = mapOf(
-    "brand" to "برند", "variant" to "طعم/مدل", "size" to "وزن/حجم", "pack_count" to "تعداد در بسته", "packaging" to "بسته‌بندی",
+  val DIFF: Map<String, String> get() = mapOf(
+    "brand" to StrProductPages.brand, "variant" to StrImagePages.flavorModel, "size" to StrImagePages.weightVolume, "pack_count" to StrImagePages.perPack, "packaging" to StrImagePages.packaging,
   )
 
   private fun JsonObject.s(k: String) = this[k]?.jsonPrimitive?.contentOrNull.orEmpty()
@@ -206,7 +209,7 @@ object ImageBank {
   /** نشانیِ فایلی که سرور داد (`/api/shop/images/file/…`) ⇒ بایت‌ها با نشستِ کاربر */
   suspend fun file(context: Context, url: String): ByteArray {
     val path = url.removePrefix("/api/v1").removePrefix("/api")
-    require(path.startsWith("$BASE/file/")) { "نشانیِ عکس درست نیست" }
+    require(path.startsWith("$BASE/file/")) { StrGoods.photoUrlBad }
     return Backend.api(context).getBytes(path)
   }
 
@@ -221,7 +224,7 @@ object ImageBank {
     val rowG = bm.gtin14(barcode)
     val bankG = bm.gtin14(hit.gtin)
     if (rowG.isNotEmpty() && bankG.isNotEmpty() && rowG != bankG) {
-      return Assess("بارکدِ این کالا ($barcode) با بارکدِ کالای بانک فرق دارد", false, emptyList())
+      return Assess(StrGoods.bankBarcodeDiffers(barcode), false, emptyList())
     }
     val key = ir.vil3ntec.tohid.core.text.TextNormalizer::compareKey
     val rowName = key(name)
@@ -229,11 +232,11 @@ object ImageBank {
     val nameDiffers = rowName.isNotEmpty() && (listOf(hit.name) + hit.altNames).none { key(it) == rowName } && !sameBarcode
     val certain = hit.certain && !hit.ambiguous
     val why = ArrayList<String>()
-    if (!hit.certain) why += "تطبیق فقط با ${KIND[hit.kind] ?: "نام"} است، نه بارکد"
-    if (hit.ambiguous) why += "چند نوعِ مشابه هست؛ فرق در: " + hit.distinguish.joinToString("، ") { DIFF[it] ?: it }
-    if (nameDiffers) why += "نامِ کالای شما با نامِ کالای بانک یکی نیست"
+    if (!hit.certain) why += StrGoods.matchOnlyBy(KIND[hit.kind] ?: StrGoods.nameWord)
+    if (hit.ambiguous) why += StrGoods.similarKinds(hit.distinguish.joinToString("، ") { DIFF[it] ?: it })
+    if (nameDiffers) why += StrGoods.bankNameDiffers
     val needs = !certain || nameDiffers || bankG.isEmpty()
-    if (needs && why.isEmpty()) why += "بارکدِ معتبری برای سنجش نیست؛ تطبیق را خودتان تأیید کنید"
+    if (needs && why.isEmpty()) why += StrGoods.noBarcodeToCheck
     return Assess("", needs, why)
   }
 
@@ -245,7 +248,7 @@ object ImageBank {
     context: Context, productId: String, img: Img, name: String, barcode: String, confirm: Boolean,
   ): ByteArray {
     val api = Backend.api(context)
-    val bytes = file(context, img.display ?: img.thumb ?: error("این عکس نسخهٔ نمایش ندارد"))
+    val bytes = file(context, img.display ?: img.thumb ?: error(StrGoods.noDisplayCopy))
     api.post("$BASE/select", buildJsonObject {
       put("product_id", productId); put("source", "central"); put("image_id", img.id); put("version", img.version)
       put("expect", buildJsonObject { put("barcode", barcode); put("name", name) })
@@ -288,7 +291,7 @@ object ImageBank {
     val r = Backend.api(context).get("$BASE/products/${enc(productId)}")
     val urls = r["urls"] as? JsonObject
     val url = urls?.get("display")?.jsonPrimitive?.contentOrNull ?: urls?.get("thumb")?.jsonPrimitive?.contentOrNull
-      ?: error("این عکس هنوز نسخهٔ نمایش ندارد")
+      ?: error(StrGoods.noDisplayCopyYet)
     return file(context, url)
   }
 
@@ -347,12 +350,12 @@ object ImageBank {
     BitmapFactory.decodeStream(ByteArrayInputStream(bytes), null, bounds)
     val w0 = bounds.outWidth
     val h0 = bounds.outHeight
-    require(w0 > 0 && h0 > 0) { "این فایل عکس نیست یا خراب است" }
-    require(!ImagePrep.tooManyPixels(w0, h0)) { "عکس بیش از اندازه بزرگ است (بیش از ۶۰ مگاپیکسل)" }
+    require(w0 > 0 && h0 > 0) { StrGoods.notImage }
+    require(!ImagePrep.tooManyPixels(w0, h0)) { StrGoods.imageTooBig }
     val orientation = if (JpegMeta.isJpeg(bytes)) JpegMeta.orientation(bytes) else 1
     val opts = BitmapFactory.Options().apply { inSampleSize = ImagePrep.sampleSize(w0, h0, ImagePrep.DISPLAY_SIDE) }
     val decoded = BitmapFactory.decodeStream(ByteArrayInputStream(bytes), null, opts)
-      ?: throw IllegalArgumentException("این فایل عکس نیست یا خراب است")
+      ?: throw IllegalArgumentException(StrGoods.notImage)
     val fit = ImagePrep.fit(decoded.width, decoded.height, ImagePrep.DISPLAY_SIDE)
     val scaled = if (fit.w != decoded.width || fit.h != decoded.height) Bitmap.createScaledBitmap(decoded, fit.w, fit.h, true) else decoded
     if (scaled !== decoded) decoded.recycle()

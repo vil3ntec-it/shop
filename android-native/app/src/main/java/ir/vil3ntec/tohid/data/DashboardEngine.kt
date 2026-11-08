@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import kotlin.math.max
 
 /**
@@ -117,7 +118,7 @@ object DashboardEngine {
     val receivables = debtLines.sumOf { it.balance.coerceAtLeast(0.0) }
 
     val catRevenue = d.saleItems.filter { it.saleId in curIds }
-      .groupBy { byId[it.productId]?.category?.ifBlank { null } ?: "بی‌دسته" }
+      .groupBy { byId[it.productId]?.category?.ifBlank { null } ?: StrSale.uncategorized }
       .map { (k, xs) -> Share(k, xs.sumOf { it.totalPrice }) }
       .sortedByDescending { it.revenue }
 

@@ -9,7 +9,9 @@ import android.os.Build
 import ir.vil3ntec.tohid.core.chat.ChatImage
 import ir.vil3ntec.tohid.core.chat.ChatLimits
 import ir.vil3ntec.tohid.core.chat.ChatSpace
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.i18n.StrChat
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.ui.Platform
 import java.io.ByteArrayOutputStream
 import java.io.File
@@ -50,9 +52,9 @@ object ChatMedia {
       var n = 0
       while (n < buf.size) { val r = input.read(buf, n, buf.size - n); if (r < 0) break; n += r }
       buf.copyOf(n)
-    } ?: error("عکس خوانده نشد")
+    } ?: error(StrGoods.photoUnread)
     val orientation = ChatImage.orientationOf(head)
-    val decoded = PhotoStore.decode(context, uri) ?: error("این فایل عکس نیست یا خوانده نشد")
+    val decoded = PhotoStore.decode(context, uri) ?: error(StrAppData.notImageOrUnread)
     //  اول کوچک، بعد چرخش: حافظه به اندازهٔ عکسِ نهایی، نه عکسِ دوربین
     val (w, h) = ChatImage.fit(decoded.width, decoded.height, ChatImage.MAIN_PX)
     val scaled = if (w != decoded.width || h != decoded.height) Bitmap.createScaledBitmap(decoded, w, h, true) else decoded
@@ -76,7 +78,7 @@ object ChatMedia {
       val bytes = out.toByteArray()
       if (cap <= 0 || bytes.size <= cap) return Triple(bytes, bmp.width, bmp.height)
       if (q > ChatImage.MIN_QUALITY) { q = maxOf(ChatImage.MIN_QUALITY, q - 15); continue }
-      if (maxOf(bmp.width, bmp.height) <= 160) error("عکس در سقفِ مجاز جا نشد")
+      if (maxOf(bmp.width, bmp.height) <= 160) error(StrAppData.photoNoFit)
       val (nw, nh) = ChatImage.fit(bmp.width, bmp.height, maxOf(bmp.width, bmp.height) * 3 / 4)
       bmp = Bitmap.createScaledBitmap(bmp, nw, nh, true)
       q = startQuality
@@ -102,7 +104,7 @@ object ChatMedia {
     val elapsedMs: Long get() = if (started == 0L) 0 else System.currentTimeMillis() - started
 
     fun start() {
-      check(voiceSupported) { "ضبطِ صدا روی این دستگاه نیست" }
+      check(voiceSupported) { StrAppData.noVoice }
       need(context, context.cacheDir, ChatSpace.voiceNeed(VOICE_MAX_MS, VOICE_BIT_RATE))
       val opus = Build.VERSION.SDK_INT >= 29
       val f = File(context.cacheDir, "chat-voice-${System.currentTimeMillis()}.${if (opus) "ogg" else "m4a"}")

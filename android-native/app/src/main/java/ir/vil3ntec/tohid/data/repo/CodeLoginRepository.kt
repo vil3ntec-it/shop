@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data.repo
 
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiJson
@@ -98,7 +99,7 @@ class CodeLoginRepository(
       val r = api.postPublic(ApiEndpoints.Auth.verifyCode(app), body)
       val access = ApiJson.text(r, "access_token").ifBlank { ApiJson.text(r, "accessToken") }
       val refresh = ApiJson.text(r, "refresh_token").ifBlank { ApiJson.text(r, "refreshToken") }
-      if (access.isBlank()) throw ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse("توکن نیامد")
+      if (access.isBlank()) throw ir.vil3ntec.tohid.core.net.ApiFailure.InvalidResponse(StrAppData.noToken)
       val expiresAt = ApiJson.long(r, "accessExpiresAt").takeIf { it > 0 }
         ?: (System.currentTimeMillis() + ApiJson.long(r, "access_expires_in", 3600) * 1000)
       tokens.save(access = access, refresh = refresh.ifBlank { null }, expiresAt = expiresAt)

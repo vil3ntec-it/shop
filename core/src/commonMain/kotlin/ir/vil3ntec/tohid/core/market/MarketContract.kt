@@ -154,6 +154,8 @@ data class PublicProduct(
   val shop: PublicShopRef? = null,
   /** IMG-12: نسخهٔ عکس (۱۲ hex) برای `?v=` ِ نشانیِ عکس؛ عکسِ تازه ⇒ نسخهٔ تازه. null ⇒ بی عکس یا سرورِ کهنه (نشانیِ بی نسخه). */
   val photoVersion: String? = null,
+  /** MKT-06: «چرخهٔ مصرف» (روز، ۱ تا ۳۶۵) — فقط وقتی دکان گذاشته؛ پایهٔ کارتِ «وقتِ دوباره خریدن؟» ِ برنامهٔ خرید (`Refills`) */
+  val consumptionDays: Int? = null,
 )
 
 @Serializable

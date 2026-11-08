@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.ledger.AppendOnce
 
 /**
@@ -106,6 +107,6 @@ object DebtEntry {
     return result(out, key, failed)
   }
 
-  const val NOT_SAVED = "ثبت نشد"
-  const val NOT_REREAD = "دفترِ روی دیسک دوباره خوانده نشد، پس این ثبت انجام نشد تا چیزی از دفتر رونویسی نشود. دوباره امتحان کنید."
+  val NOT_SAVED: String get() = StrLedger.notSaved
+  val NOT_REREAD: String get() = StrLedger.notReread
 }
