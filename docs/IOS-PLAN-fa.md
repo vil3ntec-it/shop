@@ -654,6 +654,7 @@ shim ِ بی‌لرزش (بدتر از امروز) می‌خواست یا shimی
 2. **سقفِ ۴ مگابایتِ NSUserDefaults** (راهش ساخته شد، پشتِ پرچمِ خاموش: §۰.۱۷). سایهٔ همگام‌سازی (`<کلید>.shadow`) در prefs است؛ iOS نوشتنِ مقدارِ ≥ ۴ مگابایت را نامعتبر
    می‌داند و `commit()` ِ shim همیشه `true` است ⇒ دکانِ بزرگ ممکن است سایه را پس از بستنِ برنامه کهنه ببیند (op ِ تکراری، نه
    پاک شدن). راه: سایه در پرونده با `DiskWrite`؛ باید روی دستگاه سنجیده شود.
+3. ~~**پشتیبانِ iCloud پوشه‌های حالِ همگام‌سازی (`sync-shadow/`، `sync-v3/`) را می‌برد.**~~ بسته شد — §۰.۱۶.۲ (شاخهٔ `claude/ios-backup-dirs`).
 
 **آزمون:** `jvmTest` ِ `ios/shared` روی لینوکس (`PrefTypesJvmTest` ۷/۷). `DataSafetyIosTest` (۶ آزمون: نوع‌های `all`، همگام‌سازیِ تنظیمات و
 پشتیبان، `SyncV1Keys.move`، `.prev` و بازیابی، گاوصندوق روی کلیددان، پوشهٔ پشتیبان) و کامپایلِ iOS فقط در CI ِ macOS/klib.
@@ -714,6 +715,37 @@ shim ِ بی‌لرزش (بدتر از امروز) می‌خواست یا shimی
 پس از چرخش است؛ به موتورِ همگام‌سازی دست می‌زند و در این PR نیست.
 
 
+### ۰.۱۶.۲ پوشه‌های حالِ همگام‌سازی بیرون از پشتیبانِ iCloud، مثلِ اندروید (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/ios-backup-dirs`، روی `claude/v3-restore-fence`)
+
+**اشکال:** اندروید پوشه‌های `filesDir/sync-shadow/` (سایهٔ v1 در فایلِ خودش، §۰.۱۷) و `filesDir/sync-v3/` (حالِ Sync v3 ِ هر حساب:
+cursor، سایه، ساعتِ HLC، بستگی، ژورنال، دفترچهٔ §۹.۵) را از پشتیبانِ ابری و انتقال بیرون می‌گذارد (`backup_rules.xml`،
+`backup_rules_legacy.xml`، `TohidBackupAgent.EXCLUDED_DIRS`). `filesDir` ِ آیفون (`Application Support/tohid`، shim ِ
+`iosMain/…/android/content/Context.kt`) به‌طورِ پیش‌فرض در پشتیبانِ iCloud/Finder است ⇒ آیفونِ تازه از پشتیبانِ آیفونِ دیگر cursor ِ
+گوشیِ پیشین را هم می‌گرفت (همان op ِ دو بار نشسته ِ DATA-06) و فقط حصارِ کدِ مشترک (`V3Fence`، `V1Replica.fence`) جلویش بود.
+
+**اکنون:** فهرست در `ios/shared/src/commonMain/…/ios/backup/NoBackupDirs.kt` (`NAMES` = همان `exclude domain="file"` ِ اندروید)؛
+لایهٔ iOS در `iosMain/…/ios/backup/IosNoBackupDirs.kt` با همان کمکِ `NSURLIsExcludedFromBackupKey` ِ #1012 (`BackupExclusion`؛
+`IosDeviceIdentity` هم حالا از همین می‌گذرد). هر پوشه ساخته و ویژگی رویش گذاشته می‌شود (اگر نیست):
+- **هنگامِ ساخت:** نخستین `filesDir` ِ هر فرآیند (shim) — پیش از آنکه `ShadowStore.dirOf` یا `V3StateDir` مسیری زیرِ آن بسازد؛
+  برنامه، کارِ پس‌زمینه و آزمونِ شبیه‌ساز همه از همین می‌گذرند. ویژگی روی پوشه همهٔ درونش (`sync-v3/<کلید>/…`) را بیرون می‌گذارد.
+- **نصبِ پیشین:** همان، در هر آغاز (`appDidLaunch`) و دوباره در بازگشت به پیش‌زمینه اگر نشد. هر پوشه جدا؛ خطا ⇒ گزارش و بارِ بعد، هرگز پرتاب.
+
+دفتر، `oplog-*` ِ v1 و صفِ v3 (`sync-v3-<کلید>/`، پوشهٔ کناری نه درونی) مثلِ اندروید **با** پشتیبان می‌روند: گوشیِ دوم صف را
+اول می‌فرستد و سرور با op_id «تکراری» می‌بیند. حصار دست نخورد و می‌ماند: پشتیبانِ گرفته‌شده پیش از این نسخه هنوز این پوشه‌ها را دارد.
+کدِ مشترکِ اندروید/کامپیوتر دست نخورد: مسیرها با دو ثابتِ جدا (`ShadowStore.DIR`، `V3StateDir.DIR`) ساخته می‌شوند، نه یک کمکِ
+مشترک؛ پس فهرستِ آیفون یک جاست و آزمون آن را به هر پنج جای اندروید می‌بندد.
+
+**آزمون:** `NoBackupDirsJvmTest` (jvmTest ِ `ios/shared` روی لینوکس، ۷/۷): فهرست = ابری و انتقالِ `backup_rules.xml`،
+`backup_rules_legacy.xml`، `TohidBackupAgent.EXCLUDED_DIRS` و `ShadowStore.DIR`/`V3StateDir.DIR`؛ صف و دفتر بیرون نمی‌مانند؛ کمک برای
+هر پوشه صدا زده می‌شود (ساختن، خواندن، گذاشتن)، نصبِ بیرون‌مانده چیزی نمی‌نویسد، شکستِ یکی بقیه را نمی‌ایستاند. `NoBackupDirsIosTest`
+(شبیه‌ساز، **فقط CI** ِ macOS؛ روی لینوکس ساخته نشد): ویژگیِ واقعی روی دو پوشه پس از نخستین `filesDir`، ویژگیِ پاک‌شده دوباره،
+`filesDir` و صفِ کناری بی ویژگی. همراه: `deviceOnlyStoresAreTheSameAsAndroidBackupExclusions` (`DeviceIdentityJvmTest`) روی این پایه
+سرخ بود — اندروید `tohid-sync-v1.xml` را هم کنار گذاشت (#991، دستهٔ ۳۰) — حالا `DEVICE_ONLY` + `V1_SUITE` (آیفون آن suite را نگه
+می‌دارد: چرخش replicaها را می‌برد، حصار cursor را).
+
+**فقط روی دستگاهِ واقعی سنجیدنی (مانده):** بازیابیِ واقعیِ iCloud/Finder روی آیفونِ دیگر ⇒ `sync-v3/` و `sync-shadow/` نمی‌آیند و صف
+می‌آید؛ انتقالِ مستقیم (Quick Start) — اپل نمی‌گوید قلمِ بیرون از پشتیبان آن‌جا هم نمی‌رود؛ اگر برود، حصار همان را می‌گیرد.
+
 ### ۰.۱۷ سایهٔ همگام‌سازی بیرون از NSUserDefaults (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/shadow-file`، روی #1006)
 
 **مشکل:** سایه و cursor ِ Sync v1 (کلِ دفتر؛ ≈ ۳٫۵ KB برای هر فاکتور، ۵۰هزار فاکتور ≈ ۸۷ MB ِ UTF-8) در prefs ِ
@@ -722,7 +754,7 @@ NSUserDefaults برای چنین اندازه‌ای ساخته نشده (سقف
 shim **همیشه `true`** برمی‌گرداند — سایه‌ای که ننشست «نشست» شمرده می‌شد و ژورنالِ `SyncCommit` پاک می‌شد.
 
 **اکنون (پشتِ پرچمِ دکانِ `shop.sync_shadow_file`، پیش‌فرض خاموش):** همان کدِ مشترک (`sync/v1/ShadowStoreAndroid.kt`،
-`ShadowFileAndroid.kt`) سایه و cursor را در **یک فایل و یک نوشتن** می‌گذارد (`sync-shadow-<کلید>-<شماره>.dat` در `filesDir`)،
+`ShadowFileAndroid.kt`) سایه و cursor را در **یک فایل و یک نوشتن** می‌گذارد (`sync-shadow-<کلید>-<شماره>.dat` در `filesDir/sync-shadow/`؛ این پوشه بیرون از پشتیبانِ iCloud، §۰.۱۶.۲)،
 روی آیفون با `DiskWriteIos` (نوشتن در `.tmp`، `fsync`، `link(2)` به `.prev`، `rename(2)`، `fsync` ِ پوشه) — همان تضمینِ دفتر.
 NSUserDefaults فقط نشانِ کوچکِ «کدام فایل» (`<کلید>.shadowStore`) و آینهٔ cursor را دارد. خواندن: اصل ⇐ `.prev` ⇐ نسخهٔ prefs ِ
 کوچ، هرگز «خالی»؛ برگشت به نسخهٔ کهنه‌تر ⇐ `recoverArchive`. shim ِ `Looper` حالا `isCurrentThread` (`NSThread.isMainThread`)

@@ -146,6 +146,8 @@ object IosLifecycle {
     observers += center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, main) { _ ->
       //  هویتِ دستگاه اگر هنگامِ آغاز نسنجیده ماند (دستگاه قفل بود) — پیش از همگام‌سازیِ بازگشت
       IosDeviceIdentity.check()
+      //  پوشه‌های بیرون از پشتیبان، اگر هنگامِ آغاز نشد (‎ios/backup/IosNoBackupDirs.kt‎)
+      ir.vil3ntec.tohid.ios.backup.IosNoBackupDirs.ensure()
       ShopChatSync.foreground = true
       IosNotifications.refresh()
       if (wasBackground) {

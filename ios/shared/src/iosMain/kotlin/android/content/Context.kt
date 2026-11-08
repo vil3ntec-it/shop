@@ -16,14 +16,16 @@ import platform.Foundation.NSUserDomainMask
  *  نمونه هست (`IosContext`) که ریشهٔ آیفون با `LocalContext` می‌دهد.
  *
  *  فقط آنچه فایل‌های رسیده به iOS لازم دارند. `filesDir` ⇐ `Application Support/tohid` ِ همین
- *  برنامه (پشتیبانِ iCloud ِ دستگاه هم می‌گیردش، مثلِ پشتیبانِ خودکارِ اندروید)؛ `cacheDir` ⇐ `Caches`.
+ *  برنامه (پشتیبانِ iCloud ِ دستگاه هم می‌گیردش، مثلِ پشتیبانِ خودکارِ اندروید) — جز همان پوشه‌هایی که اندروید کنار می‌گذارد
+ *  (`sync-shadow/`، `sync-v3/`): نخستین `filesDir` ِ هر فرآیند آن‌ها را با `NSURLIsExcludedFromBackupKey` می‌سازد
+ *  (‎ios/backup/IosNoBackupDirs.kt‎)؛ `cacheDir` ⇐ `Caches`.
  *  `startActivity` نشانی‌ها را باز می‌کند و `ACTION_SEND` را به برگهٔ اشتراکِ iOS می‌دهد (‎Intent.kt‎)؛
  *  سرویس‌های سیستم: اتصال، تخته‌برش، اعلان (UNUserNotificationCenter)، چاپ و موقعیت (CoreLocation)؛ بقیه null.
  */
 abstract class Context {
   open val applicationContext: Context get() = this
   open val packageName: String get() = "ir.vil3ntec.tohid"
-  open val filesDir: File get() = appDir(NSApplicationSupportDirectory, "tohid")
+  open val filesDir: File get() = appDir(NSApplicationSupportDirectory, "tohid").also { ir.vil3ntec.tohid.ios.backup.IosNoBackupDirs.firstUse(it) }
   open val cacheDir: File get() = appDir(NSCachesDirectory, "tohid")
   open val noBackupFilesDir: File get() = appDir(NSCachesDirectory, "tohid-no-backup")
   open fun getDir(name: String, mode: Int): File = File(filesDir.parentFile, "app_$name").apply { mkdirs() }
