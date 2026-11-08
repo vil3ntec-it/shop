@@ -102,6 +102,7 @@ const { v1NewerFields: shopNewerFields } = require('../lib/newer-fields');
  *  داخلِ تراکنشِ push و زیرِ قفلِ ردیف سنجیده می‌شود، نه در میان‌افزار: درجِ همان دسته را هم می‌بیند.
  */
 const finalized = require('../lib/finalized-sales');
+const returnCap = require('../lib/return-line-cap');
 /*
  *  دکان: pull بی opِ کهنه‌ترِ دیگران روی نوشتهٔ تازه‌ترِ همین دستگاه، پشتِ پرچمِ خاموشِ
  *  `sync.pull_own_newer` (#501) — ‎lib/sync-v1-own-newer.js‎. ‎lib/sync-v1.js‎ ِ مشترک با پمپ دست نمی‌خورد.
@@ -143,8 +144,11 @@ router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, contac
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : [];
     const schemaVersion = Number(req.body?.schema_version || req.body?.schemaVersion || 0);
 
-    //  S89: فقط دکان، فقط با پرچمِ `shop.doc_chain` و دسته‌ای که فاکتور یا قلم دارد؛ وگرنه null و هیچ پرسشی
-    const guard = await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) });
+    //  S89: فقط دکان، فقط با پرچمِ `shop.doc_chain` و دسته‌ای که فاکتور یا قلم دارد؛ وگرنه null و هیچ پرسشی.
+    //  ⛔ و برگشتِ بیش از فروخته‌شدهٔ هر قلم — همه، صاحب هم — درونِ همین تراکنش و زیرِ قفلِ برگشت (‎lib/return-line-cap.js‎);
+    //  دستهٔ بی برگشتِ قلم‌دار و پمپ همان `guard` ِ پیشین را می‌گیرند
+    const guard = returnCap.v1Guard(req.sync, deviceId, ops,
+      await finalized.v1Guard(req.sync, deviceId, ops, { ip: require('../middleware/ratelimit').clientIp(req) }));
 
     let out;
     try {

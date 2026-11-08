@@ -226,7 +226,7 @@ object ReturnFlow {
       if (q == 0.0) continue
       if (!okDisposition(pick.disposition)) return Outcome.Bad(Code.BAD_DISPOSITION)
       //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
-      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
+      val allowed = (ReturnLeft.left(d, item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)   //  JB5: برگشتِ دستگاه‌های دیگر هم
       val name = SalesEngine.itemName(d, item)
       if (q > allowed + 1e-9) return Outcome.Bad(Code.QTY_EXCEEDS, "$name: ${qty(allowed)}")
       val product = d.products.find { it.id == item.productId }
@@ -235,7 +235,7 @@ object ReturnFlow {
       //  مبنا پولِ واقعاً پس‌داده برای همین قلم است (#586، برگشت‌های کهنهٔ فرمولِ جداجدا)
       val prior = d.saleReturns.filter { it.saleItemId == item.id }
       val amount = ReturnShare.amount(
-        item.totalPrice, item.quantity, item.returnedQty, q, paidRatio,
+        item.totalPrice, item.quantity, ReturnLeft.returned(d, item), q, paidRatio,
         refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity },
       )
       val unit = if (item.quantity > 0) item.totalPrice / item.quantity else item.unitPrice

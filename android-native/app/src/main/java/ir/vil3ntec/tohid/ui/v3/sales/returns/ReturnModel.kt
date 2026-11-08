@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.sales.returns
 
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -10,11 +11,11 @@ import ir.vil3ntec.tohid.qty
 import kotlin.math.roundToLong
 
 /** یک قلمِ قابلِ برگشت */
-data class ReturnLine(val item: SaleItem, val name: String, val unit: String, val left: Double, val step: Double)
+data class ReturnLine(val item: SaleItem, val name: String, val unit: String, val left: Double, val step: Double, val note: String = "")
 
 /**
  *  مرجوعیِ ساده (`sales/{id}/return` وقتی «برگشت و تعویض» خاموش است) — خالص: قلم‌های
- *  قابلِ برگشت (`SalesEngine.returnable`)، پلهٔ −/+ همان سبد (`cartStep`)، و پیش‌نمایشِ مبلغ با
+ *  قابلِ برگشت (`ReturnLeft`: برگشتِ دستگاه‌های دیگر هم، JB5)، پلهٔ −/+ همان سبد (`cartStep`)، و پیش‌نمایشِ مبلغ با
  *  **همان فرمولِ ثبت** (`recordReturn`: قیمتِ همان فاکتور × سهمِ پس از تخفیفِ فاکتور) تا عددی
  *  که دیده می‌شود همان باشد که ثبت می‌شود. ثبت با خودِ موتور است.
  */
@@ -22,13 +23,13 @@ object ReturnModel {
 
   fun lines(d: ShopData, sale: Sale): List<ReturnLine> {
     val products = d.products.associateBy { it.id }
-    return d.saleItems.filter { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }.map { item ->
+    return d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 }.map { item ->
       val unit = products[item.productId]?.unit.orEmpty()
-      ReturnLine(item, SalesEngine.itemName(d, item), unit, SalesEngine.returnable(item), SalesEngine.cartStep(unit))
+      ReturnLine(item, SalesEngine.itemName(d, item), unit, ReturnLeft.left(d, item), SalesEngine.cartStep(unit), ReturnLeft.note(d, item, unit))
     }
   }
 
-  fun leftText(l: ReturnLine): String = StrSale.returnableLeft(qty(l.left) + if (l.unit.isNotBlank()) " ${l.unit}" else "")
+  fun leftText(l: ReturnLine): String = StrSale.returnableLeft(qty(l.left) + if (l.unit.isNotBlank()) " ${l.unit}" else "") + l.note
 
   /** نوشتهٔ کادر ⇒ مقدار (خالی/نادرست ⇒ ۰)، در بازهٔ مجاز */
   fun value(text: String?, l: ReturnLine): Double = (parseNumber(text.orEmpty()) ?: 0.0).coerceIn(0.0, l.left)

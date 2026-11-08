@@ -151,6 +151,8 @@ async function pushChanges(ctx, changes) {
       const bad = await require('./price-cap').judgeLegacy(c, { shopId, role, userId }, changes);
       if (bad) throw bad;
     }
+    //  ⛔ برگشتِ بیش از فروخته‌شدهٔ هر قلم — همه، صاحب هم — زیرِ قفلِ برگشت ⇒ کلِ دسته ۴۰۹ (‎lib/return-line-cap.js‎)
+    await require('./return-line-cap').legacyCheck(c, { shopId, userId, role, deviceId }, changes);
     let applied = 0, skipped = 0;
     const conflicts = [];
     const t = now();
@@ -258,6 +260,10 @@ async function pushChanges(ctx, changes) {
     //  نسیهٔ بی مشتری از برنامهٔ کهنه: پذیرفته، فقط سابقه (‎lib/credit-debtor.js‎)
     await require('./credit-debtor').flagLegacy({ shopId, userId, deviceId, ip: ctx.ip || '', path: ctx.finalized === 'enforce' ? 'api' : 'legacy' }, changes, out.conflicts);
     return out;
+  }, async (err) => {
+    //  برگشتِ ردشده بی‌صدا نمی‌رود: صندوقِ تعارض برای صاحب، پس از برگشتِ تراکنش
+    await require('./return-line-cap').boxRest(err);
+    throw err;
   }).finally(() => (guard ? guard.finish() : null));
 }
 

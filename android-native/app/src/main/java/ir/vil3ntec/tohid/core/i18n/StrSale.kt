@@ -406,6 +406,8 @@ object StrSale {
   val returnedItems: String get() = t("کالاهای برگشتی", "Returned items", "بېرته راګرځېدلي توکي")
   val allReturned: String get() = t("همهٔ اقلامِ این فاکتور برگشته است.", "All items on this invoice have been returned.", "د دې بل ټول توکي بېرته راګرځېدلي.")
   fun returnableEach(q: Any, p: Any): String = t("قابلِ برگشت: ${asIs(q)} · فی ${asIs(p)}", "Returnable: $q · $p each", "د راګرځولو وړ: $q · فی $p")
+  /** سفرِ JB5: آنچه از همین قلم پیش‌تر برگشته — از دادهٔ همگام‌شده، هر دستگاه (`ReturnLeft.note`) */
+  fun returnedOf(r: Any, s: Any): String = t("پیش‌تر برگشته: ${asIs(r)} از ${asIs(s)}", "Already returned: $r of $s", "مخکې بېرته راګرځېدلي: $r له $s")
   val itemWord: String get() = t("(کالا)", "(item)", "(توکی)")
   val addReturnItem: String get() = t("افزودنِ کالا — نام یا بارکد", "Add an item — name or barcode", "توکی زیات کړئ — نوم یا بارکوډ")
   val returnReasonRequired: String get() = t("دلیلِ برگشت (اجباری)", "Return reason (required)", "د راګرځولو دلیل (اړین)")

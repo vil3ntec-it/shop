@@ -27,6 +27,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.ReturnFlow
+import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.ReturnSettings
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -89,7 +90,7 @@ fun ReturnFlowSheet(
   val saleKey = remember { Ulid.next() }
   val chosen = remember { booleanArrayOf(false) }
 
-  val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && SalesEngine.returnable(it) > 0 } }
+  val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 } }
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<ReturnFree>()) }
@@ -175,7 +176,7 @@ fun ReturnFlowSheet(
             Row(verticalAlignment = Alignment.CenterVertically) {
               Column(Modifier.weight(1f)) {
                 Text(SalesEngine.itemName(d, item), style = V3Type.body, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(ReturnFlowModel.itemLine(item, unit), style = V3Type.footnote, color = c.inkMuted)
+                Text(ReturnFlowModel.itemLine(d, item, unit), style = V3Type.footnote, color = c.inkMuted)
               }
               Spacer(Modifier.width(8.dp))
               V3TextField(qtys[item.id].orEmpty(), { qtys = qtys + (item.id to it); error = null }, StrSale.qtyLabel, Modifier.width(110.dp), kind = V3FieldKind.NUMBER)

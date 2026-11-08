@@ -349,7 +349,8 @@ test('Sync v3: جدولِ بیرون از نقش کلِ tx را برمی‌گر�
   ];
   const sale = [
     v3op('c', 'sales', 's3-csh', { totalMinor: 2000, status: 'completed' }, 'tx-s3'),
-    v3op('c', 'saleItems', 'si3-csh', { saleId: 's3-csh', productId: 'p1', quantityMilli: 1000 }, 'tx-s3'),
+    //  ۲ عدد: دو ردیفِ برگشتِ `rd3-csh` (پایین) هر کدام ۱ عدد — بیش از فروخته برنمی‌گردد (`return-line-cap`، JB5)
+    v3op('c', 'saleItems', 'si3-csh', { saleId: 's3-csh', productId: 'p1', quantityMilli: 2000 }, 'tx-s3'),
     v3op('c', 'stockMovements', 'm3-s-csh', { productId: 'p1', qtyMilli: -1000, type: 'sale', refId: 's3-csh' }, 'tx-s3'),
   ];
   const r = await push3('cashier', [...buy, ...sale]);
