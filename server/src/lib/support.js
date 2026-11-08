@@ -20,6 +20,7 @@ const { query, one, many, newId, now } = require('../db');
 const { notifyPanel } = require('./panel-live');
 const push = require('./push');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
+const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)
 
 const MAX_BODY = 4000;
 
@@ -308,11 +309,11 @@ async function putMedia({ threadId, uploader, mime, buf }) {
   if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
   if (buf.length > MAX_MEDIA) throw new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است');
   if (uploader !== 'user' && uploader !== 'admin') throw badRequest('فرستنده نامعتبر است');
-  const row = await one(
-    `INSERT INTO support_media (id, thread_id, uploader, mime, size, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id, mime, size`,
-    [newId('smd'), threadId, uploader, String(mime).toLowerCase().split(';')[0].trim().slice(0, 80), buf.length, buf, now()]
-  );
+  const row = await mediaStore.support.put(threadId, buf, async (st) => (st.used = await one(
+    `INSERT INTO support_media (id, thread_id, uploader, mime, size, data, created_at, store_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id, mime, size`,
+    [newId('smd'), threadId, uploader, String(mime).toLowerCase().split(';')[0].trim().slice(0, 80), buf.length, st.data, now(), st.key]
+  )));
   return { mediaId: row.id, kind, mime: row.mime, size: Number(row.size) };
 }
 
@@ -323,11 +324,15 @@ async function putMedia({ threadId, uploader, mime, buf }) {
 async function getMedia({ id, threadId = null }) {
   const mid = String(id || '').trim();
   if (!mid || mid.length > 80) return null;
-  return one(
-    'SELECT id, thread_id, uploader, mime, size, data FROM support_media WHERE id=$1'
+  const m = await one(
+    'SELECT id, thread_id, uploader, mime, size, data, store_key FROM support_media WHERE id=$1'
       + (threadId ? ' AND thread_id=$2' : ''),
     threadId ? [mid, threadId] : [mid]
   );
+  const data = m && await mediaStore.support.bytes(m);   //  شیءِ گم‌شده/ناسالم ⇒ همان «نیست»
+  if (!data) return null;
+  const { store_key: _key, ...out } = m;   //  کلیدِ انبار هرگز بیرون نمی‌رود
+  return { ...out, data };
 }
 
 /**
@@ -349,7 +354,8 @@ function sendMedia(req, res, m, side) {
   const recipient = m.uploader !== side;
   if (recipient && req.method === 'GET') {
     res.on('finish', () => {
-      query('DELETE FROM support_media WHERE id=$1', [m.id])
+      query('DELETE FROM support_media WHERE id=$1 RETURNING thread_id, store_key', [m.id])
+        .then((r) => mediaStore.support.drop(r.rows))
         .catch((err) => console.error('[support:media-relay]', err.message));
     });
   }

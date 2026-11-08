@@ -71,9 +71,11 @@ async function sweep({ at = now() } = {}) {
     `DELETE FROM support_media m
       WHERE m.created_at < $1
          OR (m.created_at < $2
-             AND NOT EXISTS (SELECT 1 FROM support_messages x WHERE x.media_id = m.id))`,
+             AND NOT EXISTS (SELECT 1 FROM support_messages x WHERE x.media_id = m.id))
+      RETURNING m.thread_id, m.store_key`,
     [cutoff, at - ORPHAN_MEDIA_MS]
   );
+  await require('./media-store').support.drop(supportMedia.rows);   //  شیءِ انبار (مهاجرتِ ۲۷۵) پس از پاکِ ردیف
 
   return {
     chatMessages: msgs.rowCount, chatMedia: media.rowCount,

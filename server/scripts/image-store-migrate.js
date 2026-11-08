@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 'use strict';
 /**
- * جابه‌جاییِ عکس‌ها میانِ پایگاه و انبارِ شیء — شرح: docs/SCALING-fa.md §۳ «انبارِ عکس»، منطق: src/lib/image-store-move.js.
+ * جابه‌جاییِ عکس‌ها و رسانه‌ها (چتِ دکان، پشتیبانی، پروندهٔ اعتماد؛ مهاجرتِ ۲۷۵) میانِ پایگاه و انبارِ شیء — شرح:
+ * docs/SCALING-fa.md §۳ «انبارِ عکس»، منطق: src/lib/image-store-move.js.
  *
  *   node scripts/image-store-migrate.js status
  *   node scripts/image-store-migrate.js copy     [--table=product_photos,…] [--batch=100] [--limit=N]
