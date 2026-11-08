@@ -44,8 +44,10 @@ import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrSimpleAsk
 import ir.vil3ntec.tohid.core.i18n.StrStock
+import ir.vil3ntec.tohid.core.i18n.StrStockPages
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.report.ReportBoard
+import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.core.report.ReportTables
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.risk.Anomalies
@@ -214,7 +216,14 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
   val money = remember { ir.vil3ntec.tohid.data.ShopRole.canSeeMoney(context) }
   //  RPT-17: «شماره‌های جاافتاده» با همان تنظیمِ زبانهٔ «گزارش‌ها» (`DocGapsPref`)
   val gapsOn = remember { ir.vil3ntec.tohid.data.DocGapsPref.on(context) }
-  val tabs = remember(money, gapsOn) { DocGapsFresh.tabs(HeatmapModel.tabs(DayEndModel.tabs(ReportFreshModel.tabs(money), money), money), gapsOn) }
+  //  PRM-16: «اثرِ تخفیف» فقط وقتی دفتر قلمِ تخفیفِ خودکار دارد؛ PRD-15: «بهای میانگین» — هر دو فقط برای کسی که پول را می‌بیند
+  val promoHas = remember(d) { ir.vil3ntec.tohid.data.PromoEffectBook.has(d) }
+  val tabs = remember(money, gapsOn, promoHas) {
+    StockCostFresh.tabs(
+      PromoFresh.tabs(DocGapsFresh.tabs(HeatmapModel.tabs(DayEndModel.tabs(ReportFreshModel.tabs(money), money), money), gapsOn), money, promoHas),
+      money,
+    )
+  }
   val today = ir.vil3ntec.tohid.todayIso()
   val clock = remember { ReportBridge.deviceClock() }
   val ledger = remember(d) { ReportBridge.ledgerOf(d) }
@@ -260,7 +269,16 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       ?: d.purchases.find { it.id == id }?.let { p -> StrReportPages.docPurchase + p.notes.trim().let { if (it.isEmpty()) "" else " — $it" } }
       ?: ""
   val gaps = remember(d, def.id, today) { if (def.id == DocGapsFresh.TAB_ID) DocGapsFresh.tables(d, today) else null }
-  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: view.tables
+  //  PRM-16: اثرِ هر تخفیف با همان روشِ بهای «سود و حاشیه» (`ReportFresh.cost`)
+  val promo = remember(d, ledger, def.id, span, today, cost) {
+    if (def.id == PromoFresh.TAB_ID) PromoFresh.view(d, ledger, span, today, clock, cost) else null
+  }
+  //  PRD-15: بهای میانگینِ هر کالا و ارزشِ موجودی از همان بازپخشِ میانگینِ موزون؛ فقط خواندنی
+  val stockCost = remember(ledger, def.id) {
+    if (def.id == StockCostFresh.TAB_ID) ir.vil3ntec.tohid.core.report.ReportCore.stockCost(ledger) else null
+  }
+  val tables = dayEnd?.tables ?: heat?.let { HeatmapModel.tables(it) } ?: gaps ?: promo?.let { PromoFresh.tables(it) }
+    ?: stockCost?.let { StockCostFresh.tables(it) } ?: view.tables
   val viewMode = rememberViewMode("report-fresh", ScreenKind.MANAGEMENT)
   val name = "گزارش-${def.label}-${if (dayEnd != null) day else today}".replace(' ', '-') // داده: نامِ پروندهٔ خروجی
 
@@ -328,6 +346,8 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
       dayEnd != null -> DayEndSummary(dayEnd)
       heat != null -> HeatmapSummary(heat)
       gaps != null -> Unit   // RPT-17: شمارها در خودِ جدول‌اند
+      promo != null -> PromoSummary(promo)
+      stockCost != null -> StockCostSummary(stockCost)
       else -> Summary(view, def.id, d, money)
     }
 
@@ -439,6 +459,45 @@ private fun Summary(view: ReportFreshModel.View, tab: String, d: ShopData, showM
         if (findings != null) AnomalyBox(findings) else if (alerts.isNotEmpty()) CashierAlertBox(alerts)
       }
     }
+  }
+}
+
+/** PRM-16 — سرِ زبانهٔ «اثرِ تخفیف»: روشِ بها (همان انتخابِ «سود و حاشیه»)، قطعی/تقریبی و قاعده */
+@Composable
+private fun PromoSummary(v: PromoFresh.View) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    v.report?.let { r ->
+      val p = if (v.from == v.to) formatDate(v.from) else if (v.from == "0000-01-01") StrReports.allDates else StrSimpleAsk.range(formatDate(v.from), formatDate(v.to))
+      Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        StatCard(StrReportPages.colPromoDiscount, "${money(r.promoDiscountMinor / 100.0)} ؋", p, Modifier.weight(1f))
+        StatCard(StrReportPages.colNetSales, "${money(r.promoRevenueMinor / 100.0)} ؋", p, Modifier.weight(1f))
+        StatCard(StrReportPages.colShare, ReportCore.bp(r.promoRevenueMinor, r.totalRevenueMinor)?.let(ReportFreshModel::percent) ?: "—", p, Modifier.weight(1f))
+      }
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      Text(StrReportPages.costMethod, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+      SegmentedTabs(CostMethod.entries.map { SegmentTab(it, it.label) }, v.method, { ReportFresh.setCost(it) })
+    }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      val r = v.report
+      if (r != null && r.rows.isNotEmpty()) {
+        if (r.profitApproximate) StatusPill(StrReportPages.profitApprox, PillTone.WARNING) else StatusPill(StrReportPages.profitFinal, PillTone.SUCCESS)
+        Spacer(Modifier.width(8.dp))
+      }
+      Text(PromoFresh.note(v), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    }
+  }
+}
+
+/** PRD-15 — سرِ زبانهٔ «بهای میانگین»: ارزشِ موجودی به بهای میانگین و قاعده (فقط خواندنی) */
+@Composable
+private fun StockCostSummary(c: ReportCore.StockCost) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+      StatCard(StrStockPages.stockValueAvg, "${money(c.totals.valueMinor / 100.0)} ؋", if (c.totals.approximate) StrReportPages.colApprox else StrReportPages.untilToday, Modifier.weight(1f))
+      StatCard(StrReportPages.colProduct, c.rows.count { it.qtyMilli > 0 }.toString(), StrReportPages.untilToday, Modifier.weight(1f))
+    }
+    Text(StockCostFresh.note(c), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
 
@@ -631,6 +690,12 @@ fun PhoneFreshReports(d: ShopData) {
   val heat = remember(d, heatSpan, today, money) {
     if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours)) else null
   }
+  //  PRD-15: ارزشِ موجودی به بهای میانگینِ موزون (فقط خواندنی)؛ PRM-16: اثرِ تخفیف‌های این ماه با همان روشِ بها —
+  //  هر دو فقط برای کسی که پول را می‌بیند (همان کامپیوتر: «بهای میانگین» و «اثرِ تخفیف»)
+  val stockCost = remember(ledger, money) { if (money) ReportCore.stockCost(ledger) else null }
+  val promo = remember(d, ledger, today, money, cost) {
+    if (money && ir.vil3ntec.tohid.data.PromoEffectBook.has(d)) PromoFresh.view(d, ledger, "month", today, clock, cost) else null
+  }
   //  کلیکِ کارتِ خانه روی گوشی همین صفحه را باز می‌کند؛ مقصد این‌جا یکی است
   LaunchedEffect(ReportFresh.preset.value) { ReportFresh.preset.value = null }
 
@@ -652,7 +717,47 @@ fun PhoneFreshReports(d: ShopData) {
     item { HomeKpis(d, {}, money, columns = 2) }
     dayEnd?.let { b -> item { DayEndPhone(b) } }
     heat?.let { h -> item { HeatmapPhone(h, heatSpan) { heatSpan = it } } }
+    stockCost?.let { c -> item { StockCostPhone(c) } }
+    promo?.let { v -> item { PromoPhone(v) } }
     phoneDebts(this, debts)
+  }
+}
+
+/** PRD-15 روی گوشی: ارزشِ موجودی به بهای میانگین و قاعده؛ ریزِ هر کالا در صفحهٔ همان کالا */
+@Composable
+private fun StockCostPhone(c: ReportCore.StockCost) {
+  Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    StatCard(
+      StrStockPages.stockValueAvg, "${money(c.totals.valueMinor / 100.0)} ؋",
+      if (c.totals.approximate) StrReportPages.colApprox else StrReportPages.untilToday, Modifier.fillMaxWidth(),
+    )
+    Text(StockCostFresh.note(c), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+  }
+}
+
+/** PRM-16 روی گوشی: هر تخفیفِ این ماه یک کارت (جدولِ عریض فقط کامپیوتر) */
+@Composable
+private fun PromoPhone(v: PromoFresh.View) {
+  Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Text(StrReportPages.promoTitle, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
+    v.report?.rows?.forEach { x ->
+      Column(
+        Modifier.fillMaxWidth().clip(Shape.card).background(Shop.colors.surfaceSolid).border(1.dp, Shop.colors.border, Shape.card).padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+      ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+          Text(x.name.ifEmpty { x.id }, Modifier.weight(1f), fontWeight = FontWeight.Bold, color = Shop.colors.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text("${money(x.revenueMinor / 100.0)} ؋", fontWeight = FontWeight.Bold, color = Shop.colors.text)
+        }
+        Text(
+          "${StrReportPages.colPromoDiscount}: ${money(x.discountMinor / 100.0)} ؋ · " +
+            "${CostPolicy.label(StrReportPages.colProfit, v.method)}: ${x.profitMinor?.let { "${money(it / 100.0)} ؋" } ?: "—"}",
+          style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
+        )
+        if (x.profitApproximate) StatusPill(StrReportPages.profitApprox, PillTone.WARNING)
+      }
+    }
+    Text(PromoFresh.note(v), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
   }
 }
 

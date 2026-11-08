@@ -12,8 +12,8 @@ import java.math.BigInteger
  *  (`StockCoreVectorsTest` این‌جا، `server/test/stock-core.test.js` آن‌جا).
  *  ⛔ هر تغییرِ رفتار در یکی، بی همان تغییر در دیگری و در بردارها، ممنوع.
  *
- *  ⚠️ هنوز به هیچ صفحه‌ای وصل نیست. موتورِ امروز (`ShopStore.stock`،
- *  `SaleItem.purchasePrice`، `ExpiryEngine`) دست نخورده است.
+ *  میانگینِ موزونِ هستهٔ گزارش (`ReportCore.mavg`: سودِ RPT-03، بهای میانگینِ PRD-15، اثرِ تخفیفِ PRM-16) و «دفترِ
+ *  موجودی» (`data/StockLedger`) روی همین هسته می‌دوند. موتورِ امروزِ موجودی (`ShopStore.stock`، `ExpiryEngine`) دست نخورده است.
  *
  *  ── واحدها ──────────────────────────────────────────────────────
  *  پول = Longِ واحدِ کوچک (AFN یک‌صدم). مقدار = Longِ هزارم. مثلِ JS، هر عدد

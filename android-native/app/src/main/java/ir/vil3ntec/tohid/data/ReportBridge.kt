@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.report.ReportClock
+import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.core.report.ReportLedger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -23,6 +24,27 @@ object ReportBridge {
 
   fun ledgerOf(d: ShopData): ReportLedger =
     ReportLedger.parse(json.encodeToJsonElement(ShopData.serializer(), d).jsonObject)
+
+  /**
+   *  PRD-15 — بهای میانگینِ موزونِ کالاها و ارزشِ موجودی از **همان** بازپخشِ هستهٔ گزارش (`ReportCore.stockCost`)، فقط
+   *  خواندنی. [productIds] ⇒ فقط دفترِ همان کالاها (ورود، قلم، فاکتورِ قلم، برگشتیِ قلم) به هسته می‌رود: میانگینِ هر کالا
+   *  مستقل است، پس عدد همان بازپخشِ کلِ دفتر است و صفحهٔ یک کالا کلِ دفتر را JSON نمی‌کند (`CostViewTest`).
+   */
+  fun stockCostOf(d: ShopData, productIds: Collection<String>? = null): ReportCore.StockCost {
+    if (productIds == null) return ReportCore.stockCost(ledgerOf(d))
+    val ids = productIds.toHashSet()
+    val items = d.saleItems.filter { it.productId in ids }
+    val saleIds = items.mapTo(HashSet()) { it.saleId }
+    val itemIds = items.mapTo(HashSet()) { it.id }
+    val slim = ShopData(
+      products = d.products.filter { it.id in ids },
+      warehouseEntries = d.warehouseEntries.filter { it.productId in ids },
+      sales = d.sales.filter { it.id in saleIds },
+      saleItems = items,
+      saleReturns = d.saleReturns.filter { it.saleItemId in itemIds },
+    )
+    return ReportCore.stockCost(ledgerOf(slim), ids)
+  }
 
   /**
    *  ساعتِ همین دستگاه: اختلافِ امروزش با UTC و روزِ کاری از «پایانِ روزِ کاری»

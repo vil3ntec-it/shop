@@ -23,7 +23,11 @@ import ir.vil3ntec.tohid.core.money.checkExact
  *      فروشِ ردیف‌ها جمعِ فروش نیست — برای آن `promoRevenueMinor` (هر قلم یک بار) هست.
  *      تخفیفِ هر ردیف فقط مالِ خودش است، پس جمعِ تخفیفِ ردیف‌ها = `promoDiscountMinor`.
  *    • بهای نامعلوم (`costMinor = null`) سود را نمی‌سازد و شمرده می‌شود (`costMissingLines`)؛
- *      ردیفی که هیچ قلمش بها ندارد سودِ `null` دارد، نه صفر. تا D-23 سود «تقریبی» است.
+ *      ردیفی که هیچ قلمش بها ندارد سودِ `null` دارد، نه صفر. بهای تخمینی (`costEstimated`، مثلاً فروش بیش از
+ *      موجودی در میانگینِ موزون) در سود می‌آید ولی شمرده می‌شود (`costEstimatedLines`).
+ *    • روشِ بها با صفحه است (`CostPolicy`، پیش‌فرض و مصوبِ D-23 میانگینِ موزون؛ بها از همان `ReportCore.costs`):
+ *      سود فقط وقتی قطعی است که روش مصوب باشد (`costApproved`) و هیچ قلمِ تخفیف‌خورده‌ای بهای نامعلوم یا
+ *      تخمینی نداشته باشد؛ وگرنه «تقریبی» — هرگز عددِ قطعیِ ساختگی.
  *    • نرخ با مخرجِ صفر ⇒ null. ترتیب: تخفیفِ بیشتر، سپس شناسه.
  *    • هر جمع زیرِ ۲^۵۳−۱ (همان سقفِ `Money`)؛ بیرون از آن خطا، نه عددِ غلط.
  *
@@ -42,6 +46,8 @@ data class EffectLine(
   /** بهای تمام‌شدهٔ همهٔ `qtyMilli`، به یک‌صدم؛ null = نامعلوم */
   val costMinor: Long? = null,
   val promos: List<PromoTag> = emptyList(),
+  /** بها هست ولی تخمینی است (همان `est` ِ هستهٔ گزارش) */
+  val costEstimated: Boolean = false,
 )
 
 data class PromoEffectRow(
@@ -59,6 +65,10 @@ data class PromoEffectRow(
   val revenueShareBp: Long?,
   /** تخفیف ÷ (فروش + تخفیف)، به ده‌هزارم */
   val discountDepthBp: Long?,
+  /** قلم‌های بهادارِ این ردیف که بهایشان تخمینی است */
+  val costEstimatedLines: Int = 0,
+  /** سودِ همین ردیف «تقریبی» است: روشِ نامصوب، یا قلمِ بی‌بها/تخمینی */
+  val profitApproximate: Boolean = true,
 )
 
 data class PromoEffectReport(
@@ -69,7 +79,7 @@ data class PromoEffectReport(
   val promoRevenueMinor: Long,
   /** جمعِ همهٔ تخفیف‌های خودکار (= جمعِ `discountMinor` ِ ردیف‌ها) */
   val promoDiscountMinor: Long,
-  /** تا تصمیمِ D-23 (روشِ بها) سود تقریبی است */
+  /** روشِ بها نامصوب، یا قلمِ تخفیف‌خورده‌ای بی‌بها یا با بهای تخمینی ⇒ سود تقریبی */
   val profitApproximate: Boolean = true,
 )
 
@@ -90,9 +100,11 @@ object PromoEffect {
     var profit = 0L
     var costed = 0
     var missing = 0
+    var estimated = 0
   }
 
-  fun of(lines: List<EffectLine>): PromoEffectReport {
+  /** [costApproved] = روشِ بهایی که `costMinor` از آن آمد مصوب است (`CostPolicy.approved`)؛ پیش‌فرض نه ⇒ «تقریبی» */
+  fun of(lines: List<EffectLine>, costApproved: Boolean = false): PromoEffectReport {
     val acc = LinkedHashMap<String, Acc>()
     var total = 0L
     var promoRevenue = 0L
@@ -125,6 +137,7 @@ object PromoEffect {
         a.revenue = addExact(a.revenue, revenue)
         if (cost == null) a.missing += 1 else {
           a.costed += 1
+          if (l.costEstimated) a.estimated += 1
           a.profit = addExact(a.profit, addExact(revenue, -cost))
         }
       }
@@ -137,9 +150,11 @@ object PromoEffect {
         costMissingLines = a.missing,
         revenueShareBp = bp(a.revenue, total),
         discountDepthBp = bp(a.discount, addExact(a.revenue, a.discount)),
+        costEstimatedLines = a.estimated,
+        profitApproximate = !costApproved || a.missing > 0 || a.estimated > 0,
       )
     }.sortedWith(compareByDescending<PromoEffectRow> { it.discountMinor }.thenBy { it.id })
-    return PromoEffectReport(rows, total, promoRevenue, promoDiscount)
+    return PromoEffectReport(rows, total, promoRevenue, promoDiscount, !costApproved || rows.any { it.profitApproximate })
   }
 
   /** x × keep ÷ qty با گردِ نیمه به بالا (برای منفی قرینه)، بی سرریزِ میانی. */
