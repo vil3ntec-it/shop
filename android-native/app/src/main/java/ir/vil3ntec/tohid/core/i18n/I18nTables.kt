@@ -48,6 +48,7 @@ object I18nTables {
     StrTillPay, // نسیه فقط با مشتری؛ حساب‌پی با NFC/QR در صندوقِ گوشیِ نسخهٔ ۳ (PAY-21)
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
     StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
+    StrConflictInbox, // صندوقِ سندهای ردشده ِ صاحب/مدیر و نشانِ «سرور نپذیرفت» روی فاکتورِ دستگاهِ سازنده
     StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳

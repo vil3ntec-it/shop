@@ -302,6 +302,13 @@
   اندروید در `SyncV1Engine` (`parts.push`، `pushClient`)، وب در `recordChange`/`pushBaseline`/`pushOnce`. sync-core ِ کهنه ⇒ بی `since`، بی خطا.
 - opِ قدیمی مهلت ندارد (D-05، #233).
 - بستنِ تعارض با `data.delete.any` (مالک و مدیر)؛ لغوِ فاکتور با `sales.cancel` (#233).
+- صندوقِ سندهای ردشده (`/api/shop/conflict-inbox`، `lib/conflict-inbox.js`، مهاجرتِ ۳۱۵؛ پیش‌فرض روشن، بی پرچم): فقط گونه‌های
+  صندوقِ سند (`perm_denied`، `approval_*`) و فقط صاحب/مدیر (`data.delete.any`)؛ عضوِ دیگر فقط `/mine` ِ خودش. ⛔ «دوباره ثبت»
+  همان زنجیرهٔ زندهٔ `POST /api/sync/v1/push` (از `router.stack`، نه کپی) یا `sync-v3.push` است با **نقشِ تأییدکننده** و
+  **دستگاهِ سازنده** (دستگاهِ سازنده opها را pull نمی‌کند ⇒ دو بار کم/زیاد نمی‌شود)؛ شناسهٔ op `rs_<شناسهٔ ردیف>_<i>` و v3 یک tx ِ تازه
+  ⇒ یک بار؛ نشانِ «در حالِ ثبت» (`detail.resubmitting`، ۶۰ ثانیه) جلوی دو کارِ هم‌زمان؛ ردِ دوباره ⇒ ردیفِ تازه نمی‌ماند و بستهٔ
+  همان ردیف دست نمی‌خورد. ⛔ `return_exceeds_sold` با هیچ تأییدی دوباره ثبت نمی‌شود. هر کار سابقهٔ `conflict_inbox.*` و «دوباره ثبت»
+  برگهٔ `shop_approvals` (`nonce = cf:<شناسه>`، `key_id='inbox'`). «کنار بگذار» دلیل می‌خواهد؛ «اصلاح» ⇐ `fixed` با `fixedDoc`.
 - cursor ِ `sync_devices` ِ v1 ملاکِ «دیده بود؟» ِ تعارض است. بی پرچم = آنچه pull فرستاد (پاسخِ گم‌شده ⇒ تعارضِ بعدی ثبت نمی‌شود، «۳-ب» ِ #449)؛
   با `sync.cursor_from_since` = آنچه دستگاه تأیید کرد: `since` ِ pull یا `since` ِ اختیاریِ بدنهٔ push، بریده به سرِ دفتر و **دقیق** (نه GREATEST).
   پاسخِ pull دست نمی‌خورد (جز `since` ِ بزرگ‌تر از سرِ دفتر که پیش از pull بریده می‌شود) و پمپ پرچم را نمی‌خواند. فقط در
@@ -986,6 +993,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۲۱۵ (`215_cluster_state.sql`: جدول‌های UNLOGGED ِ `rate_limit_hits` (سقفِ نرخِ مشترکِ چند نمونه، `RATE_LIMIT_STORE=pg`) و `live_ticket_uses` (بلیتِ سوکتِ یک‌بارمصرفِ خوشه)، `CLUSTER_ENABLED`، `claude/scale-1`؛ ۱۴۰۵/۰۸/۱۷ پس از سنجشِ main و PRهای باز: بزرگ‌ترین ۲۱۴).
 - ۲۱۶ (`216_perf_category_index.sql`: فقط نمایه — `ix_sync_rows_shop_product_category` برای «کالاهای هم‌دسته» و مرورِ دستهٔ ویترین، `claude/scale-1`).
 - ۲۵۵ (`255_image_store.sql`: `store_key`، `data` ِ nullable با CHECK ِ «یکی از دو» و نمایهٔ جزئیِ کلید روی هفت جدولِ بایتِ عکس — انبارِ جداشدنیِ عکس، `claude/scale-3`؛ سهمِ هماهنگ‌کننده ۲۵۵–۲۵۹؛ rollback در `server/migrations/rollback/` که پیش از `image-store-migrate rollback` خطا می‌دهد).
+- ۳۱۵ (`315_conflict_inbox.sql`: دو حالِ تازهٔ `resubmitted`/`fixed` در CHECK ِ `sync_v3_conflicts.status` و ستونِ `resolution_note` — صندوقِ سندهای ردشدهٔ صاحب/مدیر، `claude/conflict-ui`؛ سهمِ هماهنگ‌کننده ۳۱۵–۳۱۹؛ rollback در `server/migrations/rollback/` با پاکِ ردیفِ `schema_migrations` ِ خودش).
 - ۳۰۵ (`305_return_line_index.sql`: فقط نمایه — `ix_sync_v3_rows_return_item`، `ix_sync_rows_return_item`، `ix_sale_returns_item` برای «برگشت‌های هر قلم» ِ سقفِ برگشتِ قلم، سفرِ JB5، `claude/return-cap`؛ سهمِ هماهنگ‌کننده ۳۰۵–۳۰۹؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند).
 - ۳۲۰ (`320_staff_device_keys.sql`: `staff_device_keys` — رازِ دستگاهِ شاگرد برای ورودِ دوباره با کد، فقط HMAC، یک رازِ زنده برای هر دکان + کاربر + دستگاه؛ `claude/staff-session`؛ سهمِ هماهنگ‌کننده ۳۲۰–۳۲۴؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند).
 - ۳۴۵ (`345_staff_device_key_life.sql`: `revoked_reason`/`revoked_by` روی `staff_device_keys`، نگهبانِ «رازِ باطل برنمی‌گردد و پیوندِ راز عوض نمی‌شود» (`staff_device_keys_guard`) و نمایهٔ جزئیِ رازهای زندهٔ هر دکان؛ `claude/staff-key-life`؛ سهمِ ۳۴۵–۳۴۹؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند و رازهای باطل را باطل نگه می‌دارد).

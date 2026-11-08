@@ -287,6 +287,8 @@ internal fun InvoiceRow(s: Sale, ctx: RowCtx, first: Boolean, last: Boolean, wit
       onLongClick = { ctx.onMenu(row.id) },
       onClick = { a.open(row.id) },
     )
+    //  «سرور نپذیرفت: …» — فقط فاکتوری که همین دستگاه ساخت و سرور رد کرد (`RejectedMark.kt`)
+    RejectedLine(s.id)
   }
 }
 

@@ -230,6 +230,9 @@ class SyncV3Runner private constructor(context: Context) {
 
   fun queueSize(): Int = runCatching { engine().queued() }.getOrDefault(0)
 
+  /** opهای ردشدهٔ همین حساب روی همین دستگاه (نشانِ «سرور نپذیرفت» ِ فاکتور، `data/RejectedDocs`) */
+  fun rejected(): List<V3Entry> = runCatching { engine().rejected() }.getOrDefault(emptyList())
+
   companion object {
     @Volatile private var instance: SyncV3Runner? = null
 

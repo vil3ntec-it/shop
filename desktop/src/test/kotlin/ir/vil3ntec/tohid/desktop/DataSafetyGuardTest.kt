@@ -187,6 +187,8 @@ class DataSafetyGuardTest {
       "tohid-settings-restore",
       //  سایه و cursor ِ همگام‌سازیِ تنظیماتِ دکان (`ShopSettingsSync`) — خودِ تنظیم‌ها در `SHOP_PREFS`
       "tohid-settings-sync",
+      //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: کلیدِ سبدِ همین صندوق ⇒ ردیفِ صندوقِ سرور (`ConflictFix`)؛ خودِ ردیف روی سرور است
+      "tohid-conflict-fix",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)
