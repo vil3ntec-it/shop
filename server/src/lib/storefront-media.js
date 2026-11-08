@@ -43,7 +43,7 @@ const tooLarge = (max) => new ApiError(413, 'too_large', `عکس بزرگ‌تر
 /** سنجش و پاک‌سازی؛ بایت‌های پاک و مشخصات — یا ۴۰۰/۴۱۳ بی هیچ اثری. */
 function check(kind, buf) {
   const spec = SPECS[kind];
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
   if (buf.length > spec.bytes) throw tooLarge(spec.bytes);
   const info = pipeline.run('validate', buf);
   if (!MIMES.includes(info.mime)) throw badRequest('فقط JPG، PNG یا WebP', 'bad_type');

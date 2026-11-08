@@ -109,7 +109,7 @@ const update = (shopId, body) => merge(shopId, patchOf(body));
  * می‌نشیند (`logo.orientation`): رمزگشای دستگاه برچسبِ EXIF را خودش اعمال نمی‌کند.
  */
 async function putLogo(shopId, buf) {
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکسِ لوگو خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکسِ لوگو خالی است', 'image_empty');
   if (buf.length > LOGO_MAX_BYTES) throw badRequest('لوگو حداکثر ۲۰۰ کیلوبایت', 'logo_too_large');
   const info = bytes.inspect(buf);
   if (info.width > LOGO_MAX_SIDE || info.height > LOGO_MAX_SIDE) {

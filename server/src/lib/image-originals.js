@@ -35,7 +35,7 @@ const json = (t, def) => { try { return JSON.parse(t); } catch { return def; } }
  * `withQuality` ⇒ نشان‌های IMG-15 هم، با `metrics` و `dhash` ('-' = سنجیده ولی بی هش).
  */
 function checkOriginal(buf, max, withQuality = false) {
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
   if (buf.length > max) throw tooLarge(max);
   const info = bytes.inspect(buf);
   const flags = [...info.warnings];

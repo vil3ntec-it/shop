@@ -156,7 +156,7 @@ async function addVersion(c, img, buf, info, { tool = '', settings = {}, review 
 async function putDerivative(c, img, version, size, buf) {
   const spec = DERIV[size];
   if (!spec) throw badRequest('اندازه فقط thumb، display یا zoom', 'bad_size');
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
   if (buf.length > spec.bytes) throw tooLarge(spec.bytes);
   const ver = await q1(c,
     `SELECT v.version, v.orientation, b.width, b.height FROM image_versions v
@@ -983,7 +983,7 @@ function parseCsv(text) {
   for (let n = 1; n < lines.length; n++) {
     if (lines[n].every((x) => !x.trim())) continue;
     const o = { row_no: n + 1 };
-    head.forEach((h, j) => { if (h) o[h] = (lines[n][j] || '').trim(); });
+    head.forEach((h, j) => { if (h && h !== '__proto__' && h !== 'constructor' && h !== 'prototype') o[h] = (lines[n][j] || '').trim(); });
     out.push(o);
   }
   return out;

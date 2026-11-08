@@ -28,7 +28,7 @@ const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
 
 /** نوع فقط از محتوا: JPEG، PNG یا WebP — وگرنه ''. (همان `product-photos.sniff`) */
 function sniff(buf) {
-  if (!buf || buf.length < 3) return '';
+  if (!buf || Array.isArray(buf) || typeof buf === 'string' || buf.length < 3) return '';
   if (buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg';
   if (buf.length >= 8 && buf.slice(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png';
   if (buf.length >= 12 && buf.slice(0, 4).toString('latin1') === 'RIFF' && buf.slice(8, 12).toString('latin1') === 'WEBP') return 'image/webp';
