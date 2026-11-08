@@ -53,12 +53,32 @@
     var series = typeof s.series === 'string' ? s.series.trim() : '';
     return series ? series + '-' + s.invoiceNumber : String(s.invoiceNumber);
   }
-  /* نامِ قلم — همان `SalesEngine.itemName` */
-  function itemName(data, item) {
-    if (!item.productId) return item.name || 'قلم آزاد';
-    var p = (data.products || []).find(function (x) { return x.id === item.productId; });
-    return p ? p.name : (item.name || '(محصول حذف‌شده)');
+  /*
+   * تکه‌های رسید (`receipt().parts`) تا نسخهٔ وب همان رسید را به زبانِ دکان بفرستد (`localize`) بی آن‌که دادهٔ دفتر ترجمه
+   * شود: رشته = متنِ ثابت (کلیدِ واژه‌نامه)؛ `{ t, a }` = قالب با جای‌خالیِ {n} که مقدارش (تکه‌ای دیگر) جدا گردانده می‌شود؛
+   * `{ d }` = داده یا عددِ آماده (نام، تلفن، شرح، مبلغ، تاریخ) که هرگز ترجمه نمی‌شود؛ `{ s }` = متنِ قالبِ خودِ صفحه
+   * (`fmt.state`). بی مترجم (`said(p)`) همان رشتهٔ فارسیِ همیشه.
+   */
+  function tpl(t, a, trim) { return { t: t, a: a || [], trim: !!trim }; }
+  function raw(v) { return { d: v }; }
+  function said(p, tr) {
+    var x;
+    if (typeof p === 'string') { x = tr && p ? tr.key(p) : null; return x == null ? p : x; }
+    if (!p || typeof p !== 'object') return p;
+    if (Object.prototype.hasOwnProperty.call(p, 'd')) return p.d;
+    if (Object.prototype.hasOwnProperty.call(p, 's')) { x = tr ? tr.phrase(p.s) : null; return x == null ? p.s : x; }
+    x = tr ? tr.key(p.t) : null;
+    var out = (x == null ? p.t : x).replace(/\{(\d+)\}/g, function (m, i) { return +i < p.a.length ? said(p.a[+i], tr) : m; });
+    return p.trim ? out.trim() : out;
   }
+
+  /* نامِ قلم — همان `SalesEngine.itemName`؛ تکه: نامِ کالا داده است، «قلم آزاد» و «(محصول حذف‌شده)» متنِ ثابت */
+  function itemPart(data, item) {
+    if (!item.productId) return item.name ? raw(item.name) : 'قلم آزاد';
+    var p = (data.products || []).find(function (x) { return x.id === item.productId; });
+    return p ? raw(p.name) : (item.name ? raw(item.name) : '(محصول حذف‌شده)');
+  }
+  function itemName(data, item) { return said(itemPart(data, item)); }
 
   function order(a, b) {
     var da = String(a.date || ''), db = String(b.date || '');
@@ -220,59 +240,81 @@
   /*
    * رسیدِ یک ردیف — همان ردیف‌های `DebtBook.receipt`ِ کاتلین.
    * fmt = { money(minor), date(iso), qty(n), state(minor), phone?(p) } — صفحه قالبِ خودش را می‌دهد.
+   * `rows`/`title` همان رشته‌های فارسیِ همیشه‌اند؛ `parts` همان‌ها به شکلِ تکه (بالا) برای `localize`.
    */
   function receipt(data, debtorId, txId, storeName, today, fmt) {
     var b = book(data, debtorId, today);
     if (!b) return null;
     var e = b.entry(txId);
     if (!e) return null;
-    var af = ' افغانی';
-    var rows = [];
-    rows.push(['مشتری', b.debtor.name || '']);
-    if (b.debtor.phone) rows.push(['تلفن', fmt.phone ? fmt.phone(b.debtor.phone) : b.debtor.phone]);
-    rows.push(['تاریخ', fmt.date(e.tx.date)]);
-    if (e.invoiceLabel) rows.push(['فاکتور', '#' + e.invoiceLabel]);
+    function af(minor) { return tpl('{0} افغانی', [raw(fmt.money(minor))]); }
+    function state(minor) { return { s: fmt.state(minor) }; }
+    var parts = [];
+    function row(k, v) { parts.push([k, v]); }
+    row('مشتری', raw(b.debtor.name || ''));
+    if (b.debtor.phone) row('تلفن', raw(fmt.phone ? fmt.phone(b.debtor.phone) : b.debtor.phone));
+    row('تاریخ', raw(fmt.date(e.tx.date)));
+    if (e.invoiceLabel) row('فاکتور', raw('#' + e.invoiceLabel));
     if (e.give) {
       var s = e.sale;
       if (s && e.lines.length) {
-        e.lines.forEach(function (l) {
-          var unit = l.unit ? ' ' + l.unit : '';
-          rows.push([l.name + ' — ' + fmt.qty(l.quantity) + unit + ' × ' + fmt.money(l.unitPriceMinor), fmt.money(l.totalMinor)]);
-          if (l.returned > 0) rows.push(['   مرجوعی: ' + fmt.qty(l.returned) + unit, '']);
+        var items = (data.saleItems || []).filter(function (i) { return i.saleId === s.id; });
+        e.lines.forEach(function (l, i) {
+          var unit = raw(l.unit ? ' ' + l.unit : '');
+          var name = items[i] ? itemPart(data, items[i]) : raw(l.name);
+          row(tpl('{0} — {1}{2} × {3}', [name, raw(fmt.qty(l.quantity)), unit, raw(fmt.money(l.unitPriceMinor))]), raw(fmt.money(l.totalMinor)));
+          if (l.returned > 0) row(tpl('   مرجوعی: {0}{1}', [raw(fmt.qty(l.returned)), unit]), raw(''));
         });
-        rows.push(['جمعِ اقلام', fmt.money(minorOf(s.total).minor) + af]);
-        if (num(s.discount) > 0) rows.push(['تخفیف', fmt.money(minorOf(s.discount).minor) + af]);
-        rows.push(['قابلِ پرداخت', fmt.money(minorOf(s.finalTotal).minor) + af]);
-        rows.push(['پرداختِ همان لحظه', fmt.money(minorOf(s.paidAmount).minor) + af]);
+        row('جمعِ اقلام', af(minorOf(s.total).minor));
+        if (num(s.discount) > 0) row('تخفیف', af(minorOf(s.discount).minor));
+        row('قابلِ پرداخت', af(minorOf(s.finalTotal).minor));
+        row('پرداختِ همان لحظه', af(minorOf(s.paidAmount).minor));
       }
-      rows.push(['قرضِ این ردیف', fmt.money(e.amountMinor) + af]);
-      if (e.tx.notes) rows.push(['شرح', e.tx.notes]);
-      rows.push(['سررسید', e.dueDate ? fmt.date(e.dueDate) : 'ندارد']);
+      row('قرضِ این ردیف', af(e.amountMinor));
+      if (e.tx.notes) row('شرح', raw(e.tx.notes));
+      row('سررسید', e.dueDate ? raw(fmt.date(e.dueDate)) : 'ندارد');
       e.allocations.forEach(function (a) {
         var r = b.entry(a[0]);
-        rows.push([('پرداخت ' + (r ? fmt.date(r.tx.date) : '')).trim(), fmt.money(a[1]) + af]);
+        row(tpl('پرداخت {0}', [raw(r ? fmt.date(r.tx.date) : '')], true), af(a[1]));
       });
-      rows.push(['باقیِ این قرض', e.paid ? 'تسویه شد' : fmt.money(e.openMinor) + af]);
-      if (e.overdue) rows.push(['وضعیت', 'سررسید گذشته']);
+      row('باقیِ این قرض', e.paid ? 'تسویه شد' : af(e.openMinor));
+      if (e.overdue) row('وضعیت', 'سررسید گذشته');
     } else {
-      rows.push(['مبلغِ دریافتی', fmt.money(e.amountMinor) + af]);
-      if (e.tx.notes) rows.push(['شرح', e.tx.notes]);
-      rows.push(['مانده پیش از دریافت', fmt.state(e.balanceBeforeMinor)]);
+      row('مبلغِ دریافتی', af(e.amountMinor));
+      if (e.tx.notes) row('شرح', raw(e.tx.notes));
+      row('مانده پیش از دریافت', state(e.balanceBeforeMinor));
       e.allocations.forEach(function (a) {
         var g = b.entry(a[0]);
-        var what = g && g.invoiceLabel ? 'فاکتور #' + g.invoiceLabel : ('برد ' + (g ? fmt.date(g.tx.date) : '')).trim();
-        rows.push(['بابتِ ' + what, fmt.money(a[1]) + af]);
+        var what = g && g.invoiceLabel ? tpl('فاکتور #{0}', [raw(g.invoiceLabel)]) : tpl('برد {0}', [raw(g ? fmt.date(g.tx.date) : '')], true);
+        row(tpl('بابتِ {0}', [what]), af(a[1]));
       });
-      if (e.openMinor > 0) rows.push(['پیش‌پرداخت (روی قرضِ بعدی)', fmt.money(e.openMinor) + af]);
+      if (e.openMinor > 0) row('پیش‌پرداخت (روی قرضِ بعدی)', af(e.openMinor));
     }
-    rows.push(['مانده پس از این ردیف', fmt.state(e.balanceAfterMinor)]);
-    rows.push(['ماندهٔ امروزِ حساب', fmt.state(b.balanceMinor)]);
+    row('مانده پس از این ردیف', state(e.balanceAfterMinor));
+    row('ماندهٔ امروزِ حساب', state(b.balanceMinor));
     var kind = e.give ? 'رسیدِ قرض' : 'رسیدِ دریافت';
     var safe = String(b.debtor.name || '').replace(/[\\/:*?"<>|]/g, ' ').trim() || 'مشتری';
+    var shop = String(storeName || '').trim();
+    var head = tpl('{0} — {1}', [shop ? raw(shop) : 'فروشگاه', kind]);
     return {
-      title: (String(storeName || '').trim() || 'فروشگاه') + ' — ' + kind,
+      title: said(head),
       name: kind + '-' + safe + '-' + e.tx.date + '-' + e.row,
-      rows: rows,
+      rows: parts.map(function (kv) { return [said(kv[0]), said(kv[1])]; }),
+      parts: { title: head, rows: parts },
+    };
+  }
+
+  /*
+   * همان رسید به زبانِ دیگر (نسخهٔ وب، `license/web-i18n.js`). tr = { key(متنِ ثابت یا قالبِ فارسی) ⇒ متن یا null،
+   * phrase(متنِ `fmt.state`) ⇒ متن یا null }؛ تکهٔ داده هرگز به مترجم نمی‌رسد. نامِ پرونده (`name`) همان می‌ماند.
+   */
+  function localize(r, tr) {
+    if (!r || !r.parts || !tr) return r;
+    return {
+      title: said(r.parts.title, tr),
+      name: r.name,
+      rows: r.parts.rows.map(function (kv) { return [said(kv[0], tr), said(kv[1], tr)]; }),
+      parts: r.parts,
     };
   }
 
@@ -290,6 +332,7 @@
     creditCheck: creditCheck,
     isIsoDate: isIsoDate,
     receipt: receipt,
+    localize: localize,
     receiptText: receiptText,
   };
 });

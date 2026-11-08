@@ -11,7 +11,9 @@
  *    بستن یا بازخوانیِ صفحه پس از قطعِ شبکه کلیدِ تازه نمی‌سازد: یا همان ارسال یک بار می‌نشیند، یا سرور با ۴۰۹ می‌گوید
  *    ارسالِ پیشین ثبت شده بود. فرمِ دریافت/رد همیشه روی حالِ تازهٔ سرور باز می‌شود و کلیدش تا پاسخِ قطعی می‌ماند.
  * ⛔ هیچ متنِ فارسی در این پرونده نیست: همه از واژه‌نامهٔ `license/i18n/transfers.<زبان>.json` (fa، en، ps)؛
- *    هیچ اسکریپت یا رویدادِ درون‌خطی ساخته نمی‌شود (CSP). متنِ کاربر و سرور همیشه با `esc`.
+ *    هیچ اسکریپت یا رویدادِ درون‌خطی ساخته نمی‌شود (CSP). متنِ کاربر و سرور همیشه با `esc`. زبانِ صفحه که عوض شود
+ *    (`tohid:lang` ِ `web-i18n.js`) واژه‌نامهٔ همان زبان بار و پنجره دوباره نقاشی می‌شود، بی بارگذاریِ دوبارهٔ صفحه و بی گم
+ *    شدنِ آنچه در فرم نوشته شده؛ نامِ کالا `data-raw` دارد (دادهٔ دفتر، هرگز ترجمه نمی‌شود).
  * ⛔ `index.html` یخ‌زده است ⇒ این پرونده را `orders-ui.js` بار می‌کند (هیچ خطی به index.html اضافه نمی‌شود).
  *
  * بخشِ بالایی («هسته») خالص است و در Node هم بار می‌شود (`server/test/web-transfers-core.test.js`).
@@ -138,17 +140,19 @@
 
   const st = {
     dict: null, cfg: null, busy: false, tab: 'open', list: [], loading: false, err: '',
-    view: 'list', open: null, draft: null, found: [], names: {}, act: null, key: '', listSeq: 0,
+    view: 'list', open: null, draft: null, found: [], names: {}, act: null, key: '', listSeq: 0, dictLang: '', langSeq: 0,
   };
   const t = (k, vars) => fill(st.dict && Object.prototype.hasOwnProperty.call(st.dict, k) ? st.dict[k] : k, vars);
   const loc = (l) => t(`loc.${l}`);
   const canMove = () => !!(st.cfg && st.cfg.permissions && st.cfg.permissions.move);
   const places = () => (st.cfg && Array.isArray(st.cfg.locations) ? LOCS.filter((l) => st.cfg.locations.includes(l)) : LOCS);
-  const DATE_FMT = (() => {
-    try { return new Intl.DateTimeFormat('fa-AF-u-nu-latn', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-    catch { return null; }
-  })();
-  const when = (ms) => (ms ? (DATE_FMT ? DATE_FMT.format(new Date(Number(ms))) : new Date(Number(ms)).toLocaleString()) : '');
+  //  هر بار از نو، نه یک قالبِ ثابت از بارِ نخست: تقویم و زبانِ صفحه بی بارگذاریِ دوباره عوض می‌شوند (`web-i18n.js`)
+  const WHEN = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const when = (ms) => {
+    if (!ms) return '';
+    const d = new Date(Number(ms));
+    try { return d.toLocaleString('fa-AF-u-nu-latn', WHEN); } catch { return d.toLocaleString(); }
+  };
   function errText(e) {
     if (e && e.code === 'network') return t('err.network');
     const k = e && e.code ? `err.${e.code}` : '';
@@ -164,10 +168,45 @@
     for (const l of lang === 'fa' ? ['fa'] : [lang, 'fa']) {
       try {
         const r = await fetch(`license/i18n/transfers.${l}.json?v=1`, { cache: 'no-cache' });
-        if (r.ok) { st.dict = await r.json(); return true; }
+        if (r.ok) { st.dict = await r.json(); st.dictLang = lang; return true; }
       } catch { /* next */ }
     }
     return false;
+  }
+
+  /** زبان یا تقویمِ صفحه عوض شد ⇒ واژه‌نامهٔ همان زبان (دری = فارسی + لایهٔ واژهٔ web-i18n) و نقاشیِ دوباره */
+  async function relang() {
+    const seq = ++st.langSeq;
+    if (st.dict && st.dictLang !== langOf(document.documentElement.lang)) {
+      const prev = st.dict;
+      st.dict = null;
+      const ok = await loadDict();
+      if (seq !== st.langSeq) return;
+      if (!ok) { st.dict = prev; return; }
+    }
+    if (!st.dict) return;
+    const b = $('xfr-btn');
+    const label = b && b.querySelector('span');
+    if (label) label.textContent = t('btn');
+    const x = document.querySelector('#xfr-modal .modal-close');
+    if (x) x.setAttribute('aria-label', t('close'));
+    const m = $('xfr-modal');
+    if (m && m.classList.contains('open')) repaintKeep();
+  }
+
+  /** نقاشیِ دوباره بی گم شدنِ آنچه کاربر در فرمِ باز نوشته (مقدارِ دریافت، دلیل، تیکِ «بستن») */
+  function repaintKeep() {
+    const id = (i) => `${i.name}|${i.dataset.id || ''}|${i.dataset.i || ''}`;
+    const kept = new Map();
+    const body = $('xfr-body');
+    if (body) body.querySelectorAll('input').forEach((i) => kept.set(id(i), i.type === 'checkbox' ? i.checked : i.value));
+    paint();
+    const fresh = $('xfr-body');
+    if (!fresh) return;
+    fresh.querySelectorAll('input').forEach((i) => {
+      if (!kept.has(id(i))) return;
+      if (i.type === 'checkbox') i.checked = kept.get(id(i)); else i.value = kept.get(id(i));
+    });
   }
 
   async function refresh() {
@@ -315,9 +354,9 @@
   function draftHtml() {
     const d = st.draft;
     const opt = (sel, list) => list.map((l) => `<option value="${l}"${sel === l ? ' selected' : ''}>${esc(loc(l))}</option>`).join('');
-    const found = st.found.map((p) => `<li><span>${esc(p.name)}</span><span class="xfr-meta">${esc(t('draft.have', { q: qtyText(((p.stock || {}).levels || {})[d.from] || 0) }))}</span>
+    const found = st.found.map((p) => `<li><span data-raw>${esc(p.name)}</span><span class="xfr-meta">${esc(t('draft.have', { q: qtyText(((p.stock || {}).levels || {})[d.from] || 0) }))}</span>
         <button type="button" class="btn btn-secondary btn-sm" data-xfr="add" data-id="${esc(p.id)}">${esc(t('draft.add'))}</button></li>`).join('');
-    const lines = d.lines.map((l, i) => `<li><span>${esc(l.name || l.productId)}</span>
+    const lines = d.lines.map((l, i) => `<li><span data-raw>${esc(l.name || l.productId)}</span>
         <label class="xfr-qty"><span class="sr">${esc(t('draft.qty'))}</span><input inputmode="decimal" name="xfr-qty" data-i="${i}" value="${esc(l.qty)}" aria-label="${esc(t('draft.qty'))}"></label>
         <button type="button" class="btn btn-secondary btn-sm" data-xfr="drop" data-i="${i}" aria-label="${esc(t('draft.remove'))}">✕</button></li>`).join('');
     return `<form id="xfr-draft" class="xfr-form" novalidate>
@@ -393,7 +432,7 @@
   // ── جزئیات، دریافت و رد ─────────────────────────────────────────────
 
   function detailHtml(x) {
-    const rows = x.lines.map((l) => `<tr><td>${esc(nameOf(l.productId))}</td><td>${esc(qtyText(l.sentMilli))}</td>
+    const rows = x.lines.map((l) => `<tr><td data-raw>${esc(nameOf(l.productId))}</td><td>${esc(qtyText(l.sentMilli))}</td>
       <td>${l.receivedMilli === null ? '—' : esc(qtyText(l.receivedMilli))}</td><td>${l.pendingMilli ? esc(qtyText(l.pendingMilli)) : '—'}</td>
       <td>${l.shortMilli ? esc(qtyText(l.shortMilli)) : '—'}</td></tr>`).join('');
     const info = [
@@ -415,7 +454,7 @@
   }
 
   function receiveHtml(x) {
-    const rows = x.lines.filter((l) => l.pendingMilli > 0).map((l) => `<li><span>${esc(nameOf(l.productId))}</span>
+    const rows = x.lines.filter((l) => l.pendingMilli > 0).map((l) => `<li><span data-raw>${esc(nameOf(l.productId))}</span>
       <span class="xfr-meta">${esc(t('row.pending', { q: qtyText(l.pendingMilli) }))}</span>
       <label class="xfr-qty"><span class="sr">${esc(t('recv.now'))}</span><input inputmode="decimal" name="xfr-got" data-id="${esc(l.productId)}" value="${esc(qtyText(l.pendingMilli))}" aria-label="${esc(t('recv.now'))}"></label></li>`).join('');
     return `<form id="xfr-recv" class="xfr-form xfr-act" novalidate><h4>${esc(t('recv.title', { to: loc(x.to) }))}</h4>
@@ -544,6 +583,7 @@
     if (e.detail && e.detail.pageId === 'warehouse') refresh();
   });
   window.addEventListener('online', () => { if (!st.cfg) refresh(); });
+  root.addEventListener('tohid:lang', relang);
 
   root.TohidStockTransfers = { refresh, open: openPanel, get enabled() { return !!st.cfg; }, core };
   refresh();
