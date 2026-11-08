@@ -15,6 +15,9 @@
  *     سرور و رشتهٔ بسته (#907) آن را برمی‌دارند؛ «حذف برای من» فقط نمای همین مشتری — هر دو برگه، پیش‌نمایش و شمارِ نخواندهٔ
  *     صندوق، پس از بازکردنِ دوباره هم؛ بی‌اینترنت پیامِ روشن؛
  *   • «پرسش از دکان» ِ سرِ ویترین ⇒ گفت‌وگوی عمومی؛ پس از ۷ روز بی‌کاری دورِ تازه و پیام‌های پیشین جمع‌شده؛
+ *   • CHAT-07: پیامِ صوتیِ دکان ⇒ پخش‌کننده (پخش/توقف، زمان، پیشرفت)؛ بایت فقط با زدنِ «پخش» و با بلیت؛ پخش از blob:
+ *     (readyState ≥ ۲ و زمانِ پیش‌رونده)؛ بی‌اینترنت ⇒ «تلاشِ دوباره»؛ نوعِ ناشناخته (AMR) بی درخواست ⇒ پیامِ روشن؛
+ *     پیامِ پاک‌شده در برگهٔ عقب‌مانده ⇒ «پاک شده یا مهلتش گذشته» و سپس سنگِ قبر؛ بستنِ برگه صدا را می‌ایستاند؛
  *   • پرچمِ `shop.chat` خاموش ⇒ نه دکمه، نه اسکریپت؛ بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -494,6 +497,130 @@ if (axeSrc) {
   console.log('⏭  axe-core نیست و SKIP_BROWSER_TESTS=1 — سنجهٔ دسترس‌پذیری اجرا نشد');
 } else {
   ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
+}
+
+//  ── CHAT-07: پیامِ صوتیِ دکان در ویترین ──
+//  نمونهٔ صوتی در خودِ آزمون ساخته می‌شود (نه پروندهٔ دودویی): قاب‌های بی‌صدای MP3 (MPEG-1 لایهٔ ۳، ۱۲۸kbps، ۴۴٫۱kHz،
+//  تک‌کاناله، ۴۱۷ بایت، اطلاعاتِ جانبیِ صفر)؛ AMR فقط سرآیند و قاب — نوعی که مرورگرِ رومیزی پخش نمی‌کند.
+const mp3 = (frames) => {
+  const f = Buffer.alloc(417); f[0] = 0xff; f[1] = 0xfb; f[2] = 0x90; f[3] = 0xc0;
+  return Buffer.concat(Array.from({ length: frames }, () => f));
+};
+const amr = Buffer.concat([Buffer.from('#!AMR\n'), ...Array.from({ length: 10 }, () => Buffer.concat([Buffer.from([0x3c]), Buffer.alloc(31)]))]);
+const o3 = await checkout();
+await move(o3.id, ['accepted', 'picking', 'packed', 'ready_for_pickup']);
+const conv3 = (await call('POST', '/api/shop/chat/conversations', { orderId: o3.id }, T)).body.conversation;
+let vn = 0;
+const sayVoice = async (buf, durationMs) => {
+  const up = await fetch(`${base}/api/shop/chat/conversations/${conv3.id}/media`, {
+    method: 'POST', headers: { Authorization: `Bearer ${T}`, 'Content-Type': 'application/octet-stream' }, body: buf,
+  }).then((r) => r.json());
+  const r = await call('POST', `/api/shop/chat/conversations/${conv3.id}/messages`,
+    { clientId: `client-voice-${Date.now()}-${++vn}`, kind: 'audio', mediaId: up.mediaId, meta: { durationMs } }, T);
+  return { up, msg: r.body && r.body.message, status: r.status };
+};
+const vA = await sayVoice(mp3(200), 5224);   //  ~۵ ثانیه
+const vB = await sayVoice(mp3(30), 784);
+const vC = await sayVoice(amr, 200);
+ok([vA, vB, vC].every((v) => v.status === 201) && vA.up.mime === 'audio/mpeg' && vC.up.mime === 'audio/amr',
+  'دکان سه پیامِ صوتی فرستاد (نوع از روی بایت: MP3، AMR)', JSON.stringify([vA.up, vC.up]).slice(0, 160));
+const cspStore = (await fetch(`${base}/store/${slug}`)).headers.get('content-security-policy') || '';
+ok(/(^|; )media-src 'self' blob:;/.test(cspStore) && !/media-src[^;]*(data:|\*)/.test(cspStore), "CSP ِ ویترین: media-src 'self' blob: — بی data: و بی *", cspStore);
+
+const hits = [];
+const onMedia = (r) => {
+  const m = /\/chat\/conversations\/[^/]+\/media\/([^/?]+)/.exec(r.url());
+  if (m) hits.push({ id: decodeURIComponent(m[1]), ticket: Boolean(r.headers()['x-store-ticket']) });
+};
+page.on('request', onMedia);
+await openOrder(o3);
+await page.click('#o-chat-open');
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice').length === 3, null, { timeout: 15000 });
+const voices = page.locator('#ct-list .ct-voice');
+const vstate = (i) => page.evaluate((n) => {
+  const v = document.querySelectorAll('#ct-list .ct-voice')[n];
+  if (!v) return null;
+  const b = v.querySelector('button'); const a = v.querySelector('audio'); const e = v.querySelector('.ct-aerr');
+  return { st: v.getAttribute('data-st'), label: b.getAttribute('aria-label'), disabled: b.disabled, group: v.getAttribute('aria-label'),
+    bar: Boolean(v.querySelector('progress[aria-label]')), time: v.querySelector('.ct-time').textContent, err: e && !e.hidden ? e.textContent : '',
+    audio: a ? { rs: a.readyState, t: a.currentTime, paused: a.paused, ended: a.ended, src: a.src.slice(0, 5) } : null };
+}, i);
+const s0 = await vstate(0);
+ok(s0 && s0.group === 'پیامِ صوتی' && s0.label === 'پخش' && s0.bar && /[۰-۹]:[۰-۹]{2}/.test(s0.time) && s0.st === 'idle',
+  'حبابِ صدا: پخش‌کننده با نامِ دسترس‌پذیر، دکمهٔ «پخش»، پیشرفت و زمان (از durationMs)', JSON.stringify(s0));
+await page.waitForTimeout(1200);
+ok(hits.length === 0 && await page.$('#ct-list audio') === null, 'پیش از «پخش» هیچ بایتِ صدا و هیچ <audio> (بارِ دیربار)', JSON.stringify(hits));
+
+//  بی‌اینترنت ⇒ پیامِ روشن و «تلاشِ دوباره»؛ وصل ⇒ همان دکمه صدا را می‌آورد و پخش می‌کند
+await ctx.setOffline(true);
+await voices.nth(0).locator('button').click();
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice')[0].getAttribute('data-st') === 'err', null, { timeout: 10000 });
+const sNet = await vstate(0);
+ok(/اینترنت/.test(sNet.err) && sNet.label === 'تلاشِ دوباره' && !sNet.disabled && !sNet.audio, 'بی‌اینترنت: «اتصال برقرار نشد…» و دکمهٔ «تلاشِ دوباره»', JSON.stringify(sNet));
+await ctx.setOffline(false);
+await voices.nth(0).locator('button').click();
+const played = await until(async () => { const s = await vstate(0); return s.audio && s.audio.rs >= 2 && s.audio.t > 0; }, 15000);
+const sPlay = await vstate(0);
+ok(played && sPlay.st === 'playing' && sPlay.label === 'توقف' && sPlay.audio.src === 'blob:' && !sPlay.err,
+  'زدنِ «پخش»: صدا از blob: پخش می‌شود (readyState ≥ ۲، زمان پیش می‌رود)، دکمه «توقف»', JSON.stringify(sPlay));
+ok(hits.filter((h) => h.id === vA.up.mediaId).every((h) => h.ticket) && hits.some((h) => h.id === vA.up.mediaId),
+  'بایتِ صدا از همان درِ رسانهٔ چت و با بلیتِ مشتری', JSON.stringify(hits));
+await voices.nth(0).locator('button').click();
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice')[0].getAttribute('data-st') === 'ready', null, { timeout: 5000 });
+const sPause = await vstate(0);
+ok(sPause.label === 'پخش' && sPause.audio.paused && /\//.test(sPause.time), '«توقف» ⇒ صدا می‌ایستد، دکمه «پخش»، زمانِ گذشته / کل', JSON.stringify(sPause));
+const hitsBefore = hits.length;
+await voices.nth(0).locator('button').click();
+await page.waitForFunction(() => { const a = document.querySelector('#ct-list .ct-voice audio'); return a && !a.paused; }, null, { timeout: 5000 });
+ok(hits.length === hitsBefore, 'پخشِ دوباره از همان بایتِ آمده، بی درخواستِ تازه');
+
+//  AMR در این مرورگر پخش نمی‌شود ⇒ پیش از هر درخواست پیامِ روشن
+await voices.nth(2).locator('button').click();
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice')[2].getAttribute('data-st') === 'err', null, { timeout: 5000 });
+const sAmr = await vstate(2);
+ok(/مرورگر/.test(sAmr.err) && sAmr.disabled && !hits.some((h) => h.id === vC.up.mediaId), 'نوعِ ناشناخته (AMR): «این مرورگر … پخش نمی‌کند»، بی بارگیری', JSON.stringify(sAmr));
+
+//  برگهٔ عقب‌مانده: دکان پیام را «برای همه» پاک کرده و long-poll هنوز نرسیده ⇒ «پخش» پیامِ روشن؛ رسیدنش ⇒ سنگِ قبر
+const held = [];
+const pollOf = (u) => u.pathname === `/api/store/${slug}/chat/conversations/${conv3.id}/messages`;
+await page.route(pollOf, (route) => (route.request().method() === 'GET' ? held.push(route) : route.fallback()));
+await call('POST', `/api/shop/chat/conversations/${conv3.id}/messages`, { clientId: `client-wake-${Date.now()}`, body: 'صدا را گوش کنید' }, T);
+await page.waitForFunction(() => /گوش کنید/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
+ok(await until(async () => held.length > 0, 10000), 'long-poll ِ بعدیِ برگه نگه داشته شد (برگهٔ عقب‌مانده)');
+const delB = await call('DELETE', `/api/shop/chat/conversations/${conv3.id}/messages/${vB.msg.id}?for=all`, null, T);
+await voices.nth(1).locator('button').click();
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice')[1].getAttribute('data-st') === 'err', null, { timeout: 10000 });
+const sGone = await vstate(1);
+ok(delB.status === 200 && /پاک شده یا مهلتش گذشته/.test(sGone.err) && sGone.disabled && !sGone.audio,
+  'پیامِ صوتیِ پاک‌شده: «… دیگر روی سرور نیست؛ پاک شده یا مهلتش گذشته است.»، بی «دوباره»', JSON.stringify(sGone));
+await page.unroute(pollOf);
+for (const r of held) await r.continue().catch(() => { /* درخواستِ رفته */ });
+await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice').length === 2, null, { timeout: 30000 });
+ok(await bubbles('این پیام پاک شد') === 1, 'سپس long-poll ⇒ حبابِ صدا سنگِ قبر شد');
+
+//  بستنِ برگه ⇒ صدا می‌ایستد
+if (await page.evaluate(() => document.querySelector('#ct-list .ct-voice audio').paused)) await voices.nth(0).locator('button').click();
+await page.waitForFunction(() => !document.querySelector('#ct-list .ct-voice audio').paused, null, { timeout: 5000 });
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => document.getElementById('chat-sheet').hidden, null, { timeout: 5000 });
+ok(await page.evaluate(() => document.querySelector('#ct-list .ct-voice audio').paused), 'بستنِ برگه در میانِ پخش ⇒ صدا ایستاد');
+page.off('request', onMedia);
+
+if (axeSrc) {
+  const ac = await browser.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
+  await ac.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } },
+    { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+  const ap = await ac.newPage();
+  await ap.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o3.token)}`);
+  await ap.waitForSelector('#o-chat-open', { timeout: 15000 });
+  await ap.click('#o-chat-open');
+  await ap.waitForFunction(() => document.querySelectorAll('#ct-list .ct-voice').length > 0, null, { timeout: 15000 });
+  await ap.addScriptTag({ content: axeSrc });
+  const v = await ap.evaluate(async () => (await window.axe.run(document.getElementById('chat-sheet'),
+    { runOnly: ['color-contrast', 'button-name', 'aria-allowed-attr', 'aria-progressbar-name', 'nested-interactive'] })).violations
+    .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core): پخش‌کنندهٔ صدا', v.join(' | '));
+  await ac.close();
 }
 
 //  ── پرچمِ خاموش ⇒ همان ویترینِ پیشین ──
