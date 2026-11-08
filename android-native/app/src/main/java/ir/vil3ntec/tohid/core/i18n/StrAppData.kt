@@ -476,6 +476,44 @@ object StrAppData {
     "The system key's record file is damaged",
     "د سیسټم د کیلي د ثبت فایل خراب دی",
   )
+
+  // ── کامپیوتر: کلیدِ نشستِ ورود (`SecretBox`، همان `desk.keystore`) ──
+  fun deskSessionOs(store: Any?): String = t(
+    "کلیدِ نشستِ ورود (توکن‌های ورودِ این کامپیوتر) هم با ${asIs(store)} نگه‌داری می‌شود، نه به‌شکلِ فایلِ ساده؛ کپیِ پوشهٔ داده به نشست نمی‌رسد. ",
+    "The sign-in session key (this computer's sign-in tokens) is also kept by $store, not as a plain file; a copy of the data folder doesn't get the session. ",
+    "د ننوتو د ناستې کیلي (د دې کمپیوټر د ننوتو ټوکنونه) هم د $store له لارې ساتل کېږي، د ساده فایل په بڼه نه؛ د معلوماتو د فولډر کاپي ناستې ته نه رسېږي. ",
+  )
+  val deskSessionPlainPending: String get() = t(
+    "فایلِ سادهٔ پیشینِ کلیدِ نشست تا اجرای بعد می‌ماند و پس از اینکه نشست با کلیدِ سیستم درست باز شد پاک می‌شود. ",
+    "The old plain session key file stays until the next start and is removed once the session opens correctly with the system's key. ",
+    "د ناستې د کیلي پخوانی ساده فایل تر راتلونکي پیل پورې پاتې کېږي او کله چې ناسته د سیسټم په کیلي سمه پرانیستل شي پاکېږي. ",
+  )
+  fun deskSessionFallback(why: Any?): String = t(
+    "نگه‌داریِ کلیدِ نشست در سیستم نشد (${asIs(why)})؛ کلیدِ نشست مثلِ پیش در فایلِ فقط-صاحب ماند. ",
+    "Keeping the session key in the system didn't work ($why); the session key stayed in the owner-only file as before. ",
+    "په سیسټم کې د ناستې د کیلي ساتل ونه شول ($why)؛ د ناستې کیلي د پخوا په څېر یوازې د خاوند په فایل کې پاتې شوه. ",
+  )
+  val deskSessionFile: String get() = t(
+    "کلیدِ نشستِ ورود (توکن‌ها) در فایلِ فقط-صاحبِ keys/session.key کنارِ داده‌هاست؛ هر کس کلِ پوشهٔ داده را داشته باشد آن را هم دارد. ",
+    "The sign-in session key (tokens) is in the owner-only file keys/session.key next to the data; anyone with the whole data folder has it too. ",
+    "د ننوتو د ناستې کیلي (ټوکنونه) د معلوماتو تر څنګ یوازې د خاوند په keys/session.key فایل کې ده؛ هر څوک چې د معلوماتو ټول فولډر ولري، هغه هم لري. ",
+  )
+  val deskSessionNone: String get() = t(
+    "کلیدِ نشستِ ورود هنوز به کار نرفته است؛ با نخستین ورود ساخته یا خوانده می‌شود. ",
+    "The sign-in session key hasn't been used yet; it is created or read at the first sign-in. ",
+    "د ننوتو د ناستې کیلي لا نه ده کارول شوې؛ په لومړي ننوتو جوړېږي یا لوستل کېږي. ",
+  )
+  fun deskSessionUnavailable(why: Any?): String = t(
+    "کلیدِ نشستِ ورود همین حالا خوانده نشد (${asIs(why)}): نشستِ ذخیره‌شده باز نمی‌شود و ورودِ تازه فقط تا بستنِ برنامه می‌ماند. کلیدِ تازه‌ای ساخته نشد و داده‌های دکان دست نخورد؛ کلیددانِ سیستم را باز کنید و برنامه را دوباره باز کنید. ",
+    "The sign-in session key couldn't be read right now ($why): the saved session doesn't open and a new sign-in only lasts until the app is closed. No new key was made and the shop's data wasn't touched; unlock the system key store and reopen the app. ",
+    "د ننوتو د ناستې کیلي همدا اوس ونه لوستل شوه ($why): ساتل شوې ناسته نه پرانیستل کېږي او نوی ننوتل یوازې د پروګرام تر بندولو پورې پاتې کېږي. نوې کیلي جوړه نه شوه او د دوکان معلوماتو ته لاس نه دی وړل شوی؛ د سیسټم کیلي‌دان پرانیزئ او پروګرام بیا پرانیزئ. ",
+  )
+  val deskSessionLostTitle: String get() = t("دوباره وارد شوید", "Please sign in again", "بیا ننوځئ")
+  fun deskSessionLost(why: Any?): String = t(
+    "نشستِ ورودِ این کامپیوتر باز نشد: کلیدِ نشست همین حالا خوانده نشد (${asIs(why)}). داده‌های دکان سالم است و هیچ چیز پاک نشد. اگر کلیددانِ سیستم (مثلاً Keychain مک) قفل است، بازش کنید و برنامه را دوباره باز کنید تا همان نشست برگردد؛ وگرنه دوباره وارد شوید — این ورود تا آن وقت فقط تا بستنِ برنامه می‌ماند.",
+    "This computer's sign-in session didn't open: the session key couldn't be read right now ($why). The shop's data is safe and nothing was deleted. If the system key store (for example the macOS Keychain) is locked, unlock it and reopen the app to get the same session back; otherwise sign in again — until then that sign-in only lasts until the app is closed.",
+    "د دې کمپیوټر د ننوتو ناسته ونه پرانیستل شوه: د ناستې کیلي همدا اوس ونه لوستل شوه ($why). د دوکان معلومات خوندي دي او هېڅ شی پاک نه شو. که د سیسټم کیلي‌دان (د بېلګې په توګه د مک Keychain) قلف وي، هغه پرانیزئ او پروګرام بیا پرانیزئ چې هماغه ناسته بېرته راشي؛ که نه، بیا ننوځئ — تر هغه وخته دا ننوتل یوازې د پروګرام تر بندولو پورې پاتې کېږي.",
+  )
   val deskNoGoogle: String get() = t(
     "ورود با گوگل روی برنامهٔ کامپیوتر نیست — با ایمیل وارد شوید",
     "Google sign-in isn't on the computer app — sign in with email",

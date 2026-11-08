@@ -34,8 +34,13 @@ import java.security.SecureRandom
  *   ۵) پرچمِ خاموش ⇒ رفتارِ فاز ۱ بی‌کم‌وکاست و هیچ تماسی با کلیددانِ سیستم — جز وقتی فایلِ ساده نیست و نشان هست
  *      (برگشت پس از کوچ): کلید فقط **خوانده** و فایلِ ساده با همان نوشتن و بازخوانی برمی‌گردد.
  *
- *  آزمون: `KekVaultTest` (کلیددانِ ساختگی با شکست‌های تزریقی و «برق» در هر گام) و `OsKeystoreRoundTripTest`
- *  (کلیددانِ واقعیِ ویندوز و مک در CI).
+ *  ── دو کلید، یک سازوکار ([Slot]) ──────────────────────────────────────
+ *  همین کلاس کلیدِ نشستِ ورود (`SecretBox`: توکن‌ها و فایل‌های هاب) را هم نگه می‌دارد، با [Slot.SESSION]: فایل، نشان،
+ *  حسابِ کلیددان، سرویس و دامنهٔ نشانِ **جدا** (`keys/session.key`، `keys/session.os`، `session-key-…`)، تا هیچ‌کدام
+ *  جای دیگری را نگیرد یا با آن اشتباه نشود. همهٔ قاعده‌های بالا برای هر دو یکی است.
+ *
+ *  آزمون: `KekVaultTest` و `SessionKeyVaultTest` (کلیددانِ ساختگی با شکست‌های تزریقی و «برق» در هر گام) و
+ *  `OsKeystoreRoundTripTest` (کلیددانِ واقعیِ ویندوز و مک در CI، هر دو کلید).
  */
 class KekVault(
   private val dir: File,
@@ -45,7 +50,53 @@ class KekVault(
   private val restrict: (File) -> Unit = {},
   private val random: SecureRandom = SecureRandom(),
   private val clock: () -> Long = System::currentTimeMillis,
+  private val slot: Slot = Slot.LEDGER,
 ) {
+
+  /**
+   *  نام‌های یک کلید — هر کلید فایلِ ساده، نشان، پیشوندِ حساب در کلیددان، سرآیندِ نشان، دامنهٔ `check`، سرویسِ
+   *  Keychain / Secret Service و برچسبِ خودش را دارد. نشانِ یک کلید (سرآیند و دامنهٔ دیگر) هرگز نشانِ دیگری خوانده نمی‌شود.
+   *  ⛔ نام‌ها درونی‌اند و روی دیسک و در کلیددان می‌مانند — عوض نشوند.
+   */
+  class Slot internal constructor(
+    val plain: String,
+    val os: String,
+    val refPrefix: String,
+    internal val header: String,
+    domain: String,
+    /** سرویس در Keychain ِ مک و Secret Service ِ لینوکس */
+    val service: String,
+    /** برچسبِ مدخل در Secret Service (فقط نمایش) */
+    val secretLabel: String,
+    /**
+     *  گمِ این کلید فقط «ورودِ دوباره» است (نشست)، نه گمِ داده ⇒ فایلِ سادهٔ خراب **بی هیچ نشانی** کنار می‌رود تا کلیدِ
+     *  تازه ساخته شود ([retireBrokenPlain]). KEK ِ دفتر هرگز.
+     */
+    val renewable: Boolean,
+  ) {
+    private val domain = domain.toByteArray(Charsets.US_ASCII)
+
+    /** نشانِ کلید — ۱۲۸ بیتِ اولِ SHA-256 ِ «دامنه + کلید»؛ از کلیدِ تصادفیِ ۲۵۶ بیتی چیزی نمی‌گوید */
+    fun check(key: ByteArray): String {
+      val md = MessageDigest.getInstance("SHA-256")
+      md.update(domain)
+      md.update(key)
+      return hex(md.digest()).take(32)
+    }
+
+    companion object {
+      /** KEK ِ رمزِ دفتر — همان نام‌های #1005 */
+      val LEDGER = Slot(
+        PLAIN, OS, REF_PREFIX, HEADER, "tohid-atrest-kek-check-v1\u0000", OsKeyStores.SERVICE, "My Shop data key", renewable = false,
+      )
+
+      /** کلیدِ نشستِ ورود (`SecretBox`) — همان فایلِ `keys/session.key` ِ پیشین */
+      val SESSION = Slot(
+        "session.key", "session.os", "session-key-", "tohid-session-os v1", "tohid-session-key-check-v1\u0000",
+        OsKeyStores.SESSION_SERVICE, "My Shop session key", renewable = true,
+      )
+    }
+  }
 
   /** کارهای دیسکیِ کوچ — جدا، تا آزمون وسطِ هر گام «برق را قطع کند» */
   interface Disk {
@@ -99,8 +150,8 @@ class KekVault(
     data class Fallback(val store: String?, val reason: String) : Status()
   }
 
-  val plainFile: File get() = File(dir, PLAIN)
-  val osFile: File get() = File(dir, OS)
+  val plainFile: File get() = File(dir, slot.plain)
+  val osFile: File get() = File(dir, slot.os)
 
   private val lock = Any()
 
@@ -172,8 +223,8 @@ class KekVault(
     removeAfterOpen = false
     runCatching {
       if (!flagOn()) return
-      val d = Descriptor.parse(disk.read(osFile)) ?: return
-      if (d.launch == launch || d.check != check(key)) return
+      val d = Descriptor.parse(disk.read(osFile), slot.header) ?: return
+      if (d.launch == launch || d.check != slot.check(key)) return
       val s = storeFor(d.store) ?: return
       if (!MessageDigest.isEqual(s.unprotect(d.ref, d.blob), key)) return
       if (!MessageDigest.isEqual(disk.read(plainFile), key)) return
@@ -191,7 +242,7 @@ class KekVault(
 
   private fun load(): Loaded? {
     val osBytes = if (osFile.isFile) disk.read(osFile) else null
-    val os = osBytes?.let { Descriptor.parse(it) }
+    val os = osBytes?.let { Descriptor.parse(it, slot.header) }
     val plain = if (plainFile.isFile) {
       //  کلیدِ ساختِ پیشین (پیش از ACL) هم یک بار در هر اجرا محدود می‌شود
       if (!restricted) { restricted = true; runCatching { restrict(plainFile) } }
@@ -202,7 +253,7 @@ class KekVault(
     val good = plain?.takeIf { it.size == KEY_LEN }
     if (os != null) {
       //  همان کلید هنوز ساده هم هست ⇒ بی تماس با سیستم (پرچمِ خاموش، یا کوچی که هنوز پاک نکرده)
-      if (good != null && check(good) == os.check) return Loaded(good, false, os, plain)
+      if (good != null && slot.check(good) == os.check) return Loaded(good, false, os, plain)
       val name = storeLabel(os.store)
       val s = storeFor(os.store) ?: throw unavailable(StrAppData.deskOsUnread(name, StrAppData.deskOsMissing))
       val k = try {
@@ -210,7 +261,7 @@ class KekVault(
       } catch (e: KeyStoreFailure) {
         throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, StrAppData.deskOsUnread(name, e.reason), e)
       }
-      if (k.size != KEY_LEN || check(k) != os.check) throw unavailable(StrAppData.deskOsUnread(name, StrAppData.deskOsWrongValue))
+      if (k.size != KEY_LEN || slot.check(k) != os.check) throw unavailable(StrAppData.deskOsUnread(name, StrAppData.deskOsWrongValue))
       return Loaded(k, true, os, plain)
     }
     if (osBytes != null) {
@@ -269,16 +320,16 @@ class KekVault(
   }
 
   private fun migrate(s: OsKeyStore, key: ByteArray): Status = try {
-    val check = check(key)
-    val ref = REF_PREFIX + check.take(REF_HEX)
+    val check = slot.check(key)
+    val ref = slot.refPrefix + check.take(REF_HEX)
     val blob = s.protect(ref, key)
     if (!MessageDigest.isEqual(s.unprotect(ref, blob), key)) throw KeyStoreFailure(StrAppData.deskOsReadBack)
-    if (osFile.exists()) disk.moveAside(osFile, File(dir, "$OS.old-${clock()}"))
-    disk.write(osFile, Descriptor(s.id, check, ref, blob, launch).encode())
+    if (osFile.exists()) disk.moveAside(osFile, File(dir, "${slot.os}.old-${clock()}"))
+    disk.write(osFile, Descriptor(s.id, check, ref, blob, launch, slot.header).encode())
     runCatching { restrict(osFile) }
-    val d = Descriptor.parse(disk.read(osFile))
+    val d = Descriptor.parse(disk.read(osFile), slot.header)
     if (d == null || d.check != check || !MessageDigest.isEqual(s.unprotect(d.ref, d.blob), key)) {
-      runCatching { disk.moveAside(osFile, File(dir, "$OS.bad-${clock()}")) }
+      runCatching { disk.moveAside(osFile, File(dir, "${slot.os}.bad-${clock()}")) }
       throw KeyStoreFailure(StrAppData.deskOsReadBack)
     }
     Status.Protected(s.id, Plain.KEPT)
@@ -299,10 +350,32 @@ class KekVault(
     }
   }
 
+  /**
+   *  فقط [Slot.renewable] (نشستِ ورود؛ هرگز KEK ِ دفتر): فایلِ سادهٔ **خراب** (نه ۳۲ بایت) وقتی **هیچ نشانی** نیست —
+   *  یعنی هیچ نسخهٔ دیگری از کلید جایی نیست و آنچه با آن پیچیده شده همین حالا هم باز نمی‌شود — کنار می‌رود
+   *  (`.bad-<زمان>`، نه پاک) تا [forWrite] کلیدِ تازه بسازد. نشان (هر بایتی، خراب یا بیگانه) هست، فایل سالم است یا
+   *  کنار رفتن نشد ⇒ `false` و هیچ کار.
+   */
+  fun retireBrokenPlain(): Boolean = synchronized(lock) {
+    if (!slot.renewable || osFile.exists() || !plainFile.isFile || plainFile.length() == KEY_LEN.toLong()) return false
+    runCatching {
+      disk.moveAside(plainFile, File(dir, "${slot.plain}.bad-${clock()}"))
+      runCatching { disk.syncDir(dir) }
+      restricted = false
+    }.isSuccess
+  }
+
   /** فایلِ نشان — متنِ ساده، یک کلید=مقدار در هر سطر */
-  internal class Descriptor(val store: String, val check: String, val ref: String, val blob: String, val launch: String) {
+  internal class Descriptor(
+    val store: String,
+    val check: String,
+    val ref: String,
+    val blob: String,
+    val launch: String,
+    private val header: String = HEADER,
+  ) {
     fun encode(): ByteArray = buildString {
-      append(HEADER).append('\n')
+      append(header).append('\n')
       append("store=").append(store).append('\n')
       append("check=").append(check).append('\n')
       append("ref=").append(ref).append('\n')
@@ -317,10 +390,11 @@ class KekVault(
       private val B64 = Regex("[A-Za-z0-9+/=]*")
       private val LAUNCH = Regex("[0-9a-f]{1,32}")
 
-      fun parse(bytes: ByteArray): Descriptor? {
+      /** @param header سرآیندِ همان کلید ([Slot]) — نشانِ کلیدِ دیگر خوانده نمی‌شود */
+      fun parse(bytes: ByteArray, header: String = HEADER): Descriptor? {
         if (bytes.size > MAX_OS_BYTES) return null
         val lines = String(bytes, Charsets.UTF_8).lines()
-        if (lines.firstOrNull() != HEADER) return null
+        if (lines.firstOrNull() != header) return null
         val f = lines.drop(1).mapNotNull { line ->
           val i = line.indexOf('=')
           if (i <= 0) null else line.substring(0, i) to line.substring(i + 1)
@@ -330,7 +404,7 @@ class KekVault(
         val ref = f["ref"]?.takeIf { REF.matches(it) } ?: return null
         val blob = f["blob"]?.takeIf { B64.matches(it) } ?: return null
         val launch = f["launch"]?.takeIf { LAUNCH.matches(it) } ?: return null
-        return Descriptor(store, check, ref, blob, launch)
+        return Descriptor(store, check, ref, blob, launch, header)
       }
     }
   }
@@ -343,15 +417,9 @@ class KekVault(
     private const val KEY_LEN = 32
     private const val HEADER = "tohid-kek-os v1"
     private const val MAX_OS_BYTES = 16 * 1024
-    private val CHECK_DOMAIN = "tohid-atrest-kek-check-v1\u0000".toByteArray(Charsets.US_ASCII)
 
-    /** نشانِ کلید — ۱۲۸ بیتِ اولِ SHA-256 ِ «دامنه + کلید»؛ از کلیدِ تصادفیِ ۲۵۶ بیتی چیزی نمی‌گوید */
-    fun check(key: ByteArray): String {
-      val md = MessageDigest.getInstance("SHA-256")
-      md.update(CHECK_DOMAIN)
-      md.update(key)
-      return hex(md.digest()).take(32)
-    }
+    /** نشانِ KEK ِ دفتر ([Slot.LEDGER])؛ کلیدِ دیگر: [Slot.check] */
+    fun check(key: ByteArray): String = Slot.LEDGER.check(key)
 
     internal fun hex(b: ByteArray): String = b.joinToString("") { "%02x".format(it.toInt() and 0xff) }
   }

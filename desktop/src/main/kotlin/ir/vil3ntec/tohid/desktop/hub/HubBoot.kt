@@ -45,6 +45,9 @@ object HubBoot {
     val sid = ServerSwitchAndroid.activeProfile(context)?.serverId ?: return
     val shop = LedgerOwner.currentShop(context).trim().ifEmpty { return }
     if (running != null) return
+    //  کلیدِ نشست همین حالا در دسترس نیست (کلیددانِ قفل، `SecretBox`) ⇒ هاب نه: کلیدِ TLS، توکن‌ها و صفش با رازی
+    //  که پس از بستن نمی‌ماند رونویسی و برای همیشه گم می‌شدند. اجرای بعد که کلید برگشت، همان‌ها باز می‌شوند.
+    if (!SecretBox.persistent()) return
     //  درخواستِ کُند نخِ هاب را نگه ندارد (فقط وقتی هاب روشن است؛ پیش‌تر کسی تنظیمش نکرده باشد)
     if (System.getProperty("sun.net.httpserver.maxReqTime") == null) System.setProperty("sun.net.httpserver.maxReqTime", "30")
     if (System.getProperty("sun.net.httpserver.maxRspTime") == null) System.setProperty("sun.net.httpserver.maxRspTime", "30")

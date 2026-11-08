@@ -8,7 +8,7 @@ import com.sun.jna.ptr.PointerByReference
 import ir.vil3ntec.tohid.core.i18n.StrAppData
 
 /**
- *  مک: Keychain ِ کاربر (گذرواژهٔ عمومی، سرویسِ [OsKeyStores.SERVICE]، حسابِ `ref`) از راهِ JNA ِ موجود — نه
+ *  مک: Keychain ِ کاربر (گذرواژهٔ عمومی، سرویسِ همان کلید — [OsKeyStores.SERVICE] یا [OsKeyStores.SESSION_SERVICE] — و حسابِ `ref`) از راهِ JNA ِ موجود — نه
  *  `/usr/bin/security` (کلید هرگز در خطِ فرمان نیست، چون اصلاً فرمانی نیست).
  *
  *  `SecKeychain…GenericPassword` ِ قدیمی (هنوز در macOS 15 هست) را برگزیدیم، نه `SecItemAdd` با `CFDictionary`:
@@ -17,7 +17,7 @@ import ir.vil3ntec.tohid.core.i18n.StrAppData
  *  ⚠️ دسترسی در Keychain مالِ «همین برنامه» است؛ پس از به‌روزرسانیِ برنامهٔ امضانشده مک ممکن است یک بار بپرسد
  *  («Always Allow»). «Deny» ⇒ «کلید در دسترس نیست» تا اجرای بعد، هرگز کلیدِ تازه.
  */
-internal class MacKeychain(private val interactive: Boolean) : OsKeyStore {
+internal class MacKeychain(private val interactive: Boolean, service: String = OsKeyStores.SERVICE) : OsKeyStore {
   override val id: String = "keychain"
   override val label: String get() = StrAppData.deskStoreKeychain
 
@@ -59,7 +59,7 @@ internal class MacKeychain(private val interactive: Boolean) : OsKeyStore {
     fun CFRelease(cf: Pointer)
   }
 
-  private val service = OsKeyStores.SERVICE.toByteArray(Charsets.UTF_8)
+  private val service = service.toByteArray(Charsets.UTF_8)
   private val timeout = if (interactive) 120L else 30L
 
   /** کار با Keychain؛ در حالتِ بی‌پنجره (آزمون) پنجرهٔ قفل هرگز باز نمی‌شود و همان دم شکست می‌خورد */
