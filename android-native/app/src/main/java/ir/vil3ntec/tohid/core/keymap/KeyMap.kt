@@ -255,6 +255,11 @@ object KeyMap {
     keys = listOf(Chord(KeyName.F2)),
     web = listOf(Chord(KeyName.C, alt = true)),
   )
+  val SALE_LINE_SELLER = KeyAction(
+    "sale.lineSeller", "sale", "فروشندهٔ ردیف (پایهٔ پورسانت)", KeyStatus.PARTIAL,
+    keys = listOf(Chord(KeyName.F2, shift = true)),
+    web = emptyList(),
+  )
   val SALE_EDIT_ROW = KeyAction(
     "sale.editRow", "sale", "ویرایشِ ردیف", KeyStatus.LIVE,
     keys = listOf(Chord(KeyName.F3)),
@@ -601,6 +606,7 @@ object KeyMap {
     SALE_DELETE_ROW,
     SALE_UNDO,
     SALE_CUSTOMER,
+    SALE_LINE_SELLER,
     SALE_EDIT_ROW,
     SALE_FREE_ITEM,
     SALE_DISCOUNT_ROW,

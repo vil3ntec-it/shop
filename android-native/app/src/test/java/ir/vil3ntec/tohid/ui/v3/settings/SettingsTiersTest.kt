@@ -65,7 +65,7 @@ class SettingsTiersTest {
       SettingsLayout.LAYAWAY, SettingsLayout.SAFE_BOOK, SettingsLayout.LOYALTY, SettingsLayout.SPECIAL_ORDER, SettingsLayout.AUTO_FEES,
       SettingsLayout.PRICE_LIST, SettingsLayout.LINE_PRICING, SettingsLayout.SMART_FORECAST, SettingsLayout.ANOMALY, SettingsLayout.EASY_SETUP,
       SettingsLayout.TILL_RECEIVE, SettingsLayout.TAX_QUARTER, SettingsLayout.STOCK_MODE, SettingsLayout.STOCK_PLACES,
-      SettingsLayout.SCAN_CASH,
+      SettingsLayout.SCAN_CASH, SettingsLayout.LINE_SELLER,
     ).forEach { assertEquals(it, Tier.ADVANCED, SettingsTiers.tier(it)) }
     all.filter { "(آزمایشی)" in it }.forEach { assertEquals(it, Tier.ADVANCED, SettingsTiers.tier(it)) }
   }
@@ -220,6 +220,7 @@ class SettingsTiersTest {
       SettingsLayout.RETURNS to listOf("data/ReturnSettings.kt" to "ENABLED"),
       SettingsLayout.PAY_FIX to listOf("data/PayFixAndroid.kt" to "KEY"),
       SettingsLayout.TILL_RECEIVE to listOf("data/TillReceiveAndroid.kt" to "KEY"),
+      SettingsLayout.LINE_SELLER to listOf("data/LineSellerPrefAndroid.kt" to "KEY"),
       SettingsLayout.MULTI_DRAWER to listOf("data/TillDrawerAndroid.kt" to "KEY"),
       SettingsLayout.POS_TOUCH to listOf("ui/components/pos/PosTouchPrefsAndroid.kt" to "ON"),
       SettingsLayout.POS_MORE_KEYS to listOf("ui/components/pos/PosMoreKeysPrefsAndroid.kt" to "KEY"),

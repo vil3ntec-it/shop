@@ -58,6 +58,7 @@ object ShopSettingsKeys {
     shop("blind_count", "b"),                   // ShopPolicy: شمارشِ کورِ شیفت برای کارمند
     shop("pay_fix", "b"),                       // POS-40: اصلاحِ روشِ پرداخت
     shop("till_receive", "b"),                  // POS-39: دریافت در صندوق (F7)
+    shop("line_seller", "b"),                   // POS-23/STF-08: فروشندهٔ هر ردیف (پایهٔ پورسانت)
     shop("quick_register", "b"),                // TillGoodsPref
     shop("unit_sale", "b"),
     shop("whole_packs", "b"),

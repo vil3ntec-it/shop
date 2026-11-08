@@ -55,6 +55,7 @@
     { "id": "sale.deleteRow", "scope": "sale", "title": "حذفِ ردیف", "status": "live", "keys": ["Delete"], "web": ["Delete"] },
     { "id": "sale.undo", "scope": "sale", "title": "برگرداندن", "status": "planned", "keys": ["Mod+Z"], "web": ["Mod+Z"] },
     { "id": "sale.customer", "scope": "sale", "title": "انتخاب یا ساختِ مشتری", "status": "live", "keys": ["F2"], "web": ["Alt+C"] },
+    { "id": "sale.lineSeller", "scope": "sale", "title": "فروشندهٔ ردیف (پایهٔ پورسانت)", "status": "partial", "keys": ["Shift+F2"] },
     { "id": "sale.editRow", "scope": "sale", "title": "ویرایشِ ردیف", "status": "live", "keys": ["F3"], "web": ["Alt+J"] },
     { "id": "sale.freeItem", "scope": "sale", "title": "قلمِ آزاد", "status": "live", "keys": ["F4"], "web": ["Alt+Q"] },
     { "id": "sale.discountRow", "scope": "sale", "title": "تخفیفِ ردیف", "status": "partial", "keys": ["F5"], "web": ["Alt+X"] },

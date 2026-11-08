@@ -16,8 +16,10 @@ object StaffReport {
    *  STF-08 — ردیف‌های پورسانتِ بازه (`from`..`to`، تاریخِ فاکتور): هر فاکتورِ لغونشده به نامِ فروشنده‌اش، به تفکیکِ
    *  دستهٔ کالای قلم‌ها (`Commission.saleLines`، برای «نرخِ دسته»)، و هر برگشتِ همین بازه منفی به نامِ فروشندهٔ
    *  **فاکتورِ اصل** (`Commission.returnLines`) با دستهٔ کالای برگشتی، حتی اگر فروش در ماهِ پیش بوده.
+   *  [lineSeller] (POS-23، تنظیمِ خاموشِ دکان `LineSellerPref`): هر قلم به نامِ فروشندهٔ **ردیفِ خودش** (`SaleItem.seller`) و
+   *  برگشتِ آن از همان فروشندهٔ ردیف؛ `false` ⇒ بیت‌به‌بیت پیشین (فروشندهٔ فاکتور برای همه).
    */
-  fun commissionLines(d: ShopData, from: String, to: String): List<Commission.Line> {
+  fun commissionLines(d: ShopData, from: String, to: String, lineSeller: Boolean = false): List<Commission.Line> {
     fun inRange(date: String) = date >= from && date <= to
     fun legacy(v: Double) = Money.fromLegacy(v, Currency.AFN)
     val categoryOf = d.products.associate { it.id to it.category.trim() }
@@ -25,15 +27,18 @@ object StaffReport {
     val returns = d.saleReturns.filter { inRange(it.date) }
     //  فقط قلم‌های همین بازه (فاکتورِ بازه، یا قلمی که برگشتِ بازه نام می‌برد) — نه نگاشتِ همهٔ دفتر
     val saleIds = inRangeSales.mapTo(HashSet()) { it.id }
-    val itemIds = returns.mapNotNullTo(HashSet()) { r -> r.saleItemId.takeIf { r.productId.isBlank() && it.isNotBlank() } }
+    val itemIds = returns.mapNotNullTo(HashSet()) { r -> r.saleItemId.takeIf { (lineSeller || r.productId.isBlank()) && it.isNotBlank() } }
     val items = d.saleItems.filter { it.saleId in saleIds }.groupBy { it.saleId }
-    val productOfItem = d.saleItems.filter { it.id in itemIds }.associate { it.id to it.productId }
+    val itemOf = d.saleItems.filter { it.id in itemIds }.associateBy { it.id }
+    fun seller(i: SaleItem?) = if (lineSeller) i?.seller else null
     val sold = inRangeSales.flatMap { s ->
-      Commission.saleLines(s.seller.trim(), legacy(s.finalTotal), items[s.id].orEmpty().map { Commission.Item(categoryOf[it.productId], legacy(it.totalPrice)) })
+      Commission.saleLines(s.seller.trim(), legacy(s.finalTotal), items[s.id].orEmpty().map { Commission.Item(categoryOf[it.productId], legacy(it.totalPrice), seller(it)) })
     }
     val origins = d.sales.associate { it.id to Commission.Origin(it.seller, it.status == "cancelled") }
     val back = returns.map {
-      Commission.Returned(it.saleId, legacy(it.amount), categoryOf[it.productId.ifBlank { productOfItem[it.saleItemId].orEmpty() }])
+      Commission.Returned(
+        it.saleId, legacy(it.amount), categoryOf[it.productId.ifBlank { itemOf[it.saleItemId]?.productId.orEmpty() }], seller(itemOf[it.saleItemId]),
+      )
     }
     return sold + Commission.returnLines(back, origins)
   }

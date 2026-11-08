@@ -29,6 +29,8 @@ class ReportLedger private constructor() {
   class Item(
     val id: String, val saleId: String, val productId: String, val name: String,
     val qty: Long, val unitCost: Long, val total: Long,
+    /** POS-23 — فروشندهٔ ردیف (`saleItems[].seller`، پیراسته)؛ خالی ⇒ فروشندهٔ فاکتور. فقط با `lineSeller` ِ هسته دیده می‌شود */
+    val seller: String = "",
   )
   class Return(
     val id: String, val saleId: String, val saleItemId: String, val productId: String, val qty: Long,
@@ -85,6 +87,7 @@ class ReportLedger private constructor() {
         val x = Item(
           id = i.s("id"), saleId = i.s("saleId"), productId = i.s("productId"), name = i.s("name"),
           qty = milli(i, "quantity"), unitCost = money(i, "purchasePrice"), total = money(i, "totalPrice"),
+          seller = i.s("seller").trim(),
         )
         l.items += x; l.itemById[x.id] = x
         l.itemsBySale.getOrPut(x.saleId) { ArrayList() } += x

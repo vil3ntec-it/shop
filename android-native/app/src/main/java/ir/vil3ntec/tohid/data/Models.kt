@@ -488,6 +488,8 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val priceSource: String? = null,
+  /** POS-23 — فروشندهٔ قلمِ جدا از فاکتور (`line_seller`، `LineSeller.stored`)؛ `null` = `Sale.seller`، نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val seller: String? = null,
 )
 
 @Serializable

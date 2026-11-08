@@ -916,6 +916,139 @@
      "by": "نادر"
     }
    ]
+  },
+  "lineSeller": {
+   "products": [
+    {
+     "id": "p1",
+     "name": "برنج",
+     "category": "خوراکی",
+     "purchasePrice": 60,
+     "salePrice": 100
+    },
+    {
+     "id": "p2",
+     "name": "روغن",
+     "category": "خوراکی",
+     "purchasePrice": 150,
+     "salePrice": 200
+    }
+   ],
+   "sales": [
+    {
+     "id": "s1",
+     "invoiceNumber": 1,
+     "total": 300,
+     "discount": 30,
+     "finalTotal": 270,
+     "paymentMethod": "cash",
+     "paidAmount": 270,
+     "status": "completed",
+     "seller": "احمد",
+     "date": "2026-10-10",
+     "createdAt": 1791610260000
+    },
+    {
+     "id": "s2",
+     "invoiceNumber": 2,
+     "total": 100.01,
+     "discount": 0,
+     "finalTotal": 100.01,
+     "paymentMethod": "cash",
+     "paidAmount": 100.01,
+     "status": "completed",
+     "seller": "زهرا",
+     "date": "2026-10-10",
+     "createdAt": 1791610320000
+    },
+    {
+     "id": "s3",
+     "invoiceNumber": 3,
+     "total": 999,
+     "discount": 0,
+     "finalTotal": 999,
+     "paymentMethod": "cash",
+     "paidAmount": 999,
+     "status": "cancelled",
+     "seller": "احمد",
+     "date": "2026-10-10",
+     "createdAt": 1791610380000
+    }
+   ],
+   "saleItems": [
+    {
+     "id": "i1",
+     "saleId": "s1",
+     "productId": "p1",
+     "quantity": 1,
+     "unitPrice": 100,
+     "purchasePrice": 60,
+     "totalPrice": 100
+    },
+    {
+     "id": "i2",
+     "saleId": "s1",
+     "productId": "p2",
+     "quantity": 1,
+     "unitPrice": 200,
+     "purchasePrice": 150,
+     "totalPrice": 200,
+     "seller": " زهرا "
+    },
+    {
+     "id": "i3",
+     "saleId": "s2",
+     "productId": "p1",
+     "quantity": 0.5,
+     "unitPrice": 100,
+     "purchasePrice": 60,
+     "totalPrice": 50,
+     "seller": "احمد"
+    },
+    {
+     "id": "i4",
+     "saleId": "s2",
+     "productId": "p1",
+     "quantity": 0.5,
+     "unitPrice": 100.02,
+     "purchasePrice": 60,
+     "totalPrice": 50.01
+    },
+    {
+     "id": "i5",
+     "saleId": "s3",
+     "productId": "p2",
+     "quantity": 1,
+     "unitPrice": 999,
+     "purchasePrice": 150,
+     "totalPrice": 999,
+     "seller": "زهرا"
+    }
+   ],
+   "returns": [
+    {
+     "id": "r1",
+     "saleId": "s1",
+     "saleItemId": "i2",
+     "productId": "p2",
+     "quantity": 0.5,
+     "amount": 90,
+     "by": "احمد",
+     "date": "2026-10-11",
+     "createdAt": 1791700000000
+    },
+    {
+     "id": "r2",
+     "saleId": "s3",
+     "saleItemId": "i5",
+     "productId": "p2",
+     "quantity": 1,
+     "amount": 999,
+     "by": "احمد",
+     "date": "2026-10-11",
+     "createdAt": 1791700060000
+    }
+   ]
   }
  },
  "cases": [
@@ -4573,6 +4706,319 @@
      "overrideCount": 1,
      "approvalCount": 1
     }
+   }
+  },
+  {
+   "name": "فروشندهٔ ردیف خاموش (پیش‌فرض): «کاربر» همان فروشندهٔ فاکتور است، حتی با saleItems[].seller",
+   "id": "POS-23",
+   "fn": "sales",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "clock": null,
+    "costing": "line"
+   },
+   "ledger": "lineSeller",
+   "expect": {
+    "totals": {
+     "invoices": 2,
+     "returnCount": 1,
+     "gross": 40001,
+     "discount": 3000,
+     "sales": 37001,
+     "returns": 9000,
+     "netSales": 28001,
+     "cogs": 19500,
+     "grossProfit": 8501,
+     "marginBp": 3036,
+     "avgTicket": 18501,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "برنج",
+      "invoices": 2,
+      "qty": 2000,
+      "gross": 20001,
+      "discount": 1000,
+      "sales": 19001,
+      "returns": 0,
+      "netSales": 19001,
+      "cogs": 12000,
+      "grossProfit": 7001,
+      "marginBp": 3685
+     },
+     {
+      "key": "p2",
+      "name": "روغن",
+      "invoices": 1,
+      "qty": 500,
+      "gross": 20000,
+      "discount": 2000,
+      "sales": 18000,
+      "returns": 9000,
+      "netSales": 9000,
+      "cogs": 7500,
+      "grossProfit": 1500,
+      "marginBp": 1667
+     }
+    ],
+    "category": [
+     {
+      "key": "خوراکی",
+      "name": "خوراکی",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "user": [
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 1,
+      "qty": 1500,
+      "gross": 30000,
+      "discount": 3000,
+      "sales": 27000,
+      "returns": 9000,
+      "netSales": 18000,
+      "cogs": 13500,
+      "grossProfit": 4500,
+      "marginBp": 2500
+     },
+     {
+      "key": "زهرا",
+      "name": "زهرا",
+      "invoices": 1,
+      "qty": 1000,
+      "gross": 10001,
+      "discount": 0,
+      "sales": 10001,
+      "returns": 0,
+      "netSales": 10001,
+      "cogs": 6000,
+      "grossProfit": 4001,
+      "marginBp": 4001
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "costing": "line"
+   }
+  },
+  {
+   "name": "فروشندهٔ ردیف روشن: «کاربر» به فروشندهٔ هر ردیف، برگشت از فروشندهٔ ردیفِ اصل، لغوشده بیرون",
+   "id": "POS-23",
+   "fn": "sales",
+   "opts": {
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "clock": null,
+    "costing": "line",
+    "lineSeller": true
+   },
+   "ledger": "lineSeller",
+   "expect": {
+    "totals": {
+     "invoices": 2,
+     "returnCount": 1,
+     "gross": 40001,
+     "discount": 3000,
+     "sales": 37001,
+     "returns": 9000,
+     "netSales": 28001,
+     "cogs": 19500,
+     "grossProfit": 8501,
+     "marginBp": 3036,
+     "avgTicket": 18501,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    },
+    "product": [
+     {
+      "key": "p1",
+      "name": "برنج",
+      "invoices": 2,
+      "qty": 2000,
+      "gross": 20001,
+      "discount": 1000,
+      "sales": 19001,
+      "returns": 0,
+      "netSales": 19001,
+      "cogs": 12000,
+      "grossProfit": 7001,
+      "marginBp": 3685
+     },
+     {
+      "key": "p2",
+      "name": "روغن",
+      "invoices": 1,
+      "qty": 500,
+      "gross": 20000,
+      "discount": 2000,
+      "sales": 18000,
+      "returns": 9000,
+      "netSales": 9000,
+      "cogs": 7500,
+      "grossProfit": 1500,
+      "marginBp": 1667
+     }
+    ],
+    "category": [
+     {
+      "key": "خوراکی",
+      "name": "خوراکی",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "user": [
+     {
+      "key": "زهرا",
+      "name": "زهرا",
+      "invoices": 2,
+      "qty": 1000,
+      "gross": 25001,
+      "discount": 2000,
+      "sales": 23001,
+      "returns": 9000,
+      "netSales": 14001,
+      "cogs": 10500,
+      "grossProfit": 3501,
+      "marginBp": 2501
+     },
+     {
+      "key": "احمد",
+      "name": "احمد",
+      "invoices": 2,
+      "qty": 1500,
+      "gross": 15000,
+      "discount": 1000,
+      "sales": 14000,
+      "returns": 0,
+      "netSales": 14000,
+      "cogs": 9000,
+      "grossProfit": 5000,
+      "marginBp": 3571
+     }
+    ],
+    "hour": [
+     {
+      "key": "",
+      "name": "",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "payment": [
+     {
+      "key": "cash",
+      "name": "cash",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "channel": [
+     {
+      "key": "pos",
+      "name": "pos",
+      "invoices": 2,
+      "qty": 2500,
+      "gross": 40001,
+      "discount": 3000,
+      "sales": 37001,
+      "returns": 9000,
+      "netSales": 28001,
+      "cogs": 19500,
+      "grossProfit": 8501,
+      "marginBp": 3036
+     }
+    ],
+    "from": "2026-10-01",
+    "to": "2026-10-14",
+    "costing": "line"
    }
   }
  ]

@@ -77,11 +77,17 @@ object Commission {
   /** فاکتورِ اصلِ یک برگشت: فروشنده‌اش و این‌که لغو شده یا نه */
   data class Origin(val sellerId: String, val cancelled: Boolean = false)
 
-  /** یک ردیفِ برگشت: شناسهٔ فاکتورِ اصل، مبلغِ پس‌داده (مثبت) و دستهٔ کالای برگشتی (برای «نرخِ دسته»؛ نامعلوم ⇒ null) */
-  data class Returned(val saleId: String, val amount: Money, val category: String? = null)
+  /**
+   *  یک ردیفِ برگشت: شناسهٔ فاکتورِ اصل، مبلغِ پس‌داده (مثبت)، دستهٔ کالای برگشتی (برای «نرخِ دسته»؛ نامعلوم ⇒ null)
+   *  و فروشندهٔ **ردیفِ اصل** (POS-23، `SaleItem.seller`؛ `null` ⇒ فروشندهٔ فاکتورِ اصل، همان پیشین).
+   */
+  data class Returned(val saleId: String, val amount: Money, val category: String? = null, val seller: String? = null)
 
-  /** یک قلمِ فاکتور برای `saleLines`: دستهٔ کالا (بی دسته ⇒ null یا خالی) و مبلغِ ناخالصِ قلم */
-  data class Item(val category: String?, val gross: Money)
+  /**
+   *  یک قلمِ فاکتور برای `saleLines`: دستهٔ کالا (بی دسته ⇒ null یا خالی)، مبلغِ ناخالصِ قلم و فروشندهٔ ردیف
+   *  (POS-23؛ `null` ⇒ فروشندهٔ فاکتور، همان پیشین — `LineSeller.of`).
+   */
+  data class Item(val category: String?, val gross: Money, val seller: String? = null)
 
   /**
    *  STF-08 — یک فاکتور ⇒ ردیف‌های پورسانت به تفکیکِ دسته، تا «نرخِ دسته» اثر کند. پایهٔ کل همان `finalTotal` ِ
@@ -90,31 +96,29 @@ object Commission {
    *  هم‌دسته یک ردیف‌اند، به ترتیبِ نخستین قلم. بی دسته در همهٔ قلم‌ها، بی قلم، جمعِ صفر، ارزِ دیگر، قلمِ منفی،
    *  فاکتورِ بیش از جمعِ قلم‌ها یا عددِ بیرون از بازهٔ دقیق ⇒ همان یک ردیفِ بی دسته (رفتارِ پیشین). پس بی `categoryBp`
    *  پورسانت همان پیشین است.
+   *  POS-23: قلمِ فروشنده‌دار (`Item.seller`) به نامِ فروشندهٔ **خودش** می‌رود (ردیف‌ها به تفکیکِ فروشنده و دسته)؛ همهٔ
+   *  قلم‌ها با یک فروشنده ⇒ همان ردیف‌های پیشین به نامِ او. بی فروشندهٔ ردیف ([sellerId] برای همه) ⇒ بیت‌به‌بیت پیشین.
    */
   fun saleLines(sellerId: String, finalTotal: Money, items: List<Item>): List<Line> {
-    val whole = listOf(Line(sellerId, null, finalTotal))
+    //  بی فروشندهٔ ردیف (یا همان فروشندهٔ فاکتور) ⇒ خودِ [sellerId]، همان‌طور که داده شد
+    val who = items.map { i -> LineSeller.of(i.seller, sellerId).let { if (it == sellerId.trim()) sellerId else it } }
+    val single = who.distinct().singleOrNull()
+    //  پخش‌ناپذیر ⇒ همهٔ فاکتور یک ردیف: به نامِ تنها فروشندهٔ ردیف‌ها، وگرنه فروشندهٔ فاکتور
+    val whole = listOf(Line(single ?: sellerId, null, finalTotal))
     val cur = finalTotal.currency
-    if (items.all { it.category.isNullOrBlank() } || items.any { it.gross.currency.code != cur.code || it.gross.minor < 0 }) return whole
+    if (items.any { it.gross.currency.code != cur.code || it.gross.minor < 0 }) return whole
+    if (single != null && items.all { it.category.isNullOrBlank() }) return whole
     return try {
       val sum = items.fold(0L) { acc, i -> addExact(acc, i.gross.minor) }
       val off = sum - finalTotal.minor
       if (sum <= 0L || off < 0L) return whole
-      val share = LongArray(items.size)
-      val rem = LongArray(items.size)
-      var given = 0L
+      val share = LineSeller.allocate(off, items.map { it.gross.minor }) ?: return whole
+      val net = LinkedHashMap<Pair<String, String?>, Long>()
       items.forEachIndexed { i, it ->
-        val num = mulExact(off, it.gross.minor)
-        share[i] = num / sum
-        rem[i] = num % sum
-        given += share[i]
+        val k = who[i] to it.category?.trim()?.takeIf(String::isNotEmpty)
+        net[k] = addExact(net[k] ?: 0L, it.gross.minor - share[i])
       }
-      items.indices.sortedWith(compareByDescending<Int> { rem[it] }.thenBy { it }).take((off - given).toInt()).forEach { share[it] += 1 }
-      val net = LinkedHashMap<String?, Long>()
-      items.forEachIndexed { i, it ->
-        val c = it.category?.trim()?.takeIf(String::isNotEmpty)
-        net[c] = addExact(net[c] ?: 0L, it.gross.minor - share[i])
-      }
-      net.map { (c, m) -> Line(sellerId, c, Money(m, cur)) }
+      net.map { (k, m) -> Line(k.first, k.second, Money(m, cur)) }
     } catch (_: ArithmeticException) {
       whole
     }
@@ -125,11 +129,13 @@ object Commission {
    *  حتی اگر خودِ فروش در دورهٔ پیش بوده — پس پورسانتِ همان فروش پس گرفته می‌شود.
    *  • فاکتورِ اصلِ لغوشده ⇒ بیرون: فروشش هم شمرده نشده بود (همان قاعدهٔ `ReportEngine.sales`).
    *  • فاکتورِ اصلِ ناپیدا یا بی فروشنده ⇒ ردیفِ بی فروشنده (`unassignedBase`)، نه پنهان.
+   *  • POS-23: برگشتِ ردیفِ فروشنده‌دار از همان فروشندهٔ **ردیف** کم می‌شود.
    */
   fun returnLines(returns: List<Returned>, origins: Map<String, Origin>): List<Line> =
     returns.mapNotNull { r ->
       val o = origins[r.saleId]
-      if (o?.cancelled == true) null else Line(o?.sellerId?.trim().orEmpty(), r.category?.trim()?.takeIf(String::isNotEmpty), -r.amount)
+      //  POS-23: فروشندهٔ ردیفِ اصل (`Returned.seller`) بر فروشندهٔ فاکتورِ اصل جلو می‌افتد؛ نبودش ⇒ همان پیشین
+      if (o?.cancelled == true) null else Line(LineSeller.of(r.seller, o?.sellerId.orEmpty()), r.category?.trim()?.takeIf(String::isNotEmpty), -r.amount)
     }
 
   fun compute(lines: List<Line>, plan: Plan, currency: Currency): Result {

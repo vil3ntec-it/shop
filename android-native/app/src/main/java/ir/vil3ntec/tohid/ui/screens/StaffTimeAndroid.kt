@@ -44,9 +44,9 @@ import kotlinx.serialization.json.put
  *     و «مدیریت» بیت‌به‌بیت همان پیشین است. بی حساب یا بی اینترنت هم چیزی کشیده نمی‌شود (پرچم نامعلوم است).
  *  ⛔ زدنی که به سرور نرسید (بی اینترنت) با همان شناسه در صف (`tohid-staff-time`) می‌ماند و بارِ بعد
  *     فرستاده می‌شود؛ سرور تکرار را یک بار می‌شمارد. ردِ قطعیِ سرور (۴۰۹) صف را پاک می‌کند و پیامش دیده می‌شود.
- *  ⛔ پورسانت از فاکتورهای لغونشدهٔ این ماهِ همین دفتر (فروشندهٔ فاکتور، POS-23) با نرخِ فروشنده یا نرخِ همه
- *     حساب می‌شود؛ نرخِ دسته در سرور نگه داشته می‌شود ولی تا فروشنده و دسته برای هر ردیف نیامده، این‌جا به کار
- *     نمی‌رود. برگشتِ این ماه از پایهٔ فروشندهٔ فاکتورِ اصل کم می‌شود (`StaffReport.commissionLines`).
+ *  ⛔ پورسانت از فاکتورهای لغونشدهٔ این ماهِ همین دفتر (فروشندهٔ فاکتور، و با «فروشندهٔ هر ردیف» ِ روشن فروشندهٔ
+ *     هر ردیف — POS-23) با نرخِ دسته، فروشنده یا همه حساب می‌شود. برگشتِ این ماه از پایهٔ فروشندهٔ فاکتورِ اصل (یا
+ *     ردیفِ اصل) کم می‌شود (`StaffReport.commissionLines`).
  *  ⛔ «۷ روز و این ماه» (STF-07): جمعِ نوبت‌های سالم و روزهای کارکردهٔ هر کارمند، فقط برای صاحب و مدیر.
  */
 /**
@@ -103,8 +103,10 @@ fun StaffTimeHub(d: ShopData, monthFrom: String, today: String, initial: StaffTi
   //  همان فاکتورهای «فروشنده‌ها»ی این ماه (`ReportEngine.bySeller`)، ولی فاکتورِ بی فروشنده جدا می‌ماند و
   //  برگشتِ این ماه از فروشندهٔ فاکتورِ اصل کم می‌شود (STF-08)
   //  برگشتِ این ماه از فروشندهٔ فاکتورِ اصل کم می‌شود و «نرخِ دسته» روی دستهٔ کالای هر قلم است (STF-08)؛ یک بار برای هر دفتر و نرخ
-  val result = remember(d, plan, monthFrom, today, manager) {
-    if (!manager) null else plan?.let { p -> Commission.compute(StaffReport.commissionLines(d, monthFrom, today), p.plan, Currency.AFN) }
+  //  POS-23: «فروشندهٔ هر ردیف» (تنظیمِ خاموشِ دکان) ⇒ هر قلم به نامِ فروشندهٔ ردیفِ خودش و برگشت از همان فروشنده
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
+  val result = remember(d, plan, monthFrom, today, manager, lineSeller) {
+    if (!manager) null else plan?.let { p -> Commission.compute(StaffReport.commissionLines(d, monthFrom, today, lineSeller), p.plan, Currency.AFN) }
   }
   val periods = if (!manager) emptyList() else StaffReport.periods(spans, today, monthFrom)
 

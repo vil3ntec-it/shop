@@ -60,6 +60,7 @@ object SalesEngine {
      *  ثبت‌شده بگوید «قیمتِ خاص» (`CustomerPrice.stamp`: فیِ ثبت‌شده همین باشد). پرچمِ خاموش ⇒ همیشه `null`.
      */
     val specialPrice: Double? = null,
+    val seller: String? = null, // فروشندهٔ ردیف (POS-23، `CartSellers`) — با `Checkout.lineSellers` به `SaleItem.seller` می‌رود
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -139,6 +140,8 @@ object SalesEngine {
     val rules: ir.vil3ntec.tohid.core.sale.CheckoutRules = ir.vil3ntec.tohid.core.sale.CheckoutRules.OFF,
     /** POS-11 — یادداشتِ فاکتور (`CartStore.note`)؛ `null` ⇒ فاکتورِ بی یادداشت، همان امروز */
     val note: String? = null,
+    /** POS-23 — `LineSellerPref` (خاموش، و هر ثبتِ بیرون از صندوق ⇒ `CartLine.seller` نادیده، همان امروز) */
+    val lineSellers: Boolean = false,
     /**
      *  PAY-09 — پلهٔ گردکردنِ نقدیِ صندوق به پول (`CashRoundPref`، فقط ۰/۵۰۰/۱۰۰۰). فقط نقدِ کامل (`payment = CASH`)
      *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق) ⇒ همان امروز.
@@ -541,6 +544,7 @@ object SalesEngine {
           totalPrice = lineTotal(price, line.quantity),
           returnedQty = 0.0,
           note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
+          seller = ir.vil3ntec.tohid.core.staff.LineSeller.stored(checkout.lineSellers, line.seller, checkout.seller),
         )
         return@forEachIndexed
       }
@@ -562,6 +566,7 @@ object SalesEngine {
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
         //  POS-18: «قیمتِ خاص» فقط وقتی فیِ ثبت‌شده همان قیمتِ خاصی است که صندوق نشانده بود (پرچمِ خاموش ⇒ null)
         priceSource = line.specialPrice?.let { ir.vil3ntec.tohid.core.sale.CustomerPrice.stamp((it * 100.0).roundToLong(), (unit * 100.0).roundToLong()) },
+        seller = ir.vil3ntec.tohid.core.staff.LineSeller.stored(checkout.lineSellers, line.seller, checkout.seller),
       )
       movements += StockMovement(
         id = newId(),
