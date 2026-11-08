@@ -289,7 +289,7 @@ class ShopStore(
    */
   internal suspend fun saveGuessed(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
     //  [replace] («پاک کردنِ همه») هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
-    if (!follow.on || replace) return@withContext !softLocked(_data.value, next) && writeInternal(next)
+    if (!follow.on || replace) return@withContext !softLocked(_data.value, next) && writeInternal(next, base = if (replace) null else _data.value)
     //  ⛔ پایه دیگر نگه داشته نشده: ادغام با دفترِ همین حالا ردیف‌های تازه را DELETE می‌کرد
     val base = follow.baseOf(next) ?: run { _notice.tryEmit(STALE_BASE); return@withContext false }
     !roleRefused(base, next) && !softLocked(base, next) && writeOnBase(base, next)
@@ -315,17 +315,24 @@ class ShopStore(
   private fun writeOnBase(base: ShopData, next: ShopData): Boolean = SyncV1Engine.of(context).let { engine ->
     synchronized(engine) {
       val theirs = currentForWrite() ?: return@synchronized false
-      //  دفترِ همین حالا همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام
-      if (theirs === base) return@synchronized writeLocked(engine, next)
+      //  دفترِ همین حالا همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام (جز مُهرِ سابقه، STF-09)
+      if (theirs === base) {
+        val plan = auditSeal(theirs, base, next)
+        if (plan.data === next) return@synchronized writeLocked(engine, next).also { if (it) plan.commit() }
+        follow.remember(theirs)
+        return@synchronized writeLocked(engine, plan.data).also { if (it) { plan.commit(); follow.submitted(next) } }
+      }
       //  ⛔ جلوتر است: فقط تغییرِ صفحه نسبت به پایه — نوشتنِ کاملِ دفترِ کهنه DELETE و برگرداندن می‌ساخت
       val outcome = runCatching { LedgerMerge.mergeReport(base, next, theirs) }.getOrElse {
         _diskError.tryEmit(it.message ?: STALE_UNREADABLE)
         return@synchronized false
       }
-      val merged = outcome.data
+      //  STF-09: ردیف‌های تازهٔ صفحه (نه آنچه از [theirs] آمد) مُهر و حلقه می‌خورند
+      val plan = auditSeal(theirs, base, outcome.data)
+      val merged = plan.data
       //  نگه‌داشتِ راهِ پیشین ([saveGuessed]): دفترِ پیش از ادغام، و [next] فقط با نشانهٔ یک‌سویه (`LedgerFollow.submitted`)
       if (merged !== next) follow.remember(theirs)
-      val ok = writeLocked(engine, merged).also { if (it && merged !== next) follow.submitted(next) }
+      val ok = writeLocked(engine, merged).also { if (it) plan.commit(); if (it && merged !== next) follow.submitted(next) }
       //  ⛔ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست بی‌صدا گم نمی‌شود
       if (ok && outcome.dropped.isNotEmpty()) _notice.tryEmit(editsDropped(outcome.dropped.size))
       ok
@@ -601,7 +608,8 @@ class ShopStore(
         _blocked.tryEmit(Unit)
         return@synchronized false
       }
-      writeLocked(engine, next)
+      val plan = auditSeal(cur, cur, next)
+      writeLocked(engine, plan.data).also { if (it) plan.commit() }
     }
   }
 
@@ -637,11 +645,16 @@ class ShopStore(
    *
    *  @return آیا به دیسک رسید
    */
-  private suspend fun writeInternal(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+  private suspend fun writeInternal(next: ShopData, base: ShopData? = null): Boolean = withContext(Dispatchers.IO) {
     //  جایگزینیِ کامل (بازیابی، بازسازی): صفحه‌ای که هنوز با دفترِ پیشین می‌سازد، روی همین می‌نشیند
     follow.remember(_data.value).also { follow.replaced() }
-    writer().save(next)
+    //  STF-09: جایگزینی مُهر نمی‌خورد؛ فقط ذخیرهٔ صفحه روی پایهٔ صریح ([saveGuessed] بی ادغام)
+    writer().save(next, base)
   }
+
+  /** STF-09 — مُهر و زنجیرهٔ ردیف‌های تازهٔ سابقه (شرح سرِ `AuditSeal`). دفترِ آموزشی و حالتِ آموزشی هرگز؛ هر شکست ⇐ همان [next] */
+  private fun auditSeal(prior: ShopData, base: ShopData, next: ShopData): AuditSeal.Plan =
+    if (!syncs) AuditSeal.Plan(next) else runCatching { AuditSealAndroid.plan(context, prior, base, next) }.getOrElse { AuditSeal.Plan(next) }
 
   /**
    *  ردیفِ سابقه (`auditLog`) روی دفترِ **همان لحظه** — خواندن و نوشتن زیرِ
@@ -669,7 +682,7 @@ class ShopStore(
    */
   private fun writer(): LedgerWriter {
     val engine = SyncV1Engine.of(context)
-    return LedgerWriter(engine, { currentForWrite() }) { next -> writeLocked(engine, next) }
+    return LedgerWriter(engine, { currentForWrite() }, { next -> writeLocked(engine, next) }) { prior, next -> auditSeal(prior, prior, next) }
   }
 
   /** بدنهٔ نوشتن؛ فراخوان قفلِ موتور را گرفته است ([LedgerWriter]، و [update] با `synchronized(engine)`) */

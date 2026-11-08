@@ -814,6 +814,18 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val drawer: String? = null,
   /** INV-11 — فقط `stock_transfer` (`StockTransferBook`): گامِ انتقالِ موجودیِ سرور (`StockTransfer.Step.xfer`). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val xfer: kotlinx.serialization.json.JsonObject? = null,
+  /** STF-09 — مُهرِ نشست هنگامِ نوشتن (`AuditSeal`، نه صفحه): کاربرِ واردشده، نقشش و دستگاه (`SyncStore.deviceUid` ِ همگام‌سازی).
+   *  پس از ساخت عوض نمی‌شوند؛ ردیفِ کهنه بی این‌ها «نامعلوم» دیده می‌شود. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val userId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val userRole: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val deviceId: String? = null,
+  /** STF-09 — حلقهٔ زنجیرهٔ هشِ سابقهٔ همین دستگاه (`core/audit/AuditChain`، فقط با پرچمِ `shop.doc_chain`): زنجیره
+   *  (`<deviceId>/<دوره>`)، شماره، هشِ پیشین، هشِ همین ردیف و سطحِ مدل (`AuditSeal.LEVEL`؛ ۱ نوشته نمی‌شود). `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chain: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chainSeq: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val prev: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val hash: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chainV: Long? = null,
 )
 
 /**

@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.core.audit.AuditChain
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
@@ -78,4 +81,58 @@ object AuditModel {
   }
 
   private fun order(type: String): Int = KINDS.indexOf(type).let { if (it < 0) KINDS.size else it }
+
+  /* ───── STF-09: چه کسی و کجا، و سلامتِ زنجیرهٔ هش ───── */
+
+  /** کاربر (نام اگر این دستگاه می‌شناسد، وگرنه شناسه)، نقش و دستگاه؛ ردیفِ کهنهٔ بی مُهر ⇐ «نامعلوم» */
+  data class Who(val user: String, val role: String?, val device: String)
+
+  fun who(e: AuditEntry, names: Map<String, String>, thisDevice: String): Who = Who(
+    user = e.userId?.let { names[it]?.takeIf(String::isNotBlank) ?: it } ?: StrReports.unknown,
+    role = e.userRole?.let(::roleName),
+    device = deviceName(e.deviceId, thisDevice),
+  )
+
+  /** «علی (صندوق‌دار) · این دستگاه» */
+  fun whoLine(w: Who): String = StrReports.whoLine(w.user + (w.role?.let { " ($it)" } ?: ""), w.device)
+
+  fun deviceName(id: String?, thisDevice: String): String = when {
+    id.isNullOrBlank() -> StrReports.unknown
+    id == thisDevice -> StrReports.thisDevice
+    else -> StrReports.deviceShort(id.orEmpty().take(6))
+  }
+
+  fun roleName(role: String): String = when (role.trim().lowercase()) {
+    "owner" -> StrAccount.roleOwner
+    "manager" -> StrAccount.roleManager
+    "staff" -> StrAccount.roleStaff
+    "seller" -> StrAccount.roleSeller
+    "cashier" -> StrAccount.roleCashier
+    "storekeeper" -> StrAccount.roleStorekeeper
+    "picker" -> StrAccount.rolePicker
+    "accountant" -> StrAccount.roleAccountant
+    "courier" -> StrAccount.roleCourier
+    else -> role
+  }
+
+  /** وضعیتِ زنجیره برای سرِ صفحه: [ok] = `null` ⇐ هنوز هیچ ردیفِ زنجیره‌داری نیست */
+  data class ChainLine(val ok: Boolean?, val title: String, val body: String?)
+
+  fun chainLine(r: AuditChain.Report, thisDevice: String): ChainLine {
+    val b = r.broken
+    return when {
+      b != null -> ChainLine(false, StrReports.chainBroken(b.seq.coerceAtLeast(1)), StrReports.whoLine(reasonText(b.reason), deviceName(b.chain.substringBeforeLast('/', ""), thisDevice)))
+      r.chained == 0 -> ChainLine(null, StrReports.chainNotStarted, null)
+      else -> ChainLine(true, StrReports.chainOk, if (r.unverified > 0) StrReports.chainUnverified(r.unverified) else StrReports.chainOkBody)
+    }
+  }
+
+  fun reasonText(reason: String): String = when (reason) {
+    "hash_mismatch", "bad_doc" -> StrReports.chainEdited
+    "seq_gap", "truncated" -> StrReports.chainDeleted
+    else -> StrReports.chainReordered
+  }
+
+  /** شناسهٔ ردیفی که زنجیره از آن شکسته (نشانِ قرمز روی همان ردیف)؛ ردیفِ پاک‌شده ⇐ null */
+  fun brokenId(r: AuditChain.Report?): String? = r?.broken?.id
 }

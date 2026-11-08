@@ -169,7 +169,8 @@ class CrmSweepDiskTest {
     val bytes = ledger.readBytes()
 
     assertNull(runBlocking { b.sweepMerged() })
-    runBlocking { b.applyFromServer(stray) }
+    //  STF-09: ردیفِ تازهٔ سابقه (`customer_merge`) هنگامِ ذخیره مُهرِ کاربر/دستگاه گرفت؛ رونوشتِ سرور همان دفترِ فرستاده‌شده است
+    runBlocking { b.applyFromServer(b.data.value) }
     runBlocking { ShopStore(ctx).loadAndSummarize() }
     assertEquals(q0, engine.queueSize())
     assertArrayEquals(bytes, ledger.readBytes())

@@ -1,0 +1,910 @@
+{
+  "format": "tohid-audit-chain-v1",
+  "hashFormat": "tohid-hashchain-v1",
+  "version": 1,
+  "about": "بردارِ مرجعِ زنجیرهٔ سابقهٔ عملیاتِ دستگاه (STF-09). ساخته‌شده با server/scripts/audit-chain-vectors.js — دستی ویرایش نشود. Kotlin (core/audit/AuditChain، AuditChainVectorsTest) و سرور (lib/device-audit-chain.js، device-audit-chain.test.js) همین جزئیات، بدنه، هش و نتیجهٔ سنجش را می‌سازند.",
+  "rules": {
+    "chain": "<deviceId>/<epoch>; seq per chain from 1; order = chainSeq, never list position or device clock",
+    "norm": "safe integer stays; any other number => {\"$f\": 16-hex IEEE-754 bits}; then prune: null, \"\", 0, false, [] and {} never stay in an object (list items keep their place)",
+    "detail": "every row key except id,type,date,refId,createdAt,amount,amountMinor,userId,userRole,deviceId,chain,chainSeq,prev,hash,chainV; detailHash = sha256(canonicalJson(detail))",
+    "doc": "prune({ v:1, kind:\"audit\", chain, seq:chainSeq, lv (only if chainV > 1), id, type, date, refId, createdAt, amountMinor (amountMinor if safe integer else Math.round(amount*100)), userId, userRole, deviceId, detailHash })",
+    "hash": "sha256(prev ‖ canonicalJson(doc)) — tohid-hashchain-v1"
+  },
+  "devices": [
+    "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+    "aa11bb22cc33dd44ee55ff6600778899"
+  ],
+  "chains": [
+    "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+    "aa11bb22cc33dd44ee55ff6600778899/1"
+  ],
+  "plan": [
+    {
+      "device": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "userId": "usr_owner01",
+      "userRole": "owner",
+      "row": {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320}
+    },
+    {
+      "device": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "userId": "usr_cash02",
+      "userRole": "cashier",
+      "row": {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit"}
+    },
+    {
+      "device": "aa11bb22cc33dd44ee55ff6600778899",
+      "userId": "usr_cash02",
+      "userRole": "cashier",
+      "row": {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد"}
+    },
+    {
+      "device": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "userId": "usr_owner01",
+      "userRole": "owner",
+      "row": {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"]}
+    },
+    {
+      "device": "aa11bb22cc33dd44ee55ff6600778899",
+      "userId": "usr_owner01",
+      "userRole": "owner",
+      "row": {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0}
+    },
+    {
+      "device": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "userId": "usr_cash02",
+      "userRole": "cashier",
+      "row": {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"}}
+    }
+  ],
+  "rows": [
+    {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+    {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+    {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+    {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+    {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+    {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+    {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+    {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+  ],
+  "expect": {
+    "ok": true,
+    "legacy": 2,
+    "chained": 6,
+    "unverified": 0,
+    "broken": null,
+    "chains": [
+      {
+        "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+        "from": 1,
+        "seq": 4,
+        "head": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4",
+        "rows": 4
+      },
+      {
+        "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+        "from": 1,
+        "seq": 2,
+        "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+        "rows": 2
+      }
+    ]
+  },
+  "cases": [
+    {
+      "row": {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+      "detail": "{\"notes\":\"فروش ۳۲۰\"}",
+      "detailHash": "f386b753756a5aadd54cea1d3205cb756730f474725150fa748edf80bf860c5b",
+      "doc": "{\"amountMinor\":32000,\"chain\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1\",\"createdAt\":1762600000000,\"date\":\"2026-11-08\",\"detailHash\":\"f386b753756a5aadd54cea1d3205cb756730f474725150fa748edf80bf860c5b\",\"deviceId\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"id\":\"aud_a1\",\"kind\":\"audit\",\"refId\":\"sal_01\",\"seq\":1,\"type\":\"sale\",\"userId\":\"usr_owner01\",\"userRole\":\"owner\",\"v\":1}",
+      "hash": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"
+    },
+    {
+      "row": {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+      "detail": "{\"by\":\"علی\",\"reason\":\"deposit\"}",
+      "detailHash": "2d10a64bb55b904e6066c06623953f5b57da1d57b6e09ede93745de448c2bfb3",
+      "doc": "{\"amountMinor\":1250,\"chain\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1\",\"createdAt\":1762600001000,\"date\":\"2026-11-08\",\"detailHash\":\"2d10a64bb55b904e6066c06623953f5b57da1d57b6e09ede93745de448c2bfb3\",\"deviceId\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"id\":\"aud_a2\",\"kind\":\"audit\",\"seq\":2,\"type\":\"cash_in\",\"userId\":\"usr_cash02\",\"userRole\":\"cashier\",\"v\":1}",
+      "hash": "498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"
+    },
+    {
+      "row": {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+      "detail": "{\"approvedBy\":\"مدیر\",\"by\":\"زهرا\",\"reason\":\"پولِ خرد\"}",
+      "detailHash": "a88d9fe32a4236f0144b38e603df10096776ae11856a97fdc3fa4fc2294dddc9",
+      "doc": "{\"chain\":\"aa11bb22cc33dd44ee55ff6600778899/1\",\"createdAt\":1762600001500,\"date\":\"2026-11-08\",\"detailHash\":\"a88d9fe32a4236f0144b38e603df10096776ae11856a97fdc3fa4fc2294dddc9\",\"deviceId\":\"aa11bb22cc33dd44ee55ff6600778899\",\"id\":\"aud_b1\",\"kind\":\"audit\",\"seq\":1,\"type\":\"no_sale\",\"userId\":\"usr_cash02\",\"userRole\":\"cashier\",\"v\":1}",
+      "hash": "9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"
+    },
+    {
+      "row": {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+      "detail": "{\"refIds\":[\"sales/s7\",\"transactions/t1\"],\"z\":{\"cash\":{\"$f\":\"4059100000000000\"},\"count\":3,\"methods\":[{\"m\":\"cash\",\"v\":{\"$f\":\"3fb999999999999a\"}},null,{\"m\":\"card\"}]}}",
+      "detailHash": "a8286bc7289fa09d876054c1c5c80fbea112ce901e24d46992676c80cbccda50",
+      "doc": "{\"amountMinor\":123435,\"chain\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1\",\"createdAt\":1762600002000,\"date\":\"2026-11-08\",\"detailHash\":\"a8286bc7289fa09d876054c1c5c80fbea112ce901e24d46992676c80cbccda50\",\"deviceId\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"id\":\"aud_a3\",\"kind\":\"audit\",\"refId\":\"shf_2\",\"seq\":3,\"type\":\"shift_close\",\"userId\":\"usr_owner01\",\"userRole\":\"owner\",\"v\":1}",
+      "hash": "ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"
+    },
+    {
+      "row": {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+      "detail": "{\"notes\":\"حذف — دلیل: تکراری\"}",
+      "detailHash": "e5833b41e81e21476159c98c1998252eceff7a00d29c01078fcc1dcbf3d45ed3",
+      "doc": "{\"chain\":\"aa11bb22cc33dd44ee55ff6600778899/1\",\"createdAt\":1762600003000,\"date\":\"2026-11-08\",\"detailHash\":\"e5833b41e81e21476159c98c1998252eceff7a00d29c01078fcc1dcbf3d45ed3\",\"deviceId\":\"aa11bb22cc33dd44ee55ff6600778899\",\"id\":\"aud_b2\",\"kind\":\"audit\",\"refId\":\"p_old\",\"seq\":2,\"type\":\"delete_product\",\"userId\":\"usr_owner01\",\"userRole\":\"owner\",\"v\":1}",
+      "hash": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"
+    },
+    {
+      "row": {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"},
+      "detail": "{\"approval\":{\"amount\":{\"$f\":\"4340000000000000\"},\"sig\":\"x\"},\"points\":25}",
+      "detailHash": "a19de9c1039e576f5ef5427c996f32b76a7b76a5ec78d29992f0439a80ac64d8",
+      "doc": "{\"chain\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1\",\"createdAt\":1762600004000,\"date\":\"2026-11-08\",\"detailHash\":\"a19de9c1039e576f5ef5427c996f32b76a7b76a5ec78d29992f0439a80ac64d8\",\"deviceId\":\"0f1e2d3c4b5a69788796a5b4c3d2e1f0\",\"id\":\"aud_a4\",\"kind\":\"audit\",\"seq\":4,\"type\":\"loyalty_earn\",\"userId\":\"usr_cash02\",\"userRole\":\"cashier\",\"v\":1}",
+      "hash": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"
+    }
+  ],
+  "tamper": [
+    {
+      "name": "intact_shuffled",
+      "rows": [
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5}
+      ],
+      "expect": {
+        "ok": true,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 4,
+            "head": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "intact_with_anchor",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "anchors": {
+        "current": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+        "heads": {
+          "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1": {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "seq": 4,
+            "hash": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"
+          }
+        }
+      },
+      "expect": {
+        "ok": true,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 4,
+            "head": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "edit_notes",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"دست‌خورده","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "hash_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "edit_amount",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":999,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+          "seq": 2,
+          "reason": "hash_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 4,
+            "head": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 1,
+            "head": "9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "edit_user",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_cash02","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 3,
+          "reason": "hash_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 2,
+            "head": "498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "edit_nested_double",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.26,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 3,
+          "reason": "hash_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 2,
+            "head": "498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "delete_middle",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "seq_gap"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "reorder_seq",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "prev_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "fork",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"},
+        {"id":"aud_a2x","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 7,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "fork"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 2,
+            "head": "498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c",
+            "rows": 5
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "strip_link",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "bad_link"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "unlink_middle",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": false,
+        "legacy": 3,
+        "chained": 5,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 2,
+          "reason": "seq_gap"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncate_tail_no_anchor",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"}
+      ],
+      "expect": {
+        "ok": true,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 3,
+            "head": "ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "truncate_tail_anchor",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"}
+      ],
+      "anchors": {
+        "current": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+        "heads": {
+          "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1": {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "seq": 4,
+            "hash": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"
+          }
+        }
+      },
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 4,
+          "reason": "truncated"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 3,
+            "head": "ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "rewrite_tail_anchor",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a1","type":"sale","date":"2026-11-08","refId":"sal_01","notes":"فروش ۳۲۰","createdAt":1762600000000,"amount":320,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613"},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"دمِ دوباره‌ساخته","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"6199be0840dfef01c0f06a106121b59d68548664674df06d3d52ee60feeb53da"}
+      ],
+      "anchors": {
+        "current": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+        "heads": {
+          "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1": {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "seq": 4,
+            "hash": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"
+          }
+        }
+      },
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 6,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 4,
+          "reason": "anchor_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 4,
+            "head": "6199be0840dfef01c0f06a106121b59d68548664674df06d3d52ee60feeb53da",
+            "rows": 4
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "all_rows_gone_anchor",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"}
+      ],
+      "anchors": {
+        "current": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+        "heads": {
+          "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1": {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "seq": 4,
+            "hash": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"
+          }
+        }
+      },
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 2,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 1,
+          "reason": "truncated"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 0,
+            "seq": 0,
+            "head": "0000000000000000000000000000000000000000000000000000000000000000",
+            "rows": 0
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "archived_prefix",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "expect": {
+        "ok": true,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 2,
+            "seq": 4,
+            "head": "8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    },
+    {
+      "name": "archived_prefix_strict",
+      "rows": [
+        {"id":"aud_old1","type":"shift_open","date":"2026-11-07","refId":"shf_1","notes":"","createdAt":1762500000000,"amount":1500.5},
+        {"id":"aud_a2","type":"cash_in","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001000,"amount":12.5,"by":"علی","reason":"deposit","userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":2,"prev":"5224e75e27030e5182737033e96599cc87180ec4e523a292c09396cbb5817613","hash":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c"},
+        {"id":"aud_b1","type":"no_sale","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600001500,"amount":0,"by":"زهرا","approvedBy":"مدیر","reason":"پولِ خرد","userId":"usr_cash02","userRole":"cashier","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","hash":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642"},
+        {"id":"aud_old2","type":"price_change","date":"2026-11-07","refId":"p_rice","notes":"برنج: ۵۰ ⇐ ۵۵","createdAt":1762500100000,"amount":0},
+        {"id":"aud_a3","type":"shift_close","date":"2026-11-08","refId":"shf_2","notes":"","createdAt":1762600002000,"amount":1234.345,"z":{"cash":100.25,"count":3,"methods":[{"m":"cash","v":0.1},null,{"m":"card","v":0}],"none":{}},"refIds":["sales/s7","transactions/t1"],"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":3,"prev":"498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c","hash":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d"},
+        {"id":"aud_b2","type":"delete_product","date":"2026-11-08","refId":"p_old","notes":"حذف — دلیل: تکراری","createdAt":1762600003000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"aa11bb22cc33dd44ee55ff6600778899","chain":"aa11bb22cc33dd44ee55ff6600778899/1","chainSeq":2,"prev":"9b091bb147965c4c7a841113b2072104b5b52c9f818a687f8696689ef5ab5642","hash":"68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb"},
+        {"id":"aud_a4","type":"loyalty_earn","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600004000,"amount":0,"points":25,"approval":{"amount":9007199254740992,"sig":"x"},"userId":"usr_cash02","userRole":"cashier","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":4,"prev":"ae20bc2f40e0b173c504de64ec74ec7c7fb473baf8c14500d4abdf3dd5b4ee2d","hash":"8d275a80b40b09fa79d46bb8f66c53d93207b41db5b7a5dc249a247e052659d4"}
+      ],
+      "strict": true,
+      "expect": {
+        "ok": false,
+        "legacy": 2,
+        "chained": 5,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 1,
+          "reason": "seq_gap"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 2,
+            "seq": 2,
+            "head": "498fb7735f86545a3854324fd7eac8007969841676a44abbb60fc2a15c27dc9c",
+            "rows": 3
+          },
+          {
+            "chain": "aa11bb22cc33dd44ee55ff6600778899/1",
+            "from": 1,
+            "seq": 2,
+            "head": "68f0dbd79397736de6795a0076171b6238d307beb190b9a9e08310a96c4f3bfb",
+            "rows": 2
+          }
+        ]
+      }
+    }
+  ],
+  "levels": [
+    {
+      "name": "newer_level_known",
+      "rows": [
+        {"id":"aud_lv1","type":"stock_transfer","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600009000,"amount":0,"futureField":"x","userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","chainV":2,"hash":"d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741"}
+      ],
+      "known": 2,
+      "expect": {
+        "ok": true,
+        "legacy": 0,
+        "chained": 1,
+        "unverified": 0,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741",
+            "rows": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "newer_level_dropped_field_unknown",
+      "rows": [
+        {"id":"aud_lv1","type":"stock_transfer","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600009000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","chainV":2,"hash":"d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741"}
+      ],
+      "known": 1,
+      "expect": {
+        "ok": true,
+        "legacy": 0,
+        "chained": 1,
+        "unverified": 1,
+        "broken": null,
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741",
+            "rows": 1
+          }
+        ]
+      }
+    },
+    {
+      "name": "newer_level_dropped_field_known",
+      "rows": [
+        {"id":"aud_lv1","type":"stock_transfer","date":"2026-11-08","refId":null,"notes":"","createdAt":1762600009000,"amount":0,"userId":"usr_owner01","userRole":"owner","deviceId":"0f1e2d3c4b5a69788796a5b4c3d2e1f0","chain":"0f1e2d3c4b5a69788796a5b4c3d2e1f0/1","chainSeq":1,"prev":"0000000000000000000000000000000000000000000000000000000000000000","chainV":2,"hash":"d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741"}
+      ],
+      "known": 2,
+      "expect": {
+        "ok": false,
+        "legacy": 0,
+        "chained": 1,
+        "unverified": 0,
+        "broken": {
+          "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+          "seq": 1,
+          "reason": "hash_mismatch"
+        },
+        "chains": [
+          {
+            "chain": "0f1e2d3c4b5a69788796a5b4c3d2e1f0/1",
+            "from": 1,
+            "seq": 1,
+            "head": "d84244c0965c7271bfaeb80c8e118bfeba1bfe5c1390766c710294f60c7a8741",
+            "rows": 1
+          }
+        ]
+      }
+    }
+  ]
+}

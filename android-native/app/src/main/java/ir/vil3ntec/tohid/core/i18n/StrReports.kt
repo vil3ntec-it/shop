@@ -156,6 +156,24 @@ object StrReports {
   val note: String get() = t("شرح", "Description", "تشریح")
   val openRecord: String get() = t("باز کردنِ همان مورد", "Open the record", "همغه مورد پرانیزئ")
 
+  // سابقهٔ عملیات: چه کسی، کجا، و زنجیرهٔ هش (STF-09)
+  val unknown: String get() = t("نامعلوم", "Unknown", "نامعلوم")
+  val who: String get() = t("کاربر", "User", "کارن")
+  val whoRole: String get() = t("نقش", "Role", "رول")
+  val whoDevice: String get() = t("دستگاه", "Device", "وسیله")
+  val thisDevice: String get() = t("این دستگاه", "This device", "دا وسیله")
+  fun deviceShort(id: Any): String = t("دستگاهِ ${asIs(id)}", "Device $id", "وسیله $id")
+  fun whoLine(user: Any, device: Any): String = t("${asIs(user)} · ${asIs(device)}", "$user · $device", "$user · $device")
+  val chainOk: String get() = t("زنجیره سالم است", "The chain is intact", "زنځیر روغ دی")
+  fun chainBroken(row: Any): String = t("زنجیره از ردیفِ ${asIs(row)} شکسته است", "The chain is broken from row $row", "زنځیر له $row کرښې څخه مات دی")
+  val chainNotStarted: String get() = t("زنجیرهٔ هشِ این دکان هنوز شروع نشده است", "This shop's hash chain hasn't started yet", "د دې دوکان د هش زنځیر لا نه دی پیل شوی")
+  val chainOkBody: String get() = t("هیچ ردیفی پس از ثبت ویرایش، پاک یا جابه‌جا نشده است.", "No row has been edited, deleted or reordered after it was recorded.", "هېڅ کرښه له ثبت وروسته نه ده بدله شوې، نه ړنګه شوې او نه یې ځای بدل شوی.")
+  fun chainUnverified(n: Any): String = t("${asIs(n)} ردیف را نسخهٔ تازه‌ترِ برنامه نوشته است؛ پس از به‌روزرسانی سنجیده می‌شود.", "$n ${pl(n, "row was", "rows were")} written by a newer app version; ${pl(n, "it is", "they are")} checked after you update.", "$n کرښې د اپ نوې نسخې لیکلې دي؛ له تازه کولو وروسته کتل کېږي.")
+  val chainEdited: String get() = t("ردیفی پس از ثبت ویرایش شده است", "A row was edited after it was recorded", "یوه کرښه له ثبت وروسته بدله شوې")
+  val chainDeleted: String get() = t("ردیفی پاک شده است", "A row was deleted", "یوه کرښه ړنګه شوې")
+  val chainReordered: String get() = t("ترتیب یا پیوندِ ردیف‌ها دست خورده است", "The order or links of the rows were changed", "د کرښو ترتیب یا تړاو لاسوهل شوی")
+  val chainBreakHere: String get() = t("زنجیره از این‌جا شکسته است", "The chain breaks here", "زنځیر له دې ځایه مات دی")
+
   /** نامِ هر نوعِ رویداد — همان AUDIT_TYPE_LABELS ِ وب */
   fun kind(type: String): String = when (type) {
     "sale" -> t("ثبت فروش", "Sale recorded", "پلور ثبت شو")

@@ -75,6 +75,10 @@ import java.util.Locale
  *  «سابقهٔ عملیات» (`audit?kind=`): «همه» + پنج نوعِ پرتکرار و «نوعِ رویداد» ⇐ برگهٔ همهٔ نوع‌ها؛
  *  ردیف‌ها روز به روز، پاک‌کردن‌ها با قرصِ قرمزِ «حذف». زدن ⇐ همان مورد اگر هنوز هست، وگرنه
  *  جزئیاتِ فقط‌خواندنی. دفتر فقط خوانده می‌شود (`d.auditLog`).
+ *
+ *  STF-09: هر ردیف «کاربر (نقش) · دستگاه» را دارد (ردیفِ کهنهٔ بی مُهر «نامعلوم») و سرِ فهرست سلامتِ زنجیرهٔ هش
+ *  (`AuditSeal.verify` با لنگرِ همین دستگاه، بیرون از رشتهٔ اصلی): «زنجیره سالم است» یا «زنجیره از ردیفِ N شکسته است»
+ *  با دلیل و دستگاه؛ همان ردیف نشانِ قرمز می‌گیرد. خودِ صفحه فقط با اجازهٔ `audit.view` باز می‌شود (`Need.AUDIT`).
  */
 @Composable
 fun AuditScreen(
@@ -93,6 +97,11 @@ fun AuditScreen(
   val quick = remember(log) { AuditModel.quickKinds(log) }
   val rows = remember(log, kind) { AuditModel.byDay(AuditModel.filter(log, kind)) }
   val stagger = rememberV3Stagger()
+  val chain = rememberAuditChain(log)
+  val thisDevice = chain.thisDevice
+  val names = chain.names
+  val report = chain.report
+  val brokenId = AuditModel.brokenId(report)
   val chips: (@Composable () -> Unit)? = if (log.isEmpty()) null else ({
     V3ChipRow {
       V3Chip(Str.all, kind == null, { kind = null })
@@ -121,11 +130,20 @@ fun AuditScreen(
         Modifier.fillMaxSize(),
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = pad.calculateBottomPadding()),
       ) {
+        report?.let { r ->
+          item(key = "chain") {
+            val line = AuditModel.chainLine(r, thisDevice)
+            val tone = when (line.ok) { true -> V3Tone.SUCCESS; false -> V3Tone.ERROR; null -> V3Tone.INFO }
+            Box(Modifier.padding(top = 8.dp, bottom = 4.dp)) { V3Message(tone, line.title, body = line.body) }
+          }
+        }
         itemsIndexed(rows, key = { _, g -> g.first }) { i, (date, entries) ->
           V3Section(dayTitle(date, today), Modifier.v3AnimateItem(this).v3Stagger(stagger, "$kind-$date", i)) {
             entries.forEachIndexed { i, e ->
               if (i > 0) V3Divider(start = 64.dp)
-              AuditRow(e) { AuditModel.target(e, d)?.let(onOpen) ?: run { detail = e } }
+              AuditRow(e, AuditModel.whoLine(AuditModel.who(e, names, thisDevice)), broken = e.id == brokenId) {
+                AuditModel.target(e, d)?.let(onOpen) ?: run { detail = e }
+              }
             }
           }
         }
@@ -134,22 +152,24 @@ fun AuditScreen(
   }
 
   if (sheet) KindSheet(AuditModel.sheetKinds(log), kind, onDismiss = { sheet = false }) { kind = it }
-  detail?.let { e -> DetailSheet(e, gone = !e.refId.isNullOrBlank(), onDismiss = { detail = null }) }
+  detail?.let { e -> DetailSheet(e, AuditModel.who(e, names, thisDevice), gone = !e.refId.isNullOrBlank(), onDismiss = { detail = null }) }
 }
 
 @Composable
-private fun AuditRow(e: AuditEntry, onClick: () -> Unit) {
+private fun AuditRow(e: AuditEntry, who: String, broken: Boolean, onClick: () -> Unit) {
   val c = PhoneV3.colors
   val deletion = AuditModel.isDeletion(e.type)
   V3ListRow(
     StrReports.kind(e.type),
-    subtitle = e.notes.ifBlank { null },
-    icon = kindIcon(e.type), hue = kindHue(e.type), danger = deletion,
+    subtitle = listOfNotNull(e.notes.ifBlank { null }, who).joinToString("\n"),
+    subtitleLines = 3,
+    icon = kindIcon(e.type), hue = kindHue(e.type), danger = deletion || broken,
     trailing = {
       Column(horizontalAlignment = Alignment.End) {
         timeOf(e.createdAt)?.let { Text(it, style = V3Type.footnote, color = c.inkMuted) }
         if (e.amount != 0.0) Text(afn(e.amount), style = V3Type.subhead, color = c.ink)
         if (deletion) { Spacer(Modifier.height(4.dp)); V3StatusPill(V3Status.CANCELLED, StrReports.deletion) }
+        if (broken) { Spacer(Modifier.height(4.dp)); V3StatusPill(V3Status.CANCELLED, StrReports.chainBreakHere) }
       }
     },
     onClick = onClick,
@@ -180,7 +200,7 @@ private fun KindSheet(kinds: List<Pair<String, Int>>, selected: String?, onDismi
 
 /** جزئیاتِ فقط‌خواندنیِ رویدادی که موردش دیگر نیست */
 @Composable
-private fun DetailSheet(e: AuditEntry, gone: Boolean, onDismiss: () -> Unit) {
+private fun DetailSheet(e: AuditEntry, who: AuditModel.Who, gone: Boolean, onDismiss: () -> Unit) {
   V3Sheet(onDismiss = onDismiss, title = StrReports.eventDetail) {
     V3Card(padding = PaddingValues(vertical = 4.dp)) {
       V3ListRow(StrReports.kind(e.type), icon = kindIcon(e.type), hue = kindHue(e.type), danger = AuditModel.isDeletion(e.type), chevron = false)
@@ -188,6 +208,9 @@ private fun DetailSheet(e: AuditEntry, gone: Boolean, onDismiss: () -> Unit) {
       V3ListRow(StrReports.when_, tile = false, chevron = false, value = uiDateLong(e.date) + (timeOf(e.createdAt)?.let { " · $it" } ?: ""))
       if (e.amount != 0.0) { V3Divider(start = 16.dp); V3ListRow(StrReports.amount, tile = false, chevron = false, value = afn(e.amount)) }
       if (e.notes.isNotBlank()) { V3Divider(start = 16.dp); V3ListRow(StrReports.note, subtitle = e.notes, subtitleLines = 6, tile = false, chevron = false) }
+      V3Divider(start = 16.dp); V3ListRow(StrReports.who, tile = false, chevron = false, value = who.user)
+      V3Divider(start = 16.dp); V3ListRow(StrReports.whoRole, tile = false, chevron = false, value = who.role ?: StrReports.unknown)
+      V3Divider(start = 16.dp); V3ListRow(StrReports.whoDevice, tile = false, chevron = false, value = who.device)
     }
     if (gone) Box(Modifier.padding(top = 12.dp)) { V3Message(V3Tone.INFO, StrReports.recordGone) }
     Spacer(Modifier.height(8.dp))
