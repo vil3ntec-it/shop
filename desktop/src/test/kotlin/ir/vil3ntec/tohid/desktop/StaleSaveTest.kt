@@ -45,8 +45,8 @@ import java.io.File
  *  ذخیرهٔ بعدیِ صفحه کلِ دفترِ کهنه را می‌نوشت و `record` برای ردیفِ تازه DELETE و برای ویرایشِ
  *  تازه برگرداندن به سرور می‌فرستاد. همین سناریوها با Sync v1 و v3 و با رمزگذاریِ روشن و خاموش.
  *
- *  ⛔ همه پشتِ پرچمِ `shop.ledger_merge` (`LedgerMergeFlag`، پیش‌فرض خاموش)؛ این‌جا روشن، جز آزمونِ «پرچمِ
- *  خاموش» که همان رفتارِ `main` را قفل می‌کند.
+ *  ⛔ همه پشتِ پرچمِ `shop.ledger_merge` (`LedgerMergeFlag`، از ۱۴۰۵/۰۸/۱۸ پیش‌فرض روشن؛ `LedgerMergeOnTest`)؛
+ *  این‌جا روشن، جز آزمونِ «پرچمِ خاموش» که رفتارِ پیشین را (خاموشِ صریحِ سرور) قفل می‌کند.
  */
 class StaleSaveTest {
 
@@ -77,7 +77,8 @@ class StaleSaveTest {
   }
 
   @After fun after() {
-    LedgerMergeFlag.set(ctx, false)
+    //  پیش‌فرضِ برنامه (روشن، ۱۴۰۵/۰۸/۱۸) برای آزمون‌های بعدی — پیش‌تر `false` که همان پیش‌فرضِ آن روز بود
+    LedgerMergeFlag.set(ctx, LedgerMergeFlag.DEFAULT_ON)
     SyncChoice.set(ctx, SyncChoice.V1, 0)
     SyncStateV1.setCurrentAccount(ctx, "")
     engine.rebind()
@@ -137,7 +138,7 @@ class StaleSaveTest {
 
   @Test fun `بازتولید — ذخیرهٔ صفحه پس از Pull ِ کارگر هیچ ردیفِ تازه‌ای را حذف یا برنمی‌گرداند`() = reproduce(encrypted = false)
 
-  @Test fun `پرچمِ خاموش (پیش‌فرض) — همان رفتارِ main، دفترِ صفحه کهنه می‌ماند و ذخیره‌اش کامل نوشته می‌شود`() {
+  @Test fun `پرچمِ خاموش (صریحِ سرور) — همان رفتارِ پیشین، دفترِ صفحه کهنه می‌ماند و ذخیره‌اش کامل نوشته می‌شود`() {
     LedgerMergeFlag.set(ctx, false)
     val ui = screen()
     val inHand = ui.data.value

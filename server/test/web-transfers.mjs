@@ -8,6 +8,8 @@
  *     با دلیل ماندهٔ در مسیر به مبدأ. مانده‌ها از خودِ سرور سنجیده می‌شوند.
  *   • صندوق‌دار (`stock.view` بی `stock.move`): فقط دیدن — نه «انتقالِ تازه»، نه دریافت/رد.
  *   • گوشی (۳۷۵px): صفحه افقی بیرون نمی‌زند؛ axe (اگر هست) بر پنجرهٔ باز.
+ *   • زبانِ صفحه (`web-i18n.js`) بی بارگذاریِ دوباره: پنجرهٔ باز، دکمه و فرمِ دریافت با هر زبان عوض می‌شوند، آنچه در فرم
+ *     نوشته شده می‌ماند، نامِ کالا داده است، و برگشت به فارسی همان متنِ پیشین.
  *
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-transfers.mjs
  */
@@ -252,6 +254,67 @@ await step('فرستادن: قطعِ نت وسطِ ثبت ⇒ «فرستادن»
   assert.match(row, /در مسیر: 4/);
   //  پیش‌نویسِ فرستاده پاک شد
   assert.equal(await page.evaluate(() => localStorage.getItem('tohid-stock-transfer-draft-v1')), null);
+});
+
+await step('زبان بی بارگذاریِ دوباره: پنجره، دکمه و فرمِ باز با هر زبان؛ نوشتهٔ فرم می‌ماند؛ فارسی همان', async () => {
+  const dict = (l) => JSON.parse(fs.readFileSync(path.join(ROOT, 'license', 'i18n', `transfers.${l}.json`), 'utf8'));
+  const D = { fa: dict('fa'), en: dict('en'), ps: dict('ps') };
+  const dari = require('../../license/dari.js');
+  const LETTER = /[\u0621-\u064A\u066E-\u06D3\u06D5\u06FA-\u06FF]/;
+  const ui = () => page.evaluate(() => ({
+    title: document.getElementById('xfr-title').textContent,
+    btn: document.querySelector('#xfr-btn span').textContent,
+    close: document.querySelector('#xfr-modal .modal-close').getAttribute('aria-label'),
+    head: (document.querySelector('.xfr-head') || {}).textContent || '',
+    recv: (document.querySelector('#xfr-recv h4') || {}).textContent || '',
+    when: [...document.querySelectorAll('.xfr-when, .xfr-info span')].map((e) => e.textContent).join(' | '),
+    name: (document.querySelector('.xfr-table td[data-raw]') || {}).textContent || '',
+    got: (document.querySelector('#xfr-recv input[name="xfr-got"]') || {}).value,
+    final: (document.querySelector('#xfr-recv input[name="final"]') || {}).checked,
+    reason: (document.querySelector('#xfr-recv input[name="reason"]') || {}).value,
+  }));
+  const to = async (l, title) => {
+    await page.evaluate((l) => window.TohidWebI18n.setLang(l), l);
+    await page.waitForFunction((t) => document.getElementById('xfr-title').textContent === t, title, { timeout: 10000 });
+    await page.waitForTimeout(100);
+    return ui();
+  };
+  //  فهرست در انگلیسی، با تاریخِ میلادی و بی هیچ حرفِ فارسی
+  const list = await to('en', D.en.title);
+  assert.equal(list.btn, D.en.btn);
+  assert.equal(list.close, D.en.close);
+  assert.ok(!LETTER.test(await page.locator('#xfr-body').innerText()), 'انگلیسی: هیچ حرفِ فارسی در فهرست');
+  assert.match(list.when, /^[A-Z][a-z]{2} \d{1,2}, \d{2}:\d{2}$/, `تاریخِ میلادی: ${list.when}`);
+  //  جزئیات و فرمِ دریافتِ نیمه‌نوشته
+  await page.click('#xfr-list .xfr-row');
+  await page.waitForSelector('.xfr-table');
+  await page.click('[data-xfr="act"][data-act="receive"]');
+  await page.waitForSelector('#xfr-recv');
+  await page.fill('#xfr-recv input[name="xfr-got"]', '3');
+  await page.uncheck('#xfr-recv input[name="final"]');
+  await page.fill('#xfr-recv input[name="reason"]', 'نیمه‌نوشته');
+  const ps = await to('ps', D.ps['detail.title']);
+  assert.equal(ps.btn, D.ps.btn);
+  assert.deepEqual([ps.got, ps.final, ps.reason], ['3', false, 'نیمه‌نوشته'], 'نوشتهٔ فرم ماند');
+  assert.equal(ps.name, 'برنج', 'نامِ کالا داده است');
+  assert.ok(ps.head.includes(D.ps['loc.shop_floor']), ps.head);
+  //  دری = همان واژه‌نامهٔ فارسی از لایهٔ واژه
+  const prs = await to('prs', dari.t(D.fa['detail.title']));
+  assert.ok(prs.recv.includes('گدام') && !prs.recv.includes('انبار'), `دری: ${prs.recv}`);
+  assert.deepEqual([prs.got, prs.final, prs.reason], ['3', false, 'نیمه‌نوشته']);
+  const fa = await to('fa', D.fa['detail.title']);
+  assert.equal(fa.btn, 'انتقالِ موجودی');
+  assert.equal(fa.close, D.fa.close);
+  assert.match(fa.head, /قفسهٔ فروشگاه ⇐ انبار/);
+  assert.equal(fa.recv, D.fa['recv.title'].replace('{to}', D.fa['loc.warehouse']));
+  assert.deepEqual([fa.got, fa.final, fa.reason], ['3', false, 'نیمه‌نوشته']);
+  assert.ok(!/[A-Za-z]{3}/.test(fa.when), `فارسی: تاریخِ خورشیدیِ پیشین: ${fa.when}`);
+  //  همان حالِ پیش از این گام برای گام‌های بعد: فهرستِ باز
+  await page.click('[data-xfr="act-cancel"]');
+  await page.waitForFunction(() => !document.getElementById('xfr-recv'));
+  await page.click('[data-xfr="back"]');
+  await page.waitForSelector('#xfr-list .xfr-row');
+  assert.equal(await page.evaluate(() => localStorage.getItem('tohid-shop-lang-v1')), 'fa');
 });
 
 await step('دریافتِ ناقص ⇒ «نیمه‌رسیده»؛ بستن با کسری بی دلیل نمی‌رود، با دلیل «رسید»', async () => {

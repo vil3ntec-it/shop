@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.sync.SyncStore
@@ -40,13 +41,16 @@ class StockWriter internal constructor(
   /** INV-02 — نامِ حسابِ واردشده برای «کاربر» ِ حرکت‌های انبار؛ بی حساب ⇒ null (مثلِ پیش) */
   val user: String? get() = runCatching { SyncStore(context).accountName }.getOrNull()?.trim()?.ifEmpty { null }
 
-  /** @return null اگر ثبت شد؛ وگرنه دلیلِ ردِ موتور */
-  fun commit(result: WarehouseEngine.Result, done: String): String? = when (result) {
+  /**
+   *  @param base دفتری که [result] از آن ساخته شد (همان `data` ای که به موتور رفت) — پایهٔ صریحِ `ShopStore.save`
+   *  @return null اگر ثبت شد؛ وگرنه دلیلِ ردِ موتور
+   */
+  fun commit(base: ShopData, result: WarehouseEngine.Result, done: String): String? = when (result) {
     is WarehouseEngine.Result.Failed -> result.message
     is WarehouseEngine.Result.Ok -> {
       //  برگه‌ها پس از ثبت با `back()` می‌روند و حوزهٔ همین صفحه بسته می‌شود؛ نوشتنِ دفتر
       //  همان لحظه آغاز و بی‌لغو تمام می‌شود تا هیچ ثبتی نیمه‌کاره نماند
-      scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { store.save(result.data) } }
+      scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { store.save(base, result.data) } }
       Haptics.success(context)
       toasts.show(done, V3Tone.SUCCESS)
       null

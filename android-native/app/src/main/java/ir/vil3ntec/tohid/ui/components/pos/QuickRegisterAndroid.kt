@@ -86,9 +86,10 @@ class QuickSaved(val message: String, val added: Boolean)
 /**
  *  گامِ پایانیِ ثبتِ سریع، یکی برای پنجرهٔ کامپیوتر و برگهٔ گوشیِ نسخهٔ ۳: دفترِ تازه روی دیسک، سپس کالا با
  *  موجودیِ در دست به سبد (`SalesEngine.addToCartCapped`). `null` ⇒ دفتر ننشست (پیامش را `ShopStore` می‌دهد).
+ *  پایهٔ ذخیره همان دفتری است که `QuickRegister.register` با آن ساخت ([QuickRegister.Result.Ok.base]).
  */
 suspend fun saveQuick(ok: QuickRegister.Result.Ok, store: ShopStore, cartStore: CartStore): QuickSaved? {
-  if (!store.save(ok.data)) return null
+  if (!store.save(ok.base, ok.data)) return null
   val name = ok.data.products.firstOrNull { it.id == ok.productId }?.name.orEmpty()
   val added = SalesEngine.addToCartCapped(cartStore.lines.value, ok.productId, ok.quantity, ProductInfoMap.sellable(ok.data, ok.productId))
   return if (ok.quantity > 0 && cartStore.set(added.cart)) QuickSaved(StrQuickRegister.added(name), true)

@@ -134,7 +134,7 @@ internal fun NewProductsScreen(
           is WarehouseEngine.Result.Ok -> {
             banner = null
             saving = true
-            persist(scope, store, r.data)
+            persist(scope, store, before, r.data)
             Haptics.success(context)
             val ids = ProductsListModel.added(before, r.data)
             RecentlyAdded.mark(ids)

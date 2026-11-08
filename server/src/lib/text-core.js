@@ -48,10 +48,10 @@
     for (var i = 0; i < s.length; i++) {
       var c = s.charCodeAt(i);
       var ch;
-      if (c === 0x064A || c === 0x0649) ch = 'ی';            // ي ى → ی
-      else if (c === 0x0643) ch = 'ک';                       // ك → ک
-      else if (c === 0x06C0) ch = 'ه';                       // ۀ → ه
-      else if (c === 0x0623 || c === 0x0625 || c === 0x0622) ch = 'ا'; // أ إ آ → ا
+      if (c === 0x064A || c === 0x0649) ch = 'ی';            // ي ى → ی · داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
+      else if (c === 0x0643) ch = 'ک';                       // ك → ک · داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
+      else if (c === 0x06C0) ch = 'ه';                       // ۀ → ه · داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
+      else if (c === 0x0623 || c === 0x0625 || c === 0x0622) ch = 'ا'; // أ إ آ → ا · داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
       else if ((c >= 0x064B && c <= 0x065F) || c === 0x0670 || c === 0x0640) continue; // اعراب، کشیده
       else if (c >= 0x06F0 && c <= 0x06F9) ch = String.fromCharCode(48 + c - 0x06F0);
       else if (c >= 0x0660 && c <= 0x0669) ch = String.fromCharCode(48 + c - 0x0660);
@@ -196,8 +196,8 @@
 
   /* ---------- ۳) افغانی (LOC-07) ---------- */
 
-  var AFN_SIGN = '؋';   // ؋
-  var AFN_WORD = 'افغانی';
+  var AFN_SIGN = '؋';   // ؋ · داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
+  var AFN_WORD = 'افغانی';  // داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
 
   /**
    * مبلغ بی اعشار، با جداکنندهٔ هزارگان. گرد کردن همان `Math.round` است
@@ -218,7 +218,7 @@
       out += raw.charAt(i);
     }
     //  پشتو/دری با ارقامِ فارسی: جداکنندهٔ «٬»؛ با ارقامِ لاتین همیشه «,» (نه جداکنندهٔ عجیبِ CLDR)
-    if (digits === 'fa') out = displayDigits(out, 'fa').split(',').join('٬');
+    if (digits === 'fa') out = displayDigits(out, 'fa').split(',').join('٬');  // داده: نویسهٔ یکسان‌سازی و نماد/جداکنندهٔ پول (همان LocaleFormat)
     if (symbol === 'sign') return out + ' ' + AFN_SIGN;
     if (symbol === 'word') return out + ' ' + AFN_WORD;
     return out;

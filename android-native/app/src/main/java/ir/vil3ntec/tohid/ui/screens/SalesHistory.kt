@@ -100,8 +100,8 @@ fun SalesHistoryScreen(
     when (returnsShot) {
       "first" -> {
         noReceipt = false
-        returnFor = d.sales.filter { s -> s.status != "cancelled" && d.saleItems.any { it.saleId == s.id && SalesEngine.returnable(it) > 0 } }
-          .maxByOrNull { it.createdAt }
+        val left = ir.vil3ntec.tohid.data.ReturnLeft.Index(d)
+        returnFor = d.sales.filter { left.canReturn(it) }.maxByOrNull { it.createdAt }
       }
       "none" -> { returnFor = null; noReceipt = true }
       "close" -> { returnFor = null; noReceipt = false }
@@ -117,7 +117,7 @@ fun SalesHistoryScreen(
     when (result) {
       is SalesEngine.Result.Failed -> toast(result.message)
       is SalesEngine.Result.Ok -> {
-        scope.launch { store.save(result.data) }
+        scope.launch { store.save(d, result.data) }
         toast(done)
         after()
       }
@@ -410,7 +410,7 @@ fun SalesHistoryScreen(
           when (r) {
             is ir.vil3ntec.tohid.data.CashShift.Result.Failed -> toast(r.message)
             is ir.vil3ntec.tohid.data.CashShift.Result.Ok -> {
-              scope.launch { store.save(r.data) }
+              scope.launch { store.save(d, r.data) }
               toast(if (shift == null) StrInvoices.registerOpened else StrInvoices.registerClosedNow)
               shiftDialog = false
             }
@@ -514,7 +514,7 @@ fun SalesHistoryScreen(
           is SalesEngine.Result.Ok -> {
             val before = d
             scope.launch {
-              if (store.save(r.data)) {
+              if (store.save(before, r.data)) {
                 ir.vil3ntec.tohid.sync.platform.DocChainSync.recordVoid(roleContext, before, sale.id, kind, check.reason)
               }
             }
@@ -593,7 +593,8 @@ private fun SaleRow(
   //  ORD-20: فاکتورِ سریِ W را سرور هنگامِ تحویلِ سفارشِ اینترنتی ساخته — لغو و «اصلاح» ندارد
   val online = sale.isOnlineOrder()
   val debtor = sale.debtorId?.let { id -> d.debtors.find { it.id == id } }
-  val canReturn = !cancelled && d.saleItems.any { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
+  //  همان حسابِ پنجرهٔ برگشت (`ReturnLeft`، برگشتِ دستگاه‌های دیگر هم) — نه شمارندهٔ تنها
+  val canReturn = ir.vil3ntec.tohid.data.ReturnLeft.canReturn(d, sale)
   var menu by remember { mutableStateOf(false) }
 
   val kindTint = when {
@@ -679,12 +680,14 @@ private fun ReturnDialog(
   onDismiss: () -> Unit,
   onConfirm: (Map<String, Double>, String) -> Unit,
 ) {
-  val items = d.saleItems.filter { it.saleId == sale.id && SalesEngine.returnable(it) > 0 }
+  //  همان ماندهٔ دکمه و ثبت (`ReturnLeft`: برگشتِ دستگاه‌های دیگر هم، JB5) — نه شمارندهٔ تنها
+  val left = remember(d, sale) { d.saleItems.filter { it.saleId == sale.id }.associate { it.id to ir.vil3ntec.tohid.data.ReturnLeft.left(d, it) } }
+  val items = d.saleItems.filter { it.saleId == sale.id && (left[it.id] ?: 0.0) > 0 }
   var quantities by remember { mutableStateOf(mapOf<String, String>()) }
   var reason by remember { mutableStateOf("") }
 
   val total = items.sumOf { item ->
-    val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, SalesEngine.returnable(item))
+    val wanted = (quantities[item.id]?.toDoubleOrNull() ?: 0.0).coerceIn(0.0, left[item.id] ?: 0.0)
     SalesEngine.returnAmount(d, sale, item, wanted)   //  همان مبلغی که ثبت می‌شود (سهمِ تخفیف، گردِ تجمعی)
   }
 
@@ -701,7 +704,7 @@ private fun ReturnDialog(
         } else {
           items.forEach { item ->
             val product = d.products.find { it.id == item.productId }
-            val allowed = SalesEngine.returnable(item)
+            val allowed = left[item.id] ?: 0.0
             Column(Modifier.padding(bottom = 12.dp)) {
               Text(
                 StrInvoices.returnable(SalesEngine.itemName(d, item), qty(allowed)) + (product?.unit?.takeIf { it.isNotBlank() }?.let { " $it" } ?: ""),

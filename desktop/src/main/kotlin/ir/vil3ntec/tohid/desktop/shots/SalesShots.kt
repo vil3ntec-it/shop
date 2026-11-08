@@ -132,7 +132,7 @@ object SalesShots : GroupShots {
     Shot("history-360-large-text", content = { NarrowLargeText { HistoryShot(HistoryFilter.ALL) } }),
     Shot("invoice", content = { InvoiceShot() }),
     Shot("return", content = { OverInvoice { ReturnSheet(History.ledger(), History.sale(), onConfirm = { _, _ -> }, onClose = {}, start = mapOf("h1-a" to "1")) } }),
-    Shot("return-v2", content = { OverInvoice { ReturnFlowSheet(History.ledger(), History.sale(), save = { true }, onPosted = { _, _ -> }, onClose = {}, prefill = true) } }),
+    Shot("return-v2", content = { OverInvoice { ReturnFlowSheet(History.ledger(), History.sale(), save = { _, _ -> true }, onPosted = { _, _ -> }, onClose = {}, prefill = true) } }),
     Shot("print", content = { PrintShot(reason = false) }),
     Shot("print-reprint", content = { PrintShot(reason = true) }),
     Shot("cancel", content = { OverInvoice { CancelSheet(SalesEngine.cancelWarning(History.sale()), onConfirm = {}, onClose = {}, start = "مشتری پشیمان شد") } }),

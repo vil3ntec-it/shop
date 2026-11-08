@@ -134,7 +134,7 @@ fun QuickSaleScreen(
     when (result) {
       is WarehouseEngine.Result.Failed -> toast(result.message)
       is WarehouseEngine.Result.Ok -> {
-        scope.launch { store.save(result.data) }
+        scope.launch { store.save(d, result.data) }
         toast(done)
         after()
       }
@@ -465,7 +465,7 @@ fun QuickSaleScreen(
    *  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان).
    */
   fun postSale(options: SalesEngine.Checkout) {
-    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
+    scope.launch { when (val posted = cartStore.post(store, d, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key -> ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(
       SalesEngine.record(
       d, loyal, options.copy(note = cartStore.note.value),
       today = todayIso(),

@@ -152,7 +152,7 @@ object ImageBulk {
       //  نشانهٔ عکس روی خودِ کالا — روی تازه‌ترین دفتر، نه نسخهٔ آغازِ کار
       val cur = store.data.value
       if (cur.products.any { it.id == row.productId && !it.photo }) {
-        store.save(cur.copy(products = cur.products.map { if (it.id == row.productId) it.copy(photo = true) else it }))
+        store.save(cur, cur.copy(products = cur.products.map { if (it.id == row.productId) it.copy(photo = true) else it }))
       }
       //  بارگذاریِ بانک همین‌جاست، نه صف
       ImageBank.photoSaved(context, row.productId, own = false)

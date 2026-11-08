@@ -114,8 +114,8 @@ object HistoryModel {
 
   fun statsLine(s: HistoryStats): String = StrSale.invoicesLine(plain(s.count), plain(s.cancelled))
 
-  fun canReturn(d: ShopData, s: Sale): Boolean =
-    s.status != "cancelled" && d.saleItems.any { it.saleId == s.id && SalesEngine.returnable(it) > 0 }
+  /** همان حسابِ پنجرهٔ برگشت (`ReturnLeft`: برگشتِ دستگاه‌های دیگر هم) — نه شمارندهٔ تنها */
+  fun canReturn(d: ShopData, s: Sale): Boolean = ir.vil3ntec.tohid.data.ReturnLeft.canReturn(d, s)
 
   fun returnDocs(d: ShopData, s: Sale): List<String> =
     d.saleReturns.filter { it.saleId == s.id }.mapNotNull { it.docId }.distinct()

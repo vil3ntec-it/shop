@@ -68,7 +68,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
     when (result) {
       is LedgerEngine.Result.Failed -> toast(result.message)
       is LedgerEngine.Result.Ok -> {
-        scope.launch { store.save(result.data) }
+        scope.launch { store.save(d, result.data) }
         toast(done)
         after()
       }
@@ -161,7 +161,7 @@ fun PurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState)
           returnFor = null
           //  S25: همان برگهٔ چاپیِ «سندِ کسر» ِ کامپیوتر (`PurchaseBook.invoiceSheet`) با چاپِ گوشی (`ReportPrint`)
           scope.launch {
-            if (!store.save(r.data)) return@launch
+            if (!store.save(d, r.data)) return@launch
             val credit = ir.vil3ntec.tohid.data.PurchaseBook.invoices(r.data, supplierId).filter { it.isReturn }.maxByOrNull { it.createdAt }
             val asked = snackbar.showSnackbar("برگشت و سندِ کسر ثبت شد", actionLabel = if (credit != null) "چاپِ سندِ کسر" else null, duration = SnackbarDuration.Long)
             if (asked == SnackbarResult.ActionPerformed && credit != null) {

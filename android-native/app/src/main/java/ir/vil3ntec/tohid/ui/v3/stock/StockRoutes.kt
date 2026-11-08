@@ -91,7 +91,7 @@ val StockModule = AppModule(
         data = data,
         product = args.query("product"),
         barcode = args.query("barcode"),
-        onSave = { draft -> writer.commit(WarehouseEngine.addEntry(data, draft, writer.today, writer.now, writer.newId), StrStock.entrySaved) },
+        onSave = { draft -> writer.commit(data, WarehouseEngine.addEntry(data, draft, writer.today, writer.now, writer.newId), StrStock.entrySaved) },
         onNewProduct = { code -> nav.replace(ProductsPaths.new(barcode = code)) },
         onClose = { back() },
       )
@@ -104,7 +104,7 @@ val StockModule = AppModule(
         onScan = { use -> nav.openForResult(SalesPaths.scan("stock")) { code -> code?.let(use) } },
         onSave = { rows, date ->
           //  همان فراخوانِ صفحهٔ پیشین: تاریخِ ردیف‌ها جای «امروز» ِ موتور
-          writer.commit(WarehouseEngine.addEntries(data, rows, date, writer.now, writer.newId), StrStock.rowsSaved(money(rows.size.toDouble())))
+          writer.commit(data, WarehouseEngine.addEntries(data, rows, date, writer.now, writer.newId), StrStock.rowsSaved(money(rows.size.toDouble())))
             .also { if (it == null) back() }
         },
         onBack = { back() },
@@ -119,7 +119,7 @@ val StockModule = AppModule(
         product = product,
         stock = ShopStore.stock(data, id),
         onSave = { f ->
-          writer.commit(
+          writer.commit(data, 
             WarehouseEngine.adjustStock(data, id, f.quantity, f.choice.increase, f.reason, f.choice.kind, writer.today, writer.now, writer.newId, userId = writer.user),
             if (f.choice == AdjustChoice.RETURN) StrStock.returned else StrStock.adjusted,
           )
@@ -142,7 +142,7 @@ val StockModule = AppModule(
         confirm = StrStock.delete,
         icon = Icons.Outlined.DeleteOutline,
         onConfirm = {
-          writer.commit(WarehouseEngine.deleteEntry(data, entryId, writer.today, writer.now, writer.newId), StrStock.deleted)?.let(writer::fail)
+          writer.commit(data, WarehouseEngine.deleteEntry(data, entryId, writer.today, writer.now, writer.newId), StrStock.deleted)?.let(writer::fail)
         },
         onDismiss = { back() },
       )
@@ -159,7 +159,7 @@ val StockModule = AppModule(
         onExport = export,
         onSave = { counted, note ->
           val n = WarehouseEngine.countLines(data, counted).size
-          writer.commit(WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, userId = writer.user), StrStock.countSaved(money(n.toDouble())))
+          writer.commit(data, WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, userId = writer.user), StrStock.countSaved(money(n.toDouble())))
         },
         onBack = { back() },
       )
@@ -171,7 +171,7 @@ val StockModule = AppModule(
       StockImportRoute(
         data = data,
         onSave = { plan ->
-          writer.commit(WarehouseEngine.addProducts(data, plan.drafts, writer.now, writer.newId), StrStock.imported(money(plan.drafts.size.toDouble())))
+          writer.commit(data, WarehouseEngine.addProducts(data, plan.drafts, writer.now, writer.newId), StrStock.imported(money(plan.drafts.size.toDouble())))
             .also { if (it == null) back() }
         },
         onBack = { back() },
@@ -215,7 +215,7 @@ private fun RouteScope.StockHome(selected: String?) {
     import = { nav.open(StockPaths.IMPORT) },
     bulk = { nav.open(StockPaths.ENTRY_BULK) },
     newProduct = { nav.open(ProductsPaths.new()) },
-    saveEntry = { draft -> writer.commit(WarehouseEngine.addEntry(data, draft, today, writer.now, writer.newId), StrStock.entrySaved) },
+    saveEntry = { draft -> writer.commit(data, WarehouseEngine.addEntry(data, draft, today, writer.now, writer.newId), StrStock.entrySaved) },
     extras = rememberStockExtras(),
     //  موتورِ تازه روشن ⇒ ارزش و وظیفه‌های بازِ «دفترِ موجودی» بالای فهرست (خاموش ⇒ هیچ)
     header = { StockStrip(data) { nav.open(StockPaths.book()) } },
@@ -224,7 +224,7 @@ private fun RouteScope.StockHome(selected: String?) {
     edit = { nav.open(ProductsPaths.edit(it)) },
     view = { nav.open(ProductsPaths.item(it)) },
     deleteProduct = { id ->
-      val failed = writer.commit(WarehouseEngine.deleteProduct(data, id, today, writer.now, writer.newId), StrStock.deleted)
+      val failed = writer.commit(data, WarehouseEngine.deleteProduct(data, id, today, writer.now, writer.newId), StrStock.deleted)
       if (failed != null) writer.fail(failed) else if (twoPane) nav.replace(StockPaths.LIST) else back()
     },
     entry = { nav.open(StockPaths.entry(product = it)) },

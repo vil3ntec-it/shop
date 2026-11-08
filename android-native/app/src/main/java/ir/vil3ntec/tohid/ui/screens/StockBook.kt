@@ -104,12 +104,12 @@ fun StockBookScreen(
   val on = remember(d.auditLog, StockLedger.serverFlag) { StockLedger.isOn(d) }
   val user = remember(context) { runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("") }
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
-  fun save(next: ShopData, done: String) { scope.launch { store.save(next) }; toast(done) }
+  fun save(next: ShopData, done: String) { scope.launch { store.save(d, next) }; toast(done) }
 
   //  عکسِ CI: روشن کردن با همان راهِ کارتِ تنظیمات
   val shotEnable by StockBookNav.enable
   LaunchedEffect(shotEnable, on) {
-    if (shotEnable && !on && StockLedger.serverFlag) store.save(StockActions.setMode(d, true, user, todayIso(), System.currentTimeMillis(), ::newId))
+    if (shotEnable && !on && StockLedger.serverFlag) store.save(d, StockActions.setMode(d, true, user, todayIso(), System.currentTimeMillis(), ::newId))
   }
 
   if (!on) {
@@ -769,7 +769,7 @@ fun StockModeSection(store: ShopStore, d: ShopData) {
         TextButton(onClick = {
           ask = null
           val user = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrDefault("")
-          scope.launch { store.save(StockActions.setMode(d, next, user, todayIso(), System.currentTimeMillis(), ::newId)) }
+          scope.launch { store.save(d, StockActions.setMode(d, next, user, todayIso(), System.currentTimeMillis(), ::newId)) }
         }) { Text(if (next) "روشن کن" else "خاموش کن") }
       },
       dismissButton = { TextButton(onClick = { ask = null }) { Text("انصراف") } },

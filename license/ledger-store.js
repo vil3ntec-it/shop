@@ -388,7 +388,7 @@
       refreshUsage();
     }).catch(function (e) {
       failure = e;
-      try { console.error('[ledger-store] دفتر از IndexedDB خوانده نشد:', e); } catch (x) { /* بی کنسول */ }
+      try { console.error('[ledger-store] دفتر از IndexedDB خوانده نشد:', e); } catch (x) { /* بی کنسول */ }  // داده: پیامِ کنسول
       showGate(true);
     });
   }

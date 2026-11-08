@@ -49,7 +49,7 @@ internal object MoneyUndo {
     }
     when (result) {
       is DebtorEngine.Result.Failed -> host.showSnackbar(V3SnackVisuals(result.message, V3Tone.ERROR))
-      is DebtorEngine.Result.Ok -> store.save(result.data)
+      is DebtorEngine.Result.Ok -> store.save(data, result.data)
     }
     //  پس از نوشتن برداشته می‌شود تا ردیف میانِ دو حالت یک لحظه دوباره دیده نشود
     pending -= p

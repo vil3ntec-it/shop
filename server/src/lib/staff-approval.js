@@ -432,12 +432,12 @@ function returnGroupsOf(ops) {
  * op_id ِ نخستین ردیفِ سند (تکرارِ همان دسته «تکرار» است نه بازپخش)؛ بقیه همان نتیجه.
  */
 function judgeGroup(q, ctx, g, { at, deviceId, path }) {
-  if (!g.decided) {
-    g.decided = (async () => {
-      const before = g.sale ? await returnedTotal(q, ctx, g.sale) : 0;
-      return (await require('./return-sale-cap').over(q, ctx, g, before, { path })) || judge(q, ctx, cumulativeNeed(g, before), g.slip, { opId: g.rows[0].op.op_id, at, deviceId, path });   //  SEC-DATA-07: اول پولِ خودِ فاکتور
-    })();
-  }
+  g.decided = g.decided || (async () => {
+    //  ⛔ بیش از فروخته‌شدهٔ هر قلم (‎lib/return-line-cap.js‎): برای همه، صاحب هم — پیش از نقش و پولِ فاکتور
+    const sold = await require('./return-line-cap').judgeGroup(q, ctx, g, { path });
+    const before = !sold && g.sale ? await returnedTotal(q, ctx, g.sale) : 0;
+    return sold || (await require('./return-sale-cap').over(q, ctx, g, before, { path })) || judge(q, ctx, cumulativeNeed(g, before), g.slip, { opId: g.rows[0].op.op_id, at, deviceId, path });   //  SEC-DATA-07: اول پولِ خودِ فاکتور
+  })();
   return g.decided;
 }
 
@@ -1049,6 +1049,6 @@ module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
-  returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
+  returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, parentOf, belongs, headKey, bundleV3, HOLD_KINDS,   //  سه‌تا: `return-line-cap` ِ v1
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };

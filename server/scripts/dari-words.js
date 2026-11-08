@@ -108,19 +108,29 @@ function current(js = fs.readFileSync(JS, 'utf8')) {
   return { a, b: b + END.length, text: js.slice(a, b + END.length) };
 }
 
-module.exports = { build, render, current, KT, JS };
+/**
+ *  نسخهٔ وبِ دکان (`index.html` + `license/`) جدا منتشر می‌شود (GitHub Pages، بی `server/public`)؛ پس همان لایه
+ *  رونوشتِ بایت‌به‌بایتِ همین dari.js در `license/dari.js` است — هیچ فهرستِ دومی نه (`web-shop-i18n.test.js`).
+ */
+const WEB = path.join(ROOT, 'license', 'dari.js');
+
+module.exports = { build, render, current, KT, JS, WEB };
 
 if (require.main === module) {
   const want = render(build());
   const js = fs.readFileSync(JS, 'utf8');
   const cur = current(js);
+  const next = js.slice(0, cur.a) + want + js.slice(cur.b);
+  const web = fs.existsSync(WEB) ? fs.readFileSync(WEB, 'utf8') : '';
   if (process.argv.includes('--write')) {
-    if (cur.text !== want) fs.writeFileSync(JS, js.slice(0, cur.a) + want + js.slice(cur.b));
+    if (cur.text !== want) fs.writeFileSync(JS, next);
+    if (web !== next) fs.writeFileSync(WEB, next);
     console.log(cur.text === want ? 'dari.js: بی تغییر' : 'dari.js: بلوکِ واژه‌ها از نو نوشته شد');
-  } else if (cur.text !== want) {
-    console.error('dari.js با DariText.kt یکی نیست — node scripts/dari-words.js --write');
+    if (web !== next) console.log('license/dari.js: رونوشت از نو نوشته شد');
+  } else if (cur.text !== want || web !== js) {
+    console.error('dari.js (یا رونوشتِ license/dari.js) با DariText.kt یکی نیست — node scripts/dari-words.js --write');
     process.exit(1);
   } else {
-    console.log('dari.js = DariText.kt');
+    console.log('dari.js = license/dari.js = DariText.kt');
   }
 }

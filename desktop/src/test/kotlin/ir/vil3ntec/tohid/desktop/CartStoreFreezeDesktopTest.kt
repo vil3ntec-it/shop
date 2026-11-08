@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.desktop
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
+import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import kotlinx.coroutines.runBlocking
 import org.junit.After
@@ -33,7 +34,7 @@ class CartStoreFreezeDesktopTest {
     assertFalse("اسکن وسطِ جابه‌جایی", cart.set(listOf(rice, SalesEngine.CartLine("p2", 1.0))))
     assertFalse(cart.setDebtor("d1"))
     assertFalse(cart.clear())
-    assertEquals(SalePost.Outcome.Busy, cart.post(ShopStore(DesktopContext)) { error("وسطِ جابه‌جایی ثبت نمی‌شود") })
+    assertEquals(SalePost.Outcome.Busy, cart.post(ShopStore(DesktopContext), ShopData()) { error("وسطِ جابه‌جایی ثبت نمی‌شود") })
     assertEquals(listOf(rice), cart.lines.value)
     assertNull(cart.debtorId.value)
     cart.freeze(false)

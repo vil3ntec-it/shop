@@ -485,7 +485,7 @@ fun DeskSaleScreen(
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
     //  STF-03: آخرین سد — فاکتوری که سرور بی خبر رد می‌کرد نوشته نمی‌شود (`SaleCapGate.guard`)
-    scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
+    scope.launch { when (val posted = cartStore.post(store, d, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
       ir.vil3ntec.tohid.data.SaleCapGate.guard(capRules, recordAll(key, ir.vil3ntec.tohid.print.Receipts.newToken(context)), slips) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)

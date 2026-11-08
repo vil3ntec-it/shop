@@ -335,7 +335,7 @@ fun DeskProductsScreen(
       when (r) {
         is WarehouseEngine.Result.Failed -> toast(r.message)
         is WarehouseEngine.Result.Ok -> {
-          scope.launch { store.save(r.data) }
+          scope.launch { store.save(d, r.data) }
           toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.priceChanged(plain(selected.size)))
           selected = emptySet(); priceOpen = false
         }
@@ -361,7 +361,7 @@ fun DeskProductsScreen(
             val ids = preview.filter { it.changes }.map { it.id }.toSet()
             val r = WarehouseEngine.bulkUpdate(d, ids, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = on) }
             val error = (r as? WarehouseEngine.Result.Failed)?.message
-            if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(r.data) }; selected = emptySet() }
+            if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(d, r.data) }; selected = emptySet() }
             results = (if (on) ir.vil3ntec.tohid.core.i18n.StrProductPages.activateResult else ir.vil3ntec.tohid.core.i18n.StrProductPages.deactivateResult) to ProductListModel.resultActive(preview, on, error)
             confirm = null
           },
@@ -384,7 +384,7 @@ fun DeskProductsScreen(
             val error = (r as? WarehouseEngine.Result.Failed)?.message
             if (r is WarehouseEngine.Result.Ok) {
               val next = ProductListModel.withDeleteReason(r.data, ids, now, reason)
-              scope.launch { store.save(next) }
+              scope.launch { store.save(d, next) }
               selected = emptySet()
               if (openId in ids) openId = null
             }
@@ -413,7 +413,7 @@ fun DeskProductsScreen(
       onConfirm = { _ ->
         val r = WarehouseEngine.bulkLevels(d, selected, patch, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)
         val error = (r as? WarehouseEngine.Result.Failed)?.message
-        if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(r.data) }; selected = emptySet() }
+        if (r is WarehouseEngine.Result.Ok) { scope.launch { store.save(d, r.data) }; selected = emptySet() }
         results = ir.vil3ntec.tohid.core.i18n.StrProductPages.levelsResult to plan.map { p ->
           val label = names[p.id].orEmpty()
           when {
@@ -779,7 +779,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
           )
           if (e is WarehouseEngine.Result.Ok) next = e.data else if (e is WarehouseEngine.Result.Failed) toast(e.message)
         }
-        scope.launch { store.save(next) }
+        scope.launch { store.save(d, next) }
         toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameRecorded(name.trim()))
         //  دسته و واحد برای کالای بعدی می‌مانند — معمولاً چند کالای یک دسته پشتِ هم ثبت می‌شوند
         name = ""; barcode = ""; buy = ""; sell = ""; count = ""
@@ -878,7 +878,7 @@ private fun EditPanel(
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
-      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(ir.vil3ntec.tohid.data.ProductCycle.apply(r.data, p.id, cycle)) }; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameSaved(name.trim())) }
+      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(d, ir.vil3ntec.tohid.data.ProductCycle.apply(r.data, p.id, cycle)) }; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameSaved(name.trim())) }
     }
   }
 

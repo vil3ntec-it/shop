@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v65';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v67';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -62,6 +62,17 @@ const SHELL_ASSETS = [
    *  روی نصبِ آفلاین اصلاً بار نمی‌شد. همان تله‌ای که همین بالا نوشته شده.
    */
   './license/thermal-print.js',
+  //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو): لایه و واژه‌نامه‌های کوچک. واژه‌نامهٔ بزرگِ صفحه (`i18n/web.*.json`،
+  //  ۱۰۰ تا ۲۰۰KB) و `dari.js` فقط برای همان زبان لازم‌اند: با نخستین بارِ آن زبان (برخط) همین‌جا کش می‌شوند و بعد آفلاین
+  //  هم هستند؛ پیش‌کشِ همه برای هر دکانِ فارسی نیم مگابایت دانلودِ بیهوده بود. نبودشان ⇒ صفحه فارسی می‌ماند، نه خراب.
+  './license/web-i18n.js',
+  './license/i18n/receipt.fa.json',
+  './license/i18n/receipt.en.json',
+  './license/i18n/receipt.ps.json',
+  './license/i18n/receipt.web.json',
+  './license/i18n/lang.fa.json',
+  './license/i18n/lang.en.json',
+  './license/i18n/lang.ps.json',
   //  LOC-01/05/07/09: هستهٔ خالصِ متن و تقویم — بی آن‌ها فاکتور و تاریخ به راهِ قدیم برمی‌گردند
   './license/text-core.js',
   './license/calendar-core.js',

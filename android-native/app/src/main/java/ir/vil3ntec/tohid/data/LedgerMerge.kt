@@ -91,9 +91,15 @@ object LedgerMerge {
    *  مانده از دفترِ بیرون‌رفته ساخته شده ⇒ `null` (پایه نیست؛ ادغام با دفترِ همین حالا ردیف‌های تازه را حذف می‌کرد).
    *  دفترِ خالیِ نو (`ShopData()`، «پاک کردنِ همه») هرگز پایه نمی‌خواهد و این‌جا نمی‌آید.
    */
-  fun retainedBaseOf(next: ShopData, current: ShopData, earlier: List<ShopData>, lost: Boolean): ShopData? {
+  fun retainedBaseOf(
+    next: ShopData,
+    current: ShopData,
+    earlier: List<ShopData>,
+    lost: Boolean,
+    submitted: List<ShopData> = emptyList(),
+  ): ShopData? {
     //  مسیرِ همیشگی: هیچ جایگزینی از بیرون ⇒ دفترِ همین حالا، بی شمردنِ شیءها
-    if (earlier.isEmpty() && !lost) return current
+    if (earlier.isEmpty() && !lost && submitted.isEmpty()) return current
     var best = current
     var score = kinship(next, current)
     for (c in earlier.asReversed()) {
@@ -101,8 +107,45 @@ object LedgerMerge {
       val s = kinship(next, c)
       if (s > score) { best = c; score = s }
     }
+    //  ⛔ ذخیرهٔ زنجیره‌ای (#407، پیش از روشن شدنِ پیش‌فرض): صفحه‌ای که دفترِ تازه‌اش را از نتیجهٔ ذخیرهٔ ادغام‌شدهٔ
+    //  پیشینِ خودش ساخت (نه از `data`). پایه‌اش همان دفترِ فرستاده‌شده است؛ پایهٔ کهنه‌تر شمارنده‌های همان ذخیره را
+    //  دوباره جمع می‌کرد (پرداختِ ۱۰۰ ⇒ ۲۰۰). فقط با نشانهٔ یک‌سویه ([descends]) — دو کلیکِ هم‌زمان از همان پایه
+    //  هرگز این‌جا نمی‌آید (آن یکی هیچ شیئی از ذخیرهٔ دیگر ندارد و پایه‌اش کهنه‌تر می‌ماند؛ وگرنه ردیف‌هایش DELETE).
+    for (s in submitted.asReversed()) {
+      if (s === best) continue
+      if (descends(next, s, best)) { best = s; score = Long.MAX_VALUE }
+    }
     return if (lost && score == 0L) null else best
   }
+
+  /**
+   *  [next] از [child] ساخته شد، نه از [parent]: دست‌کم یک ردیفِ همان شیء با [child] دارد که [parent] ندارد، و هیچ ردیفی
+   *  از [parent] که [child] کنار گذاشته بود. فهرستِ همان شیء نشانه نیست (فهرستِ خالیِ `emptyList()` یکی است) —
+   *  فقط ردیف‌ها، و رشته هرگز (شرح در [kinship]).
+   */
+  internal fun descends(next: ShopData, child: ShopData, parent: ShopData): Boolean {
+    var ahead = 0L
+    for (f in LISTS) {
+      val a = f(next)
+      if (a.isEmpty()) continue
+      val c = f(child)
+      val p = f(parent)
+      if (c === p) continue                       // این فهرست میانِ آن دو یکی است: نشانه‌ای ندارد
+      val inChild = identities(c)
+      val inParent = identities(p)
+      for (r in a) {
+        if (r is String) continue
+        val x = r in inChild
+        val y = r in inParent
+        if (y && !x) return false                 // ردیفی که [child] کنار گذاشته بود ⇒ از [parent] ساخته شده
+        if (x && !y) ahead++
+      }
+    }
+    return ahead > 0
+  }
+
+  private fun identities(list: List<Any?>): Set<Any?> =
+    Collections.newSetFromMap(IdentityHashMap<Any?, Boolean>(list.size)).apply { addAll(list) }
 
   /**
    *  چند فهرست و ردیفِ [a] همان شیءِ [b] است. فهرستِ همان شیء — حتی خالی — هم نشانه است: هر خواندنِ

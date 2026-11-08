@@ -11,6 +11,9 @@
  *       هم‌زمان آفلاین ⇐ همان بدهی همه‌جا.
  *   JB4 سفارشِ اینترنتی: ویترین ⇐ قبول ⇐ پیک ⇐ تحویل ⇐ فروش و کسرِ موجودی روی دستگاهِ دکان؛ دستگاهِ دوم دو بار
  *       کم نمی‌کند؛ موجودیِ سرور و سایت همان.
+ *   JB5 دو دستگاهِ صاحب (A و B)، هر دو بی اینترنت، همان کالای همان فاکتور را کامل برمی‌گردانند ⇐ فقط یکی می‌نشیند؛
+ *       دیگری با همهٔ همراه‌هایش `return_exceeds_sold`، صندوقِ تعارضِ کامل برای صاحب، تلاشِ دوباره همان یک صندوق
+ *       (`lib/return-line-cap.js`، بی هیچ پرچمی: پیش‌فرض روشن). پیش از اصلاح سرخ بود: سرور هر دو را می‌پذیرفت.
  *
  * پرچم‌ها فقط برای همین دکان: shop.approval_requests، shop.returns.sale_cap، shop.orders، shop.storefront،
  * shop.catalog، shop.delivery، shop.owner_report.
@@ -294,6 +297,55 @@ await E.step('JB4', 'سفارشِ اینترنتی: ویترین ⇐ قبول �
   assert.equal(st.levels.shop_floor, (stockBefore - 3) * 1000);
   const rep = E.ok(await A.api('GET', '/shop/catalog/report'), 'تطبیق');
   assert.equal(rep.ok, true, JSON.stringify(rep.mismatches));
+}, { needs: ['JB.0'] });
+
+/* ═══════════════════════════════ JB5 ═══════════════════════════════ */
+
+await E.step('JB5', 'دو دستگاهِ صاحب، هر دو بی اینترنت، همان کالای همان فاکتور را کامل برمی‌گردانند ⇐ یکی می‌نشیند، دیگری در صندوقِ تعارض', async () => {
+  //  سقفِ «برگشت بیش از فروخته‌شدهٔ قلم» پرچمِ خاموش‌کن دارد، نه پرچمِ روشن‌کن: این دکان هیچ پرچمی برایش ندارد
+  await syncAll();
+  const oilBefore = A.stock(oil);
+  const s = sale(A, A.sell({ lines: [{ id: oil, qty: 2 }] }));                       // ۱۰۰۰ نقد
+  await syncAll();
+  const line = itemOf(A, s.saleId, oil).id;
+  A.offline = true; B.offline = true;
+  sale(A, A.returnFlow(s.saleId, { [line]: { qty: 2 } }, { reason: 'روغنِ خراب' }));
+  sale(B, B.returnFlow(s.saleId, { [line]: { qty: 2 } }, { reason: 'روغنِ خراب' }));
+  A.offline = false; await A.drain();
+  B.offline = false; await B.sync();
+  const why = B.dropped.map((x) => `${x.table}:${x.why}`);
+  assert.deepEqual(B.dropped.filter((x) => x.table === 'returns').map((x) => x.why), ['return_exceeds_sold'], JSON.stringify(why));
+  assert.ok(why.some((w) => w.endsWith(':tx_rejected')), `همراه‌ها (حرکتِ انبار، شمارندهٔ قلم، سابقه): ${JSON.stringify(why)}`);
+  assert.equal(B.queue.length, 0, 'هیچ چیزی در صف گیر نکرد');
+  const srv = await serverLedger(A);
+  assert.equal(srv.saleItems.find((i) => i.id === line).returnedQty, 2, 'سرور: فقط یک برگشت');
+  assert.equal(srv.returns.filter((r) => r.saleId === s.saleId).reduce((n, r) => n + r.amount, 0), 1000, 'سرور: پولِ برگشت یک بار');
+
+  //  صاحب همان را در صندوقِ تعارض دارد — با سند و همهٔ همراه‌هایش، فقط برای همین دکان
+  const boxes = await db.many(
+    `SELECT * FROM sync_v3_conflicts WHERE account_id=$1 AND table_name='returns' AND status='open' AND detail->>'reason_core'='exceeds_sold'`,
+    [owner.shopId]);
+  assert.equal(boxes.length, 1, JSON.stringify(boxes.map((b) => b.detail)));
+  const box = boxes[0];
+  assert.equal(box.kind, 'perm_denied');
+  assert.equal(box.detail.sale, s.saleId);
+  assert.equal(box.detail.lines[0].sold_milli, 2000);
+  assert.equal(box.detail.lines[0].returned_milli, 2000);
+  const kept = (box.loser_value?.ops || []).map((o) => o.table);
+  assert.ok(kept.includes('returns') && kept.includes('stockMovements'), `بستهٔ کامل: ${JSON.stringify(kept)}`);
+
+  //  تلاشِ دوباره (همان opها) ⇒ همان رد، یک صندوق، هیچ چیزی بیشتر نمی‌نشیند
+  const again = await B.api('POST', '/sync/v1/push', { device_id: B.replica(), schema_version: B.wireSchema(), ops: B.dropped.map(({ why: _w, ...op }) => op) });
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.ok(again.body.results.every((x) => x.status === 'rejected'), JSON.stringify(again.body.results));
+  assert.equal((await db.many(`SELECT id FROM sync_v3_conflicts WHERE account_id=$1 AND table_name='returns' AND detail->>'reason_core'='exceeds_sold'`, [owner.shopId])).length, 1);
+
+  //  B (دفترِ برگشتی که سرور نپذیرفت) از سرور دوباره ساخته — همان «نصبِ دوباره» ِ JB1
+  B = await E.device('B-owner-desktop', owner.email, { deviceId: B.deviceId, appVersion: '1.0.9999' });
+  assert.equal((await B.firstSync()).ok, true);
+  await B.ensureSeries();
+  await syncAll();
+  await assertSameEverywhere('JB5', [A, B, S], { expect: { stock: { [oil]: oilBefore } } });
 }, { needs: ['JB.0'] });
 
 await E.finish();

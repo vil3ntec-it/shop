@@ -16,8 +16,9 @@ import java.io.File
  *  (۲) پیش از هر نوشتن، زیرِ قفلِ نوشتن، نسخه و مُهرِ دیسک سنجیده می‌شود و فقط اگر دیسک جلوتر است
  *  دفتر از نو خوانده می‌شود ([freshLocked])؛ (۳) دفترهایی که پیش از جایگزینی از بیرون روی صفحه بودند
  *  پایهٔ ادغامِ سه‌طرفهٔ `ShopStore.save` می‌مانند ([baseOf] ⇐ `LedgerMerge`).
+ *  (۴) دفترِ فرستاده‌شده‌ای که ادغام‌شده نوشته شد پایهٔ صفحه‌ای است که از همان ادامه دهد ([submitted]).
  *
- *  ⛔ [enabled] پرچمِ `shop.ledger_merge` است (`LedgerMergeFlag`، پیش‌فرض خاموش). خاموش ⇒ همان رفتارِ `main`:
+ *  ⛔ [enabled] پرچمِ `shop.ledger_merge` است (`LedgerMergeFlag`، از ۱۴۰۵/۰۸/۱۸ پیش‌فرض روشن). خاموش ⇒ رفتارِ پیشین:
  *  نوشتنِ همتا گرفته نمی‌شود، دیسک پیش از نوشتن سنجیده نمی‌شود ([freshLocked] همان دفترِ حافظه است)، دفترِ
  *  پیشینی نگه داشته نمی‌شود و [sameAccount] همیشه آری است. فقط نسخه و مُهر نگه داشته می‌شوند تا روشن شدنِ
  *  پرچم از همان لحظه درست کار کند (دیسکِ جلوتر از نو خوانده شود).
@@ -53,6 +54,15 @@ internal class LedgerFollow(
   /** دست‌کم یک دفترِ پیشین از [earlier] بیرون رفت — پایهٔ صفحه‌ای کهنه‌تر دیگر پیدا نمی‌شود ([baseOf]) */
   private var evicted = false
 
+  /**
+   *  دفترهایی که صفحه فرستاد و **ادغام‌شده** نوشته شدند (نه خودشان) — پایهٔ ذخیرهٔ زنجیره‌ای ([submitted]،
+   *  `LedgerMerge.descends`). حداکثر [SUBMITTED]؛ با هر جایگزینیِ کامل ([replaced]) و عوضِ حساب ([reset]) پاک.
+   */
+  private val sent = ArrayDeque<ShopData>()
+
+  /** قفلِ [earlier] و [sent] (پایه‌ها از رشته‌های صفحه و کارگر خوانده و نوشته می‌شوند) */
+  private inline fun <T> held(block: () -> T): T = synchronized(earlier) { block() }
+
   private val member = LedgerPeers.Member { next, gen, stamp -> adopt(next, gen, stamp) }
 
   init {
@@ -84,7 +94,7 @@ internal class LedgerFollow(
 
   fun remember(d: ShopData) {
     if (!enabled()) return
-    synchronized(earlier) {
+    held {
       if (earlier.lastOrNull() === d) return
       earlier.removeAll { it === d }           //  همان شیء، نه برابری (مقایسهٔ کلِ دفتر)
       earlier.addLast(d)
@@ -94,8 +104,26 @@ internal class LedgerFollow(
 
   /** دفترِ حسابِ دیگر، یا خالی: هیچ پایهٔ کهنه‌ای نمی‌ماند */
   fun reset(d: ShopData) {
-    synchronized(earlier) { earlier.clear(); evicted = false }
+    held { earlier.clear(); sent.clear(); evicted = false }
     data.value = d
+  }
+
+  /**
+   *  صفحه [next] را فرستاد و دفترِ ادغام‌شده (نه خودِ [next]) روی دیسک نشست: صفحه‌ای که از همین [next] ادامه دهد
+   *  پایه‌اش همین است، نه دفتری که [next] از آن ساخته شد ([baseOf]). فقط پس از نوشتنِ موفق.
+   */
+  fun submitted(next: ShopData) {
+    if (!enabled()) return
+    held {
+      sent.removeAll { it === next }
+      sent.addLast(next)
+      while (sent.size > SUBMITTED) sent.removeFirst()
+    }
+  }
+
+  /** جایگزینیِ کامل (بازیابی، بازسازی، «پاک کردنِ همه»): دیسک دیگر تغییرِ هیچ ذخیرهٔ پیشینی را ندارد */
+  fun replaced() {
+    held { sent.clear() }
   }
 
   /**
@@ -106,8 +134,8 @@ internal class LedgerFollow(
    *  DELETE)، پس فراخوان نمی‌نویسد و پیام می‌دهد.
    */
   fun baseOf(next: ShopData): ShopData? {
-    val (list, lost) = synchronized(earlier) { earlier.toList() to evicted }
-    return LedgerMerge.retainedBaseOf(next, data.value, list, lost)
+    val (list, lost, mine) = held { Triple(earlier.toList(), evicted, sent.toList()) }
+    return LedgerMerge.retainedBaseOf(next, data.value, list, lost, mine)
   }
 
   /** همتا همین حالا نوشت — زیرِ قفلِ نوشتنِ همان همتا */
@@ -182,5 +210,8 @@ internal class LedgerFollow(
   private companion object {
     /** چند دفترِ پیشین پایهٔ ممکنِ صفحه می‌مانند — هر کدام شاید یک دفترِ کامل در حافظه */
     const val EARLIER = 2
+
+    /** چند دفترِ فرستاده‌شدهٔ ادغام‌شده ([submitted]) — بیشترشان همان شیءهای دفترِ صفحه‌اند */
+    const val SUBMITTED = 2
   }
 }

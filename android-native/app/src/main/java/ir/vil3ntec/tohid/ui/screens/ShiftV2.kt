@@ -112,7 +112,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
   var reviewing by remember { mutableStateOf<AuditEntry?>(null) }
 
   fun save(row: AuditEntry, done: String) {
-    scope.launch { if (store.save(d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
+    scope.launch { if (store.save(d, d.copy(auditLog = d.auditLog + row))) toast(done) else toast(StrShift.saveFailed) }
   }
 
   /** PAY-15 — چاپِ همان نمایی که روی صفحه است، روی چاپگرِ فاکتور و از صفِ چاپ */
@@ -186,7 +186,7 @@ fun ShiftPanelV2(d: ShopData, store: ShopStore, me: String, toast: (String) -> U
         TextButton(onClick = {
           when (val r = CashShift.open(d, amount.toDoubleOrNull() ?: Double.NaN, me, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
             is CashShift.Result.Failed -> toast(r.message)
-            is CashShift.Result.Ok -> { scope.launch { store.save(r.data) }; toast(StrShift.registerOpened); openDialog = false }
+            is CashShift.Result.Ok -> { scope.launch { store.save(d, r.data) }; toast(StrShift.registerOpened); openDialog = false }
           }
         }) { Text(StrShift.openIt) }
       },

@@ -75,7 +75,8 @@ class VoidFlowTest {
       assertTrue(kind, Regex("""SalesVoid\.run\(before, sale\.id, canCancel, InvoiceVoid\.Kind\.$kind,""").containsMatchIn(routes))
       assertTrue(
         "$kind: سندِ معکوس فقط پس از ذخیرهٔ موفق",
-        routes.contains("if (store.save(r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.$kind, r.reason)"),
+        //  پایهٔ صریحِ ذخیره همان `before` ای است که لغو از آن ساخته شد (`ShopStore.save(base, next)`)
+        routes.contains("if (store.save(before, r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.$kind, r.reason)"),
       )
     }
     assertEquals("لغوکننده در هر دو مسیر", 2, Regex("""val by = remember \{ FraudTrailPref\.by\(context\) \}""").findAll(routes).count())

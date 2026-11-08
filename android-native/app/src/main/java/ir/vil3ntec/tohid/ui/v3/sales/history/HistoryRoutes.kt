@@ -189,7 +189,7 @@ fun RouteScope.CancelRoute() {
         is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
         is SalesVoid.Outcome.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesVoid.Outcome.Ok -> {
-          scope.launch { if (store.save(r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.VOID, r.reason) }
+          scope.launch { if (store.save(before, r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.VOID, r.reason) }
           //  PRM-02: کدهای سقف‌دارِ این فاکتور پس از نشستنِ لغو در دفتر آزاد می‌شوند (بی اینترنت ⇒ صف)
           ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.saleCancelled, V3Tone.SUCCESS)
@@ -228,7 +228,7 @@ fun RouteScope.FixRoute() {
         is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
         is SalesVoid.Outcome.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesVoid.Outcome.Ok -> {
-          scope.launch { if (store.save(r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.CORRECTION, r.reason) }
+          scope.launch { if (store.save(before, r.data)) DocChainSync.recordVoid(context, before, sale.id, InvoiceVoid.Kind.CORRECTION, r.reason) }
           //  PRM-02: فاکتورِ اصلاح‌شده لغو است ⇒ کدهایش آزاد؛ ثبتِ دوباره با کلیدِ تازه دوباره می‌گیرد
           ir.vil3ntec.tohid.ui.PromoLive.releaseOnVoid(context, store, sale)
           toasts.show(StrSale.fixDone, V3Tone.SUCCESS)

@@ -29,19 +29,19 @@
 
   function checkExact(v, what) {
     if (typeof v !== 'number' || !Number.isSafeInteger(v)) {
-      throw new RangeError((what || 'عدد') + ' بیرون از بازهٔ دقیق: ' + v);
+      throw new RangeError((what || 'عدد') + ' بیرون از بازهٔ دقیق: ' + v);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     }
     return norm(v);
   }
 
   /* حاصلِ واقعیِ بیرون از ۲^۵۳−۱ هرگز به عددِ «امن» گرد نمی‌شود، پس همین سنجش دقیق است */
-  function addExact(a, b) { return checkExact(checkExact(a) + checkExact(b), 'جمع'); }
-  function mulExact(a, b) { return checkExact(checkExact(a) * checkExact(b), 'ضرب'); }
+  function addExact(a, b) { return checkExact(checkExact(a) + checkExact(b), 'جمع'); }  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
+  function mulExact(a, b) { return checkExact(checkExact(a) * checkExact(b), 'ضرب'); }  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
 
   /* تقسیمِ کف‌گیر بی تقسیمِ اعشاری (Math.floor(a/b) نزدیکِ ۲^۵۳ اشتباه می‌کند) */
   function floorDiv(a, b) {
     checkExact(a); checkExact(b);
-    if (b === 0) throw new RangeError('تقسیم بر صفر');
+    if (b === 0) throw new RangeError('تقسیم بر صفر');  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     var r = a % b;                 // باقی‌ماندهٔ دقیق
     var q = (a - r) / b;           // تقسیمِ دقیقِ مضرب
     if (r !== 0 && ((r < 0) !== (b < 0))) q -= 1;
@@ -51,15 +51,15 @@
   /* n/d نیمه به سمتِ +∞ (معنای Math.round)، برای مثبت و منفی: floorDiv(n + ⌊d/2⌋, d) */
   function roundHalfUp(n, d) {
     checkExact(d);
-    if (d <= 0) throw new RangeError('مقسوم‌علیه باید مثبت باشد: ' + d);
+    if (d <= 0) throw new RangeError('مقسوم‌علیه باید مثبت باشد: ' + d);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return floorDiv(addExact(n, Math.floor(d / 2)), d);
   }
 
   // ── ارز ─────────────────────────────────────────────────
   function makeCurrency(code, decimals, stepMinor) {
-    if (typeof code !== 'string' || !code.trim()) throw new TypeError('کدِ ارز خالی است');
-    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 4) throw new RangeError('رقمِ اعشار باید ۰ تا ۴ باشد: ' + decimals);
-    if (!Number.isSafeInteger(stepMinor) || stepMinor < 1) throw new RangeError('پلهٔ گردکردن باید مثبت باشد: ' + stepMinor);
+    if (typeof code !== 'string' || !code.trim()) throw new TypeError('کدِ ارز خالی است');  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
+    if (!Number.isInteger(decimals) || decimals < 0 || decimals > 4) throw new RangeError('رقمِ اعشار باید ۰ تا ۴ باشد: ' + decimals);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
+    if (!Number.isSafeInteger(stepMinor) || stepMinor < 1) throw new RangeError('پلهٔ گردکردن باید مثبت باشد: ' + stepMinor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return Object.freeze({ code: code, decimals: decimals, stepMinor: stepMinor, minorPerMajor: Math.pow(10, decimals) });
   }
 
@@ -72,7 +72,7 @@
   /* ارز از جدول؛ پله برای هر دکان قابلِ تنظیم است */
   function currency(code, stepMinor) {
     var c = CURRENCIES[code];
-    if (!c) throw new RangeError('ارزِ ناشناخته: ' + code);
+    if (!c) throw new RangeError('ارزِ ناشناخته: ' + code);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return stepMinor === undefined ? c : makeCurrency(c.code, c.decimals, stepMinor);
   }
 
@@ -80,15 +80,15 @@
 
   // ── پول و مقدار ─────────────────────────────────────────
   function money(minor, cur) {
-    return Object.freeze({ minor: checkExact(minor, 'مبلغ'), currency: curOf(cur) });
+    return Object.freeze({ minor: checkExact(minor, 'مبلغ'), currency: curOf(cur) });  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
   }
 
-  function qty(milli) { return Object.freeze({ milli: checkExact(milli, 'مقدار') }); }
+  function qty(milli) { return Object.freeze({ milli: checkExact(milli, 'مقدار') }); }  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
 
   /* هویتِ ارز فقط کد است؛ دو ارزِ متفاوت خطای زمانِ اجراست، نه تبدیلِ بی‌صدا */
   function same(a, b) {
     if (a.currency.code !== b.currency.code) {
-      var e = new TypeError('دو ارزِ متفاوت: ' + a.currency.code + ' و ' + b.currency.code);
+      var e = new TypeError('دو ارزِ متفاوت: ' + a.currency.code + ' و ' + b.currency.code);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
       e.code = 'CURRENCY_MISMATCH';
       throw e;
     }
@@ -103,13 +103,13 @@
   /* از عددِ اعشاریِ امروز (مثلاً salePrice به افغانی)، با Math.round */
   function moneyFromLegacy(major, cur) {
     var c = curOf(cur);
-    if (typeof major !== 'number' || !isFinite(major)) throw new RangeError('مبلغِ نامعتبر: ' + major);
+    if (typeof major !== 'number' || !isFinite(major)) throw new RangeError('مبلغِ نامعتبر: ' + major);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return money(Math.round(major * c.minorPerMajor), c);
   }
 
   /* همان پاک‌سازیِ setCartQty: Math.round(x × 1000) */
   function qtyFromLegacy(quantity) {
-    if (typeof quantity !== 'number' || !isFinite(quantity)) throw new RangeError('مقدارِ نامعتبر: ' + quantity);
+    if (typeof quantity !== 'number' || !isFinite(quantity)) throw new RangeError('مقدارِ نامعتبر: ' + quantity);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     return qty(Math.round(quantity * 1000));
   }
 
@@ -117,7 +117,7 @@
   /* floorDiv(qtyMilli × priceMinor + 500·step, 1000·step) × step — برای AFN همان فرمولِ ۵۰٬۰۰۰ / ۱۰۰٬۰۰۰ */
   function lineTotalMinor(qtyMilli, priceMinor, stepMinor) {
     checkExact(stepMinor);
-    if (stepMinor <= 0) throw new RangeError('پلهٔ گردکردن باید مثبت باشد: ' + stepMinor);
+    if (stepMinor <= 0) throw new RangeError('پلهٔ گردکردن باید مثبت باشد: ' + stepMinor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     var raw = mulExact(qtyMilli, priceMinor);
     return mulExact(roundHalfUp(raw, mulExact(1000, stepMinor)), stepMinor);
   }
@@ -132,12 +132,12 @@
     var step = cur.stepMinor;
     lines.forEach(function (m) {
       same(discount, m);
-      if (m.minor < 0) throw new RangeError('مبلغِ ردیف منفی است: ' + m.minor);
+      if (m.minor < 0) throw new RangeError('مبلغِ ردیف منفی است: ' + m.minor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     });
-    if (discount.minor < 0) throw new RangeError('تخفیف منفی است: ' + discount.minor);
-    if (discount.minor % step !== 0) throw new RangeError('تخفیف باید مضربِ پله (' + step + ') باشد: ' + discount.minor);
+    if (discount.minor < 0) throw new RangeError('تخفیف منفی است: ' + discount.minor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
+    if (discount.minor % step !== 0) throw new RangeError('تخفیف باید مضربِ پله (' + step + ') باشد: ' + discount.minor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     var sum = lines.reduce(function (acc, m) { return addExact(acc, m.minor); }, 0);
-    if (discount.minor > sum) throw new RangeError('تخفیف (' + discount.minor + ') از جمعِ ردیف‌ها (' + sum + ') بیشتر است');
+    if (discount.minor > sum) throw new RangeError('تخفیف (' + discount.minor + ') از جمعِ ردیف‌ها (' + sum + ') بیشتر است');  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     if (discount.minor === 0) return lines.map(function () { return money(0, cur); });
 
     var units = discount.minor / step;
@@ -157,7 +157,7 @@
   /* گردکردنِ نقدی (مثلاً ۵ یا ۱۰ افغانی) — ردیفی جدا با نوعِ rounding، نه تغییرِ قیمت؛ صفر ⇒ null */
   function cashRounding(total, stepMinor) {
     checkExact(stepMinor);
-    if (stepMinor <= 0) throw new RangeError('پلهٔ گردکردنِ نقدی باید مثبت باشد: ' + stepMinor);
+    if (stepMinor <= 0) throw new RangeError('پلهٔ گردکردنِ نقدی باید مثبت باشد: ' + stepMinor);  // داده: خطای برنامه‌نویس (همان require ِ Money.kt)
     var rounded = mulExact(roundHalfUp(total.minor, stepMinor), stepMinor);
     var adjust = addExact(rounded, -total.minor);
     return adjust === 0 ? null : Object.freeze({ type: ROUNDING_LINE_TYPE, amount: money(adjust, total.currency) });

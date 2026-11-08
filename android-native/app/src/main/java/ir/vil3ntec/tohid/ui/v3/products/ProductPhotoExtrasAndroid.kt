@@ -40,7 +40,7 @@ private fun saveFromBank(context: android.content.Context, store: ShopStore, sco
   PhotoStore.saveBytes(context, id, bytes).onSuccess {
     scope.launch {
       val cur = store.data.value
-      store.save(cur.copy(products = cur.products.map { if (it.id == id) it.copy(photo = true) else it }))
+      store.save(cur, cur.copy(products = cur.products.map { if (it.id == id) it.copy(photo = true) else it }))
     }
     //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
     ImageBank.photoSaved(context, id, own = false)

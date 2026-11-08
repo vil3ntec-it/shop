@@ -54,8 +54,11 @@ object QuickRegister {
   data class Draft(val name: String = "", val salePrice: String = "", val unit: String = "عدد", val stock: String = "1")  // داده: واحدِ پیش‌فرضِ ذخیره‌شده
 
   sealed interface Result {
-    /** @param quantity آنچه به فاکتور می‌رود: یک واحد، یا کمتر اگر موجودیِ نوشته‌شده کمتر است */
-    data class Ok(val data: ShopData, val productId: String, val quantity: Double) : Result
+    /**
+     *  @param quantity آنچه به فاکتور می‌رود: یک واحد، یا کمتر اگر موجودیِ نوشته‌شده کمتر است
+     *  @param base دفتری که [data] از آن ساخته شد (ورودیِ [register]) — پایهٔ صریحِ `ShopStore.save`
+     */
+    data class Ok(val data: ShopData, val productId: String, val quantity: Double, val base: ShopData) : Result
     data class Failed(val message: String) : Result
   }
 
@@ -73,13 +76,13 @@ object QuickRegister {
       is WarehouseEngine.Result.Failed -> return Result.Failed(r.message)
       is WarehouseEngine.Result.Ok -> r
     }
-    if (stock == 0L) return Result.Ok(made.data, made.id, 0.0)
+    if (stock == 0L) return Result.Ok(made.data, made.id, 0.0, d)
     val units = stock / 1000.0
     return when (val e = WarehouseEngine.addEntry(
       made.data, WarehouseEngine.EntryDraft(productId = made.id, units = units, unit = unit, date = today, notes = ENTRY_NOTE), today, now, newId,
     )) {
       is WarehouseEngine.Result.Failed -> Result.Failed(e.message)
-      is WarehouseEngine.Result.Ok -> Result.Ok(e.data, made.id, minOf(1.0, units))
+      is WarehouseEngine.Result.Ok -> Result.Ok(e.data, made.id, minOf(1.0, units), d)
     }
   }
 }

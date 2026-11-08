@@ -611,7 +611,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       DueDateDialog(e, onDismiss = { dueFor = null }) { due ->
         when (val r = DebtorEngine.setDueDate(d, txId, due)) {
           is DebtorEngine.Result.Failed -> toast(r.message)
-          is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; dueFor = null; toast(ir.vil3ntec.tohid.core.i18n.StrMoney.dueSaved) }
+          is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; dueFor = null; toast(ir.vil3ntec.tohid.core.i18n.StrMoney.dueSaved) }
         }
       }
     }
@@ -639,7 +639,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
         TextButton(onClick = {
           when (val r = DebtorEngine.setCreditLimit(d, id, parseLimit(text))) {
             is DebtorEngine.Result.Failed -> toast(r.message)
-            is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; limitOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitSaved) }
+            is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; limitOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitSaved) }
           }
         }) { Text(ir.vil3ntec.tohid.core.i18n.StrKit.save) }
       },
@@ -650,7 +650,7 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
     CrmProfileDialog(debtor, onDismiss = { profileOpen = false }) { phone2, tags ->
       when (val r = CustomerProfileForm.setProfile(d, id, phone2, tags)) {
         is DebtorEngine.Result.Failed -> toast(r.message)
-        is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; profileOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.profileSaved) }
+        is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; profileOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.profileSaved) }
       }
     }
   }
@@ -800,7 +800,7 @@ private fun NewCustomerRow(store: ShopStore, d: ShopData, toast: (String) -> Uni
   fun save() {
     when (val r = DebtorEngine.add(d, DebtorEngine.DebtorDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
       is DebtorEngine.Result.Failed -> toast(r.message)
-      is DebtorEngine.Result.Ok -> { scope.launch { store.save(r.data) }; onAdded(r.id); name = ""; phone = "" }
+      is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; onAdded(r.id); name = ""; phone = "" }
     }
   }
   val enter = Modifier.onPreviewKeyEvent { e ->

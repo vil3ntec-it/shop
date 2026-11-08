@@ -168,10 +168,11 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   const t = now();
 
   const out = await lockedTx(ctx, async (c) => {
-    //  سقفِ تجمعیِ برگشت: از خواندنِ جمع تا نوشتن در همین تراکنش (با پایانش آزاد)
-    if (groups) await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [approvals.returnsLockKey(ctx.accountId)]);
     //  روشن: قفلِ v1 هم، و v1 ⇒ v3 کامل پیش از اعمال ⇒ داوریِ این opها همهٔ v1 را دیده است
     const v1 = toV1On ? await openToV1(c, ctx, t) : null;
+    //  سقفِ تجمعیِ برگشت و سقفِ قلم (`return-line-cap`): از خواندنِ جمع تا نوشتن در همین تراکنش (با پایانش آزاد).
+    //  ⛔ پس از قفلِ v1: push ِ v1 همین قفل را پس از قفلِ خودش می‌گیرد — ترتیبِ یکی، بی بن‌بست
+    if (groups) await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [approvals.returnsLockKey(ctx.accountId)]);
     const dev = (await c.query(
       `SELECT cursor FROM sync_v3_devices WHERE ${ACC} AND device_id=$4`, [...acc(ctx), deviceId]
     )).rows[0];

@@ -135,8 +135,11 @@ class DataSafetyGuardTest {
     val reopened = ShopStore(ctx).also { runBlocking { it.load() } }
     assertEquals("همه‌چیز خوانده می‌شود", base, reopened.data.value)
     assertTrue("پشتیبان گرفته می‌شود", runBlocking { reopened.exportBackup() }.contains("dsg-s1"))
-    //  کالا و انبار «همیشه باز»
-    assertTrue(runBlocking { reopened.save(base.copy(products = base.products + Product(id = "dsg-p2", name = "شکر"))) })
+    //  کالا و انبار «همیشه باز» — از دفترِ همان نمونه، همان کاری که هر صفحه می‌کند. ⛔ با `shop.ledger_merge` ِ روشن (پیش‌فرض از
+    //  ۱۴۰۵/۰۸/۱۸) دفترِ دست‌سازِ بی هیچ ردیفِ مشترک با این نمونه پایهٔ روشنی ندارد (فقط فهرست‌های خالیِ `emptyList()`) و دفترِ
+    //  خالیِ پیش از `load` پایه می‌شود — امن برای داده (هیچ ردیفی حذف نمی‌شود) ولی قفلِ نرم فروش را «تغییرِ کاربر» می‌بیند
+    val now = reopened.data.value
+    assertTrue(runBlocking { reopened.save(now.copy(products = now.products + Product(id = "dsg-p2", name = "شکر"))) })
   }
 
   /* ---------------- ۶) هر انبارِ محلی دسته دارد ---------------- */
@@ -182,6 +185,8 @@ class DataSafetyGuardTest {
       "tohid-otp", "tohid-watch", "tohid_preview", "tohid-debtor-detail", "tohid-stock", "tohid-stock-transfer",
       //  `CloudSettingsRestore`: نشانِ «یک بار برای این حساب@دکان روی همین دستگاه» (claude/no-data-loss)
       "tohid-settings-restore",
+      //  سایه و cursor ِ همگام‌سازیِ تنظیماتِ دکان (`ShopSettingsSync`) — خودِ تنظیم‌ها در `SHOP_PREFS`
+      "tohid-settings-sync",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

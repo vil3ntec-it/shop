@@ -179,4 +179,6 @@
   var api = { of: of, t: t, protect: protect, strip: strip, shape: shape, DATA: DATA, KEYS: KEYS, OPEN: OPEN, CLOSE: CLOSE };
   if (typeof module === 'object' && module.exports) module.exports = api;
   else if (g && g.VILL3N) g.VILL3N.tx = t;
+  //  نسخهٔ وبِ دکان (رونوشتِ `license/dari.js`، لایهٔ `license/web-i18n.js`)
+  if (g && typeof module !== 'object') g.TohidDari = api;
 })(this);

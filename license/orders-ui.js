@@ -208,11 +208,9 @@
   const visible = () => document.visibilityState !== 'hidden';
   const isActive = () => !!($('page-orders') && $('page-orders').classList.contains('active'));
   const af = (minor) => `${money(minor)} افغانی`;
-  const DATE_FMT = (() => {
-    try { return new Intl.DateTimeFormat('fa-AF-u-nu-latn', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
-    catch { return null; }
-  })();
-  const when = (ms) => (DATE_FMT ? DATE_FMT.format(new Date(Number(ms))) : new Date(Number(ms)).toLocaleString());
+  //  هر بار از نو (نه قالبِ ثابتِ بارِ نخست): تقویمِ انگلیسی با «تقویمِ نمایش» عوض می‌شود (`web-i18n.js`)
+  const WHEN = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+  const when = (ms) => { const d = new Date(Number(ms)); try { return d.toLocaleString('fa-AF-u-nu-latn', WHEN); } catch { return d.toLocaleString(); } };
 
   /** افزونه‌های پشتِ پرچم: `orders-desk.js` (ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») با `presence`/`delay` و `area-requests.js` (CHK-10 «خبرم کن») با `notifyArea` ِ `/config` */
   const extApi = { call, toast, esc, when, $, closeModal, get cfg() { return st.cfg; }, get open() { return st.open; },

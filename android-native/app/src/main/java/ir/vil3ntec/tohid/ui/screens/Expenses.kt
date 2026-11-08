@@ -66,7 +66,7 @@ fun ExpensesScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostState) {
     when (result) {
       is LedgerEngine.Result.Failed -> toast(result.message)
       is LedgerEngine.Result.Ok -> {
-        scope.launch { store.save(result.data) }
+        scope.launch { store.save(d, result.data) }
         toast(done)
         after()
       }
