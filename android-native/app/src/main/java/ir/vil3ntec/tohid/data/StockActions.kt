@@ -129,8 +129,9 @@ object StockActions {
   }
 
   /**
-   *  دو ردیفِ جمعِ صفرِ یک انتقال + سابقه. [id] شناسهٔ ردیفِ خروجی و `refId` ِ هر دو ردیف است — همان کلیدِ یک‌بارهٔ
-   *  «محل‌ها و انتقال» ِ موتورِ امروز (`StockPlaces.transfer`، INV-20)؛ سنجشِ موجودی کارِ فراخوان است.
+   *  دو ردیفِ جمعِ صفرِ یک انتقال + سابقه. [id] شناسهٔ ردیفِ خروجی و [ref] (پیش‌فرض همان [id]) `refId` ِ هر دو ردیف و
+   *  سابقه است — همان کلیدِ یک‌بارهٔ «محل‌ها و انتقال» ِ موتورِ امروز (`StockPlaces.transfer`، INV-20؛ انتقالِ چندسری یک
+   *  جفت برای هر سری با همان [ref])؛ سنجشِ موجودی کارِ فراخوان است.
    */
   internal fun transferRows(
     d: ShopData,
@@ -145,6 +146,7 @@ object StockActions {
     now: Long,
     id: String,
     newId: () -> String,
+    ref: String = id,
   ): ShopData {
     val productId = product.id
     val why = reason.trim()
@@ -154,20 +156,20 @@ object StockActions {
     //  دو ردیف، جمعِ صفر (شرح سرِ `StockLedger.TRANSFER_OUT`): سرورِ v3 موجودی را جمعِ همین جدول می‌داند
     val out = StockMovement(
       id = id, productId = productId, type = StockLedger.TRANSFER_OUT, qty = -q / 1000.0, date = today,
-      notes = "$note — به ${noteLabel(dest)}", refId = id, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      notes = "$note — به ${noteLabel(dest)}", refId = ref, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       userId = who, reason = why.ifEmpty { null },
       locationId = from, toLocationId = dest, lotId = lot,
     )
     val inn = StockMovement(
       id = newId(), productId = productId, type = StockLedger.TRANSFER_IN, qty = q / 1000.0, date = today,
-      notes = "$note — از ${noteLabel(from)}", refId = id, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      notes = "$note — از ${noteLabel(from)}", refId = ref, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       userId = who, reason = why.ifEmpty { null },
       locationId = dest, lotId = lot,
     )
     return d.copy(
       stockMovements = d.stockMovements + out + inn,
       auditLog = d.auditLog + AuditEntry(
-        id = newId(), type = "stock_transfer", date = today, refId = id, createdAt = now,
+        id = newId(), type = "stock_transfer", date = today, refId = ref, createdAt = now,
         notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${noteLabel(from)} به ${noteLabel(dest)}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           (if (why.isNotEmpty()) " — $why" else ""),
       ),

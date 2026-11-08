@@ -57,6 +57,22 @@ object StrPlaces {
   val reason: String get() = t("دلیل (اختیاری)", "Reason (optional)", "دلیل (اختیاري)")
   val transfer: String get() = t("انتقال", "Move", "لېږد")
   val noStock: String get() = t("این کالا در هیچ محلی موجودی ندارد", "This product has no stock in any place", "دا توکی په هېڅ ځای کې موجودي نه لري")
+
+  // ── سری و انقضا در انتقال (INV-20) ──
+  val lotsHere: String get() = t("سری‌ها در مبدأ", "Lots at the origin", "په سرچینه کې لړۍ")
+  val byFefo: String get() = t("اول آنچه زودتر منقضی می‌شود", "Earliest expiry first", "لومړی هغه چې ژر یې نېټه تېرېږي")
+  val byLot: String get() = t("انتخابِ سری", "Choose lots", "لړۍ وټاکئ")
+  fun expires(date: Any): String = t("انقضا ${asIs(date)}", "Expires $date", "د تېرېدو نېټه $date")
+  val noExpiry: String get() = t("بی انقضا", "No expiry", "بې نېټې")
+  fun moves(list: Any): String = t("جابه‌جا می‌شود: ${asIs(list)}", "Moves: $list", "لېږدول کېږي: $list")
+  fun total(q: Any, unit: Any): String = t("جمع: ${asIs(q)} ${asIs(unit)}", "Total: $q $unit", "ټول: $q $unit")
+  val lotlessHint: String get() = t(
+    "کالای بی سری فقط با «اول آنچه زودتر منقضی می‌شود» و پس از همهٔ سری‌ها جابه‌جا می‌شود.",
+    "Stock without a lot moves only with “earliest expiry first”, after every lot.",
+    "بې لړۍ توکی یوازې د «لومړی هغه چې ژر یې نېټه تېرېږي» سره او له ټولو لړیو وروسته لېږدول کېږي.",
+  )
+  /** گزارشِ انقضا: محل‌هایی که همان محموله حالا در آن‌هاست */
+  fun inPlaces(names: Any): String = t("در ${asIs(names)}", "At $names", "په $names کې")
   val close: String get() = t("بستن", "Close", "بندول")
   val cancel: String get() = t("انصراف", "Cancel", "لغوه")
 

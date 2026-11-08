@@ -198,7 +198,7 @@ fun ReportsScreen(
         ReportTab.PRODUCTS -> ProductsTab(d, canSeeMoney, list)
         ReportTab.DEBTORS -> DebtorsTab(d, list)
         ReportTab.PURCHASES -> PurchasesTab(d, from, to, list)
-        ReportTab.EXPIRY -> ExpiryTab(d, today, list)
+        ReportTab.EXPIRY -> ExpiryTab(d, today, list, places = remember { ir.vil3ntec.tohid.data.StockPlacesPref.places(context) })
         ReportTab.STOCK -> StockTab(d, list)
         //  زبانه‌های اختیاری: همان بخش‌های گزارشِ گوشیِ پیشین (`ui/screens`)
         ReportExtra.SHRINK -> ReportList(list) {

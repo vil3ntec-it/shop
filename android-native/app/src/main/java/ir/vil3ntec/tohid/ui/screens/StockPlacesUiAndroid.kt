@@ -84,8 +84,8 @@ fun StockPlacesEntry(context: android.content.Context, store: ShopStore, d: Shop
       onDismiss = { openPlaces = false },
       onAdd = { name -> write(StockPlaces::hasPlace, StrPlaces.placeAdded) { cur, k -> StockPlaces.addPlace(cur, k, name, user, todayIso(), System.currentTimeMillis()) } },
       onArchive = { name -> write(StockPlaces::hasPlace, StrPlaces.placeArchived) { cur, k -> StockPlaces.archivePlace(cur, k, name, user, todayIso(), System.currentTimeMillis()) } },
-      onTransfer = { pid, from, to, q, reason ->
-        write(StockPlaces::has, StrPlaces.moved) { cur, k -> StockPlaces.transfer(cur, k, pid, from, to, q, reason, user, todayIso(), System.currentTimeMillis(), ::newId) }
+      onTransfer = { pid, from, to, q, reason, lots ->
+        write(StockPlaces::has, StrPlaces.moved) { cur, k -> StockPlaces.transfer(cur, k, pid, from, to, q, reason, user, todayIso(), System.currentTimeMillis(), ::newId, lots = lots) }
       },
     )
   }
