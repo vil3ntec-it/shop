@@ -181,7 +181,10 @@ async function enrollDevice(req) {
   const member = await membershipOf(req.user.id);
   if (!member || member.role === 'owner') return none('not_member');
   const deviceKey = await deviceKeys.issue({ shopId: member.shop_id, userId: req.user.id, deviceUid, onlyIfNone: true });
-  if (!deviceKey) return none('exists');
+  //  ⛔ رازِ باطل‌شده (خروج از همه، کدِ باطل، «باطل کردنِ این دستگاه»…) از نشستِ باز برنمی‌گردد: فقط کدِ تازهٔ صاحب
+  if (!deviceKey) {
+    return none(await deviceKeys.hasLive({ shopId: member.shop_id, userId: req.user.id, deviceUid }) ? 'exists' : 'revoked');
+  }
   await audit.log({
     shopId: member.shop_id, userId: req.user.id, action: 'staff_device_key.issued',
     targetType: 'device', targetId: req.device.id, detail: { device: deviceUid }, ip: clientIp(req),

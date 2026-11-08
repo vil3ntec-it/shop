@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.account.team
 
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.Logout
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.KeyOff
 import androidx.compose.material.icons.outlined.PersonRemove
@@ -162,6 +163,87 @@ internal fun RouteScope.BlockDeviceRoute(id: String) {
       TeamSession.scope.launch {
         shops.disableDevice(id)
           .onSuccess { toasts.show(StrAccount.deviceDisabled, V3Tone.SUCCESS); team.reload(shops, owner) }
+          .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+      }
+    },
+    onDismiss = { back() },
+  )
+}
+
+/**
+ *  برگهٔ `team/device-keys/{id}/revoke`: «باطل کردنِ این دستگاه» — رازِ ورود با کد و نشست‌های همان دستگاه.
+ *  سرور تصمیم می‌گیرد (members.manage) و دوباره‌زدنی است؛ فهرست پس از کار از سرور خوانده می‌شود.
+ */
+@Composable
+internal fun RouteScope.RevokeDeviceKeyRoute(id: String) {
+  val context = LocalContext.current
+  val shops = remember { Backend.shop(context) }
+  val team = TeamSession.data
+  val owner = isOwner
+  if (team.staffKeys?.canRevoke != true) { LaunchedEffect(id) { back() }; return }
+  V3ConfirmSheet(
+    title = StrAccount.revokeDeviceKey,
+    message = StrAccount.revokeDeviceKeyBody,
+    confirm = StrAccount.revokeDeviceKeyConfirm,
+    icon = Icons.Outlined.KeyOff,
+    onConfirm = {
+      TeamSession.scope.launch {
+        shops.revokeStaffKey(id)
+          .onSuccess { toasts.show(StrAccount.deviceKeyRevoked, V3Tone.SUCCESS); team.reload(shops, owner) }
+          .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+      }
+    },
+    onDismiss = { back() },
+  )
+}
+
+/** برگهٔ `team/members/{id}/logout-all`: «خروج از همهٔ دستگاه‌ها» برای همین کارمند */
+@Composable
+internal fun RouteScope.LogoutEverywhereRoute(id: String) {
+  val context = LocalContext.current
+  val shops = remember { Backend.shop(context) }
+  val team = TeamSession.data
+  val owner = isOwner
+  val member = team.member(id)
+  if (member == null || !MemberModel.canRevoke(team.staffKeys, member)) { LaunchedEffect(id) { back() }; return }
+  V3ConfirmSheet(
+    title = StrAccount.logoutEverywhereTitle(TeamModel.removeName(member)),
+    message = StrAccount.logoutEverywhereBody,
+    confirm = StrAccount.logoutEverywhereConfirm,
+    icon = Icons.AutoMirrored.Outlined.Logout,
+    onConfirm = {
+      TeamSession.scope.launch {
+        shops.logoutMemberEverywhere(id)
+          .onSuccess { toasts.show(StrAccount.loggedOutEverywhere, V3Tone.SUCCESS); team.reload(shops, owner) }
+          .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
+      }
+    },
+    onDismiss = { back() },
+  )
+}
+
+/**
+ *  برگهٔ `team/members/{id}/stale/{old}`: «برداشتنِ عضوِ کهنه» از نشانهٔ «شاید همان» — همان برداشتنِ امروز
+ *  (`DELETE /api/shop/members/:id`)؛ فروش و سابقهٔ عضوِ کهنه می‌ماند و ⛔ هیچ حسابی یکی نمی‌شود. صفحهٔ عضوِ تازه می‌ماند.
+ */
+@Composable
+internal fun RouteScope.RemoveStaleRoute(id: String, old: String) {
+  val context = LocalContext.current
+  val shops = remember { Backend.shop(context) }
+  val team = TeamSession.data
+  val owner = isOwner
+  val member = team.member(id)
+  val hint = member?.let { m -> MemberModel.hintsOf(team.staffKeys, m, team.members).firstOrNull { it.oldMemberId == old } }
+  if (member == null || hint == null || !MemberModel.canRevoke(team.staffKeys, member)) { LaunchedEffect(id, old) { back() }; return }
+  V3ConfirmSheet(
+    title = StrAccount.removeStaleTitle(hint.oldName),
+    message = StrAccount.removeStaleBody,
+    confirm = StrAccount.removeConfirm,
+    icon = Icons.Outlined.PersonRemove,
+    onConfirm = {
+      TeamSession.scope.launch {
+        shops.removeMember(old)
+          .onSuccess { toasts.show(StrAccount.memberRemoved, V3Tone.SUCCESS); team.reload(shops, owner) }
           .onFailure { toasts.show(it.userMessage, V3Tone.ERROR) }
       }
     },

@@ -495,6 +495,15 @@ async function seedShop(a) {
   assert.equal(devs.status, 200, JSON.stringify(devs.body));
   ids.device = (devs.body.devices || devs.body.items || [])[0]?.id;
   assert.ok(ids.device, `دستگاهِ الف: ${JSON.stringify(devs.body)}`);
+  //  رازِ دستگاهِ شاگردِ کدی (`/shop/staff-keys/:id/revoke`، مهاجرتِ ۳۴۵) — «ب» نه می‌بیند، نه باطل می‌کند
+  const once = await h.post('/api/shop/staff-code', { role: 'staff', maxUses: 1 }, { token: a.accessToken });
+  assert.equal(once.status, 201, JSON.stringify(once.body));
+  const keyed = await h.post('/api/auth/staff', {
+    code: once.body.code, name: 'شاگردِ کلیددارِ الف', device: { uid: fresh('keyed'), platform: 'android', keyVersion: 1 },
+  });
+  assert.equal(keyed.status, 201, JSON.stringify(keyed.body));
+  ids.staffKey = (await one('SELECT id FROM staff_device_keys WHERE user_id=$1 AND revoked_at IS NULL', [keyed.body.user.id]))?.id;
+  assert.ok(ids.staffKey, 'رازِ دستگاهِ شاگردِ الف');
   const { publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const key = await h.post('/api/shop/approver-keys',
     { public_key: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), label: 'صندوقِ الف', device_id: 'pos-1' },
@@ -621,6 +630,8 @@ function concreteFor(ids) {
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/approval-requests\/):id/, ids.approvalRequest],
+    [/^(\/shop\/staff-keys\/members\/):id/, ids.member],
+    [/^(\/shop\/staff-keys\/):id/, ids.staffKey],
     [/^(\/shop\/custom-roles\/members\/):id/, ids.member],
     [/^(\/shop\/custom-roles\/):id/, ids.customRole],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],

@@ -95,6 +95,42 @@ data class ShopDeviceDto(
 data class ShopDevicesDto(val devices: List<ShopDeviceDto> = emptyList())
 
 /*
+ *  دستگاه‌های شناختهٔ کارمندان — رازِ دستگاهِ ورود با کد (`GET /api/shop/staff-keys`، مهاجرتِ ۳۴۵). سرور شناسهٔ کاملِ
+ *  دستگاه و خودِ راز را هرگز نمی‌دهد؛ `device` همان شناسهٔ کوتاه است («abcd…wxyz»).
+ */
+@Serializable
+data class StaffKeyDto(
+  val id: String = "",
+  val userId: String = "",
+  val memberId: String = "",
+  val label: String = "",
+  val platform: String = "",
+  val device: String = "",
+  val createdAt: Long = 0,
+  val lastUsedAt: Long? = null,
+)
+
+/** «شاید همان <نام> است با دستگاهِ تازه» — عضوِ تازه‌ای که دستگاهش پیش‌تر مالِ عضوِ کهنه‌تر بوده (فقط نشانه، هرگز یکی شدن) */
+@Serializable
+data class StaffRejoinHintDto(
+  val memberId: String = "",
+  val userId: String = "",
+  val oldMemberId: String = "",
+  val oldUserId: String = "",
+  val oldName: String = "",
+  val sameName: Boolean = false,
+  val device: String = "",
+)
+
+@Serializable
+data class StaffKeysDto(
+  val devices: List<StaffKeyDto> = emptyList(),
+  val hints: List<StaffRejoinHintDto> = emptyList(),
+  /** سرور می‌گوید این نشست «باطل کردن» را می‌تواند (members.manage) */
+  val canRevoke: Boolean = false,
+)
+
+/*
  *  STF-06 — محدودهٔ مکانِ کارمندان (`/api/shop/staff-scope`، `core/staff/StaffScope`).
  *  `places`/`mine` ِ خالی یعنی «همهٔ مکان‌ها» (همان رفتارِ پیشین).
  */

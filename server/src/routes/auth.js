@@ -907,10 +907,20 @@ router.post('/logout', sessionLimit, async (req, res) => {
  */
 router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req, res) => {
   const app = req.appSection || 'shop';
-  const n = await tokens.revokeAllForSubject(req.user.id, null, app);
+  const deviceKeys = require('../lib/staff-device-keys');
+  //  ⛔ نشست‌ها و رازهای دستگاهِ شاگرد (فقط بخشِ دکان) در یک تراکنش: پس از «خروج از همه» هیچ دستگاهی با رازِ
+  //  پیشینش برنمی‌گردد — فقط با کدِ تازهٔ صاحب (و آن هم حسابِ تازه، `lib/staff-login`)
+  const out = await require('../db').tx(async (c) => ({
+    n: await tokens.revokeAllForSubject(req.user.id, null, app, { client: c }),
+    keys: app === 'shop'
+      ? await deviceKeys.revokeIn(c, { userIds: [req.user.id], reason: 'logout_all', by: req.user.id, ip: clientIp(req) })
+      : deviceKeys.NONE,
+  }));
+  await out.keys.afterCommit();
+  await tokens.liveRecheck(req.user.id);
   await require('../lib/push').revokeUser(req.user.id, app, 'logout_all');
-  await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: n, app } });
-  res.json({ ok: true, sessions: n, app });
+  await audit.log({ actorType: 'user', userId: req.user.id, action: 'auth.logout_all', detail: { sessions: out.n, app, deviceKeys: out.keys.revoked } });
+  res.json({ ok: true, sessions: out.n, app, deviceKeys: out.keys.revoked });
 });
 
 /* ---------- تأییدِ دوبارهٔ هویت برای کارهای حساس (بندِ ۲۱.۱) ---------- */

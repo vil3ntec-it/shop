@@ -21,9 +21,12 @@ import ir.vil3ntec.tohid.ui.v3.account.subscription.RedeemRoute
 import ir.vil3ntec.tohid.ui.v3.account.subscription.SubscriptionRoute
 import ir.vil3ntec.tohid.ui.v3.account.support.SupportRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.BlockDeviceRoute
+import ir.vil3ntec.tohid.ui.v3.account.team.LogoutEverywhereRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.MemberRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.NewCodeRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RemoveMemberRoute
+import ir.vil3ntec.tohid.ui.v3.account.team.RemoveStaleRoute
+import ir.vil3ntec.tohid.ui.v3.account.team.RevokeDeviceKeyRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.RevealRoute
 import ir.vil3ntec.tohid.ui.v3.account.team.TeamRoute
 import ir.vil3ntec.tohid.ui.v3.nav.AppModule
@@ -45,6 +48,11 @@ object AccountPaths {
   fun member(id: String) = "team/members/" + RoutePaths.encode(id)
   fun removeMember(id: String) = member(id) + "/remove"
   fun blockDevice(id: String) = "team/devices/" + RoutePaths.encode(id) + "/block"
+  /** رازِ ورود با کدِ یک دستگاه (`/api/shop/staff-keys/:id/revoke`) */
+  fun revokeDeviceKey(id: String) = "team/device-keys/" + RoutePaths.encode(id) + "/revoke"
+  fun logoutEverywhere(id: String) = member(id) + "/logout-all"
+  /** «برداشتنِ عضوِ کهنه» از صفحهٔ عضوِ تازه */
+  fun removeStale(id: String, old: String) = member(id) + "/stale/" + RoutePaths.encode(old)
   const val SUBSCRIPTION = "subscription"
   const val PLANS = "subscription/plans"
   const val REDEEM = "subscription/redeem"
@@ -82,6 +90,15 @@ val AccountModule = AppModule(
     },
     V3Route("team/devices/{id}/block", RouteKind.SHEET, { StrAccount.block }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       BlockDeviceRoute(args["id"].orEmpty())
+    },
+    V3Route("team/device-keys/{id}/revoke", RouteKind.SHEET, { StrAccount.revokeDeviceKey }, parent = AccountPaths.TEAM, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      RevokeDeviceKeyRoute(args["id"].orEmpty())
+    },
+    V3Route("team/members/{id}/logout-all", RouteKind.SHEET, { StrAccount.logoutEverywhere }, parent = "team/members/{id}", needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      LogoutEverywhereRoute(args["id"].orEmpty())
+    },
+    V3Route("team/members/{id}/stale/{old}", RouteKind.SHEET, { StrAccount.removeStale }, parent = "team/members/{id}", needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      RemoveStaleRoute(args["id"].orEmpty(), args["old"].orEmpty())
     },
     V3Route(AccountPaths.SUBSCRIPTION, RouteKind.PAGE, { Str.mySubscription }, aliases = listOf("myplan"), chrome = Chrome.OWN) { SubscriptionRoute() },
     V3Route(AccountPaths.PLANS, RouteKind.PAGE, { Str.plans }, parent = AccountPaths.SUBSCRIPTION, aliases = listOf("vip"), chrome = Chrome.OWN) { PlansRoute() },
