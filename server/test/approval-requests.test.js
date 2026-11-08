@@ -308,6 +308,28 @@ test('Sync v1: مدیرِ بالای سقف با تأییدِ صاحب از را
   assert.equal(replay.body.results[0].reason, 'approval_replayed');
 });
 
+test('سرورِ بی Sync v3: کارِ پیش‌فرض‌ممنوعِ شاگرد درخواست نمی‌سازد (approval_needs_v3)؛ مدیرِ بالای سقف همان راهِ v1', async () => {
+  //  v1Guard تأییدِ چنین کاری را همیشه `approval_needs_v3` می‌کند (v1 ِ مشترک با پمپ نقش را می‌سنجد) ⇒ بی v3 مصرف‌شدنی نیست
+  const config = require('../src/config');
+  config.syncV3.enabled = false;
+  try {
+    const r = await ask(staff, { perm: 'sales.discount', doc: 'sales/s-nov3', pctBp: 2000, amount: 2000 });
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.equal(r.body.error.code, 'approval_needs_v3');
+    assert.equal(await one('SELECT 1 AS x FROM shop_approval_requests WHERE doc=$1', ['sales/s-nov3']), null);
+    //  همان دلیل در خودِ v1: برگهٔ تأییدشده هم برای شاگرد نمی‌نشیند
+    const v1 = { op_id: oid(), table: 'sales', row_id: 's-nov3', type: 'insert', ts: Date.now(),
+      fields: { total: 100, discount: 20, finalTotal: 80, status: 'completed', approval: ref('apr_000000000000000000000000') } };
+    assert.equal((await push1(staff, 's-nov3', [v1])).body.results[0].reason, 'approval_needs_v3');
+    //  مدیر (پیش‌فرضش «مجاز»، سقفِ ۱۰٪) بالای سقف همان امروز می‌پرسد
+    assert.equal((await ask(manager, { perm: 'sales.discount', doc: 'sales/s-nov3-m', pctBp: 2000, amount: 2000 })).status, 201);
+  } finally {
+    config.syncV3.enabled = true;
+  }
+  //  سرورِ با v3: همان درخواست ساخته می‌شود (دستگاهِ v3 مصرفش می‌کند)
+  assert.equal((await ask(staff, { perm: 'sales.discount', doc: 'sales/s-nov3', pctBp: 2000, amount: 2000 })).status, 201);
+});
+
 test('سقفِ درخواستِ باز: بیش از ده تا ⇒ ۴۲۹', async () => {
   await query(`UPDATE shop_approval_requests SET status='cancelled' WHERE requester_id=$1 AND status='pending'`, [staff.user.id]);
   for (let i = 0; i < 10; i++) {

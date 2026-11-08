@@ -577,14 +577,16 @@ function attach(server) {
     const ticket = url.searchParams.get('ticket');
     //  بلیتِ خوشه (`c1.`، فقط با `CLUSTER_ENABLED`) با پایگاه مصرف می‌شود؛ بقیه همان راهِ همیشگی
     const shared = ticket != null && cluster.enabled() && ticket.startsWith(SHARED_PREFIX) ? takeShared(ticket) : null;
-    const token = shared ? '' : ticket != null ? takeTicket(ticket)
+    //  ⛔ بلیتِ خوشه: توکنِ پشتِ بلیت همان توکنِ سوکت است (مثلِ `takeTicket`)؛ سنجشِ دوبارهٔ لایهٔ ۲ و تپشِ `dropRevoked`
+    //  با همین می‌سنجند. پیش‌تر '' می‌ماند ⇒ نخستین خبرِ پس از `RECHECK_MS` سوکتِ سالم را 4401 `session_revoked` می‌بست
+    let token = shared ? '' : ticket != null ? takeTicket(ticket)
       : m ? m[1].trim() : (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
     //  S78: کلاینتی که پس از 4403 با توکنِ تازه برمی‌گردد، `caps=expiry` می‌فرستد
     const caps = String(url.searchParams.get('caps') || '').slice(0, 64).split(',').map((c) => c.trim());
     const seen = epoch;
 
-    (shared ? shared.then(resolveSession) : resolveSession(token)).then(async (out) => {
+    (shared ? shared.then((t) => { token = t; return resolveSession(t); }) : resolveSession(token)).then(async (out) => {
       const ctx = out && out.ctx;
       if (!ctx || !ctx.accountId) return reject(socket, 401, 'Unauthorized');
       const claimed = appAlias(url.searchParams.get('app')) || appAlias(req.headers['x-app']);

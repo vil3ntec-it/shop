@@ -499,11 +499,12 @@ async function seedShop(a) {
     { token: a.accessToken });
   assert.ok([200, 201].includes(key.status), JSON.stringify(key.body));
   ids.approverKey = key.body.key.id;
-  //  STF-02: درخواستِ تأییدِ شاگردِ «الف» (تخفیفِ «نیازمندِ تأیید») — در انتظارِ صاحب/مدیر
-  const lay = await h.put('/api/shop/permissions/roles/staff', { perms: { 'sales.discount': { mode: 'approve' } } }, { token: a.accessToken });
+  //  STF-02: درخواستِ تأییدِ شاگردِ «الف» (برگشتِ بالای سقف ⇒ «نیازمندِ تأیید») — در انتظارِ صاحب/مدیر. برگشت، نه تخفیف:
+  //  تخفیفِ شاگرد (پیش‌فرضِ «ممنوع») بی Sync v3 ِ سرور درخواست نمی‌سازد (`approval_needs_v3`، approval-requests.test.js)
+  const lay = await h.put('/api/shop/permissions/roles/staff', { perms: { 'returns.create': { caps: { maxAmount: 1000 } } } }, { token: a.accessToken });
   assert.equal(lay.status, 200, JSON.stringify(lay.body));
   const apr = await h.post('/api/shop/approval-requests',
-    { key: fresh('apr-key'), perm: 'sales.discount', doc: 'sales/s-inv-a', pctBp: 2000, amount: 2000, reason: 'مشتریِ الف' },
+    { key: fresh('apr-key'), perm: 'returns.create', doc: 'returns/r-inv-a', amount: 2000, reason: 'مشتریِ الف' },
     { token: staff.accessToken });
   assert.equal(apr.status, 201, JSON.stringify(apr.body));
   ids.approvalRequest = apr.body.request.id;
