@@ -226,10 +226,13 @@ object StockLedger {
       } else if (w.isAdjustment && w.adjKind == Repack.KIND) {
         //  INV-21: بسته‌بندیِ دوباره/ساختِ بسته ⇒ سندِ `production` ِ هسته (علامت‌دار)؛ خروجی با بهای همان ردیف
         //  (بهای کارتن ÷ دانه، جمعِ اجزا — `Repack`)، ورودی به میانگینِ همان محل. ردیفی که تا امروز بوده این نوع را ندارد.
+        //  سری فقط از ردیفِ «دستورِ ساخت و سریِ تولید» (`lotId`): ورودی همان سری، خروجی [lotRefOf] (`Repack` همان شناسه را می‌نویسد) و `costMinor`
+        val lid = w.lotId?.takeIf { it.isNotEmpty() }
         out += Event(
           id, "entry", Repack.MOVE, at, dayOf(w.date, at), w.productId, loc, q, user, ref,
           reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
-          costMinor = if (q > 0) max(0L, roundOr0(w.units * w.price * 100.0)) else null,
+          costMinor = if (q > 0) max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)) else null,
+          lotId = if (q < 0) lid else null, lot = if (q > 0 && lid != null) lotRefOf(w) else null,
         )
       } else {
         val kind = if (w.isAdjustment) adjKindOf(w, moveTypeByRef, dmg != null) else "other"
@@ -454,7 +457,7 @@ object StockLedger {
         val d = if (ev.type == "purchase_receipt") {
           docOf(ev, ev.type, ev.location, ev.qtyMilli, lot = ev.lot, costMinor = ev.costMinor, landedMinor = ev.landedMinor.takeIf { it > 0 })
         } else {
-          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId, costMinor = ev.costMinor.takeIf { ev.type == Repack.MOVE })
+          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId, lot = ev.lot.takeIf { ev.type == Repack.MOVE }, costMinor = ev.costMinor.takeIf { ev.type == Repack.MOVE })
         }
         val r = StockCore.apply(book, d, mode, today)
         if (!r.result.ok) return Step(book0, emptyList(), r.result)

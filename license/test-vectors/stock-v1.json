@@ -300,6 +300,49 @@
       }
     },
     {
+      "name": "production takes component lots FEFO - dated first, the lot without expiry after - and books the product lot with the earliest component expiry at the exact cost (INV-21)",
+      "today": "2026-11-08",
+      "defaults": {"productId": "C", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 3000, "costMinor": 3000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 2600, "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 4400, "lot": {"lotId": "Z", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true}},
+        {"doc": {"type": "production", "qtyMilli": -5500, "refId": "R1"}, "expect": {"ok": true, "costMinor": 6111, "picks": [{"lotId": "X", "qtyMilli": 3000}, {"lotId": "Y", "qtyMilli": 2000}, {"lotId": "Z", "qtyMilli": 500}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "B", "qtyMilli": 1000, "costMinor": 6111, "refId": "R1", "lot": {"lotId": "w:o1", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 6111}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "B", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 6111, "lots": [{"lotId": "w:o1", "qtyMilli": 1000}]},
+          {"productId": "C", "warehouseId": "W1", "qtyMilli": 3500, "valueMinor": 3889, "lots": [{"lotId": "Z", "qtyMilli": 3500}]}
+        ],
+        "totals": {"purchasesMinor": 10000, "productionMinor": 0}
+      }
+    },
+    {
+      "name": "production at a place after a lot transfer: the chosen lot, pieces keep a lot without expiry, then FEFO at the source; no lot goes negative (INV-21)",
+      "today": "2026-11-08",
+      "defaults": {"productId": "C", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 5000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 6000, "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 4000, "lotId": "N", "refId": "T1"}, "expect": {"ok": true, "costMinor": 4400, "picks": [{"lotId": "N", "qtyMilli": 4000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 4000, "costMinor": 4400, "refId": "T1", "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true, "costMinor": 4400}},
+        {"doc": {"type": "production", "warehouseId": "W2", "qtyMilli": -1500, "lotId": "N", "refId": "R2"}, "expect": {"ok": true, "costMinor": 1650, "picks": [{"lotId": "N", "qtyMilli": 1500}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "D", "warehouseId": "W2", "qtyMilli": 3000, "costMinor": 1650, "refId": "R2", "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true, "costMinor": 1650}},
+        {"doc": {"type": "production", "qtyMilli": -6000, "refId": "R3"}, "expect": {"ok": true, "costMinor": 6600, "picks": [{"lotId": "X", "qtyMilli": 5000}, {"lotId": "N", "qtyMilli": 1000}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "B", "qtyMilli": 2000, "costMinor": 6600, "refId": "R3", "lot": {"lotId": "w:o2", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 6600}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "B", "warehouseId": "W1", "qtyMilli": 2000, "valueMinor": 6600, "lots": [{"lotId": "w:o2", "qtyMilli": 2000}]},
+          {"productId": "C", "warehouseId": "W1", "qtyMilli": 0, "valueMinor": 0, "lots": []},
+          {"productId": "C", "warehouseId": "W2", "qtyMilli": 2500, "valueMinor": 2750, "lots": [{"lotId": "N", "qtyMilli": 2500}]},
+          {"productId": "D", "warehouseId": "W2", "qtyMilli": 3000, "valueMinor": 1650, "lots": [{"lotId": "N", "qtyMilli": 3000}]}
+        ],
+        "totals": {"purchasesMinor": 11000, "transfersMinor": 0, "productionMinor": 0}
+      }
+    },
+    {
       "name": "validation (recorded mode still refuses malformed documents)",
       "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
       "steps": [

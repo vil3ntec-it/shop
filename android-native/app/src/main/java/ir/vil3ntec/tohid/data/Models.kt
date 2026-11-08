@@ -219,6 +219,7 @@ data class WarehouseEntry(
    *  PRD-07 — ارزشِ **دقیقِ** کالای همین ردیف به صدمِ افغانی (بی هزینهٔ جانبی): خریدی که به واحدِ خرید ثبت شد
    *  (۱ کارتنِ ۲۴ به ۱٬۰۰۰ ⇒ 100000)، تا میانگینِ موزون (`StockLedger`، `ReportCore`) ارزش را از `units × price` ِ گردشده
    *  (۲۴ × ۴۱٫۶۷ = ۱٬۰۰۰٫۰۸) نسازد. `null` = همان `units × price` ِ پیشین؛ نوشته نمی‌شود ⇒ ردیفِ قدیمی همان.
+   *  INV-21 — همین فیلد بهای دقیقِ کلِ ردیفِ خروجیِ تولید (`Repack` ِ `lots`، جمعِ بهای اجزا) هم هست؛ همان قاعده.
    */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -849,6 +850,7 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
   /** POS-27 — فقط `layaway` (سند) و `layaway_status` (وضعیتِ تازه)؛ `Layaways`. `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val layaway: LayawayDoc? = null,
+  /** INV-21 — فقط `stock_bom` (`Bom`): دستورِ ساختِ کالای `refId`؛ `null` نوشته نمی‌شود */ @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val bom: BomDoc? = null,
   /** PRM-13 — فقط ردیف‌های `loyalty_*` (`LoyaltyPoints`): شمارِ امتیاز (همیشه مثبت؛ نوع علامت را می‌گوید). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val points: Long? = null,
   /** PAY-07 — فقط `pay_status` (`PayStatusFlow`؛ `refId` = فاکتور، `amount` = مبلغِ ردیف): جای ردیف در `payments`، روشش،

@@ -110,6 +110,8 @@ const placed = (f) => (text(f.refId) && (f.reason === 'add' || f.reason === 'arc
 /** INV-11 (`StockTransferBook`): شیءِ `xfer` با گامِ شناخته؛ داوریِ خودِ گام (موجودی، وضعیت) با سرور هنگامِ خواندنِ دفتر */
 const transferred = (f) => (isObj(f.xfer) && ['send', 'receive', 'reject'].includes(f.xfer.step) ? MOVE : BAD);
 const repacked = (f) => (text(f.refId) ? PLACES : BAD);
+/** INV-21 (`Bom`): دستورِ ساختِ کالای `refId` — شیءِ `bom` با فهرستِ `parts` (خالی = برداشتن)؛ همان اجازهٔ بسته‌بندی */
+const bommed = (f) => (text(f.refId) && isObj(f.bom) && Array.isArray(f.bom.parts) ? PLACES : BAD);
 
 /** `auditLog.type` ⇒ (fields) ⇒ اجازهٔ لازم یا BAD */
 const AUDIT = Object.freeze({
@@ -130,6 +132,7 @@ const AUDIT = Object.freeze({
   stock_place: placed,
   stock_repack: repacked,
   stock_assembly: repacked,
+  stock_bom: bommed,
   pay_status: payStatus,
   stock_transfer: transferred,
 });

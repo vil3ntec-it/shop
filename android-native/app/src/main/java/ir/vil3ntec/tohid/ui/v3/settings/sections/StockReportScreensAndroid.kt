@@ -35,13 +35,15 @@ import ir.vil3ntec.tohid.ui.v3.settings.SettingsPageFrame
 
 /**
  *  `settings/sales/stock-places`: محل‌ها و انتقال (INV-20) و بسته‌بندیِ دوباره و ساختِ بسته (INV-21) — دو کلیدِ
- *  جدا، همان `StockPlacesPref.setPlaces` و `setRepack` ِ `StockPlacesSettingsWired`.
+ *  جدا، همان `StockPlacesPref.setPlaces` و `setRepack` ِ `StockPlacesSettingsWired`؛ و «دستورِ ساخت و سریِ تولید»
+ *  (`StockPlacesPref.setBom`، INV-21، فقط با بسته‌بندیِ روشن).
  */
 @Composable
 internal fun RouteScope.StockPlacesScreen(onBack: (() -> Unit)?) {
   val context = LocalContext.current
   var places by remember { mutableStateOf(StockPlacesPref.places(context)) }
   var repack by remember { mutableStateOf(StockPlacesPref.repack(context)) }
+  var bom by remember { mutableStateOf(StockPlacesPref.bom(context)) }
   val options = listOf(StrPlaces.off, StrPlaces.on)
   SettingsPageFrame(
     title = SettingsLayout.labelOf(SettingsLayout.STOCK_PLACES),
@@ -62,6 +64,14 @@ internal fun RouteScope.StockPlacesScreen(onBack: (() -> Unit)?) {
         V3Segmented(options, if (repack) 1 else 0, { repack = it == 1; StockPlacesPref.setRepack(context, repack) })
       }
       SettingsNote(StrPlaces.repackSectionNote)
+    }
+    //  INV-21 — دستورِ ساخت و سریِ تولید: فقط همراهِ بسته‌بندیِ دوباره؛ خاموش ⇒ پنجره و ردیف‌ها همان امروز
+    if (repack) item(key = "bom") {
+      SettingsBlock {
+        PartTitle(StrPlaces.bomSection)
+        V3Segmented(options, if (bom) 1 else 0, { bom = it == 1; StockPlacesPref.setBom(context, bom) })
+      }
+      SettingsNote(StrPlaces.bomSectionNote)
     }
   }
 }

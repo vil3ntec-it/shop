@@ -80,6 +80,7 @@ object ShopSettingsKeys {
     shop("count_blind", "b"),                   // INV-06/07/08: انبارگردانیِ کور
     shop("stock_places", "b"),                  // INV-20/21
     shop("stock_repack", "b"),
+    shop("stock_bom", "b"),                     // INV-21: دستورِ ساخت و سریِ تولید
     //  مشتری و وفاداری (قاعدهٔ همین دستگاه؛ قاعدهٔ سرور PRM-13 جدا: `loyalty_shop:`)
     shop("loyalty", "b"),
     shop("loyalty_every_afn", "l"),

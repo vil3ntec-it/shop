@@ -168,7 +168,7 @@ object SettingsSearchIndex {
     L.PRODUCT_SUGGEST to kw("پیشنهاد دسته نام از متن چسباندن فهرست", "suggest category name paste text list", "وړاندیز ډله نوم له متن"),
     L.LABEL_TOOLS to kw("برچسب بارکد لیبل", "label barcode", "لیبل بارکوډ"),
     L.PRODUCT_TOOLS to kw("ابزار کالا", "product tools", "د توکو وسایل"),
-    L.STOCK_PLACES to kw("محل جا انبار قفسه بسته‌بندی", "locations warehouse repack", "ځایونه ګدام بسته"),
+    L.STOCK_PLACES to kw("محل جا انبار قفسه بسته‌بندی دستور ساخت تولید اتلاف سری", "locations warehouse repack recipe bom production loss lot", "ځایونه ګدام بسته لارښود جوړول تولید ضایع لړۍ"),
     L.COUNT_TOOLS to kw("انبارگردانی شمارش", "stock count", "شمېرنه"),
     L.SHRINK_REPORT to kw("ضایعات کسری", "shrink waste", "ضایعات کمښت"),
     L.STOCK_LEVELS to kw("نقطه سفارش حداقل", "reorder point minimum", "د فرمایش ټکی"),
