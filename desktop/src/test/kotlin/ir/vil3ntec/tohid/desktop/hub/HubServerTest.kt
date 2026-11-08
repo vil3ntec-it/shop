@@ -65,7 +65,7 @@ class HubServerTest {
     }
   }
 
-  private data class Res(val status: Int, val body: String)
+  private data class Res(val status: Int, val body: String, val close: Boolean = false)
 
   private class Hub(val server: HubServer, val pin: String, val dir: File) {
     val port get() = server.port
@@ -130,7 +130,7 @@ class HubServerTest {
     }
     val st = c.responseCode
     val text = (if (st >= 400) c.errorStream else c.inputStream)?.use { it.readBytes().decodeToString() }.orEmpty()
-    return Res(st, text)
+    return Res(st, text, c.getHeaderField("Connection").equals("close", ignoreCase = true))
   }
 
   private fun hello(h: Hub, token: String?, device: String?) = call(h, "GET", "/hub/v1/hello", token, device)
@@ -212,6 +212,44 @@ class HubServerTest {
     c.online = true
     assertEquals(200, push(h, tokA, "devA", "a1").status)
     assertEquals(listOf("a1"), h.server.snapshot().batches.flatMap { it.opIds })
+  }
+
+  /**
+   *  ریشهٔ `SocketTimeoutException: Read timed out` ِ ماشینِ پرکار: پاسخِ پیش از خواندنِ بدنه (۴۰۳/۴۰۹/۴۱۳…) اتصالِ
+   *  keep-alive را باز می‌گذاشت و `jdk.httpserver` باقیِ بدنه را پس از پاسخ می‌خواند — درخواستِ بعدیِ همان اتصال گاهی
+   *  در بافرِ TLS ِ سرور گیر می‌کرد. حالا چنین پاسخی `Connection: close` دارد؛ پاسخِ پس از خواندنِ کاملِ بدنه نه.
+   */
+  @Test fun `پاسخِ پیش از خواندنِ بدنه اتصال را می‌بندد و پاسخِ پس از بدنهٔ کامل نه`() {
+    val c = cloud()
+    val tokC = "tok-C-0123456789abcdef"
+    c.tokens[tokC] = "devC"
+    c.shops[tokC] = "shop-B"
+    val h = hub(newDir(), c, limits = HubLimits(maxBodyBytes = 2_048))
+    val kept = listOf(
+      hello(h, tokA, "devA") to 200,
+      push(h, tokA, "devA", "a1") to 200,
+      call(h, "POST", "/hub/v1/push", tokA, "devA", "not json") to 400,
+      call(h, "POST", "/hub/v1/push", tokA, "devA", body("devB", "a2")) to 400,
+    )
+    for ((r, st) in kept) {
+      assertEquals(st, r.status)
+      assertFalse("$st پس از خواندنِ کاملِ بدنه keep-alive می‌ماند", r.close)
+    }
+    val big = """{"device_id":"devA","pad":"${"x".repeat(3_000)}","ops":[{"op_id":"a3"}]}"""
+    val closed = listOf(
+      call(h, "POST", "/hub/v1/push", tokA, "devA", body("devA", "a4"), serverId = "srv_fedcba9876543210fedc") to 409,
+      call(h, "POST", "/hub/v1/push", tokA, "devA", big) to 413,
+      push(h, tokC, "devC", "c1") to 403,
+      call(h, "POST", "/hub/v1/push", null, "devA", body("devA", "a5")) to 401,
+      call(h, "POST", "/hub/v1/nope", tokA, "devA", body("devA", "a6")) to 404,
+    )
+    for ((r, st) in closed) {
+      assertEquals(st, r.status)
+      assertTrue("$st پیش از خواندنِ بدنه ⇒ Connection: close", r.close)
+    }
+    //  و درخواستِ بعدی هنوز جواب می‌گیرد
+    assertEquals(200, push(h, tokA, "devA", "a7").status)
+    assertEquals(listOf("a1", "a7"), h.server.snapshot().batches.flatMap { it.opIds })
   }
 
   @Test fun `فقط نشانی‌های شبکهٔ دکان پذیرفته‌اند`() {

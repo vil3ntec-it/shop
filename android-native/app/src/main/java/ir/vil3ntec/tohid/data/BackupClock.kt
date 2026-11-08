@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.formatDate
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -42,13 +44,13 @@ object BackupClock {
 
   fun text(context: Context): String {
     val at = lastAt(context)
-    if (at <= 0L) return "هنوز پشتیبانی گرفته نشده"
+    if (at <= 0L) return StrAppData.noBackupYet
     val iso = SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(at))
     val days = daysSince(context) ?: 0
     return when {
-      days <= 0 -> "امروز"
-      days == 1 -> "دیروز — ${formatDate(iso)}"
-      else -> "${formatDate(iso)} (${days} روز پیش)"
+      days <= 0 -> Str.today
+      days == 1 -> StrAppData.yesterdayOn(formatDate(iso))
+      else -> StrAppData.daysAgoOn(formatDate(iso), days)
     }
   }
 }

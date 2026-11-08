@@ -16,13 +16,14 @@
 const express = require('express');
 const pay = require('../lib/payment-intents');
 const { rateLimit } = require('../middleware/ratelimit');
+const { rawBody } = require('../lib/raw-body');   //  نگهبانِ نوعِ بدنهٔ خام (CodeQL: type confusion)
 
 const router = express.Router();
 //  سقفِ نرخِ هر IP پیش از هر کار (بی توکنِ کاربر)؛ گشاده تا تکرارِ مشروعِ ارائه‌دهنده رد نشود
 router.use(rateLimit({ max: Number(process.env.RATE_PAY_WEBHOOK_MAX) || 600, windowMs: 60 * 1000, keyPrefix: 'pay-webhook-ip' }));
 
 const webhook = (name) => (req, res, next) => {
-  const raw = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const raw = rawBody(req);
   const opts = req.params.token === undefined ? {} : { token: String(req.params.token) };
   pay.handleWebhook(name, raw, req.headers, opts).then((out) => res.status(out.status).json(out.body)).catch(next);
 };

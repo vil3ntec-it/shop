@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.core.atrest.AtRestFiles
 import ir.vil3ntec.tohid.core.atrest.AtRestKeyring
 import ir.vil3ntec.tohid.core.atrest.AtRestMigration
 import ir.vil3ntec.tohid.core.atrest.AtRestScope
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.io.File
 import java.io.FileOutputStream
 
@@ -90,14 +91,15 @@ object AtRest {
     return try {
       codec(context).seal(plain).also { sealError = null }
     } catch (e: AtRestException) {
-      sealError = e.message ?: "کلیدِ رمز در دسترس نیست"
+      sealError = e.message ?: StrAppData.keyUnavailable
       plain
     }
   }
 
   /** همان `DiskWrite.text`، با رمز اگر روشن است */
-  fun writeText(context: Context, f: File, text: String) =
-    DiskWrite.bytes(f, encode(context, text.toByteArray(Charsets.UTF_8)))
+  /** @param keepPrevious نسخهٔ پیشین به نامِ `<نام>.prev` می‌ماند (`DiskWrite.bytes`) — برای دفترِ روی میز */
+  fun writeText(context: Context, f: File, text: String, keepPrevious: Boolean = false) =
+    DiskWrite.bytes(f, encode(context, text.toByteArray(Charsets.UTF_8)), keepPrevious)
 
   /** فایل‌هایی که فاز ۱ پوشش می‌دهد — دفترِ روی میز اول */
   fun files(context: Context): List<File> {
@@ -106,7 +108,8 @@ object AtRest {
       it.isFile && it.name.startsWith("ledger-") && it.name.endsWith(".json") && it.name != "ledger-summary.json"
     }.sortedBy { it.name }
     val snaps = runCatching { AutoBackup.list(context).map { it.file } }.getOrDefault(emptyList())
-    return listOf(File(dir, "shop-data.json"), File(dir, "before-restore.json")) + vaults + snaps
+    //  DATA-SAFETY: نسخهٔ پیشینِ دفتر (`shop-data.json.prev`) همان رمزِ دفتر را می‌گیرد
+    return listOf(File(dir, "shop-data.json"), File(dir, "before-restore.json"), File(dir, "shop-data.json.prev")) + vaults + snaps
   }
 
   /**

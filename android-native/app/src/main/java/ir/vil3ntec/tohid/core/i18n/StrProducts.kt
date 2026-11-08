@@ -123,6 +123,14 @@ object StrProducts {
   val saleUnitPlaceholder: String get() = t("گرم", "gram", "ګرام")
   val factor: String get() = t("ضریب", "Factor", "ضریب")
   fun factorHelper(unit: String): String = t("هر واحد = چند ${asIs(unit)}", "One sale unit = how many $unit", "یو واحد = څو $unit")
+  //  MKT-06 «چرخهٔ مصرف» (`data/ProductCycle`)
+  val cycle: String get() = t("چرخهٔ مصرف (روز)", "Consumption cycle (days)", "د مصرف دوره (ورځې)")
+  val cycleHelper: String get() = t(
+    "اختیاری — پس از این چند روز، برنامهٔ خریدِ مشتری «وقتِ دوباره خریدن؟» نشان می‌دهد",
+    "Optional — after this many days the customer app shows “Time to buy again?”",
+    "اختیاري — له دې څو ورځو وروسته د پېرودونکي اپ «د بیا پېرلو وخت دی؟» ښيي",
+  )
+  val cycleBad: String get() = t("عددِ صحیحِ ۱ تا ۳۶۵ روز بنویسید", "Enter a whole number of days from 1 to 365", "له ۱ تر ۳۶۵ ورځو پوره عدد ولیکئ")
   val supplier: String get() = t("تأمین‌کننده", "Supplier", "عرضه کوونکی")
   val noSupplier: String get() = t("هیچ‌کدام", "None", "هېڅ")
   val activeInSale: String get() = t("فعال در فروش", "Active in sales", "په پلور کې فعال")

@@ -75,6 +75,9 @@ object LedgerOwner {
     //  سرورِ پیش‌فرض (و پرچمِ خاموشِ `app.multi_server`) ⇒ همان نامِ امروز؛ سرورِ دیگر ⇒ نامِ جدای خودش
     ir.vil3ntec.tohid.core.server.DataPartition.keyIn(scope, userId, shopId)
 
+  /** دفترِ روی میز بایگانی نشد ⇒ جابه‌جایی انجام نشد و هیچ چیزی عوض نشد (ورود باید برگردد) */
+  class NotArchived : java.io.IOException("ledger not archived")
+
   /** نتیجهٔ ورود — برای اینکه صفحه بداند چه چیزی به کاربر بگوید */
   enum class Result {
     /** همان حساب و همان دکان؛ دست نخورد */
@@ -132,6 +135,18 @@ object LedgerOwner {
     runCatching { StockFlag.load(context) }
   }
 
+  /**
+   *  دفترِ بایگانی‌شدهٔ ساخت‌های پیشین (`ShopStore.vaultLegacy`) باز می‌شود ⇒ کلیدِ همگام‌سازیِ همین حساب
+   *  «بازیابیِ بایگانی» می‌خواهد پیش از هر تفاضل یا push (`SyncV1Engine.recoverArchived`). همان بایگانی‌ای
+   *  است که اشکالِ کلیدها (پیش از `AccountBind`) دفترِ واقعیِ صاحب را در آن جا گذاشت.
+   */
+  private fun markRecovery(context: Context, store: ShopStore, user: String, key: String) {
+    if (!store.vaultLegacy(key)) return
+    runCatching {
+      ir.vil3ntec.tohid.sync.v1.SyncStateV1(context, ir.vil3ntec.tohid.sync.v1.SyncV1Keys.scoped(context, user)).recoverArchive = true
+    }
+  }
+
   private suspend fun align(
     context: Context,
     store: ShopStore,
@@ -159,6 +174,23 @@ object LedgerOwner {
      *     همان لحظه از دستش می‌گرفتیم.
      */
     val adopting = previousUser.isBlank() || (previousUser == user && previousShop.isBlank())
+    /*
+     *  همان حساب از «بی‌دکان» به دکانی رسید که دفترش از پیش **بایگانی** شده (ورودی که دکان را نمی‌دانست
+     *  `حساب@خالی` ِ خالی باز کرده بود) ⇒ دفترِ واقعیِ آن دکان باز می‌شود، نه آن‌که دفترِ خالی سندِ دکان بخورد
+     *  و دفترِ واقعی برای همیشه در بایگانی بماند.
+     */
+    if (adopting && previousUser == user && shop.isNotBlank()) {
+      val scope = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scope(context)
+      val to = key(scope, user, shop)
+      if (store.deskEmpty() && store.hasVault(to)) {
+        markRecovery(context, store, user, to)
+        store.openFrom(to)
+        runCatching { PhotoStore.openFrom(context, to) }
+        state.accountId = user
+        remember(context, user, shop)
+        return Result.SWITCHED
+      }
+    }
     if (adopting) {
       state.accountId = user
       remember(context, user, shop)
@@ -170,8 +202,12 @@ object LedgerOwner {
     val from = key(scope, previousUser, previousShop)
     val to = key(scope, user, shop)
 
-    store.stashTo(from)
+    //  بایگانی ننشست (حافظهٔ پر…) ⇒ هیچ جابه‌جایی: دفترِ روی میز هرگز با دفترِ دیگری رونویسی نمی‌شود
+    if (!store.stashTo(from)) throw NotArchived()
     state.forgetAccountState()
+    //  همان حساب، دکانِ دیگر ⇒ صف/سایه/cursor ِ دکانِ پیشین هم کنارِ دفترش (کلیدِ v1 شناسهٔ حساب است، نه دکان)
+    if (previousUser == user) runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Keys.switchShop(context, user, previousShop, shop) }
+    markRecovery(context, store, user, to)
     store.openFrom(to)
 
     /*

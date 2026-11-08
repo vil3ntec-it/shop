@@ -39,6 +39,10 @@ import java.lang.reflect.Modifier
  *  7. **دورِ ۶** (پوششِ کامل): هیچ نوشتهٔ دری در جدول‌ها، برنامهٔ خرید و ویترین شکلِ فقط‌فارسیِ [farsiOnlyForms] را ندارد
  *     (جز [farsiOnlyAllowed] ِ نام‌دار)؛ `StrDebtor` (پیش‌تر `t` ِ فقط‌فارسی) جدولِ همگانی است و نمایشگرِ مشتری ([movedScreens6])
  *     متنِ خام ندارد؛ سقف باز پایین آمد.
+ *  8. **دورِ ۷**: لایه‌های دفتر، همگام‌سازی، چاپ و به‌روزرسانی ([appLayers]: `data/`، `sync/`، `print/`، `update/`؛ همچنین
+ *     جایگزین‌های کامپیوترِ همان پوشه‌ها) هیچ متنِ خامی ندارند — خطا و حالِ کارشان از `StrLedger`، `StrGoods`، `StrAppData`، `StrSync`، `StrPrint` و `StrUpdate` می‌آید؛ یادداشتِ سابقه،
+ *     برگهٔ خروجی، کلیدِ منطق و متنِ خامِ `lastError` ِ همگام‌سازی با «// داده: دلیل» می‌مانند. برچسب‌های فاکتور، رسیدِ هدیه و
+ *     صورت‌حسابِ چاپی در دری از لایهٔ واژه می‌گذرند (`Receipts.labels`)؛ چند متنِ زندهٔ قدیمیِ `ui/screens` هم؛ سقف باز پایین آمد.
  */
 class DariCoverageTest {
 
@@ -227,10 +231,12 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵ */
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵، دورِ ۷: ۱۸۳۱ */
   //  دستهٔ ۲۷: ۱۸۳۵ ِ دورِ ۶ روی پایه‌ای بی #971 شمرده شد؛ #971 سه سطرِ هم‌شکلِ STORE_PLACE (برچسبِ L.STORE_STOCK و
-  //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام
-  private val maxRawOldScreens = 1838
+  //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام.
+  //  دورِ ۷: هفت متنِ زندهٔ `MoreLayout`، `ReportFreshModel`، `ServerPulse`، `VoiceSearch`، `DeskMenu` و `DeliveryDesk` ⇒ ۱۸۳۱
+  //  (بقیهٔ متنِ زنده کلیدِ تنظیمات و جدول‌های گزارشِ `DayEndModel`/`HeatmapModel` است — منتظرِ تصمیمِ صاحب‌کار؛ باقی صفحه‌های مرده)
+  private val maxRawOldScreens = 1831
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14
@@ -563,6 +569,76 @@ class DariCoverageTest {
     println("dari-old-raw ${files.size} $n")
     assertTrue("صفحه‌ای پیدا نشد", files.size > 150)
     assertTrue("متنِ خامِ تازه در ui/screens ($n > $maxRawOldScreens) — به جدولِ Str* ببرید", n <= maxRawOldScreens)
+  }
+
+  /* ---------------- دورِ ۷: لایه‌های دفتر، همگام‌سازی، چاپ و به‌روزرسانی ---------------- */
+
+  /** لایه‌هایی که پیام‌شان (خطا و حالِ کار) به کاربر می‌رسد؛ دورِ ۷ همه را به جدول برد — متنِ خام فقط در سطرِ «// داده:» */
+  private val appLayers = listOf("data", "sync", "print", "update")
+
+  @Test fun `لایه‌های دفتر، همگام‌سازی، چاپ و به‌روزرسانی متنِ خامِ فارسی ندارند`() {
+    val bad = ArrayList<String>()
+    var files = 0
+    //  جایگزین‌های کامپیوتر برای همان لایه‌ها (`desktop/src/main/kotlin`: `UpdaterDesk`، `AtRestKeysDesk`، `ReportPrintDesk`…) هم
+    val desk = DesktopPhrases.repo().resolve("desktop/src/main/kotlin/ir/vil3ntec/tohid")
+    for (base in listOf(app, desk)) for (d in appLayers) {
+      val dir = base.resolve(d)
+      if (base == app) assertTrue("پوشهٔ $d نیست", dir.isDirectory)
+      if (!dir.isDirectory) continue
+      for (f in dir.walkTopDown().filter { it.isFile && it.extension == "kt" }) {
+        files++
+        for (s in raw(f)) bad += "${f.relativeTo(base.parentFile.parentFile.parentFile).invariantSeparatorsPath}: «$s»"
+      }
+    }
+    assertTrue("پرونده‌ای پیدا نشد ($files)", files > 250)
+    assertTrue(
+      "نوشتهٔ فارسیِ خام در لایه‌های دفتر/همگام‌سازی/چاپ/به‌روزرسانی (دری و زبان‌های دیگر آن را نمی‌بینند) — به جدولِ " +
+        "StrLedger/StrGoods/StrAppData/StrSync/StrPrint/StrUpdate با t(…) ببرید؛ داده را با «// داده: دلیل» نشان بدهید:\n" +
+        bad.joinToString("\n"),
+      bad.isEmpty(),
+    )
+  }
+
+  @Test fun `فارسیِ پیام‌های دورِ ۷ همان متنِ پیشین است و دری و زبان‌های دیگر عوض می‌شوند`() {
+    I18n.source = { Lang.FA }
+    assertEquals("مشتری پیدا نشد", StrLedger.customerNotFound)
+    assertEquals("کشوی «اصلی» از قبل باز است", StrLedger.drawerAlreadyOpen("اصلی"))
+    assertEquals("فقط 3 کیلو موجود است", StrGoods.onlyInStock("3", "کیلو"))
+    assertEquals("چاپگر در شبکه جواب نداد (10.0.0.9) — روشن است؟", StrPrint.netNoAnswer("10.0.0.9"))
+    assertEquals("همگام با سرور", StrSync.dotGreen)
+    assertEquals("نسخهٔ شما تازه‌ترین است.", StrUpdate.upToDate)
+    assertEquals("این فایل، پشتیبانِ فروشگاه من نیست", StrAppData.notOurBackup)
+    I18n.source = { Lang.PRS }
+    //  نامِ مشتری و کالا (داده) در دری همان می‌ماند
+    assertEquals("«فروشگاه گوشی»: 2 موجود است، شما 5 خواستید.", StrLedger.shortStock("فروشگاه گوشی", "2", "", "5"))
+    assertEquals("این فایل، پشتیبانِ فروشگاه من نیست", StrAppData.notOurBackup) // «فروشگاه من» نامِ برنامه است
+    I18n.source = { Lang.EN }
+    assertEquals("Customer not found", StrLedger.customerNotFound)
+    assertEquals("In sync with the server", StrSync.dotGreen)
+    I18n.source = { Lang.PS }
+    assertEquals("پېرودونکی پیدا نه شو", StrLedger.customerNotFound)
+  }
+
+  @Test fun `برچسب‌های فاکتور و صورت‌حسابِ چاپی در دری از لایهٔ واژه می‌گذرند و در فارسی همان پیشین‌اند`() {
+    I18n.source = { Lang.FA }
+    assertEquals(ir.vil3ntec.tohid.core.receipt.ReceiptLabels.FA, ir.vil3ntec.tohid.print.Receipts.labels())
+    assertEquals(ir.vil3ntec.tohid.core.receipt.StatementLabels.FA, ir.vil3ntec.tohid.print.Receipts.statementLabels())
+    //  #348: انگلیسی و پشتو دیگر برچسبِ فارسی نمی‌گیرند (پیش‌تر همان `ReceiptLabels.FA`) — آزمونِ کاملشان `ReceiptLangTest`
+    I18n.source = { Lang.EN }
+    assertEquals("Invoice no.", ir.vil3ntec.tohid.print.Receipts.labels().invoiceNo)
+    I18n.source = { Lang.PRS }
+    val l = ir.vil3ntec.tohid.print.Receipts.labels()
+    assertEquals("دکان", l.fallbackShop)
+    assertEquals(DariText.of(ir.vil3ntec.tohid.core.receipt.ReceiptLabels.FA.footer), l.footer)
+    assertEquals("دکان", ir.vil3ntec.tohid.print.Receipts.statementLabels().fallbackShop)
+    assertEquals(l, ir.vil3ntec.tohid.print.Receipts.giftLabels().base)
+    //  هیچ برچسبِ کاغذی در دری شکلِ فقط‌فارسی یا نشانهٔ جای خالی ندارد
+    val all = listOf(l.toString(), ir.vil3ntec.tohid.print.Receipts.statementLabels().toString(), ir.vil3ntec.tohid.print.Receipts.giftLabels().toString())
+    for (t in all) {
+      assertTrue(t, farsiOnlyLeft(t).isEmpty())
+      assertFalse(t, t.any { it == DariText.OPEN || it == DariText.CLOSE })
+      assertFalse("«فروشگاه» در کاغذِ دری: $t", Regex("(?<![\\p{L}\\p{M}\\u200C])فروشگاه(?! من)").containsMatchIn(t))
+    }
   }
 
   @Test fun `اندازهٔ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ چاپ می‌شود و از کف پایین نمی‌آید`() {

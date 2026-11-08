@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.pay.Drawers
 import ir.vil3ntec.tohid.money
 
@@ -99,7 +100,7 @@ object CashShift {
   const val STORE_CREDIT_RECEIPT = "store_credit"
 
   /** متنِ رسیدِ لغو که هر دو برنامه (این و نسخهٔ وب) پیش از نشانِ `kind` می‌نوشتند */
-  private const val LEGACY_CANCEL_NOTE = "لغو فروش — فاکتور #"
+  private const val LEGACY_CANCEL_NOTE = "لغو فروش — فاکتور #"  // داده: پیشوندِ یادداشتِ کهنهٔ سابقه برای سنجش
 
   /**
    *  آیا این رسید پولِ نقد به دخل آورد؟ رسیدِ دستی و رسیدِ مرجوعی (که کمِ کلِ مرجوعی را
@@ -202,14 +203,14 @@ object CashShift {
     totals(d, s.open.createdAt, s.close?.createdAt ?: now, s.open.amount, s.open.id, named = s.open.drawer != null)
 
   fun open(d: ShopData, opening: Double, by: String, today: String, now: Long, newId: () -> String): Result {
-    if (opening.isNaN() || opening < 0) return Result.Failed("مبلغِ اولِ صندوق درست نیست")
-    if (mainOpen(d)) return Result.Failed("صندوق از قبل باز است")
+    if (opening.isNaN() || opening < 0) return Result.Failed(StrLedger.openingBad)
+    if (mainOpen(d)) return Result.Failed(StrLedger.tillAlreadyOpen)
     val who = by.trim()
     return Result.Ok(
       d.copy(
         auditLog = d.auditLog + AuditEntry(
           id = newId(), type = OPEN, date = today, amount = opening, createdAt = now,
-          notes = "باز کردنِ صندوق با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",
+          notes = "باز کردنِ صندوق با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         )
       )
     )
@@ -220,23 +221,23 @@ object CashShift {
    *  صندوقدار. نامِ تکراریِ کشوی بازِ دیگر رد می‌شود (دو صندوقِ هم‌نام در یک لحظه گیج می‌کند).
    */
   fun openNamed(d: ShopData, opening: Double, drawer: String, by: String, today: String, now: Long, newId: () -> String): Result {
-    if (opening.isNaN() || opening < 0) return Result.Failed("مبلغِ اولِ صندوق درست نیست")
-    val name = Drawers.label(drawer) ?: return Result.Failed("نامِ کشو (۱ تا ${Drawers.LABEL_MAX} نویسه) لازم است")
-    if (list(d).any { it.isOpen && it.open.drawer == name }) return Result.Failed("کشوی «$name» از قبل باز است")
+    if (opening.isNaN() || opening < 0) return Result.Failed(StrLedger.openingBad)
+    val name = Drawers.label(drawer) ?: return Result.Failed(StrLedger.drawerNameNeeded(Drawers.LABEL_MAX))
+    if (list(d).any { it.isOpen && it.open.drawer == name }) return Result.Failed(StrLedger.drawerAlreadyOpen(name))
     val who = by.trim()
     return Result.Ok(
       d.copy(
         auditLog = d.auditLog + AuditEntry(
           id = newId(), type = OPEN, date = today, amount = opening, createdAt = now, drawer = name, by = who.ifEmpty { null },
-          notes = "باز کردنِ کشوی «$name» با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",
+          notes = "باز کردنِ کشوی «$name» با ${money(opening)} افغانی" + if (who.isNotEmpty()) " — $who" else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         )
       )
     )
   }
 
   fun close(d: ShopData, counted: Double, note: String, by: String, today: String, now: Long, newId: () -> String): Result {
-    if (counted.isNaN() || counted < 0) return Result.Failed("مبلغِ شمرده‌شده درست نیست")
-    val shift = current(d) ?: return Result.Failed("صندوقِ بازی نیست")
+    if (counted.isNaN() || counted < 0) return Result.Failed(StrLedger.countedBad)
+    val shift = current(d) ?: return Result.Failed(StrLedger.noOpenTill)
     val t = totalsOf(d, shift, now)
     val diff = counted - t.expected
     val who = by.trim()
@@ -245,8 +246,8 @@ object CashShift {
       d.copy(
         auditLog = d.auditLog + AuditEntry(
           id = newId(), type = CLOSE, date = today, refId = shift.open.id, amount = counted, createdAt = now,
-          notes = "بستنِ صندوق: مورد انتظار ${money(t.expected)}، شمرده ${money(counted)}، " +
-            (if (kotlin.math.abs(diff) < 0.5) "بی اختلاف" else if (diff > 0) "اضافه ${money(diff)}" else "کسری ${money(-diff)}") +
+          notes = "بستنِ صندوق: مورد انتظار ${money(t.expected)}، شمرده ${money(counted)}، " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+            (if (kotlin.math.abs(diff) < 0.5) "بی اختلاف" else if (diff > 0) "اضافه ${money(diff)}" else "کسری ${money(-diff)}") +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
             if (extra.isNotEmpty()) " — $extra" else "",
         )
       )

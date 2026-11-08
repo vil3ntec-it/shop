@@ -107,6 +107,46 @@ object StrAccount {
     "بشپړ بیک اپ دلته ولیکل شو:\n$path\n\n$pending بدلونونه لا سرور ته نه دي تللي او تر هغه چې بیا په همدې حساب ننوځئ نه لېږل کېږي. بیا هم وځئ؟",
   )
   val signOutAnyway: String get() = t("باز هم خارج شو", "Sign out anyway", "بیا هم ووځه")
+
+  // خروجِ بی گم شدنِ داده: اول همه به سرور، بعد خروج (SafeSignOut)
+  val checkingBeforeSignOut: String get() = t("در حالِ فرستادنِ همهٔ تغییرها به سرور…", "Sending every change to the server…", "ټول بدلونونه سرور ته لېږل کېږي…")
+  fun unsyncedTitle(pending: Any): String = t(
+    "${asIs(pending)} تغییرِ ثبت‌نشده هنوز به سرور نرسیده",
+    "$pending unsaved ${pl(pending, "change hasn't", "changes haven't")} reached the server yet",
+    "$pending نه ثبت شوي بدلونونه لا سرور ته نه دي رسېدلي",
+  )
+  val unsyncedOffline: String get() = t(
+    "اینترنتِ این دستگاه وصل نیست. وصل شوید و «دوباره بکوش» را بزنید؛ تا آن وقت هیچ چیزی پاک نمی‌شود.",
+    "This device is offline. Connect and tap “Try again”; nothing is deleted meanwhile.",
+    "دا وسیله انټرنېټ نه لري. وصل شئ او «بیا هڅه» کېکاږئ؛ تر هغه هېڅ شی نه ړنګېږي.",
+  )
+  val unsyncedRejected: String get() = t(
+    "سرور این تغییرها را نپذیرفت. بیرون نشوید و با پشتیبانی تماس بگیرید؛ یا با «خروجِ اجباری…» پشتیبان بگیرید و برای همین حساب نگه دارید.",
+    "The server refused these changes. Stay signed in and contact support, or use “Force sign out…” to back them up and keep them for this account.",
+    "سرور دا بدلونونه ونه منل. مه وځئ او له ملاتړ سره اړیکه ونیسئ؛ یا په «اجباري وتل…» یې بیک اپ کړئ او همدې حساب ته یې وساتئ.",
+  )
+  val unsyncedFailed: String get() = t(
+    "سرور جواب نداد. چند لحظه بعد «دوباره بکوش» را بزنید؛ تا آن وقت هیچ چیزی پاک نمی‌شود.",
+    "The server didn't answer. Tap “Try again” in a moment; nothing is deleted meanwhile.",
+    "سرور ځواب ورنه کړ. یو څو شېبې وروسته «بیا هڅه» کېکاږئ؛ تر هغه هېڅ شی نه ړنګېږي.",
+  )
+  val unsyncedNeverSent: String get() = t(
+    "دفترِ این دستگاه هنوز یک بار هم کامل به سرور نرسیده. «دوباره بکوش» را بزنید تا فرستاده و سنجیده شود.",
+    "This device's ledger has never fully reached the server. Tap “Try again” to send and check it.",
+    "د دې وسیلې دفتر لا یو ځل هم بشپړ سرور ته نه دی رسېدلی. «بیا هڅه» کېکاږئ چې ولېږل او وڅېړل شي.",
+  )
+  val unsyncedSessionEnded: String get() = t(
+    "نشستِ این حساب تمام شده و تغییرها فرستاده نمی‌شوند. اول دوباره وارد شوید؛ بیرون رفتن آن‌ها را نمی‌فرستد.",
+    "This account's session ended, so changes can't be sent. Sign in again first; signing out won't send them.",
+    "د دې حساب ناسته پای ته رسېدلې او بدلونونه نه لېږل کېږي. لومړی بیا ننوځئ؛ وتل یې نه لېږي.",
+  )
+  val tryAgain: String get() = t("دوباره بکوش", "Try again", "بیا هڅه")
+  val dontLeave: String get() = t("بیرون نشو", "Don't sign out", "مه وځه")
+  fun forceKeptBody(pending: Any, path: Any): String = t(
+    "پشتیبانِ کامل این‌جا نوشته شد:\n${asIs(path)}\n\n${asIs(pending)} تغییرِ ثبت‌نشده رمزدار روی همین دستگاه و فقط برای همین حساب نگه داشته می‌شود و با ورودِ دوباره به همین حساب خودکار به سرور می‌رود. باز هم خارج می‌شوید؟",
+    "A full backup was written here:\n$path\n\n$pending unsaved ${pl(pending, "change is", "changes are")} kept encrypted on this device for this account only, and sent automatically when you sign in to it again. Sign out anyway?",
+    "بشپړ بیک اپ دلته ولیکل شو:\n$path\n\n$pending نه ثبت شوي بدلونونه کوډ شوي په همدې وسیله یوازې د همدې حساب لپاره ساتل کېږي او بیا ننوتلو سره پخپله سرور ته ځي. بیا هم وځئ؟",
+  )
   val signedOut: String get() = t("از حساب خارج شدید", "You signed out", "له حساب ووتلئ")
   val syncStarted: String get() = t("همگام‌سازی شروع شد", "Sync started", "همغږي پیل شوه")
   val syncFailed: String get() = t("همگام‌سازی ناموفق بود", "Sync failed", "همغږي ناکامه شوه")
@@ -184,6 +224,8 @@ object StrAccount {
   val permContacts: String get() = t("دیدنِ شمارهٔ مشتریان (تماس و پیام)", "See customers' phone numbers (call and message)", "د پېرودونکو شمېرې لیدل (زنګ او پیغام)")
   //  STF-03: سقفِ فروشِ قرضیِ هر کارمند (سرور با پرچمِ `shop.credit_cap` می‌سنجد)
   val permCredit: String get() = t("فروشِ قرضی (به حساب)", "Selling on credit", "په پور پلورل")
+  //  STF-03: سقفِ تغییرِ قیمتِ ردیف (درصد از قیمتِ فهرست؛ سرور با پرچمِ `shop.price_cap` می‌سنجد)
+  val permPrice: String get() = t("تغییرِ قیمتِ ردیف", "Changing a line price", "د کرښې د بیې بدلول")
 
   //  STF-01: نقشِ سفارشی — نام + یکی از نقش‌های کارمند + مجوز و سقفِ خودش (سرور با پرچمِ `shop.custom_roles`)
   val roleCashier: String get() = t("صندوق‌دار", "Cashier", "صندوق‌دار")

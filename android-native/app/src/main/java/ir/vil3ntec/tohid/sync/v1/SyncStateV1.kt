@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 
+import ir.vil3ntec.tohid.core.i18n.StrSync
 /**
  *  حالِ همگام‌سازیِ **این حساب** روی این دستگاه.
  *
@@ -88,6 +89,11 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getString(k("lastError"), "").orEmpty()
     set(v) = prefs.edit().putString(k("lastError"), v).apply()
 
+  /** `device_id` ِ همین حساب روی همین دستگاه برای سرور، یک بار انتخاب و نگه داشته (`V1ReplicaAndroid.kt`) */
+  var replica: String
+    get() = prefs.getString(k("replica"), "").orEmpty()
+    set(v) = prefs.edit().putString(k("replica"), v).apply()
+
   /** سرور از برنامه عقب‌تر است (۴۲۶): opها نگه داشته می‌شوند. */
   var holding: Boolean
     get() = prefs.getBoolean(k("holding"), false)
@@ -133,6 +139,14 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     set(v) = prefs.edit().putBoolean(k("epochLive"), v).apply()
 
   /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
+  /**
+   *  دفترِ بایگانی‌شدهٔ ساخت‌های پیش از «یک درِ ورود» برای این حساب باز شد و سایه/صفِ این کلید شاید مالِ
+   *  دفترِ دیگری است ⇒ تا `SyncV1Engine.recoverArchived` نشده، نه تفاضل، نه push، نه pull (شرح همان‌جا).
+   */
+  var recoverArchive: Boolean
+    get() = prefs.getBoolean(k("recoverArchive"), false)
+    set(v) { prefs.edit().putBoolean(k("recoverArchive"), v).commit() }
+
   var reconciledAt: Long
     get() = prefs.getLong(k("reconciledAt"), 0)
     set(v) = prefs.edit().putLong(k("reconciledAt"), v).apply()
@@ -165,10 +179,10 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
 enum class SyncDot { GREEN, YELLOW, GREY, RED;
 
   val label: String get() = when (this) {
-    GREEN -> "همگام با سرور"
-    YELLOW -> "در صف ارسال"
-    GREY -> "آفلاین"
-    RED -> "خطای همگام‌سازی"
+    GREEN -> StrSync.dotGreen
+    YELLOW -> StrSync.dotYellow
+    GREY -> StrSync.dotGrey
+    RED -> StrSync.dotRed
   }
 
   companion object {

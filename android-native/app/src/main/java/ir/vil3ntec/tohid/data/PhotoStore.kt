@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import java.io.File
 
@@ -46,7 +47,7 @@ object PhotoStore {
 
   /** عکسِ انتخاب‌شده را کوچک و فشرده می‌کند و کنار شناسهٔ محصول می‌گذارد */
   fun save(context: Context, productId: String, source: Uri): Result<Unit> = runCatching {
-    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { "عکس خوانده نشد" }
+    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { StrGoods.photoUnread }
     val scaled = shrink(bitmap)
     file(context, productId).outputStream().use { out ->
       scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)
@@ -70,7 +71,7 @@ object PhotoStore {
 
   /** عکسی که از سرور رسید، همان‌طور که هست (از قبل کوچک و فشرده شده) */
   fun saveBytes(context: Context, productId: String, data: ByteArray): Result<Unit> = runCatching {
-    require(data.size in 100..2_000_000) { "عکس درست نیست" }
+    require(data.size in 100..2_000_000) { StrGoods.photoBad }
     val tmp = File(dir(context), "$productId.part")
     tmp.writeBytes(data)
     val target = file(context, productId)
@@ -174,7 +175,7 @@ object PhotoStore {
     File(context.filesDir, "account-avatar-${safeKey(accountId)}.jpg")
 
   fun saveAvatar(context: Context, accountId: String, source: Uri): Result<Unit> = runCatching {
-    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { "عکس خوانده نشد" }
+    val bitmap = requireNotNull(decode(context, source, MAX_EDGE)) { StrGoods.photoUnread }
     val scaled = shrink(bitmap)
     avatar(context, accountId).outputStream().use { out ->
       scaled.compress(Bitmap.CompressFormat.JPEG, QUALITY, out)

@@ -145,6 +145,12 @@ async function pushChanges(ctx, changes) {
       const bad = items.find((it) => res.has(it) && !res.get(it).ok);
       if (bad) throw forbidden(`این کار در حدِ نقشِ شما نیست (${bad.table})`, 'table_not_allowed');
     }
+    //  STF-03 (پرچمِ خاموشِ `shop.price_cap`): فاکتور یا قلمِ تازه با قیمتِ ردیفِ بیرون از سقف یا «تخفیفِ پنهان» ⇒ ۴۰۳ و
+    //  کلِ دسته برمی‌گردد (‎lib/price-cap.js‎)؛ پرچم فقط وقتی دسته فاکتور/قلم دارد و نقش صاحب نیست
+    {
+      const bad = await require('./price-cap').judgeLegacy(c, { shopId, role, userId }, changes);
+      if (bad) throw bad;
+    }
     let applied = 0, skipped = 0;
     const conflicts = [];
     const t = now();

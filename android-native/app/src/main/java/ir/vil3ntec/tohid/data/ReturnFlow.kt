@@ -1,5 +1,10 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGiftCard
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.core.pay.PaidRow
 import ir.vil3ntec.tohid.core.pay.PayMethod
@@ -96,24 +101,24 @@ object ReturnFlow {
   }
 
   fun message(code: String, detail: String = ""): String = when (code) {
-    Code.ALREADY_POSTED -> "این برگشت یک بار ثبت شده است و دوباره ثبت نمی‌شود"
-    Code.SALE_NOT_FOUND -> "فاکتور پیدا نشد"
-    Code.SALE_CANCELLED -> "این فاکتور لغو شده است؛ برگشت نمی‌پذیرد"
-    Code.REASON_REQUIRED -> "دلیلِ برگشت را انتخاب کنید"
-    Code.REASON_NOT_LISTED -> "دلیلِ برگشت را از فهرستِ دکان انتخاب کنید"
-    Code.NOTHING_TO_RETURN -> "مقدار معتبری برای برگشت وارد نشده"
-    Code.QTY_EXCEEDS -> "بیش از مقدارِ فروخته‌شده برنمی‌گردد" + if (detail.isNotEmpty()) " ($detail)" else ""
-    Code.BAD_QTY -> "مقدار درست نیست" + if (detail.isNotEmpty()) " — $detail" else ""
-    Code.BAD_PRICE -> "قیمتِ برگشت درست نیست"
-    Code.UNKNOWN_PRODUCT -> "کالا پیدا نشد"
-    Code.BAD_DISPOSITION -> "مقصدِ کالا را انتخاب کنید"
-    Code.BAD_MODE -> "روشِ بازپرداخت درست نیست"
-    Code.CUSTOMER_REQUIRED -> "برای اعتبارِ فروشگاه، مشتری را انتخاب کنید"
-    Code.RETURN_DENIED -> "این برگشت برای شما مجاز نیست"
-    Code.APPROVAL_REQUIRED -> "این برگشت تأیید لازم دارد"
-    Code.REFUND_FAILED -> "بازپرداخت حساب نشد" + if (detail.isNotEmpty()) " ($detail)" else ""
-    Code.EXCHANGE_FAILED -> detail.ifEmpty { "فروشِ تعویض ثبت نشد" }
-    else -> "درخواستِ برگشت درست نیست"
+    Code.ALREADY_POSTED -> StrLedger.returnPosted
+    Code.SALE_NOT_FOUND -> StrInvoices.invoiceNotFound
+    Code.SALE_CANCELLED -> StrSale.cancelledNoReturn
+    Code.REASON_REQUIRED -> StrLedger.returnPickReason
+    Code.REASON_NOT_LISTED -> StrLedger.returnReasonListed
+    Code.NOTHING_TO_RETURN -> StrLedger.returnNothing
+    Code.QTY_EXCEEDS -> StrLedger.returnTooMuch + if (detail.isNotEmpty()) " ($detail)" else ""
+    Code.BAD_QTY -> StrOnline.errQty + if (detail.isNotEmpty()) " — $detail" else ""
+    Code.BAD_PRICE -> StrLedger.returnPriceBad
+    Code.UNKNOWN_PRODUCT -> StrLedger.productNotFound
+    Code.BAD_DISPOSITION -> StrLedger.returnPickDisposition
+    Code.BAD_MODE -> StrLedger.refundModeBad
+    Code.CUSTOMER_REQUIRED -> StrGiftCard.errNoCustomer
+    Code.RETURN_DENIED -> StrSale.returnDenied
+    Code.APPROVAL_REQUIRED -> StrLedger.returnNeedsApproval
+    Code.REFUND_FAILED -> StrLedger.refundNotCounted + if (detail.isNotEmpty()) " ($detail)" else ""
+    Code.EXCHANGE_FAILED -> detail.ifEmpty { StrLedger.exchangeNotSaved }
+    else -> StrLedger.returnBad
   }
 
   sealed interface Outcome<out T> {
@@ -136,7 +141,7 @@ object ReturnFlow {
   fun isForeignReceipt(query: String, shopTag: String): Boolean =
     ir.vil3ntec.tohid.core.receipt.ReceiptToken.parse(query)?.let { it.first != shopTag } ?: false
 
-  const val FOREIGN_RECEIPT = "این رسیدِ دکانِ دیگری است"
+  val FOREIGN_RECEIPT: String get() = StrLedger.foreignReceipt
 
   /**
    *  RET-01 — اسکنِ QRِ رسید، شمارهٔ فاکتور (`B1-154`، `154`، `#154`، با رقمِ
@@ -578,7 +583,7 @@ object ReturnFlow {
     }
 
     val tag = label(req.docId)
-    val invoice = sale?.let { "فاکتور #${it.invoiceLabel() ?: "0"}" } ?: "بی رسید"
+    val invoice = sale?.let { "فاکتور #${it.invoiceLabel() ?: "0"}" } ?: "بی رسید"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val items = d.saleItems.toMutableList()
     val rows = ArrayList<SaleReturn>()
     val movements = ArrayList<StockMovement>()
@@ -637,14 +642,14 @@ object ReturnFlow {
       //  گردشِ انبار: کالا از مشتری برگشت؛ اگر ضایعات است، همان لحظه از موجودی بیرون
       movements += StockMovement(
         id = newId(), productId = line.productId, type = "customer_return", qty = line.qty, date = today,
-        notes = "برگشت $tag — $invoice — $reason", refId = rowId, createdAt = now,
+        notes = "برگشت $tag — $invoice — $reason", refId = rowId, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
       when {
         //  با رسید: موجودی از `returnedQty` برمی‌گردد؛ ضایعات آن را با ردیفِ اصلاحی خنثی می‌کند
         sale != null && line.disposition == DAMAGED -> {
           entries += WarehouseEntry(
             id = newId(), productId = line.productId, units = -line.qty, unit = product?.unit.orEmpty(),
-            date = today, notes = "ضایعاتِ برگشتی $tag — $reason", isAdjustment = true, createdAt = now,
+            date = today, notes = "ضایعاتِ برگشتی $tag — $reason", isAdjustment = true, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
             //  دفترِ موجودی (`StockLedger`) اصلاح را از همین نوع می‌شناسد
             adjKind = "damage", refId = req.docId,
           )
@@ -653,7 +658,7 @@ object ReturnFlow {
         sale == null && line.disposition == RESTOCK -> {
           entries += WarehouseEntry(
             id = newId(), productId = line.productId, units = line.qty, unit = product?.unit.orEmpty(),
-            date = today, notes = "برگشتِ بی رسید $tag — $reason", isAdjustment = true, createdAt = now,
+            date = today, notes = "برگشتِ بی رسید $tag — $reason", isAdjustment = true, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
             //  نوعِ اصلاح «برگشتِ مشتری»: نگهبانِ نقش (A16، `PermCore.checkRows`) اصلاحِ موجودیِ
             //  قلمِ برگشت را از رسیدِ انبارِ دستی همین‌طور جدا می‌کند (isAdjustment، بی قیمت، همان
             //  کالا و نه بیش از مقدارِ قلم، یک اصلاح برای هر قلم) — صندوق‌دار فقط این را می‌نویسد
@@ -663,7 +668,7 @@ object ReturnFlow {
       }
       if (line.disposition == DAMAGED) movements += StockMovement(
         id = newId(), productId = line.productId, type = "damage", qty = -line.qty, date = today,
-        notes = "ضایعاتِ برگشتی $tag — $reason", refId = rowId, createdAt = now,
+        notes = "ضایعاتِ برگشتی $tag — $reason", refId = rowId, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
 
@@ -672,21 +677,21 @@ object ReturnFlow {
     if (sale != null && s.account > 0 && sale.debtorId != null) {
       transactions += DebtTransaction(
         id = newId(), debtorId = sale.debtorId, type = "receive", amount = s.account, date = today,
-        notes = "برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,
+        notes = "برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
       updatedSale = sale.copy(debtSettled = sale.debtSettled + s.account)
     }
     if (creditTo != null && s.credit > 0) {
       transactions += DebtTransaction(
         id = newId(), debtorId = creditTo, type = "receive", amount = s.credit, date = today,
-        notes = "اعتبارِ فروشگاه — برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,
+        notes = "اعتبارِ فروشگاه — برگشت $tag — $invoice", createdAt = now, refId = req.docId, kind = RECEIPT_KIND,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     //  PAY-24: سهمِ کارت به همان کارت‌ها و سهمِ اعتبار به اعتبارِ مشتریِ فاکتور (رسیدِ غیرنقد)؛ فاکتورِ بی آن‌ها ⇒ هیچ
     val stored = if (sale == null) GiftCards.Rows() else when (
       val g = GiftCards.forReturn(
         d, sale, req.docId, minor(s.methods[StoredPay.GIFT] ?: 0.0), minor(s.methods[StoredPay.CREDIT] ?: 0.0),
-        "برگشت $tag — $invoice", today, now, req.by.trim().ifEmpty { null },
+        "برگشت $tag — $invoice", today, now, req.by.trim().ifEmpty { null },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     ) {
       is GiftCards.Out.Bad -> return Outcome.Bad(Code.REFUND_FAILED, g.message)
@@ -695,22 +700,22 @@ object ReturnFlow {
     transactions += stored.transactions
 
     val refundText = buildList {
-      if (s.cash > 0) add("نقد ${money(s.cash)}")
-      if (s.account > 0) add("از حساب ${money(s.account)}")
-      if (s.credit > 0) add("اعتبار ${money(s.credit)}")
+      if (s.cash > 0) add("نقد ${money(s.cash)}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      if (s.account > 0) add("از حساب ${money(s.account)}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      if (s.credit > 0) add("اعتبار ${money(s.credit)}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       s.methods.forEach { (m, a) -> add("${methodName(m)} ${money(a)}") }
     }.joinToString("، ")
     val notes = buildString {
-      append("برگشت $tag به مبلغ ${money(quote.total)} افغانی — $invoice — دلیل: $reason")
-      if (refundText.isNotEmpty()) append(" — بازپرداخت: $refundText")
-      if (quote.lines.any { it.disposition == DAMAGED }) append(" — ضایعات")
-      if (g.decision == "approve") append(" — تأیید: $approvedBy (${g.reasons.joinToString("+")})")
+      append("برگشت $tag به مبلغ ${money(quote.total)} افغانی — $invoice — دلیل: $reason")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      if (refundText.isNotEmpty()) append(" — بازپرداخت: $refundText")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      if (quote.lines.any { it.disposition == DAMAGED }) append(" — ضایعات")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      if (g.decision == "approve") append(" — تأیید: $approvedBy (${g.reasons.joinToString("+")})")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       //  RET-09: هر استثنا روی سیاستِ برگشت در سابقهٔ سند می‌ماند (شاگرد با تأیید، مدیر و صاحب خودشان)
-      if (!verdict.ok) append(" — استثنای سیاستِ برگشت: " + buildList {
-        if (verdict.late) add("${verdict.ageDays} روز پس از فاکتور")
-        verdict.blockedIds.forEach { id -> add("غیرقابلِ برگشت: " + (d.products.find { it.id == id }?.name ?: id)) }
+      if (!verdict.ok) append(" — استثنای سیاستِ برگشت: " + buildList {  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        if (verdict.late) add("${verdict.ageDays} روز پس از فاکتور")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        verdict.blockedIds.forEach { id -> add("غیرقابلِ برگشت: " + (d.products.find { it.id == id }?.name ?: id)) }  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       }.joinToString("، "))
-      if (req.by.isNotBlank()) append(" — ثبت: ${req.by.trim()}")
+      if (req.by.isNotBlank()) append(" — ثبت: ${req.by.trim()}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
 
     val out = d.copy(
@@ -833,17 +838,17 @@ object ReturnFlow {
   /** نامِ قلمِ یک ردیفِ برگشت */
   fun rowName(d: ShopData, row: SaleReturn): String {
     d.saleItems.find { it.id == row.saleItemId }?.let { return SalesEngine.itemName(d, it) }
-    return d.products.find { it.id == row.productId }?.name ?: "(کالا)"
+    return d.products.find { it.id == row.productId }?.name ?: StrSale.itemWord
   }
 
   /** نامِ روشِ پرداخت برای رسید — همان جدولِ پیش‌فرضِ هستهٔ پرداخت */
   fun methodName(id: String): String = Pay.DEFAULT_METHODS.firstOrNull { it.id == id }?.name ?: id
 
-  fun dispositionName(v: String?): String = if (v == DAMAGED) "ضایعات" else "به موجودی"
+  fun dispositionName(v: String?): String = if (v == DAMAGED) StrSale.damagedWord else StrSale.toStock
 
   fun modeName(v: String?): String = when (v) {
-    CASH -> "نقد"
-    STORE_CREDIT -> "اعتبارِ فروشگاه"
-    else -> "روشِ اصلی"
+    CASH -> StrLedger.cash
+    STORE_CREDIT -> StrSale.storeCredit
+    else -> StrSale.originalMethod
   }
 }

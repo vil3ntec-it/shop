@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.i18n.StrEvidence
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
@@ -77,7 +78,7 @@ class StorefrontRepository(private val api: ApiClient) {
     r.valueOrNull()?.let { v ->
       return BulkPublish.Outcome.Done(v.results.map { BulkPublish.ItemResult(it.productId, it.ok, it.error, it.notLive) })
     }
-    var out: BulkPublish.Outcome = BulkPublish.Outcome.Retry("نرسید")
+    var out: BulkPublish.Outcome = BulkPublish.Outcome.Retry(StrEvidence.kNotDelivered)
     r.onFailure { out = if (it.retryable) BulkPublish.Outcome.Retry(it.userMessage) else BulkPublish.Outcome.Rejected(it.userMessage) }
     return out
   }

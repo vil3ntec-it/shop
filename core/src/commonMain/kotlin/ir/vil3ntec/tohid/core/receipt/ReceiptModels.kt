@@ -104,7 +104,10 @@ interface ReceiptFormat {
   fun lunarDate(iso: String): String? = null
 }
 
-/** برچسب‌های فاکتور — پیش‌فرضِ دری؛ سازوکارِ سه‌زبانه (#348) همین را جایگزین می‌کند */
+/**
+ *  برچسب‌های فاکتور — پیش‌فرض فارسی ([FA]). برنامه برچسبِ زبانِ خودش را می‌دهد (#348، `StrReceipt` ⇐ `Receipts.labels`:
+ *  فارسی همین [FA]، دری از لایهٔ واژه، انگلیسی و پشتو ترجمه)؛ هسته فقط می‌چیند.
+ */
 data class ReceiptLabels(
   val fallbackShop: String = "فروشگاه",
   val invoiceNo: String = "شمارهٔ فاکتور",
@@ -117,7 +120,11 @@ data class ReceiptLabels(
   val listPrice: String = "قیمتِ اصلی",
   val count: String = "تعداد اقلام",
   val rows: String = "ردیف",
+  /** «۱ ردیف» — زبانی که مفرد و جمع دارد (انگلیسی «1 line»، پشتو «1 قطار»)؛ فارسی همان [rows] */
+  val rowOne: String = "ردیف",
   val pieces: String = "عدد",
+  /** «۱ عدد» — همان [rowOne] برای شمارِ دانه‌ها؛ فارسی همان [pieces] */
+  val pieceOne: String = "عدد",
   val subtotal: String = "جمع اقلام",
   val discount: String = "تخفیف",
   val total: String = "مبلغ نهایی",

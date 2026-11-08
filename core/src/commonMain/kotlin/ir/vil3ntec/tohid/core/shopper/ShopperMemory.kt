@@ -41,6 +41,8 @@ data class ShopperState(
   val plans: List<RepeatPlan> = emptyList(),
   /** MKT-02: شناسهٔ تصادفیِ همین نصب (۳۲ hex) — فقط وقتی دکان سدِ «یک بار برای هر دستگاه» دارد فرستاده می‌شود */
   val deviceId: String = "",
+  /** MKT-06: آخرین خریدِ هر کالا از همین دستگاه برای «وقتِ دوباره خریدن؟» ([Refills]، سقفِ ۶۰) */
+  val bought: List<Bought> = emptyList(),
 )
 
 /** خواندن و نوشتنِ [ShopperState] با سقف‌های روشن (هیچ فهرستی بی‌پایان بزرگ نمی‌شود). */
@@ -80,6 +82,7 @@ object ShopperMemory {
     recent = s.recent.map { if (it.slug == from) it.copy(slug = to) else it }.distinctBy { it.slug },
     keys = s.keys.mapKeys { if (it.key == from) to else it.key },
     plans = RepeatPlans.moved(s.plans, from, to),
+    bought = Refills.moved(s.bought, from, to),
   )
 
   /** همان الگوی `deviceId` ِ وب (`^[A-Za-z0-9_-]{8,128}$`)؛ نبود ⇒ تازه از [random] (مولّدِ امنِ سکو) */

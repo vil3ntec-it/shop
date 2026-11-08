@@ -48,10 +48,14 @@ object I18nTables {
     StrTillPay, // نسیه فقط با مشتری؛ حساب‌پی با NFC/QR در صندوقِ گوشیِ نسخهٔ ۳ (PAY-21)
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
     StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
+    StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
     StrScanPages, StrPanelPages, // همان، دورِ ۵ (صفحه‌های زندهٔ کوچک)
     StrDebtor, // دورِ ۶: حسابِ قرض‌دار (پیش‌تر `t` ِ فقط‌فارسیِ محلی، بی هیچ زبانی)
+    StrLedger, StrGoods, StrAppData, // دورِ ۷: پیام‌های لایهٔ دفتر (`data/`) و صفحه‌های زندهٔ قدیمی — پیش‌تر متنِ خام
+    StrSync, StrPrint, StrUpdate, // دورِ ۷: پیام‌های همگام‌سازی، چاپ و به‌روزرسانی — پیش‌تر متنِ خام
+    StrReceipt, // #348: برچسب‌های فاکتور، رسیدِ هدیه و صورت‌حسابِ چاپی به هر چهار زبان (پیش‌تر فقط فارسی/دری)
   )
 }

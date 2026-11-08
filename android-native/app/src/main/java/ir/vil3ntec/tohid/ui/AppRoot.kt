@@ -157,6 +157,8 @@ private fun AppRootActive(
         //  حساب از دکانی به دکانِ دیگر رفته ⇒ دفترِ روی گوشی هم همین‌جا جابه‌جا می‌شود
         if (state.hasShop) {
           runCatching { ir.vil3ntec.tohid.data.LedgerOwner.shopChanged(context, store, state.shop?.id.orEmpty()) }
+          //  گوشیِ مانده در حالِ خرابِ پیش از «یک درِ ورود» ⇒ دفترِ واقعیِ همین حساب از بایگانی (`AccountBind.healOnStart`)
+          runCatching { ir.vil3ntec.tohid.data.AccountBind.healOnStart(context, store) }
         }
       }
       .onFailure { failure ->
@@ -304,6 +306,17 @@ private fun AppRootActive(
       snackbar.currentSnackbarData?.dismiss()
       snackbar.showSnackbar(msg, duration = SnackbarDuration.Long)
     }
+  }
+  //  DATA-SAFETY: دفترِ خرابی که هنگامِ باز شدن خودکار از نسخهٔ سالم برگشت (`LedgerRecovery.Guard.recovered`) — یک بار گفته می‌شود
+  val recovered by store.guard.recovered.collectAsState()
+  LaunchedEffect(recovered) {
+    val found = recovered ?: return@LaunchedEffect
+    store.guard.ack()
+    snackbar.currentSnackbarData?.dismiss()
+    snackbar.showSnackbar(
+      ir.vil3ntec.tohid.core.i18n.StrSecurity.recoveredAuto(ir.vil3ntec.tohid.displayMillis(found.at)),
+      duration = SnackbarDuration.Indefinite, withDismissAction = true,
+    )
   }
 
   //  دروازه‌های خودکار: تا یکی باز است پیوندهای بیرونی نگه داشته می‌شوند

@@ -459,6 +459,17 @@ object ShopperText {
     "${num(n.toLong())} توکي نور د پلور نه دي او ټوکرۍ ته رانغلل.",
   )
 
+  // ── MKT-06: «وقتِ دوباره خریدن؟» (چرخهٔ مصرفِ کالا؛ قیمت همیشه از سرور) ──
+  val refillTitle get() = t("وقتِ دوباره خریدن؟", "Time to buy again?", "د بیا پېرلو وخت دی؟")
+  fun refillBody(shop: String, names: List<String>) = t(
+    "از ${asIs(shop)}: ${asIs(names.joinToString("، "))} — شاید تمام شده باشد.",
+    "From $shop: ${names.joinToString(", ")} — you may be running low.",
+    "له $shop: ${names.joinToString("، ")} — کېدای شي ختم شوي وي.",
+  )
+  val refillAdd get() = t("افزودن به سبد با قیمتِ امروز", "Add to cart at today's prices", "د نن ورځې په بیه ټوکرۍ ته")
+  val refillLater get() = t("بعداً", "Later", "وروسته")
+  val refillMute get() = t("دیگر نه", "Not again", "نور نه")
+
   // ── پیوند ──
   val linkBad get() = t("این پیوند برای برنامهٔ خرید نیست.", "This link isn't for the shopping app.", "دا لینک د پېرود اپ لپاره نه دی.")
 

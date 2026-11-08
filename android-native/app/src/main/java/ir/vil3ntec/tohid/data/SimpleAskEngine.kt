@@ -116,7 +116,7 @@ object SimpleAskEngine {
       //  همان کاشیِ «جمع طلب از مشتریان» (مانده‌های مثبت) و شمارِ بدهکارِ «گزارش‌ها»ی کامپیوتر (بیش از نیم افغانی)
       Answer(q, values = listOf(Value(Key.DEBT_TOTAL, rows.sumOf { it.remaining.coerceAtLeast(0.0) }), Value(Key.DEBTORS, rows.count { it.remaining > 0.5 }.toDouble())))
     }
-    else -> error("پرسشِ بازه‌دار بی بازه: ${q.template}")
+    else -> error("پرسشِ بازه‌دار بی بازه: ${q.template}")  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
   }
 
   private const val ALL_FROM = "0000-01-01"

@@ -31,6 +31,7 @@ const { one, many, query, newId, now, tx } = require('../db');
 const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const chatMedia = require('./chat-media');
+const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)
 const { notify, listen, waiting } = require('./chat-wait');
 const acct = require('./shop-chat-account');
 const { ApiError, badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
@@ -616,16 +617,11 @@ async function remove(viewer, id, messageId, scope) {
       [m.id, t, viewerKey(viewer), rev]
     );
     await pins.dropAll(c, m.id);
-    //  رسانه‌ای که دیگر هیچ پیامِ زنده‌ای به آن اشاره نمی‌کند همین حالا می‌رود
-    for (const mid of [m.media_id, m.thumb_id].filter(Boolean)) {
-      await c.query(
-        `DELETE FROM shop_chat_media x WHERE x.id=$1 AND NOT EXISTS (
-           SELECT 1 FROM shop_chat_messages y WHERE y.media_id = x.id OR y.thumb_id = x.id)`,
-        [mid]
-      );
-    }
-    return { changed: true, convId: conv.id, deletedAll: true, shopId: conv.shop_id };
+    //  رسانه‌ای که دیگر هیچ پیامِ زنده‌ای به آن اشاره نمی‌کند همین حالا می‌رود (شیءِ انبار پس از تراکنش)
+    const gone = await mediaStore.chat.dropUnused(c, [m.media_id, m.thumb_id]);
+    return { changed: true, convId: conv.id, deletedAll: true, shopId: conv.shop_id, gone };
   });
+  await mediaStore.chat.drop(out.gone);
   if (out.changed) notify(out.convId);
   if (out.deletedAll && viewer.side === 'shop') {
     await require('./audit').log({
@@ -685,13 +681,13 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
   if (buf.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
   const data = s.kind === 'image' ? chatMedia.stripImageMetadata(buf, s.mime) : buf;
   const hash = sha256(data);
-  const ins = await one(
-    `INSERT INTO shop_chat_media (id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, data, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
+  const ins = await mediaStore.chat.put(conv.shop_id, s.mime, data, async (st) => (st.used = await one(
+    `INSERT INTO shop_chat_media (id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, data, created_at, store_key)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      ON CONFLICT (conversation_id, uploader, role, sha256) DO NOTHING RETURNING id, kind, mime, size, role`,
     [newId('scf'), conv.shop_id, conv.id, viewer.side, viewer.side === 'shop' ? viewer.userId : '',
-      ro, s.kind, s.mime, data.length, hash, data, now()]
-  );
+      ro, s.kind, s.mime, data.length, hash, st.data, now(), st.key]
+  )));
   const row = ins || await one(
     'SELECT id, kind, mime, size, role FROM shop_chat_media WHERE conversation_id=$1 AND uploader=$2 AND role=$3 AND sha256=$4',
     [conv.id, viewer.side, ro, hash]
@@ -715,7 +711,9 @@ async function getMedia(viewer, id, mediaId) {
     );
     if (!ref) throw lost();
   }
-  return { id: m.id, mime: m.mime, size: n(m.size), kind: m.kind, data: Buffer.from(m.data) };
+  const data = await mediaStore.chat.bytes(m);
+  if (!data) throw lost();
+  return { id: m.id, mime: m.mime, size: n(m.size), kind: m.kind, data };
 }
 
 /** خوانندهٔ بدنهٔ خامِ بارگذاری — بزرگ‌تر از بزرگ‌ترین سقف پیش از خواندن رد می‌شود. */
@@ -837,9 +835,10 @@ async function sweep({ at = now(), retentionDays = config.shopChat.retentionDays
   }
   const o = await query(
     `DELETE FROM shop_chat_media x WHERE x.created_at < $1 AND NOT EXISTS (
-       SELECT 1 FROM shop_chat_messages m WHERE m.media_id = x.id OR m.thumb_id = x.id)`,
+       SELECT 1 FROM shop_chat_messages m WHERE m.media_id = x.id OR m.thumb_id = x.id) RETURNING x.shop_id, x.store_key`,
     [at - ORPHAN_MS]
   );
+  await mediaStore.chat.drop(o.rows);
   return { expired, orphans: o.rowCount || 0 };
 }
 

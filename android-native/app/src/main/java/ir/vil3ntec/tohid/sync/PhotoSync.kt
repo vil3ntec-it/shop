@@ -211,7 +211,7 @@ object PhotoSync {
     for (c in text) {
       if (c == '=' || c == '\n' || c == '\r' || c == ' ') continue
       val v = ALPHA.indexOf(c)
-      require(v >= 0) { "base64 نادرست" }
+      require(v >= 0) { "base64 نادرست" }  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
       buffer = ((buffer shl 6) or v) and 0xFFFFFF; bits += 6
       if (bits >= 8) { bits -= 8; out.write((buffer shr bits) and 0xFF) }
     }

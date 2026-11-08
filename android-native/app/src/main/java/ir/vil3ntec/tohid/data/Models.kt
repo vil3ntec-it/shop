@@ -58,12 +58,8 @@ data class Product(
    *  جست‌وجو فقط با تنظیمِ همین دستگاه (`ProductInfoPrefs`، پیش‌فرض خاموش)؛ ویرایشِ بی آن فرم
    *  این فیلدها را دست نمی‌زند (`ProductDraft.info = null`).
    */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val namePs: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val nameEn: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val namePs: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val nameEn: String? = null,
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val synonyms: List<String>? = null,
@@ -116,6 +112,8 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val variant: Map<String, String>? = null,
   /** POS-28 — `true` = کالای سریال‌دار: هر دانه سریال می‌خواهد و فاکتور بی سریالِ کامل بسته نمی‌شود (`SerialSale`) */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serialTracked: Boolean? = null,
+  /** MKT-06 «چرخهٔ مصرف» (روزِ ۱ تا ۳۶۵، `ProductCycle`) برای یادآوریِ «دوباره خریدن» ِ برنامهٔ خرید؛ `null` نوشته نمی‌شود ⇒ ردیفِ پیشین همان */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val consumptionDays: Int? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -258,6 +256,14 @@ data class Sale(
   val approval: kotlinx.serialization.json.JsonObject? = null,
   /** STF-02 — برگهٔ تأییدِ **لغوِ** همین فاکتور (فقط Sync v3؛ شرح سرِ `core/perm/CancelApproval`)؛ `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val cancelApproval: kotlinx.serialization.json.JsonObject? = null,
+  /**
+   *  STF-03 — برگهٔ تأییدِ **قرضِ** همین فاکتور بیش از سقفِ کارمند (`sales.credit`، `SaleCaps`)؛ سرور آن را در
+   *  `fields.creditApproval` می‌خواند (`credit-cap.slipOf`، پرچمِ `shop.credit_cap`). ارجاعِ «پرسیدن از مدیر» یا برگهٔ PIN؛
+   *  فقط وقتی هست که صندوق پیش‌سنجی کرد و تأیید لازم بود؛ `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val creditApproval: kotlinx.serialization.json.JsonObject? = null,
+  /** STF-03 — برگهٔ تأییدِ **تغییرِ قیمتِ ردیف** بیش از سقف (`sales.price`، `price-cap.slipOf`، پرچمِ `shop.price_cap`)؛ `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceApproval: kotlinx.serialization.json.JsonObject? = null,
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
@@ -843,6 +849,6 @@ data class ShopData(
   val safeEntries: List<SafeEntry> = emptyList(),
 )
 
-val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")
+val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ دستهٔ مصرف
 val DEFAULT_PRODUCT_CATEGORIES = emptyList<String>()
-val DEFAULT_UNITS = listOf("عدد", "کیلوگرم", "گرم", "لیتر", "متر", "کارتن", "بسته")
+val DEFAULT_UNITS = listOf("عدد", "کیلوگرم", "گرم", "لیتر", "متر", "کارتن", "بسته")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ واحد

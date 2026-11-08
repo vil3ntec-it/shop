@@ -6,6 +6,7 @@ import androidx.biometric.BiometricPrompt
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 /**
  *  باز کردنِ قفل با اثر انگشت.
  *
@@ -61,9 +62,9 @@ object Fingerprint {
     )
 
     val info = BiometricPrompt.PromptInfo.Builder()
-      .setTitle("باز کردن فروشگاه من")
-      .setSubtitle("انگشتتان را روی حسگر بگذارید")
-      .setNegativeButtonText("با رمز وارد می‌شوم")
+      .setTitle(StrAppData.fpTitle)
+      .setSubtitle(StrAppData.fpSubtitle)
+      .setNegativeButtonText(StrAppData.fpUsePin)
       .setAllowedAuthenticators(KINDS)
       .build()
 

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.print
 
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.data.invoiceLabel
 import ir.vil3ntec.tohid.core.receipt.ReceiptShare
 import android.content.Context
@@ -57,7 +58,7 @@ object PrintJob {
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
         java.io.File(dir, "invoice-${sale.invoiceLabel() ?: "x"}.$ext").also(write)
       }
-    }.getOrElse { return "فاکتور ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    }.getOrElse { return StrPrint.invoiceNotMade(it.message ?: StrPrint.unknownReason) }
     return runCatching {
       val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -69,10 +70,10 @@ object PrintJob {
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(
-        android.content.Intent.createChooser(send, "فرستادنِ فاکتور").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        android.content.Intent.createChooser(send, StrPrint.sendInvoice).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
       )
       null
-    }.getOrElse { "برنامه‌ای برای فرستادن پیدا نشد" }
+    }.getOrElse { StrPrint.noShareApp }
   }
 
   /** برمی‌گرداند: پیامِ خطا، یا null اگر چاپ انجام شد */
@@ -88,7 +89,7 @@ object PrintJob {
       .getString("store_name", "") ?: ""
 
     val bitmap = runCatching { Receipt.render(context, d, sale, storeName, width, qr = receiptQr(context, sale)) }
-      .getOrElse { return@withContext "فاکتور کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
+      .getOrElse { return@withContext StrPrint.invoiceNotDrawn(it.message ?: StrPrint.unknownReason) }
 
     try {
       ThermalPrinter.print(context, address, bitmap, width)
@@ -128,7 +129,7 @@ object PrintJob {
   ): String? = withContext(Dispatchers.IO) {
     val storeName = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
     val bitmap = runCatching { Receipt.renderReturn(context, d, docId, storeName, width) }
-      .getOrElse { return@withContext "رسیدِ برگشت کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
+      .getOrElse { return@withContext StrPrint.returnNotDrawn(it.message ?: StrPrint.unknownReason) }
     try {
       ThermalPrinter.print(context, address, bitmap, width)
     } finally {
@@ -149,19 +150,19 @@ object PrintJob {
         bitmap.recycle()
         f
       }
-    }.getOrElse { return "رسیدِ برگشت ساخته نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    }.getOrElse { return StrPrint.returnNotMade(it.message ?: StrPrint.unknownReason) }
     return runCatching {
       val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
         type = "image/png"
         putExtra(android.content.Intent.EXTRA_STREAM, uri)
-        putExtra(android.content.Intent.EXTRA_TEXT, "رسیدِ برگشت $label${if (storeName.isNotBlank()) " — $storeName" else ""}")
+        putExtra(android.content.Intent.EXTRA_TEXT, StrPrint.returnShareText(label, if (storeName.isNotBlank()) " — $storeName" else ""))
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(
-        android.content.Intent.createChooser(send, "فرستادنِ رسیدِ برگشت").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+        android.content.Intent.createChooser(send, StrPrint.sendReturn).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
       )
       null
-    }.getOrElse { "برنامه‌ای برای فرستادن پیدا نشد" }
+    }.getOrElse { StrPrint.noShareApp }
   }
 }

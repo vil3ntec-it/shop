@@ -91,4 +91,54 @@ class InvoiceSeriesTest {
     val back = LedgerDiff.fromJson(LedgerDiff.toJson(withSeries))
     assertEquals("B1", back.sales.single().series)
   }
+
+  /** Snapshot ِ سرور از دفتر (همان شکلِ `GET /sync/v1/snapshot`) ⇒ دفترِ تازهٔ حسابِ دیگر (`LedgerDiff.fromSnapshot`) */
+  private fun fromServer(d: ShopData): ShopData {
+    val tree = LedgerDiff.toJson(d)
+    val tables = kotlinx.serialization.json.buildJsonObject {
+      for (key in LedgerDiff.COLLECTIONS) {
+        val rows = tree[key] as? kotlinx.serialization.json.JsonArray ?: continue
+        put(key, kotlinx.serialization.json.JsonArray(rows.map { r ->
+          val o = r as kotlinx.serialization.json.JsonObject
+          kotlinx.serialization.json.buildJsonObject { put("id", o["id"]!!); put("data", o) }
+        }))
+      }
+    }
+    val snap = kotlinx.serialization.json.buildJsonObject { put("tables", tables) }
+    return LedgerDiff.fromJson(LedgerDiff.fromSnapshot(snap, LedgerDiff.toJson(ShopData())))
+  }
+
+  @Test
+  fun `همان گوشی، حسابِ دیگر با همان سری — دفترِ تازه از Snapshot شمارهٔ فروخته‌شده را دوباره نمی‌زند`() {
+    //  صاحب روی گوشی تا A1-3 فروخت؛ شاگرد با کدِ شاگرد روی همان گوشی وارد شد (سری مالِ دستگاه است)
+    var owner = ledger()
+    repeat(3) { owner = sell(owner, series = "A1").data }
+    val staff = fromServer(owner)
+    assertEquals("شمارنده همگام نمی‌شود", 1, staff.nextInvoiceNo)
+    val first = sell(staff, series = "A1").data
+    assertEquals("A1-4", first.sales.last().invoiceLabel())
+
+    //  صاحب برمی‌گردد: دفترِ خودش (شمارندهٔ ۴) + فاکتورِ شاگرد از همگام‌سازی ⇒ ۵، نه ۴ ِ دوباره
+    val back = owner.copy(sales = owner.sales + first.sales.last())
+    assertEquals(4, back.nextInvoiceNo)
+    val again = sell(back, series = "A1").data
+    assertEquals("A1-5", again.sales.last().invoiceLabel())
+    val labels = again.sales.map { it.invoiceLabel() }
+    assertEquals(labels.toSet().size, labels.size)
+  }
+
+  @Test
+  fun `فقط سریِ همین دستگاه شمرده می‌شود — فاکتورِ دستگاهِ دیگر پرشِ بیهوده نمی‌سازد`() {
+    val d = ledger(next = 3).copy(sales = listOf(
+      Sale(id = "x1", invoiceNumber = 40, series = "B1"),
+      Sale(id = "x2", invoiceNumber = 9, series = "O"),
+      Sale(id = "x3", invoiceNumber = 2, series = "A1"),
+    ))
+    assertEquals(3, InvoiceNumber.next(d, "A1"))
+    assertEquals(41, InvoiceNumber.next(d, "B1"))
+    assertEquals("بی سری فقط فاکتورهای بی سری", 3, InvoiceNumber.next(d, ""))
+    assertEquals(8, InvoiceNumber.next(d.copy(sales = d.sales + Sale(id = "x4", invoiceNumber = 7)), " "))
+    //  شمارنده‌ای که جلوتر است دست نمی‌خورد (فاکتورِ لغوشده هم شماره‌اش را نگه می‌دارد)
+    assertEquals(12, InvoiceNumber.next(d.copy(nextInvoiceNo = 12), "A1"))
+  }
 }

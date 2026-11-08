@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.sync.v1.SoftLock
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
@@ -89,22 +90,12 @@ class ShopStore(
         _unreadable.value = AtRestException.Kind.IO
         _data.value = ShopData()
       } else if (file.exists()) {
-        //  SEC-01: دفترِ ساده همان‌طور خوانده می‌شود؛ رمزدار با کلیدِ همین دستگاه
-        val text = try {
-          AtRest.readText(context, file).also { _unreadable.value = null }
-        } catch (e: AtRestException) {
-          _unreadable.value = e.kind
-          null
-        } catch (e: Exception) {
-          //  همان رفتارِ همیشهٔ دفترِ ساده: خطای خواندن بی‌صدا، دفترِ خالی
-          null
-        }
-        if (text != null) {
-          runCatching { json.decodeFromString<ShopData>(text) }
-            .onSuccess { follow.replace(it); recoverSync(it) }
-        }
+        //  SEC-01: دفترِ ساده همان‌طور، رمزدار با کلیدِ همین دستگاه. ⛔ DATA-SAFETY: خواندنِ ناموفق یا JSON ِ خراب «خالی» نیست (`LedgerRecovery`)
+        val read = try { LedgerRecovery.read(file, json, { AtRest.readText(context, it) }) } catch (e: AtRestException) { _unreadable.value = e.kind; null }
+        if (read is LedgerRecovery.Read.Ok) { _unreadable.value = null; guard.clear(); follow.replace(read.data); recoverSync(read.data) }
+        if (read is LedgerRecovery.Read.Bad) damaged(read.damage)
       } else {
-        _unreadable.value = null
+        _unreadable.value = null; guard.clear()
         recoverSync(ShopData())
       }
       //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو.
@@ -128,6 +119,16 @@ class ShopStore(
    */
   private val _unreadable = MutableStateFlow<AtRestException.Kind?>(null)
   val unreadable: StateFlow<AtRestException.Kind?> = _unreadable.asStateFlow()
+
+  /** DATA-SAFETY: دفترِ **ساده**ای که خوانده نشد — گونهٔ خرابی، نسخهٔ سالم و پیامِ برگشت (شرح سرِ `LedgerRecovery.Guard`) */
+  val guard = LedgerRecovery.Guard()
+  private fun damaged(damage: LedgerRecovery.Damage) {
+    _unreadable.value = LedgerRecovery.kindOf(damage)
+    guard.damaged(damage, { LedgerRecovery.near(context, file, json, snapshots = !training) }, { syncs && LedgerRecovery.autoRecoverable(context) }) { SyncV1Engine.of(context).resetTo(it.data, staging); recoverSync(it.data) }
+  }
+  /** پنجرهٔ دفترِ خراب: برگرداندن از `guard.recovery` از راهِ امنِ [rebuildFromServer] (بی op؛ فایلِ خراب کنار می‌رود)؛ [retryRead] همان `load` */
+  suspend fun recoverFromCopy(): Rebuilt = rebuildFromServer(guard.recovery.value?.data).also { if (it.ok) guard.clear() }
+  suspend fun retryRead(): Boolean { load(); return _unreadable.value == null }
 
   /* ------- چند نمونه روی یک دفتر: صفحه و کارگرِ پس‌زمینه — شرح سرِ `LedgerFollow` ------- */
 
@@ -443,9 +444,9 @@ class ShopStore(
    */
   suspend fun rebuildFromServer(backup: ShopData? = null): Rebuilt = withContext(Dispatchers.IO) {
     if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
-    if (_unreadable.value == null) return@withContext Rebuilt(false, "دفترِ این دستگاه باز است؛ بازسازی لازم نیست.")
+    if (_unreadable.value == null) return@withContext Rebuilt(false, StrAppData.ledgerOpenNoRebuild)
     if (SyncChoice.isV3(context)) {
-      return@withContext Rebuilt(false, "بازسازی از سرور فعلاً فقط با همگام‌سازیِ نسخهٔ ۱ است؛ هیچ چیزی پاک نشده.")
+      return@withContext Rebuilt(false, StrAppData.rebuildV1Only)
     }
     val engine = SyncV1Engine.of(context)
     engine.rebind()
@@ -455,8 +456,8 @@ class ShopStore(
       if (engine.everSynced()) return@withContext Rebuilt(false, NEED_SIGN_IN_SYNCED)
       //  هرگز همگام‌نشده: پشتیبان خودش سایه می‌شود ⇐ هیچ op
       return@withContext runCatching { engine.resetTo(backup, staging) }.fold(
-        { Rebuilt(true, "پشتیبان بازیابی شد.") },
-        { Rebuilt(false, "بازیابی انجام نشد (${it.message}). هیچ چیزی پاک نشده.") },
+        { Rebuilt(true, StrAppData.backupRestored) },
+        { Rebuilt(false, StrAppData.restoreFailed(it.message)) },
       )
     }
     if (!Backend.isOnline(context)) return@withContext Rebuilt(false, NEED_NET)
@@ -465,26 +466,26 @@ class ShopStore(
     } catch (e: kotlinx.coroutines.CancellationException) {
       throw e
     } catch (e: Exception) {
-      return@withContext Rebuilt(false, "بازسازی انجام نشد (${e.message ?: e.javaClass.simpleName}). هیچ چیزی پاک نشده؛ دوباره امتحان کنید.")
+      return@withContext Rebuilt(false, StrAppData.rebuildFailed(e.message ?: e.javaClass.simpleName))
     }
     when (out) {
       is SyncRebuild.Outcome.QueueLeft -> Rebuilt(
         false,
-        "${out.count} تغییرِ این دستگاه هنوز به سرور نرسیده؛ اول باید برسند تا گم نشوند. به اینترنت وصل شوید و دوباره امتحان کنید.",
+        StrAppData.queueLeft(out.count),
       )
       is SyncRebuild.Outcome.Done -> {
         //  کفِ شمارهٔ فاکتور پس از افزودنِ ردیف‌های پشتیبان هم (درونِ `withBackupRows`)
         val merged = backup?.let { SyncRebuild.withBackupRows(out.ledger, it, out.before) } ?: out.ledger
-        val done = "دفتر از سرور بازسازی شد (${out.rows} ردیف)."
+        val done = StrAppData.rebuiltRows(out.rows)
         when {
           backup == null -> Rebuilt(true, done)
           merged == out.ledger -> Rebuilt(
             true,
-            done + if (out.before == null) " ردیف‌هایی که فقط در پشتیبان بودند افزوده نشدند: معلوم نیست پس از پشتیبان حذف شده‌اند یا نه." else "",
+            done + if (out.before == null) StrAppData.backupRowsNotAdded else "",
           )
           writeInternal(merged) ->
-            Rebuilt(true, "$done ${backupSize(merged) - backupSize(out.ledger)} ردیفی که هرگز به سرور نرفته بود از پشتیبان افزوده شد.")
-          else -> Rebuilt(false, "$done ولی ردیف‌های پشتیبان نوشته نشدند؛ دوباره بازیابی کنید.")
+            Rebuilt(true, StrAppData.backupRowsAdded(done, backupSize(merged) - backupSize(out.ledger)))
+          else -> Rebuilt(false, StrAppData.backupRowsNotWritten(done))
         }
       }
     }
@@ -520,7 +521,7 @@ class ShopStore(
         staged = null
         return
       }
-      throw java.io.IOException("دفترِ بازسازی‌شده جا نیفتاد؛ با «دوباره امتحان» یا باز شدنِ دوبارهٔ برنامه تمام می‌شود")
+      throw java.io.IOException(StrAppData.rebuiltNotSettled)
     }
   }
 
@@ -551,7 +552,7 @@ class ShopStore(
     }
     if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
     rebuildMark.delete()
-    _unreadable.value = null
+    _unreadable.value = null; guard.clear()
     follow.replace(next)
     follow.publishedLocked(next)
     runCatching { LedgerSummary.write(context, next) }
@@ -727,14 +728,14 @@ class ShopStore(
     if (!syncs) throw StaleLedger(TRAINING_SEALED)
     //  پرچمِ خاموش ⇒ همان `main`
     if (!follow.on) {
-      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!writeToDisk(next)) throw java.io.IOException(StrAppData.ledgerNotWritten)
       return
     }
     synchronized(SyncV1Engine.of(context)) {
       //  ⛔ دفترِ حسابِ دیگری جای این نشسته (خروج/ورود در میانهٔ همگام‌سازی): opهای حسابِ پیشین
       //  روی آن نمی‌نشینند؛ cursor جلو نمی‌رود و دورِ بعد با کلیدِ درست
       if (!follow.sameAccount()) throw StaleLedger(STALE_UNREADABLE)
-      if (!writeToDisk(next)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!writeToDisk(next)) throw java.io.IOException(StrAppData.ledgerNotWritten)
     }
   }
 
@@ -766,10 +767,10 @@ class ShopStore(
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
     //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
     //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
-    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next)) }
+    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true) }   //  DATA-SAFETY: `.prev` (`LedgerRecovery`)
     saved.exceptionOrNull()?.let {
       //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
-      if (!quiet) _diskError.tryEmit(it.message ?: "خطای نامشخص")
+      if (!quiet) _diskError.tryEmit(it.message ?: StrAppData.unknownError)
       return false
     }
     _unreadable.value = null
@@ -797,14 +798,13 @@ class ShopStore(
    */
   fun parseBackup(raw: String): Result<ShopData> = runCatching {
     val tree = json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonObject
-      ?: error("فایل پشتیبان معتبر نیست")
+      ?: error(StrSettings.invalidBackup)
     val parsed = json.decodeFromJsonElement(ShopData.serializer(), tree)
     val stamped = tree.containsKey("exportedAt")
-    if (!stamped && backupSize(parsed) == 0) error("این فایل، پشتیبانِ فروشگاه من نیست")
+    if (!stamped && backupSize(parsed) == 0) error(StrAppData.notOurBackup)
     parsed
   }
 
-  /** واردکردنِ داده‌ای که از نسخهٔ وب می‌آید */
   /**
    *  واردکردنِ داده‌ای که از نسخهٔ وب می‌آید.
    *
@@ -813,7 +813,7 @@ class ShopStore(
    */
   suspend fun importJson(raw: String): Result<ShopData> = withContext(Dispatchers.IO) {
     parseBackup(raw).mapCatching {
-      if (!applyRestore(it)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!applyRestore(it)) throw java.io.IOException(StrAppData.ledgerNotWritten)
       it
     }
   }
@@ -843,7 +843,7 @@ class ShopStore(
     runCatching {
       val parsed = json.decodeFromString<ShopData>(AtRest.readText(context, safety))
       //  ⛔ نسخهٔ ایمنی فقط وقتی پاک می‌شود که دفتر واقعاً روی دیسک نشسته باشد
-      if (!applyRestore(parsed)) throw java.io.IOException("دفتر روی دیسک نوشته نشد")
+      if (!applyRestore(parsed)) throw java.io.IOException(StrAppData.ledgerNotWritten)
       safety.delete()
       parsed
     }
@@ -881,23 +881,47 @@ class ShopStore(
 
   private fun vault(key: String) = File(home, "ledger-${safeKey(key)}.json")
 
-  /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
-  suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
-    if (TrainingMode.on) return@withContext   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)
+  /** آیا دفترِ حسابی زیرِ این نام بایگانی شده (`LedgerOwner`: «بی‌دکان ⇒ دکانِ بایگانی‌شده») */
+  fun hasVault(key: String): Boolean = vault(key).exists()
+
+  /** نشانِ «این بایگانی را ساختِ «یک درِ ورود» نوشت» — سایه/صفِ همان حساب با آن جابه‌جا شده است */
+  private fun bound(key: String) = File(home, "ledger-${safeKey(key)}.bound")
+
+  /**
+   *  بایگانیِ ساخت‌های پیشین (بی نشان): کلیدِ همگام‌سازی همراهش جابه‌جا نمی‌شد، پس سایهٔ حسابش شاید مالِ
+   *  دفترِ دیگری است ⇒ پس از باز شدن فقط با `SyncV1Engine.recoverArchived` (سرور برنده، ردیف‌های تنها درج).
+   */
+  fun vaultLegacy(key: String): Boolean = vault(key).exists() && !bound(key).exists()
+
+  /** دفترِ روی میز هیچ ردیفِ شناسه‌داری ندارد (فهرست‌های نامیِ پیش‌فرض شمرده نمی‌شوند) */
+  fun deskEmpty(): Boolean = _data.value.let { d ->
+    d.products.isEmpty() && d.sales.isEmpty() && d.saleItems.isEmpty() && d.debtors.isEmpty() &&
+      d.transactions.isEmpty() && d.expenses.isEmpty() && d.warehouseEntries.isEmpty() && d.suppliers.isEmpty() &&
+      d.purchases.isEmpty() && d.supplierPayments.isEmpty() && d.saleReturns.isEmpty() && d.stockMovements.isEmpty()
+  }
+
+  /**
+   *  بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز.
+   *  @return `false` ⇒ رونوشت (fsync + جابه‌جاییِ اتمی، `DiskWrite.copy`) ننشست و دفترِ روی میز **دست نخورد**؛
+   *    صدازننده (`LedgerOwner`) نباید دفترِ دیگری جایش باز کند
+   */
+  suspend fun stashTo(key: String): Boolean = withContext(Dispatchers.IO) {
+    if (TrainingMode.on) return@withContext true   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)
     //  زیرِ قفلِ نوشتنِ دفتر و قفلِ کوچِ رمز (`AtRest.converge`): کوچ میانِ کپی و پاک کردن نمی‌نشیند
-    synchronized(SyncV1Engine.of(context)) {
+    val kept = synchronized(SyncV1Engine.of(context)) {
       runCatching {
         synchronized(AtRest.lock) {
-          if (file.exists()) file.copyTo(vault(key), overwrite = true)
+          if (file.exists()) DiskWrite.copy(file, vault(key))
+          runCatching { bound(key).writeText("1") }
           file.delete()
         }
+      }.isSuccess.also { ok ->
+        //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
+        if (ok) { follow.movedLocked(stop = false, next = ShopData()); _unreadable.value = null }
       }
-      //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
-      follow.movedLocked(stop = false, next = ShopData())
-      _unreadable.value = null
     }
-    LedgerSummary.clear(context)
-    Unit
+    if (kept) LedgerSummary.clear(context)
+    kept
   }
 
   /** باز کردنِ دفترِ یک حساب — اگر بایگانی نداشت، دفترِ خالی */
@@ -907,7 +931,7 @@ class ShopStore(
       val saved = vault(key)
       synchronized(SyncV1Engine.of(context)) {
         runCatching {
-          synchronized(AtRest.lock) { if (saved.exists()) saved.copyTo(file, overwrite = true) else file.delete() }
+          synchronized(AtRest.lock) { if (saved.exists()) DiskWrite.copy(saved, file) else file.delete() }
         }
         follow.movedLocked(stop = true, next = ShopData())
       }
@@ -931,6 +955,7 @@ class ShopStore(
    * بین دو نسخه جابه‌جا می‌شود دفترش را دوباره نمی‌سازد.
    */
   suspend fun exportBackup(storeName: String = ""): String = withContext(Dispatchers.IO) {
+    if (_unreadable.value != null) throw StaleLedger(UNREADABLE)   //  ⛔ DATA-SAFETY: دفترِ خوانده‌نشده پشتیبانِ «خالی» نمی‌دهد
     val tree = json.encodeToJsonElement(ShopData.serializer(), _data.value)
       .let { it as kotlinx.serialization.json.JsonObject }
       .toMutableMap()
@@ -947,33 +972,26 @@ class ShopStore(
 
   companion object {
     /** پیامِ ذخیره‌ای که رد شد چون دفتری که صفحه با آن ساخت دیگر نگه داشته نشده ([LedgerFollow.baseOf]) */
-    const val STALE_BASE =
-      "ثبت نشد — این صفحه از دفتری ساخته شده بود که در این فاصله چند بار از دستگاه‌های دیگر تازه شد، و ثبتش ردیف‌های تازه را پاک می‌کرد. صفحه را دوباره باز کنید و دوباره ثبت کنید؛ چیزی پاک نشده."
+    val STALE_BASE: String get() = StrAppData.staleBase
 
     /** پیامِ ویرایش‌هایی که چون ردیفشان در دستگاهِ دیگر حذف شده بود ننشستند ([LedgerMerge.Outcome.dropped]) */
     fun editsDropped(n: Int): String =
-      "ثبت شد، جز ویرایشِ شما روی $n ردیف که در همین فاصله در دستگاهِ دیگری حذف شده بود؛ آن ردیف‌ها حذف‌شده می‌مانند. اگر لازم‌اند، دوباره بسازیدشان."
+      StrAppData.editsDropped(n)
 
     /** پیامِ نوشتنی که رد شد چون دفترِ دیسک جلوتر بود و خوانده نشد (یا دفترِ حسابِ دیگری بود) */
-    const val STALE_UNREADABLE =
-      "دفترِ روی دیسک در این فاصله عوض شده بود و دوباره خوانده نشد، پس این تغییر ثبت نشد تا چیزی از آن رونویسی نشود. دوباره امتحان کنید."
+    val STALE_UNREADABLE: String get() = StrAppData.staleUnreadable
 
     /** پیامِ نوشتنی که به‌خاطرِ دفترِ رمزدارِ خوانده‌نشده رد شد */
     /** OPS-07: نوشتنی روی دفترِ واقعی، یا کاری که به سرور می‌رسد، وقتی حالتِ آموزشی روشن است */
-    const val TRAINING_SEALED =
-      "حالتِ آموزشی روشن است: دفترِ واقعی دست نمی‌خورد و چیزی به سرور نمی‌رود. برای کارِ واقعی از نوارِ بالا «خروج از آموزش» را بزنید."
+    val TRAINING_SEALED: String get() = StrAppData.trainingSealed
 
-    const val UNREADABLE =
-      "دفترِ رمزدارِ این دستگاه باز نشد، پس این تغییر ثبت نشد تا دفترِ واقعی رونویسی نشود. از «تنظیمات ← امنیت» دوباره امتحان یا «بازسازی از سرور» را بزنید."
+    val UNREADABLE: String get() = StrAppData.unreadable
 
-    const val NEED_SIGN_IN =
-      "برای بازسازی از سرور اول وارد حساب شوید؛ یا از «داده‌ها» یک پشتیبان را بازیابی کنید. هیچ چیزی پاک نشده."
+    val NEED_SIGN_IN: String get() = StrAppData.needSignIn
 
-    const val NEED_SIGN_IN_SYNCED =
-      "این دفتر پیش‌تر با سرور همگام شده؛ برای بازیابیِ پشتیبان اول وارد حساب شوید تا دفتر از سرور ساخته شود و ردیف‌های حذف‌شده زنده نشوند. هیچ چیزی پاک نشده."
+    val NEED_SIGN_IN_SYNCED: String get() = StrAppData.needSignInSynced
 
-    const val NEED_NET =
-      "برای بازسازی از سرور اینترنت لازم است؛ دفترِ خوانده‌نشده با پشتیبانِ کهنه جایگزین نمی‌شود تا ردیف‌های تازه‌ترِ سرور حذف نشوند. هیچ چیزی پاک نشده."
+    val NEED_NET: String get() = StrAppData.needNet
 
     /** چند رکورد در این دفتر هست — برای خلاصهٔ پیش از بازیابی */
     fun backupSize(d: ShopData): Int =

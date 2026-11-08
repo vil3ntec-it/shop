@@ -13,16 +13,19 @@
  *             شیءها می‌مانند (پاکشان با `gc --apply`).
  *   gc        شیءهای بی ردیف که از `olderThanMs` کهنه‌ترند (شیءِ تراکنشِ برگشته، پاکیِ آبشاریِ دکان)؛ پیش‌فرض فقط گزارش.
  *
- * ⛔ کدِ پمپ (`station_chat_media`) و رسانهٔ چت/پشتیبانی/پروندهٔ اعتماد این‌جا نیستند (docs/SCALING-fa.md §۵).
+ * رسانهٔ چتِ دکان، پشتیبانی و مدرکِ پروندهٔ اعتماد (مهاجرتِ ۲۷۵، `lib/media-store.js`) هم این‌جایند، هر کدام با سنجهٔ
+ * نوعِ خودش (`check`)؛ ردیفی که بایتش آن نوع نیست جابه‌جا نمی‌شود (`skipped`، در پایگاه می‌ماند).
+ * ⛔ کدِ پمپ (`station_chat_media`) این‌جا نیست (docs/SCALING-fa.md §۵).
  */
 const crypto = require('crypto');
 const db = require('../db');
 const store = require('./image-store');
+const media = require('./media-store');
 const { serverSecret } = require('./server-secret');
 
 const shop = (r) => store.shopTenant(r.shop_id);
 const account = (r) => store.accountTenant(r.app, r.account_id);
-/** هر جدولِ بایتِ عکس (مهاجرتِ ۲۵۵): کلیدِ ردیف، ستون‌های tenant و tenant ِ انبار. */
+/** هر جدولِ بایت (مهاجرتِ ۲۵۵ و ۲۷۵): کلیدِ ردیف، ستون‌های tenant، tenant ِ انبار و سنجهٔ نوع (پیش‌فرض عکس). */
 const TABLES = [
   { table: 'product_photos', pk: ['app', 'account_id', 'product_id'], extra: [], tenant: account },
   { table: 'photo_inbox', pk: ['id'], extra: ['app', 'account_id'], tenant: account },
@@ -31,7 +34,11 @@ const TABLES = [
   { table: 'order_issue_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
   { table: 'order_pick_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
   { table: 'delivery_photos', pk: ['id'], extra: ['shop_id'], tenant: shop },
+  { table: 'shop_chat_media', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
+  { table: 'support_media', pk: ['id'], extra: ['thread_id'], tenant: (r) => media.supportTenant(r.thread_id), check: () => media.supportCheck },
+  { table: 'trust_evidence', pk: ['id'], extra: ['shop_id', 'mime'], tenant: shop, check: (r) => media.chatCheck(r.mime) },
 ];
+const checkOf = (t, r) => (t.check ? t.check(r) : store.sniff);
 
 function pick(names) {
   if (!names || !names.length) return TABLES;
@@ -104,8 +111,8 @@ async function copy({ tables, batch, limit, log = () => {} } = {}) {
     const c = { copied: 0, changed: 0, skipped: 0, failed: 0 };
     await eachRow(t, `data IS NOT NULL AND store_key = ''`, 'data', async (r) => {
       const buf = Buffer.from(r.data);
-      const mime = store.sniff(buf);
-      //  ⛔ همان سنجشِ سختِ نوع: ردیفی که JPEG/PNG/WebP نیست جابه‌جا نمی‌شود (در پایگاه می‌ماند و گزارش می‌شود)
+      const mime = checkOf(t, r)(buf);
+      //  ⛔ همان سنجشِ سختِ نوع (عکس: JPEG/PNG/WebP؛ رسانه: `lib/media-store.js`): ردیفِ دیگر جابه‌جا نمی‌شود (در پایگاه می‌ماند و گزارش می‌شود)
       if (!mime) { c.skipped++; return; }
       const sum = md5(buf);
       const tenant = t.tenant(r);
@@ -139,7 +146,7 @@ async function verify({ tables, batch, log = () => {} } = {}) {
   for (const t of pick(tables)) {
     const c = { ok: 0, missing: 0, mismatch: 0 };
     await eachRow(t, `store_key <> ''`, 'store_key, data', async (r) => {
-      const b = await store.fetchObject(t.tenant(r), r.store_key);
+      const b = await store.fetchObject(t.tenant(r), r.store_key, checkOf(t, r));
       if (!b) { c.missing++; log(`✖ ${t.table} ${JSON.stringify(t.pk.map((k) => r[k]))}: شیء نیست یا سالم نیست`); return; }
       if (r.data !== null && !b.equals(Buffer.from(r.data))) { c.mismatch++; return; }
       c.ok++;
@@ -157,7 +164,7 @@ async function purge({ tables, batch, confirm = false, log = () => {} } = {}) {
     const c = { purged: 0, wouldPurge: 0, kept: 0 };
     await eachRow(t, `data IS NOT NULL AND store_key <> ''`, 'store_key, data', async (r) => {
       const buf = Buffer.from(r.data);
-      const b = await store.fetchObject(t.tenant(r), r.store_key);
+      const b = await store.fetchObject(t.tenant(r), r.store_key, checkOf(t, r));
       //  ⛔ رونوشتِ پایگاه فقط وقتی برداشته می‌شود که شیء همین دم بایت‌به‌بایت همان باشد
       if (!b || !b.equals(buf)) { c.kept++; log(`✖ ${t.table} ${JSON.stringify(t.pk.map((k) => r[k]))}: شیء با پایگاه یکی نیست`); return; }
       if (!confirm) { c.wouldPurge++; return; }
@@ -189,7 +196,7 @@ async function rollback({ tables, batch, log = () => {} } = {}) {
         if (done) c.unlinked++;
         return;
       }
-      const b = await store.fetchObject(t.tenant(r), r.store_key);
+      const b = await store.fetchObject(t.tenant(r), r.store_key, checkOf(t, r));
       if (!b) { c.missing++; log(`✖ ${t.table} ${JSON.stringify(t.pk.map((k) => r[k]))}: شیء نیست — ردیف دست نخورد`); return; }
       const done = await db.one(
         `UPDATE ${t.table} SET data = $${t.pk.length + 2}, store_key = '' WHERE ${w.sql} AND store_key = $1 AND data IS NULL RETURNING 1 AS ok`,

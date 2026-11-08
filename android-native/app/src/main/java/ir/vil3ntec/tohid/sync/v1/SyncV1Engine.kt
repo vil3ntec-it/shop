@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.sync.OpBacklog
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
@@ -56,7 +57,7 @@ class SyncV1Engine private constructor(context: Context) {
   private val parts = object : SyncCommit.Parts {
     override fun shadow(): String = state.shadow
     override fun commit(shadow: String, cursor: Long?) {
-      if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     }
     override fun queued(): Set<String> = queue.all().mapTo(HashSet()) { it.opId }
     override fun push(ops: List<SyncOp>) {
@@ -103,10 +104,206 @@ class SyncV1Engine private constructor(context: Context) {
       .ifBlank { store.deviceUid },
   )
 
+  /** کلیدِ دامنه‌دارِ همین حالای صف و حال — `SyncV1Keys.bind` */
+  fun currentKey(): String = accountKey
+
+  /**
+   *  نتیجهٔ «همه را بفرست» پیش از خروج — شرح سرِ [flushForSignOut].
+   *  @param rejected opهایی که سرور **در همین تلاش** نپذیرفت (از صف بیرون رفتند، به سرور نرسیدند)
+   */
+  data class SignOutFlush(
+    val queued: Int,
+    val rejected: Int,
+    val online: Boolean,
+    val signedIn: Boolean,
+    val error: String,
+    val reconciled: Boolean,
+  )
+
+  /**
+   *  پیش از هر خروج از حساب: هر تغییرِ دفتر op شود، دفترِ هرگز‌هم‌ترازنشده یک بار با سرور هم‌تراز شود، و صف
+   *  تا ته برود — و بگوید سرور **همه** را گرفت یا نه. هیچ چیزی پاک نمی‌کند.
+   *
+   *  ⛔ پیش‌تر خروج فقط شمارِ صفِ همین کلید را می‌دید: تغییری که هنوز op نشده بود (تفاضلِ دفتر با سایه) و دفتری
+   *  که هرگز به سرور نرسیده بود «صفر» شمرده می‌شدند و خروج آزاد بود.
+   *
+   *  @param read دفترِ همین حالا؛ `null` ⇒ دفتر خوانده نمی‌شود (رمزدارِ باز‌نشده) و فقط صف می‌رود
+   */
+  suspend fun flushForSignOut(read: (() -> ShopData)?, write: (ShopData) -> Unit): SignOutFlush {
+    if (SyncChoice.isV3(app)) {
+      val queued = runCatching { SyncV3Runner.of(app).asV1Status()?.queued ?: 0 }.getOrDefault(0)
+      return SignOutFlush(queued, 0, Backend.isOnline(app), Backend.isReady(app), "", reconciled = true)
+    }
+    //  ۱) تغییرِ محلیِ op‌نشده ⇒ op (زیرِ همان قفلِ `record`)؛ دفترِ خالی روی سایهٔ پر هیچ op نمی‌سازد
+    var rows = 0
+    if (read != null) {
+      val ledger = runCatching { read() }.getOrNull()
+      if (ledger != null) {
+        val tree = LedgerDiff.toJson(ledger)
+        rows = LedgerDiff.COLLECTIONS.sumOf { (tree[it] as? JsonArray)?.size ?: 0 }
+        runCatching { record(ledger) }
+      }
+    }
+    val signedIn = Backend.isReady(app)
+    val online = Backend.isOnline(app)
+    if (!signedIn || !online) {
+      publish()
+      return SignOutFlush(queue.size(), 0, online, signedIn, "", reconciled = rows == 0 || everSynced() || state.reconciledAt > 0)
+    }
+    var error = ""
+    //  بایگانیِ کهنهٔ بازیابی‌نشده ⇒ اول بازیابی (سرور برنده، ردیف‌های تنها درج)؛ نشد ⇒ «هرگز هم‌تراز نشده»
+    if (read != null && state.recoverArchive) {
+      runCatching { recoverArchived(read, write) }.onFailure { error = it.message ?: "بازیابیِ بایگانی نشد" }  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+      if (state.recoverArchive) return SignOutFlush(queue.size(), 0, true, true, error, reconciled = false)
+    }
+    //  ۲) دفتری که هرگز هم‌تراز نشده (آفلاین ساخته شد، یا پیش از v1): ردیف‌هایی که سرور ندارد به صف
+    if (read != null && rows > 0 && state.reconciledAt == 0L) {
+      runCatching { prepare(read, write) }.onFailure { error = it.message ?: "هم‌ترازی با سرور نشد" }  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+    }
+    //  ۳) صف تا ته
+    var rejected = 0
+    gate.withLock {
+      busy = true
+      publish()
+      try {
+        synchronized(this) { commit.queueRecorded() }
+        val before = queue.droppedCount()
+        try {
+          pushQueue(pushClient(), deviceId())
+        } catch (cancelled: kotlinx.coroutines.CancellationException) {
+          throw cancelled
+        } catch (e: Throwable) {
+          error = e.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+          state.lastError = error
+        }
+        rejected = (queue.droppedCount() - before).coerceAtLeast(0)
+      } finally {
+        busy = false
+        publish()
+      }
+    }
+    return SignOutFlush(queue.size(), rejected, true, true, error, reconciled = rows == 0 || state.reconciledAt > 0)
+  }
+
+  /** بازیابیِ بایگانیِ کهنه هنوز مانده (`SyncStateV1.recoverArchive`) */
+  fun recoveryPending(): Boolean = !SyncChoice.isV3(app) && state.recoverArchive
+
+  /**
+   *  بازیابیِ یک‌بارهٔ دفترِ بایگانی‌شدهٔ ساخت‌های پیش از «یک درِ ورود» — همان دفترِ واقعیِ صاحب که اشکالِ کلیدها
+   *  در بایگانی جا گذاشت (`LedgerOwner.markRecovery`). سایهٔ این کلید شاید مالِ دفترِ دیگر (شاگرد) بود، پس:
+   *
+   *   ۱) DELETE ِ در صف برای ردیفی که در همین دفتر هست از دفترِ دیگری آمده ⇒ کنار (`…-dropped.json`، دلیلِ
+   *      `foreign_desk`)، هرگز به سرور نمی‌رود؛ بقیهٔ صف (تغییرهای واقعیِ نرفته) **اول** فرستاده می‌شود.
+   *   ۲) Snapshot ⇒ `RestoreMerge.merge`: ردیفی که سرور دارد **نسخهٔ سرور** (دادهٔ تازه‌ترِ دستگاه‌های دیگر هرگز
+   *      بازنویسی نمی‌شود)؛ ردیف‌هایی که فقط سرور دارد (فروشِ شاگرد، دستگاه‌های دیگر) هم می‌آیند؛ ردیفِ دفتر که
+   *      سرور ندارد (هرگز نرفت، یا DELETE ِ همان اشکال پاکش کرد) می‌ماند و «درج» می‌رود — همان شناسه، پس دوتا نمی‌شود.
+   *   ۳) سایه = Snapshot، cursor = سرِ Snapshot، نشان برداشته؛ صف همان دم فرستاده می‌شود.
+   *
+   *  ⚠️ ردیفی که دستگاهِ **دیگری** پس از بایگانی عمداً حذف کرده بود دوباره می‌آید (سرورِ امروز نمی‌گوید حذف را
+   *  کدام دستگاه کرد): گم شدن بدتر از یک ردیفِ زنده‌شده است. شکستِ شبکه ⇒ هیچ چیزی عوض نشده، دورِ بعد دوباره.
+   *  @return چند ردیفِ تنهای دفتر «درج» رفت
+   */
+  suspend fun recoverArchived(read: () -> ShopData, write: (ShopData) -> Unit): Int = gate.withLock {
+    if (!state.recoverArchive) return@withLock 0
+    if (!Backend.isReady(app) || !Backend.isOnline(app)) throw java.io.IOException("بازیابیِ بایگانی اینترنت می‌خواهد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+    busy = true
+    publish()
+    try {
+      val client = pushClient()
+      val device = store.deviceUid
+      recoverWith(object : RecoverIo {
+        override suspend fun push() = pushQueue(client, device)
+        override suspend fun snapshot(): JsonObject = client.snapshot()
+      }, read, write)
+    } finally {
+      busy = false
+      publish()
+    }
+  }
+
+  /** شبکهٔ [recoverWith] — آزمون‌ها Snapshot ِ ساختگی و push ِ ثبت‌کننده می‌دهند */
+  internal interface RecoverIo {
+    suspend fun push()
+    suspend fun snapshot(): JsonObject
+  }
+
+  /** بدنهٔ [recoverArchived]؛ صدازننده `gate` را دارد (یا آزمون است) */
+  internal suspend fun recoverWith(io: RecoverIo, read: () -> ShopData, write: (ShopData) -> Unit): Int {
+    if (!state.recoverArchive) return 0
+    synchronized(this) {
+      if (commit.pending()) commit.recover(read())
+      commit.queueRecorded()
+      val tree = LedgerDiff.toJson(read())
+      val present = HashMap<String, Set<String>>()
+      for (key in LedgerDiff.COLLECTIONS) {
+        present[key] = (tree[key] as? JsonArray).orEmpty()
+          .mapNotNullTo(HashSet()) { ((it as? JsonObject)?.get("id") as? JsonPrimitive)?.content }
+      }
+      val foreign = queue.all().filter { it.type == SyncOp.DELETE && it.rowId in present[it.table].orEmpty() }
+      if (foreign.isNotEmpty()) {
+        queue.drop(foreign, "foreign_desk")
+        queue.ack(foreign.map { it.opId })
+      }
+    }
+    io.push()
+    val snapshot = io.snapshot()
+    val cursor = (snapshot["cursor"] as? JsonPrimitive)?.content?.toLongOrNull()
+      ?: throw java.io.IOException("Snapshot ِ سرور cursor نداشت")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+    val made = synchronized(this) {
+      val current = read()
+      val archived = LedgerArchive.archivedIds(LedgerArchive.readArchive(app))
+      val (ledger, shadow) = RestoreMerge.merge(snapshot, LedgerDiff.toJson(current), emptySet(), archived)
+      val written = commit.rebuild(ledger, shadow, current, cursor, write)
+      state.recoverArchive = false
+      commit.record(written)
+    }
+    val now = clock()
+    state.reconciledAt = now
+    state.snapshotAt = now
+    io.push()
+    state.lastError = ""
+    publish()
+    return made
+  }
+
+  /**
+   *  خروجِ اجباری: opهای نرفتهٔ همین حساب از صفِ ساده به گاوصندوقِ رمزدارِ همان حساب (`SignOutVault`) می‌روند.
+   *  فقط وقتی از صف بیرون می‌آیند که گاوصندوق نوشته **و دوباره خوانده** شد؛ وگرنه صف دست نمی‌خورد.
+   *
+   *  @return چند op اکنون در گاوصندوق است؛ `-1` اگر رمز در دسترس نبود (صفِ ساده سرِ جایش)
+   */
+  @Synchronized
+  fun sealQueueFor(userId: String, shopId: String): Int {
+    if (SyncChoice.isV3(app)) return -1
+    if (commit.pending()) runCatching { commit.queueRecorded() }
+    val ops = queue.all()
+    if (ops.isEmpty()) return 0
+    if (!SignOutVault.seal(app, userId, shopId, ops)) return -1
+    queue.ack(ops.map { it.opId })
+    publish()
+    return ops.size
+  }
+
+  /**
+   *  ورودِ دوبارهٔ همان حساب: opهای گاوصندوق با **همان op_id** جلوی صف (سرور تکراری‌ها را `duplicate` می‌شمارد).
+   *  گاوصندوق فقط پس از نشستنِ opها در صف پاک می‌شود.
+   */
+  @Synchronized
+  fun restoreSealedFor(userId: String): Int {
+    if (SyncChoice.isV3(app)) return 0
+    val ops = SignOutVault.open(app, userId) ?: return 0
+    val added = queue.pushFront(ops)
+    val have = queue.all().mapTo(HashSet()) { it.opId }
+    if (ops.all { it.opId in have }) SignOutVault.drop(app, userId)
+    publish()
+    return added
+  }
+
   /** پس از ورود یا خروج صدا زده می‌شود — کلیدها عوض می‌شوند. */
-  fun rebind() {
+  fun rebind(force: Boolean = false) {
     val fresh = keyOf()
-    if (fresh == accountKey) return
+    //  `force`: همان کلید ولی پرونده‌هایش جابه‌جا شدند (`SyncV1Keys.switchShop`) ⇒ صف و ژورنال از نو خوانده شوند
+    if (fresh == accountKey && !force) return
     accountKey = fresh
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
@@ -128,7 +325,7 @@ class SyncV1Engine private constructor(context: Context) {
     val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
     if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
-      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
+      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     }
     if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
@@ -146,6 +343,8 @@ class SyncV1Engine private constructor(context: Context) {
   @Synchronized
   fun record(data: ShopData): Int {
     if (SyncChoice.isV3(app)) return SyncV3Runner.of(app).record(data)
+    //  بایگانیِ کهنه باز شده و سایهٔ این کلید شاید مالِ دفترِ دیگری است ⇒ تا `recoverArchived` هیچ تفاضلی
+    if (state.recoverArchive) { publish(); return 0 }
     /*
      *  نخستین بار روی این دستگاه (سایه‌ای نیست): دفترِ امروز «تغییر» نیست،
      *  حالتِ پایه است. اگر همین‌جا تفاضل می‌گرفتیم، کلِ دفتر یک‌جا به سرور
@@ -158,6 +357,13 @@ class SyncV1Engine private constructor(context: Context) {
      */
     val made = try {
       commit.record(data)
+    } catch (empty: SyncCommit.EmptyLedger) {
+      //  دفترِ خالی روی سایهٔ پر: هیچ DELETE نمی‌رود؛ دورِ بعد دفتر از Snapshot ِ سرور ساخته می‌شود
+      //  (`prepare` با دفترِ خالی) و سایه همان سرور می‌شود — نه «همه حذف شد»
+      state.reconciledAt = 0L
+      state.lastError = empty.message.orEmpty()
+      publish()
+      return 0
     } catch (e: Exception) {
       //  صف (یا ژورنالش) روی حافظه ننشست — معمولاً حافظهٔ پر. دفتر پیش‌تر نشسته و سایه جلو نرفته، پس
       //  همین تغییر با ثبتِ بعدی دوباره op می‌شود؛ ولی بی‌صدا نه (هیچ opی هم دور ریخته نمی‌شود: `OpBacklog`)
@@ -228,13 +434,15 @@ class SyncV1Engine private constructor(context: Context) {
     gate.withLock {
       if (!Backend.isReady(app)) { publish(); return@withLock Result.success(Unit) }
       if (!Backend.isOnline(app)) { publish(); return@withLock Result.success(Unit) }
+      //  صفِ این کلید شاید DELETE ِ دفترِ دیگری دارد ⇒ نه push، نه pull تا `recoverArchived`
+      if (state.recoverArchive) { publish(); return@withLock Result.success(Unit) }
       busy = true
       publish()
       try {
         //  ژورنالِ نیمه‌مانده پیش از هر Push/Pull (F0-05)
         if (commit.pending()) synchronized(this) { commit.recover(read()) }
         val client = pushClient()
-        val device = store.deviceUid
+        val device = deviceId()
 
         //  §۹.۵: سرور از پشتیبان برگشته؟ (هر دور) opهای گم‌شده — خودِ دستگاه و گرفته‌شده‌ها — به ترتیبِ سرور جلوی صف
         checkEpoch(client)
@@ -301,7 +509,7 @@ class SyncV1Engine private constructor(context: Context) {
         throw cancelled
       } catch (error: Throwable) {
         attempt++
-        state.lastError = error.message ?: "خطای نامشخص"
+        state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         Result.failure(error)
       } finally {
         busy = false
@@ -358,9 +566,9 @@ class SyncV1Engine private constructor(context: Context) {
       if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })
       if (refused.isNotEmpty()) {
         //  ردشده‌ها از صف بیرون می‌روند — وگرنه صف تا ابد قفل
-        //  می‌کند — ولی بی‌صدا نه.
+        //  می‌کند — ولی بی‌صدا نه: دلیلِ خودِ سرور (approval_required، tx_rejected…) کنارِ هر op، نه «rejected» (سفرِ JB1)
         val ids = refused.map { it.opId }.toHashSet()
-        queue.drop(batch.filter { it.opId in ids }, "rejected")
+        refused.groupBy { it.reason.ifBlank { "rejected" } }.forEach { (why, rs) -> rs.map { it.opId }.toSet().let { m -> queue.drop(batch.filter { it.opId in m }, why) } }
         queue.ack(ids)
       }
       state.lastPushAt = clock()
@@ -383,18 +591,19 @@ class SyncV1Engine private constructor(context: Context) {
    */
   suspend fun pushPending(): Result<Int> = gate.withLock {
     if (!Backend.isReady(app) || !Backend.isOnline(app)) { publish(); return@withLock Result.success(queue.size()) }
+    if (state.recoverArchive) { publish(); return@withLock Result.success(queue.size()) }
     busy = true
     publish()
     try {
       //  opهای ژورنالِ «ثبت» که هنوز به صف نرسیده بودند (همان `op_id`)
       synchronized(this) { commit.queueRecorded() }
-      pushQueue(pushClient(), store.deviceUid)
+      pushQueue(pushClient(), deviceId())
       Result.success(queue.size())
     } catch (cancelled: kotlinx.coroutines.CancellationException) {
       throw cancelled
     } catch (error: Throwable) {
       attempt++
-      state.lastError = error.message ?: "خطای نامشخص"
+      state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       Result.failure(error)
     } finally {
       busy = false
@@ -416,7 +625,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       synchronized(this) { commit.queueRecorded() }
       val client = pushClient()
-      val device = store.deviceUid
+      val device = deviceId()
       //  §۹.۵: سرور از پشتیبان برگشته؟ opهای گم‌شده (خودی و گرفته‌شده، دفترچه رمزدار نیست) پیش از
       //  Snapshot جلوی صف ⇒ دفترِ بازسازی‌شده آن‌ها را هم دارد
       checkEpoch(client)
@@ -427,7 +636,7 @@ class SyncV1Engine private constructor(context: Context) {
         override suspend fun snapshot(): JsonObject = client.snapshot()
         override fun stage(next: ShopData, shadowSha: String) = synchronized(this@SyncV1Engine) { files.stage(next, shadowSha) }
         override fun commitShadow(shadow: String, cursor: Long) {
-          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         }
         override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
       }).run(base)
@@ -482,7 +691,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       val shadow = SyncRebuild.shadowFor(ledger)
       files.stage(ledger, SyncRebuild.sha(shadow))
-      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       state.reconciledAt = 0L
       state.snapshotAt = 0L
       files.swap()
@@ -512,7 +721,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  ──────────────────────────────────────────────────────────────────
    */
   suspend fun prepare(read: () -> ShopData, write: (ShopData) -> Unit) {
-    if (state.reconciledAt > 0) return
+    if (state.reconciledAt > 0 || state.recoverArchive) return
     gate.withLock {
       if (state.reconciledAt > 0) return@withLock
       val body = SyncV1Client(Backend.api(app)).snapshot()
@@ -713,7 +922,7 @@ class SyncV1Engine private constructor(context: Context) {
   fun droppedOps(): List<JsonObject> = queue.dropped()
   fun errorReports(): Boolean = state.errorReports
   fun setErrorReports(on: Boolean) { state.errorReports = on }
-  fun deviceId(): String = store.deviceUid
+  fun deviceId(): String = V1Replica.id(this, app, store, state)  // `device_id` ِ همین حساب روی همین دستگاه (V1ReplicaAndroid)
 
   private fun readShadow(): JsonObject? {
     val raw = state.shadow
@@ -737,14 +946,12 @@ class SyncV1Engine private constructor(context: Context) {
 
     /** §۹.۵: هشدارِ پوششِ دفترچه، سه روز */
     const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
-    const val RESTORE_NOTICE =
-      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
-        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
+    val RESTORE_NOTICE: String get() = StrSync.restoreNotice
 
     /** صف (یا ژورنالش) ننشست — تغییر روی دفترِ همین دستگاه می‌ماند و با ثبتِ بعدی دوباره op می‌شود */
     const val QUEUE_NOT_WRITTEN =
-      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +
-        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"
+      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     @Volatile private var instance: SyncV1Engine? = null
 

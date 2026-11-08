@@ -31,6 +31,7 @@ const { checkOriginal, putBlob, tooLarge, ...QS } = require('./image-originals')
 const { ulid } = require('./ulid');
 const { stripControl } = require('./validate');
 const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
+const { parseCsv } = require('./image-bank-csv');   //  CSV ِ ردیف‌های دسته (سقفِ طول، بی نوشتنِ پویا)
 
 const SHOP_FLAG = 'shop.image_bank';
 const CENTRAL_FLAG = 'image_bank.central';
@@ -958,35 +959,6 @@ async function batchFile(id, name, buf) {
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
     return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf), ...(row.metrics && { quality: row.metrics }) };
   }
-}
-
-/** CSV با سطرِ سرآیند ⇒ ردیف‌ها (row_no = شمارهٔ سطرِ فایل). نقل‌قولِ "…" پشتیبانی می‌شود. */
-function parseCsv(text) {
-  const lines = [];
-  let row = [], field = '', q = false;
-  const s = String(text || '').replace(/^﻿/, '');
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (q) {
-      if (ch === '"' && s[i + 1] === '"') { field += '"'; i++; } else if (ch === '"') q = false; else field += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === ',') { row.push(field); field = ''; }
-    else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && s[i + 1] === '\n') i++;
-      row.push(field); lines.push(row); row = []; field = '';
-    } else field += ch;
-  }
-  if (field || row.length) { row.push(field); lines.push(row); }
-  if (!lines.length) return [];
-  const head = lines[0].map((h) => h.trim().toLowerCase());
-  const out = [];
-  for (let n = 1; n < lines.length; n++) {
-    if (lines[n].every((x) => !x.trim())) continue;
-    const o = { row_no: n + 1 };
-    head.forEach((h, j) => { if (h && h !== '__proto__' && h !== 'constructor' && h !== 'prototype') o[h] = (lines[n][j] || '').trim(); });
-    out.push(o);
-  }
-  return out;
 }
 
 const ROW_FIELDS = ['product_id', 'barcode', 'sku', 'name', 'brand', 'category', 'variant', 'size', 'unit',

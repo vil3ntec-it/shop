@@ -6,6 +6,7 @@ import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import ir.vil3ntec.tohid.data.DiskWrite
 import java.io.File
 
 /**
@@ -32,6 +33,7 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
   private val file = File(dir, "oplog-$safe.json")
   private val dropFile = File(dir, "oplog-$safe-dropped.json")
+  private val evictedFile = File(dir, "oplog-$safe-dropped-evicted.txt")
 
   /*
    *  ── شمارشِ کش‌شده، عمداً ────────────────────────────────────────
@@ -55,7 +57,7 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
   @Synchronized
   fun droppedCount(): Int {
-    if (cachedDropped < 0) cachedDropped = read(dropFile).size
+    if (cachedDropped < 0) cachedDropped = read(dropFile).size + evicted()
     return cachedDropped
   }
 
@@ -96,7 +98,7 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
   @Synchronized
   private fun update(edit: (List<JsonObject>) -> List<JsonObject>?) {
     val next = edit(read(file)) ?: return
-    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
   }
 
   /**
@@ -148,10 +150,18 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
         put("at", JsonPrimitive(now))
       }
     }
-    //  دویست تای آخر برای عیب‌یابی بس است
-    while (book.size > 200) book.removeAt(0)
-    write(dropFile, book)
+    //  ⛔ DATA-SAFETY: opی که سرور رد کرد تغییرِ واقعیِ دکان است که به سرور نرسید — دیگر پس از ۲۰۰ تا بی‌صدا
+    //  از دفتر نمی‌افتد. سقف فقط برای حافظه است ([DROP_BOOK_MAX]) و آنچه بیرون رفت شمرده می‌شود ([evicted])
+    if (book.size > DROP_BOOK_MAX) {
+      val over = book.size - DROP_BOOK_MAX
+      repeat(over) { book.removeAt(0) }
+      evictedFile.writeText((evicted() + over).toString())
+    }
+    check(write(dropFile, book)) { ir.vil3ntec.tohid.core.i18n.StrSync.rejectedBookNotWritten }
   }
+
+  /** چند op ِ ردشده از دفترِ کنار بیرون رفت (فقط بالای [DROP_BOOK_MAX]) — در «حالِ همگام‌سازی» با همان شمار */
+  fun evicted(): Int = runCatching { evictedFile.readText().trim().toInt() }.getOrDefault(0)
 
   @Synchronized
   fun dropped(): List<JsonObject> = read(dropFile)
@@ -163,25 +173,37 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
    *  فایلِ خراب «خالی» فرض نمی‌شود: پیش‌تر `push` بعدی رویش می‌نوشت و همهٔ
    *  opهای مانده می‌رفتند. حالا کنار گذاشته می‌شود (`*.corrupt-<زمان>`)
    *  تا از دست نرود و بشود از پشتیبان یا گزارشِ خطا درش آورد.
+   *
+   *  ⛔ DATA-SAFETY: نبودن یا خرابیِ فایلِ اصلی ⇒ اول فایلِ کناری (`.tmp`): نوشتنِ ساختِ پیشین روی ویندوز
+   *  اصل را پاک و بعد کناری را جابه‌جا می‌کرد — بسته شدن میانِ این دو کلِ صف را در کناری جا می‌گذاشت و
+   *  خوانندهٔ بعدی صف را خالی می‌دید (سایه پیش‌تر جلو رفته بود ⇒ آن تغییرها هرگز به سرور نمی‌رسیدند).
    */
   private fun read(f: File): List<JsonObject> {
-    if (!f.exists()) return emptyList()
-    return runCatching {
-      (json.parseToJsonElement(f.readText()) as JsonArray).mapNotNull { it as? JsonObject }
-    }.getOrElse {
-      runCatching { f.renameTo(File(f.parentFile, "${f.name}.corrupt-${System.currentTimeMillis()}")) }
-      emptyList()
-    }
+    val main = if (f.exists()) parse(f) else null
+    if (main != null) return main
+    val side = File(f.parentFile, "${f.name}.tmp")
+    val pending = if (side.isFile) parse(side) else null
+    if (f.exists()) runCatching { f.renameTo(File(f.parentFile, "${f.name}.corrupt-${System.currentTimeMillis()}")) }
+    if (pending == null) return emptyList()
+    //  کناریِ کامل همان صفِ آخر است ⇒ سرِ جای اصل می‌نشیند (نوشتنِ بعدی دیگر رویش نمی‌نویسد)
+    runCatching { DiskWrite.text(f, JsonArray(pending).toString()) }
+    return pending
   }
 
-  /** @return نوشته شد یا نه — نوشتنِ ناموفق دیگر بی‌صدا نیست */
+  private fun parse(f: File): List<JsonObject>? = runCatching {
+    (json.parseToJsonElement(f.readText()) as JsonArray).mapNotNull { it as? JsonObject }
+  }.getOrNull()
+
+  /**
+   *  @return نوشته شد یا نه — نوشتنِ ناموفق دیگر بی‌صدا نیست.
+   *
+   *  ⛔ DATA-SAFETY: همان `DiskWrite` ِ دفتر (فایلِ کناری + `fsync` + جابه‌جاییِ اتمی که روی ویندوز هم
+   *  جایگزین می‌کند + `fsync` ِ پوشه). پیش‌تر کناری بی `fsync` نوشته می‌شد — قطعِ برق پس از جابه‌جایی صفِ
+   *  صفربایتی جا می‌گذاشت — و روی ویندوز اصل پیش از جابه‌جایی پاک می‌شد.
+   */
   private fun write(f: File, list: List<JsonObject>): Boolean {
-    val ok = runCatching {
-      val tmp = File(f.parentFile, "${f.name}.tmp")
-      tmp.writeText(JsonArray(list).toString())
-      if (!tmp.renameTo(f)) { f.delete(); check(tmp.renameTo(f)) }
-    }.isSuccess
-    if (ok) { if (f == file) cachedSize = list.size else cachedDropped = list.size }
+    val ok = runCatching { DiskWrite.text(f, JsonArray(list).toString()) }.isSuccess
+    if (ok) { if (f == file) cachedSize = list.size else cachedDropped = list.size + evicted() }
     return ok
   }
 
@@ -193,6 +215,9 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
 
     const val MAX_OPS = 200
     const val MAX_BYTES = 256 * 1024
+
+    /** DATA-SAFETY: سقفِ دفترِ opهای ردشده — فقط برای حافظه؛ بیرون‌رفته‌ها شمرده می‌شوند (`evicted`) */
+    const val DROP_BOOK_MAX = 5_000
 
     /**
      *  دسته از سرِ صف: تا [maxOps] op و [maxBytes] بایت (`sizes` اندازهٔ هر op).

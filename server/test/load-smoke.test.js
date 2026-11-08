@@ -17,12 +17,22 @@ const path = require('node:path');
 const ROOT = path.join(__dirname, '..');
 const DB = process.env.TEST_DATABASE_URL || 'postgres://shop:shoppass@127.0.0.1:5432/shop_test';
 
+//  ⛔ ریشهٔ سرخیِ «زیرِ اجرای هم‌زمان»: بار «باز» است (نرخِ ثابت، هر چه سرور کند باشد) و PGlite روی یک رشته پرس‌وجو
+//  می‌کند. با ۳۰ درخواست در ثانیه همین دودآزمون روی ماشینِ بیکار هم در مرزِ اشباع بود (۲۷ در ثانیه، p99 ≈ ۳s)؛ با چند
+//  اجرای هم‌زمان صف بلند می‌شد و دو سنجهٔ پنهانِ «سرعتِ ماشین» سرخ می‌کردند: مهلتِ ۱۰ ثانیهٔ ابزار درخواستِ سالم را
+//  «timeout» = خطا می‌شمرد (۵ از ۶ اجرای هم‌زمان)، و چهار دستگاهِ همگام‌سازی همه «مشغول» می‌ماندند تا `sync3.push` اصلاً
+//  نرود (۸ از ۲۰). این آزمون سنجهٔ زمانی ندارد، پس: همان ۱۵۰ درخواست با یک‌سومِ نرخ (۱۰ در ثانیه در ۱۵ ثانیه، دور از
+//  اشباع) و مهلتِ ۱۲۰ ثانیه — گیرِ واقعی (پاسخِ هرگز) هنوز خطاست و زیرِ مهلتِ ۲۸۰ ثانیهٔ کل دیده می‌شود.
+const RATE = 10;
+const DURATION_SEC = 15;
+const REQUEST_TIMEOUT_MS = 120_000;
+
 test('ابزارِ بار: چند ثانیه بار روی همهٔ سناریوها، بی هیچ پاسخِ بیرون از ۲xx', { timeout: 300_000 }, () => {
   const out = path.join(os.tmpdir(), `load-smoke-${process.pid}.json`);
   const r = spawnSync(process.execPath, [
     'scripts/load-test.mjs', '--db', DB, '--profile', 'smoke', '--no-budget', '--quiet',
     '--shops', '2', '--devices', '2', '--scale', '0.002', '--small-scale', '0.001', '--history', '300',
-    '--warmup', '1', '--rate', '30', '--duration', '5', '--json', out,
+    '--warmup', '1', '--rate', String(RATE), '--duration', String(DURATION_SEC), '--timeout', String(REQUEST_TIMEOUT_MS), '--json', out,
   ], { cwd: ROOT, encoding: 'utf8', timeout: 280_000 });
   assert.equal(r.status, 0, `${r.stdout.slice(-1500)}\n${r.stderr.slice(-1500)}`);
   const res = JSON.parse(fs.readFileSync(out, 'utf8'));

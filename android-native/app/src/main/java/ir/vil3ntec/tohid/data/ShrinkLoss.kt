@@ -39,12 +39,12 @@ object ShrinkLoss {
 
   /** نامِ هر نوع در برگه — داده است و با زبانِ صفحه عوض نمی‌شود */
   fun kindName(k: ShrinkReport.Kind): String = when (k) {
-    ShrinkReport.Kind.WASTE -> "ضایعات"
-    ShrinkReport.Kind.EXPIRED -> "منقضی"
-    ShrinkReport.Kind.LOST -> "گم‌شده"
-    ShrinkReport.Kind.SHORTAGE -> "کسریِ شمارش"
-    ShrinkReport.Kind.SURPLUS -> "اضافهٔ شمارش"
-    ShrinkReport.Kind.OTHER -> "اصلاحِ دستی"
+    ShrinkReport.Kind.WASTE -> "ضایعات"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.EXPIRED -> "منقضی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.LOST -> "گم‌شده"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.SHORTAGE -> "کسریِ شمارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.SURPLUS -> "اضافهٔ شمارش"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ShrinkReport.Kind.OTHER -> "اصلاحِ دستی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
   }
 
   /** مبلغ به افغانی برای برگه: رقمِ لاتین، بی جداکننده، اعشار فقط اگر هست (۳۳٫۳ ⇒ 33.30) */
@@ -69,12 +69,12 @@ object ShrinkLoss {
   fun sheet(d: ShopData, from: String, to: String): ReportCsv.Sheet {
     val r = report(d, from, to)
     val products = d.products.associateBy { it.id }
-    val rows = mutableListOf(listOf("تاریخ", "نام کالا", "نوع", "مقدار", "واحد", "زیان", "دلیل"))
+    val rows = mutableListOf(listOf("تاریخ", "نام کالا", "نوع", "مقدار", "واحد", "زیان", "دلیل"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     for (l in r.lines) {
       val p = products[l.move.productId]
       rows += listOf(
         l.move.date,
-        p?.name ?: "کالای حذف‌شده",
+        p?.name ?: "کالای حذف‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
         kindName(l.move.kind),
         qtyText(l.move.qtyMilli),
         p?.unit.orEmpty(),
@@ -82,6 +82,6 @@ object ShrinkLoss {
         l.move.reason,
       )
     }
-    return ReportCsv.Sheet("ضایعات-و-کسری-$from-تا-$to", rows)
+    return ReportCsv.Sheet("ضایعات-و-کسری-$from-تا-$to", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

@@ -80,7 +80,7 @@ object CustomerEngine {
    *  «فاکتور #۱۲» یا «فاکتور #B1-12» در شرحِ ردیف.
    *  سری (F0-03) اختیاری است: شرح‌های پیش از سری همان عدد را دارند.
    */
-  private val INVOICE = Regex("""فاکتور\s*#\s*(?:([A-Z][1-9][0-9]{0,3})-)?(\d+)""")
+  private val INVOICE = Regex("""فاکتور\s*#\s*(?:([A-Z][1-9][0-9]{0,3})-)?(\d+)""")  // داده: کلید یا سنجشِ منطق
 
   fun invoiceNumberOf(notes: String): Int? = INVOICE.find(notes)?.groupValues?.get(2)?.toIntOrNull()
 
@@ -140,39 +140,39 @@ object CustomerEngine {
 
   private fun r(v: Double) = Math.round(v).toString()
   private fun q(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
-  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "مشتری" }
+  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "مشتری" }  // داده: نامِ پروندهٔ خروجی
 
   fun ledgerSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "فاکتور", "برد (بدهکار)", "رسید (بستانکار)", "مانده"))
+    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "فاکتور", "برد (بدهکار)", "رسید (بستانکار)", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     ledger(d, debtor.id).forEach { l ->
       rows += listOf(
-        l.row.toString(), l.tx.date, l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" },
+        l.row.toString(), l.tx.date, l.tx.notes.ifBlank { if (l.give > 0) "برد" else "رسید" },  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
         l.invoiceLabel.orEmpty(),
         if (l.give > 0) r(l.give) else "", if (l.receive > 0) r(l.receive) else "", r(l.balance),
       )
     }
-    return ReportCsv.Sheet("صورت‌حساب-${safe(debtor.name)}-$today", rows)
+    return ReportCsv.Sheet("صورت‌حساب-${safe(debtor.name)}-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 
   fun invoicesSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
     val items = d.saleItems.groupBy { it.saleId }
-    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "اقلام", "جمع", "تخفیف", "قابلِ پرداخت", "پرداخت‌شده", "باقی", "نوع", "وضعیت"))
+    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "اقلام", "جمع", "تخفیف", "قابلِ پرداخت", "پرداخت‌شده", "باقی", "نوع", "وضعیت"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     invoices(d, debtor.id).forEach { s ->
       rows += listOf(
         s.invoiceLabel().orEmpty(), s.date, items[s.id].orEmpty().size.toString(),
         r(s.total), r(s.discount), r(s.finalTotal), r(s.paidAmount), r(s.remaining),
         PayFlow.payLabel(s),
-        if (s.status == "cancelled") "لغوشده" else "ثبت‌شده",
+        if (s.status == "cancelled") "لغوشده" else "ثبت‌شده",  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
       )
     }
-    return ReportCsv.Sheet("فاکتورهای-${safe(debtor.name)}-$today", rows)
+    return ReportCsv.Sheet("فاکتورهای-${safe(debtor.name)}-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 
   fun itemsSheet(d: ShopData, debtor: Debtor, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("تاریخ", "فاکتور", "کالا", "تعداد", "فی", "جمع", "برگشتی"))
+    val rows = mutableListOf(listOf("تاریخ", "فاکتور", "کالا", "تعداد", "فی", "جمع", "برگشتی"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     items(d, debtor.id).forEach { l ->
       rows += listOf(l.date, l.invoiceLabel.orEmpty(), l.name, q(l.quantity), r(l.unitPrice), r(l.total), if (l.returned > 0) q(l.returned) else "")
     }
-    return ReportCsv.Sheet("اقلامِ-${safe(debtor.name)}-$today", rows)
+    return ReportCsv.Sheet("اقلامِ-${safe(debtor.name)}-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

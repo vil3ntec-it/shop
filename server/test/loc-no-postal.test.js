@@ -39,7 +39,9 @@ const REVIEWED_OPTIONAL = new Map([
   [KT + 'core/i18n/StrMoney.kt|val addressPostal: String get() = t("کدِ پستی (اختیاری)", "Postal code (optional)", "پوستي کوډ (اختیاري)")', 'برچسبِ کادر با «(اختیاری)» در هر سه زبان'],
   [KT + 'data/CustomerCrm.kt|private val POSTAL = Regex("^[0-9]{4,10}$")', 'شکلِ رقم، فقط برای مقدارِ پر (سطرِ isNotEmpty)'],
   [KT + 'data/CustomerCrm.kt|val postal = ir.vil3ntec.tohid.latinDigits(a.postalCode).filterNot { it.isWhitespace() }', 'یکدست‌کردنِ رقم؛ خالی خالی می‌ماند'],
-  [KT + 'data/CustomerCrm.kt|if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed("کدِ پستی فقط رقم است")', 'سنجش فقط وقتی پر است؛ خالی هرگز خطا نیست'],
+  [KT + 'data/CustomerCrm.kt|if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed(StrLedger.postalDigitsOnly)', 'سنجش فقط وقتی پر است؛ خالی هرگز خطا نیست'],
+  //  دریِ دورِ ۷ (#983): همان پیام به جدولِ StrLedger رفت — همان سنجشِ «فقط وقتی پر است»ِ سطرِ بالا
+  [KT + 'core/i18n/StrLedger.kt|val postalDigitsOnly: String get() = t("کدِ پستی فقط رقم است", "The postal code is digits only", "پوستي کوډ یوازې عددونه دي")', 'متنِ خطای همان سنجشِ اختیاری'],
   [KT + 'data/CustomerCrm.kt|val next = DeliveryAddress(area, landmark, gate, floor, plus, postal).takeIf { it != DeliveryAddress() }', 'خالی ⇒ بخشِ خالی (نوشته نمی‌شود)'],
   [KT + 'data/CustomerCrm.kt|listOf(a.landmark, a.area, a.gate, a.floor, a.plusCode, a.postalCode).filter { it.isNotBlank() }.joinToString(" · ")', 'نمایش؛ بخشِ خالی نمی‌آید'],
   [KT + 'data/DeliveryAddress.kt|*  منزل؛ `floor` = طبقه؛ `plusCode` = Plus Code (بزرگ)؛ `postalCode` = فقط رقم.', 'شرح؛ همان‌جا: «هر بخش اختیاری»'],

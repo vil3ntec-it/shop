@@ -48,6 +48,8 @@ data class StatementLabels(
   val settled: String = "صاف",
   val empty: String = "هنوز ردیفی نیست",
   val rows: String = "ردیف",
+  /** «۱ ردیف» — زبانی که مفرد و جمع دارد؛ فارسی همان [rows] */
+  val rowOne: String = "ردیف",
   val footer: String = "این صورت‌حساب از دفترِ دکان ساخته شده است",
 ) {
   companion object {
@@ -99,7 +101,8 @@ object StatementLayout {
       b += ReceiptBlock.Item(name, "$kind: ${fmt.money(afn(amount))}", "${labels.balance}: ${fmt.money(afn(l.balanceMinor))}")
     }
     b += ReceiptBlock.Rule()
-    text("${fmt.digits(input.lines.size.toString())} ${labels.rows}", TextStyle.SMALL, center = false)
+    val n = input.lines.size
+    text("${fmt.digits(n.toString())} ${if (n == 1) labels.rowOne else labels.rows}", TextStyle.SMALL, center = false)
 
     /* ------------------------------ جمع‌ها ------------------------------ */
     row(labels.totalGive, fmt.money(afn(input.lines.sumOf { it.giveMinor })))

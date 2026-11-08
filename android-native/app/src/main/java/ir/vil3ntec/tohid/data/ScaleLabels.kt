@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.hw.WeightBarcode
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.pos.ScaleSale
 import org.json.JSONArray
 import org.json.JSONObject
@@ -72,16 +73,16 @@ object ScaleLabels {
     }
   }
 
-  private fun notFound(code: String) = "کالای «$code» پیدا نشد"
+  private fun notFound(code: String) = StrGoods.itemCodeNotFound(code)
 
   private fun message(m: ScaleSale.Label.Rejected): String = when (m.why) {
-    ScaleSale.Why.BAD_CHECK -> "برچسبِ ترازو رد شد — رقمِ کنترلِ «${m.arg}» درست نیست"
-    ScaleSale.Why.UNKNOWN_CODE -> "کالای ترازو با کدِ «${m.arg}» ثبت نشده — این کد را به بارکدهای کالا بیفزایید"
+    ScaleSale.Why.BAD_CHECK -> StrGoods.scaleBadCheck(m.arg)
+    ScaleSale.Why.UNKNOWN_CODE -> StrGoods.scaleUnknown(m.arg)
     ScaleSale.Why.NOT_FOUND -> notFound(m.arg)
-    ScaleSale.Why.INACTIVE -> "«${m.arg}» غیرفعال است"
-    ScaleSale.Why.ZERO -> "وزن یا مبلغِ برچسب صفر است"
-    ScaleSale.Why.NOT_WEIGHED -> "«${m.arg}» کالای وزنی نیست (واحد: ${m.item?.unit.orEmpty().ifBlank { "—" }})"
-    ScaleSale.Why.NO_PRICE -> "«${m.arg}» قیمتِ فروش ندارد — برچسبِ قیمتی بی قیمتِ کالا خوانده نمی‌شود"
-    ScaleSale.Why.PRICE_MISMATCH -> "برچسبِ قیمتیِ «${m.arg}» با قیمتِ کالا به همان مبلغ نمی‌رسد — کالا را دوباره روی ترازو بگذارید"
+    ScaleSale.Why.INACTIVE -> StrGoods.isInactive(m.arg)
+    ScaleSale.Why.ZERO -> StrGoods.scaleZero
+    ScaleSale.Why.NOT_WEIGHED -> StrGoods.notWeighed(m.arg, m.item?.unit.orEmpty().ifBlank { "—" })
+    ScaleSale.Why.NO_PRICE -> StrGoods.scaleNoPrice(m.arg)
+    ScaleSale.Why.PRICE_MISMATCH -> StrGoods.scalePriceMismatch(m.arg)
   }
 }

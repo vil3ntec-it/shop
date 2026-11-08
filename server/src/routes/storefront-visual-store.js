@@ -16,6 +16,7 @@ const sf = require('../lib/storefront');
 const vs = require('../lib/visual-search');
 const photos = require('../lib/product-photos');
 const { rateLimit } = require('../middleware/ratelimit');
+const { rawBody } = require('../lib/raw-body');   //  نگهبانِ نوعِ بدنهٔ خام (CodeQL: type confusion)
 
 const router = express.Router();
 
@@ -29,7 +30,7 @@ router.post('/:slug/visual-search', ipLimit, async (req, res, next) => {
   req.visualShop = store.shop_id;
   next();
 }, storeLimit, body, async (req, res) => {
-  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const buf = rawBody(req);
   const shopId = req.visualShop;
   const out = await vs.search(shopId, buf, {
     limit: req.query.limit,

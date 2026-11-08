@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.pay.CloseShiftInput
 import ir.vil3ntec.tohid.core.pay.EventCounts
 import ir.vil3ntec.tohid.core.pay.MethodTotals
@@ -73,7 +74,7 @@ object PayFlow {
 
   // ── روش‌ها ────────────────────────────────────────────────
   fun method(id: String): PayMethod? =
-    if (id == ACCOUNT) PayMethod(ACCOUNT, ACCOUNT, "به حسابِ مشتری") else Pay.DEFAULT_METHODS.firstOrNull { it.id == id }
+    if (id == ACCOUNT) PayMethod(ACCOUNT, ACCOUNT, "به حسابِ مشتری") else Pay.DEFAULT_METHODS.firstOrNull { it.id == id }  // داده: نامِ روش هم‌شکلِ `Pay.DEFAULT_METHODS` ِ هسته (یادداشتِ سابقه)
 
   fun methodName(id: String): String = method(id)?.name ?: id
 
@@ -96,24 +97,24 @@ object PayFlow {
   fun message(p: Problem): String {
     val row = p.method?.let { "«${methodName(it)}»" }
     return when (p.code) {
-      "REF_REQUIRED" -> "شمارهٔ مرجعِ ${row ?: "این روش"} لازم است"
-      "NON_CASH_OVERPAY" -> "پرداختِ غیرنقد بیش از مبلغِ فاکتور است؛ پولِ پس فقط از نقد داده می‌شود"
-      "METHOD_LIMIT" -> "مبلغِ ${row ?: "این روش"} از سقفِ همان روش بیشتر است"
-      "METHOD_DISABLED", "UNKNOWN_METHOD" -> "روشِ پرداخت شناخته نیست"
-      "SHORT" -> "باقی‌مانده ${fmt(p.remaining)} افغانی است — مشتری را انتخاب کنید یا مبلغ را کامل کنید"
-      "TOTAL_MISMATCH" -> "مبلغِ پرداخت با فاکتور نمی‌خواند؛ دوباره باز کنید"
-      "INSUFFICIENT_CASH" -> "نقدِ دخل برای این خروج کافی نیست"
-      "REASON_REQUIRED" -> "دلیل لازم است"
-      "NOTE_REQUIRED" -> "برای «دیگر» توضیح بنویسید"
-      "BAD_REASON" -> "دلیل درست نیست"
-      "APPROVAL_REQUIRED" -> "باز کردنِ کشو بی فروش فقط با تأییدِ صاحب یا مدیر"
-      "SHIFT_CLOSED" -> "صندوقِ بازی نیست"
-      "SHIFT_OPEN_ALREADY" -> "صندوق از قبل باز است"
-      "INVALID_TIME" -> "ساعتِ این دستگاه از زمانِ باز شدنِ صندوق عقب‌تر است"
-      "BAD_DENOMINATION", "INVALID_COUNT" -> "شمارِ اسکناس درست نیست"
+      "REF_REQUIRED" -> StrLedger.refRequired(row ?: StrLedger.thisMethod)
+      "NON_CASH_OVERPAY" -> StrLedger.nonCashOverpay
+      "METHOD_LIMIT" -> StrLedger.methodLimit(row ?: StrLedger.thisMethod)
+      "METHOD_DISABLED", "UNKNOWN_METHOD" -> StrLedger.methodUnknown
+      "SHORT" -> StrLedger.shortBy(fmt(p.remaining))
+      "TOTAL_MISMATCH" -> StrLedger.payMismatch
+      "INSUFFICIENT_CASH" -> StrLedger.cashShort
+      "REASON_REQUIRED" -> StrLedger.reasonNeeded
+      "NOTE_REQUIRED" -> StrLedger.otherNeedsNote
+      "BAD_REASON" -> StrLedger.reasonBad
+      "APPROVAL_REQUIRED" -> StrLedger.drawerOnlyApproved
+      "SHIFT_CLOSED" -> StrLedger.noOpenTill
+      "SHIFT_OPEN_ALREADY" -> StrLedger.tillAlreadyOpen
+      "INVALID_TIME" -> StrLedger.clockBehind
+      "BAD_DENOMINATION", "INVALID_COUNT" -> StrLedger.notesCountBad
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه (فقط با تنظیم)
       "BAD_CODE", "UNKNOWN_CARD", "CARD_VOID", "INSUFFICIENT_BALANCE", "NO_CUSTOMER", "INSUFFICIENT_CREDIT" -> GiftCards.message(p.code)
-      else -> "مبلغ درست نیست"
+      else -> StrLedger.amountInvalid
     }
   }
 
@@ -252,10 +253,10 @@ object PayFlow {
    */
   val KIND_LABELS: Map<String, String> = linkedMapOf(
     //  «به حساب» همان نسیه است (واژهٔ دکان)؛ «به حسابِ مشتری» فقط متنِ ردیفِ رسید/جزئیات ([receiptLines])
-    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",
-    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",
+    CASH to "نقد", "credit" to "نسیه", ACCOUNT to "نسیه", "card" to "کارت", "transfer" to "حواله",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
+    "wallet" to "کیف پول", "store_credit" to "اعتبار فروشگاه", "gift_card" to "کارت هدیه", "other" to "سایر", MIXED to "ترکیبی",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
     //  فاکتورِ W ِ سفارشِ اینترنتی (#321): روشِ سفارش، نه نوعِ ردیف
-    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",
+    ONLINE to "پرداختِ آنلاین", COD to "نقد هنگامِ تحویل",  // داده: برچسبِ روشِ پرداخت — هم‌شکلِ `ReportTables`/`report-core.js` و ستونِ خروجی (منتظرِ تصمیمِ صاحب‌کار)
   )
 
   /** `paymentMethod`ِ فاکتورِ W: پرداختِ آنلاین و نقد هنگامِ تحویل (دستِ پیک) — هیچ‌کدام نقدِ دخل نیست */
@@ -313,8 +314,8 @@ object PayFlow {
   /** «در انتظار»: ثبتِ دستی تا تأیید (PAY-08)، یا پولِ سفارش تا تأییدِ درگاه/تسویهٔ پیک */
   private fun pendingNote(p: SalePayment): String = when {
     p.status != "pending" -> ""
-    p.verification == "manual" -> " (ثبتِ دستی)"
-    else -> " (در انتظار)"
+    p.verification == "manual" -> StrLedger.pendingManual
+    else -> StrLedger.pendingWait
   }
 
   /**
@@ -329,16 +330,17 @@ object PayFlow {
   /**
    *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — جمعشان همان مبلغِ فاکتور.
    *  فاکتورِ بی `payments` (امروز، یا پرچمِ خاموش) هیچ ردیفی نمی‌گیرد.
+   *  [name] نامِ روش را برای کاغذ به زبانِ برنامه می‌برد (#348، `Receipts.payName`)؛ پیش‌فرض همان نام.
    */
-  fun receiptLines(s: Sale): List<Pair<String, Double>> {
+  fun receiptLines(s: Sale, name: (String) -> String = { it }): List<Pair<String, Double>> {
     val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return buildList {
       list.filter { it.amountMinor > 0 }.forEach { p ->
         //  PAY-24: کدِ کارتِ هدیه خودش پول است ⇒ روی رسید فقط چهار نویسهٔ آخر
-        add(rowName(p) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
+        add(name(rowName(p)) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
       }
-      s.tenderedMinor?.takeIf { it > 0 }?.let { add("دریافتی" to major(it)) }
-      s.changeMinor?.takeIf { it > 0 }?.let { add("پولِ پس" to major(it)) }
+      s.tenderedMinor?.takeIf { it > 0 }?.let { add(StrLedger.tendered to major(it)) }
+      s.changeMinor?.takeIf { it > 0 }?.let { add(StrLedger.change to major(it)) }
     }
   }
 
@@ -441,8 +443,8 @@ object PayFlow {
       ev += 3 to ShiftEventInput(id = id, type = "cash_out", at = at, amount = minor(amount), reason = reason, note = note)
     }
     d.expenses.forEach { out("exp:${it.id}", it.createdAt, it.amount, "petty_expense", null) }
-    d.supplierPayments.forEach { out("sup:${it.id}", it.createdAt, it.amount, "other", "پرداخت به تأمین‌کننده") }
-    d.purchases.forEach { out("pur:${it.id}", it.createdAt, it.paidAmount, "other", "پیش‌پرداختِ خرید") }
+    d.supplierPayments.forEach { out("sup:${it.id}", it.createdAt, it.amount, "other", "پرداخت به تأمین‌کننده") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
+    d.purchases.forEach { out("pur:${it.id}", it.createdAt, it.paidAmount, "other", "پیش‌پرداختِ خرید") }  // داده: دلیلِ رویدادِ شیفت درونِ گزارشِ Z ِ ذخیره‌شده
     val sorted = ev.sortedWith(compareBy<Pair<Int, ShiftEventInput>>({ it.first }, { it.second.at }, { it.second.id })).map { it.second }
     //  PAY-17: کشوی نام‌دار با مهر شمرده می‌شود، نه با ساعت — ردیفِ دستگاهِ دیگری با ساعتِ عقب‌تر (شناور) پیش از بازشدن نمی‌افتد
     return if (own == null) sorted else sorted.map { if (it.at < from) it.copy(at = from) else it }
@@ -598,7 +600,7 @@ object PayFlow {
       ?.joinToString("، ") { (id, v) -> "${methodName(id)} ${ir.vil3ntec.tohid.money(major(v))}" }
       ?: "${methodName(CASH)} ${ir.vil3ntec.tohid.money(row.amount)}"
     val who = row.by?.trim()?.takeIf { it.isNotEmpty() }?.let { " — $it" }.orEmpty()
-    return "بستنِ صندوق" + (if (z?.blind == true) " (شمارشِ کور)" else "") + " — شمرده: " + counted + who
+    return if (z?.blind == true) StrLedger.tillClosedBlind(counted, who) else StrLedger.tillClosed(counted, who)
   }
 
   /** Zِ ذخیره‌شده (از هر دستگاه) ⇒ گزارش؛ `null` اگر خوانا نیست */

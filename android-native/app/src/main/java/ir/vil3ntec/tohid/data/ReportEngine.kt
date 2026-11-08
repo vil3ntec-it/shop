@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.money.Currency
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.money.Qty
@@ -106,7 +108,7 @@ object ReportEngine {
   fun purchases(d: ShopData, from: String, to: String): PurchaseReport {
     val rows = d.purchases.filter { it.date in from..to }.sortedByDescending { it.date }
     val names = d.suppliers.associate { it.id to it.name }
-    val bySupplier = rows.groupBy { names[it.supplierId] ?: "بی تأمین‌کننده" }
+    val bySupplier = rows.groupBy { names[it.supplierId] ?: StrPurchasePages.noSupplier }
       .mapValues { (_, list) -> list.sumOf { it.totalAmount } }
       .toList().sortedByDescending { it.second }
     return PurchaseReport(
@@ -301,7 +303,7 @@ object ReportEngine {
   /** فاکتورهای لغونشدهٔ بازه به تفکیکِ فروشنده — بیشترین فروش اول */
   fun bySeller(d: ShopData, from: String, to: String): List<SellerStat> =
     d.sales.filter { it.status != "cancelled" && it.date >= from && it.date <= to }
-      .groupBy { it.seller.trim().ifEmpty { "نامعلوم" } }
+      .groupBy { it.seller.trim().ifEmpty { StrGoods.unknownSeller } }
       .map { (who, rows) -> SellerStat(who, rows.size, rows.sumOf { it.finalTotal }, rows.sumOf { it.discount }) }
       .sortedByDescending { it.net }
 

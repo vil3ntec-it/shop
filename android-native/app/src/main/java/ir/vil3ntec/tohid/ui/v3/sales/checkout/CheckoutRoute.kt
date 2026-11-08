@@ -24,6 +24,8 @@ import ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession
 import ir.vil3ntec.tohid.data.PromoEngine
 import ir.vil3ntec.tohid.data.SalePost
 import ir.vil3ntec.tohid.data.SalesEngine
+import ir.vil3ntec.tohid.data.SaleCapGate
+import ir.vil3ntec.tohid.core.perm.SaleCaps
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
@@ -106,6 +108,8 @@ fun RouteScope.CheckoutRoute() {
     if (CheckoutSession.pay.cashRounding != cashStep) CheckoutSession.pay.cashRounding = cashStep
     //  CRM-03 / S07 — سقفِ اعتبار در صندوق (`ShopPolicy.creditGate`، پیش‌فرض خاموش)
     val creditGateOn = remember { ShopPolicy.creditGate(context) }
+    //  STF-03 — سقف‌هایی که سرور برای همین دکان اجرا می‌کند (قرض، تغییرِ قیمت، تخفیفِ پنهان)؛ پرچم‌های خاموش ⇒ `active` نادرست
+    val capRules = remember { ShopRole.saleCaps(context) }
     val saleKey = remember(lines) { cart.saleKey() }
     val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
@@ -126,8 +130,10 @@ fun RouteScope.CheckoutRoute() {
       if (!CheckoutModel.canSubmit(busy, discountError, paidError.takeIf { paid == null }, gate, creditBlock.takeIf { paid == null })) return
       //  POS-12: سبد همین حالا با جابه‌جایی عوض شد ⇒ ردیف‌های قبلی با کلیدِ فاکتورِ دیگر ثبت نشوند
       if (!HeldRules.shownIsCurrent(lines, cart.lines.value)) { error = StrPos.cartChangedRetry; return }
-      //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد
-      val signed = if (gate == DiscountGate.State.APPROVED) CheckoutSession.approval?.let(DiscountGate::json) else null
+      //  برگهٔ تأییدشده همراهِ فاکتور؛ «نیازمند تأیید» بی برگه یا «ممنوع» این‌جا نمی‌رسد. STF-03: با پرچمِ قیمتِ سرور برگهٔ
+      //  «تخفیفِ پنهان» هم (تخفیفِ نوشته شاید صفر یا زیرِ سقف باشد)؛ سرور برگهٔ نالازم را مصرف نمی‌کند
+      val signed = if (gate == DiscountGate.State.APPROVED || capRules.price) CheckoutSession.approval?.let(DiscountGate::json) else null
+      val capSlips = buildMap { CheckoutSession.approval?.let { put(SaleCaps.DISCOUNT, it) }; putAll(CheckoutSession.capSlips) }
       val options = if (paid != null) checkout.copy(settlement = paid, debtorId = form.debtorId, approval = signed)
       else if (!payV2) CheckoutModel.legacy(checkout, n, form).copy(approval = signed)
       else when (val r = CheckoutStoredPay.settle(data, CheckoutSession.pay.draft(n.finalTotal, form.debtorId))) {
@@ -141,7 +147,9 @@ fun RouteScope.CheckoutRoute() {
       //  را می‌پوشاند؛ سبدِ بزرگ‌تر یا مشتریِ دیگر دوباره می‌پرسد. خاموش ⇒ همان ثبتِ امروز.
       val gated = options.copy(creditGate = creditGateOn)
       val over = SalesEngine.creditOver(data, loyal, gated)
+      //  STF-03: برگه‌های قرض و قیمتِ همین فاکتور (`SaleCapGate`) همراهِ همان ثبت
       val sale = CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)
+        ?.copy(creditCapSlip = SaleCapGate.json(capSlips, SaleCaps.CREDIT), priceSlip = SaleCapGate.json(capSlips, SaleCaps.PRICE))
       if (sale == null) {
         val o = over ?: return
         CheckoutSession.credit = CreditAsk(
@@ -152,6 +160,22 @@ fun RouteScope.CheckoutRoute() {
         )
         nav.open(SalesPaths.CREDIT)
         return
+      }
+      //  STF-03 — پیش‌سنجی روی **همان** فاکتوری که ثبت و فرستاده می‌شود (پس از تخفیفِ خودکار و امتیاز)، با همان قاعدهٔ سرور
+      //  (`SaleCaps`): «ممنوع» ⇒ پیام و هیچ ثبت؛ «نیازمندِ تأیید» ⇒ برگهٔ تأیید («پرسیدن از مدیر» یا PIN) و با رسیدنش همان ثبت
+      if (capRules.active) {
+        val trial = TillSale.record(
+          data, priced, sale, cart.note.value, promo, LoyaltyAtTill.points(context, loyalty),
+          today = todayIso(), now = System.currentTimeMillis(), newId = Ulid::next, saleId = saleKey,
+        ) as? SalesEngine.Result.Ok
+        val b = trial?.let { SaleCapGate.check(capRules, it.data, it.saleId, capSlips).blocked }
+        if (b != null) {
+          if (b.state == SaleCaps.State.DENIED) { error = SaleCapGate.message(b); return }
+          CheckoutSession.ask = ApprovalAsk(title = SaleCapGate.title(b.perm), summary = SaleCapGate.summary(b), need = b.need)
+          CheckoutSession.capPending = true
+          nav.open(SalesPaths.APPROVE)
+          return
+        }
       }
       submitted = true
       val d = data
@@ -167,7 +191,8 @@ fun RouteScope.CheckoutRoute() {
         //  PRM-02: پیش از ساختنِ فاکتور، زیرِ همان قفل و با کلیدِ همین فاکتور، کدِ سقف‌دار از سرور — همان دروازهٔ صندوقِ
         //  کامپیوتر (`PromoLive.redeemGate` ⇐ `TillSale.redeem`)؛ رد یا بی اینترنت ⇒ همان پیام بالای برگه و هیچ ثبتی
         when (val posted = cart.post(store, gate = { key -> PromoLive.redeemGate(context, key, promo) }) { key ->
-          TillSale.record(
+          //  STF-03: آخرین سد — فاکتوری که سرور بی خبر رد می‌کرد نوشته نمی‌شود (صفحه پیش‌تر پرسیده است)
+          SaleCapGate.guard(capRules, TillSale.record(
             d, priced, sale, note, promo, points,
             today = todayIso(),
             now = System.currentTimeMillis(),
@@ -177,7 +202,7 @@ fun RouteScope.CheckoutRoute() {
             saleId = key,
             //  فاکتورِ نسخهٔ ۲: توکنِ QR فقط با پرچمِ `shop.receipt_v2`
             receiptToken = Receipts.newToken(context),
-          )
+          ), capSlips)
         }) {
           SalePost.Outcome.Busy -> submitted = false
           SalePost.Outcome.NotSaved -> { submitted = false; error = SalePost.NOT_SAVED }
@@ -198,6 +223,11 @@ fun RouteScope.CheckoutRoute() {
     //  مشتری عوض شده و تأیید دیگر نمی‌پوشاند، `submit` دوباره می‌پرسد
     val freshCredit = CheckoutSession.creditApproval
     LaunchedEffect(freshCredit) { if (freshCredit != null && !submitted) submit() }
+    //  STF-03: تأییدِ سقفی که خودِ «ثبت» پرسید رسید ⇒ همان ثبت (برگهٔ بسته‌شده بی تأیید ⇒ هیچ)
+    val capTick = CheckoutSession.capSlips to CheckoutSession.approval
+    LaunchedEffect(capTick) {
+      if (CheckoutSession.capPending && !submitted) { CheckoutSession.capPending = false; submit() }
+    }
     //  حساب‌پی تأیید شد ⇒ همان دم ثبت با همان تسویه؛ ثبتِ ردشده (سبد عوض شد، موجودی) ⇒ همان ردیف «ثبتِ فروش» می‌شود
     val hesabPaid = CheckoutSession.hesabPaid
     LaunchedEffect(hesabPaid) { if (hesabPaid != null && !submitted) submit(hesabPaid) }
@@ -298,8 +328,12 @@ fun RouteScope.ApprovalRoute() {
     ask = ask,
     shopId = remember { ShopRole.shopId(context) },
     requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
-    onApproved = { CheckoutSession.approval = it; back() },
-    onClose = { back() },
+    //  STF-03: برگهٔ قرض و قیمت جدا از برگهٔ تخفیف (`Sale.creditApproval` / `priceApproval`)
+    onApproved = { s ->
+      if (s.perm == SaleCaps.DISCOUNT) CheckoutSession.approval = s else CheckoutSession.capSlips = CheckoutSession.capSlips + (s.perm to s)
+      back()
+    },
+    onClose = { CheckoutSession.capPending = false; back() },
   )
 }
 

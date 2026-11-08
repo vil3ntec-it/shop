@@ -20,6 +20,7 @@ import ir.vil3ntec.tohid.data.ExternalLinkAsk
 import ir.vil3ntec.tohid.data.ExternalSignIn
 import ir.vil3ntec.tohid.data.SignInProvider
 import ir.vil3ntec.tohid.data.GoogleSignIn
+import ir.vil3ntec.tohid.data.AccountBind
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.ShopRole
@@ -118,10 +119,24 @@ class AuthController(
     SavedLogins.remember(context, identifier, display)
     session.shop?.role?.let { ShopRole.remember(context, it) }
     scope.launch {
-      runCatching { LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty()) }
+      //  دفتر و کلیدِ همگام‌سازی با هم به همین حساب (`AccountBind`) — شرح سرِ `core/sync/AccountSafety.kt`
+      val bound = runCatching { AccountBind.signedIn(context, store, session.user.id, session.shop?.id.orEmpty(), display) }
+      if (notArchived(bound)) return@launch
       sync.rememberAccount(session.user, display)
+      AccountBind.bootstrapSoon(context, store)
       complete()
     }
+  }
+
+  /**
+   *  دفترِ حسابِ پیشین بایگانی نشد (`LedgerOwner.NotArchived`، حافظهٔ پر…) ⇒ ورود برمی‌گردد (نشستِ تازه بسته) و هیچ
+   *  چیزِ روی دستگاه عوض نشده؛ وگرنه دفترِ حسابِ دیگر با کلیدِ این حساب همگام می‌شد.
+   */
+  private suspend fun notArchived(bound: Result<*>): Boolean {
+    if (bound.exceptionOrNull() !is LedgerOwner.NotArchived) return false
+    runCatching { auth.signOut() }
+    ui = ui.copy(busy = false).failed(StrAuth.ledgerNotArchived)
+    return true
   }
 
   /** دکمهٔ اصلیِ فرم: ورود، یا پلهٔ اولِ ثبت‌نام (کد به همان ایمیل؛ حساب هنوز ساخته نمی‌شود) */
@@ -285,7 +300,7 @@ class AuthController(
             runCatching { LedgerOwner.shopChanged(context, store, shopState.shop?.id.orEmpty()) }
             complete()
           }
-          .onFailure { fail(it) }
+          .onFailure { ui = ui.failed(StaffJoinErrors.message(it)) }
       } else {
         auth.loginWithStaffCode(
           code = entered,
@@ -296,12 +311,17 @@ class AuthController(
           .onSuccess { session ->
             SavedLogins.remember(context, entered, session.user.name)
             session.shop?.role?.let { ShopRole.remember(context, it) }
-            //  دفترِ روی گوشی مالِ همین حساب و دکان، وگرنه دفترِ قبلی داخلِ دکانِ تازه می‌رفت
-            runCatching { LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty()) }
+            //  دفترِ روی گوشی **و** کلیدِ همگام‌سازی مالِ همین حساب و دکان (`AccountBind`). پیش‌تر فقط دفتر
+            //  جابه‌جا می‌شد و شاگرد با سایه و cursor ِ حسابِ پیشین (صاحب) کار می‌کرد: Snapshot نمی‌آمد و
+            //  دکانِ کارفرما خالی دیده می‌شد
+            val bound = runCatching { AccountBind.signedIn(context, store, session.user.id, session.shop?.id.orEmpty(), session.user.name) }
+            if (notArchived(bound)) return@onSuccess
             sync.rememberAccount(session.user)
+            //  دفترِ خالی ⇒ Snapshot ِ دکانِ کارفرما همین حالا، در پس‌زمینه (صفحه منتظرش نمی‌ماند)
+            AccountBind.bootstrapSoon(context, store)
             complete()
           }
-          .onFailure { fail(it) }
+          .onFailure { ui = ui.failed(StaffJoinErrors.message(it)) }
       }
       idle()
     }

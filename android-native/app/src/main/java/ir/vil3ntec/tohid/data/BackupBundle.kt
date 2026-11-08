@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -61,6 +62,14 @@ object BackupBundle {
       zip.write(ledgerJson.toByteArray(Charsets.UTF_8))
       zip.closeEntry()
 
+      //  DATA-SAFETY: تنظیماتِ دکان هم (`ShopSettingsBundle`) — با پشتیبانِ ابری به سرور می‌رسد
+      runCatching {
+        val settings = ShopSettingsBundle.export(context)
+        zip.putNextEntry(ZipEntry(ShopSettingsBundle.ENTRY))
+        zip.write(settings.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+      }
+
       photoDir(context).listFiles().orEmpty()
         .filter { it.isFile && it.name.endsWith(".jpg") }
         .forEach { photo ->
@@ -111,6 +120,7 @@ object BackupBundle {
     val staging = staging(context)
     staging.deleteRecursively()
     staging.mkdirs()
+    ShopSettingsBundle.dropStaged(context)
 
     var ledger: String? = null
     var photos = 0
@@ -122,6 +132,10 @@ object BackupBundle {
         when {
           !entry.isDirectory && name.endsWith(LEDGER_ENTRY) && !name.contains(PHOTO_DIR) ->
             ledger = zip.readBytes().toString(Charsets.UTF_8)
+
+          //  DATA-SAFETY: تا تأییدِ بازیابی کنار می‌ماند، همان قاعدهٔ عکس‌ها (`ShopSettingsBundle.commit`)
+          !entry.isDirectory && name == ShopSettingsBundle.ENTRY ->
+            ShopSettingsBundle.stageFrom(context, zip)
 
           !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
             /*
@@ -154,7 +168,7 @@ object BackupBundle {
       }
     }
 
-    val text = ledger ?: error("این فایل، پشتیبانِ فروشگاه من نیست")
+    val text = ledger ?: error(StrAppData.notOurBackup)
     Opened(parse(text).getOrThrow(), photos)
   }
 
@@ -164,23 +178,28 @@ object BackupBundle {
    *  فقط پس از تأییدِ بازیابی صدا زده می‌شود. عکسِ کالاهایی که در دفترِ
    *  تازه نیستند هم می‌ماند و ضرری ندارد — با حذفِ همان کالا پاک می‌شود.
    */
-  fun commitPhotos(context: Context): Int {
+  fun commitPhotos(context: Context, onlyMissing: Boolean = false): Int {
     val staging = staging(context)
     if (!staging.exists()) return 0
     val target = photoDir(context)
     var moved = 0
     staging.listFiles().orEmpty().forEach { photo ->
       runCatching {
+        //  `onlyMissing` (بازیابیِ پس از ورود، `CloudSettingsRestore`): عکسِ تازه‌ترِ همین دستگاه هرگز رونویسی نمی‌شود
+        if (onlyMissing && File(target, photo.name).exists()) return@runCatching
         photo.copyTo(File(target, photo.name), overwrite = true)
         moved++
       }
     }
     staging.deleteRecursively()
+    //  DATA-SAFETY: تنظیماتِ دکانِ همان پشتیبان — فقط کلیدهایی که این دستگاه هنوز ندارد
+    ShopSettingsBundle.commit(context)
     return moved
   }
 
   fun dropStaging(context: Context) {
     runCatching { staging(context).deleteRecursively() }
+    ShopSettingsBundle.dropStaged(context)
   }
 
   /**

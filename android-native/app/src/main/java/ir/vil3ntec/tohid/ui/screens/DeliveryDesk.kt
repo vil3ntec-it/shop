@@ -33,6 +33,7 @@ import ir.vil3ntec.tohid.core.delivery.DeskActions
 import ir.vil3ntec.tohid.core.delivery.DeskConfig
 import ir.vil3ntec.tohid.core.delivery.ExternalCompany
 import ir.vil3ntec.tohid.core.delivery.Mission
+import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.OrderText
@@ -83,7 +84,7 @@ object DeliveryGate {
 }
 
 /** «۱٬۲۵۰ افغانی» */
-internal fun afn(minor: Long) = "${OrderText.money(minor)} افغانی"
+internal fun afn(minor: Long) = StrOnline.afnAmount(OrderText.money(minor))
 
 /** زمانِ محلی به خورشیدی: «7/25 14:05» */
 internal fun deskStamp(ms: Long?): String {

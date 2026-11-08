@@ -335,9 +335,25 @@ fun ProfileScreen(
     }
   }
 
-  fun signOutNow() {
+  /**
+   *  خروج — همان راهِ برگهٔ v3 (`data/SafeSignOut`): اول همه به سرور و سنجیدنِ پاسخ؛ نگرفت ⇒ همان پنجرهٔ
+   *  «هنوز همه‌چیز به سرور نرفته» و هیچ چیزی پاک نمی‌شود. اجباری (پس از دو تأیید) ⇒ صفِ نرفته به گاوصندوقِ
+   *  رمزدارِ همین حساب، بعد خروج.
+   */
+  fun signOutNow(forced: Boolean = false) {
     busy = true
     scope.launch {
+      if (!forced) {
+        val verdict = runCatching { ir.vil3ntec.tohid.data.SafeSignOut.check(context, store).first }.getOrNull()
+        if (verdict !is ir.vil3ntec.tohid.core.sync.SignOutSafety.Allow) {
+          busy = false
+          blockSignOut = true
+          return@launch
+        }
+      } else {
+        ir.vil3ntec.tohid.data.SafeSignOut.sealForAccount(context)
+      }
+      //  همان سه گامِ `SafeSignOut.finish` (برگهٔ v3): نشستِ سرور، توکن و نامِ حساب؛ دفتر و صف و کلیدِ همگام‌سازی می‌مانند
       runCatching { Backend.auth(context).signOut() }
       state.signOut()
       //  S1: تخفیف‌ها و کدهای این حساب در حافظه نمی‌مانند
@@ -429,7 +445,7 @@ fun ProfileScreen(
         TextButton(enabled = !busy, onClick = {
           forceUnreadable = false
           //  کلیکِ «خروج بی پشتیبان» تأییدِ اول بود، این دومی است
-          if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow()
+          if (LogoutGuard.canForceUnreadable(unreadable != null, confirmations = 2)) signOutNow(forced = true)
         }) { Text("باز هم خارج شو", color = colors.danger) }
       },
       dismissButton = {
@@ -449,7 +465,7 @@ fun ProfileScreen(
         TextButton(enabled = !busy, onClick = {
           forcedBackup = null
           //  کلیکِ «خروجِ اجباری» تأییدِ اول بود، این دومی است
-          if (LogoutGuard.canForce(backupWritten = true, confirmations = 2)) signOutNow()
+          if (LogoutGuard.canForce(backupWritten = true, confirmations = 2)) signOutNow(forced = true)
         }) { Text("باز هم خارج شو", color = colors.danger) }
       },
       dismissButton = {

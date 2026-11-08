@@ -193,7 +193,7 @@ object LoyaltyPoints {
           if (s.valueMinor != plan.valueMinor || plan.baseMinor - plan.netMinor != s.valueMinor) return SalesEngine.Result.Failed(StrLoyalty.errChanged)
           rows += row(
             "${sale.id}-lp-s", Loyalty.SPEND, customer, s.points, s.valueMinor, sale.id,
-            "مصرفِ ${s.points} امتیاز — فاکتور #${label(sale)} — ${afn(s.valueMinor)} افغانی", today, now, by,
+            "مصرفِ ${s.points} امتیاز — فاکتور #${label(sale)} — ${afn(s.valueMinor)} افغانی", today, now, by,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           )
         }
       }
@@ -204,7 +204,7 @@ object LoyaltyPoints {
       val pts = Loyalty.earn(rule, tier, paid)
       if (pts > 0) rows += row(
         "${sale.id}-lp-e", Loyalty.EARN, customer, pts, 0, sale.id,
-        "کسبِ $pts امتیاز (${tierName(tier.key)} ×${multText(tier.multiplierPct)}) — فاکتور #${label(sale)}", today, now, by,
+        "کسبِ $pts امتیاز (${tierName(tier.key)} ×${multText(tier.multiplierPct)}) — فاکتور #${label(sale)}", today, now, by,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     val fresh = rows.filter { n -> d.auditLog.none { it.id == n.id } }
@@ -245,11 +245,11 @@ object LoyaltyPoints {
     if (rv.spendBack > 0) {
       val value = Loyalty.valueMinor(Loyalty.Rule(pointAfn = valuePer(d, sale.id)), rv.spendBack)
       add(row("$key-s", Loyalty.SPEND_BACK, of.customer, rv.spendBack, value, sale.id,
-        "برگشتِ ${rv.spendBack} امتیازِ مصرف‌شده — $why — فاکتور #${label(sale)}", today, now, by))
+        "برگشتِ ${rv.spendBack} امتیازِ مصرف‌شده — $why — فاکتور #${label(sale)}", today, now, by))  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     if (rv.earnBack > 0) add(row("$key-e", Loyalty.EARN_BACK, of.customer, rv.earnBack, 0, sale.id,
-      "پس‌گرفتنِ ${rv.earnBack} امتیاز — $why — فاکتور #${label(sale)}" +
-        if (rv.shortfall > 0) " (${rv.shortfall} امتیاز پیش‌تر خرج شده بود)" else "", today, now, by))
+      "پس‌گرفتنِ ${rv.earnBack} امتیاز — $why — فاکتور #${label(sale)}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        if (rv.shortfall > 0) " (${rv.shortfall} امتیاز پیش‌تر خرج شده بود)" else "", today, now, by))  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
   }.filter { n -> d.auditLog.none { it.id == n.id } }
 
   /** ماندهٔ برگشت/لغو: با انقضای قاعدهٔ در کار (`LoyaltyRules.current`؛ وصل‌نشده ⇒ بی انقضا، همان جمعِ ساده) */
@@ -278,7 +278,7 @@ object LoyaltyPoints {
       ?: return after
     val (part, whole) = returned(after, sale)
     val rv = Loyalty.reverse(of.earned, of.earnedBack, of.spent, of.spentBack, part, whole, roomOf(after, of.customer, now))
-    val rows = reversalRows(after, sale, of, rv, "$key-lp", "برگشت", today, now, by)
+    val rows = reversalRows(after, sale, of, rv, "$key-lp", "برگشت", today, now, by)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     return if (rows.isEmpty()) after else after.copy(auditLog = after.auditLog + rows)
   }
 
@@ -292,7 +292,7 @@ object LoyaltyPoints {
     val of = ofSale(d, r.saleId) ?: return r
     val sale = d.sales.find { it.id == r.saleId } ?: return r
     val rv = Loyalty.reverseAll(of.earned, of.earnedBack, of.spent, of.spentBack, roomOf(d, of.customer, now))
-    val rows = reversalRows(d, sale, of, rv, "${sale.id}-lx", "لغوِ فاکتور", today, now, by)
+    val rows = reversalRows(d, sale, of, rv, "${sale.id}-lx", "لغوِ فاکتور", today, now, by)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     return if (rows.isEmpty()) r else r.copy(data = d.copy(auditLog = d.auditLog + rows))
   }
 
@@ -348,7 +348,7 @@ object LoyaltyPoints {
       val add = target - have
       if (add > 0) rows += row(
         "$txId-lp-${s.id}", Loyalty.EARN, customer, add, 0, s.id,
-        "کسبِ $add امتیاز روی پرداختِ نسیه (${tierName(tier.key)} ×${multText(tier.multiplierPct)}) — فاکتور #${label(s)}",
+        "کسبِ $add امتیاز روی پرداختِ نسیه (${tierName(tier.key)} ×${multText(tier.multiplierPct)}) — فاکتور #${label(s)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         tx.date, tx.createdAt, by,
       )
     }
@@ -371,7 +371,7 @@ object LoyaltyPoints {
       val back = minOf(g.points ?: 0L, roomOf(d, customer, now))
       if (back <= 0) continue
       d = d.copy(auditLog = d.auditLog + row(
-        id, Loyalty.EARN_BACK, customer, back, 0, g.refId.orEmpty(), "پس‌گرفتنِ $back امتیاز — حذفِ رسیدِ پرداختِ نسیه", today, now, null,
+        id, Loyalty.EARN_BACK, customer, back, 0, g.refId.orEmpty(), "پس‌گرفتنِ $back امتیاز — حذفِ رسیدِ پرداختِ نسیه", today, now, null,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       ))
     }
     return d

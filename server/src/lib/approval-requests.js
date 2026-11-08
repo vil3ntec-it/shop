@@ -23,12 +23,16 @@
  *   • بی‌خطرِ تکرار: (دکان، درخواست‌کننده، `key`) یکتاست؛ همان کلید با همان محتوا همان ردیف، با محتوای دیگر ۴۰۹.
  *     درخواستِ تازه برای همان کار و سند درخواستِ بازِ پیشینِ همان کاربر را «جایگزین‌شده» لغو می‌کند.
  *   • هر تغییرِ حال در همان تراکنش یک ردیفِ `audit_log` دارد (`approval_request.*`).
+ *   • ⛔ کاری که پیش‌فرضِ نقشِ درخواست‌کننده برایش «ممنوع» است (تخفیف/لغوِ شاگرد و صندوق‌دار) فقط از Sync v3 می‌نشیند
+ *     (`staff-approval.v1Guard` ⇒ `approval_needs_v3`: v1 ِ مشترک با پمپ خودش نقش را می‌سنجد). سرورِ بی Sync v3 هیچ راهی
+ *     برای مصرفِ آن ندارد ⇒ ۴۰۹ `approval_needs_v3` همان دمِ پرسیدن، نه پس از تأییدِ بیهودهٔ مدیر و ردِ فاکتور.
  *   • درخواستِ تازه (نه تکرار) پس از commit یک پوش به صاحبان/مدیرانِ فعال (جز خودش) می‌فرستد ([notifyApprovers])؛
  *     بی‌انتظار، و شکستش کار را برنمی‌گرداند.
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.approval_requests` همهٔ درها جز `/config` ۴۰۳ و opِ با `request` همان
  *    `approval_invalid` ِ امروز (برگهٔ بدشکل) را می‌گیرد — رفتارِ امروز بایت‌به‌بایت همان.
  */
+const config = require('../config');
 const core = require('./perm-core');
 const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
@@ -50,7 +54,7 @@ const DOC_RE = /^[A-Za-z][A-Za-z0-9_]{0,40}\/[A-Za-z0-9_.:-]{1,120}$/;
 const ID_RE = /^apr_[0-9a-f]{24}$/;
 const LINE_BREAK = /[\r\n]/;
 /** کارهایی که بی مقدار معنا ندارند */
-const NEEDS_VALUE = new Set(['sales.discount', 'returns.create', 'sales.credit']);
+const NEEDS_VALUE = new Set(['sales.discount', 'returns.create', 'sales.credit', 'sales.price']);
 const STATUSES = Object.freeze(['open', 'pending', 'approved', 'denied', 'cancelled', 'used', 'expired', 'all']);
 
 const enabled = (shopId) => flagOf(shopId, FLAG);
@@ -142,6 +146,9 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
     const code = require('./staff-approval').DENY_CODE[p.perm] || 'perm_denied';
     throw forbidden('این کار برای نقشِ شما ممنوع است', code);
   }
+  if (!config.syncV3.enabled && core.defaultMode(actor.role, p.perm) === 'deny') {
+    throw conflict('تأییدِ این کار برای نقشِ شما فقط با همگام‌سازیِ نسخهٔ ۳ می‌نشیند و این سرور آن را ندارد؛ از مدیر بخواهید خودش ثبت کند', 'approval_needs_v3');
+  }
   const out = await inTx(async (c, log) => {
     await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`approval-requests:${shopId}:${actor.userId}`]);
     const prev = (await c.query(
@@ -180,7 +187,10 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
   return out;
 }
 
-const PERM_LABEL = Object.freeze({ 'sales.discount': 'تخفیف', 'sales.cancel': 'لغوِ فاکتور', 'returns.create': 'برگشت' });
+const PERM_LABEL = Object.freeze({
+  'sales.discount': 'تخفیف', 'sales.cancel': 'لغوِ فاکتور', 'returns.create': 'برگشت',
+  'sales.credit': 'فروشِ قرضی', 'sales.price': 'تغییرِ قیمت',   //  STF-03
+});
 
 /**
  * خبرِ پوش به صاحبان و مدیرانِ فعالِ همین دکان (جز خودِ درخواست‌کننده) — همان `push.sendTo` ِ هشدارِ حساب‌پی.

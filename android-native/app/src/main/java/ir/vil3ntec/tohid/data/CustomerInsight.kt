@@ -24,7 +24,7 @@ object CustomerInsight {
   /** همان مرزهای §۶.۷: ۰–۳۰، ۳۱–۶۰، ۶۱–۹۰، ۹۱+ */
   val BUCKETS: List<Long> = listOf(30L, 60L, 90L)
   /** سرستون‌ها عمداً «روز» ندارند: `SheetTable` ستونی را که «روز» دارد جمع نمی‌زند */
-  val BUCKET_LABELS: List<String> = listOf("سنِ ۰ تا ۳۰", "سنِ ۳۱ تا ۶۰", "سنِ ۶۱ تا ۹۰", "سنِ بیش از ۹۰")
+  val BUCKET_LABELS: List<String> = listOf("سنِ ۰ تا ۳۰", "سنِ ۳۱ تا ۶۰", "سنِ ۶۱ تا ۹۰", "سنِ بیش از ۹۰")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
 
   data class AgeLine(
     val id: String,
@@ -46,7 +46,7 @@ object CustomerInsight {
 
   /** سنِ بدهیِ همهٔ مشتریانی که مانده دارند تا `asOf` (yyyy-MM-dd)، بدهکارترین اول */
   fun aging(d: ShopData, asOf: String): Aging {
-    require(ReportDates.epochDay(asOf) != null) { "asOf باید yyyy-MM-dd باشد" }
+    require(ReportDates.epochDay(asOf) != null) { "asOf باید yyyy-MM-dd باشد" }  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
     val ledger = ReportLedger.parse(json.encodeToJsonElement(ShopData.serializer(), d).jsonObject)
     val r = ReportCore.debts(ledger, asOf, BUCKETS).customers
     val phones = d.debtors.associate { it.id to it.phone }
@@ -71,24 +71,24 @@ object CustomerInsight {
   fun agingSheet(d: ShopData, today: String): ReportCsv.Sheet {
     val a = aging(d, today)
     fun r(v: Double) = Math.round(v).toString()
-    val rows = mutableListOf(listOf("نام", "شماره تماس", "مانده") + BUCKET_LABELS + listOf("پیش‌پرداخت", "کهنه‌ترین (روز)"))
+    val rows = mutableListOf(listOf("نام", "شماره تماس", "مانده") + BUCKET_LABELS + listOf("پیش‌پرداخت", "کهنه‌ترین (روز)"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     a.lines.forEach { l ->
       rows += listOf(l.name, l.phone, r(l.balance)) + l.buckets.map(::r) +
         listOf(if (l.credit > 0) r(l.credit) else "", l.oldestDays?.takeIf { it >= 0 }?.toString().orEmpty())
     }
-    return ReportCsv.Sheet("سن-بدهی-مشتریان-$today", rows)
+    return ReportCsv.Sheet("سن-بدهی-مشتریان-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 
   /* ------------------------------ RFM (CRM-14) ------------------------------ */
 
   enum class Segment(val label: String) {
-    CHAMPION("وفادارِ برتر"),
-    LOYAL("وفادار"),
-    NEW("تازه"),
-    LOST("از دست رفته"),
-    AT_RISK("در خطرِ رفتن"),
-    SLEEPING("کم‌پیدا"),
-    REGULAR("معمولی"),
+    CHAMPION("وفادارِ برتر"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    LOYAL("وفادار"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    NEW("تازه"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    LOST("از دست رفته"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    AT_RISK("در خطرِ رفتن"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    SLEEPING("کم‌پیدا"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
+    REGULAR("معمولی"),  // داده: گروهِ RFM — ستونِ خروجیِ اکسل هم هست (منتظرِ تصمیمِ صاحب‌کار)
   }
 
   data class Rfm(
@@ -155,7 +155,7 @@ object CustomerInsight {
    *  مشتریِ بی خرید در بازه ردیف ندارد. بهترین اول.
    */
   fun rfm(d: ShopData, asOf: String, windowDays: Int = 365): List<Rfm> {
-    val end = ReportDates.epochDay(asOf) ?: throw IllegalArgumentException("asOf باید yyyy-MM-dd باشد")
+    val end = ReportDates.epochDay(asOf) ?: throw IllegalArgumentException("asOf باید yyyy-MM-dd باشد")  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
     val start = end - windowDays.coerceAtLeast(1) + 1
     val names = d.debtors.associateBy { it.id }
     val returned = d.saleReturns.groupBy { it.saleId }.mapValues { (_, l) -> l.sumOf { it.amount } }
@@ -201,7 +201,7 @@ object CustomerInsight {
 
   fun rfmSheet(d: ShopData, today: String, windowDays: Int = 365): ReportCsv.Sheet {
     val rows = mutableListOf(
-      listOf("نام", "شماره تماس", "بخش", "امتیاز R-F-M", "روز از آخرین خرید", "تعداد خرید", "مبلغِ خرید", "نخستین خرید", "آخرین خرید"),
+      listOf("نام", "شماره تماس", "بخش", "امتیاز R-F-M", "روز از آخرین خرید", "تعداد خرید", "مبلغِ خرید", "نخستین خرید", "آخرین خرید"),  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     )
     rfm(d, today, windowDays).forEach { x ->
       rows += listOf(
@@ -209,6 +209,6 @@ object CustomerInsight {
         Math.round(x.monetary).toString(), x.firstPurchase, x.lastPurchase,
       )
     }
-    return ReportCsv.Sheet("تحلیل-خرید-مشتریان-$today", rows)
+    return ReportCsv.Sheet("تحلیل-خرید-مشتریان-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

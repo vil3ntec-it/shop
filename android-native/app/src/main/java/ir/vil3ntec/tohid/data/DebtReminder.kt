@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.report.ReportDates
 import ir.vil3ntec.tohid.formatDate
 import ir.vil3ntec.tohid.money
@@ -24,13 +25,13 @@ import ir.vil3ntec.tohid.money
  */
 object DebtReminder {
 
-  const val DEFAULT_TEMPLATE = "سلام {نام} عزیز، یادآوری می‌کنم که {مبلغ} افغانی از حساب شما باقی مانده. ممنون."
+  const val DEFAULT_TEMPLATE = "سلام {نام} عزیز، یادآوری می‌کنم که {مبلغ} افغانی از حساب شما باقی مانده. ممنون."  // داده: متنِ پیش‌فرضِ ذخیره‌شدهٔ یادآوری با کلیدِ {…}
   /** همان متنِ امروز وقتی مانده‌ای نیست */
-  const val NO_BALANCE_TEMPLATE = "سلام {نام} عزیز،"
+  const val NO_BALANCE_TEMPLATE = "سلام {نام} عزیز،"  // داده: متنِ پیش‌فرضِ ذخیره‌شدهٔ یادآوری با کلیدِ {…}
   const val MAX_TEMPLATE_LENGTH = 600
 
-  val PLACEHOLDERS: List<String> = listOf("نام", "مبلغ", "دکان", "سررسید", "روز")
-  val CHANNELS: Map<String, String> = linkedMapOf("sms" to "پیامک", "whatsapp" to "واتس‌اپ", "call" to "زنگ")
+  val PLACEHOLDERS: List<String> = listOf("نام", "مبلغ", "دکان", "سررسید", "روز")  // داده: کلیدِ جای‌نگهدارِ متنِ ذخیره‌شده
+  val CHANNELS: Map<String, String> = linkedMapOf("sms" to "پیامک", "whatsapp" to "واتس‌اپ", "call" to "زنگ")  // داده: نامِ راه درونِ یادداشتِ سابقه و سنجشِ «امروز»
 
   private val SLOT = Regex("""\{([^{}\s]{1,20})\}""")
 
@@ -46,11 +47,11 @@ object DebtReminder {
   /** متنِ نهایی. مبلغ با همان `money()` ِ برنامه؛ سررسید به خورشیدی */
   fun render(template: String, v: Vars): String = SLOT.replace(template) { m ->
     when (m.groupValues[1]) {
-      "نام" -> v.name
-      "مبلغ" -> money(v.balance)
-      "دکان" -> v.store
-      "سررسید" -> if (v.dueDate.isBlank()) "" else formatDate(v.dueDate)
-      "روز" -> v.debtDays?.toString().orEmpty()
+      "نام" -> v.name  // داده: کلیدِ جای‌نگهدار
+      "مبلغ" -> money(v.balance)  // داده: کلیدِ جای‌نگهدار
+      "دکان" -> v.store  // داده: کلیدِ جای‌نگهدار
+      "سررسید" -> if (v.dueDate.isBlank()) "" else formatDate(v.dueDate)  // داده: کلیدِ جای‌نگهدار
+      "روز" -> v.debtDays?.toString().orEmpty()  // داده: کلیدِ جای‌نگهدار
       else -> m.value
     }
   }
@@ -80,9 +81,9 @@ object DebtReminder {
   /** خطای قالب برای فرم — `null` یعنی درست */
   fun validate(template: String): String? = when (val p = check(template)) {
     null -> null
-    Problem.Empty -> "متنِ یادآوری خالی است"
-    Problem.TooLong -> "متنِ یادآوری حداکثر $MAX_TEMPLATE_LENGTH حرف"
-    is Problem.Unknown -> "جای‌نگهدارِ ناشناخته: " + p.slots.joinToString("، ") { "{$it}" }
+    Problem.Empty -> StrLedger.reminderEmpty
+    Problem.TooLong -> StrLedger.reminderTooLong(MAX_TEMPLATE_LENGTH)
+    is Problem.Unknown -> StrLedger.unknownSlots(p.slots.joinToString("، ") { "{$it}" })
   }
 
   /* ------------------------------ زمان‌بندی ------------------------------ */
@@ -178,11 +179,11 @@ object DebtReminder {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == debtorId } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
-    val via = CHANNELS[channel] ?: return DebtorEngine.Result.Failed("راهِ یادآوریِ ناشناخته")
+    val c = d.debtors.find { it.id == debtorId } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    val via = CHANNELS[channel] ?: return DebtorEngine.Result.Failed(StrLedger.unknownChannel)
     val trace = AuditEntry(
       id = newId(), type = TYPE, date = today, refId = debtorId, createdAt = now,
-      notes = "یادآوریِ بدهی به «${c.name}» با $via — مانده ${money(ShopStore.debt(d, debtorId))} افغانی",
+      notes = "یادآوریِ بدهی به «${c.name}» با $via — مانده ${money(ShopStore.debt(d, debtorId))} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return DebtorEngine.Result.Ok(d.copy(auditLog = d.auditLog + trace), debtorId)
   }
@@ -202,20 +203,20 @@ object DebtReminder {
   ): ShopData? {
     val via = CHANNELS[channel] ?: return null
     val again = d.auditLog.any {
-      it.type == TYPE && it.refId == debtorId && it.date == today && it.notes.substringAfterLast("» با ").startsWith("$via — ")
+      it.type == TYPE && it.refId == debtorId && it.date == today && it.notes.substringAfterLast("» با ").startsWith("$via — ")  // داده: کلید یا سنجشِ منطق
     }
     if (again) return null
     return (record(d, debtorId, channel, today, now, newId) as? DebtorEngine.Result.Ok)?.data
   }
 
   fun dueSheet(d: ShopData, today: String, rule: Rule = Rule(), template: String = DEFAULT_TEMPLATE, store: String = ""): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("نام", "شماره تماس", "مانده", "روزهای بدهی", "سررسیدِ گذشته", "آخرین یادآوری", "متنِ پیام"))
+    val rows = mutableListOf(listOf("نام", "شماره تماس", "مانده", "روزهای بدهی", "سررسیدِ گذشته", "آخرین یادآوری", "متنِ پیام"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     due(d, today, rule, template, store).forEach { x ->
       rows += listOf(
         x.debtor.name, x.debtor.phone.ifBlank { x.debtor.phone2.orEmpty() }, Math.round(x.balance).toString(),
         x.debtDays?.toString().orEmpty(), x.overdueSince, x.lastReminded.orEmpty(), x.message,
       )
     }
-    return ReportCsv.Sheet("یادآوری-بدهی-$today", rows)
+    return ReportCsv.Sheet("یادآوری-بدهی-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

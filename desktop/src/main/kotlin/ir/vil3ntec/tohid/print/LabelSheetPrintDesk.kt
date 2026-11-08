@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.print
 import android.app.DesktopNotify
 import android.content.Context
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import java.awt.Graphics
 import java.awt.Graphics2D
 import java.awt.RenderingHints
@@ -46,7 +47,7 @@ object LabelSheetPrint {
         }
         job.setPrintable(SheetPrintable(images), format)
         if (job.printDialog()) job.print()
-      }.onFailure { DesktopNotify.show("چاپِ برچسب", "چاپ انجام نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
+      }.onFailure { DesktopNotify.show(StrPrint.labelPrintTitle, StrPrint.printNotDone(it.message ?: StrPrint.unknownReason)) }
     }, "tohid-label-print").apply { isDaemon = true }.start()
   }
 

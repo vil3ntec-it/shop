@@ -81,6 +81,12 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
       parts.commit(LedgerDiff.shadowOf(tree).toString(), null)
       return 0
     }
+    /*
+     *  ⛔ دفترِ کاملاً خالی «همه حذف شد» نمی‌فرستد (`core/sync/AccountSafety.kt` ⇐ `EmptyLedgerGuard`):
+     *  دفترِ خالی روی میز یعنی دفترِ دیگری جای این نشسته (حسابِ دیگر، نصبِ تازه). سایه دست نمی‌خورد
+     *  تا دفترِ درست که برگشت، هیچ چیزی گم یا دوباره فرستاده نشود.
+     */
+    if (ir.vil3ntec.tohid.core.sync.EmptyLedgerGuard.blocks(rowsOf(tree), rowsOf(shadow))) throw EmptyLedger()
     val ops = LedgerDiff.diff(shadow, tree)
     if (ops.isEmpty()) return 0
     commitOps(ops, before, LedgerDiff.shadowOf(tree).toString())
@@ -156,7 +162,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   private fun settle(data: ShopData?) {
     if (!journal.exists()) return
     if (recover(null) != Outcome.PENDING) return
-    if (data == null || recover(data) == Outcome.PENDING) throw IOException("ساختنِ دوبارهٔ دفتر نیمه‌کاره مانده است")
+    if (data == null || recover(data) == Outcome.PENDING) throw IOException("ساختنِ دوبارهٔ دفتر نیمه‌کاره مانده است")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
   }
 
   /** ژورنال ⇐ صف ⇐ سایه (همزمان) ⇐ پاک کردنِ ژورنال */
@@ -397,6 +403,13 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     return LedgerDiff.shadowOf(if (base != null) LedgerDiff.applyRemote(base, ops) else ledgerTree).toString()
   }
 
+  /** شمارِ ردیف‌های شناسه‌دارِ یک دفتر یا سایه (فهرست‌های نامی شمرده نمی‌شوند) */
+  private fun rowsOf(tree: JsonObject): Int =
+    LedgerDiff.COLLECTIONS.sumOf { (tree[it] as? kotlinx.serialization.json.JsonArray)?.size ?: 0 }
+
+  /** دفترِ خالی روی سایهٔ پر — هیچ op، هیچ سایه (`SyncV1Engine.record` پیامِ روشن می‌گذارد) */
+  class EmptyLedger : IllegalStateException("دفترِ خالی روی سایهٔ پر — حذفِ همه فرستاده نشد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+
   private fun parse(raw: String): JsonObject? =
     if (raw.isBlank()) null else runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull()
 
@@ -440,7 +453,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         if (e.next.isNotEmpty()) put("next", JsonPrimitive(e.next))
       }.toString().toByteArray(Charsets.UTF_8)
       file.parentFile?.mkdirs()
-      if (file.exists() && !file.delete()) throw IOException("ژورنالِ کهنه پاک نشد")
+      if (file.exists() && !file.delete()) throw IOException("ژورنالِ کهنه پاک نشد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       FileOutputStream(file).use { out ->
         out.write(body)
         out.flush()

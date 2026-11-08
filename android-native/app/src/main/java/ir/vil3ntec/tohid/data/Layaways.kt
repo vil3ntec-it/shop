@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.pos.Layaway
 import ir.vil3ntec.tohid.core.pos.SpecialOrder
 
@@ -206,8 +207,7 @@ object Layaways {
   /** ردِ فروشی که به کالای کنارگذاشته می‌رسد — روشن بگوید چرا */
   fun heldMessage(p: Product, wanted: Double, free: Double, held: Double): String {
     val u = if (p.unit.isNotBlank()) " ${p.unit}" else ""
-    return "«${p.name}»: ${ir.vil3ntec.tohid.qty(held)}$u برای فروشِ امانی کنار گذاشته شده و فروخته نمی‌شود؛ " +
-      "فقط ${ir.vil3ntec.tohid.qty(free.coerceAtLeast(0.0))}$u آزاد است، شما ${ir.vil3ntec.tohid.qty(wanted)}$u خواستید."
+    return StrLedger.layawayHeld(p.name, ir.vil3ntec.tohid.qty(held), ir.vil3ntec.tohid.qty(free.coerceAtLeast(0.0)), ir.vil3ntec.tohid.qty(wanted), u)
   }
 
   /** همهٔ سندها: بازها اول (دیرها، بعد زودترین قسطِ بعدی)، بعد بسته‌ها (تازه‌ترین اول) */
@@ -262,7 +262,7 @@ object Layaways {
     val qty = l.qtyMilli / 1000.0
     val unit = PayFlow.major(l.unitMinor)
     val known = l.label == null && cur.products.any { it.id == l.productId }
-    return if (known) SalesEngine.CartLine(l.productId, qty, unit) else SalesEngine.CartLine(l.productId, qty, unit, (l.label ?: l.name).ifBlank { "قلمِ امانی" })
+    return if (known) SalesEngine.CartLine(l.productId, qty, unit) else SalesEngine.CartLine(l.productId, qty, unit, (l.label ?: l.name).ifBlank { "قلمِ امانی" })  // داده: نامِ قلمِ ذخیره‌شده در فاکتور
   }
 
   fun hasRow(d: ShopData, key: String): Boolean = d.auditLog.any { it.id == key }
@@ -324,7 +324,7 @@ object Layaways {
     val afn = { m: Long -> ir.vil3ntec.tohid.money(PayFlow.major(m)) }
     val row = AuditEntry(
       id = key, type = TYPE, date = today, createdAt = now, amount = PayFlow.major(dep),
-      notes = "فروشِ امانی: ${lines.size} قلم — جمع ${afn(total)}، پیش‌پرداخت ${afn(dep)} افغانی، ${schedule.size} قسط از ${o.firstDue}",
+      notes = "فروشِ امانی: ${lines.size} قلم — جمع ${afn(total)}، پیش‌پرداخت ${afn(dep)} افغانی، ${schedule.size} قسط از ${o.firstDue}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       by = by.trim().ifEmpty { null },
       layaway = LayawayDoc(
         debtorId = debtor, kind = Layaway.LAYAWAY, totalMinor = total, depositMinor = dep, lines = lines,
@@ -333,7 +333,7 @@ object Layaways {
     )
     val deposit = if (dep <= 0) null else DebtTransaction(
       id = "$key-p0", debtorId = debtor!!, type = "receive", amount = PayFlow.major(dep), date = today,
-      notes = "پیش‌پرداختِ فروشِ امانی", createdAt = now, refId = key, kind = DEPOSIT,
+      notes = "پیش‌پرداختِ فروشِ امانی", createdAt = now, refId = key, kind = DEPOSIT,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Built.Ok(cur.copy(auditLog = cur.auditLog + row, transactions = cur.transactions + listOfNotNull(deposit)))
   }
@@ -350,7 +350,7 @@ object Layaways {
     val left = v.progress.remainingMinor - amountMinor
     val tx = DebtTransaction(
       id = key, debtorId = v.debtorId, type = "receive", amount = PayFlow.major(amountMinor), date = today,
-      notes = "قسطِ ${v.payCount + 1} ِ فروشِ امانی — مانده ${ir.vil3ntec.tohid.money(PayFlow.major(left))} افغانی",
+      notes = "قسطِ ${v.payCount + 1} ِ فروشِ امانی — مانده ${ir.vil3ntec.tohid.money(PayFlow.major(left))} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now, refId = v.id, kind = INSTALLMENT,
     )
     return Built.Ok(cur.copy(transactions = cur.transactions + tx))
@@ -386,11 +386,11 @@ object Layaways {
     if (PayFlow.minor(sale.finalTotal) != v.totalMinor || PayFlow.minor(sale.debtGiven) != v.totalMinor) return Built.Bad("TOTAL_MISMATCH")
     val label = sale.invoiceLabel() ?: "0"
     val txs = data.transactions.map {
-      if (it.refId == key && it.kind == SalesEngine.SALE_CREDIT) it.copy(notes = "تسویه از پرداخت‌های فروشِ امانی — فاکتور #$label") else it
+      if (it.refId == key && it.kind == SalesEngine.SALE_CREDIT) it.copy(notes = "تسویه از پرداخت‌های فروشِ امانی — فاکتور #$label") else it  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     val row = move(
       "$key-m", v, DELIVERED, today, now, by,
-      "تحویلِ فروشِ امانی — فاکتور #$label، ${ir.vil3ntec.tohid.money(PayFlow.major(v.totalMinor))} افغانی از پرداختی‌ها",
+      "تحویلِ فروشِ امانی — فاکتور #$label، ${ir.vil3ntec.tohid.money(PayFlow.major(v.totalMinor))} افغانی از پرداختی‌ها",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       amountMinor = v.totalMinor, saleId = key,
     )
     return Built.Ok(data.copy(transactions = txs, auditLog = data.auditLog + row), saleId = key)
@@ -406,10 +406,10 @@ object Layaways {
     val refund = Layaway.cancelRefund(Layaway.LAYAWAY, v.depositsMinor, v.progress)!! - v.refundsMinor
     if (refund != v.heldMinor || refund < 0) return Built.Bad("TOTAL_MISMATCH")
     val afn = ir.vil3ntec.tohid.money(PayFlow.major(refund))
-    val row = move(key, v, CANCELLED, today, now, by, "لغوِ فروشِ امانی — بازپرداختِ $afn افغانی — دلیل: $why", amountMinor = refund, reason = why)
+    val row = move(key, v, CANCELLED, today, now, by, "لغوِ فروشِ امانی — بازپرداختِ $afn افغانی — دلیل: $why", amountMinor = refund, reason = why)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val back = if (refund <= 0) null else DebtTransaction(
       id = "${v.id}-r", debtorId = v.debtorId, type = "give", amount = PayFlow.major(refund), date = today,
-      notes = "بازپرداختِ نقدِ فروشِ امانی (لغو)", createdAt = now, refId = v.id, kind = REFUND,
+      notes = "بازپرداختِ نقدِ فروشِ امانی (لغو)", createdAt = now, refId = v.id, kind = REFUND,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     if (back != null && cur.transactions.any { it.id == back.id }) return Built.Bad("STALE")
     return Built.Ok(cur.copy(auditLog = cur.auditLog + row, transactions = cur.transactions + listOfNotNull(back)))

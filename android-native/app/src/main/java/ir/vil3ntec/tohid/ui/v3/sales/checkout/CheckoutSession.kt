@@ -24,8 +24,12 @@ object CheckoutSession {
   var form by mutableStateOf<CheckoutForm?>(null)
   /** پنلِ پرداختِ ترکیبی (`ShopPolicy.payV2`) */
   val pay = PayPanelState()
-  /** برگهٔ امضاشدهٔ تأییدِ تخفیف (STF-02) */
+  /** برگهٔ امضاشدهٔ تأییدِ تخفیف (STF-02)؛ با پرچمِ قیمتِ سرور همان برگهٔ «تخفیفِ پنهان» هم (`SaleCapGate`) */
   var approval by mutableStateOf<ApprovalSlip.Slip?>(null)
+  /** STF-03 — برگه‌های تأییدِ قرض و تغییرِ قیمتِ همین فاکتور به کلیدِ کار (`sales.credit`، `sales.price`) */
+  var capSlips by mutableStateOf<Map<String, ApprovalSlip.Slip>>(emptyMap())
+  /** STF-03 — برگهٔ تأییدِ سقف را خودِ «ثبت» باز کرد ⇒ با رسیدنِ تأیید همان ثبت دوباره (مثلِ سقفِ اعتبار) */
+  var capPending by mutableStateOf(false)
   var done by mutableStateOf<CheckoutDone?>(null)
   /** برگهٔ «درخواستِ تأیید» ِ باز (`sale/checkout/approve`) */
   var ask by mutableStateOf<ApprovalAsk?>(null)
@@ -45,6 +49,8 @@ object CheckoutSession {
     pay.cash = ""
     pay.rows.clear()
     approval = null
+    capSlips = emptyMap()
+    capPending = false
     done = null
     ask = null
     credit = null

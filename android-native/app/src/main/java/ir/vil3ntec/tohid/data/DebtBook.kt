@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.money.Currency
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.formatDate
@@ -235,8 +237,11 @@ object DebtBook {
     return creditOf(debtor, balance, extra)
   }
 
+  /** همان جمله برای صفحه و خطا، به زبانِ برنامه — [overLimitText] فارسیِ یادداشتِ سابقه می‌ماند */
+  fun overLimitMsg(c: Credit): String = StrLedger.overLimit(show(c.excess), show(c.limit), show(c.balance))
+
   fun overLimitText(c: Credit): String =
-    "${show(c.excess)} افغانی بیش از سقفِ اعتبار (${show(c.limit)}) — ماندهٔ فعلی ${show(c.balance)}"
+    "${show(c.excess)} افغانی بیش از سقفِ اعتبار (${show(c.limit)}) — ماندهٔ فعلی ${show(c.balance)}"  // داده: جملهٔ یادداشتِ سابقه (پیامِ صفحه: `overLimitMsg`)
 
   /* ------------------------------ سررسید ------------------------------ */
 
@@ -261,7 +266,7 @@ object DebtBook {
     fun text(): String = (listOf(title) + rows.map { (k, v) -> if (v.isEmpty()) k else "$k: $v" }).joinToString("\n")
   }
 
-  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "مشتری" }
+  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "مشتری" }  // داده: نامِ پروندهٔ خروجی
 
   /**
    *  رسیدِ یک ردیف — برد با اقلام و پرداخت‌هایش، یا رسیدِ دریافت با پیش و پس.
@@ -270,12 +275,12 @@ object DebtBook {
   fun receipt(d: ShopData, debtorId: String, txId: String, storeName: String, today: String): Receipt? {
     val book = book(d, debtorId, today) ?: return null
     val e = book.entry(txId) ?: return null
-    val af = " افغانی"
+    val af = StrLedger.afnSuffix
     val rows = mutableListOf<Pair<String, String>>()
-    rows += "مشتری" to book.debtor.name
-    if (book.debtor.phone.isNotBlank()) rows += "تلفن" to ir.vil3ntec.tohid.LocaleText.phoneDisplay(book.debtor.phone)
-    rows += "تاریخ" to formatDate(e.tx.date)
-    e.invoiceLabel?.let { rows += "فاکتور" to "#$it" }
+    rows += StrLedger.rcCustomer to book.debtor.name
+    if (book.debtor.phone.isNotBlank()) rows += StrLedger.rcPhone to ir.vil3ntec.tohid.LocaleText.phoneDisplay(book.debtor.phone)
+    rows += StrLedger.rcDate to formatDate(e.tx.date)
+    e.invoiceLabel?.let { rows += StrLedger.rcInvoice to "#$it" }
 
     if (e.give) {
       val s = e.sale
@@ -283,39 +288,39 @@ object DebtBook {
         e.lines.forEach { l ->
           val unit = if (l.unit.isNotBlank()) " ${l.unit}" else ""
           rows += "${l.name} — ${qty(l.quantity)}$unit × ${show(l.unitPrice)}" to show(l.total)
-          if (l.returned > 0) rows += "   مرجوعی: ${qty(l.returned)}$unit" to ""
+          if (l.returned > 0) rows += StrLedger.rcReturned(qty(l.returned), unit) to ""
         }
-        rows += "جمعِ اقلام" to show(minor(s.total)) + af
-        if (s.discount > 0) rows += "تخفیف" to show(minor(s.discount)) + af
-        rows += "قابلِ پرداخت" to show(minor(s.finalTotal)) + af
-        rows += "پرداختِ همان لحظه" to show(minor(s.paidAmount)) + af
+        rows += StrLedger.rcSubtotal to show(minor(s.total)) + af
+        if (s.discount > 0) rows += StrLedger.rcDiscount to show(minor(s.discount)) + af
+        rows += StrLedger.rcPayable to show(minor(s.finalTotal)) + af
+        rows += StrLedger.rcPaidNow to show(minor(s.paidAmount)) + af
       }
-      rows += "قرضِ این ردیف" to show(e.amount) + af
-      if (e.tx.notes.isNotBlank()) rows += "شرح" to e.tx.notes
-      rows += "سررسید" to (e.dueDate?.let(::formatDate) ?: "ندارد")
+      rows += StrLedger.rcThisDebt to show(e.amount) + af
+      if (e.tx.notes.isNotBlank()) rows += StrLedger.rcDetail to e.tx.notes
+      rows += StrLedger.rcDue to (e.dueDate?.let(::formatDate) ?: StrLedger.rcNoDue)
       e.allocations.forEach { a ->
         val r = book.entry(a.txId)
-        rows += "پرداخت ${r?.tx?.date?.let(::formatDate).orEmpty()}".trim() to show(a.amount) + af
+        rows += StrLedger.rcPayment(r?.tx?.date?.let(::formatDate).orEmpty()).trim() to show(a.amount) + af
       }
-      rows += "باقیِ این قرض" to if (e.paid) "تسویه شد" else show(e.open) + af
-      if (e.overdue) rows += "وضعیت" to "سررسید گذشته"
+      rows += StrLedger.rcDebtLeft to if (e.paid) StrLedger.rcSettled else show(e.open) + af
+      if (e.overdue) rows += StrLedger.rcStatus to StrLedger.rcOverdue
     } else {
-      rows += "مبلغِ دریافتی" to show(e.amount) + af
-      if (e.tx.notes.isNotBlank()) rows += "شرح" to e.tx.notes
-      rows += "مانده پیش از دریافت" to state(e.balanceBefore)
+      rows += StrLedger.rcReceived to show(e.amount) + af
+      if (e.tx.notes.isNotBlank()) rows += StrLedger.rcDetail to e.tx.notes
+      rows += StrLedger.rcBalanceBefore to state(e.balanceBefore)
       e.allocations.forEach { a ->
         val g = book.entry(a.txId)
-        val what = g?.invoiceLabel?.let { "فاکتور #$it" } ?: "برد ${g?.tx?.date?.let(::formatDate).orEmpty()}".trim()
-        rows += "بابتِ $what" to show(a.amount) + af
+        val what = g?.invoiceLabel?.let { StrLedger.rcInvoiceNo(it) } ?: StrLedger.rcGiven(g?.tx?.date?.let(::formatDate).orEmpty()).trim()
+        rows += StrLedger.rcFor(what) to show(a.amount) + af
       }
-      if (e.open.minor > 0) rows += "پیش‌پرداخت (روی قرضِ بعدی)" to show(e.open) + af
+      if (e.open.minor > 0) rows += StrLedger.rcPrepaid to show(e.open) + af
     }
-    rows += "مانده پس از این ردیف" to state(e.balanceAfter)
-    rows += "ماندهٔ امروزِ حساب" to state(book.balance)
+    rows += StrLedger.rcBalanceAfter to state(e.balanceAfter)
+    rows += StrLedger.rcBalanceToday to state(book.balance)
 
-    val kind = if (e.give) "رسیدِ قرض" else "رسیدِ دریافت"
+    val kind = if (e.give) "رسیدِ قرض" else "رسیدِ دریافت"  // داده: نامِ پروندهٔ خروجی
     return Receipt(
-      title = "${storeName.trim().ifBlank { "فروشگاه" }} — $kind",
+      title = StrLedger.rcTitle(storeName.trim().ifBlank { StrSale.storeFallback }, if (e.give) StrLedger.rcDebtReceipt else StrLedger.rcPayReceipt),
       name = "$kind-${safe(book.debtor.name)}-${e.tx.date}-${e.row}",
       rows = rows,
     )

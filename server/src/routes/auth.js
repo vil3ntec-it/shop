@@ -15,7 +15,7 @@
  * حساب‌ها هرگز خودبه‌خود در هم ادغام نمی‌شوند.
  */
 const express = require('express');
-const { query, one, tx, newId, now } = require('../db');
+const { query, one, newId, now } = require('../db');
 const config = require('../config');
 const v = require('../lib/validate');
 const pw = require('../lib/password');
@@ -340,7 +340,7 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
     }
 
     const t = now();
-    if (!user) {
+    if (!user && await staffCodes.preflight(rawCode)) {  // دستگاهِ تازه ⇒ کد پیش از ساختنِ حساب (بی «حسابِ شبح»)
       user = await one(
         `INSERT INTO users (id, name, kind, status, created_at, updated_at)
          VALUES ($1,$2,'staff','active',$3,$3) RETURNING *`,
@@ -370,7 +370,7 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
      */
     const member = await membershipOf(user.id);
     if (!member || member.shop_id !== shopId) {
-      await staffCodes.redeem(rawCode, user.id, ip);
+      await staffCodes.redeem(rawCode, user.id, ip, { freshAt: t });  // ناموفق ⇒ حسابِ ساخته‌شده در همین لحظه پاک
     }
 
     //  کدِ شاگرد مالِ دفترِ دکان است، پس نشستش هم همان بخش است.

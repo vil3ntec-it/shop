@@ -415,11 +415,10 @@ async function putEvidence(store, token, buf) {
     if (same) return { evidenceId: same.id, mime: same.mime, size: Number(same.size), reused: true };
     const cnt = Number((await c.query('SELECT COUNT(*)::int AS n FROM trust_evidence WHERE case_id=$1', [row.id])).rows[0].n);
     if (cnt >= config.trust.evidenceMax) throw conflict(`حداکثر ${config.trust.evidenceMax} عکس برای هر پرونده`, 'evidence_limit');
-    const id = newId('tev');
-    await c.query(
-      `INSERT INTO trust_evidence (id, case_id, shop_id, mime, size, sha256, data, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
-      [id, row.id, row.shop_id, s.mime, data.length, hash, data, now()]
-    );
+    const id = newId('tev');   //  بایت در `data` یا انبار (`lib/media-store.js`، مهاجرتِ ۲۷۵)
+    await require('./media-store').trust.put(row.shop_id, s.mime, data, async (st) => { st.used = (await c.query(
+      `INSERT INTO trust_evidence (id, case_id, shop_id, mime, size, sha256, data, created_at, store_key) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [id, row.id, row.shop_id, s.mime, data.length, hash, st.data, now(), st.key])).rowCount > 0; });
     await addEvent(c, row, 'customer', '', 'evidence_added', '', { evidenceId: id });
     await c.query('UPDATE trust_cases SET updated_at=$2 WHERE id=$1', [row.id, now()]);
     return { evidenceId: id, mime: s.mime, size: data.length, reused: false };
@@ -430,9 +429,10 @@ async function evidenceBytes(caseId, evidenceId) {
   const eid = String(evidenceId || '');
   const lost = () => notFound('این فایل روی سرور نیست', 'media_gone');
   if (!EV_RE.test(eid)) throw lost();
-  const m = await one('SELECT id, mime, size, data FROM trust_evidence WHERE id=$1 AND case_id=$2', [eid, caseId]);
-  if (!m) throw lost();
-  return { id: m.id, mime: m.mime, size: Number(m.size), kind: 'image', data: Buffer.from(m.data) };
+  const m = await one('SELECT id, shop_id, mime, size, data, store_key FROM trust_evidence WHERE id=$1 AND case_id=$2', [eid, caseId]);
+  const data = m && await require('./media-store').trust.bytes(m);
+  if (!data) throw lost();
+  return { id: m.id, mime: m.mime, size: Number(m.size), kind: 'image', data };
 }
 
 async function customerEvidence(store, token, evidenceId) {

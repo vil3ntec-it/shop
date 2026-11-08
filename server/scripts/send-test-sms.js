@@ -29,7 +29,8 @@ if (provider === 'sms') {
   console.log('آدرس      :', config.sms.url || '(تنظیم نشده)');
   console.log('روش       :', config.sms.method);
   console.log('فرستنده   :', config.sms.sender || '(تنظیم نشده)');
-  console.log('کلید      :', config.sms.key ? `تنظیم شده (${config.sms.key.length} نویسه)` : '(تنظیم نشده)');
+  //  ⛔ از کلید هیچ چیز چاپ نمی‌شود، حتی طولش (CodeQL: clear-text logging) — فقط «هست / نیست»
+  console.log('کلید      :', config.sms.key ? 'تنظیم شده' : '(تنظیم نشده)');
 }
 console.log('گیرنده    :', to);
 console.log('متن       :', message);

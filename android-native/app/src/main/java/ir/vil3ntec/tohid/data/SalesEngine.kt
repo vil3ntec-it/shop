@@ -1,6 +1,10 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.credit.CreditGate
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.money.Money
 import ir.vil3ntec.tohid.core.money.ReturnShare
 import ir.vil3ntec.tohid.core.pay.TillRounding
@@ -102,6 +106,10 @@ object SalesEngine {
     val blockExpired: Boolean = false,
     /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
     val approval: kotlinx.serialization.json.JsonObject? = null,
+    /** STF-03 — برگهٔ تأییدِ قرضِ بیش از سقفِ کارمند (`SaleCapGate`) ⇒ `Sale.creditApproval`؛ `null` (پیش‌فرض) همان امروز */
+    val creditCapSlip: kotlinx.serialization.json.JsonObject? = null,
+    /** STF-03 — برگهٔ تأییدِ تغییرِ قیمتِ ردیف بیش از سقف ⇒ `Sale.priceApproval`؛ `null` همان امروز */
+    val priceSlip: kotlinx.serialization.json.JsonObject? = null,
     /**
      *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
      *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
@@ -153,12 +161,12 @@ object SalesEngine {
    * پیش‌تر فقط «کیلو» بود و فهرستِ پیش‌فرض «کیلوگرم» دارد؛ یعنی کالای
    * کیلویی ۰٫۲۵ نمی‌پذیرفت و ۲۵۰ گرم فروختنی نبود. نسخهٔ وب هم‌زمان عوض شد.
    */
-  const val ALREADY_POSTED = "این فاکتور یک بار ثبت شده است و دوباره ثبت نمی‌شود"
+  val ALREADY_POSTED: String get() = StrLedger.invoicePosted
 
   /** `DebtTransaction.kind` ِ «برد»ی که فروشِ نسیه می‌سازد (کنارِ `sale_cancel`/`customer_return`) */
   const val SALE_CREDIT = "sale_credit"
 
-  private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")
+  private val FRACTIONAL_UNITS = setOf("کیلو", "کیلوگرم", "گرم", "لیتر", "میلی‌لیتر", "متر")  // داده: نامِ واحدِ ذخیره‌شده برای سنجش
 
   fun isFractionalUnit(unit: String): Boolean = unit in FRACTIONAL_UNITS
 
@@ -170,12 +178,12 @@ object SalesEngine {
   fun quantityProblem(p: Product, quantity: Double): String? {
     if (isFractionalUnit(p.unit) || p.saleUnit.isNotBlank()) return null
     if (kotlin.math.abs(quantity - Math.rint(quantity)) < 1e-9) return null
-    return "«${p.name}» به «${p.unit.ifBlank { "عدد" }}» شمرده می‌شود و اعشار نمی‌گیرد"
+    return StrLedger.wholeUnit(p.name, p.unit.ifBlank { StrSale.unitFallback })
   }
 
   /** پلهٔ دکمه‌های کم/زیاد — گرم و میلی‌لیتر ۱۰تایی، کیلو و لیتر و متر ۰٫۱، بقیه ۱ */
   fun cartStep(unit: String): Double =
-    if (unit == "گرم" || unit == "میلی‌لیتر") 10.0 else if (isFractionalUnit(unit)) 0.1 else 1.0
+    if (unit == "گرم" || unit == "میلی‌لیتر") 10.0 else if (isFractionalUnit(unit)) 0.1 else 1.0  // داده: نامِ واحدِ ذخیره‌شده برای سنجش
 
   /**
    * افزودن به سبد. اگر کالا از قبل در سبد باشد فقط عددش بالا می‌رود —
@@ -268,9 +276,9 @@ object SalesEngine {
   fun shortageMessage(product: Product, wanted: Double, available: Double): String {
     val u = if (product.unit.isNotBlank()) " ${product.unit}" else ""
     if (available <= 0) {
-      return "«${product.name}» در برنامه موجودی ندارد. اگر جنس در دکان هست، اول ورودی انبار را ثبت کنید."
+      return StrLedger.noStock(product.name)
     }
-    return "«${product.name}»: ${money(available)}$u موجود است، شما ${money(wanted)}$u خواستید."
+    return StrLedger.shortStock(product.name, money(available), u, money(wanted))
   }
 
   /**
@@ -350,7 +358,7 @@ object SalesEngine {
      */
     ownReservation: String? = null,
   ): Result {
-    if (cart.isEmpty()) return Result.Failed("سبد خرید خالی است")
+    if (cart.isEmpty()) return Result.Failed(StrLedger.cartEmpty)
     if (saleId != null && d.sales.any { it.id == saleId }) return Result.Failed(ALREADY_POSTED)
 
     //  S22: منقضی بی تأییدِ همین کالاها ثبت نمی‌شود؛ با تأیید، سابقهٔ `expired_sale` با نام و دلیل کنارِ فروش
@@ -362,7 +370,7 @@ object SalesEngine {
     // موجودی درست پیش از ثبت سنجیده می‌شود، نه بعد از آن
     for (line in cart) {
       val p = d.products.find { it.id == line.productId } ?: continue
-      if (!p.active) return Result.Failed("«${p.name}» غیرفعال است و فروخته نمی‌شود")
+      if (!p.active) return Result.Failed(StrLedger.inactiveNoSale(p.name))
       (ProductPlansMap.kitShortage(d, cart, p) ?: SerialSale.problem(d, line, p))?.let { return Result.Failed(it) } // PRD-10: اجزای کیت؛ POS-28: سریالِ کامل
       quantityProblem(p, line.quantity)?.let { return Result.Failed(it) }
       var available = ProductInfoMap.sellable(d, p.id, ownReservation) // PRD-09: کالای خدماتی موجودی نمی‌خواهد؛ POS-27: منهای کنارگذاشتهٔ امانی
@@ -372,8 +380,7 @@ object SalesEngine {
         val expired = ExpiryEngine.expiredRemaining(d, p.id, today)
         if (expired > 0 && line.quantity > available - expired) {
           return Result.Failed(
-            "از «${p.name}» ${ir.vil3ntec.tohid.qty(expired)} واحد منقضی است؛ " +
-              "فقط ${ir.vil3ntec.tohid.qty(max(0.0, available - expired))} واحدِ سالم مانده"
+            StrLedger.expiredLeft(p.name, ir.vil3ntec.tohid.qty(expired), ir.vil3ntec.tohid.qty(max(0.0, available - expired)))
           )
         }
       }
@@ -402,8 +409,7 @@ object SalesEngine {
       val avail = (c.availableMilli ?: 0L) / 1000.0
       return Result.Failed(
         if (c.error == "expired_stock") {
-          "از «${p.name}» ${ir.vil3ntec.tohid.qty((c.expiredMilli ?: 0L) / 1000.0)} واحد منقضی است؛ " +
-            "فقط ${ir.vil3ntec.tohid.qty(avail)} واحدِ سالم مانده"
+          StrLedger.expiredLeft(p.name, ir.vil3ntec.tohid.qty((c.expiredMilli ?: 0L) / 1000.0), ir.vil3ntec.tohid.qty(avail))
         } else shortageMessage(p, cart[i].quantity, avail)
       )
     }
@@ -426,7 +432,7 @@ object SalesEngine {
     // فروشِ نقدی همیشه کامل تسویه می‌شود
     var paid = if (settled != null) settled.paidAmount
     else if (checkout.payment == Payment.CASH) finalTotal else checkout.paidAmount
-    if (paid.isNaN() || paid < 0) return Result.Failed("مبلغ پرداختی درست نیست")
+    if (paid.isNaN() || paid < 0) return Result.Failed(StrLedger.paidBad)
     paid = min(paid, finalTotal)
     val remaining = max(0.0, finalTotal - paid)
 
@@ -435,7 +441,7 @@ object SalesEngine {
      *  پایین‌تر). ⛔ هر سهمِ نپرداخته (نسیه، پرداختِ ناقص، باقیِ ترکیبی) فقط به مشتریِ موجود و فعال — `CreditDebtor`.
      */
     val debtorId: String? = checkout.debtorId?.takeIf { it.isNotBlank() }
-    if (debtorId != null && d.debtors.none { it.id == debtorId }) return Result.Failed("قرض‌دار پیدا نشد")
+    if (debtorId != null && d.debtors.none { it.id == debtorId }) return Result.Failed(StrLedger.debtorNotFound)
     val credit = if (settled != null) settled.paymentMethod == "credit" else checkout.payment == Payment.CREDIT
     CreditDebtor.check(d, debtorId, (credit && remaining > 0) || PayFlow.minor(remaining) > 0)?.let { return Result.Failed(CreditDebtor.engineText(d, it, debtorId)) }
     //  POS-24: قاعده‌های دکان پس از قاعدهٔ ثابتِ بالا، روی همان جمع‌ها به پول؛ خاموش ⇒ هیچ
@@ -448,8 +454,8 @@ object SalesEngine {
         hasCustomer = debtorId != null,
       )
       ir.vil3ntec.tohid.core.sale.CheckoutGuard.check(checkout.rules, facts)?.let { b ->
-        val from = checkout.rules.customerFromMinor?.let { ir.vil3ntec.tohid.money(PayFlow.major(it)) + " افغانی" }.orEmpty()
-        return Result.Failed(ir.vil3ntec.tohid.core.sale.CheckoutGuard.message(b, from))
+        val from = checkout.rules.customerFromMinor?.let { StrOnline.afnAmount(ir.vil3ntec.tohid.money(PayFlow.major(it))) }.orEmpty()
+        return Result.Failed(checkoutMessage(b, from))
       }
     }
     //  بدهی فقط از فروشِ نسیه‌ای می‌آید که هنوز تسویه نشده
@@ -462,13 +468,13 @@ object SalesEngine {
       val over = creditOverOf(d, debtorId, remaining + storedCredit(stl))
       when (CreditGate.state(over, debtorId, checkout.creditApproval)) {
         CreditGate.State.FREE -> Unit
-        CreditGate.State.NEEDS_APPROVAL -> return Result.Failed(creditOverText(over!!) + " — " + CREDIT_NEEDS_APPROVAL)
+        CreditGate.State.NEEDS_APPROVAL -> return Result.Failed(creditOverMsg(over!!) + " — " + CREDIT_NEEDS_APPROVAL)
         CreditGate.State.APPROVED -> creditOk = over!! to checkout.creditApproval!!
       }
     }
 
     val saleId = saleId?.takeIf { it.isNotBlank() } ?: newId()
-    val invoiceNumber = d.nextInvoiceNo
+    val invoiceNumber = InvoiceNumber.next(d, series)
 
     val sale = Sale(
       id = saleId,
@@ -491,6 +497,7 @@ object SalesEngine {
       syncStatus = "pending",
       seller = checkout.seller.trim(),
       approval = checkout.approval,
+      creditApproval = checkout.creditCapSlip, priceApproval = checkout.priceSlip, // STF-03 (`SaleCapGate`)؛ بی برگه `null`
       //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
@@ -555,7 +562,7 @@ object SalesEngine {
         type = "sale",
         qty = -line.quantity,
         date = today,
-        notes = "فاکتور #${sale.invoiceLabel()}",
+        notes = "فاکتور #${sale.invoiceLabel()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         refId = saleId,
         createdAt = now,
       )
@@ -573,7 +580,7 @@ object SalesEngine {
         type = "give",
         amount = remaining,
         date = today,
-        notes = "فروش نسیه — فاکتور #${sale.invoiceLabel()}",
+        notes = "فروش نسیه — فاکتور #${sale.invoiceLabel()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
         //  ساختهٔ سیستم: اگر سرور این فاکتور را (سقفِ تخفیف) رد کند، این «برد» هم با آن برمی‌گردد
         refId = saleId,
@@ -587,7 +594,7 @@ object SalesEngine {
       type = "sale",
       date = today,
       refId = saleId,
-      notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(finalTotal)} افغانی",
+      notes = "ثبت فروش فاکتور #${sale.invoiceLabel()} به مبلغ ${money(finalTotal)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now,
     ) + listOfNotNull(
       creditOk?.let { (over, ok) ->
@@ -597,8 +604,8 @@ object SalesEngine {
           type = "credit_over_limit",
           date = today,
           refId = saleId,
-          notes = "فروشِ نسیهٔ فاکتور #${sale.invoiceLabel()} برای «$who» بیش از سقف — ${creditOverText(over)}" +
-            " — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",
+          notes = "فروشِ نسیهٔ فاکتور #${sale.invoiceLabel()} برای «$who» بیش از سقف — ${creditOverText(over)}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+            " — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
           amount = over.excessMinor.toDouble() / DebtBook.CURRENCY.minorPerMajor,
           by = checkout.seller.trim().ifEmpty { null },
@@ -609,7 +616,7 @@ object SalesEngine {
       expiredOk?.let { (need, ok) ->
         AuditEntry(
           id = newId(), type = "expired_sale", date = today, refId = saleId, createdAt = now,
-          notes = "فروشِ کالای منقضی در فاکتور #${sale.invoiceLabel()} — ${expiredNeedText(d, need)} — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",
+          notes = "فروشِ کالای منقضی در فاکتور #${sale.invoiceLabel()} — ${expiredNeedText(d, need)} — تأیید: ${ok.by.trim()} — دلیل: ${ok.reason.trim()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           by = checkout.seller.trim().ifEmpty { null }, approvedBy = ok.by.trim(), reason = ok.reason.trim(),
         )
       },
@@ -635,7 +642,17 @@ object SalesEngine {
 
   /* ========================= سقفِ اعتبار در صندوق (CRM-03) ========================= */
 
-  const val CREDIT_NEEDS_APPROVAL = "تأییدِ مدیر لازم است"
+  val CREDIT_NEEDS_APPROVAL: String get() = StrLedger.needsManager
+
+  /**
+   *  پیامِ قاعدهٔ صندوق (`CheckoutGuard`) به زبانِ برنامه — همان سه جملهٔ فارسیِ `CheckoutGuard.message` ِ هسته
+   *  (آزمونِ «نسیه بدون قرض دار ثبت نمی شود» همان فارسی را می‌سنجد)
+   */
+  private fun checkoutMessage(b: ir.vil3ntec.tohid.core.sale.CheckoutBreach, from: String): String = when (b) {
+    ir.vil3ntec.tohid.core.sale.CheckoutBreach.CREDIT_NEEDS_CUSTOMER -> StrSale.pickDebtorForCredit
+    ir.vil3ntec.tohid.core.sale.CheckoutBreach.ZERO_TOTAL -> StrLedger.zeroTotalRule
+    ir.vil3ntec.tohid.core.sale.CheckoutBreach.CUSTOMER_REQUIRED -> StrLedger.customerFromRule(from)
+  }
 
   /** S22 — همان `ExpiryEngine.need` / `needText` (منقضی‌ای که سبد برمی‌دارد و تأیید می‌خواهد) */
   fun expiredNeed(d: ShopData, cart: List<CartLine>, today: String, ownReservation: String? = null): Map<String, Long> = ExpiryEngine.need(d, cart, today, ownReservation)
@@ -648,9 +665,15 @@ object SalesEngine {
   }
 
   /** «۱٬۰۰۰ افغانی بیش از سقفِ اعتبار (۵٬۰۰۰) — ماندهٔ فعلی ۴٬۰۰۰» — همان جملهٔ `DebtBook.overLimitText` */
+  /** همان جمله برای صفحه و خطا، به زبانِ برنامه — [creditOverText] فارسیِ یادداشتِ سابقه می‌ماند */
+  fun creditOverMsg(o: CreditGate.Over): String {
+    fun show(minor: Long) = DebtBook.show(Money(minor, DebtBook.CURRENCY))
+    return StrLedger.overLimit(show(o.excessMinor), show(o.limitMinor), show(o.balanceMinor))
+  }
+
   fun creditOverText(o: CreditGate.Over): String {
     fun show(minor: Long) = DebtBook.show(Money(minor, DebtBook.CURRENCY))
-    return "${show(o.excessMinor)} افغانی بیش از سقفِ اعتبار (${show(o.limitMinor)}) — ماندهٔ فعلی ${show(o.balanceMinor)}"
+    return "${show(o.excessMinor)} افغانی بیش از سقفِ اعتبار (${show(o.limitMinor)}) — ماندهٔ فعلی ${show(o.balanceMinor)}"  // داده: جملهٔ یادداشتِ سابقه (پیامِ صفحه: `creditOverMsg`)
   }
 
   /**
@@ -698,8 +721,8 @@ object SalesEngine {
   ): Result = LoyaltyPoints.afterCancel(cancelPlain(d, saleId, today, now, newId, reason, by), today, now, by) // PRM-13: فاکتورِ بی امتیاز ⇒ همان شیء
 
   private fun cancelPlain(d: ShopData, saleId: String, today: String, now: Long, newId: () -> String, reason: String, by: String?): Result {
-    val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
-    if (sale.status == "cancelled") return Result.Failed("این فاکتور قبلاً لغو شده است")
+    val sale = d.sales.find { it.id == saleId } ?: return Result.Failed(StrInvoices.invoiceNotFound)
+    if (sale.status == "cancelled") return Result.Failed(StrInvoices.alreadyCancelled)
     //  ORD-20: فاکتورِ سفارشِ اینترنتی را سرور ساخته؛ لغو/«اصلاح در سبد» یعنی دوباره زدن
     if (sale.isOnlineOrder()) return Result.Failed(ONLINE_ORDER_LOCKED)
     val why = reason.trim()
@@ -716,7 +739,7 @@ object SalesEngine {
           type = "receive",
           amount = outstanding,
           date = today,
-          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}",
+          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
           //  ساختهٔ سیستم: پولی به دخل نیامده، فقط بدهی بسته شد (صندوق نمی‌شمارد)
           refId = sale.id,
@@ -727,7 +750,7 @@ object SalesEngine {
     }
 
     //  PAY-24: کارت و اعتبارِ خرج‌شدهٔ این فاکتور (منهای آنچه با برگشت پس رفت) برمی‌گردد؛ فاکتورِ بی آن‌ها ⇒ هیچ
-    val stored = when (val g = GiftCards.forCancel(d, sale, "لغوِ فاکتور #${sale.invoiceLabel() ?: "0"}", today, now, by)) {
+    val stored = when (val g = GiftCards.forCancel(d, sale, "لغوِ فاکتور #${sale.invoiceLabel() ?: "0"}", today, now, by)) {  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       is GiftCards.Out.Bad -> return Result.Failed(g.message)
       is GiftCards.Out.Ok -> g.rows
     }
@@ -741,7 +764,7 @@ object SalesEngine {
         StockMovement(
           id = newId(), productId = it.productId, type = "sale_cancel",
           qty = it.quantity - it.returnedQty, date = today,
-          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}", refId = saleId, createdAt = now,
+          notes = "لغو فروش — فاکتور #${sale.invoiceLabel() ?: "0"}", refId = saleId, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         )
       }
 
@@ -755,7 +778,7 @@ object SalesEngine {
           type = "cancel_sale",
           date = today,
           refId = saleId,
-          notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",
+          notes = "لغو فروش فاکتور #${sale.invoiceLabel() ?: "0"}" + if (why.isNotEmpty()) " — دلیل: $why" else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
           by = by,
         ) + stored.audit,
@@ -767,11 +790,10 @@ object SalesEngine {
 
   /** جملهٔ هشدارِ پیش از لغو */
   /** پیامِ ردِ لغوِ فاکتورِ سفارشِ اینترنتی */
-  const val ONLINE_ORDER_LOCKED =
-    "این فاکتورِ سفارشِ اینترنتی است و از صندوق لغو نمی‌شود. کالایی که پیک برگرداند ⇒ همان سفارش را در «سفارش‌ها» «برگشت به دکان» بزنید (فروش خودش لغو می‌شود). «مرجوعی» فقط برای کالایی است که مشتری پس از تحویل پس آورد و پولش را از دخل گرفت"
+  val ONLINE_ORDER_LOCKED: String get() = StrLedger.onlineNoCancel
 
   fun cancelWarning(sale: Sale): String =
-    "فروش #${sale.invoiceLabel() ?: "0"} لغو می‌شود و موجودی کالاهای آن به انبار برمی‌گردد. سابقه فروش حذف نمی‌شود."
+    StrLedger.cancelConfirm(sale.invoiceLabel() ?: "0")
 
   /**
    *  نامی که روی یک قلمِ فاکتور نوشته می‌شود.
@@ -781,9 +803,9 @@ object SalesEngine {
    *  کالایی ندارد و نامش روی خودِ قلم نوشته شده.
    */
   fun itemName(d: ShopData, item: SaleItem): String {
-    if (item.productId.isBlank()) return item.name.ifBlank { "قلم آزاد" }
+    if (item.productId.isBlank()) return item.name.ifBlank { "قلم آزاد" }  // داده: نامِ قلمِ ذخیره‌شده (برگه و رسید هم)
     return d.products.find { it.id == item.productId }?.name
-      ?: item.name.ifBlank { "(محصول حذف‌شده)" }
+      ?: item.name.ifBlank { "(محصول حذف‌شده)" }  // داده: نامِ قلمِ ذخیره‌شده (برگه و رسید هم)
   }
 
   /** مقداری از یک قلم که هنوز می‌شود برگرداند */
@@ -837,9 +859,9 @@ object SalesEngine {
   private fun recordReturnPlain(
     d: ShopData, saleId: String, quantities: Map<String, Double>, reason: String, today: String, now: Long, newId: () -> String, by: String?,
   ): Result {
-    val sale = d.sales.find { it.id == saleId } ?: return Result.Failed("فاکتور پیدا نشد")
+    val sale = d.sales.find { it.id == saleId } ?: return Result.Failed(StrInvoices.invoiceNotFound)
     //  فاکتورِ لغوشده کلاً برگشته است؛ مرجوعیِ دوباره موجودی را دو بار برمی‌گرداند
-    if (sale.status == "cancelled") return Result.Failed("این فاکتور لغو شده است")
+    if (sale.status == "cancelled") return Result.Failed(StrLedger.invoiceCancelled)
 
     val items = d.saleItems.toMutableList()
     val returns = d.saleReturns.toMutableList()
@@ -883,7 +905,7 @@ object SalesEngine {
         type = "customer_return",
         qty = quantity,
         date = today,
-        notes = reason.ifBlank { "مرجوعی فاکتور #${sale.invoiceLabel() ?: "0"}" },
+        notes = reason.ifBlank { "مرجوعی فاکتور #${sale.invoiceLabel() ?: "0"}" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         refId = returnId,
         createdAt = now,
       )
@@ -891,7 +913,7 @@ object SalesEngine {
       any = true
     }
 
-    if (!any) return Result.Failed("مقدار معتبری برای مرجوعی وارد نشده")
+    if (!any) return Result.Failed(StrLedger.saleReturnNothing)
     //  PAY-09: فاکتورِ گردشده — همان `TillRounding.refund` ِ `ReturnFlow.quote`: هرگز بیش از پرداختی، کامل ⇒ دقیقاً ماندهٔ آن
     if ((sale.roundingMinor ?: 0L) != 0L) {
       val added = returns.subList(d.saleReturns.size, returns.size)
@@ -917,7 +939,7 @@ object SalesEngine {
           type = "receive",
           amount = settle,
           date = today,
-          notes = "مرجوعی کالا — فاکتور #${sale.invoiceLabel() ?: "0"}",
+          notes = "مرجوعی کالا — فاکتور #${sale.invoiceLabel() ?: "0"}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
           //  ساختهٔ سیستم؛ صندوق آن را کنارِ کمِ کلِ مرجوعی می‌شمارد تا خالص درست بماند
           refId = sale.id,
@@ -939,7 +961,7 @@ object SalesEngine {
           type = "return",
           date = today,
           refId = saleId,
-          notes = "مرجوعی به مبلغ ${money(totalAmount)} افغانی — فاکتور #${sale.invoiceLabel() ?: "0"}",
+          notes = "مرجوعی به مبلغ ${money(totalAmount)} افغانی — فاکتور #${sale.invoiceLabel() ?: "0"}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
         ),
       ),

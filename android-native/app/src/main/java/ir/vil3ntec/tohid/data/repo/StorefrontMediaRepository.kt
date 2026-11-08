@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.image.StorefrontMediaSpec
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiJson
@@ -30,7 +31,7 @@ class StorefrontMediaRepository(private val api: ApiClient) {
   /** بایت‌های نسخه‌ای که سرور داد (`/api/shop/storefront/media/logo/3`) با نشستِ کاربر */
   suspend fun bytes(url: String): ApiResult<ByteArray> = result {
     val path = url.removePrefix("/api/v1").removePrefix("/api")
-    require(path.startsWith("$ROOT/")) { "نشانیِ عکس درست نیست" }
+    require(path.startsWith("$ROOT/")) { StrGoods.photoUrlBad }
     api.getBytes(path)
   }
 

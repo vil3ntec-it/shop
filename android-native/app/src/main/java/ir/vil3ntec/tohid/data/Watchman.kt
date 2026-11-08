@@ -17,6 +17,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import ir.vil3ntec.tohid.core.i18n.StrAppData
+import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.nav.DeepLinks
 import ir.vil3ntec.tohid.core.nav.RoutePaths
 import ir.vil3ntec.tohid.money
@@ -86,12 +88,12 @@ object Watchman {
    */
   private data class Channel(val id: String, val title: String, val about: String, val noteId: Int)
 
-  private val STOCK = Channel("tohid-stock", "کالای تمام‌شده", "وقتی موجودی کالایی صفر شود", 4301)
-  private val DEBT = Channel("tohid-debt", "قرض زیاد", "وقتی قرضِ یک نفر از حد بگذرد", 4302)
-  private val SUB = Channel("tohid-subscription", "اشتراک", "پیش از تمام شدن اشتراک", 4303)
-  private val NEWS = Channel("tohid-news", "خبر دکان", "کارِ بقیهٔ اعضای دکان", 4304)
+  private val STOCK get() = Channel("tohid-stock", StrAppData.chStockTitle, StrAppData.chStockAbout, 4301)
+  private val DEBT get() = Channel("tohid-debt", StrAppData.chDebtTitle, StrAppData.chDebtAbout, 4302)
+  private val SUB get() = Channel("tohid-subscription", StrNav.subscription, StrAppData.chSubAbout, 4303)
+  private val NEWS get() = Channel("tohid-news", StrAppData.chNewsTitle, StrAppData.chNewsAbout, 4304)
 
-  private val ALL = listOf(STOCK, DEBT, SUB, NEWS)
+  private val ALL get() = listOf(STOCK, DEBT, SUB, NEWS)
 
   /* ------------------------------ راه‌اندازی ------------------------------ */
 
@@ -193,7 +195,7 @@ object Watchman {
 
     val fresh = out.filter { it.id !in known }
     if (fresh.isNotEmpty()) {
-      val title = if (fresh.size == 1) "${fresh[0].name} تمام شد" else "${fresh.size} کالا تمام شد"
+      val title = if (fresh.size == 1) StrAppData.itemOut(fresh[0].name) else StrAppData.itemsOut(fresh.size)
       notify(context, STOCK, title, fresh.take(4).joinToString("، ") { it.name }, LINK_STOCK_OUT)
     }
     if (ids != known) prefs(context).edit().putStringSet(SEEN_OUT, ids).apply()
@@ -216,10 +218,10 @@ object Watchman {
 
     val fresh = over.filter { it.id !in known }
     if (fresh.isNotEmpty()) {
-      val title = if (fresh.size == 1) "قرضِ ${fresh[0].name} زیاد شد"
-      else "${fresh.size} نفر قرضِ زیاد دارند"
+      val title = if (fresh.size == 1) StrAppData.debtHigh(fresh[0].name)
+      else StrAppData.debtsHigh(fresh.size)
       val text = fresh.take(4).joinToString("، ") {
-        "${it.name}: ${money(it.amount)} افغانی"
+        StrAppData.nameAfn(it.name, money(it.amount))
       }
       notify(context, DEBT, title, text, fresh.singleOrNull()?.let { linkDebtor(it.id) } ?: LINK_DEBTS)
     }
@@ -252,9 +254,9 @@ object Watchman {
     if (step >= last) return                     // این پله یا پایین‌ترش خبر داده شده
 
     val (title, text) = when (step) {
-      0 -> "اشتراک تمام شد" to "برای باز شدن دوبارهٔ صندوق فروش، اشتراک را تمدید کنید."
-      1 -> "اشتراک فردا تمام می‌شود" to "پیش از تمام شدن تمدید کنید تا کارتان نخوابد."
-      else -> "اشتراک تا ${step} روز دیگر تمام می‌شود" to "همین حالا تمدید کنید تا بعداً عجله نشود."
+      0 -> StrAppData.subEnded to StrAppData.subEndedDo
+      1 -> StrAppData.subTomorrow to StrAppData.subTomorrowDo
+      else -> StrAppData.subInDays(step) to StrAppData.subInDaysDo
     }
     notify(context, SUB, title, text, LINK_SUBSCRIPTION)
     prefs(context).edit().putInt(SEEN_SUB, step).apply()
@@ -316,7 +318,7 @@ object Watchman {
 
           val newest = others.maxOf { it.at }
           val title = if (others.size == 1) others[0].title
-          else "${others.size} خبر تازه از دکان"
+          else StrAppData.shopNews(others.size)
           val body = others.take(4).joinToString(" • ") {
             listOf(it.userName, it.title).filter { part -> part.isNotBlank() }.joinToString(": ")
           }

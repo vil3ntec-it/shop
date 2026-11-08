@@ -172,8 +172,11 @@ test('انقضای توکن، کلاینتِ تازه (caps=expiry) ⇒ سوکت
   const s = await shopWithStaff('انقضا', 'exp');
   const tok = await loginOn(s.m, 'exp-M');
   const left = 1200;
-  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
-  const t0 = Date.now();
+  //  ⛔ «نه پیش از انقضا» با خودِ لحظهٔ انقضا سنجیده می‌شود: پیش‌تر `t0` پس از همین UPDATE گرفته می‌شد و زمانِ خودِ
+  //  پرس‌وجو از ۱۲۰۰ کم می‌شد (PostgreSQL ِ پرکارِ CI، `claude/scale-2` ‏ed3715bb: «زودتر از انقضا بسته شد (1072ms)»
+  //  در حالی که سوکت درست سرِ expires_at بسته شده بود).
+  const expiresAt = now() + left;
+  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), expiresAt]);
   const ws = await socket(tok, 'exp-M', { caps: 'expiry' });
   //  پیش از انقضا باز است و کار می‌کند
   ws.send2({ type: 'ping' });
@@ -181,7 +184,7 @@ test('انقضای توکن، کلاینتِ تازه (caps=expiry) ⇒ سوکت
   assert.equal(ws.closed, null);
   await ws.until(() => ws.closed, 'سرِ انقضا بسته نشد', left + 4000);
   assert.deepEqual(ws.closed, { code: 4403, reason: 'expired' });
-  assert.ok(Date.now() - t0 >= left - 50, `زودتر از انقضا بسته شد (${Date.now() - t0}ms)`);
+  assert.ok(Date.now() >= expiresAt - 50, `زودتر از انقضا بسته شد (${expiresAt - Date.now()}ms پیش از آن)`);
   //  همان توکن دیگر وصل نمی‌شود؛ نشستِ تازه (همان راهِ همیشگیِ برنامه) می‌شود
   const t = await h.api('POST', '/api/sync/v1/live/ticket', { token: tok, body: {}, headers: { 'X-App': 'shop' } });
   assert.equal(t.status, 401);
@@ -252,12 +255,13 @@ test('پرچمِ sync.live_expiry_close (همین دکان) ⇒ برنامهٔ �
   );
   const tok = await loginOn(s.m, 'flag-M');
   const left = 800;
-  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), now() + left]);
-  const t0 = Date.now();
+  //  همان مرجعِ آزمونِ بالا: خودِ لحظهٔ انقضا
+  const expiresAt = now() + left;
+  await query('UPDATE tokens SET expires_at=$2 WHERE token_hash=$1', [hashToken(tok), expiresAt]);
   const ws = await socket(tok, 'flag-M');   //  بی caps
   await ws.until(() => ws.closed, 'با پرچم سرِ انقضا بسته نشد', left + 4000);
   assert.deepEqual(ws.closed, { code: 4403, reason: 'expired' });
-  assert.ok(Date.now() - t0 >= left - 50, `زودتر از انقضا بسته شد (${Date.now() - t0}ms)`);
+  assert.ok(Date.now() >= expiresAt - 50, `زودتر از انقضا بسته شد (${expiresAt - Date.now()}ms پیش از آن)`);
 });
 
 test('هوکِ لغو دور زده شد (SQL ِ خام) ⇒ «scan» به صندوقِ صاحب نمی‌رسد، «changed» هم نه، و سوکت بسته می‌شود', async () => {

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiFailure
@@ -104,7 +105,7 @@ class SyncRepository(private val api: ApiClient) {
   /** کلیدِ عمومیِ سرور — با آن، امضای مجوز سنجیده می‌شود */
   suspend fun publicKey(): String =
     ApiJson.text(api.getPublic(ApiEndpoints.License.PUBLIC_KEY), "publicKey")
-      .ifBlank { throw ApiFailure.InvalidResponse("کلید عمومی نیامد") }
+      .ifBlank { throw ApiFailure.InvalidResponse(StrAppData.noPublicKey) }
 
   /** کدِ اشتراکِ آفلاین ⇒ اشتراکِ دکانِ همین حساب روی سرور (یک کد، یک دکان) */
   suspend fun redeemOffline(code: String, computer: String): JsonObject =

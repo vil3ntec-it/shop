@@ -410,6 +410,11 @@ fun DeskSaleScreen(
   //  مبلغ با تأییدِ کهنه ثبت نمی‌شود.
   /** بیش از سقف و تسویهٔ همان لحظه (پنلِ پرداخت) تا پس از تأیید همان ثبت شود */
   var creditAsk by remember { mutableStateOf<Pair<ir.vil3ntec.tohid.core.credit.CreditGate.Over, ir.vil3ntec.tohid.core.pay.Settlement?>?>(null) }
+  //  STF-03 — سقف‌هایی که سرور برای همین دکان اجرا می‌کند (قرض، تغییرِ قیمت، تخفیفِ پنهان؛ `SaleCapGate`)؛ پرچم‌های خاموش ⇒ هیچ.
+  //  برگه‌های قرض و قیمت جدا از برگهٔ تخفیف؛ تأییدِ گرفته‌شده همان ثبت را دوباره می‌زند (با همان تسویه و تأییدِ اعتبار)
+  val capRules = remember { ir.vil3ntec.tohid.data.ShopRole.saleCaps(context) }
+  var capSlips by remember(saleKey) { mutableStateOf<Map<String, ir.vil3ntec.tohid.core.perm.ApprovalSlip.Slip>>(emptyMap()) }
+  var capAsk by remember { mutableStateOf<Triple<ir.vil3ntec.tohid.data.SaleCapGate.Ask, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
   //  S22 (`ExpiryPref.gate`، پیش‌فرض خاموش): منقضی فقط با تأیید؛ تأیید در حالت نمی‌ماند و فقط به همان یک تلاشِ بعدیِ `finish` می‌رود
   val expiryGateOn = remember { ir.vil3ntec.tohid.data.ExpiryPref.gate(context) }; val expiryOk = remember { arrayOfNulls<ir.vil3ntec.tohid.core.stock.ExpiryGate.Approval>(1) }
   var expiryAsk by remember { mutableStateOf<Triple<Map<String, Long>, ir.vil3ntec.tohid.core.pay.Settlement?, ir.vil3ntec.tohid.core.credit.CreditGate.Approval?>?>(null) }
@@ -444,7 +449,12 @@ fun DeskSaleScreen(
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Ok -> r.value
       is ir.vil3ntec.tohid.data.PayFlow.Outcome.Bad -> { toast(ir.vil3ntec.tohid.data.PayFlow.message(r.problem)); return }
     }
-    val sale = checkout.copy(settlement = st, approval = signed, creditGate = creditGateOn, creditApproval = creditApproval)
+    //  STF-03 — برگه‌های همین فاکتور (`SaleCapGate`): با پرچمِ قیمتِ سرور برگهٔ تخفیف «تخفیفِ پنهان» را هم می‌پوشاند (سرور برگهٔ
+    //  نالازم را مصرف نمی‌کند)؛ برگهٔ قرض و قیمت جدا
+    val slips = buildMap { approval?.let { put(ir.vil3ntec.tohid.core.perm.SaleCaps.DISCOUNT, it) }; putAll(capSlips) }
+    val sale = checkout.copy(settlement = st, approval = signed ?: if (capRules.price) approval?.let(DiscountGate::json) else null, creditGate = creditGateOn, creditApproval = creditApproval)
+      .copy(creditCapSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.CREDIT),
+        priceSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.PRICE))
     //  CRM-03 / S07: بی تأییدِ مدیر هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
     val over = SalesEngine.creditOver(d, loyal, sale)
     if (over != null && ir.vil3ntec.tohid.core.credit.CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval) ==
@@ -457,19 +467,33 @@ fun DeskSaleScreen(
     if (expiryGateOn) SalesEngine.expiredNeed(d, loyal, ir.vil3ntec.tohid.todayIso()).let { need ->
       if (!ir.vil3ntec.tohid.core.stock.ExpiryGate.covers(need, expiryApproval)) { payOpen = false; expiryAsk = Triple(need, st, creditApproval); return }
     }
+    //  STF-03 — پیش‌سنجی روی **همان** فاکتوری که ثبت و فرستاده می‌شود (پس از تخفیفِ خودکار و امتیاز)، با همان قاعدهٔ سرور
+    //  (`SaleCaps`): «ممنوع» ⇒ پیام؛ «نیازمندِ تأیید» ⇒ پنجرهٔ تأیید («پرسیدن از مدیر» یا PIN)
+    fun recordAll(key: String, token: String?): SalesEngine.Result = ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, loyal, sale.copy(note = cartStore.note.value).copy(expiryGate = expiryGateOn, expiryApproval = expiryApproval), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
+      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key, receiptToken = token), promo), loyalty, sale.seller)
+    if (capRules.active && saleKey != null) {
+      val trial = recordAll(saleKey, null) as? SalesEngine.Result.Ok
+      val b = trial?.let { ir.vil3ntec.tohid.data.SaleCapGate.check(capRules, it.data, it.saleId, slips).blocked }
+      if (b != null) {
+        if (b.state == ir.vil3ntec.tohid.core.perm.SaleCaps.State.DENIED) { toast(ir.vil3ntec.tohid.data.SaleCapGate.message(b)); return }
+        payOpen = false
+        expiryOk[0] = expiryApproval
+        capAsk = Triple(b, st, creditApproval)
+        return
+      }
+    }
     //  POS-14: F9ِ پشتِ‌سرِهم یک فروش می‌سازد؛ سبد فقط پس از نوشتنِ دفتر پاک می‌شود
     //  S2: با تخفیفِ خودکار، نشانِ قیمتِ فهرست و سهمِ هر قاعده روی فاکتور (خاموش ⇒ همان)
+    //  STF-03: آخرین سد — فاکتوری که سرور بی خبر رد می‌کرد نوشته نمی‌شود (`SaleCapGate.guard`)
     scope.launch { when (val posted = cartStore.post(store, gate = { key -> ir.vil3ntec.tohid.ui.PromoLive.redeemGate(context, key, promo) }) { key ->
-      ir.vil3ntec.tohid.ui.components.pos.LoyaltyAtTill.post(context, ir.vil3ntec.tohid.data.PromoEngine.stamp(SalesEngine.record(d, loyal, sale.copy(note = cartStore.note.value).copy(expiryGate = expiryGateOn, expiryApproval = expiryApproval), ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId,
-      series = ir.vil3ntec.tohid.sync.DocSeries.current(context), saleId = key,
-      receiptToken = ir.vil3ntec.tohid.print.Receipts.newToken(context)), promo), loyalty, sale.seller) }) {
+      ir.vil3ntec.tohid.data.SaleCapGate.guard(capRules, recordAll(key, ir.vil3ntec.tohid.print.Receipts.newToken(context)), slips) }) {
       SalePost.Outcome.Busy -> Unit
       SalePost.Outcome.NotSaved -> toast(SalePost.NOT_SAVED)
       is SalePost.Outcome.Refused -> toast(posted.message)
       is SalePost.Outcome.Done -> {
         val r = posted.ok
         ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
-        selected = null; discountText = ""; discountAmount = false; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null
+        selected = null; discountText = ""; discountAmount = false; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null; capSlips = emptyMap()
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
@@ -975,6 +999,22 @@ fun DeskSaleScreen(
       need = DiscountGate.need(saleKey, basis.discount, basis.subtotal),
       onApproved = { approval = it; askApproval = false; refocus() },
       onDismiss = { askApproval = false; refocus() },
+    )
+  }
+  //  STF-03 — تأییدِ سقفِ قرض/قیمت/تخفیفِ پنهان: «پرسیدن از مدیر» یا PIN؛ با تأیید همان ثبت (همان تسویه و تأییدِ اعتبار)
+  capAsk?.let { (ask, pending, credit) ->
+    ir.vil3ntec.tohid.ui.components.staff.ApprovalDialog(
+      title = ir.vil3ntec.tohid.data.SaleCapGate.title(ask.perm),
+      summary = ir.vil3ntec.tohid.data.SaleCapGate.summary(ask),
+      shopId = ir.vil3ntec.tohid.data.ShopRole.shopId(context),
+      requesterUserId = remember { ir.vil3ntec.tohid.data.TillUser.meId(context) },
+      need = ask.need,
+      onApproved = { s ->
+        capAsk = null
+        if (s.perm == ir.vil3ntec.tohid.core.perm.SaleCaps.DISCOUNT) approval = s else capSlips = capSlips + (s.perm to s)
+        finish(pending, credit)
+      },
+      onDismiss = { capAsk = null; expiryOk[0] = null; refocus() },
     )
   }
   creditAsk?.let { (over, pending) ->

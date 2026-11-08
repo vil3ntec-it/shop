@@ -53,7 +53,9 @@ const FIELDS = Object.freeze({
   //  `regularPriceMinor` فقط در «ارزان‌تر از قیمتِ دکان» (`highlights.deals`، WEB-02 #626)
   //  `photoVersion` (IMG-12) فقط با عکس: نسخهٔ ۱۲-hex برای `?v=` ِ نشانیِ عکس. افزوده به v1.
   product: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo', 'photoVersion?',
-    'stock', 'description?', 'specs?'],
+    'stock', 'description?', 'specs?',
+    //  MKT-06: «چرخهٔ مصرف» (روز) ِ فرمِ کالا — فقط وقتی دکان گذاشته باشد؛ برای یادآوریِ «وقتِ دوباره خریدن؟» ِ برنامهٔ خرید
+    'consumptionDays?'],
   //  کالا در خانهٔ بازار (`regularPriceMinor` فقط با `showDeals` ِ صاحب دکان)
   marketProduct: ['id', 'name', 'unit', 'category', 'priceMinor', 'regularPriceMinor?', 'maxQtyMilli', 'photo',
     'photoVersion?', 'stock', 'shop'],

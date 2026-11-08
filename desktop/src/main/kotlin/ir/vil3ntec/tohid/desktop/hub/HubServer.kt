@@ -96,6 +96,9 @@ internal class HubServer(
   }
   private val forward = HubForwarder(box, cloud, limits)
 
+  /** بدنهٔ درخواستِ جاری تا ته خوانده شد (`readLimited` ِ موفق)؟ هر exchange از `handle` تا `ex.close()` روی یک رشتهٔ `tohid-hub` است. */
+  private val bodyRead: ThreadLocal<Boolean> = ThreadLocal.withInitial { false }
+
   val port: Int get() = server?.address?.port ?: -1
 
   fun start(bind: InetSocketAddress) {
@@ -164,6 +167,7 @@ internal class HubServer(
   /* ------------------------------ درخواست ------------------------------ */
 
   private fun handle(ex: HttpExchange) {
+    bodyRead.set(false)
     try {
       val remote = ex.remoteAddress?.address
       if (remote == null || !lanPeer(remote)) return reply(ex, 403, error("hub_lan_only"))
@@ -206,6 +210,7 @@ internal class HubServer(
     } catch (t: Throwable) {
       runCatching { reply(ex, 500, error("hub_error")) }
     } finally {
+      bodyRead.remove()
       ex.close()
     }
   }
@@ -215,6 +220,7 @@ internal class HubServer(
     val declared = ex.requestHeaders.getFirst("Content-Length")?.trim()?.toLongOrNull()
     if (declared != null && declared > limits.maxBodyBytes) return reply(ex, 413, error("hub_too_large"))
     val bytes = readLimited(ex.requestBody, limits.maxBodyBytes) ?: return reply(ex, 413, error("hub_too_large"))
+    bodyRead.set(true)
     val text = utf8(bytes) ?: return reply(ex, 400, error("hub_bad_json"))
     val ids = when (val p = HubQueue.parse(text, device, limits)) {
       is HubParse.Bad -> return reply(ex, 400, error(p.code))
@@ -254,11 +260,28 @@ internal class HubServer(
     ex.responseHeaders.set("Content-Type", "application/json; charset=utf-8")
     ex.responseHeaders.set("Cache-Control", "no-store")
     if (retryAfter > 0) ex.responseHeaders.set("Retry-After", retryAfter.toString())
+    if (unreadBody(ex)) ex.responseHeaders.set("Connection", "close")
     ex.sendResponseHeaders(status, b.size.toLong())
     ex.responseBody.use { it.write(b) }
   }
 
   private fun error(code: String) = buildJsonObject { put("ok", false); put("error", code) }.toString()
+
+  /**
+   *  ⛔ پاسخ پیش از خواندنِ بدنه (۴۰۱/۴۰۳/۴۰۹/۴۱۳/۴۲۹، ۴۰۴ ِ POST و ۵۰۰) ⇒ `Connection: close`.
+   *  `jdk.httpserver` باقیِ بدنه را **پس از** فرستادنِ پاسخ، در `ex.close()`، از همان اتصالِ TLS می‌خواند؛
+   *  دستگاه همان لحظه درخواستِ بعدی را روی همان اتصالِ keep-alive می‌فرستد و آن خواندن رکوردِ TLS ِ درخواستِ
+   *  بعدی را هم در بافرِ `SSLStreams` می‌کشد ⇒ سوکت دیگر «خواندنی» نمی‌شود و درخواستِ بعدی هرگز جواب نمی‌گیرد
+   *  (`SocketTimeoutException: Read timed out` در دستگاه؛ روی ماشینِ پرکار در `HubServerTest` ِ ۴۰۳/۴۰۹/۴۱۳ دیده شد).
+   *  بستنِ همان اتصال یعنی درخواستِ بعدی روی اتصالِ تازه؛ ۲۰۰ و ۴۰۰ ِ پس از خواندنِ کاملِ بدنه keep-alive می‌مانند.
+   */
+  private fun unreadBody(ex: HttpExchange): Boolean {
+    if (bodyRead.get()) return false
+    val h = ex.requestHeaders
+    if (h.containsKey("Transfer-Encoding")) return true
+    val len = h.getFirst("Content-Length") ?: return false
+    return len.trim().toLongOrNull()?.let { it > 0 } ?: true
+  }
 
   private fun bearer(h: String?): String? =
     h?.trim()?.takeIf { it.length > 7 && it.regionMatches(0, "Bearer ", 0, 7, ignoreCase = true) }?.substring(7)?.trim()

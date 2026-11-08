@@ -1,0 +1,1628 @@
+{
+  "at": "2026-11-08T08:07:25.319Z",
+  "env": {
+    "cpu": "Intel(R) Xeon(R) Processor @ 2.10GHz",
+    "cores": 4,
+    "memGB": 16,
+    "os": "linux 6.18.44-fc-v310",
+    "node": "v22.22.0",
+    "driver": "postgres",
+    "loadAvg": [
+      8.2,
+      10.8,
+      12.4
+    ]
+  },
+  "options": {
+    "rate": 20,
+    "shops": 20,
+    "devices": 3,
+    "scale": 0.05,
+    "smallScale": 0.003,
+    "history": 3000,
+    "timeoutMs": 10000,
+    "seed": 20261102,
+    "warmupSec": 5,
+    "instances": 1,
+    "cluster": false,
+    "steps": [
+      1,
+      1.5,
+      2,
+      2.5,
+      3,
+      4,
+      5
+    ]
+  },
+  "budget": {
+    "p95Ms": 300,
+    "errors": 0,
+    "soakDriftFactor": 1.5,
+    "soakDriftSlackMs": 20,
+    "heapGrowthMB": 32,
+    "heapGrowthPct": 25,
+    "recoverMs": 10000
+  },
+  "setups": [
+    {
+      "profiles": [
+        "load"
+      ],
+      "serverEnv": {},
+      "readyMs": 170391,
+      "dataset": {
+        "big": {
+          "products": 1000,
+          "sales": 10000,
+          "saleItems": 15000,
+          "customers": 250,
+          "activeDebtors": 100,
+          "suppliers": 25,
+          "expenses": 150,
+          "days": 365
+        },
+        "small": {
+          "products": 60,
+          "sales": 600,
+          "saleItems": 900,
+          "customers": 15,
+          "activeDebtors": 6,
+          "suppliers": 2,
+          "expenses": 9,
+          "days": 365
+        },
+        "rows": 63841,
+        "seedMs": 4916,
+        "bridge": {
+          "ops": 63841,
+          "ms": 147260,
+          "opsPerSec": 434
+        },
+        "setupMs": 166468,
+        "server": "16.15 (Ubuntu 16.15-0ubuntu0.24.04.1)",
+        "poolMax": 10,
+        "workers": [
+          "login-outbox",
+          "order-notify",
+          "customer-notify",
+          "order-timeout",
+          "order-desk",
+          "order-start-alert",
+          "owner-report",
+          "storefront-alerts",
+          "payment-intents",
+          "ops-alerts"
+        ],
+        "gc": true
+      },
+      "phonesPerShop": 3,
+      "warmupMs": 74027,
+      "v3HistoryOps": 10026
+    }
+  ],
+  "profiles": [
+    {
+      "profile": "load",
+      "durationSec": 60.1,
+      "scheduled": 1199,
+      "dropped": 0,
+      "generatorLagMaxMs": 0,
+      "total": {
+        "n": 1199,
+        "p50": 15.4,
+        "p95": 53.6,
+        "p99": 554.8,
+        "max": 1120.5,
+        "rps": 20,
+        "errors": 0
+      },
+      "endpoints": {
+        "auth.login": {
+          "n": 18,
+          "p50": 260.2,
+          "p95": 351.1,
+          "p99": 351.1,
+          "max": 351.1,
+          "rps": 0.3,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 18
+          },
+          "avgKB": 0.6
+        },
+        "auth.refresh": {
+          "n": 50,
+          "p50": 14.4,
+          "p95": 24.4,
+          "p99": 31.2,
+          "max": 31.2,
+          "rps": 0.8,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 50
+          },
+          "avgKB": 0.4
+        },
+        "desk.list": {
+          "n": 101,
+          "p50": 6.3,
+          "p95": 13.7,
+          "p99": 15.1,
+          "max": 17.7,
+          "rps": 1.7,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 101
+          },
+          "avgKB": 1.1
+        },
+        "desk.summary": {
+          "n": 31,
+          "p50": 7.7,
+          "p95": 14,
+          "p99": 14.2,
+          "max": 14.2,
+          "rps": 0.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 31
+          },
+          "avgKB": 0.1
+        },
+        "store.checkout": {
+          "n": 31,
+          "p50": 31.8,
+          "p95": 55.4,
+          "p99": 87,
+          "max": 87,
+          "rps": 0.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "201": 31
+          },
+          "avgKB": 0.9
+        },
+        "store.home": {
+          "n": 80,
+          "p50": 18.5,
+          "p95": 35,
+          "p99": 66.3,
+          "max": 66.3,
+          "rps": 1.3,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 80
+          },
+          "avgKB": 0.9
+        },
+        "store.product": {
+          "n": 170,
+          "p50": 17.2,
+          "p95": 24.4,
+          "p99": 39.7,
+          "max": 41.5,
+          "rps": 2.8,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 170
+          },
+          "avgKB": 1.9
+        },
+        "store.products": {
+          "n": 195,
+          "p50": 14.9,
+          "p95": 26.7,
+          "p99": 33.8,
+          "max": 42.6,
+          "rps": 3.2,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 195
+          },
+          "avgKB": 8.6
+        },
+        "store.search": {
+          "n": 137,
+          "p50": 13.4,
+          "p95": 23.9,
+          "p99": 33.6,
+          "max": 61.9,
+          "rps": 2.3,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 137
+          },
+          "avgKB": 4.7
+        },
+        "store.track": {
+          "n": 85,
+          "p50": 17.6,
+          "p95": 30.4,
+          "p99": 67.7,
+          "max": 67.7,
+          "rps": 1.4,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 85
+          },
+          "avgKB": 1
+        },
+        "sync3.pull": {
+          "n": 151,
+          "p50": 11.3,
+          "p95": 28.5,
+          "p99": 37.1,
+          "max": 45.3,
+          "rps": 2.5,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 151
+          },
+          "avgKB": 20.9
+        },
+        "sync3.push": {
+          "n": 135,
+          "p50": 33,
+          "p95": 70,
+          "p99": 86.5,
+          "max": 99.1,
+          "rps": 2.2,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 135
+          },
+          "avgKB": 1.2
+        },
+        "sync3.pushLarge": {
+          "n": 15,
+          "p50": 685.3,
+          "p95": 1120.5,
+          "p99": 1120.5,
+          "max": 1120.5,
+          "rps": 0.2,
+          "errors": 0,
+          "errorPct": 0,
+          "codes": {
+            "200": 15
+          },
+          "avgKB": 37.6
+        }
+      },
+      "windowSec": 10,
+      "drift": [
+        {
+          "fromSec": 0,
+          "n": 198,
+          "p50": 15.7,
+          "p95": 49,
+          "p99": 677.3,
+          "max": 781.3
+        },
+        {
+          "fromSec": 10,
+          "n": 200,
+          "p50": 13.7,
+          "p95": 58.4,
+          "p99": 533.1,
+          "max": 697
+        },
+        {
+          "fromSec": 20,
+          "n": 200,
+          "p50": 15.3,
+          "p95": 64.1,
+          "p99": 595.3,
+          "max": 835.6
+        },
+        {
+          "fromSec": 30,
+          "n": 200,
+          "p50": 14.6,
+          "p95": 43.8,
+          "p99": 251.3,
+          "max": 685.3
+        },
+        {
+          "fromSec": 40,
+          "n": 200,
+          "p50": 16,
+          "p95": 47.1,
+          "p99": 332.3,
+          "max": 718.1
+        },
+        {
+          "fromSec": 50,
+          "n": 200,
+          "p50": 17,
+          "p95": 62.7,
+          "p99": 299.2,
+          "max": 1120.5
+        }
+      ],
+      "driftBy": {
+        "sync3.push": [
+          [
+            33,
+            66.6
+          ],
+          [
+            28.7,
+            60.1
+          ],
+          [
+            28.4,
+            64.1
+          ],
+          [
+            37.3,
+            59.4
+          ],
+          [
+            28.5,
+            67.2
+          ],
+          [
+            39.1,
+            78.2
+          ]
+        ],
+        "sync3.pull": [
+          [
+            11.3,
+            33.2
+          ],
+          [
+            10.2,
+            28.5
+          ],
+          [
+            10.9,
+            24.9
+          ],
+          [
+            10.5,
+            22.1
+          ],
+          [
+            11.8,
+            22.2
+          ],
+          [
+            11.6,
+            32.3
+          ]
+        ],
+        "store.home": [
+          [
+            16.2,
+            35
+          ],
+          [
+            17.7,
+            39.9
+          ],
+          [
+            18.6,
+            66.3
+          ],
+          [
+            14.7,
+            28
+          ],
+          [
+            20.6,
+            29.5
+          ],
+          [
+            20.3,
+            25.7
+          ]
+        ],
+        "store.search": [
+          [
+            15,
+            19.3
+          ],
+          [
+            12.4,
+            17.3
+          ],
+          [
+            13.5,
+            25.1
+          ],
+          [
+            11.1,
+            23.9
+          ],
+          [
+            12.5,
+            26.9
+          ],
+          [
+            14.7,
+            33.6
+          ]
+        ],
+        "auth.refresh": [
+          [
+            11.5,
+            20.8
+          ],
+          [
+            11.7,
+            19.4
+          ],
+          [
+            17.1,
+            30.8
+          ],
+          [
+            17.3,
+            21.5
+          ],
+          [
+            15.4,
+            23.3
+          ],
+          [
+            13.1,
+            31.2
+          ]
+        ],
+        "store.product": [
+          [
+            17.6,
+            24.4
+          ],
+          [
+            14.8,
+            21.2
+          ],
+          [
+            16.8,
+            23.7
+          ],
+          [
+            17.6,
+            31.4
+          ],
+          [
+            15.6,
+            23.3
+          ],
+          [
+            17.9,
+            25.8
+          ]
+        ],
+        "store.track": [
+          [
+            20.7,
+            67.7
+          ],
+          [
+            17.1,
+            29.9
+          ],
+          [
+            15.2,
+            30.4
+          ],
+          [
+            16.7,
+            27
+          ],
+          [
+            20.2,
+            27.2
+          ],
+          [
+            17.7,
+            53.4
+          ]
+        ],
+        "auth.login": [
+          [
+            253.3,
+            329.6
+          ],
+          [
+            251.9,
+            282.9
+          ],
+          [
+            249.9,
+            291
+          ],
+          [
+            251.3,
+            251.3
+          ],
+          [
+            280.4,
+            351.1
+          ],
+          [
+            244.8,
+            299.2
+          ]
+        ],
+        "store.products": [
+          [
+            15.7,
+            26.4
+          ],
+          [
+            12.5,
+            17.2
+          ],
+          [
+            15.7,
+            25.5
+          ],
+          [
+            13.5,
+            23.7
+          ],
+          [
+            16,
+            29.4
+          ],
+          [
+            17,
+            28.6
+          ]
+        ],
+        "desk.list": [
+          [
+            5.7,
+            12.2
+          ],
+          [
+            5.4,
+            13.7
+          ],
+          [
+            6.3,
+            9.7
+          ],
+          [
+            5.3,
+            9.4
+          ],
+          [
+            7.9,
+            15.1
+          ],
+          [
+            6.7,
+            17.7
+          ]
+        ],
+        "sync3.pushLarge": [
+          [
+            677.3,
+            781.3
+          ],
+          [
+            559.3,
+            697
+          ],
+          [
+            595.3,
+            835.6
+          ],
+          [
+            453.5,
+            685.3
+          ],
+          [
+            718.1,
+            718.1
+          ],
+          [
+            1045.4,
+            1120.5
+          ]
+        ],
+        "desk.summary": [
+          [
+            8.4,
+            14.2
+          ],
+          [
+            6.6,
+            9.9
+          ],
+          [
+            6.6,
+            14
+          ],
+          [
+            6.4,
+            10.8
+          ],
+          [
+            9.4,
+            11.2
+          ],
+          [
+            8.1,
+            11.5
+          ]
+        ],
+        "store.checkout": [
+          [
+            31.8,
+            35.4
+          ],
+          [
+            23.4,
+            28.2
+          ],
+          [
+            26.9,
+            33.7
+          ],
+          [
+            36.6,
+            43.8
+          ],
+          [
+            35.9,
+            47.1
+          ],
+          [
+            38.5,
+            87
+          ]
+        ]
+      },
+      "server": {
+        "samples": [
+          {
+            "t": 0,
+            "at": 1794125490818,
+            "gc": true,
+            "rssMB": 252,
+            "heapMB": 28.8,
+            "externalMB": 3.6,
+            "cpuPct": 130,
+            "loopP99Ms": 0,
+            "loopMaxMs": 0,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 2.1,
+            "at": 1794125492822,
+            "gc": false,
+            "rssMB": 252.2,
+            "heapMB": 32.8,
+            "externalMB": 3.8,
+            "cpuPct": 33,
+            "loopP99Ms": 14,
+            "loopMaxMs": 21.6,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 1,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 1
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 4.1,
+            "at": 1794125494821,
+            "gc": false,
+            "rssMB": 252.2,
+            "heapMB": 41.8,
+            "externalMB": 5.4,
+            "cpuPct": 16,
+            "loopP99Ms": 12.7,
+            "loopMaxMs": 14.2,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 6.1,
+            "at": 1794125496821,
+            "gc": false,
+            "rssMB": 252.3,
+            "heapMB": 39.9,
+            "externalMB": 4.9,
+            "cpuPct": 13,
+            "loopP99Ms": 12.8,
+            "loopMaxMs": 15,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 1
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 1
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 8.1,
+            "at": 1794125498821,
+            "gc": false,
+            "rssMB": 252.3,
+            "heapMB": 45.4,
+            "externalMB": 5.2,
+            "cpuPct": 24,
+            "loopP99Ms": 16,
+            "loopMaxMs": 16.9,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 10.1,
+            "at": 1794125500822,
+            "gc": false,
+            "rssMB": 253.1,
+            "heapMB": 32.5,
+            "externalMB": 3.9,
+            "cpuPct": 24,
+            "loopP99Ms": 12.5,
+            "loopMaxMs": 18.4,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 12.1,
+            "at": 1794125502822,
+            "gc": false,
+            "rssMB": 253.1,
+            "heapMB": 32.3,
+            "externalMB": 3.8,
+            "cpuPct": 21,
+            "loopP99Ms": 14,
+            "loopMaxMs": 17.8,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 14.1,
+            "at": 1794125504822,
+            "gc": false,
+            "rssMB": 253.1,
+            "heapMB": 39.5,
+            "externalMB": 4.6,
+            "cpuPct": 29,
+            "loopP99Ms": 12.6,
+            "loopMaxMs": 15,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 16.1,
+            "at": 1794125506822,
+            "gc": false,
+            "rssMB": 253.1,
+            "heapMB": 43.5,
+            "externalMB": 4.6,
+            "cpuPct": 19,
+            "loopP99Ms": 12.7,
+            "loopMaxMs": 16.2,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 3,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 18.1,
+            "at": 1794125508822,
+            "gc": false,
+            "rssMB": 253.2,
+            "heapMB": 42.3,
+            "externalMB": 4.9,
+            "cpuPct": 16,
+            "loopP99Ms": 14.5,
+            "loopMaxMs": 18.9,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 20.1,
+            "at": 1794125510826,
+            "gc": false,
+            "rssMB": 252.9,
+            "heapMB": 34,
+            "externalMB": 4.3,
+            "cpuPct": 27,
+            "loopP99Ms": 13.6,
+            "loopMaxMs": 19.2,
+            "pool": {
+              "total": 7,
+              "idle": 5,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 1
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 1
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 22.1,
+            "at": 1794125512825,
+            "gc": false,
+            "rssMB": 252.9,
+            "heapMB": 37.8,
+            "externalMB": 4.4,
+            "cpuPct": 34,
+            "loopP99Ms": 13.5,
+            "loopMaxMs": 14.3,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 24.1,
+            "at": 1794125514827,
+            "gc": false,
+            "rssMB": 252.9,
+            "heapMB": 33.4,
+            "externalMB": 3.7,
+            "cpuPct": 29,
+            "loopP99Ms": 15.4,
+            "loopMaxMs": 17.1,
+            "pool": {
+              "total": 7,
+              "idle": 5,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 26.1,
+            "at": 1794125516827,
+            "gc": false,
+            "rssMB": 252.9,
+            "heapMB": 40.9,
+            "externalMB": 4.6,
+            "cpuPct": 11,
+            "loopP99Ms": 12.9,
+            "loopMaxMs": 13.8,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 28.1,
+            "at": 1794125518830,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 42.4,
+            "externalMB": 4.9,
+            "cpuPct": 32,
+            "loopP99Ms": 13.5,
+            "loopMaxMs": 14.2,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 30.1,
+            "at": 1794125520830,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 40.2,
+            "externalMB": 5.4,
+            "cpuPct": 26,
+            "loopP99Ms": 13.4,
+            "loopMaxMs": 14.6,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 32.1,
+            "at": 1794125522831,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 34.7,
+            "externalMB": 4.1,
+            "cpuPct": 10,
+            "loopP99Ms": 14.2,
+            "loopMaxMs": 15.5,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 1,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 34.1,
+            "at": 1794125524831,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 43.8,
+            "externalMB": 6,
+            "cpuPct": 14,
+            "loopP99Ms": 13.5,
+            "loopMaxMs": 19.8,
+            "pool": {
+              "total": 7,
+              "idle": 5,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 1
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 1
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 36.1,
+            "at": 1794125526834,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 40.6,
+            "externalMB": 4.8,
+            "cpuPct": 21,
+            "loopP99Ms": 13.7,
+            "loopMaxMs": 15.2,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 38.1,
+            "at": 1794125528831,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 35.7,
+            "externalMB": 4,
+            "cpuPct": 11,
+            "loopP99Ms": 14.7,
+            "loopMaxMs": 20,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 1
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 1
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 40.1,
+            "at": 1794125530831,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 41.5,
+            "externalMB": 5.1,
+            "cpuPct": 21,
+            "loopP99Ms": 13.2,
+            "loopMaxMs": 15.2,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 42.1,
+            "at": 1794125532831,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 41.6,
+            "externalMB": 4.9,
+            "cpuPct": 31,
+            "loopP99Ms": 14,
+            "loopMaxMs": 20,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 44.1,
+            "at": 1794125534831,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 47.1,
+            "externalMB": 5.3,
+            "cpuPct": 20,
+            "loopP99Ms": 13.9,
+            "loopMaxMs": 15,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 46.1,
+            "at": 1794125536834,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 39.5,
+            "externalMB": 4.1,
+            "cpuPct": 9,
+            "loopP99Ms": 13.9,
+            "loopMaxMs": 18,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 1,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 48.1,
+            "at": 1794125538830,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 44.9,
+            "externalMB": 4.8,
+            "cpuPct": 22,
+            "loopP99Ms": 11.8,
+            "loopMaxMs": 16,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 50.1,
+            "at": 1794125540834,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 37.1,
+            "externalMB": 4.3,
+            "cpuPct": 33,
+            "loopP99Ms": 14.9,
+            "loopMaxMs": 28.2,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 1,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 52.1,
+            "at": 1794125542834,
+            "gc": false,
+            "rssMB": 254.5,
+            "heapMB": 42.6,
+            "externalMB": 4.8,
+            "cpuPct": 10,
+            "loopP99Ms": 12.2,
+            "loopMaxMs": 13,
+            "pool": {
+              "total": 7,
+              "idle": 6,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 54.1,
+            "at": 1794125544834,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 33.7,
+            "externalMB": 3.9,
+            "cpuPct": 16,
+            "loopP99Ms": 15,
+            "loopMaxMs": 18.8,
+            "pool": {
+              "total": 7,
+              "idle": 3,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 3
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 3
+            },
+            "cluster": null,
+            "slowLines": 0
+          },
+          {
+            "t": 56.1,
+            "at": 1794125546834,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 44.2,
+            "externalMB": 5,
+            "cpuPct": 34,
+            "loopP99Ms": 12.7,
+            "loopMaxMs": 13.8,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 2
+          },
+          {
+            "t": 58.1,
+            "at": 1794125548834,
+            "gc": false,
+            "rssMB": 254.4,
+            "heapMB": 41.9,
+            "externalMB": 5.2,
+            "cpuPct": 13,
+            "loopP99Ms": 12.2,
+            "loopMaxMs": 19.3,
+            "pool": {
+              "total": 7,
+              "idle": 5,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 2
+          },
+          {
+            "t": 60.1,
+            "at": 1794125550894,
+            "gc": true,
+            "rssMB": 254.4,
+            "heapMB": 29.5,
+            "externalMB": 3.6,
+            "cpuPct": 26,
+            "loopP99Ms": 16.3,
+            "loopMaxMs": 19.2,
+            "pool": {
+              "total": 7,
+              "idle": 7,
+              "waiting": 0
+            },
+            "pg": {
+              "total": 7,
+              "active": 0,
+              "lock_wait": 0,
+              "idle_in_tx": 0
+            },
+            "gate": {
+              "on": true,
+              "waiting": 0,
+              "inflight": 0
+            },
+            "cluster": null,
+            "slowLines": 2
+          }
+        ],
+        "rssMaxMB": 254.5,
+        "heapMaxMB": 47.1,
+        "heapAfterGcStartMB": 28.8,
+        "heapAfterGcEndMB": 29.5,
+        "poolWaitingMax": 0,
+        "poolTotalMax": 7,
+        "pgLockWaitMax": 0,
+        "pgIdleInTxMax": 3,
+        "gateWaitingMax": 0,
+        "gateInflightMax": 3,
+        "loopMaxMs": 28.2,
+        "cpuMaxPct": 130
+      },
+      "loadAvgStart": [
+        7.1,
+        9,
+        11.3
+      ],
+      "loadAvgEnd": [
+        6.7,
+        8.5,
+        11
+      ],
+      "generatorLoopMaxMs": 36.6,
+      "dbBytes": 413678615,
+      "budgetFails": [
+        "auth.login: p95 351.1ms > 300ms",
+        "sync3.pushLarge: p95 1120.5ms > 300ms"
+      ]
+    }
+  ]
+}

@@ -40,7 +40,7 @@ const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
 const { rejectOps } = require('./v1-reject');
-const roleV1 = require('./staff-role-v1');
+const roleV1 = require('./staff-role-v1'), cpay = require('./conflict-payload');   //  DATA-SAFETY: سندِ ردشده کامل در صندوق
 //  STF-02: «درخواستِ تأیید» از راهِ دور (پرچمِ خاموشِ `shop.approval_requests`) — op با `approval: {v:1, request}`
 const remote = require('./approval-requests');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
 //  ⛔ ویرایشِ پولیِ سندِ ثبت‌شدهٔ v1 (update/`$inc`) و قاعدهٔ نقشِ خودِ v1 (`v1RoleReason`) — شرح همان‌جا
@@ -55,7 +55,7 @@ const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
-  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed',   //  قرض: STF-03 (‎lib/credit-cap.js‎)
+  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed', 'sales.price': 'price_not_allowed',   //  قرض و قیمت: STF-03
 });
 const { SALE_INSERT_PERMS } = creditCap;
 
@@ -469,22 +469,21 @@ function headKey(op) {
 
 /** ردیفِ صندوقِ تعارض برای opِ ردشدهٔ v1 (بیرون از تراکنشِ v1) */
 async function boxV1(ctx, op, deviceId, out) {
-  const id = newId('cf');
-  const dedupe = `perm:${String(op.op_id || '').slice(0, 80)}`;
+  const id = newId('cf'), dedupe = `perm:${String(op.op_id || '').slice(0, 80)}`, full = out.payload ? JSON.stringify(out.payload) : null;
   const open = await one(
     `SELECT id FROM sync_v3_conflicts WHERE app=$1 AND account_kind=$2 AND account_id=$3 AND dedupe_key=$4 AND status='open' LIMIT 1`,
     ['shop', 'shop', ctx.accountId, dedupe]
   );
   if (open) {
-    await query('UPDATE sync_v3_conflicts SET detail=$2::jsonb WHERE id=$1', [open.id, JSON.stringify(out.detail)]);
+    await query('UPDATE sync_v3_conflicts SET detail=$2::jsonb, loser_value=COALESCE($3::jsonb, loser_value) WHERE id=$1', [open.id, JSON.stringify(out.detail), full]);
     return;
   }
   await query(
     `INSERT INTO sync_v3_conflicts (id, app, account_kind, account_id, kind, table_name, row_id, field,
-                                    loser_op_id, loser_device, detail, dedupe_key, at)
-     VALUES ($1,'shop','shop',$2,$3,$4,$5,'',$6,$7,$8::jsonb,$9,$10)`,
+                                    loser_op_id, loser_device, detail, dedupe_key, at, loser_value)
+     VALUES ($1,'shop','shop',$2,$3,$4,$5,'',$6,$7,$8::jsonb,$9,$10,$11::jsonb)`,
     [id, ctx.accountId, out.box, String(op.table || '').slice(0, 80), String(op.row_id || '').slice(0, 80),
-      String(op.op_id || '').slice(0, 80), String(deviceId || '').slice(0, 64), JSON.stringify(out.detail), dedupe, now()]
+      String(op.op_id || '').slice(0, 80), String(deviceId || '').slice(0, 64), JSON.stringify(out.detail), dedupe, now(), full]
   );
 }
 
@@ -847,17 +846,17 @@ async function v1Guard(req, res, next) {
       for (const m of members) reject(m, out.reason);
       const p = parentOf(need.perm, members.map((m) => m.op), first.i, liveOps);
       p.bulk = (heads.get(p.ts)?.size || 0) > 1;
-      p.box = { op: first.op, out };
+      p.box = { op: first.op, out, ops: members.map((m) => m.op) };
       parents.push(p);
     }
 
     //  ۲) همراه‌ها. سندِ نگه‌داشته‌ای که خودش در همین دسته پذیرفته شد (مثلاً لغوِ درستِ بعدی) کسی را نگه نمی‌دارد
     const held = held0.filter((p) => !live.some((x) => !rejected.has(x.i) && touchesDoc(p, x.op)));
-    const all = parents.concat(held);
+    const all = parents.concat(held), kin = cpay.collector();
     if (all.length) {
       for (const x of live) {
         if (rejected.has(x.i) || (x.need && x.op.table === 'sales')) continue;   //  فاکتورِ دیگر سندِ خودش است
-        if (all.some((p) => belongs(p, x.op))) reject(x, 'tx_rejected');
+        const o = all.find((p) => belongs(p, x.op)); if (o) { reject(x, 'tx_rejected'); kin.add(o, x.op); }
       }
     }
     if (!rejected.size) return next();
@@ -873,9 +872,10 @@ async function v1Guard(req, res, next) {
         sale: p.sale || undefined, rows: [...p.rows].slice(0, 200), items: [...p.items].slice(0, 200),
         at: p.at || undefined, debtor: p.debtor || undefined, ts: p.ts || undefined, bulk: p.bulk || undefined,
       };
-      await boxV1(ctx, op, deviceId, { box: out.box, detail });
+      await boxV1(ctx, op, deviceId, { box: out.box, detail, payload: cpay.payload('v1', [...p.box.ops, ...kin.of(p)]) });
     }
-    for (const e of edits) await boxV1(ctx, e.x.op, deviceId, e.out);
+    for (const p of kin.held()) await cpay.append(ctx, p.boxId, 'v1', kin.of(p));   //  همراهِ دستهٔ بعد ⇒ همان ردیف
+    for (const e of edits) await boxV1(ctx, e.x.op, deviceId, { ...e.out, payload: cpay.payload('v1', [e.x.op]) });
 
     return finish();
 
@@ -905,7 +905,7 @@ function v3View(op) {
  * @param units  واحدهای `push` ِ v3 (هر واحدِ بی tx یک قلم دارد)
  * @returns واحدهای تازه (واحدهای بی‌ربط دست‌نخورده، به همان ترتیب)
  */
-function bundleV3(units, groups, { credit = false } = {}) {
+function bundleV3(units, groups, { credit = false, price = false } = {}) {
   const entries = [];
   units.forEach((u, ui) => {
     if (u.tx || u.broken) return;
@@ -917,7 +917,7 @@ function bundleV3(units, groups, { credit = false } = {}) {
   entries.forEach((e, k) => e.it.ops.forEach((op, j) => {
     let perm = null;
     if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
-    else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';   //  STF-03
+    else if (op.table === 'sales' && op.kind === 'insert' && (price || (credit && int(op.fields?.debtGivenMinor) > 0))) perm = 'sales.credit';   //  STF-03: قرض؛ با پرچمِ قیمت هر فاکتور
     else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
     else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
     if (!perm) return;
@@ -1048,7 +1048,7 @@ async function heldTxs(q, ctx, deviceId, txs) {
 module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
-  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
+  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };

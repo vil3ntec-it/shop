@@ -6,6 +6,7 @@ import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.FileProvider
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -100,12 +101,12 @@ object Updater {
         }
 
         val slug = repo.trim().trim('/')
-        require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { "آدرس مخزن درست نیست" }
+        require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { StrUpdate.badRepo }
 
         val viaApi = runCatching { fromApi(slug) }
         val best = viaApi.getOrNull() ?: runCatching { fromFile(slug) }.getOrNull()
         ?: throw IllegalStateException(
-          viaApi.exceptionOrNull()?.message ?: "نسخه‌ای برای دانلود پیدا نشد"
+          viaApi.exceptionOrNull()?.message ?: StrUpdate.noRelease
         )
 
         best.takeIf { isNewer(it.version, currentVersion) }
@@ -245,11 +246,11 @@ object Updater {
 
       if (!looksLikeApk(out)) {
         out.delete()
-        throw IllegalStateException("چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید")
+        throw IllegalStateException(StrUpdate.notApk)
       }
       if (release.size > 0 && out.length() != release.size) {
         out.delete()
-        throw IllegalStateException("اندازهٔ فایلِ گرفته‌شده با انتشار نمی‌خواند — دوباره بزنید")
+        throw IllegalStateException(StrUpdate.apkSizeMismatch)
       }
       lastNote = verify(out, release)
       out
@@ -297,18 +298,18 @@ object Updater {
     }
 
     if (release.sumsUrl.isBlank()) {
-      if (strict) reject("این نسخه فهرستِ امضاشده ندارد؛ برای امنیت نصب نشد")
+      if (strict) reject(StrUpdate.noSignedList)
       return null
     }
     val text = runCatching { get(release.sumsUrl) }.getOrNull()
     if (text == null) {
-      if (strict) reject("فهرستِ جمعِ کنترلی گرفته نشد؛ برای امنیت نصب نشد — دوباره بزنید")
+      if (strict) reject(StrUpdate.noChecksums)
       return null
     }
     if (strict) {
       val signature = runCatching { get(release.sumsUrl + ".sig") }.getOrNull().orEmpty()
       if (!ReleaseSignature.verify(text, signature, pinnedKey)) {
-        reject("امضای این نسخه با کلیدِ برنامه نمی‌خواند؛ نصب نشد")
+        reject(StrUpdate.badSignature)
       }
     }
 
@@ -321,7 +322,7 @@ object Updater {
     val expected = lines.firstOrNull { (_, n) -> n.equals(name, true) }?.first
       ?: lines.firstOrNull { (_, n) -> n.endsWith(".apk", true) }?.first
     if (expected == null) {
-      if (strict) reject("این نسخه در فهرستِ امضاشده نیست؛ نصب نشد")
+      if (strict) reject(StrUpdate.notInSignedList)
       return null
     }
 
@@ -336,7 +337,7 @@ object Updater {
     }
     val actual = digest.digest().joinToString("") { "%02x".format(it) }
     if (!actual.equals(expected, ignoreCase = true)) {
-      reject("فایلِ گرفته‌شده با نسخهٔ منتشرشده یکی نیست؛ پاک شد — دوباره بزنید")
+      reject(StrUpdate.hashMismatch)
     }
     return null
   }
@@ -420,9 +421,9 @@ object Updater {
    *  درست می‌شود و راهِ دومِ به‌روزرسانی هم دورش می‌زند.
    */
   private fun reason(code: Int): String = when (code) {
-    403, 429 -> "گیت‌هاب فعلاً جواب نمی‌دهد (سهمیهٔ ساعتی تمام شده) — کمی بعد دوباره بزنید"
-    404 -> "فایلِ نسخهٔ تازه روی گیت‌هاب پیدا نشد"
-    in 500..599 -> "گیت‌هاب خطا داد ($code) — کمی بعد دوباره بزنید"
-    else -> "سرورِ به‌روزرسانی جواب نداد ($code)"
+    403, 429 -> StrUpdate.githubLimited
+    404 -> StrUpdate.githubNoFile
+    in 500..599 -> StrUpdate.githubError(code)
+    else -> StrUpdate.updateServerNoAnswer(code)
   }
 }

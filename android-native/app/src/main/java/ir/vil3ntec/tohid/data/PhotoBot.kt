@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -98,7 +99,7 @@ object PhotoBot {
     }
     progress.value = null
     if (changed > 0) ir.vil3ntec.tohid.sync.PhotoSync.version.value = ir.vil3ntec.tohid.sync.PhotoSync.version.value + 1
-    lastResult.value = if (changed == 0) "همهٔ عکس‌ها از قبل آماده بودند" else "${changed} عکس بهتر شد — اصلِ هر کدام نگه داشته شد"
+    lastResult.value = if (changed == 0) StrAppData.photosReady else StrAppData.photosBetter(changed)
     changed
   }
 
@@ -117,7 +118,7 @@ object PhotoBot {
         val ids = PhotoStore.localIds(app)
         prefs(app).edit().putStringSet("kept", ids).apply()
         ir.vil3ntec.tohid.sync.PhotoSync.version.value = ir.vil3ntec.tohid.sync.PhotoSync.version.value + 1
-        lastResult.value = "${n} عکس به اصلش برگشت"
+        lastResult.value = StrAppData.photosRestored(n)
       }
     }
   }
