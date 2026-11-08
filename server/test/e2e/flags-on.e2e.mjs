@@ -328,7 +328,10 @@ await E.step('FLAGS.SLUG', 'نگه‌داشتنِ نشانی: «الف» نشا�
 
 await E.step('FLAGS.OFF', 'دکانِ «ب» با پرچم‌های خاموش: همان کارها همان پاسخ‌های پیشین را می‌گیرند', async () => {
   //  تأییدِ از راهِ دور: فقط /config، بقیه ۴۰۳
-  assert.deepEqual(E.ok(await B.cash.api('GET', '/shop/approval-requests/config'), 'config'), { enabled: false, approver: false, ttlMs: 600000 });
+  //  #988: پاسخ کلیدِ `v3` (Sync v3 ِ همین سرور) هم دارد — مقدارش مالِ سرور است، نه پرچمِ دکان
+  const cfgB = E.ok(await B.cash.api('GET', '/shop/approval-requests/config'), 'config');
+  assert.equal(typeof cfgB.v3, 'boolean');
+  assert.deepEqual(cfgB, { enabled: false, approver: false, ttlMs: 600000, v3: cfgB.v3 });
   const ask = await B.cash.api('POST', '/shop/approval-requests', { key: E.key('apr'), perm: 'sales.discount', doc: 'sales/s-b', pctBp: 1000, amount: 2000, reason: 'x' });
   assert.deepEqual([ask.status, ask.body.error.code], [403, 'approval_requests_disabled']);
   //  تخفیفِ شاگرد همان «ممنوع» ِ پیشین (لایهٔ نقشی گذاشته نشده)
