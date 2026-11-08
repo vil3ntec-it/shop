@@ -55,8 +55,7 @@ const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
-  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed',   //  قرض: STF-03 (‎lib/credit-cap.js‎)
-  'sales.price': 'price_not_allowed',   //  تغییرِ قیمتِ ردیف: STF-03 (‎lib/price-cap.js‎، پرچمِ `shop.price_cap`)
+  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed', 'sales.price': 'price_not_allowed',   //  قرض و قیمت: STF-03
 });
 const { SALE_INSERT_PERMS } = creditCap;
 
@@ -918,8 +917,7 @@ function bundleV3(units, groups, { credit = false, price = false } = {}) {
   entries.forEach((e, k) => e.it.ops.forEach((op, j) => {
     let perm = null;
     if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
-    else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';   //  STF-03
-    else if (price && op.table === 'sales' && op.kind === 'insert') perm = 'sales.price';   //  STF-03: هر فاکتور با قلم‌هایش (‎lib/price-cap.js‎)
+    else if (op.table === 'sales' && op.kind === 'insert' && (price || (credit && int(op.fields?.debtGivenMinor) > 0))) perm = 'sales.credit';   //  STF-03: قرض؛ با پرچمِ قیمت هر فاکتور
     else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
     else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
     if (!perm) return;

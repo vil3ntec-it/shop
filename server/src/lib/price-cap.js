@@ -184,6 +184,27 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   return null;
 }
 
+/** نمایهٔ دسته از واحدهای `push` (یک بار برای هر دسته، روی همان آرایه) */
+const batches = new WeakMap();
+function batchFromPlan(plan) {
+  if (!Array.isArray(plan)) return null;
+  if (!batches.has(plan)) batches.set(plan, batchOf(plan));
+  return batches.get(plan);
+}
+
+/**
+ * درِ `sync-v3.authorize` (پیش از تخفیف/لغو/برگشت): درجِ فاکتور ⇒ تخفیف با تخفیفِ پنهان، تغییرِ قیمت، بعد قرض — نتیجهٔ نهایی؛
+ * قلمِ دیرآمده ⇒ رد یا `undefined`. پرچمِ خاموش یا opِ بی‌ربط ⇒ `undefined` و همان راهِ امروز.
+ * (`doc-roles`/`till-guard` ِ پس از آن فقط `auditLog`/`transactions` را می‌سنجند؛ درجِ فاکتور از آن‌ها چیزی نمی‌خواهد.)
+ */
+async function judgeV3(c, ctx, op, row, { plan = null, deviceId = '', origin = 'v3' } = {}) {
+  if (!touchesV3(op) || !(await on(ctx, (s, p) => c.query(s, p)))) return undefined;
+  const batch = batchFromPlan(plan);
+  const s = await judgeSaleV3(c, ctx, op, row, { batch, deviceId, origin });
+  if (s !== undefined) return s.denied || require('./credit-cap').judgeV3(c, ctx, op, row, { withDiscount: s.withDiscount, deviceId, origin });
+  return (await judgeLineV3(c, ctx, op, row, { batch, deviceId, origin })) || undefined;
+}
+
 // ---------- REST / راهِ قدیم ----------
 
 /**
@@ -263,4 +284,4 @@ async function judgeLegacy(c, ctx, changes) {
   return null;
 }
 
-module.exports = { FLAG, PERM, on, onUnits, touchesV3, batchOf, slipOf, judgeSaleV3, judgeLineV3, judgeLegacy };
+module.exports = { FLAG, PERM, on, onUnits, touchesV3, batchOf, slipOf, judgeV3, judgeSaleV3, judgeLineV3, judgeLegacy };

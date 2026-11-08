@@ -154,8 +154,7 @@ function validate(raw, origin = 'v3', ctx = undefined) {
   }
   const txId = r.tx === undefined || r.tx === null ? '' : String(r.tx);
   if (txId.length > 80) return bad('bad_tx');
-  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) و برگه‌های جدای قرض و قیمت (`creditApproval`، `priceApproval`، STF-03) — فقط همراه‌اند؛
-  //  سنجش در `authorize`
+  //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) و برگه‌های جدای قرض و قیمت (`creditApproval`/`priceApproval`، STF-03) — فقط همراه؛ سنجش در `authorize`
   const slips = { approval: null };
   for (const k of ['approval', 'creditApproval', 'priceApproval']) {
     if (r[k] === undefined || r[k] === null) continue;
@@ -422,7 +421,7 @@ function openTask(c, ctx, { kind, table, rowId, dedupe, detail, t }) {
  * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
  *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
  */
-async function authorize(c, ctx, op, row, deviceId, origin, groups = null, batch = null) {
+async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
@@ -432,14 +431,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null, batch
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
   if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row, (s, p) => c.query(s, p));   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
-  //  STF-03 (پرچمِ خاموشِ `shop.price_cap`): درجِ فاکتور ⇒ تخفیف با «تخفیفِ پنهان» و تغییرِ قیمتِ ردیف، بعد قرض؛ قلمِ دیرآمده
-  //  ⇒ جمعِ تازهٔ همان فاکتور (‎lib/price-cap.js‎). پرچمِ خاموش ⇒ `undefined` / null و همان راهِ امروز
-  const pc = await require('./price-cap').judgeSaleV3(c, ctx, op, row, { batch, deviceId, origin });
-  if (pc !== undefined) {
-    return pc.denied || require('./credit-cap').judgeV3(c, ctx, op, row, { withDiscount: pc.withDiscount, deviceId, origin });
-  }
-  { const pl = await require('./price-cap').judgeLineV3(c, ctx, op, row, { batch, deviceId, origin }); if (pl) return pl; }
-  //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
+  { const pc = await require('./price-cap').judgeV3(c, ctx, op, row, { plan, deviceId, origin }); if (pc !== undefined) return pc; }   //  STF-03 قیمت/تخفیفِ پنهان (‎lib/price-cap.js‎)؛ بعد تخفیف، لغو، برگشت (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {
     //  برگشت: سقف روی جمعِ سند (docId یا tx)، یک داوری برای همهٔ ردیف‌هایش
@@ -473,14 +465,14 @@ async function nextSeq(c) {
  * @returns {Promise<object>} نتیجهٔ همین op برای پاسخ:
  *          applied | partial | conflict | duplicate | rejected
  */
-async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null, hideContact = false, batch = null }) {
+async function applyOne(c, ctx, op, { deviceId, origin, cursor = 0, t, groups = null, plan = null, hideContact = false }) {
   const dup = (await c.query(
     `SELECT server_seq FROM sync_v3_ops WHERE ${ACC} AND op_id=$4`, [...acc(ctx), op.op_id]
   )).rows[0];
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await loadRow(c, ctx, op.table, op.row_id);
-  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, batch);
+  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید
@@ -762,10 +754,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  سندهای برگشتِ این دسته (یک برگه و یک تصمیم؛ سقفِ تجمعیِ فاکتور)، و برنامهٔ کهنهٔ بی tx:
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
-  //  STF-03: فاکتورِ قرض‌دار هم؛ با پرچمِ `shop.price_cap` هر فاکتور با قلم‌هایش، و نمایهٔ قلم‌های دسته (‎lib/price-cap.js‎)
-  const priceOn = await require('./price-cap').onUnits(ctx, units);
-  const plan = approvals.bundleV3(units, groups, { credit: await require('./credit-cap').onUnits(ctx, units), price: priceOn });
-  const batch = priceOn ? require('./price-cap').batchOf(units) : null;
+  const plan = approvals.bundleV3(units, groups, { credit: await require('./credit-cap').onUnits(ctx, units), price: await require('./price-cap').onUnits(ctx, units) });   //  STF-03: فاکتورِ قرض‌دار هم؛ با پرچمِ قیمت هر فاکتور با قلم‌هایش
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 
@@ -813,7 +802,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
       for (const it of unit.items) {
         const parts = [];
         for (const op of it.ops) {
-          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, plan, hideContact, batch });
+          const r = await applyOne(c, ctx, op, { deviceId, origin, cursor, t, groups, plan, hideContact });
           parts.push(r);
           if (r.status === 'rejected') { failed = r; break; }
         }
