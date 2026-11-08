@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.print
 
 import android.content.Context
+import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.PayFlow
@@ -9,7 +11,6 @@ import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.SavedQuote
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.displayDate
-import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -29,18 +30,25 @@ import kotlinx.coroutines.withContext
  */
 object QuoteFile {
 
-  /** سطرهای برگه — چاپ (`printQuote`) و PDF همین را می‌کشند، پس هر دو یک متن‌اند */
+  /**
+   *  سطرهای برگه — چاپ (`printQuote`) و PDF همین را می‌کشند، پس هر دو یک متن‌اند. نوشته‌ها به زبانِ برنامه (`StrPos`) و
+   *  جهتش (`HwPages.text`)؛ رقمِ کاغذ همان انتخابِ دکان، انگلیسی همیشه لاتین (#348، همان `Receipts.format`) — فقط عددها:
+   *  نامِ کالا، مشتری و یادداشت (داده) همان‌طور که نوشته شده‌اند. رقمِ لاتین ⇒ همان برگهٔ پیشین.
+   */
   fun lines(q: SavedQuote, d: ShopData): List<HwPages.Line> {
+    val dg = LocaleChoice.screenDigits
+    fun num(text: String) = LocaleText.digitsIn(text, dg)
+    fun amount(afn: Double) = LocaleText.amount(afn, dg)
     val rows = q.lines.map { l ->
       val name = l.label.ifBlank { d.products.find { it.id == l.productId }?.name.orEmpty() }
       val price = l.unitPrice ?: 0.0
-      HwPages.reportLine(StrPos.quoteSlipLine(name, qty(l.quantity), money(price), money(SalesEngine.lineTotal(price, l.quantity))))
+      HwPages.reportLine(StrPos.quoteSlipLine(name, num(qty(l.quantity)), amount(price), amount(SalesEngine.lineTotal(price, l.quantity))))
     }
-    return listOf(HwPages.Line(StrPos.quoteSlipTitle(q.number), HwPages.Style.TITLE)) +
-      HwPages.reportLine(StrPos.quoteSlipDate(displayDate(q.createdDay))) +
-      HwPages.reportLine(StrPos.quoteValidTo(displayDate(q.validUntil)), strong = true) +
+    return listOf(HwPages.Line(StrPos.quoteSlipTitle(num(q.number.toString())), HwPages.Style.TITLE)) +
+      HwPages.reportLine(StrPos.quoteSlipDate(num(displayDate(q.createdDay)))) +
+      HwPages.reportLine(StrPos.quoteValidTo(num(displayDate(q.validUntil))), strong = true) +
       HwPages.reportLine(StrPos.quoteSlipCustomer(Quotes.customer(d, q))) + rows +
-      HwPages.reportLine(StrPos.quoteSlipTotal(money(PayFlow.major(q.totalMinor))), strong = true) +
+      HwPages.reportLine(StrPos.quoteSlipTotal(amount(PayFlow.major(q.totalMinor))), strong = true) +
       listOfNotNull(q.note?.let { HwPages.reportLine(it) }) +
       HwPages.Line(StrPos.quoteSlipFooter, HwPages.Style.SMALL)
   }

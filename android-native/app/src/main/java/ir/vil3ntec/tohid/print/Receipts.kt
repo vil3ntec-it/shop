@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.core.hw.PrinterProfile
 import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrPos
+import ir.vil3ntec.tohid.core.i18n.StrReceipt
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.receipt.DiscountLine
 import ir.vil3ntec.tohid.core.receipt.ExchangeView
@@ -111,7 +112,7 @@ object Receipts {
       time = time,
       cashier = sale.seller,
       //  PAY (v3 A4): برچسب و ردیف‌های پرداخت همان `PayFlow` ِ تاریخچه و جزئیات
-      kind = dariOf(PayFlow.payLabel(sale, cash = labels.cash)),
+      kind = kindOf(sale, labels),
       cancelled = sale.status == "cancelled",
       items = items,
       subtotal = sale.total,
@@ -123,7 +124,7 @@ object Receipts {
       total = sale.finalTotal,
       rounding = PayFlow.rounding(sale) ?: 0.0, // PAY-09
       //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
-      payments = PayFlow.receiptLines(sale).map { (label, amount) -> PaymentLine(label, amount) },
+      payments = paymentLines(sale),
       paid = sale.paidAmount,
       remaining = sale.remaining,
       debtorName = sale.debtorId?.let { id -> d.debtors.find { it.id == id }?.name },
@@ -165,48 +166,72 @@ object Receipts {
     return ThermalPrinter.toBitmap(ReceiptRaster.compose(doc, ReceiptPainter(context)))
   }
 
-  /* ------------------------- برچسب‌های کاغذ در دری (LOC-08، دورِ ۷) ------------------------- */
+  /* ------------------------- برچسب‌های کاغذ به زبانِ برنامه (#348) ------------------------- */
 
   /**
-   *  برچسب‌های فاکتور، رسیدِ هدیه و صورت‌حساب فارسی‌اند (`ReceiptLabels.FA` ِ هسته، برای همهٔ زبان‌ها همان پیشین). وقتی زبانِ
-   *  برنامه دری است همان برچسب‌ها از لایهٔ واژه (`DariText.of`) می‌گذرند تا کاغذ، PNG، PDF و صفحهٔ فاکتور هم دری باشند
-   *  («فروشگاه» ⇐ «دکان»). دادهٔ فاکتور (نامِ کالا، دکان، مشتری، یادداشت) هرگز از لایه نمی‌گذرد. فارسی، انگلیسی و پشتو بایت‌به‌بایت همان.
+   *  برچسب‌های فاکتور، رسیدِ هدیه و صورت‌حساب به زبانِ برنامه (`StrReceipt`) — کاغذ، PNG، PDF و صفحهٔ فاکتور همه از همین‌اند:
+   *  فارسی بایت‌به‌بایت همان `ReceiptLabels.FA` ِ هسته، دری همان فارسی از لایهٔ واژه (دورِ ۷، «فروشگاه» ⇐ «دکان»)، انگلیسی و
+   *  پشتو ترجمه. دادهٔ فاکتور (نامِ کالا، دکان، مشتری، یادداشت) هرگز از این‌جا نمی‌گذرد. جهتِ کاغذ (راست‌به‌چپ، انگلیسی
+   *  چپ‌به‌راست) با `ReceiptPainter`؛ رقم، پول و تاریخ با [format].
    */
   private val dari: Boolean get() = I18n.lang == Lang.PRS
 
-  /** برچسبِ ثابتِ برنامه (نه دادهٔ کاربر) ⇒ دری در زبانِ دری */
-  private fun dariOf(text: String): String = if (dari) DariText.of(text) else text
-
   fun labels(): ReceiptLabels {
-    if (!dari) return ReceiptLabels.FA
-    val l = ReceiptLabels.FA
+    val s = StrReceipt
     return ReceiptLabels(
-      fallbackShop = DariText.of(l.fallbackShop), invoiceNo = DariText.of(l.invoiceNo), date = DariText.of(l.date),
-      lunarDate = DariText.of(l.lunarDate), cashier = DariText.of(l.cashier), kind = DariText.of(l.kind), cancelled = DariText.of(l.cancelled),
-      returned = DariText.of(l.returned), listPrice = DariText.of(l.listPrice), count = DariText.of(l.count), rows = DariText.of(l.rows),
-      pieces = DariText.of(l.pieces), subtotal = DariText.of(l.subtotal), discount = DariText.of(l.discount), total = DariText.of(l.total),
-      paid = DariText.of(l.paid), tendered = DariText.of(l.tendered), change = DariText.of(l.change), remaining = DariText.of(l.remaining),
-      debtor = DariText.of(l.debtor), phone = DariText.of(l.phone), scan = DariText.of(l.scan), storeScan = DariText.of(l.storeScan),
-      footer = DariText.of(l.footer), cash = DariText.of(l.cash), credit = DariText.of(l.credit), online = DariText.of(l.online),
-      note = DariText.of(l.note), rounding = DariText.of(l.rounding),
+      fallbackShop = s.fallbackShop, invoiceNo = s.invoiceNo, date = s.date, lunarDate = s.lunarDate, cashier = s.cashier, kind = s.kind,
+      cancelled = s.cancelled, returned = s.returned, listPrice = s.listPrice, count = s.count, rows = s.rows, rowOne = s.rowOne,
+      pieces = s.pieces, pieceOne = s.pieceOne,
+      subtotal = s.subtotal, discount = s.discount, total = s.total, paid = s.paid, tendered = s.tendered, change = s.change,
+      remaining = s.remaining, debtor = s.debtor, phone = s.phone, scan = s.scan, storeScan = s.storeScan, footer = s.footer,
+      cash = s.cash, credit = s.credit, online = s.online, note = s.note, rounding = s.rounding,
     )
   }
 
-  fun giftLabels(): ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels {
-    val g = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels.FA
-    return if (!dari) g else g.copy(title = DariText.of(g.title), note = DariText.of(g.note), base = labels())
-  }
+  fun giftLabels(): ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels =
+    ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels(title = StrReceipt.giftTitle, note = StrReceipt.giftNote, base = labels())
 
   fun statementLabels(): StatementLabels {
-    if (!dari) return StatementLabels.FA
-    val l = StatementLabels.FA
+    val s = StrReceipt
     return StatementLabels(
-      fallbackShop = DariText.of(l.fallbackShop), title = DariText.of(l.title), customer = DariText.of(l.customer), phone = DariText.of(l.phone),
-      date = DariText.of(l.date), give = DariText.of(l.give), receive = DariText.of(l.receive), balance = DariText.of(l.balance),
-      totalGive = DariText.of(l.totalGive), totalReceive = DariText.of(l.totalReceive), owes = DariText.of(l.owes), credit = DariText.of(l.credit),
-      settled = DariText.of(l.settled), empty = DariText.of(l.empty), rows = DariText.of(l.rows), footer = DariText.of(l.footer),
+      fallbackShop = s.fallbackShop, title = s.statementTitle, customer = s.customer, phone = s.phone, date = s.date, give = s.give,
+      receive = s.receive, balance = s.balance, totalGive = s.totalGive, totalReceive = s.totalReceive, owes = s.owes, credit = s.inCredit,
+      settled = s.settled, empty = s.empty, rows = s.rows, rowOne = s.rowOne, footer = s.statementFooter,
     )
   }
+
+  /** «نوع» ِ فاکتور (نقدی، نسیه، ترکیبی…) به زبانِ برنامه — همان `PayFlow.payLabel` ِ تاریخچه؛ دری همان لایهٔ واژهٔ دورِ ۷ */
+  fun kindOf(sale: Sale, labels: ReceiptLabels = labels()): String =
+    PayFlow.payLabel(sale, cash = labels.cash).let { if (dari) DariText.of(it) else payName(it) }
+
+  /** ردیف‌های پرداختِ ترکیبی، «دریافتی» و «پولِ پس» (`PayFlow.receiptLines`) با نامِ روش به زبانِ برنامه ([payName]) */
+  fun paymentLines(sale: Sale): List<PaymentLine> =
+    PayFlow.receiptLines(sale, name = ::payName).map { (label, amount) -> PaymentLine(label, amount) }
+
+  /**
+   *  نامِ روشِ پرداخت روی کاغذ («نوع» و ردیف‌های پرداخت): فقط واژهٔ ثابتِ برنامه (`PayFlow.KIND_LABELS`، `Pay.DEFAULT_METHODS`،
+   *  «به حسابِ مشتری») به زبانِ برنامه؛ هر نامِ دیگر (شناسهٔ ناشناخته، نامِ تجاریِ لاتین) همان‌طور که هست. فارسی ⇒ همان.
+   *  خودِ آن جدول‌ها داده می‌مانند (هم‌شکلِ `report-core.js` و ستونِ خروجی).
+   */
+  fun payName(name: String): String = if (I18n.lang == Lang.FA) name else PAY_NAMES[name]?.invoke() ?: name
+
+  /** واژهٔ فارسیِ ثابت ⇒ نوشتهٔ همان معنا در `StrReceipt`؛ کلید از خودِ جدول‌ها، نه رونوشتِ متن */
+  private val PAY_NAMES: Map<String, () -> String> by lazy {
+    val byKind: List<Pair<String, () -> String>> = listOf(
+      PayFlow.CASH to { StrReceipt.payCash }, "credit" to { StrReceipt.payCredit }, PayFlow.ACCOUNT to { StrReceipt.payCredit },
+      "card" to { StrReceipt.payCard }, "transfer" to { StrReceipt.payTransfer }, "wallet" to { StrReceipt.payWallet },
+      "store_credit" to { StrReceipt.payStoreCredit }, "gift_card" to { StrReceipt.payGiftCard }, "other" to { StrReceipt.payOther },
+      PayFlow.MIXED to { StrReceipt.payMixed }, PayFlow.ONLINE to { StrReceipt.payOnline }, PayFlow.COD to { StrReceipt.payCod },
+    )
+    buildMap {
+      byKind.forEach { (key, text) -> PayFlow.KIND_LABELS[key]?.let { put(it, text) } }
+      PayFlow.method(PayFlow.ACCOUNT)?.name?.let { put(it, { StrReceipt.payAccount }) }
+      ir.vil3ntec.tohid.core.pay.Pay.DEFAULT_METHODS.firstOrNull { it.id == AFPAY_CARD }?.name?.let { put(it, { StrReceipt.payAfPayCard }) }
+    }
+  }
+
+  /** شناسهٔ روشِ «کارت AfPay» در `Pay.DEFAULT_METHODS` (تنها نامِ پیش‌فرضِ فارسی جز نام‌های `KIND_LABELS`) */
+  private const val AFPAY_CARD = "afpay_card"
 
   /* ---------------------------- رسیدِ برگشت (RET-12) ---------------------------- */
 
@@ -300,22 +325,32 @@ object Receipts {
     return ThermalPrinter.toBitmap(ReceiptRaster.compose(doc, ReceiptPainter(context)))
   }
 
-  /** رقم و نمادِ همین دستگاه (LOC-05، LOC-07) — همان `LocaleText` ِ همه‌جای برنامه */
-  /** @param exactUnit پرچمِ `shop.promo_stamp`: قیمتِ واحدِ اعشاری با دو رقم؛ خاموش ⇒ همان پیشین */
+  /**
+   *  رقم و نمادِ همین دستگاه (LOC-05، LOC-07) به زبانِ برنامه (#348) — همان قاعدهٔ صفحه: رقم = انتخابِ دکان، جز انگلیسی که
+   *  همیشه لاتین است (`I18n.screenDigits`)؛ واژهٔ پول «افغانی» / «AFN» / «افغانۍ» (`I18n.money`، «؋» در هر زبان یکی)؛ تاریخ
+   *  خورشیدیِ عددی، و برای انگلیسی و پشتو همان تقویمِ صفحه (`I18n.gregorian`: انگلیسیِ «خودکار» میلادی). فارسی و دری
+   *  بایت‌به‌بایت همان پیشین.
+   *  @param exactUnit پرچمِ `shop.promo_stamp`: قیمتِ واحدِ اعشاری با دو رقم؛ خاموش ⇒ همان پیشین
+   */
   fun format(exactUnit: Boolean = false): ReceiptFormat {
-    val digits = LocaleChoice.digits
+    val lang = I18n.lang
+    val digits = I18n.screenDigits(lang, LocaleChoice.digits)
     val symbol = LocaleChoice.symbol
+    val calendar = LocaleChoice.calendar
+    val gregorian = !lang.persian && I18n.gregorian(lang, calendar)
     val lunar = LocaleChoice.lunar
     val lunarAdjust = LocaleChoice.lunarAdjust
     return object : ReceiptFormat {
-      override fun money(afn: Double) = LocaleText.afghani(afn, digits, symbol)
+      override fun money(afn: Double) = I18n.money(afn, lang, digits, symbol)
       //  قیمتِ واحدِ اعشاری (قلمِ تخفیفِ خودکار) با دو رقم؛ عددِ کامل همان `LocaleText.amount`
       override fun amount(afn: Double) = if (exactUnit) LocaleText.unitAmount(afn, digits) else LocaleText.amount(afn, digits)
       override fun qty(q: Double) = LocaleText.digitsIn(ir.vil3ntec.tohid.qty(q), digits)
       override fun digits(text: String) = LocaleText.digitsIn(text, digits)
       //  شماره جدا و چپ‌به‌راست (LRE…PDF) تا در سطرِ راست‌به‌چپ رقم‌ها جابه‌جا نشوند
       override fun phone(text: String) = "\u202A" + LocaleText.digitsIn(text, digits) + "\u202C"
-      override fun date(iso: String) = LocaleText.date(iso, digits)
+      override fun date(iso: String) =
+        if (gregorian) ir.vil3ntec.tohid.core.text.LocaleFormat.displayDigits(I18n.dateNumeric(iso, lang, calendar), digits)
+        else LocaleText.date(iso, digits)
       //  LOC-01: فقط با تنظیمِ «تاریخِ قمری» (پیش‌فرض خاموش)
       override fun lunarDate(iso: String) = if (lunar) LocaleText.lunar(iso, digits, lunarAdjust) else null
     }

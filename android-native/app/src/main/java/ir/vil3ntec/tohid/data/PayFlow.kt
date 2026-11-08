@@ -330,13 +330,14 @@ object PayFlow {
   /**
    *  ردیف‌های پرداختِ ترکیبی روی فاکتور و رسید (برچسب، افغانی) — جمعشان همان مبلغِ فاکتور.
    *  فاکتورِ بی `payments` (امروز، یا پرچمِ خاموش) هیچ ردیفی نمی‌گیرد.
+   *  [name] نامِ روش را برای کاغذ به زبانِ برنامه می‌برد (#348، `Receipts.payName`)؛ پیش‌فرض همان نام.
    */
-  fun receiptLines(s: Sale): List<Pair<String, Double>> {
+  fun receiptLines(s: Sale, name: (String) -> String = { it }): List<Pair<String, Double>> {
     val list = s.payments?.takeIf { it.isNotEmpty() } ?: return emptyList()
     return buildList {
       list.filter { it.amountMinor > 0 }.forEach { p ->
         //  PAY-24: کدِ کارتِ هدیه خودش پول است ⇒ روی رسید فقط چهار نویسهٔ آخر
-        add(rowName(p) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
+        add(name(rowName(p)) + pendingNote(p) + (p.ref?.let { " — " + if (p.kind == StoredPay.GIFT) GiftCards.mask(it) else it } ?: "") to major(p.amountMinor))
       }
       s.tenderedMinor?.takeIf { it > 0 }?.let { add(StrLedger.tendered to major(it)) }
       s.changeMinor?.takeIf { it > 0 }?.let { add(StrLedger.change to major(it)) }

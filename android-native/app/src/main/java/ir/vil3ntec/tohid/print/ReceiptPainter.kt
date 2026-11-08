@@ -10,13 +10,14 @@ import android.text.StaticLayout
 import android.text.TextPaint
 import ir.vil3ntec.tohid.R
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.receipt.ReceiptBlock
 import ir.vil3ntec.tohid.core.receipt.ReceiptMetrics
 import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
 import ir.vil3ntec.tohid.core.receipt.TextStyle
 
 /**
- *  نوشته‌های فاکتورِ نسخهٔ ۲ ⇒ تصویرِ یک‌بیتی، با قلمِ وزیرمتن و راست‌به‌چپ — تنها
+ *  نوشته‌های فاکتورِ نسخهٔ ۲ ⇒ تصویرِ یک‌بیتی، با قلمِ وزیرمتن و جهتِ زبانِ برنامه (انگلیسی چپ‌به‌راست) — تنها
  *  کارِ سکو در فاکتور (`ReceiptRaster.TextRenderer`). خط، لوگو و QR را هسته می‌کشد.
  *
  *  کامپیوتر همین فایل را با `desktop/src/shim` (Java2D) می‌دواند، پس دو برنامه یک فاکتور
@@ -31,17 +32,22 @@ class ReceiptPainter(context: Context) : ReceiptRaster.TextRenderer {
 
   override fun render(block: ReceiptBlock, widthDots: Int, metrics: ReceiptMetrics): MonoImage {
     val inner = (widthDots - metrics.pad * 2).coerceAtLeast(1)
+    //  جهتِ کاغذ همان جهتِ زبانِ برنامه (`Receipt.layout` هم همین را به نوشته می‌دهد)
+    val rtl = I18n.lang.rtl
     val placed = ArrayList<Placed>()
     var y = 0
 
-    /** برچسب راست، مقدار چپ؛ [share] سهمِ برچسب از پهنا */
+    /**
+     *  برچسب در آغازِ سطر، مقدار در پایانش؛ [share] سهمِ برچسب از پهنا. راست‌به‌چپ (فارسی، دری، پشتو): برچسب راست و
+     *  مقدار چپ، همان فاکتورِ پیشین؛ انگلیسی (#348) برعکس — برچسب چپ، مقدار راست (همان `Receipt.row` ِ فاکتورِ پیشین).
+     */
     fun pair(right: String, left: String, rightPaint: TextPaint, leftPaint: TextPaint, share: Float) {
       val rw = (inner * share).toInt()
       val lw = inner - rw
       val r = Receipt.layout(right, rightPaint, rw, Layout.Alignment.ALIGN_NORMAL)
       val l = Receipt.layout(left, leftPaint, lw, Layout.Alignment.ALIGN_OPPOSITE)
-      placed += Placed(r, metrics.pad + lw, y)
-      placed += Placed(l, metrics.pad, y)
+      placed += Placed(r, if (rtl) metrics.pad + lw else metrics.pad, y)
+      placed += Placed(l, if (rtl) metrics.pad else metrics.pad + rw, y)
       y += maxOf(r.height, l.height)
     }
 

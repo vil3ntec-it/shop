@@ -619,12 +619,13 @@ class DariCoverageTest {
     assertEquals("پېرودونکی پیدا نه شو", StrLedger.customerNotFound)
   }
 
-  @Test fun `برچسب‌های فاکتور و صورت‌حسابِ چاپی در دری از لایهٔ واژه می‌گذرند و در زبان‌های دیگر همان فارسی‌اند`() {
+  @Test fun `برچسب‌های فاکتور و صورت‌حسابِ چاپی در دری از لایهٔ واژه می‌گذرند و در فارسی همان پیشین‌اند`() {
     I18n.source = { Lang.FA }
     assertEquals(ir.vil3ntec.tohid.core.receipt.ReceiptLabels.FA, ir.vil3ntec.tohid.print.Receipts.labels())
     assertEquals(ir.vil3ntec.tohid.core.receipt.StatementLabels.FA, ir.vil3ntec.tohid.print.Receipts.statementLabels())
+    //  #348: انگلیسی و پشتو دیگر برچسبِ فارسی نمی‌گیرند (پیش‌تر همان `ReceiptLabels.FA`) — آزمونِ کاملشان `ReceiptLangTest`
     I18n.source = { Lang.EN }
-    assertEquals(ir.vil3ntec.tohid.core.receipt.ReceiptLabels.FA, ir.vil3ntec.tohid.print.Receipts.labels())
+    assertEquals("Invoice no.", ir.vil3ntec.tohid.print.Receipts.labels().invoiceNo)
     I18n.source = { Lang.PRS }
     val l = ir.vil3ntec.tohid.print.Receipts.labels()
     assertEquals("دکان", l.fallbackShop)

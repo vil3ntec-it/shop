@@ -58,8 +58,8 @@ object GiftReceiptLayout {
     }
     b += ReceiptBlock.Rule()
     val whole = kept.all { (_, q) -> q == kotlin.math.floor(q) }
-    val count = "${l.count}: ${fmt.digits(kept.size.toString())} ${l.rows}" +
-      if (whole && kept.isNotEmpty()) " · ${fmt.qty(kept.sumOf { it.second })} ${l.pieces}" else ""
+    val count = "${l.count}: ${fmt.digits(kept.size.toString())} ${if (kept.size == 1) l.rowOne else l.rows}" +
+      if (whole && kept.isNotEmpty()) kept.sumOf { it.second }.let { q -> " · ${fmt.qty(q)} ${if (q == 1.0) l.pieceOne else l.pieces}" } else ""
     text(count, TextStyle.SMALL, center = false)
     b += ReceiptBlock.Rule()
 

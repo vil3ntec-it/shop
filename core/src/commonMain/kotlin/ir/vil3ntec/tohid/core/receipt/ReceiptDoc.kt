@@ -6,17 +6,17 @@ import ir.vil3ntec.tohid.core.hw.PrinterProfile
 /**
  *  فاکتور به شکلِ فهرستِ بلوک‌ها — یک منبع برای کاغذِ حرارتی، صفحهٔ فاکتور (V3)، PNG/PDF
  *  و همان ترتیبی که صفحهٔ عمومیِ QR دارد. `ReceiptLayout.build` می‌سازد؛ نوشته‌ها را سکو
- *  می‌کشد (قلمِ برنامه، راست‌به‌چپ) و بقیه را `ReceiptRaster`.
+ *  می‌کشد (قلمِ برنامه، جهتِ زبانِ برنامه) و بقیه را `ReceiptRaster`.
  */
 data class ReceiptDoc(val widthDots: Int, val metrics: ReceiptMetrics, val blocks: List<ReceiptBlock>)
 
 enum class TextStyle { TITLE, TOTAL, BODY, SMALL }
 
 sealed interface ReceiptBlock {
-  /** یک یا چند سطرِ نوشته؛ [center] ⇒ وسط، وگرنه راست (آغازِ سطر) */
+  /** یک یا چند سطرِ نوشته؛ [center] ⇒ وسط، وگرنه آغازِ سطر (راست؛ انگلیسی چپ) */
   data class Text(val text: String, val style: TextStyle, val center: Boolean = true) : ReceiptBlock
 
-  /** برچسب راست، مقدار چپ */
+  /** برچسب در آغازِ سطر، مقدار در پایانش (راست‌به‌چپ: برچسب راست؛ انگلیسی: برچسب چپ) */
   data class Row(val label: String, val value: String, val style: TextStyle = TextStyle.BODY) : ReceiptBlock
 
   /** نامِ قلم؛ زیرش «۳ بسته × ۱۵۰» راست و جمعِ قلم چپ؛ و یادداشت‌ها (مرجوعی، قیمتِ اصلی) */
