@@ -6,6 +6,10 @@
  *                 تا روشن نشده برنامه تنظیمِ «موجودی و بها» را نشان نمی‌دهد و حتی با ردیفِ
  *                 `stock_mode=on` در دفتر همان موتورِ امروز را اجرا می‌کند (`StockLedger.isOn`).
  *
+ *                 INV-10: `countAbsorb: true` فقط وقتی `shop.count_absorb` روشن است (خاموش ⇒ کلید نیست، پاسخ بیت‌به‌بیت
+ *                 همان) — برنامه با آن فروشِ آفلاینِ پیش از شمارش را دوباره کم نمی‌کند (`CountAbsorbWiring`)، همان
+ *                 قاعدهٔ دفترِ سرور (`lib/count-absorb-ledger.js`).
+ *
  * ⛔ فقط خواندنِ پرچم؛ هیچ داده‌ای از دکان نمی‌دهد و چیزی نمی‌نویسد. موجودیِ منتشرشده همچنان
  * از `lib/catalog.js` (پرچمِ جدای `shop.catalog`) می‌آید.
  */
@@ -18,7 +22,10 @@ const router = express.Router();
 router.use(requireUser, requireShop);
 
 router.get('/config', async (req, res) => {
-  res.json({ enabled: await require('../lib/orders').flagOf(req.shopId, FLAG_KEY) });
+  const { flagOf } = require('../lib/orders');
+  const out = { enabled: await flagOf(req.shopId, FLAG_KEY) };
+  if (await flagOf(req.shopId, require('../lib/count-absorb-ledger').FLAG_KEY)) out.countAbsorb = true;
+  res.json(out);
 });
 
 router.FLAG_KEY = FLAG_KEY;

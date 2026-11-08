@@ -254,9 +254,12 @@ object StockActions {
       val why = listOf("انبارگردانی", StockLedger.ADJ_REASON.getValue(kind), note).filter { it.isNotEmpty() }.joinToString(" — ")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       val id = newId()
       val units = l.diffMilli / 1000.0
+      //  INV-10: لحظهٔ همین کالا در پیش‌نویس و دانستهٔ همین دستگاه ⇒ فروشِ آفلاینِ پیش از شمارش دوباره کم نمی‌شود
+      val at = CountAbsorbWiring.momentOf(draft.countedAt[l.productId], now)
       entries += WarehouseEntry(
         id = id, productId = l.productId, units = units, unit = p?.unit.orEmpty(), price = 0.0, date = today, notes = why,
         isAdjustment = true, createdAt = now, adjKind = kind, userId = user.trim().ifEmpty { null },
+        countedAt = at, seenMilli = at?.let { CountAbsorbWiring.seen(d, l.productId, it, now) },
       )
       moves += StockMovement(
         id = newId(), productId = l.productId, type = "adjustment", qty = units, date = today, notes = why, refId = id,

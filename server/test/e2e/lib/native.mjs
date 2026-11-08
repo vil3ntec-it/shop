@@ -27,6 +27,7 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
+const countAbsorb = require(path.join(ROOT, 'license', 'count-absorb-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
 /**
  * `X-App-Version` ِ پیش‌فرضِ دستگاه‌ها: گوشیِ `3.2.N` بالاتر از کفِ همهٔ فیلدهای
@@ -369,6 +370,7 @@ export class NativeDevice {
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
+    this.countAbsorb = false;   //  INV-10: `StockFlag` ⇐ `stockFlags()`
     this.token = '';
     this.refreshToken = '';
     this.refreshes = 0;
@@ -832,12 +834,71 @@ export class NativeDevice {
     return id;
   }
 
-  /** `ShopStore.stock`: Σ ورودِ انبار − Σ (فروخته − برگشته)ِ فاکتورهای لغونشده */
+  /** `ShopStore.stock`: Σ ورودِ انبار − Σ (فروخته − برگشته)ِ فاکتورهای لغونشده − جذب‌شدهٔ INV-10 (`CountAbsorbWiring`) */
   stock(productId, d = this.ledger) {
     const entered = d.warehouseEntries.filter((e) => e.productId === productId).reduce((s, e) => s + e.units, 0);
     const cancelled = new Set(d.sales.filter((s) => s.status === 'cancelled').map((s) => s.id));
     const sold = d.saleItems.filter((i) => i.productId === productId && !cancelled.has(i.saleId)).reduce((s, i) => s + (i.quantity - i.returnedQty), 0);
-    return entered - sold;
+    const g = this.absorbed(d).get(productId);
+    return entered - sold - (g ? g.gapMilli / 1000 : 0);
+  }
+
+  /** `StockFlag.kick`: پرچم‌های موجودیِ دکان (INV-10: `countAbsorb` ⇒ `CountAbsorbWiring.serverFlag`) */
+  async stockFlags() {
+    const r = await this.api('GET', '/shop/stock-ledger/config');
+    this.countAbsorb = r.status === 200 && r.body.countAbsorb === true;
+    return this.countAbsorb;
+  }
+
+  /** `CountAbsorbWiring.gaps` — پرچم خاموش یا بی ردیفِ لحظه‌دار ⇒ خالی */
+  absorbed(d = this.ledger) {
+    if (!this.countAbsorb || !d.warehouseEntries.some((e) => e.countedAt != null)) return new Map();
+    const lines = d.warehouseEntries
+      .filter((e) => e.isAdjustment && e.productId && (e.countedAt != null || e.adjKind === 'count' || String(e.notes || '').startsWith('انبارگردانی')))
+      .map((e) => ({ id: e.id, productId: e.productId, countedAt: e.countedAt ?? e.createdAt, seenMilli: e.countedAt != null ? e.seenMilli ?? null : null, createdAt: e.createdAt, correctedAt: e.correctedAt ?? null }));
+    return countAbsorb.gaps(lines, this.absorbEvents(d));
+  }
+
+  /**
+   * «انبارگردانیِ تازه» (`CountToolsRoute`): `CountShift` + `WarehouseEngine.stockCount(…, COUNT, countedAt)` — هر
+   * اختلاف یک ردیفِ «اصلاحِ شمارش» با لحظهٔ کالا و دانستهٔ همین دستگاه (`CountAbsorbWiring.seen`).
+   * counted: {کالا: عدد}، at: {کالا: لحظه} ⇒ شمارِ اختلاف‌ها
+   */
+  count(counted, at, note = '') {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const date = todayOf(now);
+    const why = ['انبارگردانی', note.trim()].filter(Boolean).join(' — ');
+    let n = 0;
+    for (const [pid, c] of Object.entries(counted)) {
+      const moved = d.stockMovements.filter((m) => m.productId === pid && !countAbsorb.TRANSFER_TYPES.includes(m.type) && m.createdAt > at[pid])
+        .reduce((s, m) => s + Math.round(m.qty * 1000), 0);
+      const diff = c - (this.stock(pid, d) - moved / 1000);
+      if (Math.abs(diff) < 0.0005) continue;
+      const p = d.products.find((x) => x.id === pid);
+      const moment = Math.min(at[pid], now);
+      const seenMilli = countAbsorb.seen(this.absorbEvents(d), pid, moment, now);
+      const id = core.ulid(now);
+      d.warehouseEntries.push(row('WarehouseEntry', {
+        id, productId: pid, cartons: 0, perCarton: 0, units: diff, unit: p.unit, price: 0, date, notes: why, isAdjustment: true,
+        createdAt: now, expiryDate: '', batch: '', productionDate: '', adjKind: 'count', countedAt: moment, seenMilli,
+      }));
+      d.stockMovements.push(row('StockMovement', {
+        id: core.ulid(now), productId: pid, type: 'count_adjust', qty: diff, date, notes: why, refId: id, createdAt: now, reason: why,
+      }));
+      d.auditLog.push(row('AuditEntry', {
+        id: core.ulid(now), type: 'stock_adjustment', date, refId: id, createdAt: now,
+        notes: `اصلاحِ شمارش «${p.name}» به مقدار ${diff > 0 ? '+' : '−'}${money(Math.abs(diff))} — دلیل: ${why}`,
+      }));
+      n += 1;
+    }
+    this.save(d);
+    return n;
+  }
+
+  /** `CountAbsorbWiring.events`: هر ردیفِ `stockMovements` */
+  absorbEvents(d) {
+    return d.stockMovements.map((m) => ({ id: m.id, productId: m.productId, at: m.createdAt, qtyMilli: Math.round(m.qty * 1000), type: m.type, refId: m.refId ?? null, correctedAt: m.correctedAt ?? null }));
   }
 
   /** `ShopStore.debt` */

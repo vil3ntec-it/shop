@@ -1,0 +1,1398 @@
+{
+ "format": "count-absorb-v1",
+ "note": "INV-10: lines/events ⇒ gaps (فقط ناصفر، با lineId) و stock = raw − gap. هر عدد هزارم. Kotlin: CountAbsorbVectorsTest، JS: server/test/count-absorb.test.js",
+ "window_ms": 2592000000,
+ "skew_ms": 300000,
+ "cases": [
+  {
+   "name": "S20/INV-10: ۳ فروشِ آفلاینِ ۱۰:۰۰ پس از شمارشِ ۱۷ ِ ساعتِ ۱۰:۳۰ می‌رسد ⇒ ۱۷، نه ۱۴",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "همان، پیش از رسیدنِ فروش ⇒ ۱۷ و هیچ جذب",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    }
+   ],
+   "raw": {
+    "p": 17000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "فروشِ پس از شمارش (۱۱:۰۰) عادی کم می‌شود: ۱۹ شمرده ⇒ ۱۶",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760003600000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "فروشِ هم‌لحظه با شمردن پیش از شمارش است (در عدد هست)",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760001800000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "شمارنده فروش را داشت (پیش از شمارش همگام شده بود) ⇒ دوباره برنمی‌گردد: ۱۶ شمرده ⇒ ۱۶",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 17000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "چند شمارش: فقط دیرترین (L2) جذب می‌کند — L1 هم فروش را ندیده بود، ولی دو بار کم نمی‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    },
+    {
+     "id": "L2",
+     "productId": "p",
+     "countedAt": 1760007200000,
+     "seenMilli": 17000,
+     "createdAt": 1760007260000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-L2",
+     "productId": "p",
+     "at": 1760007260000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L2"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 13000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L2",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "چند شمارش با لحظهٔ برابر ⇒ شناسهٔ بزرگ‌تر حاکم است",
+   "lines": [
+    {
+     "id": "L9",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    },
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 17000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L9",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "شمارشِ دیرتر بی لحظه (قدیمی یا وب) حاکم است و هیچ جذب نمی‌کند",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    },
+    {
+     "id": "L0",
+     "productId": "p",
+     "countedAt": 1760007200000,
+     "seenMilli": null,
+     "createdAt": 1760007200000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 14000
+    }
+   }
+  },
+  {
+   "name": "مسابقهٔ چند دستگاه: A (۳) و D (۲) هر دو آفلاین پیش از شمارش ⇒ ۱۵، به هر ترتیبی",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -5000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-a",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-d",
+     "productId": "p",
+     "at": 1760000600000,
+     "qtyMilli": -2000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 10000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -5000
+     }
+    },
+    "stock": {
+     "p": 15000
+    }
+   }
+  },
+  {
+   "name": "مسابقهٔ چند دستگاه، ترتیبِ دیگر",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-d",
+     "productId": "p",
+     "at": 1760000600000,
+     "qtyMilli": -2000,
+     "type": "sale"
+    },
+    {
+     "id": "e-a",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -5000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    }
+   ],
+   "raw": {
+    "p": 10000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -5000
+     }
+    },
+    "stock": {
+     "p": 15000
+    }
+   }
+  },
+  {
+   "name": "مسابقه، نیمه‌راه: فقط فروشِ D رسیده ⇒ همان ۱۵",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -5000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-d",
+     "productId": "p",
+     "at": 1760000600000,
+     "qtyMilli": -2000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 13000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -2000
+     }
+    },
+    "stock": {
+     "p": 15000
+    }
+   }
+  },
+  {
+   "name": "مسابقه: شمارنده فروشِ D را داشت، فروشِ A را نه ⇒ فقط A جذب ⇒ ۱۵",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 18000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-d",
+     "productId": "p",
+     "at": 1760000600000,
+     "qtyMilli": -2000,
+     "type": "sale"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-a",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 12000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 15000
+    }
+   }
+  },
+  {
+   "name": "op ِ تکراری (همان شناسه دو بار) یک بار شمرده می‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    },
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "برگشتِ آفلاینِ پیش از شمارش (+۲) دیر می‌رسد ⇒ در شمارش هست: ۱۷",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 15000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1759998200000,
+     "qtyMilli": -5000,
+     "type": "sale"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": 2000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-ret",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": 2000,
+     "type": "customer_return"
+    }
+   ],
+   "raw": {
+    "p": 19000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": 2000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "برگشتِ پس از شمارش عادی اضافه می‌شود: ۱۴ شمرده + ۲ ⇒ ۱۶",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 15000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1759998200000,
+     "qtyMilli": -5000,
+     "type": "sale"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-ret",
+     "productId": "p",
+     "at": 1760003600000,
+     "qtyMilli": 2000,
+     "type": "customer_return"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "انتقالِ میانِ مکان‌ها جمع را عوض نمی‌کند و جذب نمی‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-x1",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -2000,
+     "type": "transfer_out"
+    },
+    {
+     "id": "e-x2",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": 2000,
+     "type": "transfer_in"
+    }
+   ],
+   "raw": {
+    "p": 20000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 20000
+    }
+   }
+  },
+  {
+   "name": "کالای دیگر دست نمی‌خورد",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-q",
+     "productId": "q",
+     "at": 1760000000000,
+     "qtyMilli": -4000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000,
+    "q": 6000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000,
+     "q": 6000
+    }
+   }
+  },
+  {
+   "name": "ساعتِ کج — فروشنده: ساعت به ۱۰:۰۰ عقب کشیده شد پس از دیدنِ شمارش؛ سرورِ v3 زمانِ تصحیح‌شده گذاشت ⇒ جذب نمی‌شود، کم می‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale",
+     "correctedAt": 1760002160000
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "ساعتِ کج — فروشنده: زمانِ تصحیح‌شده پیش از ساختِ سندِ شمارش ⇒ واقعاً پیش از شمارش بود ⇒ جذب",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale",
+     "correctedAt": 1760000600000
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 17000
+    }
+   }
+  },
+  {
+   "name": "ساعتِ کج — شمارنده ۲ ساعت جلو؛ سرور ساختِ سند را ۱۰:۳۱ دید (serverAt) ⇒ ردیف معتبر نیست، فروشِ ۱۱:۰۰ کم می‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760009000000,
+     "seenMilli": 20000,
+     "createdAt": 1760009060000,
+     "serverAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760009060000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760003600000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "ساعتِ کج — شمارنده ۲ ساعت جلو در v3: سرور correctedAt گذاشت ⇒ هیچ گره جذب نمی‌کند",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760009000000,
+     "seenMilli": 20000,
+     "createdAt": 1760009060000,
+     "correctedAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760009060000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760003600000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "v1 بی زمانِ سرور: همان سندها روی دستگاه جذب می‌کنند (فقط سرور serverAt دارد؛ شکافِ مستند)",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760009000000,
+     "seenMilli": 20000,
+     "createdAt": 1760009060000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760009060000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760003600000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {
+     "p": {
+      "lineId": "L1",
+      "gapMilli": -3000
+     }
+    },
+    "stock": {
+     "p": 19000
+    }
+   }
+  },
+  {
+   "name": "ساعتِ کج — فروشِ عقب‌کشیده به بیش از ۳۰ روز پیش از شمارش ⇒ بیرونِ پنجره، کم می‌شود",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001800000,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -1000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1757323400000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 16000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 16000
+    }
+   }
+  },
+  {
+   "name": "لحظهٔ شمردن پس از ساختِ خودِ سند ⇒ ردیف معتبر نیست",
+   "lines": [
+    {
+     "id": "L1",
+     "productId": "p",
+     "countedAt": 1760001860001,
+     "seenMilli": 20000,
+     "createdAt": 1760001860000
+    }
+   ],
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-L1",
+     "productId": "p",
+     "at": 1760001860000,
+     "qtyMilli": -3000,
+     "type": "count_adjust",
+     "refId": "L1"
+    },
+    {
+     "id": "e-sale",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    }
+   ],
+   "raw": {
+    "p": 14000
+   },
+   "expect": {
+    "gaps": {},
+    "stock": {
+     "p": 14000
+    }
+   }
+  }
+ ],
+ "seen": [
+  {
+   "name": "دانستهٔ شمارنده: ورودی و فروشِ پیش از شمارش، نه پس از آن، نه انتقال، نه کهنه‌تر از ۳۰ روز، نه زمانِ تصحیح‌شدهٔ پس از ساختِ سند، تکراری یک بار",
+   "productId": "p",
+   "countedAt": 1760001800000,
+   "createdAt": 1760001860000,
+   "events": [
+    {
+     "id": "e-in",
+     "productId": "p",
+     "at": 1759996400000,
+     "qtyMilli": 20000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-s1",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-s1",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -3000,
+     "type": "sale"
+    },
+    {
+     "id": "e-s2",
+     "productId": "p",
+     "at": 1760001800001,
+     "qtyMilli": -1000,
+     "type": "sale"
+    },
+    {
+     "id": "e-x",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -2000,
+     "type": "transfer_out"
+    },
+    {
+     "id": "e-old",
+     "productId": "p",
+     "at": 1757409800000,
+     "qtyMilli": 5000,
+     "type": "purchase_in"
+    },
+    {
+     "id": "e-c",
+     "productId": "p",
+     "at": 1760000000000,
+     "qtyMilli": -7000,
+     "type": "sale",
+     "correctedAt": 1760001860000
+    },
+    {
+     "id": "e-q",
+     "productId": "q",
+     "at": 1760000000000,
+     "qtyMilli": -9000,
+     "type": "sale"
+    },
+    {
+     "id": "e-t",
+     "productId": "p",
+     "at": 1760001800000,
+     "qtyMilli": 1000,
+     "type": "customer_return"
+    }
+   ],
+   "expect": 18000
+  }
+ ],
+ "trusted": [
+  {
+   "line": {
+    "id": "a",
+    "productId": "p",
+    "countedAt": 1760001800000,
+    "seenMilli": 0,
+    "createdAt": 1760001860000
+   },
+   "expect": true
+  },
+  {
+   "line": {
+    "id": "b",
+    "productId": "p",
+    "countedAt": 1760001800000,
+    "seenMilli": null,
+    "createdAt": 1760001860000
+   },
+   "expect": false
+  },
+  {
+   "line": {
+    "id": "c",
+    "productId": "p",
+    "countedAt": 1760001860001,
+    "seenMilli": 0,
+    "createdAt": 1760001860000
+   },
+   "expect": false
+  },
+  {
+   "line": {
+    "id": "d",
+    "productId": "p",
+    "countedAt": 1757409860000,
+    "seenMilli": 0,
+    "createdAt": 1760001860000
+   },
+   "expect": false
+  },
+  {
+   "line": {
+    "id": "e",
+    "productId": "p",
+    "countedAt": 1757409860001,
+    "seenMilli": 0,
+    "createdAt": 1760001860000
+   },
+   "expect": true
+  },
+  {
+   "line": {
+    "id": "f",
+    "productId": "p",
+    "countedAt": 1760001800000,
+    "seenMilli": 0,
+    "createdAt": 1760001860000,
+    "correctedAt": 1760001860000
+   },
+   "expect": false
+  },
+  {
+   "line": {
+    "id": "g",
+    "productId": "p",
+    "countedAt": 1760001800000,
+    "seenMilli": 0,
+    "createdAt": 1760001860000,
+    "serverAt": 1760001500000
+   },
+   "expect": true
+  },
+  {
+   "line": {
+    "id": "h",
+    "productId": "p",
+    "countedAt": 1760001800000,
+    "seenMilli": 0,
+    "createdAt": 1760001860000,
+    "serverAt": 1760001499999
+   },
+   "expect": false
+  },
+  {
+   "line": {
+    "id": "i",
+    "productId": "p",
+    "countedAt": 0,
+    "seenMilli": 0,
+    "createdAt": 1760001860000
+   },
+   "expect": false
+  }
+ ]
+}
