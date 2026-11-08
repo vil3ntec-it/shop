@@ -262,6 +262,28 @@
       }
     },
     {
+      "name": "lots move between warehouses: a chosen lot, then FEFO; the receiving lot keeps its expiry (INV-20)",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 6000, "costMinor": 60000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 48000, "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 1000, "lotId": "Y", "refId": "T1"}, "expect": {"ok": true, "costMinor": 10800, "picks": [{"lotId": "Y", "qtyMilli": 1000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 1000, "costMinor": 10800, "refId": "T1", "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true, "costMinor": 10800}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 6000, "refId": "T2"}, "expect": {"ok": true, "costMinor": 64800, "picks": [{"lotId": "X", "qtyMilli": 6000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 6000, "costMinor": 64800, "refId": "T2", "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 64800}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 4000, "lotId": "Y"}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 3000}},
+        {"doc": {"type": "sale", "warehouseId": "W2", "qtyMilli": 2000}, "expect": {"ok": true, "costMinor": 21600, "picks": [{"lotId": "X", "qtyMilli": 2000}], "shortMilli": 0}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "P1", "warehouseId": "W1", "qtyMilli": 3000, "valueMinor": 32400, "lots": [{"lotId": "Y", "qtyMilli": 3000}]},
+          {"productId": "P1", "warehouseId": "W2", "qtyMilli": 5000, "valueMinor": 54000, "lots": [{"lotId": "X", "qtyMilli": 4000}, {"lotId": "Y", "qtyMilli": 1000}]}
+        ],
+        "totals": {"purchasesMinor": 108000, "transfersMinor": 0, "cogsMinor": 21600}
+      }
+    },
+    {
       "name": "production consumes a component at average and books the product at its cost",
       "defaults": {"productId": "P2", "warehouseId": "W1", "userId": "u1"},
       "steps": [

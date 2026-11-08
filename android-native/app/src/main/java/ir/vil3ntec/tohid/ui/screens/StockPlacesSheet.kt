@@ -11,12 +11,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import ir.vil3ntec.tohid.core.i18n.I18n
 import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.product.PackBarcodes
+import ir.vil3ntec.tohid.core.stock.Lot
+import ir.vil3ntec.tohid.core.stock.Pick
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ProductPlansMap
 import ir.vil3ntec.tohid.data.Repack
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.StockActions
 import ir.vil3ntec.tohid.data.StockLedger
 import ir.vil3ntec.tohid.data.StockPlaces
 import ir.vil3ntec.tohid.money
@@ -83,13 +87,54 @@ private fun DialogFrame(title: String, note: String, onDismiss: () -> Unit, cont
 
 /* ============================== INV-20 · محل‌ها و انتقال ============================== */
 
+/** «سری ۱۲ · انقضا ۱۴۰۵/۱۰/۰۱ · ۶ عدد» */
+private fun lotText(l: Lot, unit: String): String = listOf(
+  StockActions.lotLabel(l.lotId),
+  l.expiryDate?.let { StrPlaces.expires(I18n.dateNumeric(it, I18n.lang, I18n.CAL_SOLAR)) } ?: StrPlaces.noExpiry,
+  "${milliText(l.qtyMilli)} $unit",
+).joinToString(" · ")
+
+/**
+ *  سری‌های مبدأ و انتخاب: FEFO (پیش‌فرض، همان `StockPlaces.fefo`) با پیش‌نمایشِ آنچه می‌رود، یا مقدارِ هر سری.
+ *  [picks] متنِ تایپ‌شدهٔ هر سری؛ بی سری فقط با FEFO (`StockPlaces.transfer` همان را می‌سنجد).
+ */
+@Composable
+private fun LotChoice(lots: List<Lot>, unit: String, byLot: Boolean, onMode: (Boolean) -> Unit, amountMilli: Long, picks: Map<String, String>, onPick: (String, String) -> Unit) {
+  Spacer(Modifier.height(8.dp))
+  Text(StrPlaces.lotsHere, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
+  SegmentedChoice(listOf("fefo" to StrPlaces.byFefo, "lot" to StrPlaces.byLot), if (byLot) "lot" else "fefo", { onMode(it == "lot") })
+  Spacer(Modifier.height(4.dp))
+  for (l in lots) {
+    if (byLot && l.lotId.isNotEmpty()) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(lotText(l, unit), style = MaterialTheme.typography.bodySmall, color = Shop.colors.text, modifier = Modifier.weight(1f))
+        NumberField(picks[l.lotId].orEmpty(), { onPick(l.lotId, it) }, StrPlaces.amount, Modifier.width(110.dp))
+      }
+    } else {
+      Text(lotText(l, unit), style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted)
+    }
+  }
+  if (byLot) {
+    if (lots.any { it.lotId.isEmpty() }) Text(StrPlaces.lotlessHint, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted)
+  } else if (amountMilli > 0) {
+    val go = StockPlaces.fefo(lots, amountMilli).picks
+    if (go.isNotEmpty()) {
+      Text(
+        StrPlaces.moves(go.joinToString("، ") { "${StockActions.lotLabel(it.lotId)} ${milliText(it.qtyMilli)}" }),
+        style = MaterialTheme.typography.labelSmall, color = Shop.colors.success,
+      )
+    }
+  }
+}
+
 @Composable
 fun StockPlacesDialog(
   d: ShopData,
   onDismiss: () -> Unit,
   onAdd: (name: String) -> Unit,
   onArchive: (name: String) -> Unit,
-  onTransfer: (productId: String, from: String, to: String, qtyMilli: Long, reason: String) -> Unit,
+  /** [lots]: سری‌های برگزیده؛ `null` ⇒ FEFO */
+  onTransfer: (productId: String, from: String, to: String, qtyMilli: Long, reason: String, lots: List<Pick>?) -> Unit,
 ) {
   val stock = remember(d) { StockPlaces.stockAt(d) }
   val places = remember(d, stock) { StockPlaces.places(d, stock) }
@@ -134,15 +179,29 @@ fun StockPlacesDialog(
       FilterMenu(StrPlaces.destination, options, to, { to = it ?: StockLedger.MAIN }, StockPlaces.label(StockLedger.MAIN))
     }
     Spacer(Modifier.height(8.dp))
-    NumberField(amount, { amount = it }, StrPlaces.amount, Modifier.fillMaxWidth())
+    //  سری‌های مبدأ (همان `StockPlaces.lotsAt`)؛ مبدأِ بی سری ⇒ همان پنجرهٔ پیشین
+    val lots = remember(d, stock, productId, from) {
+      productId?.let { pid -> StockPlaces.lotsAt(d, pid, stock)[from].orEmpty().filter { it.qtyMilli > 0 } }.orEmpty()
+    }
+    val lotted = lots.any { it.lotId.isNotEmpty() }
+    var byLot by remember(productId, from) { mutableStateOf(false) }
+    var picks by remember(productId, from) { mutableStateOf(mapOf<String, String>()) }
+    val chosen = if (lotted && byLot) picks.mapNotNull { (lot, raw) -> milliOf(raw).takeIf { it > 0 }?.let { Pick(lot, it) } } else null
+    val qtyMilli = chosen?.sumOf { it.qtyMilli } ?: milliOf(amount)
+    if (chosen == null) NumberField(amount, { amount = it }, StrPlaces.amount, Modifier.fillMaxWidth())
+    if (lotted) {
+      val unit = d.products.find { it.id == productId }?.unit.orEmpty()
+      LotChoice(lots, unit, byLot, { byLot = it }, qtyMilli, picks) { lot, raw -> picks = picks + (lot to raw) }
+      if (chosen != null) Text(StrPlaces.total(milliText(qtyMilli), unit), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
+    }
     Spacer(Modifier.height(8.dp))
     OutlinedTextField(reason, { reason = it.take(80) }, label = { Text(StrPlaces.reason) }, singleLine = true, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(16.dp))
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
       OutlinedButton(onClick = onDismiss, modifier = Modifier.weight(1f)) { Text(StrPlaces.close) }
       Button(
-        enabled = productId != null && from != to && milliOf(amount) > 0,
-        onClick = { onTransfer(productId ?: return@Button, from, to, milliOf(amount), reason); amount = "" },
+        enabled = productId != null && from != to && qtyMilli > 0,
+        onClick = { onTransfer(productId ?: return@Button, from, to, qtyMilli, reason, chosen); amount = ""; picks = emptyMap() },
         modifier = Modifier.weight(1f),
       ) { Text(StrPlaces.transfer) }
     }

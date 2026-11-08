@@ -155,6 +155,18 @@ object StrGoods {
     "په «$place» کې یوازې $qty $unit شته",
   )
   val transferImpossible: String get() = t("انتقال ممکن نیست", "The transfer isn't possible", "لېږد شونی نه دی")
+  /** INV-20 — سریِ برگزیده در مبدأ کم است (`StockPlaces.transfer`) */
+  fun lotOnlyAt(lot: Any?, place: Any?, qty: Any?, unit: Any?): String = t(
+    "از «${asIs(lot)}» در «${asIs(place)}» فقط ${asIs(qty)} ${asIs(unit)} هست",
+    "Only $qty $unit of «$lot» at «$place»",
+    "د «$lot» څخه په «$place» کې یوازې $qty $unit شته",
+  )
+  /** INV-20 — بی سری فقط پس از همهٔ سری‌های مبدأ (همان FEFO ِ موتورِ تازه) */
+  val lotlessLast: String get() = t(
+    "کالای بی سری فقط پس از همهٔ سری‌های این محل جابه‌جا می‌شود",
+    "Stock without a lot moves only after every lot at this place",
+    "بې لړۍ توکی یوازې د دې ځای له ټولو لړیو وروسته لېږدول کېږي",
+  )
   val countOneBad: String get() = t("عددِ شمرده‌شدهٔ یک کالا درست نیست", "One item's counted number isn't valid", "د یو توکي شمېرل شوی عدد سم نه دی")
   val opIdEmpty: String get() = t("شناسهٔ کار خالی است", "The operation id is empty", "د کار پېژندنه تشه ده")
   val placeNameNeeded: String get() = t("نامِ محل را بنویسید", "Write the place's name", "د ځای نوم ولیکئ")

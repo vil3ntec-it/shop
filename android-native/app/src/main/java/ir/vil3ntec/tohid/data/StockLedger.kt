@@ -144,7 +144,7 @@ object StockLedger {
     val adjKind: String = "",
   )
 
-  private fun lotRefOf(w: WarehouseEntry): LotRef? {
+  internal fun lotRefOf(w: WarehouseEntry): LotRef? {
     val batch = w.batch.trim()
     val exp = w.expiryDate.takeIf { it.isNotEmpty() && StockCore.isoDateOk(it) }
     var prod = w.productionDate.takeIf { it.isNotEmpty() && StockCore.isoDateOk(it) }
@@ -333,8 +333,8 @@ object StockLedger {
      ========================================================== */
 
   /** شناسهٔ انبار در هسته خالی نمی‌شود؛ محلِ اصلی "" است ⇒ «L:» + نام */
-  private fun wid(location: String) = "L:$location"
-  private fun locOf(warehouseId: String) = warehouseId.substring(2)
+  internal fun wid(location: String) = "L:$location"
+  internal fun locOf(warehouseId: String) = warehouseId.substring(2)
 
   data class Snap(val location: String, val position: Position) {
     val lots: List<Lot> get() = position.lots.filter { it.qtyMilli != 0L }
@@ -405,7 +405,7 @@ object StockLedger {
   data class Applied(val doc: StockDoc, val result: StockResult)
   private data class Step(val book: StockBook, val applied: List<Applied>, val error: StockResult?)
 
-  private fun applyEvent(book0: StockBook, ev: Event, recorded: Boolean, today: String?): Step {
+  private fun applyEvent(book0: StockBook, ev: Event, recorded: Boolean, today: String?, keepPlace: Boolean = false): Step {
     val mode = if (recorded) StockMode.RECORDED else StockMode.LOCAL
     var book = book0
     val applied = ArrayList<Applied>()
@@ -440,7 +440,7 @@ object StockLedger {
         return Step(book, applied, null)
       }
       "sale" -> {
-        val parts = saleParts(book, ev.productId, ev.qtyMilli, ev.location, ev.lotId, today, recorded)
+        val parts = if (keepPlace) listOf(Part(ev.location, ev.qtyMilli)) else saleParts(book, ev.productId, ev.qtyMilli, ev.location, ev.lotId, today, recorded)
         for ((p, part) in parts.withIndex()) {
           val sd = docOf(ev, "sale", part.location, part.qtyMilli, id = if (parts.size > 1) "${ev.id}:$p" else ev.id, lotId = ev.lotId)
           val r = StockCore.apply(book, sd, mode, today)
@@ -538,6 +538,13 @@ object StockLedger {
       }
     }
     return View(books, rows, tasks, errors)
+  }
+
+  /** INV-20 — همین بازپخش با قاعدهٔ موتورِ امروز ([applyEvent] ِ `keepPlace`: فروش از محلِ خودِ قلم، بی پخش)؛ `StockPlaces.lotsAt` */
+  internal fun placeBooks(d: ShopData, productIds: Set<String>): Map<String, StockBook> {
+    val books = HashMap<String, StockBook>()
+    for (ev in events(d, productIds)) applyEvent(books[ev.productId] ?: StockBook(), ev, true, ev.day, keepPlace = true).let { if (it.error == null) books[ev.productId] = it.book }
+    return books
   }
 
   /* ==========================================================
