@@ -79,6 +79,8 @@ import java.util.Locale
  *  STF-09: هر ردیف «کاربر (نقش) · دستگاه» را دارد (ردیفِ کهنهٔ بی مُهر «نامعلوم») و سرِ فهرست سلامتِ زنجیرهٔ هش
  *  (`AuditSeal.verify` با لنگرِ همین دستگاه، بیرون از رشتهٔ اصلی): «زنجیره سالم است» یا «زنجیره از ردیفِ N شکسته است»
  *  با دلیل و دستگاه؛ همان ردیف نشانِ قرمز می‌گیرد. خودِ صفحه فقط با اجازهٔ `audit.view` باز می‌شود (`Need.AUDIT`).
+ *  حکمِ سرور (رونوشت و لنگرِ همهٔ دستگاه‌ها، `AuditAnchorSync.verdict`) اگر همین دفتر سالم است: «به گفتهٔ سرور،
+ *  زنجیره از ردیفِ N شکسته است» (مثلاً دُمِ همگام‌نشدهٔ دستگاهِ دیگری که بریده شد).
  */
 @Composable
 fun AuditScreen(
@@ -101,7 +103,7 @@ fun AuditScreen(
   val thisDevice = chain.thisDevice
   val names = chain.names
   val report = chain.report
-  val brokenId = AuditModel.brokenId(report)
+  val brokenId = AuditModel.brokenId(report, chain.server)
   val chips: (@Composable () -> Unit)? = if (log.isEmpty()) null else ({
     V3ChipRow {
       V3Chip(Str.all, kind == null, { kind = null })
@@ -132,7 +134,7 @@ fun AuditScreen(
       ) {
         report?.let { r ->
           item(key = "chain") {
-            val line = AuditModel.chainLine(r, thisDevice)
+            val line = AuditModel.chainLine(r, thisDevice, chain.server)
             val tone = when (line.ok) { true -> V3Tone.SUCCESS; false -> V3Tone.ERROR; null -> V3Tone.INFO }
             Box(Modifier.padding(top = 8.dp, bottom = 4.dp)) { V3Message(tone, line.title, body = line.body) }
           }

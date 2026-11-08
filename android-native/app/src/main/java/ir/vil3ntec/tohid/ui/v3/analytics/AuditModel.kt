@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.core.audit.AuditAnchor
 import ir.vil3ntec.tohid.core.audit.AuditChain
 import ir.vil3ntec.tohid.core.i18n.StrAccount
 import ir.vil3ntec.tohid.core.i18n.StrReports
@@ -119,21 +120,30 @@ object AuditModel {
   /** وضعیتِ زنجیره برای سرِ صفحه: [ok] = `null` ⇐ هنوز هیچ ردیفِ زنجیره‌داری نیست */
   data class ChainLine(val ok: Boolean?, val title: String, val body: String?)
 
-  fun chainLine(r: AuditChain.Report, thisDevice: String): ChainLine {
+  /**
+   *  @param server حکمِ سرور (`AuditAnchor.Verdict`: رونوشتِ همگام‌شده و لنگرِ گزارش‌شدهٔ **همهٔ** دستگاه‌ها، STF-09)؛
+   *  شکستِ همین دفتر جلوتر است، وگرنه شکستِ سرور با «به گفتهٔ سرور» (دُمِ بریدهٔ دستگاهِ دیگر، انشعاب، عقب‌گرد…).
+   *  `null` (پرچمِ خاموش، بی‌اینترنت، بی اجازه) ⇐ فقط سنجشِ همین دستگاه، همان پیشین.
+   */
+  fun chainLine(r: AuditChain.Report, thisDevice: String, server: AuditAnchor.Verdict? = null): ChainLine {
     val b = r.broken
+    val s = server?.broken
+    fun where(x: AuditChain.Break) = StrReports.whoLine(reasonText(x.reason), deviceName(x.chain.substringBeforeLast('/', ""), thisDevice))
     return when {
-      b != null -> ChainLine(false, StrReports.chainBroken(b.seq.coerceAtLeast(1)), StrReports.whoLine(reasonText(b.reason), deviceName(b.chain.substringBeforeLast('/', ""), thisDevice)))
+      b != null -> ChainLine(false, StrReports.chainBroken(b.seq.coerceAtLeast(1)), where(b))
+      s != null -> ChainLine(false, StrReports.chainServerBroken(s.seq.coerceAtLeast(1)), where(s))
       r.chained == 0 -> ChainLine(null, StrReports.chainNotStarted, null)
       else -> ChainLine(true, StrReports.chainOk, if (r.unverified > 0) StrReports.chainUnverified(r.unverified) else StrReports.chainOkBody)
     }
   }
 
+  /** دلیلِ شکست به زبانِ صاحب؛ `deleted` و `rewritten` فقط از سرور می‌آیند (حذفِ نرم و بازنویسی پس از رسیدن) */
   fun reasonText(reason: String): String = when (reason) {
-    "hash_mismatch", "bad_doc" -> StrReports.chainEdited
-    "seq_gap", "truncated" -> StrReports.chainDeleted
+    "hash_mismatch", "bad_doc", "rewritten" -> StrReports.chainEdited
+    "seq_gap", "truncated", "deleted" -> StrReports.chainDeleted
     else -> StrReports.chainReordered
   }
 
-  /** شناسهٔ ردیفی که زنجیره از آن شکسته (نشانِ قرمز روی همان ردیف)؛ ردیفِ پاک‌شده ⇐ null */
-  fun brokenId(r: AuditChain.Report?): String? = r?.broken?.id
+  /** شناسهٔ ردیفی که زنجیره از آن شکسته (نشانِ قرمز روی همان ردیف): همین دفتر، وگرنه سرور؛ ردیفِ پاک‌شده ⇐ null */
+  fun brokenId(r: AuditChain.Report?, server: AuditAnchor.Verdict? = null): String? = r?.broken?.id ?: server?.broken?.id
 }

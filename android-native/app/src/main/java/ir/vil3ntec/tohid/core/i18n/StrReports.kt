@@ -166,6 +166,7 @@ object StrReports {
   fun whoLine(user: Any, device: Any): String = t("${asIs(user)} · ${asIs(device)}", "$user · $device", "$user · $device")
   val chainOk: String get() = t("زنجیره سالم است", "The chain is intact", "زنځیر روغ دی")
   fun chainBroken(row: Any): String = t("زنجیره از ردیفِ ${asIs(row)} شکسته است", "The chain is broken from row $row", "زنځیر له $row کرښې څخه مات دی")
+  fun chainServerBroken(row: Any): String = t("به گفتهٔ سرور، زنجیره از ردیفِ ${asIs(row)} شکسته است", "According to the server, the chain is broken from row $row", "د سرور په وینا، زنځیر له $row کرښې څخه مات دی")
   val chainNotStarted: String get() = t("زنجیرهٔ هشِ این دکان هنوز شروع نشده است", "This shop's hash chain hasn't started yet", "د دې دوکان د هش زنځیر لا نه دی پیل شوی")
   val chainOkBody: String get() = t("هیچ ردیفی پس از ثبت ویرایش، پاک یا جابه‌جا نشده است.", "No row has been edited, deleted or reordered after it was recorded.", "هېڅ کرښه له ثبت وروسته نه ده بدله شوې، نه ړنګه شوې او نه یې ځای بدل شوی.")
   fun chainUnverified(n: Any): String = t("${asIs(n)} ردیف را نسخهٔ تازه‌ترِ برنامه نوشته است؛ پس از به‌روزرسانی سنجیده می‌شود.", "$n ${pl(n, "row was", "rows were")} written by a newer app version; ${pl(n, "it is", "they are")} checked after you update.", "$n کرښې د اپ نوې نسخې لیکلې دي؛ له تازه کولو وروسته کتل کېږي.")

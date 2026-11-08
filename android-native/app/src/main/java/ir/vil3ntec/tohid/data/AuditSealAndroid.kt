@@ -49,11 +49,16 @@ object AuditSealAndroid {
   /** لنگرِ همین حساب و دکان برای سنجشِ صفحه؛ نبود ⇐ null (بی سنجشِ دم) */
   fun anchors(context: Context): AuditChain.Anchors? = runCatching { anchorStore(context).read() }.getOrNull()
 
-  fun anchorStore(context: Context): AuditSeal.AnchorStore {
+  fun anchorStore(context: Context): AuditSeal.AnchorStore = FileAnchors(file(context, "anchor"))
+
+  /** «تا کجا به سرور گفته شد» (`core/audit/AuditAnchor.Sent`، `AuditAnchorSync`) — کنارِ همان لنگر، بیرون از پشتیبان */
+  fun sentFile(context: Context): File = file(context, "sent")
+
+  private fun file(context: Context, ext: String): File {
     val app = context.applicationContext ?: context
     val account = runCatching { SyncStateV1.currentAccount(app) }.getOrDefault("").ifBlank { "local" }
     val shop = LedgerOwner.currentShop(app).ifBlank { "local" }
-    return FileAnchors(File(app.noBackupFilesDir, "audit-chain/${safe(account)}/${safe(shop)}.anchor"))
+    return File(app.noBackupFilesDir, "audit-chain/${safe(account)}/${safe(shop)}.$ext")
   }
 
   private fun safe(s: String): String = s.replace(Regex("[^A-Za-z0-9_.-]"), "_").take(80)

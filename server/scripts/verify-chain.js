@@ -9,7 +9,8 @@
  *   node scripts/verify-chain.js --json           خروجیِ ماشینی
  *   node scripts/verify-chain.js --device-audit [<دکان>]
  *                                                 زنجیرهٔ سابقهٔ عملیاتِ دستگاه‌ها (STF-09) روی رونوشتِ همگام‌شده
- *                                                 (`sync_rows`، حذف‌شده‌ها هم) — lib/device-audit-chain.js
+ *                                                 (`sync_rows`، حذف‌شده‌ها هم) با لنگرِ گزارش‌شدهٔ هر دستگاه
+ *                                                 (`device_audit_anchors`) — lib/device-audit-chain.js
  *
  * کدِ خروج: ۰ همه سالم · ۲ دست‌کم یک زنجیره شکسته · ۱ خطا (دیتابیس، ورودی)
  * برای هر زنجیرهٔ شکسته **نخستین** حلقهٔ شکسته و دلیلش چاپ می‌شود؛ برای
@@ -67,7 +68,10 @@ async function deviceAudit(opts, print) {
     for (const r of report.results) {
       const flagged = new Set(r.extra.map((b) => b.chain));
       for (const c of r.chains) {
-        if (!c.broken && !flagged.has(c.chain)) print(`✔ ${r.shopId} ${c.chain} — ${c.rows} ردیف، سر ${c.head}`);
+        if (c.broken || flagged.has(c.chain)) continue;
+        const anchor = c.anchor ? `، لنگر #${c.anchor.seq}` : '';
+        const pending = c.pending ? `، ${c.pending} ردیفِ زیرِ لنگر هنوز در راه (صفِ دستگاه)` : '';
+        print(`✔ ${r.shopId} ${c.chain} — ${c.rows} ردیف، سر ${c.head}${anchor}${pending}`);
       }
       const all = [...r.bad, ...r.chains.filter((c) => c.broken).map((c) => c.broken), ...r.extra];
       for (const b of all) print(`✖ ${r.shopId} ${b.chain} — ردیفِ #${b.seq}: ${dac.REASONS[b.reason] || b.reason} (${b.reason})`);
