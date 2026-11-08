@@ -98,7 +98,23 @@ object ConflictInbox {
     val resolvedAt: Long?,
     val note: String,
     val fixedDoc: String,
+    /** فقط ردیفِ «کنار گذاشته» یا «اصلاح‌شده»: آنچه دستگاهِ سازنده برای هم‌سو شدن با سرور لازم دارد ([RejectedSettle]) */
+    val settle: Settle? = null,
   )
+
+  /**
+   *  `settle` ِ `/mine` — بستهٔ همان سند از دیدِ سرور (`loser_value.ops`) و مقدارِ امروزِ سرور برای ردیف‌هایی که opِ
+   *  غیرِ درجِ بسته به آن‌ها دست زد (`"<جدول>/<شناسه>"` ⇒ ردیف؛ نبودِ ردیف روی سرور ⇒ null).
+   */
+  data class Settle(
+    val path: String,
+    val ops: List<SettleOp>,
+    val base: Map<String, Map<*, *>?>,
+    val truncated: Boolean,
+  )
+
+  /** یک op ِ بسته: شناسه و جای آن (`type` همان `type` ِ v1 یا `kind` ِ v3) */
+  data class SettleOp(val id: String, val table: String, val rowId: String, val type: String)
 
   // ---------- خواندن ----------
 
@@ -160,7 +176,20 @@ object ConflictInbox {
       id = id, table = str(o["table"]), rowId = str(o["rowId"]), opId = str(o["opId"]), device = str(o["device"]),
       reason = str(o["reason"]).ifEmpty { "rejected" }, status = str(o["status"]).ifEmpty { OPEN }, at = long(o["at"]) ?: 0L,
       resolvedAt = long(o["resolvedAt"]), note = str(o["note"]), fixedDoc = str(o["fixedDoc"]),
+      settle = settle(map(o["settle"])),
     )
+  }
+
+  private fun settle(m: Map<*, *>?): Settle? {
+    m ?: return null
+    val ops = list(m["ops"]).mapNotNull { x ->
+      val o = map(x) ?: return@mapNotNull null
+      val id = str(o["id"]).takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+      SettleOp(id, str(o["table"]), str(o["rowId"]), str(o["type"]))
+    }
+    val base = LinkedHashMap<String, Map<*, *>?>()
+    map(m["base"])?.forEach { (k, v) -> if (k is String) base[k] = map(v) }
+    return Settle(str(m["path"]), ops, base, m["truncated"] == true)
   }
 
   // ---------- کار ----------

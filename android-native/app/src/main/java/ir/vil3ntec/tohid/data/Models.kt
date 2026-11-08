@@ -847,6 +847,8 @@ data class ShopData(
   val auditLog: List<AuditEntry> = emptyList(),
   /** گاوصندوق (PAY-18) — مجموعهٔ پلهٔ ۴ِ Sync v1 */
   val safeEntries: List<SafeEntry> = emptyList(),
+  /** سندِ ردشده‌ای که صاحب «کنار گذاشت»/«اصلاح کرد» — کامل و بیرون از همگام‌سازی (`data/SetAsideDoc.kt`)؛ `[]` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val setAside: List<SetAsideDoc> = emptyList(),
 )
 
 val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ دستهٔ مصرف

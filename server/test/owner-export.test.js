@@ -46,6 +46,10 @@ function ledger() {
     priceHistory: [],
     auditLog: [{ id: 'a1', type: 'shift_open', date: '2026-08-28', refId: null, notes: 'صندوق', createdAt: 1700000000000, amount: 1000 }],
     safeEntries: [{ id: 'sf1', kind: 'to_bank', amountMinor: 250000, createdAt: 1700000000000, bagNo: 'K-17' }],
+    //  سندِ ردشده‌ای که صاحب کنار گذاشت (پشتیبانِ برنامهٔ نصبی؛ `ShopData.setAside`)
+    setAside: [{ id: 'cf_1', status: 'dismissed', note: 'مشتری نخواست', reason: 'approval_required', fixedDoc: '', table: 'sales', rowId: 's9',
+      saleId: 's9', resolvedAt: 1700000000000, settledAt: 1700000001000, ops: [{ op_id: 'o1', table: 'sales', row_id: 's9', type: 'insert' }],
+      rows: { sales: [{ id: 's9', finalTotal: 1200 }] }, undo: [{ op_id: 'sx_1_0', table: 'sales', row_id: 's9', type: 'delete' }], kept: [] }],
     settings: { storeName: 'دکان آزمون', theme: 'dark', motion: 'full' },
   };
 }

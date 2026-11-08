@@ -920,6 +920,8 @@ class SyncV1Engine private constructor(context: Context) {
 
   fun queueSize(): Int = queue.size()
   fun droppedOps(): List<JsonObject> = queue.dropped()
+  /** «کنار بگذار»/«اصلاح و ثبت» ِ صاحب روی همین دفتر (`data/SetAside`؛ شرح سرِ `SetAsideCommit`) */
+  @Synchronized internal fun setAside(decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>, read: () -> ShopData, write: (ShopData) -> Unit): Int = SetAsideCommit.run(commit, { queue.all().mapTo(HashSet()) { "${it.table}/${it.rowId}" } }, decisions, book, read, write, clock())
   fun errorReports(): Boolean = state.errorReports
   fun setErrorReports(on: Boolean) { state.errorReports = on }
   fun deviceId(): String = V1Replica.id(this, app, store, state)  // `device_id` ِ همین حساب روی همین دستگاه (V1ReplicaAndroid)

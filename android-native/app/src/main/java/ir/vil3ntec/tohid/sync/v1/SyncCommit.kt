@@ -181,9 +181,21 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    *
    *  @param cursor cursorِ پس از این opها؛ `null` یعنی دست نخورد
    */
-  fun absorb(ops: List<SyncOp>, current: ShopData, cursor: Long?, writeLedger: (ShopData) -> Unit) {
+  fun absorb(ops: List<SyncOp>, current: ShopData, cursor: Long?, writeLedger: (ShopData) -> Unit) =
+    absorbWith(ops, current, cursor, writeLedger) { it }
+
+  /**
+   *  پس از «کنار بگذار»/«اصلاح و ثبت» ِ صاحب (`core/sync/RejectedSettle`، `data/SetAside`): opهای برگرداننده مثلِ
+   *  opِ رسیده روی دفتر **و** سایه (هیچ op ای به صف نمی‌رود؛ cursor دست نمی‌خورد)، و [finish] — نشانِ «کنار گذاشته شد»،
+   *  فقط بیرون از مجموعه‌های همگام — در **همان** نوشتنِ دفتر و همان اثرِ انگشتِ ژورنالِ «نشاندن». بسته شدنِ برنامه در
+   *  میانه ⇒ `recover` یا هر دو را تمام می‌کند یا هیچ‌کدام را (هرگز برگرداندنِ بی نشان، که دورِ بعد دوباره برمی‌گرداند).
+   */
+  fun setAside(undo: List<SyncOp>, current: ShopData, finish: (ShopData) -> ShopData, writeLedger: (ShopData) -> Unit) =
+    absorbWith(undo, current, null, writeLedger, finish)
+
+  private fun absorbWith(ops: List<SyncOp>, current: ShopData, cursor: Long?, writeLedger: (ShopData) -> Unit, finish: (ShopData) -> ShopData) {
     if (journal.exists()) recover(current)
-    val ledger = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(current), ops))
+    val ledger = finish(LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(current), ops)))
     val tree = LedgerDiff.toJson(ledger)
     val before = parts.shadow()
     val shadow = absorbedShadow(before, ops, tree)

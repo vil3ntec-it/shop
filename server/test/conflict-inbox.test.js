@@ -348,3 +348,54 @@ test('راهِ v3: فاکتورِ ردشده یک بار با همان دستگ�
   assert.equal(again.body.duplicate, true);
   assert.equal((await many(`SELECT 1 FROM sync_v3_ops WHERE account_id=$1 AND op_id LIKE $2`, [A.id, `rs_${key}_%`])).length, placed.length);
 });
+
+test('هم‌سو شدنِ دستگاهِ سازنده: «کنار بگذار»/«اصلاح» ⇒ `/mine` بستهٔ کامل و مقدارِ امروزِ سرور؛ باز و دوباره‌ثبت‌شده بی آن', async () => {
+  //  ۱) فروشِ ردشده (همه درج) ⇒ کنار گذاشته: همهٔ opها، هیچ مقدارِ سروری (هیچ‌کدام روی سرور نیست)
+  const d = await rejectedSale(A, 'ci-st-1');
+  const open = (await inbox(A.staff, '/mine')).body.conflicts.find((c) => c.id === d.box.id);
+  assert.equal(open.settle, undefined, 'ردیفِ باز چیزی برای برگرداندن نمی‌دهد');
+  assert.equal((await dismiss(A.owner, d.box.id, { reason: 'مشتری نخواست' })).status, 200);
+  const m = (await inbox(A.staff, '/mine')).body.conflicts.find((c) => c.id === d.box.id);
+  assert.equal(m.settle.path, 'v1');
+  assert.deepEqual(m.settle.ops.map((o) => [o.id, o.table, o.rowId, o.type]), d.ops.map((o) => [o.op_id, o.table, o.row_id, 'insert']));
+  assert.deepEqual(m.settle.base, {}, 'ردیفِ درجِ تنها روی سرور نیست');
+  assert.equal(m.settle.truncated, undefined);
+
+  //  ۲) لغوِ ردشده (ویرایشِ فاکتورِ روی سرور) ⇒ مقدارِ امروزِ همان فاکتور برای برگرداندنِ وضعیت
+  const at = (clock += 1000);
+  const sid = 'ci-st-2';
+  const placed = [
+    { op_id: oid(), table: 'sales', row_id: sid, type: 'insert', ts: at, fields: { invoiceNumber: 77, total: 3000, finalTotal: 3000, paymentMethod: 'cash', paidAmount: 3000, status: 'completed', cancelReason: '', createdAt: at } },
+    { op_id: oid(), table: 'saleItems', row_id: `${sid}-i1`, type: 'insert', ts: at, fields: { saleId: sid, productId: 'p-rice', quantity: 1, unitPrice: 3000, totalPrice: 3000, returnedQty: 0 } },
+  ];
+  assert.deepEqual(why(await push1(A.owner, 'ci-owner-pc', placed)), ['applied', 'applied']);
+  const t2 = (clock += 1000);
+  const cancel = [
+    { op_id: oid(), table: 'sales', row_id: sid, type: 'update', ts: t2, fields: { status: 'cancelled', cancelReason: 'اشتباه' } },
+    { op_id: oid(), table: 'stockMovements', row_id: `${sid}-mv`, type: 'insert', ts: t2, fields: { productId: 'p-rice', type: 'sale_cancel', qty: 1, refId: sid, createdAt: t2 } },
+  ];
+  const res = why(await push1(A.staff, 'ci-pos', cancel));
+  assert.equal(res[0], 'cancel_not_allowed', JSON.stringify(res));
+  const cbox = await boxOf(A.id, cancel[0].op_id);
+  assert.ok(cbox, 'لغوِ ردشده صندوق نگرفت');
+  assert.equal((await dismiss(A.owner, cbox.id, { reason: 'فاکتور درست بود' })).status, 200);
+  const c = (await inbox(A.staff, '/mine')).body.conflicts.find((x) => x.id === cbox.id);
+  assert.ok(c.settle.ops.some((o) => o.id === cancel[0].op_id && o.type === 'update'));
+  assert.equal(c.settle.base[`sales/${sid}`].status, 'completed', JSON.stringify(c.settle.base));
+  assert.equal(c.settle.base[`sales/${sid}`].cancelReason, '');
+  assert.ok(!(`stockMovements/${sid}-mv` in c.settle.base), 'درجِ تنها مقدارِ سرور ندارد');
+
+  //  ۳) «اصلاح» همان `settle` را دارد؛ «دوباره ثبت» ندارد (ردیف‌ها روی سرور نشستند)
+  const f = await rejectedSale(A, 'ci-st-3');
+  assert.equal((await dismiss(A.owner, f.box.id, { reason: 'اصلاح و دوباره ثبت شد', fixedDoc: 'sales/ci-st-3-new' })).status, 200);
+  const fm = (await inbox(A.staff, '/mine')).body.conflicts.find((x) => x.id === f.box.id);
+  assert.deepEqual([fm.status, fm.fixedDoc, fm.settle.ops.length], ['fixed', 'ci-st-3-new', 4]);
+  const r = await rejectedSale(A, 'ci-st-4');
+  assert.equal((await resubmit(A.owner, r.box.id)).status, 200);
+  const rm = (await inbox(A.staff, '/mine')).body.conflicts.find((x) => x.id === r.box.id);
+  assert.deepEqual([rm.status, rm.settle], ['resubmitted', undefined]);
+
+  //  ⛔ فقط ردیف‌های خودِ کارمند: صاحب و دکانِ دیگر هیچ
+  assert.ok(!(await inbox(A.owner, '/mine')).body.conflicts.some((x) => x.id === d.box.id));
+  assert.ok(!JSON.stringify((await inbox(B.staff, '/mine')).body).includes('ci-st-'));
+});

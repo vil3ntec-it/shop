@@ -18,9 +18,10 @@ import kotlinx.serialization.json.JsonPrimitive
  */
 object RejectedDocs {
 
-  fun local(context: Context): List<ConflictInbox.Rejected> = runCatching {
+  /** @param settled opهایی که صاحب «کنار گذاشت»/«اصلاح کرد» و روی همین دفتر نشستند (`SetAside.settledOps`) — دیگر «ردِ باز» نیستند */
+  fun local(context: Context, settled: Set<String> = emptySet()): List<ConflictInbox.Rejected> = runCatching {
     if (SyncChoice.isV3(context)) v3(SyncV3Runner.of(context).rejected()) else v1(OpQueue(context, SyncV1Engine.of(context).currentKey()).dropped())
-  }.getOrDefault(emptyList())
+  }.getOrDefault(emptyList()).filter { it.opId !in settled }
 
   private fun str(o: JsonObject?, k: String): String = (o?.get(k) as? JsonPrimitive)?.takeIf { it.isString }?.content.orEmpty()
   private fun long(o: JsonObject?, k: String): Long = (o?.get(k) as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L

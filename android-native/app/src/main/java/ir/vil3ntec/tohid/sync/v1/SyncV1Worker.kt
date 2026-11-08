@@ -119,7 +119,11 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
    *  چیزی نوشت، op ِ آن با همان `SyncV1Worker.now` ِ هر ذخیره در دورِ بعد می‌رود؛ دورِ بعد
    *  دیگر کاری ندارد. شکستش دورِ همگام‌سازی را نمی‌گیرد.
    */
-  private suspend fun sweepAfterPull(store: ShopStore) = store.sweepMergedQuietly()
+  private suspend fun sweepAfterPull(store: ShopStore) {
+    store.sweepMergedQuietly()
+    //  سندِ ردشدهٔ همین دستگاه که صاحب «کنار گذاشت»/«اصلاح کرد» ⇒ بیرون از دفترِ شمرده (`data/SetAside`)؛ شکستش دور را نمی‌گیرد
+    runCatching { ir.vil3ntec.tohid.data.SetAside.afterSync(applicationContext, store) }
+  }
 
   companion object {
     private const val PERIODIC = "tohid-sync-v1-periodic"

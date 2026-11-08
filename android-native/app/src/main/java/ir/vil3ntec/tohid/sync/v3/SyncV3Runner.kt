@@ -233,6 +233,13 @@ class SyncV3Runner private constructor(context: Context) {
   /** opهای ردشدهٔ همین حساب روی همین دستگاه (نشانِ «سرور نپذیرفت» ِ فاکتور، `data/RejectedDocs`) */
   fun rejected(): List<V3Entry> = runCatching { engine().rejected() }.getOrDefault(emptyList())
 
+  /** «کنار بگذار»/«اصلاح و ثبت» ِ صاحب روی همین دفتر (`data/SetAside`)؛ همان دفترِ [work] و همان قفل */
+  fun setAside(store: ShopStore, decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>): Int {
+    if (store.training) return 0
+    shop = store
+    return engine().setAside(decisions, book).also { publish() }
+  }
+
   companion object {
     @Volatile private var instance: SyncV3Runner? = null
 

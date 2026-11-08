@@ -99,7 +99,7 @@ internal fun RouteScope.HistoryHost() {
   var printing by remember { mutableStateOf<SalesPeriods.Period?>(null) }
   val onDesk = desk
 
-  RejectedWatch()
+  RejectedWatch(data = d)
   HistoryScreen(
     d = d,
     book = book,

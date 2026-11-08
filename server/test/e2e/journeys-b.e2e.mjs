@@ -18,6 +18,10 @@
  *       کامپیوترِ صاحب (B) همان را با دلیل، کارمند، دستگاه، مبلغ و قلم در صندوق می‌بیند؛ «دوباره ثبت با تأییدِ من» از B و
  *       A هم‌زمان و یک بارِ دیگر ⇐ فروش دقیقاً یک بار روی سرور و هر سه دستگاه (S دو بار کم نمی‌کند)؛ S «دوباره ثبت شد» را
  *       می‌بیند (`lib/conflict-inbox.js`، مهاجرتِ ۳۱۵). پیش از آن صاحب هیچ راهی در برنامه نداشت و S باید از نو ساخته می‌شد.
+ *       سپس «کنار بگذار» (B) و «اصلاح و ثبت» (فاکتورِ تازهٔ نقدِ A) برای دو فروشِ ردشدهٔ دیگرِ S ⇐ S بی ساختنِ دوباره سند را
+ *       از دفترِ شمرده بیرون می‌برد و کامل در `setAside` نگه می‌دارد (`core/sync/RejectedSettle.kt`، `data/SetAside.kt`):
+ *       موجودی، قرض و جمع‌های هر سه دستگاه دقیقاً همان سرور، هیچ چیزی دوباره نمی‌رود، فاکتورِ اصلاح یک بار شمرده می‌شود،
+ *       تصمیمِ تکراری بی‌اثر. پیش از آن S فروشِ ردشده را تا ابد می‌شمرد (موجودیِ کمتر، قرضِ بیشتر، فروشِ دو بار با «اصلاح»).
  *
  * پرچم‌ها فقط برای همین دکان: shop.approval_requests، shop.credit_cap (JB6)، shop.returns.sale_cap، shop.orders، shop.storefront،
  * shop.catalog، shop.delivery، shop.owner_report.
@@ -25,7 +29,7 @@
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
-import { NativeDevice } from './lib/native.mjs';
+import { NativeDevice, core } from './lib/native.mjs';
 import { assertSameEverywhere, serverLedger } from './lib/journey.mjs';
 
 const E = await boot({ name: 'journeys-b' });
@@ -407,6 +411,47 @@ await E.step('JB6', 'صندوقِ سندهای ردشده: ردِ قرضِ با�
     expect: { stock: { [sugar]: 17 }, debt: { [ahmad]: debtBefore + 1200 } },
     dropped: S.dropped.length,
   });
+  assert.equal(await S.settleRejected(), 0, '«دوباره ثبت» چیزی برای کنار گذاشتن ندارد');
+
+  //  ۴) «کنار بگذار»: شاگرد ۲ شکر نسیه (۸۰۰) ⇐ رد؛ صاحب روی B با دلیل کنار می‌گذارد ⇐ S همان سرور، سند کامل در `setAside`
+  const d = sale(S, S.sell({ lines: [{ id: sugar, qty: 2 }], payment: 'credit', debtorId: ahmad, paid: 0 }));
+  await S.sync();
+  assert.equal(S.stock(sugar), 15, 'پیش از تصمیم: دفترِ S فروشِ ردشده را می‌شمرد');
+  const cfD = E.ok(await B.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب').conflicts.find((c) => c.doc.rowId === d.saleId);
+  E.ok(await B.api('POST', `/shop/conflict-inbox/${cfD.id}/dismiss`, { reason: 'مشتری نخواست' }), 'کنار بگذار');
+  assert.equal(await S.settleRejected(), 1);
+  assert.equal(await S.settleRejected(), 0, 'تصمیمِ تکراری بی‌اثر');
+  const asideD = S.ledger.setAside.find((x) => x.id === cfD.id);
+  assert.deepEqual([asideD.status, asideD.note, asideD.rows.sales.map((x) => x.id)], ['dismissed', 'مشتری نخواست', [d.saleId]]);
+  assert.ok(asideD.rows.saleItems.length === 1 && asideD.rows.transactions.length === 1 && asideD.rows.stockMovements.length === 1, 'همهٔ ردیف‌های سند برای سابقه');
+  assert.equal(S.save(S.ledger), 0, 'هیچ op ای: نه حذف، نه درجِ دوباره');
+  const upload = new Set(core.diff({}, S.ledger).ops.map((o) => `${o.table}/${o.row_id}`));
+  assert.ok(Object.entries(asideD.rows).every(([t, rs]) => rs.every((x) => !upload.has(`${t}/${x.id}`))), 'بارگذاریِ کامل هم سند را نمی‌فرستد');
+  await syncAll();
+  await assertSameEverywhere('JB6 · کنار بگذار', [A, B, S], {
+    expect: { stock: { [sugar]: 17 }, debt: { [ahmad]: debtBefore + 1200 } },
+    dropped: S.dropped.length,
+  });
+
+  //  ۵) «اصلاح و ثبت»: شاگرد ۳ شکر نسیه ⇐ رد؛ صاحب روی A همان را نقد ثبت می‌کند و ردیف «اصلاح شد» با همان فاکتور؛
+  //     S پیش از گرفتنِ فاکتورِ تازه کنار می‌گذارد ⇐ پس از همگام‌سازی فروش یک بار (موجودی ۱۴)، قرض همان
+  const f = sale(S, S.sell({ lines: [{ id: sugar, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));
+  await S.sync();
+  const cfF = E.ok(await A.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب').conflicts.find((c) => c.doc.rowId === f.saleId);
+  await A.drain();
+  const fixed = sale(A, A.sell({ lines: [{ id: sugar, qty: 3 }] }));
+  await A.drain();
+  E.ok(await A.api('POST', `/shop/conflict-inbox/${cfF.id}/dismiss`, { reason: 'اصلاح و دوباره ثبت شد', fixedDoc: `sales/${fixed.saleId}` }), 'اصلاح');
+  assert.equal(await S.settleRejected(), 1);
+  assert.equal(S.ledger.setAside.find((x) => x.id === cfF.id).status, 'fixed');
+  await syncAll();
+  assert.equal(await S.settleRejected(), 0);
+  const tf = await assertSameEverywhere('JB6 · اصلاح', [A, B, S], {
+    expect: { stock: { [sugar]: 14 }, debt: { [ahmad]: debtBefore + 1200 } },
+    dropped: S.dropped.length,
+  });
+  assert.equal(S.ledger.sales.filter((x) => x.id === f.saleId || x.id === fixed.saleId).map((x) => x.id).join(), fixed.saleId, 'فاکتورِ اصلاح یک بار، کهنه هیچ');
+  assert.equal(tf.sales, (await serverLedger(A)).sales.filter((x) => x.status !== 'cancelled').length);
 }, { needs: ['JB.0'] });
 
 await E.finish();
