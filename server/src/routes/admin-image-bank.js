@@ -21,13 +21,14 @@ const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound, badRequest } = require('../middleware/errors');
 const { many } = require('../db');
+const { rawBody } = require('../lib/raw-body');   //  نگهبانِ نوعِ بدنهٔ خام (CodeQL: type confusion)
 
 const router = express.Router();
 const BASE = '/api/admin/image-bank';
 const raw = express.raw({ type: () => true, limit: bank.DERIV.zoom.bytes + 1024 });
 //  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر کلاینت فرستاده باشد (IMG-14)
 const bufOf = (req) => {
-  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const buf = rawBody(req);
   upload.verifyDigest(buf, req.get('x-content-sha256'));
   return buf;
 };

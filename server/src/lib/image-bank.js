@@ -49,6 +49,10 @@ const PAGE_MAX = 50;
 const CANDIDATE_MAX = 500;
 const FUZZY_SCAN = 500;
 const ROWS_MAX = 1000;
+//  سقفِ متنِ CSV ِ ردیف‌ها: بدنهٔ JSON حداکثر ۲ مگابایت است (‎app.js‎) ⇒ هیچ رشته‌ای به آن نمی‌رسد؛ فقط
+//  ورودیِ دست‌کاری‌شده (آرایه/شیئی که String() اش از بدنه بلندتر است) ⇒ ۴۰۰ (CodeQL: loop bound injection)
+const CSV_MAX_CHARS = 2 * 1024 * 1024;
+const CSV_RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 const ROLES = ['main', 'back', 'label', 'variant', 'promo', 'detail'];
 const LICENSES = ['unknown', 'licensed', 'restricted', 'denied'];
 const REPORT_KINDS = ['wrong_product', 'old_packaging', 'quality', 'license', 'other'];
@@ -965,6 +969,7 @@ function parseCsv(text) {
   const lines = [];
   let row = [], field = '', q = false;
   const s = String(text || '').replace(/^﻿/, '');
+  if (s.length > CSV_MAX_CHARS) throw badRequest('فایلِ CSV بیش از حد بزرگ است', 'csv_too_large');
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
     if (q) {
@@ -982,9 +987,11 @@ function parseCsv(text) {
   const out = [];
   for (let n = 1; n < lines.length; n++) {
     if (lines[n].every((x) => !x.trim())) continue;
-    const o = { row_no: n + 1 };
-    head.forEach((h, j) => { if (h && h !== '__proto__' && h !== 'constructor' && h !== 'prototype') o[h] = (lines[n][j] || '').trim(); });
-    out.push(o);
+    //  ⛔ نامِ ستون از فایل است: ردیف با `Object.fromEntries` ساخته می‌شود (ویژگیِ خودِ شیء، بی نوشتنِ پویای
+    //     `o[h] = …` که setter ِ `__proto__` را صدا می‌زند — CodeQL: remote property injection) و
+    //     `__proto__`/`constructor`/`prototype` باز هم کنار می‌روند. ترتیب و «آخری می‌بَرد» همان پیشین است.
+    const cells = head.flatMap((h, j) => (h && !CSV_RESERVED.has(h) ? [[h, (lines[n][j] || '').trim()]] : []));
+    out.push(Object.fromEntries([['row_no', n + 1], ...cells]));
   }
   return out;
 }

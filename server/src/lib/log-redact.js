@@ -29,10 +29,15 @@ function tokenLike(raw) {
   return s.length >= 24 && /[a-z]/.test(s) && /[A-Z]/.test(s);
 }
 
-/** مسیرِ بی querystring، با بخش‌های توکن‌مانندِ `:tok`، حداکثر ۱۲۰ نویسه. */
+/**
+ * مسیرِ بی querystring، با بخش‌های توکن‌مانندِ `:tok`، حداکثر ۱۲۰ نویسه.
+ * ⛔ CR/LF ِ خام هرگز به لاگ نمی‌رسد (log injection: سطرِ ساختگی در لاگ). Node آن را در خطِ
+ *    درخواست نمی‌پذیرد، ولی این قاعده به آن تکیه نمی‌کند؛ `%0A` ِ رمزشده همان‌طور می‌ماند.
+ */
 function redactPath(url) {
   const path = String(url || '').split('?')[0].split('#')[0];
-  return path.split('/').map((seg) => (tokenLike(seg) ? ':tok' : seg)).join('/').slice(0, MAX);
+  return path.split('/').map((seg) => (tokenLike(seg) ? ':tok' : seg)).join('/')
+    .replace(/[\r\n]/g, '').slice(0, MAX);
 }
 
 module.exports = { redactPath, tokenLike };
