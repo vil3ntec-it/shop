@@ -418,14 +418,16 @@ await E.step('S138', 'X از دستگاهِ دیگر سفارش‌های خود�
   assert.equal(hrefs.length, xMine.length, hrefs.join(' '));
   assert.ok(hrefs.every((h) => h.startsWith(`/store/${SLUG}#/o/`)), hrefs.join(' '));
   assert.equal(hrefs.some((h) => h.includes(encodeURIComponent(yOrder.token))), false, 'سفارشِ Y در فهرستِ X');
-  //  همان دستگاه در ویترین: «سفارش‌های من» از سرور
+  //  همان دستگاه در ویترین: «سفارش‌های من» از سرور (با «حسابِ من» ِ CRM-13 روشن، بخشِ `#ah-online` ِ آن — `E.storeOrdersList`)
   await openStore(p, SLUG, '#/orders');
-  await p.waitForFunction((n) => document.querySelectorAll('#my-orders li').length === n, xMine.length, { timeout: 10_000 });
-  const storeList = await p.$$eval('#my-orders a', (as) => as.map((a) => a.getAttribute('href')));
+  const mineList = await E.storeOrdersList(p, SLUG);
+  await p.waitForFunction(([sel, n]) => document.querySelectorAll(`${sel} li`).length === n, [mineList, xMine.length], { timeout: 10_000 });
+  const storeList = await p.$$eval(`${mineList} a`, (as) => as.map((a) => a.getAttribute('href')));
+  assert.equal(storeList.length, xMine.length, storeList.join(' '));
   assert.ok(storeList.includes(`#/o/${encodeURIComponent(firstToken)}`), storeList.join(' '));
   assert.equal(storeList.some((h) => h.includes(encodeURIComponent(yOrder.token))), false);
   //  پیوندِ سفارش از دستگاهِ دوم باز می‌شود
-  await p.click(`#my-orders a[href="#/o/${encodeURIComponent(firstToken)}"]`);
+  await p.click(`${mineList} a[href="#/o/${encodeURIComponent(firstToken)}"]`);
   await p.waitForFunction(() => document.querySelectorAll('#o-lines li').length === 2, null, { timeout: 10_000 });
   //  Y از راهِ API: فقط سفارشِ خودش، در ویترین و بازارچه
   const yTicket = await apiCustomer(SLUG, Y);

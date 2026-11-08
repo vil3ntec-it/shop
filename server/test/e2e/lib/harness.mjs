@@ -256,6 +256,21 @@ class Harness {
     return pg;
   }
 
+  /**
+   * فهرستِ دیدنیِ «سفارش‌های من» ِ ویترین (`#/orders`) با شمارهٔ تأییدشده: `#my-orders`، مگر دکان «حسابِ من» (CRM-13،
+   * `shop.storefront.account_history` ⇒ `features.accountHistory`) را روشن داشته باشد: آن‌گاه بخشِ «سفارش‌های اینترنتی» ِ
+   * همان حساب (`#ah-online`، همان `ordersOfPhone` ِ `/orders`) **عمداً** جای فهرستِ قدیم را می‌گیرد (`store.js` ِ
+   * `openOrders`، `store/account.js`). این‌جا همان جابه‌جایی هم سنجیده می‌شود: بخش آماده و فهرستِ قدیم پنهان — نه هر دو، نه هیچ.
+   */
+  async storeOrdersList(page, slug) {
+    const features = (await this.get(`/api/store/${slug}`)).body?.features || {};
+    if (!features.accountHistory) return '#my-orders';
+    await page.waitForSelector('#my-account[data-state="ready"], #my-account[data-state="error"]', { timeout: 10_000 });
+    assert.equal(await page.getAttribute('#my-account', 'data-state'), 'ready', `«حسابِ من» خوانده نشد: ${await page.textContent('#my-account')}`);
+    assert.equal(await page.isVisible('#my-orders'), false, 'فهرستِ قدیم کنارِ «حسابِ من» هم پیداست');
+    return '#ah-online';
+  }
+
   async shot(pg, name) {
     const file = path.join(this.shotsDir, `${this.name}-${name}.png`);
     try { await pg.page.screenshot({ path: file, fullPage: true }); } catch { /* عکس شرطِ قبولی نیست */ }
