@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.core.i18n.StrExpenses
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
@@ -89,7 +92,7 @@ object LedgerEngine {
     //  ردپا: هزینهٔ پاک‌شده سودِ خالص را بالا می‌برد و باید معلوم بماند
     val trace = AuditEntry(
       id = newId(), type = "expense_delete", date = today, refId = id, createdAt = now,
-      notes = "حذفِ مصرفِ «${e.title}» ${money(e.amount)} افغانی (تاریخ ${e.date})",
+      notes = "حذفِ مصرفِ «${e.title}» ${money(e.amount)} افغانی (تاریخ ${e.date})",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Result.Ok(d.copy(expenses = d.expenses.filter { it.id != id }, auditLog = d.auditLog + trace), id = id)
   }
@@ -112,7 +115,7 @@ object LedgerEngine {
 
   fun addSupplier(d: ShopData, draft: SupplierDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام تأمین‌کننده را بنویسید")
+    if (name.isEmpty()) return Result.Failed(StrLedger.supplierNameNeeded)
     val id = newId()
     return Result.Ok(
       d.copy(
@@ -131,9 +134,9 @@ object LedgerEngine {
   }
 
   fun editSupplier(d: ShopData, id: String, draft: SupplierDraft): Result {
-    if (d.suppliers.none { it.id == id }) return Result.Failed("تأمین‌کننده پیدا نشد")
+    if (d.suppliers.none { it.id == id }) return Result.Failed(StrLedger.supplierNotFound)
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام تأمین‌کننده را بنویسید")
+    if (name.isEmpty()) return Result.Failed(StrLedger.supplierNameNeeded)
     return Result.Ok(
       d.copy(
         suppliers = d.suppliers.map {
@@ -158,11 +161,11 @@ object LedgerEngine {
    * نیست به کیست.
    */
   fun deleteSupplier(d: ShopData, id: String): Result {
-    val supplier = d.suppliers.find { it.id == id } ?: return Result.Failed("تأمین‌کننده پیدا نشد")
+    val supplier = d.suppliers.find { it.id == id } ?: return Result.Failed(StrLedger.supplierNotFound)
     val purchases = d.purchases.count { it.supplierId == id }
     val payments = d.supplierPayments.count { it.supplierId == id }
     if (purchases > 0 || payments > 0) {
-      return Result.Failed("«${supplier.name}» خرید یا پرداخت ثبت‌شده دارد و حذف نمی‌شود")
+      return Result.Failed(StrLedger.supplierInUse(supplier.name))
     }
     return Result.Ok(d.copy(suppliers = d.suppliers.filter { it.id != id }), id = id)
   }
@@ -203,14 +206,14 @@ object LedgerEngine {
    */
   fun addPurchase(d: ShopData, draft: PurchaseDraft, today: String, now: Long, newId: () -> String): Result {
     val supplier = d.suppliers.find { it.id == draft.supplierId }
-      ?: return Result.Failed("تأمین‌کننده را انتخاب کنید")
+      ?: return Result.Failed(StrPurchasePages.chooseSupplier)
     val product = d.products.find { it.id == draft.productId }
-      ?: return Result.Failed("محصول را انتخاب کنید")
-    if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed("قیمت خرید معتبر وارد کنید")
-    if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed("هزینهٔ جانبی درست نیست")
+      ?: return Result.Failed(StrLedger.pickProduct)
+    if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed(StrStock.errAmount)
+    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrStock.errPrice)
+    if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed(StrPurchasePages.landedBad)
     val due = draft.dueDate?.trim()?.ifEmpty { null }
-    if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed("سررسید درست نیست")
+    if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed(StrLedger.dueBad)
     val landed = draft.landedCost?.takeIf { it > 0 }
 
     val date = draft.date.ifBlank { today }
@@ -245,7 +248,7 @@ object LedgerEngine {
         type = "price_change",
         date = today,
         refId = product.id,
-        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",
+        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
       )
       products = products.map {
@@ -258,7 +261,7 @@ object LedgerEngine {
       type = "purchase",
       date = date,
       refId = purchaseId,
-      notes = "ثبت خرید ${money(draft.quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",
+      notes = "ثبت خرید ${money(draft.quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now,
     )
 
@@ -276,7 +279,7 @@ object LedgerEngine {
           unit = unit,
           price = draft.purchasePrice,
           date = date,
-          notes = draft.notes.ifBlank { "خرید از تأمین‌کننده" },
+          notes = draft.notes.ifBlank { "خرید از تأمین‌کننده" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           purchaseId = purchaseId,
           createdAt = now,
           expiryDate = draft.expiryDate,
@@ -310,7 +313,7 @@ object LedgerEngine {
           type = "purchase_in",
           qty = draft.quantity,
           date = date,
-          notes = draft.notes.ifBlank { "ثبت خرید" },
+          notes = draft.notes.ifBlank { "ثبت خرید" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           refId = purchaseId,
           createdAt = now,
         ),
@@ -337,8 +340,8 @@ object LedgerEngine {
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.supplierPayments.any { it.id == k }) return Result.Failed(ALREADY_PAID)
-    val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed("تأمین‌کننده پیدا نشد")
-    if (amount.isNaN() || amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed(StrLedger.supplierNotFound)
+    if (amount.isNaN() || amount <= 0) return Result.Failed(StrLedger.amountBad)
 
     val id = k ?: newId()
     val when_ = date.ifBlank { today }
@@ -357,7 +360,7 @@ object LedgerEngine {
           type = "supplier_payment",
           date = when_,
           refId = id,
-          notes = "پرداخت به «${supplier.name}» به مبلغ ${money(amount)} افغانی",
+          notes = "پرداخت به «${supplier.name}» به مبلغ ${money(amount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           createdAt = now,
         ),
       ),
@@ -366,7 +369,7 @@ object LedgerEngine {
   }
 
   /** همان کلیدِ پرداخت به تأمین‌کننده دوباره (دو لمس، PUR-07) — پرداخت یک بار ثبت شده است */
-  const val ALREADY_PAID = "همین پرداخت پیش‌تر ثبت شده است"
+  val ALREADY_PAID: String get() = StrLedger.alreadyPaid
 
   /* ============================== خلاصه‌ها ============================== */
 

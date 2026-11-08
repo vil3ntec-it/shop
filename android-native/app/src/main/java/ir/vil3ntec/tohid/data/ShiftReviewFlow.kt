@@ -43,7 +43,7 @@ object ShiftReviewFlow {
         AuditEntry(
           id = r.review.id, type = ShiftReview.TYPE, date = date, refId = close.id, createdAt = now,
           //  داده: متنِ سابقهٔ عملیات (همگام می‌شود و با زبانِ صفحه عوض نمی‌شود)
-          notes = "بررسیِ اختلافِ صندوق: ${r.review.note}", by = r.review.by, note = r.review.note,
+          notes = "بررسیِ اختلافِ صندوق: ${r.review.note}", by = r.review.by, note = r.review.note,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         ),
       )
     }

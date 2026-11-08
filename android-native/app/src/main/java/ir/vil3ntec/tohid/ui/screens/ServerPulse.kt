@@ -6,6 +6,7 @@ import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.data.repo.Backend
 
 /**
@@ -121,7 +122,7 @@ object ServerPulse {
       prefix = Backend.apiPrefix(context)
       //  سرور بالاست ولی دیتابیسش نه — این هم «وصل است» نیست
       if (info.database.isNotBlank() && info.database != "connected") {
-        note = "سرور بالاست ولی دیتابیسش وصل نیست"
+        note = StrAppData.serverNoDb
       }
     } else {
       state = State.DOWN

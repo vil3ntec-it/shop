@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 /*
  *  PAY-19 — «کشو بی فروش» ِ «دستگاه‌ها › باز کردنِ کشو» (`PrintSpooler.openDrawer`): قاعدهٔ دلیل، مجوز و
  *  ردیفِ `no_sale`، خالص و بی چاپگر تا با آزمونِ واحد سنجیده شود. ضربه و ذخیره همان `PrintSpooler` است؛
@@ -10,10 +12,10 @@ object DrawerNoSale {
   /** تأییدکننده وقتی نامِ کاربر نیست ولی سیاستِ دکان اجازه داده (هرگز «صاحب/مدیر»ِ ساختگی) */
   const val POLICY_APPROVER = "policy"
 
-  const val NEED_REASON = "دلیل را بنویسید"
-  const val NEED_APPROVAL = "باز کردنِ کشو بی فروش تأییدِ صاحب یا مدیر می‌خواهد (APPROVAL_REQUIRED)"
+  val NEED_REASON: String get() = StrLedger.needReason
+  val NEED_APPROVAL: String get() = StrLedger.drawerNeedsApproval
 
-  const val NO_DRAWER_PRINTER = "چاپگرِ کشودار تعریف نشده — تنظیمات › دستگاه‌ها"
+  val NO_DRAWER_PRINTER: String get() = StrLedger.noDrawerPrinter
 
   /**
    *  Shift+F8 ِ صندوقِ کامپیوتر (`KeyMap.SALE_DRAWER`) پیش از پنجرهٔ دلیل: بی چاپگرِ پیش‌فرضِ کشودار پیام (پیش از مجوز،
@@ -50,8 +52,8 @@ object DrawerNoSale {
   ): AuditEntry {
     val why = reason.trim()
     val approver = by ?: POLICY_APPROVER
-    val notes = "کشو بی فروش — $why — دستگاه: $device · چاپگر: $printer" +
-      (if (printerError != null) " — خطای چاپگر: $printerError" else "") + " — تأیید: $approver"
+    val notes = "کشو بی فروش — $why — دستگاه: $device · چاپگر: $printer" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      (if (printerError != null) " — خطای چاپگر: $printerError" else "") + " — تأیید: $approver"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     return AuditEntry(
       id = id, type = "no_sale", date = today, refId = shiftOpenId, notes = notes, createdAt = now,
       by = by, reason = why, approvedBy = approver,

@@ -7,6 +7,8 @@ import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.hw.MonoImage
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
+import ir.vil3ntec.tohid.core.i18n.I18n
+import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.receipt.DiscountLine
@@ -26,6 +28,8 @@ import ir.vil3ntec.tohid.core.receipt.ReturnReceiptInput
 import ir.vil3ntec.tohid.core.receipt.ReturnReceiptLabels
 import ir.vil3ntec.tohid.core.receipt.ReturnReceiptLayout
 import ir.vil3ntec.tohid.core.receipt.ShopHeader
+import ir.vil3ntec.tohid.core.receipt.StatementLabels
+import ir.vil3ntec.tohid.core.text.DariText
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.ReceiptFlag
 import ir.vil3ntec.tohid.data.PayFlow
@@ -80,7 +84,7 @@ object Receipts {
     copyMark: String? = null,
     fallbackName: String = localName(context),
     legacyQr: String? = null,
-    labels: ReceiptLabels = ReceiptLabels.FA,
+    labels: ReceiptLabels = labels(),
   ): ReceiptInput {
     val publicUrl = publicUrl(context, sale)
     val profile = ReceiptProfileStore.current(context)
@@ -107,7 +111,7 @@ object Receipts {
       time = time,
       cashier = sale.seller,
       //  PAY (v3 A4): برچسب و ردیف‌های پرداخت همان `PayFlow` ِ تاریخچه و جزئیات
-      kind = PayFlow.payLabel(sale, cash = labels.cash),
+      kind = dariOf(PayFlow.payLabel(sale, cash = labels.cash)),
       cancelled = sale.status == "cancelled",
       items = items,
       subtotal = sale.total,
@@ -137,7 +141,7 @@ object Receipts {
   fun doc(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
     copyMark: String? = null, fallbackName: String = localName(context), legacyQr: String? = null,
-  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), widthDots, format(ir.vil3ntec.tohid.ui.PromoLive.stampOn(context)))
+  ): ReceiptDoc = ReceiptLayout.build(input(context, d, sale, widthDots, copyMark, fallbackName, legacyQr), widthDots, format(ir.vil3ntec.tohid.ui.PromoLive.stampOn(context)), labels())
 
   fun mono(
     context: Context, d: ShopData, sale: Sale, widthDots: Int,
@@ -157,8 +161,51 @@ object Receipts {
    *  مبلغ، پرداخت، قرض‌دار یا QR به کاغذ نمی‌رسد. فقط از دکمهٔ «رسیدِ هدیه» (`GiftReceiptPrefs`، خاموش).
    */
   fun giftBitmap(context: Context, d: ShopData, sale: Sale, widthDots: Int, fallbackName: String = localName(context)): Bitmap {
-    val doc = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.build(input(context, d, sale, widthDots, fallbackName = fallbackName), widthDots, format())
+    val doc = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.build(input(context, d, sale, widthDots, fallbackName = fallbackName), widthDots, format(), giftLabels())
     return ThermalPrinter.toBitmap(ReceiptRaster.compose(doc, ReceiptPainter(context)))
+  }
+
+  /* ------------------------- برچسب‌های کاغذ در دری (LOC-08، دورِ ۷) ------------------------- */
+
+  /**
+   *  برچسب‌های فاکتور، رسیدِ هدیه و صورت‌حساب فارسی‌اند (`ReceiptLabels.FA` ِ هسته، برای همهٔ زبان‌ها همان پیشین). وقتی زبانِ
+   *  برنامه دری است همان برچسب‌ها از لایهٔ واژه (`DariText.of`) می‌گذرند تا کاغذ، PNG، PDF و صفحهٔ فاکتور هم دری باشند
+   *  («فروشگاه» ⇐ «دکان»). دادهٔ فاکتور (نامِ کالا، دکان، مشتری، یادداشت) هرگز از لایه نمی‌گذرد. فارسی، انگلیسی و پشتو بایت‌به‌بایت همان.
+   */
+  private val dari: Boolean get() = I18n.lang == Lang.PRS
+
+  /** برچسبِ ثابتِ برنامه (نه دادهٔ کاربر) ⇒ دری در زبانِ دری */
+  private fun dariOf(text: String): String = if (dari) DariText.of(text) else text
+
+  fun labels(): ReceiptLabels {
+    if (!dari) return ReceiptLabels.FA
+    val l = ReceiptLabels.FA
+    return ReceiptLabels(
+      fallbackShop = DariText.of(l.fallbackShop), invoiceNo = DariText.of(l.invoiceNo), date = DariText.of(l.date),
+      lunarDate = DariText.of(l.lunarDate), cashier = DariText.of(l.cashier), kind = DariText.of(l.kind), cancelled = DariText.of(l.cancelled),
+      returned = DariText.of(l.returned), listPrice = DariText.of(l.listPrice), count = DariText.of(l.count), rows = DariText.of(l.rows),
+      pieces = DariText.of(l.pieces), subtotal = DariText.of(l.subtotal), discount = DariText.of(l.discount), total = DariText.of(l.total),
+      paid = DariText.of(l.paid), tendered = DariText.of(l.tendered), change = DariText.of(l.change), remaining = DariText.of(l.remaining),
+      debtor = DariText.of(l.debtor), phone = DariText.of(l.phone), scan = DariText.of(l.scan), storeScan = DariText.of(l.storeScan),
+      footer = DariText.of(l.footer), cash = DariText.of(l.cash), credit = DariText.of(l.credit), online = DariText.of(l.online),
+      note = DariText.of(l.note), rounding = DariText.of(l.rounding),
+    )
+  }
+
+  fun giftLabels(): ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels {
+    val g = ir.vil3ntec.tohid.core.receipt.GiftReceiptLayout.Labels.FA
+    return if (!dari) g else g.copy(title = DariText.of(g.title), note = DariText.of(g.note), base = labels())
+  }
+
+  fun statementLabels(): StatementLabels {
+    if (!dari) return StatementLabels.FA
+    val l = StatementLabels.FA
+    return StatementLabels(
+      fallbackShop = DariText.of(l.fallbackShop), title = DariText.of(l.title), customer = DariText.of(l.customer), phone = DariText.of(l.phone),
+      date = DariText.of(l.date), give = DariText.of(l.give), receive = DariText.of(l.receive), balance = DariText.of(l.balance),
+      totalGive = DariText.of(l.totalGive), totalReceive = DariText.of(l.totalReceive), owes = DariText.of(l.owes), credit = DariText.of(l.credit),
+      settled = DariText.of(l.settled), empty = DariText.of(l.empty), rows = DariText.of(l.rows), footer = DariText.of(l.footer),
+    )
   }
 
   /* ---------------------------- رسیدِ برگشت (RET-12) ---------------------------- */

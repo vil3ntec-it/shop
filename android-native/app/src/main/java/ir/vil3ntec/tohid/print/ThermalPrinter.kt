@@ -12,6 +12,7 @@ import android.hardware.usb.UsbDeviceConnection
 import android.hardware.usb.UsbEndpoint
 import android.hardware.usb.UsbInterface
 import android.hardware.usb.UsbManager
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import java.io.OutputStream
 import ir.vil3ntec.tohid.core.i18n.StrLocalNet
 import ir.vil3ntec.tohid.hw.LocalNetworkAccess
@@ -197,9 +198,9 @@ object ThermalPrinter {
     val bytes = try {
       render(bitmap, paperWidth)
     } catch (e: OutOfMemoryError) {
-      return "فاکتور برای حافظهٔ این گوشی بزرگ است"
+      return StrPrint.tooBigForMemory
     } catch (e: Exception) {
-      return "فاکتور آماده نشد: ${e.message ?: "خطای ناشناخته"}"
+      return StrPrint.invoiceNotReady(e.message ?: StrPrint.unknownError)
     }
 
     return send(context, link, bytes)
@@ -243,7 +244,7 @@ object ThermalPrinter {
         is Link.Network -> if (LocalNetworkAccess.blocked(context, link.host)) StrLocalNet.denied else sendNetwork(link.host, link.port, bytes, wrote)
         is Link.Usb -> sendUsb(context, link.deviceName, bytes, wrote)
       }
-    }.getOrElse { it.message ?: "چاپ نشد" }
+    }.getOrElse { it.message ?: StrPrint.notPrinted }
     return Sent(err, wrote.get())
   }
 
@@ -269,8 +270,8 @@ object ThermalPrinter {
     is Link.Bluetooth -> {
       val adapter = adapter(context)
       when {
-        adapter == null -> Probe(false, "بلوتوث روی این دستگاه نیست")
-        !adapter.isEnabled -> Probe(false, "بلوتوث خاموش است")
+        adapter == null -> Probe(false, StrPrint.noBluetooth)
+        !adapter.isEnabled -> Probe(false, StrPrint.bluetoothOff)
         else -> probeStream(link.address, full) {
           val s = adapter.getRemoteDevice(link.address).createRfcommSocketToServiceRecord(SPP)
           adapter.cancelDiscovery()
@@ -283,9 +284,9 @@ object ThermalPrinter {
       val manager = usbManager(context)
       val device = manager?.deviceList?.get(link.deviceName)
       when {
-        device == null -> Probe(false, "چاپگرِ سیمی پیدا نشد — کابل وصل است؟")
-        manager?.hasPermission(device) != true -> Probe(false, "اجازهٔ دسترسی به چاپگرِ سیمی داده نشده")
-        else -> Probe(true, "وصل است — وضعیتِ کاغذ از راهِ سیم خوانده نمی‌شود")
+        device == null -> Probe(false, StrPrint.usbNotFound)
+        manager?.hasPermission(device) != true -> Probe(false, StrPrint.usbNoPermission)
+        else -> Probe(true, StrPrint.usbConnected)
       }
     }
   }
@@ -301,10 +302,10 @@ object ThermalPrinter {
     val b = try { input.read() } catch (e: java.io.InterruptedIOException) { -1 }
     val paper = if (b >= 0) ir.vil3ntec.tohid.core.hw.EscPos.parsePaperStatus(b) else null
     return when {
-      paper == null -> Probe(true, "وصل شد ($label) — چاپگر وضعیتِ کاغذ را نگفت")
-      paper.out -> Probe(false, "کاغذ تمام شده است", paper)
-      paper.nearEnd -> Probe(true, "وصل است — کاغذ رو به پایان است", paper)
-      else -> Probe(true, "وصل است و کاغذ دارد", paper)
+      paper == null -> Probe(true, StrPrint.connectedNoPaper(label))
+      paper.out -> Probe(false, StrPrint.paperOut, paper)
+      paper.nearEnd -> Probe(true, StrPrint.paperLow, paper)
+      else -> Probe(true, StrPrint.paperOk, paper)
     }
   }
 
@@ -332,7 +333,7 @@ object ThermalPrinter {
       val (input, output) = when (val c = conn) {
         is Socket -> c.getInputStream() to c.getOutputStream()
         is android.bluetooth.BluetoothSocket -> c.inputStream to c.outputStream
-        else -> return Probe(true, "وصل شد")
+        else -> return Probe(true, StrPrint.connected)
       }
       if (!full) return paperOnly(label, input, output)
       val ask = ir.vil3ntec.tohid.core.hw.PrinterStatus.Probe()
@@ -346,9 +347,9 @@ object ThermalPrinter {
       val v = ir.vil3ntec.tohid.core.hw.PrinterStatus.verdict(state, label)
       Probe(v.ok, v.message, state.paper)
     } catch (e: SecurityException) {
-      Probe(false, "اجازهٔ بلوتوث داده نشده")
+      Probe(false, StrPrint.btNoPermission)
     } catch (e: Exception) {
-      Probe(false, "وصل نشد ($label): ${e.message ?: "پاسخی نیامد"}")
+      Probe(false, StrPrint.notConnected(label, e.message ?: StrPrint.noAnswer))
     } finally {
       try { conn?.close() } catch (e: Exception) { /* بسته شده */ }
     }
@@ -361,20 +362,20 @@ object ThermalPrinter {
    *  پس این یکی هر سه راه را می‌گیرد و چیزی نمی‌شکند.
    */
   fun print(context: Context, address: String, bitmap: Bitmap, paperWidth: Int): String? {
-    val link = Link.parse(address) ?: return "چاپگری انتخاب نشده است"
+    val link = Link.parse(address) ?: return StrPrint.noPrinterChosen
     return print(context, link, bitmap, paperWidth)
   }
 
   /* ---------------------------- بلوتوث ---------------------------- */
 
   private fun sendBluetooth(context: Context, address: String, bytes: ByteArray, wrote: AtomicBoolean): String? {
-    val adapter = adapter(context) ?: return "بلوتوث روی این گوشی نیست"
-    if (!adapter.isEnabled) return "بلوتوث خاموش است"
+    val adapter = adapter(context) ?: return StrPrint.noBluetoothPhone
+    if (!adapter.isEnabled) return StrPrint.bluetoothOff
 
     val device: BluetoothDevice = try {
       adapter.getRemoteDevice(address)
     } catch (e: Exception) {
-      return "چاپگر پیدا نشد"
+      return StrPrint.printerNotFound
     }
 
     var socket: android.bluetooth.BluetoothSocket? = null
@@ -385,9 +386,9 @@ object ThermalPrinter {
       socket.outputStream.use { out -> writeChunked(out, bytes, wrote) }
       null
     } catch (e: SecurityException) {
-      "اجازهٔ بلوتوث داده نشده"
+      StrPrint.btNoPermission
     } catch (e: Exception) {
-      "چاپ نشد: ${e.message ?: "اتصال برقرار نشد"}"
+      StrPrint.printFailed(e.message ?: StrPrint.noConnection)
     } finally {
       try { socket?.close() } catch (e: Exception) { /* بسته شده */ }
     }
@@ -414,13 +415,13 @@ object ThermalPrinter {
       socket.getOutputStream().use { out -> writeChunked(out, bytes, wrote) }
       null
     } catch (e: java.net.SocketTimeoutException) {
-      "چاپگر در شبکه جواب نداد ($host) — روشن است؟"
+      StrPrint.netNoAnswer(host)
     } catch (e: java.net.ConnectException) {
-      "به چاپگر وصل نشد ($host) — نشانی و شبکه را ببینید"
+      StrPrint.netNoConnect(host)
     } catch (e: java.net.UnknownHostException) {
-      "نشانیِ چاپگر شناخته نشد ($host)"
+      StrPrint.netBadHost(host)
     } catch (e: Exception) {
-      "چاپ نشد: ${e.message ?: "اتصال برقرار نشد"}"
+      StrPrint.printFailed(e.message ?: StrPrint.noConnection)
     } finally {
       try { socket?.close() } catch (e: Exception) { /* بسته شده */ }
     }
@@ -436,32 +437,32 @@ object ThermalPrinter {
    *  اینجا فقط پیامِ روشنش گفته می‌شود تا کاربر بداند چه شده.
    */
   private fun sendUsb(context: Context, deviceName: String, bytes: ByteArray, wrote: AtomicBoolean): String? {
-    val manager = usbManager(context) ?: return "این گوشی از چاپگرِ سیمی پشتیبانی نمی‌کند"
+    val manager = usbManager(context) ?: return StrPrint.usbUnsupported
     val device = manager.deviceList?.get(deviceName)
-      ?: return "چاپگرِ سیمی پیدا نشد — کابل وصل است؟"
+      ?: return StrPrint.usbNotFound
 
-    if (!manager.hasPermission(device)) return "اجازهٔ دسترسی به چاپگرِ سیمی داده نشده"
+    if (!manager.hasPermission(device)) return StrPrint.usbNoPermission
 
-    val iface = printerInterface(device) ?: return "این دستگاه چاپگر نیست"
-    val endpoint = bulkOut(iface) ?: return "راهِ فرستادن روی این چاپگر پیدا نشد"
+    val iface = printerInterface(device) ?: return StrPrint.notPrinter
+    val endpoint = bulkOut(iface) ?: return StrPrint.noEndpoint
 
     var connection: UsbDeviceConnection? = null
     return try {
-      connection = manager.openDevice(device) ?: return "چاپگرِ سیمی باز نشد"
-      if (!connection.claimInterface(iface, true)) return "چاپگرِ سیمی در دستِ برنامهٔ دیگری است"
+      connection = manager.openDevice(device) ?: return StrPrint.usbNotOpened
+      if (!connection.claimInterface(iface, true)) return StrPrint.usbBusy
 
       var sent = 0
       while (sent < bytes.size) {
         val size = minOf(CHUNK, bytes.size - sent)
         val slice = bytes.copyOfRange(sent, sent + size)
         val moved = connection.bulkTransfer(endpoint, slice, slice.size, WRITE_TIMEOUT_MS)
-        if (moved < 0) return "چاپ نیمه‌کاره ماند — کابل را ببینید"
+        if (moved < 0) return StrPrint.printHalf
         wrote.set(true)
         sent += size
       }
       null
     } catch (e: Exception) {
-      "چاپ نشد: ${e.message ?: "اتصالِ سیمی برقرار نشد"}"
+      StrPrint.printFailed(e.message ?: StrPrint.noUsbConnection)
     } finally {
       try { connection?.releaseInterface(iface) } catch (e: Exception) { /* رها شده */ }
       try { connection?.close() } catch (e: Exception) { /* بسته شده */ }

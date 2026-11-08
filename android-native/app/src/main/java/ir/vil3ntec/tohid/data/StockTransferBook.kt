@@ -25,11 +25,11 @@ object StockTransferBook {
 
   /** متنِ «سابقه» — فقط برای خواندنِ آدم؛ داده همان `xfer` است */
   fun notes(s: StockTransfer.Step, names: (String) -> String): String = when (s.step) {
-    StockTransfer.SEND -> "انتقالِ موجودی: ${place(s.from)} ⇐ ${place(s.to)} — " + s.lines.joinToString("، ") { "${names(it.productId)} ${qtyText(it.qtyMilli)}" }
-    StockTransfer.RECEIVE -> (if (s.final) "دریافتِ انتقال" else "دریافتِ ناقصِ انتقال") +
+    StockTransfer.SEND -> "انتقالِ موجودی: ${place(s.from)} ⇐ ${place(s.to)} — " + s.lines.joinToString("، ") { "${names(it.productId)} ${qtyText(it.qtyMilli)}" }  // داده: یادداشتِ سابقهٔ انتقال
+    StockTransfer.RECEIVE -> (if (s.final) "دریافتِ انتقال" else "دریافتِ ناقصِ انتقال") +  // داده: یادداشتِ سابقهٔ انتقال
       (if (s.lines.isEmpty()) "" else " — " + s.lines.joinToString("، ") { "${names(it.productId)} ${qtyText(it.qtyMilli)}" }) +
       (if (s.reason.isEmpty()) "" else " (${s.reason})")
-    else -> "ردِ انتقال (${s.reason})"
+    else -> "ردِ انتقال (${s.reason})"  // داده: یادداشتِ سابقهٔ انتقال
   }.take(500)
 
   fun row(s: StockTransfer.Step, user: String?, today: String, names: (String) -> String): AuditEntry =
@@ -44,8 +44,8 @@ object StockTransferBook {
 
   /** نامِ دادهٔ سابقه — فارسی می‌ماند (همان قاعدهٔ یادداشتِ ردیف‌های دفتر) */
   private fun place(loc: String): String = when (loc) {
-    StockTransfer.SHOP_FLOOR -> "قفسهٔ فروشگاه"
-    StockTransfer.WAREHOUSE -> "انبار"
+    StockTransfer.SHOP_FLOOR -> "قفسهٔ فروشگاه"  // داده: نامِ محل درونِ یادداشتِ سابقهٔ انتقال
+    StockTransfer.WAREHOUSE -> "انبار"  // داده: نامِ محل درونِ یادداشتِ سابقهٔ انتقال
     else -> loc
   }
 

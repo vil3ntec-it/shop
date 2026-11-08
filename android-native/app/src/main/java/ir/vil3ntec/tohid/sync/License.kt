@@ -216,7 +216,7 @@ object License {
     var bits = 0
     for (c in clean) {
       val v = ALPHABET.indexOf(c)
-      require(v >= 0) { "نویسهٔ نامعتبر در base64" }
+      require(v >= 0) { "نویسهٔ نامعتبر در base64" }  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
       buffer = (buffer shl 6) or v
       bits += 6
       if (bits >= 8) {
@@ -237,7 +237,7 @@ object License {
    * ۱ باشد یک بایتِ صفر جلویش می‌آید — وگرنه DER آن را عددِ منفی می‌خواند.
    */
   fun rawToDer(raw: ByteArray): ByteArray {
-    require(raw.size % 2 == 0 && raw.isNotEmpty()) { "طولِ امضا درست نیست" }
+    require(raw.size % 2 == 0 && raw.isNotEmpty()) { "طولِ امضا درست نیست" }  // داده: خطای برنامه‌نویس (ورودیِ نادرستِ کد، نه کاربر)
     val half = raw.size / 2
     val r = asInteger(raw.copyOfRange(0, half))
     val s = asInteger(raw.copyOfRange(half, raw.size))

@@ -98,7 +98,7 @@ object TillUser {
       store.update { d ->
         d.copy(auditLog = d.auditLog + AuditEntry(
           id = auditId(), type = AUDIT_TYPE, date = ir.vil3ntec.tohid.todayIso(), refId = id,
-          notes = "صندوق با PIN ِ «$name» باز شد", createdAt = System.currentTimeMillis(), by = name,
+          notes = "صندوق با PIN ِ «$name» باز شد", createdAt = System.currentTimeMillis(), by = name,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         ))
       }
     }

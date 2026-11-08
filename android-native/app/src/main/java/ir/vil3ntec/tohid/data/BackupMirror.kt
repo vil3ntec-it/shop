@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -45,10 +46,10 @@ object BackupMirror {
   /** یک ZIPِ کامل در پوشه — فایلِ ساخته‌شده، یا خطا */
   fun write(context: Context): Result<File> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
-    require(ledger.exists() && ledger.length() > 0) { "دفتری برای پشتیبان نیست" }
-    val dir = folder(context) ?: error("پوشهٔ پشتیبان در دسترس نیست")
+    require(ledger.exists() && ledger.length() > 0) { StrAppData.noLedgerToBackup }
+    val dir = folder(context) ?: error(StrAppData.backupFolderMissing)
     if (!dir.exists()) dir.mkdirs()
-    require(dir.isDirectory && dir.canWrite()) { "در پوشهٔ «${dir.path}» نمی‌شود نوشت" }
+    require(dir.isDirectory && dir.canWrite()) { StrAppData.folderNotWritable(dir.path) }
     val stamp = SimpleDateFormat("yyyy-MM-dd_HH-mm", Locale.US).format(Date())
     val target = File(dir, "$PREFIX$stamp.zip")
     val tmp = File(dir, "$PREFIX$stamp.zip.part")
@@ -56,7 +57,7 @@ object BackupMirror {
     val ledgerJson = AtRest.readText(context, ledger)
     tmp.outputStream().use { out -> BackupBundle.write(context, out, ledgerJson).getOrThrow() }
     if (target.exists()) target.delete()
-    require(tmp.renameTo(target)) { "نامِ فایلِ پشتیبان گذاشته نشد" }
+    require(tmp.renameTo(target)) { StrAppData.backupNameFailed }
     list(context).drop(KEEP).forEach { runCatching { it.delete() } }
     target
   }

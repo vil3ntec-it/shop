@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.perm.PermCore
 
 /**
@@ -102,19 +103,19 @@ object RoleGate {
 
   /** نامِ فارسیِ بخشِ دفتر برای پیام */
   fun tableTitle(table: String): String = when (table) {
-    "debtors" -> "قرض‌داران"
-    "transactions" -> "قرض و پرداخت"
-    "expenses", "expenseCategories" -> "مصارف"
-    "products", "productCategories", "productUnits" -> "کالاها"
-    "priceHistory" -> "قیمتِ کالا"
-    "warehouseEntries" -> "رسیدِ انبار"
-    "sales", "saleItems" -> "فروش"
-    "returns" -> "برگشتِ کالا"
-    "suppliers" -> "تأمین‌کننده‌ها"
-    "purchases" -> "خرید"
-    "supplierPayments" -> "پرداخت به تأمین‌کننده"
-    "stockMovements" -> "حرکتِ انبار"
-    "auditLog" -> "سابقهٔ عملیات"
+    "debtors" -> StrAppData.tblDebtors
+    "transactions" -> StrAppData.tblTransactions
+    "expenses", "expenseCategories" -> StrAppData.tblExpenses
+    "products", "productCategories", "productUnits" -> StrAppData.tblProducts
+    "priceHistory" -> StrAppData.tblPrices
+    "warehouseEntries" -> StrAppData.tblStockIn
+    "sales", "saleItems" -> StrAppData.tblSales
+    "returns" -> StrAppData.tblReturns
+    "suppliers" -> StrAppData.tblSuppliers
+    "purchases" -> StrAppData.tblPurchases
+    "supplierPayments" -> StrAppData.tblSupplierPay
+    "stockMovements" -> StrAppData.tblMoves
+    "auditLog" -> StrAppData.tblAudit
     else -> table
   }
 }

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -270,7 +271,7 @@ class CartStore(context: Context) : HeldCart {
   companion object {
     const val FILE = "sale-draft.json"
     /** POS-12 — اسکنی که وسطِ جابه‌جاییِ فاکتور رسید و به سبد نرفت */
-    const val NOT_ADDED = "فاکتور در حالِ جابه‌جایی بود — کالا اضافه نشد؛ دوباره اسکن کنید"
+    val NOT_ADDED: String get() = StrLedger.cartNotAdded
     // همان کلیدِ نسخهٔ وب — فقط برای آوردنِ پیش‌نویسِ نسخهٔ پیش
     private const val LEGACY_KEY = "tohid-shop-draft-cart-v1"
     private const val LEGACY_DEBTOR_KEY = "tohid-shop-draft-cart-debtor"

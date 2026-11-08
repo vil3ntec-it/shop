@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -81,210 +82,210 @@ object OwnerExport {
 
   /** مجموعه ⇐ نامِ برگه؛ ترتیبِ برگه‌ها همین است */
   val SHEETS: Map<String, String> = linkedMapOf(
-    "products" to "کالاها",
-    "productCategories" to "دسته‌های کالا",
-    "productUnits" to "واحدهای کالا",
-    "warehouseEntries" to "ورودی‌های انبار",
-    "sales" to "فاکتورهای فروش",
-    "saleItems" to "اقلام فاکتورها",
-    "returns" to "برگشتی‌های فروش",
-    "debtors" to "قرض‌داران",
-    "transactions" to "حساب قرض‌داران",
-    "expenses" to "مصارف",
-    "expenseCategories" to "دسته‌های مصارف",
-    "suppliers" to "تأمین‌کنندگان",
-    "purchases" to "خریدها",
-    "supplierPayments" to "پرداخت به تأمین‌کنندگان",
-    "stockMovements" to "حرکات انبار",
-    "priceHistory" to "سابقهٔ قیمت‌ها",
-    "auditLog" to "سابقهٔ عملیات",
-    "safeEntries" to "گاوصندوق",
+    "products" to "کالاها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "productCategories" to "دسته‌های کالا",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "productUnits" to "واحدهای کالا",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "warehouseEntries" to "ورودی‌های انبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "sales" to "فاکتورهای فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "saleItems" to "اقلام فاکتورها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "returns" to "برگشتی‌های فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "debtors" to "قرض‌داران",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "transactions" to "حساب قرض‌داران",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "expenses" to "مصارف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "expenseCategories" to "دسته‌های مصارف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "suppliers" to "تأمین‌کنندگان",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "purchases" to "خریدها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "supplierPayments" to "پرداخت به تأمین‌کنندگان",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "stockMovements" to "حرکات انبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "priceHistory" to "سابقهٔ قیمت‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "auditLog" to "سابقهٔ عملیات",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "safeEntries" to "گاوصندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
   )
 
   /** فیلد ⇐ سرستونِ فارسی */
   val HEADERS: Map<String, String> = mapOf(
-    "id" to "شناسه",
-    "name" to "نام",
-    "phone" to "تلفن",
-    "dueDate" to "سررسید",
-    "creditLimit" to "سقف اعتبار",
-    "phone2" to "تلفن دوم",
-    "tags" to "برچسب‌ها",
-    "group" to "گروه مشتری",
-    "priceList" to "لیست قیمت",
-    "marketingConsent" to "رضایت پیام تبلیغاتی",
-    "mergedInto" to "ادغام‌شده در",
+    "id" to "شناسه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "name" to "نام",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "phone" to "تلفن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "dueDate" to "سررسید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "creditLimit" to "سقف اعتبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "phone2" to "تلفن دوم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "tags" to "برچسب‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "group" to "گروه مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "priceList" to "لیست قیمت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "marketingConsent" to "رضایت پیام تبلیغاتی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "mergedInto" to "ادغام‌شده در",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  کارتِ مشتری (CRM-16) — همان `license/owner-export.js`
-    "cardCode" to "کارت مشتری",
+    "cardCode" to "کارت مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
-    "deliveryAddress" to "نشانی تحویل",
-    "notes" to "یادداشت",
-    "createdAt" to "زمان ثبت (UTC)",
-    "date" to "تاریخ",
-    "amount" to "مبلغ",
-    "type" to "نوع",
-    "title" to "عنوان",
-    "category" to "دسته",
-    "subcategory" to "زیردسته",
-    "unit" to "واحد",
-    "debtorId" to "شناسهٔ قرض‌دار",
-    "productId" to "شناسهٔ کالا",
-    "supplierId" to "شناسهٔ تأمین‌کننده",
-    "saleId" to "شناسهٔ فاکتور",
-    "saleItemId" to "شناسهٔ قلم فاکتور",
-    "purchaseId" to "شناسهٔ خرید",
-    "warehouseEntryId" to "شناسهٔ ورودی انبار",
-    "refId" to "شناسهٔ مرجع",
-    "refIds" to "ردیف‌های مرتبط",
-    "kind" to "نوعِ ردیفِ سیستمی",
-    "purchasePrice" to "قیمت خرید",
-    "salePrice" to "قیمت فروش",
-    "wholesalePrice" to "قیمت عمده",
-    "minStock" to "حداقل موجودی",
-    "barcodes" to "بارکدها",
-    "photo" to "عکس دارد",
-    "active" to "فعال",
-    "saleUnit" to "واحد فروش",
-    "unitFactor" to "ضریب واحد",
+    "deliveryAddress" to "نشانی تحویل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "notes" to "یادداشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "createdAt" to "زمان ثبت (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "date" to "تاریخ",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "amount" to "مبلغ",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "type" to "نوع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "title" to "عنوان",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "category" to "دسته",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "subcategory" to "زیردسته",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "unit" to "واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "debtorId" to "شناسهٔ قرض‌دار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "productId" to "شناسهٔ کالا",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "supplierId" to "شناسهٔ تأمین‌کننده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "saleId" to "شناسهٔ فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "saleItemId" to "شناسهٔ قلم فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "purchaseId" to "شناسهٔ خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "warehouseEntryId" to "شناسهٔ ورودی انبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "refId" to "شناسهٔ مرجع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "refIds" to "ردیف‌های مرتبط",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "kind" to "نوعِ ردیفِ سیستمی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "purchasePrice" to "قیمت خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "salePrice" to "قیمت فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "wholesalePrice" to "قیمت عمده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "minStock" to "حداقل موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "barcodes" to "بارکدها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "photo" to "عکس دارد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "active" to "فعال",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "saleUnit" to "واحد فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "unitFactor" to "ضریب واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PRD-02/PRD-26
-    "namePs" to "نام پشتو",
-    "nameEn" to "نام انگلیسی",
-    "synonyms" to "مترادف‌ها",
-    "keywords" to "واژه‌های جست‌وجو",
-    "aisle" to "راهرو",
-    "shelf" to "قفسه",
-    "shelfLevel" to "طبقهٔ قفسه",
+    "namePs" to "نام پشتو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "nameEn" to "نام انگلیسی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "synonyms" to "مترادف‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "keywords" to "واژه‌های جست‌وجو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "aisle" to "راهرو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "shelf" to "قفسه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "shelfLevel" to "طبقهٔ قفسه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PRD-24/PRD-25
-    "alternatives" to "کالاهای جایگزین",
-    "customFields" to "فیلدهای سفارشی",
+    "alternatives" to "کالاهای جایگزین",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "customFields" to "فیلدهای سفارشی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PRD-03/PRD-09
-    "sku" to "کد کالا (SKU)",
-    "stockless" to "خدماتی یا بی موجودی",
+    "sku" to "کد کالا (SKU)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "stockless" to "خدماتی یا بی موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PRD-10/PRD-13
-    "kit" to "اجزای کیت",
-    "priceWindows" to "قیمت‌های زمان‌بندی‌شده",
-    "parts" to "اجزای کیت هنگام فروش",
+    "kit" to "اجزای کیت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "priceWindows" to "قیمت‌های زمان‌بندی‌شده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "parts" to "اجزای کیت هنگام فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PRD-11
-    "variantAxes" to "ویژگی‌های تنوع",
-    "variantOf" to "شناسهٔ کالای مدل",
-    "variant" to "ترکیبِ تنوع",
+    "variantAxes" to "ویژگی‌های تنوع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "variantOf" to "شناسهٔ کالای مدل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "variant" to "ترکیبِ تنوع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  POS-28
-    "serialTracked" to "سریال‌دار",
-    "serials" to "سریال‌ها",
-    "brand" to "برند",
-    "reorderPoint" to "نقطهٔ سفارش",
-    "maxStock" to "حداکثر موجودی",
-    "brand" to "برند",
-    "packs" to "بسته‌ها",
-    "cartons" to "تعداد کارتن",
-    "perCarton" to "تعداد در هر کارتن",
-    "units" to "تعداد واحد",
-    "price" to "قیمت",
-    "isAdjustment" to "اصلاح موجودی",
-    "expiryDate" to "تاریخ انقضا",
-    "batch" to "شمارهٔ بچ",
-    "productionDate" to "تاریخ تولید",
-    "invoiceNumber" to "شمارهٔ فاکتور",
-    "series" to "سری سند",
-    "channel" to "کانال فروش",
-    "orderId" to "شناسهٔ سفارش",
-    "orderNo" to "شمارهٔ سفارش",
-    "total" to "جمع",
-    "discountType" to "نوع تخفیف",
-    "discountValue" to "مقدار تخفیف",
-    "discount" to "تخفیف",
-    "finalTotal" to "مبلغ نهایی",
-    "paymentMethod" to "روش پرداخت",
-    "paidAmount" to "پرداخت‌شده",
-    "remaining" to "باقی‌مانده",
-    "status" to "وضعیت",
-    "debtGiven" to "قرض داده‌شده",
-    "debtSettled" to "قرض تسویه‌شده",
-    "syncStatus" to "وضعیت همگام‌سازی",
-    "cancelReason" to "دلیل لغو",
-    "seller" to "فروشنده",
-    "correctedAt" to "تاریخِ تصحیح‌شده (UTC)", //  S28b: از سرور، وقتی ساعتِ دستگاه کج بود
-    "approval" to "تأییدِ مدیر",
-    "cancelApproval" to "تأییدِ لغو",
-    "payments" to "ردیف‌های پرداخت",
-    "tenderedMinor" to "دریافتی (پول)",
-    "changeMinor" to "پول پس (پول)",
-    "roundingMinor" to "گردکردن نقدی (پول)", // PAY-09
+    "serialTracked" to "سریال‌دار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "serials" to "سریال‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "brand" to "برند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "reorderPoint" to "نقطهٔ سفارش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "maxStock" to "حداکثر موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "brand" to "برند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "packs" to "بسته‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "cartons" to "تعداد کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "perCarton" to "تعداد در هر کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "units" to "تعداد واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "price" to "قیمت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "isAdjustment" to "اصلاح موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "expiryDate" to "تاریخ انقضا",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "batch" to "شمارهٔ بچ",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "productionDate" to "تاریخ تولید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "invoiceNumber" to "شمارهٔ فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "series" to "سری سند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "channel" to "کانال فروش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "orderId" to "شناسهٔ سفارش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "orderNo" to "شمارهٔ سفارش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "total" to "جمع",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "discountType" to "نوع تخفیف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "discountValue" to "مقدار تخفیف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "discount" to "تخفیف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "finalTotal" to "مبلغ نهایی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "paymentMethod" to "روش پرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "paidAmount" to "پرداخت‌شده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "remaining" to "باقی‌مانده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "status" to "وضعیت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "debtGiven" to "قرض داده‌شده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "debtSettled" to "قرض تسویه‌شده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "syncStatus" to "وضعیت همگام‌سازی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "cancelReason" to "دلیل لغو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "seller" to "فروشنده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "correctedAt" to "تاریخِ تصحیح‌شده (UTC)", //  S28b: از سرور، وقتی ساعتِ دستگاه کج بود  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "approval" to "تأییدِ مدیر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "cancelApproval" to "تأییدِ لغو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "payments" to "ردیف‌های پرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "tenderedMinor" to "دریافتی (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "changeMinor" to "پول پس (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "roundingMinor" to "گردکردن نقدی (پول)", // PAY-09  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  فاکتورِ نسخهٔ ۲ — توکنِ QRِ فاکتور (نشانیِ عمومیِ همان فروش)
-    "receiptToken" to "توکنِ QRِ فاکتور",
-    "by" to "کاربر",
-    "approvedBy" to "تأییدکننده",
-    "note" to "توضیح",
-    "z" to "گزارش Z",
+    "receiptToken" to "توکنِ QRِ فاکتور",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "by" to "کاربر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "approvedBy" to "تأییدکننده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "note" to "توضیح",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "z" to "گزارش Z",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  POS-40 اصلاحِ روشِ پرداخت (`pay_fix`)
-    "fromMethod" to "روش پیشین",
-    "toMethod" to "روش تازه",
-    "payRef" to "مرجع روش تازه",
+    "fromMethod" to "روش پیشین",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toMethod" to "روش تازه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "payRef" to "مرجع روش تازه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PAY-07 وضعیتِ پرداخت (`pay_status`)
-    "payRow" to "ردیف پرداخت",
-    "payMethod" to "روش ردیف",
-    "fromStatus" to "وضعیت پیشین",
-    "toStatus" to "وضعیت تازه",
+    "payRow" to "ردیف پرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "payMethod" to "روش ردیف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "fromStatus" to "وضعیت پیشین",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toStatus" to "وضعیت تازه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  سفارشِ ویژه (POS-26): سند و وضعیتِ تازه روی ردیفِ سابقه
-    "specialOrder" to "سفارش ویژه",
+    "specialOrder" to "سفارش ویژه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  فروشِ امانی (POS-27): سند و وضعیتِ تازه روی ردیفِ سابقه
-    "layaway" to "فروش امانی",
+    "layaway" to "فروش امانی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  امتیازِ وفاداری (PRM-13): شمارِ امتیازِ ردیفِ سابقه
-    "points" to "امتیاز",
-    "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",
-    "coupons" to "کدهای تخفیف",
-    "quantity" to "تعداد",
-    "unitPrice" to "قیمت واحد",
-    "totalPrice" to "جمع قلم",
-    "returnedQty" to "تعداد برگشتی",
-    "listPriceMinor" to "قیمت فهرست (یک‌صدم افغانی)",
-    "promo" to "تخفیف‌های خودکار قلم",
-    "reason" to "دلیل",
+    "points" to "امتیاز",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "promoDiscountMinor" to "تخفیف خودکار (یک‌صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "coupons" to "کدهای تخفیف",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "quantity" to "تعداد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "unitPrice" to "قیمت واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "totalPrice" to "جمع قلم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "returnedQty" to "تعداد برگشتی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "listPriceMinor" to "قیمت فهرست (یک‌صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "promo" to "تخفیف‌های خودکار قلم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "reason" to "دلیل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  برگشت و تعویض (RET، فقط با تنظیمِ روشن)
-    "docId" to "سند برگشت",
-    "disposition" to "مقصد کالا",
-    "refund" to "روش بازپرداخت",
-    "toAccount" to "کسر از بدهی",
-    "toCredit" to "اعتبار فروشگاه",
-    "creditTo" to "صاحب اعتبار",
-    "toMethods" to "به روش‌های دیگر",
-    "exchangeSaleId" to "فاکتور تعویض",
-    "adjKind" to "نوعِ اصلاح",
-    "address" to "نشانی",
-    "totalAmount" to "مبلغ کل",
-    "debt" to "بدهی",
-    "invoiceNo" to "شمارهٔ فاکتور خرید",
-    "qty" to "مقدار",
-    "oldPrice" to "قیمت قبلی",
-    "newPrice" to "قیمت تازه",
-    "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",
+    "docId" to "سند برگشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "disposition" to "مقصد کالا",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "refund" to "روش بازپرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toAccount" to "کسر از بدهی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toCredit" to "اعتبار فروشگاه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "creditTo" to "صاحب اعتبار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toMethods" to "به روش‌های دیگر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "exchangeSaleId" to "فاکتور تعویض",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "adjKind" to "نوعِ اصلاح",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "address" to "نشانی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "totalAmount" to "مبلغ کل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "debt" to "بدهی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "invoiceNo" to "شمارهٔ فاکتور خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "qty" to "مقدار",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "oldPrice" to "قیمت قبلی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "newPrice" to "قیمت تازه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "nextInvoiceNo" to "شمارهٔ فاکتور بعدی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  موتورِ تازهٔ موجودی و بها (افزودنی، فقط وقتی تنظیمِ دکان روشن است)
-    "landedCost" to "هزینهٔ جانبی",
-    "landedCostMinor" to "هزینهٔ جانبی (صدم افغانی)",
-    "locationId" to "محل",
-    "toLocationId" to "محلِ مقصد",
-    "userId" to "کاربر",
-    "lotId" to "سری",
+    "landedCost" to "هزینهٔ جانبی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "landedCostMinor" to "هزینهٔ جانبی (صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "locationId" to "محل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "toLocationId" to "محلِ مقصد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "userId" to "کاربر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "lotId" to "سری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PUR-10 — زمانِ تأمینِ دستیِ تأمین‌کننده (افزودنی)
-    "leadDays" to "زمان تأمین (روز)",
+    "leadDays" to "زمان تأمین (روز)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
     //  گاوصندوق (PAY-18)
-    "amountMinor" to "مبلغ (پول)",
-    "bagNo" to "شمارهٔ کیسه",
-    "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",
-    "shiftId" to "شناسهٔ صندوق",
-    "auditId" to "شناسهٔ ردیفِ صندوق",
+    "amountMinor" to "مبلغ (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "bagNo" to "شمارهٔ کیسه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "expectedMinor" to "ماندهٔ دفتر هنگامِ شمارش (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "shiftId" to "شناسهٔ صندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "auditId" to "شناسهٔ ردیفِ صندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  چند کشو (PAY-17): نامِ کشوی نام‌دار روی بازکردنِ صندوق (`shiftId` ِ فروش، برگشت و قرض همان «شناسهٔ صندوق» است)
-    "drawer" to "کشو",
+    "drawer" to "کشو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  انتقالِ موجودیِ سرور (INV-11): گامِ ارسال/دریافت/رد روی ردیفِ `stock_transfer`
-    "xfer" to "گامِ انتقالِ موجودی",
+    "xfer" to "گامِ انتقالِ موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */
   private val HEAD = setOf("format", "formatVersion", "exportedAt", "source", "counts", "settings", "archive")
 
-  const val INFO_SHEET = "اطلاعات خروجی"
-  const val ARCHIVE_PREFIX = "بایگانی — "
+  const val INFO_SHEET = "اطلاعات خروجی"  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+  const val ARCHIVE_PREFIX = "بایگانی — "  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
 
   fun tree(d: ShopData, meta: Meta, archive: LedgerArchive.Archive = LedgerArchive.Archive()): JsonObject {
     val data = json.encodeToJsonElement(ShopData.serializer(), d).jsonObject
@@ -318,10 +319,10 @@ object OwnerExport {
    */
   fun parse(raw: String): Parsed {
     val tree = runCatching { json.parseToJsonElement(raw) }.getOrNull() as? JsonObject
-      ?: error("فایلِ خروجی معتبر نیست")
-    if ((tree["format"] as? JsonPrimitive)?.contentOrNull != FORMAT) error("این فایل، خروجیِ کاملِ فروشگاه من نیست")
-    val v = (tree["formatVersion"] as? JsonPrimitive)?.intOrNull ?: error("نسخهٔ قالب در فایل نیست")
-    if (v < 1 || v > FORMAT_VERSION) error("این خروجی با قالبِ $v ساخته شده و این نسخهٔ برنامه آن را نمی‌شناسد")
+      ?: error(StrAppData.exportBad)
+    if ((tree["format"] as? JsonPrimitive)?.contentOrNull != FORMAT) error(StrAppData.exportNotOurs)
+    val v = (tree["formatVersion"] as? JsonPrimitive)?.intOrNull ?: error(StrAppData.exportNoVersion)
+    if (v < 1 || v > FORMAT_VERSION) error(StrAppData.exportNewer(v))
     val data = json.decodeFromJsonElement(ShopData.serializer(), tree)
     val archive = (tree["archive"] as? JsonObject)
       ?.let { json.decodeFromJsonElement(LedgerArchive.Archive.serializer(), it) }
@@ -353,24 +354,24 @@ object OwnerExport {
     val source = tree["source"] as? JsonObject
     val settings = tree["settings"] as? JsonObject
     val rows = ArrayList<List<Xlsx.Cell?>>()
-    rows += listOf(t("عنوان"), t("مقدار"))
-    rows += listOf(t("قالب"), t(str(tree["format"])))
-    rows += listOf(t("نسخهٔ قالب"), cell("formatVersion", tree["formatVersion"]))
-    rows += listOf(t("زمان خروجی (UTC)"), t(str(tree["exportedAt"])))
-    rows += listOf(t("برنامه"), t(str(source?.get("app"))))
-    rows += listOf(t("نسخهٔ برنامه"), t(str(source?.get("appVersion"))))
-    rows += listOf(t("نام فروشگاه"), t(str(settings?.get("storeName"))))
+    rows += listOf(t("عنوان"), t("مقدار"))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("قالب"), t(str(tree["format"])))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("نسخهٔ قالب"), cell("formatVersion", tree["formatVersion"]))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("زمان خروجی (UTC)"), t(str(tree["exportedAt"])))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("برنامه"), t(str(source?.get("app"))))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("نسخهٔ برنامه"), t(str(source?.get("appVersion"))))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("نام فروشگاه"), t(str(settings?.get("storeName"))))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     tree.forEach { (k, v) -> if (k !in HEAD && v !is JsonArray) rows += listOf(t(HEADERS[k] ?: k), cell(k, v)) }
-    settings?.forEach { (k, v) -> if (k != "storeName") rows += listOf(t("تنظیمات — $k"), cell(k, v)) }
-    for ((name, table) in tables) rows += listOf(t("ردیف‌های «$name»"), Xlsx.Cell.Num((table.size - 1).toDouble()))
-    rows += listOf(t("عکس‌ها"), t("در این خروجی نیستند؛ «پشتیبان کامل» آن‌ها را دارد"))
+    settings?.forEach { (k, v) -> if (k != "storeName") rows += listOf(t("تنظیمات — $k"), cell(k, v)) }  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    for ((name, table) in tables) rows += listOf(t("ردیف‌های «$name»"), Xlsx.Cell.Num((table.size - 1).toDouble()))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    rows += listOf(t("عکس‌ها"), t("در این خروجی نیستند؛ «پشتیبان کامل» آن‌ها را دارد"))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     return rows
   }
 
   private fun table(arr: JsonArray): List<List<Xlsx.Cell?>> {
-    if (arr.isEmpty()) return listOf(listOf(Xlsx.Cell.Text("هیچ ردیفی ثبت نشده")))
+    if (arr.isEmpty()) return listOf(listOf(Xlsx.Cell.Text("هیچ ردیفی ثبت نشده")))  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     if (!arr.all { it is JsonObject }) {
-      return listOf(listOf<Xlsx.Cell?>(Xlsx.Cell.Text("مقدار"))) + arr.map { listOf(cell("", it)) }
+      return listOf(listOf<Xlsx.Cell?>(Xlsx.Cell.Text("مقدار"))) + arr.map { listOf(cell("", it)) }  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     }
     val cols = LinkedHashSet<String>()
     arr.forEach { cols.addAll((it as JsonObject).keys) }

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.model.AppleNonceDto
 import ir.vil3ntec.tohid.core.model.OtpChallengeDto
 import ir.vil3ntec.tohid.core.model.RegisterTicketDto
@@ -536,8 +537,8 @@ class AuthRepository(
   private fun keep(body: JsonObject): SessionDto {
     val session = ApiJson.decode<SessionDto>(body)
     if (!session.isValid) throw ApiFailure.InvalidResponse(
-      if (body.isEmpty()) "پاسخِ سرور خالی بود"
-      else "توکن در پاسخ نبود — سرور فرستاد: ${body.keys.joinToString(", ").take(90)}"
+      if (body.isEmpty()) StrAppData.serverEmpty
+      else StrAppData.noTokenSent(body.keys.joinToString(", ").take(90))
     )
     tokens.save(session.accessToken, session.refreshToken, session.accessExpiresAt)
     runCatching { onSignedIn(session) }

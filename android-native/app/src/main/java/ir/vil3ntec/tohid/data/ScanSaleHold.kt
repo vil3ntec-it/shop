@@ -22,7 +22,7 @@ import ir.vil3ntec.tohid.core.money.Money
  */
 object ScanSaleHold {
   /** برچسبِ فاکتورِ نگه‌داشته — در فهرستِ نگه‌داشته‌ها و برگهٔ فاکتور دیده می‌شود */
-  const val LABEL = "از بارکدخوان"
+  const val LABEL = "از بارکدخوان"  // داده: برچسبِ ذخیره‌شدهٔ فاکتورِ نگه‌داشته
 
   data class Line(val productId: String, val name: String, val qty: Int, val totalMinor: Long)
 

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -253,7 +254,7 @@ object AutoSync {
         retrying = null
         //  مجوزِ اشتراک هم همین‌جا تازه می‌شود؛ عمرش ده روز است و اگر
         //  کاربر هیچ‌وقت دستی نزند، بی‌سروصدا تمام می‌شد
-        runCatching { Syncer(store, state, app).refreshLicense(android.os.Build.MODEL ?: "گوشی") }
+        runCatching { Syncer(store, state, app).refreshLicense(android.os.Build.MODEL ?: "گوشی") }  // داده: نامِ دستگاه برای سرور
       }
       .onFailure { failure ->
         //  «نت نیست» را به کاربر نشان نمی‌دهیم: خطا نیست و خودش دوباره
@@ -281,13 +282,12 @@ object AutoSync {
     val stale = rejected.count { it.reason == "stale" }
     val denied = rejected.count { it.reason == "delete_not_allowed" }
     val parts = buildList {
-      if (stale > 0) add("$stale مورد چون نسخهٔ تازه‌تری روی سرور بود")
-      if (denied > 0) add("$denied مورد چون اجازهٔ حذفش را نداشتید")
+      if (stale > 0) add(StrSync.staleN(stale))
+      if (denied > 0) add(StrSync.deniedN(denied))
       val other = rejected.size - stale - denied
-      if (other > 0) add("$other مورد دیگر")
+      if (other > 0) add(StrSync.otherN(other))
     }
-    return "${rejected.size} تغییر اعمال نشد: ${parts.joinToString("، ")}. " +
-      "نسخهٔ سرور جایش نشست."
+    return StrSync.rejectedNote(rejected.size, parts.joinToString("، "))
   }
 
   /**

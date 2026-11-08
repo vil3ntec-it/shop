@@ -8,6 +8,7 @@ import ir.vil3ntec.tohid.core.hw.KickOnce
 import ir.vil3ntec.tohid.core.hw.PrintQueue
 import ir.vil3ntec.tohid.core.hw.PrinterProfile
 import ir.vil3ntec.tohid.core.hw.ReceiptCopies
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.DrawerNoSale
 import ir.vil3ntec.tohid.data.Sale
@@ -57,7 +58,7 @@ object PrintSpooler {
   private const val KEY_AUTO = "print_auto_after_sale"
   private const val KEY_DEFERRED = "print_deferred"
   private const val DIR = "print-spool"
-  private const val COPY_MARK = "— چاپِ دوباره —"
+  private val COPY_MARK: String get() = StrPrint.copyMark
 
   private val queue = PrintQueue()
 
@@ -176,8 +177,8 @@ object PrintSpooler {
     onDone: CompletableDeferred<Boolean>? = null,
   ): Submitted {
     //  کشو «همین حالا یا هرگز» است — هرگز در صف (`kick`)
-    if (kind == PrintQueue.Kind.DRAWER) return Submitted(null, "کشو در صف نمی‌رود")
-    if (kind == PrintQueue.Kind.RECEIPT && copyBytes == null) return Submitted(null, "نسخهٔ «چاپِ دوباره» ساخته نشد")
+    if (kind == PrintQueue.Kind.DRAWER) return Submitted(null, StrPrint.drawerNoQueue)
+    if (kind == PrintQueue.Kind.RECEIPT && copyBytes == null) return Submitted(null, StrPrint.copyNotMade)
     start(context)
     val ctx = app ?: context
     val id = "pj" + System.currentTimeMillis().toString(36) + (1000..9999).random()
@@ -185,7 +186,7 @@ object PrintSpooler {
     runCatching {
       binFile(ctx, id).writeBytes(EscPos.withoutDrawerKick(bytes))
       copyBytes?.let { copyFile(ctx, id).writeBytes(EscPos.withoutDrawerKick(it)) }
-    }.onFailure { dropFiles(ctx, id); return Submitted(null, "کارِ چاپ ذخیره نشد: ${it.message}") }
+    }.onFailure { dropFiles(ctx, id); return Submitted(null, StrPrint.jobNotSaved(it.message)) }
     if (waiter != null) firstTry[id] = waiter
     if (onDone != null) lastTry[id] = onDone
     val added = synchronized(queue) { queue.enqueue(job) }
@@ -193,7 +194,7 @@ object PrintSpooler {
       firstTry.remove(id)
       lastTry.remove(id)?.complete(false)
       dropFiles(ctx, id)
-      return Submitted(null, "این فاکتور همین حالا در صفِ چاپ است")
+      return Submitted(null, StrPrint.alreadyQueued)
     }
     persist(ctx)
     publish()
@@ -213,12 +214,12 @@ object PrintSpooler {
     bytes: ByteArray,
     saleId: String? = null,
     reason: String = "",
-    done: String = "چاپ شد",
+    done: String = StrPrint.printed,
     copyBytes: ByteArray? = null,
   ): String {
     val waiter = CompletableDeferred<String?>()
     val s = submit(context, kind, link, title, bytes, saleId, reason, waiter, copyBytes)
-    val id = s.id ?: return s.message ?: "چاپ نشد"
+    val id = s.id ?: return s.message ?: StrPrint.notPrinted
     return firstOutcome(id, waiter) ?: done
   }
 
@@ -226,9 +227,9 @@ object PrintSpooler {
   private suspend fun firstOutcome(id: String, waiter: CompletableDeferred<String?>): String? {
     //  `null`ِ انتظار یعنی «چاپ شد»؛ پس در یک فهرست پیچیده می‌شود تا با «مهلت تمام شد» قاطی نشود
     val outcome = withTimeoutOrNull(30_000) { listOf(waiter.await()) }
-      ?: return if (synchronized(queue) { queue.all().any { it.id == id } }) "در صفِ چاپ است — پشتِ کارِ قبلی" else null
+      ?: return if (synchronized(queue) { queue.all().any { it.id == id } }) StrPrint.inQueue else null
     val err = outcome[0] ?: return null
-    return "چاپگر در دسترس نیست: $err — در صف ماند و دوباره تلاش می‌شود"
+    return StrPrint.printerAway(err)
   }
 
   /**
@@ -243,10 +244,10 @@ object PrintSpooler {
         if (reason != null) HwPages.saleBytes(context, d, sale, printer, copyMark = COPY_MARK) to null
         else HwPages.saleBytes(context, d, sale, printer) to HwPages.saleBytes(context, d, sale, printer, copyMark = COPY_MARK)
       }
-    }.getOrElse { return "فاکتور کشیده نشد: ${it.message ?: "دلیل نامعلوم"}" }
+    }.getOrElse { return StrPrint.invoiceNotDrawn(it.message ?: StrPrint.unknownReason) }
     val kind = if (reason != null) PrintQueue.Kind.REPRINT else PrintQueue.Kind.RECEIPT
-    return submitAndWait(context, kind, link, "فاکتور #${sale.invoiceLabel() ?: "—"}", bytes, sale.id, reason.orEmpty(),
-      done = if (reason != null) "چاپِ دوباره انجام شد" else "فاکتور چاپ شد", copyBytes = copy)
+    return submitAndWait(context, kind, link, "فاکتور #${sale.invoiceLabel() ?: "—"}", bytes, sale.id, reason.orEmpty(),  // داده: عنوانِ کارِ صفِ چاپ (روی دیسک و در یادداشتِ سابقهٔ چاپِ دوباره)
+      done = if (reason != null) StrPrint.reprinted else StrPrint.invoicePrinted, copyBytes = copy)
   }
 
   /**
@@ -277,9 +278,9 @@ object PrintSpooler {
     val drawerNow = printer.profile().drawer && cash
     if (!auto && !drawerNow) return
     val no = sale.invoiceLabel() ?: "—"
-    val label = "فاکتورِ #$no"
+    val label = StrPrint.invoiceNo(no)
     scope.launch {
-      if (drawerNow) kick(context, printer.link, printer.profile()).error?.let { notifyTill("کشو باز نشد: $it — با کلید باز کنید") }
+      if (drawerNow) kick(context, printer.link, printer.profile()).error?.let { notifyTill(StrPrint.drawerFailedKey(it)) }
       if (!auto) return@launch
       val copies = ReceiptCopiesPref.get(context)
       var first: Pair<String, CompletableDeferred<String?>>? = null
@@ -290,18 +291,18 @@ object PrintSpooler {
             HwPages.saleBytes(context, data, sale, printer, copyMark = ReceiptCopies.retryMark(k, copies, COPY_MARK))
         }
         if (built.isFailure) {
-          val m = "$label کشیده نشد: ${built.exceptionOrNull()?.message ?: "دلیل نامعلوم"}"
+          val m = StrPrint.labelNotDrawn(label, built.exceptionOrNull()?.message ?: StrPrint.unknownReason)
           lastError.value = m; notifyTill(m); break
         }
         val (bytes, copy) = built.getOrThrow()
-        val title = "فاکتور #$no" + (ReceiptCopies.label(k, copies)?.let { " · $it" } ?: "")
+        val title = "فاکتور #$no" + (ReceiptCopies.label(k, copies)?.let { " · $it" } ?: "")  // داده: عنوانِ کارِ صفِ چاپ (روی دیسک و در یادداشتِ سابقهٔ چاپِ دوباره)
         val waiter = if (k == 1) CompletableDeferred<String?>() else null
         val s = submit(context, PrintQueue.Kind.RECEIPT, printer.link, title, bytes, sale.id, waiter = waiter, copyBytes = copy, copy = k)
         val id = s.id
         if (id == null) { s.message?.let { notifyTill("$label: $it") }; break }
         if (waiter != null) first = id to waiter
       }
-      first?.let { (id, waiter) -> firstOutcome(id, waiter)?.let { notifyTill("$label چاپ نشد — $it") } }
+      first?.let { (id, waiter) -> firstOutcome(id, waiter)?.let { notifyTill(StrPrint.labelNotPrinted(label, it)) } }
     }
   }
 
@@ -317,9 +318,9 @@ object PrintSpooler {
    */
   private suspend fun kick(context: Context, link: String, profile: PrinterProfile): Kick = withContext(Dispatchers.IO) {
     val ticket = KickOnce(System.currentTimeMillis())
-    val l = ThermalPrinter.Link.parse(link) ?: return@withContext Kick(false, "نشانیِ چاپگر خوانده نشد")
+    val l = ThermalPrinter.Link.parse(link) ?: return@withContext Kick(false, StrPrint.badAddress)
     val sent = ThermalPrinter.sendWithin(context, l, EscPos.drawerOnly(profile), KickOnce.WINDOW_MS) { ticket.take(System.currentTimeMillis()) }
-      ?: return@withContext Kick(false, "چاپگر مشغول بود")
+      ?: return@withContext Kick(false, StrPrint.printerBusy)
     Kick(sent.wrote, sent.error)
   }
 
@@ -340,7 +341,7 @@ object PrintSpooler {
   private suspend fun openDrawerNow(context: Context, printer: PrinterRegistry.Saved, why: String): String {
     val k = kick(context, printer.link, printer.profile())
     //  ضربه‌ای که به چاپگر نرسید (بلوتوثِ خاموش، اتصالِ ناشده) کشو را باز نکرد ⇒ ردیفی هم نیست
-    if (!k.reached) return "کشو باز نشد: ${k.error ?: "به چاپگر نرسید"}"
+    if (!k.reached) return StrPrint.drawerFailed(k.error ?: StrPrint.didntReach)
     val now = System.currentTimeMillis()
     val by = who(context)
     val dev = device()
@@ -350,21 +351,21 @@ object PrintSpooler {
         shiftOpenId = ir.vil3ntec.tohid.data.CashShift.current(d)?.open?.id, today = ir.vil3ntec.tohid.todayIso(), now = now,
       )
     }
-    val head = if (k.error == null) "کشو باز شد" else "شاید کشو باز شد (خطای چاپگر: ${k.error})"
-    return head + if (saved) " — در سابقه ثبت شد" else " — ولی در سابقه ثبت نشد؛ دوباره ثبت می‌شود"
+    val head = if (k.error == null) StrPrint.drawerOpened else StrPrint.drawerMaybe(k.error)
+    return head + if (saved) StrPrint.logged else StrPrint.notLogged
   }
 
   private fun who(context: Context): String? =
     runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull()?.trim()?.ifEmpty { null }
 
-  private fun device(): String = runCatching { android.os.Build.MODEL }.getOrNull()?.ifBlank { null } ?: "این دستگاه"
+  private fun device(): String = runCatching { android.os.Build.MODEL }.getOrNull()?.ifBlank { null } ?: "این دستگاه"  // داده: نامِ دستگاه درونِ یادداشتِ سابقه
 
   /** چاپِ دوباره (دستی، یا تلاشِ دوبارهٔ رسید) ⇐ ردیفِ `reprint` در سابقهٔ دکان */
   private suspend fun auditReprint(ctx: Context, job: PrintQueue.Job, reason: String) {
     val saleId = job.saleId ?: return
     val now = System.currentTimeMillis()
     val by = who(ctx)
-    val notes = "چاپِ دوبارهٔ ${job.title} — $reason — دستگاه: ${device()}" + (by?.let { " — $it" } ?: "")
+    val notes = "چاپِ دوبارهٔ ${job.title} — $reason — دستگاه: ${device()}" + (by?.let { " — $it" } ?: "")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     audit { _ ->
       AuditEntry(id = auditId(), type = "reprint", date = ir.vil3ntec.tohid.todayIso(), refId = saleId, notes = notes,
         createdAt = now, by = by, reason = reason)
@@ -382,7 +383,7 @@ object PrintSpooler {
   fun discard(id: String) {
     synchronized(queue) { queue.discard(id) }
     app?.let { ctx -> dropFiles(ctx, id); persist(ctx) }
-    firstTry.remove(id)?.complete("کنار گذاشته شد")
+    firstTry.remove(id)?.complete(StrPrint.setAside)
     lastTry.remove(id)?.complete(false)
     publish()
     wake.trySend(Unit)
@@ -414,11 +415,11 @@ object PrintSpooler {
       }
       val err = when {
         bytes == null && copy && !copyFile(ctx, job.id).isFile ->
-          "${job.title} نسخهٔ «چاپِ دوباره» ندارد (صفِ نسخهٔ پیشین) و کنار گذاشته شد — از فهرستِ فاکتورها با دلیل دوباره چاپ کنید".also(::notifyTill)
-        bytes == null -> "فایلِ این کار پیدا نشد"
-        link == null -> "نشانیِ چاپگر خوانده نشد"
+          StrPrint.noCopySetAside(job.title).also(::notifyTill)
+        bytes == null -> StrPrint.jobFileMissing
+        link == null -> StrPrint.badAddress
         //  `send` خودش یک فرستنده در هر لحظه است (`ThermalPrinter.wire`)
-        else -> runCatching { ThermalPrinter.send(ctx, link, bytes) }.getOrElse { it.message ?: "چاپ نشد" }
+        else -> runCatching { ThermalPrinter.send(ctx, link, bytes) }.getOrElse { it.message ?: StrPrint.notPrinted }
       }
       synchronized(queue) {
         when {
@@ -434,8 +435,8 @@ object PrintSpooler {
         val reprint = job.kind == PrintQueue.Kind.REPRINT || copy
         val why = when {
           job.kind == PrintQueue.Kind.REPRINT -> job.reason
-          job.attempts == 0 -> "چاپِ نیمه‌راه پیش از بسته شدنِ برنامه"
-          else -> "تلاشِ دوباره پس از خطای چاپگر"
+          job.attempts == 0 -> "چاپِ نیمه‌راه پیش از بسته شدنِ برنامه"  // داده: دلیلِ چاپِ دوبارهٔ ذخیره‌شده در دفترِ چاپ و سابقه
+          else -> "تلاشِ دوباره پس از خطای چاپگر"  // داده: دلیلِ چاپِ دوبارهٔ ذخیره‌شده در دفترِ چاپ و سابقه
         }
         PrintLog.add(ctx, PrintLog.Entry(printedSale, if (reprint) PrintQueue.Kind.REPRINT.key else job.kind.key,
           if (reprint) why else job.reason, System.currentTimeMillis(), true))

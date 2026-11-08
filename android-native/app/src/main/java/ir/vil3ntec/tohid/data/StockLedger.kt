@@ -55,8 +55,8 @@ object StockLedger {
 
   val ADJ_KINDS = listOf("count", "damage", "expired", "lost", "other", "supplier_return")
   val ADJ_REASON = mapOf(
-    "count" to "اصلاحِ شمارش", "damage" to "خراب", "expired" to "منقضی", "lost" to "گم‌شده",
-    "other" to "اصلاح موجودی", "supplier_return" to "برگشت به تأمین‌کننده",
+    "count" to "اصلاحِ شمارش", "damage" to "خراب", "expired" to "منقضی", "lost" to "گم‌شده",  // داده: دلیلِ ذخیره‌شده در یادداشتِ سابقه و ستونِ خروجی
+    "other" to "اصلاح موجودی", "supplier_return" to "برگشت به تأمین‌کننده",  // داده: دلیلِ ذخیره‌شده در یادداشتِ سابقه و ستونِ خروجی
   )
   private val RANK = mapOf("entry" to 0, "transfer" to 1, "sale" to 2, "return" to 3)
 
@@ -159,7 +159,7 @@ object StockLedger {
     val k = w.adjKind.orEmpty()
     if (k in ADJ_KINDS) return k
     if (moveTypeByRef[w.id] == "supplier_return") return "supplier_return"
-    if (w.notes.startsWith("انبارگردانی")) return "count"
+    if (w.notes.startsWith("انبارگردانی")) return "count"  // داده: کلید یا سنجشِ منطق
     if (damagedReturn || w.notes.startsWith(DAMAGED_RETURN_NOTE)) return "damage"
     return "other"
   }
@@ -169,7 +169,7 @@ object StockLedger {
    *  `createdAt` که `refId`ش ردیفِ برگشت است. ردیفی که `adjKind` ندارد از همین شناخته
    *  می‌شود تا در «ضایعات»ِ دفترِ موجودی بیاید و کاربرش `by` ِ همان برگشت باشد.
    */
-  const val DAMAGED_RETURN_NOTE = "ضایعاتِ برگشتی"
+  const val DAMAGED_RETURN_NOTE = "ضایعاتِ برگشتی"  // داده: کلید یا سنجشِ منطق
 
   /** [only]: فقط همین کالاها (سنجشِ سبد)؛ `null` یعنی همه */
   fun events(d: ShopData, only: Set<String>? = null): List<Event> {
@@ -226,7 +226,7 @@ object StockLedger {
         //  (بهای کارتن ÷ دانه، جمعِ اجزا — `Repack`)، ورودی به میانگینِ همان محل. ردیفی که تا امروز بوده این نوع را ندارد.
         out += Event(
           id, "entry", Repack.MOVE, at, dayOf(w.date, at), w.productId, loc, q, user, ref,
-          reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },
+          reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
           costMinor = if (q > 0) max(0L, roundOr0(w.units * w.price * 100.0)) else null,
         )
       } else {
@@ -258,7 +258,7 @@ object StockLedger {
         x.id.ifEmpty { "m#$t" }, "transfer", "transfer", at, dayOf(x.date, at), x.productId, from, tq,
         x.userId.orEmpty().trim().ifEmpty { LEGACY_USER },
         x.refId.orEmpty().ifEmpty { x.id },
-        reason = x.reason.orEmpty().trim().ifEmpty { x.notes.trim().ifEmpty { "انتقال" } },
+        reason = x.reason.orEmpty().trim().ifEmpty { x.notes.trim().ifEmpty { "انتقال" } },  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
         lotId = x.lotId?.takeIf { it.isNotEmpty() },
         toLocation = to,
       )
@@ -286,7 +286,7 @@ object StockLedger {
       if (sq > 0) {
         out += Event(sid, "sale", "sale", sat, sday, si.productId, loc, sq, seller, si.saleId, lotId = pref)
       } else if (sq < 0) {
-        out += Event(sid, "sale", "adjustment", sat, sday, si.productId, loc, -sq, seller, si.saleId, reason = "قلمِ منفیِ فاکتور")
+        out += Event(sid, "sale", "adjustment", sat, sday, si.productId, loc, -sq, seller, si.saleId, reason = "قلمِ منفیِ فاکتور")  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
       }
       var left = milli(si.returnedQty)
       if (left <= 0) continue
@@ -661,7 +661,7 @@ object StockLedger {
     if (from == to) return Check(false, "same_location")
     if (qtyMilli <= 0) return Check(false, "bad_qty")
     val book = view.books[productId] ?: StockBook()
-    val ev = Event("check", "transfer", "transfer", 1L, today, productId, from, qtyMilli, "check", "", reason = "انتقال",
+    val ev = Event("check", "transfer", "transfer", 1L, today, productId, from, qtyMilli, "check", "", reason = "انتقال",  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
       lotId = lotId?.takeIf { it.isNotEmpty() }, toLocation = to)
     val step = applyEvent(book, ev, false, today)
     val err = step.error
@@ -768,7 +768,7 @@ object StockLedger {
       (f.to == null || r.at <= f.to)
   }
 
-  val EXPORT_HEADER = listOf("شناسه", "زمان", "روز", "نوع", "کالا", "محل", "مقدار", "بهای موقت (افغانی)", "کاربر", "دلیل", "سری", "سند")
+  val EXPORT_HEADER = listOf("شناسه", "زمان", "روز", "نوع", "کالا", "محل", "مقدار", "بهای موقت (افغانی)", "کاربر", "دلیل", "سری", "سند")  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
 
   fun exportRows(rows: List<Row>, nameOf: (String) -> String): List<List<String>> = rows.map { r ->
     listOf(

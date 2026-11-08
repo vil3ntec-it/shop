@@ -102,7 +102,7 @@ object LocationPing {
       val fix = DeviceLocation.current(context, force = force) ?: return
       val state = SyncStore(context)
       Backend.auth(context)
-        .sendLocation(fix, state.deviceUid, android.os.Build.MODEL ?: "گوشی")
+        .sendLocation(fix, state.deviceUid, android.os.Build.MODEL ?: "گوشی")  // داده: نامِ دستگاه برای سرور
         .onSuccess {
           prefs(context).edit().putLong(KEY_SENT, System.currentTimeMillis()).apply()
         }

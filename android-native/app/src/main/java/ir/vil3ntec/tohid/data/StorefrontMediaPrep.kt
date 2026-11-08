@@ -6,6 +6,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Matrix
 import android.graphics.Paint
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrPanelPages
 import ir.vil3ntec.tohid.core.image.ImagePrep
 import ir.vil3ntec.tohid.core.image.JpegMeta
 import ir.vil3ntec.tohid.core.image.StorefrontMediaSpec
@@ -24,13 +26,13 @@ object StorefrontMediaPrep {
   const val MAX_INPUT_BYTES = 25 * 1024 * 1024
 
   suspend fun prepare(bytes: ByteArray, kind: StorefrontMediaSpec.Kind): ByteArray = withContext(Dispatchers.Default) {
-    require(bytes.size <= MAX_INPUT_BYTES) { "فایل بیش از اندازه بزرگ است" }
+    require(bytes.size <= MAX_INPUT_BYTES) { StrPanelPages.fileTooBig }
     val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
     BitmapFactory.decodeStream(ByteArrayInputStream(bytes), null, bounds)
     val w0 = bounds.outWidth
     val h0 = bounds.outHeight
-    require(w0 > 0 && h0 > 0) { "این فایل عکس نیست یا خراب است" }
-    require(!ImagePrep.tooManyPixels(w0, h0)) { "عکس بیش از اندازه بزرگ است (بیش از ۶۰ مگاپیکسل)" }
+    require(w0 > 0 && h0 > 0) { StrGoods.notImage }
+    require(!ImagePrep.tooManyPixels(w0, h0)) { StrGoods.imageTooBig }
     val orientation = if (JpegMeta.isJpeg(bytes)) JpegMeta.orientation(bytes) else 1
     //  نمونه‌برداری فقط تا جایی که بُرش هنوز از عرضِ هدف بزرگ‌تر بماند
     val upright0 = ImagePrep.oriented(w0, h0, orientation)
@@ -40,7 +42,7 @@ object StorefrontMediaPrep {
       inSampleSize = ImagePrep.sampleSize(crop0.w, crop0.w, kind.maxW)
     }
     val decoded = BitmapFactory.decodeStream(ByteArrayInputStream(bytes), null, opts)
-      ?: throw IllegalArgumentException("این فایل عکس نیست یا خراب است")
+      ?: throw IllegalArgumentException(StrGoods.notImage)
     val straight = try { ImageBank.upright(decoded, orientation) } finally { decoded.recycle() }
     try {
       val r = StorefrontMediaSpec.crop(straight.width, straight.height, kind)
@@ -60,7 +62,7 @@ object StorefrontMediaPrep {
         return JpegMeta.strip(out.toByteArray())
       }
       val (jpeg, size) = ImagePrep.encodeUnder(start, kind.maxBytes, ::encode)
-      require(StorefrontMediaSpec.accepts(size, kind)) { "${kind.label} به اندازهٔ لازم کوچک نشد؛ عکسِ ساده‌تری انتخاب کنید" }
+      require(StorefrontMediaSpec.accepts(size, kind)) { StrGoods.mediaNotShrunk(kind.label) }
       jpeg
     } finally {
       straight.recycle()

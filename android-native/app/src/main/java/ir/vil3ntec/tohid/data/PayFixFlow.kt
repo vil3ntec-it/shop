@@ -109,9 +109,9 @@ object PayFixFlow {
   /** ردیفِ سابقهٔ یک اصلاح؛ `notes` متنِ سابقه است (داده؛ همگام می‌شود و با زبانِ صفحه عوض نمی‌شود) */
   fun row(f: PayFix.Fix, sale: Sale, today: String): AuditEntry = AuditEntry(
     id = f.id, type = PayFix.TYPE, date = today, refId = f.saleId, amount = PayFlow.major(f.amount), createdAt = f.at,
-    notes = "اصلاحِ روشِ پرداختِ فاکتور #${sale.invoiceLabel() ?: "0"}: ${PayFlow.methodName(f.from)} ⇐ ${PayFlow.methodName(f.to)}، " +
-      "${ir.vil3ntec.tohid.money(PayFlow.major(f.amount))} افغانی — ${f.reason}" +
-      (if (f.approvedBy != f.by) " — تأیید: ${f.approvedBy}" else ""),
+    notes = "اصلاحِ روشِ پرداختِ فاکتور #${sale.invoiceLabel() ?: "0"}: ${PayFlow.methodName(f.from)} ⇐ ${PayFlow.methodName(f.to)}، " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      "${ir.vil3ntec.tohid.money(PayFlow.major(f.amount))} افغانی — ${f.reason}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      (if (f.approvedBy != f.by) " — تأیید: ${f.approvedBy}" else ""),  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     by = f.by, approvedBy = f.approvedBy, reason = f.reason, fromMethod = f.from, toMethod = f.to, payRef = f.ref,
   )
 }

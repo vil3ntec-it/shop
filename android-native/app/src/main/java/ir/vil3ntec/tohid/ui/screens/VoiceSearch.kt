@@ -29,6 +29,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.ui.theme.Shop
 
 /**
@@ -142,7 +143,7 @@ fun rememberVoiceSearch(onHeard: (String) -> Unit): (() -> Unit)? {
       )
       // فارسی، و اگر دستگاه نداشت خودش سراغِ زبانِ خودش می‌رود
       putExtra(RecognizerIntent.EXTRA_LANGUAGE, "fa-IR")
-      putExtra(RecognizerIntent.EXTRA_PROMPT, "بگویید دنبالِ چه می‌گردید")
+      putExtra(RecognizerIntent.EXTRA_PROMPT, StrAppData.voicePrompt)
       putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
     }
     runCatching { listen.launch(intent) }

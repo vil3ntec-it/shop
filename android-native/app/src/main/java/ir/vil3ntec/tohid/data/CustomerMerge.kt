@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
@@ -41,7 +42,7 @@ object CustomerMerge {
     return parts.mapIndexed { i, part ->
       AuditEntry(
         id = newId(), type = "customer_merge", date = today, refId = refId, createdAt = now,
-        notes = if (i == 0) notes else "$notes (ادامهٔ فهرستِ ردیف‌ها، ${i + 1} از ${parts.size})",
+        notes = if (i == 0) notes else "$notes (ادامهٔ فهرستِ ردیف‌ها، ${i + 1} از ${parts.size})",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         refIds = part.ifEmpty { null },
       )
     }
@@ -49,7 +50,7 @@ object CustomerMerge {
 
   /* ------------------------------ پیدا کردن ------------------------------ */
 
-  enum class Reason(val label: String) { PHONE("شمارهٔ یکسان"), NAME("نامِ یکسان") }
+  enum class Reason(val label: String) { PHONE("شمارهٔ یکسان"), NAME("نامِ یکسان") }  // داده: دلیلِ گروهِ تکراری — ستونِ برگهٔ خروجی
 
   data class Group(
     /** پیشنهادِ ماندگار اول، بقیه به ترتیبِ ثبت */
@@ -125,11 +126,11 @@ object CustomerMerge {
   }
 
   private fun check(d: ShopData, keepId: String, dropId: String): Check {
-    if (keepId == dropId) return Check.Bad("یک مشتری با خودش ادغام نمی‌شود")
-    val keep = d.debtors.find { it.id == keepId } ?: return Check.Bad("مشتریِ ماندگار پیدا نشد")
-    val drop = d.debtors.find { it.id == dropId } ?: return Check.Bad("مشتریِ تکراری پیدا نشد")
-    if (!CustomerCrm.isActive(keep)) return Check.Bad("«${keep.name}» خودش پیش‌تر ادغام شده است")
-    if (!CustomerCrm.isActive(drop)) return Check.Bad("«${drop.name}» پیش‌تر ادغام شده است")
+    if (keepId == dropId) return Check.Bad(StrLedger.mergeSelf)
+    val keep = d.debtors.find { it.id == keepId } ?: return Check.Bad(StrLedger.mergeKeepMissing)
+    val drop = d.debtors.find { it.id == dropId } ?: return Check.Bad(StrLedger.mergeDropMissing)
+    if (!CustomerCrm.isActive(keep)) return Check.Bad(StrLedger.mergeKeepGone(keep.name))
+    if (!CustomerCrm.isActive(drop)) return Check.Bad(StrLedger.mergeDropGone(drop.name))
     return Check.Good(keep, drop)
   }
 
@@ -146,7 +147,7 @@ object CustomerMerge {
     }
     val extra = buildList {
       drop.notes.trim().takeIf { it.isNotEmpty() && !keep.notes.contains(it) }?.let { add(it) }
-      if (leftover.isNotEmpty()) add("تلفنِ دیگر: " + leftover.joinToString("، "))
+      if (leftover.isNotEmpty()) add("تلفنِ دیگر: " + leftover.joinToString("، "))  // داده: یادداشتِ ذخیره‌شدهٔ مشتری
     }
     val notes = (listOf(keep.notes.trim()).filter { it.isNotEmpty() } + extra).joinToString("\n")
     val tags = CustomerCrm.normalizeTags(keep.tags.orEmpty() + drop.tags.orEmpty()).ifEmpty { null }
@@ -206,11 +207,11 @@ object CustomerMerge {
       d.sales.filter { it.debtorId == dropId }.map { "sales/${it.id}" }
     //  ادغامی که رضایتِ ماندگار را عوض کرد (فقط سخت‌گیرانه‌تر) همین‌جا سند دارد
     val consent = if (p.result.marketingConsent == p.keep.marketingConsent) "" else
-      " — رضایتِ تبلیغ: ${CustomerCrm.consentText(p.keep.marketingConsent)} ⇐ ${CustomerCrm.consentText(p.result.marketingConsent)}"
+      " — رضایتِ تبلیغ: ${CustomerCrm.consentText(p.keep.marketingConsent)} ⇐ ${CustomerCrm.consentText(p.result.marketingConsent)}"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val trace = trail(
       dropId,
-      "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}» (${p.keep.id}): ${p.transactions} تراکنش و ${p.sales} فاکتور منتقل شد" +
-        " — ماندهٔ منتقل‌شده ${money(p.dropBalance)} افغانی" + consent,
+      "ادغامِ «${p.drop.name}» (${p.drop.id}) در «${p.keep.name}» (${p.keep.id}): ${p.transactions} تراکنش و ${p.sales} فاکتور منتقل شد" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        " — ماندهٔ منتقل‌شده ${money(p.dropBalance)} افغانی" + consent,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       rows, today, now, newId,
     )
     val data = d.copy(
@@ -273,8 +274,8 @@ object CustomerMerge {
     val trace = (revive + moved.keys).toSortedSet().flatMap { to ->
       val rows = moved[to].orEmpty()
       val tx = rows.count { it.startsWith("transactions/") }
-      val head = if (to in revive) "حلقهٔ ادغام ترمیم شد: «${byId.getValue(to).name}» ($to) دوباره فعال است — " else ""
-      trail(to, head + "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور", rows, today, now, newId)
+      val head = if (to in revive) "حلقهٔ ادغام ترمیم شد: «${byId.getValue(to).name}» ($to) دوباره فعال است — " else ""  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      trail(to, head + "انتقالِ ردیف‌های دیررسیده به مشتریِ ماندگار: $tx تراکنش و ${rows.size - tx} فاکتور", rows, today, now, newId)  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     return d.copy(debtors = debtors, transactions = transactions, sales = salesOut, auditLog = d.auditLog + trace)
   }
@@ -303,17 +304,17 @@ object CustomerMerge {
   /* --------------------------------- برگه --------------------------------- */
 
   fun duplicatesSheet(d: ShopData, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("شمارهٔ گروه", "نقش", "نام", "شماره تماس", "شمارهٔ دوم", "مانده", "تعداد تراکنش", "تعداد فاکتور", "دلیل"))
+    val rows = mutableListOf(listOf("شمارهٔ گروه", "نقش", "نام", "شماره تماس", "شمارهٔ دوم", "مانده", "تعداد تراکنش", "تعداد فاکتور", "دلیل"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     duplicates(d).forEachIndexed { g, grp ->
       val why = grp.reasons.sortedBy { it.ordinal }.joinToString("، ") { it.label }
       grp.members.forEachIndexed { i, c ->
         rows += listOf(
-          (g + 1).toString(), if (i == 0) "پیشنهادِ ماندگار" else "تکراری", c.name, c.phone, c.phone2.orEmpty(),
+          (g + 1).toString(), if (i == 0) "پیشنهادِ ماندگار" else "تکراری", c.name, c.phone, c.phone2.orEmpty(),  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
           Math.round(ShopStore.debt(d, c.id)).toString(),
           d.transactions.count { it.debtorId == c.id }.toString(), d.sales.count { it.debtorId == c.id }.toString(), why,
         )
       }
     }
-    return ReportCsv.Sheet("مشتریان-تکراری-$today", rows)
+    return ReportCsv.Sheet("مشتریان-تکراری-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

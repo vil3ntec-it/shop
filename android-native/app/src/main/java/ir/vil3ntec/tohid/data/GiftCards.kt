@@ -106,7 +106,7 @@ object GiftCards {
       when (val r = StoredPay.redeem(events(d), st, saleId, now, by)) {
         is GiftCard.Result.Err -> return Out.Bad(r.code)
         is GiftCard.Result.Ok -> r.value.forEach { e ->
-          audit += entry(e, today, "خرج از کارتِ هدیهٔ ${mask(e.code)} — فاکتور #$label — ${fmt(e.amountMinor)} افغانی")
+          audit += entry(e, today, "خرج از کارتِ هدیهٔ ${mask(e.code)} — فاکتور #$label — ${fmt(e.amountMinor)} افغانی")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         }
       }
     }
@@ -116,7 +116,7 @@ object GiftCards {
       StoredPay.creditProblem(st, debtorId != null, debtorId?.let { balanceMinor(d, it) } ?: 0L)?.let { return Out.Bad(it) }
       tx += DebtTransaction(
         id = "$saleId-sc", debtorId = debtorId!!, type = "give", amount = PayFlow.major(credit), date = today,
-        notes = "پرداخت با اعتبارِ فروشگاه — فاکتور #$label", createdAt = now, refId = saleId, kind = CREDIT,
+        notes = "پرداخت با اعتبارِ فروشگاه — فاکتور #$label", createdAt = now, refId = saleId, kind = CREDIT,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     return Out.Ok(Rows(audit, tx))
@@ -150,7 +150,7 @@ object GiftCards {
           is GiftCard.Result.Err -> return Out.Bad(r.code)
           is GiftCard.Result.Ok -> if (!r.duplicate) {
             work += r.value
-            audit += entry(r.value, today, "برگشت به کارتِ هدیهٔ ${mask(p.code)} — $notes — ${fmt(p.amountMinor)} افغانی")
+            audit += entry(r.value, today, "برگشت به کارتِ هدیهٔ ${mask(p.code)} — $notes — ${fmt(p.amountMinor)} افغانی")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           }
         }
       }
@@ -160,7 +160,7 @@ object GiftCards {
       val to = creditTo ?: return Out.Bad(StoreCredit.NO_CUSTOMER)
       tx += DebtTransaction(
         id = "$idBase-sc", debtorId = to, type = "receive", amount = PayFlow.major(creditMinor), date = today,
-        notes = "برگشت به اعتبارِ فروشگاه — $notes", createdAt = now, refId = refId, kind = CREDIT,
+        notes = "برگشت به اعتبارِ فروشگاه — $notes", createdAt = now, refId = refId, kind = CREDIT,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     return Out.Ok(Rows(audit, tx))
@@ -229,14 +229,14 @@ object GiftCards {
     val why = reason!!.trim()
     val tx = DebtTransaction(
       id = key, debtorId = debtorId, type = "receive", amount = PayFlow.major(amountMinor), date = today,
-      notes = "اعتبارِ هدیه — $why", createdAt = now, kind = CREDIT,
+      notes = "اعتبارِ هدیه — $why", createdAt = now, kind = CREDIT,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     //  «allow» ⇒ بی تأییدکننده (همان امروز)؛ «approve» ⇒ نام و دلیلِ مدیر/صاحب در همان ردیف
     val ok = approval?.takeIf { decision == "approve" }
     val log = AuditEntry(
       id = "$key-g", type = CREDIT_GRANT, date = today, refId = key, createdAt = now, amount = PayFlow.major(amountMinor), by = by, reason = why,
-      notes = "اعتبارِ هدیه برای «${debtor!!.name}» — ${fmt(amountMinor)} افغانی (بی نقد)" +
-        (ok?.let { " — تأیید: ${it.by.trim()} (${it.reason.trim()})" } ?: ""),
+      notes = "اعتبارِ هدیه برای «${debtor!!.name}» — ${fmt(amountMinor)} افغانی (بی نقد)" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        (ok?.let { " — تأیید: ${it.by.trim()} (${it.reason.trim()})" } ?: ""),  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       approvedBy = ok?.by?.trim(),
     )
     return Granted.Ok(cur.copy(transactions = cur.transactions + tx, auditLog = cur.auditLog + log))
@@ -256,7 +256,7 @@ object GiftCards {
     when (val r = GiftCard.build(events(cur), GiftCard.Input(key, GiftCard.ISSUE, code, amountMinor, now, by = by))) {
       is GiftCard.Result.Err -> Issued.Bad(r.code)
       is GiftCard.Result.Ok -> if (r.duplicate) Issued.Bad(GiftCard.Code.ID_CONFLICT) else Issued.Ok(
-        cur.copy(auditLog = cur.auditLog + entry(r.value, today, "فروشِ کارتِ هدیهٔ ${mask(r.value.code)} — ${fmt(r.value.amountMinor)} افغانی (نقد)")),
+        cur.copy(auditLog = cur.auditLog + entry(r.value, today, "فروشِ کارتِ هدیهٔ ${mask(r.value.code)} — ${fmt(r.value.amountMinor)} افغانی (نقد)")),  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         r.value,
       )
     }
@@ -270,7 +270,7 @@ object GiftCards {
     when (val r = GiftCard.build(events(cur), GiftCard.Input(key, GiftCard.RECHARGE, code, amountMinor, now, by = by))) {
       is GiftCard.Result.Err -> Issued.Bad(r.code)
       is GiftCard.Result.Ok -> if (r.duplicate) Issued.Ok(cur, r.value, again = true) else Issued.Ok(
-        cur.copy(auditLog = cur.auditLog + entry(r.value, today, "شارژِ کارتِ هدیهٔ ${mask(r.value.code)} — ${fmt(r.value.amountMinor)} افغانی (نقد)")),
+        cur.copy(auditLog = cur.auditLog + entry(r.value, today, "شارژِ کارتِ هدیهٔ ${mask(r.value.code)} — ${fmt(r.value.amountMinor)} افغانی (نقد)")),  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         r.value,
       )
     }
@@ -286,7 +286,7 @@ object GiftCards {
       is GiftCard.Result.Err -> Issued.Bad(r.code)
       is GiftCard.Result.Ok -> if (r.duplicate) Issued.Ok(cur, r.value, again = true) else {
         val left = GiftCard.view(all).card(r.value.code)?.balanceMinor ?: 0L
-        val notes = "باطل کردنِ کارتِ هدیهٔ ${mask(r.value.code)} — ${r.value.reason} — ماندهٔ ${fmt(left)} افغانی از بدهی کنار رفت (بی بازپرداختِ نقد)"
+        val notes = "باطل کردنِ کارتِ هدیهٔ ${mask(r.value.code)} — ${r.value.reason} — ماندهٔ ${fmt(left)} افغانی از بدهی کنار رفت (بی بازپرداختِ نقد)"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         Issued.Ok(cur.copy(auditLog = cur.auditLog + entry(r.value, today, notes)), r.value)
       }
     }

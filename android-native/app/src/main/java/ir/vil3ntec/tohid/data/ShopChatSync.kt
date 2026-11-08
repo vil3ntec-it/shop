@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.core.chat.ChatProgress
 import ir.vil3ntec.tohid.core.chat.ChatQueue
 import ir.vil3ntec.tohid.core.chat.ChatSpace
 import ir.vil3ntec.tohid.core.chat.OutboxItem
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.data.repo.Backend
@@ -154,7 +155,7 @@ object ShopChatSync {
     val key = cur.clientId
     val main = if (cur.kind != "text" && cur.mediaId == null) {
       cur.blobKey?.let { blob(context, it) }
-        ?: throw ApiFailure.Invalid("فایلِ این پیام روی این دستگاه نمانده", "local_media_gone")
+        ?: throw ApiFailure.Invalid(StrAppData.chatFileGone, "local_media_gone")
     } else null
     val thumb = if (cur.kind == "image" && cur.thumbKey != null && cur.thumbId == null) blob(context, cur.thumbKey!!) else null
     //  CHAT-05: یک نوار برای هر دو بارگذاری؛ تنظیمِ خاموش ⇒ بی گزارش، همان یک write

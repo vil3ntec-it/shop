@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -106,7 +107,7 @@ object UpdateManager {
     if (busy) return
     val app = context.applicationContext
     busy = true
-    if (!quiet) message = "در حال بررسی…"
+    if (!quiet) message = StrUpdate.checking
     job = scope.launch {
       //  F0-27: دکان و دستگاه — سرور با آن‌ها می‌داند این‌جا آزمایشی است یا نه.
       //  هر دو همان شناسه‌هایی‌اند که برنامه از قبل نگه می‌دارد؛ نبودشان ⇒ پایدار.
@@ -120,12 +121,12 @@ object UpdateManager {
           // دانلود کرده و سرِ پرسشِ نصب «نه» زده
           ready = found?.let { Updater.readyFile(app, it) }
           if (!quiet || found != null) message = when {
-            found == null -> "نسخهٔ شما تازه‌ترین است."
-            ready != null -> "نسخهٔ ${found.version} از قبل گرفته شده — آمادهٔ نصب."
+            found == null -> StrUpdate.upToDate
+            ready != null -> StrUpdate.alreadyDownloaded(found.version)
             else -> null
           }
         }
-        .onFailure { if (!quiet) message = it.message ?: "بررسی ناموفق بود" }
+        .onFailure { if (!quiet) message = it.message ?: StrUpdate.checkFailed }
       busy = false
     }
   }
@@ -158,7 +159,7 @@ object UpdateManager {
         .onFailure {
           progress = -1
           note = null
-          message = it.message ?: "دانلود ناموفق بود"
+          message = it.message ?: StrUpdate.downloadFailed
         }
       busy = false
     }
@@ -171,27 +172,26 @@ object UpdateManager {
 
     if (!Updater.canInstall(app)) {
       needsPermission = true
-      message = "فایل آماده است، ولی گوشی هنوز اجازهٔ نصب از این برنامه را نداده. " +
-        "دکمهٔ زیر را بزنید، «اجازه» را روشن کنید و برگردید."
+      message = StrUpdate.needInstallPermission
       return
     }
 
     needsPermission = false
     Updater.install(app, file)
-      .onFailure { message = "نصب‌کنندهٔ اندروید باز نشد" }
+      .onFailure { message = StrUpdate.installerFailed }
   }
 
   /** بردنِ کاربر به همان صفحهٔ اجازهٔ نصب */
   fun allowInstall(context: Context) {
     Updater.openInstallSettings(context.applicationContext)
-      .onFailure { message = "صفحهٔ تنظیماتِ اجازهٔ نصب باز نشد" }
+      .onFailure { message = StrUpdate.permissionScreenFailed }
   }
 
   /** راهِ آخر: گرفتنِ همان فایل با مرورگر */
   fun openInBrowser(context: Context, repo: String) {
     val url = release?.apkUrl ?: Updater.stableApkUrl(repo)
     Updater.openInBrowser(context.applicationContext, url)
-      .onFailure { message = "مرورگر باز نشد" }
+      .onFailure { message = StrUpdate.browserFailed }
   }
 
   /** لغو به‌خواستِ کاربر — نیمهٔ گرفته‌شده می‌ماند و دفعهٔ بعد ادامه پیدا می‌کند */
@@ -201,6 +201,6 @@ object UpdateManager {
     busy = false
     progress = -1
     note = null
-    message = "دانلود متوقف شد — با زدنِ دوباره از همین‌جا ادامه پیدا می‌کند."
+    message = StrUpdate.downloadStopped
   }
 }

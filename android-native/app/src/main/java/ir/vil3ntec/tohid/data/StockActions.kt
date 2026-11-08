@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import kotlinx.serialization.Serializable
 
 /**
@@ -21,37 +23,46 @@ object StockActions {
     data class Failed(val message: String) : Result
   }
 
-  const val MAIN_LABEL = "فروشگاه (محلِ اصلی)"
+  /** نامِ محلِ اصلی به زبانِ برنامه (صفحه)؛ یادداشتِ سابقه همان فارسیِ [MAIN_NOTE] را می‌گیرد */
+  val MAIN_LABEL: String get() = StrGoods.mainPlace
+  private const val MAIN_NOTE = "فروشگاه (محلِ اصلی)"  // داده: نامِ محل درونِ یادداشتِ سابقه
 
   fun locationLabel(loc: String): String = loc.ifEmpty { MAIN_LABEL }
 
-  /** نامِ نمایشی ⇐ شناسهٔ محل (نامِ محلِ اصلی ⇐ "") */
-  fun locationOf(label: String): String = label.trim().let { if (it == MAIN_LABEL) StockLedger.MAIN else it }
+  /** نامِ محل برای یادداشتِ سابقه (فارسی، مثلِ همیشه) */
+  private fun noteLabel(loc: String): String = loc.ifEmpty { MAIN_NOTE }
+
+  /** نامِ نمایشی ⇐ شناسهٔ محل (نامِ محلِ اصلی ⇐ ""؛ نامِ فارسیِ پیشین هم، در هر زبان) */
+  fun locationOf(label: String): String = label.trim().let { if (it == MAIN_LABEL || it == MAIN_NOTE) StockLedger.MAIN else it }
 
   fun lotLabel(lotId: String): String = when {
-    lotId.isEmpty() -> "بی سری"
-    lotId.startsWith("w:") -> "محموله"
-    else -> "سری $lotId"
+    lotId.isEmpty() -> StrReports.noSeries
+    lotId.startsWith("w:") -> StrGoods.shipment
+    else -> StrGoods.lotN(lotId)
   }
 
-  val TYPE_LABEL = mapOf(
-    "purchase_receipt" to "دریافتِ خرید", "sale" to "فروش", "customer_return" to "برگشت از مشتری",
-    "supplier_return" to "برگشت به تأمین‌کننده", "adjustment" to "اصلاح", "count_adjust" to "تعدیلِ شمارش",
-    "damage" to "خراب", "expired" to "منقضی", "transfer_out" to "انتقالِ خروجی", "transfer_in" to "انتقالِ ورودی",
-    "production" to "بسته‌بندیِ دوباره و تولید",
+  //  برچسب‌ها هر بار خوانده می‌شوند (`get()`) تا عوض کردنِ زبان بی بازکردنِ دوباره اثر کند
+  val TYPE_LABEL: Map<String, String> get() = mapOf(
+    "purchase_receipt" to StrGoods.mvPurchase, "sale" to StrGoods.mvSale, "customer_return" to StrGoods.mvCustomerReturn,
+    "supplier_return" to StrGoods.mvSupplierReturn, "adjustment" to StrGoods.mvAdjust, "count_adjust" to StrGoods.mvCountAdjust,
+    "damage" to StrGoods.mvDamage, "expired" to StrGoods.mvExpired, "transfer_out" to StrGoods.mvTransferOut, "transfer_in" to StrGoods.mvTransferIn,
+    "production" to StrGoods.mvProduction,
   )
 
-  val REASON_LABEL = mapOf(
-    "negative_stock" to "موجودیِ منفی", "expired_sold" to "فروشِ منقضی", "unknown_cost" to "بهای نامعلوم",
+  val REASON_LABEL: Map<String, String> get() = mapOf(
+    "negative_stock" to StrGoods.whyNegative, "expired_sold" to StrGoods.whyExpiredSold, "unknown_cost" to StrGoods.whyUnknownCost,
   )
 
   /** دلیل‌های کسریِ شمارش (INV-04)؛ افزایشِ شمارش همیشه «اصلاحِ شمارش» است */
-  val LOSS_KINDS = listOf("count" to "اصلاحِ شمارش", "damage" to "خراب", "lost" to "گم‌شده", "expired" to "منقضی")
+  val LOSS_KINDS: List<Pair<String, String>> get() = listOf("count" to StrGoods.mvCountFix, "damage" to StrGoods.mvDamage, "lost" to StrGoods.mvLost, "expired" to StrGoods.mvExpired)
 
   /** نوع‌های اصلاحِ دستی (INV-04) */
-  val ADJ_KINDS = listOf("other" to "دیگر", "count" to "اصلاحِ شمارش", "damage" to "خراب", "lost" to "گم‌شده", "expired" to "منقضی")
+  val ADJ_KINDS: List<Pair<String, String>> get() = listOf("other" to StrGoods.mvOther, "count" to StrGoods.mvCountFix, "damage" to StrGoods.mvDamage, "lost" to StrGoods.mvLost, "expired" to StrGoods.mvExpired)
 
-  fun userLabel(u: String): String = if (u == StockLedger.LEGACY_USER) "ثبتِ قدیمی" else u
+  fun userLabel(u: String): String = if (u == StockLedger.LEGACY_USER) StrGoods.legacyEntry else u
+
+  /** همان برچسب‌های [REASON_LABEL] به فارسی برای یادداشتِ سابقه */
+  private val REASON_NOTE = mapOf("negative_stock" to "موجودیِ منفی", "expired_sold" to "فروشِ منقضی", "unknown_cost" to "بهای نامعلوم")  // داده: یادداشتِ سابقه
 
   /* ------------------------------------------------------------ تنظیم */
 
@@ -59,7 +70,7 @@ object StockActions {
     d.copy(
       auditLog = d.auditLog + AuditEntry(
         id = newId(), type = StockLedger.MODE_TYPE, date = today, refId = if (on) "on" else "off", createdAt = now,
-        notes = "موتورِ تازهٔ موجودی و بها: ${if (on) "روشن" else "خاموش"}" + (if (user.isNotBlank()) " — ${user.trim()}" else ""),
+        notes = "موتورِ تازهٔ موجودی و بها: ${if (on) "روشن" else "خاموش"}" + (if (user.isNotBlank()) " — ${user.trim()}" else ""),  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       ),
     )
 
@@ -78,7 +89,7 @@ object StockActions {
     val rows = view.tasks.filter { it.id in taskIds && !it.acked }.distinctBy { it.id }.map { t ->
       AuditEntry(
         id = newId(), type = StockLedger.ACK_TYPE, date = today, refId = t.id, createdAt = now,
-        notes = "بررسیِ موجودیِ «${names[t.productId].orEmpty()}»: " + t.reasons.joinToString("، ") { REASON_LABEL[it] ?: it } +
+        notes = "بررسیِ موجودیِ «${names[t.productId].orEmpty()}»: " + t.reasons.joinToString("، ") { REASON_NOTE[it] ?: it } +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           (if (user.isNotBlank()) " — ${user.trim()}" else ""),
       )
     }
@@ -101,16 +112,16 @@ object StockActions {
     now: Long,
     newId: () -> String,
   ): Result {
-    val product = d.products.find { it.id == productId } ?: return Result.Failed("کالا را انتخاب کنید")
+    val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.pickItem)
     val dest = to.trim()
-    if (from == dest) return Result.Failed("مقصد باید با مبدأ فرق کند")
-    if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار درست نیست")
+    if (from == dest) return Result.Failed(StrGoods.destSame)
+    if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrGoods.qtyBad)
     val q = StockLedger.milli(quantity)
     val chk = StockLedger.checkTransfer(view, productId, from, dest, q, lotId, today)
     if (!chk.ok) {
       return Result.Failed(
-        if (chk.error == "insufficient_stock") "در «${locationLabel(from)}» فقط ${ir.vil3ntec.tohid.qty((chk.availableMilli ?: 0L) / 1000.0)} ${product.unit} هست"
-        else "انتقال ممکن نیست",
+        if (chk.error == "insufficient_stock") StrGoods.onlyAt(locationLabel(from), ir.vil3ntec.tohid.qty((chk.availableMilli ?: 0L) / 1000.0), product.unit)
+        else StrGoods.transferImpossible,
       )
     }
     val id = newId()
@@ -137,19 +148,19 @@ object StockActions {
   ): ShopData {
     val productId = product.id
     val why = reason.trim()
-    val note = why.ifEmpty { "انتقال بین محل‌ها" }
+    val note = why.ifEmpty { "انتقال بین محل‌ها" }  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val who = user.trim().ifEmpty { null }
     val lot = lotId?.takeIf { it.isNotEmpty() }
     //  دو ردیف، جمعِ صفر (شرح سرِ `StockLedger.TRANSFER_OUT`): سرورِ v3 موجودی را جمعِ همین جدول می‌داند
     val out = StockMovement(
       id = id, productId = productId, type = StockLedger.TRANSFER_OUT, qty = -q / 1000.0, date = today,
-      notes = "$note — به ${locationLabel(dest)}", refId = id, createdAt = now,
+      notes = "$note — به ${noteLabel(dest)}", refId = id, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       userId = who, reason = why.ifEmpty { null },
       locationId = from, toLocationId = dest, lotId = lot,
     )
     val inn = StockMovement(
       id = newId(), productId = productId, type = StockLedger.TRANSFER_IN, qty = q / 1000.0, date = today,
-      notes = "$note — از ${locationLabel(from)}", refId = id, createdAt = now,
+      notes = "$note — از ${noteLabel(from)}", refId = id, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       userId = who, reason = why.ifEmpty { null },
       locationId = dest, lotId = lot,
     )
@@ -157,7 +168,7 @@ object StockActions {
       stockMovements = d.stockMovements + out + inn,
       auditLog = d.auditLog + AuditEntry(
         id = newId(), type = "stock_transfer", date = today, refId = id, createdAt = now,
-        notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${locationLabel(from)} به ${locationLabel(dest)}" +
+        notes = "انتقالِ ${ir.vil3ntec.tohid.qty(q / 1000.0)} «${product.name}» از ${noteLabel(from)} به ${noteLabel(dest)}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           (if (why.isNotEmpty()) " — $why" else ""),
       ),
     )
@@ -229,9 +240,9 @@ object StockActions {
     now: Long,
     newId: () -> String,
   ): Result {
-    if (invalidCounts(draft).isNotEmpty()) return Result.Failed("عددِ شمرده‌شدهٔ یک کالا درست نیست")
+    if (invalidCounts(draft).isNotEmpty()) return Result.Failed(StrGoods.countOneBad)
     val lines = countReview(d, view, draft).lines.filter { it.diffMilli != 0L }
-    if (lines.isEmpty()) return Result.Failed("اختلافی نیست — موجودیِ شمرده‌شده با برنامه یکی است")
+    if (lines.isEmpty()) return Result.Failed(StrGoods.noDifference)
     val note = draft.note.trim()
     val byId = d.products.associateBy { it.id }
     val entries = ArrayList<WarehouseEntry>()
@@ -240,7 +251,7 @@ object StockActions {
     for (l in lines) {
       val p = byId[l.productId]
       val kind = if (l.diffMilli > 0) "count" else draft.reasons[l.productId]?.takeIf { k -> LOSS_KINDS.any { it.first == k } } ?: "count"
-      val why = listOf("انبارگردانی", StockLedger.ADJ_REASON.getValue(kind), note).filter { it.isNotEmpty() }.joinToString(" — ")
+      val why = listOf("انبارگردانی", StockLedger.ADJ_REASON.getValue(kind), note).filter { it.isNotEmpty() }.joinToString(" — ")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       val id = newId()
       val units = l.diffMilli / 1000.0
       entries += WarehouseEntry(
@@ -253,7 +264,7 @@ object StockActions {
       )
       audit += AuditEntry(
         id = newId(), type = "stock_adjustment", date = today, refId = id, createdAt = now,
-        notes = "اصلاح موجودی «${p?.name.orEmpty()}» به مقدار ${if (units > 0) "+" else "−"}${ir.vil3ntec.tohid.qty(kotlin.math.abs(units))} — دلیل: $why",
+        notes = "اصلاح موجودی «${p?.name.orEmpty()}» به مقدار ${if (units > 0) "+" else "−"}${ir.vil3ntec.tohid.qty(kotlin.math.abs(units))} — دلیل: $why",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     return Result.Ok(

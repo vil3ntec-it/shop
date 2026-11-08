@@ -142,7 +142,7 @@ class SyncV3Runner private constructor(context: Context) {
       //  دفترِ همین لحظهٔ دیسک (`ShopStore.ledgerNow`) — شرح سرِ همان
       override fun read(): ShopData = shop?.ledgerNow() ?: ShopData()
       override fun write(next: ShopData) {
-        val s = shop ?: throw java.io.IOException("دفتر باز نیست")
+        val s = shop ?: throw java.io.IOException("دفتر باز نیست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         s.applyFromServerNow(next)
       }
     }
