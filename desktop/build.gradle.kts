@@ -384,4 +384,8 @@ tasks.test {
   //  پوشهٔ دادهٔ جدا — آزمون هرگز به دادهٔ واقعیِ کامپیوتر دست نمی‌زند
   environment("TOHID_DATA_DIR", layout.buildDirectory.dir("test-data").get().asFile.absolutePath)
   jvmArgs("-Djava.awt.headless=true", "-Dfile.encoding=UTF-8", "-Dsun.jnu.encoding=UTF-8")
+  //  PERF-LEDGER: سنجهٔ دستیِ دفترِ بزرگ (`BigLedgerBenchTest`، `docs/PERF-LEDGER-fa.md`) — فقط وقتی خواسته شود
+  System.getenv("TOHID_BIG_LEDGER_HEAP")?.takeIf { it.isNotBlank() }?.let { maxHeapSize = it }
+  System.getenv("TOHID_BIG_LEDGER")?.takeIf { it.isNotBlank() }?.let { environment("TOHID_BIG_LEDGER", it); outputs.upToDateWhen { false } }
+  System.getenv("TOHID_BIG_LEDGER_CPU_ONLY")?.let { environment("TOHID_BIG_LEDGER_CPU_ONLY", it) }
 }

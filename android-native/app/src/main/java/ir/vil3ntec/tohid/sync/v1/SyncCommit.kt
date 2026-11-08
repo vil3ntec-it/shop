@@ -71,14 +71,20 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     //  دیگر روی دیسک نیست؛ `recover` بی دفتر هم تصمیمِ امن می‌گیرد (ساختنِ دوباره: با همین دفتر)
     settle(data)
     val before = parts.shadow()
-    val tree = LedgerDiff.toJson(data)
-    val shadow = parse(before)
+    //  PERF-LEDGER: ردیفِ دست‌نخورده از ثبتِ پیشین رمزگذاری نمی‌شود (`LedgerTrees`)؛ سایه‌ای که همین نمونه نشاند از نو
+    //  تجزیه نمی‌شود ([seatedAs]). هر دو همان درختِ پیشین‌اند، نه تقریبش — شرح سرِ هر کدام
+    val tree = trees.toJson(data)
+    val known = seatedAs(before)
+    val shadow = known?.tree ?: parse(before)?.also { seated = Seated(before, it, null) }
     if (shadow == null) {
       /*
        *  نخستین بار روی این دستگاه: دفترِ امروز «تغییر» نیست، حالتِ پایه
        *  است. فرستادنِ دفترِ موجود کارِ `baseline()` است و فقط یک بار.
        */
-      parts.commit(LedgerDiff.shadowOf(tree).toString(), null)
+      val first = LedgerDiff.shadowOf(tree)
+      val text = ShadowText.of(first)
+      parts.commit(text.text, null)
+      seated = Seated(text.text, first, text)
       return 0
     }
     /*
@@ -89,9 +95,43 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
     if (ir.vil3ntec.tohid.core.sync.EmptyLedgerGuard.blocks(rowsOf(tree), rowsOf(shadow))) throw EmptyLedger()
     val ops = LedgerDiff.diff(shadow, tree)
     if (ops.isEmpty()) return 0
-    commitOps(ops, before, LedgerDiff.shadowOf(tree).toString())
+    val next = LedgerDiff.shadowOf(tree)
+    //  ردیفِ همان‌شیء ⇒ همان تکهٔ متنِ سایهٔ پیشین (`ShadowText`)؛ نشانهٔ پیشین نبود ⇒ نوشتنِ کامل، همان متن
+    val held = known?.held()
+    val text = ShadowText.of(next, held?.shadow, held?.tree)
+    commitOps(ops, before, text.text, next, text)
     return ops.size
   }
+
+  /**
+   *  PERF-LEDGER — سایه‌ای که همین نمونه آخرین بار نشاند یا خواند: متن، درختِ همان متن و اثرِ انگشتش.
+   *
+   *  ⛔ فقط وقتی به کار می‌رود که متنِ سایهٔ همین حالا **نویسه‌به‌نویسه** همان است ([seatedAs]) — هر نوشتنِ دیگری
+   *  (نشاندنِ opهای رسیده، بایگانی، Snapshot، بازسازی، حسابِ دیگر، شکستِ commit) متن را عوض می‌کند و همان تجزیهٔ
+   *  همیشه برمی‌گردد. درختِ ساخته‌شده همان درختی است که تجزیهٔ همان متن می‌داد (`shadowOf` فقط از درِ رمزگذار می‌آید:
+   *  `LedgerPerfEquivalenceTest` برابریِ «تجزیهٔ متن = همان درخت» را قفل کرده). فقط در حافظه: پس از بستن، نخستین
+   *  ثبت مثلِ همیشه تجزیه می‌کند؛ ژورنال و بازیابی هیچ چیزی از این نمی‌دانند.
+   */
+  private class Seated(val text: String, tree: JsonObject, shadow: ShadowText?, known: String? = null) {
+    val sha: String by lazy { known ?: SyncCommit.sha(text) }
+
+    /**
+     *  درخت و جای تکه‌ها **نرم** نگه داشته می‌شوند (`platform.SoftRef`): دفترِ بزرگ روی گوشیِ کم‌حافظه پیش از کمبودِ
+     *  حافظه رهایشان می‌کند و ثبتِ بعدی همان راهِ همیشه را می‌رود (تجزیه، نوشتنِ کامل) — کُندتر، نه غلط.
+     */
+    private val ref = ir.vil3ntec.tohid.platform.SoftRef(Held(tree, shadow))
+    val tree: JsonObject? get() = ref.get()?.tree
+
+    /** متنِ پیشین با جای تکه‌هایش و درختِ همان متن — یا هیچ */
+    fun held(): Held? = ref.get()?.takeIf { it.shadow != null }
+  }
+
+  private class Held(val tree: JsonObject, val shadow: ShadowText?)
+
+  private var seated: Seated? = null
+  private val trees = LedgerTrees()
+
+  private fun seatedAs(raw: String): Seated? = seated?.takeIf { it.text == raw }
 
   /**
    *  opهای از پیش ساخته‌شده — **نه** تفاضلِ کلِ دفتر با سایه (CRM-10، `ShopStore.sweepMerged`).
@@ -138,7 +178,10 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
    */
   fun forget(gone: Map<String, Collection<String>>): Int {
     settle(null)
-    val shadow = parse(parts.shadow()) ?: return 0
+    val raw = parts.shadow()
+    //  PERF-LEDGER: همان درخت و همان متن (`seated`، `ShadowText`) — شرح سرِ `record`
+    val known = seatedAs(raw)
+    val shadow = known?.tree ?: parse(raw) ?: return 0
     var removed = 0
     val next = JsonObject(
       shadow.mapValues { (table, rows) ->
@@ -150,7 +193,10 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
       },
     )
     if (removed == 0) return 0
-    parts.commit(next.toString(), null)
+    val held = known?.held()
+    val text = ShadowText.of(next, held?.shadow, held?.tree)
+    parts.commit(text.text, null)
+    seated = Seated(text.text, next, text)
     return removed
   }
 
@@ -166,10 +212,13 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   }
 
   /** ژورنال ⇐ صف ⇐ سایه (همزمان) ⇐ پاک کردنِ ژورنال */
-  private fun commitOps(ops: List<SyncOp>, before: String, shadow: String) {
-    journal.write(Journal.Entry(Journal.RECORD, before = sha(before), shadow = sha(shadow), ops = ops))
+  private fun commitOps(ops: List<SyncOp>, before: String, shadow: String, tree: JsonObject? = null, text: ShadowText? = null) {
+    val after = sha(shadow)
+    journal.write(Journal.Entry(Journal.RECORD, before = seatedAs(before)?.sha ?: sha(before), shadow = after, ops = ops))
     parts.push(ops)
     parts.commit(shadow, null)
+    //  PERF-LEDGER: [tree] همان درختِ [shadow] است (`record`)؛ بی آن ([recordOps]، [baseline]) نشانه‌ای نمی‌ماند
+    seated = tree?.let { Seated(shadow, it, text, after) }
     journal.clear()
   }
 

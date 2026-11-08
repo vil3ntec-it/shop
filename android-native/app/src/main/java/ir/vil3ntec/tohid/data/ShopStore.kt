@@ -764,10 +764,10 @@ class ShopStore(
       if (!quiet) _diskError.tryEmit(UNREADABLE)
       return false
     }
-    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
-    //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
-    //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
-    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true) }   //  DATA-SAFETY: `.prev` (`LedgerRecovery`)
+    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین می‌کند (`DiskWrite`). رمز فقط با «رمزگذاریِ داده» (`AtRest`)؛
+    //  خاموش ⇒ همان بایت‌های همیشه، تکه‌تکه و بی رشته و آرایهٔ کاملِ دفتر در حافظه (PERF-LEDGER، `LedgerText`). DATA-SAFETY: `.prev`
+    val saved = runCatching { if (AtRest.wanted(context)) AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true)
+      else DiskWrite.stream(file, keepPrevious = true) { o -> LedgerText.write(json, next) { b, at, n -> o.write(b, at, n) } } }
     saved.exceptionOrNull()?.let {
       //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
       if (!quiet) _diskError.tryEmit(it.message ?: StrAppData.unknownError)
@@ -1165,7 +1165,7 @@ class ShopStore(
     fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
     /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — با `shop.debt_minor` به پول (`DebtMinorFlag`)، خاموش همان جمعِ Double */
-    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(d.transactions.filter { it.debtorId == debtorId })
+    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(DebtRows.of(d)[debtorId].orEmpty())
 
     /**
      *  بدهیِ ما به یک تأمین‌کننده.

@@ -204,6 +204,48 @@ object LedgerDiff {
     }
   }
 
+  /**
+   *  PERF-LEDGER — همان `JsonElement.toString()` ِ kotlinx (فشرده، همان ترتیب، همان گریزِ کلید و رشته)، در **یک**
+   *  `StringBuilder`. `toString` ِ تودرتو برای هر ردیف و هر فیلد رشتهٔ میانی می‌ساخت و هر سطح همه را دوباره رونویسی
+   *  می‌کرد — سایهٔ کلِ دفتر در هر ذخیره. کلید و هر مقدارِ ساده هنوز از `toString` ِ خودِ kotlinx می‌آید؛ فقط چسباندن
+   *  این‌جاست. `LedgerPerfEquivalenceTest` نویسه‌به‌نویسه با `toString` برابرش کرده (نویسهٔ کنترل، نیم‌جفتِ UTF-16، …).
+   */
+  internal fun text(e: JsonElement): String {
+    val sb = StringBuilder(4096)
+    write(sb, e, HashMap())
+    return sb.toString()
+  }
+
+  internal fun write(sb: StringBuilder, e: JsonElement, keys: HashMap<String, String>) {
+    when (e) {
+      is JsonObject -> {
+        sb.append('{')
+        var first = true
+        for ((k, v) in e) {
+          if (!first) sb.append(',')
+          first = false
+          sb.append(keys.getOrPut(k) { JsonPrimitive(k).toString() })
+          sb.append(':')
+          write(sb, v, keys)
+        }
+        sb.append('}')
+      }
+      is JsonArray -> {
+        sb.append('[')
+        for (i in e.indices) {
+          if (i > 0) sb.append(',')
+          write(sb, e[i], keys)
+        }
+        sb.append(']')
+      }
+      else -> sb.append(e.toString())
+    }
+  }
+
+  /** یک ردیف همان‌طور که [toJson] در درختِ دفتر می‌نویسدش — `LedgerTrees` (PERF-LEDGER) */
+  internal fun <T> rowJson(serializer: kotlinx.serialization.KSerializer<T>, row: T): JsonElement =
+    jsNumbers(json.encodeToJsonElement(serializer, row))
+
   fun fromJson(o: JsonObject): ShopData =
     json.decodeFromJsonElement(ShopData.serializer(), o)
 
@@ -387,9 +429,10 @@ object LedgerDiff {
       val before = rowsOf(shadow, table).associateBy { idOf(it) }
       val after = rowsOf(next, table)
       val afterIds = HashSet<String>(after.size)
-      //  فقط ردیف‌هایی که خام فرق دارند — معمولاً همان چند ردیفی که کاربر عوض کرده
+      //  فقط ردیف‌هایی که خام فرق دارند — معمولاً همان چند ردیفی که کاربر عوض کرده.
+      //  PERF-LEDGER: ردیفِ برابر (همان شیء یا همان محتوا) هرگز فیلدِ عوض‌شده ندارد ⇒ بی `changedFields` (شرح سرِ [same])
       val view = modelView(table, after.mapNotNull { row ->
-        before[idOf(row)]?.takeIf { changedFields(table, bodyOf(it), bodyOf(row)) != null }
+        before[idOf(row)]?.takeIf { !same(it, row) && changedFields(table, bodyOf(it), bodyOf(row)) != null }
       })
 
       for (row in after) {
@@ -398,7 +441,7 @@ object LedgerDiff {
         val was = before[id]
         if (was == null) {
           ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.INSERT, bodyOf(row))
-        } else {
+        } else if (!same(was, row) || view.containsKey(id)) {
           val fields = changedFields(table, bodyOf(view[id] ?: was), bodyOf(row))
           if (fields != null) ops += SyncOp(Ulid.next(now), now, table, id, SyncOp.UPDATE, fields)
         }
@@ -425,6 +468,16 @@ object LedgerDiff {
     }
     return ops
   }
+
+  /**
+   *  PERF-LEDGER — ردیفِ سایه و ردیفِ دفتر **برابرند** (همان شیء، یا همان کلیدها و همان مقدارها).
+   *
+   *  آن‌گاه [changedFields] همیشه `null` است: هر کلیدِ دفتر در سایه همان مقدار را دارد (پس `canonical` ِ دو طرف یکی است)
+   *  و سایه کلیدی ندارد که دفتر نداشته باشد. پس پرسیدنش — که برای هر فیلدِ هر ردیفِ کلِ دفتر دو رشتهٔ `canonical`
+   *  می‌ساخت — نتیجه را عوض نمی‌کرد و فقط ذخیرهٔ یک فروش را O(کلِ دفتر × فیلدها) می‌کرد. ردیفی که `modelView` دارد
+   *  (شناسهٔ تکراری) همان راهِ همیشه را می‌رود. `LedgerPerfEquivalenceTest` با الگوی پیشینِ همین تابع برابرش کرده است.
+   */
+  private fun same(was: JsonObject, row: JsonObject): Boolean = was === row || was == row
 
   /**
    *  ردیف‌های خامِ [rows] از جدولِ [table] همان‌طور که مدلِ این نسخه

@@ -55,9 +55,17 @@ object DiskWrite {
    *  ([keepPrevious]) — خطایش هرگز نوشتن را نمی‌شکند.
    */
   @Throws(IOException::class)
-  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) {
-    if (!keepPrevious) return bytes(target, data)
-    bytesKeeping(target, data, previousOf(target))
+  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) = stream(target, keepPrevious) { it.write(data) }
+
+  /**
+   *  همان [bytes] با `keepPrevious`، ولی بایت‌ها از [write] به فایلِ کناری می‌روند — بی آرایهٔ کاملِ دفتر در حافظه
+   *  (PERF-LEDGER، `LedgerText`). همان ترتیب: کناری ⇐ `fsync` ⇐ `.prev` ⇐ جابه‌جاییِ اتمی ⇐ `fsync` ِ پوشه.
+   */
+  @Throws(IOException::class)
+  fun stream(target: File, keepPrevious: Boolean, write: (OutputStream) -> Unit) {
+    if (!keepPrevious) return stream(target, write)
+    val prev = previousOf(target)
+    stream(target, before = { this.keepPrevious(target, prev) }, write = write)
   }
 
   /** همان [bytes] با نسخهٔ پیشین به نامِ [previous] — تنظیماتِ کامپیوتر (`DesktopPrefs`، `<نام>.bak`) */
