@@ -26,9 +26,6 @@ import ir.vil3ntec.tohid.core.onboarding.AuthRules
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.CodeLoginRepository
 import ir.vil3ntec.tohid.sync.SyncStore
-import ir.vil3ntec.tohid.sync.v1.SyncStateV1
-import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
-import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
@@ -44,9 +41,9 @@ import kotlinx.coroutines.launch
 
 /** `auth/code` — برگهٔ «ورود با ایمیل»: ایمیل ⇐ شش رقم ⇐ ورود (`CodeLoginRepository`، بندِ ۲۱٫۴) */
 @Composable
-internal fun EmailCodeSheet(onClose: () -> Unit, onSignedIn: () -> Unit) {
+internal fun EmailCodeSheet(onClose: () -> Unit, onSignedIn: () -> Unit, store: ir.vil3ntec.tohid.data.ShopStore? = null) {
   V3Sheet(onDismiss = onClose, title = StrAuth.emailSignIn, detents = false) { closer ->
-    EmailCodeContent(onClose = { closer.close() }, onSignedIn = { closer.close(onSignedIn) })
+    EmailCodeContent(onClose = { closer.close() }, onSignedIn = { closer.close(onSignedIn) }, store = store)
   }
 }
 
@@ -72,7 +69,13 @@ data class EmailCodeUi(
  *  همگام‌سازی. ⛔ کادرِ نشانیِ سرور این‌جا نیست و نباید بیاید.
  */
 @Composable
-fun EmailCodeContent(onClose: () -> Unit, onSignedIn: () -> Unit, showTitle: Boolean = false, initial: EmailCodeUi = EmailCodeUi()) {
+fun EmailCodeContent(
+  onClose: () -> Unit,
+  onSignedIn: () -> Unit,
+  showTitle: Boolean = false,
+  initial: EmailCodeUi = EmailCodeUi(),
+  store: ir.vil3ntec.tohid.data.ShopStore? = null,
+) {
   val context = LocalContext.current
   val repo = remember { Backend.codeLogin(context) }
   val scope = rememberCoroutineScope()
@@ -96,10 +99,26 @@ fun EmailCodeContent(onClose: () -> Unit, onSignedIn: () -> Unit, showTitle: Boo
     val out = repo.verify(requestId = ui.requestId, code = ui.code, deviceId = SyncStore(context).deviceUid, deviceName = device)
     ui = ui.copy(busy = false)
     out.onSuccess { session ->
-      //  ⛔ کلیدهای همگام‌سازی به شناسهٔ همین حساب، پیش از اولین همگام‌سازی
-      if (session.userId.isNotBlank()) SyncStateV1.setCurrentAccount(context, session.userId)
-      SyncV1Engine.of(context).rebind()
-      SyncV1Worker.now(context)
+      /*
+       *  ⛔ دفترِ روی میز **و** کلیدهای همگام‌سازی با هم به همین حساب، پیش از اولین همگام‌سازی (`AccountBind`).
+       *  پیش‌تر این‌جا فقط کلیدِ همگام‌سازی عوض می‌شد و `LedgerOwner` نه: پس از «خروج ⇒ ورودِ حسابِ دیگر ⇒
+       *  برگشتن با کدِ ایمیلی» دفترِ حسابِ دیگر روی میز می‌ماند و دفترِ واقعیِ این حساب در بایگانی.
+       *  دکان از سرور پرسیده می‌شود (پاسخِ این راه دکان ندارد)؛ نشد ⇒ «نامعلوم» و دفتر فقط برای حسابِ دیگر جابه‌جا.
+       */
+      val live = store ?: ir.vil3ntec.tohid.data.ShopStore(context).also { runCatching { it.load() } }
+      val shopId: String? = when (val r = Backend.shop(context).current()) {
+        is ir.vil3ntec.tohid.core.net.ApiResult.Success -> if (r.value.hasShop) r.value.shop?.id.orEmpty() else ""
+        is ir.vil3ntec.tohid.core.net.ApiResult.Failure -> if (r.error.code == "no_shop") "" else null
+      }
+      val bound = runCatching { ir.vil3ntec.tohid.data.AccountBind.signedIn(context, live, session.userId, shopId, session.name) }
+      if (bound.exceptionOrNull() is ir.vil3ntec.tohid.data.LedgerOwner.NotArchived) {
+        //  دفترِ حسابِ پیشین بایگانی نشد ⇒ ورود برمی‌گردد، هیچ چیزی روی دستگاه عوض نشده
+        runCatching { Backend.auth(context).signOut() }
+        ui = ui.say(StrAuth.ledgerNotArchived, true)
+        return
+      }
+      if (session.name.isNotBlank()) SyncStore(context).accountName = session.name
+      ir.vil3ntec.tohid.data.AccountBind.bootstrapSoon(context, live)
       ui = ui.say(StrAuth.signedIn)
       onSignedIn()
     }.onFailure { failure ->

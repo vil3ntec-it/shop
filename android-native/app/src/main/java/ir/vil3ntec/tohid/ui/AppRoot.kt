@@ -157,6 +157,8 @@ private fun AppRootActive(
         //  حساب از دکانی به دکانِ دیگر رفته ⇒ دفترِ روی گوشی هم همین‌جا جابه‌جا می‌شود
         if (state.hasShop) {
           runCatching { ir.vil3ntec.tohid.data.LedgerOwner.shopChanged(context, store, state.shop?.id.orEmpty()) }
+          //  گوشیِ مانده در حالِ خرابِ پیش از «یک درِ ورود» ⇒ دفترِ واقعیِ همین حساب از بایگانی (`AccountBind.healOnStart`)
+          runCatching { ir.vil3ntec.tohid.data.AccountBind.healOnStart(context, store) }
         }
       }
       .onFailure { failure ->

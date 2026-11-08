@@ -86,6 +86,15 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     //  SEC-02: زنجیرهٔ هشِ اسنادِ همین سری (پرچمِ خاموشِ shop.doc_chain ⇒ فقط پرسشِ پرچم؛ شکستش بی‌صدا)
     runCatching { ir.vil3ntec.tohid.sync.platform.DocChainSync.cycle(app, store.data.value) }
 
+    //  بایگانیِ کهنهٔ همین حساب (پیش از «یک درِ ورود») باز شده ⇒ اول بازیابی (سرور برنده، ردیف‌های تنها درج)؛
+    //  نشد ⇒ هیچ دورِ دیگری: صفِ این کلید شاید DELETE ِ دفترِ دیگری دارد (`SyncV1Engine.recoverArchived`)
+    if (engine.recoveryPending()) {
+      val ok = runCatching {
+        engine.recoverArchived(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
+      }.isSuccess
+      if (!ok) return Result.retry()
+    }
+
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
     //  ⛔ `read` دفترِ همین لحظهٔ دیسک است (`ledgerNow`)، نه دفتری که این نمونه هنگامِ `load` خواند:
     //  نشاندنِ opها روی آن فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد

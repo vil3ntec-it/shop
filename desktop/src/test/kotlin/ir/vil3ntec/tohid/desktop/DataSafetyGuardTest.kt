@@ -180,6 +180,8 @@ class DataSafetyGuardTest {
       "tohid-sync-choice", "tohid-ledger", "tohid-ledger-merge", "tohid-lock", "tohid-locale", "tohid-theme",
       "tohid-ui", "tohid-shell", "tohid-devices", "tohid-location", "tohid-location-ping", "tohid-visit-ping",
       "tohid-otp", "tohid-watch", "tohid_preview", "tohid-debtor-detail", "tohid-stock", "tohid-stock-transfer",
+      //  `CloudSettingsRestore`: نشانِ «یک بار برای این حساب@دکان روی همین دستگاه» (claude/no-data-loss)
+      "tohid-settings-restore",
     ).forEach { put(it, Kind.DEVICE) }
     //  مانده (DATA-SAFETY §۶): رمزِ کارمندان عمداً از پشتیبان بیرون است — دوباره گذاشته می‌شود
     put("tohid-staff-pins", Kind.GAP)

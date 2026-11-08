@@ -73,6 +73,8 @@
   `file.delete()` می‌تواند بایگانیِ حساب را صفربایتی بگذارد. پیشنهاد: `DiskWrite.copy(file, vault(key))` (همان کناری +
   `fsync` + جابه‌جاییِ اتمی) به‌جای `copyTo`، و `delete` فقط پس از آن.
 - بازیابیِ پس از ورود: بند ۲ ِ بالا.
+- انجام شد (`claude/no-data-loss`): `stashTo`/`openFrom` با `DiskWrite.copy`؛ بایگانیِ ناموفق ⇒ `LedgerOwner.NotArchived` و هیچ جابه‌جایی؛
+  پس از ورود و گرفتنِ دفتر `CloudSettingsRestore.once` (تازه‌ترین پشتیبانِ ابری، فقط کلید و عکسِ نبوده).
 
 ## ۴. قاعده‌ها (در `docs/RULES-fa.md` § «v3 · دفترِ محلی و مهاجرتِ داده» هم آمده)
 
@@ -91,6 +93,6 @@
 | پشتیبان (تازه) | `tohid-policy`، `tohid-receipt`، `tohid-modules` | با بازیابیِ پشتیبانِ کامل/ابری (فقط کلیدهای تنظیم‌نشده) |
 | پشتیبان | عکسِ کالا (`product-photos`) | از سرور (`PhotoSync`) و پشتیبانِ کامل |
 | نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push` | منبعش سرور است (یا صفِ فرستادنی به آن) |
-| مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
+| مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مانده | `tohid-staff-pins` | دوباره گذاشته می‌شود (بالا، بند ۵) |
 | بایگانی | `ledger-archive.json` (ردیف‌های بیش از ۴۰۰ روز) | روی سرور می‌مانند (`forgetArchived` فقط سایه را هرس می‌کند) |
