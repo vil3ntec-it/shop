@@ -272,6 +272,79 @@ jobs:
           retention-days: 3
           if-no-files-found: ignore
 
+  #  کشیدنِ بی پنجرهٔ صفحه‌های تازه (`desktop/src/test/.../shots/NewScreensRenderTest.kt` + `ScreenRender.kt`): هر صفحه در
+  #  ۳۶۰dp و ۱۲۸۰dp، فارسی و انگلیسی، با دادهٔ ثابت و سرورِ ساختگیِ 127.0.0.1؛ از درختِ معنایی نوشتهٔ بریده، چیزِ بیرون از قاب،
+  #  کلیدِ خامِ ترجمه و هدفِ لمسیِ زیرِ ۴۸dp شمرده می‌شود ⇒ render-report.json و PNGها در artifact ِ کوتاه‌عمر.
+  #  ⛔ «(گزارش)» و continue-on-error (کار و گامِ کشیدن): هرگز سدِ ادغام نیست؛ یافته‌ها فقط هشدار و خلاصه. به collect/publish
+  #  وصل نیست. آزمونِ سدِ کامپیوتر (`tohid-desktop.yml`) بی TOHID_RENDER_OUT همین کلاس را کنار می‌گذارد.
+  render:
+    name: کشیدنِ صفحه‌های تازه بی پنجره (گزارش)
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    continue-on-error: true
+    env:
+      LC_ALL: C.UTF-8
+      LANG: C.UTF-8
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@ed408507eac070d1f99cc633dbcf757c94c7933a # v4.4.3
+
+      #  بی پنجره (رَسترِ Skia، ‎java.awt.headless‎)؛ Xvfb لازم نیست، فقط قلمِ پشتیبان برای نویسه‌های بیرون از قلمِ برنامه
+      - name: قلم
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq fonts-noto-core >/dev/null
+
+      - name: کشیدن و سنجیدن
+        continue-on-error: true
+        working-directory: desktop
+        env:
+          TOHID_RENDER_OUT: ${{ github.workspace }}/desktop/build/render-report
+        run: ./gradlew --no-daemon -q -Pdev=true test --tests 'ir.vil3ntec.tohid.desktop.shots.NewScreensRenderTest'
+
+      - name: خلاصهٔ گزارش
+        if: always()
+        env:
+          REPORT: ${{ github.workspace }}/desktop/build/render-report/render-report.json
+        run: |
+          python3 - <<'PY'
+          import json, os
+          path, out = os.environ["REPORT"], os.environ["GITHUB_STEP_SUMMARY"]
+          esc = lambda t: str(t).replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          cell = lambda t: str(t).replace("|", "\\|").replace("\n", " ")
+          if not os.path.isfile(path):
+              print("::warning::render-report.json ساخته نشد (کامپایل یا آزمون پیش از گزارش شکست؛ لاگِ گامِ کشیدن)")
+              raise SystemExit(0)
+          r = json.load(open(path, encoding="utf-8"))
+          if r.get("skipped"):
+              print("::warning::کشیدنِ صفحه‌ها کنار رفت: " + esc(r["skipped"]))
+              raise SystemExit(0)
+          kinds = list(r["totals"])
+          defects = sum(r["totals"][k] for k in r["defects"] if k in r["totals"])
+          with open(out, "a", encoding="utf-8") as f:
+              f.write("## کشیدنِ صفحه‌های تازه (گزارش)\n\n")
+              f.write(f"ران‌تایمِ Compose: {r.get('composeRuntime')} · {len(r['scenes'])} حالت · {defects} یافتهٔ عیب ({', '.join(r['defects'])})\n\n")
+              f.write("| حالت | " + " | ".join(kinds) + " |\n|" + "---|" * (len(kinds) + 1) + "\n")
+              f.write("| **همه** | " + " | ".join(str(r["totals"][k]) for k in kinds) + " |\n")
+              for s in r["scenes"]:
+                  f.write(f"| {cell(s['name'])} | " + " | ".join(str(s["counts"].get(k, 0)) for k in kinds) + " |\n")
+          for s in r["scenes"]:
+              for x in s["findings"]:
+                  if x["kind"] in r["defects"]:
+                      print(f"::warning::{esc(s['name'])}: {esc(x['kind'])} «{esc(x['text'][:120])}» {esc(x['where'])}")
+          print(f"{len(r['scenes'])} حالت، {defects} یافتهٔ عیب")
+          PY
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: render-report
+          path: desktop/build/render-report
+          retention-days: 3
+          if-no-files-found: ignore
+
   #  همهٔ عکس‌ها یک‌جا ⇐ شاخهٔ desktop-screenshots. اگر تکه‌ای قرمز شد، باز هم هرچه هست منتشر می‌شود
   #  (و کارِ همان تکه قرمز می‌ماند)، تا عکس‌های گروه‌های سالم از دست نروند.
   collect:
