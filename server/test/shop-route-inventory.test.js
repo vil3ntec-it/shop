@@ -222,6 +222,8 @@ FLAGS.push('shop.device_push');
 FLAGS.push('shop.approval_requests');
 //  STF-01: نقشِ سفارشی (`/shop/custom-roles/:id…`) — «ب» نقشِ «الف» را نه می‌بیند، نه عوض/پاک می‌کند، نه به عضوی می‌دهد
 FLAGS.push('shop.custom_roles');
+//  تنظیماتِ دکان، همگام‌سازیِ زنده (`/shop/settings-sync`، مهاجرتِ ۳۰۰) — «ب» فقط کلیدهای دکانِ خودش را می‌بیند و می‌نویسد
+FLAGS.push('shop.settings_sync');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و

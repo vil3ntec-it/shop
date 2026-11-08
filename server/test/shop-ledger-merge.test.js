@@ -1,20 +1,24 @@
 'use strict';
 /**
  * پرچمِ ادغامِ سه‌طرفهٔ دفترِ برنامه — `GET /api/shop/ledger-merge/config` (#407، ذخیرهٔ کهنه).
- * پیش‌فرض خاموش؛ روشن فقط با `live_config` برای همان دکان یا `all`؛ مقدارِ دکان بر `all` جلو می‌افتد؛
- * فقط `true` روشن است؛ بی توکن ۴۰۱.
+ *
+ * برنامهٔ کهنه (بی `v`): همان قاعدهٔ پیشین بیت‌به‌بیت — پیش‌فرض خاموش؛ روشن فقط با `live_config` برای همان دکان یا
+ * `all`؛ مقدارِ دکان بر `all` جلو می‌افتد؛ فقط `true` روشن است؛ بی توکن ۴۰۱.
+ * برنامهٔ تازه (`?v=2`، از ۱۴۰۵/۰۸/۱۸): **پیش‌فرض روشن**؛ فقط `false` ِ صریح (دکان بر `all`) یا «غیرفعال کردنِ سرویس»
+ * خاموشش می‌کند؛ پمپ هرگز به این در نمی‌رسد.
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const h = require('./helpers');
-const { query } = require('../src/db');
+const { query, newId } = require('../src/db');
 
 test.before(async () => { await h.start(); });
 test.after(async () => { await h.stop(); });
 
 const C = '/api/shop/ledger-merge/config';
+const C2 = `${C}?v=2`;
 
 async function shop(label) {
   const owner = await h.newUser(`صاحب ${label}`);
@@ -47,3 +51,46 @@ test('پرچمِ shop.ledger_merge: پیش‌فرض خاموش؛ روشن برا
   assert.deepEqual((await h.get(C, { token: b.token })).body, { enabled: false }, 'فقط true روشن است');
   await query("DELETE FROM live_config WHERE key='shop.ledger_merge'");
 });
+
+test('برنامهٔ تازه (?v=2): پیش‌فرض روشن؛ فقط false ِ صریح خاموش؛ دکان بر all؛ مقدارِ نادرست همان پیش‌فرض؛ برنامهٔ کهنه همان پیشین', async () => {
+  const a = await shop('ج');
+  const b = await shop('د');
+  assert.equal((await h.get(C2)).status, 401);
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: true, v: 2 });
+  assert.deepEqual((await h.get(C, { token: a.token })).body, { enabled: false }, 'برنامهٔ کهنه (بی v) همان پیش‌فرضِ خاموشِ پیشین');
+  assert.deepEqual((await h.get(`${C}?v=1`, { token: a.token })).body, { enabled: false });
+  assert.deepEqual((await h.get(`${C}?v=abc`, { token: a.token })).body, { enabled: false });
+
+  await flag('all', 'false');
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: false, v: 2 }, 'خاموش برای همه');
+  await flag(b.shopId, 'true');
+  assert.deepEqual((await h.get(C2, { token: b.token })).body, { enabled: true, v: 2 }, 'مقدارِ دکان بر all جلو می‌افتد');
+  await flag(a.shopId, 'false');
+  await flag('all', 'true');
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: false, v: 2 }, 'خاموشِ همین دکان');
+  assert.deepEqual((await h.get(C2, { token: b.token })).body, { enabled: true, v: 2 });
+  await flag(a.shopId, '"no"');
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: true, v: 2 }, 'مقدارِ نادرست ⇒ پیش‌فرضِ روشن');
+  await query("DELETE FROM live_config WHERE key='shop.ledger_merge'");
+
+  //  «غیرفعال کردنِ سرویس» ِ پنلِ مرکزی برای همین کلید هر مقداری را می‌بُرد
+  await query(
+    "INSERT INTO shop_holds (id, shop_id, kind, service, reason, placed_by, placed_at) VALUES ($1,$2,'service_disabled','shop.ledger_merge','آزمون','admin',1)",
+    [newId('hold'), a.shopId],
+  );
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: false, v: 2 });
+  assert.deepEqual((await h.get(C2, { token: b.token })).body, { enabled: true, v: 2 }, 'دکانِ دیگر دست نمی‌خورد');
+  await query("DELETE FROM shop_holds WHERE service='shop.ledger_merge'");
+});
+
+test('جدایی از پمپ: نشستِ برنامهٔ پمپ به این در نمی‌رسد و هیچ پرچمی نمی‌گیرد', async () => {
+  const u = await h.newUser('صاحبِ پمپ', 'pump');
+  const made = await h.post('/api/pump', { name: 'پمپ آزمون', code: 'lmerge-pump' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  for (const path of [C, C2]) {
+    const r = await h.get(path, { token: u.accessToken });
+    assert.ok([401, 403, 404].includes(r.status), `${path} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
+    assert.equal(r.body && r.body.enabled, undefined);
+  }
+});
+

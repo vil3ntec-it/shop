@@ -190,4 +190,50 @@ class LedgerMergeTest {
     assertSame(current, LedgerMerge.baseOf(undo, current, listOf(screen)))
     assertTrue(LedgerMerge.kinship(stale, screen) > LedgerMerge.kinship(stale, current))
   }
+
+  /* ------------- ذخیرهٔ زنجیره‌ای پس از ادغام (پیش از روشن شدنِ پیش‌فرضِ shop.ledger_merge) ------------- */
+
+  private val pay1 = DebtTransaction(id = "t1", debtorId = "d1", type = "receive", amount = 100.0, date = "2026-11-08")
+  private val pay2 = DebtTransaction(id = "t2", debtorId = "d1", type = "receive", amount = 50.0, date = "2026-11-08")
+
+  @Test fun `زنجیره — صفحه‌ای که از ذخیرهٔ ادغام‌شدهٔ خودش ادامه داد پایه‌اش همان ذخیره است، نه پایهٔ کهنه`() {
+    val inHand = disk(ShopData(products = listOf(p1), sales = listOf(sale)))
+    val pulled = disk(inHand.copy(products = inHand.products + p2))
+    val first = inHand.copy(sales = listOf(sale.copy(paidAmount = 100.0, remaining = 400.0)), transactions = listOf(pay1))
+    val merged = LedgerMerge.merge(inHand, first, pulled)
+    val second = first.copy(sales = listOf(first.sales.single().copy(paidAmount = 150.0, remaining = 350.0)), transactions = first.transactions + pay2)
+    //  پیشین (بی فهرستِ فرستاده‌ها): پایهٔ کهنه ⇒ ۱۰۰ دو بار
+    val stale = LedgerMerge.retainedBaseOf(second, disk(merged), listOf(inHand, pulled), lost = false)
+    assertSame(inHand, stale)
+    assertEquals(250.0, LedgerMerge.merge(stale!!, second, merged).sales.single().paidAmount, 0.0)
+    //  اکنون: همان ذخیرهٔ فرستاده‌شده
+    val base = LedgerMerge.retainedBaseOf(second, disk(merged), listOf(inHand, pulled), lost = false, submitted = listOf(first))
+    assertSame(first, base)
+    val out = LedgerMerge.merge(base!!, second, merged)
+    assertEquals(150.0, out.sales.single().paidAmount, 0.0)
+    assertEquals(350.0, out.sales.single().remaining, 0.0)
+    assertEquals(listOf("t1", "t2"), out.transactions.map { it.id })
+    assertEquals(listOf("p1", "p2"), out.products.map { it.id })
+  }
+
+  @Test fun `دو کلیکِ هم‌زمان از همان پایه هرگز ذخیرهٔ دیگر را پایه نمی‌گیرد (ردیف‌هایش DELETE می‌شد)`() {
+    val inHand = disk(ShopData(products = listOf(p1)))
+    val first = inHand.copy(sales = listOf(sale))
+    val second = inHand.copy(sales = listOf(sale.copy(id = "s2")))
+    assertSame(inHand, LedgerMerge.retainedBaseOf(second, disk(first), listOf(inHand), lost = false, submitted = listOf(first)))
+    //  حتی وقتی هر دو یک فهرست را `emptyList()` کردند (همان شیء): فهرست نشانه نیست
+    val a = inHand.copy(products = emptyList(), sales = listOf(sale))
+    val b = inHand.copy(products = emptyList(), sales = listOf(sale.copy(id = "s2")))
+    assertSame(inHand, LedgerMerge.retainedBaseOf(b, disk(a), listOf(inHand), lost = false, submitted = listOf(a)))
+    assertEquals(false, LedgerMerge.descends(b, a, inHand))
+  }
+
+  @Test fun `نشانهٔ یک‌سویه — ردیفی از پایه که ذخیرهٔ فرستاده‌شده کنار گذاشته بود ⇒ از پایه ساخته شده`() {
+    val inHand = disk(ShopData(products = listOf(p1, p2)))
+    val first = inHand.copy(products = listOf(inHand.products[0].copy(salePrice = 110.0), inHand.products[1]), transactions = listOf(pay1))
+    //  همان پیشین را دارد (p1 ِ کهنه) و t1 ِ ذخیرهٔ اول را هم: هر دو سو ⇒ نه
+    val mixed = first.copy(products = inHand.products)
+    assertEquals(false, LedgerMerge.descends(mixed, first, inHand))
+    assertEquals(true, LedgerMerge.descends(first.copy(transactions = first.transactions + pay2), first, inHand))
+  }
 }

@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.LedgerMergeFlag
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.TillReceiveFlow
@@ -38,6 +39,7 @@ class TillReceiveStaleTest {
   private val engine get() = SyncV1Engine.of(ctx)
 
   private fun clean() {
+    LedgerMergeFlag.set(ctx, LedgerMergeFlag.DEFAULT_ON)
     HeartbeatCache(ctx).forget()
     SoftLock.refresh(ctx)
     AtRest.setWanted(ctx, false)
@@ -69,21 +71,25 @@ class TillReceiveStaleTest {
     engine.absorbRemote(ops, read = { w.data.value }, write = { w.applyFromServerNow(it) })
   }
 
-  /** صفحه دفترِ [seed] را دارد و کارگر رسیدِ گوشی را آورده است */
-  private fun staleUi(p: String): ShopStore {
+  /**
+   *  صفحه دفترِ [seed] را دارد و کارگر رسیدِ گوشی را آورده است. `shop.ledger_merge` ِ خاموش (صریح) ⇒ صفحه کهنه می‌ماند
+   *  (همان شرایطی که این آزمون برایش نوشته شد)؛ روشن (پیش‌فرض از ۱۴۰۵/۰۸/۱۸) ⇒ صفحه نوشتنِ کارگر را می‌گیرد. نتیجه در هر دو یکی.
+   */
+  private fun staleUi(p: String, merge: Boolean): ShopStore {
+    LedgerMergeFlag.set(ctx, merge)
     val ui = open()
     assertTrue(runBlocking { ui.save(seed(p)) })
     workerPulls(opsOf(seed(p), seed(p).let { it.copy(transactions = it.transactions + phoneReceipt(p)) }))
-    assertEquals("صفحه نوشتنِ کارگر را نمی‌بیند (نمونهٔ جدا)", listOf("$p-g1"), ui.data.value.transactions.map { it.id })
+    if (merge) assertEquals("پرچمِ روشن: صفحه نوشتنِ کارگر را می‌بیند", listOf("$p-g1", "$p-phone"), ui.data.value.transactions.map { it.id })
+    else assertEquals("صفحه نوشتنِ کارگر را نمی‌بیند (نمونهٔ جدا)", listOf("$p-g1"), ui.data.value.transactions.map { it.id })
     return ui
   }
 
   private fun receive(store: ShopStore, p: String, key: String, minor: Long, prepay: Boolean = false): DebtEntry.Result =
     runBlocking { TillReceivePref.record(store, "$p-c1", minor, "", key, prepay) }
 
-  @Test fun `دریافتِ F7 پس از Pull ِ کارگر رسیدِ گوشی را نگه می‌دارد و DELETE نمی‌سازد`() {
-    val p = "tr7a"
-    val ui = staleUi(p)
+  @Test fun `دریافتِ F7 پس از Pull ِ کارگر رسیدِ گوشی را نگه می‌دارد و DELETE نمی‌سازد`() = both("tr7a") { p, merge ->
+    val ui = staleUi(p, merge)
     val q0 = engine.queueSize()
 
     assertEquals(DebtEntry.Result.Ok("$p-k1", again = false), receive(ui, p, "$p-k1", 20_000))
@@ -99,9 +105,13 @@ class TillReceiveStaleTest {
     assertEquals(listOf("$p-k1"), ops.filter { it.table == "transactions" }.map { it.rowId })
   }
 
-  @Test fun `پیش‌پرداخت با بدهیِ همین لحظهٔ دیسک سنجیده می‌شود، نه بدهیِ صفحه`() {
-    val p = "tr7b"
-    val ui = staleUi(p)
+  /** همان سنجه با `shop.ledger_merge` ِ خاموش و روشن (شناسه‌های جدا: سایه و صفِ موتور می‌مانند) */
+  private fun both(p: String, body: (String, Boolean) -> Unit) {
+    for (merge in listOf(false, true)) { clean(); body(if (merge) "${p}m" else p, merge) }
+  }
+
+  @Test fun `پیش‌پرداخت با بدهیِ همین لحظهٔ دیسک سنجیده می‌شود، نه بدهیِ صفحه`() = both("tr7b") { p, merge ->
+    val ui = staleUi(p, merge)
     val q0 = engine.queueSize()
 
     //  صفحه هنوز ۱۰۰۰ بدهی می‌بیند و ۱۰۰۰ را «همهٔ بدهی» می‌داند؛ روی دیسک ۷۰۰ است ⇒ ۳۰۰ پیش‌پرداخت، بی تأیید رد

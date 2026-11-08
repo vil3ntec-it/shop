@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
+import ir.vil3ntec.tohid.data.LedgerMergeFlag
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
@@ -45,6 +46,7 @@ class CrmSweepDiskTest {
   private val engine get() = SyncV1Engine.of(ctx)
 
   private fun clean() {
+    LedgerMergeFlag.set(ctx, LedgerMergeFlag.DEFAULT_ON)
     ShopPolicy.setCrmReports(ctx, false)
     HeartbeatCache(ctx).forget()
     SoftLock.refresh(ctx)
@@ -224,6 +226,8 @@ class CrmSweepDiskTest {
   }
 
   @Test fun `شروعِ برنامه پس از Pull ِ کارگر — sweep ِ نمونهٔ صفحه ردیف‌های رسیده را حذف نمی‌کند`() {
+    //  صفحهٔ کهنه فقط با `shop.ledger_merge` ِ خاموشِ صریح (پیش‌فرض از ۱۴۰۵/۰۸/۱۸ روشن: صفحه Pull را می‌گیرد؛ `StaleSaveTest`)
+    LedgerMergeFlag.set(ctx, false)
     ShopPolicy.setCrmReports(ctx, true)
     val ui = open()
     val local = base.copy(transactions = base.transactions + late)

@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.data.DebtEntry
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
+import ir.vil3ntec.tohid.data.LedgerMergeFlag
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.v1.HeartbeatCache
@@ -36,6 +37,7 @@ class DebtReceiptStaleTest {
   private val engine get() = SyncV1Engine.of(ctx)
 
   private fun clean() {
+    LedgerMergeFlag.set(ctx, LedgerMergeFlag.DEFAULT_ON)
     HeartbeatCache(ctx).forget()
     SoftLock.refresh(ctx)
     AtRest.setWanted(ctx, false)
@@ -74,14 +76,20 @@ class DebtReceiptStaleTest {
   }
 
   @Test fun `رسیدِ صفحه پس از Pull ِ کارگر رسیدِ گوشی را نگه می‌دارد و DELETE نمی‌سازد`() {
-    val p = "dr7a"
+    //  `shop.ledger_merge` ِ خاموش (صریح) ⇒ صفحه کهنه (همان شرایطِ این آزمون)؛ روشن (پیش‌فرض از ۱۴۰۵/۰۸/۱۸) ⇒ صفحه نوشتنِ کارگر
+    //  را می‌گیرد. نتیجه در هر دو یکی؛ شناسه‌ها جدا چون سایه و صفِ موتور می‌مانند
+    for (merge in listOf(false, true)) { clean(); LedgerMergeFlag.set(ctx, merge); staleReceipt(if (merge) "dr7am" else "dr7a", merge) }
+  }
+
+  private fun staleReceipt(p: String, merge: Boolean) {
     val ui = open()
     assertTrue(runBlocking { ui.save(seed(p)) })
     val q0 = engine.queueSize()
 
     workerPulls(opsOf(seed(p), seed(p).let { it.copy(transactions = it.transactions + phoneReceipt(p)) }))
     assertEquals("Pull خودش op نمی‌سازد", q0, engine.queueSize())
-    assertEquals("صفحه نوشتنِ کارگر را نمی‌بیند (نمونهٔ جدا)", listOf("$p-g1"), ui.data.value.transactions.map { it.id })
+    if (merge) assertEquals("پرچمِ روشن: صفحه نوشتنِ کارگر را می‌بیند", listOf("$p-g1", "$p-phone"), ui.data.value.transactions.map { it.id })
+    else assertEquals("صفحه نوشتنِ کارگر را نمی‌بیند (نمونهٔ جدا)", listOf("$p-g1"), ui.data.value.transactions.map { it.id })
 
     assertEquals(DebtEntry.Result.Ok("$p-k1", again = false), receive(ui, p, "$p-k1"))
 

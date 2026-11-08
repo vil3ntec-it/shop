@@ -17,6 +17,8 @@
  *   ۷) صفحه‌بندی، پاسخِ گم‌شده و pull ِ تکراری ⇒ همان پاسخ و همان نتیجه؛ دستگاهِ بی نوشتهٔ تازه‌تر ⇒ پاسخِ مو‌به‌مو.
  *   ۸) push ِ تکراری (پاسخِ push گم شد) و بازشدنِ دوبارهٔ برنامه میانِ push و pull ⇒ همان نتیجه.
  *   ۹) پمپ (همان مسیرِ مشترک) با پرچمِ `all` و پرچمِ خودِ پمپ ⇒ پاسخِ pull همان امروز.
+ *  ۱۰) از ۱۴۰۵/۰۸/۱۸ **پیش‌فرض روشن** (`lib/default-on-flag.js`): بی ردیف روشن؛ `false` ِ صریح (دکان بر `all`) یا
+ *      «غیرفعال کردنِ سرویس» خاموش؛ پمپ پرچم را نمی‌خواند. «بی پرچم» در ۱ و ۶ یعنی خاموشِ **صریح** (پیش‌تر نبودنِ ردیف).
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -41,7 +43,8 @@ async function shop(label, { flag }) {
   const made = await h.api('POST', '/api/shop', { token: u.accessToken, body: { name: `دکان ${label}` } });
   assert.equal(made.status, 201, JSON.stringify(made.body));
   const shopId = made.body.shop.id;
-  if (flag) await setFlag(shopId, true);
+  //  از ۱۴۰۵/۰۸/۱۸ پیش‌فرض روشن است: «بی پرچم» = خاموشِ صریحِ همین دکان
+  await setFlag(shopId, Boolean(flag));
   return { token: u.accessToken, shopId };
 }
 
@@ -411,3 +414,40 @@ test('۹) پمپ: همان مسیر، با پرچمِ `all` و پرچمِ خود
     await setFlag('all', false);
   }
 });
+
+test('۱۰) پیش‌فرض روشن: بی ردیف روشن؛ false ِ صریح (دکان بر all) و نگه‌داشتِ سرویس خاموش؛ پمپ هرگز', async () => {
+  const ownNewer = require('../src/lib/sync-v1-own-newer');
+  const u = await h.newUser('صاحب-own10', 'shop');
+  const made = await h.api('POST', '/api/shop', { token: u.accessToken, body: { name: 'دکان own10' } });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const shopId = made.body.shop.id;
+  const ctx = { app: 'shop', accountKind: 'shop', accountId: shopId };
+  const clear = () => db.query('DELETE FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [FLAG, 'all', shopId]);
+  await clear();
+  try {
+    assert.equal(await ownNewer.on(ctx), true, 'بی هیچ ردیفی: روشن');
+    await setFlag('all', false);
+    assert.equal(await ownNewer.on(ctx), false, 'خاموش برای همه');
+    await setFlag(shopId, true);
+    assert.equal(await ownNewer.on(ctx), true, 'مقدارِ دکان بر all جلو می‌افتد');
+    await clear();
+    await db.query('INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,$2,$3,1)', [shopId, FLAG, '"yes"']);
+    assert.equal(await ownNewer.on(ctx), true, 'مقدارِ نادرست ⇒ پیش‌فرضِ روشن');
+    await clear();
+    await db.query(
+      "INSERT INTO shop_holds (id, shop_id, kind, service, reason, placed_by, placed_at) VALUES ($1,$2,'service_disabled',$3,'آزمون','admin',1)",
+      [db.newId('hold'), shopId, FLAG],
+    );
+    assert.equal(await ownNewer.on(ctx), false, '«غیرفعال کردنِ سرویس» هر مقداری را می‌بُرد');
+    await db.query('DELETE FROM shop_holds WHERE shop_id=$1', [shopId]);
+    //  پمپ و هر حسابِ غیرِ دکان: پرچم خوانده نمی‌شود (همان آرایه، همان شیء)
+    for (const c of [{ app: 'pump', accountKind: 'station', accountId: shopId }, { app: 'shop', accountKind: 'station', accountId: shopId }, { app: 'shop', accountKind: 'shop', accountId: '' }]) {
+      assert.equal(await ownNewer.on(c), false, JSON.stringify(c));
+      const ops = [{ server_seq: 1, table: 'products', row_id: 'x', type: 'update', fields: { price: 1 } }];
+      assert.equal(await ownNewer.view(c, 'd', 0, ops), ops);
+    }
+  } finally {
+    await clear();
+  }
+});
+
