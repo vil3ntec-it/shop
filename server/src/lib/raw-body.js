@@ -13,12 +13,19 @@ function rawBody(req, fallback = Buffer.alloc(0)) {
 }
 
 /**
- * همان نگهبان برای مقداری که از درخواست به یک تابعِ کتابخانه رسیده (`putMedia` ِ پشتیبانی و
- * گفت‌وگو، `putEvidence` ِ پرونده): Buffer ⇒ خودش؛ هر چیزِ دیگر ⇒ `fallback`.
+ * همان نگهبان برای مقداری که از درخواست به یک تابعِ کتابخانه رسیده (`mediaBytes` ِ `putMedia` ِ
+ * پشتیبانی و گفت‌وگو و `putEvidence` ِ پرونده): Buffer ⇒ خودش؛ هر چیزِ دیگر ⇒ `fallback`.
  */
 function bufferOf(value, fallback = Buffer.alloc(0)) {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return fallback;
   return Buffer.isBuffer(value) ? value : fallback;
 }
 
-module.exports = { rawBody, bufferOf };
+/** بایتِ رسانه: Buffer ِ ناتهی، وگرنه همان ۴۰۰ ِ `bad_media` ِ پیشین («فایل خالی است»). */
+function mediaBytes(value) {
+  const buf = bufferOf(value, null);
+  if (!buf || !buf.length) throw require('../middleware/errors').badRequest('فایل خالی است', 'bad_media');
+  return buf;
+}
+
+module.exports = { rawBody, bufferOf, mediaBytes };

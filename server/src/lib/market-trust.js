@@ -23,7 +23,6 @@ const express = require('express');
 const config = require('../config');
 const { one, many, newId, now, tx } = require('../db');
 const chatMedia = require('./chat-media');
-const { bufferOf } = require('./raw-body');
 const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'market.trust';
@@ -403,9 +402,7 @@ const kb = (bytes) => `${Math.round(bytes / 1024)} کیلوبایت`;
 async function putEvidence(store, token, buf) {
   const pre = await caseByToken(store, token);
   if (pre.status !== 'open' && pre.status !== 'in_review') throw conflict('این پرونده دیگر مدرک نمی‌پذیرد', 'case_not_open');
-  //  ⛔ نوع با typeof/Array.isArray (`lib/raw-body.js`)؛ CodeQL `Buffer.isBuffer` را نگهبان نمی‌شناسد (type confusion)
-  const bytes = bufferOf(buf, null);
-  if (!bytes || !bytes.length) throw badRequest('فایل خالی است', 'bad_media');
+  const bytes = require('./raw-body').mediaBytes(buf);   //  ⛔ نوع با typeof/Array.isArray، نه `Buffer.isBuffer` (type confusion)
   const s = chatMedia.sniff(bytes);
   if (!s || s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)');
   if (bytes.length > config.trust.imageMax) throw new ApiError(413, 'too_large', `عکس بزرگ‌تر از ${kb(config.trust.imageMax)} است`);

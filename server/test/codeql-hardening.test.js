@@ -10,7 +10,7 @@
  *  • CR/LF در لاگِ درخواست: `log-redact.test.js`.
  *  • `bearerToken` (‎lib/bearer.js‎): پارسرِ خطی به جای `/^Bearer\s+(.+)$/i` (polynomial ReDoS) — آزمونِ تفاضلی با
  *    regex ِ پیشین، سقفِ طول و زمانِ ورودیِ بدخواه؛ `tokenOf` ِ همگام‌سازی و `bearer` ِ میان‌افزار هم همان.
- *  • `bufferOf` (‎lib/raw-body.js‎) در `putMedia` ِ پشتیبانی (این‌جا)، گفت‌وگو (`shop-chat.test.js`) و
+ *  • `mediaBytes`/`bufferOf` (‎lib/raw-body.js‎) در `putMedia` ِ پشتیبانی (این‌جا)، گفت‌وگو (`shop-chat.test.js`) و
  *    `putEvidence` (`market-trust.test.js`): type confusion.
  *  • `image-pipeline.run`: کارِ مرحله از `Map` ِ بسته (unvalidated dynamic method call).
  *  • `oneLine` (‎lib/log-redact.js‎) در لاگِ «شناسهٔ دستگاهِ ناجور»: `sync-device-bind.test.js` (log injection).
@@ -136,7 +136,7 @@ test('tokenOf ِ همگام‌سازی و bearer ِ میان‌افزار: هم�
 });
 
 //  ── type confusion: بایتِ رسانه ───────────────────────────────────────────
-const { bufferOf } = require('../src/lib/raw-body');
+const { bufferOf, mediaBytes } = require('../src/lib/raw-body');
 
 test('bufferOf: فقط Buffer؛ رشته، آرایه، شیء، null، Uint8Array و بی مقدار ⇒ جایگزین', () => {
   const buf = Buffer.from([1, 2, 3]);
@@ -146,7 +146,10 @@ test('bufferOf: فقط Buffer؛ رشته، آرایه، شیء، null، Uint8Arr
     assert.equal(bufferOf(v, null), null, `${typeof v}`);
     const out = bufferOf(v);
     assert.ok(Buffer.isBuffer(out) && out.length === 0);
+    assert.equal(code(() => mediaBytes(v)), 'bad_media', `${typeof v}`);
   }
+  assert.equal(mediaBytes(buf), buf);
+  assert.equal(code(() => mediaBytes(Buffer.alloc(0))), 'bad_media');
 });
 
 test('⛔ support.putMedia: بایتِ غیرِ Buffer ⇒ ۴۰۰ bad_media پیش از هر نوشتن', async () => {

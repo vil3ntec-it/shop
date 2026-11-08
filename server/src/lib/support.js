@@ -21,7 +21,6 @@ const { notifyPanel } = require('./panel-live');
 const push = require('./push');
 const { ApiError, badRequest, notFound } = require('../middleware/errors');
 const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)
-const { bufferOf } = require('./raw-body');
 
 const MAX_BODY = 4000;
 
@@ -307,9 +306,7 @@ async function post(threadId, { sender = 'user', senderId = '', senderName = '',
 async function putMedia({ threadId, uploader, mime, buf }) {
   const kind = mediaKindOf(mime);
   if (!kind) throw badRequest('فقط عکس، ویدیو و صدا', 'bad_media');
-  //  ⛔ نوع با typeof/Array.isArray (`lib/raw-body.js`)؛ CodeQL `Buffer.isBuffer` را نگهبان نمی‌شناسد (type confusion)
-  const bytes = bufferOf(buf, null);
-  if (!bytes || !bytes.length) throw badRequest('فایل خالی است', 'bad_media');
+  const bytes = require('./raw-body').mediaBytes(buf);   //  ⛔ نوع با typeof/Array.isArray، نه `Buffer.isBuffer` (type confusion)
   if (bytes.length > MAX_MEDIA) throw new ApiError(413, 'too_large', 'فایل بزرگ‌تر از ۲۵ مگابایت است');
   if (uploader !== 'user' && uploader !== 'admin') throw badRequest('فرستنده نامعتبر است');
   const row = await mediaStore.support.put(threadId, bytes, async (st) => (st.used = await one(

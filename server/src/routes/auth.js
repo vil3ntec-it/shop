@@ -709,16 +709,10 @@ const readProfileOf = (p) => async (req, res, next) => {
 };
 
 /*
- *  ── سنجشِ رازِ حساب: فقط سرور «ثابت شد» می‌گوید ───────────────────────
- *  `proveExistingMethod` و `/reauth` هر دو رمز یا کد می‌پذیرند. بدنه فقط می‌گوید
- *  **کدام** راز آمده؛ «ثابت شد» فقط از این دو تابع می‌آید که راز را با دادهٔ خودِ
- *  سرور می‌سنجند (هشِ رمزِ همان حساب / کدِ ثبت‌شدهٔ همان مقصد و هدف)، هر دو پشتِ
- *  قفلِ تلاشِ ناموفقِ ورودِ عادی، و ناموفق ⇒ خطا. هیچ پرچم یا سرآیندی از درخواست
- *  سنجش را جا نمی‌اندازد؛ نبودِ هر دو راز رد است. (CodeQL `js/user-controlled-bypass`
- *  شاخه‌زدن روی «کدام راز آمد» را دورزدن می‌خواند؛ سنجش برای همین این‌جا بی شرطِ بیرونی است.)
+ *  ⛔ رازِ حساب (`proveExistingMethod`، `/reauth`): بدنه فقط می‌گوید **کدام** راز آمده؛ «ثابت شد» فقط از این دو
+ *  تابع (هشِ رمزِ همان حساب / کدِ همان مقصد و `purpose`، پشتِ قفلِ ورود). هیچ پرچم/سرآیندی سنجش را جا نمی‌اندازد؛
+ *  بی راز ⇒ رد. سنجش بی شرطِ بیرونی است (CodeQL `js/user-controlled-bypass`). رمز: حسابِ بی‌رمز همان زمان را می‌سوزاند.
  */
-
-/** رمز با هشِ همان حساب؛ حسابِ بی‌رمز همان زمان را می‌سوزاند و رد می‌شود. */
 async function provePassword(user, password, lockId, ip, { message, clear = false }) {
   await assertNotLocked('user', lockId, ip);
   let ok = false;
@@ -729,7 +723,6 @@ async function provePassword(user, password, lockId, ip, { message, clear = fals
   if (clear) await clearAttempts('user', lockId);
 }
 
-/** کدِ یک‌بارمصرف با ردیفِ ثبت‌شدهٔ همان مقصد و همان هدف (`purpose`). */
 async function proveCode(to, code, ip, { purpose, clear = false }) {
   await assertNotLocked('otp', to, ip);
   try {
@@ -987,24 +980,16 @@ router.post('/reauth', requireAnyUser, sessionLimit, passwordSessionLimit, async
   const ip = clientIp(req);
   const password = typeof req.body?.password === 'string' ? req.body.password : '';
   const code = String(req.body?.code || '').trim();
-  //  قفل و مقصدِ کد از خودِ حساب (`req.user` ِ توکن)، نه از بدنه
-  const lockId = user.email || user.phone || user.id;
-  const to = reauthDestination(user);
-  let method = '';
-  try {
-    if (password) {
-      await provePassword(user, password, lockId, ip, { message: 'رمز درست نیست' });
-      method = 'password';
-    } else if (code) {
-      await proveCode(to, code, ip, { purpose: 'reauth' });
-      method = 'code';
-    }
-  } catch (err) {
-    return next(err);
+  const to = reauthDestination(user);   //  قفل و مقصدِ کد از خودِ حساب (`req.user` ِ توکن)، نه از بدنه
+  let method = '';   //  فقط پس از سنجشِ موفق پر می‌شود؛ خطا با Express 5 به next می‌رسد
+  if (password) {
+    await provePassword(user, password, user.email || user.phone || user.id, ip, { message: 'رمز درست نیست' });
+    method = 'password';
+  } else if (code) {
+    await proveCode(to, code, ip, { purpose: 'reauth' });
+    method = 'code';
   }
-  if (!method) {
-    return next(badRequest('رمز یا کد لازم است', 'reauth_proof_required'));
-  }
+  if (!method) return next(badRequest('رمز یا کد لازم است', 'reauth_proof_required'));
   await reauth.markFresh({ tokenHash: req.tokenRow.token_hash, ip });
   await audit.log({ actorType: 'user', userId: user.id, action: 'auth.reauth', detail: { method }, ip });
   res.json({ ok: true, freshUntil: await reauth.freshUntil(req.tokenRow.token_hash) });
