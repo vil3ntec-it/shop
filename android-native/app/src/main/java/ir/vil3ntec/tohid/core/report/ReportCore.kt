@@ -194,7 +194,8 @@ object ReportCore {
           if (e.qty > 0) {
             val u = if (!e.adjustment || e.unitCost > 0) e.unitCost.toDouble()
             else if (p.q > 0) p.v.toDouble() * 1000.0 / p.q.toDouble() else (p.unit ?: 0.0)
-            put(p, e.qty, rnd(e.qty.toDouble() * u / 1000.0))
+            //  PRD-07: ورودِ خرید به واحدِ خرید ارزشِ دقیقِ خودش را دارد (`costMinor`)، نه مقدار × بهای گردشده
+            put(p, e.qty, if (!e.adjustment && e.value != null && e.value >= 0) e.value else rnd(e.qty.toDouble() * u / 1000.0))
           } else if (e.qty < 0) {
             take(p, -e.qty, p.unit ?: e.unitCost.toDouble())
           }

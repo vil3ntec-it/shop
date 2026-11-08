@@ -42,6 +42,7 @@ import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.core.text.TextNormalizer
+import ir.vil3ntec.tohid.core.product.PurchaseUnits
 import ir.vil3ntec.tohid.data.PoBillDto
 import ir.vil3ntec.tohid.data.PoConfigDto
 import ir.vil3ntec.tohid.data.PoLineDto
@@ -418,7 +419,8 @@ private fun PoDetail(
 
 /* ══════════════════════════ ساختن و ویرایش ══════════════════════════ */
 
-private data class EditRow(val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String)
+/** `unitName`: PRD-07 واحدِ خریدِ ردیف (مقدار و فی به همان واحد)؛ null = واحدِ پایهٔ `unit` */
+private data class EditRow(val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String, val unitName: String? = null)
 
 @Composable
 private fun PoEditor(
@@ -430,13 +432,15 @@ private fun PoEditor(
 ) {
   val c = Shop.colors
   val scope = rememberCoroutineScope()
+  val unitsOn = purchaseUnitsOn()   //  PRD-07
   //  کلیدِ یکتای همین فرم: دو بار زدن یا قطعِ نت همان سفارش است، نه دومی
   val formKey = remember { newId() }
   var supplierId by remember { mutableStateOf(base?.supplierId ?: d.suppliers.firstOrNull()?.id.orEmpty()) }
   var seq by remember { mutableStateOf(base?.lines?.size ?: 0) }
   var rows by remember {
     mutableStateOf(base?.lines.orEmpty().mapIndexed { i, l ->
-      EditRow(i, l.productId, l.name, l.unit, poNum(PurchaseOrderBook.units(l.qtyMilli)), poNum(PurchaseOrderBook.asAfn(l.priceMinor)))
+      EditRow(i, l.productId, l.name, l.unit, poNum(PurchaseOrderBook.units(l.qtyMilli)), poNum(PurchaseOrderBook.asAfn(l.priceMinor)),
+        unitName = if (l.factorMilli != null) l.unit else null)
     })
   }
   var expected by remember { mutableStateOf(base?.expectedDate.orEmpty()) }
@@ -480,7 +484,10 @@ private fun PoEditor(
       val p = r.price.toDoubleOrNull()
       if (q == null || q <= 0) { error = StrPurchasePages.rowBadQty(i + 1); return }
       if (p == null || p < 0) { error = StrPurchasePages.rowBadPrice(i + 1); return }
-      PoLineDto(id = "l${i + 1}", productId = r.productId, name = r.name, unit = r.unit, qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p))
+      //  PRD-07: ردیفِ به واحدِ خرید ⇒ نامِ همان واحد و ضریبش؛ مقدار و فی به همان واحد
+      val pu = if (unitsOn) unitOf(d, r) else null
+      PoLineDto(id = "l${i + 1}", productId = r.productId, name = r.name, unit = pu?.name ?: r.unit, qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p),
+        factorMilli = pu?.factorMilli)
     }
     val check = PurchaseOrderCore.checkOrder(PurchaseOrderCore.Order(supplier.id, PurchaseOrderCore.State.DRAFT,
       lines.map { PurchaseOrderCore.Line(it.id, it.productId, it.qtyMilli, it.priceMinor) }))
@@ -534,10 +541,18 @@ private fun PoEditor(
     rows.forEachIndexed { i, r ->
       Row(Modifier.fillMaxWidth().padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("${i + 1}. ${r.name}", color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(r.unit), Modifier.width(120.dp))
+        NumberField(r.qty, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it } }, StrPurchasePages.qtyIn(r.unitName ?: r.unit), Modifier.width(120.dp))
         NumberField(r.price, { v -> lastKey = r.key; rows = rows.map { if (it.key == r.key) it.copy(price = v) else it } }, StrReturnPages.unitPriceAfn, Modifier.width(120.dp))
         TextButton(onClick = { historyFor = r.productId }) { Text(StrHome.history) }
         TextButton(onClick = { rows = rows.filterNot { it.key == r.key } }) { Text(StrMoney.delete) }
+      }
+      //  PRD-07: واحدِ خریدِ ردیف؛ فی به نسبتِ ضریب جابه‌جا می‌شود (فیِ هر واحدِ پایه همان می‌ماند)
+      val product = if (unitsOn) d.products.find { it.id == r.productId } else null
+      if (product != null && !product.purchaseUnits.isNullOrEmpty()) {
+        val lineTotal = (r.qty.toDoubleOrNull() ?: 0.0) * (r.price.toDoubleOrNull() ?: 0.0)
+        PurchaseUnitPicker(product, r.unitName, r.qty, lineTotal) { u ->
+          rows = rows.map { if (it.key == r.key) rescaled(d, it, u) else it }
+        }
       }
       //  PUR-09: آخرین فیِ همین تأمین‌کننده هنگامِ ورود (همان متنِ فرمِ فاکتورِ خریدِ دستی)
       val last = remember(buys, r.productId, supplierId) { PurchaseOrderBook.lastPriceHint(buys, r.productId, supplierId) ?: PurchaseOrderBook.NO_BUY_YET }
@@ -649,14 +664,20 @@ private fun PoReceive(
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
+  val unitsOn = purchaseUnitsOn()
+  val unitIndex = remember(d) { ShopStore.purchaseUnitIndex(d) }
 
   /** اسکن: یک واحدِ کالای همان بارکد به «رسیده» */
   fun scanned(code: String): Boolean {
-    val pid = index[code.trim()]
-    val line = order.lines.find { it.productId == pid }
+    //  PRD-07: بارکدِ واحدِ خرید (کارتنِ ۲۴) ⇒ ردیفِ همان واحد (+۱)، یا ردیفِ واحدِ دیگرِ همان کالا به نسبتِ ضریب
+    val hit = if (unitsOn) unitIndex.find(code) else null
+    val pid = hit?.productId ?: index[code.trim()]
+    val line = hit?.let { h -> order.lines.find { it.productId == pid && it.factorMilli != null && PurchaseUnits.key(it.unit) == PurchaseUnits.key(h.unit.name) } }
+      ?: order.lines.find { it.productId == pid }
     if (line == null) { toast(StrPurchasePages.notInPo(code)); return true }
     val cur = rows[line.id] ?: RecvRow()
-    val next = (cur.received.toDoubleOrNull() ?: 0.0) + 1.0
+    val step = if (hit == null) 1.0 else hit.unit.factorMilli.toDouble() / (line.factorMilli ?: 1000L).toDouble()
+    val next = (cur.received.toDoubleOrNull() ?: 0.0) + step
     rows = rows + (line.id to cur.copy(received = poNum(next)))
     error = null
     return true
@@ -746,5 +767,20 @@ private fun PoReceive(
 }
 
 /** عدد برای کادرِ ورودی: بی اعشارِ بی‌مورد و با رقمِ لاتین (همان قاعدهٔ کادرهای انبار) */
+/** PRD-07: واحدِ خریدِ ردیف روی کالا، یا null */
+private fun unitOf(d: ShopData, r: EditRow): ir.vil3ntec.tohid.core.product.PurchaseUnits.Item? {
+  val p = d.products.find { it.id == r.productId } ?: return null
+  return ir.vil3ntec.tohid.core.product.PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName)
+}
+
+/** واحدِ ردیف عوض شد ⇒ فی × (ضریبِ تازه ÷ ضریبِ پیشین)، گرد به صدمِ افغانی */
+private fun rescaled(d: ShopData, r: EditRow, unit: String?): EditRow {
+  val from = unitOf(d, r)?.factorMilli ?: 1000L
+  val next = r.copy(unitName = unit)
+  val to = unitOf(d, next)?.factorMilli ?: 1000L
+  val price = r.price.toDoubleOrNull() ?: return next
+  return next.copy(price = poNum(Math.round(price * to / from * 100.0) / 100.0))
+}
+
 private fun poNum(value: Double): String =
   if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()

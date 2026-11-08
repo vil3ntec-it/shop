@@ -168,6 +168,8 @@
       L.entries.push({
         id: str(e.id), productId: str(e.productId), qty: milli(e.units), unitCost: money(e.price),
         adjustment: e.isAdjustment === true, date: str(e.date), createdAt: ms(e.createdAt),
+        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها، همان پیشین (همتای `ReportLedger.Entry.value`)
+        value: Number.isSafeInteger(e.costMinor) ? e.costMinor : null,
       });
     });
     arr(raw.auditLog).forEach(function (a) {
@@ -245,7 +247,7 @@
         if (e.qty > 0) {
           var u = !e.adjustment || e.unitCost > 0 ? e.unitCost
             : (p.q > 0 ? p.v * 1000 / p.q : (p.unit !== null ? p.unit : 0));
-          put(p, e.qty, rnd(e.qty * u / 1000));
+          put(p, e.qty, !e.adjustment && e.value !== null && e.value >= 0 ? e.value : rnd(e.qty * u / 1000));
         } else if (e.qty < 0) {
           take(p, -e.qty, p.unit !== null ? p.unit : e.unitCost);
         }

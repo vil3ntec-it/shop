@@ -217,7 +217,8 @@ object StockLedger {
       if (!w.isAdjustment && q > 0) {
         out += Event(
           id, "entry", "purchase_receipt", at, dayOf(w.date, at), w.productId, loc, q, user, ref,
-          costMinor = max(0L, roundOr0(w.units * w.price * 100.0)),
+          //  PRD-07: خریدِ به واحدِ خرید ارزشِ دقیقِ خودش را دارد (نه مقدار × بهای گردشدهٔ واحدِ پایه)
+          costMinor = max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)),
           landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
         )

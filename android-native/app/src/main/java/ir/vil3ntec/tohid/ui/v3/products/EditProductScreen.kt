@@ -90,6 +90,11 @@ internal fun EditProductScreen(
   //  AI-06: فقط وقتی دستهٔ کالا خالی است دیده می‌شود
   val suggest = rememberCategorySuggest(data)
   val errors = ProductFormModel.errors(row, Mode.EDIT)
+  //  PRD-07: «واحدهای خرید» فقط با `ShopPolicy.productTools` (پیش‌فرض خاموش ⇒ همان فرمِ پیشین و `purchaseUnits = null`)
+  val toolsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
+  val canEditUnits = remember { ir.vil3ntec.tohid.data.ShopRole.canWrite(context, "products") }
+  val unitsInitial = remember(productId) { ir.vil3ntec.tohid.ui.screens.purchaseUnitDrafts(product) }
+  var units by remember(productId) { mutableStateOf(unitsInitial) }
 
   val hooks = FieldHooks(
     onChange = { change -> row = change(row) },
@@ -110,7 +115,8 @@ internal fun EditProductScreen(
     }
     val now = System.currentTimeMillis()
     val base = store.data.value
-    when (val r = WarehouseEngine.editProduct(base, productId, ProductFormModel.draftEdit(row), todayIso(), now, ::newId)) {
+    val draft = ProductFormModel.draftEdit(row).copy(purchaseUnits = if (toolsOn && canEditUnits) units else null)
+    when (val r = WarehouseEngine.editProduct(base, productId, draft, todayIso(), now, ::newId)) {
       is WarehouseEngine.Result.Failed -> { banner = r.message; shake++ }
       is WarehouseEngine.Result.Ok -> {
         banner = null
@@ -133,7 +139,7 @@ internal fun EditProductScreen(
       onPrimary = ::save,
       onBack = nav.back,
       primaryEnabled = !done,
-      dirty = row != initial && !done,
+      dirty = (row != initial || units != unitsInitial) && !done,
     ) {
       V3Collapse(banner != null) {
         V3Message(V3Tone.ERROR, StrProducts.saveFailed, Modifier.padding(top = 12.dp).v3Shake(shake.takeIf { it > 0 }), body = banner.orEmpty())
@@ -146,6 +152,13 @@ internal fun EditProductScreen(
         CollapsibleHeader(StrProducts.groupMore, more) { more = !more }
         V3Collapse(more) {
           V3Section(null, padding = PaddingValues(16.dp)) { MoreFields(row, visible, data.suppliers, hooks) }
+        }
+      }
+      if (toolsOn) {
+        Column(Modifier.fillMaxWidth().padding(top = 8.dp).v3Stagger(stagger, "units", 2)) {
+          V3Section(null, padding = PaddingValues(16.dp)) {
+            ir.vil3ntec.tohid.ui.screens.PurchaseUnitEditor(units, row.unit, data.suppliers, canEditUnits) { units = it }
+          }
         }
       }
       Spacer(Modifier.height(16.dp))

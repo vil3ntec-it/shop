@@ -1208,11 +1208,21 @@ class ShopStore(
      */
     fun codeOwners(d: ShopData): Map<String, String> {
       val main = barcodeIndex(d)
-      if (d.products.none { !it.packs.isNullOrEmpty() }) return main
+      if (d.products.none { !it.packs.isNullOrEmpty() || !it.purchaseUnits.isNullOrEmpty() }) return main
       return buildMap {
+        //  PRD-07: بارکدِ واحدِ خرید هم مالِ همان کالاست (بارکدِ کالا و بسته بر آن جلو می‌افتند)
+        d.products.forEach { p -> p.purchaseUnits.orEmpty().forEach { u -> u.barcode?.let { put(it, p.id) } } }
         d.products.forEach { p -> p.packs.orEmpty().forEach { pk -> pk.barcodes.forEach { put(it, p.id) } } }
         putAll(main)
       }
     }
+
+    /** PRD-07: بارکدِ واحدِ خرید ⇐ کالا و واحد — فقط فرمِ خرید و سفارش آن را می‌خواند (صندوق نه) */
+    fun purchaseUnitIndex(d: ShopData): ir.vil3ntec.tohid.core.product.PurchaseUnits.Index =
+      ir.vil3ntec.tohid.core.product.PurchaseUnits.Index(
+        d.products.mapNotNull { p -> p.purchaseUnits?.takeIf { it.isNotEmpty() }?.let { p.id to it.map(::coreOf) } }
+      )
+
+    fun coreOf(u: PurchaseUnit) = ir.vil3ntec.tohid.core.product.PurchaseUnits.Item(u.name, u.factorMilli, u.supplierId, u.barcode)
   }
 }
