@@ -9,7 +9,7 @@ package ir.vil3ntec.tohid.core.i18n
 object StrRemoteApproval {
   val ask: String get() = t("پرسیدن از مدیر", "Ask a manager", "له مدیر وپوښتئ")
   val askHint: String get() = t(
-    "صاحب یا مدیرِ دکان روی گوشی یا کمپیوترِ خودش تأیید می‌کند؛ دلیل را بالا بنویسید.",
+    "صاحب یا مدیرِ دکان روی دستگاهِ خودش، گوشی یا کمپیوتر، تأیید می‌کند؛ دلیل را بالا بنویسید.",
     "The shop owner or a manager approves on their own phone or computer; write the reason above.",
     "د دوکان خاوند یا مدیر په خپل ټیلیفون یا کمپیوټر تایید کوي؛ لامل پورته ولیکئ.",
   )
