@@ -63,7 +63,7 @@ data class SaleDraft(
     val seller: String? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, it.seller) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, seller = it.seller) }
 
   companion object {
     fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null) = SaleDraft(
