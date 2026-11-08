@@ -187,7 +187,8 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
 // ---------- REST / راهِ قدیم ----------
 
 /**
- * `sync.pushChanges` (درونِ همان تراکنش، پیش از نوشتن): هر فاکتورِ تازه یا فاکتوری که قلمِ تازه گرفت ⇒ همان سنجش با
+ * `sync.pushChanges` (درونِ همان تراکنش، پیش از نوشتن): هر فاکتورِ تازه، فاکتوری که قلمِ تازه گرفت، یا سرِ نشسته‌ای که دوباره
+ * آمد (فقط آنچه از نیازِ پیشینِ همان سند بیشتر شد) ⇒ همان سنجش با
  * ردیف‌ها و کالاهای جدول‌های قدیم. ⇒ null، یا خطای ۴۰۳ (کلِ دسته برمی‌گردد). REST برگه نمی‌برد؛ تأییدِ پیشینِ همان
  * سند (`shop_approvals`، مثلاً از Sync v3) اگر بپوشاند بس است.
  */
@@ -207,19 +208,25 @@ async function judgeLegacy(c, ctx, changes) {
   const oldHeads = await known('sales', heads.map((h) => h.id));
   const oldItems = await known('sale_items', items.map((i) => i.id));
   const freshItems = items.filter((i) => !oldItems.has(i.id));
-  const sids = new Set([...heads.filter((h) => !oldHeads.has(h.id)).map((h) => h.id), ...freshItems.map((i) => str(i.data.saleId)).filter(Boolean)]);
+  //  فاکتورِ تازه، فاکتوری که قلمِ تازه گرفت، و سرِ نشسته‌ای که دوباره فرستاده شد (راهِ قدیم کلِ ردیف را جایگزین می‌کند:
+  //  تخفیف بالاتر یا «جمعِ نهایی» پایین‌تر ⇒ همان سنجش؛ فقط آنچه از نیازِ پیشینِ همان سند بیشتر شد)
+  const sids = new Set([...heads.map((h) => h.id), ...freshItems.map((i) => str(i.data.saleId)).filter(Boolean)]);
   if (!sids.size) return null;
   const layers = await require('./staff-perms').layersFor(shopId, role, userId, run);
   const core = require('./perm-core');
   const { forbidden } = require('../middleware/errors');
+  const sumAfn = (vs) => vs.reduce((a, v) => a + Math.max(0, Math.round(Number(v) * 100) || 0), 0);
   for (const sid of sids) {
     const given = heads.find((h) => h.id === sid);
-    const head = given ? given.data : (await c.query('SELECT data FROM sales WHERE shop_id=$1 AND id=$2 AND deleted = false', [shopId, sid])).rows[0]?.data;
+    const stored = given && !oldHeads.has(sid) ? null
+      : (await c.query('SELECT data FROM sales WHERE shop_id=$1 AND id=$2 AND deleted = false', [shopId, sid])).rows[0]?.data;
+    const head = given ? given.data : stored;
     if (!isObj(head)) continue;
     const m = new Map();
     for (const r of (await c.query(
       `SELECT id, data FROM sale_items WHERE shop_id=$1 AND deleted = false AND data->>'saleId' = $2`, [shopId, sid]
     )).rows) m.set(r.id, r.data);
+    const before = [...m.values()].filter(isObj).map((f) => caps.lineOf(f, { legacy: true }));
     for (const i of items) if (str(i.data.saleId) === sid) m.set(i.id, i.data);
     const list = [...m.values()].filter(isObj).map((f) => caps.lineOf(f, { legacy: true }));
     const ids = [...new Set(list.map((l) => l.productId).filter(Boolean))];
@@ -229,14 +236,19 @@ async function judgeLegacy(c, ctx, changes) {
         'SELECT id, data FROM products WHERE shop_id=$1 AND deleted = false AND id = ANY($2::text[])', [shopId, ids]
       )).rows) refs.set(r.id, caps.refOf(r.data, { legacy: true }));
     }
-    //  امتیازِ مصرف‌شدهٔ همین فاکتور: ردیفِ همین دسته، وگرنه دفترِ نشسته (افغانی ⇒ Minor)
+    //  امتیازِ مصرف‌شدهٔ همین فاکتور (افغانی ⇒ Minor): ردیفِ همین دسته؛ دفترِ نشسته فقط برای سندی که پیش‌تر نشسته بود
+    const kept = isObj(stored) ? sumAfn((await c.query(
+      `SELECT data->>'amount' AS amount FROM shop_audit_log WHERE shop_id=$1 AND deleted = false AND data->>'refId' = $2 AND data->>'type' = $3`,
+      [shopId, sid, caps.LOYALTY_SPEND])).rows.map((r) => r.amount)) : 0;
     const mine = spends.filter((a) => a.data.refId === sid);
-    const loyaltyAfn = mine.length || (given && !oldHeads.has(sid)) ? mine.map((a) => a.data.amount)
-      : (await c.query(`SELECT data->>'amount' AS amount FROM shop_audit_log WHERE shop_id=$1 AND deleted = false AND data->>'refId' = $2 AND data->>'type' = $3`,
-        [shopId, sid, caps.LOYALTY_SPEND])).rows.map((r) => r.amount);
-    const loyaltyMinor = loyaltyAfn.reduce((a, v) => a + Math.max(0, Math.round(Number(v) * 100) || 0), 0);
+    const loyaltyMinor = mine.length ? sumAfn(mine.map((a) => a.data.amount)) : kept;
     const needs = caps.needs(caps.saleOf(sid, head, { legacy: true, loyaltyMinor }), list, refs, { enforcePrice: true });
+    //  نیازِ همان سند پیش از این دسته (سر و قلم‌های نشسته): آنچه بیش از آن نیست ویرایشِ بی‌پول است، آزاد
+    const prior = isObj(stored) ? caps.needs(caps.saleOf(sid, stored, { legacy: true, loyaltyMinor: kept }), before, refs, { enforcePrice: true }) : [];
+    const covered = (n) => prior.some((b) => b.perm === n.perm
+      && (n.pctBp === null || (b.pctBp !== null && b.pctBp >= n.pctBp)) && (n.amount === null || (b.amount !== null && b.amount >= n.amount)));
     for (const n of needs) {
+      if (covered(n)) continue;
       const d = core.evaluate(role, layers, n.perm, caps.req(n));
       if (d.decision === 'allow') continue;
       if (d.decision === 'deny') {

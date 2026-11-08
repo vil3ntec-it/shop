@@ -94,7 +94,8 @@ test.after(async () => { await h.stop(); });
 test('پرچمِ خاموش (پیش‌فرض): درها ۴۰۳ جز /config، و op با ارجاع همان «برگهٔ نادرست» ِ امروز', async () => {
   const cfg = await h.get(`${BASE}/config`, { token: staff.accessToken });
   assert.equal(cfg.status, 200);
-  assert.deepEqual(cfg.body, { enabled: false, approver: false, ttlMs: 600000 });
+  //  STF-03 (`claude/credit-cap-2`): `v3` = سرور Sync v3 دارد — برنامه دکمهٔ کارِ فقط-v3 را بی آن نشان نمی‌دهد
+  assert.deepEqual(cfg.body, { enabled: false, approver: false, ttlMs: 600000, v3: true });
   assert.equal((await h.get(`${BASE}/config`, { token: manager.accessToken })).body.approver, true);
   const r = await ask(staff, { perm: 'sales.discount', doc: 'sales/s-off', pctBp: 2000, amount: 2000 });
   assert.equal(r.status, 403);
@@ -313,6 +314,8 @@ test('سرورِ بی Sync v3: کارِ پیش‌فرض‌ممنوعِ شاگر�
   const config = require('../src/config');
   config.syncV3.enabled = false;
   try {
+    //  برنامه همین را از `/config` می‌خواند و دکمه را پنهان می‌کند (`RemoteApproval.offered`)
+    assert.equal((await h.get(`${BASE}/config`, { token: staff.accessToken })).body.v3, false);
     const r = await ask(staff, { perm: 'sales.discount', doc: 'sales/s-nov3', pctBp: 2000, amount: 2000 });
     assert.equal(r.status, 409, JSON.stringify(r.body));
     assert.equal(r.body.error.code, 'approval_needs_v3');

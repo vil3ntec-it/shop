@@ -37,7 +37,10 @@ async function needFlag(req, res, next) {
 }
 
 router.get('/config', async (req, res) => {
-  res.json({ enabled: await ar.enabled(req.shopId), approver: ar.APPROVER_ROLES.includes(req.role), ttlMs: ar.TTL_DEFAULT_MS });
+  //  `v3`: این سرور Sync v3 دارد — بی آن، کاری که پیش‌فرضِ نقش برایش «ممنوع» است `approval_needs_v3` می‌گیرد و برنامه دکمه را
+  //  نشان نمی‌دهد (`RemoteApproval.offered`)
+  res.json({ enabled: await ar.enabled(req.shopId), approver: ar.APPROVER_ROLES.includes(req.role), ttlMs: ar.TTL_DEFAULT_MS,
+    v3: Boolean(require('../config').syncV3.enabled) });
 });
 
 router.post('/', needFlag, async (req, res) => {

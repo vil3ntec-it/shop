@@ -54,8 +54,8 @@ object RemoteApproval {
     }
   }
 
-  /** پاسخِ `GET /config` */
-  data class Config(val enabled: Boolean, val approver: Boolean, val ttlMs: Long = TTL_DEFAULT_MS)
+  /** پاسخِ `GET /config`؛ [v3] = سرور Sync v3 دارد (سرورِ کهنهٔ بی این کلید ⇒ همان امروز، درست) */
+  data class Config(val enabled: Boolean, val approver: Boolean, val ttlMs: Long = TTL_DEFAULT_MS, val v3: Boolean = true)
 
   data class Request(
     val id: String,
@@ -75,9 +75,22 @@ object RemoteApproval {
     val note: String = "",
   )
 
-  /** «پرسیدن از مدیر» دیده شود؟ */
-  fun offered(cfg: Config?, decision: String, perm: String): Boolean =
-    cfg?.enabled == true && decision == "approve" && perm in PERMS
+  /**
+   *  تأییدِ این کار برای این نقش فقط از Sync v3 می‌نشیند؟ پیش‌فرضِ نقش برای این کار «ممنوع» است (تخفیف و لغوِ شاگرد و
+   *  صندوق‌دار): v1 ِ مشترک با پمپ خودش نقش را می‌سنجد (`staff-approval.v1Guard` ⇒ `approval_needs_v3`) و سرورِ بی Sync v3
+   *  همان دمِ پرسیدن ۴۰۹ `approval_needs_v3` می‌دهد. برگشت، قرض و تغییرِ قیمت (پیش‌فرضِ «مجاز») از v1 هم می‌نشینند.
+   */
+  fun needsV3(role: String, perm: String): Boolean = PermCore.defaultMode(role, perm) == "deny"
+
+  /**
+   *  «پرسیدن از مدیر» دیده شود؟ [v3Only] = [needsV3] برای همین نقش؛ آن‌گاه فقط وقتی همین دستگاه ([deviceV3]) و سرور
+   *  ([Config.v3]) هر دو Sync v3 دارند — وگرنه مدیر بیهوده تأیید می‌کرد و فاکتور باز رد می‌شد (PIN ِ همین دستگاه همان امروز).
+   */
+  fun offered(cfg: Config?, decision: String, perm: String, v3Only: Boolean = false, deviceV3: Boolean = true): Boolean =
+    cfg?.enabled == true && decision == "approve" && perm in PERMS && lands(cfg, v3Only, deviceV3)
+
+  /** تأییدِ از راهِ دور این‌جا می‌نشیند؟ کارِ فقط-v3 فقط با دستگاه و سرورِ Sync v3؛ بقیه همیشه */
+  fun lands(cfg: Config?, v3Only: Boolean, deviceV3: Boolean): Boolean = !v3Only || (deviceV3 && cfg?.v3 != false)
 
   /** کلیدِ بی‌خطرِ تکرار (۲۴ نویسه) — یک بار برای هر «پرسیدن»، همان کلید برای فرستادنِ دوباره */
   fun newKey(rnd: Random = Random.Default): String = "k" + (1..23).map { KEY_CHARS[rnd.nextInt(KEY_CHARS.length)] }.joinToString("")
@@ -128,6 +141,7 @@ object RemoteApproval {
     enabled = m?.get("enabled") == true,
     approver = m?.get("approver") == true,
     ttlMs = long(m?.get("ttlMs"))?.takeIf { it > 0 } ?: TTL_DEFAULT_MS,
+    v3 = m?.get("v3") != false,
   )
 
   /** حالِ دیده‌شده با ساعتِ دستگاه (فقط نمایش؛ مرجع سرور است) */
@@ -179,7 +193,7 @@ object RemoteApproval {
   fun waitOfError(code: String): Wait? = when (code) {
     "request_expired", "approval_expired" -> Wait.EXPIRED
     "request_not_found", "approval_requests_disabled", "approval_not_needed", "bad_perm", "request_invalid", "bad_value",
-    "bad_reason", "bad_time", "request_key_reused", "too_many_pending", "request_closed", "discount_not_allowed",
+    "bad_reason", "bad_time", "request_key_reused", "too_many_pending", "request_closed", "discount_not_allowed", "approval_needs_v3",
     "cancel_not_allowed", "return_not_allowed", "credit_not_allowed", "price_not_allowed", "perm_denied" -> Wait.FAILED
     else -> null
   }

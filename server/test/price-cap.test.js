@@ -239,7 +239,22 @@ test('پرچمِ روشن، REST/راهِ قدیم: کاهشِ قیمتِ ردی
   assert.equal(up.body.error.code, 'approval_required');
   const ok = await post('pc-r-ok', 1000);
   assert.ok([200, 201].includes(ok.status), JSON.stringify(ok.body));
+  //  راهِ قدیم کلِ ردیف را جایگزین می‌کند: سرِ نشسته با «جمعِ نهایی» ِ کمتر ⇒ تخفیفِ پنهان؛ همان ردیفِ بی‌تغییر آزاد
+  const head = { total: 1000, discount: 0, finalTotal: 1000, status: 'completed', date: '2026-11-08' };
+  const same = await h.put('/api/sales/pc-r-ok', { ...head, note: 'یادداشت', updatedAt: Date.now() + 1000 }, { token: staff.accessToken });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+  const cut = await h.put('/api/sales/pc-r-ok', { ...head, finalTotal: 700, updatedAt: Date.now() + 2000 }, { token: staff.accessToken });
+  assert.equal(cut.status, 403, JSON.stringify(cut.body));
+  assert.equal(cut.body.error.code, 'discount_not_allowed');
+  assert.equal((await one(`SELECT data FROM sales WHERE shop_id=$1 AND id='pc-r-ok'`, [shopId])).data.finalTotal, 1000);
   assert.equal((await setRole('staff', {})).status, 200);
+});
+
+test('«پرسیدن از مدیر»: /config می‌گوید سرور Sync v3 دارد (برنامه دکمهٔ کارِ فقط-v3 را بی آن نشان نمی‌دهد)', async () => {
+  const r = await h.get('/api/shop/approval-requests/config', { token: staff.accessToken });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.v3, true);
+  assert.equal(r.body.enabled, true);
 });
 
 test('پرچمِ یک دکان دکانِ دیگر را نمی‌گیرد', async () => {

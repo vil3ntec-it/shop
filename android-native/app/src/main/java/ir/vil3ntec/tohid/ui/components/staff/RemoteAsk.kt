@@ -42,6 +42,10 @@ class RemoteAsk internal constructor(
   private val now: () -> Long = System::currentTimeMillis,
   /** انتظارِ میانِ دو پرسش (آزمون‌ها بی ساعتِ واقعی) */
   private val sleep: suspend (Long) -> Unit = { delay(it) },
+  /** تأییدِ این کار برای این نقش فقط از Sync v3 می‌نشیند (`RemoteApproval.needsV3`) */
+  private val v3Only: Boolean = false,
+  /** همین دستگاه با Sync v3 همگام می‌شود (`SyncChoice.isV3`) */
+  private val deviceV3: Boolean = true,
 ) {
   var config by mutableStateOf<RemoteApproval.Config?>(null)
     private set
@@ -60,7 +64,8 @@ class RemoteAsk internal constructor(
   /** «پس گرفتن» یا بستنِ برگه ⇒ حلقهٔ [run] در نخستین فرصت می‌ایستد */
   @Volatile private var stopped = false
 
-  val offered: Boolean get() = repo != null && shopId.isNotBlank() && RemoteApproval.offered(config, decision, need.perm)
+  val offered: Boolean get() = repo != null && shopId.isNotBlank() && RemoteApproval.offered(config, decision, need.perm) &&
+    RemoteApproval.lands(config, v3Only, deviceV3)
   /** [run] در کار است (دکمه ⇒ «پس گرفتن»)؛ پس از ایست، حتی «بی اینترنت»، دکمهٔ «دوباره بپرس» برمی‌گردد */
   var active by mutableStateOf(false)
     private set
@@ -68,6 +73,8 @@ class RemoteAsk internal constructor(
   /** یک بار هنگامِ باز شدن؛ خطا یا خاموش ⇒ [offered] نه */
   suspend fun load() {
     if (repo == null || decision != "approve" || need.perm !in RemoteApproval.PERMS) return
+    //  دستگاهِ v1 و کارِ فقط-v3 ⇒ نه پرسیدنِ سرور، نه دکمه
+    if (v3Only && !deviceV3) return
     config = (repo.config() as? ApiResult.Success)?.value
   }
 
@@ -181,7 +188,9 @@ class RemoteAsk internal constructor(
         need.amount?.let { put("amount", it.toDouble()) }
       }
       val decision = runCatching { ShopRole.decide(context, need.perm, req.ifEmpty { null }).decision }.getOrDefault("deny")
-      return RemoteAsk(if (ready) ApprovalRequestsRepository(Backend.api(context)) else null, need, shopId, decision)
+      val v3Only = runCatching { RemoteApproval.needsV3(ShopRole.current(context), need.perm) }.getOrDefault(true)
+      val deviceV3 = runCatching { ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(context) }.getOrDefault(false)
+      return RemoteAsk(if (ready) ApprovalRequestsRepository(Backend.api(context)) else null, need, shopId, decision, v3Only = v3Only, deviceV3 = deviceV3)
     }
   }
 }
