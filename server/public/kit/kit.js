@@ -167,10 +167,12 @@
     if (t) headers['X-Store-Ticket'] = t.ticket;
     if (K.sess()) headers['X-Store-Session'] = K.sess().token;
     if (opts.key) headers['Idempotency-Key'] = opts.key;
-    return fetch(url, {
+    var pre = V.pre && V.pre[url]; // WEB-15: همان درخواستِ boot.js
+    if (pre) delete V.pre[url];
+    return (pre && !opts.method && pre.h === JSON.stringify(headers) ? pre.r : fetch(url, {
       method: opts.method || 'GET', headers: headers, body: opts.body ? JSON.stringify(opts.body) : undefined,
       credentials: 'omit', cache: 'no-store',
-    }).then(function (res) {
+    })).then(function (res) {
       return res.json().catch(function () { return {}; }).then(function (body) {
         if (res.ok) return body;
         var e = (body && body.error) || {};

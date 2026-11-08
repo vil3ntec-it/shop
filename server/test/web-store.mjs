@@ -593,7 +593,7 @@ for (const lang of ['fa', 'en']) {
 }
 
 //  ── WEB-15 (۳.۱۰): کلِ بارِ اول ≤ ۵۰۰KB و CLS ≤ ۰٫۱ — قطعی و بی وابستگی به سرعتِ ماشینِ CI.
-//  (LCP/INP و امتیازِ Lighthouse این‌جا سنجیده نمی‌شوند: روی ماشینِ مشترکِ CI ناپایدارند.)
+//  (LCP/INP زیرِ شبکه و پردازندهٔ کند، با میانه و پیمانهٔ پردازنده: `web-store-vitals.mjs`؛ Lighthouse ِ اختیاری: `bench/lighthouse-store.mjs`.)
 {
   const wc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
   const wp = await wc.newPage();
