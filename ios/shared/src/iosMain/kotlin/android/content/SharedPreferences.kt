@@ -1,5 +1,7 @@
 package android.content
 
+import ir.vil3ntec.tohid.ios.prefs.PrefTypes
+import kotlinx.cinterop.toKString
 import platform.Foundation.NSNumber
 import platform.Foundation.NSUserDefaults
 
@@ -42,7 +44,14 @@ interface SharedPreferences {
   }
 }
 
-internal class UserDefaultsPreferences(name: String) : SharedPreferences {
+/**
+ *  @param declared نوعِ اعلام‌شدهٔ هر کلید (`b`، `s`، `i`، `l`، `f`، `set`) یا `null` — پیش‌فرض: تنظیم‌های دکان
+ *    (`ShopSettingsKeys`)؛ فقط [all] از آن می‌خواند (‎commonMain/…/ios/prefs/PrefTypes.kt‎)
+ */
+internal class UserDefaultsPreferences(
+  name: String,
+  private val declared: (String) -> String? = { key -> declaredType(name, key) },
+) : SharedPreferences {
   private val defaults = NSUserDefaults(suiteName = suite(name))
   private val listeners = ArrayList<SharedPreferences.OnSharedPreferenceChangeListener>()
 
@@ -54,9 +63,21 @@ internal class UserDefaultsPreferences(name: String) : SharedPreferences {
   override fun getFloat(key: String, defValue: Float): Float = if (contains(key)) defaults.floatForKey(key) else defValue
   override fun getBoolean(key: String, defValue: Boolean): Boolean = if (contains(key)) defaults.boolForKey(key) else defValue
   override fun contains(key: String): Boolean = defaults.objectForKey(key) != null
+  /**
+   *  ⛔ DATA-SAFETY: همان نوع‌های `getAll()` ِ اندروید (`Boolean`، `Int`، `Long`، `Float`، `String`، `Set<String>`) — نه
+   *  متنِ هر عدد (`stringValue` ِ پیشین). شرح و آزمون: ‎commonMain/…/ios/prefs/PrefTypes.kt‎، `PrefTypesJvmTest`،
+   *  `DataSafetyIosTest`. (کلیدهای دامنهٔ سراسریِ سیستم که NSUserDefaults کنارِ suite می‌دهد مثلِ پیش می‌آیند؛ کدِ مشترک
+   *  فقط کلیدهای خودش را می‌خواند.)
+   */
   override val all: Map<String, *>
-    get() =
-    defaults.dictionaryRepresentation().entries.associate { (k, v) -> k.toString() to (if (v is NSNumber) v.stringValue else v) }
+    get() = defaults.dictionaryRepresentation().entries.associate { (k, v) ->
+      val key = k.toString()
+      val type = declared(key)
+      val value: Any? =
+        if (v is NSNumber) PrefTypes.number(v.objCType?.toKString(), type, v.longLongValue, v.doubleValue, v.boolValue)
+        else PrefTypes.typed(v, type)
+      key to value
+    }
 
   override fun registerOnSharedPreferenceChangeListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
     listeners += listener
@@ -99,5 +120,12 @@ internal class UserDefaultsPreferences(name: String) : SharedPreferences {
 
   companion object {
     fun suite(name: String) = "tohid.prefs.$name"
+
+    /** نوعِ اعلام‌شدهٔ تنظیم‌های دکان (`tohid-policy`، `tohid-receipt`، `tohid-modules`) — Int و Long را از هم جدا می‌کند */
+    private val shopTypes: Map<String, String> by lazy {
+      ir.vil3ntec.tohid.data.ShopSettingsKeys.KEYS.associate { it.id to it.type }
+    }
+
+    fun declaredType(store: String, key: String): String? = shopTypes["$store/$key"]
   }
 }

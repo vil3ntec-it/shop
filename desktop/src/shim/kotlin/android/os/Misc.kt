@@ -8,6 +8,9 @@ class Bundle
 class CancellationSignal { fun cancel() {} }
 
 class Looper private constructor() {
+  /** رشتهٔ صفحه = رشتهٔ رویدادِ AWT (Compose Desktop) — `ShadowStore.onMainThread` */
+  val isCurrentThread: Boolean get() = javax.swing.SwingUtilities.isEventDispatchThread()
+
   companion object {
     private val main = Looper()
     fun getMainLooper(): Looper = main

@@ -59,6 +59,14 @@ class OwnerExportTest {
     stockMovements = listOf(StockMovement("m1", "p1", "purchase_in", 100.0, "2026-08-02", "", "pu1", 1_700_000_000_000)),
     priceHistory = listOf(PriceChange("ph1", "p1", 290.0, 300.0, "2026-08-03", 1_700_000_000_000)),
     auditLog = listOf(AuditEntry("a1", "shift_open", "2026-08-28", null, "صندوق", 1_700_000_000_000, 1000.0)),
+    //  سندِ ردشده‌ای که صاحب کنار گذاشت (`ShopData.setAside`) — برگهٔ خودش، با همهٔ ردیف‌ها
+    setAside = listOf(
+      SetAsideDoc(
+        "cf_1", "dismissed", note = "مشتری نخواست", reason = "approval_required", table = "sales", rowId = "s9", saleId = "s9",
+        resolvedAt = 1_700_000_000_000, settledAt = 1_700_000_001_000,
+        rows = Json.parseToJsonElement("""{"sales":[{"id":"s9","finalTotal":1200}]}""").jsonObject,
+      ),
+    ),
   )
 
   private val archive = LedgerArchive.Archive(

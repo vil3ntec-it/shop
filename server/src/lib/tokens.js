@@ -246,13 +246,14 @@ async function revoke(token, kind) {
  * `app = null` یعنی «هر بخشی» و جای درستش عوض شدنِ رمز و بازیابی
  * است: آن‌جا خودِ **هویت** عوض شده، نه یک نشست.
  */
-async function revokeAllForSubject(subjectId, kind = null, app = null) {
+async function revokeAllForSubject(subjectId, kind = null, app = null, { client = null } = {}) {
   const args = [now(), subjectId];
   let sql = 'UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL';
   if (kind) { args.push(kind); sql += ` AND kind=$${args.length}`; }
   if (app) { args.push(app); sql += ` AND COALESCE(app,'shop')=$${args.length}`; }
-  const r = await query(sql, args);
-  await liveRecheck(subjectId);
+  //  `client` ⇒ درونِ تراکنشِ صدازننده (همراهِ باطل کردنِ رازِ دستگاه)؛ سنجشِ دوبارهٔ سوکت پس از COMMIT با خودِ او
+  const r = client ? await client.query(sql, args) : await query(sql, args);
+  if (!client) await liveRecheck(subjectId);
   return r.rowCount;
 }
 
@@ -295,6 +296,6 @@ function safeEqual(a, b) {
 module.exports = {
   COURIER_SCOPE, scopeFor,
   rotateRefresh, markRotated, revokeFamily, findRefresh, GRACE_MS,
-  generateToken, hashToken, issue, verify, revoke, ownerOf,
+  generateToken, hashToken, issue, verify, revoke, ownerOf, liveRecheck,
   revokeAllForSubject, revokeOthersForSubject, revokeAllForDevice, safeEqual,
 };

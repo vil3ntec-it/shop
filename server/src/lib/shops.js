@@ -6,7 +6,7 @@
  * سرور خودش از روی کاربرِ توکن، عضویت او را پیدا می‌کند. به همین دلیل
  * کسی نمی‌تواند با فرستادن shop_id دیگری به اطلاعات دکان دیگر برسد.
  */
-const { query, one, many, tx, newId, now } = require('../db');
+const { one, many, tx, newId, now } = require('../db');
 const { forbidden, notFound, conflict, badRequest } = require('../middleware/errors');
 const { can } = require('./permissions');
 
@@ -146,7 +146,10 @@ async function findMember(shopId, idOrUserId) {
   );
 }
 
-async function updateMember(shopId, memberId, patch) {
+/**
+ * @param {{by?: string, ip?: string}} [actor] چه کسی (برای سابقهٔ باطل شدنِ رازِ دستگاه)
+ */
+async function updateMember(shopId, memberId, patch, { by = '', ip = '' } = {}) {
   const m = await findMember(shopId, memberId);
   if (!m) throw notFound('این عضو در دکان شما نیست', 'member_not_found');
   memberId = m.id;
@@ -156,14 +159,25 @@ async function updateMember(shopId, memberId, patch) {
   const status = patch.status && ['active', 'suspended', 'removed'].includes(patch.status)
     ? patch.status : m.status;
 
-  const row = await one(
-    'UPDATE shop_members SET role=$3, status=$4, updated_at=$5 WHERE id=$1 AND shop_id=$2 RETURNING *',
-    [memberId, shopId, role, status, now()]
-  );
-  // با حذف یا تعلیق، نشست‌های آن شخص همان لحظه باطل می‌شوند
+  const deviceKeys = require('./staff-device-keys');
+  //  ⛔ با حذف یا تعلیق، نشست‌های آن شخص و رازهای دستگاهش در همین دکان در **همان تراکنش** باطل می‌شوند: پس از
+  //  برگشتن (یا دوباره فعال شدن) دستگاهش فقط با کدِ تازهٔ صاحب برمی‌گردد. فروش و سابقه‌اش دست نمی‌خورد.
+  const { row, keys } = await tx(async (c) => {
+    const updated = (await c.query(
+      'UPDATE shop_members SET role=$3, status=$4, updated_at=$5 WHERE id=$1 AND shop_id=$2 RETURNING *',
+      [memberId, shopId, role, status, now()]
+    )).rows[0];
+    if (status === 'active') return { row: updated, keys: deviceKeys.NONE };
+    await c.query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL', [now(), m.user_id]);
+    return {
+      row: updated,
+      keys: await deviceKeys.revokeIn(c, {
+        shopId, userIds: [m.user_id], reason: status === 'suspended' ? 'member_suspended' : 'member_removed', by, ip,
+      }),
+    };
+  });
+  await keys.afterCommit();
   if (status !== 'active') {
-    await query('UPDATE tokens SET revoked_at=$1 WHERE subject_id=$2 AND revoked_at IS NULL',
-      [now(), m.user_id]);
     //  O-01: گوشیِ او دیگر هیچ پوشی از این دکان نمی‌گیرد (کالا تمام شد، سفارشِ تازه…) — توکن کهنه با دلیل
     await require('./push').revokeMember(shopId, m.user_id, status === 'suspended' ? 'member_suspended' : 'member_removed');
   }

@@ -26,11 +26,15 @@
   var cal = typeof module !== 'undefined' && module.exports ? require('./calendar-core.js')
     : (typeof window !== 'undefined' ? window.TohidCalendar : globalThis.TohidCalendar);
   if (!cal || typeof cal.businessDateAt !== 'function') throw new Error('report-core: calendar-core.js (TohidCalendar) must load first');
-  var api = factory(cal);
+  //  میانگینِ موزون (RPT-03، PRD-15) با همان هستهٔ موجودی (`stock-core.js` = `core/stock/StockCore`)؛ در مرورگر پیش از این فایل
+  var stock = typeof module !== 'undefined' && module.exports ? require('./stock-core.js')
+    : (typeof window !== 'undefined' ? window.TohidStockCore : globalThis.TohidStockCore);
+  if (!stock || typeof stock.apply !== 'function') throw new Error('report-core: stock-core.js (TohidStockCore) must load first');
+  var api = factory(cal, stock);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') window.TohidReportCore = api;
   else if (typeof globalThis !== 'undefined') globalThis.TohidReportCore = api;
-})(function (cal) {
+})(function (cal, stock) {
   'use strict';
 
   var VERSION = 1;
@@ -107,6 +111,13 @@
 
   /* ---------------- دفتر ⇐ شکلِ عددِ صحیح ---------------- */
 
+  function landedOf(e) {
+    var m = e.landedCostMinor;
+    if (typeof m === 'number' && Math.floor(m) === m && m >= 0 && m <= 9007199254740991) return m;
+    var x = money(e.landedCost);
+    return x > 0 ? x : 0;
+  }
+
   function ledger(raw) {
     if (raw && raw.__reportLedger === VERSION) return raw;
     raw = raw || {};
@@ -167,7 +178,11 @@
     arr(raw.warehouseEntries).forEach(function (e) {
       L.entries.push({
         id: str(e.id), productId: str(e.productId), qty: milli(e.units), unitCost: money(e.price),
+        //  هزینهٔ جانبیِ کلِ ردیف (PUR-06): `landedCostMinor` ِ دقیق، وگرنه `landedCost` ِ افغانی؛ منفی یا نادرست ⇒ ۰
+        landed: landedOf(e),
         adjustment: e.isAdjustment === true, date: str(e.date), createdAt: ms(e.createdAt),
+        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها، همان پیشین (همتای `ReportLedger.Entry.value`)
+        value: Number.isSafeInteger(e.costMinor) ? e.costMinor : null,
       });
     });
     arr(raw.auditLog).forEach(function (a) {
@@ -181,31 +196,35 @@
     return L;
   }
 
-  /* ---------------- بهای تمام‌شده (RPT-03) ---------------- */
+  /* ---------------- بهای تمام‌شده (RPT-03، PRD-15) ---------------- */
 
-  /**
-   * بهای هر قلمِ فروش و هر برگشتی، به واحدِ کوچک.
-   *  • 'line' — همان امروز: `purchasePrice`ِ ثبت‌شده روی قلم × مقدار.
-   *  • 'mavg' — میانگینِ موزونِ متحرک: ورودهای انبار (`warehouseEntries`)،
-   *    فروش‌ها و برگشتی‌ها به ترتیبِ زمان بازپخش می‌شوند؛ هر فروش به میانگینِ
-   *    همان لحظه از «انبارهٔ ارزش» برمی‌دارد و برگشتی به بهای همان قلم
-   *    برمی‌گردد. پیش از نخستین ورود، بهای ثبت‌شده روی قلم جایگزین است.
-   *  `est[itemId]` = بهای این قلم معلوم نیست یا تخمینی است: بهای ثبت‌شدهٔ صفر، یا
-   *  در 'mavg' فروشِ بیش از موجودیِ بازپخش‌شده (بخشِ ۱۵.۴ بند ۴ v3).
-   *  `approved` = تصمیمِ D-23 ثبت شده و همین روش، روشِ مصوب است. تا آن روز (BLOCKERS.md)
-   *  سود همیشه «تقریبی» است؛ 'line' (کپیِ قیمتِ خرید) هرگز سودِ قطعی نمی‌دهد.
+  /*
+   * میانگینِ موزونِ متحرک (D-23، الف) با **همان** هستهٔ موجودی (`stock-core.js`، حالتِ `recorded`)، یک جایگاه برای
+   * هر کالا (انتقال بینِ محل‌ها اثری ندارد). ترتیب: (زمان، ورود < فروش < برگشت، شناسه). ورودِ عادی `purchase_receipt`
+   * (+ هزینهٔ جانبی)، اصلاحِ مثبت به قیمتش یا میانگینِ همان لحظه، ورودِ منفی `count_adjust`؛ فروش `sale` (کمبود ⇒ تخمینی؛
+   * بی هیچ بهای معلوم ⇒ آن بخش به `purchasePrice` ِ قلم)؛ برگشتی `customer_return` به همان بهایی که رفت؛ لغوشده بیرون؛
+   * شمارشِ مثبتِ کالای بی‌بها ⇒ پایهٔ نامعلوم تا تمام شدنِ موجودی. سندِ ردشده نادیده؛ فروشِ ردشده به بهای قلم و تخمینی.
+   * شرحِ کامل: `docs/RULES-fa.md` «v3 · گزارش»؛ دوقلو: `ReportCore.mavg`؛ بردار: `core/test-vectors/cost-v1.json`.
    */
-  function costsOf(L, mode, approved) {
-    var line = {}, ret = {}, est = {};
+  var STOCK_WH = 'main', STOCK_USER = 'report', REC = { mode: 'recorded' };
+
+  /** round(a × b ÷ c) ِ هستهٔ موجودی؛ عددِ نا‌امن (بیرون از ۲^۵۳) ⇒ null، نه خطا (Kotlin: `mdr`) */
+  function mdr(a, b, c) {
+    try { return stock.mulDivRound(a, b, c); } catch (e) { if (e instanceof RangeError) return null; throw e; }
+  }
+
+  function mavgReplay(L) {
+    var line = {}, ret = {}, est = {}, books = {}, unknown = {};
     function lineMode(it) { if (it.unitCost === 0) est[it.id] = true; return rnd(it.unitCost * it.qty / 1000); }
-    if (mode !== 'mavg') {
-      L.items.forEach(function (it) { line[it.id] = lineMode(it); });
-      L.returns.forEach(function (r) {
-        var it = L.itemById[r.saleItemId];
-        ret[r.id] = it ? rnd(it.unitCost * r.qty / 1000) : 0;
-      });
-      return { mode: 'line', approved: false, line: line, ret: ret, est: est };
+    function step(pid, doc) {
+      var r;
+      try { r = stock.apply(books[pid] || stock.emptyBook(), doc, REC); } catch (e) { if (e instanceof RangeError) return null; throw e; }
+      if (r.result.ok) books[pid] = r.book;
+      return r.result.ok ? r.result : null;
     }
+    function posOf(pid) { return books[pid] ? stock.position(books[pid], pid, STOCK_WH) : null; }
+    function doc(t, type, pid, id, q) { return { id: id, type: type, productId: pid, warehouseId: STOCK_WH, userId: STOCK_USER, at: t > 0 ? t : 1, qtyMilli: q }; }
+    function afterOut(pid) { var p = posOf(pid); if (p && p.qtyMilli <= 0) delete unknown[pid]; }
     var ev = [];
     L.entries.forEach(function (e) { ev.push({ t: timeOf(e), k: 0, id: e.id, e: e }); });
     L.sales.forEach(function (s) {
@@ -214,56 +233,92 @@
     });
     L.returns.forEach(function (r) {
       var s = L.saleById[r.saleId];
-      if (s && s.cancelled) return;
-      ev.push({ t: timeOf(r), k: 2, id: r.id, r: r });
+      if (!(s && s.cancelled)) ev.push({ t: timeOf(r), k: 2, id: r.id, r: r });
     });
     ev.sort(function (a, b) { return (a.t - b.t) || (a.k - b.k) || cmp(a.id, b.id); });
-    var pools = {};
-    function pool(pid) { return pools[pid] || (pools[pid] = { q: 0, v: 0, unit: null }); }
-    var short = false;
-    function take(p, q, fallbackUnit) {
-      var cost;
-      short = false;
-      if (p.q > 0 && q <= p.q) cost = rnd(p.v * q / p.q);
-      else {
-        short = true;
-        var avail = p.q > 0 ? p.q : 0;
-        var unit = p.unit !== null ? p.unit : fallbackUnit;
-        cost = (avail > 0 ? p.v : 0) + rnd((q - avail) * unit / 1000);
-      }
-      p.q -= q; p.v -= cost;
-      return cost;
-    }
-    function put(p, q, value) {
-      if (p.q < 0) { p.q += q; p.v = rnd(p.q * value / q); p.unit = value * 1000 / q; return; }
-      p.q += q; p.v += value;
-      if (p.q > 0) p.unit = p.v * 1000 / p.q;
-    }
     ev.forEach(function (x) {
+      var d, p, res;
       if (x.k === 0) {
-        var e = x.e, p = pool(e.productId);
-        if (e.qty > 0) {
-          var u = !e.adjustment || e.unitCost > 0 ? e.unitCost
-            : (p.q > 0 ? p.v * 1000 / p.q : (p.unit !== null ? p.unit : 0));
-          put(p, e.qty, rnd(e.qty * u / 1000));
-        } else if (e.qty < 0) {
-          take(p, -e.qty, p.unit !== null ? p.unit : e.unitCost);
-        }
+        var e = x.e;
+        if (e.productId === '' || e.qty === 0) return;
+        d = doc(x.t, e.adjustment || e.qty < 0 ? 'count_adjust' : 'purchase_receipt', e.productId, 'e:' + e.id, e.qty);
+        if (d.type === 'count_adjust') d.reason = 'adjustment';
+        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0) && (d.costMinor = !e.adjustment && e.value !== null && e.value >= 0 ? e.value : mdr(e.qty, e.unitCost, 1000)) === null) return;
+        if (d.type === 'purchase_receipt' && e.landed > 0) d.landedMinor = e.landed;
+        p = posOf(e.productId);
+        var blind = e.qty > 0 && d.costMinor === undefined && !(p && (p.qtyMilli > 0 || p.lastCost));
+        if (!step(e.productId, d)) return;
+        if (blind) unknown[e.productId] = true;
+        if (e.qty < 0) afterOut(e.productId);
       } else if (x.k === 1) {
         var it = x.it;
-        if (it.productId === '' || it.qty <= 0) line[it.id] = lineMode(it);
-        else { line[it.id] = take(pool(it.productId), it.qty, it.unitCost); if (short) est[it.id] = true; }
+        if (it.productId === '' || it.qty <= 0) { line[it.id] = lineMode(it); return; }
+        var wasUnknown = unknown[it.productId] === true;
+        res = step(it.productId, doc(x.t, 'sale', it.productId, 's:' + it.id, it.qty));
+        if (!res) { line[it.id] = lineMode(it); est[it.id] = true; return; }
+        var cost = res.costMinor, task = res.reviewTask;
+        var guess = res.shortMilli > 0 && task && task.reasons.indexOf('unknown_cost') >= 0 && it.unitCost > 0 ? mdr(res.shortMilli, it.unitCost, 1000) : null;
+        if (guess !== null && mdr(cost + guess, 1, 1) !== null) cost += guess;
+        if (res.shortMilli > 0 || wasUnknown) est[it.id] = true;
+        line[it.id] = cost;
+        afterOut(it.productId);
       } else {
         var r = x.r, item = L.itemById[r.saleItemId];
         if (!item || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0; return; }
-        //  برگشتیِ پیش از فروشش (ساعتِ دستگاهِ عقب، دادهٔ کهنه): بهای قلم هنوز معلوم نیست ⇒ بهای ثبت‌شده، مثلِ 'line'
-        var c = line[item.id] === undefined ? rnd(item.unitCost * r.qty / 1000) : rnd(line[item.id] * r.qty / item.qty);
-        ret[r.id] = c;
-        if (item.productId !== '') put(pool(item.productId), r.qty, c);
+        var c = mdr(line[item.id] !== undefined ? line[item.id] : rnd(item.unitCost * item.qty / 1000), r.qty, item.qty);
+        ret[r.id] = c === null ? 0 : c;
+        if (item.productId === '' || c === null || c < 0) return;
+        d = doc(x.t, 'customer_return', item.productId, 'r:' + r.id, r.qty);
+        d.costMinor = c;
+        step(item.productId, d);
       }
     });
     L.items.forEach(function (it) { if (line[it.id] === undefined) line[it.id] = lineMode(it); });
-    return { mode: 'mavg', approved: approved === true, line: line, ret: ret, est: est };
+    return { line: line, ret: ret, est: est, books: books, unknown: unknown };
+  }
+
+  /**
+   * بهای هر قلم و برگشتی (واحدِ کوچک): 'line' = `purchasePrice` ِ قلم × مقدار (همیشه «تقریبی»)، 'mavg' = بالا.
+   * `est[itemId]` = بها نامعلوم یا تخمینی؛ `approved` = همین روش مصوبِ D-23 است (`CostPolicy`)؛ 'line' هرگز قطعی نیست.
+   */
+  function costsOf(L, mode, approved) {
+    if (mode === 'mavg') {
+      var m = mavgReplay(L);
+      return { mode: 'mavg', approved: approved === true, line: m.line, ret: m.ret, est: m.est };
+    }
+    var line = {}, ret = {}, est = {};
+    L.items.forEach(function (it) { if (it.unitCost === 0) est[it.id] = true; line[it.id] = rnd(it.unitCost * it.qty / 1000); });
+    L.returns.forEach(function (r) {
+      var it = L.itemById[r.saleItemId];
+      ret[r.id] = it ? rnd(it.unitCost * r.qty / 1000) : 0;
+    });
+    return { mode: 'line', approved: false, line: line, ret: ret, est: est };
+  }
+
+  /**
+   * PRD-15 — بهای میانگینِ هر کالا و ارزشِ موجودیِ همین حالا از همان بازپخش (فقط خواندنی). `unitCostMinor` = بهای یک
+   * واحد (موجودیِ صفر/منفی ⇒ آخرین بهای معلوم؛ هیچ ⇒ null)؛ `approximate` = موجودیِ صفر/منفی یا پایهٔ نامعلوم؛ جمع فقط
+   * کالاهای مثبت (`negative` = شمارِ منفی‌ها). `opts.products` فقط همان کالاها.
+   */
+  function stockCost(raw, opts) {
+    opts = opts || {};
+    var L = ledger(raw), m = mavgReplay(L);
+    var want = null;
+    if (arr(opts.products).length) { want = {}; arr(opts.products).forEach(function (id) { want[str(id)] = true; }); }
+    var rows = [], value = 0, negative = 0, approx = false;
+    Object.keys(m.books).sort(cmp).forEach(function (pid) {
+      if (want && !want[pid]) return;
+      var p = stock.position(m.books[pid], pid, STOCK_WH);
+      if (!p) return;
+      var unit = p.qtyMilli > 0 ? mdr(p.valueMinor, 1000, p.qtyMilli)
+        : (p.lastCost ? mdr(p.lastCost.num, 1000, p.lastCost.den) : null);
+      var a = p.qtyMilli <= 0 || m.unknown[pid] === true;
+      var prod = L.products[pid];
+      rows.push({ productId: pid, name: prod ? prod.name : '', qtyMilli: p.qtyMilli, valueMinor: p.valueMinor, unitCostMinor: unit, approximate: a });
+      if (p.qtyMilli > 0) { value += p.valueMinor; if (a) approx = true; }
+      else if (p.qtyMilli < 0) negative += 1;
+    });
+    return { rows: rows, totals: { products: rows.length, valueMinor: value, negative: negative, approximate: approx } };
   }
 
   /* ---------------- تخصیصِ تخفیفِ فاکتور ---------------- */
@@ -727,6 +782,7 @@
     fixedClock: fixedClock,
     allocate: allocate,
     costs: costsOf,
+    stockCost: stockCost,
     today: today,
     sales: sales,
     debts: debts,

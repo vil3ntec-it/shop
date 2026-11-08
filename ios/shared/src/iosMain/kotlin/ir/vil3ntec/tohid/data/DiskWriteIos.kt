@@ -33,15 +33,18 @@ object DiskWrite {
   fun bytes(target: File, data: ByteArray) = stream(target) { it.write(data) }
 
   /** همان `DiskWrite.bytes(target, data, keepPrevious)` ِ اندروید: نسخهٔ پیشین با `link(2)` به `<نام>.prev` */
-  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) {
-    if (!keepPrevious) return bytes(target, data)
+  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) = stream(target, keepPrevious) { it.write(data) }
+
+  /** همان `DiskWrite.stream(target, keepPrevious, write)` ِ اندروید (PERF-LEDGER، `LedgerText`) */
+  fun stream(target: File, keepPrevious: Boolean, write: (OutputStream) -> Unit) {
+    if (!keepPrevious) return stream(target, write)
     stream(target, before = {
       if (target.isFile) {
         val prev = previousOf(target)
         unlink(prev.path)
         link(target.path, prev.path)
       }
-    }) { it.write(data) }
+    }, write = write)
   }
 
   fun previousOf(target: File): File = File(target.absoluteFile.parentFile, target.name + ".prev")

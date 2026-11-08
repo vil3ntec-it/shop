@@ -67,7 +67,8 @@ object AuditModel {
     return when (type) {
       "sale", "cancel_sale", "return" -> sale()
       "price_change", "product_edit" -> product()
-      "customer_payment", "credit_over_limit", "credit_limit_set", "debt_tx_delete" -> debtor()
+      //  CRM-15: «دیدنِ پروندهٔ مشتری» ⇐ همان پرونده (خروجیِ همهٔ مشتریان `*` ⇐ هیچ)
+      "customer_payment", "credit_over_limit", "credit_limit_set", "debt_tx_delete", "customer_view" -> debtor()
       "debt_due_set" -> d.transactions.firstOrNull { it.id == ref }?.let { debtor(it.debtorId) }
       "purchase" -> d.purchases.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }
       "supplier_payment" -> d.supplierPayments.firstOrNull { it.id == ref }?.let { supplier(it.supplierId) }

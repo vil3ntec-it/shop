@@ -99,7 +99,7 @@ class SyncV1Engine private constructor(context: Context) {
    */
   private fun keyOf(): String = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scopedKey(
     app,
-    SyncStateV1.currentAccount(app)
+    V1Replica.account(app, store)
       .ifBlank { store.accountName }
       .ifBlank { store.deviceUid },
   )
@@ -323,6 +323,7 @@ class SyncV1Engine private constructor(context: Context) {
     //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
     //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
     val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
+    runCatching { fence(ledger) }
     if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
       state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
@@ -330,13 +331,15 @@ class SyncV1Engine private constructor(context: Context) {
     if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
 
+  internal fun fence(ledger: ShopData) =  // DATA-06: حالِ دستگاهِ دیگر؟ هنگامِ باز شدن و پس از هر ورود (زیرِ قفلِ همین موتور)
+    V1Replica.fence(this, app, store, state, ledger, queue.size()) { commit.record(it) }
+
   /* ==========================================================
      ۱) هر تغییرِ دفتر ⇒ op
      ========================================================== */
 
   /**
-   *  تنها درِ ساختنِ op. `ShopStore.save()` این را صدا می‌زند و هیچ
-   *  نوشتنِ دیگری در دفتر نیست.
+   *  تنها درِ ساختنِ op. `ShopStore.save()` این را صدا می‌زند و هیچ نوشتنِ دیگری در دفتر نیست.
    *
    *  @return چند op ساخته شد
    */
@@ -352,8 +355,7 @@ class SyncV1Engine private constructor(context: Context) {
      *  موجود کارِ `baseline()` است و فقط یک بار.
      *
      *  ⛔ صف و سایه با هم (F0-05): اگر میانِ این دو بسته شود، ذخیرهٔ بعدی
-     *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد.
-     *  شرح سرِ `SyncCommit`.
+     *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد. شرح سرِ `SyncCommit`.
      */
     val made = try {
       commit.record(data)
@@ -405,8 +407,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  دفترِ امروز را یک‌جا به سرور می‌دهد — فقط برای دستگاهِ نخست.
    *
    *  ⚠️ تنها جایی است که «کلِ دفتر» می‌رود و عمدی است: حسابی که تازه
-   *  ساخته شده روی سرور هیچ ردیفی ندارد. دستگاهِ دوم همین را از
-   *  `snapshot` می‌گیرد، نه از این راه.
+   *  ساخته شده روی سرور هیچ ردیفی ندارد. دستگاهِ دوم همین را از `snapshot` می‌گیرد، نه از این راه.
    */
   fun baseline(data: ShopData): Int {
     val made = commit.baseline(data)
@@ -485,9 +486,9 @@ class SyncV1Engine private constructor(context: Context) {
           }
         }
 
-        //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
+        //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست (DATA-06: حالِ دستگاهِ دیگر ⇒ نه تا «بازسازی از سرور»، `V1Replica.fence`)
         var rounds = 0
-        while (!state.restorePending && rounds < 50) {
+        while (!state.restorePending && !state.restoredRebuild && rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
@@ -676,7 +677,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  آیا این حساب روی این دستگاه هرگز با سرور هم‌تراز شده؟ اگر شده، بازیابی بی سرور ممکن نیست:
    *  ردیفی که در پشتیبان هست و سرور ندارد شاید حذف‌شده باشد و `prepare` زنده‌اش می‌کرد.
    */
-  fun everSynced(): Boolean = state.cursor > 0 || state.reconciledAt > 0 || state.snapshotAt > 0
+  fun everSynced(): Boolean = state.reconciledAt > 0 || state.snapshotAt > 0 || state.cursor > 0
 
   /** اثرِ سایهٔ همین حالا — برای `SyncRebuild.atLoad` */
   fun shadowSha(): String = SyncRebuild.sha(state.shadow)
@@ -721,9 +722,9 @@ class SyncV1Engine private constructor(context: Context) {
    *  ──────────────────────────────────────────────────────────────────
    */
   suspend fun prepare(read: () -> ShopData, write: (ShopData) -> Unit) {
-    if (state.reconciledAt > 0 || state.recoverArchive) return
+    if (state.reconciledAt > 0 || state.recoverArchive || state.restoredRebuild) return
     gate.withLock {
-      if (state.reconciledAt > 0) return@withLock
+      if (state.reconciledAt > 0 || state.restoredRebuild) return@withLock
       val body = SyncV1Client(Backend.api(app)).snapshot()
       val server = LedgerDiff.fromSnapshot(body, JsonObject(emptyMap()))
       val serverCursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
@@ -734,8 +735,7 @@ class SyncV1Engine private constructor(context: Context) {
         if (localRows == 0) {
           val next = LedgerDiff.fromSnapshot(body, local)
           write(LedgerDiff.fromJson(next))
-          writeShadow(next)
-          state.cursor = serverCursor
+          writeShadow(next, serverCursor)
           state.snapshotAt = clock()
         } else {
           val missing = LedgerDiff.diff(server, local).filter { it.type == SyncOp.INSERT }
@@ -744,8 +744,7 @@ class SyncV1Engine private constructor(context: Context) {
             val next = LedgerDiff.unionRows(local, server)
             write(LedgerDiff.fromJson(next))
             val shadow = readShadow()
-            writeShadow(if (shadow != null) LedgerDiff.unionRows(shadow, server) else next)
-            state.cursor = serverCursor
+            writeShadow(if (shadow != null) LedgerDiff.unionRows(shadow, server) else next, serverCursor)
           }
         }
         state.reconciledAt = clock()
@@ -814,9 +813,7 @@ class SyncV1Engine private constructor(context: Context) {
     restore.pulled(epoch)
     val next = LedgerDiff.fromSnapshot(body, LedgerDiff.toJson(read()))
     write(LedgerDiff.fromJson(next))
-    writeShadow(next)
-    state.cursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
-      ?.content?.toLongOrNull() ?: 0L
+    writeShadow(next, (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toLongOrNull() ?: 0L)
     state.snapshotAt = clock()
     state.lastOkAt = clock()
     state.lastError = ""
@@ -842,8 +839,7 @@ class SyncV1Engine private constructor(context: Context) {
     /*
      *  ⚠️ **اول فرستادن، بعد گرفتن** — و این ترتیب عمدی است. اگر اول
      *  pull می‌کردیم، سایه روی «دفترِ ادغام‌شده» می‌نشست و ردیف‌های
-     *  محلی — که سرور آن‌ها را ندارد — دیگر «تغییر» شمرده نمی‌شدند و
-     *  هیچ‌وقت نمی‌رفتند.
+     *  محلی — که سرور آن‌ها را ندارد — دیگر «تغییر» شمرده نمی‌شدند و هیچ‌وقت نمی‌رفتند.
      */
     baseline(data)
     runOnce(read, write)
@@ -874,7 +870,7 @@ class SyncV1Engine private constructor(context: Context) {
       ),
       queued = queued,
       dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
-      cursor = state.cursor,
+      cursor = state.cursorSeen,  // PERF-LEDGER: نوار فایلِ سایه را نمی‌خواند (رشتهٔ صفحه)
       lastOkAt = state.lastOkAt,
       //  §۹.۵: هشدارِ «دفترچه همهٔ پنجره را نداشت» — نوشته، ولی چراغ را قرمز نمی‌کند
       //  صفِ بزرگ (`OpBacklog.WARN_AT`): «X تغییر هنوز به سرور نرسیده» — همان‌جا، بی قرمز کردنِ چراغ
@@ -920,6 +916,8 @@ class SyncV1Engine private constructor(context: Context) {
 
   fun queueSize(): Int = queue.size()
   fun droppedOps(): List<JsonObject> = queue.dropped()
+  /** «کنار بگذار»/«اصلاح و ثبت» ِ صاحب روی همین دفتر (`data/SetAside`؛ شرح سرِ `SetAsideCommit`) */
+  internal fun setAside(decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>, read: () -> ShopData, write: (ShopData) -> Unit): Int = locked { SetAsideCommit.run(commit, { queue.all().mapTo(HashSet()) { "${it.table}/${it.rowId}" } }, decisions, book, read, write, clock()) }
   fun errorReports(): Boolean = state.errorReports
   fun setErrorReports(on: Boolean) { state.errorReports = on }
   fun deviceId(): String = V1Replica.id(this, app, store, state)  // `device_id` ِ همین حساب روی همین دستگاه (V1ReplicaAndroid)
@@ -934,11 +932,10 @@ class SyncV1Engine private constructor(context: Context) {
    *  سایهٔ Snapshot (`prepare`، `restoreFromServer`) — ⛔ A00: از درِ مدلِ همین ساخت
    *  (`LedgerDiff.modelTree`)، مثلِ `SyncV3Engine.shape`. ردیفِ خامِ سرور کلیدهایی دارد که
    *  دفترِ این ساخت نمی‌تواند نگه دارد؛ اگر در سایه می‌ماندند، پس از به‌روزرسانی به ساختی
-   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد.
+   *  که آن‌ها را می‌شناسد نخستین ذخیرهٔ بی‌ربط همه را `null` می‌فرستاد. سایه و cursor با هم (یک نوشتن، F0-05).
    */
-  private fun writeShadow(tree: JsonObject) {
-    state.shadow = LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString()
-  }
+  private fun writeShadow(tree: JsonObject, cursor: Long) =
+    state.commitShadowOrThrow(LedgerDiff.shadowOf(LedgerDiff.modelTree(tree)).toString(), cursor)
 
   companion object {
     const val MIN_BACKOFF_MS = 2_000L
@@ -954,6 +951,7 @@ class SyncV1Engine private constructor(context: Context) {
         "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     @Volatile private var instance: SyncV1Engine? = null
+    fun peek(): SyncV1Engine? = instance  // ساخته شده؟ (`rememberSyncV1Status`: ساختن بیرون از رشتهٔ صفحه)
 
     fun of(context: Context): SyncV1Engine =
       instance ?: synchronized(this) {

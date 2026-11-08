@@ -43,7 +43,9 @@ await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const origin = `http://127.0.0.1:${server.address().port}`;
 
 /** مجموعه‌هایی که فقط برنامه‌های نصبی دارند و دفترِ وب نگه نمی‌دارد */
-const APP_ONLY = ['safeEntries'];
+//  گاوصندوق (PAY-18) و «سندهای کنارگذاشته» (`ShopData.setAside` ِ #1008: سندِ ردشده‌ای که صاحب کنار گذاشت، فقط روی
+//  دستگاهِ سازندهٔ برنامهٔ نصبی) فقط در برنامه‌های نصبی‌اند؛ دفترِ وب آن‌ها را ندارد
+const APP_ONLY = ['safeEntries', 'setAside'];
 
 const LEDGER = {
   debtors: [{ id: 'd1', name: 'احمد آزمون', phone: '0700123456', notes: 'a < b & c', createdAt: 1700000000000 }],

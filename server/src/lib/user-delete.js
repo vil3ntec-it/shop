@@ -142,6 +142,7 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
   const accounts = [userId, ...tenants];
 
   const counts = {};
+  const afterCommit = [];
   await tx(async (c) => {
     const q = async (label, sql, params) => {
       const r = await c.query(sql, params);
@@ -159,6 +160,14 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
       uids.add(raw);
       uids.add(raw.replace(/[^A-Za-z0-9_.-]/g, '-').slice(0, 64));   //  همان پاک‌سازیِ موتورِ v3ِ برنامه
     }
+
+    //  ⛔ رازهای دستگاهِ خودِ این حساب (شاگردِ دکانِ دیگران) و شاگردهای دکان‌های رفته — باطل، با سابقه، در همین
+    //  تراکنش؛ ردیف‌ها پس از آن با CASCADE می‌روند. سابقهٔ دکانِ دیگر می‌ماند (صاحبش می‌بیند چرا)
+    const keys = await require('./staff-device-keys').revokeIn(c, {
+      userIds: [userId], shopIds, reason: 'account_deleted', actorType: 'system',
+    });
+    counts.staff_device_keys = keys.revoked;
+    afterCommit.push(keys.afterCommit);
 
     //  ۱) ردیف‌های بی‌کلیدِ خارجی که به همین حساب یا پمپ/دکان‌هایش اشاره دارند
     const devIds = (await c.query(
@@ -224,6 +233,7 @@ async function remove(userId, { confirm = '', confirmEmail = '' } = {}) {
     await q('users', 'DELETE FROM users WHERE id=$1', [userId]);
   });
 
+  for (const fn of afterCommit) await fn();
   //  ⛔ S78: پس از تراکنش — سوکت‌های زندهٔ خودش و همهٔ دستگاه‌های دکان‌ها/پمپ‌های رفته همان لحظه بسته
   const live = require('./sync-v1-live');
   await live.accessChanged({ userId });

@@ -26,6 +26,8 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/data/Models.kt",
   //  `ShopData.safeEntries` (#364): مدلِ گاوصندوق در پروندهٔ جدای خودش است
   "ir/vil3ntec/tohid/data/SafeEntry.kt",
+  //  `ShopData.setAside`: سندِ ردشدهٔ کنارگذاشته (کاتلینِ خالص)
+  "ir/vil3ntec/tohid/data/SetAsideDoc.kt",
   //  مدل‌های خالصی که `Models.kt` به آن‌ها اشاره می‌کند: کیت، قیمتِ زمان‌بندی‌شده، تنوع، سفارشِ ویژه
   "ir/vil3ntec/tohid/data/ModelParts.kt",
   //  CRM-09: `Debtor.deliveryAddress` — نشانیِ تحویل در پروندهٔ جدای خودش (کاتلینِ خالص)

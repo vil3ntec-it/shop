@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ (و همان استثنای SEC-01 در `TohidBackupAgent`) -->
+<!-- همان قاعده، برای اندرویدِ پیش از ۱۲ (و همان استثنای SEC-01 در `TohidBackupAgent`)؛ `tohid-sync-v1`: DATA-06، شرح در `backup_rules.xml` -->
 <full-backup-content>
   <include domain="file" path="." />
   <include domain="sharedpref" path="." />
@@ -8,4 +8,6 @@
   <exclude domain="sharedpref" path="tohid-session-secure.xml" />
   <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
   <exclude domain="sharedpref" path="tohid-doc-series.xml" />
+  <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+  <exclude domain="file" path="sync-shadow" />
 </full-backup-content>

@@ -65,7 +65,8 @@ object ReceiptModel {
         detail = if (stamped) SaleReceipt.detail(item, bare, true, PhoneSaleText::amount, ::unitMoney, ::qty)
         else "${qty(item.quantity)}$unit × ${PhoneSaleText.amount(item.unitPrice)}",
         total = PhoneSaleText.amount(item.totalPrice),
-        note = item.returnedQty.takeIf { it > 0 }?.let { StrSale.returned(qty(it) + unit) },
+        //  POS-18: «قیمتِ خاص» کنارِ «برگشت»؛ بی منبع ⇒ همان
+        note = ir.vil3ntec.tohid.data.CustomerPriceCart.noteWith(item, item.returnedQty.takeIf { it > 0 }?.let { StrSale.returned(qty(it) + unit) }),
       )
     }
   }

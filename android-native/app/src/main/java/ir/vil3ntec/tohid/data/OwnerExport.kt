@@ -100,6 +100,7 @@ object OwnerExport {
     "priceHistory" to "سابقهٔ قیمت‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "auditLog" to "سابقهٔ عملیات",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "safeEntries" to "گاوصندوق",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "setAside" to "سندهای کنارگذاشته",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
   )
 
   /** فیلد ⇐ سرستونِ فارسی */
@@ -119,6 +120,7 @@ object OwnerExport {
     "cardCode" to "کارت مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
     "deliveryAddress" to "نشانی تحویل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "specialPrices" to "قیمت‌های خاص مشتری",  // داده: POS-18، همان `license/owner-export.js`
     "notes" to "یادداشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "createdAt" to "زمان ثبت (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "date" to "تاریخ",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
@@ -178,6 +180,11 @@ object OwnerExport {
     "consumptionDays" to "چرخهٔ مصرف (روز)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، MKT-06
     "brand" to "برند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "packs" to "بسته‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "purchaseUnits" to "واحدهای خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "costMinor" to "ارزش دقیق کالا (صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitName" to "واحد خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitQtyMilli" to "مقدار به واحد خرید (هزارم)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitFactorMilli" to "ضریب واحد خرید (هزارم)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
     "cartons" to "تعداد کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "perCarton" to "تعداد در هر کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "units" to "تعداد واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
@@ -243,6 +250,7 @@ object OwnerExport {
     "returnedQty" to "تعداد برگشتی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "listPriceMinor" to "قیمت فهرست (یک‌صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "promo" to "تخفیف‌های خودکار قلم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "priceSource" to "منبع قیمت",  // داده: POS-18 («special» = قیمتِ خاصِ مشتری)، همان `license/owner-export.js`
     "reason" to "دلیل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  برگشت و تعویض (RET، فقط با تنظیمِ روشن)
     "docId" to "سند برگشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
@@ -269,6 +277,9 @@ object OwnerExport {
     "toLocationId" to "محلِ مقصد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "userId" to "کاربر",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "lotId" to "سری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    //  INV-10 — ردیفِ «انبارگردانی»: لحظهٔ شمردنِ کالا و دانستهٔ شمارنده (افزودنی)
+    "countedAt" to "لحظهٔ شمارش (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "seenMilli" to "دانستهٔ شمارنده (هزارم)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  PUR-10 — زمانِ تأمینِ دستیِ تأمین‌کننده (افزودنی)
     "leadDays" to "زمان تأمین (روز)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  `adjKind` و `by` بالاتر (RET/PAY) آمده‌اند — کلیدِ تکراری در `mapOf` برچسبِ آن‌ها را عوض می‌کرد
@@ -282,6 +293,21 @@ object OwnerExport {
     "drawer" to "کشو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  انتقالِ موجودیِ سرور (INV-11): گامِ ارسال/دریافت/رد روی ردیفِ `stock_transfer`
     "xfer" to "گامِ انتقالِ موجودی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    //  سندِ ردشده‌ای که صاحب کنار گذاشت/اصلاح کرد (`ShopData.setAside`، فقط دستگاهِ سازنده)
+    "table" to "جدولِ سند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "rowId" to "شناسهٔ ردیفِ سند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "fixedDoc" to "فاکتورِ اصلاح",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "resolvedAt" to "زمانِ تصمیم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "settledAt" to "زمانِ کنار گذاشتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "ops" to "تغییرهای ردشده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "rows" to "ردیف‌های کنارگذاشته",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "undo" to "برگرداندن‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "kept" to "برگردانده‌نشده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    //  سابقهٔ دسترسی (CRM-15): بیننده، نقش، دستگاه و نوعِ دیدن روی ردیفِ `customer_view` (نامِ بیننده همان «کاربر»)
+    "viewer" to "شناسهٔ بیننده",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "role" to "نقش",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "device" to "دستگاه",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "view" to "نوعِ دیدن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
   )
 
   /** کلیدهای سرآیند — داده نیستند و برگه نمی‌شوند */

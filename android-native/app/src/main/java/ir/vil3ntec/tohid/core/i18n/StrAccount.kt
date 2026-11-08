@@ -281,6 +281,51 @@ object StrAccount {
   val deviceEnabled: String get() = t("دستگاه برگشت؛ کارمند باید دوباره وارد شود", "Device re-enabled; the staff member must sign in again", "وسیله بیرته فعاله شوه؛ کارکوونکی باید بیا ننوځي")
   val memberMissing: String get() = t("این کارمند پیدا نشد", "This staff member wasn't found", "دا کارکوونکی ونه موندل شو")
 
+  // دستگاه‌های شناختهٔ ورود با کد (رازِ دستگاه، `GET /api/shop/staff-keys`)
+  val deviceKeysTitle: String get() = t("دستگاه‌های ورود با کد", "Code sign-in devices", "د کوډ ننوتلو وسایل")
+  val deviceKeysHelper: String get() = t(
+    "این دستگاه‌ها با کدِ شاگرد بی کدِ تازه برمی‌گردند. باطل کردن نشست‌های همان دستگاه را هم می‌بندد؛ فروش و سابقه می‌ماند.",
+    "These devices can sign back in with the staff code without a new code. Revoking also closes that device's sessions; sales and history stay.",
+    "دا وسایل د شاګرد په کوډ پرته له نوي کوډه بېرته ننوځي. باطلول د همدې وسیلې ناستې هم بندوي؛ پلورونه او تاریخچه پاتې کېږي.",
+  )
+  fun deviceKeyMeta(id: Any, used: Any, created: Any): String = t(
+    "${asIs(id)} · آخرین استفاده: ${asIs(used)} · ساخته: ${asIs(created)}",
+    "$id · Last used: $used · Added: $created",
+    "$id · وروستۍ کارونه: $used · جوړ شو: $created",
+  )
+  val notUsedYet: String get() = t("هنوز نه", "Not yet", "لا نه")
+  val revokeDeviceKey: String get() = t("باطل کردنِ این دستگاه", "Revoke this device", "دا وسیله باطلول")
+  val revokeDeviceKeyBody: String get() = t(
+    "این دستگاه دیگر با کدِ شاگرد برنمی‌گردد و نشست‌هایش همین حالا بسته می‌شود. برای برگشت کدِ تازه بدهید؛ آن هم حسابِ تازه می‌سازد. فروش و سابقهٔ کارمند می‌ماند.",
+    "This device can no longer sign back in with the staff code and its sessions close now. To return, give a new code; it creates a new account. The member's sales and history stay.",
+    "دا وسیله نور د شاګرد په کوډ بېرته نه ننوځي او ناستې یې همدا اوس بندېږي. د بېرته راتګ لپاره نوی کوډ ورکړئ؛ هغه نوی حساب جوړوي. د کارکوونکي پلورونه او تاریخچه پاتې کېږي.",
+  )
+  val revokeDeviceKeyConfirm: String get() = t("باطل کن", "Revoke", "باطل یې کړه")
+  val deviceKeyRevoked: String get() = t("دستگاه باطل شد", "Device revoked", "وسیله باطله شوه")
+  val logoutEverywhere: String get() = t("خروج از همهٔ دستگاه‌ها", "Sign out of all devices", "له ټولو وسایلو وتل")
+  fun logoutEverywhereTitle(name: Any): String = t("خروجِ ${asIs(name)} از همهٔ دستگاه‌ها؟", "Sign $name out of all devices?", "$name له ټولو وسایلو وباسئ؟")
+  val logoutEverywhereBody: String get() = t(
+    "همهٔ نشست‌های این کارمند بسته و دستگاه‌هایش باطل می‌شوند؛ برای برگشت کدِ تازه لازم است. فروش و سابقه‌اش می‌ماند.",
+    "All of this member's sessions close and their devices are revoked; a new code is needed to return. Their sales and history stay.",
+    "د دې کارکوونکي ټولې ناستې بندېږي او وسایل یې باطلېږي؛ د بېرته راتګ لپاره نوی کوډ پکار دی. پلورونه او تاریخچه یې پاتې کېږي.",
+  )
+  val logoutEverywhereConfirm: String get() = t("بیرون کن", "Sign out", "ویې باسه")
+  val loggedOutEverywhere: String get() = t("کارمند از همهٔ دستگاه‌ها بیرون رفت", "Signed out of all devices", "له ټولو وسایلو ووت")
+  fun staleHint(name: Any): String = t("شاید همان ${asIs(name)} است با دستگاهِ تازه", "Maybe the same $name on a new device", "شاید همغه $name وي په نوې وسیله")
+  fun staleHintBody(device: Any): String = t(
+    "دستگاهِ ${asIs(device)} پیش‌تر مالِ عضوِ کهنه بود. حساب‌ها خودبه‌خود یکی نمی‌شوند؛ اگر همان آدم است عضوِ کهنه را بردارید — فروش و سابقه‌اش می‌ماند.",
+    "Device $device belonged to the older member before. Accounts are never merged automatically; if it's the same person, remove the old member. Their sales and history stay.",
+    "وسیله $device مخکې د زاړه غړي وه. حسابونه پخپله نه یو کېږي؛ که همغه کس وي زوړ غړی لرې کړئ — پلورونه او تاریخچه یې پاتې کېږي.",
+  )
+  val staleSameName: String get() = t("نامش هم یکی است.", "The name matches too.", "نوم یې هم یو دی.")
+  val removeStale: String get() = t("برداشتنِ عضوِ کهنه", "Remove the old member", "زوړ غړی لرې کول")
+  fun removeStaleTitle(name: Any): String = t("برداشتنِ عضوِ کهنه (${asIs(name)})؟", "Remove the old member ($name)?", "زوړ غړی ($name) لرې شي؟")
+  val removeStaleBody: String get() = t(
+    "عضوِ کهنه از دکان برداشته می‌شود و دیگر وارد نمی‌شود. حساب‌ها یکی نمی‌شوند؛ فروش و سابقه‌اش پاک نمی‌شود.",
+    "The old member is removed from the shop and can no longer sign in. Accounts are not merged; their sales and history are not deleted.",
+    "زوړ غړی له دوکانه لرې کېږي او نور نه شي ننوتلی. حسابونه نه یو کېږي؛ پلورونه او تاریخچه یې نه ړنګېږي.",
+  )
+
   // «اشتراکِ من»
   val refreshFromServer: String get() = t("تازه کردن از سرور", "Refresh from server", "له سرور تازه کول")
   val reading: String get() = t("در حالِ خواندن…", "Loading…", "لوستل کېږي…")

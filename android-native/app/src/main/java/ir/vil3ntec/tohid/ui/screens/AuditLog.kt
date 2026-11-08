@@ -144,6 +144,8 @@ private fun auditLabel(type: String): String = when (type) {
   "customer_merge" -> StrExpenses.auditCustomerMerge
   "marketing_consent" -> StrExpenses.auditMarketingConsent
   "price_list_set" -> StrExpenses.auditPriceListSet
+  ir.vil3ntec.tohid.data.CustomerPrices.AUDIT_SET -> ir.vil3ntec.tohid.core.i18n.StrCustomerPrices.auditSet
+  ir.vil3ntec.tohid.data.CustomerPrices.AUDIT_REMOVE -> ir.vil3ntec.tohid.core.i18n.StrCustomerPrices.auditRemoved
   "debt_reminder" -> StrExpenses.auditDebtReminder
   "line_delete" -> StrExpenses.auditLineDelete
   else -> type

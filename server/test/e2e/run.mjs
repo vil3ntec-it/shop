@@ -10,6 +10,8 @@
  *
  *   node test/e2e/run.mjs              همه
  *   node test/e2e/run.mjs sync order   فقط همین‌ها
+ *   E2E_FLAGS_ON=1 node test/e2e/run.mjs   همه، با پرچم‌های تازه روشن روی هر دکانِ تازه (`lib/harness.mjs`، `flagsOnList`؛
+ *                                           `all` یا `k1,k2` هم)
  *
  * پوشه‌ها: `E2E_RESULTS_DIR` (پیش‌فرض: پوشهٔ موقت) و `E2E_SHOTS_DIR` (عکس‌ها).
  */
@@ -59,7 +61,9 @@ function runOne(file) {
 }
 
 const t0 = Date.now();
-console.log(`سناریوهای سرتاسری: ${files.length} تا، ${N} هم‌زمان${sharedDb ? ' (دیتابیسِ مشترک ⇒ ترتیبی)' : ' (هر کدام PGlite ِ خودش)'}\n`);
+const flagsOn = String(process.env.E2E_FLAGS_ON || '').trim();
+const mode = flagsOn && flagsOn !== '0' ? ` — پرچم‌ها: E2E_FLAGS_ON=${flagsOn}` : ' — پرچم‌ها: پیش‌فرض';
+console.log(`سناریوهای سرتاسری: ${files.length} تا، ${N} هم‌زمان${sharedDb ? ' (دیتابیسِ مشترک ⇒ ترتیبی)' : ' (هر کدام PGlite ِ خودش)'}${mode}\n`);
 const queue = files.slice();
 const done = [];
 await Promise.all(Array.from({ length: Math.min(N, queue.length) }, async () => {
@@ -92,7 +96,7 @@ for (const r of crashed) {
   const tail = fs.readFileSync(r.log, 'utf8').split('\n').filter((l) => !/^(GET|POST|PUT|PATCH|DELETE) \//.test(l)).slice(-25).join('\n');
   console.log(`──── تهِ لاگِ ${r.name} (${r.log}) ────\n${tail}\n`);
 }
-const summary = `گام‌ها: ${tally.pass} سبز · ${tally.fail} قرمز · ${tally['known-gap']} شکافِ شناخته · ${tally.xpass} xpass · ${tally.skip} اجرا‌نشده — ${(((Date.now() - t0) / 1000)).toFixed(0)} ثانیه`;
+const summary = `${mode.slice(3)} · گام‌ها: ${tally.pass} سبز · ${tally.fail} قرمز · ${tally['known-gap']} شکافِ شناخته · ${tally.xpass} xpass · ${tally.skip} اجرا‌نشده — ${(((Date.now() - t0) / 1000)).toFixed(0)} ثانیه`;
 console.log(summary);
 fs.writeFileSync(path.join(results, 'SUMMARY.txt'), `${table}\n\n${summary}\n`);
 fs.writeFileSync(path.join(results, 'summary.json'), JSON.stringify({ tally, scenarios: done.map(({ name, code, ms, steps }) => ({ name, code, ms, steps })) }, null, 2));

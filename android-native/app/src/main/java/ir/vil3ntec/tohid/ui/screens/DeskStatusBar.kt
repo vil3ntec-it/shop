@@ -19,7 +19,6 @@ import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.v1.SyncDot
-import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.theme.Shop
 import kotlinx.coroutines.delay
@@ -38,7 +37,8 @@ import ir.vil3ntec.tohid.core.i18n.Str
 fun DeskStatusBar(d: ShopData) {
   val context = LocalContext.current
   val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
-  val sync by SyncV1Engine.of(context).status.collectAsState()
+  //  PERF-LEDGER: موتور بیرون از رشتهٔ صفحه ساخته می‌شود (`rememberSyncV1Status`)
+  val sync = ir.vil3ntec.tohid.sync.v1.rememberSyncV1Status(context) ?: ir.vil3ntec.tohid.sync.v1.SYNC_STARTING
   var now by remember { mutableStateOf(System.currentTimeMillis()) }
   LaunchedEffect(Unit) { while (true) { delay(30_000); now = System.currentTimeMillis() } }
   val today = ir.vil3ntec.tohid.todayIso()

@@ -24,6 +24,12 @@ object PurchaseBook {
     val price: Double,
     val unit: String = "",
     val expiryDate: String = "",
+    /**
+     *  PRD-07 — نامِ یکی از واحدهای خریدِ کالا (`Product.purchaseUnits`): `quantity` به همان واحد (۲ کارتن) و `price`
+     *  قیمتِ یک واحدِ همان (یک کارتن) است؛ موجودی مقدار × ضریب به واحدِ پایه بالا می‌رود و بهای واحدِ پایه از جمعِ دقیقِ
+     *  ردیف (`LedgerEngine.InUnit`). `null` = واحدِ پایه، همان امروز.
+     */
+    val unitName: String? = null,
   )
 
   sealed interface Result {
@@ -35,6 +41,28 @@ object PurchaseBook {
   fun nextNo(d: ShopData): Int = (d.purchases.maxOfOrNull { it.invoiceNo } ?: 0) + 1
 
   fun lineTotal(l: Line): Double = Math.round(l.quantity * l.price).toDouble()
+
+  /**
+   *  PRD-07: ردیف به واحدِ خریدِ [name] ⇐ ورودیِ موتور، یا null (واحد روی کالا نیست، یا مقدارِ پایهٔ کالای شمارشی اعشاری می‌شود).
+   *  [total] جمعِ ردیف به افغانی (همان [lineTotal]) — بی تغییر به صدمِ افغانی می‌رود.
+   */
+  fun inUnitOf(product: Product, name: String, quantity: Double, total: Double): LedgerEngine.InUnit? {
+    val u = ir.vil3ntec.tohid.core.product.PurchaseUnits.find(product.purchaseUnits?.map(ShopStore::coreOf), name) ?: return null
+    if (quantity.isNaN() || quantity <= 0 || total.isNaN() || total < 0) return null
+    val q = StockLedger.milli(quantity)
+    if (q <= 0) return null
+    val base = runCatching { ir.vil3ntec.tohid.core.product.PurchaseUnits.baseQtyMilli(q, u.factorMilli) }.getOrNull() ?: return null
+    if (base <= 0 || (!wholeOk(product) && base % 1000 != 0L)) return null
+    return LedgerEngine.InUnit(u.name, q, u.factorMilli, StockLedger.minor(total))
+  }
+
+  /** همان قاعدهٔ اعشارِ بسته‌ها و واحدهای خرید: واحدِ وزنی یا واحدِ فروشِ دوم */
+  private fun wholeOk(p: Product) = SalesEngine.isFractionalUnit(p.unit) || p.saleUnit.isNotBlank()
+
+  private fun unitWhy(p: Product, name: String, quantity: Double): String =
+    if (ir.vil3ntec.tohid.core.product.PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), name) == null) ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits.unknownUnit
+    else if (quantity.isNaN() || quantity <= 0) StrStock.errAmount
+    else ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits.wholeBase(p.unit)
 
   fun record(
     d: ShopData,
@@ -75,6 +103,12 @@ object PurchaseBook {
       if (l.quantity.isNaN() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
       if (l.price.isNaN() || l.price < 0) return Result.Failed(StrGoods.rowPriceBad(i + 1))
     }
+    //  PRD-07: واحدِ خریدِ هر ردیف ⇐ ضریب (پیش از هر اثر؛ ردیفِ بی واحد همان امروز)
+    val inUnits = real.mapIndexed { i, l ->
+      val name = l.unitName?.trim()?.ifEmpty { null } ?: return@mapIndexed null
+      val product = d.products.find { it.id == l.productId } ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, ir.vil3ntec.tohid.core.i18n.StrLedger.pickProduct))
+      inUnitOf(product, name, l.quantity, lineTotal(l)) ?: return Result.Failed(StrGoods.rowOfWhy(i + 1, unitWhy(product, name, l.quantity)))
+    }
     val total = real.sumOf { lineTotal(it) }
     var left = if (paid.isNaN() || paid < 0) 0.0 else minOf(paid, total)
 
@@ -95,6 +129,7 @@ object PurchaseBook {
           notes = listOf(tag, notes.trim()).filter { it.isNotBlank() }.joinToString(" — "),
           expiryDate = l.expiryDate,
           dueDate = dueDate,
+          inUnit = inUnits[i],
         ),
         today, now, lineIds,
       )
@@ -284,6 +319,11 @@ object PurchaseBook {
      *  ساخته می‌شود، پس دو کلیکِ پشتِ‌سرِهم دو سند نمی‌سازد؛ سندِ همین کلید اگر هست ⇒ رد.
      */
     key: String? = null,
+    /**
+     *  PRD-07 — برگشت به یکی از واحدهای خریدِ کالا: `quantity` به همان واحد (۱ کارتن) و `unitPrice` قیمتِ یک واحدِ همان؛
+     *  از انبار مقدار × ضریب به واحدِ پایه بیرون می‌رود و سندِ کسر جمعِ دقیقِ همان ردیف است. `null` = واحدِ پایه.
+     */
+    unitName: String? = null,
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id == k }) return Result.Failed(ALREADY_RETURNED)
@@ -291,6 +331,15 @@ object PurchaseBook {
     val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.pickItem)
     if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
     if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed(StrGoods.returnPriceBad2)
+    val inUnit = unitName?.trim()?.ifEmpty { null }?.let { n ->
+      inUnitOf(product, n, quantity, Math.round(quantity * unitPrice).toDouble()) ?: return Result.Failed(unitWhy(product, n, quantity))
+    }
+    if (inUnit != null) {
+      val bc = ir.vil3ntec.tohid.core.product.PurchaseUnits.baseCost(inUnit.qtyMilli, inUnit.factorMilli, inUnit.totalMinor)
+      return supplierReturn(
+        d, supplierId, productId, bc.baseQtyMilli / 1000.0, bc.unitCostMinor / 100.0, reason, date, today, now, newId, userId, key,
+      ).let { r -> if (r is Result.Ok) Result.Ok(inUnitReturn(r.data, k, d, inUnit), 0) else r }
+    }
     val why = reason.trim()
     if (why.isEmpty()) return Result.Failed(StrGoods.returnReasonNeeded)
     val stock = ShopStore.stock(d, productId)
@@ -325,6 +374,18 @@ object PurchaseBook {
         ),
       ),
       0,
+    )
+  }
+
+  /** سندِ کسرِ تازهٔ [supplierReturn] به واحدِ خرید: جمعِ دقیق (نه مقدارِ پایه × بهای گردشده) و نام، مقدار و ضریبِ همان واحد */
+  private fun inUnitReturn(next: ShopData, key: String?, before: ShopData, u: LedgerEngine.InUnit): ShopData {
+    val old = before.purchases.map { it.id }.toSet()
+    val amount = u.totalMinor / 100.0
+    return next.copy(
+      purchases = next.purchases.map { p ->
+        if (p.id in old || (key != null && p.id != key)) p
+        else p.copy(totalAmount = -amount, debt = -amount, unitName = u.name, unitQtyMilli = -u.qtyMilli, unitFactorMilli = u.factorMilli)
+      },
     )
   }
 

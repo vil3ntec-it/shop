@@ -60,8 +60,14 @@ object BackupMirror {
     //  ⛔ DATA-SAFETY: دفترِ خراب پشتیبانِ پوشه نمی‌شود — وگرنه با هرسِ «۳۰ تای آخر» پشتیبان‌های سالم را بیرون می‌راند
     require(LedgerRecovery.decode(ledgerJson, parseJson) is LedgerRecovery.Read.Ok) { ir.vil3ntec.tohid.core.i18n.StrAppData.mirrorSkippedDamaged }
     tmp.outputStream().use { out -> BackupBundle.write(context, out, ledgerJson).getOrThrow() }
-    if (target.exists()) target.delete()
-    require(tmp.renameTo(target)) { StrAppData.backupNameFailed }
+    //  F0-01: ضدویروسِ ویندوز ZIP ِ تازه‌بسته را لحظه‌ای قفل نگه می‌دارد و `renameTo` بی‌درنگ شکست می‌خورد —
+    //  همان جابه‌جاییِ جایگزین‌کنندهٔ دفتر با چند دورِ درنگ (`DiskWrite.move`)
+    try {
+      DiskWrite.move(tmp, target)
+    } catch (e: Exception) {
+      tmp.delete()
+      throw IllegalStateException(StrAppData.backupNameFailed, e)
+    }
     list(context).drop(KEEP).forEach { runCatching { it.delete() } }
     target
   }

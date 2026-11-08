@@ -28,8 +28,10 @@ import java.nio.file.StandardOpenOption
  *      یا فایلِ کهنه سرِ جایش است یا تازه، نه نصفه.
  *   ۲) جابه‌جایی با `Files.move(ATOMIC_MOVE, REPLACE_EXISTING)`؛ اگر
  *      سیستم جابه‌جاییِ اتمی ندهد یا لحظه‌ای فایل را قفل کرده باشد
- *      (ضدویروس و نمایه‌سازِ ویندوز)، `REPLACE_EXISTING` و چند تلاشِ کوتاه.
+ *      (ضدویروس و نمایه‌سازِ ویندوز)، `REPLACE_EXISTING` و تا پنج دور با درنگِ
+ *      رو به افزایش ([move]).
  *   ۳) شکست **بی‌صدا نیست**: `IOException` بالا می‌رود تا صدازننده بگوید.
+ *   ۴) `fsync` ِ پوشه روی ویندوز تلاش نمی‌شود و هیچ‌جا نوشتن را نمی‌شکند ([syncDir]).
  *
  *  ⚠️ `java.nio.file` از اندرویدِ ۸ (API 26) هست؛ پایین‌تر همان `rename`ِ
  *  لینوکس است که جایگزین می‌کند — و نتیجه‌اش این بار بررسی می‌شود.
@@ -49,20 +51,43 @@ object DiskWrite {
    *  ⛔ دفتر (`ShopStore.writeToDisk`) هر ذخیره را این‌طور می‌نویسد: اگر فایلِ تازه بعداً خراب خوانده شد
    *  (خطای دیسک، قطعِ برق روی سیستمی که `fsync` را جدی نمی‌گیرد)، نسخهٔ یک ذخیره پیش‌تر سالم کنارش هست
    *  (`LedgerRecovery`). پیوندِ سخت است، نه رونوشت: هیچ بایتی دوباره نوشته نمی‌شود و ثبتِ فروش کُند نمی‌شود.
-   *  سیستمی که پیوندِ سخت نمی‌دهد ⇒ بی `.prev` (نسخه‌های خودکار هنوز هستند) — خطایش هرگز نوشتن را نمی‌شکند.
+   *  سیستمی که پیوندِ سخت نمی‌دهد (FAT/exFAT ِ فلش، درایوِ شبکه) ⇒ **رونوشت** با همان بایت‌ها و همان زمانِ فایل
+   *  ([keepPrevious]) — خطایش هرگز نوشتن را نمی‌شکند.
    */
   @Throws(IOException::class)
-  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) {
-    if (!keepPrevious) return bytes(target, data)
-    stream(target, before = { linkPrevious(target) }) { it.write(data) }
+  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) = stream(target, keepPrevious) { it.write(data) }
+
+  /**
+   *  همان [bytes] با `keepPrevious`، ولی بایت‌ها از [write] به فایلِ کناری می‌روند — بی آرایهٔ کاملِ دفتر در حافظه
+   *  (PERF-LEDGER، `LedgerText`). همان ترتیب: کناری ⇐ `fsync` ⇐ `.prev` ⇐ جابه‌جاییِ اتمی ⇐ `fsync` ِ پوشه.
+   */
+  @Throws(IOException::class)
+  fun stream(target: File, keepPrevious: Boolean, write: (OutputStream) -> Unit) {
+    if (!keepPrevious) return stream(target, write)
+    val prev = previousOf(target)
+    stream(target, before = { this.keepPrevious(target, prev) }, write = write)
   }
+
+  /** همان [bytes] با نسخهٔ پیشین به نامِ [previous] — تنظیماتِ کامپیوتر (`DesktopPrefs`، `<نام>.bak`) */
+  @Throws(IOException::class)
+  internal fun bytesKeeping(target: File, data: ByteArray, previous: File) =
+    stream(target, before = { keepPrevious(target, previous) }) { it.write(data) }
 
   /** نامِ نسخهٔ پیشینِ [target] — همان که [bytes] با `keepPrevious` می‌گذارد */
   fun previousOf(target: File): File = File(target.absoluteFile.parentFile, target.name + PREV)
 
-  private fun linkPrevious(target: File) {
+  /**
+   *  نسخهٔ پیشین: پیوندِ سخت؛ نشد ⇒ رونوشت. زمانِ رونوشت همان زمانِ [target] است، چون `LedgerRecovery.best`
+   *  نسخه‌ها را با زمانِ فایل می‌چیند: رونوشتی با زمانِ «حالا» از فایلِ کناریِ تازه‌تر (`.tmp`) جلو می‌افتاد و
+   *  دفترِ کهنه‌تر برمی‌گشت.
+   */
+  private fun keepPrevious(target: File, prev: File) {
     if (!target.isFile || Build.VERSION.SDK_INT < 26) return
-    runCatching { Api26.link(previousOf(target), target) }
+    val disk = fs
+    if (runCatching { disk.hardLink(prev, target) }.isSuccess) return
+    runCatching {
+      stream(prev, before = {}, stamp = target.lastModified()) { out -> target.inputStream().use { it.copyTo(out) } }
+    }
   }
 
   /** رونوشتِ یک فایل، همان بایت‌ها */
@@ -74,8 +99,11 @@ object DiskWrite {
   @Throws(IOException::class)
   fun stream(target: File, write: (OutputStream) -> Unit) = stream(target, before = {}, write = write)
 
-  /** @param before درست پیش از جابه‌جایی (فایلِ کناری کامل و `fsync` شده) — نسخهٔ پیشین ([linkPrevious]) */
-  private fun stream(target: File, before: () -> Unit, write: (OutputStream) -> Unit) {
+  /**
+   *  @param before درست پیش از جابه‌جایی (فایلِ کناری کامل و `fsync` شده) — نسخهٔ پیشین ([keepPrevious])
+   *  @param stamp زمانِ فایل (میلی‌ثانیه) که فایلِ کناری پیش از جابه‌جایی می‌گیرد؛ `0` ⇒ همان «حالا»
+   */
+  private fun stream(target: File, before: () -> Unit, stamp: Long = 0L, write: (OutputStream) -> Unit) {
     val dir = target.absoluteFile.parentFile ?: throw IOException(StrAppData.folderUnknown(target))
     if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException(StrAppData.folderNotMade(dir))
     val tmp = File(dir, target.name + ".tmp")
@@ -85,6 +113,7 @@ object DiskWrite {
         out.flush()
         out.fd.sync()
       }
+      if (stamp > 0L) tmp.setLastModified(stamp)
       before()
       move(tmp, target)
     } catch (e: Throwable) {
@@ -94,44 +123,90 @@ object DiskWrite {
     syncDir(dir)
   }
 
-  /** همان جابه‌جاییِ اتمی که جایگزین می‌کند — برای کوچِ رمز (`AtRest`) */
+  /**
+   *  همان جابه‌جاییِ اتمی که جایگزین می‌کند — برای کوچِ رمز (`AtRest`) و پشتیبانِ پوشه (`BackupMirror`).
+   *
+   *  هر دور: اول `ATOMIC_MOVE + REPLACE_EXISTING`، نشد (درایوِ شبکه جابه‌جاییِ اتمی نمی‌دهد) `REPLACE_EXISTING`.
+   *  هر دو نشد ⇒ درنگِ رو به افزایش ([backoff]) و دورِ بعد: ضدویروس و نمایه‌سازِ ویندوز فایلِ تازه‌بسته را چند
+   *  صد میلی‌ثانیه قفل نگه می‌دارند. پس از [ATTEMPTS] دور ⇒ `IOException`، هرگز بی‌صدا.
+   */
   internal fun move(tmp: File, target: File) {
-    if (Build.VERSION.SDK_INT >= 26) return Api26.move(tmp, target)
-    if (!tmp.renameTo(target)) throw IOException(StrAppData.notReplaced(target.name))
+    if (Build.VERSION.SDK_INT < 26) {
+      if (!tmp.renameTo(target)) throw IOException(StrAppData.notReplaced(target.name))
+      return
+    }
+    val disk = fs
+    var last: IOException? = null
+    for (attempt in 1..ATTEMPTS) {
+      if (attempt > 1) disk.pause(backoff(attempt - 1))
+      try {
+        //  `AtomicMoveNotSupportedException` هم همین‌جاست
+        disk.moveAtomic(tmp, target)
+        return
+      } catch (e: IOException) {
+        last = e
+      }
+      try {
+        disk.moveReplace(tmp, target)
+        return
+      } catch (e: IOException) {
+        last = e
+      }
+    }
+    throw IOException(StrAppData.notReplacedWhy(target.name, last?.message), last)
+  }
+
+  /** درنگِ پس از [failed] دورِ ناموفق: ۵۰، ۱۰۰، ۲۰۰، ۴۰۰ میلی‌ثانیه (روی هم کمتر از یک ثانیه) */
+  internal fun backoff(failed: Int): Long = BACKOFF_MS shl (failed - 1).coerceIn(0, 10)
+
+  /**
+   *  `fsync`ِ خودِ پوشه تا نامِ تازه هم پس از قطعِ برق بماند. ویندوز پوشه را برای `fsync` باز نمی‌کند (و
+   *  NTFS نامِ تازه را خودش در ژورنال می‌نشاند) ⇒ آن‌جا اصلاً تلاش نمی‌شود؛ هر جای دیگر خطایش نادیده
+   *  گرفته می‌شود — هرگز نوشتنِ نشسته را «ناموفق» نمی‌کند.
+   */
+  internal fun syncDir(dir: File) {
+    if (Build.VERSION.SDK_INT < 26) return
+    val disk = fs
+    if (disk.windows) return
+    runCatching { disk.syncDir(dir) }
   }
 
   /**
-   *  `fsync`ِ خودِ پوشه تا نامِ تازه هم پس از قطعِ برق بماند. روی ویندوز
-   *  پوشه باز نمی‌شود و لازم هم نیست — خطایش نادیده گرفته می‌شود.
+   *  آنچه [DiskWrite] از سیستمِ فایل می‌خواهد. برنامه همیشه [RealFs] است؛ آزمونِ کامپیوتر (`WindowsDiskFaultsTest`)
+   *  جایش ویندوزِ ساختگی می‌گذارد — جابه‌جاییِ قفل‌شده، دیسکِ بی پیوندِ سخت، پوشهٔ بی `fsync` — بی ویندوزِ واقعی.
+   *  همه با `File` (نه `Path`) تا اندرویدِ ۷ هرگز `java.nio.file` را بار نکند.
    */
-  internal fun syncDir(dir: File) {
-    if (Build.VERSION.SDK_INT >= 26) runCatching { Api26.syncDir(dir) }
+  internal interface Fs {
+    /** آیا این سیستم ویندوز است — [syncDir] آن‌جا تلاش نمی‌کند */
+    val windows: Boolean
+    fun moveAtomic(from: File, to: File)
+    fun moveReplace(from: File, to: File)
+    /** پیوندِ سختِ [link] به [existing]؛ [link] ِ پیشین اول پاک می‌شود */
+    fun hardLink(link: File, existing: File)
+    fun syncDir(dir: File)
+    fun pause(millis: Long)
+  }
+
+  @Volatile internal var fs: Fs = RealFs
+
+  private object RealFs : Fs {
+    override val windows: Boolean = System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)
+    override fun moveAtomic(from: File, to: File) = Api26.moveAtomic(from, to)
+    override fun moveReplace(from: File, to: File) = Api26.moveReplace(from, to)
+    override fun hardLink(link: File, existing: File) = Api26.link(link, existing)
+    override fun syncDir(dir: File) = Api26.syncDir(dir)
+    override fun pause(millis: Long) = Thread.sleep(millis)
   }
 
   /** هر چه از `java.nio.file` است همین‌جاست تا اندرویدِ ۷ هرگز بارش نکند. */
   @SuppressLint("NewApi")
   private object Api26 {
-    fun move(tmp: File, target: File) {
-      val from = tmp.toPath()
-      val to = target.toPath()
-      var last: IOException? = null
-      repeat(ATTEMPTS) { attempt ->
-        try {
-          Files.move(from, to, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
-          return
-        } catch (e: IOException) {
-          //  `AtomicMoveNotSupportedException` هم همین‌جاست
-          last = e
-        }
-        try {
-          Files.move(from, to, StandardCopyOption.REPLACE_EXISTING)
-          return
-        } catch (e: IOException) {
-          last = e
-        }
-        if (attempt < ATTEMPTS - 1) Thread.sleep(40L * (attempt + 1))
-      }
-      throw IOException(StrAppData.notReplacedWhy(target.name, last?.message), last)
+    fun moveAtomic(tmp: File, target: File) {
+      Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+    }
+
+    fun moveReplace(tmp: File, target: File) {
+      Files.move(tmp.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
     }
 
     fun syncDir(dir: File) {
@@ -145,6 +220,8 @@ object DiskWrite {
     }
   }
 
-  private const val ATTEMPTS = 3
+  /** دورهای جابه‌جایی پیش از «جایگزین نشد» — روی هم تا ۷۵۰ میلی‌ثانیه درنگ ([backoff]) */
+  internal const val ATTEMPTS = 5
+  private const val BACKOFF_MS = 50L
   private const val PREV = ".prev"
 }

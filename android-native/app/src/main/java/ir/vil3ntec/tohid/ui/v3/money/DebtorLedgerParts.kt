@@ -251,6 +251,14 @@ internal fun rememberDebtorTasks(d: ShopData, account: DebtorEngine.Account, act
       val number = DebtorLedgerModel.dialable(debtor.phone)
       //  CRM-06: متنِ دکان (`DebtReminderPref`) با سررسید، روزهای بدهی و نامِ دکان — همان متنِ «یادآوریِ امروز»
       fun message() = DebtReminderSend.message(context, data, debtor.id, storeName(context))
+      //  CRM-15: شمارهٔ به‌کاررفته و خروجیِ صورت‌حساب در «چه کسی پرونده را دید»
+      when (action) {
+        DebtorLedgerModel.Action.CALL, DebtorLedgerModel.Action.SMS, DebtorLedgerModel.Action.WHATSAPP ->
+          acts.onViewed(ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.PHONE)
+        DebtorLedgerModel.Action.STATEMENT_CSV, DebtorLedgerModel.Action.PRINT, DebtorLedgerModel.Action.STATEMENT_IMAGE ->
+          acts.onViewed(ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind.EXPORT)
+        else -> Unit
+      }
       when (action) {
         DebtorLedgerModel.Action.CALL -> { open("tel:$number", android.content.Intent.ACTION_DIAL) }
         //  «فرستاده شد» فقط وقتی برنامهٔ پیام باز شد — همان ردی که زمان‌بندیِ «یادآوریِ امروز» می‌خواند

@@ -40,4 +40,9 @@ function redactPath(url) {
     .replace(/[\r\n]/g, '').slice(0, MAX);
 }
 
-module.exports = { redactPath, tokenLike };
+/** مقدارِ درخواست برای یک سطرِ لاگ: بی CR/LF ِ خام (log injection)، حداکثر `max` نویسه. */
+function oneLine(value, max = MAX) {
+  return String(value ?? '').replace(/[\r\n]/g, '').slice(0, max);
+}
+
+module.exports = { redactPath, tokenLike, oneLine };

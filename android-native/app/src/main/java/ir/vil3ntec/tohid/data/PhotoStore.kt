@@ -6,6 +6,9 @@ import android.graphics.BitmapFactory
 import android.net.Uri
 import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.image.ImagePrep
+import ir.vil3ntec.tohid.core.image.PhotoThumb
+import ir.vil3ntec.tohid.core.shopper.ShopperPhoto
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
@@ -68,6 +71,31 @@ object PhotoStore {
   /** بایت‌های JPEGِ عکسِ کالا — برای فرستادن به سرور */
   fun bytes(context: Context, productId: String): ByteArray? =
     file(context, productId).takeIf { it.exists() }?.readBytes()
+
+  /**
+   *  WEB-15: نسخهٔ کارتِ ویترین (≤ ۳۲۰px، JPEG ِ ۷۰، جهتِ EXIF روی پیکسل‌ها، بی فراداده) از بایت‌های همین عکس —
+   *  قاعده‌ها در `core/image/PhotoThumb`. نشد ⇒ null: عکس بی کارت می‌رود و ویترین همان عکسِ کامل را نشان می‌دهد.
+   *  روی نخِ پس‌زمینه صدا زده می‌شود (`PhotoSync`)؛ حافظه: عکسِ ۸۰۰ پیکسلی با `inSampleSize` ِ ۲ (۴۰۰px) خوانده می‌شود.
+   */
+  fun thumb(data: ByteArray): ByteArray? = runCatching {
+    val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+    BitmapFactory.decodeByteArray(data, 0, data.size, bounds)
+    if (bounds.outWidth <= 0 || bounds.outHeight <= 0 || ImagePrep.tooManyPixels(bounds.outWidth, bounds.outHeight)) return@runCatching null
+    val opts = BitmapFactory.Options().apply { inSampleSize = ImagePrep.sampleSize(bounds.outWidth, bounds.outHeight, PhotoThumb.EDGE) }
+    val bmp = BitmapFactory.decodeByteArray(data, 0, data.size, opts) ?: return@runCatching null
+    val w = bmp.width
+    val h = bmp.height
+    val px = IntArray(w * h)
+    bmp.getPixels(px, 0, w, 0, 0, w, h)
+    bmp.recycle()
+    PhotoThumb.make(px, w, h, ShopperPhoto.orientationOf(data)) { p, ow, oh, q ->
+      val b = Bitmap.createBitmap(p, ow, oh, Bitmap.Config.ARGB_8888)
+      val out = ByteArrayOutputStream()
+      b.compress(Bitmap.CompressFormat.JPEG, q, out)
+      b.recycle()
+      out.toByteArray()
+    }?.bytes
+  }.getOrNull()
 
   /** عکسی که از سرور رسید، همان‌طور که هست (از قبل کوچک و فشرده شده) */
   fun saveBytes(context: Context, productId: String, data: ByteArray): Result<Unit> = runCatching {

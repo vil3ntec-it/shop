@@ -71,6 +71,8 @@ internal class DebtorLedgerActions(
   val onOlderSales: () -> Unit,
   /** CRM-06: «یادآوری فرستاده شد» (`sms`/`whatsapp`) پس از باز شدنِ برنامهٔ پیام — `DebtReminder.sent` */
   val onReminded: (String) -> Unit = {},
+  /** CRM-15: «چه کسی پرونده را دید» — باز شدن، شمارهٔ به‌کاررفته و خروجی (`CustomerAccessNote`، بی انتظار) */
+  val onViewed: (ir.vil3ntec.tohid.core.crm.CustomerAccess.Kind) -> Unit = {},
 )
 
 /**
@@ -108,12 +110,15 @@ internal fun DebtorLedgerScreen(
   val stagger = rememberV3Stagger(id)
   var menuFor by rememberSaveable { mutableStateOf<String?>(null) }
   val tasks = rememberDebtorTasks(d, account, actions)
+  val contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts() // CRM-15
   val available = DebtorLedgerModel.actions(
     account.debtor.phone, account.transactions.isNotEmpty(),
     //  CRM-05: «تصویرِ صورت‌حساب» فقط با «گزارش‌های مشتری» روشن (پیش‌فرض خاموش)
     image = ir.vil3ntec.tohid.data.ShopPolicy.crmReports(context),
-    contacts = ir.vil3ntec.tohid.ui.components.rememberCanSeeContacts(), // CRM-15
+    contacts = contacts,
   )
+  //  CRM-15: یک ردیفِ «دیدنِ پرونده» برای هر باز شدن (شمارهٔ کامل پیداست ⇒ «شماره»)؛ تکرارِ ۱۰ دقیقه نوشته نمی‌شود
+  androidx.compose.runtime.LaunchedEffect(id) { actions.onViewed(ir.vil3ntec.tohid.data.CustomerAccessLog.openKind(contacts, account.debtor)) }
   val navInset = LocalV3SystemBottom.current ?: WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 
   //  دو ستون فقط وقتی جا هست (کامپیوتر، تبلت) — پنجرهٔ باریک همان چیدمانِ گوشی

@@ -177,13 +177,16 @@ function v1NewerFields(req, res, next) {
       version: String(req.headers['x-app-version'] || '').slice(0, 32), shape: 'v1',
       caps: req.body?.caps, client: req.body?.client,
     });
-    if (!fl.dropped.size && !fl.trimmed.size) return next();
-    req.body.ops = fl.ops;
-    const send = res.json.bind(res);
-    res.json = (body) => {
-      if (body && body.ok && Array.isArray(body.results)) body.results = mergeResults(fl, body.results);
-      return send(body);
-    };
+    if (fl.dropped.size || fl.trimmed.size) {
+      req.body.ops = fl.ops;
+      const send = res.json.bind(res);
+      res.json = (body) => {
+        if (body && body.ok && Array.isArray(body.results)) body.results = mergeResults(fl, body.results);
+        return send(body);
+      };
+    }
+    //  PRD-07: شکلِ `products.purchaseUnits` روی همان دستهٔ پالایش‌شده (‎lib/purchase-units.js‎؛ ‎routes/sync-v1.js‎ دست نمی‌خورد)
+    require('./purchase-units').v1Guard(req, res);
     next();
   } catch (err) { next(err); }
 }

@@ -261,6 +261,12 @@ jobs:
         working-directory: server
         run: npm run test:web-store
 
+      # WEB-15 (§۳.۱۰): LCP و INP ِ ویترین روی گوشیِ ارزان با 3G ِ تند و 2G (شبکه و پردازندهٔ شبیه‌سازی‌شده با CDP،
+      # gzip ِ همان Caddy، میانهٔ چند بارِ سرد)؛ سقف‌ها و دلیلشان در خودِ آزمون
+      - name: آزمونِ LCP و INP ِ ویترین
+        working-directory: server
+        run: npm run test:web-vitals
+
       # بازارچه (WEB، §۲۳): از خانه تا لغوِ سفارش با کرومیومِ واقعی — جداییِ دکان‌ها،
       # سبدِ ماندگار، قیمتِ عوض‌شده (۴۰۹)، پیگیری، CSP ِ سخت، axe روشن/تاریک، بی بیرون‌زدگی
       - name: آزمونِ بازارچه

@@ -391,6 +391,25 @@ object ShopperText {
   val chatPhotoBusy get() = t("آماده کردنِ عکس…", "Preparing the photo…", "انځور چمتو کېږي…")
   val chatPhotoBad get() = t("این عکس خوانده نشد؛ عکسِ دیگری برگزینید (JPG، PNG یا WebP).", "That photo couldn't be read — choose another (JPG, PNG or WebP).", "دا انځور ونه لوستل شو؛ بل انځور وټاکئ (JPG، PNG یا WebP).")
   val chatImage get() = t("عکس", "Photo", "انځور")
+  //  حذف (CHAT-08) — همان واژه‌های `ct.del.*` ِ ویترینِ وب
+  val chatActions get() = t("کارهای این پیام", "Message actions", "د دې پیغام کارونه")
+  val chatDeleteMe get() = t("حذف برای من", "Delete for me", "زما لپاره پاکول")
+  val chatDeleteAll get() = t("حذف برای همه", "Delete for everyone", "د ټولو لپاره پاکول")
+  val chatDeleteMeAsk get() = t("این پیام فقط از نمای شما پاک شود؟ دکان آن را هنوز می‌بیند.", "Delete this message from your view only? The shop still sees it.", "دا پیغام یوازې ستاسو له لید څخه پاک شي؟ دوکان یې لا هم ویني.")
+  val chatDeleteAllAsk get() = t("این پیام برای همه پاک شود؟ دکان هم دیگر آن را نمی‌بیند.", "Delete this message for everyone? The shop will no longer see it either.", "دا پیغام د ټولو لپاره پاک شي؟ دوکان به یې هم نور ونه ویني.")
+  val chatDeleteYes get() = t("بله، پاک کن", "Yes, delete", "هو، پاک یې کړه")
+  val chatDeleteBusy get() = t("در حالِ پاک کردن…", "Deleting…", "پاکېږي…")
+  val chatDeleteMeDone get() = t("پیام از نمای شما پاک شد.", "Message deleted from your view.", "پیغام ستاسو له لید څخه پاک شو.")
+  val chatDeleteAllDone get() = t("پیام برای همه پاک شد.", "Message deleted for everyone.", "پیغام د ټولو لپاره پاک شو.")
+  val chatDeleteOffline get() = t("پاک نشد؛ اینترنت وصل نیست. پس از وصل شدن دوباره کوشش کنید.", "Not deleted; no internet. Try again once you are connected.", "پاک نه شو؛ انټرنېټ وصل نه دی. له وصل کېدو وروسته بیا یې کېکاږئ.")
+  val chatDeleteClosed get() = t("این گفت‌وگو بسته شد؛ «حذف برای همه» دیگر نمی‌شود، فقط «حذف برای من».", "This chat is closed — you can no longer delete for everyone, only for yourself.", "دا خبرې وتړل شوې؛ «د ټولو لپاره پاکول» نور نه کېږي، یوازې «زما لپاره پاکول».")
+
+  /** خطای حذف: بی‌اینترنت، رشتهٔ بسته و مهلتِ گذشته روشن؛ بقیه همان [error] */
+  fun chatDeleteError(e: ShopperError): String = when {
+    e.network -> chatDeleteOffline
+    e.code == "chat_closed" -> chatDeleteClosed
+    else -> error(e)
+  }
 
   // ── نظر و امتیاز (NTF-09، DLV-18) ──
   val reviewTitle get() = t("نظرِ شما دربارهٔ این خرید", "Your review of this order", "د دې پېرود په اړه ستاسو نظر")
@@ -614,6 +633,8 @@ object ShopperText {
     "too_many_addresses" -> addressProblem(AddressProblem.FULL)
     "chat_closed" -> chatClosed
     "chat_blocked" -> chatBlocked
+    "delete_window_passed" -> t("وقتِ «حذف برای همه» ِ این پیام گذشته است؛ فقط «حذف برای من» می‌ماند.", "The time to delete this message for everyone has passed — you can still delete it for yourself.", "د دې پیغام د «ټولو لپاره پاکولو» موده تېره شوې؛ یوازې «زما لپاره پاکول» پاتې دي.")
+    "delete_not_allowed" -> t("این پیام را نمی‌توانید برای همه پاک کنید.", "You can't delete this message for everyone.", "دا پیغام د ټولو لپاره نه شئ پاکولی.")
     "chat_disabled" -> t("گفت‌وگو برای این دکان روشن نیست.", "Chat isn't turned on for this shop.", "د دې دوکان لپاره خبرې فعالې نه دي.")
     "issue_window_passed" -> t("مهلتِ «مشکل دارم» برای این سفارش گذشته است؛ با دکان تماس بگیرید.", "It's too late to report a problem here — please call the shop.", "د «ستونزه لرم» وخت تېر شوی؛ دوکان ته زنګ ووهئ.")
     "too_large" -> t("فایل بزرگ است؛ عکسِ کوچک‌تری برگزینید.", "That file is too large — choose a smaller photo.", "دوتنه لویه ده؛ کوچنی انځور وټاکئ.")

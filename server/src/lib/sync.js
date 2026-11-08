@@ -124,6 +124,8 @@ async function pushChanges(ctx, changes) {
     ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, ip: ctx.ip || '' }, ctx.finalized, changes)
     : null;
   //  رویداد پس از تراکنش — در `enforce` همان ردی که تراکنش را برگرداند هم ثبت می‌شود
+  //  PRD-07: ردیفِ کالا با `purchaseUnits` ِ نادرست ⇒ ۴۰۰ و هیچ ردیفی نمی‌نشیند (‎lib/purchase-units.js‎)
+  { const why = require('./purchase-units').legacyReason(changes); if (why) throw badRequest('واحدهای خریدِ کالا درست نیستند', why); }
   return tx(async (c) => {
     let rev = await reserveRevs(c, shopId, changes.length);
     //  قاعدهٔ ردیف (صندوق‌دار: اصلاحِ قلمِ برگشتِ خودش، حرکتِ فاکتور و برگشت؛ `role-rows.js`).

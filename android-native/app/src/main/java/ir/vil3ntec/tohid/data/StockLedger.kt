@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.Lot
 import ir.vil3ntec.tohid.core.stock.LotRef
@@ -217,7 +218,8 @@ object StockLedger {
       if (!w.isAdjustment && q > 0) {
         out += Event(
           id, "entry", "purchase_receipt", at, dayOf(w.date, at), w.productId, loc, q, user, ref,
-          costMinor = max(0L, roundOr0(w.units * w.price * 100.0)),
+          //  PRD-07: خریدِ به واحدِ خرید ارزشِ دقیقِ خودش را دارد (نه مقدار × بهای گردشدهٔ واحدِ پایه)
+          costMinor = max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)),
           landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
         )
@@ -244,6 +246,13 @@ object StockLedger {
           adjKind = kind,
         )
       }
+    }
+    //  INV-10 (`CountAbsorbWiring`): جذب‌شده ⇒ اصلاحِ برعکس در لحظه و محلِ همان ردیفِ شمارش؛ پرچم خاموش ⇒ هیچ
+    for (g in CountAbsorbWiring.gaps(d).values) {
+      val w = d.warehouseEntries.find { it.id == g.lineId }?.takeIf { want(g.productId) } ?: continue
+      val at = atOf(w.createdAt, w.date)
+      out += Event("${CountAbsorbWiring.ABSORB_TYPE}:${w.id}", "entry", "adjustment", at, dayOf(w.date, at), g.productId, w.locationId.orEmpty(),
+        -g.gapMilli, w.userId?.trim()?.ifEmpty { null } ?: LEGACY_USER, w.id, reason = StrStock.countAbsorbed, adjKind = "count")
     }
 
     d.stockMovements.forEachIndexed { t, x ->

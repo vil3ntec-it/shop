@@ -27,6 +27,7 @@ import { randomUUID } from 'node:crypto';
 const require = createRequire(import.meta.url);
 const ROOT = path.join(import.meta.dirname, '..', '..', '..', '..');
 export const core = require(path.join(ROOT, 'license', 'sync-core.js'));
+const countAbsorb = require(path.join(ROOT, 'license', 'count-absorb-core.js'));
 export const MODELS_KT = path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'Models.kt');
 /**
  * `X-App-Version` ِ پیش‌فرضِ دستگاه‌ها: گوشیِ `3.2.N` بالاتر از کفِ همهٔ فیلدهای
@@ -261,7 +262,98 @@ export const KOTLIN = {
   //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
   restoreNoOps: restoreWiredNoOps(bodyOf('restoreBackup', fs.readFileSync(
     path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
+  //  پس از «کنار بگذار»/«اصلاح» ِ صاحب: کارگرِ همگام‌سازی (`SyncV1Worker` ⇒ `SetAsideSync.afterSync`) سند را از دفترِ شمرده
+  //  بیرون می‌برد (`SyncV1Engine.setAside` ⇒ `SetAsideCommit.run`). نبودش ⇒ [NativeDevice.settleRejected] هیچ (سفرِ JB6 سرخ)
+  setAside: /SetAsideCommit\.run\(/.test(SYNC_V1_ENGINE_KT) && /SetAsideSync\.afterSync\(/.test(KT('SyncV1Worker.kt')),
+  //  DATA-06: گوشیِ بازیابی‌شده از پشتیبانِ گوشیِ دیگر (`V1ReplicaAndroid.kt`، `core/sync/RestoredDevice.kt`) — `tohid-sync-v1` با
+  //  پشتیبان نمی‌رود، پایهٔ سایه = دفترِ بازیابی‌شده، و پیش از هر Pull «بازسازی از سرور» (کارگر). نبودش ⇒ همان نسخهٔ پیشین:
+  //  replica و cursor ِ گوشیِ اول روی گوشیِ دوم (سفرِ JB6 سرخ: سریِ دوتایی، دفترِ جدا از سرور)
+  restoredFence: restoredFenceWired(),
 };
+
+/* ---- پس از «کنار بگذار»/«اصلاح و ثبت» — قرینهٔ سطر به سطرِ `core/sync/RejectedSettle.kt` ---- */
+
+const isPlain = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+/** `RejectedSettle.same`: عدد با عدد، بقیه همان */
+function sameValue(a, b) {
+  if (typeof a === 'number' && typeof b === 'number') return a === b;
+  return JSON.stringify(a ?? null) === JSON.stringify(b ?? null);
+}
+
+/**
+ * `RejectedSettle.plan` ⇒ {undo, rows, ops, kept, touched} یا null. m: ردیفِ `/mine`؛ book: opهای ردشدهٔ همین دستگاه؛
+ * ledger: دفتر؛ done: شناسهٔ ردیف‌های صندوقی که پیش‌تر کنار گذاشته شدند.
+ */
+export function settlePlan(m, book, ledger, done) {
+  if (!m || !['dismissed', 'fixed'].includes(m.status) || done.has(m.id)) return null;
+  const s = m.settle;
+  if (!s || s.truncated || !Array.isArray(s.ops) || !s.ops.length) return null;
+  const mine = new Map();
+  for (const op of book) if (op.op_id && !mine.has(op.op_id)) mine.set(op.op_id, op);
+  const local = s.ops.map((o) => mine.get(o.id)).filter(Boolean);
+  if (!local.length) return null;
+  const missing = s.ops.filter((o) => !mine.has(o.id));
+  if (missing.some((o) => (o.type !== 'insert') || !o.table || !o.rowId)) return null;
+  const rowOf = (t, r) => (ledger[t] || []).find((x) => String(x.id) === r) || null;
+  const key = (t, r) => `${t}/${r}`;
+  const removed = new Map();
+  for (const op of local) if (op.type === 'insert') removed.set(key(op.table, op.row_id), [op.table, op.row_id]);
+  for (const o of missing) removed.set(key(o.table, o.rowId), [o.table, o.rowId]);
+  const inc = new Map(); const set = new Map(); const revive = new Map(); const kept = [];
+  for (const op of [...local].reverse()) {
+    const k = key(op.table, op.row_id);
+    if (removed.has(k)) continue;
+    const base = Object.prototype.hasOwnProperty.call(s.base || {}, k) ? s.base[k] : undefined;
+    if (op.type === 'update') {
+      for (const [f, v] of Object.entries(op.fields || {})) {
+        if (isPlain(v) && typeof v.$inc === 'number') {
+          const acc = inc.get(k) || new Map(); inc.set(k, acc);
+          acc.set(f, (acc.get(f) || 0) - v.$inc);
+          continue;
+        }
+        if (!isPlain(base) || !(f in base)) { kept.push(`${k}.${f}`); continue; }
+        if (!sameValue(rowOf(op.table, op.row_id)?.[f], v)) { kept.push(`${k}.${f}`); continue; }
+        const acc = set.get(k) || new Map(); set.set(k, acc);
+        acc.set(f, base[f]);
+      }
+    } else if (op.type === 'delete') {
+      if (rowOf(op.table, op.row_id)) continue;
+      if (isPlain(base)) revive.set(k, base); else kept.push(k);
+    }
+  }
+  const tag = String(m.id).replace(/[^A-Za-z0-9]/g, '').slice(-24);
+  const undo = [];
+  const mk = (table, rowId, type, fields) => undo.push({ op_id: `sx_${tag}_${undo.length}`, ts: 0, table, row_id: rowId, type, ...(fields ? { fields } : {}) });
+  for (const [k, row] of revive) { const [t, r] = [k.slice(0, k.indexOf('/')), k.slice(k.indexOf('/') + 1)]; mk(t, r, 'insert', { ...row }); }
+  for (const k of new Set([...inc.keys(), ...set.keys()])) {
+    const [t, r] = [k.slice(0, k.indexOf('/')), k.slice(k.indexOf('/') + 1)];
+    if (!rowOf(t, r)) continue;
+    const fields = {};
+    for (const [f, v] of set.get(k) || []) fields[f] = v;
+    for (const [f, d] of inc.get(k) || []) if (d !== 0) fields[f] = { $inc: d };
+    if (Object.keys(fields).length) mk(t, r, 'update', fields);
+  }
+  const rows = {};
+  for (const [k, [t, r]] of removed) {
+    const row = rowOf(t, r);
+    if (!row) continue;
+    if (s.base && s.base[k]) { kept.push(k); continue; }
+    (rows[t] = rows[t] || []).push(row);
+    mk(t, r, 'delete', null);
+  }
+  return { undo, rows, ops: local, kept, touched: new Set(undo.map((o) => key(o.table, o.row_id))) };
+}
+
+/** `restoredFence` ِ [KOTLIN]: قاعدهٔ پشتیبان، حصار با پایهٔ سایه، سدِ Pull و بازسازیِ کارگر — هر چهار در کدِ امروز */
+function restoredFenceWired() {
+  const rules = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'res', 'xml', 'backup_rules.xml'), 'utf8');
+  const cloud = rules.slice(rules.indexOf('<cloud-backup>'), rules.indexOf('</cloud-backup>'));
+  return /<exclude domain="sharedpref" path="tohid-sync-v1\.xml" \/>/.test(cloud)
+    && /baseline\(ledger\)/.test(KT('V1ReplicaAndroid.kt'))
+    && /!state\.restoredRebuild/.test(SYNC_V1_ENGINE_KT)
+    && /V1Replica\.rebuildRestored\(/.test(KT('SyncV1Worker.kt'));
+}
 
 /**
  * `ShopStore.restoreBackup` واقعاً بی op است؟ تنها «decide هست» کافی نبود: `writeInternal` در شاخهٔ
@@ -369,8 +461,11 @@ export class NativeDevice {
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
+    this.countAbsorb = false;   //  INV-10: `StockFlag` ⇐ `stockFlags()`
     this.token = '';
     this.refreshToken = '';
+    //  `TokenStorage.staffDeviceKey`: رازِ دستگاهِ شاگرد — مثلِ Keystore با نصبِ تازه (دستگاهِ نو) نمی‌آید و با خروج نمی‌رود
+    this.staffKey = '';
     this.refreshes = 0;
     this.ledger = emptyLedger();
     this.shadow = {};
@@ -400,6 +495,45 @@ export class NativeDevice {
     //  `SyncStateV1.replica` ِ همین حساب (یک بار انتخاب) و `lastPushAt`
     this.syncId = '';
     this.lastPushAt = 0;
+    //  DATA-06 (`SyncStateV1.restoredRebuild`): حالِ گوشیِ دیگر ⇒ تا «بازسازی از سرور» Pull نه
+    this.restoredRebuild = false;
+  }
+
+  /**
+   *  پشتیبانِ خودکارِ اندروید از همین گوشی (`backup_rules.xml`): پرونده‌ها (`file`) — دفتر، صف و ردشده‌هایش، دفترچهٔ §۹.۵.
+   *  `tohid-sync`، `tohid-session*` و `tohid-doc-series` هرگز. `syncV1`: حالِ `tohid-sync-v1` (replica، cursor، سایه) — فقط
+   *  ساخت‌هایی که آن را بیرون نمی‌گذاشتند ([restoredFrom]).
+   */
+  deviceBackup() {
+    return {
+      ledger: clone(this.ledger), queue: clone(this.queue), dropped: clone(this.dropped), sent: clone(this.sent),
+      syncV1: clone({
+        shadow: this.shadow, cursor: this.cursor, snapshotAt: this.snapshotAt, lastPushAt: this.lastPushAt, epoch: this.epoch,
+        syncId: this.syncId,
+      }),
+    };
+  }
+
+  /**
+   *  گوشیِ **دیگری** که از [files] بالا آمد: شناسهٔ دستگاهِ تازه، بی نشست و بی سری.
+   *  کدِ امروز (`KOTLIN.restoredFence`، `V1Replica.fence`): پایهٔ سایه = دفترِ بازیابی‌شده (پیش از نخستین ذخیره) و «در انتظارِ
+   *  بازسازی» ⇒ نخستین دور: صف ⇐ بازسازی از سرور ⇐ Pull. ساختِ پیشین: `tohid-sync-v1` با replica ِ گوشیِ اول آمد.
+   *  `naive` (شاهدِ خطر، همان آیفونِ #1012 پیش از این): `tohid-sync-v1` با cursor و سایه، ولی replica ِ تازه و بی بازسازی.
+   */
+  static restoredFrom(E, label, files, { naive = false, ...opts } = {}) {
+    const d = new NativeDevice(E, label, opts);
+    d.ledger = clone(files.ledger);
+    d.queue = clone(files.queue);
+    d.dropped = clone(files.dropped);
+    d.sent = clone(files.sent);
+    if (naive || !d.kotlin.restoredFence) {
+      Object.assign(d, clone(files.syncV1));
+      if (naive) d.syncId = '';
+      return d;
+    }
+    d.shadow = core.shadowOf(d.ledger);
+    d.restoredRebuild = true;
+    return d;
   }
 
   /** `LedgerDiff.wireSchema(state.serverSchema)`: پلهٔ همان سرور روی سیم، نه بیشتر (پرچمِ گاوصندوق) */
@@ -470,12 +604,14 @@ export class NativeDevice {
 
   /**
    * `AuthRepository.loginWithStaffCode`: شاگرد فقط با کدِ صاحب (`POST /auth/staff`) — بی ایمیل و رمز. همان دستگاه
-   * (`device.uid` = `deviceId`) و همان دکان ⇒ همان حساب، نه عضوِ تازه. خطا ⇒ `Error` با `status` و `code` ِ سرور.
+   * و همان دکان ⇒ همان حساب، نه عضوِ تازه — ⛔ از ۲.۱۴.۵ با **رازِ دستگاه** (`keyVersion: 1`، `key`)، نه فقط
+   * `device.uid`؛ `deviceKey` ِ پاسخ نگه داشته می‌شود. خطا ⇒ `Error` با `status` و `code` ِ سرور.
    */
   async loginStaff(code, name) {
+    const device = { uid: this.deviceId, name: this.label, platform: 'android', keyVersion: 1 };
+    if (this.staffKey) device.key = this.staffKey;
     const r = await this.api('POST', '/auth/staff', {
-      code: String(code).trim().toUpperCase(), name: String(name).trim(), app: 'shop',
-      device: { uid: this.deviceId, name: this.label, platform: 'android' },
+      code: String(code).trim().toUpperCase(), name: String(name).trim(), app: 'shop', device,
     });
     if (r.status !== 201 && r.status !== 200) {
       const e = new Error(`${this.label}: ورودِ شاگرد ${r.status} ${JSON.stringify(r.body)}`);
@@ -487,6 +623,7 @@ export class NativeDevice {
     this.refreshToken = r.body.refresh_token || r.body.refreshToken;
     this.user = r.body.user;
     this.shop = r.body.shop;
+    if (typeof r.body.deviceKey === 'string' && r.body.deviceKey) this.staffKey = r.body.deviceKey;
     return this;
   }
 
@@ -649,8 +786,14 @@ export class NativeDevice {
       await this.checkEpoch();
       let step = await this.pushAll();
       if (step) return step;
+      //  DATA-06 (`SyncV1Worker` ⇐ `V1Replica.rebuildRestored` = `ShopStore.restoreBackup` با دفترِ همین حالا): صف رفت ⇒ از سرور
+      if (this.restoredRebuild && this.token && !this.queue.length) {
+        const r = await this.restore(this.ledger, { pushed: true });
+        if (!r.ok) return { ok: false, restored: r };
+        this.restoredRebuild = false;
+      }
       if (this.restorePending && !this.queue.length && await this.rebuild() && (step = await this.pushAll())) return step;
-      for (let i = 0; !this.restorePending && i < 50; i++) {
+      for (let i = 0; !this.restorePending && !this.restoredRebuild && i < 50; i++) {
         const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.replica())}&since=${this.cursor}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         const ops = r.body.ops || [];
@@ -677,6 +820,37 @@ export class NativeDevice {
     const shape = this.kotlin.applyRemoteShaped ? (x) => projectLedger(x, this.keepOf) : (x) => x;
     this.ledger = shape(core.applyRemote(this.ledger, ops).data);
     this.shadow = core.shadowOf(shape(core.applyRemote(this.shadow, ops).data));
+  }
+
+  /**
+   * `SetAsideSync.afterSync` (پس از دورِ همگام‌سازیِ کارگر؛ صفحهٔ تاریخچه `due` می‌گذارد) ⇒ `SyncV1Engine.setAside` ⇒
+   * `SetAsideCommit.run`: ردِ بازی هست ⇒ `/mine` ⇒ هر «کنار گذاشته/اصلاح‌شده» ِ همین دستگاه: opهای برگرداننده روی دفتر و
+   * سایه (همان [absorb]، cursor دست نمی‌خورد) و نشانِ `setAside` در همان نوشتن. هیچ op ای به صف نمی‌رود.
+   * @returns {Promise<number>} چند سند کنار گذاشته شد
+   */
+  async settleRejected() {
+    if (!this.kotlin.setAside || this.offline) return 0;
+    const book = this.dropped.map(({ why: _w, ...op }) => op);
+    const aside = () => this.ledger.setAside || [];
+    const settled = new Set(aside().flatMap((d) => d.ops.map((o) => o.op_id)));
+    if (!book.some((o) => !settled.has(o.op_id))) return 0;
+    const r = await this.api('GET', '/shop/conflict-inbox/mine');
+    if (r.status !== 200) return 0;
+    let n = 0;
+    for (const m of r.body.conflicts || []) {
+      const plan = settlePlan(m, book, this.ledger, new Set(aside().map((d) => d.id)));
+      if (!plan || this.queue.some((o) => plan.touched.has(`${o.table}/${o.row_id}`))) continue;
+      this.absorb(plan.undo);
+      this.ledger = {
+        ...this.ledger,
+        setAside: [...aside(), {
+          id: m.id, status: m.status, note: m.note || '', reason: m.reason || '', fixedDoc: m.fixedDoc || '', table: m.table, rowId: m.rowId,
+          resolvedAt: m.resolvedAt || 0, settledAt: this.now(), ops: plan.ops, rows: plan.rows, undo: plan.undo, kept: plan.kept,
+        }],
+      };
+      n++;
+    }
+    return n;
   }
 
   /** `SyncV1Engine.firstSync`: دفترِ خالی ⇒ Snapshot؛ وگرنه کلِ دفتر یک بار */
@@ -723,7 +897,7 @@ export class NativeDevice {
    * ساختی که بازیابی را هنوز «ذخیره» می‌کند (`KOTLIN.restoreNoOps` خاموش) ⇒ همان [save] (تفاضل با سایه).
    * @returns {Promise<{ok:boolean, route:string, rows?:number, notOnServer?:number}>}
    */
-  async restore(backup) {
+  async restore(backup, { pushed: queueSent = false } = {}) {
     if (!this.kotlin.restoreNoOps) { this.save(backup); return { ok: true, route: 'save' }; }
     const shaped = (t) => (this.kotlin.snapshotShaped ? projectLedger(t, this.keepOf) : t);
     const synced = this.cursor > 0 || this.snapshotAt > 0;
@@ -745,7 +919,8 @@ export class NativeDevice {
     if (!synced && (serverRows === null || this.offline)) return { ok: false, route: 'sync_first' };
     if (!signedIn) return { ok: false, route: 'need_sign_in' };
     if (this.offline) return { ok: false, route: 'need_net' };
-    const pushed = await this.sync();
+    //  `queueSent`: صف همین دور رفت (حصارِ DATA-06 از درونِ [sync]) — همان `SyncRebuild.run` که خودش اول صف را می‌فرستد
+    const pushed = queueSent ? { ok: true } : await this.sync();
     if (!pushed.ok) return { ok: false, route: 'from_server', error: this.lastError };
     if (this.queue.length) return { ok: false, route: 'queue_left' };
     const r = await this.api('GET', '/sync/v1/snapshot');
@@ -832,12 +1007,71 @@ export class NativeDevice {
     return id;
   }
 
-  /** `ShopStore.stock`: Σ ورودِ انبار − Σ (فروخته − برگشته)ِ فاکتورهای لغونشده */
+  /** `ShopStore.stock`: Σ ورودِ انبار − Σ (فروخته − برگشته)ِ فاکتورهای لغونشده − جذب‌شدهٔ INV-10 (`CountAbsorbWiring`) */
   stock(productId, d = this.ledger) {
     const entered = d.warehouseEntries.filter((e) => e.productId === productId).reduce((s, e) => s + e.units, 0);
     const cancelled = new Set(d.sales.filter((s) => s.status === 'cancelled').map((s) => s.id));
     const sold = d.saleItems.filter((i) => i.productId === productId && !cancelled.has(i.saleId)).reduce((s, i) => s + (i.quantity - i.returnedQty), 0);
-    return entered - sold;
+    const g = this.absorbed(d).get(productId);
+    return entered - sold - (g ? g.gapMilli / 1000 : 0);
+  }
+
+  /** `StockFlag.kick`: پرچم‌های موجودیِ دکان (INV-10: `countAbsorb` ⇒ `CountAbsorbWiring.serverFlag`) */
+  async stockFlags() {
+    const r = await this.api('GET', '/shop/stock-ledger/config');
+    this.countAbsorb = r.status === 200 && r.body.countAbsorb === true;
+    return this.countAbsorb;
+  }
+
+  /** `CountAbsorbWiring.gaps` — پرچم خاموش یا بی ردیفِ لحظه‌دار ⇒ خالی */
+  absorbed(d = this.ledger) {
+    if (!this.countAbsorb || !d.warehouseEntries.some((e) => e.countedAt != null)) return new Map();
+    const lines = d.warehouseEntries
+      .filter((e) => e.isAdjustment && e.productId && (e.countedAt != null || e.adjKind === 'count' || String(e.notes || '').startsWith('انبارگردانی')))
+      .map((e) => ({ id: e.id, productId: e.productId, countedAt: e.countedAt ?? e.createdAt, seenMilli: e.countedAt != null ? e.seenMilli ?? null : null, createdAt: e.createdAt, correctedAt: e.correctedAt ?? null }));
+    return countAbsorb.gaps(lines, this.absorbEvents(d));
+  }
+
+  /**
+   * «انبارگردانیِ تازه» (`CountToolsRoute`): `CountShift` + `WarehouseEngine.stockCount(…, COUNT, countedAt)` — هر
+   * اختلاف یک ردیفِ «اصلاحِ شمارش» با لحظهٔ کالا و دانستهٔ همین دستگاه (`CountAbsorbWiring.seen`).
+   * counted: {کالا: عدد}، at: {کالا: لحظه} ⇒ شمارِ اختلاف‌ها
+   */
+  count(counted, at, note = '') {
+    const d = clone(this.ledger);
+    const now = this.now();
+    const date = todayOf(now);
+    const why = ['انبارگردانی', note.trim()].filter(Boolean).join(' — ');
+    let n = 0;
+    for (const [pid, c] of Object.entries(counted)) {
+      const moved = d.stockMovements.filter((m) => m.productId === pid && !countAbsorb.TRANSFER_TYPES.includes(m.type) && m.createdAt > at[pid])
+        .reduce((s, m) => s + Math.round(m.qty * 1000), 0);
+      const diff = c - (this.stock(pid, d) - moved / 1000);
+      if (Math.abs(diff) < 0.0005) continue;
+      const p = d.products.find((x) => x.id === pid);
+      const moment = Math.min(at[pid], now);
+      const seenMilli = countAbsorb.seen(this.absorbEvents(d), pid, moment, now);
+      const id = core.ulid(now);
+      d.warehouseEntries.push(row('WarehouseEntry', {
+        id, productId: pid, cartons: 0, perCarton: 0, units: diff, unit: p.unit, price: 0, date, notes: why, isAdjustment: true,
+        createdAt: now, expiryDate: '', batch: '', productionDate: '', adjKind: 'count', countedAt: moment, seenMilli,
+      }));
+      d.stockMovements.push(row('StockMovement', {
+        id: core.ulid(now), productId: pid, type: 'count_adjust', qty: diff, date, notes: why, refId: id, createdAt: now, reason: why,
+      }));
+      d.auditLog.push(row('AuditEntry', {
+        id: core.ulid(now), type: 'stock_adjustment', date, refId: id, createdAt: now,
+        notes: `اصلاحِ شمارش «${p.name}» به مقدار ${diff > 0 ? '+' : '−'}${money(Math.abs(diff))} — دلیل: ${why}`,
+      }));
+      n += 1;
+    }
+    this.save(d);
+    return n;
+  }
+
+  /** `CountAbsorbWiring.events`: هر ردیفِ `stockMovements` */
+  absorbEvents(d) {
+    return d.stockMovements.map((m) => ({ id: m.id, productId: m.productId, at: m.createdAt, qtyMilli: Math.round(m.qty * 1000), type: m.type, refId: m.refId ?? null, correctedAt: m.correctedAt ?? null }));
   }
 
   /** `ShopStore.debt` */

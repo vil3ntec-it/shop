@@ -72,6 +72,11 @@ object WarehouseEngine {
      *  (`PackBarcodes.check`). null ⇒ در ویرایش دست نمی‌خورد؛ فهرستِ خالی ⇒ همه برداشته.
      */
     val packs: List<PackBarcodes.Draft>? = null,
+    /**
+     *  PRD-07 (همان پرچم): واحدهای خریدِ چندگانه (کارتنِ ۱۲ از الف، کارتنِ ۲۴ از ب) به شکلِ فرم؛ موتور می‌سنجد
+     *  (`PurchaseUnits.check`). null ⇒ در ویرایش دست نمی‌خورد؛ فهرستِ خالی ⇒ همه برداشته.
+     */
+    val purchaseUnits: List<ir.vil3ntec.tohid.core.product.PurchaseUnits.Draft>? = null,
   )
 
   data class EntryDraft(
@@ -153,6 +158,7 @@ object WarehouseEngine {
     kind: AdjustKind = AdjustKind.ADJUSTMENT,
     /** INV-02 — کاربرِ ثبت‌کننده روی هر حرکت؛ `null` ⇒ مثلِ پیش */
     userId: String? = null,
+    countedAt: Map<String, Long> = emptyMap(), // INV-10: لحظهٔ هر کالا ⇒ روی ردیف با دانستهٔ همین دستگاه (`CountAbsorbWiring`)
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed(StrGoods.countedNegative)
     val lines = countLines(d, counted, shift)
@@ -161,9 +167,7 @@ object WarehouseEngine {
     var data = d
     var lastId = ""
     for (l in lines) {
-      when (val r = adjustStock(
-        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId, userId = userId,
-      )) {
+      when (val r = adjustStock(data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId, userId = userId, countedAt = CountAbsorbWiring.momentOf(countedAt[l.product.id], now))) {
         is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
         is Result.Ok -> { data = r.data; lastId = r.id }
       }
@@ -225,6 +229,29 @@ object WarehouseEngine {
     if (a.packs.orEmpty() != b.packs.orEmpty()) {
       add(if (b.packs.isNullOrEmpty()) "بسته‌ها برداشته شد"  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
         else "بسته‌ها «${b.packs.joinToString("، ") { PackBarcodes.label(ShopStore.coreOf(it), b.unit) }}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    }
+    if (a.purchaseUnits.orEmpty() != b.purchaseUnits.orEmpty()) {
+      add(if (b.purchaseUnits.isNullOrEmpty()) "واحدهای خرید برداشته شد"  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا (PRD-07)
+        else "واحدهای خرید «${b.purchaseUnits.joinToString("، ") { ir.vil3ntec.tohid.core.product.PurchaseUnits.label(ShopStore.coreOf(it), b.unit) }}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا (PRD-07)
+    }
+  }
+
+  /**
+   *  PRD-07: واحدهای خریدِ فرم ⇒ واحدهای کالا، یا پیامِ رد. `null` ⇒ همان `keep`؛ خالی ⇒ null (همان JSON ِ بی واحدِ خرید).
+   *  همان قاعدهٔ اعشارِ بسته‌ها؛ بارکدِ واحد نه بارکدِ کالا، نه مالِ کالای دیگر؛ همان کارتنِ فروش (همان اندازه) همان بارکد را دارد.
+   */
+  private fun purchaseUnitsOf(
+    d: ShopData, drafts: List<ir.vil3ntec.tohid.core.product.PurchaseUnits.Draft>?, keep: List<PurchaseUnit>?, unit: String, saleUnit: String,
+    codes: List<String>, packs: List<ProductPack>?, selfId: String?, owners: Map<String, String>,
+  ): Pair<List<PurchaseUnit>?, String?> {
+    if (drafts == null) return keep to null
+    val fractional = SalesEngine.isFractionalUnit(unit) || saleUnit.isNotBlank()
+    val ownPacks = packs.orEmpty().flatMap { pk -> pk.barcodes.map { it to pk.sizeMilli } }.toMap()
+    val suppliers = d.suppliers.map { it.id }.toSet()
+    return when (val c = ir.vil3ntec.tohid.core.product.PurchaseUnits.check(drafts, unit, fractional, codes, ownPacks, selfId, { owners[it] }, { it in suppliers })) {
+      is ir.vil3ntec.tohid.core.product.PurchaseUnits.Checked.Failed -> null to ir.vil3ntec.tohid.core.i18n.purchaseUnitProblem(c.failure, unit)
+      is ir.vil3ntec.tohid.core.product.PurchaseUnits.Checked.Ok ->
+        c.units.map { PurchaseUnit(it.name, it.factorMilli, it.supplierId, it.barcode) }.ifEmpty { null } to null
     }
   }
 
@@ -302,6 +329,8 @@ object WarehouseEngine {
     }
     val (packs, packProblem) = packsOf(draft.packs, null, draft.unit, draft.saleUnit.orEmpty(), codes, null, index)
     (packProblem ?: draft.info?.let { ProductInfoMap.skuProblem(d, it, null, null) })?.let { return Result.Failed(it) } // PRD-03: کد یکتا
+    val (units, unitProblem) = purchaseUnitsOf(d, draft.purchaseUnits, null, draft.unit, draft.saleUnit.orEmpty(), codes, packs, null, index)
+    unitProblem?.let { return Result.Failed(it) }
 
     val id = newId()
     val product = Product(
@@ -326,6 +355,7 @@ object WarehouseEngine {
       brand = brandOf(draft.brand, null),
       tags = tagsOf(draft.tags, null),
       packs = packs,
+      purchaseUnits = units,
     ).let { p -> draft.info?.let { ProductInfoMap.apply(p, it) } ?: p }
 
     return Result.Ok(
@@ -386,6 +416,12 @@ object WarehouseEngine {
     if (packs != null && draft.packs == null && unitNow != existing.unit) {
       return Result.Failed(StrGoods.hasPacks)
     }
+    //  PRD-07: ضریبِ واحدهای خرید به همان واحدِ پایه است ⇒ واحد بی فرمِ تازهٔ واحدها عوض نمی‌شود
+    val (units, unitProblem) = purchaseUnitsOf(d, draft.purchaseUnits, existing.purchaseUnits, unitNow, draft.saleUnit ?: existing.saleUnit, codes, packs, id, index)
+    unitProblem?.let { return Result.Failed(it) }
+    if (units != null && draft.purchaseUnits == null && unitNow != existing.unit) {
+      return Result.Failed(ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits.hasUnits)
+    }
 
     val updated = existing.copy(
       name = name,
@@ -408,6 +444,7 @@ object WarehouseEngine {
       brand = brandOf(draft.brand, existing.brand),
       tags = tagsOf(draft.tags, existing.tags),
       packs = packs,
+      purchaseUnits = units,
     ).let { u -> draft.info?.let { ProductInfoMap.apply(u, it) } ?: u }
 
     // تغییرِ قیمتِ خرید در تاریخچه می‌ماند — سودِ گذشته نباید عوض شود
@@ -869,6 +906,7 @@ object WarehouseEngine {
      */
     adjKind: String? = null,
     userId: String? = null,
+    countedAt: Long? = null, // INV-10 — فقط ردیفِ «انبارگردانی» (`stockCount`)؛ `null` ⇒ نوشته نمی‌شود
   ): Result {
     val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.addProductFirst)
     if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
@@ -911,7 +949,7 @@ object WarehouseEngine {
           isAdjustment = true,
           createdAt = now,
           adjKind = stockKind,
-          userId = user,
+          userId = user, countedAt = countedAt, seenMilli = countedAt?.let { CountAbsorbWiring.seen(d, productId, it, now) },
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),

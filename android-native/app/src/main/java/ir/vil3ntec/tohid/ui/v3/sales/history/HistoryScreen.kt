@@ -237,6 +237,7 @@ private fun PhoneList(
     item(key = "top-" + current.key) { Top(current, PeriodLabel.current(current, book.gregorian), ctx, drawer, reviews, money) }
     returnsHint(ctx)
     invoices(current, currentList, ctx, query, empty = if (unit == SalesPeriods.Unit.DAY) StrHistory.emptyToday else StrHistory.emptyPeriod)
+    setAside(ctx)
     if (olderLists.isNotEmpty()) item(key = "earlier") { GroupTitle(StrHistory.earlier) }
     olderLists.forEach { (p, list) ->
       val open = query.open[p.key] == true || (query.filtered && list.isNotEmpty() && query.open[p.key] == null)
@@ -284,12 +285,19 @@ private fun TwoPane(
         item(key = "top-" + picked.key) { Top(picked, title, ctx, drawer.takeIf { picked.key == current.key }, reviews, money) }
         if (picked.key == current.key) returnsHint(ctx)
         invoices(picked, list, ctx, query, empty = StrHistory.emptyPeriod)
+        if (picked.key == current.key) setAside(ctx)
       }
     },
   )
 }
 
 /** «برگشت و تعویض» روشن: راهنما و «برگشتِ بی رسید» — همان جای پیشین، زیرِ کادرِ امروز */
+/** سندهای ردشده‌ای که صاحب کنار گذاشت/اصلاح کرد — بیرون از جمعِ دوره (`RejectedMark.kt`) */
+private fun LazyListScope.setAside(ctx: RowCtx) {
+  if (ctx.d.setAside.isEmpty()) return
+  item(key = "set-aside") { SetAsideSection(ctx.d.setAside) }
+}
+
 private fun LazyListScope.returnsHint(ctx: RowCtx) {
   if (!ctx.returnsV2) return
   item(key = "returns") {

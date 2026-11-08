@@ -438,6 +438,20 @@ test('CHAT-10: فایلِ اجرایی، MIME ِ جعلی، SVG و فایلِ ب
   assert.equal(alive.status, 200);
 });
 
+test('⛔ putMedia (CodeQL type confusion): فقط Buffer؛ رشته، آرایه، شیءِ «length»دار، null و Uint8Array ⇒ ۴۰۰ bad_media بی هیچ ردیف؛ Buffer ِ درست مثلِ پیش', async () => {
+  const o = await chatShop('نوعِ بدنه');
+  const me = customer(o.shopId, '+93790000017');
+  const conv = (await chat.open(me, { name: 'نوع' })).conversation.id;
+  for (const bad of ['abcd', ['a', 'b'], { length: 5 }, null, undefined, 7, new Uint8Array([0xff, 0xd8, 0xff])]) {
+    await assert.rejects(chat.putMedia(me, conv, bad), (e) => e.status === 400 && e.code === 'bad_media', JSON.stringify(bad));
+  }
+  assert.equal(await count('shop_chat_media', o.shopId), 0);
+  const ok = await chat.putMedia(me, conv, smallJpeg(4));
+  assert.equal(ok.kind, 'image');
+  assert.equal(ok.reused, false);
+  assert.equal(await count('shop_chat_media', o.shopId), 1);
+});
+
 test('CHAT-08: حذف برای من فقط در نمای همان؛ حذف برای همه سنگِ قبر به دستگاهِ آفلاین می‌رسد و رسانه می‌رود', async () => {
   const o = await chatShop('حذف');
   const mgr = await member(o.shopId, 'manager', 'مدیرِ حذف');
@@ -499,6 +513,34 @@ test('CHAT-08: حذف برای من فقط در نمای همان؛ حذف بر�
   await query('UPDATE shop_chat_messages SET created_at=$2 WHERE id=$1', [c1.message.id, now() - 2 * 24 * 3600 * 1000]);
   await assert.rejects(chat.remove(me, conv, c1.message.id, 'all'), (e) => e.code === 'delete_window_passed');
   await assert.rejects(chat.remove(me, conv, c1.message.id, 'x'), (e) => e.code === 'bad_scope');
+});
+
+test('CHAT-08: مهلتِ «حذف برای همه» فقط روی پیامِ زندهٔ خودِ مشتری و از ساعتِ سرور (deleteUntil)؛ دوباره زدن همان سنگِ قبر', async () => {
+  const config = require('../src/config');
+  const o = await chatShop('مهلتِ حذف');
+  const me = customer(o.shopId, '+93790000018');
+  const conv = (await chat.open(me, {})).conversation.id;
+  const mine = (await chat.send(me, conv, { clientId: cid(), body: 'پیامِ من' })).message;
+  assert.equal(mine.deleteUntil, mine.createdAt + config.shopChat.deleteWindowMs);
+  const shopMsg = (await sendHttp(o.token, conv, { clientId: cid(), body: 'پیامِ دکان' })).body.message;
+  assert.equal(shopMsg.deleteUntil, undefined, 'دکان مهلت را از /config دارد، نه از پیام');
+  const seen = (await chat.changes(me, conv, { after: 0 })).messages;
+  assert.equal(seen.find((m) => m.id === mine.id).deleteUntil, mine.deleteUntil);
+  assert.equal(seen.find((m) => m.id === shopMsg.id).deleteUntil, undefined, 'پیامِ دکان برای مشتری مهلت ندارد');
+  const shopSeen = (await msgs(o.token, conv)).body.messages.find((m) => m.id === mine.id);
+  assert.equal(shopSeen.deleteUntil, undefined, 'دکان مهلتِ مشتری را نمی‌بیند');
+
+  //  دو بار «حذف برای همه» (دوبار زدن، دو برگه) ⇒ هر دو ۲۰۰ و همان سنگِ قبر، بی مهلت؛ rev فقط یک بار جلو رفت
+  const first = await chat.remove(me, conv, mine.id, 'all');
+  const again = await chat.remove(me, conv, mine.id, 'all');
+  assert.equal(first.message.deleted, true);
+  assert.deepEqual(again.message, first.message);
+  assert.equal(first.message.deleteUntil, undefined);
+  //  «حذف برای من» ِ دوباره هم همان پنهان
+  const h1 = await chat.remove(me, conv, shopMsg.id, 'me');
+  const h2 = await chat.remove(me, conv, shopMsg.id, 'me');
+  assert.deepEqual(h2.message, h1.message);
+  assert.equal(h1.message.hidden, true);
 });
 
 test('CHAT-09: دکان یا مشتریِ دیگر با عوض کردنِ شناسه به هیچ گفت‌وگو، پیام یا رسانه‌ای نمی‌رسد', async () => {

@@ -111,6 +111,8 @@ fun InvoiceScreen(
       Modifier.fillMaxSize().verticalScroll(rememberScrollState())
         .padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = pad.calculateBottomPadding() + 16.dp),
     ) {
+      RejectedWatch(force = true, data = d)
+      RejectedBanner(sale.id)
       if (paper != null) PaperPreview(paper, ReceiptModel.title(sale)) else ReceiptCard(d, sale, storeName, onDebtor = actions.debtor)
       PayStatusSection(payRows, onPayRow)
       if (docs.isNotEmpty()) {

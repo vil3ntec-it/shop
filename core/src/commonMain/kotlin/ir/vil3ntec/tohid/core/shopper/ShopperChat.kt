@@ -80,6 +80,8 @@ data class ChatMessage(
   val status: String? = null,
   val hidden: Boolean = false,
   val deleted: Boolean = false,
+  /** فقط پیامِ زندهٔ خودِ مشتری: پایانِ «حذف برای همه» به ساعتِ سرور (`remove` ِ سرور باز هم می‌سنجد؛ CHAT-08) */
+  val deleteUntil: Long? = null,
 )
 
 @Serializable
@@ -251,8 +253,32 @@ data class ChatThread(val conversation: ChatConversation, val messages: List<Cha
     val byId = LinkedHashMap<String, ChatMessage>()
     messages.forEach { byId[it.id] = it }
     c.messages.forEach { m -> val old = byId[m.id]; if (old == null || m.rev >= old.rev) byId[m.id] = m }
-    return ChatThread(c.conversation, byId.values.filter { !it.hidden }.sortedBy { it.seq }, max(cursor, c.cursor))
+    //  رسیدها فقط جلو (پاسخِ کهنه‌تر وضعیتِ «خوانده شد» را عقب نمی‌برد) — همان GREATEST ِ سرور
+    val o = conversation.receipts
+    val n = c.conversation.receipts
+    val receipts = if (c.conversation.id != conversation.id) n else ChatReceipts(
+      max(o.peerDeliveredSeq, n.peerDeliveredSeq), max(o.peerReadSeq, n.peerReadSeq), max(o.myDeliveredSeq, n.myDeliveredSeq), max(o.myReadSeq, n.myReadSeq),
+    )
+    return ChatThread(c.conversation.copy(receipts = receipts), byId.values.filter { !it.hidden }.sortedBy { it.seq }, max(cursor, c.cursor))
   }
+
+  /**
+   *  وضعیتِ پیامِ خودم (CHAT-04): «رفت» = سرور دارد؛ «رسید/خوانده شد» فقط با رسیدِ واقعیِ دکان — `status` ِ همان پیام یا
+   *  رسیدِ تازه‌ترِ گفت‌وگو (long-poll ِ بی پیام فقط رسید می‌آورد)؛ هر کدام بیشتر، هرگز حدس. پیامِ دکان و سنگِ قبر ⇒ null.
+   */
+  fun statusOf(m: ChatMessage): String? {
+    if (!(m.mine || m.sender == "customer") || m.deleted) return null
+    val r = conversation.receipts
+    val seen = when {
+      m.seq > 0 && m.seq <= r.peerReadSeq -> "read"
+      m.seq > 0 && m.seq <= r.peerDeliveredSeq -> "delivered"
+      else -> "sent"
+    }
+    val own = m.status ?: "sent"
+    return if (rank(own) >= rank(seen)) own else seen
+  }
+
+  private fun rank(s: String) = when (s) { "read" -> 3; "delivered" -> 2; "sent" -> 1; else -> 0 }
 
   /** پیامِ تازهٔ خودم که همین حالا رسید (پیش از رسیدنِ تغییرها) */
   fun withMine(m: ChatMessage): ChatThread =
@@ -263,4 +289,76 @@ data class ChatThread(val conversation: ChatConversation, val messages: List<Cha
 
   /** پیامِ صف که سرور دارد (جوابِ گم‌شده + تغییرها) ⇒ از صف بیرون، بی تکرار */
   fun arrived(clientId: String): Boolean = messages.any { it.mine && it.clientId == clientId }
+
+  /**
+   *  رسیدی که باید اعلام شود (CHAT-04)، یا null — همان `ChatThread.receiptNeed` ِ برنامهٔ دکان: «رسید» تا آخرین پیامِ
+   *  دکان که برنامه دارد، «خواندم» فقط وقتی صفحهٔ گفت‌وگو جلوی چشم است ([visible]: صفحه باز + برنامه در RESUMED/پیش).
+   *  هرگز پایین‌تر از رسیدِ سرور (`my*Seq`) و هرگز جلوتر از پیامی که رسیده (حدس نه). [asked] = درخواستِ در راه ⇒ تکرار نه.
+   */
+  fun receiptNeed(visible: Boolean, asked: ChatReceiptNeed? = null): ChatReceiptNeed? {
+    val r = conversation.receipts
+    val top = lastShopSeq()
+    val d = if (top > r.myDeliveredSeq) top else 0
+    val read = if (visible && top > r.myReadSeq) top else 0
+    if (d == 0L && read == 0L) return null
+    val need = ChatReceiptNeed(maxOf(d, read, r.myDeliveredSeq), if (read > 0) read else r.myReadSeq)
+    return if (asked != null && need.deliveredSeq <= asked.deliveredSeq && need.readSeq <= asked.readSeq) null else need
+  }
+
+  /**
+   *  چرا «حذف برای همه» نه (کدِ همان خطای سرور)، یا null = می‌شود — همان `canAll` ِ `store/chat.js`: فقط پیامِ زندهٔ
+   *  خودِ مشتری، تا `deleteUntil` ِ سرور، و نه در رشتهٔ بسته (#907). «حذف برای من» همیشه باز است.
+   */
+  fun deleteBlock(m: ChatMessage, now: Long): String? = when {
+    !(m.mine || m.sender == "customer") || m.deleted || m.hidden || messages.none { it.id == m.id } -> "delete_not_allowed"
+    conversation.life.state == "closed" -> "chat_closed"
+    (m.deleteUntil ?: 0) <= now -> "delete_window_passed"
+    else -> null
+  }
+}
+
+/** «رسید» و «خواندم» تا این seqها (`POST …/receipts`) */
+data class ChatReceiptNeed(val deliveredSeq: Long, val readSeq: Long)
+
+/** دامنهٔ حذف — همان `?for=` ِ `DELETE …/messages/:id` ِ سرور */
+enum class ChatDeleteScope(val wire: String) { ME("me"), ALL("all") }
+
+/** نوارِ کارهای یک پیام: [ask] = null (فهرست) یا پرسشِ تأیید؛ [busy] = درخواست در راه (همهٔ دکمه‌ها خاموش) */
+data class ChatAct(val messageId: String, val ask: ChatDeleteScope? = null, val note: String? = null, val busy: Boolean = false)
+
+/**
+ *  «حذف برای من / برای همه» ِ مشتری (CHAT-08) — همان `bar`/`drop` ِ وب: فهرست ⇐ پرسشِ تأیید ⇐ یک درخواست برای هر
+ *  (پیام، دامنه) تا پاسخ (دوبار زدن درخواستِ دوم نمی‌سازد). مهلتی که سرور گفت گذشته ([end] با `delete_window_passed`)
+ *  «حذف برای همه» ِ همان پیام را می‌بندد حتی اگر ساعتِ گوشی عقب باشد.
+ */
+class ChatDeletes {
+  private val inflight = HashSet<String>()
+  private val passed = HashSet<String>()
+
+  private fun key(id: String, scope: ChatDeleteScope) = id + ":" + scope.wire
+
+  fun block(t: ChatThread, m: ChatMessage, now: Long): String? =
+    t.deleteBlock(m, now) ?: if (m.id in passed) "delete_window_passed" else null
+
+  fun canForAll(t: ChatThread, m: ChatMessage, now: Long): Boolean = block(t, m, now) == null
+
+  /** فهرست یا پرسشِ تأییدِ [scope]؛ «برای همه» ِ ناممکن ⇒ فهرست با دلیلِ روشن (پیامِ دکان/سنگِ قبر: بی دلیل) */
+  fun ask(t: ChatThread, m: ChatMessage, scope: ChatDeleteScope?, now: Long): ChatAct {
+    if (scope != ChatDeleteScope.ALL) return ChatAct(m.id, scope)
+    val why = block(t, m, now) ?: return ChatAct(m.id, scope)
+    return ChatAct(m.id, null, if (why == "delete_not_allowed") null else ShopperText.chatDeleteError(ShopperError(409, why)))
+  }
+
+  /** آغازِ درخواست؛ false ⇒ همین (پیام، دامنه) در راه است */
+  fun begin(id: String, scope: ChatDeleteScope): Boolean = inflight.add(key(id, scope))
+
+  fun busy(id: String): Boolean = ChatDeleteScope.entries.any { key(id, it) in inflight }
+
+  /** پایانِ درخواست؛ خطا ⇒ همان نوار، فهرست با پیامِ روشن (بی‌اینترنت، بسته، مهلت) */
+  fun end(act: ChatAct, scope: ChatDeleteScope, error: ShopperError?): ChatAct? {
+    inflight.remove(key(act.messageId, scope))
+    if (error == null) return null
+    if (error.code == "delete_window_passed") passed += act.messageId
+    return act.copy(ask = null, busy = false, note = ShopperText.chatDeleteError(error))
+  }
 }
