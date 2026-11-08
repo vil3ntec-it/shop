@@ -195,7 +195,7 @@ class BigLedgerBenchTest {
     assertEquals(size.sales, store.data.value.sales.size)
 
     //  ---- نخستین ذخیره: سایهٔ پایه (بی op) ----
-    val (_, firstMs) = ms { runBlocking { store.save(BigLedger.sell(store.data.value, 0)) } }
+    val (_, firstMs) = ms { runBlocking { val base = store.data.value; store.save(base, BigLedger.sell(base, 0)) } }
     SyncV1Worker.cancel(ctx)
     rows += Row("first save (baseline shadow)", firstMs)
     val shadowChars = SyncStateV1(ctx, account).shadow.length
@@ -205,9 +205,10 @@ class BigLedgerBenchTest {
     val single = ArrayList<Double>()
     var savePeak = 0.0
     repeat(singles) { i ->
-      val next = BigLedger.sell(store.data.value, i + 1, credit = i % 2 == 1)
+      val base = store.data.value
+      val next = BigLedger.sell(base, i + 1, credit = i % 2 == 1)
       val p = Peak()
-      val (ok, t) = ms { runBlocking { store.save(next) } }
+      val (ok, t) = ms { runBlocking { store.save(base, next) } }
       p.close()
       SyncV1Worker.cancel(ctx)
       assertTrue("ذخیرهٔ فروش باید بنشیند", ok)
@@ -239,10 +240,10 @@ class BigLedgerBenchTest {
     val peer = ShopStore(ctx)
     val (_, peerLoad) = ms { runBlocking { peer.load() } }
     rows += Row("  · peer load (2nd instance)", peerLoad)
-    runBlocking { peer.save(BigLedger.sell(peer.data.value, 960, tag = 6)) }
+    runBlocking { val pb = peer.data.value; peer.save(pb, BigLedger.sell(pb, 960, tag = 6)) }
     SyncV1Worker.cancel(ctx)
     val stale = BigLedger.sell(held, 970, tag = 7)
-    val (okStale, staleMs) = ms { runBlocking { store.save(stale) } }
+    val (okStale, staleMs) = ms { runBlocking { store.save(held, stale) } }
     SyncV1Worker.cancel(ctx)
     assertTrue(okStale)
     assertEquals(held.sales.size + 2, store.data.value.sales.size)
@@ -253,13 +254,14 @@ class BigLedgerBenchTest {
     val before = store.data.value
     val (done, cm) = ms { LedgerArchive.compact(ctx, before, now = BigLedger.NOW).getOrThrow() }
     rows += Row("archive: LedgerArchive.compact", cm, "moved ${done.moved.total}")
-    val (_, cs) = ms { runBlocking { store.save(done.data) } }
+    val (_, cs) = ms { runBlocking { store.save(before, done.data) } }
     SyncV1Worker.cancel(ctx)
     rows += Row("archive: save compacted ledger", cs)
     val after = ArrayList<Double>()
     repeat(singles) { i ->
-      val n2 = BigLedger.sell(store.data.value, 980 + i)
-      val (_, t) = ms { runBlocking { store.save(n2) } }
+      val b2 = store.data.value
+      val n2 = BigLedger.sell(b2, 980 + i)
+      val (_, t) = ms { runBlocking { store.save(b2, n2) } }
       SyncV1Worker.cancel(ctx)
       after += t
     }
