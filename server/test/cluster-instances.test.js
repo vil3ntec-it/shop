@@ -156,6 +156,9 @@ test('رله، بلیت و بستنِ سوکت از نمونه‌ای به نم�
   const again = socket(wsUrl(A.base, `ticket=${encodeURIComponent(tk.body.ticket)}&device_id=desk-b`));
   const refused = await again.closedWith();
   assert.equal(refused.code, 1006, `بلیتِ مصرف‌شده در نمونهٔ دیگر هم پذیرفته نمی‌شود: ${JSON.stringify(refused)}`);
+  //  پنجرهٔ سنجشِ لایهٔ ۲ (`SYNC_LIVE_RECHECK_MS` ِ نمونه‌ها: ۵۰) بگذرد ⇒ خبرِ بعدی با توکنِ خودِ سوکت دوباره سنجیده می‌شود.
+  //  سوکتِ بلیتِ خوشه پیش‌تر توکنی نداشت و همین‌جا بی‌دلیل 4401 `session_revoked` می‌گرفت (فقط وقتی خبر دیر می‌رسید)
+  await new Promise((r) => setTimeout(r, 150));
 
   //  عکسِ کالا روی A ⇒ رلهٔ «photos» به سوکتِ دستگاهِ دیگر روی B
   const jpeg = Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(200, 7)]).toString('base64');

@@ -772,9 +772,11 @@ export class NativeDevice {
 
   /**
    * `SalesEngine.record`. lines: [{id, qty}]؛ payment: 'cash' | 'credit'
+   * `approval`: همان `Checkout.approval` ⇒ `Sale.approval` (برگهٔ امضاشده، یا ارجاعِ «درخواستِ تأیید» `{v:1, request}` ِ
+   * `RemoteApproval.ref`)؛ نیامده ⇒ فیلد نوشته نمی‌شود (`EncodeDefault.NEVER`)
    * @returns {{ok:true, saleId:string, invoiceNumber:number} | {ok:false, message:string}}
    */
-  sell({ lines, payment = 'cash', debtorId = null, paid = null, discountType = 'amount', discountValue = 0, saleId = null }) {
+  sell({ lines, payment = 'cash', debtorId = null, paid = null, discountType = 'amount', discountValue = 0, saleId = null, approval = null }) {
     const d = clone(this.ledger);
     const now = this.now();
     const today = todayOf(now);
@@ -805,6 +807,7 @@ export class NativeDevice {
       id, invoiceNumber, total: subtotal, discountType: discountType === 'percent' ? 'percent' : 'amount', discountValue: value, discount, finalTotal,
       paymentMethod: payment === 'cash' ? 'cash' : 'credit', debtorId: debtorId || null, paidAmount: p0, remaining, status: 'completed',
       debtGiven: onCredit ? remaining : 0, debtSettled: 0, createdAt: now, date: today, syncStatus: 'pending', seller: this.seller,
+      ...(approval ? { approval } : {}),
     }));
     for (const l of lines) {
       const p = d.products.find((x) => x.id === l.id);
