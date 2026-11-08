@@ -263,7 +263,7 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
             RETURNING m.id`,
           [shopId, convIds, at]
         );
-        counts.chatMedia = await q('DELETE FROM shop_chat_media WHERE shop_id=$1 AND conversation_id = ANY($2::text[]) RETURNING id', [shopId, convIds]);
+        counts.chatMedia = await qk('DELETE FROM shop_chat_media WHERE shop_id=$1 AND conversation_id = ANY($2::text[]) RETURNING id, store_key', [shopId, convIds]);
         counts.chatPins = await q('DELETE FROM shop_chat_pins WHERE shop_id=$1 AND conversation_id = ANY($2::text[]) RETURNING message_id', [shopId, convIds]);
         counts.chatReports = await q(
           `UPDATE shop_chat_reports SET snapshot='{}'::jsonb, note=''

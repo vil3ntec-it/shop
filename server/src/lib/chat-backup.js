@@ -33,6 +33,7 @@ const config = require('../config');
 const { many, one, tx } = require('../db');
 const backup = require('./backup');
 const { ERASED_PREFIX } = require('./customer-erasure');
+const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)؛ کلیدِ انبار هرگز در پرونده
 
 const MESSAGES_FORMAT = 'shop-chat-messages';
 const MEDIA_FORMAT = 'shop-chat-media';
@@ -121,7 +122,7 @@ async function exportChat({ dir = path.join(config.backup.dir, 'chat'), shopId =
     tables[t.name] = rows.map(rowOut);
   }
   const media = await many(
-    `SELECT id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, created_at, data
+    `SELECT id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, created_at, data, store_key
        FROM shop_chat_media ${shopId ? 'WHERE shop_id = $1' : ''} ORDER BY id`,
     shopId ? [shopId] : []
   );
@@ -129,16 +130,18 @@ async function exportChat({ dir = path.join(config.backup.dir, 'chat'), shopId =
   const messagesDoc = {
     format: MESSAGES_FORMAT, version: VERSION, createdAt: at, shopId, tables, media: manifest,
   };
-  const lines = [JSON.stringify({ format: MEDIA_FORMAT, version: VERSION, createdAt: at, shopId, count: media.length })];
+  const lines = [];
   for (const m of media) {
-    const data = Buffer.from(m.data);
-    lines.push(JSON.stringify({ ...rowOut({ ...m, data: undefined }), data: data.toString('base64') }));
+    const data = await mediaStore.chat.bytes(m);
+    if (!data) continue;   //  شیءِ گم‌شده/ناسالم (`verify` آن را «خراب» می‌گوید) — بایتِ ساختگی نه
+    lines.push(JSON.stringify({ ...rowOut({ ...m, data: undefined, store_key: undefined }), data: data.toString('base64') }));
   }
+  lines.unshift(JSON.stringify({ format: MEDIA_FORMAT, version: VERSION, createdAt: at, shopId, count: lines.length }));
   const suffix = encrypted ? '.enc' : '';
   const messages = await writeArchive(path.join(dir, `chat-messages-${tag}.json.gz${suffix}`), Buffer.from(JSON.stringify(messagesDoc)));
   const mediaOut = await writeArchive(path.join(dir, `chat-media-${tag}.jsonl.gz${suffix}`), Buffer.from(`${lines.join('\n')}\n`));
   const counts = Object.fromEntries(Object.entries(tables).map(([k, v]) => [k, v.length]));
-  counts.shop_chat_media = media.length;
+  counts.shop_chat_media = lines.length - 1;
   return { messages, media: mediaOut, encrypted, counts, createdAt: at };
 }
 
@@ -236,7 +239,12 @@ async function restoreMedia(file) {
         'SELECT 1 AS x FROM shop_chat_messages WHERE conversation_id=$1 AND (media_id=$2 OR thumb_id=$2) LIMIT 1',
         [m.conversation_id, m.id]
       )).rows[0]) { report.erased.push(m.id); continue; }
-      const n = await insertRows(c, 'shop_chat_media', [{ ...m, data }], cols);
+      //  همان راهِ نوشتنِ رسانه (حالتِ شیء ⇒ انبار)؛ `store_key` ِ پرونده هرگز، نوعِ ناجور با برچسب ⇒ همان پایگاه
+      const n = await mediaStore.chat.put(m.shop_id, m.mime, data, async (st) => {
+        const k = await insertRows(c, 'shop_chat_media', [{ ...m, data: st.data, store_key: st.key }], cols);
+        st.used = k > 0;
+        return k;
+      }, { keepUnknown: true });
       if (n) report.restored += 1; else report.existing += 1;
     }
   });
@@ -272,10 +280,10 @@ async function verify({ shopId = null } = {}) {
     }
   }
   const corrupt = [];
-  const media = await many(`SELECT id, sha256, size, data FROM shop_chat_media ${shopId ? 'WHERE shop_id = $1' : ''}`, args);
+  const media = await many(`SELECT id, shop_id, mime, sha256, size, data, store_key FROM shop_chat_media ${shopId ? 'WHERE shop_id = $1' : ''}`, args);
   for (const x of media) {
-    const data = Buffer.from(x.data);
-    if (sha256(data) !== x.sha256 || data.length !== Number(x.size)) corrupt.push(x.id);
+    const data = await mediaStore.chat.bytes(x);
+    if (!data || sha256(data) !== x.sha256 || data.length !== Number(x.size)) corrupt.push(x.id);
   }
   const messages = Number((await one(`SELECT COUNT(*)::int AS n FROM shop_chat_messages m WHERE true ${scope}`, args)).n);
   return {
