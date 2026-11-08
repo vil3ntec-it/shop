@@ -138,7 +138,7 @@
 
   const st = {
     dict: null, cfg: null, busy: false, tab: 'open', list: [], loading: false, err: '',
-    view: 'list', open: null, draft: null, found: [], names: {}, act: null, key: '', listSeq: 0,
+    view: 'list', open: null, draft: null, found: [], names: {}, act: null, key: '', listSeq: 0, findSeq: 0,
   };
   const t = (k, vars) => fill(st.dict && Object.prototype.hasOwnProperty.call(st.dict, k) ? st.dict[k] : k, vars);
   const loc = (l) => t(`loc.${l}`);
@@ -338,16 +338,25 @@
       </div></form>`;
   }
 
-  async function find() {
+  /**
+   * جست‌وجوی کالا. ⛔ نتیجهٔ کهنه هرگز به‌جای نتیجهٔ جست‌وجوی تازه نمی‌نشیند: فهرستِ پیشین همان لحظه برداشته می‌شود
+   * (تا «افزودن» روی کالای جست‌وجوی قبلی زده نشود) و پاسخی که پس از جست‌وجوی تازه‌تر برسد کنار می‌رود.
+   */
+  async function find(keepFocus) {
     const q = (st.draft.q || '').trim();
     if (!q) return;
+    const seq = ++st.findSeq;
+    const refocus = () => { const el = keepFocus && document.querySelector('#xfr-draft input[name="q"]'); if (el) el.focus(); };
+    st.found = []; st.searched = false;
+    paint(); refocus();
     try {
       const r = await call(`/products?limit=20&q=${encodeURIComponent(q)}`);
+      if (seq !== st.findSeq || !st.draft) return;
       st.found = (r.items || []).filter((p) => p.active !== false && !p.deleted);
       st.found.forEach((p) => { st.names[p.id] = p.name; });
       st.searched = true;
-      paint();
-    } catch (e) { setErr(errText(e)); }
+      paint(); refocus();
+    } catch (e) { if (seq === st.findSeq) setErr(errText(e)); }
   }
 
   function addLine(id) {
@@ -522,6 +531,9 @@
 
   function onSubmit(e) {
     e.preventDefault();
+    //  Enter در کادرِ جست‌وجو یعنی «جست‌وجو»، هرگز «فرستادن» ِ انتقال
+    const active = document.activeElement;
+    if (e.target.id === 'xfr-draft' && active && active.name === 'q' && e.target.contains(active)) { find(true); return; }
     if (e.target.id === 'xfr-draft') sendDraft();
     else confirmAct(e.target);
   }
@@ -533,7 +545,6 @@
     if (el.name === 'xfr-qty') st.draft.lines[Number(el.dataset.i)].qty = el.value;
     else if (el.name === 'from' || el.name === 'to' || el.name === 'note' || el.name === 'q') st.draft[el.name] = el.value;
     if (el.name === 'from' && e.type === 'change') { st.found = []; st.searched = false; paint(); }
-    if (el.name === 'q' && e.type === 'change') { find(); }
     saveDraft();
   }
 

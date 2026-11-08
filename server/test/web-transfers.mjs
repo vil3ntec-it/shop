@@ -197,10 +197,16 @@ await step('پیش‌نویس: جست‌وجو، افزودن، مقدار با 
   await page.waitForSelector('.xfr-found li');
   assert.equal(await page.locator('#xss-probe').count(), 0, 'نامِ کالا HTML نشد');
   assert.match(await page.locator('.xfr-found').innerText(), /<img src=x/);
+  //  جست‌وجوی دوم با Enter: جست‌وجو است، نه «فرستادن»؛ فهرستِ جست‌وجوی پیشین همان لحظه می‌رود (پاسخِ کهنه هرگز
+  //  جای پاسخِ تازه نمی‌نشیند و «افزودن» روی کالای پیشین زده نمی‌شود)
   await page.fill('#xfr-draft input[name="q"]', 'برنج');
-  await page.click('[data-xfr="find"]');
-  await page.waitForSelector('.xfr-found [data-xfr="add"]');
-  assert.match(await page.locator('.xfr-found').innerText(), /در مبدأ: 10/);
+  await page.press('#xfr-draft input[name="q"]', 'Enter');
+  await page.waitForFunction(() => /برنج/.test(document.querySelector('.xfr-found')?.textContent || ''));
+  const found = await page.locator('.xfr-found').innerText();
+  assert.doesNotMatch(found, /زهر/, 'نتیجهٔ جست‌وجوی پیشین ماند');
+  assert.match(found, /در مبدأ: 10/);
+  assert.equal(await page.locator('#xfr-draft input[name="q"]').evaluate((el) => el === document.activeElement), true, 'کادرِ جست‌وجو فوکوس را نگه داشت');
+  assert.equal((await transfers()).length, 0, 'Enter انتقالی نفرستاد');
   await page.click('.xfr-found [data-xfr="add"]');
   await page.fill('#xfr-draft input[name="xfr-qty"]', '۴');
   await page.fill('#xfr-draft input[name="note"]', 'برای انبارِ پشتی');
