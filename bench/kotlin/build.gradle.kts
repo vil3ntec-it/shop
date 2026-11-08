@@ -34,7 +34,8 @@ val engineSources by tasks.registering(Sync::class) {
     val missing = engineDirs.filter { d -> engineRoots.none { it.resolve(d).isDirectory } }
     check(missing.isEmpty()) { "پوشهٔ موتور جابه‌جا شده؛ فهرستِ engineDirs را درست کنید: $missing" }
   }
-  engineRoots.forEach { root -> from(root) { engineDirs.forEach { include("$it/*.kt") } } }
+  //  `OwnerReportPlan.kt` متنِ پیامِ صاحب را از `core/i18n` می‌سازد (موتور نیست و هیچ موتوری صدایش نمی‌زند) ⇒ بیرون
+  engineRoots.forEach { root -> from(root) { engineDirs.forEach { include("$it/*.kt") }; exclude("ir/vil3ntec/tohid/core/report/OwnerReportPlan.kt") } }
   into(layout.buildDirectory.dir("generated/engines"))
 }
 

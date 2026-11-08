@@ -84,13 +84,11 @@ async function login(req, { issueSession, loginPayload }) {
      */
     let user = null;
     let proof = false;
-    const secret = deviceKeys.presented(device);
-    if (secret && deviceUid) {
-      const k = await deviceKeys.verify({ shopId, deviceUid, secret });
-      if (k) {
-        user = await one('SELECT * FROM users WHERE id=$1', [k.user_id]);
-        proof = Boolean(user);
-      }
+    //  `verify` خودش رازِ تهی یا شناسهٔ تهی را `null` می‌کند؛ پس تصمیم فقط با نتیجهٔ سنجش در پایگاه است، نه با بودنِ راز (CodeQL)
+    const k = await deviceKeys.verify({ shopId, deviceUid, secret: deviceKeys.presented(device) });
+    if (k) {
+      user = await one('SELECT * FROM users WHERE id=$1', [k.user_id]);
+      proof = Boolean(user);
     }
     if (!user && subject) {
       const bound = await one(

@@ -225,7 +225,10 @@ class DeviceIdentityJvmTest {
     val rule = Regex("""<exclude\s+domain="sharedpref"\s+path="([^"]+)\.xml"\s*/>""")
     for (section in listOf("cloud-backup", "device-transfer")) {
       val body = xml.substringAfter("<$section>").substringBefore("</$section>")
-      assertEquals(K.DEVICE_ONLY.toSet(), rule.findAll(body).map { it.groupValues[1] }.toSet(), section)
+      //  `tohid-sync-v1` (replica و cursor ِ هر حساب) را اندروید از پشتیبان بیرون می‌گذارد (DATA-06، `claude/android-restore-id`)؛
+      //  روی آیفون پاک نمی‌شود، چون حصارِ مشترکِ `V1ReplicaAndroid` + `core/sync/RestoredDevice` (در ios-exclude نیست) همان حال را
+      //  به `device_uid` ِ امروز می‌بندد و پس از بازیابی پیش از هر Pull «بازسازی از سرور» می‌کند — همان تضمین، بی پاک کردن
+      assertEquals(K.DEVICE_ONLY.toSet() + "tohid-sync-v1", rule.findAll(body).map { it.groupValues[1] }.toSet(), section)
     }
   }
 
