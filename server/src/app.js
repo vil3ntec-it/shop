@@ -432,6 +432,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/staff-scope', require('./routes/staff-scope'));
     //  STF-02: «درخواستِ تأیید» از راهِ دور (شاگرد می‌پرسد، صاحب/مدیر روی دستگاهِ خودش) — پشتِ `shop.approval_requests`، پیش‌فرض خاموش
     api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
+    //  صندوقِ سندهای ردشده (DATA-SAFETY، مهاجرتِ ۳۱۵): صاحب/مدیر می‌بیند، دوباره ثبت می‌کند یا کنار می‌گذارد؛ دستگاهِ سازنده ردیفِ خودش را — بی پرچم
+    api.use('/shop/conflict-inbox', require('./routes/shop-conflict-inbox'));
     //  STF-01: نقشِ سفارشی (نام + نقشِ پایه + لایهٔ مجوز؛ اجرا در `staff-perms.layersFor`) — پشتِ `shop.custom_roles`، پیش‌فرض خاموش
     api.use('/shop/custom-roles', require('./routes/shop-custom-roles'));
     //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش

@@ -81,8 +81,17 @@
 8. آزمون‌های فقط-اندروید و آیفون این‌جا اجرا نشدند (فقط در CI).
 9. **سندِ ردشده در صندوقِ سرور:** v3 ِ «tx» ای که از یک دسته بزرگ‌تر است و دنباله‌اش در دستهٔ بعد `tx_rejected` می‌گیرد هنوز
    فقط تکهٔ نخست را در `loser_value` دارد (v1 همهٔ دسته‌های بعد را می‌افزاید)؛ و opی که جدولش در حدِ نقش نیست
-   (`table_not_allowed`، فقط برنامهٔ کهنه — برنامهٔ امروز پیش از دیسک می‌ایستد: `RoleGate`) صندوق ندارد. صفحهٔ «دوباره ثبت
-   کردن از صندوق» روی دستگاهِ دیگر هنوز ساخته نشده؛ داده روی سرور هست و از `GET /api/sync/v3/conflicts` خوانده می‌شود.
+   (`table_not_allowed`، فقط برنامهٔ کهنه — برنامهٔ امروز پیش از دیسک می‌ایستد: `RoleGate`) صندوق ندارد. ~~صفحهٔ «دوباره ثبت
+   کردن از صندوق» روی دستگاهِ دیگر هنوز ساخته نشده~~ ⇐ **ساخته شد** (مهاجرتِ ۳۱۵): «سندهای ردشده» ِ صاحب/مدیر در گوشیِ
+   نسخهٔ ۳ و کامپیوتر (`ui/v3/shell/ConflictInbox.kt`، `/api/shop/conflict-inbox`، `lib/conflict-inbox.js`) با دلیل،
+   کارمند، دستگاه، مبلغ، قلم‌ها و فاکتورِ کامل؛ «دوباره ثبت با تأییدِ من» (همان زنجیرهٔ push با نقشِ تأییدکننده، به نامِ
+   دستگاهِ سازنده، شناسهٔ opها `rs_<شناسهٔ ردیف>_<i>` ⇒ یک بار؛ برگهٔ تأیید در `shop_approvals` با `key_id='inbox'`)، «اصلاح و
+   ثبت» (سبدِ صندوق؛ ردیف پس از ثبتِ همان سبد `fixed`) و «کنار بگذار» (دلیلِ اجباری) — هر سه با سابقهٔ `conflict_inbox.*`؛
+   دستگاهِ سازنده روی همان فاکتور «سرور نپذیرفت: <دلیل>» و پس از تصمیمِ صاحب حالِ آن را می‌نویسد (`GET …/mine`). آزمون‌ها:
+   `server/test/conflict-inbox.test.js` ۹/۹، سفرِ JB6 ِ `journeys-b`، `ConflictInboxTest` (core) و `ConflictInboxDesktopTest`.
+   هنوز: دستگاهِ سازنده opهای خودش را pull نمی‌کند، پس «سرور نپذیرفت» ِ پیش از دوباره ثبت فقط روی همان دستگاه است و دفترش
+   تا دوباره ثبت با سرور فرق دارد (همان پیش)؛ «دوباره ثبت» ِ op ِ `cancel` ِ v3 (بی `reason` در بسته) دوباره رد می‌شود ⇒ «اصلاح»
+   یا «کنار بگذار».
 
 ## ۳. هماهنگی با `claude/no-data-loss` (پرونده‌هایش دست نخورد)
 
@@ -111,7 +120,7 @@
 | پشتیبان | عکسِ کالا (`product-photos`) | از سرور (`PhotoSync`) و پشتیبانِ کامل |
 | نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push` | منبعش سرور است (یا صفِ فرستادنی به آن) |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
-| مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
+| مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مانده | `tohid-staff-pins` | دوباره گذاشته می‌شود (بالا، بند ۵) |
 | بایگانی | `ledger-archive.json` (ردیف‌های بیش از ۴۰۰ روز) | روی سرور می‌مانند (`forgetArchived` فقط سایه را هرس می‌کند) |
 

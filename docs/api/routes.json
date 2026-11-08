@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 982,
+    "routes": 987,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 476,
+      "user": 481,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 687,
-      "empty": 293,
+      "extracted": 691,
+      "empty": 294,
       "unresolved": 2
     }
   },
@@ -607,7 +607,7 @@
     {"method":"POST","path":"/api/shop/approval-requests/:id/approve","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/approval-requests/:id/cancel","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/approval-requests/:id/deny","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/shop/approval-requests/config","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["approver","enabled","ttlMs"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/approval-requests/config","area":"shop","source":"server/src/routes/shop-approval-requests.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'approval-requests-ip' ","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["approver","enabled","ttlMs","v3"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approvals","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('audit.view')"],"params":[],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":["approvals"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["keys"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/approver-keys","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop"],"params":[],"query":[],"body":["deviceId","device_id","label","publicKey","public_key"],"response":{"statuses":[201],"keys":["key"]},"errors":[],"shape":"extracted"},
@@ -649,6 +649,11 @@
     {"method":"POST","path":"/api/shop/chat/conversations/:id/reports","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/shop/chat/conversations/:id/status","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":["id"],"query":[],"body":["status"],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/chat/search","area":"shop","source":"server/src/routes/shop-chat.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-chat-ip' })","requireUser","requireShop","requirePermission('chat.view')"],"params":[],"query":["limit","q"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/conflict-inbox","area":"shop","source":"server/src/routes/shop-conflict-inbox.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requirePermission(inbox.RESOLVE_PERMISSION)"],"params":[],"query":["limit","status"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/conflict-inbox/:id","area":"shop","source":"server/src/routes/shop-conflict-inbox.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requirePermission(inbox.RESOLVE_PERMISSION)"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/shop/conflict-inbox/:id/dismiss","area":"shop","source":"server/src/routes/shop-conflict-inbox.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requirePermission(inbox.RESOLVE_PERMISSION)"],"params":["id"],"query":[],"body":["fixedDoc","reason"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/conflict-inbox/:id/resubmit","area":"shop","source":"server/src/routes/shop-conflict-inbox.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' })","requireUser","requireShop","limit","requirePermission('data.read')","requirePermission(inbox.RESOLVE_PERMISSION)"],"params":["id"],"query":[],"body":["note"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/conflict-inbox/mine","area":"shop","source":"server/src/routes/shop-conflict-inbox.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'conflict-inbox-ip' })","requireUser","requireShop","limit","requirePermission('data.read')"],"params":[],"query":["limit"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/create","area":"shop","source":"server/src/routes/shop.js","auth":"user","guards":["requireUser"],"params":[],"query":[],"body":["name"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/custom-roles","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["roles"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/custom-roles","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["role"]},"errors":[],"shape":"extracted"},
