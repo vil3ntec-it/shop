@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.desktop
 
+import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.core.perm.ApproverVault
+import ir.vil3ntec.tohid.core.perm.PinGuard
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopRole
@@ -12,6 +14,7 @@ import kotlinx.coroutines.runBlocking
 import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
@@ -140,11 +143,90 @@ class ScenarioS46DesktopTest {
     assertTrue("رمزِ دستگاه راهِ برگشت است", TillUser.lock(ctx, deviceCode = true))
   }
 
+  /** همهٔ پرونده‌های زیرِ ریشهٔ دادهٔ برنامه (همان که پیش‌تر گشته می‌شد) */
+  private fun disk(): String = ctx.filesDir.parentFile!!.walkTopDown().filter { it.isFile && it.length() < 2_000_000 }
+    .mapNotNull { runCatching { it.readText() }.getOrNull() }.joinToString("\n")
+
+  private fun fa(pin: String) = pin.map { '۰' + (it - '0') }.joinToString("")
+
+  /**
+   *  ⛔ ریشهٔ سرخیِ ناپایدار (main ِ #958، `:148`): پوشهٔ دادهٔ آزمون را ~۳۲۰۰ آزمونِ همین JVM پر می‌کنند (oplog،
+   *  سایهٔ همگام‌سازی، زمان‌های میلی‌ثانیه‌ای، شناسه‌ها)؛ در یک اجرای کامل تا ۲۲ هزار پنجرهٔ شش‌رقمیِ گوناگون در آن
+   *  هست، پس هر PIN ِ ثابت تا ۲٪ به تصادف «پیدا» می‌شد («482915» در run 42407192906). PIN ِ تازه این را می‌بندد:
+   *   • در هیچ پرونده‌ای پیش از کار نیست (نه با رقمِ لاتین، نه فارسی) ⇒ پیدا شدنش فقط از نوشته‌های پس از آن است؛
+   *   • پنجره‌ای از ساعتِ ده دقیقهٔ پیشِ رو هم نیست (`onClock`) ⇒ زمان‌هایی که خودِ این راه می‌نویسد (سابقه، oplog،
+   *     HLC) هم به تصادف همان PIN نمی‌شوند. همین دو، جز رقم‌های تصادفیِ درونِ شناسه‌ها، همهٔ رقم‌های نوشته‌شده‌اند.
+   */
+  private fun freshPin(seen: String, t0: Long, vararg taken: String): String =
+    generateSequence { (1..6).joinToString("") { kotlin.random.Random.nextInt(10).toString() } }.first { p ->
+      PinGuard.newPinProblem(p) == null && p !in seen && fa(p) !in seen && !onClock(p, t0, t0 + 600_000) &&
+        taken.none { it == p }
+    }
+
+  /**
+   *  [p] پنجرهٔ ششْ‌رقمیِ زمانی در [from, to] است؟ میلی‌ثانیهٔ ۱۳ رقمی، ثانیه و HLC ِ ۱۵ رقمیِ صفرپیشوند همه
+   *  `⌊T/10^m⌋ mod 10⁶` با m = ۰…۹اند و ⌊T/10^m⌋ روی بازه پیوسته است.
+   */
+  private fun onClock(p: String, from: Long, to: Long): Boolean {
+    val v = p.toLong()
+    var d = 1L
+    repeat(10) {
+      val lo = from / d
+      val hi = to / d
+      if (hi - lo >= 1_000_000 || Math.floorMod(v - lo, 1_000_000L) <= hi - lo) return true
+      d *= 10
+    }
+    return false
+  }
+
   @Test
-  fun `PIN خام هیچ‌جا نوشته نمی‌شود`() {
-    val text = ctx.filesDir.parentFile?.walkTopDown()?.filter { it.isFile && it.length() < 2_000_000 }
-      ?.mapNotNull { runCatching { it.readText() }.getOrNull() }?.joinToString("\n").orEmpty()
-    assertFalse(text.contains("739164"))
-    assertFalse(text.contains("482915"))
+  fun `PIN خام هیچ‌جا نوشته نمی‌شود`() = runBlocking<Unit> {
+    val t0 = System.currentTimeMillis()
+    val before = disk()
+    val ownerPin = freshPin(before, t0)
+    val aliPin = freshPin(before, t0, ownerPin)
+    val wrongPin = freshPin(before, t0, ownerPin, aliPin)
+
+    //  گشتن واقعاً می‌بیند: رشتهٔ تازه در پوشهٔ داده ⇒ پیدا
+    val canary = File(ctx.cacheDir, "s46-canary.txt")
+    val decoy = freshPin(before, t0, ownerPin, aliPin, wrongPin)
+    canary.writeText("x$decoy\n")
+    assertTrue(disk().contains(decoy))
+    canary.delete()
+
+    //  همهٔ راهِ PIN، هر ردیفِ برگشتی همان‌طور که برنامه ذخیره می‌کند
+    pins.put(ApproverVault.create("u-owner-s46", "صاحب", "owner", ownerPin, iterations = 1000))
+    pins.put(ApproverVault.create("u-ali-s46", "علی", "staff", aliPin, iterations = 1000))
+    val wrong = ApproverVault.verify(pins.get("u-ali-s46")!!, wrongPin)
+    assertFalse(wrong.ok)
+    pins.put(wrong.record)
+    //  با رقمِ فارسی (صفحه‌کلیدِ فارسی)
+    val ok = ApproverVault.verify(pins.get("u-ali-s46")!!, fa(aliPin))
+    assertTrue(ok.ok)
+    pins.put(ok.record)
+    val owner = pins.get("u-owner-s46")!!
+    val (signedBy, slip) = ApproverVault.approve(
+      owner, ownerPin, ApproverVault.draft(owner, "shp_s46", ApprovalSlip.discountNeed("s-46", 2000, 10000), "S46", System.currentTimeMillis()),
+    )
+    assertNotNull(slip)
+    pins.put(signedBy)
+
+    val store = open()
+    val cart = CartStore(ctx)
+    TillUser.set(ctx, true)
+    assertTrue(cart.set(listOf(SalesEngine.CartLine("p-rice", 2.0))))
+    assertTrue(TillUser.lock(ctx, deviceCode = false))
+    TillUser.unlock(ctx, cart, store, TillUser.user(ok.record))
+    assertTrue(TillUser.lock(ctx, deviceCode = false))
+    TillUser.unlock(ctx, cart, store, TillUser.user(pins.get("u-owner-s46")!!))
+
+    //  `apply()` ِ prefs در صفِ یک رشته می‌نویسد؛ `commit()` پشتِ همهٔ آن‌ها منتظر می‌ماند ⇒ گشتن پس از آخرین نوشتن
+    assertTrue(ctx.getSharedPreferences("tohid-staff-pins", 0).edit().commit())
+
+    val after = disk()
+    for (p in listOf(ownerPin, aliPin, wrongPin)) {
+      assertFalse("PIN ِ خام روی دیسک", after.contains(p))
+      assertFalse("PIN ِ خام (رقمِ فارسی) روی دیسک", after.contains(fa(p)))
+    }
   }
 }
