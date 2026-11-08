@@ -94,6 +94,28 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     get() = prefs.getString(k("replica"), "").orEmpty()
     set(v) = prefs.edit().putString(k("replica"), v).apply()
 
+  /** DATA-06: شناسهٔ دستگاهی که این حال به آن بسته است (`core/sync/RestoredDevice.kt`)؛ خالی ⇒ هنوز نه */
+  val device: String
+    get() = prefs.getString(k("device"), "").orEmpty()
+
+  /** DATA-06: حالِ دستگاهِ دیگر بود ⇒ تا «بازسازی از سرور» نه Pull، نه هم‌ترازی (`V1Replica.fence`) */
+  var restoredRebuild: Boolean
+    get() = prefs.getBoolean(k("restoredRebuild"), false)
+    set(v) { prefs.edit().putBoolean(k("restoredRebuild"), v).commit() }
+
+  /**
+   *  بستن به [device] — با حصار ([fence]) replica ِ تازه و «در انتظارِ بازسازی» هم، هر سه در **یک** `commit()`: بسته شدنِ
+   *  برنامه پیش از آن ⇒ هیچ چیزی عوض نشده و دورِ بعد همان تصمیم؛ پس از آن ⇒ تمام.
+   */
+  fun commitBinding(device: String, fence: Boolean, replica: String): Boolean {
+    val e = prefs.edit().putString(k("device"), device)
+    if (fence) {
+      e.putBoolean(k("restoredRebuild"), true)
+      if (replica.isBlank()) e.remove(k("replica")) else e.putString(k("replica"), replica)
+    }
+    return e.commit()
+  }
+
   /** سرور از برنامه عقب‌تر است (۴۲۶): opها نگه داشته می‌شوند. */
   var holding: Boolean
     get() = prefs.getBoolean(k("holding"), false)

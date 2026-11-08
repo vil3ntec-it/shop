@@ -14,6 +14,11 @@
  *   JB5 دو دستگاهِ صاحب (A و B)، هر دو بی اینترنت، همان کالای همان فاکتور را کامل برمی‌گردانند ⇐ فقط یکی می‌نشیند؛
  *       دیگری با همهٔ همراه‌هایش `return_exceeds_sold`، صندوقِ تعارضِ کامل برای صاحب، تلاشِ دوباره همان یک صندوق
  *       (`lib/return-line-cap.js`، بی هیچ پرچمی: پیش‌فرض روشن). پیش از اصلاح سرخ بود: سرور هر دو را می‌پذیرفت.
+ *   JB6 گوشیِ صاحب از پشتیبانِ خودکارِ اندرویدش روی گوشیِ **دوم** بالا می‌آید (DATA-06، `core/sync/RestoredDevice.kt`):
+ *       در لحظهٔ پشتیبان برگشتی از فاکتورِ نسیه (`$inc` ِ `returnedQty` و `debtSettled`) در صف بود؛ گوشیِ اول همان را
+ *       فرستاد و کار را ادامه داد. گوشیِ دوم شناسه و سریِ خودش را می‌گیرد، فروشِ پیش از ورودش گم نمی‌شود، و پس از
+ *       «بازسازی از سرور» موجودی و قرض درست همان سرورند — هیچ چیزی دو بار نیست، همهٔ دستگاه‌ها یکی. شاهدِ خطر: همان
+ *       پشتیبان با cursor ِ کهنه و شناسهٔ تازه (بی بازسازی) برگشت را دو بار می‌نشاند.
  *
  * پرچم‌ها فقط برای همین دکان: shop.approval_requests، shop.returns.sale_cap، shop.orders، shop.storefront،
  * shop.catalog، shop.delivery، shop.owner_report.
@@ -346,6 +351,68 @@ await E.step('JB5', 'دو دستگاهِ صاحب، هر دو بی اینترن�
   await B.ensureSeries();
   await syncAll();
   await assertSameEverywhere('JB5', [A, B, S], { expect: { stock: { [oil]: oilBefore } } });
+}, { needs: ['JB.0'] });
+
+/* ═══════════════════════════════ JB6 ═══════════════════════════════ */
+
+await E.step('JB6', 'بازیابیِ پشتیبانِ گوشیِ صاحب روی گوشیِ دوم ⇐ شناسه و سریِ تازه، فروشِ پیش از ورود می‌رسد، هیچ چیزی دو بار نیست، همه یکی', async () => {
+  await syncAll();
+  const s = sale(A, A.sell({ lines: [{ id: rice, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));   // ۹۰۰ قرض
+  await syncAll();
+  const [rice0, tea0, oil0, debt0] = [A.stock(rice), A.stock(tea), A.stock(oil), A.debt(ahmad)];
+
+  //  ۱) لحظهٔ پشتیبان: گوشیِ صاحب بی اینترنت ۱ برنج از همان فاکتورِ نسیه برمی‌گرداند (۳۰۰ از قرض) و ۱ چای می‌فروشد
+  A.offline = true;
+  sale(A, A.returnFlow(s.saleId, { [itemOf(A, s.saleId, rice).id]: { qty: 1 } }, { reason: 'خراب' }));
+  sale(A, A.sell({ lines: [{ id: tea, qty: 1 }] }));
+  const files = A.deviceBackup();
+  assert.ok(files.queue.some((o) => o.table === 'saleItems' && o.fields?.returnedQty?.$inc === 1), 'پشتیبان `$inc` ِ نرفته را دارد');
+
+  //  ۲) پس از پشتیبان: گوشیِ اول همان صف را می‌فرستد و کار را ادامه می‌دهد؛ کامپیوتر هم
+  A.offline = false;
+  await A.drain();
+  sale(A, A.sell({ lines: [{ id: rice, qty: 1 }] }));
+  await B.drain();
+  sale(B, B.sell({ lines: [{ id: tea, qty: 2 }] }));
+  await syncAll();
+  const truth = await serverLedger(A);
+  assert.equal(A.stock(rice, truth), rice0 + 1 - 1);
+
+  //  ۳) شاهدِ خطر: cursor و سایهٔ پشتیبان با شناسهٔ تازه، بی بازسازی ⇒ opهای خودِ گوشیِ اول پس از cursor «دیگری»اند و
+  //     برگشت دو بار می‌نشیند (موجودی +۱، `debtSettled` ِ فاکتور +۳۰۰)
+  const N = NativeDevice.restoredFrom(E, 'A-restored-naive', files, { naive: true });
+  await N.login(owner.email);
+  await N.drain();
+  assert.equal(N.stock(rice) - A.stock(rice, truth), 1, 'شاهد: بی بازسازی برگشت دو بار شمرده می‌شد');
+  assert.equal(N.ledger.sales.find((x) => x.id === s.saleId).debtSettled - truth.sales.find((x) => x.id === s.saleId).debtSettled, 300);
+
+  //  ۴) کدِ امروز: `tohid-sync-v1` با پشتیبان نیامد ⇒ حصار (پایهٔ سایه = دفترِ بازیابی‌شده، «در انتظارِ بازسازی»)
+  const A2 = NativeDevice.restoredFrom(E, 'A2-owner-second-phone', files);
+  assert.equal(A2.restoredRebuild, true, 'KOTLIN.restoredFence');
+  const before = sale(A2, A2.sell({ lines: [{ id: oil, qty: 1 }] }));                   //  پیش از ورود، بی اینترنت
+  assert.ok(A2.queue.some((o) => o.table === 'sales' && o.row_id === before.saleId), 'فروشِ پیش از ورود op شد، «پایه» نشد');
+  await A2.login(owner.email);
+  await A2.ensureSeries();
+  assert.notEqual(A2.replica(), A.replica(), 'دو گوشی، دو شناسه');
+  assert.ok(A2.series && A2.series !== A.series, `سریِ تازه: ${A2.series} / ${A.series}`);
+  await A2.drain();
+  assert.equal(A2.restoredRebuild, false, 'بازسازی شد');
+  assert.equal(A2.stock(rice), A.stock(rice, truth), 'برگشت یک بار');
+  //  فروشِ تازهٔ گوشیِ دوم با سریِ خودش، هرگز زیرِ بلندترین شمارهٔ همان سری
+  const next = sale(A2, A2.sell({ lines: [{ id: rice, qty: 1 }] }));
+  const mine = A2.ledger.sales.find((x) => x.id === next.saleId);
+  assert.equal(mine.series, A2.series);
+  const top = Math.max(0, ...A2.ledger.sales.filter((x) => x.id !== next.saleId && x.series === A2.series).map((x) => x.invoiceNumber || 0));
+  assert.ok(mine.invoiceNumber >= top + 1, `${mine.invoiceNumber} ≥ ${top + 1}`);
+  await A2.drain();
+  await syncAll();
+  await A2.drain();
+  await assertSameEverywhere('JB6', [A, B, S, A2], {
+    expect: {
+      stock: { [rice]: rice0 + 1 - 1 - 1, [tea]: tea0 - 1 - 2, [oil]: oil0 - 1 },
+      debt: { [ahmad]: debt0 - 300 },
+    },
+  });
 }, { needs: ['JB.0'] });
 
 await E.finish();

@@ -99,7 +99,7 @@ class SyncV1Engine private constructor(context: Context) {
    */
   private fun keyOf(): String = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scopedKey(
     app,
-    SyncStateV1.currentAccount(app)
+    V1Replica.account(app, store)
       .ifBlank { store.accountName }
       .ifBlank { store.deviceUid },
   )
@@ -323,6 +323,7 @@ class SyncV1Engine private constructor(context: Context) {
     //  A00: مهرِ سایه پیش از بازیابی خوانده می‌شود؛ سایهٔ بی مهرِ ساختِ پیشین یک بار و پیش از
     //  نخستین تفاضل درمان، و opهای آن ساخت در صف نشان می‌شوند (شرح سرِ `SyncCommit.start`)
     val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
+    runCatching { fence(ledger) }
     if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
       state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
@@ -330,13 +331,15 @@ class SyncV1Engine private constructor(context: Context) {
     if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
 
+  internal fun fence(ledger: ShopData) =  // DATA-06: حالِ دستگاهِ دیگر؟ هنگامِ باز شدن و پس از هر ورود (زیرِ قفلِ همین موتور)
+    V1Replica.fence(this, app, store, state, ledger, queue.size()) { commit.record(it) }
+
   /* ==========================================================
      ۱) هر تغییرِ دفتر ⇒ op
      ========================================================== */
 
   /**
-   *  تنها درِ ساختنِ op. `ShopStore.save()` این را صدا می‌زند و هیچ
-   *  نوشتنِ دیگری در دفتر نیست.
+   *  تنها درِ ساختنِ op. `ShopStore.save()` این را صدا می‌زند و هیچ نوشتنِ دیگری در دفتر نیست.
    *
    *  @return چند op ساخته شد
    */
@@ -352,8 +355,7 @@ class SyncV1Engine private constructor(context: Context) {
      *  موجود کارِ `baseline()` است و فقط یک بار.
      *
      *  ⛔ صف و سایه با هم (F0-05): اگر میانِ این دو بسته شود، ذخیرهٔ بعدی
-     *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد.
-     *  شرح سرِ `SyncCommit`.
+     *  همان تغییرها را با op_idِ تازه می‌فرستاد و `$inc` دو بار جمع می‌شد. شرح سرِ `SyncCommit`.
      */
     val made = try {
       commit.record(data)
@@ -405,8 +407,7 @@ class SyncV1Engine private constructor(context: Context) {
    *  دفترِ امروز را یک‌جا به سرور می‌دهد — فقط برای دستگاهِ نخست.
    *
    *  ⚠️ تنها جایی است که «کلِ دفتر» می‌رود و عمدی است: حسابی که تازه
-   *  ساخته شده روی سرور هیچ ردیفی ندارد. دستگاهِ دوم همین را از
-   *  `snapshot` می‌گیرد، نه از این راه.
+   *  ساخته شده روی سرور هیچ ردیفی ندارد. دستگاهِ دوم همین را از `snapshot` می‌گیرد، نه از این راه.
    */
   fun baseline(data: ShopData): Int {
     val made = commit.baseline(data)
@@ -485,9 +486,9 @@ class SyncV1Engine private constructor(context: Context) {
           }
         }
 
-        //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست
+        //  Pull — تا وقتی سرور بگوید چیزِ دیگری هست (DATA-06: حالِ دستگاهِ دیگر ⇒ نه تا «بازسازی از سرور»، `V1Replica.fence`)
         var rounds = 0
-        while (!state.restorePending && rounds < 50) {
+        while (!state.restorePending && !state.restoredRebuild && rounds < 50) {
           rounds++
           val got = client.pull(device, state.cursor)
           //  §۹.۵: opهای دیگران با شماره‌شان — **پیش از** نشاندن — برای دوباره فرستادن پس از بازیابی
@@ -721,9 +722,9 @@ class SyncV1Engine private constructor(context: Context) {
    *  ──────────────────────────────────────────────────────────────────
    */
   suspend fun prepare(read: () -> ShopData, write: (ShopData) -> Unit) {
-    if (state.reconciledAt > 0 || state.recoverArchive) return
+    if (state.reconciledAt > 0 || state.recoverArchive || state.restoredRebuild) return
     gate.withLock {
-      if (state.reconciledAt > 0) return@withLock
+      if (state.reconciledAt > 0 || state.restoredRebuild) return@withLock
       val body = SyncV1Client(Backend.api(app)).snapshot()
       val server = LedgerDiff.fromSnapshot(body, JsonObject(emptyMap()))
       val serverCursor = (body["cursor"] as? kotlinx.serialization.json.JsonPrimitive)
@@ -842,8 +843,7 @@ class SyncV1Engine private constructor(context: Context) {
     /*
      *  ⚠️ **اول فرستادن، بعد گرفتن** — و این ترتیب عمدی است. اگر اول
      *  pull می‌کردیم، سایه روی «دفترِ ادغام‌شده» می‌نشست و ردیف‌های
-     *  محلی — که سرور آن‌ها را ندارد — دیگر «تغییر» شمرده نمی‌شدند و
-     *  هیچ‌وقت نمی‌رفتند.
+     *  محلی — که سرور آن‌ها را ندارد — دیگر «تغییر» شمرده نمی‌شدند و هیچ‌وقت نمی‌رفتند.
      */
     baseline(data)
     runOnce(read, write)
