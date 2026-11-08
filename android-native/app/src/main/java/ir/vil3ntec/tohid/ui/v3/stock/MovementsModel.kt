@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
 import ir.vil3ntec.tohid.core.i18n.StrStock
+import ir.vil3ntec.tohid.data.CountAbsorbWiring
 import ir.vil3ntec.tohid.data.ReportCsv
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.StockMovement
@@ -16,7 +17,7 @@ enum class MoveKind { PURCHASE, SALE, CUSTOMER_RETURN, SALE_CANCEL, SUPPLIER_RET
       "customer_return" -> CUSTOMER_RETURN
       "sale_cancel" -> SALE_CANCEL
       "supplier_return" -> SUPPLIER_RETURN
-      "adjustment", "count_adjust" -> ADJUSTMENT
+      "adjustment", "count_adjust", CountAbsorbWiring.ABSORB_TYPE -> ADJUSTMENT
       else -> OTHER
     }
   }
@@ -39,8 +40,10 @@ object MovementsModel {
       .groupBy { it.move.date }
       .map { (date, moves) -> MoveDay(date, moves) }
 
+  /** INV-10: با ردیفِ نمایشیِ «پیش از شمارش ثبت شده بود — در شمارش آمده است» (`CountAbsorbWiring.historyRows`) */
   private fun moves(d: ShopData, productId: String, kind: MoveKind?): List<StockMovement> =
-    d.stockMovements.filter { it.productId == productId && (kind == null || MoveKind.of(it.type) == kind) }
+    (d.stockMovements + CountAbsorbWiring.historyRows(d, productId))
+      .filter { it.productId == productId && (kind == null || MoveKind.of(it.type) == kind) }
 
   /** INV-02: گونه‌هایی که این کالا حرکت دارد (تراشه‌های صافی، به ترتیبِ `MoveKind`)؛ یک گونه ⇒ بی تراشه */
   fun kinds(d: ShopData, productId: String): List<MoveKind> {

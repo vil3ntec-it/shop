@@ -153,6 +153,7 @@ object WarehouseEngine {
     kind: AdjustKind = AdjustKind.ADJUSTMENT,
     /** INV-02 — کاربرِ ثبت‌کننده روی هر حرکت؛ `null` ⇒ مثلِ پیش */
     userId: String? = null,
+    countedAt: Map<String, Long> = emptyMap(), // INV-10: لحظهٔ هر کالا ⇒ روی ردیف با دانستهٔ همین دستگاه (`CountAbsorbWiring`)
   ): Result {
     if (counted.values.any { it.isNaN() || it < 0 }) return Result.Failed(StrGoods.countedNegative)
     val lines = countLines(d, counted, shift)
@@ -161,9 +162,7 @@ object WarehouseEngine {
     var data = d
     var lastId = ""
     for (l in lines) {
-      when (val r = adjustStock(
-        data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId, userId = userId,
-      )) {
+      when (val r = adjustStock(data, l.product.id, kotlin.math.abs(l.diff), l.diff > 0, why, kind, today, now, newId, userId = userId, countedAt = CountAbsorbWiring.momentOf(countedAt[l.product.id], now))) {
         is Result.Failed -> return Result.Failed("«${l.product.name}»: ${r.message}")
         is Result.Ok -> { data = r.data; lastId = r.id }
       }
@@ -869,6 +868,7 @@ object WarehouseEngine {
      */
     adjKind: String? = null,
     userId: String? = null,
+    countedAt: Long? = null, // INV-10 — فقط ردیفِ «انبارگردانی» (`stockCount`)؛ `null` ⇒ نوشته نمی‌شود
   ): Result {
     val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.addProductFirst)
     if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
@@ -911,7 +911,7 @@ object WarehouseEngine {
           isAdjustment = true,
           createdAt = now,
           adjKind = stockKind,
-          userId = user,
+          userId = user, countedAt = countedAt, seenMilli = countedAt?.let { CountAbsorbWiring.seen(d, productId, it, now) },
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),

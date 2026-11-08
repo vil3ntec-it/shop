@@ -88,23 +88,31 @@ import androidx.compose.ui.text.font.FontWeight
  *  «دور ریخته شود؟». (`V3Form` بدنهٔ ستونی دارد؛ این فهرست تنبل است، پس همان تکه‌های
  *  کیت — `V3Scaffold` + `V3FormBar` — کنارِ هم.)
  *
- *  @param onSave null یعنی ثبت شد؛ وگرنه دلیلِ ردِ `WarehouseEngine.stockCount`
+ *  @param onSave null یعنی ثبت شد؛ وگرنه دلیلِ ردِ `WarehouseEngine.stockCount`. سومی (INV-10): لحظهٔ آخرین
+ *  نوشتن یا اسکنِ هر کالا روی همین صفحه، با ساعتِ همین دستگاه
  */
 @Composable
 fun StockCountScreen(
   data: ShopData,
   today: String,
   onExport: (ReportCsv.Sheet) -> Unit,
-  onSave: (Map<String, Double>, String) -> String?,
+  onSave: (Map<String, Double>, String, Map<String, Long>) -> String?,
   onBack: () -> Unit,
+  /** INV-10: ساعتِ لحظهٔ هر کالا (`StockWriter.now`) */
+  clock: () -> Long,
   /** حالتِ آغازِ دلخواه (عکس‌های پیش‌نمایش) */
   start: CountState = CountState(),
 ) {
   var state by remember { mutableStateOf(start) }
+  //  INV-10: لحظهٔ آخرین تغییرِ عددِ هر کالا (نوشتن یا اسکن) ⇒ ردیفِ شمارش (`WarehouseEngine.stockCount(countedAt)`)
+  var at by remember { mutableStateOf(emptyMap<String, Long>()) }
   //  «اسکن‌های در انتظار» ⇒ انبارگردانی: شمارِ بارکدخوان به خانهٔ هر کالا افزوده می‌شود (`ScanApply.counts`)
   androidx.compose.runtime.LaunchedEffect(Unit) {
     ir.vil3ntec.tohid.scan.ScanHandoff.take(ir.vil3ntec.tohid.core.hw.ScanTarget.COUNT)?.let { h ->
-      state = state.copy(counts = ir.vil3ntec.tohid.scan.ScanApply.counts(state.counts, data, h.scans).counts)
+      val next = ir.vil3ntec.tohid.scan.ScanApply.counts(state.counts, data, h.scans).counts
+      val now = clock()
+      at = at + next.keys.filter { next[it] != state.counts[it] }.associateWith { now }
+      state = state.copy(counts = next)
     }
   }
   var query by remember { mutableStateOf("") }
@@ -153,13 +161,13 @@ fun StockCountScreen(
         }
       }
       itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->
-        CountRow(p, system[p.id] ?: 0.0, state, Modifier.v3AnimateItem(this).v3Stagger(stagger, p.id, i)) { v -> state = state.copy(counts = state.counts + (p.id to v)); failure = null }
+        CountRow(p, system[p.id] ?: 0.0, state, Modifier.v3AnimateItem(this).v3Stagger(stagger, p.id, i)) { v -> state = state.copy(counts = state.counts + (p.id to v)); at = at + (p.id to clock()); failure = null }
       }
     }
   }
 
   if (confirm) ConfirmLines(lines, onDismiss = { confirm = false }) {
-    failure = onSave(state.valid, state.note)
+    failure = onSave(state.valid, state.note, at)
     if (failure == null) onBack() else shake++
   }
   if (askDiscard) {

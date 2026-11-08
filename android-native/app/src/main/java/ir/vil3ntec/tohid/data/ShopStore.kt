@@ -1003,14 +1003,11 @@ class ShopStore(
     /**
      *  جدولِ موجودی — یک بار ساخته می‌شود، بارها خوانده.
      *
-     *  این کلاس یک باگِ کندیِ واقعی را می‌بندد. حسابِ قبلی برای **هر
-     *  کالا** کلِ اقلامِ فروش را می‌گشت، و برای **هر قلم** هم کلِ
-     *  فاکتورها را دنبالِ وضعیتِ «لغو» می‌گردید. یعنی هزینه‌اش ضربِ سه
-     *  عدد بود: کالاها × اقلامِ فروش × فاکتورها.
+     *  این کلاس یک باگِ کندیِ واقعی را می‌بندد. حسابِ قبلی برای **هر کالا** کلِ اقلامِ فروش را می‌گشت، و برای
+     *  **هر قلم** هم کلِ فاکتورها را دنبالِ وضعیتِ «لغو» می‌گردید. یعنی هزینه‌اش ضربِ سه عدد بود: کالاها × اقلامِ فروش × فاکتورها.
      *
-     *  صفحهٔ محصولات این را برای همهٔ کالاها صدا می‌زد و با هر حرفی که
-     *  در جستجو زده می‌شد از نو. دکانی با چند صد کالا و چند هزار فاکتور،
-     *  همان‌جا می‌ایستاد.
+     *  صفحهٔ محصولات این را برای همهٔ کالاها صدا می‌زد و با هر حرفی که در جستجو زده می‌شد از نو. دکانی با
+     *  چند صد کالا و چند هزار فاکتور، همان‌جا می‌ایستاد.
      *
      *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد هر پرسش یک خواندن است.
      *  PRD-10: کیت موجودیِ خودش را ندارد — ورود/فروش/برگشتِ آن به اجزا پخش می‌شود (`ProductPlansMap`).
@@ -1039,8 +1036,11 @@ class ShopStore(
 
       fun soldQty(productId: String): Double = sold[productId] ?: 0.0
 
+      val absorbOn = CountAbsorbWiring.serverFlag // INV-10: فروشِ پیش از شمارشِ دیررسیده (`CountAbsorbWiring`؛ خاموش ⇒ خالی)
+      private val absorbed = CountAbsorbWiring.gaps(d, absorbOn)
+
       fun stock(productId: String): Double = kits[productId]?.let { k -> ProductPlansMap.kitStock(k) { raw(it) } } ?: raw(productId)
-      private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0)
+      private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0) - (absorbed[productId]?.gapMilli ?: 0L) / 1000.0
 
       fun cartons(productId: String): Double = cartonsIn[productId] ?: 0.0
 
@@ -1067,7 +1067,7 @@ class ShopStore(
     @Synchronized
     fun index(d: ShopData): StockIndex {
       val ready = indexed
-      if (ready != null && indexedData === d) return ready
+      if (ready != null && indexedData === d && ready.absorbOn == CountAbsorbWiring.serverFlag) return ready
       val fresh = StockIndex(d)
       indexedData = d
       indexed = fresh

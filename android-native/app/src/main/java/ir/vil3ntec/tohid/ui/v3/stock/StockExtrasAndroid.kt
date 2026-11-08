@@ -135,7 +135,7 @@ internal fun RouteScope.CountToolsRoute() {
       val shift = CountShift.of(data, at)
       val n = WarehouseEngine.countLines(data, counted, shift).size
       writer.commit(data, 
-        WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, shift, WarehouseEngine.AdjustKind.COUNT, userId = writer.user),
+        WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, shift, WarehouseEngine.AdjustKind.COUNT, userId = writer.user, countedAt = at),
         StrStock.countSaved(money(n.toDouble())),
       ).let { failed -> if (failed != null) writer.fail(failed) else back() }
     },

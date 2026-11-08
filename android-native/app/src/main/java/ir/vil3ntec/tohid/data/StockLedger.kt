@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.core.stock.CountDuringSales
 import ir.vil3ntec.tohid.core.stock.Lot
 import ir.vil3ntec.tohid.core.stock.LotRef
@@ -244,6 +245,13 @@ object StockLedger {
           adjKind = kind,
         )
       }
+    }
+    //  INV-10 (`CountAbsorbWiring`): جذب‌شده ⇒ اصلاحِ برعکس در لحظه و محلِ همان ردیفِ شمارش؛ پرچم خاموش ⇒ هیچ
+    for (g in CountAbsorbWiring.gaps(d).values) {
+      val w = d.warehouseEntries.find { it.id == g.lineId }?.takeIf { want(g.productId) } ?: continue
+      val at = atOf(w.createdAt, w.date)
+      out += Event("${CountAbsorbWiring.ABSORB_TYPE}:${w.id}", "entry", "adjustment", at, dayOf(w.date, at), g.productId, w.locationId.orEmpty(),
+        -g.gapMilli, w.userId?.trim()?.ifEmpty { null } ?: LEGACY_USER, w.id, reason = StrStock.countAbsorbed, adjKind = "count")
     }
 
     d.stockMovements.forEachIndexed { t, x ->
