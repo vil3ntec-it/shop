@@ -8,7 +8,8 @@
  * ⛔ shop_id فقط از عضویتِ کاربرِ توکن. جست‌وجو با شماره فقط برای کسی که شمارهٔ کامل را می‌بیند
  *    (`orders.view` + `orders.contact`)؛ پاسخ همان کارتِ فهرست است (شمارهٔ پوشیده).
  * ⛔ سقف: سطلِ IP (`order-customer-ip`) پیش از احراز.
- * CRM-15: هر پرسش یک ردیفِ «سابقهٔ دسترسی» (`customerId` ِ اختیاری = شناسهٔ پروندهٔ برنامه؛ بی آن کلیدِ یک‌طرفهٔ شماره).
+ * CRM-15: هر پرسش «سابقهٔ دسترسی» می‌نویسد (`customerId` ِ اختیاری = شناسهٔ پروندهٔ برنامه، و هر شمارهٔ خوانده‌شده‌ای که در
+ *   پروندهٔ همان شناسه نیست با کلیدِ یک‌طرفهٔ شماره — `customer-access.noteLookup`؛ شمارهٔ دوم یا شناسهٔ ساختگی پنهانش نمی‌کند).
  * ⚠️ در app.js پیش از `/shop/orders` سوار می‌شود.
  */
 const express = require('express');
@@ -34,10 +35,9 @@ router.get('/', needFlag, async (req, res) => {
   const q = req.query?.phone;
   const phones = (Array.isArray(q) ? q : [q]).filter((x) => typeof x === 'string');
   const out = await orders.forCustomer(req.shopId, phones, { type: 'user', id: req.user.id, role: req.role });
-  //  CRM-15: «چه کسی پروندهٔ مشتری را دید» — شناسهٔ پروندهٔ برنامه (`customerId`)، وگرنه کلیدِ یک‌طرفهٔ شماره؛
-  //  بی انتظار و بی خطا (‎lib/customer-access.js‎)
-  const cid = typeof req.query?.customerId === 'string' ? access.refOf(req.query.customerId) : null;
-  access.note(req, { customerRef: cid || (phones.length ? access.phoneRef(phones[0]) : null), kind: 'detail', door: 'orders' });
+  //  CRM-15: «چه کسی پروندهٔ مشتری را دید» — شناسهٔ پروندهٔ برنامه (`customerId`) و هر شمارهٔ خوانده‌شده‌ای که در دفترِ
+  //  سرورِ همان پرونده نیست (کلیدِ یک‌طرفه)؛ بی انتظار و بی خطا (‎lib/customer-access.noteLookup‎)
+  access.noteLookup(req, { customerId: req.query?.customerId, phones, kind: 'detail', door: 'orders' });
   res.json(out);
 });
 

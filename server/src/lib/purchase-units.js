@@ -78,11 +78,15 @@ const isProducts = (table) => table === 'products';
 function v1Guard(req, res) {
   const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
   if (!ops || !ops.length) return;
+  //  ⛔ همان خوانشِ v1 (`sync-v1.normalize`/`tableOf`): «Products»، «pro_ducts» و `op_type`/`opType` هم همان opِ کالا‌اند —
+  //  پیش‌تر فقط `table === 'products'` و `type` سنجیده می‌شد و شکلِ دیگرِ همان op بی سنجش می‌نشست
+  const { tableOf } = require('./sync-v1');
   const rejected = new Map();
   ops.forEach((o, i) => {
-    if (!isObj(o) || !isProducts(o.table ?? o.table_name ?? o.tableName)) return;
-    if (o.type !== 'insert' && o.type !== 'update') return;
-    if (reasonOf(o.fields)) rejected.set(i, { op_id: String(o.op_id ?? '').slice(0, 80), status: 'rejected', reason: REASON });
+    if (!isObj(o) || !isProducts(tableOf('shop', o.table ?? o.table_name ?? o.tableName))) return;
+    const kind = o.type ?? o.op_type ?? o.opType;
+    if (kind !== 'insert' && kind !== 'update') return;
+    if (reasonOf(o.fields)) rejected.set(i, { op_id: String(o.op_id ?? o.opId ?? '').slice(0, 80), status: 'rejected', reason: REASON });
   });
   if (rejected.size) require('./v1-reject').rejectOps(req, res, ops, rejected);
 }
