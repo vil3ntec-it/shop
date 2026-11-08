@@ -206,6 +206,8 @@ object OwnerExport {
     "correctedAt" to "تاریخِ تصحیح‌شده (UTC)", //  S28b: از سرور، وقتی ساعتِ دستگاه کج بود
     "approval" to "تأییدِ مدیر",
     "cancelApproval" to "تأییدِ لغو",
+    "creditApproval" to "تأییدِ قرض", // STF-03
+    "priceApproval" to "تأییدِ قیمت", // STF-03
     "payments" to "ردیف‌های پرداخت",
     "tenderedMinor" to "دریافتی (پول)",
     "changeMinor" to "پول پس (پول)",

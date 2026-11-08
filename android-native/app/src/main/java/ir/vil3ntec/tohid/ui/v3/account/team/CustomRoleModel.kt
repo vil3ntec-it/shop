@@ -46,6 +46,7 @@ object CustomRoleModel {
     "sales.discount" -> Str.discount
     "sales.cancel" -> StrSetupPages.permVoid
     "sales.credit" -> StrAccount.permCredit
+    "sales.price" -> StrAccount.permPrice
     "returns.create" -> StrSetupPages.permReturns
     "shift.report" -> StrShiftReview.permReports
     "safe.move" -> StrSetupPages.permSafe

@@ -184,6 +184,8 @@ object StrAccount {
   val permContacts: String get() = t("دیدنِ شمارهٔ مشتریان (تماس و پیام)", "See customers' phone numbers (call and message)", "د پېرودونکو شمېرې لیدل (زنګ او پیغام)")
   //  STF-03: سقفِ فروشِ قرضیِ هر کارمند (سرور با پرچمِ `shop.credit_cap` می‌سنجد)
   val permCredit: String get() = t("فروشِ قرضی (به حساب)", "Selling on credit", "په پور پلورل")
+  //  STF-03: سقفِ تغییرِ قیمتِ ردیف (درصد از قیمتِ فهرست؛ سرور با پرچمِ `shop.price_cap` می‌سنجد)
+  val permPrice: String get() = t("تغییرِ قیمتِ ردیف", "Changing a line price", "د کرښې د بیې بدلول")
 
   //  STF-01: نقشِ سفارشی — نام + یکی از نقش‌های کارمند + مجوز و سقفِ خودش (سرور با پرچمِ `shop.custom_roles`)
   val roleCashier: String get() = t("صندوق‌دار", "Cashier", "صندوق‌دار")

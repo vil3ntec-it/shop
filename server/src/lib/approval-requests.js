@@ -50,7 +50,7 @@ const DOC_RE = /^[A-Za-z][A-Za-z0-9_]{0,40}\/[A-Za-z0-9_.:-]{1,120}$/;
 const ID_RE = /^apr_[0-9a-f]{24}$/;
 const LINE_BREAK = /[\r\n]/;
 /** کارهایی که بی مقدار معنا ندارند */
-const NEEDS_VALUE = new Set(['sales.discount', 'returns.create', 'sales.credit']);
+const NEEDS_VALUE = new Set(['sales.discount', 'returns.create', 'sales.credit', 'sales.price']);
 const STATUSES = Object.freeze(['open', 'pending', 'approved', 'denied', 'cancelled', 'used', 'expired', 'all']);
 
 const enabled = (shopId) => flagOf(shopId, FLAG);
@@ -180,7 +180,10 @@ async function create(shopId, actor, body, { deviceId = '' } = {}) {
   return out;
 }
 
-const PERM_LABEL = Object.freeze({ 'sales.discount': 'تخفیف', 'sales.cancel': 'لغوِ فاکتور', 'returns.create': 'برگشت' });
+const PERM_LABEL = Object.freeze({
+  'sales.discount': 'تخفیف', 'sales.cancel': 'لغوِ فاکتور', 'returns.create': 'برگشت',
+  'sales.credit': 'فروشِ قرضی', 'sales.price': 'تغییرِ قیمت',   //  STF-03
+});
 
 /**
  * خبرِ پوش به صاحبان و مدیرانِ فعالِ همین دکان (جز خودِ درخواست‌کننده) — همان `push.sendTo` ِ هشدارِ حساب‌پی.

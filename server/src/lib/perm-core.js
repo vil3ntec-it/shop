@@ -108,6 +108,13 @@
       defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
     },
+    //  STF-03: تغییرِ قیمتِ ردیفِ فاکتور نسبت به قیمتِ فهرستِ کالا (بالا یا پایین) — امروز هر نویسندهٔ فاکتور قیمتِ دستی
+    //  می‌گذارد، پس پیش‌فرض همان `sales.credit`؛ سقفِ `maxPct` = بیشترین فاصلهٔ یک ردیف از فهرست (درصد). سرور فقط با
+    //  پرچمِ خاموشِ `shop.price_cap` می‌سنجد (`server/src/lib/price-cap.js`)؛ کاهشِ قیمت همان‌جا تخفیف هم شمرده می‌شود
+    'sales.price': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: true, caps: ['maxPct'], display: false,
+    },
     'settings.write': {
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,

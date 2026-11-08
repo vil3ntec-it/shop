@@ -161,6 +161,8 @@
     correctedAt: 'تاریخِ تصحیح‌شده (UTC)',
     approval: 'تأییدِ مدیر',
     cancelApproval: 'تأییدِ لغو',
+    creditApproval: 'تأییدِ قرض', // STF-03 — همتای OwnerExport.kt
+    priceApproval: 'تأییدِ قیمت', // STF-03
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',

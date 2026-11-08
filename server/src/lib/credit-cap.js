@@ -22,8 +22,10 @@
  * پرچمِ خاموش (پیش‌فرض) ⇒ هیچ خواندنی جز خودِ پرچم (و آن هم فقط برای فاکتورِ قرض‌دار) و پاسخ‌ها همان امروز.
  * صاحبِ دکان هرگز سنجیده نمی‌شود.
  */
-const FLAG = 'shop.credit_cap';
-const PERM = 'sales.credit';
+//  قاعدهٔ مبلغ (جمعِ قرضِ فاکتور پس از همین درج) مشترک با صندوق: `sale-caps.creditAmount` = `core/perm/SaleCaps`
+const caps = require('./sale-caps');
+const FLAG = caps.CREDIT_FLAG;
+const PERM = caps.CREDIT;
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const int = (v) => { const n = Number(v); return Number.isFinite(n) ? Math.round(n) : 0; };
@@ -48,8 +50,8 @@ function needV3(op, row) {
   const prior = row && isObj(row.data) ? int(row.data.debtGivenMinor) : 0;
   if (op.kind === 'insert') {
     if (row && row.inserted) return null;
-    const a = int(op.fields.debtGivenMinor);
-    return a > 0 ? need(op.row_id, a + Math.max(0, prior)) : null;
+    const a = caps.creditAmount(op.fields.debtGivenMinor, prior);
+    return a > 0 ? need(op.row_id, a) : null;
   }
   if (op.kind === 'delta') {
     const d = Number(op.fields.debtGivenMinor);
@@ -62,7 +64,7 @@ function needV3(op, row) {
 /** opِ v1 ِ سنجیده‌شده (`validateOp`) — فقط درج؛ ویرایش در `staff-edit-v1` */
 function needV1(op) {
   if (!isObj(op) || op.table !== 'sales' || op.type !== 'insert' || !isObj(op.fields)) return null;
-  const a = minor(op.fields.debtGiven);
+  const a = caps.creditAmount(minor(op.fields.debtGiven));
   return a > 0 ? need(op.row_id, a) : null;
 }
 
@@ -149,7 +151,7 @@ function editNeedV1(rowId, was, now) {
 }
 
 /** سندِ «درجِ فاکتور» در `staff-approval` — همراه‌ها، نگه‌داشتن و دفترِ پایه یکی (تخفیف و قرض) */
-const SALE_INSERT_PERMS = new Set(['sales.discount', PERM]);
+const SALE_INSERT_PERMS = new Set(['sales.discount', PERM, 'sales.price']);   //  قیمت: ‎lib/price-cap.js‎
 
 module.exports = {
   FLAG, PERM, SALE_INSERT_PERMS, on, onUnits, needV3, needV1, touchesV1, touchesV3, slipOf, judgeV3, markV1, judgeLegacy, editNeedV1, minor,

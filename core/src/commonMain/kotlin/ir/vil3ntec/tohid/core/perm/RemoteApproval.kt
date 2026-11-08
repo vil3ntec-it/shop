@@ -25,8 +25,14 @@ object RemoteApproval {
   const val FLAG = "shop.approval_requests"
   /** `Slip.key` ِ تأییدِ از راهِ دور — ارجاع است، نه امضا */
   const val KEY = "remote"
-  /** کارهایی که سرور درخواستشان را می‌پذیرد (`approval-core.PERMS` بی `sales.pay_fix`، که سرور op اش را نمی‌سنجد) */
-  val PERMS: List<String> = listOf("sales.discount", "sales.cancel", "returns.create")
+  /**
+   *  کارهایی که سرور درخواستشان را می‌پذیرد (`approval-core.PERMS` بی `sales.pay_fix`، که سرور op اش را نمی‌سنجد).
+   *  STF-03: قرض (`sales.credit`) و تغییرِ قیمتِ ردیف (`sales.price`) فقط وقتی پرسیده می‌شوند که صندوق پیش‌سنجی‌شان کرده
+   *  (`SaleCaps`، با پرچمِ سرور)؛ سرور هر دو را با همان `create` ِ عمومی و همان سقف می‌پذیرد.
+   */
+  val PERMS: List<String> = listOf("sales.discount", "sales.cancel", "returns.create", "sales.credit", "sales.price")
+  /** کارهایی که بی مقدار معنا ندارند — همان `NEEDS_VALUE` ِ سرور */
+  val NEEDS_VALUE: Set<String> = setOf("sales.discount", "returns.create", "sales.credit", "sales.price")
   val APPROVER_ROLES: List<String> = listOf("owner", "manager")
   const val TTL_DEFAULT_MS: Long = 10 * 60 * 1000L
   const val POLL_MIN_MS: Long = 2_000L
@@ -87,7 +93,7 @@ object RemoteApproval {
     if (!KEY_RE.matches(key) || need.perm !in PERMS || !DOC_RE.matches(need.doc) || !reasonOk(reason)) return null
     if (need.pctBp != null && need.pctBp !in 0..10_000) return null
     if (need.amount != null && need.amount < 0) return null
-    if ((need.perm == "sales.discount" || need.perm == "returns.create") && need.pctBp == null && need.amount == null) return null
+    if (need.perm in NEEDS_VALUE && need.pctBp == null && need.amount == null) return null
     return buildMap {
       put("key", key); put("perm", need.perm); put("doc", need.doc)
       need.pctBp?.let { put("pctBp", it) }
@@ -174,7 +180,7 @@ object RemoteApproval {
     "request_expired", "approval_expired" -> Wait.EXPIRED
     "request_not_found", "approval_requests_disabled", "approval_not_needed", "bad_perm", "request_invalid", "bad_value",
     "bad_reason", "bad_time", "request_key_reused", "too_many_pending", "request_closed", "discount_not_allowed",
-    "cancel_not_allowed", "return_not_allowed", "perm_denied" -> Wait.FAILED
+    "cancel_not_allowed", "return_not_allowed", "credit_not_allowed", "price_not_allowed", "perm_denied" -> Wait.FAILED
     else -> null
   }
 

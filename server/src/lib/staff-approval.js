@@ -56,6 +56,7 @@ const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
   'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed',   //  قرض: STF-03 (‎lib/credit-cap.js‎)
+  'sales.price': 'price_not_allowed',   //  تغییرِ قیمتِ ردیف: STF-03 (‎lib/price-cap.js‎، پرچمِ `shop.price_cap`)
 });
 const { SALE_INSERT_PERMS } = creditCap;
 
@@ -905,7 +906,7 @@ function v3View(op) {
  * @param units  واحدهای `push` ِ v3 (هر واحدِ بی tx یک قلم دارد)
  * @returns واحدهای تازه (واحدهای بی‌ربط دست‌نخورده، به همان ترتیب)
  */
-function bundleV3(units, groups, { credit = false } = {}) {
+function bundleV3(units, groups, { credit = false, price = false } = {}) {
   const entries = [];
   units.forEach((u, ui) => {
     if (u.tx || u.broken) return;
@@ -918,6 +919,7 @@ function bundleV3(units, groups, { credit = false } = {}) {
     let perm = null;
     if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
     else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';   //  STF-03
+    else if (price && op.table === 'sales' && op.kind === 'insert') perm = 'sales.price';   //  STF-03: هر فاکتور با قلم‌هایش (‎lib/price-cap.js‎)
     else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
     else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
     if (!perm) return;
@@ -1048,7 +1050,7 @@ async function heldTxs(q, ctx, deviceId, txs) {
 module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
-  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
+  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };
