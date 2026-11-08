@@ -19,6 +19,12 @@
  *           `notice_deliveries`. گیرنده فقط صاحبِ دکان (`shops.owner_user_id`) و ردیف بی `tenant_id` ⇒ کارمندانِ
  *           دکان آن را در صندوقِ اعلانِ خود نمی‌بینند. واتس‌اپ در این مخزن هیچ سرویس‌دهنده‌ای ندارد (D-09) ⇒
  *           کانالِ پذیرفتنی نیست. ایمیل در `notify-cost.js` کانالِ پولی نیست؛ سقفِ عملی همان یک گزارش در روز است.
+ *   سود ─── RPT-03، پشتِ پرچمِ جدای `shop.owner_report.profit` (⛔ پیش‌فرض خاموش؛ عددی تازه در پیامی که صاحب
+ *           همین حالا می‌گیرد): سودِ ناخالصِ بازه با **میانگینِ موزونِ متحرک** (D-23، الف) از همان `report-core`
+ *           (`costing: 'mavg'`، بازپخش با `stock-core.js`) روی تاریخچهٔ همان کالاها — ورودهای انبار، قلم‌ها، فاکتورها و
+ *           برگشتی‌ها تا لحظهٔ گزارش — پس عدد همان «گزارشِ تازه» ِ برنامه برای همان دفتر است
+ *           (`core/test-vectors/cost-v1.json`). قلمِ بی‌بها، سقفِ ردیف یا ناهمخوانیِ خالص ⇒ «تقریبی»، نه عددِ قطعی.
+ *           خاموش ⇒ خلاصه و متن بایت‌به‌بایت همان پیشین.
  *   ایمنی ─ هر دکان در هر روزِ محلی **یک** گزارش: ردیفِ `owner_reports` با `UNIQUE (shop_id, report_date)` پیش از
  *           ساختن و فرستادن درج می‌شود (`ON CONFLICT DO NOTHING`) و فقط برندهٔ درج می‌فرستد ⇒ دو نمونهٔ سرور یا
  *           دو دورِ پیاپی پیامِ دوم نمی‌سازند. شکستِ پس از گرفتن ⇒ `error` و بی تلاشِ دوباره (حداکثر یک بار).
@@ -37,6 +43,9 @@ const schema = require('./sync-v3-schema');
 const { toLegacy } = require('./sync-v3-to-v1');
 
 const FLAG_KEY = 'shop.owner_report';
+const PROFIT_FLAG = 'shop.owner_report.profit';
+//  روشِ مصوبِ بها (D-23، ۱۴۰۵/۰۸/۱۳) — همان `CostPolicy.DECIDED` ِ برنامه (`core/cost/CostPolicy.kt`)
+const COST_DECIDED = 'mavg';
 const FREQUENCIES = Object.freeze(['daily', 'weekly']);
 const CHANNELS = Object.freeze(['inapp', 'push', 'email']);
 const HOUR_MS = 60 * 60 * 1000;
@@ -57,6 +66,7 @@ const METHOD_LABELS = Object.freeze({
 });
 
 const flagOf = (shopId) => require('./orders').flagOf(shopId, FLAG_KEY);
+const profitFlagOf = (shopId) => require('./orders').flagOf(shopId, PROFIT_FLAG);
 
 // ── تنظیم ────────────────────────────────────────────────────────────
 
@@ -193,7 +203,11 @@ function legacyRow(fmt, table, r) {
 const CREATED = "(CASE WHEN data->>'createdAt' ~ '^[0-9]{1,15}$' THEN (data->>'createdAt')::bigint ELSE 0 END)";
 
 //  نامِ جدول فقط از همین فهرستِ ثابت و در متنِ پرسش (نه پارامتر) تا نمایهٔ جزئیِ `saleItems` (مهاجرتِ ۱۱۹) به کار بیاید
-const TABLE_SQL = Object.freeze({ sales: "'sales'", saleItems: "'saleItems'", returns: "'returns'", products: "'products'" });
+const TABLE_SQL = Object.freeze({
+  sales: "'sales'", saleItems: "'saleItems'", returns: "'returns'", products: "'products'", warehouseEntries: "'warehouseEntries'",
+});
+//  «تا لحظهٔ گزارش» برای تاریخچهٔ بها: همان مرزِ بالای `rowsInWindow`، بی مرزِ پایین
+const UP_TO = `((${CREATED} > 0 AND ${CREATED} < $3) OR (${CREATED} = 0 AND data->>'date' <= $4))`;
 
 async function rowsInWindow(T0, table, shopId, w) {
   return (await replicaQuery(
@@ -233,6 +247,66 @@ async function ledgerOf(shopId, w) {
   return { fmt, partial, raw: { sales, saleItems, returns, products } };
 }
 
+/** تاریخچهٔ همان کالاها تا لحظهٔ گزارش (`productId` یا `id` ِ فاکتور) — فقط برای بهای میانگین */
+async function rowsUpTo(T0, table, shopId, ids, w, field) {
+  if (!ids.length) return [];
+  const where = field === 'id' ? 'row_id = ANY($2::text[])' : "data->>'productId' = ANY($2::text[])";
+  return (await replicaQuery(
+    `SELECT row_id, data, deleted_at FROM ${T0}
+      WHERE ${ACC} AND table_name=${TABLE_SQL[table]} AND ${where} AND ${UP_TO}
+      ORDER BY row_id LIMIT ${MAX_ROWS + 1}`,
+    [shopId, ids, w.until, w.to]
+  )).rows;
+}
+
+async function itemsOfProducts(T0, shopId, pids) {
+  return (await replicaQuery(
+    `SELECT row_id, data, deleted_at FROM ${T0} WHERE ${ACC} AND table_name=${TABLE_SQL.saleItems}
+        AND data->>'productId' = ANY($2::text[]) ORDER BY row_id LIMIT ${MAX_ROWS + 1}`,
+    [shopId, pids]
+  )).rows;
+}
+
+/**
+ * RPT-03 — دفترِ بها: دفترِ بازه + تاریخچهٔ کالاهای فروخته/برگشته‌اش تا لحظهٔ گزارش (ورودِ انبار، قلم، فاکتور، برگشتی).
+ * میانگین مالِ هر کالا جداست، پس فقط همین کالاها لازم‌اند و عددشان همان بازپخشِ کلِ دفتر است. ⇒ {raw, partial}
+ */
+async function costLedgerOf(shopId, w, L) {
+  const T0 = STORES[L.fmt];
+  let partial = L.partial;
+  const cap = (rows) => { if (rows.length > MAX_ROWS) { partial = true; return rows.slice(0, MAX_ROWS); } return rows; };
+  const map = (table, rows) => cap(rows).map((r) => legacyRow(L.fmt, table, r)).filter(Boolean);
+  const pids = [...new Set([...L.raw.saleItems, ...L.raw.returns].map((x) => String(x.productId || '')).filter(Boolean))];
+  if (!pids.length) return { raw: L.raw, partial };
+  const entries = map('warehouseEntries', await rowsUpTo(T0, 'warehouseEntries', shopId, pids, w, 'productId'));
+  const items = map('saleItems', await itemsOfProducts(T0, shopId, pids));
+  const returns = map('returns', await rowsUpTo(T0, 'returns', shopId, pids, w, 'productId'));
+  const saleIds = [...new Set([...items, ...returns].map((x) => String(x.saleId || '')).filter(Boolean))];
+  const sales = map('sales', await rowsUpTo(T0, 'sales', shopId, saleIds, w, 'id'));
+  const union = (a, b) => { const seen = new Set(a.map((x) => x.id)); return a.concat(b.filter((x) => !seen.has(x.id) && seen.add(x.id))); };
+  return {
+    partial,
+    raw: {
+      products: L.raw.products, warehouseEntries: entries,
+      sales: union(L.raw.sales, sales), saleItems: union(L.raw.saleItems, items), returns: union(L.raw.returns, returns),
+    },
+  };
+}
+
+/**
+ * سودِ ناخالصِ بازه — خالص، فقط با `report-core` و روشِ مصوب (همان «گزارشِ تازه» ِ برنامه). `netSales` باید همان
+ * خلاصه باشد؛ ناهمخوانی (دفترِ ناقص) یا سقفِ ردیف ⇒ «تقریبی».
+ */
+function profitOf(raw, w, zone, { partial = false, netSales = null } = {}) {
+  //  روشِ به‌کاررفته همان روشِ مصوب است ⇒ `costApproved` (همان `CostPolicy.approved`)؛ «تقریبی» فقط از قلمِ بی‌بها
+  const t = R.sales(raw, { from: w.from, to: w.to, clock: clockFor(zone), costing: COST_DECIDED, costApproved: true }).totals;
+  const off = netSales !== null && netSales !== t.netSales;
+  return {
+    costing: COST_DECIDED, cogs: t.cogs, grossProfit: t.grossProfit, marginBp: t.marginBp,
+    costEstimatedLines: t.costEstimatedLines, approximate: t.profitApproximate || partial || off,
+  };
+}
+
 /** کالای کم‌موجود از موجودیِ سرور (همان قاعدهٔ `stock.checkProducts`)؛ بی `shop.catalog` ⇒ null. */
 async function lowStockOf(shopId) {
   const stock = require('./stock');
@@ -266,9 +340,14 @@ function summarize(raw, w, zone, { partial = false, lowStock = null } = {}) {
   };
 }
 
-async function buildSummary(shopId, w, zone) {
+/** `opts.profit` ⇒ سود هم (فقط کارگرِ گزارش، و فقط با پرچمِ `shop.owner_report.profit`)؛ «همهٔ شعبه‌ها» آن را نمی‌خواهد */
+async function buildSummary(shopId, w, zone, opts = {}) {
   const L = await ledgerOf(shopId, w);
-  const sum = summarize(L.raw, w, zone, { partial: L.partial, lowStock: await lowStockOf(shopId) });
+  let sum = summarize(L.raw, w, zone, { partial: L.partial, lowStock: await lowStockOf(shopId) });
+  if (opts.profit === true && (await profitFlagOf(shopId))) {
+    const C = await costLedgerOf(shopId, w, L);
+    sum = { ...sum, profit: profitOf(C.raw, w, zone, { partial: C.partial, netSales: sum.netSales }) };
+  }
   //  حساب‌پی (PAY-21): پول به کدام حسابِ دکان رسید — فقط نام و ۴ رقم؛ حسابِ غیرِ فعال و هشدارِ «گیرنده ثابت نشد» جدا
   const hp = await require('./hesabpay-guard').receivedBy(shopId, w, L.raw.sales);
   return hp.accounts.length || hp.alerts ? { ...sum, hesabpay: hp } : sum;
@@ -294,6 +373,8 @@ function render(sum, { shopName = '' } = {}) {
     lines.push(`فروش: ${fa(sum.invoices)} فاکتور — ${money(sum.sales)}`);
     lines.push(`برگشتی: ${fa(sum.returnCount)} — ${money(sum.returns)}`);
     lines.push(`خالص: ${money(sum.netSales)}`);
+    //  RPT-03: فقط با پرچمِ سود؛ قلمِ بی‌بها یا دفترِ ناقص ⇒ «تقریبی»، نه عددِ قطعی
+    if (sum.profit) lines.push(`سودِ ناخالص${sum.profit.approximate ? ' (تقریبی)' : ''}: ${money(sum.profit.grossProfit)}`);
     if (sum.payments.length) {
       lines.push(`روشِ پرداخت: ${sum.payments.map((p) => `${METHOD_LABELS[p.method] || clean(p.method)} ${money(p.netSales)}`).join('، ')}`);
     }
@@ -354,7 +435,7 @@ async function runShop(row, at) {
   );
   if (!claimed) return null;
   try {
-    const summary = await buildSummary(row.shop_id, w, zone);
+    const summary = await buildSummary(row.shop_id, w, zone, { profit: true });
     const out = await deliver(row, render(summary, { shopName: row.shop_name }), s.channels);
     await query(
       `UPDATE owner_reports SET status=$2, summary=$3::jsonb, results=$4::jsonb, notice_id=$5, sent_at=$6 WHERE id=$1`,
@@ -441,7 +522,7 @@ function stop() {
 }
 
 module.exports = {
-  FLAG_KEY, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
-  flagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, buildSummary, render, timezoneOf,
+  FLAG_KEY, PROFIT_FLAG, COST_DECIDED, FREQUENCIES, CHANNELS, CATCHUP_MS, MORNING_BEFORE, MAX_ROWS, DEFAULTS,
+  flagOf, profitFlagOf, settingsOf, saveSettings, parseSettings, dueOf, clockFor, summarize, profitOf, buildSummary, render, timezoneOf,
   runShop, sweep, viewOf, start, stop,
 };

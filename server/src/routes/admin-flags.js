@@ -69,6 +69,8 @@ const KNOWN = Object.freeze([
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
   { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
+  //  RPT-03 (docs/FLAGS-ON-fa.md): عددِ تازه در پیامی که صاحب همین حالا می‌گیرد ⇒ جدا و خاموش؛ با `shop.owner_report`
+  { key: 'shop.owner_report.profit', scope: 'shop', default: false, what: 'سودِ ناخالص با میانگینِ موزون در گزارشِ خودکارِ صاحب (RPT-03)؛ قلمِ بی‌بها ⇒ «تقریبی»' },
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },

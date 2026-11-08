@@ -40,6 +40,8 @@ class ReportLedger private constructor() {
   class Entry(
     val id: String, val productId: String, val qty: Long, val unitCost: Long, val adjustment: Boolean,
     override val date: String, override val createdAt: Long,
+    /** هزینهٔ جانبیِ کلِ ردیف (PUR-06)، واحدِ کوچک، ≥ ۰ — همان `landedOf` ِ JS */
+    val landed: Long = 0L,
   ) : Dated
   class Audit(
     val id: String, val type: String, val refId: String, val user: String, val approvedBy: String, val amount: Long,
@@ -107,7 +109,7 @@ class ReportLedger private constructor() {
         l.entries += Entry(
           e.s("id"), e.s("productId"), milli(e, "units"), money(e, "price"),
           (e["isAdjustment"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true,
-          e.s("date"), ms(e, "createdAt"),
+          e.s("date"), ms(e, "createdAt"), landedOf(e),
         )
       }
       raw.list("auditLog").forEach { a ->
@@ -131,6 +133,15 @@ class ReportLedger private constructor() {
       if (p is JsonNull) return 0.0
       val d = if (p.isString) (if (p.content.isEmpty()) 0.0 else p.content.toDoubleOrNull()) else p.content.toDoubleOrNull()
       return if (d == null || d.isNaN() || d.isInfinite()) 0.0 else d
+    }
+
+    /** `landedCostMinor` ِ صحیح و نامنفی (≤ ۲^۵۳−۱)، وگرنه `landedCost` ِ افغانی؛ منفی یا نادرست ⇒ ۰ */
+    private fun landedOf(e: JsonObject): Long {
+      val p = e["landedCostMinor"] as? JsonPrimitive
+      val d = if (p != null && p !is JsonNull && !p.isString) p.content.toDoubleOrNull() else null
+      if (d != null && d >= 0.0 && d <= 9_007_199_254_740_991.0 && floor(d) == d) return d.toLong()
+      val x = money(e, "landedCost")
+      return if (x > 0) x else 0L
     }
 
     private fun money(o: JsonObject, k: String): Long = Math.round(num(o, k) * 100)
