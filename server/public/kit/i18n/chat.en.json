@@ -30,7 +30,20 @@
   "ct.v.send": "Send code",
   "ct.v.code": "Confirmation code",
   "ct.v.check": "Confirm",
+  "ct.mk.sent": "Sent",
+  "ct.mk.delivered": "Delivered",
+  "ct.mk.read": "Read",
+  "ct.act": "Message actions",
+  "ct.del.me": "Delete for me",
+  "ct.del.all": "Delete for everyone",
+  "ct.del.me.q": "Delete this message from your view only? The shop still sees it.",
+  "ct.del.all.q": "Delete this message for everyone? The shop will no longer see it either.",
+  "ct.del.yes": "Yes, delete",
+  "ct.del.me.ok": "Message deleted from your view.",
+  "ct.del.all.ok": "Message deleted for everyone.",
+  "ct.del.off": "Not deleted; no internet. Try again once you are connected.",
   "err.chat_closed": "This chat is closed.",
   "err.issue_window_passed": "The time for “I have a problem” on this order has passed.",
-  "err.chat_blocked": "This shop is not accepting your messages right now."
+  "err.chat_blocked": "This shop is not accepting your messages right now.",
+  "err.delete_window_passed": "The time to delete this message for everyone has passed."
 }
