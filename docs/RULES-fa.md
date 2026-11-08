@@ -669,7 +669,7 @@
 - ⛔ CodeQL ِ بیرون از پمپ (`(2.14.5)`، `codeql-hardening.test.js`): بدنهٔ خامِ `express.raw` فقط با `rawBody(req[, fallback])` ِ
   `lib/raw-body.js` (‏`typeof`/`Array.isArray` پیش از `Buffer.isBuffer`؛ CodeQL `Buffer.isBuffer` را نگهبانِ نوع نمی‌شناسد)؛ مسیرِ لاگ فقط
   با `redactPath` (CR/LF ِ خام پاک)؛ از کلید/راز هیچ چیز، حتی طول، چاپ نمی‌شود؛ حلقه روی متنِ درخواست پس از سقفِ طولِ سنجیده
-  (`parseCsv`: `csv_too_large`)؛ شیء از کلیدهای درخواست با `Object.fromEntries` + کنار گذاشتنِ `__proto__`/`constructor`/`prototype`، نه
+  (`parseCsv` ِ `lib/image-bank-csv.js`: `csv_too_large`)؛ شیء از کلیدهای درخواست با `Object.fromEntries` + کنار گذاشتنِ `__proto__`/`constructor`/`prototype`، نه
   `o[k] = …`؛ احراز (`auth(...)`) بی شرطِ بیرونی روی مقدارِ کاربر — خودش ورودیِ تهی/بی‌شکل را رد می‌کند. هشدارهای `lib/sync-v1.js`
   (کلیدِ `op.fields` در `applyOp`) مشترک با پمپ‌اند و دست نمی‌خورند.
 

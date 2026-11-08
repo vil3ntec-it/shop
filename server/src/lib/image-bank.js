@@ -31,6 +31,7 @@ const { checkOriginal, putBlob, tooLarge, ...QS } = require('./image-originals')
 const { ulid } = require('./ulid');
 const { stripControl } = require('./validate');
 const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
+const { parseCsv } = require('./image-bank-csv');   //  CSV ِ ردیف‌های دسته (سقفِ طول، بی نوشتنِ پویا)
 
 const SHOP_FLAG = 'shop.image_bank';
 const CENTRAL_FLAG = 'image_bank.central';
@@ -49,10 +50,6 @@ const PAGE_MAX = 50;
 const CANDIDATE_MAX = 500;
 const FUZZY_SCAN = 500;
 const ROWS_MAX = 1000;
-//  سقفِ متنِ CSV ِ ردیف‌ها: بدنهٔ JSON حداکثر ۲ مگابایت است (‎app.js‎) ⇒ هیچ رشته‌ای به آن نمی‌رسد؛ فقط
-//  ورودیِ دست‌کاری‌شده (آرایه/شیئی که String() اش از بدنه بلندتر است) ⇒ ۴۰۰ (CodeQL: loop bound injection)
-const CSV_MAX_CHARS = 2 * 1024 * 1024;
-const CSV_RESERVED = new Set(['__proto__', 'constructor', 'prototype']);
 const ROLES = ['main', 'back', 'label', 'variant', 'promo', 'detail'];
 const LICENSES = ['unknown', 'licensed', 'restricted', 'denied'];
 const REPORT_KINDS = ['wrong_product', 'old_packaging', 'quality', 'license', 'other'];
@@ -962,38 +959,6 @@ async function batchFile(id, name, buf) {
       [id, fname, row.hash, row.status, row.error, JSON.stringify(row.flags), row.orientation, now()]);
     return { name: fname, status: row.status, error: row.error, quality_flags: row.flags, sha256: row.hash || sha256(buf), ...(row.metrics && { quality: row.metrics }) };
   }
-}
-
-/** CSV با سطرِ سرآیند ⇒ ردیف‌ها (row_no = شمارهٔ سطرِ فایل). نقل‌قولِ "…" پشتیبانی می‌شود. */
-function parseCsv(text) {
-  const lines = [];
-  let row = [], field = '', q = false;
-  const s = String(text || '').replace(/^﻿/, '');
-  if (s.length > CSV_MAX_CHARS) throw badRequest('فایلِ CSV بیش از حد بزرگ است', 'csv_too_large');
-  for (let i = 0; i < s.length; i++) {
-    const ch = s[i];
-    if (q) {
-      if (ch === '"' && s[i + 1] === '"') { field += '"'; i++; } else if (ch === '"') q = false; else field += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === ',') { row.push(field); field = ''; }
-    else if (ch === '\n' || ch === '\r') {
-      if (ch === '\r' && s[i + 1] === '\n') i++;
-      row.push(field); lines.push(row); row = []; field = '';
-    } else field += ch;
-  }
-  if (field || row.length) { row.push(field); lines.push(row); }
-  if (!lines.length) return [];
-  const head = lines[0].map((h) => h.trim().toLowerCase());
-  const out = [];
-  for (let n = 1; n < lines.length; n++) {
-    if (lines[n].every((x) => !x.trim())) continue;
-    //  ⛔ نامِ ستون از فایل است: ردیف با `Object.fromEntries` ساخته می‌شود (ویژگیِ خودِ شیء، بی نوشتنِ پویای
-    //     `o[h] = …` که setter ِ `__proto__` را صدا می‌زند — CodeQL: remote property injection) و
-    //     `__proto__`/`constructor`/`prototype` باز هم کنار می‌روند. ترتیب و «آخری می‌بَرد» همان پیشین است.
-    const cells = head.flatMap((h, j) => (h && !CSV_RESERVED.has(h) ? [[h, (lines[n][j] || '').trim()]] : []));
-    out.push(Object.fromEntries([['row_no', n + 1], ...cells]));
-  }
-  return out;
 }
 
 const ROW_FIELDS = ['product_id', 'barcode', 'sku', 'name', 'brand', 'category', 'variant', 'size', 'unit',
