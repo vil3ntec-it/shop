@@ -196,16 +196,20 @@ class AuditSealTest {
   }
 
   private companion object {
-    /** `AuditEntry` و سندهای درونش در سطحِ ۱ (نامِ فیلدها، مرتب) */
+    /**
+     *  `AuditEntry` و سندهای درونش در سطحِ ۱ (نامِ فیلدها، مرتب). سطحِ ۱ = شکلِ مدل وقتی زنجیره نخستین بار رسید (دستهٔ ۳۲)،
+     *  با فیلدهای هم‌دستهٔ CRM-15 (`viewer`/`role`/`device`/`view`) و INV-21 (`bom`)؛ هیچ نسخه‌ای پیش از آن ردیفِ زنجیره‌دار ننوشت.
+     */
     const val SCHEMA_V1 =
-      "amount,approval,approvedBy,by,chain,chainSeq,chainV,createdAt,date,deviceId,drawer,fromMethod," +
-      "fromStatus,hash,id,layaway,layaway.debtorId,layaway.depositMinor,layaway.kind,layaway.lines," +
-      "layaway.lines.label,layaway.lines.name,layaway.lines.productId,layaway.lines.qtyMilli," +
-      "layaway.lines.unitMinor,layaway.saleId,layaway.schedule,layaway.schedule.amountMinor," +
-      "layaway.schedule.due,layaway.schedule.no,layaway.to,layaway.totalMinor,note,notes,payMethod,payRef," +
-      "payRow,points,prev,reason,refId,refIds,specialOrder,specialOrder.debtorId,specialOrder.depositMinor," +
+      "amount,approval,approvedBy,bom,bom.lossBp,bom.parts,bom.parts.productId,bom.parts.qtyMilli,by,chain," +
+      "chainSeq,chainV,createdAt,date,device,deviceId,drawer,fromMethod,fromStatus,hash,id,layaway," +
+      "layaway.debtorId,layaway.depositMinor,layaway.kind,layaway.lines,layaway.lines.label," +
+      "layaway.lines.name,layaway.lines.productId,layaway.lines.qtyMilli,layaway.lines.unitMinor," +
+      "layaway.saleId,layaway.schedule,layaway.schedule.amountMinor,layaway.schedule.due," +
+      "layaway.schedule.no,layaway.to,layaway.totalMinor,note,notes,payMethod,payRef,payRow,points,prev," +
+      "reason,refId,refIds,role,specialOrder,specialOrder.debtorId,specialOrder.depositMinor," +
       "specialOrder.due,specialOrder.item,specialOrder.productId,specialOrder.qtyMilli,specialOrder.saleId," +
-      "specialOrder.to,specialOrder.totalMinor,toMethod,toStatus,type,userId,userRole,xfer,z"
+      "specialOrder.to,specialOrder.totalMinor,toMethod,toStatus,type,userId,userRole,view,viewer,xfer,z"
   }
 
   @Test fun sealedRowRoundTripsThroughTheLedgerJson() {
