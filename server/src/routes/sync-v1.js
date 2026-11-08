@@ -118,6 +118,8 @@ const ack = require('../lib/sync-v1-ack');
  *  ⛔ پس از `shopNewerFields`: نگهبان همان opی را می‌بیند که v1 می‌نشاند (کلیدِ null برداشته).
  */
 const { v1SafeGuard: shopSafeGuard } = require('../lib/safe-ledger');
+//  STF-06 (مهاجرتِ ۲۸۰): گامِ انتقالِ عضوِ محدود ⇒ محدوده‌اش کنارِ کلیدِ گام (هیچ opی برداشته نمی‌شود؛ پمپ بی هیچ کار رد می‌شود)
+const { v1Guard: shopStepScope } = require('../lib/transfer-step-scope');
 /*
  *  دکان: فاکتورِ نسیهٔ بی مشتری (برنامهٔ کهنه) پذیرفته می‌شود ولی سابقهٔ `sale.credit_no_debtor` می‌گیرد — ‎lib/credit-debtor.js‎.
  *  پس از نشستن (شکلِ نهاییِ ردیف در `sync_rows`)؛ پمپ بی هیچ پرسشی از آن رد می‌شود.
@@ -133,7 +135,7 @@ const contact = require('../lib/customer-contact');
 //  ترتیب مهم است: پالایشِ null opِ نادرست را درست می‌کند (کلیدِ null ِ ناشناخته بیرون، hash ِ تازه)،
 //  پس نگهبان‌ها باید همان دسته‌ای را ببینند که به v1 می‌رسد — نه دستهٔ پیش از پالایش.
 //  `contact.v1Guard` (CRM-15) هم پالایش است (فیلدِ تماسِ ردیفِ موجود از اصلِ بی مجوز بیرون، hash ِ تازه) ⇒ پیش از نگهبان‌ها.
-router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, contact.v1Guard, shopStaffGuard, shopSafeGuard, async (req, res, next) => {
+router.post('/push', requireSyncWrite, pumpServicesOnly, shopNewerFields, contact.v1Guard, shopStaffGuard, shopSafeGuard, shopStepScope, async (req, res, next) => {
   try {
     const deviceId = v.id(req.body?.device_id || req.body?.deviceId, {
       field: 'شناسه دستگاه', required: true, max: 64,

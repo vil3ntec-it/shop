@@ -16,6 +16,7 @@ import ir.vil3ntec.tohid.core.shopper.CodeSent
 import ir.vil3ntec.tohid.core.shopper.MarketOverview
 import ir.vil3ntec.tohid.core.shopper.ProductPage
 import ir.vil3ntec.tohid.core.shopper.RecentShop
+import ir.vil3ntec.tohid.core.shopper.Refills
 import ir.vil3ntec.tohid.core.shopper.SavedOrder
 import ir.vil3ntec.tohid.core.shopper.ShopAddress
 import ir.vil3ntec.tohid.core.shopper.ShopList
@@ -229,7 +230,7 @@ class CustomerModel(
     if (r !is Route.Chat) chat.leave()
     notice = null
     when (r) {
-      Route.Home -> if (market !is Load.Ready && market !is Load.Busy) loadHome()
+      Route.Home -> { if (market !is Load.Ready && market !is Load.Busy) loadHome(); refreshRefills() }   //  MKT-06: چرخه‌ها از سرور
       is Route.Shop -> ensureStore(r.slug)
       is Route.Product -> {
         ensureStore(r.slug)
@@ -631,6 +632,7 @@ class CustomerModel(
     )
     s = ShopperMemory.withCart(s, Cart(slug))
     s = ShopperMemory.withOrder(s, SavedOrder(slug, o.token, o.orderNo, o.totalMinor, o.createdAt, page.shop.title))
+    s = s.copy(bought = Refills.record(s.bought, slug, o.lines, o.createdAt))   //  MKT-06: قلم‌های پذیرفتهٔ سرور، نه سبد
     persist(s)
     placeNote = null
     repriced = false

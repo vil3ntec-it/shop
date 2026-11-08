@@ -841,9 +841,8 @@ private fun EditPanel(
   var brand by remember { mutableStateOf(p.brand.orEmpty()) }
   var tags by remember { mutableStateOf(p.tags.orEmpty().joinToString("، ")) }
   //  PRD-04 (همان پرچم): بسته‌ها با بارکدِ هر واحد
-  var packs by remember {
-    mutableStateOf(p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ShopStore.coreOf(it)) })
-  }
+  var packs by remember { mutableStateOf(p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ShopStore.coreOf(it)) }) }
+  var cycle by remember { mutableStateOf(ir.vil3ntec.tohid.data.ProductCycle.text(p.consumptionDays)) }   //  MKT-06 چرخهٔ مصرف (روز، اختیاری)
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
@@ -861,6 +860,7 @@ private fun EditPanel(
   var maxStock by remember { mutableStateOf(p.maxStock?.let { qty(it) }.orEmpty()) }
 
   fun save() {
+    if (ir.vil3ntec.tohid.data.ProductCycle.bad(cycle)) { toast(ir.vil3ntec.tohid.core.i18n.StrProducts.cycleBad); return }
     val draft = WarehouseEngine.ProductDraft(
       name = name, category = category.trim(), unit = unit.trim(),
       purchasePrice = buy.toDoubleOrNull() ?: 0.0, salePrice = sell.toDoubleOrNull() ?: 0.0,
@@ -878,7 +878,7 @@ private fun EditPanel(
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
-      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(r.data) }; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameSaved(name.trim())) }
+      is WarehouseEngine.Result.Ok -> { scope.launch { store.save(ir.vil3ntec.tohid.data.ProductCycle.apply(r.data, p.id, cycle)) }; toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameSaved(name.trim())) }
     }
   }
 
@@ -886,8 +886,7 @@ private fun EditPanel(
     color = Shop.colors.surfaceSolid,
     shape = RoundedCornerShape(10.dp),
     modifier = Modifier
-      .width(340.dp)
-      .fillMaxHeight()
+      .width(340.dp).fillMaxHeight()
       .border(1.dp, Shop.colors.border, RoundedCornerShape(10.dp))
       .onPreviewKeyEvent { e ->
         if (e.type != KeyEventType.KeyDown) return@onPreviewKeyEvent false
@@ -941,6 +940,7 @@ private fun EditPanel(
         F(priceReason, { priceReason = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.priceReason)
       }
       F(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.alertLevel, true)
+      F(cycle, { cycle = it.filter(Char::isDigit) }, ir.vil3ntec.tohid.core.i18n.StrProducts.cycle, true)
       if (levelsOn) {
         Row {
           Box(Modifier.weight(1f)) { F(reorder, { reorder = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderPoint, true) }

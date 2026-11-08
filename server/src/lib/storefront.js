@@ -198,6 +198,13 @@ function priceOf(row) {
   return Number.isSafeInteger(minor) && minor <= MAX_PRICE_MINOR ? minor : null;
 }
 
+/** MKT-06: `consumptionDays` ِ کالا — همان `Product.CYCLE_MAX` ِ برنامه */
+const CYCLE_MAX = 365;
+function cycleOf(d) {
+  const n = d && d.consumptionDays;
+  return Number.isSafeInteger(n) && n >= 1 && n <= CYCLE_MAX ? { consumptionDays: n } : {};
+}
+
 function productView(row) {
   const d = typeof row.data === 'string' ? JSON.parse(row.data) : row.data || {};
   return views.pub('product', {
@@ -210,6 +217,8 @@ function productView(row) {
     photo: row.has_photo === true,
     //  IMG-12: نسخهٔ عکسِ همگام‌شده برای `?v=` ِ نشانیِ عکس (بانک در `withBank` جایش را می‌گیرد)؛ بی عکس ⇒ بی کلید
     ...(row.has_photo === true && row.photo_hash && { photoVersion: shelf.photoTag(`l:${row.photo_hash}`) }),
+    //  MKT-06: چرخهٔ مصرف (روزِ صحیحِ ۱ تا ۳۶۵) — نبود یا نادرست ⇒ بی کلید (پاسخِ پیشین بی‌کم‌وکاست)
+    ...cycleOf(d),
     //  ۳۲.۱/۳۲.۳: سرور هنوز دفترِ موجودی ندارد ⇒ «در حال بررسی»، هرگز «موجود»
     stock: { status: 'unverified', checkedAt: null },
   });

@@ -703,4 +703,12 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();
+
+  /*
+   *  بخش‌های سرور‌محورِ تازه که `index.html` ِ یخ‌زده برچسبی برایشان ندارد — هر کدام خودش پرچمش را از سرور
+   *  می‌پرسد و خاموش ⇒ هیچ نشانی در صفحه. INV-11: «انتقالِ موجودی» ِ صفحهٔ انبار (`stock-transfers.js`).
+   */
+  if (!window.TohidStockTransfers) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/stock-transfers.js?v=1', defer: true }));
+  }
 })();
