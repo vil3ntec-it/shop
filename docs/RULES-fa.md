@@ -405,6 +405,23 @@
   `orders.contact` **و** `customers.contact` (`ordersContact`، `requireOrdersContact`)؛ پیش‌فرضِ همه همان. ⛔ نگهبانِ نوشتن هرگز شیء/opِ تازه از کلیدهای درخواست نمی‌سازد
   (نه `{...fields}`، نه `req.body.ops = …`): فقط کلیدهای ثابتِ `FIELDS` در جا پاک/نوشته می‌شوند و opِ با نامِ ناامن (`isSafeFieldName`) رد
   (`bad_field_name`) — CodeQL js/remote-property-injection روی `lib/sync-v1.js`. سنجه: `customer-contact.test.js`.
+- ⛔ CRM-15 — **سابقهٔ دسترسی** («چه کسی پروندهٔ مشتری را دید»، `claude/customer-access-log`، **بی پرچم**: سپرِ حریم است، نه رفتارِ
+  تازهٔ پول یا مجوز). دو منبع، یک فهرست: (۱) سرور (`lib/customer-access.js`، مهاجرتِ ۳۸۰ `customer_access_log`): هر خواندنِ
+  **یک** مشتری از درِ سرور — `GET /api/debtors/:id` (`phone` اگر شماره/نشانیِ کامل در پاسخ رفت، وگرنه `detail`) و
+  `GET /api/shop/orders/customer` (`detail`؛ `customerId` ِ برنامه، بی آن `ph:` + HMAC ِ کلیدِ شماره) — با `note(req, …)` که
+  **منتظر نمی‌ماند و نمی‌اندازد** (خطا فقط در `stats()` و «سلامت» ِ پنلِ مرکزی، `customerAccessLog`)؛ همان بیننده + مشتری + نوع
+  در ۱۰ دقیقه از نخستین دیدن ⇐ همان ردیف با `hits + 1` (قفلِ تراکنشیِ کلید). فهرست و همگام‌سازی «یک مشتری» نیستند. (۲) دستگاه
+  (بی‌اینترنت): هر باز شدنِ پرونده (`openKind`: شمارهٔ کامل پیداست ⇒ `phone`)، زنگ/پیامک/واتس‌اپ (`phone`)، صورت‌حساب/چاپ/تصویر/اکسل
+  (`export`) و خروجی/چاپِ برگهٔ مشتریان (`CustomerAccess.CUSTOMER_SHEETS` ⇐ `refId = "*"`) یک ردیفِ **فقط‌افزودنیِ** `auditLog`
+  با `type = customer_view` و `viewer`/`role`/`device`/`view` (نام در `by`) — `data/CustomerAccessLog.kt`، تکرارِ ۱۰ دقیقه ⇐ هیچ
+  نوشتن؛ همان راهِ همگام‌سازیِ امروزِ `auditLog` (⛔ `lib/sync-v1.js` و `routes/sync-v1.js` دست نخوردند). نقشی که `auditLog`
+  نمی‌نویسد (حسابدار، `PermCore.canWrite`)، حالتِ آموزشی و بازسازیِ دفتر ⇐ ننوشتن. ⛔ هیچ‌جا نام، شماره، نشانی یا یادداشتِ
+  مشتری (`notes` خالی). ⛔ فقط‌افزودنیِ سرور با تریگر: فقط `hits`/`last_at` بالا و `customer_ref` ⇐ `erased:…`؛ SEC-10
+  (`customer-erasure.erase`) ردیف‌های همان شماره، قرض‌دارانِ دفترِ سرور با همان شماره و شمارهٔ دیگرِ همان پرونده‌ها را
+  `erased:<شناسهٔ حذف>` می‌کند (بیرون از `counts`). نگه‌داری = `CUSTOMER_ACCESS_RETENTION_DAYS` (پیش‌فرض ۰ = همان `audit_logs`:
+  سرور پاک نمی‌کند). دیدن: `GET /api/shop/customer-access?customerId=` و بخشِ «چه کسی این پرونده را دید»
+  (`CustomerAccessPanel`، گوشیِ نسخهٔ ۳ در `DebtorFileExtras` و کامپیوتر در `DeskCustomers`) فقط `audit.view` (صاحب همیشه؛ پیش‌فرض
+  مدیر و حسابدار؛ لایه می‌بندد). سنجه: `customer-access.test.js`، `CustomerAccessTest` (core)، `CustomerAccessLogTest`.
 - `shift.report` (PAY-15، گزارشِ X و Z ِ صندوقِ شیفت): پیش‌فرض همه allow (همان امروز؛ شاگرد نمای کور)، `restrict`، بی تأیید و فقط نمایشی؛ در `SERVER_EDITABLE` مثلِ `reports.money` تا «کارمندان» نشانش دهد؛ برنامه با `ShopRole.allows(…, "shift.report")` دکمهٔ X، Zِ پس از بستن و «گزارش Z» را می‌بندد، نه خودِ بستن (`claude/part-PAY-3`).
 - ⛔ STF-06 (پرچمِ خاموشِ `shop.staff_scope`، `lib/staff-scope.js`، `core/staff/StaffScope.kt`): «مکان» = قفسه یا انبار ِ موجودیِ سرور (شعبه در داده نیست). کارِ عضوِ محدود باید همهٔ مکان‌هایی را که نام می‌برد در محدوده داشته باشد و دست‌کم یکی («خراب» و «در مسیر» مکان نیستند) ⇒ وگرنه ۴۰۳ `location_out_of_scope`؛ ارسال از مبدأ، دریافت و رد در مقصد. مالک هرگز محدود نیست؛ خالی یا همهٔ مکان‌ها = همه (ردیف پاک می‌شود)؛ محدوده در هر درخواست از نو خوانده می‌شود. پرچم خاموش ⇒ هیچ خواندنی از `shop_member_scopes` و پاسخ‌ها بایت‌به‌بایت همان (`staff-scope.test.js`).
 - ⛔ STF-03 — **ویرایشِ** سندِ پولیِ Sync v1 (`lib/staff-edit-v1.js`، در `v1Guard`): هر `update` ِ v1 روی `sales` (`discount` یا `total`، عدد یا `{"$inc": n}`) یا `returns` (`amount`) که تخفیف، درصدِ تخفیف یا مبلغِ برگشت (سقفِ تجمعیِ فاکتور) را **بالا ببرد** همان نیازِ درج را می‌گیرد، با مقدارِ پس از اعمال (ردیفِ `sync_rows` + opهای پیشینِ همان دسته که رد نشدند)؛ برگه نمی‌برد ⇒ «نیازمند تأیید» = `approval_required`، نقشِ بی این کار ⇒ همان کدِ درج؛ فقط همان op رد می‌شود (بی همراه) و صندوق با `detail.edit`. کاهش و ویرایشِ بی‌پول آزاد. `Number(f.x) > 0` روی فیلدِ v1 بس نیست (`$inc` عدد نیست ⇒ NaN). ستونِ پولیِ تازهٔ سند (مثلاً `debtGiven` برای سقفِ قرضی) ⇒ همین‌جا + `staff-edit-v1.test.js`؛ `v1RoleReason` هم همان‌جاست. پرونده‌ها فقط کلیدهای ثابت (`KEYS`) را دنبال می‌کنند، نه کلیدهای درخواست.
@@ -1013,6 +1030,7 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ۲۱۶ (`216_perf_category_index.sql`: فقط نمایه — `ix_sync_rows_shop_product_category` برای «کالاهای هم‌دسته» و مرورِ دستهٔ ویترین، `claude/scale-1`).
 - ۲۵۵ (`255_image_store.sql`: `store_key`، `data` ِ nullable با CHECK ِ «یکی از دو» و نمایهٔ جزئیِ کلید روی هفت جدولِ بایتِ عکس — انبارِ جداشدنیِ عکس، `claude/scale-3`؛ سهمِ هماهنگ‌کننده ۲۵۵–۲۵۹؛ rollback در `server/migrations/rollback/` که پیش از `image-store-migrate rollback` خطا می‌دهد).
 - ۳۱۵ (`315_conflict_inbox.sql`: دو حالِ تازهٔ `resubmitted`/`fixed` در CHECK ِ `sync_v3_conflicts.status` و ستونِ `resolution_note` — صندوقِ سندهای ردشدهٔ صاحب/مدیر، `claude/conflict-ui`؛ سهمِ هماهنگ‌کننده ۳۱۵–۳۱۹؛ rollback در `server/migrations/rollback/` با پاکِ ردیفِ `schema_migrations` ِ خودش).
+- ۳۸۰ (`380_customer_access_log.sql`: `customer_access_log` با تریگرِ فقط‌افزودنی — سابقهٔ دسترسی، CRM-15، `claude/customer-access-log`؛ سهمِ هماهنگ‌کننده ۳۸۰–۳۸۴؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند).
 - ۳۰۵ (`305_return_line_index.sql`: فقط نمایه — `ix_sync_v3_rows_return_item`، `ix_sync_rows_return_item`، `ix_sale_returns_item` برای «برگشت‌های هر قلم» ِ سقفِ برگشتِ قلم، سفرِ JB5، `claude/return-cap`؛ سهمِ هماهنگ‌کننده ۳۰۵–۳۰۹؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند).
 - ۳۲۰ (`320_staff_device_keys.sql`: `staff_device_keys` — رازِ دستگاهِ شاگرد برای ورودِ دوباره با کد، فقط HMAC، یک رازِ زنده برای هر دکان + کاربر + دستگاه؛ `claude/staff-session`؛ سهمِ هماهنگ‌کننده ۳۲۰–۳۲۴؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند).
 - ۳۴۵ (`345_staff_device_key_life.sql`: `revoked_reason`/`revoked_by` روی `staff_device_keys`، نگهبانِ «رازِ باطل برنمی‌گردد و پیوندِ راز عوض نمی‌شود» (`staff_device_keys_guard`) و نمایهٔ جزئیِ رازهای زندهٔ هر دکان؛ `claude/staff-key-life`؛ سهمِ ۳۴۵–۳۴۹؛ rollback در `server/migrations/rollback/` که ردیفِ `schema_migrations` ِ خودش را هم پاک می‌کند و رازهای باطل را باطل نگه می‌دارد).

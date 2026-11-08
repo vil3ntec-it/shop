@@ -60,7 +60,8 @@ class CustomerOnlineOrdersTest {
     assertTrue(src("ui/screens/DeskCustomers.kt").contains("CustomerOnlineOrdersPanel(d, id, Modifier.padding(top = 8.dp), onOpen = onOpenOrder)"))
     val panel = src("ui/screens/CustomerOnlineOrdersAndroid.kt")
     //  دروازه پیش از هر پرسش؛ خطای شبکه یا فهرستِ خالی ⇒ هیچ
-    assertTrue(panel.indexOf("if (!CustomerOnlineOrders.canAsk(OrdersLive.config.value)) return") in 0 until panel.indexOf("forCustomer(phones)"))
+    //  CRM-15: همان پرسش، با شناسهٔ پرونده برای «چه کسی پرونده را دید» ِ سرور
+    assertTrue(panel.indexOf("if (!CustomerOnlineOrders.canAsk(OrdersLive.config.value)) return") in 0 until panel.indexOf("forCustomer(phones, customerId = debtorId)"))
     assertTrue(panel.contains("val shown = page ?: return"))
     assertTrue(panel.contains("if (rows.isEmpty()) return"))
     val repo = src("data/repo/OrdersRepository.kt")

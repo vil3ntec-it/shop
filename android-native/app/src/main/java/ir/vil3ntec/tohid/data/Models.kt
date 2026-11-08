@@ -835,6 +835,12 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val drawer: String? = null,
   /** INV-11 — فقط `stock_transfer` (`StockTransferBook`): گامِ انتقالِ موجودیِ سرور (`StockTransfer.Step.xfer`). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val xfer: kotlinx.serialization.json.JsonObject? = null,
+  /** CRM-15 — فقط `customer_view` («چه کسی پرونده را دید»، `CustomerAccessLog`): شناسهٔ بیننده، نقش، دستگاه و نوع
+   *  (`detail`/`phone`/`export`؛ `core/crm/CustomerAccess`). نامِ بیننده همان `by`. بی دادهٔ مشتری. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val viewer: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val role: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val device: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val view: String? = null,
 )
 
 /**

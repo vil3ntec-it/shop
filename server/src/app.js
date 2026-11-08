@@ -452,6 +452,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/payments', require('./routes/admin-payments'));
     //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش
     api.use('/shop/customer-erasure', require('./routes/shop-customer-erasure'));
+    //  CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی) — فقط `audit.view`/صاحب، بی پرچم (سپرِ حریم، نه رفتارِ تازه)
+    api.use('/shop/customer-access', require('./routes/shop-customer-access'));
     //  AI-11: «جست‌وجو با عکس» (کالاهای مشابهِ همان دکان) — پشتِ `shop.visual_search`، پیش‌فرض خاموش
     api.use('/shop/visual-search', require('./routes/shop-visual-search'));
     api.use('/shop', require('./routes/shop'));
@@ -725,6 +727,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
     //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
     require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
+    //  CRM-15: سابقهٔ دسترسی فقط اگر CUSTOMER_ACCESS_RETENTION_DAYS > 0 (۰ = همان `audit_logs`: سرور پاک نمی‌کند)
+    require('./lib/customer-access').sweep().catch(err => console.error('[customer-access]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.
