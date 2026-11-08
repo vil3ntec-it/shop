@@ -7,6 +7,9 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.LedgerTrees
 import ir.vil3ntec.tohid.sync.v1.SyncCommit
+import ir.vil3ntec.tohid.sync.v1.ShadowFileFlag
+import ir.vil3ntec.tohid.sync.v1.ShadowStore
+import ir.vil3ntec.tohid.sync.v1.SyncStateV1
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import kotlinx.serialization.json.Json
@@ -202,6 +205,62 @@ class LedgerPerfEquivalenceTest {
       assertEquals(coldDisk2.shadow, warmDisk.shadow)
     } finally {
       dir.deleteRecursively()
+    }
+  }
+
+  /**
+   *  `ShadowStore` (پرچمِ `shop.sync_shadow_file`): همان ثبت‌ها روی سایهٔ prefs و سایهٔ فایل ⇒ همان opها به همان ترتیب و
+   *  همان متنِ سایه در هر گام (همان نشانهٔ `seated` هم: نمونه همان رشته را پس می‌دهد)؛ پس از شروعِ دوباره همان بایت‌های
+   *  UTF-8 که prefs ِ دیسک نگه می‌دارد (جفتِ UTF-16 ِ بی‌جفت ⇒ `?` ِ هر دو) و همان اثرِ انگشتِ ژورنال.
+   */
+  @Test fun `سایهٔ فایل همان opها و همان متنِ سایهٔ prefs را می‌دهد — در هر گام و پس از شروعِ دوباره`() {
+    val ctx = ir.vil3ntec.tohid.desktop.DesktopContext
+    val prefs = ctx.getSharedPreferences("tohid-sync-v1", android.content.Context.MODE_PRIVATE)
+    val n = System.nanoTime().toString(36)
+    val a = "perfeqp$n"
+    val b = "perfeqf$n"
+    val dir = Files.createTempDirectory("perf-shadow").toFile()
+    fun state(k: String) = SyncStateV1(ctx, k)
+    class Q(val k: String) : SyncCommit.Parts {
+      val queue = ArrayList<SyncOp>()
+      override fun shadow(): String = state(k).shadow
+      override fun commit(shadow: String, cursor: Long?) { if (!state(k).commitShadow(shadow, cursor)) throw java.io.IOException("x") }
+      override fun queued(): Set<String> = queue.mapTo(HashSet()) { it.opId }
+      override fun push(ops: List<SyncOp>) { queue += ops }
+    }
+    try {
+      ShadowFileFlag.override = false
+      state(a).shadow
+      ShadowFileFlag.override = true
+      state(b).shadow
+      val pa = Q(a); val pb = Q(b)
+      val ca = SyncCommit(SyncCommit.Journal(File(dir, "a.json")), pa)
+      val cb = SyncCommit(SyncCommit.Journal(File(dir, "b.json")), pb)
+      assertEquals(ca.record(base), cb.record(base))
+      for ((name, d) in steps()) {
+        assertEquals(name, ca.record(d), cb.record(d))
+        assertEquals(name, pa.queue.map(::key), pb.queue.map(::key))
+        assertEquals(name, state(a).shadow, state(b).shadow)
+      }
+      assertTrue(prefs.getString("$b.shadow", null) == null)
+      assertTrue(state(a).commitShadow(state(a).shadow, 33))
+      assertTrue(state(b).commitShadow(state(b).shadow, 33))
+      val text = state(a).shadow
+      ShadowStore.restartForTest()
+      assertEquals(String(text.toByteArray(Charsets.UTF_8), Charsets.UTF_8), state(b).shadow)
+      assertEquals(SyncCommit.sha(text), SyncCommit.sha(state(b).shadow))
+      assertEquals(33L, state(b).cursor)
+      //  همان که prefs ِ کامپیوتر از دیسک پس می‌دهد
+      val disk = ir.vil3ntec.tohid.desktop.DesktopPrefs(File(ctx.root, "shared_prefs/tohid-sync-v1.json"))
+      assertEquals(disk.getString("$a.shadow", null), state(b).shadow)
+    } finally {
+      ShadowFileFlag.override = null
+      dir.deleteRecursively()
+      val e = prefs.edit()
+      prefs.all.keys.filter { it.startsWith("$a.") || it.startsWith("$b.") }.forEach { e.remove(it) }
+      e.commit()
+      ctx.filesDir.listFiles().orEmpty().filter { it.name.startsWith("sync-shadow-perfeq") && it.name.contains(n) }.forEach { it.delete() }
+      ShadowStore.restartForTest()
     }
   }
 

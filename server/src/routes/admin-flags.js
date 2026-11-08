@@ -48,6 +48,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.save_base', scope: 'shop', default: true, what: 'پایهٔ صریحِ ذخیره: دو ذخیره از یک صفحهٔ کهنه هیچ‌کدام را نمی‌برند و سدِ نقش با ادغامِ خاموش هم (برنامهٔ تازه، `?v=3`)؛ فقط false خاموش' },
   //  ⛔ پیش‌فرض روشن (رفعِ امنیتی، نه اجازه): فقط خاموش‌کنِ اضطراری — `false` ِ صریح ورودِ دوبارهٔ شاگرد را به پیش از ۲.۱۴.۵ برمی‌گرداند
   { key: 'auth.staff_session_guard', scope: 'shop', default: true, what: 'ورودِ دوبارهٔ شاگرد با کد فقط با رازِ همان دستگاه و کدی که هنوز برای همان عضو معتبر است (`lib/staff-device-keys.js`) — فقط false خاموش' },
+  { key: 'shop.sync_shadow_file', scope: 'shop', default: false, what: 'سایه و cursor ِ همگام‌سازیِ برنامه در فایلِ خودشان، نه تنظیمات (PERF-LEDGER) — خاموش ⇒ همان prefs؛ خاموش کردن امن است' },
   { key: 'sync.pull_own_newer', scope: 'shop', default: true, what: 'pull ِ v1 نوشتهٔ تازه‌ترِ خودِ دستگاه را با opِ کهنه‌ترِ دیگری بازنویسی نمی‌کند (#501) — فقط false خاموش' },
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },

@@ -11,7 +11,8 @@ package ir.vil3ntec.tohid.core.atrest
  *     Keystore ازدست‌رفته) تغییرهای نرفته هنوز به سرور برسند.
  *   • دفترچهٔ §۹.۵ (`sync-replay-*-sent.jsonl`، `ReplayBook`): همان opها پس از پذیرش — برای
  *     دوباره فرستادن اگر سرور از پشتیبان برگشت؛ «بازسازی از سرور» هم پیش از Snapshot آن را می‌خواند.
- *   • سایه و cursorِ Sync v1 (`shared_prefs/tohid-sync-v1.xml`).
+ *   • سایه و cursorِ Sync v1 (`shared_prefs/tohid-sync-v1.xml`، یا با پرچمِ `shop.sync_shadow_file` فایلِ
+ *     `sync-shadow-*.dat` و `.prev` ِ آن — `sync/v1/ShadowStore`).
  *   • `ledger-summary.json` (چند عدد برای نگهبانِ پس‌زمینه) و `sale-draft.json` (سبدِ نیمه‌کاره).
  */
 object AtRestScope {
@@ -32,7 +33,8 @@ object AtRestScope {
 
   /** حالِ همگام‌سازی که روی دیسک ساده می‌ماند و به سایه/cursor/دفتر بسته است */
   fun syncState(rel: String): Boolean =
-    rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-") || rel.startsWith("sync-replay-")
+    rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-") || rel.startsWith("sync-replay-") ||
+      rel.startsWith("sync-shadow-")
 
   /** فایلی که کنار گذاشته شد و دیگر بکار نمی‌رود — برای فهرستِ صفحهٔ امنیت */
   fun leftover(rel: String): Boolean =

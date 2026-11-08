@@ -849,6 +849,7 @@
 | `shop.storefront.bulk` | دکان / `all` | خاموش | M2 ِ قراردادِ بازار: `PUT /api/shop/storefront/products` (تا ۵۰۰ کالا، `Idempotency-Key` اجباری) و `notLive` در فهرستِ کالای کارمند؛ کالا از همان منبعِ ویترین (`ledgerSource`) ⇒ با `storefront.catalog_source` دکانِ v3 هم | M2، #425 | باز |
 | `shop.ledger_merge` | دکان / `all` | **روشن** برای برنامهٔ تازه (`?v=2`، از ۱۴۰۵/۰۸/۱۸)؛ برنامهٔ کهنه (بی `v`) خاموش | ذخیرهٔ کهنه در برنامه: همتاها (`LedgerPeers`)، سنجشِ دیسک پیش از نوشتن و ادغامِ سه‌طرفهٔ `ShopStore.save` (`LedgerMerge`)؛ برنامه از `GET /api/shop/ledger-merge/config?v=2` می‌خواند (`LedgerMergeFlag`، پیش‌فرضِ برنامه روشن)؛ فقط `false` ِ صریح (دکان بر `all`) یا نگه‌داشتِ «غیرفعال کردنِ سرویس» خاموش ⇒ همان رفتارِ پیشین | #407، `docs/DATA-SAFETY-fa.md` | main |
 | `shop.save_base` | دکان / `all` | ⛔ **روشن** (فقط `false` ِ صریح یا نگه‌داشتِ سرویس خاموش می‌کند) | پایهٔ صریحِ ذخیرهٔ برنامه (`ShopStore.save(base, next)`): دو ذخیره از یک صفحهٔ کهنه هیچ‌کدام را نمی‌برند و سدِ نقش با `shop.ledger_merge` ِ خاموش هم؛ برنامه از پاسخِ `?v=3` ِ `GET /api/shop/ledger-merge/config` (فیلدِ `base`) می‌خواند (`LedgerMergeFlag.base`)؛ پاسخِ `v=2` و بی `v` بی تغییر. فقط خاموش‌کنِ اضطراری ⇒ همان ذخیرهٔ پیشین (`saveGuessed`) | DATA-SAFETY، `claude/stale-save` | باز |
+| `shop.sync_shadow_file` | دکان / `all` | خاموش | سایه و cursor ِ Sync v1 ِ برنامه در فایلِ خودشان (`sync/v1/ShadowStore`: یک فایل، یک نوشتن، `DiskWrite` با `.prev`)، نه SharedPreferences/NSUserDefaults؛ برنامه از `GET /api/shop/ledger-merge/config?v=3` (کلیدِ `shadowFile`، فقط `true` روشن) می‌خواند و فقط در شروع به کار می‌گیرد؛ خاموش ⇒ همان prefs بیت‌به‌بیت، و فایلِ مانده در شروعِ بعد در prefs می‌نشیند | `claude/shadow-file`، `docs/PERF-LEDGER-fa.md` §۱۰ | باز |
 | `shop.settings_sync` | دکان / `all` | خاموش | همگام‌سازیِ زندهٔ کلیدهای «مالِ دکان» ِ `tohid-policy` (`ShopSettingsKeys`، DATA-SAFETY §۶): `GET`/`PUT /api/shop/settings-sync` (خاموش ⇒ `{enabled:false}` و ۴۰۳ `settings_sync_disabled`)، مهاجرتِ ۳۰۰، خبرِ سوکتِ `settings`؛ آخرین نویسنده با ساعتِ سرور هر کلید جدا، فقط صاحب/مدیر | DATA-SAFETY | باز |
 | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |
 | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
@@ -1084,6 +1085,12 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   ژورنال. بازیابی در `ShopStore.load` و پیش از هر ثبت و Push/Pull. opی که دوباره به صف برمی‌گردد **همان** `op_id`
   را دارد؛ هرگز opِ تازه برای همان تغییر. در کامپیوتر `DesktopPrefs.commit()` پشتِ `apply()`های در صف می‌رود. سنجه:
   `SyncCommitTest` (۱۳) و `SyncCommitDesktopTest`.
+  ⛔ با پرچمِ `shop.sync_shadow_file` (پیش‌فرض خاموش) همان «با هم» یک فایل است (`ShadowStore`، `ShadowFile`: سایه + cursor + دو
+  SHA-256، `DiskWrite` با `.prev`)؛ هر نوشتنِ فقط-cursor هم همان یک فایل. خواندن: اصل ⇐ `.prev` ⇐ نسخهٔ prefs ِ کوچ، هرگز «خالی»؛
+  برگشت به نسخهٔ کهنه‌تر ⇐ `recoverArchive` پیش از هر تفاضل. کوچ: فایل ⇐ دوباره‌خوانی و سنجش ⇐ نشانِ `copy` (همزمان)؛ نسخهٔ
+  prefs تا نخستین نوشتنِ موفق. نامِ فایل در نشانِ prefs است (`SyncV1Keys.move` همان یک `commit`). نوار و «ردِ حال» فایل را نمی‌خوانند
+  (`cursorSeen`، `hasSyncState`)؛ خانه و نوارِ کامپیوتر موتور را بیرون از رشتهٔ صفحه می‌سازند (`rememberSyncV1Status`).
+  سنجه: `ShadowStoreTest`، `LedgerPerfEquivalenceTest`.
 - ⛔ **F0-10 (#190):** شناسهٔ هر ردیفِ تازه (`newId()`، `auditId()`) فقط `Ulid.next()` (۴۸ بیت زمان + ۸۰ بیتِ
   SecureRandom)؛ `"id" + زمان + Math.random` برنمی‌گردد. شناسهٔ ردیف‌های موجود دست نمی‌خورد و هیچ کدی شکلِ شناسه
   را تجزیه یا بر اساسش مرتب نمی‌کند. سنجه: `NewIdTest`.
