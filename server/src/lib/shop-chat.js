@@ -375,13 +375,13 @@ function messageView(viewer, r, conv) {
       thumbSize: r.thumb_size == null ? null : n(r.thumb_size),
     } : null,
   };
-  //  رسید فقط برای پیامِ طرفِ خودِ بیننده معنا دارد
+  //  رسید فقط برای پیامِ طرفِ خودِ بیننده؛ `deleteUntil` (ساعتِ سرور) مهلتِ «حذف برای همه» ِ مشتری است و `remove` باز هم می‌سنجد (CHAT-08)
   if (r.sender === viewer.side) {
     v.clientId = r.client_id;
     v.status = deliveryStatus(n(r.seq), conv, r.sender);
+    if (viewer.side === 'customer') v.deleteUntil = n(r.created_at) + config.shopChat.deleteWindowMs;
   }
-  //  ⛔ شناسهٔ کارمند فقط درونِ دکان
-  if (viewer.side === 'shop' && r.sender === 'shop') v.senderUserId = r.sender_user_id;
+  if (viewer.side === 'shop' && r.sender === 'shop') v.senderUserId = r.sender_user_id; //  ⛔ شناسهٔ کارمند فقط درونِ دکان
   return v;
 }
 

@@ -106,6 +106,29 @@ class ShopperChatTest {
     assertEquals(2, hidden.messages.size, "«حذف برای من» دیده نمی‌شود")
   }
 
+  @Test fun ownStatusFollowsOnlyRealShopReceiptsLiveAndNeverGoesBack() {
+    val conv = ChatConversation("c1")
+    val mine = ChatMessage("m1", seq = 2, rev = 2, sender = "customer", body = "سلام", mine = true, clientId = "c-abcdefgh1", status = "sent")
+    val theirs = ChatMessage("m2", seq = 1, rev = 1, sender = "shop", body = "بفرمایید")
+    fun st(t: ChatThread, id: String) = t.statusOf(t.messages.first { it.id == id })
+    var t = ChatThread(conv).merge(ChatChanges(conv, listOf(theirs, mine), cursor = 2))
+    assertEquals("sent", st(t, "m1"), "بی رسیدِ دکان فقط «رفت»")
+    assertNull(st(t, "m2"), "پیامِ دکان وضعیتِ من ندارد")
+    //  long-poll ِ بی پیام فقط گفت‌وگو با رسیدِ تازهٔ دکان را می‌آورد
+    t = t.merge(ChatChanges(conv.copy(receipts = ChatReceipts(peerDeliveredSeq = 2)), emptyList(), cursor = 2))
+    assertEquals("delivered", st(t, "m1"))
+    t = t.merge(ChatChanges(conv.copy(receipts = ChatReceipts(peerDeliveredSeq = 2, peerReadSeq = 2)), emptyList(), cursor = 2))
+    assertEquals("read", st(t, "m1"))
+    t = t.merge(ChatChanges(conv.copy(receipts = ChatReceipts(peerDeliveredSeq = 1)), emptyList(), cursor = 2))
+    assertEquals("read", st(t, "m1"), "پاسخِ کهنه‌تر عقب نمی‌برد")
+    assertEquals(2, t.conversation.receipts.peerReadSeq)
+    val later = mine.copy(id = "m3", seq = 3, rev = 3, clientId = "c-abcdefgh2")
+    t = t.merge(ChatChanges(conv, listOf(later), cursor = 3))
+    assertEquals("sent", st(t, "m3"), "پیامِ تازه‌تر از «خواندم» ِ دکان «رفت» می‌ماند")
+    assertEquals("read", st(t, "m1"))
+    assertNull(t.statusOf(mine.copy(deleted = true)), "سنگِ قبر وضعیت ندارد")
+  }
+
   @Test fun photoOrientationRotationAndTransparencyLikeTheShopApp() {
     //  JPEG ِ کمینه با APP1/Exif و جهتِ ۶ (۹۰° ساعت‌گرد)، هر دو ترتیبِ بایت
     fun jpeg(orientation: Int, le: Boolean): ByteArray {

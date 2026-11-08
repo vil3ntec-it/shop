@@ -501,6 +501,34 @@ test('CHAT-08: حذف برای من فقط در نمای همان؛ حذف بر�
   await assert.rejects(chat.remove(me, conv, c1.message.id, 'x'), (e) => e.code === 'bad_scope');
 });
 
+test('CHAT-08: مهلتِ «حذف برای همه» فقط روی پیامِ زندهٔ خودِ مشتری و از ساعتِ سرور (deleteUntil)؛ دوباره زدن همان سنگِ قبر', async () => {
+  const config = require('../src/config');
+  const o = await chatShop('مهلتِ حذف');
+  const me = customer(o.shopId, '+93790000018');
+  const conv = (await chat.open(me, {})).conversation.id;
+  const mine = (await chat.send(me, conv, { clientId: cid(), body: 'پیامِ من' })).message;
+  assert.equal(mine.deleteUntil, mine.createdAt + config.shopChat.deleteWindowMs);
+  const shopMsg = (await sendHttp(o.token, conv, { clientId: cid(), body: 'پیامِ دکان' })).body.message;
+  assert.equal(shopMsg.deleteUntil, undefined, 'دکان مهلت را از /config دارد، نه از پیام');
+  const seen = (await chat.changes(me, conv, { after: 0 })).messages;
+  assert.equal(seen.find((m) => m.id === mine.id).deleteUntil, mine.deleteUntil);
+  assert.equal(seen.find((m) => m.id === shopMsg.id).deleteUntil, undefined, 'پیامِ دکان برای مشتری مهلت ندارد');
+  const shopSeen = (await msgs(o.token, conv)).body.messages.find((m) => m.id === mine.id);
+  assert.equal(shopSeen.deleteUntil, undefined, 'دکان مهلتِ مشتری را نمی‌بیند');
+
+  //  دو بار «حذف برای همه» (دوبار زدن، دو برگه) ⇒ هر دو ۲۰۰ و همان سنگِ قبر، بی مهلت؛ rev فقط یک بار جلو رفت
+  const first = await chat.remove(me, conv, mine.id, 'all');
+  const again = await chat.remove(me, conv, mine.id, 'all');
+  assert.equal(first.message.deleted, true);
+  assert.deepEqual(again.message, first.message);
+  assert.equal(first.message.deleteUntil, undefined);
+  //  «حذف برای من» ِ دوباره هم همان پنهان
+  const h1 = await chat.remove(me, conv, shopMsg.id, 'me');
+  const h2 = await chat.remove(me, conv, shopMsg.id, 'me');
+  assert.deepEqual(h2.message, h1.message);
+  assert.equal(h1.message.hidden, true);
+});
+
 test('CHAT-09: دکان یا مشتریِ دیگر با عوض کردنِ شناسه به هیچ گفت‌وگو، پیام یا رسانه‌ای نمی‌رسد', async () => {
   const a = await chatShop('الف');
   const b = await chatShop('ب');

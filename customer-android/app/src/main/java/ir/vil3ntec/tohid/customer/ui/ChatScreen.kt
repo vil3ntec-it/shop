@@ -79,7 +79,7 @@ private fun ThreadView(model: CustomerModel, t: ChatThread, modifier: Modifier) 
   @Suppress("UNUSED_VARIABLE") val rev = c.mediaRev
   LazyColumn(modifier.fillMaxWidth(), state = list, contentPadding = PaddingValues(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
     if (total == 0) item { Note(ShopperText.chatEmpty) }
-    items(t.messages, key = { it.id }) { m -> Bubble(model, m) }
+    items(t.messages, key = { it.id }) { m -> Bubble(model, m, t.statusOf(m)) }
     items(queued, key = { "q-" + it.clientId }) { q -> QueuedBubble(model, q) }
   }
   c.note?.let { Note(it, Tone.WARN, Modifier.fillMaxWidth().padding(horizontal = 12.dp)) }
@@ -109,7 +109,7 @@ private fun ThreadView(model: CustomerModel, t: ChatThread, modifier: Modifier) 
 }
 
 @Composable
-private fun Bubble(model: CustomerModel, m: ChatMessage) {
+private fun Bubble(model: CustomerModel, m: ChatMessage, status: String?) {
   val mine = m.mine || m.sender == "customer"
   val colors = MaterialTheme.colorScheme
   Row(Modifier.fillMaxWidth(), horizontalArrangement = if (mine) Arrangement.End else Arrangement.Start) {
@@ -130,7 +130,8 @@ private fun Bubble(model: CustomerModel, m: ChatMessage) {
       }
       val meta = listOfNotNull(
         ShopperText.chatEdited.takeIf { m.editedAt != null && !m.deleted },
-        when (m.status) { "read" -> ShopperText.chatRead; "delivered" -> ShopperText.chatDelivered; "sent" -> ShopperText.chatSent; else -> null }.takeIf { mine },
+        //  `ChatThread.statusOf`: status ِ پیام یا رسیدِ تازه‌ترِ دکان (long-poll ِ بی پیام) — زنده، هرگز عقب (CHAT-04)
+        when (status) { "read" -> ShopperText.chatRead; "delivered" -> ShopperText.chatDelivered; "sent" -> ShopperText.chatSent; else -> null }.takeIf { mine },
       )
       if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelSmall)
     }

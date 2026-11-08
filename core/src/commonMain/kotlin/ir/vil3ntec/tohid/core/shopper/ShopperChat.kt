@@ -251,8 +251,32 @@ data class ChatThread(val conversation: ChatConversation, val messages: List<Cha
     val byId = LinkedHashMap<String, ChatMessage>()
     messages.forEach { byId[it.id] = it }
     c.messages.forEach { m -> val old = byId[m.id]; if (old == null || m.rev >= old.rev) byId[m.id] = m }
-    return ChatThread(c.conversation, byId.values.filter { !it.hidden }.sortedBy { it.seq }, max(cursor, c.cursor))
+    //  رسیدها فقط جلو (پاسخِ کهنه‌تر وضعیتِ «خوانده شد» را عقب نمی‌برد) — همان GREATEST ِ سرور
+    val o = conversation.receipts
+    val n = c.conversation.receipts
+    val receipts = if (c.conversation.id != conversation.id) n else ChatReceipts(
+      max(o.peerDeliveredSeq, n.peerDeliveredSeq), max(o.peerReadSeq, n.peerReadSeq), max(o.myDeliveredSeq, n.myDeliveredSeq), max(o.myReadSeq, n.myReadSeq),
+    )
+    return ChatThread(c.conversation.copy(receipts = receipts), byId.values.filter { !it.hidden }.sortedBy { it.seq }, max(cursor, c.cursor))
   }
+
+  /**
+   *  وضعیتِ پیامِ خودم (CHAT-04): «رفت» = سرور دارد؛ «رسید/خوانده شد» فقط با رسیدِ واقعیِ دکان — `status` ِ همان پیام یا
+   *  رسیدِ تازه‌ترِ گفت‌وگو (long-poll ِ بی پیام فقط رسید می‌آورد)؛ هر کدام بیشتر، هرگز حدس. پیامِ دکان و سنگِ قبر ⇒ null.
+   */
+  fun statusOf(m: ChatMessage): String? {
+    if (!(m.mine || m.sender == "customer") || m.deleted) return null
+    val r = conversation.receipts
+    val seen = when {
+      m.seq > 0 && m.seq <= r.peerReadSeq -> "read"
+      m.seq > 0 && m.seq <= r.peerDeliveredSeq -> "delivered"
+      else -> "sent"
+    }
+    val own = m.status ?: "sent"
+    return if (rank(own) >= rank(seen)) own else seen
+  }
+
+  private fun rank(s: String) = when (s) { "read" -> 3; "delivered" -> 2; "sent" -> 1; else -> 0 }
 
   /** پیامِ تازهٔ خودم که همین حالا رسید (پیش از رسیدنِ تغییرها) */
   fun withMine(m: ChatMessage): ChatThread =
