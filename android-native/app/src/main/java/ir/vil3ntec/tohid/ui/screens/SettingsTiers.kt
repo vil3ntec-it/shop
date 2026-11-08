@@ -125,6 +125,7 @@ object SettingsHelp {
     SettingsLayout.WEBCAM -> H.webcamLine
     SettingsLayout.PERIPHERALS -> H.peripheralsLine
     SettingsLayout.PROFILE -> ir.vil3ntec.tohid.core.i18n.StrSettingsHome.profileLine
+    SettingsLayout.STORE_PLACE -> ir.vil3ntec.tohid.core.i18n.StrStorePlace.line
     LATE_APOLOGY -> H.lateApologyLine
     else -> null
   }

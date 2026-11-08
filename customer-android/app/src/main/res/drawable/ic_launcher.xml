@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- کیسهٔ خرید روی سبزِ ویترین (#0F766E) — آیکونِ ساده تا آیکونِ نهایی (مرحلهٔ انتشار) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+  android:width="108dp"
+  android:height="108dp"
+  android:viewportWidth="108"
+  android:viewportHeight="108">
+  <path android:fillColor="#0F766E" android:pathData="M54,4a50,50 0,1 1,0 100a50,50 0,1 1,0 -100z" />
+  <path android:fillColor="#FFFFFF" android:pathData="M34,42h40l-3,36a4,4 0,0 1,-4 4H41a4,4 0,0 1,-4 -4z" />
+  <path android:fillColor="#00000000" android:strokeColor="#FFFFFF" android:strokeWidth="5"
+    android:pathData="M44,46V36a10,10 0,0 1,20 0v10" />
+</vector>

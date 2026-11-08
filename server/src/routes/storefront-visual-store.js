@@ -8,7 +8,8 @@
  *    منقضی/معلق/لغو) ⇒ همان ۴۰۴ `store_not_found` ِ `sf.open` (SUB-10: دستهٔ STORE_PAID).
  * ⛔ فقط کالاهای منتشرشده و پنهان‌نشدهٔ همان دکان (`sf.catalogByIds`)؛ shop_id فقط از `slug`.
  * ⛔ عکسِ مشتری ذخیره نمی‌شود؛ هیچ کالایی خودکار انتخاب یا به سبد افزوده نمی‌شود.
- * ⛔ سقف: سطلِ IP پیش از هر کار، و سطلِ جدای هر ویترین.
+ * ⛔ سقف: سطلِ IP پیش از هر کار، و سطلِ جدای هر ویترین — کلیدش **شناسهٔ دکان** است، نه نشانیِ خام: `sf.open`
+ *    نشانی را trim و کوچک می‌کند و `/ABC/` یا `/abc%20/` همان ویترین‌اند (`storefront-security.test.js`).
  */
 const express = require('express');
 const sf = require('../lib/storefront');
@@ -19,7 +20,7 @@ const { rateLimit } = require('../middleware/ratelimit');
 const router = express.Router();
 
 const ipLimit = rateLimit({ max: 20, keyPrefix: 'store-visual-ip' });
-const storeLimit = rateLimit({ max: 300, keyPrefix: 'store-visual', key: (req) => `store:${req.params.slug}` });
+const storeLimit = rateLimit({ max: 300, keyPrefix: 'store-visual', key: (req) => `store:${req.visualShop}` });
 const body = express.raw({ type: () => true, limit: photos.MAX_BYTES + 1024 });
 
 router.post('/:slug/visual-search', ipLimit, async (req, res, next) => {

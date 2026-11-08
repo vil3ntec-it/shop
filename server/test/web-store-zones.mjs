@@ -324,11 +324,15 @@ ok(!(await text('#t-disc-label')).includes('اولین'), 'خریدِ دومِ �
 await open();
 await addRice();
 await toCheckout();
-ok(await page.isHidden('#addr-extra'), 'پرچمِ نشانیِ بیشتر خاموش ⇒ همان فرم');
+ok(await page.$eval('#addr-extra', (e) => e.hidden), 'پرچمِ نشانیِ بیشتر خاموش ⇒ همان فرم');
 await flag('shop.storefront.address_extra', true);
 await open();
 await toCheckout();
-ok(await page.isVisible('#addr-extra'), 'روشن ⇒ «شمارهٔ دوم» و «Plus Code»');
+//  ممیزیِ ویترین (CHK-08): اختیاری‌ها زیرِ «جزئیاتِ بیشتر» ِ بسته‌اند ⇒ پیدا فقط پین، نشانی و نشانه
+ok(!(await page.isVisible('#a-phone2')) && await page.isVisible('#a-text') && await page.isVisible('#a-landmark') && await page.isVisible('#pin-btn'),
+  'فرمِ کوتاه: «شمارهٔ دوم» زیرِ «جزئیاتِ بیشتر»، نشانی و نشانه و پین پیدا');
+await page.click('#addr-more > summary');
+ok(await page.isVisible('#addr-extra'), 'روشن ⇒ «شمارهٔ دوم» و «کدِ مکانِ گوگل» در «جزئیاتِ بیشتر»');
 await page.selectOption('#zone-pick', { label: 'کارته‌سه — ارسال ۳۰ افغانی' });
 await page.fill('#a-text', 'کارته‌سه، کوچهٔ سوم');
 await page.fill('#a-phone2', '۰۷۹۹ ۸۸۸ ۷۷۷');

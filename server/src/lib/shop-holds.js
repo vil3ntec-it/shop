@@ -178,7 +178,7 @@ async function place(shopId, req, { reason, ip = '' }) {
     throw badRequest('برای این کار سرآیندِ Idempotency-Key لازم است', 'idempotency_key_required');
   }
   const actor = require('./admin-service').actorRecord(req);
-  return tx(async (c) => {
+  const result = await tx(async (c) => {
     if (idem) {
       await idempotency.lock(c, idem);
       const prior = await idempotency.find(idem, idempotency.viaClient(c));
@@ -210,6 +210,9 @@ async function place(shopId, req, { reason, ip = '' }) {
     if (idem) await idempotency.save(c, idem, { tenantId: shopId, resultId: hold.id, response: out });
     return { ...out, replayed: false, accessChanged: !before && ACCESS_KINDS.includes(kind) };
   });
+  //  «غیرفعال کردنِ سرویس» پرچم را می‌بُرد ⇒ حافظهٔ کوتاهِ پرچم‌های همین دکان (`lib/hot-cache.js`)، پس از commit
+  require('./hot-cache').invalidate('flag', `${String(shopId)}\u0000`);
+  return result;
 }
 
 /** برداشتنِ یک حالت (همان دکان — شناسهٔ حالتِ دکانِ دیگر ۴۰۴). */
@@ -222,7 +225,7 @@ async function lift(shopId, holdId, req, { reason, ip = '' }) {
     throw badRequest('برای این کار سرآیندِ Idempotency-Key لازم است', 'idempotency_key_required');
   }
   const actor = require('./admin-service').actorRecord(req);
-  return tx(async (c) => {
+  const result = await tx(async (c) => {
     if (idem) {
       await idempotency.lock(c, idem);
       const prior = await idempotency.find(idem, idempotency.viaClient(c));
@@ -248,6 +251,9 @@ async function lift(shopId, holdId, req, { reason, ip = '' }) {
     if (idem) await idempotency.save(c, idem, { tenantId: shopId, resultId: hold.id, response: out });
     return { ...out, replayed: false };
   });
+  //  «غیرفعال کردنِ سرویس» پرچم را می‌بُرد ⇒ حافظهٔ کوتاهِ پرچم‌های همین دکان (`lib/hot-cache.js`)، پس از commit
+  require('./hot-cache').invalidate('flag', `${String(shopId)}\u0000`);
+  return result;
 }
 
 /** برای `entitlementOf`: زمانِ «پایانِ اشتراک» ِ باز، یا null. */

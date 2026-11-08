@@ -89,9 +89,8 @@
       box.appendChild(K.pill(s));
       var hours = K.hours(s);
       if (hours) box.appendChild(el('span', {}, hours));
-      box.appendChild(el('span', { text: t('sh.local', { t: K.fa(Number(s.localTime.slice(0, 2)), 0) + ':' + K.fa(Number(s.localTime.slice(3)), 0).padStart(2, K.fa(0, 0)) }) }));
-      //  ۳۱.۱: زمانِ آخرین تأییدِ اتصال فقط با زمانِ واقعیِ ثبت‌شده
-      box.appendChild(el('span', { text: s.lastConfirmedAt ? t('sh.seen', { t: K.clock(s.lastConfirmedAt, s.timezone) }) : t('sh.unseen') }));
+      //  ۳۱.۱: آخرین اتصال فقط وقتی تأیید نیست (ممیزی ۶: زبانِ فنی نه)
+      if (s.connection !== 'confirmed') box.appendChild(el('span', { text: s.lastConfirmedAt ? t('sh.seen', { t: K.clock(s.lastConfirmedAt, s.timezone) }) : t('sh.unseen') }));
       box.appendChild(el('span', { class: 'accept', text: accept(s) }));
       if (s.notice) box.appendChild(el('span', { class: 'notice', text: s.notice }));
     }
@@ -101,6 +100,7 @@
     if (store.minOrderMinor > 0) meta.appendChild(el('span', { text: t('min.order', { m: K.money(store.minOrderMinor) }) }));
     meta.appendChild(el('span', {}, K.icon('cash'), t('cod')));
     $('accept-line').textContent = s || closed() ? accept(s) : '';
+    if (more) more.head();
   }
   function closed() { return Boolean(store && store.ordering && store.ordering.accepting === false); }
   function accept(s) { return closed() ? t('err.store_not_accepting_orders') : K.accept(s.orderAcceptance); }
@@ -158,7 +158,7 @@
 
   function loadProducts(more) {
     var ul = $('products');
-    var qs = '?limit=40' + (catalog.q ? '&q=' + encodeURIComponent(catalog.q) : '') +
+    var qs = '?limit=40&sort=' + $('sort').value + (catalog.q ? '&q=' + encodeURIComponent(catalog.q) : '') +
       (catalog.category ? '&category=' + encodeURIComponent(catalog.category) : '') +
       (catalog.extra || '') + (more && catalog.cursor ? '&cursor=' + encodeURIComponent(catalog.cursor) : '');
     if (!more) {
@@ -167,7 +167,7 @@
     }
     ul.setAttribute('aria-busy', 'true');
     return api('/products' + qs).then(function (r) {
-      if (!more) K.clear(ul);
+      if (!more) { K.clear(ul); $('cat-count').textContent = r.total ? t('n.items', { n: K.fa(r.total, 0) }) : ''; }
       r.items.forEach(function (p) { catalog.items[p.id] = p; ul.appendChild(card(p)); });
       var unknown = r.items.some(function (p) { return !K.stockOf(p).known; }) || (more && !$('stock-note').hidden);
       $('stock-note').hidden = !unknown;
@@ -257,10 +257,11 @@
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
     if (milli <= 0) delete cart[id];
     else {
-      cart[id] = {
+      //  CHK-15/16: یادداشت و «اگر نبود» ِ قلم (line-prefs.js) با تغییرِ تعداد می‌مانند
+      cart[id] = Object.assign({}, line, {
         qtyMilli: milli, name: src.name, unit: src.unit || '', priceMinor: src.priceMinor,
         maxQtyMilli: src.maxQtyMilli || null, photo: Boolean(src.photo), photoVersion: src.photoVersion, unavailable: line ? line.unavailable === true : false,
-      };
+      });
     }
     saveCart();
     if (catalog.items[id]) refreshCard(id);
@@ -451,7 +452,7 @@
   var orderView = null; var ov = null;
   function loadOrderView() {
     //  واژه‌نامهٔ order.<زبان>.json و یاورهای پیگیری (kit/order-kit.js) هم‌زمان؛ واژه‌نامه نیامد ⇒ متنِ HTML
-    orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); return ov; })
+    orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, store: store, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); } }); return ov; })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
   }
@@ -609,6 +610,7 @@
     });
     $('clear-search').addEventListener('click', function () { catalog.q = ''; catalog.category = ''; $('q').value = ''; renderCats(); loadProducts(false); });
     $('more').addEventListener('click', function () { loadProducts(true); });
+    $('sort').addEventListener('change', function () { loadProducts(false); });
     $('cart-bar').addEventListener('click', function () { location.hash = '#/cart'; });
     $('cart-close').addEventListener('click', function () { closeCart(); closeToCatalog(); });
     K.onPhone(function () { if (document.body.classList.contains('cart-open')) { closeCart(); closeToCatalog(); } renderBar(); });

@@ -199,11 +199,15 @@ object SettingsLayout {
   /** پیوند به «حسابِ من» (نام و عکسِ دکان) — ردیفِ نخستِ «دکان و امنیت» */
   const val PROFILE = "حساب من"
 
+  /** پیوند به «ویترین ⇐ تنظیمات»: نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (ممیزیِ ویترین، مهاجرتِ ۲۱۵) */
+  const val STORE_PLACE = "نشانی و نقشهٔ دکان"
+
   /** ردیفی که صفحهٔ دیگری از برنامه را باز می‌کند ⇐ مسیرِ همان صفحه */
   val LINKS: Map<String, String> = mapOf(
     PRINTER to "devices?tab=printers",
     PERIPHERALS to "devices",
     PROFILE to "profile/edit",
+    STORE_PLACE to "storefront?tab=settings",
   )
 
   /**
@@ -226,7 +230,7 @@ object SettingsLayout {
         Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)),
         Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
         Part("till", listOf(MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
-        Part("online", listOf(ONLINE_ORDERS, STOREFRONT_ETA, PROMO_GUARD)),
+        Part("online", listOf(ONLINE_ORDERS, STORE_PLACE, STOREFRONT_ETA, PROMO_GUARD)),
       ),
     ),
     Group(
@@ -480,6 +484,7 @@ object SettingsLayout {
     ABOUT_APP -> StrSettings.versionRow
     WHATS_NEW -> StrSettings.whatsNewSetting
     PROFILE -> StrSettingsHome.profileRow
+    STORE_PLACE -> ir.vil3ntec.tohid.core.i18n.StrStorePlace.section
     else -> row
   }
 
@@ -553,7 +558,7 @@ object SettingsLayout {
    *  بخش‌های پشتِ پرچمِ سرور — مثلِ رابطِ امروز تا سرور «روشن» نگفته ردیفی ندارند (نه در گروه، نه در ستونِ
    *  کامپیوتر). `serverOn` همان بخش‌هایی است که درِ سرورشان همین لحظه «دیده شود» گفته (`SettingsFacts.serverOn`).
    */
-  val SERVER_GATED: Set<String> = setOf(OWNER_REPORT, STOREFRONT_ETA, PROMO_GUARD, ONLINE_ORDERS)
+  val SERVER_GATED: Set<String> = setOf(OWNER_REPORT, STOREFRONT_ETA, PROMO_GUARD, ONLINE_ORDERS, STORE_PLACE)
 
   /** ردیفِ این بخش کشیده شود؟ — بخشِ بی پرچم همیشه؛ بخشِ پشتِ پرچم فقط با پاسخِ روشنِ سرور */
   fun shown(key: String, serverOn: Set<String>): Boolean = key !in SERVER_GATED || key in serverOn

@@ -134,6 +134,18 @@ data class StorefrontPermsDto(val manage: Boolean = false)
 @Serializable
 data class StorefrontFulfillmentDto(val delivery: Boolean = true, val pickup: Boolean = true)
 
+/** پینِ دکان روی نقشه (مهاجرتِ ۲۱۵؛ درجه) */
+@Serializable
+data class StorefrontPinDto(val lat: Double = 0.0, val lng: Double = 0.0)
+
+/** پینِ بدنهٔ صف (`{lat, lng}` یا null) — همان شکلِ پاسخِ سرور */
+fun storefrontPinOf(e: kotlinx.serialization.json.JsonElement?): StorefrontPinDto? {
+  val o = e as? kotlinx.serialization.json.JsonObject ?: return null
+  val lat = (o["lat"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: return null
+  val lng = (o["lng"] as? kotlinx.serialization.json.JsonPrimitive)?.content?.toDoubleOrNull() ?: return null
+  return StorefrontPinDto(lat, lng)
+}
+
 @Serializable
 data class StorefrontSettingsDto(
   val slug: String = "",
@@ -154,6 +166,9 @@ data class StorefrontSettingsDto(
   val declaredUntil: Long? = null,
   /** «پرداخت پس از پذیرش» (مهاجرتِ ۲۱۰، `lib/order-flow.js`)؛ سرورِ پیشین ⇒ خاموش */
   val payAfterAccept: Boolean = false,
+  /** نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (مهاجرتِ ۲۱۵)؛ سرورِ پیشین ⇒ خالی */
+  val pickupAddress: String = "",
+  val pickupPin: StorefrontPinDto? = null,
   val updatedAt: Long = 0,
 )
 

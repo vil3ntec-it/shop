@@ -42,15 +42,27 @@
         ul.appendChild(el('li', {}, el('span', { class: 'grow' }, l.name, el('small', { text: K.qty(l.qtyMilli) + ' ' + (l.unit || '') + ' × ' + K.money(l.unitPriceMinor) })),
           el('span', { class: 'amt num', text: K.money(l.lineTotalMinor) })));
       });
-      var paid = o.paymentStatus === 'paid' ? o.totalMinor : 0;
+      //  CHK-16/15: یادداشت و «اگر نبود» ِ مشتری زیرِ همان قلم (store/line-prefs.js ِ دیربار، فقط وقتی هست)
+      if (o.substitution || o.lines.some(function (l) { return l.note || l.substitution; })) {
+        K.js('/store/line-prefs.js').then(function () { return window.StoreLines({}); })
+          .then(function (m) { m.receipt(ul, o); }, function () { /* بی واژه‌نامه ⇒ همان فهرست */ });
+      }
       var rows = [['od.sub', K.money(o.subtotalMinor)]];
       if (o.discountMinor) rows.push(['od.disc', K.money(o.discountMinor)]);
       if (o.fulfillment === 'delivery') rows.push(['ck.fee', o.deliveryFeeMinor ? K.money(o.deliveryFeeMinor) : t('free')]);
-      rows.push(['od.total', K.money(o.totalMinor)], ['od.paid', K.money(paid)], ['od.due', K.money(o.totalMinor - paid)]);
+      rows.push(['od.total', K.money(o.totalMinor)]);
+      //  CHK-20/ORD-15/PCK-07: یک خلاصهٔ پولِ سازگار برای هر حال — بسته (رد، لغو، برگشت به دکان) ⇒ فقط جمع؛ رسیده به
+      //  دستِ مشتری با نقد ⇒ «پرداخت‌شده (نقد…)» = جمع (بازپرداخت جدا در بخشِ خودش)؛ باز ⇒ «پرداخت‌شده» فقط برای آنلاینِ
+      //  پرداخت‌شده و «مانده» فقط وقتی هنوز چیزی مانده — هرگز «پرداخت‌شده ۰» یا «مانده» کنارِ «پرداختی لازم نیست»
+      var online = ['paid', 'partially_refunded', 'refunded'].indexOf(o.paymentStatus) >= 0;
+      var done = ['delivered', 'picked_up', 'return_requested', 'refunded_partial', 'refunded_full'].indexOf(o.status) >= 0;
+      if (online) rows.push(['od.paid', K.money(o.totalMinor)]);
+      else if (done) rows.push(['od.paid', K.money(o.totalMinor), t('od.paid') + ' (' + t('cod') + ')']);
+      else if (!/^(rejected|auto_rejected|cancelled|cancelled_by_customer|returned_to_store|restocked)$/.test(o.status)) rows.push(['od.due', K.money(o.totalMinor)]);
       var tt = K.clear($('o-totals'));
       rows.forEach(function (r) {
         var g = r[0] === 'od.total';
-        tt.append(el('span', { class: g ? 'grand' : '', text: t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
+        tt.append(el('span', { class: g ? 'grand' : '', text: r[2] || t(r[0]) }), el('span', { class: g ? 'grand num' : 'num', text: r[1] }));
       });
       $('o-cancel').hidden = !o.canCancel;
       $('o-reorder').hidden = false;
@@ -76,7 +88,56 @@
       renderChat(o);
       renderAdd(o, token);
       renderApology(o);
+      renderAlt(o);
+      renderPlace(o);
       return o;
+    }
+
+    //  ORD-13/PCK-05 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱۰): سفارشِ ردشده/لغوشده به‌خاطرِ «ناموجود» ⇒ کالاهای مشابهِ فروختنیِ همین
+    //  دکان (همان «مشابه» ِ برگهٔ کالا، `GET /products/:id`) به‌جای تنها «خریدِ دوباره» ِ همان کالای ناموجود. «+» ⇒ سبد.
+    var altFor = '';
+    function renderAlt(o) {
+      var box = $('o-alt');
+      var want = o.statusReason === 'out_of_stock' && K.orderKind(o.status) === 'err';
+      if (!want) { if (box) box.hidden = true; return; }
+      if (altFor === o.token) return;
+      altFor = o.token;
+      var had = {}; o.lines.forEach(function (l) { had[l.productId] = true; });
+      Promise.all(o.lines.slice(0, 3).map(function (l) {
+        return api('/products/' + encodeURIComponent(l.productId)).then(function (r) { return r.similar || []; }, function () { return []; });
+      })).then(function (lists) {
+        var seen = {}; var list = [];
+        lists.forEach(function (xs) {
+          xs.forEach(function (p) { if (!had[p.id] && !seen[p.id] && K.stockOf(p).orderable && list.length < 6) { seen[p.id] = true; list.push(p); } });
+        });
+        if (!list.length) return;
+        if (!box) {
+          box = el('div', { class: 'card card-lg', attrs: { id: 'o-alt' } }, el('h2', { text: t('ps.similar') }), el('ul', { class: 'rail products section', attrs: { id: 'o-alt-list' } }));
+          $('o-subs').parentNode.insertBefore(box, $('o-subs').nextSibling);
+        }
+        var ul = K.clear($('o-alt-list'));
+        list.forEach(function (p) {
+          ul.appendChild(K.productCard(p, {
+            href: '#/p/' + encodeURIComponent(p.id), qty: 0,
+            photo: '/api/store/' + encodeURIComponent(ctx.slug) + '/products/' + encodeURIComponent(p.id) + '/thumb' + (p.photoVersion ? '?v=' + encodeURIComponent(p.photoVersion) : ''),
+            onAdd: function (x) { ctx.reorder({ lines: [{ productId: x.id, qtyMilli: 1000 }] }); },
+          }));
+        });
+        box.hidden = false;
+      });
+    }
+
+    //  CHK-11 (ممیزی، مشکلِ ۶): سفارشِ «دریافت از دکان» ⇒ نشانی و «مسیر روی نقشه» ِ دکان (نبود ⇒ هیچ)
+    function renderPlace(o) {
+      var box = $('o-place');
+      var node = o.fulfillment === 'pickup' && K.orderKind(o.status) !== 'err' && K.place(ctx.store);
+      if (!node) { if (box) box.hidden = true; return; }
+      if (!box) {
+        box = el('div', { attrs: { id: 'o-place' } });
+        $('o-meta').parentNode.insertBefore(box, $('o-meta').nextSibling);
+      }
+      K.clear(box).appendChild(node);
+      box.hidden = false;
     }
 
     //  بخشِ پرچم‌دار فقط وقتی سرور کلیدش را داد ساخته می‌شود (پیش از «خریدِ دوباره») — خاموش ⇒ همان صفحهٔ امروز

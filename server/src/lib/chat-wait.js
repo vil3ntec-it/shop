@@ -8,14 +8,21 @@
  * «خواندنِ خالی» و «شروعِ صبر» برسد بیدارباش را گم نمی‌کند — پیش‌تر صبر پس از
  * خواندن ثبت می‌شد و چنین پیامی تا پایانِ مهلت (حداکثر ۲۵ ثانیه) دیر می‌رسید.
  * ⛔ قطعِ اتصالِ کلاینت (`goneSignal`) صبر را همان دم آزاد می‌کند؛ صبرِ آویزان نمی‌ماند.
- * ⛔ درونِ همین فرایند: سرورِ خانگی تک‌نمونه‌ای است (مثلِ سقفِ نرخ در `middleware/ratelimit`).
+ * ⛔ صبر درونِ همین فرایند است؛ با چند نمونهٔ سرور (`CLUSTER_ENABLED`) بیدارباش با گذرگاهِ LISTEN/NOTIFY ِ
+ *    `lib/cluster.js` به نمونه‌های دیگر هم می‌رسد (فقط شناسهٔ گفت‌وگو)، و پس از وصلِ دوبارهٔ گذرگاه همه
+ *    بیدار می‌شوند تا دوباره بخوانند. منبع همچنان دیتابیس است؛ بیدارباشِ گم‌شده فقط تا پایانِ مهلت دیر می‌کند.
  */
+const cluster = require('./cluster');
 
 /** شناسهٔ گفت‌وگو ⇒ مجموعهٔ بیدارکننده‌ها */
 const waiters = new Map();
 
 /** هر چیزی در گفت‌وگو عوض شد (پیام، رسید، وضعیت، بلاک) ⇒ همهٔ منتظرها بیدار. */
 function notify(convId) {
+  cluster.publish('chat-wait', { c: String(convId) });
+  wakeHere(convId);
+}
+function wakeHere(convId) {
   const set = waiters.get(convId);
   if (!set) return;
   waiters.delete(convId);
@@ -55,6 +62,8 @@ function listen(convId, ms, signal = null) {
   return { promise, cancel: () => finish(false) };
 }
 
+cluster.subscribe('chat-wait', (d) => wakeHere(String(d.c || '')));
+cluster.onResync(() => { for (const id of [...waiters.keys()]) wakeHere(id); });
 /** شمارِ long-poll های منتظر — برای سنجش و آزمون. */
 function waiting() {
   let k = 0;

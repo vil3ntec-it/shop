@@ -68,7 +68,7 @@
     { "id": "sale.payPanel", "scope": "sale", "title": "پنلِ پرداخت (امروز F9 فروش را فوری می‌بندد)", "status": "planned", "keys": ["F9"], "web": ["Alt+Enter"] },
     { "id": "sale.returnMode", "scope": "sale", "title": "حالتِ برگشت", "status": "planned", "keys": ["Shift+F9"], "web": ["Alt+Shift+Enter"] },
     { "id": "sale.finishExact", "scope": "sale", "title": "پایانِ فوری با نقدِ دقیق", "status": "live", "keys": ["F12", "Mod+Enter"], "web": ["Mod+Enter"], "overrides": ["global.save"] },
-    { "id": "sale.priceCheck", "scope": "sale", "title": "قیمت‌پرسی بدون افزودن", "status": "planned", "keys": ["Mod+I"], "web": ["Alt+I"] },
+    { "id": "sale.priceCheck", "scope": "sale", "title": "قیمت‌پرسی بدون افزودن", "status": "partial", "keys": ["Mod+I"], "web": ["Alt+I"] },
     { "id": "sale.unit", "scope": "sale", "title": "تغییرِ واحدِ ردیف", "status": "planned", "keys": ["Mod+U"], "web": ["Alt+U"] },
     { "id": "sale.priceList", "scope": "sale", "title": "تغییرِ لیستِ قیمتِ فاکتور", "status": "partial", "keys": ["Mod+R"], "web": ["Alt+Shift+R"] },
     { "id": "sale.clear", "scope": "sale", "title": "پاک کردنِ کادر؛ خالی کردنِ فاکتور فقط با تأیید", "status": "live", "keys": ["Escape"], "web": ["Escape"], "overrides": ["global.back"] },

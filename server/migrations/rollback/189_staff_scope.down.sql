@@ -3,3 +3,4 @@
 --  محدودهٔ مکانِ کارمندان پاک می‌شود؛ همه به «همهٔ مکان‌ها» (رفتارِ پیش از STF-06) برمی‌گردند.
 -- ============================================================
 DROP TABLE IF EXISTS shop_member_scopes;
+DELETE FROM schema_migrations WHERE version = '189_staff_scope.sql';

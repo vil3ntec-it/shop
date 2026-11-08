@@ -180,6 +180,25 @@ test('«پرداخت پس از پذیرش» خاموش (صریح) ⇒ پیگیر
   assert.equal(d.invoice, null);
 });
 
+test('«پرداخت پس از پذیرش» روشن ولی جز نقد راهی نیست (بی حساب‌پی) ⇒ هیچ «روشِ پرداخت را انتخاب کنید»؛ نقدِ ثبت همان', async () => {
+  //  ممیزیِ ویترین با چشمِ مشتری (CHK-13/20): برگزیدن فقط وقتی معنا دارد که حساب‌پی هم هست
+  const s = await liveShop('فقط‌نقد', { settings: { payAfterAccept: true } });
+  assert.equal(s.settings.payAfterAccept, true);
+  const o = await storeOrder(s, { fulfillment: 'delivery' });
+  for (const steps of [[], ['accepted']]) {
+    await walk(s, o.id, steps);
+    const tr = (await track(s, o.token)).body.order;
+    assert.equal('paymentStep' in tr, false, `بی کارتِ «پرداخت» (${tr.status})`);
+    assert.deepEqual(tr.onlinePay, { available: false });
+    assert.deepEqual((await detail(s, o.id)).payStep, { mode: 'any', state: 'cash', choice: '' }, 'فروشنده هم هشدارِ «برنگزیده» نمی‌گیرد');
+  }
+  const c = await choose(s, o.token, { method: 'cash' });
+  assert.equal(c.status, 404, JSON.stringify(c.body));
+  //  همان دکان با حساب‌پی ⇒ همان گامِ برگزیدن (پس از قبول)
+  await hesabpay(s);
+  assert.equal((await track(s, o.token)).body.order.paymentStep.state, 'awaiting_choice');
+});
+
 test('مهاجرتِ ۲۱۱: دکانِ تازه «پرداخت پس از پذیرش» را روشن می‌گیرد، دکانِ موجود خاموش؛ تنظیمِ صاحب جلو می‌افتد', async () => {
   //  دکانِ تازه (پس از ۲۱۱) ⇒ ویترینِ نخست روشن؛ پیش از قبول نه حساب‌پی، نه `/pay`
   const fresh = await liveShop('تازه');

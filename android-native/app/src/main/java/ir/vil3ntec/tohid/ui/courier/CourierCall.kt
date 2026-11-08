@@ -15,6 +15,10 @@ import ir.vil3ntec.tohid.core.net.ApiResult
 internal fun landmarkLines(c: MissionCard): List<String> =
   MissionView.landmarkFirst(c, StrCourierApp::areaLine, StrCourierApp::gateLine)
 
+/** DLV-02 — دو خطِ ردیفِ نمای جدولیِ تبلت (`MissionView.tableLines`): نشانه یا نشانیِ متنی، سپس «ناحیه · دروازه» */
+internal fun tableLines(c: MissionCard): List<String> =
+  MissionView.tableLines(c, StrCourierApp::areaLine, StrCourierApp::gateLine)
+
 /**
  *  «تماس با مشتری»: شمارهٔ کامل فقط همین لحظه از سرور ([fetch] = `CourierRepository.callNumber`، POST و در سابقهٔ دکان؛
  *  سرور پرچم، پیکِ فعال، مالکیت و `CALLABLE` را می‌سنجد)، فقط شماره‌گیر باز می‌شود (تماس را خودِ پیک می‌زند) و شماره

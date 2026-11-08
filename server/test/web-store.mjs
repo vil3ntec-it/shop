@@ -114,7 +114,8 @@ ok(await page.evaluate(() => document.fonts.check('16px Vazirmatn') && getComput
   'قلمِ Vazirmatn از همین سرور بار شد');
 ok((await page.textContent('#store-title')) === 'ویترینِ آزمایشی', 'نامِ ویترین');
 const status = await page.textContent('#store-status');
-ok(/باز است|بسته است|آفلاین|اعلام شده/.test(status) && /اتصال/.test(status), 'وضعیتِ دکان و اتصال دیده می‌شود (۳۱.۱)', status.slice(0, 80));
+//  ممیزیِ ۱۴۰۵/۰۸/۱۷ (مشکلِ ۶): «آخرین تأییدِ اتصال» زبانِ فنی است ⇒ فقط وقتی اتصالِ دکان تأیید نیست (این دکان همین حالا همگام شد)
+ok(/باز است|بسته است|آفلاین|اعلام شده/.test(status) && !/اتصال|ساعتِ دکان/.test(status), 'وضعیتِ دکان دیده می‌شود؛ اتصالِ تأییدشده سطرِ فنی ندارد (۳۱.۱)', status.slice(0, 80));
 ok((await page.locator('#products li[data-id]').count()) === 2, 'فقط دو کالای منتشرشده — «صابون» نه');
 //  ۳۲.۳: موجودیِ نامعلوم هرگز «موجود» نیست؛ «در حال بررسی» یک بار بالای کاتالوگ، نه روی هر کارت
 ok(await page.isVisible('#stock-note') && (await page.textContent('#stock-note')).includes('موجودی در حال بررسی است')
@@ -328,7 +329,10 @@ ok((await fetch(`${base}/store/no-such-store/manifest.webmanifest`)).status === 
     'WEB-02: پرفروش‌ها از سه سفارشِ سه شماره', JSON.stringify(await ids('#picks-list')));
   ok(JSON.stringify(await ids('#fresh-list')) === '["oil"]' && await page.isVisible('#fresh'),
     'WEB-02: «تازه‌ها» کنارِ پرفروش، بی تکرارِ همان کالا', JSON.stringify(await ids('#fresh-list')));
-  ok(await page.isHidden('#deals') && (await page.locator('.p-was').count()) === 0, 'بی خواستِ صاحب دکان «ارزان‌تر» و قیمتِ دفتر نیست');
+  //  ممیزیِ ۱۴۰۵/۰۸/۱۷ (مشکلِ ۹): کارتِ خودِ ویترین قیمتِ پیشینِ خط‌خورده را بی کلید دارد؛ ردیفِ «ارزان‌تر» همان رضایتِ صاحب را می‌خواهد
+  ok(await page.isHidden('#deals') && (await page.locator('#picks .p-was, #fresh .p-was').count()) === 0
+    && (await page.locator('#products li[data-id="soap"] .p-was').count()) === 1,
+  'بی خواستِ صاحب دکان ردیفِ «ارزان‌تر» نیست؛ کارتِ ویترین قیمتِ پیشینِ خط‌خورده دارد');
   ok((await call('PUT', '/api/shop/market', { showDeals: true }, T)).status === 200, 'صاحب دکان «ارزان‌تر از قیمتِ دکان» را روشن کرد');
   await page.reload();
   await page.waitForSelector('#deals:not([hidden])', { timeout: 15000 });

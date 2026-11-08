@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.data.repo.StorefrontFulfillmentDto
 import ir.vil3ntec.tohid.data.repo.StorefrontProductDto
 import ir.vil3ntec.tohid.data.repo.StorefrontSettingsDto
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import org.junit.After
@@ -73,6 +74,24 @@ class StorefrontModelTest {
     assertEquals(25_050L, body["minOrderMinor"]!!.jsonPrimitive.long)
     assertFalse(body["acceptPickup"]!!.jsonPrimitive.boolean)
     assertEquals("my-shop.vill3n.top", StorefrontSettingsModel.address(" My-Shop "))
+  }
+
+  /** ممیزیِ ویترین (مشکلِ ۶، مهاجرتِ ۲۱۵): نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» — رقمِ فارسی هم */
+  @Test
+  fun `نشانی و پینِ دکان در فرمِ تنظیمات`() {
+    val s = StorefrontSettingsDto(slug = "my-shop", title = "دکان", pickupAddress = "کارتهٔ سه", pickupPin = ir.vil3ntec.tohid.data.repo.StorefrontPinDto(34.5281, 69.1723))
+    val f = StorefrontSettingsModel.from(s)
+    assertEquals("کارتهٔ سه", f.address)
+    assertEquals("34.5281, 69.1723", f.pin)
+    var body = StorefrontSettingsModel.build(f.copy(pin = "۳۴٫۵۲۸۱، ۶۹٫۱۷۲۳")).body!!
+    assertEquals("کارتهٔ سه", body["pickupAddress"]!!.jsonPrimitive.content)
+    assertEquals("34.5281", body["pickupPin"]!!.jsonObject["lat"]!!.jsonPrimitive.content)
+    assertEquals("69.1723", body["pickupPin"]!!.jsonObject["lng"]!!.jsonPrimitive.content)
+    body = StorefrontSettingsModel.build(f.copy(pin = " ")).body!!
+    assertEquals("پینِ خالی ⇒ برداشتن", kotlinx.serialization.json.JsonNull, body["pickupPin"])
+    for (bad in listOf("34.5", "abc, 1", "95, 10", "34.5 69.1")) {
+      assertEquals(bad, setOf("pin"), StorefrontSettingsModel.build(f.copy(pin = bad)).errors.keys)
+    }
   }
 
   @Test

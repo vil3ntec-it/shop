@@ -118,9 +118,9 @@
   "err.store_not_accepting_orders": "This shop isn't taking online orders right now",
   "hours.off": "Closed today",
   "hours.today": "Today {h}",
-  "sh.local": "Shop time {t}",
   "sh.seen": "Connection last confirmed {t}",
   "sh.unseen": "Shop connection not confirmed yet",
+  "sh.map": "Directions on the map",
   "ship": "Delivery",
   "ship.fee": "Delivery {fee}",
   "ship.free": "Free delivery",
@@ -201,7 +201,7 @@
   "phone.l": "Mobile number",
   "ck.note": "Note for the shop (optional)",
   "ck.pay": "Payment",
-  "ck.pay.note": "Online payment isn't available yet — cash only for now.",
+  "ck.pay.note": "Pay in cash when you receive your order.",
   "ck.cart": "Your cart",
   "ck.edit": "Edit",
   "ck.empty": "Your cart is empty.",
@@ -341,5 +341,10 @@
   "err.out_of_zone": "This address is outside the shop's delivery area; choose pickup.",
   "err.zone_required": "To deliver, add a pin or choose your area.",
   "err.bad_zone": "This area is no longer in the delivery list; choose again.",
-  "err.in_zone": "This address is inside the delivery area; order now."
+  "err.in_zone": "This address is inside the delivery area; order now.",
+  "sort.l": "Sort",
+  "sort.az": "A–Z",
+  "sort.low": "Cheapest",
+  "sort.high": "Most expensive",
+  "sort.new": "Newest"
 }

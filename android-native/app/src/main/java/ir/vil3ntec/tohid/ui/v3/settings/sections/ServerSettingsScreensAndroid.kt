@@ -82,6 +82,8 @@ internal fun rememberServerSections(): Set<String> {
     if (eta) add(SettingsLayout.STOREFRONT_ETA)
     if (promo) add(SettingsLayout.PROMO_GUARD)
     if (online) add(SettingsLayout.ONLINE_ORDERS)
+    //  نشانی و نقشهٔ دکان (ممیزیِ ویترین): همان درِ «سفارشِ آنلاین» — دکانِ بی ویترین این ردیف را نمی‌بیند
+    if (online) add(SettingsLayout.STORE_PLACE)
   }
 }
 

@@ -10,9 +10,8 @@
 const config = require('./config');
 const { createApp } = require('./app');
 const { closeDb, healthy, isPglite, pgliteDir, driverName } = require('./db');
-const backup = require('./lib/backup');
-const outbox = require('./lib/login-outbox');
 const live = require('./lib/sync-v1-live');
+const cluster = require('./lib/cluster');
 
 async function main() {
   const problems = config.validate();
@@ -73,79 +72,27 @@ async function main() {
   server.headersTimeout = 70_000;
 
   /*
-   *  Workerِ ایمیلِ کدِ ورود — درخواستِ کد همان لحظه ۲۰۰ می‌گیرد و ارسال
-   *  این‌جا با تلاشِ دوباره و مدارشکن انجام می‌شود. بی این، کاربر پشتِ
-   *  سرویسِ ایمیل منتظر می‌ماند و هر کندیِ ایمیل، کندیِ ورود می‌شد.
+   *  کارگرهای پس‌زمینه (`src/workers.js`) — `cluster.jobs`: تک‌نمونه (پیش‌فرض) ⇒ همه همین حالا و به همین
+   *  ترتیب، مثلِ پیش؛ چند نمونه (`CLUSTER_ENABLED=1`) ⇒ فقط روی رهبر (قفلِ advisory ِ `lib/cluster.js`).
    */
-  outbox.start();
-  //  کارگرِ اعلانِ سفارش (v3 §۳۰) — روی خودِ سرور، بی‌نیاز به کامپیوترِ دکان؛
-  //  بی پرچمِ `shop.order_notify` صفش خالی است و کاری نمی‌کند
-  const orderNotify = require('./lib/order-notify');
-  orderNotify.start();
-  //  NTF-01: اعلانِ وضعیت به مشتری (بی پرچمِ `shop.customer_notify` ⇒ صفِ خالی، یک پرسشِ کوچک)
-  require('./lib/customer-notify').start();
-  //  ORD-05: زمان‌سنجِ قبولِ سفارشِ ویترین (۱۵ دقیقه؛ فقط سفارشِ مُهرخورده)
-  require('./lib/order-timeout').start();
-  //  ORD-09: توقفِ خودکارِ سفارش‌گیری (فقط دکانِ با پرچمِ `shop.orders.desk` و توقفِ خودکارِ روشن)
-  require('./lib/order-desk').start();
-  //  ORD-18: هشدارِ «شروعِ سفارشِ زمان‌بندی‌شده» (فقط دکانِ با پرچمِ `shop.orders.start_alert`)
-  require('./lib/order-start-alert').start();
-  //  PAY-20/RPT-12: گزارشِ خودکارِ صاحبِ دکان (فقط دکانِ با پرچمِ `shop.owner_report` و تنظیمِ روشنِ صاحب)
-  require('./lib/owner-report').start();
-  //  حساب‌پیِ هر دکان: «پول رسید» ِ صندوق با گیرنده‌ای جز حسابِ دکان ⇒ هشدار و پوشِ فوری به صاحب (فقط دکانِ دارای حساب)
-  require('./lib/hesabpay-guard').start();
-  //  WEB-10: «خبرم کن وقتی موجود/ارزان شد» (بی پرچمِ `shop.storefront.alerts` ⇒ جدولِ خالی، یک پرسشِ کوچک)
-  require('./lib/storefront-alerts').start();
-  //  NTF-10: پوزش و کوپنِ خودکارِ تأخیر (فقط دکانِ با پرچمِ `shop.orders.late_apology` و سیاستِ روشنِ صاحب)
-  require('./lib/order-late-apology').start();
-  //  AI-11: نمایهٔ هشِ عکسِ کالاها برای «جست‌وجو با عکس» — فقط دکان‌های پرچمِ `shop.visual_search`، دسته‌ای و بی‌تکرار
-  require('./lib/visual-search').start();
-  //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
-  const payments = require('./lib/payment-intents');
-  payments.startReconciler();
+  cluster.jobs(require('./workers').backgroundJobs());
   //  نسخهٔ schemaی هر بخش از کد به دفتر می‌رود — پنل و مدیر از همان‌جا می‌خوانند
   require('./lib/sync-v1').syncSchemaTable().catch((e) => console.error('[sync] app_schema', e.message));
   //  «چیزی عوض شد» ⇒ دستگاه‌های دیگرِ همان حساب Pull می‌کنند
   live.attach(server);
-
-  const backupTimer = backup.schedule();
-  //  PGlite autovacuum ندارد ⇒ آمارِ planner را خودمان تازه می‌کنیم (PERF-03)؛ روی PostgreSQL هیچ
-  const pgliteStats = require('./lib/pglite-stats').schedule();
-  //  زمان‌بندِ مرکزِ اعلان: هر دقیقه اعلان‌های وقت‌رسیده، و روزی یک بار
-  //  «رو به پایان / منقضی»
-  const notices = require('./lib/notices');
-  notices.startRunner();
-  require('./lib/job-beat').register('notices', 60_000);   //  پنلِ مرکزی ۴.۹: «زمان‌بندی شد» از همین لحظه
-  //  هشدارهای مرکزیِ پنلِ مالک (۴.۱۱): هر ۵ دقیقه، با یکی کردنِ تکرار و سقفِ سیل (`lib/ops-alerts.js`)
-  const opsAlerts = require('./lib/ops-alerts');
-  opsAlerts.start();
-  //  OPS-01@29: خبرِ بحرانی به مسئول + پیگیری (هر دقیقه؛ پرچمِ خاموشِ `ops.critical_alerts` ⇒ فقط پرسشِ پرچم)
-  const opsPaging = require('./lib/ops-paging');
-  opsPaging.start();
-  //  (جاروی رزروهای سفارش برداشته شد: سفارشِ آنلاین دیگر موجودی رزرو نمی‌کند — lib/stock.js)
-  //  باتِ تلگرامِ پمپ — کدش در ریپوی پمپ است (bots/pump، lib/bots.js)؛ نبود ⇒ بی بات.
-  //  تا رمزش از پنل داده نشده، فقط هر چند ثانیه نگاه می‌کند.
-  const telegram = require('./lib/bots').pump();
-  if (!telegram.available) console.log('[bots] باتِ پمپ نصب نیست (bots/pump) — سرور بی بات بالا می‌آید');
-  if (config.telegram.autoStart) telegram.start();
+  //  چند نمونه: گذرگاهِ LISTEN/NOTIFY و رقابت برای رهبری (تک‌نمونه ⇒ هیچ)
+  if (await cluster.start()) {
+    console.log(`[cluster] نمونهٔ ${cluster.instanceId} — سقفِ نرخ: ${config.rateLimit.store}، قفلِ گاوصندوق: ${config.accountLock.scope}`);
+  }
 
   let closing = false;
   async function shutdown(signal) {
     if (closing) return;
     closing = true;
     console.log(`[${signal}] در حال خاموش شدن…`);
-    if (backupTimer) clearInterval(backupTimer);
-    if (pgliteStats) pgliteStats.stop();
-    outbox.stop();
-    orderNotify.stop();
-    require('./lib/customer-notify').stop();
-    require('./lib/owner-report').stop();
-    require('./lib/hesabpay-guard').stop();
-    payments.stopReconciler();
-    notices.stopRunner();
-    opsAlerts.stop();
-    opsPaging.stop();
-    telegram.stop();
+    //  همهٔ کارگرهای راه‌افتادهٔ همین نمونه (و رها کردنِ رهبری و گذرگاه، اگر خوشه است)
+    cluster.stopJobs();
+    await cluster.stop().catch(() => {});
     server.close(async () => {
       await closeDb();
       console.log('خاموش شد.');

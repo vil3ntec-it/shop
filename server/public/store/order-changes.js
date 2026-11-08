@@ -55,8 +55,9 @@
       var note = el('div', { class: 'note', hidden: true, attrs: { id: 'o-ch-msg', role: 'status' } });
       if (a.status === 'pending') {
         if (a.expiresAt) wrap.appendChild(el('p', { class: 'muted small', text: t('ch.am.until', { d: K.when(a.expiresAt) }) }));
-        var yes = el('button', { class: 'btn btn-accent btn-block', text: t('ch.am.accept'), attrs: { id: 'o-ch-yes', type: 'button' } });
-        var no = el('button', { class: 'btn btn-block', text: t('ch.am.reject'), attrs: { id: 'o-ch-no', type: 'button' } });
+        //  ORD-14 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱۰): «می‌پذیرم» دکمهٔ اصلیِ پررنگ، «نمی‌پذیرم» دکمهٔ دومِ قاب‌دار (پیش‌تر وارونه دیده می‌شد)
+        var yes = el('button', { class: 'btn btn-block', text: t('ch.am.accept'), attrs: { id: 'o-ch-yes', type: 'button' } });
+        var no = el('button', { class: 'btn btn-ghost btn-block', text: t('ch.am.reject'), attrs: { id: 'o-ch-no', type: 'button' } });
         var decide = function (what) {
           yes.disabled = true; no.disabled = true;
           api(path(token, '/amendments/' + encodeURIComponent(a.id) + '/' + what), { method: 'POST', body: {} }).then(function (r) {

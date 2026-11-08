@@ -212,6 +212,17 @@ class PosLogicTest {
     assertNull(PosKeys.screen(KeyName.I, primary = false))
   }
 
+  /**
+   *  POS-15: «قیمت‌پرسی» از دستهٔ دهم پیش‌فرض روشن است (`PosPriceCheckPrefs.load` ⇐ `true`) ولی Ctrl+I در keymap «planned»
+   *  مانده بود ⇒ راهنمای F1 ِ صندوق آن را نشان نمی‌داد. حالا partial (فقط صندوقِ کامپیوتر) و در راهنمای صندوق می‌آید.
+   */
+  @Test
+  fun `POS-15 Ctrl+I قیمت‌پرسی در راهنمای کلیدهای صندوق می‌آید`() {
+    assertEquals(ir.vil3ntec.tohid.core.keymap.KeyStatus.PARTIAL, ir.vil3ntec.tohid.core.keymap.KeyMap.SALE_PRICE_CHECK.status)
+    val sale = ir.vil3ntec.tohid.ui.components.keys.keyHelpSections("sale").flatMap { it.items }
+    assertTrue(sale.any { it.id == "sale.priceCheck" && it.keys.isNotEmpty() })
+  }
+
   /** RET-01/05 (S13/S15): Shift+F9 = «حالتِ برگشت» فقط با برگشتِ تازهٔ روشن؛ خاموش همان F9 ِ امروز */
   @Test
   fun `Shift+F9 حالتِ برگشت است فقط با برگشتِ تازه — خاموش همان بستنِ فاکتور`() {

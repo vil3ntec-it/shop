@@ -32,9 +32,10 @@ const PRESENCE = ['badge', 'mode', 'declaredUntil', 'connection', 'lastConfirmed
   'timezone', 'localTime', 'hoursSet', 'holiday', 'today', 'notice'];
 
 const FIELDS = Object.freeze({
-  //  §۱.۱ — `GET /api/store/:slug` ⇒ store
+  //  §۱.۱ — `GET /api/store/:slug` ⇒ store. `place?` (`{ text, map }`، مهاجرتِ ۲۱۵) و `logo?` ِ کارتِ بازارچه: ممیزیِ ویترین
+  //  ۱۴۰۵/۰۸/۱۷، اختیاری و فقط وقتی هست ⇒ افزوده به v1 (پاسخِ پیشین همان).
   shop: ['slug', 'title', 'tagline', 'contactPhone', 'accent', 'status', 'fulfillment', 'deliveryFeeMinor',
-    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?', 'media?', 'ordering?'],
+    'minOrderMinor', 'currency', 'payment', 'categories', 'delivery?', 'media?', 'ordering?', 'place?'],
   //  «سفارش می‌پذیرد؟» (#467، پرچمِ `shop.orders.subscribers_only`؛ خاموش ⇒ کلید نیست)
   ordering: ['accepting', 'code?', 'message?'],
   //  لوگو و تصویرِ سرِ ویترین (M3 #428): main همیشه می‌فرستد؛ پرچمِ خاموش ⇒ هر دو null. افزوده به v1.
@@ -45,7 +46,7 @@ const FIELDS = Object.freeze({
   //  کارتِ دکان در بازار: همان حضور بی `mode`
   cardPresence: PRESENCE.filter((k) => k !== 'mode'),
   shopCard: ['slug', 'title', 'tagline', 'accent', 'category', 'categoryLabel', 'area', 'status', 'fulfillment',
-    'deliveryFeeMinor', 'minOrderMinor', 'currency', 'productCount', 'distanceKm', 'isNew', 'cover?'],
+    'deliveryFeeMinor', 'minOrderMinor', 'currency', 'productCount', 'distanceKm', 'isNew', 'cover?', 'logo?'],
   //  ارجاعِ کوتاه به دکان روی کالای بازار
   shopRef: ['slug', 'title', 'accent', 'badge', 'orderAcceptance', 'distanceKm'],
   //  §۱.۳ — کالا در ویترین (`description`/`specs` فقط در صفحهٔ کالا)

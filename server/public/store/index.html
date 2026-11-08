@@ -63,6 +63,7 @@
       <section id="view-catalog" hidden>
         <div class="wrap">
           <div class="shop-hero card card-lg">
+            <div id="store-cover" class="shop-cover" hidden></div>
             <div class="shop-id">
               <span id="store-avatar"></span>
               <div class="grow">
@@ -71,15 +72,24 @@
               </div>
             </div>
             <div id="store-status" class="status-line" role="status" aria-live="polite"></div>
+            <div id="store-place"></div>
             <div id="store-meta" class="meta"></div>
           </div>
 
-          <section id="banners" class="section" hidden>
-            <ul id="banners-list" class="banners"></ul>
-          </section>
+          <div class="toolbar section">
+            <form id="search-form" class="search" role="search">
+              <label for="q" class="sr-only" data-t="s.label">جست‌وجوی کالا در این دکان</label>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
+              <input id="q" type="search" data-tp="s.ph" placeholder="جست‌وجوی کالا در همین دکان…" autocomplete="off" enterkeyhint="search" maxlength="60">
+            </form>
+            <div id="cats" class="chips" role="group" data-ta="a.cats" aria-label="دسته‌ها"></div>
+          </div>
           <section id="picks" class="section" hidden aria-labelledby="picks-title">
             <div class="section-head"><h2 id="picks-title" data-i="flame" data-t="picks.title">پیشنهادِ همین دکان</h2><p id="picks-why"></p></div>
             <ul id="picks-list" class="rail products"></ul>
+          </section>
+          <section id="banners" class="section" hidden>
+            <ul id="banners-list" class="banners"></ul>
           </section>
           <section id="deals" class="section" hidden aria-labelledby="deals-title">
             <div class="section-head"><h2 id="deals-title" data-t="deals.title">ارزان‌تر از قیمتِ دکان</h2></div>
@@ -111,13 +121,10 @@
             <div class="section-head"><h2 id="recent-title" data-t="recent.title">دیده‌شده‌های اخیر</h2><button id="recent-clear" class="btn btn-ghost" type="button" data-t="recent.clear">پاک کردن</button></div>
             <ul id="recent-list" class="rail products"></ul>
           </section>
-          <div class="toolbar section">
-            <form id="search-form" class="search" role="search">
-              <label for="q" class="sr-only" data-t="s.label">جست‌وجوی کالا در این دکان</label>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M11 4a7 7 0 1 0 0 14 7 7 0 0 0 0-14z M20 20l-3.5-3.5"/></svg>
-              <input id="q" type="search" data-tp="s.ph" placeholder="جست‌وجوی کالا در همین دکان…" autocomplete="off" enterkeyhint="search" maxlength="60">
-            </form>
-            <div id="cats" class="chips" role="group" data-ta="a.cats" aria-label="دسته‌ها"></div>
+          <div class="cat-head section">
+            <p id="cat-count" class="muted" role="status"></p>
+            <label class="sort"><span data-t="sort.l">مرتب‌سازی</span>
+              <select id="sort"><option value="" data-t="sort.az">الفبا</option><option value="price" data-t="sort.low">ارزان‌ترین</option><option value="-price" data-t="sort.high">گران‌ترین</option><option value="new" data-t="sort.new">تازه‌ترین</option></select></label>
           </div>
           <details id="filters" class="filters section" hidden>
             <summary><span data-t="fl.title">فیلتر</span> <span id="fl-count" class="pill plain"></span></summary>
@@ -164,18 +171,12 @@
                   <label id="opt-pickup"><input type="radio" name="fulfillment" value="pickup"><span data-t="pickup">دریافت از دکان</span><small data-t="free">رایگان</small></label>
                 </div>
                 <div id="address-box" class="stack" hidden>
-                  <label class="field"><span data-t="ck.addr.l">نشانی</span><textarea id="a-text" maxlength="300" autocomplete="street-address" data-tp="ck.addr.ph" placeholder="ناحیه، سرک، کوچه، شمارهٔ خانه"></textarea></label>
-                  <label class="field"><span data-t="ck.lm.l">نشانهٔ نزدیک</span><input id="a-landmark" type="text" maxlength="200" data-tp="ck.lm.ph" placeholder="مثلاً «پشتِ مسجد»"></label>
-                  <label class="field"><span data-t="ck.area.l">ناحیه (اختیاری)</span><input id="a-area" type="text" maxlength="80" data-tp="ck.area.ph" placeholder="مثلاً «کارتهٔ چهار»"></label>
-                  <label class="field"><span data-t="ck.gate.l">رنگِ دروازه (اختیاری)</span><input id="a-gate" type="text" maxlength="40" data-tp="ck.gate.ph" placeholder="مثلاً «سبز»"></label>
-                  <div id="addr-extra" class="stack" hidden>
-                    <label class="field"><span data-t="ck.phone2.l">شمارهٔ دوم (اختیاری)</span><input id="a-phone2" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" class="ltr"></label>
-                    <label class="field"><span data-t="ck.plus.l">Plus Code (اختیاری)</span><input id="a-plus" type="text" maxlength="60" autocomplete="off" class="ltr" data-tp="ck.plus.ph" placeholder="مثلاً 9G8F+6W کابل"></label>
-                  </div>
                   <div class="pin-row">
                     <button id="pin-btn" class="btn btn-soft btn-sm" type="button" data-t="pin.btn">پین با موقعیتِ فعلیِ من</button>
                     <span id="pin-text" class="muted small" data-t="pin.hint">پین اختیاری است؛ فقط برای پیدا کردنِ دقیق‌ترِ در.</span>
                   </div>
+                  <label class="field"><span data-t="ck.addr.l">نشانی</span><input id="a-text" type="text" maxlength="300" autocomplete="street-address" data-tp="ck.addr.ph" placeholder="ناحیه، سرک، کوچه، شمارهٔ خانه"></label>
+                  <label class="field"><span data-t="ck.lm.l">نشانهٔ نزدیک</span><input id="a-landmark" type="text" maxlength="200" data-tp="ck.lm.ph" placeholder="مثلاً «پشتِ مسجد»"></label>
                   <div id="zone-box" class="stack" hidden>
                     <label class="field"><span data-t="zone.l">ناحیهٔ ارسال</span><select id="zone-pick"><option value="" data-t="zone.pick">ناحیه را برگزینید</option></select></label>
                     <div id="zone-msg" class="note" role="status" hidden></div>
@@ -184,10 +185,22 @@
                       <button id="zone-notify" class="btn btn-soft btn-sm" type="button" data-t="zone.notify">وقتی ارسال به این‌جا رسید خبرم کن</button>
                     </div>
                   </div>
-                  <label class="check"><input id="d-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
-                  <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="d-leave" type="text" maxlength="80" data-tp="ck.leave.ph" placeholder="مثلاً «دربان» یا «برادرم»"></label>
+                  <details id="addr-more" class="more-box">
+                    <summary data-t="ck.more">جزئیاتِ بیشتر (اختیاری)</summary>
+                    <div class="stack">
+                      <label class="field"><span data-t="ck.area.l">ناحیه (اختیاری)</span><input id="a-area" type="text" maxlength="80" data-tp="ck.area.ph" placeholder="مثلاً «کارتهٔ چهار»"></label>
+                      <label class="field"><span data-t="ck.gate.l">رنگِ دروازه (اختیاری)</span><input id="a-gate" type="text" maxlength="40" data-tp="ck.gate.ph" placeholder="مثلاً «سبز»"></label>
+                      <div id="addr-extra" class="stack" hidden>
+                        <label class="field"><span data-t="ck.phone2.l">شمارهٔ دوم (اختیاری)</span><input id="a-phone2" type="tel" inputmode="tel" maxlength="20" autocomplete="tel" class="ltr"></label>
+                        <label class="field"><span data-t="ck.plus.l">کدِ مکانِ گوگل (اختیاری)</span><input id="a-plus" type="text" maxlength="60" autocomplete="off" class="ltr" data-tp="ck.plus.ph" placeholder="9G8F+6W"></label>
+                      </div>
+                      <label class="check"><input id="d-call" type="checkbox"> <span data-t="ck.call">پیش از رسیدن زنگ بزنید</span></label>
+                      <label class="field"><span data-t="ck.leave.l">تحویل به (اختیاری)</span><input id="d-leave" type="text" maxlength="80" data-tp="ck.leave.ph" placeholder="مثلاً «دربان» یا «برادرم»"></label>
+                    </div>
+                  </details>
                   <label class="field" id="tender-row" hidden><span data-t="ck.tender.l">با کدام اسکناس پرداخت می‌کنید؟ (اختیاری، تا پیک پول خرد بیاورد)</span><select id="d-tender"></select></label>
                 </div>
+                <div id="pickup-place" hidden></div>
                 <div id="slot-box" class="stack" hidden>
                   <label class="field"><span data-t="slot.l">زمانِ تحویل</span><select id="slot-pick"></select></label>
                   <div id="slot-msg" class="note" role="status" hidden></div>
@@ -212,7 +225,7 @@
 
               <fieldset class="card card-lg plain-set">
                 <legend class="label-lg" data-t="ck.pay">پرداخت</legend>
-                <label class="pay-opt"><input type="radio" name="payment" value="cod" checked><span id="pay-ico"></span><span class="grow"><b data-t="cod">نقد هنگامِ تحویل</b><small data-t="ck.pay.note">پرداختِ آنلاین هنوز فعال نیست؛ تا راه‌اندازیِ درگاه، فقط نقد.</small></span></label>
+                <label class="pay-opt"><input type="radio" name="payment" value="cod" checked><span id="pay-ico"></span><span class="grow"><b data-t="cod">نقد هنگامِ تحویل</b><small data-t="ck.pay.note">نقد، هنگامِ تحویل یا برداشت از دکان.</small></span></label>
               </fieldset>
             </form>
 

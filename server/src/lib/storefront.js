@@ -183,6 +183,8 @@ function profile(sf, categories = [], status = null) {
     //  پرداختِ آنلاین منتظرِ D-08 است (🔌) — تا آن روز هیچ دکمه‌ای نیست
     payment: { methods: ['cod'], online: { available: false, decision: 'D-08' } },
     categories,
+    //  مهاجرتِ ۲۱۵: نشانی و پیوندِ نقشهٔ دکان برای «دریافت از دکان» (ممیزیِ ۱۴۰۵/۰۸/۱۷، `storefront-sort.placeOf`) — نبود ⇒ کلید نیست
+    ...browse.placeOf(sf),
   });
 }
 
@@ -236,21 +238,11 @@ async function categories(shopId) {
   return rows.map((r) => text(r.c, 80)).filter(Boolean);
 }
 
-function encodeCursor(name, id) {
-  return Buffer.from(JSON.stringify([name, id])).toString('base64url');
-}
-function decodeCursor(raw) {
-  try {
-    const [name, id] = JSON.parse(Buffer.from(String(raw), 'base64url').toString('utf8'));
-    if (typeof name !== 'string' || typeof id !== 'string' || !PRODUCT_ID_RE.test(id)) throw new Error('x');
-    return { name, id };
-  } catch {
-    throw badRequest('نشانگرِ صفحه معتبر نیست', 'bad_cursor');
-  }
-}
+//  نشانگرِ صفحه، «مرتب‌سازی»، شمار و «قیمتِ پیشینِ خط‌خورده» (WEB-02/07، ممیزیِ ۱۴۰۵/۰۸/۱۷) — `storefront-sort.js`
+const browse = require('./storefront-sort')({ PRODUCT_ID_RE, MAX_PRICE_MINOR });
 
 /** کاتالوگِ عمومی: فقط منتشرشده، زنده و قیمت‌دار؛ به ترتیبِ نام، صفحه‌بندیِ کلیدی؛ با `shop.storefront.search` (WEB-05/06) پرش به دسته، غلطِ تایپی و «پیدا نشد» ِ مفید. */
-async function catalog(shopId, { q, category, cursor, limit, contactPhone = '', filters = null } = {}) {
+async function catalog(shopId, { q, category, cursor, limit, sort, contactPhone = '', filters = null } = {}) {
   const lim = Math.min(MAX_PAGE, Math.max(1, Number.parseInt(limit, 10) || PAGE));
   const params = [shopId];
   let where = `sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT}`;
@@ -265,25 +257,23 @@ async function catalog(shopId, { q, category, cursor, limit, contactPhone = '', 
   if (cat) where += ` AND r.data->>'category' = $${params.push(cat)}`;
   //  WEB-07 (`storefront-filters.js`، پرچمِ `shop.storefront.filters`): خاموش ⇒ `filters` تهی و همان پرس‌وجو
   if (filters) where += await filters.where(shopId, params);
-  if (cursor) {
-    const c = decodeCursor(cursor);
-    params.push(c.name, c.id);
-    where += ` AND (COALESCE(r.data->>'name', ''), r.row_id) > ($${params.length - 1}, $${params.length})`;
-  }
-  params.push(lim + 1);
+  const from = await sfc.productFrom(shopId);
+  const count = ((w, a) => () => one(`SELECT count(*) AS n FROM ${from} WHERE ${w}`, a))(where, [...params]);
+  const pg = browse.pageOf(sort, cursor, params, lim);
+  const limAt = params.push(lim + 1);
+  const tail = pg.offset ? ` OFFSET $${params.push(pg.offset)}` : '';
   const rows = await many(
-    `SELECT ${PRODUCT_COLS} FROM ${await sfc.productFrom(shopId)} WHERE ${where}
-      ORDER BY COALESCE(r.data->>'name', ''), r.row_id LIMIT $${params.length}`,
+    `SELECT ${PRODUCT_COLS} FROM ${from} WHERE ${where}${pg.where}
+      ORDER BY ${pg.order}COALESCE(r.data->>'name', ''), r.row_id LIMIT $${limAt}${tail}`,
     params
   );
   const more = rows.length > lim;
   const page = more ? rows.slice(0, lim) : rows;
-  const last = page[page.length - 1];
-  return searchFinish({
-    //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
-    items: (filters ? filters.keep : (x) => x)(await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name))),
-    nextCursor: more ? encodeCursor(String((last.data && last.data.name) || ''), last.id) : null,
-  }, p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
+  //  کالای بی‌قیمت فروختنی نیست — نشان داده نمی‌شود
+  const items = (filters ? filters.keep : (x) => x)(browse.withWas(page, await decorate(shopId, page.map(productView).filter((x) => x.priceMinor !== null && x.name))));
+  const total = await browse.totalOf({ cursor, q: raw, more, items, filters, count });
+  return searchFinish({ items, nextCursor: more ? pg.next(page[page.length - 1]) : null, ...(total !== undefined && { total }) },
+    p, { cursor, shopId, raw, cat, lim, contactPhone, decorate });
 }
 
 /** عکسِ بانک (پرچمِ دکان) پیش از عکسِ همگام‌شده — همان ترتیبِ `photo()` ⇒ «عکس دارد» و نسخهٔ عکس (IMG-12) از بانک. */

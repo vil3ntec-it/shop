@@ -91,7 +91,13 @@ data class PublicShop(
   val media: ShopMedia = ShopMedia(),
   /** «سفارش می‌پذیرد؟» (#467) — فقط با پرچمِ `shop.orders.subscribers_only`؛ نبودن = همان رفتارِ پیشین */
   val ordering: StoreOrdering? = null,
+  /** نشانی و «مسیر روی نقشه» ِ دکان برای «دریافت از دکان» (مهاجرتِ ۲۱۵، ممیزیِ ویترین ۱۴۰۵/۰۸/۱۷)؛ نبودن = نگفته */
+  val place: ShopPlace? = null,
 )
+
+/** نشانیِ دکان و پیوندِ نقشهٔ آن (سرور می‌سازد: پینِ صاحب، وگرنه جست‌وجوی نام و نشانی) */
+@Serializable
+data class ShopPlace(val text: String = "", val map: String = "")
 
 /** §۱.۴ — نشانِ موجودی. عددها فقط وقتی دکان «دقیق» را خواسته. */
 @Serializable

@@ -83,8 +83,10 @@
 .dlv-code { display: flex; flex-direction: column; align-items: flex-start; gap: var(--s1); padding: var(--s3) var(--s4); border: 1px dashed var(--line); border-radius: var(--surface-radius); }
 .dlv-code b { font-size: 28px; letter-spacing: .2em; }
 .promo-auto { margin: 0; padding: 0; list-style: none; display: grid; gap: var(--s1); font-size: 14px; }
-/* WEB-11: ♥ ِ کارت (catalog.js) و فهرستِ خرید */
-.p-card > .fav { position: absolute; top: var(--s3); inset-inline-end: var(--s3); margin: 0; background: var(--surface); box-shadow: var(--shadow-1); }
+/* WEB-11: ♥ ِ کارت (catalog.js) و فهرستِ خرید — ♥ در گوشهٔ روبه‌روی «+ افزودن» (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱: ♥ دقیقاً
+   روی «+» می‌نشست و مشتری دکمهٔ خرید را نمی‌دید)؛ برچسبِ تخفیف زیرِ ♥ */
+.p-card > .fav { position: absolute; top: var(--s3); inset-inline-start: var(--s3); margin: 0; background: var(--surface); box-shadow: var(--shadow-1); }
+.p-card:has(> .fav) > .p-off { top: calc(var(--s3) + 46px); }
 .list-lines { list-style: none; margin: 0 0 var(--s3); padding: 0; }
 .list-lines li { display: flex; align-items: center; gap: var(--s2); padding: var(--s2) 0; border-bottom: 1px solid var(--line); }
 .list-lines .grow { flex: 1; min-width: 0; }
@@ -94,13 +96,23 @@
 .banner p { margin: 0; color: var(--muted); }
 .banner .btn { margin-top: auto; }
 /* WEB-07/10: فیلترِ کاتالوگ و «خبرم کن» (store/filters.js ِ دیربار) */
-.filters summary { cursor: pointer; font-weight: 600; display: flex; align-items: center; gap: var(--s2); min-height: 44px; }
+.filters summary {
+  cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: var(--s2); min-height: 44px; padding: 0 var(--s4);
+  border: 1px solid var(--btn2-line); border-radius: 999px; background: var(--btn2-bg); color: var(--btn2-text); list-style: none;
+}
+.filters summary::-webkit-details-marker { display: none; }
+.filters summary:focus-visible { outline: none; box-shadow: var(--shadow-focus); }
+.filters[open] summary { background: var(--selected); border-color: var(--brand); }
 .filters summary .pill:empty { display: none; }
 .fl-form { display: flex; flex-wrap: wrap; align-items: flex-end; gap: var(--s3); margin-top: var(--s2); }
 .fl-form label, .fl-form fieldset { display: flex; flex-direction: column; gap: var(--s1); font-size: 14px; }
 .fl-form fieldset { flex-direction: row; flex-wrap: wrap; border: 0; padding: 0; margin: 0; }
 .fl-form legend { color: var(--muted); padding: 0; margin-bottom: var(--s1); width: 100%; }
-.fl-form select, .fl-form input[type="text"] { min-height: 44px; min-width: 7em; }
+.fl-form select, .fl-form input[type="text"], .sort select {
+  min-height: 44px; min-width: 7em; padding: 0 var(--s3); border: 1px solid var(--field-line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text); font-size: 15px;
+}
+.fl-form select:focus, .fl-form input[type="text"]:focus, .sort select:focus { outline: none; border-color: var(--brand); box-shadow: var(--shadow-focus); }
 .fl-form .fl-check { flex-direction: row; align-items: center; min-height: 44px; }
 .fl-actions { display: flex; gap: var(--s2); }
 .ps-alerts { display: grid; gap: var(--s2); margin-top: var(--s2); }
@@ -126,3 +138,68 @@
 .ct-form { display: flex; gap: var(--s2); align-items: flex-end; }
 .ct-form textarea { flex: 1 1 auto; min-height: 48px; max-height: 140px; resize: vertical; }
 .ct-form .btn-accent { min-height: 48px; padding-inline: var(--s4); }
+
+/* CHK-15/16: یادداشت و «اگر نبود…» ِ هر قلم در برگهٔ ثبت (store/line-prefs.js ِ دیربار) */
+.sum-lines li.lp-li { flex-wrap: wrap; }
+.lp, .lp-g { display: grid; gap: var(--s2); }
+.sum-lines .lp { flex-basis: 100%; }
+.lp .btn-sm { justify-self: start; }
+.lp-hits { flex-wrap: wrap; }
+
+/* CHK-08/10 (ممیزیِ ویترین): فرمِ ارسالِ کوتاه — اختیاری‌ها زیرِ «جزئیاتِ بیشتر»؛ گزینش‌گرها همان شکلِ خانه‌ها */
+.more-box > summary { display: flex; align-items: center; gap: var(--s2); min-height: 44px; cursor: pointer; font-weight: 700; font-size: 14px; color: var(--link); list-style: none; }
+.more-box > summary::-webkit-details-marker { display: none; }
+.more-box > summary::before { content: '+'; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 999px; background: var(--selected); }
+.more-box[open] > summary::before { content: '−'; }
+.more-box > summary:focus-visible { outline: none; box-shadow: var(--shadow-focus); border-radius: var(--r-ctl); }
+#view-checkout .field select {
+  width: 100%; min-height: 48px; padding: 10px var(--s3); border: 1px solid var(--field-line); border-radius: var(--r-ctl);
+  background: var(--surface); color: var(--text); font-size: 15px;
+}
+#view-checkout .field select:focus { outline: none; border-color: var(--brand); box-shadow: var(--shadow-focus); }
+
+/* CHK-03/04 (ممیزیِ ویترین): سبدِ گوشی — «− ۱ +» همیشه پیدا، جمعِ پول روی نوار، نوارِ پایینِ برنامه زیرِ سبدِ باز پنهان */
+.cline .stepper { display: inline-flex; }
+/* سرخطِ برگه فقط برای جای تمرکز است (نه کنترل) ⇒ قابِ تمرکز روی آن به ایراد می‌ماند */
+.sheet h2[tabindex="-1"]:focus, .sheet h2[tabindex="-1"]:focus-visible { outline: none; box-shadow: none; }
+@media (max-width: 599px) {
+  body.phone-cart .cartbar .sum { display: flex; }
+  body.phone-cart .cartbar .sum small { display: none; }
+  body.phone-cart.cart-open .bnav { visibility: hidden; }
+}
+
+/* ── ممیزیِ ویترین با چشمِ مشتری (۱۴۰۵/۰۸/۱۷) ── */
+/* WEB-01 (مشکلِ ۵): لوگو و تصویرِ سرِ خودِ دکان (catalog.js) */
+.shop-cover { margin: calc(var(--s5) * -1) calc(var(--s5) * -1) var(--s4); aspect-ratio: 3 / 1; overflow: hidden; background: var(--surface-2); }
+.shop-cover img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.shop-hero:has(> .shop-cover:not([hidden]))::before { display: none; }
+.avatar.logo { padding: 0; overflow: hidden; background: var(--surface); border: 1px solid var(--divider); }
+.avatar.logo img { display: block; width: 100%; height: 100%; object-fit: cover; }
+/* WEB-02/CHK-11 (مشکلِ ۶): نشانی و «مسیر روی نقشه» ِ دکان — سربرگ، «دریافت از دکان» و پیگیری */
+.place { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1) var(--s2); margin-top: var(--s3); font-size: 14px; }
+.place svg { width: 18px; height: 18px; flex: none; color: var(--icon); }
+.place a { font-weight: 700; }
+#pickup-place .place { margin-top: 0; padding: var(--s3) var(--s4); border-radius: var(--r-card); background: var(--surface-2); border: 1px solid var(--divider); }
+/* WEB-02/07 (مشکلِ ۹): شمارِ کالا و «مرتب‌سازی» کنارِ فیلتر */
+.cat-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--s2) var(--s3); }
+.cat-head p { font-size: 14px; }
+.sort { display: inline-flex; align-items: center; gap: var(--s2); font-size: 14px; color: var(--muted); }
+/* WEB-02/05/06 (مشکلِ ۲): در گوشی جست‌وجو و دسته‌ها چسبیده زیرِ نوارِ بالا، کارتِ دکان فشرده — کالا از صفحهٔ اول */
+@media (max-width: 599px) {
+  .toolbar { position: sticky; top: 61px; z-index: 15; margin-top: var(--s3); padding-block: var(--s2); gap: var(--s2); background: var(--bg); }
+  .shop-hero.card-lg { padding: var(--s4); }
+  .shop-hero .shop-cover { margin: calc(var(--s4) * -1) calc(var(--s4) * -1) var(--s3); aspect-ratio: auto; height: 76px; }
+  .shop-hero .avatar.lg { width: 44px; height: 44px; border-radius: 12px; font-size: 19px; }
+  .shop-id h1 { font-size: 17px; }
+  .shop-id p { font-size: 13px; }
+  .shop-hero .status-line { margin-top: var(--s2); gap: var(--s1) var(--s2); font-size: 12.5px; }
+  .shop-hero .place { margin-top: var(--s2); flex-wrap: nowrap; font-size: 13px; }
+  .shop-hero .place span { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .shop-hero .place a { flex: none; }
+  .shop-hero .meta { margin: var(--s2) calc(var(--s4) * -1) 0; padding-inline: var(--s4); flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; font-size: 12.5px; }
+  .shop-hero .meta > span { flex: none; padding: 3px 8px; }
+  .banner { flex-basis: 80%; padding: var(--s3); gap: var(--s1); }
+}
+/* جست‌وجو، دسته یا فیلتر ⇒ بنرها و ردیف‌ها کنار می‌روند و نتیجه درست زیرِ کادر است؛ «پیدا نشد» ⇒ «پیشنهادِ همین دکان» می‌ماند (WEB-06) */
+#view-catalog:has(#q:not(:placeholder-shown), #cats > [aria-pressed="true"]:not(:first-child), #fl-count:not(:empty)) :is(#banners, #deals, #fresh, #saved, #recent, #rv),
+#view-catalog:has(#q:not(:placeholder-shown), #cats > [aria-pressed="true"]:not(:first-child), #fl-count:not(:empty)):not(:has(#catalog-empty:not([hidden]))) #picks { display: none; }
