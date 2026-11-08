@@ -438,6 +438,20 @@ test('CHAT-10: فایلِ اجرایی، MIME ِ جعلی، SVG و فایلِ ب
   assert.equal(alive.status, 200);
 });
 
+test('⛔ putMedia (CodeQL type confusion): فقط Buffer؛ رشته، آرایه، شیءِ «length»دار، null و Uint8Array ⇒ ۴۰۰ bad_media بی هیچ ردیف؛ Buffer ِ درست مثلِ پیش', async () => {
+  const o = await chatShop('نوعِ بدنه');
+  const me = customer(o.shopId, '+93790000017');
+  const conv = (await chat.open(me, { name: 'نوع' })).conversation.id;
+  for (const bad of ['abcd', ['a', 'b'], { length: 5 }, null, undefined, 7, new Uint8Array([0xff, 0xd8, 0xff])]) {
+    await assert.rejects(chat.putMedia(me, conv, bad), (e) => e.status === 400 && e.code === 'bad_media', JSON.stringify(bad));
+  }
+  assert.equal(await count('shop_chat_media', o.shopId), 0);
+  const ok = await chat.putMedia(me, conv, smallJpeg(4));
+  assert.equal(ok.kind, 'image');
+  assert.equal(ok.reused, false);
+  assert.equal(await count('shop_chat_media', o.shopId), 1);
+});
+
 test('CHAT-08: حذف برای من فقط در نمای همان؛ حذف برای همه سنگِ قبر به دستگاهِ آفلاین می‌رسد و رسانه می‌رود', async () => {
   const o = await chatShop('حذف');
   const mgr = await member(o.shopId, 'manager', 'مدیرِ حذف');

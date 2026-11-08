@@ -673,13 +673,13 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
     throw forbidden('این دکان پیامِ شما را نمی‌پذیرد', 'chat_blocked');
   }
   await life.assertOpen(null, conv.id);
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
-  const s = chatMedia.sniff(buf);
+  const bytes = require('./raw-body').mediaBytes(buf);   //  ⛔ نوع با typeof/Array.isArray، نه `Buffer.isBuffer` (type confusion)
+  const s = chatMedia.sniff(bytes);
   if (!s) throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)، پیامِ صوتی (Opus، AAC، MP3، AMR) و PDF');
   if (ro === 'thumb' && s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'پیش‌نمایش باید عکس باشد');
   const cap = capOf(s.kind, ro);
-  if (buf.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
-  const data = s.kind === 'image' ? chatMedia.stripImageMetadata(buf, s.mime) : buf;
+  if (bytes.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
+  const data = s.kind === 'image' ? chatMedia.stripImageMetadata(bytes, s.mime) : bytes;
   const hash = sha256(data);
   const ins = await mediaStore.chat.put(conv.shop_id, s.mime, data, async (st) => (st.used = await one(
     `INSERT INTO shop_chat_media (id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, data, created_at, store_key)

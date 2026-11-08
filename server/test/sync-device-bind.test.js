@@ -144,3 +144,24 @@ test('SEC-AUTH-14: کامپیوترِ پمپ (توکنِ دستگاه) هم فق
   assert.equal(other.status, 403);
   assert.equal(other.body.error.code, 'device_mismatch');
 });
+
+test('⛔ لاگِ «شناسهٔ دستگاهِ ناجور» (CodeQL log injection): CR/LF ِ شناسهٔ ادعاشده سطرِ ساختگی نمی‌سازد؛ مسیر بی querystring', async () => {
+  const c = await shopWithStaff('لاگ');
+  const lines = [];
+  const warn = console.warn;
+  console.warn = (...a) => { const s = a.join(' '); if (s.startsWith('[sync] ')) lines.push(s); else warn(...a); };
+  try {
+    const evil = 'evil\r\n[sync] account=fake bound=x claimed=y';
+    const r = await h.api('POST', '/api/sync/v1/push?token=secret-q', {
+      token: c.owner, body: { device_id: evil, schema_version: 2, ops: [ins('flour')] }, headers: { 'X-App': 'shop' },
+    });
+    assert.ok(r.status < 500, JSON.stringify(r.body));
+  } finally {
+    console.warn = warn;
+  }
+  const mine = lines.filter((s) => s.includes('claimed=evil'));
+  assert.equal(mine.length, 1, JSON.stringify(lines));
+  assert.ok(!/[\r\n]/.test(mine[0]), JSON.stringify(mine[0]));
+  assert.match(mine[0], /claimed=evil\[sync\] account=fake bound=x claimed=y path=\/api\/sync\/v1\/push$/);
+  assert.ok(!mine[0].includes('secret-q'));
+});

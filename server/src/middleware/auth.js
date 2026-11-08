@@ -15,11 +15,11 @@ const { isCoreFeature } = require('../lib/features');
 const { entitlementOf } = require('../lib/entitlement');
 const { membershipOf, sessionShopOf } = require('../lib/shops');
 const { can } = require('../lib/permissions');
+const { bearerToken } = require('../lib/bearer');
 
+/** پارسرِ خطی با سقفِ طول (`lib/bearer.js`)؛ همان خروجیِ `/^Bearer\s+(.+)$/i` ِ پیشین، بی زمانِ درجهٔ دو. */
 function bearer(req) {
-  const h = req.headers.authorization || '';
-  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
-  return m ? m[1].trim() : null;
+  return bearerToken(req.headers.authorization);
 }
 
 /**
