@@ -49,6 +49,7 @@ const MESSAGES = {
   duplicate_product: 'یک کالا دو بار در سفارش آمده است',
   bad_qty: 'مقدار درست نیست',
   bad_price: 'قیمت درست نیست',
+  bad_factor: 'ضریبِ واحدِ خریدِ ردیف درست نیست',
   overflow: 'مبلغ بیش از اندازه است',
   not_draft: 'فقط پیش‌نویس ویرایش می‌شود',
   not_sent: 'سفارش هنوز فرستاده نشده است',
@@ -122,6 +123,8 @@ function parseDraft(body) {
       unit: text(x.unit, MAX_TEXT.unit, 'واحد'),
       qtyMilli: x.qtyMilli,
       priceMinor: x.priceMinor,
+      //  PRD-07: ردیف به واحدِ خرید (`unit` نامِ همان، مقدار و فی به همان واحد)؛ ضریب به واحدِ پایهٔ کالا. نبود ⇒ کلید نیست (همان پیشین)
+      ...(x.factorMilli === undefined || x.factorMilli === null ? {} : { factorMilli: x.factorMilli }),
     };
   });
   const draft = {
@@ -134,6 +137,8 @@ function parseDraft(body) {
   const bad = core.checkOrder({ supplierId: draft.supplierId, state: core.STATE.DRAFT, lines });
   if (bad) throw refuse(bad);
   lines.forEach((l, i) => {
+    if (l.factorMilli !== undefined && (!Number.isSafeInteger(l.factorMilli) || l.factorMilli <= 0
+      || l.factorMilli > require('./purchase-units').MAX_FACTOR_MILLI)) throw refuse({ code: 'bad_factor', lineId: l.id, index: i });
     if (l.qtyMilli > MAX_QTY_MILLI) throw refuse({ code: 'bad_qty', lineId: l.id, index: i });
     if (l.priceMinor > MAX_PRICE_MINOR) throw refuse({ code: 'bad_price', lineId: l.id, index: i });
   });

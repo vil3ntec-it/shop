@@ -190,7 +190,16 @@ object LedgerEngine {
     val userId: String? = null,
     /** سررسیدِ پرداخت (`yyyy-MM-dd`، PUR-07)؛ `null` یا خالی = ندارد */
     val dueDate: String? = null,
+    /**
+     *  PRD-07 — ردیف به واحدِ خرید (کارتنِ ۲۴): با این، `quantity` و `purchasePrice` ِ بالا نادیده‌اند و موتور مقدار و بهای
+     *  واحدِ پایه را از هسته می‌سازد (`PurchaseUnits.baseCost`)؛ جمعِ خرید، بدهی و ارزشِ انبار (`WarehouseEntry.costMinor`)
+     *  خودِ [InUnit.totalMinor] است، بی گرد کردنِ دوباره. `null` = همان خریدِ امروز.
+     */
+    val inUnit: InUnit? = null,
   )
+
+  /** ردیفِ خرید به واحدِ خرید: نام، مقدار به همان واحد (هزارم)، ضریب به واحدِ پایه (هزارم) و جمعِ دقیقِ ردیف (صدمِ افغانی) */
+  data class InUnit(val name: String, val qtyMilli: Long, val factorMilli: Long, val totalMinor: Long)
 
   /**
    * ثبتِ خرید — یک کار، چهار اثر:
@@ -209,8 +218,17 @@ object LedgerEngine {
       ?: return Result.Failed(StrPurchasePages.chooseSupplier)
     val product = d.products.find { it.id == draft.productId }
       ?: return Result.Failed(StrLedger.pickProduct)
-    if (draft.quantity.isNaN() || draft.quantity <= 0) return Result.Failed(StrStock.errAmount)
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrStock.errPrice)
+    //  PRD-07: ردیف به واحدِ خرید ⇒ مقدار و بهای واحدِ پایه از هسته (`PurchaseUnits.baseCost`)، جمع همان جمعِ دقیقِ ردیف
+    val pu = draft.inUnit?.let { u ->
+      if (u.name.isBlank() || u.qtyMilli <= 0 || u.factorMilli <= 0) return Result.Failed(StrStock.errAmount)
+      if (u.totalMinor < 0) return Result.Failed(StrStock.errPrice)
+      runCatching { ir.vil3ntec.tohid.core.product.PurchaseUnits.baseCost(u.qtyMilli, u.factorMilli, u.totalMinor) }.getOrNull()
+        ?: return Result.Failed(StrStock.errAmount)
+    }
+    val quantity = pu?.let { it.baseQtyMilli / 1000.0 } ?: draft.quantity
+    val unitPrice = pu?.let { it.unitCostMinor / 100.0 } ?: draft.purchasePrice
+    if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
+    if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed(StrStock.errPrice)
     if (draft.landedCost != null && (draft.landedCost.isNaN() || draft.landedCost < 0)) return Result.Failed(StrPurchasePages.landedBad)
     val due = draft.dueDate?.trim()?.ifEmpty { null }
     if (due != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(due)) return Result.Failed(StrLedger.dueBad)
@@ -220,7 +238,7 @@ object LedgerEngine {
     if (due != null && due < date) return Result.Failed(PurchaseBook.DUE_BEFORE_DATE)
     val unit = draft.unit.ifBlank { product.unit }
     // گِرد کردن دقیقاً همان‌جای نسخهٔ وب است
-    val totalAmount = Math.round(draft.quantity * draft.purchasePrice).toDouble()
+    val totalAmount = pu?.let { it.totalMinor / 100.0 } ?: Math.round(quantity * unitPrice).toDouble()
     var paid = if (draft.paidAmount.isNaN() || draft.paidAmount < 0) 0.0 else draft.paidAmount
     paid = minOf(paid, totalAmount)
 
@@ -234,12 +252,12 @@ object LedgerEngine {
     var audit = d.auditLog
 
     // قیمتِ خریدِ کالا با آخرین خرید به‌روز می‌شود، و تغییرش می‌ماند
-    if (product.purchasePrice != draft.purchasePrice) {
+    if (product.purchasePrice != unitPrice) {
       history = history + PriceChange(
         id = newId(),
         productId = product.id,
         oldPrice = product.purchasePrice,
-        newPrice = draft.purchasePrice,
+        newPrice = unitPrice,
         date = today,
         createdAt = now,
       )
@@ -248,11 +266,11 @@ object LedgerEngine {
         type = "price_change",
         date = today,
         refId = product.id,
-        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(draft.purchasePrice)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        notes = "تغییر قیمت خرید از ${money(product.purchasePrice)} به ${money(unitPrice)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
       )
       products = products.map {
-        if (it.id == product.id) it.copy(purchasePrice = draft.purchasePrice) else it
+        if (it.id == product.id) it.copy(purchasePrice = unitPrice) else it
       }
     }
 
@@ -261,7 +279,7 @@ object LedgerEngine {
       type = "purchase",
       date = date,
       refId = purchaseId,
-      notes = "ثبت خرید ${money(draft.quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+      notes = "ثبت خرید ${draft.inUnit?.let { "${money(it.qtyMilli / 1000.0)} ${it.name} = " }.orEmpty()}${money(quantity)} $unit از «${supplier.name}» به مبلغ ${money(totalAmount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now,
     )
 
@@ -275,9 +293,9 @@ object LedgerEngine {
           productId = product.id,
           cartons = 0.0,
           perCarton = 0.0,
-          units = draft.quantity,
+          units = quantity,
           unit = unit,
-          price = draft.purchasePrice,
+          price = unitPrice,
           date = date,
           notes = draft.notes.ifBlank { "خرید از تأمین‌کننده" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           purchaseId = purchaseId,
@@ -287,14 +305,15 @@ object LedgerEngine {
           landedCost = landed,
           landedCostMinor = landed?.let(StockLedger::minor),
           userId = draft.userId?.trim()?.ifEmpty { null },
+          costMinor = pu?.totalMinor,
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId,
           productId = product.id,
           supplierId = supplier.id,
-          quantity = draft.quantity,
+          quantity = quantity,
           unit = unit,
-          purchasePrice = draft.purchasePrice,
+          purchasePrice = unitPrice,
           totalAmount = totalAmount,
           date = date,
           notes = draft.notes,
@@ -306,12 +325,15 @@ object LedgerEngine {
           //  خریدِ تکی: هزینهٔ جانبی روی ردیفِ خرید هم (مثلِ فاکتورِ چندردیفه، `PurchaseBook`)
           landedCost = landed,
           landedCostMinor = landed?.let(StockLedger::minor),
+          unitName = draft.inUnit?.name,
+          unitQtyMilli = draft.inUnit?.qtyMilli,
+          unitFactorMilli = draft.inUnit?.factorMilli,
         ),
         stockMovements = d.stockMovements + StockMovement(
           id = newId(),
           productId = product.id,
           type = "purchase_in",
-          qty = draft.quantity,
+          qty = quantity,
           date = date,
           notes = draft.notes.ifBlank { "ثبت خرید" },  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           refId = purchaseId,

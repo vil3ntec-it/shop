@@ -181,6 +181,8 @@
         //  هزینهٔ جانبیِ کلِ ردیف (PUR-06): `landedCostMinor` ِ دقیق، وگرنه `landedCost` ِ افغانی؛ منفی یا نادرست ⇒ ۰
         landed: landedOf(e),
         adjustment: e.isAdjustment === true, date: str(e.date), createdAt: ms(e.createdAt),
+        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها، همان پیشین (همتای `ReportLedger.Entry.value`)
+        value: Number.isSafeInteger(e.costMinor) ? e.costMinor : null,
       });
     });
     arr(raw.auditLog).forEach(function (a) {
@@ -241,7 +243,7 @@
         if (e.productId === '' || e.qty === 0) return;
         d = doc(x.t, e.adjustment || e.qty < 0 ? 'count_adjust' : 'purchase_receipt', e.productId, 'e:' + e.id, e.qty);
         if (d.type === 'count_adjust') d.reason = 'adjustment';
-        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0) && (d.costMinor = mdr(e.qty, e.unitCost, 1000)) === null) return;
+        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0) && (d.costMinor = !e.adjustment && e.value !== null && e.value >= 0 ? e.value : mdr(e.qty, e.unitCost, 1000)) === null) return;
         if (d.type === 'purchase_receipt' && e.landed > 0) d.landedMinor = e.landed;
         p = posOf(e.productId);
         var blind = e.qty > 0 && d.costMinor === undefined && !(p && (p.qtyMilli > 0 || p.lastCost));

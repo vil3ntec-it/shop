@@ -180,6 +180,11 @@ object OwnerExport {
     "consumptionDays" to "چرخهٔ مصرف (روز)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، MKT-06
     "brand" to "برند",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "packs" to "بسته‌ها",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "purchaseUnits" to "واحدهای خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "costMinor" to "ارزش دقیق کالا (صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitName" to "واحد خرید",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitQtyMilli" to "مقدار به واحد خرید (هزارم)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
+    "unitFactorMilli" to "ضریب واحد خرید (هزارم)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، PRD-07
     "cartons" to "تعداد کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "perCarton" to "تعداد در هر کارتن",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "units" to "تعداد واحد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

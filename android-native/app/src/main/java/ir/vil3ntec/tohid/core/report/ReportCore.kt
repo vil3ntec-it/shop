@@ -212,7 +212,9 @@ object ReportCore {
           if (e.productId == "" || e.qty == 0L) continue
           val adjust = e.adjustment || e.qty < 0
           val priced = e.qty > 0 && (!e.adjustment || e.unitCost > 0)
-          val cost = if (priced) mdr(e.qty, e.unitCost, 1000) ?: continue else null
+          //  PRD-07: ورودِ خرید به واحدِ خرید ارزشِ دقیقِ خودش را دارد (`costMinor`)، نه مقدار × بهای گردشده
+          val exact = if (!e.adjustment && e.value != null && e.value >= 0) e.value else null
+          val cost = if (priced) exact ?: mdr(e.qty, e.unitCost, 1000) ?: continue else null
           val p = posOf(e.productId)
           val blind = e.qty > 0 && cost == null && !(p != null && (p.qtyMilli > 0 || p.lastCost != null))
           val d = doc(

@@ -114,6 +114,19 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serialTracked: Boolean? = null,
   /** MKT-06 «چرخهٔ مصرف» (روزِ ۱ تا ۳۶۵، `ProductCycle`) برای یادآوریِ «دوباره خریدن» ِ برنامهٔ خرید؛ `null` نوشته نمی‌شود ⇒ ردیفِ پیشین همان */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val consumptionDays: Int? = null,
+  /*  PRD-07 — واحدهای خریدِ چندگانه (کارتنِ ۱۲ از یک تأمین‌کننده، کارتنِ ۲۴ از دیگری) با ضریب به همین `unit`؛ قاعده‌ها و حساب در
+   *  `core/product/PurchaseUnits`. فرم فقط با `ShopPolicy.productTools`؛ سرور شکلش را می‌سنجد (`lib/purchase-units.js`). همان راهِ
+   *  همگام‌سازی و ادغامِ `packs` (یک فیلدِ کالا). `null` نوشته نمی‌شود ⇒ کالای بی واحدِ خرید همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val purchaseUnits: List<PurchaseUnit>? = null,
+)
+
+/** یک واحدِ خرید (PRD-07): نام، ضریب به هزارمِ `Product.unit` (کارتنِ ۲۴ ⇒ 24000)، تأمین‌کنندهٔ پیش‌فرض و بارکدِ اختیاری */
+@Serializable
+data class PurchaseUnit(
+  val name: String = "",
+  val factorMilli: Long = 0,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val supplierId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val barcode: String? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -202,6 +215,14 @@ data class WarehouseEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val countedAt: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val seenMilli: Long? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val correctedAt: Long? = null,
+  /**
+   *  PRD-07 — ارزشِ **دقیقِ** کالای همین ردیف به صدمِ افغانی (بی هزینهٔ جانبی): خریدی که به واحدِ خرید ثبت شد
+   *  (۱ کارتنِ ۲۴ به ۱٬۰۰۰ ⇒ 100000)، تا میانگینِ موزون (`StockLedger`، `ReportCore`) ارزش را از `units × price` ِ گردشده
+   *  (۲۴ × ۴۱٫۶۷ = ۱٬۰۰۰٫۰۸) نسازد. `null` = همان `units × price` ِ پیشین؛ نوشته نمی‌شود ⇒ ردیفِ قدیمی همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val costMinor: Long? = null,
 )
 
 @Serializable
@@ -730,6 +751,11 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /*  PRD-07 — ردیفی که به واحدِ خرید ثبت شد: نامِ واحد، مقدار به همان واحد و ضریب (هزارم). `quantity` و `purchasePrice` همچنان به
+   *  واحدِ پایه‌اند و `totalAmount` جمعِ دقیقِ همان ردیف؛ این سه فقط برای نمایش و برگشت. `null` نوشته نمی‌شود ⇒ خریدِ پیشین همان. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitName: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitQtyMilli: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitFactorMilli: Long? = null,
 )
 
 @Serializable

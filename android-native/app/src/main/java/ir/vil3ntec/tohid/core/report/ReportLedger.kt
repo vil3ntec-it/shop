@@ -37,11 +37,14 @@ class ReportLedger private constructor() {
   class Tx(val id: String, val debtorId: String, val give: Boolean, val amount: Long, override val date: String, override val createdAt: Long) : Dated
   class Purchase(val id: String, val supplierId: String, val total: Long, val paid: Long, override val date: String, override val createdAt: Long) : Dated
   class Payment(val id: String, val supplierId: String, val amount: Long, override val date: String, override val createdAt: Long) : Dated
+  /** `value`: ارزشِ دقیقِ ورود (PRD-07، `costMinor` ِ ردیف)؛ `null` = مقدار × `unitCost` ِ پیشین */
   class Entry(
     val id: String, val productId: String, val qty: Long, val unitCost: Long, val adjustment: Boolean,
     override val date: String, override val createdAt: Long,
     /** هزینهٔ جانبیِ کلِ ردیف (PUR-06)، واحدِ کوچک، ≥ ۰ — همان `landedOf` ِ JS */
     val landed: Long = 0L,
+    /** PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها */
+    val value: Long? = null,
   ) : Dated
   class Audit(
     val id: String, val type: String, val refId: String, val user: String, val approvedBy: String, val amount: Long,
@@ -110,6 +113,7 @@ class ReportLedger private constructor() {
           e.s("id"), e.s("productId"), milli(e, "units"), money(e, "price"),
           (e["isAdjustment"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true,
           e.s("date"), ms(e, "createdAt"), landedOf(e),
+          (e["costMinor"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull(),
         )
       }
       raw.list("auditLog").forEach { a ->

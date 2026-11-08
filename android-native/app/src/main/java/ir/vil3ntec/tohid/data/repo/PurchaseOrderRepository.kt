@@ -137,6 +137,8 @@ class PurchaseOrderRepository(private val api: ApiClient) {
             put("unit", l.unit)
             put("qtyMilli", l.qtyMilli)
             put("priceMinor", l.priceMinor)
+            //  PRD-07: فقط ردیفِ به واحدِ خرید — بدنهٔ ردیفِ واحدِ پایه همان پیشین
+            l.factorMilli?.let { put("factorMilli", it) }
           })
         }
       })
