@@ -270,6 +270,7 @@ val MoneyModule = AppModule(
         },
         //  همان شرطِ کامپیوتر (`DeskPurchasing.stockOn`)
         extrasOn = remember(data.auditLog, ir.vil3ntec.tohid.data.StockLedger.serverFlag) { ir.vil3ntec.tohid.data.StockLedger.isOn(data) },
+        notify = { tone, text -> toasts.show(text, tone) },
       )
     },
 
