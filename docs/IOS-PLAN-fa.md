@@ -631,6 +631,38 @@ shim ِ بی‌لرزش (بدتر از امروز) می‌خواست یا shimی
 و بقیه. از لاگ: «زدنِ دکمهٔ خاموش: کنشِ کلیک فرستاده شد» (و هیچ فروشی ننشست)، کشیدن ۴۲۸ ⇐ ۱۵۲۸ پیکسل در ۹۰۰ میلی‌ثانیه، سفارشِ
 ویترینِ #1 (۱۸۰ ؋). klib ِ لینوکس با Compose 1.9.3 ِ CI: «۱۲۳۲ فایلِ مشترک کپی شد، ۱۰ سطرِ بیرون‌مانده» (۱۲۳۰ از ۱۲۴۰ فایلِ اندروید).
 
+### ۰.۱۶ ایمنیِ داده روی آیفون — هم‌ترازی با رفع‌های دسته‌های ۲۸ تا ۳۰ (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/ios-parity`)
+
+> همهٔ پرونده‌های این رفع‌ها (حتی `*Android.kt`) در `android-native` اند و چون در `ios-exclude.txt` نیستند خودشان برای آیفون
+> کامپایل می‌شوند؛ پس پرسش این بود که shim ِ زیرشان راست می‌گوید یا نه. اندروید، کامپیوتر و `core` دست نخوردند.
+
+| رفع | آیفون | چرا / چه شد |
+|---|---|---|
+| #986 `AccountBind`، `SafeSignOut`، `CloudSettingsRestore`، بازیابیِ دفترِ بایگانی | (الف) | کدِ مشترک؛ ورودِ آیفون هم از همان `AppShell` و `AuthController` می‌گذرد (هیچ راهِ ورود/خروجِ جدا در `ios/` نیست) |
+| #986 `SignOutVault` (گاوصندوقِ رمزدار) | (الف) | `AtRest.codec` ⇐ `AtRestKeysIos` (کلیددان، «فقط همین دستگاه»)؛ آزمونِ شبیه‌ساز: `DataSafetyIosTest` |
+| #986 پشتیبانِ دیدنیِ «خروجِ اجباری» (`BackupMirror`) | (ب) | `Platform.defaultBackupDir` ِ آیفون `null` بود ⇒ `BackupMirror.write` همیشه شکست و خروجِ اجباری هرگز. حالا `Documents/Backups` (همتای `getExternalFilesDir("Backups")`)، دیدنی در Files (`UIFileSharingEnabled`، `LSSupportsOpeningDocumentsInPlace`) |
+| #989 `LedgerRecoveryAndroid.kt`، `DiskWrite` ِ `.prev` | (الف) | `DiskWriteIos` همان API (`bytes(…, keepPrevious)`، `previousOf`) با `link(2)` پیش از `rename(2)`؛ آزمونِ شبیه‌ساز: `.prev`، دفترِ بریده ⇐ `CORRUPT` ⇐ نسخهٔ پیشین |
+| #989 `OpQueue` و `fsync` | (الف) | از `DiskWrite` ِ آیفون: `fsync` ِ پرونده + `rename(2)` + `fsync` ِ پوشه |
+| #989 `.bak` ِ `DesktopPrefs` | (الف) با یک (ج) | تنظیم‌های آیفون NSUserDefaults اند: plist را `cfprefsd` اتمی می‌نویسد و برنامه هیچ پروندهٔ نیمه‌ای نمی‌خواند — همان خطری که `.bak` می‌بست نیست. (ج) پایین: سقفِ ۴ مگابایت |
+| #991 `V1ReplicaAndroid.kt` | (الف) با یک (ج) | منطقِ مشترک روی همان prefs. (ج) پایین: پشتیبانِ دستگاهِ iOS |
+| #994 `ShopSettingsSync` | (ب) | `SharedPreferences.all` ِ shim هر NSNumber را متن می‌داد ⇒ `ShopSettingsKeys.encode` بولی/عددی را «نیست» می‌دید و صاحب/مدیر روی آیفون (با پرچمِ روشن) برای همه «برداشتن» می‌فرستاد؛ همین در `ShopSettingsBundle.export` ⇒ `"t":"s"` و `ClassCastException` در بازیابیِ اندروید. حالا همان نوع‌های اندروید (`commonMain/…/ios/prefs/PrefTypes.kt`؛ Int/Long با نوعِ اعلام‌شدهٔ `ShopSettingsKeys`)؛ `SyncV1Keys.move` و `AccountVault` هم نوع را نگه می‌دارند |
+| #998 `save(base, next)` | (الف) | فقط کدِ مشترک؛ هیچ پروندهٔ `ios/` `ShopStore.save` را صدا نمی‌زند (هنوز روی `claude/stale-save`، نه این پایه) |
+| #995 `ReturnLeft` | (الف) | منطقِ خالص (`core/money/ReturnCap`) و صفحه‌های مشترک |
+
+**(ج) هنوز نه، و چرا:**
+1. **پشتیبانِ دستگاهِ iOS شناسهٔ دستگاه را می‌برد.** اندروید `tohid-sync.xml` (`device_uid`، `replica_owner`) و `tohid-sync-v1.xml` را از
+   پشتیبان کنار می‌گذارد (`backup_rules.xml`، `TohidBackupAgent`)؛ NSUserDefaults و `Application Support` ِ آیفون همیشه در پشتیبانِ
+   iCloud/Finder اند ⇒ آیفونِ تازه‌ای که از پشتیبان برگردد همان `device_id` و `replica` ِ آیفونِ پیشین را دارد (و پرونده‌های رمزدار بی
+   کلید). راهِ درست (پرونده با `NSURLIsExcludedFromBackupKey` به‌جای suite، یا نشانِ کلیددانِ «فقط همین دستگاه» و شناسهٔ تازه) را فقط
+   روی دستگاهِ واقعی و بازیابیِ واقعی می‌شود سنجید؛ تشخیصِ نادرست شناسهٔ دستگاه را عوض می‌کند و مجوز را از گوشی جدا — پس پیش از
+   انتشارِ آیفون، نه کورکورانه.
+2. **سقفِ ۴ مگابایتِ NSUserDefaults.** سایهٔ همگام‌سازی (`<کلید>.shadow`) در prefs است؛ iOS نوشتنِ مقدارِ ≥ ۴ مگابایت را نامعتبر
+   می‌داند و `commit()` ِ shim همیشه `true` است ⇒ دکانِ بزرگ ممکن است سایه را پس از بستنِ برنامه کهنه ببیند (op ِ تکراری، نه
+   پاک شدن). راه: سایه در پرونده با `DiskWrite`؛ باید روی دستگاه سنجیده شود.
+
+**آزمون:** `jvmTest` ِ `ios/shared` روی لینوکس (`PrefTypesJvmTest` ۷/۷). `DataSafetyIosTest` (۶ آزمون: نوع‌های `all`، همگام‌سازیِ تنظیمات و
+پشتیبان، `SyncV1Keys.move`، `.prev` و بازیابی، گاوصندوق روی کلیددان، پوشهٔ پشتیبان) و کامپایلِ iOS فقط در CI ِ macOS/klib.
+
 ## ۱. خلاصه در پنج خط
 
 1. کدِ برنامه **۳۴۲ فایلِ Kotlin و ۸۹٬۸۷۲ خط** است. از این‌ها **۱۲۰ فایل** فقط Kotlin/Compose/kotlinx دارند، **۵۸ فایل** فقط به JDK تکیه دارند (`java.*`، `org.json`، `System.currentTimeMillis`، `String.format`، `synchronized`…) و **۱۶۴ فایل** به اندروید وابسته‌اند (`android.*`، androidxِ غیرِ Compose، `Context`، `SharedPreferences`، `R.`، کتابخانه‌های گوگل، OkHttp).
