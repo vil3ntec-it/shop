@@ -90,22 +90,12 @@ class ShopStore(
         _unreadable.value = AtRestException.Kind.IO
         _data.value = ShopData()
       } else if (file.exists()) {
-        //  SEC-01: دفترِ ساده همان‌طور خوانده می‌شود؛ رمزدار با کلیدِ همین دستگاه
-        val text = try {
-          AtRest.readText(context, file).also { _unreadable.value = null }
-        } catch (e: AtRestException) {
-          _unreadable.value = e.kind
-          null
-        } catch (e: Exception) {
-          //  همان رفتارِ همیشهٔ دفترِ ساده: خطای خواندن بی‌صدا، دفترِ خالی
-          null
-        }
-        if (text != null) {
-          runCatching { json.decodeFromString<ShopData>(text) }
-            .onSuccess { follow.replace(it); recoverSync(it) }
-        }
+        //  SEC-01: دفترِ ساده همان‌طور، رمزدار با کلیدِ همین دستگاه. ⛔ DATA-SAFETY: خواندنِ ناموفق یا JSON ِ خراب «خالی» نیست (`LedgerRecovery`)
+        val read = try { LedgerRecovery.read(file, json, { AtRest.readText(context, it) }) } catch (e: AtRestException) { _unreadable.value = e.kind; null }
+        if (read is LedgerRecovery.Read.Ok) { _unreadable.value = null; guard.clear(); follow.replace(read.data); recoverSync(read.data) }
+        if (read is LedgerRecovery.Read.Bad) damaged(read.damage)
       } else {
-        _unreadable.value = null
+        _unreadable.value = null; guard.clear()
         recoverSync(ShopData())
       }
       //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو.
@@ -129,6 +119,16 @@ class ShopStore(
    */
   private val _unreadable = MutableStateFlow<AtRestException.Kind?>(null)
   val unreadable: StateFlow<AtRestException.Kind?> = _unreadable.asStateFlow()
+
+  /** DATA-SAFETY: دفترِ **ساده**ای که خوانده نشد — گونهٔ خرابی، نسخهٔ سالم و پیامِ برگشت (شرح سرِ `LedgerRecovery.Guard`) */
+  val guard = LedgerRecovery.Guard()
+  private fun damaged(damage: LedgerRecovery.Damage) {
+    _unreadable.value = LedgerRecovery.kindOf(damage)
+    guard.damaged(damage, { LedgerRecovery.near(context, file, json, snapshots = !training) }, { syncs && LedgerRecovery.autoRecoverable(context) }) { SyncV1Engine.of(context).resetTo(it.data, staging); recoverSync(it.data) }
+  }
+  /** پنجرهٔ دفترِ خراب: برگرداندن از `guard.recovery` از راهِ امنِ [rebuildFromServer] (بی op؛ فایلِ خراب کنار می‌رود)؛ [retryRead] همان `load` */
+  suspend fun recoverFromCopy(): Rebuilt = rebuildFromServer(guard.recovery.value?.data).also { if (it.ok) guard.clear() }
+  suspend fun retryRead(): Boolean { load(); return _unreadable.value == null }
 
   /* ------- چند نمونه روی یک دفتر: صفحه و کارگرِ پس‌زمینه — شرح سرِ `LedgerFollow` ------- */
 
@@ -552,7 +552,7 @@ class ShopStore(
     }
     if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
     rebuildMark.delete()
-    _unreadable.value = null
+    _unreadable.value = null; guard.clear()
     follow.replace(next)
     follow.publishedLocked(next)
     runCatching { LedgerSummary.write(context, next) }
@@ -767,7 +767,7 @@ class ShopStore(
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
     //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
     //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
-    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next)) }
+    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true) }   //  DATA-SAFETY: `.prev` (`LedgerRecovery`)
     saved.exceptionOrNull()?.let {
       //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
       if (!quiet) _diskError.tryEmit(it.message ?: StrAppData.unknownError)
@@ -805,7 +805,6 @@ class ShopStore(
     parsed
   }
 
-  /** واردکردنِ داده‌ای که از نسخهٔ وب می‌آید */
   /**
    *  واردکردنِ داده‌ای که از نسخهٔ وب می‌آید.
    *
@@ -932,6 +931,7 @@ class ShopStore(
    * بین دو نسخه جابه‌جا می‌شود دفترش را دوباره نمی‌سازد.
    */
   suspend fun exportBackup(storeName: String = ""): String = withContext(Dispatchers.IO) {
+    if (_unreadable.value != null) throw StaleLedger(UNREADABLE)   //  ⛔ DATA-SAFETY: دفترِ خوانده‌نشده پشتیبانِ «خالی» نمی‌دهد
     val tree = json.encodeToJsonElement(ShopData.serializer(), _data.value)
       .let { it as kotlinx.serialization.json.JsonObject }
       .toMutableMap()

@@ -139,7 +139,9 @@ object LedgerArchive {
         //  دوباره اضافه نمی‌شود.
         //  زیرِ قفلِ کوچِ رمز (SEC-01): کوچ میانِ خواندن و نوشتن نمی‌نشیند
         synchronized(AtRest.lock) {
-          val existing = readArchive(context)
+          //  ⛔ DATA-SAFETY: بایگانیِ خوانده‌نشده یا خراب «خالی» نیست ⇒ شکست، رونوشتش کنار و دفتر کوتاه نمی‌شود
+          //  (`LedgerRecovery.strict`) — پیش‌تر «خالی + تازه‌ها» رویِ بایگانیِ واقعی می‌نشست
+          val existing = LedgerRecovery.strict(file(context), { AtRest.readText(context, it) }) { json.decodeFromString<Archive>(it) } ?: Archive()
           val merged = Archive(
             stockMovements = union(existing.stockMovements, fresh.stockMovements) { it.id },
             priceHistory = union(existing.priceHistory, fresh.priceHistory) { it.id },

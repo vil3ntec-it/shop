@@ -43,6 +43,28 @@ object DiskWrite {
   @Throws(IOException::class)
   fun bytes(target: File, data: ByteArray) = stream(target) { it.write(data) }
 
+  /**
+   *  همان [bytes]، و پیش از جابه‌جایی نسخهٔ پیشینِ [target] به نامِ `<نام>.prev` می‌ماند (DATA-SAFETY).
+   *
+   *  ⛔ دفتر (`ShopStore.writeToDisk`) هر ذخیره را این‌طور می‌نویسد: اگر فایلِ تازه بعداً خراب خوانده شد
+   *  (خطای دیسک، قطعِ برق روی سیستمی که `fsync` را جدی نمی‌گیرد)، نسخهٔ یک ذخیره پیش‌تر سالم کنارش هست
+   *  (`LedgerRecovery`). پیوندِ سخت است، نه رونوشت: هیچ بایتی دوباره نوشته نمی‌شود و ثبتِ فروش کُند نمی‌شود.
+   *  سیستمی که پیوندِ سخت نمی‌دهد ⇒ بی `.prev` (نسخه‌های خودکار هنوز هستند) — خطایش هرگز نوشتن را نمی‌شکند.
+   */
+  @Throws(IOException::class)
+  fun bytes(target: File, data: ByteArray, keepPrevious: Boolean) {
+    if (!keepPrevious) return bytes(target, data)
+    stream(target, before = { linkPrevious(target) }) { it.write(data) }
+  }
+
+  /** نامِ نسخهٔ پیشینِ [target] — همان که [bytes] با `keepPrevious` می‌گذارد */
+  fun previousOf(target: File): File = File(target.absoluteFile.parentFile, target.name + PREV)
+
+  private fun linkPrevious(target: File) {
+    if (!target.isFile || Build.VERSION.SDK_INT < 26) return
+    runCatching { Api26.link(previousOf(target), target) }
+  }
+
   /** رونوشتِ یک فایل، همان بایت‌ها */
   @Throws(IOException::class)
   fun copy(source: File, target: File) = stream(target) { out ->
@@ -50,7 +72,10 @@ object DiskWrite {
   }
 
   @Throws(IOException::class)
-  fun stream(target: File, write: (OutputStream) -> Unit) {
+  fun stream(target: File, write: (OutputStream) -> Unit) = stream(target, before = {}, write = write)
+
+  /** @param before درست پیش از جابه‌جایی (فایلِ کناری کامل و `fsync` شده) — نسخهٔ پیشین ([linkPrevious]) */
+  private fun stream(target: File, before: () -> Unit, write: (OutputStream) -> Unit) {
     val dir = target.absoluteFile.parentFile ?: throw IOException(StrAppData.folderUnknown(target))
     if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException(StrAppData.folderNotMade(dir))
     val tmp = File(dir, target.name + ".tmp")
@@ -60,6 +85,7 @@ object DiskWrite {
         out.flush()
         out.fd.sync()
       }
+      before()
       move(tmp, target)
     } catch (e: Throwable) {
       tmp.delete()
@@ -111,7 +137,14 @@ object DiskWrite {
     fun syncDir(dir: File) {
       FileChannel.open(dir.toPath(), StandardOpenOption.READ).use { it.force(true) }
     }
+
+    /** پیوندِ سختِ [prev] به [target] (همان inode؛ جابه‌جاییِ بعدی فقط [target] را به فایلِ تازه می‌برد) */
+    fun link(prev: File, target: File) {
+      Files.deleteIfExists(prev.toPath())
+      Files.createLink(prev.toPath(), target.toPath())
+    }
   }
 
   private const val ATTEMPTS = 3
+  private const val PREV = ".prev"
 }

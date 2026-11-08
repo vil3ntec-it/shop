@@ -29,9 +29,7 @@ const { one, many, tx, now, query } = require('../db');
 const { ApiError, badRequest, notFound, conflict: conflictError, forbidden } = require('../middleware/errors');
 const { can } = require('./permissions');
 const v1migrations = require('./sync-v1-migrations');
-const hlc = require('./hlc');
-const schema = require('./sync-v3-schema');
-const convert = require('./sync-v3-convert');
+const hlc = require('./hlc'), schema = require('./sync-v3-schema'), convert = require('./sync-v3-convert');
 const toV1 = require('./sync-v3-to-v1');
 const approvals = require('./staff-approval');
 const store = require('./sync-v3-store');
@@ -221,7 +219,9 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
         //  opِ پولیِ ردشده هرگز بی‌صدا نمی‌رود: صندوقِ تعارض برای صاحب دکان
         if (failed.box) {
           const b = failed.box;
-          await s.conflict(ctx, { table: b.table, row_id: b.row_id, loser_op_id: b.op_id, loser_device: deviceId },
+          //  DATA-SAFETY: سند و همهٔ همراه‌هایش کامل (`conflict-payload`) — قلم‌ها فقط روی دستگاه نمی‌مانند
+          await s.conflict(ctx, { table: b.table, row_id: b.row_id, loser_op_id: b.op_id, loser_device: deviceId,
+            loser_value: require('./conflict-payload').payload('v3', unit.items.flatMap((it) => it.ops)) },
             b.kind, t, { dedupe: `perm:${b.op_id}`, detail: {
               ...b.detail,
               //  نشانی‌های سند برای همراهِ دستهٔ بعد (v3 ِ بی tx، `holdV3Units`) و دنبالهٔ همان tx
