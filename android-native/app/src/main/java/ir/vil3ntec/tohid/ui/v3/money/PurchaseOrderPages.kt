@@ -218,16 +218,17 @@ internal fun RouteScope.PurchaseOrdersRoute() {
       PoForms.Filter.entries.forEach { f -> V3Chip(PoForms.label(f), selected = filter == f, onClick = { filter = f }) }
     }
     Spacer(Modifier.height(12.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    //  زیرِ هم با پهنای کامل (همان کارهای صفحهٔ جزئیات): کنارِ هم در ۳۶۰dp نوشتهٔ هر دو دکمه بریده می‌شد («New purcha…»)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       if (perms.manage) {
         V3Button(
           StrPurchasePages.newPoTitle,
           { nav.openForResult(MoneyPaths.NEW_PURCHASE_ORDER) { id -> tick++; if (id != null) nav.open(MoneyPaths.purchaseOrder(id)) } },
-          Modifier.weight(1f), icon = Icons.Outlined.Add,
+          Modifier.fillMaxWidth(), icon = Icons.Outlined.Add,
         )
       }
       V3Button(
-        StrPurchasePages.reorderSuggest, { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) }, Modifier.weight(1f),
+        StrPurchasePages.reorderSuggest, { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) }, Modifier.fillMaxWidth(),
         kind = V3ButtonKind.SECONDARY,
       )
     }
