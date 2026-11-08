@@ -593,10 +593,12 @@ async function seedShop(a) {
   //  STF-09: لنگرِ واقعیِ زنجیرهٔ سابقهٔ دستگاهِ «الف» (`POST /api/sync/v1/audit-anchor`، مهاجرتِ ۴۱۰؛ درِ جدای
   //  فقط‌دکان بیرون از /api/shop) — ردپا نشان می‌دهد هیچ درِ /api/shop ِ «ب» آن را عوض نمی‌کند. پرچم فقط برای
   //  همین گزارش روشن و بعد خاموش، تا بقیهٔ آزمون همان بماند. جداسازیِ خودِ در: device-audit-anchor.test.js و tenant-matrix
+  //  ⛔ گزارش فقط برای دستگاهِ همین نشست (`device-audit-anchor.ownDevice`) ⇒ همان `device_uid` ِ ثبت‌شدهٔ صاحب، نه `device`
   await query("INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.doc_chain','true',1)", [a.shopId]);
+  const ownDev = (await one('SELECT device_uid FROM devices WHERE user_id=$1 ORDER BY created_at LIMIT 1', [a.user.id])).device_uid;
   const anchored = await h.api('POST', '/api/sync/v1/audit-anchor', {
-    token: a.accessToken, headers: { 'X-App': 'shop', 'X-Device': device },
-    body: { device_id: device, format: 'tohid-audit-chain-v1', heads: [{ chain: `${device}/1`, seq: 3, hash: 'b'.repeat(64) }] },
+    token: a.accessToken, headers: { 'X-App': 'shop', 'X-Device': ownDev },
+    body: { device_id: ownDev, format: 'tohid-audit-chain-v1', heads: [{ chain: `${ownDev}/1`, seq: 3, hash: 'b'.repeat(64) }] },
   });
   assert.equal(anchored.status, 200, JSON.stringify(anchored.body));
   assert.equal(anchored.body.acks.length, 1, JSON.stringify(anchored.body));

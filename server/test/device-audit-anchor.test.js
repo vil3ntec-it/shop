@@ -67,8 +67,17 @@ async function put(shop, row, seq) {
     [shop, row.id, JSON.stringify(row), JSON.stringify(fsq), seq],
   );
 }
-async function fresh(label) {
-  const u = await h.newUser(label);
+/**
+ * نشستِ همان آدم روی دستگاهِ `uid` (همان ورودِ برنامه با `device.uid`). ⛔ از بازبینیِ درهای دستهٔ ۳۲ گزارش فقط برای
+ * دستگاهِ همین نشست پذیرفته است (`anchors.ownDevice`)، پس هر فرستنده باید واقعاً روی همان دستگاه وارد شده باشد.
+ */
+async function onDevice(u, uid) {
+  const r = await h.post('/api/auth/login', { identifier: u.email, password: u.password, device: { uid, name: 'آزمون', platform: 'test' } });
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  return { ...u, ...r.body };
+}
+async function fresh(label, dev = DEV) {
+  const u = await onDevice(await h.newUser(label), dev);
   const id = (await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken })).body.shop.id;
   return { u, id };
 }
@@ -332,7 +341,7 @@ test('۷) حکمِ سرور فقط برای audit.view: شاگرد ۴۰۳', asyn
   const { u, id } = await fresh('اجازهٔ لنگر');
   await flagOn(id);
   const code = (await h.post('/api/shop/staff-code', {}, { token: u.accessToken })).body.code;
-  const staff = await h.newUser('شاگردِ لنگر');
+  const staff = await onDevice(await h.newUser('شاگردِ لنگر'), OTHER);
   assert.ok((await h.post('/api/shop/staff/join', { code }, { token: staff.accessToken })).status < 300);
   const r = await verdict(staff.accessToken);
   assert.deepEqual([r.status, r.body?.error?.code], [403, 'permission_denied'], JSON.stringify(r.body));
