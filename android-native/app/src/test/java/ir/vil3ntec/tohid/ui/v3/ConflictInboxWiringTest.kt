@@ -60,7 +60,7 @@ class ConflictInboxWiringTest {
   @Test
   fun `سندِ کنارگذاشته در تاریخچه دیده می‌شود و کارگرِ همگام‌سازی آن را می‌نشاند`() {
     assertTrue(src("ui/v3/sales/history/HistoryScreen.kt").contains("SetAsideSection(ctx.d.setAside)"))
-    assertTrue(src("sync/v1/SyncV1Worker.kt").contains("SetAside.afterSync(applicationContext, store)"))
+    assertTrue(src("sync/v1/SyncV1Worker.kt").contains("SetAsideSync.afterSync(applicationContext, store)"))
     assertTrue(src("sync/v1/SyncV1Engine.kt").contains("SetAsideCommit.run("))
     assertTrue(src("sync/v3/SyncV3Engine.kt").contains("SetAsideCommit.run("))
   }

@@ -22,6 +22,7 @@ import ir.vil3ntec.tohid.core.sync.RejectedSettle
 import ir.vil3ntec.tohid.data.RejectedDocs
 import ir.vil3ntec.tohid.data.SetAside
 import ir.vil3ntec.tohid.data.SetAsideDoc
+import ir.vil3ntec.tohid.data.SetAsideSync
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
 import ir.vil3ntec.tohid.ui.v3.V3Section
@@ -72,7 +73,7 @@ object RejectedLive {
     //  صاحب «کنار گذاشت»/«اصلاح کرد» و هنوز روی این دفتر ننشسته ⇒ همین حالا یک دورِ همگام‌سازی (`data/SetAside`)
     val ids = local.mapTo(HashSet()) { it.opId }
     if (mine.any { m -> RejectedSettle.actionable(m) && (m.opId in ids || m.settle?.ops?.any { it.id in ids } == true) }) {
-      SetAside.due = true
+      SetAsideSync.due = true
       runCatching { SyncV1Worker.now(context) }
     }
   }

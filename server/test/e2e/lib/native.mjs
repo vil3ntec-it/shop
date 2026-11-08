@@ -261,9 +261,9 @@ export const KOTLIN = {
   //  S143: بازیابی از `RestoreRoute.decide` ِ core می‌گذرد و هرگز op نمی‌سازد (پیش از آن «ذخیره»ٔ عادی بود)
   restoreNoOps: restoreWiredNoOps(bodyOf('restoreBackup', fs.readFileSync(
     path.join(ROOT, 'android-native', 'app', 'src', 'main', 'java', 'ir', 'vil3ntec', 'tohid', 'data', 'ShopStore.kt'), 'utf8'))),
-  //  پس از «کنار بگذار»/«اصلاح» ِ صاحب: کارگرِ همگام‌سازی (`SyncV1Worker` ⇒ `SetAside.afterSync`) سند را از دفترِ شمرده
+  //  پس از «کنار بگذار»/«اصلاح» ِ صاحب: کارگرِ همگام‌سازی (`SyncV1Worker` ⇒ `SetAsideSync.afterSync`) سند را از دفترِ شمرده
   //  بیرون می‌برد (`SyncV1Engine.setAside` ⇒ `SetAsideCommit.run`). نبودش ⇒ [NativeDevice.settleRejected] هیچ (سفرِ JB6 سرخ)
-  setAside: /SetAsideCommit\.run\(/.test(SYNC_V1_ENGINE_KT) && /SetAside\.afterSync\(/.test(KT('SyncV1Worker.kt')),
+  setAside: /SetAsideCommit\.run\(/.test(SYNC_V1_ENGINE_KT) && /SetAsideSync\.afterSync\(/.test(KT('SyncV1Worker.kt')),
 };
 
 /* ---- پس از «کنار بگذار»/«اصلاح و ثبت» — قرینهٔ سطر به سطرِ `core/sync/RejectedSettle.kt` ---- */
@@ -757,7 +757,7 @@ export class NativeDevice {
   }
 
   /**
-   * `SetAside.afterSync` (پس از دورِ همگام‌سازیِ کارگر؛ صفحهٔ تاریخچه `due` می‌گذارد) ⇒ `SyncV1Engine.setAside` ⇒
+   * `SetAsideSync.afterSync` (پس از دورِ همگام‌سازیِ کارگر؛ صفحهٔ تاریخچه `due` می‌گذارد) ⇒ `SyncV1Engine.setAside` ⇒
    * `SetAsideCommit.run`: ردِ بازی هست ⇒ `/mine` ⇒ هر «کنار گذاشته/اصلاح‌شده» ِ همین دستگاه: opهای برگرداننده روی دفتر و
    * سایه (همان [absorb]، cursor دست نمی‌خورد) و نشانِ `setAside` در همان نوشتن. هیچ op ای به صف نمی‌رود.
    * @returns {Promise<number>} چند سند کنار گذاشته شد

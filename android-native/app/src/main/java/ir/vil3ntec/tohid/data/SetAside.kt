@@ -1,14 +1,7 @@
 package ir.vil3ntec.tohid.data
 
-import android.content.Context
-import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.sync.ConflictInbox
 import ir.vil3ntec.tohid.core.sync.RejectedSettle
-import ir.vil3ntec.tohid.data.repo.Backend
-import ir.vil3ntec.tohid.data.repo.ConflictInboxRepository
-import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
-import ir.vil3ntec.tohid.sync.v3.SyncChoice
-import ir.vil3ntec.tohid.sync.v3.SyncV3Runner
 import ir.vil3ntec.tohid.sync.v3.V3Convert
 import ir.vil3ntec.tohid.sync.v3.V3Entry
 import ir.vil3ntec.tohid.sync.v3.V3Schema
@@ -25,17 +18,10 @@ import kotlinx.serialization.json.buildJsonObject
  *  دیگر شمرده نمی‌شود (هر ترتیبی: اول فاکتورِ تازه یا اول کنار گذاشتن ⇒ همان دفتر).
  *
  *  ⛔ «دوباره ثبت» همان #1003 است (ردیف‌ها روی سرور نشستند) — این‌جا هیچ کاری ندارد.
- *  ⛔ پس از دورِ همگام‌سازی ([afterSync]) و فقط وقتی ردِ «بازِ» این دستگاه هست: دستگاهی که چیزی رد نشده هیچ نمی‌پرسد.
+ *  ⛔ پس از دورِ همگام‌سازی (`SetAsideSync.afterSync`، `SetAsideAndroid.kt`) و فقط وقتی ردِ «بازِ» این دستگاه هست:
+ *     دستگاهی که چیزی رد نشده هیچ نمی‌پرسد. این‌جا فقط منطقِ خالص است (بی Context، بی ساعت، بی قفل).
  */
 object SetAside {
-  /** کمترین فاصلهٔ دو پرسشِ `/mine` از کارگرِ همگام‌سازی (جز وقتی [due] است) */
-  const val MIN_MS = 5 * 60_000L
-
-  @Volatile private var lastAt = 0L
-
-  /** صفحهٔ تاریخچه تصمیمی دید که هنوز این‌جا ننشسته ⇒ دورِ بعدِ کارگر بی صبر می‌پرسد */
-  @Volatile var due = false
-
   // ---------- خالص ----------
 
   /** نشانِ «کنار گذاشته شد» با همهٔ برنامه — دستِ آخرِ `SyncCommit.setAside` (در همان نوشتن) */
@@ -117,32 +103,5 @@ object SetAside {
   fun openRejected(book: List<JsonObject>, d: ShopData): Boolean {
     val done = settledOps(d)
     return book.any { o -> (o["op_id"] as? JsonPrimitive)?.content?.let { it !in done } == true }
-  }
-
-  // ---------- سکو ----------
-
-  /**
-   *  پس از هر دورِ همگام‌سازی (`SyncV1Worker`): ردِ بازی هست ⇒ `/mine` (هر [MIN_MS] یک بار، یا همان دم با [due]) ⇒
-   *  هر تصمیمِ «کنار گذاشته/اصلاح‌شده» که مالِ همین دستگاه است زیرِ قفلِ موتور می‌نشیند.
-   *  @return چند سند کنار گذاشته شد
-   */
-  suspend fun afterSync(context: Context, store: ShopStore): Int {
-    val app = context.applicationContext
-    if (store.training || !TrainingMode.networkAllowed() || !runCatching { Backend.isReady(app) }.getOrDefault(false)) return 0
-    val v3 = SyncChoice.isV3(app)
-    val book = runCatching { if (v3) v3Book(SyncV3Runner.of(app).rejected()) else v1Book(SyncV1Engine.of(app).droppedOps()) }.getOrDefault(emptyList())
-    if (book.isEmpty() || !openRejected(book, store.ledgerNow())) return 0
-    val t = System.currentTimeMillis()
-    if (!due && t - lastAt < MIN_MS) return 0
-    lastAt = t
-    due = false
-    val mine = when (val r = ConflictInboxRepository(Backend.api(app)).mine()) {
-      is ApiResult.Success -> r.value
-      is ApiResult.Failure -> return 0
-    }
-    val decisions = mine.filter(RejectedSettle::actionable).map { m -> m.settle?.let { m.copy(settle = legacyBase(it)) } ?: m }
-    if (decisions.isEmpty()) return 0
-    if (v3) return SyncV3Runner.of(app).setAside(store, decisions, book)
-    return SyncV1Engine.of(app).setAside(decisions, book, read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
   }
 }

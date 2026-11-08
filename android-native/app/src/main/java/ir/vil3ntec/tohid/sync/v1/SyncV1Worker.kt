@@ -122,7 +122,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
   private suspend fun sweepAfterPull(store: ShopStore) {
     store.sweepMergedQuietly()
     //  سندِ ردشدهٔ همین دستگاه که صاحب «کنار گذاشت»/«اصلاح کرد» ⇒ بیرون از دفترِ شمرده (`data/SetAside`)؛ شکستش دور را نمی‌گیرد
-    runCatching { ir.vil3ntec.tohid.data.SetAside.afterSync(applicationContext, store) }
+    runCatching { ir.vil3ntec.tohid.data.SetAsideSync.afterSync(applicationContext, store) }
   }
 
   companion object {
