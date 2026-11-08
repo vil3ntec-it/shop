@@ -20,31 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-<<<<<<< HEAD
-    "routes": 986,
-=======
-    "routes": 987,
->>>>>>> origin/claude/conflict-ui
+    "routes": 991,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-<<<<<<< HEAD
-      "user": 480,
-=======
-      "user": 481,
->>>>>>> origin/claude/conflict-ui
+      "user": 485,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-<<<<<<< HEAD
-      "extracted": 688,
-      "empty": 296,
-=======
-      "extracted": 691,
-      "empty": 294,
->>>>>>> origin/claude/conflict-ui
+      "extracted": 692,
+      "empty": 297,
       "unresolved": 2
     }
   },

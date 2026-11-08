@@ -108,6 +108,29 @@ object StrConflictInbox {
   val markFixed: String get() = t("صاحب یا مدیر اصلاح کرد و دوباره ثبت شد.", "The owner or a manager fixed it and it was recorded again.", "خاوند یا مدیر سم کړ او بیا ثبت شو.")
   fun markDismissed(note: String): String = t("صاحب یا مدیر کنار گذاشت: ${asIs(note)}", "The owner or a manager set it aside: $note", "خاوند یا مدیر یو طرف ته کړ: $note")
 
+  //  سندی که صاحب «کنار گذاشت»/«اصلاح کرد» — روی دستگاهِ سازنده، بیرون از دفترِ شمرده (`data/SetAside`)
+  val setAsideTitle: String get() = t("سندهایی که سرور نپذیرفت", "Documents the server did not accept", "هغه اسناد چې سرور ونه منل")
+  val setAsideIntro: String get() = t(
+    "در موجودی، قرض، دخل و گزارش شمرده نمی‌شوند؛ برای سابقه کامل نگه داشته شده‌اند.",
+    "Not counted in stock, debts, the till or reports; kept in full for the record.",
+    "په موجودي، پور، صندوق او راپور کې نه شمېرل کېږي؛ د سابقې لپاره بشپړ ساتل شوي دي.",
+  )
+  fun setAsideDismissed(note: String): String = t(
+    "سرور نپذیرفت — کنار گذاشته شد: ${asIs(note)}",
+    "The server did not accept it — set aside: $note",
+    "سرور ونه منله — یو طرف ته شو: $note",
+  )
+  fun setAsideFixed(note: String): String = t(
+    "سرور نپذیرفت — اصلاح شد: ${asIs(note)}",
+    "The server did not accept it — fixed: $note",
+    "سرور ونه منله — سم شو: $note",
+  )
+  fun setAsideKept(n: Any): String = t(
+    "${asIs(n)} مقدار با سرور یکی نشد (از آن پس روی همین دستگاه عوض شده بود)",
+    "$n ${pl(n, "value", "values")} could not be matched to the server (changed on this device since)",
+    "$n ${pl(n, "ارزښت", "ارزښتونه")} له سرور سره برابر نه شول (له هغه وروسته په همدې وسیله بدل شوي وو)",
+  )
+
   /** دلیلِ رد به زبانِ کاربر — همان کدهای سرور (`staff-approval.DENY_CODE`، `return-line-cap`، `approval-core`) */
   fun reason(code: String): String = when (code) {
     "approval_required" -> t("نیازمندِ تأییدِ صاحب یا مدیر", "Needs the owner’s or a manager’s approval", "د خاوند یا مدیر تایید ته اړتیا لري")

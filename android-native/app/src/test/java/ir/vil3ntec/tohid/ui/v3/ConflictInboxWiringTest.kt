@@ -52,7 +52,17 @@ class ConflictInboxWiringTest {
   fun `نشانِ «سرور نپذیرفت» روی ردیفِ تاریخچه و بالای فاکتور`() {
     assertTrue(src("ui/v3/sales/history/HistoryParts.kt").contains("RejectedLine(s.id)"))
     assertTrue(src("ui/v3/sales/history/InvoiceScreen.kt").contains("RejectedBanner(sale.id)"))
-    assertTrue(src("ui/v3/sales/history/HistoryHostAndroid.kt").contains("RejectedWatch()"))
+    //  با دفترِ همان صفحه: opهای کنارگذاشته (`ShopData.setAside`) دیگر «ردِ باز» نیستند (`data/SetAside`)
+    assertTrue(src("ui/v3/sales/history/HistoryHostAndroid.kt").contains("RejectedWatch(data = d)"))
+    assertTrue(src("ui/v3/sales/history/InvoiceScreen.kt").contains("RejectedWatch(force = true, data = d)"))
+  }
+
+  @Test
+  fun `سندِ کنارگذاشته در تاریخچه دیده می‌شود و کارگرِ همگام‌سازی آن را می‌نشاند`() {
+    assertTrue(src("ui/v3/sales/history/HistoryScreen.kt").contains("SetAsideSection(ctx.d.setAside)"))
+    assertTrue(src("sync/v1/SyncV1Worker.kt").contains("SetAsideSync.afterSync(applicationContext, store)"))
+    assertTrue(src("sync/v1/SyncV1Engine.kt").contains("SetAsideCommit.run("))
+    assertTrue(src("sync/v3/SyncV3Engine.kt").contains("SetAsideCommit.run("))
   }
 
   private fun obj(s: String) = Json.parseToJsonElement(s) as JsonObject

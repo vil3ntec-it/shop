@@ -256,23 +256,63 @@ async function get(shopId, actor, id, { hideContact = false } = {}) {
 }
 
 /** ردیف‌های خودِ درخواست‌کننده (هر نقش) — برای نشانِ «سرور نپذیرفت» روی همان فاکتور */
+// ---------- هم‌سو شدنِ دستگاهِ سازنده پس از «کنار بگذار» / «اصلاح» ----------
+
+/** ردیفی که سند را بیرون از دفترِ سرور گذاشت — فقط این‌ها `settle` دارند */
+const SETTLED = new Set(['dismissed', 'fixed']);
+/** سقفِ ردیف‌های «مقدارِ امروزِ سرور» ِ یک سند (لغو: ۱؛ برگشت: فاکتور و چند قلم) */
+const BASE_MAX = 200;
+
+/**
+ * `settle` ِ یک ردیفِ بسته برای دستگاهِ سازنده (`core/sync/RejectedSettle.kt`):
+ *   ops  — همهٔ opهای بسته (شناسه، جدول، ردیف، گونه)؛ دستگاه فقط آن‌هایی را برمی‌گرداند که خودش دارد؛
+ *   base — مقدارِ امروزِ سرور برای هر ردیفی که opِ **غیرِ درجِ** بسته به آن دست زد (null = روی سرور نیست)، و ردیفِ
+ *          op ِ درجی که سرور **دارد** (همان شناسه از راهِ دیگر نشست ⇒ دستگاه آن را بیرون نمی‌گذارد).
+ * فقط خواندن؛ `lib/sync-v1.js` دست نمی‌خورد (همان جدول‌های `sync_rows`/`sync_v3_rows`، فقط همین دکان).
+ */
+async function settleOf(shopId, r) {
+  const p = payloadOf(r);
+  const ops = p.ops
+    .filter((o) => isObj(o) && str(o.op_id))
+    .map((o) => ({ id: o.op_id, table: str(o.table), rowId: str(o.row_id), type: str(o.type) || str(o.kind) }));
+  const want = new Map();
+  for (const o of ops) if (o.table && o.rowId && want.size < BASE_MAX) want.set(`${o.table}/${o.rowId}`, o.type !== 'insert');
+  const base = {};
+  if (want.size) {
+    const tables = [...new Set([...want.keys()].map((k) => k.slice(0, k.indexOf('/'))))];
+    const ids = [...new Set([...want.keys()].map((k) => k.slice(k.indexOf('/') + 1)))];
+    const found = p.path === 'v3'
+      ? await many(`SELECT table_name, row_id, data FROM sync_v3_rows WHERE ${ACC} AND table_name = ANY($2::text[]) AND row_id = ANY($3::text[]) AND inserted AND deleted_at IS NULL`, [shopId, tables, ids])
+      : await many(`SELECT table_name, row_id, data FROM sync_rows WHERE ${ACC} AND table_name = ANY($2::text[]) AND row_id = ANY($3::text[]) AND deleted_at IS NULL`, [shopId, tables, ids]);
+    const have = new Map(found.map((x) => [`${x.table_name}/${x.row_id}`, isObj(x.data) ? x.data : {}]));
+    for (const [k, needed] of want) {
+      if (have.has(k)) base[k] = have.get(k);
+      else if (needed) base[k] = null;
+    }
+  }
+  return { path: p.path, ops, base, ...(p.truncated ? { truncated: true } : {}) };
+}
+
 async function mine(shopId, actor, { limit = 100 } = {}) {
   if (!actor || !actor.userId) throw forbidden();
   const cap = Math.min(Math.max(1, Number(limit) || 100), LIST_MAX);
   const rows = await many(
-    `SELECT id, kind, table_name, row_id, loser_op_id, loser_device, status, at, resolved_at, resolution_note, detail
+    `SELECT id, kind, table_name, row_id, loser_op_id, loser_device, status, at, resolved_at, resolution_note, detail,
+            CASE WHEN status = ANY($5::text[]) THEN loser_value END AS loser_value
        FROM sync_v3_conflicts WHERE ${ACC} AND kind = ANY($2::text[]) AND detail->>'requester' = $3
       ORDER BY at DESC, id DESC LIMIT $4`,
-    [shopId, BOX, actor.userId, cap]);
-  return {
-    conflicts: rows.map((r) => ({
+    [shopId, BOX, actor.userId, cap, [...SETTLED]]);
+  const conflicts = [];
+  for (const r of rows) {
+    conflicts.push({
       id: r.id, table: r.table_name, rowId: r.row_id, opId: r.loser_op_id, device: r.loser_device,
       reason: reasonOf(r), status: r.status, at: Number(r.at),
       resolvedAt: r.resolved_at === null ? null : Number(r.resolved_at), note: r.resolution_note || '',
       fixedDoc: str(isObj(r.detail) ? r.detail.fixed_doc : ''),
-    })),
-    server_time: now(),
-  };
+      ...(SETTLED.has(r.status) ? { settle: await settleOf(shopId, r) } : {}),
+    });
+  }
+  return { conflicts, server_time: now() };
 }
 
 /** تراکنش + سابقه در همان تراکنش؛ زنجیرهٔ هشِ سابقه (STF-09) پس از commit — همان `approval-requests.inTx` */

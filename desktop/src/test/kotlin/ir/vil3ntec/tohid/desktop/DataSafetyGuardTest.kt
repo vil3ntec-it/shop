@@ -57,7 +57,8 @@ class DataSafetyGuardTest {
     val names = (0 until d.elementsCount).map { d.getElementName(it) }
     val synced = LedgerDiff.COLLECTIONS + LedgerDiff.LIST_COLLECTIONS
     //  شمارهٔ فاکتورِ بعدیِ هر دستگاه مالِ خودش است (کفش پس از بازسازی از ردیف‌ها ساخته می‌شود: `SyncRebuild`)
-    val deviceOnly = setOf("nextInvoiceNo")
+    //  و سندِ ردشده‌ای که صاحب کنار گذاشت (`ShopData.setAside`): سابقهٔ همان دستگاهِ سازنده، عمداً هرگز به سرور نمی‌رود
+    val deviceOnly = setOf("nextInvoiceNo", "setAside")
     assertEquals("مجموعهٔ دفتر بی همگام‌سازی و بی دلیل", emptyList<String>(), names.filter { it !in synced && it !in deviceOnly })
     assertTrue("نامِ همگام‌شده‌ای که دیگر در دفتر نیست", synced.all { it in names })
   }
