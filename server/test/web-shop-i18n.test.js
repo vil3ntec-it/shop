@@ -15,6 +15,9 @@
  *   ۴) دری: `license/dari.js` رونوشتِ بایت‌به‌بایتِ `server/public/kit/dari.js` (همان DariText.kt).
  *   ۵) CSP بدتر نمی‌شود: CSP ِ index.html همان؛ پرونده‌های تازه بی eval، Function، رویدادِ درون‌خطی، `javascript:` و صفتِ style.
  *   ۶) سرویس‌ورکر لایه و واژه‌نامه‌های کوچک را پیش‌کش دارد (واژه‌نامهٔ بزرگ با نخستین بارِ همان زبان کش می‌شود).
+ *   ۷) رسیدِ قرض (واتس‌اپ/کپی، `debt-book.js`): فارسی بایت‌به‌بایت همان؛ هر متنِ ثابتش در بخشِ `debt` ِ receipt.web.json؛ در
+ *      انگلیسی و پشتو برچسب از StrReceipt/واژه‌نامه و نام، شرح، واحد و مبلغ دست‌نخورده.
+ *   ۸) ظرف‌های دادهٔ لایه (`DATA_SEL`) هنوز در index.html هستند؛ تقویمِ نمایش در lang.<زبان>.json.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -147,21 +150,153 @@ test('۳) برچسب‌های فاکتور همان StrReceipt.kt ِ برنام�
   assert.ok(want.fa.subtotal && want.en.total === 'Total' && want.ps.footer, 'چند برچسبِ پایه');
 });
 
-test('۳) نقشهٔ برچسبِ صفحه ⇐ StrReceipt: هر برچسب در index.html هست و کلیدش در StrReceipt', () => {
+test('۳) نقشهٔ برچسبِ صفحه ⇐ StrReceipt: هر برچسب در index.html (رسیدِ قرض: debt-book.js) هست و کلیدش در StrReceipt', () => {
   const map = json('receipt.web.json');
   const labels = R.build().fa;
   const page = norm(dec(html));
+  const debtSrc = norm(read('license/debt-book.js'));
   for (const [section, m] of Object.entries(map)) {
     if (section.startsWith('_')) continue;
+    const hay = section === 'debt' ? `${debtSrc}\n${page}` : page;
     for (const [fa, v] of Object.entries(m)) {
-      for (const c of fa.split(/\{\d+\}/).map(norm).filter((x) => LETTER.test(x))) assert.ok(page.includes(c), `${section}: «${c}» در index.html نیست`);
+      for (const c of fa.split(/\{\d+\}/).map(norm).filter((x) => LETTER.test(x))) assert.ok(hay.includes(c), `${section}: «${c}» در ${section === 'debt' ? 'debt-book.js' : 'index.html'} نیست`);
       if (v === '=') { assert.ok(KEYS.has(fa), `${section}: «${fa}» در واژه‌نامهٔ صفحه نیست`); continue; }
       const refs = [...String(v).matchAll(/\[(\w+)\]/g)].map((x) => x[1]);
       assert.ok(refs.length, `${section}: ${fa} ⇐ ${v}`);
       for (const r of refs) assert.ok(Object.hasOwn(labels, r), `${section}: کلیدِ ناشناختهٔ StrReceipt: ${r}`);
     }
   }
-  for (const s of ['label', 'kind', 'footer', 'meta', 'title', 'preview']) assert.ok(map[s], s);
+  for (const s of ['label', 'kind', 'footer', 'meta', 'title', 'preview', 'debt']) assert.ok(map[s], s);
+});
+
+/**
+ *  همان مترجمِ رسیدِ قرضِ web-i18n.js (`DEBT_TR`) برای en/ps، بی مرورگر: کلید ⇐ بخشِ `debt`؛ «=» ⇐ واژه‌نامهٔ صفحه،
+ *  `[key]` ⇐ StrReceipt؛ `phrase` (متنِ `debtState`) با الگوی همان بخش و جای‌خالیِ عددی.
+ */
+function debtTr(lang, asked) {
+  const map = json('receipt.web.json').debt;
+  const page = lang === 'en' ? EN : PS;
+  const labels = R.build()[lang];
+  const res = (k) => {
+    const v = map[k];
+    if (v === undefined) return null;
+    return v === '=' ? page[k] : v.replace(/\[(\w+)\]/g, (m, n) => labels[n]);
+  };
+  return {
+    key: (k) => {
+      const key = norm(k);
+      if (asked) asked.add(key);
+      const out = res(key);
+      return out == null ? null : /^\s*/.exec(k)[0] + out;
+    },
+    phrase: (s) => {
+      for (const k of Object.keys(map)) {
+        if (!/\{0\}/.test(k) && k === s) return res(k);
+        const re = new RegExp(`^${k.split('{0}').map((x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('([\\d,.]+)')}$`);
+        const m = re.exec(s);
+        if (m && /\{0\}/.test(k)) return res(k).replace('{0}', m[1]);
+      }
+      return null;
+    },
+  };
+}
+const DEBT = (() => {
+  const B = require('../../license/debt-book.js');
+  const data = {
+    products: [{ id: 'p1', name: 'تنظیمات', unit: 'کیلو' }, { id: 'p2', name: 'گوشی', unit: '' }],
+    debtors: [{ id: 'c1', name: 'نقدی', phone: '0790000000' }],
+    sales: [{ id: 's1', invoiceNumber: 1, debtorId: 'c1', total: 400, discount: 25, finalTotal: 375, paidAmount: 75, remaining: 300, date: '2026-10-01' }],
+    saleItems: [
+      { id: 'i1', saleId: 's1', productId: 'p1', quantity: 1.25, unitPrice: 300, totalPrice: 375, returnedQty: 1 },
+      { id: 'i2', saleId: 's1', productId: '', name: '', quantity: 1, unitPrice: 10, totalPrice: 10 },
+      { id: 'i3', saleId: 's1', productId: 'gone', quantity: 1, unitPrice: 15, totalPrice: 15 },
+    ],
+    transactions: [
+      { id: 'g', debtorId: 'c1', type: 'give', amount: 300, date: '2026-10-01', notes: 'فروش نسیه — فاکتور #1', dueDate: '2026-10-05', createdAt: 1 },
+      { id: 'g2', debtorId: 'c1', type: 'give', amount: 50, date: '2026-10-02', notes: 'فروش', createdAt: 2 },
+      { id: 'r', debtorId: 'c1', type: 'receive', amount: 400, date: '2026-10-06', notes: 'نقدی', createdAt: 6 },
+    ],
+  };
+  const money = (m) => Math.round(m / 100).toLocaleString('en-US');
+  const fmt = {
+    money, date: (s) => s, qty: (n) => String(n), phone: (p) => p,
+    state: (m) => (m > 0 ? `${money(m)} افغانی بدهکار` : m < 0 ? `${money(-m)} افغانی موجودی دارد` : 'حساب صاف است'),
+  };
+  return { B, all: () => ['g', 'g2', 'r'].flatMap((id) => ['', 'تنظیمات'].map((shop) => B.receipt(data, 'c1', id, shop, '2026-10-17', fmt))) };
+})();
+
+test('۷) رسیدِ قرض: هر متنِ ثابتِ debt-book.js در بخشِ `debt` است؛ فارسی (بی مترجم) همان رسیدِ همیشه', () => {
+  const asked = new Set();
+  const all = DEBT.all();
+  assert.equal(all.length, 6);
+  for (const r of all) {
+    const L = DEBT.B.localize(r, debtTr('en', asked));
+    assert.equal(L.name, r.name, 'نامِ پرونده همان');
+    const same = DEBT.B.localize(r, { key: () => null, phrase: () => null });
+    assert.deepEqual([same.title, same.rows], [r.title, r.rows], 'بی ترجمه = همان فارسی');
+  }
+  const map = json('receipt.web.json').debt;
+  const missing = [...asked].filter((k) => LETTER.test(k) && !Object.hasOwn(map, k));
+  assert.deepEqual(missing, [], 'متنِ ثابتِ رسیدِ قرض بیرون از بخشِ debt');
+  //  هیچ تکهٔ داده به مترجم نمی‌رسد: نامِ کالا/مشتری/دکان و شرح که خودشان کلیدند پرسیده نمی‌شوند
+  for (const d of ['تنظیمات', 'نقدی', 'فروش', 'فروش نسیه — فاکتور #1', 'گوشی', 'کیلو']) assert.ok(!asked.has(d), `داده به مترجم رسید: ${d}`);
+  assert.ok(DEBT.B.receiptText(all[0]).startsWith('فروشگاه — رسیدِ قرض\nمشتری: نقدی\nتلفن: 0790000000'));
+});
+
+test('۷) رسیدِ قرض در انگلیسی و پشتو: برچسب از StrReceipt/واژه‌نامه، داده و مبلغ دست‌نخورده', () => {
+  const L = R.build();
+  for (const lang of ['en', 'ps']) {
+    const tr = debtTr(lang);
+    const D = lang === 'en' ? EN : PS;
+    const [give, named, , , recv] = DEBT.all().map((r) => DEBT.B.localize(r, tr));
+    const text = DEBT.B.receiptText(give);
+    assert.ok(named.title.startsWith('تنظیمات — '), `${lang}: نامِ دکان داده است`);
+    const rows = Object.fromEntries(give.rows);
+    assert.ok(text.startsWith(`${L[lang].fallbackShop} — `), `${lang}: عنوان`);
+    assert.equal(rows[L[lang].customer], 'نقدی', `${lang}: نامِ مشتری داده است`);
+    assert.equal(rows[L[lang].phone], '0790000000');
+    assert.equal(rows[L[lang].note], 'فروش نسیه — فاکتور #1', `${lang}: شرح داده است`);
+    assert.ok(Object.hasOwn(rows, 'تنظیمات — 1.25 کیلو × 300'), `${lang}: نامِ کالا و واحد داده‌اند`);
+    assert.ok(give.rows.some(([k]) => k === `   ${L[lang].returned}: 1 کیلو`), `${lang}: مرجوعی`);
+    assert.equal(rows[L[lang].subtotal], D['{0} افغانی'].replace('{0}', '400'), `${lang}: مبلغ`);
+    for (const k of ['discount', 'total', 'paid']) assert.ok(Object.hasOwn(rows, L[lang][k]), `${lang}: ${k}`);
+    assert.ok(give.rows.some(([k]) => k.startsWith(lang === 'en' ? 'Custom item — ' : PS['قلم آزاد'])), `${lang}: قلمِ آزاد ترجمه می‌شود`);
+    const recvText = DEBT.B.receiptText(recv);
+    const back = Object.fromEntries(recv.rows);
+    assert.ok(recvText.split('\n')[0].endsWith(D['رسیدِ دریافت']), `${lang}: نوعِ رسید`);
+    assert.equal(back[D['مانده پس از این ردیف']], D['{0} افغانی موجودی دارد'].replace('{0}', '50'), `${lang}: متنِ debtState`);
+    assert.equal(back[D['مانده پیش از دریافت']], D['{0} افغانی بدهکار'].replace('{0}', '350'));
+    assert.equal(back[D['بابتِ {0}'].replace('{0}', D['فاکتور #{0}'].replace('{0}', '1'))], D['{0} افغانی'].replace('{0}', '300'), `${lang}: بابتِ فاکتور`);
+    assert.ok(Object.hasOwn(back, D['بابتِ {0}'].replace('{0}', D['برد {0}'].replace('{0}', '2026-10-02'))), `${lang}: بابتِ برد`);
+    assert.equal(back[L[lang].note], 'نقدی', `${lang}: شرحِ «نقدی» داده است، نه «${D['نقدی']}»`);
+    if (lang === 'en') {
+      //  انگلیسی: هیچ حرفِ فارسی جز دادهٔ دفتر
+      for (const t of [text, recvText]) {
+        const rest = ['تنظیمات', 'نقدی', 'فروش نسیه — فاکتور #1', 'کیلو', 'گوشی'].reduce((s, d) => s.split(d).join(''), t);
+        assert.ok(!LETTER.test(rest), `en: فارسی مانده:\n${t}`);
+      }
+    }
+  }
+});
+
+test('۸) ظرف‌های دادهٔ web-i18n.js (`DATA_SEL`) هنوز در index.html هستند؛ تقویمِ نمایش در lang.<زبان>.json', () => {
+  const src = read('license/web-i18n.js');
+  const block = /const DATA_SEL = \[([\s\S]*?)\]\.join/.exec(src);
+  assert.ok(block, 'DATA_SEL');
+  const sels = [...block[1].matchAll(/'([^']+)'/g)].map((m) => m[1]).filter((x) => x !== '[data-raw]');
+  assert.ok(sels.length >= 10);
+  for (const sel of sels) {
+    for (const part of sel.split(/\s*>\s*|\s+/)) {
+      const cls = /^\.([\w-]+)$/.exec(part);
+      const id = /^#([\w-]+)$/.exec(part);
+      const attr = /^\[([\w-]+)\]$/.exec(part);
+      if (cls) assert.match(html, new RegExp(`class="(?:[^"]*\\s)?${cls[1]}(?:\\s[^"]*)?"`), sel);
+      else if (id) assert.match(html, new RegExp(`id="${id[1]}"`), sel);
+      else if (attr) assert.ok(html.includes(`${attr[1]}="`), sel);
+      else assert.fail(`گزینش‌گرِ ناشناخته: ${sel}`);
+    }
+  }
+  for (const l of ['fa', 'en', 'ps']) for (const k of ['cal.note', 'cal.auto', 'cal.solar', 'cal.gregorian']) assert.ok(json(`lang.${l}.json`)[k], `${l}: ${k}`);
 });
 
 test('۴) دریِ وبِ دکان همان لایهٔ ویترین است: license/dari.js = server/public/kit/dari.js', () => {

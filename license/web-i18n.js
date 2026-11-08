@@ -10,11 +10,15 @@
  *     `DariText.kt`)؛ متنی که کلید نیست هرگز به لایه نمی‌رسد.
  *   • ⛔ داده دست نمی‌خورد: فقط متنی که دقیقاً یکی از کلیدهاست عوض می‌شود؛ هر متنی که با نامِ کالا، واحد، دسته، مشتری،
  *     تأمین‌کننده، مصرف یا نامِ دکانِ همین دفتر یکی است (`dataSet`) همان‌طور که هست می‌ماند، و جای خالی همیشه همان مقدار است.
- *     کادرِ نوشتن (`input`، `textarea`، `contenteditable`) هرگز.
+ *     کادرِ نوشتن (`input`، `textarea`، `contenteditable`) هرگز. و جدا از این، **ظرفِ داده** (`DATA_SEL`: `[data-raw]` و
+ *     ظرف‌های خودِ index.html برای نامِ کالا، مشتری، تأمین‌کننده و دکان، و یادداشت) هرگز — حتی وقتی متنش دقیقاً کلید است.
  *   • جهت: انگلیسی چپ‌به‌راست، بقیه راست‌به‌چپ. رقم: انگلیسی همیشه لاتین؛ بقیه همان انتخابِ دکان. ماه: پشتو همیشه وری، غویی…،
- *     انگلیسی Hamal، Sawr… (`I18n.solarMonths`)، فارسی و دری انتخابِ دکان.
+ *     انگلیسی Hamal، Sawr… (`I18n.solarMonths`)، فارسی و دری انتخابِ دکان. تقویم: انگلیسی پیروِ «تقویمِ نمایش» ِ همین مرورگر
+ *     (`tohid-shop-cal-v1`، همان `LocaleChoice.calendar` ِ برنامه): «خودکار» و «میلادی» ⇒ تاریخِ میلادی (`2026-11-08`)، «خورشیدی»
+ *     ⇒ همان خورشیدیِ امروز. فارسی، دری و پشتو همیشه همان خورشیدیِ امروز.
  *   • فاکتور (پیش‌نمایش و چاپِ حرارتی): برچسب‌ها از `receipt.<زبان>.json` که از خودِ `StrReceipt.kt` ساخته می‌شود
- *     (`server/scripts/receipt-labels.js`)؛ `receipt.web.json` می‌گوید کدام برچسبِ صفحه کدام کلیدِ StrReceipt است.
+ *     (`server/scripts/receipt-labels.js`)؛ `receipt.web.json` می‌گوید کدام برچسبِ صفحه کدام کلیدِ StrReceipt است. رسیدِ قرض
+ *     (واتس‌اپ/کپی، `debt-book.js`) از همان: بخشِ `debt`، با تکه‌های `TohidDebtBook.localize` (نام، شرح و مبلغ هرگز ترجمه نمی‌شوند).
  *
  * ⛔ CSP: نه اسکریپت یا رویدادِ درون‌خطی، نه `eval`، نه صفتِ `style` (فقط CSSOM)؛ همان `script-src 'self'`.
  * ⛔ زبان فقط روی همین مرورگر (`tohid-shop-lang-v1`)، مثلِ `LocaleChoice.lang` ِ برنامه؛ هیچ داده یا همگام‌سازی‌ای عوض نمی‌شود.
@@ -31,12 +35,30 @@
   //  زیرشاخهٔ این‌ها هرگز (متنِ textarea همان مقدارِ کادر است و `SKIP_SEL` نگهش می‌دارد؛ placeholder ِ کادرها ترجمه می‌شود)
   const SKIP_TAGS = /^(SCRIPT|STYLE|NOSCRIPT|TEMPLATE)$/;
   const SKIP_SEL = 'script,style,textarea,noscript,template,[contenteditable],[data-wi-skip]';
+  /**
+   *  ⛔ ظرفِ داده: متن و صفتِ درونِ این‌ها هرگز ترجمه نمی‌شود، حتی اگر دقیقاً کلید باشد (کالایی به نامِ «تنظیمات»).
+   *  `[data-raw]` نشانِ صریحِ پرونده‌های `license/` است؛ بقیه ظرف‌هایی از index.html ِ یخ‌زده که **فقط** داده دارند (بی متنِ
+   *  پیش‌فرضِ فارسی): نامِ کالا، مشتری و تأمین‌کننده، و یادداشتِ ردیف. ظرفی که متنِ پیش‌فرض دارد این‌جا نیست (`dataSet` نگهش
+   *  می‌دارد). نامِ دکان (`SHOP_SEL`) فقط وقتی داده است که دکان نام دارد؛ نبودش ⇒ «فروشگاه من» ِ پیش‌فرض ترجمه می‌شود.
+   */
+  const DATA_SEL = [
+    '[data-raw]',
+    '.prod-name', '.qs-name', '.cart-row-name', '#prod-sheet-name', '#pd-name',
+    '.debtor-name', '.pick-debtor-name', '.debtor-open', '#sacc-name',
+    '.tx-notes', '[data-tx-receipt] > .tx-note-col',
+  ].join(',');
+  const SHOP_SEL = '.brand-text b,#dash-shop-name,.invoice-head h4';
   const AR = /[\u0600-\u06FF]/;
   /** حرف (نه رقم و نشانه) */
   const LETTER = /[\u0621-\u064A\u066E-\u06D3\u06D5\u06FA-\u06FF]/;
   const HOLE = /\{(\d+)\}/g;
   /** نامِ ماه‌های خورشیدی به انگلیسی — همان `I18n.SOLAR_MONTHS_EN` ِ برنامه */
   const MONTHS_EN = ['Hamal', 'Sawr', 'Jawza', 'Saratan', 'Asad', 'Sunbula', 'Mizan', 'Aqrab', 'Qaws', 'Jadi', 'Dalw', 'Hut'];
+  /** تقویمِ نمایش — همان `I18n.CAL_*` ِ برنامه؛ فقط روی همین مرورگر */
+  const CALS = ['auto', 'solar', 'gregorian'];
+  const CAL_STORE = 'tohid-shop-cal-v1';
+  /** قالبِ میلادی: `2026-11-08` (همان `I18n.dateNumeric`) و ساعتِ ۲۴ */
+  const GREG = 'en-CA-u-nu-latn';
 
   const st = {
     lang: 'fa', on: false, mo: null, gen: 0,
@@ -44,8 +66,8 @@
     receipt: null, rmap: null, ui: null, uiFa: null, //  برچسب‌های فاکتور، نقشهٔ صفحه ⇐ StrReceipt، متنِ گزینش‌گر
     orig: new WeakMap(), wrote: new WeakMap(),     //  متن: اصلِ فارسی / آنچه همین لایه نوشت
     aorig: new WeakMap(), awrote: new WeakMap(),   //  صفت‌ها: همان، برای هر نام
-    data: null, dataSig: '', dataAt: 0,
-    hooks: {}, dialogs: null, listeners: [], ready: Promise.resolve(),
+    data: null, dataSig: '', dataAt: 0, dict: null, cal: 'auto',
+    hooks: {}, patches: [], dialogs: null, listeners: [], ready: Promise.resolve(),
   };
 
   const own = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -60,7 +82,15 @@
   function writeLang(l) {
     try { root.localStorage.setItem(STORE, l); } catch { /* حافظهٔ بسته: فقط همین بار */ }
   }
+  function readCal() {
+    try { const v = root.localStorage.getItem(CAL_STORE); return CALS.includes(v) ? v : 'auto'; } catch { return 'auto'; }
+  }
+  function writeCal(c) {
+    try { root.localStorage.setItem(CAL_STORE, c); } catch { /* حافظهٔ بسته: فقط همین بار */ }
+  }
   const lang = () => st.lang;
+  /** تاریخِ میلادی؟ فقط انگلیسی، مثلِ `I18n.gregorian`: «خودکار» و «میلادی» ⇒ بله. فارسی، دری و پشتو همان خورشیدیِ امروز */
+  const gregorian = () => st.lang === 'en' && st.cal !== 'solar';
   const rtl = (l = st.lang) => l !== 'en';
   /** رقمِ صفحه و کاغذ: انگلیسی همیشه لاتین (همان `I18n.screenDigits`)، بقیه انتخابِ دکان */
   function digits() {
@@ -127,6 +157,7 @@
     //  دری: فهرستِ کلیدها، و متن از لایهٔ واژه هنگامِ نیاز
     const d = Array.isArray(dict) ? Object.fromEntries(dict.map((k) => [k, null])) : dict;
     Object.assign(st, compile(d));
+    st.dict = d;
     st.dari = dari;
     st.receipt = receipt;
     st.rmap = Object.fromEntries(Object.keys(rmap).filter((s) => !s.startsWith('_')).map((s) => [s, compile(rmap[s])]));
@@ -185,7 +216,9 @@
     const parts = key.split(/\s+·\s+/);
     if (parts.length < 2) return null;
     let hit = false;
+    const data = dataSet();
     const out = parts.map((x, i) => {
+      if (data.has(norm(x))) return x;   //  تکه‌ای که دادهٔ دفتر است («گوشی · ۳ عدد») هرگز
       //  «… · حافظهٔ این مرورگر: {0}٪ پر»: کلیدِ تکهٔ دوم خودش با «·» شروع می‌شود
       let t = lookup(st, x, value);
       if (t == null && i > 0) { const d = lookup(st, `· ${x}`, value); if (d != null) t = d.replace(/^·\s*/, ''); }
@@ -265,12 +298,33 @@
     const key = norm(raw);
     const c = st.rmap[section];
     if (!c || dataSet().has(key)) return null;
-    return lookup(c, key, (k, v) => {
-      if (st.lang === 'prs') return st.dari ? st.dari.t(k) : null;
-      if (v === '=') { const p = lookup(st, k, value); return p == null ? null : p; }
-      return String(v).replace(/\[(\w+)\]/g, (m, n) => (st.receipt && own(st.receipt, n) ? st.receipt[n] : m));
-    });
+    return lookup(c, key, rres);
   }
+  /** یک برچسبِ `receipt.web.json` در زبانِ کنونی: دری از لایهٔ واژه، «=» از واژه‌نامهٔ صفحه، `[key]` از StrReceipt */
+  function rres(k, v) {
+    if (st.lang === 'prs') return st.dari ? st.dari.t(k) : null;
+    if (v === '=') {
+      const d = st.dict && own(st.dict, k) ? value(k, st.dict[k]) : null;
+      return d != null ? d : lookup(st, k, value);
+    }
+    return String(v).replace(/\[(\w+)\]/g, (m, n) => (st.receipt && own(st.receipt, n) ? st.receipt[n] : m));
+  }
+  /**
+   *  قالب یا متنِ ثابتِ رسیدِ قرض (`TohidDebtBook.localize`): خودِ کلید، نه متنی که باید با الگو خوانده شود — جای‌خالی را
+   *  debt-book.js با تکهٔ داده پر می‌کند، پس هیچ نامی از راهِ «جای‌خالی‌ای که خودش کلید است» ترجمه نمی‌شود.
+   */
+  function receiptKey(section, raw) {
+    if (st.lang === 'fa' || !st.rmap || typeof raw !== 'string') return null;
+    const key = norm(raw);
+    const c = st.rmap[section];
+    if (!c || !key) return null;
+    let out = null;
+    if (c.exact.has(key)) out = rres(key, c.exact.get(key));
+    else { const p = c.pats.find((x) => x.k === key); if (p) out = rres(p.k, p.v); }
+    if (out == null) return null;
+    return /^[\s\u00a0]*/.exec(raw)[0] + out + /[\s\u00a0]*$/.exec(raw)[0];
+  }
+  const DEBT_TR = { key: (k) => receiptKey('debt', k), phrase: (s) => receiptText('debt', s) };
   /** متنِ خودِ این لایه و چاپگر (`lang.<زبان>.json`) */
   const ui = (k) => (st.ui && own(st.ui, k) ? (st.lang === 'prs' && st.dari ? st.dari.t(st.ui[k]) : st.ui[k]) : k);
 
@@ -282,6 +336,12 @@
     return el.closest('thead, th') ? 'receipt-head' : 'receipt';
   }
   function skipped(el) { return !el || (el.closest ? !!el.closest(SKIP_SEL) : false); }
+  /** درونِ ظرفِ داده (`DATA_SEL`، یا نامِ دکان وقتی دکان نام دارد)؟ */
+  function isData(el) {
+    if (!el || !el.closest) return false;
+    if (el.closest(DATA_SEL)) return true;
+    return !!el.closest(SHOP_SEL) && !!String(readStoreName() || '').trim();
+  }
 
   function doText(n) {
     const cur = n.nodeValue;
@@ -289,6 +349,7 @@
     if (!cur || !AR.test(cur)) { st.wrote.delete(n); return; }
     const p = n.parentElement;
     if (skipped(p)) return;
+    if (isData(p)) { st.wrote.delete(n); return; }
     st.orig.set(n, cur);
     const out = tx(cur, ctxOf(p));
     if (out == null) { st.wrote.delete(n); return; }
@@ -299,7 +360,7 @@
     const cur = el.getAttribute(a);
     const w = st.awrote.get(el) || {};
     if (cur == null || w[a] === cur) return;
-    if (!AR.test(cur)) { delete w[a]; return; }
+    if (!AR.test(cur) || isData(el)) { delete w[a]; return; }
     const o = st.aorig.get(el) || {};
     o[a] = cur;
     st.aorig.set(el, o);
@@ -383,13 +444,67 @@
     if (!own(st.hooks, name)) st.hooks[name] = root[name];
     root[name] = fn;
   }
+  /** ویژگیِ یک شیء (نه تابعِ سراسری): `TohidDebtBook.receiptText`، `Date.prototype.toLocale…`، `Intl.DateTimeFormat` */
+  function patch(obj, name, fn) {
+    if (!obj || typeof obj[name] !== 'function') return;
+    st.patches.push([obj, name, obj[name]]);
+    obj[name] = fn;
+  }
   function unhook() {
     for (const k of Object.keys(st.hooks)) root[k] = st.hooks[k];
     st.hooks = {};
+    while (st.patches.length) { const [o, n, f] = st.patches.pop(); o[n] = f; }
+  }
+
+  /** `YYYY-MM-DD` ِ درست ⇒ همان (تاریخِ میلادیِ صفحه، مثلِ `I18n.dateNumeric`)؛ هر چیزِ دیگر ⇒ null (قالبِ خودِ صفحه) */
+  function isoDay(iso) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(typeof iso === 'string' ? iso : '');
+    if (!m) return null;
+    const d = new Date(Date.UTC(+m[1], +m[2] - 1, +m[3]));
+    return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3] ? m[0] : null;
+  }
+  /**
+   *  تاریخِ میلادی برای انگلیسی: `formatDate` ِ صفحه، و هر قالبِ تاریخِ فارسی‌زبان (`fa-IR`، `fa-AF`) ِ index.html و
+   *  `license/*.js` ⇒ همان روز در تقویمِ میلادی (en-CA: `2026-11-08`، ساعتِ ۲۴). فقط نمایش: هیچ تاریخی که ذخیره، همگام یا
+   *  در خروجی نوشته می‌شود از این راه نمی‌گذرد (خروجی‌ها خودِ ISO را می‌نویسند). قالبی که پیش از این ساخته شده
+   *  (`_jalaliFmt` ِ گروه‌بندیِ ماهِ خورشیدیِ گزارش، `en-US-u-ca-persian`) دست نمی‌خورد.
+   */
+  function gregorianHooks() {
+    const fa = (l) => { const f = Array.isArray(l) ? l[0] : l; return typeof f === 'string' && /^fa(?:-|$)/i.test(f); };
+    const args = (a) => (fa(a[0]) ? [GREG, Object.assign({ hourCycle: 'h23' }, a[1])] : a);
+    hook('formatDate', (iso) => isoDay(iso) || st.hooks.formatDate(iso));
+    const P = Date.prototype;
+    for (const name of ['toLocaleString', 'toLocaleDateString']) {
+      const orig = P[name];
+      patch(P, name, function (...a) { return orig.apply(this, args(a)); });
+    }
+    if (root.Intl && typeof root.Intl.DateTimeFormat === 'function') {
+      patch(root.Intl, 'DateTimeFormat', new Proxy(root.Intl.DateTimeFormat, {
+        construct: (T, a, nt) => Reflect.construct(T, args(a), nt),
+        apply: (T, self, a) => Reflect.apply(T, self, args(a)),
+      }));
+    }
+  }
+
+  /**
+   *  رسیدِ قرض که فرستاده یا کپی می‌شود (`index.html`: `TohidDebtBook.receiptText(r)` و سپس `navigator.share({ title: r.title })`):
+   *  همان رسید از تکه‌هایش به زبانِ کنونی؛ عنوان هم روی همان شیءِ یک‌بارمصرف عوض می‌شود تا عنوانِ «فرستادن» هم‌زبان باشد.
+   */
+  function debtHooks() {
+    const B = root.TohidDebtBook;
+    if (!B || typeof B.localize !== 'function' || typeof B.receiptText !== 'function') return;
+    const orig = B.receiptText;
+    patch(B, 'receiptText', (r) => {
+      const L = B.localize(r, DEBT_TR);
+      if (L && L !== r && r && typeof r === 'object') r.title = L.title;
+      return orig.call(B, L);
+    });
   }
   function pageHooks(l) {
     unhook();
     if (l === 'en') hook('shopDigits', () => 'latn');
+    if (l !== 'fa') debtHooks();
+    if (gregorian()) gregorianHooks();
     if (l === 'en' || l === 'ps') {
       const orig = root.applyMonthNames;
       hook('applyMonthNames', () => {
@@ -452,7 +567,34 @@
         const b = e.target.closest('[data-lang-choice]');
         if (b) setLang(b.dataset.langChoice);
       });
-      box.append(head, hint, row);
+      //  تقویمِ نمایش (همان `LocaleSection` ِ برنامه) — فقط در انگلیسی دیده می‌شود؛ جای دیگر کاری نمی‌کند، پس پنهان
+      const cal = document.createElement('div');
+      cal.id = 'wi-cal';
+      const calHint = document.createElement('p');
+      calHint.className = 'settings-hint';
+      calHint.id = 'wi-cal-hint';
+      calHint.style.marginTop = '14px';
+      const calRow = document.createElement('div');
+      calRow.className = 'theme-toggle';
+      calRow.id = 'cal-toggle';
+      calRow.setAttribute('role', 'radiogroup');
+      calRow.setAttribute('aria-labelledby', 'wi-cal-hint');
+      calRow.style.marginTop = '8px';
+      calRow.style.flexWrap = 'wrap';
+      for (const c of CALS) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'theme-toggle-btn';
+        b.dataset.calChoice = c;
+        b.setAttribute('role', 'radio');
+        calRow.appendChild(b);
+      }
+      calRow.addEventListener('click', (e) => {
+        const b = e.target.closest('[data-cal-choice]');
+        if (b) setCalendar(b.dataset.calChoice);
+      });
+      cal.append(calHint, calRow);
+      box.append(head, hint, row, cal);
       panel.parentNode.insertBefore(box, panel);
     }
     const title = document.getElementById('wi-lang-title');
@@ -464,6 +606,18 @@
       b.classList.toggle('active', on);
       b.setAttribute('aria-checked', on ? 'true' : 'false');
     });
+    const cal = document.getElementById('wi-cal');
+    if (cal) {
+      cal.style.display = st.lang === 'en' ? '' : 'none';
+      const calHint = document.getElementById('wi-cal-hint');
+      if (calHint) calHint.textContent = ui('cal.note');
+      cal.querySelectorAll('[data-cal-choice]').forEach((b) => {
+        const on = b.dataset.calChoice === st.cal;
+        b.textContent = ui(`cal.${b.dataset.calChoice}`);
+        b.classList.toggle('active', on);
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+      });
+    }
   }
 
   // ══════════════════════════════ اجرا ══════════════════════════════
@@ -506,7 +660,23 @@
     picker();
     if (!initial || l !== 'fa') rerender();
     st.listeners.forEach((f) => { try { f(l); } catch { /* شنونده */ } });
-    root.dispatchEvent(new CustomEvent('tohid:lang', { detail: { lang: l } }));
+    root.dispatchEvent(new CustomEvent('tohid:lang', { detail: { lang: l, calendar: st.cal } }));
+  }
+
+  /** تقویمِ نمایش (`auto`، `solar`، `gregorian`): ماندگار روی همین مرورگر؛ فقط انگلیسی را عوض می‌کند (`gregorian`) */
+  function setCalendar(c) {
+    const v = CALS.includes(c) ? c : 'auto';
+    writeCal(v);
+    if (v === st.cal) { picker(); return st.ready; }
+    const was = gregorian();
+    st.cal = v;
+    picker();
+    if (st.lang !== 'fa' && st.on && was !== gregorian()) {
+      pageHooks(st.lang);
+      rerender();
+      root.dispatchEvent(new CustomEvent('tohid:lang', { detail: { lang: st.lang, calendar: st.cal } }));
+    }
+    return st.ready;
   }
 
   function setLang(l) {
@@ -518,11 +688,13 @@
   }
 
   root.TohidWebI18n = {
-    LANGS, lang, rtl, digits, setLang, tx, receiptText, ui,
+    LANGS, CALS, lang, rtl, digits, setLang, tx, receiptText, ui, gregorian, setCalendar,
+    calendar: () => st.cal,
     ready: () => st.ready,
     onChange: (f) => { if (typeof f === 'function') st.listeners.push(f); },
   };
 
+  st.cal = readCal();
   const start = () => { st.ready = apply(readLang(), true); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
   else start();
