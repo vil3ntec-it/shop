@@ -28,6 +28,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.market.PublicOrder
+import ir.vil3ntec.tohid.core.shopper.RefillCard
 import ir.vil3ntec.tohid.core.shopper.RepeatPlan
 import ir.vil3ntec.tohid.core.shopper.RepeatPlans
 import ir.vil3ntec.tohid.core.shopper.ShopperText
@@ -132,6 +133,22 @@ fun DuePlanCard(model: CustomerModel, p: RepeatPlan) {
       Row {
         TextButton(onClick = { model.snoozePlan(p) }) { Text(ShopperText.repeatLater) }
         TextButton(onClick = { model.skipPlan(p) }) { Text(ShopperText.repeatSkip) }
+      }
+    }
+  }
+}
+
+/** MKT-06: یک دکان، کالاهای مصرفیِ رسیده به موعد؛ «افزودن» از پاسخِ تازهٔ سرور، «بعداً» فردا، «دیگر نه» تا خریدِ بعد */
+@Composable
+fun RefillCardView(model: CustomerModel, c: RefillCard) {
+  Card(Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+      Text(ShopperText.refillTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+      Text(ShopperText.refillBody(c.storeTitle, c.items.map { it.name.ifBlank { it.productId } }), style = MaterialTheme.typography.bodyMedium)
+      MainButton(ShopperText.refillAdd) { model.fillRefill(c) }
+      Row {
+        TextButton(onClick = { model.snoozeRefill(c) }) { Text(ShopperText.refillLater) }
+        TextButton(onClick = { model.muteRefill(c) }) { Text(ShopperText.refillMute) }
       }
     }
   }

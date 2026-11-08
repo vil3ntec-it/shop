@@ -174,6 +174,13 @@ internal fun ColumnScope.MoreFields(
       error = errors[Field.UNIT_FACTOR]?.let(::problemText),
     )
   }
+  Spacer(Modifier.height(14.dp))
+  //  MKT-06: اختیاری؛ خالی ⇒ بی یادآوری
+  V3TextField(
+    row.cycle, { v -> hooks.onChange { it.copy(cycle = v) } }, StrProducts.cycle,
+    Modifier.fillMaxWidth().field(Field.CYCLE, hooks), kind = V3FieldKind.NUMBER,
+    helper = StrProducts.cycleHelper, error = errors[Field.CYCLE]?.let { StrProducts.cycleBad },
+  )
   if (suppliers.isNotEmpty()) {
     Spacer(Modifier.height(14.dp))
     ChipGroup(StrProducts.supplier, null, required = false) {

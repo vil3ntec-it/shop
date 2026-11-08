@@ -33,7 +33,7 @@ const { now, tx, newId } = require('../db');
 const stock = require('./stock');
 const catalog = require('./catalog');
 const { stable } = require('./idempotency');
-const { ApiError, badRequest, notFound, conflict } = require('../middleware/errors');
+const { ApiError, badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
 const ENDPOINTS = Object.freeze(['shop_floor', 'warehouse']);
 const STATUSES = Object.freeze(['in_transit', 'partial', 'received', 'rejected']);
@@ -183,10 +183,19 @@ async function replayOf(c, shopId, st, hash) {
   return { transfer: view(row), replayed: true };
 }
 
+/**
+ * STF-06 برای گامِ دستگاه (`transfer-step-scope.js`، مهاجرتِ ۲۸۰): `places` = محدودهٔ عضوی که ردیف را push کرد، یا null.
+ * همان قاعدهٔ REST ِ `routes/catalog.js`: ارسال از مبدأِ محدوده، دریافت و رد در مقصدِ محدوده.
+ */
+function inScope(places, loc) {
+  if (places && !places.includes(loc)) throw forbidden('این مکانِ موجودی در محدودهٔ دسترسیِ فرستندهٔ گام نیست', 'location_out_of_scope');
+}
+
 /** ارسال درونِ تراکنشِ گیرنده (قفل و دفترِ دستگاه پیش‌تر خوانده شده) */
-async function sendIn(c, shopId, { key, req, hash, actor, origin, by = '' }, settings, at) {
+async function sendIn(c, shopId, { key, req, hash, actor, origin, by = '', places = null }, settings, at) {
   const st = await stepOf(c, shopId, key);
   if (st) return replayOf(c, shopId, st, hash);
+  inScope(places, req.from);
   //  انتقالِ پیش از ۲۶۵ گامی ندارد؛ کلیدش همان `send_key` است
   const prev = (await c.query('SELECT * FROM stock_transfers WHERE shop_id=$1 AND send_key=$2', [shopId, key])).rows[0];
   if (prev) {
@@ -246,7 +255,7 @@ async function send(shopId, { key, body, actor }) {
  * بستن یا پیش بردنِ انتقال (دریافت یا رد) درونِ تراکنشِ گیرنده. `ref` = { id } یا { sendKey } (گامِ دستگاه که شناسهٔ
  * سرور را هنوز نمی‌داند). `plan(view, part)` ⇒ { kind, status, lines, reason, moves, tasks, stepLines, final, note }
  */
-async function closeIn(c, shopId, ref, { key, hash, actor, origin, by = '' }, settings, at, plan) {
+async function closeIn(c, shopId, ref, { key, hash, actor, origin, by = '', places = null }, settings, at, plan) {
   const st = await stepOf(c, shopId, key);
   if (st) return replayOf(c, shopId, st, hash);
   const id = str(ref.id);
@@ -255,6 +264,7 @@ async function closeIn(c, shopId, ref, { key, hash, actor, origin, by = '' }, se
     `SELECT * FROM stock_transfers WHERE shop_id=$1 AND ${id ? 'id=$2' : 'send_key=$2'} FOR UPDATE`, [shopId, id || sendKey]
   )).rows[0];
   if (!row || (!id && !sendKey)) throw notFound('انتقال پیدا نشد', 'transfer_not_found');
+  inScope(places, row.to_location);   //  دریافت و رد در مقصد
   if (!OPEN.includes(row.status)) {
     if (row.close_key === key && row.close_hash === hash) return { transfer: view(row), replayed: true };
     throw conflict(row.status === 'received' ? 'این انتقال پیش‌تر دریافت شده است' : 'این انتقال پیش‌تر رد شده است', 'transfer_closed');
@@ -428,7 +438,8 @@ async function ingestDevice(c, shopId, rows, settings, at) {
     const s = deviceStep(x);
     const actor = { id: 'device' };
     const by = text(d.by, 80);
-    const opts = { key, hash, actor, origin: 'device', by };
+    const places = await require('./transfer-step-scope').placesFor(c, shopId, key);   //  STF-06: فقط عضوِ محدود
+    const opts = { key, hash, actor, origin: 'device', by, places };
     await c.query('SAVEPOINT xfer_device');
     try {
       if (s.step === 'send') {

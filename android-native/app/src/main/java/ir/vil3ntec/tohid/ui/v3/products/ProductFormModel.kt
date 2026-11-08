@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ProductCycle
 import ir.vil3ntec.tohid.data.WarehouseEngine
 
 /**
@@ -23,6 +24,8 @@ data class ProductRowDraft(
   val active: Boolean = true,
   val saleUnit: String = "",
   val unitFactor: String = "",
+  /** MKT-06 «چرخهٔ مصرف» (روز، اختیاری) — فقط ویرایش؛ نوشتن با `ProductCycle.apply` پس از ویرایشِ موفق */
+  val cycle: String = "",
 )
 
 /**
@@ -41,7 +44,7 @@ data class ProductRowDraft(
 object ProductFormModel {
 
   /** کادرهایی که خطا می‌گیرند — به ترتیبِ دیده شدن در فرم (نخستین خطا = کمترین) */
-  enum class Field { NAME, CATEGORY, PURCHASE, SALE, UNIT, UNIT_FACTOR }
+  enum class Field { NAME, CATEGORY, PURCHASE, SALE, UNIT, UNIT_FACTOR, CYCLE }
 
   /** نخستین کادرِ خراب به ترتیبِ فرم، یا null */
   fun firstField(errors: Map<Field, Problem>): Field? = errors.keys.minByOrNull { it.ordinal }
@@ -79,6 +82,7 @@ object ProductFormModel {
             f == null || f <= 0 -> put(Field.UNIT_FACTOR, Problem.NOT_A_NUMBER)
           }
         }
+        if (ProductCycle.bad(r.cycle)) put(Field.CYCLE, Problem.NOT_A_NUMBER)
       }
     }
     number(r.sale, required = true)?.let { put(Field.SALE, it) }
@@ -154,6 +158,7 @@ object ProductFormModel {
     active = p.active,
     saleUnit = p.saleUnit,
     unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
+    cycle = ProductCycle.text(p.consumptionDays),
   )
 
   /** عدد برای کادر: بی اعشارِ بی‌مورد و با رقمِ لاتین */
