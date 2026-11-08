@@ -82,6 +82,9 @@ object CourierWire {
       nearPinMaxM = (o["nearPin"] as? JsonObject)?.let { long(it, "maxM") }?.toInt(),
       //  DLV-05: فقط با پرچمِ `shop.delivery_map` و فقط تا مأموریت زنده است؛ قالبِ نادرست ⇒ null
       navigation = (o["navigation"] as? JsonObject)?.let { MissionNav.of(str(it, "geo"), str(it, "google"), str(it, "osmand")) },
+      //  DLV-16: فقط با هر دو پرچمِ موقعیتِ دکان؛ بی کلید ⇒ هرگز موقعیت
+      trackLocation = (o["tracking"] as? JsonObject)?.let { bool(it, "location") } == true,
+      trackMinIntervalMs = (o["tracking"] as? JsonObject)?.let { long(it, "minIntervalMs") }?.coerceAtLeast(0L) ?: 0L,
       timeline = (o["timeline"] as? JsonArray).orEmpty().mapNotNull { (it as? JsonObject)?.let(::step) },
     )
   }

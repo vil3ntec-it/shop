@@ -227,7 +227,8 @@ object StrDevicePages {
   val overCapacity: String get() = t("بیش از ظرفیت", "Over capacity", "له ظرفیت زیات")
   val underCapacity: String get() = t("زیرِ ظرفیت", "Under capacity", "له ظرفیت کم")
   val scaleError: String get() = t("خطای ترازو", "Scale error", "د تلې تېروتنه")
-  val stable: String get() = t(" · ایستا", " · stable", " · ثابت")
+  //  بی « · » ِ آغاز (آن را صفحه می‌گذارد) تا متنِ فارسی کلیدِ جملهٔ کاملِ دری شود (`DariText.PHRASES`)
+  val stable: String get() = t("ایستا", "stable", "ثابت")
   val readWeight: String get() = t("خواندنِ وزن", "Read weight", "وزن لوستل")
   val displayNote: String get() = t(
     "پنجرهٔ دوم رو به مشتری: اقلامِ سبد و جمع. پنجره را به صفحهٔ دوم ببرید.",

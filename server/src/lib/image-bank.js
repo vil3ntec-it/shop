@@ -156,7 +156,7 @@ async function addVersion(c, img, buf, info, { tool = '', settings = {}, review 
 async function putDerivative(c, img, version, size, buf) {
   const spec = DERIV[size];
   if (!spec) throw badRequest('اندازه فقط thumb، display یا zoom', 'bad_size');
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکس خالی است', 'image_empty');
   if (buf.length > spec.bytes) throw tooLarge(spec.bytes);
   const ver = await q1(c,
     `SELECT v.version, v.orientation, b.width, b.height FROM image_versions v
@@ -192,11 +192,11 @@ async function putDerivative(c, img, version, size, buf) {
 
 async function readFile(imageId, version, size) {
   const r = size === 'original'
-    ? await one(`SELECT b.data, b.mime, b.hash FROM image_versions v JOIN image_blobs b ON b.hash=v.blob_hash
+    ? await one(`SELECT b.data, b.store_key, b.mime, b.hash FROM image_versions v JOIN image_blobs b ON b.hash=v.blob_hash
                   WHERE v.image_id=$1 AND v.version=$2`, [imageId, version])
-    : await one(`SELECT b.data, b.mime, b.hash FROM image_derivatives d JOIN image_blobs b ON b.hash=d.blob_hash
+    : await one(`SELECT b.data, b.store_key, b.mime, b.hash FROM image_derivatives d JOIN image_blobs b ON b.hash=d.blob_hash
                   WHERE d.image_id=$1 AND d.version=$2 AND d.size=$3`, [imageId, version, size]);
-  return r ? { data: Buffer.from(r.data), mime: r.mime, hash: r.hash } : null;
+  return QS.blobFile(r);
 }
 
 async function imageRow(id) {
@@ -607,7 +607,7 @@ async function resolve(shopId, productId, base = '') {
   if (!row) {
     //  رفتارِ امروز: عکسِ همگام‌شدهٔ ۰۴۵ — هیچ عکسِ مرکزی خودکار نمی‌نشیند
     const legacy = await one(
-      `SELECT hash FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND data IS NOT NULL`, [shopId, pid]);
+      `SELECT hash FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND ${photos.HAS}`, [shopId, pid]);
     return legacy
       ? { product_id: pid, source: 'legacy_photo', hash: legacy.hash, url: `/api/sync/v1/photos/${pid}`, placeholder: false }
       : { product_id: pid, source: 'none', placeholder: true };
@@ -983,7 +983,7 @@ function parseCsv(text) {
   for (let n = 1; n < lines.length; n++) {
     if (lines[n].every((x) => !x.trim())) continue;
     const o = { row_no: n + 1 };
-    head.forEach((h, j) => { if (h) o[h] = (lines[n][j] || '').trim(); });
+    head.forEach((h, j) => { if (h && h !== '__proto__' && h !== 'constructor' && h !== 'prototype') o[h] = (lines[n][j] || '').trim(); });
     out.push(o);
   }
   return out;

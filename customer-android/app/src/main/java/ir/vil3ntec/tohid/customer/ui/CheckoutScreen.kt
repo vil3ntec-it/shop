@@ -29,7 +29,8 @@ import ir.vil3ntec.tohid.core.shopper.CheckoutForm
 import ir.vil3ntec.tohid.core.shopper.CheckoutRules
 import ir.vil3ntec.tohid.core.shopper.DeliverySlot
 import ir.vil3ntec.tohid.core.shopper.ShopperText
-import ir.vil3ntec.tohid.core.shopper.StorePage
+import ir.vil3ntec.tohid.core.shopper.PromoRules
+import ir.vil3ntec.tohid.core.shopper.RepeatPlans
 
 /**
  *  ثبتِ سفارش — همان قاعده‌های وب: روش‌های خودِ دکان، تأییدِ شماره با کد، نشانی یا نشانهٔ نزدیک، ناحیه و
@@ -64,19 +65,32 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
       // ── شما و تأییدِ شماره ──
       SectionTitle(ShopperText.you)
       Field(ShopperText.name, f.name) { set(f.copy(name = it.take(80))) }
-      Verify(model, page)
+      Verify(model, page.verificationAvailable)
 
       // ── نشانی ──
       if (ful == CheckoutRules.DELIVERY) {
         SectionTitle(ShopperText.address)
+        SavedAddresses(model)
         Field(ShopperText.address, f.addressText, ShopperText.addressHint) { set(f.copy(addressText = it.take(300))) }
         Field(ShopperText.landmark, f.landmark, ShopperText.landmarkHint) { set(f.copy(landmark = it.take(200))) }
         Field(ShopperText.area, f.area) { set(f.copy(area = it.take(80))) }
         Field(ShopperText.gate, f.gateColor) { set(f.copy(gateColor = it.take(40))) }
+        PinBlock(
+          pin = f.pin, busy = model.pinBusy, note = model.pinNote,
+          onMine = { model.takePin() }, onPaste = { model.pastePin(it) }, onClear = { model.clearPin() },
+        )
+        if (f.addressId == null && (f.pin != null || f.addressText.isNotBlank() || f.landmark.isNotBlank())) {
+          TextButton(onClick = { model.go(Route.AddressEdit(null, fromCheckout = true)) }) { Text(ShopperText.saveThisAddress) }
+        }
         CheckoutRules.zones(page)?.let { zones ->
           SectionTitle(ShopperText.zone)
+          when {
+            model.pinOutside -> Note(ShopperText.pinOutside, Tone.WARN)
+            f.pin != null && model.pinBusy -> Text(ShopperText.pinZoneWait, style = MaterialTheme.typography.bodySmall)
+            f.pin != null -> CheckoutRules.zoneOf(page, f)?.let { Note(ShopperText.pinZone(it.name), Tone.OK) }
+          }
           val sub = CartRules.subtotal(model.cartOf(slug))
-          zones.forEach { z -> Choice(ShopperText.zoneOption(z.name, CheckoutRules.zoneFee(z, sub)), f.zoneId == z.id) { set(f.copy(zoneId = z.id)) } }
+          zones.forEach { z -> Choice(ShopperText.zoneOption(z.name, CheckoutRules.zoneFee(z, sub)), f.zoneId == z.id) { model.pickZone(z.id) } }
         }
         Check(ShopperText.callBefore, f.callBeforeArrival) { set(f.copy(callBeforeArrival = it)) }
         Field(ShopperText.leaveWith, f.leaveWith) { set(f.copy(leaveWith = it.take(80))) }
@@ -86,6 +100,8 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
       if (CheckoutRules.scheduled(page, ful)) Slots(model, f)
 
       Field(ShopperText.note, f.note, single = false) { set(f.copy(note = it.take(500))) }
+
+      Promo(model)
 
       // ── پرداخت: فقط نقد، بی پرسش (سرور هم فقط `cod` می‌پذیرد) ──
       SectionTitle(ShopperText.pay)
@@ -101,22 +117,29 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
           if (s.smallBasketFeeMinor > 0) Text(ShopperText.zoneSmall(s.smallBasketFeeMinor, CheckoutRules.zoneOf(page, f)?.minOrderMinor ?: 0), style = MaterialTheme.typography.bodySmall)
           s.freeLeftMinor?.let { Text(ShopperText.freeLeft(it), style = MaterialTheme.typography.bodySmall) }
         }
-        MoneyRow(ShopperText.total, ShopperText.money(s.totalMinor), strong = true)
+        val off = model.promo.applied(model.saved.ticket, model.saved.deviceId)?.discountMinor ?: 0
+        if (off > 0) MoneyRow(ShopperText.discount, "− " + ShopperText.money(off))
+        MoneyRow(ShopperText.total, ShopperText.money(s.totalMinor - off), strong = true)
         if (s.shortOfMinMinor > 0) Note(ShopperText.minLeft(s.shortOfMinMinor, s.minOrderMinor), Tone.WARN)
       }
     }
     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
       model.placeNote?.let { Note(it, if (model.placing) Tone.INFO else Tone.WARN) }
-      val total = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage()).totalMinor
+      val total = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage()).totalMinor -
+        (model.promo.applied(model.saved.ticket, model.saved.deviceId)?.discountMinor ?: 0)
       MainButton(if (model.repriced) ShopperText.accept(total) else ShopperText.submit(total), enabled = !model.placing) { model.placeOrder() }
     }
   }
 }
 
+/** تأییدِ شماره با کد — برگهٔ ثبت و گفت‌وگو (هویتِ مشتری همان شمارهٔ تأییدشده است) */
 @Composable
-private fun Verify(model: CustomerModel, page: StorePage) {
+fun VerifyBlock(model: CustomerModel) = Verify(model, model.store.valueOrNull()?.verificationAvailable ?: true)
+
+@Composable
+private fun Verify(model: CustomerModel, available: Boolean) {
   val f = model.form
-  if (!page.verificationAvailable) {
+  if (!available) {
     Field(ShopperText.phone, f.phone, keyboard = KeyboardType.Phone) { model.updateForm(f.copy(phone = it.take(20))) }
     Note(ShopperText.verifyOff, Tone.WARN)
     return
@@ -142,6 +165,41 @@ private fun Verify(model: CustomerModel, page: StorePage) {
     }
   }
   model.verifyNote?.let { Note(it) }
+}
+
+/** «از نشانی‌های من»: یک لمس ⇒ نشانی، نشانه و پین؛ ناحیه از پین */
+@Composable
+private fun SavedAddresses(model: CustomerModel) {
+  val list = model.saved.addresses
+  if (list.isEmpty()) return
+  Text(ShopperText.useSaved, style = MaterialTheme.typography.bodySmall)
+  androidx.compose.foundation.lazy.LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    items(list.size) { i -> val a = list[i]; Pill(a.label, model.form.addressId == a.id) { model.useAddress(a) } }
+  }
+}
+
+/** تخفیف (MKT-01/09): خودکارهای زنده، کدِ تخفیف و پیامِ سرور؛ خاموش ⇒ هیچ */
+@Composable
+private fun Promo(model: CustomerModel) {
+  val p = model.promo
+  val list = p.list.valueOrNull() ?: return
+  SectionTitle(ShopperText.promoTitle)
+  list.promos.forEach { a ->
+    val left = PromoRules.endsAtMs(a.endsOn)?.let { ((it - model.now()) / RepeatPlans.DAY_MS).coerceAtLeast(0) }
+    Text(if (left != null) ShopperText.promoEnds(a.name, left) else a.name, style = MaterialTheme.typography.bodyMedium)
+  }
+  if (list.codes) {
+    if (p.code.isBlank()) {
+      Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        OutlinedTextField(
+          value = p.input, onValueChange = { p.input = it.take(PromoRules.CODE_MAX) }, singleLine = true,
+          label = { Text(ShopperText.promoCode) }, modifier = Modifier.weight(1f),
+        )
+        OutlinedButton(onClick = { model.applyPromo() }, enabled = p.input.isNotBlank()) { Text(ShopperText.promoApply) }
+      }
+    } else TextButton(onClick = { model.clearPromo() }) { Text(ShopperText.promoClear) }
+  }
+  p.note?.let { Note(it, if (p.code.isNotBlank()) Tone.OK else Tone.WARN) }
 }
 
 @Composable

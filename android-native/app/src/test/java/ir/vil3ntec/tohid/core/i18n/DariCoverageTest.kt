@@ -36,6 +36,9 @@ import java.lang.reflect.Modifier
  *     ([movedScreens4]) هم متنِ خام ندارند؛ جدول و برچسبِ `PromoText`/`ProductListModel` هر بار خوانده می‌شوند؛ سقف باز پایین آمد.
  *  6. **دورِ ۵**: صفحه‌های زندهٔ کوچک — لوگوی ویترین، نقشهٔ ساعت و روز، دوربینِ گوشی برای کامپیوتر، بسته‌ها و بارکدِ هر واحد، گزارشِ
  *     مشتریِ گوشی و اسکنِ بارکد ([movedScreens5]) هم متنِ خام ندارند؛ «دوربین/گوشی» ِ اسکن با `td(…)`؛ سقف باز پایین آمد.
+ *  7. **دورِ ۶** (پوششِ کامل): هیچ نوشتهٔ دری در جدول‌ها، برنامهٔ خرید و ویترین شکلِ فقط‌فارسیِ [farsiOnlyForms] را ندارد
+ *     (جز [farsiOnlyAllowed] ِ نام‌دار)؛ `StrDebtor` (پیش‌تر `t` ِ فقط‌فارسی) جدولِ همگانی است و نمایشگرِ مشتری ([movedScreens6])
+ *     متنِ خام ندارد؛ سقف باز پایین آمد.
  */
 class DariCoverageTest {
 
@@ -224,8 +227,10 @@ class DariCoverageTest {
     "core/report/OwnerReportPlan.kt", "core/storefront/StorefrontEtaApi.kt", "core/storefront/PromoGuardApi.kt",
   )
 
-  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴ */
-  private val maxRawOldScreens = 1984
+  /** سقفِ متنِ خامِ باقی‌ماندهٔ `ui/screens` (بی سطرهای «// داده:»)؛ چرخ‌دنده‌ای: فقط پایین بیاید — دورِ ۲: ۳۶۳۳، دورِ ۳: ۲۶۰۲، دورِ ۴: ۲۰۵۲، دورِ ۵: ۱۹۸۴، دورِ ۶: ۱۸۳۵ */
+  //  دستهٔ ۲۷: ۱۸۳۵ ِ دورِ ۶ روی پایه‌ای بی #971 شمرده شد؛ #971 سه سطرِ هم‌شکلِ STORE_PLACE (برچسبِ L.STORE_STOCK و
+  //  کلیدواژه‌های جست‌وجوی تنظیمات در SettingsLayout/SettingsSearchIndex) پیش از آن افزوده بود ⇒ ۱۸۳۸ = همان شمارِ ادغام
+  private val maxRawOldScreens = 1838
 
   /** کفِ پوششِ دریِ نوشته‌های جابه‌جاشدهٔ دورِ ۲ (٪) — اندازهٔ همین کار؛ فقط بالا برود */
   private val minMovedPercent = 14
@@ -473,6 +478,83 @@ class DariCoverageTest {
     assertEquals("Hold the barcode up to the camera — the field fills on the first read", StrScanPages.scanOnce)
     I18n.desktop = true
     assertEquals("Scan the barcode with the barcode scanner — the field fills on the first read", StrScanPages.scanOnce)
+  }
+
+  /* ---------------- دورِ ۶: پوششِ کامل — شکل‌های فقط‌فارسی، حسابِ قرض‌دار، نمایشگرِ مشتری، برنامهٔ خرید ---------------- */
+
+  /**
+   *  شکل‌هایی که دری‌شان در خودِ `DariText.PHRASES` آمده («دوباره بزنید» ⇐ «دوباره کوشش کنید»، «مهلت» ⇐ «میعاد»،
+   *  «نمی‌خواند» ⇐ «برابر نیست»، «ایستا» ⇐ «ثابت»، «پاسخ نداد» ⇐ «جواب نداد»، «شلوغ» ⇐ «مصروف»، «خیلی» ⇐ «زیاد»)
+   *  ولی واژه‌به‌واژه درست نمی‌شوند؛ هر نوشتهٔ تازه با یکی از این‌ها جملهٔ کاملِ دری می‌خواهد.
+   */
+  private val farsiOnlyForms = listOf("دوباره بزنید", "دوباره بکوشید", "مهلت", "نمی‌خواند", "ایستا", "پاسخ نداد", "شلوغ", "خیلی")
+
+  /** همان شکل با معنای دیگر که در دری هم درست است — با دلیل؛ هر تازه‌ای یعنی تصمیم */
+  private val farsiOnlyAllowed = listOf(
+    "رمز را دوباره بزنید", "رمزِ حساب را دوباره بزنید", // «زدن» ِ رمز = نوشتنِ دوباره، نه «دوباره کوشش»
+    "» را دوباره بزنید", // زدنِ دکمهٔ نام‌دار
+    "چیزی نمی‌خواند", // خواندنِ پرونده، نه «برابر نبودن»
+  )
+
+  private fun farsiOnlyLeft(text: String): List<String> {
+    var t = text
+    for (a in farsiOnlyAllowed) t = t.replace(a, "")
+    return farsiOnlyForms.filter { t.contains(it) }
+  }
+
+  @Test fun `هیچ نوشتهٔ دری شکلِ فقط‌فارسیِ فهرست را ندارد — برنامهٔ دکان، برنامهٔ خرید و ویترین`() {
+    val bad = ArrayList<String>()
+    for (r in rows(I18nTables.all)) farsiOnlyLeft(r.dari).forEach { bad += "${r.table}.${r.key}: «$it» در «${r.dari}»" }
+    //  برنامهٔ خرید (`ShopperText`) و ویترینِ وب همان `DariText.of` را می‌گذرانند؛ هر `{}` یک مقدارِ asIs
+    for (k in DariSources.shopperTexts() + DariSources.webTexts()) {
+      var i = 0
+      val marked = k.split("{}").reduce { a, b -> a + DariText.protect("v${i++}") + b }
+      farsiOnlyLeft(DariText.of(marked)).forEach { bad += "خرید/وب: «$it» در «$k»" }
+    }
+    assertTrue("شکلِ فقط‌فارسی در دری ماند — جملهٔ کاملِ دری در DariText.PHRASES بنویسید:\n" + bad.joinToString("\n"), bad.isEmpty())
+  }
+
+  /** پرونده‌های زندهٔ `ui/screens` که دورِ ۶ همهٔ نوشته‌شان را به جدول برد */
+  private val movedScreens6 = listOf("CustomerDisplay.kt")
+
+  @Test fun `حسابِ قرض‌دار و نمایشگرِ مشتری از لایهٔ زبان می‌گذرند`() {
+    //  `StrDebtor` تا دورِ ۵ یک `t` ِ محلیِ فقط‌فارسی داشت؛ حالا جدولِ همگانی است
+    assertTrue(I18nTables.all.contains(StrDebtor))
+    assertFalse("ui/screens/StrDebtor.kt برگشت", app.resolve("ui/screens/StrDebtor.kt").exists())
+    for (f in movedScreens6.map { app.resolve("ui/screens/$it") }) {
+      assertTrue("${f.path} دیگر نیست — از فهرست بردارید", f.isFile)
+      assertTrue("${f.name}: نوشتهٔ فارسیِ خام: ${raw(f)}", raw(f).isEmpty())
+    }
+    I18n.source = { Lang.FA }
+    assertEquals("بدهی ندارد", StrDebtor.noDebt)
+    assertEquals("3 ماه است که بدهکار است — از 1405/08/01", StrDebtor.daysInDebt("3 ماه", "1405/08/01"))
+    assertEquals("قرض‌دار تازه", StrDebtor.newDebtor)
+    assertEquals("سپاس از خرید شما", StrPanelPages.thanksForPurchase)
+    assertEquals("3 تازه", StrCatalogPages.freshN(3))
+    I18n.source = { Lang.PRS }
+    assertEquals("قرض ندارد", StrDebtor.noDebt)
+    assertEquals("قرض‌دار جدید", StrDebtor.newDebtor)
+    assertEquals("تشکر از خرید شما", StrPanelPages.thanksForPurchase)
+    //  نامِ مشتری (داده) در دری همان می‌ماند، حتی اگر واژهٔ فهرست باشد
+    assertEquals("«فروشگاه گوشی» حذف گردید", StrDebtor.debtorDeleted("فروشگاه گوشی"))
+    I18n.source = { Lang.EN }
+    assertEquals("No debt", StrDebtor.noDebt)
+    assertEquals("Thank you for your purchase", StrPanelPages.thanksForPurchase)
+  }
+
+  @Test fun `فارسیِ نوشته‌های دورِ ۶ همان متنِ پیشین است و دری جملهٔ کامل می‌گیرد`() {
+    I18n.source = { Lang.FA }
+    assertEquals("ایستا", StrDevicePages.stable)
+    assertEquals("شلوغ: +5 دقیقه", StrSettingsPages.etaBusyNow(5))
+    assertEquals("مهلت: 10:30", StrPay.expiresIn("10:30"))
+    I18n.source = { Lang.PRS }
+    assertEquals("ثابت", StrDevicePages.stable)
+    assertEquals("مصروف: +5 دقیقه", StrSettingsPages.etaBusyNow(5))
+    assertEquals("سفارش ختم شده و میعادِ «مشکل دارم» گذشته است؛ این گفت‌وگو فقط خواندنی است.", StrOrdersHub.closedOrder(null))
+    assertEquals("میعاد: 10:30", StrPay.expiresIn("10:30"))
+    I18n.source = { Lang.EN }
+    assertEquals("stable", StrDevicePages.stable)
+    assertEquals("Busy: +5 min", StrSettingsPages.etaBusyNow(5))
   }
 
   @Test fun `متنِ خامِ باقی‌ماندهٔ صفحه‌های قدیمی فقط کم می‌شود`() {

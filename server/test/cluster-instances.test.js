@@ -231,6 +231,43 @@ test('گذرگاه پس از کشته شدنِ اتصالش دوباره وصل 
   }
 });
 
+/** تا `pred(health)` راست شود (تپشِ ۲۵۰ms) — یا آخرین پاسخ */
+async function healthUntil(kid, pred, ms = 10_000) {
+  const t0 = Date.now();
+  let hl;
+  for (;;) {
+    hl = await kid.ask({ type: 'health' });
+    if (pred(hl) || Date.now() - t0 > ms) return hl;
+    await new Promise((r) => setTimeout(r, 150));
+  }
+}
+
+test('پنلِ ۴.۹ از هر دو نمونه: هر دو نمونه، رهبرِ قفل و کارهای رهبر (روی پیرو هم، نه «نامعلوم»)', { skip: PGLITE && 'فقط PostgreSQL' }, async () => {
+  const [sa, sb] = await Promise.all([A.ask({ type: 'stats' }), B.ask({ type: 'stats' })]);
+  const leaderId = sa.leader ? sa.instanceId : sb.instanceId;
+  for (const kid of [A, B]) {
+    const hl = await healthUntil(kid, (x) => x.cluster && x.cluster.instances.filter((i) => i.status === 'ok').length === 2);
+    const c = hl.cluster;
+    assert.ok(c, `نمای خوشه نیست: ${JSON.stringify(hl.parts)}`);
+    assert.deepEqual(c.instances.map((i) => i.instanceId).sort(), ['test-a', 'test-b']);
+    assert.equal(c.instances.filter((i) => i.self).length, 1);
+    assert.equal(c.leader && c.leader.instanceId, leaderId, JSON.stringify(c.leader));
+    assert.equal(c.leader.source, 'lock', 'رهبر از دارندهٔ واقعیِ قفل');
+    assert.equal(c.status, 'ok');
+    assert.equal(hl.parts.cluster, 'ok');
+    //  کارهای بالای پاسخ همان کارهای رهبرند، حتی روی پیرو
+    const jobs = Object.fromEntries(hl.jobs.map((j) => [j.name, j]));
+    for (const j of ['login-outbox', 'order-notify', 'order-timeout', 'owner-report']) {
+      assert.ok(jobs[j], `کارِ ${j}`);
+      assert.equal(jobs[j].instanceId, leaderId, j);
+      assert.notEqual(jobs[j].status, 'unknown', `${j} روی ${kid.name} «نامعلوم» است`);
+    }
+    //  هر نمونه برشِ خودش را هم در فهرست دارد (پیروِ تازه‌کنارگذاشته تا مهلتِ هر کار «سالم» ِ پیشین را نشان می‌دهد)
+    assert.ok(c.instances.every((i) => Array.isArray(i.jobs) && i.jobs.length > 0));
+    assert.ok(!JSON.stringify(c).includes(process.env.TEST_DATABASE_URL || 'shoppass'), 'بی نشانیِ پایگاه/راز');
+  }
+});
+
 test('کارگرهای پس‌زمینه فقط روی رهبر؛ رهبر بیفتد ⇒ دیگری', { skip: PGLITE && 'فقط PostgreSQL' }, async () => {
   const [sa, sb] = await Promise.all([A.ask({ type: 'stats' }), B.ask({ type: 'stats' })]);
   assert.equal([sa.leader, sb.leader].filter(Boolean).length, 1, `دقیقاً یک رهبر: ${JSON.stringify([sa, sb])}`);
@@ -253,4 +290,20 @@ test('کارگرهای پس‌زمینه فقط روی رهبر؛ رهبر بی�
   assert.equal(st.leader, true, `پیرو رهبر نشد: ${JSON.stringify(st)}`);
   assert.deepEqual(st.jobs, ls.jobs, 'همان کارگرها');
   assert.ok(Date.now() - t0 < 10_000);
+});
+
+test('پس از افتادنِ رهبر: پنل رهبرِ تازه را از قفل می‌بیند و نمونهٔ کشته «کهنه» و هشدار', { skip: PGLITE && 'فقط PostgreSQL' }, async () => {
+  //  آزمونِ بالا رهبر را کشت؛ نمونهٔ زنده همان پیروِ پیشین است
+  const alive = [A, B].find((k) => k.child.exitCode === null && !k.child.killed);
+  assert.ok(alive, 'یک نمونه زنده است');
+  const self = (await alive.ask({ type: 'stats' })).instanceId;
+  const hl = await healthUntil(alive, (x) => x.cluster && x.cluster.leader && x.cluster.leader.instanceId === self
+    && x.cluster.instances.some((i) => i.instanceId !== self && i.status === 'stale'), 15_000);
+  const c = hl.cluster;
+  assert.equal(c.leader && c.leader.instanceId, self, JSON.stringify(c));
+  const dead = c.instances.find((i) => i.instanceId !== self);
+  assert.equal(dead.status, 'stale', JSON.stringify(dead));
+  assert.equal(c.status, 'warn', 'نمونهٔ بی‌تپش ⇒ هشدار تا رهبر ردیفش را بردارد');
+  assert.equal(hl.parts.cluster, 'warn');
+  assert.ok(hl.jobs.every((j) => j.instanceId === self), 'کارها حالا از رهبرِ تازه');
 });

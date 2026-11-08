@@ -218,6 +218,10 @@ FLAGS.push('shop.loyalty_rule');
 FLAGS.push('shop.visual_search');
 //  O-01: پوشِ گوشی (`/shop/push/devices`) — «ب» فقط توکنِ خودش را ثبت/پاک می‌کند، هرگز توکنِ «الف»
 FLAGS.push('shop.device_push');
+//  STF-02: «درخواستِ تأیید» از راهِ دور (`/shop/approval-requests/:id…`) — «ب» نه می‌بیند، نه تأیید/رد/لغو می‌کند
+FLAGS.push('shop.approval_requests');
+//  STF-01: نقشِ سفارشی (`/shop/custom-roles/:id…`) — «ب» نقشِ «الف» را نه می‌بیند، نه عوض/پاک می‌کند، نه به عضوی می‌دهد
+FLAGS.push('shop.custom_roles');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -495,6 +499,21 @@ async function seedShop(a) {
     { token: a.accessToken });
   assert.ok([200, 201].includes(key.status), JSON.stringify(key.body));
   ids.approverKey = key.body.key.id;
+  //  STF-02: درخواستِ تأییدِ شاگردِ «الف» (تخفیفِ «نیازمندِ تأیید») — در انتظارِ صاحب/مدیر
+  const lay = await h.put('/api/shop/permissions/roles/staff', { perms: { 'sales.discount': { mode: 'approve' } } }, { token: a.accessToken });
+  assert.equal(lay.status, 200, JSON.stringify(lay.body));
+  const apr = await h.post('/api/shop/approval-requests',
+    { key: fresh('apr-key'), perm: 'sales.discount', doc: 'sales/s-inv-a', pctBp: 2000, amount: 2000, reason: 'مشتریِ الف' },
+    { token: staff.accessToken });
+  assert.equal(apr.status, 201, JSON.stringify(apr.body));
+  ids.approvalRequest = apr.body.request.id;
+  //  STF-01: نقشِ سفارشیِ «الف»، داده‌شده به شاگردِ «الف»
+  const crl = await h.post('/api/shop/custom-roles', { name: 'شاگردِ ارشدِ الف', baseRole: 'staff', perms: { 'sales.discount': { mode: 'approve' } } },
+    { token: a.accessToken });
+  assert.equal(crl.status, 201, JSON.stringify(crl.body));
+  ids.customRole = crl.body.role.id;
+  const crlAssign = await h.put(`/api/shop/custom-roles/members/${ids.member}`, { roleId: ids.customRole }, { token: a.accessToken });
+  assert.equal(crlAssign.status, 200, JSON.stringify(crlAssign.body));
 
   //  قاعدهٔ تخفیف — شناسه را برنامه می‌سازد؛ کلیدِ فضای خودِ دکان
   ids.promoRule = 'inv-promo-a1';
@@ -598,6 +617,9 @@ function concreteFor(ids) {
     [/^(\/shop\/staff-scope\/members\/):id/, ids.member],
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
+    [/^(\/shop\/approval-requests\/):id/, ids.approvalRequest],
+    [/^(\/shop\/custom-roles\/members\/):id/, ids.member],
+    [/^(\/shop\/custom-roles\/):id/, ids.customRole],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
@@ -663,6 +685,11 @@ function bodyFor(r, ids) {
     'PATCH /shop/members/:id': { role: 'manager' },
     'PUT /shop/permissions/members/:id': { perms: {} },
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
+    'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },
+    'POST /shop/approval-requests/:id/deny': { note: 'ردِ ب' },
+    'POST /shop/custom-roles': { name: 'نقشِ ب', baseRole: 'staff', perms: {} },
+    'PUT /shop/custom-roles/:id': { name: 'نقشِ دزدیده', perms: {} },
+    'PUT /shop/custom-roles/members/:id': { roleId: ids.customRole },
     'PUT /shop/permissions/roles/:role': { perms: {} },
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
     'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },

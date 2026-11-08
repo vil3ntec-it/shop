@@ -10,6 +10,7 @@ package ir.vil3ntec.tohid.core.i18n
 object I18nTables {
   val all: List<Any> get() = listOf(
     StrPlaces, // INV-20/21
+    StrTransfer, // INV-11: انتقالِ موجودی با «در مسیر»، دریافتِ ناقص و با اسکن
     Str, StrNav, StrAuth, StrSettings, StrHome, StrSale, StrShell, StrPos, StrExpenses, StrFields,
     StrInvoices, StrSecurity, StrLine, StrLoyalty, StrKit, StrProducts, StrStock, StrMoney, StrReports, StrAccount,
     StrTraining, // OPS-07
@@ -29,6 +30,7 @@ object I18nTables {
     StrQuickRegister, // S03/POS-17: ثبتِ سریعِ کالا در صندوقِ گوشیِ نسخهٔ ۳
     StrReach, // درهای نسخهٔ ۳ به کارهای بی‌راه‌مانده پس از رابطِ قدیم (`V3ReachabilityTest`)
     StrMarketRegion, // S109: ولایت و ولسوالیِ دکان در «نمایش در بازارچه»
+    StrCourierArea, // S83: محدودهٔ خدمتِ هر پیک (فرمِ پیک، کارت و سپردنِ دستی)
     StrProductSuggest, // AI-06: پیشنهادِ دسته و نام در فرمِ کالا
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
@@ -41,12 +43,15 @@ object I18nTables {
     StrOrdersHub, // «سفارش‌های آنلاین» ِ خانه، صف و گفت‌وگوی هر سفارش
     StrOrderFlow, // «چرا سفارش نمی‌رسد؟»، «پرداخت پس از پذیرش» و «به سبد / فاکتور» ِ سفارشِ آنلاین
     StrStorePlace, // نشانی و پینِ دکان برای مشتریِ «دریافت از دکان» (ممیزیِ ویترین، مهاجرتِ ۲۱۵)
+    StrStoreStock, // WEB-09: «کالای ناموجود را در ویترین پنهان کن» (مهاجرتِ ۲۴۰)
     StrPush, // پوشِ گوشی (Firebase، O-01): حالِ «سفارشِ آنلاین»، «اجازهٔ اعلان» و نامِ کانال‌های اعلان
     StrTillPay, // نسیه فقط با مشتری؛ حساب‌پی با NFC/QR در صندوقِ گوشیِ نسخهٔ ۳ (PAY-21)
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
+    StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
     StrScanPages, StrPanelPages, // همان، دورِ ۵ (صفحه‌های زندهٔ کوچک)
+    StrDebtor, // دورِ ۶: حسابِ قرض‌دار (پیش‌تر `t` ِ فقط‌فارسیِ محلی، بی هیچ زبانی)
   )
 }

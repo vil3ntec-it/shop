@@ -16,9 +16,11 @@ import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.net.ApiResult
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  *  دکان، کارمندان و کدهای شاگرد.
@@ -118,6 +120,30 @@ class ShopRepository(
   /** لایهٔ یک کارمند — `perms` همان قالبِ `PermCore` ({کلید: {mode}}) */
   suspend fun setMemberPerms(memberId: String, perms: JsonObject): ApiResult<Unit> =
     result { api.put(ApiEndpoints.Shop.memberPerms(memberId), buildJsonObject { put("perms", perms) }); Unit }
+
+  /**
+   *  STF-01: نقشِ سفارشی — فقط صاحب؛ `perms` همان قالبِ لایهٔ `PermCore`. سرور مرجع است: لایهٔ گشادتر از
+   *  نقشِ پایه `exceeds_role`، نامِ تکراری `role_name_taken`، پرچمِ خاموش `custom_roles_disabled`.
+   */
+  suspend fun createCustomRole(name: String, baseRole: String, perms: JsonObject): ApiResult<Unit> =
+    result {
+      api.post(ApiEndpoints.Shop.CUSTOM_ROLES, buildJsonObject { put("name", name); put("baseRole", baseRole); put("perms", perms) })
+      Unit
+    }
+
+  suspend fun updateCustomRole(id: String, name: String, perms: JsonObject): ApiResult<Unit> =
+    result { api.put(ApiEndpoints.Shop.customRole(id), buildJsonObject { put("name", name); put("perms", perms) }); Unit }
+
+  /** کارمندانِ این نقش روی همان نقشِ پایه می‌مانند */
+  suspend fun deleteCustomRole(id: String): ApiResult<Unit> =
+    result { api.delete(ApiEndpoints.Shop.customRole(id)); Unit }
+
+  /** دادن (`roleId`) یا برداشتنِ (`null`) نقشِ سفارشیِ یک عضو؛ نقشِ او همان نقشِ پایه می‌شود */
+  suspend fun assignCustomRole(memberId: String, roleId: String?): ApiResult<Unit> =
+    result {
+      api.put(ApiEndpoints.Shop.customRoleMember(memberId), buildJsonObject { put("roleId", if (roleId == null) JsonNull else JsonPrimitive(roleId)) })
+      Unit
+    }
 
   /** STF-06: سرورِ قدیمی یا پرچمِ خاموش ⇒ `enabled = false` و هیچ چیزِ تازه‌ای دیده نمی‌شود */
   suspend fun staffScopeConfig(): StaffScopeConfigDto =

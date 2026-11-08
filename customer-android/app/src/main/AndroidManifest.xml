@@ -1,8 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-  <!-- فقط اینترنت: نه دوربین، نه موقعیت، نه پیامک (پین و نشانی‌های ذخیره‌شده مرحلهٔ ۲) -->
+  <!--
+       اینترنت، و از مرحلهٔ ۲ موقعیت (فقط برای پینِ نشانی، و فقط وقتی مشتری «موقعیتِ فعلیِ من» را می‌زند — هیچ پرسشی
+       هنگامِ باز شدن). نه دوربین، نه حافظه (عکسِ گفت‌وگو از گزینشگرِ سیستم)، نه پیامک، نه موقعیتِ پس‌زمینه.
+  -->
   <uses-permission android:name="android.permission.INTERNET" />
+  <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+  <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+  <uses-feature android:name="android.hardware.location" android:required="false" />
+  <uses-feature android:name="android.hardware.location.gps" android:required="false" />
 
   <!--
        allowBackup=false: سبد، بلیتِ شماره و پیوندِ پیگیری فقط روی همین گوشی می‌مانند و به پشتیبانِ ابری
@@ -18,10 +25,35 @@
     <activity
       android:name=".MainActivity"
       android:exported="true"
+      android:launchMode="singleTop"
       android:windowSoftInputMode="adjustResize">
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
+      </intent-filter>
+      <!-- پیوندِ عمیقِ خودِ برنامه: tohidshop://store/<slug>[/p/<id>|/o/<توکن>] (QR و هم‌رسانی) -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="tohidshop" android:host="store" />
+      </intent-filter>
+      <!--
+           نشانی‌های ویترینِ وب. ⛔ autoVerify نیست: «App Links» ِ تأییدشده پروندهٔ assetlinks.json با اثرِ کلیدِ امضای
+           انتشار می‌خواهد (امضا و انتشار با اجازهٔ صاحب‌کار). تا آن روز اندروید ۱۲+ این پیوندها را فقط با روشن کردنِ
+           «باز کردنِ پیوندهای پشتیبانی‌شده» در تنظیماتِ برنامه به برنامه می‌دهد؛ برنامه هر پیوندِ ناشناخته را رد می‌کند.
+      -->
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="vill3n.top" android:pathPrefix="/store/" />
+      </intent-filter>
+      <intent-filter>
+        <action android:name="android.intent.action.VIEW" />
+        <category android:name="android.intent.category.DEFAULT" />
+        <category android:name="android.intent.category.BROWSABLE" />
+        <data android:scheme="https" android:host="*.vill3n.top" />
       </intent-filter>
     </activity>
   </application>

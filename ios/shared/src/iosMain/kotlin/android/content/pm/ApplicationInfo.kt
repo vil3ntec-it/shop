@@ -18,4 +18,5 @@ class ApplicationInfo internal constructor() {
 object ServiceInfo {
   const val FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE = 0x10
   const val FOREGROUND_SERVICE_TYPE_DATA_SYNC = 0x1
+  const val FOREGROUND_SERVICE_TYPE_LOCATION = 0x8
 }

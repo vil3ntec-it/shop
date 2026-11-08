@@ -20,6 +20,8 @@ object CheckoutFlow {
     data class Slots(val slots: List<DeliverySlot>?) : After()
     /** ناحیه دیگر نیست یا لازم است: ناحیهٔ برگزیده پاک */
     object Rezone : After()
+    /** MKT-01: کدِ تخفیف در همان تراکنش اعمال نشد ⇒ کد برداشته و پیش‌نمایش از نو (هرگز سفارشِ بی‌صدا با قیمتِ دیگر) */
+    data class PromoRejected(val status: String) : After()
     /** بقیه (شبکه، ۴۲۹، توقفِ دکان…): فقط پیام؛ کلیدِ یکتایی می‌ماند تا زدنِ دوباره همان سفارش باشد */
     object Message : After()
   }
@@ -34,6 +36,7 @@ object CheckoutFlow {
     "verification_required", "phone_not_verified" -> After.Reverify
     "slot_required", "slot_unavailable", "slot_full" -> After.Slots(e.slots())
     "bad_zone", "zone_required" -> After.Rezone
+    ShopperError.PROMO_REJECTED -> After.PromoRejected(e.promoStatus().orEmpty())
     else -> After.Message
   }
 
@@ -44,6 +47,7 @@ object CheckoutFlow {
         if (after.changes.isEmpty()) "" else ".",
       after.totalMinor,
     )
+    is After.PromoRejected -> ShopperText.promoStatus(after.status)
     else -> ShopperText.error(e)
   }
 }

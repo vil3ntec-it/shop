@@ -16,6 +16,7 @@ const db = require('../db');
 const { one, now, tx } = db;
 const bytes = require('./image-bytes');
 const { putBlob } = require('./image-bank');
+const store = require('./image-store');
 const v = require('./validate');
 const { badRequest } = require('../middleware/errors');
 
@@ -108,7 +109,7 @@ const update = (shopId, body) => merge(shopId, patchOf(body));
  * می‌نشیند (`logo.orientation`): رمزگشای دستگاه برچسبِ EXIF را خودش اعمال نمی‌کند.
  */
 async function putLogo(shopId, buf) {
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکسِ لوگو خالی است', 'image_empty');
+  if (Array.isArray(buf) || typeof buf === 'string' || !Buffer.isBuffer(buf) || !buf.length) throw badRequest('عکسِ لوگو خالی است', 'image_empty');
   if (buf.length > LOGO_MAX_BYTES) throw badRequest('لوگو حداکثر ۲۰۰ کیلوبایت', 'logo_too_large');
   const info = bytes.inspect(buf);
   if (info.width > LOGO_MAX_SIDE || info.height > LOGO_MAX_SIDE) {
@@ -148,9 +149,10 @@ async function swapLogo(shopId, logo) {
  * همان تراکنش قفل می‌شود.
  */
 async function releaseBlob(hash) {
-  await tx(async (c) => {
-    const { rows } = await c.query('SELECT hash FROM image_blobs WHERE hash=$1 FOR UPDATE', [hash]);
-    if (!rows.length) return;
+  //  بایت در انبارِ شیء (`lib/image-store.js`) ⇒ شیء پس از نشستنِ پاکیِ ردیف
+  const key = await tx(async (c) => {
+    const { rows } = await c.query('SELECT hash, store_key FROM image_blobs WHERE hash=$1 FOR UPDATE', [hash]);
+    if (!rows.length) return '';
     const used = await c.query(
       `SELECT 1 FROM image_versions WHERE blob_hash=$1
        UNION ALL SELECT 1 FROM image_derivatives WHERE blob_hash=$1
@@ -159,8 +161,11 @@ async function releaseBlob(hash) {
        LIMIT 1`,
       [hash]
     );
-    if (!used.rows.length) await c.query('DELETE FROM image_blobs WHERE hash=$1', [hash]);
+    if (used.rows.length) return '';
+    await c.query('DELETE FROM image_blobs WHERE hash=$1', [hash]);
+    return rows[0].store_key;
   });
+  if (key) await store.drop(store.BLOBS, [key]);
 }
 
 /** پرچمِ نسخهٔ ۲ برای این دکان — همان خوانشِ `live_config` ِ بخش‌های دیگر (`orders.flagOf`) */
@@ -176,8 +181,7 @@ const debtMinorFor = (shopId) => require('./orders').flagOf(shopId, DEBT_MINOR_K
 
 /** بایت‌های یک لوگو از `image_blobs`، یا null */
 async function blob(hash) {
-  const b = await one('SELECT data, mime, hash FROM image_blobs WHERE hash=$1', [hash]);
-  return b ? { data: Buffer.from(b.data), mime: b.mime, hash: b.hash } : null;
+  return require('./image-originals').blobFile(await one('SELECT data, store_key, mime, hash FROM image_blobs WHERE hash=$1', [hash]));
 }
 
 /** بایت‌های لوگوی دکان، یا null */

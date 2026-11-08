@@ -21,14 +21,15 @@ class HttpAndroid(private val base: () -> String) : ShopperHttp {
       c.useCaches = false
       c.requestMethod = request.method
       for ((k, v) in request.headers) c.setRequestProperty(k, v)
-      request.body?.let { b ->
+      //  بدنهٔ JSON، یا بایت‌های خام (عکسِ گفت‌وگو با `Content-Type` ِ خودش)
+      (request.bytes ?: request.body?.toByteArray(Charsets.UTF_8))?.let { b ->
         c.doOutput = true
-        c.outputStream.use { it.write(b.toByteArray(Charsets.UTF_8)) }
+        c.outputStream.use { it.write(b) }
       }
       val status = c.responseCode
-      val body = (if (status >= 400) c.errorStream else c.inputStream)?.use { it.readBytes().toString(Charsets.UTF_8) }.orEmpty()
+      val raw = (if (status >= 400) c.errorStream else c.inputStream)?.use { it.readBytes() } ?: ByteArray(0)
       val headers = c.headerFields.filterKeys { it != null }.mapValues { it.value.joinToString(",") }
-      return ShopperResponse(status, body, headers)
+      return ShopperResponse(status, if (request.binary && status == 200) "" else raw.toString(Charsets.UTF_8), headers, raw.takeIf { request.binary })
     } finally {
       c.disconnect()
     }

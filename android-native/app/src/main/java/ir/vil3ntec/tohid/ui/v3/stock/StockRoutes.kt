@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.core.i18n.StrLabel
 import ir.vil3ntec.tohid.core.i18n.StrImageChanges
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrStock
+import ir.vil3ntec.tohid.core.i18n.StrTransfer
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Place
 import ir.vil3ntec.tohid.core.nav.RoutePaths
@@ -55,6 +56,10 @@ object StockPaths {
   const val IMAGE_CHANGES_NEW = "stock/images/changes/new"
   fun imageChange(id: String) = "$IMAGE_CHANGES/" + RoutePaths.encode(id)
   const val IMPORT_HISTORY = "stock/import/history"
+  /** INV-11: انتقالِ موجودیِ سرور (`StockTransfer`) — راهش فقط با پرچمِ `shop.catalog` و `stock.move` (`StockTransferFlag`) */
+  const val TRANSFERS = "stock/transfers"
+  const val TRANSFER_NEW = "stock/transfers/new"
+  fun transfer(key: String) = "$TRANSFERS/" + RoutePaths.encode(key)
 }
 
 /**
@@ -183,6 +188,10 @@ val StockModule = AppModule(
     V3Route(StockPaths.IMAGE_CHANGES_NEW, RouteKind.PAGE, { StrImageChanges.newBatch }, parent = StockPaths.IMAGE_CHANGES) { ImageBatchRoute() },
     V3Route("stock/images/changes/{id}", RouteKind.PAGE, { StrImageChanges.batch }, parent = StockPaths.IMAGE_CHANGES) { ImageChangeRoute(args["id"].orEmpty()) },
     V3Route(StockPaths.IMPORT_HISTORY, RouteKind.SHEET, { StrReach.importHistory }, parent = StockPaths.IMPORT, chrome = Chrome.OWN) { ImportHistoryRoute() },
+    //  INV-11 — انتقال با «در مسیر»، دریافتِ ناقص و دریافت با اسکن (`TransferRoutesAndroid.kt`)
+    V3Route(StockPaths.TRANSFERS, RouteKind.PAGE, { StrTransfer.title }, parent = StockPaths.LIST, chrome = Chrome.OWN) { TransferListRoute() },
+    V3Route(StockPaths.TRANSFER_NEW, RouteKind.PAGE, { StrTransfer.newTransfer }, parent = StockPaths.TRANSFERS, chrome = Chrome.OWN) { TransferDraftRoute() },
+    V3Route("stock/transfers/{key}", RouteKind.PAGE, { StrTransfer.receiveTitle }, parent = StockPaths.TRANSFERS, chrome = Chrome.OWN) { TransferReceiveRoute(args["key"].orEmpty()) },
   ),
 )
 

@@ -138,7 +138,7 @@ object StorefrontEtaApi {
     append(StrSettingsPages.etaQueue(num(s.queue)))
     append(StrSettingsPages.etaPrepNow(num(s.prepMinutes)))
     append(if (s.prepFromHistory) StrSettingsPages.etaFromHistory else StrSettingsPages.etaFromSetting)
-    if (s.busyExtraMinutes > 0) append(StrSettingsPages.etaBusyNow(num(s.busyExtraMinutes)))
+    if (s.busyExtraMinutes > 0) append(" · ").append(StrSettingsPages.etaBusyNow(num(s.busyExtraMinutes)))
     if (s.couriers.couriers > 0) append(StrSettingsPages.etaCouriersNow(num(s.couriers.live), num(s.couriers.cap)))
   }
 

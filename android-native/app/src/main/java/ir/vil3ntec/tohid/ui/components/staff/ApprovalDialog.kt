@@ -11,6 +11,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -28,6 +29,7 @@ import androidx.compose.ui.window.Dialog
 import ir.vil3ntec.tohid.core.perm.ApprovalSlip
 import ir.vil3ntec.tohid.core.perm.ApproverVault
 import ir.vil3ntec.tohid.core.perm.PinGuard
+import ir.vil3ntec.tohid.core.perm.RemoteApproval
 import ir.vil3ntec.tohid.core.perm.ReturnApprovals
 import ir.vil3ntec.tohid.data.StaffPins
 import ir.vil3ntec.tohid.plain
@@ -42,6 +44,7 @@ import kotlinx.coroutines.withContext
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrNav
+import ir.vil3ntec.tohid.core.i18n.StrRemoteApproval
 
 /**
  *  «درخواستِ تأیید» — STF-02، سناریوهای S07 و S08 (بخشِ ۱۰.۱).
@@ -68,8 +71,13 @@ fun ApprovalDialog(
    *  برگشتِ بالای سقفِ نقش فقط صاحب را نشان می‌دهد (S14؛ `ReturnApprovals.approverCovers`).
    */
   minRole: String? = null,
+  /** STF-02 «پرسیدن از مدیر» تأیید شد (پیش‌فرض: همان [onApproved] با برگهٔ ارجاع) — برگشت نام و نقشِ تأییدکننده را می‌خواهد */
+  onRemote: ((ApprovalSlip.Slip, RemoteApproval.Request) -> Unit)? = null,
 ) {
   val context = LocalContext.current
+  //  فقط با پرچمِ روشنِ سرور و تصمیمِ «نیازمندِ تأیید»؛ وگرنه برگه همان امروز
+  val remote = rememberRemoteAsk(need, shopId)
+  val remoteDone: (ApprovalSlip.Slip, RemoteApproval.Request) -> Unit = { slip, r -> onRemote?.invoke(slip, r) ?: onApproved(slip) }
   val store = remember { StaffPins(context) }
   val scope = rememberCoroutineScope()
   val approvers = remember(minRole) {
@@ -92,6 +100,23 @@ fun ApprovalDialog(
         Text(summary, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
         Spacer(Modifier.height(14.dp))
 
+        if (shopId.isNotBlank() && approvers.isEmpty() && remote.offered) {
+          OutlinedTextField(
+            value = reason,
+            onValueChange = { reason = it.replace('\n', ' ').take(ApprovalSlip.MAX_REASON) },
+            label = { Text(StrPos.reasonKept) },
+            singleLine = true,
+            enabled = !remote.active,
+            modifier = Modifier.fillMaxWidth(),
+          )
+          Spacer(Modifier.height(12.dp))
+          RemoteAskRow(remote, reason, pinToo = false, onApproved = remoteDone)
+          Spacer(Modifier.height(10.dp))
+          Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+            TextButton(onClick = onDismiss) { Text(Str.cancel) }
+          }
+          return@Column
+        }
         if (shopId.isBlank() || approvers.isEmpty()) {
           Text(
             if (shopId.isBlank()) StrPos.deviceNotLinked
@@ -121,10 +146,14 @@ fun ApprovalDialog(
           onValueChange = { reason = it.replace('\n', ' ').take(ApprovalSlip.MAX_REASON) },
           label = { Text(StrPos.reasonKept) },
           singleLine = true,
-          enabled = !busy,
+          enabled = !busy && !remote.active,
           modifier = Modifier.fillMaxWidth(),
         )
         Spacer(Modifier.height(14.dp))
+        if (remote.offered) {
+          RemoteAskRow(remote, reason, pinToo = true, onApproved = remoteDone)
+          Spacer(Modifier.height(14.dp))
+        }
 
         val name = record?.name?.ifBlank { null } ?: StrPos.approver
         PinPad(
@@ -161,5 +190,42 @@ fun ApprovalDialog(
         }
       }
     }
+  }
+}
+
+/**
+ *  «پرسیدن از مدیر» در پنجرهٔ تأییدِ کامپیوتر/برگشت: دکمه (با دلیل)، سپس حالِ انتظار و «پس گرفتن»؛ پایانِ ناموفق ⇒ متن
+ *  و «دوباره بپرس». همان [RemoteAsk] ِ برگهٔ گوشی.
+ */
+@Composable
+internal fun RemoteAskRow(
+  remote: RemoteAsk,
+  reason: String,
+  pinToo: Boolean,
+  onApproved: (ApprovalSlip.Slip, RemoteApproval.Request) -> Unit,
+) {
+  val scope = rememberCoroutineScope()
+  val status = remote.statusText()
+  if (remote.active) {
+    StatusPill(status.orEmpty(), PillTone.AWAITING)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+      TextButton(onClick = { remote.withdraw() }) { Text(StrRemoteApproval.withdraw) }
+    }
+  } else {
+    OutlinedButton(
+      onClick = { scope.launch { remote.run(reason, onApproved) } },
+      enabled = RemoteApproval.reasonOk(reason),
+      modifier = Modifier.fillMaxWidth(),
+    ) { Text(if (remote.wait == null) StrRemoteApproval.ask else StrRemoteApproval.askAgain) }
+    Spacer(Modifier.height(4.dp))
+    Text(
+      status ?: StrRemoteApproval.askHint,
+      style = MaterialTheme.typography.bodySmall,
+      color = if (status != null) MaterialTheme.colorScheme.error else Shop.colors.muted,
+    )
+  }
+  if (pinToo) {
+    Spacer(Modifier.height(6.dp))
+    Text(StrRemoteApproval.orPin, style = MaterialTheme.typography.labelMedium, color = Shop.colors.muted)
   }
 }

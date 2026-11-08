@@ -20,6 +20,13 @@ internal fun tableLines(c: MissionCard): List<String> =
   MissionView.tableLines(c, StrCourierApp::areaLine, StrCourierApp::gateLine)
 
 /**
+ *  نمای جدولیِ تبلت (`MissionRow`): همان «اول نشانه» در دو خط — نشانه (بی نشانه، نشانیِ متنی) و «ناحیه · دروازه»؛
+ *  نشانیِ متنیِ کنارِ نشانه فقط در جزئیات (ردیف جا ندارد). پیش از این ردیف فقط نشانه داشت.
+ */
+internal fun rowLines(c: MissionCard): List<String> =
+  landmarkLines(if (c.landmark.isBlank()) c else c.copy(addressText = "")).take(2)
+
+/**
  *  «تماس با مشتری»: شمارهٔ کامل فقط همین لحظه از سرور ([fetch] = `CourierRepository.callNumber`، POST و در سابقهٔ دکان؛
  *  سرور پرچم، پیکِ فعال، مالکیت و `CALLABLE` را می‌سنجد)، فقط شماره‌گیر باز می‌شود (تماس را خودِ پیک می‌زند) و شماره
  *  جایی نگه داشته نمی‌شود. ⇒ پیام برای نوارِ پیام، یا `null` وقتی شماره‌گیر باز شد. بی اینترنت ⇒ پیامِ روشن.

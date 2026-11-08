@@ -81,6 +81,16 @@ private fun Catalog(model: CustomerModel, slug: String, page: StorePage, modifie
           if (shop.minOrderMinor > 0) add(ShopperText.minOrder(shop.minOrderMinor))
         }.filter { it.isNotBlank() }.joinToString(" · ")
         Text(meta, style = MaterialTheme.typography.bodySmall)
+        //  NTF-09: میانگینِ نظرهای تأییدشده (پرچمِ `shop.orders.reviews`)
+        model.feedback.shop?.takeIf { page.features.reviews && it.count > 0 && it.avgTenths != null }?.let {
+          Text(ShopperText.shopRating(it.avgTenths!!, it.count), style = MaterialTheme.typography.bodySmall)
+        }
+        //  گفت‌وگو با دکان (پرچمِ `shop.chat`)
+        if (page.features.chat) {
+          androidx.compose.material3.OutlinedButton(onClick = { model.go(Route.Chat(slug, null)) }, modifier = Modifier.fillMaxWidth()) {
+            Text(ShopperText.chatShop)
+          }
+        }
         if (CheckoutRules.closed(shop)) Note(shop.ordering?.message?.takeIf { it.isNotBlank() } ?: ShopperText.notAccepting, Tone.WARN)
       }
     }

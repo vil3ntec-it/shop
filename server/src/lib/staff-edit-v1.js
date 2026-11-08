@@ -14,22 +14,27 @@
  * «نیازمند تأیید» ⇒ approval_required؛ «ممنوع» ⇒ همان کدِ درج. فقط همان op رد می‌شود (بی همراه) و یک
  * ردیف در صندوقِ تعارض (`detail.edit`). صاحبِ دکان هرگز به این‌جا نمی‌رسد (`v1Guard`). Sync v3 نیازی
  * ندارد: سندِ v3 فقط‌افزودنی است و تخفیف، جمع و مبلغِ برگشت شمارنده نیستند.
+ * STF-03 (پرچمِ خاموشِ `shop.credit_cap`): بالا بردنِ `debtGiven` ِ فاکتور هم همان سقفِ `sales.credit` ِ درج را
+ * می‌گیرد (مقدارِ پس از اعمال)؛ در v3 قرض شمارنده است و دلتایش در `credit-cap.needV3` سنجیده می‌شود.
  */
 const core = require('./perm-core');
 const { many } = require('../db');
 
 /** فقط همین کلیدها پیگیری می‌شوند — هرگز شیء از کلیدهای درخواست ساخته نمی‌شود */
-const KEYS = ['discount', 'total', 'amount', 'saleId', 'status'];
+const KEYS = ['discount', 'total', 'amount', 'saleId', 'status', 'debtGiven'];
 
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const has = (o, k) => isObj(o) && Object.prototype.hasOwnProperty.call(o, k);
 const isInc = (v) => isObj(v) && Object.keys(v).length === 1 && Number.isFinite(v.$inc);
 const minor = (v) => { const n = Math.round(Number(v) * 100); return Number.isFinite(n) ? n : 0; };
 
-/** ویرایشِ پولی؟ (بی پرس‌وجو — برای «چیزی برای سنجیدن هست؟» ِ نگهبان) */
-function isMoneyEdit(op) {
+/**
+ * ویرایشِ پولی؟ (بی پرس‌وجو — برای «چیزی برای سنجیدن هست؟» ِ نگهبان)
+ * @param credit  STF-03: پرچمِ `shop.credit_cap` روشن ⇒ `debtGiven` ِ فاکتور هم (‎lib/credit-cap.js‎)
+ */
+function isMoneyEdit(op, credit = false) {
   if (!op || op.type !== 'update' || !isObj(op.fields)) return false;
-  if (op.table === 'sales') return has(op.fields, 'discount') || has(op.fields, 'total');
+  if (op.table === 'sales') return has(op.fields, 'discount') || has(op.fields, 'total') || (credit && has(op.fields, 'debtGiven'));
   return op.table === 'returns' && has(op.fields, 'amount');
 }
 
@@ -62,16 +67,29 @@ function v1RoleReason(role, op) {
   return null;
 }
 
-/** نیازِ ویرایشِ یک op از «پیش» به «پس»، یا null اگر چیزی بالا نرفت */
-async function needOf(ctx, op, was, now, db) {
+/**
+ * نیازهای ویرایشِ یک op از «پیش» به «پس» (به ترتیب؛ نخستینِ ردشده تصمیم است)، یا [] اگر چیزی بالا نرفت.
+ * فاکتور: تخفیف، سپس (STF-03، با `credit`) قرضِ همان فاکتور (`debtGiven`).
+ */
+async function needsOf(ctx, op, was, now, db, credit) {
   if (op.table === 'sales') {
+    const out = [];
     const d0 = minor(was.discount);
     const d1 = minor(now.discount);
     const bp0 = core.discountBp(d0, minor(was.total));
     const bp1 = core.discountBp(d1, minor(now.total));
-    if (d1 <= 0 || (d1 <= d0 && bp1 <= bp0)) return null;
-    return { perm: 'sales.discount', doc: `sales/${op.row_id}`, req: { pct: bp1 / 100, amount: d1 }, pct_bp: bp1, amount: d1 };
+    if (d1 > 0 && (d1 > d0 || bp1 > bp0)) {
+      out.push({ perm: 'sales.discount', doc: `sales/${op.row_id}`, req: { pct: bp1 / 100, amount: d1 }, pct_bp: bp1, amount: d1 });
+    }
+    const c = credit ? require('./credit-cap').editNeedV1(op.row_id, was, now) : null;
+    if (c) out.push(c);
+    return out;
   }
+  const one = await returnNeedOf(ctx, op, was, now, db);
+  return one ? [one] : [];
+}
+
+async function returnNeedOf(ctx, op, was, now, db) {
   const a1 = minor(now.amount);
   if (a1 <= minor(was.amount) || now.status === 'cancelled') return null;
   const need = { perm: 'returns.create', doc: `returns/${op.row_id}`, req: { amount: a1 }, amount: a1 };
@@ -88,8 +106,8 @@ async function needOf(ctx, op, was, now, db) {
  * @param live [{i, op, need}] — opهای زندهٔ نگهبان (بی تکراری و بی ردشده)
  * @returns {Promise<Array<{x, out: {reason, box, detail}}>>}
  */
-async function judgeEdits(ctx, live, deviceId) {
-  const edits = live.filter((x) => !x.need && isMoneyEdit(x.op));
+async function judgeEdits(ctx, live, deviceId, { credit = false } = {}) {
+  const edits = live.filter((x) => !x.need && isMoneyEdit(x.op, credit));
   if (!edits.length) return [];
   const keyOf = (op) => `${op.table}/${op.row_id}`;
   const keys = new Set(edits.map((x) => keyOf(x.op)));
@@ -113,14 +131,17 @@ async function judgeEdits(ctx, live, deviceId) {
     if (!keys.has(k) || (x.op.type !== 'insert' && x.op.type !== 'update') || !isObj(x.op.fields)) continue;
     const was = state.get(k) || {};
     const now = applied(was, x.op);
-    const need = !x.need && isMoneyEdit(x.op) ? await needOf(ctx, x.op, was, now, dbRows.get(k)) : null;
+    const needs = !x.need && isMoneyEdit(x.op, credit) ? await needsOf(ctx, x.op, was, now, dbRows.get(k), credit) : [];
     let verdict = null;
-    if (need && core.defaultMode(ctx.role, need.perm) === 'deny') {
-      //  نقشی که این کار را ندارد (شاگرد): v1 برگه نمی‌پذیرد — همان کدِ درج
-      verdict = { reason: sa.DENY_CODE[need.perm], box: 'perm_denied',
-        detail: { perm: need.perm, decision: 'deny', requester: ctx.userId || '', role: ctx.role || '', path: 'v1' } };
-    } else if (need) {
-      verdict = await sa.judge(null, ctx, need, null, { opId: x.op.op_id, deviceId, path: 'v1' });
+    for (const need of needs) {
+      if (core.defaultMode(ctx.role, need.perm) === 'deny') {
+        //  نقشی که این کار را ندارد (شاگرد): v1 برگه نمی‌پذیرد — همان کدِ درج
+        verdict = { reason: sa.DENY_CODE[need.perm], box: 'perm_denied',
+          detail: { perm: need.perm, decision: 'deny', requester: ctx.userId || '', role: ctx.role || '', path: 'v1' } };
+      } else {
+        verdict = await sa.judge(null, ctx, need, null, { opId: x.op.op_id, deviceId, path: 'v1' });
+      }
+      if (verdict) break;
     }
     if (verdict) out.push({ x, out: { ...verdict, detail: { ...verdict.detail, edit: true } } });
     else state.set(k, now);

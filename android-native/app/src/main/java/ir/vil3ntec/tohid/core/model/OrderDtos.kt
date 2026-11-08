@@ -248,7 +248,15 @@ data class OrderAddressDto(
   val lng: Double? = null,
   val landmark: String = "",
   val text: String = "",
+  /** «ناحیه» ِ نشانی (DLV-02) — نوشتهٔ مشتری یا کارمند */
+  val area: String = "",
+  /** ناحیهٔ ارسالِ ویترین (CHK-07)؛ نامش ناحیهٔ سفارش برای محدودهٔ خدمتِ پیک است (S83) */
+  val zone: OrderZoneDto? = null,
 )
+
+/** `address.zone` ِ سفارشِ ویترین — فقط نام لازم است (شناسه با هر ذخیرهٔ ناحیه‌ها عوض می‌شود) */
+@Serializable
+data class OrderZoneDto(val name: String = "")
 
 /** دستورِ تحویلِ سفارش — «پیش از رسیدن زنگ بزنید»، «تحویل به…»، اسکناسِ مشتری (CHK-14/23/24) */
 @Serializable

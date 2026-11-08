@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.v3.online.delivery
 
 import ir.vil3ntec.tohid.Jalali
 import ir.vil3ntec.tohid.core.delivery.AutoAssign
+import ir.vil3ntec.tohid.core.delivery.CourierArea
 import ir.vil3ntec.tohid.core.delivery.CourierCash
 import ir.vil3ntec.tohid.core.delivery.CourierRow
 import ir.vil3ntec.tohid.core.delivery.DeskActions
@@ -59,6 +60,12 @@ object DeliveryModel {
   fun expected(o: OrderDto): Long = AutoAssign.expectedOf(o.paymentMethod, o.paymentStatus, o.totalMinor)
 
   fun landmark(o: OrderDto): String = o.address.landmark.ifEmpty { o.address.text }
+
+  /** ناحیهٔ سفارش برای محدودهٔ خدمتِ پیک (S83) — همان `orderArea` ِ سرور */
+  fun area(o: OrderDto): String = CourierArea.orderArea(o.address.zone?.name.orEmpty(), o.address.area)
+
+  /** نامزدِ سپردنِ خودکار با ناحیه */
+  fun candidate(o: OrderDto): AutoAssign.Candidate = AutoAssign.Candidate(o.id, o.orderNo, expected(o), o.createdAt, area(o))
 
   /** چه کسی می‌برد: نامِ پیکِ دکان، نامِ شرکت، یا نامِ روش */
   internal fun who(m: Mission, d: DeskData): String = when (m.mode) {

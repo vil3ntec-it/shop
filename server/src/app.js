@@ -18,6 +18,8 @@ async function createApp({ runMigrations = true } = {}) {
   if (config.trustProxy) app.set('trust proxy', (addr) => require('./middleware/ratelimit').trustedPeer(addr));
 
   if (runMigrations) await migrate.run({ log: (m) => console.log(`[migrate] ${m}`) });
+  //  نسخهٔ خواندنی: سنجشِ زنده‌بودن و تأخیر از همین حالا (بی `DATABASE_REPLICA_URL` هیچ)
+  require('./lib/read-replica').start();
   await plans.seedDefaults();
   //  قالب‌های آمادهٔ مرکزِ اعلان (خوش‌آمد، رو به پایان، تمدید شد، …)
   await require('./lib/notices').seedTemplates();
@@ -214,6 +216,9 @@ async function createApp({ runMigrations = true } = {}) {
   // ---- API ----
   function apiRouter() {
     const api = express.Router();
+    //  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش ⇒ فقط `next()`): هر درخواستِ نوشتنی ⇒ خواندن‌های
+    //  همان مشتری/کاربر تا `REPLICA_STICKY_MS` از پایگاهِ اصلی (`lib/read-replica.js`)
+    api.use(require('./lib/read-replica').writes);
     api.get('/health', health);
     api.get('/ready', ready);
 
@@ -423,6 +428,10 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/staff-time', require('./routes/staff-time'));
     //  STF-06: محدودهٔ مکانِ کارمندان (اجرا در `/shop/catalog`) — پشتِ `shop.staff_scope`، پیش‌فرض خاموش
     api.use('/shop/staff-scope', require('./routes/staff-scope'));
+    //  STF-02: «درخواستِ تأیید» از راهِ دور (شاگرد می‌پرسد، صاحب/مدیر روی دستگاهِ خودش) — پشتِ `shop.approval_requests`، پیش‌فرض خاموش
+    api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
+    //  STF-01: نقشِ سفارشی (نام + نقشِ پایه + لایهٔ مجوز؛ اجرا در `staff-perms.layersFor`) — پشتِ `shop.custom_roles`، پیش‌فرض خاموش
+    api.use('/shop/custom-roles', require('./routes/shop-custom-roles'));
     //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
     api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛

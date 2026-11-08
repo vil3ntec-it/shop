@@ -81,6 +81,9 @@ object PermCore {
     "sales.pay_fix" to Spec(d("allow", "allow", "approve", "approve", "deny", "deny", "deny"), "restrict", true, emptyList(), false),
     // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند؛ از نقش‌های تازه فقط صندوق‌دار
     "returns.create" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
+    // STF-03: فروشِ قرضی (`debtGiven`) — امروز هر نویسندهٔ فاکتور قرض می‌دهد؛ سقفِ مبلغ یا «نیازمند تأیید» از لایه.
+    // سرور فقط با پرچمِ خاموشِ `shop.credit_cap` می‌سنجد — همان `d()` ِ JS
+    "sales.credit" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMA, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMA, "full", false, emptyList(), true),

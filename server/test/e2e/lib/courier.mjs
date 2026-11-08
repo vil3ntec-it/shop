@@ -7,6 +7,8 @@
  *                                      ناقص ⇒ بقیه بعداً» ⇐ کارت‌های active و done
  *   `ui/courier/CourierHome.kt`        record(): شناسهٔ `cev-<ULID>` و `from` = وضعیتی که روی کارت دیده شد
  *   `data/repo/CourierWire.kt`         بدنهٔ `POST /api/courier/events` (کلیدِ خالی فرستاده نمی‌شود)
+ *   `core/…/courier/LiveTrack.kt`      DLV-16: targets، Pacer، usable و tick ِ سرویسِ موقعیت؛ بدنهٔ
+ *                                      `CourierRepository.location` (`POST /api/courier/missions/:id/location`)
  *
  * فهرست‌های دلیل، گذارها و سقفِ بسته از **خودِ** CourierQueue.kt خوانده می‌شوند (`KT`)، نه رونوشت؛
  * پس جابه‌جاییِ کاتلین این‌جا هم دیده می‌شود.
@@ -45,6 +47,55 @@ export const KT = Object.freeze({
   MAX_BATCH: Number(/const val MAX_BATCH = (\d+)/.exec(SRC)[1]),
   MAX_NOTE: Number(/const val MAX_NOTE = (\d+)/.exec(SRC)[1]),
 });
+
+/* ════════════════════════ LiveTrack (DLV-16) ════════════════════════ */
+
+const LT_SRC = fs.readFileSync(path.join(ROOT, 'core', 'src', 'commonMain', 'kotlin', 'ir', 'vil3ntec', 'tohid', 'core', 'courier', 'LiveTrack.kt'), 'utf8');
+function ltSet(name) {
+  const m = new RegExp(`val ${name}: Set<String> = setOf\\(([^)]*)\\)`).exec(LT_SRC);
+  if (!m) throw new Error(`LiveTrack.kt: ${name} پیدا نشد`);
+  return quoted(m[1]);
+}
+const ltLong = (name) => Number(new RegExp(`const val ${name}: Long = ([\\d_]+)L`).exec(LT_SRC)[1].replace(/_/g, ''));
+/** آن‌چه از LiveTrack.kt خوانده شد — برای سنجیدن با `delivery-live.js` ِ سرور */
+export const LT = Object.freeze({
+  ON_THE_WAY: ltSet('ON_THE_WAY'),
+  STOP_CODES: ltSet('STOP_CODES'),
+  PERIOD_MS: ltLong('PERIOD_MS'),
+  MAX_FIX_AGE_MS: ltLong('MAX_FIX_AGE_MS'),
+  MAX_FIX_SKEW_MS: ltLong('MAX_FIX_SKEW_MS'),
+});
+
+/** `LiveTrack.Pacer` */
+export class Pacer {
+  constructor() { this.sentAt = new Map(); this.dropped = new Map(); }
+  live(targets) { return targets.filter((t) => this.dropped.get(t.assignmentId) !== t.version); }
+  due(targets, now) {
+    return this.live(targets).filter((t) => {
+      const last = this.sentAt.get(t.assignmentId);
+      return last === undefined || now - last >= t.intervalMs || now < last;
+    });
+  }
+  sent(t, now) { this.sentAt.set(t.assignmentId, now); }
+  failed(t, code) { if (LT.STOP_CODES.includes(code)) this.dropped.set(t.assignmentId, t.version); }
+  forget(keep) { const ids = new Set(keep); for (const m of [this.sentAt, this.dropped]) for (const k of [...m.keys()]) if (!ids.has(k)) m.delete(k); }
+}
+
+/** `LiveTrack.usable` */
+export function usable(fix, now) {
+  if (!fix || !Number.isFinite(fix.lat) || !Number.isFinite(fix.lng) || Math.abs(fix.lat) > 90 || Math.abs(fix.lng) > 180) return false;
+  if (fix.lat === 0 && fix.lng === 0) return false;
+  const age = now - fix.at;
+  return age <= LT.MAX_FIX_AGE_MS && age >= -LT.MAX_FIX_SKEW_MS;
+}
+
+/** `CourierRepository.location`: بدنهٔ درِ موقعیت (`accuracyM` فقط وقتی معلوم است) */
+export function locationJson(fix) {
+  const o = { lat: fix.lat, lng: fix.lng };
+  if (fix.accuracyM !== null && fix.accuracyM !== undefined) o.accuracyM = fix.accuracyM;
+  o.deviceTime = fix.at;
+  return o;
+}
 
 /* ════════════════════════ CourierFlow ════════════════════════ */
 
@@ -159,6 +210,38 @@ export class CourierApp {
       { from: card.status, reason, note, cashCollectedMinor: cash, cashReason, code });
     this.queue = next;
     return this;
+  }
+
+  /** `LiveTrack.targets`: کارتِ `tracking.location` ِ سرور (`CourierWire.card`) **و** وضعیتِ دیده‌شده با صف «در راه» */
+  trackTargets() {
+    const seen = new Set();
+    return this.cards.active
+      .filter((c) => c.tracking?.location === true && LT.ON_THE_WAY.includes(projectedStatus(c.status, c.id, this.queue)))
+      .filter((c) => (seen.has(c.id) ? false : seen.add(c.id)))
+      .map((c) => ({ assignmentId: c.id, intervalMs: Math.max(LT.PERIOD_MS, Math.max(0, Number(c.tracking.minIntervalMs) || 0)), version: Number(c.updatedAt) || 0 }));
+  }
+
+  /**
+   * `LiveTrack.tick` با `CourierTrack.loop` (`fix` ⇐ `DeviceLocation.current(keep = false)`، `send` ⇐
+   * `CourierRepository.location` + `CourierTrack.sentOf`). ⇒ { left, sent: [{ id, status, code }] }
+   */
+  async trackTick(pacer, now, fix) {
+    const targets = this.trackTargets();
+    pacer.forget(targets.map((t) => t.assignmentId));
+    const due = pacer.due(targets, now);
+    const sent = [];
+    if (due.length && usable(fix, now)) {
+      for (const t of due) {
+        let ok = false; let code = '';
+        try {
+          const r = await this.dev.api('POST', `/courier/missions/${encodeURIComponent(t.assignmentId)}/location`, locationJson(fix));
+          ok = r.status === 200; code = ok ? '' : (r.body?.error?.code || `http_${r.status}`);
+        } catch (e) { code = e.code || 'offline'; }
+        if (ok) pacer.sent(t, now); else pacer.failed(t, code);
+        sent.push({ id: t.assignmentId, ok, code });
+      }
+    }
+    return { left: pacer.live(targets).length, sent };
   }
 
   /**

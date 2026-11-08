@@ -39,5 +39,9 @@ fun ReturnApprovalRequest(need: ReturnApproval.Need, onResult: (ReturnFlow.Appro
     },
     onDismiss = { onResult(null) },
     minRole = need.approver,
+    //  STF-02 «پرسیدن از مدیر»: تأییدکننده روی دستگاهِ خودش بود ⇒ نام و نقش از سرور (نقشِ نامعلوم ⇒ شاگرد، بسته‌به‌خطا)
+    onRemote = { slip, r ->
+      onResult(ReturnFlow.Approval(by = r.deciderName.ifBlank { slip.by }, role = r.deciderRole.ifBlank { "staff" }, slip = slip))
+    },
   )
 }

@@ -41,8 +41,9 @@
 
   var VERSION = 1;
   var HEADER = 'tohid-approval/1';
+  //  `sales.credit` (STF-03): فروشِ قرضی بیش از سقفِ کارمند — سرور با پرچمِ `shop.credit_cap` می‌سنجد
   //  `sales.pay_fix` (POS-40): برگه فقط روی همان دستگاه، برای «نیازمند تأیید» ِ اصلاحِ روشِ پرداخت؛ سرور هنوز opی با آن نمی‌سنجد
-  var PERMS = ['returns.create', 'sales.cancel', 'sales.discount', 'sales.pay_fix'];
+  var PERMS = ['returns.create', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.pay_fix'];
   /** بیشترین عمرِ برگه: از PINِ مدیر تا بستنِ فاکتور */
   var TTL_MAX_MS = 15 * 60 * 1000;
   /** اختلافِ ساعتِ پذیرفتنی میانِ برگه و op */

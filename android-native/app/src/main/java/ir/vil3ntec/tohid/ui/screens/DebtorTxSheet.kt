@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.ui.screens
 
+import ir.vil3ntec.tohid.core.i18n.StrDebtor
 import ir.vil3ntec.tohid.ui.v3.money.DebtorLedgerModel
 
 import androidx.compose.foundation.border

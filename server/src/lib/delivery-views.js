@@ -6,6 +6,7 @@
 const D = require('./delivery-states');
 const orders = require('./orders');
 const liveCap = require('./delivery-live-cap');
+const courierArea = require('./delivery-courier-area');   //  S83
 const { n, asJson } = require('./delivery-input');
 const { CODE_MAX_ATTEMPTS } = require('./delivery-codes');
 
@@ -91,6 +92,7 @@ function courierRowView(c, stats = {}) {
   return {
     id: c.id, userId: c.user_id, name: c.name, phone: c.phone, active: c.active === true,
     cashCapMinor: Number(c.cash_cap_minor), maxLive: liveCap.view(c),
+    areas: courierArea.view(c),   //  S83: محدودهٔ خدمت؛ خالی = همه‌جا
     cashHeldMinor: Number(stats.held || 0),
     liveCount: Number(stats.live || 0),
     liveExpectedMinor: Number(stats.live_expected || 0),

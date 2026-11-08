@@ -157,9 +157,11 @@ class SettingsLayoutTest {
 
   @Test
   fun `پیوندها بخش نیستند و به صفحهٔ دستگاه‌ها، «حسابِ من» یا تنظیماتِ ویترین می‌روند`() {
-    assertEquals(setOf(SettingsLayout.PRINTER, SettingsLayout.PERIPHERALS, SettingsLayout.PROFILE, SettingsLayout.STORE_PLACE), links)
+    assertEquals(setOf(SettingsLayout.PRINTER, SettingsLayout.PERIPHERALS, SettingsLayout.PROFILE, SettingsLayout.STORE_PLACE, SettingsLayout.STORE_STOCK), links)
     //  ممیزیِ ویترین (۱۴۰۵/۰۸/۱۷): «نشانی و نقشهٔ دکان» ⇐ «ویترین ⇐ تنظیمات»
     assertEquals("storefront?tab=settings", SettingsLayout.LINKS[SettingsLayout.STORE_PLACE])
+    //  WEB-09: «کالای ناموجود در ویترین» ⇐ همان «ویترین ⇐ تنظیمات»
+    assertEquals("storefront?tab=settings", SettingsLayout.LINKS[SettingsLayout.STORE_STOCK])
     assertEquals("devices?tab=printers", SettingsLayout.LINKS[SettingsLayout.PRINTER])
     assertEquals("devices", SettingsLayout.LINKS[SettingsLayout.PERIPHERALS])
     assertEquals("profile/edit", SettingsLayout.LINKS[SettingsLayout.PROFILE])

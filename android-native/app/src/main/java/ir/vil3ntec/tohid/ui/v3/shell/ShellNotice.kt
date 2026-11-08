@@ -23,6 +23,8 @@ fun ShellNotice() {
     if (desk || !home) SubscriptionNotice()
     //  «این من نبودم — لغو کن»: فقط صاحب، فقط وقتی حسابِ گیرندهٔ حساب‌پی در انتظار است (همهٔ صفحه‌ها)
     HesabPayChangeNotice()
+    //  STF-02: «N درخواستِ تأیید در انتظارِ شماست» — فقط صاحب/مدیر و فقط با پرچمِ روشنِ سرور (همهٔ صفحه‌ها)
+    ApprovalInboxNotice()
     //  O-09: صاحبِ دکانِ بیرون از سقفِ دستگاه — هشدار و راهِ برداشتن، در همهٔ صفحه‌ها (صندوق هم)
     DeviceCapNotice()
     ClockSkewNotice()

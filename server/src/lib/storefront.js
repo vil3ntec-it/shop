@@ -34,7 +34,7 @@
  */
 const crypto = require('crypto');
 const db = require('../db');
-const { one, many, now } = db;
+const { one, many, now } = db, rr = require('./read-replica');   //  نسخهٔ خواندنی (پیش‌فرض خاموش): فقط کاتالوگ و دسته‌های عمومی
 const config = require('../config');
 const orders = require('./orders');
 const S = require('./order-states');
@@ -217,9 +217,9 @@ function productView(row) {
 
 const PRODUCT_COLS = `r.row_id AS id, r.data, sp.online_price_minor, sp.max_qty_milli,
   EXISTS (SELECT 1 FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
-            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS has_photo,
+            AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS has_photo,
   (SELECT ph.hash FROM product_photos ph WHERE ph.app = 'shop' AND ph.account_id = sp.shop_id
-            AND ph.product_id = r.row_id AND ph.data IS NOT NULL) AS photo_hash`;
+            AND ph.product_id = r.row_id AND (ph.data IS NOT NULL OR ph.store_key <> '')) AS photo_hash`;
 //  جریمهٔ «پنهان کردنِ کالا» (v3 §۳۸.۶، `trust_sanctions`) کالا را از کاتالوگ، عکس
 //  و ثبتِ سفارش کنار می‌گذارد؛ `published` ِ خودِ دکان دست نمی‌خورد. بی جریمه ⇒ همان قبلی.
 const NOT_HIDDEN = `NOT EXISTS (SELECT 1 FROM trust_sanctions ts WHERE ts.shop_id = sp.shop_id AND ts.product_id = sp.product_id
@@ -228,12 +228,14 @@ const PRODUCT_FROM = `storefront_products sp
   JOIN sync_rows r ON ${SHOP_ROWS} AND r.account_id = sp.shop_id AND r.row_id = sp.product_id AND ${NOT_HIDDEN}`;
 const sfc = require('./storefront-catalog')({ SHOP_ROWS, PRODUCT_FROM, NOT_HIDDEN, PRODUCT_ID_RE, MAX_PRICE_MINOR, MAX_QTY_MILLI, obj, int, bool, text, isActive, priceOf });   //  S1 و M2 (شرح همان‌جا)
 
-async function categories(shopId) {
-  const rows = await many(
+async function categories(shopId, { hide = false } = {}) {
+  const params = [shopId];
+  const hidden = hide ? await require('./storefront-filters').hideWhere(shopId, params) : '';   //  WEB-09: دستهٔ همه‌ناموجود نه
+  const rows = await rr.many(
     `SELECT DISTINCT r.data->>'category' AS c FROM ${await sfc.productFrom(shopId)}
-      WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''
+      WHERE sp.shop_id = $1 AND sp.published AND ${LIVE_PRODUCT} AND COALESCE(r.data->>'category', '') <> ''${hidden}
       ORDER BY 1 LIMIT 60`,
-    [shopId]
+    params
   );
   return rows.map((r) => text(r.c, 80)).filter(Boolean);
 }
@@ -262,7 +264,7 @@ async function catalog(shopId, { q, category, cursor, limit, sort, contactPhone 
   const pg = browse.pageOf(sort, cursor, params, lim);
   const limAt = params.push(lim + 1);
   const tail = pg.offset ? ` OFFSET $${params.push(pg.offset)}` : '';
-  const rows = await many(
+  const rows = await rr.many(
     `SELECT ${PRODUCT_COLS} FROM ${from} WHERE ${where}${pg.where}
       ORDER BY ${pg.order}COALESCE(r.data->>'name', ''), r.row_id LIMIT $${limAt}${tail}`,
     params

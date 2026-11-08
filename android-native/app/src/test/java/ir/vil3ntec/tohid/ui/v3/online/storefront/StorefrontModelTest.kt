@@ -94,6 +94,29 @@ class StorefrontModelTest {
     }
   }
 
+  /** WEB-09 (مهاجرتِ ۲۴۰): «کالای ناموجود را پنهان کن» از سرور به فرم، از فرم به بدنهٔ ذخیره، و در صفِ بی‌اینترنت همان */
+  @Test
+  fun `پنهان کردنِ کالای ناموجود در فرمِ تنظیمات و صف`() {
+    val off = StorefrontSettingsModel.from(StorefrontSettingsDto(slug = "my-shop", title = "دکان"))
+    assertFalse("پیش‌فرض خاموش", off.hideOutOfStock)
+    assertFalse(StorefrontSettingsModel.build(off).body!!["hideOutOfStock"]!!.jsonPrimitive.boolean)
+    val on = StorefrontSettingsModel.from(StorefrontSettingsDto(slug = "my-shop", title = "دکان", hideOutOfStock = true))
+    assertTrue(on.hideOutOfStock)
+    val body = StorefrontSettingsModel.build(on.copy(hideOutOfStock = false)).body!!
+    assertFalse(body["hideOutOfStock"]!!.jsonPrimitive.boolean)
+    //  ذخیرهٔ در صف: کاربر همان کلیدی را می‌بیند که زده، نه مقدارِ کهنهٔ سرور
+    val queued = ir.vil3ntec.tohid.core.storefront.OutboxEntry(
+      id = "q1", change = ir.vil3ntec.tohid.core.storefront.StorefrontChange.SETTINGS, shopId = "s1",
+      body = StorefrontSettingsModel.build(off.copy(hideOutOfStock = true)).body.toString(), base = "", queuedAt = 0,
+    )
+    val shown = ir.vil3ntec.tohid.data.repo.StorefrontQueue.settingsWithPending(StorefrontSettingsDto(slug = "my-shop"), queued)!!
+    assertTrue(shown.hideOutOfStock)
+    assertTrue(StorefrontSettingsModel.from(shown).hideOutOfStock)
+    //  بدنهٔ برنامهٔ پیشین (بی کلید) مقدارِ سرور را نگه می‌دارد
+    val legacy = queued.copy(body = "{\"title\":\"x\"}")
+    assertTrue(ir.vil3ntec.tohid.data.repo.StorefrontQueue.settingsWithPending(StorefrontSettingsDto(hideOutOfStock = true), legacy)!!.hideOutOfStock)
+  }
+
   @Test
   fun `خطاهای فرمِ تنظیمات`() {
     val bad = StorefrontSettingsModel.Form(slug = "", enabled = true, accent = "red", delivery = false, pickup = false, fee = "x", days = mapOf(2 to "25:00-26:00"))

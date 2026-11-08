@@ -148,6 +148,10 @@ ok((await prs.textContent('#t-fee-label')) === 'کرایهٔ ارسال', 'در�
 const part = await prs.evaluate(() => window.K.part('method').then((r) => [r, window.K.t('dm.to.pickup'), window.K.t('dm.send')]));
 ok(part[0] === true && part[1] === 'دریافت از دکان (بدون کرایهٔ ارسال)' && part[2] === 'دیدنِ هزینهٔ تازه',
   'دری: واژه‌نامهٔ بخش (method) از fa، لایه روی آن و جانشینیِ کلید‌به‌کلید (dm.send فارسی می‌ماند)', part.join(' | '));
+//  دورِ ۶: جملهٔ کاملِ دری (`DariText.PHRASES`) در خودِ صفحه — خطای همگانی و شبکه، نه «دوباره بزنید»/«اینترنت را ببینید»
+const whole = await prs.evaluate(() => [window.K.t('err.generic'), window.K.t('err.network')]);
+ok(whole[0] === 'خطا؛ دوباره کوشش کنید.' && whole[1] === 'اتصال برقرار نشد؛ انترنت را بررسی کنید و دوباره کوشش کنید.',
+  'دری: جملهٔ کاملِ خطاها (دورِ ۶)', whole.join(' | '));
 ok(fa.seen.some((u) => u === '/kit/i18n/method.fa.json') && !fa.seen.some((u) => /\.prs\.json$|\/prs\.json$/.test(u)) && fa.seen.includes('/kit/dari.js'),
   'دری: fa.json و method.fa.json و dari.js خواسته شد، هیچ prs.json', fa.seen.filter((u) => /i18n|dari/.test(u)).join(' '));
 const aria = await prs.getAttribute('.topbar [data-act="lang"]', 'aria-label');

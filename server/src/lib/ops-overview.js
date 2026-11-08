@@ -206,12 +206,18 @@ async function health() {
   const [snap, sync, serverErrors, schema] = await Promise.all([
     safe(() => hs.snapshot()), safe(() => syncHealth(t)), safe(() => errs.serverErrorCounts(t)), safe(schemaInfo),
   ]);
-  const jobs = require('./job-beat').report(t);
+  //  خوشه (`CLUSTER_ENABLED=1`): کارها = کارهای رهبر، از هر نمونه (`lib/cluster-view.js`)؛ تک‌نمونه ⇒ null و همان پیشین
+  const cluster = await safe(() => require('./cluster-view').clusterView(t), null);
+  const jobs = cluster && cluster.jobs ? cluster.jobs : require('./job-beat').report(t);
+  const replica = require('./read-replica').stats(t);
   const mem = process.memoryUsage();
   const loop = eventLoop();
   const jobsStatus = jobs.some((j) => j.status === 'warn') ? 'warn' : jobs.every((j) => j.status === 'unknown') ? 'unknown' : 'ok';
   const serverErrStatus = serverErrors.lastHour == null ? 'unknown' : serverErrors.lastHour >= 20 ? 'warn' : 'ok';
   const parts = { snapshot: snap.status || 'unknown', jobs: jobsStatus, serverErrors: serverErrStatus, eventLoop: loop.status };
+  if (cluster) parts.cluster = cluster.status || 'unknown';
+  //  نسخهٔ خواندنی پیکربندی شده ولی کنار است (افتاده/عقب) ⇒ هشدار؛ خواندن‌ها همان اصلی‌اند، پس «از کار افتاده» نیست
+  if (replica.configured) parts.replica = replica.usable ? 'ok' : 'warn';
   return {
     checkedAt: t,
     status: hs.worst(Object.values(parts).map((s) => (['ok', 'warn', 'down', 'unknown'].includes(s) ? s : 'unknown'))),
@@ -219,6 +225,8 @@ async function health() {
     server: { version: apiVersion(), node: process.version, uptimeSeconds: Math.round(process.uptime()), rssBytes: mem.rss, heapUsedBytes: mem.heapUsed, driver: snap.database?.driver || null },
     snapshot: snap,
     jobs,
+    ...(cluster ? { cluster } : {}),
+    ...(replica.configured ? { replica } : {}),
     sync,
     serverErrors: { ...serverErrors, status: serverErrStatus, limits: { warnPerHour: 20 } },
     eventLoop: loop,

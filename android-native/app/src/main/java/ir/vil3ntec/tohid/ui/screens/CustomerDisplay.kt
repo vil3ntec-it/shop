@@ -22,6 +22,10 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
+import ir.vil3ntec.tohid.core.i18n.StrAuth
+import ir.vil3ntec.tohid.core.i18n.StrInvoices
+import ir.vil3ntec.tohid.core.i18n.StrPanelPages
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.hw.CustomerFacing
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -43,16 +47,16 @@ fun CustomerDisplayScreen(storeName: String) {
   val v by CustomerFacing.view
   val c = Shop.colors
   Column(Modifier.fillMaxSize().background(c.bg).padding(Space.xl)) {
-    Text(storeName.ifBlank { "فروشگاه" }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c.text)
+    Text(storeName.ifBlank { StrSale.storeFallback }, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = c.text)
     Spacer(Modifier.height(Space.md))
     Box(Modifier.weight(1f).fillMaxWidth().clip(Shape.cardLarge).background(c.surfaceSolid).padding(Space.lg)) {
       when {
         v.paid != null -> Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
-          Text("سپاس از خرید شما", style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.Bold)
+          Text(StrPanelPages.thanksForPurchase, style = MaterialTheme.typography.headlineMedium, color = c.text, fontWeight = FontWeight.Bold)
           Spacer(Modifier.height(Space.sm))
           Text("${money(v.paid ?: 0.0)} ؋", fontSize = 44.sp, color = c.primary, fontWeight = FontWeight.Bold)
         }
-        v.lines.isEmpty() -> Text("خوش آمدید", Modifier.align(Alignment.Center), style = MaterialTheme.typography.headlineMedium, color = c.muted)
+        v.lines.isEmpty() -> Text(StrAuth.welcome, Modifier.align(Alignment.Center), style = MaterialTheme.typography.headlineMedium, color = c.muted)
         else -> LazyColumn(verticalArrangement = Arrangement.spacedBy(Space.xs)) {
           items(v.lines) { l ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
@@ -70,7 +74,7 @@ fun CustomerDisplayScreen(storeName: String) {
       Modifier.fillMaxWidth().clip(Shape.cardLarge).background(c.primaryTint).padding(horizontal = Space.lg, vertical = Space.md),
       verticalAlignment = Alignment.CenterVertically,
     ) {
-      Text("جمع", Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = c.text)
+      Text(StrInvoices.total, Modifier.weight(1f), style = MaterialTheme.typography.titleLarge, color = c.text)
       Text("${money(if (v.paid != null) v.paid ?: 0.0 else v.total)} ؋", fontSize = 40.sp, color = c.primary, fontWeight = FontWeight.Bold)
     }
   }

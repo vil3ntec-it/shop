@@ -14,6 +14,7 @@ const db = require('../db');
 const { now, tx } = db;
 const { ulid } = require('./ulid');
 const { sniff, MAX_BYTES } = require('./product-photos');
+const imgStore = require('./image-store');
 const { badRequest, notFound, conflict } = require('../middleware/errors');
 
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -65,7 +66,8 @@ function view(r) {
 async function add(shopId, orderId, body, actor) {
   const id = orderIdOf(orderId);
   const p = parse(body);
-  return tx(async (c) => {
+  //  بایت در `data` یا انبارِ شیء (`lib/image-store.js`)؛ تکرار یا رد ⇒ شیءِ آماده همان دم پاک
+  return imgStore.withStaged(imgStore.shopTenant(shopId), p.buf, (s) => tx(async (c) => {
     const order = (await c.query('SELECT id, status FROM online_orders WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, id])).rows[0];
     if (!order) throw notFound('سفارش پیدا نشد', 'order_not_found');
     const pick = (await c.query('SELECT status, bags FROM order_picks WHERE order_id=$1 FOR UPDATE', [id])).rows[0];
@@ -83,13 +85,14 @@ async function add(shopId, orderId, body, actor) {
     const n = Number((await c.query('SELECT COUNT(*)::int AS n FROM order_pick_photos WHERE order_id=$1', [id])).rows[0].n);
     if (n >= MAX_PHOTOS) throw conflict(`حداکثر ${MAX_PHOTOS} عکس برای هر سفارش`, 'too_many_photos');
     const at = now();
+    s.used = true;
     const row = (await c.query(
-      `INSERT INTO order_pick_photos (id, shop_id, order_id, event_key, mime, size, hash, data, bags, device_time, created_by, created_at)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING id, order_id, mime, size, hash, bags, device_time, created_by, created_at`,
-      [ulid(at), shopId, id, p.key, p.mime, p.buf.length, p.hash, p.buf, Number(pick.bags), p.deviceTime, actor.id || '', at]
+      `INSERT INTO order_pick_photos (id, shop_id, order_id, event_key, mime, size, hash, data, store_key, bags, device_time, created_by, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$13,$9,$10,$11,$12) RETURNING id, order_id, mime, size, hash, bags, device_time, created_by, created_at`,
+      [ulid(at), shopId, id, p.key, p.mime, p.buf.length, p.hash, s.data, Number(pick.bags), p.deviceTime, actor.id || '', at, s.key]
     )).rows[0];
     return { photo: view(row), replayed: false };
-  });
+  }));
 }
 
 /** فهرستِ عکس‌های یک سفارش (بی بایت). سفارشِ دکانِ دیگر ⇒ ۴۰۴. */
@@ -110,10 +113,11 @@ async function get(shopId, orderId, photoId) {
   const pid = str(photoId);
   if (!ID_RE.test(pid)) throw notFound('عکس پیدا نشد', 'photo_not_found');
   const r = (await db.query(
-    'SELECT mime, data FROM order_pick_photos WHERE shop_id=$1 AND order_id=$2 AND id=$3', [shopId, id, pid]
+    'SELECT mime, data, store_key FROM order_pick_photos WHERE shop_id=$1 AND order_id=$2 AND id=$3', [shopId, id, pid]
   )).rows[0];
-  if (!r) throw notFound('عکس پیدا نشد', 'photo_not_found');
-  return { mime: r.mime, data: Buffer.from(r.data) };
+  const data = await imgStore.bytes(imgStore.shopTenant(shopId), r);
+  if (!data) throw notFound('عکس پیدا نشد', 'photo_not_found');
+  return { mime: r.mime, data };
 }
 
 module.exports = { MAX_PHOTOS, add, list, get };

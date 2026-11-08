@@ -38,7 +38,14 @@ const SERVER_EDITABLE = Object.freeze([
   //  شماره و نشانیِ مشتری (CRM-15): در برنامه `rememberCanSeeContacts`؛ در سرور پوشاندن/نبودن در REST و همگام‌سازی و
   //  «push بازنویسی نمی‌کند»، و همراهِ `orders.contact` برای شمارهٔ سفارش/گفت‌وگو — ‎lib/customer-contact.js‎
   'customers.contact',
+  //  STF-03: سقفِ فروشِ قرضی — فقط وقتی پرچمِ همان دکان روشن است (`FLAGGED`؛ اجرا در ‎lib/credit-cap.js‎)
+  'sales.credit',
 ]);
+/**
+ * کلیدی که سرور فقط با پرچمِ خاموشِ خودش اجرا می‌کند: پرچمِ خاموش ⇒ در کاتالوگ «none» و ذخیره‌اش
+ * `not_enforceable_yet` (همان قاعدهٔ «تغییرِ فقط ظاهری پذیرفته نمی‌شود»)
+ */
+const FLAGGED = Object.freeze({ 'sales.credit': 'shop.credit_cap' });
 //  همهٔ نقش‌های کارمند، از جمله چهار نقشِ تازهٔ A16 (مهاجرتِ ۱۲۳)
 const EDITABLE_ROLES = STAFF_ROLES;
 
@@ -63,18 +70,29 @@ function parsePerms(v) {
 }
 
 /**
- * دو لایهٔ یک عضو: [نقش، کاربر] — هر کدام {} اگر نبود.
+ * لایه‌های یک عضو: [نقش، کاربر] — هر کدام {} اگر نبود. STF-01: عضوی که نقشِ سفارشیِ همان نقشِ پایه را دارد و
+ * پرچمِ `shop.custom_roles` روشن است ⇒ [نقش، نقشِ سفارشی، کاربر] (‎lib/custom-roles.js‎؛ پرچم فقط برای همان عضو
+ * خوانده می‌شود، پس نقش‌های پیش‌فرض همان یک پرس‌وجوی امروز را دارند).
  * `run` = اتصالِ تراکنشِ صدازننده (`(sql, params) ⇒ {rows}`، مثلِ `orders.flagOf`)؛ نیامده ⇒ استخر.
  */
 async function layersFor(shopId, role, userId, run = null) {
   if (!shopId || role === 'owner') return [{}, {}];
   const sql = `SELECT 'role' AS scope, perms FROM shop_role_perms WHERE shop_id=$1 AND role=$2
      UNION ALL
-     SELECT 'member' AS scope, perms FROM shop_member_perms WHERE shop_id=$1 AND user_id=$3`;
+     SELECT 'member' AS scope, perms FROM shop_member_perms WHERE shop_id=$1 AND user_id=$3
+     UNION ALL
+     SELECT 'custom' AS scope, c.perms FROM shop_member_custom_roles a
+       JOIN shop_custom_roles c ON c.id = a.role_id AND c.shop_id = a.shop_id
+      WHERE a.shop_id=$1 AND a.user_id=$3 AND c.base_role=$2`;
   const params = [shopId, String(role || ''), String(userId || '')];
   const rows = run ? (await run(sql, params)).rows : await many(sql, params);
   const out = [{}, {}];
-  for (const r of rows) out[r.scope === 'role' ? 0 : 1] = parsePerms(r.perms);
+  let custom = null;
+  for (const r of rows) {
+    if (r.scope === 'custom') custom = parsePerms(r.perms);
+    else out[r.scope === 'role' ? 0 : 1] = parsePerms(r.perms);
+  }
+  if (custom && await require('./custom-roles').enabled(shopId, run)) return [out[0], custom, out[1]];
   return out;
 }
 
@@ -104,21 +122,36 @@ function legacyPermissions(role, layers) {
   return permissionsOf(role).filter((k) => !isLayered(k) || core.allows(role, layers, k));
 }
 
+/** کلیدهای قابل‌ویرایشِ همین دکان — کلیدِ پرچم‌دار فقط با پرچمِ روشن */
+async function editableFor(shopId) {
+  const { flagOf } = require('./orders');
+  const out = [];
+  for (const k of SERVER_EDITABLE) {
+    if (FLAGGED[k] && !(shopId && await flagOf(shopId, FLAGGED[k]))) continue;
+    out.push(k);
+  }
+  return out;
+}
+
 /** آنچه برنامه برای چیدنِ دکمه‌ها لازم دارد */
-function policyPayload(role, layers) {
+function policyPayload(role, layers, editable = SERVER_EDITABLE.filter((k) => !FLAGGED[k])) {
   return {
     v: core.VERSION,
     role: role || '',
-    layers: [layers[0] || {}, layers[1] || {}],
+    //  STF-01: نقشِ سفارشی لایهٔ سومِ میانِ نقش و کاربر است (`layersFor`)؛ بی آن همان دو لایهٔ امروز
+    layers: layers.length > 2 ? layers.map((l) => l || {}) : [layers[0] || {}, layers[1] || {}],
     effective: core.effective(role, layers),
-    editable: SERVER_EDITABLE.slice(),
+    editable: editable.slice(),
   };
 }
 
 async function policyOf(shopId, member) {
   if (!member) return { permissions: [], policy: null };
   const layers = await layersFor(shopId, member.role, member.user_id);
-  return { permissions: legacyPermissions(member.role, layers), policy: policyPayload(member.role, layers) };
+  return {
+    permissions: legacyPermissions(member.role, layers),
+    policy: policyPayload(member.role, layers, await editableFor(shopId)),
+  };
 }
 
 /**
@@ -142,11 +175,22 @@ function cleanLayer(role, perms) {
   return out;
 }
 
+/** کلیدِ پرچم‌دار با پرچمِ خاموش ⇒ `not_enforceable_yet` */
+async function requireEnforced(shopId, layer) {
+  const keys = Object.keys(layer).filter((k) => FLAGGED[k]);
+  if (!keys.length) return;
+  const on = await editableFor(shopId);
+  for (const k of keys) {
+    if (!on.includes(k)) throw badRequest(`${MESSAGES.not_enforceable_yet} (${k})`, 'not_enforceable_yet');
+  }
+}
+
 async function setRoleLayer(shopId, role, perms, byUserId) {
   if (!EDITABLE_ROLES.includes(role)) {
     throw badRequest(role === 'owner' ? MESSAGES.owner_fixed : MESSAGES.unknown_role, role === 'owner' ? 'owner_fixed' : 'unknown_role');
   }
   const layer = cleanLayer(role, perms);
+  await requireEnforced(shopId, layer);
   if (!Object.keys(layer).length) {
     await query('DELETE FROM shop_role_perms WHERE shop_id=$1 AND role=$2', [shopId, role]);
     return {};
@@ -174,6 +218,7 @@ async function editableMember(shopId, idOrUserId) {
 async function setMemberLayer(shopId, idOrUserId, perms, byUserId) {
   const m = await editableMember(shopId, idOrUserId);
   const layer = cleanLayer(m.role, perms);
+  await requireEnforced(shopId, layer);
   if (!Object.keys(layer).length) {
     await query('DELETE FROM shop_member_perms WHERE shop_id=$1 AND user_id=$2', [shopId, m.user_id]);
   } else {
@@ -194,6 +239,8 @@ async function overview(shopId) {
   for (const role of EDITABLE_ROLES) roles[role] = {};
   for (const r of roleRows) roles[r.role] = parsePerms(r.perms);
 
+  //  STF-01: نقش‌های سفارشی فقط با پرچمِ روشن (وگرنه پاسخ همان امروز)
+  const custom = await require('./custom-roles').effectiveByUser(shopId);
   const members = await many(
     `SELECT m.id, m.user_id, m.role, m.status, u.name, p.perms
        FROM shop_members m
@@ -203,12 +250,13 @@ async function overview(shopId) {
       ORDER BY (m.role = 'owner') DESC, m.created_at ASC`,
     [shopId]
   );
+  const editable = await editableFor(shopId);
   return {
     v: core.VERSION,
     catalog: core.keys().map((k) => ({
       key: k,
-      edit: SERVER_EDITABLE.includes(k) ? core.CATALOG[k].edit : 'none',
-      caps: SERVER_EDITABLE.includes(k) ? core.CATALOG[k].caps.slice() : [],
+      edit: editable.includes(k) ? core.CATALOG[k].edit : 'none',
+      caps: editable.includes(k) ? core.CATALOG[k].caps.slice() : [],
       approvable: core.CATALOG[k].approvable,
       display: core.CATALOG[k].display,
       defaults: { ...core.CATALOG[k].defaults },
@@ -216,17 +264,20 @@ async function overview(shopId) {
     roles,
     members: members.map((m) => {
       const layer = parsePerms(m.perms);
-      const layers = [roles[m.role] || {}, layer];
+      const mine = custom && m.role !== 'owner' ? custom.get(m.user_id) : null;
+      const layers = mine ? [roles[m.role] || {}, mine.perms, layer] : [roles[m.role] || {}, layer];
       return {
         id: m.id, userId: m.user_id, name: m.name || '', role: m.role, status: m.status,
         layer, effective: core.effective(m.role, layers),
+        ...(mine ? { customRole: { id: mine.id, name: mine.name } } : {}),
       };
     }),
+    ...(custom ? { customRoles: await require('./custom-roles').list(shopId) } : {}),
   };
 }
 
 module.exports = {
-  SERVER_EDITABLE, EDITABLE_ROLES, MESSAGES,
+  SERVER_EDITABLE, FLAGGED, EDITABLE_ROLES, MESSAGES, editableFor, requireEnforced,
   layersFor, layersOfReq, isLayered, memberAllows, legacyPermissions, policyPayload, policyOf,
-  cleanLayer, setRoleLayer, setMemberLayer, overview,
+  cleanLayer, setRoleLayer, setMemberLayer, overview, editableMember,
 };

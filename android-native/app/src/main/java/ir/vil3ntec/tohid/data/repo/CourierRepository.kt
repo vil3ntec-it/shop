@@ -90,6 +90,25 @@ class CourierRepository(private val api: ApiClient) {
     }
   }
 
+  /**
+   *  آخرین نقطهٔ پیک «در راه» (DLV-16، `POST /api/courier/missions/:id/location`) — فقط سرویسِ پیش‌زمینه
+   *  (`CourierTrack`) صدا می‌زند و فقط برای کارتی که سرور `tracking.location` داد. سرور مالکیت، «در راه» و هر دو
+   *  پرچم را می‌سنجد و فقط آخرین نقطه را نگه می‌دارد. ⇒ `true` وقتی سرور نقطه را گرفت (`accepted`)؛ نقطهٔ تندتر از
+   *  `minIntervalMs` را سرور بی خطا کنار می‌گذارد (`false`).
+   */
+  suspend fun location(assignmentId: String, fix: ir.vil3ntec.tohid.core.courier.LiveTrack.Fix): ApiResult<Boolean> = result {
+    val out = api.post(
+      ApiEndpoints.Courier.location(assignmentId),
+      buildJsonObject {
+        put("lat", JsonPrimitive(fix.lat))
+        put("lng", JsonPrimitive(fix.lng))
+        fix.accuracyM?.let { put("accuracyM", JsonPrimitive(it)) }
+        put("deviceTime", JsonPrimitive(fix.at))
+      },
+    )
+    CourierWire.bool(out, "accepted")
+  }
+
   /** عکسِ بسته (DLV-08) — `parcelOnly` همیشه true: پیک پیش از گرفتن تأیید کرده */
   suspend fun photo(assignmentId: String, eventId: String, imageBase64: String, deviceTime: Long): ApiResult<String> = result {
     val out = api.post(

@@ -271,6 +271,28 @@ class SettingsHomeTest {
     I18n.source = { Lang.FA }
   }
 
+  /**
+   *  WEB-09 — «کالای ناموجود در ویترین»: ردیفِ «فروش و پرداخت ⇐ آنلاین» که «ویترین ⇐ تنظیمات» (کلیدِ «پنهان کن») را باز
+   *  می‌کند، به هر سه زبان و دری با جست‌وجو پیدا می‌شود؛ دکانِ بی ویترین (بی پاسخِ سرور) نه.
+   */
+  @Test
+  fun `جست‌وجوی کالای ناموجود به تنظیماتِ ویترین می‌رسد`() {
+    val on = setOf(SettingsLayout.STORE_STOCK)
+    val docs = SettingsSearchIndex.docs(desktop = false, serverOn = on)
+    fun keys(q: String) = SettingsSearchIndex.search(docs, q).map { it.key }
+    for (q in listOf("ناموجود", "پنهان", "تمام شده", "out of stock", "sold out", "نشته توکي")) {
+      assertTrue(q, SettingsLayout.STORE_STOCK in keys(q))
+    }
+    assertEquals("storefront?tab=settings", SettingsLayout.LINKS[SettingsLayout.STORE_STOCK])
+    assertEquals(SettingsLayout.SALES, SettingsLayout.groupOf(SettingsLayout.STORE_STOCK))
+    assertTrue(SettingsLayout.visibleParts(SettingsLayout.SALES, false, on, emptySet()).any { SettingsLayout.STORE_STOCK in it.rows })
+    val off = SettingsSearchIndex.docs(desktop = false, serverOn = emptySet())
+    assertTrue(SettingsSearchIndex.search(off, "ناموجود").none { it.key == SettingsLayout.STORE_STOCK })
+    I18n.source = { Lang.EN }
+    assertEquals("Out-of-stock items on the storefront", SettingsLayout.labelOf(SettingsLayout.STORE_STOCK))
+    I18n.source = { Lang.FA }
+  }
+
   /** PAY-13 — «شمارشِ کور» گزینهٔ صفحهٔ «پرداخت» است؛ جست‌وجو به همان صفحه می‌برد، به هر سه زبان */
   @Test
   fun `جست‌وجوی شمارشِ کور به صفحهٔ پرداخت می‌رسد`() {

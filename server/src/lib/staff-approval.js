@@ -7,6 +7,7 @@
  *   sales.discount   درجِ فاکتور با تخفیف (درصد و مبلغ)
  *   sales.cancel     لغوِ فاکتور
  *   returns.create   درجِ برگشت/بازپرداخت (مبلغ)
+ *   sales.credit     قرضِ فاکتور (`debtGiven`؛ فقط با پرچمِ `shop.credit_cap` — ‎lib/credit-cap.js‎)
  * تصمیم با همان هستهٔ مشترک (`perm-core.js`) و دو لایهٔ `staff-perms.js` است:
  *   allow    ⇒ می‌نشیند (همان امروز)
  *   deny     ⇒ رد (همان کدهای امروز)
@@ -39,9 +40,12 @@ const { one, many, query, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
 const { rejectOps } = require('./v1-reject');
-const roleV1 = require('./staff-role-v1');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
+const roleV1 = require('./staff-role-v1');
+//  STF-02: «درخواستِ تأیید» از راهِ دور (پرچمِ خاموشِ `shop.approval_requests`) — op با `approval: {v:1, request}`
+const remote = require('./approval-requests');   //  A16: جدول/ردیفِ بیرون از نقش در v1 (شرح همان‌جا)
 //  ⛔ ویرایشِ پولیِ سندِ ثبت‌شدهٔ v1 (update/`$inc`) و قاعدهٔ نقشِ خودِ v1 (`v1RoleReason`) — شرح همان‌جا
 const { isMoneyEdit, v1RoleReason, judgeEdits } = require('./staff-edit-v1');
+const creditCap = require('./credit-cap');   //  STF-03: سقفِ فروشِ قرضی (پرچمِ خاموشِ `shop.credit_cap`)
 
 const ALG = 'ES256';
 const MAX_KEYS_PER_USER = 5;
@@ -51,8 +55,9 @@ const APPROVER_ROLES = Object.freeze(['owner', 'manager']);
 const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
-  'returns.create': 'return_not_allowed',
+  'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed',   //  قرض: STF-03 (‎lib/credit-cap.js‎)
 });
+const { SALE_INSERT_PERMS } = creditCap;
 
 const MESSAGES = {
   bad_public_key: 'کلیدِ عمومی باید ECDSA P-256 (SPKI، base64) باشد',
@@ -232,6 +237,8 @@ const dbq = { query: (s, p) => query(s, p) };
  * @returns {Promise<null | string>} کدِ خطا یا null
  */
 async function acceptSlip(q, ctx, need, slip, { opId, at, deviceId, path }) {
+  //  تأییدِ صاحب/مدیر روی دستگاهِ خودش (سرور تصمیم گرفته، نه امضا) — پرچمِ خاموش ⇒ همان `approval_invalid` ِ برگهٔ بدشکل
+  if (remote.isRef(slip)) return remote.accept(q, ctx, need, slip, { opId, at, deviceId, path });
   const c = q || dbq;
   const shape = slipCore.check(slip);
   if (shape) return 'approval_invalid';
@@ -503,7 +510,7 @@ function parentOf(perm, ops, index, batch) {
   }
   p.sale = first.row_id;
   p.debtor = str(f.debtorId);
-  if (perm === 'sales.discount') p.at = atOf(first);
+  if (SALE_INSERT_PERMS.has(perm)) p.at = atOf(first);
   if (perm === 'sales.cancel' && batch) {
     const a = batch.find((o) => o.table === 'auditLog' && fieldsOf(o).type === 'cancel_sale'
       && str(fieldsOf(o).refId) === p.sale && tsOf(o) === p.ts);
@@ -539,7 +546,7 @@ function sameSave(p, op) {
 function companionOf(p, op) {
   const f = fieldsOf(op);
   const ref = str(f.refId);
-  if (p.perm === 'sales.discount') {
+  if (SALE_INSERT_PERMS.has(p.perm)) {
     if (!p.sale) return false;
     if (op.table === 'saleItems' || op.table === 'returns') return op.type === 'insert' && str(f.saleId) === p.sale;
     return SALE_LINKED.has(op.table) && ref === p.sale;
@@ -577,7 +584,7 @@ function looseOf(p, op) {
   if (!isLoose(op) || !sameSave(p, op)) return false;
   const f = fieldsOf(op);
   if (op.table === 'transactions') {
-    if (p.perm === 'sales.discount') {
+    if (SALE_INSERT_PERMS.has(p.perm)) {
       return f.type === 'give' && (!p.debtor || !str(f.debtorId) || str(f.debtorId) === p.debtor);
     }
     return f.type === 'receive';
@@ -649,7 +656,7 @@ async function heldParents(ctx, deviceId, ops, { tol = 0 } = {}) {
     }
   }
   return parents.filter((p) => {
-    if (p.perm === 'sales.discount') return !!p.sale && !on.has(`sales/${p.sale}`);
+    if (SALE_INSERT_PERMS.has(p.perm)) return !!p.sale && !on.has(`sales/${p.sale}`);
     if (p.perm === 'sales.cancel') return !!p.sale && on.get(`sales/${p.sale}`) !== 'cancelled';
     if (p.perm === 'returns.create') return ![...p.rows].some((id) => on.has(`returns/${id}`));
     return false;
@@ -744,8 +751,9 @@ async function v1Guard(req, res, next) {
       }
     });
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
+    const credit = await creditCap.markV1(ctx, valid);   //  STF-03: قرضِ درجِ فاکتور (`x.need`/`x.credit`)؛ ویرایش در `judgeEdits`
     const offTable = await roleV1.offRole(ctx, valid, rejected);
-    const hasNeed = valid.some((x) => x.need || isMoneyEdit(x.op));
+    const hasNeed = valid.some((x) => x.need || isMoneyEdit(x.op, credit));
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
     if (!hasNeed && !held0.length && !offTable.length) return finish();
@@ -765,7 +773,7 @@ async function v1Guard(req, res, next) {
     }
 
     const reject = (x, reason) => rejected.set(x.i, { op_id: String(x.op.op_id || ''), status: 'rejected', reason });
-    const edits = await judgeEdits(ctx, live, deviceId);     //  فقط همان op، بی همراه و بی برگه
+    const edits = await judgeEdits(ctx, live, deviceId, { credit });     //  فقط همان op، بی همراه و بی برگه
     for (const e of edits) reject(e.x, e.out.reason);
     const parents = [];
 
@@ -806,7 +814,7 @@ async function v1Guard(req, res, next) {
       const members = g ? g.rows : [x];
       const first = members[0];
       let need = g ? g.need : x.need;
-      const slip = g ? g.slip : slipOf(x.op);
+      const slip = g ? g.slip : need.perm === 'sales.credit' ? creditCap.slipOf(x.op, false) : slipOf(x.op);
       let out;
       if (core.defaultMode(ctx.role, need.perm) === 'deny') {
         if (slip) {
@@ -829,6 +837,8 @@ async function v1Guard(req, res, next) {
           //  opِ بی زمان (برنامهٔ خیلی قدیمی) ⇒ فقط سنجشِ زمان کنار می‌رود؛ برگه هنوز یک‌بارمصرف و بسته به سند است
           opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1',
         });
+        //  STF-03: تخفیفِ پذیرفته ⇒ حالا قرضِ همان فاکتور (برگهٔ جدا در `creditApproval`)
+        if (!out && x.credit) out = await judge(null, ctx, (need = x.credit), creditCap.slipOf(x.op, true), { opId: first.op.op_id, at: tsOf(first.op) || undefined, deviceId, path: 'v1' });
         if (!out) {
           if (g && g.sale) tally.set(g.sale, tally.get(g.sale) + g.amount);
           continue;
@@ -895,7 +905,7 @@ function v3View(op) {
  * @param units  واحدهای `push` ِ v3 (هر واحدِ بی tx یک قلم دارد)
  * @returns واحدهای تازه (واحدهای بی‌ربط دست‌نخورده، به همان ترتیب)
  */
-function bundleV3(units, groups) {
+function bundleV3(units, groups, { credit = false } = {}) {
   const entries = [];
   units.forEach((u, ui) => {
     if (u.tx || u.broken) return;
@@ -907,6 +917,7 @@ function bundleV3(units, groups) {
   entries.forEach((e, k) => e.it.ops.forEach((op, j) => {
     let perm = null;
     if (op.table === 'sales' && op.kind === 'insert' && int(op.fields?.discountMinor) > 0) perm = 'sales.discount';
+    else if (credit && op.table === 'sales' && op.kind === 'insert' && int(op.fields?.debtGivenMinor) > 0) perm = 'sales.credit';   //  STF-03
     else if (op.table === 'sales' && op.kind === 'cancel') perm = 'sales.cancel';
     else if (op.table === 'returns' && op.kind === 'insert') perm = 'returns.create';
     if (!perm) return;
@@ -1032,32 +1043,12 @@ async function heldTxs(q, ctx, deviceId, txs) {
   return out;
 }
 
-// ---------- سابقه ----------
-
-async function listApprovals(shopId, { limit = 100 } = {}) {
-  const cap = Math.min(Math.max(1, Number(limit) || 100), 500);
-  const rows = await many(
-    `SELECT a.*, ua.name AS approver_name, ur.name AS requester_name
-       FROM shop_approvals a
-       LEFT JOIN users ua ON ua.id = a.approver_id
-       LEFT JOIN users ur ON ur.id = a.requester_id
-      WHERE a.shop_id=$1 ORDER BY a.used_at DESC LIMIT $2`,
-    [shopId, cap]
-  );
-  return rows.map((r) => ({
-    nonce: r.nonce, opId: r.op_id, doc: r.doc, perm: r.perm,
-    pctBp: r.pct_bp === null ? null : Number(r.pct_bp), amount: r.amount === null ? null : Number(r.amount),
-    approverId: r.approver_id, approverName: r.approver_name || '',
-    requesterId: r.requester_id, requesterName: r.requester_name || '',
-    keyId: r.key_id, deviceId: r.device_id, path: r.path, reason: r.reason,
-    issuedAt: Number(r.issued_at), usedAt: Number(r.used_at),
-  }));
-}
+//  سابقهٔ تأییدهای پذیرفته (`GET /api/shop/approvals`): ‎lib/approval-log.js‎
 
 module.exports = {
   ALG, MAX_KEYS_PER_USER, APPROVER_ROLES, DENY_CODE, MESSAGES,
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
-  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals,
+  needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, bundleV3, HOLD_KINDS,
   returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
 };

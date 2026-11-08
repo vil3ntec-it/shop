@@ -48,19 +48,19 @@ object GiftCardPref {
 
   /**
    *  PRM-15 — اعطای دستیِ اعتبار (`GiftCards.grantCredit`)، همان راهِ [issue]: زیرِ قفلِ موتور روی دفترِ همین لحظهٔ دیسک و
-   *  با کلیدِ پنجره ⇒ دو ضربه یک ردیف. [decision] تصمیمِ `sales.discount` برای همین مبلغ (`ShopRole.decide`)؛ جز «مجاز»
-   *  هیچ چیز نوشته نمی‌شود.
+   *  با کلیدِ پنجره ⇒ دو ضربه یک ردیف. [decision] تصمیمِ `sales.discount` برای همین مبلغ (`ShopRole.decide`)؛ «مجاز»
+   *  بی‌واسطه، «نیازمندِ تأیید» فقط با [approval] ِ مدیر/صاحبِ دیگر (`StoreCredit.approves`)؛ جز این هیچ چیز نوشته نمی‌شود.
    */
   suspend fun grant(
     store: ShopStore, key: String, debtorId: String, amountMinor: Long, reason: String, decision: String,
-    today: String, now: Long, by: String?,
+    today: String, now: Long, by: String?, approval: ir.vil3ntec.tohid.core.pay.StoreCredit.Approval? = null,
   ): Saved {
     var bad: String? = null
     var again = false
     val out = AppendOnce.append<ShopData>(
       key, GiftCards::hasGrant,
       { cur, k ->
-        when (val g = GiftCards.grantCredit(cur, k, debtorId, amountMinor, reason, decision, today, now, by)) {
+        when (val g = GiftCards.grantCredit(cur, k, debtorId, amountMinor, reason, decision, today, now, by, approval)) {
           is GiftCards.Granted.Ok -> { again = g.again; g.data.takeUnless { g.again } }
           is GiftCards.Granted.Bad -> { bad = g.code; null }
         }

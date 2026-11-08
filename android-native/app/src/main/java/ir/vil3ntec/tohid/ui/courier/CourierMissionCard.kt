@@ -131,11 +131,11 @@ internal fun MissionRow(c: MissionCard, waiting: Boolean, modifier: Modifier, on
     horizontalArrangement = Arrangement.spacedBy(10.dp),
   ) {
     Text(c.orderNo.fa(), style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted, modifier = Modifier.width(56.dp))
-    //  DLV-02: نشانه (بی نشانه، نشانیِ متنی) و زیرش «ناحیه · دروازه» — همان «اول نشانه» ِ کارت، نه فقط نشانه
-    val lines = tableLines(c)
+    //  DLV-02: همان «اول نشانه» ِ کارت — نشانه (بی نشانه، نشانیِ متنی) و زیرش «ناحیه · دروازه» (`rowLines`)
+    val lines = rowLines(c)
     Column(Modifier.weight(1f)) {
       Text(lines.firstOrNull() ?: "—", style = courierText(15.sp), color = p.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
-      lines.getOrNull(1)?.let { Text(it, style = courierText(13.sp), color = p.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
+      lines.getOrNull(1)?.let { Text(it, style = courierText(12.sp), color = p.inkMuted, maxLines = 1, overflow = TextOverflow.Ellipsis) }
     }
     Text(if (c.expectedCollectMinor > 0) afn(c.expectedCollectMinor) else "—", style = courierText(13.sp), color = p.inkMuted)
     if (waiting) QueuedPill()

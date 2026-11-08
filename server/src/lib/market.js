@@ -30,7 +30,7 @@
  *           «نزدیکِ من» فقط فاصلهٔ گردشده می‌دهد و مکانِ مشتری ذخیره یا لاگ نمی‌شود
  *           (لاگِ درخواست بی querystring است).
  */
-const { one, many, now, tx } = require('../db');
+const { one, many, now, tx } = require('../db'), rr = require('./read-replica');   //  نسخهٔ خواندنی (پیش‌فرض خاموش): جست‌وجو و قفسه‌ها؛ نه برش و نه سنجشِ زنده
 const config = require('../config');
 const sf = require('./storefront');
 const orders = require('./orders');
@@ -330,7 +330,7 @@ async function search({ q, lat, lng, limit } = {}, at = now()) {
     //  M4 (پرچمِ `market.product_details`): برند (بخشی از نام) و بارکد (برابرِ کامل) هم
     const { more, code } = await m4.searchMode(raw);
     //  نامزد از `market_search` ِ باریک (با pg_trgm نمایه‌دار)؛ بعد سنجشِ زنده
-    const rows = await many(
+    const rows = await rr.many(
       `SELECT sp.shop_id, ${sf.PRODUCT_COLS}
          FROM market_search ms JOIN (${await sf.productFrom()}) ON sp.shop_id = ms.shop_id AND sp.product_id = ms.product_id
         WHERE ms.shop_id = ANY($1::text[])
@@ -429,7 +429,7 @@ function shelfOf(shopId) {
 
 async function loadShelf(shopId) {
   counters.shelves++;
-  const rows = await many(
+  const rows = await rr.many(
     `SELECT ${sf.PRODUCT_COLS} FROM ${await sf.productFrom(shopId)}
       WHERE sp.shop_id = $1 AND sp.published AND ${sf.LIVE_PRODUCT} AND COALESCE(r.data->>'name', '') <> ''
       ORDER BY has_photo DESC, COALESCE(r.data->>'name', ''), r.row_id LIMIT $2`,
@@ -495,7 +495,7 @@ function seeded(day, s) {
 async function loadPopular(ids, day) {
   counters.popular++;
   const end = day * DAY_MS;
-  const rows = await many(
+  const rows = await rr.many(
     `SELECT shop_id, product_id FROM (
        SELECT l.shop_id, l.product_id,
               ROW_NUMBER() OVER (PARTITION BY l.shop_id ORDER BY COUNT(DISTINCT l.order_id) DESC, l.product_id) AS n
@@ -531,7 +531,7 @@ async function popularOf(ids, at) {
 /** «ارزان‌تر» ِ دکان‌هایی که صاحبشان خواسته (`market_listings.show_deals`)، تا PER_SHOP از هر دکان. */
 async function loadDeals(ids) {
   counters.deals++;
-  const rows = ids.length ? await many(
+  const rows = ids.length ? await rr.many(
     `SELECT shop_id, id FROM (
        SELECT sp.shop_id, r.row_id AS id,
               ROW_NUMBER() OVER (PARTITION BY sp.shop_id

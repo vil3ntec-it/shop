@@ -24,6 +24,7 @@ const bytes = require('./image-bytes');
 const quality = require('./image-quality');
 const { checkOriginal } = require('./image-originals');
 const photos = require('./product-photos');
+const imgStore = require('./image-store');
 const { flagOf } = require('./orders');
 const { ApiError } = require('../middleware/errors');
 
@@ -123,7 +124,7 @@ async function search(shopId, buf, { limit, store = null } = {}) {
 async function currentSql(shopId) {
   const bankOn = await require('./image-bank').shopEnabled(shopId);
   const legacy = `SELECT p.product_id, 'p' || p.rev AS src FROM product_photos p
-     WHERE p.app='shop' AND p.account_id=$1 AND p.data IS NOT NULL`;
+     WHERE p.app='shop' AND p.account_id=$1 AND ${imgStore.has('p.')}`;
   if (!bankOn) return legacy;
   return `${legacy} AND NOT EXISTS (SELECT 1 FROM shop_product_images s WHERE s.shop_id=$1 AND s.product_id=p.product_id)
     UNION ALL
@@ -134,12 +135,11 @@ async function currentSql(shopId) {
 
 async function bytesOf(shopId, productId, src) {
   if (src[0] === 'p') {
-    const r = await one(`SELECT data FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND data IS NOT NULL`,
+    const r = await one(`SELECT data, store_key FROM product_photos WHERE app='shop' AND account_id=$1 AND product_id=$2 AND ${photos.HAS}`,
       [shopId, productId]);
-    return r ? Buffer.from(r.data) : null;
+    return imgStore.bytes(imgStore.shopTenant(shopId), r);
   }
-  const r = await one('SELECT data FROM image_blobs WHERE hash=$1', [src.slice(1)]);
-  return r ? Buffer.from(r.data) : null;
+  return imgStore.bytes(imgStore.BLOBS, await one('SELECT data, store_key FROM image_blobs WHERE hash=$1', [src.slice(1)]));
 }
 
 function hashOf(buf) {

@@ -107,6 +107,8 @@ val replaced = listOf(
   //  ‎hw/DeviceSignalsDesk.kt‎ (درگاه‌های COM) و ‎scan/ScanServiceDesk.kt‎ (کارگرها در سینی)
   "hw/DeviceSignalsAndroid.kt",
   "scan/ScanServiceAndroid.kt",
+  //  DLV-16: سرویسِ پیش‌روی موقعیتِ پیک (نوعِ location) فقط اندروید — کامپیوتر GPS ندارد: ‎ui/courier/CourierTrackDesk.kt‎ (هیچ)
+  "ui/courier/CourierTrackAndroid.kt",
   //  PAY-21: NFC (HCE) و میان‌برِ تنظیماتش فقط اندروید؛ کامپیوتر: ‎pay/platform/PayDeviceDesk.kt‎.
   //  سرویسِ HCE جایگزین ندارد (فقط مانیفستِ اندروید صدایش می‌زند)
   "pay/platform/PayDevice.kt",

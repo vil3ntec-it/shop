@@ -182,6 +182,45 @@ object StrAccount {
   val permMoney: String get() = t("دیدنِ عددهای مالی (درآمد، سود)", "See money figures (income, profit)", "مالي شمېرې لیدل (عاید، ګټه)")
   /** CRM-15 — `customers.contact` */
   val permContacts: String get() = t("دیدنِ شمارهٔ مشتریان (تماس و پیام)", "See customers' phone numbers (call and message)", "د پېرودونکو شمېرې لیدل (زنګ او پیغام)")
+  //  STF-03: سقفِ فروشِ قرضیِ هر کارمند (سرور با پرچمِ `shop.credit_cap` می‌سنجد)
+  val permCredit: String get() = t("فروشِ قرضی (به حساب)", "Selling on credit", "په پور پلورل")
+
+  //  STF-01: نقشِ سفارشی — نام + یکی از نقش‌های کارمند + مجوز و سقفِ خودش (سرور با پرچمِ `shop.custom_roles`)
+  val roleCashier: String get() = t("صندوق‌دار", "Cashier", "صندوق‌دار")
+  val roleStorekeeper: String get() = t("مسئولِ انبار", "Storekeeper", "ګدام‌دار")
+  val rolePicker: String get() = t("جمع‌آورِ سفارش", "Order picker", "د فرمایش راټولوونکی")
+  val roleAccountant: String get() = t("حسابدار (فقط دیدن)", "Accountant (view only)", "محاسب (یوازې لیدل)")
+  val customRolesTitle: String get() = t("نقش‌های سفارشی", "Custom roles", "ځانګړي رولونه")
+  val customRolesHelper: String get() = t(
+    "هر نقش یکی از نقش‌های کارمند است با مجوز و سقفِ خودش، هرگز بیش از همان نقش. سرور همین را اجرا می‌کند.",
+    "Each role is one of the staff roles with its own permissions and limits, never more than that role. The server enforces it.",
+    "هر رول د کارکوونکو یو رول دی له خپلو اجازو او حدونو سره، هېڅکله له هماغه رول ډېر نه. سرور همدا پلي کوي.",
+  )
+  val customRoleNew: String get() = t("نقشِ تازه", "New role", "نوی رول")
+  val customRoleEdit: String get() = t("ویرایشِ نقش", "Edit role", "رول سمول")
+  val customRoleName: String get() = t("نامِ نقش", "Role name", "د رول نوم")
+  val customRoleNameBad: String get() = t("نام لازم است (حداکثر ۴۰ نویسه)", "A name is required (up to 40 characters)", "نوم اړین دی (تر ۴۰ تورو)")
+  val customRoleBase: String get() = t("بر پایهٔ نقشِ", "Based on role", "د رول پر بنسټ")
+  fun customRoleSubtitle(base: String, n: Int): String =
+    t("بر پایهٔ ${asIs(base)} · ${asIs(n)} کارمند", "Based on $base · $n ${pl(n, "member", "members")}", "د $base پر بنسټ · $n کارکوونکي")
+  val customRoleNone: String get() = t("بی نقشِ سفارشی", "No custom role", "بې ځانګړي رول")
+  val customRoleSection: String get() = t("نقشِ سفارشی", "Custom role", "ځانګړی رول")
+  val customRoleMemberHelper: String get() = t(
+    "نقشِ کارمند همان نقشِ پایه می‌شود؛ مجوزِ جداگانهٔ همین کارمند روی آن می‌نشیند.",
+    "The member's role becomes the base role; this member's own permissions apply on top.",
+    "د کارکوونکي رول هماغه بنسټیز رول کېږي؛ د همدې کارکوونکي خپلې اجازې پرې پلي کېږي.",
+  )
+  val customRoleDelete: String get() = t("پاک کردنِ نقش", "Delete role", "رول ړنګول")
+  fun customRoleDeleteTitle(name: String): String = t("«${asIs(name)}» پاک شود؟", "Delete “$name”?", "«$name» دې ړنګ شي؟")
+  val customRoleDeleteBody: String get() = t(
+    "کارمندانِ این نقش روی همان نقشِ پایه با مجوزهای امروزشان می‌مانند.",
+    "Members with this role stay on the base role with their current permissions.",
+    "د دې رول کارکوونکي پر هماغه بنسټیز رول له اوسنیو اجازو سره پاتې کېږي.",
+  )
+  val customRoleSaved: String get() = t("نقش ذخیره شد", "Role saved", "رول خوندي شو")
+  val customRoleDeleted: String get() = t("نقش پاک شد", "Role deleted", "رول ړنګ شو")
+  val customRoleAssigned: String get() = t("نقشِ کارمند عوض شد", "Member's role changed", "د کارکوونکي رول بدل شو")
+  val customRolePerms: String get() = t("مجوزها و سقف‌ها", "Permissions and limits", "اجازې او حدونه")
   val devicesTitle: String get() = t("دستگاه‌ها", "Devices", "وسایل")
   val noDevices: String get() = t("دستگاهی ثبت نشده است.", "No devices registered.", "هېڅ وسیله نه ده ثبت.")
   val device: String get() = t("دستگاه", "Device", "وسیله")

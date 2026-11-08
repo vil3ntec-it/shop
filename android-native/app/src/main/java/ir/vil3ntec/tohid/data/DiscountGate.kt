@@ -98,9 +98,12 @@ object DiscountGate {
     return Basis(b.discountMinor / 100.0, b.baseMinor / 100.0)
   }
 
-  /** برگه ⇐ JSONِ `Sale.approval` (همان کلیدهای سرور) */
+  /**
+   *  برگه ⇐ JSONِ `Sale.approval` (همان کلیدهای سرور). تأییدِ از راهِ دور («پرسیدن از مدیر»، `RemoteApproval.isRef`)
+   *  ارجاعِ `{v:1, request:<id>}` است، نه برگهٔ امضاشده — سرور همان را در `acceptSlip` می‌شناسد و یک بار مصرف می‌کند.
+   */
   fun json(s: ApprovalSlip.Slip): JsonObject = buildJsonObject {
-    ApprovalSlip.toMap(s).forEach { (k, v) ->
+    (if (ir.vil3ntec.tohid.core.perm.RemoteApproval.isRef(s)) ir.vil3ntec.tohid.core.perm.RemoteApproval.ref(s) else ApprovalSlip.toMap(s)).forEach { (k, v) ->
       put(
         k,
         when (v) {

@@ -46,6 +46,17 @@ class StorePage(
   /** کدِ تأییدِ شماره روی این سرور واقعاً می‌رسد؟ (۲۳.۳) نه ⇒ ثبت با برنامه شدنی نیست */
   val verificationAvailable: Boolean,
   val marketAvailable: Boolean,
+  /** بخش‌های پرچم‌دارِ همین دکان (`features` ِ پاسخ؛ پرچمِ خاموش ⇒ کلید نیست ⇒ false) */
+  val features: StoreFeatures = StoreFeatures(),
+)
+
+/** `features` ِ `GET /api/store/:slug` (فقط کلیدهایی که برنامهٔ خرید به کار می‌برد). */
+@Serializable
+data class StoreFeatures(
+  /** گفت‌وگو با دکان (`shop.chat`) */
+  val chat: Boolean = false,
+  /** نظرهای تأییدشده (`shop.orders.reviews`) */
+  val reviews: Boolean = false,
 )
 
 /** کاتالوگ با صفحه‌بندیِ نشانگری (`nextCursor`). */
@@ -167,6 +178,9 @@ data class CheckoutAddress(
   val gateColor: String = "",
   /** بی پین ⇒ ناحیهٔ برگزیده (`source: customer`) */
   val zoneId: String? = null,
+  /** CHK-08: پین (هر دو یا هیچ)؛ با پین ناحیه را سرور می‌گوید */
+  val lat: Double? = null,
+  val lng: Double? = null,
 )
 
 @Serializable
@@ -186,6 +200,12 @@ data class CheckoutRequest(
   val slotStartsAt: Long? = null,
   val address: CheckoutAddress? = null,
   val delivery: CheckoutDelivery? = null,
+  /** MKT-01: کدِ تخفیف — سرور در همان تراکنش می‌سنجد */
+  val promoCode: String? = null,
+  /** MKT-02: شناسهٔ تصادفیِ همین دستگاه، فقط وقتی دکان سدِ «یک بار برای هر دستگاه» دارد */
+  val deviceId: String? = null,
+  /** MKT-11: کدِ پیوند/QR ِ کمپین که مشتری با آن آمد — فقط نسبت داده می‌شود، مبلغ را دست نمی‌زند */
+  val campaign: String? = null,
 )
 
 /** JSON ِ برنامهٔ خرید: فیلدِ ناشناخته نادیده؛ null در بدنه نمی‌رود (همان `undefined` ِ وب). */

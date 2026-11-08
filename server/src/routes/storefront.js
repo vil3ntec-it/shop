@@ -39,6 +39,7 @@ const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
+const { reads: replicaReads } = require('../lib/read-replica');
 const { notFound, ApiError } = require('../middleware/errors');
 
 const router = express.Router();
@@ -49,6 +50,8 @@ const RECENT_FLAG = 'shop.storefront.recent';
 const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
 //  CHK-08: شمارهٔ دوم و Plus Code در فرمِ نشانیِ وب (پیش‌فرض خاموش ⇒ همان فرم)
 const ADDRESS_EXTRA_FLAG = 'shop.storefront.address_extra';
+//  CHK-01/09، WEB-14: حسابِ مشتری در وبِ ویترین (`store/acct.js` ِ دیربار: پیشنهادِ حساب پس از ثبت، نشانی‌های نام‌دار، همگامیِ سبد)
+const WEB_ACCOUNT_FLAG = 'shop.storefront.web_account';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -101,7 +104,7 @@ router.get('/', (req, res, next) => next(typeof req.query.id === 'string' ? unde
 
 router.get('/:slug', readLimit, store, async (req, res) => {
   const [cats, status, delivery, seo, media, pid] = await Promise.all([
-    sf.categories(req.store.shop_id), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
+    sf.categories(req.store.shop_id, { hide: req.store.hide_out_of_stock === true }), sf.statusOf(req.store).then((st) => orderDesk.overlay(req.store.shop_id, st)), sfd.publicInfo(req.store),
     storeSeo.publicInfo(req.store), sfm.publicView(req.store), sf.publicIdOn(req.store.shop_id),
   ]);
   res.json({
@@ -148,6 +151,8 @@ async function featuresOf(shopId, sf) {
     ...((await require('../lib/visual-search').storeFlagOn(shopId)) ? { visualSearch: true } : {}),
     //  CRM-13: «حسابِ من» (`/:slug/account/history`، `store/account.js`) با پرچمِ `shop.storefront.account_history`
     ...((await require('../lib/store-account-history').flagOn(shopId)) ? { accountHistory: true } : {}),
+    //  CHK-01/09، WEB-14: «حسابِ من» ِ وب (همان درهای `/:slug/account…`)؛ سبدِ حساب (`accountCart`) فقط با `shop.storefront.cart` هم
+    ...((await orders.flagOf(shopId, WEB_ACCOUNT_FLAG)) ? { webAccount: true, ...((await cart.flagOn(shopId)) ? { accountCart: true } : {}) } : {}),
     //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`
     ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
   };
@@ -202,14 +207,16 @@ router.delete('/:slug/area-request', areaStore, checkoutLimit, verified, async (
   res.json(await areas.withdraw(req.store, req.verifiedPhone));
 });
 
-router.get('/:slug/products', readLimit, store, async (req, res) => {
+//  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش): فقط کاتالوگ/دسته/جست‌وجوی همین مسیر (`lib/read-replica.js`)
+router.get('/:slug/products', readLimit, store, replicaReads, async (req, res) => {
   const out = req.query.ids !== undefined
     ? await sf.catalogByIds(req.store.shop_id, req.query.ids)
     : await sf.catalog(req.store.shop_id, {
       q: req.query.q, category: req.query.category, cursor: req.query.cursor, limit: req.query.limit, sort: req.query.sort,
       contactPhone: req.store.contact_phone,
-      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)
-      filters: await finder.parse(req.store.shop_id, req.query),
+      //  WEB-07: برند، قیمت، موجود بودن و مشخصه (پرچمِ خاموشِ `shop.storefront.filters` ⇒ null و همان پاسخ)؛
+      //  WEB-09: «ناموجود را پنهان کن» ِ دکان (مهاجرتِ ۲۴۰؛ خاموش ⇒ همان). `?ids=` (سبد) و صفحهٔ کالا راستش را می‌گیرند.
+      filters: finder.hiding(await finder.parse(req.store.shop_id, req.query), req.store.hide_out_of_stock === true),
     });
   //  RPT-14: صفحهٔ نخستِ جست‌وجوی بی‌نتیجه شمرده می‌شود (فقط با پرچمِ گزارش؛ خطا جواب را خراب نمی‌کند)
   if (req.query.ids === undefined && !req.query.cursor && req.query.q && !out.items.length) {

@@ -54,4 +54,7 @@ object StrPanelPages {
     "$times ${pl(times, "purchase", "purchases")} · $amount ؋ · last purchase $days ${pl(days, "day", "days")} ago",
     "$times پېرود · $amount ؋ · وروستی پېرود $days ${pl(days, "ورځ", "ورځې")} مخکې",
   )
+
+  // ── دورِ ۶: نمایشگرِ مشتری (HW-10، پنجرهٔ دومِ کامپیوتر رو به مشتری) ──
+  val thanksForPurchase: String get() = t("سپاس از خرید شما", "Thank you for your purchase", "له پېرود مو مننه")
 }

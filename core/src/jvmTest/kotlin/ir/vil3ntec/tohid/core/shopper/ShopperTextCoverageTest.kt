@@ -22,12 +22,14 @@ class ShopperTextCoverageTest {
   private val codeParams = mapOf(
     "presence" to "open_online", "stock" to "in_stock", "step" to "placed", "status" to "new",
     "payState" to "awaiting_accept", "payCashButton" to "pickup",
+    //  مرحلهٔ ۲: وضعیتِ کدِ تخفیف و برچسبِ امتیازِ پیک
+    "promoStatus" to "unknown", "rateTag" to "on_time",
   )
 
   private fun texts(): List<Method> = ShopperText::class.java.declaredMethods.filter {
     Modifier.isPublic(it.modifiers) && !it.isSynthetic && it.returnType == String::class.java &&
       it.name !in setOf("t", "asIs", "num", "money", "qty") &&
-      it.parameterTypes.all { p -> p in listOf(String::class.java, java.lang.Long.TYPE, Integer.TYPE, CheckoutProblem::class.java, ShopperError::class.java) }
+      it.parameterTypes.all { p -> p in listOf(String::class.java, java.lang.Long.TYPE, Integer.TYPE, CheckoutProblem::class.java, ShopperError::class.java, AddressProblem::class.java) }
   }
 
   private fun arg(type: Class<*>, text: String): Any = when (type) {
@@ -35,6 +37,7 @@ class ShopperTextCoverageTest {
     java.lang.Long.TYPE -> 125_050L
     Integer.TYPE -> 3
     CheckoutProblem::class.java -> CheckoutProblem.ADDRESS
+    AddressProblem::class.java -> AddressProblem.FULL
     else -> ShopperError(400, "otp_wrong")
   }
 

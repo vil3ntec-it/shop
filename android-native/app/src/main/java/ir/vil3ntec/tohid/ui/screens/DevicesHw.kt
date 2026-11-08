@@ -632,7 +632,7 @@ internal fun ScalePanel(d: ShopData, toast: (String) -> Unit) {
               w + listOfNotNull(
                 if (motion) StrDevicePages.inMotion else null, if (zero) StrDevicePages.onZero else null,
                 if (over) StrDevicePages.overCapacity else null, if (under) StrDevicePages.underCapacity else null, if (error) StrDevicePages.scaleError else null,
-              ).joinToString("") { " · $it" } + if (usable) StrDevicePages.stable else ""
+              ).joinToString("") { " · $it" } + if (usable) " · " + StrDevicePages.stable else ""
             }
           }
         }
