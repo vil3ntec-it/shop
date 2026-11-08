@@ -608,7 +608,9 @@ const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 async function verifiedPhone(ticket, session) {
   const fromTicket = await verifiedPhoneOfTicket(ticket);
   if (fromTicket) return fromTicket;
-  const a = session ? await require('./store-customers').auth(session) : null;
+  //  ⛔ بی شرطِ «نشست هست؟»: `auth` خودش نشستِ تهی/بی‌شکل را بی پرس‌وجو null می‌کند؛ شرطِ بیرونی
+  //     یعنی «مقدارِ کاربر تصمیم می‌گیرد احراز اجرا شود یا نه» (CodeQL: user-controlled bypass)
+  const a = await require('./store-customers').auth(session);
   return a ? a.customer.phone : null;
 }
 

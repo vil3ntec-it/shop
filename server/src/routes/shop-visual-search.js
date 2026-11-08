@@ -18,6 +18,7 @@ const vs = require('../lib/visual-search');
 const photos = require('../lib/product-photos');
 const { requireUser, requireShop, optionalShop, requirePermission } = require('../middleware/auth');
 const { rateLimit } = require('../middleware/ratelimit');
+const { rawBody } = require('../lib/raw-body');   //  نگهبانِ نوعِ بدنهٔ خام (CodeQL: type confusion)
 
 const router = express.Router();
 
@@ -42,7 +43,7 @@ router.get('/', requireShop, requirePermission('data.read'), async (req, res) =>
 });
 
 router.post('/', requireShop, requirePermission('data.read'), shopLimit, body, async (req, res) => {
-  const buf = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
+  const buf = rawBody(req);
   res.set('Cache-Control', 'no-store').json(await vs.search(req.shopId, buf, { limit: req.query.limit }));
 });
 

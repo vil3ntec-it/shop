@@ -25,6 +25,7 @@ const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { ApiError, forbidden, notFound, badRequest } = require('../middleware/errors');
+const { rawBody } = require('../lib/raw-body');   //  نگهبانِ نوعِ بدنهٔ خام (CodeQL: type confusion)
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -259,7 +260,7 @@ router.get('/media/:kind/:version', requirePermission('data.read'), needFlag, ne
 
 router.put('/media/:kind', requirePermission('settings.write'), needFlag, needMedia, needWrite, mediaLimit, rawMedia, async (req, res) => {
   const kind = sfm.kindOf(req.params.kind);
-  const out = await sfm.put(req.shopId, kind, Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0), req.user.id);
+  const out = await sfm.put(req.shopId, kind, rawBody(req), req.user.id);
   if (!out.replayed) {
     await audit.log({
       shopId: req.shopId, userId: req.user.id, action: 'storefront.media', targetType: 'storefront', targetId: req.shopId,
