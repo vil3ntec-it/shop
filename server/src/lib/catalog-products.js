@@ -32,20 +32,40 @@ async function productSourceOf(shopId) {
 }
 
 const productChecks = new Map();
+/** تازه‌کردنِ ویترینیِ (`throttle`) هر دکان که همین حالا در همین فرایند در جریان است */
+const productRuns = new Map();
 
 /**
  * کالاهای تازهٔ دفترِ دستگاه‌ها ⇒ `catalog_products` (فقط کالا). `throttle` (خواندنِ ویترین/بازار)
  * ⇒ برای هر دکان حداکثر هر [REFRESH_THROTTLE_MS] یک پرسشِ «ردیفِ تازه؟»؛ ثبتِ سفارش بی مهلت.
  * ⇒ { products, source } یا { skipped }
+ *
+ * ⛔ خواندنِ هم‌زمان (ویترین از #1010 کالاها، دکان و برجسته‌ها را با هم می‌خواهد): درخواستی که در پنجره
+ * می‌رسد و تازه‌کردنِ همان دکان هنوز تمام نشده **منتظرِ همان** می‌ماند — وگرنه روی PostgreSQL (استخرِ چند
+ * اتصالی) پیش از کامیت می‌خواند و قیمت/کالای کهنه می‌بیند (PGlite یک اتصال دارد و این را پنهان می‌کرد).
+ * خطای آن تازه‌کردن به این درخواست نمی‌رسد (همان رفتارِ «رد شد» ِ پیشین؛ همان قاعدهٔ `catalog.refresh`).
  */
 async function refreshProducts(shopId, { at = now(), throttle = true } = {}) {
-  const { TABLES, PAGE, REFRESH_THROTTLE_MS, upsertProduct } = catalog;
-  if (throttle) {
-    const t = Date.now();
-    if (t - (productChecks.get(shopId) || 0) < REFRESH_THROTTLE_MS) return { skipped: true, throttled: true };
-    productChecks.set(shopId, t);
-    if (productChecks.size > 10_000) productChecks.clear();
+  if (!throttle) return readProducts(shopId, at);
+  const t = Date.now();
+  if (t - (productChecks.get(shopId) || 0) < catalog.REFRESH_THROTTLE_MS) {
+    const running = productRuns.get(shopId);
+    if (running) await running.catch(() => {});
+    return { skipped: true, throttled: true, ...(running ? { joined: true } : {}) };
   }
+  productChecks.set(shopId, t);
+  if (productChecks.size > 10_000) productChecks.clear();
+  const run = readProducts(shopId, at);
+  productRuns.set(shopId, run);
+  try {
+    return await run;
+  } finally {
+    if (productRuns.get(shopId) === run) productRuns.delete(shopId);
+  }
+}
+
+async function readProducts(shopId, at) {
+  const { TABLES, PAGE, upsertProduct } = catalog;
   const fmt = await productSourceOf(shopId);
   const T = TABLES[fmt];
   const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
