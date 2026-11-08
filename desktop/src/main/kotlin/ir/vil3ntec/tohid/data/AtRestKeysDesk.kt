@@ -46,8 +46,10 @@ object AtRestKeys {
   @Volatile var windowsAcl: Boolean? = null
     private set
 
-  /** جای کلید و آنچه از آن برمی‌آید — بی تعارف، برای صفحهٔ امنیت */
-  fun note(): String = buildString {
+  /** جای کلید و آنچه از آن برمی‌آید — بی تعارف، برای صفحهٔ امنیت؛ سپس حالِ کلیدِ نشستِ ورود (`SecretBox`، همان پرچم) */
+  fun note(): String = (ledgerNote().trimEnd() + " " + ir.vil3ntec.tohid.desktop.SecretBox.note()).trimEnd()
+
+  private fun ledgerNote(): String = buildString {
     when (val s = vault.status) {
       is KekVault.Status.Protected -> {
         append(StrAppData.deskOsNote(OsKeyStores.label(s.store)))

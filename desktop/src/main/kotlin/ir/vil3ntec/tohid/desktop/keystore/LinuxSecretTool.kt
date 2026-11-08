@@ -12,7 +12,11 @@ import java.util.concurrent.TimeUnit
  *  خطِ فرمان فقط نامِ سرویس و حساب را دارد که راز نیستند (حساب = پیشوندِ نشانِ SHA-256 ِ کلید).
  *  ابزار نیست، D-Bus نیست، مجموعه قفل است ⇒ `KeyStoreFailure` ⇒ همان فایلِ فقط-صاحبِ پیشین.
  */
-internal class LinuxSecretTool(private val tool: File) : OsKeyStore {
+internal class LinuxSecretTool(
+  private val tool: File,
+  private val service: String = OsKeyStores.SERVICE,
+  private val entryLabel: String = "My Shop data key",
+) : OsKeyStore {
   override val id: String = "secret-service"
   override val label: String get() = StrAppData.deskStoreSecret
 
@@ -48,7 +52,7 @@ internal class LinuxSecretTool(private val tool: File) : OsKeyStore {
     }
   }
 
-  private fun attrs(ref: String) = listOf("service", OsKeyStores.SERVICE, "account", ref)
+  private fun attrs(ref: String) = listOf("service", service, "account", ref)
 
   private fun why(r: Result): String {
     //  پیامِ ابزار فقط برای صفحهٔ امنیت؛ یک سطر، کوتاه
@@ -57,7 +61,7 @@ internal class LinuxSecretTool(private val tool: File) : OsKeyStore {
   }
 
   override fun protect(ref: String, key: ByteArray): String {
-    val r = run(listOf("store", "--label=My Shop data key") + attrs(ref), stdin = hex(key))
+    val r = run(listOf("store", "--label=$entryLabel") + attrs(ref), stdin = hex(key))
     if (r.code != 0) throw KeyStoreFailure(why(r))
     return ""
   }

@@ -203,10 +203,11 @@ jobs:
         #  قفلِ ضدویروس، دیسکِ بی پیوندِ سخت، `fsync` ِ پوشه و مسیرِ فارسیِ فاصله‌دار (`WindowsDiskFaultsTest`)
         #  SEC-01 فاز ۲ (`desk.keystore`، در آزمون روشن): سپردن و بازخوانیِ واقعی با DPAPI ویندوز و Keychain مک و کوچِ کامل
         #  (`OsKeystoreRoundTripTest`؛ با `DESK_KEYSTORE_REQUIRE=1` نبودن یا شکستِ کلیددان سرخ است)، شکست‌ها و برقِ تزریقی
-        #  (`KekVaultTest`) و دفترِ رمزدار سرتاسری (`KeystoreDiskTest`)
+        #  (`KekVaultTest`) و دفترِ رمزدار سرتاسری (`KeystoreDiskTest`)؛ کلیدِ نشستِ ورود با همان سازوکار: مدخلِ جدا و کوچِ
+        #  واقعی در همان `OsKeystoreRoundTripTest`، شکست‌ها و برق (`SessionKeyVaultTest`) و توکن‌ها سرتاسری (`SessionKeyDiskTest`)
         env:
           DESK_KEYSTORE_REQUIRE: '1'
-        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest' --tests 'ir.vil3ntec.tohid.desktop.StaleSaveTest' --tests 'ir.vil3ntec.tohid.desktop.WindowsDiskFaultsTest' --tests 'ir.vil3ntec.tohid.desktop.DataSafetyDiskTest' --tests 'ir.vil3ntec.tohid.desktop.SignOutNoLossDesktopTest' --tests 'ir.vil3ntec.tohid.desktop.keystore.OsKeystoreRoundTripTest' --tests 'ir.vil3ntec.tohid.desktop.keystore.KekVaultTest' --tests 'ir.vil3ntec.tohid.desktop.KeystoreDiskTest'
+        run: ./gradlew --no-daemon test --tests 'ir.vil3ntec.tohid.desktop.ShopStoreDiskTest' --tests 'ir.vil3ntec.tohid.data.DiskWriteTest' --tests 'ir.vil3ntec.tohid.data.LocalSnapshotsTest' --tests 'ir.vil3ntec.tohid.desktop.AtRestDiskTest' --tests 'ir.vil3ntec.tohid.core.atrest.AtRestTest' --tests 'ir.vil3ntec.tohid.desktop.StaleSaveTest' --tests 'ir.vil3ntec.tohid.desktop.WindowsDiskFaultsTest' --tests 'ir.vil3ntec.tohid.desktop.DataSafetyDiskTest' --tests 'ir.vil3ntec.tohid.desktop.SignOutNoLossDesktopTest' --tests 'ir.vil3ntec.tohid.desktop.keystore.OsKeystoreRoundTripTest' --tests 'ir.vil3ntec.tohid.desktop.keystore.KekVaultTest' --tests 'ir.vil3ntec.tohid.desktop.KeystoreDiskTest' --tests 'ir.vil3ntec.tohid.desktop.keystore.SessionKeyVaultTest' --tests 'ir.vil3ntec.tohid.desktop.SessionKeyDiskTest'
 
   #  ⛔ ۱۴۰۵/۰۷/۲۷: پنج نصاب (دو ویندوز، دو مک، لینوکس؛ هر کدام تا ۴۰ دقیقه با نصبِ واقعی) روی
   #  **هر** pushِ هر PRِ برنامه گلوگاهِ صفِ Actions بودند. حالا در PR فقط وقتی ساخته می‌شوند که

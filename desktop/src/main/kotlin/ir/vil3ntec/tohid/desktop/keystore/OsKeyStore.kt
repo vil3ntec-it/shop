@@ -48,6 +48,9 @@ object OsKeyStores {
   /** نامِ سرویس در Keychain / Secret Service — نامِ درونی، عوض نشود */
   const val SERVICE = "ir.vil3ntec.tohid.desktop.atrest"
 
+  /** سرویسِ جدای کلیدِ نشستِ ورود (`SecretBox`، [KekVault.Slot.SESSION]) — نامِ درونی، عوض نشود */
+  const val SESSION_SERVICE = "ir.vil3ntec.tohid.desktop.session"
+
   /** نامِ نمایشیِ یک شناسه به زبانِ همین دم — شناسهٔ ناشناخته همان شناسه */
   fun label(id: String): String = when (id) {
     WindowsDpapi.id -> StrAppData.deskStoreDpapi
@@ -59,13 +62,18 @@ object OsKeyStores {
   /**
    *  کلیددانِ همین سیستم، یا `null` اگر این سیستم چیزی ندارد (لینوکسِ بی `secret-tool`).
    *  @param interactive مک: `false` یعنی Keychain هیچ پنجره‌ای نشان ندهد (آزمونِ CI) — قفل ⇒ شکستِ فوری
+   *  @param slot کدام کلید: سرویس و برچسبِ همان کلید در Keychain / Secret Service (DPAPI: بایت‌ها در نشانِ همان کلیدند)
    */
-  fun forThisOs(interactive: Boolean = true, os: String = System.getProperty("os.name").orEmpty()): OsKeyStore? {
+  fun forThisOs(
+    interactive: Boolean = true,
+    os: String = System.getProperty("os.name").orEmpty(),
+    slot: KekVault.Slot = KekVault.Slot.LEDGER,
+  ): OsKeyStore? {
     val o = os.lowercase()
     return when {
       o.startsWith("windows") -> WindowsDpapi
-      o.startsWith("mac") || o.startsWith("darwin") -> MacKeychain(interactive)
-      else -> LinuxSecretTool.find(System.getenv("PATH"))?.let(::LinuxSecretTool)
+      o.startsWith("mac") || o.startsWith("darwin") -> MacKeychain(interactive, slot.service)
+      else -> LinuxSecretTool.find(System.getenv("PATH"))?.let { LinuxSecretTool(it, slot.service, slot.secretLabel) }
     }
   }
 }

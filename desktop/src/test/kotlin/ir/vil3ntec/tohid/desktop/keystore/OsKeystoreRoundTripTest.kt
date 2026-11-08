@@ -21,6 +21,9 @@ import java.security.SecureRandom
  *  یا شکستِ کلیددان **سرخ** است، نه «رد شد». بی آن (لینوکسِ بی `secret-tool`، یا D-Bus ِ نبود) همان راهِ برگشت سنجیده
  *  می‌شود: پرچمِ روشن، کلیددان نشد ⇒ همان فایل و همان کلید. مک بی‌پنجره (`interactive = false`) تا CI هرگز منتظرِ
  *  پنجرهٔ Keychain نماند.
+ *
+ *  کلیدِ نشستِ ورود (`SecretBox`، [KekVault.Slot.SESSION]) همین‌جا با همان کلیددان سنجیده می‌شود: مدخلِ جدا (سرویس و
+ *  حسابِ خودش) کنارِ KEK ِ دفتر، و همان کوچِ کامل با رازهای رمزشده که بایت‌به‌بایت همان باز می‌شوند.
  */
 class OsKeystoreRoundTripTest {
 
@@ -29,6 +32,8 @@ class OsKeystoreRoundTripTest {
   private lateinit var dir: File
   private val store: OsKeyStore? = OsKeyStores.forThisOs(interactive = false)
   private val refs = ArrayList<String>()
+  private val sessionStore: OsKeyStore? = OsKeyStores.forThisOs(interactive = false, slot = KekVault.Slot.SESSION)
+  private val sessionRefs = ArrayList<String>()
 
   @Before fun before() {
     dir = Files.createTempDirectory("kek-os").toFile()
@@ -36,6 +41,7 @@ class OsKeystoreRoundTripTest {
 
   @After fun after() {
     for (ref in refs) runCatching { store?.remove(ref) }
+    for (ref in sessionRefs) runCatching { sessionStore?.remove(ref) }
     dir.deleteRecursively()
   }
 
@@ -98,6 +104,70 @@ class OsKeystoreRoundTripTest {
     v.relaunch()
     assertArrayEquals("فقط از کلیددانِ سیستم", key, v.forRead().single())
     assertEquals(KekVault.Status.Protected(store!!.id, KekVault.Plain.NONE), v.status)
+  }
+
+  @Test fun `کلیدِ نشست — مدخلِ جدا کنارِ کلیدِ دفتر در همان کلیددان، هر کدام کلیدِ خودش`() {
+    if (required) assertNotNull("این سیستم کلیددان ندارد: ${os()}", sessionStore)
+    val s = store ?: return
+    val ss = sessionStore ?: return
+    assertEquals("همان کلیددان", s.id, ss.id)
+    val kek = ByteArray(32).also { random.nextBytes(it) }
+    val session = ByteArray(32).also { random.nextBytes(it) }
+    val tag = KekVault.hex(ByteArray(6).also { random.nextBytes(it) })
+    val kekRef = KekVault.REF_PREFIX + "test-" + tag
+    val sessionRef = KekVault.Slot.SESSION.refPrefix + "test-" + tag
+    refs += kekRef
+    sessionRefs += sessionRef
+    val (kb, sb) = try {
+      s.protect(kekRef, kek) to ss.protect(sessionRef, session)
+    } catch (e: KeyStoreFailure) {
+      if (required) fail("کلیددانِ ${s.id} روی ${os()} نپذیرفت: ${e.reason}")
+      return
+    }
+    assertArrayEquals(kek, s.unprotect(kekRef, kb))
+    assertArrayEquals(session, ss.unprotect(sessionRef, sb))
+    if (s.id != "dpapi") {
+      //  پاک کردنِ مدخلِ نشست مدخلِ دفتر را نمی‌بَرد
+      ss.remove(sessionRef)
+      assertArrayEquals("کلیدِ دفتر سرِ جایش", kek, s.unprotect(kekRef, kb))
+      try {
+        ss.unprotect(sessionRef, sb)
+        fail("پس از پاک کردن هنوز بود")
+      } catch (e: KeyStoreFailure) {
+        assertTrue(e.reason, e.notFound)
+      }
+    }
+  }
+
+  @Test fun `کوچِ کاملِ کلیدِ نشست با کلیددانِ سیستم — رازها بایت‌به‌بایت همان، فایل تا اجرای بعد`() {
+    val secrets = listOf("access-test-value", "refresh-test-value", "staff-device-test-value")
+    val keys = File(dir, "keys").apply { mkdirs() }
+    val slot = KekVault.Slot.SESSION
+    val phase1 = SessionBox(KekVault(keys, flag = { false }, store = { null }, slot = slot))
+    val sealed = secrets.map { phase1.seal(it) }
+    val key = File(keys, slot.plain).readBytes()
+    val b = SessionBox(KekVault(keys, flag = { true }, store = { sessionStore }, slot = slot))
+    assertEquals(secrets, sealed.map { b.open(it) })
+    val st = b.vaultStatus
+    if (st is KekVault.Status.Fallback) {
+      if (required) fail("کوچِ کلیدِ نشست روی ${os()} نشد: ${st.reason}")
+      assertTrue(File(keys, slot.plain).exists())
+      assertTrue(b.persistent())
+      return
+    }
+    assertTrue("$st", st is KekVault.Status.Protected)
+    sessionRefs += slot.refPrefix + slot.check(key).take(16)
+    assertTrue(File(keys, slot.os).exists())
+    assertTrue(File(keys, slot.plain).exists())
+
+    b.relaunch()
+    assertEquals(secrets, sealed.map { b.open(it) })
+    assertFalse("اجرای بعد فایلِ ساده را پاک کرد", File(keys, slot.plain).exists())
+
+    b.relaunch()
+    assertEquals("فقط از کلیددانِ سیستم", secrets, sealed.map { b.open(it) })
+    assertEquals(KekVault.Status.Protected(sessionStore!!.id, KekVault.Plain.NONE), b.vaultStatus)
+    assertFalse(b.lost)
   }
 
   /** بی کلیددان: پرچمِ روشن همان فایل را نگه می‌دارد و همان کلید را می‌دهد — هرگز «کلید نیست» */
