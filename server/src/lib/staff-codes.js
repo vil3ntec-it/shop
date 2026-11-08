@@ -224,6 +224,39 @@ async function shopIdOf(rawCode) {
   return row.shop_id;
 }
 
+/**
+ * پیش‌سنجیِ کد **بی خرج کردن و بی نوشتن** — برای ورودِ شاگردِ تازه، پیش از ساختنِ حساب.
+ *
+ * پیش‌تر `/auth/staff` اول کاربر و هویتِ دستگاه را می‌ساخت و بعد `redeem` می‌زد؛ کدِ تمام‌شده، باطل‌شده یا دکانِ
+ * پر یک «حسابِ شبح» جا می‌گذاشت و شاگرد پیامِ روشن را دیر می‌گرفت. همان سنجه‌های `redeem` (و همان کدهای خطا)،
+ * فقط خواندنی؛ `redeem` همه را دوباره زیرِ قفل می‌سنجد، پس این‌جا هیچ دری باز نمی‌شود.
+ */
+async function preflight(rawCode) {
+  const normalized = normalize(rawCode);
+  if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
+    throw badRequest('قالب کد درست نیست', 'bad_code');
+  }
+  const code = await one('SELECT * FROM staff_codes WHERE code_hash=$1', [hashCode(normalized)]);
+  if (!code) throw notFound('این کد معتبر نیست', 'bad_code');
+  if (code.role === 'courier') {
+    const st = await require('./delivery').stateOf(code.shop_id);
+    if (!st.readable) throw notFound('تحویل و پیک برای این دکان روشن نیست', 'delivery_disabled');
+  }
+  if (code.status !== 'active') throw forbidden('این کد دیگر کار نمی‌کند', 'code_inactive');
+  if (code.expires_at && Number(code.expires_at) < now()) throw forbidden('مهلت این کد تمام شده است', 'code_expired');
+  if (code.max_uses > 0 && code.used_count >= code.max_uses) throw forbidden('این کد قبلاً استفاده شده است', 'code_used');
+  const shop = await one(`SELECT id, max_members FROM shops WHERE id=$1 AND status='active'`, [code.shop_id]);
+  if (!shop) throw notFound('دکان این کد فعال نیست', 'shop_not_found');
+  const ent = await require('./entitlement').entitlementOf(code.shop_id, now());
+  if (!ent.features.includes('multi_device')) {
+    throw forbidden('اشتراک این دکان اجازه‌ی افزودن شاگرد را نمی‌دهد', 'subscription_required');
+  }
+  const active = await one(
+    `SELECT COUNT(*)::int AS n FROM shop_members WHERE shop_id=$1 AND status='active'`, [code.shop_id]);
+  if (Number(active.n) >= Number(shop.max_members)) throw forbidden('ظرفیت اعضای این دکان پر است', 'shop_full');
+  return { shopId: code.shop_id, role: code.role };
+}
+
 async function redeem(rawCode, userId, ip = '') {
   const normalized = normalize(rawCode);
   if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
@@ -337,5 +370,5 @@ async function redeem(rawCode, userId, ip = '') {
 }
 
 module.exports = {
-  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, shopIdOf, normalize, format, hashCode, PREFIX,
+  standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, preflight, shopIdOf, normalize, format, hashCode, PREFIX,
   COURIER_INVITE };

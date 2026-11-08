@@ -20,6 +20,7 @@ import ir.vil3ntec.tohid.data.ExternalLinkAsk
 import ir.vil3ntec.tohid.data.ExternalSignIn
 import ir.vil3ntec.tohid.data.SignInProvider
 import ir.vil3ntec.tohid.data.GoogleSignIn
+import ir.vil3ntec.tohid.data.AccountBind
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.LocationFix
 import ir.vil3ntec.tohid.data.ShopRole
@@ -118,8 +119,10 @@ class AuthController(
     SavedLogins.remember(context, identifier, display)
     session.shop?.role?.let { ShopRole.remember(context, it) }
     scope.launch {
-      runCatching { LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty()) }
+      //  دفتر و کلیدِ همگام‌سازی با هم به همین حساب (`AccountBind`) — شرح سرِ `core/sync/AccountSafety.kt`
+      runCatching { AccountBind.signedIn(context, store, session.user.id, session.shop?.id.orEmpty(), display) }
       sync.rememberAccount(session.user, display)
+      AccountBind.bootstrapSoon(context, store)
       complete()
     }
   }
@@ -285,7 +288,7 @@ class AuthController(
             runCatching { LedgerOwner.shopChanged(context, store, shopState.shop?.id.orEmpty()) }
             complete()
           }
-          .onFailure { fail(it) }
+          .onFailure { ui = ui.failed(StaffJoinErrors.message(it)) }
       } else {
         auth.loginWithStaffCode(
           code = entered,
@@ -296,12 +299,16 @@ class AuthController(
           .onSuccess { session ->
             SavedLogins.remember(context, entered, session.user.name)
             session.shop?.role?.let { ShopRole.remember(context, it) }
-            //  دفترِ روی گوشی مالِ همین حساب و دکان، وگرنه دفترِ قبلی داخلِ دکانِ تازه می‌رفت
-            runCatching { LedgerOwner.signedIn(context, store, session.user.id, session.shop?.id.orEmpty()) }
+            //  دفترِ روی گوشی **و** کلیدِ همگام‌سازی مالِ همین حساب و دکان (`AccountBind`). پیش‌تر فقط دفتر
+            //  جابه‌جا می‌شد و شاگرد با سایه و cursor ِ حسابِ پیشین (صاحب) کار می‌کرد: Snapshot نمی‌آمد و
+            //  دکانِ کارفرما خالی دیده می‌شد
+            runCatching { AccountBind.signedIn(context, store, session.user.id, session.shop?.id.orEmpty(), session.user.name) }
             sync.rememberAccount(session.user)
+            //  دفترِ خالی ⇒ Snapshot ِ دکانِ کارفرما همین حالا، در پس‌زمینه (صفحه منتظرش نمی‌ماند)
+            AccountBind.bootstrapSoon(context, store)
             complete()
           }
-          .onFailure { fail(it) }
+          .onFailure { ui = ui.failed(StaffJoinErrors.message(it)) }
       }
       idle()
     }
