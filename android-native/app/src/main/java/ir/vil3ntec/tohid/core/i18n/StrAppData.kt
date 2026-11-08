@@ -416,6 +416,66 @@ object StrAppData {
     "The key file couldn't be read: $why",
     "د کیلي فایل ونه لوستل شو: $why",
   )
+
+  // ── کامپیوتر: کلید در کلیددانِ سیستم (`desk.keystore`، `desktop/keystore`) ──
+  val deskStoreDpapi: String get() = t("DPAPI ویندوز", "Windows DPAPI", "د وینډوز DPAPI")
+  val deskStoreKeychain: String get() = t("Keychain مک", "the macOS Keychain", "د مک Keychain")
+  val deskStoreSecret: String get() = t("Secret Service لینوکس", "the Linux Secret Service", "د لینوکس Secret Service")
+  fun deskOsWhere(store: Any?): String = t(
+    "${asIs(store)} روی همین کامپیوتر",
+    "$store on this computer",
+    "په دې کمپیوټر کې $store",
+  )
+  fun deskOsNote(store: Any?): String = t(
+    "کلید با ${asIs(store)} نگه‌داری می‌شود، نه به‌شکلِ فایلِ ساده کنارِ داده‌ها: کسی که فقط پوشهٔ داده یا دیسک را کپی کند کلید را ندارد. برنامه‌ای که با همین حسابِ کاربری روی همین کامپیوتر اجرا شود هنوز می‌تواند آن را بخواند. ",
+    "The key is kept by $store, not as a plain file next to the data: someone who only copies the data folder or the disk doesn't get the key. A program running under this same user account on this computer can still read it. ",
+    "کیلي د $store له لارې ساتل کېږي، د معلوماتو تر څنګ د ساده فایل په بڼه نه: څوک چې یوازې د معلوماتو فولډر یا ډیسک کاپي کړي کیلي نه لري. هغه پروګرام چې په همدې کمپیوټر کې د همدې کارن حساب لاندې چلېږي لا هم کولی شي هغه ولولي. ",
+  )
+  val deskOsPlainPending: String get() = t(
+    "فایلِ سادهٔ پیشینِ کلید تا اجرای بعدیِ برنامه می‌ماند و پس از بازشدنِ درستِ دفتر پاک می‌شود. ",
+    "The old plain key file stays until the app's next start and is removed once the ledger opens correctly. ",
+    "د کیلي پخوانی ساده فایل د پروګرام تر راتلونکي پیل پورې پاتې کېږي او کله چې دفتر سم پرانیستل شي پاکېږي. ",
+  )
+  val deskOsPlainStray: String get() = t(
+    "یک فایلِ کلیدِ ساده هم هست که با کلیدِ سیستم یکی نیست؛ به آن دست زده نشد. ",
+    "There is also a plain key file that doesn't match the system's key; it was left untouched. ",
+    "یو ساده کیلي فایل هم شته چې د سیسټم له کیلي سره سمون نه خوري؛ لاس ورته نه دی وړل شوی. ",
+  )
+  fun deskOsFallback(why: Any?): String = t(
+    "نگه‌داریِ کلید در سیستم روشن است ولی نشد (${asIs(why)})؛ کلید مثلِ پیش در فایل ماند. ",
+    "Keeping the key in the system is on but didn't work ($why); the key stayed in the file as before. ",
+    "په سیسټم کې د کیلي ساتل روښانه دي خو ونه شو ($why)؛ کیلي د پخوا په څېر په فایل کې پاتې شوه. ",
+  )
+  fun deskOsUnread(store: Any?, why: Any?): String = t(
+    "کلید از ${asIs(store)} خوانده نشد: ${asIs(why)}",
+    "The key couldn't be read from $store: $why",
+    "کیلي له $store څخه ونه لوستل شوه: $why",
+  )
+  val deskOsMissing: String get() = t(
+    "این سیستم آن را ندارد یا در دسترس نیست",
+    "this system doesn't have it or it isn't reachable",
+    "دا سیسټم یې نه لري یا لاسرسی ورته نشته",
+  )
+  val deskOsLocked: String get() = t("قفل است یا اجازه نداد", "it is locked or didn't allow it", "قلف دی یا یې اجازه ورنه کړه")
+  val deskOsNotFound: String get() = t("کلید آن‌جا پیدا نشد", "the key wasn't found there", "کیلي هلته پیدا نه شوه")
+  val deskOsReadBack: String get() = t(
+    "پس از نوشتن، همان کلید بازخوانی نشد",
+    "after writing, the same key couldn't be read back",
+    "له لیکلو وروسته، هماغه کیلي بېرته ونه لوستل شوه",
+  )
+  val deskOsWrongValue: String get() = t(
+    "کلیدی که برگشت با نشانِ فایل یکی نیست",
+    "the key that came back doesn't match the file's check",
+    "هغه کیلي چې راوګرځېده د فایل له نښې سره سمون نه خوري",
+  )
+  val deskOsTimeout: String get() = t("در زمانِ مقرر جواب نداد", "it didn't answer in time", "په ټاکلي وخت کې یې ځواب ورنه کړ")
+  fun deskOsError(what: Any?): String = t("خطای ${asIs(what)}", "error $what", "تېروتنه $what")
+  fun deskOsRefused(code: Any?): String = t("نپذیرفت (${asIs(code)})", "it refused ($code)", "ونه منله ($code)")
+  val deskOsBroken: String get() = t(
+    "فایلِ نشانِ کلیدِ سیستم خراب است",
+    "The system key's record file is damaged",
+    "د سیسټم د کیلي د ثبت فایل خراب دی",
+  )
   val deskNoGoogle: String get() = t(
     "ورود با گوگل روی برنامهٔ کامپیوتر نیست — با ایمیل وارد شوید",
     "Google sign-in isn't on the computer app — sign in with email",
