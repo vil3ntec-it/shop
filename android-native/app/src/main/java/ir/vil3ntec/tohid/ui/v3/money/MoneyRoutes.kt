@@ -187,7 +187,7 @@ val MoneyModule = AppModule(
             onOpen = { nav.open(MoneyPaths.supplier(it)) },
             onPay = { nav.open(MoneyPaths.paySupplier(it)) },
             onEdit = { nav.open(MoneyPaths.editSupplier(it)) },
-            onDelete = { id -> MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) },
+            onDelete = { id -> MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) },
             onNewSupplier = { nav.open(MoneyPaths.NEW_SUPPLIER) },
             onNewPurchase = { nav.open(MoneyPaths.newPurchase()) },
             onSupplierBills = if (billsDoor) ({ nav.open(MoneyPaths.SUPPLIER_BILLS) }) else null,
@@ -209,7 +209,7 @@ val MoneyModule = AppModule(
           onPay = { nav.open(MoneyPaths.paySupplier(id)) },
           onNewPurchase = { nav.open(MoneyPaths.newPurchase(id)) },
           onEdit = { nav.open(MoneyPaths.editSupplier(id)) },
-          onDelete = { if (MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) != null) back() },
+          onDelete = { if (MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteSupplier(data, id), StrMoney.deleted) != null) back() },
           onReturn = { nav.open(MoneyPaths.returnSupplier(id)) },
         ),
       )
@@ -229,12 +229,13 @@ val MoneyModule = AppModule(
         onBack = { back() },
         onNewProduct = { nav.open(ProductsPaths.new()) },
         onSave = { draft ->
-          MoneyWriter.ledger(store, toasts, context, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
+          MoneyWriter.ledger(store, toasts, context, data, LedgerEngine.addPurchase(data, draft, todayIso(), System.currentTimeMillis(), ir.vil3ntec.tohid.data.PurchaseBook.keyedIds(saveKey)), StrMoney.purchaseSaved) != null
         },
         //  PUR-05: همان فاکتورِ چندردیفهٔ کامپیوتر (`DeskPurchasing`)، با هزینهٔ جانبی (PUR-06) و سررسید (PUR-07)
         onSaveMany = { supplierId, lines, paid, date, notes, extras ->
           MoneyWriter.purchase(
             store, toasts, context,
+            data,
             ir.vil3ntec.tohid.data.PurchaseBook.record(data, supplierId, lines, paid, date, notes, todayIso(), System.currentTimeMillis(), ::moneyId, landedTotal = extras.landedTotal, dueDate = extras.dueDate, key = saveKey),
             StrMoney.purchaseSaved,
           ) != null
@@ -254,7 +255,7 @@ val MoneyModule = AppModule(
           onBack = backOrNull,
           onNew = { nav.open(MoneyPaths.NEW_EXPENSE) },
           onOpen = { nav.open(MoneyPaths.expense(it)) },
-          onDelete = { id -> MoneyWriter.ledger(store, toasts, null, LedgerEngine.deleteExpense(data, id), StrMoney.deleted) },
+          onDelete = { id -> MoneyWriter.ledger(store, toasts, null, data, LedgerEngine.deleteExpense(data, id), StrMoney.deleted) },
           onPickMonth = { current, then -> nav.openForResult(MoneyPaths.expenseMonth(current)) { m -> m?.let(then) } },
           onBreakdown = { month, category, then -> nav.openForResult(MoneyPaths.breakdown(month, category)) { c -> if (c != null) then(c) } },
         ),
@@ -309,7 +310,7 @@ private fun RouteScope.DebtorTxRoute() {
       actions = DebtorTxSheetActions(
         onClose = { back() },
         onDelete = { MoneyUndo.deleteLater(store, snackbar, PendingDelete.Transaction(txId), StrMoney.txDeleted) },
-        onSaveDue = { due -> MoneyWriter.debtor(store, toasts, context, DebtorEngine.setDueDate(data, txId, due), StrMoney.dueSaved) },
+        onSaveDue = { due -> MoneyWriter.debtor(store, toasts, context, data, DebtorEngine.setDueDate(data, txId, due), StrMoney.dueSaved) },
       ),
     )
   }
@@ -398,7 +399,7 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
       debtor = debtor,
       onClose = { back() },
       onSave = { f ->
-        saved[0] = MoneyWriter.debtor(store, toasts, context, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
         saved[0] != null
       },
       onSaved = { if (id == null) nav.finish(saved[0]) else back() },
@@ -421,7 +422,7 @@ private fun RouteScope.TxFormRoute() {
       overLimitOf = { f -> DebtorFormsModel.overLimit(data, id, f) },
       onClose = { back() },
       onSubmit = { f, over ->
-        MoneyWriter.debtor(store, toasts, context, DebtorFormsModel.submit(data, id, f, todayIso(), System.currentTimeMillis(), ::moneyId, over), StrMoney.saved) != null
+        MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.submit(data, id, f, todayIso(), System.currentTimeMillis(), ::moneyId, over), StrMoney.saved) != null
       },
       onDone = { nav.finish("ok") },
     )
@@ -439,7 +440,7 @@ private fun RouteScope.SupplierFormRoute(id: String?) {
     onClose = { back() },
     onSave = { draft ->
       val result = if (id == null) LedgerEngine.addSupplier(data, draft, System.currentTimeMillis(), ::moneyId) else LedgerEngine.editSupplier(data, id, draft)
-      MoneyWriter.ledger(store, toasts, context, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
+      MoneyWriter.ledger(store, toasts, context, data, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
     },
     onSaved = { back() },
   )
@@ -460,7 +461,7 @@ private fun RouteScope.PayRoute() {
     onClose = { back() },
     onSave = { f ->
       val result = LedgerEngine.paySupplier(data, id, LedgerFormsModel.payAmount(f), f.date, f.notes, todayIso(), System.currentTimeMillis(), ::moneyId, key = payKey)
-      MoneyWriter.ledger(store, toasts, context, result, StrMoney.saved) != null
+      MoneyWriter.ledger(store, toasts, context, data, result, StrMoney.saved) != null
     },
     onSaved = { back() },
   )
@@ -479,11 +480,11 @@ private fun RouteScope.ExpenseFormRoute(id: String?) {
     onSave = { draft ->
       val result = if (id == null) LedgerEngine.addExpense(data, draft, todayIso(), System.currentTimeMillis(), ::moneyId)
       else LedgerEngine.editExpense(data, id, draft, todayIso())
-      MoneyWriter.ledger(store, toasts, context, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
+      MoneyWriter.ledger(store, toasts, context, data, result, if (id == null) StrMoney.saved else StrMoney.edited) != null
     },
     onSaved = { back() },
     onDelete = if (id == null) null else ({
-      MoneyWriter.ledger(store, toasts, context, LedgerEngine.deleteExpense(data, id), StrMoney.deleted)
+      MoneyWriter.ledger(store, toasts, context, data, LedgerEngine.deleteExpense(data, id), StrMoney.deleted)
       back()
     }),
   )

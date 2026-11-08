@@ -130,7 +130,7 @@ fun ProductGridSheet(store: ShopStore, d: ShopData, ids: List<String>, by: Strin
         r.productId?.let { id -> sheet.rows.indexOfFirst { it.id == id }.takeIf { it >= 0 }?.let { at = DeskGrid.Cell(it, Col.NAME) } }
       }
       is ProductGridSave.Result.Ok -> {
-        scope.launch { store.save(r.data) }
+        scope.launch { store.save(d, r.data) }
         toast(StrGrid.saved(plain(r.saved)))
         onClose()
       }

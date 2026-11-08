@@ -104,7 +104,8 @@ fun ProductDetailScreen(
         // نشانهٔ عکس روی خودِ محصول می‌نشیند، همان فیلدی که وب می‌نویسد
         scope.launch {
           store.save(
-            d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it })
+            d,
+            d.copy(products = d.products.map { if (it.id == product.id) it.copy(photo = true) else it }),
           )
         }
         //  همگام‌سازیِ امروز + بانکِ تصاویرِ روشن ⇒ عکسِ خودِ دکان به بانکِ همین دکان (در صف)
@@ -126,7 +127,7 @@ fun ProductDetailScreen(
     PhotoStore.saveBytes(context, product.id, bytes).onSuccess {
       scope.launch {
         val cur = store.data.value
-        store.save(cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
+        store.save(cur, cur.copy(products = cur.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
       }
       //  عکسِ مرکزی: فقط همگام‌سازیِ امروز؛ عکسِ قدیمیِ در صفِ بانک دیگر فرستاده نمی‌شود
       ir.vil3ntec.tohid.data.ImageBank.photoSaved(context, product.id, own = false)

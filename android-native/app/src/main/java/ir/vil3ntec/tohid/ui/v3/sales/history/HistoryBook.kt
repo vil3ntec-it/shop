@@ -15,7 +15,6 @@ import ir.vil3ntec.tohid.data.PayFlow
 import ir.vil3ntec.tohid.data.PayStatusFlow
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
-import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.SalesPeriods
 import ir.vil3ntec.tohid.data.ShopData
 
@@ -30,7 +29,7 @@ enum class HistoryChannel(val id: String) {
 
 /**
  *  نمایه‌های یک‌باره برای ردیف‌های فهرست — `HistoryModel.row` بی این‌ها برای هر ردیف همهٔ اقلام، برگشت‌ها و سابقه را
- *  می‌گشت؛ با ده هزار فاکتور پیمایش کُند می‌شد. معنا همان است (`SalesEngine.returnable`، `PayStatusFlow.chip`).
+ *  می‌گشت؛ با ده هزار فاکتور پیمایش کُند می‌شد. معنا همان است (`ReturnLeft.canReturn`، `PayStatusFlow.chip`).
  */
 class RowLookup(d: ShopData) {
   val items: Map<String, List<SaleItem>> = d.saleItems.groupBy { it.saleId }
@@ -41,7 +40,10 @@ class RowLookup(d: ShopData) {
   val debtors: Map<String, String> = d.debtors.associate { it.id to it.name }
   private val products: Map<String, String> = d.products.associate { it.id to it.name }
 
-  fun canReturn(s: Sale): Boolean = s.status != "cancelled" && items[s.id].orEmpty().any { SalesEngine.returnable(it) > 0 }
+  private val returnLeft = ir.vil3ntec.tohid.data.ReturnLeft.Index(d)
+
+  /** دکمهٔ «برگشت»: همان حسابِ پنجرهٔ برگشت (`ReturnLeft`) — برگشتِ دستگاهِ دیگر که شمارندهٔ این دستگاه نشمرده هم */
+  fun canReturn(s: Sale): Boolean = returnLeft.canReturn(s)
 
   /** همان `SalesEngine.itemName`، با نمایهٔ کالا */
   fun itemName(item: SaleItem): String =

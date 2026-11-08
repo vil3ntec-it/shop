@@ -83,11 +83,51 @@ test('برنامهٔ تازه (?v=2): پیش‌فرض روشن؛ فقط false ِ
   await query("DELETE FROM shop_holds WHERE service='shop.ledger_merge'");
 });
 
+const C3 = `${C}?v=3`;
+const baseFlag = (scope, value) => query(
+  "INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'shop.save_base',$2,1) "
+  + 'ON CONFLICT (scope, key) DO UPDATE SET value=EXCLUDED.value',
+  [String(scope), value],
+);
+
+test('پایهٔ صریحِ ذخیره (?v=3): base پیش‌فرض روشن؛ فقط false ِ صریح یا نگه‌داشت؛ دکان بر all؛ v=2 و بی v همان پیشین', async () => {
+  const a = await shop('ه');
+  const b = await shop('و');
+  assert.equal((await h.get(C3)).status, 401);
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: true, v: 2, base: true });
+  //  برنامه‌های نصب‌شده (v=2، بی v) بایت‌به‌بایت همان پاسخِ پیشین
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: true, v: 2 });
+  assert.deepEqual((await h.get(C, { token: a.token })).body, { enabled: false });
+
+  await baseFlag('all', 'false');
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: true, v: 2, base: false }, 'خاموش برای همه');
+  assert.deepEqual((await h.get(C2, { token: a.token })).body, { enabled: true, v: 2 });
+  await baseFlag(b.shopId, 'true');
+  assert.equal((await h.get(C3, { token: b.token })).body.base, true, 'مقدارِ دکان بر all جلو می‌افتد');
+  await baseFlag(b.shopId, '"no"');
+  assert.equal((await h.get(C3, { token: b.token })).body.base, true, 'مقدارِ نادرست ⇒ پیش‌فرضِ روشن');
+  await query("DELETE FROM live_config WHERE key='shop.save_base' AND scope='all'");
+
+  //  دو پرچمِ جدا: خاموشیِ یکی دیگری را نمی‌برد
+  await flag(a.shopId, 'false');
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: false, v: 2, base: true });
+  await query("DELETE FROM live_config WHERE key='shop.ledger_merge'");
+
+  await query(
+    "INSERT INTO shop_holds (id, shop_id, kind, service, reason, placed_by, placed_at) VALUES ($1,$2,'service_disabled','shop.save_base','آزمون','admin',1)",
+    [newId('hold'), a.shopId],
+  );
+  assert.deepEqual((await h.get(C3, { token: a.token })).body, { enabled: true, v: 2, base: false });
+  assert.equal((await h.get(C3, { token: b.token })).body.base, true, 'دکانِ دیگر دست نمی‌خورد');
+  await query("DELETE FROM shop_holds WHERE service='shop.save_base'");
+  await query("DELETE FROM live_config WHERE key='shop.save_base'");
+});
+
 test('جدایی از پمپ: نشستِ برنامهٔ پمپ به این در نمی‌رسد و هیچ پرچمی نمی‌گیرد', async () => {
   const u = await h.newUser('صاحبِ پمپ', 'pump');
   const made = await h.post('/api/pump', { name: 'پمپ آزمون', code: 'lmerge-pump' }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
-  for (const path of [C, C2]) {
+  for (const path of [C, C2, C3]) {
     const r = await h.get(path, { token: u.accessToken });
     assert.ok([401, 403, 404].includes(r.status), `${path} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
     assert.equal(r.body && r.body.enabled, undefined);

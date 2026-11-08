@@ -25,7 +25,7 @@ import kotlinx.coroutines.withContext
  *  کارهای کالا که چند صفحه دارند (فهرست، جزئیات، برگهٔ دسته) — یک‌جا، همان
  *  `apply`ِ صفحه‌های پیشین: نتیجهٔ `WarehouseEngine` یا نوشته و پیامِ «شد»، یا
  *  دلیلِ رد. همیشه روی **آخرین** دفتر (`store.data.value`) کار می‌کند، نه روی
- *  نسخه‌ای که هنگامِ کشیدنِ صفحه گرفته شده.
+ *  نسخه‌ای که هنگامِ کشیدنِ صفحه گرفته شده — و همان دفتر پایهٔ صریحِ ذخیره است ([commit]).
  */
 @Stable
 internal class ProductOps(
@@ -34,21 +34,24 @@ internal class ProductOps(
   private val scope: CoroutineScope,
   private val context: Context,
 ) {
-  fun commit(result: WarehouseEngine.Result, done: String?, after: (WarehouseEngine.Result.Ok) -> Unit = {}): Boolean =
-    when (result) {
+  /** [build] روی آخرین دفتر؛ همان دفتر پایهٔ ذخیره است (`ShopStore.save(base, next)`) */
+  private fun commit(build: (ShopData) -> WarehouseEngine.Result, done: String?, after: (WarehouseEngine.Result.Ok) -> Unit = {}): Boolean {
+    val base = store.data.value
+    return when (val result = build(base)) {
       is WarehouseEngine.Result.Failed -> { toasts.show(result.message); false }
       is WarehouseEngine.Result.Ok -> {
-        persist(scope, store, result.data)
+        persist(scope, store, base, result.data)
         if (done != null) toasts.show(done)
         after(result)
         true
       }
     }
+  }
 
   /** حذفِ یک کالا (پس از برگهٔ تأیید با `deleteWarning`) — عکسش هم از این دستگاه و همگام‌سازی می‌رود */
   fun delete(id: String, after: () -> Unit = {}) {
     val now = System.currentTimeMillis()
-    commit(WarehouseEngine.deleteProduct(store.data.value, id, todayIso(), now, ::newId), StrProducts.productDeleted) {
+    commit({ d -> WarehouseEngine.deleteProduct(d, id, todayIso(), now, ::newId) }, StrProducts.productDeleted) {
       PhotoStore.delete(context, id)
       PhotoSync.removed(context, id)
       after()
@@ -58,40 +61,41 @@ internal class ProductOps(
   fun setActive(ids: Set<String>, active: Boolean, after: () -> Unit = {}) {
     val n = ids.size
     commit(
-      WarehouseEngine.bulkUpdate(store.data.value, ids, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = active) },
+      { d -> WarehouseEngine.bulkUpdate(d, ids, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(active = active) } },
       if (active) StrProducts.activated(n) else StrProducts.deactivated(n),
     ) { after() }
   }
 
   fun setCategory(ids: Set<String>, category: String, after: () -> Unit = {}) {
     commit(
-      WarehouseEngine.bulkUpdate(store.data.value, ids, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(category = category.trim()) },
+      { d -> WarehouseEngine.bulkUpdate(d, ids, todayIso(), System.currentTimeMillis(), ::newId) { it.copy(category = category.trim()) } },
       StrProducts.categoryChanged(ids.size),
     ) { after() }
   }
 
   fun deleteMany(ids: Set<String>, after: () -> Unit = {}) {
     commit(
-      WarehouseEngine.bulkDelete(store.data.value, ids, todayIso(), System.currentTimeMillis(), ::newId),
+      { d -> WarehouseEngine.bulkDelete(d, ids, todayIso(), System.currentTimeMillis(), ::newId) },
       StrProducts.deleted(ids.size),
     ) { after() }
   }
 
   fun addCategory(name: String, after: (String) -> Unit = {}) {
-    commit(WarehouseEngine.addCategory(store.data.value, name), StrProducts.categoryAdded) { after(it.id) }
+    commit({ d -> WarehouseEngine.addCategory(d, name) }, StrProducts.categoryAdded) { after(it.id) }
   }
 
   fun removeCategory(name: String) {
-    commit(WarehouseEngine.removeCategory(store.data.value, name), StrProducts.categoryDeleted)
+    commit({ d -> WarehouseEngine.removeCategory(d, name) }, StrProducts.categoryDeleted)
   }
 }
 
 /**
  *  نوشتنِ دفتر که با بسته شدنِ صفحه نیمه‌کاره نمی‌ماند: فرم پس از «ذخیره» فوراً
  *  بسته می‌شود و `scope`ِ همان صفحه لغو می‌شود؛ نوشتن همان لحظه آغاز و بی‌لغو تمام می‌شود.
+ *  [base] دفتری است که [next] از آن ساخته شد — پایهٔ صریحِ `ShopStore.save`.
  */
-internal fun persist(scope: CoroutineScope, store: ShopStore, next: ShopData) {
-  scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { store.save(next) } }
+internal fun persist(scope: CoroutineScope, store: ShopStore, base: ShopData, next: ShopData) {
+  scope.launch(start = CoroutineStart.UNDISPATCHED) { withContext(NonCancellable) { store.save(base, next) } }
 }
 
 @Composable

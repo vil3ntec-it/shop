@@ -77,7 +77,7 @@ fun PhoneLinkHost(store: ShopStore, data: ShopData, snackbar: SnackbarHostState)
       if (product == null) { toast(StrProducts.missingTitle); return@PhotoStudioDialog }
       PhotoStore.saveBitmap(context, product.id, bitmap).onSuccess {
         scope.launch {
-          store.save(data.copy(products = data.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
+          store.save(data, data.copy(products = data.products.map { if (it.id == product.id) it.copy(photo = true) else it }))
           PhoneScanner.discard(context, item)
         }
         PhotoSync.changed(context, product.id)

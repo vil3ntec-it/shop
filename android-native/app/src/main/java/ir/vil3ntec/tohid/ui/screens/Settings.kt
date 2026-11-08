@@ -292,7 +292,7 @@ fun SettingsScreen(
         val now = System.currentTimeMillis()
         val cur = store.data.value
         store.save(
-          cur.copy(
+          cur, cur.copy(
             auditLog = cur.auditLog + ir.vil3ntec.tohid.data.AuditEntry(
               id = ir.vil3ntec.tohid.data.auditId(), type = "data_export", date = todayIso(),
               notes = if (excel) "خروجی کامل داده — اکسل" else "خروجی کامل داده — JSON", createdAt = now,
@@ -1165,7 +1165,7 @@ fun SettingsScreen(
             val done = withContext(Dispatchers.IO) { LedgerArchive.compact(context, d) }
             done
               .onSuccess {
-                store.save(it.data)
+                store.save(d, it.data)
                 toast(StrSettings.archived(plain(it.moved.total)))
               }
               .onFailure { toast(StrSettings.compactFailed(it.message ?: Str.unknownReason)) }
@@ -1220,7 +1220,7 @@ fun SettingsScreen(
         else scope.launch {
           //  «پاک کردنِ همه» جایگزینیِ کامل است، نه ویرایشی روی پایه (`ShopStore.save`، پرچمِ `shop.ledger_merge`).
           //  نوشته نشد (قفلِ نرم، خطای دیسک) ⇒ پیامش را `AppRoot` می‌دهد؛ «پاک شد» دروغ نگوید
-          if (store.save(ShopData(), replace = true)) toast(StrSettings.wiped)
+          if (store.replaceAll(ShopData())) toast(StrSettings.wiped)
         }
       },
     )

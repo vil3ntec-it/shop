@@ -27,11 +27,16 @@ import kotlinx.serialization.json.jsonPrimitive
  *
  *  تنها کارِ شبکه پرسیدنِ خودِ پرچم است (`GET /shop/ledger-merge/config`)، با اتصالِ سوکتِ زنده
  *  و حداکثر هر [CHECK_MS] یک بار — همان الگوی `ReceiptFlag`. مقدار به دکان بسته است.
+ *
+ *  ── پایهٔ صریحِ ذخیره ([base]، `shop.save_base`، ۱۴۰۵/۰۸/۱۸) ──────────────
+ *  همان پاسخ (`?v=3`) پرچمِ دوم را هم می‌گوید: `ShopStore.save(base, next)` با پایهٔ صریح، و سدِ نقش با ادغامِ
+ *  خاموش هم. **پیش‌فرض روشن**؛ فقط `base: false` ِ صریحِ سرور خاموشش می‌کند (خاموش‌کنِ اضطراری ⇒ همان ذخیرهٔ پیشین،
+ *  `ShopStore.saveGuessed`). سرورِ کهنه `base` نمی‌فرستد ⇒ همان پیش‌فرض.
  */
 object LedgerMergeFlag {
 
   private const val PREFS = "tohid-ledger-merge"
-  private const val CONFIG = "/shop/ledger-merge/config?v=2"
+  private const val CONFIG = "/shop/ledger-merge/config?v=3"
 
   /** هر چند وقت یک بار «روشن است؟» دوباره پرسیده شود */
   const val CHECK_MS = 10 * 60_000L
@@ -43,6 +48,7 @@ object LedgerMergeFlag {
 
   private fun prefs(context: Context) = context.applicationContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
   private fun key(context: Context) = "on2:" + LedgerOwner.currentShop(context).ifBlank { "-" }
+  private fun baseKey(context: Context) = "base3:" + LedgerOwner.currentShop(context).ifBlank { "-" }
 
   fun enabled(context: Context): Boolean =
     runCatching { prefs(context).getBoolean(key(context), DEFAULT_ON) }.getOrDefault(DEFAULT_ON)
@@ -50,6 +56,17 @@ object LedgerMergeFlag {
   /** مقدارِ پرسیده‌شده از سرور برای دکانِ همین حالا (و آزمون‌ها) */
   fun set(context: Context, on: Boolean) {
     prefs(context).edit().putBoolean(key(context), on).apply()
+  }
+
+  /** پایهٔ صریحِ ذخیره (`shop.save_base`) — پیش از نخستین پاسخ و با هر خطای خواندن: روشن */
+  const val BASE_DEFAULT_ON = true
+
+  fun base(context: Context): Boolean =
+    runCatching { prefs(context).getBoolean(baseKey(context), BASE_DEFAULT_ON) }.getOrDefault(BASE_DEFAULT_ON)
+
+  /** مقدارِ `base` ِ پاسخِ سرور برای دکانِ همین حالا (و آزمون‌ها) */
+  fun setBase(context: Context, on: Boolean) {
+    prefs(context).edit().putBoolean(baseKey(context), on).apply()
   }
 
   /**
@@ -63,6 +80,10 @@ object LedgerMergeFlag {
     else -> null
   }
 
+  /** `base` ِ پاسخ: فقط بولیِ صریح؛ سرورِ کهنه (بی `base`) یا مقدارِ نادرست ⇒ `null` (همان مقدارِ پیشین/پیش‌فرض) */
+  fun baseFrom(body: kotlinx.serialization.json.JsonObject): Boolean? =
+    runCatching { (body["base"] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { !it.isString }?.booleanOrNull }.getOrNull()
+
   /** اتصالِ سوکتِ زنده (`hello`): پرچم را بپرس (نه زودتر از [CHECK_MS]) */
   fun kick(context: Context, now: Long = System.currentTimeMillis()) {
     val app = context.applicationContext
@@ -71,6 +92,7 @@ object LedgerMergeFlag {
     prefs(app).edit().putLong(at, now).apply()
     scope.launch {
       val body = runCatching { Backend.api(app).get(CONFIG) }.getOrNull() ?: return@launch
+      baseFrom(body)?.let { setBase(app, it) }
       val on = decide(body["enabled"]?.jsonPrimitive?.booleanOrNull, body["v"]?.jsonPrimitive?.intOrNull) ?: return@launch
       set(app, on)
     }

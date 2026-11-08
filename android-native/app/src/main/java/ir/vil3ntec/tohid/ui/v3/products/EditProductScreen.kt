@@ -109,11 +109,12 @@ internal fun EditProductScreen(
       return
     }
     val now = System.currentTimeMillis()
-    when (val r = WarehouseEngine.editProduct(store.data.value, productId, ProductFormModel.draftEdit(row), todayIso(), now, ::newId)) {
+    val base = store.data.value
+    when (val r = WarehouseEngine.editProduct(base, productId, ProductFormModel.draftEdit(row), todayIso(), now, ::newId)) {
       is WarehouseEngine.Result.Failed -> { banner = r.message; shake++ }
       is WarehouseEngine.Result.Ok -> {
         banner = null
-        persist(scope, store, ProductCycle.apply(r.data, productId, row.cycle))   //  MKT-06
+        persist(scope, store, base, ProductCycle.apply(r.data, productId, row.cycle))   //  MKT-06
         Haptics.success(context)
         toasts.show(StrProducts.editSaved)
         done = true

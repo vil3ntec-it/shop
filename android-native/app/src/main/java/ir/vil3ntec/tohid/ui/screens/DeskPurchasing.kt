@@ -314,7 +314,7 @@ private fun NewPurchaseInvoice(
     when (val r = PurchaseBook.record(d, sid, ls, paidValue, iso, notes, today, System.currentTimeMillis(), ::newId, landedTotal = landedValue, userId = user, dueDate = dueIso, key = saveKey)) {
       is PurchaseBook.Result.Failed -> toast(r.message)
       is PurchaseBook.Result.Ok -> {
-        scope.launch { store.save(r.data) }
+        scope.launch { store.save(d, r.data) }
         toast(StrPurchasePages.purchaseSaved(r.invoiceNo, money(total)))
         onClose()
       }
@@ -361,7 +361,7 @@ private fun NewPurchaseInvoice(
           if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) {
             when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = newSupplier), System.currentTimeMillis(), ::newId)) {
               is LedgerEngine.Result.Failed -> toast(r.message)
-              is LedgerEngine.Result.Ok -> { scope.launch { store.save(r.data) }; supplierId = r.id; newSupplier = "" }
+              is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; supplierId = r.id; newSupplier = "" }
             }
             true
           } else false
@@ -505,7 +505,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
     fun add() {
       when (val r = LedgerEngine.addSupplier(d, LedgerEngine.SupplierDraft(name = name, phone = phone), System.currentTimeMillis(), ::newId)) {
         is LedgerEngine.Result.Failed -> toast(r.message)
-        is LedgerEngine.Result.Ok -> { scope.launch { store.save(r.data) }; name = ""; phone = "" }
+        is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; name = ""; phone = "" }
       }
     }
     val enter = Modifier.onPreviewKeyEvent { e -> if (e.type == KeyEventType.KeyDown && (e.key == Key.Enter || e.key == Key.NumPadEnter)) { add(); true } else false }
@@ -598,7 +598,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
           userId = runCatching { ir.vil3ntec.tohid.sync.SyncStore(context).accountName }.getOrNull(), key = key,
         )) {
           is PurchaseBook.Result.Failed -> toast(r.message)
-          is PurchaseBook.Result.Ok -> { scope.launch { store.save(r.data) }; returning = false; toast(StrReach.returnSaved) }
+          is PurchaseBook.Result.Ok -> { scope.launch { store.save(d, r.data) }; returning = false; toast(StrReach.returnSaved) }
         }
       }
     }
@@ -612,7 +612,7 @@ private fun ColumnScope.Suppliers(store: ShopStore, d: ShopData, toast: (String)
         val a = amount.toDoubleOrNull() ?: return
         when (val r = LedgerEngine.paySupplier(d, open.supplier.id, a, today, StrHistory.payment, today, System.currentTimeMillis(), ::newId, key = payKey)) { // داده: یادداشتِ ردیفِ دفترِ تأمین‌کننده (داده)
           is LedgerEngine.Result.Failed -> toast(r.message)
-          is LedgerEngine.Result.Ok -> { scope.launch { store.save(r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
+          is LedgerEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; paying = false; amount = ""; toast(StrPurchasePages.paymentSaved(money(a))) }
         }
       }
       Surface(color = Shop.colors.success.copy(alpha = 0.08f), shape = RoundedCornerShape(8.dp)) {

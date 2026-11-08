@@ -377,7 +377,7 @@ fun ReturnFlowDialog(
                   saving = true
                   scope.launch {
                     //  قفلِ نرمِ اشتراک یا خطای دیسک ⇒ `false`: هیچ «ثبت شد»ی نیست و فرم باز می‌ماند
-                    if (store.save(built.first)) onPosted(docId, built.second)
+                    if (store.save(d, built.first)) onPosted(docId, built.second)
                     else error = StrSale.returnNotSaved
                     saving = false
                   }

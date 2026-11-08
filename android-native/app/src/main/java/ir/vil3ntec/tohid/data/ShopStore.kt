@@ -264,66 +264,66 @@ class ShopStore(
   }.getOrNull()
 
   /**
-   *  ذخیرهٔ دفتر — تنها درِ نوشتن.
-   *
-   *  ⛔ با اشتراکِ تمام‌شده **نمی‌نویسد** (قفلِ نرمِ بندِ ۲۱٫۸): دفتر
-   *  دست‌نخورده می‌ماند و صفحه همان چیزی را نشان می‌دهد که روی دیسک
-   *  است. هیچ چیزی پاک نمی‌شود و خروجی و چاپ و پشتیبان باز می‌مانند.
-   *
-   *  [replace] ⇒ جایگزینیِ کاملِ دفتر به خواستِ کاربر («پاک کردنِ همه»)، بی ادغام. ⛔ از روی مقدارِ [next]
-   *  حدس زده نمی‌شود: دفتری که کاربر آخرین کالایش را حذف کرد با `ShopData()` برابر است و ادغام می‌خواهد.
-   *
-   *  @return آیا نوشته شد. `false` یعنی قفلِ نرم یا خطای دیسک — صفحه
-   *  نباید «ثبت شد» بگوید؛ دلیلش از `blocked` یا `diskError` گفته می‌شود.
+   *  ذخیرهٔ دفتر — تنها درِ نوشتنِ صفحه‌ها و جریان‌ها. [base] **پایهٔ صریح** است: دفتری که [next] از آن ساخته شد (همان
+   *  `data`/`d` ِ موتور، یک بار خوانده؛ `docs/DATA-SAFETY-fa.md` «دو ذخیره از یک صفحهٔ کهنه»). دفترِ همین حالا همان پایه ⇒
+   *  خودِ [next] (رفتارِ همیشه)؛ جلوتر (Pull ِ کارگر، ذخیرهٔ دیگری از همان دفترِ کهنه، [appendAudit]/[update] ِ همین نمونه)
+   *  ⇒ فقط تغییرِ صفحه روی آن (`LedgerMerge`)، با `shop.ledger_merge` روشن یا خاموش (خاموش ⇒ فقط دفترِ حافظهٔ همین نمونه).
+   *  ⛔ پایه نه حدس زده می‌شود و نه همان لحظه از `data.value` خوانده (`SaveBaseGuardTest`). سدِ نقش (A16) و قفلِ نرم تغییرِ
+   *  خودِ صفحه را در هر دو حالت می‌سنجند. `shop.save_base` = `false` ِ صریح (`LedgerMergeFlag.base`) ⇒ [saveGuessed].
+   *  ⛔ با اشتراکِ تمام‌شده نمی‌نویسد (قفلِ نرمِ بندِ ۲۱٫۸): هیچ چیزی پاک نمی‌شود؛ خروجی، چاپ و پشتیبان باز می‌مانند.
+   *  @return آیا نوشته شد؛ `false` ⇒ صفحه «ثبت شد» نگوید (دلیل از `blocked`، `roleBlocked` یا `diskError`).
    */
-  suspend fun save(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
-    //  ⛔ پرچمِ `shop.ledger_merge` خاموش (فقط با `false` ِ صریحِ سرور؛ پیش‌فرض روشن) ⇒ رفتارِ پیشین: دفترِ صفحه کامل نوشته می‌شود.
+  suspend fun save(base: ShopData, next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    if (!LedgerMergeFlag.base(context)) return@withContext saveGuessed(next)
+    !roleRefused(base, next) && !softLocked(base, next) && writeOnBase(base, next)
+  }
+
+  /** «پاک کردنِ همه»: جایگزینیِ کامل، بی پایه (⛔ از مقدارِ [next] حدس زده نمی‌شود)؛ سدِ نقش و قفلِ نرم همان */
+  suspend fun replaceAll(next: ShopData): Boolean = withContext(Dispatchers.IO) {
+    !roleRefused(_data.value, next) && !softLocked(_data.value, next) && writeInternal(next)
+  }
+
+  /**
+   *  راهِ پیشین: پایه از شیءهای مشترک حدس زده می‌شد (`LedgerFollow.baseOf`)؛ `shop.ledger_merge` خاموش ⇒ دفترِ صفحه کامل
+   *  و بی سدِ نقش. ⛔ فقط خاموش‌کنِ `shop.save_base` و آزمون‌های پیشین (پسوندِ آزمونیِ `save(next)`)، هرگز صفحه‌ای.
+   */
+  internal suspend fun saveGuessed(next: ShopData, replace: Boolean = false): Boolean = withContext(Dispatchers.IO) {
     //  [replace] («پاک کردنِ همه») هم: جایگزینیِ کامل به خواستِ کاربر، نه ویرایشی روی پایه
-    if (!follow.on || replace) {
-      if (touchesPaid(_data.value, next) && SoftLock.isLocked(context)) {
-        SoftLock.noteBlocked()
-        _blocked.tryEmit(Unit)
-        return@withContext false
-      }
-      return@withContext writeInternal(next)
-    }
-    //  دفتری که صفحه با آن ساخت — نه لزوماً دفترِ همین حالا (شرح سرِ `LedgerMerge`)
-    val base = follow.baseOf(next) ?: run {
-      //  ⛔ پایه دیگر نگه داشته نشده: ادغام با دفترِ همین حالا ردیف‌های تازه را DELETE می‌کرد
-      _notice.tryEmit(STALE_BASE)
-      return@withContext false
-    }
-    //  A16: نقشی که این بخشِ دفتر را نمی‌نویسد (صندوق‌دار خرید، انباردار فروش، حسابدار هیچ) ⇐ پیش از دیسک و op؛ سرور هم
-    //  ردش می‌کرد و دفترِ این دستگاه از دکان جدا می‌ماند. صاحب، مدیر و شاگرد هرگز. ⛔ تغییرِ خودِ صفحه (پایه ⇐ [next])، نه دفترِ
-    //  همین حالا: خریدی که کارگر از دستگاهِ دیگر آورد «خریدِ صندوق‌دار» نیست (پیش‌تر فروشِ صندوق‌دار پس از هر Pull رد می‌شد).
+    if (!follow.on || replace) return@withContext !softLocked(_data.value, next) && writeInternal(next)
+    //  ⛔ پایه دیگر نگه داشته نشده: ادغام با دفترِ همین حالا ردیف‌های تازه را DELETE می‌کرد
+    val base = follow.baseOf(next) ?: run { _notice.tryEmit(STALE_BASE); return@withContext false }
+    !roleRefused(base, next) && !softLocked(base, next) && writeOnBase(base, next)
+  }
+
+  /** A16: نقشی که این بخش را نمی‌نویسد ⇐ پیش از دیسک و op (سرور هم رد می‌کرد) — تغییرِ خودِ صفحه، نه دفترِ همین حالا */
+  private fun roleRefused(base: ShopData, next: ShopData): Boolean {
     val role = ShopRole.current(context)
-    RoleGate.blocked(role, base, next)?.let { table ->
-      _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
-      return@withContext false
-    }
-    //  ⛔ قفلِ نرم فقط بخش‌های پولی را می‌بندد — فروش و قرض‌داران. انبار،
-    //  کالا، خرید و مصارف «همیشه باز» است، همان‌که صفحهٔ قفل می‌گوید.
-    //  تغییرِ خودِ صفحه سنجیده می‌شود، نه فروشی که کارگر در این فاصله آورد.
-    if (touchesPaid(base, next) && SoftLock.isLocked(context)) {
-      SoftLock.noteBlocked()
-      _blocked.tryEmit(Unit)
-      return@withContext false
-    }
-    val engine = SyncV1Engine.of(context)
+    val table = RoleGate.blocked(role, base, next) ?: return false
+    _roleBlocked.tryEmit(RoleGate.tableTitle(table) to ir.vil3ntec.tohid.core.perm.RoleInfo.title(role))
+    return true
+  }
+
+  /** ⛔ قفلِ نرم فقط فروش و قرض‌داران را می‌بندد (انبار، کالا، خرید و مصارف «همیشه باز») — تغییرِ خودِ صفحه */
+  private fun softLocked(base: ShopData, next: ShopData): Boolean {
+    if (!touchesPaid(base, next) || !SoftLock.isLocked(context)) return false
+    SoftLock.noteBlocked()
+    _blocked.tryEmit(Unit)
+    return true
+  }
+
+  /** زیرِ قفلِ موتور: [next] روی دفترِ همین حالا با [base] ِ داده‌شده */
+  private fun writeOnBase(base: ShopData, next: ShopData): Boolean = SyncV1Engine.of(context).let { engine ->
     synchronized(engine) {
       val theirs = currentForWrite() ?: return@synchronized false
-      //  دیسک همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام
+      //  دفترِ همین حالا همان است که صفحه با آن ساخت — رفتارِ همیشه، بی ادغام
       if (theirs === base) return@synchronized writeLocked(engine, next)
-      //  ⛔ دیسک جلوتر است: فقط تغییرِ صفحه نسبت به پایه روی دیسک می‌نشیند. نوشتنِ کاملِ دفترِ
-      //  کهنه برای ردیف‌های تازهٔ دیسک DELETE و برای ویرایش‌های تازه‌اش برگرداندن می‌ساخت.
+      //  ⛔ جلوتر است: فقط تغییرِ صفحه نسبت به پایه — نوشتنِ کاملِ دفترِ کهنه DELETE و برگرداندن می‌ساخت
       val outcome = runCatching { LedgerMerge.mergeReport(base, next, theirs) }.getOrElse {
         _diskError.tryEmit(it.message ?: STALE_UNREADABLE)
         return@synchronized false
       }
       val merged = outcome.data
-      //  دفترِ ادغام‌شده شیءهای تازه است: دفترِ پیش از آن پایهٔ صفحه‌ای می‌ماند که هنوز با آن می‌سازد. ⛔ خودِ [next] فقط با
-      //  نشانهٔ یک‌سویه پایه می‌شود (`LedgerFollow.submitted`، صفحه‌ای که از همین ادامه داد): ذخیرهٔ دومی که هم‌زمان از همان
-      //  پایه ساخته شد (دو کلیک) ردیف‌های این ذخیره را «حذفِ کاربر» می‌دید — DELETE روی همهٔ دستگاه‌ها
+      //  نگه‌داشتِ راهِ پیشین ([saveGuessed]): دفترِ پیش از ادغام، و [next] فقط با نشانهٔ یک‌سویه (`LedgerFollow.submitted`)
       if (merged !== next) follow.remember(theirs)
       val ok = writeLocked(engine, merged).also { if (it && merged !== next) follow.submitted(next) }
       //  ⛔ ویرایشی که روی ردیفِ حذف‌شده در دستگاهِ دیگر ننشست بی‌صدا گم نمی‌شود

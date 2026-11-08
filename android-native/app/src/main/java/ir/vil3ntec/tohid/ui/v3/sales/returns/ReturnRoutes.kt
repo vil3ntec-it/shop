@@ -35,7 +35,7 @@ fun RouteScope.ReturnRoute() {
     ReturnFlowSheet(
       d = data,
       sale = sale,
-      save = { store.save(it) },
+      save = { base, next -> store.save(base, next) },
       onPosted = { doc, note -> toasts.show(note, V3Tone.SUCCESS); nav.replace(SalesPaths.returnReceipt(doc)) },
       onClose = { back() },
       prefill = ReturnsShot.open.value == "first",
@@ -49,7 +49,7 @@ fun RouteScope.ReturnRoute() {
       when (val r = SalesEngine.recordReturn(data, sale.id, quantities, reason, todayIso(), System.currentTimeMillis(), Ulid::next)) {
         is SalesEngine.Result.Failed -> toasts.show(r.message, V3Tone.ERROR)
         is SalesEngine.Result.Ok -> {
-          scope.launch { store.save(r.data) }
+          scope.launch { store.save(data, r.data) }
           toasts.show(StrSale.returnDone, V3Tone.SUCCESS)
         }
       }
@@ -66,7 +66,7 @@ fun RouteScope.NoReceiptReturnRoute() {
   ReturnFlowSheet(
     d = data,
     sale = null,
-    save = { store.save(it) },
+    save = { base, next -> store.save(base, next) },
     onPosted = { doc, note -> toasts.show(note, V3Tone.SUCCESS); nav.replace(SalesPaths.returnReceipt(doc)) },
     onClose = { back() },
   )

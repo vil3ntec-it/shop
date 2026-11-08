@@ -24,7 +24,7 @@ internal object ProductPhotos {
     PhotoStore.saveBitmap(context, productId, bitmap)
       .onSuccess {
         val d = store.data.value
-        persist(scope, store, d.copy(products = d.products.map { if (it.id == productId) it.copy(photo = true) else it }))
+        persist(scope, store, d, d.copy(products = d.products.map { if (it.id == productId) it.copy(photo = true) else it }))
         PhotoSync.changed(context, productId)
         version.intValue++
         toasts.show(StrProducts.photoSaved)

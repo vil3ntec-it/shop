@@ -49,9 +49,10 @@ class PhoneTillWiringTest {
   fun `هر صندوق، گوشیِ نسخهٔ ۳ هم، کدِ سقف‌دار را پیش از ثبت از همان دروازهٔ کامپیوتر می‌گذراند`() {
     assertTrue(
       "پرداختِ گوشی بی دروازهٔ کدِ سقف‌دار ثبت می‌کند",
-      checkout.contains("cart.post(store, gate = { key -> PromoLive.redeemGate(context, key, promo) })"),
+      checkout.contains("cart.post(store, d, gate = { key -> PromoLive.redeemGate(context, key, promo) })"),
     )
-    val gated = Regex("""\.post\(store, gate = \{ key -> (ir\.vil3ntec\.tohid\.ui\.)?PromoLive\.redeemGate\(context, key, promo\) \}\)""")
+    //  پایهٔ صریحِ ذخیره (`d`، همان دفتری که فاکتور با آن ساخته می‌شود) پیش از دروازه — `CartStore.post`
+    val gated = Regex("""\.post\(store, d, gate = \{ key -> (ir\.vil3ntec\.tohid\.ui\.)?PromoLive\.redeemGate\(context, key, promo\) \}\)""")
     val tills = listOf("ui/v3/sales/checkout/CheckoutRoute.kt", "ui/screens/DeskSale.kt", "ui/screens/Sale.kt", "ui/screens/QuickSale.kt")
     for (rel in tills) {
       val s = src(rel)
