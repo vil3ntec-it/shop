@@ -75,6 +75,9 @@ object LedgerOwner {
     //  سرورِ پیش‌فرض (و پرچمِ خاموشِ `app.multi_server`) ⇒ همان نامِ امروز؛ سرورِ دیگر ⇒ نامِ جدای خودش
     ir.vil3ntec.tohid.core.server.DataPartition.keyIn(scope, userId, shopId)
 
+  /** دفترِ روی میز بایگانی نشد ⇒ جابه‌جایی انجام نشد و هیچ چیزی عوض نشد (ورود باید برگردد) */
+  class NotArchived : java.io.IOException("ledger not archived")
+
   /** نتیجهٔ ورود — برای اینکه صفحه بداند چه چیزی به کاربر بگوید */
   enum class Result {
     /** همان حساب و همان دکان؛ دست نخورد */
@@ -199,7 +202,8 @@ object LedgerOwner {
     val from = key(scope, previousUser, previousShop)
     val to = key(scope, user, shop)
 
-    store.stashTo(from)
+    //  بایگانی ننشست (حافظهٔ پر…) ⇒ هیچ جابه‌جایی: دفترِ روی میز هرگز با دفترِ دیگری رونویسی نمی‌شود
+    if (!store.stashTo(from)) throw NotArchived()
     state.forgetAccountState()
     //  همان حساب، دکانِ دیگر ⇒ صف/سایه/cursor ِ دکانِ پیشین هم کنارِ دفترش (کلیدِ v1 شناسهٔ حساب است، نه دکان)
     if (previousUser == user) runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Keys.switchShop(context, user, previousShop, shop) }

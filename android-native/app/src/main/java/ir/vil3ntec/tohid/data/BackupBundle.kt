@@ -178,13 +178,15 @@ object BackupBundle {
    *  فقط پس از تأییدِ بازیابی صدا زده می‌شود. عکسِ کالاهایی که در دفترِ
    *  تازه نیستند هم می‌ماند و ضرری ندارد — با حذفِ همان کالا پاک می‌شود.
    */
-  fun commitPhotos(context: Context): Int {
+  fun commitPhotos(context: Context, onlyMissing: Boolean = false): Int {
     val staging = staging(context)
     if (!staging.exists()) return 0
     val target = photoDir(context)
     var moved = 0
     staging.listFiles().orEmpty().forEach { photo ->
       runCatching {
+        //  `onlyMissing` (بازیابیِ پس از ورود، `CloudSettingsRestore`): عکسِ تازه‌ترِ همین دستگاه هرگز رونویسی نمی‌شود
+        if (onlyMissing && File(target, photo.name).exists()) return@runCatching
         photo.copyTo(File(target, photo.name), overwrite = true)
         moved++
       }

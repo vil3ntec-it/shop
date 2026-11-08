@@ -264,6 +264,10 @@
   برنده، تنهاهای دفتر «درج» با همان شناسه)، سایه = Snapshot. گوشیِ هنوز واردِ حالِ خراب (کلید = صاحب، دفتر = شاگرد) ⇐ `AccountBind.healOnStart`
   در `AppRoot` با `/me`. ⚠️ ردیفی که دستگاهِ دیگر پس از بایگانی عمداً حذف کرده بود زنده می‌شود (سرور حذف‌کننده را نمی‌گوید؛ گم شدن بدتر است).
   سنجه: `SignOutNoLossDesktopTest` «گوشیِ مانده در حالِ خرابِ ساختِ پیشین…».
+- ⛔ `ShopStore.stashTo` با `DiskWrite.copy` (fsync + جابه‌جاییِ اتمی) و `Boolean` برمی‌گرداند؛ `false` ⇒ `LedgerOwner.NotArchived`: هیچ جابه‌جایی،
+  دفترِ روی میز و کلیدِ همگام‌سازی دست‌نخورده، ورود برمی‌گردد (`StrAuth.ledgerNotArchived`)؛ «سرورِ بعدی» هم در انتظار می‌ماند. پس از ورود و
+  گرفتنِ دفتر، `CloudSettingsRestore.once` (یک بار برای هر حساب@دکان): تازه‌ترین پشتیبانِ ابری ⇐ `BackupBundle.read` + `commitPhotos(onlyMissing = true)`
+  ⇒ فقط کلیدهای نبودهٔ `tohid-policy`/`tohid-receipt`/`tohid-modules` و عکس‌های نبوده؛ دفترِ درونِ پشتیبان نشانده نمی‌شود.
 - ⛔ `/auth/staff`: دستگاهِ تازه ⇒ `staffCodes.preflight` (همان سنجه‌ها و کدهای `redeem`، فقط خواندنی) **پیش از** ساختنِ حساب؛ `redeem` ِ
   ناموفقِ حسابی که همین درخواست ساخت ⇒ حساب و هویتش پاک (هیچ «حسابِ شبح»). پیامِ برنامه برای هر کد: `StaffJoinErrors`.
 - حالِ همگام‌سازی (منتظر، آخرین موفق، خطای آخر) فقط از `SyncV1Engine.status` / `TohidSync.status()` خوانده شود؛ عددِ ساختگی نه (SYN-08، #230).

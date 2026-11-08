@@ -310,6 +310,27 @@ class SignOutNoLossDesktopTest {
     assertTrue(engine.queuedOps().any { it.rowId == "d9-$n" })
   }
 
+  @Test fun `بایگانیِ دفتر ننشست ⇒ هیچ جابه‌جایی، دفترِ روی میز دست‌نخورده و ورودِ حسابِ دیگر برمی‌گردد`() {
+    val store = ownerWithData()
+    val before = store.data.value
+    //  جای پروندهٔ بایگانیِ «صاحب@دکان» را پوشه‌ای گرفته ⇒ رونوشت (DiskWrite.copy) نمی‌نشیند
+    val safe = "$owner@$shop".map { if (it.isLetterOrDigit()) it else '_' }.joinToString("").take(48)
+    val blocker = File(ctx.filesDir, "ledger-$safe.json")
+    blocker.delete()
+    blocker.mkdirs()
+    File(blocker, "x").writeText("x")
+    try {
+      val r = runCatching { runBlocking { AccountBind.signedIn(ctx, store, staff, shop, "علی") } }
+      assertTrue(r.exceptionOrNull() is LedgerOwner.NotArchived)
+      assertEquals(owner, LedgerOwner.currentUser(ctx))
+      assertEquals(before, store.data.value)
+      assertEquals(before, open().data.value)
+      assertEquals("کلیدِ همگام‌سازی هم جابه‌جا نشد", SyncV1Keys.scoped(ctx, owner), engine.currentKey())
+    } finally {
+      blocker.deleteRecursively()
+    }
+  }
+
   @Test fun `دفترِ کاملاً خالی روی سایهٔ پر هیچ DELETE نمی‌فرستد و هم‌ترازیِ دوباره را می‌خواهد`() {
     val store = ownerWithData()
     val queued = engine.queuedOps().map { it.opId }

@@ -87,21 +87,14 @@ object AccountBind {
   fun bootstrapSoon(context: Context, store: ShopStore) {
     val app = context.applicationContext
     val engine = SyncV1Engine.of(app)
-    if (!store.training && engine.recoveryPending()) {
-      background.launch {
-        runCatching { engine.recoverArchived(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) }) }
-        runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
-      }
-      return
-    }
-    if (store.training || !store.deskEmpty()) {
-      runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
-      return
-    }
+    if (store.training) return
     background.launch {
-      runCatching {
-        SyncV1Engine.of(app).prepare(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) })
-      }
+      val read = { store.ledgerNow() }
+      val write = { next: ShopData -> store.applyFromServerNow(next) }
+      //  بایگانیِ کهنه ⇒ اول بازیابی؛ دفترِ خالی ⇒ Snapshot همین حالا؛ بعد تنظیماتِ نبوده از پشتیبانِ ابری
+      if (engine.recoveryPending()) runCatching { engine.recoverArchived(read, write) }
+      else if (store.deskEmpty()) runCatching { engine.prepare(read, write) }
+      runCatching { CloudSettingsRestore.once(app, store) }
       runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
     }
   }

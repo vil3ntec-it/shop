@@ -900,24 +900,28 @@ class ShopStore(
       d.purchases.isEmpty() && d.supplierPayments.isEmpty() && d.saleReturns.isEmpty() && d.stockMovements.isEmpty()
   }
 
-  /** بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز */
-  suspend fun stashTo(key: String) = withContext(Dispatchers.IO) {
-    if (TrainingMode.on) return@withContext   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)
+  /**
+   *  بایگانی کردنِ دفترِ فعلی زیرِ نامِ حساب، و خالی کردنِ دفترِ روی میز.
+   *  @return `false` ⇒ رونوشت (fsync + جابه‌جاییِ اتمی، `DiskWrite.copy`) ننشست و دفترِ روی میز **دست نخورد**؛
+   *    صدازننده (`LedgerOwner`) نباید دفترِ دیگری جایش باز کند
+   */
+  suspend fun stashTo(key: String): Boolean = withContext(Dispatchers.IO) {
+    if (TrainingMode.on) return@withContext true   //  OPS-07: دفترِ واقعی در آموزش جابه‌جا نمی‌شود (`LedgerOwner` هم نمی‌خواهد)
     //  زیرِ قفلِ نوشتنِ دفتر و قفلِ کوچِ رمز (`AtRest.converge`): کوچ میانِ کپی و پاک کردن نمی‌نشیند
-    synchronized(SyncV1Engine.of(context)) {
+    val kept = synchronized(SyncV1Engine.of(context)) {
       runCatching {
         synchronized(AtRest.lock) {
-          if (file.exists()) file.copyTo(vault(key), overwrite = true)
+          if (file.exists()) DiskWrite.copy(file, vault(key))
           runCatching { bound(key).writeText("1") }
           file.delete()
         }
+      }.isSuccess.also { ok ->
+        //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
+        if (ok) { follow.movedLocked(stop = false, next = ShopData()); _unreadable.value = null }
       }
-      //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
-      follow.movedLocked(stop = false, next = ShopData())
-      _unreadable.value = null
     }
-    LedgerSummary.clear(context)
-    Unit
+    if (kept) LedgerSummary.clear(context)
+    kept
   }
 
   /** باز کردنِ دفترِ یک حساب — اگر بایگانی نداشت، دفترِ خالی */
@@ -927,7 +931,7 @@ class ShopStore(
       val saved = vault(key)
       synchronized(SyncV1Engine.of(context)) {
         runCatching {
-          synchronized(AtRest.lock) { if (saved.exists()) saved.copyTo(file, overwrite = true) else file.delete() }
+          synchronized(AtRest.lock) { if (saved.exists()) DiskWrite.copy(saved, file) else file.delete() }
         }
         follow.movedLocked(stop = true, next = ShopData())
       }

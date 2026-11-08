@@ -333,7 +333,8 @@ object ServerSwitchAndroid {
           .let { it[0] to it.getOrElse(1) { "" } }
         val toKey = if (nextUser.isBlank()) DataPartition.deskKey(to) else DataPartition.ledgerKey(to, nextUser, nextShop)
 
-        store.stashTo(fromKey)
+        //  بایگانی ننشست ⇒ هیچ جابه‌جایی (دفترِ روی میز رونویسی نمی‌شود)؛ «سرورِ بعدی» در انتظار می‌ماند تا بارِ بعد
+        if (!store.stashTo(fromKey)) return@withContext
         runCatching { PhotoStore.stashTo(app, fromKey) }
         runCatching { AccountVault.switch(app, fromKey, toKey) }
         TokenStore(app).let { t -> t.stashTo(DataPartition.scope(from)); t.openFrom(DataPartition.scope(to)) }

@@ -110,7 +110,13 @@ fun EmailCodeContent(
         is ir.vil3ntec.tohid.core.net.ApiResult.Success -> if (r.value.hasShop) r.value.shop?.id.orEmpty() else ""
         is ir.vil3ntec.tohid.core.net.ApiResult.Failure -> if (r.error.code == "no_shop") "" else null
       }
-      runCatching { ir.vil3ntec.tohid.data.AccountBind.signedIn(context, live, session.userId, shopId, session.name) }
+      val bound = runCatching { ir.vil3ntec.tohid.data.AccountBind.signedIn(context, live, session.userId, shopId, session.name) }
+      if (bound.exceptionOrNull() is ir.vil3ntec.tohid.data.LedgerOwner.NotArchived) {
+        //  دفترِ حسابِ پیشین بایگانی نشد ⇒ ورود برمی‌گردد، هیچ چیزی روی دستگاه عوض نشده
+        runCatching { Backend.auth(context).signOut() }
+        ui = ui.say(StrAuth.ledgerNotArchived, true)
+        return
+      }
       if (session.name.isNotBlank()) SyncStore(context).accountName = session.name
       ir.vil3ntec.tohid.data.AccountBind.bootstrapSoon(context, live)
       ui = ui.say(StrAuth.signedIn)
