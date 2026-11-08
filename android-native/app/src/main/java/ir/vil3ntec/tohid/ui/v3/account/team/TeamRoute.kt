@@ -30,6 +30,13 @@ import kotlinx.coroutines.launch
 
 private enum class Ask { ROTATE, DISABLE }
 
+/** همان `ShopRepository` ِ برگه‌های کارمندان (یک جا، نه در هر برگه) */
+private val RouteScope.shopsRepo: ir.vil3ntec.tohid.data.repo.ShopRepository
+  @Composable get() {
+    val context = LocalContext.current
+    return remember { Backend.shop(context) }
+  }
+
 private val RouteScope.isOwner: Boolean
   @Composable get() {
     val context = LocalContext.current
@@ -114,8 +121,7 @@ internal fun RouteScope.TeamRoute() {
 /** برگهٔ `team/members/{id}/remove`: «برداشتنِ X؟» با متنِ امروز؛ صاحب دکان برداشتنی نیست */
 @Composable
 internal fun RouteScope.RemoveMemberRoute(id: String) {
-  val context = LocalContext.current
-  val shops = remember { Backend.shop(context) }
+  val shops = shopsRepo
   val team = TeamSession.data
   val owner = isOwner
   val member = team.member(id)
@@ -149,8 +155,7 @@ internal fun RouteScope.RemoveMemberRoute(id: String) {
 /** برگهٔ `team/devices/{id}/block`: دو جملهٔ هشدارِ امروز، فقط صاحب دکان */
 @Composable
 internal fun RouteScope.BlockDeviceRoute(id: String) {
-  val context = LocalContext.current
-  val shops = remember { Backend.shop(context) }
+  val shops = shopsRepo
   val team = TeamSession.data
   val owner = isOwner
   if (!owner) { LaunchedEffect(id) { back() }; return }
@@ -176,8 +181,7 @@ internal fun RouteScope.BlockDeviceRoute(id: String) {
  */
 @Composable
 internal fun RouteScope.RevokeDeviceKeyRoute(id: String) {
-  val context = LocalContext.current
-  val shops = remember { Backend.shop(context) }
+  val shops = shopsRepo
   val team = TeamSession.data
   val owner = isOwner
   if (team.staffKeys?.canRevoke != true) { LaunchedEffect(id) { back() }; return }
@@ -200,8 +204,7 @@ internal fun RouteScope.RevokeDeviceKeyRoute(id: String) {
 /** برگهٔ `team/members/{id}/logout-all`: «خروج از همهٔ دستگاه‌ها» برای همین کارمند */
 @Composable
 internal fun RouteScope.LogoutEverywhereRoute(id: String) {
-  val context = LocalContext.current
-  val shops = remember { Backend.shop(context) }
+  val shops = shopsRepo
   val team = TeamSession.data
   val owner = isOwner
   val member = team.member(id)
@@ -228,8 +231,7 @@ internal fun RouteScope.LogoutEverywhereRoute(id: String) {
  */
 @Composable
 internal fun RouteScope.RemoveStaleRoute(id: String, old: String) {
-  val context = LocalContext.current
-  val shops = remember { Backend.shop(context) }
+  val shops = shopsRepo
   val team = TeamSession.data
   val owner = isOwner
   val member = team.member(id)

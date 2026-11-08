@@ -912,7 +912,7 @@ router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req,
   //  پیشینش برنمی‌گردد — فقط با کدِ تازهٔ صاحب (و آن هم حسابِ تازه، `lib/staff-login`)
   const out = await require('../db').tx(async (c) => ({
     n: await tokens.revokeAllForSubject(req.user.id, null, app, { client: c }),
-    keys: app === 'shop'
+    keys: app === require('../lib/tenancy').SHOP.app
       ? await deviceKeys.revokeIn(c, { userIds: [req.user.id], reason: 'logout_all', by: req.user.id, ip: clientIp(req) })
       : deviceKeys.NONE,
   }));
