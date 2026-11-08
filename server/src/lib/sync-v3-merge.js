@@ -86,7 +86,7 @@ function validate(raw, origin = 'v3', ctx = undefined) {
   if (txId.length > 80) return bad('bad_tx');
   //  «برگهٔ امضاشده»ی تأیید (بخشِ ۱۰.۱) و برگهٔ جدای قرض (`creditApproval`، STF-03) — فقط همراه‌اند؛ سنجش در `authorize`
   const slips = { approval: null };
-  for (const k of ['approval', 'creditApproval']) {
+  for (const k of ['approval', 'creditApproval', 'priceApproval']) {   //  STF-03: برگه‌های جدای قرض و قیمت (#988)
     if (r[k] === undefined || r[k] === null) continue;
     if (!isPlainObject(r[k]) || Buffer.byteLength(JSON.stringify(r[k]), 'utf8') > MAX_APPROVAL_BYTES) return bad('bad_approval');
     slips[k] = r[k];

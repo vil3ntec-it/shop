@@ -42,6 +42,26 @@ class RemoteApprovalTest {
     assertFalse(RemoteApproval.offered(null, "approve", "sales.discount"), "بی اینترنت یا پاسخ ⇒ همان امروز")
   }
 
+  /** STF-02/03 — کاری که پیش‌فرضِ نقش برایش «ممنوع» است فقط از Sync v3 می‌نشیند: بی v3 (دستگاه یا سرور) دکمه نیست */
+  @Test fun remoteAskHiddenWhereTheApprovalCannotLand() {
+    assertTrue(RemoteApproval.needsV3("staff", "sales.discount"))
+    assertTrue(RemoteApproval.needsV3("cashier", "sales.cancel"))
+    assertFalse(RemoteApproval.needsV3("staff", "sales.credit"), "قرض از v1 هم می‌نشیند")
+    assertFalse(RemoteApproval.needsV3("staff", "sales.price"))
+    assertFalse(RemoteApproval.needsV3("staff", "returns.create"))
+    assertFalse(RemoteApproval.needsV3("manager", "sales.discount"))
+    val on = RemoteApproval.Config(enabled = true, approver = false)
+    assertTrue(RemoteApproval.offered(on, "approve", "sales.discount", v3Only = true, deviceV3 = true))
+    assertFalse(RemoteApproval.offered(on, "approve", "sales.discount", v3Only = true, deviceV3 = false), "دستگاهِ v1")
+    assertFalse(RemoteApproval.offered(on.copy(v3 = false), "approve", "sales.discount", v3Only = true, deviceV3 = true), "سرورِ بی v3")
+    assertTrue(RemoteApproval.offered(on.copy(v3 = false), "approve", "sales.credit", v3Only = false, deviceV3 = false), "قرض همان")
+    assertTrue(RemoteApproval.parseConfig(mapOf("enabled" to true)).v3, "سرورِ کهنهٔ بی کلید ⇒ همان امروز")
+    assertFalse(RemoteApproval.parseConfig(mapOf("enabled" to true, "v3" to false)).v3)
+    assertEquals(RemoteApproval.Wait.FAILED, RemoteApproval.waitOfError("approval_needs_v3"))
+    assertTrue(RemoteApproval.lands(on, v3Only = false, deviceV3 = false))
+    assertFalse(RemoteApproval.lands(on.copy(v3 = false), v3Only = true, deviceV3 = true))
+  }
+
   @Test fun bodyMatchesServerContract() {
     val key = RemoteApproval.newKey(Random(7))
     val need = ApprovalSlip.discountNeed("s-1", 2_000, 10_000)

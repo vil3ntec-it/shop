@@ -257,6 +257,14 @@ data class Sale(
   /** STF-02 — برگهٔ تأییدِ **لغوِ** همین فاکتور (فقط Sync v3؛ شرح سرِ `core/perm/CancelApproval`)؛ `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val cancelApproval: kotlinx.serialization.json.JsonObject? = null,
   /**
+   *  STF-03 — برگهٔ تأییدِ **قرضِ** همین فاکتور بیش از سقفِ کارمند (`sales.credit`، `SaleCaps`)؛ سرور آن را در
+   *  `fields.creditApproval` می‌خواند (`credit-cap.slipOf`، پرچمِ `shop.credit_cap`). ارجاعِ «پرسیدن از مدیر» یا برگهٔ PIN؛
+   *  فقط وقتی هست که صندوق پیش‌سنجی کرد و تأیید لازم بود؛ `null` نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val creditApproval: kotlinx.serialization.json.JsonObject? = null,
+  /** STF-03 — برگهٔ تأییدِ **تغییرِ قیمتِ ردیف** بیش از سقف (`sales.price`، `price-cap.slipOf`، پرچمِ `shop.price_cap`)؛ `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceApproval: kotlinx.serialization.json.JsonObject? = null,
+  /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
    *  (`paidAmount`، `remaining`، `debtGiven`) همان امروز است، پس برنامهٔ کهنه همان عدد

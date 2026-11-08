@@ -89,6 +89,7 @@ private fun permLabel(key: String): String = when (key) {
   "sales.cancel" -> StrSetupPages.permVoid
   "returns.create" -> StrSetupPages.permReturns
   "sales.credit" -> StrAccount.permCredit
+  "sales.price" -> StrAccount.permPrice
   "shift.report" -> ir.vil3ntec.tohid.core.i18n.StrShiftReview.permReports
   "safe.move" -> StrSetupPages.permSafe
   else -> key

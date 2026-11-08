@@ -157,7 +157,7 @@ async function push(ctx, { deviceId, protocol = PROTOCOL, format = 'v3', schemaV
   //  سندهای برگشتِ این دسته (یک برگه و یک تصمیم؛ سقفِ تجمعیِ فاکتور)، و برنامهٔ کهنهٔ بی tx:
   //  هر سندِ پولی با همراه‌هایش یک واحد (همه یا هیچ)
   const groups = approvals.returnGroupsOf(units.flatMap((u) => u.items.flatMap((it) => it.ops)));
-  const plan = approvals.bundleV3(units, groups, { credit: await require('./credit-cap').onUnits(ctx, units) });   //  STF-03: فاکتورِ قرض‌دار هم
+  const plan = approvals.bundleV3(units, groups, { credit: await require('./credit-cap').onUnits(ctx, units), price: await require('./price-cap').onUnits(ctx, units) });   //  STF-03: فاکتورِ قرض‌دار هم
   //  همراهِ بی tx ِ سندی که در دستهٔ پیشینِ همین دستگاه رد شد ⇒ همان رد
   await approvals.holdV3Units(ctx, deviceId, plan);
 

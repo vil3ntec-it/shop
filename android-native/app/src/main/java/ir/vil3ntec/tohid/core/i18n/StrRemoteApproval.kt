@@ -57,6 +57,9 @@ object StrRemoteApproval {
   val permDiscount: String get() = t("تخفیف", "Discount", "تخفیف")
   val permCancel: String get() = t("لغوِ فاکتور", "Invoice cancellation", "د بل لغوه")
   val permReturn: String get() = t("برگشت", "Return", "بېرته ورکول")
+  //  STF-03 — پیش‌سنجیِ صندوق (`SaleCapGate`) قرض و تغییرِ قیمتِ ردیف را هم می‌پرسد
+  val permCredit: String get() = t("فروشِ قرضی", "Credit sale", "پور پلور")
+  val permPrice: String get() = t("تغییرِ قیمت", "Price change", "د بیې بدلون")
   fun saleDoc(no: String): String = t("فاکتورِ ${asIs(no)}", "Invoice $no", "بل $no")
   fun returnDoc(no: String): String = t("سندِ برگشتِ ${asIs(no)}", "Return $no", "د بېرته ورکولو سند $no")
   fun who(name: String): String = t("از ${asIs(name)}", "From $name", "له $name")

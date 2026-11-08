@@ -171,6 +171,14 @@ object ShopRole {
   /** سابقهٔ عملیات — همان `audit.view`ِ سرور */
   fun canSeeAudit(context: Context): Boolean = allows(context, "audit.view")
 
+  /** STF-03 — سرور این کلیدِ پرچم‌دار را برای همین دکان اجرا می‌کند؟ (`policy.editable`؛ `SaleCapGate.rules`) */
+  fun enforces(context: Context, key: String): Boolean = key in PermPolicy.editable(prefs(context).getString(POLICY, null))
+
+  /** STF-03 — قاعده‌های پیش‌سنجیِ صندوق (`SaleCapGate`): همین کاربر و کلیدهایی که سرور برای همین دکان اجرا می‌کند */
+  fun saleCaps(context: Context): SaleCapGate.Rules = SaleCapGate.Rules(
+    current(context), layers(context), price = enforces(context, "sales.price"), credit = enforces(context, "sales.credit"),
+  )
+
   /** لایه‌های `policy` برای تصمیمِ عددی (RET-10: `ReturnFlow.permDecision`) */
   fun layers(context: Context): List<Any?> = PermPolicy.layers(prefs(context).getString(POLICY, null))
 

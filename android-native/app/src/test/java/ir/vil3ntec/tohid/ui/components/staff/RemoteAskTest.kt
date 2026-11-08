@@ -59,6 +59,30 @@ class RemoteAskTest {
   private fun ask(api: ApprovalRequestsApi?, decision: String = "approve", n: ApprovalSlip.Need = need) =
     RemoteAsk(api, n, "shop-1", decision, now = { clock }, sleep = { ms -> clock += ms })
 
+  /** کارِ فقط-v3 (تخفیف/لغوِ شاگرد) روی دستگاهِ v1 یا سرورِ بی v3 ⇒ نه دکمه، نه پرسیدنِ سرور — PIN همان امروز */
+  @Test fun `بی همگام‌سازیِ نسخهٔ ۳ دکمه برای کارِ فقط-v3 نیست`() = runBlocking {
+    val v1Device = RemoteAsk(FakeApi(), need, "shop-1", "approve", now = { clock }, sleep = { ms -> clock += ms }, v3Only = true, deviceV3 = false)
+    v1Device.load()
+    assertFalse(v1Device.offered)
+    assertNull("دستگاهِ v1 از سرور نمی‌پرسد", v1Device.config)
+    val v1Server = RemoteAsk(
+      FakeApi(cfg = ApiResult.Success(RemoteApproval.Config(enabled = true, approver = false, v3 = false))), need, "shop-1", "approve",
+      now = { clock }, sleep = { ms -> clock += ms }, v3Only = true, deviceV3 = true,
+    )
+    v1Server.load()
+    assertFalse(v1Server.offered)
+    val credit = RemoteAsk(
+      FakeApi(cfg = ApiResult.Success(RemoteApproval.Config(enabled = true, approver = false, v3 = false))),
+      ApprovalSlip.Need("sales.credit", "sales/s-1", null, 50_000), "shop-1", "approve",
+      now = { clock }, sleep = { ms -> clock += ms }, v3Only = false, deviceV3 = false,
+    )
+    credit.load()
+    assertTrue("قرض از v1 هم می‌نشیند", credit.offered)
+    val v3 = RemoteAsk(FakeApi(), need, "shop-1", "approve", now = { clock }, sleep = { ms -> clock += ms }, v3Only = true, deviceV3 = true)
+    v3.load()
+    assertTrue(v3.offered)
+  }
+
   @Test fun `پرچمِ خاموش، مجاز یا بی سرور ⇒ دکمه دیده نمی‌شود و برگه همان امروز است`() = runBlocking {
     val off = ask(FakeApi(cfg = ApiResult.Success(RemoteApproval.Config(enabled = false, approver = false))))
     off.load()

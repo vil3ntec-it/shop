@@ -39,7 +39,7 @@ function openTask(s, ctx, { kind, table, rowId, dedupe, detail, t }) {
  * @returns {Promise<null | string | {reason, box, detail}>} دلیلِ رد؛ با `box`
  *          یعنی ردیفی هم در صندوقِ تعارض لازم است (opِ پولیِ ردشده).
  */
-async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
+async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
@@ -49,6 +49,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null) {
     return !row || !row.created_by || own ? null : 'delete_not_allowed';
   }
   if (op.table === 'safeEntries') return require('./safe-ledger').judgeV3(ctx, op, row, (s, p) => c.query(s, p));   // گاوصندوق (PAY-18): فقط درج، شکل و safe.move
+  { const pc = await require('./price-cap').judgeV3(c, ctx, op, row, { plan, deviceId, origin }); if (pc !== undefined) return pc; }   //  STF-03 قیمت/تخفیفِ پنهان (‎lib/price-cap.js‎، #988)
   //  تخفیف، لغوِ فاکتور و برگشت: نقش + دو لایه + «برگهٔ امضاشده» (STF-02/03)
   const need = approvals.needOf(op, row);
   if (need) {
@@ -84,7 +85,7 @@ async function applyOne(s, ctx, op, { deviceId, origin, cursor = 0, t, groups = 
   if (dup) return { op_id: op.op_id, status: 'duplicate', server_seq: Number(dup.server_seq) };
 
   const row = await s.load(ctx, op.table, op.row_id);
-  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups);
+  const denied = await require('./sync-v3-roles').denied(c, ctx, op, origin, plan) || await authorize(c, ctx, op, row, deviceId, origin, groups, plan);
   if (denied) {
     const out = { op_id: op.op_id, status: 'rejected', reason: typeof denied === 'string' ? denied : denied.reason };
     //  ردیفِ صندوق بعد از برگشتِ savepoint نوشته می‌شود (`push`)؛ در پاسخ نمی‌آید

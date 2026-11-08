@@ -42,6 +42,17 @@ object PermPolicy {
     }.getOrNull() ?: emptyList()
   }
 
+  /**
+   *  STF-03 — کلیدهایی که سرور **برای همین دکان** اجرا می‌کند (`policy.editable`): کلیدِ پرچم‌دار (`sales.credit`،
+   *  `sales.price`) فقط با پرچمِ روشنِ دکان این‌جاست. نبودن یا خراب بودن ⇒ هیچ (صندوق پیش‌سنجی نمی‌کند، همان امروز).
+   */
+  fun editable(policyJson: String?): List<String> {
+    if (policyJson.isNullOrBlank()) return emptyList()
+    return runCatching {
+      (tree(Json.parseToJsonElement(policyJson).jsonObject["editable"]) as? List<*>)?.filterIsInstance<String>()
+    }.getOrNull() ?: emptyList()
+  }
+
   fun allows(role: String, policyJson: String?, key: String): Boolean =
     PermCore.allows(role, layers(policyJson), key)
 }

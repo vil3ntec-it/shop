@@ -106,6 +106,10 @@ object SalesEngine {
     val blockExpired: Boolean = false,
     /** برگهٔ تأییدِ تخفیفِ بیش از سقف (STF-02) — همان‌طور روی فاکتور می‌نشیند */
     val approval: kotlinx.serialization.json.JsonObject? = null,
+    /** STF-03 — برگهٔ تأییدِ قرضِ بیش از سقفِ کارمند (`SaleCapGate`) ⇒ `Sale.creditApproval`؛ `null` (پیش‌فرض) همان امروز */
+    val creditCapSlip: kotlinx.serialization.json.JsonObject? = null,
+    /** STF-03 — برگهٔ تأییدِ تغییرِ قیمتِ ردیف بیش از سقف ⇒ `Sale.priceApproval`؛ `null` همان امروز */
+    val priceSlip: kotlinx.serialization.json.JsonObject? = null,
     /**
      *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
      *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
@@ -493,6 +497,7 @@ object SalesEngine {
       syncStatus = "pending",
       seller = checkout.seller.trim(),
       approval = checkout.approval,
+      creditApproval = checkout.creditCapSlip, priceApproval = checkout.priceSlip, // STF-03 (`SaleCapGate`)؛ بی برگه `null`
       //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,

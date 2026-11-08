@@ -40,12 +40,14 @@ const SERVER_EDITABLE = Object.freeze([
   'customers.contact',
   //  STF-03: سقفِ فروشِ قرضی — فقط وقتی پرچمِ همان دکان روشن است (`FLAGGED`؛ اجرا در ‎lib/credit-cap.js‎)
   'sales.credit',
+  //  STF-03: سقفِ تغییرِ قیمتِ ردیف (و «تخفیفِ پنهان» زیرِ همان `sales.discount`) — فقط با پرچمِ دکان (‎lib/price-cap.js‎)
+  'sales.price',
 ]);
 /**
  * کلیدی که سرور فقط با پرچمِ خاموشِ خودش اجرا می‌کند: پرچمِ خاموش ⇒ در کاتالوگ «none» و ذخیره‌اش
  * `not_enforceable_yet` (همان قاعدهٔ «تغییرِ فقط ظاهری پذیرفته نمی‌شود»)
  */
-const FLAGGED = Object.freeze({ 'sales.credit': 'shop.credit_cap' });
+const FLAGGED = Object.freeze({ 'sales.credit': 'shop.credit_cap', 'sales.price': 'shop.price_cap' });
 //  همهٔ نقش‌های کارمند، از جمله چهار نقشِ تازهٔ A16 (مهاجرتِ ۱۲۳)
 const EDITABLE_ROLES = STAFF_ROLES;
 
