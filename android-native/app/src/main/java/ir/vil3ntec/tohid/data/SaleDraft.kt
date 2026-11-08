@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -177,6 +178,6 @@ class SalePost {
   }
 
   companion object {
-    const val NOT_SAVED = "فروش ثبت نشد — دفتر روی دستگاه نوشته نشد. سبد سرِ جایش است؛ دوباره بزنید."
+    val NOT_SAVED: String get() = StrLedger.saleNotSaved
   }
 }

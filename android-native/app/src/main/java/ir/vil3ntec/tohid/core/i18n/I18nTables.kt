@@ -53,5 +53,7 @@ object I18nTables {
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
     StrScanPages, StrPanelPages, // همان، دورِ ۵ (صفحه‌های زندهٔ کوچک)
     StrDebtor, // دورِ ۶: حسابِ قرض‌دار (پیش‌تر `t` ِ فقط‌فارسیِ محلی، بی هیچ زبانی)
+    StrLedger, StrGoods, StrAppData, // دورِ ۷: پیام‌های لایهٔ دفتر (`data/`) و صفحه‌های زندهٔ قدیمی — پیش‌تر متنِ خام
+    StrSync, StrPrint, StrUpdate, // دورِ ۷: پیام‌های همگام‌سازی، چاپ و به‌روزرسانی — پیش‌تر متنِ خام
   )
 }

@@ -2,6 +2,9 @@ package ir.vil3ntec.tohid.data
 
 import android.content.Context
 import android.net.Uri
+import ir.vil3ntec.tohid.core.i18n.StrCount
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.image.BulkJob
 import ir.vil3ntec.tohid.core.image.BulkMatch
 import ir.vil3ntec.tohid.core.image.BulkStore
@@ -93,15 +96,15 @@ object ImageBulk {
         j.rows += BulkJob.Row(key, n, 0, "skip-$key", status = status, note = note)
       }
       //  پسوند پیش از خواندن
-      if (!BulkMatch.isImageName(n)) { fail("پسوندِ فایل عکس نیست", BulkJob.Status.NOT_IMAGE); progress(i + 1, pics.size); continue }
+      if (!BulkMatch.isImageName(n)) { fail(StrGoods.notImageExt, BulkJob.Status.NOT_IMAGE); progress(i + 1, pics.size); continue }
       val bytes = try {
         readCapped(context, u, MAX_FILE_BYTES)
       } catch (c: CancellationException) { throw c } catch (_: TooBig) {
-        fail("فایل بزرگ‌تر از ${MAX_FILE_BYTES / (1024 * 1024)} مگابایت است"); progress(i + 1, pics.size); continue
+        fail(StrGoods.fileOverMb(MAX_FILE_BYTES / (1024 * 1024))); progress(i + 1, pics.size); continue
       } catch (_: OutOfMemoryError) {
-        fail("حافظهٔ دستگاه برای خواندنِ این فایل کافی نبود"); progress(i + 1, pics.size); continue
+        fail(StrGoods.noMemRead); progress(i + 1, pics.size); continue
       } catch (_: Exception) { null }
-      if (bytes == null || bytes.isEmpty()) { fail("فایل خوانده نشد"); progress(i + 1, pics.size); continue }
+      if (bytes == null || bytes.isEmpty()) { fail(StrCount.readFailed); progress(i + 1, pics.size); continue }
       val sum = ImageBank.sha256(bytes)
       val m = BulkMatch.match(n, list, csv)
       val row = BulkJob.Row(key, n, bytes.size.toLong(), sum, productId = m.productId, candidates = m.candidates, how = m.how)
@@ -112,9 +115,9 @@ object ImageBulk {
           s.put(sum, prep.display, prep.thumb)
           row.small = prep.small
         } catch (c: CancellationException) { throw c } catch (_: OutOfMemoryError) {
-          row.status = BulkJob.Status.FAILED; row.note = "حافظهٔ دستگاه برای آماده‌سازیِ این عکس کافی نبود"
+          row.status = BulkJob.Status.FAILED; row.note = StrGoods.noMemPrep
         } catch (e: Exception) {
-          row.status = BulkJob.Status.NOT_IMAGE; row.note = e.message ?: "این فایل عکس نیست یا خراب است"
+          row.status = BulkJob.Status.NOT_IMAGE; row.note = e.message ?: StrGoods.notImage
         }
       }
       j.rows += row
@@ -136,12 +139,12 @@ object ImageBulk {
    */
   suspend fun process(context: Context, store: ShopStore, job: BulkJob, row: BulkJob.Row) {
     val ready = withContext(Dispatchers.IO) { disk(context).get(row.sum) }
-    if (ready == null) { row.status = BulkJob.Status.FAILED; row.note = "فایل روی این دستگاه نماند — دوباره انتخابش کنید"; return }
+    if (ready == null) { row.status = BulkJob.Status.FAILED; row.note = StrGoods.fileGone; return }
     val prep = ImageBank.Prepared(ready.display, ready.thumb, row.small)
     if (!row.local) {
       val p = store.data.value.products.firstOrNull { it.id == row.productId }
       if (p == null) {
-        row.productId = ""; row.status = BulkJob.Status.UNMATCHED; row.note = "این کالا دیگر در فهرست نیست"
+        row.productId = ""; row.status = BulkJob.Status.UNMATCHED; row.note = StrSale.itemGone
         return
       }
       if (p.photo && !job.replace) { row.status = BulkJob.Status.HAS_PHOTO; return }
@@ -154,7 +157,7 @@ object ImageBulk {
       //  بارگذاریِ بانک همین‌جاست، نه صف
       ImageBank.photoSaved(context, row.productId, own = false)
       row.local = true
-      if (prep.small) row.note = "عکس کوچک است (زیرِ ${ImagePrep.MIN_SIDE} پیکسل)"
+      if (prep.small) row.note = StrGoods.imageSmall(ImagePrep.MIN_SIDE)
       if (ImageBank.enabled.value != true) { row.status = BulkJob.Status.DONE; return }
       row.status = BulkJob.Status.PENDING_BANK
       save(context, job)
@@ -166,9 +169,9 @@ object ImageBulk {
     } catch (c: CancellationException) {
       throw c
     } catch (f: Exception) {
-      if (ImageBank.transient(f)) { row.status = BulkJob.Status.PENDING_BANK; row.note = "روی دستگاه گذاشته شد؛ بانک منتظرِ اینترنت"; throw f }
+      if (ImageBank.transient(f)) { row.status = BulkJob.Status.PENDING_BANK; row.note = StrGoods.bankWaitsNet; throw f }
       row.status = BulkJob.Status.DONE
-      row.note = "روی دستگاه گذاشته شد؛ بانکِ تصاویر نپذیرفت: ${(f as? ir.vil3ntec.tohid.core.net.ApiFailure)?.userMessage ?: f.message.orEmpty()}"
+      row.note = StrGoods.bankRefused((f as? ir.vil3ntec.tohid.core.net.ApiFailure)?.userMessage ?: f.message.orEmpty())
     }
   }
 }

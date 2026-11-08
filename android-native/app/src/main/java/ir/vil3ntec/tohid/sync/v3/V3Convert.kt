@@ -87,8 +87,8 @@ object V3Schema {
  *  «بومی» نیست ⇒ با `format: "v2"` می‌رود تا خودِ سرور تصمیم بگیرد.
  */
 object V3Convert {
-  const val DEFAULT_CANCEL_REASON = "لغو از نسخهٔ قدیمیِ برنامه"
-  const val DELETE_CANCEL_REASON = "حذف از نسخهٔ قدیمیِ برنامه"
+  const val DEFAULT_CANCEL_REASON = "لغو از نسخهٔ قدیمیِ برنامه"  // داده: به سرور فرستاده می‌شود (دلیلِ لغو)
+  const val DELETE_CANCEL_REASON = "حذف از نسخهٔ قدیمیِ برنامه"  // داده: به سرور فرستاده می‌شود (دلیلِ لغو)
   private const val MAX_SAFE = 9_007_199_254_740_991L
   private const val MAX_FIELDS_BYTES = 64 * 1024
   private val OP_ID_RE = Regex("[A-Za-z0-9_.-]{1,80}")

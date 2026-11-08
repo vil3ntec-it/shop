@@ -156,7 +156,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
   private fun settle(data: ShopData?) {
     if (!journal.exists()) return
     if (recover(null) != Outcome.PENDING) return
-    if (data == null || recover(data) == Outcome.PENDING) throw IOException("ساختنِ دوبارهٔ دفتر نیمه‌کاره مانده است")
+    if (data == null || recover(data) == Outcome.PENDING) throw IOException("ساختنِ دوبارهٔ دفتر نیمه‌کاره مانده است")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
   }
 
   /** ژورنال ⇐ صف ⇐ سایه (همزمان) ⇐ پاک کردنِ ژورنال */
@@ -440,7 +440,7 @@ internal class SyncCommit(private val journal: Journal, private val parts: Parts
         if (e.next.isNotEmpty()) put("next", JsonPrimitive(e.next))
       }.toString().toByteArray(Charsets.UTF_8)
       file.parentFile?.mkdirs()
-      if (file.exists() && !file.delete()) throw IOException("ژورنالِ کهنه پاک نشد")
+      if (file.exists() && !file.delete()) throw IOException("ژورنالِ کهنه پاک نشد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       FileOutputStream(file).use { out ->
         out.write(body)
         out.flush()

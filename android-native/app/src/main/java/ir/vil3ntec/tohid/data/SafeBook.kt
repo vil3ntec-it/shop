@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGiftCard
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrSafe
 import ir.vil3ntec.tohid.core.money.MoneyInput
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.safe.SafeCore
@@ -54,7 +57,7 @@ object SafeBook {
   const val SHIFT_CLOSED = "SHIFT_CLOSED"
 
   /** یادداشتِ ردیفِ جفتِ سابقهٔ صندوق (داده، همیشه فارسی) */
-  const val DRAWER_NOTE = "گاوصندوق"
+  const val DRAWER_NOTE = "گاوصندوق"  // داده: یادداشتِ ذخیره‌شدهٔ حرکتِ پول
 
   /**
    *  انتقالِ دخل ⇄ گاوصندوق: [SafeCore.FROM_DRAWER] (خروج از دخل، ورود به گاوصندوق) یا [SafeCore.TO_DRAWER].
@@ -106,18 +109,19 @@ object SafeBook {
 
   fun message(code: String, varianceMinor: Long? = null): String = when (code) {
     SafeCore.Code.REASON_REQUIRED -> varianceMinor?.let {
-      "اختلافِ شمارش ${if (it > 0) "اضافه" else "کسری"} ${money(kotlin.math.abs(it) / 100.0)} افغانی است — " +
-        "بیش از ${money(Pay.DEFAULT_VARIANCE_THRESHOLD / 100.0)} افغانی دلیل می‌خواهد"
-    } ?: "دلیل را بنویسید"
-    SafeCore.Code.INSUFFICIENT_FUNDS -> "این مبلغ بیش از ماندهٔ گاوصندوق است"
-    SafeCore.Code.INVALID_AMOUNT -> "مبلغ درست نیست"
-    SafeCore.Code.NOTE_REQUIRED -> "برای «دیگر» یادداشت بنویسید"
-    SafeCore.Code.BAG_REQUIRED -> "شمارهٔ کیسه را بنویسید"
-    SafeCore.Code.BAD_REASON -> "دلیل درست نیست"
-    SafeCore.Code.TEXT_TOO_LONG -> "متن بیش از اندازه بلند است"
-    SafeCore.Code.ID_CONFLICT -> "این عملیات با محتوای دیگری ثبت شده بود"
-    SafeCore.Code.INVALID_TIME -> "زمانِ دستگاه درست نیست"
-    SHIFT_CLOSED -> "صندوق باز نیست؛ اول صندوق را باز کنید"
-    else -> "ثبت نشد ($code)"
+      val amount = money(kotlin.math.abs(it) / 100.0)
+      val limit = money(Pay.DEFAULT_VARIANCE_THRESHOLD / 100.0)
+      if (it > 0) StrLedger.varianceOver(amount, limit) else StrLedger.varianceShort(amount, limit)
+    } ?: StrSafe.reasonRequired
+    SafeCore.Code.INSUFFICIENT_FUNDS -> StrSafe.insufficientFunds
+    SafeCore.Code.INVALID_AMOUNT -> StrLedger.amountInvalid
+    SafeCore.Code.NOTE_REQUIRED -> StrSafe.noteRequired
+    SafeCore.Code.BAG_REQUIRED -> StrSafe.bagRequired
+    SafeCore.Code.BAD_REASON -> StrLedger.reasonBad
+    SafeCore.Code.TEXT_TOO_LONG -> StrGiftCard.errTooLong
+    SafeCore.Code.ID_CONFLICT -> StrSafe.idConflict
+    SafeCore.Code.INVALID_TIME -> StrSafe.badTime
+    SHIFT_CLOSED -> StrSafe.shiftClosed
+    else -> StrLedger.notSavedCode(code)
   }
 }

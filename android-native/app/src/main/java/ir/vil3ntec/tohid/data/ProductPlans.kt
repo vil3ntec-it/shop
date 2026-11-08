@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.product.PriceSchedule
 import ir.vil3ntec.tohid.core.product.ProductKit
 
@@ -59,7 +60,7 @@ object ProductPlansMap {
    */
   fun kitShortage(d: ShopData, cart: List<SalesEngine.CartLine>, p: Product): String? {
     if (!isKit(p)) return null
-    if (StockLedger.isOn(d)) return "«${p.name}» کیت است و با موتورِ تازهٔ موجودی هنوز فروخته نمی‌شود"
+    if (StockLedger.isOn(d)) return StrGoods.kitNotYet(p.name)
     val byId = d.products.associateBy { it.id }
     val need = HashMap<String, Double>()
     for (line in cart) {
@@ -72,7 +73,7 @@ object ProductPlansMap {
       val want = need[part.productId] ?: 0.0
       if (want > have + 1e-9) {
         val name = byId[part.productId]?.name ?: part.productId
-        return "«${p.name}»: از جزءِ «$name» ${ir.vil3ntec.tohid.qty(have.coerceAtLeast(0.0))} مانده، این سبد ${ir.vil3ntec.tohid.qty(want)} می‌خواهد"
+        return StrGoods.kitPartShort(p.name, name, ir.vil3ntec.tohid.qty(have.coerceAtLeast(0.0)), ir.vil3ntec.tohid.qty(want))
       }
     }
     return null
@@ -84,7 +85,7 @@ object ProductPlansMap {
 
   /** ردپای ویرایشِ همین دو بخش */
   fun changes(a: Product, b: Product): List<String> = buildList {
-    if (a.kit.orEmpty() != b.kit.orEmpty()) add("اجزای کیت عوض شد")
-    if (a.priceWindows.orEmpty() != b.priceWindows.orEmpty()) add("قیمتِ زمان‌بندی‌شده عوض شد")
+    if (a.kit.orEmpty() != b.kit.orEmpty()) add("اجزای کیت عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.priceWindows.orEmpty() != b.priceWindows.orEmpty()) add("قیمتِ زمان‌بندی‌شده عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
   }
 }

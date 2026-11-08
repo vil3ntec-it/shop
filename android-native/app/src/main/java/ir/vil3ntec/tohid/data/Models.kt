@@ -843,6 +843,6 @@ data class ShopData(
   val safeEntries: List<SafeEntry> = emptyList(),
 )
 
-val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")
+val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ دستهٔ مصرف
 val DEFAULT_PRODUCT_CATEGORIES = emptyList<String>()
-val DEFAULT_UNITS = listOf("عدد", "کیلوگرم", "گرم", "لیتر", "متر", "کارتن", "بسته")
+val DEFAULT_UNITS = listOf("عدد", "کیلوگرم", "گرم", "لیتر", "متر", "کارتن", "بسته")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ واحد

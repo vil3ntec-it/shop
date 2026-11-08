@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.LocaleText
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 /**
  *  پروندهٔ مشتری در صفحه‌های قدیمِ قرض‌داران (گوشی) و مشتریانِ کامپیوتر — CRM-02 (شمارهٔ دوم)،
  *  CRM-11 (برچسب و صافیِ برچسب) و فهرستِ بی ادغام‌شده‌ها (CRM-10).
@@ -38,7 +39,7 @@ object CustomerProfileForm {
 
   /** فقط شمارهٔ دوم و برچسب‌ها (پروندهٔ کامپیوتر) — بقیهٔ پرونده همان */
   fun setProfile(d: ShopData, id: String, phone2: String, tagsText: String): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
     val p = CustomerCrm.profileOf(c).copy(phone2 = phone2, tags = CustomerCrm.parseTags(tagsText))
     return when (val r = CustomerCrm.setProfile(d, id, p)) {
       is DebtorEngine.Result.Ok -> DebtorEngine.Result.Ok(r.data, id)

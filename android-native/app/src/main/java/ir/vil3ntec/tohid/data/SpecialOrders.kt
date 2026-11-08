@@ -165,8 +165,8 @@ object SpecialOrders {
     val dep = o.depositMinor!!
     val row = AuditEntry(
       id = key, type = TYPE, date = today, createdAt = now, amount = PayFlow.major(dep),
-      notes = "سفارشِ ویژه: $item — جمع ${ir.vil3ntec.tohid.money(PayFlow.major(o.totalMinor!!))}، " +
-        "پیش‌پرداخت ${ir.vil3ntec.tohid.money(PayFlow.major(dep))} افغانی، تحویل ${o.due}",
+      notes = "سفارشِ ویژه: $item — جمع ${ir.vil3ntec.tohid.money(PayFlow.major(o.totalMinor!!))}، " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        "پیش‌پرداخت ${ir.vil3ntec.tohid.money(PayFlow.major(dep))} افغانی، تحویل ${o.due}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       by = by.trim().ifEmpty { null },
       specialOrder = SpecialOrderDoc(
         debtorId = debtor, productId = o.productId, item = item, qtyMilli = o.qtyMilli,
@@ -175,7 +175,7 @@ object SpecialOrders {
     )
     val deposit = if (dep <= 0) null else DebtTransaction(
       id = newId(), debtorId = debtor!!, type = "receive", amount = PayFlow.major(dep), date = today,
-      notes = "پیش‌پرداختِ سفارشِ ویژه — $item", createdAt = now, refId = key, kind = DEPOSIT,
+      notes = "پیش‌پرداختِ سفارشِ ویژه — $item", createdAt = now, refId = key, kind = DEPOSIT,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Built.Ok(cur.copy(auditLog = cur.auditLog + row, transactions = cur.transactions + listOfNotNull(deposit)))
   }
@@ -190,7 +190,7 @@ object SpecialOrders {
   fun ready(cur: ShopData, key: String, orderId: String, today: String, now: Long, by: String): Built {
     val v = find(cur, orderId) ?: return Built.Bad("NOT_FOUND")
     SpecialOrder.moveProblem(v.status, Status.READY, null)?.let { return Built.Bad(it) }
-    return Built.Ok(cur.copy(auditLog = cur.auditLog + move(key, v, Status.READY, today, now, by, "سفارشِ ویژه آماده شد: ${v.item}")))
+    return Built.Ok(cur.copy(auditLog = cur.auditLog + move(key, v, Status.READY, today, now, by, "سفارشِ ویژه آماده شد: ${v.item}")))  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
   }
 
   /** لغو با دلیل؛ همهٔ پیش‌پرداختِ نگه‌داشته با بردِ [REFUND] به مشتری پس داده می‌شود (نقد از دخل) */
@@ -201,12 +201,12 @@ object SpecialOrders {
     val refund = v.heldMinor
     val row = move(
       key, v, Status.CANCELLED, today, now, by,
-      "لغوِ سفارشِ ویژه: ${v.item} — بازپرداختِ ${ir.vil3ntec.tohid.money(PayFlow.major(refund))} افغانی — دلیل: $why",
+      "لغوِ سفارشِ ویژه: ${v.item} — بازپرداختِ ${ir.vil3ntec.tohid.money(PayFlow.major(refund))} افغانی — دلیل: $why",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       amountMinor = refund, reason = why,
     )
     val back = if (refund <= 0) null else DebtTransaction(
       id = newId(), debtorId = v.debtorId, type = "give", amount = PayFlow.major(refund), date = today,
-      notes = "بازپرداختِ پیش‌پرداختِ سفارشِ ویژه — ${v.item}", createdAt = now, refId = v.id, kind = REFUND,
+      notes = "بازپرداختِ پیش‌پرداختِ سفارشِ ویژه — ${v.item}", createdAt = now, refId = v.id, kind = REFUND,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Built.Ok(cur.copy(auditLog = cur.auditLog + row, transactions = cur.transactions + listOfNotNull(back)))
   }
@@ -250,11 +250,11 @@ object SpecialOrders {
     if (PayFlow.minor(sale.finalTotal) != v.totalMinor || PayFlow.minor(sale.debtGiven) != s.applyMinor) return Built.Bad("TOTAL_MISMATCH")
     val label = sale.invoiceLabel() ?: "0"
     val txs = data.transactions.map {
-      if (it.refId == key && it.kind == SalesEngine.SALE_CREDIT) it.copy(notes = "کسرِ پیش‌پرداختِ سفارشِ ویژه — فاکتور #$label") else it
+      if (it.refId == key && it.kind == SalesEngine.SALE_CREDIT) it.copy(notes = "کسرِ پیش‌پرداختِ سفارشِ ویژه — فاکتور #$label") else it  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     val row = move(
       newId(), v, Status.DELIVERED, today, now, by,
-      "تحویلِ سفارشِ ویژه: ${v.item} — فاکتور #$label، از پیش‌پرداخت ${ir.vil3ntec.tohid.money(PayFlow.major(s.applyMinor))} افغانی",
+      "تحویلِ سفارشِ ویژه: ${v.item} — فاکتور #$label، از پیش‌پرداخت ${ir.vil3ntec.tohid.money(PayFlow.major(s.applyMinor))} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       amountMinor = s.applyMinor, saleId = key,
     )
     return Built.Ok(data.copy(transactions = txs, auditLog = data.auditLog + row), saleId = key)

@@ -290,7 +290,7 @@ internal fun OverLimitDialog(credit: DebtBook.Credit, onConfirm: () -> Unit, onD
     title = { Text(StrMoney.overLimitTitle, color = Shop.colors.danger) },
     text = {
       Text(
-        DebtBook.overLimitText(credit) + StrDebtPages.overLimitTail,
+        DebtBook.overLimitMsg(credit) + StrDebtPages.overLimitTail,
         style = MaterialTheme.typography.bodySmall, color = Shop.colors.muted,
       )
     },

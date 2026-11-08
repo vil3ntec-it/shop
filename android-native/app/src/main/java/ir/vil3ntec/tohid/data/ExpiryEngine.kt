@@ -163,6 +163,6 @@ object ExpiryEngine {
 
   /** «از «شیر» ۲ واحدِ منقضی» */
   fun needText(d: ShopData, need: Map<String, Long>): String = need.entries.joinToString("، ") { (id, q) ->
-    "از «${d.products.find { it.id == id }?.name.orEmpty()}» ${ir.vil3ntec.tohid.qty(q / 1000.0)} واحدِ منقضی"
+    "از «${d.products.find { it.id == id }?.name.orEmpty()}» ${ir.vil3ntec.tohid.qty(q / 1000.0)} واحدِ منقضی"  // داده: جملهٔ یادداشتِ سابقه و تأییدِ منقضی
   }
 }

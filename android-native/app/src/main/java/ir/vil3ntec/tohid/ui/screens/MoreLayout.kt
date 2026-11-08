@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.screens
 
 import androidx.compose.material.icons.outlined.SystemUpdate
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.nav.Access
 import ir.vil3ntec.tohid.core.nav.Need
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -31,7 +32,7 @@ object MoreLayout {
 
   data class Group(val title: String, val items: List<Item>)
 
-  const val SETTINGS = "تنظیمات"
+  const val SETTINGS = "تنظیمات"  // داده: کلیدِ گروهِ تنظیمات (`SettingsLayout.groupLabel` نوشتهٔ هر زبان را می‌دهد)
   /** «نسخه و به‌روزرسانی» — برای همه (کارمند هم)، مستقیم روی کنترل‌های به‌روزرسانی */
   const val APP = SettingsPaths.UPDATES
 
@@ -81,5 +82,5 @@ object MoreLayout {
   }
 
   private fun appItem(version: String) =
-    Item("app", "نسخه و به‌روزرسانی", APP, version, icon = androidx.compose.material.icons.Icons.Outlined.SystemUpdate, hue = ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE)
+    Item("app", StrAppData.versionUpdates, APP, version, icon = androidx.compose.material.icons.Icons.Outlined.SystemUpdate, hue = ir.vil3ntec.tohid.ui.v3.V3Hue.BLUE)
 }

@@ -96,7 +96,7 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
   @Synchronized
   private fun update(edit: (List<JsonObject>) -> List<JsonObject>?) {
     val next = edit(read(file)) ?: return
-    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")
+    if (!write(file, next)) throw java.io.IOException("صفِ همگام‌سازی روی حافظه نوشته نشد")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
   }
 
   /**

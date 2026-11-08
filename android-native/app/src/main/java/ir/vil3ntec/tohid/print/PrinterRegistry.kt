@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.print
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -89,7 +90,7 @@ object PrinterRegistry {
     //  چاپگرِ نسخه‌های قبلی
     val legacy = p.getString("printer_address", null)
     if (raw == null && !legacy.isNullOrBlank()) {
-      val first = listOf(Saved(newId(), "چاپگرِ فاکتور", legacy, p.getInt("printer_width", ThermalPrinter.WIDTH_58MM)))
+      val first = listOf(Saved(newId(), "چاپگرِ فاکتور", legacy, p.getInt("printer_width", ThermalPrinter.WIDTH_58MM)))  // داده: نامِ ذخیره‌شدهٔ چاپگر
       write(context, first)
       return first
     }
@@ -105,7 +106,7 @@ object PrinterRegistry {
   fun defaultSaved(context: Context): Saved? {
     val link = defaultLink(context)?.takeIf { it.isNotBlank() } ?: return null
     val saved = list(context).firstOrNull { it.link == link }
-      ?: Saved("default", "چاپگرِ فاکتور", link, prefs(context).getInt("printer_width", ThermalPrinter.WIDTH_58MM))
+      ?: Saved("default", "چاپگرِ فاکتور", link, prefs(context).getInt("printer_width", ThermalPrinter.WIDTH_58MM))  // داده: نامِ ذخیره‌شدهٔ چاپگر
     return saved.takeIf { !it.isLabel }
   }
 
@@ -148,9 +149,9 @@ object PrinterRegistry {
   }
 
   fun kind(link: String): String = when (ThermalPrinter.Link.parse(link)) {
-    is ThermalPrinter.Link.Network -> "شبکه / وای‌فای"
-    is ThermalPrinter.Link.Usb -> if (link.startsWith("usb:sys:")) "چاپگرِ نصب‌شده در سیستم" else "سیم (USB)"
-    else -> "بلوتوث"
+    is ThermalPrinter.Link.Network -> StrPrint.kindNetwork
+    is ThermalPrinter.Link.Usb -> if (link.startsWith("usb:sys:")) StrPrint.kindSystem else StrPrint.kindUsb
+    else -> StrPrint.kindBluetooth
   }
 
   fun label(link: String): String = ThermalPrinter.Link.parse(link)?.label() ?: link
@@ -163,16 +164,16 @@ object PrinterRegistry {
    */
   suspend fun testPrint(context: Context, s: Saved): String? = withContext(Dispatchers.IO) {
     val bytes = runCatching { HwPages.testBytes(context, s) }
-      .getOrElse { return@withContext "برگهٔ آزمون کشیده نشد: ${it.message}" }
-    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext "نشانیِ چاپگر خوانده نشد"
+      .getOrElse { return@withContext StrPrint.testNotDrawn(it.message) }
+    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext StrPrint.badAddress
     ThermalPrinter.send(context, link, bytes)
   }
 
   /** HW-01: برگهٔ دوروشی (`HwPages.modeTestBytes`) — بی صف، همان لحظه */
   suspend fun modeTestPrint(context: Context, s: Saved): String? = withContext(Dispatchers.IO) {
     val bytes = runCatching { HwPages.modeTestBytes(context, s) }
-      .getOrElse { return@withContext "برگهٔ دوروشی کشیده نشد: ${it.message}" }
-    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext "نشانیِ چاپگر خوانده نشد"
+      .getOrElse { return@withContext StrPrint.modeTestNotDrawn(it.message) }
+    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext StrPrint.badAddress
     ThermalPrinter.send(context, link, bytes)
   }
 

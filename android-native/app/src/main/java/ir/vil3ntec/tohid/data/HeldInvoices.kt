@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
@@ -134,10 +135,10 @@ object HeldRules {
   /** فاکتورِ نگه‌داشتهٔ کهنه‌تر از این به مدیر نشان داده می‌شود (S09) */
   const val STALE_HOURS = 24
 
-  const val EMPTY = "سبد خالی است — چیزی برای نگه‌داشتن نیست"
-  const val FULL = "حداکثر $MAX_OPEN فاکتورِ باز با هم. یکی را تمام کنید، باز کنید یا دور بیندازید."
-  const val GONE = "این فاکتور دیگر نگه‌داشته نیست"
-  const val NOTHING_LEFT = "کالاهای این فاکتور دیگر فروختنی نیستند (پاک یا غیرفعال شده‌اند). فاکتور نگه‌داشته ماند."
+  val EMPTY: String get() = StrLedger.heldEmpty
+  val FULL: String get() = StrLedger.heldFull(MAX_OPEN)
+  val GONE: String get() = StrLedger.heldGone
+  val NOTHING_LEFT: String get() = StrLedger.heldNothingLeft
 
   sealed interface Result {
     /** `cart` = فاکتورِ تازهٔ صندوق (`null` = خالی)؛ `extras` = آنچه صفحه باید بگذارد */
@@ -370,7 +371,7 @@ class HeldInvoiceStore(
 
   private suspend fun commit(next: HeldBook): Boolean = write(next).also { if (it) _book.value = next }
 
-  private fun title(number: Int, label: String) = if (label.isBlank()) "فاکتورِ #$number" else "فاکتورِ #$number «$label»"
+  private fun title(number: Int, label: String) = if (label.isBlank()) StrLedger.heldTitle(number) else StrLedger.heldTitleNamed(number, label)
 
   /**
    *  هستهٔ هر جابه‌جایی: سبد تا پایان قفل است و لغوِ صفحه (رفتن به صفحهٔ دیگر،
@@ -393,7 +394,7 @@ class HeldInvoiceStore(
           if (!commit(r.book)) return@switching Outcome.Refused(NOT_SAVED)
           cart.replace(null)
           val h = r.book.items.first { it.number == r.number }
-          Outcome.Done("${title(h.number, h.label)} نگه داشته شد", HeldExtras())
+          Outcome.Done(StrLedger.heldDone(title(h.number, h.label)), HeldExtras())
         }
       }
     }
@@ -424,8 +425,8 @@ class HeldInvoiceStore(
       //  ۳) هدف از دفتر بیرون. نرسید ⇒ `reconcile` در بالا آمدنِ بعدی
       write(r.book)
       _book.value = r.book
-      val dropped = if (r.dropped > 0) " — ${r.dropped} ردیف که کالایش دیگر فروختنی نیست کنار رفت" else ""
-      Outcome.Done("${title(target.number, target.label)} باز شد$dropped", r.extras)
+      val dropped = if (r.dropped > 0) StrLedger.heldDropped(r.dropped) else ""
+      Outcome.Done(StrLedger.heldOpened(title(target.number, target.label), dropped), r.extras)
     }
   }
 
@@ -441,7 +442,7 @@ class HeldInvoiceStore(
   /** فاکتورِ باز بعدی (`dir` > ۰) یا قبلی */
   suspend fun step(cart: HeldCart, dir: Int, extras: HeldExtras, d: ShopData? = null): Outcome {
     load()
-    val id = HeldRules.neighbour(_book.value, cart.snapshot(), dir) ?: return Outcome.Refused("فاکتورِ نگه‌داشته‌ای نیست")
+    val id = HeldRules.neighbour(_book.value, cart.snapshot(), dir) ?: return Outcome.Refused(StrLedger.heldNone)
     return resume(cart, id, extras, d)
   }
 
@@ -450,23 +451,23 @@ class HeldInvoiceStore(
     ensureLoaded()
     val h = _book.value.items.firstOrNull { it.id == id } ?: return Outcome.Refused(HeldRules.GONE)
     if (!commit(HeldRules.discard(_book.value, id))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done("${title(h.number, h.label)} دور انداخته شد")
+    Outcome.Done(StrLedger.heldDiscarded(title(h.number, h.label)))
   }
 
   suspend fun rename(id: String, label: String, note: String): Outcome = lock.withLock {
     ensureLoaded()
     if (_book.value.items.none { it.id == id }) return Outcome.Refused(HeldRules.GONE)
     if (!commit(HeldRules.rename(_book.value, id, label, note))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done("ذخیره شد")
+    Outcome.Done(StrLedger.saved)
   }
 
   /** پاک کردنِ نگه‌داشته‌های کهنه — صفحه مجوز و تأیید را می‌گیرد */
   suspend fun dropStale(hours: Int = HeldRules.STALE_HOURS): Outcome = lock.withLock {
     ensureLoaded()
     val n = HeldRules.stale(_book.value, clock(), hours).size
-    if (n == 0) return Outcome.Refused("فاکتورِ کهنه‌ای نیست")
+    if (n == 0) return Outcome.Refused(StrLedger.heldNoOld)
     if (!commit(HeldRules.dropStale(_book.value, clock(), hours))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done("$n فاکتورِ کهنه پاک شد")
+    Outcome.Done(StrLedger.heldOldCleared(n))
   }
 
   /**
@@ -506,7 +507,7 @@ class HeldInvoiceStore(
 
   companion object {
     const val FILE = "held-invoices.json"
-    const val BUSY = "فروش در حالِ ثبت است — لحظه‌ای بعد"
-    const val NOT_SAVED = "روی دستگاه نوشته نشد — چیزی جابه‌جا نشد؛ دوباره بزنید."
+    val BUSY: String get() = StrLedger.saleBusy
+    val NOT_SAVED: String get() = StrLedger.heldNotSaved
   }
 }

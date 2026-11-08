@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.i18n.StrTillPay
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.pay.StoredPay
@@ -45,10 +47,10 @@ object CreditDebtor {
 
   /** متنِ ردِ موتور — فارسی مثلِ بقیهٔ ردهای `SalesEngine`؛ «بی مشتری» و «پیدا نشد» همان متنِ همیشه */
   fun engineText(d: ShopData, issue: Issue, debtorId: String?): String = when (issue) {
-    Issue.MISSING -> "برای فروش نسیه، قرض‌دار را انتخاب کنید"
-    Issue.UNKNOWN -> "قرض‌دار پیدا نشد"
+    Issue.MISSING -> StrSale.pickDebtorForCredit
+    Issue.UNKNOWN -> StrLedger.debtorNotFound
     Issue.MERGED -> nameOf(d, keeperOf(d, debtorId)).let { keep ->
-      "«${nameOf(d, debtorId)}» با «$keep» یکی شده است؛ برای نسیه «$keep» را انتخاب کنید"
+      StrLedger.debtorMergedInto(nameOf(d, debtorId), keep)
     }
   }
 

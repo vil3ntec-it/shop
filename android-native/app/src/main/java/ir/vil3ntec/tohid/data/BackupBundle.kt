@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -154,7 +155,7 @@ object BackupBundle {
       }
     }
 
-    val text = ledger ?: error("این فایل، پشتیبانِ فروشگاه من نیست")
+    val text = ledger ?: error(StrAppData.notOurBackup)
     Opened(parse(text).getOrThrow(), photos)
   }
 

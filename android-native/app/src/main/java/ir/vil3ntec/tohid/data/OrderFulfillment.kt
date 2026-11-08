@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
 import ir.vil3ntec.tohid.core.orders.OrderRefunds
@@ -73,8 +74,8 @@ object OrderFulfillment {
   const val CHANNEL = "online"
   /** سریِ فاکتورِ تحویلِ سفارش — هیچ دستگاهی آن را نمی‌گیرد (`doc-series.LETTERS` بی O) */
   const val SERIES = "O"
-  const val FEE_LABEL = "هزینهٔ ارسال"
-  const val REVERSE_REASON = "سفارشِ اینترنتی به دکان برگشت"
+  const val FEE_LABEL = "هزینهٔ ارسال"  // داده: نامِ قلمِ ذخیره‌شده در فاکتور
+  const val REVERSE_REASON = "سفارشِ اینترنتی به دکان برگشت"  // داده: دلیلِ لغوِ ذخیره‌شده و یادداشتِ سابقه
 
   fun saleIdOf(orderId: String): String = "o-$orderId"
   fun legacySaleIdOf(orderId: String): String = "w-$orderId"
@@ -139,7 +140,7 @@ object OrderFulfillment {
   }
 
   /** دلیلِ فهرستِ بررسی برای ردیفِ `review` ِ سرور (`reviewCode = before_floor`) */
-  const val REVIEW_BEFORE_FLOOR = "پیش از راه‌اندازی تحویل شده؛ اگر دستی ثبت نکرده‌اید، ثبت کنید"
+  val REVIEW_BEFORE_FLOOR: String get() = StrLedger.reviewBeforeFloor
 
   /** فروشِ این سفارش (از هر دستگاه) در دفتر هست ⇒ هشدارِ «ثبت نشد» دیگر لازم نیست */
   fun settled(d: ShopData, orderId: String): Boolean = saleOf(d, orderId) != null
@@ -157,8 +158,7 @@ object OrderFulfillment {
     val saleId = saleIdOf(o.id)
     val returned = d.saleItems.any { it.saleId == saleId && it.returnedQty > 1e-9 } || d.saleReturns.any { it.saleId == saleId }
     if (!returned) return null
-    return "سفارش #${o.orderNo} به دکان برگشت ولی برای فاکتورش پیش‌تر «مرجوعیِ» دستی ثبت شده — لغوِ خودکار نشد. " +
-      "مرجوعی پول را از دخل برداشته و کالا را یک بار برگردانده؛ صاحب دخل و موجودی را بررسی کند."
+    return StrLedger.orderBackManualReturn(o.orderNo)
   }
 
   sealed interface Result {
@@ -217,12 +217,12 @@ object OrderFulfillment {
     blockExpired: Boolean = false,
     allowShortage: Boolean = false,
   ): Result {
-    if (o.id.isBlank()) return Result.Failed("سفارش معتبر نیست")
+    if (o.id.isBlank()) return Result.Failed(StrLedger.orderBad)
     saleOf(d, o.id)?.let { return Result.Already(it.id) }
-    if (o.isTest) return Result.Failed("سفارشِ آزمایشی فروش و کسرِ موجودی ندارد")
+    if (o.isTest) return Result.Failed(StrLedger.orderTest)
     val lines = o.lines.sortedBy { it.lineNo }
-    if (lines.isEmpty()) return Result.Failed("قلم‌های سفارش #${o.orderNo} نیامد؛ سفارش را دوباره باز کنید")
-    val tag = "سفارش #${o.orderNo}: "
+    if (lines.isEmpty()) return Result.Failed(StrLedger.orderNoLines(o.orderNo))
+    val tag = StrLedger.orderTag(o.orderNo)
 
     class Plan(val itemId: String, val lineNo: Int, val cart: SalesEngine.CartLine, val totalMinor: Long, val product: Product?)
 
@@ -234,12 +234,12 @@ object OrderFulfillment {
       if (p == null) {
         //  کالایی که در دفترِ دکان نیست (یا قلمِ آزادِ سفارشِ دستی) ⇒ قلمِ آزاد، بی اثر بر موجودی
         val q = l.qtyMilli / 1000.0
-        if (!(q > 0)) return Result.Failed(tag + "مقدارِ «${l.name}» درست نیست")
+        if (!(q > 0)) return Result.Failed(tag + StrLedger.qtyOfBad(l.name))
         val id = itemIdOf(o.id, l.lineNo)
-        plan += Plan(id, l.lineNo, SalesEngine.CartLine(id, q, round2(total / q), l.name.ifBlank { "قلمِ سفارش" }), l.lineTotalMinor, null)
+        plan += Plan(id, l.lineNo, SalesEngine.CartLine(id, q, round2(total / q), l.name.ifBlank { "قلمِ سفارش" }), l.lineTotalMinor, null)  // داده: نامِ قلمِ ذخیره‌شده در فاکتور
       } else {
         val q = stockQty(p, l.unit, l.qtyMilli)
-        if (!(q > 0)) return Result.Failed(tag + "مقدارِ «${p.name}» درست نیست")
+        if (!(q > 0)) return Result.Failed(tag + StrLedger.qtyOfBad(p.name))
         plan += Plan(itemIdOf(o.id, l.lineNo), l.lineNo, SalesEngine.CartLine(p.id, q, round2(total / q)), l.lineTotalMinor, p)
       }
     }
@@ -293,13 +293,13 @@ object OrderFulfillment {
     val newMoves = base.stockMovements.drop(d.stockMovements.size)
     val newAudit = base.auditLog.drop(d.auditLog.size)
     val rows = plan.map { it.itemId to it.totalMinor } + listOfNotNull(feeLine?.let { feeItemIdOf(o.id) to fee })
-    if (newItems.size != rows.size) return Result.Failed(tag + "قلم‌های فاکتور با سفارش نمی‌خواند")
+    if (newItems.size != rows.size) return Result.Failed(tag + StrLedger.orderLinesMismatch)
     val items = newItems.mapIndexed { i, it ->
       val total = rows[i].second / 100.0
       it.copy(id = rows[i].first, totalPrice = total, unitPrice = if (it.quantity > 0) round2(total / it.quantity) else total)
     }
     val stocked = plan.filter { it.product != null }
-    if (newMoves.size != stocked.size) return Result.Failed(tag + "حرکت‌های انبار با سفارش نمی‌خواند")
+    if (newMoves.size != stocked.size) return Result.Failed(tag + StrLedger.orderMovesMismatch)
 
     val pay = paymentOf(o)
     val made = base.sales.last()
@@ -324,12 +324,12 @@ object OrderFulfillment {
     )
     val label = sale.invoiceLabel() ?: "0"
     val moves = newMoves.mapIndexed { i, m ->
-      m.copy(id = moveIdOf(o.id, stocked[i].lineNo), notes = "فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}")
+      m.copy(id = moveIdOf(o.id, stocked[i].lineNo), notes = "فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     val audit = newAudit.map {
       it.copy(
         id = auditIdOf(o.id),
-        notes = "ثبت فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی",
+        notes = "ثبت فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo} به مبلغ ${money(finalTotal)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       )
     }
     return Result.Ok(
@@ -365,7 +365,7 @@ object OrderFulfillment {
       .map {
         StockMovement(
           id = "${it.id}-x", productId = it.productId, type = "sale_cancel", qty = it.quantity - it.returnedQty,
-          date = today, notes = "لغو فروش — فاکتور #$label — $REVERSE_REASON", refId = saleId, createdAt = now,
+          date = today, notes = "لغو فروش — فاکتور #$label — $REVERSE_REASON", refId = saleId, createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         )
       }
     val updated = sale.copy(status = "cancelled", cancelReason = REVERSE_REASON)
@@ -373,7 +373,7 @@ object OrderFulfillment {
     val audit = if (d.auditLog.any { it.id == auditId }) emptyList() else listOf(
       AuditEntry(
         id = auditId, type = "cancel_sale", date = today, refId = saleId,
-        notes = "لغو فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REVERSE_REASON", createdAt = now,
+        notes = "لغو فروش فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REVERSE_REASON", createdAt = now,  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       ),
     )
     return Result.Ok(
@@ -388,8 +388,8 @@ object OrderFulfillment {
 
   /* ===================== بازپرداختِ سفارشِ تحویل‌شده (RET-11، FIN-01) ===================== */
 
-  const val REFUND_REASON = "بازپرداختِ سفارشِ اینترنتی"
-  const val RESTOCK_REASON = "کالای سفارشِ بازپرداخت‌شده به انبار برگشت"
+  const val REFUND_REASON = "بازپرداختِ سفارشِ اینترنتی"  // داده: دلیلِ ذخیره‌شدهٔ برگشت
+  const val RESTOCK_REASON = "کالای سفارشِ بازپرداخت‌شده به انبار برگشت"  // داده: دلیلِ ذخیره‌شدهٔ برگشت
 
   /** رویدادهای بازپرداختِ ردیفِ `refunds` ِ سرور ⇒ رویدادِ هسته */
   fun eventsOf(o: OrderDto): List<OrderRefunds.Event> =
@@ -429,7 +429,7 @@ object OrderFulfillment {
   fun refund(d: ShopData, o: OrderDto, by: String, dayOf: (Long) -> String): Result {
     val saleId = saleIdOf(o.id)
     val sale = d.sales.firstOrNull { it.id == saleId }
-      ?: return Result.Failed("سفارش #${o.orderNo}: فروشِ تحویلِ این سفارش هنوز در این دستگاه نیست؛ پس از همگام‌سازی ثبت می‌شود")
+      ?: return Result.Failed(StrLedger.orderSaleMissing(o.orderNo))
     if (sale.status == "cancelled") return Result.Already(saleId)
     val steps = OrderRefunds.plan(ReturnFlow.minor(sale.finalTotal), returnedMinor(d, saleId), refundedKeys(d, o.id), eventsOf(o))
     if (steps.isEmpty()) return Result.Already(saleId)
@@ -445,13 +445,13 @@ object OrderFulfillment {
       if (s.amountMinor > 0) {
         val prior = d.saleReturns.filter { it.saleId == saleId } + rows
         val split = when (val r = ReturnFlow.split(sale, amount, ReturnFlow.ORIGINAL, by.ifBlank { "owner" }, null, prior)) {
-          is ReturnFlow.Outcome.Bad -> return Result.Failed("سفارش #${o.orderNo}: ${r.message}")
+          is ReturnFlow.Outcome.Bad -> return Result.Failed(StrLedger.orderWhy(o.orderNo, r.message))
           is ReturnFlow.Outcome.Ok -> r.value
         }
         //  فروشِ تحویل نسیه و اعتبار ندارد (`debtGiven = 0`، روشِ اصلی)؛ اگر شد، بی‌صدا نه
-        if (split.account > 0 || split.credit > 0) return Result.Failed("سفارش #${o.orderNo}: بازپرداخت به حسابِ مشتری نمی‌رود؛ دستی بررسی کنید")
+        if (split.account > 0 || split.credit > 0) return Result.Failed(StrLedger.orderRefundNotAccount(o.orderNo))
         where = buildList {
-          if (split.cash > 0) add("نقد ${money(split.cash)}")
+          if (split.cash > 0) add("نقد ${money(split.cash)}")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           split.methods.forEach { (m, a) -> add("${ReturnFlow.methodName(m)} ${money(a)}") }
         }.joinToString("، ")
         rows += SaleReturn(
@@ -465,10 +465,10 @@ object OrderFulfillment {
       audit += AuditEntry(
         id = markId, type = "return", date = day, refId = saleId, createdAt = s.at, amount = amount,
         notes = if (s.amountMinor > 0) {
-          "برگشت ${ReturnFlow.label(docId)} به مبلغ ${money(amount)} افغانی — فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REFUND_REASON" +
-            if (where.isNotEmpty()) " — بازپرداخت: $where" else ""
+          "برگشت ${ReturnFlow.label(docId)} به مبلغ ${money(amount)} افغانی — فاکتور #$label — سفارشِ اینترنتی #${o.orderNo}: $REFUND_REASON" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+            if (where.isNotEmpty()) " — بازپرداخت: $where" else ""  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         } else {
-          "سفارشِ اینترنتی #${o.orderNo}: بازپرداخت رسید ولی از فاکتور #$label چیزی برای برگشت نمانده بود"
+          StrLedger.orderRefundNothing(o.orderNo, label)
         },
       )
     }
@@ -503,7 +503,7 @@ object OrderFulfillment {
     val items = d.saleItems.associateBy { it.id }
     val all = refundLines(d, orderId)
     return OrderRefunds.restockLines(all, all.mapTo(HashSet()) { it.lineNo }).map { l ->
-      val name = items[itemIdOf(orderId, l.lineNo)]?.let { SalesEngine.itemName(d, it) } ?: "قلمِ ${l.lineNo}"
+      val name = items[itemIdOf(orderId, l.lineNo)]?.let { SalesEngine.itemName(d, it) } ?: "قلمِ ${l.lineNo}"  // داده: نامِ قلمِ یادداشتِ سابقه
       l.lineNo to "$name — ${ir.vil3ntec.tohid.qty(l.remaining)}"
     }
   }
@@ -544,7 +544,7 @@ object OrderFulfillment {
    */
   fun restock(d: ShopData, orderId: String, orderNo: Long, chosen: Set<Int>, by: String, today: String, now: Long): Result {
     val saleId = saleIdOf(orderId)
-    val sale = d.sales.firstOrNull { it.id == saleId } ?: return Result.Failed("فروشِ سفارش #$orderNo در این دفتر نیست")
+    val sale = d.sales.firstOrNull { it.id == saleId } ?: return Result.Failed(StrLedger.orderSaleNotHere(orderNo))
     val keys = restockPending(d, orderId)
     if (keys.isEmpty()) return Result.Already(saleId)
     val doc = OrderRefunds.decisionIdOf(orderId, keys.first())
@@ -559,7 +559,7 @@ object OrderFulfillment {
       val item = items[itemIdOf(orderId, line.lineNo)] ?: continue
       val product = products[line.productId]
       val name = SalesEngine.itemName(d, item)
-      val note = "برگشتِ کالا — فاکتور #$label — سفارشِ اینترنتی #$orderNo — $name"
+      val note = "برگشتِ کالا — فاکتور #$label — سفارشِ اینترنتی #$orderNo — $name"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       entries += WarehouseEntry(
         id = OrderRefunds.restockIdOf(orderId, line.lineNo), productId = line.productId, units = line.remaining,
         unit = product?.unit.orEmpty(), date = today, notes = note, isAdjustment = true, createdAt = now, refId = doc,
@@ -576,10 +576,10 @@ object OrderFulfillment {
       names += "$name ${ir.vil3ntec.tohid.qty(line.remaining)}"
     }
     val known = d.auditLog.mapTo(HashSet()) { it.id }
-    val what = if (names.isEmpty()) "هیچ کالایی به انبار برنگشت" else "به انبار برگشت: ${names.joinToString("، ")}"
+    val what = if (names.isEmpty()) "هیچ کالایی به انبار برنگشت" else "به انبار برگشت: ${names.joinToString("، ")}"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     val audit = keys.map { OrderRefunds.decisionIdOf(orderId, it) }.filter { it !in known }.map {
       AuditEntry(id = it, type = "return", date = today, refId = saleId, createdAt = now,
-        notes = "برگشتِ کالای سفارشِ اینترنتی #$orderNo (فاکتور #$label): $what" + if (by.isNotBlank()) " — ثبت: ${by.trim()}" else "")
+        notes = "برگشتِ کالای سفارشِ اینترنتی #$orderNo (فاکتور #$label): $what" + if (by.isNotBlank()) " — ثبت: ${by.trim()}" else "")  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     }
     return Result.Ok(
       d.copy(

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data.repo
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiEndpoints
 import ir.vil3ntec.tohid.core.net.ApiJson
@@ -93,7 +94,7 @@ class BackupRepository(private val api: ApiClient) {
       bytes,
       headers = if (appVersion.isBlank()) emptyMap() else mapOf("X-App-Version" to appVersion),
     )
-    item(body["backup"] as? JsonObject) ?: error("پاسخِ سرور شکلِ درستی نداشت")
+    item(body["backup"] as? JsonObject) ?: error(StrAppData.serverShapeBad)
   }
 
   suspend fun remove(id: String): ApiResult<Unit> = result {

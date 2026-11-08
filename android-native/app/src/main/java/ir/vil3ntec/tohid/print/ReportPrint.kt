@@ -17,6 +17,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextDirectionHeuristics
 import android.text.TextPaint
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.data.ReportCsv
 import java.io.FileOutputStream
 
@@ -79,8 +80,8 @@ object ReportPrint {
       addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     context.startActivity(android.content.Intent.createChooser(send, title).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK))
-    "PDF آماده شد"
-  }.getOrElse { "PDF ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}" }
+    StrPrint.pdfReady
+  }.getOrElse { StrPrint.pdfFailed(it.message ?: StrPrint.unknownReason) }
 
   private class TableAdapter(
     private val context: Context,
@@ -111,7 +112,7 @@ object ReportPrint {
       cancellationSignal: CancellationSignal?,
       callback: WriteResultCallback,
     ) {
-      val a = attrs ?: run { callback.onWriteFailed("اندازهٔ کاغذ معلوم نیست"); return }
+      val a = attrs ?: run { callback.onWriteFailed(StrPrint.paperUnknown); return }
       val pdf = PrintedPdfDocument(context, a)
       try {
         draw(pdf, cancellationSignal)
@@ -187,7 +188,7 @@ object ReportPrint {
       at(sub, margin, y); y += sub.height + 10
 
       if (body.isEmpty()) {
-        val none = layout("داده‌ای برای چاپ نیست.", text, width)
+        val none = layout(StrPrint.nothingToPrint, text, width)
         at(none, margin, y)
       } else {
         y += row(header, head, true)

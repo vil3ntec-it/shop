@@ -9,6 +9,8 @@ import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 
+import ir.vil3ntec.tohid.core.i18n.StrAppData
+import ir.vil3ntec.tohid.core.i18n.StrAuth
 /**
  *  ورود با حسابِ گوگلِ خودِ گوشی.
  *
@@ -30,7 +32,7 @@ object GoogleSignIn {
    *  قرمز بگیرد. هر چیزِ دیگری با پیامِ فارسی پرتاب می‌شود.
    */
   suspend fun pick(context: Context, clientId: String): Account? {
-    if (clientId.isBlank()) throw IllegalStateException("ورود با گوگل روی این سرور روشن نیست")
+    if (clientId.isBlank()) throw IllegalStateException(StrAppData.googleOff)
 
     val option = GetGoogleIdOption.Builder()
       .setServerClientId(clientId)
@@ -48,8 +50,7 @@ object GoogleSignIn {
       return null
     } catch (e: NoCredentialException) {
       throw IllegalStateException(
-        "روی این گوشی حساب گوگلی نیست، یا گوگل حسابی برای این برنامه پیدا نکرد — " +
-          "از تنظیماتِ گوشی یک حساب گوگل اضافه کنید و دوباره بزنید"
+        StrAppData.googleNoAccount
       )
     } catch (e: Exception) {
       /*
@@ -66,10 +67,9 @@ object GoogleSignIn {
       val raw = e.message.orEmpty().take(160)
       throw IllegalStateException(
         buildString {
-          append("ورود با گوگل انجام نشد")
+          append(StrAuth.googleFailed)
           if (raw.isNotBlank()) append(" — ").append(raw)
-          append("\nاگر تکرار شد: شناسهٔ کلاینتِ سرور باید از نوعِ Web باشد و ")
-          append("امضای SHA-1 این برنامه در Google Cloud ثبت شده باشد.")
+          append("\n").append(StrAppData.googleHint)
         }
       )
     }
@@ -78,11 +78,11 @@ object GoogleSignIn {
     if (credential !is CustomCredential ||
       credential.type != GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
     ) {
-      throw IllegalStateException("پاسخِ گوگل شناخته نشد")
+      throw IllegalStateException(StrAppData.googleBadAnswer)
     }
 
     val google = runCatching { GoogleIdTokenCredential.createFrom(credential.data) }
-      .getOrElse { throw IllegalStateException("توکنِ گوگل خوانده نشد") }
+      .getOrElse { throw IllegalStateException(StrAppData.googleBadToken) }
 
     return Account(idToken = google.idToken, email = google.id)
   }

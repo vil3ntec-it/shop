@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.money
 
 /**
@@ -39,8 +40,8 @@ object DebtorEngine {
 
   fun add(d: ShopData, draft: DebtorDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام قرض‌دار را بنویسید")
-    if (badLimit(draft.creditLimit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
+    if (name.isEmpty()) return Result.Failed(StrLedger.debtorNameNeeded)
+    if (badLimit(draft.creditLimit)) return Result.Failed(StrLedger.creditLimitBad)
 
     val id = newId()
     return Result.Ok(
@@ -59,9 +60,9 @@ object DebtorEngine {
   }
 
   fun edit(d: ShopData, id: String, draft: DebtorDraft): Result {
-    if (d.debtors.none { it.id == id }) return Result.Failed("قرض‌دار پیدا نشد")
+    if (d.debtors.none { it.id == id }) return Result.Failed(StrLedger.debtorNotFound)
     val name = draft.name.trim()
-    if (name.isEmpty()) return Result.Failed("نام قرض‌دار را بنویسید")
+    if (name.isEmpty()) return Result.Failed(StrLedger.debtorNameNeeded)
 
     return Result.Ok(
       d.copy(
@@ -87,13 +88,13 @@ object DebtorEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed("قرض‌دار پیدا نشد")
-    if (badLimit(limit)) return Result.Failed("سقفِ اعتبار معتبر وارد کنید")
+    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed(StrLedger.debtorNotFound)
+    if (badLimit(limit)) return Result.Failed(StrLedger.creditLimitBad)
     if (limit == debtor.creditLimit) return Result.Ok(d, id)
-    fun text(v: Double?) = v?.let { "${money(it)} افغانی" } ?: "بی سقف"
+    fun text(v: Double?) = v?.let { "${money(it)} افغانی" } ?: "بی سقف"  // داده: برچسبِ درونِ یادداشتِ سابقه
     val trace = AuditEntry(
       id = newId(), type = "credit_limit_set", date = today, refId = id, createdAt = now,
-      notes = "سقفِ اعتبارِ «${debtor.name}»: ${text(debtor.creditLimit)} ⇐ ${text(limit)}",
+      notes = "سقفِ اعتبارِ «${debtor.name}»: ${text(debtor.creditLimit)} ⇐ ${text(limit)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Result.Ok(
       d.copy(
@@ -124,12 +125,12 @@ object DebtorEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed("قرض‌دار پیدا نشد")
+    val debtor = d.debtors.find { it.id == id } ?: return Result.Failed(StrLedger.debtorNotFound)
     val rows = d.transactions.count { it.debtorId == id }
     //  ردپا: پیش‌تر قرض‌دار و همهٔ تراکنش‌هایش بی هیچ سابقه‌ای می‌رفتند
     val trace = AuditEntry(
       id = newId(), type = "debtor_delete", date = today, refId = id, createdAt = now,
-      notes = "حذفِ قرض‌دار «${debtor.name}» با $rows تراکنش — ماندهٔ حساب ${money(ShopStore.debt(d, id))} افغانی",
+      notes = "حذفِ قرض‌دار «${debtor.name}» با $rows تراکنش — ماندهٔ حساب ${money(ShopStore.debt(d, id))} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     return Result.Ok(
       d.copy(
@@ -147,9 +148,9 @@ object DebtorEngine {
     val balance = ShopStore.debt(d, id)
     val count = d.transactions.count { it.debtorId == id }
     return if (balance > 0) {
-      "«${debtor.name}» هنوز ${money(balance)} افغانی بدهی دارد. با حذف او، این طلب و ${money(count.toDouble())} تراکنش او برای همیشه از دفتر پاک می‌شود."
+      StrLedger.deleteWarnDebt(debtor.name, money(balance), money(count.toDouble()))
     } else {
-      "«${debtor.name}» و ${money(count.toDouble())} تراکنش او حذف خواهند شد. این عملیات قابل بازگشت نیست."
+      StrLedger.deleteWarn(debtor.name, money(count.toDouble()))
     }
   }
 
@@ -181,8 +182,8 @@ object DebtorEngine {
     /** شناسهٔ ردیف که پیش از ثبت ساخته شد — کلیدِ «یک بار» ِ `DebtEntry`؛ `null` ⇒ [newId] */
     txId: String? = null,
   ): Result {
-    val debtor = d.debtors.find { it.id == debtorId } ?: return Result.Failed("قرض‌دار پیدا نشد")
-    if (amount.isNaN() || amount <= 0) return Result.Failed("مبلغ معتبر وارد کنید")
+    val debtor = d.debtors.find { it.id == debtorId } ?: return Result.Failed(StrLedger.debtorNotFound)
+    if (amount.isNaN() || amount <= 0) return Result.Failed(StrLedger.amountBad)
 
     val when_ = date.ifBlank { today }
     //  رسید سررسید ندارد
@@ -190,7 +191,7 @@ object DebtorEngine {
     dueProblem(due, when_)?.let { return Result.Failed(it) }
 
     val credit = if (kind == Kind.GIVE) DebtBook.creditCheck(d, debtorId, DebtBook.minor(amount)) else null
-    if (credit != null && credit.over && !overLimit) return Result.Failed(DebtBook.overLimitText(credit))
+    if (credit != null && credit.over && !overLimit) return Result.Failed(DebtBook.overLimitMsg(credit))
 
     val id = txId ?: newId()
     val transaction = DebtTransaction(
@@ -210,7 +211,7 @@ object DebtorEngine {
         type = "credit_over_limit",
         date = when_,
         refId = id,
-        notes = "بردِ ${money(amount)} افغانی برای «${debtor.name}» با تأییدِ کاربر — ${DebtBook.overLimitText(credit)}",
+        notes = "بردِ ${money(amount)} افغانی برای «${debtor.name}» با تأییدِ کاربر — ${DebtBook.overLimitText(credit)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
       )
     } else if (kind == Kind.RECEIVE) {
@@ -219,7 +220,7 @@ object DebtorEngine {
         type = "customer_payment",
         date = when_,
         refId = id,
-        notes = "پرداخت مشتری «${debtor.name}» به مبلغ ${money(amount)} افغانی",
+        notes = "پرداخت مشتری «${debtor.name}» به مبلغ ${money(amount)} افغانی",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
       )
     } else {
@@ -235,8 +236,8 @@ object DebtorEngine {
   /** سررسیدِ نامعتبر ⇒ جمله؛ درست یا خالی ⇒ `null` */
   private fun dueProblem(due: String?, date: String): String? = when {
     due == null -> null
-    !DebtBook.isIsoDate(due) -> "سررسید خوانده نشد"
-    due < date -> "سررسید نمی‌تواند پیش از تاریخِ برد باشد"
+    !DebtBook.isIsoDate(due) -> StrLedger.dueUnreadable
+    due < date -> StrLedger.dueBeforeGive
     else -> null
   }
 
@@ -254,8 +255,8 @@ object DebtorEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val tx = d.transactions.find { it.id == txId } ?: return Result.Failed("تراکنش پیدا نشد")
-    if (tx.type != "give") return Result.Failed("سررسید فقط برای برد است")
+    val tx = d.transactions.find { it.id == txId } ?: return Result.Failed(StrLedger.txNotFound)
+    if (tx.type != "give") return Result.Failed(StrLedger.dueOnlyGive)
     val due = dueDate?.trim()?.takeIf { it.isNotEmpty() }
     dueProblem(due, tx.date)?.let { return Result.Failed(it) }
     if (due == tx.dueDate) return Result.Ok(d, txId)
@@ -263,7 +264,7 @@ object DebtorEngine {
     val who = d.debtors.find { it.id == tx.debtorId }?.name.orEmpty()
     val trace = AuditEntry(
       id = newId(), type = "debt_due_set", date = today, refId = txId, createdAt = now,
-      notes = "سررسیدِ بردِ ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date}): " +
+      notes = "سررسیدِ بردِ ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date}): " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         "${tx.dueDate ?: "ندارد"} ⇐ ${due ?: "ندارد"}",
     )
     return Result.Ok(
@@ -282,12 +283,12 @@ object DebtorEngine {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): Result {
-    val tx = d.transactions.find { it.id == id } ?: return Result.Failed("تراکنش پیدا نشد")
+    val tx = d.transactions.find { it.id == id } ?: return Result.Failed(StrLedger.txNotFound)
     val who = d.debtors.find { it.id == tx.debtorId }?.name.orEmpty()
-    val kind = if (tx.type == "receive") "دریافت" else "قرض"
+    val kind = if (tx.type == "receive") "دریافت" else "قرض"  // داده: برچسبِ درونِ یادداشتِ سابقه
     val trace = AuditEntry(
       id = newId(), type = "debt_tx_delete", date = today, refId = tx.debtorId, createdAt = now,
-      notes = "حذفِ $kind ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date})",
+      notes = "حذفِ $kind ${money(tx.amount)} افغانی از حسابِ «$who» (تاریخ ${tx.date})",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     )
     val out = d.copy(transactions = d.transactions.filter { it.id != id }, auditLog = d.auditLog + trace)
     //  PRM-13: رسیدِ دستیِ حذف‌شده امتیازی را که داده بود پس می‌گیرد (بی امتیاز ⇒ همان شیء)
@@ -397,8 +398,8 @@ object DebtorEngine {
 
   /** حالِ حساب، با همان جمله‌های نسخهٔ وب — با `shop.debt_minor` صفر و نشانه به پول (`DebtMinorFlag.sign`) */
   fun stateText(balance: Double): String = when (DebtMinorFlag.sign(balance)) {
-    1 -> "${money(balance)} افغانی بدهکار"
-    -1 -> "${money(-balance)} افغانی موجودی دارد"
-    else -> "حساب صاف است"
+    1 -> "${money(balance)} افغانی بدهکار"  // داده: هم‌جملهٔ نسخهٔ وب برای برگهٔ خروجی (صفحه: `MoneyText.state`)
+    -1 -> "${money(-balance)} افغانی موجودی دارد"  // داده: هم‌جملهٔ نسخهٔ وب برای برگهٔ خروجی (صفحه: `MoneyText.state`)
+    else -> "حساب صاف است"  // داده: هم‌جملهٔ نسخهٔ وب برای برگهٔ خروجی (صفحه: `MoneyText.state`)
   }
 }

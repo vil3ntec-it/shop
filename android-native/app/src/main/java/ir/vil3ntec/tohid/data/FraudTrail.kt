@@ -44,7 +44,7 @@ object FraudTrail {
       type = LineVoid.TYPE,
       date = today,
       refId = draftKey,
-      notes = "حذفِ ردیف از فاکتورِ باز — $name × ${ir.vil3ntec.tohid.qty(line.quantity)}",
+      notes = "حذفِ ردیف از فاکتورِ باز — $name × ${ir.vil3ntec.tohid.qty(line.quantity)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now,
       amount = SalesEngine.lineTotal(SalesEngine.linePrice(d, line), line.quantity),
       by = by,

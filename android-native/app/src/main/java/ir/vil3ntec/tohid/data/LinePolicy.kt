@@ -84,8 +84,8 @@ object LinePolicy {
   fun approvalAudit(g: ir.vil3ntec.tohid.core.pos.PriceApproval.Grant, product: String, refId: String?, now: Long, today: String): AuditEntry =
     AuditEntry(
       id = auditId(), type = ir.vil3ntec.tohid.core.pos.PriceApproval.AUDIT_TYPE, date = today, refId = refId,
-      notes = "تغییرِ قیمتِ «$product» از ${ir.vil3ntec.tohid.money(g.listMinor / 100.0)} به ${ir.vil3ntec.tohid.money(g.priceMinor / 100.0)} افغانی بیرون از قاعده" +
-        " — درخواست: ${g.requester.trim()} — تأیید: ${g.by.trim()} — دلیل: ${g.reason.trim()}",
+      notes = "تغییرِ قیمتِ «$product» از ${ir.vil3ntec.tohid.money(g.listMinor / 100.0)} به ${ir.vil3ntec.tohid.money(g.priceMinor / 100.0)} افغانی بیرون از قاعده" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        " — درخواست: ${g.requester.trim()} — تأیید: ${g.by.trim()} — دلیل: ${g.reason.trim()}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
       createdAt = now, amount = g.priceMinor / 100.0,
       by = g.requester.trim().ifEmpty { null }, approvedBy = g.by.trim(), reason = g.reason.trim(),
     )
