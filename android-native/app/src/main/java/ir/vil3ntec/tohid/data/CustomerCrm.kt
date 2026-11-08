@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.LocaleText
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 
@@ -182,31 +183,31 @@ object CustomerCrm {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
-    if (!isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    if (!isActive(c)) return DebtorEngine.Result.Failed(StrLedger.customerMerged)
 
     val phone2 = LocaleText.phoneForSave(p.phone2).ifBlank { null }
     if (phone2 != null) {
       val k = phoneKey(phone2)
-      if (phone2 == c.phone || (k != null && k == phoneKey(c.phone))) return DebtorEngine.Result.Failed("شمارهٔ دوم همان شمارهٔ اول است")
+      if (phone2 == c.phone || (k != null && k == phoneKey(c.phone))) return DebtorEngine.Result.Failed(StrLedger.secondPhoneSame)
     }
     val tags = normalizeTags(p.tags)
-    if (tags.size > MAX_TAGS) return DebtorEngine.Result.Failed("حداکثر $MAX_TAGS برچسب")
-    if (tags.any { it.length > MAX_TAG_LENGTH }) return DebtorEngine.Result.Failed("هر برچسب حداکثر $MAX_TAG_LENGTH حرف")
+    if (tags.size > MAX_TAGS) return DebtorEngine.Result.Failed(StrLedger.maxTags(MAX_TAGS))
+    if (tags.any { it.length > MAX_TAG_LENGTH }) return DebtorEngine.Result.Failed(StrLedger.tagTooLong(MAX_TAG_LENGTH))
     val group = clean(p.group).ifEmpty { null }
-    if (group != null && group.length > MAX_GROUP_LENGTH) return DebtorEngine.Result.Failed("نامِ گروه حداکثر $MAX_GROUP_LENGTH حرف")
+    if (group != null && group.length > MAX_GROUP_LENGTH) return DebtorEngine.Result.Failed(StrLedger.groupTooLong(MAX_GROUP_LENGTH))
     val priceList = when (p.priceList.trim()) {
       "", PRICE_RETAIL -> null
       PRICE_WHOLESALE -> PRICE_WHOLESALE
-      else -> return DebtorEngine.Result.Failed("لیستِ قیمتِ ناشناخته")
+      else -> return DebtorEngine.Result.Failed(StrLedger.unknownPriceList)
     }
 
     val next = c.copy(phone2 = phone2, tags = tags.ifEmpty { null }, group = group, priceList = priceList)
     if (next == c) return DebtorEngine.Result.Ok(d, id)
-    fun label(v: String?) = if (v == PRICE_WHOLESALE) "عمده" else "خرده"
+    fun label(v: String?) = if (v == PRICE_WHOLESALE) "عمده" else "خرده"  // داده: برچسبِ درونِ یادداشتِ سابقه
     val trace = if (priceList != c.priceList) AuditEntry(
       id = newId(), type = "price_list_set", date = today, refId = id, createdAt = now,
-      notes = "لیستِ قیمتِ «${c.name}»: ${label(c.priceList)} ⇐ ${label(priceList)}",
+      notes = "لیستِ قیمتِ «${c.name}»: ${label(c.priceList)} ⇐ ${label(priceList)}",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     ) else null
     return DebtorEngine.Result.Ok(
       d.copy(
@@ -231,19 +232,19 @@ object CustomerCrm {
    *  رقمِ لاتین. بی ردیفِ سابقه (مثلِ شمارهٔ دوم) — پول را عوض نمی‌کند. همان نشانی ⇒ همان دفتر (بی op).
    */
   fun setDeliveryAddress(d: ShopData, id: String, a: DeliveryAddress): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
-    if (!isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    if (!isActive(c)) return DebtorEngine.Result.Failed(StrLedger.customerMerged)
     val area = clean(a.area)
     val landmark = clean(a.landmark)
     val gate = clean(a.gate)
     val floor = clean(a.floor)
     val plus = ir.vil3ntec.tohid.latinDigits(a.plusCode).filterNot { it.isWhitespace() }.uppercase()
     val postal = ir.vil3ntec.tohid.latinDigits(a.postalCode).filterNot { it.isWhitespace() }
-    if (area.length > MAX_ADDRESS_PART || landmark.length > MAX_ADDRESS_PART) return DebtorEngine.Result.Failed("هر بخشِ نشانی حداکثر $MAX_ADDRESS_PART حرف")
-    if (gate.length > MAX_GATE) return DebtorEngine.Result.Failed("رنگِ دروازه حداکثر $MAX_GATE حرف")
-    if (floor.length > MAX_FLOOR) return DebtorEngine.Result.Failed("طبقه حداکثر $MAX_FLOOR حرف")
-    if (plus.isNotEmpty() && !PLUS_CODE.matches(plus)) return DebtorEngine.Result.Failed("Plus Code درست نیست (مثلاً V75V+8Q)")
-    if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed("کدِ پستی فقط رقم است")
+    if (area.length > MAX_ADDRESS_PART || landmark.length > MAX_ADDRESS_PART) return DebtorEngine.Result.Failed(StrLedger.addressPartTooLong(MAX_ADDRESS_PART))
+    if (gate.length > MAX_GATE) return DebtorEngine.Result.Failed(StrLedger.gateTooLong(MAX_GATE))
+    if (floor.length > MAX_FLOOR) return DebtorEngine.Result.Failed(StrLedger.floorTooLong(MAX_FLOOR))
+    if (plus.isNotEmpty() && !PLUS_CODE.matches(plus)) return DebtorEngine.Result.Failed(StrLedger.plusCodeBad)
+    if (postal.isNotEmpty() && !POSTAL.matches(postal)) return DebtorEngine.Result.Failed(StrLedger.postalDigitsOnly)
     val next = DeliveryAddress(area, landmark, gate, floor, plus, postal).takeIf { it != DeliveryAddress() }
     if (next == c.deliveryAddress) return DebtorEngine.Result.Ok(d, id)
     return DebtorEngine.Result.Ok(d.copy(debtors = d.debtors.map { if (it.id == id) it.copy(deliveryAddress = next) else it }), id)
@@ -255,7 +256,7 @@ object CustomerCrm {
 
   /* ------------------------- رضایتِ پیامِ تبلیغاتی ------------------------- */
 
-  fun consentText(v: Boolean?): String = when (v) { true -> "بله"; false -> "نه"; null -> "نپرسیده" }
+  fun consentText(v: Boolean?): String = when (v) { true -> "بله"; false -> "نه"; null -> "نپرسیده" }  // داده: برچسبِ درونِ یادداشتِ سابقه
 
   /**
    *  رضایت برای پیامِ تبلیغاتی (CRM-12). هر تغییر در دفترچهٔ ثبت با تاریخ و منبع
@@ -271,14 +272,14 @@ object CustomerCrm {
     now: Long = System.currentTimeMillis(),
     newId: () -> String = ::auditId,
   ): DebtorEngine.Result {
-    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed("مشتری پیدا نشد")
-    if (!isActive(c)) return DebtorEngine.Result.Failed("این مشتری با مشتریِ دیگری ادغام شده است")
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    if (!isActive(c)) return DebtorEngine.Result.Failed(StrLedger.customerMerged)
     val from = clean(source).take(60)
-    if (consent == true && from.isEmpty()) return DebtorEngine.Result.Failed("برای «بله» منبعِ رضایت را بنویسید (مثلاً «حضوری» یا «تلفنی»)")
+    if (consent == true && from.isEmpty()) return DebtorEngine.Result.Failed(StrLedger.consentSourceNeeded)
     if (c.marketingConsent == consent) return DebtorEngine.Result.Ok(d, id)
     val trace = AuditEntry(
       id = newId(), type = "marketing_consent", date = today, refId = id, createdAt = now,
-      notes = "رضایتِ «${c.name}» برای پیامِ تبلیغاتی: ${consentText(c.marketingConsent)} ⇐ ${consentText(consent)}" +
+      notes = "رضایتِ «${c.name}» برای پیامِ تبلیغاتی: ${consentText(c.marketingConsent)} ⇐ ${consentText(consent)}" +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         (if (from.isNotEmpty()) " — $from" else ""),
     )
     return DebtorEngine.Result.Ok(

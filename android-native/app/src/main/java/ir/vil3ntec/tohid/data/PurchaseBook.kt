@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.data
 
+
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrStock
 /**
  *  فاکتورِ خریدِ چندردیفه و حسابِ تأمین‌کننده.
  *
@@ -61,21 +65,21 @@ object PurchaseBook {
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id.startsWith("$k-") }) return Result.Failed(ALREADY_RECORDED)
-    if (d.suppliers.none { it.id == supplierId }) return Result.Failed("تأمین‌کننده را انتخاب کنید")
-    if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed("هزینهٔ جانبی درست نیست")
+    if (d.suppliers.none { it.id == supplierId }) return Result.Failed(StrPurchasePages.chooseSupplier)
+    if (landedTotal.isNaN() || landedTotal < 0) return Result.Failed(StrPurchasePages.landedBad)
     val due = dueDate?.trim()?.ifEmpty { null }
     if (due != null && due < date.ifBlank { today }) return Result.Failed(DUE_BEFORE_DATE)
     val real = lines.filter { it.productId.isNotBlank() }
-    if (real.isEmpty()) return Result.Failed("دست‌کم یک ردیف کالا لازم است")
+    if (real.isEmpty()) return Result.Failed(StrGoods.oneRowNeeded)
     real.forEachIndexed { i, l ->
-      if (l.quantity.isNaN() || l.quantity <= 0) return Result.Failed("ردیفِ ${i + 1}: مقدار معتبر نیست")
-      if (l.price.isNaN() || l.price < 0) return Result.Failed("ردیفِ ${i + 1}: قیمت معتبر نیست")
+      if (l.quantity.isNaN() || l.quantity <= 0) return Result.Failed(StrGoods.rowQtyBad(i + 1))
+      if (l.price.isNaN() || l.price < 0) return Result.Failed(StrGoods.rowPriceBad(i + 1))
     }
     val total = real.sumOf { lineTotal(it) }
     var left = if (paid.isNaN() || paid < 0) 0.0 else minOf(paid, total)
 
     val no = nextNo(d)
-    val tag = "فاکتورِ خرید #$no"
+    val tag = "فاکتورِ خرید #$no"  // داده: تکهٔ یادداشتِ سابقه
     var cur = d
     val ids = mutableListOf<String>()
     for ((i, l) in real.withIndex()) {
@@ -95,7 +99,7 @@ object PurchaseBook {
         today, now, lineIds,
       )
       when (r) {
-        is LedgerEngine.Result.Failed -> return Result.Failed("ردیفِ ${i + 1}: ${r.message}")
+        is LedgerEngine.Result.Failed -> return Result.Failed(StrGoods.rowOfWhy(i + 1, r.message))
         is LedgerEngine.Result.Ok -> { cur = r.data; ids += r.id }
       }
     }
@@ -283,23 +287,23 @@ object PurchaseBook {
   ): Result {
     val k = key?.trim()?.ifEmpty { null }
     if (k != null && d.purchases.any { it.id == k }) return Result.Failed(ALREADY_RETURNED)
-    val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed("تأمین‌کننده را انتخاب کنید")
-    val product = d.products.find { it.id == productId } ?: return Result.Failed("کالا را انتخاب کنید")
-    if (quantity.isNaN() || quantity <= 0) return Result.Failed("مقدار معتبر وارد کنید")
-    if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed("قیمتِ برگشت معتبر نیست")
+    val supplier = d.suppliers.find { it.id == supplierId } ?: return Result.Failed(StrPurchasePages.chooseSupplier)
+    val product = d.products.find { it.id == productId } ?: return Result.Failed(StrGoods.pickItem)
+    if (quantity.isNaN() || quantity <= 0) return Result.Failed(StrStock.errAmount)
+    if (unitPrice.isNaN() || unitPrice < 0) return Result.Failed(StrGoods.returnPriceBad2)
     val why = reason.trim()
-    if (why.isEmpty()) return Result.Failed("دلیلِ برگشت را بنویسید")
+    if (why.isEmpty()) return Result.Failed(StrGoods.returnReasonNeeded)
     val stock = ShopStore.stock(d, productId)
-    if (quantity > stock) return Result.Failed("فقط ${ir.vil3ntec.tohid.qty(kotlin.math.max(0.0, stock))} ${product.unit} موجود است")
+    if (quantity > stock) return Result.Failed(StrGoods.onlyInStock(ir.vil3ntec.tohid.qty(kotlin.math.max(0.0, stock)), product.unit))
     val cap = returnable(d, supplierId, productId)
-    if (quantity > cap) return Result.Failed("از «${supplier.name}» فقط ${ir.vil3ntec.tohid.qty(cap)} ${product.unit} خریده شده که هنوز برنگشته")
+    if (quantity > cap) return Result.Failed(StrGoods.returnCap(supplier.name, ir.vil3ntec.tohid.qty(cap), product.unit))
     val day = date.ifBlank { today }
-    if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed("تاریخ درست نیست")
+    if (!ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(day)) return Result.Failed(StrGoods.dateBad)
     val amount = Math.round(quantity * unitPrice).toDouble()
     val purchaseId = k ?: newId()
     val entryId = if (k != null) "$k-w" else newId()
     val user = userId?.trim()?.ifEmpty { null }
-    val text = "برگشت به «${supplier.name}» — $why"
+    val text = "برگشت به «${supplier.name}» — $why"  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
     return Result.Ok(
       d.copy(
         warehouseEntries = d.warehouseEntries + WarehouseEntry(
@@ -312,19 +316,19 @@ object PurchaseBook {
         ),
         purchases = d.purchases + Purchase(
           id = purchaseId, productId = productId, supplierId = supplierId, quantity = -quantity, unit = product.unit,
-          purchasePrice = unitPrice, totalAmount = -amount, date = day, notes = "سندِ کسر — برگشت به تأمین‌کننده: $why",
+          purchasePrice = unitPrice, totalAmount = -amount, date = day, notes = "سندِ کسر — برگشت به تأمین‌کننده: $why",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
           paidAmount = 0.0, debt = -amount, warehouseEntryId = entryId, createdAt = now,
         ),
         auditLog = d.auditLog + AuditEntry(
           id = if (k != null) "$k-a" else newId(), type = "supplier_return", date = day, refId = entryId, createdAt = now,
-          notes = "برگشت ${ir.vil3ntec.tohid.qty(quantity)} ${product.unit} «${product.name}» به «${supplier.name}» — سندِ کسرِ ${ir.vil3ntec.tohid.money(amount)} افغانی — دلیل: $why",
+          notes = "برگشت ${ir.vil3ntec.tohid.qty(quantity)} ${product.unit} «${product.name}» به «${supplier.name}» — سندِ کسرِ ${ir.vil3ntec.tohid.money(amount)} افغانی — دلیل: $why",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         ),
       ),
       0,
     )
   }
 
-  const val ALREADY_RETURNED = "همین برگشت پیش‌تر ثبت شده است"
+  val ALREADY_RETURNED: String get() = StrGoods.alreadyReturned
 
   /**
    *  شناسه‌های ردیفِ [line] ِ فاکتوری با کلیدِ [key] (`کلید-ردیف-n`، به ترتیبِ ساختنِ `LedgerEngine.addPurchase`) — همان
@@ -344,13 +348,13 @@ object PurchaseBook {
     entry.purchaseId?.let { pid -> d.purchases.any { it.id == pid } } == true &&
       (productId == null || productId != entry.productId || units != entry.units)
 
-  const val PURCHASE_ENTRY = "این ورود از فاکتورِ خرید آمده و جدا حذف یا عوض نمی‌شود — برای اصلاح «برگشت به تأمین‌کننده» بزنید تا موجودی و بدهی با هم کم شوند"
+  val PURCHASE_ENTRY: String get() = StrGoods.purchaseEntryFixed
 
   /** همان کلیدِ فاکتورِ خرید دوباره (دو کلیک، PUR-05) — فاکتور یک بار ثبت شده است */
-  const val ALREADY_RECORDED = "همین فاکتورِ خرید پیش‌تر ثبت شده است"
+  val ALREADY_RECORDED: String get() = StrGoods.purchaseRecorded
 
   /** سررسید پیش از تاریخِ فاکتور معنی ندارد (PUR-07) */
-  const val DUE_BEFORE_DATE = "سررسید نباید پیش از تاریخِ خرید باشد"
+  val DUE_BEFORE_DATE: String get() = StrGoods.dueBeforePurchase
 
   data class LedgerLine(
     val row: Int,
@@ -374,15 +378,15 @@ object PurchaseBook {
     invoices(d, supplierId).forEach { inv ->
       //  سندِ کسر (برگشت به تأمین‌کننده) در ستونِ «پرداخت» می‌نشیند — همان اثر روی مانده
       if (inv.isReturn) {
-        evs += Ev(inv.date, inv.createdAt, 0, "برگشت به تأمین‌کننده (سندِ کسر)", 0.0, -inv.total, inv.key)
+        evs += Ev(inv.date, inv.createdAt, 0, "برگشت به تأمین‌کننده (سندِ کسر)", 0.0, -inv.total, inv.key)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
         return@forEach
       }
-      val title = if (inv.no > 0) "فاکتورِ خرید #${inv.no} (${inv.lines.size} ردیف)" else "خرید"
+      val title = if (inv.no > 0) "فاکتورِ خرید #${inv.no} (${inv.lines.size} ردیف)" else "خرید"  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
       evs += Ev(inv.date, inv.createdAt, 0, title, inv.total, 0.0, inv.key)
-      if (inv.paid > 0) evs += Ev(inv.date, inv.createdAt, 1, "پرداخت هنگامِ خرید", 0.0, inv.paid, inv.key)
+      if (inv.paid > 0) evs += Ev(inv.date, inv.createdAt, 1, "پرداخت هنگامِ خرید", 0.0, inv.paid, inv.key)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
     }
     d.supplierPayments.filter { it.supplierId == supplierId }.forEach { p ->
-      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { "پرداخت" }, 0.0, p.amount, null)
+      evs += Ev(p.date, p.createdAt, 2, p.notes.ifBlank { "پرداخت" }, 0.0, p.amount, null)  // داده: شرحِ ردیفِ حسابِ تأمین‌کننده — ستونِ برگهٔ خروجی هم هست (منتظرِ تصمیمِ صاحب‌کار)
     }
     var run = 0.0
     return evs.sortedWith(compareBy<Ev> { it.date }.thenBy { it.at }.thenBy { it.order })
@@ -396,49 +400,49 @@ object PurchaseBook {
 
   private fun r(v: Double) = Math.round(v).toString()
   private fun q(v: Double) = if (v == Math.floor(v)) v.toLong().toString() else v.toString()
-  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "تأمین‌کننده" }
+  private fun safe(name: String) = name.replace(Regex("[\\\\/:*?\"<>|]"), " ").trim().ifBlank { "تأمین‌کننده" }  // داده: نامِ پروندهٔ خروجی
 
   /** عنوانِ برگهٔ چاپیِ برگشت به تأمین‌کننده (S25، PUR-08) */
-  const val CREDIT_NOTE_TITLE = "سندِ کسر"
+  const val CREDIT_NOTE_TITLE = "سندِ کسر"  // داده: نامِ پروندهٔ خروجی
 
   fun invoiceSheet(d: ShopData, inv: Invoice): ReportCsv.Sheet {
     val names = d.products.associate { it.id to it.name }
     val supplier = d.suppliers.find { it.id == inv.supplierId }?.name.orEmpty()
-    val rows = mutableListOf(listOf("ردیف", "کالا", "مقدار", "واحد", "فی", "جمع"))
+    val rows = mutableListOf(listOf("ردیف", "کالا", "مقدار", "واحد", "فی", "جمع"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     //  S25: سندِ کسر برگهٔ خودش را دارد — عنوانِ «سندِ کسر»، مقدار و مبلغِ برگشتی مثبت، دلیل و کسر از بدهی (نه پرداخت/مانده)
     if (inv.isReturn) {
       inv.lines.forEachIndexed { i, p ->
         rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(-p.quantity), p.unit, r(p.purchasePrice), r(-p.totalAmount))
       }
-      rows += listOf("", "کسر از بدهی به «$supplier»", "", "", "", r(-inv.total))
-      inv.lines.map { it.notes.substringAfter("برگشت به تأمین‌کننده: ", "").trim() }.filter { it.isNotEmpty() }.distinct()
-        .forEach { rows += listOf("", "دلیل: $it", "", "", "", "") }
+      rows += listOf("", "کسر از بدهی به «$supplier»", "", "", "", r(-inv.total))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+      inv.lines.map { it.notes.substringAfter("برگشت به تأمین‌کننده: ", "").trim() }.filter { it.isNotEmpty() }.distinct()  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+        .forEach { rows += listOf("", "دلیل: $it", "", "", "", "") }  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
       return ReportCsv.Sheet("$CREDIT_NOTE_TITLE-${safe(supplier)}-${inv.date}", rows)
     }
     inv.lines.forEachIndexed { i, p ->
       rows += listOf((i + 1).toString(), names[p.productId].orEmpty(), q(p.quantity), p.unit, r(p.purchasePrice), r(p.totalAmount))
     }
-    rows += listOf("", "جمع", "", "", "", r(inv.total))
-    rows += listOf("", "پرداخت‌شده", "", "", "", r(inv.paid))
-    rows += listOf("", "مانده", "", "", "", r(inv.debt))
-    val title = if (inv.no > 0) "فاکتور-خرید-${inv.no}" else "خرید"
+    rows += listOf("", "جمع", "", "", "", r(inv.total))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("", "پرداخت‌شده", "", "", "", r(inv.paid))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    rows += listOf("", "مانده", "", "", "", r(inv.debt))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    val title = if (inv.no > 0) "فاکتور-خرید-${inv.no}" else "خرید"  // داده: نامِ پروندهٔ خروجی
     return ReportCsv.Sheet("$title-${safe(supplier)}-${inv.date}", rows)
   }
 
   fun invoicesSheet(d: ShopData, list: List<Invoice>, today: String): ReportCsv.Sheet {
     val names = d.suppliers.associate { it.id to it.name }
-    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "تأمین‌کننده", "ردیف‌ها", "جمع", "پرداخت‌شده", "مانده"))
+    val rows = mutableListOf(listOf("فاکتور", "تاریخ", "تأمین‌کننده", "ردیف‌ها", "جمع", "پرداخت‌شده", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     list.forEach { v ->
       rows += listOf(if (v.no > 0) v.no.toString() else "", v.date, names[v.supplierId].orEmpty(), v.lines.size.toString(), r(v.total), r(v.paid), r(v.debt))
     }
-    return ReportCsv.Sheet("فاکتورهای-خرید-$today", rows)
+    return ReportCsv.Sheet("فاکتورهای-خرید-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 
   fun ledgerSheet(d: ShopData, supplier: Supplier, today: String): ReportCsv.Sheet {
-    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "خرید", "پرداخت", "مانده"))
+    val rows = mutableListOf(listOf("ردیف", "تاریخ", "شرح", "خرید", "پرداخت", "مانده"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
     ledger(d, supplier.id).forEach { l ->
       rows += listOf(l.row.toString(), l.date, l.text, if (l.bill > 0) r(l.bill) else "", if (l.pay > 0) r(l.pay) else "", r(l.balance))
     }
-    return ReportCsv.Sheet("حساب-${safe(supplier.name)}-$today", rows)
+    return ReportCsv.Sheet("حساب-${safe(supplier.name)}-$today", rows)  // داده: نامِ پروندهٔ خروجی
   }
 }

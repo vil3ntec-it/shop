@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.print
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.hw.MonoPng
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.core.receipt.ReceiptRaster
 import ir.vil3ntec.tohid.core.receipt.ShopHeader
 import ir.vil3ntec.tohid.core.receipt.StatementInput
@@ -37,7 +38,7 @@ object StatementImage {
 
   fun png(context: Context, d: ShopData, debtorId: String, today: String): ByteArray? {
     val input = input(context, d, debtorId, today) ?: return null
-    val doc = StatementLayout.build(input, Receipts.SHARE_DOTS, Receipts.format())
+    val doc = StatementLayout.build(input, Receipts.SHARE_DOTS, Receipts.format(), Receipts.statementLabels())
     return MonoPng.encode(ReceiptRaster.compose(doc, ReceiptPainter(context)))
   }
 
@@ -48,16 +49,16 @@ object StatementImage {
   suspend fun share(context: Context, d: ShopData, debtorId: String, today: String): String {
     val name = CustomerStatement.fileName(d, debtorId, today)
     val bytes = withContext(Dispatchers.Default) { runCatching { png(context, d, debtorId, today) }.getOrNull() }
-      ?: return "تصویرِ صورت‌حساب ساخته نشد"
+      ?: return StrPrint.statementNotMade
     if (ir.vil3ntec.tohid.ui.Platform.DESKTOP) {
-      return ir.vil3ntec.tohid.ui.Platform.saveFile(name, bytes)?.let { "ذخیره شد: $it" } ?: "ذخیره نشد"
+      return ir.vil3ntec.tohid.ui.Platform.saveFile(name, bytes)?.let { StrPrint.savedAt(it) } ?: StrPrint.notSaved
     }
     val file = withContext(Dispatchers.IO) {
       runCatching {
         val dir = java.io.File(context.cacheDir, "share").apply { mkdirs(); listFiles()?.forEach { it.delete() } }
         java.io.File(dir, name).also { it.writeBytes(bytes) }
       }.getOrNull()
-    } ?: return "تصویرِ صورت‌حساب ساخته نشد"
+    } ?: return StrPrint.statementNotMade
     return runCatching {
       val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
       val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
@@ -67,9 +68,9 @@ object StatementImage {
         addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
       }
       context.startActivity(
-        android.content.Intent.createChooser(send, "فرستادنِ صورت‌حساب").addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        android.content.Intent.createChooser(send, StrPrint.sendStatement).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
       )
-      "صورت‌حساب آمادهٔ فرستادن است"
-    }.getOrElse { "برنامه‌ای برای فرستادن پیدا نشد" }
+      StrPrint.statementReady
+    }.getOrElse { StrPrint.noShareApp }
   }
 }

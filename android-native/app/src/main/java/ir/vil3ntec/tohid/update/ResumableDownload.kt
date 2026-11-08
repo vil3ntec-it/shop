@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.update
 
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -112,19 +113,19 @@ object ResumableDownload {
       //  (فایل عوض شده) ⇒ همین بدنه از صفر، روی فایلِ خالی
       200 -> Step.Write(0, positive(expected, r.contentLength), validator)
       206 -> {
-        val span = parseContentRange(r.contentRange) ?: return Step.Restart("Content-Range نامعتبر")
+        val span = parseContentRange(r.contentRange) ?: return Step.Restart(StrUpdate.badRange)
         when {
-          span.start != asked -> Step.Restart("سرور از بایتِ ${span.start} فرستاد، نه $asked")
-          span.total > 0 && expected > 0 && span.total != expected -> Step.Restart("اندازهٔ فایلِ سرور با انتشار نمی‌خواند")
-          span.total > 0 && known > 0 && span.total != known -> Step.Restart("فایلِ سرور عوض شده (اندازه)")
-          sent.isNotEmpty() && validator.isNotEmpty() && validator != sent -> Step.Restart("فایلِ سرور عوض شده (ETag)")
+          span.start != asked -> Step.Restart(StrUpdate.wrongStart(span.start, asked))
+          span.total > 0 && expected > 0 && span.total != expected -> Step.Restart(StrUpdate.sizeMismatch)
+          span.total > 0 && known > 0 && span.total != known -> Step.Restart(StrUpdate.changedSize)
+          sent.isNotEmpty() && validator.isNotEmpty() && validator != sent -> Step.Restart(StrUpdate.changedEtag)
           else -> Step.Write(asked, positive(span.total, expected, known), validator.ifEmpty { sent })
         }
       }
       416 -> {
         val total = unsatisfiedTotal(r.contentRange)
         if (asked > 0 && total == asked && (expected <= 0 || expected == asked)) Step.Complete(asked)
-        else Step.Restart("بازهٔ خواسته‌شده روی سرور نیست")
+        else Step.Restart(StrUpdate.rangeMissing)
       }
       408, 425, 429, in 500..599 -> Step.Fail(r.code, retryable = true)
       else -> Step.Fail(r.code, retryable = false)
@@ -143,13 +144,13 @@ object ResumableDownload {
 
   /** یک خطِ کوتاه زیرِ نوارِ پیشرفت — «ادامه از ۴۲٪»، «منتظرِ اینترنت…» */
   fun statusText(e: Event): String? = when (e) {
-    is Event.Progress -> if (e.resumedFrom > 0 && e.total > 0) "ادامه از ${percent(e.resumedFrom, e.total)}٪" else null
-    is Event.Retrying -> "اتصال قطع شد — تلاشِ ${e.attempt} از ${e.of}، ${e.waitSeconds} ثانیهٔ دیگر" + resumeNote(e.done, e.total)
-    is Event.Offline -> "منتظرِ اینترنت…" + resumeNote(e.done, e.total)
+    is Event.Progress -> if (e.resumedFrom > 0 && e.total > 0) StrUpdate.resumedAt(percent(e.resumedFrom, e.total)) else null
+    is Event.Retrying -> StrUpdate.retrying(e.attempt, e.of, e.waitSeconds) + resumeNote(e.done, e.total)
+    is Event.Offline -> StrUpdate.waitingNet + resumeNote(e.done, e.total)
   }
 
   private fun resumeNote(done: Long, total: Long) =
-    if (done > 0 && total > 0) " (ادامه از ${percent(done, total)}٪)" else ""
+    if (done > 0 && total > 0) StrUpdate.resumeNote(percent(done, total)) else ""
 
   /** یادداشتِ کنارِ `.part`: از کجا، با کدام اعتبارسنج، چند بایت */
   data class Meta(val url: String, val validator: String, val total: Long)
@@ -202,7 +203,7 @@ object ResumableDownload {
     out: File,
     expected: Long,
     online: () -> Boolean = { true },
-    reason: (Int) -> String = { "سرورِ دانلود جواب نداد ($it)" },
+    reason: (Int) -> String = { StrUpdate.dlNoAnswer(it) },
     userAgent: String = "tohid-app",
     backoffSeconds: List<Long> = BACKOFF_SECONDS,
     pause: suspend (Long) -> Unit = { delay(it) },
@@ -235,7 +236,7 @@ object ResumableDownload {
       if (!online()) {
         onEvent(Event.Offline(have, total))
         if (!awaitOnline(online, pause, offlineMaxMs)) {
-          throw IllegalStateException("اینترنت وصل نشد — بعد دوباره بزنید؛ از همین‌جا ادامه پیدا می‌کند")
+          throw IllegalStateException(StrUpdate.netFailed)
         }
       }
 
@@ -255,7 +256,7 @@ object ResumableDownload {
             is Step.Complete -> return finish(part, metaFile, out)
             is Step.Restart -> {
               reset(); meta = null
-              if (++restarts > MAX_RESTARTS) throw IllegalStateException("فایلِ سرور پشتِ هم عوض می‌شود — کمی بعد دوباره بزنید")
+              if (++restarts > MAX_RESTARTS) throw IllegalStateException(StrUpdate.keepsChanging)
               continue
             }
             is Step.Fail -> {
@@ -264,7 +265,7 @@ object ResumableDownload {
             }
             is Step.Write -> {
               if (step.offset == 0L && have > 0 && ++restarts > MAX_RESTARTS) {
-                throw IllegalStateException("فایلِ سرور پشتِ هم عوض می‌شود — کمی بعد دوباره بزنید")
+                throw IllegalStateException(StrUpdate.keepsChanging)
               }
               val m = Meta(url, step.validator, step.total)
               writeMeta(metaFile, m)
@@ -276,12 +277,12 @@ object ResumableDownload {
                 step.total > 0 && now == step.total -> return finish(part, metaFile, out)
                 step.total > 0 && now > step.total -> {
                   reset(); meta = null
-                  if (++restarts > MAX_RESTARTS) throw IllegalStateException("فایلِ گرفته‌شده از اندازهٔ انتشار بزرگ‌تر شد — دوباره بزنید")
+                  if (++restarts > MAX_RESTARTS) throw IllegalStateException(StrUpdate.tooLarge)
                   continue
                 }
                 //  اندازه را هیچ‌کس نگفت و جریان تمیز تمام شد ⇒ همین است (جمعِ کنترلی بعداً می‌سنجد)
                 step.total <= 0 -> return finish(part, metaFile, out)
-                else -> "پاسخ کوتاه بود"
+                else -> StrUpdate.shortAnswer
               }
             }
           }
@@ -289,7 +290,7 @@ object ResumableDownload {
           conn.disconnect()
         }
       } catch (e: IOException) {
-        e.message ?: "اتصال قطع شد"
+        e.message ?: StrUpdate.connLost
       }
 
       val now = if (part.isFile) part.length() else 0L
@@ -299,8 +300,7 @@ object ResumableDownload {
       if (failures > backoffSeconds.size) {
         val pct = percent(now, totalNow)
         throw IllegalStateException(
-          "دانلود با ${backoffSeconds.size} بار تلاش تمام نشد ($problem)" +
-            (if (pct > 0) "؛ $pct٪ گرفته شده و" else "؛") + " با زدنِ دوباره از همان‌جا ادامه پیدا می‌کند"
+          if (pct > 0) StrUpdate.dlGaveUpAt(backoffSeconds.size, problem, pct) else StrUpdate.dlGaveUp(backoffSeconds.size, problem)
         )
       }
       val wait = backoffSeconds[failures - 1]
@@ -355,7 +355,7 @@ object ResumableDownload {
   }
 
   private fun finish(part: File, metaFile: File, out: File): File {
-    if (out.exists() && !out.delete()) throw IOException("فایلِ قبلیِ ${out.name} پاک نشد")
+    if (out.exists() && !out.delete()) throw IOException(StrUpdate.oldNotDeleted(out.name))
     if (!part.renameTo(out)) {
       part.copyTo(out, overwrite = true)
       part.delete()

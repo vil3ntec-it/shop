@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data
 import android.content.Context
 import ir.vil3ntec.tohid.core.atrest.AtRestException
 import ir.vil3ntec.tohid.core.atrest.AtRestKek
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.desktop.DesktopContext
 import java.io.File
 import java.nio.file.Files
@@ -32,7 +33,7 @@ import javax.crypto.spec.SecretKeySpec
  */
 object AtRestKeys {
 
-  const val WHERE: String = "فایلِ کلید در پوشهٔ دادهٔ همین کامپیوتر"
+  val WHERE: String get() = StrAppData.deskWhere
   const val HARDWARE_BACKED: Boolean = false
 
   /** `true`/`false` پس از نخستین تلاش روی ویندوز؛ `null` یعنی ACL در کار نیست (مک/لینوکس) یا هنوز تلاشی نشده */
@@ -41,14 +42,14 @@ object AtRestKeys {
 
   /** جای کلید و آنچه از آن برمی‌آید — بی تعارف، برای صفحهٔ امنیت */
   fun note(): String = buildString {
-    append("کلید در فایلی کنارِ داده‌هاست (پوشهٔ keys کنارِ پوشهٔ files در پوشهٔ دادهٔ برنامه)، نه در خودِ ویندوز یا مک. ")
-    append("پس این رمز فقط وقتی کمک می‌کند که پوشهٔ files (دفتر و نسخه‌ها) جدا کپی یا فرستاده شود؛ ")
-    append("هر کس کلِ پوشهٔ داده یا دیسک را داشته باشد، کلید را هم دارد. ")
+    append(StrAppData.deskNote1)
+    append(StrAppData.deskNote2)
+    append(StrAppData.deskNote3)
     append(
       when (windowsAcl) {
-        true -> "روی ویندوز فایلِ کلید فقط برای حسابِ ویندوزِ خودتان، SYSTEM و مدیرانِ دستگاه خواندنی است (ACL)."
-        false -> "روی ویندوز اجازهٔ فایلِ کلید محدود **نشد**؛ هر حسابی که پوشه را می‌خواند، کلید را هم می‌خواند."
-        null -> if (isWindows) "اجازهٔ فایلِ کلید روی ویندوز هنوز سنجیده نشده." else "فایلِ کلید فقط برای حسابِ خودتان خواندنی است (۶۰۰)."
+        true -> StrAppData.deskAclOn
+        false -> StrAppData.deskAclOff
+        null -> if (isWindows) StrAppData.deskAclUnknown else StrAppData.deskAclUnix
       },
     )
   }
@@ -122,7 +123,7 @@ object AtRestKeys {
       if (!f.isFile) return null
       if (!restricted) { restricted = true; runCatching { restrict(f) } }
       val bytes = f.readBytes()
-      if (bytes.size != 32) throw AtRestException(AtRestException.Kind.KEY_MISSING, "فایلِ کلید خراب است")
+      if (bytes.size != 32) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyBroken)
       return SecretKeySpec(bytes, "AES")
     }
 
@@ -145,10 +146,10 @@ object AtRestKeys {
     }
 
     override fun unwrap(blob: ByteArray, kekId: String): ByteArray = guard {
-      if (kekId != id) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ اصلیِ کامپیوتر عوض شده ($kekId)")
-      if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, "کلیدِ پیچیده بریده است")
+      if (kekId != id) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyChanged(kekId))
+      if (blob.size <= IV) throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.keyCut)
       val key = existing()
-        ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, "فایلِ کلیدِ رمز روی این کامپیوتر نیست")
+        ?: throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyMissing)
       val c = Cipher.getInstance("AES/GCM/NoPadding")
       c.init(Cipher.DECRYPT_MODE, key, GCMParameterSpec(128, blob, 0, IV))
       c.doFinal(blob, IV, blob.size - IV)
@@ -159,9 +160,9 @@ object AtRestKeys {
     } catch (e: AtRestException) {
       throw e
     } catch (e: AEADBadTagException) {
-      throw AtRestException(AtRestException.Kind.KEY_MISSING, "فایلِ کلید با کلیددان نمی‌خواند", e)
+      throw AtRestException(AtRestException.Kind.KEY_MISSING, StrAppData.deskKeyMismatch, e)
     } catch (e: Exception) {
-      throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, "فایلِ کلید خوانده نشد: ${e.javaClass.simpleName}", e)
+      throw AtRestException(AtRestException.Kind.KEY_UNAVAILABLE, StrAppData.deskKeyUnread(e.javaClass.simpleName), e)
     }
 
     private const val IV = 12

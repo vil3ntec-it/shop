@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.data.repo
 
 import android.content.Context
 import androidx.compose.runtime.mutableStateOf
+import ir.vil3ntec.tohid.core.i18n.StrAppData
+import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiJson
 import ir.vil3ntec.tohid.core.storefront.MarketListing
@@ -142,7 +144,7 @@ object StorefrontQueue {
     val api = Backend.api(context)
     val body: JsonObject? = if (e.change == StorefrontChange.PRESENCE) null
       else runCatching { ApiJson.format.parseToJsonElement(e.body).jsonObject }.getOrNull()
-    if (e.change != StorefrontChange.PRESENCE && body == null) return finish(context, e, SendOutcome.REJECTED, "دادهٔ این تغییر روی دستگاه خراب بود؛ دوباره ذخیره کنید.")
+    if (e.change != StorefrontChange.PRESENCE && body == null) return finish(context, e, SendOutcome.REJECTED, StrAppData.sqBadData)
 
     return try {
       when (e.change) {
@@ -152,36 +154,36 @@ object StorefrontQueue {
           if (cur != null && StorefrontOutbox.isConflict(e, settingsBase(cur.settings))) {
             return if (cur.settings != null && settingsBody(draftOf(cur.settings)) == body) {
               StorefrontGate.config.value = cur
-              finish(context, e, SendOutcome.CONFIRMED, "تنظیماتِ ویترین روی سرور ثبت شد")
+              finish(context, e, SendOutcome.CONFIRMED, StrAppData.sqSettingsSaved)
             } else conflict(context, e)
           }
           val saved = ApiJson.decode<StorefrontSettingsDto>(api.put(StorefrontRepository.ROOT, body!!)["settings"] ?: JsonNull)
           StorefrontGate.config.value = StorefrontGate.config.value?.copy(settings = saved)
-          return finish(context, e, SendOutcome.CONFIRMED, "تنظیماتِ ویترین روی سرور ثبت شد")
+          return finish(context, e, SendOutcome.CONFIRMED, StrAppData.sqSettingsSaved)
         }
         StorefrontChange.DELIVERY -> {
           val repo = StorefrontDeliveryRepository(api)
           val cur = repo.load().valueOrNull()
           if (cur != null && StorefrontOutbox.isConflict(e, deliveryBase(cur))) {
-            return if (sameDelivery(cur, body!!)) finish(context, e, SendOutcome.CONFIRMED, "ارسال و زمان روی سرور ثبت شد")
+            return if (sameDelivery(cur, body!!)) finish(context, e, SendOutcome.CONFIRMED, StrAppData.sqDeliverySaved)
             else conflict(context, e)
           }
           ApiJson.decode<StorefrontDeliveryDto>(api.put(StorefrontDeliveryRepository.PATH, body!!))
-          return finish(context, e, SendOutcome.CONFIRMED, "ارسال و زمان روی سرور ثبت شد")
+          return finish(context, e, SendOutcome.CONFIRMED, StrAppData.sqDeliverySaved)
         }
         StorefrontChange.MARKET -> {
           val cur = MarketListingRepository(api).load().valueOrNull()
           if (cur != null && StorefrontOutbox.isConflict(e, marketBase(cur.listing))) {
-            return if (sameMarket(cur.listing, body!!)) finish(context, e, SendOutcome.CONFIRMED, "نمایش در بازار روی سرور ثبت شد")
+            return if (sameMarket(cur.listing, body!!)) finish(context, e, SendOutcome.CONFIRMED, StrAppData.sqMarketSaved)
             else conflict(context, e)
           }
           val saved = MarketListing.parseSaved(api.put(MarketListing.ROOT, body!!))
           return finish(context, e, SendOutcome.CONFIRMED,
-            if (saved.listed) "ثبت شد — دکان در بازار نشان داده می‌شود" else "ثبت شد — دکان در بازار نشان داده نمی‌شود")
+            if (saved.listed) StrAppData.sqListed else StrAppData.sqUnlisted)
         }
         StorefrontChange.PRESENCE -> {
           val p = PresenceDeclaration.decode(e.body)
-            ?: return finish(context, e, SendOutcome.REJECTED, "اعلامِ ذخیره‌شده خراب بود؛ دوباره اعلام کنید.")
+            ?: return finish(context, e, SendOutcome.REJECTED, StrAppData.sqBadPresence)
           val r = StorefrontRepository(api).declare(p, "")
           r.onFailure { throw it }
           val res = r.valueOrNull()!!
@@ -190,8 +192,8 @@ object StorefrontQueue {
           }
           val tz = StorefrontGate.config.value?.settings?.timezone ?: "Asia/Kabul"
           return finish(context, e, SendOutcome.CONFIRMED, when (res.applied) {
-            false -> "ثبت شد، ولی وضعیتِ تازه‌تری از دستگاهِ دیگر جلوتر است؛ همان می‌ماند."
-            else -> "ثبت شد — زمانِ سرور: " + StorefrontRules.toFa(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.clock(res.serverReceivedAt, tz))
+            false -> StrOnline.presenceOverridden
+            else -> StrAppData.sqSavedAt(StorefrontRules.toFa(ir.vil3ntec.tohid.core.storefront.StorefrontOwner.clock(res.serverReceivedAt, tz)))
           })
         }
       }

@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
+import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.sync.OpBacklog
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
@@ -56,7 +57,7 @@ class SyncV1Engine private constructor(context: Context) {
   private val parts = object : SyncCommit.Parts {
     override fun shadow(): String = state.shadow
     override fun commit(shadow: String, cursor: Long?) {
-      if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     }
     override fun queued(): Set<String> = queue.all().mapTo(HashSet()) { it.opId }
     override fun push(ops: List<SyncOp>) {
@@ -128,7 +129,7 @@ class SyncV1Engine private constructor(context: Context) {
     val start = commit.start(ledger) { upTo -> state.legacyOpsUpTo = upTo }
     if (start.outcome == SyncCommit.Outcome.MISMATCH) {
       //  نباید پیش بیاید؛ اگر آمد، دیده شود
-      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"
+      state.lastError = "ژورنالِ همگام‌سازی با سایه نخواند"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     }
     if (start.outcome != SyncCommit.Outcome.NONE) publish()
   }
@@ -301,7 +302,7 @@ class SyncV1Engine private constructor(context: Context) {
         throw cancelled
       } catch (error: Throwable) {
         attempt++
-        state.lastError = error.message ?: "خطای نامشخص"
+        state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         Result.failure(error)
       } finally {
         busy = false
@@ -394,7 +395,7 @@ class SyncV1Engine private constructor(context: Context) {
       throw cancelled
     } catch (error: Throwable) {
       attempt++
-      state.lastError = error.message ?: "خطای نامشخص"
+      state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       Result.failure(error)
     } finally {
       busy = false
@@ -427,7 +428,7 @@ class SyncV1Engine private constructor(context: Context) {
         override suspend fun snapshot(): JsonObject = client.snapshot()
         override fun stage(next: ShopData, shadowSha: String) = synchronized(this@SyncV1Engine) { files.stage(next, shadowSha) }
         override fun commitShadow(shadow: String, cursor: Long) {
-          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+          if (!state.commitShadow(shadow, cursor)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         }
         override fun swap() = synchronized(this@SyncV1Engine) { files.swap() }
       }).run(base)
@@ -482,7 +483,7 @@ class SyncV1Engine private constructor(context: Context) {
     try {
       val shadow = SyncRebuild.shadowFor(ledger)
       files.stage(ledger, SyncRebuild.sha(shadow))
-      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")
+      if (!state.commitShadow(shadow, 0L)) throw java.io.IOException("سایهٔ همگام‌سازی روی دیسک ننشست")  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       state.reconciledAt = 0L
       state.snapshotAt = 0L
       files.swap()
@@ -737,14 +738,12 @@ class SyncV1Engine private constructor(context: Context) {
 
     /** §۹.۵: هشدارِ پوششِ دفترچه، سه روز */
     const val RESTORE_NOTICE_MS = 3 * 24 * 60 * 60_000L
-    const val RESTORE_NOTICE =
-      "سرور از پشتیبان برگشت و این دستگاه همهٔ کارهای پس از پشتیبان را نگه نداشته بود؛ " +
-        "فروش‌ها و ردیف‌های تازهٔ همین دستگاه فرستاده شدند، ولی ویرایش‌های پیش از آن را یک بار با دفتر بسنجید."
+    val RESTORE_NOTICE: String get() = StrSync.restoreNotice
 
     /** صف (یا ژورنالش) ننشست — تغییر روی دفترِ همین دستگاه می‌ماند و با ثبتِ بعدی دوباره op می‌شود */
     const val QUEUE_NOT_WRITTEN =
-      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +
-        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"
+      "تغییر روی همین دستگاه ذخیره شد ولی هنوز در صفِ همگام‌سازی ننشست؛ با ذخیرهٔ بعدی دوباره امتحان می‌شود " +  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+        "(اگر حافظهٔ دستگاه پر است آزادش کنید) — هیچ تغییری دور ریخته نمی‌شود"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
 
     @Volatile private var instance: SyncV1Engine? = null
 

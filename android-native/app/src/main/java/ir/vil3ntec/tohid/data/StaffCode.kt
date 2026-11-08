@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+
+import ir.vil3ntec.tohid.core.i18n.StrAuth
 /**
  *  کدِ پیوستن — همان چیزی که صاحب دکان به شاگردش می‌دهد.
  *
@@ -23,7 +25,7 @@ package ir.vil3ntec.tohid.data
 object StaffCode {
 
   /** نمونه‌ای که در کادرِ ورودی به‌عنوان راهنما نوشته می‌شود */
-  const val HINT = "کدی که صاحب دکان داده"
+  val HINT: String get() = StrAuth.ownerCodeHint
 
   /**
    *  تمیز کردنِ آنچه کاربر زده.

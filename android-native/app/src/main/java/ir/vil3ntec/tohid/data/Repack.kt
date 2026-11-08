@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.stock.StockCore
 
 /**
@@ -60,10 +62,10 @@ object Repack {
     if (location == null || stock == null) StockLedger.milli(ShopStore.stock(d, pid)) else StockPlaces.at(stock, pid, location)
 
   private fun stockProblem(p: Product?, role: String): String? = when {
-    p == null -> "$role را انتخاب کنید"
-    ProductPlansMap.isKit(p) -> "«${p.name}» کیت است و موجودیِ خودش را ندارد"
-    p.stockless == true -> "«${p.name}» خدماتی است و موجودی ندارد"
-    !p.active -> "«${p.name}» غیرفعال است"
+    p == null -> StrGoods.pickRole(role)
+    ProductPlansMap.isKit(p) -> StrGoods.isKit(p.name)
+    p.stockless == true -> StrGoods.isService(p.name)
+    !p.active -> StrGoods.isInactive(p.name)
     else -> null
   }
 
@@ -80,9 +82,8 @@ object Repack {
     for (l in inputs) {
       if (l.qtyMilli <= l.haveMilli) continue
       val p = names[l.productId]
-      val where = if (location == null) "" else " در «${StockPlaces.label(location)}»"
-      return "از «${p?.name.orEmpty()}»$where فقط ${ir.vil3ntec.tohid.qty(maxOf(0L, l.haveMilli) / 1000.0)} ${p?.unit.orEmpty()} هست، " +
-        "این کار ${ir.vil3ntec.tohid.qty(l.qtyMilli / 1000.0)} می‌خواهد"
+      val where = if (location == null) "" else StrGoods.atPlace(StockPlaces.label(location))
+      return StrGoods.repackShort(p?.name.orEmpty(), where, ir.vil3ntec.tohid.qty(maxOf(0L, l.haveMilli) / 1000.0), p?.unit.orEmpty(), ir.vil3ntec.tohid.qty(l.qtyMilli / 1000.0))
     }
     return null
   }
@@ -94,12 +95,12 @@ object Repack {
   fun planBreak(d: ShopData, fromId: String, packsMilli: Long, toId: String, perPackMilli: Long, location: String? = null): Planned {
     val from = d.products.find { it.id == fromId }
     val to = d.products.find { it.id == toId }
-    stockProblem(from, "کالای بسته (کارتن)")?.let { return Planned.Bad(it) }
-    stockProblem(to, "کالای دانه")?.let { return Planned.Bad(it) }
-    if (fromId == toId) return Planned.Bad("کالای دانه باید با کالای بسته فرق کند")
-    if (packsMilli <= 0 || packsMilli > MAX_MILLI) return Planned.Bad("تعدادِ بسته درست نیست")
-    if (perPackMilli <= 0 || perPackMilli > MAX_MILLI) return Planned.Bad("تعدادِ دانهٔ هر بسته درست نیست")
-    val outQ = times(packsMilli, perPackMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad("مقدارِ دانه‌ها درست نیست")
+    stockProblem(from, StrGoods.packedItemBox)?.let { return Planned.Bad(it) }
+    stockProblem(to, StrGoods.looseItem)?.let { return Planned.Bad(it) }
+    if (fromId == toId) return Planned.Bad(StrGoods.looseSame)
+    if (packsMilli <= 0 || packsMilli > MAX_MILLI) return Planned.Bad(StrGoods.packCountBad)
+    if (perPackMilli <= 0 || perPackMilli > MAX_MILLI) return Planned.Bad(StrGoods.perPackBad)
+    val outQ = times(packsMilli, perPackMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad(StrGoods.piecesBad)
     val stock = location?.let { StockPlaces.stockAt(d) }
     val input = line(d, stock, location, from!!, packsMilli)
     shortage(d, listOf(input), location)?.let { return Planned.Bad(it) }
@@ -109,21 +110,21 @@ object Repack {
   /** ساختِ [countMilli] بسته از کالای [bundleId]؛ [parts] مقدارِ هر جزء برای **یک** بسته */
   fun planBuild(d: ShopData, bundleId: String, countMilli: Long, parts: List<Part>, location: String? = null): Planned {
     val bundle = d.products.find { it.id == bundleId }
-    stockProblem(bundle, "کالای بسته")?.let { return Planned.Bad(it) }
-    if (countMilli <= 0 || countMilli > MAX_MILLI) return Planned.Bad("تعدادِ بسته درست نیست")
+    stockProblem(bundle, StrGoods.packedItem)?.let { return Planned.Bad(it) }
+    if (countMilli <= 0 || countMilli > MAX_MILLI) return Planned.Bad(StrGoods.packCountBad)
     val clean = parts.filter { it.productId.isNotEmpty() }
-    if (clean.isEmpty()) return Planned.Bad("دست‌کم یک جزء بیفزایید")
-    if (clean.size > MAX_PARTS) return Planned.Bad("حداکثر $MAX_PARTS جزء")
-    if (clean.map { it.productId }.toSet().size != clean.size) return Planned.Bad("یک کالا دو بار در اجزا آمده")
-    if (clean.any { it.productId == bundleId }) return Planned.Bad("بسته جزءِ خودش نمی‌شود")
+    if (clean.isEmpty()) return Planned.Bad(StrGoods.addOnePart)
+    if (clean.size > MAX_PARTS) return Planned.Bad(StrGoods.maxParts(MAX_PARTS))
+    if (clean.map { it.productId }.toSet().size != clean.size) return Planned.Bad(StrGoods.partTwice)
+    if (clean.any { it.productId == bundleId }) return Planned.Bad(StrGoods.packSelfPart)
     val stock = location?.let { StockPlaces.stockAt(d) }
     val byId = d.products.associateBy { it.id }
     val inputs = ArrayList<Line>()
     for (pt in clean) {
       val p = byId[pt.productId]
-      stockProblem(p, "جزء")?.let { return Planned.Bad(it) }
-      if (pt.qtyMilli <= 0 || pt.qtyMilli > MAX_MILLI) return Planned.Bad("مقدارِ «${p!!.name}» درست نیست")
-      val need = times(pt.qtyMilli, countMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad("مقدارِ «${p!!.name}» درست نیست")
+      stockProblem(p, StrGoods.part)?.let { return Planned.Bad(it) }
+      if (pt.qtyMilli <= 0 || pt.qtyMilli > MAX_MILLI) return Planned.Bad(StrLedger.qtyOfBad(p!!.name))
+      val need = times(pt.qtyMilli, countMilli)?.takeIf { it in 1..MAX_MILLI } ?: return Planned.Bad(StrLedger.qtyOfBad(p!!.name))
       inputs += line(d, stock, location, p!!, need)
     }
     shortage(d, inputs, location)?.let { return Planned.Bad(it) }
@@ -135,11 +136,11 @@ object Repack {
     d: ShopData, key: String, fromId: String, packsMilli: Long, toId: String, perPackMilli: Long, location: String?,
     note: String, user: String, today: String, now: Long, newId: () -> String,
   ): StockPlaces.Result {
-    if (key.isBlank()) return StockPlaces.Result.Failed("شناسهٔ کار خالی است")
+    if (key.isBlank()) return StockPlaces.Result.Failed(StrGoods.opIdEmpty)
     if (has(d, key)) return StockPlaces.Result.Already
     return when (val p = planBreak(d, fromId, packsMilli, toId, perPackMilli, location)) {
       is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId, breakOutputs(d, p.plan, perPackMilli)), key)
+      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BREAK, "شکستنِ بسته", p.plan, location, note, user, today, now, newId, breakOutputs(d, p.plan, perPackMilli)), key)  // داده: نامِ کار درونِ یادداشتِ سابقه
     }
   }
 
@@ -175,11 +176,11 @@ object Repack {
     d: ShopData, key: String, bundleId: String, countMilli: Long, parts: List<Part>, location: String?,
     note: String, user: String, today: String, now: Long, newId: () -> String,
   ): StockPlaces.Result {
-    if (key.isBlank()) return StockPlaces.Result.Failed("شناسهٔ کار خالی است")
+    if (key.isBlank()) return StockPlaces.Result.Failed(StrGoods.opIdEmpty)
     if (has(d, key)) return StockPlaces.Result.Already
     return when (val p = planBuild(d, bundleId, countMilli, parts, location)) {
       is Planned.Bad -> StockPlaces.Result.Failed(p.message)
-      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BUILD, "ساختِ بسته", p.plan, location, note, user, today, now, newId, buildOutputs(d, p.plan)), key)
+      is Planned.Ok -> StockPlaces.Result.Ok(write(d, key, BUILD, "ساختِ بسته", p.plan, location, note, user, today, now, newId, buildOutputs(d, p.plan)), key)  // داده: نامِ کار درونِ یادداشتِ سابقه
     }
   }
 
@@ -224,7 +225,7 @@ object Repack {
     fun txt(l: Line) = "${ir.vil3ntec.tohid.qty(l.qtyMilli / 1000.0)} «${byId[l.productId]?.name.orEmpty()}»"
     val audit = AuditEntry(
       id = key, type = type, date = today, refId = key, createdAt = now, by = who,
-      notes = "$title: ${plan.inputs.joinToString(" + ") { txt(it) }} ⇐ ${txt(plan.output)}، بهای هر واحد " +
+      notes = "$title: ${plan.inputs.joinToString(" + ") { txt(it) }} ⇐ ${txt(plan.output)}، بهای هر واحد " +  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         "${ir.vil3ntec.tohid.money(plan.output.unitMinor / 100.0)} ؋" +
         (if (loc != null) " — ${StockPlaces.label(loc)}" else "") + (if (note.isNotBlank()) " — ${note.trim()}" else "") +
         (if (who != null) " — $who" else ""),

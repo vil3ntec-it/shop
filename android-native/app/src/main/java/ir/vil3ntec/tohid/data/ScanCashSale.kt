@@ -20,7 +20,7 @@ import ir.vil3ntec.tohid.core.hw.ScanSaleRule
  */
 object ScanCashSale {
   /** برچسبِ فاکتورِ نگه‌داشته‌ای که «نقد» خورده بود ولی ثبت نشد */
-  const val HELD_LABEL = "از بارکدخوان — نقد گرفته شد"
+  const val HELD_LABEL = "از بارکدخوان — نقد گرفته شد"  // داده: برچسبِ ذخیره‌شدهٔ فاکتورِ نگه‌داشته
 
   /** فاکتورِ آمادهٔ ثبتِ نقدی */
   data class Ready(

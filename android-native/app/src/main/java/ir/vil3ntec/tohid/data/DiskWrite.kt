@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.data
 
 import android.annotation.SuppressLint
 import android.os.Build
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
@@ -50,8 +51,8 @@ object DiskWrite {
 
   @Throws(IOException::class)
   fun stream(target: File, write: (OutputStream) -> Unit) {
-    val dir = target.absoluteFile.parentFile ?: throw IOException("پوشهٔ «$target» معلوم نیست")
-    if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException("پوشهٔ «$dir» ساخته نشد")
+    val dir = target.absoluteFile.parentFile ?: throw IOException(StrAppData.folderUnknown(target))
+    if (!dir.isDirectory && !dir.mkdirs() && !dir.isDirectory) throw IOException(StrAppData.folderNotMade(dir))
     val tmp = File(dir, target.name + ".tmp")
     try {
       FileOutputStream(tmp).use { out ->
@@ -62,7 +63,7 @@ object DiskWrite {
       move(tmp, target)
     } catch (e: Throwable) {
       tmp.delete()
-      throw e as? IOException ?: IOException(e.message ?: "نوشتن روی دیسک نشد", e)
+      throw e as? IOException ?: IOException(e.message ?: StrAppData.diskWriteFailed, e)
     }
     syncDir(dir)
   }
@@ -70,7 +71,7 @@ object DiskWrite {
   /** همان جابه‌جاییِ اتمی که جایگزین می‌کند — برای کوچِ رمز (`AtRest`) */
   internal fun move(tmp: File, target: File) {
     if (Build.VERSION.SDK_INT >= 26) return Api26.move(tmp, target)
-    if (!tmp.renameTo(target)) throw IOException("«${target.name}» روی دیسک جایگزین نشد")
+    if (!tmp.renameTo(target)) throw IOException(StrAppData.notReplaced(target.name))
   }
 
   /**
@@ -104,7 +105,7 @@ object DiskWrite {
         }
         if (attempt < ATTEMPTS - 1) Thread.sleep(40L * (attempt + 1))
       }
-      throw IOException("«${target.name}» روی دیسک جایگزین نشد: ${last?.message}", last)
+      throw IOException(StrAppData.notReplacedWhy(target.name, last?.message), last)
     }
 
     fun syncDir(dir: File) {

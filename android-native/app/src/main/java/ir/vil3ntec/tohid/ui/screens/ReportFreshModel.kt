@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.ui.screens
 
 import ir.vil3ntec.tohid.core.cost.CostMethod
 import ir.vil3ntec.tohid.core.cost.CostPolicy
+import ir.vil3ntec.tohid.core.i18n.StrAppData
 import ir.vil3ntec.tohid.core.report.ReportBoard
 import ir.vil3ntec.tohid.core.report.ReportClock
 import ir.vil3ntec.tohid.core.report.ReportCore
@@ -73,7 +74,7 @@ object ReportFreshModel {
       "profit" -> {
         val s = ReportCore.sales(l, r.from, r.to, clock, costing, ok)
         val t = ReportTables.sales(s).first { it.id == "sales.$d" }
-        val title = CostPolicy.label("سود و حاشیه به تفکیک ${ReportBoard.DIM_LABELS.getValue(d)}", CostPolicy.parse(costing.id))
+        val title = CostPolicy.label(StrAppData.profitBy(ReportBoard.DIM_LABELS.getValue(d)), CostPolicy.parse(costing.id))
         View(listOf(project(t, "profit", title, PROFIT_KEYS)), s, null, null)
       }
       "debts" -> {

@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.calendar.CivilDays
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.core.purchase.SupplierPricing
@@ -170,11 +171,11 @@ object PurchaseOrderBook {
   fun status(o: PurchaseOrderDto): PurchaseOrderCore.Status = PurchaseOrderCore.Status.of(o.status) ?: PurchaseOrderCore.Status.DRAFT
 
   fun label(s: PurchaseOrderCore.Status): String = when (s) {
-    PurchaseOrderCore.Status.DRAFT -> "پیش‌نویس"
-    PurchaseOrderCore.Status.SENT -> "فرستاده"
-    PurchaseOrderCore.Status.PARTIAL -> "بخشی دریافت‌شده"
-    PurchaseOrderCore.Status.COMPLETE -> "کامل"
-    PurchaseOrderCore.Status.CANCELLED -> "لغو"
+    PurchaseOrderCore.Status.DRAFT -> StrGoods.poDraft
+    PurchaseOrderCore.Status.SENT -> StrGoods.poSent
+    PurchaseOrderCore.Status.PARTIAL -> StrGoods.poPartial
+    PurchaseOrderCore.Status.COMPLETE -> StrGoods.poComplete
+    PurchaseOrderCore.Status.CANCELLED -> StrGoods.poCancelled
   }
 
   fun can(o: PurchaseOrderDto, action: PurchaseOrderCore.Action): Boolean = action.wire in o.allowed
@@ -229,7 +230,7 @@ object PurchaseOrderBook {
     val missing = todo.filter { purchaseIdOf(r.id, it.lineId) !in existing }
     if (missing.isEmpty()) return Posting.Already
     if (d.suppliers.none { it.id == o.supplierId }) {
-      return Posting.Failed("تأمین‌کنندهٔ «${o.supplierName}» در دفترِ این دستگاه نیست — اول همگام‌سازی کنید")
+      return Posting.Failed(StrGoods.poSupplierMissing(o.supplierName))
     }
     val byLine = o.lines.associateBy { it.id }
     val no = todo.firstNotNullOfOrNull { existing[purchaseIdOf(r.id, it.lineId)]?.invoiceNo?.takeIf { n -> n > 0 } }
@@ -237,14 +238,14 @@ object PurchaseOrderBook {
     var cur = d
     val made = ArrayList<String>()
     for (p in missing) {
-      val line = byLine[p.lineId] ?: return Posting.Failed("ردیفِ «${p.lineId}» در سفارش نیست")
+      val line = byLine[p.lineId] ?: return Posting.Failed(StrGoods.poLineMissing(p.lineId))
       var k = 0
       val res = LedgerEngine.addPurchase(
         cur,
         LedgerEngine.PurchaseDraft(
           supplierId = o.supplierId, productId = line.productId, quantity = units(p.acceptedMilli), unit = line.unit,
           purchasePrice = asAfn(p.priceMinor), paidAmount = 0.0, date = today,
-          notes = "سفارشِ خرید #${o.no} — رسید",
+          notes = "سفارشِ خرید #${o.no} — رسید",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         ),
         today, now,
       ) { ledgerId(r.id, p.lineId, k++) }
@@ -368,24 +369,24 @@ object PurchaseOrderBook {
 
   /** سطرِ فهرستِ فاکتورها: شماره، تاریخ، جمع (و «باطل» برای باطل‌شده) */
   fun billLine(b: PoBillDto): String = buildString {
-    append("فاکتورِ «").append(b.billNo).append("»")
+    append(StrGoods.billNo(b.billNo))
     b.billDate?.let { append(" · ").append(ir.vil3ntec.tohid.formatDate(it)) }
     append(" · ").append(ir.vil3ntec.tohid.money(asAfn(b.totalMinor))).append(" ؋")
-    if (!b.active) append(" · باطل")
+    if (!b.active) append(StrGoods.voided)
   }
 
   /** سرخطِ تطبیقِ درست — با فاکتورِ تأمین‌کننده یا فاکتورِ دفتر */
   fun matchTitle(supplier: Boolean): String =
-    if (supplier) "تطبیقِ سفارش، رسید و فاکتورِ تأمین‌کننده: درست" else "تطبیقِ سفارش، رسید و فاکتور: درست"
+    if (supplier) StrGoods.matchOkSupplier else StrGoods.matchOk
 
   /** متنِ هر ناهمخوانی؛ «فاکتور» همان طرفِ سوم است (تأمین‌کننده یا دفتر) */
   fun issueText(i: PurchaseOrderCore.Issue, supplier: Boolean = false): String = when (i) {
-    PurchaseOrderCore.Issue.RECEIVED_OVER_ORDER -> "بیش از سفارش رسیده"
-    PurchaseOrderCore.Issue.BILLED_OVER_RECEIVED -> if (supplier) "فاکتورِ تأمین‌کننده بیش از رسید" else "فاکتور بیش از رسید"
-    PurchaseOrderCore.Issue.BILLED_UNDER_RECEIVED -> if (supplier) "رسیده ولی در فاکتورِ تأمین‌کننده نیست" else "رسیده ولی فاکتورش در دفتر نیست"
-    PurchaseOrderCore.Issue.PRICE_OVER_ORDER -> "فی بالاتر از سفارش"
-    PurchaseOrderCore.Issue.PRICE_UNDER_ORDER -> "فی پایین‌تر از سفارش"
-    PurchaseOrderCore.Issue.NOT_ON_ORDER -> "بیرون از سفارش"
+    PurchaseOrderCore.Issue.RECEIVED_OVER_ORDER -> StrGoods.overReceived
+    PurchaseOrderCore.Issue.BILLED_OVER_RECEIVED -> if (supplier) StrGoods.billedOverSupplier else StrGoods.billedOver
+    PurchaseOrderCore.Issue.BILLED_UNDER_RECEIVED -> if (supplier) StrGoods.billedUnderSupplier else StrGoods.billedUnder
+    PurchaseOrderCore.Issue.PRICE_OVER_ORDER -> StrGoods.priceOver
+    PurchaseOrderCore.Issue.PRICE_UNDER_ORDER -> StrGoods.priceUnder
+    PurchaseOrderCore.Issue.NOT_ON_ORDER -> StrGoods.notOnOrder
   }
 
   /** «۱۲» نه «12.0»؛ رقمِ لاتین تا کادر همان را نشان دهد که کاربر می‌نویسد */
@@ -428,7 +429,7 @@ object PurchaseOrderBook {
   /** «▲ ۵٪» / «▼ ۲٫۵٪» / «بی تغییر» نسبت به خریدِ پیشینِ همان تأمین‌کننده (PUR-09)؛ بی پیشین ⇒ "" */
   fun changeText(p: SupplierPricing.Point): String {
     val bp = p.changeBp ?: return ""
-    if (bp == 0L) return " · بی تغییر"
+    if (bp == 0L) return StrGoods.unchanged
     val pct = kotlin.math.abs(bp) / 100.0
     return (if (bp > 0) " · ▲ " else " · ▼ ") + ir.vil3ntec.tohid.qty(pct) + "٪"
   }
@@ -440,10 +441,10 @@ object PurchaseOrderBook {
   fun lastPriceHint(buys: List<SupplierPricing.Buy>, productId: String?, supplierId: String?): String? {
     if (productId.isNullOrBlank() || supplierId.isNullOrBlank()) return null
     val last = SupplierPricing.last(buys, productId, supplierId) ?: return NO_BUY_YET
-    return "آخرین فیِ این تأمین‌کننده: ${ir.vil3ntec.tohid.money(asAfn(last.priceMinor))} ؋ (${ir.vil3ntec.tohid.formatDate(last.date)})" + changeText(last)
+    return StrGoods.lastPrice(ir.vil3ntec.tohid.money(asAfn(last.priceMinor)), ir.vil3ntec.tohid.formatDate(last.date)) + changeText(last)
   }
 
-  const val NO_BUY_YET = "از این تأمین‌کننده هنوز خریده نشده"
+  val NO_BUY_YET: String get() = StrGoods.noBuyYet
 
   /** فروشِ خالصِ (فروش − برگشتِ همان قلم) [windowDays] روزِ آخر تا امروز، بی فاکتورِ لغوشده */
   fun soldMilli(d: ShopData, today: String, windowDays: Int = ReorderCore.DEFAULT_WINDOW_DAYS): Map<String, Long> {
@@ -505,5 +506,5 @@ object PurchaseOrderBook {
   }
 
   /** واحدهایی که مقدارشان کسری است */
-  val WEIGHED_UNITS = setOf("کیلوگرم", "کیلو", "گرم", "لیتر", "متر")
+  val WEIGHED_UNITS = setOf("کیلوگرم", "کیلو", "گرم", "لیتر", "متر")  // داده: نامِ واحدِ ذخیره‌شده برای سنجش
 }

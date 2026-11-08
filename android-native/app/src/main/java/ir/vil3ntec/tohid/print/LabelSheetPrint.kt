@@ -12,6 +12,7 @@ import android.print.PrintDocumentInfo
 import android.print.PrintManager
 import android.print.pdf.PrintedPdfDocument
 import ir.vil3ntec.tohid.core.hw.MonoImage
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import java.io.FileOutputStream
 
 /**
@@ -69,7 +70,7 @@ object LabelSheetPrint {
       cancellationSignal: CancellationSignal?,
       callback: WriteResultCallback,
     ) {
-      val a = attrs ?: run { callback.onWriteFailed("اندازهٔ کاغذ معلوم نیست"); return }
+      val a = attrs ?: run { callback.onWriteFailed(StrPrint.paperUnknown); return }
       val pdf = PrintedPdfDocument(context, a)
       try {
         for ((index, sheet) in sheets.withIndex()) {

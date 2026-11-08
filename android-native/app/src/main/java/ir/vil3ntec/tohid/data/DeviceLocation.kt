@@ -164,7 +164,7 @@ object DeviceLocation {
             }
             override fun onProviderDisabled(provider: String) {}
             override fun onProviderEnabled(provider: String) {}
-            @Deprecated("لازمهٔ نسخه‌های قدیمی")
+            @Deprecated("لازمهٔ نسخه‌های قدیمی")  // داده: یادداشتِ برنامه‌نویس (دیده نمی‌شود)
             override fun onStatusChanged(provider: String?, status: Int, extras: android.os.Bundle?) {}
           }
           cont.invokeOnCancellation { runCatching { manager.removeUpdates(listener) } }

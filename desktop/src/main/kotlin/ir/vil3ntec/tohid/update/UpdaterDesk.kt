@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.update
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrUpdate
 import ir.vil3ntec.tohid.desktop.DesktopContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -70,9 +71,9 @@ object Updater {
           if (viaServer != null) return@runCatching viaServer.takeIf { isNewer(it.version, currentVersion) }
         }
         val slug = repo.trim().trim('/')
-        require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { "آدرس مخزن درست نیست" }
+        require(Regex("^[\\w.-]+/[\\w.-]+$").matches(slug)) { StrUpdate.badRepo }
         val text = get(versionUrl(slug)).trim().lineSequence().firstOrNull()?.trim().orEmpty()
-        if (!Regex("^\\d+(\\.\\d+)+$").matches(text)) throw IllegalStateException("نسخه‌ای برای دانلود پیدا نشد")
+        if (!Regex("^\\d+(\\.\\d+)+$").matches(text)) throw IllegalStateException(StrUpdate.noRelease)
         val url = stableApkUrl(slug)
         Release(
           version = text,
@@ -150,11 +151,11 @@ object Updater {
 
       if (out.length() < 1_000_000) {
         out.delete()
-        throw IllegalStateException("چیزی که گرفته شد فایلِ نصبی نیست — دوباره بزنید")
+        throw IllegalStateException(StrUpdate.notApk)
       }
       if (release.size > 0 && out.length() != release.size) {
         out.delete()
-        throw IllegalStateException("اندازهٔ فایلِ گرفته‌شده با انتشار نمی‌خواند — دوباره بزنید")
+        throw IllegalStateException(StrUpdate.apkSizeMismatch)
       }
       val bad = verify(out, release)
       if (bad != null) {
@@ -179,19 +180,19 @@ object Updater {
   private fun verify(file: File, release: Release): String? {
     val pinnedKey = ir.vil3ntec.tohid.BuildConfig.UPDATE_PUBLIC_KEY
     val strict = ReleaseSignature.pinned(pinnedKey)
-    if (release.sumsUrl.isBlank()) return if (strict) "این نسخه فهرستِ امضاشده ندارد؛ برای امنیت نصب نشد" else null
+    if (release.sumsUrl.isBlank()) return if (strict) StrUpdate.noSignedList else null
     val text = runCatching { get(release.sumsUrl) }.getOrNull()
-      ?: return if (strict) "فهرستِ جمعِ کنترلی گرفته نشد؛ برای امنیت نصب نشد — دوباره بزنید" else null
+      ?: return if (strict) StrUpdate.noChecksums else null
     if (strict) {
       val signature = runCatching { get(release.sumsUrl + ".sig") }.getOrNull().orEmpty()
-      if (!ReleaseSignature.verify(text, signature, pinnedKey)) return "امضای این نسخه با کلیدِ برنامه نمی‌خواند؛ نصب نشد"
+      if (!ReleaseSignature.verify(text, signature, pinnedKey)) return StrUpdate.badSignature
     }
     val lines = text.lines().mapNotNull { line ->
       val parts = line.trim().split(Regex("\\s+"))
       if (parts.size >= 2) parts[0].lowercase() to parts[1].removePrefix("*") else null
     }
     val expected = lines.firstOrNull { (_, n) -> n.equals(assetName, true) }?.first
-      ?: return if (strict) "این نسخه در فهرستِ امضاشده نیست؛ نصب نشد" else null
+      ?: return if (strict) StrUpdate.notInSignedList else null
     val digest = java.security.MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
       val buffer = ByteArray(64 * 1024)
@@ -203,7 +204,7 @@ object Updater {
     }
     val actual = digest.digest().joinToString("") { "%02x".format(it) }
     return if (actual.equals(expected, ignoreCase = true)) null
-    else "جمعِ کنترلیِ فایل با نسخهٔ منتشرشده یکی نیست — دوباره دانلود کنید"
+    else StrUpdate.checksumMismatch
   }
 
   fun readyFile(context: Context, release: Release): File? =
@@ -215,7 +216,7 @@ object Updater {
   fun openInstallSettings(context: Context): Result<Unit> = Result.success(Unit)
 
   fun openInBrowser(context: Context, url: String): Result<Unit> = runCatching {
-    check(DesktopContext.openExternal(url)) { "مرورگر باز نشد" }
+    check(DesktopContext.openExternal(url)) { StrUpdate.browserFailed }
   }
 
   /**
@@ -231,7 +232,7 @@ object Updater {
         Thread { Thread.sleep(1500); Runtime.getRuntime().halt(0) }.start()
       }
       os.contains("mac") -> ProcessBuilder("open", apk.absolutePath).start()
-      else -> check(DesktopContext.openExternal(apk.toURI().toString())) { "نصب‌کننده باز نشد" }
+      else -> check(DesktopContext.openExternal(apk.toURI().toString())) { StrUpdate.installerFailedDesk }
     }
     Unit
   }
@@ -263,9 +264,9 @@ object Updater {
   }
 
   private fun reason(code: Int): String = when (code) {
-    403, 429 -> "گیت‌هاب فعلاً جواب نمی‌دهد — کمی بعد دوباره بزنید"
-    404 -> "فایلِ نسخهٔ تازه روی گیت‌هاب پیدا نشد"
-    in 500..599 -> "گیت‌هاب خطا داد ($code) — کمی بعد دوباره بزنید"
-    else -> "سرورِ به‌روزرسانی جواب نداد ($code)"
+    403, 429 -> StrUpdate.githubBusy
+    404 -> StrUpdate.githubNoFile
+    in 500..599 -> StrUpdate.githubError(code)
+    else -> StrUpdate.updateServerNoAnswer(code)
   }
 }

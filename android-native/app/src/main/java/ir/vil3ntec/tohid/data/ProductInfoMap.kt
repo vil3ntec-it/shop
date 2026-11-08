@@ -81,14 +81,14 @@ object ProductInfoMap {
 
   /** ردپای ویرایشِ همین بخش (محلِ قفسه، جایگزین، فیلدِ سفارشی، کد، خدماتی) — همان متن‌های پیشین به همان ترتیب */
   fun changes(a: Product, b: Product): List<String> = buildList {
-    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")
-    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")
-    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")
-    if (a.sku.orEmpty() != b.sku.orEmpty()) add("کدِ کالا «${a.sku.orEmpty()}» ⇐ «${b.sku.orEmpty()}»")
-    if ((a.stockless == true) != (b.stockless == true)) add(if (b.stockless == true) "خدماتی (بی موجودی) شد" else "دیگر خدماتی نیست")
+    if (a.aisle != b.aisle || a.shelf != b.shelf || a.shelfLevel != b.shelfLevel) add("محلِ قفسه عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.alternatives != b.alternatives) add("کالاهای جایگزین عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.customFields != b.customFields) add("فیلدهای سفارشی عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if (a.sku.orEmpty() != b.sku.orEmpty()) add("کدِ کالا «${a.sku.orEmpty()}» ⇐ «${b.sku.orEmpty()}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if ((a.stockless == true) != (b.stockless == true)) add(if (b.stockless == true) "خدماتی (بی موجودی) شد" else "دیگر خدماتی نیست")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     addAll(ProductPlansMap.changes(a, b))
-    if (a.variantAxes.orEmpty() != b.variantAxes.orEmpty()) add("ویژگی‌های تنوع عوض شد")
-    if ((a.serialTracked == true) != (b.serialTracked == true)) add(if (b.serialTracked == true) "سریال‌دار شد" else "دیگر سریال‌دار نیست")
+    if (a.variantAxes.orEmpty() != b.variantAxes.orEmpty()) add("ویژگی‌های تنوع عوض شد")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    if ((a.serialTracked == true) != (b.serialTracked == true)) add(if (b.serialTracked == true) "سریال‌دار شد" else "دیگر سریال‌دار نیست")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
   }
 
   /**

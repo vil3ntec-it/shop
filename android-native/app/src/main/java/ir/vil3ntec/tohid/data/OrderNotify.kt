@@ -11,6 +11,7 @@ import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.orders.AckState
 import ir.vil3ntec.tohid.core.orders.OrderNotice
@@ -99,7 +100,7 @@ object OrderNotify {
   /** کانالِ «سفارش‌های آنلاین» (اهمیتِ بالا) — اعلانِ برنامهٔ باز و پوشِ برنامهٔ بسته هر دو همین */
   fun channel(): NotificationChannel =
     NotificationChannel(CHANNEL, ir.vil3ntec.tohid.core.i18n.StrPush.channelOrders, NotificationManager.IMPORTANCE_HIGH)
-      .apply { description = "سفارشِ تازهٔ مشتری از ویترین" }
+      .apply { description = StrLedger.orderChannelNote }
 
   /** کانالِ پیش از پوش (`tohid-orders`) — پاک شود تا در تنظیماتِ گوشی دو «سفارشِ تازه» نماند */
   fun replaceOldChannel(nm: NotificationManager) {
@@ -161,11 +162,11 @@ object OrderNotify {
     val pending = open?.let {
       PendingIntent.getActivity(context, noteId, it, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
     }
-    val title = if (n.orderNo > 0) "سفارشِ تازه #${n.orderNo}" else "سفارشِ تازه"
+    val title = if (n.orderNo > 0) StrLedger.newOrderNo(n.orderNo) else StrLedger.newOrder
     val note = NotificationCompat.Builder(context, CHANNEL)
       .setSmallIcon(android.R.drawable.ic_dialog_info)
       .setContentTitle(title)
-      .setContentText("برای دیدن و پذیرفتن لمس کنید")
+      .setContentText(StrLedger.tapToView)
       .setAutoCancel(true)
       .setOnlyAlertOnce(true)
       .apply { pending?.let { setContentIntent(it) } }

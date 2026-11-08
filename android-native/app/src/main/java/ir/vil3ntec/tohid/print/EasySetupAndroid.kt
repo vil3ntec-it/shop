@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.hw.EscPos
 import ir.vil3ntec.tohid.core.hw.MonoImage
 import ir.vil3ntec.tohid.core.hw.NetScan
 import ir.vil3ntec.tohid.core.hw.ScannerSheet
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
@@ -76,7 +77,7 @@ object NetPrinterScan {
 
   /** «چاپِ شناسایی» (`EasyTestPrint`): متنِ ASCII با نشانی، بی صفِ چاپ */
   suspend fun identify(context: Context, link: String): String? = withContext(Dispatchers.IO) {
-    val l = ThermalPrinter.Link.parse(link) ?: return@withContext "نشانیِ چاپگر خوانده نشد"
+    val l = ThermalPrinter.Link.parse(link) ?: return@withContext StrPrint.badAddress
     ThermalPrinter.send(context, l, EasyTestPrint.bytes(l.save()))
   }
 }
@@ -122,9 +123,9 @@ object ScannerSheetPrint {
 
   /** چاپ روی چاپگرِ پیش‌فرضِ رسید، بی صف؛ نبودِ چاپگر یا خطا ⇒ پیام */
   suspend fun print(context: Context): String? = withContext(Dispatchers.IO) {
-    val s = PrinterRegistry.defaultSaved(context) ?: return@withContext "چاپگرِ رسید ثبت نشده — برگه را از روی صفحه اسکن کنید"
-    val bytes = runCatching { bytes(context, s) }.getOrElse { return@withContext "برگه کشیده نشد: ${it.message}" }
-    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext "نشانیِ چاپگر خوانده نشد"
+    val s = PrinterRegistry.defaultSaved(context) ?: return@withContext StrPrint.noReceiptPrinter
+    val bytes = runCatching { bytes(context, s) }.getOrElse { return@withContext StrPrint.sheetNotDrawn(it.message) }
+    val link = ThermalPrinter.Link.parse(s.link) ?: return@withContext StrPrint.badAddress
     ThermalPrinter.send(context, link, bytes)
   }
 }

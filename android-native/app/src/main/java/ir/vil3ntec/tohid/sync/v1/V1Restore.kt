@@ -108,7 +108,7 @@ class V1Restore internal constructor(
     }
     queue.pushFront(book.replayAbove(plan.base).mapNotNull { SyncOp.fromJson(it.body) })
     if (book.floor() > plan.base) state.noteGap(now())
-    check(state.commitRestore(plan.epoch, true)) { "دورانِ همگام‌سازی روی دیسک ننشست" }
+    check(state.commitRestore(plan.epoch, true)) { "دورانِ همگام‌سازی روی دیسک ننشست" }  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     return true
   }
 
@@ -151,7 +151,7 @@ class V1Restore internal constructor(
     if (commit.record(current) > 0) return false
     val (ledger, shadow) = RestoreMerge.merge(snapshot, LedgerDiff.toJson(current), gone, archived())
     val written = commit.rebuild(ledger, shadow, current, cursor, write)
-    check(state.commitRestore(state.epoch, false)) { "دورانِ همگام‌سازی روی دیسک ننشست" }
+    check(state.commitRestore(state.epoch, false)) { "دورانِ همگام‌سازی روی دیسک ننشست" }  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
     //  ردیف‌های تنهای این دستگاه ⇒ «درج» (همان op_idِ تازه با ژورنالِ ثبت)
     commit.record(written)
     return true

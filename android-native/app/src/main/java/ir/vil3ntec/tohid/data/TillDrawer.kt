@@ -61,6 +61,6 @@ object TillDrawer {
   /** ردیفِ سابقهٔ «ادامه روی این دستگاه» */
   fun resumeRow(shift: CashShift.Shift, by: String, today: String, now: Long, id: String): AuditEntry = AuditEntry(
     id = id, type = RESUME, date = today, refId = shift.open.id, createdAt = now, by = by.trim().ifEmpty { null },
-    notes = "ادامهٔ صندوقِ «" + (shift.open.drawer ?: "اصلی") + "» روی این دستگاه" + if (by.isNotBlank()) " — ${by.trim()}" else "",
+    notes = "ادامهٔ صندوقِ «" + (shift.open.drawer ?: "اصلی") + "» روی این دستگاه" + if (by.isNotBlank()) " — ${by.trim()}" else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
   )
 }

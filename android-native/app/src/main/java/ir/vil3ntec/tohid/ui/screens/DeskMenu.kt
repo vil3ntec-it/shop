@@ -32,7 +32,7 @@ object DeskMenu {
 
   private fun shortcutItem(shortcuts: List<Pair<String, String>>, id: String, label: String?): Item {
     val i = shortcuts.indexOfFirst { it.first == id }
-    require(i >= 0) { "$id در AppNav.SHORTCUTS نیست" }
+    require(i >= 0) { "$id در AppNav.SHORTCUTS نیست" }  // داده: خطای برنامه‌نویس (شناسهٔ نادرستِ کد، نه کاربر)
     return Item(id, label ?: shortcuts[i].second, "Ctrl+${i + 1}")
   }
 

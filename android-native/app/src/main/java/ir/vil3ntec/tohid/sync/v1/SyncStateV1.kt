@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.sync.v1
 
 import android.content.Context
 
+import ir.vil3ntec.tohid.core.i18n.StrSync
 /**
  *  حالِ همگام‌سازیِ **این حساب** روی این دستگاه.
  *
@@ -165,10 +166,10 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
 enum class SyncDot { GREEN, YELLOW, GREY, RED;
 
   val label: String get() = when (this) {
-    GREEN -> "همگام با سرور"
-    YELLOW -> "در صف ارسال"
-    GREY -> "آفلاین"
-    RED -> "خطای همگام‌سازی"
+    GREEN -> StrSync.dotGreen
+    YELLOW -> StrSync.dotYellow
+    GREY -> StrSync.dotGrey
+    RED -> StrSync.dotRed
   }
 
   companion object {

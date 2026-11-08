@@ -2,6 +2,7 @@ package ir.vil3ntec.tohid.print
 
 import android.app.DesktopNotify
 import android.content.Context
+import ir.vil3ntec.tohid.core.i18n.StrPrint
 import ir.vil3ntec.tohid.data.ReportCsv
 import java.awt.BasicStroke
 import java.awt.Color
@@ -40,7 +41,7 @@ object ReportPrint {
     //  اول پیش‌نمایش (همان صفحه‌هایی که به چاپگر می‌روند)، بعد پنجرهٔ چاپِ سیستم
     javax.swing.SwingUtilities.invokeLater {
       runCatching { preview(sheet, title) }
-        .onFailure { DesktopNotify.show("چاپ", "پیش‌نمایش ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
+        .onFailure { DesktopNotify.show(StrPrint.printTitle, StrPrint.previewNotMade(it.message ?: StrPrint.unknownReason)) }
     }
   }
 
@@ -87,8 +88,8 @@ object ReportPrint {
 
   /** PDF ⇐ پنجرهٔ «ذخیره» (`Platform.saveFile`)؛ پیام برای صفحه */
   fun savePdf(context: Context, sheet: ReportCsv.Sheet, title: String): String = runCatching {
-    ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.pdf", pdf(context, sheet, title))?.let { "ذخیره شد: $it" } ?: "ذخیره نشد"
-  }.getOrElse { if (it is TooManyPages) it.message.orEmpty() else "PDF ساخته نشد: ${it.message ?: "دلیلِ نامعلوم"}" }
+    ir.vil3ntec.tohid.ui.Platform.saveFile("${sheet.name}.pdf", pdf(context, sheet, title))?.let { StrPrint.savedAt(it) } ?: StrPrint.notSaved
+  }.getOrElse { if (it is TooManyPages) it.message.orEmpty() else StrPrint.pdfFailed(it.message ?: StrPrint.unknownReason) }
 
   private fun send(sheet: ReportCsv.Sheet, title: String) {
     //  پنجرهٔ چاپ نخِ صفحه را نگه نمی‌دارد
@@ -98,7 +99,7 @@ object ReportPrint {
         job.jobName = sheet.name
         job.setPrintable(TablePrintable(sheet, title))
         if (job.printDialog()) job.print()
-      }.onFailure { DesktopNotify.show("چاپ", "چاپ انجام نشد: ${it.message ?: "دلیلِ نامعلوم"}") }
+      }.onFailure { DesktopNotify.show(StrPrint.printTitle, StrPrint.printNotDone(it.message ?: StrPrint.unknownReason)) }
     }, "tohid-print").apply { isDaemon = true }.start()
   }
 
@@ -133,18 +134,18 @@ object ReportPrint {
         add(javax.swing.JLabel(javax.swing.ImageIcon(img)).apply {
           alignmentX = java.awt.Component.CENTER_ALIGNMENT
           border = javax.swing.BorderFactory.createEmptyBorder(10, 10, 10, 10)
-          toolTipText = "صفحهٔ ${n + 1} از ${pages.size}"
+          toolTipText = StrPrint.pageOf(n + 1, pages.size)
         })
       }
     }
-    val dialog = javax.swing.JDialog(null as java.awt.Frame?, "پیش‌نمایش چاپ — $title", true)
-    val printBtn = javax.swing.JButton("چاپ…").apply {
+    val dialog = javax.swing.JDialog(null as java.awt.Frame?, StrPrint.previewTitle(title), true)
+    val printBtn = javax.swing.JButton(StrPrint.printDots).apply {
       addActionListener { dialog.dispose(); send(sheet, title) }
     }
-    val closeBtn = javax.swing.JButton("بستن").apply { addActionListener { dialog.dispose() } }
+    val closeBtn = javax.swing.JButton(StrPrint.close).apply { addActionListener { dialog.dispose() } }
     val bar = javax.swing.JPanel(java.awt.FlowLayout(java.awt.FlowLayout.LEFT)).apply {
       componentOrientation = java.awt.ComponentOrientation.RIGHT_TO_LEFT
-      add(javax.swing.JLabel("${pages.size} صفحه"))
+      add(javax.swing.JLabel(StrPrint.pagesN(pages.size)))
       add(printBtn); add(closeBtn)
     }
     dialog.contentPane.layout = java.awt.BorderLayout()
@@ -160,7 +161,7 @@ object ReportPrint {
 
     private val base: Font = runCatching<Font> {
       val path = ir.vil3ntec.tohid.R.path(ir.vil3ntec.tohid.R.font.vazirmatn_regular)
-      val stream = ReportPrint::class.java.classLoader.getResourceAsStream(path) ?: error("قلم پیدا نشد")
+      val stream = ReportPrint::class.java.classLoader.getResourceAsStream(path) ?: error("قلم پیدا نشد")  // داده: خطای برنامه‌نویس (قلمِ جاافتادهٔ بسته، نه کاربر)
       stream.use { Font.createFont(Font.TRUETYPE_FONT, it) }
     }.getOrDefault(Font(Font.SANS_SERIF, Font.PLAIN, 10))
 
@@ -252,7 +253,7 @@ object ReportPrint {
         g2.color = Color.BLACK
       }
       if (body.isEmpty()) {
-        draw(lines("داده‌ای برای چاپ نیست.", text, width), width, y)
+        draw(lines(StrPrint.nothingToPrint, text, width), width, y)
         return Printable.PAGE_EXISTS
       }
       row(header, head, true)

@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrGoods
 import ir.vil3ntec.tohid.core.product.ImportTable
 import ir.vil3ntec.tohid.core.product.ProductImportPlan
 import java.io.ByteArrayInputStream
@@ -41,13 +42,13 @@ object ProductImport {
   )
 
   private val ALIASES: Map<String, String> = mapOf(
-    "نام محصول" to "name", "نام کالا" to "name", "نام" to "name", "کالا" to "name", "name" to "name", "product" to "name",
-    "دسته" to "category", "دسته‌بندی" to "category", "دسته بندی" to "category", "category" to "category",
-    "واحد" to "unit", "unit" to "unit",
-    "قیمت خرید" to "purchase", "purchase price" to "purchase", "purchaseprice" to "purchase", "cost" to "purchase",
-    "قیمت فروش" to "sale", "sale price" to "sale", "saleprice" to "sale", "price" to "sale",
-    "حداقل موجودی" to "min", "min stock" to "min", "minstock" to "min",
-    "بارکد" to "barcode", "barcode" to "barcode",
+    "نام محصول" to "name", "نام کالا" to "name", "نام" to "name", "کالا" to "name", "name" to "name", "product" to "name",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "دسته" to "category", "دسته‌بندی" to "category", "دسته بندی" to "category", "category" to "category",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "واحد" to "unit", "unit" to "unit",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "قیمت خرید" to "purchase", "purchase price" to "purchase", "purchaseprice" to "purchase", "cost" to "purchase",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "قیمت فروش" to "sale", "sale price" to "sale", "saleprice" to "sale", "price" to "sale",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "حداقل موجودی" to "min", "min stock" to "min", "minstock" to "min",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
+    "بارکد" to "barcode", "barcode" to "barcode",  // داده: نامِ ستونِ فایلِ ورودی برای شناختن (منطق)
   )
 
   /**
@@ -89,13 +90,13 @@ object ProductImport {
       val min = number(at(r, "min"))
       val barcode = at(r, "barcode")
       val reason = when {
-        name.isEmpty() -> "نام ندارد"
-        !seenNames.add(key) -> "نامِ تکراری در همین فایل"
-        WarehouseEngine.duplicateName(d, name) != null -> "این کالا از قبل در دکان هست"
-        purchase.isNaN() || purchase < 0 -> "قیمتِ خرید درست نیست"
-        sale.isNaN() || sale < 0 -> "قیمتِ فروش درست نیست"
-        min.isNaN() || min < 0 -> "حداقلِ موجودی درست نیست"
-        barcode.isNotEmpty() && (codes.containsKey(barcode) || !seenCodes.add(barcode)) -> "بارکدِ تکراری"
+        name.isEmpty() -> StrGoods.noName
+        !seenNames.add(key) -> StrGoods.dupName
+        WarehouseEngine.duplicateName(d, name) != null -> StrGoods.alreadyInShop
+        purchase.isNaN() || purchase < 0 -> StrGoods.buyPriceBad2
+        sale.isNaN() || sale < 0 -> StrGoods.salePriceBad2
+        min.isNaN() || min < 0 -> StrGoods.minStockBad
+        barcode.isNotEmpty() && (codes.containsKey(barcode) || !seenCodes.add(barcode)) -> StrGoods.dupBarcode
         else -> null
       }
       if (reason != null) {
@@ -105,7 +106,7 @@ object ProductImport {
         drafts += WarehouseEngine.ProductDraft(
           name = name,
           category = at(r, "category"),
-          unit = at(r, "unit").ifEmpty { "عدد" },
+          unit = at(r, "unit").ifEmpty { "عدد" },  // داده: واحدِ پیش‌فرضِ ذخیره‌شده
           purchasePrice = purchase,
           salePrice = sale,
           minStock = min,
@@ -150,11 +151,11 @@ object ProductImport {
    */
   fun read(bytes: ByteArray): ImportTable.Read {
     if (bytes.size > ImportTable.MAX_FILE_BYTES) {
-      return ImportTable.Read.Failed("فایل بزرگ‌تر از ${ImportTable.MAX_FILE_BYTES / (1024 * 1024)} مگابایت است — آن را چند تکه کنید")
+      return ImportTable.Read.Failed(StrGoods.fileTooBigSplit(ImportTable.MAX_FILE_BYTES / (1024 * 1024)))
     }
-    if (bytes.isEmpty()) return ImportTable.Read.Failed("فایل خالی است")
+    if (bytes.isEmpty()) return ImportTable.Read.Failed(StrGoods.fileEmpty)
     if (bytes.startsWith(OLE)) {
-      return ImportTable.Read.Failed("فایلِ xls ِ قدیمی (یا اکسلِ رمزدار) خوانده نمی‌شود — در اکسل «ذخیره به xlsx» کنید")
+      return ImportTable.Read.Failed(StrGoods.oldXls)
     }
     if (bytes.startsWith(ZIP)) return readXlsx(bytes)
     val text = when {
@@ -168,10 +169,10 @@ object ProductImport {
           .onUnmappableCharacter(java.nio.charset.CodingErrorAction.REPORT)
           .decode(java.nio.ByteBuffer.wrap(bytes)).toString()
       }.getOrNull() ?: return ImportTable.Read.Failed(
-        "فایل UTF-8 نیست — در اکسل «CSV UTF-8» ذخیره کنید یا خودِ فایلِ xlsx را بدهید"
+        StrGoods.notUtf8
       )
     }
-    if (text.contains('\u0000')) return ImportTable.Read.Failed("این فایل جدول نیست — xlsx یا CSV بدهید")
+    if (text.contains('\u0000')) return ImportTable.Read.Failed(StrGoods.notTable)
     return ImportTable.readCsv(text)
   }
 
@@ -181,7 +182,7 @@ object ProductImport {
    *  روشن شدنِ «برگهٔ اول» (workbook + rels) نگه داشته می‌شوند.
    */
   private fun readXlsx(bytes: ByteArray): ImportTable.Read {
-    val tooBig = ImportTable.Read.Failed("فایلِ اکسل پس از باز شدن بیش از حد بزرگ است — آن را چند تکه کنید")
+    val tooBig = ImportTable.Read.Failed(StrGoods.xlsxTooBig)
     var workbook: String? = null
     var rels: String? = null
     var shared: String? = null
@@ -221,15 +222,15 @@ object ProductImport {
         }
       }
     } catch (e: java.util.zip.ZipException) {
-      return ImportTable.Read.Failed("فایلِ اکسل خراب است و باز نمی‌شود")
+      return ImportTable.Read.Failed(StrGoods.xlsxBroken)
     } catch (e: java.io.IOException) {
-      return ImportTable.Read.Failed("فایلِ اکسل خراب است و باز نمی‌شود")
+      return ImportTable.Read.Failed(StrGoods.xlsxBroken)
     }
     if (workbook == null) {
-      return ImportTable.Read.Failed("این ZIP اکسل (xlsx) نیست — فایلِ ods یا دیگر را «ذخیره به xlsx» کنید")
+      return ImportTable.Read.Failed(StrGoods.notXlsx)
     }
     val sheet = sheets[ImportTable.sheetPath(workbook, rels)]
-      ?: return ImportTable.Read.Failed("برگهٔ اولِ فایلِ اکسل پیدا نشد")
+      ?: return ImportTable.Read.Failed(StrGoods.noFirstSheet)
     return ImportTable.readXlsx(sheet, shared)
   }
 
@@ -265,11 +266,11 @@ object ProductImport {
   fun describe(c: ProductImportPlan.Change): String = when (c) {
     is ProductImportPlan.Change.Text -> "${c.col.label} «${c.old}» ⇐ «${c.new}»"
     is ProductImportPlan.Change.Price -> "${c.col.label} ${ir.vil3ntec.tohid.money(c.oldMinor / 100.0)} ⇐ ${ir.vil3ntec.tohid.money(c.newMinor / 100.0)}"
-    is ProductImportPlan.Change.MinStock -> "حداقل موجودی ${ir.vil3ntec.tohid.qty(c.oldMilli / 1000.0)} ⇐ ${ir.vil3ntec.tohid.qty(c.newMilli / 1000.0)}"
-    is ProductImportPlan.Change.AddBarcodes -> "بارکدِ تازه ${c.codes.joinToString("، ")}"
+    is ProductImportPlan.Change.MinStock -> "حداقل موجودی ${ir.vil3ntec.tohid.qty(c.oldMilli / 1000.0)} ⇐ ${ir.vil3ntec.tohid.qty(c.newMilli / 1000.0)}"  // داده: تکهٔ یادداشتِ سابقه و پیش‌نمایشِ ورود (منطقِ هسته)
+    is ProductImportPlan.Change.AddBarcodes -> "بارکدِ تازه ${c.codes.joinToString("، ")}"  // داده: تکهٔ یادداشتِ سابقه و پیش‌نمایشِ ورود (منطقِ هسته)
   }
 
   /** «فایلِ ردیف‌های رد» به xlsx: همه متن (نه عدد، نه فرمول) تا بارکد و صفرِ اول سالم بماند و فرمولی اجرا نشود */
   fun errorWorkbook(plan: ProductImportPlan.Plan): ByteArray =
-    Xlsx.book(listOf(Xlsx.Sheet("ردیف‌های رد", ProductImportPlan.errorReport(plan).map { r -> r.map { Xlsx.Cell.Text(it) } })))
+    Xlsx.book(listOf(Xlsx.Sheet("ردیف‌های رد", ProductImportPlan.errorReport(plan).map { r -> r.map { Xlsx.Cell.Text(it) } })))  // داده: برگهٔ خروجیِ ردیف‌های رد
 }
