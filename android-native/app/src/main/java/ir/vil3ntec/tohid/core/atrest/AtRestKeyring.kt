@@ -9,8 +9,9 @@ import javax.crypto.spec.SecretKeySpec
  *  کلیدِ رمزِ کلید (KEK) — جایش بیرون از فایل‌هاست.
  *
  *  اندروید: کلیدِ AES در Android Keystore که هرگز از سخت‌افزار/سرویس بیرون
- *  نمی‌آید (`data/AtRestKeys.kt`). کامپیوتر: فعلاً فایلِ کلیدِ فقط-صاحب
- *  (`AtRestKeysDesk.kt`) — PARTIAL؛ DPAPI/Keychain در فاز ۲.
+ *  نمی‌آید (`data/AtRestKeys.kt`). کامپیوتر: فایلِ کلیدِ فقط-صاحب
+ *  (`AtRestKeysDesk.kt`) — PARTIAL؛ فاز ۲ (DPAPI/Keychain/Secret Service) پشتِ پرچمِ
+ *  `desk.keystore`، پیش‌فرض خاموش (`desktop/keystore/KekVault.kt`).
  */
 interface AtRestKek {
   /**

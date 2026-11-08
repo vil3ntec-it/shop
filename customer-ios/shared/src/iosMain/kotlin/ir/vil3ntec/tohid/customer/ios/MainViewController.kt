@@ -72,3 +72,6 @@ fun openUrl(url: String) {
 
 /** برنامه دوباره پیش آمد (`scenePhase == .active`): پیگیری، سبد و صفِ گفت‌وگو از نو */
 fun resumed() = model.resumed()
+
+/** برنامه دیگر جلوی چشم نیست (`scenePhase` ِ inactive/background): گفت‌وگو فقط «رسید»، نه «خواندم» (CHAT-04) */
+fun paused() = model.paused()

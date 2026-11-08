@@ -31,6 +31,8 @@ object ShellPaths {
   fun heroMoney(safe: Boolean) = RoutePaths.withQuery(HERO_MONEY, "page" to if (safe) "safe" else "till")
   /** STF-02: «درخواست‌های تأیید» ِ صاحب/مدیر — راهش نوارِ پوسته و پوشِ سرور است (پرچمِ خاموش ⇒ هیچ‌جا دیده نمی‌شود) */
   const val APPROVALS = "approvals"
+  /** صندوقِ سندهای ردشده ِ صاحب/مدیر (`ConflictInbox.kt`) — راهش نوارِ پوسته؛ بی سندِ باز هیچ‌جا دیده نمی‌شود */
+  const val CONFLICTS = "conflicts"
 }
 
 /** بخش‌های جست‌وجو که همین کاربر حق دارد باز کند (نقش، پرچمِ سرور، پرچمِ ماژول) */
@@ -82,6 +84,9 @@ val ShellModule = AppModule(
     V3Route("search", RouteKind.TAB, { Str.search }, chrome = Chrome.OWN) { Search() },
     V3Route(ShellPaths.APPROVALS, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrRemoteApproval.inboxTitle }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       ApprovalInboxRoute()
+    },
+    V3Route(ShellPaths.CONFLICTS, RouteKind.PAGE, { ir.vil3ntec.tohid.core.i18n.StrConflictInbox.title }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
+      ConflictInboxRoute()
     },
     V3Route(TransactionPaths.LIST, RouteKind.PAGE, { StrHome.transactions }, parent = ShellPaths.HOME, chrome = Chrome.OWN) {
       TransactionsScreen(

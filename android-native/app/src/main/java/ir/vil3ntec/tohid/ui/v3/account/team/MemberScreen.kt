@@ -14,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.Key
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.PersonRemove
 import androidx.compose.material3.Text
@@ -66,6 +67,12 @@ internal class MemberActions(
   val place: (place: String, on: Boolean) -> Unit = { _, _ -> },
   /** STF-01: دادن (شناسه) یا برداشتنِ (null) نقشِ سفارشی */
   val customRole: (roleId: String?) -> Unit = {},
+  /** «باطل کردنِ این دستگاه» (رازِ ورود با کد) — برگهٔ تأیید */
+  val revokeKey: (keyId: String) -> Unit = {},
+  /** «خروج از همهٔ دستگاه‌ها» برای همین کارمند — برگهٔ تأیید */
+  val logoutAll: () -> Unit = {},
+  /** «برداشتنِ عضوِ کهنه» از نشانهٔ «شاید همان» — برگهٔ تأیید */
+  val removeStale: (oldMemberId: String) -> Unit = {},
 )
 
 /**
@@ -94,6 +101,17 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
               RolePill(row.role)
               Spacer(Modifier.width(6.dp))
               V3StatusPill(if (row.active) V3Status.DELIVERED else V3Status.INACTIVE, if (row.active) StrAccount.stateActive else StrAccount.stateClosed)
+            }
+            val keysPage = team.staffKeys
+            val canRevoke = MemberModel.canRevoke(keysPage, member)
+            //  «شاید همان <نام> است با دستگاهِ تازه» — فقط نشانه؛ حساب‌ها هرگز خودبه‌خود یکی نمی‌شوند
+            MemberModel.hintsOf(keysPage, member, team.members).forEach { h ->
+              V3Section(h.title) {
+                Text(h.body, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(start = 16.dp, end = 16.dp, top = 12.dp))
+                if (canRevoke && !busy) {
+                  V3TextButton(StrAccount.removeStale, { actions.removeStale(h.oldMemberId) }, modifier = Modifier.padding(horizontal = 8.dp), danger = true)
+                } else Spacer(Modifier.height(12.dp))
+              }
             }
             val permsOf = MemberModel.permsOf(team.perms, member)
             if (CustomRoleModel.visibleFor(team.perms, permsOf)) {
@@ -146,6 +164,29 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
                     }
                   },
                 )
+              }
+            }
+            if (MemberModel.keysVisible(keysPage, member)) {
+              val keys = MemberModel.keysOf(keysPage, member)
+              V3Section(StrAccount.deviceKeysTitle, footer = StrAccount.deviceKeysHelper) {
+                if (keys.isEmpty()) Text(StrAccount.noDevices, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(16.dp))
+                keys.forEachIndexed { i, k ->
+                  if (i > 0) V3Divider(start = 64.dp)
+                  val kr = MemberModel.keyRow(k)
+                  V3ListRow(
+                    title = kr.title,
+                    subtitle = kr.meta,
+                    icon = Icons.Outlined.Key,
+                    chevron = false,
+                    trailing = if (canRevoke && !busy) {
+                      { V3TextButton(StrAccount.revokeDeviceKey, { actions.revokeKey(kr.id) }, danger = true) }
+                    } else null,
+                  )
+                }
+                if (canRevoke && !busy) {
+                  V3Divider(start = 16.dp)
+                  V3TextButton(StrAccount.logoutEverywhere, actions.logoutAll, modifier = Modifier.padding(horizontal = 8.dp), danger = true)
+                }
               }
             }
           }
@@ -241,6 +282,9 @@ internal fun RouteScope.MemberRoute(id: String) {
         }
       },
       remove = { nav.open(AccountPaths.removeMember(id)) },
+      revokeKey = { nav.open(AccountPaths.revokeDeviceKey(it)) },
+      logoutAll = { nav.open(AccountPaths.logoutEverywhere(id)) },
+      removeStale = { nav.open(AccountPaths.removeStale(id, it)) },
     ),
   )
 }

@@ -55,6 +55,11 @@ object SalesEngine {
     val lotId: String? = null,
     val note: String? = null, // یادداشتِ ردیف (POS-11، `CartNotes`) — به `SaleItem.note` می‌رود
     val serials: List<String>? = null, // سریال‌های ردیف (POS-28، `CartSerials`) — به `SaleItem.serials` می‌رود
+    /**
+     *  قیمتِ خاصِ مشتری که صندوق روی همین ردیف نشانده (POS-18، `CustomerPriceCart`، افغانی) — فقط برای این‌که قلمِ
+     *  ثبت‌شده بگوید «قیمتِ خاص» (`CustomerPrice.stamp`: فیِ ثبت‌شده همین باشد). پرچمِ خاموش ⇒ همیشه `null`.
+     */
+    val specialPrice: Double? = null,
   ) {
     /** ردیفی که کالای ثبت‌شده‌ای پشتش نیست */
     val free: Boolean get() = label.isNotBlank()
@@ -555,6 +560,8 @@ object SalesEngine {
         returnedQty = 0.0, parts = ProductPlansMap.parts(p), serials = SerialSale.forItem(line, p),
         lotId = if (stockPlan != null) line.lotId?.takeIf { it.isNotEmpty() } else null,
         note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(line.note),
+        //  POS-18: «قیمتِ خاص» فقط وقتی فیِ ثبت‌شده همان قیمتِ خاصی است که صندوق نشانده بود (پرچمِ خاموش ⇒ null)
+        priceSource = line.specialPrice?.let { ir.vil3ntec.tohid.core.sale.CustomerPrice.stamp((it * 100.0).roundToLong(), (unit * 100.0).roundToLong()) },
       )
       movements += StockMovement(
         id = newId(),

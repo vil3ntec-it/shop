@@ -69,6 +69,11 @@ function validate(raw, origin = 'v3', ctx = undefined) {
       if (spec.intFields.has(k) && v !== null && !Number.isSafeInteger(v)) return bad('not_integer');
     }
     if (Buffer.byteLength(JSON.stringify(r.fields), 'utf8') > MAX_FIELDS_BYTES) return bad('fields_too_large');
+    //  PRD-07: شکلِ واحدهای خریدِ کالا (v3 و v2 ِ مبدل) — ‎lib/purchase-units.js‎
+    if (spec.name === 'products' && r.kind !== 'delta') {
+      const why = require('./purchase-units').reasonOf(r.fields);
+      if (why) return bad(why);
+    }
     fields = r.fields;
     if (r.kind === 'insert' && !relaxed) {
       if (spec.policy === 'moves' && (typeof fields.productId !== 'string' || !fields.productId

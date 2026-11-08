@@ -34,6 +34,14 @@ data class PoLineDto(
   val unit: String = "",
   val qtyMilli: Long = 0,
   val priceMinor: Long = 0,
+  /**
+   *  PRD-07 — ردیف به واحدِ خرید: `unit` نامِ همان واحد، `qtyMilli`/`priceMinor` و رسیدها به همان واحد، و این ضریب به واحدِ
+   *  پایهٔ کالا (هزارم). ثبتِ رسید در دفتر مقدار × ضریب را به واحدِ پایه می‌برد (`post`). `null` = واحدِ پایه، همان پیشین
+   *  (نوشته نمی‌شود؛ سرورِ پیش از آن هم نمی‌فرستد).
+   */
+  @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+  @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+  val factorMilli: Long? = null,
 )
 
 @Serializable
@@ -246,6 +254,10 @@ object PurchaseOrderBook {
           supplierId = o.supplierId, productId = line.productId, quantity = units(p.acceptedMilli), unit = line.unit,
           purchasePrice = asAfn(p.priceMinor), paidAmount = 0.0, date = today,
           notes = "سفارشِ خرید #${o.no} — رسید",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+          //  PRD-07: ردیفِ به واحدِ خرید ⇒ مقدار × ضریب به واحدِ پایه، با جمعِ دقیقِ پذیرفته به فیِ رسید
+          inUnit = line.factorMilli?.takeIf { it > 0 }?.let { f ->
+            LedgerEngine.InUnit(line.unit, p.acceptedMilli, f, ir.vil3ntec.tohid.core.product.PurchaseUnits.lineTotalMinor(p.acceptedMilli, p.priceMinor))
+          },
         ),
         today, now,
       ) { ledgerId(r.id, p.lineId, k++) }

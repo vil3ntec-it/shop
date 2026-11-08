@@ -95,14 +95,14 @@ test('خروج و ورودِ دوبارهٔ صاحب (یا نصبِ دوباره
 
 test('کدِ شاگرد ⇒ همان دکانِ صاحب با نقشِ شاگرد، و Snapshot ِ کامل', async () => {
   const code = (await h.post('/api/shop/staff-code', {}, { token: owner.accessToken })).body.code;
-  const r = await h.post('/api/auth/staff', { code, name: 'علی', device: { uid: 'staff-phone-1', name: 'گوشیِ علی' } });
+  const r = await h.post('/api/auth/staff', { code, name: 'علی', device: { uid: 'staff-phone-1', name: 'گوشیِ علی', keyVersion: 1 } });
   assert.equal(r.status, 201, JSON.stringify(r.body));
   assert.equal(r.body.shop.id, shopId);
   assert.equal(r.body.shop.role, 'staff');
   assert.ok(r.body.user.id && r.body.user.id !== owner.user.id, 'حسابِ خودِ شاگرد، نه صاحب');
   assertComplete(await snapshot(r.body.accessToken), 'شاگرد');
-  //  همان دستگاه دوباره ⇒ همان حساب
-  const again = await h.post('/api/auth/staff', { code, device: { uid: 'staff-phone-1' } });
+  //  همان دستگاه دوباره ⇒ همان حساب (⛔ از ۲.۱۴.۵ با رازِ همان دستگاه، نه شناسهٔ تنها — staff-session-guard.test.js)
+  const again = await h.post('/api/auth/staff', { code, device: { uid: 'staff-phone-1', key: r.body.deviceKey, keyVersion: 1 } });
   assert.equal(again.body.user.id, r.body.user.id);
 });
 
@@ -121,15 +121,15 @@ test('کدِ غلط، تمام‌شده، مصرف‌شده و دکانِ پر �
   assert.equal(await usersCount(), users, 'کدِ تمام‌شده حساب نمی‌سازد');
 
   const once = await staffCodes.create(shopId, owner.user.id, { role: 'staff', maxUses: 1 });
-  const first = await h.post('/api/auth/staff', { code: once.code, name: 'رضا', device: { uid: 'once-1' } });
+  const first = await h.post('/api/auth/staff', { code: once.code, name: 'رضا', device: { uid: 'once-1', keyVersion: 1 } });
   assert.equal(first.status, 201, JSON.stringify(first.body));
   users = await usersCount();
   const second = await h.post('/api/auth/staff', { code: once.code, device: { uid: 'once-2' } });
   assert.equal(second.status, 403, JSON.stringify(second.body));
   assert.ok(['code_used', 'code_inactive'].includes(second.body.error.code), second.body.error.code);
   assert.equal(await usersCount(), users, 'کدِ مصرف‌شده حساب نمی‌سازد');
-  //  همان دستگاهِ پیوسته هنوز وارد می‌شود (کدِ یک‌بار برای عضوِ فعال دوباره خرج نمی‌شود)
-  assert.equal((await h.post('/api/auth/staff', { code: once.code, device: { uid: 'once-1' } })).status, 201);
+  //  همان دستگاهِ پیوسته هنوز وارد می‌شود (کدِ یک‌بار برای عضوِ فعال دوباره خرج نمی‌شود) — با رازِ همان دستگاه (۲.۱۴.۵)
+  assert.equal((await h.post('/api/auth/staff', { code: once.code, device: { uid: 'once-1', key: first.body.deviceKey, keyVersion: 1 } })).status, 201);
 
   const open = (await h.post('/api/shop/staff-code', {}, { token: owner.accessToken })).body.code;
   const members = Number((await one(`SELECT COUNT(*)::int AS n FROM shop_members WHERE shop_id=$1 AND status='active'`, [shopId])).n);

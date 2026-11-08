@@ -62,6 +62,7 @@ object ShopSettingsKeys {
     shop("unit_sale", "b"),
     shop("whole_packs", "b"),
     shop("price_lists", "b"),                   // فهرستِ قیمت در صندوق
+    shop("customer_prices", "b"),               // POS-18: قیمتِ خاصِ مشتری (`CustomerPricePrefs`)
     shop("gift_cards", "b"),                    // PAY-24
     shop("layaway", "b"),                       // امانت
     shop("quotes", "b"),                        // پیش‌فاکتور

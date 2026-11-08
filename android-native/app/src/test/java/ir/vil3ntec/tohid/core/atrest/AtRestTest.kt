@@ -535,6 +535,8 @@ class AtRestTest {
       "oplog-u1.json", "sync-journal-u1.json", "sync-v3-u1/state.json", "ledger-summary.json", "shop-data.json.unreadable-1",
       //  §۹.۵: دفترچهٔ opهای پذیرفته/گرفته‌شده همان حالِ همگام‌سازی است — ساده، و با رمز در پشتیبان نه
       "sync-replay-u1-sent.jsonl", "sync-v3-u1/replay-sent.jsonl",
+      //  سایهٔ همگام‌سازی در فایلِ خودش (`shop.sync_shadow_file`): پوشهٔ `sync-shadow/` و جای ساختِ پیشین
+      "sync-shadow", "sync-shadow/sync-shadow-u1-1.dat", "sync-shadow/sync-shadow-u1-1.dat.prev", "sync-shadow-u1-1.dat",
     )) assertTrue(n, AtRestScope.skipInDeviceBackup(n))
     for (n in listOf("sale-draft.json", "product-photos/p1.jpg", "chat-outbox/1.json")) assertFalse(n, AtRestScope.skipInDeviceBackup(n))
     assertTrue("tohid-sync-v1.xml" in AtRestScope.SYNC_PREFS)

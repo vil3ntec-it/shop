@@ -495,6 +495,15 @@ async function seedShop(a) {
   assert.equal(devs.status, 200, JSON.stringify(devs.body));
   ids.device = (devs.body.devices || devs.body.items || [])[0]?.id;
   assert.ok(ids.device, `دستگاهِ الف: ${JSON.stringify(devs.body)}`);
+  //  رازِ دستگاهِ شاگردِ کدی (`/shop/staff-keys/:id/revoke`، مهاجرتِ ۳۴۵) — «ب» نه می‌بیند، نه باطل می‌کند
+  const once = await h.post('/api/shop/staff-code', { role: 'staff', maxUses: 1 }, { token: a.accessToken });
+  assert.equal(once.status, 201, JSON.stringify(once.body));
+  const keyed = await h.post('/api/auth/staff', {
+    code: once.body.code, name: 'شاگردِ کلیددارِ الف', device: { uid: fresh('keyed'), platform: 'android', keyVersion: 1 },
+  });
+  assert.equal(keyed.status, 201, JSON.stringify(keyed.body));
+  ids.staffKey = (await one('SELECT id FROM staff_device_keys WHERE user_id=$1 AND revoked_at IS NULL', [keyed.body.user.id]))?.id;
+  assert.ok(ids.staffKey, 'رازِ دستگاهِ شاگردِ الف');
   const { publicKey } = crypto.generateKeyPairSync('ec', { namedCurve: 'prime256v1' });
   const key = await h.post('/api/shop/approver-keys',
     { public_key: publicKey.export({ format: 'der', type: 'spki' }).toString('base64'), label: 'صندوقِ الف', device_id: 'pos-1' },
@@ -510,6 +519,15 @@ async function seedShop(a) {
     { token: staff.accessToken });
   assert.equal(apr.status, 201, JSON.stringify(apr.body));
   ids.approvalRequest = apr.body.request.id;
+  //  صندوقِ سندهای ردشده (`/shop/conflict-inbox/:id…`، مهاجرتِ ۳۱۵): فاکتورِ نسیهٔ ردشدهٔ شاگردِ «الف» با بستهٔ کامل —
+  //  «ب» نه می‌بیند، نه دوباره ثبت می‌کند، نه کنار می‌گذارد (۴۰۴)
+  ids.conflict = newId('cf');
+  await query(
+    `INSERT INTO sync_v3_conflicts (id, app, account_kind, account_id, kind, table_name, row_id, loser_op_id, loser_device, detail, at, loser_value)
+     VALUES ($1,'shop','shop',$2,'approval_required','sales','inv-cf-sale-a','op-inv-cf-a','pos-1',$3::jsonb,$4,$5::jsonb)`,
+    [ids.conflict, a.shopId, JSON.stringify({ perm: 'sales.credit', decision: 'approve', requester: staff.user.id, role: 'staff', amount: 600000 }), now(),
+      JSON.stringify({ v: 1, path: 'v1', ops: [{ op_id: 'op-inv-cf-a', table: 'sales', row_id: 'inv-cf-sale-a', type: 'insert', ts: now(),
+        fields: { finalTotal: 10000, paymentMethod: 'credit', debtGiven: 6000, status: 'completed' } }] })]);
   //  STF-01: نقشِ سفارشیِ «الف»، داده‌شده به شاگردِ «الف»
   const crl = await h.post('/api/shop/custom-roles', { name: 'شاگردِ ارشدِ الف', baseRole: 'staff', perms: { 'sales.discount': { mode: 'approve' } } },
     { token: a.accessToken });
@@ -621,6 +639,9 @@ function concreteFor(ids) {
     [/^(\/shop\/devices\/):id/, ids.device],
     [/^(\/shop\/approver-keys\/):id/, ids.approverKey],
     [/^(\/shop\/approval-requests\/):id/, ids.approvalRequest],
+    [/^(\/shop\/staff-keys\/members\/):id/, ids.member],
+    [/^(\/shop\/staff-keys\/):id/, ids.staffKey],
+    [/^(\/shop\/conflict-inbox\/):id/, ids.conflict],
     [/^(\/shop\/custom-roles\/members\/):id/, ids.member],
     [/^(\/shop\/custom-roles\/):id/, ids.customRole],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
@@ -690,6 +711,8 @@ function bodyFor(r, ids) {
     'PUT /shop/staff-scope/members/:id': { places: ['warehouse'] },
     'POST /shop/approval-requests/:id/approve': { note: 'تأییدِ ب' },
     'POST /shop/approval-requests/:id/deny': { note: 'ردِ ب' },
+    'POST /shop/conflict-inbox/:id/resubmit': { note: 'دوباره ثبتِ ب' },
+    'POST /shop/conflict-inbox/:id/dismiss': { reason: 'کنار گذاشتنِ ب', fixedDoc: 'sales/inv-cf-sale-b' },
     'POST /shop/custom-roles': { name: 'نقشِ ب', baseRole: 'staff', perms: {} },
     'PUT /shop/custom-roles/:id': { name: 'نقشِ دزدیده', perms: {} },
     'PUT /shop/custom-roles/members/:id': { roleId: ids.customRole },

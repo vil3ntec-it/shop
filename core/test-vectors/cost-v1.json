@@ -1,0 +1,950 @@
+{
+ "version": 1,
+ "format": "cost-v1",
+ "about": "Shared golden vectors for the moving weighted average cost (D-23 option A, 1405/08/13): RPT-03 gross profit, PRD-15 product average cost and stock value, PRM-16 promo effect. The ledger is the web/ShopData shape. Run by license/report-core.js (server/test/cost-vectors.test.js, also through the server owner report) and by core/report/ReportCore.kt (CostVectorsTest, which also runs PromoEffect on case F). Money = integer minor units (AFN 1/100), quantity = integer milli, percent = basis points. Expected numbers were worked out by hand from the rules in the report-core header (one stock-core position per product, recorded mode; returns at the cost they left with), not copied from either engine. sales = report-core sales() over the whole day with costing mavg and costApproved true; lineSales (case A) = the optional 'purchase price on the line' method for comparison.",
+ "range": {
+  "from": "2026-11-01",
+  "to": "2026-11-01"
+ },
+ "zone": "Asia/Kabul",
+ "cases": [
+  {
+   "name": "خرید به دو قیمت، سپس دو فروش (گردِ نیمه به بالا)",
+   "id": "A",
+   "ledger": {
+    "products": [
+     {
+      "id": "pA",
+      "name": "برنج",
+      "category": "",
+      "purchasePrice": 133,
+      "salePrice": 150
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pA",
+      "units": 10,
+      "price": 100,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "pA",
+      "units": 7,
+      "price": 133,
+      "date": "2026-11-01",
+      "createdAt": 1793512800000
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 750,
+      "discount": 0,
+      "finalTotal": 750,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     },
+     {
+      "id": "s2",
+      "total": 450,
+      "discount": 0,
+      "finalTotal": 450,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793520000000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pA",
+      "name": "",
+      "quantity": 5,
+      "unitPrice": 150,
+      "purchasePrice": 133,
+      "totalPrice": 750
+     },
+     {
+      "id": "i2",
+      "saleId": "s2",
+      "productId": "pA",
+      "name": "",
+      "quantity": 3,
+      "unitPrice": 150,
+      "purchasePrice": 133,
+      "totalPrice": 450
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 56794,
+     "i2": 34077
+    },
+    "ret": {},
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pA",
+       "name": "برنج",
+       "qtyMilli": 9000,
+       "valueMinor": 102229,
+       "unitCostMinor": 11359,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 1,
+      "valueMinor": 102229,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 120000,
+     "returns": 0,
+     "netSales": 120000,
+     "cogs": 90871,
+     "grossProfit": 29129,
+     "marginBp": 2427,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
+    },
+    "lineSales": {
+     "sales": 120000,
+     "returns": 0,
+     "netSales": 120000,
+     "cogs": 106400,
+     "grossProfit": 13600,
+     "marginBp": 1133,
+     "costEstimatedLines": 0,
+     "profitApproximate": true
+    }
+   }
+  },
+  {
+   "name": "برگشتی به همان بهایی که رفت",
+   "id": "B",
+   "ledger": {
+    "products": [
+     {
+      "id": "pB",
+      "name": "روغن",
+      "category": "",
+      "purchasePrice": 62,
+      "salePrice": 80
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pB",
+      "units": 10,
+      "price": 50,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "pB",
+      "units": 10,
+      "price": 62,
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 320,
+      "discount": 0,
+      "finalTotal": 320,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793512800000
+     },
+     {
+      "id": "s2",
+      "total": 160,
+      "discount": 0,
+      "finalTotal": 160,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793523600000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pB",
+      "name": "",
+      "quantity": 4,
+      "unitPrice": 80,
+      "purchasePrice": 50,
+      "totalPrice": 320
+     },
+     {
+      "id": "i2",
+      "saleId": "s2",
+      "productId": "pB",
+      "name": "",
+      "quantity": 2,
+      "unitPrice": 80,
+      "purchasePrice": 62,
+      "totalPrice": 160
+     }
+    ],
+    "returns": [
+     {
+      "id": "r1",
+      "saleId": "s1",
+      "saleItemId": "i1",
+      "productId": "pB",
+      "quantity": 1,
+      "amount": 80,
+      "date": "2026-11-01",
+      "createdAt": 1793520000000
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 20000,
+     "i2": 11412
+    },
+    "ret": {
+     "r1": 5000
+    },
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pB",
+       "name": "روغن",
+       "qtyMilli": 15000,
+       "valueMinor": 85588,
+       "unitCostMinor": 5706,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 1,
+      "valueMinor": 85588,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 48000,
+     "returns": 8000,
+     "netSales": 40000,
+     "cogs": 26412,
+     "grossProfit": 13588,
+     "marginBp": 3397,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
+    }
+   }
+  },
+  {
+   "name": "فروش پیش از هر خرید ⇒ بهای نامعلوم و سودِ «تقریبی»",
+   "id": "C",
+   "ledger": {
+    "products": [
+     {
+      "id": "pC",
+      "name": "صابون",
+      "category": "",
+      "purchasePrice": 30,
+      "salePrice": 40
+     },
+     {
+      "id": "pD",
+      "name": "کبریت",
+      "category": "",
+      "purchasePrice": 0,
+      "salePrice": 50
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pC",
+      "units": 10,
+      "price": 30,
+      "date": "2026-11-01",
+      "createdAt": 1793512800000
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 170,
+      "discount": 0,
+      "finalTotal": 170,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "s2",
+      "total": 80,
+      "discount": 0,
+      "finalTotal": 80,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pC",
+      "name": "",
+      "quantity": 3,
+      "unitPrice": 40,
+      "purchasePrice": 25,
+      "totalPrice": 120
+     },
+     {
+      "id": "i1b",
+      "saleId": "s1",
+      "productId": "pD",
+      "name": "",
+      "quantity": 1,
+      "unitPrice": 50,
+      "purchasePrice": 0,
+      "totalPrice": 50
+     },
+     {
+      "id": "i2",
+      "saleId": "s2",
+      "productId": "pC",
+      "name": "",
+      "quantity": 2,
+      "unitPrice": 40,
+      "purchasePrice": 30,
+      "totalPrice": 80
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 7500,
+     "i1b": 0,
+     "i2": 6000
+    },
+    "ret": {},
+    "est": [
+     "i1",
+     "i1b"
+    ],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pC",
+       "name": "صابون",
+       "qtyMilli": 5000,
+       "valueMinor": 15000,
+       "unitCostMinor": 3000,
+       "approximate": false
+      },
+      {
+       "productId": "pD",
+       "name": "کبریت",
+       "qtyMilli": -1000,
+       "valueMinor": 0,
+       "unitCostMinor": null,
+       "approximate": true
+      }
+     ],
+     "totals": {
+      "products": 2,
+      "valueMinor": 15000,
+      "negative": 1,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 25000,
+     "returns": 0,
+     "netSales": 25000,
+     "cogs": 13500,
+     "grossProfit": 11500,
+     "marginBp": 4600,
+     "costEstimatedLines": 2,
+     "profitApproximate": true
+    }
+   }
+  },
+  {
+   "name": "اصلاحِ شمارشِ انبار (کم و زیاد) به میانگینِ همان لحظه",
+   "id": "D",
+   "ledger": {
+    "products": [
+     {
+      "id": "pE",
+      "name": "چای",
+      "category": "",
+      "purchasePrice": 13,
+      "salePrice": 20
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pE",
+      "units": 20,
+      "price": 10,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "pE",
+      "units": -3,
+      "price": 0,
+      "date": "2026-11-01",
+      "createdAt": 1793512800000,
+      "isAdjustment": true,
+      "adjKind": "count"
+     },
+     {
+      "id": "w3",
+      "productId": "pE",
+      "units": 10,
+      "price": 13,
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     },
+     {
+      "id": "w4",
+      "productId": "pE",
+      "units": 2,
+      "price": 0,
+      "date": "2026-11-01",
+      "createdAt": 1793520000000,
+      "isAdjustment": true,
+      "adjKind": "count"
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 180,
+      "discount": 0,
+      "finalTotal": 180,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793523600000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pE",
+      "name": "",
+      "quantity": 9,
+      "unitPrice": 20,
+      "purchasePrice": 13,
+      "totalPrice": 180
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 10000
+    },
+    "ret": {},
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pE",
+       "name": "چای",
+       "qtyMilli": 20000,
+       "valueMinor": 22222,
+       "unitCostMinor": 1111,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 1,
+      "valueMinor": 22222,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 18000,
+     "returns": 0,
+     "netSales": 18000,
+     "cogs": 10000,
+     "grossProfit": 8000,
+     "marginBp": 4444,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
+    }
+   }
+  },
+  {
+   "name": "شمارشِ مثبتِ کالای هرگز‌نخریده ⇒ پایهٔ نامعلوم",
+   "id": "D2",
+   "ledger": {
+    "products": [
+     {
+      "id": "pF",
+      "name": "شمع",
+      "category": "",
+      "purchasePrice": 0,
+      "salePrice": 30
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pF",
+      "units": 5,
+      "price": 0,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000,
+      "isAdjustment": true,
+      "adjKind": "count"
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 30,
+      "discount": 0,
+      "finalTotal": 30,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793512800000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pF",
+      "name": "",
+      "quantity": 1,
+      "unitPrice": 30,
+      "purchasePrice": 0,
+      "totalPrice": 30
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 0
+    },
+    "ret": {},
+    "est": [
+     "i1"
+    ],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pF",
+       "name": "شمع",
+       "qtyMilli": 4000,
+       "valueMinor": 0,
+       "unitCostMinor": 0,
+       "approximate": true
+      }
+     ],
+     "totals": {
+      "products": 1,
+      "valueMinor": 0,
+      "negative": 0,
+      "approximate": true
+     }
+    },
+    "sales": {
+     "sales": 3000,
+     "returns": 0,
+     "netSales": 3000,
+     "cogs": 0,
+     "grossProfit": 3000,
+     "marginBp": 10000,
+     "costEstimatedLines": 1,
+     "profitApproximate": true
+    }
+   }
+  },
+  {
+   "name": "انتقال بینِ محل‌ها: میانگین مالِ کالاست و انتقال آن را عوض نمی‌کند",
+   "id": "E",
+   "ledger": {
+    "products": [
+     {
+      "id": "pG",
+      "name": "آرد",
+      "category": "",
+      "purchasePrice": 46,
+      "salePrice": 60
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pG",
+      "units": 10,
+      "price": 40,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "pG",
+      "units": 10,
+      "price": 46,
+      "date": "2026-11-01",
+      "createdAt": 1793512800000,
+      "locationId": "store2"
+     }
+    ],
+    "stockMovements": [
+     {
+      "id": "m1",
+      "productId": "pG",
+      "type": "transfer_out",
+      "qty": -5,
+      "date": "2026-11-01",
+      "refId": "x1",
+      "createdAt": 1793516400000,
+      "locationId": "",
+      "toLocationId": "store2"
+     },
+     {
+      "id": "m2",
+      "productId": "pG",
+      "type": "transfer_in",
+      "qty": 5,
+      "date": "2026-11-01",
+      "refId": "x1",
+      "createdAt": 1793516400000,
+      "locationId": "store2"
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 240,
+      "discount": 0,
+      "finalTotal": 240,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793520000000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pG",
+      "name": "",
+      "quantity": 4,
+      "unitPrice": 60,
+      "purchasePrice": 46,
+      "totalPrice": 240,
+      "locationId": "store2"
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 17200
+    },
+    "ret": {},
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pG",
+       "name": "آرد",
+       "qtyMilli": 16000,
+       "valueMinor": 68800,
+       "unitCostMinor": 4300,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 1,
+      "valueMinor": 68800,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 24000,
+     "returns": 0,
+     "netSales": 24000,
+     "cogs": 17200,
+     "grossProfit": 6800,
+     "marginBp": 2833,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
+    }
+   }
+  },
+  {
+   "name": "قلم‌های تخفیف‌خورده، فاکتورِ باطل و برگشتیِ قلمِ دوتخفیفه",
+   "id": "F",
+   "ledger": {
+    "products": [
+     {
+      "id": "pH",
+      "name": "شیر",
+      "category": "",
+      "purchasePrice": 55,
+      "salePrice": 80
+     },
+     {
+      "id": "pI",
+      "name": "نان",
+      "category": "",
+      "purchasePrice": 20,
+      "salePrice": 30
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "pH",
+      "units": 20,
+      "price": 50,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "pI",
+      "units": 10,
+      "price": 20,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 340,
+      "discount": 0,
+      "finalTotal": 340,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793512800000
+     },
+     {
+      "id": "s2",
+      "total": 700,
+      "discount": 0,
+      "finalTotal": 700,
+      "paymentMethod": "cash",
+      "status": "cancelled",
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     },
+     {
+      "id": "s3",
+      "total": 420,
+      "discount": 0,
+      "finalTotal": 420,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793520000000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "pH",
+      "name": "",
+      "quantity": 4,
+      "unitPrice": 70,
+      "purchasePrice": 55,
+      "totalPrice": 280,
+      "promo": [
+       {
+        "id": "pr1",
+        "name": "تخفیفِ هفته",
+        "discountMinor": 4000
+       }
+      ],
+      "listPriceMinor": 8000
+     },
+     {
+      "id": "i2",
+      "saleId": "s1",
+      "productId": "pI",
+      "name": "",
+      "quantity": 2,
+      "unitPrice": 30,
+      "purchasePrice": 20,
+      "totalPrice": 60
+     },
+     {
+      "id": "i3",
+      "saleId": "s2",
+      "productId": "pH",
+      "name": "",
+      "quantity": 10,
+      "unitPrice": 70,
+      "purchasePrice": 55,
+      "totalPrice": 700,
+      "promo": [
+       {
+        "id": "pr1",
+        "name": "تخفیفِ هفته",
+        "discountMinor": 10000
+       }
+      ],
+      "listPriceMinor": 8000
+     },
+     {
+      "id": "i4",
+      "saleId": "s3",
+      "productId": "pH",
+      "name": "",
+      "quantity": 6,
+      "unitPrice": 70,
+      "purchasePrice": 55,
+      "totalPrice": 420,
+      "promo": [
+       {
+        "id": "pr1",
+        "name": "تخفیفِ هفته",
+        "discountMinor": 6000
+       },
+       {
+        "id": "pr2",
+        "name": "دوتا بخر",
+        "discountMinor": 1500
+       }
+      ],
+      "listPriceMinor": 8000
+     }
+    ],
+    "returns": [
+     {
+      "id": "r1",
+      "saleId": "s3",
+      "saleItemId": "i4",
+      "productId": "pH",
+      "quantity": 2,
+      "amount": 140,
+      "date": "2026-11-01",
+      "createdAt": 1793523600000
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 20000,
+     "i2": 4000,
+     "i3": 55000,
+     "i4": 30000
+    },
+    "ret": {
+     "r1": 10000
+    },
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "pH",
+       "name": "شیر",
+       "qtyMilli": 12000,
+       "valueMinor": 60000,
+       "unitCostMinor": 5000,
+       "approximate": false
+      },
+      {
+       "productId": "pI",
+       "name": "نان",
+       "qtyMilli": 8000,
+       "valueMinor": 16000,
+       "unitCostMinor": 2000,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 2,
+      "valueMinor": 76000,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 76000,
+     "returns": 14000,
+     "netSales": 62000,
+     "cogs": 44000,
+     "grossProfit": 18000,
+     "marginBp": 2903,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
+    },
+    "promo": {
+     "totalRevenueMinor": 62000,
+     "promoRevenueMinor": 56000,
+     "promoDiscountMinor": 9000,
+     "profitApproximate": false,
+     "rows": [
+      {
+       "id": "pr1",
+       "name": "تخفیفِ هفته",
+       "invoices": 2,
+       "lines": 2,
+       "qtyMilli": 8000,
+       "discountMinor": 8000,
+       "revenueMinor": 56000,
+       "profitMinor": 16000,
+       "costMissingLines": 0,
+       "revenueShareBp": 9032,
+       "discountDepthBp": 1250
+      },
+      {
+       "id": "pr2",
+       "name": "دوتا بخر",
+       "invoices": 1,
+       "lines": 1,
+       "qtyMilli": 4000,
+       "discountMinor": 1000,
+       "revenueMinor": 28000,
+       "profitMinor": 8000,
+       "costMissingLines": 0,
+       "revenueShareBp": 4516,
+       "discountDepthBp": 345
+      }
+     ]
+    }
+   }
+  }
+ ]
+}

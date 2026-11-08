@@ -4,6 +4,7 @@ import android.content.Context
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.SyncV1Engine
 import ir.vil3ntec.tohid.sync.v1.SyncV1Keys
+import ir.vil3ntec.tohid.sync.v1.V1Replica
 import kotlinx.coroutines.launch
 
 /**
@@ -47,6 +48,8 @@ object AccountBind {
     }
     val sameDesk = result == LedgerOwner.Result.SAME || (result == LedgerOwner.Result.ADOPTED && before == user)
     SyncV1Keys.bind(app, user, display, sameDesk)
+    //  DATA-06: کلیدِ تازه با دفترِ همین میز — حالِ پشتیبانِ گوشیِ دیگر؟ (`V1Replica.fence`)
+    runCatching { SyncV1Engine.of(app).fence(store.ledgerNow()) }
     runCatching { SyncV1Engine.of(app).restoreSealedFor(user) }
     SyncStore(app).accountId = user
     return result
@@ -91,6 +94,8 @@ object AccountBind {
     background.launch {
       val read = { store.ledgerNow() }
       val write = { next: ShopData -> store.applyFromServerNow(next) }
+      //  DATA-06: حالِ پشتیبانِ گوشیِ دیگر ⇒ اول «بازسازی از سرور» با همین دفترِ صفحه (نه نمونهٔ کارگر) — `V1Replica.rebuildRestored`
+      if (V1Replica.restoredPending(app)) runCatching { V1Replica.rebuildRestored(app, store) }
       //  بایگانیِ کهنه ⇒ اول بازیابی؛ دفترِ خالی ⇒ Snapshot همین حالا؛ بعد تنظیماتِ نبوده از پشتیبانِ ابری
       if (engine.recoveryPending()) runCatching { engine.recoverArchived(read, write) }
       else if (store.deskEmpty()) runCatching { engine.prepare(read, write) }

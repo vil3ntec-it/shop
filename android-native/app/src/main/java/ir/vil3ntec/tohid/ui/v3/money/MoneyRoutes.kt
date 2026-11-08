@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.ReceiptLong
 import androidx.compose.material.icons.outlined.DeleteOutline
@@ -68,6 +70,19 @@ object MoneyPaths {
   const val SUPPLIER_BILLS = "purchasing/bills"
   fun supplierBill(orderId: String) = SUPPLIER_BILLS + "/" + RoutePaths.encode(orderId)
   fun newSupplierBill(orderId: String) = supplierBill(orderId) + "/new"
+  /**
+   *  PUR-02/03/04/14: سفارش‌های خرید در گوشی (`PurchaseOrderPages.kt`) — درش فقط با پرچمِ `shop.purchase_orders`
+   *  (`rememberPurchaseOrdersDoor`)؛ کارِ هر نقش همان سرور (`PoForms.actions`)
+   */
+  const val PURCHASE_ORDERS = "purchasing/orders"
+  fun purchaseOrders(status: String? = null) = RoutePaths.withQuery(PURCHASE_ORDERS, "status" to status)
+  const val NEW_PURCHASE_ORDER = "purchasing/orders/new"
+  fun newPurchaseOrder(supplier: String? = null) = RoutePaths.withQuery(NEW_PURCHASE_ORDER, "supplier" to supplier)
+  const val PURCHASE_ORDER_SUGGEST = "purchasing/orders/suggest"
+  fun purchaseOrder(id: String) = PURCHASE_ORDERS + "/" + RoutePaths.encode(id)
+  fun editPurchaseOrder(id: String) = purchaseOrder(id) + "/edit"
+  fun receivePurchaseOrder(id: String) = purchaseOrder(id) + "/receive"
+  fun matchPurchaseOrder(id: String) = purchaseOrder(id) + "/match"
   const val EXPENSES = "expenses"
   fun expenses(month: String? = null, category: String? = null) = RoutePaths.withQuery(EXPENSES, "month" to month, "category" to category)
   const val NEW_EXPENSE = "expenses/new"
@@ -121,6 +136,7 @@ val MoneyModule = AppModule(
       //  پیوندِ کهنه به مشتریِ ادغام‌شده (#330) همان مشتریِ ماندگار را باز می‌کند
       val id = CustomerCrm.resolve(data, args["id"].orEmpty())
       val remindScope = rememberCoroutineScope()
+      val viewed = ir.vil3ntec.tohid.ui.screens.rememberCustomerAccessNote(store) // CRM-15
       VipGate(Str.debtors) {
         DebtorLedgerScreen(
           id = id,
@@ -137,6 +153,8 @@ val MoneyModule = AppModule(
             onOlderSales = { nav.open(SalesPaths.history(q = data.debtors.find { d -> d.id == id }?.name)) },
             //  CRM-06: یک ردِ `debt_reminder` در روز برای هر راه (زمان‌بندیِ «یادآوریِ امروز»)
             onReminded = { channel -> remindScope.launch { DebtReminderSend.sent(store, id, channel) } },
+            //  CRM-15: «چه کسی پرونده را دید» در دفترِ همین دستگاه (همگام می‌شود)
+            onViewed = { kind -> viewed(id, kind) },
           ),
           extras = { DebtorFileExtras(data, store, id, onOpenOrder = { nav.open(OnlinePaths.order(it)) }) { toasts.show(it) } },
         )
@@ -180,6 +198,8 @@ val MoneyModule = AppModule(
       else {
         //  PUR-14: فاکتورِ تأمین‌کننده و «باطل» روی گوشی هم (پیش‌تر فقط پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر)
         val billsDoor = rememberSupplierBillsDoor()
+        //  PUR-02/03/04: «سفارش‌های خرید» روی گوشی هم (پیش‌تر فقط پنجرهٔ کامپیوتر) — همان پرچم
+        val ordersDoor = rememberPurchaseOrdersDoor()
         SuppliersScreen(
           d = data,
           actions = SuppliersActions(
@@ -191,6 +211,7 @@ val MoneyModule = AppModule(
             onNewSupplier = { nav.open(MoneyPaths.NEW_SUPPLIER) },
             onNewPurchase = { nav.open(MoneyPaths.newPurchase()) },
             onSupplierBills = if (billsDoor) ({ nav.open(MoneyPaths.SUPPLIER_BILLS) }) else null,
+            onPurchaseOrders = if (ordersDoor) ({ nav.open(MoneyPaths.PURCHASE_ORDERS) }) else null,
           ),
         )
       }
@@ -198,6 +219,13 @@ val MoneyModule = AppModule(
     V3Route(MoneyPaths.SUPPLIER_BILLS, RouteKind.PAGE, { StrSupplierBills.title }, parent = MoneyPaths.PURCHASING) { SupplierBillsRoute() },
     V3Route("purchasing/bills/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.SUPPLIER_BILLS) { SupplierBillRoute(args["id"].orEmpty()) },
     V3Route("purchasing/bills/{id}/new", RouteKind.PAGE, { StrSupplierBills.newBill }, parent = "purchasing/bills/{id}") { SupplierBillNewRoute(args["id"].orEmpty()) },
+    V3Route(MoneyPaths.PURCHASE_ORDERS, RouteKind.PAGE, { StrPurchasePages.purchaseOrders }, parent = MoneyPaths.PURCHASING) { PurchaseOrdersRoute() },
+    V3Route(MoneyPaths.NEW_PURCHASE_ORDER, RouteKind.PAGE, { StrPurchasePages.newPoTitle }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderNewRoute() },
+    V3Route(MoneyPaths.PURCHASE_ORDER_SUGGEST, RouteKind.PAGE, { StrPurchasePages.reorderSuggest }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderSuggestRoute() },
+    V3Route("purchasing/orders/{id}", RouteKind.PAGE, { StrSupplierBills.order }, parent = MoneyPaths.PURCHASE_ORDERS) { PurchaseOrderRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/edit", RouteKind.PAGE, { StrMoney.edit }, parent = "purchasing/orders/{id}") { PurchaseOrderEditRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/receive", RouteKind.PAGE, { StrPurchasePages.receiveGoods }, parent = "purchasing/orders/{id}") { PurchaseOrderReceiveRoute(args["id"].orEmpty()) },
+    V3Route("purchasing/orders/{id}/match", RouteKind.PAGE, { StrPurchaseOrders.match }, parent = "purchasing/orders/{id}") { PurchaseOrderMatchRoute(args["id"].orEmpty()) },
     V3Route(MoneyPaths.NEW_SUPPLIER, RouteKind.SHEET, { StrMoney.newSupplier }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) { SupplierFormRoute(null) },
     V3Route("purchasing/suppliers/{id}", RouteKind.PAGE, { Str.purchasing }, parent = MoneyPaths.PURCHASING, chrome = Chrome.OWN) {
       val id = args["id"].orEmpty()

@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.core.report.ReportCore
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ReportBridge
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -11,6 +13,7 @@ import ir.vil3ntec.tohid.ui.screens.ProductListModel
  *  عددهای صفحهٔ یک کالا (`products/{id}`) — همان حساب‌های صفحهٔ پیشین، یک‌جا:
  *  موجودی از `ShopStore`، فروخته‌شده و سودِ کسب‌شده از `ReportEngine.productStat`،
  *  سودِ موجودی = سودِ هر واحد × موجودیِ نامنفی. آزمون: `ProductDetailModelTest`.
+ *  PRD-15: بهای میانگینِ موزونِ همین حالا از همان بازپخشِ گزارش‌ها (`ReportBridge.stockCostOf`)؛ فقط خواندنی.
  */
 object ProductDetailModel {
 
@@ -22,6 +25,8 @@ object ProductDetailModel {
     val stockProfit: Double,
     val sold: Double,
     val earned: Double,
+    /** PRD-15 — بهای میانگینِ موزون (null = کیت/بی‌موجودی یا هیچ ورود و فروشی) */
+    val avgCost: ReportCore.StockCostRow? = null,
   )
 
   fun figures(d: ShopData, p: Product): Figures {
@@ -35,8 +40,14 @@ object ProductDetailModel {
       stockProfit = unitProfit * stock.coerceAtLeast(0.0),
       sold = sold,
       earned = earned,
+      avgCost = avgCostOf(d, p),
     )
   }
+
+  /** کیت (PRD-10) و کالای بی‌موجودی بهای میانگینِ خودشان را ندارند */
+  fun avgCostOf(d: ShopData, p: Product): ReportCore.StockCostRow? =
+    if (!p.kit.isNullOrEmpty() || p.stockless == true) null
+    else ReportBridge.stockCostOf(d, listOf(p.id)).rows.firstOrNull()
 
   /** حرکت‌های اخیرِ همین کالا، تازه‌ترین اول */
   fun recentMoves(d: ShopData, productId: String, limit: Int = 5): List<StockMovement> =

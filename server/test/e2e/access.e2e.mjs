@@ -62,6 +62,27 @@ async function footprint(shopId) {
   out.sync_rows = `${s.n}:${s.h}`;
   return out;
 }
+/** شناسهٔ ساختگیِ هم‌شکل: همه‌چیز (پیشوند، زمانِ ULID) همان، جز ۸ نویسهٔ آخر که تصادفی از همان دسته‌اند ⇒ همان درِ اعتبارسنجی */
+function decoyOf(id) {
+  const pick = (set) => set[crypto.randomInt(set.length)];
+  const head = id.slice(0, Math.max(id.lastIndexOf('_') + 1, id.length - 8));
+  return head + [...id.slice(head.length)].map((c) => (/[0-9]/.test(c) ? pick('0123456789')
+    : /[A-Z]/.test(c) ? pick('ABCDEFGHJKMNPQRSTVWXYZ') : /[a-z]/.test(c) ? pick('abcdefghjkmnpqrstvwxyz') : c)).join('');
+}
+/**
+ * S75 (`shop.image_bank` با `E2E_FLAGS_ON=all`): پاسخی که فقط همان شناسه‌ای را برمی‌گرداند که «ب» خودش در نشانی فرستاد
+ * (مثلاً `GET /shop/images/products/:productId` ⇒ `{product_id, source:'none', placeholder:true}`) چیزی از «الف» نمی‌گوید —
+ * **به شرطی** که پاسخ به وجودِ آن شناسه در «الف» بسته نباشد. سنجش: فقط GET (بی اثر)، همهٔ رازهای پیداشده دقیقاً همان شناسهٔ
+ * نشانی، و همان درخواست با شناسهٔ ساختگیِ هم‌شکل (که هیچ‌جا نیست) همان وضعیت و بایت‌به‌بایت همان بدنه را بدهد پس از جای‌گذاریِ
+ * شناسه. هر تفاوت ⇒ پیشگوی وجود یا دادهٔ «الف» ⇒ همان «نشت».
+ */
+async function onlyEcho(r, id, url, res, found) {
+  if (r.method !== 'GET' || !r.path.includes(':') || !found.every((s) => s === id)) return false;
+  const decoy = decoyOf(id);
+  const ctl = await B.api('GET', url.split(id).join(decoy), undefined, { headers: { 'X-Shop-Id': ownerA.shopId } });
+  const norm = (x, k) => JSON.stringify(x.body || '').split(k).join('<id>');
+  return ctl.status === res.status && norm(ctl, decoy) === norm(res, id);
+}
 /** فقط جدول‌هایی که عوض شده‌اند — برای پیامِ خطای خوانا */
 const changed = (x, y) => Object.keys({ ...x, ...y }).filter((k) => x[k] !== y[k]).map((k) => `${k}: ${x[k]} ⇒ ${y[k]}`);
 /** سوکتِ زندهٔ برنامه با بلیتِ یک‌بارمصرف؛ هر پیام در `msgs` و منتظرماندن بر رویداد */
@@ -195,7 +216,10 @@ await E.step('S75', 'ماتریسِ کامل: هر مسیرِ /api/shop و /api/
       calls++;
       if (res.status >= 500) fails.push(`${r.method} ${url} ⇒ ${res.status}`);
       const text = JSON.stringify(res.body || '');
-      for (const s of secretsOf()) if (text.includes(s)) fails.push(`${r.method} ${url} دادهٔ «الف» (${s.slice(0, 10)}…)`);
+      const found = secretsOf().filter((s) => text.includes(s));
+      if (found.length && !(await onlyEcho(r, id, url, res, found))) {
+        for (const s of found) fails.push(`${r.method} ${url} دادهٔ «الف» (${s.slice(0, 10)}…)`);
+      }
       if (!r.path.includes(':')) break;   //  مسیرِ بی شناسه یک بار
     }
   }

@@ -64,6 +64,14 @@ object StrProducts {
   val stockNow: String get() = t("موجودی فعلی", "In stock", "اوسنۍ موجودي")
   val salePrice: String get() = t("قیمت فروش", "Sale price", "د پلور بیه")
   val purchasePrice: String get() = t("قیمت خرید", "Purchase price", "د پېرود بیه")
+  /** PRD-15 — بهای میانگینِ موزونِ همین حالا (فقط خواندنی؛ `ReportCore.stockCost`) */
+  val avgCost: String get() = t("بهای میانگین", "Average cost", "منځنۍ بیه")
+  val avgCostApprox: String get() = t("بهای میانگین (تقریبی)", "Average cost (approximate)", "منځنۍ بیه (نږدې)")
+  val avgCostNote: String get() = t(
+    "میانگینِ موزون از ورود، فروش و برگشتِ همین کالا — همان بهای گزارشِ سود؛ با دست عوض نمی‌شود.",
+    "Weighted average from this product's receipts, sales and returns — the same cost the profit report uses; it cannot be edited.",
+    "د همدې توکي د راوړلو، پلور او بېرته راتګ وزن لرونکې منځنۍ بیه — د ګټې د راپور هماغه بیه؛ په لاس نه بدلېږي.",
+  )
   fun unitProfit(unit: String): String = t("سود هر ${asIs(unit)}", "Profit per $unit", "د هر $unit ګټه")
   val unitWord: String get() = t("واحد", "unit", "واحد")
   val stockProfit: String get() = t("سود موجودی فعلی", "Profit on current stock", "د اوسنۍ موجودۍ ګټه")

@@ -32,6 +32,8 @@ object ApiEndpoints {
     const val LOGIN = "/auth/login"
     //  ورود شاگرد فقط با کد — نه ایمیل، نه شماره، نه رمز
     const val STAFF = "/auth/staff"
+    /** رازِ دستگاهِ شاگرد برای نشستِ بازی که پیش از ۲.۱۴.۵ وارد شد (`AuthRepository.ensureStaffDeviceKey`) */
+    const val STAFF_DEVICE_KEY = "/auth/staff/device-key"
     const val GOOGLE = "/auth/google"
     const val GOOGLE_LINK_CODE = "/auth/google/link-code"
     //  ورود با اپل (فقط آیفون): nonce ِ یک‌بارمصرفِ سرور ⇐ پنجرهٔ اپل ⇐ توکن + nonce
@@ -176,6 +178,10 @@ object ApiEndpoints {
     fun approverKey(id: String) = "$APPROVER_KEYS/${enc(id)}"
     fun deviceDisable(id: String) = "$DEVICES/${enc(id)}/disable"
     fun deviceEnable(id: String) = "$DEVICES/${enc(id)}/enable"
+    /** دستگاه‌های شناختهٔ کارمندان (رازِ ورود با کد، مهاجرتِ ۳۴۵): فهرست، «باطل کردنِ این دستگاه»، «خروج از همه» ِ یک عضو */
+    const val STAFF_KEYS = "/shop/staff-keys"
+    fun staffKeyRevoke(id: String) = "$STAFF_KEYS/${enc(id)}/revoke"
+    fun staffKeysLogoutAll(memberId: String) = "$STAFF_KEYS/members/${enc(memberId)}/logout-all"
 
     /**
      *  وضعیتِ تحویل و پیکِ دکان (`readable`/`entitled`) — صفحهٔ کارمندان با

@@ -16,6 +16,7 @@ object I18nTables {
     StrTraining, // OPS-07
     StrSimpleAsk,
     StrEvidence, StrLateApology, StrErasure, // RSK-08، NTF-10، SEC-10: صفحه‌های برنامه برای سه درِ سرور
+    StrCustomerAccess, // CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی)
     StrOnline, StrSearch, StrTouch, StrPick, StrStaffTime, StrShiftReview, StrWhy, StrLocalNet, StrShrink,
     StrPriceCheck, StrChat, StrLabel, StrOrderSlip, StrCount, StrGift, StrRetPolicy, StrDeliver, StrProduct, StrGrid,
     StrRisk, StrPay, StrAdmin, StrShift, StrCourier, StrOrderOps, StrPayFix, StrSpecialOrder, StrSafe, StrGiftCard,
@@ -37,6 +38,8 @@ object I18nTables {
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
     StrSupplierBills, // PUR-14: فاکتورهای تأمین‌کننده در گوشیِ نسخهٔ ۳
+    StrPurchaseOrders, // PUR-02/03/04/14: سفارش‌های خرید در گوشیِ نسخهٔ ۳ (فهرست، فرم، دریافت با اسکن، تطبیق)
+    StrPurchaseUnits, // PRD-07: واحدهای خریدِ چندگانه در فرمِ کالا، فاکتورِ خرید و سفارشِ خرید
     StrHistory, // «تاریخچه» ِ روز/ماه/سال و چاپِ گزارشِ هر دوره
     StrCourierApp, // حالتِ پیک (`ui/courier`) — پیش‌تر متنِ خام، بی هیچ زبانی (LOC-08 دری)
     StrSettingsPages, // صفحه‌های تنظیماتِ نسخهٔ ۳ با متنِ خام: گزارشِ صاحب، زمانِ تحویل، اولین خرید، موتورِ موجودی، یادداشتِ صندوق
@@ -48,7 +51,9 @@ object I18nTables {
     StrTillPay, // نسیه فقط با مشتری؛ حساب‌پی با NFC/QR در صندوقِ گوشیِ نسخهٔ ۳ (PAY-21)
     StrHero, // HOME-V3: کادرِ بالای خانه (صندوق/گاوصندوق، نمودار و «+»)
     StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
+    StrConflictInbox, // صندوقِ سندهای ردشده ِ صاحب/مدیر و نشانِ «سرور نپذیرفت» روی فاکتورِ دستگاهِ سازنده
     StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
+    StrCustomerPrices, // POS-18: «قیمتِ خاصِ این مشتری» (پروندهٔ مشتری، صندوق، رسید و تنظیم)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴

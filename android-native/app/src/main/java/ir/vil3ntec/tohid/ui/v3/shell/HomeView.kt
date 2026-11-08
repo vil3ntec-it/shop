@@ -84,9 +84,11 @@ fun rememberHomeView(d: ShopData): HomeView {
     }
   }
   val signedIn = remember { ir.vil3ntec.tohid.data.repo.Backend.isReady(context) }
-  val status by ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(context).status.collectAsState()
+  //  PERF-LEDGER: موتور بیرون از رشتهٔ صفحه ساخته می‌شود (`rememberSyncV1Status`)؛ تا آن وقت هشداری نیست
+  val status = ir.vil3ntec.tohid.sync.v1.rememberSyncV1Status(context)
   val sync = when {
     !signedIn -> HomeAlerts.Sync.LOCAL_ONLY
+    status == null -> HomeAlerts.Sync.OK
     status.dot == SyncDot.RED -> HomeAlerts.Sync.ERROR
     status.dot == SyncDot.YELLOW -> HomeAlerts.Sync.QUEUED
     status.dot == SyncDot.GREY -> HomeAlerts.Sync.OFFLINE
@@ -101,7 +103,7 @@ fun rememberHomeView(d: ShopData): HomeView {
     HomeAlerts.Input(
       ordersLive = ordersLive, newOrders = newOrders,
       subscriptionLocked = locked, subscriptionDaysLeft = warnDays,
-      sync = sync, queued = status.queued, syncError = status.lastError,
+      sync = sync, queued = status?.queued ?: 0, syncError = status?.lastError.orEmpty(),
       outOfStock = nums.outOfStock.size, lowStock = nums.lowStock.size,
       overdueDebtors = nums.overdue.size, overdueTotal = "${money(nums.overdueTotal)} ؋",
       expiring = nums.expiring.size,
@@ -117,7 +119,7 @@ fun rememberHomeView(d: ShopData): HomeView {
     profit = if (canSeeMoney) nums.todayProfit else null,
     alerts = alerts,
     sync = sync,
-    queued = status.queued,
+    queued = status?.queued ?: 0,
     canSeeMoney = canSeeMoney,
     bellDot = alerts.any { it.urgent } || ShopFeed.unseen,
   )

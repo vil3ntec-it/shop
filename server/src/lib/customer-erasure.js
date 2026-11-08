@@ -27,6 +27,8 @@
  *   storefront_alerts          «خبرم کن» ِ موجودی/قیمت پاک (شمارِ هزینهٔ پیامِ امروزِ دکان به‌اندازهٔ همین خبرها کم می‌شود).
  *   order_issues               متنِ گزارشِ مشکل و پاسخِ دکان پاک؛ نوع و وضعیت می‌مانند. order_issue_photos پاک.
  *   order_reviews              متنِ نظر پاک؛ ستاره و وضعیت (میانگینِ امتیاز) همان.
+ *   customer_access_log        «سابقهٔ دسترسی» (CRM-15): پروندهٔ همین شماره (`ph:` ِ شماره و قرض‌دارانِ دفترِ سرور با
+ *                              همین شماره) ⇐ `erased:<شناسهٔ حذف>`؛ بیننده، نقش، زمان و شمار می‌مانند (`lib/customer-access.js`).
  *
  * عمداً **نمی‌ماند/نمی‌رود** (فهرستِ `KEPT`، در پاسخ هم):
  *   order_ledger_docs (زنجیرهٔ هش، فقط شناسه)، online_order_refunds، courier_settlements،
@@ -43,6 +45,7 @@
  */
 const { tx, one, newId, now } = require('../db');
 const audit = require('./audit');
+const access = require('./customer-access');
 const imgStore = require('./image-store');
 const S = require('./order-states');
 const v = require('./validate');
@@ -283,6 +286,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         }
       }
 
+      //  CRM-15: «سابقهٔ دسترسی» ِ همین مشتری (درِ سرور) ⇐ `erased:<شناسهٔ حذف>` — بیننده، زمان و شمار می‌مانند.
+      //  ردیف دادهٔ شخصی ندارد، پس در `counts`/`total` (شمارِ دادهٔ شخصیِ پاک‌شده) نیست.
+      if (await has(c, 'customer_access_log')) await access.anonymize(c, shopId, t.forms, placeholder);
       const total = COUNT_KEYS.reduce((s, k) => s + counts[k], 0);
       const out = { dryRun: Boolean(dryRun), mode: t.mode, openOrders: open, counts, total, kept: KEPT };
       if (dryRun) throw new DryRun(out);

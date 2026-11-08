@@ -28,8 +28,8 @@ object SyncV1Keys {
 
   /** آیا این کلید هیچ ردی از همگام‌سازی دارد (cursor، سایه، هم‌ترازی، صف) */
   fun hasState(context: Context, key: String): Boolean {
-    val s = SyncStateV1(context, key)
-    if (s.cursor > 0 || s.shadow.isNotBlank() || s.reconciledAt > 0 || s.snapshotAt > 0) return true
+    //  بی خواندنِ فایلِ سایه (`ShadowStore.present`): نشانِ فایل خودش رد است
+    if (SyncStateV1(context, key).hasSyncState()) return true
     return runCatching { OpQueue(context, key).size() > 0 }.getOrDefault(false)
   }
 
@@ -88,7 +88,8 @@ object SyncV1Keys {
 
   /**
    *  جابه‌جاییِ کاملِ حالِ یک کلید به کلیدِ دیگر: ترجیحات (`<کلید>.*`)، صف و ردشده‌هایش، ژورنال و دفترچهٔ بازپخش.
-   *  اول رونوشت، بعد پاک کردنِ اصل؛ مقصدی که از پیش فایل دارد بازنویسی نمی‌شود.
+   *  اول رونوشت، بعد پاک کردنِ اصل؛ مقصدی که از پیش فایل دارد بازنویسی نمی‌شود. فایلِ سایه (`ShadowStore`) جابه‌جا
+   *  نمی‌شود: نامش در نشانِ `<کلید>.shadowStore` است و نشان با همین یک `commit` ِ prefs می‌رود.
    */
   internal fun move(context: Context, from: String, to: String) {
     if (from == to) return
@@ -111,6 +112,7 @@ object SyncV1Keys {
     }
     gone.forEach { edit.remove(it) }
     edit.commit()
+    ShadowStore.invalidate(app, from, to)
 
     val dir = app.filesDir
     val a = OpQueue.fileKey(from)

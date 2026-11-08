@@ -94,6 +94,18 @@ class V3ReachabilityTest {
     ),
     Feature("PUR-14 فرمِ فاکتورِ تأمین‌کننده (گوشی)", "purchasing/bills/{id}/new", s("PoBill"), root = "$MONEY.SupplierBillNewRoute"),
     Feature("PUR-14 درِ «فاکتورهای تأمین‌کننده» در زبانهٔ خریدِ گوشی", "purchasing", "$MONEY.rememberSupplierBillsDoor", "$MONEY.SuppliersScreen"),
+    //  PUR-02/03/04/14 (دستهٔ ۳۰): سفارشِ خرید پیش‌تر فقط پنجرهٔ «سفارش‌های خرید» ِ کامپیوتر — ریشه همان صفحهٔ گوشی
+    Feature("PUR-02 درِ «سفارش‌های خرید» در زبانهٔ خریدِ گوشی", "purchasing", "$MONEY.rememberPurchaseOrdersDoor", "$MONEY.SuppliersScreen"),
+    Feature(
+      "PUR-02 فهرستِ سفارش‌های خرید با پالایهٔ وضعیت (گوشی)", "purchasing/orders",
+      "$MONEY.PurchaseOrdersRoute", "ir.vil3ntec.tohid.data.PoForms", root = "$MONEY.PurchaseOrdersRoute",
+    ),
+    Feature("PUR-02/03 ساختنِ سفارش با پیشنهادها و «همهٔ کالاهای این تأمین‌کننده» (گوشی)", "purchasing/orders/new", "$MONEY.PoEditorForm", root = "$MONEY.PurchaseOrderNewRoute"),
+    Feature("PUR-03 پیشنهادِ سفارش و پیش‌نویس با یک کلید (گوشی)", "purchasing/orders/suggest", s("PoSuggest"), root = "$MONEY.PurchaseOrderSuggestRoute"),
+    Feature("PUR-02 جزئیات، فرستادن و لغو با دلیل (گوشی)", "purchasing/orders/{id}", "$MONEY.PoCancelSheet", "$MONEY.postReceipt", root = "$MONEY.PurchaseOrderRoute"),
+    Feature("PUR-02 ویرایشِ پیش‌نویس (گوشی)", "purchasing/orders/{id}/edit", "$MONEY.PoEditorForm", root = "$MONEY.PurchaseOrderEditRoute"),
+    Feature("PUR-04 دریافتِ کامل/جزئی با اسکن، خراب و باقی‌ماندهٔ باز (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiveForm", root = "$MONEY.PurchaseOrderReceiveRoute"),
+    Feature("PUR-14 تطبیقِ سفارش، رسید و فاکتور (گوشی)", "purchasing/orders/{id}/match", "$MONEY.PurchaseOrderMatchRoute", root = "$MONEY.PurchaseOrderMatchRoute"),
     Feature("POS-39 دریافتِ بدهی در صندوقِ گوشی", "sale", s("TillReceivePhone"), root = PHONE_SALE),
     Feature(
       "POS-25/26/27/18، PAY-24، POS-38 ابزارهای سبدِ صندوقِ گوشی", "sale",

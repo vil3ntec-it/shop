@@ -114,6 +114,19 @@ data class Product(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val serialTracked: Boolean? = null,
   /** MKT-06 «چرخهٔ مصرف» (روزِ ۱ تا ۳۶۵، `ProductCycle`) برای یادآوریِ «دوباره خریدن» ِ برنامهٔ خرید؛ `null` نوشته نمی‌شود ⇒ ردیفِ پیشین همان */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val consumptionDays: Int? = null,
+  /*  PRD-07 — واحدهای خریدِ چندگانه (کارتنِ ۱۲ از یک تأمین‌کننده، کارتنِ ۲۴ از دیگری) با ضریب به همین `unit`؛ قاعده‌ها و حساب در
+   *  `core/product/PurchaseUnits`. فرم فقط با `ShopPolicy.productTools`؛ سرور شکلش را می‌سنجد (`lib/purchase-units.js`). همان راهِ
+   *  همگام‌سازی و ادغامِ `packs` (یک فیلدِ کالا). `null` نوشته نمی‌شود ⇒ کالای بی واحدِ خرید همان JSON ِ پیشین است و op ِ تازه‌ای نمی‌سازد. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val purchaseUnits: List<PurchaseUnit>? = null,
+)
+
+/** یک واحدِ خرید (PRD-07): نام، ضریب به هزارمِ `Product.unit` (کارتنِ ۲۴ ⇒ 24000)، تأمین‌کنندهٔ پیش‌فرض و بارکدِ اختیاری */
+@Serializable
+data class PurchaseUnit(
+  val name: String = "",
+  val factorMilli: Long = 0,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val supplierId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val barcode: String? = null,
 )
 
 /** یک بسته از کالا: نام، اندازه به هزارمِ `Product.unit` (کارتنِ ۲۴ دانه‌ای ⇒ 24000) و بارکدهایش — PRD-04 */
@@ -198,6 +211,18 @@ data class WarehouseEntry(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val lotId: String? = null,
+  /** INV-10 (`CountAbsorbWiring`): فقط ردیفِ «انبارگردانی» — لحظهٔ کالا و دانستهٔ شمارنده؛ `correctedAt` فقط از سرورِ v3 */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val countedAt: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val seenMilli: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val correctedAt: Long? = null,
+  /**
+   *  PRD-07 — ارزشِ **دقیقِ** کالای همین ردیف به صدمِ افغانی (بی هزینهٔ جانبی): خریدی که به واحدِ خرید ثبت شد
+   *  (۱ کارتنِ ۲۴ به ۱٬۰۰۰ ⇒ 100000)، تا میانگینِ موزون (`StockLedger`، `ReportCore`) ارزش را از `units × price` ِ گردشده
+   *  (۲۴ × ۴۱٫۶۷ = ۱٬۰۰۰٫۰۸) نسازد. `null` = همان `units × price` ِ پیشین؛ نوشته نمی‌شود ⇒ ردیفِ قدیمی همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val costMinor: Long? = null,
 )
 
 @Serializable
@@ -455,6 +480,13 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val note: String? = null,
+  /**
+   *  منبعِ قیمتِ همین قلم برای رسید و سابقه (POS-18): فقط `"special"` (قیمتِ خاصِ مشتری، `CustomerPrice.stamp`).
+   *  `null` = لیست/دستی، همان رفتارِ همیشه، و نوشته نمی‌شود — پرچمِ خاموش ⇒ قلم بایت‌به‌بایت همان.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceSource: String? = null,
 )
 
 @Serializable
@@ -599,6 +631,24 @@ data class Debtor(
   val cardCode: String? = null,
   /** نشانیِ تحویل (CRM-09) — شرح سرِ `DeliveryAddress`؛ `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val deliveryAddress: DeliveryAddress? = null,
+  /**
+   *  قیمت‌های خاصِ همین مشتری (POS-18) — هر کالا یک ردیف؛ نوشتن فقط از `CustomerPrices` (پشتِ `CustomerPricePrefs`).
+   *  یک فیلدِ قرض‌دار است، پس همان راهِ همگام‌سازی و همان ادغامِ `Debtor.priceList` را دارد (v1 ردیف، v3 ‹master›
+   *  فیلدبه‌فیلد). `null` = بی قیمتِ خاص، همان رفتارِ همیشه، و ⛔ نوشته نمی‌شود (`EncodeDefault.NEVER`).
+   */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialPrices: List<SpecialPrice>? = null,
+)
+
+/**
+ *  یک قیمتِ خاصِ مشتری (POS-18، هسته `core/sale/CustomerPrice.Entry`): کالا، قیمتِ واحدِ پایه به **یک‌صدمِ افغانی** و
+ *  بازهٔ اختیاری (`yyyy-MM-dd`، دو سر داخل). سرِ خالی نوشته نمی‌شود.
+ */
+@Serializable
+data class SpecialPrice(
+  val productId: String = "",
+  val priceMinor: Long = 0,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val from: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val to: String? = null,
 )
 
 @Serializable
@@ -701,6 +751,11 @@ data class Purchase(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val dueDate: String? = null,
+  /*  PRD-07 — ردیفی که به واحدِ خرید ثبت شد: نامِ واحد، مقدار به همان واحد و ضریب (هزارم). `quantity` و `purchasePrice` همچنان به
+   *  واحدِ پایه‌اند و `totalAmount` جمعِ دقیقِ همان ردیف؛ این سه فقط برای نمایش و برگشت. `null` نوشته نمی‌شود ⇒ خریدِ پیشین همان. */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitName: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitQtyMilli: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val unitFactorMilli: Long? = null,
 )
 
 @Serializable
@@ -726,21 +781,13 @@ data class StockMovement(
   val createdAt: Long = 0,
   /*  افزودنی — `StockLedger`: کاربر و دلیل (INV-02)، و برای `transfer` مبدأ،
    *  مقصد و سری (INV-20). انتقال جمعِ صفر است و موتورِ امروز نمی‌بیندش. */
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val userId: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val reason: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val locationId: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val toLocationId: String? = null,
-  @OptIn(ExperimentalSerializationApi::class)
-  @EncodeDefault(EncodeDefault.Mode.NEVER)
-  val lotId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val userId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val reason: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val locationId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val toLocationId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val lotId: String? = null,
+  /** «تاریخِ تصحیح‌شده» ِ سرورِ v3 (S28b)؛ فقط از سرور — نگهبانِ ساعتِ INV-10 (`CountAbsorb.member`) */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val correctedAt: Long? = null,
 )
 
 @Serializable
@@ -814,6 +861,12 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val drawer: String? = null,
   /** INV-11 — فقط `stock_transfer` (`StockTransferBook`): گامِ انتقالِ موجودیِ سرور (`StockTransfer.Step.xfer`). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val xfer: kotlinx.serialization.json.JsonObject? = null,
+  /** CRM-15 — فقط `customer_view` («چه کسی پرونده را دید»، `CustomerAccessLog`): شناسهٔ بیننده، نقش، دستگاه و نوع
+   *  (`detail`/`phone`/`export`؛ `core/crm/CustomerAccess`). نامِ بیننده همان `by`. بی دادهٔ مشتری. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val viewer: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val role: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val device: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val view: String? = null,
 )
 
 /**
@@ -847,6 +900,8 @@ data class ShopData(
   val auditLog: List<AuditEntry> = emptyList(),
   /** گاوصندوق (PAY-18) — مجموعهٔ پلهٔ ۴ِ Sync v1 */
   val safeEntries: List<SafeEntry> = emptyList(),
+  /** سندِ ردشده‌ای که صاحب «کنار گذاشت»/«اصلاح کرد» — کامل و بیرون از همگام‌سازی (`data/SetAsideDoc.kt`)؛ `[]` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val setAside: List<SetAsideDoc> = emptyList(),
 )
 
 val DEFAULT_EXPENSE_CATEGORIES = listOf("کرایه", "برق", "معاش", "ترانسپورت", "خوراک", "متفرقه")  // داده: نامِ پیش‌فرضِ ذخیره‌شدهٔ دستهٔ مصرف

@@ -78,16 +78,19 @@ fun DeskPurchasingScreen(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
   fun toast(t: String) { scope.launch { snackbar.showSnackbar(t) } }
   var tab by remember { mutableStateOf(0) }
   var editing by remember { mutableStateOf(false) }
-  val pending = remember { mutableStateListOf<String>() }
+  val unitsOn = purchaseUnitsOn()
+  val pending = remember { mutableStateListOf<Scan>() }
 
   //  بارکدخوان: کالا به فاکتورِ باز؛ اگر بسته است، فاکتورِ تازه باز می‌شود
   val latest by rememberUpdatedState(d)
   val owner = remember { Any() }
   DisposableEffect(Unit) {
     ir.vil3ntec.tohid.scan.ScanRouter.register(owner) { code ->
-      val id = ShopStore.barcodeIndex(latest)[code]
+      //  PRD-07: بارکدِ واحدِ خرید (کارتنِ ۲۴ ِ تأمین‌کنندهٔ ب) همان واحد را برمی‌گزیند — فقط با `ShopPolicy.productTools`
+      val unitHit = if (unitsOn) ShopStore.purchaseUnitIndex(latest).find(code) else null
+      val id = unitHit?.productId ?: ShopStore.barcodeIndex(latest)[code]
       if (id == null) { toast(StrPurchasePages.barcodeUnknown(code)); true }
-      else { pending += id; editing = true; true }
+      else { pending += Scan(id, unitHit?.unit?.name); editing = true; true }
     }
     onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(owner) }
   }
@@ -238,11 +241,23 @@ internal fun qtyText(v: Double) = if (v == Math.floor(v)) v.toLong().toString() 
 
 /* ══════════════════════════ فاکتورِ خریدِ تازه ══════════════════════════ */
 
-private class Draft(product: Product? = null) {
+/** یک اسکن: کالا و (PRD-07) واحدِ خریدی که بارکدش خوانده شد */
+private data class Scan(val productId: String, val unit: String? = null)
+
+/** PRD-07: واحدهای خرید در فرمِ خرید فقط با `ShopPolicy.productTools` (پیش‌فرض خاموش ⇒ همان ردیفِ واحدِ پایه) */
+@Composable
+internal fun purchaseUnitsOn(): Boolean {
+  val context = androidx.compose.ui.platform.LocalContext.current
+  return remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
+}
+
+private class Draft(product: Product? = null, unit: String? = null) {
   var productId by mutableStateOf(product?.id.orEmpty())
+  /** PRD-07: نامِ واحدِ خرید؛ null = واحدِ پایه */
+  var unitName by mutableStateOf(unit)
   var query by mutableStateOf(product?.name.orEmpty())
   var qty by mutableStateOf(if (product != null) "1" else "")
-  var price by mutableStateOf(product?.purchasePrice?.takeIf { it > 0 }?.let { Math.round(it).toString() }.orEmpty())
+  var price by mutableStateOf(product?.let { defaultPrice(it, unit) }.orEmpty())
   var expiry by mutableStateOf("")
   val focus = FocusRequester()
   val qtyFocus = FocusRequester()
@@ -250,16 +265,24 @@ private class Draft(product: Product? = null) {
   fun total(): Double = Math.round((qty.toDoubleOrNull() ?: 0.0) * (price.toDoubleOrNull() ?: 0.0)).toDouble()
 }
 
+/** قیمتِ پیش‌فرضِ ردیف: قیمتِ خریدِ واحدِ پایه، یا (PRD-07) همان × ضریبِ واحدِ خرید */
+private fun defaultPrice(p: Product, unit: String?): String {
+  val base = p.purchasePrice.takeIf { it > 0 } ?: return ""
+  val f = ir.vil3ntec.tohid.core.product.PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), unit)?.factorMilli ?: 1000L
+  return Math.round(base * f / 1000.0).toString()
+}
+
 @Composable
 private fun NewPurchaseInvoice(
   store: ShopStore,
   d: ShopData,
-  pending: MutableList<String>,
+  pending: MutableList<Scan>,
   toast: (String) -> Unit,
   onClose: () -> Unit,
 ) {
   val scope = rememberCoroutineScope()
   val today = ir.vil3ntec.tohid.todayIso()
+  val unitsOn = purchaseUnitsOn()
   var supplierId by remember { mutableStateOf(d.suppliers.maxByOrNull { s -> d.purchases.filter { it.supplierId == s.id }.maxOfOrNull { it.createdAt } ?: 0L }?.id) }
   var supplierMenu by remember { mutableStateOf(false) }
   var newSupplier by remember { mutableStateOf("") }
@@ -284,14 +307,17 @@ private fun NewPurchaseInvoice(
   //  بارکد از بارکدخوان ⇐ ردیف (همان کالا دوباره ⇐ یکی بیشتر)
   LaunchedEffect(pending.size) {
     while (pending.isNotEmpty()) {
-      val id = pending.removeAt(0)
+      val scan = pending.removeAt(0)
+      val id = scan.productId
       val p = d.products.find { it.id == id } ?: continue
-      val same = lines.find { it.productId == id }
+      //  PRD-07: بارکدِ واحدِ خرید ⇒ همان واحد؛ بارکدِ کالا ⇒ واحدِ پیش‌فرضِ همین تأمین‌کننده (یا پایه)
+      val unit = scan.unit ?: if (unitsOn) ir.vil3ntec.tohid.core.product.PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId)?.name else null
+      val same = lines.find { it.productId == id && it.unitName == unit }
       if (same != null) same.qty = qtyText((same.qty.toDoubleOrNull() ?: 0.0) + 1)
       else {
         val empty = lines.lastOrNull()?.takeIf { it.productId.isBlank() && it.query.isBlank() }
         if (empty != null) lines.remove(empty)
-        lines += Draft(p)
+        lines += Draft(p, unit)
         lines += Draft()
       }
     }
@@ -305,7 +331,8 @@ private fun NewPurchaseInvoice(
     val ls = lines.filter { it.productId.isNotBlank() }.map {
       val exp = it.expiry.trim()
       PurchaseBook.Line(it.productId, it.qty.toDoubleOrNull() ?: 0.0, it.price.toDoubleOrNull() ?: 0.0,
-        expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast(StrPurchasePages.expiryBad(exp)))
+        expiryDate = if (exp.isEmpty()) "" else ir.vil3ntec.tohid.Jalali.parseTyped(exp) ?: return toast(StrPurchasePages.expiryBad(exp)),
+        unitName = if (unitsOn) it.unitName else null)
     }
     val iso = if (date.isBlank()) today else ir.vil3ntec.tohid.Jalali.parseTyped(date) ?: return toast(StrPurchasePages.invoiceDateBad(formatDate(today)))
     val landedValue = if (!stockOn || landed.isBlank()) 0.0 else landed.toDoubleOrNull() ?: return toast(StrPurchasePages.landedBad)
@@ -382,10 +409,10 @@ private fun NewPurchaseInvoice(
       }
       LazyColumn(Modifier.weight(1f)) {
         itemsIndexed(lines, key = { _, l -> System.identityHashCode(l) }) { i, l ->
-          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), onTouch = { touched = l }, onNext = {
+          LineRow(i, l, d, ir.vil3ntec.tohid.data.PurchaseOrderBook.lastPriceHint(buys, l.productId, supplierId), unitsOn, supplierId, onTouch = { touched = l }, onNext = {
             if (i == lines.lastIndex) lines += Draft()
             scope.launch { kotlinx.coroutines.delay(60); runCatching { lines[i + 1].focus.requestFocus() } }
-          }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = "" } })
+          }, onRemove = { if (lines.size > 1) lines.remove(l) else { l.productId = ""; l.query = ""; l.qty = ""; l.price = ""; l.unitName = null } })
         }
       }
     }
@@ -425,7 +452,7 @@ private fun NewPurchaseInvoice(
 }
 
 @Composable
-private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
+private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, unitsOn: Boolean, supplierId: String?, onTouch: () -> Unit, onNext: () -> Unit, onRemove: () -> Unit) {
   var menu by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
   val matches = remember(l.query, d) {
@@ -435,8 +462,10 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, onTouch: () ->
   }
   fun pick(p: Product) {
     l.productId = p.id; l.query = p.name; menu = false; onTouch()
+    //  PRD-07: واحدِ پیش‌فرضِ همین تأمین‌کننده (کارتنِ ۲۴ ِ ب)، وگرنه واحدِ پایه
+    l.unitName = if (unitsOn) ir.vil3ntec.tohid.core.product.PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId)?.name else null
     if (l.qty.isBlank()) l.qty = "1"
-    if (l.price.isBlank() && p.purchasePrice > 0) l.price = Math.round(p.purchasePrice).toString()
+    if (l.price.isBlank()) l.price = defaultPrice(p, l.unitName)
     runCatching { l.qtyFocus.requestFocus() }
   }
   fun enterOn(next: () -> Unit) = Modifier.onPreviewKeyEvent { e ->
@@ -480,6 +509,14 @@ private fun LineRow(i: Int, l: Draft, d: ShopData, hint: String?, onTouch: () ->
       modifier = Modifier.width(144.dp).then(enterOn(onNext)))
     Text(if (l.productId.isNotBlank()) money(l.total()) else "", Modifier.width(130.dp), textAlign = TextAlign.End, fontWeight = FontWeight.SemiBold, color = Shop.colors.text)
     IconButton(onClick = onRemove, modifier = Modifier.width(40.dp)) { Icon(Icons.Filled.Close, StrStock.removeRow, tint = Shop.colors.muted) }
+  }
+  //  PRD-07: واحدِ خریدِ همین ردیف و مقدار/بهای واحدِ پایه از هسته (`PurchaseUnits.baseCost`)
+  val product = if (unitsOn && l.productId.isNotBlank()) d.products.find { it.id == l.productId } else null
+  if (product != null && !product.purchaseUnits.isNullOrEmpty()) PurchaseUnitPicker(product, l.unitName, l.qty, l.total()) { u ->
+    val before = defaultPrice(product, l.unitName)
+    l.unitName = u
+    if (l.price.isBlank() || l.price == before) l.price = defaultPrice(product, u)
+    onTouch()
   }
   //  PUR-09: آخرین فیِ همین تأمین‌کننده برای همین کالا (هنگامِ ورود)
   if (hint != null) {

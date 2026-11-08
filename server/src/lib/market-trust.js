@@ -402,11 +402,11 @@ const kb = (bytes) => `${Math.round(bytes / 1024)} کیلوبایت`;
 async function putEvidence(store, token, buf) {
   const pre = await caseByToken(store, token);
   if (pre.status !== 'open' && pre.status !== 'in_review') throw conflict('این پرونده دیگر مدرک نمی‌پذیرد', 'case_not_open');
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
-  const s = chatMedia.sniff(buf);
+  const bytes = require('./raw-body').mediaBytes(buf);   //  ⛔ نوع با typeof/Array.isArray، نه `Buffer.isBuffer` (type confusion)
+  const s = chatMedia.sniff(bytes);
   if (!s || s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)');
-  if (buf.length > config.trust.imageMax) throw new ApiError(413, 'too_large', `عکس بزرگ‌تر از ${kb(config.trust.imageMax)} است`);
-  const data = chatMedia.stripImageMetadata(buf, s.mime);
+  if (bytes.length > config.trust.imageMax) throw new ApiError(413, 'too_large', `عکس بزرگ‌تر از ${kb(config.trust.imageMax)} است`);
+  const data = chatMedia.stripImageMetadata(bytes, s.mime);
   const hash = sha256(data);
   return tx(async (c) => {
     const row = (await c.query('SELECT * FROM trust_cases WHERE id=$1 FOR UPDATE', [pre.id])).rows[0];

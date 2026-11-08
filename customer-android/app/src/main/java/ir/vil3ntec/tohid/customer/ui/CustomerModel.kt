@@ -252,8 +252,9 @@ class CustomerModel(
     }
   }
 
-  /** برنامه دوباره پیش آمد: پیگیری و سبد از سرور تازه می‌شوند */
+  /** برنامه دوباره پیش آمد: پیگیری و سبد از سرور تازه می‌شوند؛ گفت‌وگوی باز ⇒ «خواندم» (CHAT-04) */
   fun resumed() {
+    chat.visible(true)
     chat.online()
     when (val r = route) {
       is Route.Track -> loadOrder(r.slug, r.token, quiet = true)
@@ -262,6 +263,9 @@ class CustomerModel(
       else -> Unit
     }
   }
+
+  /** برنامه پس رفت (`Activity.onPause`، آیفون: `scenePhase` ِ نه active): گفت‌وگوی باز تا برگشتن فقط «رسید» می‌دهد */
+  fun paused() = chat.visible(false)
 
   // ── خانه و بازارچه ──
 

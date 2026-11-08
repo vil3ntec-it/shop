@@ -46,6 +46,9 @@ const KNOWN = Object.freeze([
   { key: 'shop.ledger_merge', scope: 'shop', default: true, what: 'ذخیرهٔ کهنه: ادغامِ سه‌طرفهٔ دفترِ برنامه (#407) — روشن برای برنامهٔ تازه؛ فقط false خاموش' },
   //  ⛔ پیش‌فرض روشن (درستی): فقط خاموش‌کنِ اضطراری — `false` ِ صریح ذخیرهٔ برنامه را به حدسِ پایهٔ پیشین برمی‌گرداند
   { key: 'shop.save_base', scope: 'shop', default: true, what: 'پایهٔ صریحِ ذخیره: دو ذخیره از یک صفحهٔ کهنه هیچ‌کدام را نمی‌برند و سدِ نقش با ادغامِ خاموش هم (برنامهٔ تازه، `?v=3`)؛ فقط false خاموش' },
+  //  ⛔ پیش‌فرض روشن (رفعِ امنیتی، نه اجازه): فقط خاموش‌کنِ اضطراری — `false` ِ صریح ورودِ دوبارهٔ شاگرد را به پیش از ۲.۱۴.۵ برمی‌گرداند
+  { key: 'auth.staff_session_guard', scope: 'shop', default: true, what: 'ورودِ دوبارهٔ شاگرد با کد فقط با رازِ همان دستگاه و کدی که هنوز برای همان عضو معتبر است (`lib/staff-device-keys.js`) — فقط false خاموش' },
+  { key: 'shop.sync_shadow_file', scope: 'shop', default: false, what: 'سایه و cursor ِ همگام‌سازیِ برنامه در فایلِ خودشان، نه تنظیمات (PERF-LEDGER) — خاموش ⇒ همان prefs؛ خاموش کردن امن است' },
   { key: 'sync.pull_own_newer', scope: 'shop', default: true, what: 'pull ِ v1 نوشتهٔ تازه‌ترِ خودِ دستگاه را با opِ کهنه‌ترِ دیگری بازنویسی نمی‌کند (#501) — فقط false خاموش' },
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
@@ -68,7 +71,10 @@ const KNOWN = Object.freeze([
   { key: 'shop.credit_cap', scope: 'shop', default: false, what: 'سقفِ فروشِ قرضیِ کارمند در سرور (`sales.credit`، STF-03)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
+  { key: 'shop.count_absorb', scope: 'shop', default: false, what: 'فروشِ آفلاینِ پیش از شمارش که پس از ثبتِ شمارش می‌رسد دوباره از موجودی کم نمی‌شود — سرور و برنامه (INV-10)؛ با shop.catalog' },
   { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
+  //  RPT-03 (docs/FLAGS-ON-fa.md): عددِ تازه در پیامی که صاحب همین حالا می‌گیرد ⇒ جدا و خاموش؛ با `shop.owner_report`
+  { key: 'shop.owner_report.profit', scope: 'shop', default: false, what: 'سودِ ناخالص با میانگینِ موزون در گزارشِ خودکارِ صاحب (RPT-03)؛ قلمِ بی‌بها ⇒ «تقریبی»' },
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },

@@ -738,3 +738,20 @@ test('TEN-03: پرچمِ shop.storefront.link_expiry — پرونده‌ای ک�
   assert.equal((await pub(s.slug, 'GET', `/cases/${tok}`)).status, 200);
   assert.equal((await evidence()).status, 201);
 });
+
+test('⛔ putEvidence (CodeQL type confusion): فقط Buffer؛ رشته، آرایه، شیءِ «length»دار، null و Uint8Array ⇒ ۴۰۰ bad_media بی هیچ ردیف؛ عکسِ درست مثلِ پیش', async () => {
+  const trust = require('../src/lib/market-trust');
+  const s = await liveStore('نوعِ مدرک');
+  const PHONE = '0790000271';
+  const order = await placeOrder(s, PHONE);
+  const made = await pub(s.slug, 'POST', '/complaints', { subject: 'order', orderNo: order.orderNo, category: 'damaged', body: 'نوعِ بدنه' }, await ticketFor(s.slug, PHONE));
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const store = await trust.storeOf(s.slug);
+  for (const bad of ['abcd', ['a', 'b'], { length: 5 }, null, undefined, 7, new Uint8Array([0xff, 0xd8, 0xff])]) {
+    await assert.rejects(trust.putEvidence(store, made.body.case.token, bad), (e) => e.status === 400 && e.code === 'bad_media', JSON.stringify(bad));
+  }
+  assert.equal(await rows('trust_evidence', s.shopId), 0);
+  const ok = await trust.putEvidence(store, made.body.case.token, jpegWithGps('type'));
+  assert.equal(ok.reused, false);
+  assert.equal(await rows('trust_evidence', s.shopId), 1);
+});

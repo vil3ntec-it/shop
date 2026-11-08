@@ -39,14 +39,26 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
 
   private fun k(name: String) = "$accountKey.$name"
 
+  /**
+   *  سایه و cursor — پرچمِ `shop.sync_shadow_file` خاموش (پیش‌فرض): همان کلیدهای prefs ِ همیشه، بیت‌به‌بیت؛ روشن:
+   *  یک فایل و یک نوشتن (`ShadowStore`، PERF-LEDGER). همهٔ نمونه‌های همین کلید یک حافظه را می‌بینند.
+   */
+  private val store = ShadowStore.of(context, accountKey)
+
   override var cursor: Long
-    get() = prefs.getLong(k("cursor"), 0)
-    set(v) = prefs.edit().putLong(k("cursor"), v).apply()
+    get() = store.cursor()
+    set(v) = store.setCursor(v)
+
+  /** فقط نوار و صفحه: هرگز فایلِ سایه را نمی‌خواند (رشتهٔ صفحه) — منطق همیشه [cursor] */
+  val cursorSeen: Long get() = store.cursorSeen()
+
+  /** ردی از همگام‌سازی (cursor، سایه، هم‌ترازی) بی خواندنِ فایلِ سایه — `SyncV1Keys.hasState` */
+  fun hasSyncState(): Boolean = store.present() || reconciledAt > 0 || snapshotAt > 0
 
   /** سایهٔ آخرین حالتِ همگام‌شده، به شکلِ متنِ JSON. خالی یعنی «هنوز هیچ». */
   var shadow: String
-    get() = prefs.getString(k("shadow"), "").orEmpty()
-    set(v) = prefs.edit().putString(k("shadow"), v).apply()
+    get() = store.shadow()
+    set(v) = store.setShadow(v)
 
   /**
    *  سایه و cursor با هم و **همزمان** (`commit`، نه `apply`) — F0-05.
@@ -57,11 +69,7 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
    *
    *  @return نوشته شد یا نه
    */
-  fun commitShadow(shadow: String, cursor: Long?): Boolean {
-    val e = prefs.edit().putString(k("shadow"), shadow)
-    if (cursor != null) e.putLong(k("cursor"), cursor)
-    return e.commit()
-  }
+  fun commitShadow(shadow: String, cursor: Long?): Boolean = store.commit(shadow, cursor)
 
   var lastOkAt: Long
     get() = prefs.getLong(k("lastOkAt"), 0)
@@ -93,6 +101,28 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
   var replica: String
     get() = prefs.getString(k("replica"), "").orEmpty()
     set(v) = prefs.edit().putString(k("replica"), v).apply()
+
+  /** DATA-06: شناسهٔ دستگاهی که این حال به آن بسته است (`core/sync/RestoredDevice.kt`)؛ خالی ⇒ هنوز نه */
+  val device: String
+    get() = prefs.getString(k("device"), "").orEmpty()
+
+  /** DATA-06: حالِ دستگاهِ دیگر بود ⇒ تا «بازسازی از سرور» نه Pull، نه هم‌ترازی (`V1Replica.fence`) */
+  var restoredRebuild: Boolean
+    get() = prefs.getBoolean(k("restoredRebuild"), false)
+    set(v) { prefs.edit().putBoolean(k("restoredRebuild"), v).commit() }
+
+  /**
+   *  بستن به [device] — با حصار ([fence]) replica ِ تازه و «در انتظارِ بازسازی» هم، هر سه در **یک** `commit()`: بسته شدنِ
+   *  برنامه پیش از آن ⇒ هیچ چیزی عوض نشده و دورِ بعد همان تصمیم؛ پس از آن ⇒ تمام.
+   */
+  fun commitBinding(device: String, fence: Boolean, replica: String): Boolean {
+    val e = prefs.edit().putString(k("device"), device)
+    if (fence) {
+      e.putBoolean(k("restoredRebuild"), true)
+      if (replica.isBlank()) e.remove(k("replica")) else e.putString(k("replica"), replica)
+    }
+    return e.commit()
+  }
 
   /** سرور از برنامه عقب‌تر است (۴۲۶): opها نگه داشته می‌شوند. */
   var holding: Boolean
@@ -144,7 +174,8 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
    *  دفترِ دیگری است ⇒ تا `SyncV1Engine.recoverArchived` نشده، نه تفاضل، نه push، نه pull (شرح همان‌جا).
    */
   var recoverArchive: Boolean
-    get() = prefs.getBoolean(k("recoverArchive"), false)
+    //  سایهٔ فایل که به نسخهٔ کهنه‌تر برگشت همین نشان را می‌گذارد — پیش از سنجیدنش (`ShadowStore.settleOffMain`)
+    get() { store.settleOffMain(); return prefs.getBoolean(k("recoverArchive"), false) }
     set(v) { prefs.edit().putBoolean(k("recoverArchive"), v).commit() }
 
   var reconciledAt: Long
@@ -166,6 +197,7 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     set(v) { prefs.edit().putString(k("legacyOpsUpTo"), v).commit() }
 
   fun reset() {
+    store.reset()
     prefs.edit()
       .remove(k("cursor")).remove(k("shadow")).remove(k("lastOkAt"))
       .remove(k("lastPushAt")).remove(k("lastPullAt")).remove(k("lastError"))

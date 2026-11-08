@@ -13,7 +13,7 @@ import java.io.File
  *
  *  ── خاموش (پیش‌فرض) ────────────────────────────────────────────────
  *  همان `super.onFullBackup`: قاعده‌های `backup_rules.xml` و `backup_rules_legacy.xml`
- *  بی هیچ تغییری (دفتر، تنظیمات و حالِ همگام‌سازی می‌روند؛ توکن نه).
+ *  بی هیچ تغییری (دفتر، تنظیمات، صف و ژورنال می‌روند؛ توکن، شناسهٔ دستگاه و `tohid-sync-v1` نه).
  *
  *  ── رمز در کار است ──────────────────────────────────────────────────
  *  کلیدِ Keystore با پشتیبان نمی‌رود. اگر دفترِ رمزدار و سایهٔ پُر و صف و cursor با هم
@@ -49,10 +49,11 @@ class TohidBackupAgent : BackupAgent() {
 
   private companion object {
     /**
-     *  همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، PINهای شاگرد (STF-02/04) و سریِ سندِ همین
-     *  دستگاه (DATA-06، `DocSeries`) — گوشیِ بازیابی‌شده سریِ خودش را از سرور می‌گیرد.
+     *  همان استثناهای XML: توکنِ امروز و جای قدیمی‌اش، PINهای شاگرد (STF-02/04)، سریِ سندِ همین
+     *  دستگاه (DATA-06، `DocSeries`) — گوشیِ بازیابی‌شده سریِ خودش را از سرور می‌گیرد — و replica و cursor ِ
+     *  هر حساب (`tohid-sync-v1`، DATA-06؛ همان که `AtRestScope.SYNC_PREFS` هم دارد).
      */
     val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml",
-      "tohid-doc-series.xml")
+      "tohid-doc-series.xml", "tohid-sync-v1.xml")
   }
 }

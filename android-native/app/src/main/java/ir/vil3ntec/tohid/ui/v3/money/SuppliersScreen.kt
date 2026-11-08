@@ -36,6 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
 import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -73,6 +74,8 @@ internal class SuppliersActions(
   val onNewPurchase: () -> Unit,
   /** PUR-14: «فاکتورهای تأمین‌کننده» — `null` ⇒ پرچمِ سفارشِ خرید خاموش یا کاربر مدیر/صاحب نیست (تراشه پنهان) */
   val onSupplierBills: (() -> Unit)? = null,
+  /** PUR-02/03/04: «سفارش‌های خرید» — `null` ⇒ پرچمِ `shop.purchase_orders` خاموش یا بی اینترنت (تراشه پنهان) */
+  val onPurchaseOrders: (() -> Unit)? = null,
 )
 
 /**
@@ -104,6 +107,7 @@ internal fun SuppliersScreen(d: ShopData, actions: SuppliersActions) {
             caption = StrMoney.suppliersCaption(d.suppliers.size, d.purchases.size),
             chips = listOfNotNull(
               V3HeroChip(StrMoney.newSupplier, Icons.Outlined.PersonAddAlt, onClick = actions.onNewSupplier),
+              actions.onPurchaseOrders?.let { V3HeroChip(StrPurchasePages.purchaseOrders, Icons.Outlined.LocalShipping, onClick = it) },
               actions.onSupplierBills?.let { V3HeroChip(StrSupplierBills.title, Icons.AutoMirrored.Outlined.ReceiptLong, onClick = it) },
             ),
           )

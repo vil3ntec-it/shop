@@ -27,7 +27,7 @@ test('شاگرد فقط با کد وارد می‌شود', async () => {
   const code = (await h.post('/api/shop/staff-code', {}, { token: owner.accessToken })).body.code;
   console.log('  کد شاگرد:', code);
 
-  const r = await h.post('/api/auth/staff', { code, name: 'کریم', device: { uid: 'phone-1', name: 'گوشی کریم' } });
+  const r = await h.post('/api/auth/staff', { code, name: 'کریم', device: { uid: 'phone-1', name: 'گوشی کریم', keyVersion: 1 } });
   console.log('  ورود →', r.status, '| دکان:', JSON.stringify(r.body.shop), '| کاربر:', r.body.user?.name);
   assert.equal(r.status, 201);
   assert.ok(r.body.accessToken, 'توکن نیامد');
@@ -45,9 +45,13 @@ test('شاگرد فقط با کد وارد می‌شود', async () => {
   assert.equal(push.status, 200);
   console.log('  فروشِ کریم ثبت شد:', push.body.applied);
 
-  // دفعه‌ی دوم: همان حساب، نه یک عضو تازه
-  const again = await h.post('/api/auth/staff', { code, device: { uid: 'phone-1' } });
+  // دفعه‌ی دوم: همان حساب، نه یک عضو تازه — ⛔ از ۲.۱۴.۵ با رازِ همین دستگاه (`deviceKey` ِ پیوستنِ نخست)، نه فقط
+  // شناسه‌اش؛ شناسهٔ تنها دیگر حسابِ کسی را نمی‌دهد (`staff-session-guard.test.js`)
+  assert.equal(typeof r.body.deviceKey, 'string', 'رازِ دستگاه نیامد');
+  const again = await h.post('/api/auth/staff', { code, device: { uid: 'phone-1', key: r.body.deviceKey, keyVersion: 1 } });
   assert.equal(again.body.user.id, r.body.user.id, 'باید همان حساب باشد');
+  const bare = await h.post('/api/auth/staff', { code, device: { uid: 'phone-1' } });
+  assert.equal(bare.status, 403, 'شناسهٔ دستگاهِ تنها اثبات نیست');
   const members = (await h.get('/api/shop/members', { token: owner.accessToken })).body;
   console.log('  اعضای دکان بعد از دو بار ورود:', members.members.length);
   assert.equal(members.members.length, 2, 'صاحب + یک شاگرد');

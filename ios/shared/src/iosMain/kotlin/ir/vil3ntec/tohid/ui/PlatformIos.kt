@@ -1,15 +1,26 @@
 package ir.vil3ntec.tohid.ui
 
+import platform.Foundation.NSDocumentDirectory
+import platform.Foundation.NSSearchPathForDirectoriesInDomains
+import platform.Foundation.NSUserDomainMask
 import platform.UIKit.UIDevice
 
 /*
  *  جایگزینِ iOS ِ `ui/Platform.kt` (همان API؛ کامپیوتر: ‎desktop/…/ui/PlatformDesk.kt‎).
- *  پوشه در آیفون نیست (مثلِ اندروید)؛ «ذخیره به‌عنوان» همان `CreateDocument` است (‎ios/IosPickers.kt‎: Files) و اشتراک برگهٔ iOS.
+ *  انتخابِ پوشه در آیفون نیست (مثلِ اندروید)؛ پوشهٔ پشتیبانِ دیدنی `Documents/Backups` است؛ «ذخیره به‌عنوان» همان `CreateDocument` است (‎ios/IosPickers.kt‎: Files) و اشتراک برگهٔ iOS.
  */
 object Platform {
   const val DESKTOP: Boolean = false
 
-  fun defaultBackupDir(context: android.content.Context): java.io.File? = null
+  /**
+   *  ⛔ DATA-SAFETY: پوشهٔ «پشتیبانِ دیدنی» (`BackupMirror`) — همتای `getExternalFilesDir("Backups")` ِ اندروید:
+   *  `Documents/Backups` ِ همین برنامه (در برنامهٔ Files زیرِ «On My iPhone» با `UIFileSharingEnabled` ِ ‎ios/iosApp/…/Info.plist‎،
+   *  و در پشتیبانِ iCloud ِ دستگاه). پیش‌تر `null` بود ⇒ `BackupMirror.write` همیشه شکست می‌خورد و «خروجِ اجباری»
+   *  (`SafeSignOut.keepForAccount`: پشتیبانِ دیدنی **و** گاوصندوقِ رمزدار) روی آیفون هرگز انجام نمی‌شد.
+   */
+  fun defaultBackupDir(context: android.content.Context): java.io.File? =
+    NSSearchPathForDirectoriesInDomains(NSDocumentDirectory, NSUserDomainMask, true).firstOrNull()?.toString()
+      ?.let { java.io.File(it, "Backups") }
 
   fun pickFolder(start: String?): String? = null
 

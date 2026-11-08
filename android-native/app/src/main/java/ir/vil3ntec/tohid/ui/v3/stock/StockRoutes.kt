@@ -157,11 +157,12 @@ val StockModule = AppModule(
         data = data,
         today = writer.today,
         onExport = export,
-        onSave = { counted, note ->
+        onSave = { counted, note, at ->
           val n = WarehouseEngine.countLines(data, counted).size
-          writer.commit(data, WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, userId = writer.user), StrStock.countSaved(money(n.toDouble())))
+          writer.commit(data, WarehouseEngine.stockCount(data, counted, note, writer.today, writer.now, writer.newId, userId = writer.user, countedAt = at), StrStock.countSaved(money(n.toDouble())))
         },
         onBack = { back() },
+        clock = { writer.now },
       )
     },
     V3Route(StockPaths.IMPORT, RouteKind.PAGE, { StrStock.importTitle }, parent = StockPaths.LIST, chrome = Chrome.OWN) {

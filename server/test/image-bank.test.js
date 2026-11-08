@@ -212,6 +212,27 @@ test('IMG-BANK-06 / IMG-BANK-07 / IMG-BANK-12: انتخاب فقط برای هم
   assert.equal((await ADR('GET', `/file/${own.body.id}/1/original`, root, undefined)).status, 404);
 });
 
+test('S75 / IMG-BANK-12: «کدام عکس» با شناسهٔ کالای دکانِ دیگر فقط همان شناسهٔ پرسیده را برمی‌گرداند — همان پاسخِ شناسهٔ ناموجود، بی عکس، نشانی، hash یا پیشگوی وجود', async () => {
+  //  «الف» برای همین شناسه‌ها واقعاً عکس دارد: مرکزی + عکسِ خود (tea-1)، مرکزیِ «احتمالی» (oil-1)، عکسِ همگام‌شدهٔ ۰۴۵ (p-legacy)
+  const mineA = {};
+  for (const pid of ['tea-1', 'oil-1', 'p-legacy']) mineA[pid] = (await S('GET', `/products/${pid}`, A)).body;
+  assert.deepEqual(Object.values(mineA).map((x) => x.placeholder), [false, false, false], JSON.stringify(mineA));
+  const marks = [A.shopId, ...Object.values(mineA).flatMap((x) => [x.image_id, x.hash, x.central?.image_id, ...Object.values(x.urls || {})])]
+    .filter((v) => typeof v === 'string' && v.length > 6);
+  assert.ok(marks.length >= 4, marks.join(' '));
+  //  پاسخِ «ب» فقط از ردیف‌های خودِ «ب» ساخته می‌شود ⇒ با شناسهٔ «الف» بایت‌به‌بایت همان پاسخِ شناسه‌ای که هیچ‌جا نیست
+  const norm = (r, id) => [r.status, JSON.stringify(r.body).split(id).join('<id>')];
+  const ghost = norm(await S('GET', '/products/never-seen-9', B), 'never-seen-9');
+  assert.deepEqual(ghost, [200, JSON.stringify({ product_id: '<id>', source: 'none', placeholder: true })]);
+  for (const pid of Object.keys(mineA)) {
+    for (const headers of [{}, { 'X-Shop-Id': A.shopId }]) {   //  سرآیندِ دکانِ دیگر هم دکانِ نشست را عوض نمی‌کند
+      const r = await h.api('GET', `/api/shop/images/products/${pid}`, { token: B.token, headers });
+      assert.deepEqual(norm(r, pid), ghost, `${pid} ${JSON.stringify(headers)}`);
+      for (const m of marks) assert.equal(JSON.stringify(r.body).includes(m), false, `${pid}: ${m}`);
+    }
+  }
+});
+
 test('IMG-BANK-08: پیشنهادِ عکسِ دکان به بانک فقط با اجازهٔ صریحِ صاحبِ دکان؛ اصل خصوصی می‌ماند', async () => {
   const own = await SR('POST', '/?product_id=soap-1', A, img());
   assert.equal((await S('POST', `/${own.body.id}/propose`, A, {})).body.error.code, 'consent_required');

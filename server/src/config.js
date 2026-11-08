@@ -339,6 +339,9 @@ const config = {
      */
     verifyMax:    num(process.env.RATE_VERIFY_MAX, 20),
     joinMax:      num(process.env.RATE_JOIN_MAX, 10),
+    //  ورودِ شاگرد به‌ازای **هر کد** (کلید HMAC ِ کد، نه خودش) — کنارِ `joinMax` ِ هر IP: یک کدِ لورفته از چند
+    //  اینترنت هم بیش از این در پنجره امتحان نمی‌شود. کدِ ثابتِ یک دکان مالِ همهٔ شاگردهاست، پس بازتر از IP.
+    joinCodeMax:  num(process.env.RATE_JOIN_CODE_MAX, 30),
     //  تازه‌سازیِ نشست و خروج. بازتر از ورود چون کارِ روزمره‌ی هر گوشی
     //  است (ساعتی یک بار) و یک دکانِ چندگوشی‌ای پشتِ یک اینترنت
     //  نباید همدیگر را ببندند.
@@ -484,6 +487,14 @@ const config = {
     pumpSite: (process.env.PUMP_SITE_URL || 'https://yaqobipump.top').replace(/\/$/, ''),
     //  در آزمون خاموش است: حلقهٔ گرفتنِ پیام نباید به اینترنت برود.
     autoStart: bool(process.env.TELEGRAM_AUTOSTART, (process.env.NODE_ENV || '') !== 'test'),
+  },
+
+  /**
+   * CRM-15 — «سابقهٔ دسترسی» (`lib/customer-access.js`): چند روز می‌ماند. ۰ (پیش‌فرض) = همان قاعدهٔ
+   * `audit_logs` و `CHAT_SHOP_RETENTION_DAYS`: تا عددِ نگه‌داری تصویب نشده، سرور خودش پاک نمی‌کند.
+   */
+  customerAccess: {
+    retentionDays: num(process.env.CUSTOMER_ACCESS_RETENTION_DAYS, 0),
   },
 
   /**

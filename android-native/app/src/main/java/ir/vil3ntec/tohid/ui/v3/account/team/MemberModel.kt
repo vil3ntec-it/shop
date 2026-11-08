@@ -5,7 +5,10 @@ import ir.vil3ntec.tohid.core.model.MemberDto
 import ir.vil3ntec.tohid.core.model.MemberPermsDto
 import ir.vil3ntec.tohid.core.model.ShopDeviceDto
 import ir.vil3ntec.tohid.core.model.ShopPermsDto
+import ir.vil3ntec.tohid.core.model.StaffKeyDto
+import ir.vil3ntec.tohid.core.model.StaffKeysDto
 import ir.vil3ntec.tohid.ui.theme.V3Status
+import ir.vil3ntec.tohid.ui.v3.account.AccountFormat
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -74,4 +77,54 @@ object MemberModel {
   }
 
   fun deviceName(d: ShopDeviceDto): String = d.name.ifBlank { d.platform.ifBlank { StrAccount.device } }
+
+  /* ---------------- دستگاه‌های ورود با کد (رازِ دستگاه، `GET /api/shop/staff-keys`) ---------------- */
+
+  /** رازهای زندهٔ همین عضو (با شناسهٔ کاربر، وگرنه عضویت) — تازه‌ترین بالا */
+  fun keysOf(page: StaffKeysDto?, member: MemberDto): List<StaffKeyDto> =
+    page?.devices.orEmpty()
+      .filter { (member.userId.isNotBlank() && it.userId == member.userId) || (it.memberId.isNotBlank() && it.memberId == member.id) }
+      .sortedByDescending { it.createdAt }
+
+  data class KeyRow(val id: String, val title: String, val meta: String)
+
+  /** برچسب (نامِ دستگاه، وگرنه سکو)، شناسهٔ کوتاه، آخرین استفاده و ساخت */
+  fun keyRow(k: StaffKeyDto): KeyRow = KeyRow(
+    id = k.id,
+    title = k.label.trim().ifBlank { k.platform.ifBlank { StrAccount.device } },
+    meta = StrAccount.deviceKeyMeta(
+      k.device,
+      k.lastUsedAt?.takeIf { it > 0 }?.let { AccountFormat.date(it) } ?: StrAccount.notUsedYet,
+      AccountFormat.date(k.createdAt),
+    ),
+  )
+
+  /** بخش دیده شود؟ سرورِ قدیمی یا بی اجازه ⇒ نه؛ صاحب دکان رازِ کد ندارد */
+  fun keysVisible(page: StaffKeysDto?, member: MemberDto): Boolean =
+    page != null && AccountFormat.roleOf(member.role) != AccountFormat.Role.OWNER
+
+  /** «باطل کردن» و «خروج از همه» فقط وقتی سرور گفته این نشست می‌تواند (members.manage) — سرور باز هم می‌سنجد */
+  fun canRevoke(page: StaffKeysDto?, member: MemberDto): Boolean = page?.canRevoke == true && keysVisible(page, member)
+
+  data class StaleHint(val oldMemberId: String, val oldName: String, val title: String, val body: String)
+
+  /**
+   *  «شاید همان <نام> است با دستگاهِ تازه» روی عضوِ تازه — فقط وقتی عضوِ کهنه هنوز در فهرستِ اعضاست (برداشته‌شده دیگر نه).
+   *  ⛔ فقط نشانه: هیچ چیز یکی نمی‌شود؛ تنها کار «برداشتنِ عضوِ کهنه» با تأیید است.
+   */
+  fun hintsOf(page: StaffKeysDto?, member: MemberDto, members: List<MemberDto>): List<StaleHint> =
+    page?.hints.orEmpty()
+      .filter { it.memberId == member.id || (it.userId.isNotBlank() && it.userId == member.userId) }
+      .filter { h -> h.oldMemberId != member.id && members.any { it.id == h.oldMemberId && it.status != "removed" } }
+      .distinctBy { it.oldMemberId }
+      .map { h ->
+        val name = h.oldName.trim().ifBlank { members.firstOrNull { it.id == h.oldMemberId }?.name?.trim().orEmpty() }
+          .ifBlank { StrAccount.noName }
+        StaleHint(
+          oldMemberId = h.oldMemberId,
+          oldName = name,
+          title = StrAccount.staleHint(name),
+          body = StrAccount.staleHintBody(h.device) + if (h.sameName) " " + StrAccount.staleSameName else "",
+        )
+      }
 }

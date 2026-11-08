@@ -278,6 +278,14 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
       "deliveredSeq" to JsonPrimitive(deliveredSeq), "readSeq" to JsonPrimitive(readSeq),
     ), ticketHeader(ticket)) { root -> root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) } }
 
+  /**
+   *  «حذف برای من» (فقط نمای همین مشتری؛ پیش‌نمایش و شمارِ نخوانده هم با سرور) یا «حذف برای همه» (سنگِ قبر) — همان
+   *  `DELETE …/messages/:id?for=` ِ وب (CHAT-08). پاسخ همان پیام با `rev` ِ تازه (`hidden` یا `deleted`).
+   */
+  fun chatDelete(slug: String, ticket: String, convId: String, messageId: String, scope: ChatDeleteScope): ShopperResult<ChatMessage> =
+    call("DELETE", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/messages/" + ShopperUrl.encode(messageId) +
+      ShopperUrl.query("for" to scope.wire), null, ticketHeader(ticket)) { root -> root["message"]?.let { decodeOrNull(ChatMessage.serializer(), it) } }
+
   /** «مشکل دارم»: رشتهٔ سفارشِ بسته تا مهلتِ سرور دوباره باز می‌شود (پس از آن ۴۰۹ ِ `issue_window_passed`) */
   fun chatIssue(slug: String, ticket: String, convId: String): ShopperResult<ChatConversation> =
     call("POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/issue", "{}", ticketHeader(ticket)) { root ->

@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v67';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v68';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -77,6 +77,8 @@ const SHELL_ASSETS = [
   './license/text-core.js',
   './license/calendar-core.js',
   //  «گزارشِ تازه»: هستهٔ مشترکِ گزارش، تابلوی خانه و صفحه‌اش — بی این‌ها روی نصبِ آفلاین بار نمی‌شدند
+  //  میانگینِ موزونِ هستهٔ گزارش (RPT-03) با همین هستهٔ موجودی — بی آن report-core بار نمی‌شد
+  './license/stock-core.js',
   './license/report-core.js',
   './license/report-board.js',
   './license/report-ui.js',

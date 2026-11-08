@@ -15,7 +15,7 @@ const express = require('express');
 const config = require('../config');
 const sync = require('../lib/shop-settings-sync');
 const audit = require('../lib/audit');
-const { can } = require('../lib/permissions');
+const perms = require('../lib/staff-perms');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { forbidden } = require('../middleware/errors');
@@ -30,13 +30,18 @@ const needFlag = async (req, res, next) => {
   next();
 };
 
-const writer = (req) => can(req.role, 'settings.write') && sync.WRITERS.includes(req.role);
+/**
+ * `permissions.write` ِ پاسخ = همان سنجشِ `PUT` (`requirePermission` ⇐ `memberAllows`): سقفِ نقش **و** لایه‌های دکان، کاربر و
+ * نقشِ سفارشی (STF-01..03). ⛔ فقط نقش بس نیست: مدیری که صاحب «تنظیمات» را برایش بسته وگرنه `write: true` می‌گرفت و
+ * برنامه (`ShopSettingsPlan.plan`) تغییرِ محلی را هر دور می‌فرستاد (۴۰۳) و قاعدهٔ پولِ دکان را هرگز نمی‌نشاند.
+ */
+const writer = async (req) => sync.WRITERS.includes(req.role) && perms.memberAllows(req, 'settings.write');
 
 router.get('/', async (req, res) => {
   if (!(await sync.flagOn(req.shopId))) return res.json({ enabled: false });
   const since = Number.parseInt(typeof req.query.since === 'string' ? req.query.since : '0', 10);
   const out = await sync.read(req.shopId, Number.isSafeInteger(since) ? since : 0);
-  res.json({ enabled: true, ...out, permissions: { write: writer(req) } });
+  res.json({ enabled: true, ...out, permissions: { write: await writer(req) } });
 });
 
 router.put('/', requirePermission('settings.write'), needFlag, async (req, res) => {
