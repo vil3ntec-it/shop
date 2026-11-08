@@ -828,7 +828,7 @@ object SalesEngine {
     val paidRatio =
       if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
     val prior = d.saleReturns.filter { it.saleItemId == item.id }
-    return ReturnShare.amount(item.totalPrice, item.quantity, item.returnedQty, quantity, paidRatio,
+    return ReturnShare.amount(item.totalPrice, item.quantity, ReturnLeft.returned(d, item), quantity, paidRatio,
       refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity })
   }
 
@@ -870,7 +870,7 @@ object SalesEngine {
       if (quantity.isNaN() || quantity <= 0) return@forEachIndexed
 
       //  قلمِ سفارشِ اینترنتی که «کالا به انبار برگشت؟» پیش‌تر برگرداند دوباره برنمی‌گردد
-      val allowed = (returnable(item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)
+      val allowed = (ReturnLeft.left(d, item) - OrderFulfillment.restockedQty(d, item.id)).coerceAtLeast(0.0)   //  JB5: دستگاه‌های دیگر هم
       if (quantity > allowed) quantity = allowed
       if (quantity <= 0) return@forEachIndexed
 

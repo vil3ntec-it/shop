@@ -4,6 +4,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ReturnFlow
+import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SaleItem
 import ir.vil3ntec.tohid.data.ShopData
@@ -35,8 +36,10 @@ object ReturnFlowModel {
   fun saleLine(d: ShopData, s: Sale): String =
     listOfNotNull(displayDate(s.date), PhoneSaleText.amount(s.finalTotal), s.debtorId?.let { id -> d.debtors.find { it.id == id }?.name }).joinToString(" · ")
 
-  fun itemLine(item: SaleItem, unit: String): String =
-    StrSale.returnableEach(qty(ReturnFlow.returnable(item)) + if (unit.isNotBlank()) " $unit" else "", PhoneSaleText.amount(item.totalPrice / item.quantity.coerceAtLeast(1e-9)))
+  /** «قابلِ برگشت: … · فی … · پیش‌تر برگشته: … از …» — از دادهٔ همگام‌شده، برگشتِ دستگاه‌های دیگر هم (JB5) */
+  fun itemLine(d: ShopData, item: SaleItem, unit: String): String =
+    StrSale.returnableEach(qty(ReturnLeft.left(d, item)) + if (unit.isNotBlank()) " $unit" else "", PhoneSaleText.amount(item.totalPrice / item.quantity.coerceAtLeast(1e-9))) +
+      ReturnLeft.note(d, item, unit)
 
   /** سه راهِ بازپرداخت؛ بی رسید «روشِ اصلی» همان نقد است و «نقد» جدا ندارد */
   fun modes(hasSale: Boolean): List<Pair<String, String>> = buildList {

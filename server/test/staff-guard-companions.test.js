@@ -581,13 +581,14 @@ test('v1 (P-K): ثبتِ برگشتِ بزرگ‌تر از یک دسته — ب�
   await ownerSale('s-big', 5000);
   const sv = save();
   //  ۲۳۰ ردیف × ۲٫۵ = ۵۷۵ > ۵۰۰؛ دستهٔ اول ۲۰۰ ردیف = ۵۰۰ (زیرِ سقف). برگشت‌ها پیش از شمارنده‌ها (`DIFF_ORDER`)
+  //  مقدار ۰٫۰۲ (جمع ۴٫۶ از ۵ عددِ قلم): بیش از فروخته برنمی‌گردد (`return-line-cap`، JB5)؛ پیش‌تر ۰٫۱ ⇒ ۲۳ از ۵
   const rows = Array.from({ length: 230 }, (_, i) =>
-    sv.op('returns', `r-big-${i}`, 'insert', { saleId: 's-big', saleItemId: 's-big-i1', quantity: 0.1, amount: 2.5, createdAt: sv.at }));
+    sv.op('returns', `r-big-${i}`, 'insert', { saleId: 's-big', saleItemId: 's-big-i1', quantity: 0.02, amount: 2.5, createdAt: sv.at }));
   const tail = [
     sv.op('sales', 's-big', 'update', { debtSettled: { $inc: 575 } }),
-    sv.op('saleItems', 's-big-i1', 'update', { returnedQty: { $inc: 23 } }),
+    sv.op('saleItems', 's-big-i1', 'update', { returnedQty: { $inc: 4.6 } }),
     sv.op('transactions', 's-big-rcv', 'insert', { debtorId: 'd-1', type: 'receive', amount: 575, createdAt: sv.at, refId: 's-big', kind: 'customer_return' }),
-    sv.op('stockMovements', 's-big-m', 'insert', { productId: 'p-gc', type: 'customer_return', qty: 23, refId: 'r-big-0', createdAt: sv.at }),
+    sv.op('stockMovements', 's-big-m', 'insert', { productId: 'p-gc', type: 'customer_return', qty: 4.6, refId: 'r-big-0', createdAt: sv.at }),
   ];
   const b1 = await push1(staff, 's-big', rows.slice(0, 200));
   assert.ok(b1.body.results.every((x) => x.status === 'applied'), JSON.stringify(b1.body.results.slice(0, 2)));
@@ -595,7 +596,7 @@ test('v1 (P-K): ثبتِ برگشتِ بزرگ‌تر از یک دسته — ب�
   const b2 = await push1(staff, 's-big', [...rows.slice(200), ...tail]);
   assert.ok(b2.body.results.every((x) => x.status === 'applied'), why(b2).join(','));
   assert.equal(Number((await row1('sales', 's-big')).data.debtSettled), 575);
-  assert.equal(Number((await row1('saleItems', 's-big-i1')).data.returnedQty), 23);
+  assert.equal(Number((await row1('saleItems', 's-big-i1')).data.returnedQty), 4.6);
   assert.ok(await row1('transactions', 's-big-rcv'));
   //  ثبتِ تازهٔ دیگری روی همان فاکتور (ts ِ دیگر) دوباره با سقفِ تجمعی داوری می‌شود
   const next = save();

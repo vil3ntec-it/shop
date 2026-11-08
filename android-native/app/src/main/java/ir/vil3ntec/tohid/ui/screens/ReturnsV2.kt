@@ -29,6 +29,7 @@ import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.ReturnFlow
+import ir.vil3ntec.tohid.data.ReturnLeft
 import ir.vil3ntec.tohid.data.ReturnSettings
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -129,7 +130,7 @@ fun ReturnFlowDialog(
   val docId = remember { newId() }
   val saleKey = remember { newId() }
 
-  val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && SalesEngine.returnable(it) > 0 } }
+  val items = remember(d, sale) { if (sale == null) emptyList() else d.saleItems.filter { it.saleId == sale.id && ReturnLeft.left(d, it) > 0 } }
   var qtys by remember { mutableStateOf<Map<String, String>>(if (prefill) items.take(1).associate { it.id to "1" } else mapOf()) }
   var disp by remember { mutableStateOf(mapOf<String, String>()) }
   var free by remember { mutableStateOf(listOf<FreeRow>()) }
@@ -202,13 +203,13 @@ fun ReturnFlowDialog(
             if (sale != null) {
               if (items.isEmpty()) EmptyNote(StrSale.allReturned)
               items.forEach { item ->
-                val left = SalesEngine.returnable(item)
+                val left = ReturnLeft.left(d, item)   //  JB5: برگشتِ دستگاه‌های دیگر هم
                 val unit = d.products.find { it.id == item.productId }?.unit.orEmpty()
                 Column(Modifier.padding(vertical = 6.dp)) {
                   Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                       Text(SalesEngine.itemName(d, item), style = MaterialTheme.typography.bodyMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                      Text(StrReturnPages.returnable(qty(left), unit, money(item.totalPrice / item.quantity.coerceAtLeast(1e-9))), style = MaterialTheme.typography.labelSmall, color = c.muted)
+                      Text(StrReturnPages.returnable(qty(left), unit, money(item.totalPrice / item.quantity.coerceAtLeast(1e-9))) + ReturnLeft.note(d, item, unit), style = MaterialTheme.typography.labelSmall, color = c.muted)
                     }
                     NumberField(
                       value = qtys[item.id].orEmpty(),
