@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.data.Reminders
 import ir.vil3ntec.tohid.data.ShopChatSync
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.Watchman
+import ir.vil3ntec.tohid.ios.identity.IosDeviceIdentity
 import ir.vil3ntec.tohid.sync.v1.LiveSocket
 import ir.vil3ntec.tohid.sync.v1.SyncV1Worker
 import kotlinx.coroutines.CoroutineScope
@@ -26,6 +27,7 @@ import platform.Foundation.NSOperationQueue
 import platform.Foundation.dateWithTimeIntervalSinceNow
 import platform.UIKit.UIApplicationDidBecomeActiveNotification
 import platform.UIKit.UIApplicationDidEnterBackgroundNotification
+import platform.UIKit.UIApplicationProtectedDataDidBecomeAvailable
 import platform.UIKit.UIApplicationWillResignActiveNotification
 
 /*
@@ -142,6 +144,8 @@ object IosLifecycle {
     val center = NSNotificationCenter.defaultCenter
     val main = NSOperationQueue.mainQueue
     observers += center.addObserverForName(UIApplicationDidBecomeActiveNotification, null, main) { _ ->
+      //  هویتِ دستگاه اگر هنگامِ آغاز نسنجیده ماند (دستگاه قفل بود) — پیش از همگام‌سازیِ بازگشت
+      IosDeviceIdentity.check()
       ShopChatSync.foreground = true
       IosNotifications.refresh()
       if (wasBackground) {
@@ -150,6 +154,10 @@ object IosLifecycle {
       }
       //  توکنِ APNs پس از ورود (روزی یک بار برای هر حساب؛ ‎IosPush.kt‎)
       if (IosBoot.started) IosPush.upload()
+    }
+    //  نخستین بازگشایی پس از روشن شدن: کلیددان و NSUserDefaults تازه خوانا شده‌اند
+    observers += center.addObserverForName(UIApplicationProtectedDataDidBecomeAvailable, null, main) { _ ->
+      IosDeviceIdentity.check()
     }
     observers += center.addObserverForName(UIApplicationWillResignActiveNotification, null, main) { _ ->
       ShopChatSync.foreground = false
