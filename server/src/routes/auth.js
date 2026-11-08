@@ -340,11 +340,7 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
     }
 
     const t = now();
-    //  دستگاهِ تازه ⇒ کد پیش از ساختنِ هر حسابی سنجیده می‌شود (بی «حسابِ شبح» برای کدِ تمام‌شده/باطل/دکانِ پر)
-    let created = false;
-    if (!user) await staffCodes.preflight(rawCode);
-    if (!user) {
-      created = true;
+    if (!user && await staffCodes.preflight(rawCode)) {  // دستگاهِ تازه ⇒ کد پیش از ساختنِ حساب (بی «حسابِ شبح»)
       user = await one(
         `INSERT INTO users (id, name, kind, status, created_at, updated_at)
          VALUES ($1,$2,'staff','active',$3,$3) RETURNING *`,
@@ -374,16 +370,7 @@ router.post(['/staff', '/staff-login'], joinLimit, async (req, res, next) => {
      */
     const member = await membershipOf(user.id);
     if (!member || member.shop_id !== shopId) {
-      try {
-        await staffCodes.redeem(rawCode, user.id, ip);
-      } catch (err) {
-        //  همین درخواست حساب را ساخت و پیوستن نشد (مسابقه با پیش‌سنجی) ⇒ هیچ حسابِ شبحی نمی‌ماند
-        if (created) {
-          await query(`DELETE FROM user_identities WHERE user_id=$1 AND provider='staff'`, [user.id]);
-          await query('DELETE FROM users WHERE id=$1', [user.id]);
-        }
-        throw err;
-      }
+      await staffCodes.redeem(rawCode, user.id, ip, { freshAt: t });  // ناموفق ⇒ حسابِ ساخته‌شده در همین لحظه پاک
     }
 
     //  کدِ شاگرد مالِ دفترِ دکان است، پس نشستش هم همان بخش است.

@@ -139,3 +139,18 @@ test('کدِ غلط، تمام‌شده، مصرف‌شده و دکانِ پر �
   assert.equal(full.body.error.code, 'shop_full');
   assert.equal(await usersCount(), users, 'دکانِ پر حساب نمی‌سازد');
 });
+
+test('مسابقه با پیش‌سنجی: پیوستنِ ناموفقِ حسابی که همین لحظه ساخته شد ⇒ حساب و هویتش پاک؛ حسابِ کهنه هرگز', async () => {
+  const dead = await staffCodes.create(shopId, owner.user.id, { role: 'staff', maxUses: 1 });
+  await query(`UPDATE staff_codes SET status='revoked' WHERE id=$1`, [dead.id]);
+  const t = now();
+  const fresh = newId('usr');
+  await query(`INSERT INTO users (id, name, kind, status, created_at, updated_at) VALUES ($1,'تازه','staff','active',$2,$2)`, [fresh, t]);
+  await query(`INSERT INTO user_identities (id, user_id, provider, subject, created_at) VALUES ($1,$2,'staff',$3,$4)`, [newId('idn'), fresh, `${shopId}:race-1`, t]);
+  await assert.rejects(staffCodes.redeem(dead.code, fresh, '', { freshAt: t }), (e) => e.code === 'code_inactive');
+  assert.equal(await one('SELECT id FROM users WHERE id=$1', [fresh]), null, 'حسابِ شبح ماند');
+  assert.equal(await one(`SELECT id FROM user_identities WHERE user_id=$1`, [fresh]), null);
+  //  حسابِ کهنه (لحظهٔ دیگر) با همان شکست دست نمی‌خورد
+  await assert.rejects(staffCodes.redeem(dead.code, owner.user.id, '', { freshAt: t }));
+  assert.ok(await one('SELECT id FROM users WHERE id=$1', [owner.user.id]));
+});

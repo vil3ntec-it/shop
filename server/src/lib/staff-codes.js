@@ -257,7 +257,26 @@ async function preflight(rawCode) {
   return { shopId: code.shop_id, role: code.role };
 }
 
-async function redeem(rawCode, userId, ip = '') {
+/**
+ * @param {{freshAt?: number}} [opts] `freshAt`: لحظه‌ای که `/auth/staff` همین حساب را ساخت — پیوستنِ ناموفق ⇒ همان
+ *   حساب و هویتِ دستگاهش پاک می‌شوند (مسابقه با `preflight`)، تا هیچ «حسابِ شبحی» نماند. حسابِ کهنه هرگز.
+ */
+async function redeem(rawCode, userId, ip = '', { freshAt = 0 } = {}) {
+  try {
+    return await redeemOnce(rawCode, userId, ip);
+  } catch (err) {
+    if (freshAt) {
+      const ghost = await one(`SELECT id FROM users WHERE id=$1 AND kind='staff' AND created_at=$2`, [userId, freshAt]);
+      if (ghost) {
+        await query(`DELETE FROM user_identities WHERE user_id=$1 AND provider='staff'`, [userId]);
+        await query('DELETE FROM users WHERE id=$1', [userId]);
+      }
+    }
+    throw err;
+  }
+}
+
+async function redeemOnce(rawCode, userId, ip = '') {
   const normalized = normalize(rawCode);
   if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
     throw badRequest('قالب کد درست نیست', 'bad_code');
