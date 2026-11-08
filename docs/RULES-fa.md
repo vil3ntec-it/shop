@@ -258,6 +258,12 @@
   `AccountBind.bootstrapSoon` (Snapshot همان دم، صفحه منتظر نمی‌ماند). `SyncCommit.record`: دفترِ **کاملاً خالی** روی سایهٔ پر هیچ op نمی‌سازد
   (`EmptyLedgerGuard`) و `reconciledAt` صفر ⇒ دورِ بعد از Snapshot. سنجه: `AccountSafetyTest`، `SignOutNoLossDesktopTest`،
   `server/test/signout-restore.test.js`، `security.e2e.mjs` «SYN-10.staff-code».
+- ⛔ **بازیابیِ بایگانیِ ساخت‌های پیشین:** بایگانیِ دفتر بی نشانِ `.bound` (`ShopStore.vaultLegacy`، پیش از `AccountBind`) که باز شود ⇒
+  `SyncStateV1.recoverArchive` ِ همان حساب؛ تا `SyncV1Engine.recoverArchived` نه تفاضل (`record`)، نه push/pull، نه `prepare`. بازیابی:
+  DELETE ِ در صف برای ردیفِ همین دفتر ⇐ `foreign_desk` (کنار، هرگز به سرور)، صفِ دیگر اول، بعد Snapshot ⇐ `RestoreMerge.merge` (ردیفِ سرور
+  برنده، تنهاهای دفتر «درج» با همان شناسه)، سایه = Snapshot. گوشیِ هنوز واردِ حالِ خراب (کلید = صاحب، دفتر = شاگرد) ⇐ `AccountBind.healOnStart`
+  در `AppRoot` با `/me`. ⚠️ ردیفی که دستگاهِ دیگر پس از بایگانی عمداً حذف کرده بود زنده می‌شود (سرور حذف‌کننده را نمی‌گوید؛ گم شدن بدتر است).
+  سنجه: `SignOutNoLossDesktopTest` «گوشیِ مانده در حالِ خرابِ ساختِ پیشین…».
 - ⛔ `/auth/staff`: دستگاهِ تازه ⇒ `staffCodes.preflight` (همان سنجه‌ها و کدهای `redeem`، فقط خواندنی) **پیش از** ساختنِ حساب؛ `redeem` ِ
   ناموفقِ حسابی که همین درخواست ساخت ⇒ حساب و هویتش پاک (هیچ «حسابِ شبح»). پیامِ برنامه برای هر کد: `StaffJoinErrors`.
 - حالِ همگام‌سازی (منتظر، آخرین موفق، خطای آخر) فقط از `SyncV1Engine.status` / `TohidSync.status()` خوانده شود؛ عددِ ساختگی نه (SYN-08، #230).

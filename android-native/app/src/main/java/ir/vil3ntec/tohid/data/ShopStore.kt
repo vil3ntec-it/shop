@@ -885,6 +885,15 @@ class ShopStore(
   /** آیا دفترِ حسابی زیرِ این نام بایگانی شده (`LedgerOwner`: «بی‌دکان ⇒ دکانِ بایگانی‌شده») */
   fun hasVault(key: String): Boolean = vault(key).exists()
 
+  /** نشانِ «این بایگانی را ساختِ «یک درِ ورود» نوشت» — سایه/صفِ همان حساب با آن جابه‌جا شده است */
+  private fun bound(key: String) = File(home, "ledger-${safeKey(key)}.bound")
+
+  /**
+   *  بایگانیِ ساخت‌های پیشین (بی نشان): کلیدِ همگام‌سازی همراهش جابه‌جا نمی‌شد، پس سایهٔ حسابش شاید مالِ
+   *  دفترِ دیگری است ⇒ پس از باز شدن فقط با `SyncV1Engine.recoverArchived` (سرور برنده، ردیف‌های تنها درج).
+   */
+  fun vaultLegacy(key: String): Boolean = vault(key).exists() && !bound(key).exists()
+
   /** دفترِ روی میز هیچ ردیفِ شناسه‌داری ندارد (فهرست‌های نامیِ پیش‌فرض شمرده نمی‌شوند) */
   fun deskEmpty(): Boolean = _data.value.let { d ->
     d.products.isEmpty() && d.sales.isEmpty() && d.saleItems.isEmpty() && d.debtors.isEmpty() &&
@@ -900,6 +909,7 @@ class ShopStore(
       runCatching {
         synchronized(AtRest.lock) {
           if (file.exists()) file.copyTo(vault(key), overwrite = true)
+          runCatching { bound(key).writeText("1") }
           file.delete()
         }
       }

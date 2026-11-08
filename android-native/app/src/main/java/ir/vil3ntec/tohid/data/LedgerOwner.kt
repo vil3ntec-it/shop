@@ -132,6 +132,18 @@ object LedgerOwner {
     runCatching { StockFlag.load(context) }
   }
 
+  /**
+   *  دفترِ بایگانی‌شدهٔ ساخت‌های پیشین (`ShopStore.vaultLegacy`) باز می‌شود ⇒ کلیدِ همگام‌سازیِ همین حساب
+   *  «بازیابیِ بایگانی» می‌خواهد پیش از هر تفاضل یا push (`SyncV1Engine.recoverArchived`). همان بایگانی‌ای
+   *  است که اشکالِ کلیدها (پیش از `AccountBind`) دفترِ واقعیِ صاحب را در آن جا گذاشت.
+   */
+  private fun markRecovery(context: Context, store: ShopStore, user: String, key: String) {
+    if (!store.vaultLegacy(key)) return
+    runCatching {
+      ir.vil3ntec.tohid.sync.v1.SyncStateV1(context, ir.vil3ntec.tohid.sync.v1.SyncV1Keys.scoped(context, user)).recoverArchive = true
+    }
+  }
+
   private suspend fun align(
     context: Context,
     store: ShopStore,
@@ -168,6 +180,7 @@ object LedgerOwner {
       val scope = ir.vil3ntec.tohid.platform.ServerSwitchAndroid.scope(context)
       val to = key(scope, user, shop)
       if (store.deskEmpty() && store.hasVault(to)) {
+        markRecovery(context, store, user, to)
         store.openFrom(to)
         runCatching { PhotoStore.openFrom(context, to) }
         state.accountId = user
@@ -190,6 +203,7 @@ object LedgerOwner {
     state.forgetAccountState()
     //  همان حساب، دکانِ دیگر ⇒ صف/سایه/cursor ِ دکانِ پیشین هم کنارِ دفترش (کلیدِ v1 شناسهٔ حساب است، نه دکان)
     if (previousUser == user) runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Keys.switchShop(context, user, previousShop, shop) }
+    markRecovery(context, store, user, to)
     store.openFrom(to)
 
     /*

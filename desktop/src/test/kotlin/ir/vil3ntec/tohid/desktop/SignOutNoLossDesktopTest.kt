@@ -210,6 +210,106 @@ class SignOutNoLossDesktopTest {
     assertEquals(queued, engine.queuedOps().map { it.opId })
   }
 
+  /** Snapshot ِ ساختگیِ سرور از یک دفتر (همان شکلِ `/sync/v1/snapshot`) */
+  private fun snapshotOf(d: ShopData, cursor: Long): kotlinx.serialization.json.JsonObject {
+    val tree = ir.vil3ntec.tohid.sync.v1.LedgerDiff.toJson(d)
+    val tables = kotlinx.serialization.json.buildJsonObject {
+      for (key in ir.vil3ntec.tohid.sync.v1.LedgerDiff.COLLECTIONS) {
+        val rows = (tree[key] as? kotlinx.serialization.json.JsonArray).orEmpty().map { r ->
+          val o = r as kotlinx.serialization.json.JsonObject
+          kotlinx.serialization.json.buildJsonObject {
+            put("id", o["id"]!!)
+            put("data", kotlinx.serialization.json.JsonObject(o.filterKeys { it != "id" }))
+          }
+        }
+        put(key, kotlinx.serialization.json.JsonArray(rows))
+      }
+      //  فهرست‌های نامی (دسته، واحد، دستهٔ مصرف): هر نام یک ردیف با `data.name`
+      for (key in ir.vil3ntec.tohid.sync.v1.LedgerDiff.LIST_COLLECTIONS) {
+        val names = (tree[key] as? kotlinx.serialization.json.JsonArray).orEmpty()
+          .mapNotNull { (it as? kotlinx.serialization.json.JsonPrimitive)?.content }
+        put(key, kotlinx.serialization.json.JsonArray(names.map { name ->
+          kotlinx.serialization.json.buildJsonObject {
+            put("id", kotlinx.serialization.json.JsonPrimitive(ir.vil3ntec.tohid.sync.v1.LedgerDiff.listRowId(name)))
+            put("data", kotlinx.serialization.json.buildJsonObject { put("name", kotlinx.serialization.json.JsonPrimitive(name)) })
+          }
+        }))
+      }
+    }
+    return kotlinx.serialization.json.buildJsonObject {
+      put("tables", tables)
+      put("cursor", kotlinx.serialization.json.JsonPrimitive(cursor))
+    }
+  }
+
+  @Test fun `گوشیِ مانده در حالِ خرابِ ساختِ پیشین — دفترِ واقعیِ صاحب برمی‌گردد، بی گم شدن، بی دوتایی، دادهٔ تازه‌ترِ سرور برنده`() {
+    val store = ownerWithData()
+    val key = engine.currentKey()
+    //  تغییرهای صاحب پیش‌تر رسیده بودند
+    OpQueue(ctx, key).ack(engine.queuedOps().map { it.opId })
+    engine.rebind(force = true)
+    val owned = store.data.value
+    sync.signOut()
+
+    //  —— همان حالِ خرابِ ساختِ پیشین ——
+    //  ۱) ورودِ کدِ شاگرد فقط دفتر را جابه‌جا کرد، کلید همان صاحب ماند؛ بایگانی بی نشانِ «یک درِ ورود»
+    assertEquals(LedgerOwner.Result.SWITCHED, runBlocking { LedgerOwner.signedIn(ctx, store, staff, shop) })
+    ctx.filesDir.walkTopDown().filter { it.name.endsWith(".bound") && it.name.contains(n) }.forEach { it.delete() }
+    assertEquals("کلید هنوز مالِ صاحب (اشکالِ پیشین)", key, engine.currentKey())
+    //  ۲) شاگرد روی دفترِ خالی یک کالا ثبت کرد ⇒ تفاضل با سایهٔ صاحب ⇒ DELETE برای ردیف‌های صاحب
+    assertTrue(runBlocking { store.save(store.data.value.copy(products = listOf(Product(id = "ps-$n", name = "نان", salePrice = 10.0)))) })
+    val foreign = deletes(engine.queuedOps())
+    assertTrue("حالِ خراب ساخته شد: ${foreign.size}", foreign.size >= 4)
+    //  ۳) صاحب با برگهٔ کدِ ایمیلیِ پیشین برگشت: فقط کلید، دفترِ شاگرد روی میز
+    SyncStateV1.setCurrentAccount(ctx, owner)
+    engine.rebind()
+    assertEquals(staff, LedgerOwner.currentUser(ctx))
+    assertEquals(1, store.data.value.products.size)
+
+    //  —— ساختِ تازه: همان کارِ `AccountBind.healOnStart` پس از آن‌که `/me` گفت «صاحب» ——
+    assertEquals(LedgerOwner.Result.SWITCHED, runBlocking { AccountBind.signedIn(ctx, store, owner, shop, "صاحب") })
+    assertEquals(owned.products.map { it.id }.toSet(), store.data.value.products.map { it.id }.toSet())
+    assertTrue("بازیابی لازم است", engine.recoveryPending())
+    //  تا بازیابی هیچ تفاضلی (DELETE ِ تازه‌ای) ساخته نمی‌شود
+    val before = engine.queuedOps().map { it.opId }
+    assertTrue(runBlocking { store.save(store.data.value) })
+    assertEquals(before, engine.queuedOps().map { it.opId })
+
+    //  سرور: DELETE ِ اشکال p1 و p2 را پاک کرده بود؛ دستگاهِ دیگر قیمتِ p3 را تازه کرده؛ کالای شاگرد هست
+    val p = owned.products.associateBy { it.id }
+    val server = ShopData(
+      products = listOf(p.getValue("p3-$n").copy(salePrice = 350.0), p.getValue("p4-$n"), Product(id = "ps-$n", name = "نان", salePrice = 10.0)),
+      debtors = owned.debtors,
+    )
+    val pushed = ArrayList<List<SyncOp>>()
+    val io = object : SyncV1Engine.RecoverIo {
+      override suspend fun push() {
+        val q = engine.queuedOps()
+        pushed += q
+        OpQueue(ctx, engine.currentKey()).ack(q.map { it.opId })
+      }
+      override suspend fun snapshot() = snapshotOf(server, cursor = 900)
+    }
+    val made = runBlocking { engine.recoverWith(io, read = { store.ledgerNow() }, write = { store.applyFromServerNow(it) }) }
+
+    val ids = store.data.value.products.map { it.id }
+    assertEquals("بی دوتایی", ids.toSet().size, ids.size)
+    assertEquals("هیچ کالایی گم نشد، کالای شاگرد هم آمد", setOf("p1-$n", "p2-$n", "p3-$n", "p4-$n", "ps-$n"), ids.toSet())
+    assertEquals("دادهٔ تازه‌ترِ سرور برنده", 350.0, store.data.value.products.first { it.id == "p3-$n" }.salePrice, 0.0)
+    assertEquals(1, store.data.value.debtors.size)
+    assertFalse(engine.recoveryPending())
+    assertEquals(900L, SyncStateV1(ctx, engine.currentKey()).cursor)
+    assertTrue("DELETE ِ دفترِ دیگر هرگز نرفت", pushed.flatten().none { it.type == SyncOp.DELETE })
+    assertEquals(2, made)
+    assertEquals("فقط آنچه سرور ندارد «درج» رفت", setOf("p1-$n", "p2-$n"), pushed.last().map { it.rowId }.toSet())
+    assertTrue(pushed.last().all { it.type == SyncOp.INSERT })
+    assertTrue("کنار گذاشته با دلیل", OpQueue(ctx, engine.currentKey()).dropped().count { (it["reason"] as? kotlinx.serialization.json.JsonPrimitive)?.content == "foreign_desk" } >= foreign.size)
+    //  پس از بازیابی، ذخیرهٔ عادی دوباره op می‌سازد و هیچ DELETE ای برای ردیف‌های صاحب نیست
+    assertTrue(runBlocking { store.save(store.data.value.copy(debtors = store.data.value.debtors + Debtor(id = "d9-$n", name = "تازه"))) })
+    assertEquals(emptyList<SyncOp>(), deletes(engine.queuedOps()))
+    assertTrue(engine.queuedOps().any { it.rowId == "d9-$n" })
+  }
+
   @Test fun `دفترِ کاملاً خالی روی سایهٔ پر هیچ DELETE نمی‌فرستد و هم‌ترازیِ دوباره را می‌خواهد`() {
     val store = ownerWithData()
     val queued = engine.queuedOps().map { it.opId }

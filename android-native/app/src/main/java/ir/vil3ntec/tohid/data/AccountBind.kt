@@ -52,6 +52,26 @@ object AccountBind {
     return result
   }
 
+  /**
+   *  گوشیِ صاحب که با ساختِ پیشین در همان حالِ خراب ماند و هنوز وارد است (کلیدِ همگام‌سازی = صاحب، دفترِ روی
+   *  میز = شاگرد، دفترِ واقعیِ صاحب در بایگانی): با نخستین باز شدنِ ساختِ تازه، حسابِ واقعیِ نشست از سرور
+   *  پرسیده می‌شود (`/me`)؛ همان حسابِ کلید است ⇒ همان ورودِ [signedIn] (دفترِ شاگرد کنار، دفترِ صاحب باز و
+   *  نشانِ بازیابی) و بازیابیِ بایگانی همان دم. حسابِ دیگری بود یا سرور جواب نداد ⇒ هیچ کاری.
+   *  `AppRoot` با دفترِ زندهٔ صفحه صدایش می‌زند (کارگرِ پس‌زمینه نه: نمونهٔ دیگرِ دفتر، دفترِ کهنه را بازمی‌نوشت).
+   */
+  suspend fun healOnStart(context: Context, store: ShopStore) {
+    val app = context.applicationContext
+    if (store.training) return
+    val keyUser = ir.vil3ntec.tohid.sync.v1.SyncStateV1.currentAccount(app)
+    val deskUser = LedgerOwner.currentUser(app)
+    if (keyUser.isNotBlank() && deskUser.isNotBlank() && keyUser != deskUser) {
+      val me = (ir.vil3ntec.tohid.data.repo.Backend.account(app).me() as? ir.vil3ntec.tohid.core.net.ApiResult.Success)?.value
+      val id = me?.user?.id.orEmpty()
+      if (id.isNotBlank() && id == keyUser) signedIn(app, store, id, me?.shop?.id.orEmpty(), me?.user?.name.orEmpty())
+    }
+    if (SyncV1Engine.of(app).recoveryPending()) bootstrapSoon(app, store)
+  }
+
   private val background = kotlinx.coroutines.CoroutineScope(
     kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
   )
@@ -66,6 +86,14 @@ object AccountBind {
    */
   fun bootstrapSoon(context: Context, store: ShopStore) {
     val app = context.applicationContext
+    val engine = SyncV1Engine.of(app)
+    if (!store.training && engine.recoveryPending()) {
+      background.launch {
+        runCatching { engine.recoverArchived(read = { store.ledgerNow() }, write = { next -> store.applyFromServerNow(next) }) }
+        runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
+      }
+      return
+    }
     if (store.training || !store.deskEmpty()) {
       runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(app) }
       return

@@ -134,6 +134,14 @@ class SyncStateV1(context: Context, private val accountKey: String) : V1Restore.
     set(v) = prefs.edit().putBoolean(k("epochLive"), v).apply()
 
   /** زمانِ «هم‌ترازیِ یک‌باره» با سرور — شرح سرِ `SyncV1Engine.prepare` */
+  /**
+   *  دفترِ بایگانی‌شدهٔ ساخت‌های پیش از «یک درِ ورود» برای این حساب باز شد و سایه/صفِ این کلید شاید مالِ
+   *  دفترِ دیگری است ⇒ تا `SyncV1Engine.recoverArchived` نشده، نه تفاضل، نه push، نه pull (شرح همان‌جا).
+   */
+  var recoverArchive: Boolean
+    get() = prefs.getBoolean(k("recoverArchive"), false)
+    set(v) { prefs.edit().putBoolean(k("recoverArchive"), v).commit() }
+
   var reconciledAt: Long
     get() = prefs.getLong(k("reconciledAt"), 0)
     set(v) = prefs.edit().putLong(k("reconciledAt"), v).apply()

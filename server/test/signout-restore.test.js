@@ -154,3 +154,19 @@ test('مسابقه با پیش‌سنجی: پیوستنِ ناموفقِ حسا�
   await assert.rejects(staffCodes.redeem(dead.code, owner.user.id, '', { freshAt: t }));
   assert.ok(await one('SELECT id FROM users WHERE id=$1', [owner.user.id]));
 });
+
+test('بازیابیِ بایگانی: «درج» ِ دوبارهٔ ردیفی که DELETE ِ اشتباه پاکش کرده بود آن را در Snapshot زنده می‌کند (بی دوتایی)', async () => {
+  const push = (ops) => h.api('POST', '/api/sync/v1/push', {
+    token: owner.accessToken, ...app, body: { device_id: 'owner-phone', schema_version: 3, ops },
+  });
+  const ins = () => ({ op_id: oid(), ts: Date.now(), table: 'products', row_id: 'p-revive', type: 'insert', fields: { name: 'زعفران', salePrice: 900 } });
+  assert.equal((await push([ins()])).status, 200);
+  const del = await push([{ op_id: oid(), ts: Date.now(), table: 'products', row_id: 'p-revive', type: 'delete' }]);
+  assert.equal(del.body.results[0].status, 'applied', JSON.stringify(del.body));
+  assert.equal((await snapshot(owner.accessToken)).tables.products.some((r) => r.id === 'p-revive'), false);
+  const back = await push([ins()]);
+  assert.equal(back.body.results[0].status, 'applied', JSON.stringify(back.body));
+  const rows = (await snapshot(owner.accessToken)).tables.products.filter((r) => r.id === 'p-revive');
+  assert.equal(rows.length, 1, 'زنده و یک‌بار');
+  assert.equal(rows[0].data.salePrice, 900);
+});
