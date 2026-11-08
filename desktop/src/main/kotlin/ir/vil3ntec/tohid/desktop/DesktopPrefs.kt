@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.desktop
 
 import android.content.SharedPreferences
+import ir.vil3ntec.tohid.data.DiskWrite
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -12,8 +13,6 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import java.io.File
-import java.nio.file.Files
-import java.nio.file.StandardCopyOption
 import java.util.concurrent.Executors
 
 /**
@@ -131,29 +130,12 @@ class DesktopPrefs(private val file: File) : SharedPreferences {
    *  کناری بی `fsync` جابه‌جا می‌شد: قطعِ برق پس از جابه‌جایی فایلِ صفربایتی یا نیمه جا می‌گذاشت، [load]
    *  آن را بی‌صدا «هیچ تنظیمی» می‌خواند و نخستین `apply` رویش می‌نوشت — سایه و cursor ِ همگام‌سازی، حساب و
    *  همهٔ تنظیم‌های دکان با هم می‌رفتند.
+   *
+   *  ⛔ همان `DiskWrite` ِ دفتر (F0-01)، نه جابه‌جاییِ جدا: روی ویندوز قفلِ لحظه‌ایِ ضدویروس با چند دورِ درنگ،
+   *  دیسکِ بی پیوندِ سخت با رونوشتِ `.bak`، و `fsync` ِ پوشه که ویندوز نمی‌دهد بی خطا (`WindowsDiskFaultsTest`).
    */
   private fun write(text: String): Boolean = synchronized(lock) {
-    runCatching {
-      file.parentFile?.mkdirs()
-      val tmp = File(file.parentFile, file.name + ".tmp")
-      java.io.FileOutputStream(tmp).use { out ->
-        out.write(text.toByteArray(Charsets.UTF_8))
-        out.flush()
-        out.fd.sync()
-      }
-      //  نسخهٔ پیشین: پیوندِ سخت (بی رونوشت)؛ سیستمی که نمی‌دهد ⇒ رونوشت
-      if (file.isFile) runCatching {
-        Files.deleteIfExists(backup.toPath())
-        runCatching { Files.createLink(backup.toPath(), file.toPath()) }
-          .getOrElse { Files.copy(file.toPath(), backup.toPath(), StandardCopyOption.REPLACE_EXISTING) }
-      }
-      runCatching {
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
-      }.getOrElse {
-        Files.move(tmp.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING)
-      }
-      Unit
-    }.isSuccess
+    runCatching { DiskWrite.bytesKeeping(file, text.toByteArray(Charsets.UTF_8), backup) }.isSuccess
   }
 
   /** نسخهٔ پیشینِ همین فایل — [write] می‌گذارد، [load] اگر اصل خراب بود می‌خواند */
