@@ -101,7 +101,7 @@ object Receipts {
         returnedQty = item.returnedQty,
         //  پیگیریِ #307 (S3، پرچمِ `shop.promo_stamp`): قیمتِ فهرست فقط برای قلمی که تخفیفِ خودکار گرفته
         listPrice = SaleReceipt.line(item, stamped).takeIf { it.promo > 0 }?.unit,
-        note = item.note,
+        note = ir.vil3ntec.tohid.data.CustomerPriceCart.noteWith(item), // POS-18: «قیمتِ خاص»؛ بی منبع ⇒ همان یادداشت
       )
     }
     val time = if (sale.createdAt > 0) SimpleDateFormat("HH:mm", Locale.US).format(Date(sale.createdAt)) else ""

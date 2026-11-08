@@ -163,6 +163,9 @@ object CustomerMerge {
       tags = tags,
       group = keep.group ?: drop.group,
       priceList = keep.priceList ?: drop.priceList,
+      //  POS-18: قیمت‌های خاص — ماندگار برنده است؛ کالایی که فقط ادغام‌شونده دارد هم می‌ماند (تا سقفِ هسته)
+      specialPrices = (keep.specialPrices.orEmpty() + drop.specialPrices.orEmpty().filter { e -> keep.specialPrices.orEmpty().none { it.productId == e.productId } })
+        .take(ir.vil3ntec.tohid.core.sale.CustomerPrice.MAX_ENTRIES).ifEmpty { null },
       creditLimit = keep.creditLimit ?: drop.creditLimit,
       marketingConsent = consent,
       //  CRM-09: نشانیِ ماندگار مقدم؛ بی آن نشانیِ تکراری

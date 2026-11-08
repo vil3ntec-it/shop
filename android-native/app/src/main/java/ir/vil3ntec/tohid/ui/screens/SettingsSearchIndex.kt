@@ -138,7 +138,7 @@ object SettingsSearchIndex {
     L.PRINTER to kw("چاپگر پرینتر رسید چاپ", "printer receipt print", "چاپګر رسید چاپ"),
     L.RETURNS to kw("برگشت مرجوعی تعویض", "returns exchange refund", "بېرته ورکړه بدلول"),
     L.LOYALTY to kw("امتیاز وفاداری مشتری", "loyalty points customer tier", "امتیاز وفاداري"),
-    L.PRICE_LIST to kw("لیست قیمت عمده خرده", "price list wholesale retail", "د بیو لېست عمده"),
+    L.PRICE_LIST to kw("لیست قیمت عمده خرده قیمت خاص مشتری", "price list wholesale retail customer special price", "د بیو لېست عمده ځانګړې بیه"),
     L.GIFT_RECEIPT to kw("رسید هدیه", "gift receipt", "د ډالۍ رسید"),
     L.POS_TOUCH to kw("لمسی صفحه لمسی", "touch mode", "لمسي"),
     L.POS_MORE_KEYS to kw("کلید میانبر", "shortcut keys", "کیلي"),

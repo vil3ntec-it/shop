@@ -183,7 +183,8 @@ object Receipt {
       row(detail, num(item.totalPrice), small)
       if (item.returnedQty > 0) line(StrSale.returned(num(item.returnedQty)), small)
       //  POS-11: یادداشتِ ردیف؛ بی یادداشت ⇒ همان چیدمانِ پیشین
-      item.note?.takeIf { it.isNotBlank() }?.let { line(it, small) }
+      //  POS-18: «قیمتِ خاص» کنارِ همان یادداشت؛ بی منبع ⇒ همان یادداشت
+      ir.vil3ntec.tohid.data.CustomerPriceCart.noteWith(item)?.takeIf { it.isNotBlank() }?.let { line(it, small) }
       gap(0.25f)
     }
 

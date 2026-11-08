@@ -13,6 +13,7 @@ import ir.vil3ntec.tohid.ui.components.pos.LoyaltyHistory
 import ir.vil3ntec.tohid.ui.screens.CrmPricingButton
 import ir.vil3ntec.tohid.ui.screens.CustomerCardButton
 import ir.vil3ntec.tohid.ui.screens.CustomerOnlineOrdersPanel
+import ir.vil3ntec.tohid.ui.screens.CustomerPricesButton
 import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton
 
 /**
@@ -21,6 +22,7 @@ import ir.vil3ntec.tohid.ui.screens.StoreCreditGrantButton
  *  - فروشِ امانی و قسطیِ همین مشتری (POS-27، `LayawayCustomerPanel`، پشتِ `LayawayPref`)؛
  *  - مانده و سابقهٔ امتیازِ وفاداری (PRM-13، `LoyaltyHistory`؛ `LoyaltyPref` خاموش و بی ردیف ⇒ هیچ)؛
  *  - «گروه، لیستِ قیمت و رضایت» (CRM-08/12، `CrmPricingButton`، پشتِ «گزارش‌های مشتری»)؛
+ *  - «قیمتِ خاصِ این مشتری» (POS-18، `CustomerPricesButton`، پشتِ `CustomerPricePrefs`)؛
  *  - «کارتِ مشتری» (CRM-16، `CustomerCardButton` — همان دکمهٔ پروندهٔ کامپیوتر، پشتِ `CustomerCardPref`؛ مشتریِ ادغام‌شده نه)؛
  *  - «دادنِ اعتبارِ هدیه» (PRM-15، `StoreCreditGrantButton`، پشتِ `GiftCardPref` و تخفیفِ «مجاز» ِ همان مبلغ)؛
  *  - سفارش‌های اینترنتیِ باز یا لغوشده (CRM-07، `CustomerOnlineOrdersPanel` — همان بخشِ کامپیوتر، فقط با بخشِ سفارشِ
@@ -40,6 +42,7 @@ internal fun DebtorFileExtras(
     LayawayCustomerPanel(d, store, debtorId, toast)
     LoyaltyHistory(d, debtorId, Modifier.padding(top = 12.dp), store, toast)
     CrmPricingButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
+    CustomerPricesButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp)) // POS-18، پیش‌فرض خاموش
     CustomerCardButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     StoreCreditGrantButton(store, d, debtorId, toast, Modifier.fillMaxWidth().padding(top = 8.dp))
     CustomerOnlineOrdersPanel(d, debtorId, Modifier.padding(top = 12.dp), onOpen = onOpenOrder)

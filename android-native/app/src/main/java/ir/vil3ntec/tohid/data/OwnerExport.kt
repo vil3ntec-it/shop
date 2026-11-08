@@ -120,6 +120,7 @@ object OwnerExport {
     "cardCode" to "کارت مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
     "deliveryAddress" to "نشانی تحویل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "specialPrices" to "قیمت‌های خاص مشتری",  // داده: POS-18، همان `license/owner-export.js`
     "notes" to "یادداشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "createdAt" to "زمان ثبت (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "date" to "تاریخ",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
@@ -244,6 +245,7 @@ object OwnerExport {
     "returnedQty" to "تعداد برگشتی",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "listPriceMinor" to "قیمت فهرست (یک‌صدم افغانی)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "promo" to "تخفیف‌های خودکار قلم",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "priceSource" to "منبع قیمت",  // داده: POS-18 («special» = قیمتِ خاصِ مشتری)، همان `license/owner-export.js`
     "reason" to "دلیل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  برگشت و تعویض (RET، فقط با تنظیمِ روشن)
     "docId" to "سند برگشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

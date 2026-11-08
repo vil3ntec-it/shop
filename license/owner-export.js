@@ -79,6 +79,8 @@
     cardCode: 'کارت مشتری',
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `OwnerExport.kt`
     deliveryAddress: 'نشانی تحویل',
+    //  قیمت‌های خاصِ مشتری (POS-18) — همان `OwnerExport.kt`
+    specialPrices: 'قیمت‌های خاص مشتری',
     notes: 'یادداشت',
     createdAt: 'زمان ثبت (UTC)',
     date: 'تاریخ',
@@ -200,6 +202,8 @@
     returnedQty: 'تعداد برگشتی',
     listPriceMinor: 'قیمت فهرست (یک‌صدم افغانی)',
     promo: 'تخفیف‌های خودکار قلم',
+    //  منبعِ قیمتِ قلم (POS-18: «special» = قیمتِ خاصِ مشتری) — همان `OwnerExport.kt`
+    priceSource: 'منبع قیمت',
     reason: 'دلیل',
     //  برگشت و تعویض (RET، فقط با تنظیمِ روشن)
     docId: 'سند برگشت',

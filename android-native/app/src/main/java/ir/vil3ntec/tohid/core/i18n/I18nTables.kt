@@ -51,6 +51,7 @@ object I18nTables {
     StrRemoteApproval, // STF-02: «پرسیدن از مدیر» در صندوق و «درخواست‌های تأیید» ِ صاحب/مدیر
     StrConflictInbox, // صندوقِ سندهای ردشده ِ صاحب/مدیر و نشانِ «سرور نپذیرفت» روی فاکتورِ دستگاهِ سازنده
     StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
+    StrCustomerPrices, // POS-18: «قیمتِ خاصِ این مشتری» (پروندهٔ مشتری، صندوق، رسید و تنظیم)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴
