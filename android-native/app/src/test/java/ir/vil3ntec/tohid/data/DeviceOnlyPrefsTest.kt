@@ -22,9 +22,14 @@ class DeviceOnlyPrefsTest {
       .map { File(it, rel) }.firstOrNull { it.isFile }?.readText()
       ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
 
-  /** پرونده‌های SharedPreferences که مالِ همین دستگاه‌اند و هرگز با پشتیبانِ اندروید جابه‌جا نمی‌شوند */
+  /**
+   *  پرونده‌های SharedPreferences که مالِ همین دستگاه‌اند و هرگز با پشتیبانِ اندروید جابه‌جا نمی‌شوند.
+   *  `tohid-sync-v1.xml` (۱۴۰۵/۰۸/۱۸): replica و cursor ِ هر حساب (#991) — با آن گوشیِ دوم همان `device_id` ِ گوشیِ اول را
+   *  داشت؛ گوشیِ بازیابی‌شده شناسهٔ خودش را می‌گیرد و پیش از Pull از سرور بازسازی می‌شود (`RestoredDeviceDesktopTest`).
+   */
   private val deviceOnly = listOf(
     "tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml", "tohid-doc-series.xml",
+    "tohid-sync-v1.xml",
   )
 
   private fun excluded(xml: String): Set<String> =
@@ -50,5 +55,14 @@ class DeviceOnlyPrefsTest {
   @Test fun `نامِ پروندهٔ سری همان است که بیرون می‌ماند`() {
     val src = file("java/ir/vil3ntec/tohid/sync/DocSeries.kt")
     assertEquals("tohid-doc-series", Regex("""private const val PREFS = "([^"]+)"""").find(src)?.groupValues?.get(1))
+    //  همان نام در حصارِ گوشیِ بازیابی‌شده (سریِ کهنه کنار) — `V1ReplicaAndroid.kt`
+    val replica = file("java/ir/vil3ntec/tohid/sync/v1/V1ReplicaAndroid.kt")
+    assertEquals("tohid-doc-series", Regex("""const val DOC_SERIES = "([^"]+)"""").find(replica)?.groupValues?.get(1))
+  }
+
+  @Test fun `نامِ پروندهٔ حالِ همگام‌سازی همان است که بیرون می‌ماند — و رمزِ دفتر هم همان را کنار می‌گذارد`() {
+    val src = file("java/ir/vil3ntec/tohid/sync/v1/SyncStateV1.kt")
+    assertTrue(Regex("""getSharedPreferences\("tohid-sync-v1"""").containsMatchIn(src))
+    assertTrue("tohid-sync-v1.xml" in ir.vil3ntec.tohid.core.atrest.AtRestScope.SYNC_PREFS)
   }
 }

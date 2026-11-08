@@ -264,6 +264,10 @@ export const KOTLIN = {
   //  پس از «کنار بگذار»/«اصلاح» ِ صاحب: کارگرِ همگام‌سازی (`SyncV1Worker` ⇒ `SetAsideSync.afterSync`) سند را از دفترِ شمرده
   //  بیرون می‌برد (`SyncV1Engine.setAside` ⇒ `SetAsideCommit.run`). نبودش ⇒ [NativeDevice.settleRejected] هیچ (سفرِ JB6 سرخ)
   setAside: /SetAsideCommit\.run\(/.test(SYNC_V1_ENGINE_KT) && /SetAsideSync\.afterSync\(/.test(KT('SyncV1Worker.kt')),
+  //  DATA-06: گوشیِ بازیابی‌شده از پشتیبانِ گوشیِ دیگر (`V1ReplicaAndroid.kt`، `core/sync/RestoredDevice.kt`) — `tohid-sync-v1` با
+  //  پشتیبان نمی‌رود، پایهٔ سایه = دفترِ بازیابی‌شده، و پیش از هر Pull «بازسازی از سرور» (کارگر). نبودش ⇒ همان نسخهٔ پیشین:
+  //  replica و cursor ِ گوشیِ اول روی گوشیِ دوم (سفرِ JB6 سرخ: سریِ دوتایی، دفترِ جدا از سرور)
+  restoredFence: restoredFenceWired(),
 };
 
 /* ---- پس از «کنار بگذار»/«اصلاح و ثبت» — قرینهٔ سطر به سطرِ `core/sync/RejectedSettle.kt` ---- */
@@ -338,6 +342,16 @@ export function settlePlan(m, book, ledger, done) {
     mk(t, r, 'delete', null);
   }
   return { undo, rows, ops: local, kept, touched: new Set(undo.map((o) => key(o.table, o.row_id))) };
+}
+
+/** `restoredFence` ِ [KOTLIN]: قاعدهٔ پشتیبان، حصار با پایهٔ سایه، سدِ Pull و بازسازیِ کارگر — هر چهار در کدِ امروز */
+function restoredFenceWired() {
+  const rules = fs.readFileSync(path.join(ROOT, 'android-native', 'app', 'src', 'main', 'res', 'xml', 'backup_rules.xml'), 'utf8');
+  const cloud = rules.slice(rules.indexOf('<cloud-backup>'), rules.indexOf('</cloud-backup>'));
+  return /<exclude domain="sharedpref" path="tohid-sync-v1\.xml" \/>/.test(cloud)
+    && /baseline\(ledger\)/.test(KT('V1ReplicaAndroid.kt'))
+    && /!state\.restoredRebuild/.test(SYNC_V1_ENGINE_KT)
+    && /V1Replica\.rebuildRestored\(/.test(KT('SyncV1Worker.kt'));
 }
 
 /**
@@ -479,6 +493,45 @@ export class NativeDevice {
     //  `SyncStateV1.replica` ِ همین حساب (یک بار انتخاب) و `lastPushAt`
     this.syncId = '';
     this.lastPushAt = 0;
+    //  DATA-06 (`SyncStateV1.restoredRebuild`): حالِ گوشیِ دیگر ⇒ تا «بازسازی از سرور» Pull نه
+    this.restoredRebuild = false;
+  }
+
+  /**
+   *  پشتیبانِ خودکارِ اندروید از همین گوشی (`backup_rules.xml`): پرونده‌ها (`file`) — دفتر، صف و ردشده‌هایش، دفترچهٔ §۹.۵.
+   *  `tohid-sync`، `tohid-session*` و `tohid-doc-series` هرگز. `syncV1`: حالِ `tohid-sync-v1` (replica، cursor، سایه) — فقط
+   *  ساخت‌هایی که آن را بیرون نمی‌گذاشتند ([restoredFrom]).
+   */
+  deviceBackup() {
+    return {
+      ledger: clone(this.ledger), queue: clone(this.queue), dropped: clone(this.dropped), sent: clone(this.sent),
+      syncV1: clone({
+        shadow: this.shadow, cursor: this.cursor, snapshotAt: this.snapshotAt, lastPushAt: this.lastPushAt, epoch: this.epoch,
+        syncId: this.syncId,
+      }),
+    };
+  }
+
+  /**
+   *  گوشیِ **دیگری** که از [files] بالا آمد: شناسهٔ دستگاهِ تازه، بی نشست و بی سری.
+   *  کدِ امروز (`KOTLIN.restoredFence`، `V1Replica.fence`): پایهٔ سایه = دفترِ بازیابی‌شده (پیش از نخستین ذخیره) و «در انتظارِ
+   *  بازسازی» ⇒ نخستین دور: صف ⇐ بازسازی از سرور ⇐ Pull. ساختِ پیشین: `tohid-sync-v1` با replica ِ گوشیِ اول آمد.
+   *  `naive` (شاهدِ خطر، همان آیفونِ #1012 پیش از این): `tohid-sync-v1` با cursor و سایه، ولی replica ِ تازه و بی بازسازی.
+   */
+  static restoredFrom(E, label, files, { naive = false, ...opts } = {}) {
+    const d = new NativeDevice(E, label, opts);
+    d.ledger = clone(files.ledger);
+    d.queue = clone(files.queue);
+    d.dropped = clone(files.dropped);
+    d.sent = clone(files.sent);
+    if (naive || !d.kotlin.restoredFence) {
+      Object.assign(d, clone(files.syncV1));
+      if (naive) d.syncId = '';
+      return d;
+    }
+    d.shadow = core.shadowOf(d.ledger);
+    d.restoredRebuild = true;
+    return d;
   }
 
   /** `LedgerDiff.wireSchema(state.serverSchema)`: پلهٔ همان سرور روی سیم، نه بیشتر (پرچمِ گاوصندوق) */
@@ -731,8 +784,14 @@ export class NativeDevice {
       await this.checkEpoch();
       let step = await this.pushAll();
       if (step) return step;
+      //  DATA-06 (`SyncV1Worker` ⇐ `V1Replica.rebuildRestored` = `ShopStore.restoreBackup` با دفترِ همین حالا): صف رفت ⇒ از سرور
+      if (this.restoredRebuild && this.token && !this.queue.length) {
+        const r = await this.restore(this.ledger, { pushed: true });
+        if (!r.ok) return { ok: false, restored: r };
+        this.restoredRebuild = false;
+      }
       if (this.restorePending && !this.queue.length && await this.rebuild() && (step = await this.pushAll())) return step;
-      for (let i = 0; !this.restorePending && i < 50; i++) {
+      for (let i = 0; !this.restorePending && !this.restoredRebuild && i < 50; i++) {
         const r = await this.api('GET', `/sync/v1/pull?device_id=${encodeURIComponent(this.replica())}&since=${this.cursor}`);
         if (r.status !== 200) { this.lastError = `${r.status} ${r.body?.error?.code || ''}`.trim(); return { ok: false, status: r.status, body: r.body }; }
         const ops = r.body.ops || [];
@@ -836,7 +895,7 @@ export class NativeDevice {
    * ساختی که بازیابی را هنوز «ذخیره» می‌کند (`KOTLIN.restoreNoOps` خاموش) ⇒ همان [save] (تفاضل با سایه).
    * @returns {Promise<{ok:boolean, route:string, rows?:number, notOnServer?:number}>}
    */
-  async restore(backup) {
+  async restore(backup, { pushed: queueSent = false } = {}) {
     if (!this.kotlin.restoreNoOps) { this.save(backup); return { ok: true, route: 'save' }; }
     const shaped = (t) => (this.kotlin.snapshotShaped ? projectLedger(t, this.keepOf) : t);
     const synced = this.cursor > 0 || this.snapshotAt > 0;
@@ -858,7 +917,8 @@ export class NativeDevice {
     if (!synced && (serverRows === null || this.offline)) return { ok: false, route: 'sync_first' };
     if (!signedIn) return { ok: false, route: 'need_sign_in' };
     if (this.offline) return { ok: false, route: 'need_net' };
-    const pushed = await this.sync();
+    //  `queueSent`: صف همین دور رفت (حصارِ DATA-06 از درونِ [sync]) — همان `SyncRebuild.run` که خودش اول صف را می‌فرستد
+    const pushed = queueSent ? { ok: true } : await this.sync();
     if (!pushed.ok) return { ok: false, route: 'from_server', error: this.lastError };
     if (this.queue.length) return { ok: false, route: 'queue_left' };
     const r = await this.api('GET', '/sync/v1/snapshot');

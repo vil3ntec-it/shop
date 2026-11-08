@@ -98,6 +98,12 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       if (!ok) return Result.retry()
     }
 
+    //  DATA-06: حالِ این حساب از پشتیبانِ گوشیِ دیگر آمد ⇒ پیش از هر هم‌ترازی و Pull یک بار «بازسازی از سرور» (صف اول)؛
+    //  نشد ⇒ هیچ چیزی عوض نشده، دورِ بعد دوباره (`V1Replica.rebuildRestored`)
+    if (V1Replica.restoredPending(app) && !runCatching { V1Replica.rebuildRestored(app, store) }.getOrDefault(false)) {
+      return Result.retry()
+    }
+
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
     //  ⛔ `read` دفترِ همین لحظهٔ دیسک است (`ledgerNow`)، نه دفتری که این نمونه هنگامِ `load` خواند:
     //  نشاندنِ opها روی آن فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد
