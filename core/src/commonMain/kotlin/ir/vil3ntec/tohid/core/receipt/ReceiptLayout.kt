@@ -57,8 +57,9 @@ object ReceiptLayout {
     }
     b += ReceiptBlock.Rule()
     val whole = input.items.all { it.qty == kotlin.math.floor(it.qty) }
-    val count = "${labels.count}: ${fmt.digits(input.items.size.toString())} ${labels.rows}" +
-      if (whole && input.items.isNotEmpty()) " · ${fmt.qty(input.items.sumOf { it.qty })} ${labels.pieces}" else ""
+    val n = input.items.size
+    val count = "${labels.count}: ${fmt.digits(n.toString())} ${if (n == 1) labels.rowOne else labels.rows}" +
+      if (whole && input.items.isNotEmpty()) input.items.sumOf { it.qty }.let { q -> " · ${fmt.qty(q)} ${if (q == 1.0) labels.pieceOne else labels.pieces}" } else ""
     text(count, TextStyle.SMALL, center = false)
 
     /* ------------------------------ جمع‌ها ------------------------------ */
