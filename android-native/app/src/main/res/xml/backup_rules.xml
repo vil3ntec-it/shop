@@ -17,11 +17,20 @@
      `tohid-doc-series` (سریِ سندِ این دستگاه، F0-03) هم — DATA-06: گوشیِ دومی که از پشتیبانِ
      این گوشی بالا بیاید شناسهٔ دستگاهِ تازه می‌گیرد (`tohid-sync` بیرون است)، پس باید سریِ خودش را
      هم از سرور بگیرد؛ با سریِ همین گوشی و همان `nextInvoiceNo` ِ دفتر، هر دو «A1-155» می‌ساختند.
+     `tohid-sync-v1` (DATA-06، ۱۴۰۵/۰۸/۱۸) هم: از #991 `replica` ِ هر حساب (`device_id` ِ push/pull و سریِ سند) و
+     cursor ِ همان حساب آن‌جاست — گوشیِ دوم با آن همان شناسهٔ گوشیِ اول را به سرور می‌داد، و با شناسهٔ تازه ولی همان
+     cursor opهای خودِ گوشیِ اول را دوباره روی دفتر می‌نشاند (موجودی و قرض دو بار). دفتر، صف و ژورنال (`file`)
+     می‌روند؛ گوشیِ بازیابی‌شده با `V1Replica.fence` شناسهٔ خودش را می‌گیرد و پیش از هر Pull یک بار «بازسازی از
+     سرور» می‌کند (صف اول) — `core/sync/RestoredDevice.kt`. قاعدهٔ همین فایل هنگامِ **بازیابی** هم بر پشتیبانِ کهنه‌تر
+     اجرا می‌شود (`BackupAgent.onRestoreFile`)، پس پشتیبانِ نسخه‌های پیشین هم این پرونده را برنمی‌گرداند.
+     پوشهٔ `sync-shadow/` (`file`) همان حالِ `tohid-sync-v1` است وقتی پرچمِ `shop.sync_shadow_file` روشن است
+     (`sync/v1/ShadowStore`: سایه و cursor در فایلِ خودشان): نشانش با پشتیبان نمی‌رود، پس در گوشیِ بازیابی‌شده هیچ
+     بکار نمی‌آمد، و فایلی هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد ⇒ بیرون.
 
      SEC-01: وقتی «رمزگذاریِ دفتر» در کار است، `TohidBackupAgent` به‌جای این
      قاعده‌ها همان دو دامنه را می‌فرستد منهای دفترِ رمزدار، کلیددان و حالِ
      همگام‌سازی (هر سه با هم) — کلیدِ Keystore با پشتیبان نمی‌رود. استثناهای
-     همین فایل (توکن‌ها، `tohid-staff-pins`) آن‌جا هم بیرون‌اند.
+     همین فایل (توکن‌ها، `tohid-staff-pins`، `tohid-doc-series`، `tohid-sync-v1`) آن‌جا هم بیرون‌اند.
 -->
 <data-extraction-rules>
   <cloud-backup>
@@ -32,6 +41,8 @@
     <exclude domain="sharedpref" path="tohid-session-secure.xml" />
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
+    <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="file" path="sync-shadow" />
   </cloud-backup>
   <device-transfer>
     <include domain="file" path="." />
@@ -41,5 +52,7 @@
     <exclude domain="sharedpref" path="tohid-session-secure.xml" />
     <exclude domain="sharedpref" path="tohid-staff-pins.xml" />
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
+    <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
+    <exclude domain="file" path="sync-shadow" />
   </device-transfer>
 </data-extraction-rules>

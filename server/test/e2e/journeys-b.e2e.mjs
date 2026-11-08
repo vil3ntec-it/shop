@@ -14,14 +14,27 @@
  *   JB5 دو دستگاهِ صاحب (A و B)، هر دو بی اینترنت، همان کالای همان فاکتور را کامل برمی‌گردانند ⇐ فقط یکی می‌نشیند؛
  *       دیگری با همهٔ همراه‌هایش `return_exceeds_sold`، صندوقِ تعارضِ کامل برای صاحب، تلاشِ دوباره همان یک صندوق
  *       (`lib/return-line-cap.js`، بی هیچ پرچمی: پیش‌فرض روشن). پیش از اصلاح سرخ بود: سرور هر دو را می‌پذیرفت.
+ *   JB6 صندوقِ سندهای ردشده: شاگرد (S) فروشِ قرضیِ بالای سقف می‌زند ⇐ سرور رد می‌کند و دلیل روی دستگاهِ S می‌ماند؛
+ *       کامپیوترِ صاحب (B) همان را با دلیل، کارمند، دستگاه، مبلغ و قلم در صندوق می‌بیند؛ «دوباره ثبت با تأییدِ من» از B و
+ *       A هم‌زمان و یک بارِ دیگر ⇐ فروش دقیقاً یک بار روی سرور و هر سه دستگاه (S دو بار کم نمی‌کند)؛ S «دوباره ثبت شد» را
+ *       می‌بیند (`lib/conflict-inbox.js`، مهاجرتِ ۳۱۵). پیش از آن صاحب هیچ راهی در برنامه نداشت و S باید از نو ساخته می‌شد.
+ *       سپس «کنار بگذار» (B) و «اصلاح و ثبت» (فاکتورِ تازهٔ نقدِ A) برای دو فروشِ ردشدهٔ دیگرِ S ⇐ S بی ساختنِ دوباره سند را
+ *       از دفترِ شمرده بیرون می‌برد و کامل در `setAside` نگه می‌دارد (`core/sync/RejectedSettle.kt`، `data/SetAside.kt`):
+ *       موجودی، قرض و جمع‌های هر سه دستگاه دقیقاً همان سرور، هیچ چیزی دوباره نمی‌رود، فاکتورِ اصلاح یک بار شمرده می‌شود،
+ *       تصمیمِ تکراری بی‌اثر. پیش از آن S فروشِ ردشده را تا ابد می‌شمرد (موجودیِ کمتر، قرضِ بیشتر، فروشِ دو بار با «اصلاح»).
+ *   JB7 گوشیِ صاحب از پشتیبانِ خودکارِ اندرویدش روی گوشیِ **دوم** بالا می‌آید (DATA-06، `core/sync/RestoredDevice.kt`):
+ *       در لحظهٔ پشتیبان برگشتی از فاکتورِ نسیه (`$inc` ِ `returnedQty` و `debtSettled`) در صف بود؛ گوشیِ اول همان را
+ *       فرستاد و کار را ادامه داد. گوشیِ دوم شناسه و سریِ خودش را می‌گیرد، فروشِ پیش از ورودش گم نمی‌شود، و پس از
+ *       «بازسازی از سرور» موجودی و قرض درست همان سرورند — هیچ چیزی دو بار نیست، همهٔ دستگاه‌ها یکی. شاهدِ خطر: همان
+ *       پشتیبان با cursor ِ کهنه و شناسهٔ تازه (بی بازسازی) برگشت را دو بار می‌نشاند.
  *
- * پرچم‌ها فقط برای همین دکان: shop.approval_requests، shop.returns.sale_cap، shop.orders، shop.storefront،
+ * پرچم‌ها فقط برای همین دکان: shop.approval_requests، shop.credit_cap (JB6)، shop.returns.sale_cap، shop.orders، shop.storefront،
  * shop.catalog، shop.delivery، shop.owner_report.
  * اجرا:  node test/e2e/run.mjs journeys-b
  */
 import { createRequire } from 'node:module';
 import { boot, assert } from './lib/harness.mjs';
-import { NativeDevice } from './lib/native.mjs';
+import { NativeDevice, core } from './lib/native.mjs';
 import { assertSameEverywhere, serverLedger } from './lib/journey.mjs';
 
 const E = await boot({ name: 'journeys-b' });
@@ -124,9 +137,21 @@ await E.step('JB1', 'برگشت و لغو: شاگرد زیرِ سقف؛ بالا
   await syncAll();
 
   //  S ِ واقعی (دفترِ برگشتِ هم‌زمان را دارد که سرور نپذیرفت) همان نیست ⇒ از سرور دوباره ساخته (نصبِ دوباره)
+  const before = S.user.id;
   S = new NativeDevice(E, 'S-staff-phone', { deviceId: S.deviceId, seller: 'علی' });
+  //  ⛔ ۲.۱۴.۵: نصبِ تازه رازِ دستگاه را ندارد ⇒ شناسهٔ همان گوشی حسابِ پیشین را نمی‌دهد (کدِ ثابت ⇒ «کدِ تازه از
+  //  صاحبِ دکان بگیرید»)؛ کدِ تازهٔ صاحب ⇒ عضوِ تازه با رازِ تازه، هرگز ربودنِ حسابِ پیشین
+  const standing = E.ok(await A.api('GET', '/shop/staff-code'), 'کدِ ثابت').code;
+  await assert.rejects(() => S.loginStaff(standing, 'علی'), (e) => e.code === 'staff_device_unverified');
   const code2 = E.ok(await A.api('POST', '/shop/staff-code', { role: 'staff', maxUses: 1 }), 'کدِ شاگرد', [200, 201]).code;
   await S.loginStaff(code2, 'علی');
+  assert.notEqual(S.user.id, before, 'کدِ تازه حسابِ پیشینِ همان شناسه را نمی‌دهد');
+  assert.ok(S.staffKey, 'رازِ دستگاه نیامد');
+  //  خروج و ورودِ دوباره روی همان نصب: رازِ همان دستگاه ⇒ همان حساب، کدِ یک‌بارِ خودش دوباره خرج نمی‌شود
+  const mine = S.user.id;
+  assert.equal((await S.logout()).blocked, false);
+  await S.loginStaff(code2, 'علی');
+  assert.equal(S.user.id, mine, 'ورودِ دوباره با رازِ دستگاه همان حساب');
   assert.equal((await S.firstSync()).ok, true);
   await S.ensureSeries();
   const t = await assertSameEverywhere('JB1', [A, B, S], {
@@ -346,6 +371,170 @@ await E.step('JB5', 'دو دستگاهِ صاحب، هر دو بی اینترن�
   await B.ensureSeries();
   await syncAll();
   await assertSameEverywhere('JB5', [A, B, S], { expect: { stock: { [oil]: oilBefore } } });
+}, { needs: ['JB.0'] });
+
+/* ═══════════════════════════════ JB6 ═══════════════════════════════ */
+
+await E.step('JB6', 'صندوقِ سندهای ردشده: ردِ قرضِ بالای سقف ⇐ صندوقِ کامپیوترِ صاحب ⇐ دوباره ثبت با تأیید ⇐ فروش دقیقاً یک بار، همه‌جا', async () => {
+  await E.flag(owner.shopId, 'shop.credit_cap', true);
+  E.ok(await A.api('PUT', '/shop/permissions/roles/staff', { perms: { 'sales.credit': { caps: { maxAmount: 50000 } } } }), 'سقفِ قرضِ شاگرد ۵۰۰');
+  const sugar = A.stockIn({ name: 'شکر', price: 400, cost: 300, units: 20 });
+  await syncAll();
+  const debtBefore = A.debt(ahmad);
+
+  //  ۱) شاگرد: ۳ شکر نسیه (۱۲۰۰ قرض) ⇐ رد، با همهٔ همراه‌ها؛ دلیل روی خودِ دستگاه (نشانِ «سرور نپذیرفت»)
+  const s = sale(S, S.sell({ lines: [{ id: sugar, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));
+  await S.sync();
+  assert.equal(S.queue.length, 0);
+  const head = S.dropped.find((x) => x.table === 'sales' && x.row_id === s.saleId);
+  assert.equal(head?.why, 'approval_required', JSON.stringify(S.dropped.map((x) => `${x.table}:${x.why}`)));
+  const mine0 = E.ok(await S.api('GET', '/shop/conflict-inbox/mine'), 'ردیف‌های شاگرد').conflicts.find((c) => c.rowId === s.saleId);
+  assert.deepEqual([mine0?.status, mine0?.reason, mine0?.opId], ['open', 'approval_required', head.op_id]);
+  assert.equal((await S.api('GET', '/shop/conflict-inbox')).status, 403, 'شاگرد صندوقِ صاحب را نمی‌بیند');
+  assert.equal((await serverLedger(A)).sales.filter((x) => x.id === s.saleId).length, 0, 'پیش از تأیید روی سرور نیست');
+
+  //  ۲) کامپیوترِ صاحب (B): همان سند با دلیل، کارمند، دستگاه، مبلغ، قلم و زمان
+  const list = E.ok(await B.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب');
+  const cf = list.conflicts.find((c) => c.doc.rowId === s.saleId);
+  assert.ok(cf, JSON.stringify(list).slice(0, 400));
+  assert.ok(list.open >= 1);
+  assert.deepEqual([cf.reason, cf.perm, cf.device.id, cf.amountMinor, cf.resubmittable], ['approval_required', 'sales.credit', S.replica(), 120000, true]);
+  assert.equal(cf.staff.role, 'staff');
+  assert.deepEqual(cf.items.map((x) => [x.name, x.qtyMilli]), [['شکر', 3000]]);
+  const det = E.ok(await B.api('GET', `/shop/conflict-inbox/${cf.id}`), 'فاکتورِ کامل').conflict;
+  assert.deepEqual([det.invoice.finalMinor, det.invoice.debtMinor, det.invoice.debtor?.name], [120000, 120000, 'احمد']);
+
+  //  ۳) «دوباره ثبت با تأییدِ من» از B و A هم‌زمان، و یک بارِ دیگر (پاسخِ گم‌شده) ⇐ یک فروش
+  const both = await Promise.all([
+    B.api('POST', `/shop/conflict-inbox/${cf.id}/resubmit`, { note: 'مشتریِ همیشگی' }),
+    A.api('POST', `/shop/conflict-inbox/${cf.id}/resubmit`, {}),
+  ]);
+  const verdicts = both.map((r) => (r.status === 200 ? (r.body.duplicate ? 'dup' : 'ok') : r.body?.error?.code));
+  assert.ok(verdicts.includes('ok') && verdicts.every((v) => ['ok', 'dup', 'resubmit_in_progress'].includes(v)), JSON.stringify(verdicts));
+  const again = E.ok(await B.api('POST', `/shop/conflict-inbox/${cf.id}/resubmit`, {}), 'تکرار');
+  assert.equal(again.duplicate, true);
+  assert.equal(again.conflict.status, 'resubmitted');
+  await syncAll();
+
+  const srv = await serverLedger(A);
+  assert.equal(srv.sales.filter((x) => x.id === s.saleId).length, 1, 'سرور: فروش یک بار');
+  assert.equal(srv.saleItems.filter((x) => x.saleId === s.saleId).length, 1);
+  assert.equal(A.debt(ahmad), debtBefore + 1200, 'قرضِ احمد یک بار');
+  const mine1 = E.ok(await S.api('GET', '/shop/conflict-inbox/mine'), 'ردیف‌های شاگرد').conflicts.find((c) => c.rowId === s.saleId);
+  assert.equal(mine1.status, 'resubmitted', 'دستگاهِ شاگرد «دوباره ثبت شد» را می‌بیند');
+  assert.equal(E.ok(await B.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب').conflicts.some((c) => c.id === cf.id), false, 'بسته‌ها از فهرستِ باز بیرون');
+  //  S بی ساختنِ دوباره همان دفترِ سرور را دارد (فروش و قرض روی دفترش بود و opهای دوباره‌ثبت‌شده را دوباره نگرفت)
+  await assertSameEverywhere('JB6', [A, B, S], {
+    expect: { stock: { [sugar]: 17 }, debt: { [ahmad]: debtBefore + 1200 } },
+    dropped: S.dropped.length,
+  });
+  assert.equal(await S.settleRejected(), 0, '«دوباره ثبت» چیزی برای کنار گذاشتن ندارد');
+
+  //  ۴) «کنار بگذار»: شاگرد ۲ شکر نسیه (۸۰۰) ⇐ رد؛ صاحب روی B با دلیل کنار می‌گذارد ⇐ S همان سرور، سند کامل در `setAside`
+  const d = sale(S, S.sell({ lines: [{ id: sugar, qty: 2 }], payment: 'credit', debtorId: ahmad, paid: 0 }));
+  await S.sync();
+  assert.equal(S.stock(sugar), 15, 'پیش از تصمیم: دفترِ S فروشِ ردشده را می‌شمرد');
+  const cfD = E.ok(await B.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب').conflicts.find((c) => c.doc.rowId === d.saleId);
+  E.ok(await B.api('POST', `/shop/conflict-inbox/${cfD.id}/dismiss`, { reason: 'مشتری نخواست' }), 'کنار بگذار');
+  assert.equal(await S.settleRejected(), 1);
+  assert.equal(await S.settleRejected(), 0, 'تصمیمِ تکراری بی‌اثر');
+  const asideD = S.ledger.setAside.find((x) => x.id === cfD.id);
+  assert.deepEqual([asideD.status, asideD.note, asideD.rows.sales.map((x) => x.id)], ['dismissed', 'مشتری نخواست', [d.saleId]]);
+  assert.ok(asideD.rows.saleItems.length === 1 && asideD.rows.transactions.length === 1 && asideD.rows.stockMovements.length === 1, 'همهٔ ردیف‌های سند برای سابقه');
+  assert.equal(S.save(S.ledger), 0, 'هیچ op ای: نه حذف، نه درجِ دوباره');
+  const upload = new Set(core.diff({}, S.ledger).ops.map((o) => `${o.table}/${o.row_id}`));
+  assert.ok(Object.entries(asideD.rows).every(([t, rs]) => rs.every((x) => !upload.has(`${t}/${x.id}`))), 'بارگذاریِ کامل هم سند را نمی‌فرستد');
+  await syncAll();
+  await assertSameEverywhere('JB6 · کنار بگذار', [A, B, S], {
+    expect: { stock: { [sugar]: 17 }, debt: { [ahmad]: debtBefore + 1200 } },
+    dropped: S.dropped.length,
+  });
+
+  //  ۵) «اصلاح و ثبت»: شاگرد ۳ شکر نسیه ⇐ رد؛ صاحب روی A همان را نقد ثبت می‌کند و ردیف «اصلاح شد» با همان فاکتور؛
+  //     S پیش از گرفتنِ فاکتورِ تازه کنار می‌گذارد ⇐ پس از همگام‌سازی فروش یک بار (موجودی ۱۴)، قرض همان
+  const f = sale(S, S.sell({ lines: [{ id: sugar, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));
+  await S.sync();
+  const cfF = E.ok(await A.api('GET', '/shop/conflict-inbox'), 'صندوقِ صاحب').conflicts.find((c) => c.doc.rowId === f.saleId);
+  await A.drain();
+  const fixed = sale(A, A.sell({ lines: [{ id: sugar, qty: 3 }] }));
+  await A.drain();
+  E.ok(await A.api('POST', `/shop/conflict-inbox/${cfF.id}/dismiss`, { reason: 'اصلاح و دوباره ثبت شد', fixedDoc: `sales/${fixed.saleId}` }), 'اصلاح');
+  assert.equal(await S.settleRejected(), 1);
+  assert.equal(S.ledger.setAside.find((x) => x.id === cfF.id).status, 'fixed');
+  await syncAll();
+  assert.equal(await S.settleRejected(), 0);
+  const tf = await assertSameEverywhere('JB6 · اصلاح', [A, B, S], {
+    expect: { stock: { [sugar]: 14 }, debt: { [ahmad]: debtBefore + 1200 } },
+    dropped: S.dropped.length,
+  });
+  assert.equal(S.ledger.sales.filter((x) => x.id === f.saleId || x.id === fixed.saleId).map((x) => x.id).join(), fixed.saleId, 'فاکتورِ اصلاح یک بار، کهنه هیچ');
+  assert.equal(tf.sales, (await serverLedger(A)).sales.filter((x) => x.status !== 'cancelled').length);
+}, { needs: ['JB.0'] });
+
+await E.step('JB7', 'بازیابیِ پشتیبانِ گوشیِ صاحب روی گوشیِ دوم ⇐ شناسه و سریِ تازه، فروشِ پیش از ورود می‌رسد، هیچ چیزی دو بار نیست، همه یکی', async () => {
+  await syncAll();
+  //  دفترِ ردشدهٔ S از JB6 می‌ماند (حلِ «کنار بگذار/اصلاح» آن را در `setAside` می‌برد، از دفترِ رد پاک نمی‌کند) ⇒ این سفر
+  //  باید **هیچ ردِ تازه‌ای** نیاورد: S دقیقاً همان دفتر، سه دستگاهِ دیگر هیچ
+  const book0 = S.dropped.map((x) => x.op_id);
+  const s = sale(A, A.sell({ lines: [{ id: rice, qty: 3 }], payment: 'credit', debtorId: ahmad, paid: 0 }));   // ۹۰۰ قرض
+  await syncAll();
+  const [rice0, tea0, oil0, debt0] = [A.stock(rice), A.stock(tea), A.stock(oil), A.debt(ahmad)];
+
+  //  ۱) لحظهٔ پشتیبان: گوشیِ صاحب بی اینترنت ۱ برنج از همان فاکتورِ نسیه برمی‌گرداند (۳۰۰ از قرض) و ۱ چای می‌فروشد
+  A.offline = true;
+  sale(A, A.returnFlow(s.saleId, { [itemOf(A, s.saleId, rice).id]: { qty: 1 } }, { reason: 'خراب' }));
+  sale(A, A.sell({ lines: [{ id: tea, qty: 1 }] }));
+  const files = A.deviceBackup();
+  assert.ok(files.queue.some((o) => o.table === 'saleItems' && o.fields?.returnedQty?.$inc === 1), 'پشتیبان `$inc` ِ نرفته را دارد');
+
+  //  ۲) پس از پشتیبان: گوشیِ اول همان صف را می‌فرستد و کار را ادامه می‌دهد؛ کامپیوتر هم
+  A.offline = false;
+  await A.drain();
+  sale(A, A.sell({ lines: [{ id: rice, qty: 1 }] }));
+  await B.drain();
+  sale(B, B.sell({ lines: [{ id: tea, qty: 2 }] }));
+  await syncAll();
+  const truth = await serverLedger(A);
+  assert.equal(A.stock(rice, truth), rice0 + 1 - 1);
+
+  //  ۳) شاهدِ خطر: cursor و سایهٔ پشتیبان با شناسهٔ تازه، بی بازسازی ⇒ opهای خودِ گوشیِ اول پس از cursor «دیگری»اند و
+  //     برگشت دو بار می‌نشیند (موجودی +۱، `debtSettled` ِ فاکتور +۳۰۰)
+  const N = NativeDevice.restoredFrom(E, 'A-restored-naive', files, { naive: true });
+  await N.login(owner.email);
+  await N.drain();
+  assert.equal(N.stock(rice) - A.stock(rice, truth), 1, 'شاهد: بی بازسازی برگشت دو بار شمرده می‌شد');
+  assert.equal(N.ledger.sales.find((x) => x.id === s.saleId).debtSettled - truth.sales.find((x) => x.id === s.saleId).debtSettled, 300);
+
+  //  ۴) کدِ امروز: `tohid-sync-v1` با پشتیبان نیامد ⇒ حصار (پایهٔ سایه = دفترِ بازیابی‌شده، «در انتظارِ بازسازی»)
+  const A2 = NativeDevice.restoredFrom(E, 'A2-owner-second-phone', files);
+  assert.equal(A2.restoredRebuild, true, 'KOTLIN.restoredFence');
+  const before = sale(A2, A2.sell({ lines: [{ id: oil, qty: 1 }] }));                   //  پیش از ورود، بی اینترنت
+  assert.ok(A2.queue.some((o) => o.table === 'sales' && o.row_id === before.saleId), 'فروشِ پیش از ورود op شد، «پایه» نشد');
+  await A2.login(owner.email);
+  await A2.ensureSeries();
+  assert.notEqual(A2.replica(), A.replica(), 'دو گوشی، دو شناسه');
+  assert.ok(A2.series && A2.series !== A.series, `سریِ تازه: ${A2.series} / ${A.series}`);
+  await A2.drain();
+  assert.equal(A2.restoredRebuild, false, 'بازسازی شد');
+  assert.equal(A2.stock(rice), A.stock(rice, truth), 'برگشت یک بار');
+  //  فروشِ تازهٔ گوشیِ دوم با سریِ خودش، هرگز زیرِ بلندترین شمارهٔ همان سری
+  const next = sale(A2, A2.sell({ lines: [{ id: rice, qty: 1 }] }));
+  const mine = A2.ledger.sales.find((x) => x.id === next.saleId);
+  assert.equal(mine.series, A2.series);
+  const top = Math.max(0, ...A2.ledger.sales.filter((x) => x.id !== next.saleId && x.series === A2.series).map((x) => x.invoiceNumber || 0));
+  assert.ok(mine.invoiceNumber >= top + 1, `${mine.invoiceNumber} ≥ ${top + 1}`);
+  await A2.drain();
+  await syncAll();
+  await A2.drain();
+  await assertSameEverywhere('JB7', [A, B, S, A2], {
+    expect: {
+      stock: { [rice]: rice0 + 1 - 1 - 1, [tea]: tea0 - 1 - 2, [oil]: oil0 - 1 },
+      debt: { [ahmad]: debt0 - 300 },
+    },
+    dropped: book0.length,
+  });
+  for (const d of [A, B, A2]) assert.deepEqual(d.dropped.map((x) => `${x.table}/${x.row_id}: ${x.why}`), [], `JB7 · ${d.label}: op ِ ردشده`);
+  assert.deepEqual(S.dropped.map((x) => x.op_id), book0, 'JB7 · S: فقط دفترِ ردشدهٔ JB6، هیچ ردِ تازه');
 }, { needs: ['JB.0'] });
 
 await E.finish();

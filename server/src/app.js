@@ -333,6 +333,9 @@ async function createApp({ runMigrations = true } = {}) {
      */
     api.use('/auth', require('./routes/auth'));
     api.use('/auth/:app', require('./routes/app-auth'));
+    //  WEB-15: کارتِ ویترین (`PUT /sync/v1/photos/:productId/thumb`) — فقط دکان، جدا از `routes/sync-v1.js` ِ مشترک با
+    //  پمپ؛ پیش از آن و فقط همان یک در (زنجیره روی خودِ در، نه `router.use`) ⇒ هیچ درخواستِ دیگری از آن نمی‌گذرد
+    api.use('/sync/v1', require('./routes/sync-photo-thumbs'));
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));
@@ -432,8 +435,12 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/staff-scope', require('./routes/staff-scope'));
     //  STF-02: «درخواستِ تأیید» از راهِ دور (شاگرد می‌پرسد، صاحب/مدیر روی دستگاهِ خودش) — پشتِ `shop.approval_requests`، پیش‌فرض خاموش
     api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
+    //  صندوقِ سندهای ردشده (DATA-SAFETY، مهاجرتِ ۳۱۵): صاحب/مدیر می‌بیند، دوباره ثبت می‌کند یا کنار می‌گذارد؛ دستگاهِ سازنده ردیفِ خودش را — بی پرچم
+    api.use('/shop/conflict-inbox', require('./routes/shop-conflict-inbox'));
     //  STF-01: نقشِ سفارشی (نام + نقشِ پایه + لایهٔ مجوز؛ اجرا در `staff-perms.layersFor`) — پشتِ `shop.custom_roles`، پیش‌فرض خاموش
     api.use('/shop/custom-roles', require('./routes/shop-custom-roles'));
+    //  دستگاه‌های شناختهٔ کارمندان (رازِ دستگاهِ ورود با کد): فهرست، «باطل کردنِ این دستگاه»، «خروج از همه» ِ یک عضو — مهاجرتِ ۳۴۵
+    api.use('/shop/staff-keys', require('./routes/shop-staff-keys'));
     //  موتورِ تازهٔ موجودیِ برنامهٔ دکان (#315) — فقط خواندنِ پرچمِ `shop.stock_v2`، پیش‌فرض خاموش
     api.use('/shop/stock-ledger', require('./routes/shop-stock-ledger'));
     //  پرداختِ درگاهی (حساب‌پی، PAY-21) — درِ دکان پیش از `/shop`، پشتِ پرچمِ خاموشِ `pay.hesabpay`؛
@@ -445,6 +452,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/admin/payments', require('./routes/admin-payments'));
     //  SEC-10: حذفِ دادهٔ شخصیِ مشتری به درخواستِ صاحبِ دکان — پشتِ `shop.customer_erasure`، پیش‌فرض خاموش
     api.use('/shop/customer-erasure', require('./routes/shop-customer-erasure'));
+    //  CRM-15: «چه کسی این پرونده را دید» (سابقهٔ دسترسی) — فقط `audit.view`/صاحب، بی پرچم (سپرِ حریم، نه رفتارِ تازه)
+    api.use('/shop/customer-access', require('./routes/shop-customer-access'));
     //  AI-11: «جست‌وجو با عکس» (کالاهای مشابهِ همان دکان) — پشتِ `shop.visual_search`، پیش‌فرض خاموش
     api.use('/shop/visual-search', require('./routes/shop-visual-search'));
     api.use('/shop', require('./routes/shop'));
@@ -720,6 +729,8 @@ async function createApp({ runMigrations = true } = {}) {
     require('./lib/shop-chat').sweep().catch(err => console.error('[shop-chat]', err.message));
     //  RPT-14: روزهای کهنه‌تر از ۹۲ روزِ «جست‌وجوی بی‌نتیجه» (پرچم خاموش ⇒ جدولِ خالی)
     require('./lib/order-online-report').sweep().catch(err => console.error('[online-report]', err.message));
+    //  CRM-15: سابقهٔ دسترسی فقط اگر CUSTOMER_ACCESS_RETENTION_DAYS > 0 (۰ = همان `audit_logs`: سرور پاک نمی‌کند)
+    require('./lib/customer-access').sweep().catch(err => console.error('[customer-access]', err.message));
     subs.expireDue().catch(err => console.error('[subscriptions]', err.message));
     //  خبر دادن به کسی که اشتراکش دارد تمام می‌شود — پیش از آنکه قفل
     //  شود، نه بعدش. هر آستانه فقط یک بار، پس تکراری نمی‌رود.

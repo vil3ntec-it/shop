@@ -189,6 +189,8 @@ object StrStock {
   /** INV-02 — کاربرِ ثبت‌کنندهٔ حرکت */
   fun moveBy(name: Any): String = t("کاربر: ${asIs(name)}", "By $name", "کارن: $name")
   val noMovements: String get() = t("هنوز حرکتی برای این کالا ثبت نشده", "No movements recorded for this item yet", "د دې توکي لپاره تر اوسه خوځښت نه دی ثبت شوی")
+  /** INV-10: ردیفِ سابقهٔ فروشِ پیش از شمارش که پس از ثبتِ شمارش رسید (`CountAbsorbWiring.historyRows`) */
+  val countAbsorbed: String get() = t("پیش از شمارش ثبت شده بود — در شمارش آمده است", "Recorded before the count — already in the counted number", "له شمېرنې مخکې ثبت شوی و — په شمېرنه کې راغلی دی")
 
   // ورود از فایل
   val importTitle: String get() = t("ورود کالا از فایل", "Import items", "له دوتنې توکي راوړل")

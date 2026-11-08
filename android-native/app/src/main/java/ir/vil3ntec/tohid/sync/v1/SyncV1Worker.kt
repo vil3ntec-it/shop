@@ -98,6 +98,12 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
       if (!ok) return Result.retry()
     }
 
+    //  DATA-06: حالِ این حساب از پشتیبانِ گوشیِ دیگر آمد ⇒ پیش از هر هم‌ترازی و Pull یک بار «بازسازی از سرور» (صف اول)؛
+    //  نشد ⇒ هیچ چیزی عوض نشده، دورِ بعد دوباره (`V1Replica.rebuildRestored`)
+    if (V1Replica.restoredPending(app) && !runCatching { V1Replica.rebuildRestored(app, store) }.getOrDefault(false)) {
+      return Result.retry()
+    }
+
     //  یک بار در عمرِ هر حساب روی این دستگاه؛ شکستش (نت) دورِ عادی را نمی‌گیرد
     //  ⛔ `read` دفترِ همین لحظهٔ دیسک است (`ledgerNow`)، نه دفتری که این نمونه هنگامِ `load` خواند:
     //  نشاندنِ opها روی آن فروشی را که صفحه در این فاصله ثبت کرد از دیسک پاک می‌کرد
@@ -119,7 +125,11 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
    *  چیزی نوشت، op ِ آن با همان `SyncV1Worker.now` ِ هر ذخیره در دورِ بعد می‌رود؛ دورِ بعد
    *  دیگر کاری ندارد. شکستش دورِ همگام‌سازی را نمی‌گیرد.
    */
-  private suspend fun sweepAfterPull(store: ShopStore) = store.sweepMergedQuietly()
+  private suspend fun sweepAfterPull(store: ShopStore) {
+    store.sweepMergedQuietly()
+    //  سندِ ردشدهٔ همین دستگاه که صاحب «کنار گذاشت»/«اصلاح کرد» ⇒ بیرون از دفترِ شمرده (`data/SetAside`)؛ شکستش دور را نمی‌گیرد
+    runCatching { ir.vil3ntec.tohid.data.SetAsideSync.afterSync(applicationContext, store) }
+  }
 
   companion object {
     private const val PERIODIC = "tohid-sync-v1-periodic"

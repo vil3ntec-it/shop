@@ -143,6 +143,8 @@ private fun DeskSpan.label() = when (this) {
 @Composable
 fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Unit = {}) {
   val context = LocalContext.current
+  //  CRM-15: چاپ یا اکسلِ برگه (کلیدِ `ReportCsv`) — برگهٔ مشتریان ⇐ «چه کسی پرونده را دید» (`AnalyticsRoutes`)
+  val onExport = ir.vil3ntec.tohid.ui.screens.LocalReportExport.current
   //  RPT-14: «گزارشِ فروشِ اینترنتی» فقط با پرچمِ روشنِ سرور
   val online = rememberOnlineReportVisible()
   //  RPT-18: «گزارشِ همهٔ شعبه‌ها» فقط با پرچمِ روشنِ سرور و فقط برای صاحب
@@ -196,10 +198,10 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
     else ReportCsv.compared(rep.key, base, ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate), StrReach.prevColumn, StrReach.changeColumn)
   }
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
-  fun print() { if (rep != DeskRep.ASK) ReportPrint.print(context, sheet, sheet.name) }
+  fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }
   fun excel() {
     if (rep == DeskRep.ASK) return
-    Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { scope.launch { snackbar.showSnackbar(StrReports.savedTo(it)) } }
+    Platform.saveFile("${sheet.name}.xlsx", Xlsx.of(sheet))?.let { onExport(rep.key); scope.launch { snackbar.showSnackbar(StrReports.savedTo(it)) } }
   }
   val shifting = keys && rep.ranged && span != DeskSpan.CUSTOM
   fun step(by: Int) { if (ReportKeys.can(span.name, baseFrom, baseTo, shift + by, today)) shift += by }

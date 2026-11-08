@@ -13,6 +13,9 @@ import platform.darwin.dispatch_time
  *  `removeCallbacksAndMessages(null)` کارهای مانده‌ی همین Handler را بی‌اثر می‌کند (مثلِ اندروید).
  */
 class Looper private constructor() {
+  /** همان `Looper.isCurrentThread` ِ اندروید: رشتهٔ اصلیِ UIKit — `ShadowStore.onMainThread` */
+  val isCurrentThread: Boolean get() = platform.Foundation.NSThread.isMainThread
+
   companion object {
     private val main = Looper()
     fun getMainLooper(): Looper = main

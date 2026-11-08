@@ -24,11 +24,13 @@
 const { query, one, now, tx } = require('../db');
 const core = require('./stock-core');
 const stock = require('./stock');
+const absorbLedger = require('./count-absorb-ledger');
 const { toMinor, toMilli } = require('./sync-v3-convert');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
 
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
-const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems', 'auditLog'];
+//  `stockMovements` فقط برای INV-10 (`count-absorb-ledger.collect`): موجودی همچنان از ورود و فروش است
+const DEVICE_TABLES = ['products', 'warehouseEntries', 'sales', 'saleItems', 'auditLog', 'stockMovements'];
 //  از `auditLog` فقط گام‌های انتقال (INV-11، `stock-transfers.ingestDevice`)؛ بقیهٔ سابقه هرگز خوانده نمی‌شود
 const DEVICE_ROWS = "(table_name <> 'auditLog' OR data->>'type' = 'stock_transfer')";
 const PAGE = 5000;
@@ -134,9 +136,10 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   let moves = 0;
   const transfers = { applied: 0, refused: 0 };
   const touched = new Set();
+  const counted = new Set();   //  INV-10: کالاهایی که ردیفِ شمارش یا حرکتِ دستگاهشان در این خواندن عوض شد
   for (;;) {
     const page = (await c.query(
-      `SELECT table_name, row_id, data, deleted_at, updated_seq FROM ${T}
+      `SELECT table_name, row_id, data, deleted_at, updated_seq, created_at FROM ${T}
         WHERE ${ACC} AND table_name = ANY($2::text[]) AND ${DEVICE_ROWS} AND updated_seq > $3
         ORDER BY updated_seq, table_name, row_id LIMIT $4`,
       [shopId, DEVICE_TABLES, wm, PAGE]
@@ -245,6 +248,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
         }
       }
     }
+    for (const pid of await absorbLedger.collect(c, shopId, rows, rd, at)) counted.add(pid);
     //  INV-11: گام‌های انتقالِ بی‌اینترنت پس از ورود و فروشِ همین صفحه، به ترتیبِ رسیدن (یک بار برای هر ردیف)
     if (steps.length) {
       const x = await require('./stock-transfers').ingestDevice(c, shopId, steps, settings, at);
@@ -260,6 +264,8 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
      ON CONFLICT (shop_id) DO UPDATE SET source=excluded.source, watermark=excluded.watermark, last_run_at=excluded.last_run_at`,
     [shopId, fmt, wm, at]
   );
+  //  INV-10: فروشِ پیش از شمارش که پس از ثبتِ شمارش رسید دوباره کم نمی‌شود (پرچمِ `shop.count_absorb`)
+  for (const pid of await absorbLedger.settle(c, shopId, settings, at, counted)) { touched.add(pid); moves += 1; }
   if (touched.size) await stock.checkProducts(c, shopId, [...touched].sort(), settings, at);
   return { products, moves, source: fmt, retired: retiredNow, ...(transfers.applied || transfers.refused ? { transfers } : {}) };
 }
@@ -298,21 +304,45 @@ const REFRESH_THROTTLE_MS = (() => {
   return Number.isSafeInteger(v) && v >= 0 ? v : 500;
 })();
 const lastCheck = new Map();
+/** خواندنِ ویترینی که همین حالا در همین فرایند برای هر دکان در جریان است (`refresh` با `maxAgeMs`) */
+const inflight = new Map();
 
 /**
  * همگام‌سازیِ کاتالوگ در تراکنشِ خودش. `maxAgeMs` (خواندنِ ویترین/بازار) ⇒ فقط وقتی
  * دفترِ دستگاه‌ها ردیفِ تازه دارد خوانده می‌شود، و برای هر دکان حداکثر هر
  * [REFRESH_THROTTLE_MS] یک بار پرسیده می‌شود؛ پس فروشِ رسیده حداکثر همین‌قدر بعد در
  * ویترین است و خواندنِ پیاپیِ بی‌تغییر بار ندارد.
+ *
+ * ⛔ خواندنِ هم‌زمان (ویترین از #1010 کالاها، دکان و برجسته‌ها را با هم می‌خواهد): درخواستی که در
+ * پنجرهٔ [REFRESH_THROTTLE_MS] می‌رسد و خواندنِ همان دکان هنوز تمام نشده، **منتظرِ همان** می‌ماند
+ * و نه بی‌صبر رد می‌شود — وگرنه کالایی که همین حالا رسیده پیش از کامیت خوانده می‌شود و «قابلِ سفارش
+ * نیست» (`unavailable`) می‌گیرد. خطای آن خواندن به این درخواست نمی‌رسد (همان رفتارِ «رد شد» ِ پیشین).
  */
 async function refresh(shopId, { full = false, maxAgeMs = 0, at = now(), throttle = true } = {}) {
   if (maxAgeMs > 0 && !full) {
     const t = Date.now();
-    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) return { skipped: true, throttled: true };
+    if (throttle && t - (lastCheck.get(shopId) || 0) < REFRESH_THROTTLE_MS) {
+      const running = inflight.get(shopId);
+      if (running) await running.catch(() => {});
+      return { skipped: true, throttled: true, ...(running ? { joined: true } : {}) };
+    }
     lastCheck.set(shopId, t);
     if (lastCheck.size > 10_000) lastCheck.clear();
-    if (!(await hasNewer(shopId))) return { skipped: true };
+    const run = (async () => {
+      if (!(await hasNewer(shopId))) return { skipped: true };
+      return ingest(shopId, at, full);
+    })();
+    inflight.set(shopId, run);
+    try {
+      return await run;
+    } finally {
+      if (inflight.get(shopId) === run) inflight.delete(shopId);
+    }
   }
+  return ingest(shopId, at, full);
+}
+
+async function ingest(shopId, at, full) {
   const out = await tx(async (c) => ingestTx(c, shopId, at, await stock.settingsOf(shopId, c), { full }));
   await afterIngest(shopId, out);
   return out;

@@ -263,3 +263,61 @@ test('پرچم خاموش ⇒ همان پاسخ‌ها و هیچ ردیف و ا�
   const after = await h.get('/api/me/notices', { token: s.token });
   assert.deepEqual({ ...after.body, serverTime: 0 }, { ...before.body, serverTime: 0 });
 });
+
+/*
+ *  RPT-03 — سودِ ناخالص با میانگینِ موزونِ متحرک (D-23) فقط پشتِ پرچمِ جدای `shop.owner_report.profit`.
+ *  دو خرید به دو قیمت پیش از بازه، یک فروشِ دیروز، یک فروشِ امروز و یکی پس از ساعتِ گزارش:
+ *  ۲۰ عدد به ارزشِ ۲۳۰۰ ⇒ دیروز ۵ عدد = ۵۷۵ ⇒ ۱۵ عدد به ۱۷۲۵ ⇒ امروز ۳ عدد = ۳۴۵؛ فروشِ امروز ۴۵۰ ⇒ سود ۱۰۵
+ *  (قیمتِ روی قلم ۳ × ۱۳۰ = ۳۹۰ ⇒ ۶۰ می‌داد). فروشِ ۲۱:۳۰ نه در فروش است، نه در بها.
+ */
+async function seedCost(s) {
+  await row(s, 'warehouseEntries', 'w1', { productId: 'p1', units: 10, price: 100, createdAt: local(-48), date: '' });
+  await row(s, 'warehouseEntries', 'w2', { productId: 'p1', units: 10, price: 130, createdAt: local(-30), date: '' });
+  await sale(s, 'y1', 750, local(-5));
+  await row(s, 'saleItems', 'yi1', { saleId: 'y1', productId: 'p1', quantity: 5, unitPrice: 150, purchasePrice: 130, totalPrice: 750 });
+  await sale(s, 't1', 450, local(10));
+  await row(s, 'saleItems', 'ti1', { saleId: 't1', productId: 'p1', quantity: 3, unitPrice: 150, purchasePrice: 130, totalPrice: 450 });
+  await sale(s, 't2', 150, local(21, 30));
+  await row(s, 'saleItems', 'ti2', { saleId: 't2', productId: 'p1', quantity: 1, unitPrice: 150, purchasePrice: 130, totalPrice: 150 });
+}
+
+test('RPT-03: سودِ ناخالص با میانگینِ موزون فقط با پرچمِ shop.owner_report.profit؛ خاموش ⇒ خلاصه و متن همان پیشین', async () => {
+  const off = await shop('بی‌سود');
+  const on = await shop('با‌سود');
+  const r1 = await h.put('/api/admin/pump/live-config', { scope: on.shopId, key: rep.PROFIT_FLAG, value: true }, { token: admin });
+  assert.equal(r1.status, 200, JSON.stringify(r1.body));
+  for (const s of [off, on]) {
+    assert.equal((await putSettings(s, { active: true, hour: 21, channels: ['inapp'] })).status, 200);
+    await seedCost(s);
+  }
+  await rep.sweep(local(21, 5));
+  const [a] = await reportsOf(off);
+  const [b] = await reportsOf(on);
+  assert.equal(a.status, 'sent', a.error);
+  assert.equal(b.status, 'sent', b.error);
+  //  خاموش: هیچ کلیدِ تازه‌ای، هیچ سطرِ تازه‌ای
+  assert.equal('profit' in a.summary, false);
+  assert.equal(rep.render(a.summary).body.includes('سود'), false);
+  const { profit, ...rest } = b.summary;
+  assert.deepEqual(rest, a.summary);
+  assert.equal(a.summary.netSales, 45000);
+  assert.deepEqual(profit, { costing: 'mavg', cogs: 34500, grossProfit: 10500, marginBp: 2333, costEstimatedLines: 0, approximate: false });
+  const body = rep.render(b.summary).body;
+  const af = (minor) => require('../src/lib/text-core').formatAfghani(Math.round(minor / 100), '', 'fa');
+  assert.ok(body.includes(`خالص: ${af(45000)}\nسودِ ناخالص: ${af(10500)}`), body);
+  //  «همهٔ شعبه‌ها» سود نمی‌خواهد ⇒ همان خلاصهٔ بی سود
+  const w = { from: '2026-10-31', to: '2026-10-31', fromAt: MIDNIGHT, until: local(21), frequency: 'daily' };
+  assert.equal('profit' in (await rep.buildSummary(on.shopId, w, ZONE)), false);
+  assert.equal((await rep.buildSummary(on.shopId, w, ZONE, { profit: true })).profit.grossProfit, 10500);
+});
+
+test('RPT-03: قلمِ بی هیچ بها (فروش پیش از هر ورودِ انبار) ⇒ «تقریبی»، نه سودِ قطعی', async () => {
+  const s = await shop('بی‌بها');
+  assert.equal((await h.put('/api/admin/pump/live-config', { scope: s.shopId, key: rep.PROFIT_FLAG, value: true }, { token: admin })).status, 200);
+  await sale(s, 'n1', 200, local(10));
+  await row(s, 'saleItems', 'ni1', { saleId: 'n1', productId: 'q1', quantity: 2, unitPrice: 100, purchasePrice: 0, totalPrice: 200 });
+  const w = { from: '2026-10-31', to: '2026-10-31', fromAt: MIDNIGHT, until: local(21), frequency: 'daily' };
+  const sum = await rep.buildSummary(s.shopId, w, ZONE, { profit: true });
+  assert.deepEqual(sum.profit, { costing: 'mavg', cogs: 0, grossProfit: 20000, marginBp: 10000, costEstimatedLines: 1, approximate: true });
+  assert.match(rep.render(sum).body, /سودِ ناخالص \(تقریبی\): /);
+});

@@ -22,8 +22,13 @@ class SyncStore(context: Context) {
 
   val deviceUid: String
     get() = prefs.getString(DEVICE, null) ?: newDeviceUid().also {
-      prefs.edit().putString(DEVICE, it).apply()
+      //  DATA-06: شناسهٔ تازه روی ردِ کارِ پیشین (دفترِ صاحب‌دار، صف) = پشتیبانِ دستگاهِ دیگر — با همان `commit` (`RestoredDevice`)
+      prefs.edit().putString(DEVICE, it).putLong(RESTORED_AT, ir.vil3ntec.tohid.sync.v1.V1Replica.mintedOver(app)).commit()
     }
+
+  /** DATA-06: زمانی که [deviceUid] روی ردِ کارِ پیشین ساخته شد (بازیابی روی دستگاهِ دیگر)؛ ۰ ⇒ نه */
+  val restoredAt: Long
+    get() = prefs.getLong(RESTORED_AT, 0L)
 
   /**
    *  توکن‌ها — رمزشده در `TokenStore`، نه اینجا.
@@ -325,6 +330,7 @@ class SyncStore(context: Context) {
     const val CREATED = "account_created"
     const val ACCOUNT_ID = "account_id"
     const val REPLICA_OWNER = "replica_owner"
+    const val RESTORED_AT = "restored_at"
     const val LOCK_ASKED = "lock_asked"
     const val LICENSE = "license"
     const val OFFLINE_CODE = "offline_code"

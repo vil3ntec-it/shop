@@ -7,6 +7,10 @@
  *           کنونی جمع‌شده می‌مانند (`<details>`)؛ پیام‌های دورِ پیشینِ گفت‌وگوی عمومی هم.
  *   بسته ── سفارشِ تمام‌شده ⇒ فقط خواندن؛ تا مهلتِ سرور «مشکل دارم» همان رشته را باز می‌کند. عمومیِ بی‌کار ⇒
  *           «گفت‌وگوی تازه». تصمیم فقط با سرور (`life`)؛ ۴۰۹ ِ سرور ⇒ خواندنِ دوباره، نه حدس.
+ *   وضعیت ── پیامِ خودم «رفت / رسید / خوانده شد» فقط از `status` ِ سرور و رسیدِ واقعیِ دکان (`receipts.peer*Seq`)؛
+ *           هرگز جلوتر و هرگز عقب (CHAT-04). پیامِ در صف حبابی ندارد ⇒ وضعیتِ جعلی هم ندارد.
+ *   حذف ── «حذف برای من» هر پیام؛ «حذف برای همه» فقط پیامِ زندهٔ خودم، تا `deleteUntil` ِ سرور و نه در رشتهٔ بسته
+ *           (#907). هر دو با پرسشِ تأیید؛ دکمه‌ها تا پاسخ خاموش (دوبار زدن یک درخواست)؛ سرور باز هم می‌سنجد (CHAT-08).
  * ⛔ هر متن فقط با textContent (`K.el`)؛ عکس با بلیت خوانده و data: می‌شود (CSP: img-src 'self' data:).
  * ⛔ شماره فقط با کدِ یک‌بارمصرف (`/verify`)؛ بلیتِ منقضی ⇒ همان فرمِ تأیید.
  * ⛔ پیامِ صوتی (CHAT-07): هیچ بایتی پیش از «پخش»؛ بایت با بلیت از همان درِ رسانه و پخش از blob: ِ همین صفحه
@@ -26,6 +30,8 @@
     var api = ctx.api;
     var base = '/api/store/' + encodeURIComponent(ctx.slug);
     var conv = null; var cursor = 0; var msgs = {}; var loop = 0; var want = null; var sheet = null;
+    //  info[شناسه] = { m, cid, li, more, sp, st } — پیامِ نشان‌داده؛ acting = نوارِ کارهای بازِ یک پیام؛ inflight = حذفِ در راه
+    var info = {}; var acting = null; var inflight = {};
     //  پیامِ در راه { conv, body, key, wait } — تا رسیدن با همان شناسه (CHAT-02/11)؛ retry = زمان‌سنجِ تلاشِ دوباره
     var out = null; var retry = 0;
     //  عکسِ در راه { conv, key, main, thumb, w, h, thumbId, mainId, xhr, wait } و سقف‌های سرور (`limits` ِ گشودن)
@@ -117,12 +123,15 @@
     }
     function title(c) { return c.orderNo ? t('ct.order', { n: K.fa(c.orderNo, 0) }) : t('ct.general'); }
     function show(c, fresh) {
-      if (fresh || !conv || conv.id !== c.id) { conv = c; cursor = 0; msgs = {}; K.clear($('ct-list')); K.clear($('ct-old-list')); prev(); }
+      if (fresh || !conv || conv.id !== c.id) {
+        conv = c; cursor = 0; msgs = {}; info = {}; acting = null; inflight = {};
+        K.clear($('ct-list')); K.clear($('ct-old-list')); prev();
+      }
       if (ph && ph.conv !== c.id) phDrop();   //  عکسِ آمادهٔ رشتهٔ دیگر به این رشته نمی‌رود
       conv = c;
       $('ct-title').textContent = title(c);
       state();
-      if (fresh) poll(++loop);
+      if (fresh) poll(++loop, true);
     }
     function state() {
       var l = conv.life || { state: 'open' };
@@ -136,6 +145,8 @@
       else if (l.state === 'reopened') K.note(box, 'info', t('ct.st.reopened'));
       else if (!conv.canSend) K.note(box, 'warn', t('ct.st.blocked'));
       else box.hidden = true;
+      refresh();
+      ticks();
     }
 
     // ── رشته‌های پیشینِ همین شماره (جمع‌شده) ──
@@ -164,18 +175,151 @@
 
     // ── پیام‌ها ──
     function put(list, m, cid) {
-      if (m.hidden) { var gone = msgs[m.id]; if (gone && gone.parentNode) gone.parentNode.removeChild(gone); return; }
-      var li = el('li', { class: 'ct-msg ' + (m.sender === 'customer' ? 'mine' : 'shop') });
+      var old = msgs[m.id]; var was = info[m.id];
+      //  همان نسخه (پاسخِ حذف و long-poll هر دو) ⇒ فقط وضعیت؛ حباب و تمرکز دست نمی‌خورند
+      if (was && old && old.parentNode && !m.hidden && Number(m.rev) === Number(was.m.rev) && Boolean(m.deleted) === Boolean(was.m.deleted)) {
+        if ((RANK[m.status] || 0) > (RANK[was.m.status] || 0)) was.m.status = m.status;
+        if (was.sp) tick(was);
+        return;
+      }
+      //  نوارِ بازِ همین پیام با نسخهٔ تازه بسته می‌شود؛ تمرکزِ درونِ حباب به دکمهٔ تازه (یا کادر) می‌رود
+      var had = acting && acting.id === m.id ? acting : null;
+      var focusIn = Boolean((had && had.box.contains(document.activeElement)) || (old && old.contains(document.activeElement)));
+      if (had) acting = null;
+      if (m.hidden) {
+        if (old && old.parentNode) old.parentNode.removeChild(old);
+        delete msgs[m.id]; delete info[m.id];
+        if (focusIn) home();
+        return;
+      }
+      var mine = m.sender === 'customer';
+      var li = el('li', { class: 'ct-msg ' + (mine ? 'mine' : 'shop'), attrs: { 'data-id': m.id } });
       if (m.deleted) li.appendChild(el('p', { class: 'muted', text: t('ct.deleted') }));
       else {
         if (m.kind === 'image' && m.media) li.appendChild(photo(cid, m.media, m.sender === 'customer'));
         if (m.kind === 'audio' && m.media) li.appendChild(voice(cid, m));
         if (m.body) li.appendChild(el('p', { text: m.body }));
       }
-      li.appendChild(el('small', { class: 'muted num', text: K.clock(m.createdAt) }));
-      var old = msgs[m.id];
+      var x = { m: m, cid: cid, li: li, more: null, sp: null, st: was && !m.deleted ? was.st : null };
+      var meta = el('div', { class: 'ct-meta' }, el('small', { class: 'muted num', text: K.clock(m.createdAt) }));
+      if (mine && !m.deleted) { x.sp = el('small', { class: 'muted ct-st' }); meta.appendChild(x.sp); }
+      //  کار فقط روی پیامِ همین رشته (رشته‌های پیشین فقط خواندنی‌اند)
+      if (conv && cid === conv.id) {
+        x.more = el('button', { class: 'ct-more', attrs: { type: 'button', 'aria-label': t('ct.act'), 'aria-expanded': 'false' },
+          on: { click: function () { if (acting && acting.id === m.id) shut(true); else bar(m.id, null, '', true); } } }, K.icon('more'));
+        meta.appendChild(x.more);
+      }
+      li.appendChild(meta);
       if (old && old.parentNode) old.parentNode.replaceChild(li, old); else list.appendChild(li);
-      msgs[m.id] = li;
+      msgs[m.id] = li; info[m.id] = x;
+      if (x.sp) tick(x);
+      if (focusIn) { if (x.more) x.more.focus(); else home(); }
+    }
+
+    // ── وضعیتِ پیامِ خودم (CHAT-04): «رفت» = سرور دارد؛ «رسید/خوانده شد» فقط با رسیدِ خودِ دکان؛ هرگز عقب ──
+    var RANK = { sent: 1, delivered: 2, read: 3 };
+    function tick(x) {
+      var r = (conv && x.cid === conv.id && conv.receipts) || {};
+      var seq = Number(x.m.seq) || 0;
+      var s = RANK[x.m.status] ? x.m.status : 'sent';
+      if (seq && seq <= (Number(r.peerReadSeq) || 0)) s = 'read';
+      else if (seq && seq <= (Number(r.peerDeliveredSeq) || 0) && RANK[s] < 2) s = 'delivered';
+      if (x.st && RANK[x.st] > RANK[s]) s = x.st;
+      x.st = s;
+      if (x.sp.getAttribute('data-st') === s) return;
+      x.sp.setAttribute('data-st', s);
+      x.sp.textContent = t(s === 'read' ? 'ct.mk.read' : s === 'delivered' ? 'ct.mk.delivered' : 'ct.mk.sent');
+    }
+    function ticks() { Object.keys(info).forEach(function (id) { if (info[id].sp) tick(info[id]); }); }
+
+    // ── حذف (CHAT-08): نوارِ کارها درونِ همان حباب؛ پرسشِ تأیید؛ تا پاسخ همه خاموش ──
+    K.ICONS.more = 'M6.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z M13.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z M20.5 12a1.5 1.5 0 1 1-3 0 1.5 1.5 0 0 1 3 0z';
+    function home() { var f = $('ct-form').hidden ? $('ct-close') : $('ct-text'); if (f) f.focus(); }
+    function canAll(x) {
+      var l = (conv && conv.life) || {};
+      return Boolean(conv) && x.cid === conv.id && x.m.sender === 'customer' && !x.m.deleted && l.state !== 'closed' &&
+        (Number(x.m.deleteUntil) || 0) > Date.now();
+    }
+    function why(x) {
+      if (x.m.sender !== 'customer' || x.m.deleted) return '';
+      return ((conv && conv.life) || {}).state === 'closed' ? t('err.chat_closed') : t('err.delete_window_passed');
+    }
+    function shut(focus) {
+      var a = acting; if (!a || a.busy) return;
+      acting = null;
+      if (a.box.parentNode) a.box.parentNode.removeChild(a.box);
+      var x = info[a.id];
+      if (x) { x.li.classList.remove('acting'); if (x.more) { x.more.setAttribute('aria-expanded', 'false'); x.more.removeAttribute('aria-controls'); if (focus) x.more.focus(); } }
+    }
+    /** ask: null (فهرست) | 'me' | 'all' (پرسشِ تأیید)؛ note: خطا/دلیل؛ focus: تمرکز به نخستین دکمه */
+    function bar(id, ask, note, focus) {
+      var x = info[id];
+      if (!x || !x.more || !x.li.parentNode) return;
+      if (acting && acting.id !== id) { if (acting.busy) return; shut(false); }
+      if (acting && acting.busy) return;
+      if (ask === 'all' && !canAll(x)) { ask = null; note = note || why(x); }
+      var box = acting ? K.clear(acting.box) : el('div', { class: 'ct-acts', attrs: { id: 'ct-a-' + id, role: 'group', 'aria-label': t('ct.act') } });
+      acting = { id: id, box: box, ask: ask, busy: false };
+      var first;
+      if (!ask) {
+        first = el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-del': 'me' }, text: t('ct.del.me'), on: { click: function () { bar(id, 'me', '', true); } } });
+        box.appendChild(first);
+        if (canAll(x)) box.appendChild(el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-del': 'all' }, text: t('ct.del.all'), on: { click: function () { bar(id, 'all', '', true); } } }));
+      } else {
+        first = el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-no': '' }, text: t('no'), on: { click: function () { bar(id, null, '', true); } } });
+        var yes = el('button', { class: 'btn btn-danger btn-sm', attrs: { type: 'button', 'data-yes': ask }, text: t('ct.del.yes'), on: { click: function () { drop(id, ask); } } });
+        box.appendChild(el('p', { class: 'ct-q', text: t(ask === 'all' ? 'ct.del.all.q' : 'ct.del.me.q') }));
+        box.appendChild(el('div', { class: 'row' }, first, yes));
+      }
+      if (note) { var n = el('div', { attrs: { role: 'alert' } }); K.note(n, 'err', note); box.appendChild(n); }
+      if (!box.parentNode) x.li.appendChild(box);
+      x.li.classList.add('acting');
+      x.more.setAttribute('aria-expanded', 'true');
+      x.more.setAttribute('aria-controls', box.id);
+      if (focus) first.focus();
+    }
+    //  رشته بسته شد یا مهلت گذشت (long-poll، خواندنِ دوباره) ⇒ «حذف برای همه» از نوارِ باز می‌رود، با دلیل
+    function refresh() {
+      if (!acting || acting.busy || acting.ask === 'me') return;
+      var x = info[acting.id];
+      if (!x || !x.li.parentNode) { acting = null; return; }
+      var shown = acting.ask === 'all' || Boolean(acting.box.querySelector('[data-del="all"]'));
+      if (shown !== canAll(x)) bar(x.m.id, acting.ask, shown ? why(x) : '', acting.box.contains(document.activeElement));
+    }
+    function drop(id, scope) {
+      var x = info[id]; var a = acting;
+      if (!x || !a || a.id !== id || a.busy) return;
+      if (scope === 'all' && !canAll(x)) { bar(id, null, why(x), true); return; }
+      var key = id + ':' + scope;
+      if (inflight[key]) return;
+      inflight[key] = true; a.busy = true;
+      [].forEach.call(a.box.querySelectorAll('button'), function (b) { b.disabled = true; });
+      var cid = x.cid;
+      api(path(cid, '/messages/' + encodeURIComponent(id) + '?for=' + scope), { method: 'DELETE' }).then(function (r) {
+        delete inflight[key]; a.busy = false;
+        if (!conv || conv.id !== cid || !r.message) return;
+        //  دکمهٔ خاموش‌شده تمرکز را به body می‌دهد ⇒ تمرکز به دکمهٔ کارهای سنگِ قبر، یا کادرِ نوشتن
+        var lost = a.box.contains(document.activeElement) || document.activeElement === document.body;
+        put(x.li.parentNode || $('ct-list'), r.message, cid);
+        if (lost && !sheet.contains(document.activeElement)) { var nx = info[id]; if (nx && nx.more) nx.more.focus(); else home(); }
+        $('ct-empty').hidden = $('ct-list').childNodes.length > 0;
+        done(t(scope === 'all' ? 'ct.del.all.ok' : 'ct.del.me.ok'));
+      }).catch(function (e) {
+        delete inflight[key]; a.busy = false;
+        if (e.status === 401) { if (acting === a) acting = null; fail(e); return; }
+        if (e.code === 'delete_window_passed') x.m.deleteUntil = 0;
+        if (e.code === 'chat_closed') reload();
+        var msg = e.status === 0 ? t('ct.del.off') : e.message;
+        if (acting === a) bar(id, null, msg, true); else K.note($('ct-msg'), 'err', msg);
+      });
+    }
+    //  «پاک شد» چند ثانیه، سپس خودش می‌رود (مگر یادداشتِ دیگری جایش نشسته باشد)
+    var doneAt = 0;
+    function done(text) {
+      var box = $('ct-msg');
+      K.note(box, 'ok', text);
+      clearTimeout(doneAt);
+      doneAt = setTimeout(function () { if (box.classList.contains('ok') && box.textContent === text) box.hidden = true; }, 4000);
     }
     function photo(cid, media, mine) {
       var img = el('img', { class: 'ct-img', attrs: { alt: t(mine ? 'ct.ph.mine' : 'ct.photo'), width: '200', height: '150' } });
@@ -290,20 +434,21 @@
       var last = $('ct-list').lastChild;
       if (last && last.scrollIntoView) last.scrollIntoView({ block: 'end' });
     }
-    function poll(my) {
+    //  نخستین خواندن بی صبر؛ پس از آن همیشه long-poll — رشتهٔ بی‌پیام (cursor همان ۰) هم پیاپی نمی‌پرسد
+    function poll(my, first) {
       if (my !== loop || K.sheetOpen() !== sheet || !conv) return;
       var id = conv.id;
-      api(path(id, '/messages?after=' + cursor + '&wait=' + (cursor ? WAIT : 0))).then(function (r) {
+      api(path(id, '/messages?after=' + cursor + '&wait=' + (first ? 0 : WAIT))).then(function (r) {
         if (my !== loop || !conv || conv.id !== id) return;
         if (r.conversation) { conv = r.conversation; state(); }
         cursor = r.cursor;
         render(r.messages || []);
         if (r.messages && r.messages.length) receipt(id, conv.seq || 0);
-        poll(my);
+        poll(my, false);
       }).catch(function (e) {
         if (my !== loop) return;
         if (e.status === 401) { fail(e); return; }
-        setTimeout(function () { poll(my); }, 5000);
+        setTimeout(function () { poll(my, first); }, 5000);
       });
     }
 
@@ -311,7 +456,7 @@
     function seen() { return document.visibilityState !== 'hidden'; }
     function receipt(id, seq) {
       api(path(id, '/receipts'), { method: 'POST', body: seen() ? { deliveredSeq: seq, readSeq: seq } : { deliveredSeq: seq } })
-        .then(function (r) { if (conv && r.conversation && conv.id === r.conversation.id) conv.receipts = r.conversation.receipts; })
+        .then(function (r) { if (conv && r.conversation && conv.id === r.conversation.id) { conv.receipts = r.conversation.receipts; ticks(); } })
         .catch(function () { /* بعدی */ });
     }
     document.addEventListener('visibilitychange', function () {

@@ -741,3 +741,22 @@ test('S97: شروعِ ساده (دکان فقط با نام، پرچم‌های 
   assert.equal((await stockOf(s, 'qs1')).levels.shop_floor, 3000);
   await reconciled(s, 'qs1');
 });
+
+test('خواندنِ هم‌زمانِ ویترین (#1010: کالاها، دکان و برجسته‌ها با هم): درخواستِ دوم و سوم منتظرِ همان خواندنِ کاتالوگ می‌مانند، نه «قابلِ سفارش نیست»', async () => {
+  const s = await shop('هم‌زمان');
+  await enable(s);
+  await push(s, [product('cc1'), entry('cc1-e1', 'cc1', 4)]);
+  await new Promise((r) => setTimeout(r, catalog.REFRESH_THROTTLE_MS + 100));   //  پنجرهٔ پیشینِ همین دکان بسته شود
+  //  خواندنِ نخست کُند (دیتابیسِ کُندِ CI): تنظیمِ درونِ تراکنشِ `ingestTx` دیر برمی‌گردد
+  const orig = stock.settingsOf;
+  stock.settingsOf = async (shopId, c) => {
+    if (c) await new Promise((r) => setTimeout(r, 300));
+    return orig(shopId, c);
+  };
+  try {
+    const all = await Promise.all([1, 2, 3].map(() => catalog.publicStock(s.shopId, ['cc1'])));
+    assert.deepEqual(all.map((m) => m.get('cc1').status), ['in_stock', 'in_stock', 'in_stock']);
+  } finally {
+    stock.settingsOf = orig;
+  }
+});

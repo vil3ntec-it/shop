@@ -9,6 +9,9 @@
  *                    `docs/DATA-SAFETY-fa.md` «دو ذخیره از یک صفحهٔ کهنه»)، **پیش‌فرض روشن**، فقط `false` ِ صریح یا
  *                    نگه‌داشتِ سرویس خاموشش می‌کند: خاموش‌کنِ اضطراری که ذخیره را بیت‌به‌بیت به رفتارِ پیشین برمی‌گرداند.
  *                    پاسخِ `v=2` و بی `v` بایت‌به‌بایت همان پیشین است (برنامه‌های نصب‌شده چیزی نمی‌بینند).
+ *                    و `shadowFile`: پرچمِ `shop.sync_shadow_file` (**پیش‌فرض خاموش**، `orders.flagOf`: فقط
+ *                    `true` روشن) — سایه و cursor ِ Sync v1 ِ برنامه در فایلِ خودشان (`ShadowStore`، PERF-LEDGER).
+ *                    سرورِ کهنه `v=3` را `v=2` می‌بیند و کلید ندارد ⇒ برنامه خاموش می‌خواند.
  *   GET /config      برنامهٔ کهنه (بی `v`) ⇒ { enabled } — همان قاعدهٔ پیشین بیت‌به‌بیت (`orders.flagOf`: فقط `true`
  *                    روشن). برنامه‌های نصب‌شدهٔ پیش از این نسخه همان رفتارِ خودشان را نگه می‌دارند.
  *                    خاموش ⇒ برنامه همان رفتارِ پیشین را دارد (`LedgerMergeFlag` در android-native).
@@ -26,6 +29,8 @@ const { defaultOn } = require('../lib/default-on-flag');
 const FLAG_KEY = 'shop.ledger_merge';
 /** پایهٔ صریحِ ذخیره — خاموش‌کنِ اضطراری، پیش‌فرض روشن (`LedgerMergeFlag.base`) */
 const BASE_KEY = 'shop.save_base';
+/** سایهٔ همگام‌سازیِ برنامه در فایلِ خودش (`docs/PERF-LEDGER-fa.md`) — پیش‌فرض خاموش؛ در همان پاسخِ `v=3` */
+const SHADOW_KEY = 'shop.sync_shadow_file';
 /** نسخهٔ پرسشی که پیش‌فرضِ روشن را می‌فهمد (`LedgerMergeFlag.decide`) */
 const DEFAULT_ON_V = 2;
 /** نسخهٔ پرسشی که `base` را می‌خواهد */
@@ -41,8 +46,9 @@ const enabledByDefault = (shopId) => defaultOn(shopId, FLAG_KEY);
 router.get('/config', async (req, res) => {
   const v = Number.parseInt(typeof req.query.v === 'string' ? req.query.v : '', 10);
   if (v >= BASE_V) {
-    const [enabled, base] = await Promise.all([enabledByDefault(req.shopId), defaultOn(req.shopId, BASE_KEY)]);
-    return res.json({ enabled, v: DEFAULT_ON_V, base });
+    const [enabled, base, shadowFile] = await Promise.all([
+      enabledByDefault(req.shopId), defaultOn(req.shopId, BASE_KEY), flagOf(req.shopId, SHADOW_KEY)]);
+    return res.json({ enabled, v: DEFAULT_ON_V, base, shadowFile });
   }
   if (v >= DEFAULT_ON_V) return res.json({ enabled: await enabledByDefault(req.shopId), v: DEFAULT_ON_V });
   res.json({ enabled: await flagOf(req.shopId, FLAG_KEY) });
@@ -51,4 +57,5 @@ router.get('/config', async (req, res) => {
 module.exports = router;
 module.exports.FLAG_KEY = FLAG_KEY;
 module.exports.BASE_KEY = BASE_KEY;
+module.exports.SHADOW_KEY = SHADOW_KEY;
 module.exports.enabledByDefault = enabledByDefault;

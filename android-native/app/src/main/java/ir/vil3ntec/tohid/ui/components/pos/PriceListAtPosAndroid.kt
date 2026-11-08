@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.ui.components.pos
 
 import android.content.Context
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.LocalOffer
@@ -16,11 +17,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrCustomerPrices
 import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.sale.PriceList
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.CustomerPriceCart
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.screens.SegmentedChoice
@@ -41,6 +44,18 @@ const val PRICE_LIST_SETTINGS_TITLE = "لیستِ قیمت در صندوق (خر
  */
 object PriceListPrefs {
   private const val KEY = "price_lists"
+  private fun prefs(context: Context) = context.getSharedPreferences("tohid-policy", Context.MODE_PRIVATE)
+  fun on(context: Context): Boolean = prefs(context).getBoolean(KEY, false)
+  fun set(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY, on).apply() }
+}
+
+/**
+ *  «قیمتِ خاصِ مشتری» (POS-18، هسته `core/sale/CustomerPrice`) — ⛔ پیش‌فرض **خاموش** (`tohid-policy` ‹`customer_prices`›،
+ *  مالِ دکان مثلِ `price_lists`). فقط همراهِ «لیستِ قیمت در صندوق» ِ روشن اثر دارد (همان نشانِ صندوق). خاموش ⇒ بخشِ
+ *  پروندهٔ مشتری کشیده نمی‌شود و سبد فقط با همان `repriceCart` ِ لیست، بایت‌به‌بایت مثلِ پیش.
+ */
+object CustomerPricePrefs {
+  private const val KEY = "customer_prices"
   private fun prefs(context: Context) = context.getSharedPreferences("tohid-policy", Context.MODE_PRIVATE)
   fun on(context: Context): Boolean = prefs(context).getBoolean(KEY, false)
   fun set(context: Context, on: Boolean) { prefs(context).edit().putBoolean(KEY, on).apply() }
@@ -77,15 +92,43 @@ fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.Car
   LaunchedEffect(toggles) { if (toggles != seen[0]) { seen[0] = toggles; state = PriceList.toggle(state) } }
   //  فاکتورِ تازه (سبدِ خالی) از نو: لیستِ مشتریِ همین لحظه یا خرده، بی انتخابِ دستی
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) state = PriceList.onCustomer(PriceList.FRESH, customerList()) }
-  LaunchedEffect(cart, state.list) {
-    val next = repriceCart(d, cart, state.list)
-    if (next !== cart) cartStore.set(next)
+  val special = remember { CustomerPricePrefs.on(context) }
+  if (!special) {
+    LaunchedEffect(cart, state.list) {
+      val next = repriceCart(d, cart, state.list)
+      if (next !== cart) cartStore.set(next)
+    }
+    PriceListChip(state.list, { state = PriceList.toggle(state) }, modifier.padding(bottom = 6.dp))
+    return
   }
+  //  POS-18 «قیمتِ خاص»: دستی ← قیمتِ خاص ← لیستِ مشتری ← لیستِ فاکتور ← خرده (`CustomerPrice.resolve`)؛ فیِ دستی فقط
+  //  وقتی نقش تغییرِ قیمت دارد (`sales.price` ممنوع نیست). عوض شدنِ مشتری ⇒ همان بازقیمت‌گذاری با پیامِ شمارِ ردیف‌ها.
+  val manualAllowed = remember { ir.vil3ntec.tohid.data.ShopRole.decide(context, "sales.price").decision != "deny" }
+  val specials = debtorId?.let { id -> d.debtors.find { it.id == id }?.specialPrices }
+  val seenDebtor = remember { arrayOfNulls<String>(1) }
+  var before by remember { mutableStateOf<List<SalesEngine.CartLine>?>(null) }
+  var notice by remember { mutableStateOf<String?>(null) }
+  LaunchedEffect(cart, state, debtorId, specials) {
+    if (debtorId != seenDebtor[0]) { seenDebtor[0] = debtorId; before = cart.takeIf { debtorId != null && it.isNotEmpty() } }
+    if (cart.isEmpty()) before = null
+    val r = CustomerPriceCart.reprice(d, cart, state, debtorId, ir.vil3ntec.tohid.todayIso(), manualAllowed)
+    notice = before?.let { b -> CustomerPriceCart.changedSince(b, r.cart).takeIf { it > 0 || r.keptManual > 0 }?.let { StrCustomerPrices.repriced(it, r.keptManual) } }
+      ?: r.special.takeIf { it > 0 }?.let(StrCustomerPrices::specialLines)
+    if (r.cart !== cart) cartStore.set(r.cart)
+  }
+  Column(modifier.padding(bottom = 6.dp)) {
+    PriceListChip(state.list, { state = PriceList.toggle(state) }, Modifier)
+    notice?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2) }
+  }
+}
+
+@Composable
+private fun PriceListChip(list: String, onClick: () -> Unit, modifier: Modifier) {
   FilterChip(
-    selected = state.list == PriceList.WHOLESALE,
-    onClick = { state = PriceList.toggle(state) },
-    label = { Text(if (state.list == PriceList.WHOLESALE) StrPos.priceListWholesaleChip else StrPos.priceListRetailChip) },
-    modifier = modifier.padding(bottom = 6.dp),
+    selected = list == PriceList.WHOLESALE,
+    onClick = onClick,
+    label = { Text(if (list == PriceList.WHOLESALE) StrPos.priceListWholesaleChip else StrPos.priceListRetailChip) },
+    modifier = modifier,
   )
 }
 
@@ -107,6 +150,15 @@ fun PriceListSettingsWired(context: Context) {
       options = listOf("off" to StrSettingsPages.off, "on" to StrSettingsPages.on),
       selected = if (on) "on" else "off",
       onSelect = { on = it == "on"; PriceListPrefs.set(context, on) },
+    )
+    //  POS-18 «قیمتِ خاصِ مشتری» — همان کلیدِ صفحهٔ نسخهٔ ۳ (`PriceListSettingsScreen`)
+    var special by remember { mutableStateOf(CustomerPricePrefs.on(context)) }
+    Text(StrCustomerPrices.settingsTitle, style = MaterialTheme.typography.labelLarge, color = Shop.colors.text)
+    Text(StrCustomerPrices.settingsNote, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2)
+    SegmentedChoice(
+      options = listOf("off" to StrSettingsPages.off, "on" to StrSettingsPages.on),
+      selected = if (special) "on" else "off",
+      onSelect = { special = it == "on"; CustomerPricePrefs.set(context, special) },
     )
   }
 }

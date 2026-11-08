@@ -140,7 +140,7 @@ private fun CountShot() {
       else -> sys.toLong().toString()
     }
   }.toMap()
-  StockCountScreen(d, todayIso(), onExport = {}, onSave = { _, _ -> null }, onBack = {}, start = CountState(counts, "قفسهٔ برنج و حبوبات"))
+  StockCountScreen(d, todayIso(), onExport = {}, onSave = { _, _, _ -> null }, onBack = {}, clock = { 0L }, start = CountState(counts, "قفسهٔ برنج و حبوبات"))
 }
 
 @Composable

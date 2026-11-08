@@ -62,7 +62,7 @@ PRها: همین شاخه (سرور + این سند) · #580 (`claude/sec-client
 **اندروید (`android-native`):** انتشار با R8 و `shrinkResources`، بی `debuggable`؛ `network_security.xml`ِ انتشار بی cleartext و فقط
 CAِ سیستم (نسخهٔ http و CAِ کاربر فقط در `src/debug`)؛ نشانیِ سرور فقط از ساخت (`AppConfig.allowInsecure = BuildConfig.DEBUG`، کادرِ
 نشانی در انتشار نیست)؛ یک Activityِ صادرشده (فقط LAUNCHER، بی deep link)، `FileProvider` صادرنشده با سه پوشهٔ کَش؛ توکن در
-`EncryptedSharedPreferences`/Keystore (`tohid-session-secure`) و همراهِ PINِ شاگرد، شناسهٔ دستگاه و سریِ سند از پشتیبانِ ابری و انتقال بیرون
+`EncryptedSharedPreferences`/Keystore (`tohid-session-secure`) و همراهِ PINِ شاگرد، شناسهٔ دستگاه، سریِ سند و replica/cursor ِ همگام‌سازی (`tohid-sync-v1`، DATA-06) از پشتیبانِ ابری و انتقال بیرون
 (`backup_rules*.xml`، `TohidBackupAgent`، `DeviceOnlyPrefsTest`)؛ `SavedLogins` بی توکن؛ در کلِ برنامه یک `Log.d` (خطای فریمِ
 بارکد، بی داده)؛ سنجشِ امضای خودِ برنامه (`Integrity`) — که با SEC-CLI-02 ارزشش رفته. اجازه‌ها هر کدام با کارِ نوشته‌شده (دوربین،
 میکروفونِ پیامِ صوتی، مکان یک‌باره، بلوتوث/USBِ چاپگر، نصبِ به‌روزرسانی). `FLAG_SECURE` در برنامهٔ دکان نیست (سیاستی نخواسته؛

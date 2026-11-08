@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.core.promo
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -123,5 +124,42 @@ class PromoEffectTest {
     assertEquals(0L, r.totalRevenueMinor)
     assertEquals(0L, r.promoRevenueMinor)
     assertEquals(0L, r.promoDiscountMinor)
+  }
+
+  /*
+   *  D-23 (۱۴۰۵/۰۸/۱۳، الف): بها از میانگینِ موزون (`ReportCore.costs` با `CostPolicy`) می‌آید؛ سود فقط با روشِ مصوب و
+   *  وقتی هیچ قلمِ تخفیف‌خورده‌ای بی‌بها یا تخمینی نیست قطعی است — هر ردیف جدا، و گزارش اگر یکی تقریبی باشد.
+   */
+  @Test
+  fun approvedMovingAverageIsFinalOnlyWhenEveryPromoLineIsCosted() {
+    val lines = listOf(
+      EffectLine("s1", 2_000L, netMinor = 18_000L, costMinor = 15_000L, promos = listOf(tag(ramadan, 2_000L))),
+      EffectLine("s2", 1_000L, netMinor = 9_000L, costMinor = 7_000L, promos = listOf(tag(oil, 1_000L))),
+      //  قلمِ بی تخفیف با بهای تخمینی در سودِ تخفیف‌ها اثری ندارد
+      EffectLine("s2", 1_000L, netMinor = 5_000L, costMinor = 1L, costEstimated = true),
+    )
+    //  روشِ نامصوب (قیمتِ روی قلم) ⇒ تقریبی، حتی با همهٔ بها
+    val line = PromoEffect.of(lines)
+    assertTrue(line.profitApproximate)
+    assertTrue(line.rows.all { it.profitApproximate })
+    val ok = PromoEffect.of(lines, costApproved = true)
+    assertFalse(ok.profitApproximate, "میانگینِ موزونِ مصوب و همهٔ قلم‌ها بهادار ⇒ قطعی")
+    assertTrue(ok.rows.none { it.profitApproximate })
+    assertEquals(listOf(3_000L, 2_000L), ok.rows.map { it.profitMinor })
+    //  بهای تخمینی (فروش بیش از موجودی) ⇒ سود هنوز با همان بها، ولی همان ردیف و گزارش «تقریبی»
+    val est = PromoEffect.of(lines.mapIndexed { i, l -> if (i == 1) l.copy(costEstimated = true) else l }, costApproved = true)
+    assertTrue(est.profitApproximate)
+    val oilRow = est.rows.single { it.id == oil.id }
+    assertEquals(2_000L, oilRow.profitMinor)
+    assertEquals(1, oilRow.costEstimatedLines)
+    assertTrue(oilRow.profitApproximate)
+    assertFalse(est.rows.single { it.id == ramadan.id }.profitApproximate)
+    //  بی‌بها ⇒ سودِ null (نه صفر)، شمرده و «تقریبی»
+    val missing = PromoEffect.of(listOf(lines[0], lines[1].copy(costMinor = null)), costApproved = true)
+    val m = missing.rows.single { it.id == oil.id }
+    assertNull(m.profitMinor)
+    assertEquals(1, m.costMissingLines)
+    assertTrue(m.profitApproximate)
+    assertTrue(missing.profitApproximate)
   }
 }

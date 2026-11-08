@@ -18,6 +18,7 @@ const { requireUser, requireShop, requirePermission, requireDataWrite } = requir
 const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { can } = require('../lib/permissions');
 const contact = require('../lib/customer-contact');
+const access = require('../lib/customer-access');
 
 const router = express.Router();
 router.use(requireUser, requireShop);
@@ -122,7 +123,13 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     );
     if (!row || row.deleted) return next(notFound('این رکورد پیدا نشد'));
     //  CRM-15: بی `customers.contact` شماره پوشیده (قالبِ برنامه) و نشانی نه — ‎lib/customer-contact.js‎
-    const data = contact.fieldsOf(collection) && await contact.hiddenForReq(req) ? contact.mask(collection, row.data) : row.data;
+    const hidden = contact.fieldsOf(collection) ? await contact.hiddenForReq(req) : false;
+    const data = hidden ? contact.mask(collection, row.data) : row.data;
+    //  CRM-15: «چه کسی پروندهٔ مشتری را دید» — بی انتظار و بی خطا (‎lib/customer-access.js‎)
+    if (collection === 'debtors') {
+      const full = !hidden && ['phone', 'phone2', 'deliveryAddress'].some((k) => row.data?.[k]);
+      access.note(req, { customerRef: access.refOf(row.id), kind: full ? 'phone' : 'detail', door: 'debtor' });
+    }
     res.json({
       id: row.id, rev: Number(row.rev), version: row.version,
       createdAt: Number(row.created_at), updatedAt: Number(row.updated_at),

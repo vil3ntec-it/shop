@@ -111,6 +111,15 @@ internal fun FiguresCard(p: Product, f: ProductDetailModel.Figures, onStock: () 
         Spacer(Modifier.width(1.dp).fillMaxHeight().background(c.hairline))
         MoneyCell(StrProducts.purchasePrice, money(buy), Modifier.weight(1f))
       }
+      //  PRD-15: بهای میانگینِ موزون — فقط خواندنی (نه زدنی، نه کادر)؛ موجودیِ تمام‌شده یا پایهٔ نامعلوم ⇒ «تقریبی»
+      f.avgCost?.let { a ->
+        V3Divider()
+        Column(Modifier.fillMaxWidth().padding(16.dp)) {
+          Text(if (a.approximate) StrProducts.avgCostApprox else StrProducts.avgCost, style = V3Type.footnote, color = c.inkMuted, maxLines = 1)
+          Text(a.unitCostMinor?.let { "${money(it / 100.0)} ؋" } ?: "—", style = V3Type.figure, color = c.ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+          Text(StrProducts.avgCostNote, style = V3Type.footnote, color = c.inkMuted)
+        }
+      }
     }
   }
 }

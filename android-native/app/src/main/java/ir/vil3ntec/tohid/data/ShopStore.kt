@@ -764,10 +764,10 @@ class ShopStore(
       if (!quiet) _diskError.tryEmit(UNREADABLE)
       return false
     }
-    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین
-    //  می‌کند — شرحش سرِ `DiskWrite`. رمز فقط اگر «رمزگذاریِ داده» روشن است
-    //  (`AtRest`)؛ خاموش ⇒ همان بایت‌های همیشه.
-    val saved = runCatching { AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true) }   //  DATA-SAFETY: `.prev` (`LedgerRecovery`)
+    //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین می‌کند (`DiskWrite`). رمز فقط با «رمزگذاریِ داده» (`AtRest`)؛
+    //  خاموش ⇒ همان بایت‌های همیشه، تکه‌تکه و بی رشته و آرایهٔ کاملِ دفتر در حافظه (PERF-LEDGER، `LedgerText`). DATA-SAFETY: `.prev`
+    val saved = runCatching { if (AtRest.wanted(context)) AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true)
+      else DiskWrite.stream(file, keepPrevious = true) { o -> LedgerText.write(json, next) { b, at, n -> o.write(b, at, n) } } }
     saved.exceptionOrNull()?.let {
       //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
       if (!quiet) _diskError.tryEmit(it.message ?: StrAppData.unknownError)
@@ -1003,14 +1003,11 @@ class ShopStore(
     /**
      *  جدولِ موجودی — یک بار ساخته می‌شود، بارها خوانده.
      *
-     *  این کلاس یک باگِ کندیِ واقعی را می‌بندد. حسابِ قبلی برای **هر
-     *  کالا** کلِ اقلامِ فروش را می‌گشت، و برای **هر قلم** هم کلِ
-     *  فاکتورها را دنبالِ وضعیتِ «لغو» می‌گردید. یعنی هزینه‌اش ضربِ سه
-     *  عدد بود: کالاها × اقلامِ فروش × فاکتورها.
+     *  این کلاس یک باگِ کندیِ واقعی را می‌بندد. حسابِ قبلی برای **هر کالا** کلِ اقلامِ فروش را می‌گشت، و برای
+     *  **هر قلم** هم کلِ فاکتورها را دنبالِ وضعیتِ «لغو» می‌گردید. یعنی هزینه‌اش ضربِ سه عدد بود: کالاها × اقلامِ فروش × فاکتورها.
      *
-     *  صفحهٔ محصولات این را برای همهٔ کالاها صدا می‌زد و با هر حرفی که
-     *  در جستجو زده می‌شد از نو. دکانی با چند صد کالا و چند هزار فاکتور،
-     *  همان‌جا می‌ایستاد.
+     *  صفحهٔ محصولات این را برای همهٔ کالاها صدا می‌زد و با هر حرفی که در جستجو زده می‌شد از نو. دکانی با
+     *  چند صد کالا و چند هزار فاکتور، همان‌جا می‌ایستاد.
      *
      *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد هر پرسش یک خواندن است.
      *  PRD-10: کیت موجودیِ خودش را ندارد — ورود/فروش/برگشتِ آن به اجزا پخش می‌شود (`ProductPlansMap`).
@@ -1039,8 +1036,11 @@ class ShopStore(
 
       fun soldQty(productId: String): Double = sold[productId] ?: 0.0
 
+      val absorbOn = CountAbsorbWiring.serverFlag // INV-10: فروشِ پیش از شمارشِ دیررسیده (`CountAbsorbWiring`؛ خاموش ⇒ خالی)
+      private val absorbed = CountAbsorbWiring.gaps(d, absorbOn)
+
       fun stock(productId: String): Double = kits[productId]?.let { k -> ProductPlansMap.kitStock(k) { raw(it) } } ?: raw(productId)
-      private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0)
+      private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0) - (absorbed[productId]?.gapMilli ?: 0L) / 1000.0
 
       fun cartons(productId: String): Double = cartonsIn[productId] ?: 0.0
 
@@ -1067,7 +1067,7 @@ class ShopStore(
     @Synchronized
     fun index(d: ShopData): StockIndex {
       val ready = indexed
-      if (ready != null && indexedData === d) return ready
+      if (ready != null && indexedData === d && ready.absorbOn == CountAbsorbWiring.serverFlag) return ready
       val fresh = StockIndex(d)
       indexedData = d
       indexed = fresh
@@ -1165,7 +1165,7 @@ class ShopStore(
     fun stockStatus(d: ShopData, product: Product): String = index(d).status(product)
 
     /** بدهیِ یک قرض‌دار: آنچه گرفته منهای آنچه پس داده — با `shop.debt_minor` به پول (`DebtMinorFlag`)، خاموش همان جمعِ Double */
-    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(d.transactions.filter { it.debtorId == debtorId })
+    fun debt(d: ShopData, debtorId: String): Double = DebtMinorFlag.balance(DebtRows.of(d)[debtorId].orEmpty())
 
     /**
      *  بدهیِ ما به یک تأمین‌کننده.
@@ -1208,11 +1208,21 @@ class ShopStore(
      */
     fun codeOwners(d: ShopData): Map<String, String> {
       val main = barcodeIndex(d)
-      if (d.products.none { !it.packs.isNullOrEmpty() }) return main
+      if (d.products.none { !it.packs.isNullOrEmpty() || !it.purchaseUnits.isNullOrEmpty() }) return main
       return buildMap {
+        //  PRD-07: بارکدِ واحدِ خرید هم مالِ همان کالاست (بارکدِ کالا و بسته بر آن جلو می‌افتند)
+        d.products.forEach { p -> p.purchaseUnits.orEmpty().forEach { u -> u.barcode?.let { put(it, p.id) } } }
         d.products.forEach { p -> p.packs.orEmpty().forEach { pk -> pk.barcodes.forEach { put(it, p.id) } } }
         putAll(main)
       }
     }
+
+    /** PRD-07: بارکدِ واحدِ خرید ⇐ کالا و واحد — فقط فرمِ خرید و سفارش آن را می‌خواند (صندوق نه) */
+    fun purchaseUnitIndex(d: ShopData): ir.vil3ntec.tohid.core.product.PurchaseUnits.Index =
+      ir.vil3ntec.tohid.core.product.PurchaseUnits.Index(
+        d.products.mapNotNull { p -> p.purchaseUnits?.takeIf { it.isNotEmpty() }?.let { p.id to it.map(::coreOf) } }
+      )
+
+    fun coreOf(u: PurchaseUnit) = ir.vil3ntec.tohid.core.product.PurchaseUnits.Item(u.name, u.factorMilli, u.supplierId, u.barcode)
   }
 }

@@ -9,6 +9,11 @@
  *   • دکان سفارش را تحویل می‌دهد ⇒ همان برگهٔ باز (long-poll) «بسته شد»: نوشتن پنهان، «مشکل دارم» پیدا ⇒ زدن ⇒ همان
  *     رشته باز و پیامِ مشتری به سرور؛
  *   • سفارشِ دیگرِ تمام‌شده پس از ۷ روز: «مهلت گذشت»، بی «مشکل دارم»، بی نوشتن؛ رشته‌های پیشین جمع‌شده بالای رشته؛
+ *   • CHAT-04: «رفت / رسید / خوانده شد» ِ پیامِ خودِ مشتری فقط با رسیدِ واقعیِ دکان، زنده (long-poll) و پس از بازکردنِ
+ *     دوباره، هرگز عقب؛ برگهٔ پنهان «خواندم» نمی‌دهد؛
+ *   • CHAT-08: «حذف برای همه» ِ مشتری با پرسشِ تأیید (دوبار زدن یک درخواست) به برگهٔ دیگر و long-poll ِ دکان می‌رسد؛ مهلتِ
+ *     سرور و رشتهٔ بسته (#907) آن را برمی‌دارند؛ «حذف برای من» فقط نمای همین مشتری — هر دو برگه، پیش‌نمایش و شمارِ نخواندهٔ
+ *     صندوق، پس از بازکردنِ دوباره هم؛ بی‌اینترنت پیامِ روشن؛
  *   • «پرسش از دکان» ِ سرِ ویترین ⇒ گفت‌وگوی عمومی؛ پس از ۷ روز بی‌کاری دورِ تازه و پیام‌های پیشین جمع‌شده؛
  *   • CHAT-07: پیامِ صوتیِ دکان ⇒ پخش‌کننده (پخش/توقف، زمان، پیشرفت)؛ بایت فقط با زدنِ «پخش» و با بلیت؛ پخش از blob:
  *     (readyState ≥ ۲ و زمانِ پیش‌رونده)؛ بی‌اینترنت ⇒ «تلاشِ دوباره»؛ نوعِ ناشناخته (AMR) بی درخواست ⇒ پیامِ روشن؛
@@ -166,14 +171,36 @@ await page.click('#ct-send');
 await page.waitForFunction(() => /یک ساعت دیگر/.test(document.getElementById('ct-list').textContent), null, { timeout: 10000 });
 ok((await lastFrom(conv1.id, 'customer'))?.body === 'تا یک ساعت دیگر می‌آیم', 'پیامِ مشتری روی سرور، در همان رشته');
 
+//  ── CHAT-04: «رفت / رسید / خوانده شد» ِ پیامِ خودِ مشتری فقط از رسیدِ واقعیِ دکان؛ زنده با long-poll ِ همان برگه ──
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const until = async (fn, ms = 15000) => {
+  for (const end = Date.now() + ms; Date.now() < end; await sleep(200)) if (await fn()) return true;
+  return false;
+};
+const msgOf = async (body) => one('SELECT id, seq FROM shop_chat_messages WHERE conversation_id=$1 AND body=$2 ORDER BY seq DESC LIMIT 1', [conv1.id, body]);
+const stOf = (p, id) => p.evaluate((x) => {
+  const s = document.querySelector(`#ct-list li[data-id="${x}"] .ct-st`);
+  return s ? `${s.dataset.st}|${s.textContent}` : '';
+}, id);
+const shopReceipt = (b) => call('POST', `/api/shop/chat/conversations/${conv1.id}/receipts`, b, T);
+const hour = await msgOf('تا یک ساعت دیگر می‌آیم');
+await page.waitForFunction((x) => document.querySelector(`#ct-list li[data-id="${x}"] .ct-st`), hour.id, { timeout: 10000 });
+ok(await stOf(page, hour.id) === 'sent|رفت', 'پیامِ تازهٔ مشتری: «رفت» — دکان هنوز رسیدی نداده', await stOf(page, hour.id));
+await sleep(1200);
+ok(await stOf(page, hour.id) === 'sent|رفت', 'بی رسیدِ دکان هیچ وضعیتی خودش جلو نمی‌رود (جعلی نه)');
+await shopReceipt({ deliveredSeq: Number(hour.seq) });
+ok(await until(async () => (await stOf(page, hour.id)) === 'delivered|رسید'), 'دکان «رسید» داد ⇒ همان برگهٔ باز «رسید» (long-poll)', await stOf(page, hour.id));
+await shopReceipt({ readSeq: Number(hour.seq) });
+ok(await until(async () => (await stOf(page, hour.id)) === 'read|خوانده شد'), 'دکان «خواندم» داد ⇒ «خوانده شد»', await stOf(page, hour.id));
+const back = await shopReceipt({ deliveredSeq: 1, readSeq: 1 });
+await sleep(1200);
+ok(back.status === 200 && Number(back.body.conversation.receipts.peerReadSeq) >= Number(hour.seq) && await stOf(page, hour.id) === 'read|خوانده شد',
+  'رسیدِ کهنه‌تر (seq ِ ۱) هیچ چیز را عقب نمی‌برد — نه سرور، نه برگه');
+
 //  ── CHAT-02/11: بی‌اینترنت ⇒ متن در صف می‌ماند و با وصل شدن خودش یک بار می‌رود؛ جوابِ گم‌شده + زدنِ دوباره ⇒ همان شناسه ──
 const countFrom = async (convId, body) => Number((await one(
   "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND body=$2", [convId, body])).n);
-const bubbles = (text) => page.evaluate((x) => [...document.querySelectorAll('#ct-list .ct-msg')].filter((li) => li.textContent.includes(x)).length, text);
-const until = async (fn, ms = 15000) => {
-  for (const end = Date.now() + ms; Date.now() < end; await new Promise((r) => setTimeout(r, 200))) if (await fn()) return true;
-  return false;
-};
+const bubbles = (text, p = page) => p.evaluate((x) => [...document.querySelectorAll('#ct-list .ct-msg')].filter((li) => li.textContent.includes(x)).length, text);
 await ctx.setOffline(true);
 await page.fill('#ct-text', 'پیامِ بی‌اینترنت');
 await page.click('#ct-send');
@@ -184,6 +211,9 @@ await ctx.setOffline(false);
 ok(await until(async () => (await countFrom(conv1.id, 'پیامِ بی‌اینترنت')) === 1, 20000), 'وصل شد ⇒ خودش رفت، بی زدنِ دوباره');
 await page.waitForFunction(() => /بی‌اینترنت/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
 ok((await page.inputValue('#ct-text')) === '' && await bubbles('پیامِ بی‌اینترنت') === 1, 'پس از رسیدن: کادر خالی و یک حباب');
+const offMsg = await msgOf('پیامِ بی‌اینترنت');
+ok(await stOf(page, offMsg.id) === 'sent|رفت' && await stOf(page, hour.id) === 'read|خوانده شد',
+  'پیامِ تازه‌تر از «خواندم» ِ دکان «رفت» می‌ماند؛ هر پیام از seq ِ خودش', `${await stOf(page, offMsg.id)} / ${await stOf(page, hour.id)}`);
 
 let drop = 1;
 const postUrl = `**/api/store/${slug}/chat/conversations/${conv1.id}/messages`;
@@ -204,7 +234,7 @@ ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles(
 await page.unroute(postUrl);
 
 //  ── CHAT-04: برگهٔ پنهانِ مرورگر «رسید» می‌دهد ولی «خواندم» نه؛ دیده شدن ⇒ «خواندم» ──
-const vis = (s) => page.evaluate((v) => {
+const vis = (s, p = page) => p.evaluate((v) => {
   Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => v });
   Object.defineProperty(document, 'hidden', { configurable: true, get: () => v === 'hidden' });
   document.dispatchEvent(new Event('visibilitychange'));
@@ -216,8 +246,11 @@ const lateSeq = Number(late.body.message.seq);
 await page.waitForFunction(() => /ساعتِ پنج/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
 ok(await until(async () => Number((await marks()).d) >= lateSeq), 'برگهٔ پنهان: پیام رسید و «رسید» به سرور رفت');
 ok(Number((await marks()).r) < lateSeq, 'برگهٔ پنهان: «خواندم» نرفت', JSON.stringify(await marks()));
+const shopStatus = async (id) => (await call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=0`, null, T)).body.messages.find((m) => m.id === id)?.status;
+ok(await shopStatus(late.body.message.id) === 'delivered', 'برگهٔ پنهان: دکان پیامش را «رسید» می‌بیند، نه «خوانده شد»');
 await vis('visible');
 ok(await until(async () => Number((await marks()).r) >= lateSeq), 'برگه دیده شد ⇒ «خواندم» رفت', JSON.stringify(await marks()));
+ok(await shopStatus(late.body.message.id) === 'read', 'برگه دیده شد ⇒ دکان «خوانده شد» می‌بیند');
 
 //  ── CHAT-08: «حذف برای همه» ِ دکان همان دم به برگهٔ بازِ مشتری می‌رسد (long-poll)، فقط سنگِ قبر ──
 const gone = await call('DELETE', `/api/shop/chat/conversations/${conv1.id}/messages/${late.body.message.id}?for=all`, null, T);
@@ -232,11 +265,159 @@ await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getEle
 ok(await bubbles('پیامِ بی‌اینترنت') === 1 && await bubbles('جوابِ گم‌شده') === 1 && await bubbles('یک ساعت دیگر') === 1,
   'پس از بازکردنِ دوباره: پیام‌های مشتری از سرور، هر کدام یک بار');
 ok(await bubbles('ساعتِ پنج') === 0 && await bubbles('این پیام پاک شد') === 1, 'پس از بازکردنِ دوباره: پیامِ پاک‌شده فقط سنگِ قبر');
+await page.waitForFunction((x) => document.querySelector(`#ct-list li[data-id="${x}"] .ct-st`), hour.id, { timeout: 10000 });
+ok(await stOf(page, hour.id) === 'read|خوانده شد' && await stOf(page, offMsg.id) === 'sent|رفت',
+  'پس از بازکردنِ دوباره: همان وضعیت‌ها از سرور', `${await stOf(page, hour.id)} / ${await stOf(page, offMsg.id)}`);
+
+//  ── CHAT-08 (مشتری): «حذف برای همه» با پرسشِ تأیید، دوبار زدن یک درخواست؛ به برگهٔ دیگر و دکان همان دم می‌رسد ──
+const li = (id, rest = '') => `#ct-list li[data-id="${id}"] ${rest}`.trim();
+const ticketH = { 'X-Store-Ticket': vc.body.ticket };
+const page2 = await ctx.newPage();
+page2.on('pageerror', (e) => errors.push(`برگهٔ ۲: ${e}`));
+page2.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+await page2.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o1.token)}`);
+await page2.waitForFunction(() => { const b = document.getElementById('o-chat-open'); return b && b.offsetParent !== null; }, null, { timeout: 15000 });
+await page2.click('#o-chat-open');
+await page2.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+await page.fill('#ct-text', 'این را پاک می‌کنم');
+await page.click('#ct-send');
+await page2.waitForFunction(() => /این را پاک می‌کنم/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
+const doomed = await msgOf('این را پاک می‌کنم');
+const shopCur = (await call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=0`, null, T)).body.cursor;
+const shopWait = call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=${shopCur}&wait=20000`, null, T);
+const dels = [];
+const onDel = (r) => { if (r.method() === 'DELETE') dels.push(r.url()); };
+page.on('request', onDel);
+await page.click(li(doomed.id, '.ct-more'));
+await page.waitForSelector(li(doomed.id, '[data-del="all"]'));
+ok(await page.getAttribute(li(doomed.id, '.ct-more'), 'aria-expanded') === 'true' && Boolean(await page.getAttribute(li(doomed.id, '.ct-more'), 'aria-label')) &&
+  await page.evaluate(() => Boolean(document.activeElement) && document.activeElement.dataset.del === 'me'),
+'دکمهٔ «کارهای این پیام» با نام و aria-expanded؛ تمرکز روی نخستین کار');
+ok(await page.evaluate(() => { const b = document.getElementById('ct-body'); return document.documentElement.scrollWidth <= innerWidth && b.scrollWidth <= b.clientWidth + 1; }),
+  'عرضِ گوشی (۳۶۰): نوارِ کارها بی پیمایشِ افقی');
+await page.keyboard.press('Tab');
+ok(await page.evaluate(() => document.activeElement.dataset.del === 'all'), 'صفحه‌کلید: Tab ⇒ «حذف برای همه»');
+await page.keyboard.press('Enter');
+await page.waitForSelector(li(doomed.id, '[data-yes="all"]'));
+ok(/برای همه/.test(await page.textContent(li(doomed.id, '.ct-acts'))) && await page.evaluate(() => document.activeElement.hasAttribute('data-no')) && dels.length === 0,
+  'پیش از پاک کردن پرسشِ تأیید (تمرکز روی «نه») و هنوز هیچ درخواستی');
+await page.dblclick(li(doomed.id, '[data-yes="all"]'));
+await page.waitForFunction((x) => { const e = document.querySelector(`#ct-list li[data-id="${x}"]`); return e && /این پیام پاک شد/.test(e.textContent); }, doomed.id, { timeout: 10000 });
+await sleep(600);
+page.off('request', onDel);
+ok(dels.length === 1, 'دوبار زدنِ «بله» ⇒ یک درخواستِ حذف', String(dels.length));
+ok(await page.evaluate(() => Boolean(document.activeElement) && document.activeElement.classList.contains('ct-more')) && /برای همه پاک شد/.test(await page.textContent('#ct-msg')),
+  'پس از حذف: تمرکز روی دکمهٔ همان سنگِ قبر و پیامِ «پاک شد»');
+await page2.waitForFunction(() => !/این را پاک می‌کنم/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
+ok(await bubbles('این پیام پاک شد', page2) === 2, 'برگهٔ دیگرِ همان مشتری همان دم فقط سنگِ قبر (long-poll)');
+const sw = await shopWait;
+const tombShop = (sw.body.messages || []).find((m) => m.id === doomed.id);
+ok(sw.status === 200 && tombShop && tombShop.deleted === true && tombShop.body === undefined, 'long-poll ِ دکان همان دم سنگِ قبر را گرفت (بی متن)', JSON.stringify(tombShop));
+const dbRow = await one('SELECT body, deleted_at FROM shop_chat_messages WHERE id=$1', [doomed.id]);
+ok(dbRow.body === '' && Boolean(dbRow.deleted_at), 'سرور: متن رفت و فقط سنگِ قبر ماند');
+const twice = await call('DELETE', `/api/store/${slug}/chat/conversations/${conv1.id}/messages/${doomed.id}?for=all`, null, null, ticketH);
+ok(twice.status === 200 && twice.body.message.deleted === true, '«حذف برای همه» ِ دوباره (برگهٔ دیگر) ⇒ همان سنگِ قبر، بی خطا');
+await page.click(li(doomed.id, '.ct-more'));
+await page.waitForSelector(li(doomed.id, '[data-del="me"]'));
+ok(await page.$(li(doomed.id, '[data-del="all"]')) === null, 'سنگِ قبر فقط «حذف برای من» دارد');
+await page.click(li(doomed.id, '.ct-more'));
+ok(await page.$(li(doomed.id, '.ct-acts')) === null && await page.getAttribute(li(doomed.id, '.ct-more'), 'aria-expanded') === 'false', 'دوباره زدنِ دکمه نوار را می‌بندد');
+
+//  مهلت همین حالا روی سرور گذشت (صفحه هنوز نمی‌داند) ⇒ پیامِ روشن، پیام سرِ جایش و «حذف برای همه» می‌رود
+const lostMsg = await msgOf('جوابِ گم‌شده');
+await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE id=$1', [lostMsg.id, 2 * DAY]);
+await page.click(li(lostMsg.id, '.ct-more'));
+await page.click(li(lostMsg.id, '[data-del="all"]'));
+await page.click(li(lostMsg.id, '[data-yes="all"]'));
+await page.waitForFunction((x) => /حذف برای همه» ِ این پیام گذشته/.test((document.querySelector(`#ct-list li[data-id="${x}"] .ct-acts`) || {}).textContent || ''), lostMsg.id, { timeout: 10000 });
+ok(await page.$(li(lostMsg.id, '[data-del="all"]')) === null && await bubbles('جوابِ گم‌شده') === 1 &&
+  (await one('SELECT deleted_at FROM shop_chat_messages WHERE id=$1', [lostMsg.id])).deleted_at === null,
+'مهلتِ سرور گذشته ⇒ «وقتِ حذف برای همه… گذشته است»، پیام سرِ جایش و دکمه‌اش رفت', await page.textContent(li(lostMsg.id, '.ct-acts')));
+await page.click(li(lostMsg.id, '.ct-more'));
+
+//  ── CHAT-08 (مشتری): «حذف برای من» فقط نمای همین مشتری — هر دو برگه و صندوق (پیش‌نمایش و نخوانده)، پس از بازکردنِ دوباره هم ──
+await vis('hidden');
+await vis('hidden', page2);
+const ask = await call('POST', `/api/shop/chat/conversations/${conv1.id}/messages`, { clientId: `client-ask-${Date.now()}`, body: 'کی می‌آیید؟' }, T);
+const hideMe = (await call('POST', `/api/shop/chat/conversations/${conv1.id}/messages`, { clientId: `client-hide-${Date.now()}`, body: 'شمارهٔ دوم را بفرستید' }, T)).body.message;
+for (const p of [page, page2]) await p.waitForFunction((x) => document.querySelector(`#ct-list li[data-id="${x}"]`), hideMe.id, { timeout: 30000 });
+const inbox = async () => (await call('GET', `/api/store/${slug}/chat/conversations?limit=50`, null, null, ticketH)).body.conversations.find((c) => c.id === conv1.id);
+const before = await inbox();
+ok(before.unread === 2 && before.lastMessage.preview === 'شمارهٔ دوم را بفرستید', 'پیش از حذف: صندوقِ مشتری دو نخوانده و پیش‌نمایشِ همان پیام',
+  JSON.stringify({ u: before.unread, l: before.lastMessage }));
+await page.click(li(hideMe.id, '.ct-more'));
+await page.waitForSelector(li(hideMe.id, '[data-del="me"]'));
+ok(await page.$(li(hideMe.id, '[data-del="all"]')) === null, 'پیامِ دکان برای مشتری «حذف برای همه» ندارد');
+await page.click(li(hideMe.id, '[data-del="me"]'));
+ok(/فقط از نمای شما/.test(await page.textContent(li(hideMe.id, '.ct-acts'))), 'پرسشِ «حذف برای من»');
+await page.click(li(hideMe.id, '[data-yes="me"]'));
+for (const p of [page, page2]) await p.waitForFunction((x) => !document.querySelector(`#ct-list li[data-id="${x}"]`), hideMe.id, { timeout: 30000 });
+ok(await page.evaluate(() => Boolean(document.activeElement) && document.activeElement.id === 'ct-text'), '«حذف برای من» ⇒ از هر دو برگهٔ همین مشتری رفت؛ تمرکز به کادرِ نوشتن');
+const after = await inbox();
+ok(after.unread === 1 && after.lastMessage.preview === 'کی می‌آیید؟', 'صندوقِ مشتری: پیش‌نمایش به پیامِ دیدنیِ پیشین برگشت و پنهان در نخوانده نیست',
+  JSON.stringify({ u: after.unread, l: after.lastMessage }));
+const shopRow = (await call('GET', '/api/shop/chat/conversations', null, T)).body.conversations.find((c) => c.id === conv1.id);
+const shopMsg = (await call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=0`, null, T)).body.messages.find((m) => m.id === hideMe.id);
+ok(shopRow.lastMessage.preview === 'شمارهٔ دوم را بفرستید' && shopMsg && shopMsg.body === 'شمارهٔ دوم را بفرستید', 'دکان پیام و پیش‌نمایشش را دست‌نخورده می‌بیند');
+
+//  بی‌اینترنت ⇒ «پاک نشد» به زبانِ روشن؛ پیام سرِ جایش و دکمه دوباره زدنی (هیچ حذفِ خودکارِ بعدی)
+await ctx.setOffline(true);
+const askId = ask.body.message.id;
+await page.click(li(askId, '.ct-more'));
+await page.click(li(askId, '[data-del="me"]'));
+await page.click(li(askId, '[data-yes="me"]'));
+await page.waitForFunction((x) => /اینترنت/.test((document.querySelector(`#ct-list li[data-id="${x}"] .ct-acts`) || {}).textContent || ''), askId, { timeout: 10000 });
+ok(await bubbles('کی می‌آیید؟') === 1 && !(await page.isDisabled(li(askId, '[data-del="me"]'))), 'بی‌اینترنت: «پاک نشد؛ اینترنت وصل نیست…»، پیام سرِ جایش و دکمه دوباره زدنی',
+  await page.textContent(li(askId, '.ct-acts')));
+await ctx.setOffline(false);
+await page.click(li(askId, '.ct-more'));
+
+//  صفحه از نو (برگه هنوز پنهان ⇒ «خواندم» نمی‌رود و شمارِ نخوانده همان می‌ماند): صندوقی که خودِ صفحه می‌گیرد هم پنهان را ندارد
+await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE id=$1', [offMsg.id, 2 * DAY]);
+await page.addInitScript(() => {
+  try {
+    if (sessionStorage.getItem('hide-tab') !== '1') return;
+    Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' });
+    Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+  } catch { /* about:blank */ }
+});
+await page.evaluate(() => sessionStorage.setItem('hide-tab', '1'));
+const listed = page.waitForResponse((r) => /\/chat\/conversations\?limit=50/.test(r.url()), { timeout: 20000 });
+await page.reload();
+await page.waitForFunction(() => { const b = document.getElementById('o-chat-open'); return b && b.offsetParent !== null; }, null, { timeout: 15000 });
+await page.click('#o-chat-open');
+const seenList = (await (await listed).json()).conversations.find((c) => c.id === conv1.id);
+await page.waitForFunction(() => /کی می‌آیید/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+ok(await bubbles('شمارهٔ دوم') === 0 && seenList.unread === 1 && seenList.lastMessage.preview === 'کی می‌آیید؟',
+  'پس از بازکردنِ دوباره: پیامِ پنهان نیست و صندوقی که صفحه گرفت پیش‌نمایش و نخوانده‌اش را ندارد', JSON.stringify({ u: seenList.unread, l: seenList.lastMessage }));
+await page.click(li(offMsg.id, '.ct-more'));
+await page.waitForSelector(li(offMsg.id, '[data-del="me"]'));
+ok(await page.$(li(offMsg.id, '[data-del="all"]')) === null, 'پیامِ خودم پس از مهلتِ سرور (deleteUntil): فقط «حذف برای من»');
+await page.click(li(offMsg.id, '.ct-more'));
+await page.evaluate(() => sessionStorage.removeItem('hide-tab'));
+await vis('visible');
+await page2.close();
 
 //  ── دکان تحویل می‌دهد ⇒ همان برگهٔ باز «بسته شد» (long-poll) ⇒ «مشکل دارم» ⇒ همان رشته باز ──
+//  CHAT-08 + #907: رشتهٔ بسته «حذف برای همه» ندارد — نوارِ بازِ پیامِ خودم همان دم (long-poll) آن را با دلیل برمی‌دارد
+await page.click(li(hour.id, '.ct-more'));
+await page.waitForSelector(li(hour.id, '[data-del="all"]'));
 await move(o1.id, ['picked_up']);
-await call('POST', `/api/shop/chat/conversations/${conv1.id}/receipts`, { readSeq: 2 }, T);   //  بیدار کردنِ long-poll با رسیدِ واقعی
+//  بیدار کردنِ long-poll با رسیدِ واقعی (تا آخرین seq؛ «خواندم» ِ دکان پیش‌تر تا پیامِ مشتری جلو رفته، پس ۲ دیگر تغییری نیست)
+const seqNow = Number((await one('SELECT seq FROM shop_chat_conversations WHERE id=$1', [conv1.id])).seq);
+await call('POST', `/api/shop/chat/conversations/${conv1.id}/receipts`, { readSeq: seqNow }, T);
 await page.waitForFunction(() => !document.getElementById('ct-issue').hidden, null, { timeout: 30000 });
+ok(await page.$(li(hour.id, '[data-del="all"]')) === null && /بسته شد/.test(await page.textContent(li(hour.id, '.ct-acts'))),
+  'رشته بسته شد ⇒ «حذف برای همه» از نوارِ باز رفت، با دلیل', await page.textContent(li(hour.id, '.ct-acts')));
+await page.click(li(hour.id, '.ct-more'));
+await page.click(li(hour.id, '.ct-more'));
+ok(await page.$(li(hour.id, '[data-del="me"]')) !== null && await page.$(li(hour.id, '[data-del="all"]')) === null, 'رشتهٔ بسته: پیامِ تازهٔ خودم هم فقط «حذف برای من»');
+const closedAll = await call('DELETE', `/api/store/${slug}/chat/conversations/${conv1.id}/messages/${hour.id}?for=all`, null, null, ticketH);
+ok(closedAll.status === 409 && closedAll.body.error.code === 'chat_closed', 'سرور هم: رشتهٔ بسته ⇒ ۴۰۹ chat_closed');
+await page.click(li(hour.id, '[data-del="me"]'));
+await page.click(li(hour.id, '[data-yes="me"]'));
+await page.waitForFunction((x) => !document.querySelector(`#ct-list li[data-id="${x}"]`), hour.id, { timeout: 10000 });
+ok(Boolean(await one("SELECT 1 AS x FROM shop_chat_hidden WHERE message_id=$1 AND viewer='customer'", [hour.id])), 'رشتهٔ بسته: «حذف برای من» باز است');
 ok(!(await shown('ct-form')), 'تحویل‌شده و پرداخت‌شده ⇒ بسته شد: نوشتن پنهان');
 ok(/بسته شد/.test(await page.textContent('#ct-state')) && /مشکل دارم/.test(await page.textContent('#ct-state')), 'یادداشتِ «بسته شد» با مهلتِ «مشکل دارم»', await page.textContent('#ct-state'));
 await page.click('#ct-issue');
@@ -272,6 +453,12 @@ ok(Boolean(await page.getAttribute('#store-chat', 'aria-label')), 'دکمهٔ «
 await page.click('#store-chat');
 await page.waitForFunction(() => { const s = document.getElementById('chat-sheet'); return s && !s.hidden && !document.getElementById('ct-form').hidden; }, null, { timeout: 15000 });
 ok(/عمومی/.test(await page.textContent('#ct-title')), 'گفت‌وگوی عمومی', await page.textContent('#ct-title'));
+const gets = [];
+const onGet = (r) => { if (r.method() === 'GET' && /\/chat\/conversations\/[^/?]+\/messages/.test(r.url())) gets.push(r.url()); };
+page.on('request', onGet);
+await sleep(2500);
+page.off('request', onGet);
+ok(gets.length <= 2, 'رشتهٔ بی‌پیام: یک long-poll ِ باز، نه پرسشِ پیاپی', String(gets.length));
 await page.fill('#ct-text', 'آرد دارید؟');
 await page.click('#ct-send');
 await page.waitForFunction(() => /آرد/.test(document.getElementById('ct-list').textContent), null, { timeout: 10000 });
@@ -298,6 +485,12 @@ if (axeSrc) {
   await ap.click('#o-chat-open');
   await ap.waitForFunction(() => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, { timeout: 15000 });
   await ap.waitForTimeout(400);
+  //  نوارِ کارها و پرسشِ تأیید هم زیرِ همان سنجه (کنتراستِ دکمه‌ها درونِ حبابِ تیره)
+  await ap.evaluate(() => [...document.querySelectorAll('#ct-list .ct-msg.mine .ct-more')].pop().click());
+  await ap.waitForSelector('#ct-list .ct-acts [data-del]');
+  if (await ap.$('#ct-list .ct-acts [data-del="all"]')) await ap.click('#ct-list .ct-acts [data-del="all"]');
+  else await ap.click('#ct-list .ct-acts [data-del="me"]');
+  await ap.waitForSelector('#ct-list .ct-acts [data-yes]');
   await ap.addScriptTag({ content: axeSrc });
   const v = await ap.evaluate(async () => (await window.axe.run(document.getElementById('chat-sheet'),
     { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations
@@ -619,7 +812,7 @@ if (axeSrc) {
   await ap.click('#o-chat-open');
   await ap.waitForFunction(() => { const f = document.getElementById('ct-form'); return f && !f.hidden; }, null, { timeout: 15000 });
   const cam = await ap.getAttribute('#ct-ph-cam', 'aria-label').catch(() => null);
-  ok(Boolean(cam), 'گوشیِ لمسی: دکمهٔ «گرفتنِ عکس با دوربین»', String(cam));
+  ok(Boolean(cam), 'گوشیِ لمسی: دکمهٔ «عکس با دوربین»', String(cam));
   await ap.setInputFiles('#ct-file', { name: 'small.jpg', mimeType: 'image/jpeg', buffer: small });
   await ap.waitForFunction(() => document.getElementById('ct-ph').getAttribute('data-st') === 'ready', null, { timeout: 20000 });
   await ap.addScriptTag({ content: axeSrc });

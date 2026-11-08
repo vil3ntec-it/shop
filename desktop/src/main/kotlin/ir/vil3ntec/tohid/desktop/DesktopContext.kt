@@ -22,10 +22,14 @@ import java.net.URI
  *  | لینوکس | `$XDG_DATA_HOME/tohid` یا `~/.local/share/tohid` |
  *
  *  `TOHID_DATA_DIR` فقط برای آزمون است.
+ *
+ *  نامِ کاربرِ فارسی و فاصله در مسیر (`C:\Users\محمد رضا\…`، `Application Support`) همان `File` ِ
+ *  یونیکد است و هرگز به رشتهٔ ANSI برنمی‌گردد (`WindowsDiskFaultsTest`). مک و لینوکس: پوشهٔ داده فقط
+ *  برای صاحبش (`700`، [ownerOnly]) — دفترِ ساده (رمزِ دفتر خاموش) را حسابِ دیگرِ همان کامپیوتر نمی‌خواند.
  */
 object DesktopContext : Context() {
 
-  val root: File by lazy { resolveRoot().apply { mkdirs() } }
+  val root: File by lazy { resolveRoot().apply { mkdirs(); ownerOnly(this) } }
 
   override val filesDir: File get() = File(root, "files").apply { mkdirs() }
   override val cacheDir: File get() = File(root, "cache").apply { mkdirs() }
@@ -99,14 +103,31 @@ object DesktopContext : Context() {
     runCatching { ProcessBuilder("xdg-open", uri).start(); true }.getOrDefault(false)
   }
 
-  private fun resolveRoot(): File {
-    System.getenv("TOHID_DATA_DIR")?.takeIf { it.isNotBlank() }?.let { return File(it) }
-    val os = System.getProperty("os.name").orEmpty().lowercase()
-    val home = System.getProperty("user.home")
+  private fun resolveRoot(): File =
+    rootFor(System.getProperty("os.name").orEmpty(), System.getProperty("user.home").orEmpty(), System::getenv)
+
+  /**
+   *  پوشهٔ دادهٔ هر سیستم — جدا تا آزمون ویندوز و مک را بی خودِ آن سیستم بسنجد. متغیرِ تهی همان «نیست»
+   *  است: `LOCALAPPDATA=` ِ خالی پیش‌تر پوشهٔ `Tohid` را کنارِ پوشهٔ جاریِ برنامه می‌ساخت.
+   */
+  internal fun rootFor(osName: String, home: String, env: (String) -> String?): File {
+    fun v(name: String) = env(name)?.takeIf { it.isNotBlank() }
+    v("TOHID_DATA_DIR")?.let { return File(it) }
+    val os = osName.lowercase()
     return when {
-      os.contains("win") -> File(System.getenv("LOCALAPPDATA") ?: "$home\\AppData\\Local", "Tohid")
-      os.contains("mac") -> File(home, "Library/Application Support/Tohid")
-      else -> File(System.getenv("XDG_DATA_HOME")?.takeIf { it.isNotBlank() } ?: "$home/.local/share", "tohid")
+      os.startsWith("windows") -> File(v("LOCALAPPDATA") ?: File(File(home, "AppData"), "Local").path, "Tohid")
+      os.startsWith("mac") || os.startsWith("darwin") -> File(File(File(home, "Library"), "Application Support"), "Tohid")
+      else -> File(v("XDG_DATA_HOME") ?: File(File(home, ".local"), "share").path, "tohid")
+    }
+  }
+
+  /** مک/لینوکس: `rwx------`؛ ویندوز (بی POSIX) و هر شکستی ⇒ بی‌تغییر — هرگز جلوی باز شدنِ برنامه را نمی‌گیرد */
+  internal fun ownerOnly(dir: File) {
+    runCatching {
+      if (!dir.isDirectory) return
+      val view = java.nio.file.Files.getFileAttributeView(dir.toPath(), java.nio.file.attribute.PosixFileAttributeView::class.java)
+        ?: return
+      view.setPermissions(java.nio.file.attribute.PosixFilePermissions.fromString("rwx------"))
     }
   }
 }

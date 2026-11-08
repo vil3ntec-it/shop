@@ -22,7 +22,9 @@ process.env.RATE_GENERAL_MAX = '100000';
 process.env.RATE_AUTH_MAX = '10000';
 process.env.RATE_OTP_MAX ||= '10000';
 process.env.RATE_VERIFY_MAX ||= '10000';
-process.env.RATE_JOIN_MAX = '10000';
+//  سقفِ «هر IP» و «هر کد» ِ ورودِ شاگرد — خودشان در `staff-login-limits.test.js` با عددِ کوچک سنجیده می‌شوند
+process.env.RATE_JOIN_MAX ||= '10000';
+process.env.RATE_JOIN_CODE_MAX ||= '10000';
 process.env.LOGIN_LOCKOUT_TRIES = '10000';
 //  شمارنده‌ی دومِ قفل هم باید باز باشد، وگرنه سنجه‌هایی که عمداً رمزِ
 //  غلط می‌زنند همدیگر را می‌بندند — همه از یک IP می‌آیند (127.0.0.1)

@@ -99,6 +99,8 @@ fun ReportsScreen(
   startPicker: Boolean = false,
 ) {
   val context = LocalContext.current
+  //  CRM-15: خروجی یا چاپِ برگه (کلیدِ `ReportCsv`) — برگهٔ مشتریان ⇐ «چه کسی پرونده را دید» (`AnalyticsRoutes`)
+  val onExport = ir.vil3ntec.tohid.ui.screens.LocalReportExport.current
   val scope = rememberCoroutineScope()
   val toasts = LocalV3Toasts.current
   //  زبانه‌های اختیاری: همان تنظیم‌های گوشیِ پیشین (ضایعات قیمتِ خرید است ⇒ `pages` با `canSeeMoney`)
@@ -160,9 +162,10 @@ fun ReportsScreen(
     val s = sheet()
     if (s.isEmpty) { toasts?.show(StrReports.nothingToExport, V3Tone.INFO); return }
     pending = s
+    onExport(tab.csv)
     saveCsv.launch("${s.name}.csv")
   }
-  fun print() { if (tab.csv.isNotEmpty()) ReportPrint.print(context, sheet(), tabLabel(tab)) }
+  fun print() { if (tab.csv.isNotEmpty()) { onExport(tab.csv); ReportPrint.print(context, sheet(), tabLabel(tab)) } }
 
   V3Scaffold(
     title = Str.reports,

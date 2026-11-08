@@ -38,8 +38,8 @@ import java.net.toByteArray
 import java.net.toNSData
 
 /*
- *  کلیددانِ iOS (Keychain) برای چند بایتِ رازِ برنامه — کلیدِ اصلیِ دفترِ رمزدار (`AtRestKeysIos`) و
- *  توکنِ ورود. «پس از نخستین بازگشاییِ دستگاه، فقط همین دستگاه»
+ *  کلیددانِ iOS (Keychain) برای چند بایتِ رازِ برنامه — کلیدِ اصلیِ دفترِ رمزدار (`AtRestKeysIos`)،
+ *  توکنِ ورود و آینهٔ هویتِ دستگاه (`IosDeviceIdentity`: همین «به دستگاهِ دیگر نمی‌رود» بازیابی را می‌شناسد). «پس از نخستین بازگشاییِ دستگاه، فقط همین دستگاه»
  *  (`kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly`): نه در پشتیبانِ iCloud، نه انتقال به گوشیِ تازه —
  *  همان قاعدهٔ Android Keystore. خطا ⇐ [KeychainException] با کدِ OSStatus، هرگز «خالی» ِ بی‌صدا.
  */
@@ -101,6 +101,24 @@ object Keychain {
     val rc = SecItemDelete(q)
     CFRelease(q)
     if (rc != errSecSuccess && rc != errSecItemNotFound) throw KeychainException(rc, "پاک کردنِ کلیددان")
+  }
+
+  /**
+   *  آیا قلمِ [account] با همین ردهٔ دسترسی (`kSecAttrAccessible`) در کلیددانِ iOS است — آزمونِ شبیه‌ساز
+   *  (`DeviceIdentityIosTest`: آینهٔ هویتِ دستگاه «فقط همین دستگاه» است، نه ردهٔ جابه‌جاشونده). کلیددانِ درونِ حافظه ردی ندارد ⇒ false.
+   */
+  internal fun storedAs(account: String, accessible: CFTypeRef?): Boolean {
+    if (memory != null) return false
+    val q = query(account)
+    CFDictionaryAddValue(q, kSecAttrAccessible, accessible)
+    CFDictionaryAddValue(q, kSecMatchLimit, kSecMatchLimitOne)
+    val rc = SecItemCopyMatching(q, null)
+    CFRelease(q)
+    return when (rc) {
+      errSecSuccess -> true
+      errSecItemNotFound -> false
+      else -> throw KeychainException(rc, "جست‌وجوی کلیددان")
+    }
   }
 
   private fun query(account: String): CFMutableDictionaryRef {

@@ -1,5 +1,11 @@
 package ir.vil3ntec.tohid.core.report
 
+import ir.vil3ntec.tohid.core.stock.Position
+import ir.vil3ntec.tohid.core.stock.StockBook
+import ir.vil3ntec.tohid.core.stock.StockCore
+import ir.vil3ntec.tohid.core.stock.StockDoc
+import ir.vil3ntec.tohid.core.stock.StockMode
+import ir.vil3ntec.tohid.core.stock.StockResult
 import kotlinx.serialization.Serializable
 import kotlin.math.floor
 import kotlin.math.max
@@ -16,8 +22,8 @@ import kotlin.math.min
  *  ⛔ هر حسابِ اعشاری این‌جا عمداً با همان ترتیبِ عملیاتِ JS نوشته شده (Double
  *  در هر دو IEEE-754 است)؛ «ساده‌تر» کردنش برابریِ دو هسته را می‌شکند.
  *
- *  هنوز به هیچ صفحه‌ای وصل نیست: موتورهای امروز (`ReportEngine`، `DashboardEngine`)
- *  دست نخورده‌اند. تفاوت‌ها در شرحِ PR و `ReportCoreVectorsTest` ثبت شده‌اند.
+ *  صفحه‌ها: «گزارشِ تازه» (`ReportFreshModel`)، صفحهٔ کالا (`stockCost`) و گزارشِ خودکارِ سرور (همان JS). موتورهای
+ *  پیشین (`ReportEngine`، `DashboardEngine`) دست نخورده‌اند. میانگینِ موزون با `StockCore` (`mavg`، بردار: `cost-v1.json`).
  */
 object ReportCore {
   enum class Costing(val id: String) { LINE("line"), MAVG("mavg") }
@@ -120,33 +126,72 @@ object ReportCore {
   private fun timeOf(r: ReportLedger.Dated): Long =
     if (r.createdAt > 0) r.createdAt else (ReportDates.epochDay(r.date)?.let { it * ReportDates.DAY_MS } ?: 0L)
 
-  /* ---------------- بهای تمام‌شده (RPT-03) ---------------- */
+  /* ---------------- بهای تمام‌شده (RPT-03، PRD-15) ---------------- */
 
   /**
-   *  بهای هر قلم و هر برگشتی. LINE = همان امروز (`purchasePrice`ِ قلم × مقدار).
-   *  MAVG = میانگینِ موزونِ متحرک با بازپخشِ ورودِ انبار، فروش و برگشتی به ترتیبِ
-   *  زمان؛ پیش از نخستین ورود، بهای ثبت‌شده روی قلم. شرحِ کامل سرِ `costsOf`ِ JS.
-   */
-  /**
-   *  `approved` = تصمیمِ D-23 ثبت شده و همین روش مصوب است؛ تا آن روز سود همیشه «تقریبی» است
-   *  (v3 ۱۵.۴ بند ۴، BLOCKERS.md). LINE هرگز سودِ قطعی نمی‌دهد.
+   *  بهای هر قلم و هر برگشتی. LINE = `purchasePrice`ِ قلم × مقدار (انتخابِ همان دستگاه، همیشه «تقریبی»).
+   *  MAVG = میانگینِ موزونِ متحرک با **همان** هستهٔ موجودی (`StockCore`، حالتِ RECORDED، یک جایگاه برای
+   *  هر کالا) — شرحِ کامل سرِ `mavgReplay` ِ `license/report-core.js`؛ بردار: `core/test-vectors/cost-v1.json`.
+   *  `approved` = همین روش مصوبِ D-23 است (`CostPolicy.approved`)؛ LINE هرگز سودِ قطعی نمی‌دهد.
    */
   fun costs(l: ReportLedger, mode: Costing, approved: Boolean = false): Costs {
+    if (mode == Costing.MAVG) {
+      val m = mavg(l)
+      return Costs(Costing.MAVG, approved, m.line, m.ret, m.est)
+    }
     val line = HashMap<String, Long>()
     val ret = HashMap<String, Long>()
     val est = HashSet<String>()
+    l.items.forEach {
+      if (it.unitCost == 0L) est += it.id
+      line[it.id] = rnd(it.unitCost.toDouble() * it.qty.toDouble() / 1000.0)
+    }
+    l.returns.forEach { r ->
+      val it = l.itemById[r.saleItemId]
+      ret[r.id] = if (it != null) rnd(it.unitCost.toDouble() * r.qty.toDouble() / 1000.0) else 0L
+    }
+    return Costs(Costing.LINE, false, line, ret, est)
+  }
+
+  private const val STOCK_WH = "main"
+  private const val STOCK_USER = "report"
+
+  private fun safe(x: Long) = x in -StockCore.MAX_SAFE..StockCore.MAX_SAFE
+
+  /** round(a × b ÷ c) ِ هستهٔ موجودی؛ عددِ نا‌امن (بیرون از ۲^۵۳) ⇒ null، نه خطا — همان `mdr` ِ JS */
+  private fun mdr(a: Long, b: Long, c: Long): Long? {
+    if (!safe(a) || !safe(b) || !safe(c) || c <= 0) return null
+    val r = try { StockCore.mulDivRound(a, b, c) } catch (e: ArithmeticException) { return null }
+    return if (safe(r)) r else null
+  }
+
+  private class Mavg(
+    val line: Map<String, Long>, val ret: Map<String, Long>, val est: Set<String>,
+    val books: Map<String, StockBook>, val unknown: Set<String>,
+  )
+
+  /** دوقلوی `mavgReplay` ِ JS — هر گام همان ترتیب و همان سند */
+  private fun mavg(l: ReportLedger): Mavg {
+    val line = HashMap<String, Long>()
+    val ret = HashMap<String, Long>()
+    val est = HashSet<String>()
+    val books = HashMap<String, StockBook>()
+    val unknown = HashSet<String>()
     fun lineMode(it: ReportLedger.Item): Long {
       if (it.unitCost == 0L) est += it.id
       return rnd(it.unitCost.toDouble() * it.qty.toDouble() / 1000.0)
     }
-    if (mode != Costing.MAVG) {
-      l.items.forEach { line[it.id] = lineMode(it) }
-      l.returns.forEach { r ->
-        val it = l.itemById[r.saleItemId]
-        ret[r.id] = if (it != null) rnd(it.unitCost.toDouble() * r.qty.toDouble() / 1000.0) else 0L
-      }
-      return Costs(Costing.LINE, false, line, ret, est)
+    fun step(pid: String, doc: StockDoc): StockResult? {
+      val a = try { StockCore.apply(books[pid] ?: StockBook(), doc, StockMode.RECORDED) } catch (e: ArithmeticException) { return null }
+      if (!a.result.ok) return null
+      books[pid] = a.book
+      return a.result
     }
+    fun posOf(pid: String): Position? = books[pid]?.let { StockCore.position(it, pid, STOCK_WH) }
+    fun afterOut(pid: String) { val p = posOf(pid); if (p != null && p.qtyMilli <= 0) unknown -= pid }
+    fun doc(t: Long, type: String, pid: String, id: String, qty: Long, reason: String? = null, cost: Long? = null, landed: Long? = null) =
+      StockDoc(id, type, pid, STOCK_WH, STOCK_USER, if (t > 0) t else 1L, qtyMilli = qty, reason = reason, costMinor = cost, landedMinor = landed)
+
     class Ev(val t: Long, val k: Int, val id: String, val e: ReportLedger.Entry? = null, val it: ReportLedger.Item? = null, val r: ReportLedger.Return? = null)
     val ev = ArrayList<Ev>()
     l.entries.forEach { ev += Ev(timeOf(it), 0, it.id, e = it) }
@@ -160,62 +205,98 @@ object ReportCore {
     }
     ev.sortWith(compareBy<Ev>({ it.t }, { it.k }, { it.id }))
 
-    class Pool(var q: Long = 0, var v: Long = 0, var unit: Double? = null)
-    val pools = HashMap<String, Pool>()
-    fun pool(pid: String) = pools.getOrPut(pid) { Pool() }
-    var short = false
-    fun take(p: Pool, q: Long, fallbackUnit: Double): Long {
-      short = false
-      val cost = if (p.q > 0 && q <= p.q) rnd(p.v.toDouble() * q.toDouble() / p.q.toDouble())
-      else {
-        short = true
-        val avail = if (p.q > 0) p.q else 0L
-        val unit = p.unit ?: fallbackUnit
-        (if (avail > 0) p.v else 0L) + rnd((q - avail).toDouble() * unit / 1000.0)
-      }
-      p.q -= q; p.v -= cost
-      return cost
-    }
-    fun put(p: Pool, q: Long, value: Long) {
-      if (p.q < 0) {
-        p.q += q
-        p.v = rnd(p.q.toDouble() * value.toDouble() / q.toDouble())
-        p.unit = value.toDouble() * 1000.0 / q.toDouble()
-        return
-      }
-      p.q += q; p.v += value
-      if (p.q > 0) p.unit = p.v.toDouble() * 1000.0 / p.q.toDouble()
-    }
     for (x in ev) {
       when (x.k) {
         0 -> {
           val e = x.e!!
-          val p = pool(e.productId)
-          if (e.qty > 0) {
-            val u = if (!e.adjustment || e.unitCost > 0) e.unitCost.toDouble()
-            else if (p.q > 0) p.v.toDouble() * 1000.0 / p.q.toDouble() else (p.unit ?: 0.0)
-            put(p, e.qty, rnd(e.qty.toDouble() * u / 1000.0))
-          } else if (e.qty < 0) {
-            take(p, -e.qty, p.unit ?: e.unitCost.toDouble())
-          }
+          if (e.productId == "" || e.qty == 0L) continue
+          val adjust = e.adjustment || e.qty < 0
+          val priced = e.qty > 0 && (!e.adjustment || e.unitCost > 0)
+          //  PRD-07: ورودِ خرید به واحدِ خرید ارزشِ دقیقِ خودش را دارد (`costMinor`)، نه مقدار × بهای گردشده
+          val exact = if (!e.adjustment && e.value != null && e.value >= 0) e.value else null
+          val cost = if (priced) exact ?: mdr(e.qty, e.unitCost, 1000) ?: continue else null
+          val p = posOf(e.productId)
+          val blind = e.qty > 0 && cost == null && !(p != null && (p.qtyMilli > 0 || p.lastCost != null))
+          val d = doc(
+            x.t, if (adjust) "count_adjust" else "purchase_receipt", e.productId, "e:" + e.id, e.qty,
+            reason = if (adjust) "adjustment" else null, cost = cost, landed = if (!adjust && e.landed > 0) e.landed else null,
+          )
+          step(e.productId, d) ?: continue
+          if (blind) unknown += e.productId
+          if (e.qty < 0) afterOut(e.productId)
         }
         1 -> {
           val it = x.it!!
-          if (it.productId == "" || it.qty <= 0) line[it.id] = lineMode(it)
-          else { line[it.id] = take(pool(it.productId), it.qty, it.unitCost.toDouble()); if (short) est += it.id }
+          if (it.productId == "" || it.qty <= 0) { line[it.id] = lineMode(it); continue }
+          val wasUnknown = it.productId in unknown
+          val res = step(it.productId, doc(x.t, "sale", it.productId, "s:" + it.id, it.qty))
+          if (res == null) { line[it.id] = lineMode(it); est += it.id; continue }
+          var cost = res.costMinor
+          if (res.shortMilli > 0) {
+            est += it.id
+            val guess = if (res.reviewTask?.reasons?.contains("unknown_cost") == true && it.unitCost > 0) mdr(res.shortMilli, it.unitCost, 1000) else null
+            if (guess != null && safe(cost + guess)) cost += guess
+          }
+          if (wasUnknown) est += it.id
+          line[it.id] = cost
+          afterOut(it.productId)
         }
         else -> {
           val r = x.r!!
           val item = l.itemById[r.saleItemId]
           if (item == null || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0L; continue }
-          val c = rnd(line.getValue(item.id).toDouble() * r.qty.toDouble() / item.qty.toDouble())
-          ret[r.id] = c
-          if (item.productId != "") put(pool(item.productId), r.qty, c)
+          val left = line[item.id] ?: rnd(item.unitCost.toDouble() * item.qty.toDouble() / 1000.0)
+          val c = mdr(left, r.qty, item.qty)
+          ret[r.id] = c ?: 0L
+          if (item.productId == "" || c == null || c < 0) continue
+          step(item.productId, doc(x.t, "customer_return", item.productId, "r:" + r.id, r.qty, cost = c))
         }
       }
     }
     l.items.forEach { if (it.id !in line) line[it.id] = lineMode(it) }
-    return Costs(Costing.MAVG, approved, line, ret, est)
+    return Mavg(line, ret, est, books, unknown)
+  }
+
+  /** PRD-15 — یک کالا: موجودی، ارزش و بهای میانگینِ یک واحد (همان `stockCost` ِ JS) */
+  @Serializable
+  data class StockCostRow(
+    val productId: String, val name: String, val qtyMilli: Long, val valueMinor: Long,
+    /** بهای یک واحد، واحدِ کوچک؛ null = هیچ بهای معلومی نیست */
+    val unitCostMinor: Long?,
+    /** موجودیِ صفر/منفی (بهای آخر) یا پایهٔ نامعلوم */
+    val approximate: Boolean,
+  )
+
+  @Serializable
+  data class StockCostTotals(val products: Int, val valueMinor: Long, val negative: Int, val approximate: Boolean)
+
+  @Serializable
+  data class StockCost(val rows: List<StockCostRow>, val totals: StockCostTotals)
+
+  /**
+   *  PRD-15 — بهای میانگینِ هر کالا و ارزشِ موجودیِ همین حالا از **همان** بازپخشِ میانگینِ موزون؛ فقط خواندنی.
+   *  [products] فقط همان کالاها (عددشان همان است). شرحِ قاعده سرِ `stockCost` ِ JS.
+   */
+  fun stockCost(l: ReportLedger, products: Collection<String>? = null): StockCost {
+    val m = mavg(l)
+    val want = products?.takeIf { it.isNotEmpty() }?.toHashSet()
+    val rows = ArrayList<StockCostRow>()
+    var value = 0L
+    var negative = 0
+    var approx = false
+    for (pid in m.books.keys.sorted()) {
+      if (want != null && pid !in want) continue
+      val p = StockCore.position(m.books.getValue(pid), pid, STOCK_WH) ?: continue
+      val unit = when {
+        p.qtyMilli > 0 -> mdr(p.valueMinor, 1000, p.qtyMilli)
+        p.lastCost != null -> mdr(p.lastCost.num, 1000, p.lastCost.den)
+        else -> null
+      }
+      val a = p.qtyMilli <= 0 || pid in m.unknown
+      rows += StockCostRow(pid, l.products[pid]?.name ?: "", p.qtyMilli, p.valueMinor, unit, a)
+      if (p.qtyMilli > 0) { value += p.valueMinor; if (a) approx = true } else if (p.qtyMilli < 0) negative += 1
+    }
+    return StockCost(rows, StockCostTotals(rows.size, value, negative, approx))
   }
 
   /* ---------------- تخصیصِ تخفیف ---------------- */

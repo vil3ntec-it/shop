@@ -1,0 +1,91 @@
+{
+  "version": 1,
+  "about": "POS-18 — CustomerPrice: قیمتِ خاصِ مشتری، ترتیبِ قیمتِ ردیف، بازهٔ اعتبار، عوض شدنِ مشتری، تخفیفِ خودکار و سقفِ قیمت. پول یک‌صدمِ افغانی، مقدار هزارم. -1 = ندارد، \"-\" = بی مشتری. هر ردیف یک خط.",
+  "active": [
+    { "name": "open-range", "price": 9500, "from": "", "to": "", "date": "2026-11-08", "want": true },
+    { "name": "inside", "price": 9500, "from": "2026-11-01", "to": "2026-11-30", "date": "2026-11-08", "want": true },
+    { "name": "first-day-counts", "price": 9500, "from": "2026-11-08", "to": "", "date": "2026-11-08", "want": true },
+    { "name": "last-day-counts", "price": 9500, "from": "", "to": "2026-11-08", "date": "2026-11-08", "want": true },
+    { "name": "not-yet", "price": 9500, "from": "2026-11-09", "to": "", "date": "2026-11-08", "want": false },
+    { "name": "expired", "price": 9500, "from": "", "to": "2026-11-07", "date": "2026-11-08", "want": false },
+    { "name": "bad-entry-date", "price": 9500, "from": "2026/11/01", "to": "", "date": "2026-11-08", "want": false },
+    { "name": "bad-today", "price": 9500, "from": "", "to": "", "date": "", "want": false },
+    { "name": "zero-price-never", "price": 0, "from": "", "to": "", "date": "2026-11-08", "want": false }
+  ],
+  "resolve": [
+    { "name": "retail-default", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "-", "list": "retail", "byHand": false, "date": "2026-11-08", "want": 10000, "source": "retail" },
+    { "name": "invoice-wholesale", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "-", "list": "wholesale", "byHand": true, "date": "2026-11-08", "want": 9000, "source": "invoice_list" },
+    { "name": "customer-wholesale", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "wholesale", "list": "wholesale", "byHand": false, "date": "2026-11-08", "want": 9000, "source": "customer_list" },
+    { "name": "customer-retail-beats-invoice-list", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "", "list": "wholesale", "byHand": false, "date": "2026-11-08", "want": 10000, "source": "retail" },
+    { "name": "hand-switch-beats-customer-list", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "wholesale", "list": "retail", "byHand": true, "date": "2026-11-08", "want": 10000, "source": "retail" },
+    { "name": "special-beats-customer-list", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": 9500, "from": "", "to": "", "customer": "wholesale", "list": "wholesale", "byHand": false, "date": "2026-11-08", "want": 9500, "source": "special" },
+    { "name": "special-beats-hand-switch", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": 9500, "from": "", "to": "", "customer": "", "list": "wholesale", "byHand": true, "date": "2026-11-08", "want": 9500, "source": "special" },
+    { "name": "manual-allowed-beats-special", "retail": 10000, "wholesale": 9000, "manual": 9700, "allowed": true, "special": 9500, "from": "", "to": "", "customer": "", "list": "retail", "byHand": false, "date": "2026-11-08", "want": 9700, "source": "manual" },
+    { "name": "manual-not-allowed-ignored", "retail": 10000, "wholesale": 9000, "manual": 9700, "allowed": false, "special": 9500, "from": "", "to": "", "customer": "", "list": "retail", "byHand": false, "date": "2026-11-08", "want": 9500, "source": "special" },
+    { "name": "expired-special-falls-back-to-customer-list", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": 9500, "from": "", "to": "2026-11-07", "customer": "wholesale", "list": "wholesale", "byHand": false, "date": "2026-11-08", "want": 9000, "source": "customer_list" },
+    { "name": "future-special-falls-back-to-retail", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": 9500, "from": "2026-12-01", "to": "", "customer": "", "list": "retail", "byHand": false, "date": "2026-11-08", "want": 10000, "source": "retail" },
+    { "name": "no-wholesale-is-retail", "retail": 10000, "wholesale": 0, "manual": -1, "allowed": true, "special": -1, "from": "", "to": "", "customer": "wholesale", "list": "wholesale", "byHand": false, "date": "2026-11-08", "want": 10000, "source": "retail" },
+    { "name": "special-above-retail-is-allowed", "retail": 10000, "wholesale": 9000, "manual": -1, "allowed": true, "special": 10500, "from": "", "to": "", "customer": "", "list": "retail", "byHand": false, "date": "2026-11-08", "want": 10500, "source": "special" }
+  ],
+  "reprice": [
+    { "name": "special-customer-arrives", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "specials": [-1, -1, -1, -1], "fixed": [false, false, false, false], "eProducts": [0, 2], "ePrices": [9500, 7500], "eTo": "", "customer": "", "list": "retail", "byHand": false, "allowed": true, "date": "2026-11-08", "want": [9500, -1, 7777, -1], "wantSpecials": [9500, -1, -1, -1], "changed": 1, "kept": 1, "special": 1 },
+    { "name": "wholesale-customer-with-special", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "specials": [-1, -1, -1, -1], "fixed": [false, false, false, false], "eProducts": [0], "ePrices": [9500], "eTo": "", "customer": "wholesale", "list": "wholesale", "byHand": false, "allowed": true, "date": "2026-11-08", "want": [9500, -1, 7777, 2800], "wantSpecials": [9500, -1, -1, -1], "changed": 2, "kept": 1, "special": 1 },
+    { "name": "expired-special-falls-back", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [9500, -1, 7777, -1], "specials": [9500, -1, -1, -1], "fixed": [false, false, false, false], "eProducts": [0], "ePrices": [9500], "eTo": "2026-11-07", "customer": "", "list": "retail", "byHand": false, "allowed": true, "date": "2026-11-08", "want": [-1, -1, 7777, -1], "wantSpecials": [-1, -1, -1, -1], "changed": 1, "kept": 1, "special": 0 },
+    { "name": "manual-not-allowed-takes-special", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "specials": [-1, -1, -1, -1], "fixed": [false, false, false, false], "eProducts": [2], "ePrices": [7500], "eTo": "", "customer": "", "list": "retail", "byHand": false, "allowed": false, "date": "2026-11-08", "want": [-1, -1, 7500, -1], "wantSpecials": [-1, -1, 7500, -1], "changed": 1, "kept": 0, "special": 1 },
+    { "name": "pack-list-line-untouched", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [9167, -1, -1, -1], "specials": [-1, -1, -1, -1], "fixed": [true, false, false, false], "eProducts": [0], "ePrices": [9500], "eTo": "", "customer": "", "list": "retail", "byHand": false, "allowed": true, "date": "2026-11-08", "want": [9167, -1, -1, -1], "wantSpecials": [-1, -1, -1, -1], "changed": 0, "kept": 0, "special": 0 },
+    { "name": "empty-invoice", "retail": [], "wholesale": [], "units": [], "specials": [], "fixed": [], "eProducts": [0], "ePrices": [9500], "eTo": "", "customer": "", "list": "retail", "byHand": false, "allowed": true, "date": "2026-11-08", "want": [], "wantSpecials": [], "changed": 0, "kept": 0, "special": 0 }
+  ],
+  "switch": [
+    { "name": "special-wholesale-to-retail-customer", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "aProducts": [0], "aPrices": [9500], "aList": "wholesale", "bProducts": [], "bPrices": [], "bList": "", "date": "2026-11-08", "wantA": [9500, -1, 7777, 2800], "wantB": [-1, -1, 7777, -1], "changedB": 2, "keptB": 1 },
+    { "name": "special-customer-to-other-special", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "aProducts": [0], "aPrices": [9500], "aList": "", "bProducts": [0, 1], "bPrices": [9300, 4500], "bList": "", "date": "2026-11-08", "wantA": [9500, -1, 7777, -1], "wantB": [9300, 4500, 7777, -1], "changedB": 2, "keptB": 1 },
+    { "name": "customer-removed-drops-special-keeps-list", "retail": [10000, 5000, 8000, 3000], "wholesale": [9000, 0, 7000, 2800], "units": [-1, -1, 7777, -1], "aProducts": [0], "aPrices": [9500], "aList": "wholesale", "bProducts": [], "bPrices": [], "bList": "-", "date": "2026-11-08", "wantA": [9500, -1, 7777, 2800], "wantB": [9000, -1, 7777, 2800], "changedB": 1, "keptB": 1 }
+  ],
+  "promo": [
+    { "name": "percent-promo-on-special", "special": 9500, "qty": 2000, "kind": "percent", "bp": 1000, "promoUnit": -1, "amount": 19000, "discount": 1900, "net": 17100 },
+    { "name": "promo-price-below-special", "special": 9500, "qty": 2000, "kind": "price", "bp": 0, "promoUnit": 9000, "amount": 19000, "discount": 1000, "net": 18000 },
+    { "name": "promo-price-above-special-gives-nothing", "special": 9500, "qty": 2000, "kind": "price", "bp": 0, "promoUnit": 9800, "amount": 19000, "discount": 0, "net": 19000 }
+  ],
+  "cap": [
+    { "name": "between-lists-no-cap", "retail": 10000, "wholesale": 9000, "special": 9500, "qty": 1000, "role": "cashier", "mode": "", "maxPct": -1, "bp": 556, "reduction": 0, "decision": "allow" },
+    { "name": "between-lists-over-cap", "retail": 10000, "wholesale": 9000, "special": 9500, "qty": 1000, "role": "cashier", "mode": "", "maxPct": 3, "bp": 556, "reduction": 0, "decision": "approve" },
+    { "name": "below-wholesale-is-hidden-discount", "retail": 10000, "wholesale": 9000, "special": 8000, "qty": 1000, "role": "cashier", "mode": "", "maxPct": 10, "bp": 1112, "reduction": 1000, "decision": "approve" },
+    { "name": "below-retail-only-list", "retail": 10000, "wholesale": 0, "special": 9500, "qty": 2000, "role": "staff", "mode": "", "maxPct": -1, "bp": 500, "reduction": 1000, "decision": "allow" },
+    { "name": "role-denied-price-change", "retail": 10000, "wholesale": 0, "special": 9500, "qty": 1000, "role": "staff", "mode": "deny", "maxPct": -1, "bp": 500, "reduction": 500, "decision": "deny" },
+    { "name": "owner-always-free", "retail": 10000, "wholesale": 0, "special": 5000, "qty": 1000, "role": "owner", "mode": "", "maxPct": 1, "bp": 5000, "reduction": 5000, "decision": "allow" },
+    { "name": "within-rounding-tolerance", "retail": 10000, "wholesale": 0, "special": 9950, "qty": 1000, "role": "cashier", "mode": "", "maxPct": 0, "bp": 0, "reduction": 0, "decision": "allow" }
+  ],
+  "amounts": [
+    { "name": "fraction-qty-rounds-half-up", "special": 9500, "qty": 2500, "want": 23800 },
+    { "name": "whole-qty", "special": 9500, "qty": 12000, "want": 114000 },
+    { "name": "small-qty-rounds-to-afghani", "special": 9550, "qty": 100, "want": 1000 }
+  ],
+  "edit": [
+    { "name": "owner", "role": "owner", "mode": "", "want": true },
+    { "name": "single-device-owner", "role": "", "mode": "", "want": true },
+    { "name": "manager", "role": "manager", "mode": "", "want": true },
+    { "name": "staff", "role": "staff", "mode": "", "want": true },
+    { "name": "staff-price-needs-approval", "role": "staff", "mode": "approve", "want": false },
+    { "name": "staff-price-denied", "role": "staff", "mode": "deny", "want": false },
+    { "name": "cashier-no-products", "role": "cashier", "mode": "", "want": false },
+    { "name": "storekeeper-no-debtors", "role": "storekeeper", "mode": "", "want": false },
+    { "name": "accountant", "role": "accountant", "mode": "", "want": false },
+    { "name": "picker", "role": "picker", "mode": "", "want": false },
+    { "name": "unknown-role", "role": "ghost", "mode": "", "want": false }
+  ],
+  "check": [
+    { "name": "ok", "product": "p1", "price": 9500, "from": "", "to": "", "others": 0, "dup": false, "want": "" },
+    { "name": "blank-product", "product": " ", "price": 9500, "from": "", "to": "", "others": 0, "dup": false, "want": "product" },
+    { "name": "zero-price", "product": "p1", "price": 0, "from": "", "to": "", "others": 0, "dup": false, "want": "price" },
+    { "name": "too-large", "product": "p1", "price": 100000000001, "from": "", "to": "", "others": 0, "dup": false, "want": "price" },
+    { "name": "bad-date", "product": "p1", "price": 9500, "from": "1405-08-17x", "to": "", "others": 0, "dup": false, "want": "date" },
+    { "name": "reversed-range", "product": "p1", "price": 9500, "from": "2026-12-01", "to": "2026-11-01", "others": 0, "dup": false, "want": "range" },
+    { "name": "one-day-range", "product": "p1", "price": 9500, "from": "2026-12-01", "to": "2026-12-01", "others": 0, "dup": false, "want": "" },
+    { "name": "duplicate-product", "product": "p1", "price": 9500, "from": "", "to": "", "others": 1, "dup": true, "want": "duplicate" },
+    { "name": "full", "product": "p1", "price": 9500, "from": "", "to": "", "others": 200, "dup": false, "want": "full" }
+  ],
+  "stamp": [
+    { "name": "sold-at-special", "special": 9500, "sold": 9500, "want": "special" },
+    { "name": "edited-after-special", "special": 9500, "sold": 9400, "want": "" },
+    { "name": "no-special", "special": -1, "sold": 9500, "want": "" }
+  ]
+}

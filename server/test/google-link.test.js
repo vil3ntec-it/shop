@@ -310,3 +310,26 @@ test('AUTH-03: صادرکنندهٔ دیگر (iss) با امضای درست هم
     assert.equal(ok.status, 201, `iss=${iss} ${JSON.stringify(ok.body)}`);
   }
 });
+
+test('⛔ وصلِ گوگل فقط با سنجشِ سرور (CodeQL `js/user-controlled-bypass`): پرچم/سرآیندِ «اثبات شد» یا رمزِ غیرِرشته ⇒ ۴۰۹؛ کدِ غلط رد؛ هیچ وصل', async () => {
+  const u = await h.newUser('بی دورزدنِ وصل');
+  const idToken = googleToken({ sub: 'g-sub-bypass', email: u.email });
+  for (const [extra, headers] of [
+    [{ linked: true, via: 'password', method: 'email_code', emailVerified: true, proved: true }, { 'X-Link-Proof': 'password', 'X-Verified': 'true' }],
+    [{ password: [u.password] }, {}],
+    [{ password: { value: u.password }, method: 'password' }, {}],
+  ]) {
+    const r = await h.api('POST', '/api/auth/google', { body: { idToken, ...extra }, headers });
+    assert.equal(r.status, 409, `${JSON.stringify(extra)} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
+    assert.equal(r.body.error.code, 'google_link_required');
+    assert.equal(r.body.accessToken, undefined, 'هیچ نشستی صادر نشد');
+  }
+  const badCode = await h.post('/api/auth/google', { idToken, code: '000000', linked: true });
+  assert.ok(badCode.status >= 400, JSON.stringify(badCode.body));
+  assert.equal((await identities(u.user.id)).length, 0, 'گوگل وصل نشد');
+  assert.equal((await linkAudits(u.user.id)).length, 0);
+  //  رازِ درست، همان رفتارِ پیشین
+  const ok = await h.post('/api/auth/google', { idToken, password: u.password });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await identities(u.user.id)).length, 1);
+});

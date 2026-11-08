@@ -47,6 +47,8 @@ internal object IosBoot {
   }
 
   val store: ShopStore by lazy {
+    //  هویتِ دستگاه پیش از دفتر، همگام‌سازی و هر درخواستی (`Backend` شناسه را یک بار می‌خواند)
+    ir.vil3ntec.tohid.ios.identity.IosDeviceIdentity.check()
     ir.vil3ntec.tohid.data.platform.CrashReporter.install(IosContext)
     ir.vil3ntec.tohid.platform.ServerSwitchAndroid.applyPending(IosContext)
     val s = ShopStore(IosContext)

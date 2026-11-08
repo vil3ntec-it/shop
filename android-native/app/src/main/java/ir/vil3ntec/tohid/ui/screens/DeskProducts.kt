@@ -842,6 +842,9 @@ private fun EditPanel(
   var tags by remember { mutableStateOf(p.tags.orEmpty().joinToString("، ")) }
   //  PRD-04 (همان پرچم): بسته‌ها با بارکدِ هر واحد
   var packs by remember { mutableStateOf(p.packs.orEmpty().map { ir.vil3ntec.tohid.core.product.PackBarcodes.draftOf(ShopStore.coreOf(it)) }) }
+  //  PRD-07 (همان پرچم): واحدهای خریدِ چندگانه؛ نوشتن فقط با نقشی که کالا می‌نویسد
+  var purchaseUnits by remember { mutableStateOf(purchaseUnitDrafts(p)) }
+  val canEditUnits = remember { ir.vil3ntec.tohid.data.ShopRole.canWrite(context, "products") }
   var cycle by remember { mutableStateOf(ir.vil3ntec.tohid.data.ProductCycle.text(p.consumptionDays)) }   //  MKT-06 چرخهٔ مصرف (روز، اختیاری)
   var category by remember { mutableStateOf(p.category) }
   var unit by remember { mutableStateOf(p.unit) }
@@ -872,6 +875,7 @@ private fun EditPanel(
       brand = if (tools) brand else null,
       tags = if (tools) ProductLabels.tags(tags) else null,
       packs = if (tools) packs else null,
+      purchaseUnits = if (tools && canEditUnits) purchaseUnits else null,
       editLevels = levelsOn,
       reorderPoint = if (levelsOn) levelNumber(reorder) else null,
       maxStock = if (levelsOn) levelNumber(maxStock) else null,
@@ -929,6 +933,8 @@ private fun EditPanel(
       F(unit, { unit = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.unit)
       if (tools) {
         PackEditor(packs, unit) { packs = it }
+        Spacer(Modifier.height(6.dp))
+        PurchaseUnitEditor(purchaseUnits, unit, d.suppliers, canEditUnits) { purchaseUnits = it }
         Spacer(Modifier.height(6.dp))
       }
       Row {

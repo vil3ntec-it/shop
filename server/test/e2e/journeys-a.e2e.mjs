@@ -10,6 +10,8 @@
  *   J3  چرخهٔ قرض: فروشِ نسیه ⇐ پرداختِ جزئی روی دو دستگاه هم‌زمان (آفلاین) ⇐ تسویهٔ کامل ⇐ مانده همه‌جا صفر.
  *   J4  جابه‌جاییِ دستگاه: صاحب برنامه را پاک و دوباره نصب می‌کند (دفترِ محلی هیچ) ⇐ ورود ⇐ همه برمی‌گردد و فروشِ
  *       تازه شمارهٔ تکراری نمی‌سازد.
+ *   J6  INV-10: فروشِ آفلاینِ A پیش از شمارش ⇐ B قفسه را ۱۷ می‌شمارد و ثبت می‌شود ⇐ A دیر می‌فرستد ⇐ A، B و سرور
+ *       (دفترِ همگام‌سازی و موجودیِ کاتالوگ) همه ۱۷، نه ۱۴؛ فروش در دفتر می‌ماند و جذب در سابقه دیده می‌شود.
  *   J5  دو دستگاه قیمتِ یک کالا را آفلاین عوض می‌کنند ⇐ یکی برنده، بازنده در صندوقِ تعارضِ سرور و در سابقهٔ هر دو
  *       دستگاه؛ هیچ چیزی بی‌صدا گم نمی‌شود.
  *
@@ -293,6 +295,54 @@ await E.step('J2b', 'همان گوشی: صاحب خارج، شاگرد با کد
   assert.equal(O.ledger.sales.filter((x) => x.seller === 'حسن').length, 2);
   if (!KOTLIN.invoiceBySeries) throw new Error('InvoiceNumber.next در SalesEngine.record ِ کاتلین نیست');
 }, { needs: ['J2', 'J4'] });
+
+await E.step('J6', 'INV-10: فروشِ آفلاینِ A پیش از شمارش ⇐ شمارشِ ۱۷ روی B ⇐ A دیر می‌فرستد ⇐ A، B و سرور همه ۱۷', async () => {
+  const boss = await E.owner('owner-count@e2e.local', 'صاحبِ شمارش', 'دکانِ شمارش');
+  await E.flag(boss.shopId, 'shop.catalog');
+  await E.flag(boss.shopId, 'shop.count_absorb');
+  const X = await E.device('X-count-phone', boss.email);
+  assert.equal((await X.firstSync()).ok, true);
+  const Y = await E.device('Y-count-desktop', boss.email, { appVersion: '1.0.9999' });
+  assert.equal((await Y.firstSync()).ok, true);
+  assert.equal(await X.stockFlags(), true);
+  assert.equal(await Y.stockFlags(), true);
+  const oil = X.stockIn({ name: 'روغن', price: 100, cost: 80, units: 20 });
+  await X.drain(); await Y.drain();
+  const floor = async (dev) => {
+    const r = await dev.api('GET', `/shop/catalog/products/${oil}`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return r.body.product.stock.levels.shop_floor;
+  };
+  assert.equal(await floor(Y), 20_000);
+
+  //  ۱۰:۰۰ — A آفلاین ۳ می‌فروشد (هنوز نفرستاده)
+  X.offline = true;
+  assert.equal(X.sell({ lines: [{ id: oil, qty: 3 }] }).ok, true);
+  assert.equal(X.stock(oil), 17);
+  //  ۱۰:۳۰ — B قفسه را می‌شمارد: ۱۷ (عددِ درست پس از فروشِ A) و ثبت می‌شود
+  await new Promise((r) => setTimeout(r, 5));
+  assert.equal(Y.count({ [oil]: 17 }, { [oil]: Date.now() }), 1);
+  await Y.drain();
+  assert.equal(Y.stock(oil), 17);
+  assert.equal(await floor(Y), 17_000);
+  //  ۱۱:۰۰ — A برمی‌گردد و فروشِ ۱۰:۰۰ را می‌فرستد ⇒ هیچ‌جا ۱۴ نیست
+  X.offline = false;
+  await X.drain(); await Y.drain(); await X.drain();
+  assert.equal(X.stock(oil), 17, 'A');
+  assert.equal(Y.stock(oil), 17, 'B');
+  assert.equal(await floor(X), 17_000, 'موجودیِ کاتالوگِ سرور');
+  await assertSameEverywhere('J6 · پس از فروشِ دیررس', [X, Y], { expect: { sales: 1, stock: { [oil]: 17 } } });
+  //  فروش در دفتر و گزارش می‌ماند؛ جذب با یادداشت در سابقهٔ سرور
+  const mv = await X.api('GET', `/shop/catalog/moves?productId=${oil}&limit=100`);
+  assert.equal(mv.status, 200);
+  assert.deepEqual(mv.body.items.filter((m) => m.type === 'sale').map((m) => m.qtyMilli), [3000]);
+  assert.deepEqual(mv.body.items.filter((m) => m.reason === 'count_absorb').map((m) => [m.deltaOnHandMilli, m.note]),
+    [[3000, 'پیش از شمارش ثبت شده بود — در شمارش آمده است']]);
+  //  پرچم خاموش روی همان دستگاه ⇒ همان ۱۴ ِ امروز (شکاف بسته شد، نه پنهان)
+  X.countAbsorb = false;
+  assert.equal(X.stock(oil), 14);
+  X.countAbsorb = true;
+});
 
 await E.step('J.db', 'سرور: هیچ op ِ تکراری در دفترِ دکان و هیچ حسابِ شبح از کدهای شاگرد', async () => {
   const dup = await db.many(`SELECT op_id, COUNT(*)::int AS n FROM oplog GROUP BY op_id HAVING COUNT(*) > 1`);

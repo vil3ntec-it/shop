@@ -375,13 +375,13 @@ function messageView(viewer, r, conv) {
       thumbSize: r.thumb_size == null ? null : n(r.thumb_size),
     } : null,
   };
-  //  رسید فقط برای پیامِ طرفِ خودِ بیننده معنا دارد
+  //  رسید فقط برای پیامِ طرفِ خودِ بیننده؛ `deleteUntil` (ساعتِ سرور) مهلتِ «حذف برای همه» ِ مشتری است و `remove` باز هم می‌سنجد (CHAT-08)
   if (r.sender === viewer.side) {
     v.clientId = r.client_id;
     v.status = deliveryStatus(n(r.seq), conv, r.sender);
+    if (viewer.side === 'customer') v.deleteUntil = n(r.created_at) + config.shopChat.deleteWindowMs;
   }
-  //  ⛔ شناسهٔ کارمند فقط درونِ دکان
-  if (viewer.side === 'shop' && r.sender === 'shop') v.senderUserId = r.sender_user_id;
+  if (viewer.side === 'shop' && r.sender === 'shop') v.senderUserId = r.sender_user_id; //  ⛔ شناسهٔ کارمند فقط درونِ دکان
   return v;
 }
 
@@ -673,13 +673,13 @@ async function putMedia(viewer, id, buf, { role = 'main' } = {}) {
     throw forbidden('این دکان پیامِ شما را نمی‌پذیرد', 'chat_blocked');
   }
   await life.assertOpen(null, conv.id);
-  if (!Buffer.isBuffer(buf) || !buf.length) throw badRequest('فایل خالی است', 'bad_media');
-  const s = chatMedia.sniff(buf);
+  const bytes = require('./raw-body').mediaBytes(buf);   //  ⛔ نوع با typeof/Array.isArray، نه `Buffer.isBuffer` (type confusion)
+  const s = chatMedia.sniff(bytes);
   if (!s) throw new ApiError(415, 'unsupported_media', 'فقط عکس (JPG، PNG، WebP)، پیامِ صوتی (Opus، AAC، MP3، AMR) و PDF');
   if (ro === 'thumb' && s.kind !== 'image') throw new ApiError(415, 'unsupported_media', 'پیش‌نمایش باید عکس باشد');
   const cap = capOf(s.kind, ro);
-  if (buf.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
-  const data = s.kind === 'image' ? chatMedia.cleanImage(buf, s.mime, ro) : buf;   //  سقفِ ابعاد از سرآیند (CHAT-05)
+  if (bytes.length > cap) throw new ApiError(413, 'too_large', `فایل بزرگ‌تر از ${kb(cap)} است`);
+  const data = s.kind === 'image' ? chatMedia.cleanImage(bytes, s.mime, ro) : bytes;   //  سقفِ ابعاد از سرآیند (CHAT-05)
   const hash = sha256(data);
   const ins = await mediaStore.chat.put(conv.shop_id, s.mime, data, async (st) => (st.used = await one(
     `INSERT INTO shop_chat_media (id, shop_id, conversation_id, uploader, uploader_user_id, role, kind, mime, size, sha256, data, created_at, store_key)

@@ -198,7 +198,7 @@
       var st = K.stockOf(x);
       $('ps-cat').textContent = x.category || '';
       $('ps-cat').hidden = !x.category;
-      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1, x.photoVersion), alt: '', width: '300', height: '300' } })
+      K.clear($('ps-img')).appendChild(x.photo ? el('img', { attrs: { src: photoUrl(x.id, 1, x.photoVersion), alt: '', width: '300', height: '300', fetchpriority: 'high' } })
         : el('span', { class: 'ph', text: String(x.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
       $('ps-img').classList.toggle('photo', Boolean(x.photo));
       $('ps-img').classList.toggle('tile', Boolean(x.photo));

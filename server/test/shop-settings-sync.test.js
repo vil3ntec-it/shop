@@ -126,6 +126,26 @@ test('فقط صاحب و مدیر: شاگرد ۴۰۳؛ سابقه: پیش/پس/�
   assert.ok(detail.changed.split(',').includes('tohid-policy:cash_rounding'), JSON.stringify(detail));
 });
 
+test('لایهٔ نقش (STF-01..03): مدیری که صاحب «تنظیمات» را برایش بسته `write: false` می‌گیرد — همان سنجشِ PUT', async () => {
+  //  پیش از این `permissions.write` فقط نقش را می‌دید ⇒ `true`، و برنامه (`ShopSettingsPlan.plan`) تغییرِ محلی را هر دور
+  //  می‌فرستاد (۴۰۳) و مقدارِ دکان را هرگز نمی‌نشاند: قاعدهٔ پولِ گوشیِ مدیر برای همیشه جدا از دکان
+  resetAll();
+  const deny = await h.put('/api/shop/permissions/roles/manager', { perms: { 'settings.write': { mode: 'deny' } } }, { token: owner.accessToken });
+  assert.equal(deny.status, 200, JSON.stringify(deny.body));
+  try {
+    const r = (await get(manager)).body;
+    assert.equal(r.enabled, true);
+    assert.equal(r.permissions.write, false, 'مدیرِ بسته‌شده می‌خواند ولی نمی‌نویسد');
+    const w = await put(manager, [P('cash_rounding', 'l', 7)]);
+    assert.deepEqual([w.status, w.body.error?.code], [403, 'permission_denied'], 'سرور همان را می‌گوید که GET گفت');
+    assert.equal((await get(owner)).body.permissions.write, true, 'صاحب هرگز بسته نمی‌شود');
+  } finally {
+    resetAll();
+    assert.equal((await h.put('/api/shop/permissions/roles/manager', { perms: {} }, { token: owner.accessToken })).status, 200);
+  }
+  assert.equal((await get(manager)).body.permissions.write, true, 'لایهٔ خالی = برگشت به نقش');
+});
+
 test('جدایی: دکانِ دیگر نه می‌بیند نه می‌نویسد؛ پمپ به این در نمی‌رسد', async () => {
   await flag(true, 'all');
   const mine = (await get(other)).body;

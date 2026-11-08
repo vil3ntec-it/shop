@@ -81,6 +81,7 @@ const NO_TENANT = {
   'GET /api/releases/:tag/file/:name': 'فایلِ انتشارِ عمومی',
   'GET /api/receipt/:tag/:token': 'رسیدِ QR با توکنِ HMAC — receipt-public.test.js، receipt-token.test.js',
   'POST /api/auth/staff': 'پیوستن با کد — staff-code.test.js', 'POST /api/auth/staff-login': 'ورودِ شاگرد با کد — staff-login.test.js',
+  'POST /api/auth/staff/device-key': 'رازِ دستگاهِ شاگرد برای نشستِ خودش؛ دکان از عضویتِ خودِ توکن، دستگاه از ردیفِ توکن — staff-session-guard.test.js',
   'POST /api/auth/register': 'ثبت‌نام (بسته)', 'POST /api/auth/register/start': 'ثبت‌نام', 'POST /api/auth/register/verify': 'ثبت‌نام',
   'POST /api/auth/register/complete': 'ثبت‌نام', 'GET /api/auth/terms': 'شرایط', 'POST /api/auth/login': 'ورود',
   'POST /api/auth/otp/request': 'کدِ ورود', 'POST /api/auth/otp/verify': 'کدِ ورود', 'POST /api/auth/google': 'ورود با گوگل',
@@ -160,6 +161,7 @@ async function seedShop(label) {
   assert.equal(ph.status, 200, JSON.stringify(ph.body));
   M.photoHash = ph.body.hash;
   assert.ok(M.photoHash, JSON.stringify(ph.body));
+  I.photoHash = M.photoHash;   //  `of` ِ درِ کارتِ ویترین (WEB-15، مهاجرتِ ۳۵۰)
   const inbox = await h.post('/api/sync/v1/photo-inbox', { data: jpegB64(label.length + 9), pair: PAIR, product_id: I.v1prod, device_id: I.device }, { token: o.token });
   assert.equal(inbox.status, 200, JSON.stringify(inbox.body));
   I.inbox = inbox.body.id;
@@ -251,6 +253,7 @@ function casesFor(I) {
   add('GET /api/sync/v1/photos', { url: '/api/sync/v1/photos?since=0', own: ['photoHash'] });
   add('GET /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}`, own: ['photoHash'] });
   add('PUT /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}`, body: () => ({ data: jpegB64(77) }) });
+  add('PUT /api/sync/v1/photos/:productId/thumb', { url: `/api/sync/v1/photos/${I.v1prod}/thumb`, body: () => ({ data: jpegB64(79), of: I.photoHash }) });
   add('DELETE /api/sync/v1/photos/:productId', { url: `/api/sync/v1/photos/${I.v1prod}` });
   add('POST /api/sync/v1/photo-inbox', { url: '/api/sync/v1/photo-inbox', body: () => ({ data: jpegB64(78), pair: PAIR, product_id: I.v1prod }) });
   add('GET /api/sync/v1/photo-inbox', { url: `/api/sync/v1/photo-inbox?pair=${PAIR}`, own: ['inboxId'] });

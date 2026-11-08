@@ -69,6 +69,7 @@
 const crypto = require('node:crypto');
 const { WebSocketServer, WebSocket } = require('ws');
 const { resolveToken, resolveSession, contextOfRow, appAlias } = require('./sync-v1-auth');
+const { bearerToken } = require('./bearer');
 const cluster = require('./cluster');
 
 const PATHS = ['/sync/live', '/api/sync/live', '/api/sync/v1/live', '/api/v1/sync/v1/live'];
@@ -572,15 +573,14 @@ function attach(server) {
     try { url = new URL(req.url, 'http://localhost'); } catch { return reject(socket, 400, 'Bad Request'); }
     if (!PATHS.includes(url.pathname)) return reject(socket, 404, 'Not Found');
 
-    const h = req.headers.authorization || '';
-    const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+    const bt = bearerToken(req.headers.authorization);   //  پارسرِ خطی با سقفِ طول (`lib/bearer.js`)
     const ticket = url.searchParams.get('ticket');
     //  بلیتِ خوشه (`c1.`، فقط با `CLUSTER_ENABLED`) با پایگاه مصرف می‌شود؛ بقیه همان راهِ همیشگی
     const shared = ticket != null && cluster.enabled() && ticket.startsWith(SHARED_PREFIX) ? takeShared(ticket) : null;
     //  ⛔ بلیتِ خوشه: توکنِ پشتِ بلیت همان توکنِ سوکت است (مثلِ `takeTicket`)؛ سنجشِ دوبارهٔ لایهٔ ۲ و تپشِ `dropRevoked`
     //  با همین می‌سنجند. پیش‌تر '' می‌ماند ⇒ نخستین خبرِ پس از `RECHECK_MS` سوکتِ سالم را 4401 `session_revoked` می‌بست
     let token = shared ? '' : ticket != null ? takeTicket(ticket)
-      : m ? m[1].trim() : (url.searchParams.get('token') || '');
+      : bt || (url.searchParams.get('token') || '');
     const deviceId = String(url.searchParams.get('device_id') || req.headers['x-device'] || '').slice(0, 64);
     //  S78: کلاینتی که پس از 4403 با توکنِ تازه برمی‌گردد، `caps=expiry` می‌فرستد
     const caps = String(url.searchParams.get('caps') || '').slice(0, 64).split(',').map((c) => c.trim());

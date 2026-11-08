@@ -119,4 +119,44 @@ object StrReportPages {
     "The count of each type is this row's column; “Approved work of …” is someone else's action that this user approved.",
     "د هر ډول شمېر د همدې قطار ستون دی؛ «د … د کار تایید» د بل چا کار دی چې دې کارن تایید کړ.",
   )
+
+  // ── PRM-16: «اثرِ تخفیف» (`PromoFresh`) ──
+  val promoTab: String get() = t("اثرِ تخفیف", "Promotion effect", "د تخفیف اغېز")
+  val promoTitle: String get() = t("اثرِ هر تخفیفِ خودکار روی فروش و سود", "Effect of each automatic promotion on sales and profit", "پر پلور او ګټې د هر اتومات تخفیف اغېز")
+  val colPromo: String get() = t("تخفیف", "Promotion", "تخفیف")
+  val colPromoDiscount: String get() = t("مبلغِ تخفیف", "Discount given", "د تخفیف اندازه")
+  val colNetSales: String get() = t("فروشِ خالص", "Net sales", "خالص پلور")
+  val colProfit: String get() = t("سودِ ناخالص", "Gross profit", "ناخالصه ګټه")
+  val colShare: String get() = t("سهم از فروش", "Share of sales", "په پلور کې برخه")
+  val colDepth: String get() = t("عمقِ تخفیف", "Discount depth", "د تخفیف ژوروالی")
+  val colApprox: String get() = t("تقریبی", "Approximate", "نږدې")
+  val promoTotal: String get() = t("جمع (هر قلم یک بار)", "Total (each line once)", "ټول (هره کرښه یو ځل)")
+  val promoNone: String get() = t("در این بازه هیچ قلمی تخفیفِ خودکار نگرفته است.", "No line got an automatic promotion in this period.", "په دې موده کې هېڅ کرښې اتومات تخفیف نه دی اخیستی.")
+  val promoNote: String get() = t(
+    "قلمی که دو تخفیف گرفت در هر دو ردیف می‌آید؛ «جمع» هر قلم را یک بار می‌شمارد. سود با همان روشِ بهای «سود و حاشیه».",
+    "A line with two promotions appears in both rows; the total counts each line once. Profit uses the same costing as “Profit and margin”.",
+    "هغه کرښه چې دوه تخفیفه یې اخیستي په دواړو قطارونو کې راځي؛ «ټول» هره کرښه یو ځل شمېري. ګټه د «ګټې او حاشیې» په هماغه بیه.",
+  )
+  val promoFailed: String get() = t(
+    "اثرِ تخفیف حساب نشد: مقدار یا مبلغی بیرون از بازه است.",
+    "The promotion effect could not be computed: a quantity or amount is out of range.",
+    "د تخفیف اغېز حساب نه شو: یو مقدار یا مبلغ له حد بهر دی.",
+  )
+
+  // ── PRD-15: «بهای میانگین» (`StockCostFresh`) ──
+  val stockCostTab: String get() = t("بهای میانگین", "Average cost", "منځنۍ بیه")
+  val stockCostTitle: String get() = t("بهای میانگینِ موزون و ارزشِ موجودی", "Weighted average cost and stock value", "منځنۍ وزن لرونکې بیه او د موجودۍ ارزښت")
+  val colProduct: String get() = t("کالا", "Product", "توکی")
+  val colUnitCost: String get() = t("بهای یک واحد", "Unit cost", "د یو واحد بیه")
+  val colStockValue: String get() = t("ارزشِ موجودی", "Stock value", "د موجودۍ ارزښت")
+  val stockCostNote: String get() = t(
+    "میانگینِ موزونِ متحرک از ورود، فروش و برگشت به ترتیبِ زمان — همان بهای «سود و حاشیه»؛ فقط خواندنی. «تقریبی» یعنی موجودی تمام شده یا بهای پایه معلوم نیست.",
+    "Moving weighted average from receipts, sales and returns in time order — the same cost as “Profit and margin”; read-only. “Approximate” means the stock ran out or the base cost is unknown.",
+    "متحرکه وزن لرونکې منځنۍ بیه د راوړلو، پلور او بېرته راتګ له مخې د وخت په ترتیب — د «ګټې او حاشیې» هماغه بیه؛ یوازې لوستل. «نږدې» یعنې موجودي پای ته رسېدلې یا اصلي بیه نه ده معلومه.",
+  )
+  fun negativeStock(n: Any?): String = t(
+    "${asIs(n)} کالا موجودیِ منفی دارد و در جمع نیست.",
+    "$n ${pl(n ?: 0, "product has", "products have")} negative stock and ${pl(n ?: 0, "is", "are")} not in the total.",
+    "$n توکي منفي موجودي لري او په ټولګه کې نه دي.",
+  )
 }

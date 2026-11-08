@@ -349,6 +349,7 @@ fun main() {
               )
               ir.vil3ntec.tohid.ui.components.keys.KeyLabelsOverlay() //  S50: برچسب‌های Ctrl (تنظیمِ خاموش ⇒ هیچ)
             }
+            SessionLostNotice(context)
           }
         }
       }
@@ -356,6 +357,41 @@ fun main() {
   }
 }
 
+
+/**
+ *  کلیدِ نشست همین حالا خوانده نشد (کلیددانِ سیستم قفل و فایلی نیست، `SecretBox`) ⇒ یک بار پیامِ روشن: «دوباره وارد
+ *  شوید»، داده سالم است، و راهِ برگشتِ همان نشست. سنجش بیرون از نخِ رابط (Keychain شاید بپرسد)؛ هیچ چیز پاک نمی‌شود.
+ */
+@androidx.compose.runtime.Composable
+private fun SessionLostNotice(context: android.content.Context) {
+  var notice by remember { mutableStateOf<Boolean?>(null) }
+  LaunchedEffect(Unit) {
+    notice = kotlinx.coroutines.withContext(Dispatchers.IO) {
+      runCatching {
+        //  همان خواندنِ آغازِ برنامه: نشستِ ذخیره‌شده‌ای که باز نشد ⇒ `SecretBox.lostNotice`
+        val tokens = ir.vil3ntec.tohid.core.net.TokenStore(context)
+        tokens.accessToken
+        tokens.refreshToken
+        SecretBox.lostNotice() != null
+      }.getOrDefault(false)
+    }
+  }
+  if (notice != true) return
+  //  متن هر بار از نو ⇒ همان زبانِ همین دم (دری هم)
+  val text = SecretBox.lostNotice() ?: return
+  val c = Shop.colors
+  androidx.compose.material3.AlertDialog(
+    onDismissRequest = { notice = false },
+    containerColor = c.surfaceSolid,
+    title = { androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.StrAppData.deskSessionLostTitle, color = c.text) },
+    text = { androidx.compose.material3.Text(text, color = c.text) },
+    confirmButton = {
+      androidx.compose.material3.TextButton(onClick = { notice = false }) {
+        androidx.compose.material3.Text(ir.vil3ntec.tohid.core.i18n.Str.close)
+      }
+    },
+  )
+}
 
 /** پنجرهٔ «میان‌برهای صفحه‌کلید» — همان چیزهایی که `onPreviewKeyEvent` می‌گیرد */
 @androidx.compose.runtime.Composable

@@ -183,12 +183,27 @@ async function list(shopId) {
   );
 }
 
-async function revoke(shopId, codeId) {
-  const r = await one(
-    `UPDATE staff_codes SET status='revoked' WHERE id=$1 AND shop_id=$2 AND status='active' RETURNING id`,
-    [codeId, shopId]
-  );
-  if (!r) throw notFound('کد پیدا نشد یا از قبل باطل شده است', 'code_not_found');
+/**
+ * باطل کردنِ کد به دستِ صاحب. ⛔ کدِ **شماره‌دارِ** غیرِ ثابت مالِ کسی است که خرجش کرد (`assertValidForMember`) ⇒
+ * رازهای دستگاهِ همان عضو(ها) در همین دکان در **همان تراکنش** باطل می‌شوند (`staff-device-keys.revokeIn`): دستگاه
+ * فقط با کدِ تازه برمی‌گردد، نه با رازِ پیشین + کدِ ثابتِ دکان. کدِ ثابت مالِ همه است ⇒ هیچ رازی.
+ */
+async function revoke(shopId, codeId, { by = '', ip = '' } = {}) {
+  const deviceKeys = require('./staff-device-keys');
+  const keys = await tx(async (c) => {
+    const r = (await c.query(
+      `UPDATE staff_codes SET status='revoked' WHERE id=$1 AND shop_id=$2 AND status='active'
+       RETURNING id, standing, max_uses`,
+      [codeId, shopId]
+    )).rows[0];
+    if (!r) throw notFound('کد پیدا نشد یا از قبل باطل شده است', 'code_not_found');
+    if (r.standing || !(Number(r.max_uses) > 0)) return deviceKeys.NONE;
+    const users = (await c.query('SELECT DISTINCT user_id FROM staff_code_uses WHERE staff_code_id=$1', [r.id]))
+      .rows.map((x) => x.user_id);
+    return deviceKeys.revokeIn(c, { shopId, userIds: users, reason: 'code_revoked', by, ip, detail: { invite: r.id } });
+    //  («invite» نه «code…»: کلیدِ «code» در سابقه پاک می‌شود — `audit.scrub`)
+  });
+  await keys.afterCommit();
   return true;
 }
 
@@ -205,11 +220,19 @@ async function revoke(shopId, codeId) {
  * این کار `redeem` را صدا می‌زدیم، هر بار یک استفاده از کد می‌خورد.
  */
 async function shopIdOf(rawCode) {
+  return (await codeRow(rawCode)).shop_id;
+}
+
+/**
+ * ردیفِ کد (هر وضعیتی) بی خرج کردن — `/auth/staff` با آن هم دکان را می‌فهمد و هم (برای عضوِ موجود) اعتبارِ کد را
+ * با `assertValidForMember` می‌سنجد. قالبِ بد یا کدِ ناموجود ⇒ همان `bad_code` ِ همیشگی.
+ */
+async function codeRow(rawCode) {
   const normalized = normalize(rawCode);
   if (normalized.length !== PREFIX.length + GROUPS * GROUP_LEN || !normalized.startsWith(PREFIX)) {
     throw badRequest('قالب کد درست نیست', 'bad_code');
   }
-  const row = await one('SELECT shop_id FROM staff_codes WHERE code_hash=$1', [hashCode(normalized)]);
+  const row = await one('SELECT * FROM staff_codes WHERE code_hash=$1', [hashCode(normalized)]);
   if (!row) throw notFound('این کد معتبر نیست', 'bad_code');
   /*
    * وضعیت کد اینجا سنجیده نمی‌شود، عمداً.
@@ -219,9 +242,51 @@ async function shopIdOf(rawCode) {
    * نمی‌شد — با اینکه عضو فعال همان دکان است.
    *
    * سدّ سرِ جایش است: کسی که هنوز عضو نیست از `redeem` رد می‌شود و
-   * آنجا وضعیت، مهلت و تعداد استفاده همه بررسی می‌شوند.
+   * آنجا وضعیت، مهلت و تعداد استفاده همه بررسی می‌شوند؛ عضوِ موجود از
+   * `assertValidForMember` (باطل، تمام‌شده، مالِ کسِ دیگر) — `/auth/staff`.
    */
-  return row.shop_id;
+  return row;
+}
+
+/** مهلتِ کد گذشته؟ (`expires_at` با ساعتِ سرور، نه برنامه) */
+function expired(code) {
+  return Boolean(code.expires_at) && Number(code.expires_at) < now();
+}
+
+/**
+ * ⛔ ورودِ دوبارهٔ **عضوِ فعالِ** همین دکان با کد (`/auth/staff`، پرچمِ `auth.staff_session_guard`).
+ *
+ * پیش‌تر برای عضوِ موجود وضعیتِ کد اصلاً سنجیده نمی‌شد: کدِ باطل‌شده یا کدِ ثابتِ نسلِ پیشین (پس از «عوض کردن»)
+ * هنوز در را باز می‌کرد. حالا:
+ *   - باطل (`revoked` — «عوض کردن»، «خاموش»، حذف یا مهلتِ گذشته در `redeem`) ⇒ `code_inactive`؛
+ *   - مهلتِ گذشته ⇒ `code_expired`؛
+ *   - کدِ شماره‌دارِ غیرِ ثابت (هر کد مالِ کسی که خرجش کرد) ⇒ فقط اگر **همین عضو** خرجش کرده (تمام‌شده هم باشد)،
+ *     یا هنوز جا دارد (کدِ بازی که هر تازه‌واردی را هم می‌پذیرد) — وگرنه `code_used`.
+ * «تمام‌شده» برای خودِ مصرف‌کننده باطل نیست: کدِ یک‌بارِ شاگرد پس از نخستین ورود `exhausted` است و او باید بتواند
+ * با همان کد (و رازِ دستگاهش) دوباره وارد شود.
+ */
+async function assertValidForMember(code, userId) {
+  if (!code) throw notFound('این کد معتبر نیست', 'bad_code');
+  if (code.status === 'revoked') throw forbidden('این کد دیگر کار نمی‌کند', 'code_inactive');
+  if (expired(code)) throw forbidden('مهلت این کد تمام شده است', 'code_expired');
+  if (!code.standing && Number(code.max_uses) > 0) {
+    const open = code.status === 'active' && Number(code.used_count) < Number(code.max_uses);
+    if (open) return true;
+    const mine = await one(
+      'SELECT 1 AS ok FROM staff_code_uses WHERE staff_code_id=$1 AND user_id=$2 LIMIT 1', [code.id, userId]);
+    if (!mine) throw forbidden('این کد قبلاً استفاده شده است', 'code_used');
+  }
+  return true;
+}
+
+/**
+ * «کدِ تازه از صاحبِ دکان»: کدِ شماره‌دارِ غیرِ ثابت که هنوز فعال، در مهلت و با جای خالی است. فقط چنین کدی دستگاهی را
+ * که شناسه‌اش به حسابِ دیگری بسته است ولی رازِ دستگاه را نشان نمی‌دهد (نسخهٔ کهنه، نصبِ تازه، یا مهاجم) راه می‌دهد —
+ * و آن هم **حسابِ تازه**، هرگز حسابِ بسته‌شده (`/auth/staff`). کدِ ثابت مالِ همهٔ شاگردهاست، پس هرگز.
+ */
+function isFreshInvite(code) {
+  return Boolean(code) && !code.standing && Number(code.max_uses) > 0 && code.status === 'active' &&
+    !expired(code) && Number(code.used_count) < Number(code.max_uses);
 }
 
 /**
@@ -390,4 +455,5 @@ async function redeemOnce(rawCode, userId, ip = '') {
 
 module.exports = {
   standing, rotateStanding, disableStanding, deriveStanding, create, list, revoke, redeem, preflight, shopIdOf, normalize, format, hashCode, PREFIX,
+  codeRow, assertValidForMember, isFreshInvite, pepper,
   COURIER_INVITE };

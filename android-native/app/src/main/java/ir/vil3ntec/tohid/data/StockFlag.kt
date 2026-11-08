@@ -32,8 +32,12 @@ object StockFlag {
 
   fun enabled(context: Context): Boolean = prefs(context).getBoolean(key(context), false)
 
-  /** مقدارِ ذخیره‌شدهٔ دکانِ فعال را در [StockLedger.serverFlag] بگذار (شروع، عوض شدنِ دکان) */
-  fun load(context: Context): Boolean = enabled(context).also { StockLedger.serverFlag = it }
+  /** مقدارِ ذخیره‌شدهٔ دکانِ فعال را در [StockLedger.serverFlag] بگذار (شروع، عوض شدنِ دکان)؛ INV-10: `shop.count_absorb`
+   *  (کلیدِ `countAbsorb` ِ همان پاسخ؛ نیامده ⇒ خاموش) ⇒ [CountAbsorbWiring.serverFlag] */
+  fun load(context: Context): Boolean = enabled(context).also {
+    StockLedger.serverFlag = it
+    CountAbsorbWiring.serverFlag = prefs(context).getBoolean("${key(context)}:absorb", false)
+  }
 
   /** اتصالِ سوکتِ زنده (`hello`): پرچم را بپرس (نه زودتر از [CHECK_MS]) */
   fun kick(context: Context, now: Long = System.currentTimeMillis()) {
@@ -43,9 +47,10 @@ object StockFlag {
     if (now - prefs(app).getLong(at, 0L) < CHECK_MS) return
     prefs(app).edit().putLong(at, now).apply()
     scope.launch {
-      val on = runCatching { Backend.api(app).get(CONFIG)["enabled"]?.jsonPrimitive?.booleanOrNull == true }.getOrNull()
-        ?: return@launch
-      prefs(app).edit().putBoolean(key(app), on).apply()
+      val body = runCatching { Backend.api(app).get(CONFIG) }.getOrNull() ?: return@launch
+      val on = body["enabled"]?.jsonPrimitive?.booleanOrNull == true
+      val absorb = body["countAbsorb"]?.jsonPrimitive?.booleanOrNull == true
+      prefs(app).edit().putBoolean(key(app), on).putBoolean("${key(app)}:absorb", absorb).apply()
       load(app)
     }
   }

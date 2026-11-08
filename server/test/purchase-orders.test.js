@@ -451,3 +451,29 @@ test('PUR-14 فاکتورِ جدای تأمین‌کننده: فقط مدیر، 
     .map((r) => r.action).sort();
   assert.deepEqual(acts, ['purchase_order.bill', 'purchase_order.bill', 'purchase_order.bill_void']);
 });
+
+test('PRD-07: ردیف به واحدِ خرید با ضریب ذخیره و برگردانده می‌شود؛ ردیفِ بی ضریب همان شکلِ پیشین؛ ضریبِ نادرست ۴۰۰', async () => {
+  const t = await shopWithTeam('PRD07');
+  const body = {
+    supplierId: 'sup-b', supplierName: 'ب', note: '',
+    lines: [
+      { productId: 'tea', name: 'چای', unit: 'کارتن ۲۴', factorMilli: 24000, qtyMilli: 2000, priceMinor: 100000 },
+      { productId: 'rice', name: 'برنج', unit: 'کیلو', qtyMilli: 5000, priceMinor: 9000 },
+    ],
+  };
+  const c = await create(t.manager, body);
+  assert.equal(c.status, 201, JSON.stringify(c.body));
+  const [tea, rice] = c.body.order.lines;
+  assert.equal(tea.factorMilli, 24000);
+  assert.equal(tea.unit, 'کارتن ۲۴');
+  assert.equal(Object.prototype.hasOwnProperty.call(rice, 'factorMilli'), false, 'ردیفِ واحدِ پایه کلیدِ تازه ندارد');
+  //  جمعِ سفارش به همان واحدِ ردیف: ۲ کارتن × ۱٬۰۰۰ + ۵ کیلو × ۹۰
+  assert.equal(c.body.order.totals.orderedMinor, 2 * 100000 + 5 * 9000);
+  const again = await h.get(`${BASE}/${c.body.order.id}`, { token: t.manager });
+  assert.equal(again.body.order.lines[0].factorMilli, 24000);
+  for (const bad of [0, -1, 1.5, '24000', 1000000001]) {
+    const r = await create(t.manager, { ...body, lines: [{ ...body.lines[0], factorMilli: bad }] });
+    assert.equal(r.status, 400, `ضریبِ ${bad}`);
+    assert.equal(r.body.error?.code ?? r.body.code, 'bad_factor', JSON.stringify(r.body));
+  }
+});

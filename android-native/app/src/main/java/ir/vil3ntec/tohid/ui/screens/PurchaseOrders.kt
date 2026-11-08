@@ -44,10 +44,9 @@ import ir.vil3ntec.tohid.core.purchase.SupplierPricing
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 import ir.vil3ntec.tohid.data.PoBillDto
 import ir.vil3ntec.tohid.data.PoConfigDto
-import ir.vil3ntec.tohid.data.PoLineDto
 import ir.vil3ntec.tohid.data.PoPermsDto
 import ir.vil3ntec.tohid.data.PoReceiptDto
-import ir.vil3ntec.tohid.data.PoReceiptLineDto
+import ir.vil3ntec.tohid.data.PoForms
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseOrderBook
 import ir.vil3ntec.tohid.data.PurchaseOrderDto
@@ -319,23 +318,24 @@ private fun PoDetail(
       style = MaterialTheme.typography.bodySmall, color = c.text,
     )
 
-    //  کارها
+    //  کارها — مجوزِ هر کار از همان `PoForms.actions` ِ گوشیِ نسخهٔ ۳ (نقش × وضعیت)
+    val can = PoForms.actions(o, perms)
     Spacer(Modifier.height(12.dp))
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-      if (perms.receive && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.RECEIVE)) {
+      if (can.receive) {
         Button(onClick = { onReceive(o) }, enabled = !busy) { Text(StrPurchasePages.receiveGoods) }
       }
-      if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.SEND)) {
+      if (can.send) {
         Button(onClick = { act({ repo.send(o.id) }, StrPurchasePages.poSent) }, enabled = !busy) { Text(StrPurchasePages.sendToSupplier) }
       }
-      if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.EDIT)) {
+      if (can.edit) {
         OutlinedButton(onClick = { onEdit(o) }, enabled = !busy) { Text(StrMoney.edit) }
       }
-      if (perms.manage && PurchaseOrderBook.can(o, PurchaseOrderCore.Action.CANCEL)) {
+      if (can.cancel) {
         OutlinedButton(onClick = { cancelAsk = true }, enabled = !busy) { Text(StrPay.cancel, color = c.danger) }
       }
       //  PUR-14: فاکتورِ کاغذیِ خودِ تأمین‌کننده، جدا از رسید (پس از فرستادن؛ فقط مدیر)
-      if (PurchaseOrderBook.canBill(o, perms.manage)) {
+      if (can.bill) {
         OutlinedButton(onClick = { onBill(o) }, enabled = !busy) { Text(StrPurchasePages.supplierBill) }
       }
     }
@@ -390,7 +390,7 @@ private fun PoDetail(
 
   if (cancelAsk) {
     var why by remember { mutableStateOf("") }
-    val needWhy = st != PurchaseOrderCore.Status.DRAFT
+    val needWhy = PoForms.cancelNeedsReason(o)
     AlertDialog(
       onDismissRequest = { cancelAsk = false },
       containerColor = c.surfaceSolid,
@@ -418,8 +418,6 @@ private fun PoDetail(
 
 /* ══════════════════════════ ساختن و ویرایش ══════════════════════════ */
 
-private data class EditRow(val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String)
-
 @Composable
 private fun PoEditor(
   d: ShopData,
@@ -433,12 +431,7 @@ private fun PoEditor(
   //  کلیدِ یکتای همین فرم: دو بار زدن یا قطعِ نت همان سفارش است، نه دومی
   val formKey = remember { newId() }
   var supplierId by remember { mutableStateOf(base?.supplierId ?: d.suppliers.firstOrNull()?.id.orEmpty()) }
-  var seq by remember { mutableStateOf(base?.lines?.size ?: 0) }
-  var rows by remember {
-    mutableStateOf(base?.lines.orEmpty().mapIndexed { i, l ->
-      EditRow(i, l.productId, l.name, l.unit, poNum(PurchaseOrderBook.units(l.qtyMilli)), poNum(PurchaseOrderBook.asAfn(l.priceMinor)))
-    })
-  }
+  var rows by remember { mutableStateOf(PoForms.rowsOf(base)) }
   var expected by remember { mutableStateOf(base?.expectedDate.orEmpty()) }
   var note by remember { mutableStateOf(base?.note.orEmpty()) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -451,44 +444,30 @@ private fun PoEditor(
   var historyFor by remember { mutableStateOf<String?>(null) }
   var lastKey by remember { mutableStateOf<Int?>(null) }
 
-  fun addProduct(p: Product, qtyMilli: Long? = null, priceMinor: Long? = null) {
-    if (rows.any { it.productId == p.id }) { error = StrPurchasePages.alreadyInPo(p.name); return }
-    val q = qtyMilli ?: PurchaseOrderBook.suggestedQtyMilli(d, p)
-    val pr = priceMinor ?: PurchaseOrderBook.lastPriceMinor(d, supplierId, p)
-    rows = rows + EditRow(seq++, p.id, p.name, p.unit, poNum(PurchaseOrderBook.units(q)), poNum(PurchaseOrderBook.asAfn(pr)))
+  //  ردیف‌ها، سنجش و پیش‌نویس از `PoForms` (همان فرمِ گوشیِ نسخهٔ ۳)
+  fun addProduct(p: Product) {
+    rows = PoForms.addProduct(d, rows, supplierId, p) ?: run { error = StrPurchasePages.alreadyInPo(p.name); return }
     error = null
   }
 
   fun addPicks(onlyLow: Boolean) {
-    val picks = PurchaseOrderBook.supplierPicks(d, supplierId, onlyLow).filter { pk -> rows.none { it.productId == pk.productId } }
-    if (picks.isEmpty()) { toast(if (onlyLow) StrPurchasePages.noLowFromSupplier else StrPurchasePages.noNewFromSupplier); return }
-    rows = rows + picks.map { pk -> EditRow(seq++, pk.productId, pk.name, pk.unit, poNum(PurchaseOrderBook.units(pk.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pk.priceMinor))) }
+    val next = PoForms.addPicks(rows, PurchaseOrderBook.supplierPicks(d, supplierId, onlyLow))
+    if (next.size == rows.size) { toast(if (onlyLow) StrPurchasePages.noLowFromSupplier else StrPurchasePages.noNewFromSupplier); return }
+    rows = next
   }
 
   fun addPlanned() {
-    val plan = PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).filter { pl -> rows.none { it.productId == pl.pick.productId } }
-    if (plan.isEmpty()) { toast(StrPurchasePages.nothingToOrder); return }
-    rows = rows + plan.map { pl ->
-      EditRow(seq++, pl.pick.productId, pl.pick.name, pl.pick.unit, poNum(PurchaseOrderBook.units(pl.pick.qtyMilli)), poNum(PurchaseOrderBook.asAfn(pl.pick.priceMinor)))
-    }
+    val next = PoForms.addPicks(rows, PurchaseOrderBook.planned(d, supplierId, sentOrders, todayIso()).map { it.pick })
+    if (next.size == rows.size) { toast(StrPurchasePages.nothingToOrder); return }
+    rows = next
   }
 
   fun save() {
-    val supplier = d.suppliers.find { it.id == supplierId } ?: run { error = StrPurchasePages.chooseSupplier; return }
-    val lines = rows.mapIndexed { i, r ->
-      val q = r.qty.toDoubleOrNull()
-      val p = r.price.toDoubleOrNull()
-      if (q == null || q <= 0) { error = StrPurchasePages.rowBadQty(i + 1); return }
-      if (p == null || p < 0) { error = StrPurchasePages.rowBadPrice(i + 1); return }
-      PoLineDto(id = "l${i + 1}", productId = r.productId, name = r.name, unit = r.unit, qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p))
+    if (busy) return
+    val draft = when (val chk = PoForms.draft(d, supplierId, rows, expected, note)) {
+      is PoForms.DraftCheck.Bad -> { error = chk.message; return }
+      is PoForms.DraftCheck.Ok -> chk.draft
     }
-    val check = PurchaseOrderCore.checkOrder(PurchaseOrderCore.Order(supplier.id, PurchaseOrderCore.State.DRAFT,
-      lines.map { PurchaseOrderCore.Line(it.id, it.productId, it.qtyMilli, it.priceMinor) }))
-    if (check != null) { error = if (check.code == PurchaseOrderCore.Code.LINES_REQUIRED) StrPurchasePages.needOneItem else StrPurchasePages.poInvalid(check.code); return }
-    //  تاریخِ ذخیره‌شده همیشه ASCII `YYYY-MM-DD` (LOC-05)
-    val exp = ir.vil3ntec.tohid.latinDigits(expected).trim().ifBlank { null }
-    if (exp != null && !ir.vil3ntec.tohid.core.stock.StockCore.isoDateOk(exp)) { error = StrPurchasePages.arrivalDateFormat; return }
-    val draft = PurchaseOrderRepository.Draft(supplier.id, supplier.name, lines, exp, note.trim())
     busy = true; error = null
     scope.launch {
       val r = if (base == null) repo.create(formKey, draft) else repo.update(base.id, base.version, draft)
@@ -549,7 +528,7 @@ private fun PoEditor(
       OutlinedTextField(value = expected, onValueChange = { expected = it.take(10) }, label = { Text(StrPurchasePages.arrivalOptional) }, singleLine = true, modifier = Modifier.weight(1f))
       OutlinedTextField(value = note, onValueChange = { note = it.take(500) }, label = { Text(StrDeliver.noteField) }, singleLine = true, modifier = Modifier.weight(2f))
     }
-    val total = rows.sumOf { (it.qty.toDoubleOrNull() ?: 0.0) * (it.price.toDoubleOrNull() ?: 0.0) }
+    val total = PoForms.total(rows)
     Spacer(Modifier.height(6.dp))
     Text(StrPurchasePages.poTotal(money(total), rows.size), style = MaterialTheme.typography.bodySmall, color = c.text)
     error?.let { Text(it, color = c.danger, style = MaterialTheme.typography.bodySmall) }
@@ -620,8 +599,6 @@ private fun PoProductPicker(d: ShopData, hint: String, onPick: (Product) -> Unit
 
 /* ══════════════════════════ دریافت (PUR-04) ══════════════════════════ */
 
-private data class RecvRow(val received: String = "", val damaged: String = "", val price: String = "")
-
 @Composable
 private fun PoReceive(
   store: ShopStore,
@@ -638,9 +615,7 @@ private fun PoReceive(
   //  کلیدِ یکتای همین رسید: تلاشِ دوباره همان رسید است (سرور «تکراری» می‌گوید)
   val receiptId = remember { newId() }
   val prog = remember(order) { order.progress.associateBy { it.lineId } }
-  var rows by remember {
-    mutableStateOf(order.lines.associate { it.id to RecvRow(price = poNum(PurchaseOrderBook.asAfn(it.priceMinor))) })
-  }
+  var rows by remember { mutableStateOf(PoForms.recvRows(order)) }
   var allowOver by remember { mutableStateOf(false) }
   var note by remember { mutableStateOf("") }
   //  PUR-06: کرایهٔ همین رسید به حمل‌کننده (فقط مدیر؛ خالی = بی کرایه)
@@ -650,15 +625,12 @@ private fun PoReceive(
   var busy by remember { mutableStateOf(false) }
   val index = remember(d) { ShopStore.barcodeIndex(d) }
 
-  /** اسکن: یک واحدِ کالای همان بارکد به «رسیده» */
+  /** اسکن: یک واحدِ کالای همان بارکد به «رسیده» (`PoForms.scan`، همان اسکنِ گوشی) */
   fun scanned(code: String): Boolean {
-    val pid = index[code.trim()]
-    val line = order.lines.find { it.productId == pid }
-    if (line == null) { toast(StrPurchasePages.notInPo(code)); return true }
-    val cur = rows[line.id] ?: RecvRow()
-    val next = (cur.received.toDoubleOrNull() ?: 0.0) + 1.0
-    rows = rows + (line.id to cur.copy(received = poNum(next)))
-    error = null
+    when (val s = PoForms.scan(order, rows, index, code)) {
+      is PoForms.Scan.NotInPo -> toast(StrPurchasePages.notInPo(s.code))
+      is PoForms.Scan.Added -> { rows = s.rows; error = null }
+    }
     return true
   }
 
@@ -670,20 +642,12 @@ private fun PoReceive(
   }
 
   fun submit() {
-    val lines = ArrayList<PoReceiptLineDto>()
-    for ((i, l) in order.lines.withIndex()) {
-      val r = rows[l.id] ?: continue
-      val rec = r.received.ifBlank { "0" }.toDoubleOrNull()
-      val dmg = r.damaged.ifBlank { "0" }.toDoubleOrNull()
-      val price = r.price.toDoubleOrNull()
-      if (rec == null || rec < 0 || dmg == null || dmg < 0) { error = StrPurchasePages.rowBadQty(i + 1); return }
-      if (dmg > rec) { error = StrPurchasePages.rowDamagedOver(i + 1); return }
-      if (price == null || price < 0) { error = StrPurchasePages.rowBadPrice(i + 1); return }
-      if (rec == 0.0) continue
-      lines += PoReceiptLineDto(l.id, PurchaseOrderBook.milli(rec), PurchaseOrderBook.milli(dmg), PurchaseOrderBook.minor(price))
+    if (busy) return
+    //  سنجشِ ردیف‌ها و همان `PurchaseOrderCore.receive` ِ سرور پیش از فرستادن (`PoForms.receipt`)
+    val (lines, freightMinor) = when (val chk = PoForms.receipt(order, rows, receiptId, allowOver, freight)) {
+      is PoForms.ReceiptCheck.Bad -> { error = chk.message; return }
+      is PoForms.ReceiptCheck.Ok -> chk.lines to chk.freightMinor
     }
-    if (lines.isEmpty()) { error = StrPurchasePages.nothingEntered; return }
-    val freightMinor = PurchaseOrderBook.freightMinorOf(freight) ?: run { error = StrPurchasePages.freightBad; return }
     busy = true; error = null
     scope.launch {
       val res = repo.receive(order.id, receiptId, lines, allowOver, note.trim(), freightMinor)
@@ -718,14 +682,14 @@ private fun PoReceive(
     )
     Spacer(Modifier.height(8.dp))
     order.lines.forEach { l ->
-      val r = rows[l.id] ?: RecvRow()
+      val r = rows[l.id] ?: PoForms.RecvRow()
       val left = prog[l.id]?.remainingMilli ?: l.qtyMilli
       Column(Modifier.padding(vertical = 4.dp)) {
         Text(StrPurchasePages.remainingOf(l.name, qty(PurchaseOrderBook.units(left)), l.unit), color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-          NumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(received = v)); error = null }, StrPurchasePages.received, Modifier.weight(1f))
-          NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
-          if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
+          NumberField(r.received, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(received = v)); error = null }, StrPurchasePages.received, Modifier.weight(1f))
+          NumberField(r.damaged, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(damaged = v)); error = null }, StrPurchasePages.damaged, Modifier.weight(1f))
+          if (perms.manage) NumberField(r.price, { v -> rows = rows + (l.id to (rows[l.id] ?: PoForms.RecvRow()).copy(price = v)); error = null }, StrReturnPages.unitPriceAfn, Modifier.weight(1f))
         }
       }
     }
@@ -744,7 +708,3 @@ private fun PoReceive(
     Button(onClick = { submit() }, enabled = !busy, modifier = Modifier.fillMaxWidth()) { Text(if (busy) StrSale.posting else StrLayaway.payConfirm) }
   }
 }
-
-/** عدد برای کادرِ ورودی: بی اعشارِ بی‌مورد و با رقمِ لاتین (همان قاعدهٔ کادرهای انبار) */
-private fun poNum(value: Double): String =
-  if (value == Math.floor(value) && !value.isInfinite()) value.toLong().toString() else value.toString()

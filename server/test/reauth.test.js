@@ -319,3 +319,31 @@ test('امنیت ۶: نشستِ تازهٔ پمپ (همین حالا وارد ش
   assert.equal(set.status, 200, `جریانِ عادیِ پمپ نباید بشکند: ${JSON.stringify(set.body)}`);
   assert.equal((await h.get('/api/pump/me', { token: pumpIn.body.accessToken })).status, 200);
 });
+
+test('⛔ تأییدِ دوباره فقط با سنجشِ سرور (CodeQL `js/user-controlled-bypass`): پرچم/سرآیندِ «تأییدشده»، رازِ غیرِرشته، رمز یا کدِ غلط و بی راز ⇒ هیچ تازگی', async () => {
+  const u = await h.newUser('بی دورزدن');
+  const stale = await staleSession(u);
+  const tries = [
+    [{}, {}, 400, 'reauth_proof_required'],
+    [{ verified: true, method: 'password', fresh: true, ok: true }, { 'X-Reauth': '1', 'X-Verified': 'true', 'X-Fresh': 'true' }, 400, 'reauth_proof_required'],
+    [{ password: [u.password] }, {}, 400, 'reauth_proof_required'],
+    [{ password: { value: u.password }, method: 'password' }, {}, 400, 'reauth_proof_required'],
+    [{ password: 'Wrong!pass1', verified: true }, { 'X-Verified': 'true' }, 401, 'bad_credentials'],
+    [{ code: '000000', method: 'code', verified: true }, {}, null, null],
+  ];
+  for (const [body, headers, status, code] of tries) {
+    const r = await h.api('POST', '/api/auth/reauth', { token: stale.accessToken, body, headers });
+    if (status) {
+      assert.equal(r.status, status, `${JSON.stringify(body)} ⇒ ${r.status} ${JSON.stringify(r.body)}`);
+      assert.equal(r.body.error.code, code);
+    } else {
+      assert.ok(r.status >= 400, `${JSON.stringify(body)} ⇒ ${r.status}`);
+    }
+    assertNeedsReauth(await h.post('/api/auth/logout-all', {}, { token: stale.accessToken }), JSON.stringify(body));
+  }
+  assert.equal(await one(`SELECT 1 AS x FROM audit_logs WHERE action='auth.reauth' AND user_id=$1`, [u.user.id]), null, 'هیچ تأییدی ثبت نشد');
+  //  رازِ درست، همان رفتارِ پیشین
+  const ok = await reauthWithPassword(stale);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal((await h.post('/api/auth/logout-all', {}, { token: stale.accessToken })).status, 200);
+});
