@@ -15,8 +15,8 @@ export const KNOWN_GAPS = [
     scenario: 'journeys-a',
     step: 'J5.default',
     //  دستگاهی که دیرتر رسید، opِ کهنه‌ترِ دیگری را روی نوشتهٔ تازه‌ترِ خودش می‌نشاند (pull به ترتیبِ سرور)
-    match: /J5\.default · Y-owner-laptop\/products\/[^:]+: محتوا با سرور فرق دارد/,
-    ref: '#501 — اصلاح هست ولی پشتِ پرچمِ خاموشِ `sync.pull_own_newer` (روشن کردنش برای همهٔ دکان‌ها تصمیمِ صاحب‌کار است؛ docs/JOURNEYS-fa.md)',
+    match: /J5\.default · Y-owner-laptop\/products\/\S+: محتوا با سرور فرق دارد/,
+    ref: 'PR #501 — اصلاح هست ولی پشتِ پرچمِ خاموشِ `sync.pull_own_newer` (روشن کردنش برای همهٔ دکان‌ها تصمیمِ صاحب‌کار است؛ docs/JOURNEYS-fa.md)',
   },
 ];
 
