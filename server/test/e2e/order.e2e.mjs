@@ -156,8 +156,10 @@ await E.step('E2E-ORD-04.illegal', 'گذارِ غیرمجاز و وضعیتِ ک
 await E.step('E2E-ORD-04.customer', 'مشتری در صفحهٔ پیگیری همان وضعیت و همان خطِ زمانی را می‌بیند', async () => {
   const { page } = C;
   await page.goto(`${E.apiBase}/store/${SLUG}#/orders`);
-  await page.waitForSelector('#my-orders li', { timeout: 10_000 });
-  await page.locator('#my-orders li').last().click();
+  //  با «حسابِ من» ِ CRM-13 روشن، بخشِ `#ah-online` ِ آن جای فهرستِ قدیم را می‌گیرد (`E.storeOrdersList`)؛ هر دو تازه‌ترین اول
+  const mineList = await E.storeOrdersList(page, SLUG);
+  await page.waitForSelector(`${mineList} li`, { timeout: 10_000 });
+  await page.locator(`${mineList} li`).last().click();
   await page.waitForFunction(() => /تحویل گرفته شد/.test(document.getElementById('o-status')?.textContent || ''), null, { timeout: 10_000 });
   assert.equal(await page.locator('#o-timeline li').count(), 6);
   assert.equal(await page.isVisible('#o-cancel'), false, 'پس از قبول، لغوِ رایگان نیست');
