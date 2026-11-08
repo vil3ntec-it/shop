@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.sync.v3
 
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoredDevice
+import ir.vil3ntec.tohid.core.sync.v3.Hlc
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
 import ir.vil3ntec.tohid.data.Debtor
@@ -264,6 +266,8 @@ class SyncV3EngineTest {
     }
     override fun loadQueue() = queue
     override fun saveQueue(queue: V3Queue) { this.queue = queue }
+    /** DATA-06: فایلِ حال خوانده نشد (`FileV3Store`) */
+    override var unreadable = false
     //  همان دفترچهٔ `FileV3Store` (§۹.۵) — همهٔ آزمون‌ها با آن می‌دوند، مثلِ برنامه
     override var replay: ReplayBook? = FileReplayStore.inDir(dir, "replay")
   }
@@ -963,5 +967,235 @@ class SyncV3EngineTest {
     assertTrue("جابه‌جاییِ قرض در v3 ویرایشِ سند است ⇒ v2", added.any { it.fmt == V3Entry.V2 })
     assertEquals("فقط درجِ کالا مانده؛ sweep دوباره نمی‌رود و کالا گم نشده", 1, b.engine.record(b.ledger.data))
     assertEquals(0, b.engine.record(b.ledger.data))
+  }
+
+  /* ------------------------------------------------ DATA-06: پشتیبانِ دستگاهِ دیگر (`V3State.kt`) */
+
+  /** پشتیبانِ خودکارِ اندروید از یک دستگاه: دفتر، صف (`sync-v3-<کلید>/queue.json`)، و فقط در ساخت‌های پیشین حال (`state.json`) */
+  private class Backup(val ledger: ShopData, val queue: V3Queue?, val meta: V3Meta?)
+
+  private fun Device.backup(withState: Boolean) = Backup(ledger.data, store.queue, if (withState) store.meta else null)
+
+  /** دستگاهِ **دیگری** ([name]، شناسهٔ خودش) که از [b] بالا آمد */
+  private fun restored(name: String, server: FakeServer, b: Backup): Device =
+    Device(name, server, b.ledger).also { it.store.meta = b.meta; it.store.queue = b.queue; it.engine = it.make() }
+
+  private val p2 = Product(id = "p2", name = "روغن", salePrice = 300.0)
+  private fun debtSettled(d: Device) = d.ledger.data.sales.single { it.id == "s1" }.debtSettled
+  private fun returned(d: Device) = d.ledger.data.saleItems.single { it.id == "si1" }.returnedQty
+  private fun stock(d: Device) = d.ledger.data.stockMovements.filter { it.productId == "p1" }.sumOf { it.qty }
+  private fun nodeOf(e: V3Entry) = e.ops.map { (it["hlc"] as JsonPrimitive).content.substringAfterLast(':') }.toSet()
+
+  /** برگشتِ ۱ از قلمِ si1 ِ فاکتورِ نسیهٔ s1: `$inc` ِ `returnedQty` و `debtSettled` (۵۰)، و حرکتِ +۱ */
+  private fun ShopData.returnOne() = copy(
+    sales = sales.map { if (it.id == "s1") it.copy(debtSettled = it.debtSettled + 50.0) else it },
+    saleItems = saleItems.map { if (it.id == "si1") it.copy(returnedQty = it.returnedQty + 1.0) else it },
+    saleReturns = saleReturns + SaleReturn(id = "r1", saleId = "s1", saleItemId = "si1", productId = "p1", quantity = 1.0, amount = 50.0),
+    stockMovements = stockMovements + StockMovement(id = "m-r1", productId = "p1", type = "return", qty = 1.0),
+  )
+
+  private fun ShopData.sell(id: String, qty: Double) = copy(
+    sales = sales + Sale(id = id, total = 115.5 * qty, finalTotal = 115.5 * qty, paidAmount = 115.5 * qty),
+    saleItems = saleItems + SaleItem(id = "$id-i", saleId = id, productId = "p1", quantity = qty, unitPrice = 115.5, totalPrice = 115.5 * qty),
+    stockMovements = stockMovements + StockMovement(id = "$id-m", productId = "p1", type = "sale", qty = -qty),
+  )
+
+  /**
+   *  گوشیِ اول (dev-a): همگام؛ بی اینترنت ۱ برگشت از فاکتورِ نسیه (در صف) ⇐ **پشتیبان** ⇐ [after] (گوشیِ اول همان صف را
+   *  می‌فرستد، ۱ فروش و کالای p2 را پاک می‌کند؛ گوشیِ از کار افتاده: هیچ).
+   */
+  private fun phoneWithBackup(server: FakeServer, withState: Boolean, after: Boolean = true): Pair<Device, Backup> {
+    val a = Device("dev-a", server, baseData.copy(products = baseData.products + p2)).also { assertTrue(it.sync().ok) }
+    server.offline = true
+    a.edit { it.returnOne() }
+    assertFalse(a.sync(first = false).ok)
+    assertTrue("برگشت در صفِ پشتیبان است", a.engine.queued() > 0)
+    val files = a.backup(withState)
+    server.offline = false
+    if (after) {
+      assertTrue(a.sync(first = false).ok)
+      a.edit { it.sell("s-a2", 1.0).let { d -> d.copy(products = d.products.filter { p -> p.id != "p2" }) } }
+      assertTrue(a.sync(first = false).ok)
+    }
+    return a to files
+  }
+
+  /** همه همان سرور: دستگاهِ تازه از Snapshot؛ برگشت یک بار (۵۰، نه ۱۰۰)، کالای حذف‌شده زنده نشد */
+  private fun sameAsServer(server: FakeServer, vararg devices: Device) {
+    val fresh = Device("dev-truth-${devices.size}", server, ShopData()).also { assertTrue(it.sync().ok) }
+    assertEquals(5000L, long(server.row("sales", "s1"), "debtSettledMinor"))
+    assertEquals("روی سرور برگشت یک بار", 1, server.log.count { it.rowId == "s1" && it.kind == "delta" })
+    for (d in devices) {
+      assertEquals("${d.name}: قرضِ برگشته", 50.0, debtSettled(d), 0.0)
+      assertEquals("${d.name}: قرض", debtSettled(fresh), debtSettled(d), 0.0)
+      assertEquals("${d.name}: برگشته", returned(fresh), returned(d), 0.0)
+      assertEquals("${d.name}: موجودی", stock(fresh), stock(d), 0.0)
+      assertEquals("${d.name}: فروش‌ها", fresh.ledger.data.sales.map { it.id }.toSet(), d.ledger.data.sales.map { it.id }.toSet())
+      assertEquals("${d.name}: کالاها", fresh.ledger.data.products.map { it.id }.toSet(), d.ledger.data.products.map { it.id }.toSet())
+      assertFalse("${d.name}: در انتظار نماند", d.engine.meta.restorePending || d.engine.meta.restoredRebuild)
+      assertEquals("${d.name}: صف خالی", 0, d.engine.queued())
+      assertEquals("${d.name}: opِ تازه‌ای ساخته نشد", 0, d.engine.record(d.ledger.data))
+    }
+  }
+
+  /** «اول صف، بعد Snapshot، Pull فقط پس از آن» — از درخواست‌های همین دور */
+  private fun rebuiltBeforeAnyPull(server: FakeServer) {
+    val snap = server.requests.indexOf("GET /snapshot")
+    assertTrue("بازسازی از سرور: ${server.requests}", snap >= 0)
+    assertTrue("هیچ Pull ِ پیش از بازسازی: ${server.requests}", server.requests.take(snap).none { it == "GET /pull" })
+  }
+
+  @Test fun restoredStateFromAnotherDeviceIsFencedRebuiltFirstAndNothingCountsTwice() {
+    val server = FakeServer()
+    val (a, files) = phoneWithBackup(server, withState = true)
+    //  شاهدِ خطر: همان حالِ پشتیبان (cursor ِ کهنه) با شناسهٔ تازه و بی حصار ⇒ برگشتِ گوشیِ اول «دیگری» است و دو بار می‌نشیند
+    val naive = restored("dev-naive", server, files)
+    assertTrue(naive.sync(first = false).ok)
+    assertEquals("شاهد: بی حصار قرضِ برگشته دو بار", 100.0, debtSettled(naive), 0.0)
+
+    //  ساختِ پیشین (یا رونوشتِ خام): حالِ گوشیِ اول آمد؛ شناسهٔ دستگاه پیش‌تر ساخته شده بود (`restoredAt` ِ صفر) — گرهٔ
+    //  ساعتِ همان حال (`dev-a`) کافی است
+    val b = restored("dev-b", server, files)
+    val stale = b.store.meta!!.cursor
+    assertTrue(stale > 0)
+    assertEquals(RestoredDevice.Verdict.FENCE, b.engine.fence("dev-b", 0L, b.ledger.data))
+    val m = b.store.meta!!
+    assertEquals("dev-b", m.device)
+    assertEquals("cursor ِ کهنه دور", 0L, m.cursor)
+    assertTrue(m.restorePending && m.restoredRebuild)
+    assertEquals("گرهٔ HLC ِ تازه", "dev-b", Hlc.parse(m.clock)!!.node)
+    assertEquals("پایهٔ سایه = دفترِ بازیابی‌شده", LedgerDiff.shadowOf(LedgerDiff.toJson(b.ledger.data)).toString(), m.shadow)
+    assertEquals("صفِ پشتیبان دست نخورد", files.queue, b.store.queue)
+    //  دوباره ⇒ همان دستگاه، هیچ نوشتنی
+    assertEquals(RestoredDevice.Verdict.SAME, b.engine.fence("dev-b", 0L, b.ledger.data))
+    assertTrue(m === b.store.meta)
+
+    //  پیش از ورود، بی اینترنت: فروشِ گوشیِ دوم op می‌شود («پایه» نمی‌شود) با گرهٔ خودش
+    b.edit { it.sell("s-b1", 2.0) }
+    assertTrue(b.engine.record(b.ledger.data) > 0)
+    assertEquals(setOf("dev-b"), b.engine.queue.outbox.filter { it.rowId.startsWith("s-b1") }.flatMap { nodeOf(it) }.toSet())
+    server.requests.clear()
+    assertTrue(b.sync(first = false).ok)
+    rebuiltBeforeAnyPull(server)
+    assertTrue("cursor سرِ همان Snapshot", b.engine.meta.cursor > 0)
+    assertEquals(setOf("dev-b"), server.log.filter { it.rowId.startsWith("s-b1") }.map { it.device }.toSet())
+    assertTrue(a.sync(first = false).ok)
+    sameAsServer(server, a, b)
+  }
+
+  @Test fun normalRestoreWithoutStateIsFencedByTheMintedIdQueueGoesFirstAndTheFirstSaleIsNotLost() {
+    val server = FakeServer()
+    //  این ساخت: `sync-v3/` با پشتیبان نمی‌رود ⇒ فقط دفتر و صف
+    val (a, files) = phoneWithBackup(server, withState = false)
+    val b = restored("dev-b", server, files)
+    assertNull(b.store.meta)
+    //  شناسهٔ دستگاه روی ردِ کارِ پیشین ساخته شد (`SyncStore.restoredAt`)
+    assertEquals(RestoredDevice.Verdict.FENCE, b.engine.fence("dev-b", 1_234L, b.ledger.data))
+    assertTrue(b.engine.meta.initialized && b.engine.meta.restorePending && b.engine.meta.restoredRebuild)
+    b.edit { it.sell("s-b1", 2.0) }
+    assertTrue("فروشِ پیش از ورود op شد", b.engine.record(b.ledger.data) > 0)
+    server.requests.clear()
+    assertTrue(b.sync(first = false).ok)
+    rebuiltBeforeAnyPull(server)
+    assertTrue("p2 را گوشیِ اول پاک کرد ⇒ زنده نشد", b.ledger.data.products.none { it.id == "p2" })
+    assertNull(server.row("products", "p2"))
+    assertTrue(a.sync(first = false).ok)
+    sameAsServer(server, a, b)
+  }
+
+  @Test fun theQueueOfAPhoneThatDiedAfterTheBackupStillReachesTheServerExactlyOnce() {
+    val server = FakeServer()
+    //  گوشیِ اول پس از پشتیبان هرگز برنگشت: برگشتِ در صف فقط در پشتیبان است
+    val (_, files) = phoneWithBackup(server, withState = false, after = false)
+    assertEquals(0, server.log.count { it.rowId == "s1" && it.kind == "delta" })
+    val b = restored("dev-b", server, files)
+    assertEquals(RestoredDevice.Verdict.FENCE, b.engine.fence("dev-b", 1_234L, b.ledger.data))
+    assertTrue(b.sync(first = false).ok)
+    //  همان op_idها، یک بار؛ دفترِ گوشیِ دوم همان سرور
+    val sent = files.queue!!.outbox.flatMap { e -> e.ops.map { (it["op_id"] as JsonPrimitive).content } }
+    assertTrue(sent.isNotEmpty())
+    for (id in sent) assertEquals(id, listOf("dev-b"), server.log.filter { it.opId == id }.map { it.device })
+    sameAsServer(server, b)
+    //  دوباره همان صف (مثلاً بازیابیِ دوم) ⇒ سرور «تکراری»، هیچ چیزی دو بار
+    val again = restored("dev-c", server, files)
+    assertEquals(RestoredDevice.Verdict.FENCE, again.engine.fence("dev-c", 1_234L, again.ledger.data))
+    assertTrue(again.sync(first = false).ok)
+    sameAsServer(server, b, again)
+  }
+
+  @Test fun anUpgradeOfThisDeviceBindsAndNeverRotates_unreadableDecidesNothing() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { it.sell("s-a2", 1.0) }
+    assertTrue(a.sync(first = false).ok)
+    //  حالِ ساختِ پیشین: بی بستگی، ساعت از همین دستگاه
+    a.store.meta = a.store.meta!!.copy(device = "")
+    val before = a.store.meta!!
+    a.engine = a.make()
+    //  شناسهٔ دستگاه ناخوانا ⇒ هیچ تصمیمی، هیچ نوشتنی
+    assertEquals(RestoredDevice.Verdict.UNDECIDED, a.engine.fence("", 0L, a.ledger.data))
+    assertTrue(before === a.store.meta)
+    //  حالِ ناخوانا (فایلِ خراب کنار رفت) ⇒ همان
+    a.store.unreadable = true
+    assertEquals(RestoredDevice.Verdict.UNDECIDED, a.engine.fence("dev-a", 0L, a.ledger.data))
+    assertTrue(before === a.store.meta)
+    a.store.unreadable = false
+    //  به‌روزرسانی ⇒ فقط بستن: همان cursor، بی بازسازی
+    assertEquals(RestoredDevice.Verdict.BIND, a.engine.fence("dev-a", 0L, a.ledger.data))
+    assertEquals(before.copy(device = "dev-a", clock = a.store.meta!!.clock), a.store.meta)
+    assertEquals(before.cursor, a.engine.meta.cursor)
+    assertFalse(a.engine.meta.restorePending || a.engine.meta.restoredRebuild)
+    assertEquals(RestoredDevice.Verdict.SAME, a.engine.fence("dev-a", 0L, a.ledger.data))
+    server.requests.clear()
+    assertTrue(a.sync(first = false).ok)
+    assertFalse("بی بازسازی", "GET /snapshot" in server.requests)
+    //  حسابِ تازه روی همین دستگاه (نصبِ تازه، یا گذر از v1): بی ردِ کار ⇒ بستن، بی بازسازی
+    val fresh = Device("dev-f", server, baseData)
+    assertEquals(RestoredDevice.Verdict.BIND, fresh.engine.fence("dev-f", 0L, fresh.ledger.data))
+    assertFalse(fresh.engine.meta.initialized || fresh.engine.meta.restorePending)
+  }
+
+  @Test fun aCrashMidFenceRepeatsTheSameDecisionAndNeverPullsTheStaleCursor() {
+    val server = FakeServer()
+    val (a, files) = phoneWithBackup(server, withState = true)
+    val b = restored("dev-b", server, files)
+    val before = b.store.meta
+    //  برق در لحظهٔ نوشتنِ حال ⇒ پرتاب، هیچ چیزی ننشست (`SyncV3Runner.work` این دور را نمی‌رود)
+    b.store.failMeta = 1
+    assertTrue(runCatching { b.engine.fence("dev-b", 0L, b.ledger.data) }.isFailure)
+    assertTrue(before === b.store.meta)
+    assertEquals(before!!.cursor, b.engine.meta.cursor)
+    //  بالا آمدنِ دوباره ⇒ همان تصمیم و همان نتیجه
+    b.engine = b.make()
+    assertEquals(RestoredDevice.Verdict.FENCE, b.engine.fence("dev-b", 0L, b.ledger.data))
+    //  بسته شدن پس از حصار و پیش از بازسازی ⇒ «در انتظار» روی دیسک می‌ماند
+    b.engine = b.make()
+    assertEquals(RestoredDevice.Verdict.SAME, b.engine.fence("dev-b", 0L, b.ledger.data))
+    assertTrue(b.engine.meta.restorePending && b.engine.meta.restoredRebuild)
+    //  برق میانِ بازسازی (نوشتنِ دفتر) ⇒ همان‌جا برگردانده می‌شود؛ هنوز «در انتظار»، هیچ Pull
+    server.requests.clear()
+    b.ledger.failWrite = 1
+    assertTrue(runCatching { b.sync(first = false) }.isFailure)
+    assertTrue(b.engine.meta.restorePending)
+    assertFalse("GET /pull" in server.requests)
+    b.engine = b.make()
+    b.engine.recover(b.ledger.data)
+    server.requests.clear()
+    assertTrue(b.sync(first = false).ok)
+    rebuiltBeforeAnyPull(server)
+    assertTrue(a.sync(first = false).ok)
+    sameAsServer(server, a, b)
+  }
+
+  @Test fun aQueueWithoutStateIsRebuiltNotInitialized() {
+    //  صف با پشتیبان آمد و حال نه، ولی شناسهٔ دستگاه پیش از آن ساخته شده بود (`restoredAt` ِ صفر) ⇒ بستن، با همان بازسازی
+    val server = FakeServer()
+    val (_, files) = phoneWithBackup(server, withState = false, after = false)
+    val b = restored("dev-b", server, files)
+    assertEquals(RestoredDevice.Verdict.BIND, b.engine.fence("dev-b", 0L, b.ledger.data))
+    assertTrue(b.engine.meta.restorePending)
+    assertFalse(b.engine.meta.restoredRebuild)
+    assertTrue(b.sync(first = false).ok)
+    sameAsServer(server, b)
   }
 }

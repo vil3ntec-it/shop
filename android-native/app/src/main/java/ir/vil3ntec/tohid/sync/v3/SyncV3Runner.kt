@@ -4,6 +4,8 @@ import android.content.Context
 import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.sync.ReplayBook
+import ir.vil3ntec.tohid.core.sync.RestoredDevice
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.data.DiskWrite
 import ir.vil3ntec.tohid.data.LedgerArchive
@@ -64,14 +66,20 @@ object SyncChoice {
   }
 }
 
-/** صف و حالِ v3 روی دیسک — هر فایل با `DiskWrite` (کناری + fsync + جابه‌جاییِ اتمی) */
-internal class FileV3Store(private val dir: File) : V3Store {
+/**
+ *  صف و حالِ v3 روی دیسک — هر فایل با `DiskWrite` (کناری + fsync + جابه‌جاییِ اتمی). DATA-06 (`V3StateDir`): حال، ژورنال
+ *  و دفترچه در [dir] (بیرون از پشتیبان؛ فایلِ جای ساختِ پیشین در نخستین خواندن به آن می‌رود)، صف در [queueDir] (با پشتیبان).
+ */
+internal class FileV3Store(private val dir: File, private val queueDir: File = dir) : V3Store {
   private val json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
-  private val metaFile = File(dir, "state.json")
-  private val queueFile = File(dir, "queue.json")
-  override val journal = SyncCommit.Journal(File(dir, "journal.json"))
-  /** §۹.۵: پس از بازیابیِ سرور — `replay-sent.jsonl` و `replay-seen.jsonl` در همین پوشه */
-  override val replay = FileReplayStore.inDir(dir, "replay")
+  /** DATA-06: فایلی در همین اجرا خوانده نشد و کنار رفت ⇒ حصار تصمیم نمی‌گیرد (`V3Fence`) */
+  private var bad = false
+  override val unreadable: Boolean get() = bad
+  private val metaFile = V3StateDir.file(dir, queueDir, V3StateDir.META)
+  private val queueFile = File(queueDir, V3StateDir.QUEUE)
+  override val journal = SyncCommit.Journal(V3StateDir.file(dir, queueDir, V3StateDir.JOURNAL))
+  /** §۹.۵: پس از بازیابیِ سرور — `replay-sent.jsonl` کنارِ حال */
+  override val replay = ReplayBook(FileReplayStore(V3StateDir.file(dir, queueDir, V3StateDir.REPLAY)))
 
   override fun loadMeta(): V3Meta? = read(metaFile) { json.decodeFromString(V3Meta.serializer(), it) }
   override fun saveMeta(meta: V3Meta) = write(metaFile, json.encodeToString(V3Meta.serializer(), meta))
@@ -81,6 +89,7 @@ internal class FileV3Store(private val dir: File) : V3Store {
   private fun <T> read(f: File, parse: (String) -> T): T? {
     if (!f.isFile) return null
     return runCatching { parse(f.readText(Charsets.UTF_8)) }.getOrElse {
+      bad = true
       //  فایلِ خراب پاک نمی‌شود؛ کنار می‌رود تا دیده شود (همان قاعدهٔ `OpQueue`)
       runCatching { f.renameTo(File(f.parentFile, "${f.name}.corrupt-${System.currentTimeMillis()}")) }
       null
@@ -88,7 +97,7 @@ internal class FileV3Store(private val dir: File) : V3Store {
   }
 
   private fun write(f: File, text: String) {
-    dir.mkdirs()
+    f.parentFile?.mkdirs()
     DiskWrite.text(f, text)
   }
 }
@@ -137,7 +146,8 @@ class SyncV3Runner private constructor(context: Context) {
     val k = accountKey()
     engine?.let { if (k == key) return it }
     key = k
-    val dir = File(app.filesDir, "sync-v3-${OpQueue.fileKey(k)}")
+    //  DATA-06: حال در `filesDir/sync-v3/<کلید>/` (بیرون از پشتیبان)، صف در `sync-v3-<کلید>/` (با پشتیبان) — `V3StateDir`
+    val v3Store = V3StateDir.store(app.filesDir, OpQueue.fileKey(k))
     val ledger = object : V3Ledger {
       //  دفترِ همین لحظهٔ دیسک (`ShopStore.ledgerNow`) — شرح سرِ همان
       override fun read(): ShopData = shop?.ledgerNow() ?: ShopData()
@@ -148,7 +158,7 @@ class SyncV3Runner private constructor(context: Context) {
     }
     return SyncV3Engine(
       transport = HttpV3Transport(Backend.api(app)),
-      store = FileV3Store(dir),
+      store = v3Store,
       deviceId = SyncStore(app).deviceUid,
       ledger = ledger,
       withLock = { block -> synchronized(lock()) { block() } },
@@ -202,8 +212,26 @@ class SyncV3Runner private constructor(context: Context) {
 
   fun recover(onDisk: ShopData) {
     runCatching { engine().recover(onDisk) }
+    //  DATA-06: پس از ژورنال، پیش از نخستین ذخیره (پایهٔ سایه = همین دفتر)؛ شکست ⇒ [work] دوباره، پیش از هر Pull
+    runCatching { fence(onDisk) }
     publish()
   }
+
+  /**
+   *  DATA-06: حالِ v3 ِ این حساب از پشتیبان/رونوشتِ دستگاهِ دیگر آمد؟ (`V3Fence`، `RestoredDevice`) — هنگامِ باز شدنِ دفتر،
+   *  پس از هر ورود (`AccountBind`) و پیش از هر دور ([work]). شناسهٔ ناخوانا ⇒ هیچ تصمیمی. ننشست ⇒ پرتاب.
+   */
+  fun fence(ledger: ShopData): RestoredDevice.Verdict = fenceOn(engine(), ledger)
+
+  private fun fenceOn(e: SyncV3Engine, ledger: ShopData): RestoredDevice.Verdict {
+    val sync = SyncStore(app)
+    val device = runCatching { sync.deviceUid }.getOrDefault("")
+    val restoredAt = runCatching { sync.restoredAt }.getOrDefault(0L)
+    return e.fence(device, restoredAt, ledger)
+  }
+
+  /** DATA-06: این حساب هنوز «بازسازی از سرور» ِ پس از بازیابی را می‌خواهد (Pull بسته) */
+  fun restoredPending(): Boolean = runCatching { engine().meta.restoredRebuild }.getOrDefault(false)
 
   fun forgetArchived(gone: Map<String, Collection<String>>): Int = engine().forget(gone).also { publish() }
 
@@ -216,7 +244,12 @@ class SyncV3Runner private constructor(context: Context) {
     //  دیسک جلوتر بود و خوانده نشد (`ledgerNow`، فقط با پرچمِ `shop.ledger_merge`) ⇒ هیچ چیزی نشانده
     //  نمی‌شود؛ دورِ بعد دوباره. هر خطای دیگر همان رفتارِ `main` (بالا می‌رود، بی `publish`).
     try {
-      synchronized(lock()) { e.recover(store.ledgerNow()) }
+      synchronized(lock()) {
+        val now = store.ledgerNow()
+        e.recover(now)
+        //  DATA-06: حالِ دستگاهِ دیگر ⇒ حصار پیش از هر Pull؛ ننشست (دیسک) ⇒ این دور هیچ، cursor ِ کهنه هرگز
+        if (runCatching { fenceOn(e, now) }.isFailure) { publish(); return false }
+      }
       //  دستگاهی که هرگز با v1 همگام نشده، دفترش را یک بار «درج» می‌فرستد (نخستین بارگذاری)
       val firstUpload = SyncV1Engine.of(app).snapshotStatus().lastOkAt == 0L
       val r = e.sync(keepLocalOnly = firstUpload) { synchronized(lock()) { e.record(store.ledgerNow()) } }

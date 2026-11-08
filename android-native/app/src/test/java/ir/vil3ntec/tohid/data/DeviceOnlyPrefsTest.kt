@@ -60,6 +60,31 @@ class DeviceOnlyPrefsTest {
     assertEquals("tohid-doc-series", Regex("""const val DOC_SERIES = "([^"]+)"""").find(replica)?.groupValues?.get(1))
   }
 
+  /**
+   *  پوشه‌های `filesDir` که مالِ همین دستگاه‌اند: سایهٔ v1 در فایلِ خودش (`sync-shadow/`) و حالِ Sync v3 (`sync-v3/`، DATA-06:
+   *  cursor ِ گوشیِ پیشین روی گوشیِ دوم opهای خودِ آن را دوباره می‌نشاند — `sync/v3/V3State.kt`). هر سه راه و عاملِ رمزِ دفتر.
+   */
+  @Test fun `پوشهٔ حالِ Sync v3 و سایهٔ v1 در هیچ راهِ پشتیبانِ اندروید نیستند`() {
+    val dirs = setOf("sync-shadow", "sync-v3")
+    fun files(xml: String) = Regex("""<exclude\s+domain="file"\s+path="([^"]+)"\s*/>""").findAll(xml).map { it.groupValues[1] }.toSet()
+    val rules = file("res/xml/backup_rules.xml")
+    val agentSrc = file("java/ir/vil3ntec/tohid/data/TohidBackupAgent.kt")
+    val agent = Regex("\"([^\"]+)\"").findAll(
+      Regex("""val EXCLUDED_DIRS = setOf\(([^)]*)\)""").find(agentSrc)?.groupValues?.get(1) ?: error("EXCLUDED_DIRS در TohidBackupAgent پیدا نشد"),
+    ).map { it.groupValues[1] }.toSet()
+    for ((where, set) in listOf(
+      "cloud-backup" to files(rules.substringAfter("<cloud-backup>").substringBefore("</cloud-backup>")),
+      "device-transfer" to files(rules.substringAfter("<device-transfer>").substringBefore("</device-transfer>")),
+      "backup_rules_legacy" to files(file("res/xml/backup_rules_legacy.xml")), "TohidBackupAgent" to agent,
+    )) assertEquals(where, dirs, set)
+    //  همان نام در کد و در قاعدهٔ رمزِ دفتر
+    val v3 = file("java/ir/vil3ntec/tohid/sync/v3/V3StateDirAndroid.kt")
+    assertEquals("sync-v3", Regex("""const val DIR = "([^"]+)"""").find(v3)?.groupValues?.get(1))
+    for (n in listOf("sync-v3", "sync-v3/u1/state.json", "sync-shadow/sync-shadow-u1-1.dat")) {
+      assertTrue(n, ir.vil3ntec.tohid.core.atrest.AtRestScope.skipInDeviceBackup(n))
+    }
+  }
+
   @Test fun `نامِ پروندهٔ حالِ همگام‌سازی همان است که بیرون می‌ماند — و رمزِ دفتر هم همان را کنار می‌گذارد`() {
     val src = file("java/ir/vil3ntec/tohid/sync/v1/SyncStateV1.kt")
     assertTrue(Regex("""getSharedPreferences\("tohid-sync-v1"""").containsMatchIn(src))

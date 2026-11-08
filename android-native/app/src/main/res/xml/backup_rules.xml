@@ -26,6 +26,11 @@
      پوشهٔ `sync-shadow/` (`file`) همان حالِ `tohid-sync-v1` است وقتی پرچمِ `shop.sync_shadow_file` روشن است
      (`sync/v1/ShadowStore`: سایه و cursor در فایلِ خودشان): نشانش با پشتیبان نمی‌رود، پس در گوشیِ بازیابی‌شده هیچ
      بکار نمی‌آمد، و فایلی هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد ⇒ بیرون.
+     پوشهٔ `sync-v3/` (`file`، DATA-06) حالِ Sync v3 ِ هر حساب است (cursor، سایه، ساعتِ HLC، بستگی، ژورنال و دفترچهٔ
+     §۹.۵ — `sync/v3/V3StateDirAndroid.kt`): cursor ِ گوشیِ اول روی گوشیِ دوم با شناسهٔ تازه opهای خودِ گوشیِ اول را
+     دوباره می‌نشاند ⇒ بیرون. صفِ v3 (`sync-v3-<کلید>/queue.json`) مثلِ `oplog-*` ِ v1 می‌رود و گوشیِ دوم آن را اول
+     می‌فرستد. ساخت‌های پیشین حال را هم در `sync-v3-<کلید>/` می‌گذاشتند (`exclude` الگو نمی‌پذیرد) ⇒ در نخستین خواندن
+     به `sync-v3/` می‌رود؛ حالی که باز هم برسد (پشتیبانِ کهنه، رونوشتِ خام) را `V3Fence` می‌گیرد.
 
      SEC-01: وقتی «رمزگذاریِ دفتر» در کار است، `TohidBackupAgent` به‌جای این
      قاعده‌ها همان دو دامنه را می‌فرستد منهای دفترِ رمزدار، کلیددان و حالِ
@@ -43,6 +48,7 @@
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
     <exclude domain="file" path="sync-shadow" />
+    <exclude domain="file" path="sync-v3" />
   </cloud-backup>
   <device-transfer>
     <include domain="file" path="." />
@@ -54,5 +60,6 @@
     <exclude domain="sharedpref" path="tohid-doc-series.xml" />
     <exclude domain="sharedpref" path="tohid-sync-v1.xml" />
     <exclude domain="file" path="sync-shadow" />
+    <exclude domain="file" path="sync-v3" />
   </device-transfer>
 </data-extraction-rules>

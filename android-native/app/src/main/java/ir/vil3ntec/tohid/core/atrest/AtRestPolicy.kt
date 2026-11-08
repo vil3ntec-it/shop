@@ -6,7 +6,7 @@ package ir.vil3ntec.tohid.core.atrest
  *  همه با نامِ نسبی به `filesDir` (جداکنندهٔ `/`)، بی اندروید، تا روی JVM آزموده شود.
  *
  *  ── ساده در فاز ۱ (عمداً) ─────────────────────────────────────────────
- *   • صفِ opها (`oplog-*.json`) و ژورنال‌های همگام‌سازی (`sync-journal-*`، `sync-v3-*`):
+ *   • صفِ opها (`oplog-*.json`، صفِ v3 `sync-v3-<کلید>/queue.json`) و ژورنال‌ها و حالِ همگام‌سازی (`sync-journal-*`، `sync-v3/`):
  *     باید **بی کلید** خوانده شوند تا وقتی دفترِ رمزدار باز نمی‌شود (گوشیِ تازه،
  *     Keystore ازدست‌رفته) تغییرهای نرفته هنوز به سرور برسند.
  *   • دفترچهٔ §۹.۵ (`sync-replay-*-sent.jsonl`، `ReplayBook`): همان opها پس از پذیرش — برای
@@ -34,7 +34,7 @@ object AtRestScope {
   /** حالِ همگام‌سازی که روی دیسک ساده می‌ماند و به سایه/cursor/دفتر بسته است */
   fun syncState(rel: String): Boolean =
     rel.startsWith("oplog-") || rel.startsWith("sync-journal-") || rel.startsWith("sync-v3-") || rel.startsWith("sync-replay-") ||
-      rel.startsWith("sync-shadow-") || rel == SHADOW_DIR || rel.startsWith("$SHADOW_DIR/")
+      rel.startsWith("sync-shadow-") || rel == SHADOW_DIR || rel.startsWith("$SHADOW_DIR/") || rel == V3_DIR || rel.startsWith("$V3_DIR/")
 
   /** فایلی که کنار گذاشته شد و دیگر بکار نمی‌رود — برای فهرستِ صفحهٔ امنیت */
   fun leftover(rel: String): Boolean =
@@ -44,6 +44,9 @@ object AtRestScope {
 
   /** پوشهٔ سایهٔ همگام‌سازی (`ShadowStore.DIR`) */
   private const val SHADOW_DIR = "sync-shadow"
+
+  /** پوشهٔ حالِ Sync v3 (`V3StateDir.DIR`) */
+  private const val V3_DIR = "sync-v3"
 
   /** نامِ prefsی که سایه، cursor و شناسهٔ حسابِ همگام‌سازی را دارد */
   val SYNC_PREFS: Set<String> = setOf("tohid-sync-v1.xml")

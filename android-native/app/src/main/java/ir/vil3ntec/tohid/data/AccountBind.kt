@@ -50,6 +50,8 @@ object AccountBind {
     SyncV1Keys.bind(app, user, display, sameDesk)
     //  DATA-06: کلیدِ تازه با دفترِ همین میز — حالِ پشتیبانِ گوشیِ دیگر؟ (`V1Replica.fence`)
     runCatching { SyncV1Engine.of(app).fence(store.ledgerNow()) }
+    //  همان برای Sync v3 ِ همین دستگاه (`sync/v3/V3State.kt`): حالِ کلیدِ تازه پیش از نخستین دورِ آن
+    if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) runCatching { ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).fence(store.ledgerNow()) }
     runCatching { SyncV1Engine.of(app).restoreSealedFor(user) }
     SyncStore(app).accountId = user
     return result

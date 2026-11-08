@@ -86,6 +86,9 @@ class RestoredDeviceTest {
     assertTrue(RestoredDevice.mintedOverHistory("", listOf("oplog-usr_owner.json")))
     assertTrue(RestoredDevice.mintedOverHistory("", listOf("sync-journal-usr_owner.json")))
     assertTrue(RestoredDevice.mintedOverHistory("", listOf("sync-replay-usr_owner-sent.jsonl")))
+    //  حالِ Sync v3: پوشهٔ ساختِ پیشین در خودِ `filesDir` و پوشهٔ امروز (`V3StateDir`)
+    assertTrue(RestoredDevice.mintedOverHistory("", listOf("sync-v3-usr_owner")))
+    assertTrue(RestoredDevice.mintedOverHistory("", listOf("sync-v3")))
   }
 
   @Test

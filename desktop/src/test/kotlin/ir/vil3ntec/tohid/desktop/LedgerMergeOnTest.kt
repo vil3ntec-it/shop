@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
 import ir.vil3ntec.tohid.sync.v1.SyncOp
@@ -19,6 +20,7 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.sync.v3.FileV3Store
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
 import ir.vil3ntec.tohid.sync.v3.V3Meta
+import ir.vil3ntec.tohid.sync.v3.V3StateDir
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -63,6 +65,7 @@ class LedgerMergeOnTest {
     ctx.filesDir.listFiles().orEmpty()
       .filter { it.name.startsWith("shop-data.json") || it.name.startsWith("sync-v3-lmon") }
       .forEach { it.deleteRecursively() }
+    File(ctx.filesDir, V3StateDir.DIR).listFiles().orEmpty().filter { it.name.startsWith("lmon") }.forEach { it.deleteRecursively() }
   }
 
   @Before fun before() {
@@ -279,8 +282,9 @@ class LedgerMergeOnTest {
 
   @Test fun `Sync v3 — فروشِ صندوق‌دار پس از Pull ِ خرید فقط همان فروش را در صف می‌گذارد`() {
     val after = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(seed), otherPurchase))
+    //  جای ساختِ پیشین (حال به `sync-v3/` می‌رود، صف همین‌جا می‌ماند — `V3StateDir`)؛ حالِ همین دستگاه (`V3Meta.device`، DATA-06)
     val dir = File(ctx.filesDir, "sync-v3-${OpQueue.fileKey(account)}")
-    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(after).toString(), cursor = 7))
+    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(after).toString(), cursor = 7, device = SyncStore(ctx).deviceUid))
     assertEquals("", SyncChoice.set(ctx, SyncChoice.V3, 0))
     AtRest.writeText(ctx, ledger, Json.encodeToString(ShopData.serializer(), seed))
     ShopRole.remember(ctx, ShopRole.CASHIER)
