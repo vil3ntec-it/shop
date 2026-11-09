@@ -53,6 +53,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/perf-load` (PERF-02: نخستین اجرای واقعیِ ۲۰۰ دکان × ۵ دستگاه و درستی زیرِ بار؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) آمیزهٔ `scale` و `scale-burst` ِ ابزارِ بار (`server/scripts/load-scale.mjs`: فروش، ویرایشِ بها از چند دستگاه، حرکت، مشتری،
+  نگه‌داشته، ویترین روی زیرمجموعهٔ دکان‌ها، اشتراکِ صاحب، پنلِ مدیر، کاوشِ ویترینِ دکانِ دیگر) با دفترِ درستی و بازفرستِ op ِ بی‌پاسخ؛
+  سنجهٔ `server/scripts/load-check.js` (۱۲ سنجه، درونِ سرورِ آزمون یا جدا)؛ `--query-stats` به‌جای `pg_stat_statements`. (۲) سه اجرای ۲۰۰ × ۵
+  روی PostgreSQL ِ محلی (۱۰ دقیقه پایدار + «قطعِ سراسری»؛ عددها و بارِ ماشین در `docs/PERF-LOAD-fa.md` «۱۴۰۵/۰۸/۱۹ (دوم)»): پایدار هر بار
+  ۲۳٬۹۹۹ درخواست و ۰ خطا؛ داده بی گم/دوتایی و دکان‌ها جدا. (۳) رفع: مهاجرتِ ۴۵۰ (نمایهٔ جزئیِ وظیفهٔ بازِ تکراری‌نشو؛ آزمونِ
+  `sync-v3-task-dedupe.test.js` پیش از رفع سرخ). (۴) آزمونِ پایدارِ `load-correctness.test.js` (بی سنجهٔ زمانی، ~۱ دقیقه، ۳/۳ روی هر دو).
+  (۵) کاشتنِ ابزارِ بار دیگر درِ پمپ (`/api/admin/pump/live-config`) را نمی‌زند؛ `/api/admin/flags`.
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. PERF-02 همان PARTIAL (شاهدِ CI نیست). یافتهٔ بی‌ربط: `upgrade-rehearsal.test.js` روی PGlite ِ ماشینِ شلوغ گاهی
+  `fetch failed` (ECONNRESET ِ اتصالِ keep-alive ِ کهنه) می‌گیرد؛ در CI سبز؛ دست نخورد.
+- قدمِ بعدی (صاحب محصول): روشن کردنِ `SYNC_V3_BATCH` و `HOT_CACHE_MS` در تولید (اجرای سوم همین سند)؛ بودجهٔ ورود؛ رفتارِ «قطعِ سراسری»
+  (مهلتِ کلاینتِ ۱۰ ثانیه در برابرِ ۸ ثانیه انتظارِ دروازه، `REQUEST_TIMEOUT_MS`/`PG_POOL_MAX_WAITING`)؛ همین اجرا روی سخت‌افزارِ جدا.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
   بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
