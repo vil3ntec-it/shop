@@ -20,7 +20,7 @@ enum class StatsPeriod(val id: String, val count: Int) {
 data class StatsBar(val from: String, val to: String, val net: Double, val count: Int)
 
 /** یک روزِ کارتِ «روزهای فروشِ این هفته» */
-data class StreakDay(val date: String, val sold: Boolean, val future: Boolean)
+data class StreakDay(val date: String, val sold: Boolean, val future: Boolean, val closed: Boolean = false)
 
 /** یک خانهٔ پخشِ ساعتی: از ساعتِ `hour` به اندازهٔ `span` ساعت */
 data class HourBin(val hour: Int, val span: Int, val count: Int, val net: Double)
@@ -70,14 +70,21 @@ object StatsModel {
   fun spend(d: ShopData, from: String, to: String): Double =
     ReportEngine.sales(d, from, to).expenses + ReportEngine.purchases(d, from, to).total
 
-  /** هفتهٔ دکان (از شنبه، `BusinessDay`) تا امروز: کدام روز فروش داشت؛ روزهای آینده جدا */
+  /**
+   *  هفتهٔ دکان (از شنبه، `BusinessDay`) تا امروز: کدام روز فروش داشت؛ روزهای آینده جدا. LOC-03: روزِ تعطیلِ
+   *  `WeekRules` (جمعه) که گذشته و فروش نداشت «تعطیل» است، نه «بی فروش»؛ جمعه‌ای که فروخت همان روزِ فروش.
+   */
   fun streak(d: ShopData, today: String): List<StreakDay> {
     val start = BusinessDay.weekStartOf(today) ?: return emptyList()
     return (0 until 7).mapNotNull { i ->
       val day = CivilDays.addDays(start, i) ?: return@mapNotNull null
-      StreakDay(day, sold = day <= today && ReportEngine.sales(d, day, day).count > 0, future = day > today)
+      val sold = day <= today && ReportEngine.sales(d, day, day).count > 0
+      StreakDay(day, sold = sold, future = day > today, closed = day <= today && !sold && !BusinessDay.isWorkingDay(day))
     }
   }
+
+  /** روزهای گذشتهٔ این هفته بی روزِ تعطیلِ بی فروش — مخرجِ «N روز از M» */
+  fun pastWorkingDays(days: List<StreakDay>): Int = days.count { !it.future && !it.closed }
 
   /**
    *  پخشِ فاکتورهای لغونشدهٔ `from..to` بر ساعتِ ثبت. خانه‌ها از نخستین تا آخرین ساعتِ

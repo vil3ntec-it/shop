@@ -2,11 +2,22 @@ package ir.vil3ntec.tohid.desktop
 
 import android.content.Context
 import ir.vil3ntec.tohid.data.BackupBundle
+import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.DeviceDocsBundle
+import ir.vil3ntec.tohid.data.HeldBackup
+import ir.vil3ntec.tohid.data.HeldBackupRules
+import ir.vil3ntec.tohid.data.HeldBook
+import ir.vil3ntec.tohid.data.HeldInvoice
+import ir.vil3ntec.tohid.data.HeldInvoiceCodec
+import ir.vil3ntec.tohid.data.HeldInvoiceStore
+import ir.vil3ntec.tohid.data.HeldInvoices
+import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.QuoteBook
 import ir.vil3ntec.tohid.data.QuoteStore
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleDraft
+import ir.vil3ntec.tohid.data.SaleDraftCodec
 import ir.vil3ntec.tohid.data.SavedQuote
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopSettingsBundle
@@ -27,6 +38,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.util.zip.ZipInputStream
 
 /**
  *  DATA-SAFETY (`docs/DATA-SAFETY-fa.md`) — نگهبانِ «چه چیزی به سرور/پشتیبان می‌رسد» و «پایانِ اشتراک
@@ -47,6 +59,10 @@ class DataSafetyGuardTest {
     ShopSettingsBundle.dropStaged(ctx)
     DeviceDocsBundle.dropStaged(ctx)
     File(ctx.filesDir, QuoteStore.FILE).delete()
+    File(ctx.filesDir, HeldInvoiceStore.FILE).delete()
+    File(ctx.filesDir, CartStore.FILE).delete()
+    HeldInvoices.reset()
+    ir.vil3ntec.tohid.data.HeldSync.cart = null
   }
 
   @Before fun before() = clean()
@@ -136,6 +152,105 @@ class DataSafetyGuardTest {
     BackupBundle.read(ctx, ByteArrayInputStream(zip)) { ShopStore(ctx).parseBackup(it) }.getOrThrow()
     BackupBundle.commitPhotos(ctx)
     assertEquals(listOf(mine), QuoteStore.read(ctx).items)
+  }
+
+  /**
+   *  DATA-SAFETY §۸: فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) با پرچمِ خاموشِ `shop.held_sync`
+   *  (پیش‌فرض) در هیچ پشتیبانی نبودند: نصبِ دوباره یا بازیابیِ پشتیبانِ کامل همه را می‌برد. حالا قلمِ `device/held-invoices.json`
+   *  ِ پشتیبانِ کامل (پس با پشتیبانِ ابری روی سرور)؛ بی نگه‌داشته و سبد ⇒ هیچ قلمی، پشتیبان همان پیشین.
+   */
+  @Test fun `نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل‌اند و بی آن‌ها هیچ قلمی نیست`() {
+    fun entries(): List<String> {
+      val zip = ByteArrayOutputStream().also { BackupBundle.write(ctx, it, "{\"products\":[{\"id\":\"dsg-p1\",\"name\":\"x\"}]}").getOrThrow() }.toByteArray()
+      return ZipInputStream(ByteArrayInputStream(zip)).use { z -> generateSequence { z.nextEntry }.map { it.name }.toList() }
+    }
+    assertTrue("بی نگه‌داشته و سبد هیچ قلمی", entries().none { it.startsWith("device/held") })
+    val h = HeldInvoice(id = "dsg-h1", number = 1, label = "آقای کریمی", lines = listOf(SaleDraft.Line("dsg-p1", 2.0, 95.0)), heldAt = 1_762_600_000_000)
+    File(ctx.filesDir, HeldInvoiceStore.FILE).writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h))))
+    HeldInvoices.reset()
+    assertTrue("نگه‌داشته", "device/held-invoices.json" in entries())
+    File(ctx.filesDir, HeldInvoiceStore.FILE).delete()
+    File(ctx.filesDir, CartStore.FILE).writeText(SaleDraftCodec.encode(SaleDraft(key = "dsg-c1", lines = h.lines)))
+    HeldInvoices.reset()
+    assertTrue("سبدِ جاری", "device/held-invoices.json" in entries())
+  }
+
+  /**
+   *  DATA-SAFETY §۸: بازیابیِ پس از ورود (`CloudSettingsRestore`: `commitPhotos(onlyMissing)` و سپس `commitHeld` با دفترِ سرور) —
+   *  نگه‌داشته‌ها فقط پس از دفتر، فقط روی دستگاهِ بی فاکتورِ باز، فقط در همان دکان، و نه آن‌که در دفتر فروش رفته؛ و چون این
+   *  راه خودکار و بی پرسش است، فقط پشتیبانی که **همین دستگاه** نوشت (`sameMachineOnly`): پشتیبانِ ابریِ گوشیِ دیگرِ همان حساب
+   *  روی کامپیوترِ تازه، نگه‌داشته‌های هنوز-بازِ آن گوشی را دوتایی نمی‌کند (هم‌کلید ⇒ Sync v1 دو فروش را در یک ردیف می‌آمیخت).
+   */
+  @Test fun `نگه‌داشته‌های پشتیبانِ ابری پس از ورود فقط روی دستگاهِ بی فاکتورِ باز و در همان دکان برمی‌گردند`() {
+    val heldFile = File(ctx.filesDir, HeldInvoiceStore.FILE)
+    fun now(): HeldBook = HeldInvoices.of(ctx).let { runBlocking { it.load() }; it.book.value }
+    val h = HeldInvoice(id = "dsg-h2", number = 2, label = "آقای کریمی", lines = listOf(SaleDraft.Line("dsg-p1", 2.0, 95.0)), heldAt = 1_762_600_000_000)
+    val sold = h.copy(id = "dsg-s1", number = 3)
+    heldFile.writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h, sold))))
+    HeldInvoices.reset()
+    val zip = ByteArrayOutputStream().also { BackupBundle.write(ctx, it, "{\"products\":[{\"id\":\"dsg-p1\",\"name\":\"x\"}]}").getOrThrow() }.toByteArray()
+    val ledger = ShopData(products = listOf(Product(id = "dsg-p1", name = "x")), sales = listOf(Sale(id = "dsg-s1", invoiceNumber = 1)))
+    fun stage() = BackupBundle.read(ctx, ByteArrayInputStream(zip)) { ShopStore(ctx).parseBackup(it) }.getOrThrow()
+
+    //  نصبِ دوباره
+    heldFile.delete(); HeldInvoices.reset()
+    stage()
+    BackupBundle.commitPhotos(ctx, onlyMissing = true)
+    assertTrue("عکس و تنظیم نگه‌داشته نمی‌نشانند — فقط پس از دفتر", now().items.isEmpty())
+    assertEquals(1, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+    assertEquals("فروخته در دفترِ سرور هرگز", listOf(h), now().items)
+    assertEquals("یک بار", 0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+
+    //  دستگاهی که نگه‌داشتهٔ خودش را دارد: هیچ چیز رونویسی یا قاطی نمی‌شود
+    val mine = HeldBook(items = listOf(h.copy(id = "dsg-mine", number = 1, label = "مالِ همین دستگاه")))
+    heldFile.writeText(HeldInvoiceCodec.encode(mine)); HeldInvoices.reset()
+    stage()
+    assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+    assertEquals(mine, now())
+
+    //  دکانِ دیگر روی همین دستگاه: هیچ
+    heldFile.delete(); HeldInvoices.reset()
+    LedgerOwner.remember(ctx, "u-x", "s-x")
+    try {
+      stage()
+      assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+      assertTrue(now().items.isEmpty())
+    } finally {
+      LedgerOwner.remember(ctx, "", "")
+    }
+    //  پشتیبانِ دستگاهِ دیگرِ همین حساب: راهِ خودکارِ پس از ورود هیچ؛ بازیابیِ آگاهانهٔ فایل (`BackupRestore.confirm`) همه
+    heldFile.delete(); HeldInvoices.reset()
+    val other = HeldBackupRules.encode(HeldBackup(from = "other-machine", items = listOf(h)))
+    File(ctx.cacheDir, "restore-held.json").writeText(other)
+    assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+    assertTrue(now().items.isEmpty())
+    File(ctx.cacheDir, "restore-held.json").writeText(other)
+    assertEquals(1, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
+    assertEquals(listOf(h), now().items)
+    heldFile.delete(); HeldInvoices.reset()
+    //  پروندهٔ خراب: هیچ اثری
+    File(ctx.cacheDir, "restore-held.json").writeText("{not json")
+    assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger, sameMachineOnly = true) })
+    assertFalse(File(ctx.cacheDir, "restore-held.json").exists())
+  }
+
+  /**
+   *  DATA-SAFETY §۸ — سیم‌کشیِ «فقط پس از نشستنِ دفتر»: بازیابیِ فایل (`BackupRestore.confirm`) نگه‌داشته‌ها را پس از
+   *  `restoreBackup` و ردِ آن (همان حصارِ «اول وارد شوید / اول همگام کنید / صفِ نرفته») می‌نشاند؛ `commitPhotos` (که پیش از
+   *  دفتر هم صدا زده می‌شود) هرگز؛ راهِ خودکارِ پس از ورود فقط پشتیبانِ همین دستگاه. (کدِ اندرویدی، پس متن سنجیده می‌شود.)
+   */
+  @Test fun `نگه‌داشته‌ها فقط پس از حصارِ بازیابی و از راهِ ابری فقط پشتیبانِ همین دستگاه`() {
+    fun src(name: String) = File("../android-native/app/src/main/java/ir/vil3ntec/tohid/data/$name").readText()
+    val confirm = src("BackupRestoreAndroid.kt").let { it.substring(it.indexOf("suspend fun confirm(")) }
+    val restored = confirm.indexOf("store.restoreBackup(")
+    val refused = confirm.indexOf("if (!r.ok)")
+    val held = confirm.indexOf("DeviceDocsBundle.commitHeld(context, store.data.value)")
+    assertTrue("ترتیب: دفتر ⇐ رد ⇐ نگه‌داشته ($restored، $refused، $held)", restored in 0 until refused && refused < held)
+    val bundle = src("BackupBundle.kt")
+    assertFalse("commitPhotos نگه‌داشته نمی‌نشاند", bundle.substring(bundle.indexOf("fun commitPhotos(")).substringBefore("fun dropStaging(").contains("commitHeld"))
+    val cloud = src("CloudSettingsRestore.kt")
+    assertTrue(cloud.contains("DeviceDocsBundle.commitHeld(app, store.data.value, sameMachineOnly = true)"))
+    assertTrue("پس از خواندنِ سالم", cloud.indexOf("isFailure") in 0 until cloud.indexOf("DeviceDocsBundle.commitHeld(app,"))
   }
 
   @Test fun `پشتیبانِ دست‌ساز نشست یا همگام‌سازی را نمی‌نویسد`() {

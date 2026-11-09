@@ -24,7 +24,8 @@ import java.io.OutputStream
  *     قالبِ تازه‌تر ⇒ «به‌روز کنید»؛ پشتیبانِ دکانِ دیگر (`BackupStamp.judge` با صاحبِ دفترِ روی میز، همان قاعدهٔ
  *     `LedgerOwner`) ⇒ رد. هیچ‌کدام دفتر، عکس یا تنظیمی را نمی‌نویسد؛ پوشهٔ موقت پاک می‌شود.
  *   • [confirm] پس از تأیید: نسخهٔ ایمنی ⇐ دفتر (`ShopStore.restoreBackup`، راه از `RestoreRoute`: هرگز op
- *     نمی‌سازد، صف دست نمی‌خورد) ⇐ **فقط اگر نشست** عکس‌ها و تنظیماتِ کنار گذاشته. پیش از این عکس‌ها و تنظیمات
+ *     نمی‌سازد، صف دست نمی‌خورد) ⇐ **فقط اگر نشست** عکس‌ها، تنظیماتِ کنار گذاشته و فاکتورهای نگه‌داشته
+ *     (`DeviceDocsBundle.commitHeld`). پیش از این عکس‌ها و تنظیمات
  *     **پیش از** دفتر می‌نشستند: بازیابیِ ردشده («اول وارد شوید»، «اول همگام کنید»، صفِ نرفته) عکسِ تازه‌ترِ کالا
  *     را با عکسِ کهنهٔ پشتیبان رونویسی می‌کرد.
  *   • [openSnapshot]: نسخهٔ خودکار، ساده، رمزدار با کلیدِ دستگاه، یا رمزدار با عبارت (`SnapshotSeal`)؛ پوشهٔ
@@ -103,6 +104,8 @@ object BackupRestore {
       return Confirmed(false, 0, r.message)
     }
     val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
+    //  DATA-SAFETY §۸: نگه‌داشته‌ها و سبدِ جاری — فقط پس از نشستنِ دفتر (بالا) و با همان دفتر (فروخته‌ها نه)
+    withContext(Dispatchers.IO) { DeviceDocsBundle.commitHeld(context, store.data.value) }
     return Confirmed(true, moved, r.message)
   }
 }

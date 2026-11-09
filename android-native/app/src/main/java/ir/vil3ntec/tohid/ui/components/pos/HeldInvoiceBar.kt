@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.keymap.KeyMap
 import ir.vil3ntec.tohid.core.keymap.KeyName
 import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.HeldClaim
+import ir.vil3ntec.tohid.data.HeldConflict
 import ir.vil3ntec.tohid.data.HeldExtras
 import ir.vil3ntec.tohid.data.HeldInvoice
 import ir.vil3ntec.tohid.data.HeldInvoiceStore
@@ -129,7 +131,22 @@ internal sealed interface HeldDialog {
   data object List : HeldDialog
   data class Discard(val invoice: HeldInvoice) : HeldDialog
   data object DropStale : HeldDialog
+  /** S09 «در دستِ دستگاهِ X»: بازگرداندن فقط با تأییدِ صریح (`HeldSyncEngine.claim`) */
+  data class TakeOver(val invoice: HeldInvoice, val held: HeldClaim.Held) : HeldDialog
+  /** S09 «یک فاکتور در دو دستگاه» — تا کاربر ببیند («دیدم») */
+  data class Twice(val id: String, val conflict: HeldConflict) : HeldDialog
 }
+
+/** «دستگاهِ A1» — سریِ سند همان است که روی فاکتورِ آن دستگاه چاپ می‌شود؛ نامعلوم ⇒ «دستگاهِ دیگری» */
+internal fun heldTakeTitle(h: HeldClaim.Held): String = when {
+  h.fresh && h.series.isNotBlank() -> StrPos.heldClaimedBy(h.series)
+  h.fresh -> StrPos.heldClaimedElsewhere
+  h.series.isNotBlank() -> StrPos.heldOpenedOn(h.series)
+  else -> StrPos.heldOpenedElsewhere
+}
+
+internal fun heldTwiceText(c: HeldConflict): String =
+  if (c.series.isNotBlank()) StrPos.heldTwice(c.title, c.series) else StrPos.heldTwiceElsewhere(c.title)
 
 /** وضعیت و کارهای برگه‌ها برای یک صفحهٔ صندوق */
 @Stable
@@ -146,6 +163,11 @@ class HeldInvoicesUi internal constructor(
   internal var onFocusBack: () -> Unit = {}
   /** S09: نگه‌دارندهٔ این فاکتور کسِ دیگری است (پشتیبانِ سرور، `HeldSync.othersHeld`)؛ پرچمِ خاموش ⇒ همیشه نه */
   internal var notMine: (String) -> Boolean = { false }
+  /** S09 «در دستِ دستگاهِ X»: پشتیبانِ سرور روشن است (`HeldSync.claims`)؛ خاموش ⇒ بازگرداندن بایت‌به‌بایت همان پیشین */
+  internal var claims: () -> Boolean = { false }
+  internal var claim: suspend (id: String, force: Boolean) -> HeldClaim = { _, _ -> HeldClaim.Free }
+  /** «یک فاکتور در دو دستگاه» دیده شد */
+  internal var ack: (String) -> Unit = {}
   internal var data: ShopData = ShopData()
   /** دادهٔ دکان بار شده — بی آن `fit` همهٔ ردیف‌های کالا را «ناموجود» می‌دید */
   internal var loaded: Boolean = true
@@ -153,6 +175,8 @@ class HeldInvoicesUi internal constructor(
 
   private var pending by mutableStateOf(0)
   private var warned = false
+  /** S09: پرسشِ «در دستِ کیست» در جریان است */
+  private var asking = false
   /** جابه‌جاییِ فاکتور در جریان است: سبد قفل است و صفحه ورودی نمی‌گیرد */
   val switching: Boolean get() = pending > 0
 
@@ -193,8 +217,41 @@ class HeldInvoicesUi internal constructor(
   fun hold(label: String?, note: String?) { dialog = null; run(switches = true) { store.hold(cart, extras(), label, note) } }
   /** «+ تازه» — نگه‌داشتن بی پرسیدنِ نام و صندوقِ خالی برای مشتریِ بعدی */
   fun newInvoice() = hold(null, null)
-  fun resume(id: String) { dialog = null; if (ready()) run(switches = true) { store.resume(cart, id, extras(), data) } }
-  fun step(dir: Int) { if (ready()) run(switches = true) { store.step(cart, dir, extras(), data) } }
+  /**
+   *  @param force «باز کردن در این دستگاه» ِ برگهٔ «در دستِ دستگاهِ X» — تأییدِ صریحِ گرفتن
+   *  پرچمِ `shop.held_sync` خاموش ⇒ همان بازگرداندنِ پیشین، بی هیچ پرسشی.
+   */
+  fun resume(id: String, force: Boolean = false) {
+    dialog = null
+    if (!ready()) return
+    if (!claims()) { run(switches = true) { store.resume(cart, id, extras(), data) }; return }
+    //  یک پرسش در هر لحظه (دو ضربه ⇒ یکی)؛ تا پاسخ (حداکثر ۳ ثانیه) صفحه همان «در حالِ جابه‌جایی» است
+    if (asking) return
+    asking = true
+    pending++
+    scope.launch {
+      val answer = try { claim(id, force) } finally { asking = false; if (--pending == 0) warned = false }
+      when (val c = answer) {
+        is HeldClaim.Held -> store.book.value.items.firstOrNull { it.id == id }?.let { dialog = HeldDialog.TakeOver(it, c) }
+        is HeldClaim.Rekey -> run(switches = true) { store.resume(cart, c.id, extras(), data) }
+        HeldClaim.Free -> run(switches = true) { store.resume(cart, id, extras(), data) }
+      }
+    }
+  }
+
+  fun step(dir: Int) {
+    if (!ready()) return
+    if (!claims()) { run(switches = true) { store.step(cart, dir, extras(), data) }; return }
+    //  پشتیبانِ سرور روشن: همان همسایه، از درِ «در دستِ کیست»
+    scope.launch {
+      store.load()
+      val id = HeldRules.neighbour(store.book.value, cart.snapshot(), dir)
+      if (id == null) snackbar.showSnackbar(ir.vil3ntec.tohid.core.i18n.StrLedger.heldNone) else resume(id)
+    }
+  }
+
+  /** «یک فاکتور در دو دستگاه» — «دیدم» */
+  fun seen(id: String) { ack(id); close() }
 
   private fun ready(): Boolean {
     if (!loaded) toast(NOT_LOADED)
@@ -269,6 +326,9 @@ fun rememberHeldInvoices(
   ui.onSwitched = onSwitched
   ui.onFocusBack = onFocusBack
   ui.notMine = { id -> ir.vil3ntec.tohid.data.HeldSync.othersHeld(context, id) }
+  ui.claims = { ir.vil3ntec.tohid.data.HeldSync.claims(context) }
+  ui.claim = { id, force -> ir.vil3ntec.tohid.data.HeldSync.claim(context, id, force) }
+  ui.ack = { id -> ir.vil3ntec.tohid.data.HeldSync.ack(context, id) }
   ui.data = d
   ui.loaded = loaded
   //  بالا آمدن پس از قطعِ برق وسطِ جابه‌جایی (شرحِ `HeldRules.reconcile`)؛ پرسشِ
@@ -285,6 +345,11 @@ fun rememberHeldInvoices(
       ir.vil3ntec.tohid.data.HeldSync.kick(context)
       kotlinx.coroutines.delay(ir.vil3ntec.tohid.data.HeldSync.MIN_MS)
     }
+  }
+  //  S09 «یک فاکتور در دو دستگاه»: تا کاربر ببیند («دیدم») روی همین صندوق؛ پرچمِ خاموش ⇒ همیشه خالی
+  val twice by ir.vil3ntec.tohid.data.HeldSync.conflicts.collectAsState()
+  LaunchedEffect(ui, twice, ui.dialog == null) {
+    if (ui.dialog == null) twice.entries.firstOrNull()?.let { (id, c) -> ui.dialog = HeldDialog.Twice(id, c) }
   }
   //  «پرداخت» در «اسکن‌های در انتظار» (`ScanSaleHold`): فاکتورِ نگه‌داشتهٔ بارکدخوان به همین صندوق برمی‌گردد؛
   //  فروش فقط با پرداختِ همین صندوق و دستِ کاربر ثبت می‌شود
@@ -518,6 +583,23 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
         Button(onClick = { ui.dropStale() }, colors = ButtonDefaults.buttonColors(containerColor = colors.danger)) { Text(StrPos.clearIt) }
       },
       dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
+    )
+    is HeldDialog.TakeOver -> AlertDialog(
+      onDismissRequest = { ui.close() },
+      shape = Shape.dialog,
+      title = { Text(heldTakeTitle(dlg.held)) },
+      text = { Text(StrPos.heldTakeWarn) },
+      confirmButton = {
+        Button(onClick = { ui.resume(dlg.invoice.id, force = true) }, colors = ButtonDefaults.buttonColors(containerColor = colors.warning)) { Text(StrPos.heldTakeOver) }
+      },
+      dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.no) } },
+    )
+    is HeldDialog.Twice -> AlertDialog(
+      onDismissRequest = { ui.seen(dlg.id) },
+      shape = Shape.dialog,
+      title = { Text(StrPos.heldTwiceTitle) },
+      text = { Text(heldTwiceText(dlg.conflict)) },
+      confirmButton = { Button(onClick = { ui.seen(dlg.id) }) { Text(StrPos.heldSeen) } },
     )
   }
 }

@@ -34,6 +34,8 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
   private val file = File(dir, "oplog-$safe.json")
   private val dropFile = File(dir, "oplog-$safe-dropped.json")
   private val evictedFile = File(dir, "oplog-$safe-dropped-evicted.txt")
+  /** DATA-SAFETY §۷: دفترچهٔ بازفرستِ `hash_mismatch` ِ عددی (`DroppedResend`) — هر op یک بار، با وضع و خودِ op */
+  private val resendFile = File(dir, "oplog-$safe-resend.json")
 
   /*
    *  ── شمارشِ کش‌شده، عمداً ────────────────────────────────────────
@@ -45,6 +47,10 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
    */
   @Volatile private var cachedSize: Int = -1
   @Volatile private var cachedDropped: Int = -1
+  /** op_idهای «queued» ِ دفترچهٔ بازفرست — هر `accepted`/`drop` ِ هر دسته می‌پرسد، پس کش (هر نوشتنِ دفترچه باطلش می‌کند) */
+  @Volatile private var inflight: Set<String>? = null
+  /** شمارِ دفترِ ردشده در آخرین دورِ `DroppedResend` (۱- ⇒ هنوز نه، از باز شدنِ برنامه) */
+  @Volatile private var resendSeen: Int = -1
 
   @Synchronized
   override fun all(): List<SyncOp> = read(file).mapNotNull { SyncOp.fromJson(it) }
@@ -125,6 +131,23 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
     return cut(ops, sizes, maxOps, maxBytes)
   }
 
+  /**
+   *  opهای پذیرفتهٔ سرور (`applied`/`duplicate`) ⇒ بیرون از صف؛ و اگر بازفرستِ `DroppedResend` بودند ⇒ ردیفشان در دفترِ
+   *  ردشده **همین حالا** پاک (نه زودتر) و دفترچه «accepted». پاک نشد ⇒ «queued» می‌ماند ⇒ دورِ بعد همان op ⇒ duplicate.
+   */
+  fun accepted(ids: Collection<String>, now: Long): Int = locked {
+    val n = ack(ids)
+    val mine = resendInflight().intersect(ids.toSet())
+    if (mine.isNotEmpty()) {
+      val book = read(dropFile)
+      val keep = book.filterNot { e ->
+        (e["reason"] as? JsonPrimitive)?.content == DroppedResend.REASON && ((e["op"] as? JsonObject)?.get("op_id") as? JsonPrimitive)?.content in mine
+      }
+      if (keep.size == book.size || write(dropFile, keep)) settle(mine, DroppedResend.ACCEPTED, "", now)
+    }
+    n
+  }
+
   /** فقط opهای پذیرفته‌شده بیرون می‌روند. */
   @Synchronized
   fun ack(ids: Collection<String>): Int {
@@ -136,13 +159,19 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
     return list.size - keep.size
   }
 
+  /** ⛔ بازفرستِ `DroppedResend` که باز رد شد دوباره در دفتر نمی‌نشیند: همان ردیفِ کهنه سرِ جایش، دفترچه «rejected» با دلیل */
   @Synchronized
-  fun drop(ops: List<SyncOp>, reason: String) = dropRaw(ops.map { it.toJson() }, reason)
+  fun drop(ops: List<SyncOp>, reason: String) {
+    val now = System.currentTimeMillis()
+    val mine = resendInflight()
+    val again = ops.filter { it.opId in mine }
+    if (again.isNotEmpty()) settle(again.mapTo(HashSet()) { it.opId }, DroppedResend.REJECTED, reason, now)
+    dropRaw(ops.filter { it.opId !in mine }.map { it.toJson() }, reason, now)
+  }
 
-  private fun dropRaw(ops: List<JsonObject>, reason: String) {
+  private fun dropRaw(ops: List<JsonObject>, reason: String, now: Long) {
     if (ops.isEmpty()) return
     val book = read(dropFile).toMutableList()
-    val now = System.currentTimeMillis()
     for (o in ops) {
       book += buildJsonObject {
         put("op", o)
@@ -169,8 +198,62 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
   /** نشانِ «تصمیمِ صندوق نشست» ِ همین حساب، کنارِ همین دفترِ کنار (`SetAsideMarks`؛ با `SyncV1Keys.move` جابه‌جا می‌شود) */
   fun settledMarks(): SetAsideMarks = File(dir, SetAsideMarks.v1Name(safe)).let { f -> SetAsideMarks({ f.takeIf { it.isFile }?.readText() }, { DiskWrite.text(f, it) }) }
 
+  fun clear() { locked { write(file, emptyList()) } }
+
+  /* ---------------- DATA-SAFETY §۷: بازفرستِ `hash_mismatch` ِ عددی (`DroppedResend`) ---------------- */
+
+  /** دفترچه: `{op_id, state, why, at, op?}` (`DroppedResend.QUEUED|ACCEPTED|SKIPPED|REJECTED`) */
+  fun resendRecord(): List<JsonObject> = locked { read(resendFile) }
+
+  /** دفترِ ردشده از آخرین دور عوض شده (یا نخستین دورِ پس از باز شدن)؟ — تا هر دورِ همگام‌سازی دفتر را نخواند */
+  fun resendDue(): Boolean = droppedCount() != resendSeen
+  fun resendChecked() { resendSeen = droppedCount() }
+
+  /**
+   *  تصمیم‌ها ⇒ **اول** دفترچه (رفتنی «queued» با خودِ op، بقیه «skipped» با دلیل)، **بعد** جلوی صف با همان op_id.
+   *  دفترچه ننشست ⇒ پرتاب و هیچ چیزی در صف. @return چند op به صف آمد
+   */
+  fun resend(decisions: List<DroppedResend.Decision>, now: Long): Int = locked {
+    if (decisions.isEmpty()) return@locked 0
+    val add = decisions.map { d ->
+      buildJsonObject {
+        put("op_id", JsonPrimitive(d.opId))
+        put("state", JsonPrimitive(if (d.send != null) DroppedResend.QUEUED else DroppedResend.SKIPPED))
+        put("why", JsonPrimitive(d.why))
+        put("at", JsonPrimitive(now))
+        d.send?.let { put("op", it.toJson()) }
+      }
+    }
+    check(write(resendFile, read(resendFile) + add)) { ir.vil3ntec.tohid.core.i18n.StrSync.rejectedBookNotWritten }
+    inflight = null
+    pushFront(decisions.mapNotNull { it.send })
+  }
+
+  /** «queued» ِ دفترچه که در صف نیست (بسته شدن میانِ دفترچه و صف، یا پذیرش پیش از «accepted») ⇒ همان op دوباره جلوی صف */
+  fun resendRestore(): Int = locked {
+    val ops = read(resendFile).filter { (it["state"] as? JsonPrimitive)?.content == DroppedResend.QUEUED }
+      .mapNotNull { e -> (e["op"] as? JsonObject)?.let { SyncOp.fromJson(it) } }
+    pushFront(ops)
+  }
+
+  private fun resendInflight(): Set<String> = inflight ?: read(resendFile)
+    .filter { (it["state"] as? JsonPrimitive)?.content == DroppedResend.QUEUED }
+    .mapNotNullTo(HashSet()) { (it["op_id"] as? JsonPrimitive)?.content }.also { inflight = it }
+
+  /** «queued» ِ [ids] ⇒ [state]؛ ننشست ⇒ پرتاب (همان قاعدهٔ دفترِ ردشده: op در صف می‌ماند) */
+  private fun settle(ids: Set<String>, state: String, why: String, now: Long) {
+    val next = read(resendFile).map { e ->
+      val id = (e["op_id"] as? JsonPrimitive)?.content
+      if (id !in ids || (e["state"] as? JsonPrimitive)?.content != DroppedResend.QUEUED) e
+      else JsonObject(e + mapOf("state" to JsonPrimitive(state), "why" to JsonPrimitive(why), "done_at" to JsonPrimitive(now)))
+    }
+    check(write(resendFile, next)) { ir.vil3ntec.tohid.core.i18n.StrSync.rejectedBookNotWritten }
+    inflight = null
+  }
+
+  /** قفلِ همین صف (همان قفلِ دیگر درها) */
   @Synchronized
-  fun clear() { write(file, emptyList()) }
+  private fun <T> locked(block: () -> T): T = block()
 
   /**
    *  فایلِ خراب «خالی» فرض نمی‌شود: پیش‌تر `push` بعدی رویش می‌نوشت و همهٔ
@@ -206,7 +289,7 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
    */
   private fun write(f: File, list: List<JsonObject>): Boolean {
     val ok = runCatching { DiskWrite.text(f, JsonArray(list).toString()) }.isSuccess
-    if (ok) { if (f == file) cachedSize = list.size else cachedDropped = list.size + evicted() }
+    if (ok) { if (f == file) cachedSize = list.size else if (f == dropFile) cachedDropped = list.size + evicted() }
     return ok
   }
 

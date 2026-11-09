@@ -56,16 +56,21 @@ fun DraftPrompt(cartStore: CartStore, d: ShopData, loaded: Boolean, snackbar: Sn
     is DraftRestore.Offer -> {
       val offer = decision.draft
       val total = remember(offer, d) { SalesEngine.cartTotal(d, offer.cart()) }
+      //  POS-13: تخفیف، روشِ پرداخت و فروشندهٔ همان فاکتور (`SaleDraft.page`) به صفحهٔ صندوق — یک بار (`HeldSession.take`)
+      fun keep() {
+        cartStore.resolveRecovery(offer)
+        offer.page?.let { ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.keep(cartStore, it.extras()) }
+      }
       DraftSheet(
         lines = offer.lines.size,
         total = total,
         dropped = decision.dropped,
         onContinue = {
-          cartStore.resolveRecovery(offer)
+          keep()
           AppNav.go(SalesPaths.SALE)
         },
         onDiscard = { cartStore.resolveRecovery(null) },
-        onLater = { cartStore.resolveRecovery(offer) },
+        onLater = { keep() },
       )
     }
   }

@@ -89,6 +89,14 @@ object BackupBundle {
         zip.closeEntry()
       }
 
+      //  DATA-SAFETY §۸: فاکتورهای نگه‌داشته و سبدِ جاری (`DeviceDocsBundle.held`) — بی آن‌ها هیچ قلمی، پشتیبان همان پیشین
+      runCatching {
+        val held = DeviceDocsBundle.held(context) ?: return@runCatching
+        zip.putNextEntry(ZipEntry(DeviceDocsBundle.HELD_ENTRY))
+        zip.write(held.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+      }
+
       photoDir(context).listFiles().orEmpty()
         .filter { it.isFile && it.name.endsWith(".jpg") }
         .forEach { photo ->
@@ -173,6 +181,10 @@ object BackupBundle {
             //  DATA-SAFETY §۸: پیش‌فاکتورهای همین دستگاه — تا تأییدِ بازیابی کنار می‌مانند (`DeviceDocsBundle`)
             !entry.isDirectory && name == DeviceDocsBundle.QUOTES_ENTRY ->
               DeviceDocsBundle.stageFrom(context, zip)
+
+            //  DATA-SAFETY §۸: نگه‌داشته‌ها و سبدِ جاری — تا تأیید و نشستنِ دفتر کنار (`DeviceDocsBundle.commitHeld`)
+            !entry.isDirectory && name == DeviceDocsBundle.HELD_ENTRY ->
+              DeviceDocsBundle.stageHeldFrom(context, zip)
 
             !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
               /*

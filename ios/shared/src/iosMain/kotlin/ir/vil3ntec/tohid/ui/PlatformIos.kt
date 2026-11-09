@@ -34,4 +34,8 @@ object Platform {
     "ios-" + (UIDevice.currentDevice.identifierForVendor?.UUIDString ?: "unknown")
 
   fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
+
+  /** OPS-02 — iOS پنجرهٔ «امن» در برابرِ عکسِ صفحه ندارد (برنامه نمی‌تواند آن را ببندد)؛ همان API بی‌اثر */
+  @androidx.compose.runtime.Composable
+  fun SecureWindow(on: Boolean) = Unit
 }

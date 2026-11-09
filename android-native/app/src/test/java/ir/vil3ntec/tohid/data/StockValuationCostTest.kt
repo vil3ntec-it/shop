@@ -49,6 +49,23 @@ class StockValuationCostTest {
   }
 
   @Test
+  fun engineOn_valueIsTheLedgersExactValue_notQtyTimesRoundedUnitCost() {
+    //  ۱ صابون به ۱۰ + ۲ صابون به ۵ = ۲۰ افغانی برای ۳ ⇒ میانگینِ ۶٫۶۶۶… (گرد ۶٫۶۷). ارزش همان ۲۰٫۰۰ ِ دفتر است،
+    //  نه ۳ × ۶٫۶۷ = ۲۰٫۰۱ — و سودِ بالقوه از همان ارزش (۳ × ۹ − ۲۰)
+    val soap = ShopData(
+      products = listOf(Product(id = "s", name = "صابون", unit = "عدد", purchasePrice = 5.0, salePrice = 9.0)),
+      warehouseEntries = listOf(
+        WarehouseEntry(id = "a", productId = "s", units = 1.0, price = 10.0, date = "2026-08-01", createdAt = 1000),
+        WarehouseEntry(id = "b", productId = "s", units = 2.0, price = 5.0, date = "2026-08-02", createdAt = 2000),
+      ),
+    )
+    val v = ReportEngine.stockInsight(StockActions.setMode(soap, true, "مالک", today, 10, ::newId), "2026-08-01", "2026-08-31").valuation
+    assertEquals(2000L, v.costMinor)
+    assertEquals(2000L, v.lines.single().costMinor)
+    assertEquals(3 * 900L - 2000L, v.potentialProfitMinor)
+  }
+
+  @Test
   fun engineOff_costStaysPurchasePrice() {
     val v = ReportEngine.stockInsight(base, "2026-08-01", "2026-08-31").valuation
     assertEquals((20 * 150 + 5 * 40) * 100L, v.costMinor)

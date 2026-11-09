@@ -307,6 +307,24 @@ async function ownerView(shopId, at = db.now()) {
   };
 }
 
+/**
+ * CRM-15: همان نما برای عضوی که صاحب «شمارهٔ مشتریان» (`customers.contact`) را برایش بسته — هر شماره با
+ * [mask] (`customer-contact.maskPhone`، قالبِ `ContactMask` ِ برنامه) پوشیده؛ شمار، دستگاه و زمان همان.
+ * گروه‌بندیِ «مشکوک» پیش از پوشاندن روی شمارهٔ کامل انجام شده است.
+ */
+function maskView(view, mask) {
+  const m = (v) => (typeof v === 'string' && v ? mask(v) : v);
+  return {
+    ...view,
+    recent: view.recent.map((r) => ({ ...r, phone: m(r.phone) })),
+    suspicious: {
+      ...view.suspicious,
+      devices: view.suspicious.devices.map((d) => ({ ...d, phones: d.phones.map(m) })),
+      phones: view.suspicious.phones.map((p) => ({ ...p, phone: m(p.phone) })),
+    },
+  };
+}
+
 /** فهرستِ عمومیِ ویترین (`GET /promos`، فقط وقتی روشن است): اولین خرید بی هیچ دادهٔ مشتری */
 function publicFirstOrder(s) {
   const f = s.firstOrder;
@@ -319,5 +337,5 @@ function publicFirstOrder(s) {
 
 module.exports = {
   FLAG, ATTEMPTS, SUSPECT_AT, flagOn, normalize, parseSettings, settingsOf, saveSettings, deviceKeyOf, prepare,
-  gate, failed, resetAttempts, overLimit, firstOrderOpen, amountOf, split, preview, settle, ownerView, publicFirstOrder,
+  gate, failed, resetAttempts, overLimit, firstOrderOpen, amountOf, split, preview, settle, ownerView, maskView, publicFirstOrder,
 };

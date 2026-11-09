@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.data
 
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonNull
@@ -315,6 +316,48 @@ class ReturnFlowTest {
     assertEquals(400.0, CashShift.totals(more.data, now, now, 0.0).returns, 0.0)
     //  رسید (نمای سند) همان تقسیم را نشان می‌دهد
     assertEquals(mapOf("hesabpay" to 100.0), ReturnFlow.doc(more.data, "w2")!!.split.methods)
+  }
+
+  /**
+   *  PAY-23 — بازپرداخت فقط از پولِ رسیده، همان قاعدهٔ X/Z (`PayStatus.unreceived`): حساب‌پیِ «در انتظار» (نه ثبتِ
+   *  دستی، هنوز بی «پول رسید») نه به روشِ خودش پس می‌رود و نه با نقدِ دخل جبران می‌شود. عددها دستی‌اند: s60 = نقدِ
+   *  ۴۰۰ + حساب‌پیِ ۶۰۰، چهار عدد به ۲۵۰.
+   */
+  @Test
+  fun `بازپرداخت فقط از پولِ رسیده — حساب‌پیِ «در انتظار» تا «پول رسید» پس‌دادنی نیست`() {
+    val base = ledger()
+    val s60 = base.sales.first { it.id == "s60" }
+    val waiting = s60.copy(payments = s60.payments!!.map { if (it.method == "hesabpay") it.copy(verification = null) else it })
+    val d = base.copy(sales = base.sales.map { if (it.id == "s60") waiting else it })
+    fun ok(r: ReturnFlow.Outcome<ReturnFlow.Split>) = (r as ReturnFlow.Outcome.Ok).value
+    //  ثبتِ دستی (بردار) همان امروز: ۵۰۰ به حساب‌پی
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 0.0, mapOf("hesabpay" to 500.0)), ok(ReturnFlow.split(s60, 500.0, ReturnFlow.ORIGINAL, "owner", null)))
+    //  در انتظار: فقط ۴۰۰ ِ نقدِ رسیده، به هر روشی
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 400.0), ok(ReturnFlow.split(waiting, 400.0, ReturnFlow.ORIGINAL, "owner", null)))
+    for (mode in listOf(ReturnFlow.ORIGINAL, ReturnFlow.CASH)) {
+      val bad = ReturnFlow.split(waiting, 500.0, mode, "owner", null) as ReturnFlow.Outcome.Bad
+      assertEquals(mode, ReturnFlow.Code.REFUND_FAILED, bad.code)
+      assertTrue(bad.message, bad.message.contains(StrLedger.refundAwaitsPayment))
+    }
+    //  ثبت: همه یا هیچ — دفتر دست نمی‌خورد
+    val posted = ReturnFlow.post(d, ReturnFlow.Request(docId = "pw", saleId = "s60", picks = mapOf("i60" to ReturnFlow.Pick(2.0)), reason = "دیگر"), today, now, ::newId)
+    assertEquals(ReturnFlow.Code.REFUND_FAILED, (posted as ReturnFlow.Outcome.Bad).code)
+    //  تکه‌تکه هم نه: نقدِ دخل ۲۵۰ + ۲۵۰ = ۵۰۰ > ۴۰۰ ِ رسیده می‌شد (ردیفِ نقد پس‌داده‌اش را نمی‌شمارد)
+    fun one(on: ShopData, doc: String) = ReturnFlow.post(on, ReturnFlow.Request(docId = doc, saleId = "s60", picks = mapOf("i60" to ReturnFlow.Pick(1.0)), reason = "دیگر"), today, now, ::newId)
+    val first = (one(d, "p1") as ReturnFlow.Outcome.Ok).value
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 250.0), first.split)
+    val second = one(first.data, "p2") as ReturnFlow.Outcome.Bad
+    assertEquals(ReturnFlow.Code.REFUND_FAILED, second.code)
+    assertTrue(second.message, second.message.contains(StrLedger.refundAwaitsPayment))
+    //  «پول رسید» ِ صندوقدار (سندِ `pay_status`) ⇒ مثلِ ثبتِ دستی
+    val arrived = listOf(ir.vil3ntec.tohid.core.pay.PayStatus.Change("ps1", "s60", 1, "hesabpay", "pending", "confirmed", 7_000, "سارا"))
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 0.0, mapOf("hesabpay" to 500.0)), ok(ReturnFlow.split(waiting, 500.0, ReturnFlow.ORIGINAL, "owner", null, changes = arrived)))
+    //  نقدِ هنگامِ تحویل که نزدِ پیک است (`custody`، همیشه `pending`) پولِ رسیدهٔ دکان است — همان امروز
+    val cod = s60.copy(payments = listOf(SalePayment(method = "cod", kind = "cash", amountMinor = 100_000, status = "pending", custody = "courier")))
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 500.0), ok(ReturnFlow.split(cod, 500.0, ReturnFlow.ORIGINAL, "owner", null)))
+    //  فاکتورِ سفارشِ اینترنتی بیرون از وضعیتِ دستی است (`PayStatusFlow.view`)؛ بازپرداختِ سرور (ORD-15) همان امروز به درگاه
+    val web = s60.copy(channel = CashShift.ONLINE, payments = listOf(SalePayment(method = "online", kind = "other", amountMinor = 100_000, status = "pending")))
+    assertEquals(ReturnFlow.Split(0.0, 0.0, 0.0, mapOf("online" to 500.0)), ok(ReturnFlow.split(web, 500.0, ReturnFlow.ORIGINAL, "owner", null)))
   }
 
   /**

@@ -130,6 +130,8 @@ object StrProducts {
   val saleUnit: String get() = t("واحدِ فروشِ دوم", "Second sale unit", "د پلور دویم واحد")
   val saleUnitPlaceholder: String get() = t("گرم", "gram", "ګرام")
   val factor: String get() = t("ضریب", "Factor", "ضریب")
+  //  PRD-12 قیمتِ عمده — فقط با «لیستِ قیمت در صندوق»
+  val wholesaleHelper: String get() = t("لیستِ «عمده» در صندوق همین را می‌گیرد؛ خالی یعنی عمده ندارد", "The till's “wholesale” list uses this; empty means no wholesale price", "په صندوق کې د «عمده» لیست همدا اخلي؛ تش یعنې عمده نه لري")
   fun factorHelper(unit: String): String = t("هر واحد = چند ${asIs(unit)}", "One sale unit = how many $unit", "یو واحد = څو $unit")
   //  MKT-06 «چرخهٔ مصرف» (`data/ProductCycle`)
   val cycle: String get() = t("چرخهٔ مصرف (روز)", "Consumption cycle (days)", "د مصرف دوره (ورځې)")

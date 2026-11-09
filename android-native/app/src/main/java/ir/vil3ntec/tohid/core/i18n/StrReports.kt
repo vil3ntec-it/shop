@@ -125,6 +125,7 @@ object StrReports {
     t("${asIs(sold)} روز از ${asIs(past)} روزِ گذشتهٔ این هفته فروش داشتید", "Sales on $sold of the $past days so far this week", "د دې اونۍ له $past تېرو ورځو $sold ورځې پلور درلود")
   val streakNone: String get() = t("این هفته هنوز فروشی ثبت نشده", "No sales recorded this week yet", "پدې اونۍ کې لا پلور نه دی ثبت شوی")
   val soldThatDay: String get() = t("فروش داشت", "Had sales", "پلور یې درلود")
+  val closedDay: String get() = t("روزِ تعطیلِ دکان", "Shop closed", "د دکان رخصتي")
   val hoursTitle: String get() = t("ساعت‌های فروش", "Sales by hour", "د پلور ساعتونه")
   val peakHour: String get() = t("پُرفروش‌ترین ساعت", "Busiest hour", "تر ټولو ګڼ ساعت")
   fun peakLine(span: Any, count: Any, amount: Any): String =

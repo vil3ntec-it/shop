@@ -8,9 +8,9 @@
    Kotlinاش `core/stock/StockCore.kt` است و هر دو یک فایلِ بردارِ
    مرجع را می‌گذرانند: `license/test-vectors/stock-v1.json`.
 
-   میانگینِ موزونِ هستهٔ گزارش (`report-core.js` ‹`mavgReplay`›: سودِ RPT-03 و
-   بهای میانگینِ PRD-15، در برنامه، مرورگر و گزارشِ خودکارِ سرور) روی همین هسته
-   می‌دود. موتورِ امروزِ موجودی (جمعِ ورودی منهای فروش) دست نخورده است.
+   میانگینِ موزونِ هستهٔ گزارش (‹`reportReplay`› پایینِ همین فایل، از `report-core.js`: سودِ
+   RPT-03 و بهای میانگینِ PRD-15، در برنامه، مرورگر و گزارشِ خودکارِ سرور) روی همین
+   هسته می‌دود. موتورِ امروزِ موجودی (جمعِ ورودی منهای فروش) دست نخورده است.
 
    ── واحدها ──────────────────────────────────────────────────────
    پول = عددِ صحیحِ واحدِ کوچک (AFN یک‌صدم). مقدار = عددِ صحیحِ هزارم.
@@ -593,6 +593,89 @@
     });
   }
 
+  /* ---------------- بازپخشِ دفترِ گزارش (RPT-03، PRD-15) ---------------- */
+
+  /*
+   * بازپخشِ دفترِ گزارش (`report-core.js` ‹`ledger`›) برای میانگینِ موزونِ متحرک (D-23، الف) با همین هسته (حالتِ
+   * `recorded`)، یک جایگاه برای هر کالا (انتقال بینِ محل‌ها اثری ندارد). ترتیب: (زمان، ورود < فروش < برگشت، شناسه). ورودِ عادی `purchase_receipt`
+   * (+ هزینهٔ جانبی)، اصلاحِ مثبت به قیمتش یا میانگینِ همان لحظه (خروجیِ تولید به `costMinor`)، ورودِ منفی `count_adjust`؛ فروش `sale` (کمبود ⇒ تخمینی؛
+   * بی هیچ بهای معلوم ⇒ آن بخش به `purchasePrice` ِ قلم)؛ برگشتی `customer_return` به همان بهایی که رفت؛ لغوشده بیرون؛
+   * شمارشِ مثبتِ کالای بی‌بها ⇒ پایهٔ نامعلوم تا تمام شدنِ موجودی. سندِ ردشده نادیده؛ فروشِ ردشده به بهای قلم و تخمینی.
+   * `timeOf(rec)` زمانِ مرتب‌سازیِ همان هستهٔ گزارش است. خروجی: بهای هر قلم (`line`) و برگشتی (`ret`)، `est`، دفترِ هر کالا
+   * (`books`) و پایهٔ نامعلوم (`unknown`). شرحِ کامل: `docs/RULES-fa.md` «v3 · گزارش»؛ دوقلو: `ReportCore.mavg`؛
+   * بردار: `core/test-vectors/cost-v1.json` (روی `report-core.js`، که این را صدا می‌زند).
+   */
+  var REPORT_WH = 'main', REPORT_USER = 'report', REPORT_REC = { mode: 'recorded' };
+  function rnd(x) { var r = Math.round(x); return r === 0 ? 0 : r; }
+  /** mulDivRound، ولی عددِ نا‌امن ⇒ null (نه خطا) */
+  function mdrOrNull(a, b, c) {
+    try { return mulDivRound(a, b, c); } catch (e) { if (e instanceof RangeError) return null; throw e; }
+  }
+
+  function reportReplay(L, timeOf) {
+    var line = {}, ret = {}, est = {}, books = {}, unknown = {};
+    function lineMode(it) { if (it.unitCost === 0) est[it.id] = true; return rnd(it.unitCost * it.qty / 1000); }
+    function step(pid, doc) {
+      var r;
+      try { r = apply(books[pid] || emptyBook(), doc, REPORT_REC); } catch (e) { if (e instanceof RangeError) return null; throw e; }
+      if (r.result.ok) books[pid] = r.book;
+      return r.result.ok ? r.result : null;
+    }
+    function posOf(pid) { return books[pid] ? position(books[pid], pid, REPORT_WH) : null; }
+    function doc(t, type, pid, id, q) { return { id: id, type: type, productId: pid, warehouseId: REPORT_WH, userId: REPORT_USER, at: t > 0 ? t : 1, qtyMilli: q }; }
+    function afterOut(pid) { var p = posOf(pid); if (p && p.qtyMilli <= 0) delete unknown[pid]; }
+    var ev = [];
+    L.entries.forEach(function (e) { ev.push({ t: timeOf(e), k: 0, id: e.id, e: e }); });
+    L.sales.forEach(function (s) {
+      if (s.cancelled) return;
+      (L.itemsBySale[s.id] || []).forEach(function (it) { ev.push({ t: timeOf(s), k: 1, id: it.id, it: it }); });
+    });
+    L.returns.forEach(function (r) {
+      var s = L.saleById[r.saleId];
+      if (!(s && s.cancelled)) ev.push({ t: timeOf(r), k: 2, id: r.id, r: r });
+    });
+    ev.sort(function (a, b) { return (a.t - b.t) || (a.k - b.k) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)); });
+    ev.forEach(function (x) {
+      var d, p, res;
+      if (x.k === 0) {
+        var e = x.e;
+        if (e.productId === '' || e.qty === 0) return;
+        d = doc(x.t, e.adjustment || e.qty < 0 ? 'count_adjust' : 'purchase_receipt', e.productId, 'e:' + e.id, e.qty);
+        if (d.type === 'count_adjust') d.reason = 'adjustment';
+        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0 || e.value !== null) && (d.costMinor = e.value !== null && e.value >= 0 ? e.value : mdrOrNull(e.qty, e.unitCost, 1000)) === null) return;
+        if (d.type === 'purchase_receipt' && e.landed > 0) d.landedMinor = e.landed;
+        p = posOf(e.productId);
+        var blind = e.qty > 0 && d.costMinor === undefined && !(p && (p.qtyMilli > 0 || p.lastCost));
+        if (!step(e.productId, d)) return;
+        if (blind) unknown[e.productId] = true;
+        if (e.qty < 0) afterOut(e.productId);
+      } else if (x.k === 1) {
+        var it = x.it;
+        if (it.productId === '' || it.qty <= 0) { line[it.id] = lineMode(it); return; }
+        var wasUnknown = unknown[it.productId] === true;
+        res = step(it.productId, doc(x.t, 'sale', it.productId, 's:' + it.id, it.qty));
+        if (!res) { line[it.id] = lineMode(it); est[it.id] = true; return; }
+        var cost = res.costMinor, task = res.reviewTask;
+        var guess = res.shortMilli > 0 && task && task.reasons.indexOf('unknown_cost') >= 0 && it.unitCost > 0 ? mdrOrNull(res.shortMilli, it.unitCost, 1000) : null;
+        if (guess !== null && mdrOrNull(cost + guess, 1, 1) !== null) cost += guess;
+        if (res.shortMilli > 0 || wasUnknown) est[it.id] = true;
+        line[it.id] = cost;
+        afterOut(it.productId);
+      } else {
+        var r = x.r, item = L.itemById[r.saleItemId];
+        if (!item || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0; return; }
+        var c = mdrOrNull(line[item.id] !== undefined ? line[item.id] : rnd(item.unitCost * item.qty / 1000), r.qty, item.qty);
+        ret[r.id] = c === null ? 0 : c;
+        if (item.productId === '' || c === null || c < 0) return;
+        d = doc(x.t, 'customer_return', item.productId, 'r:' + r.id, r.qty);
+        d.costMinor = c;
+        step(item.productId, d);
+      }
+    });
+    L.items.forEach(function (it) { if (line[it.id] === undefined) line[it.id] = lineMode(it); });
+    return { line: line, ret: ret, est: est, books: books, unknown: unknown };
+  }
+
   return {
     VECTORS_FORMAT: 'stock-v1',
     TYPES: TYPES,
@@ -615,5 +698,7 @@
     onHandMilli: onHandMilli,
     filterDocs: filterDocs,
     exportRows: exportRows,
+    REPORT_WH: REPORT_WH,
+    reportReplay: reportReplay,
   };
 });

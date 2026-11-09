@@ -44,23 +44,85 @@ object CatalogSearch {
   }
 
   /** شمارِ فاکتورهای (لغونشدهٔ) هر کالا — ردیفِ آزاد (بی کالا) حساب نمی‌شود */
-  fun popularity(sales: List<Sale>, items: List<SaleItem>): Map<String, Int> {
-    val cancelled = HashSet<String>()
-    for (s in sales) if (s.status == "cancelled") cancelled += s.id
-    val seen = HashSet<Pair<String, String>>()
-    val out = HashMap<String, Int>()
-    for (it in items) {
-      if (it.productId.isBlank() || it.saleId in cancelled) continue
-      //  دو ردیفِ یک کالا در یک فاکتور یک فروش است
-      if (!seen.add(it.saleId to it.productId)) continue
-      out[it.productId] = (out[it.productId] ?: 0) + 1
+  fun popularity(sales: List<Sale>, items: List<SaleItem>): Map<String, Int> = Counted.build(sales, items).counts
+
+  /** همان [popularity] با خانهٔ یکتای [counts] */
+  private class Counted(
+    val sales: List<Sale>,
+    val items: List<SaleItem>,
+    val counts: Map<String, Int>,
+    /** لغوشده‌ها و فاکتورهایی که قلمی در دفتر دارند — مالِ همین خانه، بیرون داده نمی‌شوند */
+    val cancelled: HashSet<String>,
+    val itemSales: HashSet<String>,
+  ) {
+    companion object {
+      fun build(sales: List<Sale>, items: List<SaleItem>): Counted {
+        val cancelled = HashSet<String>()
+        for (s in sales) if (s.status == "cancelled") cancelled += s.id
+        val itemSales = HashSet<String>()
+        val seen = HashSet<Pair<String, String>>()
+        val out = HashMap<String, Int>()
+        for (it in items) {
+          itemSales += it.saleId
+          if (it.productId.isBlank() || it.saleId in cancelled) continue
+          //  دو ردیفِ یک کالا در یک فاکتور یک فروش است
+          if (!seen.add(it.saleId to it.productId)) continue
+          out[it.productId] = (out[it.productId] ?: 0) + 1
+        }
+        return Counted(sales, items, out, cancelled, itemSales)
+      }
     }
-    return out
+
+    /**
+     *  POS-42 — همین شمارش برای دفترِ پس از یک فروش، بی گذشتن از همهٔ اقلام: فقط وقتی فاکتورها و اقلام تنها به ته افزوده
+     *  شده‌اند (`AppendTail`)، هیچ فاکتورِ تازهٔ لغوشده‌ای قلمِ پیشین ندارد و هیچ قلمِ تازه‌ای به فاکتوری نمی‌خورد که
+     *  پیش‌تر قلم داشت (یکی‌شدنِ «یک کالا در یک فاکتور» فقط میانِ قلم‌های تازه است). هر چیزِ دیگر ⇒ `null` ⇒ ساختنِ کامل.
+     *  نگاشتِ پیشین دست نمی‌خورد (صفحه‌ای که نمایهٔ پیشین را دارد همان را می‌بیند).
+     */
+    fun grow(sales: List<Sale>, items: List<SaleItem>): Counted? {
+      val newSales = ir.vil3ntec.tohid.core.ledger.AppendTail.of(this.sales, sales) ?: return null
+      val newItems = ir.vil3ntec.tohid.core.ledger.AppendTail.of(this.items, items) ?: return null
+      val newCancelled = newSales.filter { it.status == "cancelled" }.map { it.id }
+      if (newCancelled.any { it in itemSales }) return null
+      if (newItems.any { it.saleId in itemSales }) return null
+      //  از این‌جا به بعد هیچ بازگشتی نیست ⇒ دو مجموعهٔ همین خانه درجا بزرگ می‌شوند (خانهٔ پیشین دیگر خوانده نمی‌شود)
+      cancelled += newCancelled
+      if (newItems.isEmpty()) return Counted(sales, items, counts, cancelled, itemSales)
+      val out = HashMap(counts)
+      val seen = HashSet<Pair<String, String>>()
+      for (it in newItems) {
+        itemSales += it.saleId
+        if (it.productId.isBlank() || it.saleId in cancelled) continue
+        if (!seen.add(it.saleId to it.productId)) continue
+        out[it.productId] = (out[it.productId] ?: 0) + 1
+      }
+      return Counted(sales, items, out, cancelled, itemSales)
+    }
   }
 
-  /** فقط کالاهای فعال؛ یک بار با هر تغییرِ کالاها یا فروش‌ها */
-  fun index(products: List<Product>, popularity: Map<String, Int>): Index {
-    val entries = keys(products)
+  private var counted: Counted? = null
+
+  /**
+   *  POS-42 — [popularity] برای نمایهٔ صندوقِ گوشی (`CatalogModel.index`) که با **هر فروش** از نو ساخته می‌شود: شمارِ همهٔ
+   *  ۱۵۰ هزار قلم نیمی از «نخستین اسکن پس از فروش» بود. یک خانه (یک دفتر روی صفحه)؛ دفترِ همان خانه به‌اضافهٔ فروش‌های
+   *  تازه ⇒ فقط اقلامِ تازه شمرده می‌شوند، وگرنه کامل. نتیجه مو‌به‌مو همان [popularity] است (`CatalogCountsTest`).
+   */
+  fun counts(sales: List<Sale>, items: List<SaleItem>): Map<String, Int> = locked {
+    val next = counted?.grow(sales, items) ?: Counted.build(sales, items)
+    counted = next
+    next.counts
+  }
+
+  /** یک قفل برای هر دو خانهٔ این شیء ([counts] و کلیدهای نرمال) — همان قفلِ پیشینِ `keys` */
+  @Synchronized
+  private fun <T> locked(block: () -> T): T = block()
+
+  /**
+   *  فقط کالاهای فعال؛ یک بار با هر تغییرِ کالاها یا فروش‌ها. [codes] (POS-01/PRD-03، پشتِ `ProductInfoPrefs`): کدِ کالا (SKU)
+   *  هم مثلِ بارکد — کامل اول، بخشی از آن در نتیجه‌ها؛ خاموش ⇒ همان بارکدها.
+   */
+  fun index(products: List<Product>, popularity: Map<String, Int>, codes: Boolean = false): Index {
+    val entries = keys(products, codes)
       .map { it.copy(sold = popularity[it.id] ?: 0) }
       .sortedWith(compareByDescending<Entry> { it.sold }.thenBy { it.nameKey }.thenBy { it.id })
     return Index(entries)
@@ -74,21 +136,25 @@ object CatalogSearch {
    *  عوض‌شده ⇒ از نو. نتیجه مو‌به‌مو همان ساختنِ کامل است (`CatalogSearchTest`).
    */
   private var keyedFrom: List<Product>? = null
+  private var keyedCodes = false
   private var keyed: List<Entry> = emptyList()
 
-  @Synchronized
-  private fun keys(products: List<Product>): List<Entry> {
-    if (keyedFrom == products) return keyed
+  private fun keys(products: List<Product>, sku: Boolean): List<Entry> = locked { keysLocked(products, sku) }
+
+  private fun keysLocked(products: List<Product>, sku: Boolean): List<Entry> {
+    if (keyedFrom == products && keyedCodes == sku) return keyed
     val fresh = products.filter { it.active }.map { p ->
+      val raw = if (sku) p.barcodes + listOfNotNull(p.sku?.takeIf { it.isNotBlank() }) else p.barcodes
       Entry(
         id = p.id,
         category = p.category,
         nameKey = TextNormalizer.compareKey(p.name),
-        codes = p.barcodes.map { TextNormalizer.compareKey(it) }.filter { it.isNotEmpty() },
+        codes = raw.map { TextNormalizer.compareKey(it) }.filter { it.isNotEmpty() },
         sold = 0,
       )
     }
     keyedFrom = products.toList()
+    keyedCodes = sku
     keyed = fresh
     return fresh
   }

@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.ui.v3.products
 
+import ir.vil3ntec.tohid.core.product.PackBarcodes
+import ir.vil3ntec.tohid.core.product.UnitSale
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ProductCycle
 import ir.vil3ntec.tohid.data.WarehouseEngine
@@ -26,6 +28,8 @@ data class ProductRowDraft(
   val unitFactor: String = "",
   /** MKT-06 «چرخهٔ مصرف» (روز، اختیاری) — فقط ویرایش؛ نوشتن با `ProductCycle.apply` پس از ویرایشِ موفق */
   val cycle: String = "",
+  /** PRD-12 قیمتِ عمده — فقط ویرایش و فقط با «لیستِ قیمت در صندوق» (صفحه وگرنه `wholesalePrice = null` می‌فرستد) */
+  val wholesale: String = "",
 )
 
 /**
@@ -44,7 +48,7 @@ data class ProductRowDraft(
 object ProductFormModel {
 
   /** کادرهایی که خطا می‌گیرند — به ترتیبِ دیده شدن در فرم (نخستین خطا = کمترین) */
-  enum class Field { NAME, CATEGORY, PURCHASE, SALE, UNIT, UNIT_FACTOR, CYCLE }
+  enum class Field { NAME, CATEGORY, PURCHASE, SALE, WHOLESALE, UNIT, UNIT_FACTOR, CYCLE }
 
   /** نخستین کادرِ خراب به ترتیبِ فرم، یا null */
   fun firstField(errors: Map<Field, Problem>): Field? = errors.keys.minByOrNull { it.ordinal }
@@ -83,6 +87,7 @@ object ProductFormModel {
           }
         }
         if (ProductCycle.bad(r.cycle)) put(Field.CYCLE, Problem.NOT_A_NUMBER)
+        number(r.wholesale, required = false)?.let { put(Field.WHOLESALE, it) }
       }
     }
     number(r.sale, required = true)?.let { put(Field.SALE, it) }
@@ -142,6 +147,8 @@ object ProductFormModel {
     saleUnit = r.saleUnit,
     //  خالی یا نادرست ⇒ NaN تا موتور با پیامِ روشن ردش کند
     unitFactor = if (r.saleUnit.isBlank()) 1.0 else r.unitFactor.toDoubleOrNull() ?: Double.NaN,
+    //  خالی ⇒ ۰ (= عمده ندارد)؛ نادرست ⇒ NaN تا موتور رد کند
+    wholesalePrice = if (r.wholesale.isBlank()) 0.0 else r.wholesale.toDoubleOrNull() ?: Double.NaN,
   )
 
   /** فرمِ ویرایش از کالای موجود — همان `ProductFormState.of` */
@@ -157,8 +164,11 @@ object ProductFormModel {
     supplierId = p.supplierId,
     active = p.active,
     saleUnit = p.saleUnit,
-    unitFactor = if (p.saleUnit.isBlank()) "" else p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
+    //  PRD-07: ضریبِ دقیق از همان هزارم (بی وابستگی به `Double.toString` ِ جاوا)؛ ضریبِ کهنهٔ ناجور همان متنِ پیشین
+    unitFactor = if (p.saleUnit.isBlank()) "" else UnitSale.exactMilli(p.unitFactor)?.let(PackBarcodes::sizeText)
+      ?: p.unitFactor.toBigDecimal().stripTrailingZeros().toPlainString(),
     cycle = ProductCycle.text(p.consumptionDays),
+    wholesale = if (p.wholesalePrice == 0.0) "" else numberText(p.wholesalePrice),
   )
 
   /** عدد برای کادر: بی اعشارِ بی‌مورد و با رقمِ لاتین */

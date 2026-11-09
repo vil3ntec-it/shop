@@ -60,6 +60,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Button
 import ir.vil3ntec.tohid.ui.v3.V3Card
 import ir.vil3ntec.tohid.ui.v3.V3ConfirmSheet
 import ir.vil3ntec.tohid.ui.v3.V3Divider
+import ir.vil3ntec.tohid.ui.v3.V3FieldKind
 import ir.vil3ntec.tohid.ui.v3.V3FormBar
 import ir.vil3ntec.tohid.ui.v3.V3ListRow
 import ir.vil3ntec.tohid.ui.v3.V3Message
@@ -71,6 +72,7 @@ import ir.vil3ntec.tohid.ui.v3.V3StatusPill
 import ir.vil3ntec.tohid.ui.v3.V3TextField
 import ir.vil3ntec.tohid.ui.v3.V3Type
 import ir.vil3ntec.tohid.ui.v3.rememberV3Stagger
+import ir.vil3ntec.tohid.ui.v3.v3ScanGuard
 import ir.vil3ntec.tohid.ui.v3.V3Collapse
 import ir.vil3ntec.tohid.ui.v3.V3SuccessCheck
 import ir.vil3ntec.tohid.ui.v3.v3AnimateItem
@@ -238,6 +240,9 @@ internal fun DraftCountField(value: String, onValue: (String) -> Unit, label: St
     modifier = Modifier
       .width(96.dp)
       .heightIn(min = 44.dp)
+      //  HW-05: «تعداد» است — اسکن در آن نمی‌نشیند (همان نگهبانِ `V3TextField`، فقط با «ابزارهای تازهٔ دستگاه»)؛
+      //  کد فقط به صفحهٔ گوش‌دهنده (انتقال)، نه صندوق: شمارشِ نوشته‌نشده با بسته شدنِ صفحه گم می‌شد
+      .v3ScanGuard(V3FieldKind.NUMBER, value, onValue, toCart = false)
       .semantics {
         contentDescription = "${StrStock.countField}: $label"
         if (error) error(StrStock.badNumber(label))

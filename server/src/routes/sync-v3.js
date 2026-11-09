@@ -26,7 +26,7 @@ const sync = require('../lib/sync-v3');
 const syncEpoch = require('../lib/sync-epoch');
 const newerFields = require('../lib/newer-fields');
 const safeLedger = require('../lib/safe-ledger');
-const { rateLimit } = require('../middleware/ratelimit');
+const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireSyncAccount, requireSyncWrite } = require('../lib/sync-v1-auth');
 const { forbidden, badRequest, notFoundHandler } = require('../middleware/errors');
 const v = require('../lib/validate');
@@ -35,6 +35,7 @@ const v = require('../lib/validate');
  *  push اش فیلدِ تماسِ ردیفِ موجود را عوض یا پاک نمی‌کند (`hideContact` ⇒ `applyOne`) — ‎lib/customer-contact.js‎
  */
 const contact = require('../lib/customer-contact');
+const creditReview = require('../lib/credit-limit-review');
 
 const gzip = promisify(zlib.gzip);
 const router = express.Router();
@@ -97,6 +98,8 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
       clockOffsetMs: b.clock_offset_ms,
       hideContact: await contact.hiddenForReq(req),
     });
+    //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
+    await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     out.results = newerFields.mergeResults(fl, out.results);
     await send(req, res, { ok: true, ...out, cursor: out.head });
   } catch (err) {

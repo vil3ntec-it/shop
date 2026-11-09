@@ -35,3 +35,10 @@ test('برچسبِ خانه: شمار، مختصات و ناحیه — بی شم
   assert.doesNotMatch(out, /\+93|07\d/);
   assert.match(A.cellLabel({ lat: 34.5, lng: 69.1, count: 9, coveredBy: 'کارته‌سه' }), /«کارته‌سه»/);
 });
+
+test('CRM-15: شمارهٔ پوشیده (بی «شمارهٔ مشتریان») فقط متن است، نه پیوندِ tel:؛ شمارهٔ کامل همان پیوند', () => {
+  const esc = (v) => String(v).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+  assert.equal(A.phoneHtml('+•••••••••03', esc), '<span class="ltr">+•••••••••03</span>');
+  assert.equal(A.phoneHtml('+93791200003', esc), '<a class="ltr" href="tel:+93791200003">+93791200003</a>');
+  assert.doesNotMatch(A.phoneHtml('"><b>', esc), /<b>/);
+});

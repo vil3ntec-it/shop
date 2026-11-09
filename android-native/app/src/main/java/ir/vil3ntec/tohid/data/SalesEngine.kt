@@ -69,13 +69,13 @@ object SalesEngine {
   /** قیمتِ واحدِ یک ردیف — دستی اگر گذاشته شده، وگرنه قیمتِ کالا */
   /**
    *  مقدار بر حسبِ واحدِ فروش ⇒ مقدار بر حسبِ واحدِ موجودی.
-   *  ۲۵۰ گرم از کالای کیلویی با ضریبِ ۰٫۰۰۱ ⇒ ۰٫۲۵ کیلوگرم. نتیجه تا سه رقمِ
-   *  اعشار گرد می‌شود تا خطای ممیزِ شناور (۰٫۲۵۰۰۰۰۰۰۰۱) در موجودی ننشیند.
+   *  ۲۵۰ گرم از کالای کیلویی با ضریبِ ۰٫۰۰۱ ⇒ ۰٫۲۵ کیلوگرم. حساب با هزارمِ صحیح (`UnitSale.toBaseQty`، PRD-07):
+   *  همان ضریبِ هزارمی که برگهٔ ردیف و سرور می‌گیرند، نه ضربِ ممیزِ شناور (۱/۲۴ ⇒ هر دانه ۰٫۰۴۲، چه تک چه ۲۴تایی).
    *  واحدِ فروش نداشت ⇒ همان عدد.
    */
   fun toStockQty(product: Product, quantityInSaleUnit: Double): Double {
-    if (product.saleUnit.isBlank() || product.unitFactor <= 0 || product.unitFactor.isNaN()) return quantityInSaleUnit
-    return Math.round(quantityInSaleUnit * product.unitFactor * 1000.0) / 1000.0
+    if (product.saleUnit.isBlank()) return quantityInSaleUnit
+    return ir.vil3ntec.tohid.core.product.UnitSale.toBaseQty(quantityInSaleUnit, product.unitFactor) ?: quantityInSaleUnit
   }
 
   fun linePrice(d: ShopData, line: CartLine): Double {

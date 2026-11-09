@@ -27,9 +27,11 @@ import kotlin.time.TimeSource
  *  وقتی هجوم اسکن از آب درآمد مقدارِ پیش از هجوم برمی‌گردد و کد به همان راهِ بارکدخوانِ وصل‌شده می‌رود
  *  ([toListenerOrCart]). پژواکِ بارکدخوان (`Hit.echo`) فقط کادر را برمی‌گرداند. تایپِ آدم دست نمی‌خورد.
  *  `ScanPrefs` و `HwTools` را `AppRoot` در آغاز می‌خواند؛ زمان یکنواخت است (جابه‌جاییِ ساعتِ دستگاه اسکن را نمی‌شکند).
+ *  [toCart] = false (کادرِ شمارش و انتقال): کد فقط به صفحه‌ای که گوش می‌دهد؛ وگرنه کنار می‌رود — رفتن به صندوق آن
+ *  صفحه و عددهای نوشته‌نشده‌اش را می‌بست.
  */
 @Composable
-internal fun Modifier.v3ScanGuard(kind: V3FieldKind, value: String, onValueChange: (String) -> Unit): Modifier {
+internal fun Modifier.v3ScanGuard(kind: V3FieldKind, value: String, onValueChange: (String) -> Unit, toCart: Boolean = true): Modifier {
   if (!scanGuarded(kind, HwTools.on.value)) return this
   val guard = remember { FieldScanGuard(ScanPrefs.current()) }
   val clock = remember { TimeSource.Monotonic.markNow() }
@@ -37,7 +39,7 @@ internal fun Modifier.v3ScanGuard(kind: V3FieldKind, value: String, onValueChang
   val restore by rememberUpdatedState(onValueChange)
   fun hit(h: FieldScanGuard.Hit): Boolean {
     restore(h.restore)
-    if (!h.echo) toListenerOrCart(h.code)
+    if (!h.echo) { if (toCart) toListenerOrCart(h.code) else ScanRouter.offer(h.code) }
     return true
   }
   return this.onPreviewKeyEvent { e ->

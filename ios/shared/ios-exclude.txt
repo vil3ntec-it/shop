@@ -22,5 +22,6 @@ data/GoogleSignIn.kt  # Credential Manager ِ اندروید (ورود با گو
 hw/PrinterFinderAndroid.kt  # کارتِ شبکه (ConnectivityManager) و جست‌وجوی بلوتوثِ کلاسیک؛ iOS: hw/PrinterFinderIos.kt (getifaddrs؛ بی بلوتوث، §۵.۱)
 scan/BarcodeScanner.kt  # CameraX + ML Kit + MediaPlayer؛ iOS: scan/BarcodeScannerIos.kt (AVFoundation). سدها مشترک‌اند: BarcodeGuard و ScanGate (core)
 scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/GuidedCaptureIos.kt (دکمه پنهان، عکسِ کالا با دوربینِ خودِ iOS از راهِ TakePicture)
+ui/SecureWindowAndroid.kt  # OPS-02: `FLAG_SECURE` ِ برگهٔ عبارت (android.view) — آیفون پنجرهٔ امن ندارد؛ ui/PlatformIos.kt: `SecureWindow` ِ بی‌اثر
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
 ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)

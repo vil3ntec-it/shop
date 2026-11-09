@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.PurchaseSuggest
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.ui.v3.products.ProductsPaths
 
@@ -45,6 +46,12 @@ data class StockOverview(
   val summary: WarehouseEngine.Summary,
   val rows: List<StockRowUi>,
   val counts: Map<StockFilter, Int>,
+  /**
+   *  INV-01 — محل‌ها (اصلی اول) و موجودیِ هر کالا در هر محل به هزارم (`PlaceStock.all`: ورود با
+   *  محل + انتقال − فروش؛ جمعِ محل‌های یک کالا همان موجودیِ کل). فقط با «محل‌های نگه‌داری» ِ همین دستگاه، وگرنه خالی.
+   */
+  val places: List<String> = emptyList(),
+  val placeStock: Map<String, Map<String, Long>> = emptyMap(),
 )
 
 /**
@@ -54,7 +61,7 @@ data class StockOverview(
  */
 object StockListModel {
 
-  fun overview(d: ShopData, today: String): StockOverview {
+  fun overview(d: ShopData, today: String, places: Boolean = false): StockOverview {
     val alerts = ExpiryEngine.alerts(d, today)
     val expired = alerts.filter { it.expired }.map { it.product.id }.toSet()
     val near = alerts.filter { !it.expired }.groupBy { it.product.id }.mapValues { (_, lots) -> lots.minOf { it.daysLeft } }
@@ -77,7 +84,20 @@ object StockListModel {
       )
     }
     val counts = StockFilter.entries.associateWith { f -> rows.count { matches(it, f) } }
-    return StockOverview(WarehouseEngine.summary(d), rows, counts)
+    val (where, at) = if (places) PlaceStock.all(d) else emptyList<String>() to emptyMap<String, Map<String, Long>>()
+    return StockOverview(WarehouseEngine.summary(d), rows, counts, where, at)
+  }
+
+  /** INV-01: تراشه‌های محل فقط وقتی جز محلِ اصلی محلی هست */
+  fun placeChips(o: StockOverview): List<String> = if (o.places.size > 1) o.places else emptyList()
+
+  /**
+   *  INV-01 «موجودی به تفکیکِ محل»: [place] ⇒ فقط کالاهایی که در همان محل عدد دارند، با موجودیِ **همان محل**؛ حالِ کم/تمام
+   *  همان حالِ کلِ کالاست. `null` یا محلی که دیگر نیست ⇒ همان ردیف‌ها. فقط خواندنی.
+   */
+  fun atPlace(o: StockOverview, place: String?): List<StockRowUi> {
+    if (place == null || place !in o.places) return o.rows
+    return o.rows.mapNotNull { r -> o.placeStock[r.product.id]?.get(place)?.takeIf { it != 0L }?.let { r.copy(stock = it / 1000.0) } }
   }
 
   /** INV-14: روزهای کافی که ردیف نشان می‌دهد — تمام‌شده («تمام» خودش قرص دارد) و بی فروش ⇒ null */

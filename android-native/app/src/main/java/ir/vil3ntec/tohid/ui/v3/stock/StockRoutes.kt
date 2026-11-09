@@ -206,6 +206,7 @@ private fun RouteScope.StockHome(selected: String?) {
   val writer = rememberStockWriter()
   val today = writer.today
   val countRoute = rememberCountRoute()
+  val placesOn = rememberStockPlacesOn()
   val listActions = StockListActions(
     //  کامپیوتر (دو ستون): کالای دیگر جای همین ستون می‌نشیند، نه پلهٔ تازه در پشته
     open = { id -> if (twoPane && selected != null) nav.replace(StockPaths.item(id)) else nav.open(StockPaths.item(id)) },
@@ -244,6 +245,7 @@ private fun RouteScope.StockHome(selected: String?) {
       onBack = if (selected == null) backOrNull else null,
       wide = twoPane,
       selectedId = selected,
+      places = placesOn,
     )
   }
   when {

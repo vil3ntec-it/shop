@@ -157,6 +157,29 @@ object StrPos {
     "Only someone allowed to cancel invoices can discard someone else's held invoice",
     "د بل چا ساتل شوی بل یوازې هغه څوک لرې کولی شي چې د بل د لغوه کولو اجازه لري",
   )
+  //  S09 «در دستِ دستگاهِ X» (پشتیبانِ سرورِ نگه‌داشته‌ها، پرچمِ خاموشِ `shop.held_sync`) — سریِ سند همان «A1» ِ روی فاکتور
+  fun heldClaimedBy(d: Any): String = t("در دستِ دستگاهِ ${asIs(d)}", "In use on device $d", "د $d وسیلې په لاس کې")
+  val heldClaimedElsewhere: String get() = t("در دستِ دستگاهی دیگر", "In use on another device", "د بلې وسیلې په لاس کې")
+  fun heldOpenedOn(d: Any): String = t("پیش‌تر در دستگاهِ ${asIs(d)} باز شد", "Already opened on device $d", "مخکې په $d وسیله کې پرانیستل شو")
+  val heldOpenedElsewhere: String get() = t("پیش‌تر در دستگاهی دیگر باز شد", "Already opened on another device", "مخکې په بله وسیله کې پرانیستل شو")
+  val heldTakeWarn: String get() = t(
+    "همین فاکتور در دستگاهی دیگر هم باز شده است. اگر این‌جا هم باز و ثبت شود، دو فروش می‌شود. فقط اگر مطمئنید آن‌جا ثبت نمی‌شود، این‌جا باز کنید.",
+    "This invoice was also opened on another device. If it is opened and recorded here too, it becomes two sales. Open it here only if you are sure it won't be recorded there.",
+    "همدا بل په بله وسیله کې هم پرانیستل شوی. که دلته هم پرانیستل او ثبت شي، دوه پلور کېږي. یوازې هغه وخت یې دلته پرانیزئ چې ډاډه یاست هلته نه ثبتېږي.",
+  )
+  val heldTakeOver: String get() = t("باز کردن در این دستگاه", "Open on this device", "په دې وسیله کې پرانیستل")
+  val heldTwiceTitle: String get() = t("یک فاکتور در دو دستگاه", "One invoice on two devices", "یو بل په دوو وسیلو کې")
+  fun heldTwice(name: Any, d: Any): String = t(
+    "فاکتورِ «${asIs(name)}» هم این‌جا و هم در دستگاهِ ${asIs(d)} باز شد. اگر در هر دو ثبت شده، یکی را برگردانید.",
+    "Invoice “$name” was opened both here and on device $d. If it was recorded on both, return one of them.",
+    "«$name» بل هم دلته او هم په $d وسیله کې پرانیستل شو. که په دواړو کې ثبت شوی، یو یې بېرته کړئ.",
+  )
+  fun heldTwiceElsewhere(name: Any): String = t(
+    "فاکتورِ «${asIs(name)}» هم این‌جا و هم در دستگاهی دیگر باز شد. اگر در هر دو ثبت شده، یکی را برگردانید.",
+    "Invoice “$name” was opened both here and on another device. If it was recorded on both, return one of them.",
+    "«$name» بل هم دلته او هم په بله وسیله کې پرانیستل شو. که په دواړو کې ثبت شوی، یو یې بېرته کړئ.",
+  )
+  val heldSeen: String get() = t("دیدم", "Got it", "ومې لید")
   val heldAutoCleanLocked: String get() = t("فقط کسی که اجازهٔ لغوِ فاکتور دارد این را عوض می‌کند", "Only someone allowed to cancel invoices can change this", "یوازې هغه څوک چې د بل د لغوه کولو اجازه لري دا بدلولی شي")
   fun heldAutoCleared(n: Any, h: Any): String = t("${asIs(n)} فاکتورِ نگه‌داشتهٔ کهنه‌تر از ${asIs(h)} ساعت خودکار پاک شد", "$n held invoices older than $h hours were cleared automatically", "$n ساتل شوي بلونه له $h ساعتونو زاړه پخپله پاک شول")
   val clearIt: String get() = t("پاک کن", "Clear", "پاک یې کړئ")

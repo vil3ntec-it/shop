@@ -69,10 +69,12 @@ async function flagV1(ctx, deviceId, ops, { ip = '' } = {}) {
     if (!ctx || ctx.app !== SHOP.app || ctx.accountKind !== SHOP.app || !ctx.accountId || !Array.isArray(ops)) return 0;
     const { tableOf } = require('./sync-v1');
     const ids = new Set();
+    const inserted = new Set();
     for (const r of ops) {
       if (!isObj(r) || tableOf(SHOP.app, r.table ?? r.table_name ?? r.tableName) !== 'sales') continue;
       const id = String(r.row_id ?? r.rowId ?? r.id ?? '');
       if (id && ids.size < MAX_ROWS) ids.add(id);
+      if (id && (r.type ?? r.op_type ?? r.opType) === 'insert') inserted.add(id);
     }
     if (!ids.size) return 0;
     const rows = await many(
@@ -80,6 +82,8 @@ async function flagV1(ctx, deviceId, ops, { ip = '' } = {}) {
         WHERE app=$1 AND account_kind=$1 AND account_id=$2 AND table_name='sales' AND row_id = ANY($3::text[]) AND deleted_at IS NULL`,
       [SHOP.app, ctx.accountId, [...ids]]
     );
+    //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبارِ مشتری ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
+    if (inserted.size) await require('./credit-limit-review').v1(ctx, deviceId, rows, inserted, { ip });
     return await flag(ctx.accountId, rows, { path: 'v1', deviceId, userId: ctx.userId || '', ip });
   } catch (err) {
     console.error('[credit-debtor] بررسیِ push نشد:', err.message);
@@ -88,7 +92,7 @@ async function flagV1(ctx, deviceId, ops, { ip = '' } = {}) {
 }
 
 /** راهِ قدیمِ `/api/sync`: ردیف‌ها کامل‌اند؛ فقط آن‌هایی که نشستند (نه تعارض و نه حذف) */
-async function flagLegacy({ shopId, userId = '', deviceId = '', ip = '', path = 'legacy' }, changes, conflicts = []) {
+async function flagLegacy({ shopId, userId = '', deviceId = '', ip = '', path = 'legacy', role = '' }, changes, conflicts = []) {
   try {
     if (!shopId || !Array.isArray(changes)) return 0;
     const refused = new Set((conflicts || []).filter((c) => c && c.collection === 'sales').map((c) => String(c.id)));
@@ -96,6 +100,8 @@ async function flagLegacy({ shopId, userId = '', deviceId = '', ip = '', path = 
       .filter((ch) => isObj(ch) && ch.collection === 'sales' && ch.deleted !== true && isObj(ch.data) && !refused.has(String(ch.id)))
       .slice(0, MAX_ROWS)
       .map((ch) => ({ id: String(ch.id), data: ch.data }));
+    //  CRM-03: همان بررسیِ سقفِ اعتبار (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎) — فقط درجِ تازه
+    if (rows.length && role) await require('./credit-limit-review').legacy({ shopId, role, userId, deviceId, ip, path }, rows);
     return rows.length ? await flag(shopId, rows, { path, deviceId, userId, ip }) : 0;
   } catch (err) {
     console.error('[credit-debtor] بررسیِ راهِ قدیم نشد:', err.message);

@@ -45,6 +45,8 @@ internal fun RecoveryPhraseSheet(ctrl: BackupController) {
   val c = PhoneV3.colors
   var typed by remember(flow) { mutableStateOf("") }
   V3Sheet(onDismiss = { if (!ctrl.making) ctrl.cancelPhrase() }, title = StrBackupSafety.phraseTitle, dismissible = !ctrl.making) { closer ->
+    //  عبارت روی صفحه (نشان دادن و نوشتنِ دوباره) ⇒ بی عکسِ صفحه و ضبط (اندروید `FLAG_SECURE`)؛ «چرا» و بستن ⇒ برداشته
+    ir.vil3ntec.tohid.ui.Platform.SecureWindow(RecoveryPhraseFlow.Step.secret(ctrl.phraseStep))
     when (ctrl.phraseStep) {
       RecoveryPhraseFlow.Step.INTRO -> {
         Text(StrBackupSafety.introBody, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
@@ -98,6 +100,8 @@ internal fun SnapshotUnlockSheet(ctrl: BackupController) {
   val c = PhoneV3.colors
   var typed by remember(snap) { mutableStateOf("") }
   V3Sheet(onDismiss = ctrl::cancelUnlock, title = StrBackupSafety.unlockTitle) { closer ->
+    //  عبارتی که برای باز کردن نوشته می‌شود هم
+    ir.vil3ntec.tohid.ui.Platform.SecureWindow(true)
     Text(StrBackupSafety.unlockBody, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
     Spacer(Modifier.height(14.dp))
     V3TextField(typed, { typed = it }, StrBackupSafety.confirmLabel, Modifier.fillMaxWidth(), error = ctrl.unlockError)

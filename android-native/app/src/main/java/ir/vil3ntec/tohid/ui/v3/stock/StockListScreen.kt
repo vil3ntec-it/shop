@@ -16,6 +16,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
 import androidx.compose.material.icons.automirrored.outlined.PlaylistAdd
 import androidx.compose.material.icons.outlined.Category
+import androidx.compose.material.icons.outlined.Place
 import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.MoveToInbox
 import androidx.compose.material.icons.outlined.QrCodeScanner
@@ -35,6 +36,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.StockActions
 import ir.vil3ntec.tohid.ui.v3.V3Action
 import ir.vil3ntec.tohid.ui.v3.V3Chip
 import ir.vil3ntec.tohid.ui.v3.V3ChipRow
@@ -91,13 +93,16 @@ fun StockListScreen(
   onBack: (() -> Unit)? = null,
   wide: Boolean = false,
   selectedId: String? = null,
+  /** INV-01: «محل‌های نگه‌داری» ِ همین دستگاه روشن (و دفترِ تازهٔ موجودی خاموش) ⇒ تراشهٔ هر محل */
+  places: Boolean = false,
 ) {
   var query by rememberSaveable { mutableStateOf(initialQuery) }
+  var place by rememberSaveable { mutableStateOf<String?>(null) }
   var filterKey by rememberSaveable(initialFilter) { mutableStateOf(initialFilter.key) }
   var category by rememberSaveable { mutableStateOf<String?>(null) }
   val filter = StockFilter.of(filterKey)
-  val overview by produceState<StockOverview?>(null, data, today) {
-    value = withContext(Dispatchers.Default) { StockListModel.overview(data, today) }
+  val overview by produceState<StockOverview?>(null, data, today, places) {
+    value = withContext(Dispatchers.Default) { StockListModel.overview(data, today, places) }
   }
   val categories = remember(data) { StockListModel.usedCategories(data) }
   val empty = data.products.isEmpty()
@@ -119,7 +124,7 @@ fun StockListScreen(
     ) + actions.extras,
     search = if (empty) null else ({ V3SearchField(query, { query = it }, StrStock.searchHint) }),
     chips = if (empty) null else ({
-      FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it })
+      FilterChips(overview, filter, categories, category, onFilter = { filterKey = it.key }, onCategory = { category = it }, place = place, onPlace = { place = it })
     }),
     //  دکمهٔ شناور با container transform به صفحهٔ «ورود کالا» باز می‌شود و به خودش برمی‌گردد
     fab = if (empty) null else ({ expanded ->
@@ -140,6 +145,7 @@ fun StockListScreen(
         filter = filter,
         query = query,
         category = category,
+        place = place,
         wide = wide,
         selectedId = selectedId,
         actions = actions,
@@ -147,7 +153,7 @@ fun StockListScreen(
         stagger = stagger,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 4.dp, bottom = pad.calculateBottomPadding() + FAB_CLEARANCE),
         onFilter = { filterKey = it.key },
-        onClear = { query = ""; filterKey = StockFilter.ALL.key; category = null },
+        onClear = { query = ""; filterKey = StockFilter.ALL.key; category = null; place = null },
       )
     }
   }
@@ -180,6 +186,8 @@ private fun FilterChips(
   category: String?,
   onFilter: (StockFilter) -> Unit,
   onCategory: (String?) -> Unit,
+  place: String?,
+  onPlace: (String?) -> Unit,
 ) {
   val counts = overview?.counts.orEmpty()
   V3ChipRow {
@@ -193,6 +201,10 @@ private fun FilterChips(
     }
     categories.forEach { name ->
       V3Chip(name, selected = category == name, icon = Icons.Outlined.Category, onClick = { onCategory(if (category == name) null else name) })
+    }
+    //  INV-01: موجودیِ هر محل (همان تراشه دوباره ⇒ همهٔ محل‌ها)
+    overview?.let(StockListModel::placeChips).orEmpty().forEach { loc ->
+      V3Chip(StockActions.locationLabel(loc), selected = place == loc, icon = Icons.Outlined.Place, onClick = { onPlace(if (place == loc) null else loc) })
     }
   }
 }
@@ -211,6 +223,7 @@ private fun StockList(
   filter: StockFilter,
   query: String,
   category: String?,
+  place: String?,
   wide: Boolean,
   selectedId: String?,
   actions: StockListActions,
@@ -220,7 +233,7 @@ private fun StockList(
   onFilter: (StockFilter) -> Unit,
   onClear: () -> Unit,
 ) {
-  val rows = remember(overview, filter, query, category) { StockListModel.visible(overview.rows, filter, query, category) }
+  val rows = remember(overview, filter, query, category, place) { StockListModel.visible(StockListModel.atPlace(overview, place), filter, query, category) }
   LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = contentPadding, verticalArrangement = Arrangement.spacedBy(8.dp)) {
     item(key = "stats") {
       StockStatsCard(overview.summary, onFilter, Modifier.padding(bottom = 4.dp).v3Stagger(stagger, "stats", 0))

@@ -188,7 +188,8 @@ class ConvertFidelityTest {
     )
     assertEquals(expect, lines)
     val x = SaleReopen.extras(d, s, lines)
-    assertEquals(HeldExtras("10"), x)
+    //  فروشندهٔ فاکتور هم (پیش‌تر نمی‌آمد ⇒ فاکتورِ اصلاح‌شده به نامِ اصلاح‌کننده ثبت می‌شد)
+    assertEquals(HeldExtras("10", seller = "مدیر"), x)
     assertEquals("فاکتورِ عمده", SaleReopen.note(s))
     //  لیست: چای به عمده بود ⇒ عمدهٔ دستی، وگرنه سبدِ خرده ۳۰ افغانی گران‌تر
     val hand = CartPriceList.keep(d, lines, "")
@@ -199,7 +200,8 @@ class ConvertFidelityTest {
     //  برگهٔ تسویهٔ گوشی همان تخفیف را می‌گیرد (`HeldSession` ⇐ `CheckoutModel.start`)
     val form = CheckoutModel.start("d1", d.debtors, x)
     assertEquals(SalesEngine.DiscountType.PERCENT, form.discountType)
-    val checkout = CheckoutModel.checkout(form, canDiscount = true, blockExpired = false, seller = "مدیر")
+    //  صندوقِ گوشی: فروشندهٔ فاکتورِ اصلاح‌شده، نه کاربرِ صندوق («شاگرد») — همان قاعدهٔ `CheckoutRoute`
+    val checkout = CheckoutModel.checkout(form, canDiscount = true, blockExpired = false, seller = x.seller.ifBlank { "شاگرد" })
     assertEquals(1219.0, CheckoutModel.numbers(d, lines, form, checkout).finalTotal, 0.0)
     //  دوباره ثبت (فاکتورِ اصلی لغو) ⇒ همان پول و همان قلم‌ها
     val voided = d.copy(sales = d.sales.map { if (it.id == s.id) it.copy(status = "cancelled") else it })
@@ -207,6 +209,7 @@ class ConvertFidelityTest {
     assertEquals(s.finalTotal, sale(again).finalTotal, 0.0)
     assertEquals(s.discount, sale(again).discount, 0.0)
     assertEquals(s.note, sale(again).note)
+    assertEquals(s.seller, sale(again).seller)
     val was = d.saleItems.filter { it.saleId == s.id }
     items(again).zip(was).forEach { (n, o) ->
       assertEquals(listOf(o.productId, o.quantity, o.unitPrice, o.totalPrice, o.note, o.serials, o.priceSource, o.seller),
@@ -229,7 +232,7 @@ class ConvertFidelityTest {
     assertEquals(listOf("SN-1"), lines.first { it.productId == "ph" }.serials)
     val x = SaleReopen.extras(d, s, lines)
     //  round(۶۰ × ۱۲۶۵ ÷ ۱۳۵۵) = ۵۶ ⇒ ۱۲۰۹ (پیش از رفع: بی تخفیف ۱۲۶۵)
-    assertEquals(HeldExtras("56", discountAmount = true), x)
+    assertEquals(HeldExtras("56", discountAmount = true, seller = "مدیر"), x)
     val form = CheckoutModel.start("d1", d.debtors, x)
     assertEquals(SalesEngine.DiscountType.AMOUNT, form.discountType)
     val n = CheckoutModel.numbers(d, lines, form, CheckoutModel.checkout(form, canDiscount = true, blockExpired = false, seller = ""))
@@ -240,7 +243,8 @@ class ConvertFidelityTest {
   @Test
   fun `فاکتورِ بی تخفیف تخفیفی نمی‌سازد و قیمتِ خاصِ پایان‌یافته نشان نمی‌گیرد`() {
     val (d, s) = posted(SalesEngine.Checkout())
-    assertEquals(HeldExtras(), SaleReopen.extras(d, s, SaleReopen.lines(d, s, ::newId, today)))
+    //  بی تخفیف ⇒ فقط فروشندهٔ فاکتور
+    assertEquals(HeldExtras(seller = "مدیر"), SaleReopen.extras(d, s, SaleReopen.lines(d, s, ::newId, today)))
     val gone = d.copy(debtors = listOf(ali.copy(specialPrices = null)))
     val cupLine = SaleReopen.lines(gone, s, ::newId, today).first { it.productId == "cup" }
     assertEquals(40.0, cupLine.unitPrice)
@@ -285,12 +289,12 @@ class ConvertFidelityTest {
       else SalesEngine.CartLine("free-x", it.quantity, it.unitPrice, it.name)
     }
     val x = SaleReopen.extras(inv)
-    assertEquals(HeldExtras("55", SalesEngine.Payment.CREDIT, "100", discountAmount = true), x)
+    assertEquals(HeldExtras("55", SalesEngine.Payment.CREDIT, "100", discountAmount = true, seller = "زهرا"), x)
     val form = CheckoutModel.start("d1", shop.debtors, x)
     val n = CheckoutModel.numbers(shop, lines, form, CheckoutModel.checkout(form, canDiscount = true, blockExpired = false, seller = ""))
     //  پیش از رفع: بی تخفیف و بی دریافتی ⇒ ۳۵۵ همه به حساب، به جای ۳۰۰ و ۲۰۰
     assertEquals(listOf(inv.finalMinor, inv.paidMinor, inv.remainingMinor), listOf(n.finalTotal, n.paid, n.remaining).map(PayFlow::minor))
-    assertEquals(HeldExtras(), SaleReopen.extras(inv.copy(discountMinor = 0, paymentMethod = "cash")))
+    assertEquals(HeldExtras(seller = "زهرا"), SaleReopen.extras(inv.copy(discountMinor = 0, paymentMethod = "cash")))
   }
 
   /* ─────────────────────────── امانی ⇒ فاکتورِ تحویل ─────────────────────────── */

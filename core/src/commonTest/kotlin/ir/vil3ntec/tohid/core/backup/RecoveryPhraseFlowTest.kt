@@ -70,4 +70,19 @@ class RecoveryPhraseFlowTest {
     assertEquals(listOf(listOf(fixed), listOf("دکانِ کریمی"), listOf("۱۴۰۵/۰۸/۱۹"), listOf("جای امن"), listOf("چگونه")), rows)
     assertEquals(4, flow().apply { start() }.printRows("", "d", "k", "h").size, "بی نامِ دکان")
   }
+
+  /** OPS-02 — پنجرهٔ امن (`FLAG_SECURE`) فقط تا عبارت روی صفحه است: نشان دادن و نوشتنِ دوباره، نه «چرا» و نه پس از بستن */
+  @Test
+  fun windowIsSecureOnlyWhileThePhraseIsOnScreen() {
+    val f = flow()
+    val seen = mutableListOf(RecoveryPhraseFlow.Step.secret(f.step))
+    f.start(); seen += RecoveryPhraseFlow.Step.secret(f.step)
+    f.written(); seen += RecoveryPhraseFlow.Step.secret(f.step)
+    f.cancel(); seen += RecoveryPhraseFlow.Step.secret(f.step)
+    assertEquals(listOf(false, true, true, false), seen)
+    assertEquals(
+      setOf(RecoveryPhraseFlow.Step.SHOW, RecoveryPhraseFlow.Step.CONFIRM, RecoveryPhraseFlow.Step.DONE),
+      RecoveryPhraseFlow.Step.entries.filter { RecoveryPhraseFlow.Step.secret(it) }.toSet(),
+    )
+  }
 }

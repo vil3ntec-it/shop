@@ -32,4 +32,11 @@ object Platform {
 
   /** ذخیرهٔ فایل با پنجرهٔ «ذخیره به‌عنوان» — فقط کامپیوتر؛ مسیرِ ذخیره‌شده یا null */
   fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
+
+  /**
+   *  OPS-02 — تا [on] است عکسِ صفحه، ضبطِ صفحه و پیش‌نمایشِ «برنامه‌های اخیر» این پنجره را سیاه می‌بینند: عبارتِ بازیابی
+   *  (`RecoveryPhraseSheet`). پیاده‌سازی در ‎ui/SecureWindowAndroid.kt‎؛ کامپیوتر و آیفون: هیچ (‎ui/PlatformDesk.kt‎، ‎ui/PlatformIos.kt‎).
+   */
+  @androidx.compose.runtime.Composable
+  fun SecureWindow(on: Boolean) = secureWindowAndroid(on)
 }

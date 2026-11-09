@@ -86,7 +86,14 @@ object StockAnalysis {
    *  یک کالا: موجودیِ امروز، بهای یک واحد (هر روشی که برنامه دارد: آخرین قیمتِ خرید، یا بهای
    *  میانگین وقتی موتورِ تازهٔ موجودی روشن است) و قیمتِ فروشِ یک واحد. بها/قیمتِ ≤ ۰ یعنی «ثبت نشده».
    */
-  data class ValueLine(val id: String, val onHandMilli: Long, val unitCostMinor: Long, val unitPriceMinor: Long)
+  data class ValueLine(
+    val id: String, val onHandMilli: Long, val unitCostMinor: Long, val unitPriceMinor: Long,
+    /**
+     *  INV-16 — ارزشِ دقیقِ همین موجودی به بها (جمعِ دفترِ میانگینِ موزون)، اگر صداکننده دارد؛ `null` ⇒ مقدار × بهای واحد.
+     *  بهای واحد گردشده است (۲۰ ÷ ۳ ⇒ ۶٫۶۷) و ضربش در مقدار جمعِ دفتر را نمی‌سازد (۲۰٫۰۱ به جای ۲۰٫۰۰).
+     */
+    val costValueMinor: Long? = null,
+  )
 
   /** ارزشِ یک کالای موجود (۰ یعنی بها/قیمت ثبت نشده) */
   data class LineValue(val id: String, val costMinor: Long, val retailMinor: Long)
@@ -139,9 +146,14 @@ object StockAnalysis {
       if (l.onHandMilli < 0) { negative += l.id; continue }
       if (l.onHandMilli == 0L) continue
       inStock++
-      val hasCost = l.unitCostMinor > 0
+      val exact = l.costValueMinor
+      val hasCost = l.unitCostMinor > 0 || (exact ?: 0L) > 0
       val hasPrice = l.unitPriceMinor > 0
-      val c = if (hasCost) lineValue(l.onHandMilli, l.unitCostMinor) else 0L
+      val c = when {
+        !hasCost -> 0L
+        exact != null -> if (exact in 0..MAX_EXACT) exact else -1L
+        else -> lineValue(l.onHandMilli, l.unitCostMinor)
+      }
       val r = if (hasPrice) lineValue(l.onHandMilli, l.unitPriceMinor) else 0L
       if (c < 0 || r < 0) { outOfRange += l.id; continue }
       if (!hasCost) missingCost += l.id

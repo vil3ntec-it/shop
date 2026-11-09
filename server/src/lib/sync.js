@@ -260,7 +260,7 @@ async function pushChanges(ctx, changes) {
     })() };
   }).then(async (out) => {
     //  نسیهٔ بی مشتری از برنامهٔ کهنه: پذیرفته، فقط سابقه (‎lib/credit-debtor.js‎)
-    await require('./credit-debtor').flagLegacy({ shopId, userId, deviceId, ip: ctx.ip || '', path: ctx.finalized === 'enforce' ? 'api' : 'legacy' }, changes, out.conflicts);
+    await require('./credit-debtor').flagLegacy({ shopId, userId, deviceId, role, ip: ctx.ip || '', path: ctx.finalized === 'enforce' ? 'api' : 'legacy' }, changes, out.conflicts);
     return out;
   }, async (err) => {
     //  برگشتِ ردشده بی‌صدا نمی‌رود: صندوقِ تعارض برای صاحب، پس از برگشتِ تراکنش

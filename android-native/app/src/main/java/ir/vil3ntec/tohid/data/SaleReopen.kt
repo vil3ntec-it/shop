@@ -38,13 +38,15 @@ object SaleReopen {
   /**
    *  تخفیفِ کلِ فاکتور برای همان اقلامِ [lines]: درصد همان درصد؛ مبلغ به سهمِ اقلامِ برنگشته
    *  (`round(تخفیف × جمعِ تازه ÷ جمعِ فاکتور)` — همان سهمی که برگشت پس داده بود، `SalesEngine.paidRatio`). بی برگشت ⇒ همان مبلغ.
+   *  فروشندهٔ فاکتور هم (`Sale.seller`): پیش‌تر فاکتورِ اصلاح‌شده به نامِ کسی ثبت می‌شد که اصلاحش کرد.
    */
   fun extras(d: ShopData, s: Sale, lines: List<SalesEngine.CartLine>): HeldExtras {
-    if (!(s.discount > 0) || !(s.discountValue > 0)) return HeldExtras()
-    if (s.discountType == "percent") return HeldExtras(discount = plain(s.discountValue))
+    val seller = s.seller.trim()
+    if (!(s.discount > 0) || !(s.discountValue > 0)) return HeldExtras(seller = seller)
+    if (s.discountType == "percent") return HeldExtras(discount = plain(s.discountValue), seller = seller)
     val now = SalesEngine.cartTotal(d, lines)
     val amount = if (s.total > 0 && now < s.total) (s.discount * now / s.total).roundToLong().toDouble() else s.discount
-    return if (amount > 0) HeldExtras(discount = plain(amount), discountAmount = true) else HeldExtras()
+    return if (amount > 0) HeldExtras(discount = plain(amount), discountAmount = true, seller = seller) else HeldExtras(seller = seller)
   }
 
   /**
@@ -60,6 +62,8 @@ object SaleReopen {
       payment = if (credit) SalesEngine.Payment.CREDIT else null,
       paid = inv.paidMinor?.takeIf { credit && it > 0 }?.let { plain(PayFlow.major(it)) }.orEmpty(),
       discountAmount = off != null,
+      //  همان فروشندهٔ فاکتورِ ردشده، نه کسی که اصلاحش کرد
+      seller = inv.seller.trim(),
     )
   }
 

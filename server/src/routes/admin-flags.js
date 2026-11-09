@@ -70,6 +70,8 @@ const KNOWN = Object.freeze([
   //  نادرست (مثلاً «"true"» ِ رشته‌ای) بی‌صدا هیچ اثری نداشت
   { key: 'shop.approval_requests', scope: 'shop', default: false, what: 'درخواستِ تأیید از راهِ دور: کارمند می‌پرسد، صاحب/مدیر روی گوشیِ خودش تأیید می‌کند (STF-02)' },
   { key: 'shop.credit_cap', scope: 'shop', default: false, what: 'سقفِ فروشِ قرضیِ کارمند در سرور (`sales.credit`، STF-03)' },
+  //  CRM-03: فقط سابقهٔ بررسی، هرگز رد (تصمیمِ «رد یا بررسی» با صاحب‌کار؛ ‎lib/credit-limit-review.js‎)
+  { key: 'shop.credit_limit_review', scope: 'shop', default: false, what: 'فروشِ نسیهٔ بیش از سقفِ اعتبارِ مشتری بی تأییدِ دستگاه ⇒ سابقهٔ بررسی برای صاحب (CRM-03؛ رد نمی‌کند)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
   { key: 'shop.count_absorb', scope: 'shop', default: false, what: 'فروشِ آفلاینِ پیش از شمارش که پس از ثبتِ شمارش می‌رسد دوباره از موجودی کم نمی‌شود — سرور و برنامه (INV-10)؛ با shop.catalog' },

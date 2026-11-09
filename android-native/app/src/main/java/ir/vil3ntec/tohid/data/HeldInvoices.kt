@@ -42,8 +42,8 @@ import java.io.IOException
  *  ── پشتیبانِ سرور (S09) ──────────────────────────────────────────────
  *  پشتِ پرچمِ خاموشِ `shop.held_sync` هر تغییرِ دفتر به سرور می‌رود و دستگاهِ
  *  تازه یا دیگرِ دکان همه را پس می‌گیرد (`HeldSync`، `onChange`، `absorb`).
- *  خاموش ⇒ همین دستگاه، بایت‌به‌بایت همان پیشین. قفلِ «در دستِ دستگاهِ ۲» نیست:
- *  بازگرداندن نگه‌داشته را از سرور برمی‌دارد و دستگاه‌های دیگر با دورِ بعد می‌بینند.
+ *  خاموش ⇒ همین دستگاه، بایت‌به‌بایت همان پیشین. روشن ⇒ بازگرداندن پیش از آن از سرور می‌پرسد («در دستِ دستگاهِ X»،
+ *  ادعای نرم با تأییدِ صریح برای گرفتن؛ `HeldSyncEngine.claim`) و دستگاه‌های دیگر با دورِ بعد می‌بینند.
  */
 @Serializable
 data class HeldInvoice(
@@ -101,6 +101,11 @@ data class HeldExtras(
   val paid: String = "",
   /** POS-20: `discount` به مبلغ (افغانی) است، نه درصد — بی آن عددِ مبلغ پس از جابه‌جایی درصد خوانده می‌شد */
   val discountAmount: Boolean = false,
+  /**
+   *  فروشندهٔ **فاکتورِ** اصلاح‌شده (`Sale.seller`، `SaleReopen.extras`): فاکتورِ دوباره ثبت‌شده به نامِ همان فروشنده می‌ماند،
+   *  نه کسی که اصلاحش کرد (ردِ اصلاح‌کننده در سندِ لغو است). خالی ⇒ کاربرِ همین صندوق، همان امروز.
+   */
+  val seller: String = "",
 )
 
 /** شماره، نام و یادداشتِ فاکتورِ **جاری** — تا با هر جابه‌جایی عوض نشوند */
@@ -314,6 +319,96 @@ object HeldRules {
   fun dropStale(book: HeldBook, now: Long, hours: Int = STALE_HOURS): HeldBook {
     val old = stale(book, now, hours).mapTo(HashSet()) { it.id }
     return book.copy(items = book.items.filter { it.id !in old })
+  }
+}
+
+/**
+ *  DATA-SAFETY §۸ — فاکتورهای نگه‌داشته و سبدِ جاری در پشتیبانِ کامل (`DeviceDocsBundle`، قلمِ `device/held-invoices.json`).
+ *
+ *  با پرچمِ خاموشِ `shop.held_sync` (پیش‌فرض) نگه‌داشته‌ها و سبدِ نیمه‌کاره فقط در `held-invoices.json` و `sale-draft.json`
+ *  ِ همین دستگاه بودند: نصبِ دوباره پس از پشتیبانِ دستی، یا بازیابیِ پشتیبانِ کامل، همه را می‌برد. حالا با همان پشتیبان
+ *  می‌روند و برمی‌گردند — **همه به‌شکلِ نگه‌داشته**: سبدِ جاریِ پشتیبان هرگز روی سبدِ این دستگاه نمی‌نشیند (`CartStore`
+ *  در حافظه است و نوشتنِ بعدی‌اش آن را می‌برد) و کاربر خودش بازش می‌کند.
+ *
+ *  ⛔ قاعدهٔ امن‌تر (نه آمیختن با شناسه): فقط روی دستگاهی که **خودش هیچ فاکتورِ بازی ندارد** — نه نگه‌داشته، نه سبدِ پُرِ
+ *     دیگری (سبدِ همان کلید هست ⇒ همان بماند، بقیه بیایند). بی سنگِ قبرِ محلی، آمیختن نگه‌داشتهٔ برگشته یا دور انداخته را
+ *     زنده می‌کرد و نسخهٔ کهنهٔ هم‌کلیدِ سبد دو فاکتورِ یکسان می‌ساخت. همان قاعدهٔ پیش‌فاکتورها.
+ *  ⛔ فقط در همان دکان: صاحبِ دفتر هنگامِ پشتیبان (`LedgerOwner`) با صاحبِ دفترِ روی میز هنگامِ بازیابی یکی (دفترِ بی‌دکان ⇒
+ *     همان کاربر). نگه‌داشتهٔ ماندهٔ حسابِ دیگرِ همین دستگاه (سریِ سندِ دیگر) هرگز در پشتیبان نمی‌رود.
+ *  ⛔ آن‌که در دفترِ بازیابی‌شده فروش رفته (`SaleDraftRules.posted`) هرگز دوباره پیشنهاد نمی‌شود.
+ *  ⛔ شماره‌ها همان، مگر گرفته باشند؛ حداکثر `MAX_OPEN` (همان «نگه‌داشته‌ها + سبد» ِ پشتیبان).
+ *  ⛔ راهِ خودکارِ پس از ورود (`CloudSettingsRestore`، بی پرسش) فقط پشتیبانی که **همین دستگاه** نوشت ([HeldBackup.from]):
+ *     پشتیبانِ ابریِ گوشیِ دیگرِ همان حساب روی کامپیوترِ تازه نگه‌داشته‌های هنوز-بازِ آن گوشی را دوتایی نمی‌کند (هم‌کلید ⇒
+ *     دو فروشِ یک شناسه). بازیابیِ آگاهانهٔ فایل (`BackupRestore.confirm`) هر دستگاه.
+ */
+@Serializable
+data class HeldBackup(
+  val v: Int = 1,
+  /** صاحبِ دفترِ روی میز هنگامِ پشتیبان (`LedgerOwner`) */
+  val user: String = "",
+  val shop: String = "",
+  /** دستگاهی که پشتیبان را نوشت ([HeldBackupRules.machineOf]: هشِ شناسهٔ سیستم، نه خودِ آن) — راهِ خودکارِ پس از ورود فقط همین */
+  val from: String = "",
+  val items: List<HeldInvoice> = emptyList(),
+  /** سبدِ جاری (`sale-draft.json`) با شماره و نامِ برگه‌اش — با بازیابی نگه‌داشته می‌شود */
+  val cart: HeldInvoice? = null,
+)
+
+object HeldBackupRules {
+  private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
+  fun encode(b: HeldBackup): String = json.encodeToString(b)
+  /** نشانِ دستگاه در پشتیبان: ۱۶ نویسهٔ هگزِ SHA-256 ِ شناسهٔ سیستم (`Platform.machineFingerprint`)؛ خودِ شناسه هرگز */
+  fun machineOf(fingerprint: String): String {
+    if (fingerprint.isBlank()) return ""
+    return ir.vil3ntec.tohid.core.audit.Sha256.hexOf("tohid-shop|held-backup|v1|$fingerprint").take(16)
+  }
+
+  /** خراب یا بیگانه ⇒ `null` (هیچ اثری) */
+  fun decode(raw: String?): HeldBackup? =
+    raw?.takeIf { it.isNotBlank() }?.let { runCatching { json.decodeFromString(HeldBackup.serializer(), it) }.getOrNull() }
+
+  /** پشتیبان: نگه‌داشته‌های همین حساب (سریِ همین دستگاه یا بی سری) و سبدِ جاری (سبد می‌بَرد، همان `reconcile`)؛ هیچ ⇒ `null` */
+  fun of(book: HeldBook, cart: SaleDraft?, series: String, user: String, shop: String, now: Long, from: String = ""): HeldBackup? {
+    val open = cart?.takeIf { it.key != null && it.lines.isNotEmpty() }
+    val items = book.items.filter { it.lines.isNotEmpty() && it.id != open?.key && (it.device.isBlank() || it.device == series) }
+    val parked = open?.let { d ->
+      val tag = book.current?.takeIf { it.id == d.key }
+      HeldInvoice(
+        id = d.key!!, number = tag?.number ?: 0, label = tag?.label.orEmpty(), lines = d.lines, debtorId = d.debtorId,
+        note = tag?.note.orEmpty(), heldAt = d.savedAt.takeIf { it > 0 } ?: now, device = series, coupons = d.coupons,
+        saleNote = d.note, priceList = d.priceList,
+      )
+    }
+    if (items.isEmpty() && parked == null) return null
+    return HeldBackup(user = user, shop = shop, from = from, items = items, cart = parked)
+  }
+
+  /**
+   *  بازیابی، پس از نشستنِ دفتر ([d] = دفترِ روی میز). @param live سبدِ همین حالای این دستگاه
+   *  @param machine نشانِ همین دستگاه ([machineOf]) ⇒ فقط پشتیبانی که همین دستگاه نوشت؛ `null` = هر دستگاه (بازیابیِ فایل)
+   *  @return دفترِ نگه‌داشته‌های تازه، یا `null` = هیچ تغییری (قاعده‌ها سرِ [HeldBackup])
+   */
+  fun restore(mine: HeldBook, backup: HeldBackup, user: String, shop: String, live: SaleDraft?, d: ShopData, machine: String? = null): HeldBook? {
+    if (machine != null && (machine.isBlank() || backup.from != machine)) return null
+    if (backup.shop != shop || (shop.isBlank() && backup.user != user)) return null
+    if (mine.items.isNotEmpty()) return null
+    val liveKey = live?.takeIf { it.lines.isNotEmpty() }?.let { it.key ?: "" }
+    if (liveKey != null && liveKey != backup.cart?.id) return null
+    val seen = HashSet<String>()
+    val wanted = (backup.items + listOfNotNull(backup.cart))
+      .filter { it.lines.isNotEmpty() && it.id.isNotBlank() && it.id != liveKey && !SaleDraftRules.posted(d, it.id) && seen.add(it.id) }
+    if (wanted.isEmpty()) return null
+    val cap = if (liveKey != null) HeldRules.MAX_OPEN - 1 else HeldRules.MAX_OPEN
+    val used = HashSet<Int>().apply { if (liveKey != null) mine.current?.takeIf { it.id == liveKey }?.let { add(it.number) } }
+    val out = ArrayList<HeldInvoice>()
+    //  شماره‌ای که روی برگه دیده می‌شد همان می‌ماند؛ بی شماره یا گرفته ⇒ کوچک‌ترین آزاد
+    for (h in wanted.sortedBy { if (it.number in 1..HeldRules.MAX_OPEN) it.number else Int.MAX_VALUE }) {
+      if (out.size >= cap) break
+      val n = h.number.takeIf { it in 1..HeldRules.MAX_OPEN && it !in used } ?: (1..HeldRules.MAX_OPEN).firstOrNull { it !in used } ?: break
+      used += n
+      out += h.copy(number = n)
+    }
+    return mine.copy(items = out.sortedBy { it.number })
   }
 }
 
@@ -557,6 +652,21 @@ class HeldInvoiceStore(
     ensureLoaded()
     val next = plan(_book.value)
     next == _book.value || commit(next)
+  }
+
+  /**
+   *  S09 «در دستِ دستگاهِ X» — همان نگه‌داشته با شناسهٔ تازه ([next] = کلیدِ تازهٔ فروش؛ شماره، نام و ردیف‌ها همان)، زیرِ
+   *  همین قفل و بی [onChange] (`HeldSyncEngine` صفِ خودش را می‌سازد). نبود یا نوشتنِ ناموفق ⇒ `false` و دفتر همان.
+   */
+  suspend fun rekey(id: String, next: String): Boolean {
+    if (id == next) return false
+    var moved = false
+    val ok = absorb { b ->
+      if (b.items.none { it.id == id } || b.items.any { it.id == next } || b.current?.id == next) b
+      else { moved = true; b.copy(items = b.items.map { if (it.id == id) it.copy(id = next) else it }) }
+    }
+    //  دفتر همان ماند (شناسهٔ تازه از پیش هست) ⇒ `false` — وگرنه صندوق نگه‌داشتهٔ دیگری را باز می‌کرد
+    return ok && moved
   }
 
   companion object {

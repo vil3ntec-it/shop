@@ -30,7 +30,11 @@ class PriceListTest {
   @Test fun cartLineFollowsListUnlessManual() {
     assertEquals(9_000L, PriceList.cartUnit(p, null, PriceList.WHOLESALE))
     assertEquals(null, PriceList.cartUnit(p, 9_000, PriceList.RETAIL))
-    assertEquals(null, PriceList.cartUnit(p, 10_000, PriceList.RETAIL))
+    //  فیِ ثابتِ برابر با خرده «زنده» (`null`) نمی‌شود — پیش‌تر می‌شد و تخفیفِ خودکار یا قیمتِ تازهٔ کالا را می‌گرفت
+    assertEquals(10_000L, PriceList.cartUnit(p, 10_000, PriceList.RETAIL))
+    assertEquals(null, PriceList.cartUnit(p, null, PriceList.RETAIL))
+    //  همان فیِ ثابت در لیستِ عمده عمده می‌شود و برگشت به خرده ⇒ قیمتِ کالا (همان رفتارِ ردیفِ اسکنی)
+    assertEquals(9_000L, PriceList.cartUnit(p, 10_000, PriceList.WHOLESALE))
     //  فیِ دستی (نه خرده، نه عمده) در هر دو لیست همان
     assertEquals(8_500L, PriceList.cartUnit(p, 8_500, PriceList.WHOLESALE))
     assertEquals(8_500L, PriceList.cartUnit(p, 8_500, PriceList.RETAIL))

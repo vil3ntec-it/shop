@@ -129,6 +129,41 @@ class PayStatusTest {
     assertEquals(listOf("pending", "failed"), PayStatus.withRefunds(two, listOf("pending", "failed"), mapOf("afpay_card" to 200_000)))
   }
 
+  /** PAY-23 — بازپرداخت فقط از پولِ رسیده؛ همان قاعدهٔ X/Z ([PayStatus.unreceived])، نه «هر چه ثبت شد» */
+  @Test
+  fun refundSeesOnlyMoneyThatArrived() {
+    val cod = Row("cod", "cash", 90_000, "pending", custody = "courier")
+    val online = Row("online", "other", 90_000, "pending")
+    val all = rows + listOf(cod, online)
+    val st = PayStatus.apply("s1", all, emptyList()).statuses
+    //  ثبتِ دستی و درگاه پس‌دادنی؛ «در انتظار» ِ واقعی و درگاهِ نپرداخته نه؛ نقدِ نزدِ پیک (امانت) پولِ رسیدهٔ دکان است
+    assertEquals(listOf("confirmed", "confirmed", "confirmed", "pending", "confirmed", "pending"), PayStatus.forRefund(all, st))
+    assertEquals(PayStatus.unreceived(all, st).keys, all.indices.filter { PayStatus.forRefund(all, st)[it] == "pending" }.map { all[it].method }.toSet())
+    //  «پول رسید» ⇒ پس‌دادنی؛ ردیفی که «ناموفق» شد نه
+    val moved = listOf(
+      Change("c1", "s1", 3, "hesabpay", "pending", "confirmed", 1, "سارا"),
+      Change("c2", "s1", 1, "afpay_card", "confirmed", "failed", 2, "مدیر"),
+    )
+    assertEquals(listOf("confirmed", "failed", "confirmed", "confirmed", "confirmed", "pending"), PayStatus.forRefund(all, PayStatus.apply("s1", all, moved).statuses))
+    //  نیمه‌پس‌داده باقی‌اش را دارد؛ «نیازمند بررسی»، «لغو» و امانتِ ناموفق پس‌دادنی نیستند
+    assertEquals(listOf("confirmed", "needs_review", "cancelled", "failed"),
+      PayStatus.forRefund(listOf(card, card, card, cod), listOf("partially_refunded", "needs_review", "cancelled", "failed")))
+    //  فاکتورِ سفارشِ اینترنتی: درگاه/سرور مرجع است (ORD-15) ⇒ «در انتظار» همان امروز گرفته‌شده؛ «ناموفق» نه
+    assertEquals(listOf("confirmed", "failed"), PayStatus.forRefund(listOf(online, online), listOf("pending", "failed"), online = true))
+  }
+
+  /** PAY-23 — با ردیفِ نارسیده، جمعِ برگشت‌های فاکتور هرگز بیش از پولِ رسیده (ردیفِ نقد پس‌داده‌اش را نمی‌شمارد) */
+  @Test
+  fun refundRoomCapsTheInvoiceAtMoneyThatArrived() {
+    val cashRow = PaidRow("cash", 40_000, 0, "confirmed")
+    val wallet = PaidRow("hesabpay", 60_000, 10_000, "confirmed")
+    //  همه رسیده ⇒ بی سقفِ تازه (همان سقفِ امروزِ فاکتور)
+    assertNull(PayStatus.refundRoom(listOf(cashRow, wallet), 90_000))
+    assertEquals(15_000L, PayStatus.refundRoom(listOf(cashRow, wallet.copy(status = "pending")), 25_000))
+    assertEquals(0L, PayStatus.refundRoom(listOf(cashRow, wallet.copy(status = "failed")), 50_000))
+    assertEquals(40_000L, PayStatus.refundRoom(listOf(cashRow, wallet.copy(status = "needs_review")), 0))
+  }
+
   @Test
   fun summaryShowsTheWorstNonCashRow() {
     assertNull(PayStatus.summary(listOf(cash), listOf("confirmed")))

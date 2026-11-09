@@ -120,7 +120,8 @@ fun SaleScreen(
   var pulse by remember { mutableIntStateOf(0) }
   LaunchedEffect(count) { if (count > last) pulse++; last = count }
 
-  val index = remember(d.products, d.sales, d.saleItems) { CatalogModel.index(d) }
+  val codes = ir.vil3ntec.tohid.ui.components.product.productInfoOn() // POS-01: کدِ کالا (SKU) در همان کادر
+  val index = remember(d.products, d.sales, d.saleItems, codes) { CatalogModel.index(d, codes) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
   val items = remember(index, search, category, inCart, d, held, pins) { CatalogModel.items(d, index, search, category, inCart, held, pins) }
   val best = remember(index, inCart, d, held) { CatalogModel.bestsellers(d, index, inCart, held) }

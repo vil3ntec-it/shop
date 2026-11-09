@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.analytics
 import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -67,6 +68,22 @@ class StatsModelTest {
     assertEquals("2026-10-24", s.first().date)
     assertEquals(listOf(true, false, true, false, false, false, false), s.map { it.sold })
     assertEquals(4, s.count { it.future })
+  }
+
+  @Test
+  fun `جمعهٔ بی فروش تعطیلِ دکان است نه روزِ بی فروش - LOC-03`() {
+    val friday = "2026-10-30"
+    val quiet = StatsModel.streak(ShopData(sales = listOf(sale("a", "2026-10-24", 10.0, 9))), friday)
+    assertEquals(listOf(false, false, false, false, false, false, true), quiet.map { it.closed })
+    assertEquals("روزِ کاریِ گذشته: شنبه تا پنجشنبه", 6, StatsModel.pastWorkingDays(quiet))
+    //  دکانی که جمعه هم فروخت: آن روز فروش دارد و در شمار است
+    val open = StatsModel.streak(ShopData(sales = listOf(sale("a", friday, 10.0, 9))), friday)
+    assertTrue(open.last().sold)
+    assertFalse(open.last().closed)
+    assertEquals(7, StatsModel.pastWorkingDays(open))
+    //  جمعهٔ آینده هنوز «آینده» است، نه تعطیل
+    assertFalse(StatsModel.streak(ShopData(), today).last().closed)
+    assertEquals(3, StatsModel.pastWorkingDays(StatsModel.streak(ShopData(), today)))
   }
 
   @Test

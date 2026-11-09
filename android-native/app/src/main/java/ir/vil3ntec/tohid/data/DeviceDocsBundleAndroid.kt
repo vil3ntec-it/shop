@@ -16,17 +16,25 @@ import java.io.InputStream
  *
  *  ⛔ بازیابی فقط وقتی این دستگاه **هیچ** پیش‌فاکتوری ندارد (`QuoteStore.update`، زیرِ همان قفل و با `DiskWrite`):
  *     پیش‌فاکتورِ موجود هرگز رونویسی یا با شماره‌های پشتیبان قاطی نمی‌شود. پروندهٔ ناخوانا هیچ اثری ندارد.
- *  ⛔ فاکتورِ نگه‌داشته (`held-invoices.json`) عمداً نه: سبدِ نیمه‌کارهٔ همان روز است (حداکثر ۹، کهنه پس از ۲۴ ساعت)
- *     و `HeldInvoices` آن را یک بار در حافظه می‌خواند — نشاندنِ پرونده زیرِ پایش با نخستین نگه‌داشتنِ بعدی پاک می‌شد.
+ *
+ *  ── فاکتورهای نگه‌داشته و سبدِ جاری (`device/held-invoices.json`، `HeldBackup`) ─────────────────────
+ *  با پرچمِ خاموشِ `shop.held_sync` (پیش‌فرض) در هیچ پشتیبانی نبودند. همان راه: کنار تا تأییدِ بازیابی، و فقط **پس از نشستنِ
+ *  دفتر** ([commitHeld] از `BackupRestore.confirm` و `CloudSettingsRestore`، هرگز از `commitPhotos`) — دفترِ ردشده هیچ
+ *  نگه‌داشته‌ای نمی‌نشاند. نشاندن از درِ خودِ دفترِ زنده (`HeldInvoiceStore.absorb`، زیرِ همان قفل و حافظه)، نه نوشتنِ پرونده
+ *  زیرِ پایش (نخستین نگه‌داشتنِ بعدی پاکش می‌کرد). قاعده‌ها (همان دکان، دستگاهِ بی فاکتورِ باز، نه فروخته؛ راهِ ابری فقط
+ *  پشتیبانِ همین دستگاه): `HeldBackupRules`.
+ *  ⛔ پرچمِ `shop.held_sync` روشن روی این دستگاه ⇒ نگه‌داشته‌ها از سرور می‌آیند (S09)، نه از پشتیبانِ کهنه. آموزش هرگز.
  */
 object DeviceDocsBundle {
 
   const val QUOTES_ENTRY = "device/quotes.json"
+  const val HELD_ENTRY = "device/held-invoices.json"
 
   /** بیش از این، پروندهٔ پیش‌فاکتور نیست */
   const val MAX_BYTES = 2 * 1024 * 1024
 
   private fun staged(context: Context): File = File(context.cacheDir, "restore-quotes.json")
+  private fun stagedHeld(context: Context): File = File(context.cacheDir, "restore-held.json")
 
   /** `BackupBundle.write`: پیش‌فاکتورهای خوانا و ناتهی ⇒ متنِ همان پرونده؛ هیچ ⇒ null */
   fun quotes(context: Context): String? {
@@ -35,7 +43,12 @@ object DeviceDocsBundle {
   }
 
   /** `BackupBundle.read`: تا تأییدِ بازیابی کنار می‌ماند (همان قاعدهٔ عکس‌ها و تنظیمات) */
-  fun stageFrom(context: Context, input: InputStream) {
+  fun stageFrom(context: Context, input: InputStream) = stage(input, staged(context))
+
+  /** `BackupBundle.read`: نگه‌داشته‌ها و سبدِ جاری — تا تأییدِ بازیابی و نشستنِ دفتر کنار */
+  fun stageHeldFrom(context: Context, input: InputStream) = stage(input, stagedHeld(context))
+
+  private fun stage(input: InputStream, to: File) {
     val out = ByteArrayOutputStream()
     val buf = ByteArray(8 * 1024)
     while (out.size() <= MAX_BYTES) {
@@ -44,10 +57,57 @@ object DeviceDocsBundle {
       out.write(buf, 0, n)
     }
     if (out.size() > MAX_BYTES) return
-    runCatching { staged(context).writeText(out.toString(Charsets.UTF_8.name())) }
+    runCatching { to.writeText(out.toString(Charsets.UTF_8.name())) }
   }
 
-  fun dropStaged(context: Context) { runCatching { staged(context).delete() } }
+  fun dropStaged(context: Context) {
+    runCatching { staged(context).delete() }
+    runCatching { stagedHeld(context).delete() }
+  }
+
+  /** `BackupBundle.write`: نگه‌داشته‌ها و سبدِ جاریِ همین حساب روی این دستگاه؛ هیچ (یا آموزش) ⇒ null */
+  fun held(context: Context): String? {
+    if (TrainingMode.on) return null
+    val dir = context.applicationContext?.filesDir ?: context.filesDir
+    fun text(name: String): String? = runCatching { File(dir, name).takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull()
+    //  پرونده همان حافظه است: `HeldInvoiceStore` پیش از نشاندن در حافظه می‌نویسد، `CartStore` همیشه آخرین حالت را
+    val book = HeldInvoiceCodec.decode(text(HeldInvoiceStore.FILE)) ?: return null
+    val cart = SaleDraftCodec.decode(text(CartStore.FILE))
+    val b = HeldBackupRules.of(
+      book, cart, runCatching { ir.vil3ntec.tohid.sync.DocSeries.current(context) }.getOrDefault(""),
+      LedgerOwner.currentUser(context), LedgerOwner.currentShop(context), System.currentTimeMillis(), machine(context),
+    ) ?: return null
+    return HeldBackupRules.encode(b)
+  }
+
+  private fun machine(context: Context): String =
+    runCatching { HeldBackupRules.machineOf(ir.vil3ntec.tohid.ui.Platform.machineFingerprint(context)) }.getOrDefault("")
+
+  /**
+   *  پس از نشستنِ دفتر ([d] = دفترِ روی میز) — @return چند فاکتورِ نگه‌داشته نشست. هر شکستی ⇒ ۰ و هیچ تغییری.
+   *  @param sameMachineOnly راهِ خودکارِ پس از ورود (`CloudSettingsRestore`): فقط پشتیبانی که همین دستگاه نوشت
+   */
+  suspend fun commitHeld(context: Context, d: ShopData, sameMachineOnly: Boolean = false): Int {
+    val f = stagedHeld(context)
+    if (!f.isFile) return 0
+    val backup = HeldBackupRules.decode(runCatching { f.readText(Charsets.UTF_8) }.getOrNull())
+    runCatching { f.delete() }
+    if (backup == null || TrainingMode.on || HeldSync.claims(context)) return 0
+    val dir = context.applicationContext?.filesDir ?: context.filesDir
+    //  سبدِ همین حالا: صندوقِ باز (حافظه) یا پیش‌نویسِ روی دیسک
+    val live = runCatching { HeldSync.cart?.snapshot() }.getOrNull()?.takeIf { it.lines.isNotEmpty() }
+      ?: SaleDraftCodec.decode(runCatching { File(dir, CartStore.FILE).takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull())
+    val user = LedgerOwner.currentUser(context)
+    val shop = LedgerOwner.currentShop(context)
+    val machine = if (sameMachineOnly) machine(context) else null
+    var added = 0
+    val ok = HeldInvoices.of(context).absorb { mine ->
+      val next = HeldBackupRules.restore(mine, backup, user, shop, live, d, machine) ?: return@absorb mine
+      added = next.items.size - mine.items.size
+      next
+    }
+    return if (ok) added else 0
+  }
 
   /** پس از تأییدِ بازیابی (`BackupBundle.commitPhotos`) — @return چند پیش‌فاکتور نشست */
   fun commit(context: Context): Int {

@@ -62,6 +62,10 @@ object Platform {
     (id ?: ("app-" + ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid)).also { fingerprint = it }
   }
 
+  /** OPS-02 — کامپیوتر پنجرهٔ «امن» در برابرِ عکسِ صفحه ندارد؛ عبارت فقط روی صفحه است و هیچ‌جا نوشته نمی‌شود */
+  @androidx.compose.runtime.Composable
+  fun SecureWindow(on: Boolean) = Unit
+
   fun saveFile(suggestedName: String, bytes: ByteArray): String? {
     var picked: java.io.File? = null
     val run = Runnable {

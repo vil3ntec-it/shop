@@ -62,7 +62,7 @@ fun RouteScope.SaleRoute() {
     cart, data, snackbar, loaded,
     extras = { HeldSession.extras(cart) },
     onSwitched = { x ->
-      HeldSession.kept = cart.snapshot().key?.let { it to x }
+      HeldSession.keep(cart, x)
       CheckoutSession.reset()
     },
   )

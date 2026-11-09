@@ -501,6 +501,9 @@ class SyncV1Engine private constructor(context: Context) {
           if (got.serverSchema > 0) state.serverSchema = got.serverSchema
           if (!got.hasMore) break
         }
+        //  DATA-SAFETY §۷: opِ ردشده فقط به خاطرِ شکلِ عدد (`hash_mismatch`) ⇒ پس از Pull، جلوی صف با همان op_id (`DroppedResend`)
+        val io = DroppedResend.Io({ client.snapshot() }, { client.deleted(it, strict = true) }, { LedgerArchive.archivedIds(LedgerArchive.readArchive(app)) }) { DroppedResend.settled(locked { read() }, queue.settledMarks()) }
+        if (!state.restorePending && !state.restoredRebuild && DroppedResend.run(queue, io, { locked { LedgerDiff.toJson(read()) } }, clock()) > 0) pushQueue(client, device)
 
         attempt = 0
         state.lastError = ""
@@ -558,10 +561,7 @@ class SyncV1Engine private constructor(context: Context) {
 
       val accepted = out.results.filter { it.accepted }.map { it.opId }
       val rejected = out.results.filter { !it.accepted }
-      if (accepted.isNotEmpty()) {
-        restore.accepted(batch, out.results)
-        queue.ack(accepted)
-      }
+      if (accepted.isNotEmpty()) { restore.accepted(batch, out.results); queue.accepted(accepted, clock()) }
       //  ردِ opِ دوباره‌فرستاده (پیش‌تر پذیرفته یا گرفته شده بود) ردشده‌ای نیست که کاربر ببیند
       val (replayed, refused) = rejected.partition { restore.isReplay(it.opId) }
       if (replayed.isNotEmpty()) queue.ack(replayed.map { it.opId })

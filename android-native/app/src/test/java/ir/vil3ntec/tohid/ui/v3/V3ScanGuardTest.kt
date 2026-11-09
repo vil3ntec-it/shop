@@ -45,9 +45,24 @@ class V3ScanGuardTest {
     assertTrue(gate in 0 until g.indexOf("FieldScanGuard(ScanPrefs.current())"))
     //  زمانِ یکنواخت، نه ساعتِ دیواری (و بی وابستگیِ سکو، راهِ آیفون)
     assertTrue(g.contains("val now = clock.elapsedNow().inWholeMilliseconds"))
-    assertTrue(g.contains("restore(h.restore)\n    if (!h.echo) toListenerOrCart(h.code)"))
+    assertTrue(g.contains("restore(h.restore)\n    if (!h.echo) { if (toCart) toListenerOrCart(h.code) else ScanRouter.offer(h.code) }"))
     //  همان راهِ بارکدخوانِ وصل‌شده در `AppRoot` (`LiveScans`)
     assertTrue(g.contains("SaleScan.reads.trySend(SaleScan.Read(c))"))
+  }
+
+  @Test fun `هر کادرِ عددیِ نسخهٔ ۳ - حتی کادرِ کوچکِ شمارش و انتقال - نگهبانِ اسکن دارد`() {
+    //  کادرِ مقدار بیرون از `V3TextField` (`DraftCountField` ِ شمارشِ انبار و انتقال) هم «تعداد» است: اسکن در آن نمی‌نشیند
+    val root = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { File(it, "ir/vil3ntec/tohid/ui/v3") }.first { it.isDirectory }
+    val numeric = Regex("""KeyboardType\.(Decimal|Number)\b(?!Password)""")
+    val bare = root.walkTopDown().filter { it.isFile && it.extension == "kt" }
+      .filter { numeric.containsMatchIn(it.readText()) && !it.readText().contains(".v3ScanGuard(") }
+      .map { it.relativeTo(root).invariantSeparatorsPath }.toList()
+    assertEquals("کادرِ عددیِ بی نگهبان: $bare", emptyList<String>(), bare)
+    val count = app("ir/vil3ntec/tohid/ui/v3/stock/StockCountScreen.kt")
+    val fn = count.substring(count.indexOf("internal fun DraftCountField("))
+    //  بی رفتن به صندوق: شمارشِ نوشته‌نشده در `remember` است و با بسته شدنِ صفحه گم می‌شد
+    assertTrue(fn.substring(0, fn.indexOf("decorationBox")).contains(".v3ScanGuard(V3FieldKind.NUMBER, value, onValue, toCart = false)"))
   }
 
   @Test fun `سیم‌کشی - صندوق نسخهٔ ۳ و پنجرهٔ کامپیوتر تنظیم را پیش از نخستین کلید می‌خوانند`() {

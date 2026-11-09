@@ -24,6 +24,7 @@ import androidx.compose.material.icons.outlined.BarChart
 import androidx.compose.material.icons.outlined.CalendarToday
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.Lock
+import androidx.compose.material.icons.outlined.Remove
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -196,7 +197,7 @@ private fun StreakCard(days: List<StreakDay>, modifier: Modifier = Modifier) {
   val c = PhoneV3.colors
   val on = PhoneV3Roles.button(c, V3ButtonKind.PRIMARY)
   val sold = days.count { it.sold }
-  val past = days.count { !it.future }
+  val past = StatsModel.pastWorkingDays(days)
   V3Card(modifier, padding = PaddingValues(16.dp)) {
     CardTitle(Icons.Outlined.CalendarToday, StrReports.streakTitle)
     Spacer(Modifier.height(14.dp))
@@ -209,7 +210,10 @@ private fun StreakCard(days: List<StreakDay>, modifier: Modifier = Modifier) {
           Box(
             Modifier.size(34.dp).clip(CircleShape).background(if (day.sold) on.bg else c.tile),
             contentAlignment = Alignment.Center,
-          ) { if (day.sold) Icon(Icons.Outlined.Check, contentDescription = StrReports.soldThatDay, tint = on.fg, modifier = Modifier.size(18.dp)) }
+          ) {
+            if (day.sold) Icon(Icons.Outlined.Check, contentDescription = StrReports.soldThatDay, tint = on.fg, modifier = Modifier.size(18.dp))
+            else if (day.closed) Icon(Icons.Outlined.Remove, contentDescription = StrReports.closedDay, tint = c.inkMuted, modifier = Modifier.size(18.dp))
+          }
         }
       }
     }
