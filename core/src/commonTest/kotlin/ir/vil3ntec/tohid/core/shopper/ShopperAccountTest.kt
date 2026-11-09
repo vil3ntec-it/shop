@@ -198,16 +198,17 @@ class ShopperAccountTest {
     assertEquals(listOf(ListOp(all = listOf(ListItem("soap", 2000)))), s.sync[slug]!!.listOps)
   }
 
-  @Test fun cartConflictKeepsTheDeviceCartAndFullMergesNeverDropAnything() {
+  @Test fun cartConflictReappliesTheDeviceChangeAndFullMergesNeverDropAnything() {
     val srv = Server()
     val api = withServer(srv)
     var (s, _) = run(api, device(cart = listOf(line("rice", 100, 1000))))
     assertEquals(1L, srv.cartV)
-    //  دستگاهِ دیگر سبد را عوض کرد (نسخهٔ ۲)؛ این دستگاه «+» زد ⇒ ۴۰۹ ⇒ سبدِ همین دستگاه روی نسخهٔ تازه (همان acct.js)
+    //  دستگاهِ دیگر سبد را عوض کرد (نسخهٔ ۲: روغن)؛ این دستگاه «+» ِ برنج زد ⇒ ۴۰۹ ⇒ همان «+» روی سبدِ تازه (CHK-03،
+    //  `CartSync.rebase`): کارِ هر دو دستگاه می‌ماند (پیش‌تر سبدِ این دستگاه کلِ سبد را جای‌گزین می‌کرد و روغن گم می‌شد)
     srv.cart = mutableListOf(Triple("oil", 1000L, "")); srv.cartV = 2
     s = ShopperMemory.withCart(s, CartRules.step(ShopperMemory.cartOf(s, slug), "rice", up = true, at = 9))
     s = run(api, s, AccountPulls()).first
-    assertEquals(listOf(Triple("rice", 2000L, "")), srv.cart)
+    assertEquals(listOf(Triple("oil", 1000L, ""), Triple("rice", 2000L, "")), srv.cart)
     assertEquals(3L, srv.cartV)
     //  فهرستِ پر در ادغام ⇒ فهرستِ دستگاه جای فهرستِ حساب
     val full = Server().apply { list = (1..100).map { "f$it" to 1000L }.toMutableList(); listV = 5 }

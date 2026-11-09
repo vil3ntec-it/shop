@@ -208,6 +208,11 @@ object ShopperText {
     "$n cart items are no longer in the shop.",
     "د ټوکرۍ ${num(n.toLong())} توکي نور په دوکان کې نشته.",
   )
+  /** CHK-03: سبدِ حساب از سرور آمد — قیمتِ عوض‌شده و «دیگر نیست» (همان دو پیامِ تازه‌سازیِ سبد؛ هیچ کدام ⇒ «قیمت‌ها تازه است») */
+  fun cartFresh(repriced: Int, gone: Int): String {
+    val parts = listOfNotNull(if (repriced > 0) repricedCount(repriced) else null, if (gone > 0) goneCount(gone) else null)
+    return if (parts.isEmpty()) t("سبد با قیمتِ امروز است.", "Your cart has today's prices.", "ټوکرۍ د نن ورځې په بیه ده.") else parts.joinToString(" ")
+  }
   val itemsTotal get() = t("جمعِ کالاها", "Items total", "د توکو ټولټال")
   val deliveryFee get() = t("هزینهٔ ارسال", "Delivery fee", "د رسولو لګښت")
   val total get() = t("جمع", "Total", "ټول")

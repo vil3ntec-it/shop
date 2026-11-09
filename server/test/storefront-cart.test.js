@@ -12,6 +12,8 @@
  *   ۵) S140: ادغامِ سبدِ مهمان بیشینه است نه جمع؛ تکرارش هیچ اثر و نسخهٔ تازه‌ای ندارد؛
  *      بیش از سقف ⇒ ۴۰۹ و هیچ تغییر.
  *   ۶) سبد ⇒ ثبت با همان جمع ⇒ خالی کردن.
+ *   ۷) بردارِ مشترکِ `core/test-vectors/account-cart-v1.json` (همان را `ShopperCartVectorsTest.kt` ِ برنامهٔ خرید روی
+ *      سرورِ جعلیِ Kotlin می‌دواند، فقط CI): شکلِ پاسخ، نسخه، ۴۰۹، ادغامِ بیشینه، قیمتِ امروز و کدِ پرچمِ خاموش.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '1000';
 const test = require('node:test');
@@ -19,6 +21,8 @@ const assert = require('node:assert/strict');
 const h = require('./helpers');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const path = require('node:path');
+const V = require(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'account-cart-v1.json'));
 
 let admin = '';
 let seq = 0;
@@ -45,8 +49,14 @@ async function setFlag(scope, key, value) {
 
 const op = (rowId, fields) => ({ op_id: `op-${uniq()}`, ts: Date.now(), table: 'products', row_id: rowId, type: 'insert', fields });
 
+const THREE = [
+  { id: 'rice', name: 'برنج', unit: 'کیلو', salePrice: 120.5 },
+  { id: 'oil', name: 'روغن', unit: 'بوتل', salePrice: 300 },
+  { id: 'salt', name: 'نمک', unit: 'بسته', salePrice: 20 },
+];
+
 /** دکانِ روشن با ویترین و سه کالای منتشرشده؛ `cart` = پرچمِ سبدِ سروری. */
-async function liveStore(label, { cart = true } = {}) {
+async function liveStore(label, { cart = true, products = THREE } = {}) {
   const u = await h.newUser(label, 'shop');
   const made = await h.post('/api/shop', { name: `دکانِ ${label}` }, { token: u.accessToken });
   assert.equal(made.status, 201, JSON.stringify(made.body));
@@ -59,14 +69,10 @@ async function liveStore(label, { cart = true } = {}) {
   assert.equal(put.status, 200, JSON.stringify(put.body));
   const p = await h.api('POST', '/api/sync/v1/push', {
     token: o.token, headers: { 'X-App': 'shop', 'X-Device': 'dev-cart' },
-    body: { device_id: 'dev-cart', schema_version: 2, ops: [
-      op('rice', { name: 'برنج', unit: 'کیلو', salePrice: 120.5 }),
-      op('oil', { name: 'روغن', unit: 'بوتل', salePrice: 300 }),
-      op('salt', { name: 'نمک', unit: 'بسته', salePrice: 20 }),
-    ] },
+    body: { device_id: 'dev-cart', schema_version: 2, ops: products.map((x) => op(x.id, { name: x.name, unit: x.unit, salePrice: x.salePrice })) },
   });
   assert.equal(p.status, 200, JSON.stringify(p.body));
-  for (const id of ['rice', 'oil', 'salt']) {
+  for (const id of products.map((x) => x.id)) {
     assert.equal((await h.put(`/api/shop/storefront/products/${id}`, { published: true }, { token: o.token })).status, 200);
   }
   return { ...o, slug };
@@ -299,4 +305,53 @@ test('CHK-03: سبد ⇒ ثبتِ سفارش با همان جمع ⇒ خالی �
   const cleared = await h.put(url(s.slug), { version: c.version, items: [] }, A);
   assert.equal(cleared.status, 200);
   assert.deepEqual([cleared.body.cart.version, cleared.body.cart.lines.length], [2, 0]);
+});
+
+test('CHK-03 بردارِ account-cart-v1: همان پاسخ‌هایی که سرورِ جعلیِ برنامهٔ خرید می‌دهد', async () => {
+  assert.equal(V.version, 1);
+  assert.equal(V.flag, 'shop.storefront.cart');
+  assert.equal(require('../src/lib/store-cart').FLAG_KEY, V.flag);
+  assert.equal(require('../src/lib/store-cart').MAX_LINES, V.maxLines);
+  assert.deepEqual(V.products, THREE, 'همان سه کالای آزمون‌های بالا');
+  const s = await liveStore('سبدِ بردار', { products: V.products });
+  const A = await session(s.slug, '0791000008');
+  assert.ok(A.headers[V.sessionHeader]);
+
+  //  پرچمِ ویترین: `features.accountCart` فقط با «حسابِ وب» (`shop.storefront.web_account`) هم
+  await setFlag(s.shopId, 'shop.storefront.web_account', true);
+  const f = (await h.get(`/api/store/${s.slug}`)).body.features;
+  assert.equal(f && f[V.feature], true, JSON.stringify(f));
+
+  const call = (st) => {
+    if (st.do === 'get') return h.get(url(s.slug), A);
+    if (st.do === 'put') return h.put(url(s.slug), st.body, A);
+    return h.post(`${url(s.slug)}/merge`, st.body, A);
+  };
+  const shape = (c) => [c.version, c.subtotalMinor, c.lines.map((l) => [l.productId, l.qtyMilli, l.note, l.available, l.priceMinor])];
+  for (const [i, st] of V.steps.entries()) {
+    const at = `گامِ ${i + 1} (${st.note})`;
+    if (st.do === 'unpublish' || st.do === 'price') {
+      const body = st.do === 'unpublish' ? { published: false } : { published: true, onlinePriceMinor: st.onlinePriceMinor };
+      assert.equal((await h.put(`/api/shop/storefront/products/${st.productId}`, body, { token: s.token })).status, 200, at);
+      continue;
+    }
+    const r = await call(st);
+    assert.equal(r.status, st.status, `${at}: ${JSON.stringify(r.body)}`);
+    if (st.code) assert.equal(r.body.error.code, st.code, at);
+    const cart = r.status === 200 ? r.body.cart : r.body.error && r.body.error.cart;
+    if (!st.cart) { assert.equal(cart, undefined, at); continue; }
+    assert.deepEqual(Object.keys(cart).sort(), V.cartKeys, at);
+    for (const l of cart.lines) assert.deepEqual(Object.keys(l).sort(), V.lineKeys, at);
+    assert.equal(cart.maxLines, V.maxLines, at);
+    assert.deepEqual(shape(cart), [st.cart.version, st.cart.subtotalMinor, st.cart.lines], at);
+    for (const [id, reason] of Object.entries(st.reasons || {})) assert.equal(cart.lines.find((l) => l.productId === id).reason, reason, at);
+  }
+
+  //  بی نشست و پرچمِ خاموش: دو ۴۰۱ ِ جدا — فقط اولی «دوباره وارد شوید» است
+  const none = await h.get(url(s.slug));
+  assert.deepEqual([none.status, none.body.error.code], [V.noSession.status, V.noSession.code]);
+  await setFlag(s.shopId, V.flag, false);
+  const off = await h.get(url(s.slug), A);
+  assert.deepEqual([off.status, off.body.error.code], [V.flagOff.status, V.flagOff.code]);
+  assert.notEqual(V.flagOff.code, V.noSession.code);
 });
