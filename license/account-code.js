@@ -91,6 +91,20 @@
    *  بخشِ پیش‌فرض مهر می‌زند — همان باگی که یک بار اپِ کارمندانِ پمپ
    *  را کاملاً مرده کرد.
    */
+  /*
+   *  SYN-04: بدنهٔ فشرده (`opts.gzip === true`) — فقط بالای GZIP_MIN نویسه و فقط با `CompressionStream` ِ مرورگر؛
+   *  نبودش یا شکستِ فشرده‌سازی ⇒ همان متنِ ساده. زیرِ فشرده همان `JSON.stringify` است (عدد با متنِ جاوااسکریپت)،
+   *  پس اثرِ انگشتِ op همان می‌ماند.
+   */
+  var GZIP_MIN = 1024;
+  async function gzipped(text) {
+    if (typeof CompressionStream !== 'function' || typeof Blob !== 'function' || typeof Response !== 'function') return null;
+    try {
+      var stream = new Blob([text]).stream().pipeThrough(new CompressionStream('gzip'));
+      return new Uint8Array(await new Response(stream).arrayBuffer());
+    } catch (e) { return null; }
+  }
+
   async function call(path, opts) {
     var o = opts || {};
     if (!configured()) throw ApiError('نشانی سرور تنظیم نشده است', 'no_server');
@@ -104,6 +118,11 @@
     if (o.body !== undefined) headers['Content-Type'] = 'application/json';
     if (o.token) headers.Authorization = 'Bearer ' + o.token;
     if (o.headers) Object.assign(headers, o.headers);
+    var payload = o.body === undefined ? undefined : JSON.stringify(o.body);
+    if (o.gzip === true && payload !== undefined && payload.length >= GZIP_MIN) {
+      var packed = await gzipped(payload);
+      if (packed) { payload = packed; headers['Content-Encoding'] = 'gzip'; }
+    }
 
     var ctrl = new AbortController();
     var timer = setTimeout(function () { ctrl.abort(); }, o.timeout || TIMEOUT_MS);
@@ -113,7 +132,7 @@
         method: o.method || 'GET',
         headers: headers,
         signal: ctrl.signal,
-        body: o.body === undefined ? undefined : JSON.stringify(o.body),
+        body: payload,
       });
     } catch (e) {
       throw ApiError(e && e.name === 'AbortError' ? 'سرور پاسخ نداد' : 'به سرور نرسیدیم', 'network');

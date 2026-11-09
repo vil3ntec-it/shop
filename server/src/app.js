@@ -74,11 +74,18 @@ async function createApp({ runMigrations = true } = {}) {
    *  ──────────────────────────────────────────────────────────────
    */
   app.use((err, req, res, next) => {
-    if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large')) {
+    //  SYN-04: بدنهٔ فشرده (`Content-Encoding`) — gzip ِ خراب خطای zlib است (`Z_DATA_ERROR`، متنِ انگلیسی) و
+    //  کدگذاریِ ناشناخته `encoding.unsupported`؛ هر دو همان پاسخِ تمیز. سقفِ بالا روی بدنهٔ **باز‌شده** است (بمبِ فشرده ۴۱۳).
+    const zlibBad = !!err && /^Z_[A-Z_]+$/.test(String(err.code || ''));
+    const badEncoding = !!err && err.type === 'encoding.unsupported';
+    if (!err || (err.type !== 'entity.parse.failed' && err.type !== 'entity.too.large' && !zlibBad && !badEncoding)) {
       return next(err);
     }
     const tooBig = err.type === 'entity.too.large';
-    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type}`);
+    console.warn(`[body] ${req.method} ${redactPath(req.originalUrl)} — ${err.type || err.code}`);
+    if (badEncoding) {
+      return res.status(415).json({ error: { code: 'unsupported_encoding', message: 'فشرده‌سازیِ این درخواست شناخته نشد' } });
+    }
     res.status(tooBig ? 413 : 400).json({
       error: {
         code: tooBig ? 'body_too_large' : 'bad_json',
@@ -120,8 +127,9 @@ async function createApp({ runMigrations = true } = {}) {
          *  «net::ERR_FAILED» می‌گوید — نه ۴۰۰، نه ۴۰۳، هیچ.
          *  همان تله‌ای که یک بار اپِ کارمندانِ پمپ را خواباند.
          */
+        //  `Content-Encoding`: push ِ فشردهٔ وب (SYN-04، پرچمِ `sync.gzip_push`)
         res.set('Access-Control-Allow-Headers',
-          'Content-Type, Authorization, Idempotency-Key, X-App, X-App-Id, X-Device, X-App-Version, X-Request-Id');
+          'Content-Type, Content-Encoding, Authorization, Idempotency-Key, X-App, X-App-Id, X-Device, X-App-Version, X-Request-Id');
         res.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
         res.set('Access-Control-Max-Age', '600');
       } else if (req.method === 'OPTIONS') {
