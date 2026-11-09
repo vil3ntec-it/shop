@@ -973,7 +973,7 @@ fun CartLineDialog(
 
   val typedQty = qtyText.toDoubleOrNull()
   val parsedQty = if (unitNow != null) ir.vil3ntec.tohid.core.product.UnitSale.toBase(typedQty, unitNow, units?.wholeOnly == true)
-    else typedQty?.let { if (inSaleUnit) Math.round(it * unitFactor * 1000.0) / 1000.0 else it }
+    else typedQty?.let { if (inSaleUnit) ir.vil3ntec.tohid.core.product.UnitSale.typedToBase(it, unitFactor) else it } // PRD-07: همان هزارمِ هسته و سرور
   val partBad = unitNow != null && typedQty != null && ir.vil3ntec.tohid.core.product.UnitSale.partRejected(typedQty, unitNow, units?.wholeOnly == true)
   val listPrice = unitNow?.let(ir.vil3ntec.tohid.core.product.UnitSale::lineUnitPrice) // قیمتِ هر واحدِ پایه از قیمتِ بسته
   val parsedPrice = priceText.toDoubleOrNull()
@@ -1025,7 +1025,7 @@ fun CartLineDialog(
               if (wantSale != inSaleUnit) {
                 //  همان مقدار، به واحدِ تازه — نه پاک شدنِ کادر
                 typedQty?.let { v ->
-                  qtyText = qty(if (wantSale) v / unitFactor else v * unitFactor)
+                  qtyText = qty(if (wantSale) v / unitFactor else ir.vil3ntec.tohid.core.product.UnitSale.typedToBase(v, unitFactor))
                 }
                 inSaleUnit = wantSale
               }

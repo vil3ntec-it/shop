@@ -193,6 +193,8 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  //  PERF-04: مهلتِ سراسریِ درخواست — `REQUEST_TIMEOUT_MS` (۰ = خاموش)؛ پمپ و v1 بیرون (`middleware/deadline.js`)
+  app.use('/api', require('./middleware/deadline').requestDeadline());
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
@@ -600,6 +602,8 @@ async function createApp({ runMigrations = true } = {}) {
   //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
   //  `media-src blob:` فقط برای پیامِ صوتیِ چت (CHAT-07): <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ
   //  امضاشده ندارد (S118) ⇒ بایت با fetch ِ بلیت‌دار و پخش از blob: ِ همین صفحه؛ blob را فقط اسکریپتِ همین مبدأ می‌سازد. نه data:.
+  //  `microphone=(self)` فقط برای ضبطِ پیامِ صوتیِ مشتری (`store/chat-voice.js`، پرچمِ خاموشِ `shop.chat.voice`): فقط همین
+  //  مبدأ (نه قابِ بیرونی؛ frame-ancestors 'none')، و مرورگر خودش اجازه می‌پرسد. دوربین و پرداخت همان بسته.
   //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
@@ -608,7 +612,7 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Content-Security-Policy',
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; " +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
-    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+    res.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self), payment=()');
     next();
   };
   //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با

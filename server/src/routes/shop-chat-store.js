@@ -78,7 +78,12 @@ router.get(`${base}/conversations`, readLimit, customer, async (req, res) => {
 router.post(`${base}/conversations`, readLimit, customer, sendLimit, async (req, res) => {
   const out = await chat.open(v(req), req.body);
   //  سقفِ عکس تا ویترین پیش از بارگذاری به همان کوچک کند (CHAT-05)؛ سرور هر بایت را باز خودش می‌سنجد (`putMedia`)
-  const limits = { imageMax: config.shopChat.imageMax, thumbMax: config.shopChat.thumbMax };
+  //  CHAT-07: `voice` (پرچمِ خاموشِ `shop.chat.voice`) فقط دکمهٔ ضبطِ ویترین را نشان می‌دهد؛ `audioMax` سقفِ ضبط است.
+  //  ⛔ مرز همان `putMedia` است (نوع از بایت، `audioMax`، سطلِ `uploadLimit`)، نه این پرچم.
+  const limits = {
+    imageMax: config.shopChat.imageMax, thumbMax: config.shopChat.thumbMax, audioMax: config.shopChat.audioMax,
+    voice: Boolean(await require('../lib/orders').flagOf(v(req).shopId, 'shop.chat.voice')),
+  };
   res.status(out.created ? 201 : 200).json({ conversation: out.conversation, limits });
 });
 

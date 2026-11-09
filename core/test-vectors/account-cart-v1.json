@@ -1,0 +1,377 @@
+{
+ "_doc": "CHK-03 — قراردادِ سبدِ حسابِ مشتری (`GET`/`PUT /api/store/:slug/account/cart` و `POST …/cart/merge`؛ `server/src/lib/store-cart.js` و `routes/storefront.js`). همین فایل را `server/test/storefront-cart.test.js` روی سرورِ واقعی (PGlite و PostgreSQL) و `core/src/jvmTest/.../shopper/ShopperCartVectorsTest.kt` (فقط CI) روی سرورِ جعلیِ آزمون‌های Kotlin (`CartServer` ِ commonTest) و کارخواهِ `ShopperApi` می‌دوانند، پس سرورِ جعلیِ `ShopperCartSyncTest` و سرورِ واقعی از هم جدا نمی‌شوند. هر گام: `do` (get، put، merge، unpublish، price)، `body` ِ درخواست، و پاسخِ چشم‌داشته: `status`، `code` ِ خطا، و سبد (در ۲۰۰ `cart`، در ۴۰۹ `error.cart`) با `version`، `subtotalMinor` و قلم‌ها به شکلِ [productId، qtyMilli، note، available، priceMinor]. قیمت هرگز ذخیره نمی‌شود: هر خواندن قیمتِ امروز. ادغام بیشینه است نه جمع و تکرارش نسخه را بالا نمی‌برد. پرچمِ خاموش ⇒ همان ۴۰۱ ِ درِ ناشناخته (`unauthorized`)، نه `session_required` ⇒ برنامه از حساب بیرون نمی‌رود. مبلغ Minor (یک‌صدمِ افغانی)، مقدار هزارم.",
+ "version": 1,
+ "flag": "shop.storefront.cart",
+ "feature": "accountCart",
+ "sessionHeader": "X-Store-Session",
+ "rateBuckets": {
+  "get": "store-read",
+  "put": "store-acct-sync",
+  "merge": "store-acct-sync"
+ },
+ "flagOff": {
+  "status": 401,
+  "code": "unauthorized"
+ },
+ "noSession": {
+  "status": 401,
+  "code": "session_required"
+ },
+ "cartKeys": [
+  "lines",
+  "maxLines",
+  "subtotalMinor",
+  "updatedAt",
+  "version"
+ ],
+ "lineKeys": [
+  "available",
+  "lineTotalMinor",
+  "maxQtyMilli",
+  "name",
+  "note",
+  "overLimit",
+  "priceMinor",
+  "productId",
+  "qtyMilli",
+  "reason",
+  "stock",
+  "unit"
+ ],
+ "maxLines": 100,
+ "products": [
+  {
+   "id": "rice",
+   "name": "برنج",
+   "unit": "کیلو",
+   "salePrice": 120.5
+  },
+  {
+   "id": "oil",
+   "name": "روغن",
+   "unit": "بوتل",
+   "salePrice": 300
+  },
+  {
+   "id": "salt",
+   "name": "نمک",
+   "unit": "بسته",
+   "salePrice": 20
+  }
+ ],
+ "steps": [
+  {
+   "note": "سبدِ تازهٔ حساب: نسخهٔ ۰، خالی",
+   "do": "get",
+   "status": 200,
+   "cart": {
+    "version": 0,
+    "subtotalMinor": 0,
+    "lines": []
+   }
+  },
+  {
+   "note": "نوشتن با نسخهٔ دیده‌شده",
+   "do": "put",
+   "body": {
+    "version": 0,
+    "items": [
+     {
+      "productId": "rice",
+      "qtyMilli": 2000,
+      "note": "دانه‌بلند"
+     },
+     {
+      "productId": "oil",
+      "qtyMilli": 1000
+     }
+    ]
+   },
+   "status": 200,
+   "cart": {
+    "version": 1,
+    "subtotalMinor": 54100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      1000,
+      "",
+      true,
+      30000
+     ]
+    ]
+   }
+  },
+  {
+   "note": "نسخهٔ کهنه ⇒ ۴۰۹ با سبدِ تازه، هیچ نوشتن",
+   "do": "put",
+   "body": {
+    "version": 0,
+    "items": []
+   },
+   "status": 409,
+   "code": "cart_changed",
+   "cart": {
+    "version": 1,
+    "subtotalMinor": 54100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      1000,
+      "",
+      true,
+      30000
+     ]
+    ]
+   }
+  },
+  {
+   "note": "ادغامِ سبدِ مهمان: بیشینه نه جمع؛ کالای تازه پشتِ سبد؛ یادداشتِ حساب مقدم",
+   "do": "merge",
+   "body": {
+    "items": [
+     {
+      "productId": "rice",
+      "qtyMilli": 1000,
+      "note": "یادداشتِ مهمان"
+     },
+     {
+      "productId": "oil",
+      "qtyMilli": 3000
+     },
+     {
+      "productId": "salt",
+      "qtyMilli": 1000,
+      "note": "ریز"
+     }
+    ]
+   },
+   "status": 200,
+   "cart": {
+    "version": 2,
+    "subtotalMinor": 116100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      3000,
+      "",
+      true,
+      30000
+     ],
+     [
+      "salt",
+      1000,
+      "ریز",
+      true,
+      2000
+     ]
+    ]
+   }
+  },
+  {
+   "note": "تکرارِ همان ادغام (تلاشِ دوباره پس از قطع) ⇒ همان سبد، همان نسخه",
+   "do": "merge",
+   "body": {
+    "items": [
+     {
+      "productId": "rice",
+      "qtyMilli": 1000,
+      "note": "یادداشتِ مهمان"
+     },
+     {
+      "productId": "oil",
+      "qtyMilli": 3000
+     },
+     {
+      "productId": "salt",
+      "qtyMilli": 1000,
+      "note": "ریز"
+     }
+    ]
+   },
+   "status": 200,
+   "cart": {
+    "version": 2,
+    "subtotalMinor": 116100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      3000,
+      "",
+      true,
+      30000
+     ],
+     [
+      "salt",
+      1000,
+      "ریز",
+      true,
+      2000
+     ]
+    ]
+   }
+  },
+  {
+   "note": "کالا از ویترین بیرون رفت",
+   "do": "unpublish",
+   "productId": "salt"
+  },
+  {
+   "note": "خواندن: قلمِ بیرون‌رفته می‌ماند، «نیست»، بی قیمت و بیرون از جمع؛ خواندن نسخه را عوض نمی‌کند",
+   "do": "get",
+   "status": 200,
+   "cart": {
+    "version": 2,
+    "subtotalMinor": 114100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      3000,
+      "",
+      true,
+      30000
+     ],
+     [
+      "salt",
+      1000,
+      "ریز",
+      false,
+      null
+     ]
+    ]
+   },
+   "reasons": {
+    "salt": "not_in_store"
+   }
+  },
+  {
+   "note": "دکان قیمت را عوض کرد",
+   "do": "price",
+   "productId": "oil",
+   "onlinePriceMinor": 35000
+  },
+  {
+   "note": "خواندنِ بعدی قیمتِ امروز",
+   "do": "get",
+   "status": 200,
+   "cart": {
+    "version": 2,
+    "subtotalMinor": 129100,
+    "lines": [
+     [
+      "rice",
+      2000,
+      "دانه‌بلند",
+      true,
+      12050
+     ],
+     [
+      "oil",
+      3000,
+      "",
+      true,
+      35000
+     ],
+     [
+      "salt",
+      1000,
+      "ریز",
+      false,
+      null
+     ]
+    ]
+   }
+  },
+  {
+   "note": "جایگزینیِ کامل: برداشتنِ دو قلم و کم کردنِ یکی",
+   "do": "put",
+   "body": {
+    "version": 2,
+    "items": [
+     {
+      "productId": "oil",
+      "qtyMilli": 1000
+     }
+    ]
+   },
+   "status": 200,
+   "cart": {
+    "version": 3,
+    "subtotalMinor": 35000,
+    "lines": [
+     [
+      "oil",
+      1000,
+      "",
+      true,
+      35000
+     ]
+    ]
+   }
+  },
+  {
+   "note": "خالی کردن (پس از ثبتِ سفارش هم) = فهرستِ خالی؛ نسخه بالا می‌رود",
+   "do": "put",
+   "body": {
+    "version": 3,
+    "items": []
+   },
+   "status": 200,
+   "cart": {
+    "version": 4,
+    "subtotalMinor": 0,
+    "lines": []
+   }
+  },
+  {
+   "note": "ورودیِ بد ⇒ ۴۰۰ و هیچ نوشتن",
+   "do": "put",
+   "body": {
+    "version": 4,
+    "items": [
+     {
+      "productId": "rice",
+      "qtyMilli": 0
+     }
+    ]
+   },
+   "status": 400,
+   "code": "bad_number"
+  }
+ ]
+}

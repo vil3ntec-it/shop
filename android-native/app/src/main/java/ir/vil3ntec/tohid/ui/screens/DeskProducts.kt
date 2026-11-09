@@ -430,18 +430,6 @@ fun DeskProductsScreen(
   results?.let { (title, list) -> BulkResultDialog(title, list) { results = null } }
 }
 
-/** «کمینه ۵ ⇐ ۱۰، نقطهٔ سفارش — ⇐ ۲۰» یا ایرادِ ردیف */
-private fun levelsNote(p: StockLevelRules.Planned): String {
-  if (!p.ok) return p.problems.joinToString("، ") { it.fa }
-  fun t(m: Long?) = m?.let { qty(it / 1000.0) } ?: "—"
-  val parts = buildList {
-    if (p.before.minMilli != p.after.minMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.minChange(t(p.before.minMilli), t(p.after.minMilli)))
-    if (p.before.reorderMilli != p.after.reorderMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.reorderChange(t(p.before.reorderMilli), t(p.after.reorderMilli)))
-    if (p.before.maxMilli != p.after.maxMilli) add(ir.vil3ntec.tohid.core.i18n.StrProductPages.maxChange(t(p.before.maxMilli), t(p.after.maxMilli)))
-  }
-  return if (parts.isEmpty()) ir.vil3ntec.tohid.core.i18n.StrProductPages.alreadySo else parts.joinToString("، ")
-}
-
 /**
  *  ورودیِ ویرایشِ گروهیِ حدها (INV-12): کادرِ خالی ⇒ «بی‌تغییر»؛ تیکِ «پاک» آن حد را برمی‌دارد؛
  *  حد کم بودنِ ۰ همان «بی هشدار» ِ امروز است. عددِ نادرست دکمه را خاموش نگه می‌دارد.
@@ -489,14 +477,6 @@ private fun LevelsInputDialog(count: Int, onDismiss: () -> Unit, onNext: (StockL
     confirmButton = { Button(onClick = { onNext(patch) }, enabled = !bad && !patch.isNoop) { Text(ir.vil3ntec.tohid.core.i18n.StrDevicePages.preview) } },
     dismissButton = { TextButton(onClick = onDismiss) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
   )
-}
-
-/** متنِ کادر ⇒ تغییرِ حد؛ `null` یعنی خالی (بی‌تغییر) یا نادرست — `bad` این دو را جدا می‌کند */
-private fun levelEdit(text: String, clear: Boolean, zeroClears: Boolean = false): StockLevelRules.Edit? {
-  if (clear) return StockLevelRules.Edit.Clear
-  val v = text.trim().takeIf { it.isNotEmpty() }?.toDoubleOrNull()?.takeIf { it.isFinite() && it >= 0 } ?: return null
-  if (zeroClears && v == 0.0) return StockLevelRules.Edit.Clear
-  return runCatching { StockLevelRules.Edit.To(ir.vil3ntec.tohid.core.money.Qty.fromLegacy(v).milli) }.getOrNull()
 }
 
 /** کارِ گروهیِ در انتظارِ تأیید */
@@ -752,6 +732,9 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
   val tools = remember { ShopPolicy.productTools(context) }
   val similarIndex = remember(d.products, tools) { if (tools) SimilarNames.Index(d.products.map { it.name }) else null }
   var warnedFor by remember { mutableStateOf("") }
+  //  PRD-12: «قیمتِ عمده» فقط با «لیستِ قیمت در صندوق» (خاموش ⇒ همان ردیف و `wholesalePrice = null`، همان فرمِ تازهٔ نسخهٔ ۳)
+  val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
+  var wholesale by remember { mutableStateOf("") }
 
   fun save() {
     val similar = similarIndex?.find(name).orEmpty()
@@ -765,6 +748,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
       purchasePrice = buy.toDoubleOrNull() ?: 0.0, salePrice = sell.toDoubleOrNull() ?: 0.0,
       barcode = if (tools) "" else barcode.trim(),
       barcodes = if (tools) ProductBarcodes.parse(barcode) else null,
+      wholesalePrice = if (wholesaleOn) deskWholesale(wholesale) else null,
     )
     when (val r = WarehouseEngine.addProduct(d, draft, System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -782,7 +766,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
         scope.launch { store.save(d, next) }
         toast(ir.vil3ntec.tohid.core.i18n.StrProductPages.nameRecorded(name.trim()))
         //  دسته و واحد برای کالای بعدی می‌مانند — معمولاً چند کالای یک دسته پشتِ هم ثبت می‌شوند
-        name = ""; barcode = ""; buy = ""; sell = ""; count = ""
+        name = ""; barcode = ""; buy = ""; sell = ""; count = ""; wholesale = ""
         runCatching { nameFocus.requestFocus() }
       }
     }
@@ -807,6 +791,7 @@ private fun QuickAddRow(store: ShopStore, d: ShopData, toast: (String) -> Unit, 
       Spacer(Modifier.width(6.dp))
       QuickField(sell, { sell = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.sellShort, Modifier.width(95.dp), ::save, numeric = true)
       Spacer(Modifier.width(6.dp))
+      if (wholesaleOn) { QuickField(wholesale, { wholesale = it }, ir.vil3ntec.tohid.core.i18n.StrPriceCheck.wholesale, Modifier.width(95.dp), ::save, numeric = true); Spacer(Modifier.width(6.dp)) }
       QuickField(count, { count = it }, ir.vil3ntec.tohid.core.i18n.StrSale.stock, Modifier.width(90.dp), ::save, numeric = true)
       Spacer(Modifier.width(6.dp))
       Button(onClick = ::save, enabled = name.isNotBlank()) { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.saveKey) }
@@ -850,6 +835,9 @@ private fun EditPanel(
   var unit by remember { mutableStateOf(p.unit) }
   var buy by remember { mutableStateOf(qty(p.purchasePrice)) }
   var sell by remember { mutableStateOf(qty(p.salePrice)) }
+  //  PRD-12 (فقط با «لیستِ قیمت در صندوق»؛ خاموش ⇒ `wholesalePrice = null` = دست نمی‌خورد): تغییرش در سابقه با کاربر و دلیل (PRD-14)
+  val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
+  var wholesale by remember { mutableStateOf(deskWholesaleText(p.wholesalePrice)) }
   var min by remember { mutableStateOf(qty(p.minStock)) }
   var active by remember { mutableStateOf(p.active) }
   //  PRD-02/PRD-26: خاموش ⇒ همان پنلِ پیشین و `info = null` (فیلدها دست نمی‌خورند)
@@ -879,6 +867,7 @@ private fun EditPanel(
       editLevels = levelsOn,
       reorderPoint = if (levelsOn) levelNumber(reorder) else null,
       maxStock = if (levelsOn) levelNumber(maxStock) else null,
+      wholesalePrice = if (wholesaleOn) deskWholesale(wholesale) else null,
     )
     when (val r = WarehouseEngine.editProduct(d, p.id, draft, ir.vil3ntec.tohid.todayIso(), System.currentTimeMillis(), ::newId)) {
       is WarehouseEngine.Result.Failed -> toast(r.message)
@@ -942,7 +931,8 @@ private fun EditPanel(
         Spacer(Modifier.width(6.dp))
         Box(Modifier.weight(1f)) { F(sell, { sell = it }, ir.vil3ntec.tohid.core.i18n.StrGrid.sell, true) }
       }
-      if (tools && (buy != qty(p.purchasePrice) || sell != qty(p.salePrice))) {
+      if (wholesaleOn) F(wholesale, { wholesale = it }, ir.vil3ntec.tohid.core.i18n.StrPriceCheck.wholesale, true)
+      if (tools && (buy != qty(p.purchasePrice) || sell != qty(p.salePrice) || wholesale != deskWholesaleText(p.wholesalePrice))) {
         F(priceReason, { priceReason = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.priceReason)
       }
       F(min, { min = it }, ir.vil3ntec.tohid.core.i18n.StrProductPages.alertLevel, true)

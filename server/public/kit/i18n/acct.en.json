@@ -21,5 +21,7 @@
   "ac.keep": "Keep this address with a name",
   "ac.label": "Address name (e.g. “Home”)",
   "ac.saved": "Address “{label}” saved",
-  "ac.pin": "Pin of this address"
+  "ac.pin": "Pin of this address",
+  "ac.cart.out": "{n} cart items are out of stock for now.",
+  "ac.cart.out.1": "1 cart item is out of stock for now."
 }

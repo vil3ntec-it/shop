@@ -28,7 +28,7 @@ data class ProductRowDraft(
   val unitFactor: String = "",
   /** MKT-06 «چرخهٔ مصرف» (روز، اختیاری) — فقط ویرایش؛ نوشتن با `ProductCycle.apply` پس از ویرایشِ موفق */
   val cycle: String = "",
-  /** PRD-12 قیمتِ عمده — فقط ویرایش و فقط با «لیستِ قیمت در صندوق» (صفحه وگرنه `wholesalePrice = null` می‌فرستد) */
+  /** PRD-12 قیمتِ عمده — فرمِ تازه و ویرایش، فقط با «لیستِ قیمت در صندوق» (صفحه وگرنه `wholesalePrice = null` می‌فرستد) */
   val wholesale: String = "",
 )
 
@@ -60,13 +60,14 @@ object ProductFormModel {
 
   /** ردیفی که هیچ چیزش پر نشده — نادیده گرفته می‌شود، خطا نیست */
   fun untouched(r: ProductRowDraft): Boolean =
-    r.name.isBlank() && r.purchase.isBlank() && r.sale.isBlank() && r.barcode.isBlank() && r.minStock.isBlank()
+    r.name.isBlank() && r.purchase.isBlank() && r.sale.isBlank() && r.barcode.isBlank() && r.minStock.isBlank() && r.wholesale.isBlank()
 
   private fun nonNegative(s: String): Boolean = (s.toDoubleOrNull() ?: -1.0) >= 0
 
-  /** آمادهٔ ثبت؟ — همان شرطِ `ProductRow.ready` (کالای تازه) */
+  /** آمادهٔ ثبت؟ — همان شرطِ `ProductRow.ready` (کالای تازه)؛ قیمتِ عمدهٔ نوشته‌شده (PRD-12) هم باید خوانا و نامنفی باشد */
   fun ready(r: ProductRowDraft): Boolean =
-    r.name.isNotBlank() && nonNegative(r.purchase) && nonNegative(r.sale) && r.unit.isNotBlank() && r.category.isNotBlank()
+    r.name.isNotBlank() && nonNegative(r.purchase) && nonNegative(r.sale) && r.unit.isNotBlank() && r.category.isNotBlank() &&
+      (r.wholesale.isBlank() || nonNegative(r.wholesale))
 
   /** خطای هر کادر — صفحه فقط خطای کادرهایی را نشان می‌دهد که لمس شده‌اند یا پس از «ذخیره» */
   fun errors(r: ProductRowDraft, mode: Mode): Map<Field, Problem> = buildMap {
@@ -87,10 +88,11 @@ object ProductFormModel {
           }
         }
         if (ProductCycle.bad(r.cycle)) put(Field.CYCLE, Problem.NOT_A_NUMBER)
-        number(r.wholesale, required = false)?.let { put(Field.WHOLESALE, it) }
       }
     }
     number(r.sale, required = true)?.let { put(Field.SALE, it) }
+    //  PRD-12: خالی ⇒ عمده ندارد (کادر فقط با «لیستِ قیمت در صندوق» دیده می‌شود؛ خاموش ⇒ همیشه خالی)
+    number(r.wholesale, required = false)?.let { put(Field.WHOLESALE, it) }
     //  حداقلِ موجودیِ ناخوانا امروز هم بی‌صدا صفر است — خطا نیست
   }
 
@@ -130,6 +132,8 @@ object ProductFormModel {
     salePrice = r.sale.toDoubleOrNull() ?: -1.0,
     minStock = r.minStock.toDoubleOrNull() ?: 0.0,
     barcode = r.barcode,
+    //  PRD-12: خالی ⇒ null ⇒ ۰ (همان کالای تازهٔ امروز)؛ نادرست ⇒ NaN تا موتور رد کند
+    wholesalePrice = r.wholesale.takeIf { it.isNotBlank() }?.let { it.toDoubleOrNull() ?: Double.NaN },
   )
 
   /** پیش‌نویسِ ویرایش — همان دکمهٔ «ذخیره تغییرات» ِ `ProductDialog` */
