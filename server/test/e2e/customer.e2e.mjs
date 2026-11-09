@@ -12,7 +12,7 @@
  *
  * اجرا:  node test/e2e/customer.e2e.mjs
  */
-import { boot, assert } from './lib/harness.mjs';
+import { boot, assert, sameOrderLink } from './lib/harness.mjs';
 
 const E = await boot({ name: 'customer', env: { CATALOG_REFRESH_THROTTLE_MS: '0' } });
 const { db } = E;
@@ -44,7 +44,8 @@ let yOrder = null;      //  سفارشِ Y
 //  DESIGN v2: کارتِ کالا «یک زدن = یک واحد» (−/+ فقط در سبد)
 async function addToCart(page, id, times = 1) {
   const li = page.locator(`#products li[data-id="${id}"]`);
-  for (let i = 0; i < times; i++) await li.getByRole('button', { name: /افزودن/ }).click();
+  //  `.p-add`: با ♥ ِ `shop.storefront.favorites` (E2E_FLAGS_ON) کارت دکمهٔ دومی با نامِ «افزودنِ … به دلخواه‌ها» هم دارد
+  for (let i = 0; i < times; i++) await li.getByRole('button', { name: /افزودن/ }).and(li.locator('.p-add')).click();
 }
 async function openStore(page, slug = SLUG, hash = '') {
   await page.goto(`${E.apiBase}/store/${slug}${hash}`);
@@ -322,7 +323,7 @@ await E.step('S134', 'سفارش با شمارهٔ تأییدشده به هما�
   //  فهرستِ «سفارش‌های من» با بلیتِ X: فقط سفارشِ X
   const mine = E.ok(await E.get(`/api/store/${SLUG}/orders`, null, { 'X-Store-Ticket': tk.ticket }), 'سفارش‌های X').orders;
   assert.deepEqual(mine.map((o) => o.orderNo), [Number(first.order_no)]);
-  assert.equal(mine[0].token, firstToken);
+  assert.ok(sameOrderLink(mine[0].token, firstToken), `${mine[0].token} ≠ ${firstToken}`);
   //  حسابِ مشتری (نشستِ ماندگار) از همان بلیت ⇒ همان شماره و همان سفارش
   const acc = await E.post(`/api/store/${SLUG}/account`, { name: 'مشتریِ ایکس' }, null, { 'X-Store-Ticket': tk.ticket });
   assert.equal(acc.status, 201, JSON.stringify(acc.body));
@@ -417,24 +418,27 @@ await E.step('S138', 'X از دستگاهِ دیگر سفارش‌های خود�
   const hrefs = await p.$$eval('#orders a', (as) => as.map((a) => a.getAttribute('href')));
   assert.equal(hrefs.length, xMine.length, hrefs.join(' '));
   assert.ok(hrefs.every((h) => h.startsWith(`/store/${SLUG}#/o/`)), hrefs.join(' '));
-  assert.equal(hrefs.some((h) => h.includes(encodeURIComponent(yOrder.token))), false, 'سفارشِ Y در فهرستِ X');
+  //  به شناسهٔ سفارش (پیشوندِ توکن)، نه کلِ توکن: با `shop.storefront.link_expiry` هر فهرست لینکِ v2 ِ تازه می‌دهد (TEN-03)
+  const yId = yOrder.token.split('.')[0];
+  assert.equal(hrefs.some((h) => h.includes(yId)), false, 'سفارشِ Y در فهرستِ X');
   //  همان دستگاه در ویترین: «سفارش‌های من» از سرور (با «حسابِ من» ِ CRM-13 روشن، بخشِ `#ah-online` ِ آن — `E.storeOrdersList`)
   await openStore(p, SLUG, '#/orders');
   const mineList = await E.storeOrdersList(p, SLUG);
   await p.waitForFunction(([sel, n]) => document.querySelectorAll(`${sel} li`).length === n, [mineList, xMine.length], { timeout: 10_000 });
   const storeList = await p.$$eval(`${mineList} a`, (as) => as.map((a) => a.getAttribute('href')));
   assert.equal(storeList.length, xMine.length, storeList.join(' '));
-  assert.ok(storeList.includes(`#/o/${encodeURIComponent(firstToken)}`), storeList.join(' '));
-  assert.equal(storeList.some((h) => h.includes(encodeURIComponent(yOrder.token))), false);
+  const firstHref = storeList.find((h) => sameOrderLink(decodeURIComponent(h.replace(/^#\/o\//, '')), firstToken));
+  assert.ok(firstHref, storeList.join(' '));
+  assert.equal(storeList.some((h) => h.includes(yId)), false);
   //  پیوندِ سفارش از دستگاهِ دوم باز می‌شود
-  await p.click(`${mineList} a[href="#/o/${encodeURIComponent(firstToken)}"]`);
+  await p.click(`${mineList} a[href="${firstHref}"]`);
   await p.waitForFunction(() => document.querySelectorAll('#o-lines li').length === 2, null, { timeout: 10_000 });
   //  Y از راهِ API: فقط سفارشِ خودش، در ویترین و بازارچه
   const yTicket = await apiCustomer(SLUG, Y);
   const yStore = E.ok(await E.get(`/api/store/${SLUG}/orders`, null, { 'X-Store-Ticket': yTicket }), 'سفارش‌های Y').orders;
-  assert.deepEqual(yStore.map((o) => o.token), [yOrder.token]);
+  assert.ok(yStore.length === 1 && sameOrderLink(yStore[0].token, yOrder.token), JSON.stringify(yStore.map((o) => o.token)));
   const yMarket = E.ok(await E.get('/api/market/orders', null, { 'X-Store-Ticket': yTicket }), 'بازارچهٔ Y').orders;
-  assert.deepEqual(yMarket.map((o) => o.token), [yOrder.token]);
+  assert.ok(yMarket.length === 1 && sameOrderLink(yMarket[0].token, yOrder.token), JSON.stringify(yMarket.map((o) => o.token)));
   await E.shot(D2, 'S138-second-device');
 }, { needs: ['S137'] });
 

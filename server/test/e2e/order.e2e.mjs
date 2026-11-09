@@ -30,7 +30,8 @@ async function go(dev, id, to, from, extra = {}) {
 //  DESIGN v2: کارتِ کالا «یک زدن = یک واحد» (−/+ فقط در سبد)
 async function addToCart(page, id, times = 1) {
   const li = page.locator(`#products li[data-id="${id}"]`);
-  for (let i = 0; i < times; i++) await li.getByRole('button', { name: /افزودن/ }).click();
+  //  `.p-add`: با ♥ ِ `shop.storefront.favorites` (E2E_FLAGS_ON) کارت دکمهٔ دومی با نامِ «افزودنِ … به دلخواه‌ها» هم دارد
+  for (let i = 0; i < times; i++) await li.getByRole('button', { name: /افزودن/ }).and(li.locator('.p-add')).click();
 }
 //  نوارِ سبد ⇐ سبدِ باز (در گوشی مدلِ r3/r2) ⇐ «ادامه» ⇐ ثبت
 async function toCheckout(page) {
