@@ -33,10 +33,13 @@ const MAX_MESSAGE = 500;
 const MAX_STACK = 4000;
 const MAX_LOG = 4000;
 const REPORT_ID = /^cer_[0-9A-HJKMNP-TV-Z]{26}$/;
+//  ⛔ ممیزیِ ۳۵ (B3): NUL را PostgreSQL در متن نمی‌پذیرد و عددِ بیرون از int ستون را می‌شکند ⇒ هر دو پیش‌تر ۵۰۰ می‌دادند
+const noNul = (s) => String(s ?? '').replace(/\u0000/g, '');
+const schemaOf = (x) => { const n = Number(x); return Number.isSafeInteger(n) && n >= 0 && n <= 2147483647 ? n : 0; };
 
 /** هر چیزی که به کسی برگردد — ایمیل، شماره، توکنِ بلند، شمارهٔ کاملِ کارت (S117) — پوشانده می‌شود. */
 function scrub(text, limit) {
-  return maskCards(text)
+  return noNul(maskCards(text))
     .replace(/[\w.+-]+@[\w-]+\.[\w.]+/g, '[ایمیل]')
     //  هر دو شکل: ۰۷xxxxxxxx افغانستان و ۰۹xxxxxxxxx ایران، با یا بی کدِ کشور
     .replace(/\b(?:\+?9[38][\s-]?)?0?7\d{8}\b/g, '[شماره]')
@@ -71,9 +74,9 @@ router.post(
           app,
           ctx?.accountKind || '',
           ctx?.accountId || '',
-          String(req.headers['x-device'] || req.body?.device_id || '').slice(0, 64),
-          String(req.headers['x-app-version'] || req.body?.app_version || '').slice(0, 32),
-          Number(req.body?.schema_version || 0) || 0,
+          noNul(req.headers['x-device'] || req.body?.device_id || '').slice(0, 64),
+          noNul(req.headers['x-app-version'] || req.body?.app_version || '').slice(0, 32),
+          schemaOf(req.body?.schema_version),
           scrub(req.body?.message, MAX_MESSAGE),
           scrub(req.body?.stack, MAX_STACK),
           scrub(req.body?.log_tail || req.body?.logTail, MAX_LOG),

@@ -856,6 +856,7 @@
 | کلید | scope | پیش‌فرض | چه را باز می‌کند | PR | وضعیت |
 |---|---|---|---|---|---|
 | `shop.orders` | دکان / `all` | خاموش | `/api/shop/orders/*` جز `/config` (خاموش ⇒ ۴۰۳ `orders_disabled`)؛ نوشتن کلیدِ اشتراکِ `online_orders` هم می‌خواهد؛ پایهٔ ویترین و تحویل | #227، #253 | main |
+| `shop.backup_contact_guard` | دکان / `all` | خاموش | ممیزیِ ۳۵ (B1، CRM-15): `GET /api/me/backups/:id` فقط برای کسی که `customers.contact` دارد (صاحب همیشه)؛ بقیه ۴۰۳ `permission_denied`. خاموش ⇒ هر نقش برمی‌دارد (جمع‌آور و انباردار تنظیم و عکس را از همین پشتیبان برمی‌گردانند — `CloudSettingsRestore`). روشن کردن با صاحب محصول | `claude/sec-audit-35` | باز |
 | `shop.orders.subscribers_only` | دکان / `all` | خاموش | سفارشِ تازهٔ مشتری فقط با اشتراکِ فعال (۴۰۳ `store_not_accepting_orders`)؛ ویترینِ آزمایشیِ باز (SUB-10) فقط‌خواندنی و بیرون از بازارچه؛ منقضی/بسته همان ۴۰۴ ِ SUB-10؛ سفارشِ پیشین جلو می‌رود. روشن کردن با صاحب محصول | — | باز |
 | `shop.storefront` | دکان / `all` | خاموش | `/api/store/:slug/*` (۴۰۴) و `/api/shop/storefront/*` (۴۰۳ جز `/config`)؛ با `shop.orders` و کلیدِ اشتراکِ `storefront` | #244 | main |
 | `shop.storefront.recent` | دکان / `all` | خاموش | کلیدِ `recent: true` در `GET /api/store/:slug` ⇒ ویترین `store/recent.js` را دیر بار می‌کند و «دیده‌شده‌های اخیر» را فقط روی دستگاه نگه می‌دارد (WEB-13، همزادِ `core/product/RecentlyViewed`)؛ خاموش ⇒ کلید نیست و recent.js بار نمی‌شود | `claude/new-web-2` | باز |
@@ -2933,6 +2934,11 @@ test/staff-code-desk.test.js  ۶ بند
   و ۹ روی PostgreSQL پیش از اصلاح سرخ بودند و روی PGlite سبز.
 - ⚠️ **کلیدِ امضا را خودسرانه عوض نکنید**: هر نصبِ امروز `key_mismatch`
   می‌گیرد. راهِ درست دو گام است (بخشِ «کلیدها» در سندِ ممیزی).
+- ⛔ (ممیزیِ ۳۵، `security-audit-35.test.js`) **بدنهٔ بزرگ فقط پس از سنجیدنِ دکان و نقش** خوانده می‌شود (`POST /api/me/backups`
+  ِ ۶۵MB)؛ **زمانِ آینده از دستگاه** پذیرفته نمی‌شود (`POST /api/events` و `/seen` ⇐ ساعتِ سرور)؛ **NUL** در مسیر ⇐ ۴۰۰
+  `bad_path` و در بدنه انداخته می‌شود (جز `sync`/`shop/sync`/`pump`)؛ ۵xx هرگز SQLSTATE یا کدِ درونی را بیرون نمی‌دهد؛
+  «هر کاربر یک دکان» زیرِ قفلِ `staff-join-user` ِ همان حساب است (روی PostgreSQL پیش از رفع هشت دکان)؛ `otp/request` سطلِ
+  IP ِ `otp-ip` (`RATE_OTP_IP_MAX`) دارد؛ پشتیبانِ کاملِ دکان با پرچمِ `shop.backup_contact_guard` فقط برای `customers.contact`.
 - آزمون: `test/security-hardening.test.js` (۱۳ بند).
 
 ## ⛔ لغو و تعلیقِ اشتراک در ماهِ اول واقعاً می‌بندد (از ۱۴۰۵/۰۷/۱۳)

@@ -431,7 +431,8 @@ async function list(f = {}) {
   else if (STATUSES.includes(f.status)) add('status = $?', f.status);
   if (SEVERITIES.includes(f.severity)) add('severity = $?', f.severity);
   if (RULES[f.rule]) add('rule = $?', f.rule);
-  if (Number(f.since) > 0) add('live_since > $?', Math.floor(Number(f.since)));
+  //  ممیزیِ ۳۵ (B7): عددِ بیرون از bigint ۵۰۰ می‌داد
+  if (Number(f.since) > 0) add('live_since > $?', Math.floor(Math.min(Number(f.since), Number.MAX_SAFE_INTEGER)));
   const sql = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const limit = Math.min(200, Math.max(1, Number(f.limit) || 50));
   const offset = Math.max(0, Math.min(100_000, Number(f.offset) || 0));

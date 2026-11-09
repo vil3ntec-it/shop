@@ -580,7 +580,7 @@ function destinationOf(body) {
     : { kind: 'phone', value: v.phone(raw, { required: true }) };
 }
 
-router.post('/otp/request', otpLimit, async (req, res, next) => {
+router.post('/otp/request', rateLimit({ max: config.rateLimit.otpIpMax, keyPrefix: 'otp-ip' }), otpLimit, async (req, res, next) => {   //  S18: IP پیش از مقصد
   const to = destinationOf(req.body);
   const out = await otp.request(to.value, { purpose: 'login', ip: clientIp(req), app: appOf(req) });
   res.json({ ok: true, [to.kind]: to.value, destination: to.value, ...out });

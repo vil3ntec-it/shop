@@ -97,7 +97,10 @@ router.get('/moves', needFlag, async (req, res) => {
 
 router.get('/report', needFlag, requirePermission('reports.view'), async (req, res) => {
   scope.requireAll(await scope.scopeOfReq(req));
-  res.json(await stock.reconcile(req.shopId, { productId: String(req.query.productId || '') }));
+  const productId = String(req.query.productId || '');
+  //  ممیزیِ ۳۵ (B4): NUL ⇒ ۵۰۰ ِ پایگاه‌داده
+  if (productId.includes('\u0000')) throw badRequest('شناسهٔ کالا معتبر نیست', 'bad_product_id');
+  res.json(await stock.reconcile(req.shopId, { productId }));
 });
 
 router.get('/tasks', needFlag, async (req, res) => {
