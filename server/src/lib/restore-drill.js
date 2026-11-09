@@ -168,7 +168,8 @@ async function restoreIsolated(file, { targetUrl = '', keep = false } = {}) {
   if (String(target.url) === String(base)) throw new Error('هدفِ تمرین همان دیتابیسِ زنده است — رد شد');
   if (own) await pgAdmin(target.admin, `CREATE DATABASE ${ident(target.name)}`);
   try {
-    await backup.restore(file, { databaseUrl: target.url });
+    //  F0-28: پاکت‌ها را خودِ `drill` می‌سنجد (هر دو راه‌انداز یکسان)، نه restore
+    await backup.restore(file, { databaseUrl: target.url, unseal: false });
   } catch (err) {
     if (own && !keep) await pgAdmin(target.admin, `DROP DATABASE IF EXISTS ${ident(target.name)}`).catch(() => {});
     throw err;
@@ -217,6 +218,9 @@ async function drill({ file, expected = null, migrate = false, targetUrl = '', k
       const after = await fingerprint(iso.q);
       migration = { applied, ...compare(got, after, { allowAdded: true }), digest: after.digest };
     }
+    //  F0-28: رازهای مهرشده — با BACKUP_SECRETS_KEY روی همین کپی باز می‌شوند و کلیدِ مجوز با meta سنجیده می‌شود؛ بی کلید
+    //  داده «برابر» می‌ماند و `secrets.ok=false` با پیامِ صاحبِ سامانه. plain ⇒ null و خروجیِ همان امروز (پس از اثرِ انگشت‌ها)
+    const secrets = await require('./backup-secrets').drillStep(iso, meta);
     //  پشتیبانی که هیچ جدولی برنمی‌گرداند هرگز «سالم» نیست، حتی اگر با manifest ِ خالی‌اش برابر باشد
     const empty = got.summary.tables === 0;
     const ok = !empty && (restore ? restore.equal : false) && (!migration || migration.equal);
@@ -242,6 +246,7 @@ async function drill({ file, expected = null, migrate = false, targetUrl = '', k
       digest: got.digest,
       restore,
       migration,
+      ...(secrets ? { secrets } : {}),
     };
   } finally {
     await iso.close();
@@ -292,6 +297,8 @@ async function record(r, { at = Date.now(), migrate = false } = {}) {
     migrationOk: r?.migration ? r.migration.equal === true : null,
     //  هدفِ D-24 اگر خودِ تمرین سنجیده باشد (`targets`/`withinTargets`)؛ وگرنه نامعلوم
     withinTargets: typeof r?.withinTargets === 'boolean' ? r.withinTargets : null,
+    //  F0-28: فقط نشان — 'unsealed' | 'sealed' (بی کلید) | 'rejected'؛ پشتیبانِ plain ⇒ null
+    ...(r?.secrets ? { secrets: r.secrets.ok ? 'unsealed' : r.secrets.missingKey ? 'sealed' : 'rejected' } : {}),
     error: r?.error ? errorKind(r.error) : null,
   };
   const file = logPath();

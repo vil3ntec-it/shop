@@ -54,6 +54,10 @@ services:
       BACKUP_ENABLED: ${BACKUP_ENABLED:-true}
       BACKUP_PATH: /app/data/backups
       BACKUP_PASSPHRASE: ${BACKUP_PASSPHRASE:-}
+      # F0-28: plain (پیش‌فرض) | seal — رازهای app_config در پشتیبان با این کلید مهر می‌شوند؛ کلید هرگز در دیتابیس یا پشتیبان نیست
+      BACKUP_SECRETS: ${BACKUP_SECRETS:-plain}
+      BACKUP_SECRETS_KEY: ${BACKUP_SECRETS_KEY:-}
+      BACKUP_SECRETS_KEY_FILE: ${BACKUP_SECRETS_KEY_FILE:-}
       # O-18: کلیدِ امضای مجوز (همان کلیدِ امروز؛ scripts/license-key.js). خالی ⇒ ردیفِ پایگاه‌داده؛ هیچ‌کدام ⇒ ۵۰۳، نه کلیدِ تازه
       LICENSE_PRIVATE_KEY: ${LICENSE_PRIVATE_KEY:-}
       LICENSE_PRIVATE_KEY_FILE: ${LICENSE_PRIVATE_KEY_FILE:-}

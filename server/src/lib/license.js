@@ -63,6 +63,10 @@ const SOURCE_FA = { env: 'LICENSE_PRIVATE_KEY', file: 'LICENSE_PRIVATE_KEY_FILE'
 //  ⛔ پیام‌ها هیچ چیزی از خودِ کلید یا خطای خامِ رمز ندارند
 const missing = () => new ApiError(503, 'license_key_missing',
   'کلیدِ امضای مجوز روی سرور تنظیم نیست؛ مدیرِ سرور باید همان کلیدِ پیشین را در LICENSE_PRIVATE_KEY بگذارد');
+/** F0-28: کلید با پشتیبانِ مهرشده برگشته و هنوز مهر است — همان کدِ ۵۰۳، با آنچه صاحبِ سامانه باید بگذارد */
+const sealedKey = () => new ApiError(503, 'license_key_missing',
+  'کلیدِ امضای مجوز از پشتیبانِ مهرشده برگشته و هنوز مهر است؛ مدیرِ سرور همان BACKUP_SECRETS_KEY ِ هنگامِ پشتیبان را بگذارد و سرور را دوباره روشن کند (یا همان کلیدِ پیشین را در LICENSE_PRIVATE_KEY). کلیدِ تازه ساخته نمی‌شود');
+const SEALED_PRIVATE = `sealed:${KEY_PRIVATE}`;
 const invalid = (source) => new ApiError(503, 'license_key_invalid',
   `کلیدِ امضای مجوز (${SOURCE_FA[source]}) خوانده نشد یا ES256 (P-256) نیست`);
 
@@ -102,6 +106,8 @@ async function load({ generate }) {
     const publicSpki = (await plans.getConfig(KEY_PUBLIC, '')) || spkiOf(privateKey);
     return { privateKey, publicSpki, source: 'db' };
   }
+  //  ⛔ F0-28: کلیدِ پیشین مهرشده این‌جاست ⇒ هرگز کلیدِ تازه کنارش (حتی development/test)؛ باز شدنش همان کلید را برمی‌گرداند
+  if (await plans.getConfig(SEALED_PRIVATE, '')) throw sealedKey();
   if (!generate) throw missing();
 
   const pem = newPem();
@@ -191,6 +197,8 @@ async function traces() {
   if (priv) out.push({ source: 'db', kid: kidOfPem(priv) });
   const pub = await plans.getConfig(KEY_PUBLIC, '');
   if (pub) out.push({ source: 'db-public', kid: kidOf(pub) });
+  //  F0-28: کلیدِ مهرشدهٔ پشتیبان هم ردِ کلیدِ پیشین است (kid اش فقط با باز شدن معلوم می‌شود)
+  if (await plans.getConfig(SEALED_PRIVATE, '')) out.push({ source: 'db-sealed', kid: '' });
   return out;
 }
 
