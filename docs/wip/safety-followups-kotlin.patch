@@ -1,0 +1,2281 @@
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrPos.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrPos.kt
+index 4b80d3a58..58b21a57d 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrPos.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrPos.kt
+@@ -157,6 +157,29 @@ object StrPos {
+     "Only someone allowed to cancel invoices can discard someone else's held invoice",
+     "د بل چا ساتل شوی بل یوازې هغه څوک لرې کولی شي چې د بل د لغوه کولو اجازه لري",
+   )
++  //  S09 «در دستِ دستگاهِ X» (پشتیبانِ سرورِ نگه‌داشته‌ها، پرچمِ خاموشِ `shop.held_sync`) — سریِ سند همان «A1» ِ روی فاکتور
++  fun heldClaimedBy(d: Any): String = t("در دستِ دستگاهِ ${asIs(d)}", "In use on device $d", "د $d وسیلې په لاس کې")
++  val heldClaimedElsewhere: String get() = t("در دستِ دستگاهی دیگر", "In use on another device", "د بلې وسیلې په لاس کې")
++  fun heldOpenedOn(d: Any): String = t("پیش‌تر در دستگاهِ ${asIs(d)} باز شد", "Already opened on device $d", "مخکې په $d وسیله کې پرانیستل شو")
++  val heldOpenedElsewhere: String get() = t("پیش‌تر در دستگاهی دیگر باز شد", "Already opened on another device", "مخکې په بله وسیله کې پرانیستل شو")
++  val heldTakeWarn: String get() = t(
++    "همین فاکتور در دستگاهی دیگر هم باز شده است. اگر این‌جا هم باز و ثبت شود، دو فروش می‌شود. فقط اگر مطمئنید آن‌جا ثبت نمی‌شود، این‌جا باز کنید.",
++    "This invoice was also opened on another device. If it is opened and recorded here too, it becomes two sales. Open it here only if you are sure it won't be recorded there.",
++    "همدا بل په بله وسیله کې هم پرانیستل شوی. که دلته هم پرانیستل او ثبت شي، دوه پلور کېږي. یوازې هغه وخت یې دلته پرانیزئ چې ډاډه یاست هلته نه ثبتېږي.",
++  )
++  val heldTakeOver: String get() = t("باز کردن در این دستگاه", "Open on this device", "په دې وسیله کې پرانیستل")
++  val heldTwiceTitle: String get() = t("یک فاکتور در دو دستگاه", "One invoice on two devices", "یو بل په دوو وسیلو کې")
++  fun heldTwice(name: Any, d: Any): String = t(
++    "فاکتورِ «${asIs(name)}» هم این‌جا و هم در دستگاهِ ${asIs(d)} باز شد. اگر در هر دو ثبت شده، یکی را برگردانید.",
++    "Invoice “$name” was opened both here and on device $d. If it was recorded on both, return one of them.",
++    "«$name» بل هم دلته او هم په $d وسیله کې پرانیستل شو. که په دواړو کې ثبت شوی، یو یې بېرته کړئ.",
++  )
++  fun heldTwiceElsewhere(name: Any): String = t(
++    "فاکتورِ «${asIs(name)}» هم این‌جا و هم در دستگاهی دیگر باز شد. اگر در هر دو ثبت شده، یکی را برگردانید.",
++    "Invoice “$name” was opened both here and on another device. If it was recorded on both, return one of them.",
++    "«$name» بل هم دلته او هم په بله وسیله کې پرانیستل شو. که په دواړو کې ثبت شوی، یو یې بېرته کړئ.",
++  )
++  val heldSeen: String get() = t("دیدم", "Got it", "ومې لید")
+   val heldAutoCleanLocked: String get() = t("فقط کسی که اجازهٔ لغوِ فاکتور دارد این را عوض می‌کند", "Only someone allowed to cancel invoices can change this", "یوازې هغه څوک چې د بل د لغوه کولو اجازه لري دا بدلولی شي")
+   fun heldAutoCleared(n: Any, h: Any): String = t("${asIs(n)} فاکتورِ نگه‌داشتهٔ کهنه‌تر از ${asIs(h)} ساعت خودکار پاک شد", "$n held invoices older than $h hours were cleared automatically", "$n ساتل شوي بلونه له $h ساعتونو زاړه پخپله پاک شول")
+   val clearIt: String get() = t("پاک کن", "Clear", "پاک یې کړئ")
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupBundle.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupBundle.kt
+index ccee94bc2..5f4be88b3 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupBundle.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupBundle.kt
+@@ -89,6 +89,14 @@ object BackupBundle {
+         zip.closeEntry()
+       }
+ 
++      //  DATA-SAFETY §۸: فاکتورهای نگه‌داشته و سبدِ جاری (`DeviceDocsBundle.held`) — بی آن‌ها هیچ قلمی، پشتیبان همان پیشین
++      runCatching {
++        val held = DeviceDocsBundle.held(context) ?: return@runCatching
++        zip.putNextEntry(ZipEntry(DeviceDocsBundle.HELD_ENTRY))
++        zip.write(held.toByteArray(Charsets.UTF_8))
++        zip.closeEntry()
++      }
++
+       photoDir(context).listFiles().orEmpty()
+         .filter { it.isFile && it.name.endsWith(".jpg") }
+         .forEach { photo ->
+@@ -174,6 +182,10 @@ object BackupBundle {
+             !entry.isDirectory && name == DeviceDocsBundle.QUOTES_ENTRY ->
+               DeviceDocsBundle.stageFrom(context, zip)
+ 
++            //  DATA-SAFETY §۸: نگه‌داشته‌ها و سبدِ جاری — تا تأیید و نشستنِ دفتر کنار (`DeviceDocsBundle.commitHeld`)
++            !entry.isDirectory && name == DeviceDocsBundle.HELD_ENTRY ->
++              DeviceDocsBundle.stageHeldFrom(context, zip)
++
+             !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
+               /*
+                *  فقط نامِ خودِ فایل برداشته می‌شود، نه مسیرِ داخلِ ZIP.
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupRestoreAndroid.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupRestoreAndroid.kt
+index cc5d5a719..9c529236d 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupRestoreAndroid.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/BackupRestoreAndroid.kt
+@@ -24,7 +24,8 @@ import java.io.OutputStream
+  *     قالبِ تازه‌تر ⇒ «به‌روز کنید»؛ پشتیبانِ دکانِ دیگر (`BackupStamp.judge` با صاحبِ دفترِ روی میز، همان قاعدهٔ
+  *     `LedgerOwner`) ⇒ رد. هیچ‌کدام دفتر، عکس یا تنظیمی را نمی‌نویسد؛ پوشهٔ موقت پاک می‌شود.
+  *   • [confirm] پس از تأیید: نسخهٔ ایمنی ⇐ دفتر (`ShopStore.restoreBackup`، راه از `RestoreRoute`: هرگز op
+- *     نمی‌سازد، صف دست نمی‌خورد) ⇐ **فقط اگر نشست** عکس‌ها و تنظیماتِ کنار گذاشته. پیش از این عکس‌ها و تنظیمات
++ *     نمی‌سازد، صف دست نمی‌خورد) ⇐ **فقط اگر نشست** عکس‌ها، تنظیماتِ کنار گذاشته و فاکتورهای نگه‌داشته
++ *     (`DeviceDocsBundle.commitHeld`). پیش از این عکس‌ها و تنظیمات
+  *     **پیش از** دفتر می‌نشستند: بازیابیِ ردشده («اول وارد شوید»، «اول همگام کنید»، صفِ نرفته) عکسِ تازه‌ترِ کالا
+  *     را با عکسِ کهنهٔ پشتیبان رونویسی می‌کرد.
+  *   • [openSnapshot]: نسخهٔ خودکار، ساده، رمزدار با کلیدِ دستگاه، یا رمزدار با عبارت (`SnapshotSeal`)؛ پوشهٔ
+@@ -103,6 +104,8 @@ object BackupRestore {
+       return Confirmed(false, 0, r.message)
+     }
+     val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
++    //  DATA-SAFETY §۸: نگه‌داشته‌ها و سبدِ جاری — فقط پس از نشستنِ دفتر (بالا) و با همان دفتر (فروخته‌ها نه)
++    withContext(Dispatchers.IO) { DeviceDocsBundle.commitHeld(context, store.data.value) }
+     return Confirmed(true, moved, r.message)
+   }
+ }
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/CloudSettingsRestore.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/CloudSettingsRestore.kt
+index a1f3e46b2..0c627645a 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/CloudSettingsRestore.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/CloudSettingsRestore.kt
+@@ -9,8 +9,8 @@ import ir.vil3ntec.tohid.data.repo.Backend
+  *  پس از ورود و گرفتنِ دفتر از سرور: تنظیماتِ دکان (`tohid-policy`، `tohid-receipt`، `tohid-modules` — `ShopSettingsBundle`)
+  *  و عکس‌های کالا از **تازه‌ترین پشتیبانِ ابریِ** همین حساب برمی‌گردند — یک بار برای هر حساب@دکان روی این دستگاه.
+  *
+- *  ⛔ فقط آنچه این دستگاه هنوز ندارد: کلیدِ تنظیم (`ShopSettingsBundle.apply(onlyMissing = true)` از راهِ `commitPhotos`) و
+- *  عکسِ نبوده (`commitPhotos(onlyMissing = true)`). دفترِ درونِ پشتیبان **نشانده نمی‌شود** — دفتر از سرور آمده و تازه‌تر است.
++ *  ⛔ فقط آنچه این دستگاه هنوز ندارد: کلیدِ تنظیم (`ShopSettingsBundle.apply(onlyMissing = true)` از راهِ `commitPhotos`)،
++ *  عکسِ نبوده (`commitPhotos(onlyMissing = true)`) و نگه‌داشته‌ها فقط روی دستگاهِ بی فاکتورِ باز (`DeviceDocsBundle.commitHeld`). دفترِ درونِ پشتیبان **نشانده نمی‌شود** — دفتر از سرور آمده و تازه‌تر است.
+  *  نبودِ پشتیبان، شبکه یا فایلِ ناخوانا ⇒ هیچ کاری (بارِ بعد دوباره، جز «پشتیبانی نیست» که یک بار بس است).
+  */
+ object CloudSettingsRestore {
+@@ -33,6 +33,8 @@ object CloudSettingsRestore {
+       return 0
+     }
+     val photos = BackupBundle.commitPhotos(app, onlyMissing = true)
++    //  DATA-SAFETY §۸: نگه‌داشته‌ها و سبدِ جاری — فقط روی دستگاهِ بی فاکتورِ باز، همان دکان، نه آن‌که در دفترِ سرور فروش رفته
++    DeviceDocsBundle.commitHeld(app, store.data.value)
+     prefs.edit().putBoolean(mark, true).apply()
+     return photos
+   }
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/DeviceDocsBundleAndroid.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/DeviceDocsBundleAndroid.kt
+index 3f6d19d69..b9046808b 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/DeviceDocsBundleAndroid.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/DeviceDocsBundleAndroid.kt
+@@ -16,17 +16,24 @@ import java.io.InputStream
+  *
+  *  ⛔ بازیابی فقط وقتی این دستگاه **هیچ** پیش‌فاکتوری ندارد (`QuoteStore.update`، زیرِ همان قفل و با `DiskWrite`):
+  *     پیش‌فاکتورِ موجود هرگز رونویسی یا با شماره‌های پشتیبان قاطی نمی‌شود. پروندهٔ ناخوانا هیچ اثری ندارد.
+- *  ⛔ فاکتورِ نگه‌داشته (`held-invoices.json`) عمداً نه: سبدِ نیمه‌کارهٔ همان روز است (حداکثر ۹، کهنه پس از ۲۴ ساعت)
+- *     و `HeldInvoices` آن را یک بار در حافظه می‌خواند — نشاندنِ پرونده زیرِ پایش با نخستین نگه‌داشتنِ بعدی پاک می‌شد.
++ *
++ *  ── فاکتورهای نگه‌داشته و سبدِ جاری (`device/held-invoices.json`، `HeldBackup`) ─────────────────────
++ *  با پرچمِ خاموشِ `shop.held_sync` (پیش‌فرض) در هیچ پشتیبانی نبودند. همان راه: کنار تا تأییدِ بازیابی، و فقط **پس از نشستنِ
++ *  دفتر** ([commitHeld] از `BackupRestore.confirm` و `CloudSettingsRestore`، هرگز از `commitPhotos`) — دفترِ ردشده هیچ
++ *  نگه‌داشته‌ای نمی‌نشاند. نشاندن از درِ خودِ دفترِ زنده (`HeldInvoiceStore.absorb`، زیرِ همان قفل و حافظه)، نه نوشتنِ پرونده
++ *  زیرِ پایش (نخستین نگه‌داشتنِ بعدی پاکش می‌کرد). قاعده‌ها (همان دکان، دستگاهِ بی فاکتورِ باز، نه فروخته): `HeldBackupRules`.
++ *  ⛔ پرچمِ `shop.held_sync` روشن روی این دستگاه ⇒ نگه‌داشته‌ها از سرور می‌آیند (S09)، نه از پشتیبانِ کهنه. آموزش هرگز.
+  */
+ object DeviceDocsBundle {
+ 
+   const val QUOTES_ENTRY = "device/quotes.json"
++  const val HELD_ENTRY = "device/held-invoices.json"
+ 
+   /** بیش از این، پروندهٔ پیش‌فاکتور نیست */
+   const val MAX_BYTES = 2 * 1024 * 1024
+ 
+   private fun staged(context: Context): File = File(context.cacheDir, "restore-quotes.json")
++  private fun stagedHeld(context: Context): File = File(context.cacheDir, "restore-held.json")
+ 
+   /** `BackupBundle.write`: پیش‌فاکتورهای خوانا و ناتهی ⇒ متنِ همان پرونده؛ هیچ ⇒ null */
+   fun quotes(context: Context): String? {
+@@ -35,7 +42,12 @@ object DeviceDocsBundle {
+   }
+ 
+   /** `BackupBundle.read`: تا تأییدِ بازیابی کنار می‌ماند (همان قاعدهٔ عکس‌ها و تنظیمات) */
+-  fun stageFrom(context: Context, input: InputStream) {
++  fun stageFrom(context: Context, input: InputStream) = stage(input, staged(context))
++
++  /** `BackupBundle.read`: نگه‌داشته‌ها و سبدِ جاری — تا تأییدِ بازیابی و نشستنِ دفتر کنار */
++  fun stageHeldFrom(context: Context, input: InputStream) = stage(input, stagedHeld(context))
++
++  private fun stage(input: InputStream, to: File) {
+     val out = ByteArrayOutputStream()
+     val buf = ByteArray(8 * 1024)
+     while (out.size() <= MAX_BYTES) {
+@@ -44,10 +56,52 @@ object DeviceDocsBundle {
+       out.write(buf, 0, n)
+     }
+     if (out.size() > MAX_BYTES) return
+-    runCatching { staged(context).writeText(out.toString(Charsets.UTF_8.name())) }
++    runCatching { to.writeText(out.toString(Charsets.UTF_8.name())) }
++  }
++
++  fun dropStaged(context: Context) {
++    runCatching { staged(context).delete() }
++    runCatching { stagedHeld(context).delete() }
+   }
+ 
+-  fun dropStaged(context: Context) { runCatching { staged(context).delete() } }
++  /** `BackupBundle.write`: نگه‌داشته‌ها و سبدِ جاریِ همین حساب روی این دستگاه؛ هیچ (یا آموزش) ⇒ null */
++  fun held(context: Context): String? {
++    if (TrainingMode.on) return null
++    val dir = context.applicationContext?.filesDir ?: context.filesDir
++    fun text(name: String): String? = runCatching { File(dir, name).takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull()
++    //  پرونده همان حافظه است: `HeldInvoiceStore` پیش از نشاندن در حافظه می‌نویسد، `CartStore` همیشه آخرین حالت را
++    val book = HeldInvoiceCodec.decode(text(HeldInvoiceStore.FILE)) ?: return null
++    val cart = SaleDraftCodec.decode(text(CartStore.FILE))
++    val b = HeldBackupRules.of(
++      book, cart, runCatching { ir.vil3ntec.tohid.sync.DocSeries.current(context) }.getOrDefault(""),
++      LedgerOwner.currentUser(context), LedgerOwner.currentShop(context), System.currentTimeMillis(),
++    ) ?: return null
++    return HeldBackupRules.encode(b)
++  }
++
++  /**
++   *  پس از نشستنِ دفتر ([d] = دفترِ روی میز) — @return چند فاکتورِ نگه‌داشته نشست. هر شکستی ⇒ ۰ و هیچ تغییری.
++   */
++  suspend fun commitHeld(context: Context, d: ShopData): Int {
++    val f = stagedHeld(context)
++    if (!f.isFile) return 0
++    val backup = HeldBackupRules.decode(runCatching { f.readText(Charsets.UTF_8) }.getOrNull())
++    runCatching { f.delete() }
++    if (backup == null || TrainingMode.on || HeldSync.claims(context)) return 0
++    val dir = context.applicationContext?.filesDir ?: context.filesDir
++    //  سبدِ همین حالا: صندوقِ باز (حافظه) یا پیش‌نویسِ روی دیسک
++    val live = runCatching { HeldSync.cart?.snapshot() }.getOrNull()?.takeIf { it.lines.isNotEmpty() }
++      ?: SaleDraftCodec.decode(runCatching { File(dir, CartStore.FILE).takeIf { it.isFile }?.readText(Charsets.UTF_8) }.getOrNull())
++    val user = LedgerOwner.currentUser(context)
++    val shop = LedgerOwner.currentShop(context)
++    var added = 0
++    val ok = HeldInvoices.of(context).absorb { mine ->
++      val next = HeldBackupRules.restore(mine, backup, user, shop, live, d) ?: return@absorb mine
++      added = next.items.size - mine.items.size
++      next
++    }
++    return if (ok) added else 0
++  }
+ 
+   /** پس از تأییدِ بازیابی (`BackupBundle.commitPhotos`) — @return چند پیش‌فاکتور نشست */
+   fun commit(context: Context): Int {
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoiceFile.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoiceFile.kt
+index bafca821f..2eb8125cf 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoiceFile.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoiceFile.kt
+@@ -41,4 +41,7 @@ object HeldInvoices {
+ 
+   /** خروج از آموزش (`TrainingLedger.exit`): ورودِ بعدی پرونده را از نو می‌خواند (شاید پاک شده باشد) */
+   fun forgetTraining() { training = null }
++
++  /** آزمون (`BackupRestoreDrillTest`): «برنامه از نو باز شد» — نمونهٔ بعدی پرونده را از نو می‌خواند */
++  internal fun reset() { store = null; training = null }
+ }
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoices.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoices.kt
+index 0f883fa20..27eb58a17 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoices.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldInvoices.kt
+@@ -42,8 +42,8 @@ import java.io.IOException
+  *  ── پشتیبانِ سرور (S09) ──────────────────────────────────────────────
+  *  پشتِ پرچمِ خاموشِ `shop.held_sync` هر تغییرِ دفتر به سرور می‌رود و دستگاهِ
+  *  تازه یا دیگرِ دکان همه را پس می‌گیرد (`HeldSync`، `onChange`، `absorb`).
+- *  خاموش ⇒ همین دستگاه، بایت‌به‌بایت همان پیشین. قفلِ «در دستِ دستگاهِ ۲» نیست:
+- *  بازگرداندن نگه‌داشته را از سرور برمی‌دارد و دستگاه‌های دیگر با دورِ بعد می‌بینند.
++ *  خاموش ⇒ همین دستگاه، بایت‌به‌بایت همان پیشین. روشن ⇒ بازگرداندن پیش از آن از سرور می‌پرسد («در دستِ دستگاهِ X»،
++ *  ادعای نرم با تأییدِ صریح برای گرفتن؛ `HeldSyncEngine.claim`) و دستگاه‌های دیگر با دورِ بعد می‌بینند.
+  */
+ @Serializable
+ data class HeldInvoice(
+@@ -317,6 +317,83 @@ object HeldRules {
+   }
+ }
+ 
++/**
++ *  DATA-SAFETY §۸ — فاکتورهای نگه‌داشته و سبدِ جاری در پشتیبانِ کامل (`DeviceDocsBundle`، قلمِ `device/held-invoices.json`).
++ *
++ *  با پرچمِ خاموشِ `shop.held_sync` (پیش‌فرض) نگه‌داشته‌ها و سبدِ نیمه‌کاره فقط در `held-invoices.json` و `sale-draft.json`
++ *  ِ همین دستگاه بودند: نصبِ دوباره پس از پشتیبانِ دستی، یا بازیابیِ پشتیبانِ کامل، همه را می‌برد. حالا با همان پشتیبان
++ *  می‌روند و برمی‌گردند — **همه به‌شکلِ نگه‌داشته**: سبدِ جاریِ پشتیبان هرگز روی سبدِ این دستگاه نمی‌نشیند (`CartStore`
++ *  در حافظه است و نوشتنِ بعدی‌اش آن را می‌برد) و کاربر خودش بازش می‌کند.
++ *
++ *  ⛔ قاعدهٔ امن‌تر (نه آمیختن با شناسه): فقط روی دستگاهی که **خودش هیچ فاکتورِ بازی ندارد** — نه نگه‌داشته، نه سبدِ پُرِ
++ *     دیگری (سبدِ همان کلید هست ⇒ همان بماند، بقیه بیایند). بی سنگِ قبرِ محلی، آمیختن نگه‌داشتهٔ برگشته یا دور انداخته را
++ *     زنده می‌کرد و نسخهٔ کهنهٔ هم‌کلیدِ سبد دو فاکتورِ یکسان می‌ساخت. همان قاعدهٔ پیش‌فاکتورها.
++ *  ⛔ فقط در همان دکان: صاحبِ دفتر هنگامِ پشتیبان (`LedgerOwner`) با صاحبِ دفترِ روی میز هنگامِ بازیابی یکی (دفترِ بی‌دکان ⇒
++ *     همان کاربر). نگه‌داشتهٔ ماندهٔ حسابِ دیگرِ همین دستگاه (سریِ سندِ دیگر) هرگز در پشتیبان نمی‌رود.
++ *  ⛔ آن‌که در دفترِ بازیابی‌شده فروش رفته (`SaleDraftRules.posted`) هرگز دوباره پیشنهاد نمی‌شود.
++ *  ⛔ شماره‌ها همان، مگر گرفته باشند؛ حداکثر `MAX_OPEN` (همان «نگه‌داشته‌ها + سبد» ِ پشتیبان).
++ */
++@Serializable
++data class HeldBackup(
++  val v: Int = 1,
++  /** صاحبِ دفترِ روی میز هنگامِ پشتیبان (`LedgerOwner`) */
++  val user: String = "",
++  val shop: String = "",
++  val items: List<HeldInvoice> = emptyList(),
++  /** سبدِ جاری (`sale-draft.json`) با شماره و نامِ برگه‌اش — با بازیابی نگه‌داشته می‌شود */
++  val cart: HeldInvoice? = null,
++)
++
++object HeldBackupRules {
++  private val json = Json { ignoreUnknownKeys = true; isLenient = true; encodeDefaults = true }
++  fun encode(b: HeldBackup): String = json.encodeToString(b)
++  /** خراب یا بیگانه ⇒ `null` (هیچ اثری) */
++  fun decode(raw: String?): HeldBackup? =
++    raw?.takeIf { it.isNotBlank() }?.let { runCatching { json.decodeFromString(HeldBackup.serializer(), it) }.getOrNull() }
++
++  /** پشتیبان: نگه‌داشته‌های همین حساب (سریِ همین دستگاه یا بی سری) و سبدِ جاری (سبد می‌بَرد، همان `reconcile`)؛ هیچ ⇒ `null` */
++  fun of(book: HeldBook, cart: SaleDraft?, series: String, user: String, shop: String, now: Long): HeldBackup? {
++    val open = cart?.takeIf { it.key != null && it.lines.isNotEmpty() }
++    val items = book.items.filter { it.lines.isNotEmpty() && it.id != open?.key && (it.device.isBlank() || it.device == series) }
++    val parked = open?.let { d ->
++      val tag = book.current?.takeIf { it.id == d.key }
++      HeldInvoice(
++        id = d.key!!, number = tag?.number ?: 0, label = tag?.label.orEmpty(), lines = d.lines, debtorId = d.debtorId,
++        note = tag?.note.orEmpty(), heldAt = d.savedAt.takeIf { it > 0 } ?: now, device = series, coupons = d.coupons,
++        saleNote = d.note, priceList = d.priceList,
++      )
++    }
++    if (items.isEmpty() && parked == null) return null
++    return HeldBackup(user = user, shop = shop, items = items, cart = parked)
++  }
++
++  /**
++   *  بازیابی، پس از نشستنِ دفتر ([d] = دفترِ روی میز). @param live سبدِ همین حالای این دستگاه
++   *  @return دفترِ نگه‌داشته‌های تازه، یا `null` = هیچ تغییری (قاعده‌ها سرِ [HeldBackup])
++   */
++  fun restore(mine: HeldBook, backup: HeldBackup, user: String, shop: String, live: SaleDraft?, d: ShopData): HeldBook? {
++    if (backup.shop != shop || (shop.isBlank() && backup.user != user)) return null
++    if (mine.items.isNotEmpty()) return null
++    val liveKey = live?.takeIf { it.lines.isNotEmpty() }?.let { it.key ?: "" }
++    if (liveKey != null && liveKey != backup.cart?.id) return null
++    val seen = HashSet<String>()
++    val wanted = (backup.items + listOfNotNull(backup.cart))
++      .filter { it.lines.isNotEmpty() && it.id.isNotBlank() && it.id != liveKey && !SaleDraftRules.posted(d, it.id) && seen.add(it.id) }
++    if (wanted.isEmpty()) return null
++    val cap = if (liveKey != null) HeldRules.MAX_OPEN - 1 else HeldRules.MAX_OPEN
++    val used = HashSet<Int>().apply { if (liveKey != null) mine.current?.takeIf { it.id == liveKey }?.let { add(it.number) } }
++    val out = ArrayList<HeldInvoice>()
++    //  شماره‌ای که روی برگه دیده می‌شد همان می‌ماند؛ بی شماره یا گرفته ⇒ کوچک‌ترین آزاد
++    for (h in wanted.sortedBy { if (it.number in 1..HeldRules.MAX_OPEN) it.number else Int.MAX_VALUE }) {
++      if (out.size >= cap) break
++      val n = h.number.takeIf { it in 1..HeldRules.MAX_OPEN && it !in used } ?: (1..HeldRules.MAX_OPEN).firstOrNull { it !in used } ?: break
++      used += n
++      out += h.copy(number = n)
++    }
++    return mine.copy(items = out.sortedBy { it.number })
++  }
++}
++
+ /** فایلِ دفترِ نگه‌داشته‌ها. `write` باید پس از بازگشت روی دیسک باشد و شکست را پرتاب کند. */
+ interface HeldDisk {
+   fun read(): String?
+@@ -559,6 +636,19 @@ class HeldInvoiceStore(
+     next == _book.value || commit(next)
+   }
+ 
++  /**
++   *  S09 «در دستِ دستگاهِ X» — همان نگه‌داشته با شناسهٔ تازه ([next] = کلیدِ تازهٔ فروش؛ شماره، نام و ردیف‌ها همان)، زیرِ
++   *  همین قفل و بی [onChange] (`HeldSyncEngine` صفِ خودش را می‌سازد). نبود یا نوشتنِ ناموفق ⇒ `false` و دفتر همان.
++   */
++  suspend fun rekey(id: String, next: String): Boolean {
++    if (id == next) return false
++    val ok = absorb { b ->
++      if (b.items.none { it.id == id } || b.items.any { it.id == next } || b.current?.id == next) b
++      else b.copy(items = b.items.map { if (it.id == id) it.copy(id = next) else it })
++    }
++    return ok && _book.value.items.any { it.id == next }
++  }
++
+   companion object {
+     const val FILE = "held-invoices.json"
+     val BUSY: String get() = StrLedger.saleBusy
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSync.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSync.kt
+index bbf302efa..4f1d9ad88 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSync.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSync.kt
+@@ -2,6 +2,8 @@ package ir.vil3ntec.tohid.data
+ 
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
++import kotlinx.serialization.EncodeDefault
++import kotlinx.serialization.ExperimentalSerializationApi
+ import kotlinx.serialization.Serializable
+ import kotlinx.serialization.json.Json
+ import kotlinx.serialization.json.JsonArray
+@@ -28,6 +30,15 @@ import kotlinx.serialization.json.longOrNull
+  *     سرِ جایش؛ نگه‌داشتهٔ سرور که جا نشد (`MAX_OPEN`) روی سرور می‌ماند و دورِ بعد از نو خوانده می‌شود.
+  *  ⛔ فقط نگه‌داشته‌هایی که همین دستگاه زیرِ همین حساب ساخت (سریِ سند) خودبه‌خود فرستاده می‌شوند — نگه‌داشتهٔ ماندهٔ
+  *     حسابِ دیگر هرگز به دکانِ دیگری نمی‌رود.
++ *
++ *  ── «در دستِ دستگاهِ X» (ادعای نرم، همان پرچم) ──────────────────────────────────────────────────────
++ *  پیش از بازگرداندن [HeldSyncEngine.claim] از سرور می‌پرسد (`DELETE …&claim=1&base=<نسخهٔ دیده‌شده>`، شرح: سرِ
++ *  `server/src/lib/shop-held-sync.js`): داد ⇒ همان بازگرداندن؛ در دستِ دستگاهِ دیگر ⇒ [HeldClaim.Held] تا صفحه تأییدِ صریح
++ *  بگیرد («در دستِ دستگاهِ A1»)؛ با تأیید (`force`) یا بی شبکه (نگه‌داشته‌ای که سرور می‌شناخت) ⇒ [HeldClaim.Rekey]: همان
++ *  نگه‌داشته با **کلیدِ تازهٔ فروش** باز می‌شود، تا اگر دستگاهِ دیگر هم فروخت دو فروشِ جدا باشند و Sync v1 دو فروشِ یک شناسه
++ *  را بی‌صدا در یک ردیف نیامیزد (ردیف‌های هر دو زیرِ یک فروش، جمعِ یکی). بازگرداندنِ بی شبکه در صف با `base` می‌رود؛ سرور
++ *  اگر دیگری پیش‌تر برش گرداند/فروخت/عوضش کرد ⇒ `held_conflict` ⇒ [HeldConflict] تا کاربر ببیند («یک فاکتور در دو دستگاه»)؛
++ *  دستگاهی که فاکتورِ صندوقش را دیگری با تأیید گرفت هم با دورِ بعد همان را می‌بیند. هیچ‌گاه «دو فروشِ یک نگه‌داشته» بی دیدنِ کاربر.
+  */
+ enum class HeldChange(val reason: String) {
+   HOLD(""), PARK(""), RENAME(""),
+@@ -36,7 +47,22 @@ enum class HeldChange(val reason: String) {
+   DISCARD("deleted"), STALE("deleted"),
+ }
+ 
++/** «در دستِ دستگاهِ X» — پاسخِ پرسشِ پیش از بازگرداندن ([HeldSyncEngine.claim]) */
++sealed interface HeldClaim {
++  /** همان بازگرداندنِ پیشین: پرچم خاموش، نگه‌داشتهٔ فقط-همین-دستگاه، یا سرور به همین دستگاه داد */
++  data object Free : HeldClaim
++  /** همان نگه‌داشته با شناسهٔ تازه ([id] = کلیدِ تازهٔ فروش) باز شود: بی شبکه، یا گرفته از دستِ دستگاهِ دیگر با تأیید */
++  data class Rekey(val id: String) : HeldClaim
++  /** در دستِ دستگاهِ دیگر ([series] سریِ سندِ آن، خالی = نامعلوم)؛ [fresh] = همین حالا باز است. تأییدِ صریح ⇒ `force` */
++  data class Held(val series: String, val reason: String, val fresh: Boolean) : HeldClaim
++}
++
++/** «یک فاکتور در دو دستگاه» — تا کاربر ببیند می‌ماند ([HeldSyncState.conflicts]، [HeldSyncEngine.ack]) */
++@Serializable
++data class HeldConflict(val title: String = "", val series: String = "", val reason: String = "", val at: Long = 0)
++
+ /** وضعِ همگام‌سازیِ نگه‌داشته‌های یک دکان روی این دستگاه — فقط وقتی پرچم روشن است نوشته می‌شود */
++@OptIn(ExperimentalSerializationApi::class)
+ @Serializable
+ data class HeldSyncState(
+   val on: Boolean = false,
+@@ -51,16 +77,32 @@ data class HeldSyncState(
+   val cancel: Boolean = false,
+   /** نگه‌داشته‌ای از سرور جا نشد (`MAX_OPEN`) ⇒ دورِ بعد زنده‌ها از نو خوانده می‌شوند (روی سرور می‌ماند، گم نمی‌شود) */
+   val refill: Boolean = false,
++  /** «یک فاکتور در دو دستگاه»ِ دیده‌نشده (شناسهٔ نگه‌داشته ⇒ شرح)؛ نبود ⇒ نوشته نمی‌شود (وضعِ پیشین بایت‌به‌بایت همان) */
++  @EncodeDefault(EncodeDefault.Mode.NEVER)
++  val conflicts: Map<String, HeldConflict> = emptyMap(),
+ ) {
++  /** [base] و [title] فقط برای بازگرداندن (نسخه‌ای که دیده بود؛ نامِ برگه برای پیامِ «دوتایی»)؛ ۰/خالی نوشته نمی‌شوند */
++  @OptIn(ExperimentalSerializationApi::class)
+   @Serializable
+-  data class Op(val del: Boolean, val v: Long, val why: String = "")
++  data class Op(
++    val del: Boolean,
++    val v: Long,
++    val why: String = "",
++    @EncodeDefault(EncodeDefault.Mode.NEVER) val base: Long = 0,
++    @EncodeDefault(EncodeDefault.Mode.NEVER) val title: String = "",
++  )
+ }
+ 
+ /** قواعدِ خالص — بی شبکه و بی فایل */
+ object HeldSyncPlan {
+ 
+-  /** ردیفِ سرور: `body = null` ⇒ سنگِ قبر (برگشت، فروش یا دور انداخته شد) */
+-  data class Remote(val id: String, val version: Long, val body: HeldInvoice?, val mine: Boolean = true)
++  /**
++   *  ردیفِ سرور: `body = null` ⇒ سنگِ قبر (برگشت، فروش یا دور انداخته شد) با [device]/[series] ِ دستگاهی که کرد و [reason].
++   */
++  data class Remote(
++    val id: String, val version: Long, val body: HeldInvoice?, val mine: Boolean = true,
++    val device: String = "", val series: String = "", val reason: String = "",
++  )
+ 
+   /** نتیجهٔ نشاندن: دفترِ تازه، نسخه‌های تازه (بیشینه با پیشین)، و «کسِ دیگر»ها */
+   data class Absorbed(
+@@ -70,9 +112,14 @@ object HeldSyncPlan {
+     val others: Set<String>,
+     /** ردیفی که جا نشد ⇒ دورِ بعد از نو */
+     val full: Boolean,
++    /** فاکتورِ همین حالای صندوق که دستگاهِ دیگری (با تأیید) گرفت */
++    val taken: List<Remote> = emptyList(),
+   )
+ 
+-  private fun nextVersion(known: Map<String, Long>, id: String, now: Long): Long = maxOf(now, (known[id] ?: 0L) + 1)
++  fun nextVersion(known: Map<String, Long>, id: String, now: Long): Long = maxOf(now, (known[id] ?: 0L) + 1)
++
++  /** نامِ برگه در پیامِ «یک فاکتور در دو دستگاه» */
++  fun titleOf(h: HeldInvoice): String = h.label.ifBlank { "#${h.number}" }
+ 
+   /** پس از تغییرِ محلیِ دفتر: هر فاکتورِ تازه یا عوض‌شده یک `PUT`، هر رفته یک `DELETE` با دلیلِ همان کار */
+   fun record(s: HeldSyncState, before: HeldBook, after: HeldBook, why: HeldChange, now: Long): HeldSyncState {
+@@ -87,8 +134,16 @@ object HeldSyncPlan {
+     }
+     for (id in was.keys) {
+       if (id in next) continue
++      //  بازگرداندن: نسخه‌ای که این دستگاه دیده بود — سرور با آن «دیگری پیش‌تر برش گرداند/فروخت» را می‌فهمد (`held_conflict`)
++      val resumed = why.reason == HeldChange.RESUME.reason
++      val base = if (resumed) known[id] ?: 0L else 0L
+       val v = nextVersion(known, id, now)
+-      out.remove(id); out[id] = HeldSyncState.Op(del = true, v = v, why = why.reason.ifBlank { HeldChange.DISCARD.reason }); known[id] = v
++      out.remove(id)
++      out[id] = HeldSyncState.Op(
++        del = true, v = v, why = why.reason.ifBlank { HeldChange.DISCARD.reason },
++        base = base, title = if (resumed) titleOf(was.getValue(id)) else "",
++      )
++      known[id] = v
+     }
+     return if (out == s.out && known == s.known) s else s.copy(out = out, known = known)
+   }
+@@ -114,14 +169,21 @@ object HeldSyncPlan {
+    *  فاکتورِ همین حالای صندوق ([activeKey]) دوباره نگه‌داشته نمی‌شود. سنگِ قبر فقط آن را برمی‌دارد که همین دستگاه
+    *  پیش‌تر با نسخه‌ای نه تازه‌تر دیده بود.
+    */
+-  fun absorb(book: HeldBook, known: Map<String, Long>, pending: Set<String>, rows: List<Remote>, activeKey: String?): Absorbed {
++  fun absorb(
++    book: HeldBook, known: Map<String, Long>, pending: Set<String>, rows: List<Remote>, activeKey: String?, me: String = "",
++  ): Absorbed {
+     var b = book
+     val seen = LinkedHashMap<String, Long>()
+     val mine = HashSet<String>()
+     val others = HashSet<String>()
++    val taken = ArrayList<Remote>()
+     var full = false
+     fun k(id: String): Long? = seen[id] ?: known[id]
+     for (r in rows) {
++      //  فاکتورِ همین حالای صندوق را دستگاهِ دیگری برگرداند (فقط با تأییدِ صریح، «در دستِ دستگاهِ X») ⇒ کاربرِ این‌جا هم ببیند
++      if (r.body == null && r.id == activeKey && r.reason == HeldChange.RESUME.reason && me.isNotBlank() && r.device.isNotBlank() && r.device != me) {
++        taken += r
++      }
+       if (r.id in pending) continue
+       val have = k(r.id)
+       val local = b.items.firstOrNull { it.id == r.id }
+@@ -147,7 +209,7 @@ object HeldSyncPlan {
+       seen[r.id] = r.version
+       if (r.mine) mine += r.id else others += r.id
+     }
+-    return Absorbed(b, seen, mine, others, full)
++    return Absorbed(b, seen, mine, others, full, taken)
+   }
+ 
+   /** نسخه‌ها و «کسِ دیگر»ها فقط برای فاکتورهای زنده یا در صف — بقیه کنار */
+@@ -172,12 +234,18 @@ class HeldSyncEngine(
+   /** فاکتورِ همین حالای صندوق (`CartStore`) */
+   private val activeKey: () -> String? = { null },
+   private val deviceId: () -> String = { "" },
++  /** کلیدِ تازهٔ فروش (`Ulid`) — بازگرداندنِ بی شبکه یا گرفته از دستِ دیگری ([HeldClaim.Rekey]) */
++  private val newKey: () -> String = { ir.vil3ntec.tohid.sync.v1.Ulid.next() },
+ ) {
+   interface Port {
+     /** `null` ⇒ نرسید */
+     suspend fun pull(since: Long): JsonObject?
+     suspend fun put(id: String, body: JsonObject): Reply
+     suspend fun delete(id: String, version: Long, reason: String): Reply
++    /** بازگرداندن با نسخه‌ای که این دستگاه دیده بود ([base] ۰ = نامعلوم ⇒ همان پیشین) */
++    suspend fun delete(id: String, version: Long, reason: String, base: Long): Reply = delete(id, version, reason)
++    /** «در دستِ دستگاهِ X» پیش از بازگرداندن ([force] = تأییدِ صریحِ گرفتن)؛ نرسید ⇒ `Reply(0)` */
++    suspend fun claim(id: String, version: Long, base: Long, force: Boolean): Reply = Reply(0)
+   }
+ 
+   /** `status` ۰ ⇒ نرسید (شبکه)؛ [error] = شیءِ `error` ِ پاسخِ ناموفق */
+@@ -203,6 +271,77 @@ class HeldSyncEngine(
+   /** «کسِ دیگر» ِ نگه‌داشته — دور انداختنش «لغوِ فاکتور» می‌خواهد */
+   fun othersHeld(id: String): Boolean = state.read().let { it.on && id in it.others }
+ 
++  /** «یک فاکتور در دو دستگاه» ِ دیده‌نشده */
++  fun conflicts(): Map<String, HeldConflict> = state.read().conflicts
++
++  /** کاربر دید ⇒ کنار */
++  fun ack(id: String) { update { s -> if (id !in s.conflicts) s else s.copy(conflicts = s.conflicts - id) } }
++
++  private fun conflict(id: String, c: HeldConflict) = update { s -> s.copy(conflicts = s.conflicts + (id to c)) }
++
++  private fun holderOf(o: JsonObject?, title: String): HeldConflict = HeldConflict(
++    title = title, series = str(o, "series"), reason = str(o, "reason"), at = clock(),
++  )
++
++  /**
++   *  «در دستِ دستگاهِ X» — پیش از بازگرداندنِ نگه‌داشتهٔ [id] (`HeldInvoicesUi.resume`). خاموش یا نگه‌داشتهٔ نبوده ⇒
++   *  [HeldClaim.Free] بی هیچ درخواستی. شرحِ پاسخ‌ها سرِ همین پرونده.
++   */
++  suspend fun claim(id: String, force: Boolean = false): HeldClaim {
++    if (!state.read().on || !ID.matches(id)) return HeldClaim.Free
++    store.load()
++    val h = store.book.value.items.firstOrNull { it.id == id } ?: return HeldClaim.Free
++    return ask(h, force, retry = true)
++  }
++
++  private suspend fun ask(h: HeldInvoice, force: Boolean, retry: Boolean): HeldClaim {
++    val s = state.read()
++    val base = s.known[h.id] ?: 0L
++    val reply = port.claim(h.id, HeldSyncPlan.nextVersion(s.known, h.id, clock()), base, force)
++    return when {
++      reply.status in 200..299 -> {
++        val v = (reply.body?.get("version") as? JsonPrimitive)?.longOrNull ?: 0L
++        if (v > 0) update { st -> st.copy(known = LinkedHashMap(st.known).apply { put(h.id, maxOf(v, st.known[h.id] ?: 0L)) }) }
++        //  گرفته از دستِ دستگاهِ دیگر ⇒ کلیدِ تازه (آن دستگاه شاید هنوز بفروشد؛ دو فروشِ یک شناسه هرگز)
++        if ((reply.body?.get("claim") as? JsonObject)?.get("takeover") is JsonObject) rekey(h, queue = false) else HeldClaim.Free
++      }
++      reply.code == "held_claimed" -> {
++        val o = reply.error?.get("holder") as? JsonObject
++        HeldClaim.Held(str(o, "series"), str(o, "reason"), (o?.get("fresh") as? JsonPrimitive)?.booleanOrNull == true)
++      }
++      //  نسخهٔ دیده‌شده کهنه بود ⇒ اول همان تازه‌تر را بنشاند، بعد یک بار دیگر بپرسد
++      reply.code == "held_stale" && retry -> {
++        (reply.error?.get("current") as? JsonObject)?.let { cur ->
++          remoteOf(cur, gone = (cur["deleted"] as? JsonPrimitive)?.booleanOrNull == true)?.let { absorb(listOf(it), null, state.read().cancel) }
++        }
++        val again = store.book.value.items.firstOrNull { it.id == h.id } ?: return HeldClaim.Free
++        ask(again, force, retry = false)
++      }
++      reply.code == "held_sync_disabled" -> { update { HeldSyncState() }; HeldClaim.Free }
++      //  بی شبکه: آزاد — نگه‌داشتهٔ در همگام‌سازی (`known`؛ شاید روی دستگاهِ دیگری هم هست) با کلیدِ تازه، و بازگرداندنش با نسخهٔ
++      //  دیده‌شده در صف (دوتایی پس از وصل دیده شود). نگه‌داشته‌ای که هرگز به سرور نرسیده بود هم بی‌خطر: آن برداشتن بی‌اثر است
++      reply.status == 0 || reply.status == 401 || reply.status == 429 || reply.status >= 500 ->
++        if (h.id in s.known) rekey(h, queue = true) else HeldClaim.Free
++      else -> HeldClaim.Free
++    }
++  }
++
++  private suspend fun rekey(h: HeldInvoice, queue: Boolean): HeldClaim {
++    val next = newKey()
++    if (!store.rekey(h.id, next)) return HeldClaim.Free
++    if (queue) update { st ->
++      val known = LinkedHashMap(st.known)
++      val out = LinkedHashMap(st.out)
++      val base = known[h.id] ?: 0L
++      val v = HeldSyncPlan.nextVersion(known, h.id, clock())
++      out.remove(h.id)
++      out[h.id] = HeldSyncState.Op(del = true, v = v, why = HeldChange.RESUME.reason, base = base, title = HeldSyncPlan.titleOf(h))
++      known[h.id] = v
++      st.copy(out = out, known = known)
++    }
++    return HeldClaim.Rekey(next)
++  }
++
+   /** تغییرِ محلی (`HeldInvoiceStore.onChange`، زیرِ قفلِ دفتر). خاموش ⇒ هیچ، حتی خواندنِ دوباره یا نوشتن */
+   fun changed(before: HeldBook, after: HeldBook, why: HeldChange): Boolean {
+     if (!state.read().on) return false
+@@ -262,11 +401,15 @@ class HeldSyncEngine(
+    */
+   private suspend fun absorb(rows: List<HeldSyncPlan.Remote>, rev: Long?, cancel: Boolean, refillPass: Boolean = false): Int {
+     var result: HeldSyncPlan.Absorbed? = null
++    val me = runCatching(deviceId).getOrDefault("")
++    val active = activeKey()
++    val title = store.book.value.current?.takeIf { it.id == active }?.let { it.label.ifBlank { "#${it.number}" } }.orEmpty()
+     val ok = store.absorb { book ->
+       val s = state.read()
+-      HeldSyncPlan.absorb(book, s.known, s.out.keys, rows, activeKey()).also { result = it }.book
++      HeldSyncPlan.absorb(book, s.known, s.out.keys, rows, active, me).also { result = it }.book
+     }
+     val a = result
++    a?.taken?.forEach { r -> conflict(r.id, HeldConflict(title, r.series, r.reason, clock())) }
+     update { s ->
+       if (!ok || a == null) return@update s.copy(on = true, cancel = cancel, refill = s.refill || !ok)
+       val known = LinkedHashMap(s.known)
+@@ -291,7 +434,9 @@ class HeldSyncEngine(
+     for ((id, op) in state.read().out.entries.toList()) {
+       //  شناسه‌ای که سرور نمی‌پذیرد (همان `ID_RE` ِ سرور) ⇒ فقط روی همین دستگاه
+       if (!ID.matches(id)) { done(id, op); continue }
+-      val reply: Reply = if (op.del) port.delete(id, op.v, op.why) else {
++      val reply: Reply = if (op.del) {
++        if (op.base > 0) port.delete(id, op.v, op.why, op.base) else port.delete(id, op.v, op.why)
++      } else {
+         //  دیگر در دفتر نیست (کارِ بعدی برداشتنش را در صف گذاشته یا می‌گذارد)
+         val h = store.book.value.items.firstOrNull { it.id == id }
+         if (h == null) { done(id, op); continue }
+@@ -310,6 +455,11 @@ class HeldSyncEngine(
+         }
+         //  جا برای نگه‌داشتهٔ تازه نیست ⇒ در صف می‌ماند تا برداشتنی جا باز کند
+         reply.code == "too_many_held" -> Unit
++        //  همین نگه‌داشته را دستگاهِ دیگری پیش‌تر برگرداند، فروخت یا عوض کرد ⇒ کاربر ببیند؛ سرور دست نخورد
++        reply.code == "held_conflict" -> {
++          done(id, op)
++          conflict(id, holderOf(reply.error?.get("holder") as? JsonObject, op.title))
++        }
+         //  ردِ همیشگی (شکل، اندازه، نگه‌داشتهٔ کسِ دیگر): نسخهٔ دستگاه سرِ جایش، کار کنار
+         else -> done(id, op)
+       }
+@@ -323,11 +473,13 @@ class HeldSyncEngine(
+     put("device_id", JsonPrimitive(runCatching(deviceId).getOrDefault("")))
+   }
+ 
++  private fun str(o: JsonObject?, key: String): String = (o?.get(key) as? JsonPrimitive)?.contentOrNull.orEmpty()
++
+   private fun remoteOf(o: JsonObject?, gone: Boolean): HeldSyncPlan.Remote? {
+     o ?: return null
+     val id = (o["id"] as? JsonPrimitive)?.contentOrNull ?: return null
+     val v = (o["version"] as? JsonPrimitive)?.longOrNull ?: return null
+-    if (gone) return HeldSyncPlan.Remote(id, v, null)
++    if (gone) return HeldSyncPlan.Remote(id, v, null, device = str(o, "device_id"), series = str(o, "series"), reason = str(o, "reason"))
+     val body = (o["body"] as? JsonObject)?.let { runCatching { json.decodeFromJsonElement(HeldInvoice.serializer(), it) }.getOrNull() } ?: return null
+     return HeldSyncPlan.Remote(id, v, body, mine = (o["mine"] as? JsonPrimitive)?.booleanOrNull != false)
+   }
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSyncAndroid.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSyncAndroid.kt
+index 251831b10..1c7bd498f 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSyncAndroid.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/data/HeldSyncAndroid.kt
+@@ -6,7 +6,11 @@ import ir.vil3ntec.tohid.data.repo.Backend
+ import kotlinx.coroutines.CoroutineScope
+ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.SupervisorJob
++import kotlinx.coroutines.flow.MutableStateFlow
++import kotlinx.coroutines.flow.StateFlow
++import kotlinx.coroutines.flow.asStateFlow
+ import kotlinx.coroutines.launch
++import kotlinx.coroutines.withTimeoutOrNull
+ import kotlinx.serialization.json.JsonObject
+ 
+ /**
+@@ -16,6 +20,8 @@ import kotlinx.serialization.json.JsonObject
+  *  `held` ِ دستگاهِ دیگر (فوری) و هر تغییرِ دفترِ نگه‌داشته‌ها وقتی پرچم روشن است (فوری).
+  *  ⛔ پرچمِ `shop.held_sync` خاموش ⇒ تنها کار یک `GET` در هر [MIN_MS] است؛ هیچ نوشتنی (نه `tohid-held-sync`، نه فایلِ
+  *     نگه‌داشته‌ها). حالتِ آموزشی (OPS-07) هرگز: دفترِ آموزشی وصل نمی‌شود و شبکه بسته است.
++ *  «در دستِ دستگاهِ X» پیش از بازگرداندن ([claim]، حداکثر [CLAIM_WAIT_MS]؛ نرسید ⇒ همان بی شبکه) و «یک فاکتور در دو
++ *  دستگاه» ([conflicts]): شرح سرِ `HeldSync.kt`. خاموش ⇒ [claims] `false` و هیچ درخواستی.
+  */
+ object HeldSync {
+ 
+@@ -25,6 +31,13 @@ object HeldSync {
+   /** کمترین فاصلهٔ دو دورِ ناخواسته */
+   const val MIN_MS = 60_000L
+ 
++  /** بیشترین انتظارِ صندوق برای پاسخِ «در دستِ کیست» — پس از آن همان بازگرداندنِ بی شبکه */
++  const val CLAIM_WAIT_MS = 3_000L
++
++  private val _conflicts = MutableStateFlow<Map<String, HeldConflict>>(emptyMap())
++  /** «یک فاکتور در دو دستگاه» ِ دیده‌نشدهٔ همین دکان روی این دستگاه — صندوق نشانش می‌دهد تا کاربر ببیند */
++  val conflicts: StateFlow<Map<String, HeldConflict>> = _conflicts.asStateFlow()
++
+   /** سبدِ صندوقِ باز (`CartStore`) — فاکتورِ همین حالا دوباره نگه‌داشته نشود */
+   @Volatile var cart: HeldCart? = null
+ 
+@@ -32,11 +45,20 @@ object HeldSync {
+   private val engines = HashMap<String, HeldSyncEngine>()
+   @Volatile private var lastAt = 0L
+ 
+-  private class Live(private val app: Context) : HeldSyncEngine.Port {
++  private class Live(private val app: Context, private val device: () -> String) : HeldSyncEngine.Port {
++    /** شناسهٔ دستگاه در نشانی — فقط نویسه‌های امن (همان `ID_RE` ِ سرور) */
++    private fun dev(): String = runCatching(device).getOrDefault("").filter { it.isLetterOrDigit() || it == '-' || it == '_' }.take(64)
++
+     override suspend fun pull(since: Long): JsonObject? = runCatching { Backend.api(app).get("$PATH?since=$since") }.getOrNull()
+     override suspend fun put(id: String, body: JsonObject): HeldSyncEngine.Reply = reply { Backend.api(app).put("$PATH/$id", body) }
+     override suspend fun delete(id: String, version: Long, reason: String): HeldSyncEngine.Reply =
+-      reply { Backend.api(app).delete("$PATH/$id?version=$version&reason=$reason") }
++      reply { Backend.api(app).delete("$PATH/$id?version=$version&reason=$reason&device_id=${dev()}") }
++    override suspend fun delete(id: String, version: Long, reason: String, base: Long): HeldSyncEngine.Reply =
++      reply { Backend.api(app).delete("$PATH/$id?version=$version&reason=$reason&base=$base&device_id=${dev()}") }
++    override suspend fun claim(id: String, version: Long, base: Long, force: Boolean): HeldSyncEngine.Reply =
++      withTimeoutOrNull(CLAIM_WAIT_MS) {
++        reply { Backend.api(app).delete("$PATH/$id?version=$version&reason=resumed&base=$base&claim=1${if (force) "&force=1" else ""}&device_id=${dev()}") }
++      } ?: HeldSyncEngine.Reply(0)
+ 
+     private inline fun reply(call: () -> JsonObject): HeldSyncEngine.Reply = try {
+       HeldSyncEngine.Reply(200, call())
+@@ -70,12 +92,13 @@ object HeldSync {
+     if (s.isBlank() || TrainingMode.on) return null
+     return synchronized(engines) {
+       engines.getOrPut(s) {
++        val device = { runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(app).deviceId() }.getOrDefault("") }
+         HeldSyncEngine(
+-          HeldInvoices.of(app), Live(app), Prefs(app, s),
++          HeldInvoices.of(app), Live(app, device), Prefs(app, s),
+           clock = { System.currentTimeMillis() },
+           series = { ir.vil3ntec.tohid.sync.DocSeries.current(app) },
+           activeKey = { cart?.snapshot()?.key },
+-          deviceId = { runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Engine.of(app).deviceId() }.getOrDefault("") },
++          deviceId = device,
+         )
+       }
+     }
+@@ -96,7 +119,36 @@ object HeldSync {
+     if (!force && now - lastAt < MIN_MS) return
+     lastAt = now
+     val e = engine(app) ?: return
+-    scope.launch { runCatching { e.cycle() } }
++    scope.launch { runCatching { e.cycle() }; publish(e) }
++  }
++
++  private fun publish(e: HeldSyncEngine) { _conflicts.value = runCatching { e.conflicts() }.getOrDefault(emptyMap()) }
++
++  /** پشتیبانِ سرور برای همین دکان روی این دستگاه روشن است (پرچم دیده شده) — خاموش ⇒ همان رفتارِ بی پشتیبان */
++  fun claims(context: Context): Boolean =
++    !TrainingMode.on && runCatching { engine(context.applicationContext ?: context)?.enabled == true }.getOrDefault(false)
++
++  /** «در دستِ دستگاهِ X» پیش از بازگرداندن؛ خاموش، آموزش یا بی دکان ⇒ `Free` بی هیچ درخواستی */
++  suspend fun claim(context: Context, id: String, force: Boolean): HeldClaim {
++    val app = context.applicationContext ?: context
++    if (TrainingMode.on || !TrainingMode.networkAllowed()) return HeldClaim.Free
++    val e = engine(app) ?: return HeldClaim.Free
++    return try {
++      e.claim(id, force)
++    } catch (c: kotlinx.coroutines.CancellationException) {
++      throw c
++    } catch (_: Exception) {
++      HeldClaim.Free
++    } finally {
++      publish(e)
++    }
++  }
++
++  /** کاربر «یک فاکتور در دو دستگاه» را دید */
++  fun ack(context: Context, id: String) {
++    val e = runCatching { engine(context.applicationContext ?: context) }.getOrNull() ?: return
++    runCatching { e.ack(id) }
++    publish(e)
+   }
+ 
+   /** نگه‌دارندهٔ این فاکتور کسِ دیگری است (به گفتهٔ سرور) ⇒ دور انداختنش «لغوِ فاکتور» می‌خواهد */
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt
+index f6b9d7742..0e0bbb2c3 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt
+@@ -1,5 +1,14 @@
+ package ir.vil3ntec.tohid.ui
+ 
++import android.app.Activity
++import android.content.Context
++import android.content.ContextWrapper
++import android.view.WindowManager
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
++import androidx.compose.ui.platform.LocalView
++import androidx.compose.ui.window.DialogWindowProvider
++
+ /**
+  *  کدام برنامه است؟ — گوشی/تبلتِ اندروید.
+  *
+@@ -32,4 +41,31 @@ object Platform {
+ 
+   /** ذخیرهٔ فایل با پنجرهٔ «ذخیره به‌عنوان» — فقط کامپیوتر؛ مسیرِ ذخیره‌شده یا null */
+   fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
++
++  /**
++   *  OPS-02 — تا [on] است عکسِ صفحه، ضبطِ صفحه و پیش‌نمایشِ «برنامه‌های اخیر» این پنجره را سیاه می‌بینند (`FLAG_SECURE`):
++   *  عبارتِ بازیابی (`RecoveryPhraseSheet`). روی پنجرهٔ خودِ برگه (`DialogWindowProvider`) **و** پنجرهٔ Activity — برگهٔ
++   *  پایینِ Compose سیاستِ «Inherit» دارد و با هر بازکشیدن پرچم را از Activity می‌خواند؛ فقط یکی ⇒ دیگری پاکش می‌کرد.
++   *  `on = false` یا بیرون رفتن ⇒ فقط همان که این‌جا گذاشته شد برداشته می‌شود. کامپیوتر و آیفون: هیچ (‎ui/PlatformDesk.kt‎،
++   *  ‎ui/PlatformIos.kt‎).
++   */
++  @Composable
++  fun SecureWindow(on: Boolean) {
++    val view = LocalView.current
++    DisposableEffect(on, view) {
++      val windows = if (!on) emptyList() else listOfNotNull(
++        (view.parent as? DialogWindowProvider)?.window,
++        view.context.activity()?.window,
++      ).distinct()
++      val set = windows.filter { w -> (w.attributes.flags and WindowManager.LayoutParams.FLAG_SECURE) == 0 }
++      set.forEach { runCatching { it.addFlags(WindowManager.LayoutParams.FLAG_SECURE) } }
++      onDispose { set.forEach { w -> runCatching { w.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) } } }
++    }
++  }
++
++  private tailrec fun Context.activity(): Activity? = when (this) {
++    is Activity -> this
++    is ContextWrapper -> baseContext.activity()
++    else -> null
++  }
+ }
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt
+index b5320a0ee..048261d7f 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/components/pos/HeldInvoiceBar.kt
+@@ -60,6 +60,8 @@ import androidx.compose.ui.unit.dp
+ import ir.vil3ntec.tohid.core.keymap.KeyMap
+ import ir.vil3ntec.tohid.core.keymap.KeyName
+ import ir.vil3ntec.tohid.data.CartStore
++import ir.vil3ntec.tohid.data.HeldClaim
++import ir.vil3ntec.tohid.data.HeldConflict
+ import ir.vil3ntec.tohid.data.HeldExtras
+ import ir.vil3ntec.tohid.data.HeldInvoice
+ import ir.vil3ntec.tohid.data.HeldInvoiceStore
+@@ -129,8 +131,23 @@ internal sealed interface HeldDialog {
+   data object List : HeldDialog
+   data class Discard(val invoice: HeldInvoice) : HeldDialog
+   data object DropStale : HeldDialog
++  /** S09 «در دستِ دستگاهِ X»: بازگرداندن فقط با تأییدِ صریح (`HeldSyncEngine.claim`) */
++  data class TakeOver(val invoice: HeldInvoice, val held: HeldClaim.Held) : HeldDialog
++  /** S09 «یک فاکتور در دو دستگاه» — تا کاربر ببیند («دیدم») */
++  data class Twice(val id: String, val conflict: HeldConflict) : HeldDialog
+ }
+ 
++/** «دستگاهِ A1» — سریِ سند همان است که روی فاکتورِ آن دستگاه چاپ می‌شود؛ نامعلوم ⇒ «دستگاهِ دیگری» */
++internal fun heldTakeTitle(h: HeldClaim.Held): String = when {
++  h.fresh && h.series.isNotBlank() -> StrPos.heldClaimedBy(h.series)
++  h.fresh -> StrPos.heldClaimedElsewhere
++  h.series.isNotBlank() -> StrPos.heldOpenedOn(h.series)
++  else -> StrPos.heldOpenedElsewhere
++}
++
++internal fun heldTwiceText(c: HeldConflict): String =
++  if (c.series.isNotBlank()) StrPos.heldTwice(c.title, c.series) else StrPos.heldTwiceElsewhere(c.title)
++
+ /** وضعیت و کارهای برگه‌ها برای یک صفحهٔ صندوق */
+ @Stable
+ class HeldInvoicesUi internal constructor(
+@@ -146,6 +163,11 @@ class HeldInvoicesUi internal constructor(
+   internal var onFocusBack: () -> Unit = {}
+   /** S09: نگه‌دارندهٔ این فاکتور کسِ دیگری است (پشتیبانِ سرور، `HeldSync.othersHeld`)؛ پرچمِ خاموش ⇒ همیشه نه */
+   internal var notMine: (String) -> Boolean = { false }
++  /** S09 «در دستِ دستگاهِ X»: پشتیبانِ سرور روشن است (`HeldSync.claims`)؛ خاموش ⇒ بازگرداندن بایت‌به‌بایت همان پیشین */
++  internal var claims: () -> Boolean = { false }
++  internal var claim: suspend (id: String, force: Boolean) -> HeldClaim = { _, _ -> HeldClaim.Free }
++  /** «یک فاکتور در دو دستگاه» دیده شد */
++  internal var ack: (String) -> Unit = {}
+   internal var data: ShopData = ShopData()
+   /** دادهٔ دکان بار شده — بی آن `fit` همهٔ ردیف‌های کالا را «ناموجود» می‌دید */
+   internal var loaded: Boolean = true
+@@ -193,8 +215,36 @@ class HeldInvoicesUi internal constructor(
+   fun hold(label: String?, note: String?) { dialog = null; run(switches = true) { store.hold(cart, extras(), label, note) } }
+   /** «+ تازه» — نگه‌داشتن بی پرسیدنِ نام و صندوقِ خالی برای مشتریِ بعدی */
+   fun newInvoice() = hold(null, null)
+-  fun resume(id: String) { dialog = null; if (ready()) run(switches = true) { store.resume(cart, id, extras(), data) } }
+-  fun step(dir: Int) { if (ready()) run(switches = true) { store.step(cart, dir, extras(), data) } }
++  /**
++   *  @param force «باز کردن در این دستگاه» ِ برگهٔ «در دستِ دستگاهِ X» — تأییدِ صریحِ گرفتن
++   *  پرچمِ `shop.held_sync` خاموش ⇒ همان بازگرداندنِ پیشین، بی هیچ پرسشی.
++   */
++  fun resume(id: String, force: Boolean = false) {
++    dialog = null
++    if (!ready()) return
++    if (!claims()) { run(switches = true) { store.resume(cart, id, extras(), data) }; return }
++    scope.launch {
++      when (val c = claim(id, force)) {
++        is HeldClaim.Held -> store.book.value.items.firstOrNull { it.id == id }?.let { dialog = HeldDialog.TakeOver(it, c) }
++        is HeldClaim.Rekey -> run(switches = true) { store.resume(cart, c.id, extras(), data) }
++        HeldClaim.Free -> run(switches = true) { store.resume(cart, id, extras(), data) }
++      }
++    }
++  }
++
++  fun step(dir: Int) {
++    if (!ready()) return
++    if (!claims()) { run(switches = true) { store.step(cart, dir, extras(), data) }; return }
++    //  پشتیبانِ سرور روشن: همان همسایه، از درِ «در دستِ کیست»
++    scope.launch {
++      store.load()
++      val id = HeldRules.neighbour(store.book.value, cart.snapshot(), dir)
++      if (id == null) snackbar.showSnackbar(ir.vil3ntec.tohid.core.i18n.StrLedger.heldNone) else resume(id)
++    }
++  }
++
++  /** «یک فاکتور در دو دستگاه» — «دیدم» */
++  fun seen(id: String) { ack(id); close() }
+ 
+   private fun ready(): Boolean {
+     if (!loaded) toast(NOT_LOADED)
+@@ -269,6 +319,9 @@ fun rememberHeldInvoices(
+   ui.onSwitched = onSwitched
+   ui.onFocusBack = onFocusBack
+   ui.notMine = { id -> ir.vil3ntec.tohid.data.HeldSync.othersHeld(context, id) }
++  ui.claims = { ir.vil3ntec.tohid.data.HeldSync.claims(context) }
++  ui.claim = { id, force -> ir.vil3ntec.tohid.data.HeldSync.claim(context, id, force) }
++  ui.ack = { id -> ir.vil3ntec.tohid.data.HeldSync.ack(context, id) }
+   ui.data = d
+   ui.loaded = loaded
+   //  بالا آمدن پس از قطعِ برق وسطِ جابه‌جایی (شرحِ `HeldRules.reconcile`)؛ پرسشِ
+@@ -286,6 +339,11 @@ fun rememberHeldInvoices(
+       kotlinx.coroutines.delay(ir.vil3ntec.tohid.data.HeldSync.MIN_MS)
+     }
+   }
++  //  S09 «یک فاکتور در دو دستگاه»: تا کاربر ببیند («دیدم») روی همین صندوق؛ پرچمِ خاموش ⇒ همیشه خالی
++  val twice by ir.vil3ntec.tohid.data.HeldSync.conflicts.collectAsState()
++  LaunchedEffect(ui, twice, ui.dialog == null) {
++    if (ui.dialog == null) twice.entries.firstOrNull()?.let { (id, c) -> ui.dialog = HeldDialog.Twice(id, c) }
++  }
+   //  «پرداخت» در «اسکن‌های در انتظار» (`ScanSaleHold`): فاکتورِ نگه‌داشتهٔ بارکدخوان به همین صندوق برمی‌گردد؛
+   //  فروش فقط با پرداختِ همین صندوق و دستِ کاربر ثبت می‌شود
+   val scanPay = ir.vil3ntec.tohid.data.ScanSaleHold.payRequest.value
+@@ -519,6 +577,23 @@ private fun HeldDialogs(ui: HeldInvoicesUi, items: List<HeldInvoice>) {
+       },
+       dismissButton = { TextButton(onClick = { ui.dialog = HeldDialog.List }) { Text(StrPos.no) } },
+     )
++    is HeldDialog.TakeOver -> AlertDialog(
++      onDismissRequest = { ui.close() },
++      shape = Shape.dialog,
++      title = { Text(heldTakeTitle(dlg.held)) },
++      text = { Text(StrPos.heldTakeWarn) },
++      confirmButton = {
++        Button(onClick = { ui.resume(dlg.invoice.id, force = true) }, colors = ButtonDefaults.buttonColors(containerColor = colors.warning)) { Text(StrPos.heldTakeOver) }
++      },
++      dismissButton = { TextButton(onClick = { ui.close() }) { Text(StrPos.no) } },
++    )
++    is HeldDialog.Twice -> AlertDialog(
++      onDismissRequest = { ui.seen(dlg.id) },
++      shape = Shape.dialog,
++      title = { Text(StrPos.heldTwiceTitle) },
++      text = { Text(heldTwiceText(dlg.conflict)) },
++      confirmButton = { Button(onClick = { ui.seen(dlg.id) }) { Text(StrPos.heldSeen) } },
++    )
+   }
+ }
+ 
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HeldSheets.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HeldSheets.kt
+index 51114eaa3..7a64eba33 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HeldSheets.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/sales/cart/HeldSheets.kt
+@@ -31,6 +31,8 @@ import ir.vil3ntec.tohid.money
+ import ir.vil3ntec.tohid.plain
+ import ir.vil3ntec.tohid.ui.components.pos.HeldDialog
+ import ir.vil3ntec.tohid.ui.components.pos.HeldInvoicesUi
++import ir.vil3ntec.tohid.ui.components.pos.heldTakeTitle
++import ir.vil3ntec.tohid.ui.components.pos.heldTwiceText
+ import ir.vil3ntec.tohid.ui.theme.PhoneV3
+ import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
+ import ir.vil3ntec.tohid.ui.theme.V3Status
+@@ -144,6 +146,21 @@ fun HeldSheets(ui: HeldInvoicesUi, d: ShopData) {
+       onDismiss = { if (ui.dialog == HeldDialog.DropStale) ui.dialog = HeldDialog.List },
+       icon = Icons.Outlined.DeleteOutline,
+     )
++    //  S09 «در دستِ دستگاهِ X» — گرفتن فقط با تأییدِ صریح
++    is HeldDialog.TakeOver -> V3ConfirmSheet(
++      title = heldTakeTitle(dlg.held),
++      message = StrPos.heldTakeWarn,
++      confirm = StrPos.heldTakeOver,
++      onConfirm = { ui.resume(dlg.invoice.id, force = true) },
++      onDismiss = { if (ui.dialog is HeldDialog.TakeOver) ui.close() },
++      icon = Icons.Outlined.Layers,
++    )
++    //  S09 «یک فاکتور در دو دستگاه» — تا «دیدم»
++    is HeldDialog.Twice -> V3Sheet(onDismiss = { ui.seen(dlg.id) }, title = StrPos.heldTwiceTitle, detents = false) { closer ->
++      Text(heldTwiceText(dlg.conflict), style = V3Type.callout, color = c.inkMuted)
++      Spacer(Modifier.height(16.dp))
++      V3Button(StrPos.heldSeen, { closer.close() }, Modifier.fillMaxWidth())
++    }
+   }
+ }
+ 
+diff --git a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSheet.kt b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSheet.kt
+index 9745dd284..7e59acebd 100644
+--- a/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSheet.kt
++++ b/android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSheet.kt
+@@ -45,6 +45,8 @@ internal fun RecoveryPhraseSheet(ctrl: BackupController) {
+   val c = PhoneV3.colors
+   var typed by remember(flow) { mutableStateOf("") }
+   V3Sheet(onDismiss = { if (!ctrl.making) ctrl.cancelPhrase() }, title = StrBackupSafety.phraseTitle, dismissible = !ctrl.making) { closer ->
++    //  عبارت روی صفحه (نشان دادن و نوشتنِ دوباره) ⇒ بی عکسِ صفحه و ضبط (اندروید `FLAG_SECURE`)؛ «چرا» و بستن ⇒ برداشته
++    ir.vil3ntec.tohid.ui.Platform.SecureWindow(RecoveryPhraseFlow.Step.secret(ctrl.phraseStep))
+     when (ctrl.phraseStep) {
+       RecoveryPhraseFlow.Step.INTRO -> {
+         Text(StrBackupSafety.introBody, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+@@ -98,6 +100,8 @@ internal fun SnapshotUnlockSheet(ctrl: BackupController) {
+   val c = PhoneV3.colors
+   var typed by remember(snap) { mutableStateOf("") }
+   V3Sheet(onDismiss = ctrl::cancelUnlock, title = StrBackupSafety.unlockTitle) { closer ->
++    //  عبارتی که برای باز کردن نوشته می‌شود هم
++    ir.vil3ntec.tohid.ui.Platform.SecureWindow(true)
+     Text(StrBackupSafety.unlockBody, style = V3Type.callout, color = c.inkMuted, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+     Spacer(Modifier.height(14.dp))
+     V3TextField(typed, { typed = it }, StrBackupSafety.confirmLabel, Modifier.fillMaxWidth(), error = ctrl.unlockError)
+diff --git a/android-native/app/src/test/java/ir/vil3ntec/tohid/data/HeldClaimTest.kt b/android-native/app/src/test/java/ir/vil3ntec/tohid/data/HeldClaimTest.kt
+new file mode 100644
+index 000000000..7cd96707e
+--- /dev/null
++++ b/android-native/app/src/test/java/ir/vil3ntec/tohid/data/HeldClaimTest.kt
+@@ -0,0 +1,245 @@
++package ir.vil3ntec.tohid.data
++
++import kotlinx.coroutines.runBlocking
++import kotlinx.serialization.json.JsonObject
++import kotlinx.serialization.json.JsonPrimitive
++import kotlinx.serialization.json.buildJsonArray
++import kotlinx.serialization.json.buildJsonObject
++import kotlinx.serialization.json.jsonPrimitive
++import kotlinx.serialization.json.long
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ *  S09 — «در دستِ دستگاهِ X» (`HeldSyncEngine.claim`) و «یک فاکتور در دو دستگاه» با سرورِ ساختگیِ همان قراردادِ
++ *  `DELETE /api/shop/held-invoices/:id?…&base=&claim=1&force=1` (`server/test/shop-held-invoices.test.js` خودِ سرور را،
++ *  روی PGlite و PostgreSQL و با رقابتِ هم‌زمان، می‌سنجد).
++ *
++ *  پرچمِ خاموش ⇒ هیچ پرسشی؛ دستگاهِ دوم پیش از گرفتن تأییدِ صریح می‌خواهد و با کلیدِ تازهٔ فروش باز می‌کند؛ دستگاهِ نخست
++ *  می‌فهمد؛ بازگرداندنِ بی شبکه آزاد است و پس از وصل «دوتایی» دیده می‌شود — دو فروشِ یک نگه‌داشته هرگز یک شناسه نمی‌گیرند.
++ */
++class HeldClaimTest {
++
++  /** همان قاعده‌های `lib/shop-held-sync.js` (`remove` با ادعا، base، force و دستگاه) — بی پایگاه */
++  class Server {
++    var enabled = true
++    var now = 1_700_000_000_000L
++    private var rev = 0L
++    class Row(val id: String, var version: Long, var body: JsonObject?, var device: String, var reason: String, var rev: Long, var at: Long)
++    val rows = LinkedHashMap<String, Row>()
++    val series = HashMap<String, String>()
++    var claims = 0
++
++    private fun err(code: String, extra: Pair<String, JsonObject>? = null) = buildJsonObject {
++      put("code", JsonPrimitive(code)); if (extra != null) put(extra.first, extra.second)
++    }
++
++    private fun view(r: Row) = buildJsonObject {
++      put("id", JsonPrimitive(r.id)); put("version", JsonPrimitive(r.version)); put("rev", JsonPrimitive(r.rev))
++      if (r.body == null) {
++        put("deleted", JsonPrimitive(true)); put("reason", JsonPrimitive(r.reason))
++        put("device_id", JsonPrimitive(r.device)); put("series", JsonPrimitive(series[r.device].orEmpty()))
++      } else { put("body", r.body!!); put("mine", JsonPrimitive(true)) }
++    }
++
++    private fun holder(r: Row) = buildJsonObject {
++      put("device_id", JsonPrimitive(r.device)); put("series", JsonPrimitive(series[r.device].orEmpty()))
++      put("reason", JsonPrimitive(if (r.body == null) r.reason else "held")); put("at", JsonPrimitive(r.at))
++      put("fresh", JsonPrimitive(r.body == null && r.reason == "resumed" && now - r.at < 10 * 60_000L))
++    }
++
++    private fun ok(body: JsonObject = buildJsonObject {}) = HeldSyncEngine.Reply(200, body)
++    private fun no(status: Int, e: JsonObject) = HeldSyncEngine.Reply(status, error = e)
++
++    private fun granted(version: Long, takeover: JsonObject? = null, deleted: Boolean) = ok(buildJsonObject {
++      put("deleted", JsonPrimitive(deleted)); put("version", JsonPrimitive(version))
++      put("claim", buildJsonObject { put("granted", JsonPrimitive(true)); if (takeover != null) put("takeover", takeover) })
++    })
++
++    fun remove(dev: String, id: String, version: Long, reason: String, base: Long?, claiming: Boolean, forcing: Boolean): HeldSyncEngine.Reply {
++      if (!enabled) return no(403, err("held_sync_disabled"))
++      val cur = rows[id] ?: return if (claiming) granted(0, deleted = false) else ok()
++      if (cur.body == null) {
++        val mine = dev.isNotBlank() && cur.device == dev
++        val taken = !mine && base != null && cur.version > base && (cur.reason == "resumed" || cur.reason == "sold")
++        if (!claiming) return if (taken && reason == "resumed") no(409, err("held_conflict", "holder" to holder(cur))) else ok()
++        if (mine) return granted(cur.version, deleted = false)
++        if (taken && !forcing) return no(409, err("held_claimed", "holder" to holder(cur)))
++        val take = if (taken) holder(cur) else null
++        cur.version = maxOf(version, cur.version + 1); cur.reason = "resumed"; cur.device = dev; cur.rev = ++rev; cur.at = now
++        return granted(cur.version, take, deleted = true)
++      }
++      if (base != null && cur.version > base) {
++        if (claiming) return no(409, err("held_stale", "current" to view(cur)))
++        if (reason == "resumed") return no(409, err("held_conflict", "holder" to holder(cur)))
++      }
++      if (cur.version > version) return no(409, err("held_stale", "current" to view(cur)))
++      cur.version = version; cur.body = null; cur.reason = reason; cur.device = dev; cur.rev = ++rev; cur.at = now
++      return if (claiming) granted(version, deleted = true) else ok()
++    }
++
++    fun port(dev: String, online: () -> Boolean) = object : HeldSyncEngine.Port {
++      override suspend fun pull(since: Long): JsonObject? {
++        if (!online()) return null
++        if (!enabled) return buildJsonObject { put("enabled", JsonPrimitive(false)) }
++        val page = rows.values.filter { it.rev > since && (it.body != null || since > 0) }.sortedBy { it.rev }
++        return buildJsonObject {
++          put("enabled", JsonPrimitive(true)); put("rev", JsonPrimitive(rev))
++          put("items", buildJsonArray { page.filter { it.body != null }.forEach { add(view(it)) } })
++          put("gone", buildJsonArray { page.filter { it.body == null }.forEach { add(view(it)) } })
++        }
++      }
++
++      override suspend fun put(id: String, body: JsonObject): HeldSyncEngine.Reply {
++        if (!online()) return HeldSyncEngine.Reply(0)
++        if (!enabled) return no(403, err("held_sync_disabled"))
++        val v = body["version"]!!.jsonPrimitive.long
++        val b = body["body"] as JsonObject
++        val cur = rows[id]
++        if (cur != null && cur.version >= v) return if (cur.body == b && cur.version == v) ok() else no(409, err("held_stale", "current" to view(cur)))
++        if (cur == null) rows[id] = Row(id, v, b, dev, "", ++rev, now)
++        else { cur.version = v; cur.body = b; cur.reason = ""; cur.device = dev; cur.rev = ++rev; cur.at = now }
++        return ok()
++      }
++
++      override suspend fun delete(id: String, version: Long, reason: String): HeldSyncEngine.Reply =
++        if (!online()) HeldSyncEngine.Reply(0) else remove(dev, id, version, reason, null, claiming = false, forcing = false)
++
++      override suspend fun delete(id: String, version: Long, reason: String, base: Long): HeldSyncEngine.Reply =
++        if (!online()) HeldSyncEngine.Reply(0) else remove(dev, id, version, reason, base, claiming = false, forcing = false)
++
++      override suspend fun claim(id: String, version: Long, base: Long, force: Boolean): HeldSyncEngine.Reply {
++        if (!online()) return HeldSyncEngine.Reply(0)
++        claims++
++        return remove(dev, id, version, "resumed", base, claiming = true, forcing = force)
++      }
++    }
++  }
++
++  /** یک دستگاه: دفتر، سبد، وضع و موتور — همان سیم‌کشیِ `HeldSync` (شناسهٔ دستگاه و کلیدِ تازهٔ فروش) */
++  inner class Device(val server: Server, val dev: String, series: String) {
++    var now = 1_700_000_000_000L
++    var online = true
++    private var keys = 0
++    val cart = HeldInvoicesTest.MemCart()
++    val store = HeldInvoiceStore(HeldInvoicesTest.MemDisk(), device = { series }, clock = { now })
++    val state = HeldSyncTest.MemState()
++    val engine = HeldSyncEngine(
++      store, server.port(dev) { online }, state, clock = { now }, series = { series }, activeKey = { cart.snapshot().key },
++      deviceId = { dev }, newKey = { "$dev-k${++keys}" },
++    )
++    init { server.series[dev] = series; store.onChange = { b, a, why -> engine.changed(b, a, why) } }
++    fun sync() = runBlocking { now += 1000; server.now = now; engine.cycle() }
++  }
++
++  private suspend fun hold(d: Device, key: String, label: String) {
++    d.now += 1000
++    d.cart.put(key, "p1" to 2.0)
++    assertTrue(d.store.hold(d.cart, HeldExtras(), label = label) is HeldInvoiceStore.Outcome.Done)
++  }
++
++  /** همان راهِ `HeldInvoicesUi.resume`: پرسش ⇐ بازگرداندن (با شناسهٔ تازه اگر Rekey)؛ Held ⇒ هیچ (برگهٔ تأیید) */
++  private suspend fun resume(d: Device, id: String, force: Boolean = false): HeldClaim {
++    d.now += 1000
++    d.server.now = d.now
++    val c = d.engine.claim(id, force)
++    val target = when (c) { is HeldClaim.Held -> return c; is HeldClaim.Rekey -> c.id; HeldClaim.Free -> id }
++    assertTrue(d.store.resume(d.cart, target, HeldExtras()) is HeldInvoiceStore.Outcome.Done)
++    return c
++  }
++
++  @Test
++  fun `پرچمِ خاموش — بازگرداندن هیچ پرسشی ندارد و همان پیشین است`() = runBlocking<Unit> {
++    val server = Server().apply { enabled = false }
++    val a = Device(server, "dev-a", "A1")
++    hold(a, "K0", "کریمی")
++    a.sync()
++    assertEquals(HeldClaim.Free, resume(a, "K0"))
++    assertEquals("K0", a.cart.snapshot().key)
++    assertEquals("هیچ درخواستِ ادعا", 0, server.claims)
++    assertEquals("وضعِ همگام‌سازی نوشته نشد", HeldSyncState(), a.state.s)
++  }
++
++  @Test
++  fun `دستگاهِ دوم در دستِ دستگاهِ A1 را می‌بیند، فقط با تأیید و با کلیدِ تازه می‌گیرد و دستگاهِ نخست هم می‌بیند`() = runBlocking<Unit> {
++    val server = Server()
++    val a = Device(server, "dev-a", "A1")
++    val b = Device(server, "dev-b", "B1")
++    hold(a, "K1", "کریمی")
++    a.sync(); b.sync()
++    assertEquals(setOf("K1"), b.store.book.value.items.map { it.id }.toSet())
++
++    assertEquals(HeldClaim.Free, resume(a, "K1"))
++    assertEquals("K1", a.cart.snapshot().key)
++    a.sync()
++    //  «ب» هنوز دور نزده و برگه را در فهرست دارد ⇒ پرسش ⇒ در دستِ «A1»، هیچ چیزی باز نشد
++    val held = resume(b, "K1")
++    assertEquals(HeldClaim.Held("A1", "resumed", fresh = true), held)
++    assertEquals(null, b.cart.snapshot().key)
++    assertEquals(listOf("K1"), b.store.book.value.items.map { it.id })
++    assertEquals("dev-a", server.rows.getValue("K1").device)
++
++    //  تأییدِ صریح ⇒ گرفتن، با کلیدِ تازهٔ فروش (اگر «الف» هم بفروشد، دو فروشِ جدا؛ نه یک ردیفِ آمیخته)
++    val took = resume(b, "K1", force = true)
++    assertTrue(took is HeldClaim.Rekey)
++    val bKey = b.cart.snapshot().key
++    assertEquals((took as HeldClaim.Rekey).id, bKey)
++    assertNotEquals("K1", bKey)
++    assertEquals("dev-b", server.rows.getValue("K1").device)
++    assertEquals("همان ردیف‌ها", a.cart.snapshot().lines, b.cart.snapshot().lines)
++
++    //  «الف» که همان را در صندوق دارد با دورِ بعد می‌بیند
++    a.sync()
++    assertEquals(mapOf("K1" to HeldConflict("کریمی", "B1", "resumed", a.now)), a.engine.conflicts())
++    a.engine.ack("K1")
++    assertTrue(a.engine.conflicts().isEmpty())
++    b.sync()
++    assertTrue("«ب» خودش گرفت؛ دوتایی برای خودش نیست", b.engine.conflicts().isEmpty())
++  }
++
++  @Test
++  fun `بی شبکه باز کردن آزاد است و پس از وصل یک فاکتور در دو دستگاه دیده می‌شود — با دو شناسهٔ جدا`() = runBlocking<Unit> {
++    val server = Server()
++    val a = Device(server, "dev-a", "A1")
++    val b = Device(server, "dev-b", "B1")
++    hold(a, "K2", "آقای رحیمی")
++    a.sync(); b.sync()
++
++    b.online = false
++    val off = resume(b, "K2")
++    assertTrue("بی شبکه هم باز می‌شود", off is HeldClaim.Rekey)
++    val bKey = b.cart.snapshot().key!!
++    assertNotEquals("K2", bKey)
++    //  همان وقت «الف» با شبکه برش گرداند
++    assertEquals(HeldClaim.Free, resume(a, "K2"))
++    a.sync()
++
++    b.online = true
++    b.sync()
++    val seen = b.engine.conflicts()
++    assertEquals(setOf("K2"), seen.keys)
++    assertEquals(Triple("آقای رحیمی", "A1", "resumed"), seen.getValue("K2").let { Triple(it.title, it.series, it.reason) })
++    assertEquals("ردیفِ سرور همان «الف» ماند", "dev-a", server.rows.getValue("K2").device)
++    assertTrue("صف خالی شد", b.state.s.out.isEmpty())
++    //  دو فروشِ ممکن هرگز یک شناسه نیستند
++    assertNotEquals(a.cart.snapshot().key, b.cart.snapshot().key)
++  }
++
++  @Test
++  fun `نسخهٔ دیده‌شده کهنه بود — پیش از بازگرداندن تازه‌تر نشانده می‌شود و همان باز می‌شود`() = runBlocking<Unit> {
++    val server = Server()
++    val a = Device(server, "dev-a", "A1")
++    val b = Device(server, "dev-b", "B1")
++    hold(a, "K4", "کهنه")
++    a.sync(); b.sync()
++    a.now += 1000
++    assertTrue(a.store.rename("K4", "تازه", "منتظر") is HeldInvoiceStore.Outcome.Done)
++    a.sync()
++    assertEquals(HeldClaim.Free, resume(b, "K4"))
++    assertEquals("K4", b.cart.snapshot().key)
++    assertEquals(Pair("تازه", "منتظر"), b.store.book.value.current?.let { it.label to it.note })
++    assertEquals("dev-b", server.rows.getValue("K4").device)
++  }
++}
+diff --git a/android-native/app/src/test/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSecureWiringTest.kt b/android-native/app/src/test/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSecureWiringTest.kt
+new file mode 100644
+index 000000000..a47977ca1
+--- /dev/null
++++ b/android-native/app/src/test/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSecureWiringTest.kt
+@@ -0,0 +1,73 @@
++package ir.vil3ntec.tohid.ui.v3.settings.sections
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.io.File
++
++/**
++ *  OPS-02 — عبارتِ بازیابی در عکسِ صفحه، ضبطِ صفحه و پیش‌نمایشِ «برنامه‌های اخیر» ِ اندروید نمی‌آید (`FLAG_SECURE`)، فقط
++ *  تا وقتی عبارت روی صفحه است (نشان دادن، نوشتنِ دوباره، باز کردنِ نسخهٔ رمزدار) و پس از آن پاک می‌شود. کامپیوتر و آیفون
++ *  هیچ (همان API، بی‌اثر)؛ و عبارت هیچ‌جا در سابقه/خروجیِ برنامه نوشته نمی‌شود. (رابطِ Compose، پس متن سنجیده می‌شود.)
++ */
++class RecoveryPhraseSecureWiringTest {
++
++  private fun src(rel: String): String =
++    listOf("", "../", "../../")
++      .map { File(it + rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد (cwd=${File(".").absoluteFile})")
++
++  private val sheet = "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/RecoveryPhraseSheet.kt"
++  private val android = "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/Platform.kt"
++  private val desk = "desktop/src/main/kotlin/ir/vil3ntec/tohid/ui/PlatformDesk.kt"
++  private val ios = "ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/ui/PlatformIos.kt"
++
++  @Test fun `برگهٔ عبارت فقط تا عبارت روی صفحه است پنجره را امن می‌کند`() {
++    val s = src(sheet)
++    //  درونِ محتوای برگه (پنجرهٔ خودِ برگه) و با گام، نه همیشه
++    val phrase = s.indexOf("V3Sheet(onDismiss = { if (!ctrl.making) ctrl.cancelPhrase() }")
++    val secure = s.indexOf("ir.vil3ntec.tohid.ui.Platform.SecureWindow(RecoveryPhraseFlow.Step.secret(ctrl.phraseStep))")
++    assertTrue(phrase >= 0 && secure > phrase)
++    assertTrue("پیش از نخستین گام", secure < s.indexOf("RecoveryPhraseFlow.Step.INTRO ->"))
++    //  باز کردنِ نسخهٔ رمزدار: عبارتِ نوشته‌شده هم
++    val unlock = s.indexOf("V3Sheet(onDismiss = ctrl::cancelUnlock")
++    assertTrue(unlock > 0 && s.indexOf("ir.vil3ntec.tohid.ui.Platform.SecureWindow(true)", unlock) > unlock)
++    assertEquals(2, Regex(Regex.escape("Platform.SecureWindow(")).findAll(s).count())
++  }
++
++  @Test fun `اندروید FLAG_SECURE را روی پنجرهٔ برگه و Activity می‌گذارد و پس از آن پاک می‌کند`() {
++    val a = src(android)
++    val fn = a.indexOf("fun SecureWindow(on: Boolean)")
++    assertTrue(fn > 0)
++    val body = a.substring(fn)
++    assertTrue(body.contains("DisposableEffect(on, view)"))
++    assertTrue("پنجرهٔ خودِ برگه", body.contains("(view.parent as? DialogWindowProvider)?.window"))
++    assertTrue("و پنجرهٔ Activity (برگه با Inherit همان را می‌خواند)", body.contains("view.context.activity()?.window"))
++    assertTrue(body.contains("if (!on) emptyList()"))
++    assertTrue(body.contains("it.addFlags(WindowManager.LayoutParams.FLAG_SECURE)"))
++    //  فقط آنچه همین‌جا گذاشته شد پاک می‌شود
++    assertTrue(body.contains("onDispose { set.forEach { w -> runCatching { w.clearFlags(WindowManager.LayoutParams.FLAG_SECURE) } } }"))
++  }
++
++  @Test fun `کامپیوتر و آیفون همان API را بی‌اثر دارند`() {
++    for (f in listOf(desk, ios)) {
++      val t = src(f)
++      assertTrue(f, t.contains("fun SecureWindow(on: Boolean) = Unit"))
++      assertFalse(f, t.contains("FLAG_SECURE"))
++    }
++  }
++
++  @Test fun `عبارت هیچ‌جا در سابقهٔ برنامه نوشته نمی‌شود`() {
++    val files = listOf(
++      sheet,
++      "android-native/app/src/main/java/ir/vil3ntec/tohid/ui/v3/settings/sections/BackupController.kt",
++      "android-native/app/src/main/java/ir/vil3ntec/tohid/data/SnapshotSealAndroid.kt",
++      "core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlow.kt",
++      "core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhrase.kt",
++    )
++    val log = Regex("""\bprintln\(|\bLog\.[diwevx]\(|System\.(out|err)|printStackTrace\(|\blogger\.""")
++    for (f in files) assertEquals(f, emptyList<String>(), log.findAll(src(f)).map { it.value }.toList())
++    //  کلاسِ جریان `data class` نیست ⇒ `toString` عبارت را بیرون نمی‌دهد
++    assertTrue(src(files[3]).contains("\nclass RecoveryPhraseFlow("))
++  }
++}
+diff --git a/core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlow.kt b/core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlow.kt
+index 6fe246122..69544c056 100644
+--- a/core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlow.kt
++++ b/core/src/commonMain/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlow.kt
+@@ -19,7 +19,14 @@ package ir.vil3ntec.tohid.core.backup
+  */
+ class RecoveryPhraseFlow(private val generate: () -> String = { RecoveryPhrase.generate() }) {
+ 
+-  enum class Step { INTRO, SHOW, CONFIRM, DONE, CANCELLED }
++  enum class Step {
++    INTRO, SHOW, CONFIRM, DONE, CANCELLED;
++
++    companion object {
++      /** عبارت روی صفحه است (نشان داده یا دارد نوشته می‌شود) ⇒ پنجره در برابرِ عکسِ صفحه امن (`Platform.SecureWindow`) */
++      fun secret(s: Step): Boolean = s == SHOW || s == CONFIRM || s == DONE
++    }
++  }
+ 
+   /** نتیجهٔ تأیید */
+   enum class Check { OK, TYPO, MISMATCH, NOT_ASKED }
+diff --git a/core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlowTest.kt b/core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlowTest.kt
+index aff69cfdc..cb3452ae5 100644
+--- a/core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlowTest.kt
++++ b/core/src/commonTest/kotlin/ir/vil3ntec/tohid/core/backup/RecoveryPhraseFlowTest.kt
+@@ -70,4 +70,19 @@ class RecoveryPhraseFlowTest {
+     assertEquals(listOf(listOf(fixed), listOf("دکانِ کریمی"), listOf("۱۴۰۵/۰۸/۱۹"), listOf("جای امن"), listOf("چگونه")), rows)
+     assertEquals(4, flow().apply { start() }.printRows("", "d", "k", "h").size, "بی نامِ دکان")
+   }
++
++  /** OPS-02 — پنجرهٔ امن (`FLAG_SECURE`) فقط تا عبارت روی صفحه است: نشان دادن و نوشتنِ دوباره، نه «چرا» و نه پس از بستن */
++  @Test
++  fun windowIsSecureOnlyWhileThePhraseIsOnScreen() {
++    val f = flow()
++    val seen = mutableListOf(RecoveryPhraseFlow.Step.secret(f.step))
++    f.start(); seen += RecoveryPhraseFlow.Step.secret(f.step)
++    f.written(); seen += RecoveryPhraseFlow.Step.secret(f.step)
++    f.cancel(); seen += RecoveryPhraseFlow.Step.secret(f.step)
++    assertEquals(listOf(false, true, true, false), seen)
++    assertEquals(
++      setOf(RecoveryPhraseFlow.Step.SHOW, RecoveryPhraseFlow.Step.CONFIRM, RecoveryPhraseFlow.Step.DONE),
++      RecoveryPhraseFlow.Step.entries.filter { RecoveryPhraseFlow.Step.secret(it) }.toSet(),
++    )
++  }
+ }
+diff --git a/desktop/src/main/kotlin/ir/vil3ntec/tohid/ui/PlatformDesk.kt b/desktop/src/main/kotlin/ir/vil3ntec/tohid/ui/PlatformDesk.kt
+index 39b85cfa3..d4c6efa69 100644
+--- a/desktop/src/main/kotlin/ir/vil3ntec/tohid/ui/PlatformDesk.kt
++++ b/desktop/src/main/kotlin/ir/vil3ntec/tohid/ui/PlatformDesk.kt
+@@ -62,6 +62,10 @@ object Platform {
+     (id ?: ("app-" + ir.vil3ntec.tohid.sync.SyncStore(context).deviceUid)).also { fingerprint = it }
+   }
+ 
++  /** OPS-02 — کامپیوتر پنجرهٔ «امن» در برابرِ عکسِ صفحه ندارد؛ عبارت فقط روی صفحه است و هیچ‌جا نوشته نمی‌شود */
++  @androidx.compose.runtime.Composable
++  fun SecureWindow(on: Boolean) = Unit
++
+   fun saveFile(suggestedName: String, bytes: ByteArray): String? {
+     var picked: java.io.File? = null
+     val run = Runnable {
+diff --git a/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/BackupRestoreDrillTest.kt b/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/BackupRestoreDrillTest.kt
+index abd2a257c..1eaec2c43 100644
+--- a/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/BackupRestoreDrillTest.kt
++++ b/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/BackupRestoreDrillTest.kt
+@@ -8,10 +8,19 @@ import ir.vil3ntec.tohid.data.AtRest
+ import ir.vil3ntec.tohid.data.AutoBackup
+ import ir.vil3ntec.tohid.data.BackupBundle
+ import ir.vil3ntec.tohid.data.BackupRestore
++import ir.vil3ntec.tohid.data.CartStore
++import ir.vil3ntec.tohid.data.HeldBook
++import ir.vil3ntec.tohid.data.HeldInvoice
++import ir.vil3ntec.tohid.data.HeldInvoiceCodec
++import ir.vil3ntec.tohid.data.HeldInvoiceStore
++import ir.vil3ntec.tohid.data.HeldInvoices
++import ir.vil3ntec.tohid.data.HeldTag
+ import ir.vil3ntec.tohid.data.LedgerOwner
+ import ir.vil3ntec.tohid.data.LedgerRecovery
+ import ir.vil3ntec.tohid.data.OwnerExport
+ import ir.vil3ntec.tohid.data.Product
++import ir.vil3ntec.tohid.data.SaleDraft
++import ir.vil3ntec.tohid.data.SaleDraftCodec
+ import ir.vil3ntec.tohid.data.ShopData
+ import ir.vil3ntec.tohid.data.ShopSettingsBundle
+ import ir.vil3ntec.tohid.data.ShopStore
+@@ -43,7 +52,8 @@ import java.util.zip.ZipOutputStream
+  *  کامل و نسخهٔ خودکار ⇐ پاک شدنِ دادهٔ برنامه ⇐ برگرداندن ⇐ دفتر (JSON ِ استاندارد) و تنظیمات و عکس‌ها بایت‌به‌بایت همان.
+  *  و راه‌های شکست: فایلِ بریده/خراب، نسخهٔ کهنه/تازه‌تر، دکانِ دیگر، صفِ نرفته، و رمزِ نسخه‌ها با عبارتِ بازیابی.
+  *
+- *  ⚠️ فاکتورهای نگه‌داشته (`held-invoices.json`) در هیچ پشتیبانی نیستند — `docs/DATA-SAFETY-fa.md` §۲ (مانده).
++ *  و فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`؛ DATA-SAFETY §۸): با پشتیبانِ کامل برمی‌گردند،
++ *  فقط پس از نشستنِ دفتر، فقط در همان دکان، فقط روی دستگاهی که خودش فاکتورِ بازی ندارد، و هرگز آن‌که فروش رفته.
+  */
+ class BackupRestoreDrillTest {
+ 
+@@ -69,6 +79,10 @@ class BackupRestoreDrillTest {
+     if (snapshots) AutoBackup.dir(ctx).listFiles().orEmpty().forEach { it.delete() }
+     ShopSettingsBundle.SHOP_PREFS.forEach { ctx.deleteSharedPreferences(it) }
+     BackupBundle.dropStaging(ctx)
++    //  فاکتورهای نگه‌داشته و سبدِ جاری — پرونده و حافظهٔ برنامه
++    dir.listFiles().orEmpty().filter { it.name.startsWith(HeldInvoiceStore.FILE) || it.name.startsWith(CartStore.FILE) }.forEach { it.delete() }
++    HeldInvoices.reset()
++    ir.vil3ntec.tohid.data.HeldSync.cart = null
+   }
+ 
+   private fun key(): String {
+@@ -150,7 +164,8 @@ class BackupRestoreDrillTest {
+   private fun openZip(store: ShopStore, bytes: ByteArray) = BackupRestore.open(ctx, store, ByteArrayInputStream(bytes))
+ 
+   private fun staged(): Boolean =
+-    File(ctx.cacheDir, "restore-photos").listFiles().orEmpty().isNotEmpty() || File(ctx.cacheDir, "restore-settings.json").exists()
++    File(ctx.cacheDir, "restore-photos").listFiles().orEmpty().isNotEmpty() || File(ctx.cacheDir, "restore-settings.json").exists() ||
++      File(ctx.cacheDir, "restore-held.json").exists()
+ 
+   /* ------------------------- ۱) رفت و برگشتِ کامل ------------------------- */
+ 
+@@ -435,4 +450,112 @@ class BackupRestoreDrillTest {
+     assertEquals(LedgerRecovery.Source.AUTO_BACKUP, back.guard.recovered.value?.source)
+     assertEquals(more, back.data.value)
+   }
++
++  /* ------------------------- ۷) فاکتورهای نگه‌داشته و سبدِ جاری ------------------------- */
++
++  private val heldFile get() = File(dir, HeldInvoiceStore.FILE)
++  private val cartFile get() = File(dir, CartStore.FILE)
++
++  private fun line(p: Product, q: Double, price: Double? = null) =
++    SaleDraft.Line(productId = p.id, quantity = q, unitPrice = price, note = "بی‌نمک", seller = "زهرا", specialPrice = price)
++
++  /** دو نگه‌داشته (با همهٔ فیلدها) و سبدِ جاریِ نیمه‌کاره با برگه‌اش — همان پرونده‌هایی که صندوق می‌نویسد */
++  private fun heldDesk(d: ShopData): Triple<HeldInvoice, HeldInvoice, SaleDraft> {
++    val p = d.products
++    val h1 = HeldInvoice(
++      id = "drill-h1", number = 1, label = "آقای کریمی", lines = listOf(line(p[0], 2.0, 95.0), SaleDraft.Line("", 1.0, 5.0, label = "کیسه")),
++      debtorId = d.debtors.firstOrNull()?.id, discount = "10", note = "پولش را می‌آورد", heldAt = 1_762_600_000_000, payment = "CREDIT",
++      paid = "50", coupons = listOf("EID5"), discountAmount = true, saleNote = "فاکتورِ عمده", priceList = "wholesale",
++    )
++    val h2 = HeldInvoice(id = "drill-h2", number = 3, lines = listOf(line(p[1], 1.0)), heldAt = 1_762_600_100_000)
++    val cart = SaleDraft(key = "drill-c1", lines = listOf(line(p[2], 4.0)), savedAt = 1_762_600_200_000, coupons = listOf("NEW"), note = "سبدِ نیمه‌کاره")
++    heldFile.writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h1, h2), current = HeldTag("drill-c1", 2, "خانمِ احمدی", "منتظرِ پول"))))
++    cartFile.writeText(SaleDraftCodec.encode(cart))
++    HeldInvoices.reset()
++    return Triple(h1, h2, cart)
++  }
++
++  /** نگه‌داشته‌های برنامه همان‌طور که صندوق می‌بیند (حافظه، پس از نخستین خواندن) */
++  private fun heldNow(): HeldBook = HeldInvoices.of(ctx).let { runBlocking { it.load() }; it.book.value }
++
++  private fun confirmFrom(zip: ByteArray): BackupRestore.Confirmed {
++    val fresh = open()
++    return runBlocking { BackupRestore.confirm(ctx, fresh, openZip(fresh, zip).getOrThrow().data) }
++  }
++
++  @Test fun `فاکتورهای نگه‌داشته و سبدِ جاری با پشتیبانِ کامل از پاک شدنِ برنامه برمی‌گردند`() {
++    val store = seed()
++    val (h1, h2, cart) = heldDesk(store.data.value)
++    val zip = fullBackup(store)
++
++    wipe()
++    val fresh = open()
++    assertTrue("برنامهٔ تازه نگه‌داشته ندارد", heldNow().items.isEmpty())
++    val opened = openZip(fresh, zip).getOrThrow()
++    assertTrue("تا تأییدِ بازیابی هیچ نگه‌داشته‌ای ننشسته", heldNow().items.isEmpty() && !heldFile.exists())
++    assertTrue(runBlocking { BackupRestore.confirm(ctx, fresh, opened.data) }.ok)
++
++    val back = heldNow().items.associateBy { it.id }
++    assertEquals(setOf("drill-h1", "drill-h2", "drill-c1"), back.keys)
++    assertEquals("نگه‌داشته با همهٔ فیلدهایش", h1, back.getValue("drill-h1"))
++    assertEquals(h2, back.getValue("drill-h2"))
++    val c = back.getValue("drill-c1")
++    assertEquals("سبدِ جاری با شماره، نام و یادداشتِ برگه‌اش نگه‌داشته می‌شود", Triple(2, "خانمِ احمدی", "منتظرِ پول"), Triple(c.number, c.label, c.note))
++    assertEquals("سبدِ جاری با همهٔ ردیف‌ها، کدها و یادداشتِ فاکتور", cart, c.draft())
++    assertFalse("سبدِ این دستگاه هرگز رونویسی نمی‌شود", cartFile.exists())
++    //  روی دیسک هم: برنامه از نو باز شد
++    HeldInvoices.reset()
++    assertEquals(back.values.toSet(), heldNow().items.toSet())
++    assertFalse("پوشهٔ موقت خالی شد", staged())
++  }
++
++  @Test fun `نگه‌داشته‌های پشتیبان فقط پس از دفتر، در همان دکان و روی دستگاهِ بی فاکتورِ باز می‌نشینند و فروخته هرگز`() {
++    LedgerOwner.remember(ctx, "u-h", "s-h")
++    val store = seed()
++    val sold = store.data.value.sales.first()
++    heldDesk(store.data.value)
++    //  نگه‌داشته‌ای که همان فروشِ دفتر است (از دستگاهِ دیگر یا پیش از پشتیبان فروش رفت) دوباره پیشنهاد نمی‌شود
++    val book = HeldInvoiceCodec.decode(heldFile.readText())!!
++    heldFile.writeText(HeldInvoiceCodec.encode(book.copy(items = book.items + book.items[1].copy(id = sold.id, number = 4))))
++    HeldInvoices.reset()
++    val zip = fullBackup(store)
++
++    //  ۱) دستگاهی که نگه‌داشتهٔ خودش را دارد: هیچ چیز رونویسی یا قاطی نمی‌شود
++    wipe()
++    val mine = HeldBook(items = listOf(book.items[1].copy(id = "drill-mine", number = 5, label = "مالِ همین دستگاه")))
++    heldFile.writeText(HeldInvoiceCodec.encode(mine))
++    HeldInvoices.reset()
++    assertTrue(confirmFrom(zip).ok)
++    assertEquals(mine, heldNow())
++    assertFalse(staged())
++
++    //  ۲) سبدِ پُرِ دیگری روی این دستگاه (فاکتورِ بازِ خودش): همان؛ سبد دست نمی‌خورد
++    wipe()
++    val own = SaleDraft(key = "drill-own", lines = listOf(line(store.data.value.products[3], 1.0)), savedAt = 5)
++    cartFile.writeText(SaleDraftCodec.encode(own))
++    assertTrue(confirmFrom(zip).ok)
++    assertTrue(heldNow().items.isEmpty())
++    assertEquals(own, SaleDraftCodec.decode(cartFile.readText()))
++
++    //  ۳) بازیابیِ ردشده (حسابِ همگامِ بی ورود): مثلِ عکس و تنظیم، هیچ نگه‌داشته‌ای پیش یا بی دفتر نمی‌نشیند
++    wipe()
++    SyncStateV1(ctx, key()).cursor = 5L
++    val refused = confirmFrom(zip)
++    SyncStateV1(ctx, key()).cursor = 0L
++    assertFalse(refused.ok)
++    assertTrue(heldNow().items.isEmpty() && !heldFile.exists())
++    assertFalse(staged())
++
++    //  ۴) دستگاهِ تازهٔ همان دکان: همه، جز آن‌که فروش رفته
++    wipe()
++    assertTrue(confirmFrom(zip).ok)
++    assertEquals(setOf("drill-h1", "drill-h2", "drill-c1"), heldNow().items.map { it.id }.toSet())
++
++    //  ۵) دفترِ دکانِ دیگر نیست: پشتیبانِ «s-h» روی دفترِ بی‌صاحب (مُهر می‌پذیرد) — دفتر برمی‌گردد، نگه‌داشته‌ها نه
++    wipe()
++    LedgerOwner.remember(ctx, "", "")
++    assertTrue(confirmFrom(zip).ok)
++    assertTrue(heldNow().items.isEmpty())
++    assertFalse(staged())
++  }
+ }
+diff --git a/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/DataSafetyGuardTest.kt b/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/DataSafetyGuardTest.kt
+index 7be0704ad..b6d178831 100644
+--- a/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/DataSafetyGuardTest.kt
++++ b/desktop/src/test/kotlin/ir/vil3ntec/tohid/desktop/DataSafetyGuardTest.kt
+@@ -2,11 +2,20 @@ package ir.vil3ntec.tohid.desktop
+ 
+ import android.content.Context
+ import ir.vil3ntec.tohid.data.BackupBundle
++import ir.vil3ntec.tohid.data.CartStore
+ import ir.vil3ntec.tohid.data.DeviceDocsBundle
++import ir.vil3ntec.tohid.data.HeldBook
++import ir.vil3ntec.tohid.data.HeldInvoice
++import ir.vil3ntec.tohid.data.HeldInvoiceCodec
++import ir.vil3ntec.tohid.data.HeldInvoiceStore
++import ir.vil3ntec.tohid.data.HeldInvoices
++import ir.vil3ntec.tohid.data.LedgerOwner
+ import ir.vil3ntec.tohid.data.Product
+ import ir.vil3ntec.tohid.data.QuoteBook
+ import ir.vil3ntec.tohid.data.QuoteStore
+ import ir.vil3ntec.tohid.data.Sale
++import ir.vil3ntec.tohid.data.SaleDraft
++import ir.vil3ntec.tohid.data.SaleDraftCodec
+ import ir.vil3ntec.tohid.data.SavedQuote
+ import ir.vil3ntec.tohid.data.ShopData
+ import ir.vil3ntec.tohid.data.ShopSettingsBundle
+@@ -27,6 +36,7 @@ import org.junit.Test
+ import java.io.ByteArrayInputStream
+ import java.io.ByteArrayOutputStream
+ import java.io.File
++import java.util.zip.ZipInputStream
+ 
+ /**
+  *  DATA-SAFETY (`docs/DATA-SAFETY-fa.md`) — نگهبانِ «چه چیزی به سرور/پشتیبان می‌رسد» و «پایانِ اشتراک
+@@ -47,6 +57,10 @@ class DataSafetyGuardTest {
+     ShopSettingsBundle.dropStaged(ctx)
+     DeviceDocsBundle.dropStaged(ctx)
+     File(ctx.filesDir, QuoteStore.FILE).delete()
++    File(ctx.filesDir, HeldInvoiceStore.FILE).delete()
++    File(ctx.filesDir, CartStore.FILE).delete()
++    HeldInvoices.reset()
++    ir.vil3ntec.tohid.data.HeldSync.cart = null
+   }
+ 
+   @Before fun before() = clean()
+@@ -138,6 +152,74 @@ class DataSafetyGuardTest {
+     assertEquals(listOf(mine), QuoteStore.read(ctx).items)
+   }
+ 
++  /**
++   *  DATA-SAFETY §۸: فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) با پرچمِ خاموشِ `shop.held_sync`
++   *  (پیش‌فرض) در هیچ پشتیبانی نبودند: نصبِ دوباره یا بازیابیِ پشتیبانِ کامل همه را می‌برد. حالا قلمِ `device/held-invoices.json`
++   *  ِ پشتیبانِ کامل (پس با پشتیبانِ ابری روی سرور)؛ بی نگه‌داشته و سبد ⇒ هیچ قلمی، پشتیبان همان پیشین.
++   */
++  @Test fun `نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل‌اند و بی آن‌ها هیچ قلمی نیست`() {
++    fun entries(): List<String> {
++      val zip = ByteArrayOutputStream().also { BackupBundle.write(ctx, it, "{\"products\":[{\"id\":\"dsg-p1\",\"name\":\"x\"}]}").getOrThrow() }.toByteArray()
++      return ZipInputStream(ByteArrayInputStream(zip)).use { z -> generateSequence { z.nextEntry }.map { it.name }.toList() }
++    }
++    assertTrue("بی نگه‌داشته و سبد هیچ قلمی", entries().none { it.startsWith("device/held") })
++    val h = HeldInvoice(id = "dsg-h1", number = 1, label = "آقای کریمی", lines = listOf(SaleDraft.Line("dsg-p1", 2.0, 95.0)), heldAt = 1_762_600_000_000)
++    File(ctx.filesDir, HeldInvoiceStore.FILE).writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h))))
++    HeldInvoices.reset()
++    assertTrue("نگه‌داشته", "device/held-invoices.json" in entries())
++    File(ctx.filesDir, HeldInvoiceStore.FILE).delete()
++    File(ctx.filesDir, CartStore.FILE).writeText(SaleDraftCodec.encode(SaleDraft(key = "dsg-c1", lines = h.lines)))
++    HeldInvoices.reset()
++    assertTrue("سبدِ جاری", "device/held-invoices.json" in entries())
++  }
++
++  /**
++   *  DATA-SAFETY §۸: بازیابیِ پس از ورود (`CloudSettingsRestore`: `commitPhotos(onlyMissing)` و سپس `commitHeld` با دفترِ سرور) —
++   *  نگه‌داشته‌ها فقط پس از دفتر، فقط روی دستگاهِ بی فاکتورِ باز، فقط در همان دکان، و نه آن‌که در دفتر فروش رفته.
++   */
++  @Test fun `نگه‌داشته‌های پشتیبانِ ابری پس از ورود فقط روی دستگاهِ بی فاکتورِ باز و در همان دکان برمی‌گردند`() {
++    val heldFile = File(ctx.filesDir, HeldInvoiceStore.FILE)
++    fun now(): HeldBook = HeldInvoices.of(ctx).let { runBlocking { it.load() }; it.book.value }
++    val h = HeldInvoice(id = "dsg-h2", number = 2, label = "آقای کریمی", lines = listOf(SaleDraft.Line("dsg-p1", 2.0, 95.0)), heldAt = 1_762_600_000_000)
++    val sold = h.copy(id = "dsg-s1", number = 3)
++    heldFile.writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h, sold))))
++    HeldInvoices.reset()
++    val zip = ByteArrayOutputStream().also { BackupBundle.write(ctx, it, "{\"products\":[{\"id\":\"dsg-p1\",\"name\":\"x\"}]}").getOrThrow() }.toByteArray()
++    val ledger = ShopData(products = listOf(Product(id = "dsg-p1", name = "x")), sales = listOf(Sale(id = "dsg-s1", invoiceNumber = 1)))
++    fun stage() = BackupBundle.read(ctx, ByteArrayInputStream(zip)) { ShopStore(ctx).parseBackup(it) }.getOrThrow()
++
++    //  نصبِ دوباره
++    heldFile.delete(); HeldInvoices.reset()
++    stage()
++    BackupBundle.commitPhotos(ctx, onlyMissing = true)
++    assertTrue("عکس و تنظیم نگه‌داشته نمی‌نشانند — فقط پس از دفتر", now().items.isEmpty())
++    assertEquals(1, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
++    assertEquals("فروخته در دفترِ سرور هرگز", listOf(h), now().items)
++    assertEquals("یک بار", 0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
++
++    //  دستگاهی که نگه‌داشتهٔ خودش را دارد: هیچ چیز رونویسی یا قاطی نمی‌شود
++    val mine = HeldBook(items = listOf(h.copy(id = "dsg-mine", number = 1, label = "مالِ همین دستگاه")))
++    heldFile.writeText(HeldInvoiceCodec.encode(mine)); HeldInvoices.reset()
++    stage()
++    assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
++    assertEquals(mine, now())
++
++    //  دکانِ دیگر روی همین دستگاه: هیچ
++    heldFile.delete(); HeldInvoices.reset()
++    LedgerOwner.remember(ctx, "u-x", "s-x")
++    try {
++      stage()
++      assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
++      assertTrue(now().items.isEmpty())
++    } finally {
++      LedgerOwner.remember(ctx, "", "")
++    }
++    //  پروندهٔ خراب: هیچ اثری
++    File(ctx.cacheDir, "restore-held.json").writeText("{not json")
++    assertEquals(0, runBlocking { DeviceDocsBundle.commitHeld(ctx, ledger) })
++    assertFalse(File(ctx.cacheDir, "restore-held.json").exists())
++  }
++
+   @Test fun `پشتیبانِ دست‌ساز نشست یا همگام‌سازی را نمی‌نویسد`() {
+     val crafted = buildJsonObject {
+       put("tohid-session", buildJsonObject { put("dsg.evil", buildJsonObject { put("t", JsonPrimitive("s")); put("v", JsonPrimitive("x")) }) })
+diff --git a/docs/DATA-SAFETY-fa.md b/docs/DATA-SAFETY-fa.md
+index ee36f148b..38f39c43d 100644
+--- a/docs/DATA-SAFETY-fa.md
++++ b/docs/DATA-SAFETY-fa.md
+@@ -188,9 +188,7 @@
+     دفترِ صفحه می‌رود؛ (و) نقشی که فقط «ردیفِ خودش» را حذف می‌کند ردیف‌های ساختهٔ گوشیِ اول را دیگر خودی نمی‌بیند (همان آیفون).
+ 
+ 11. **OPS-02 — بازیابیِ آزموده و رمزِ نسخه‌ها (۱۴۰۵/۰۸/۱۹، شاخهٔ `claude/backup-restore`): آنچه مانده.**
+-    (الف) **فاکتورهای نگه‌داشته** (`held-invoices.json`، POS-12) در هیچ پشتیبانی نیستند — مالِ همین دستگاه و همگام‌نشده‌اند؛
+-    برداشتنِ برنامه یعنی رفتنِ سبدهای باز (نه فروشِ ثبت‌شده). بردنشان به ZIP آسان است، ولی نشاندنشان زیرِ `HeldInvoiceStore` ِ
+-    بازِ همان لحظه (قفل، رزروِ موجودی، `reconcile` با سبدِ جاری) ادغام می‌خواهد؛ گامِ بعد.
++    (الف) ~~**فاکتورهای نگه‌داشته** در هیچ پشتیبانی نیستند~~ ⇒ **بسته** (§۲ بندِ ۱۲، شاخهٔ `claude/safety-followups`).
+     (ب) **راهِ محلی با صفِ نرفته:** دستگاهِ هرگز همگام‌نشده‌ای که پشتیبانِ کهنه را برگرداند، opهای پس از آن پشتیبان را در صف
+     نگه می‌دارد (هیچ opی گم نمی‌شود — آزموده)؛ با نخستین ورود همان‌ها به سرور می‌روند در حالی که دفترِ همین دستگاه آن‌ها را ندارد
+     (تا یک «بازسازی از سرور» دفترِ دستگاه از سرور جداست). کنار گذاشتنِ آن opها یعنی گم شدنشان؛ «بازیابی = برگشت به گذشته» یا
+@@ -200,11 +198,40 @@
+     (`RestoredDevice`: کلیدِ پیش از ورود = صاحبِ دفتر) ⇒ نشد.
+     (د) فایلِ «فقط دفتر» (JSON ِ همسازِ وب) و نسخه‌های خودکار مُهر ندارند ⇒ سنجشِ دکان برایشان نیست (نسخهٔ خودکار مالِ همین دستگاه است).
+     (ه) **USB با یک لمس** و پشتیبانِ دستی/پوشه با همین عبارت رمز نشده؛ گامِ بعد همان پاکت روی ZIP (بازکردن با عبارت).
+-    (و) صفحهٔ عبارت جلوی عکسِ صفحه را نمی‌گیرد (`FLAG_SECURE`)؛ هر دستگاه عبارتِ خودش (عبارتِ یکسانِ دکان، با همگام‌سازیِ
+-    کلید، ساخته نشد).
++    (و) ~~صفحهٔ عبارت جلوی عکسِ صفحه را نمی‌گیرد~~ ⇒ **بسته** (§۲ بندِ ۱۲-ج). هر دستگاه عبارتِ خودش (عبارتِ یکسانِ دکان، با
++    همگام‌سازیِ کلید، ساخته نشد).
+     (ز) آزمون‌های فقط-اندروید این‌جا اجرا نشدند؛ کشیدنِ برگهٔ عبارت و بخشِ تازهٔ «داده‌ها» آزمونِ تصویری ندارد (منطق در
+     `RecoveryPhraseFlowTest` و کارها در همان `BackupRestore` ِ آزموده).
+ 
++12. **پیگیری‌های ایمنیِ داده (۱۴۰۵/۰۸/۱۹، شاخهٔ `claude/safety-followups`).**
++    (الف) **نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل** (پرچمِ `shop.held_sync` خاموش، پیش‌فرض): قلمِ `device/held-invoices.json`
++    ِ ZIP (`DeviceDocsBundle.held`، `HeldBackup`: نگه‌داشته‌های همین حساب با همهٔ فیلدها + سبدِ جاری با شماره و نامِ برگه‌اش). تا
++    تأییدِ بازیابی کنار؛ **فقط پس از نشستنِ دفتر** (`BackupRestore.confirm` و `CloudSettingsRestore` ⇐ `commitHeld`، هرگز
++    `commitPhotos`) و از درِ دفترِ زنده (`HeldInvoiceStore.absorb`، زیرِ همان قفل و حافظه). **قاعدهٔ برگزیده: فقط روی دستگاهی که
++    خودش فاکتورِ بازی ندارد** (نه نگه‌داشته، نه سبدِ پُرِ دیگری؛ سبدِ همان کلید ⇒ همان بماند) — نه آمیختن با شناسه: بی سنگِ قبرِ
++    محلی آمیختن نگه‌داشتهٔ برگشته/دور انداخته را زنده می‌کرد و نسخهٔ کهنهٔ هم‌کلیدِ سبد دو فاکتورِ یکسان می‌ساخت (همان قاعدهٔ
++    پیش‌فاکتورها). سبدِ پشتیبان **به‌شکلِ نگه‌داشته** برمی‌گردد، هرگز روی سبدِ این دستگاه (`CartStore` در حافظه است). فقط در همان
++    دکان (صاحبِ دفتر هنگامِ پشتیبان = صاحبِ دفترِ روی میز، `LedgerOwner`؛ نگه‌داشتهٔ سریِ دیگرِ همین دستگاه در پشتیبان نمی‌رود)؛
++    آن‌که در دفترِ بازیابی‌شده فروش رفته هرگز؛ پرچمِ روشن روی دستگاه ⇒ از سرور (S09)، نه از پشتیبان؛ آموزش هرگز. سنجه (سرخ ⇐
++    سبز): `BackupRestoreDrillTest` «فاکتورهای نگه‌داشته و سبدِ جاری…» و «…فقط پس از دفتر، در همان دکان…»، `DataSafetyGuardTest`
++    «نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل‌اند…» و «…پشتیبانِ ابری پس از ورود…». ⚠️ نگه‌داشته‌ای که پس از پشتیبان دور
++    انداخته شد، روی دستگاهِ تازه برمی‌گردد (دیده‌شدنی و دورانداختنی؛ فروش نیست). پاک‌سازیِ خودکارِ کهنه‌ها (اگر صاحب روشنش
++    کرده باشد) نگه‌داشتهٔ برگشتهٔ بالای ۲۴ ساعت را هم مثلِ همیشه برمی‌دارد.
++    (ب) **«در دستِ دستگاهِ X»** (پرچمِ `shop.held_sync` روشن؛ بی مهاجرتِ تازه): سنگِ قبرِ `resumed` همان ادعای نرم است (دستگاه
++    و زمان، ۱۰ دقیقه «تازه»). بازگرداندن پیش از آن می‌پرسد (`DELETE …&claim=1&base=`، حداکثر ۳ ثانیه)؛ در دستِ دیگری ⇒ برگهٔ «در
++    دستِ دستگاهِ A1» و فقط با «باز کردن در این دستگاه» (`force`، سابقهٔ `held.takeover`) — آن‌وقت با **کلیدِ تازهٔ فروش**، و
++    دستگاهِ نخست (که همان را در صندوق دارد) با دورِ بعد «یک فاکتور در دو دستگاه» می‌بیند. بی شبکه باز کردن آزاد است (نگه‌داشتهٔ
++    در همگام‌سازی با کلیدِ تازه)؛ بازگرداندنِ در صف با `base` می‌رود و اگر دیگری پیش‌تر برش گرداند، فروخت یا عوضش کرد ⇒
++    `held_conflict` ⇒ همان پیام تا «دیدم». کلیدِ تازه یعنی دو فروشِ یک نگه‌داشته هرگز یک شناسه نمی‌گیرند (Sync v1 دو فروشِ هم‌شناسه
++    را بی‌صدا در یک ردیف می‌آمیخت: ردیف‌های هر دو زیرِ یک فروش، جمعِ یکی)؛ دو فروشِ جدا فقط پس از دیدنِ کاربر. سنجه:
++    `server/test/shop-held-invoices.test.js` (PGlite و PostgreSQL، با رقابتِ دو ادعای هم‌زمان)، `HeldClaimTest`.
++    ⚠️ مانده: دو فروشِ جدای یک نگه‌داشته (پس از هشدار) خودکار یکی نمی‌شوند — کاربر یکی را برمی‌گرداند؛ «در دستِ» پس از ۱۰ دقیقه
++    «پیش‌تر باز شد» می‌گوید (دستگاهِ نخست ادعایش را تازه نمی‌کند).
++    (ج) **عبارتِ بازیابی و عکسِ صفحه:** اندروید تا عبارت روی صفحه است (نشان دادن، نوشتنِ دوباره، باز کردنِ نسخهٔ رمزدار)
++    `FLAG_SECURE` روی پنجرهٔ برگه و Activity (`Platform.SecureWindow`، `RecoveryPhraseFlow.Step.secret`) و پس از آن برداشته؛
++    کامپیوتر و آیفون همان API بی‌اثر؛ عبارت هیچ‌جا در سابقهٔ برنامه نوشته نمی‌شود. سنجه: `RecoveryPhraseSecureWiringTest`،
++    `RecoveryPhraseFlowTest`. ⚠️ آزمونِ اندرویدیِ واقعیِ پرچمِ پنجره (عکسِ صفحهٔ سیاه) فقط روی دستگاه.
++
+ ## ۳. هماهنگی با `claude/no-data-loss` (پرونده‌هایش دست نخورد)
+ 
+ - `ShopStore.stashTo`/`openFrom`: `file.copyTo(vault, overwrite = true)` و برعکسش بی `fsync` است؛ قطعِ برق درست پس از
+@@ -237,7 +264,7 @@
+ | پشتیبان (تازه) | `tohid-policy`، `tohid-receipt`، `tohid-modules` | با بازیابیِ پشتیبانِ کامل/ابری (فقط کلیدهای تنظیم‌نشده)؛ کلیدهای «مالِ دکان» (§۶) با پرچمِ `shop.settings_sync` زنده از سرور |
+ | پشتیبان | عکسِ کالا (`product-photos`) | از سرور (`PhotoSync`) و پشتیبانِ کامل |
+ | پشتیبان (تازه، §۷) | پیش‌فاکتورها (`quotes.json`) | با بازیابیِ پشتیبانِ کامل/ابری (`CloudSettingsRestore`)، فقط وقتی دستگاه هیچ پیش‌فاکتوری ندارد |
+-| مالِ همین دستگاه (عمداً، §۷) | فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) | — (کارِ نیمه‌تمام؛ با «ثبت» فروش می‌شود و همگام) |
++| پشتیبان (تازه، §۲ بندِ ۱۲) | فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) | با بازیابیِ پشتیبانِ کامل/ابری پس از نشستنِ دفتر، همه به‌شکلِ نگه‌داشته، فقط روی دستگاهِ بی فاکتورِ باز و همان دکان (نه فروخته)؛ با پرچمِ `shop.held_sync` از سرور |
+ | نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push` | منبعش سرور است (یا صفِ فرستادنی به آن) |
+ | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
+ | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، صف و cursor ِ پشتیبانِ نگه‌داشته‌ها `tohid-held-sync` (خودِ نگه‌داشته‌ها با پرچمِ `shop.held_sync` روی سرور)، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
+@@ -337,7 +364,8 @@
+ | `Sale.syncStatus` | v1 بله؛ v3 نه (`localOnly`) | v3 ⇒ «pending» | نشانِ «فرستاده شد؟» ِ همان دستگاه |
+ | `correctedAt` ِ فاکتور/رسید/جابه‌جایی | v1 همان؛ v3 فقط سرور می‌نویسد (S28b) | از سرور | سرورمرجع |
+ | پیش‌فاکتورها (`quotes.json`) | **تازه:** در هر پشتیبانِ کامل (`device/quotes.json`) ⇐ پشتیبانِ ابری | `CloudSettingsRestore` پس از ورود، فقط وقتی دستگاه هیچ پیش‌فاکتوری ندارد | نه (پیش‌تر بله — گم می‌شد) |
+-| فاکتورهای نگه‌داشته، سبدِ جاری، پیش‌نویسِ شمارش/انتقال/قرض‌دار (`held-invoices.json`، `sale-draft.json`، `tohid-stock*`، `tohid-debtor-detail`) | — | — | بله: کارِ نیمه‌تمام (نگه‌داشته حداکثر ۹ و کهنه پس از ۲۴ ساعت)؛ با «ثبت» فروش/سند می‌شود و همگام. همگام‌سازیِ نگه‌داشته = S09 (به‌تعویق) |
++| فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) | **تازه:** در هر پشتیبانِ کامل (`device/held-invoices.json`) ⇐ پشتیبانِ ابری؛ با `shop.held_sync` هر نگه‌داشته جدا | پس از نشستنِ دفتر، فقط روی دستگاهِ بی فاکتورِ باز و همان دکان، نه فروخته (§۲ بندِ ۱۲) | نه (پیش‌تر بله — گم می‌شد) |
++| پیش‌نویسِ شمارش/انتقال/قرض‌دار (`tohid-stock*`، `tohid-debtor-detail`) | — | — | بله: کارِ نیمه‌تمام؛ با «ثبت» سند می‌شود و همگام |
+ | تنظیمات، عکس، رمزِ کارمندان، حالِ همگام‌سازی | §۵ و §۶ | §۵ و §۶ | رمز و هویتِ دستگاه: بله |
+ 
+ **یافته و رفع (سرخ ⇐ سبز):**
+diff --git a/docs/FLAGS-ON-fa.md b/docs/FLAGS-ON-fa.md
+index cf3a83225..2e1c08bc9 100644
+--- a/docs/FLAGS-ON-fa.md
++++ b/docs/FLAGS-ON-fa.md
+@@ -193,8 +193,11 @@
+   تازه» کلیدِ تازه می‌سازد؛ پروندهٔ کلیدِ ناخوانا پاک نمی‌شود، کنار می‌رود (`atrest/phrase-keys.lost-<زمان>`).
+ - **خاموش کردن:** همان کلید ⇒ «خاموش کن». نسخه‌های بعدی مثلِ پیش؛ نسخه‌های رمزدارِ پیشین می‌مانند (با کلیدِ همین دستگاه یا
+   عبارت باز می‌شوند) و فقط با هرسِ عادیِ «۶ + ۷ + ۴» می‌روند. هیچ داده‌ای پاک نمی‌شود.
+-- **هنوز نه:** نشان دادنِ عبارت پنجره را در برابرِ عکسِ صفحه نمی‌بندد (`FLAG_SECURE`)؛ یک عبارتِ مشترک برای همهٔ دستگاه‌های
+-  دکان و رمزِ پشتیبانِ پوشه/USB با همین عبارت ساخته نشده (§۲ ِ `DATA-SAFETY-fa.md`).
++- **عکسِ صفحه:** روی گوشیِ اندروید تا عبارت روی صفحه است (نشان دادن، نوشتنِ دوباره، باز کردنِ نسخهٔ رمزدار) عکسِ صفحه، ضبطِ
++  صفحه و پیش‌نمایشِ «برنامه‌های اخیر» سیاه است (`FLAG_SECURE`، از ۱۴۰۵/۰۸/۱۹)؛ «چرا» و پس از بستن عادی. ببینید: در گامِ
++  «نشان بده» عکسِ صفحه بگیرید ⇒ سیاه یا «برنامه اجازه نمی‌دهد». کامپیوتر و آیفون این را ندارند؛ عبارت هیچ‌جا نوشته نمی‌شود.
++- **هنوز نه:** یک عبارتِ مشترک برای همهٔ دستگاه‌های دکان و رمزِ پشتیبانِ پوشه/USB با همین عبارت ساخته نشده (§۲ ِ
++  `DATA-SAFETY-fa.md`).
+ 
+ ---
+ 
+@@ -206,7 +209,15 @@
+   می‌شود (`DELETE`، با دلیلِ `resumed`/`sold`/`deleted`). نصبِ تازه یا دستگاهِ دیگرِ همان دکان با بازشدنِ صندوق (و سپس هر
+   دقیقه، و فوری با خبرِ سوکتِ `held`) همه را در فهرستِ نگه‌داشته‌ها پس می‌گیرد — با همهٔ ردیف‌ها، مشتری، کدهای تخفیف،
+   یادداشتِ فاکتور، تخفیف، روشِ پرداخت، «قیمتِ خاص» ِ ردیف‌ها و لیستِ قیمتِ دستی. فاکتوری که روی دستگاهی برگشت یا فروش رفت
+-  با دورِ بعد از فهرستِ بقیه می‌رود. قفلِ «در دستِ دستگاهِ ۲» نیست.
++  با دورِ بعد از فهرستِ بقیه می‌رود.
++- **«در دستِ دستگاهِ X» (از ۱۴۰۵/۰۸/۱۹، همین پرچم، بی مهاجرتِ تازه):** بازگرداندن پیش از آن از سرور می‌پرسد (حداکثر ۳ ثانیه؛
++  `DELETE …&claim=1&base=<نسخهٔ دیده‌شده>`). سنگِ قبرِ «برگشت» همان ادعای نرم است (کدام دستگاه، کی؛ ۱۰ دقیقه «همین حالا»).
++  دستگاهِ دیگری که همان برگه را هنوز در فهرست دارد ⇒ برگهٔ «در دستِ دستگاهِ A1» (یا «پیش‌تر در دستگاهِ A1 باز شد»؛ A1 همان
++  سریِ روی فاکتورِ آن دستگاه) و فقط با «باز کردن در این دستگاه» باز می‌شود — آن‌وقت با **کلیدِ تازهٔ فروش** و در «سابقهٔ
++  عملیات» (`held.takeover`)، و دستگاهِ نخست با دورِ بعد «یک فاکتور در دو دستگاه» می‌بیند. **بی شبکه** باز کردن آزاد است
++  (نگه‌داشتهٔ در همگام‌سازی با کلیدِ تازه)؛ پس از وصل، اگر دستگاهِ دیگری پیش‌تر همان را برگرداند، فروخت یا عوضش کرد ⇒ ۴۰۹
++  `held_conflict` و همان پیام تا «دیدم». کلیدِ تازه یعنی دو فروشِ یک نگه‌داشته هرگز یک شناسه نمی‌گیرند (Sync v1 دو فروشِ
++  هم‌شناسه را بی‌صدا در یک ردیف می‌آمیخت)؛ دو فروشِ جدا فقط پس از دیدنِ کاربر. برنامهٔ پیشین (بی `base`/`claim`) همان رفتار.
+ - **تعارض:** هر فاکتور جدا، با نسخهٔ دستگاه (ساعتِ ویرایش، همیشه بیش از نسخه‌ای که همان دستگاه دیده بود). نوشتنِ کهنه‌تر
+   هرگز روی تازه‌تر نمی‌نشیند (۴۰۹ `held_stale` و دستگاه نسخهٔ تازهٔ سرور را می‌نشاند)؛ نوشتنِ دیررسیده فاکتورِ برگشته یا
+   فروخته را زنده نمی‌کند (سنگِ قبر، ۳۰ روز). ساعتِ بسیار کجِ یک دستگاه فقط ترتیبِ دو ویرایشِ هم‌زمانِ **همان** فاکتور را
+@@ -220,11 +231,18 @@
+   دستگاه بودند با نخستین دور فرستاده می‌شوند (فقط آن‌که همان دستگاه زیرِ همان دکان ساخت؛ ماندهٔ دکانِ دیگرِ همان گوشی هرگز).
+ - **بعد از روشن کردن ببینید:** روی گوشیِ «الف» فاکتوری با مشتری و یادداشت نگه دارید ⇐ کامپیوترِ «ب» صندوق را باز کند: همان
+   فاکتور در فهرستِ نگه‌داشته‌ها؛ آن را روی «ب» برگردانید ⇐ چند ثانیه بعد (یا با بازکردنِ دوبارهٔ صندوق) از فهرستِ «الف» رفته است.
++  «در دستِ»: پیش از آن‌که «الف» دور بزند همان برگه را روی «الف» هم بزنید ⇒ «در دستِ دستگاهِ B1»؛ «نه» ⇒ هیچ چیز عوض نشد؛ «باز
++  کردن در این دستگاه» ⇒ باز می‌شود و «ب» تا یک دقیقه «یک فاکتور در دو دستگاه» می‌بیند. «ب» را بی اینترنت کنید و همان کار را
++  بکنید ⇒ باز می‌شود؛ با وصلِ دوباره پیامِ «دوتایی» روی «ب» می‌آید.
+   برنامه را روی «الف» پاک و دوباره نصب کنید و وارد شوید ⇐ نگه‌داشته‌های باقی برمی‌گردند. شاگرد نگه‌داشتهٔ صاحب را دور
+   نمی‌اندازد؛ مدیر می‌اندازد.
+ - **خاموش کردن:** `false` یا «حذف» ⇒ `GET` فقط `{enabled:false}` و `PUT`/`DELETE` ۴۰۳ `held_sync_disabled`؛ برنامه وضعِ
+   همگام‌سازیِ خودش را فراموش می‌کند و نگه‌داشته‌ها همان‌جا روی هر دستگاه می‌مانند (هیچ پاک نمی‌شود)؛ فایلِ نگه‌داشته‌ها و
+-  پیش‌نویسِ فاکتور بایت‌به‌بایت همان پیشین. ردیف‌های سرور سرِ جایشان (با rollback ِ دستیِ ۴۲۵ می‌روند).
++  پیش‌نویسِ فاکتور بایت‌به‌بایت همان پیشین؛ بازگرداندن هیچ پرسشی ندارد. ردیف‌های سرور سرِ جایشان (با rollback ِ دستیِ ۴۲۵
++  می‌روند).
++- **پرچمِ خاموش و پشتیبانِ دستگاه:** نگه‌داشته‌ها و سبدِ جاری با **پشتیبانِ کامل** هم (دستی/پوشه/ابری) می‌روند و پس از
++  بازیابی (فقط پس از نشستنِ دفتر، فقط روی دستگاهِ بی فاکتورِ باز و همان دکان، نه آن‌که فروش رفته) به‌شکلِ نگه‌داشته برمی‌گردند؛
++  پرچمِ روشن روی دستگاه ⇒ نگه‌داشته‌ها از سرور، نه از پشتیبان (`DATA-SAFETY-fa.md` §۲ بندِ ۱۲).
+ 
+ ---
+ 
+diff --git a/docs/RULES-fa.md b/docs/RULES-fa.md
+index 4293a3a72..431fc7212 100644
+--- a/docs/RULES-fa.md
++++ b/docs/RULES-fa.md
+@@ -717,6 +717,15 @@
+ - تمرینِ بازیابیِ پشتیبانِ سرور با «شمارش و جمعِ کنترل» (`server/test/e2e/lib/control-sums.mjs`): هر جدول (شمار، هشِ محتوا، جمعِ `*_minor`) و هر مجموعهٔ دفترِ دکان (شمار، جمعِ هر فیلدِ عددی) باید با مبدأ یکی باشد؛ جدولِ تازه خودکار شمرده می‌شود (REC-01).
+ - پشتیبانِ سرور با پرچمِ `security / backup.require_encryption`: بی رمز هیچ فایلی (نه متنِ ساده، نه `.part`) و هیچ هرسی؛ «موفق» فقط پس از رمزگشایی + gzip ِ همان فایل با شمارِ بایتِ برابرِ dump؛ پرچمِ ناخوانا = خاموش = رفتارِ F0-08 (SEC-07).
+ - چت جدا هم پشتیبان می‌گیرد (`node scripts/chat-backup.js`): پیام و رسانه دو فایلِ جدا، رمز با همان `BACKUP_PASSPHRASE`؛ بازگردانی فقط افزودنی (`ON CONFLICT DO NOTHING`) و به ترتیبِ «پشتیبانِ اصلی ⇐ پیام ⇐ رسانه ⇐ verify»؛ رسانه‌ای که sha256 ِ بایتش نخواند نوشته نمی‌شود (CHAT-12).
++- ⛔ **نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل** (DATA-SAFETY §۲ بندِ ۱۲، `device/held-invoices.json`، `HeldBackupRules`): کنار تا
++  تأیید و فقط **پس از نشستنِ دفتر** (`DeviceDocsBundle.commitHeld` از `BackupRestore.confirm` و `CloudSettingsRestore`، هرگز از
++  `commitPhotos`)، از درِ `HeldInvoiceStore.absorb` (هرگز نوشتنِ پرونده زیرِ پای دفترِ زنده)؛ فقط روی دستگاهی که خودش فاکتورِ بازی
++  ندارد (آمیختن نه: بی سنگِ قبرِ محلی زنده می‌کرد)؛ سبدِ پشتیبان فقط به‌شکلِ نگه‌داشته (هرگز روی `CartStore`)؛ فقط همان دکان
++  (`LedgerOwner` ِ پشتیبان = روی میز)؛ فروخته‌ها (`SaleDraftRules.posted`) هرگز؛ `shop.held_sync` ِ روشن روی دستگاه ⇒ از سرور؛
++  آموزش هرگز. سنجه: `BackupRestoreDrillTest` (دو آزمونِ «نگه‌داشته…»)، `DataSafetyGuardTest`.
++- ⛔ برگهٔ عبارتِ بازیابی تا عبارت روی صفحه است (`RecoveryPhraseFlow.Step.secret`، و برگهٔ باز کردنِ نسخهٔ رمزدار) `Platform.SecureWindow`
++  می‌گیرد: اندروید `FLAG_SECURE` روی پنجرهٔ برگه **و** Activity (برگهٔ Compose با Inherit از Activity می‌خواند) و فقط همان که گذاشت
++  برمی‌دارد؛ کامپیوتر و آیفون بی‌اثر؛ عبارت هرگز در سابقه/خروجی. سنجه: `RecoveryPhraseSecureWiringTest`.
+ - **عبارتِ بازیابیِ فروشگاه** (OPS-02، §۱۰.۳؛ صفحه از ۱۴۰۵/۰۸/۱۹: «داده‌ها» ⇐ «رمزِ نسخه‌های خودکار»، `RecoveryPhraseFlow`): پشتیبانِ دستگاه با کلیدِ ساخته از عبارت رمز می‌شود، **هرگز** با کلیدِ دستگاه. عبارت = ۲۵ نویسهٔ Crockford (۱۲۰ بیتِ تصادفی + وارسی، `core/backup/RecoveryPhrase`)؛ کلید = PBKDF2-HMAC-SHA256 با ۶۰۰٬۰۰۰ تکرار؛ فایل = همان پاکتِ `AtRestEnvelope` با KID ِ `rp1.<تکرار>.<نمک>` (`core/atrest/platform/PhraseBackup`). تکرارِ بیرون از ۱۰۰٬۰۰۰..۵٬۰۰۰٬۰۰۰ در فایل ⇒ باز نمی‌شود (فایلِ دست‌کاری‌شده برنامه را قفل نکند). قالب را بی بردارِ تازه در `PhraseBackupTest` و `RecoveryPhraseTest` (ساختهٔ Python) عوض نکن — پشتیبانِ قدیمی دیگر باز نمی‌شود.
+ - ⛔ **رمزِ نسخه‌های خودکار** (`SnapshotSeal`، تنظیمِ همین دستگاه، پیش‌فرض خاموش؛ FLAGS-ON §۸و): فقط با کلیدِ ساخته از عبارت (`PhraseBackup.seal`، KID ِ `rp1`)، **هرگز** با کلیدِ دستگاه؛ روشن فقط پس از نشان دادن و **نوشتنِ دوبارهٔ** عبارت. دفتر، `.prev`، `.tmp`، نسخهٔ ایمنی، بایگانی، صف و پشتیبان‌های دستی/پوشه/ابری هرگز با این کلید رمز نمی‌شوند. کلیدِ دستگاه (پیچندهٔ کلیدِ عبارت، `atrest/phrase-keys`) باز نشد ⇒ نسخه همان رونوشتِ خامِ پیشین، هرگز «بی نسخه»؛ پروندهٔ کلیدِ ناخوانا کنار (`.lost-<زمان>`)، نه پاک. «فقط با تغییر» با متنِ باز سنجیده می‌شود (بایتِ رمزدار هر بار فرق دارد). کوچِ «رمزِ دفتر» (`AtRest.files`) نسخهٔ رمزدار با عبارت را نمی‌گیرد.
+ - ⛔ **بازیابی از فایل** فقط از `BackupRestore` (گوشیِ نسخهٔ ۳، کامپیوتر، تنظیماتِ قدیم): ZIP بی رکوردِ پایانی یا با شمارِ قلمِ دیگر (`ZipTail.complete`)، هر خطای خواندن، JSON ِ بریده ⇒ رد با `StrBackupSafety.damaged` (هرگز متنِ فنی)؛ مُهرِ `bundle.json` (`BackupStamp`) ِ تازه‌تر یا خروجیِ مالکِ `formatVersion` ِ تازه‌تر ⇒ «به‌روز کنید»؛ دکانِ دیگر (صاحبِ دفترِ روی میز، قاعدهٔ `LedgerOwner`) ⇒ رد پیش از برگهٔ تأیید. پس از تأیید **دفتر اول**؛ عکس و تنظیمِ کنار گذاشته فقط اگر دفتر نشست. سرتاسری: `BackupRestoreDrillTest` — راهی را که از آن نگذرد نسازید.
+@@ -904,7 +913,7 @@
+ | `shop.save_base` | دکان / `all` | ⛔ **روشن** (فقط `false` ِ صریح یا نگه‌داشتِ سرویس خاموش می‌کند) | پایهٔ صریحِ ذخیرهٔ برنامه (`ShopStore.save(base, next)`): دو ذخیره از یک صفحهٔ کهنه هیچ‌کدام را نمی‌برند و سدِ نقش با `shop.ledger_merge` ِ خاموش هم؛ برنامه از پاسخِ `?v=3` ِ `GET /api/shop/ledger-merge/config` (فیلدِ `base`) می‌خواند (`LedgerMergeFlag.base`)؛ پاسخِ `v=2` و بی `v` بی تغییر. فقط خاموش‌کنِ اضطراری ⇒ همان ذخیرهٔ پیشین (`saveGuessed`) | DATA-SAFETY، `claude/stale-save` | باز |
+ | `shop.sync_shadow_file` | دکان / `all` | خاموش | سایه و cursor ِ Sync v1 ِ برنامه در فایلِ خودشان (`sync/v1/ShadowStore`: یک فایل، یک نوشتن، `DiskWrite` با `.prev`)، نه SharedPreferences/NSUserDefaults؛ برنامه از `GET /api/shop/ledger-merge/config?v=3` (کلیدِ `shadowFile`، فقط `true` روشن) می‌خواند و فقط در شروع به کار می‌گیرد؛ خاموش ⇒ همان prefs بیت‌به‌بیت، و فایلِ مانده در شروعِ بعد در prefs می‌نشیند | `claude/shadow-file`، `docs/PERF-LEDGER-fa.md` §۱۰ | باز |
+ | `shop.settings_sync` | دکان / `all` | خاموش | همگام‌سازیِ زندهٔ کلیدهای «مالِ دکان» ِ `tohid-policy` (`ShopSettingsKeys`، DATA-SAFETY §۶): `GET`/`PUT /api/shop/settings-sync` (خاموش ⇒ `{enabled:false}` و ۴۰۳ `settings_sync_disabled`)، مهاجرتِ ۳۰۰، خبرِ سوکتِ `settings`؛ آخرین نویسنده با ساعتِ سرور هر کلید جدا، فقط صاحب/مدیر | DATA-SAFETY | باز |
+-| `shop.held_sync` | دکان / `all` | خاموش | پشتیبانِ سرورِ فاکتورهای نگه‌داشته (POS-12، S09): `GET`/`PUT`/`DELETE /api/shop/held-invoices` (خاموش ⇒ `{enabled:false}` و ۴۰۳ `held_sync_disabled`)، مهاجرتِ ۴۲۵، خبرِ سوکتِ `held`؛ هر فاکتور جدا با نسخهٔ دستگاه (کهنه ⇒ ۴۰۹ `held_stale`)، سنگِ قبرِ ۳۰ روزه، دور انداختنِ نگه‌داشتهٔ کسِ دیگر `sales.cancel`؛ برنامه: `HeldSyncEngine` (`HeldSync.kt`)، خاموش ⇒ هیچ نوشتنی | `claude/held-sync` | باز |
++| `shop.held_sync` | دکان / `all` | خاموش | پشتیبانِ سرورِ فاکتورهای نگه‌داشته (POS-12، S09): `GET`/`PUT`/`DELETE /api/shop/held-invoices` (خاموش ⇒ `{enabled:false}` و ۴۰۳ `held_sync_disabled`)، مهاجرتِ ۴۲۵، خبرِ سوکتِ `held`؛ هر فاکتور جدا با نسخهٔ دستگاه (کهنه ⇒ ۴۰۹ `held_stale`)، سنگِ قبرِ ۳۰ روزه، دور انداختنِ نگه‌داشتهٔ کسِ دیگر `sales.cancel`؛ برنامه: `HeldSyncEngine` (`HeldSync.kt`)، خاموش ⇒ هیچ نوشتنی. «در دستِ دستگاهِ X» (`claude/safety-followups`): ⛔ بازگرداندن پیش از آن `DELETE …&claim=1&base=` (سنگِ قبرِ `resumed` = ادعا، ۱۰ دقیقه «تازه»)؛ در دستِ دیگری ⇒ ۴۰۹ `held_claimed` و فقط با تأییدِ صریح (`force`، سابقهٔ `held.takeover`)؛ گرفته یا بی شبکه ⇒ **کلیدِ تازهٔ فروش** (دو فروشِ یک نگه‌داشته هرگز یک شناسه — Sync v1 بی‌صدا می‌آمیخت)؛ در صف با `base` ⇒ ۴۰۹ `held_conflict` ⇒ «یک فاکتور در دو دستگاه» تا «دیدم». بی `base`/`claim` همان رفتارِ پیشین. سنجه: `shop-held-invoices.test.js` (رقابت)، `HeldClaimTest` | `claude/held-sync` | باز |
+ | `pay.hesabpay` | دکان / `all` | خاموش | `POST /api/shop/payments/intents` (خاموش یا بی `HESABPAY_*` ⇒ ۴۰۳ `hesabpay_disabled`؛ `/config` فقط `enabled`)؛ سفارشِ آنلاین اشتراکِ فعال هم | `claude/payments-hesabpay-1` | باز |
+ | `shop.receipt_v2` | دکان / `all` | خاموش | فاکتورِ نسخهٔ ۲: توکنِ QR ِ هر فروشِ تازه، QR ِ رسید = صفحهٔ عمومیِ `/r/<نشان>/<توکن>` (POS-33)، پیوندِ آنلاین در متنِ «فرستادن» و «کپیِ پیوند» ِ کامپیوتر (POS-32، `ReceiptShare`) | #379، `claude/spec-pos-b-2` | main |
+ | `shop.debt_minor` | دکان / `all` | خاموش | ماندهٔ حساب در برنامه به پول، دقیقاً مثلِ `DebtBook` (`core/money/LedgerBalance` از راهِ `DebtMinorFlag`): `ShopStore.debt`، «حساب صاف/بدهکار/موجودی»، داشبورد، `LedgerSummary` و گزارشِ قرض‌داران؛ خاموش ⇒ همان جمعِ Double، بیت‌به‌بیت. سرور چیزی حساب نمی‌کند؛ برنامه از `debtMinor` ِ `GET /api/shop/receipt-profile/config` می‌خواند (`ReceiptFlag`) | #610 | باز |
+diff --git a/docs/WHATS-NEW-fa.md b/docs/WHATS-NEW-fa.md
+index da1693cc2..3b21b42d2 100644
+--- a/docs/WHATS-NEW-fa.md
++++ b/docs/WHATS-NEW-fa.md
+@@ -19,6 +19,10 @@
+ - سطرِ `shipped` (درونِ توضیحِ HTML زیرِ سرخط) فقط برای بخش‌های پخش‌شده پیش از این سامانه است: شمارهٔ ساختِ پیش‌نمایش و
+   آزمایشی، تا دستگاهی که فقط «آخرین نسخهٔ دیده‌شده» ِ قدیم را دارد بداند از کجا نشان دهد. بخشِ تازه آن را نمی‌خواهد.
+ 
++## 3.2 · ۱۴۰۵/۰۸/۱۹ — فاکتورِ نگه‌داشته در پشتیبان و «در دستِ دستگاهِ دیگر»
++- رفع: فاکتورهای نگه‌داشته و فاکتورِ نیمه‌کارهٔ صندوق حالا در پشتیبانِ کامل و پشتیبانِ ابری هستند؛ پس از نصبِ دوباره و بازیابیِ پشتیبان در فهرستِ «فاکتورهای نگه‌داشته» برمی‌گردند — فقط روی دستگاهی که خودش فاکتورِ بازی ندارد، و هرگز فاکتوری که فروخته شده.
++- تازه: وقتی «پشتیبانِ فاکتورهای نگه‌داشته» برای دکان روشن است، فاکتورِ نگه‌داشته‌ای که همین حالا در دستگاهِ دیگری باز است «در دستِ دستگاهِ A1» نشان داده می‌شود و فقط با «باز کردن در این دستگاه» این‌جا هم باز می‌شود؛ اگر یک فاکتور در دو دستگاه باز شود (مثلاً بی اینترنت)، صندوق پیامِ «یک فاکتور در دو دستگاه» را نشان می‌دهد تا «دیدم».
++- تغییر: روی گوشیِ اندروید، تا «عبارتِ بازیابی» روی صفحه است، عکسِ صفحه و ضبطِ صفحه آن را نمی‌گیرند.
+ ## 3.2 · ۱۴۰۵/۰۸/۱۸ — سودِ بستهٔ ساخته‌شده در گزارش
+ - رفع: در «گزارشِ تازه» (سود و «بهای میانگین») و در گزارشِ روزانهٔ صاحبِ دکان، بسته‌ای که با «دستورِ ساخت» ساخته شده حالا به همان بهای دقیقِ اجزایش حساب می‌شود که موجودی نشان می‌دهد؛ پیش‌تر بهای هر بسته گرد می‌شد و سود و ارزشِ آن چند صدمِ افغانی با موجودی فرق می‌کرد.
+ ## 3.2 · ۱۴۰۵/۰۸/۱۸ — هیچ فروشی پشتِ همگام‌سازی جا نمی‌ماند
+diff --git a/docs/api/routes.json b/docs/api/routes.json
+index 9da18cc83..5a2305c66 100644
+--- a/docs/api/routes.json
++++ b/docs/api/routes.json
+@@ -690,7 +690,7 @@
+     {"method":"POST","path":"/api/shop/devices/:id/disable","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.manage')"],"params":["id"],"query":[],"body":["reason"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
+     {"method":"POST","path":"/api/shop/devices/:id/enable","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.manage')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
+     {"method":"GET","path":"/api/shop/held-invoices","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":[],"query":["since"],"body":[],"response":{"statuses":[200],"keys":["...","enabled","permissions"]},"errors":[],"shape":"extracted"},
+-    {"method":"DELETE","path":"/api/shop/held-invoices/:id","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["deleted","enabled","version"]},"errors":[],"shape":"extracted"},
++    {"method":"DELETE","path":"/api/shop/held-invoices/:id","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","deleted","enabled","version"]},"errors":[],"shape":"extracted"},
+     {"method":"PUT","path":"/api/shop/held-invoices/:id","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled"]},"errors":[],"shape":"extracted"},
+     {"method":"GET","path":"/api/shop/hesabpay","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+     {"method":"PUT","path":"/api/shop/hesabpay/account","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+diff --git a/docs/spec/STATUS.md b/docs/spec/STATUS.md
+index 5999bd6b4..3440fa7b2 100644
+--- a/docs/spec/STATUS.md
++++ b/docs/spec/STATUS.md
+@@ -131,7 +131,7 @@
+ | POS-09 | تغییر واحد فروش در ردیف (کارتن، بسته، دانه، کیلو) فقط بر اساس تبدیل ثبت‌شده. | §۶.۱ | ۲ | P0 | IMPLEMENTED-VERIFIED | واحدِ فروشِ دوم با ضریب (Product.saleUnit/unitFactor، SalesEngine.toStockQty؛ ProductRulesTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ پشتِ `TillGoodsPref.units` (پیش‌فرض خاموش) چند واحد در ردیف — پایه، واحدِ دوم و بسته‌ها — با Ctrl+U و برگهٔ ردیفِ گوشی و کامپیوتر، فقط بر اساسِ تبدیلِ ثبت‌شده (`UnitSale`؛ `ScenarioS05Test` ۵/۵ محلی، claude/scenario-gaps-1)؛ صندوقِ گوشیِ نسخهٔ ۳ (`claude/gaps15-partial`): برگهٔ ردیفِ سبد (`sale/line/{i}`، `LineModel`/`LineSheet`) با همان تنظیم همهٔ واحدها — پایه، واحدِ دوم و بسته‌ها — با قیمتِ لیستِ هر بسته، باز شدن با واحدی که مقدارِ ردیف را درست می‌گیرد، قیمتِ دستیِ ردیف و قیمتِ نوشته با عوض شدنِ واحد می‌مانند و «برگشت به قیمتِ کالا» = قیمتِ لیستِ همان واحد، «فقط بستهٔ کامل» ۱٫۵ کارتن را با نامِ واحد رد می‌کند؛ خاموش ⇒ همان برگهٔ دوواحدیِ امروز — `LineUnitsTest` ۷/۷ (`gradle -p desktop test`)؛ کدِ مشترک (آیفون هم). **شاهدِ CI ِ main (ممیزیِ STATUS، دورِ یازدهم؛ روش در «یادداشت‌ها»):** `LineUnitsTest` ۷/۷، `ScenarioS05Test` ۵/۵ و `ProductRulesTest` ۷/۷ (شمارِ `@Test`؛ هر سه در `android-native/app/src/test`) در CI ِ main ‏bd310844 (#891): «فروشگاه من — کامپیوتر» 41654110717 (`:test` ِ desktop اجرا شد، نه UP-TO-DATE یا FROM-CACHE) و «توحید بومی» 41654110812 (`testReleaseUnitTest :core:jvmTest`، «31 actionable tasks: 31 executed») | — | — | پیش از v3، claude/scenario-gaps-1؛ `claude/gaps15-partial`؛ شاهد: main #891 (bd310844) |
+ | POS-10 | قلم آزاد با قیمت دلخواه (با مجوز و سقف). | §۶.۱ | ۲ | P0 | PARTIAL | قلمِ آزاد با قیمتِ دلخواه (F4؛ CartLineTest، CIِ اندرویدِ main ‏39268884098 سبز)؛ پشتِ تنظیمِ خاموشِ `LinePolicy`: سقفِ قیمتِ واحدِ قلمِ آزاد (خالی بی سقف، ۰ بسته) برای همه جز صاحبِ دکان، هم در افزودن و هم در ویرایشِ ردیف — هستهٔ `LinePricing` (core commonMain): Kotlin محلی `LinePricingTest` ۲۰/۲۰ و جهش ۱۶/۱۶ کشته؛ `LinePolicyTest` و `DiscountGateTest` محلی ۱۳/۱۳ با کامپایلِ مستقیمِ Kotlin (بی Gradle)؛ صفحه‌ها فقط در CI؛ سقف تنظیمِ همین دستگاه است و همگام نمی‌شود | — | — | پیش از v3؛ همین PR |
+ | POS-11 | یادداشت ردیف و یادداشت فاکتور که روی رسید چاپ شوند. قالب‌های یادداشت تکراری. | §۶.۱ | ۲ | P1 | IMPLEMENTED-VERIFIED | پشتِ تنظیمِ خاموشِ همین دستگاه (`PosNotesPrefs`: `tohid-ui:pos_notes`، قالب‌ها `pos_note_templates`؛ خاموش ⇒ صندوق و فاکتور همان امروز): یادداشتِ ردیف در کادرِ ویرایشِ ردیف و «یادداشتِ فاکتور» کنارِ سبد، در صندوقِ گوشی و کامپیوتر؛ `Sale.note` و `SaleItem.note` ِ افزودنی (`EncodeDefault.NEVER`: فاکتورِ بی یادداشت همان JSON) که با پیش‌نویس و فاکتورِ نگه‌داشته (`SaleDraft.note`، `Line.note`، `CartStore.note`) می‌مانند؛ چاپ روی رسیدِ پیشین و نسخهٔ ۲ (`ReceiptLayout`: زیرِ همان ردیف و پیش از QR)؛ قالب‌های تکراری (۱۲ تا، یک لمس ⇒ افزوده). هستهٔ `core/…/pos/SaleNotes.kt` (یک خط، ۱۲۰ نویسه): `SaleNotesTest` ۵/۵ (`gradle -p core jvmTest`)؛ `SaleNotesFlowTest` ۴/۴، `SaleDraftTest` ۲۰/۲۰ و `SalesEngineTest` ۳۲/۳۲ با کامپایلِ مستقیمِ `data` (جهشِ «یادداشتِ خامِ فاکتور» کشته)، و `CartStore` (پیش‌نویس، نگه‌داشتن، سبدِ خالی) در هارنسِ محلی؛ دو فایلِ تازهٔ Compose با Compose Desktop کامپایل شدند؛ صفحه‌ها فقط در CI. نمای فاکتور (تاریخچه و پس از فروش، `InvoiceDialog`) یادداشتِ ردیف و فاکتور را نشان می‌دهد؛ صفحهٔ عمومیِ QR هم (`receipt-public.js` با هم‌زادِ `noteOf`، فقط textContent): `receipt-public.test.js` ۱۱/۱۱ (آزمونِ تازهٔ POS-11 روی کدِ main سرخ؛ بی یادداشت ⇒ همان پاسخِ پیشین، بی کلید)؛ فروشِ سریع (`QuickSale`) هم یادداشتِ فاکتورِ همان سبد را می‌برد و دکمه دارد: `SaleNotesWiringTest` ۲/۲ با کامپایلِ مستقیم (هر `cartStore.post` با `note`؛ بی سیم‌کشیِ `QuickSale` سرخ)؛ پیشنهادِ وضعیت پس از CI ِ سبز: IMPLEMENTED-VERIFIED؛ **شاهدِ CI ِ main (ممیزیِ STATUS):** core ‏SaleNotesTest ۵/۵، SaleNotesFlowTest ۴/۴، SaleDraftTest ۲۰/۲۰، SalesEngineTest ۳۲/۳۲ و SaleNotesWiringTest ۲/۲؛ سرور `receipt-public.test.js` ۱۱/۱۱ — CI ِ main سبز: «توحید بومی» 41342762143 (3b3520fa) و 41355374191 (73de5d5c)، «فروشگاه من — کامپیوتر» 41342762229 و 41355374281؛ سرورِ 41355374256 (73de5d5c): هر آزمونِ این پرونده‌ها با نامش «ok» در PGlite و PostgreSQL، ۰ شکست؛ شرطِ «پیشنهادِ وضعیت پس از CI ِ سبز» برآورده شد؛ بازتولید: `gradle -p core jvmTest --tests '*SaleNotesTest'`، `gradle -p desktop test --tests '*SaleNotes*' --tests '*SaleDraftTest' --tests '*SalesEngineTest'`، `TEST_DATABASE_URL=pglite:memory node --test test/receipt-public.test.js` | — | — | #709 (`claude/pos-notes`)، #716 (`claude/pos-notes-views`)، #754 (3b3520fa، شاملِ #716) |
+-| POS-12 | نگه‌داشتن فاکتور با نام یا شماره. چند فاکتور هم‌زمان. بازیابی روی دستگاه دیگر. پاک‌سازی خ… | §۶.۱ | ۲ | P0 | PARTIAL | نگه‌داشتن با نام یا شماره، تا ۹ فاکتورِ هم‌زمان و پاک‌کردنِ کهنه‌ها (بیش از ۲۴ ساعت) فقط با مجوزِ لغو (`sales.cancel`)، روی همین دستگاه پشتِ تنظیمِ خاموشِ «چند فاکتورِ هم‌زمان» (#332؛ `HeldInvoicesTest` ۲۶ آزمون، CIِ اندرویدِ main ‏41081653448 (6e8acd9) سبز)؛ پاک‌سازیِ **خودکارِ** کهنه‌ها با زیرتنظیمِ خاموشِ «پاک‌سازیِ خودکار» (`tohid-ui:held_auto_clean`، فقط با «چند فاکتورِ هم‌زمان» اثر دارد) که فقط دارندهٔ «لغوِ فاکتور» عوضش می‌کند: با بازشدنِ صندوق و سپس هر ساعت، همان قاعدهٔ دستی، بی پرسش؛ خاموش ⇒ حتی فایل خوانده نمی‌شود، کهنه‌ای نیست ⇒ نوشتنی نیست، نوشتنِ ناموفق ⇒ هیچ چیز گم نمی‌شود، فاکتورِ جاریِ صندوق پاک نمی‌شود (`HeldInvoiceStore.autoDropStale`؛ `HeldInvoicesTest` «پاک‌سازیِ خودکارِ کهنه‌ها فقط با تنظیم و فقط کهنه‌ها» محلی با کامپایلِ مستقیمِ Kotlin ۲/۲ و جهش ۷/۷ کشته؛ صفحهٔ تنظیم و راه‌اندازِ صندوق فقط CI)؛ وفاداری (`claude/held-sync`): نگه‌داشتن ⇐ بازگشت و پیش‌نویس حالا همهٔ فیلدهای `CartLine` (افتاده بود: `specialPrice` ⇐ رسیدِ فاکتورِ برگشته «قیمتِ خاص» نمی‌نوشت) و فیلدهای فاکتور (افتاده بود: یادداشتِ فاکتور `SaleDraft.note` در نگه‌داشته، و لیستِ قیمتِ دستی که اصلاً نوشته نمی‌شد ⇐ فاکتورِ عمدهٔ دستی پس از بازگشت/بازیابی خرده قیمت می‌خورد؛ `SaleDraft.priceList`، `HeldInvoice.saleNote/priceList`، `CartPriceList`) را برمی‌گرداند، افزودنی با `EncodeDefault.NEVER` (پیش‌نویس و نگه‌داشتهٔ بی آن‌ها بایت‌به‌بایت همان)؛ `HeldFidelityTest` ۶/۶ (پیش از رفع ۳/۳ سرخ: specialPrice و ۹۰⇐null)؛ بازیابی روی دستگاهِ دیگر و پس از نصبِ دوباره (S09) پشتِ پرچمِ خاموشِ `shop.held_sync`: `/api/shop/held-invoices` (مهاجرتِ ۴۲۵؛ هر فاکتور جدا با نسخهٔ دستگاه، کهنه ⇒ ۴۰۹ `held_stale`، سنگِ قبرِ ۳۰ روزه، دور انداختنِ نگه‌داشتهٔ کسِ دیگر فقط `sales.cancel`، سقفِ ۶۰ نگه‌داشته/۳۲KB/۲۰۰ ردیف؛ `shop-held-invoices.test.js` ۸/۸ روی PGlite و PostgreSQL، با دو دستگاهِ هم‌زمان) و برنامه `HeldSyncEngine` (`HeldSyncTest` ۷/۷: خاموش ⇒ هیچ نوشتن/فرستادن و فایلِ بایت‌به‌بایت همان، نصبِ تازهٔ «ب» همان نگه‌داشتهٔ «الف»، بازگشت روی «ب» از «الف» برمی‌دارد، نوشتنِ کهنه، جا نشدن، نگه‌داشتهٔ کسِ دیگر)؛ صندوقِ گوشی و کامپیوتر (`rememberHeldInvoices`) و سوکتِ `held` فقط CI؛ قفلِ «در دستِ دستگاهِ ۲» نیست | — | — | #332 (fd06f0c)، `claude/part-pos-2`، `claude/held-sync` |
++| POS-12 | نگه‌داشتن فاکتور با نام یا شماره. چند فاکتور هم‌زمان. بازیابی روی دستگاه دیگر. پاک‌سازی خ… | §۶.۱ | ۲ | P0 | PARTIAL | نگه‌داشتن با نام یا شماره، تا ۹ فاکتورِ هم‌زمان و پاک‌کردنِ کهنه‌ها (بیش از ۲۴ ساعت) فقط با مجوزِ لغو (`sales.cancel`)، روی همین دستگاه پشتِ تنظیمِ خاموشِ «چند فاکتورِ هم‌زمان» (#332؛ `HeldInvoicesTest` ۲۶ آزمون، CIِ اندرویدِ main ‏41081653448 (6e8acd9) سبز)؛ پاک‌سازیِ **خودکارِ** کهنه‌ها با زیرتنظیمِ خاموشِ «پاک‌سازیِ خودکار» (`tohid-ui:held_auto_clean`، فقط با «چند فاکتورِ هم‌زمان» اثر دارد) که فقط دارندهٔ «لغوِ فاکتور» عوضش می‌کند: با بازشدنِ صندوق و سپس هر ساعت، همان قاعدهٔ دستی، بی پرسش؛ خاموش ⇒ حتی فایل خوانده نمی‌شود، کهنه‌ای نیست ⇒ نوشتنی نیست، نوشتنِ ناموفق ⇒ هیچ چیز گم نمی‌شود، فاکتورِ جاریِ صندوق پاک نمی‌شود (`HeldInvoiceStore.autoDropStale`؛ `HeldInvoicesTest` «پاک‌سازیِ خودکارِ کهنه‌ها فقط با تنظیم و فقط کهنه‌ها» محلی با کامپایلِ مستقیمِ Kotlin ۲/۲ و جهش ۷/۷ کشته؛ صفحهٔ تنظیم و راه‌اندازِ صندوق فقط CI)؛ وفاداری (`claude/held-sync`): نگه‌داشتن ⇐ بازگشت و پیش‌نویس حالا همهٔ فیلدهای `CartLine` (افتاده بود: `specialPrice` ⇐ رسیدِ فاکتورِ برگشته «قیمتِ خاص» نمی‌نوشت) و فیلدهای فاکتور (افتاده بود: یادداشتِ فاکتور `SaleDraft.note` در نگه‌داشته، و لیستِ قیمتِ دستی که اصلاً نوشته نمی‌شد ⇐ فاکتورِ عمدهٔ دستی پس از بازگشت/بازیابی خرده قیمت می‌خورد؛ `SaleDraft.priceList`، `HeldInvoice.saleNote/priceList`، `CartPriceList`) را برمی‌گرداند، افزودنی با `EncodeDefault.NEVER` (پیش‌نویس و نگه‌داشتهٔ بی آن‌ها بایت‌به‌بایت همان)؛ `HeldFidelityTest` ۶/۶ (پیش از رفع ۳/۳ سرخ: specialPrice و ۹۰⇐null)؛ بازیابی روی دستگاهِ دیگر و پس از نصبِ دوباره (S09) پشتِ پرچمِ خاموشِ `shop.held_sync`: `/api/shop/held-invoices` (مهاجرتِ ۴۲۵؛ هر فاکتور جدا با نسخهٔ دستگاه، کهنه ⇒ ۴۰۹ `held_stale`، سنگِ قبرِ ۳۰ روزه، دور انداختنِ نگه‌داشتهٔ کسِ دیگر فقط `sales.cancel`، سقفِ ۶۰ نگه‌داشته/۳۲KB/۲۰۰ ردیف؛ `shop-held-invoices.test.js` ۸/۸ روی PGlite و PostgreSQL، با دو دستگاهِ هم‌زمان) و برنامه `HeldSyncEngine` (`HeldSyncTest` ۷/۷: خاموش ⇒ هیچ نوشتن/فرستادن و فایلِ بایت‌به‌بایت همان، نصبِ تازهٔ «ب» همان نگه‌داشتهٔ «الف»، بازگشت روی «ب» از «الف» برمی‌دارد، نوشتنِ کهنه، جا نشدن، نگه‌داشتهٔ کسِ دیگر)؛ صندوقِ گوشی و کامپیوتر (`rememberHeldInvoices`) و سوکتِ `held` فقط CI؛ «در دستِ دستگاهِ X» (`claude/safety-followups`، همان پرچم): ادعای نرم با سنگِ قبرِ `resumed`، ۴۰۹ `held_claimed` و گرفتن فقط با تأییدِ صریح (`held.takeover`) با کلیدِ تازهٔ فروش، بی شبکه آزاد و `held_conflict` ⇒ «یک فاکتور در دو دستگاه» — `shop-held-invoices.test.js` ۱۱/۱۱ روی PGlite و PostgreSQL (با رقابتِ دو ادعای هم‌زمان)، `HeldClaimTest` ۴/۴؛ پشتیبانِ کاملِ دستگاه هم نگه‌داشته‌ها و سبدِ جاری را دارد (پرچمِ خاموش؛ `BackupRestoreDrillTest`، `DataSafetyGuardTest`)؛ برگه‌های تأیید و «دوتایی» آزمونِ تصویری ندارند | — | — | #332 (fd06f0c)، `claude/part-pos-2`، `claude/held-sync` |
+ | POS-13 | بازیابی خودکار پیش‌نویس فاکتور پس از بسته شدن ناگهانی یا قطع برق. | §۶.۱ | ۱ | P0 | IMPLEMENTED-VERIFIED | پیش‌نویسِ اتمی و پرسشِ بازیابی در گوشی و کامپیوتر (و وبِ منجمد): SaleDraftTest (CIِ اندرویدِ main ‏39268884098 سبز) | — | — | #234 |
+ | POS-14 | جلوگیری از فروش تکراری: کلید یکتای فاکتور. دکمه پرداخت تا پایان ثبت قفل می‌ماند. | §۶.۱ | ۱ | P0 | IMPLEMENTED-VERIFIED | کلیدِ یکتای فاکتور (CartStore.saleKey، SalePost) و قفلِ دکمه تا پایانِ ثبت: SaleDraftTest (CIِ اندرویدِ main ‏39268884098 سبز) | — | — | #234 |
+ | POS-15 | قیمت‌پرسی بدون فروش (Ctrl+I): قیمت‌ها، موجودی، آخرین خرید و انقضای نزدیک. | §۶.۱ | ۲ | P1 | IMPLEMENTED-VERIFIED | صندوقِ کامپیوتر، پشتِ تنظیمِ خاموشِ همین دستگاه (`PosPriceCheckPrefs`، `tohid-ui:pos_price_check`؛ خاموش ⇒ Ctrl+I همان امروز): پنجرهٔ قیمت‌پرسی با بارکد یا نام — قیمتِ فروش و عمده، موجودی، آخرین خرید (تاریخ، تأمین‌کننده، فی) و نزدیک‌ترین انقضا با ماندهٔ FEFO و ماندهٔ گذشته؛ قیمتِ خرید، سود و فیِ خرید فقط با `reports.money`؛ بی افزودن و بی نوشتن. هسته `core/…/pos/PriceCheck.kt` (`PriceCheckTest` ۵/۵ محلی، جهشِ «مرزِ انقضا» کشته)؛ `PriceCheckDataTest` ۲/۲ و `PosLogicTest` ۱۷/۱۷ (Ctrl+I ⇒ `PRICE_CHECK`) محلی با کامپایلِ مستقیمِ Kotlin؛ `DeskSale` فقط در CI. **دورِ ۳۷ (`claude/gaps37-daily`):** تنظیم از دستهٔ دهم (#831) پیش‌فرض **روشن** است (`PosPriceCheckPrefs.load` ⇐ `true`؛ صاحب‌کار: کارِ سودمندِ بی اثر بر پول روشن) ⇒ مانعِ «روشن کردنِ پیش‌فرض» کهنه بود؛ `sale.priceCheck` در `keymap.json` حالا partial (فقط صندوقِ کامپیوتر؛ `KeyMap.kt` و `license/keymap.js` با `gen-keymap.mjs`) و در راهنمای F1 ِ صندوق می‌آید — `gradle -p desktop test` ⇒ PosLogicTest ۲۲/۲۲ («POS-15 Ctrl+I قیمت‌پرسی در راهنمای کلیدهای صندوق می‌آید»)، KeyMapTest ۹/۹، ScenarioS50Test ۵/۵، ScenarioS42KeyTest ۳/۳ و `keymap.test.js` ۶/۶ (PGlite) محلی؛ تنها ماندهٔ آن روز شاهدِ CI بود (برآورده شد؛ شاهد در پایانِ همین ردیف)؛ ⚠️ تا #711 بخشِ این تنظیم در فهرستِ تنظیماتِ کامپیوتر (`DeskSettings` ِ `AppRoot`) نبود و روی کامپیوتر روشن‌شدنی نبود — `DeskSettingsCoverageTest` ِ main سرخ (CI ِ #646)؛ اکنون ۳/۳ با کامپایلِ مستقیم؛ گوشی (دورِ ۱۱): «قیمت‌پرسی» در منوی «…» ِ صندوقِ نسخهٔ ۳ (`sale/price-check`، `PriceCheckSheet`، کدِ مشترک) پشتِ همان `PosPriceCheckPrefs` (ردهٔ A؛ از `PHONE_HIDDEN` بیرون آمد تا روی گوشی هم خاموش‌شدنی باشد) با همان سطرها و همان جست‌وجوی پنجرهٔ کامپیوتر (`PriceCheckData.lines/pick`)، فقط خواندن — `PriceCheckDataTest` «سطرهای کارت…» و «برگهٔ قیمت‌پرسیِ گوشی…»، `SettingsPortTest` **وب (`claude/gaps39-staff`، پیگیریِ #960):** status ِ keymap مالِ کامپیوتر است؛ حالا هر کلید `webStatus` ِ جدا دارد (نیامده = planned) و راهنمای وب فقط از `TohidKeymap.help(scope)` می‌آید که کلیدِ پیاده‌نشدهٔ وب را نمی‌آورد ⇒ Alt+I ِ «قیمت‌پرسی» در وب دیده نمی‌شود؛ `gen-keymap.mjs` «live/partial بی کلیدِ وب» و وضعیتِ نادرست را رد می‌کند. آزمون: `keymap.test.js` ۷/۷. **شاهدِ main (ممیزیِ STATUS، دورِ پانزدهم؛ روش در «یادداشت‌ها»):** با #958 (671bd256)، #966 (bdb563f0)، #979 (2cf59860) در main آمد؛ CI ِ PR ِ #958 سبز (سرور 42401835212، کامپیوتر 42401835116، توحید بومی 42401835095)، #966 سبز (سرور 42421522818، کامپیوتر 42421522788، توحید بومی 42421522867)، #979 سبز (سرور 42437175124، کامپیوتر 42437175135، توحید بومی 42437175019). روی main ‏2cf59860 (CI ِ push ِ #979): سرور — `keymap` ۷/۷ نام‌به‌نام «ok» در PostgreSQL، PGlite و Electron؛ Kotlin — `DeskSettingsCoverageTest` ۳، `KeyMapTest` ۹، `PosLogicTest` ۲۲، `PriceCheckDataTest` ۵، `PriceCheckTest` ۵، `ScenarioS42KeyTest` ۳، `ScenarioS50Test` ۵، `SettingsPortTest` ۸ (شمارِ `@Test`؛ `:test` ِ کامپیوتر و `testReleaseUnitTest :core:jvmTest` اجرا شدند). محلی روی همان 2cf59860: سرور روی PGlite سبز، Kotlin با `desk-check.sh` سبز. | — | — | claude/new-pos-price-1، claude/gaps11-partial، `claude/gaps37-daily`، `claude/gaps39-staff`؛ main: #958 (671bd256)، #966 (bdb563f0)، #979 (2cf59860) |
+@@ -656,7 +656,7 @@
+ | شناسه | عنوان | بخش | فاز | اولویت | وضعیت | تأیید: دستور و نتیجه | اتصال بیرونی | مانع | commit/PR |
+ |---|---|---|---|---|---|---|---|---|---|
+ | OPS-01 | به‌روزرسانی امضاشده داخل برنامه، دلتا و قابل ادامه، با کانال آزمایشی و پایدار و انتشار مر… | §۶.۲۴ | ۲ | P1 | PARTIAL | به‌روزرسانیِ امضاشده (ReleaseSignature)، ادامه‌دار (ResumableDownloadTest، UpdaterTest)، کانالِ آزمایشی/پایدار (admin-release.test.js ۴/۴)؛ انتشارِ مرحله‌ای فقط آماده: برچسبِ نسخه‌دارِ `<برچسب>-v<نسخه>` و `stage.*` پشتِ پیکربندی با پنل و `staged=1` ِ برنامه (release-stage.test.js ۱۰/۱۰، ReleaseFeedTest ۱۷/۱۷)؛ مانده: گامِ ورک‌فلوِ انتشارِ مرحله‌ای (انتشارِ پایدار فقط با اجازهٔ صریحِ صاحب‌کار ⇐ **تصمیمِ صاحب محصول**) و دلتا (نیست؛ Play خودش وصله می‌دهد، برای APK ِ مستقیم کارِ جدا با میزبانِ فایل) | — | — | #188، #194، #264، #265، `claude/spec-ops2-1` |
+-| OPS-02 | پشتیبان‌گیری: | §۶.۲۴ | ۱ | P0 | PARTIAL | نسخهٔ محلیِ نیم‌ساعته فقط با تغییر و نگه‌داریِ ۶+۷+۴: Kotlin محلی BackupRetentionTest ۱۱/۱۱، LocalSnapshotsTest (CIِ اندرویدِ main ‏39268884098 سبز)؛ عبارتِ بازیابی و پاکتِ رمزِ پشتیبان (منطق و رمز با بردارِ Python: RecoveryPhraseTest، PhraseBackupTest)؛ **(2.14.5، `claude/backup-restore`)** بازیابیِ آزمودهٔ سرتاسری (`BackupRestore`، همان درِ صفحه‌ها): `BackupRestoreDrillTest` کامپیوتر ۱۱/۱۱ — دفترِ پایدارِ ۳.۲.۳۳۷ + تنظیماتِ دکان + عکس ⇐ پشتیبانِ کامل و نسخهٔ خودکار ⇐ پاک شدنِ برنامه ⇐ برگشتِ بایت‌به‌بایت؛ شش رفعِ سرخ ⇐ سبز: ZIP ِ بریده سرِ مرزِ قلم «سالم» بود (`ZipTail`، رکوردِ پایانی)، پیامِ فنیِ جاوا برای فایلِ خراب، خروجیِ مالکِ `formatVersion` ِ تازه‌تر نیمه‌خوانده، بستهٔ تازه‌تر (`bundle.json`/`BackupStamp`)، پشتیبانِ دکانِ دیگر، و بازیابیِ ردشده که عکس و تنظیم را پیش از دفتر می‌نشاند؛ صفِ نرفته: هیچ op گم یا دو بار نه؛ رمزِ نسخه‌های خودکار با همان عبارت (`SnapshotSeal`، تنظیمِ دستگاه، پیش‌فرض خاموش، FLAGS-ON §۸و؛ گم شدنِ کلیدِ دستگاه ⇒ عبارت باز می‌کند و نسخه‌ها بی‌وقفه) و صفحهٔ «عبارتِ بازیابی» (یک بار نشان، تأییدِ نوشتنی، چاپِ A4؛ گوشیِ نسخهٔ ۳ و کامپیوتر) — `RecoveryPhraseFlowTest` ۴/۴، `BackupIntegrityTest` ۳/۳ (core)؛ مانده: USB با یک لمس، پشتیبانِ دستی/پوشهٔ رمزدار با عبارت، فاکتورهای نگه‌داشته در پشتیبان، آزمون‌های اندروید فقط CI (`docs/DATA-SAFETY-fa.md` §۲ بندِ ۱۱)؛ DATA-SAFETY (2.14.5): دفترِ خراب نسخهٔ خودکار/پوشه/ابری نمی‌سازد؛ تنظیماتِ دکان در پشتیبانِ کامل (`ShopSettingsBundle`) — `DataSafetyDiskTest`، `DataSafetyGuardTest`؛ `docs/DATA-SAFETY-fa.md`؛ تنظیماتِ دکان: دسته‌بندیِ هر کلید (دکان/دستگاه/سرور، `ShopSettingsKeys`) و همگام‌سازیِ زندهٔ کلیدهای دکان (`/api/shop/settings-sync`، مهاجرتِ ۳۰۰، آخرین نویسنده با ساعتِ سرور، سابقه، فقط صاحب/مدیر) پشتِ پرچمِ خاموشِ `shop.settings_sync` — `ShopSettingsSyncTest`، `shop-settings-sync.test.js` ۵/۵ | — | — | #252، `claude/spec-ops2-4`، `claude/ledger-merge-on`، `claude/backup-restore` |
++| OPS-02 | پشتیبان‌گیری: | §۶.۲۴ | ۱ | P0 | PARTIAL | نسخهٔ محلیِ نیم‌ساعته فقط با تغییر و نگه‌داریِ ۶+۷+۴: Kotlin محلی BackupRetentionTest ۱۱/۱۱، LocalSnapshotsTest (CIِ اندرویدِ main ‏39268884098 سبز)؛ عبارتِ بازیابی و پاکتِ رمزِ پشتیبان (منطق و رمز با بردارِ Python: RecoveryPhraseTest، PhraseBackupTest)؛ **(2.14.5، `claude/backup-restore`)** بازیابیِ آزمودهٔ سرتاسری (`BackupRestore`، همان درِ صفحه‌ها): `BackupRestoreDrillTest` کامپیوتر ۱۱/۱۱ — دفترِ پایدارِ ۳.۲.۳۳۷ + تنظیماتِ دکان + عکس ⇐ پشتیبانِ کامل و نسخهٔ خودکار ⇐ پاک شدنِ برنامه ⇐ برگشتِ بایت‌به‌بایت؛ شش رفعِ سرخ ⇐ سبز: ZIP ِ بریده سرِ مرزِ قلم «سالم» بود (`ZipTail`، رکوردِ پایانی)، پیامِ فنیِ جاوا برای فایلِ خراب، خروجیِ مالکِ `formatVersion` ِ تازه‌تر نیمه‌خوانده، بستهٔ تازه‌تر (`bundle.json`/`BackupStamp`)، پشتیبانِ دکانِ دیگر، و بازیابیِ ردشده که عکس و تنظیم را پیش از دفتر می‌نشاند؛ صفِ نرفته: هیچ op گم یا دو بار نه؛ رمزِ نسخه‌های خودکار با همان عبارت (`SnapshotSeal`، تنظیمِ دستگاه، پیش‌فرض خاموش، FLAGS-ON §۸و؛ گم شدنِ کلیدِ دستگاه ⇒ عبارت باز می‌کند و نسخه‌ها بی‌وقفه) و صفحهٔ «عبارتِ بازیابی» (یک بار نشان، تأییدِ نوشتنی، چاپِ A4؛ گوشیِ نسخهٔ ۳ و کامپیوتر) — `RecoveryPhraseFlowTest` ۴/۴، `BackupIntegrityTest` ۳/۳ (core)؛ مانده: USB با یک لمس، پشتیبانِ دستی/پوشهٔ رمزدار با عبارت، فاکتورهای نگه‌داشته در پشتیبان، آزمون‌های اندروید فقط CI (`docs/DATA-SAFETY-fa.md` §۲ بندِ ۱۱)؛ DATA-SAFETY (2.14.5): دفترِ خراب نسخهٔ خودکار/پوشه/ابری نمی‌سازد؛ تنظیماتِ دکان در پشتیبانِ کامل (`ShopSettingsBundle`) — `DataSafetyDiskTest`، `DataSafetyGuardTest`؛ `docs/DATA-SAFETY-fa.md`؛ تنظیماتِ دکان: دسته‌بندیِ هر کلید (دکان/دستگاه/سرور، `ShopSettingsKeys`) و همگام‌سازیِ زندهٔ کلیدهای دکان (`/api/shop/settings-sync`، مهاجرتِ ۳۰۰، آخرین نویسنده با ساعتِ سرور، سابقه، فقط صاحب/مدیر) پشتِ پرچمِ خاموشِ `shop.settings_sync` — `ShopSettingsSyncTest`، `shop-settings-sync.test.js` ۵/۵؛ فاکتورهای نگه‌داشته و سبدِ جاری در پشتیبانِ کامل (`device/held-invoices.json`، پس از نشستنِ دفتر، فقط دستگاهِ بی فاکتورِ باز و همان دکان، نه فروخته — `BackupRestoreDrillTest` ۱۳/۱۳، `DataSafetyGuardTest`) و برگهٔ عبارتِ بازیابی بی عکسِ صفحه (`FLAG_SECURE` تا عبارت روی صفحه است؛ `RecoveryPhraseSecureWiringTest`، `RecoveryPhraseFlowTest`؛ `claude/safety-followups`) | — | — | #252، `claude/spec-ops2-4`، `claude/ledger-merge-on`، `claude/backup-restore` |
+ | OPS-03 | گزارش خطا و از کار افتادن برنامه با شناسه، بدون داده شخصی. | §۶.۲۴ | ۳ | P1 | IMPLEMENTED-VERIFIED | POST /api/errors با پوشاندنِ داده (سرور) و گزارشگرِ وب؛ برنامهٔ نصبی (اندروید و کامپیوتر): گیرندهٔ خطا، پوشاندن روی دستگاه، کدِ `cer_<ULID>` = شناسهٔ ردیف و صفِ ماندگار (CrashReportsTest ۸/۸، CrashStoreTest ۴/۴، client-errors-report-id.test.js ۲/۲)؛ iOS: همان گیرنده (قلابِ خطای Kotlin/Native) و پنجرهٔ «برنامه بسته شد» (`CrashNotice`) از همان کدِ مشترک (`docs/IOS-PLAN-fa.md` §۰.۸)، فقط ساختِ CI ِ گزارشی؛ **شاهدِ CI ِ main (ممیزیِ STATUS، `claude/gaps35-ops`؛ روش در «یادداشت‌ها»):** CrashReportsTest ۸/۸ در `:core:jvmTest` و CrashStoreTest ۴/۴ در `:app:testReleaseUnitTest` ِ «توحید بومی» 41783084756 (کارِ 126418912348، «31 actionable tasks: 31 executed») و در `:jvmTest`/`:test` ِ «فروشگاه من — کامپیوتر» 41783084806 (کارِ 126418912480) (شمارِ `@Test`، بی `@Ignore`)؛ `client-errors-report-id` ۲/۲، `console-phase3` ۱۲/۱۲ و `card-data` ۵/۵ با نامِ خودشان «ok» در PostgreSQL و PGlite ِ سرور 41783084702 — همه CI ِ main ‏b786cb72 (#934)؛ آزمونِ روی دستگاه و ساختِ آیفونِ «(گزارش)» بنا بر قاعدهٔ «یادداشت‌ها» کمبودِ کارکردی نیستند؛ **شاهدِ main (ممیزیِ STATUS، دورِ پانزدهم؛ روش در «یادداشت‌ها»):** با #958 (671bd256) در main آمد؛ CI ِ PR ِ #958 سبز (سرور 42401835212، کامپیوتر 42401835116، توحید بومی 42401835095). روی main ‏2cf59860 (CI ِ push ِ #979): سرور — `client-errors-report-id` ۲/۲، `card-data` ۵/۵، `console-phase3` ۱۲/۱۲ نام‌به‌نام «ok» در PostgreSQL، PGlite و Electron؛ Kotlin — `CrashReportsTest` ۸، `CrashStoreTest` ۴ (شمارِ `@Test`؛ `:test` ِ کامپیوتر و `testReleaseUnitTest :core:jvmTest` اجرا شدند). محلی روی همان 2cf59860: سرور روی PGlite سبز، Kotlin با `desk-check.sh` سبز. | — | — | پیش از v3، `claude/spec-ops2-2`؛ شاهد: main #934 (b786cb72)؛ main: #958 (671bd256) |
+ | OPS-04 | پایش سرور: سلامت، صف‌ها، تأخیر همگام‌سازی، داشبورد نسخه دستگاه‌ها و هشدار. | §۶.۲۴ | ۳ | P1 | IMPLEMENTED-VERIFIED | سلامتِ API، دیتابیس، صف، دیسک و پشتیبان (system-health.test.js ۶/۶)؛ داشبوردِ نسخهٔ دستگاه‌ها با هشدارِ کهنه/زیرِ حداقل (#381)؛ تأخیرِ همگام‌سازی پشتِ پرچمِ خاموشِ `ops.sync_lag`: دستگاهِ عقب، صفِ دستگاه، کهنه و «گیرکرده» ⇒ warn، فقط عدد (`system-health-sync-lag.test.js` ۵/۵ روی PGlite و PostgreSQL 16.15 محلی؛ PRِ سلامت ۱۶/۱۶) | — | — | #256، #381، #460 |
+ | OPS-05 | «چه چیزی تازه است» داخل برنامه. هیچ قابلیتی بی‌صدا حذف نمی‌شود. | §۶.۲۴ | ۲ | P1 | IMPLEMENTED-VERIFIED | **منبع از ۱۴۰۵/۰۸/۱۲ (خواستِ صاحب‌کار: «هر پیش‌نمایش و آزمایشیِ تازه بگوید چه عوض شد»، `claude/whats-new-changelog`):** تنها پروندهٔ فارسیِ `docs/WHATS-NEW-fa.md` (یک بخش برای هر دسته/مرج، سطرهای «تازه/تغییر/رفع/برداشته … ⇐ به‌جایش»)، هنگامِ ساخت همراهِ برنامه (`generateWhatsNew` ِ `core/build.gradle.kts` ⇐ `WhatsNewBundled`، بی شبکه)؛ هسته `core/guide/WhatsNew` (خواندن، «دیده‌شده» با کلیدِ هر سطر نه شمارهٔ نسخه — پیش‌نمایش و آزمایشی شمارهٔ ساختِ جدا دارند؛ از ۶۰ به ۶۴ ⇐ ۶۱ تا ۶۴ با هم؛ نصبِ تازه و برگشت هیچ؛ گذر از «آخرین نسخهٔ دیده‌شده» ِ پیشین با شمارهٔ `shipped` ِ هر کانال؛ برداشته اول و بی «به‌جایش» پذیرفته نیست). سطرهای ۳٫۲٫۶۱ تا ۳٫۲٫۶۶ (دسته‌های ۱۲ تا ۱۶ و #861) با main سنجیده و نوشته شد (یادداشتِ #865 ِ شکلِ قدیم در بخشِ ۶۱). رفعِ کمبود: یادداشت‌های پیشین با نسخهٔ «2.14.5» بودند و برنامه «3.2.N» است ⇒ پنجرهٔ پس از به‌روزرسانی هرگز باز نمی‌شد. **جای نسخهٔ ۳:** برگهٔ یک‌باره `WhatsNewSheet`/`WhatsNewOnUpdate` در پوستهٔ نسخهٔ ۳ (`ui/AppRoot.kt`، پس از قفل‌ها و دروازه‌ها)، صفحهٔ «بیشتر» ← «تازه‌ها» (`whats-new`، `WhatsNewScreen`؛ کامپیوتر: «بیشتر» ِ منوی کنار) و «دربارهٔ برنامه» ⇐ همان صفحه؛ کلیدِ ردهٔ A `SettingsLayout.WHATS_NEW` (روشن و پنهان، `settings/data/whats-new`). **CI:** `tools/whatsnew/check.mjs` (هشدارِ «کیفیتِ کد» برای PR ِ کدِ برنامه بی سطرِ تازه؛ سدِ محلی `finish-pr.sh`). آزمون: `WhatsNewTest` و `WhatsNewFileTest` (`gradle -p core jvmTest`)، `V3ReachabilityTest`، `V3PortedFeaturesTest`، `SettingsTiersTest`، `check.test.mjs`؛ **شاهدِ CI ِ main (ممیزیِ STATUS، دورِ دهم؛ روش در «یادداشت‌ها»):** `check.test.mjs` ۵/۵ (`# pass 5`، `# fail 0`) در گامِ «تازه‌ها — آزمونِ خودِ سنجه» ِ کارِ «سنجهٔ کیفیت» ِ «کیفیتِ کد» که از #885 در push به main هم اجرا می‌شود: 1d2d81e2 (#885) 41613706064، دوباره 915ff8fb (#886) 41618359067 و 647abc8e (#887) 41632748430؛ `WhatsNewTest` ۱۰/۱۰، `WhatsNewFileTest` ۴/۴، `V3ReachabilityTest` ۶/۶، `V3PortedFeaturesTest` ۷/۷ و `SettingsTiersTest` ۷/۷ (شمارِ `@Test`) در CI ِ main ‏647abc8e (#887): «توحید بومی» 41632748448 (`:core:jvmTest` و `:app:testReleaseUnitTest`، «31 actionable tasks: 31 executed») و «فروشگاه من — کامپیوتر» 41632748440 (`:test` و `:jvmTest` ِ core) | — | — | `claude/new-ops-1`، `claude/v3-port-legacy-only`، `claude/gaps7-web-crm`، `claude/whats-new-changelog`؛ main: #885 (1d2d81e2)؛ شاهد: main #887 (647abc8e) |
+@@ -682,7 +682,7 @@
+ | S06 | پرداخت ترکیبی | §۷.۱ | ۲ | — | PARTIAL | PayFlowTest «S06»: دو ردیفِ پرداخت با مرجع، جمعِ دقیق و شمارشِ هر روش، پشتِ پرچمِ خاموشِ ShopPolicy.payV2 (CIِ اندرویدِ main ‏40119580372 (5487fe4) سبز)؛ کلیدهای PgDn و پنلِ واقعی آزموده نشده | — | — | #286 (d61d4a9) |
+ | S07 | فروش قرضی بیش از سقف | §۷.۱ | ۲ | — | IMPLEMENTED-VERIFIED | آزمونِ تازهٔ `ScenarioS07Test` ۳/۳ (محلی `gradle -p desktop test --tests 'ir.vil3ntec.tohid.scenario.*'`) روی CRM-03، STF-02، POS-21: پیامِ «۱٬۰۰۰ … بیش از سقفِ اعتبار — تأییدِ مدیر لازم است»، «درخواستِ تأیید» فقط برای مدیر/صاحب (`CreditGate.canApprove`)، PIN ِ درستِ مدیر (`ApproverVault.verify`) ⇒ فروش ثبت و سابقهٔ `credit_over_limit` با نامِ مدیر و دلیل، PIN ِ غلط یا Esc ⇒ رد و هیچ ثبت؛ پشتِ تنظیمِ خاموشِ `ShopPolicy.creditGate` (#451)، پنجرهٔ PIN فقط در CI کامپایل می‌شود؛ همهٔ سطرها سبز؛ **شاهدِ CI ِ main (ممیزیِ STATUS، دورِ چهارم؛ روش در «یادداشت‌ها»):** ScenarioS07Test ۳/۳ (شمارِ `@Test`) در CI ِ main ‏171c7d65 (#819): «توحید بومی» 41416339625 و «فروشگاه من — کامپیوتر» 41416339472، و پنجرهٔ PIN در «ساخت APK» ِ همان «توحید بومی» کامپایل شد | — | — | شاخهٔ claude/scenarios-a؛ main: #819 (171c7d65) |
+ | S08 | تخفیف بیش از سقف نقش | §۷.۱ | ۲ | — | PARTIAL | سرور: تخفیفِ بیش از سقفِ نقش بی برگه رد و صندوقِ تعارض؛ با برگهٔ صاحب می‌نشیند و سابقه نامِ تأییدکننده و دلیل را دارد (`staff-approval.test.js` «S08»، CIِ سرورِ main ‏40098799437 (bbe85b9) سبز)؛ برنامه: «درخواستِ تأیید» و پنجرهٔ PIN (DiscountGateTest، CIِ PR ‏40115213277)؛ F5 روی ردیف (تخفیفِ ردیف نیست) و ثبت در ضدتقلب (RPT-09 پشتِ تنظیمِ خاموش) آزموده نشده | — | — | #283 (6c1fa68)، #284 (e15b928) |
+-| S09 | نگه‌داشتن و بازیابی فاکتور روی دستگاه دیگر | §۷.۱ | ۲ | — | PARTIAL | آزمونِ تازهٔ `ScenarioS09Test` ۲/۲ (محلی `gradle -p desktop test --tests 'ir.vil3ntec.tohid.scenario.*'`) روی POS-12 (`HeldInvoiceStore`): نگه‌داشتنِ فاکتورِ ۵ قلمی با نامِ «آقای کریمی»، فروشِ دیگر و بازگشتِ همان فاکتور با همهٔ ردیف‌ها و تخفیف روی **همان** دستگاه، و فهرستِ کهنه‌تر از ۲۴ ساعت برای مدیر (`HeldRules.stale`)؛ پشتِ تنظیمِ خاموشِ «چند فاکتورِ هم‌زمان». بازیابی روی دستگاهِ دیگر و پس از نصبِ دوباره پشتِ پرچمِ خاموشِ `shop.held_sync` (POS-12، مهاجرتِ ۴۲۵، `HeldSyncTest` ۷/۷، `shop-held-invoices.test.js` ۸/۸؛ `claude/held-sync`). نیست: قفلِ «در دستِ دستگاه ۲» (بازگرداندن فقط از سرور برمی‌دارد؛ دو دستگاهِ بی‌اینترنت هم‌زمان می‌توانند همان را باز کنند؛ شناسهٔ فروشِ هر دو همان کلیدِ فاکتور است) | — | — | شاخهٔ claude/scenarios-a |
++| S09 | نگه‌داشتن و بازیابی فاکتور روی دستگاه دیگر | §۷.۱ | ۲ | — | PARTIAL | آزمونِ تازهٔ `ScenarioS09Test` ۲/۲ (محلی `gradle -p desktop test --tests 'ir.vil3ntec.tohid.scenario.*'`) روی POS-12 (`HeldInvoiceStore`): نگه‌داشتنِ فاکتورِ ۵ قلمی با نامِ «آقای کریمی»، فروشِ دیگر و بازگشتِ همان فاکتور با همهٔ ردیف‌ها و تخفیف روی **همان** دستگاه، و فهرستِ کهنه‌تر از ۲۴ ساعت برای مدیر (`HeldRules.stale`)؛ پشتِ تنظیمِ خاموشِ «چند فاکتورِ هم‌زمان». بازیابی روی دستگاهِ دیگر و پس از نصبِ دوباره پشتِ پرچمِ خاموشِ `shop.held_sync` (POS-12، مهاجرتِ ۴۲۵، `HeldSyncTest` ۷/۷، `shop-held-invoices.test.js` ۸/۸؛ `claude/held-sync`). «در دستِ دستگاهِ X» (`claude/safety-followups`): بازگرداندن پیش از آن می‌پرسد، دستگاهِ دیگر فقط با تأییدِ صریح و با کلیدِ تازهٔ فروش می‌گیرد و دستگاهِ نخست می‌بیند؛ دو دستگاهِ بی‌اینترنت هنوز هم‌زمان باز می‌کنند ولی هر کدام با شناسهٔ جدا و پس از وصل «یک فاکتور در دو دستگاه» دیده می‌شود (`HeldClaimTest` ۴/۴، `shop-held-invoices.test.js` ۱۱/۱۱ PGlite و PostgreSQL). نیست: یکی کردنِ خودکارِ دو فروشِ جدا (کاربر یکی را برمی‌گرداند)؛ آزمونِ سرتاسریِ دو دستگاهِ واقعی | — | — | شاخهٔ claude/scenarios-a |
+ | S10 | قطع برق وسط فروش | §۷.۱ | ۱ | — | PARTIAL | آزمونِ تازهٔ `ScenarioS10Test` ۱/۱ (محلی `gradle -p desktop test --tests 'ir.vil3ntec.tohid.scenario.*'`) روی POS-13، SYN-02: فاکتورِ ۴ قلمی ۱۰۰ بار با قطعِ برق در لحظهٔ تصادفی (بذرِ ثابت، هر ۷ لحظه دست‌کم یک بار: وسطِ پیش‌نویس، وسطِ نوشتنِ دفتر با فایلِ کناریِ نیمه، میانِ دفتر و پاک‌کردنِ پیش‌نویس) روی همان `DiskWrite`، `SaleDraftCodec`، `SalePost.run` و `SaleDraftRules.decide`: یا فاکتورِ کامل (سند، ۴ قلم، حرکتِ کالا، پرداخت) یا پیش‌نویسِ سالم با همان ردیف‌ها، هرگز نیمه‌ثبت، دفتر همیشه خوانا، و ثبتِ دوباره با همان کلید «یک بار ثبت شده» (op ِ صف: `SyncCommitTest`). نیست: `kill -9` / `taskkill /F` روی برنامهٔ واقعی در CI و قطعِ برقِ واقعی (`system_reset` ِ QEMU یا کامپیوترِ مرجع) | — | — | شاخهٔ claude/scenarios-a |
+ | S11 | دوبار زدن پرداخت و Enter تصادفی | §۷.۱ | ۲ | — | PARTIAL | آزمونِ تازهٔ `ScenarioS11Test` ۲/۲ (محلی `gradle -p desktop test --tests 'ir.vil3ntec.tohid.scenario.*'`) روی POS-14: پنج Enter روی پرداخت ⇒ یک فروش، یک شمارهٔ سند و یک رسید (`SalePost` و کلیدِ یکتا؛ Enter ِ دیرتر «یک بار ثبت شده»)؛ اسکن و سه Enter ⇒ Enter ِ پسوند کالا را می‌افزاید، Enter در کادرِ خالی هیچ کار، و Enter ِ زیرِ ۴۰۰ میلی‌ثانیه پنل را نمی‌بندد (`CashKeys.enterArmed`، پنل پشتِ `ShopPolicy.payV2`) ⇒ هیچ فروشی. نیست: گامِ ۲ (دو کلیک در وب با قطع و وصلِ شبکه) آزموده نشده، و قاعدهٔ «Enter در کادرِ خالی پس از ≥ ۵۰۰ میلی‌ثانیه ⇒ پنلِ پرداخت» ِ §۵.۲ فقط در صندوقِ کامپیوتر ساخته شد (`claude/gaps15-partial`): با پنلِ پرداخت (`payV2`) Enter در کادرِ خالی ⇒ پنل فقط اگر سبد پر و دست‌کم ۵۰۰ میلی‌ثانیه از آخرین Enter یا اسکن (درون یا بیرونِ کادر) گذشته باشد (`CashKeys.emptyEnterOpensPay` و `EmptyEnterGate` ِ core؛ `CashKeysTest.emptyEnterOpensPayOnlyFiveHundredMillisecondsAfterLastScanOrEnter` و `CashKeysTest.emptyEnterGateCountsEveryScanAndEnter`، `ScenarioS11Test` «S11 — Enter در کادرِ خالی ⇒ پنلِ پرداخت فقط ۵۰۰ میلی‌ثانیه پس از آخرین اسکن یا Enter» و «S11 — صندوقِ کامپیوتر قاعده را فقط با پنلِ پرداخت…»؛ بی پنل همان «هیچ کار» ِ امروز). صندوقِ گوشیِ نسخهٔ ۳ با صفحه‌کلید/بارکدخوانِ بیرونی (`claude/gaps18-partial`): با پنلِ پرداخت (`payV2`) Enter ِ بی اسکن خورده می‌شود و «پرداخت» فقط با سبدِ پر و ≥ ۵۰۰ میلی‌ثانیه پس از آخرین اسکن یا Enter (`bareEnterPays` با همان `EmptyEnterGate`؛ هر بارکد از هر راه در `SaleRoute.onCode` لحظه را می‌نشاند)، بی پنل همان راهِ امروز — `ScenarioS11Test` «S11 — صندوقِ گوشی با صفحه‌کلیدِ بیرونی ⇒ Enter ِ بی اسکن پرداخت را فقط با پنل و ۵۰۰ میلی‌ثانیه پس از آخرین اسکن باز می‌کند» و «S11 — صندوقِ گوشی هر اسکن را می‌شمارد…» (محلی `gradle -p desktop test`). مانده: آزمونِ گامِ ۲؛ رفتنِ واقعی به برگهٔ پرداخت روی دستگاه؛ **شاهدِ main (ممیزیِ STATUS، دورِ پانزدهم؛ روش در «یادداشت‌ها»):** روی main ‏2cf59860 (CI ِ push ِ #979): Kotlin — `CashKeysTest` ۱۰، `ScenarioS11Test` ۶ (شمارِ `@Test`؛ `:test` ِ کامپیوتر و `testReleaseUnitTest :core:jvmTest` اجرا شدند). محلی روی همان 2cf59860: Kotlin با `desk-check.sh` سبز. | — | — | شاخهٔ claude/scenarios-a؛ `claude/gaps15-partial`، `claude/gaps18-partial` |
+ | S12 | بستن شیفت با اختلاف | §۷.۱ | ۲ | — | PARTIAL | سرتاسری `cash.e2e.mjs` S12.1–S12.2: موردِ انتظار، «کسری ۱۰» و هیچ اصلاحِ خودکار (CIِ سرورِ main ‏40098799437 (bbe85b9) سبز)؛ شمارشِ اسکناس، دلیلِ اجباری بالای آستانه و Z در PayFlowTest «S12» پشتِ پرچمِ خاموشِ ShopPolicy.payV2؛ چاپِ Z آزموده نشده | — | — | #311 (59c8f19)، #286 (d61d4a9) |
+diff --git a/ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/ui/PlatformIos.kt b/ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/ui/PlatformIos.kt
+index c548d4917..0b3cf1199 100644
+--- a/ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/ui/PlatformIos.kt
++++ b/ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/ui/PlatformIos.kt
+@@ -34,4 +34,8 @@ object Platform {
+     "ios-" + (UIDevice.currentDevice.identifierForVendor?.UUIDString ?: "unknown")
+ 
+   fun saveFile(suggestedName: String, bytes: ByteArray): String? = null
++
++  /** OPS-02 — iOS `FLAG_SECURE` ندارد (عکسِ صفحه را برنامه نمی‌تواند ببندد)؛ همان API بی‌اثر */
++  @androidx.compose.runtime.Composable
++  fun SecureWindow(on: Boolean) = Unit
+ }
+diff --git a/server/src/lib/shop-held-sync.js b/server/src/lib/shop-held-sync.js
+index a9ccdcb63..482dd6cfc 100644
+--- a/server/src/lib/shop-held-sync.js
++++ b/server/src/lib/shop-held-sync.js
+@@ -22,6 +22,15 @@
+  *    `sales.cancel` می‌خواهد (همان «لغوِ فاکتور» ِ پاک کردنِ کهنه‌ها)؛ بازگرداندن و فروش برای هر فروشنده.
+  * ⛔ shop_id فقط از عضویتِ توکن. سقف‌ها: ۶۰ نگه‌داشتهٔ زنده در هر دکان، ۳۲ کیلوبایت و ۲۰۰ ردیف در هر فاکتور.
+  * ⛔ سرور بدنه را نمی‌خواند و با آن هیچ پولی نمی‌سازد؛ فقط شکل و اندازه را می‌سنجد.
++ *
++ * ── «در دستِ دستگاهِ X» (ادعای نرم، همان پرچم؛ بی ستون و بی مهاجرتِ تازه) ──────────────────────────────────
++ * سنگِ قبرِ `resumed` همان ادعاست: دستگاهی که برش گرداند (`device_id`) و کی (`updated_at`)؛ تا [CLAIM_MS] «تازه».
++ * برنامه پیش از بازگرداندن می‌پرسد (`DELETE …&claim=1&base=<نسخه‌ای که دیده بود>`): ردیفِ زنده ⇒ سنگِ قبر به نامِ همین
++ * دستگاه؛ برگشته یا فروخته به دستِ دستگاهِ دیگر پس از [base] ⇒ ۴۰۹ `held_claimed` با `holder` (دستگاه، سریِ سندِ آن،
++ * دلیل، زمان، تازه بودن) تا صفحه تأییدِ صریح بگیرد؛ با `force=1` همان سنگِ قبر به نامِ این دستگاه (و سابقهٔ
++ * `held.takeover`) تا دستگاهِ نخست هم با دورِ بعد بداند. بی شبکه بازگرداندن آزاد است؛ همان `DELETE` ِ در صف (`base` بی
++ * `claim`) اگر دستگاهِ دیگری پس از [base] برش گرداند، فروخت یا عوضش کرد ⇒ ۴۰۹ `held_conflict` با `holder` و هیچ تغییری:
++ * برنامه «دو دستگاه یک فاکتور را باز کردند» را نشان می‌دهد. بی `base`/`claim` (برنامهٔ پیشین) ⇒ همان رفتارِ پیشین.
+  */
+ const { one, many, tx, now } = require('../db');
+ const { flagOf } = require('./orders');
+@@ -36,6 +45,8 @@ const MAX_LINES = 200;
+ const MAX_TEXT = 512;
+ const PAGE = 200;
+ const TOMB_MS = 30 * 24 * 60 * 60 * 1000;
++/** تا این مدت پس از بازگرداندن، فاکتور «در دستِ» همان دستگاه است (ادعای نرم؛ هیچ قفلی) */
++const CLAIM_MS = 10 * 60 * 1000;
+ /** رشته‌های بالادستِ بدنه (`HeldInvoice`) */
+ const TEXTS = Object.freeze(['label', 'discount', 'note', 'device', 'payment', 'paid', 'debtorId', 'saleNote', 'priceList']);
+ 
+@@ -55,6 +66,16 @@ function versionOf(raw) {
+   return v;
+ }
+ 
++/** نسخه‌ای که دستگاه پیش از کارش دیده بود (۰ = هیچ)؛ نبود ⇒ `null` = همان رفتارِ پیشین */
++function baseOf(raw) {
++  if (raw === undefined || raw === null || raw === '') return null;
++  const v = typeof raw === 'string' && /^\d{1,16}$/.test(raw) ? Number(raw) : raw;
++  if (!Number.isSafeInteger(v) || v < 0) throw bad('نسخهٔ پایهٔ فاکتورِ نگه‌داشته درست نیست');
++  return v;
++}
++
++const yes = (raw) => raw === true || raw === '1';
++
+ /** بدنهٔ `HeldInvoice` ِ برنامه — فقط شکل و اندازه؛ سرور آن را نمی‌خواند */
+ function bodyOf(id, raw) {
+   if (!plain(raw)) throw bad();
+@@ -89,7 +110,8 @@ function canon(v) {
+ 
+ function view(r, me) {
+   const base = { id: r.id, version: Number(r.version), rev: Number(r.rev) };
+-  if (r.deleted) return { ...base, deleted: true, reason: r.reason };
++  //  سنگِ قبر: کدام دستگاه (و سریِ سندِ آن) — دستگاهی که همین فاکتور را باز دارد می‌فهمد دیگری گرفتش
++  if (r.deleted) return { ...base, deleted: true, reason: r.reason, device_id: r.device_id || '', series: r.series || '' };
+   return {
+     ...base, body: r.body, mine: r.held_by === me, held_by: r.held_by,
+     device_id: r.device_id, at: Number(r.updated_at),
+@@ -97,6 +119,7 @@ function view(r, me) {
+ }
+ 
+ const COLS = 'id, body, version, deleted, reason, rev, created_by, held_by, device_id, updated_at';
++const HCOLS = COLS.split(', ').map((c) => `h.${c}`).join(', ');
+ 
+ /**
+  * ردیف‌های تازه‌تر از [since] به ترتیبِ `rev`، حداکثر یک صفحه. `since = 0` (دستگاهِ تازه) ⇒ فقط زنده‌ها؛ پس از آن
+@@ -106,9 +129,10 @@ async function read(shopId, since, me) {
+   const shop = String(shopId);
+   const from = Number.isSafeInteger(since) && since > 0 ? since : 0;
+   const rows = await many(
+-    `SELECT ${COLS} FROM shop_held_invoices
+-      WHERE shop_id=$1 AND rev > $2::bigint AND (NOT deleted OR $2::bigint > 0)
+-      ORDER BY rev ASC LIMIT $3`,
++    `SELECT ${HCOLS}, s.series FROM shop_held_invoices h
++       LEFT JOIN shop_doc_series s ON s.shop_id = h.shop_id AND s.device_id = h.device_id AND h.device_id <> ''
++      WHERE h.shop_id=$1 AND h.rev > $2::bigint AND (NOT h.deleted OR $2::bigint > 0)
++      ORDER BY h.rev ASC LIMIT $3`,
+     [shop, from, PAGE + 1],
+   );
+   const more = rows.length > PAGE;
+@@ -182,22 +206,85 @@ async function put(shopId, actor, rawId, raw) {
+   });
+ }
+ 
++async function seriesOf(c, shop, deviceId) {
++  if (!deviceId) return '';
++  const r = (await c.query('SELECT series FROM shop_doc_series WHERE shop_id=$1 AND device_id=$2', [shop, deviceId])).rows[0];
++  return r ? String(r.series) : '';
++}
++
++/** «در دستِ کیست»: دستگاه، سریِ سندِ آن (همان «A1» ِ روی فاکتور)، دلیل (`held` = هنوز نگه‌داشته)، زمان و تازه بودنِ ادعا */
++async function holderOf(c, shop, cur, at) {
++  return {
++    device_id: cur.device_id || '',
++    series: await seriesOf(c, shop, cur.device_id),
++    reason: cur.deleted ? cur.reason : 'held',
++    at: Number(cur.updated_at),
++    fresh: Boolean(cur.deleted && cur.reason === 'resumed' && at - Number(cur.updated_at) < CLAIM_MS),
++  };
++}
++
++const claimed = (holder) => Object.assign(
++  conflict('این فاکتورِ نگه‌داشته در دستِ دستگاهِ دیگری است', 'held_claimed'), { data: { holder } },
++);
++const crossed = (holder) => Object.assign(
++  conflict('این فاکتورِ نگه‌داشته در دستگاهِ دیگری هم باز یا عوض شد', 'held_conflict'), { data: { holder } },
++);
++
+ /**
+  * برداشتن (سنگِ قبر). نبود یا پیش‌تر برداشته ⇒ بی تغییر؛ نسخهٔ کهنه‌تر از ردیفِ زنده ⇒ ۴۰۹ `held_stale`؛ دور
+  * انداختنِ نگه‌داشتهٔ کسِ دیگر بی [canCancel] ⇒ ۴۰۳ `held_not_yours`.
+- * @returns {{ deleted: boolean, others: boolean, version: number }}
++ * ادعا (`claim`)، `base` و `force`: شرح سرِ همین پرونده («در دستِ دستگاهِ X»).
++ * @returns {{ deleted: boolean, others: boolean, version: number, rev?: number, claim?: object }}
+  */
+-async function remove(shopId, actor, rawId, { version: rawVersion, reason: rawReason } = {}, canCancel = false) {
++async function remove(shopId, actor, rawId, {
++  version: rawVersion, reason: rawReason, base: rawBase, claim: rawClaim, force: rawForce,
++} = {}, canCancel = false) {
+   const id = idOf(rawId);
+   const version = versionOf(rawVersion);
+   const reason = typeof rawReason === 'string' && REASONS.includes(rawReason) ? rawReason : null;
+   if (!reason) throw bad('دلیلِ برداشتن (resumed، sold یا deleted) لازم است');
++  const base = baseOf(rawBase);
++  const claiming = yes(rawClaim);
++  const forcing = claiming && yes(rawForce);
++  if (claiming && reason !== 'resumed') throw bad('ادعا فقط با بازگرداندن (resumed) است');
+   const deviceId = typeof actor.deviceId === 'string' ? actor.deviceId.slice(0, 64) : '';
+   const shop = String(shopId);
+   return tx(async (c) => {
+     await locked(c, shop);
+     const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE shop_id=$1 AND id=$2`, [shop, id])).rows[0];
+-    if (!cur || cur.deleted) return { deleted: false, others: false, version: cur ? Number(cur.version) : 0 };
++    const at = now();
++    const granted = (extra = {}) => ({ granted: true, until: at + CLAIM_MS, ...extra });
++    if (!cur) return { deleted: false, others: false, version: 0, ...(claiming ? { claim: granted() } : {}) };
++    if (cur.deleted) {
++      const mine = deviceId !== '' && cur.device_id === deviceId;
++      //  دستگاهِ دیگری پس از نسخه‌ای که این دستگاه دیده بود برش گرداند یا فروخت
++      const taken = !mine && base !== null && Number(cur.version) > base && (cur.reason === 'resumed' || cur.reason === 'sold');
++      if (!claiming) {
++        if (taken && reason === 'resumed') throw crossed(await holderOf(c, shop, cur, at));
++        return { deleted: false, others: false, version: Number(cur.version) };
++      }
++      if (mine) {
++        //  ادعای خودِ همین دستگاه ⇒ تازه می‌شود (بی rev: دستگاه‌های دیگر فقط هنگامِ پرسیدن می‌خوانندش)
++        if (cur.reason === 'resumed') await c.query('UPDATE shop_held_invoices SET updated_at=$3 WHERE shop_id=$1 AND id=$2', [shop, id, at]);
++        return { deleted: false, others: false, version: Number(cur.version), claim: granted() };
++      }
++      if (taken && !forcing) throw claimed(await holderOf(c, shop, cur, at));
++      //  سنگِ قبر به نامِ همین دستگاه (دستگاهِ سوم هم بداند در دستِ کیست)؛ گرفتن از دستِ دیگری فقط با تأییدِ صریح
++      const takeover = taken ? await holderOf(c, shop, cur, at) : null;
++      const v = Math.max(version, Number(cur.version) + 1);
++      const rev = await nextRev(c, shop);
++      await c.query(
++        `UPDATE shop_held_invoices SET reason='resumed', version=$3, rev=$4, updated_by=$5, device_id=$6, updated_at=$7
++          WHERE shop_id=$1 AND id=$2`,
++        [shop, id, v, rev, actor.userId, deviceId, at],
++      );
++      return { deleted: true, others: cur.held_by !== actor.userId, version: v, rev, claim: granted(takeover ? { takeover } : {}) };
++    }
++    if (base !== null && Number(cur.version) > base) {
++      //  نسخه‌ای که این دستگاه دید کهنه است: پیش از بازگرداندن تازه‌ترش را بگیرد؛ بازگرداندنِ بی شبکه ⇒ دو دستگاه
++      if (claiming) throw stale(cur, actor.userId);
++      if (reason === 'resumed') throw crossed(await holderOf(c, shop, cur, at));
++    }
+     if (Number(cur.version) > version) throw stale(cur, actor.userId);
+     const others = cur.held_by !== actor.userId;
+     if (reason === 'deleted' && others && !canCancel) {
+@@ -207,13 +294,13 @@ async function remove(shopId, actor, rawId, { version: rawVersion, reason: rawRe
+     await c.query(
+       `UPDATE shop_held_invoices SET deleted=true, body=NULL, bytes=0, reason=$3, version=$4, rev=$5,
+          updated_by=$6, device_id=$7, updated_at=$8 WHERE shop_id=$1 AND id=$2`,
+-      [shop, id, reason, version, rev, actor.userId, deviceId, now()],
++      [shop, id, reason, version, rev, actor.userId, deviceId, at],
+     );
+-    return { deleted: true, others, version, rev };
++    return { deleted: true, others, version, rev, ...(claiming ? { claim: granted() } : {}) };
+   });
+ }
+ 
+ module.exports = {
+-  FLAG, ID_RE, REASONS, MAX_LIVE, MAX_BYTES, MAX_LINES, PAGE, TOMB_MS,
++  FLAG, ID_RE, REASONS, MAX_LIVE, MAX_BYTES, MAX_LINES, PAGE, TOMB_MS, CLAIM_MS,
+   flagOn, bodyOf, canon, read, put, remove,
+ };
+diff --git a/server/src/routes/shop-held-invoices.js b/server/src/routes/shop-held-invoices.js
+index fb7255b1b..7eb72bdc0 100644
+--- a/server/src/routes/shop-held-invoices.js
++++ b/server/src/routes/shop-held-invoices.js
+@@ -7,6 +7,9 @@
+  *   PUT    /:id                   `{version, body, device_id?}` ⇒ `{enabled, applied, item}` (کهنه ⇒ ۴۰۹ `held_stale`)
+  *   DELETE /:id?version=&reason=  `resumed|sold|deleted` ⇒ `{enabled, deleted, version}`؛ دور انداختنِ نگه‌داشتهٔ کسِ
+  *                                 دیگر `sales.cancel` (۴۰۳ `held_not_yours`)
++ *          &device_id=&base=     «در دستِ دستگاهِ X»: `claim=1` پیش از بازگرداندن ⇒ `{…, claim}` یا ۴۰۹ `held_claimed`
++ *          &claim=1&force=1      (`force=1` = گرفتن با تأییدِ صریح، سابقهٔ `held.takeover`)؛ در صف بی `claim` ⇒ ۴۰۹
++ *                                 `held_conflict`. شرح: `lib/shop-held-sync.js`
+  *
+  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.held_sync` ⇒ `GET` فقط `{enabled:false}` و `PUT`/`DELETE` ۴۰۳ `held_sync_disabled`.
+  * ⛔ shop_id فقط از عضویتِ توکن. سقف: سطلِ IP پیش از احراز، سپس سطلِ هر کاربر. فقط برنامهٔ دکان، نه sync-v1.
+@@ -55,7 +58,14 @@ router.delete('/:id', needFlag, async (req, res) => {
+   const q = (k) => (typeof req.query[k] === 'string' ? req.query[k] : undefined);
+   const canCancel = await perms.memberAllows(req, 'sales.cancel');
+   const out = await held.remove(req.shopId, { userId: req.user.id, deviceId: q('device_id') }, req.params.id,
+-    { version: q('version'), reason: q('reason') }, canCancel);
++    { version: q('version'), reason: q('reason'), base: q('base'), claim: q('claim'), force: q('force') }, canCancel);
++  if (out.claim && out.claim.takeover) {
++    const t = out.claim.takeover;
++    await audit.log({
++      shopId: req.shopId, userId: req.user.id, action: 'held.takeover', targetType: 'held_invoice', targetId: req.params.id,
++      detail: { from_series: t.series, from_reason: t.reason, fresh: t.fresh, version: out.version }, ip: clientIp(req),
++    });
++  }
+   if (out.deleted) {
+     if (q('reason') === 'deleted') {
+       await audit.log({
+@@ -65,7 +75,7 @@ router.delete('/:id', needFlag, async (req, res) => {
+     }
+     relay(req, out.rev);
+   }
+-  res.json({ enabled: true, deleted: out.deleted, version: out.version });
++  res.json({ enabled: true, deleted: out.deleted, version: out.version, ...(out.claim ? { claim: out.claim } : {}) });
+ });
+ 
+ module.exports = router;
+diff --git a/server/test/shop-held-invoices.test.js b/server/test/shop-held-invoices.test.js
+index 437e4e276..67fcde474 100644
+--- a/server/test/shop-held-invoices.test.js
++++ b/server/test/shop-held-invoices.test.js
+@@ -8,6 +8,9 @@
+  *   • سنگِ قبر: فاکتورِ برگشته یا فروخته با نوشتنِ دیررسیده زنده نمی‌شود؛ دستگاهِ تازه فقط زنده‌ها را می‌گیرد.
+  *   • مجوز: هر فروشنده همه را می‌بیند؛ دور انداختنِ نگه‌داشتهٔ کسِ دیگر `sales.cancel`؛ بی `data.write` هیچ.
+  *   • سقف‌ها و شکل؛ جدایی از دکانِ دیگر؛ rollback ِ مهاجرت.
++ *   • «در دستِ دستگاهِ X»: ادعای بازگرداندن، ۴۰۹ با سری و تازه بودن، گرفتن فقط با تأییدِ صریح (سابقه)، دستگاهِ نخست
++ *     با دورِ بعد می‌فهمد؛ بازگرداندنِ بی شبکه که دیگری پیش‌تر برش گرداند/فروخت/عوض کرد ⇒ ۴۰۹ `held_conflict`؛
++ *     رقابتِ دو ادعای هم‌زمان ⇒ دقیقاً یکی؛ برنامهٔ پیشین (بی base/claim) همان رفتار.
+  */
+ process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
+ 
+@@ -32,6 +35,16 @@ const flag = (value, scope) => h.put('/api/admin/pump/live-config', { scope, key
+   .then((r) => assert.equal(r.status, 200, JSON.stringify(r.body)));
+ const put = (who, id, version, body, extra = {}) => { resetAll(); return h.put(`${BASE}/${id}`, { version, body, ...extra }, { token: who.accessToken }); };
+ const del = (who, id, version, reason) => { resetAll(); return h.del(`${BASE}/${id}?version=${version}&reason=${reason}`, { token: who.accessToken }); };
++/** «در دستِ دستگاهِ X»: پیش از بازگرداندن (`claim=1`) یا کارِ در صف (`queued`) با نسخه‌ای که دستگاه دیده بود */
++const claim = (who, dev, id, version, base, extra = '') => {
++  resetAll();
++  return h.del(`${BASE}/${id}?version=${version}&reason=resumed&base=${base}&claim=1&device_id=${dev}${extra}`, { token: who.accessToken });
++};
++const queued = (who, dev, id, version, base, reason = 'resumed') => {
++  resetAll();
++  return h.del(`${BASE}/${id}?version=${version}&reason=${reason}&base=${base}&device_id=${dev}`, { token: who.accessToken });
++};
++const rowOf = (id) => one('SELECT version, deleted, reason, device_id, body FROM shop_held_invoices WHERE shop_id=$1 AND id=$2', [shopId, id]);
+ const get = (who, since = 0) => { resetAll(); return h.get(`${BASE}?since=${since}`, { token: who.accessToken }); };
+ /** همان شکلِ `HeldInvoice` ِ برنامه */
+ const inv = (id, extra = {}) => ({
+@@ -223,6 +236,111 @@ test('بی data.write (حسابدار) هیچ؛ دکانِ دیگر نه می‌
+   assert.equal(await count(otherShopId), 1, 'سنگِ قبرِ همان شناسه فقط در «ب»');
+ });
+ 
++test('در دستِ دستگاهِ X: ادعا، ۴۰۹ با سری و تازه بودن، گرفتن فقط با force و در سابقه، و دستگاهِ نخست می‌فهمد', async () => {
++  const series = async (who, dev) => (await h.post('/api/shop/series', { deviceId: dev }, { token: who.accessToken })).body.series;
++  const sa = await series(owner, 'dev-a');
++  const sb = await series(staff, 'dev-b');
++  assert.ok(sa && sb && sa !== sb, `${sa} ${sb}`);
++  assert.equal((await put(owner, 'K1', 10, inv('K1'), { device_id: 'dev-a' })).status, 200);
++  const cursor = (await get(owner)).body.rev;
++  //  پرچمِ خاموش ⇒ همان ۴۰۳ و هیچ ادعایی
++  await flag(false, shopId);
++  assert.deepEqual([(await claim(owner, 'dev-a', 'K1', 11, 10)).body.error?.code], ['held_sync_disabled']);
++  await flag(true, shopId);
++  assert.equal((await rowOf('K1')).deleted, false);
++
++  //  «الف» برش می‌گرداند ⇒ سنگِ قبرِ resumed به نامِ همان دستگاه = ادعا
++  const a = await claim(owner, 'dev-a', 'K1', 11, 10);
++  assert.deepEqual([a.status, a.body.deleted, a.body.claim?.granted], [200, true, true], JSON.stringify(a.body));
++  assert.ok(a.body.claim.until > Date.now());
++  assert.deepEqual([(await rowOf('K1')).device_id, (await rowOf('K1')).reason], ['dev-a', 'resumed']);
++  //  همان دستگاه دوباره ⇒ همان ادعا، بی تغییرِ نسخه
++  const a2 = await claim(owner, 'dev-a', 'K1', 12, 11);
++  assert.deepEqual([a2.status, a2.body.deleted, a2.body.claim?.granted, Number((await rowOf('K1')).version)], [200, false, true, 11]);
++
++  //  «ب» با نسخه‌ای که پیش از آن دیده بود ⇒ ۴۰۹ «در دستِ دستگاهِ الف»، هیچ تغییری
++  const b = await claim(staff, 'dev-b', 'K1', 13, 10);
++  assert.deepEqual([b.status, b.body.error?.code], [409, 'held_claimed'], JSON.stringify(b.body));
++  assert.deepEqual([b.body.error.holder.series, b.body.error.holder.reason, b.body.error.holder.fresh], [sa, 'resumed', true]);
++  assert.equal((await rowOf('K1')).device_id, 'dev-a');
++  //  تأییدِ صریح ⇒ گرفتن: سنگِ قبر به نامِ «ب» با نسخهٔ بزرگ‌تر، در سابقه
++  const f = await claim(staff, 'dev-b', 'K1', 13, 10, '&force=1');
++  assert.deepEqual([f.status, f.body.deleted, f.body.claim?.takeover?.series], [200, true, sa], JSON.stringify(f.body));
++  assert.deepEqual([(await rowOf('K1')).device_id, Number((await rowOf('K1')).version)], ['dev-b', 13]);
++  const log = await one("SELECT detail FROM audit_logs WHERE shop_id=$1 AND action='held.takeover' AND target_id='K1'", [shopId]);
++  assert.equal(log?.detail?.from_series, sa);
++  //  «الف» با دورِ بعد می‌بیند که «ب» گرفتش (سنگِ قبر با دستگاه و سری)
++  const gone = (await get(owner, cursor)).body.gone.find((x) => x.id === 'K1');
++  assert.deepEqual([gone.device_id, gone.series, gone.reason, gone.version], ['dev-b', sb, 'resumed', 13]);
++  //  ادعای کهنه (پس از CLAIM_MS) هنوز می‌پرسد، فقط «تازه» نیست
++  const held = require('../src/lib/shop-held-sync');
++  await query('UPDATE shop_held_invoices SET updated_at = updated_at - $3 WHERE shop_id=$1 AND id=$2', [shopId, 'K1', held.CLAIM_MS + 1]);
++  const late = await claim(owner, 'dev-a', 'K1', 20, 11);
++  assert.deepEqual([late.status, late.body.error?.code, late.body.error?.holder?.fresh, late.body.error?.holder?.series], [409, 'held_claimed', false, sb]);
++
++  //  ردیفِ زنده‌ای که پس از نسخهٔ دیده‌شده عوض شد ⇒ ۴۰۹ held_stale با ردیفِ تازه (اول همان را بگیرد)، بعد ادعا
++  assert.equal((await put(owner, 'K2', 10, inv('K2'), { device_id: 'dev-a' })).status, 200);
++  assert.equal((await put(owner, 'K2', 12, inv('K2', { label: 'تازه' }), { device_id: 'dev-a' })).status, 200);
++  const st = await claim(staff, 'dev-b', 'K2', 14, 10);
++  assert.deepEqual([st.status, st.body.error?.code, st.body.error?.current?.body?.label], [409, 'held_stale', 'تازه']);
++  assert.equal((await rowOf('K2')).deleted, false);
++  assert.deepEqual([(await claim(staff, 'dev-b', 'K2', 14, 12)).body.claim?.granted, (await rowOf('K2')).device_id], [true, 'dev-b']);
++  //  ادعا فقط با بازگرداندن؛ نسخهٔ پایهٔ نادرست ⇒ ۴۰۰
++  resetAll();
++  assert.equal((await h.del(`${BASE}/K2?version=30&reason=sold&base=1&claim=1&device_id=dev-a`, { token: owner.accessToken })).status, 400);
++  assert.equal((await claim(owner, 'dev-a', 'K2', 30, -1)).status, 400);
++  //  برنامهٔ پیشین (بی base و claim) ⇒ همان رفتار: برداشتنِ دوباره بی تغییر
++  assert.deepEqual([(await del(staff, 'K1', 40, 'resumed')).status, (await del(staff, 'K1', 40, 'resumed')).body.deleted], [200, false]);
++});
++
++test('بازگرداندنِ بی شبکه: کارِ در صف که دستگاهِ دیگری پیش‌تر برش گرداند، فروخت یا عوض کرد ⇒ ۴۰۹ held_conflict و هیچ تغییری', async () => {
++  //  برگرداندنِ دستگاهِ «الف» با شبکه، و «ب» همان را بی شبکه باز کرده بود
++  assert.equal((await put(owner, 'Q1', 10, inv('Q1'), { device_id: 'dev-a' })).status, 200);
++  assert.equal((await claim(owner, 'dev-a', 'Q1', 11, 10)).status, 200);
++  const c1 = await queued(staff, 'dev-b', 'Q1', 15, 10);
++  assert.deepEqual([c1.status, c1.body.error?.code, c1.body.error?.holder?.reason, c1.body.error?.holder?.device_id], [409, 'held_conflict', 'resumed', 'dev-a']);
++  assert.deepEqual([(await rowOf('Q1')).device_id, Number((await rowOf('Q1')).version)], ['dev-a', 11]);
++  //  کارِ در صفِ خودِ «الف» پس از ادعا ⇒ بی تغییر
++  assert.deepEqual([(await queued(owner, 'dev-a', 'Q1', 12, 11)).status], [200]);
++  //  فروخته در «الف» (نگه‌داشته‌ای که در دفترِ «الف» فروش رفت)
++  assert.equal((await put(owner, 'Q2', 10, inv('Q2'), { device_id: 'dev-a' })).status, 200);
++  assert.equal((await queued(owner, 'dev-a', 'Q2', 11, 10, 'sold')).status, 200);
++  const c2 = await queued(staff, 'dev-b', 'Q2', 15, 10);
++  assert.deepEqual([c2.status, c2.body.error?.code, c2.body.error?.holder?.reason], [409, 'held_conflict', 'sold']);
++  //  عوض‌شده (نام) در «الف» پس از نسخه‌ای که «ب» دید: ردیف زنده می‌ماند، «ب» دوتایی را می‌بیند
++  assert.equal((await put(owner, 'Q3', 10, inv('Q3'), { device_id: 'dev-a' })).status, 200);
++  assert.equal((await put(owner, 'Q3', 12, inv('Q3', { label: 'منتظر' }), { device_id: 'dev-a' })).status, 200);
++  const c3 = await queued(staff, 'dev-b', 'Q3', 15, 10);
++  assert.deepEqual([c3.status, c3.body.error?.code, c3.body.error?.holder?.reason], [409, 'held_conflict', 'held']);
++  assert.deepEqual([(await rowOf('Q3')).deleted, (await rowOf('Q3')).body.label], [false, 'منتظر']);
++  //  «ب» آخرین نسخه را دیده بود ⇒ بازگرداندنِ عادی
++  assert.equal((await put(owner, 'Q4', 10, inv('Q4'), { device_id: 'dev-a' })).status, 200);
++  const ok = await queued(staff, 'dev-b', 'Q4', 15, 10);
++  assert.deepEqual([ok.status, ok.body.deleted, (await rowOf('Q4')).device_id], [200, true, 'dev-b']);
++  //  دور انداختن (نه بازگرداندن) هیچ‌گاه «دوتایی» نیست
++  assert.equal((await put(owner, 'Q5', 10, inv('Q5'), { device_id: 'dev-a' })).status, 200);
++  assert.equal((await claim(owner, 'dev-a', 'Q5', 11, 10)).status, 200);
++  assert.deepEqual([(await queued(manager, 'dev-c', 'Q5', 15, 10, 'deleted')).status], [200]);
++});
++
++test('رقابت: دو دستگاه هم‌زمان یک نگه‌داشته را ادعا می‌کنند ⇒ دقیقاً یکی می‌گیرد و دیگری ۴۰۹ با نامِ همان', async () => {
++  for (let round = 0; round < 6; round++) {
++    const id = `RC${round}`;
++    assert.equal((await put(owner, id, 10, inv(id), { device_id: 'dev-a' })).status, 200);
++    resetAll();
++    const who = round % 2 ? [[owner, 'dev-a'], [staff, 'dev-b']] : [[staff, 'dev-b'], [owner, 'dev-a']];
++    const out = await Promise.all(who.map(([w, dev]) => h.del(`${BASE}/${id}?version=11&reason=resumed&base=10&claim=1&device_id=${dev}`,
++      { token: w.accessToken })));
++    const ok = out.filter((r) => r.status === 200);
++    const no = out.filter((r) => r.status === 409);
++    assert.deepEqual([ok.length, no.length], [1, 1], `دور ${round}: ${JSON.stringify(out.map((r) => r.body))}`);
++    assert.equal(no[0].body.error.code, 'held_claimed');
++    const row = await rowOf(id);
++    assert.deepEqual([row.deleted, row.reason, Number(row.version)], [true, 'resumed', 11]);
++    assert.equal(no[0].body.error.holder.device_id, row.device_id, 'بازنده نامِ همان برنده را می‌بیند');
++  }
++});
++
+ test('سقف‌ها و شکل: ردیف، بایت، شمارِ زنده، شناسه و نسخه', async () => {
+   const bad = async (id, version, body, code = 'bad_held', status = 400) => {
+     const r = await put(owner, id, version, body);
