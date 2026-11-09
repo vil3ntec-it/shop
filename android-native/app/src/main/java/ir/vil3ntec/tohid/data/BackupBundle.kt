@@ -70,6 +70,14 @@ object BackupBundle {
         zip.closeEntry()
       }
 
+      //  DATA-SAFETY §۸: پیش‌فاکتورهای همین دستگاه (`DeviceDocsBundle`) — نه در دفتر، نه در همگام‌سازی
+      runCatching {
+        val quotes = DeviceDocsBundle.quotes(context) ?: return@runCatching
+        zip.putNextEntry(ZipEntry(DeviceDocsBundle.QUOTES_ENTRY))
+        zip.write(quotes.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+      }
+
       photoDir(context).listFiles().orEmpty()
         .filter { it.isFile && it.name.endsWith(".jpg") }
         .forEach { photo ->
@@ -121,6 +129,7 @@ object BackupBundle {
     staging.deleteRecursively()
     staging.mkdirs()
     ShopSettingsBundle.dropStaged(context)
+    DeviceDocsBundle.dropStaged(context)
 
     var ledger: String? = null
     var photos = 0
@@ -136,6 +145,9 @@ object BackupBundle {
           //  DATA-SAFETY: تا تأییدِ بازیابی کنار می‌ماند، همان قاعدهٔ عکس‌ها (`ShopSettingsBundle.commit`)
           !entry.isDirectory && name == ShopSettingsBundle.ENTRY ->
             ShopSettingsBundle.stageFrom(context, zip)
+
+          !entry.isDirectory && name == DeviceDocsBundle.QUOTES_ENTRY ->
+            DeviceDocsBundle.stageFrom(context, zip)
 
           !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
             /*
@@ -194,12 +206,15 @@ object BackupBundle {
     staging.deleteRecursively()
     //  DATA-SAFETY: تنظیماتِ دکانِ همان پشتیبان — فقط کلیدهایی که این دستگاه هنوز ندارد
     ShopSettingsBundle.commit(context)
+    //  DATA-SAFETY §۸: پیش‌فاکتورها — فقط روی دستگاهی که هیچ پیش‌فاکتوری ندارد
+    DeviceDocsBundle.commit(context)
     return moved
   }
 
   fun dropStaging(context: Context) {
     runCatching { staging(context).deleteRecursively() }
     ShopSettingsBundle.dropStaged(context)
+    DeviceDocsBundle.dropStaged(context)
   }
 
   /**

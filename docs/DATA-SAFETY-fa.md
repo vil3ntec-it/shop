@@ -211,6 +211,8 @@
 | دفتر (همگام) | `shop-data.json` (همهٔ مجموعه‌ها جز `nextInvoiceNo`) | از سرور |
 | پشتیبان (تازه) | `tohid-policy`، `tohid-receipt`، `tohid-modules` | با بازیابیِ پشتیبانِ کامل/ابری (فقط کلیدهای تنظیم‌نشده)؛ کلیدهای «مالِ دکان» (§۶) با پرچمِ `shop.settings_sync` زنده از سرور |
 | پشتیبان | عکسِ کالا (`product-photos`) | از سرور (`PhotoSync`) و پشتیبانِ کامل |
+| پشتیبان (تازه، §۷) | پیش‌فاکتورها (`quotes.json`) | با بازیابیِ پشتیبانِ کامل/ابری (`CloudSettingsRestore`)، فقط وقتی دستگاه هیچ پیش‌فاکتوری ندارد |
+| مالِ همین دستگاه (عمداً، §۷) | فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`) | — (کارِ نیمه‌تمام؛ با «ثبت» فروش می‌شود و همگام) |
 | نسخهٔ سرور | `tohid-heartbeat`، `tohid-news`، `tohid-promos`، `tohid-storefront`، `tohid-shop-chat`، `order-notify`، `tohid-doc-chain`، `tohid-doc-series`، `tohid-hesabpay`، `tohid-courier`، `tohid-staff-time`، `tohid-imgbank`، `tohid-photos`، `tohid-photobot`، `device-push` | منبعش سرور است (یا صفِ فرستادنی به آن) |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
@@ -285,3 +287,60 @@
   هزینهٔ جانبی را ویرایش می‌کند (بررسیِ `git grep` روی `e02fe4561`).
 - قاعدهٔ تازه برای هر فیلدِ **آینه‌ای** (مثلِ `costMinor` کنارِ `price`): نسخهٔ پیشین می‌تواند فیلدِ پایه را عوض کند و
   آینه را کهنه بگذارد (سرور نگهش می‌دارد) ⇒ خواننده آینه را فقط وقتی با فیلدِ پایه جور است بپذیرد.
+
+## ۸. فیلدبه‌فیلد: هر چه در دفتر است کجا می‌رود و از کجا برمی‌گردد (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/sync-coverage`)
+
+**خواستِ صاحب‌کار:** هر چه دکان‌دار وارد کند دقیق و کامل ثبت شود؛ با خروج یا پاک کردنِ برنامه هیچ چیز گم نشود و هرگز
+کالا و داده‌اش را دوباره ننویسد.
+
+**نگهبان (همیشه):** `core/test-vectors/ledger-sync-v1.json` دفترِ کاملاً پر است — **۳۸۵ مسیرِ فیلد** (۱۶ تای آن فقط-همین-دستگاه) در همهٔ مدل‌های
+`ShopData` (تودرتو هم: `packs[]`، `kit[]`، `purchaseUnits[]`، `payments[]`، `promo[]`، `parts[]`، `deliveryAddress`،
+`specialPrices[]`، `specialOrder`، `layaway.lines[]/schedule[]`، `bom.parts[]`، برگه‌های تأیید، `z`، `xfer`، زنجیره و مهرِ
+سابقه). `LedgerSyncCoverageTest` (برنامه، کامپیوتر و CI ِ اندروید) سرخ می‌شود اگر فیلدِ تازه‌ای در مدل بیاید و در بردار
+مقدار نگیرد، کلیدِ تازهٔ `ShopData` بی مجموعهٔ همگام و بی دلیل در `deviceOnly` بماند، مدل کلیدی از بردار بیندازد، شکلِ روی خط
+(`ops` با `hash` ِ کاتلین) کهنه شود، یا Pull/Snapshot/v3 روی دستگاهِ تازه چیزی جز `deviceOnly` را برنگرداند.
+`server/test/sync-ledger-coverage.test.js` همان بایت‌ها را به push ِ واقعیِ v1 (و v3 با `SYNC_V3_ENABLED`) می‌دهد و Pull
+و Snapshot را **بایت‌به‌بایت** (JSON ِ مرتب و همان اثرِ انگشت) می‌سنجد — روی PGlite و PostgreSQL. نوشتنِ دوبارهٔ `ops`/`v3`:
+`TOHID_WRITE_VECTORS=ledger-sync`.
+
+| داده | راهِ سرور | روی دستگاهِ تازه (همان حساب) | فقط همین دستگاه؟ چرا |
+|---|---|---|---|
+| ۱۵ مجموعهٔ ردیفی (`products` … `safeEntries`) — **هر** فیلدِ هر ردیف و هر شیءِ تودرتو، تازه‌ها هم (`seller`/`priceSource` ِ قلم، `costMinor`/`countedAt`/`seenMilli` ِ رسید، `lotId`/`locationId`، `purchaseUnits`، `bom`، `chain`/`hash` ِ سابقه، `viewer`/`view` ِ دیدنِ مشتری) | Sync v1: ردیفِ **کامل** در insert، فیلدِ عوض‌شده در update ⇐ `sync_rows.data` (بی فهرستِ سفیدِ فیلد)؛ v3: `sync_v3_rows` با `…Minor`/`…Milli` | Snapshot ⇐ `LedgerDiff.fromSnapshot` (v3: `V3Convert.snapshotToLegacy`)؛ دستگاهِ دوم: Pull | نه |
+| سه فهرستِ نام (دسته‌ها، واحدها، دسته‌های مصرف) | هر نام یک ردیف (`sha256(نام)`) | Snapshot | ترتیبِ دست‌چینِ نام‌ها روی سرور نیست (ردیف‌ها به ترتیبِ شناسه)؛ خودِ نام‌ها همه برمی‌گردند |
+| `nextInvoiceNo` | — | از بلندترین شمارهٔ همان سری + ۱ (`InvoiceNumber.next`) | بله: شمارندهٔ همین دستگاه |
+| `setAside` (سندِ ردشدهٔ کنارگذاشته) | کامل در صندوقِ سندهای ردشده (`sync_v3_conflicts.loser_value`، وضعِ بسته) | در «سندهای ردشده» ِ صاحب/مدیر؛ در دفترِ شمرده هرگز نبود | بله: آینهٔ همان صندوقِ سرور |
+| `Sale.syncStatus` | v1 بله؛ v3 نه (`localOnly`) | v3 ⇒ «pending» | نشانِ «فرستاده شد؟» ِ همان دستگاه |
+| `correctedAt` ِ فاکتور/رسید/جابه‌جایی | v1 همان؛ v3 فقط سرور می‌نویسد (S28b) | از سرور | سرورمرجع |
+| پیش‌فاکتورها (`quotes.json`) | **تازه:** در هر پشتیبانِ کامل (`device/quotes.json`) ⇐ پشتیبانِ ابری | `CloudSettingsRestore` پس از ورود، فقط وقتی دستگاه هیچ پیش‌فاکتوری ندارد | نه (پیش‌تر بله — گم می‌شد) |
+| فاکتورهای نگه‌داشته، سبدِ جاری، پیش‌نویسِ شمارش/انتقال/قرض‌دار (`held-invoices.json`، `sale-draft.json`، `tohid-stock*`، `tohid-debtor-detail`) | — | — | بله: کارِ نیمه‌تمام (نگه‌داشته حداکثر ۹ و کهنه پس از ۲۴ ساعت)؛ با «ثبت» فروش/سند می‌شود و همگام. همگام‌سازیِ نگه‌داشته = S09 (به‌تعویق) |
+| تنظیمات، عکس، رمزِ کارمندان، حالِ همگام‌سازی | §۵ و §۶ | §۵ و §۶ | رمز و هویتِ دستگاه: بله |
+
+**یافته و رفع (سرخ ⇐ سبز):**
+
+1. **عددِ نماییِ جاوا ⇒ `hash_mismatch` ⇒ ردیف هرگز به سرور نمی‌رسید.** کاتلین `Double` ِ زیرِ ۰٫۰۰۱ یا بالای ده میلیون
+   را نمایی می‌نویسد (`4.0E-4`، `1.23456785E7`، `5.684341886080802E-14`) و سرور اثرِ انگشت را روی شکلِ جاوااسکریپت
+   (`0.0004`، `12345678.5`، `…e-14`) دوباره می‌سازد. پس فروشی که `remaining` ِ آن ته‌ماندهٔ `Double` بود
+   (`max(0, finalTotal − paid)` پس از تخفیفِ درصدی یا جمعِ قیمت‌های اعشاری)، قیمتِ هر گرم، یا فاکتورِ بالای ده میلیون با
+   اعشار رد می‌شد، به دفترِ ردشده می‌رفت و با نصبِ دوباره گم بود. **رفع:** `sync/v1/JsNumber.kt` (همان رقم‌ها، شکلِ
+   `Number#toString` ِ ECMAScript؛ بی `BigDecimal` تا آیفون هم) در `LedgerDiff.toJson`، دلتای `$inc` و `applyRemote`؛ و
+   `changedFields` همان عدد با شکلِ کهنهٔ سایه را «تغییر» نمی‌بیند (وگرنه ردیفی که insertش رد شده بود با یک ویرایشِ تنها
+   ردیفِ نیمه روی سرور می‌ساخت). سرور دست نخورد. سرخ (کدِ پیش از رفع): `LedgerSyncCoverageTest` «عددِ روی خط…» (`expected 0.0004 but was 4.0E-4`)، «مدل هیچ کلیدی…» و «شکلِ روی خط…»، و `sync-ledger-coverage.test.js` «v1» با همان بایت‌های کاتلین: ۳ op ِ `hash_mismatch` (کالا، فاکتور، خرید)؛ سبز: `LedgerSyncCoverageTest` و
+   `sync-ledger-coverage.test.js` (شاهدِ «پیش از رفع» همان op با اثرِ انگشتِ جاوا را `hash_mismatch` می‌بیند).
+2. **پیش‌فاکتورها در هیچ پشتیبانی نبودند.** رفع: `data/DeviceDocsBundleAndroid.kt` + سه قلابِ `BackupBundle`؛ سنجه:
+   `DataSafetyGuardTest` «پیش‌فاکتورها با پشتیبانِ کامل…» (سرخ ⇐ سبز).
+
+**مانده (و چرا):**
+
+- **ساخت‌های نصب‌شدهٔ پیش از این رفع** هنوز همان عددهای نمایی را با اثرِ انگشتِ جاوا می‌فرستند و ردشان همان است تا
+  به‌روز شوند. پذیرفتنشان در سرور یعنی سنجشِ `hash` را نرم کردن: `server/src/lib/sync-v1.js` `validateOp` (سطرهای ۱۹۲–۱۹۴،
+  `bad('hash_mismatch')`) یا میان‌افزاری پیش از آن در `server/src/routes/sync-v1.js` (`router.post('/push', …)`) — هر دو
+  مشترک با پمپ‌اند و دست نخوردند.
+- **opهایی که پیش‌تر `hash_mismatch` گرفته‌اند** در دفترِ ردشدهٔ همان دستگاه (`oplog-*-dropped.json`) مانده‌اند و خودکار
+  دوباره فرستاده نمی‌شوند؛ ردیف روی دستگاه هست ولی روی سرور نه. فرستادنِ دوباره پس از ویرایش‌های بعدیِ همان ردیف ترتیب را
+  به هم می‌زند (مقدارِ کهنه روی تازه) ⇒ تصمیمِ جدا («بازسازی از سرور» با `prepare`، که تنهاهای دفتر را درج می‌کند، راهِ امنِ امروز است).
+- **سقفِ ۶۴ کیلوبایت برای هر op** (`server/src/lib/sync-v1.js` `MAX_FIELDS_BYTES`، سطرهای ۱۰۳ و ۱۸۷): ردیفی بزرگ‌تر
+  `fields_too_large` می‌گیرد و برنامه پیش از فرستادن جلویش را نمی‌گیرد. در دفترِ امروز هیچ ردیفی نزدیکش نیست (بزرگ‌ترین: سابقهٔ
+  `z`/`refIds`)؛ مشترک با پمپ.
+- **v3 (پیش‌فرض خاموش):** (الف) سند فقط‌افزودنی است — ویرایشِ پس از درجِ فاکتور/قلم/رسید (یادداشتِ بعدی، `countedAt` ِ
+  شمارش) `append_only_edit` می‌گیرد و در Snapshot ِ v3 نیست (در صندوقِ تعارض هست)؛ (ب) مبلغ به یک‌صدمِ افغانی و مقدار به
+  هزارم گرد می‌شود (`purchasePrice` ِ ۰٫۰۰۰۴ ⇒ ۰). هر دو تصمیمِ طرحِ v3 است؛ v1 ِ پیش‌فرض هر دو را دقیق نگه می‌دارد.
