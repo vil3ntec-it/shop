@@ -6,12 +6,9 @@
  *   ساختن/ورود ── فقط با بلیتِ تازهٔ «شماره تأیید شد» (`POST /account`؛ سرور ≤ ۱۰ دقیقه)؛ کهنه ⇒ همین‌جا کد و تأیید.
  *   پیشنهاد ──── CHK-01: صفحهٔ تأییدِ سفارشِ تازه (`offer`، فقط بی نشست)؛ «نه، ممنون» ۳۰ روز به یاد می‌ماند.
  *   نشانی ────── CHK-09: برگهٔ ثبت (`checkout`): گزینش از نشانی‌های نام‌دار، «نگه‌داشتن با نام» فقط پس از ثبتِ موفق، حذف.
- *   سبد ──────── CHK-03/WEB-14، فقط با `features.accountCart` (پرچمِ `shop.storefront.cart`): شناسه، مقدار و یادداشت —
- *                 قیمت هرگز از این‌جا نمی‌رود (هر خواندن قیمتِ امروز را از سرور می‌گیرد). نخستین بارِ پس از ورود ⇒ ادغامِ
- *                 سبدِ مهمان (`/merge`، بیشینه؛ تکرارش بی اثر)؛ سپس سبدِ سرور. تغییرِ این دستگاه ⇒ `PUT` با نسخهٔ دیده‌شده؛
- *                 بی اینترنت ⇒ در صف (`store-cartsync:<slug>` = نسخه و نشانِ آخرین هم‌گامی) تا `online` یا بارِ بعد.
- *                 ۴۰۹ `cart_changed` ⇒ تغییرِ در صفِ همین دستگاه روی نسخهٔ تازه (حداکثر ۳ بار). نشستِ نامعتبر ⇒ خروج؛
- *                 سبد روی دستگاه می‌ماند.
+ *   سبد ──────── CHK-03/WEB-14، فقط با `features.accountCart` (پرچمِ `shop.storefront.cart`): `store/cart-sync.js` ِ دیربار
+ *                 (ادغامِ یک‌بارهٔ سبدِ مهمان، `PUT` با نسخه، ۴۰۹ ⇒ سه‌طرفه، درنگ). نشست رفت (خروج، ۴۰۱ ِ حساب، منقضی) ⇒
+ *                 نسخهٔ سبدِ حساب از این دستگاه پاک (`gone`)؛ سبدِ مهمانِ بی حساب (بی `merged`) همان می‌ماند.
  * ⛔ همهٔ متن با textContent (`K.el`)؛ واژه‌نامهٔ `kit/i18n/acct.<زبان>.json` نیامد ⇒ هیچ گره‌ای (سبد همان هم‌گام می‌شود).
  */
 (function () {
@@ -26,7 +23,7 @@
     var api = ctx.api;
     var SYNC = 'store-cartsync:' + ctx.slug;
     var dict = K.part('acct', $('ac-box'));
-    var timer = 0; var busy = false; var retry = 0;
+    var cs = null; var fell = false;
 
     function save(r) { K.save(KEY, { token: r.session, expiresAt: r.expiresAt, phone: r.customer.phone, name: r.customer.name || '' }); }
     function drop() { K.save(KEY, null); K.save(SYNC, null); }
@@ -49,7 +46,8 @@
       function create() {
         go.disabled = true;
         return api('/account', { method: 'POST', body: { name: name || '' } }).then(function (r) {
-          save(r); K.save(SYNC, null); start(); done();
+          //  نسخهٔ سبدِ حسابِ پیشین (نشستِ مرده) با حسابِ تازه ادغام نمی‌شود؛ سبدِ مهمان یک بار
+          gone(); save(r); start(); done();
         }).catch(function (e) {
           go.disabled = false;
           if (e.code === 'verification_required') { ask(); K.note(msg, 'info', t('ac.again')); } else K.note(msg, 'err', e.message);
@@ -107,9 +105,10 @@
         var out = btn('btn-ghost btn-sm', t('ac.out'));
         out.addEventListener('click', function () {
           out.disabled = true;
-          //  «خروج» شمارهٔ تأییدشدهٔ این دستگاه را هم می‌برد (بلیت)؛ سبد روی دستگاه می‌ماند
-          api('/account/logout', { method: 'POST' }).catch(function () { /* نشستِ سرور هم سرِ مهلت می‌میرد */ })
-            .then(function () { drop(); K.setTicket(null); K.account(); mine(); });
+          //  تغییرِ در صفِ سبد اول نوشته می‌شود؛ «خروج» بلیتِ این دستگاه و نسخهٔ سبدِ حساب را هم می‌برد
+          sync().then(function (c) { return c && c.settle(); }).then(function () {
+            return api('/account/logout', { method: 'POST' }).catch(function () { /* نشستِ سرور هم سرِ مهلت می‌میرد */ });
+          }).then(function () { gone(); K.setTicket(null); K.account(); mine(); });
         });
         box.append(el('div', { class: 'spread' }, el('b', { text: t('ac.me') }), el('span', { class: 'ltr', text: K.localPhone(s.phone) })), out);
       });
@@ -167,74 +166,27 @@
       return handle;
     }
 
-    // ── سبدِ حساب (CHK-03، WEB-14) ──
+    // ── سبدِ حساب (CHK-03، WEB-14): `store/cart-sync.js` ِ دیربار، فقط با `features.accountCart` و نشست ──
     function on() { return Boolean(K.sess() && ctx.store.features && ctx.store.features.accountCart); }
-    function st() { return K.load(SYNC, null) || {}; }
-    /** فهرستِ قلم‌های دستگاه برای سرور — فقط شناسه، مقدار و یادداشت (به ترتیبِ شناسه) */
-    function items() {
-      var c = ctx.cart();
-      return Object.keys(c).sort().map(function (id) {
-        var x = { productId: id, qtyMilli: c[id].qtyMilli };
-        var n = String(c[id].note || '').trim().slice(0, 200);
-        if (n) x.note = n;
-        return x;
+    function sync() {
+      if (!on()) return Promise.resolve(null);
+      cs = cs || K.js('/store/cart-sync.js').then(function () {
+        return window.StoreCartSync({ api: api, key: SYNC, slug: ctx.slug, cart: ctx.cart, set: ctx.set, on: on, out: lost });
       });
+      //  نیامد ⇒ یک بار همان قیمتِ امروزِ کالاها (راهِ مهمان؛ store.js در حالتِ حساب آن را به این‌جا سپرده)؛ بارِ بعد دوباره
+      return cs.catch(function () { cs = null; if (!fell) { fell = true; ctx.set(ctx.cart()); } return null; });
     }
-    /** نشانِ هم‌سنجی: همان قلم‌ها، مقدار و یادداشت ⇒ همان رشته (ترتیبِ سرور مهم نیست) */
-    function mark(list) {
-      return JSON.stringify(list.map(function (i) { return [i.productId, i.qtyMilli, String(i.note || '').trim()]; })
-        .sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; }));
+    function start() { sync().then(function (c) { if (c) c.start(); }); }
+    function push() { if (on()) sync().then(function (c) { if (c) c.push(); }); }
+    /** نشست رفت (خروج، منقضی، ۴۰۱ ِ حساب): نشست و نسخهٔ سبدِ حساب از این دستگاه پاک؛ سبدِ حساب روی سرور می‌ماند */
+    function gone() {
+      var copy = (K.load(SYNC, null) || {}).merged;
+      drop();
+      if (copy) ctx.set({});
     }
-    function synced(cart) { K.save(SYNC, { v: cart.version, k: mark(cart.lines), merged: true }); }
-    /** سبدِ سرور ⇒ سبدِ دستگاه؛ نام/عکس/«اگر نبود» ِ قلمِ هم‌شناسه می‌ماند، قیمت و «هست؟» را store.js از نو می‌خواند */
-    function adopt(cart) {
-      var cur = ctx.cart(); var next = {};
-      cart.lines.forEach(function (l) {
-        var o = cur[l.productId] || {};
-        var x = Object.assign({}, o, {
-          qtyMilli: l.qtyMilli, name: l.name || o.name || '', unit: l.unit || o.unit || '',
-          priceMinor: l.priceMinor === null || l.priceMinor === undefined ? (Number(o.priceMinor) || 0) : l.priceMinor,
-          maxQtyMilli: l.maxQtyMilli || null, photo: Boolean(o.photo), photoVersion: o.photoVersion, unavailable: !l.available,
-        });
-        if (l.note) x.note = l.note; else delete x.note;
-        next[l.productId] = x;
-      });
-      synced(cart);
-      ctx.set(next);
-    }
-    function fail(e) { if (e.status === 401) drop(); }
-    function start() {
-      if (!on() || busy) return;
-      var s = st();
-      //  WEB-14: تغییرِ در صفِ همین دستگاه پیش از خواندن ⇒ اول همان
-      if (s.merged && mark(items()) !== s.k) { flush(); return; }
-      busy = true;
-      (s.merged ? api('/account/cart') : api('/account/cart/merge', { method: 'POST', body: { items: items() } })).then(function (r) {
-        busy = false; adopt(r.cart);
-      }).catch(function (e) {
-        busy = false;
-        //  بیش از ۱۰۰ قلم ⇒ سبدِ این دستگاه روی نسخهٔ سرور می‌رود (هیچ چیز بی‌صدا گم نمی‌شود)
-        if (e.code === 'cart_full' && e.data && e.data.cart) { K.save(SYNC, { v: e.data.cart.version, k: '', merged: true }); flush(); } else fail(e);
-      });
-    }
-    function flush() {
-      if (!on() || busy) return;
-      var s = st(); var list = items();
-      if (!s.merged) { start(); return; }
-      if (mark(list) === s.k || navigator.onLine === false) return;
-      busy = true;
-      api('/account/cart', { method: 'PUT', body: { version: Number(s.v) || 0, items: list } }).then(function (r) {
-        busy = false; retry = 0; synced(r.cart);
-        flush();
-      }).catch(function (e) {
-        busy = false;
-        if (e.code === 'cart_changed' && e.data && e.data.cart && retry++ < 3) { K.save(SYNC, { v: e.data.cart.version, k: s.k, merged: true }); flush(); } else fail(e);
-      });
-    }
-    function push() { if (on()) { clearTimeout(timer); timer = setTimeout(flush, 400); } }
+    function lost() { gone(); if ($('ac-mine')) mine(); }
 
-    window.addEventListener('online', function () { if (st().merged) flush(); else start(); });
-    start();
+    if (K.sess()) start(); else gone();
     return { push: push, offer: offer, mine: mine, checkout: checkout };
   };
 })();

@@ -280,7 +280,7 @@ const cart2 = await p2.evaluate((s) => JSON.parse(localStorage.getItem(`store-ca
 ok(cart2.rice.qtyMilli === 2000 && cart2.oil.qtyMilli === 2000 && cart2.rice.priceMinor === 30000 && /0791114455/.test(await p2.textContent('#ac-mine')),
   'دستگاهِ دوم پس از ورود همان سبد را از سرور خواند (قیمتِ امروزِ سرور)', JSON.stringify(cart2));
 
-//  «خروج از حساب» ⇒ نشست باطل، سبد روی دستگاه می‌ماند
+//  «خروج از حساب» ⇒ نشست باطل (نسخهٔ سبدِ حساب از دستگاه پاک: web-store-cart-sync.mjs)
 const token2 = await p2.evaluate(() => JSON.parse(localStorage.getItem('store-session')).token);
 await p2.click('#ac-mine button:has-text("خروج از حساب")');
 await p2.waitForFunction(() => /ورود به حساب/.test(document.getElementById('ac-mine').textContent), null, { timeout: 5000 });
