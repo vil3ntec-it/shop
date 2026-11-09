@@ -21,7 +21,8 @@
  *   shop_chat_conversations    شماره ⇐ `erased:<شناسهٔ گفت‌وگو>`، نام پاک، پیوندِ حساب NULL؛
  *     shop_chat_messages       متن/رسانه/meta پاک و «پاک‌شده» (ردیف و شمار می‌ماند)؛
  *     shop_chat_media، shop_chat_pins   پاک؛ shop_chat_reports: snapshot و یادداشت پاک.
- *   store_customer_carts، store_customer_favorites   سبد و ♥ ِ همین دکان پاک.
+ *   store_customer_carts، store_customer_favorites،
+ *     store_customer_lists     سبد، ♥ و «فهرستِ خرید» ِ همین دکان پاک (اگر جدولش هست — مهاجرتِ ۴۳۲).
  *   storefront_area_requests   «خبرم کن» ِ همین شماره در همین دکان پاک.
  *   (اگر جدولش هست — مهاجرت‌های ۱۸۸/۱۹۱)
  *   storefront_alerts          «خبرم کن» ِ موجودی/قیمت پاک (شمارِ هزینهٔ پیامِ امروزِ دکان به‌اندازهٔ همین خبرها کم می‌شود).
@@ -60,7 +61,7 @@ const KEPT = Object.freeze([
 ]);
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
-  'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'areaRequests',
+  'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
   'alerts', 'issues', 'issuePhotos', 'reviews',
 ]);
 
@@ -278,6 +279,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
       if (t.customerIds.length) {
         counts.carts = await q('DELETE FROM store_customer_carts WHERE shop_id=$1 AND customer_id = ANY($2::text[]) RETURNING customer_id', [shopId, t.customerIds]);
         counts.favorites = await q('DELETE FROM store_customer_favorites WHERE shop_id=$1 AND customer_id = ANY($2::text[]) RETURNING product_id', [shopId, t.customerIds]);
+        if (await has(c, 'store_customer_lists')) {
+          counts.lists = await q('DELETE FROM store_customer_lists WHERE shop_id=$1 AND customer_id = ANY($2::text[]) RETURNING customer_id', [shopId, t.customerIds]);
+        }
       }
       if (t.forms.length) {
         counts.areaRequests = await q('DELETE FROM storefront_area_requests WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);

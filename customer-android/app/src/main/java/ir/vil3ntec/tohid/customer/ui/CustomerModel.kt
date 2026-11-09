@@ -5,6 +5,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.market.PublicOrder
 import ir.vil3ntec.tohid.core.market.PublicProduct
+import ir.vil3ntec.tohid.core.shopper.AccountPulls
 import ir.vil3ntec.tohid.core.shopper.Cart
 import ir.vil3ntec.tohid.core.shopper.CartRules
 import ir.vil3ntec.tohid.core.shopper.CheckoutFlow
@@ -94,6 +95,7 @@ class CustomerModel(
   private val locator: Locator = Locator { it(null) },
   secureRandom: (Int) -> ByteArray = { Random.nextBytes(it) },
   chatWaitMs: Int = 20_000,
+  secrets: ShopperKeyValue? = null,
 ) {
   var saved: ShopperState by mutableStateOf(ShopperMemory.withDevice(ShopperMemory.load(kv)) { secureRandom(16) })
     private set
@@ -182,6 +184,8 @@ class CustomerModel(
   val feedback = FeedbackModel(api, scope, io)
   val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
   val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs)
+  /** WEB-11/CHK-01: حسابِ مشتری — سبد، ♥ و «فهرستِ خرید» همراهِ حساب (`ModelAccount.kt`؛ [secrets] نگه‌دارِ رمزشدهٔ نشست) */
+  val account = AccountBox(secrets)
   /** MKT-11: کدِ کمپینِ پیوند/QR که مشتری با آن به هر دکان آمد (فقط همین اجرا، مثلِ «همین نشست» ِ وب) */
   internal val campaigns = HashMap<String, String>()
 
@@ -254,6 +258,7 @@ class CustomerModel(
 
   /** برنامه دوباره پیش آمد: پیگیری و سبد از سرور تازه می‌شوند؛ گفت‌وگوی باز ⇒ «خواندم» (CHAT-04) */
   fun resumed() {
+    syncAccount(storeSlug, AccountPulls.ALL)
     chat.visible(true)
     chat.online()
     when (val r = route) {
@@ -326,6 +331,7 @@ class CustomerModel(
       r.valueOrNull()?.let { page ->
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
+        enteredStore(slug, page)
         if (page.features.reviews) feedback.loadShop(slug)
         //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
         if (route is Route.Checkout) {
@@ -391,7 +397,10 @@ class CustomerModel(
 
   fun cartOf(slug: String): Cart = ShopperMemory.cartOf(saved, slug)
 
-  private fun setCart(c: Cart) = persist(ShopperMemory.withCart(saved, c))
+  private fun setCart(c: Cart) {
+    persist(ShopperMemory.withCart(saved, c))
+    syncAccount(c.slug)
+  }
 
   fun add(slug: String, p: PublicProduct) {
     val before = cartOf(slug)
@@ -638,6 +647,7 @@ class CustomerModel(
     s = ShopperMemory.withOrder(s, SavedOrder(slug, o.token, o.orderNo, o.totalMinor, o.createdAt, page.shop.title))
     s = s.copy(bought = Refills.record(s.bought, slug, o.lines, o.createdAt))   //  MKT-06: قلم‌های پذیرفتهٔ سرور، نه سبد
     persist(s)
+    syncAccount(slug)   //  سبدِ حساب هم خالی (همان وب)
     placeNote = null
     repriced = false
     form = form.copy(note = "", slotStartsAt = null)
