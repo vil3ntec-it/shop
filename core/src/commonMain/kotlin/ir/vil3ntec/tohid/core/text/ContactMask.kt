@@ -27,4 +27,10 @@ object ContactMask {
 
   /** [visible] ⇒ همان متن؛ وگرنه پوشیده ([phone]) */
   fun show(text: String, visible: Boolean): String = if (visible) text else phone(text)
+
+  /**
+   *  شمارهٔ پوشیده (همین قالب، یا همان `maskPhone` ِ سرور برای اصلِ بی `customers.contact`)؟ ⇒ نه «زنگ»، نه «کپی»:
+   *  `tel:` با «•» شماره‌گیرِ بی‌فایده باز می‌کند
+   */
+  fun isMasked(text: String): Boolean = DOT in text
 }

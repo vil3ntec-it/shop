@@ -20,6 +20,7 @@ const config = require('../config');
 const areas = require('../lib/storefront-area-requests');
 const extras = require('../lib/storefront-extras');
 const audit = require('../lib/audit');
+const contact = require('../lib/customer-contact');   //  CRM-15: شمارهٔ مشتری در «خبرم کن»
 const idempotency = require('../lib/idempotency');
 const { can } = require('../lib/permissions');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
@@ -175,7 +176,10 @@ const needArea = async (req, res, next) => {
 
 router.get('/area-requests', requirePermission('settings.write'), needFlag, needZones, needArea, async (req, res) => {
   res.set('Cache-Control', 'no-store');
-  res.json(await areas.forShop(req.shopId));
+  const out = await areas.forShop(req.shopId);
+  //  ⛔ CRM-15: بی «شمارهٔ مشتریان» (`customers.contact`، لایهٔ نقش یا کاربر) شماره فقط پوشیده؛ «خبر دادم» با شناسه همان
+  if (await contact.hiddenForReq(req)) out.contacts = out.contacts.map((c) => ({ ...c, phone: contact.maskPhone(c.phone) }));
+  res.json(out);
 });
 
 //  «خبر دادم» ⇒ درخواست پاک می‌شود؛ در سابقه نامِ ناحیه، هرگز شماره

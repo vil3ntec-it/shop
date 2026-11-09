@@ -38,7 +38,13 @@
     return `${num(c.count)} درخواست نزدیکِ ${num(c.lat)}، ${num(c.lng)} — ${c.coveredBy ? `اکنون در ناحیهٔ «${c.coveredBy}»` : 'هنوز بیرون از ناحیه‌ها'}`;
   }
 
-  const core = { view, cellLabel };
+  /** CRM-15: شمارهٔ پوشیده (کارمندِ بی «شمارهٔ مشتریان»، `maskPhone` ِ سرور) ⇒ فقط متن، نه پیوندِ `tel:` */
+  function phoneHtml(phone, esc) {
+    const p = String(phone ?? '');
+    return p.includes('•') ? `<span class="ltr">${esc(p)}</span>` : `<a class="ltr" href="tel:${esc(p)}">${esc(p)}</a>`;
+  }
+
+  const core = { view, cellLabel, phoneHtml };
   if (typeof module !== 'undefined' && module.exports) { module.exports = core; return; }
 
   // ══════════════════════════════ مرورگر ══════════════════════════════
@@ -120,7 +126,7 @@
     const esc = api.esc;
     const rows = d.contacts.map((c) => `
       <li class="ord-area-row">
-        <span><a class="ltr" href="tel:${esc(c.phone)}">${esc(c.phone)}</a><small class="ord-hint"> — ناحیهٔ «${esc(c.zone)}»، ${esc(api.when(c.requestedAt))}</small></span>
+        <span>${phoneHtml(c.phone, esc)}<small class="ord-hint"> — ناحیهٔ «${esc(c.zone)}»، ${esc(api.when(c.requestedAt))}</small></span>
         <button type="button" class="btn btn-primary btn-sm" data-area-done="${esc(c.id)}">خبر دادم</button>
       </li>`).join('');
     body.innerHTML = `
