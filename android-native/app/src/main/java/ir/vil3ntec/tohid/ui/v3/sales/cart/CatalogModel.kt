@@ -30,8 +30,12 @@ enum class CatalogEmpty {
  */
 object CatalogModel {
 
-  /** نمایه — یک بار با هر تغییرِ کالاها یا فروش‌ها، نه با هر حرف */
-  fun index(d: ShopData): CatalogSearch.Index = CatalogSearch.index(d.products, CatalogSearch.popularity(d.sales, d.saleItems))
+  /**
+   *  نمایه — یک بار با هر تغییرِ کالاها یا فروش‌ها، نه با هر حرف؛ شمارِ فروش پس از یک فروش افزایشی (`CatalogSearch.counts`).
+   *  [codes] (POS-01، `ProductInfoPrefs`): کدِ کالا (SKU) هم در جست‌وجوی همان یک کادر، مثلِ بارکد.
+   */
+  fun index(d: ShopData, codes: Boolean = false): CatalogSearch.Index =
+    CatalogSearch.index(d.products, CatalogSearch.counts(d.sales, d.saleItems), codes)
 
   /**
    *  کاشیِ یک کالا با مقدارش در سبد. [held] (INV-03، `HeldStock.reserved`): مقدارِ همان کالا در فاکتورهای نگه‌داشته ⇒

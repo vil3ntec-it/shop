@@ -77,11 +77,16 @@ object PriceList {
   fun isManual(p: Prices, unitMinor: Long?): Boolean =
     unitMinor != null && unitMinor != p.retailMinor && !(p.wholesaleMinor > 0 && unitMinor == p.wholesaleMinor)
 
-  /** فیِ تازهٔ ردیفِ سبد در این لیست؛ خرده ⇒ `null` (همان قیمتِ کالا)، دستی ⇒ همان */
+  /**
+   *  فیِ تازهٔ ردیفِ سبد در این لیست؛ خرده ⇒ `null` (همان قیمتِ کالا)، دستی ⇒ همان. ⛔ ردیفی که فیِ **ثابتش** همین حالا
+   *  برابرِ خرده است (اصلاحِ فاکتور، پیش‌فاکتور، فاکتورِ ردشده) در لیستِ خرده همان عددِ ثابت می‌ماند: پیش‌تر `null` و «زنده»
+   *  می‌شد ⇒ تخفیفِ خودکار می‌گرفت (`PromoEngine`: فیِ دستی بی تخفیف) و با تغییرِ قیمتِ کالا عوض می‌شد — پولِ فاکتور.
+   */
   fun cartUnit(p: Prices, unitMinor: Long?, list: String): Long? {
     if (isManual(p, unitMinor)) return unitMinor
     val target = unitMinor(p, list)
-    return if (target == p.retailMinor) null else target
+    if (target != p.retailMinor) return target
+    return if (unitMinor == p.retailMinor) unitMinor else null
   }
 
   /** لیستِ همین فاکتور و این‌که صندوق‌دار خودش انتخابش کرده */

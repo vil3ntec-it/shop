@@ -242,7 +242,7 @@ fun RouteScope.FixRoute() {
           if (ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context)) {
             cart.setPriceList(CartPriceList.keep(before, lines, sale.debtorId?.let { id -> before.debtors.find { it.id == id }?.priceList.orEmpty() }))
           }
-          HeldSession.kept = cart.snapshot().key?.let { it to SaleReopen.extras(before, sale, lines) }
+          HeldSession.keep(cart, SaleReopen.extras(before, sale, lines))
           nav.switchTab(SalesPaths.SALE)
         }
       }

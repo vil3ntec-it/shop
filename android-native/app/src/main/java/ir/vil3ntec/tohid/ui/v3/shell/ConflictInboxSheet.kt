@@ -218,7 +218,7 @@ private fun RouteScope.fixAtTill(context: android.content.Context, item: Conflic
   if (!cart.set(lines)) { toasts.show(StrConflictInbox.cartBusy, V3Tone.WARNING); return }
   cart.setDebtor(inv.debtorId.takeIf { id -> id.isNotBlank() && data.debtors.any { it.id == id } })
   //  تخفیف و دریافتیِ نسیهٔ همان فاکتور به برگهٔ تسویه (`SaleReopen.extras`) — پیش‌تر می‌افتادند
-  ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.kept = cart.saleKey() to ir.vil3ntec.tohid.data.SaleReopen.extras(inv)
+  ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.keep(cart, ir.vil3ntec.tohid.data.SaleReopen.extras(inv))
   ConflictFix.begin(context, cart.saleKey(), item.id)
   toasts.show(StrConflictInbox.fixOpened, V3Tone.INFO)
   onClose()

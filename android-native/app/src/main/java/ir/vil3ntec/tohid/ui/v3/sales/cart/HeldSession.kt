@@ -14,7 +14,19 @@ import ir.vil3ntec.tohid.data.HeldExtras
 object HeldSession {
   var kept by mutableStateOf<Pair<String, HeldExtras>?>(null)
 
-  fun extras(cart: CartStore): HeldExtras = kept?.takeIf { it.first == cart.snapshot().key }?.second ?: HeldExtras()
+  /**
+   *  همان [kept] برای سبدِ کنونی، و نوشتنش در پیش‌نویسِ همان سبد (`CartStore.setPage`، POS-13): تخفیف و دریافتیِ فاکتورِ
+   *  اصلاح‌شده یا برگشته با بسته شدنِ برنامه نمی‌افتد. سبدِ خالی ⇒ هیچ.
+   */
+  fun keep(cart: CartStore, x: HeldExtras) {
+    val key = cart.snapshot().key
+    kept = key?.let { it to x }
+    if (key != null) cart.setPage(x)
+  }
+
+  /** [kept] ِ همین سبد؛ وگرنه آنچه پیش‌نویسِ همین سبد نگه داشته (پس از بازیابی، POS-13)؛ وگرنه هیچ */
+  fun extras(cart: CartStore): HeldExtras =
+    kept?.takeIf { it.first == cart.snapshot().key }?.second ?: cart.page.value?.extras() ?: HeldExtras()
 
   /**
    *  صندوقِ کامپیوتر (`DeskSale`) تخفیفِ «اصلاحِ فاکتور» (`SaleReopen`) را برای همین سبد یک بار برمی‌دارد — کادرِ خودش

@@ -113,7 +113,9 @@ fun RouteScope.CheckoutRoute() {
     val saleKey = remember(lines) { cart.saleKey() }
     //  POS-23: فروشندهٔ هر ردیف فقط با تنظیمِ روشنِ دکان روی قلم می‌نشیند (`LineSellerPref`)؛ خاموش ⇒ همان امروز
     val lineSellers = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
-    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers)
+    //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
+    val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
+    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)
@@ -158,7 +160,7 @@ fun RouteScope.CheckoutRoute() {
           debtorId = gated.debtorId.orEmpty(),
           addMinor = o.addMinor,
           summary = (debtor?.name?.let { "«$it» — " } ?: "") + SalesEngine.creditOverText(o),
-          seller = gated.seller,
+          seller = seller,
         )
         nav.open(SalesPaths.CREDIT)
         return

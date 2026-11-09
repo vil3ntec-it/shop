@@ -158,8 +158,7 @@ fun DeskSaleScreen(
   //  تراشهٔ دستهٔ انتخابی: null = «همه»
   var category by remember { mutableStateOf<String?>(null) }
   var confirmClear by remember { mutableStateOf(false) }
-  //  نمای کارتی/جدولی — ترجیحِ همین کاربر روی همین دستگاه (§۱٫۵)
-  val view = rememberViewMode("sale", ScreenKind.SALE)
+  val view = rememberViewMode("sale", ScreenKind.SALE) // نمای کارتی/جدولی — ترجیحِ همین کاربر روی همین دستگاه (§۱٫۵)
   val shotView = PosShot.view.value
   LaunchedEffect(shotView) { if (shotView != null) { view.set(shotView); PosShot.view.value = null } }
   //  لمسی (تبلت/گوشی) ⇐ هدفِ ۴۸؛ کامپیوتر ⇐ ۳۶ (۵.۳). POS-31: کامپیوترِ لمسی (پشتِ `PosTouchPrefs`،
@@ -175,29 +174,30 @@ fun DeskSaleScreen(
   //  «نیازمند تأیید» هم کادرِ تخفیف را نشان می‌دهد؛ فقط «ممنوع» پنهانش می‌کند (STF-02)
   val canDiscount = remember { ir.vil3ntec.tohid.data.ShopRole.mayDiscount(context) }
   val blockExpired = remember { ir.vil3ntec.tohid.data.ShopPolicy.blockExpired(context) }
-  //  POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
-  val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) }
+  val checkoutRules = remember { ir.vil3ntec.tohid.data.CheckoutRulesPref.get(context) } // POS-24: قاعده‌های پیش از پایانِ فاکتورِ همین دستگاه (پیش‌فرض خاموش)
   val cashStep = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) } // PAY-09: گردکردنِ نقدی، پیش‌فرض خاموش
   //  POS-15 (پشتِ `PosPriceCheckPrefs`، پیش‌فرض روشن): Ctrl+I قیمت‌پرسی بی افزودن به فاکتور
   ir.vil3ntec.tohid.ui.components.pos.PosPriceCheckPrefs.load(context)
   var priceCheck by remember { mutableStateOf(false) }
-  //  PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت را باز می‌کند، F12 نقدِ دقیق
-  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) }
+  val payV2 = remember { ir.vil3ntec.tohid.data.ShopPolicy.payV2(context) } // PAY (v3 A4): پرداختِ ترکیبی — فقط با پرچم؛ F9 پنلِ پرداخت، F12 نقدِ دقیق
   var payOpen by remember { mutableStateOf(false) }
   val enterGate = remember { ir.vil3ntec.tohid.core.pay.EmptyEnterGate() } // S11 (§۵.۲): Enter در کادرِ خالی ⇒ پنل، ≥ ۵۰۰ ms پس از اسکن/Enter
   val seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) } // S46: کاربرِ صندوق؛ تنظیمِ خاموش ⇒ همان نامِ حساب
   val lineSellerOn = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: خاموش ⇒ بی دکمه و Shift+F2 همان «مشتری»
   var lineSellerOpen by remember { mutableStateOf(false) }; var lineSellerFor by remember { mutableStateOf<String?>(null) }
-  var payment by remember { mutableStateOf(SalesEngine.Payment.CASH) }
-  var discountText by remember { mutableStateOf("") }
-  //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`،
-  //  پیش‌فرض خاموش). خاموش ⇒ هرگز `true` نمی‌شود و کادر همان درصدِ امروز است — جز فاکتورِ نگه‌داشته‌ای که
-  //  با تنظیمِ روشن به مبلغ نگه داشته شد: عددش همان مبلغ می‌ماند، نه درصد (۵۰۰ ؋ هرگز ۱۰۰٪ نمی‌شود).
+  val page0 = remember { cartStore.page.value?.takeIf { !cartStore.recovering }?.extras() } // POS-13: کادرهای همین فاکتور از پیش‌نویس (`CartStore.page`)؛ پرسشِ بی‌پاسخ ⇒ خالی تا `take`
+  var payment by remember { mutableStateOf(page0?.payment ?: SalesEngine.Payment.CASH) }
+  var discountText by remember { mutableStateOf(page0?.discount.orEmpty()) }
+  //  POS-20: تخفیفِ کلِ فاکتور به مبلغ (افغانی) هم، فقط با تنظیمِ «قیمت و تخفیفِ ردیف» (`LinePolicyPrefs.on`، پیش‌فرض خاموش). خاموش ⇒
+  //  هرگز `true` نمی‌شود — جز فاکتورِ نگه‌داشته‌ای که با تنظیمِ روشن به مبلغ نگه داشته شد: همان مبلغ می‌ماند (۵۰۰ ؋ هرگز ۱۰۰٪ نمی‌شود).
   val amountChoosable = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
-  var discountAmount by remember { mutableStateOf(false) }; var paidText by remember { mutableStateOf("") }
-  LaunchedEffect(cart) { ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.take(cartStore)?.let { discountText = it.discount; discountAmount = it.discountAmount } } // «اصلاحِ فاکتور» (`SaleReopen`): تخفیفِ همان فاکتور، یک بار
-  //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
-  var switchedDebtor by remember { mutableStateOf<String?>(null) }
+  var discountAmount by remember { mutableStateOf(page0?.discountAmount == true) }; var paidText by remember { mutableStateOf(page0?.paid.orEmpty()) }
+  var invoiceSeller by remember { mutableStateOf(page0?.seller.orEmpty()) } // «اصلاحِ فاکتور» (`SaleReopen`): فروشندهٔ همان فاکتور؛ خالی ⇒ [seller]
+  LaunchedEffect(cart, ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.kept) { ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.take(cartStore)?.let { x -> // «اصلاحِ فاکتور» یا بازیابیِ پیش‌نویس: یک بار
+    discountText = x.discount; discountAmount = x.discountAmount; invoiceSeller = x.seller; x.payment?.let { payment = it }; if (x.paid.isNotEmpty()) paidText = x.paid } }
+  LaunchedEffect(discountText, discountAmount, paidText, payment, invoiceSeller, cart.isEmpty()) { cartStore.setPage(ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText, discountAmount, invoiceSeller)) }
+  //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد (یا روشِ برگشته از پیش‌نویس، `page0`) روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
+  var switchedDebtor by remember { mutableStateOf(if (page0?.payment != null) cartStore.debtorId.value else null) }
   LaunchedEffect(cartDebtorId) {
     val fromSwitch = cartDebtorId != null && cartDebtorId == switchedDebtor
     switchedDebtor = null
@@ -368,7 +368,7 @@ fun DeskSaleScreen(
   }
 
   val checkout = SalesEngine.Checkout(
-    seller = seller,
+    seller = invoiceSeller.ifBlank { seller },
     lineSellers = lineSellerOn, // POS-23: خاموش ⇒ قلم بی فروشندهٔ ردیف، همان امروز
     discountType = if (discountAmount) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT,
     //  F0-06: خالی ⇐ صفر؛ نامعتبر ⇐ خطای کنارِ کادر و `finish` ثبت نمی‌کند
@@ -496,7 +496,7 @@ fun DeskSaleScreen(
       is SalePost.Outcome.Done -> {
         val r = posted.ok
         ir.vil3ntec.tohid.hw.CustomerFacing.sold(r.data.sales.last().finalTotal)
-        selected = null; discountText = ""; discountAmount = false; paidText = ""; payment = SalesEngine.Payment.CASH; approval = null; capSlips = emptyMap()
+        selected = null; discountText = ""; discountAmount = false; paidText = ""; payment = SalesEngine.Payment.CASH; invoiceSeller = ""; approval = null; capSlips = emptyMap()
         payOpen = false
         lastInvoice = r.data to r.saleId
         val change = st?.change ?: 0L
@@ -549,9 +549,9 @@ fun DeskSaleScreen(
   val dataLoaded by store.loaded.collectAsState()
   val held = ir.vil3ntec.tohid.ui.components.pos.rememberHeldInvoices(
     cartStore, d, snackbar, dataLoaded,
-    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText, discountAmount) },
+    extras = { ir.vil3ntec.tohid.data.HeldExtras(discountText, payment, paidText, discountAmount, invoiceSeller) },
     onSwitched = { x ->
-      discountText = x.discount; discountAmount = x.discountAmount; paidText = x.paid; selected = null
+      discountText = x.discount; discountAmount = x.discountAmount; paidText = x.paid; invoiceSeller = x.seller; selected = null
       //  پنلِ پرداخت مالِ فاکتورِ قبلی بود
       payOpen = false
       //  روشِ پرداخت با فاکتور برمی‌گردد (نسیهٔ بی‌مشتری هم: `finish` مشتری می‌خواهد و فهرست را باز می‌کند)

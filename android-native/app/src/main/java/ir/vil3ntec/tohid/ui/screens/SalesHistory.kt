@@ -538,7 +538,7 @@ fun SalesHistoryScreen(
           cartStore.setPriceList(ir.vil3ntec.tohid.data.CartPriceList.keep(d, lines, sale.debtorId?.let { id -> d.debtors.find { it.id == id }?.priceList.orEmpty() }))
         }
         //  تخفیفِ فاکتور به صندوقِ کامپیوتر (`DeskSale` همان را برای همین سبد برمی‌دارد)
-        ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.kept = cartStore.snapshot().key?.let { it to ir.vil3ntec.tohid.data.SaleReopen.extras(d, sale, lines) }
+        ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.keep(cartStore, ir.vil3ntec.tohid.data.SaleReopen.extras(d, sale, lines))
         reopenFor = null
         onEditInCart()
       }

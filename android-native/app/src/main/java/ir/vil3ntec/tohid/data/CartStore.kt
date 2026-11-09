@@ -71,6 +71,13 @@ class CartStore(context: Context) : HeldCart {
   val priceList: StateFlow<String?> = _priceList.asStateFlow()
 
   /**
+   *  POS-13 — تخفیف، روشِ پرداخت، دریافتی و فروشندهٔ همین فاکتور (`SaleDraft.page`): صفحه می‌نویسد ([setPage]) و با پیش‌نویس
+   *  و فاکتورِ نگه‌داشته برمی‌گردد؛ بی آن بسته شدنِ برنامه فاکتور را بی تخفیفش برمی‌گرداند. سبدِ خالی ⇒ `null`.
+   */
+  private val _page = MutableStateFlow(initial?.takeIf { it.lines.isNotEmpty() }?.page)
+  val page: StateFlow<SaleDraft.Page?> = _page.asStateFlow()
+
+  /**
    *  پیش‌نویسی که از بارِ پیش مانده و هنوز از کاربر پرسیده نشده
    *  (`DraftRecoveryPrompt`). تا پاسخ، همان ردیف‌ها در سبد هستند — مثلِ پیش.
    */
@@ -90,7 +97,7 @@ class CartStore(context: Context) : HeldCart {
   }
 
   private fun persist() {
-    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value)
+    val draft = SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value, _page.value)
     write(file, draft) {
       //  پیش‌نویس به فایل رسید ⇒ نسخهٔ کهنه دیگر لازم نیست و نباید روزی دوباره زنده شود
       if (!training && (prefs.contains(LEGACY_KEY) || prefs.contains(LEGACY_DEBTOR_KEY))) {
@@ -128,7 +135,7 @@ class CartStore(context: Context) : HeldCart {
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
-    if (lines.isEmpty()) { _coupons.value = emptyList(); _note.value = null; _priceList.value = null }
+    if (lines.isEmpty()) { _coupons.value = emptyList(); _note.value = null; _priceList.value = null; _page.value = null }
     persist()
     if (byUser) removed(before, lines, draftKey)
     return true
@@ -176,6 +183,21 @@ class CartStore(context: Context) : HeldCart {
     return true
   }
 
+  /**
+   *  POS-13 — صفحه تخفیف، روشِ پرداخت یا دریافتیِ همین فاکتور را عوض کرد (یا «اصلاحِ فاکتور» فروشنده‌اش را آورد).
+   *  `false` ⇒ وسطِ جابه‌جاییِ فاکتور، یا پرسشِ بازیابی هنوز پاسخ نگرفته: صفحه‌ای که تازه با کادرهای خالی باز شد نباید
+   *  تخفیفِ پیش‌نویسِ بازیابی‌نشده را پاک کند. سبدِ خالی ⇒ چیزی نگه داشته نمی‌شود (مثلِ یادداشت).
+   */
+  fun setPage(x: HeldExtras): Boolean {
+    if (frozen || _recovered.value != null) return false
+    val next = if (_lines.value.isEmpty()) null else SaleDraft.Page.of(x)
+    if (next != _page.value) {
+      _page.value = next
+      persist()
+    }
+    return true
+  }
+
   /** S1 — حساب عوض شد: کدهای حسابِ قبلی فقط از حافظه می‌روند (فایل را `LedgerOwner` خالی کرده) */
   fun forgetCoupons() {
     _coupons.value = emptyList()
@@ -199,6 +221,7 @@ class CartStore(context: Context) : HeldCart {
     _coupons.value = emptyList()
     _note.value = null
     _priceList.value = null
+    _page.value = null
     persist()
   }
 
@@ -244,6 +267,7 @@ class CartStore(context: Context) : HeldCart {
     _coupons.value = keep.coupons
     _note.value = keep.note
     _priceList.value = keep.priceList
+    _page.value = keep.page
     persist()
   }
 
@@ -256,7 +280,7 @@ class CartStore(context: Context) : HeldCart {
   override val recovering: Boolean get() = _recovered.value != null
 
   override fun snapshot(): SaleDraft =
-    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value)
+    SaleDraft.of(if (_lines.value.isEmpty()) null else saleKey(), _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value, _page.value)
 
   /**
    *  سبد را با فاکتورِ دیگری عوض می‌کند (`null` = سبدِ خالی) و تا رسیدنش به
@@ -273,11 +297,13 @@ class CartStore(context: Context) : HeldCart {
     //  N3: کدهای تخفیف مالِ همان فاکتورند — با آن می‌روند و برمی‌گردند، به فاکتورِ دیگر نمی‌رسند
     _coupons.value = if (lines.isEmpty()) emptyList() else draft?.coupons.orEmpty()
     _note.value = if (lines.isEmpty()) null else draft?.note
+    //  POS-13: صفحهٔ همان فاکتور (برگشتِ همین سبد پس از جابه‌جاییِ ناموفق)؛ نگه‌داشته صفحه ندارد ⇒ صفحه پس از جابه‌جایی می‌نویسد
+    _page.value = if (lines.isEmpty()) null else draft?.page
     //  همان نویسندهٔ تک‌رشته‌ای: نوشتن‌های پیشین پیش از این می‌روند و این یکی آخرین حالت را می‌نویسد
     return withContext(Dispatchers.IO) {
       runCatching {
         writer.submit(Callable {
-          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value))) }.isSuccess
+          runCatching { DiskWrite.text(file, SaleDraftCodec.encode(SaleDraft.of(key, _lines.value, _debtorId.value, System.currentTimeMillis(), _coupons.value, _note.value, _priceList.value, _page.value))) }.isSuccess
         }).get()
       }.getOrDefault(false)
     }

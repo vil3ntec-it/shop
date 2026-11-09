@@ -88,7 +88,8 @@ fun QuickSaleScreen(
   var query by rememberSaveable { mutableStateOf(initialQuery) }
   var picked by rememberSaveable { mutableStateOf(initialCategory) }
   val category = CatalogModel.keepCategory(picked, d.productCategories)
-  val index = remember(d.products, d.sales, d.saleItems) { CatalogModel.index(d) }
+  val codes = ir.vil3ntec.tohid.ui.components.product.productInfoOn() // POS-01: کدِ کالا (SKU) در همان کادر
+  val index = remember(d.products, d.sales, d.saleItems, codes) { CatalogModel.index(d, codes) }
   val inCart = remember(cart) { CartModel.inCart(cart) }
   val items = remember(index, query, category, inCart, d) { CatalogModel.items(d, index, query, category, inCart) }
   val empty = CatalogModel.empty(index, items.size, query)

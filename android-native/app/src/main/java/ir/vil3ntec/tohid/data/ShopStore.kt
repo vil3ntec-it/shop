@@ -1018,32 +1018,39 @@ class ShopStore(
      *  حالا یک بار روی هر سه فهرست رد می‌شویم و سه نگاشت می‌سازیم؛ بعد هر پرسش یک خواندن است.
      *  PRD-10: کیت موجودیِ خودش را ندارد — ورود/فروش/برگشتِ آن به اجزا پخش می‌شود (`ProductPlansMap`).
      */
-    class StockIndex(d: ShopData) {
-      private val entered = HashMap<String, Double>()
-      private val cartonsIn = HashMap<String, Double>()
-      private val sold = HashMap<String, Double>()
-      private val kits: Map<String, List<KitPart>> = d.products.mapNotNull { p -> p.kit?.ifEmpty { null }?.let { p.id to it } }.toMap()
-
-      init {
+    /** [cancelled] = فاکتورهای لغوشده، برای [extend]؛ [absorbOn] = INV-10: فروشِ پیش از شمارشِ دیررسیده (`CountAbsorbWiring`؛ خاموش ⇒ خالی) */
+    class StockIndex private constructor(
+      private val entered: HashMap<String, Double>, private val cartonsIn: HashMap<String, Double>, private val sold: HashMap<String, Double>,
+      private val kits: Map<String, List<KitPart>>, private val cancelled: HashSet<String>, val absorbOn: Boolean, d: ShopData?,
+    ) {
+      constructor(d: ShopData) : this(
+        HashMap(), HashMap(), HashMap(), d.products.mapNotNull { p -> p.kit?.ifEmpty { null }?.let { p.id to it } }.toMap(), HashSet(), CountAbsorbWiring.serverFlag, d,
+      ) {
         d.warehouseEntries.forEach { e ->
           (kits[e.productId]?.map { it.productId to e.units * it.qty } ?: listOf(e.productId to e.units)).forEach { (id, u) -> entered[id] = (entered[id] ?: 0.0) + u }
           cartonsIn[e.productId] = (cartonsIn[e.productId] ?: 0.0) + e.cartons
         }
-        // وضعیتِ فاکتورها یک بار در یک نگاشت می‌نشیند تا برای هر قلم
-        // دوباره جستجو نشود
-        val cancelled = HashSet<String>()
-        d.sales.forEach { if (it.status == "cancelled") cancelled += it.id }
-        d.saleItems.forEach { item ->
-          if (item.saleId in cancelled) return@forEach
-          sold[item.productId] = (sold[item.productId] ?: 0.0) + (item.quantity - item.returnedQty)
-          item.parts?.forEach { k -> sold[k.productId] = (sold[k.productId] ?: 0.0) + (item.quantity - item.returnedQty) * k.qty }
-        }
+        d.sales.forEach { if (it.status == "cancelled") cancelled += it.id } // وضعیتِ فاکتورها یک بار، نه برای هر قلم
+        add(d.saleItems)
+      }
+      private fun add(items: List<SaleItem>) = items.forEach { item ->
+        if (item.saleId in cancelled) return@forEach
+        sold[item.productId] = (sold[item.productId] ?: 0.0) + (item.quantity - item.returnedQty)
+        item.parts?.forEach { k -> sold[k.productId] = (sold[k.productId] ?: 0.0) + (item.quantity - item.returnedQty) * k.qty }
+      }
+      /** POS-42 — همین جدول برای [next] بی گذشتن از کلِ دفتر، فقط وقتی [next] = [prev] + فاکتور و قلمِ تازه به ته (`AppendTail`، همان شیءها)،
+       *  کالا و ورودِ انبار همان شیء، فاکتورِ تازهٔ لغوشده نه و «جذبِ شمارش» خاموش: جمعِ هر کالا از همان جمعِ پیشین به همان ترتیب ⇒ عددِ
+       *  دقیقاً برابرِ ساختنِ کامل (`StockIndexAppendTest`). وگرنه `null`. جدولِ پیشین دست نمی‌خورد (`sold` رونوشت است). */
+      internal fun extend(prev: ShopData, next: ShopData): StockIndex? {
+        if (absorbOn || CountAbsorbWiring.serverFlag || next.products !== prev.products || next.warehouseEntries !== prev.warehouseEntries) return null
+        ir.vil3ntec.tohid.core.ledger.AppendTail.of(prev.sales, next.sales)?.takeIf { t -> t.none { it.status == "cancelled" } } ?: return null
+        val items = ir.vil3ntec.tohid.core.ledger.AppendTail.of(prev.saleItems, next.saleItems) ?: return null
+        return if (items.isEmpty()) this else StockIndex(entered, cartonsIn, HashMap(sold), kits, cancelled, false, null).also { it.add(items) }
       }
 
       fun soldQty(productId: String): Double = sold[productId] ?: 0.0
 
-      val absorbOn = CountAbsorbWiring.serverFlag // INV-10: فروشِ پیش از شمارشِ دیررسیده (`CountAbsorbWiring`؛ خاموش ⇒ خالی)
-      private val absorbed = CountAbsorbWiring.gaps(d, absorbOn)
+      private val absorbed = if (d != null) CountAbsorbWiring.gaps(d, absorbOn) else emptyMap()
 
       fun stock(productId: String): Double = kits[productId]?.let { k -> ProductPlansMap.kitStock(k) { raw(it) } } ?: raw(productId)
       private fun raw(productId: String): Double = (entered[productId] ?: 0.0) - (sold[productId] ?: 0.0) - (absorbed[productId]?.gapMilli ?: 0L) / 1000.0
@@ -1074,7 +1081,7 @@ class ShopStore(
     fun index(d: ShopData): StockIndex {
       val ready = indexed
       if (ready != null && indexedData === d && ready.absorbOn == CountAbsorbWiring.serverFlag) return ready
-      val fresh = StockIndex(d)
+      val fresh = indexedData?.let { prev -> ready?.extend(prev, d) } ?: StockIndex(d) // POS-42: پس از فروش فقط اقلامِ تازه، نه کلِ دفتر
       indexedData = d
       indexed = fresh
       return fresh
