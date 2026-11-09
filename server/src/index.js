@@ -54,6 +54,8 @@ async function main() {
   }
 
   const app = await createApp();
+  //  F0-28: پاکت‌های رازِ پشتیبانِ مهرشده — پس از migrate، پیش از کلیدِ مجوز و نخستین درخواست؛ بی کلید پیامِ بلند، هرگز توقف
+  await require('./lib/backup-secrets').startup();
   //  O-18: کلیدِ امضای مجوز — یک خطِ روشن؛ نبودنش در production فقط صدورِ مجوز را ۵۰۳ می‌کند، نه کلِ سرور را
   await require('./lib/license').startupCheck();
   //  HTTPS ِ مستقیم فقط با `TLS_*` (سرورِ شبکهٔ دکان)؛ بی آن همان http ِ امروز (پشتِ تونل/Caddy)

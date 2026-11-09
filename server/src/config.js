@@ -288,6 +288,8 @@ const config = {
     rtoTargetMs: num(process.env.BACKUP_RTO_HOURS, 12) * 60 * 60 * 1000,
     enabled:    bool(process.env.BACKUP_ENABLED, true),
     passphrase: process.env.BACKUP_PASSPHRASE || '',   // اگر پر باشد، پشتیبان رمز می‌شود
+    //  F0-28: plain (پیش‌فرض، همان امروز) | seal — رازهای app_config در پشتیبان با BACKUP_SECRETS_KEY مهر می‌شوند (lib/backup-secrets.js)
+    secrets:    process.env.BACKUP_SECRETS || 'plain',
     pgDump:     process.env.PG_DUMP_BIN || 'pg_dump',
     pgRestore:  process.env.PSQL_BIN || 'psql',
     //  OPS-02@29: «سلامت» زرد اگر آخرین تمرینِ بازیابیِ موفق کهنه‌تر از این چند روز است (`npm run restore-drill`).

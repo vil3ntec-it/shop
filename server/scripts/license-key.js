@@ -20,6 +20,7 @@ const license = require('../src/lib/license');
 
 const SOURCE_FA = {
   env: 'LICENSE_PRIVATE_KEY', file: 'LICENSE_PRIVATE_KEY_FILE', db: 'پایگاه‌داده (app_config)', 'db-public': 'کلیدِ عمومیِ پایگاه‌داده',
+  'db-sealed': 'کلیدِ مهرشدهٔ پشتیبان (BACKUP_SECRETS_KEY)',
 };
 
 /** PEM در `out`: حالتِ 600، `wx` (فایلِ موجود ⇒ EEXIST)؛ پیش‌فرض یک خطِ .env */

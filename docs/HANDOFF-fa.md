@@ -67,6 +67,16 @@
   بیرون از کاتالوگ (shop.visual_search، pay.hesabpay، shop.promo_uses، shop.owner_report، …) هنوز در `KNOWN` نیستند. `shop.orders.ledger` بازنشسته
   است ولی هنوز در `order-ledger.js` خوانده می‌شود. `E2E_FLAGS_ON=all` حالا `shop.orders.subscribers_only` را هم روشن می‌کند (دکانِ بی اشتراک ⇒ بی سفارش).
 - قدمِ بعدی: شاهدِ CI؛ تصمیمِ صاحب‌کار دربارهٔ subscribers_only در «همه روشن»؛ کاتالوگِ پیک و پرداخت با همان سنجهٔ `console-shell.test.js`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/backup-secrets` (F0-28: رازهای app_config در پشتیبانِ سرور؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `server/src/lib/backup-secrets.js` پشتِ `BACKUP_SECRETS=seal` (پیش‌فرض plain = همان امروز، بی هیچ تبدیل): هفت رازِ app_config
+  (کلیدِ مجوز، vapid، رمز و کلیدِ ایمیل، کلیدِ پیامک، حسابِ سرویسِ پوش، `station_read_key`) در خودِ پشتیبان `sealed:<نام>` با AES-256-GCM و
+  `BACKUP_SECRETS_KEY[_FILE]`؛ pg_dump با تبدیلِ جریانیِ فقط بلوکِ `COPY public.app_config` (و سنجشِ شمار در همان snapshot)، PGlite با رونوشت +
+  `VACUUM FULL` + چرخاندنِ WAL و سنجشِ نشانیِ هر صفحهٔ WAL (بی آن مقدارِ خام در WAL می‌ماند — با جهشِ آزمون دیده شد). باز شدن (restore،
+  تمرین، راه‌اندازی پیش از نخستین درخواست) همه یا هیچ؛ بی کلید ۵۰۳ ِ روشن و هیچ کلیدِ تازه (`license.js`، و ردیفِ خالیِ `station_read_key`؛
+  کدِ پمپ دست نخورد). seal بی کلید یا حالتِ ناشناخته ⇒ ۴۰۹ و هیچ فایل. `omit` عمداً ساخته نشد (کلیدِ پمپ و vapid برنمی‌گشتند ⇒ قفلِ کارمندان).
+- آزمون: `test/backup-secrets.test.js` ⇒ PGlite ۱۱/۱۱ (+۱ فقط PostgreSQL)، PostgreSQL ۱۶ ۱۲/۱۲؛ خانوادهٔ پشتیبان/مجوز/امنیت سبز (گزارشِ شاخه).
+- نیمه‌کاره: CI ندیده (F0-28 = PARTIAL)؛ روشن کردن با صاحب محصول (OWNER-ACTIONS-fa.md §۳ گامِ ۸). قدمِ بعدی: پس از CI ِ سبز، روی سرورِ
+  خانگی گامِ ۸ و یک `npm run restore-drill` (باید «کلیدِ مجوز: همان کلیدِ پیشین» بگوید)؛ نمایشِ «رازِ مهر مانده» در «سلامت» ِ پنل هنوز نیست.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای

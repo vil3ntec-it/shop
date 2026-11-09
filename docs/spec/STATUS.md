@@ -12,7 +12,7 @@
 
 | خانواده | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| F0 | ۲۸ | ۲۴ | ۲ | ۲ | ۰ | ۰ | ۰ |
+| F0 | ۲۸ | ۲۴ | ۳ | ۱ | ۰ | ۰ | ۰ |
 | POS | ۴۲ | ۲۳ | ۱۷ | ۱ | ۰ | ۱ | ۰ |
 | PAY | ۲۴ | ۱۲ | ۱۱ | ۱ | ۰ | ۰ | ۰ |
 | PRD | ۲۷ | ۲۲ | ۵ | ۰ | ۰ | ۰ | ۰ |
@@ -68,13 +68,13 @@
 | REC | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | REL | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
 | ABUSE | ۱ | ۰ | ۱ | ۰ | ۰ | ۰ | ۰ |
-| **همه** | ۷۶۴ | ۴۳۰ | ۲۶۵ | ۳۱ | ۰ | ۱۲ | ۲۶ |
+| **همه** | ۷۶۴ | ۴۳۰ | ۲۶۶ | ۳۰ | ۰ | ۱۲ | ۲۶ |
 
 ## خلاصه به تفکیکِ فاز
 
 | فاز | شمار | IMPLEMENTED-VERIFIED | PARTIAL | MISSING | BROKEN | NOT-VERIFIED | BLOCKED-EXTERNAL |
 |---|---|---|---|---|---|---|---|
-| ۰ | ۳۲ | ۲۷ | ۲ | ۳ | ۰ | ۰ | ۰ |
+| ۰ | ۳۲ | ۲۷ | ۳ | ۲ | ۰ | ۰ | ۰ |
 | ۱ | ۴۰ | ۲۳ | ۱۷ | ۰ | ۰ | ۰ | ۰ |
 | ۲ | ۱۱۳ | ۵۶ | ۵۵ | ۰ | ۰ | ۲ | ۰ |
 | ۳ | ۷۷ | ۵۱ | ۲۵ | ۰ | ۰ | ۱ | ۰ |
@@ -114,7 +114,7 @@
 | F0-25 | سرور فروش صاحب دکانِ اشتراک‌تمام‌شده را می‌پذیرد، ولی قفل فقط در کلاینت است. | §۲.۳ | ۰ | 🟡 | IMPLEMENTED-VERIFIED | سیاستِ D-05 در سرور: نوشتنِ دادهٔ خودِ صاحب (فروش، همگام‌سازی) با انقضا گروگان نمی‌شود، کلیدهای پولی (online_orders، storefront، delivery، multi_device) در `requireFeature` ِ سرور بسته‌اند. آزمونِ مستقیمِ **همهٔ** مسیرهای نوشتنیِ /api/shop از سورس با اشتراکِ منقضی/معلق/لغوشده: روی main با PGlite `paid-routes-entitlement.test.js` ۶/۶ و `entitlement-enforcement.test.js` ۷/۷؛ جهش (`requireFeature` بی سنجش) ⇒ ۲/۶ | — | — | #213، #374، #416 |
 | F0-26 | پیش از هر اصلاح، خط پایه گرفته نشده است. | §۲.۳ | ۰ | 🟠 | PARTIAL | #211؛ خطِ پایه روی ماشینِ ایجنت (docs/spec/bench)؛ سخت‌افزارِ مرجع و گوشی مانده | — | — | #211 |
 | F0-27 | هر push به main بی‌درنگ APK، نصب‌کننده و وب تازه منتشر می‌کند و به‌روزرسان در ۶ ساعت آن ر… | §۲.۳ | ۰ | 🔴 | PARTIAL | #188 سرور+CI، #194 برنامه؛ اولین انتشارِ beta سبز (اجرای 38478699893)؛ وب: PR #221 (web-beta-channel ۴/۵ قرمز ⇐ ۵/۵)، پس از آن یک کلیکِ صاحب محصول (OWNER-ACTIONS بخشِ ۵)؛ #221 مرج شد (fdeb48a)؛ #235 (a339283): ساختِ Pages بی برچسبِ tohid-web دیگر قرمز نمی‌شود | — | یک کلیکِ صاحب محصول: Pages ⇐ GitHub Actions (BLOCKERS، بخشِ «ب») | #188، #194، #221، #235 |
-| F0-28 | کلید خصوصی مجوز (license_private_key) در app_config است و داخل پشتیبان‌ها می‌رود. | §۲.۳ | ۰ | 🟠 | MISSING | فقط دستورالعمل: OWNER-ACTIONS-fa.md بخشِ ۳ (نیاز به .env) | — | — | — |
+| F0-28 | کلید خصوصی مجوز (license_private_key) در app_config است و داخل پشتیبان‌ها می‌رود. | §۲.۳ | ۰ | 🟠 | PARTIAL | `BACKUP_SECRETS=seal` (پیش‌فرض plain = همان امروز): هفت رازِ app_config در هر پشتیبانِ سرور (pg_dump و PGlite با WAL ِ سنجیده) با AES-256-GCM و `BACKUP_SECRETS_KEY[_FILE]` مهر، باز شدن همه‌یا‌هیچ، بی کلید ۵۰۳ ِ روشن و هیچ کلیدِ تازه (`server/src/lib/backup-secrets.js`)؛ محلی `TEST_DATABASE_URL=pglite:memory node --test test/backup-secrets.test.js` ⇒ ۱۱/۱۱ (+۱ فقط PostgreSQL) و روی PostgreSQL ۱۶ ⇒ ۱۲/۱۲؛ CI هنوز دیده نشده؛ روشن کردن: OWNER-ACTIONS-fa.md §۳ گامِ ۸ | — | CI + کارِ صاحب محصول (گامِ ۸) | claude/backup-secrets |
 
 ## POS
 
