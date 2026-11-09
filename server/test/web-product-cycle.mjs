@@ -309,6 +309,13 @@ await step('گوشی ۳۷۵px: پنجرهٔ ویرایش با کادر افقی 
   const box = await s.page.evaluate(() => { const r = document.getElementById('fg-bp-cycle').getBoundingClientRect(); return { l: r.left, r: r.right }; });
   assert.ok(box.l >= 0 && box.r <= 375 + 1, JSON.stringify(box));
   if (axeSrc) {
+    //  پایانِ `modalUp` (۰٫۲۲ ثانیه از شفافیتِ ۰) و `rowIn` ِ سطرها: رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد (CI ِ #1020 در
+    //  ۳۷۵px؛ همان علتِ CI ِ #881 در web-store.mjs) ⇒ axe بر همان حالتی که کاربر می‌بیند
+    await s.page.waitForFunction(() => {
+      const box = document.querySelector('#modal-bulk-product .modal-box');
+      return Boolean(box) && getComputedStyle(box).opacity === '1'
+        && document.getAnimations().every((a) => a.playState === 'finished');
+    }, null, { timeout: 10_000 });
     await s.page.addScriptTag({ content: axeSrc });
     const v = await s.page.evaluate(async () => (await window.axe.run('#fg-bp-cycle', { runOnly: ['wcag2a', 'wcag2aa'] })).violations.map((x) => x.id));
     assert.deepEqual(v, []);

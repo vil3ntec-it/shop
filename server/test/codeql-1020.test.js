@@ -68,3 +68,26 @@ test('۲۸۹) دیسکِ بی پیوندِ سخت (FAT/exFAT): ساختنِ ان
     fs.linkSync = realLink;
   }
 });
+
+test('۲۸۹ ب) ورودی همان پرونده‌ای است که سنجیده شد: جابه‌جاییِ مسیر پس از بررسی، خوانده نمی‌شود', () => {
+  const pb = require('../scripts/phrase-backup');
+  const dir = tmpDir();
+  const inp = path.join(dir, 'in.tbak');
+  const swap = path.join(dir, 'swap.tbak');
+  fs.writeFileSync(inp, 'checked');
+  fs.writeFileSync(swap, 'swapped');
+  //  پس از هر بررسی (stat مسیر یا fstat ِ دستگیره) مهاجم مسیر را با پروندهٔ دیگری عوض می‌کند
+  const realStat = fs.statSync;
+  const realFstat = fs.fstatSync;
+  const after = (st) => { if (fs.existsSync(swap)) fs.renameSync(swap, inp); return st; };
+  fs.statSync = (...a) => after(realStat(...a));
+  fs.fstatSync = (...a) => after(realFstat(...a));
+  try {
+    assert.equal(pb.readFile(inp).toString('utf8'), 'checked');
+  } finally {
+    fs.statSync = realStat;
+    fs.fstatSync = realFstat;
+  }
+  assert.equal(fs.readFileSync(inp, 'utf8'), 'swapped');
+  assert.throws(() => pb.readFile(dir), (e) => e instanceof pb.PhraseError && e.kind === 'bad_input');
+});

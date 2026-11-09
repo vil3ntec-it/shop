@@ -114,13 +114,14 @@ const numText = (v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) 
 /** فاکتور پس از op: کلِ ردیف (راهِ قدیم، درجِ تازه) یا ویرایش روی ردیفِ فعلی (دلتا جمع) */
 function nextSale(cur, fields, full) {
   if (full || !cur) return { ...fields };
-  const out = { ...cur };
+  //  کلیدِ «__proto__» ِ JSON ِ دستگاه نمونهٔ out را عوض می‌کرد و فیلدِ ساختگی ارث می‌رسید (CodeQL ۲۹۰)؛ نوشتن در
+  //  Map و ساختنِ شیء با `Object.fromEntries` (ویژگیِ خودی، نه setter) ⇐ هیچ نوشتنِ پویا روی شیءِ ساده با کلیدِ دستگاه
+  const out = new Map(Object.entries(cur));
   for (const [k, v] of Object.entries(fields)) {
-    //  کلیدِ «__proto__» ِ JSON ِ دستگاه نمونهٔ out را عوض می‌کرد و فیلدِ ساختگی ارث می‌رسید (CodeQL ۲۹۰)
     if (UNSAFE_KEY.has(k)) continue;
-    out[k] = after(cur[k], v);
+    out.set(k, after(hasOwn(cur, k) ? cur[k] : undefined, v));
   }
-  return out;
+  return Object.fromEntries(out);
 }
 
 /** درهمِ محتوای مالیِ فاکتور (همان فیلدهایی که عوض نمی‌شوند) — خالی‌ها یکی، عدد با متنِ جاوااسکریپت */

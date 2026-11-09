@@ -152,11 +152,17 @@ function zipComplete(b) {
 
 /* ------------------------------------------------------------------ خطِ فرمان */
 
+/** ورودی: یک بار باز، اندازه و نوع از همان دستگیره (fstat) و خواندن از همان ⇐ بی پنجرهٔ «بررسی سپس خواندن» (CodeQL) */
 function readFile(path) {
-  const st = fs.statSync(path);
-  if (!st.isFile()) throw new PhraseError('bad_input', `فایل نیست: ${path}`);
-  if (st.size > MAX_FILE) throw new PhraseError('bad_input', 'فایل بزرگ‌تر از ۲ گیگابایت است');
-  return fs.readFileSync(path);
+  const fd = fs.openSync(path, 'r');
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile()) throw new PhraseError('bad_input', `فایل نیست: ${path}`);
+    if (st.size > MAX_FILE) throw new PhraseError('bad_input', 'فایل بزرگ‌تر از ۲ گیگابایت است');
+    return fs.readFileSync(fd);
+  } finally {
+    fs.closeSync(fd);
+  }
 }
 
 const exists = (path) => new PhraseError('bad_input', `خروجی از پیش هست و رونویسی نمی‌شود: ${path}`);
@@ -256,4 +262,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, writeNew, main };
+module.exports = { PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, readFile, writeNew, main };

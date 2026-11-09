@@ -721,6 +721,9 @@ await step('حداقل نسخه: از پنل ذخیره می‌شود، نادر
 
   await page.fill('#dl-min', '');
   await openTab('sales');
+  //  `loadDownloads` ِ بازکردنِ برگه ناهمگام است و ۴۰۰ms ِ `openTab` روی CI ِ پربار کم بود (CI ِ #1020: پاسخِ GET پس از
+  //  خواندنِ کادر رسید ⇒ '') ⇒ تا ۱۰ ثانیه صبر برای نشستنِ پاسخ؛ برابری همان سنجشِ پیشین است
+  await page.waitForFunction(() => document.getElementById('dl-min').value === '2.14.0', null, { timeout: 10_000 }).catch(() => {});
   assert.equal(await page.inputValue('#dl-min'), '2.14.0', 'پس از بازخوانی همان مقدارِ ذخیره‌شده');
 });
 
