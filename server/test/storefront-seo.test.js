@@ -211,7 +211,10 @@ test('روشن: زبان، عکس، کالای منتشرنشده و صفحهٔ 
   );
   const withPhoto = await rawGet(`/store/${s.slug}/p/oil`);
   const img = metaOf(withPhoto.body, 'og:image');
-  assert.equal(img, `${origin}/api/store/${s.slug}/products/oil/photo`);
+  //  IMG-12 × WEB-20: همان `?v=` ِ نمای کالا (عکسِ تازه ⇒ پیش‌نمایشِ تازه؛ `storefront-seo-media.test.js`)
+  const pv = (await h.get(`/api/store/${s.slug}/products/oil`)).body.product.photoVersion;
+  assert.match(pv, /^[0-9a-f]{12}$/);
+  assert.equal(img, `${origin}/api/store/${s.slug}/products/oil/photo?v=${pv}`);
   assert.equal(metaOf(withPhoto.body, 'og:image:alt'), 'روغن');
   assert.match(withPhoto.body, /<meta name="twitter:card" content="summary_large_image">/);
   assert.deepEqual(ldOf(withPhoto.body).image, [img]);
