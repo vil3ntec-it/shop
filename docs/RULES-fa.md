@@ -2991,6 +2991,7 @@ test/staff-code-desk.test.js  ۶ بند
   `bad_path` و در بدنه انداخته می‌شود (جز `sync`/`shop/sync`/`pump`)؛ ۵xx هرگز SQLSTATE یا کدِ درونی را بیرون نمی‌دهد؛
   «هر کاربر یک دکان» زیرِ قفلِ `staff-join-user` ِ همان حساب است (روی PostgreSQL پیش از رفع هشت دکان)؛ `otp/request` سطلِ
   IP ِ `otp-ip` (`RATE_OTP_IP_MAX`) دارد؛ پشتیبانِ کاملِ دکان با پرچمِ `shop.backup_contact_guard` فقط برای `customers.contact`.
+- ⛔ (بازبینیِ ۳۸، `security-review-38.test.js`) پارسرِ پیش از سقفِ نرخ هرگز `reviver` نمی‌گیرد (`middleware/json-body.js`)؛ `sealPglite` آمارِ app_config (`pg_statistic`) را هم می‌بَرد؛ هر اتصالِ بیرون‌کشیده‌ای که در تراکنش منتظرِ کارِ بیرونی می‌ماند شنوندهٔ `error` و `release(err)` دارد.
 - آزمون: `test/security-hardening.test.js` (۱۳ بند).
 
 ## ⛔ لغو و تعلیقِ اشتراک در ماهِ اول واقعاً می‌بندد (از ۱۴۰۵/۰۷/۱۳)
