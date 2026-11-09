@@ -10,7 +10,9 @@ import kotlinx.serialization.json.Json
  *
  *  ⛔ نه دفترِ دکان و نه همگام‌سازی: پیش‌فاکتور سندِ مالی نیست. ردیف‌ها با قیمتِ همان لحظه ثابت می‌شوند
  *  (`unitPrice` ِ هر ردیف، `SalesEngine.linePrice`)، پس تغییرِ بعدیِ قیمتِ کالا عددِ پیش‌فاکتور را عوض نمی‌کند.
- *  سریِ موجودی (`lotId`) نگه داشته نمی‌شود — هنگامِ فروش از نو انتخاب می‌شود.
+ *  سریِ موجودی (`lotId`) و سریال نگه داشته نمی‌شوند — هنگامِ فروش از نو انتخاب می‌شوند. فروشندهٔ ردیف، نشانِ «قیمتِ خاص» و
+ *  لیستِ دستیِ فاکتور ([SavedQuote.priceList]) با پیش‌فاکتور می‌مانند و به سبد برمی‌گردند (افزودنی، `EncodeDefault.NEVER` ⇒
+ *  پیش‌فاکتورِ بی آن‌ها بایت‌به‌بایت همان پیشین).
  */
 @Serializable
 data class SavedQuote(
@@ -29,6 +31,13 @@ data class SavedQuote(
   val by: String = "",
   /** کلیدِ سبدی که پیش‌فاکتور به آن رفت (`SaleDraft.key` = شناسهٔ فروشی که از آن ثبت می‌شود)؛ null ⇒ هنوز نرفته */
   val cartKey: String? = null,
+  /**
+   *  POS-18 — لیستِ قیمتی که صندوق‌دار برای همین سبد **دستی** برگزید (`CartStore.priceList`، `CartPriceList`). بی آن
+   *  پیش‌فاکتورِ عمدهٔ دستی پس از رفتن به سبد دوباره خرده قیمت می‌خورد (۳ × ۹۰ = ۲۷۰ ⇐ ۳۰۰). `null` نوشته نمی‌شود.
+   */
+  @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+  @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+  val priceList: String? = null,
 )
 
 @Serializable
@@ -53,14 +62,25 @@ object Quotes {
     data class Refused(val code: String) : Result
   }
 
-  /** ردیف‌های سبد با قیمتِ همین لحظه ثابت‌شده؛ ردیفِ کالای حذف‌شده نمی‌آید (جمعش صفر بود) */
+  /**
+   *  ردیف‌های سبد با قیمتِ همین لحظه ثابت‌شده؛ ردیفِ کالای حذف‌شده نمی‌آید (جمعش صفر بود). فروشندهٔ ردیف و نشانِ «قیمتِ
+   *  خاص» (فقط وقتی فیِ ثابت‌شده همان قیمتِ خاص است، همان شرطِ `CustomerPrice.stamp`) هم.
+   */
   fun frozen(d: ShopData, cart: List<SalesEngine.CartLine>): List<SaleDraft.Line> = cart
     .filter { it.free || d.products.any { p -> p.id == it.productId } }
-    .map { SaleDraft.Line(it.productId, it.quantity, SalesEngine.linePrice(d, it), it.label, null, it.note) }
+    .map {
+      val unit = SalesEngine.linePrice(d, it)
+      SaleDraft.Line(
+        it.productId, it.quantity, unit, it.label, null, it.note, seller = it.seller,
+        specialPrice = it.specialPrice?.takeIf { s -> Math.round(s * 100.0) == Math.round(unit * 100.0) },
+      )
+    }
 
   fun create(
     book: QuoteBook, d: ShopData, cart: List<SalesEngine.CartLine>, debtorId: String?, note: String?,
     today: String, days: Int, now: Long, id: String, by: String,
+    /** POS-18 — لیستِ دستیِ همین سبد (`CartStore.priceList`)؛ `null` ⇒ لیستِ مشتری یا خرده */
+    priceList: String? = null,
   ): Result {
     val lines = frozen(d, cart)
     Quote.createProblem(lines.size, book.items.size, today, days)?.let { return Result.Refused(it) }
@@ -68,11 +88,28 @@ object Quotes {
       id = id, number = Quote.nextNumber(book.items.map { it.number }), lines = lines, debtorId = debtorId,
       note = Quote.note(note), createdAt = now, createdDay = today, validUntil = Quote.validUntil(today, days)!!,
       totalMinor = PayFlow.minor(SalesEngine.cartTotal(d, lines.map(::cartLine))), by = by.trim(),
+      priceList = priceList?.let(ir.vil3ntec.tohid.core.sale.PriceList::of),
     )
     return Result.Ok(book.copy(items = book.items + q), q)
   }
 
-  fun cartLine(l: SaleDraft.Line) = SalesEngine.CartLine(l.productId, l.quantity, l.unitPrice, l.label, null, l.note)
+  fun cartLine(l: SaleDraft.Line) =
+    SalesEngine.CartLine(l.productId, l.quantity, l.unitPrice, l.label, null, l.note, specialPrice = l.specialPrice, seller = l.seller)
+
+  /**
+   *  «به سبد»: ردیف‌ها با همان فیِ ثابت، یادداشت و فروشنده؛ نشانِ «قیمتِ خاص» فقط اگر امروز ([today]) هنوز همان قیمتِ خاصِ
+   *  فعالِ مشتریِ پیش‌فاکتور است (`CustomerPriceCart.stillSpecial`) — وگرنه ردیف دستی با همان فی می‌ماند.
+   */
+  fun cartLines(d: ShopData, q: SavedQuote, today: String): List<SalesEngine.CartLine> = q.lines.map { l ->
+    cartLine(l).copy(specialPrice = l.specialPrice?.let { CustomerPriceCart.stillSpecial(d, q.debtorId, l.productId, l.unitPrice, today) })
+  }
+
+  /**
+   *  لیستِ دستی‌ای که سبد با پیش‌فاکتور می‌گیرد: همان که نوشته شد، وگرنه (پیش‌فاکتورِ پیش از این نسخه) لیستی که هیچ فیِ
+   *  ثابتی را عوض نمی‌کند (`CartPriceList.keep`) — فقط با «لیستِ قیمت در صندوق» ِ روشن ([listsOn]).
+   */
+  fun priceList(d: ShopData, q: SavedQuote, lines: List<SalesEngine.CartLine>, listsOn: Boolean): String? =
+    q.priceList ?: if (!listsOn) null else CartPriceList.keep(d, lines, q.debtorId?.let { id -> d.debtors.find { it.id == id }?.priceList.orEmpty() })
 
   /** فروخته شد؟ فروشِ زندهٔ با همان کلیدِ سبد */
   fun sold(q: SavedQuote, d: ShopData): Boolean =

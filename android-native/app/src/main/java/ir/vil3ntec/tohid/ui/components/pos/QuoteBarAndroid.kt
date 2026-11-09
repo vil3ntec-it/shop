@@ -104,7 +104,7 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
         var made: SavedQuote? = null
         val next = withContext(Dispatchers.IO) {
           QuoteStore.update(context) { b ->
-            when (val r = Quotes.create(b, d, cart.lines.value, debtorId, note, today, days, now, id, me)) {
+            when (val r = Quotes.create(b, d, cart.lines.value, debtorId, note, today, days, now, id, me, cart.priceList.value)) {
               is Quotes.Result.Ok -> { made = r.quote; r.book }
               is Quotes.Result.Refused -> { refused = r.code; null }
             }
@@ -146,8 +146,12 @@ fun QuoteBar(d: ShopData, cart: CartStore, toast: (String) -> Unit, modifier: Mo
           is Quotes.Result.Refused -> toast(problem(r.code))
           is Quotes.Result.Ok -> {
             //  سبدِ وسطِ جابه‌جاییِ فاکتور ⇒ `set` هیچ نمی‌کند و پیش‌فاکتور «در سبد» نمی‌شود
-            if (!cart.set(r.quote.lines.map(Quotes::cartLine))) { toast(StrPos.quoteErrNotSaved); return@QuoteListDialog }
+            val lines = Quotes.cartLines(d, r.quote, today)
+            if (!cart.set(lines)) { toast(StrPos.quoteErrNotSaved); return@QuoteListDialog }
             cart.setDebtor(r.quote.debtorId)
+            //  POS-18/POS-11: لیستِ دستیِ پیش‌فاکتور (وگرنه فیِ ثابت با لیستِ خرده عوض می‌شد) و یادداشتش به فاکتور
+            cart.setPriceList(Quotes.priceList(d, r.quote, lines, PriceListPrefs.on(context)))
+            cart.setNote(ir.vil3ntec.tohid.core.pos.SaleNotes.clean(r.quote.note))
             val key = cart.snapshot().key
             scope.launch {
               withContext(Dispatchers.IO) { QuoteStore.update(context) { Quotes.markInCart(it, q.id, key) } }?.let { book = it }

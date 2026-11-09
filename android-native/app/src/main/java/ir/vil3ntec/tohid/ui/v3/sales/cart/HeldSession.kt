@@ -15,4 +15,15 @@ object HeldSession {
   var kept by mutableStateOf<Pair<String, HeldExtras>?>(null)
 
   fun extras(cart: CartStore): HeldExtras = kept?.takeIf { it.first == cart.snapshot().key }?.second ?: HeldExtras()
+
+  /**
+   *  صندوقِ کامپیوتر (`DeskSale`) تخفیفِ «اصلاحِ فاکتور» (`SaleReopen`) را برای همین سبد یک بار برمی‌دارد — کادرِ خودش
+   *  از آن پس مالکِ عدد است. سبدِ دیگر ⇒ `null` و دست نمی‌خورد.
+   */
+  fun take(cart: CartStore): HeldExtras? {
+    val key = cart.snapshot().key ?: return null
+    val x = kept?.takeIf { it.first == key }?.second ?: return null
+    kept = null
+    return x
+  }
 }

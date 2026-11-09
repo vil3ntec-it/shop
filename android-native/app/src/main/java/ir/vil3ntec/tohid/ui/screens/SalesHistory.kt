@@ -528,26 +528,17 @@ fun SalesHistoryScreen(
   //  اصلاحِ فاکتور: لغو (سندِ معکوس) و بردنِ اقلام با همان قیمت به سبد — شرح سرِ `ReopenInvoiceDialog`
   reopenFor?.let { sale ->
     ReopenInvoiceDialog(sale, onDismiss = { reopenFor = null }) {
-      val lines = d.saleItems
-        .filter { it.saleId == sale.id }
-        .mapNotNull { item ->
-          val left = item.quantity - item.returnedQty
-          if (left <= 0) null
-          else if (item.productId.isBlank()) SalesEngine.CartLine(
-            productId = newId(),
-            quantity = left,
-            unitPrice = item.unitPrice,
-            label = item.name.ifBlank { "قلم آزاد" }, // داده: نامِ قلمِ آزاد در فاکتورِ تازه ذخیره می‌شود
-          )
-          else SalesEngine.CartLine(
-            productId = item.productId,
-            quantity = left,
-            unitPrice = item.unitPrice,
-          )
-        }
+      //  همان راهِ گوشی (`SaleReopen`): نشان‌های ردیف، تخفیف، یادداشت و لیستِ فاکتور هم — پیش‌تر می‌افتادند
+      val lines = ir.vil3ntec.tohid.data.SaleReopen.lines(d, sale, ::newId, ir.vil3ntec.tohid.todayIso())
       voidSale(sale, InvoiceVoid.Kind.CORRECTION, InvoiceVoid.CORRECTION_REASON, StrInvoices.reopenedToCart) {
         cartStore.set(lines)
         cartStore.setDebtor(sale.debtorId)
+        cartStore.setNote(ir.vil3ntec.tohid.data.SaleReopen.note(sale))
+        if (ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(roleContext)) {
+          cartStore.setPriceList(ir.vil3ntec.tohid.data.CartPriceList.keep(d, lines, sale.debtorId?.let { id -> d.debtors.find { it.id == id }?.priceList.orEmpty() }))
+        }
+        //  تخفیفِ فاکتور به صندوقِ کامپیوتر (`DeskSale` همان را برای همین سبد برمی‌دارد)
+        ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.kept = cartStore.snapshot().key?.let { it to ir.vil3ntec.tohid.data.SaleReopen.extras(d, sale, lines) }
         reopenFor = null
         onEditInCart()
       }

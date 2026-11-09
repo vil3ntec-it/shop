@@ -245,24 +245,32 @@ object Layaways {
     val firstDue: String,
   )
 
-  /** ردیف‌های سبد با قیمتِ همین لحظه (`SalesEngine.linePrice`)؛ کالای ناموجود در فهرست ⇒ null */
+  /**
+   *  ردیف‌های سبد با قیمتِ همین لحظه (`SalesEngine.linePrice`)، یادداشتِ ردیف و نشانِ «قیمتِ خاص» (فقط وقتی فی همان قیمتِ
+   *  خاص است، شرطِ `CustomerPrice.stamp`)؛ کالای ناموجود در فهرست ⇒ null. سری و فروشندهٔ ردیف نه: سری هنگامِ تحویل از نو
+   *  (FEFO)، و هر ثبتِ بیرون از صندوق فروشندهٔ ردیف را نادیده می‌گیرد (`Checkout.lineSellers`، POS-23).
+   */
   fun linesOf(d: ShopData, cart: List<SalesEngine.CartLine>): List<LayawayLine>? = cart.map { l ->
     val p = if (l.free) null else d.products.find { it.id == l.productId } ?: return null
+    val unit = PayFlow.minor(SalesEngine.linePrice(d, l))
     LayawayLine(
       productId = l.productId,
       label = if (l.free) l.label.trim() else null,
       name = p?.name ?: l.label.trim(),
       qtyMilli = Math.round(l.quantity * 1000),
-      unitMinor = PayFlow.minor(SalesEngine.linePrice(d, l)),
+      unitMinor = unit,
+      note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(l.note),
+      specialMinor = l.specialPrice?.let(PayFlow::minor)?.takeIf { p != null && it == unit },
     )
   }
 
-  /** ردیفِ فاکتورِ تحویل: کالای فهرست، یا قلمِ آزاد با همان نام (کالای پاک‌شده هم) — قیمتِ ثابتِ سند */
+  /** ردیفِ فاکتورِ تحویل: کالای فهرست، یا قلمِ آزاد با همان نام (کالای پاک‌شده هم) — قیمتِ ثابتِ سند، یادداشت و نشانِ قیمتِ خاص */
   fun cartLine(cur: ShopData, l: LayawayLine): SalesEngine.CartLine {
     val qty = l.qtyMilli / 1000.0
     val unit = PayFlow.major(l.unitMinor)
     val known = l.label == null && cur.products.any { it.id == l.productId }
-    return if (known) SalesEngine.CartLine(l.productId, qty, unit) else SalesEngine.CartLine(l.productId, qty, unit, (l.label ?: l.name).ifBlank { "قلمِ امانی" })  // داده: نامِ قلمِ ذخیره‌شده در فاکتور
+    return if (known) SalesEngine.CartLine(l.productId, qty, unit, note = l.note, specialPrice = l.specialMinor?.let(PayFlow::major))
+    else SalesEngine.CartLine(l.productId, qty, unit, (l.label ?: l.name).ifBlank { "قلمِ امانی" }, note = l.note)  // داده: نامِ قلمِ ذخیره‌شده در فاکتور
   }
 
   fun hasRow(d: ShopData, key: String): Boolean = d.auditLog.any { it.id == key }
