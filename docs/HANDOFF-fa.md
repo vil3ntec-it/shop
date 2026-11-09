@@ -53,6 +53,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/ios-keychain` (سه آزمونِ سرخِ کارِ `ios-app`؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- ریشه (از لاگِ کارهای 128869959125 تا 129427623969): `test.kexe` کلیددانِ iOS ندارد (OSStatus -25291، همان که کاوشِ آزمونِ سرتاسری
+  در همان فرآیند می‌نویسد). `DeviceIdentityIosTest` در `keepingRealState` (`Keychain.read`، سطرِ ۱۰۷) KeychainException می‌داد؛
+  `DataSafetyIosTest.signOutVault…`: KEK ِ `AtRestKeysIos` ⇐ `KEY_UNAVAILABLE` ⇐ `SignOutVault.seal` = false (سطرِ ۱۹۱). نخستین سرخ: اجرای
+  ‎#716‎ (دستهٔ ۳۱، ‏b9cfbc736)؛ پیشینِ سبز ‎#713‎ (دستهٔ ۳۰، ‏83c283fa6) این دو کلاس را نداشت (db573a6bc و 5c019a53f؛ اجرای خودِ شاخه‌ها لغو شده بود).
+- انجام شد: هر دو آزمون روی `Keychain.memory` (برگردانده پس از خود؛ کلیددانِ دفتری که آزمونِ گاوصندوق ساخت برداشته می‌شود)؛ ردهٔ
+  «فقط همین دستگاه» با `Keychain.addRequestIs` (همان واژه‌نامهٔ `SecItemAdd` ِ `add`، `addQuery` ِ تازه) به‌جای `storedAs`. هیچ assertی کم نشد.
+- نیمه‌کاره / قدمِ بعد: فقط CI ِ macOS (کارِ `ios-app`) سه آزمون را می‌سنجد؛ کامپایل را کارِ `ios-ui-klib` ِ لینوکس. کلیددانِ واقعی در
+  `test.kexe` (امضای ad-hoc با entitlements ِ DER، `__ents_der`) آزموده نشده — اگر خواستند، آزمونی جدا و گزارشی.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای
