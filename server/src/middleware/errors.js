@@ -73,7 +73,8 @@ function errorHandler(err, req, res, _next) {
       //  جزئیاتِ قابلِ نمایش (مثلاً «فقط ۱ عدد قابلِ سفارش است»: `lines`) — فقط برای
       //  خطای نمایش‌دادنی؛ کد و پیام همیشه بر آن جلو می‌افتند
       ...(exposed && status < 500 && err.data && typeof err.data === 'object' && !Array.isArray(err.data) ? err.data : {}),
-      code: err.code || (status >= 500 ? 'internal' : 'error'),
+      //  ⛔ ممیزیِ ۳۵ (B5): کدِ خطای درونی (SQLSTATE مثلِ ۲۲۰۰۳، ECONNREFUSED…) بیرون نمی‌رود — فقط کدِ خطای نمایش‌دادنی
+      code: (exposed && err.code) || (status >= 500 ? 'internal' : 'error'),
       message: exposed
         ? err.message
         //  همان جمله، به‌علاوهٔ تنها چیزی که پیدا کردنِ ریشه را ممکن می‌کند

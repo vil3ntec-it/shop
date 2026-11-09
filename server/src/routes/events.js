@@ -18,10 +18,20 @@ const { requireUser, requireShop } = require('../middleware/auth');
 const router = express.Router();
 router.use(requireUser, requireShop);
 
+/*
+ *  ⛔ ممیزیِ ۳۵ (B6): زمانِ خبر از دستگاه می‌آید (صفِ بی‌اینترنت زمانِ خودش را دارد)، ولی **آینده** نه. خبرِ ۲۰۵۸ ِ
+ *  یک کارمند همیشه «تازه‌ترین» بود: برنامهٔ صاحب `since` و «دیده شد» را روی آن می‌گذاشت و هیچ خبرِ واقعیِ بعدی
+ *  (تمام شدنِ کالا، قرض…) دیگر نمی‌رسید؛ عددِ بیرون از bigint هم ۵۰۰ می‌داد. آینده (با ۵ دقیقه لغزشِ ساعت)، منفی و
+ *  ناعدد ⇐ ساعتِ سرور. (پمپ همان کتابخانه را از درِ خودش می‌خواند و دست نخورد.)
+ */
+const SKEW_MS = 5 * 60 * 1000;
+const atOf = (x, t) => { const n = Number(x); return Number.isSafeInteger(n) && n > 0 && n <= t + SKEW_MS ? n : t; };
+
 router.post('/', async (req, res, next) => {
   try {
-    const items = Array.isArray(req.body?.events) ? req.body.events
-      : (req.body?.kind ? [req.body] : []);
+    const t = require('../db').now();
+    const items = (Array.isArray(req.body?.events) ? req.body.events
+      : (req.body?.kind ? [req.body] : [])).map((it) => (it && typeof it === 'object' ? { ...it, at: atOf(it.at, t) } : it));
     const out = await events.record(
       { shopId: req.shopId, userId: req.user.id, userName: req.user.name || '' },
       items
@@ -46,9 +56,11 @@ router.get('/', async (req, res, next) => {
 
 router.post('/seen', async (req, res, next) => {
   try {
-    const at = v.integer(req.body?.at, {
-      field: 'at', min: 0, max: Number.MAX_SAFE_INTEGER, def: require('../db').now(),
-    });
+    //  «دیده شد» هم آینده نمی‌گیرد (GREATEST است و برنمی‌گردد) — همان سقفِ زمانِ خبر
+    const t = require('../db').now();
+    const at = Math.min(v.integer(req.body?.at, {
+      field: 'at', min: 0, max: Number.MAX_SAFE_INTEGER, def: t,
+    }), t + SKEW_MS);
     await events.markSeen(req.shopId, req.user.id, at);
     res.json({ ok: true, seenAt: at });
   } catch (err) { next(err); }

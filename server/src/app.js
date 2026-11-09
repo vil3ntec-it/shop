@@ -54,7 +54,17 @@ async function createApp({ runMigrations = true } = {}) {
   //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
   //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
   app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
-  app.use(express.json({ limit: '2mb' }));
+  /*
+   *  ⛔ ممیزیِ ۳۵ (B4): NUL (`\u0000`) در رشته‌های بدنه — PostgreSQL متن و jsonb ِ NUL‌دار را نمی‌پذیرد، پس هر دری
+   *  که رشته را بی `validate.text` (که NUL را از پیش می‌انداخت) می‌نوشت ۵۰۰ می‌داد (خرج کردنِ کد، پاک کردنِ مشتری…).
+   *  همان کارِ `validate.text`، این‌بار برای همه. همگام‌سازی و پمپ (`sync`، `shop/sync`، `pump`) پارسرِ دست‌نخوردهٔ
+   *  پیشین را دارند: آن راه‌ها مشترک با پمپ‌اند و opِ همگام‌سازی بیت‌به‌بیت همانی می‌ماند که دستگاه فرستاد.
+   */
+  const jsonPlain = express.json({ limit: '2mb' });
+  const noNul = (k, val) => (typeof val === 'string' && val.includes('\u0000') ? val.replace(/\u0000/g, '') : val);
+  const jsonClean = express.json({ limit: '2mb', reviver: noNul });
+  const RAW_SYNC = /^\/api(?:\/v1)?\/(?:sync|shop\/sync|pump)(?:\/|$)/;
+  app.use((req, res, next) => (RAW_SYNC.test(req.path) ? jsonPlain : jsonClean)(req, res, next));
 
   /*
    *  بدنه‌ای که JSON نیست.
@@ -109,6 +119,13 @@ async function createApp({ runMigrations = true } = {}) {
     }
     next();
   });
+
+  //  ⛔ ممیزیِ ۳۵ (B4): NUL در مسیر (`%00`) — PostgreSQL متنِ NUL‌دار را نمی‌پذیرد (۲۲۰۲۱)، پس هر شناسهٔ خامِ مسیر
+  //  ۵۰۰ می‌شد (و خطای سرور ثبت می‌کرد). هیچ برنامه‌ای NUL نمی‌فرستد ⇒ ۴۰۰ پیش از هر کار. `%2500` (متنِ «%00») NUL نیست.
+  //  پرسش (`?…`) دست نمی‌خورد: درهایش خودشان می‌سنجند (`routes-idor-31.test.js`).
+  app.use((req, res, next) => (/%00/i.test(req.url.split('?')[0])
+    ? res.status(400).json({ error: { code: 'bad_path', message: 'نشانیِ درخواست درست نیست' } })
+    : next()));
 
   // ---- CORS ----
   // برنامه‌ی اندروید به CORS کاری ندارد؛ این فقط برای نسخه‌ی وب است و

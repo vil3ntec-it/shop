@@ -16,6 +16,7 @@ const plans = require('../lib/plans');
 const { publicUser } = require('./auth');
 const audit = require('../lib/audit');
 const reauth = require('../lib/reauth');
+const { forbidden } = require('../middleware/errors');
 
 const router = express.Router();
 
@@ -374,14 +375,33 @@ router.delete('/push', async (req, res, next) => {
  *  خالی باشد و خودِ مسیرِ پشتیبان همان‌جا `no_shop` می‌گوید — نه
  *  این‌که کلِ `/me` برای او ۴۰۳ شود.
  */
+//  A16: پشتیبانِ کاملِ دفتر را فقط نقشی می‌فرستد که همهٔ دفتر را می‌نویسد (صاحب، مدیر، شاگرد)
+const canUploadBackup = (req) => require('../lib/perm-core').writable(req.role) === '*';
+/*
+ *  ⛔ ممیزیِ ۳۵ (`security-audit-35.test.js`) — نگهبانِ پیش از روترِ مشترکِ پشتیبان (پمپ همان روتر را بی این دارد):
+ *   B2  دکان و نقش **پیش از** خواندنِ بدنهٔ تا ۶۵ مگابایتی: پیش‌تر هر حسابِ ثبت‌شده (حتی بی دکان یا جمع‌آور) سرور را
+ *       وادار به نگه‌داشتنِ کلِ بدنه در حافظه می‌کرد و بعد ۴۰۳ می‌گرفت. پاسخ همان است، فقط زودتر.
+ *   B1  (CRM-15) پشتیبان کلِ دفتر است با شماره و نشانیِ مشتری ⇒ با پرچمِ `shop.backup_contact_guard` (پیش‌فرض خاموش؛
+ *       جمع‌آور و انباردارِ امروز تنظیم و عکس را از همین پشتیبان برمی‌گردانند) فقط کسی که `customers.contact` دارد.
+ */
+router.use('/backups', (req, res, next) => (async () => {
+  if (req.method === 'POST' && req.path === '/') {
+    if (!req.shopId) return next(forbidden('برای این حساب دکانی ثبت نشده است', 'no_shop'));
+    if (!canUploadBackup(req)) return next(forbidden('فرستادنِ پشتیبان در حدِ نقشِ شما نیست', 'permission_denied'));
+    return next();
+  }
+  if (req.method !== 'GET' || req.path === '/' || !req.shopId) return next();
+  if (!(await require('../lib/orders').flagOf(req.shopId, 'shop.backup_contact_guard'))) return next();
+  if (!(await require('../lib/customer-contact').hiddenForReq(req))) return next();
+  next(forbidden('پشتیبانِ کاملِ دفتر شمارهٔ مشتریان را دارد؛ صاحب دکان دیدنِ آن را برای شما بسته است', 'permission_denied'));
+})().catch(next));
 router.use('/backups', require('./account-backups').makeRouter(
   'shop',
   (req) => req.shopId || '',
   {
     actor: (req) => ({ userId: req.user ? req.user.id : '', deviceId: req.device ? req.device.id : '' }),
     canDelete: (req) => req.role === 'owner' || req.role === 'manager',
-    //  A16: پشتیبانِ کاملِ دفتر را فقط نقشی می‌فرستد که همهٔ دفتر را می‌نویسد (صاحب، مدیر، شاگرد)
-    canUpload: (req) => require('../lib/perm-core').writable(req.role) === '*',
+    canUpload: canUploadBackup,
   }
 ));
 

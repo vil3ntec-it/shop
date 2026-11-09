@@ -73,6 +73,14 @@ async function createShop(userId, name) {
   if (block) throw holds.blockError(block);
 
   return tx(async (c) => {
+    //  ⛔ ممیزیِ ۳۵ (B8): «هر کاربر یک دکان» بشمار-بعد-بنویس بود — هشت POST ِ هم‌زمان هشت دکان (و هشت دورهٔ
+    //  آزمایشیِ تازه) می‌ساخت (PostgreSQL). همان قفلِ حسابِ پیوستن با کد (`staff-codes.js`) ⇒ ساختن و پیوستن هم پشتِ هم.
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`staff-join-user:${userId}`]);
+    const taken = (await c.query(
+      `SELECT 1 FROM shop_members m JOIN shops s ON s.id = m.shop_id
+        WHERE m.user_id = $1 AND m.status = 'active' AND s.status = 'active' LIMIT 1`, [userId]
+    )).rows[0];
+    if (taken) throw conflict('این حساب از قبل عضو یک دکان است', 'already_member');
     const t = now();
     const shopId = newId('shp');
     await c.query(

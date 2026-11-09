@@ -117,7 +117,8 @@ router.get('/request-status', async (req, res, next) => {
   try {
     const app = codes.appOf(req.params.app);
     const id = String(req.query?.request_id || '').slice(0, 80);
-    const rec = await codes.requestById(id);
+    //  ممیزیِ ۳۵ (B4): NUL در پرسش ⇒ ۵۰۰ ِ پایگاه‌داده روی درِ بی‌توکن بود
+    const rec = id.includes('\u0000') ? null : await codes.requestById(id);
     if (!rec || rec.app !== app) {
       return sendFail(res, codes.fail(400, 'REQUEST_NOT_FOUND', 'درخواست نامعتبر است.'));
     }
