@@ -23,7 +23,9 @@ import ir.vil3ntec.tohid.core.i18n.StrSale
 import ir.vil3ntec.tohid.data.FraudTrailPref
 import ir.vil3ntec.tohid.data.ReturnFlow
 import ir.vil3ntec.tohid.data.ReturnSettings
+import ir.vil3ntec.tohid.data.CartPriceList
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SaleReopen
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopRole
 import ir.vil3ntec.tohid.print.PrintJob
@@ -32,6 +34,7 @@ import ir.vil3ntec.tohid.print.PrintSpooler
 import ir.vil3ntec.tohid.sync.platform.DocChainSync
 import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.todayIso
+import ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.screens.ReturnsShot
 import ir.vil3ntec.tohid.ui.screens.SalesVoid
@@ -222,7 +225,7 @@ fun RouteScope.FixRoute() {
     //  برگه پیش از `onConfirm` خودش بسته شده (`onDismiss`)؛ این‌جا برگشتِ دوباره نیست
     onConfirm = {
       val before = data
-      val lines = HistoryModel.reopenLines(before, sale, Ulid::next)
+      val lines = HistoryModel.reopenLines(before, sale, todayIso(), Ulid::next)
       //  SEC-03: «اصلاح» همان کنترل و سندِ معکوسِ لغو را دارد (دلیلِ ثابتِ `InvoiceVoid.CORRECTION_REASON`)
       when (val r = SalesVoid.run(before, sale.id, canCancel, InvoiceVoid.Kind.CORRECTION, HistoryModel.EDIT_IN_CART, todayIso(), System.currentTimeMillis(), Ulid::next, by, StrSale.cancelDenied)) {
         is SalesVoid.Outcome.Denied -> toasts.show(r.message, V3Tone.WARNING)
@@ -234,6 +237,12 @@ fun RouteScope.FixRoute() {
           toasts.show(StrSale.fixDone, V3Tone.SUCCESS)
           cart.set(lines)
           cart.setDebtor(sale.debtorId)
+          //  همان تخفیف، یادداشت و لیستِ فاکتور (`SaleReopen`) — پیش‌تر می‌افتادند و فاکتورِ اصلاح‌شده گران‌تر ثبت می‌شد
+          cart.setNote(SaleReopen.note(sale))
+          if (ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context)) {
+            cart.setPriceList(CartPriceList.keep(before, lines, sale.debtorId?.let { id -> before.debtors.find { it.id == id }?.priceList.orEmpty() }))
+          }
+          HeldSession.kept = cart.snapshot().key?.let { it to SaleReopen.extras(before, sale, lines) }
           nav.switchTab(SalesPaths.SALE)
         }
       }

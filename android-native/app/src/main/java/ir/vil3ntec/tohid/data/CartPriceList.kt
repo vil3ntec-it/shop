@@ -25,4 +25,29 @@ object CartPriceList {
    */
   fun restore(hand: String?, customerList: String?): PriceList.State =
     if (hand != null) PriceList.State(PriceList.of(hand), byHand = true) else PriceList.onCustomer(PriceList.FRESH, customerList)
+
+  /**
+   *  ردیف‌های سندِ ثابت‌قیمت (اصلاحِ فاکتور، پیش‌فاکتورِ پیش از این نسخه) که به سبدِ صندوق می‌روند: کدام انتخابِ دستیِ لیست
+   *  پولِ هیچ ردیفی را با بازقیمت‌گذاریِ صندوق (`repriceCart`، همان `PriceList.cartUnit`) عوض نمی‌کند. حالتِ تازهٔ فاکتور
+   *  (لیستِ مشتری یا خرده) بس است ⇒ `null`؛ وگرنه لیستِ دیگر اگر همه را همان نگه می‌دارد؛ هیچ‌کدام ⇒ `null`.
+   *  بی این، ردیفِ عمدهٔ فاکتورِ اصلاح‌شده (فیِ برابر با عمدهٔ کالا) در سبدِ خرده دوباره خرده قیمت می‌خورد.
+   */
+  fun keep(d: ShopData, lines: List<SalesEngine.CartLine>, customerList: String?): String? {
+    val fresh = restore(null, customerList).list
+    if (holds(d, lines, fresh)) return null
+    val other = if (fresh == PriceList.WHOLESALE) PriceList.RETAIL else PriceList.WHOLESALE
+    return other.takeIf { holds(d, lines, it) }
+  }
+
+  /** پولِ هر ردیفِ کالادارِ [lines] زیرِ لیستِ [list] همان می‌ماند؟ (فیِ خالی = خردهٔ کالا، مثلِ `repriceCart`) */
+  fun holds(d: ShopData, lines: List<SalesEngine.CartLine>, list: String): Boolean {
+    val byId = d.products.associateBy { it.id }
+    return lines.all { l ->
+      val p = byId[l.productId]
+      if (l.free || p == null) return@all true
+      val prices = PriceList.Prices(Math.round(p.salePrice * 100.0), Math.round(p.wholesalePrice * 100.0))
+      val unit = l.unitPrice?.let { Math.round(it * 100.0) }
+      (PriceList.cartUnit(prices, unit, list) ?: prices.retailMinor) == (unit ?: prices.retailMinor)
+    }
+  }
 }

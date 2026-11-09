@@ -173,16 +173,12 @@ object HistoryModel {
     )
   }
 
-  /** «اصلاحِ فاکتور»: اقلامِ برنگشته با همان قیمت به سبد؛ قلمِ آزاد شناسهٔ تازه می‌گیرد */
-  fun reopenLines(d: ShopData, s: Sale, newId: () -> String): List<SalesEngine.CartLine> =
-    d.saleItems.filter { it.saleId == s.id }.mapNotNull { item ->
-      val left = item.quantity - item.returnedQty
-      when {
-        left <= 0 -> null
-        item.productId.isBlank() -> SalesEngine.CartLine(productId = newId(), quantity = left, unitPrice = item.unitPrice, label = item.name.ifBlank { FREE_ITEM })
-        else -> SalesEngine.CartLine(productId = item.productId, quantity = left, unitPrice = item.unitPrice)
-      }
-    }
+  /**
+   *  «اصلاحِ فاکتور»: اقلامِ برنگشته با همان قیمت و نشان‌های ردیف به سبد؛ قلمِ آزاد شناسهٔ تازه می‌گیرد. همان راهِ کامپیوتر
+   *  (`SaleReopen`)؛ تخفیف، یادداشت و لیستِ فاکتور هم با `SaleReopen` به سبد و برگهٔ تسویه می‌روند (`FixRoute`).
+   */
+  fun reopenLines(d: ShopData, s: Sale, today: String = "", newId: () -> String): List<SalesEngine.CartLine> =
+    ir.vil3ntec.tohid.data.SaleReopen.lines(d, s, newId, today, FREE_ITEM)
 
   /** فاکتورِ زنده‌ای که QRِ رسید یک‌جا پیدا کرد ⇒ همان لحظه فرمِ برگشت */
   fun scanned(d: ShopData, code: String, shopTag: String? = null): Sale? =
