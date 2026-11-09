@@ -22,6 +22,15 @@
  *    `sales.cancel` می‌خواهد (همان «لغوِ فاکتور» ِ پاک کردنِ کهنه‌ها)؛ بازگرداندن و فروش برای هر فروشنده.
  * ⛔ shop_id فقط از عضویتِ توکن. سقف‌ها: ۶۰ نگه‌داشتهٔ زنده در هر دکان، ۳۲ کیلوبایت و ۲۰۰ ردیف در هر فاکتور.
  * ⛔ سرور بدنه را نمی‌خواند و با آن هیچ پولی نمی‌سازد؛ فقط شکل و اندازه را می‌سنجد.
+ *
+ * ── «در دستِ دستگاهِ X» (ادعای نرم، همان پرچم؛ بی ستون و بی مهاجرتِ تازه) ──────────────────────────────────
+ * سنگِ قبرِ `resumed` همان ادعاست: دستگاهی که برش گرداند (`device_id`) و کی (`updated_at`)؛ تا [CLAIM_MS] «تازه».
+ * برنامه پیش از بازگرداندن می‌پرسد (`DELETE …&claim=1&base=<نسخه‌ای که دیده بود>`): ردیفِ زنده ⇒ سنگِ قبر به نامِ همین
+ * دستگاه؛ برگشته یا فروخته به دستِ دستگاهِ دیگر پس از [base] ⇒ ۴۰۹ `held_claimed` با `holder` (دستگاه، سریِ سندِ آن،
+ * دلیل، زمان، تازه بودن) تا صفحه تأییدِ صریح بگیرد؛ با `force=1` همان سنگِ قبر به نامِ این دستگاه (و سابقهٔ
+ * `held.takeover`) تا دستگاهِ نخست هم با دورِ بعد بداند. بی شبکه بازگرداندن آزاد است؛ همان `DELETE` ِ در صف (`base` بی
+ * `claim`) اگر دستگاهِ دیگری پس از [base] برش گرداند، فروخت یا عوضش کرد ⇒ ۴۰۹ `held_conflict` با `holder` و هیچ تغییری:
+ * برنامه «دو دستگاه یک فاکتور را باز کردند» را نشان می‌دهد. بی `base`/`claim` (برنامهٔ پیشین) ⇒ همان رفتارِ پیشین.
  */
 const { one, many, tx, now } = require('../db');
 const { flagOf } = require('./orders');
@@ -36,6 +45,8 @@ const MAX_LINES = 200;
 const MAX_TEXT = 512;
 const PAGE = 200;
 const TOMB_MS = 30 * 24 * 60 * 60 * 1000;
+/** تا این مدت پس از بازگرداندن، فاکتور «در دستِ» همان دستگاه است (ادعای نرم؛ هیچ قفلی) */
+const CLAIM_MS = 10 * 60 * 1000;
 /** رشته‌های بالادستِ بدنه (`HeldInvoice`) */
 const TEXTS = Object.freeze(['label', 'discount', 'note', 'device', 'payment', 'paid', 'debtorId', 'saleNote', 'priceList']);
 
@@ -54,6 +65,16 @@ function versionOf(raw) {
   if (!Number.isSafeInteger(v) || v <= 0) throw bad('نسخهٔ فاکتورِ نگه‌داشته درست نیست');
   return v;
 }
+
+/** نسخه‌ای که دستگاه پیش از کارش دیده بود (۰ = هیچ)؛ نبود ⇒ `null` = همان رفتارِ پیشین */
+function baseOf(raw) {
+  if (raw === undefined || raw === null || raw === '') return null;
+  const v = typeof raw === 'string' && /^\d{1,16}$/.test(raw) ? Number(raw) : raw;
+  if (!Number.isSafeInteger(v) || v < 0) throw bad('نسخهٔ پایهٔ فاکتورِ نگه‌داشته درست نیست');
+  return v;
+}
+
+const yes = (raw) => raw === true || raw === '1';
 
 /** بدنهٔ `HeldInvoice` ِ برنامه — فقط شکل و اندازه؛ سرور آن را نمی‌خواند */
 function bodyOf(id, raw) {
@@ -89,7 +110,8 @@ function canon(v) {
 
 function view(r, me) {
   const base = { id: r.id, version: Number(r.version), rev: Number(r.rev) };
-  if (r.deleted) return { ...base, deleted: true, reason: r.reason };
+  //  سنگِ قبر: کدام دستگاه (و سریِ سندِ آن) — دستگاهی که همین فاکتور را باز دارد می‌فهمد دیگری گرفتش
+  if (r.deleted) return { ...base, deleted: true, reason: r.reason, device_id: r.device_id || '', series: r.series || '' };
   return {
     ...base, body: r.body, mine: r.held_by === me, held_by: r.held_by,
     device_id: r.device_id, at: Number(r.updated_at),
@@ -97,6 +119,7 @@ function view(r, me) {
 }
 
 const COLS = 'id, body, version, deleted, reason, rev, created_by, held_by, device_id, updated_at';
+const HCOLS = COLS.split(', ').map((c) => `h.${c}`).join(', ');
 
 /**
  * ردیف‌های تازه‌تر از [since] به ترتیبِ `rev`، حداکثر یک صفحه. `since = 0` (دستگاهِ تازه) ⇒ فقط زنده‌ها؛ پس از آن
@@ -106,9 +129,10 @@ async function read(shopId, since, me) {
   const shop = String(shopId);
   const from = Number.isSafeInteger(since) && since > 0 ? since : 0;
   const rows = await many(
-    `SELECT ${COLS} FROM shop_held_invoices
-      WHERE shop_id=$1 AND rev > $2::bigint AND (NOT deleted OR $2::bigint > 0)
-      ORDER BY rev ASC LIMIT $3`,
+    `SELECT ${HCOLS}, s.series FROM shop_held_invoices h
+       LEFT JOIN shop_doc_series s ON s.shop_id = h.shop_id AND s.device_id = h.device_id AND h.device_id <> ''
+      WHERE h.shop_id=$1 AND h.rev > $2::bigint AND (NOT h.deleted OR $2::bigint > 0)
+      ORDER BY h.rev ASC LIMIT $3`,
     [shop, from, PAGE + 1],
   );
   const more = rows.length > PAGE;
@@ -182,22 +206,85 @@ async function put(shopId, actor, rawId, raw) {
   });
 }
 
+async function seriesOf(c, shop, deviceId) {
+  if (!deviceId) return '';
+  const r = (await c.query('SELECT series FROM shop_doc_series WHERE shop_id=$1 AND device_id=$2', [shop, deviceId])).rows[0];
+  return r ? String(r.series) : '';
+}
+
+/** «در دستِ کیست»: دستگاه، سریِ سندِ آن (همان «A1» ِ روی فاکتور)، دلیل (`held` = هنوز نگه‌داشته)، زمان و تازه بودنِ ادعا */
+async function holderOf(c, shop, cur, at) {
+  return {
+    device_id: cur.device_id || '',
+    series: await seriesOf(c, shop, cur.device_id),
+    reason: cur.deleted ? cur.reason : 'held',
+    at: Number(cur.updated_at),
+    fresh: Boolean(cur.deleted && cur.reason === 'resumed' && at - Number(cur.updated_at) < CLAIM_MS),
+  };
+}
+
+const claimed = (holder) => Object.assign(
+  conflict('این فاکتورِ نگه‌داشته در دستِ دستگاهِ دیگری است', 'held_claimed'), { data: { holder } },
+);
+const crossed = (holder) => Object.assign(
+  conflict('این فاکتورِ نگه‌داشته در دستگاهِ دیگری هم باز یا عوض شد', 'held_conflict'), { data: { holder } },
+);
+
 /**
  * برداشتن (سنگِ قبر). نبود یا پیش‌تر برداشته ⇒ بی تغییر؛ نسخهٔ کهنه‌تر از ردیفِ زنده ⇒ ۴۰۹ `held_stale`؛ دور
  * انداختنِ نگه‌داشتهٔ کسِ دیگر بی [canCancel] ⇒ ۴۰۳ `held_not_yours`.
- * @returns {{ deleted: boolean, others: boolean, version: number }}
+ * ادعا (`claim`)، `base` و `force`: شرح سرِ همین پرونده («در دستِ دستگاهِ X»).
+ * @returns {{ deleted: boolean, others: boolean, version: number, rev?: number, claim?: object }}
  */
-async function remove(shopId, actor, rawId, { version: rawVersion, reason: rawReason } = {}, canCancel = false) {
+async function remove(shopId, actor, rawId, {
+  version: rawVersion, reason: rawReason, base: rawBase, claim: rawClaim, force: rawForce,
+} = {}, canCancel = false) {
   const id = idOf(rawId);
   const version = versionOf(rawVersion);
   const reason = typeof rawReason === 'string' && REASONS.includes(rawReason) ? rawReason : null;
   if (!reason) throw bad('دلیلِ برداشتن (resumed، sold یا deleted) لازم است');
+  const base = baseOf(rawBase);
+  const claiming = yes(rawClaim);
+  const forcing = claiming && yes(rawForce);
+  if (claiming && reason !== 'resumed') throw bad('ادعا فقط با بازگرداندن (resumed) است');
   const deviceId = typeof actor.deviceId === 'string' ? actor.deviceId.slice(0, 64) : '';
   const shop = String(shopId);
   return tx(async (c) => {
     await locked(c, shop);
     const cur = (await c.query(`SELECT ${COLS} FROM shop_held_invoices WHERE shop_id=$1 AND id=$2`, [shop, id])).rows[0];
-    if (!cur || cur.deleted) return { deleted: false, others: false, version: cur ? Number(cur.version) : 0 };
+    const at = now();
+    const granted = (extra = {}) => ({ granted: true, until: at + CLAIM_MS, ...extra });
+    if (!cur) return { deleted: false, others: false, version: 0, ...(claiming ? { claim: granted() } : {}) };
+    if (cur.deleted) {
+      const mine = deviceId !== '' && cur.device_id === deviceId;
+      //  دستگاهِ دیگری پس از نسخه‌ای که این دستگاه دیده بود برش گرداند یا فروخت
+      const taken = !mine && base !== null && Number(cur.version) > base && (cur.reason === 'resumed' || cur.reason === 'sold');
+      if (!claiming) {
+        if (taken && reason === 'resumed') throw crossed(await holderOf(c, shop, cur, at));
+        return { deleted: false, others: false, version: Number(cur.version) };
+      }
+      if (mine) {
+        //  ادعای خودِ همین دستگاه ⇒ تازه می‌شود (بی rev: دستگاه‌های دیگر فقط هنگامِ پرسیدن می‌خوانندش)
+        if (cur.reason === 'resumed') await c.query('UPDATE shop_held_invoices SET updated_at=$3 WHERE shop_id=$1 AND id=$2', [shop, id, at]);
+        return { deleted: false, others: false, version: Number(cur.version), claim: granted() };
+      }
+      if (taken && !forcing) throw claimed(await holderOf(c, shop, cur, at));
+      //  سنگِ قبر به نامِ همین دستگاه (دستگاهِ سوم هم بداند در دستِ کیست)؛ گرفتن از دستِ دیگری فقط با تأییدِ صریح
+      const takeover = taken ? await holderOf(c, shop, cur, at) : null;
+      const v = Math.max(version, Number(cur.version) + 1);
+      const rev = await nextRev(c, shop);
+      await c.query(
+        `UPDATE shop_held_invoices SET reason='resumed', version=$3, rev=$4, updated_by=$5, device_id=$6, updated_at=$7
+          WHERE shop_id=$1 AND id=$2`,
+        [shop, id, v, rev, actor.userId, deviceId, at],
+      );
+      return { deleted: true, others: cur.held_by !== actor.userId, version: v, rev, claim: granted(takeover ? { takeover } : {}) };
+    }
+    if (base !== null && Number(cur.version) > base) {
+      //  نسخه‌ای که این دستگاه دید کهنه است: پیش از بازگرداندن تازه‌ترش را بگیرد؛ بازگرداندنِ بی شبکه ⇒ دو دستگاه
+      if (claiming) throw stale(cur, actor.userId);
+      if (reason === 'resumed') throw crossed(await holderOf(c, shop, cur, at));
+    }
     if (Number(cur.version) > version) throw stale(cur, actor.userId);
     const others = cur.held_by !== actor.userId;
     if (reason === 'deleted' && others && !canCancel) {
@@ -207,13 +294,13 @@ async function remove(shopId, actor, rawId, { version: rawVersion, reason: rawRe
     await c.query(
       `UPDATE shop_held_invoices SET deleted=true, body=NULL, bytes=0, reason=$3, version=$4, rev=$5,
          updated_by=$6, device_id=$7, updated_at=$8 WHERE shop_id=$1 AND id=$2`,
-      [shop, id, reason, version, rev, actor.userId, deviceId, now()],
+      [shop, id, reason, version, rev, actor.userId, deviceId, at],
     );
-    return { deleted: true, others, version, rev };
+    return { deleted: true, others, version, rev, ...(claiming ? { claim: granted() } : {}) };
   });
 }
 
 module.exports = {
-  FLAG, ID_RE, REASONS, MAX_LIVE, MAX_BYTES, MAX_LINES, PAGE, TOMB_MS,
+  FLAG, ID_RE, REASONS, MAX_LIVE, MAX_BYTES, MAX_LINES, PAGE, TOMB_MS, CLAIM_MS,
   flagOn, bodyOf, canon, read, put, remove,
 };
