@@ -112,6 +112,9 @@
   }
 
   async function apiAuth(path, opts) {
+    //  توکنی که همین درخواست می‌برد (`api` همین را هم‌زمان می‌خواند): ۴۰۱ ِ دیررس پس از تازه‌سازیِ لایهٔ دیگر
+    //  زنجیره را دوباره نمی‌چرخاند (`TohidAccount.refresh(stale)`)
+    const sent = getAcct().accessToken || '';
     try { return await api(path, opts); }
     catch (e) {
       if (e.status !== 401) throw e;
@@ -126,9 +129,10 @@
        */
       const acc = window.TohidAccount;
       if (acc && typeof acc.refresh === 'function') {
-        await acc.refresh();
+        await acc.refresh(sent);
         return api(path, opts);
       }
+      if (sent && acct.accessToken && acct.accessToken !== sent) return api(path, opts);
       const r = await api('/api/v1/auth/refresh', { method: 'POST', auth: false, body: { refreshToken: acct.refreshToken } });
       const access = (r && (r.accessToken || r.access_token)) || '';
       if (!access) throw new ApiError('پاسخ سرور خوانده نشد', 'invalid_response');

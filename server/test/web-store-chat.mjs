@@ -1027,6 +1027,211 @@ if (axeSrc) {
   await ac.close();
 }
 
+//  ── CHAT-07: مشتری پیامِ صوتی ضبط می‌کند — میکروفونِ ساختگیِ کرومیوم (`--use-fake-device-for-media-stream`) ──
+//  پرچمِ خاموشِ `shop.chat.voice` ⇒ نه دکمه، نه اسکریپت؛ روشن ⇒ ضبط، «پایان و فرستادن»، پیش‌شنوایی پس از سقفِ زمان، «لغو»،
+//  سقفِ حجم، رد شدنِ اجازه، بی‌اینترنت و افتادنِ جوابِ پیام با همان clientId؛ میکروفون پس از هر کدام بسته؛ axe؛ بی نقضِ CSP.
+{
+  const o5 = await checkout();
+  await move(o5.id, ['accepted']);
+  const conv5 = (await call('POST', '/api/shop/chat/conversations', { orderId: o5.id }, T)).body.conversation;
+  const voices = async () => Number((await one(
+    "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND kind='audio' AND deleted_at IS NULL", [conv5.id])).n);
+  const audioRows = async () => Number((await one("SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1 AND kind='audio'", [conv5.id])).n);
+  const seed = { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt };
+  const openChat = async (p) => {
+    await p.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o5.token)}`);
+    await p.waitForSelector('#o-chat-open', { timeout: 15000 });
+    await p.click('#o-chat-open');
+    await p.waitForFunction(() => { const f = document.getElementById('ct-form'); return f && !f.hidden; }, null, { timeout: 15000 });
+  };
+
+  //  پرچمِ خاموش (پیش‌فرض) ⇒ دکمهٔ میکروفون پنهان و کدِ ضبط بار نمی‌شود
+  await openChat(page);
+  ok(!(await shown('ct-vc-mic')) && await page.$('script[src="/store/chat-voice.js"]') === null, 'پرچمِ shop.chat.voice خاموش ⇒ نه دکمهٔ میکروفون، نه chat-voice.js');
+  await page.keyboard.press('Escape');
+  await flag('shop.chat.voice', true);
+
+  const vb = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium/chrome-linux/chrome', args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] })
+    .catch(() => chromium.launch({ args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'] }));
+  const vctx = await vb.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  await vctx.grantPermissions(['microphone'], { origin: base });
+  await vctx.addInitScript((t) => {
+    try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ }
+    //  شمارِ درخواستِ میکروفون و trackها — تا «بسته شد» از خودِ مرورگر سنجیده شود
+    window.__mic = { calls: 0, tracks: [] };
+    const md = navigator.mediaDevices;
+    if (md && md.getUserMedia) {
+      const real = md.getUserMedia.bind(md);
+      md.getUserMedia = (c) => { window.__mic.calls++; return real(c).then((s) => { window.__mic.tracks.push(...s.getTracks()); return s; }); };
+    }
+  }, seed);
+  const vp = await vctx.newPage();
+  vp.on('pageerror', (e) => errors.push(`صدا: ${e}`));
+  vp.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  let voiceUps = 0; let partGets = 0;
+  vp.on('request', (r) => {
+    if (r.method() === 'POST' && r.url().includes(`/chat/conversations/${conv5.id}/media`)) voiceUps++;
+    if (r.url().includes('/kit/i18n/voice.')) partGets++;
+  });
+  const mic = () => vp.evaluate(() => ({ calls: window.__mic.calls, live: window.__mic.tracks.filter((k) => k.readyState === 'live').length }));
+  const vst = () => vp.evaluate(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden ? b.getAttribute('data-st') : 'gone'; });
+  const said = () => vp.textContent('#ct-vc-say');
+  const record = async () => {
+    await vp.click('#ct-vc-mic');
+    await vp.waitForFunction(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden && b.getAttribute('data-st') === 'rec'; }, null, { timeout: 15000 });
+  };
+
+  await openChat(vp);
+  const label = await vp.getAttribute('#ct-vc-mic', 'aria-label');
+  ok(await vp.isVisible('#ct-vc-mic') && label === 'پیامِ صوتی', 'پرچمِ روشن ⇒ دکمهٔ میکروفون با نامِ «پیامِ صوتی»', String(label));
+  ok(await vp.$('script[src="/store/chat-voice.js"]') === null && partGets === 0 && (await mic()).calls === 0,
+    'پیش از زدن: نه chat-voice.js، نه واژه‌نامهٔ voice، نه درخواستِ میکروفون (دیربار)');
+
+  //  ۱. ضبط ⇒ «پایان و فرستادن» ⇒ یک پیامِ صوتی روی سرور، میکروفون بسته، حبابِ «پخش»
+  await record();
+  ok(await vp.$('script[src="/store/chat-voice.js"]') !== null && partGets === 1, 'کدِ ضبط و واژه‌نامه‌اش فقط با زدنِ میکروفون آمدند');
+  ok(/در حالِ ضبط/.test(await said()) && await vp.evaluate(() => document.activeElement && document.activeElement.id) === 'ct-vc-finish',
+    'ضبط: ناحیهٔ زنده «در حالِ ضبط…» و تمرکز روی «پایان و فرستادن»', await said());
+  ok((await mic()).live === 1, 'میکروفون فقط پس از زدن و فقط یک track');
+  await vp.waitForTimeout(1600);
+  const ticking = await vp.textContent('#ct-vc-time');
+  await vp.click('#ct-vc-finish');
+  ok(await until(async () => (await voices()) === 1, 20000) && await until(async () => (await vst()) === 'gone'), 'پایان و فرستادن ⇒ یک پیامِ صوتیِ مشتری روی سرور', ticking);
+  ok((await mic()).live === 0, 'پس از پایان میکروفون بسته شد (هیچ track ِ زنده)');
+  ok(/رفت/.test(await said()), 'ناحیهٔ زنده: «پیامِ صوتی رفت.»', await said());
+  const sent1 = await one("SELECT m.meta, mm.mime, mm.size FROM shop_chat_messages m JOIN shop_chat_media mm ON mm.id = m.media_id WHERE m.conversation_id=$1 AND m.kind='audio'", [conv5.id]);
+  ok(['audio/webm', 'audio/ogg', 'audio/mp4'].includes(sent1.mime) && Number(sent1.size) > 500 && sent1.meta.durationMs >= 1000 && sent1.meta.durationMs < 15000,
+    'روی سرور: نوعِ صوتیِ شناخته از بایت، چند کیلوبایت و مدتِ واقعی', JSON.stringify(sent1));
+  await vp.waitForSelector('#ct-list .ct-msg.mine .ct-voice', { timeout: 10000 });
+  await vp.click('#ct-list .ct-msg.mine .ct-voice .ct-play');
+  ok(await until(() => vp.evaluate(() => { const a = document.querySelector('#ct-list .ct-msg.mine .ct-voice audio'); return Boolean(a) && a.readyState >= 2 && /^blob:/.test(a.src); }), 10000),
+    'پخشِ صدای خودِ مشتری از blob: (readyState ≥ ۲)');
+  await vp.evaluate(() => { const a = document.querySelector('#ct-list .ct-msg.mine .ct-voice audio'); if (a) a.pause(); });
+
+  //  ۲. سقفِ ۵ دقیقه ⇒ ضبط می‌ایستد و ردیفِ «فرستادن/لغو» با پیش‌شنوایی؛ «فرستادن» ⇒ پیامِ دوم با همان مدتِ ثبت‌شده
+  await record();
+  await vp.waitForTimeout(1200);
+  await vp.evaluate(() => { const real = Date.now; window.__realNow = real; Date.now = () => real() + 5 * 60 * 1000 + 500; });
+  await vp.waitForFunction(() => document.getElementById('ct-vc').getAttribute('data-st') === 'ready', null, { timeout: 10000 });
+  await vp.evaluate(() => { Date.now = window.__realNow; });
+  ok(/۵ دقیقه/.test(await vp.textContent('#ct-vc-st')) && await vp.isVisible('#ct-vc-send') && await vp.isVisible('#ct-vc-au') &&
+    /^blob:/.test(await vp.getAttribute('#ct-vc-au', 'src')) && (await mic()).live === 0,
+  'سقفِ ۵ دقیقه ⇒ ایستاد، میکروفون بسته، پیش‌شنوایی از blob: و «فرستادن»', await vp.textContent('#ct-vc-st'));
+  ok(await vp.evaluate(() => document.activeElement && document.activeElement.id) === 'ct-vc-send', 'تمرکز روی «فرستادن»');
+  await vp.click('#ct-vc-send');
+  ok(await until(async () => (await voices()) === 2, 20000), 'پیش‌شنوایی ⇒ «فرستادن» ⇒ پیامِ دوم');
+  const long = await one("SELECT meta FROM shop_chat_messages WHERE conversation_id=$1 AND kind='audio' ORDER BY seq DESC LIMIT 1", [conv5.id]);
+  ok(long.meta.durationMs >= 300000 && long.meta.durationMs <= 15 * 60 * 1000, 'مدتِ ثبت‌شده همان زمانِ ضبط (سرور ≤ ۱۵ دقیقه)', JSON.stringify(long.meta));
+
+  //  ۳. «لغو» در میانِ ضبط ⇒ هیچ بارگذاری، هیچ پیام، میکروفون بسته؛ بستنِ برگه در میانِ ضبط هم
+  const upsBefore = voiceUps;
+  await record();
+  await vp.waitForTimeout(800);
+  await vp.click('#ct-vc-cancel');
+  await vp.waitForTimeout(600);
+  ok((await vst()) === 'gone' && voiceUps === upsBefore && (await voices()) === 2 && (await mic()).live === 0 && /لغو/.test(await said()),
+    '«لغو» ⇒ نه بارگذاری، نه پیام؛ میکروفون بسته و «ضبط لغو شد.»', `ups=${voiceUps - upsBefore}`);
+  await record();
+  await vp.keyboard.press('Escape');
+  ok(await until(async () => (await mic()).live === 0, 5000) && voiceUps === upsBefore && (await voices()) === 2, 'بستنِ برگه در میانِ ضبط ⇒ میکروفون بسته و چیزی نرفت');
+
+  //  ۴. سقفِ حجم (سقفِ کوچکِ ساختگی در پاسخِ گشودن) ⇒ ضبط خودش می‌ایستد؛ بزرگ‌تر از سقف ⇒ بی «فرستادن»، فقط «لغو»
+  const openRoute = (u) => u.pathname === `/api/store/${slug}/chat/conversations`;
+  await vp.route(openRoute, async (route) => {
+    if (route.request().method() !== 'POST') return route.fallback();
+    const res = await route.fetch();
+    const j = await res.json();
+    j.limits.audioMax = 300;
+    return route.fulfill({ response: res, json: j });
+  });
+  await openChat(vp);
+  await record();
+  await vp.waitForFunction(() => document.getElementById('ct-vc').getAttribute('data-st') === 'ready', null, { timeout: 10000 });
+  ok(/بزرگ‌تر/.test(await vp.textContent('#ct-vc-st')) && !(await vp.isVisible('#ct-vc-send')) && await vp.isVisible('#ct-vc-cancel') && (await mic()).live === 0,
+    'نزدیکِ سقفِ حجم ⇒ خودش ایستاد؛ بزرگ‌تر از سقف ⇒ پیامِ روشن، بی «فرستادن»', await vp.textContent('#ct-vc-st'));
+  await vp.click('#ct-vc-cancel');
+  ok(voiceUps === upsBefore, 'صدای بزرگ‌تر از سقف هیچ بارگذاری نکرد');
+  await vp.unroute(openRoute);
+  await vp.keyboard.press('Escape');
+
+  //  ۵. افتادنِ جوابِ پیام (سرور گرفت) ⇒ «تلاشِ دوباره» ⇒ همان رسانه و همان clientId ⇒ یک پیام؛ سپس بی‌اینترنت ⇒ صف و رفتنِ خودکار
+  await openChat(vp);
+  let drop = 1;
+  const msgRoute = (u) => u.pathname === `/api/store/${slug}/chat/conversations/${conv5.id}/messages`;
+  await vp.route(msgRoute, async (route) => {
+    if (route.request().method() !== 'POST' || drop-- < 1) return route.fallback();
+    await route.fetch();
+    return route.abort('failed');
+  });
+  const rows5 = await audioRows();
+  await record();
+  await vp.waitForTimeout(1200);
+  await vp.click('#ct-vc-finish');
+  await vp.waitForFunction(() => document.getElementById('ct-vc').getAttribute('data-st') === 'queued', null, { timeout: 15000 });
+  ok(await vp.isVisible('#ct-vc-retry') && (await voices()) === 3, 'جوابِ پیام گم شد ⇒ «در صف» و «دوباره بفرست» (سرور پیام را دارد)', await vp.textContent('#ct-vc-st'));
+  await vp.click('#ct-vc-retry');
+  ok(await until(async () => (await vst()) === 'gone', 15000) && (await voices()) === 3 && (await audioRows()) === rows5 + 1,
+    'تلاشِ دوباره ⇒ همان رسانه و همان clientId ⇒ یک پیام، یک ردیفِ رسانه', `voices=${await voices()} rows=${(await audioRows()) - rows5}`);
+  await vp.unroute(msgRoute);
+  await record();
+  await vp.waitForTimeout(1200);
+  await vctx.setOffline(true);
+  await vp.click('#ct-vc-finish');
+  await vp.waitForFunction(() => document.getElementById('ct-vc').getAttribute('data-st') === 'queued', null, { timeout: 15000 });
+  ok((await voices()) === 3 && (await mic()).live === 0 && /اینترنت/.test(await vp.textContent('#ct-vc-st')), 'بی‌اینترنت ⇒ صدا در صف می‌ماند و میکروفون بسته', await vp.textContent('#ct-vc-st'));
+  await vctx.setOffline(false);
+  ok(await until(async () => (await voices()) === 4, 25000) && await until(async () => (await vst()) === 'gone'), 'وصل شد ⇒ صدا خودش رفت، یک بار');
+  await vp.keyboard.press('Escape');
+  await vctx.close();
+
+  //  ۶. اجازهٔ میکروفون رد شد / مرورگرِ بی MediaRecorder ⇒ پیامِ روشن یا بی دکمه؛ هیچ بارگذاری
+  const dctx = await vb.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  await dctx.addInitScript((t) => {
+    try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ }
+    if (navigator.mediaDevices) navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('denied', 'NotAllowedError'));
+  }, seed);
+  const dp = await dctx.newPage();
+  dp.on('pageerror', (e) => errors.push(`صدا (رد): ${e}`));
+  dp.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  await openChat(dp);
+  await dp.click('#ct-vc-mic');
+  await dp.waitForFunction(() => { const b = document.getElementById('ct-vc'); return b && !b.hidden && b.getAttribute('data-st') === 'err'; }, null, { timeout: 15000 });
+  ok(/اجازهٔ میکروفون/.test(await dp.textContent('#ct-vc-st')) && !(await dp.isVisible('#ct-vc-finish')) && await dp.isVisible('#ct-vc-cancel'),
+    'اجازه رد شد ⇒ «اجازهٔ میکروفون داده نشد…» و فقط «لغو»', await dp.textContent('#ct-vc-st'));
+  await dp.click('#ct-vc-cancel');
+  ok(!(await dp.isVisible('#ct-vc')) && (await voices()) === 4, '«لغو» ⇒ کادرِ صدا بسته، چیزی نرفت');
+  await dctx.close();
+  const nctx = await vb.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  await nctx.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } delete window.MediaRecorder; }, seed);
+  const np = await nctx.newPage();
+  await openChat(np);
+  ok(!(await np.isVisible('#ct-vc-mic')), 'مرورگرِ بی MediaRecorder ⇒ بی دکمهٔ میکروفون (نه دکمهٔ مرده)');
+  await nctx.close();
+
+  //  ۷. دسترس‌پذیری (axe-core) ِ کادرِ صدا: در حالِ ضبط و پیش‌شنوایی
+  if (axeSrc) {
+    const actx = await vb.newContext({ viewport: { width: 360, height: 760 }, bypassCSP: true });
+    await actx.grantPermissions(['microphone'], { origin: base });
+    await actx.addInitScript((t) => { try { localStorage.setItem('store-ticket', JSON.stringify(t)); } catch { /* about:blank */ } }, seed);
+    const ap = await actx.newPage();
+    await openChat(ap);
+    await ap.click('#ct-vc-mic');
+    await ap.waitForFunction(() => document.getElementById('ct-vc') && document.getElementById('ct-vc').getAttribute('data-st') === 'rec', null, { timeout: 15000 });
+    await ap.addScriptTag({ content: axeSrc });
+    const rules = ['color-contrast', 'button-name', 'label', 'aria-allowed-attr', 'aria-progressbar-name', 'nested-interactive', 'aria-allowed-role'];
+    const run = () => ap.evaluate(async (r) => (await window.axe.run(document.getElementById('chat-sheet'), { runOnly: r })).violations
+      .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`), rules);
+    const vRec = await run();
+    await ap.waitForTimeout(1200);
+    await ap.evaluate(() => { const real = Date.now; Date.now = () => real() + 5 * 60 * 1000 + 500; });
+    await ap.waitForFunction(() => document.getElementById('ct-vc').getAttribute('data-st') === 'ready', null, { timeout: 10000 });
+    const vReady = await run();
+    ok(vRec.length === 0 && vReady.length === 0, 'دسترس‌پذیری (axe-core): میکروفون، ضبط، نوارِ مدت، پیش‌شنوایی، «فرستادن» و «لغو»', [...vRec, ...vReady].join(' | '));
+    await actx.close();
+  }
+  await vb.close();
+}
+
 //  ── پرچمِ خاموش ⇒ همان ویترینِ پیشین ──
 await flag('shop.chat', false);
 await page.goto('about:blank');   //  بارِ تازهٔ صفحه ⇒ هیچ اسکریپتِ پیشین نمی‌ماند

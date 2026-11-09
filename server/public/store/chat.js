@@ -22,6 +22,8 @@
  *           با «دوباره» و «لغو» و پس از بستنِ برگه (`store/chat-out.js` ِ دیربار، localStorage ِ `store-chat-out`، فقط متن)؛
  *           با گشودنِ دوبارهٔ گفت‌وگو فرستادن از سر گرفته می‌شود. تأییدِ شمارهٔ دیگر ⇒ صف پاک.
  *   کارها ── پاسخ، ویرایش، سنجاق و جست‌وجو (CHAT-14) در `store/chat-acts.js` ِ دیربار؛ نیامد ⇒ همین گفت‌وگو بی آن‌ها.
+ * ⛔ صدای مشتری (CHAT-07): دکمهٔ میکروفون فقط با `limits.voice` (پرچمِ خاموشِ `shop.chat.voice`) و مرورگرِ دارای MediaRecorder؛
+ *   ضبط، لغو، پیش‌شنوایی و بارگذاری در `store/chat-voice.js` ِ دیربار (همان `upload` و همان پیام با `clientId`).
  */
 (function () {
   'use strict';
@@ -93,6 +95,7 @@
         el('form', { class: 'ct-form', attrs: { id: 'ct-form', novalidate: '' }, hidden: true },
           el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-ph-add', type: 'button', 'aria-label': t('ct.ph.add') }, on: { click: function () { $('ct-file').click(); } } }, K.icon('image')),
           coarse() ? el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-ph-cam', type: 'button', 'aria-label': t('ct.ph.cam') }, on: { click: function () { $('ct-cam').click(); } } }, K.icon('camera')) : null,
+          el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-vc-mic', type: 'button', 'aria-label': t('ct.au') }, hidden: true, on: { click: mic } }, K.icon('mic')),
           el('input', { attrs: { id: 'ct-file', type: 'file', accept: 'image/*' }, hidden: true, on: { change: pick } }),
           el('input', { attrs: { id: 'ct-cam', type: 'file', accept: 'image/*', capture: 'environment' }, hidden: true, on: { change: pick } }),
           el('textarea', { class: 'input', attrs: { id: 'ct-text', rows: '2', maxlength: '4000', 'aria-label': t('ct.text'), placeholder: t('ct.text') } }),
@@ -151,6 +154,7 @@
         if (A) A.reset();
       }
       if (ph && ph.conv !== c.id) phDrop();   //  عکسِ آمادهٔ رشتهٔ دیگر به این رشته نمی‌رود
+      if (window.StoreChatVoice) window.StoreChatVoice.drop(c.id);   //  صدا هم
       conv = c;
       $('ct-title').textContent = title(c);
       state();
@@ -164,6 +168,7 @@
       $('ct-issue').hidden = !(closed && l.canIssue);
       $('ct-new').hidden = !(closed && l.canRestart);
       $('ct-form').hidden = !conv.canSend;
+      $('ct-vc-mic').hidden = !(lim && lim.voice && canRec());
       if (closed && l.kind === 'general') K.note(box, 'warn', t('ct.st.idle'));
       else if (closed) K.note(box, 'warn', t('ct.st.order') + ' ' + (l.canIssue ? t('ct.st.issue', { d: K.when(l.issueUntil) }) : t('ct.st.late')));
       else if (l.state === 'reopened') K.note(box, 'info', t('ct.st.reopened'));
@@ -615,14 +620,14 @@
       return err;
     }
     //  بارگذاری با XHR (fetch پیشرفتِ فرستادن ندارد)؛ همان سرآیندهای `K.api`. status ِ ‎-1‎ = لغو، ۰ = بی‌اینترنت
-    function upload(my, role, blob, prog) {
+    function upload(my, role, blob, prog, type) {
       return new Promise(function (ok, no) {
         var x = new XMLHttpRequest(); var tk = K.ticket(); var ss = K.sess();
         my.xhr = x;
         x.open('POST', base + path(my.conv, '/media') + (role === 'thumb' ? '?role=thumb' : ''));
         x.setRequestHeader('Accept', 'application/json');
         x.setRequestHeader('Accept-Language', K.lang);
-        x.setRequestHeader('Content-Type', 'image/jpeg');
+        x.setRequestHeader('Content-Type', type || 'image/jpeg');
         if (tk) x.setRequestHeader('X-Store-Ticket', tk.ticket);
         if (ss) x.setRequestHeader('X-Store-Session', ss.token);
         x.upload.onprogress = function (e) { if (e.lengthComputable) prog(e.loaded); };
@@ -679,6 +684,19 @@
     }
     function phAgain(my) { if (ph === my && conv && conv.id === my.conv) phGo(my); }
     window.addEventListener('online', function () { if (ph && ph.queued) phAgain(ph); });
+
+    // ── صدای مشتری (CHAT-07): دکمه ⇒ `store/chat-voice.js` ِ دیربار؛ همان `upload`، همان `api` و همان حباب ──
+    K.ICONS.mic = 'M12 4a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V7a3 3 0 0 0-3-3z M6 11.5a6 6 0 0 0 12 0 M12 17.5V20';
+    function canRec() { return Boolean(window.MediaRecorder && navigator.mediaDevices && navigator.mediaDevices.getUserMedia); }
+    var vctx = { conv: function () { return conv; }, lim: function () { return lim; }, upload: upload, api: api, path: path, fail: fail, reload: reload,
+      put: function (m, cid) { if (conv && conv.id === cid) { put($('ct-list'), m, cid); $('ct-empty').hidden = true; } } };
+    function mic() {
+      if (!conv || !conv.canSend) return;
+      var b = $('ct-vc-mic'); b.disabled = true;
+      K.js('/store/chat-voice.js').then(function () { return window.StoreChatVoice.open(vctx); })
+        .catch(function () { K.note($('ct-msg'), 'err', t('err.network')); })
+        .then(function () { b.disabled = false; });
+    }
     function issue() {
       var b = $('ct-issue'); b.disabled = true;
       api(path(conv.id, '/issue'), { method: 'POST', body: {} }).then(function (r) {
@@ -692,7 +710,7 @@
       var go = extras();
       return ready.then(function () {
         build();
-        K.openSheet(sheet, function () { loop++; hush(); });
+        K.openSheet(sheet, function () { loop++; hush(); if (window.StoreChatVoice) window.StoreChatVoice.drop(); });
         return go;
       }).then(function () {
         if (A) A.mount();

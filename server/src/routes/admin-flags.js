@@ -34,6 +34,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.delivery', scope: 'shop', default: false, what: 'تحویل و پیک' },
   { key: 'shop.orders.refunds', scope: 'shop', default: false, what: 'بازپرداختِ سفارش با دفتر' },
   { key: 'shop.chat', scope: 'shop', default: false, what: 'گفت‌وگو با مشتری' },
+  { key: 'shop.chat.voice', scope: 'shop', default: false, what: 'ضبطِ پیامِ صوتیِ مشتری در گفت‌وگوی ویترین (CHAT-07)' },
   { key: 'shop.image_bank', scope: 'shop', default: false, what: 'بانکِ تصاویرِ دکان' },
   { key: 'image_bank.central', scope: 'all', default: false, what: 'پنلِ بانکِ تصاویرِ مدیر' },
   { key: 'account.self_delete', scope: 'all', default: false, what: 'حذفِ حساب به دستِ خودِ کاربر در برنامه و پورتال (Google Play)' },
