@@ -19,7 +19,14 @@ package ir.vil3ntec.tohid.core.backup
  */
 class RecoveryPhraseFlow(private val generate: () -> String = { RecoveryPhrase.generate() }) {
 
-  enum class Step { INTRO, SHOW, CONFIRM, DONE, CANCELLED }
+  enum class Step {
+    INTRO, SHOW, CONFIRM, DONE, CANCELLED;
+
+    companion object {
+      /** عبارت روی صفحه است (نشان داده یا دارد نوشته می‌شود) ⇒ پنجره در برابرِ عکسِ صفحه امن (`Platform.SecureWindow`) */
+      fun secret(s: Step): Boolean = s == SHOW || s == CONFIRM || s == DONE
+    }
+  }
 
   /** نتیجهٔ تأیید */
   enum class Check { OK, TYPO, MISMATCH, NOT_ASKED }

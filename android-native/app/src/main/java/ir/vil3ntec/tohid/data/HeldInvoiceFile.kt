@@ -41,4 +41,7 @@ object HeldInvoices {
 
   /** خروج از آموزش (`TrainingLedger.exit`): ورودِ بعدی پرونده را از نو می‌خواند (شاید پاک شده باشد) */
   fun forgetTraining() { training = null }
+
+  /** آزمون (`BackupRestoreDrillTest`): «برنامه از نو باز شد» — نمونهٔ بعدی پرونده را از نو می‌خواند */
+  internal fun reset() { store = null; training = null }
 }
