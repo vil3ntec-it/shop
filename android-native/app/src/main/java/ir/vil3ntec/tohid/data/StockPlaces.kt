@@ -306,6 +306,9 @@ object PlaceStock {
     return out
   }
 
+  /** INV-01 — فهرستِ انبار: محل‌ها (اصلی اول) و کالا ⇒ محل ⇒ هزارم، همان [StockPlaces.places]/[StockPlaces.stockAt]؛ فقط خواندنی */
+  fun all(d: ShopData): Pair<List<String>, Map<String, Map<String, Long>>> = StockPlaces.stockAt(d).let { StockPlaces.places(d, it) to it }
+
   fun of(d: ShopData, p: Product?): List<PlaceQty> {
     if (p == null || p.stockless == true || !p.kit.isNullOrEmpty() || StockLedger.isOn(d)) return emptyList()
     val byPlace = StockPlaces.stockAt(d)[p.id].orEmpty().filterValues { it != 0L }

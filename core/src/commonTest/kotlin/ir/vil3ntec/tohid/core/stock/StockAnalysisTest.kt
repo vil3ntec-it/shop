@@ -173,4 +173,19 @@ class StockAnalysisTest {
     assertNull(v.marginBp)
     assertTrue(v.complete)
   }
+
+  /** INV-16: ارزشِ دقیقِ دفتر (`costValueMinor`) جای مقدار × بهای گردشدهٔ واحد را می‌گیرد؛ بی آن همان پیشین */
+  @Test
+  fun valuation_exactCostValueReplacesQtyTimesRoundedUnit() {
+    //  ۳ عدد به جمعِ ۲۰٫۰۰ ⇒ بهای واحدِ گرد ۶٫۶۷؛ ضربش ۲۰٫۰۱ است، ارزشِ دفتر ۲۰٫۰۰
+    val rounded = StockAnalysis.valuation(listOf(ValueLine("soap", 3_000, 667, 900)))
+    assertEquals(2_001L, rounded.costMinor)
+    val exact = StockAnalysis.valuation(listOf(ValueLine("soap", 3_000, 667, 900, costValueMinor = 2_000)))
+    assertEquals(2_000L, exact.costMinor)
+    assertEquals(2_700L - 2_000L, exact.potentialProfitMinor)
+    assertTrue(exact.complete)
+    //  ارزشِ دقیقِ بیرون از بازه ⇒ «حساب نشد»، نه عددِ دروغ؛ موجودیِ منفی همچنان در هیچ جمعی نیست
+    assertEquals(listOf("soap"), StockAnalysis.valuation(listOf(ValueLine("soap", 3_000, 667, 900, costValueMinor = -1))).outOfRange)
+    assertEquals(listOf("neg"), StockAnalysis.valuation(listOf(ValueLine("neg", -1_000, 667, 900, costValueMinor = 500))).negative)
+  }
 }

@@ -11,7 +11,12 @@ import kotlin.math.roundToLong
  *  • واحدها: پایه، واحدِ فروشِ دومِ کالا (`saleUnit` × `unitFactor`) و بسته‌ها (`PackBarcodes.Pack`)؛ نامِ تکراری یک بار.
  *  • قیمتِ یک واحد: قیمتِ همان بسته در لیستِ قیمتِ کالا (`Pack.priceMinor`) اگر تعریف شده، وگرنه اندازه × قیمتِ پایه.
  *  • «فروشِ بخشی از بسته مجاز نیست» (تنظیمِ دکان): تعدادِ اعشاری از واحدِ بزرگ‌تر از پایه رد می‌شود.
- *  منطقِ خالص؛ آزمون: `ScenarioS05Test`.
+ *  • PRD-07 — ضریبِ واحدِ فروشِ دوم (`Product.unitFactor`، Double روی خط) به هزارمِ واحدِ پایه: [factorMilli] = همان
+ *    `unit_factor_milli` ِ سرور (`catalog.js`، `toStockLines`) و همان اندازهٔ [units]. ضریبِ تازه باید دقیقاً به هزارم
+ *    نوشته شود ([exactMilli]) و تبدیلش با عددِ صحیح است ([toBaseQty]، همان `mulDivRound` ِ سرور؛ ضربِ ممیزِ شناور
+ *    ۱٫۵ × ۰٫۰۰۹ را ۰٫۰۱۳ می‌کرد، نه ۰٫۰۱۴). «۱ دانه = ۱/۲۴ کارتن» در دفترِ هزارمی دقیق نمی‌ماند ⇒ ضریبِ تازهٔ ناجور رد؛
+ *    ضریبِ کهنهٔ ناجور همان ضربِ پیشین را دارد (نزدیک‌ترین هزارم به همان فروش: ۶ بطری از کارتنِ ۱۲ = ۰٫۵).
+ *  منطقِ خالص؛ آزمون: `ScenarioS05Test`، `UnitFactorTest`.
  */
 object UnitSale {
 
@@ -28,14 +33,36 @@ object UnitSale {
     val out = ArrayList<Unit>()
     out += Unit(base.trim(), 1000L)
     val byName = packs.associateBy { key(it.name) }
-    if (saleUnit.isNotBlank() && !unitFactor.isNaN() && unitFactor > 0) {
-      val size = (unitFactor * 1000.0).roundToLong()
-      if (size > 0 && size != 1000L) out += Unit(saleUnit.trim(), size, byName[key(saleUnit)]?.takeIf { it.sizeMilli == size }?.priceMinor)
-    }
+    val size = if (saleUnit.isBlank()) null else factorMilli(unitFactor)
+    if (size != null && size != 1000L) out += Unit(saleUnit.trim(), size, byName[key(saleUnit)]?.takeIf { it.sizeMilli == size }?.priceMinor)
     for (p in packs) {
       if (p.sizeMilli > 0 && out.none { key(it.name) == key(p.name) }) out += Unit(p.name, p.sizeMilli, p.priceMinor)
     }
     return out
+  }
+
+  /** ضریبِ واحدِ فروشِ دوم ⇒ هزارمِ واحدِ پایه (گردِ نیمه‌به‌بالا، همان `toMilli` ِ سرور)؛ نامثبت، NaN یا بیرون از سقف ⇒ null */
+  fun factorMilli(unitFactor: Double): Long? {
+    if (!unitFactor.isFinite() || unitFactor <= 0) return null
+    return (unitFactor * 1000.0).roundToLong().takeIf { it in 1..PackBarcodes.MAX_SIZE_MILLI }
+  }
+
+  /** ضریبی که دقیقاً به هزارم نوشته می‌شود (۰٫۰۰۱، ۰٫۵، ۲۴، ۱۰۰۰)؛ ۱/۲۴ یا ۰٫۰۰۰۵ ⇒ null — شرطِ ضریبِ تازه */
+  fun exactMilli(unitFactor: Double): Long? =
+    factorMilli(unitFactor)?.takeIf { abs(unitFactor * 1000.0 - it) <= 1e-9 * it }
+
+  /**
+   *  مقدار به واحدِ فروشِ دوم ⇒ به واحدِ پایه (سه رقمِ اعشار): هزارمِ مقدار × [factorMilli] ÷ ۱۰۰۰ با عددِ صحیح
+   *  (نیمه به +∞، همان `PurchaseUnits.baseQtyMilli` و `mulDivRound` ِ سرور). ضریبِ نادرست ⇒ null. ضریبِ کهنه‌ای که
+   *  به هزارم دقیق نیست (۱/۱۲) ⇒ همان ضربِ پیشین، گرد به هزارم: نزدیک‌ترین عدد به مقدارِ واقعیِ همین فروش.
+   */
+  fun toBaseQty(quantity: Double, unitFactor: Double): Double? {
+    val f = factorMilli(unitFactor) ?: return null
+    if (!quantity.isFinite()) return null
+    if (exactMilli(unitFactor) == null) return (quantity * unitFactor * 1000.0).roundToLong() / 1000.0
+    val q = (quantity * 1000.0).roundToLong()
+    //  بیرون از بازهٔ دقیق (۲^۵۳) فقط عددِ بی‌معنا می‌رسد؛ همان حسابِ پیشین، بی پرتابِ خطا در صندوق
+    return runCatching { PurchaseUnits.baseQtyMilli(q, f) / 1000.0 }.getOrElse { (quantity * f).roundToLong() / 1000.0 }
   }
 
   /** قیمتِ یک [u] (Minor): قیمتِ بسته از لیستِ قیمت، وگرنه اندازه × قیمتِ واحدِ پایه */
