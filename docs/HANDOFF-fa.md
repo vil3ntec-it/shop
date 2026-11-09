@@ -53,6 +53,20 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/store-allflags` (ویترین با همهٔ پرچم‌های مشتری‌رو روشن، سرتاسر در مرورگر؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `server/test/web-store-allflags.mjs` (در `test:web-store`): ۵۲ پرچمِ خانوادهٔ ویترین/گفت‌وگو/سفارش + catalog/image_bank/customer_notify/
+  delivery_customer_view از `KNOWN`، با پیش‌نیازِ shop.delivery، shop.visual_search و pay.hesabpay؛ سفرِ کامل در ۳۶۰·fa، ۷۶۸·en، ۱۲۸۰·ps و همان صفحه‌ها در
+  شش ترکیبِ دیگر؛ هر صفحه axe ِ WCAG 2.1 A/AA پس از گذارها، بیرون‌زدگی، JS/CSP، ۴xx/۵xx و بارِ نخست؛ سنجه‌ها خودشان هم سنجیده می‌شوند.
+  محلی پنج بارِ پیاپی سبز (چهار PGlite + یک PostgreSQL ِ محلی؛ ۱۴۷/۱۴۷ صفحه، ۳۳۴/۳۳۴ سنجه، ~۳ دقیقه). (۲) چهار رفع با آزمونِ پیش‌سرخ: ۳۹ پرچمِ خوانده‌شده بیرون از `KNOWN`
+  (`console-shell.test.js`)؛ پاسخِ pay-choice/افزودن/ویرایش/لغو فقط `sf.track` بود و کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش را می‌برد
+  (`lib/store-order-view.js`؛ order-flow، order-add-items، order-amend، storefront) — **برهم‌کنشِ پرچم‌ها**؛ ۴۰۴ ِ `…/rating` بی
+  `shop.delivery_ratings` (کلیدِ `deliveryRating`، delivery-ratings)؛ ردیفِ `#store-meta` ِ گوشی بی دسترسیِ صفحه‌کلید (web-store.mjs، axe).
+  (۳) سرتاسری با `E2E_FLAGS_ON` (۵۱ پرچمِ خانواده + shop.delivery): هفت گامِ سرخ بی ایرادِ محصول ⇒ گزینندهٔ «+» جدا از ♥، `sameOrderLink`
+  (TEN-03)، «بی پرچمِ نمای پیک» صریح و سه مقدارِ شمارشیِ عمومی؛ customer/order/track/notify/delivery/courier/lifecycle ۶۶/۶۶ با و بی آن.
+- نیمه‌کاره: شاهدِ CI ِ `web-store-allflags.mjs` (شغلِ ۴۵ دقیقه‌ایِ «آزمونِ ویترین» ~۳ دقیقه بیشتر). خانوادهٔ `shop.delivery_*` و پرچم‌های دیگرِ
+  بیرون از کاتالوگ (shop.visual_search، pay.hesabpay، shop.promo_uses، shop.owner_report، …) هنوز در `KNOWN` نیستند. `shop.orders.ledger` بازنشسته
+  است ولی هنوز در `order-ledger.js` خوانده می‌شود. `E2E_FLAGS_ON=all` حالا `shop.orders.subscribers_only` را هم روشن می‌کند (دکانِ بی اشتراک ⇒ بی سفارش).
+- قدمِ بعدی: شاهدِ CI؛ تصمیمِ صاحب‌کار دربارهٔ subscribers_only در «همه روشن»؛ کاتالوگِ پیک و پرداخت با همان سنجهٔ `console-shell.test.js`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای
