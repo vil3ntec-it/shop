@@ -57,6 +57,8 @@ class ShopStore(
 
   private val _data = MutableStateFlow(ShopData())
   val data: StateFlow<ShopData> = _data.asStateFlow()
+  @Volatile private var extras: LedgerExtras? = null   //  DATA-SAFETY §۷: کلیدهای نسخهٔ تازه‌تر، فقط [localOnly] (شرح سرِ `LedgerExtras`)
+  private fun localOnly() = training || runCatching { !SyncChoice.isV3(context) && !Backend.isReady(context) && !SyncV1Engine.of(context).everSynced() }.getOrDefault(false)
 
   /**
    *  آیا دفتر از روی دیسک خوانده شده؟
@@ -92,10 +94,10 @@ class ShopStore(
       } else if (file.exists()) {
         //  SEC-01: دفترِ ساده همان‌طور، رمزدار با کلیدِ همین دستگاه. ⛔ DATA-SAFETY: خواندنِ ناموفق یا JSON ِ خراب «خالی» نیست (`LedgerRecovery`)
         val read = try { LedgerRecovery.read(file, json, { AtRest.readText(context, it) }) } catch (e: AtRestException) { _unreadable.value = e.kind; null }
-        if (read is LedgerRecovery.Read.Ok) { _unreadable.value = null; guard.clear(); follow.replace(read.data); recoverSync(read.data) }
+        if (read is LedgerRecovery.Read.Ok) { extras = read.extras?.takeIf { localOnly() }; _unreadable.value = null; guard.clear(); follow.replace(read.data); recoverSync(read.data) }
         if (read is LedgerRecovery.Read.Bad) damaged(read.damage)
       } else {
-        _unreadable.value = null; guard.clear()
+        extras = null; _unreadable.value = null; guard.clear()
         recoverSync(ShopData())
       }
       //  از این‌جا نوشتنِ همتاها گرفته می‌شود؛ همتایی که میانِ خواندن نوشت ⇒ همین حالا از نو.
@@ -280,7 +282,7 @@ class ShopStore(
 
   /** «پاک کردنِ همه»: جایگزینیِ کامل، بی پایه (⛔ از مقدارِ [next] حدس زده نمی‌شود)؛ سدِ نقش و قفلِ نرم همان */
   suspend fun replaceAll(next: ShopData): Boolean = withContext(Dispatchers.IO) {
-    !roleRefused(_data.value, next) && !softLocked(_data.value, next) && writeInternal(next)
+    extras = null; !roleRefused(_data.value, next) && !softLocked(_data.value, next) && writeInternal(next)
   }
 
   /**
@@ -371,7 +373,7 @@ class ShopStore(
    */
   suspend fun restoreBackup(next: ShopData): Rebuilt = withContext(Dispatchers.IO) {
     if (TrainingMode.on) return@withContext Rebuilt(false, TRAINING_SEALED)
-    if (_unreadable.value != null) return@withContext rebuildFromServer(next)
+    extras = null; if (_unreadable.value != null) return@withContext rebuildFromServer(next)
     val engine = SyncV1Engine.of(context)
     engine.rebind()
     val v3 = SyncChoice.isV3(context)
@@ -557,7 +559,7 @@ class ShopStore(
       val keep = File(file.absoluteFile.parentFile, "${file.name}.unreadable-${System.currentTimeMillis()}")
       if (runCatching { DiskWrite.move(file, keep) }.isFailure) return false
     }
-    if (runCatching { DiskWrite.move(side, file) }.isFailure) return false
+    if (runCatching { DiskWrite.move(side, file) }.isFailure) return false else extras = null
     rebuildMark.delete()
     _unreadable.value = null; guard.clear()
     follow.replace(next)
@@ -779,8 +781,8 @@ class ShopStore(
     }
     //  فایلِ کناری + fsync + جابه‌جاییِ اتمی که روی ویندوز هم جایگزین می‌کند (`DiskWrite`). رمز فقط با «رمزگذاریِ داده» (`AtRest`)؛
     //  خاموش ⇒ همان بایت‌های همیشه، تکه‌تکه و بی رشته و آرایهٔ کاملِ دفتر در حافظه (PERF-LEDGER، `LedgerText`). DATA-SAFETY: `.prev`
-    val saved = runCatching { if (AtRest.wanted(context)) AtRest.writeText(context, file, json.encodeToString(next), keepPrevious = true)
-      else DiskWrite.stream(file, keepPrevious = true) { o -> LedgerText.write(json, next) { b, at, n -> o.write(b, at, n) } } }
+    val saved = runCatching { val keep = extras?.takeIf { localOnly() }.also { extras = it }; if (AtRest.wanted(context)) AtRest.writeText(context, file, keep?.text(json, next) ?: json.encodeToString(next), keepPrevious = true)
+      else DiskWrite.stream(file, keepPrevious = true) { o -> LedgerText.write(json, next, keep) { b, at, n -> o.write(b, at, n) } } }
     saved.exceptionOrNull()?.let {
       //  [quiet]: نوشتنِ پس‌زمینه (CRM-10 sweep) — کاربر چیزی ثبت نکرده که «ذخیره نشد» بشنود
       if (!quiet) _diskError.tryEmit(it.message ?: StrAppData.unknownError)
@@ -930,7 +932,7 @@ class ShopStore(
         }
       }.isSuccess.also { ok ->
         //  همتاهای پیشین (کارگرِ نیمه‌راه) دیگر روی این فایل نمی‌نویسند — `LedgerFollow.movedLocked`
-        if (ok) { follow.movedLocked(stop = false, next = ShopData()); _unreadable.value = null }
+        if (ok) { follow.movedLocked(stop = false, next = ShopData()); _unreadable.value = null; extras = null }
       }
     }
     if (kept) LedgerSummary.clear(context)
@@ -969,9 +971,7 @@ class ShopStore(
    */
   suspend fun exportBackup(storeName: String = ""): String = withContext(Dispatchers.IO) {
     if (_unreadable.value != null) throw StaleLedger(UNREADABLE)   //  ⛔ DATA-SAFETY: دفترِ خوانده‌نشده پشتیبانِ «خالی» نمی‌دهد
-    val tree = json.encodeToJsonElement(ShopData.serializer(), _data.value)
-      .let { it as kotlinx.serialization.json.JsonObject }
-      .toMutableMap()
+    val tree = (extras?.takeIf { localOnly() }?.tree(json, _data.value) ?: json.encodeToJsonElement(ShopData.serializer(), _data.value) as kotlinx.serialization.json.JsonObject).toMutableMap()  //  §۷: + کلیدهای نسخهٔ تازه‌تر
     tree["exportedAt"] = kotlinx.serialization.json.JsonPrimitive(
       java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss'Z'", java.util.Locale.US).apply {
         timeZone = java.util.TimeZone.getTimeZone("UTC")

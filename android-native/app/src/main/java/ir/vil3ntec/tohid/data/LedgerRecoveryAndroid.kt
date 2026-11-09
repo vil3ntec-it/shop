@@ -53,7 +53,8 @@ object LedgerRecovery {
 
   /** خواندنِ دفتر: یا دفتر، یا گونهٔ خرابی */
   sealed interface Read {
-    data class Ok(val data: ShopData) : Read
+    /** @property extras کلیدهای نسخهٔ تازه‌تر که این نسخه نمی‌شناسد (`LedgerExtras`)؛ دفترِ همین نسخه ⇒ `null` */
+    data class Ok(val data: ShopData, val extras: LedgerExtras? = null) : Read
     data class Bad(val damage: Damage) : Read
   }
 
@@ -80,12 +81,18 @@ object LedgerRecovery {
     return decode(text!!, json)
   }
 
-  /** متنِ خوانده‌شده ⇒ دفتر یا گونهٔ خرابی */
-  fun decode(text: String, json: Json): Read =
-    runCatching { json.decodeFromString(ShopData.serializer(), text) }.fold(
-      { Read.Ok(it) },
+  /**
+   *  متنِ خوانده‌شده ⇒ دفتر یا گونهٔ خرابی. اول سخت‌گیر (`LedgerExtras.strictOf`: همان تنظیم‌ها، کلیدِ ناشناخته ⇒ خطا) —
+   *  دفترِ همین نسخه همان یک بار خوانده می‌شود؛ کلیدِ ناشناخته (دفترِ نسخهٔ تازه‌تر) ⇒ همان خواندنِ همیشه و نگه‌داشتنِ
+   *  آن کلیدها (`LedgerExtras.scan`، DATA-SAFETY §۷).
+   */
+  fun decode(text: String, json: Json): Read {
+    runCatching { LedgerExtras.strictOf(json).decodeFromString(ShopData.serializer(), text) }.onSuccess { return Read.Ok(it) }
+    return runCatching { json.decodeFromString(ShopData.serializer(), text) }.fold(
+      { Read.Ok(it, LedgerExtras.scan(text, json)) },
       { Read.Bad(if (runCatching { json.parseToJsonElement(text) }.getOrNull() is JsonObject) Damage.NEWER_FORMAT else Damage.CORRUPT) },
     )
+  }
 
   /**
    *  جاهایی که نسخهٔ سالم شاید هست، به هر ترتیب — [best] با زمانِ فایل می‌چیند.

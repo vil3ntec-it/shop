@@ -270,8 +270,15 @@ class SyncV3Runner private constructor(context: Context) {
   fun setAside(store: ShopStore, decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>): Int {
     if (store.training) return 0
     shop = store
-    return engine().setAside(decisions, book).also { publish() }
+    return engine().setAside(decisions, book, marks()).also { publish() }
   }
+
+  /** `SetAsideMarks` ِ همین حساب در پوشهٔ v3 ِ همان (DATA-SAFETY §۷) */
+  private fun marks() = File(File(app.filesDir, "sync-v3-${OpQueue.fileKey(accountKey())}"), ir.vil3ntec.tohid.sync.v1.SetAsideMarks.V3_NAME)
+    .let { f -> ir.vil3ntec.tohid.sync.v1.SetAsideMarks({ f.takeIf { it.isFile }?.readText() }, { f.parentFile?.mkdirs(); DiskWrite.text(f, it) }) }
+
+  /** opهای تصمیم‌هایی که بیرون از دفتر «نشست» نشان خورده‌اند — `SetAside.openRejected` */
+  fun settledOps(): Set<String> = runCatching { marks().read().ops }.getOrDefault(emptySet())
 
   companion object {
     @Volatile private var instance: SyncV3Runner? = null

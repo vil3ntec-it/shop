@@ -201,6 +201,17 @@ export const COLLECTION_MODEL = Object.fromEntries((MODELS.ShopData || [])
  * همهٔ ردیف‌های مجموعه‌ها از درِ مدل؛ بقیهٔ کلیدهای دفتر دست نمی‌خورند. [keepOf]: مدلِ ساختی
  * قدیمی‌تر از `Models.kt` ِ امروز (مجموعه ⇒ پالایهٔ کلید، یا null یعنی همان مدلِ امروز).
  */
+/**
+ * مدلِ دفترِ یک ساختِ دیگر از دفتری که **همان ساخت** با همهٔ فیلدهایش پر نوشت (`android-native/app/src/test/resources/compat/
+ * old-maximal.json`، `tools/compat-ledger`): مجموعه ⇒ کلیدهای ردیف — گزینهٔ `model` ِ [NativeDevice].
+ */
+export function modelOfLedger(file) {
+  const t = JSON.parse(fs.readFileSync(file, 'utf8'));
+  const out = {};
+  for (const c of core.COLLECTIONS) if (Array.isArray(t[c]) && t[c][0]) out[c] = new Set(Object.keys(t[c][0]));
+  return out;
+}
+
 export function projectLedger(tree, keepOf = null) {
   const out = { ...tree };
   for (const c of core.COLLECTIONS) {
@@ -449,15 +460,17 @@ export class NativeDevice {
    * @param {object} [o.kotlin]    قاعده‌های `LedgerDiff` ِ همین ساخت؛ پیش‌فرض همان کدِ امروز (`KOTLIN`).
    *                               `PRE_A00` = ساختِ نصب‌شدهٔ پیش از A00
    * @param {boolean} [o.raw]      دفترِ JSON ِ خام بی مدل — همان وب (`license/sync-core.js`)
+   * @param {object} [o.model]     مدلِ دفترِ ساختی دیگر: مجموعه ⇒ Set ِ کلیدهایی که آن ساخت می‌شناسد ([modelOfLedger])؛
+   *                               نبود ⇒ امروز (یا فهرستِ منجمدِ `PRE_A00`)
    */
-  constructor(E, label, { deviceId = null, seller = '', appVersion = APP_VERSION, kotlin = KOTLIN, raw = false, phone = null } = {}) {
+  constructor(E, label, { deviceId = null, seller = '', appVersion = APP_VERSION, kotlin = KOTLIN, raw = false, phone = null, model = null } = {}) {
     this.E = E;
     this.label = label;
     this.appVersion = appVersion;
     this.kotlin = raw ? NO_MODEL : kotlin;
     this.raw = raw;
     //  مدلِ دفترِ همین ساخت: امروز ⇒ `Models.kt`؛ ساختِ پیش از A00 ⇒ فهرستِ منجمدِ همان نسخه
-    this.keepOf = this.kotlin.frozenModel ? oldModelOf(appVersion) : null;
+    this.keepOf = model ? (c) => (model[c] ? (k) => model[c].has(k) : null) : (this.kotlin.frozenModel ? oldModelOf(appVersion) : null);
     this.deviceId = deviceId || `e2e-${label}-${randomUUID().slice(0, 8)}`.replace(/[^A-Za-z0-9_-]/g, '');
     this.seller = seller || label;
     this.offline = false;
