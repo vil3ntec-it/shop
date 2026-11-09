@@ -29,7 +29,7 @@
   //  میانگینِ موزون (RPT-03، PRD-15) با همان هستهٔ موجودی (`stock-core.js` = `core/stock/StockCore`)؛ در مرورگر پیش از این فایل
   var stock = typeof module !== 'undefined' && module.exports ? require('./stock-core.js')
     : (typeof window !== 'undefined' ? window.TohidStockCore : globalThis.TohidStockCore);
-  if (!stock || typeof stock.apply !== 'function') throw new Error('report-core: stock-core.js (TohidStockCore) must load first');
+  if (!stock || typeof stock.reportReplay !== 'function') throw new Error('report-core: stock-core.js (TohidStockCore) must load first');
   var api = factory(cal, stock);
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
   if (typeof window !== 'undefined') window.TohidReportCore = api;
@@ -207,84 +207,16 @@
 
   /* ---------------- بهای تمام‌شده (RPT-03، PRD-15) ---------------- */
 
-  /*
-   * میانگینِ موزونِ متحرک (D-23، الف) با **همان** هستهٔ موجودی (`stock-core.js`، حالتِ `recorded`)، یک جایگاه برای
-   * هر کالا (انتقال بینِ محل‌ها اثری ندارد). ترتیب: (زمان، ورود < فروش < برگشت، شناسه). ورودِ عادی `purchase_receipt`
-   * (+ هزینهٔ جانبی)، اصلاحِ مثبت به قیمتش یا میانگینِ همان لحظه (خروجیِ تولید به `costMinor`)، ورودِ منفی `count_adjust`؛ فروش `sale` (کمبود ⇒ تخمینی؛
-   * بی هیچ بهای معلوم ⇒ آن بخش به `purchasePrice` ِ قلم)؛ برگشتی `customer_return` به همان بهایی که رفت؛ لغوشده بیرون؛
-   * شمارشِ مثبتِ کالای بی‌بها ⇒ پایهٔ نامعلوم تا تمام شدنِ موجودی. سندِ ردشده نادیده؛ فروشِ ردشده به بهای قلم و تخمینی.
-   * شرحِ کامل: `docs/RULES-fa.md` «v3 · گزارش»؛ دوقلو: `ReportCore.mavg`؛ بردار: `core/test-vectors/cost-v1.json`.
-   */
-  var STOCK_WH = 'main', STOCK_USER = 'report', REC = { mode: 'recorded' };
+  /*  میانگینِ موزونِ متحرک (D-23، الف): بازپخشِ همین دفتر روی هستهٔ موجودی — `stock-core.js` ‹`reportReplay`›
+   *  (شرحِ کامل همان‌جا؛ دوقلو: `ReportCore.mavg`). */
+  var STOCK_WH = stock.REPORT_WH;
 
   /** round(a × b ÷ c) ِ هستهٔ موجودی؛ عددِ نا‌امن (بیرون از ۲^۵۳) ⇒ null، نه خطا (Kotlin: `mdr`) */
   function mdr(a, b, c) {
     try { return stock.mulDivRound(a, b, c); } catch (e) { if (e instanceof RangeError) return null; throw e; }
   }
 
-  function mavgReplay(L) {
-    var line = {}, ret = {}, est = {}, books = {}, unknown = {};
-    function lineMode(it) { if (it.unitCost === 0) est[it.id] = true; return rnd(it.unitCost * it.qty / 1000); }
-    function step(pid, doc) {
-      var r;
-      try { r = stock.apply(books[pid] || stock.emptyBook(), doc, REC); } catch (e) { if (e instanceof RangeError) return null; throw e; }
-      if (r.result.ok) books[pid] = r.book;
-      return r.result.ok ? r.result : null;
-    }
-    function posOf(pid) { return books[pid] ? stock.position(books[pid], pid, STOCK_WH) : null; }
-    function doc(t, type, pid, id, q) { return { id: id, type: type, productId: pid, warehouseId: STOCK_WH, userId: STOCK_USER, at: t > 0 ? t : 1, qtyMilli: q }; }
-    function afterOut(pid) { var p = posOf(pid); if (p && p.qtyMilli <= 0) delete unknown[pid]; }
-    var ev = [];
-    L.entries.forEach(function (e) { ev.push({ t: timeOf(e), k: 0, id: e.id, e: e }); });
-    L.sales.forEach(function (s) {
-      if (s.cancelled) return;
-      (L.itemsBySale[s.id] || []).forEach(function (it) { ev.push({ t: timeOf(s), k: 1, id: it.id, it: it }); });
-    });
-    L.returns.forEach(function (r) {
-      var s = L.saleById[r.saleId];
-      if (!(s && s.cancelled)) ev.push({ t: timeOf(r), k: 2, id: r.id, r: r });
-    });
-    ev.sort(function (a, b) { return (a.t - b.t) || (a.k - b.k) || cmp(a.id, b.id); });
-    ev.forEach(function (x) {
-      var d, p, res;
-      if (x.k === 0) {
-        var e = x.e;
-        if (e.productId === '' || e.qty === 0) return;
-        d = doc(x.t, e.adjustment || e.qty < 0 ? 'count_adjust' : 'purchase_receipt', e.productId, 'e:' + e.id, e.qty);
-        if (d.type === 'count_adjust') d.reason = 'adjustment';
-        if (e.qty > 0 && (!e.adjustment || e.unitCost > 0 || e.value !== null) && (d.costMinor = e.value !== null && e.value >= 0 ? e.value : mdr(e.qty, e.unitCost, 1000)) === null) return;
-        if (d.type === 'purchase_receipt' && e.landed > 0) d.landedMinor = e.landed;
-        p = posOf(e.productId);
-        var blind = e.qty > 0 && d.costMinor === undefined && !(p && (p.qtyMilli > 0 || p.lastCost));
-        if (!step(e.productId, d)) return;
-        if (blind) unknown[e.productId] = true;
-        if (e.qty < 0) afterOut(e.productId);
-      } else if (x.k === 1) {
-        var it = x.it;
-        if (it.productId === '' || it.qty <= 0) { line[it.id] = lineMode(it); return; }
-        var wasUnknown = unknown[it.productId] === true;
-        res = step(it.productId, doc(x.t, 'sale', it.productId, 's:' + it.id, it.qty));
-        if (!res) { line[it.id] = lineMode(it); est[it.id] = true; return; }
-        var cost = res.costMinor, task = res.reviewTask;
-        var guess = res.shortMilli > 0 && task && task.reasons.indexOf('unknown_cost') >= 0 && it.unitCost > 0 ? mdr(res.shortMilli, it.unitCost, 1000) : null;
-        if (guess !== null && mdr(cost + guess, 1, 1) !== null) cost += guess;
-        if (res.shortMilli > 0 || wasUnknown) est[it.id] = true;
-        line[it.id] = cost;
-        afterOut(it.productId);
-      } else {
-        var r = x.r, item = L.itemById[r.saleItemId];
-        if (!item || item.qty <= 0 || r.qty <= 0) { ret[r.id] = 0; return; }
-        var c = mdr(line[item.id] !== undefined ? line[item.id] : rnd(item.unitCost * item.qty / 1000), r.qty, item.qty);
-        ret[r.id] = c === null ? 0 : c;
-        if (item.productId === '' || c === null || c < 0) return;
-        d = doc(x.t, 'customer_return', item.productId, 'r:' + r.id, r.qty);
-        d.costMinor = c;
-        step(item.productId, d);
-      }
-    });
-    L.items.forEach(function (it) { if (line[it.id] === undefined) line[it.id] = lineMode(it); });
-    return { line: line, ret: ret, est: est, books: books, unknown: unknown };
-  }
+  function mavgReplay(L) { return stock.reportReplay(L, timeOf); }
 
   /**
    * بهای هر قلم و برگشتی (واحدِ کوچک): 'line' = `purchasePrice` ِ قلم × مقدار (همیشه «تقریبی»)، 'mavg' = بالا.

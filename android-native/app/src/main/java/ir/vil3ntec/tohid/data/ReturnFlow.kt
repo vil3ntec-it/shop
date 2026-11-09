@@ -10,6 +10,7 @@ import ir.vil3ntec.tohid.core.pay.PaidRow
 import ir.vil3ntec.tohid.core.pay.PayMethod
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.PayResult
+import ir.vil3ntec.tohid.core.pay.PayStatus
 import ir.vil3ntec.tohid.core.pay.RefundInput
 import ir.vil3ntec.tohid.core.pay.TillRounding
 import ir.vil3ntec.tohid.core.pay.StoredPay
@@ -388,9 +389,6 @@ object ReturnFlow {
   fun minor(afn: Double): Long = Math.round(afn * 100)
   private fun major(m: Long): Double = m / 100.0
 
-  /** وضع‌هایی که پولشان سرِ صندوق گرفته شده: «در انتظار»ِ ثبتِ دستیِ غیرنقد (PAY-08) هم */
-  private val TAKEN = setOf("confirmed", "partially_refunded", "pending")
-
   /**
    *  ردیف‌های پرداختِ فاکتور از نگاهِ بازپرداخت.
    *
@@ -419,10 +417,9 @@ object ReturnFlow {
     prior.forEach { r -> r.toMethods?.forEach { (m, a) -> used[m] = (used[m] ?: 0L) + minor(a) } }
     val known = Pay.DEFAULT_METHODS.associateBy { it.id }
     val extra = LinkedHashMap<String, PayMethod>()
-    //  PAY-07: ردیفی که «ناموفق»، «لغو» یا «نیازمند بررسی» شد به روشِ خودش پس‌دادنی نیست (بی سند ⇒ همان امروز)
-    val now = if (changes.isEmpty()) null else PayStatusFlow.rows(sale).let { all ->
-      val st = ir.vil3ntec.tohid.core.pay.PayStatus.apply(sale.id, all, changes).statuses
-      all.indices.filter { all[it].amount > 0 }.map { st[it] }
+    //  PAY-07/PAY-23: فقط پولِ رسیده، همان X/Z (`PayStatus.forRefund`): ثبتِ دستی و امانتِ پیک بله؛ «در انتظار» تا «پول رسید»، «ناموفق»، «لغو» و «نیازمند بررسی» نه
+    val now = PayStatusFlow.rows(sale).let { all ->
+      PayStatus.forRefund(all, PayStatus.apply(sale.id, all, changes).statuses, sale.isOnlineOrder()).filterIndexed { i, _ -> all[i].amount > 0 }
     }
     val rows = list.mapIndexed { i, p ->
       val id = when {
@@ -433,8 +430,7 @@ object ReturnFlow {
       if (id != Pay.CASH && id != Pay.ACCOUNT && id !in known && id !in extra) {
         extra[id] = PayMethod(id, if (p.kind in Pay.KINDS && p.kind != Pay.CASH) p.kind else "other", id)
       }
-      val eff = now?.getOrNull(i) ?: p.status
-      val status = if (eff in TAKEN) "confirmed" else eff
+      val status = now[i]
       val back = if (id == Pay.CASH || id == Pay.ACCOUNT) 0L else minOf(used[id] ?: 0L, p.amountMinor)
       if (back > 0) used[id] = (used[id] ?: 0L) - back
       PaidRow(id, p.amountMinor, back, status)
@@ -461,6 +457,8 @@ object ReturnFlow {
     val m = if (sale == null && mode == ORIGINAL) CASH else mode
     if (m != ORIGINAL && m != CASH && m != STORE_CREDIT) return Outcome.Bad(Code.BAD_MODE)
     val (rows, methods) = paidRows(sale, amount, prior, changes)
+    val waiting = if (rows.any { it.status == PayStatus.PENDING }) StrLedger.refundAwaitsPayment else "REFUND_EXCEEDS"
+    PayStatus.refundRoom(rows, prior.sumOf { minor(it.amount) })?.let { if (minor(amount) > it) return Outcome.Bad(Code.REFUND_FAILED, waiting) }
     val outstanding = if (sale == null) 0L else max(0L, minor(sale.debtGiven - sale.debtSettled))
     val r = Pay.refund(
       RefundInput(
@@ -474,7 +472,8 @@ object ReturnFlow {
       )
     )
     return when (r) {
-      is PayResult.Err -> Outcome.Bad(if (r.code == "CUSTOMER_REQUIRED") Code.CUSTOMER_REQUIRED else Code.REFUND_FAILED, r.code)
+      is PayResult.Err -> Outcome.Bad(if (r.code == "CUSTOMER_REQUIRED") Code.CUSTOMER_REQUIRED else Code.REFUND_FAILED,
+        if (r.code == "REFUND_EXCEEDS") waiting else r.code)
       is PayResult.Ok -> {
         var account = 0L; var credit = 0L; var cash = 0L
         val other = LinkedHashMap<String, Long>()
