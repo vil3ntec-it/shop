@@ -91,6 +91,17 @@ test('RPT-03 با دست: میانگینِ موزونِ متحرک', () => {
   assert.equal(solo.est.xi, true); // بی ورودِ انبار ⇒ بها تخمینی است
 });
 
+test('PRD-07: costMinor ِ ناجور با مقدار × بها (ویرایشِ بها روی نسخهٔ پیش از دستهٔ ۳۱) ⇒ همان مقدار × بها — همتای ReportLedger.exactValue', () => {
+  const of = (price, costMinor) => core.costs(core.ledger({
+    warehouseEntries: [{ id: 'w', productId: 'tea', units: 24, price, costMinor, date: '2026-11-01', createdAt: 1 }],
+    sales: [{ id: 's', finalTotal: 1500, date: '2026-11-02', createdAt: 2 }],
+    saleItems: [{ id: 'i', saleId: 's', productId: 'tea', quantity: 24, unitPrice: 62.5, totalPrice: 1500 }],
+  }), 'mavg').line.i;
+  assert.equal(of(41.67, 100000), 100000); // ۲۴ × ۴۱٫۶۷ = ۱۰۰۰٫۰۸ ⇒ گردِ همان جمع، جور
+  assert.equal(of(41.67, undefined), 100008);
+  assert.equal(of(50, 100000), 120000); // بها عوض شد و آینه کهنه ماند ⇒ ۲۴ × ۵۰
+});
+
 test('v3 ۱۵.۴ بند ۴: سود «تقریبی» تا بها معتبر نیست', () => {
   const line = core.today(L, { date: '2026-10-14', clock: kabulClock });
   // کپیِ قیمتِ خرید (line) همیشه تقریبی؛ قلمِ آزادِ بی‌بها + فاکتورِ قدیمیِ بی‌قلم = ۲ قلمِ بی‌بها

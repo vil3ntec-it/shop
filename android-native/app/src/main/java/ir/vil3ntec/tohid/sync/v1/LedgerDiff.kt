@@ -187,7 +187,7 @@ object LedgerDiff {
    *
    *  ⚠️ عددِ کسری دست نمی‌خورد (`2.5` همان `2.5` است)، جز شکلِ نماییِ جاوا
    *  (`4.0E-4`، `1.23456785E7`) که همان رقم‌ها با شکلِ جاوااسکریپت می‌رود
-   *  (`0.0004`، `12345678.5`) — وگرنه همان `hash_mismatch` (`JsNumber`، DATA-SAFETY §۷).
+   *  (`0.0004`، `12345678.5`) — وگرنه همان `hash_mismatch` (`JsNumber`، DATA-SAFETY §۸).
    */
   fun toJson(data: ShopData): JsonObject =
     jsNumbers(json.encodeToJsonElement(ShopData.serializer(), data)) as JsonObject

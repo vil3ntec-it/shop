@@ -61,12 +61,15 @@ class CustomerPricesWiringTest {
     val listGate = s.indexOf("if (!on) return")
     val flag = s.indexOf("val special = remember { CustomerPricePrefs.on(context) }")
     val off = s.indexOf("if (!special) {")
-    val legacy = s.indexOf("val next = repriceCart(d, cart, state.list)")
+    val legacy = s.indexOf("val next = repriceCart(d, cart, current().list)")
     val ret = s.indexOf("    return\n  }", off)
-    val on = s.indexOf("CustomerPriceCart.reprice(d, cart, state, debtorId,")
+    val on = s.indexOf("CustomerPriceCart.reprice(d, cart, current(), debtorId,")
     assertTrue(listGate in 0 until flag)
     assertTrue(flag < off && off < legacy && legacy < ret && ret < on)
-    assertEquals(1, Regex(Regex.escape("repriceCart(d, cart, state.list)")).findAll(s).count())
+    assertEquals(1, Regex(Regex.escape("repriceCart(d, cart, current().list)")).findAll(s).count())
+    //  POS-12/18: هر دو راه با لیستِ همان فاکتور (انتخابِ دستیِ نگه‌داشته در سبد)، نه حالتِ صفحه از فاکتورِ پیشین
+    val current = s.indexOf("fun current(): PriceList.State = CartPriceList.effective(state, cartStore.priceList.value)")
+    assertTrue(current in (listGate + 1) until off)
     //  فیِ دستی فقط با اجازهٔ تغییرِ قیمت
     assertTrue(s.contains("ShopRole.decide(context, \"sales.price\").decision != \"deny\""))
   }

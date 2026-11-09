@@ -219,7 +219,8 @@ object StockLedger {
         out += Event(
           id, "entry", "purchase_receipt", at, dayOf(w.date, at), w.productId, loc, q, user, ref,
           //  PRD-07: خریدِ به واحدِ خرید ارزشِ دقیقِ خودش را دارد (نه مقدار × بهای گردشدهٔ واحدِ پایه)
-          costMinor = max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)),
+          //  ناجور با مقدار × بها (ویرایشِ بها روی نسخهٔ کهنه‌تر) ⇒ همان پیشین (`ReportLedger.exactValue`)
+          costMinor = max(0L, ir.vil3ntec.tohid.core.report.ReportLedger.exactValue(w.costMinor, milli(w.units), minor(w.price)) ?: roundOr0(w.units * w.price * 100.0)),
           landedMinor = max(0L, landedMinorOf(w)),
           lot = lotRefOf(w),
         )
@@ -231,7 +232,7 @@ object StockLedger {
         out += Event(
           id, "entry", Repack.MOVE, at, dayOf(w.date, at), w.productId, loc, q, user, ref,
           reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
-          costMinor = if (q > 0) max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)) else null,
+          costMinor = if (q > 0) max(0L, ir.vil3ntec.tohid.core.report.ReportLedger.exactValue(w.costMinor, milli(w.units), minor(w.price)) ?: roundOr0(w.units * w.price * 100.0)) else null,
           lotId = if (q < 0) lid else null, lot = if (q > 0 && lid != null) lotRefOf(w) else null,
         )
       } else {

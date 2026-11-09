@@ -144,6 +144,8 @@ class HeldInvoicesUi internal constructor(
   internal var extras: () -> HeldExtras = { HeldExtras() }
   internal var onSwitched: (HeldExtras) -> Unit = {}
   internal var onFocusBack: () -> Unit = {}
+  /** S09: نگه‌دارندهٔ این فاکتور کسِ دیگری است (پشتیبانِ سرور، `HeldSync.othersHeld`)؛ پرچمِ خاموش ⇒ همیشه نه */
+  internal var notMine: (String) -> Boolean = { false }
   internal var data: ShopData = ShopData()
   /** دادهٔ دکان بار شده — بی آن `fit` همهٔ ردیف‌های کالا را «ناموجود» می‌دید */
   internal var loaded: Boolean = true
@@ -198,7 +200,12 @@ class HeldInvoicesUi internal constructor(
     if (!loaded) toast(NOT_LOADED)
     return loaded
   }
-  fun discard(h: HeldInvoice) { dialog = null; run { store.discard(h.id) } }
+  fun discard(h: HeldInvoice) {
+    dialog = null
+    //  S09: نگه‌داشتهٔ کسِ دیگر (از دستگاهِ دیگر رسیده) را فقط دارندهٔ «لغوِ فاکتور» دور می‌اندازد — همان سرور (`held_not_yours`)
+    if (!canDropStale && notMine(h.id)) { toast(StrPos.heldNotYours); return }
+    run { store.discard(h.id) }
+  }
   fun dropStale() { dialog = null; run { store.dropStale() } }
 
   /** POS-12 — پاک‌سازیِ خودکار؛ پیام فقط وقتی چیزی پاک شد (بی کهنه یا خاموش ⇒ بی‌صدا) */
@@ -261,6 +268,7 @@ fun rememberHeldInvoices(
   ui.extras = extras
   ui.onSwitched = onSwitched
   ui.onFocusBack = onFocusBack
+  ui.notMine = { id -> ir.vil3ntec.tohid.data.HeldSync.othersHeld(context, id) }
   ui.data = d
   ui.loaded = loaded
   //  بالا آمدن پس از قطعِ برق وسطِ جابه‌جایی (شرحِ `HeldRules.reconcile`)؛ پرسشِ
@@ -269,6 +277,15 @@ fun rememberHeldInvoices(
   LaunchedEffect(ui, recovering == null) { ui.store.reconcile(cartStore) }
   //  فاکتورِ فروش‌شده از فهرست می‌رود
   LaunchedEffect(ui, d.sales.size) { ui.store.prune(d) }
+  //  S09: پشتیبانِ سرورِ نگه‌داشته‌ها (پرچمِ خاموشِ `shop.held_sync`) — با بازشدنِ صندوق و سپس هر دقیقه تا باز است:
+  //  نگه‌داشته‌های دستگاهِ دیگر یا نصبِ پیشین به فهرست برمی‌گردند. خاموش ⇒ فقط یک `GET`، هیچ نوشتنی
+  LaunchedEffect(ui) {
+    ir.vil3ntec.tohid.data.HeldSync.cart = cartStore
+    while (true) {
+      ir.vil3ntec.tohid.data.HeldSync.kick(context)
+      kotlinx.coroutines.delay(ir.vil3ntec.tohid.data.HeldSync.MIN_MS)
+    }
+  }
   //  «پرداخت» در «اسکن‌های در انتظار» (`ScanSaleHold`): فاکتورِ نگه‌داشتهٔ بارکدخوان به همین صندوق برمی‌گردد؛
   //  فروش فقط با پرداختِ همین صندوق و دستِ کاربر ثبت می‌شود
   val scanPay = ir.vil3ntec.tohid.data.ScanSaleHold.payRequest.value

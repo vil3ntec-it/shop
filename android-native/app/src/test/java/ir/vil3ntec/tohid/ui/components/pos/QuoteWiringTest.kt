@@ -27,7 +27,11 @@ class QuoteWiringTest {
 
   @Test fun `به سبد فقط با Quotes convert و بی دفترِ دکان`() {
     val s = src(bar)
-    assertTrue(s.indexOf("Quotes.convert(") in 0 until s.indexOf("cart.set(r.quote.lines.map(Quotes::cartLine))"))
+    //  ردیف‌ها با `Quotes.cartLines` (فروشنده و نشانِ قیمتِ خاص هم) و پس از آن لیستِ دستی و یادداشتِ پیش‌فاکتور (`ConvertFidelityTest`)
+    val lines = s.indexOf("val lines = Quotes.cartLines(d, r.quote, today)")
+    assertTrue(s.indexOf("Quotes.convert(") in 0 until lines)
+    assertTrue(lines in 0 until s.indexOf("if (!cart.set(lines))"))
+    assertTrue(s.indexOf("if (!cart.set(lines))") in 0 until s.indexOf("cart.setPriceList(Quotes.priceList(d, r.quote, lines, PriceListPrefs.on(context)))"))
     assertFalse(s.contains("store.save"))
     assertFalse(s.contains("store.update"))
     assertFalse(s.contains("SalesEngine.record"))

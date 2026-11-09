@@ -51,6 +51,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.sync_shadow_file', scope: 'shop', default: false, what: 'سایه و cursor ِ همگام‌سازیِ برنامه در فایلِ خودشان، نه تنظیمات (PERF-LEDGER) — خاموش ⇒ همان prefs؛ خاموش کردن امن است' },
   { key: 'sync.pull_own_newer', scope: 'shop', default: true, what: 'pull ِ v1 نوشتهٔ تازه‌ترِ خودِ دستگاه را با opِ کهنه‌ترِ دیگری بازنویسی نمی‌کند (#501) — فقط false خاموش' },
   { key: 'shop.settings_sync', scope: 'shop', default: false, what: 'همگام‌سازیِ زندهٔ تنظیماتِ دکان (قاعده‌های پول، برگشت، مالیات) بینِ دستگاه‌ها' },
+  { key: 'shop.held_sync', scope: 'shop', default: false, what: 'پشتیبانِ سرورِ فاکتورهای نگه‌داشته: با پاک کردنِ برنامه گم نمی‌شوند و روی دستگاهِ دیگرِ دکان برمی‌گردند (POS-12، S09)' },
   { key: 'shop.customer_erasure', scope: 'shop', default: false, what: 'حذفِ دادهٔ شخصیِ مشتری با نگه‌داشتنِ سندِ مالیِ ناشناس (SEC-10)' },
   { key: 'shop.orders.dispute_file', scope: 'shop', default: false, what: 'پروندهٔ مدرکِ اختلافِ سفارش (RSK-08)' },
   { key: 'shop.storefront.filters', scope: 'shop', default: false, what: 'فیلترِ کاتالوگِ ویترین (برند، قیمت، موجود، مشخصه)' },

@@ -86,9 +86,17 @@ object ExpiryEngine {
    *  گنجایشِ هر محموله پس از مصرفِ سری‌دار ([isLotUse]): مصرفِ هر (انقضا، سری) از نخستین ردیف‌های همان کلید کم می‌شود
    *  (هرگز زیرِ صفر). بی چنین ردیفی ⇒ همان `units` (همان حسابِ امروز، عددبه‌عدد).
    */
-  private fun capacities(d: ShopData, productId: String, entries: List<WarehouseEntry>): List<Pair<WarehouseEntry, Double>> {
+  private fun capacities(d: ShopData, productId: String, entries: List<WarehouseEntry>): List<Pair<WarehouseEntry, Double>> =
+    capacities(d.warehouseEntries.filter { it.productId == productId && isLotUse(it) }, entries)
+
+  /**
+   *  همان [capacities] با ردیف‌های مصرفِ سری‌دارِ **همین کالا** ([uses]، به ترتیبِ دفتر) که از پیش جدا شده‌اند — [lots] برای
+   *  همهٔ کالاها یک بار جدا می‌کند، نه یک گذر روی همهٔ ورودها برای هر کالا (POS-42: با ۲۰ هزار کالا و ۴۰ هزار ورود
+   *  هر سبد با قاعدهٔ «نزدیکِ انقضا» ~۹ ثانیه می‌شد). همان ردیف‌ها به همان ترتیب ⇒ همان عدد.
+   */
+  private fun capacities(uses: List<WarehouseEntry>, entries: List<WarehouseEntry>): List<Pair<WarehouseEntry, Double>> {
     val use = HashMap<Pair<String, String>, Double>()
-    for (w in d.warehouseEntries) if (w.productId == productId && isLotUse(w)) {
+    for (w in uses) {
       val k = w.expiryDate to w.batch.trim()
       use[k] = (use[k] ?: 0.0) - w.units
     }
@@ -109,13 +117,14 @@ object ExpiryEngine {
       .filter(::isLot)
       .groupBy { it.productId }
     val products = d.products.associateBy { it.id }
+    val uses = d.warehouseEntries.filter(::isLotUse).groupBy { it.productId }
     for ((productId, entries) in byProduct) {
       if (entries.none { it.expiryDate.isNotBlank() }) continue
       val product = products[productId] ?: continue
       var left = ShopStore.stock(d, productId)
       if (left <= 0) continue
       //  از دیرترین به زودترین؛ بی‌انقضا دیرتر از همه
-      val ordered = capacities(d, productId, entries).sortedWith(
+      val ordered = capacities(uses[productId].orEmpty(), entries).sortedWith(
         compareByDescending<Pair<WarehouseEntry, Double>> { it.first.expiryDate.isBlank() }.thenByDescending { it.first.expiryDate }
       )
       for ((e, cap) in ordered) {

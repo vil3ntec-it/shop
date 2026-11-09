@@ -20,9 +20,11 @@ const PICK = ['sales', 'returns', 'netSales', 'cogs', 'grossProfit', 'marginBp',
 const pick = (t) => Object.fromEntries(PICK.map((k) => [k, t[k]]));
 const salesOf = (ledger, extra) => core.sales(ledger, { from: V.range.from, to: V.range.to, ...extra }).totals;
 
-test('قالب و پوشش: دو قیمت، برگشتی، فروش پیش از خرید، شمارش، انتقال، تخفیف', () => {
+test('قالب و پوشش: دو قیمت، برگشتی، فروش پیش از خرید، شمارش، انتقال، تخفیف، ساختِ بسته', () => {
   assert.equal(V.format, 'cost-v1');
-  assert.deepEqual(V.cases.map((c) => c.id), ['A', 'B', 'C', 'D', 'D2', 'E', 'F']);
+  assert.deepEqual(V.cases.map((c) => c.id), ['A', 'B', 'C', 'D', 'D2', 'E', 'F', 'G']);
+  const G = V.cases.find((c) => c.id === 'G').ledger.warehouseEntries.filter((w) => w.adjKind === 'repack');
+  assert.ok(G.some((w) => w.units < 0) && G.some((w) => w.units > 0 && Number.isSafeInteger(w.costMinor)), 'مصرف و خروجیِ بهادارِ تولید');
   const F = V.cases.find((c) => c.id === 'F').ledger;
   assert.ok(F.saleItems.some((i) => Array.isArray(i.promo) && i.promo.length === 2), 'قلمِ دوتخفیفه');
   assert.ok(F.sales.some((s) => s.status === 'cancelled'), 'فاکتورِ باطل');
@@ -60,6 +62,26 @@ for (const c of V.cases) {
     assert.equal(rep.profitOf(c.ledger, w, V.zone, { netSales: sum.netSales + 1 }).approximate, true);
   });
 }
+
+/*
+ *  INV-21 با دست (موردِ G): شیرِ خشک ۳ × ۱۰٫۰۱ + ۴ × ۱۱٫۴۹ = ۷۵٫۹۹ و روبان ۷ × ۰٫۴۷ = ۳٫۲۹؛ ساختِ ۶ بسته (`Bom.build`، هر بسته
+ *  ۱ + ۱) ⇒ مصرف به میانگینِ همان لحظه: ۷۵۹۹ × ۶/۷ = ۶۵۱۳ و ۳۲۹ × ۶/۷ = ۲۸۲ ⇒ بهای دقیقِ ۶ بسته ۶۷۹۵ (`costMinor`؛ قیمتِ ردیف
+ *  ۱۱٫۳۳ = ۱۱۳۲٫۵ ِ گردشده). `StockLedger` همین ۶۷۹۵ را به سندِ `production` می‌دهد (`ReportCoreParityTest`).
+ */
+test('G با دست: خروجیِ ساختِ بسته به بهای دقیقِ اجزا؛ بی adjKind یا بی costMinor همان قاعدهٔ پیشین', () => {
+  const G = V.cases.find((c) => c.id === 'G').ledger;
+  const c = core.costs(core.ledger(G), 'mavg');
+  assert.equal(c.line.i1, 4530); // ۶۷۹۵ × ۴/۶ (مقدار × بها: ۶ × ۱۱۳۳ = ۶۷۹۸ ⇒ ۴۵۳۲)
+  assert.equal(c.line.i2, 1133); // ۲۲۶۵ / ۲ = ۱۱۳۲٫۵
+  assert.equal(c.line.i3, 1086); // جزءِ مانده: ۷۵۹۹ − ۶۵۱۳ — مصرف همان میانگین است
+  assert.deepEqual(core.stockCost(G, { products: ['b'] }).rows.map((r) => [r.qtyMilli, r.valueMinor, r.unitCostMinor]), [[1000, 1132, 1132]]);
+  //  همان ردیف‌ها بی `adjKind` (اصلاحِ عادی) یا بی `costMinor` (ساختِ پیش از سری‌ها) ⇒ مقدار × بهای ردیف، همان پیشین
+  const strip = (k) => ({ ...G, warehouseEntries: G.warehouseEntries.map((w) => { const x = { ...w }; delete x[k]; return x; }) });
+  for (const k of ['adjKind', 'costMinor']) {
+    assert.deepEqual(core.costs(core.ledger(strip(k)), 'mavg').line, { i1: 4532, i2: 1133, i3: 1086 }, k);
+    assert.equal(core.stockCost(strip(k), { products: ['b'] }).rows[0].valueMinor, 1133, k);
+  }
+});
 
 test('هستهٔ گزارش بی stock-core بار نمی‌شود (مرورگر: پیش از report-core)', () => {
   const fs = require('node:fs');

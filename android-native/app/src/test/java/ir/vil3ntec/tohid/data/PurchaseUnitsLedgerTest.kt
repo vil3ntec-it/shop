@@ -108,6 +108,35 @@ class PurchaseUnitsLedgerTest {
     assertEquals(140_008L, ReportCore.costs(ReportLedger.parse(Json.encodeToJsonElement(ShopData.serializer(), old).jsonObject), ReportCore.Costing.MAVG).line["i1"])
   }
 
+  @Test fun `بهای ورود عوض شد — ارزش با بهای تازه، نه costMinor ِ کهنه`() {
+    val d = buy(d0, "supB", PurchaseBook.Line("tea", 1.0, 1000.0, unitName = "کارتن ۲۴"))
+    val w = d.warehouseEntries.single()
+    fun value(x: ShopData) = StockLedger.productView(StockLedger.replay(x), "tea").valueMinor
+    fun cogs(x: ShopData): Long? {
+      val sold = x.copy(
+        sales = listOf(Sale(id = "s1", total = 1500.0, finalTotal = 1500.0, date = "2026-11-02", createdAt = 3)),
+        saleItems = listOf(SaleItem(id = "i1", saleId = "s1", productId = "tea", quantity = 24.0, unitPrice = 62.5, totalPrice = 1500.0)),
+      )
+      return ReportCore.costs(ReportLedger.parse(Json.encodeToJsonElement(ShopData.serializer(), sold).jsonObject), ReportCore.Costing.MAVG).line["i1"]
+    }
+    assertEquals(100_000L, value(d))
+    assertEquals(100_000L, cogs(d))
+    val draft = WarehouseEngine.EntryDraft(productId = "tea", units = w.units, unit = w.unit, price = w.price, date = w.date)
+    //  این نسخه: بها همان ⇒ ارزشِ دقیق می‌ماند؛ بهای تازه ⇒ برداشته (پیش‌تر می‌ماند و ارزش همان ۱۰۰۰ ِ کهنه بود)
+    assertEquals(100_000L, okW(WarehouseEngine.editEntry(d, w.id, draft.copy(notes = "یادداشت"), "2026-11-02")).warehouseEntries.single().costMinor)
+    val edited = okW(WarehouseEngine.editEntry(d, w.id, draft.copy(price = 50.0), "2026-11-02"))
+    assertNull(edited.warehouseEntries.single().costMinor)
+    assertEquals(120_000L, value(edited))
+    //  نسخهٔ پیش از دستهٔ ۳۱ `costMinor` را نمی‌شناسد: ویرایشش فقط `price` را می‌فرستد و سرور مقدارِ کهنه را نگه می‌دارد (A00)
+    val stale = d.copy(warehouseEntries = listOf(w.copy(price = 50.0)))
+    assertEquals(100_000L, stale.warehouseEntries.single().costMinor)
+    assertEquals(120_000L, value(stale))
+    assertEquals(120_000L, cogs(stale))
+    //  گردکردنِ بهای واحد (۲۴ × ۴۱٫۶۷ = ۱۰۰۰٫۰۸) هنوز «جور» است
+    assertEquals(100_000L, ReportLedger.exactValue(100_000L, 24_000, 4_167))
+    assertNull(ReportLedger.exactValue(100_000L, 24_000, 5_000))
+  }
+
   @Test fun `برگشت به تأمین‌کننده به واحدِ خرید — یک کارتنِ ۲۴ ⇒ ۲۴ دانه بیرون و سندِ کسرِ دقیقِ ۱۰۰۰`() {
     val b = buy(d0, "supB", PurchaseBook.Line("tea", 2.0, 1000.0, unitName = "کارتن ۲۴"))
     val r = ok(PurchaseBook.supplierReturn(b, "supB", "tea", 1.0, 1000.0, "خراب", "2026-11-02", "2026-11-02", 5, ::id, key = "ret1", unitName = "کارتن ۲۴"))

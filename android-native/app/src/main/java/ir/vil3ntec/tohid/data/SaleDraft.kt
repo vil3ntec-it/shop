@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.EncodeDefault
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
@@ -28,7 +30,8 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  شکلِ دفتر عوض نمی‌شود: شناسهٔ فروش همان ULID است که بود.
  *
  *  ── شکلِ فایل ────────────────────────────────────────────────────────
- *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…,"coupons":[…]}`. شکلِ قدیمی
+ *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…,"coupons":[…]}`؛ فیلدهای افزودنیِ تازه (`priceList`، و در ردیف
+ *  `seller`/`specialPrice`) فقط وقتی مقدار دارند نوشته می‌شوند ⇒ پیش‌نویسِ بی آن‌ها بایت‌به‌بایت همان پیشین. شکلِ قدیمی
  *  (آرایهٔ ردیف‌ها، همان `tohid-shop-draft-cart-v1`ِ وب و برنامهٔ قبلی) هم
  *  خوانده می‌شود و کلید ندارد.
  */
@@ -43,6 +46,14 @@ data class SaleDraft(
   val coupons: List<String> = emptyList(),
   /** یادداشتِ فاکتور (POS-11) — با پیش‌نویس و فاکتورِ نگه‌داشته برمی‌گردد؛ پیش‌نویسِ قدیمی ندارد */
   val note: String? = null,
+  /**
+   *  POS-18 — لیستِ قیمتی که صندوق‌دار برای همین فاکتور **دستی** برگزید (`PriceList.State.byHand`: `retail`/`wholesale`،
+   *  `CartPriceList`). بی آن فاکتورِ عمدهٔ دستی پس از بازگشت یا بازیابی دوباره به خرده قیمت می‌خورد. `null` (لیستِ مشتری یا
+   *  خرده، همان امروز) نوشته نمی‌شود.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceList: String? = null,
 ) {
   /** همان شکلِ ردیفِ پیش‌نویسِ قدیمی؛ فیلدهای تازه پیش‌فرض دارند */
   @Serializable
@@ -61,20 +72,42 @@ data class SaleDraft(
     @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
     @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
     val seller: String? = null,
+    /**
+     *  قیمتِ خاصِ مشتری که صندوق روی همین ردیف نشانده بود (POS-18، `CartLine.specialPrice`، افزودنی). بی آن رسیدِ فاکتورِ
+     *  برگشته یا بازیابی‌شده «قیمتِ خاص» نمی‌گفت (پول همان بود). `null` نوشته نمی‌شود.
+     */
+    @OptIn(ExperimentalSerializationApi::class)
+    @EncodeDefault(EncodeDefault.Mode.NEVER)
+    val specialPrice: Double? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, seller = it.seller) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map {
+    SalesEngine.CartLine(
+      productId = it.productId, quantity = it.quantity, unitPrice = it.unitPrice, label = it.label, lotId = it.lotId,
+      note = it.note, serials = it.serials, specialPrice = it.specialPrice, seller = it.seller,
+    )
+  }
 
   companion object {
-    fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null) = SaleDraft(
+    fun of(
+      key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null,
+      priceList: String? = null,
+    ) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, it.seller) },
+      lines = cart.map {
+        Line(
+          productId = it.productId, quantity = it.quantity, unitPrice = it.unitPrice, label = it.label, lotId = it.lotId,
+          note = it.note, serials = it.serials, seller = it.seller, specialPrice = it.specialPrice,
+        )
+      },
       debtorId = debtorId,
       savedAt = now,
       //  کد بی سبد معنا ندارد
       coupons = if (cart.isEmpty()) emptyList() else coupons,
       //  یادداشتِ فاکتور هم
       note = if (cart.isEmpty()) null else note,
+      //  و لیستِ دستی
+      priceList = if (cart.isEmpty()) null else priceList,
     )
   }
 }

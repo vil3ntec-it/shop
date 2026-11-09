@@ -28,6 +28,11 @@ const DEFAULT_MAX_DEVICES = 10;
 const DEVICE_WINDOW_MS = 90 * 24 * 60 * 60 * 1000;
 /** پرچمِ `live_config` (دکان / `all`، پیش‌فرض خاموش): دستگاهِ ثبت‌شده‌ای که بیرون از n ِ اول است هم رد شود */
 const STRICT_CAP_FLAG = 'shop.device_cap';
+/**
+ *  پرچمِ `live_config` (دکان / `all`، ⛔ پیش‌فرض خاموش — اثرِ پولی): مجوزِ ۳۵ روزه به‌جای ده روز تا دستگاهِ بی اینترنت
+ *  ۳۰ روز بفروشد (SYN-01، D-05)؛ هرگز دیرتر از پایانِ اشتراک و مهلتش — شرح سرِ `license.SHOP_OFFLINE_TTL_MS`
+ */
+const OFFLINE_FLAG = 'shop.license_offline_30d';
 
 /**
  *  جای این دستگاه در سقفِ دکان — SEC-CLI-01 (SEC-SUB-03/04).
@@ -201,6 +206,7 @@ router.post('/sync', async (req, res, next) => {
       ? Number(ent.trial.endsAt || 0)
       : Number(ent.subscription.endsAt || 0);
 
+    const longOffline = await require('../lib/orders').flagOf(req.shopId, OFFLINE_FLAG);
     const issued = await license.issue({
       deviceUid,
       accountId: String(req.user.id),
@@ -211,6 +217,7 @@ router.post('/sync', async (req, res, next) => {
       activeUntil: ent.source === 'trial' ? endsAt : Number(ent.subscription.graceEndsAt || endsAt),
       plan: ent.subscription.plan || (ent.source === 'trial' ? 'trial' : ''),
       planTitle: ent.source === 'trial' ? 'دوره‌ی آزمایشی' : (ent.subscription.plan || ''),
+      ttlMs: longOffline ? license.SHOP_OFFLINE_TTL_MS : license.TOKEN_TTL_MS,
       at,
     });
     if (!issued) {

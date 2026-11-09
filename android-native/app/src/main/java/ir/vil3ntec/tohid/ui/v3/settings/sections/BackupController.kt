@@ -15,13 +15,18 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.BuildConfig
+import ir.vil3ntec.tohid.core.backup.RecoveryPhraseFlow
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.AutoBackup
 import ir.vil3ntec.tohid.data.BackupBundle
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.BackupMirror
+import ir.vil3ntec.tohid.data.BackupRestore
+import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.data.SnapshotSeal
 import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.OwnerExport
 import ir.vil3ntec.tohid.data.ShopData
@@ -30,6 +35,7 @@ import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.auditId
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.data.repo.BackupRepository
+import ir.vil3ntec.tohid.print.ReportPrint
 import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.Platform
 import ir.vil3ntec.tohid.ui.v3.V3Toasts
@@ -78,6 +84,27 @@ internal class BackupController(
   var mirrorOn by mutableStateOf(BackupMirror.enabled(context))
     private set
 
+  //  OPS-02: «رمزِ نسخه‌های خودکار» (`SnapshotSeal`، پیش‌فرض خاموش) و برگهٔ «عبارتِ بازیابی» (`RecoveryPhraseFlow`)
+  var sealOn by mutableStateOf(SnapshotSeal.on(context))
+    private set
+  var sealKeyReady by mutableStateOf(sealOn && SnapshotSeal.keyReady(context))
+    private set
+  var phrase by mutableStateOf<RecoveryPhraseFlow?>(null)
+    private set
+  var phraseStep by mutableStateOf(RecoveryPhraseFlow.Step.INTRO)
+    private set
+  var phraseError by mutableStateOf<String?>(null)
+    private set
+  var making by mutableStateOf(false)
+    private set
+  var askSealOff by mutableStateOf(false)
+    private set
+  /** نسخهٔ رمزدار با عبارت که کلیدش این‌جا نیست — برگهٔ پرسیدنِ عبارت */
+  var unlock by mutableStateOf<AutoBackup.Snapshot?>(null)
+    private set
+  var unlockError by mutableStateOf<String?>(null)
+    private set
+
   private val storeName: String
     get() = context.getSharedPreferences("tohid", Context.MODE_PRIVATE).getString("store_name", "") ?: ""
 
@@ -86,11 +113,7 @@ internal class BackupController(
   /** پشتیبانِ کامل — دفتر و عکس‌ها در یک ZIP (بیرون از رشتهٔ اصلی) */
   fun writeFull(uri: Uri) = scope.launch {
     runCatching {
-      withContext(Dispatchers.IO) {
-        val ledger = store.exportBackup(storeName)
-        val out = context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable)
-        out.use { BackupBundle.write(context, it, ledger).getOrThrow() }
-      }
+      BackupRestore.writeFull(context, store, storeName) { context.contentResolver.openOutputStream(uri) ?: error(StrSettings.pathNotWritable) }
     }.onSuccess { photos ->
       BackupClock.mark(context)
       toasts.show(if (photos > 0) StrSettings.backupMadeWithPhotos(photos) else StrSettings.backupMade)
@@ -141,17 +164,26 @@ internal class BackupController(
     withContext(Dispatchers.IO) {
       runCatching {
         val input = context.contentResolver.openInputStream(uri) ?: error(StrSettings.fileNotOpened)
-        input.use { BackupBundle.read(context, it) { text -> store.parseBackup(text) }.getOrThrow() }
+        input.use { BackupRestore.open(context, store, it).getOrThrow() }
       }
     }.onSuccess { pendingRestore = it.data; restorePhotos = it.photos; restoreError = null }
       .onFailure { BackupBundle.dropStaging(context); restoreError = it.message ?: StrSettings.invalidBackup }
   }
 
-  fun readSnapshot(snap: AutoBackup.Snapshot) = scope.launch {
-    withContext(Dispatchers.IO) { runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() } }
-      .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
-      .onFailure { restoreError = StrSettings.snapshotUnreadable }
+  /** @param typed عبارتِ بازیابی برای نسخهٔ رمزداری که کلیدش این‌جا نیست ([unlock]) */
+  fun readSnapshot(snap: AutoBackup.Snapshot, typed: String? = null) = scope.launch {
+    withContext(Dispatchers.IO) { BackupRestore.openSnapshot(context, store, snap.file, typed) }
+      .onSuccess { unlock = null; unlockError = null; pendingRestore = it; restorePhotos = 0; restoreError = null }
+      .onFailure { e ->
+        when {
+          typed == null && BackupRestore.needsPhrase(e, snap.file) -> { unlock = snap; unlockError = null; restoreError = null }
+          typed != null -> unlockError = StrBackupSafety.wrongPhrase
+          else -> restoreError = StrSettings.snapshotUnreadable
+        }
+      }
   }
+
+  fun cancelUnlock() { unlock = null; unlockError = null }
 
   fun cancelRestore() {
     BackupBundle.dropStaging(context)
@@ -163,15 +195,14 @@ internal class BackupController(
     val next = pendingRestore ?: return
     pendingRestore = null
     scope.launch {
-      store.keepSafetyCopy()
-      //  اول عکس‌ها سرِ جایشان، بعد پرچمِ `photo` با واقعیتِ دیسک یکی می‌شود
-      val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
-      val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
-      //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد
-      if (!store.applyRestore(fixed)) { toasts.show(StrSettings.restoreDiskFail); return@launch }
+      //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد. OPS-02 (`BackupRestore.confirm`):
+      //  عکس‌ها و تنظیمات فقط پس از نشستنِ دفتر؛ ردشده («اول وارد شوید»، صفِ نرفته…) ⇒ پیامِ خودش، نه «روی حافظه نوشته نشد»
+      val r = BackupRestore.confirm(context, store, next)
+      if (!r.ok) { toasts.show(r.message.ifBlank { StrSettings.restoreDiskFail }); return@launch }
       canUndo = true
       restorePhotos = 0
-      toasts.show(if (moved > 0) StrSettings.restoredWithPhotos(moved) else StrSettings.restored)
+      val done = if (r.photos > 0) StrSettings.restoredWithPhotos(r.photos) else StrSettings.restored
+      toasts.show(if (r.message.isEmpty()) done else "$done\n${r.message}")
     }
   }
 
@@ -228,6 +259,61 @@ internal class BackupController(
     store.undoRestore()
       .onSuccess { canUndo = false; toasts.show(StrSettings.undone) }
       .onFailure { toasts.show(StrSettings.undoFailed) }
+  }
+
+  /* ---------- OPS-02: رمزِ نسخه‌های خودکار و «عبارتِ بازیابی» ---------- */
+
+  /** روشن ⇒ برگهٔ عبارت (فقط پس از تأیید روشن می‌شود)؛ خاموش ⇒ پرسیدن */
+  fun toggleSeal(on: Boolean) { if (on) startPhrase() else askSealOff = true }
+
+  fun sealOff() {
+    askSealOff = false
+    SnapshotSeal.setOn(context, false)
+    sealOn = false
+    sealKeyReady = false
+    toasts.show(StrBackupSafety.sealedOff)
+  }
+
+  fun dismissSealOff() { askSealOff = false }
+
+  fun startPhrase() { phrase = RecoveryPhraseFlow(); phraseError = null; syncPhrase() }
+  fun showPhrase() { phrase?.start(); syncPhrase() }
+  fun phraseWritten() { phrase?.written(); syncPhrase() }
+  fun phraseBack() { phrase?.back(); phraseError = null; syncPhrase() }
+  fun clearPhraseError() { phraseError = null }
+  fun cancelPhrase() { phrase?.cancel(); phrase = null; syncPhrase() }
+  private fun syncPhrase() { phraseStep = phrase?.step ?: RecoveryPhraseFlow.Step.INTRO }
+
+  /** چاپِ عبارت (فقط در گامِ نمایش) — همان چاپِ گزارش، A4 */
+  fun printPhrase() {
+    val rows = phrase?.printRows(storeName, StrBackupSafety.printDate(todayIso()), StrBackupSafety.printKeep, StrBackupSafety.printHow).orEmpty()
+    if (rows.isNotEmpty()) runCatching { ReportPrint.print(context, ReportCsv.Sheet("recovery-phrase", rows), StrBackupSafety.phraseTitle) }
+  }
+
+  /** تأییدِ نوشتنی ⇒ کلید (PBKDF2، بیرون از رشتهٔ صفحه) ⇒ روشن */
+  fun confirmPhrase(typed: String) {
+    val f = phrase ?: return
+    when (f.confirm(typed)) {
+      RecoveryPhraseFlow.Check.OK -> {
+        val canonical = f.takeConfirmed() ?: return
+        making = true
+        scope.launch {
+          val ok = withContext(Dispatchers.Default) {
+            runCatching { SnapshotSeal.adopt(context, canonical) }.isSuccess && SnapshotSeal.setOn(context, true)
+          }
+          making = false
+          phrase = null
+          syncPhrase()
+          sealOn = SnapshotSeal.on(context)
+          sealKeyReady = sealOn && SnapshotSeal.keyReady(context)
+          toasts.show(if (ok) StrBackupSafety.sealedOn else StrBackupSafety.keyFailed)
+        }
+      }
+      RecoveryPhraseFlow.Check.TYPO -> phraseError = StrBackupSafety.typo
+      RecoveryPhraseFlow.Check.MISMATCH -> phraseError = StrBackupSafety.mismatch
+      RecoveryPhraseFlow.Check.NOT_ASKED -> Unit
+    }
+    syncPhrase()
   }
 
   fun wipe() = scope.launch {

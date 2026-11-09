@@ -88,6 +88,10 @@ data class LayawayLine(
   val name: String = "",
   val qtyMilli: Long = 1000,
   val unitMinor: Long = 0,
+  /** یادداشتِ ردیفِ سبد (POS-11) — به قلمِ فاکتورِ تحویل (`SaleItem.note`)؛ `null` نوشته نمی‌شود ⇒ سندِ کهنه همان */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val note: String? = null,
+  /** قیمتِ خاصِ مشتری که فیِ همین ردیف بود (POS-18، `CartLine.specialPrice`، به پول) ⇒ نشانِ «قیمتِ خاص» ِ رسیدِ تحویل */
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val specialMinor: Long? = null,
 )
 
 /** یک قسطِ جدول: شماره از ۱، سررسید (`yyyy-MM-dd`) و مبلغ به پول */

@@ -100,8 +100,8 @@ object SetAside {
   }
 
   /** آیا هنوز opِ ردشدهٔ «بازی» روی این دستگاه هست */
-  fun openRejected(book: List<JsonObject>, d: ShopData): Boolean {
-    val done = settledOps(d)
+  fun openRejected(book: List<JsonObject>, d: ShopData, marked: Set<String> = emptySet()): Boolean {
+    val done = settledOps(d) + marked
     return book.any { o -> (o["op_id"] as? JsonPrimitive)?.content?.let { it !in done } == true }
   }
 }
