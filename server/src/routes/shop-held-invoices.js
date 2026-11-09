@@ -7,6 +7,9 @@
  *   PUT    /:id                   `{version, body, device_id?}` ⇒ `{enabled, applied, item}` (کهنه ⇒ ۴۰۹ `held_stale`)
  *   DELETE /:id?version=&reason=  `resumed|sold|deleted` ⇒ `{enabled, deleted, version}`؛ دور انداختنِ نگه‌داشتهٔ کسِ
  *                                 دیگر `sales.cancel` (۴۰۳ `held_not_yours`)
+ *          &device_id=&base=     «در دستِ دستگاهِ X»: `claim=1` پیش از بازگرداندن ⇒ `{…, claim}` یا ۴۰۹ `held_claimed`
+ *          &claim=1&force=1      (`force=1` = گرفتن با تأییدِ صریح، سابقهٔ `held.takeover`)؛ در صف بی `claim` ⇒ ۴۰۹
+ *                                 `held_conflict`. شرح: `lib/shop-held-sync.js`
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.held_sync` ⇒ `GET` فقط `{enabled:false}` و `PUT`/`DELETE` ۴۰۳ `held_sync_disabled`.
  * ⛔ shop_id فقط از عضویتِ توکن. سقف: سطلِ IP پیش از احراز، سپس سطلِ هر کاربر. فقط برنامهٔ دکان، نه sync-v1.
@@ -55,7 +58,14 @@ router.delete('/:id', needFlag, async (req, res) => {
   const q = (k) => (typeof req.query[k] === 'string' ? req.query[k] : undefined);
   const canCancel = await perms.memberAllows(req, 'sales.cancel');
   const out = await held.remove(req.shopId, { userId: req.user.id, deviceId: q('device_id') }, req.params.id,
-    { version: q('version'), reason: q('reason') }, canCancel);
+    { version: q('version'), reason: q('reason'), base: q('base'), claim: q('claim'), force: q('force') }, canCancel);
+  if (out.claim && out.claim.takeover) {
+    const t = out.claim.takeover;
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'held.takeover', targetType: 'held_invoice', targetId: req.params.id,
+      detail: { from_series: t.series, from_reason: t.reason, fresh: t.fresh, version: out.version }, ip: clientIp(req),
+    });
+  }
   if (out.deleted) {
     if (q('reason') === 'deleted') {
       await audit.log({
@@ -65,7 +75,7 @@ router.delete('/:id', needFlag, async (req, res) => {
     }
     relay(req, out.rev);
   }
-  res.json({ enabled: true, deleted: out.deleted, version: out.version });
+  res.json({ enabled: true, deleted: out.deleted, version: out.version, ...(out.claim ? { claim: out.claim } : {}) });
 });
 
 module.exports = router;
