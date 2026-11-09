@@ -7,6 +7,7 @@
  *   • WEB-13: «دیده‌شده‌های اخیر» (پرچمِ `shop.storefront.recent`) پس از دیدنِ کالا و بارِ دوباره، فقط روی همین دستگاه؛
  *   • WEB-20: دکمهٔ «فرستادنِ نشانیِ کالا» (پرچمِ `shop.storefront.seo`) نشانیِ `/p/…` را کپی می‌کند؛
  *   • WEB-11: ♥ روی کارت و برگهٔ کالا، «دلخواه‌ها» و «فهرستِ خرید» (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ)؛
+ *     با نشستِ حساب ♥ با حساب هم‌گام است (دو دستگاه، بی اینترنت در صف، بی نشست فقط محلی)؛
  *   • WEB-24: بنرهای همین لحظه (پرچمِ `shop.storefront.banners`)، پیوندِ کالا و دسته؛
  *   • WEB-04: «تحویلِ تقریبی: … تا … دقیقه» در برگهٔ ثبت (ارسال و دریافت) و پیگیری (پرچمِ `shop.storefront.eta`؛ خاموش ⇒ هیچ)؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
@@ -154,6 +155,61 @@ ok(!/price|name/i.test(listed), 'فهرست فقط شناسه و مقدار را
 await page.click('#list-add');
 await page.waitForFunction(() => location.hash === '#/cart', null, { timeout: 5000 });
 ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store-cart:${slug}`)), '«همه به سبد» ⇒ همان اقلام با قیمتِ امروز در سبد');
+
+//  WEB-11: ♥ با حسابِ مشتری (نشستِ `store-session`): ادغامِ نخستین بار، دستگاهِ دوم همان را می‌بیند، حذف در یکی ⇒ دیگری،
+//  بی اینترنت در صف تا برگشتِ شبکه، و بی نشست فقط محلی
+{
+  const phone = '0791114888';
+  const sessionOf = async () => {
+    const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
+    const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+    const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
+    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+  };
+  const S1 = await sessionOf();
+  const favsOf = async (S) => ((await call('GET', `/api/store/${slug}/account/favorites`, null, null, { 'X-Store-Session': S.token })).body.items || []).map((p) => p.id);
+  const until = async (S, want, what) => {
+    let got = [];
+    for (let i = 0; i < 50; i++) { got = await favsOf(S); if (JSON.stringify(got) === JSON.stringify(want)) break; await new Promise((r) => setTimeout(r, 100)); }
+    ok(JSON.stringify(got) === JSON.stringify(want), what, JSON.stringify(got));
+  };
+  ok(JSON.stringify(await favsOf(S1)) === '[]', 'حسابِ تازه: هیچ ♥ ِ سروری');
+  await page.evaluate((v) => localStorage.setItem('store-session', JSON.stringify(v)), S1);
+  await open();
+  await until(S1, ['oil', 'rice'], 'WEB-11 هم‌گامی: نخستین بارِ نشست ⇒ ♥ ِ این دستگاه به حساب رفت، با همان ترتیب (تازه‌ترین اول)');
+
+  const ctx2 = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const p2 = await ctx2.newPage();
+  p2.on('pageerror', (e) => errors.push(String(e)));
+  await p2.goto(`${base}/store/${slug}`);
+  await p2.evaluate((v) => localStorage.setItem('store-session', JSON.stringify(v)), await sessionOf());
+  await p2.goto(`${base}/store/${slug}`);
+  await p2.waitForSelector('#favs:not([hidden]) #favs-list li[data-id="rice"]', { timeout: 10000 });
+  ok(await p2.locator('#favs-list li').count() === 2 && await p2.getAttribute('#products li[data-id="rice"] .fav', 'aria-pressed') === 'true',
+    'دستگاهِ دوم (همان شماره، دستگاهِ خالی): همان دو ♥ از حساب');
+  await p2.click('#products li[data-id="rice"] .fav');
+  await until(S1, ['oil'], 'برداشتنِ ♥ در دستگاهِ دوم ⇒ از حساب هم رفت');
+  await ctx2.close();
+
+  await open();
+  await page.waitForFunction(() => document.querySelector('#products li[data-id="rice"] .fav')?.getAttribute('aria-pressed') === 'false', null, { timeout: 10000 });
+  ok(await page.locator('#favs-list li').count() === 1, 'دستگاهِ نخست پس از بارِ دوباره: حساب حرفِ آخر را می‌زند (فقط روغن)');
+
+  await ctx.setOffline(true);
+  await page.click('#products li[data-id="rice"] .fav');
+  const queued = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}').ops, `store-favsync:${slug}`);
+  ok(JSON.stringify(queued) === '[["rice",1]]', 'بی اینترنت ⇒ ♥ در صفِ همین دستگاه', JSON.stringify(queued));
+  ok(JSON.stringify(await favsOf(S1)) === '["oil"]', '…و هنوز به حساب نرفته');
+  await ctx.setOffline(false);
+  await until(S1, ['rice', 'oil'], 'برگشتِ شبکه ⇒ صف رفت');
+
+  await page.evaluate(() => localStorage.removeItem('store-session'));
+  await open();
+  await page.click('#products li[data-id="oil"] .fav');
+  await page.waitForFunction(() => document.querySelector('#products li[data-id="oil"] .fav')?.getAttribute('aria-pressed') === 'false', null, { timeout: 5000 });
+  await new Promise((r) => setTimeout(r, 500));
+  ok(JSON.stringify(await favsOf(S1)) === '["rice","oil"]', 'بی نشست ⇒ ♥ فقط روی همین دستگاه؛ حساب دست نمی‌خورد');
+}
 
 //  WEB-24: بنرها — خاموش ⇒ هیچ؛ روشن ⇒ فقط بنرِ اکنون و همه‌جا (بی ناحیهٔ دانسته)، پیوندِ کالا و دسته
 ok(await page.isHidden('#banners'), 'WEB-24 خاموش: بی بنر');
