@@ -193,7 +193,7 @@ object LedgerDiff {
     jsNumbers(json.encodeToJsonElement(ShopData.serializer(), data)) as JsonObject
 
   /** عددِ `Double` ⇒ متنِ جاوااسکریپت: صحیح بی اعشار، نمایی به شکلِ JS (`JsNumber`). */
-  private fun jsNumbers(e: JsonElement): JsonElement = when (e) {
+  internal fun jsNumbers(e: JsonElement): JsonElement = when (e) {
     is JsonArray -> JsonArray(e.map { jsNumbers(it) })
     is JsonObject -> JsonObject(e.mapValues { (_, v) -> jsNumbers(v) })
     is JsonPrimitive -> JsNumber.of(e)

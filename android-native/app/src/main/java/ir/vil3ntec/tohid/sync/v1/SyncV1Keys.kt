@@ -120,6 +120,7 @@ object SyncV1Keys {
     listOf(
       "oplog-$a.json" to "oplog-$b.json",
       "oplog-$a-dropped.json" to "oplog-$b-dropped.json",
+      "oplog-$a-resend.json" to "oplog-$b-resend.json",  // دفترچهٔ `DroppedResend` همراهِ همان دفترِ ردشده
       "sync-journal-$a.json" to "sync-journal-$b.json",
       ir.vil3ntec.tohid.core.sync.ReplayBook.fileName("sync-replay-$a") to
         ir.vil3ntec.tohid.core.sync.ReplayBook.fileName("sync-replay-$b"),

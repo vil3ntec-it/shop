@@ -356,6 +356,10 @@
   (برنامه) و `server/test/sync-ledger-coverage.test.js` (push/Pull/Snapshot ِ v1 و v3، بایت‌به‌بایت).
 - ⛔ عددِ روی خط فقط شکلِ جاوااسکریپت (`sync/v1/JsNumber.kt`): `Double` ِ نماییِ جاوا (`4.0E-4`) ⇒ سرور `hash_mismatch`
   می‌دهد و ردیف هرگز نمی‌رسد. هر درِ تازه‌ای که op یا دلتا می‌سازد عدد را از `JsNumber.of` بگذراند، نه `JsonPrimitive(Double)`.
+- ⛔ بازفرستِ دفترِ ردشده فقط برای `hash_mismatch` ِ عددی (`sync/v1/DroppedResend.kt`، DATA-SAFETY §۷ بندِ ۳): همان
+  `op_id`/`ts`، جلوی صف، پس از Pull و با Snapshot؛ ردیفِ دفترِ ردشده فقط پس از پذیرشِ سرور پاک می‌شود و هر op یک بار در
+  `oplog-*-resend.json` تصمیم می‌گیرد. op ِ ردشده با هر دلیلِ دیگر هرگز خودکار دوباره نمی‌رود. سنجه: `DroppedResendTest`،
+  `DroppedResendDesktopTest`، `server/test/sync-resend-dropped.test.js` (بردارِ `resend-dropped-v1.json`).
 
 ### v3 · دفترِ محلی و مهاجرتِ داده
 

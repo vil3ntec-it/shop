@@ -111,8 +111,9 @@ class SyncV1Client(
    *  از ردیف‌های تنهای دستگاه (نه در Snapshot) کدام روی سرور حذف‌شده است — پیش از ساختنِ
    *  دوبارهٔ دفتر پس از بازیابی (§۹.۵، `V1Restore.rebuild`). دسته‌های ۵۰۰تایی.
    *  ۴۰۴ (سرورِ بی این مسیر) ⇒ هیچ — ردیف می‌ماند و «درج» می‌رود (نگه داشتن بهتر از گم کردن).
+   *  [strict] ⇒ ۴۰۴ هم پرتاب می‌شود: `DroppedResend` با «نامعلوم» ردیفِ حذف‌شده را زنده نمی‌کند.
    */
-  suspend fun deleted(rows: List<RestoreMerge.Row>): Set<RestoreMerge.Row> {
+  suspend fun deleted(rows: List<RestoreMerge.Row>, strict: Boolean = false): Set<RestoreMerge.Row> {
     val out = HashSet<RestoreMerge.Row>()
     for (chunk in rows.distinct().chunked(DELETED_CHUNK)) {
       val body = buildJsonObject {
@@ -121,7 +122,7 @@ class SyncV1Client(
       val res = try {
         api.post(ApiEndpoints.SyncV1.DELETED, body)
       } catch (failure: ApiFailure) {
-        if (failure.status == 404) return out
+        if (failure.status == 404 && !strict) return out
         throw failure
       }
       for (e in (res["deleted"] as? JsonArray).orEmpty()) {
