@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
+  (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای
+  جای‌گزینیِ کل که کارِ دستگاهِ دیگر را گم می‌کرد؛ تغییرِ میانهٔ ادغام/نوشتن هم می‌ماند؛ بی اینترنت/۵xx/۴۲۹ ⇒ درنگِ ۲ تا ۱۲۰ ثانیه
+  (`Retry-After`)؛ ۴۰۱ ِ بی `session_required` (پرچمِ خاموش) ⇒ فقط سبد خاموش، بی خروج؛ قیمت/موجودی/سقف از سرور با شمارِ پیام (`cartFresh`)؛
+  خروج/۴۰۱/نشستِ سرآمده ⇒ سبدِ حساب از گوشی پاک. (۲) اندروید (`ModelAccount.kt`): سکوتِ ۸۰۰ms پیش از نوشتن و بیدار شدن پس از درنگ
+  (`CustomerModel.later`)، پیامِ قیمت/«دیگر نیست» فقط روی سبد/ثبت. (۳) بردارِ مشترکِ `core/test-vectors/account-cart-v1.json` (`storefront-cart.test.js`
+  ۷/۷ روی PGlite و PostgreSQL ِ محلی، سه جهش ⇒ سرخ) و `CartServer` ِ آزمونِ Kotlin که `ShopperCartVectorsTest` با همان بردار نگه می‌دارد.
+- نیمه‌کاره: Kotlin این‌جا ساخته نمی‌شود ⇒ `ShopperCartSyncTest`، `ShopperCartVectorsTest`، `ShopperAccountTest` (یک بندِ عمداً عوض‌شده: ۴۰۹ دیگر
+  روغنِ دستگاهِ دیگر را پاک نمی‌کند) و `CustomerAccountTest` فقط در CI. وب (`acct.js`) هنوز «دستگاه برنده» است (سیزنِ دیگر روی ویترین کار دارد).
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin ⇒ بازنگریِ متنِ CHK-03؛ هم‌قاعده کردنِ ۴۰۹ ِ `acct.js` با همان `rebase` و بردار؛ D-09 برای ورود در تولید.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
   بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
