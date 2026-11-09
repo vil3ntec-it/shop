@@ -391,6 +391,11 @@ object StrLedger {
   val refundModeBad: String get() = t("روشِ بازپرداخت درست نیست", "The refund method isn't valid", "د بېرته ورکړې لاره سمه نه ده")
   val returnNeedsApproval: String get() = t("این برگشت تأیید لازم دارد", "This return needs approval", "دا بېرته ورکړه تایید غواړي")
   val refundNotCounted: String get() = t("بازپرداخت حساب نشد", "The refund couldn't be worked out", "بېرته ورکړه حساب نه شوه")
+  val refundAwaitsPayment: String get() = t(
+    "بخشی از پولِ این فاکتور هنوز «در انتظار» است؛ اول «پول رسید» را بزنید",
+    "Part of this invoice's payment is still pending; tap \"Money received\" first",
+    "د دې بل یوه برخه پیسې لا «په تمه» دي؛ لومړی «پیسې ورسېدې» ووهئ",
+  )
   val exchangeNotSaved: String get() = t("فروشِ تعویض ثبت نشد", "The exchange sale wasn't recorded", "د بدلون پلور ثبت نه شو")
   val returnBad: String get() = t("درخواستِ برگشت درست نیست", "The return request isn't valid", "د بېرته ورکړې غوښتنه سمه نه ده")
   val foreignReceipt: String get() = t("این رسیدِ دکانِ دیگری است", "This is another shop's receipt", "دا د بل دوکان رسید دی")

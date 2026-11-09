@@ -169,6 +169,27 @@ object PayStatus {
     }
   }
 
+  /**
+   *  PAY-23 — وضعیتی که `Pay.refund` برای هر ردیف می‌بیند: پولِ رسیده «تأییدشده» (نیمه‌پس‌داده هم؛ باقی‌اش از
+   *  `refunded` ِ ردیف) و هر چیزِ دیگر همان‌طور که هست، پس پس‌ندادنی. «رسیده» همان [unreceived] ِ X/Z است: امانتِ
+   *  پیک (`custody`) پولِ دکان است؛ «در انتظار» ِ واقعی تا «پول رسید»، و «ناموفق»/«لغو»/«نیازمند بررسی» نه.
+   *  [online] = فاکتورِ سفارشِ اینترنتی: بیرون از وضعیتِ دستی است و درگاه/سرور مرجع (ORD-15) ⇒ «در انتظار» همان امروز گرفته‌شده.
+   */
+  fun forRefund(rows: List<Row>, statuses: List<String>, online: Boolean = false): List<String> = rows.mapIndexed { i, r ->
+    val st = statuses[i]
+    if (st == CONFIRMED || st == PARTIAL || (st == PENDING && (online || r.custody != null))) CONFIRMED else st
+  }
+
+  /**
+   *  PAY-23 — جای ماندهٔ بازپرداختِ فاکتور وقتی ردیفی نرسیده: پولِ رسیده (ردیفِ «تأییدشده» پس از [forRefund]) منهای همهٔ
+   *  برگشت‌های پیشینِ همان فاکتور ([priorMinor]، به پول). ردیفِ نقد پس‌داده‌اش را جدا نمی‌شمارد و تا امروز سقفِ فاکتور بس
+   *  بود چون همه رسیده بود؛ با ردیفِ نارسیده نقدِ دخل از نقدِ رسیده بیشتر بیرون می‌رفت. همه رسیده ⇒ null (سقفِ امروز).
+   */
+  fun refundRoom(rows: List<PaidRow>, priorMinor: Long): Long? {
+    if (rows.all { it.status == CONFIRMED }) return null
+    return maxOf(0L, rows.filter { it.status == CONFIRMED }.fold(0L) { a, r -> addExact(a, r.amount) } - priorMinor)
+  }
+
   /** مبلغِ نارسیدهٔ هر روش — ردیفِ دارای مبلغ، بی امانت، با وضعیتِ بیرون از [RECEIVED] */
   fun unreceived(rows: List<Row>, statuses: List<String>): Map<String, Long> {
     val out = LinkedHashMap<String, Long>()
