@@ -223,8 +223,9 @@ if (axeSrc) {
     await ap.waitForSelector('#products li[data-id]', { state: 'attached', timeout: 15000 });
     await ap.waitForTimeout(400);
     await ap.addScriptTag({ content: axeSrc });
+    //  scrollable-region-focusable (WCAG 2.1.1): ردیفِ «ارسال/دریافت/نقد» در گوشی یک خطِ پیمایش‌پذیر است (`web-store-allflags.mjs`)
     const out = await ap.evaluate(async () => (await window.axe.run(document,
-      { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations
+      { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name', 'scrollable-region-focusable'] })).violations
       .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
     out.forEach((x) => v.push(`${hash} ${x}`));
   }
