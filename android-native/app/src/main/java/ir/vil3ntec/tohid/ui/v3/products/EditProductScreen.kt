@@ -93,6 +93,8 @@ internal fun EditProductScreen(
   //  PRD-07: «واحدهای خرید» فقط با `ShopPolicy.productTools` (پیش‌فرض خاموش ⇒ همان فرمِ پیشین و `purchaseUnits = null`)
   val toolsOn = remember { ir.vil3ntec.tohid.data.ShopPolicy.productTools(context) }
   val canEditUnits = remember { ir.vil3ntec.tohid.data.ShopRole.canWrite(context, "products") }
+  //  PRD-12: قیمتِ عمده فقط با «لیستِ قیمت در صندوق» (پیش‌فرض خاموش ⇒ همان فرم و `wholesalePrice = null`)
+  val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
   val unitsInitial = remember(productId) { ir.vil3ntec.tohid.ui.screens.purchaseUnitDrafts(product) }
   var units by remember(productId) { mutableStateOf(unitsInitial) }
 
@@ -115,7 +117,7 @@ internal fun EditProductScreen(
     }
     val now = System.currentTimeMillis()
     val base = store.data.value
-    val draft = ProductFormModel.draftEdit(row).copy(purchaseUnits = if (toolsOn && canEditUnits) units else null)
+    val draft = ProductFormModel.draftEdit(row).let { d0 -> d0.copy(purchaseUnits = if (toolsOn && canEditUnits) units else null, wholesalePrice = d0.wholesalePrice.takeIf { wholesaleOn }) }
     when (val r = WarehouseEngine.editProduct(base, productId, draft, todayIso(), now, ::newId)) {
       is WarehouseEngine.Result.Failed -> { banner = r.message; shake++ }
       is WarehouseEngine.Result.Ok -> {
@@ -146,7 +148,7 @@ internal fun EditProductScreen(
       }
       val visible = touched.visible(0, errors)
       Column(Modifier.v3Shake(shake.takeIf { it > 0 }).v3Stagger(stagger, "fields", 0)) {
-        ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT, suggest = suggest)
+        ProductFieldGroups(row, visible, data.productCategories, data.productUnits, hooks, PageSection, Mode.EDIT, suggest = suggest, wholesale = wholesaleOn)
       }
       Column(Modifier.fillMaxWidth().padding(top = 8.dp).v3Stagger(stagger, "more", 1)) {
         CollapsibleHeader(StrProducts.groupMore, more) { more = !more }

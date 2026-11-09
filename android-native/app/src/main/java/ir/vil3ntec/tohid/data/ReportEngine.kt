@@ -234,8 +234,11 @@ object ReportEngine {
     val avg = if (StockLedger.isOn(d)) StockLedger.replay(d, products.map { it.id }) else null
     val valuation = StockAnalysis.valuation(
       products.map {
-        val cost = avg?.let { v -> StockLedger.productView(v, it.id).unitCostMinor } ?: minorOf(it.purchasePrice)
-        StockAnalysis.ValueLine(it.id, if (it.kit.isNullOrEmpty()) milliOf(stock.stock(it.id)) else 0L, cost, minorOf(it.salePrice))
+        val pv = avg?.let { v -> StockLedger.productView(v, it.id) }
+        val onHand = if (it.kit.isNullOrEmpty()) milliOf(stock.stock(it.id)) else 0L
+        //  ارزش = خودِ جمعِ دفترِ میانگینِ موزون (نه مقدار × بهای گردشدهٔ واحد)، وقتی مقدارِ دفتر همان موجودیِ دست است
+        val exact = pv?.takeIf { p -> p.unitCostMinor != null && p.qtyMilli == onHand }?.valueMinor
+        StockAnalysis.ValueLine(it.id, onHand, pv?.unitCostMinor ?: minorOf(it.purchasePrice), minorOf(it.salePrice), exact)
       },
     )
     val rows = abc.rows.mapNotNull { r ->
