@@ -32,7 +32,8 @@ class JsNumberJdkTest {
   @Test fun `کوتاه‌ترین رقم‌ها همان مقدار را برمی‌گردانند و روی جاوا ۱۹ به بعد همان toString اند`() {
     val r = Random(20261109)
     //  از جاوا ۱۹ `Double.toString` خودش کوتاه‌ترین است (JDK-4511638) ⇒ داورِ مستقل
-    val modern = Runtime.version().feature() >= 19
+    //  `Runtime.version()` در android.jar نیست ⇒ همان ویژگیِ سیستم (۱٫۸ ⇒ ۸، ۱۷ ⇒ ۱۷)
+    val modern = (System.getProperty("java.specification.version").orEmpty().removePrefix("1.").toIntOrNull() ?: 0) >= 19
     var checked = 0
     repeat(20_000) {
       val d = when (it % 4) {
