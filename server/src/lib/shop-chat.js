@@ -32,7 +32,7 @@ const { stable } = require('./idempotency');
 const { can } = require('./permissions');
 const chatMedia = require('./chat-media');
 const mediaStore = require('./media-store');   //  بایتِ رسانه در `data` یا انبار (مهاجرتِ ۲۷۵)
-const { notify, listen, waiting } = require('./chat-wait');
+const { notify, listen, waiting, peerAhead } = require('./chat-wait');
 const acct = require('./shop-chat-account');
 const { ApiError, badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 
@@ -507,7 +507,7 @@ async function messageRow(messageId, viewer) {
  * نبود، تا رسیدنِ پیام/رسید یا پایانِ مهلت صبر کن. `signal` (قطعِ اتصال) ⇒ صبر
  * همان دم آزاد و پاسخ `null` (کسی برای شنیدن نیست).
  */
-async function changes(viewer, id, { after, limit, wait, signal = null } = {}) {
+async function changes(viewer, id, { after, limit, wait, signal = null, known = null } = {}) {
   const a = intIn(after, { min: 0, def: 0 });
   const lim = intIn(limit, { min: 1, max: MAX_PAGE, def: 100 });
   const w = Math.min(MAX_WAIT_MS, intIn(wait, { min: 0, max: 60_000, def: 0 }));
@@ -523,7 +523,7 @@ async function changes(viewer, id, { after, limit, wait, signal = null } = {}) {
   let rows;
   try {
     rows = await fetch();
-    if (ear && !rows.length) {
+    if (ear && !rows.length && !(await peerAhead(peerOf(viewer.side), conv.id, known))) {   //  CHAT-04: رسیدِ میانِ دو پرسش (`chat-wait`)
       await ear.promise;
       if (signal && signal.aborted) return null;
       rows = await fetch();

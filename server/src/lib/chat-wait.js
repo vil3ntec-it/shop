@@ -78,4 +78,23 @@ function goneSignal(res) {
   return ctl.signal;
 }
 
-module.exports = { notify, listen, waiting, goneSignal };
+/**
+ * CHAT-04: رسیدِ طرفِ دیگر که **میانِ دو long-poll** نشست هیچ منتظری را بیدار نکرد، و پرسشِ بعدی جز پیامِ تازه چیزی
+ * نمی‌دید ⇒ «رسید/خوانده شد» تا پایانِ مهلت (۲۵ ثانیه) دیر می‌رسید. کلاینت رسیدهای دانسته‌اش را می‌فرستد (`pd`/`pr`)؛
+ * این‌جا **پس از** `listen` خوانده می‌شود (رسیدِ پس از این خواندن بیدارباش دارد) و جلوتر بودنش یعنی بی صبر برگرد.
+ * بی `pd`/`pr` (برنامه‌های پیشین) ⇒ `null` و همان رفتار. عددِ ناجور ⇒ همان «نمی‌دانم».
+ */
+const PEERS = new Set(['shop', 'customer']);
+function knownOf(q) {
+  if (!q || (q.pd === undefined && q.pr === undefined)) return null;
+  const [d, r] = [q.pd, q.pr].map((x) => (x === undefined ? 0 : Number(x)));
+  return Number.isSafeInteger(d) && Number.isSafeInteger(r) && d >= 0 && r >= 0 ? { d, r } : null;
+}
+/** `peer` = ستونِ طرفِ دیگر (`peerOf(viewer.side)` ِ `shop-chat.js`)؛ جز این دو هیچ */
+async function peerAhead(peer, convId, known) {
+  if (!known || !PEERS.has(peer)) return false;
+  const r = await require('../db').one(`SELECT ${peer}_delivered_seq AS d, ${peer}_read_seq AS r FROM shop_chat_conversations WHERE id=$1`, [convId]);
+  return Boolean(r) && (Number(r.d) > known.d || Number(r.r) > known.r);
+}
+
+module.exports = { notify, listen, waiting, goneSignal, knownOf, peerAhead };
