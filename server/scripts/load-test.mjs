@@ -686,13 +686,15 @@ for (const defs of groups.values()) {
     //  درستی زیرِ بار: صف‌ها خالی، هر دستگاه تا سرِ دفتر، سپس `load-check.js` روی همان پایگاه (درونِ سرورِ آزمون)
     const td = performance.now();
     const drained = await kit.drain({ par: SETUP_PAR * 2 });
-    const file = LEDGER_OUT || path.join(os.tmpdir(), `load-ledger-${process.pid}.json`);
+    //  پوشهٔ موقتِ یکتا (mkdtemp) و ساختنِ انحصاری با ۰۶۰۰: نامِ پیش‌بینی‌پذیر در tmp راهِ symlink است (CodeQL ۲۹۳)
+    const tmpDir = LEDGER_OUT ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'load-ledger-'));
+    const file = LEDGER_OUT || path.join(tmpDir, 'ledger.json');
     //  کدهای پاسخِ همهٔ نمایه‌ها (فقط ۵۰۳ ِ `db_busy` ِ کنترل‌شده پذیرفته است)
     const http = {};
     for (const o of result.profiles) for (const [label, e] of Object.entries(o.endpoints)) for (const [c, n] of Object.entries(e.codes)) (http[label] ||= {})[c] = (http[label][c] || 0) + n;
-    fs.writeFileSync(file, JSON.stringify({ ...kit.ledger(), http, checkouts: state.checkouts, drained }));
+    fs.writeFileSync(file, JSON.stringify({ ...kit.ledger(), http, checkouts: state.checkouts, drained }), tmpDir ? { flag: 'wx', mode: 0o600 } : undefined);
     const res = await srv.ask({ type: 'check', ledger: file });
-    if (!LEDGER_OUT) fs.rmSync(file, { force: true });
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
     const check = { drain: { ...drained, ms: Math.round(performance.now() - td) }, ...(res.check || { ok: false, error: res.error || 'بی پاسخ' }) };
     result.check = check;
     console.log(`\n── درستی پس از بار (پایان‌دادنِ صف‌ها: ${drained.pushes} push، ${drained.pulls} pull، ${drained.left} مانده، ${check.drain.ms}ms)`);
