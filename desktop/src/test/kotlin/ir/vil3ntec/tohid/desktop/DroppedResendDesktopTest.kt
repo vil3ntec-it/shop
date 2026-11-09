@@ -41,7 +41,7 @@ class DroppedResendDesktopTest {
   }
 
   private var asked = 0
-  private val io = DroppedResend.Io({ asked++; snapshot }, { emptySet<RestoreMerge.Row>() }) { emptyMap() }
+  private val io = DroppedResend.Io({ asked++; snapshot }, { emptySet<RestoreMerge.Row>() }, { emptyMap() })
 
   private fun opIdsOf(list: List<JsonObject>) = list.map { it.getValue("op").jsonObject.getValue("op_id").jsonPrimitive.content }
   private fun state(q: OpQueue) = q.resendRecord().associate { it.getValue("op_id").jsonPrimitive.content to it.getValue("state").jsonPrimitive.content }
@@ -97,6 +97,22 @@ class DroppedResendDesktopTest {
     assertEquals(resend.map { it.toString() }, reopened.all().map { it.toJson().toString() })
     assertEquals("هیچ تصمیمِ دوباره‌ای (یک ردیف برای هر op)", resend.size + skippedCount(), reopened.resendRecord().size)
     assertEquals("یک Snapshot", 1, asked)
+  }
+
+  @Test fun `نشانِ صندوق روی دیسک (SetAsideMarks) ⇒ همان سند نمی‌رود، بقیه می‌روند`() = runBlocking {
+    val key = "resend-${System.nanoTime()}"
+    val q = seeded(key)
+    val id = "01JRSND00000000000000R0002"
+    //  صاحب همان فاکتور را در «سندهای ردشده» اصلاح کرد؛ دفتر آن کلید را از دست داد، نشانِ کنارِ صف ماند
+    q.settledMarks().add("cf-1", listOf(id))
+    val marked = DroppedResend.Io({ asked++; snapshot }, { emptySet<RestoreMerge.Row>() }, { emptyMap() }) {
+      DroppedResend.settled(ir.vil3ntec.tohid.data.ShopData(), OpQueue(DesktopContext, key).settledMarks())
+    }
+    val ids = resend.map { it.getValue("op_id").jsonPrimitive.content }
+    assertEquals(ids.size - 1, DroppedResend.run(q, marked, { ledger }, 1_762_700_000_000))
+    assertEquals(ids - id, q.all().map { it.opId })
+    val rec = q.resendRecord().single { it.getValue("op_id").jsonPrimitive.content == id }
+    assertEquals(DroppedResend.SKIPPED to "set_aside", rec.getValue("state").jsonPrimitive.content to rec.getValue("why").jsonPrimitive.content)
   }
 
   private fun skippedCount(): Int = DroppedResend.candidates(book, emptySet()).size - resend.size

@@ -368,7 +368,9 @@
   می‌دهد و ردیف هرگز نمی‌رسد. هر درِ تازه‌ای که op یا دلتا می‌سازد عدد را از `JsNumber.of` بگذراند، نه `JsonPrimitive(Double)`.
 - ⛔ بازفرستِ دفترِ ردشده فقط برای `hash_mismatch` ِ عددی (`sync/v1/DroppedResend.kt`، DATA-SAFETY §۷ بندِ ۳): همان
   `op_id`/`ts`، جلوی صف، پس از Pull و با Snapshot؛ ردیفِ دفترِ ردشده فقط پس از پذیرشِ سرور پاک می‌شود و هر op یک بار در
-  `oplog-*-resend.json` تصمیم می‌گیرد. op ِ ردشده با هر دلیلِ دیگر هرگز خودکار دوباره نمی‌رود. سنجه: `DroppedResendTest`،
+  `oplog-*-resend.json` تصمیم می‌گیرد. op ِ ردشده با هر دلیلِ دیگر هرگز خودکار دوباره نمی‌رود. هر دو علت (نمای جاوا و رقمِ
+  اضافهٔ جاوا ۱۷/ART) از همان `JsNumber` می‌گذرند؛ ردیفِ سندی که در «سندهای ردشده» نشسته (`DroppedResend.Settled`:
+  `ShopData.setAside` ∪ `SetAsideMarks`) هرگز، بایگانی‌شده هم. بایتِ «جاوا» ی فیکسچر صریح است، نه `JsonPrimitive(Double)`. سنجه: `DroppedResendTest`،
   `DroppedResendDesktopTest`، `server/test/sync-resend-dropped.test.js` (بردارِ `resend-dropped-v1.json`).
 
 ### v3 · دفترِ محلی و مهاجرتِ داده

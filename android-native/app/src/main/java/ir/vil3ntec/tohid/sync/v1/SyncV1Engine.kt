@@ -502,7 +502,7 @@ class SyncV1Engine private constructor(context: Context) {
           if (!got.hasMore) break
         }
         //  DATA-SAFETY §۷: opِ ردشده فقط به خاطرِ شکلِ عدد (`hash_mismatch`) ⇒ پس از Pull، جلوی صف با همان op_id (`DroppedResend`)
-        val io = DroppedResend.Io({ client.snapshot() }, { client.deleted(it, strict = true) }) { LedgerArchive.archivedIds(LedgerArchive.readArchive(app)) }
+        val io = DroppedResend.Io({ client.snapshot() }, { client.deleted(it, strict = true) }, { LedgerArchive.archivedIds(LedgerArchive.readArchive(app)) }) { DroppedResend.settled(locked { read() }, queue.settledMarks()) }
         if (!state.restorePending && !state.restoredRebuild && DroppedResend.run(queue, io, { locked { LedgerDiff.toJson(read()) } }, clock()) > 0) pushQueue(client, device)
 
         attempt = 0

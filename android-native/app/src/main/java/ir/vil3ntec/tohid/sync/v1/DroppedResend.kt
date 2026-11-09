@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.sync.v1
 
+import ir.vil3ntec.tohid.data.SetAside
+import ir.vil3ntec.tohid.data.ShopData
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -16,7 +18,9 @@ import kotlin.math.max
  *  ── چرا ──────────────────────────────────────────────────────────────
  *  ساخت‌های پیش از `JsNumber` عددِ زیرِ ۰٫۰۰۱ یا بالای ده میلیون را نماییِ جاوا می‌نوشتند (`4.0E-4`)؛ سرور اثرِ انگشت را
  *  روی شکلِ جاوااسکریپت (`0.0004`) می‌سازد ⇒ `hash_mismatch` ⇒ op به دفترِ ردشده (`oplog-*-dropped.json`) رفت و هرگز
- *  دوباره نرفت: ردیف فقط روی همان دستگاه ماند. رفعِ `JsNumber` فقط opهای **تازه** را درست می‌کند؛ این‌جا همان opهای کهنه.
+ *  دوباره نرفت: ردیف فقط روی همان دستگاه ماند. علتِ دوم همان پایان را داشت: `Double.toString` ِ جاوا ۱۷ و اندروید (ART)
+ *  گاه رقمِ اضافه می‌نوشت (`5.6843418860808015E-14`، `0.0020`). رفعِ `JsNumber` (و `JsNumber.shortest` برای رقم‌ها) فقط
+ *  opهای **تازه** را درست می‌کند؛ این‌جا همان opهای کهنه، با همان `JsNumber` (هر دو شکل).
  *
  *  ── نامزد (همه با هم) ─────────────────────────────────────────────
  *   • دلیلِ رد `hash_mismatch`، op ِ درج یا ویرایش با `op_id` ِ درست؛
@@ -29,6 +33,8 @@ import kotlin.math.max
  *
  *  ── چه می‌رود (پس از Pull، با Snapshot ِ همان دم) ──────────────────
  *   • ردیف روی سرور حذف شده ⇒ هیچ (زنده کردنِ ردیفِ حذف‌شده نه).
+ *   • سندی که صاحب در «سندهای ردشده» کنار گذاشت یا اصلاح کرد ([Settled]، `SetAside` ∪ `SetAsideMarks`) ⇒ هیچ opی روی
+ *     همان ردیف‌ها، حتی بایگانی‌شده (وگرنه فاکتورِ اصلاح‌شده دو بار، یا سندِ کنارگذاشته زنده می‌شد).
  *   • سرور هیچ ردیفی ندارد ⇒ هیچ opی از هیچ دستگاهی روی آن پذیرفته نشده ⇒ همان opها **همان‌طور** و به همان ترتیب (از
  *     نخستین درج؛ ویرایشِ پیش از آن ردیفِ نیمه می‌ساخت ⇒ نه). ردیفِ پاک‌شده در همین دفتر (و نه بایگانی) ⇒ هیچ.
  *   • سرور ردیف را دارد (ویرایشِ بعدیِ پذیرفته، درجِ دوباره، دستگاهِ دیگر) ⇒ فقط فیلدی که هنوز درست است و سرور ندارد:
@@ -62,12 +68,25 @@ object DroppedResend {
   /** [send] null ⇒ نمی‌رود، با [why] */
   data class Decision(val opId: String, val send: SyncOp?, val why: String)
 
-  /** شبکه و بایگانیِ [run] — آزمون‌ها ساختگی می‌دهند */
+  /** تصمیمِ نشستهٔ «کنار بگذار»/«اصلاح و ثبت»: شناسهٔ opها و ردیف‌هایشان (`SetAside.settledOps` ∪ `SetAsideMarks`) */
+  data class Settled(val ops: Set<String> = emptySet(), val rows: Set<RestoreMerge.Row> = emptySet())
+
+  /** [Settled] از دفتر (`ShopData.setAside`، opها و ردیف‌های اصلی) و نشانِ بیرون از دفتر ([SetAsideMarks]، فقط شناسه) */
+  fun settled(d: ShopData, marks: SetAsideMarks?): Settled = Settled(
+    SetAside.settledOps(d) + marks?.read()?.ops.orEmpty(),
+    d.setAside.flatMapTo(HashSet()) { doc ->
+      (doc.ops.map { RestoreMerge.Row(str(it, "table"), str(it, "row_id")) } + RestoreMerge.Row(doc.table, doc.rowId))
+        .filter { it.table.isNotEmpty() && it.id.isNotEmpty() }
+    },
+  )
+
+  /** شبکه، بایگانی و صندوقِ [run] — آزمون‌ها ساختگی می‌دهند */
   class Io(
     val snapshot: suspend () -> JsonObject,
     /** ۴۰۴ یا هر شکست ⇒ پرتاب (نبودنِ پاسخ «حذف نشده» نیست) */
     val deleted: suspend (List<RestoreMerge.Row>) -> Set<RestoreMerge.Row>,
     val archived: () -> Map<String, Set<String>>,
+    val settled: () -> Settled = { Settled() },
   )
 
   /**
@@ -87,7 +106,7 @@ object DroppedResend {
       val snapshot = io.snapshot()
       val ask = cands.map { RestoreMerge.Row(it.op.table, it.op.rowId) }.distinct().filter { serverRow(snapshot, it) == null }
       val gone = if (ask.isEmpty()) emptySet() else io.deleted(ask)
-      plan(cands, book, queue.all(), local(), io.archived(), snapshot, gone)
+      plan(cands, book, queue.all(), local(), io.archived(), snapshot, gone, io.settled())
     } catch (cancelled: CancellationException) {
       throw cancelled
     } catch (_: Throwable) {
@@ -179,6 +198,7 @@ object DroppedResend {
    *  @param local دفترِ همین حالا (`LedgerDiff.toJson`، پس از Pull)
    *  @param snapshot Snapshot ِ v1 ِ همان دم
    *  @param gone از ردیف‌های نبودِ Snapshot، آنچه سرور حذف‌شده می‌داند
+   *  @param settled سندهای کنارگذاشته/اصلاح‌شدهٔ صندوق — ردیفِ هر op ِ آن (از خودش یا از [book]) دیگر نمی‌رود
    */
   fun plan(
     cands: List<Candidate>,
@@ -188,12 +208,17 @@ object DroppedResend {
     archived: Map<String, Set<String>>,
     snapshot: JsonObject,
     gone: Set<RestoreMerge.Row>,
+    settled: Settled = Settled(),
   ): List<Decision> {
     val mine = cands.mapTo(HashSet()) { it.op.opId }
+    val setAside = settled.rows + book.mapNotNull { e ->
+      (e["op"] as? JsonObject)?.let { SyncOp.fromJson(it) }?.takeIf { it.opId in settled.ops }?.let { RestoreMerge.Row(it.table, it.rowId) }
+    }
     val out = ArrayList<Pair<Int, Decision>>()
     for ((row, group) in cands.groupBy { RestoreMerge.Row(it.op.table, it.op.rowId) }) {
       val decided = when {
         row.table !in LedgerDiff.COLLECTIONS -> group.map { skip(it, "unknown_table") }
+        row in setAside -> group.map { skip(it, "set_aside") }
         row in gone -> group.map { skip(it, "deleted_on_server") }
         else -> {
           val server = serverRow(snapshot, row)

@@ -1,9 +1,10 @@
 'use strict';
 /**
- * بازفرستِ opهای `hash_mismatch` ِ عددِ نماییِ ساخت‌های پیشین (DATA-SAFETY §۷، `sync/v1/DroppedResend.kt`) — سمتِ سرور.
+ * بازفرستِ opهای `hash_mismatch` ِ عددیِ ساخت‌های پیشین (DATA-SAFETY §۷، `sync/v1/DroppedResend.kt`) — سمتِ سرور.
  *
  * بردارِ `core/test-vectors/resend-dropped-v1.json` را `DroppedResendTest` ِ برنامه می‌نویسد: `dropped` دفترِ ردشدهٔ یک
- * دستگاه با بایت‌های ساختِ پیشین (`4.0E-4`، `5.684341886080802E-14`، `1.23456785E7` و اثرِ انگشتِ کاتلین روی همان)،
+ * دستگاه با بایت‌های ساختِ پیشین (نما: `4.0E-4`، `5.684341886080802E-14`، `1.23456785E7`؛ رقمِ اضافهٔ جاوا ۱۷ و اندروید:
+ * `0.0020`، `5.6843418860808015E-14`؛ و اثرِ انگشتِ کاتلین روی همان)،
  * `accepted` آنچه سرور پیش‌تر پذیرفته بود (درجِ کالای `p-edit`، ویرایشِ بعدیِ فروشِ نیمهٔ `s-half`)، `resend` همان
  * opهایی که برنامه با همان op_id دوباره جلوی صف می‌گذارد و `rows` دفترِ دستگاه. این‌جا روی push ِ واقعیِ `/sync/v1`
  * (همان زنجیرهٔ میان‌افزارهای دکان):
@@ -23,7 +24,8 @@ const h = require('./helpers');
 const { query, newId, now } = require('../src/db');
 const syncV1 = require('../src/lib/sync-v1');
 
-const VEC = JSON.parse(fs.readFileSync(path.join(__dirname, '../../core/test-vectors/resend-dropped-v1.json'), 'utf8'));
+const RAW = fs.readFileSync(path.join(__dirname, '../../core/test-vectors/resend-dropped-v1.json'), 'utf8');
+const VEC = JSON.parse(RAW);
 const app = { headers: { 'X-App': 'shop' } };
 const key = (o) => `${o.table}/${o.row_id}`;
 const canon = (v) => syncV1.canonical(v);
@@ -60,13 +62,15 @@ test.before(async () => {
   owner = await h.newUser('صاحبِ دکانِ بازفرست');
   const id = (await h.post('/api/shop', { name: 'دکانِ بازفرست' }, { token: owner.accessToken })).body.shop.id;
   await h.post('/api/admin/subscriptions', { shopId: id, plan: 'm1', days: 30 }, { token: await admin() });
+  //  schema ِ ۴ ِ برنامه (پلهٔ گاوصندوق) — همان پرچمِ `sync-ledger-coverage.test.js`؛ بی آن push ۴۲۶ می‌گیرد
+  await require('../src/lib/live-config').set(id, 'sync.safe_entries', true);
   owner = await h.signIn(owner, 'shop');
 });
 test.after(async () => { await h.stop(); });
 
 test('بردار: بازفرست همان op_id/ts ِ دفترِ ردشده و اثرِ انگشتِ خودِ سرور', () => {
   const dropped = new Map(VEC.dropped.filter((e) => e.reason === 'hash_mismatch').map((e) => [e.op.op_id, e.op]));
-  assert.equal(VEC.resend.length, 5);
+  assert.equal(VEC.resend.length, 7);
   for (const o of VEC.resend) {
     const old = dropped.get(o.op_id);
     assert.ok(old, `${o.op_id} در دفترِ ردشده نیست`);
@@ -79,6 +83,17 @@ test('بردار: بازفرست همان op_id/ts ِ دفترِ ردشده و �
   const others = VEC.dropped.filter((e) => e.reason !== 'hash_mismatch').map((e) => e.op.op_id);
   assert.ok(others.length >= 5);
   assert.deepEqual(VEC.resend.filter((o) => others.includes(o.op_id)), []);
+});
+
+test('بردار: رقمِ اضافهٔ جاوا ۱۷ و اندروید (بی نما هم) در دفترِ ردشده، و بازفرستش با رقم‌های String(x)', () => {
+  //  JSON.parse شکلِ متن را می‌اندازد ⇒ همان بایت‌های پرونده
+  assert.ok(RAW.includes('"purchasePrice":0.0020'), 'p-art: 0.0020');
+  assert.ok(RAW.includes('"discountValue":5.6843418860808015E-14'), 's-art: 5.6843418860808015E-14');
+  const by = new Map(VEC.resend.map((o) => [key(o), o]));
+  assert.equal(by.get('products/p-art').fields.purchasePrice, 0.002);
+  assert.equal(String(by.get('products/p-art').fields.purchasePrice), '0.002');
+  assert.equal(String(by.get('sales/s-art').fields.discountValue), '5.684341886080802e-14');
+  for (const k of ['products/p-art', 'sales/s-art']) assert.equal(by.get(k).type, 'insert', k);
 });
 
 test('پیش از رفع: بایت‌های کهنه ⇒ hash_mismatch و هیچ ردیفی', async () => {
