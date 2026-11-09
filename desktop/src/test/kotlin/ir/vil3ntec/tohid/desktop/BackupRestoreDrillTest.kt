@@ -8,10 +8,19 @@ import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.AutoBackup
 import ir.vil3ntec.tohid.data.BackupBundle
 import ir.vil3ntec.tohid.data.BackupRestore
+import ir.vil3ntec.tohid.data.CartStore
+import ir.vil3ntec.tohid.data.HeldBook
+import ir.vil3ntec.tohid.data.HeldInvoice
+import ir.vil3ntec.tohid.data.HeldInvoiceCodec
+import ir.vil3ntec.tohid.data.HeldInvoiceStore
+import ir.vil3ntec.tohid.data.HeldInvoices
+import ir.vil3ntec.tohid.data.HeldTag
 import ir.vil3ntec.tohid.data.LedgerOwner
 import ir.vil3ntec.tohid.data.LedgerRecovery
 import ir.vil3ntec.tohid.data.OwnerExport
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.SaleDraft
+import ir.vil3ntec.tohid.data.SaleDraftCodec
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopSettingsBundle
 import ir.vil3ntec.tohid.data.ShopStore
@@ -43,7 +52,8 @@ import java.util.zip.ZipOutputStream
  *  کامل و نسخهٔ خودکار ⇐ پاک شدنِ دادهٔ برنامه ⇐ برگرداندن ⇐ دفتر (JSON ِ استاندارد) و تنظیمات و عکس‌ها بایت‌به‌بایت همان.
  *  و راه‌های شکست: فایلِ بریده/خراب، نسخهٔ کهنه/تازه‌تر، دکانِ دیگر، صفِ نرفته، و رمزِ نسخه‌ها با عبارتِ بازیابی.
  *
- *  ⚠️ فاکتورهای نگه‌داشته (`held-invoices.json`) در هیچ پشتیبانی نیستند — `docs/DATA-SAFETY-fa.md` §۲ (مانده).
+ *  و فاکتورهای نگه‌داشته و سبدِ جاری (`held-invoices.json`، `sale-draft.json`؛ DATA-SAFETY §۸): با پشتیبانِ کامل برمی‌گردند،
+ *  فقط پس از نشستنِ دفتر، فقط در همان دکان، فقط روی دستگاهی که خودش فاکتورِ بازی ندارد، و هرگز آن‌که فروش رفته.
  */
 class BackupRestoreDrillTest {
 
@@ -69,6 +79,10 @@ class BackupRestoreDrillTest {
     if (snapshots) AutoBackup.dir(ctx).listFiles().orEmpty().forEach { it.delete() }
     ShopSettingsBundle.SHOP_PREFS.forEach { ctx.deleteSharedPreferences(it) }
     BackupBundle.dropStaging(ctx)
+    //  فاکتورهای نگه‌داشته و سبدِ جاری — پرونده و حافظهٔ برنامه
+    dir.listFiles().orEmpty().filter { it.name.startsWith(HeldInvoiceStore.FILE) || it.name.startsWith(CartStore.FILE) }.forEach { it.delete() }
+    HeldInvoices.reset()
+    ir.vil3ntec.tohid.data.HeldSync.cart = null
   }
 
   private fun key(): String {
@@ -150,7 +164,8 @@ class BackupRestoreDrillTest {
   private fun openZip(store: ShopStore, bytes: ByteArray) = BackupRestore.open(ctx, store, ByteArrayInputStream(bytes))
 
   private fun staged(): Boolean =
-    File(ctx.cacheDir, "restore-photos").listFiles().orEmpty().isNotEmpty() || File(ctx.cacheDir, "restore-settings.json").exists()
+    File(ctx.cacheDir, "restore-photos").listFiles().orEmpty().isNotEmpty() || File(ctx.cacheDir, "restore-settings.json").exists() ||
+      File(ctx.cacheDir, "restore-held.json").exists()
 
   /* ------------------------- ۱) رفت و برگشتِ کامل ------------------------- */
 
@@ -434,5 +449,113 @@ class BackupRestoreDrillTest {
     val back = open()
     assertEquals(LedgerRecovery.Source.AUTO_BACKUP, back.guard.recovered.value?.source)
     assertEquals(more, back.data.value)
+  }
+
+  /* ------------------------- ۷) فاکتورهای نگه‌داشته و سبدِ جاری ------------------------- */
+
+  private val heldFile get() = File(dir, HeldInvoiceStore.FILE)
+  private val cartFile get() = File(dir, CartStore.FILE)
+
+  private fun line(p: Product, q: Double, price: Double? = null) =
+    SaleDraft.Line(productId = p.id, quantity = q, unitPrice = price, note = "بی‌نمک", seller = "زهرا", specialPrice = price)
+
+  /** دو نگه‌داشته (با همهٔ فیلدها) و سبدِ جاریِ نیمه‌کاره با برگه‌اش — همان پرونده‌هایی که صندوق می‌نویسد */
+  private fun heldDesk(d: ShopData): Triple<HeldInvoice, HeldInvoice, SaleDraft> {
+    val p = d.products
+    val h1 = HeldInvoice(
+      id = "drill-h1", number = 1, label = "آقای کریمی", lines = listOf(line(p[0], 2.0, 95.0), SaleDraft.Line("", 1.0, 5.0, label = "کیسه")),
+      debtorId = d.debtors.firstOrNull()?.id, discount = "10", note = "پولش را می‌آورد", heldAt = 1_762_600_000_000, payment = "CREDIT",
+      paid = "50", coupons = listOf("EID5"), discountAmount = true, saleNote = "فاکتورِ عمده", priceList = "wholesale",
+    )
+    val h2 = HeldInvoice(id = "drill-h2", number = 3, lines = listOf(line(p[1], 1.0)), heldAt = 1_762_600_100_000)
+    val cart = SaleDraft(key = "drill-c1", lines = listOf(line(p[2], 4.0)), savedAt = 1_762_600_200_000, coupons = listOf("NEW"), note = "سبدِ نیمه‌کاره")
+    heldFile.writeText(HeldInvoiceCodec.encode(HeldBook(items = listOf(h1, h2), current = HeldTag("drill-c1", 2, "خانمِ احمدی", "منتظرِ پول"))))
+    cartFile.writeText(SaleDraftCodec.encode(cart))
+    HeldInvoices.reset()
+    return Triple(h1, h2, cart)
+  }
+
+  /** نگه‌داشته‌های برنامه همان‌طور که صندوق می‌بیند (حافظه، پس از نخستین خواندن) */
+  private fun heldNow(): HeldBook = HeldInvoices.of(ctx).let { runBlocking { it.load() }; it.book.value }
+
+  private fun confirmFrom(zip: ByteArray): BackupRestore.Confirmed {
+    val fresh = open()
+    return runBlocking { BackupRestore.confirm(ctx, fresh, openZip(fresh, zip).getOrThrow().data) }
+  }
+
+  @Test fun `فاکتورهای نگه‌داشته و سبدِ جاری با پشتیبانِ کامل از پاک شدنِ برنامه برمی‌گردند`() {
+    val store = seed()
+    val (h1, h2, cart) = heldDesk(store.data.value)
+    val zip = fullBackup(store)
+
+    wipe()
+    val fresh = open()
+    assertTrue("برنامهٔ تازه نگه‌داشته ندارد", heldNow().items.isEmpty())
+    val opened = openZip(fresh, zip).getOrThrow()
+    assertTrue("تا تأییدِ بازیابی هیچ نگه‌داشته‌ای ننشسته", heldNow().items.isEmpty() && !heldFile.exists())
+    assertTrue(runBlocking { BackupRestore.confirm(ctx, fresh, opened.data) }.ok)
+
+    val back = heldNow().items.associateBy { it.id }
+    assertEquals(setOf("drill-h1", "drill-h2", "drill-c1"), back.keys)
+    assertEquals("نگه‌داشته با همهٔ فیلدهایش", h1, back.getValue("drill-h1"))
+    assertEquals(h2, back.getValue("drill-h2"))
+    val c = back.getValue("drill-c1")
+    assertEquals("سبدِ جاری با شماره، نام و یادداشتِ برگه‌اش نگه‌داشته می‌شود", Triple(2, "خانمِ احمدی", "منتظرِ پول"), Triple(c.number, c.label, c.note))
+    assertEquals("سبدِ جاری با همهٔ ردیف‌ها، کدها و یادداشتِ فاکتور", cart, c.draft())
+    assertFalse("سبدِ این دستگاه هرگز رونویسی نمی‌شود", cartFile.exists())
+    //  روی دیسک هم: برنامه از نو باز شد
+    HeldInvoices.reset()
+    assertEquals(back.values.toSet(), heldNow().items.toSet())
+    assertFalse("پوشهٔ موقت خالی شد", staged())
+  }
+
+  @Test fun `نگه‌داشته‌های پشتیبان فقط پس از دفتر، در همان دکان و روی دستگاهِ بی فاکتورِ باز می‌نشینند و فروخته هرگز`() {
+    LedgerOwner.remember(ctx, "u-h", "s-h")
+    val store = seed()
+    val sold = store.data.value.sales.first()
+    heldDesk(store.data.value)
+    //  نگه‌داشته‌ای که همان فروشِ دفتر است (از دستگاهِ دیگر یا پیش از پشتیبان فروش رفت) دوباره پیشنهاد نمی‌شود
+    val book = HeldInvoiceCodec.decode(heldFile.readText())!!
+    heldFile.writeText(HeldInvoiceCodec.encode(book.copy(items = book.items + book.items[1].copy(id = sold.id, number = 4))))
+    HeldInvoices.reset()
+    val zip = fullBackup(store)
+
+    //  ۱) دستگاهی که نگه‌داشتهٔ خودش را دارد: هیچ چیز رونویسی یا قاطی نمی‌شود
+    wipe()
+    val mine = HeldBook(items = listOf(book.items[1].copy(id = "drill-mine", number = 5, label = "مالِ همین دستگاه")))
+    heldFile.writeText(HeldInvoiceCodec.encode(mine))
+    HeldInvoices.reset()
+    assertTrue(confirmFrom(zip).ok)
+    assertEquals(mine, heldNow())
+    assertFalse(staged())
+
+    //  ۲) سبدِ پُرِ دیگری روی این دستگاه (فاکتورِ بازِ خودش): همان؛ سبد دست نمی‌خورد
+    wipe()
+    val own = SaleDraft(key = "drill-own", lines = listOf(line(store.data.value.products[3], 1.0)), savedAt = 5)
+    cartFile.writeText(SaleDraftCodec.encode(own))
+    assertTrue(confirmFrom(zip).ok)
+    assertTrue(heldNow().items.isEmpty())
+    assertEquals(own, SaleDraftCodec.decode(cartFile.readText()))
+
+    //  ۳) بازیابیِ ردشده (حسابِ همگامِ بی ورود): مثلِ عکس و تنظیم، هیچ نگه‌داشته‌ای پیش یا بی دفتر نمی‌نشیند
+    wipe()
+    SyncStateV1(ctx, key()).cursor = 5L
+    val refused = confirmFrom(zip)
+    SyncStateV1(ctx, key()).cursor = 0L
+    assertFalse(refused.ok)
+    assertTrue(heldNow().items.isEmpty() && !heldFile.exists())
+    assertFalse(staged())
+
+    //  ۴) دستگاهِ تازهٔ همان دکان: همه، جز آن‌که فروش رفته
+    wipe()
+    assertTrue(confirmFrom(zip).ok)
+    assertEquals(setOf("drill-h1", "drill-h2", "drill-c1"), heldNow().items.map { it.id }.toSet())
+
+    //  ۵) دفترِ دکانِ دیگر نیست: پشتیبانِ «s-h» روی دفترِ بی‌صاحب (مُهر می‌پذیرد) — دفتر برمی‌گردد، نگه‌داشته‌ها نه
+    wipe()
+    LedgerOwner.remember(ctx, "", "")
+    assertTrue(confirmFrom(zip).ok)
+    assertTrue(heldNow().items.isEmpty())
+    assertFalse(staged())
   }
 }

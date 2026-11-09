@@ -95,6 +95,8 @@ val replaced = listOf(
   "ui/PressMenu.kt",
   //  «این کامپیوتر است» — اندازه‌ها، پنجره‌ها و نوارهای کامپیوتری (‎ui/Platform.kt‎)
   "ui/Platform.kt",
+  //  OPS-02: `FLAG_SECURE` ِ برگهٔ عبارتِ بازیابی — کامپیوتر پنجرهٔ امن ندارد (`Platform.SecureWindow` ِ بی‌اثر)
+  "ui/SecureWindowAndroid.kt",
   //  بانکِ تصاویر: دوربینِ راهنما فقط گوشی است؛ نامِ فایل از دیسک، نه ContentResolver
   "scan/GuidedCapture.kt",
   "data/FileName.kt",

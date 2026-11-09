@@ -31,6 +31,8 @@ import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.ui.components.pos.HeldDialog
 import ir.vil3ntec.tohid.ui.components.pos.HeldInvoicesUi
+import ir.vil3ntec.tohid.ui.components.pos.heldTakeTitle
+import ir.vil3ntec.tohid.ui.components.pos.heldTwiceText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
@@ -144,6 +146,21 @@ fun HeldSheets(ui: HeldInvoicesUi, d: ShopData) {
       onDismiss = { if (ui.dialog == HeldDialog.DropStale) ui.dialog = HeldDialog.List },
       icon = Icons.Outlined.DeleteOutline,
     )
+    //  S09 «در دستِ دستگاهِ X» — گرفتن فقط با تأییدِ صریح
+    is HeldDialog.TakeOver -> V3ConfirmSheet(
+      title = heldTakeTitle(dlg.held),
+      message = StrPos.heldTakeWarn,
+      confirm = StrPos.heldTakeOver,
+      onConfirm = { ui.resume(dlg.invoice.id, force = true) },
+      onDismiss = { if (ui.dialog is HeldDialog.TakeOver) ui.close() },
+      icon = Icons.Outlined.Layers,
+    )
+    //  S09 «یک فاکتور در دو دستگاه» — تا «دیدم»
+    is HeldDialog.Twice -> V3Sheet(onDismiss = { ui.seen(dlg.id) }, title = StrPos.heldTwiceTitle, detents = false) { closer ->
+      Text(heldTwiceText(dlg.conflict), style = V3Type.callout, color = c.inkMuted)
+      Spacer(Modifier.height(16.dp))
+      V3Button(StrPos.heldSeen, { closer.close() }, Modifier.fillMaxWidth())
+    }
   }
 }
 
