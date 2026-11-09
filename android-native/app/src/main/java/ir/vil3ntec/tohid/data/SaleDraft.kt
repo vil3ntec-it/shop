@@ -30,7 +30,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *  شکلِ دفتر عوض نمی‌شود: شناسهٔ فروش همان ULID است که بود.
  *
  *  ── شکلِ فایل ────────────────────────────────────────────────────────
- *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…,"coupons":[…]}`؛ فیلدهای افزودنیِ تازه (`priceList`، و در ردیف
+ *  `{"v":2,"key":…,"lines":[…],"debtorId":…,"savedAt":…,"coupons":[…]}`؛ فیلدهای افزودنیِ تازه (`priceList`، `page`، و در ردیف
  *  `seller`/`specialPrice`) فقط وقتی مقدار دارند نوشته می‌شوند ⇒ پیش‌نویسِ بی آن‌ها بایت‌به‌بایت همان پیشین. شکلِ قدیمی
  *  (آرایهٔ ردیف‌ها، همان `tohid-shop-draft-cart-v1`ِ وب و برنامهٔ قبلی) هم
  *  خوانده می‌شود و کلید ندارد.
@@ -54,7 +54,38 @@ data class SaleDraft(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val priceList: String? = null,
+  /**
+   *  POS-13 — آنچه صفحهٔ صندوق برای همین فاکتور نوشته و در ردیف‌ها نیست ([Page]). پیش‌تر فقط در حافظهٔ صفحه بود:
+   *  بسته شدنِ برنامه فاکتورِ ۱۰٪ را بی تخفیف و نسیه را نقد برمی‌گرداند (پولِ فاکتور). `null` نوشته نمی‌شود ⇒ پیش‌نویسِ
+   *  بی آن بایت‌به‌بایت همان پیشین.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val page: Page? = null,
 ) {
+  /**
+   *  تخفیفِ کلِ فاکتور همان‌طور که در کادر نوشته شده (و این‌که به مبلغ است)، روشِ پرداخت (`SalesEngine.Payment.name`؛ خالی ⇒
+   *  صفحه از مشتری می‌سازد)، «دریافتیِ همین حالا» و فروشندهٔ فاکتورِ اصلاح‌شده — همان `HeldExtras`.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @Serializable
+  data class Page(
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val discount: String = "",
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val discountAmount: Boolean = false,
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val payment: String = "",
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val paid: String = "",
+    @EncodeDefault(EncodeDefault.Mode.NEVER) val seller: String = "",
+  ) {
+    fun extras(): HeldExtras =
+      HeldExtras(discount, SalesEngine.Payment.values().firstOrNull { it.name == payment }, paid, discountAmount && discount.isNotBlank(), seller)
+
+    companion object {
+      /** هیچ ⇒ `null` (چیزی نوشته نمی‌شود) */
+      fun of(x: HeldExtras): Page? =
+        Page(x.discount, x.discountAmount && x.discount.isNotBlank(), x.payment?.name.orEmpty(), x.paid, x.seller).takeIf { it != Page() }
+    }
+  }
+
   /** همان شکلِ ردیفِ پیش‌نویسِ قدیمی؛ فیلدهای تازه پیش‌فرض دارند */
   @Serializable
   data class Line(
@@ -91,7 +122,7 @@ data class SaleDraft(
   companion object {
     fun of(
       key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null,
-      priceList: String? = null,
+      priceList: String? = null, page: Page? = null,
     ) = SaleDraft(
       key = key,
       lines = cart.map {
@@ -108,6 +139,8 @@ data class SaleDraft(
       note = if (cart.isEmpty()) null else note,
       //  و لیستِ دستی
       priceList = if (cart.isEmpty()) null else priceList,
+      //  و آنچه صفحه برای فاکتور نوشته
+      page = if (cart.isEmpty()) null else page,
     )
   }
 }
