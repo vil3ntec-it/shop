@@ -52,7 +52,8 @@ class HeldFidelityTest {
     val disk = HeldInvoicesTest.MemDisk()
     val c = HeldInvoicesTest.MemCart(disk = draft())
     val s = HeldInvoiceStore(disk, device = { "A" }, clock = { 7L })
-    val extras = HeldExtras(discount = " 500 ", payment = SalesEngine.Payment.CREDIT, paid = "200", discountAmount = true)
+    //  فروشندهٔ فاکتورِ اصلاح‌شده (`SaleReopen`) هم — پیش‌تر `HeldInvoice` آن را نداشت
+    val extras = HeldExtras(discount = " 500 ", payment = SalesEngine.Payment.CREDIT, paid = "200", discountAmount = true, seller = "زهرا")
     s.hold(c, extras, label = "آقای کریمی", note = "منتظر")
     assertTrue(c.snapshot().lines.isEmpty())
     //  دفترِ تازه از همان فایل (بسته شدنِ برنامه، نصبِ دوباره با پشتیبانِ همان فایل)
@@ -62,7 +63,7 @@ class HeldFidelityTest {
     assertEquals(cart, back.cart())
     assertEquals(bytes(draft()), bytes(back))
     //  حالتِ صفحه و برچسب هم
-    assertEquals(HeldExtras("500", SalesEngine.Payment.CREDIT, "200", discountAmount = true), o.extras)
+    assertEquals(HeldExtras("500", SalesEngine.Payment.CREDIT, "200", discountAmount = true, seller = "زهرا"), o.extras)
     assertEquals(HeldTag("K1", 1, "آقای کریمی", "منتظر"), again.book.value.current)
   }
 

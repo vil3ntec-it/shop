@@ -34,6 +34,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.delivery', scope: 'shop', default: false, what: 'تحویل و پیک' },
   { key: 'shop.orders.refunds', scope: 'shop', default: false, what: 'بازپرداختِ سفارش با دفتر' },
   { key: 'shop.chat', scope: 'shop', default: false, what: 'گفت‌وگو با مشتری' },
+  { key: 'shop.chat.voice', scope: 'shop', default: false, what: 'ضبطِ پیامِ صوتیِ مشتری در گفت‌وگوی ویترین (CHAT-07)' },
   { key: 'shop.image_bank', scope: 'shop', default: false, what: 'بانکِ تصاویرِ دکان' },
   { key: 'image_bank.central', scope: 'all', default: false, what: 'پنلِ بانکِ تصاویرِ مدیر' },
   { key: 'account.self_delete', scope: 'all', default: false, what: 'حذفِ حساب به دستِ خودِ کاربر در برنامه و پورتال (Google Play)' },
@@ -82,6 +83,7 @@ const KNOWN = Object.freeze([
   { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
   //  RPT-03 (docs/FLAGS-ON-fa.md): عددِ تازه در پیامی که صاحب همین حالا می‌گیرد ⇒ جدا و خاموش؛ با `shop.owner_report`
   { key: 'shop.owner_report.profit', scope: 'shop', default: false, what: 'سودِ ناخالص با میانگینِ موزون در گزارشِ خودکارِ صاحب (RPT-03)؛ قلمِ بی‌بها ⇒ «تقریبی»' },
+  { key: 'shop.backup_contact_guard', scope: 'shop', default: false, what: 'پشتیبانِ کاملِ دکان (`GET /api/me/backups/:id`) فقط برای کسی که شمارهٔ مشتری را می‌بیند (CRM-15، ممیزیِ ۳۵ B1)' },
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },

@@ -589,8 +589,10 @@
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });
       document.head.appendChild(link);
       if (ids().length) K.save(K.cartMetaKey(slug), { title: store.title, accent: store.accent, at: Date.now() });
-      if (K.sess()) account().catch(function () {});
-      return Promise.all([loadProducts(false), refreshCart(), loadMore(r)]);
+      //  CHK-03: سبدِ حساب ⇒ قیمت از سرور (cart-sync.js)
+      var own = K.sess() && store.features.accountCart;
+      if (K.sess() || K.load('store-cartsync:' + slug)) account().catch(function () { if (own) refreshCart(); });
+      return Promise.all([loadProducts(false), own ? 0 : refreshCart(), loadMore(r)]);
     }).then(route).catch(function (e) {
       if (e.status === 404) {
         show('view-missing');

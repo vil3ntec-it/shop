@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.stock
 
+import ir.vil3ntec.tohid.core.i18n.StrCount
+import ir.vil3ntec.tohid.core.stock.CountScan
+import ir.vil3ntec.tohid.data.CountSheetModel
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -41,7 +44,31 @@ data class CountState(val counts: Map<String, String> = emptyMap(), val note: St
     return if (kotlin.math.abs(d) < 0.0005) 0.0 else d
   }
 
+  /**
+   *  بارکدخوان روی همین صفحه (`ScanRouter`: پنجرهٔ کامپیوتر بی کادرِ فوکوس‌دار، بارکدخوانِ وصل‌شده، گوشیِ جفت‌شده). پیش‌تر هیچ
+   *  گیرنده‌ای نبود ⇒ صندوق باز می‌شد و شمارشِ ذخیره‌نشده با بسته شدنِ صفحه گم. [counting] («ابزارهای تازهٔ دستگاه»، `HwTools`)
+   *  ⇒ +۱ به خانهٔ همان کالا (`CountSheetModel.scan`: وزنی، غیرفعال و ناشناس بی تغییر و با پیام)؛ خاموش ⇒ هیچ عددی عوض نمی‌شود
+   *  و نتیجه `null` است. در هر دو حال صفحه و نوشته‌هایش سرِ جایشان می‌مانند.
+   */
+  fun scan(d: ShopData, code: String, index: Map<String, String>, counting: Boolean): Pair<CountState, CountScan.Result?> {
+    if (!counting) return this to null
+    val (next, r) = CountSheetModel.scan(counts, code, d, index)
+    return copy(counts = next) to r
+  }
+
   companion object {
+    /** پیامِ پس از اسکن — همان پیام‌های «انبارگردانیِ تازه» (`StrCount`)؛ `null` (تنظیمِ خاموش) ⇒ «شمرده نشد، صفحه همان» */
+    fun scanMessage(r: CountScan.Result?, d: ShopData): String {
+      if (r == null) return StrCount.scanOff
+      fun name(id: String) = d.products.firstOrNull { it.id == id }?.name.orEmpty()
+      return when (r) {
+        is CountScan.Result.Counted -> StrCount.scanned(name(r.productId), CountSheetModel.text(r.countedMilli))
+        is CountScan.Result.Unknown -> StrCount.unknown(r.code)
+        is CountScan.Result.Weighed -> StrCount.weighed(name(r.productId))
+        is CountScan.Result.Inactive -> StrCount.inactive(name(r.productId))
+      }
+    }
+
     /** ردیف‌های شمارش: کالاهای فعال، به ترتیبِ نام، با جست‌وجو در نام و بارکد */
     fun rows(d: ShopData, query: String): List<Product> {
       val term = query.trim()

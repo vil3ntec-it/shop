@@ -61,7 +61,9 @@ test('کلیدِ دلخواه جدا شمرده و درهم ذخیره می‌ش
   assert.equal((await get('/k?email=a@x.test')).status, 200);
   assert.equal((await get('/k?email=a@x.test')).status, 429);
   assert.equal((await get('/k?email=b@x.test')).status, 200);
-  const keys = (await db.many("SELECT key FROM rate_limit_hits WHERE key LIKE 'rs-k:%'")).map((r) => r.key);
+  //  ردیف = (کلید، برشِ یک‌ثانیه‌ای): دو درخواستِ همان کلید دو سوی مرزِ ثانیه دو ردیفِ همان کلیدند (CI ِ #1020 روی
+  //  PostgreSQL: ۳ ردیف برای ۲ کلید) ⇒ کلیدهای جدا شمرده می‌شوند؛ «جدا شمرده» را همان ۴۲۹ ِ a و ۲۰۰ ِ b می‌سنجد
+  const keys = (await db.many("SELECT DISTINCT key FROM rate_limit_hits WHERE key LIKE 'rs-k:%'")).map((r) => r.key);
   assert.equal(keys.length, 2);
   for (const k of keys) assert.ok(!k.includes('@') && !k.includes('x.test'), `کلیدِ خام در پایگاه: ${k}`);
   assert.ok(keys.includes(storeKey('rs-k:a@x.test')));

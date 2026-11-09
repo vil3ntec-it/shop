@@ -54,7 +54,17 @@ async function createApp({ runMigrations = true } = {}) {
   //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
   //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
   app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
-  app.use(express.json({ limit: '2mb' }));
+  /*
+   *  ⛔ ممیزیِ ۳۵ (B4): NUL (`\u0000`) در رشته‌های بدنه — PostgreSQL متن و jsonb ِ NUL‌دار را نمی‌پذیرد، پس هر دری
+   *  که رشته را بی `validate.text` (که NUL را از پیش می‌انداخت) می‌نوشت ۵۰۰ می‌داد (خرج کردنِ کد، پاک کردنِ مشتری…).
+   *  همان کارِ `validate.text`، این‌بار برای همه. همگام‌سازی و پمپ (`sync`، `shop/sync`، `pump`) پارسرِ دست‌نخوردهٔ
+   *  پیشین را دارند: آن راه‌ها مشترک با پمپ‌اند و opِ همگام‌سازی بیت‌به‌بیت همانی می‌ماند که دستگاه فرستاد.
+   */
+  const jsonPlain = express.json({ limit: '2mb' });
+  const noNul = (k, val) => (typeof val === 'string' && val.includes('\u0000') ? val.replace(/\u0000/g, '') : val);
+  const jsonClean = express.json({ limit: '2mb', reviver: noNul });
+  const RAW_SYNC = /^\/api(?:\/v1)?\/(?:sync|shop\/sync|pump)(?:\/|$)/;
+  app.use((req, res, next) => (RAW_SYNC.test(req.path) ? jsonPlain : jsonClean)(req, res, next));
 
   /*
    *  بدنه‌ای که JSON نیست.
@@ -109,6 +119,13 @@ async function createApp({ runMigrations = true } = {}) {
     }
     next();
   });
+
+  //  ⛔ ممیزیِ ۳۵ (B4): NUL در مسیر (`%00`) — PostgreSQL متنِ NUL‌دار را نمی‌پذیرد (۲۲۰۲۱)، پس هر شناسهٔ خامِ مسیر
+  //  ۵۰۰ می‌شد (و خطای سرور ثبت می‌کرد). هیچ برنامه‌ای NUL نمی‌فرستد ⇒ ۴۰۰ پیش از هر کار. `%2500` (متنِ «%00») NUL نیست.
+  //  پرسش (`?…`) دست نمی‌خورد: درهایش خودشان می‌سنجند (`routes-idor-31.test.js`).
+  app.use((req, res, next) => (/%00/i.test(req.url.split('?')[0])
+    ? res.status(400).json({ error: { code: 'bad_path', message: 'نشانیِ درخواست درست نیست' } })
+    : next()));
 
   // ---- CORS ----
   // برنامه‌ی اندروید به CORS کاری ندارد؛ این فقط برای نسخه‌ی وب است و
@@ -172,6 +189,8 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
+  //  PERF-04: مهلتِ سراسریِ درخواست — `REQUEST_TIMEOUT_MS` (۰ = خاموش)؛ پمپ و v1 بیرون (`middleware/deadline.js`)
+  app.use('/api', require('./middleware/deadline').requestDeadline());
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
   const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
@@ -579,6 +598,8 @@ async function createApp({ runMigrations = true } = {}) {
   //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
   //  `media-src blob:` فقط برای پیامِ صوتیِ چت (CHAT-07): <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ
   //  امضاشده ندارد (S118) ⇒ بایت با fetch ِ بلیت‌دار و پخش از blob: ِ همین صفحه؛ blob را فقط اسکریپتِ همین مبدأ می‌سازد. نه data:.
+  //  `microphone=(self)` فقط برای ضبطِ پیامِ صوتیِ مشتری (`store/chat-voice.js`، پرچمِ خاموشِ `shop.chat.voice`): فقط همین
+  //  مبدأ (نه قابِ بیرونی؛ frame-ancestors 'none')، و مرورگر خودش اجازه می‌پرسد. دوربین و پرداخت همان بسته.
   //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
@@ -587,7 +608,7 @@ async function createApp({ runMigrations = true } = {}) {
     res.set('Content-Security-Policy',
       "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; " +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
-    res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
+    res.set('Permissions-Policy', 'camera=(), microphone=(self), geolocation=(self), payment=()');
     next();
   };
   //  WEB-17/20 (`lib/store-seo.js`، پرچمِ خاموشِ `shop.storefront.seo`): روشن ⇒ همان پوسته با

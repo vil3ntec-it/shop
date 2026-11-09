@@ -65,6 +65,14 @@ object UnitSale {
     return runCatching { PurchaseUnits.baseQtyMilli(q, f) / 1000.0 }.getOrElse { (quantity * f).roundToLong() / 1000.0 }
   }
 
+  /**
+   *  کادرِ «تعداد» ِ ردیفِ صندوق به واحدِ فروشِ دوم (`CartLineDialog`) ⇒ واحدِ پایه: همان [toBaseQty] ِ `SalesEngine.toStockQty`
+   *  و سرور (۱٫۵ × ۰٫۰۰۹ = ۰٫۰۱۴؛ ضربِ پیشینِ کادر ۰٫۰۱۳ می‌داد). ضریبی که [toBaseQty] نمی‌پذیرد (بیرون از سقف) یا مقدارِ
+   *  نامتناهی ⇒ همان ضربِ پیشینِ کادر، گرد به هزارم (NaN ⇒ ۰ = همان `Math.round`).
+   */
+  fun typedToBase(quantity: Double, unitFactor: Double): Double =
+    toBaseQty(quantity, unitFactor) ?: (quantity * unitFactor * 1000.0).let { if (it.isNaN()) 0.0 else it.roundToLong() / 1000.0 }
+
   /** قیمتِ یک [u] (Minor): قیمتِ بسته از لیستِ قیمت، وگرنه اندازه × قیمتِ واحدِ پایه */
   fun priceMinor(u: Unit, basePriceMinor: Long): Long = u.priceMinor ?: (basePriceMinor.toDouble() * u.sizeMilli / 1000.0).roundToLong()
 

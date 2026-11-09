@@ -11,6 +11,7 @@ const fs = require('fs');
 const path = require('path');
 const { createHash } = require('crypto');
 const { getPool } = require('./db');
+const config = require('./config');
 
 const DIR = path.join(__dirname, '..', 'migrations');
 
@@ -49,7 +50,10 @@ function files() {
  */
 async function run({ log = () => {}, pool = null } = {}) {
   const client = await (pool || getPool()).connect();
+  //  PERF-04: سقفِ پرس‌وجوی استخر (`PG_STATEMENT_TIMEOUT_MS`) هرگز مهاجرتِ بلند را نیمه‌کاره نمی‌گذارد؛ پایان ⇒ RESET
+  const unbounded = config.db.statementTimeoutMs > 0 || config.db.idleTxTimeoutMs > 0;
   try {
+    if (unbounded) await client.query('SET statement_timeout = 0; SET idle_in_transaction_session_timeout = 0');
     await client.query(`
       CREATE TABLE IF NOT EXISTS schema_migrations (
         version     text PRIMARY KEY,
@@ -93,6 +97,7 @@ async function run({ log = () => {}, pool = null } = {}) {
     return done;
   } finally {
     try { await client.query('SELECT pg_advisory_unlock($1)', [727311]); } catch { /* بی‌اهمیت */ }
+    if (unbounded) { try { await client.query('RESET statement_timeout; RESET idle_in_transaction_session_timeout'); } catch { /* اتصالِ خراب */ } }
     client.release();
   }
 }

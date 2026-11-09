@@ -38,7 +38,7 @@ router.get('/', async (req, res, next) => {
         destination: String(req.query?.destination || req.query?.email || ''),
         app: String(req.query?.app || ''),
         purpose: String(req.query?.purpose || ''),
-        limit: Math.min(200, Number(req.query?.limit || 50) || 50),
+        limit: Math.min(200, Math.max(1, Number(req.query?.limit || 50) || 50)),   //  ممیزیِ ۳۵ (B7): منفی ⇒ ۵۰۰ ِ LIMIT
       }),
     });
   } catch (err) { next(err); }

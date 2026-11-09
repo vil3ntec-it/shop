@@ -208,7 +208,8 @@ test('CHAT-05: عکسِ مشتری از ویترین — سقف‌ها با گش
   const headers = { 'X-Store-Ticket': check.body.ticket };
   const opened = await h.api('POST', `/api/store/${slug}/chat/conversations`, { body: {}, headers });
   assert.equal(opened.status, 201, JSON.stringify(opened.body));
-  assert.deepEqual(opened.body.limits, { imageMax: 1536 * 1024, thumbMax: 64 * 1024 }, 'ویترین سقفِ سرور را می‌گیرد، نه عددِ ثابتِ خودش');
+  //  CHAT-07: سقفِ صدا هم از سرور؛ `voice` فقط با پرچمِ خاموشِ `shop.chat.voice` (این‌جا خاموش)
+  assert.deepEqual(opened.body.limits, { imageMax: 1536 * 1024, thumbMax: 64 * 1024, audioMax: 3072 * 1024, voice: false }, 'ویترین سقفِ سرور را می‌گیرد، نه عددِ ثابتِ خودش');
   const conv = opened.body.conversation.id;
   const up = (buf, role = 'main') => h.raw('POST', `/api/store/${slug}/chat/conversations/${conv}/media?role=${role}`, buf, { headers: { ...headers, 'Content-Type': 'image/jpeg' } });
   const media = async () => Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_media WHERE conversation_id=$1', [conv])).n);

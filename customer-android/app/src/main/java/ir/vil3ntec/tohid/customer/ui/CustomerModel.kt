@@ -205,6 +205,9 @@ class CustomerModel(
   internal fun <T> request(call: () -> ShopperResult<T>, done: (ShopperResult<T>) -> Unit): Job =
     scope.launch { done(withContext(io) { call() }) }
 
+  /** کاری پس از [ms] روی همان نخِ صفحه (CHK-03: سکوتِ پس از تغییرِ سبد و درنگِ پس از شکستِ هم‌گامی) */
+  internal fun later(ms: Long, block: () -> Unit): Job = scope.launch { delay(ms); block() }
+
   internal fun persist(s: ShopperState) {
     saved = s
     ShopperMemory.save(kv, s)

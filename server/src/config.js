@@ -46,6 +46,8 @@ const config = {
   env:  process.env.NODE_ENV || 'development',
   host: process.env.HOST || '0.0.0.0',
   port: num(process.env.PORT, 3000),
+  //  PERF-04: مهلتِ سراسریِ درخواستِ `/api` (`middleware/deadline.js`)؛ ۰ = خاموش (پیش‌فرض)، کف ۵ ثانیه، long-poll +۳۰
+  http: { requestTimeoutMs: Math.max(0, Math.floor(num(process.env.REQUEST_TIMEOUT_MS, 0))) },
 
   /**
    *  آدرسی که برنامه‌ها با آن به این سرور می‌رسند — فقط برای نمایش و لینک‌ها، و `publicUrl` ِ
@@ -72,6 +74,10 @@ const config = {
     connectTimeoutMs: num(process.env.PG_CONNECT_TIMEOUT_MS, 10000),
     //  سقفِ صفِ انتظارِ استخر (`db.js`، PERF-04)؛ ۰ = بی سقف
     maxWaiting:       Math.max(0, Math.floor(num(process.env.PG_POOL_MAX_WAITING, 0))),
+    //  PERF-04 (`db.js`): سقفِ هر پرس‌وجو و تراکنشِ بیکار در PostgreSQL؛ ۰ = خاموش (پیش‌فرض، همان پیشین).
+    //  مهاجرت‌ها همیشه بی سقف (`migrate.js`). پیشنهادِ تولید: ۱۵٬۰۰۰ و ۶۰٬۰۰۰
+    statementTimeoutMs: Math.max(0, Math.floor(num(process.env.PG_STATEMENT_TIMEOUT_MS, 0))),
+    idleTxTimeoutMs:    Math.max(0, Math.floor(num(process.env.PG_IDLE_TX_TIMEOUT_MS, 0))),
     ssl:              bool(process.env.PGSSL, false),
     /**
      * نسخهٔ فقط-خواندنی (read replica، `lib/read-replica.js`، docs/SCALING-fa.md). خالی (پیش‌فرض) ⇒ هیچ استخرِ دومی
@@ -327,6 +333,9 @@ const config = {
     //  `otpMax` به‌ازای هر ایمیل است، پس امتحانِ هزار ایمیلِ گوناگون از یک
     //  جا هیچ سقفی نداشت. سی در ربع ساعت برای یک کافی‌نت هم بس است.
     probeIpMax:   num(process.env.RATE_PROBE_IP_MAX, 30),
+    //  ⛔ S18 (ممیزیِ ۳۵): `otp/request` ِ ایمیلی فقط سطلِ «هر مقصد» داشت ⇒ از یک IP به هر شمار ایمیلِ گوناگون کد
+    //  می‌رفت (فقط زیرِ سقفِ عمومیِ ۶۰۰). پیامک سقفِ IP ِ خودش را در `otp.smsGuard` دارد.
+    otpIpMax:     num(process.env.RATE_OTP_IP_MAX, 30),
     /*
      *  زدنِ کد (تأییدِ ثبت‌نام، رمزِ تازه، ورود با کد) — **جدا از فرستادن**.
      *

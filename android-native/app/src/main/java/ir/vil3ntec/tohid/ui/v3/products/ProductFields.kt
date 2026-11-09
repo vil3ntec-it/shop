@@ -93,7 +93,7 @@ internal fun ProductFieldGroups(
   nameHelper: String? = null,
   /** AI-06: دستهٔ پیشنهادی از نام (`rememberCategorySuggest`)؛ null ⇒ هیچ */
   suggest: ((String) -> List<ProductSuggest.Pick>)? = null,
-  /** PRD-12: کادرِ «قیمتِ عمده» — فقط ویرایش با «لیستِ قیمت در صندوق» روشن */
+  /** PRD-12: کادرِ «قیمتِ عمده» — فرمِ تازه و ویرایش، فقط با «لیستِ قیمت در صندوق» روشن */
   wholesale: Boolean = false,
 ) {
   val strict = mode == ProductFormModel.Mode.NEW

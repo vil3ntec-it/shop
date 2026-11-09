@@ -179,6 +179,32 @@ test('سنجش سرِ آستانه: صفِ ایمیلِ ۲۹ دقیقه⇒نه/�
   assert.ok(!(await targets()).includes('payments.reconcile'));
 });
 
+test('سنجش: شکستِ پیاپیِ تطبیق میانِ نمونه‌ها و پس از راه‌اندازیِ دوباره گم نمی‌شود (شمارش در پایگاه)', async () => {
+  //  «نمونهٔ دیگر» یا «همین سرور پس از راه‌اندازیِ دوباره» = نسخهٔ تازهٔ همان پرونده با حافظهٔ صفر، روی همان پایگاه
+  const file = require.resolve('../src/lib/payment-reconciler');
+  const here = require(file);
+  await here.noteReconcile(null);
+  const mine = require.cache[file];
+  delete require.cache[file];
+  const other = require(file);
+  require.cache[file] = mine;
+  assert.notEqual(other, here);
+  for (let i = 0; i < 2; i++) await other.noteReconcile({ name: 'TypeError', code: 'ETIMEDOUT' });
+  //  دو نوبت در نمونهٔ دیگر، نوبتِ سوم پس از «راه‌اندازیِ دوباره» (باز نسخهٔ تازه)
+  delete require.cache[file];
+  const restarted = require(file);
+  require.cache[file] = mine;
+  await restarted.noteReconcile({ name: 'ReconcileErrors', code: '2' });
+  assert.equal(here.reconcileHealth().streak, 0, 'حافظهٔ نمونهٔ پیجر هیچ شکستی ندیده');
+  const f = (await paging.criticalFindings(db.now())).find((x) => x.target === 'payments.reconcile');
+  assert.ok(f, '⛔ سه شکستِ پیاپی در نمونه‌های دیگر ⇒ هشدارِ بحرانی در پیجر');
+  assert.deepEqual([f.detail.streak, f.detail.lastError], [3, 'ReconcileErrors:2']);
+  await other.noteReconcile(null);
+  assert.ok(!(await paging.criticalFindings(db.now())).some((x) => x.target === 'payments.reconcile'), 'نوبتِ موفقِ هر نمونه شمارش را صفر می‌کند');
+  const row = await db.one(`SELECT value FROM app_config WHERE key = 'ops:payments.reconcile.health'`);
+  assert.ok(!/ETIMEDOUT|stack|at /.test(row.value.replace('"lastError":""', '')), 'فقط عدد و زمان، بی متنِ خطا');
+});
+
 test('سنجش: کارِ حیاتیِ شکست‌خورده یا از مهلت‌گذشته با پرچمِ روشن critical، کارِ دیگر همان high', async () => {
   jobBeat._reset();
   await jobBeat.wrap('order-notify', MIN, async () => { throw new Error('x'); })().catch(() => null);

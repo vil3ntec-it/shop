@@ -54,13 +54,28 @@ const TRANSITIONS = Object.freeze({
  * «مهلت» (پس از `ends_at` و تا `graceEndsAt`) از «فعال» است، و «هنوز
  * شروع‌نشده» (`scheduled`). دسترسی فقط از `active` می‌آید و عوض نشده.
  */
+/*
+ *  ⛔ SUB-03 ساعت (فقط دکان؛ مهاجرتِ ۳۳۳): ردیفِ جدولِ دکان ستونِ `auto_expired_at` را دارد (NULL یا عدد)؛ ردیفِ پمپ
+ *  هرگز ⇒ پمپ بیت‌به‌بیت همان پیشین. در ناسازگاریِ ساعتِ کنونی با شاهدِ ثبت‌شده، همیشه به سودِ دکان:
+ *   ۱) بستنِ **خودکار** (نه دستیِ مدیر) که ساعتِ کنونی هنوز به لحظه‌اش نرسیده و هنوز در مدت/مهلت است ⇒ ساعت جلو
+ *      پریده بود و درست شده: «فعال» (خانه‌تکانیِ بعدی ستون را هم برمی‌گرداند — `healClockExpired`).
+ *   ۲) ردیفی که سرور آن را **پس از** شروعش نوشته (`updated_at ≥ starts_at`: اعطا یا تمدیدِ «همین لحظه») «شروع‌نشده»
+ *      نیست، حتی اگر ساعت پس از آن عقب رفته باشد. شروعِ آیندهٔ واقعیِ مدیر پیش از شروع نوشته شده ⇒ همان «شروع‌نشده».
+ *  هزینه: خطای ساعت حداکثر به اندازهٔ همان خطا دسترسیِ پولیِ اضافه می‌دهد، نه کمتر.
+ */
+const clockSafe = (sub) => Object.prototype.hasOwnProperty.call(sub, 'auto_expired_at');
+
 function stateOf(sub, at = now()) {
   if (!sub) return { status: 'none', phase: 'none', active: false, endsAt: 0, startsAt: 0, daysLeft: 0, plan: '' };
   const endsAt = Number(sub.ends_at);
   const graceEnd = endsAt + (sub.grace_days || 0) * DAY;
+  const safe = clockSafe(sub);
   let status = sub.status;
+  if (safe && status === 'expired' && sub.auto_expired_at !== null && sub.auto_expired_at !== undefined
+      && at < Number(sub.auto_expired_at) && at <= graceEnd) status = 'active';
   if (status === 'active' && at > graceEnd) status = 'expired';
-  const active = status === 'active' && at >= Number(sub.starts_at) && at <= graceEnd;
+  const begun = at >= Number(sub.starts_at) || (safe && Number(sub.updated_at) >= Number(sub.starts_at));
+  const active = status === 'active' && begun && at <= graceEnd;
   let phase = status;
   if (status === 'active') phase = !active ? 'scheduled' : at > endsAt ? 'grace' : 'active';
   return {
@@ -130,6 +145,19 @@ function build(T) {
 
   /** بستن اشتراک‌هایی که مهلتشان تمام شده — با ساعت سرور. */
   async function expireDue(at = now()) {
+    //  ⛔ دکان (مهاجرتِ ۳۳۳): پیش از بستن، برگرداندنِ بستنِ خودکارِ نادرستِ پیشین؛ بستن با شاهدِ ساعت و روی نمایهٔ
+    //  عبارتیِ `ix_subs_active_grace_end` (عددِ روز همان‌جا ثابت است، نه پارامتر). پمپ همان پرس‌وجوی پیشین.
+    if (T === tenancy.SHOP) {
+      await healClockExpired(at);
+      const r = await query(
+        `UPDATE ${TBL}
+            SET status='expired', updated_at=$1, auto_expired_at=$1
+          WHERE status='active'
+            AND (ends_at + grace_days * ${DAY}::bigint) < $1`,
+        [at]
+      );
+      return r.rowCount;
+    }
     const r = await query(
       `UPDATE ${TBL}
           SET status='expired', updated_at=$1
@@ -138,6 +166,48 @@ function build(T) {
       [at, DAY]
     );
     return r.rowCount;
+  }
+
+  /*
+   *  ⛔ SUB-03 ساعت (فقط دکان): بستنِ خودکاری که ساعتِ کنونی هنوز به لحظه‌اش نرسیده و مدت/مهلتش هنوز نگذشته ⇒ ساعت
+   *  جلو پریده بود. ستون `active` برمی‌گردد تا `grant`، `liveOf` و فهرست‌های SQL همان «فعال» ِ `stateOf` را ببینند:
+   *  تمدیدِ بعدی از پایانِ خودِ ردیف است، نه از «اکنون». زیرِ همان قفلِ `sub-grant` ِ اعطا و فقط وقتی ردیفِ زندهٔ دیگری
+   *  نیست (ایندکسِ یکتای «یک زنده»؛ اعطای پنجرهٔ نادرست خودش زنده است). در حالتِ عادی هیچ ردیفی ندارد: یک نگاه به نمایهٔ
+   *  جزئیِ `ix_subs_auto_expired`.
+   */
+  async function healClockExpired(at) {
+    const rows = await many(
+      `SELECT id, ${KEY} AS tenant_id FROM ${TBL}
+        WHERE status='expired' AND auto_expired_at IS NOT NULL AND auto_expired_at > $1
+          AND (ends_at + grace_days * ${DAY}::bigint) >= $1
+        ORDER BY auto_expired_at LIMIT 200`,
+      [at]
+    );
+    let healed = 0;
+    for (const r of rows) {
+      const back = await tx(async (c) => {
+        await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sub-grant:${T.app}:${r.tenant_id}`]);
+        const u = (await c.query(
+          `UPDATE ${TBL} s SET status='active', auto_expired_at=NULL, updated_at=$2
+            WHERE s.id=$1 AND s.status='expired' AND s.auto_expired_at > $2
+              AND (s.ends_at + s.grace_days * ${DAY}::bigint) >= $2
+              AND NOT EXISTS (SELECT 1 FROM ${TBL} o WHERE o.${KEY}=s.${KEY} AND o.id<>s.id
+                                AND o.status IN ('active','suspended','pending'))
+          RETURNING *`,
+          [r.id, at]
+        )).rows[0];
+        if (u) {
+          await logChange({
+            subscriptionId: u.id, tenantId: u[KEY], action: 'status', plan: u.plan,
+            prevStatus: 'expired', newStatus: 'active', prevEndsAt: Number(u.ends_at), newEndsAt: Number(u.ends_at),
+            actor: 'system', note: 'clock: بستنِ خودکار با ساعتِ جلورفته برگشت',
+          }, c);
+        }
+        return u;
+      });
+      if (back) healed++;
+    }
+    return healed;
   }
 
   /**

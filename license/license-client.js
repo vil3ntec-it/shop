@@ -553,13 +553,14 @@
     async upload(data, { label = '', manual = false, ext = 'json' } = {}) {
       const q = new URLSearchParams({ ext, kind: manual ? 'manual' : 'auto', label });
       const body = typeof data === 'string' ? new Blob([data], { type: 'application/octet-stream' }) : data;
+      const sent = readStore().accessToken || '';
       try {
         return await apiRaw(`/api/v1/me/backups?${q}`, { body });
       } catch (e) {
         //  توکنِ پیر — یک بار تازه و یک بار دوباره، مثلِ `apiWithRefresh`
         if (e.code !== 'invalid_token' && e.status !== 401) throw e;
         if (!readStore().refreshToken) throw e;
-        await refreshSession();
+        await refreshSession(sent);
         return apiRaw(`/api/v1/me/backups?${q}`, { body });
       }
     },
@@ -569,36 +570,32 @@
     },
   };
 
-  /** تازه‌سازی خودکار توکن دسترسی در صورت انقضا. */
+  /** تازه‌سازی خودکار توکن دسترسی در صورت انقضا؛ `sent` همان توکنِ درخواست (`api` همان را می‌خواند) ⇒ `refreshSession(sent)`. */
   async function apiWithRefresh(path, opts) {
+    const sent = readStore().accessToken || '';
     try {
       return await api(path, opts);
     } catch (e) {
       if (e.code !== 'invalid_token' && e.status !== 401) throw e;
       if (!readStore().refreshToken) throw e;
-      await refreshSession();
+      await refreshSession(sent);
       return api(path, opts);
     }
   }
 
   /**
    *  تازه‌سازیِ نشست — **یکی** برای همهٔ لایه‌های وب.
-   *
-   *  ⛔ سرور توکنِ تازه‌سازی را در هر بار می‌چرخاند و توکنِ قبلی را — اگر
-   *  بیرون از پنجرهٔ ارفاقِ سی‌ثانیه‌ای برگردد — «دزدی» می‌گیرد و کلِ نشستِ
-   *  این مرورگر را می‌بندد (`refresh_reused`). این‌جا تا دیروز فقط توکنِ
-   *  دسترسی نوشته می‌شد و توکنِ چرخیده دور می‌رفت، پس دومین تازه‌سازی
-   *  (حدودِ دو ساعت کار، یا فردا) کاربر را بیرون می‌انداخت.
-   *
-   *  اگر `account-code.js` بالا آمده، همان `TohidAccount.refresh` به کار
-   *  می‌رود: یک تازه‌سازیِ هم‌زمان برای هر سه لایه، نه سه تا که زنجیره را
-   *  روی هم بچرخانند. جایگزینش همان کار را می‌کند و توکنِ چرخیده را نگه
-   *  می‌دارد. ⚠️ هیچ‌کدام نشست را این‌جا پاک نمی‌کنند: خطا فقط بالا می‌رود.
+   *  ⛔ سرور توکنِ تازه‌سازی را در هر بار می‌چرخاند و توکنِ قبلی را — بیرون از پنجرهٔ ارفاقِ سی‌ثانیه‌ای —
+   *  «دزدی» می‌گیرد و کلِ نشستِ این مرورگر را می‌بندد (`refresh_reused`)؛ پس توکنِ چرخیده همیشه نگه داشته می‌شود.
+   *  با `account-code.js` همان `TohidAccount.refresh` (یک تازه‌سازیِ هم‌زمان برای هر سه لایه)؛ جایگزینش همان کار.
+   *  ⚠️ هیچ‌کدام نشست را این‌جا پاک نمی‌کنند: خطا فقط بالا می‌رود. ⛔ `stale` = توکنی که درخواستِ ۴۰۱‌خورده با آن
+   *  رفت؛ ذخیره دیگر آن نیست ⇒ همان توکنِ تازه و **بی چرخشِ دوباره** (شرح سرِ `account-code.js` → `refresh`).
    */
-  async function refreshSession() {
+  async function refreshSession(stale) {
     const acc = window.TohidAccount;
-    if (acc && typeof acc.refresh === 'function') return acc.refresh();
+    if (acc && typeof acc.refresh === 'function') return acc.refresh(stale);
     const st = readStore();
+    if (stale && st.accessToken && st.accessToken !== stale) return st.accessToken;
     const r = await api('/api/v1/auth/refresh', {
       method: 'POST', auth: false, body: { refreshToken: st.refreshToken },
     });

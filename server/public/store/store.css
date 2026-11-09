@@ -172,6 +172,8 @@
 .ct-hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
 .ct-hit { width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .ct-find .input { flex: 1 1 auto; min-width: 0; }
+.ct-vc audio { width: 100%; }
+.ct-vc[data-st="rec"] .ct-time::before { content: ''; display: inline-block; width: .6em; height: .6em; margin-inline-end: .4em; border-radius: 50%; background: var(--danger); }
 
 /* CHK-15/16: یادداشت و «اگر نبود…» ِ هر قلم در برگهٔ ثبت (store/line-prefs.js ِ دیربار) */
 .sum-lines li.lp-li { flex-wrap: wrap; }
