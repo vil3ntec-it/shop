@@ -105,6 +105,8 @@ class V3ReachabilityTest {
     Feature("PUR-02 جزئیات، فرستادن و لغو با دلیل (گوشی)", "purchasing/orders/{id}", "$MONEY.PoCancelSheet", "$MONEY.postReceipt", root = "$MONEY.PurchaseOrderRoute"),
     Feature("PUR-02 ویرایشِ پیش‌نویس (گوشی)", "purchasing/orders/{id}/edit", "$MONEY.PoEditorForm", root = "$MONEY.PurchaseOrderEditRoute"),
     Feature("PUR-04 دریافتِ کامل/جزئی با اسکن، خراب و باقی‌ماندهٔ باز (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiveForm", root = "$MONEY.PurchaseOrderReceiveRoute"),
+    //  PUR-04 (دستهٔ ۳۴): دریافتِ کامل با یک لمس — «رسیده» ِ هر ردیفِ باز = باقی‌مانده (`PoForms.fillRemaining`)
+    Feature("PUR-04 دریافتِ همهٔ باقی‌مانده با یک لمس (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiveAll", root = "$MONEY.PurchaseOrderReceiveRoute"),
     Feature("PUR-14 تطبیقِ سفارش، رسید و فاکتور (گوشی)", "purchasing/orders/{id}/match", "$MONEY.PurchaseOrderMatchRoute", root = "$MONEY.PurchaseOrderMatchRoute"),
     Feature("PUR-13 برچسبِ اقلامِ رسیده پس از دریافت (گوشی)", "purchasing/orders/{id}/receive", "$MONEY.PoReceiptLabels", "ir.vil3ntec.tohid.ui.platform.printReceiptLabels", root = "$MONEY.PurchaseOrderReceiveRoute"),
     Feature("PUR-13 برچسبِ هر رسید در جزئیاتِ سفارش (گوشی)", "purchasing/orders/{id}", "$MONEY.PoReceiptLabels", root = "$MONEY.PurchaseOrderRoute"),

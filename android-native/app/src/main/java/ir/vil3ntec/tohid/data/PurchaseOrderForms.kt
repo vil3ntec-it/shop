@@ -283,6 +283,25 @@ object PoForms {
   fun recvRows(o: PurchaseOrderDto): Map<String, RecvRow> =
     o.lines.associate { it.id to RecvRow(price = num(PurchaseOrderBook.asAfn(it.priceMinor))) }
 
+  /** باقی‌ماندهٔ بازِ هر ردیف (میلی‌واحدِ همان ردیف، از `progress` ِ سرور؛ بی آن همان مقدارِ سفارش) */
+  private fun remaining(o: PurchaseOrderDto): Map<String, Long> {
+    val prog = o.progress.associateBy { it.lineId }
+    return o.lines.associate { it.id to (prog[it.id]?.remainingMilli ?: it.qtyMilli) }
+  }
+
+  /** دکمهٔ «دریافتِ همهٔ باقی‌مانده» فقط وقتی ردیفی هنوز باز است */
+  fun hasRemaining(o: PurchaseOrderDto): Boolean = remaining(o).values.any { it > 0 }
+
+  /**
+   *  PUR-04 «دریافتِ همهٔ باقی‌مانده» (دریافتِ کامل با یک لمس، بی تایپ یا اسکنِ تک‌تکِ اقلام): «رسیده» ِ هر ردیفِ باز = همان
+   *  باقی‌مانده، دقیق به هزارمِ واحدِ همان ردیف (کارتن، دانه). خراب و فی دست نمی‌خورند (خراب از پذیرفته کم می‌شود و همان
+   *  اندازه باز می‌ماند) و ردیفِ کامل همان می‌ماند. فقط کادرها پر می‌شوند — سنجش همان [receipt] و سرور است.
+   */
+  fun fillRemaining(o: PurchaseOrderDto, rows: Map<String, RecvRow>): Map<String, RecvRow> =
+    rows + remaining(o).filterValues { it > 0 }.mapValues { (id, left) ->
+      (rows[id] ?: RecvRow()).copy(received = num(PurchaseOrderBook.units(left)))
+    }
+
   sealed interface Scan {
     /** [unit] (PRD-07) نامِ واحدِ خریدی که بارکدش خوانده شد؛ بارکدِ خودِ کالا ⇒ null */
     data class Added(val rows: Map<String, RecvRow>, val lineId: String, val name: String, val received: String, val unit: String? = null) : Scan

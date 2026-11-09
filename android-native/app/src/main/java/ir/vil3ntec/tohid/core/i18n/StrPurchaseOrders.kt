@@ -69,6 +69,12 @@ object StrPurchaseOrders {
 
   // ── دریافت با اسکن (PUR-04) ──
   val scanHint: String get() = t("بارکد را اسکن کنید یا بنویسید", "Scan or type a barcode", "بارکوډ سکن یا ولیکئ")
+  val receiveAll: String get() = t("دریافتِ همهٔ باقی‌مانده", "Receive all remaining", "ټول پاتې ترلاسه کړئ")
+  val filledAll: String get() = t(
+    "«رسیده» ِ هر قلمِ باز همان باقی‌مانده شد؛ خراب را بنویسید و پیش از ثبت ببینید.",
+    "Each open item's received is now its remaining; enter any damaged and check before saving.",
+    "د هر پرانیستي توکي رسېدلی اوس د هغه پاتې دی؛ خراب ولیکئ او له ثبت مخکې یې وګورئ.",
+  )
   fun scanned(name: Any?, received: Any?): String = t("«${asIs(name)}»: رسیده ${asIs(received)}", "“$name”: received $received", "«$name»: رسېدلي $received")
   fun leftAfter(left: Any?, unit: Any?): String = t(
     "پس از این رسید مانده ${asIs(left)} ${asIs(unit)} (باز می‌ماند)",
