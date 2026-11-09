@@ -864,6 +864,10 @@
   (`parseCsv` ِ `lib/image-bank-csv.js`: `csv_too_large`)؛ شیء از کلیدهای درخواست با `Object.fromEntries` + کنار گذاشتنِ `__proto__`/`constructor`/`prototype`، نه
   `o[k] = …`؛ احراز (`auth(...)`) بی شرطِ بیرونی روی مقدارِ کاربر — خودش ورودیِ تهی/بی‌شکل را رد می‌کند. هشدارهای `lib/sync-v1.js`
   (کلیدِ `op.fields` در `applyOp`) مشترک با پمپ‌اند و دست نمی‌خورند.
+- ⛔ آزمونِ شبیه‌سازِ آیفون (`iosSimulatorArm64Test`، فرآیندِ بی بستهٔ `test.kexe`) کلیددانِ iOS ندارد (OSStatus -25291، حتی با
+  `e2e/test.entitlements`): آزمونی که از `Keychain` می‌گذرد (KEK ِ `AtRest`/`SignOutVault`، هویتِ دستگاه، توکن) روی `Keychain.memory`
+  می‌رود و پس از خود برمی‌گرداند؛ ردهٔ دسترسی (`kSecAttrAccessible`) با `Keychain.addRequestIs` (همان درخواستِ `SecItemAdd`) سنجیده
+  می‌شود، نه با خواندنِ کلیددان. آزمونِ تازهٔ iOS پیش از ادغام یک بار روی کارِ `ios-app` سبز دیده شود (دستهٔ ۳۱ ‏#1015: اجرای خودِ شاخه‌ها لغو شد و سه آزمون از آن پس سرخ ماند).
 
 ### v3 · نقشهٔ پرچم‌ها
 
