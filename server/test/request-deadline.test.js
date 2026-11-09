@@ -45,11 +45,18 @@ async function call(base, p, init) {
 
 test.after(() => { process.off('uncaughtException', onCrash); process.off('unhandledRejection', onCrash); });
 
+/*
+ *  ⚠️ مسیرِ «کند» تا `release()` پاسخ نمی‌دهد، نه با تایمرِ ۴۰۰ms: زیرِ گیرِ حلقهٔ رویداد (CI ِ پربار) Node همهٔ تایمرهای
+ *  موعدرسیدهٔ یک فهرستِ هم‌مدت را پیش از فهرستِ دیگر می‌دواند، پس تایمرِ ۴۰۰ms ِ مسیر (هم‌فهرستِ تایمرِ درخواستِ پیشین)
+ *  پیش از تایمرِ ۱۵۰ms ِ مهلت اجرا می‌شد و ۲۰۱ ِ دیر زودتر می‌رسید (CI ِ #1021). با «رها» پاسخِ مسیر پیش از ۵۰۳ ممکن نیست.
+ */
 test('مسیرِ کند ⇒ ۵۰۳ ِ request_timeout سرِ مهلت؛ نوشتن و خطای دیر دور ریخته می‌شوند و فرایند نمی‌افتد', async () => {
+  let release = null;
+  const gate = new Promise((r) => { release = r; });
   const s = await serve({ ms: 150, floorMs: 0 }, (app) => {
-    app.get('/api/slow', async (req, res) => { await sleep(500); res.json({ late: true }); });
-    app.get('/api/slow-throw', async () => { await sleep(400); throw new Error('دیر'); });
-    app.get('/api/slow-cb', (req, res) => { setTimeout(() => res.status(201).set('X-Late', '1').send('دیر'), 400); });
+    app.get('/api/slow', async (req, res) => { await gate; res.json({ late: true }); });
+    app.get('/api/slow-throw', async () => { await gate; throw new Error('دیر'); });
+    app.get('/api/slow-cb', (req, res) => { gate.then(() => res.status(201).set('X-Late', '1').send('دیر')); });
     app.get('/api/fast', (req, res) => res.json({ ok: true }));
   });
   try {
@@ -57,10 +64,11 @@ test('مسیرِ کند ⇒ ۵۰۳ ِ request_timeout سرِ مهلت؛ نوشت
     assert.equal(r.status, 503);
     assert.equal(r.body.error.code, 'request_timeout');
     assert.equal(r.retry, '5');
-    assert.ok(r.ms < 450, `سرِ مهلت، نه پس از کارِ مسیر (${r.ms}ms)`);
+    assert.ok(r.ms >= 140, `سرِ مهلت، نه زودتر (${r.ms}ms)؛ کارِ مسیر هنوز رها نشده`);
     assert.equal((await call(s.base, '/api/slow-throw')).status, 503);
     assert.equal((await call(s.base, '/api/slow-cb')).status, 503);
-    await sleep(600);   //  نوشتن‌ها و خطای دیر در این فاصله می‌رسند
+    release();          //  حالا کارِ هر سه مسیر تمام می‌شود: نوشتن‌ها و خطای دیر پس از ۵۰۳
+    await sleep(300);
     assert.deepEqual(crashes.map(String), [], '⛔ بی ERR_HTTP_HEADERS_SENT و بی افتادنِ فرایند');
     const f = await call(s.base, '/api/fast');
     assert.deepEqual([f.status, f.body], [200, { ok: true }], 'سرور سالم و مسیرِ تند دست‌نخورده');
@@ -69,11 +77,14 @@ test('مسیرِ کند ⇒ ۵۰۳ ِ request_timeout سرِ مهلت؛ نوشت
 
 test('بریده نمی‌شوند: جریانی که سرآیندش رفته، long-poll، پمپ و Sync v1، بارگذاریِ خوانده‌نشده؛ خاموش و کف همان پیشین', async () => {
   const slow = (app, p) => app.all(p, async (req, res) => { await sleep(350); res.json({ ok: true }); });
+  //  آن‌چه باید بریده شود تا `release()` پاسخ نمی‌دهد (همان علتِ آزمونِ بالا: تایمرِ مسیر پیش از مهلت زیرِ گیرِ CI)
+  let release = null;
+  const gate = new Promise((r) => { release = r; });
   const s = await serve({ ms: 120, floorMs: 0 }, (app) => {
     app.get('/api/stream', async (req, res) => { res.write('a'); await sleep(350); res.end('b'); });
     for (const p of ['/api/pump/device/rate', '/api/v1/pump/x', '/api/sync/v1/pull']) slow(app, p);
-    slow(app, '/api/chat/messages');
-    slow(app, '/api/json-slow');
+    app.all('/api/chat/messages', async (req, res) => { await (req.query.wait === '0' ? gate : sleep(350)); res.json({ ok: true }); });
+    app.all('/api/json-slow', async (req, res) => { await gate; res.json({ ok: true }); });
     app.post('/api/upload', async (req, res) => { let n = 0; for await (const c of req) n += c.length; await sleep(350); res.json({ n }); });
   });
   try {
@@ -96,7 +107,7 @@ test('بریده نمی‌شوند: جریانی که سرآیندش رفته، 
     //  ولی بدنهٔ JSON ِ خوانده‌شده (ورود، ثبتِ سفارش، push) شمرده می‌شود
     const js = await call(s.base, '/api/json-slow', { method: 'POST', body: JSON.stringify({ a: 1 }), headers: { 'content-type': 'application/json' } });
     assert.deepEqual([js.status, js.body.error?.code], [503, 'request_timeout'], 'POST ِ JSON هم مهلت دارد');
-  } finally { await s.close(); }
+  } finally { release(); await s.close(); }
 
   for (const opts of [{ ms: 0 }, { ms: 1, floorMs: 1000 }]) {
     const o = await serve(opts, (app) => slow(app, '/api/slow'));
