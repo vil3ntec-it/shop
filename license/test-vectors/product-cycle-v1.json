@@ -1,0 +1,47 @@
+{
+  "_doc": "MKT-06 «چرخهٔ مصرف (روز)» ِ کالا: کادرِ ویرایش ⇐ مقدارِ دفتر. برنامه: android-native/.../data/ProductCycle.kt (ProductCycleVectorsTest)؛ وب: license/product-cycle.js (web-product-cycle.test.js). parse: رقمِ فارسی/عربی ⇐ لاتین، سپس trim ِ Kotlin (Char.isWhitespace = Character.isWhitespace || isSpaceChar: U+001C..U+001F و U+00A0 بله، U+FEFF نه)، فقط ۱ تا ۳ رقمِ 0-9 و ۱ ≤ n ≤ max. out: clear ⇒ کلید برداشته (null)، bad ⇒ ذخیره بسته، عدد ⇒ همان روز. text: مقدارِ دفتر ⇐ متنِ کادر (نادرست ⇒ خالی). سقف همان CYCLE_MAX ِ server/src/lib/storefront.js",
+  "max": 365,
+  "parse": [
+    { "in": "", "out": "clear" },
+    { "in": "   ", "out": "clear" },
+    { "in": " \t", "out": "clear" },
+    { "in": "30", "out": 30 },
+    { "in": " 30 ", "out": 30 },
+    { "in": "۱۴", "out": 14 },
+    { "in": "٣٦٥", "out": 365 },
+    { "in": "۰۷", "out": 7 },
+    { "in": "1", "out": 1 },
+    { "in": "365", "out": 365 },
+    { "in": "030", "out": 30 },
+    { "in": "\u001f30", "out": 30 },
+    { "in": " 30　", "out": 30 },
+    { "in": " ۹۰", "out": 90 },
+    { "in": "0", "out": "bad" },
+    { "in": "000", "out": "bad" },
+    { "in": "366", "out": "bad" },
+    { "in": "999", "out": "bad" },
+    { "in": "1000", "out": "bad" },
+    { "in": "0030", "out": "bad" },
+    { "in": "-3", "out": "bad" },
+    { "in": "+30", "out": "bad" },
+    { "in": "7.5", "out": "bad" },
+    { "in": "۷٫۵", "out": "bad" },
+    { "in": "3 0", "out": "bad" },
+    { "in": "abc", "out": "bad" },
+    { "in": "30روز", "out": "bad" },
+    { "in": "１２", "out": "bad" },
+    { "in": "﻿30", "out": "bad" },
+    { "in": "‌30", "out": "bad" },
+    { "in": "1e2", "out": "bad" },
+    { "in": "0x1F", "out": "bad" }
+  ],
+  "text": [
+    { "in": null, "out": "" },
+    { "in": 0, "out": "" },
+    { "in": -5, "out": "" },
+    { "in": 1, "out": "1" },
+    { "in": 30, "out": "30" },
+    { "in": 365, "out": "365" },
+    { "in": 366, "out": "" }
+  ]
+}

@@ -53,6 +53,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
+  بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
+  `web-product-cycle.mjs` ۱۰/۱۰ (PGlite و PostgreSQL ِ محلی؛ از صفحه تا `?ids=` ِ ویترین؛ بی بارکننده و سه جهش سرخ).
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. بقیهٔ MKT بسته به بیرون/تصمیم: MKT-02 (برنامهٔ خرید)، MKT-03/04/05/07/08 (O-01، D-09، رضایت و
+  قاعدهٔ پاداش = تصمیمِ صاحب‌کار)، MKT-10 (چاپگرِ واقعی)، MKT-12 (D-09).
+- قدمِ بعدی: شاهدِ CI ِ `web-product-cycle.mjs` (گامِ «آزمونِ نسخهٔ وب») و `ProductCycleVectorsTest` ⇒ بازنگریِ متنِ MKT-06.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-2` (ردیف‌های غیرِ P0 ِ ویترین، سفارشِ آنلاین و پیک؛ بارِ نخست؛ روی `ccr-3a0d593c-ac0jpj-batch-34` = #1018؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) باگِ واقعیِ مشتری: `PUT`/`merge` ِ سبدِ سرور و ♥ همان سطلِ `store-checkout` ِ ثبت را (۲۰ در ربع ساعت به‌ازای IP) می‌خوردند ⇒
   مشتریِ واردشده پس از ~۲۰ تغییرِ سبد سفارش را با ۴۲۹ نمی‌توانست ثبت کند؛ حالا سطلِ `store-acct-sync` (`RATE_STORE_SYNC_MAX` ۲۴۰)،
