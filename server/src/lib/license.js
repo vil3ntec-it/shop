@@ -44,6 +44,15 @@ const AUDIENCE_PUMP = 'tohid-pump-app';
 /** عمر خود مجوز (نه اشتراک): ده روز */
 const TOKEN_TTL_MS = 10 * 24 * 60 * 60 * 1000;
 
+/**
+ *  SYN-01 / D-05 — عمرِ مجوزِ **دکان** با پرچمِ `shop.license_offline_30d` (پیش‌فرض خاموش، `routes/license.js`): ۳۵ روز.
+ *  دستگاهِ بی اینترنت مجوزش را تازه نمی‌کند؛ با ده روز، روزِ یازدهمِ قطعی «فروش» و «قرض‌داران» (`VipGate`) قفل می‌شد
+ *  حتی برای دکانی که اشتراکش ماه‌ها مانده بود (`Offline30DaysDesktopTest`). سقفِ همیشگی سرِ جایش است: هرگز دیرتر از
+ *  پایانِ اشتراک و مهلتش (`activeUntil`)، و لغو یا «اشتراک نیست» ِ سرور همان دم مجوزِ دستگاهِ آنلاین را برمی‌دارد
+ *  (`Syncer.refreshLicense`). پمپ و هر صدازننده‌ی دیگر همان ده روز.
+ */
+const SHOP_OFFLINE_TTL_MS = 35 * 24 * 60 * 60 * 1000;
+
 const KEY_PRIVATE = 'license_private_key';
 const KEY_PUBLIC = 'license_public_key';
 
@@ -246,9 +255,12 @@ async function issue({
   planTitle = '',
   audience = AUDIENCE,
   tenantId = '',
+  /** عمرِ خودِ مجوز؛ پیش‌فرض همان ده روز ([TOKEN_TTL_MS]) — فقط مجوزِ دکان با پرچم بلندتر ([SHOP_OFFLINE_TTL_MS]) */
+  ttlMs = TOKEN_TTL_MS,
   at = Date.now(),
 }) {
   const { privateKey } = await keys();
+  const ttl = Number(ttlMs) > 0 ? Number(ttlMs) : TOKEN_TTL_MS;
 
   const header = { alg: 'ES256', typ: 'TLIC', kid: await keyId() };
 
@@ -257,8 +269,8 @@ async function issue({
   //  ⚠️ `activeUntil` پایانِ **مهلتِ** اشتراک است (`graceEndsAt`): تا ۲.۹.۰
   //  سقف همان `ends_at`ِ خام بود، پس در روزهای مهلت سرور «فعال» می‌گفت و
   //  مجوزی می‌داد که همان لحظه منقضی بود.
-  const cap = Number(activeUntil) || Number(subscriptionEndsAt) || at + TOKEN_TTL_MS;
-  const expiresAt = Math.min(at + TOKEN_TTL_MS, cap);
+  const cap = Number(activeUntil) || Number(subscriptionEndsAt) || at + ttl;
+  const expiresAt = Math.min(at + ttl, cap);
   //  مجوزی که پیش از صدور منقضی است امضا نمی‌شود
   if (expiresAt <= at) return null;
 
@@ -357,7 +369,7 @@ async function verifyBytes(buf, sig) {
 
 module.exports = {
   issue, publicKey, keyId, signBytes, verifyBytes, startupCheck, existing, traces, newPem, kidOf,
-  ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS,
+  ISSUER, AUDIENCE, AUDIENCE_PUMP, TOKEN_TTL_MS, SHOP_OFFLINE_TTL_MS,
   /** فقط آزمون: کشِ کلید را خالی می‌کند */
   _reset() { cached = null; loading = null; },
 };
