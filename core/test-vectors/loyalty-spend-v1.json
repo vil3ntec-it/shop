@@ -1,0 +1,466 @@
+{
+ "_doc": "PRM-13 / STF-03 — مصرفِ امتیازِ وفاداری: `Loyalty.Rule.valid`، `Loyalty.cap`، `Loyalty.valueMinor` و `Loyalty.spend` ِ `core/promo/Loyalty.kt` و همتای JS ِ آن `server/src/lib/loyalty-balance.js` (`validRule`، `cap`، `valueMinor`، `spend`). سرور با همین قاعده مصرفِ امتیازِ فاکتورِ کارمند (`loyalty_spend`) را با قاعده و ماندهٔ دفترِ دکان می‌سنجد (`lib/promo-loyalty-review.js`، فقط بررسی). هر قاعده کامل نوشته می‌شود (پیش‌فرض‌های Kotlin و JS یکی نیستند). همه عددِ صحیح؛ مبلغ Minor (یک‌صدمِ افغانی). cap = min(مانده، floor(floor(فاکتور × درصد ÷ ۱۰۰) ÷ (ارزشِ امتیاز × ۱۰۰))، ۱۰^۹)؛ spend: اول قاعده (BAD_RULE)، بعد امتیاز ۱..۱۰^۹ (BAD_POINTS)، بعد مانده (OVER_BALANCE)، بعد سهم (OVER_SHARE). آزمون‌ها: server/test/loyalty-spend.test.js و core/src/jvmTest/.../promo/LoyaltySpendVectorsTest.kt (فقط در CI).",
+ "version": 1,
+ "valid": [
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "out": true
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 50000,
+    "expiryMonths": 0
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 0,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 101,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 120
+   },
+   "out": true
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 121
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 1000001,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 0,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "out": false
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "out": true
+  }
+ ],
+ "cap": [
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "out": 200
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 150,
+   "invoiceMinor": 100000,
+   "out": 150
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 0,
+   "invoiceMinor": 100000,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": -5,
+   "invoiceMinor": 100000,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 0,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 99,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "balance": 10000,
+   "invoiceMinor": 1234567,
+   "out": 246
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 0,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 5000000000,
+   "invoiceMinor": 1000000000000000,
+   "out": 1000000000
+  }
+ ],
+ "valueMinor": [
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "points": 200,
+   "out": 20000
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "points": 246,
+   "out": 123000
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "points": -3,
+   "out": 0
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "points": 2000000000,
+   "out": 100000000000
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1000,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "points": 1000000,
+   "out": 100000000000
+  }
+ ],
+ "spend": [
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "points": 200,
+   "out": {
+    "points": 200,
+    "valueMinor": 20000
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "points": 201,
+   "out": {
+    "code": "OVER_SHARE"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 150,
+   "invoiceMinor": 100000,
+   "points": 151,
+   "out": {
+    "code": "OVER_BALANCE"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": -10,
+   "invoiceMinor": 100000,
+   "points": 5,
+   "out": {
+    "code": "OVER_BALANCE"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "points": 0,
+   "out": {
+    "code": "BAD_POINTS"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "points": -1,
+   "out": {
+    "code": "BAD_POINTS"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 20,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 2000000000,
+   "invoiceMinor": 100000,
+   "points": 1000000001,
+   "out": {
+    "code": "BAD_POINTS"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 1,
+    "maxSharePct": 0,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 0
+   },
+   "balance": 1000,
+   "invoiceMinor": 100000,
+   "points": 0,
+   "out": {
+    "code": "BAD_RULE"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "balance": 10000,
+   "invoiceMinor": 1234567,
+   "points": 246,
+   "out": {
+    "points": 246,
+    "valueMinor": 123000
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "balance": 10000,
+   "invoiceMinor": 1234567,
+   "points": 247,
+   "out": {
+    "code": "OVER_SHARE"
+   }
+  },
+  {
+   "rule": {
+    "everyAfn": 100,
+    "pointAfn": 5,
+    "maxSharePct": 10,
+    "silverAfn": 50000,
+    "goldAfn": 200000,
+    "expiryMonths": 12
+   },
+   "balance": 100,
+   "invoiceMinor": 1234567,
+   "points": 101,
+   "out": {
+    "code": "OVER_BALANCE"
+   }
+  }
+ ]
+}

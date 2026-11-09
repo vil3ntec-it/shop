@@ -76,14 +76,21 @@ async function flagV1(ctx, deviceId, ops, { ip = '' } = {}) {
       if (id && ids.size < MAX_ROWS) ids.add(id);
       if (id && (r.type ?? r.op_type ?? r.opType) === 'insert') inserted.add(id);
     }
-    if (!ids.size) return 0;
+    //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
+    await require('./promo-loyalty-review').v1(ctx, deviceId, ops, { ip });
+    //  CRM-03: ردیفِ «give» ِ دیررسیده بی فاکتورِ همین دسته هم بررسی می‌شود (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
+    if (!ids.size) {
+      await require('./credit-limit-review').v1(ctx, deviceId, [], inserted, { ip, ops });
+      return 0;
+    }
     const rows = await many(
       `SELECT row_id AS id, data FROM sync_rows
         WHERE app=$1 AND account_kind=$1 AND account_id=$2 AND table_name='sales' AND row_id = ANY($3::text[]) AND deleted_at IS NULL`,
       [SHOP.app, ctx.accountId, [...ids]]
     );
-    //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبارِ مشتری ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
-    if (inserted.size) await require('./credit-limit-review').v1(ctx, deviceId, rows, inserted, { ip });
+    //  CRM-03: فروشِ نسیهٔ تازه، ویرایشِ بالابرندهٔ قرض یا تراکنشِ دیررسیده بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی
+    //  (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
+    await require('./credit-limit-review').v1(ctx, deviceId, rows, inserted, { ip, ops });
     return await flag(ctx.accountId, rows, { path: 'v1', deviceId, userId: ctx.userId || '', ip });
   } catch (err) {
     console.error('[credit-debtor] بررسیِ push نشد:', err.message);
@@ -100,8 +107,16 @@ async function flagLegacy({ shopId, userId = '', deviceId = '', ip = '', path = 
       .filter((ch) => isObj(ch) && ch.collection === 'sales' && ch.deleted !== true && isObj(ch.data) && !refused.has(String(ch.id)))
       .slice(0, MAX_ROWS)
       .map((ch) => ({ id: String(ch.id), data: ch.data }));
-    //  CRM-03: همان بررسیِ سقفِ اعتبار (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎) — فقط درجِ تازه
-    if (rows.length && role) await require('./credit-limit-review').legacy({ shopId, role, userId, deviceId, ip, path }, rows);
+    const txRefused = new Set((conflicts || []).filter((c) => c && c.collection === 'transactions').map((c) => String(c.id)));
+    const txs = changes.filter((ch) => isObj(ch) && ch.collection === 'transactions' && ch.deleted !== true && isObj(ch.data)
+      && !txRefused.has(String(ch.id))).slice(0, MAX_ROWS).map((ch) => ch.data);
+    //  CRM-03: همان بررسیِ سقفِ اعتبار (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎) — درجِ تازه و تراکنشِ دیررسیده
+    if ((rows.length || txs.length) && role) await require('./credit-limit-review').legacy({ shopId, role, userId, deviceId, ip, path }, rows, { txs });
+    //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
+    if (role) {
+      await require('./promo-loyalty-review').legacy({ shopId, role, userId, deviceId, ip, path }, changes,
+        new Set((conflicts || []).filter(Boolean).map((c) => `${c.collection}/${c.id}`)));
+    }
     return rows.length ? await flag(shopId, rows, { path, deviceId, userId, ip }) : 0;
   } catch (err) {
     console.error('[credit-debtor] بررسیِ راهِ قدیم نشد:', err.message);

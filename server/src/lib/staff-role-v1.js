@@ -70,9 +70,11 @@ async function rememberAuthorsV1(ctx, valid, rejected, off) {
  * نویسندهٔ درجِ برگشت. روی همان opِ یک‌دست‌شده‌ای سنجیده می‌شود که به v1 می‌رسد (پس از
  * shopNewerFields). سه نقشِ قدیم قاعدهٔ ردیف ندارند، پس برایشان فهرست همیشه خالی است.
  */
-async function offRole(ctx, valid, rejected) {
+async function offRole(ctx, valid, rejected, deviceId = '') {
   const off = await offRoleV1(ctx, valid, rejected);
   await rememberAuthorsV1(ctx, valid, rejected, off);
+  //  CRM-03 (§۱۰.۱، پرچمِ خاموشِ `shop.credit_limit_perm`): تغییرِ سقفِ اعتبارِ مشتری بی `customers.credit_limit` ⇒ رد + صندوق
+  await require('./credit-limit-perm').v1(ctx, valid, rejected, deviceId);
   return off;
 }
 

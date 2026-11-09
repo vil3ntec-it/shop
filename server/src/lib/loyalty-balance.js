@@ -98,4 +98,50 @@ function tier(rule, spendAfn) {
   return 'bronze';
 }
 
-module.exports = { MONTH_MS, MAX_EXPIRY_MONTHS, MAX_POINTS, SOON_MS, TYPES, signed, state, tier };
+// ── مصرف (STF-03، `lib/promo-loyalty-review.js`): همتای دقیقِ `Loyalty.Rule.valid`، `cap`، `valueMinor` و `spend` ──
+//  بردارِ مشترک: `core/test-vectors/loyalty-spend-v1.json` (`test/loyalty-spend.test.js` و `LoyaltySpendVectorsTest.kt`).
+//  همه BigInt: `points × pointAfn × 100` تا ۱۰^۱۷ می‌رسد (Long ِ Kotlin)؛ بیرون از ±(2^53−1) ⇒ null (ناامن، بسته‌به‌خطا).
+
+const MINOR = 100n;
+const MAX_SAFE = BigInt(Number.MAX_SAFE_INTEGER);
+const isInt = (v) => Number.isSafeInteger(v);
+const inRange = (v, lo, hi) => isInt(v) && v >= lo && v <= hi;
+const back = (b) => (b <= MAX_SAFE && b >= -MAX_SAFE ? Number(b) : null);
+
+/** همان `Loyalty.Rule.valid` (طلایی بیش از نقره‌ای؛ انقضا ۰ تا ۱۲۰ ماه) */
+function validRule(r) {
+  if (!r || typeof r !== 'object') return false;
+  const exp = r.expiryMonths === undefined ? 0 : r.expiryMonths;
+  return inRange(r.everyAfn, 1, 1000000) && inRange(r.pointAfn, 1, 1000000) && inRange(r.maxSharePct, 1, 100)
+    && inRange(r.silverAfn, 1, 1000000000000) && inRange(r.goldAfn, r.silverAfn + 1, 1000000000000) && inRange(exp, 0, MAX_EXPIRY_MONTHS);
+}
+
+/** بیشترین امتیازِ قابلِ مصرف روی فاکتورِ [invoiceMinor] — همان `Loyalty.cap` */
+function cap(rule, balance, invoiceMinor) {
+  if (!validRule(rule) || !isInt(balance) || !isInt(invoiceMinor) || balance <= 0 || invoiceMinor <= 0) return 0;
+  const share = (BigInt(invoiceMinor) * BigInt(rule.maxSharePct)) / 100n / (BigInt(rule.pointAfn) * MINOR);
+  const out = [BigInt(balance), share, BigInt(MAX_POINTS)].reduce((a, b) => (b < a ? b : a));
+  return Number(out);
+}
+
+/** ارزشِ [points] امتیاز به Minor — همان `Loyalty.valueMinor` (null = بیرون از بازهٔ امنِ JS) */
+function valueMinor(rule, points) {
+  if (!rule || !isInt(rule.pointAfn) || !isInt(points)) return null;
+  const p = BigInt(Math.max(0, Math.min(MAX_POINTS, points)));
+  return back(p * BigInt(rule.pointAfn) * MINOR);
+}
+
+const SPEND_CODE = Object.freeze({ BAD_RULE: 'BAD_RULE', BAD_POINTS: 'BAD_POINTS', OVER_BALANCE: 'OVER_BALANCE', OVER_SHARE: 'OVER_SHARE' });
+
+/** سنجشِ مصرفِ [points] روی فاکتورِ [invoiceMinor] با ماندهٔ [balance] — همان `Loyalty.spend` ⇒ {ok, points, valueMinor} | {ok:false, code} */
+function spend(rule, balance, invoiceMinor, points) {
+  if (!validRule(rule)) return { ok: false, code: SPEND_CODE.BAD_RULE };
+  if (!isInt(points) || points <= 0 || points > MAX_POINTS) return { ok: false, code: SPEND_CODE.BAD_POINTS };
+  if (!isInt(balance) || points > balance) return { ok: false, code: SPEND_CODE.OVER_BALANCE };
+  if (points > cap(rule, balance, invoiceMinor)) return { ok: false, code: SPEND_CODE.OVER_SHARE };
+  return { ok: true, points, valueMinor: valueMinor(rule, points) };
+}
+
+module.exports = {
+  MONTH_MS, MAX_EXPIRY_MONTHS, MAX_POINTS, SOON_MS, TYPES, SPEND_CODE, signed, state, tier, validRule, cap, valueMinor, spend,
+};

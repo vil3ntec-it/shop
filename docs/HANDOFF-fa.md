@@ -53,6 +53,55 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
+  بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
+  `web-product-cycle.mjs` ۱۰/۱۰ (PGlite و PostgreSQL ِ محلی؛ از صفحه تا `?ids=` ِ ویترین؛ بی بارکننده و سه جهش سرخ).
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. بقیهٔ MKT بسته به بیرون/تصمیم: MKT-02 (برنامهٔ خرید)، MKT-03/04/05/07/08 (O-01، D-09، رضایت و
+  قاعدهٔ پاداش = تصمیمِ صاحب‌کار)، MKT-10 (چاپگرِ واقعی)، MKT-12 (D-09).
+- قدمِ بعدی: شاهدِ CI ِ `web-product-cycle.mjs` (گامِ «آزمونِ نسخهٔ وب») و `ProductCycleVectorsTest` ⇒ بازنگریِ متنِ MKT-06.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-app` (برنامهٔ خرید و ویترین: «فهرستِ خرید»، ♥ و سبد همراهِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-35`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور: «فهرستِ خرید» ِ حساب (`lib/store-shopping-list.js`، مهاجرتِ ۴۳۲ + rollback؛ `GET/PUT /api/store/:slug/account/shopping-list` و
+  `POST …/merge`، پرچمِ ♥، سطلِ `store-acct-sync` پیش از نشست): نسخهٔ دیده‌شده (۴۰۹)، همان محتوا ⇒ تکرارِ بی‌اثر، ادغامِ بیشینه، ۱۰۰ قلم و
+  ۵۰ فهرستِ پُر برای هر مشتری، پنهان = نبوده (بی شمارش)؛ حذفِ دادهٔ مشتری (SEC-10) و privacy.html هم. ممیزیِ مهاجم: IDOR (مشتری/دکانِ دیگر،
+  شناسهٔ بدنه)، تکرار، شمارش، نشستِ ساختگی، ویترینِ بسته و هم‌زمانی (PostgreSQL ِ محلی) ⇒ `storefront-shopping-list.test.js`؛ ثبت در
+  `role-route-isolation` و `routes.json` (SUB-10، route-authz و tenant-matrix از روی سورس خودکار، اجرا شدند). (۲) وب: `catalog.js` ِ دیربار
+  (بیرونِ ۷۱KB) فهرست را مثلِ ♥ با حساب هم‌گام می‌کند (صفِ `store-listsync:`). (۳) برنامهٔ خرید: `AccountRules` (core) با همان درها و ادغام برای
+  سبد، ♥ و فهرست؛ ورود با کدِ واقعیِ سرور (`ModelAccount.kt`)، نشست فقط در Keystore (`SecretsAndroid.kt`)؛ ♥ در برگهٔ کالا، «دلخواه‌ها» در دکان،
+  «فهرستِ خرید» و «حسابِ من» زیرِ سبد، خروج در تنظیمات. (۴) STATUS: متنِ «مانده» ِ WEB-13، CHK-14، MKT-02 و WEB-11 بی ارتقا.
+- نیمه‌کاره: Kotlin این‌جا ساخته نمی‌شود ⇒ `ShopperAccountTest` (core) و `CustomerAccountTest` (اندروید) فقط در CI؛ آیفون نشست را فقط در حافظه
+  نگه می‌دارد (Keychain نیست). پیامکِ واقعیِ تولید همان D-09 است (بی آن ورود در تولید «تأیید راه‌اندازی نشده» می‌گوید).
+- قدمِ بعدی: شاهدِ CI ِ این‌ها و `web-store-web.mjs`؛ Keychain ِ آیفون؛ «کالاهای دیده‌شده» و انتخابِ اسکناس در برنامهٔ خرید (WEB-13، CHK-14).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-syn` (ردیف‌های P0 ِ SEC-03، SYN-01/04/05/06 و OPS-02، بخشِ سرور/JS؛ روی main ‏37f8fa4c = دستهٔ ۳۵، #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) SEC-03 پشتِ `shop.doc_chain`: هر لغوی که S89 می‌نشاند (v1 ِ زنجیره‌دار و بی زنجیره، وب، راهِ قدیم، API) در همان
+  تراکنش حلقهٔ `hash_chain` ِ `void/<دکان>` می‌شود، یک بار برای هر فاکتور (نمایهٔ `sale_void_index`، **مهاجرتِ ۳۲۶**)، بی متنِ دلیل،
+  مبلغ با متنِ عددِ JS؛ شکستِ حلقه لغو را نمی‌بندد (SAVEPOINT ⇒ `void_unrecorded`)؛ بازگرداندنِ تعارضِ مدیرِ ارشد روی فیلدِ مالی/وضعیتِ
+  فاکتورِ ثبت‌شده ۴۰۹ (`adminRestoreCheck`). (۲) SYN-04: push ِ فشرده — پرچمِ خاموشِ `sync.gzip_push` در pull، وب با `CompressionStream`
+  بالای ۱KB، پاسخِ تمیزِ بمب/gzip ِ خراب/کدگذاریِ ناشناخته، CORS. (۳) OPS-02: `server/scripts/phrase-backup.js` (رمز و بازکردنِ پشتیبانِ
+  دستی با عبارت، همان پاکتِ برنامه با بردارِ Python). (۴) شاهدِ PostgreSQL ِ محلی برای آزمون‌های SYN (پیش‌تر فقط PGlite).
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. کاتلین دست نخورد (push ِ فشرده و رمزِ پشتیبانِ درونِ برنامه هنوز نه). SYN-05/06: کارِ بازِ سرور/JS
+  نماند؛ مانده‌ها پرچم و v3 (تصمیمِ صاحب‌کار) و «۵-ب» در `lib/sync-v1.js` ِ مشترک با پمپ.
+- قدمِ بعدی: شاهدِ CI ِ `sale-void-chain`، `sync-gzip-push` و `phrase-backup-tool`؛ کاتلین: `GZIPOutputStream` برای push پس از
+  `gzip_push`، و «پشتیبان روی USB با عبارت» در برنامه با همان پاکت.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/srv-authority` (اختیارِ سرور: STF-03 تخفیف/امتیاز، پیگیری‌های CRM-03، مجوزِ «تغییرِ سقفِ اعتبار»؛ آغاز روی `ccr-3a0d593c-ac0jpj-batch-35`، سپس روی main پس از #1019 (همان درخت)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (همه پشتِ پرچمِ خاموش، بی مسیرِ تازه، بی مهاجرت، ⛔ `sync-v1.js` دست نخورد): (۱) **STF-03** `lib/promo-loyalty-review.js` (`shop.promo_loyalty_review`): `promo` ِ قلم با `promo-core.evaluate` و قاعده‌های دکان، `loyalty_spend` با `Loyalty.spend` (همتای JS ِ تازه در `loyalty-balance.js` + بردارِ `core/test-vectors/loyalty-spend-v1.json` + `LoyaltySpendVectorsTest.kt`) ⇒ فقط سابقهٔ `sale.promo_review` (یک بار، هرگز رد، شکستش push را نمی‌خواباند). (۲) **CRM-03** بررسیِ سقفِ اعتبار حالا دلتای `debtGivenMinor` ِ v3، ویرایشِ قرضِ v1 و تراکنشِ دیررسیده را هم می‌بیند. (۳) مجوزِ هسته‌ایِ `customers.credit_limit` (§۱۰.۱؛ JS/Kotlin/`perm-v1.json`) و اجرا در v1، v3 و REST پشتِ `shop.credit_limit_perm` (`lib/credit-limit-perm.js`). آزمون‌ها روی PGlite و PostgreSQL ِ محلی.
+- نیمه‌کاره: برنامه مجوزِ تازه را پیش از ذخیره نمی‌پرسد و برچسبِ فارسی ندارد (صفحهٔ کارمند/مشتری، بیرون از این کار)؛ Kotlin (`PermCore`، `LoyaltySpendVectorsTest`) فقط در CI.
+- تصمیمِ صاحب‌کار: STF-03/CRM-03 «رد یا بررسی»؛ پیش‌فرضِ `customers.credit_limit` برای شاگرد/صندوق‌دار (امروز «مجاز» = رفتارِ امروز).
+- قدمِ بعدی: شاهدِ CI برای پنج آزمونِ تازه/گسترده و `PermCoreTest`/`LoyaltySpendVectorsTest`؛ سپس پرسیدنِ مجوز در فرمِ مشتریِ برنامه.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chat-web` (گفت‌وگوی ویترین: CHAT-02 و CHAT-14 در وب، `editUntil`، شاهدِ CI ِ CHAT-04/08؛ آغاز روی `ccr-3a0d593c-ac0jpj-batch-35`، سپس روی main ‏37f8fa4c پس از #1019 با همان درخت؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور: `editUntil` ِ ساعتِ سرور (`editWindowMs`) فقط روی پیامِ زندهٔ خودِ مشتری، کنارِ `deleteUntil` (`lib/shop-chat.js` `messageView`، بی خطِ تازه). `shop-chat-web-acts.test.js` (۶ آزمون از راهِ درهای ویترین: editUntil، `not_author`/`edit_window_passed`، ۴۰۴ ِ گفت‌وگوی دیگری، `bad_reply`، جست‌وجوی محدود، سنجاقِ دیگری ۴۰۴ و سنجاقِ بی متن). (۲) CHAT-02 در وب: `store/chat-out.js` (منطقِ خالصِ صف، همزادِ `ChatOutbox`؛ `web-chat-out.test.js`) و سیم‌کشی در `store/chat.js`: حبابِ «در صف» با «دوباره»/«لغو»، localStorage ِ `store-chat-out`، از سر گرفتن با گشودنِ دوباره، پاک شدن با شمارهٔ دیگر، خواندن⇐تغییر⇐نوشتن میانِ برگه‌ها. (۳) CHAT-14 در وب: `store/chat-acts.js` (پاسخ، ویرایش تا `editUntil`، سنجاق، جست‌وجو) با واژه‌نامه‌های جدای `chatq`/`chatacts` (بخشِ `chat` ِ ۴۰۵۳ بایتی جا نداشت). همه دیربار، بارِ نخست دست‌نخورده. (۴) CHAT-04 و CHAT-08 ⇐ IMPLEMENTED-VERIFIED با شاهدِ دیده‌شدهٔ CI ِ main bd6cb560 (شرح در STATUS).
+- دو گامِ `web-store-chat.mjs` عمداً عوض شد: بی‌اینترنت متن دیگر در کادر نمی‌ماند (به حبابِ «در صف» می‌رود)؛ «زدنِ دوباره» پس از جوابِ گم‌شده حالا «دوباره» ِ همان حباب است (و همان `clientId` در دو POST سنجیده می‌شود).
+- نیمه‌کاره: CHAT-07 (ضبطِ صدا در وب) انجام نشد. CHAT-02 و CHAT-14 PARTIAL می‌مانند تا شاهدِ CI ِ همین شاخه.
+- قدمِ بعدی: پس از CI ِ دسته: `web-store-chat.mjs` و `web-chat-out`/`shop-chat-web-acts` ⇒ بازنگریِ CHAT-02 و CHAT-14؛ سپس CHAT-07 ِ وب.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sub-ten-rsk` (ردیف‌های PARTIAL ِ SUB، TEN، RSK، DATA و PRES؛ روی main ‏37f8fa4c = دستهٔ ۳۵؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) دو باگِ مرزِ اشتراکِ دکان (`entitlement-boundaries.test.js`، پیش از رفع ۲ سرخ): تمدیدِ ماهانه/ساله از بامدادِ یکمِ ماه ِ کابل با UTC ِ خام
+  تا ۲۹ ِ همان ماه می‌رسید (سه روز کم) ⇐ `plans.endOfPeriodIn` و `max` با حسابِ پیشین؛ اشتراکِ شروع‌نشده دورهٔ آزمایشیِ دکان را می‌سوزاند ⇐ نه.
+  پمپ عمداً دست نخورد (همان دو باگ را دارد؛ تصمیم با صاحب‌کار). (۲) RSK-03 ِ وب: کارتِ «سابقهٔ این مشتری» در جزئیاتِ سفارشِ وب
+  (`license/orders-risk.js`، پرچمِ `shop.order_risk` ⇒ `risk` ِ `/config`)؛ `web-orders.mjs` ۲۵/۲۵ (پیش از سیم‌کشی ۲ سرخ). (۳) SUB-02 با شاهدِ CI ِ #1019
+  (سرور 42668579333) IMPLEMENTED-VERIFIED شد. (۴) جداسازی روی PostgreSQL ِ محلی: `tenant-matrix`، `role-route-isolation`، `tenant-surfaces` ۱۱/۱۱؛
+  ریسک/حضور/لینک ۳۷/۳۷؛ اشتراک ۸۳/۸۳.
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. SUB-08/S144 (D-26) ساخته نشد: راهِ push ِ همگام‌سازی (v1 مشترکِ پمپ) را می‌خواهد. TEN-04 بسته به ACP-D1/D2.
+- قدمِ بعدی: شاهدِ CI برای `entitlement-boundaries` و سه گامِ RSK-03 ِ `web-orders.mjs`؛ کارتِ ریسک در فهرستِ سفارش (برنامه و وب)؛ D-26 با صاحبِ همگام‌سازی.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-2` (ردیف‌های غیرِ P0 ِ ویترین، سفارشِ آنلاین و پیک؛ بارِ نخست؛ روی `ccr-3a0d593c-ac0jpj-batch-34` = #1018؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) باگِ واقعیِ مشتری: `PUT`/`merge` ِ سبدِ سرور و ♥ همان سطلِ `store-checkout` ِ ثبت را (۲۰ در ربع ساعت به‌ازای IP) می‌خوردند ⇒
   مشتریِ واردشده پس از ~۲۰ تغییرِ سبد سفارش را با ۴۲۹ نمی‌توانست ثبت کند؛ حالا سطلِ `store-acct-sync` (`RATE_STORE_SYNC_MAX` ۲۴۰)،

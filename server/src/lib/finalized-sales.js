@@ -27,10 +27,23 @@
  *   **بی بازنویسی** (همان قاعدهٔ «فقط‌افزودنی» ِ Sync v3: درجِ یکسان بی اثر) — تا نسخهٔ کهنهٔ پیش از لغو، وضعیت و
  *   شمارنده‌های سندِ معکوس را برنگرداند؛ در log همان امروز. ویرایشی که همان مقدار را دوباره می‌نویسد هم «همان» است.
  *
- * ⛔ درهای سرور که op نمی‌سازند (`restoreConflict`/`restoreDeleted` ِ مدیر، پلِ v3) نگهبان ندارند؛ Sync v3 خودش
- *    سند را فقط‌افزودنی می‌داند (`append_only_edit`).
+ * ── لغو = حلقهٔ زنجیرهٔ سرور (SEC-03، همان پرچم) ────────────────────────────────────────────
+ *   هر لغوی که این نگهبان آزاد می‌گذارد (`status` ِ نالغو ⇒ `cancelled`، یا درجِ فاکتورِ تازه که بی اینترنت ثبت و لغو
+ *   شد) **در همان تراکنشِ نوشتن** یک حلقه در `hash_chain` ِ `void/<دکان>` می‌شود — برای هر دستگاه (زنجیره‌دار یا نه،
+ *   وب هم) و هر راه (`v1`، `legacy`، `api`): دستهٔ برگشته حلقه نمی‌گذارد. یک فاکتور ⇐ یک حلقه (زیرِ قفلِ زنجیره، با
+ *   نمایهٔ `sale_void_index` ِ مهاجرتِ ۳۲۶؛ تکرار، بازپخش، لغوِ دوباره و برگشت‌ولغوِ دوباره ⇒ هیچ). بدنه: شناسه، شماره و سری، مبلغ با متنِ عددِ جاوااسکریپت
+ *   (همان `JsNumber` ِ کاتلین؛ زنجیره فقط عددِ صحیح می‌پذیرد)، درهمِ محتوای مالی و درهمِ دلیل — **نه متنِ دلیل**
+ *   (شاید دادهٔ شخصی؛ زنجیره پاک‌شدنی نیست). ⛔ زنجیره هرگز فروش را نمی‌بندد: شکستِ حلقه با SAVEPOINT برمی‌گردد،
+ *   لغو و بقیهٔ دسته می‌نشینند و رویدادِ `void_unrecorded` می‌ماند.
+ *   ⚠️ درجِ دوبارهٔ فاکتورِ موجود از دستگاهِ زنجیره‌دار (`replay`) نمی‌نشیند، حتی اگر وضعیتش «لغو» باشد: لغو با ویرایشِ
+ *   خودِ دستگاه می‌رسد (قاعدهٔ S89 دست نخورد).
+ *
+ * ⛔ بازگرداندنِ تعارض (`restoreConflict` ِ مدیرِ ارشد، `routes/admin-sync.js`) از همین نگهبان با `enforce` و راهِ `admin`
+ *    می‌گذرد: مقدارِ بازندهٔ فیلدِ مالیِ فاکتورِ ثبت‌شده ۴۰۹. `restoreDeleted` (بی فیلد) و پلِ v3 نگهبان ندارند؛ Sync v3
+ *    خودش سند را فقط‌افزودنی می‌داند (`append_only_edit`).
  */
 const db = require('../db');
+const hc = require('./hash-chain');
 const { conflict } = require('../middleware/errors');
 
 const REASON = 'sale_finalized_edit_forbidden';
@@ -54,9 +67,14 @@ const ITEM_FIXED = Object.freeze([
 const SALE_TABLES = new Set(['sales', 'saleItems']);
 const MERGE_HOPS = 8;
 const MAX_EVENTS = 20;
+const VOID_PROBLEM = 'void_unrecorded';
+const VOID_TEXT = 'لغوِ فاکتور نشست ولی حلقهٔ زنجیرهٔ لغو نوشته نشد';
+const SHOP_PART = /^[A-Za-z0-9_.:-]{1,180}$/;
+const TEXT_MAX = 80;
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const UNSAFE_KEY = new Set(['__proto__', 'constructor', 'prototype']);
 const isInc = (v) => isPlainObject(v) && Object.keys(v).length === 1 && typeof v.$inc === 'number';
 const isEmpty = (v) => v === undefined || v === null || v === '' || v === 0
   || (Array.isArray(v) && !v.length) || (isPlainObject(v) && !Object.keys(v).length);
@@ -78,6 +96,46 @@ function same(a, b) {
 const after = (cur, v) => (isInc(v) ? (Number(cur) || 0) + v.$inc : v);
 const statusOf = (s) => (isEmpty(s) ? 'completed' : String(s));
 const isCredit = (s) => Number(s.debtGiven) > 0 || Number(s.remaining) > 0;
+
+/* ------------------------------------------------------------- زنجیرهٔ لغو */
+
+/** نامِ زنجیرهٔ لغوِ دکان ⇐ رشته یا '' (شناسهٔ ناجور ⇒ بی زنجیره) */
+const voidChainOf = (shopId) => (SHOP_PART.test(String(shopId || '')) ? `void/${shopId}` : '');
+
+/** متنِ کوتاه و امن برای بدنهٔ زنجیره: نیم‌جفتِ تنها (که canonicalJson نمی‌پذیرد) ⇐ U+FFFD */
+function text(v) {
+  if (isEmpty(v) && v !== 0) return '';
+  return String(v).slice(0, TEXT_MAX).replace(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g, '\uFFFD');
+}
+
+/** مبلغ ⇐ متنِ `Number#toString` ِ جاوااسکریپت (همان `JsNumber.of` ِ کاتلین)؛ نبود ⇐ '' */
+const numText = (v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) : text(v));
+
+/** فاکتور پس از op: کلِ ردیف (راهِ قدیم، درجِ تازه) یا ویرایش روی ردیفِ فعلی (دلتا جمع) */
+function nextSale(cur, fields, full) {
+  if (full || !cur) return { ...fields };
+  //  کلیدِ «__proto__» ِ JSON ِ دستگاه نمونهٔ out را عوض می‌کرد و فیلدِ ساختگی ارث می‌رسید (CodeQL ۲۹۰)؛ نوشتن در
+  //  Map و ساختنِ شیء با `Object.fromEntries` (ویژگیِ خودی، نه setter) ⇐ هیچ نوشتنِ پویا روی شیءِ ساده با کلیدِ دستگاه
+  const out = new Map(Object.entries(cur));
+  for (const [k, v] of Object.entries(fields)) {
+    if (UNSAFE_KEY.has(k)) continue;
+    out.set(k, after(hasOwn(cur, k) ? cur[k] : undefined, v));
+  }
+  return Object.fromEntries(out);
+}
+
+/** درهمِ محتوای مالیِ فاکتور (همان فیلدهایی که عوض نمی‌شوند) — خالی‌ها یکی، عدد با متنِ جاوااسکریپت */
+function saleHash(sale) {
+  const pick = {};
+  for (const k of [...SALE_FIXED, ...SALE_ONCE, 'debtorId']) pick[k] = isEmpty(sale[k]) ? null : sale[k];
+  return hc.sha256Hex(canonical(pick));
+}
+
+/** این نوشتن فاکتور را لغو می‌کند؟ (نالغو ⇒ لغو، یا ثبتِ تازهٔ لغوشده) */
+function isVoid(cur, fields, { type, full }) {
+  if (type === 'delete' || !(full || hasOwn(fields, 'status')) || statusOf(fields.status) !== 'cancelled') return false;
+  return cur ? statusOf(cur.status) !== 'cancelled' : (full || type === 'insert');
+}
 
 /**
  * فیلدهای مالیِ فاکتورِ [cur] که [fields] عوض می‌کند (بی سنجشِ مشتری، که ادغام می‌خواهد) ⇐ نام‌ها.
@@ -120,10 +178,11 @@ async function chainDevice(shopId, deviceId) {
  * `merges`: ادغام‌های همین دسته (شناسهٔ مشتری ⇐ `mergedInto` یا null).
  */
 class Guard {
-  constructor({ ctx, deviceId, mode, path, merges, rowOf, firstInsert, ip = '' }) {
-    Object.assign(this, { ctx, deviceId, mode, path, merges, rowOf, firstInsert, ip });
+  constructor({ ctx, deviceId, mode, path, merges, rowOf, firstInsert, ip = '', voids = true }) {
+    Object.assign(this, { ctx, deviceId, mode, path, merges, rowOf, firstInsert, ip, voids });
     this.notes = new Map();
     this.newSales = new Set();
+    this.voidFails = new Map();
   }
 
   get enforce() { return this.mode === 'enforce'; }
@@ -154,7 +213,11 @@ class Guard {
     let changed = [];
     let sale = '';
     if (table === 'sales') {
-      if (!cur) { this.newSales.add(rowId); return null; }   //  ثبت، نه ویرایش (ردیفِ حذف‌شده هم «نیست»)
+      if (!cur) {                                             //  ثبت، نه ویرایش (ردیفِ حذف‌شده هم «نیست»)
+        this.newSales.add(rowId);
+        if (this.voids && isVoid(null, fields, { type, full })) await this.recordVoid(c, rowId, null, fields, { full, atInsert: true });
+        return null;
+      }
       sale = rowId;
       if (type === 'delete') changed = ['*delete*'];
       else {
@@ -164,7 +227,11 @@ class Guard {
         if (move && !(await this.merged(c, move[0], move[1])) && !(insert && (await this.merged(c, move[1], move[0])))) {
           changed.push('debtorId');
         }
-        if (insert && !changed.length) return this.enforce ? { replay: true } : null;
+        if (insert && !changed.length && this.enforce) return { replay: true };
+      }
+      //  نوشتن می‌نشیند (آزاد، یا `log`) و فاکتور را لغو می‌کند ⇒ حلقهٔ لغو در همین تراکنش
+      if (this.voids && (!changed.length || !this.enforce) && isVoid(cur, fields, { type, full })) {
+        await this.recordVoid(c, rowId, cur, fields, { full, atInsert: false });
       }
     } else if (cur) {
       sale = String(cur.saleId || '');
@@ -187,6 +254,57 @@ class Guard {
     if (!changed.length) return null;
     this.note(sale, { table, row: rowId, type, fields: changed });
     return this.enforce ? { reject: REASON } : null;
+  }
+
+  /**
+   * حلقهٔ لغوِ فاکتورِ [saleId] در `void/<دکان>` — درونِ تراکنشِ نوشتن ([c])، زیرِ قفلِ همان زنجیره، یک بار برای هر
+   * فاکتور. ⛔ هرگز خطا نمی‌دهد: شکست با SAVEPOINT برمی‌گردد و رویدادِ `void_unrecorded` پس از تراکنش ثبت می‌شود.
+   */
+  async recordVoid(c, saleId, cur, fields, { full, atInsert }) {
+    const shopId = this.ctx.accountId;
+    const chain = voidChainOf(shopId);
+    if (!chain || isEmpty(saleId)) return;
+    const next = nextSale(cur, fields, full);
+    const reason = isEmpty(next.cancelReason) ? '' : String(next.cancelReason);
+    const doc = {
+      kind: 'doc', type: 'void', v: 1,
+      saleId: text(saleId), invoiceNumber: text(next.invoiceNumber), series: text(next.series),
+      total: numText(isEmpty(next.finalTotal) ? next.total : next.finalTotal),
+      saleHash: saleHash(next), reasonHash: reason ? hc.sha256Hex(reason) : '',
+      deviceId: text(this.deviceId), by: text(this.ctx.userId), path: this.path, enforced: this.enforce,
+      //  انبارِ ردیف: v1 (`sync_rows`) یا راهِ قدیم/API (`sales`) — همان شناسه در انبارِ دیگر فاکتورِ دیگری است
+      store: this.path === 'v1' ? 'v1' : 'rest',
+      atInsert: !!atInsert, at: db.now(),
+    };
+    await c.query('SAVEPOINT sale_void_chain');
+    try {
+      await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`sale-void:${shopId}`]);
+      //  یک فاکتور ⇐ یک حلقه: نمایهٔ ۳۲۶ (کلیدِ اصلی)، نه گشتنِ متنِ حلقه‌ها
+      const seen = await c.query(
+        'SELECT seq FROM sale_void_index WHERE shop_id=$1 AND store=$2 AND sale_id=$3', [shopId, doc.store, String(saleId)]
+      );
+      if (!seen.rows.length) {
+        const head = (await c.query('SELECT seq, hash FROM hash_chain WHERE chain=$1 ORDER BY seq DESC LIMIT 1', [chain])).rows[0];
+        const seq = head ? Number(head.seq) + 1 : 1;
+        const prev = head ? head.hash : hc.GENESIS;
+        const body = hc.canonicalJson({ ...doc, chain, seq });
+        const r = await c.query(
+          `INSERT INTO hash_chain (chain, seq, prev_hash, hash, body, created_at)
+           VALUES ($1,$2,$3,$4,$5,$6) ON CONFLICT (chain, seq) DO NOTHING RETURNING seq`,
+          [chain, seq, prev, hc.sha256Hex(prev + body), body, doc.at]
+        );
+        if (!r.rows.length) throw new Error('void chain head moved');
+        await c.query(
+          'INSERT INTO sale_void_index (shop_id, store, sale_id, seq, created_at) VALUES ($1,$2,$3,$4,$5)',
+          [shopId, doc.store, String(saleId), seq, doc.at]
+        );
+      }
+      await c.query('RELEASE SAVEPOINT sale_void_chain');
+    } catch (err) {
+      await c.query('ROLLBACK TO SAVEPOINT sale_void_chain');
+      await c.query('RELEASE SAVEPOINT sale_void_chain');
+      if (this.voidFails.size < MAX_EVENTS) this.voidFails.set(String(saleId), String(err && err.message || err).slice(0, 200));
+    }
   }
 
   /** قلمِ تازه از همان ثبتِ فاکتور است؟ */
@@ -223,6 +341,18 @@ class Guard {
       }
     }
     this.notes.clear();
+    for (const [sale, error] of this.voidFails) {
+      try {
+        await require('./audit').log({
+          shopId: this.ctx.accountId, actorType: 'user', userId: this.ctx.userId || '', ip: this.ip,
+          action: ACTION, targetType: 'sale', targetId: sale,
+          detail: { problem: VOID_PROBLEM, enforced: this.enforce, path: this.path, deviceId: this.deviceId || '', error, text: VOID_TEXT },
+        });
+      } catch (err) {
+        console.error('[finalized-sales] رویدادِ لغو ثبت نشد:', err.message);
+      }
+    }
+    this.voidFails.clear();
   }
 }
 
@@ -236,6 +366,14 @@ const SHOP_V1 = { app: 'shop', accountKind: 'shop' };
  * نگهبانِ یک push ِ v1 ⇐ Guard یا null (پمپ، دسته‌ای بی فاکتور و قلم، پرچمِ خاموش ⇒ null و هیچ پرسشی).
  * `lib/sync-v1.js` آن را برای هر op پس از قفلِ ردیف صدا می‌زند (همان تراکنش، زیرِ قفلِ حساب).
  */
+/** ردیفِ زندهٔ v1 ِ دکان ⇐ داده یا null (`c`: تراکنش یا خودِ `db`) */
+const v1RowOf = (shopId) => async (c, table, id) => {
+  const r = (await c.query(
+    `SELECT data FROM sync_rows WHERE ${V1_ACC} AND table_name=$2 AND row_id=$3 AND deleted_at IS NULL`, [shopId, table, id]
+  )).rows[0];
+  return r ? r.data : null;
+};
+
 async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
   if (!ctx || ctx.app !== SHOP_V1.app || ctx.accountKind !== SHOP_V1.accountKind || !ctx.accountId || !Array.isArray(ops)) return null;
   const { tableOf } = require('./sync-v1');
@@ -251,12 +389,7 @@ async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
   return new Guard({
     ctx, deviceId, path: 'v1', merges, ip,
     mode: (await chainDevice(shopId, deviceId)) ? 'enforce' : 'log',
-    rowOf: async (c, table, id) => {
-      const r = (await c.query(
-        `SELECT data FROM sync_rows WHERE ${V1_ACC} AND table_name=$2 AND row_id=$3 AND deleted_at IS NULL`, [shopId, table, id]
-      )).rows[0];
-      return r ? r.data : null;
-    },
+    rowOf: v1RowOf(shopId),
     firstInsert: async (c, saleId) => {
       const r = (await c.query(
         `SELECT device_id, client_ts FROM oplog WHERE ${V1_ACC} AND table_name='sales' AND row_id=$2 AND op_type='insert'
@@ -265,6 +398,37 @@ async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
       return r ? { device: r.device_id, ts: Number(r.client_ts) } : null;
     },
   });
+}
+
+/**
+ * پیش از `restoreConflict` ِ مدیرِ ارشد (`routes/admin-sync.js`): همان op (مقدارِ بازنده روی ردیفِ امروز) از نگهبانِ
+ * `enforce` با راهِ `admin` ⇐ ۴۰۹ (`sale_finalized_edit_forbidden`، پرتاب) + رویداد، یا هیچ (آزاد).
+ * پمپ، جدولِ دیگر، پرچمِ خاموش و تعارضِ نبوده (خودِ restore ۴۰۴ می‌دهد) ⇒ هیچ پرسشِ دیگری.
+ * وضعیتِ فاکتور هم با بازگرداندن عوض نمی‌شود: برگشت از لغو ویرایش است و لغو کارِ خودِ دکان با دلیل (حلقهٔ لغو).
+ */
+async function adminRestoreCheck(conflictId, { adminId = '', ip = '' } = {}) {
+  const cf = await db.one(
+    'SELECT app, account_kind, account_id, table_name, row_id, field, loser_value FROM sync_conflicts WHERE id=$1',
+    [Number(conflictId) || 0]
+  );
+  if (!cf || cf.app !== SHOP_V1.app || cf.account_kind !== SHOP_V1.accountKind || !SALE_TABLES.has(cf.table_name)) return;
+  const shopId = cf.account_id;
+  if (!(await flagOn(shopId))) return;
+  const rowOf = v1RowOf(shopId);
+  const g = new Guard({
+    ctx: { accountId: shopId, userId: adminId }, deviceId: require('./sync-v1').SERVER_DEVICE, mode: 'enforce', path: 'admin',
+    merges: new Map(), rowOf, firstInsert: async () => null, ip, voids: false,
+  });
+  const fields = { [cf.field]: cf.loser_value };
+  const cur = await rowOf(db, cf.table_name, cf.row_id);
+  let res = await g.check(db, { table: cf.table_name, rowId: cf.row_id, type: 'update', fields }, cur);
+  if (!(res && res.reject) && cur && cf.table_name === 'sales' && cf.field === 'status'
+      && statusOf(cf.loser_value) !== statusOf(cur.status)) {
+    g.note(cf.row_id, { table: cf.table_name, row: cf.row_id, type: 'update', fields: ['status'] });
+    res = { reject: REASON };
+  }
+  await g.finish();
+  if (res && res.reject) throw forbiddenError();
 }
 
 /* ------------------------------------------------------- راهِ قدیم و API ِ مستقیم */
@@ -300,5 +464,6 @@ async function legacyGuard({ shopId, userId = '', deviceId = '', ip = '' }, mode
 const forbiddenError = () => conflict('فاکتورِ ثبت‌شده ویرایش یا حذف نمی‌شود؛ اصلاح فقط با لغو یا برگشت (سندِ معکوس)', REASON);
 
 module.exports = {
-  REASON, PROBLEM, SALE_FIXED, SALE_ONCE, ITEM_FIXED, v1Guard, legacyGuard, forbiddenError,
+  REASON, PROBLEM, VOID_PROBLEM, SALE_FIXED, SALE_ONCE, ITEM_FIXED, voidChainOf,
+  v1Guard, legacyGuard, adminRestoreCheck, forbiddenError, nextSale,
 };

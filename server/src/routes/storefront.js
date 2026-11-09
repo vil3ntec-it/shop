@@ -21,6 +21,7 @@ const sfd = require('../lib/storefront-delivery');
 const sfm = require('../lib/storefront-media');
 const customers = require('../lib/store-customers');
 const extras = require('../lib/storefront-extras');
+const shoppingList = require('../lib/store-shopping-list');
 const finder = require('../lib/storefront-filters');
 const cart = require('../lib/store-cart');
 const storeSeo = require('../lib/store-seo');
@@ -486,6 +487,20 @@ router.put('/:slug/account/favorites/:productId', syncLimit, store, customer, fa
 
 router.delete('/:slug/account/favorites/:productId', syncLimit, store, customer, favoritesOn, async (req, res) => {
   res.json(await extras.removeFavorite(req.store.shop_id, req.customer, req.params.productId));
+});
+
+//  WEB-11: «فهرستِ خرید» ِ حساب (`lib/store-shopping-list.js`) — همان پرچمِ ♥؛ نوشتن با نسخهٔ دیده‌شده، تکرار بی‌اثر
+router.get('/:slug/account/shopping-list', readLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json({ list: await shoppingList.get(req.store, req.customer) });
+});
+
+router.put('/:slug/account/shopping-list', syncLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json({ list: await shoppingList.replace(req.store, req.customer, req.body) });
+});
+
+//  فهرستِ همین دستگاه پس از ورود — تکرارش اثرِ دوم ندارد
+router.post('/:slug/account/shopping-list/merge', syncLimit, store, customer, favoritesOn, async (req, res) => {
+  res.json({ list: await shoppingList.merge(req.store, req.customer, req.body) });
 });
 
 //  ── WEB-24: بنرهای همین لحظه برای ناحیهٔ مشتری (پرچمِ خاموشِ `shop.storefront.banners` ⇒ ۴۰۴) ──

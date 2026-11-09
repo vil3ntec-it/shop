@@ -586,6 +586,59 @@ await step('CHK-10: «خبرم کن» — شماره فقط برای محلِ پ
   await page.waitForFunction(() => !document.querySelector('#ord-area-modal.open'));
 });
 
+/* ══════════════════════ RSK-03: کارتِ سابقهٔ مشتری ══════════════════════ */
+const riskLoaded = () => page.evaluate(() => performance.getEntriesByType('resource').some((e) => /orders-risk\.js/.test(e.name)));
+const riskAsked = () => seen.filter((s) => /^GET \/api\/v1\/shop\/orders\/[^/]+\/risk$/.test(s)).length;
+const latin = (t) => String(t).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
+async function openAccepted() {
+  for (let i = 0; i < 2; i++) await page.keyboard.press('Escape');
+  const made = (await apiOrder()).body.order;
+  assert.equal((await post(`/api/v1/shop/orders/${made.id}/transition`, { to: 'accepted', readyInMinutes: 15 }, owner.accessToken)).status, 200);
+  await page.click('#ord-tabs [data-tab="preparing"]');
+  await page.locator(`.ord-card[data-id="${made.id}"]`).click();
+  await page.waitForSelector('#ord-detail-modal.open .ord-timeline li');
+  return made;
+}
+
+await step('RSK-03 بی پرچمِ order_risk: orders-risk.js بار نمی‌شود، نه کارتِ سابقه، نه درخواستِ /risk', async () => {
+  await openAccepted();
+  assert.equal(await riskLoaded(), false);
+  assert.equal(await page.locator('#ord-risk').count(), 0);
+  assert.equal(riskAsked(), 0);
+});
+
+await step('RSK-03: پرچمِ روشن ⇒ «سابقهٔ این مشتری در دکانِ شما» با شمارِ سرور، هشدار اول، بی شماره؛ بازنقاشی دوباره نمی‌پرسد', async () => {
+  await liveConfig.set(String(shopOn), 'shop.order_risk', true);
+  await page.evaluate(() => window.TohidOrders.refreshConfig());
+  await page.waitForFunction(() => !!window.TohidOrdersRisk, null, { timeout: 10000 });
+  const asked = riskAsked();
+  const made = await openAccepted();
+  await page.waitForSelector('#ord-risk .ord-risk-sum', { timeout: 10000 });
+  const card = latin(await page.locator('#ord-risk').innerText());
+  const truth = (await call('GET', `/api/v1/shop/orders/${made.id}/risk`, undefined, owner.accessToken)).body;
+  assert.equal(truth.enabled, true);
+  assert.match(card, /سابقهٔ این مشتری در دکانِ شما/);
+  assert.ok(card.includes(`${truth.history.orders} سفارشِ پیشین`) && card.includes(`${truth.history.open} باز`), card);
+  assert.match(card, /سفارشِ بازِ دیگر دارد/);
+  assert.equal(await page.locator('#ord-risk .ord-risk-flags li').first().getAttribute('class'), 'ord-risk-warn', 'هشدار اول');
+  assert.ok(!card.includes('0700111222') && !card.includes('+93700111222') && !card.includes('700111222'), 'کارت شماره ندارد');
+  await page.waitForTimeout(1600);   //  دو دورِ صفِ زنده (۷۰۰ میلی‌ثانیه)
+  assert.equal(riskAsked() - asked, 1, 'هر سفارش یک بار');
+  assert.equal(await page.locator('#ord-risk .ord-risk-sum').count(), 1);
+});
+
+await step('RSK-03: سرور نرسید (۵۰۳) ⇒ «سابقهٔ مشتری خوانده نشد» و «دوباره»، بی کارتِ ساختگی؛ «دوباره» ⇒ کارت', async () => {
+  await page.route('**/risk', (r) => r.fulfill({ status: 503, contentType: 'application/json', body: '{"error":{"code":"unavailable","message":"x"}}' }));
+  await openAccepted();
+  await page.waitForSelector('#ord-risk [data-risk-retry]', { timeout: 10000 });
+  assert.match(await page.locator('#ord-risk').innerText(), /سابقهٔ مشتری خوانده نشد/);
+  assert.equal(await page.locator('#ord-risk .ord-risk-sum, #ord-risk .ord-risk-flags').count(), 0, 'خطا ⇒ هیچ «بی‌خطر» ِ ساختگی');
+  await page.unroute('**/risk');
+  await page.click('#ord-risk [data-risk-retry]');
+  await page.waitForSelector('#ord-risk .ord-risk-sum', { timeout: 10000 });
+  for (let i = 0; i < 2; i++) await page.keyboard.press('Escape');
+});
+
 await step('کارمند (۳۹۰ پیکسل): شمارهٔ نقاب‌دار، بی دکمهٔ تماس؛ دکمه‌های گذار هست؛ بی بیرون‌زدگی', async () => {
   const s = await openAs(staff, { width: 390, hash: '#orders' });
   await s.page.waitForSelector('#page-orders.active', { timeout: 10000 });

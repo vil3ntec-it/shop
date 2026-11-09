@@ -9,6 +9,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.HorizontalDivider
@@ -37,6 +39,12 @@ fun CartScreen(model: CustomerModel, slug: String) {
     TopBar(page?.shop?.title?.let { ShopperText.cart + " — " + it } ?: ShopperText.cart, onBack = { model.back() })
     if (cart.lines.isEmpty()) {
       Note(ShopperText.emptyCart, modifier = Modifier.fillMaxWidth().padding(16.dp))
+      //  WEB-11 و CHK-01: «فهرستِ خرید» و ورود با سبدِ خالی هم (دستگاهِ تازه سبدِ حساب را همین‌جا می‌گیرد)
+      Column(Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp)) {
+        model.notice?.let { Note(it, Tone.WARN) }
+        SavedList(model, slug)
+        AccountCard(model, slug)
+      }
       return@Column
     }
     LazyColumn(Modifier.weight(1f), contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -64,6 +72,9 @@ fun CartScreen(model: CustomerModel, slug: String) {
           }
         }
       }
+      //  WEB-11 و CHK-01: «فهرستِ خرید» و ورود به حساب (سبد، ♥ و فهرست همراهِ حساب)
+      item { SavedList(model, slug) }
+      item { AccountCard(model, slug) }
     }
     Column(Modifier.padding(16.dp)) {
       MainButton(ShopperText.toCheckout, enabled = !CartRules.hasUnavailable(cart) && page != null) { model.go(Route.Checkout(slug)) }

@@ -311,6 +311,11 @@ function build(T) {
       const p = await plans.getPlan(plan, T.app, run);
       if (!p || !p.amount || !p.unit) throw badRequest('مدت اشتراک مشخص نیست', 'missing_duration');
       end = plans.endOfPeriod(base, p.amount, p.unit);
+      //  ⛔ SUB-03 (فقط دکان؛ پمپ بیت‌به‌بیت همان): «همین روز در ماهِ بعد» به روزِ کابل — هرگز کمتر از حسابِ UTC ِ پیشین
+      //  منطقهٔ نادرست در `DEFAULT_TIMEZONE` (RangeError ِ Intl) تمدید را نمی‌شکند ⇒ همان حسابِ UTC
+      if (T === tenancy.SHOP) {
+        try { end = Math.max(end, plans.endOfPeriodIn(base, p.amount, p.unit, require('./finance-window').tz())); } catch { /* UTC */ }
+      }
       start = if_live(existing, t) ?? start;
       maxDevices = maxDevices || p.max_devices;
     }

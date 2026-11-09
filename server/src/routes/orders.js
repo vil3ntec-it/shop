@@ -92,6 +92,8 @@ router.get('/config', async (req, res) => {
     //  CHK-10/S34: فهرستِ «خبرم کن» ِ ویترین (پرچمِ `shop.storefront.notify_area` روی ناحیه‌ها) فقط برای صاحب و مدیر
     //  (`settings.write`، همان درِ `GET /storefront/area-requests`) — خاموش یا نقشِ دیگر ⇒ کلید نیست (همان پاسخِ پیشین)
     ...(can(req.role, 'settings.write') && (await require('../lib/storefront-area-requests').flagOn(req.shopId)) ? { notifyArea: true } : {}),
+    //  RSK-03: کارتِ «سابقهٔ این مشتری» (پرچمِ `shop.order_risk`؛ همان درِ `GET /:id/risk`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...((await require('../lib/order-risk').flagIn((t, p) => require('../db').query(t, p), req.shopId)) ? { risk: true } : {}),
     //  «فروشِ تحویل در برنامه» (تصمیمِ صاحبِ مخزن): برنامه فقط وقتی سرور این را می‌گوید فروش
     //  می‌سازد (سرورِ کهنه هنوز خودش کم می‌کرد ⇒ دو بار)؛ تحویلِ پیش از `handoverSince` هرگز.
     saleOnHandover: true,

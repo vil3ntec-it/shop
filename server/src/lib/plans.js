@@ -88,6 +88,19 @@ function endOfPeriod(startMs, amount, unit) {
   return d.getTime();
 }
 
+/**
+ * ⛔ SUB-03 — همان `endOfPeriod`، ولی «همین روز» روزِ **تقویمِ محلیِ** `zone` (کابل) است، نه UTC.
+ * بامدادِ ۰۰:۰۰ تا ۰۴:۲۹ ِ کابل در UTC هنوز روزِ پیش است؛ پایانی که یکمِ ماه بود با `endOfPeriod` ِ خام
+ * «روزِ آخرِ ماهِ پیش + ۱ ماه» می‌شد ⇒ یکمِ مارس + ۱ ماه = ۲۹ مارس (سه روز کم). ساعتِ دیواریِ محلی
+ * جابه‌جا حساب و با اختلافِ همان لحظهٔ پایان برگردانده می‌شود (منطقهٔ دارای ساعتِ تابستانی هم).
+ */
+function endOfPeriodIn(startMs, amount, unit, zone) {
+  const { tzOffsetMs } = require('./finance-window');
+  const off = tzOffsetMs(startMs, zone);
+  const wall = endOfPeriod(startMs + off, amount, unit);
+  return wall - tzOffsetMs(wall - off, zone);
+}
+
 async function seedDefaults() {
   const t = now();
   /*
@@ -271,7 +284,7 @@ async function publicConfig() {
 }
 
 module.exports = {
-  DEFAULT_PLANS, DEFAULT_CONFIG, approxDays, endOfPeriod,
+  DEFAULT_PLANS, DEFAULT_CONFIG, approxDays, endOfPeriod, endOfPeriodIn,
   seedDefaults, listPlans, getPlan, getConfig, setConfig, allConfig,
   publicConfig, PUBLIC_CONFIG_KEYS,
   TRIAL_DEFAULT, trialConfig, trialDaysOf,

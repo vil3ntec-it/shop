@@ -108,6 +108,8 @@ private fun Catalog(model: CustomerModel, slug: String, page: StorePage, modifie
         }
       }
     }
+    //  WEB-11: دلخواه‌های همین دکان
+    item { FavRow(model, slug) }
     model.notice?.let { n -> item { Note(n, Tone.WARN) } }
     val c = model.catalog
     if (model.items.isEmpty()) {
