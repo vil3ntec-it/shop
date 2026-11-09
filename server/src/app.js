@@ -192,7 +192,9 @@ async function createApp({ runMigrations = true } = {}) {
   //  PERF-04: مهلتِ سراسریِ درخواست — `REQUEST_TIMEOUT_MS` (۰ = خاموش)؛ پمپ و v1 بیرون (`middleware/deadline.js`)
   app.use('/api', require('./middleware/deadline').requestDeadline());
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
-  const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
+  //  ترافیکِ اثبات‌شدهٔ مدیر/پلِ پنل سطلِ خودش را دارد؛ بقیه همین سطلِ IP (`middleware/admin-bucket.js`)
+  const general = require('./middleware/admin-bucket').withAdminBucket(
+    rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
 
   // ---- بررسی سلامت ----

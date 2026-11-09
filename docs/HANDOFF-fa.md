@@ -97,6 +97,16 @@
 - نیمه‌کاره: Kotlin این‌جا ساخته نمی‌شود ⇒ `ShopperCartSyncTest`، `ShopperCartVectorsTest`، `ShopperAccountTest` (یک بندِ عمداً عوض‌شده: ۴۰۹ دیگر
   روغنِ دستگاهِ دیگر را پاک نمی‌کند) و `CustomerAccountTest` فقط در CI. وب (`acct.js`) هنوز «دستگاه برنده» است (سیزنِ دیگر روی ویترین کار دارد).
 - قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin ⇒ بازنگریِ متنِ CHK-03؛ هم‌قاعده کردنِ ۴۰۹ ِ `acct.js` با همان `rebase` و بردار؛ D-09 برای ورود در تولید.
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/acct-bucket` (سطلِ نرخِ جدای پلِ پنل و مدیر؛ روی main ‏0e2e7b36 = دستهٔ ۳۶؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ریشهٔ «سقفِ نرخِ سرورِ حساب پر شده» (۱۴۰۵/۰۷/۱۰): پلِ پنل از 127.0.0.1 و بی XFF همان سطلِ عمومیِ ۶۰۰ ِ یک IP را
+  می‌خورد. حالا `middleware/admin-bucket.js` (پیچیده دورِ همان `general` ِ `app.js`): فقط `/api[/v1]/admin/*` (نه login/reauth/2fa/pump)
+  با کلیدِ سرویسِ فعال یا نشستِ زندهٔ مدیرِ فعال ⇒ سطلِ همان کلید/مدیر (`RATE_ADMIN_PROVEN_MAX` ۶٬۰۰۰)؛ هر چه اثبات نشد همان سطلِ IP.
+  پرسشِ پایگاه برای اعتبارنامهٔ ناشناخته سطلِ IP ِ خودش (`RATE_ADMIN_PROBE_MAX` ۶۰، فقط شکست‌ها)؛ `requireAdmin` شکست ⇒ `forget`.
+  پیش‌فرض روشن، `RATE_ADMIN_BUCKET=0` ⇒ رفتارِ پیشین. `admin-bucket.test.js` (۱۲ آزمون؛ روی کدِ پیشین ۵ سرخ، هشت جهش سرخ)، PGlite و
+  PostgreSQL ِ محلی، هر دو انبار (حافظه و pg).
+- نیمه‌کاره: هیچ. ماندهٔ آگاهانه: سقف‌های تنگِ هر درِ مدیر (`admin-census`، `admin-notify-usage-ip`، آزمونِ پیامک/ایمیل…) هنوز به‌ازای
+  IP‌اند و برای پل همه 127.0.0.1 — عمداً دست نخورد. بی `TRUST_PROXY=true` همهٔ ترافیکِ درگاه یک IP است (همان قاعدهٔ پیشین).
+- قدمِ بعدی: شاهدِ CI ِ `admin-bucket.test.js`؛ اگر پل هنوز با رمزِ ارشد می‌آید، کلیدِ سرویس (بندِ ۱۲.۲ ِ ADMIN-CONTROL-PLANE) — هر دو راه سطلِ خودشان را دارند.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/mkt-1` (ردیف‌های MKT ِ بازِ بی‌مانع؛ روی `ccr-3a0d593c-ac0jpj-batch-35` = #1019؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: MKT-06 در نسخهٔ وبِ دکان — کادرِ «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`license/product-cycle.js`، بی هیچ خطی در index.html)،
   بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json` با `ProductCycleVectorsTest` (Kotlin، فقط CI)، `web-product-cycle.test.js` ۸/۸ و
@@ -150,6 +160,7 @@
 - قدمِ بعدی (صاحب محصول): عددِ تولیدِ سه مهلت (پیشنهاد: ۱۵ ثانیه، ۱۵ ثانیه، ۶۰ ثانیه)؛ قاعدهٔ سرریزِ پایانِ ماه؛ CI برای `entitlement-clock`،
   `request-deadline`، `ops-paging`، `admin-notify-usage`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sub-ten-rsk` (ردیف‌های PARTIAL ِ SUB، TEN، RSK، DATA و PRES؛ روی main ‏37f8fa4c = دستهٔ ۳۵؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sub-ten-rsk` (ردیف‌های PARTIAL ِ SUB، TEN، RSK، DATA و PRES؛ روی main ‏0e2e7b36 = دستهٔ ۳۶؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) دو باگِ مرزِ اشتراکِ دکان (`entitlement-boundaries.test.js`، پیش از رفع ۲ سرخ): تمدیدِ ماهانه/ساله از بامدادِ یکمِ ماه ِ کابل با UTC ِ خام
   تا ۲۹ ِ همان ماه می‌رسید (سه روز کم) ⇐ `plans.endOfPeriodIn` و `max` با حسابِ پیشین؛ اشتراکِ شروع‌نشده دورهٔ آزمایشیِ دکان را می‌سوزاند ⇐ نه.
   پمپ عمداً دست نخورد (همان دو باگ را دارد؛ تصمیم با صاحب‌کار). (۲) RSK-03 ِ وب: کارتِ «سابقهٔ این مشتری» در جزئیاتِ سفارشِ وب
