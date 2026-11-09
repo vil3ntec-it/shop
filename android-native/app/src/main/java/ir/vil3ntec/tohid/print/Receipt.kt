@@ -381,8 +381,10 @@ object Receipt {
   }
 
   @Suppress("DEPRECATION")
-  internal fun layout(text: String, paint: TextPaint, width: Int, align: Layout.Alignment): StaticLayout {
+  internal fun layout(raw: String, paint: TextPaint, width: Int, align: Layout.Alignment): StaticLayout {
     val w = width.coerceAtLeast(1)
+    //  HW-01: «−۵۰» ِ تخفیف/مانده در کاغذِ راست‌به‌چپ «۵۰−» نشود — LRM پیش از نشانهٔ عدد (`core/receipt/PaperBidi`)
+    val text = if (I18n.lang.rtl) ir.vil3ntec.tohid.core.receipt.PaperBidi.signs(raw) else raw
     return if (android.os.Build.VERSION.SDK_INT >= 23) {
       StaticLayout.Builder.obtain(text, 0, text.length, paint, w)
         .setAlignment(align)
