@@ -27,6 +27,10 @@
  *   ⛔ نشانیِ مطلق فقط از `config.storefront.domain` ساخته می‌شود، نه از سرآیندِ
  *     `Host` ِ درخواست (بی مسمومیتِ کش). دامنه خالی ⇒ این قابلیت خاموش می‌ماند.
  *   ⛔ پول: فقط عددِ صحیحِ یک‌صدمِ افغانی؛ «۱۲۰٫۵۰» با تقسیمِ صحیح ساخته می‌شود.
+ *   عکس ──── og:image ِ کالا با `?v=` ِ همان `photoVersion` ِ نمای کالا (IMG-12؛ بانک پیش از عکسِ همگام‌شده، همان
+ *            ترتیبِ `storefront.photo()`): واتس‌اپ و فیسبوک پیش‌نمایش را با نشانیِ og:image نگه می‌دارند، پس عکسِ
+ *            تازه نشانیِ تازه می‌خواهد. لوگوی خودِ دکان (M3، پرچمِ `shop.storefront.media`) پیش‌نمایشِ صفحهٔ دکان و
+ *            کالای بی‌عکس است، با ابعاد و نوعِ واقعی؛ ابعادِ عکسِ کالا دانسته نیست و ادعا نمی‌شود.
  */
 const fs = require('fs');
 const path = require('path');
@@ -35,6 +39,7 @@ const config = require('../config');
 const orders = require('./orders');
 const sf = require('./storefront');
 const shelf = require('./storefront-shelf');
+const media = require('./storefront-media');
 
 const FLAG_KEY = 'shop.storefront.seo';
 const LANGS = ['fa', 'en', 'ps'];
@@ -125,7 +130,9 @@ async function productOf(store, productId) {
   const p = sf.productView(row);
   if (p.priceMinor === null || !p.name) return null;
   p.description = oneLine(row.description, 2000);
-  if (!p.photo && (await shelf.bankIds(store.shop_id, [p.id])).has(p.id)) p.photo = true;
+  //  IMG-12: عکسِ بانک (پرچمِ دکان) پیش از عکسِ همگام‌شده — همان `withBank` ِ نمای کالا ⇒ همان `photoVersion`
+  const bank = await shelf.bankIds(store.shop_id, [p.id]);
+  if (bank.has(p.id)) Object.assign(p, { photo: true, photoVersion: bank.get(p.id) });
   await shelf.applyStock(store.shop_id, [p]);
   return p;
 }
@@ -147,18 +154,41 @@ function alternates(url) {
   ];
 }
 
-function headOf(store, product, lang) {
+/** برچسب‌های عکسِ پیش‌نمایش: نشانیِ مطلق و — فقط وقتی دانسته است — ابعاد و نوع. */
+function imageTags(meta, img, alt) {
+  if (!img) return [];
+  return [
+    meta('og:image', img.url),
+    ...(img.width ? [meta('og:image:width', String(img.width)), meta('og:image:height', String(img.height))] : []),
+    img.mime ? meta('og:image:type', img.mime) : '',
+    meta('og:image:alt', alt),
+  ];
+}
+
+/** لوگوی جاریِ دکان (M3) با نشانیِ مطلق — یا null (پرچمِ media خاموش، بی لوگو). */
+function logoOf(store, m) {
+  const l = m && m.logo;
+  if (!l || !Number.isSafeInteger(l.width) || !Number.isSafeInteger(l.height)) return null;
+  return { url: `${originOf(store)}${l.url}`, width: l.width, height: l.height, mime: l.mime };
+}
+
+function headOf(store, product, lang, m = null) {
   const w = WORDS[lang];
   const url = pageUrl(store, product && product.id);
   const canonical = withLang(url, lang);
   const meta = (k, v) => (v ? `<meta property="${k}" content="${esc(v)}">` : '');
   const tags = [];
+  const logo = logoOf(store, m);
   if (product) {
     const price = priceText(product.priceMinor, lang);
     const title = `${product.name} — ${store.title}`;
     const description = oneLine(product.description, MAX_DESCRIPTION)
       || oneLine(`${w.price}: ${price}${product.unit ? ` / ${product.unit}` : ''} — ${w.in} ${store.title}`, MAX_DESCRIPTION);
-    const image = product.photo ? `${originOf(store)}/api/store/${encodeURIComponent(store.slug)}/products/${encodeURIComponent(product.id)}/photo` : '';
+    const image = product.photo
+      ? `${originOf(store)}/api/store/${encodeURIComponent(store.slug)}/products/${encodeURIComponent(product.id)}/photo${product.photoVersion ? `?v=${encodeURIComponent(product.photoVersion)}` : ''}`
+      : '';
+    //  کالای بی‌عکس ⇒ لوگوی دکان برای پیش‌نمایش (نه برای JSON-LD ِ کالا: عکسِ خودِ کالا نیست)
+    const preview = image ? { url: image } : logo;
     const offer = {
       '@type': 'Offer', price: amountOf(product.priceMinor), priceCurrency: 'AFN', url: canonical,
       seller: { '@type': 'Organization', name: store.title },
@@ -177,7 +207,7 @@ function headOf(store, product, lang) {
       meta('og:type', 'product'), meta('og:site_name', store.title), meta('og:title', product.name),
       meta('og:description', description), meta('og:url', canonical), meta('og:locale', LOCALE[lang]),
       ...LANGS.filter((l) => l !== lang).map((l) => meta('og:locale:alternate', LOCALE[l])),
-      meta('og:image', image), image ? meta('og:image:alt', product.name) : '',
+      ...imageTags(meta, preview, image ? product.name : store.title),
       meta('product:price:amount', amountOf(product.priceMinor)), meta('product:price:currency', 'AFN'),
       `<meta name="twitter:card" content="${image ? 'summary_large_image' : 'summary'}">`,
       `<script type="application/ld+json">${ld(data)}</script>`,
@@ -186,6 +216,7 @@ function headOf(store, product, lang) {
     const description = oneLine(store.tagline, MAX_DESCRIPTION) || `${w.shop} — ${store.title}`;
     const data = { '@context': 'https://schema.org', '@type': 'Store', name: store.title, url: canonical };
     if (store.tagline) data.description = oneLine(store.tagline, 1000);
+    if (logo) Object.assign(data, { logo: logo.url, image: [logo.url] });
     tags.push(
       `<title>${esc(store.title)}</title>`,
       `<meta name="description" content="${esc(description)}">`,
@@ -194,6 +225,7 @@ function headOf(store, product, lang) {
       meta('og:type', 'website'), meta('og:site_name', store.title), meta('og:title', store.title),
       meta('og:description', description), meta('og:url', canonical), meta('og:locale', LOCALE[lang]),
       ...LANGS.filter((l) => l !== lang).map((l) => meta('og:locale:alternate', LOCALE[l])),
+      ...imageTags(meta, logo, store.title),
       `<meta name="twitter:card" content="summary">`,
       `<script type="application/ld+json">${ld(data)}</script>`,
     );
@@ -210,7 +242,9 @@ async function page(store, { productId = null, lang } = {}) {
   if (!(await on(store))) return null;
   const l = langOf(lang);
   const product = productId === null ? null : await productOf(store, productId);
-  const head = headOf(store, product, l);
+  //  لوگو فقط برای صفحهٔ دکان و کالای بی‌عکس (پرچمِ media خاموش ⇒ تهی، بی خواندنِ جدول)
+  const m = product && product.photo ? null : await media.publicView(store);
+  const head = headOf(store, product, l, m);
   let html = shell().replace(/<html lang="fa" dir="rtl">/, () => `<html lang="${l}" dir="${DIR[l]}">`);
   html = /<title>[^<]*<\/title>/.test(html)
     ? html.replace(/<title>[^<]*<\/title>/, () => head)

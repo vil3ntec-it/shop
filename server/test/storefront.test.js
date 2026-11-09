@@ -191,6 +191,22 @@ test('تنظیم: نشانیِ رزرو/بدشکل/گرفته‌شده رد، ش
   assert.equal(r2.status, 403);
 });
 
+test('WEB-01: رنگِ ویترین فقط شش رقمِ hex (کوچک‌شده) و همان در نمای عمومی؛ ردشده بی اثر؛ کلیدِ نیامده رنگ را نگه می‌دارد', async () => {
+  const a = await liveStore('رنگ', { accent: '#0E8278' });
+  const pub = async () => (await h.get(`/api/store/${a.slug}`)).body.store.accent;
+  assert.equal(await pub(), '#0e8278');
+  for (const bad of ['red', '#12345', '#1234567', 'rgb(1,2,3)', '#12345g', '"><x>']) {
+    const r = await h.put('/api/shop/storefront', { accent: bad }, { token: a.token });
+    assert.equal(r.status, 400, bad);
+    assert.equal(r.body.error.code, 'bad_accent', bad);
+  }
+  assert.equal(await pub(), '#0e8278', 'ردشده‌ها اثری نگذاشتند');
+  assert.equal((await h.put('/api/shop/storefront', { tagline: 'تازه' }, { token: a.token })).status, 200);
+  assert.equal(await pub(), '#0e8278', 'کلیدِ نیامده رنگ را نگه می‌دارد');
+  assert.equal((await h.put('/api/shop/storefront', { accent: '' }, { token: a.token })).status, 200);
+  assert.equal(await pub(), '', 'خالی ⇒ رنگِ پیش‌فرضِ کیت');
+});
+
 test('کاتالوگ: فقط منتشرشده، زنده و قیمت‌دار؛ قیمتِ آنلاین بر قیمتِ دفتر جلو؛ موجودی «در حال بررسی»', async () => {
   const s = await liveStore('کاتالوگ');
   let list = (await h.get(`/api/store/${s.slug}/products`)).body.items;
