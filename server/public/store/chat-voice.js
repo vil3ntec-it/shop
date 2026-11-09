@@ -230,6 +230,9 @@
     clearTimeout(my.again);
     my.busy = true; my.queued = false;
     mode('up', t('vc.up'));
+    //  «پایان و فرستادن» پنهان شد ⇒ تمرکز به «لغو» (نه گم در body)؛ صفی که خودش می‌رود تمرکزِ کادرِ دیگری را نمی‌دزدد
+    var a = document.activeElement;
+    if (!a || a === document.body || $('ct-vc').contains(a)) $('ct-vc-cancel').focus();
     var total = my.blob.size;
     var bar = function (n) { $('ct-vc-bar').value = Math.min(0.99, n / total); };
     $('ct-vc-bar').value = 0;
