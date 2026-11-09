@@ -120,14 +120,11 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
-  //  ⛔ ممیزیِ ۳۵ (B4): NUL در مسیر (`%00`) — PostgreSQL متنِ NUL‌دار را نمی‌پذیرد (۲۲۰۲۱)، پس هر شناسهٔ خامِ مسیر
-  //  ۵۰۰ می‌شد (و خطای سرور ثبت می‌کرد). هیچ برنامه‌ای NUL نمی‌فرستد ⇒ ۴۰۰ پیش از هر کار. `%2500` (متنِ «%00») NUL نیست.
-  //  ⛔ X2: پرسش (`?…`، کلید یا مقدار) هم ⇒ ۴۰۰ ِ `bad_query`؛ در به در سنجیدن هفت درِ مدیر را جا انداخته بود. شناسهٔ NUL‌دار
-  //  «نیافته» نیست، نادرست است (همان شناسه در مسیر `bad_path` است). همگام‌سازی و پمپ (`RAW_SYNC`، مشترک) مثلِ بدنه دست‌نخورده.
+  //  ⛔ ممیزیِ ۳۵: NUL (`%00`) در مسیر (B4 ⇒ `bad_path`) یا پرسش، کلید یا مقدار (X2 ⇒ `bad_query`) ⇒ ۴۰۰ پیش از هر کار (PostgreSQL
+  //  ۲۲۰۲۱ ⇒ ۵۰۰؛ در-به-در هفت درِ مدیر جا افتاده بود). شناسهٔ NUL‌دار نادرست است نه «نیافته»؛ `%2500` NUL نیست؛ پرسشِ `RAW_SYNC` دست‌نخورده.
   app.use((req, res, next) => {
-    const q = req.url.indexOf('?');
-    const bad = /%00/.test(q < 0 ? req.url : req.url.slice(0, q)) ? 'bad_path'
-      : (q >= 0 && /%00/.test(req.url.slice(q)) && !RAW_SYNC.test(req.path) ? 'bad_query' : '');
+    const [p, ...q] = req.url.split('?');
+    const bad = /%00/.test(p) ? 'bad_path' : (/%00/.test(q.join('?')) && !RAW_SYNC.test(req.path) ? 'bad_query' : '');
     return bad ? res.status(400).json({ error: { code: bad, message: 'نشانیِ درخواست درست نیست' } }) : next();
   });
 
