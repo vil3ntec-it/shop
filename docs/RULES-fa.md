@@ -335,6 +335,15 @@
   `queue_overflow` می‌کرد برداشته شد. از ۱۰٬۰۰۰ پیامِ «X تغییر هنوز به سرور نرسیده» در همان جای پیامِ نوار (چراغ قرمز نمی‌شود)؛ حافظهٔ
   پر ⇒ ثبت با پیامِ روشن رد می‌شود و تغییر روی دفتر می‌ماند. منطق: `core/…/core/sync/OpBacklog.kt` و `QUEUE_WARN`/`backlogWarning`
   با `core/test-vectors/op-backlog-v1.json`. سنجه: `OpQueueBacklogDesktopTest` (۶۰٬۰۰۰ op)، `sync-keep-local.test.js`.
+- ⛔ **۳۰ روز بی اینترنت** (SYN-01، `claude/offline-30d`): هیچ مهلتی کارِ دستگاهِ بی اینترنت را نمی‌بندد یا op ای را دور نمی‌ریزد —
+  توکنِ تازه‌سازی ۹۰ روز (دسترسیِ ۶۰ دقیقه‌ای با یک تازه‌سازی)، نشستِ ازدست‌رفته صف را نگه می‌دارد تا ورودِ دوباره، رازِ دستگاهِ
+  شاگرد بی عمرِ زمانی، برگهٔ تأیید با زمانِ op (`staff-approval` ⇐ `covers(at = op.ts)`، هرگز ساعتِ سرور)، پایانِ اشتراک ⇒ ۴۰۳
+  `subscription_required` و صف تا تمدید، فاکتورِ نگه‌داشته فقط «کهنه» (پاک‌سازیِ خودکار خاموش). مجوزِ اشتراکِ دکان با پرچمِ
+  `shop.license_offline_30d` (⛔ پیش‌فرض خاموش، اثرِ پولی) ۳۵ روز و هرگز دیرتر از پایانِ اشتراک و مهلتش — بی آن ده روز و `VipGate`
+  «فروش» و «قرض‌داران» را روزِ ۱۱ ِ قطعی می‌بندد. `HttpURLConnection` ِ برنامه POST ِ بریده را خودش یک بار دوباره می‌فرستد
+  (`sun.net.http.retryPost`) ⇒ یکتاییِ `oplog.op_id` همان دسته را «تکراری» برمی‌گرداند. هر تغییرِ صف، توکن، مجوز، مهلت یا push/pull
+  باید `Offline30DaysDesktopTest` (سرورِ واقعی: `server/test/e2e/lib/offline30-backend.mjs`، ساعت و شبکهٔ دست‌گردان) و
+  `server/test/license-offline.test.js` را سبز نگه دارد.
 - pull ِ v1 با پرچمِ `sync.keep_pending` (پیش‌فرض خاموش، فقط دکان؛ `keep_pending` در پاسخ) تغییرِ محلیِ **در صف** را بازنویسی نمی‌کند:
   opِ رسیده پیش از نشاندن از `KeepPending` (`core/…/core/sync/KeepPending.kt`؛ اندروید `LedgerDiff.keepPending` زیرِ قفلِ موتور، وب
   `core.keepPending`؛ بردار `keep-pending-v1.json`) می‌گذرد و همان op روی دفتر، سایه و ژورنال می‌نشیند. فیلدِ سادهٔ صف می‌ماند،
@@ -942,6 +951,7 @@
 
 تنظیمِ همین دستگاه برای «گزارش‌ها»ی کامپیوتر: `tohid-policy:report_keys` = کلیدهای − / + ِ دوره و Ctrl+Shift+C ِ مقایسه (`ReportKeysPref`، RPT-13، `claude/new-rpt-3`، باز؛ پیش‌فرض خاموش).
 | `shop.device_cap` | دکان / `all` | خاموش | سقفِ `max_devices` برای دستگاهی هم که با «ورود» ثبت شده: بیرون از n ِ اول (ترتیبِ نخستین ثبت، فقط دیده‌شده در ۹۰ روز) ⇒ `POST /api/license/sync` بی مجوز (`device_limit`) — **جز دستگاهِ ثبت‌شدهٔ خودِ صاحبِ دکان** (O-09: مجوز + `warning`)؛ خاموش ⇒ فقط شناسهٔ تازه بی جای خالی و شناسهٔ باطل‌شده رد می‌شوند (SEC-CLI-01) | `claude/sec-client` | باز |
+| `shop.license_offline_30d` | دکان / `all` | خاموش | SYN-01، D-05: مجوزِ اشتراکِ دکان (`POST /api/license/sync`) ۳۵ روز به‌جای ده روز (`license.SHOP_OFFLINE_TTL_MS`، `ttlMs` ِ `license.issue`) — دستگاهِ بی اینترنت مجوزش را تازه نمی‌کند و با ده روز روزِ یازدهمِ قطعی «فروش» و «قرض‌داران» (`VipGate`) قفل می‌شد. ⛔ هرگز دیرتر از پایانِ اشتراک و مهلتش (`activeUntil`)؛ لغو/«اشتراک نیست» ِ سرور مجوزِ دستگاهِ آنلاین را همان دم برمی‌دارد؛ پمپ همان ده روز. سنجه: `server/test/license-offline.test.js`، `Offline30DaysDesktopTest` |
 
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:held_invoices` چند فاکتورِ هم‌زمان (POS-12، #332، main) و `tohid-ui:held_auto_clean` پاک‌سازیِ خودکارِ کهنه‌های آن، عوض کردنش فقط با «لغوِ فاکتور» (POS-12، `claude/part-pos-2`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
 تنظیم‌های همین دستگاه (همگام نمی‌شوند): `tohid-ui:pos_smart_search` جست‌وجوی مقاومِ صندوقِ کامپیوتر (POS-04، باز)؛ `tohid-ui:pos_more_keys` کلیدهای بیشترِ صندوقِ کامپیوتر — Shift+F5، Esc ِ کادرِ خالی با پرسش، برچسب‌های F3/+−/Delete/Esc (POS-41، `claude/part-pos-4`)؛ `tohid-ledger-store-v1 = idb` دفترِ وب در IndexedDB (#228، main)؛ `cashRounding = 0`
