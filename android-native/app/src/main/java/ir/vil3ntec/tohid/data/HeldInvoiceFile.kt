@@ -34,7 +34,8 @@ object HeldInvoices {
       else store ?: HeldInvoiceStore(
         FileHeldDisk(File(app.filesDir, HeldInvoiceStore.FILE)),
         device = { ir.vil3ntec.tohid.sync.DocSeries.current(app) },
-      ).also { store = it }
+      //  S09: پشتیبانِ سرور (پرچمِ خاموشِ `shop.held_sync`) — فقط دفترِ واقعی، هرگز آموزشی
+      ).also { HeldSync.attach(app, it); store = it }
     }
   }
 

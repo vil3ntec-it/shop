@@ -220,6 +220,8 @@ class DataSafetyGuardTest {
       "tohid-settings-restore",
       //  سایه و cursor ِ همگام‌سازیِ تنظیماتِ دکان (`ShopSettingsSync`) — خودِ تنظیم‌ها در `SHOP_PREFS`
       "tohid-settings-sync",
+      //  صف، نسخه‌ها و cursor ِ پشتیبانِ فاکتورهای نگه‌داشته (`HeldSync`، پرچمِ `shop.held_sync`) — خودِ نگه‌داشته‌ها روی سرورند
+      "tohid-held-sync",
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: کلیدِ سبدِ همین صندوق ⇒ ردیفِ صندوقِ سرور (`ConflictFix`)؛ خودِ ردیف روی سرور است
       "tohid-conflict-fix",
     ).forEach { put(it, Kind.DEVICE) }

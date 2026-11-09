@@ -39,10 +39,11 @@ import java.io.IOException
  *  در بالا آمدنِ بعدی آن را یکی می‌کند: **سبدِ جاری می‌بَرد**، نسخهٔ هم‌کلیدِ
  *  نگه‌داشته کنار می‌رود.
  *
- *  ── فقط همین دستگاه ──────────────────────────────────────────────────
- *  فعلاً همگام نمی‌شود. بازیابی روی دستگاهِ دیگر و قفلِ «در دستِ دستگاهِ ۲»
- *  (S09) گامِ بعدی است و به جدول و opِ همگام‌سازی نیاز دارد؛ فیلدِ `device`
- *  برای همان است.
+ *  ── پشتیبانِ سرور (S09) ──────────────────────────────────────────────
+ *  پشتِ پرچمِ خاموشِ `shop.held_sync` هر تغییرِ دفتر به سرور می‌رود و دستگاهِ
+ *  تازه یا دیگرِ دکان همه را پس می‌گیرد (`HeldSync`، `onChange`، `absorb`).
+ *  خاموش ⇒ همین دستگاه، بایت‌به‌بایت همان پیشین. قفلِ «در دستِ دستگاهِ ۲» نیست:
+ *  بازگرداندن نگه‌داشته را از سرور برمی‌دارد و دستگاه‌های دیگر با دورِ بعد می‌بینند.
  */
 @Serializable
 data class HeldInvoice(
@@ -74,8 +75,20 @@ data class HeldInvoice(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val discountAmount: Boolean = false,
+  /**
+   *  POS-11 — یادداشتِ **فاکتور** (`SaleDraft.note`، روی رسید)، جدا از [note] ِ برگه. پیش‌تر با نگه‌داشتن گم می‌شد.
+   *  `null` نوشته نمی‌شود ⇒ نگه‌داشتهٔ بی یادداشتِ فاکتور بایت‌به‌بایت همان پیشین.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val saleNote: String? = null,
+  /** POS-18 — لیستِ قیمتِ دستیِ فاکتور (`SaleDraft.priceList`)؛ `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val priceList: String? = null,
 ) {
-  fun draft(): SaleDraft = SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt, coupons = coupons)
+  fun draft(): SaleDraft =
+    SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt, coupons = coupons, note = saleNote, priceList = priceList)
 }
 
 /**
@@ -191,6 +204,8 @@ object HeldRules {
       coupons = active.coupons,
       //  کادرِ خالی واحد ندارد — نگه‌داشتهٔ بی تخفیف همان شکلِ امروز را می‌گیرد
       discountAmount = extras.discountAmount && extras.discount.isNotBlank(),
+      saleNote = active.note,
+      priceList = active.priceList,
     )
 
   private fun extrasOf(h: HeldInvoice) =
@@ -344,6 +359,23 @@ class HeldInvoiceStore(
   @Volatile private var loaded = false
   private var deviceId = ""
 
+  /**
+   *  S09 — پس از هر تغییرِ دفتر (زیرِ همان قفل، پس از نوشتنِ دیسک): پشتیبانِ سرور (`HeldSync`، پرچمِ خاموشِ
+   *  `shop.held_sync`). `null` (پیش‌فرض، آموزش و آزمون) ⇒ هیچ. خطایش هرگز کارِ صندوق را نمی‌شکند.
+   */
+  @Volatile var onChange: ((before: HeldBook, after: HeldBook, why: HeldChange) -> Unit)? = null
+
+  private fun told(before: HeldBook, why: HeldChange) {
+    val after = _book.value
+    if (after != before) onChange?.let { runCatching { it(before, after, why) } }
+  }
+
+  /** هر کارِ دفتر: پس از پایان (هر راهی، حتی ردِ میانه) آنچه واقعاً عوض شد به [onChange] می‌رسد */
+  private inline fun <T> changing(why: HeldChange, block: () -> T): T {
+    val before = _book.value
+    try { return block() } finally { told(before, why) }
+  }
+
   sealed interface Outcome {
     /** `extras` ناتهی ⇒ صفحه آن‌ها را برای فاکتورِ تازهٔ صندوق بگذارد */
     data class Done(val message: String, val extras: HeldExtras? = null) : Outcome
@@ -386,7 +418,7 @@ class HeldInvoiceStore(
   suspend fun hold(cart: HeldCart, extras: HeldExtras, label: String? = null, note: String? = null): Outcome = lock.withLock {
     ensureLoaded()
     if (cart.busy) return Outcome.Refused(BUSY)
-    switching(cart) {
+    changing(HeldChange.HOLD) { switching(cart) {
       when (val r = HeldRules.hold(_book.value, cart.snapshot(), extras, label, note, clock(), deviceId)) {
         is HeldRules.Result.Refused -> Outcome.Refused(r.message)
         is HeldRules.Result.Ok -> {
@@ -397,13 +429,13 @@ class HeldInvoiceStore(
           Outcome.Done(StrLedger.heldDone(title(h.number, h.label)), HeldExtras())
         }
       }
-    }
+    } }
   }
 
   suspend fun resume(cart: HeldCart, id: String, extras: HeldExtras, d: ShopData? = null): Outcome = lock.withLock {
     ensureLoaded()
     if (cart.busy) return Outcome.Refused(BUSY)
-    switching(cart) {
+    changing(HeldChange.RESUME) { switching(cart) {
       val before = _book.value
       val active = cart.snapshot()
       val r = HeldRules.resume(before, id, active, extras, clock(), deviceId, d)
@@ -427,16 +459,16 @@ class HeldInvoiceStore(
       _book.value = r.book
       val dropped = if (r.dropped > 0) StrLedger.heldDropped(r.dropped) else ""
       Outcome.Done(StrLedger.heldOpened(title(target.number, target.label), dropped), r.extras)
-    }
+    } }
   }
 
   /** فاکتورِ ساخته از اسکن‌ها (`HeldRules.park`) — سبدِ جاری دست نمی‌خورد */
   suspend fun park(item: HeldInvoice): Outcome = lock.withLock {
     ensureLoaded()
-    when (val r = HeldRules.park(_book.value, item.copy(device = item.device.ifBlank { deviceId }))) {
+    changing(HeldChange.PARK) { when (val r = HeldRules.park(_book.value, item.copy(device = item.device.ifBlank { deviceId }))) {
       is HeldRules.Result.Refused -> Outcome.Refused(r.message)
       is HeldRules.Result.Ok -> if (r.book == _book.value || commit(r.book)) Outcome.Done(title(r.number, item.label)) else Outcome.Refused(NOT_SAVED)
-    }
+    } }
   }
 
   /** فاکتورِ باز بعدی (`dir` > ۰) یا قبلی */
@@ -449,25 +481,31 @@ class HeldInvoiceStore(
   /** دور انداختن — صفحه پیش از آن تأیید می‌گیرد */
   suspend fun discard(id: String): Outcome = lock.withLock {
     ensureLoaded()
-    val h = _book.value.items.firstOrNull { it.id == id } ?: return Outcome.Refused(HeldRules.GONE)
-    if (!commit(HeldRules.discard(_book.value, id))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done(StrLedger.heldDiscarded(title(h.number, h.label)))
+    changing(HeldChange.DISCARD) {
+      val h = _book.value.items.firstOrNull { it.id == id } ?: return Outcome.Refused(HeldRules.GONE)
+      if (!commit(HeldRules.discard(_book.value, id))) return Outcome.Refused(NOT_SAVED)
+      Outcome.Done(StrLedger.heldDiscarded(title(h.number, h.label)))
+    }
   }
 
   suspend fun rename(id: String, label: String, note: String): Outcome = lock.withLock {
     ensureLoaded()
-    if (_book.value.items.none { it.id == id }) return Outcome.Refused(HeldRules.GONE)
-    if (!commit(HeldRules.rename(_book.value, id, label, note))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done(StrLedger.saved)
+    changing(HeldChange.RENAME) {
+      if (_book.value.items.none { it.id == id }) return Outcome.Refused(HeldRules.GONE)
+      if (!commit(HeldRules.rename(_book.value, id, label, note))) return Outcome.Refused(NOT_SAVED)
+      Outcome.Done(StrLedger.saved)
+    }
   }
 
   /** پاک کردنِ نگه‌داشته‌های کهنه — صفحه مجوز و تأیید را می‌گیرد */
   suspend fun dropStale(hours: Int = HeldRules.STALE_HOURS): Outcome = lock.withLock {
     ensureLoaded()
-    val n = HeldRules.stale(_book.value, clock(), hours).size
-    if (n == 0) return Outcome.Refused(StrLedger.heldNoOld)
-    if (!commit(HeldRules.dropStale(_book.value, clock(), hours))) return Outcome.Refused(NOT_SAVED)
-    Outcome.Done(StrLedger.heldOldCleared(n))
+    changing(HeldChange.STALE) {
+      val n = HeldRules.stale(_book.value, clock(), hours).size
+      if (n == 0) return Outcome.Refused(StrLedger.heldNoOld)
+      if (!commit(HeldRules.dropStale(_book.value, clock(), hours))) return Outcome.Refused(NOT_SAVED)
+      Outcome.Done(StrLedger.heldOldCleared(n))
+    }
   }
 
   /**
@@ -480,17 +518,21 @@ class HeldInvoiceStore(
     if (!on) return 0
     return lock.withLock {
       ensureLoaded()
-      val now = clock()
-      val n = HeldRules.stale(_book.value, now, hours).size
-      if (n == 0 || !commit(HeldRules.dropStale(_book.value, now, hours))) 0 else n
+      changing(HeldChange.STALE) {
+        val now = clock()
+        val n = HeldRules.stale(_book.value, now, hours).size
+        if (n == 0 || !commit(HeldRules.dropStale(_book.value, now, hours))) 0 else n
+      }
     }
   }
 
   /** پس از تغییرِ دفتر (فروش، حذفِ کالا یا مشتری) */
   suspend fun prune(d: ShopData) = lock.withLock {
     ensureLoaded()
-    val next = HeldRules.prune(_book.value, d)
-    if (next != _book.value) { write(next); _book.value = next }
+    changing(HeldChange.PRUNE) {
+      val next = HeldRules.prune(_book.value, d)
+      if (next != _book.value) { write(next); _book.value = next }
+    }
   }
 
   /**
@@ -501,8 +543,20 @@ class HeldInvoiceStore(
   suspend fun reconcile(cart: HeldCart) = lock.withLock {
     ensureLoaded()
     if (cart.recovering) return@withLock
-    val next = HeldRules.reconcile(_book.value, cart.snapshot())
-    if (next != _book.value) { write(next); _book.value = next }
+    changing(HeldChange.RECONCILE) {
+      val next = HeldRules.reconcile(_book.value, cart.snapshot())
+      if (next != _book.value) { write(next); _book.value = next }
+    }
+  }
+
+  /**
+   *  S09 — نگه‌داشته‌های رسیده از سرور (`HeldSyncEngine`): [plan] دفترِ تازه را از دفترِ کنونی می‌سازد، زیرِ همین قفل.
+   *  [onChange] صدا زده نمی‌شود — برگرداندنِ همان به سرور فقط پژواک بود. نوشتنِ ناموفق ⇒ `false` و دفتر همان.
+   */
+  suspend fun absorb(plan: (HeldBook) -> HeldBook): Boolean = lock.withLock {
+    ensureLoaded()
+    val next = plan(_book.value)
+    next == _book.value || commit(next)
   }
 
   companion object {

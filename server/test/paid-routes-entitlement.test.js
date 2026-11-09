@@ -58,6 +58,9 @@ const FREE = [
     'PUT /shop/loyalty']],
   ['تنظیماتِ دکان (همگام‌سازیِ زنده، مهاجرتِ ۳۰۰) بخشی از هستهٔ دکان است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.settings_sync و فقط صاحب/مدیر', [
     'PUT /shop/settings-sync']],
+  ['پشتیبانِ فاکتورهای نگه‌داشته (مهاجرتِ ۴۲۵، POS-12/S09) بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد؛ فقط پرچمِ shop.held_sync و مجوزِ فروش — '
+    + 'نگه‌داشتهٔ فروشنده پس از پایانِ اشتراک هم گروگان نمی‌شود', [
+    'PUT /shop/held-invoices/:id', 'DELETE /shop/held-invoices/:id']],
   ['سربرگ و لوگوی فاکتورِ نسخهٔ ۲ بخشی از صندوقِ پایه است و کلیدِ کاتالوگ ندارد (#379؛ فقط پرچمِ shop.receipt_v2)', [
     'PUT /shop/receipt-profile', 'PUT /shop/receipt-profile/logo', 'DELETE /shop/receipt-profile/logo']],
   ['پرسشِ فقط‌خواندنیِ همگام‌سازی پس از بازیابی (§۹.۵): هیچ داده‌ای نمی‌نویسد و مثلِ خودِ همگام‌سازی پس از پایانِ اشتراک هم باز است تا داده گم نشود (پشتِ پرچمِ خاموشِ SYNC_EPOCH_ENABLED)', [
@@ -141,6 +144,8 @@ FLAGS.push('shop.approval_requests');
 FLAGS.push('shop.custom_roles');
 //  تنظیماتِ دکان، همگام‌سازیِ زنده (`PUT /shop/settings-sync`، FREE) با پرچمِ خودش
 FLAGS.push('shop.settings_sync');
+//  POS-12/S09: پشتیبانِ فاکتورهای نگه‌داشته (`PUT`/`DELETE /shop/held-invoices/:id`، FREE) با پرچمِ خودش
+FLAGS.push('shop.held_sync');
 const writes = () => inv.routes('/shop').filter((r) => r.method !== 'GET');
 const paidGate = (r) => /\bneedWrite\b/.test(r.head)
   || [...`${r.uses} ${r.head}`.matchAll(/requireFeature\(\s*'([^']+)'/g)].some((m) => PAID_KEYS.includes(m[1]));
