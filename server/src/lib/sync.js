@@ -119,6 +119,8 @@ async function pushChanges(ctx, changes) {
     && changes.some((ch) => ch?.collection === 'sales' && ch?.deleted !== true && Number(ch?.data?.debtGiven) > 0)
     && await require('./credit-cap').on(creditCtx)
     ? await require('./staff-perms').layersFor(shopId, role, userId) : null;
+  //  CRM-03 §۱۰.۱ (پرچمِ خاموشِ `shop.credit_limit_perm`): تغییرِ سقفِ اعتبارِ مشتری بی `customers.credit_limit` ⇒ کلِ دسته ۴۰۳
+  const limitLayers = await require('./credit-limit-perm').legacyLayers({ shopId, role, userId }, changes);
   //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
   const guard = ctx.finalized
     ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, ip: ctx.ip || '' }, ctx.finalized, changes)
@@ -234,6 +236,10 @@ async function pushChanges(ctx, changes) {
       }
       if (creditLayers && collection === 'sales' && !deleted) {
         const bad = await require('./credit-cap').judgeLegacy({ role }, recordId, data, existing, creditLayers);
+        if (bad) throw bad;
+      }
+      if (limitLayers && collection === 'debtors' && !deleted) {
+        const bad = require('./credit-limit-perm').judgeLegacy(role, recordId, data, existing, limitLayers);
         if (bad) throw bad;
       }
 

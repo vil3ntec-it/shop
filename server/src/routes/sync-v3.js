@@ -100,6 +100,8 @@ router.post('/push', requireSyncWrite, async (req, res, next) => {
     });
     //  CRM-03: فروشِ نسیهٔ تازه بیش از سقفِ اعتبار ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/credit-limit-review.js‎)
     await creditReview.v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
+    //  STF-03: تخفیفِ خودکار و مصرفِ امتیاز با تعریف‌های دکان ⇒ فقط سابقهٔ بررسی (پرچمِ خاموش؛ ‎lib/promo-loyalty-review.js‎)
+    await require('../lib/promo-loyalty-review').v3(req.sync, deviceOf(b), fl.ops, out.results, { ip: clientIp(req) });
     out.results = newerFields.mergeResults(fl, out.results);
     await send(req, res, { ok: true, ...out, cursor: out.head });
   } catch (err) {
