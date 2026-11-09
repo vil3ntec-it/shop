@@ -54,6 +54,26 @@ class SaleUnitExactTest {
     assertEquals(0.042, SalesEngine.toStockQty(legacy, 1.0), 0.0)
   }
 
+  /**
+   *  کادرِ ردیفِ صندوق (`CartLineDialog`، Compose ⇒ متن سنجیده می‌شود) خودش ضربِ ممیزِ شناور می‌کرد: «۱٫۵ بسته» ۰٫۰۱۳ کیلو
+   *  ثبت می‌شد، در حالی که برگهٔ ردیف، `toStockQty` و سرور ۰٫۰۱۴. حالا همان `UnitSale.typedToBase` (= `toBaseQty`).
+   */
+  @Test
+  fun tillLineDialog_sameMilliAsToStockQty() {
+    val spice = kilo.copy(saleUnit = "بسته", unitFactor = 0.009)
+    for (q in listOf(0.5, 1.0, 1.5, 2.5, 7.5, 100.0)) {
+      assertEquals("q=$q", SalesEngine.toStockQty(spice, q), UnitSale.typedToBase(q, spice.unitFactor), 0.0)
+    }
+    assertEquals(0.014, UnitSale.typedToBase(1.5, 0.009), 0.0)
+    assertEquals(1.0, UnitSale.typedToBase(24.0, legacy.unitFactor), 0.0)
+    val rel = "ir/vil3ntec/tohid/ui/screens/SaleDialogs.kt"
+    val src = listOf("src/main/java", "../android-native/app/src/main/java", "android-native/app/src/main/java")
+      .map { java.io.File(it, rel) }.firstOrNull { it.isFile }?.readText() ?: error("$rel پیدا نشد")
+    assertTrue(src.contains("if (inSaleUnit) ir.vil3ntec.tohid.core.product.UnitSale.typedToBase(it, unitFactor) else it"))
+    assertTrue(src.contains("if (wantSale) v / unitFactor else ir.vil3ntec.tohid.core.product.UnitSale.typedToBase(v, unitFactor)"))
+    assertTrue("ضربِ ممیزِ شناورِ کادر برگشت", !src.contains("* unitFactor * 1000.0") && !src.contains("v * unitFactor"))
+  }
+
   @Test
   fun newFactorMustBeExactToTheMilli() {
     val d = ShopData()

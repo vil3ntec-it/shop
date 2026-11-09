@@ -86,6 +86,13 @@ data class HeldInvoice(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val priceList: String? = null,
+  /**
+   *  فروشندهٔ فاکتورِ اصلاح‌شده (`HeldExtras.seller`، `SaleReopen`) — پیش‌تر با نگه‌داشتن گم می‌شد و فاکتورِ برگشته به نامِ
+   *  صندوق‌دارِ همین لحظه ثبت می‌شد. خالی نوشته نمی‌شود ⇒ نگه‌داشتهٔ بی آن (و نسخهٔ پیش) بایت‌به‌بایت همان پیشین.
+   */
+  @OptIn(ExperimentalSerializationApi::class)
+  @EncodeDefault(EncodeDefault.Mode.NEVER)
+  val seller: String = "",
 ) {
   fun draft(): SaleDraft =
     SaleDraft(key = id, lines = lines, debtorId = debtorId, savedAt = heldAt, coupons = coupons, note = saleNote, priceList = priceList)
@@ -211,10 +218,11 @@ object HeldRules {
       discountAmount = extras.discountAmount && extras.discount.isNotBlank(),
       saleNote = active.note,
       priceList = active.priceList,
+      seller = extras.seller.trim(),
     )
 
   private fun extrasOf(h: HeldInvoice) =
-    HeldExtras(h.discount, SalesEngine.Payment.values().firstOrNull { it.name == h.payment }, h.paid, h.discountAmount)
+    HeldExtras(h.discount, SalesEngine.Payment.values().firstOrNull { it.name == h.payment }, h.paid, h.discountAmount, h.seller)
 
   /** F6 — فاکتورِ جاری نگه داشته می‌شود و صندوق خالی. `label`/`note` `null` ⇒ همان قبلی. */
   fun hold(book: HeldBook, active: SaleDraft, extras: HeldExtras, label: String?, note: String?, now: Long, device: String): Result {
@@ -373,10 +381,13 @@ object HeldBackupRules {
     val items = book.items.filter { it.lines.isNotEmpty() && it.id != open?.key && (it.device.isBlank() || it.device == series) }
     val parked = open?.let { d ->
       val tag = book.current?.takeIf { it.id == d.key }
+      //  برگهٔ صندوقِ همین سبد (`SaleDraft.page`: تخفیف، روشِ پرداخت، دریافتی، فروشندهٔ فاکتورِ اصلاح‌شده) — همان `HeldRules.hold`
+      val x = d.page?.extras() ?: HeldExtras()
       HeldInvoice(
         id = d.key!!, number = tag?.number ?: 0, label = tag?.label.orEmpty(), lines = d.lines, debtorId = d.debtorId,
-        note = tag?.note.orEmpty(), heldAt = d.savedAt.takeIf { it > 0 } ?: now, device = series, coupons = d.coupons,
-        saleNote = d.note, priceList = d.priceList,
+        discount = x.discount.trim(), note = tag?.note.orEmpty(), heldAt = d.savedAt.takeIf { it > 0 } ?: now, device = series,
+        payment = x.payment?.name.orEmpty(), paid = x.paid.trim(), coupons = d.coupons,
+        discountAmount = x.discountAmount && x.discount.isNotBlank(), saleNote = d.note, priceList = d.priceList, seller = x.seller.trim(),
       )
     }
     if (items.isEmpty() && parked == null) return null

@@ -32,6 +32,12 @@ object StrCount {
   fun unknown(code: Any): String = t("بارکدِ «${asIs(code)}» مالِ هیچ کالایی نیست", "Barcode “$code” doesn't belong to any product", "بارکوډ «$code» د هېڅ توکي نه دی")
   fun weighed(name: Any): String = t("«${asIs(name)}» وزنی است؛ وزنش را بنویسید", "“$name” is sold by weight; type its weight", "«$name» وزني دی؛ وزن یې ولیکئ")
   fun inactive(name: Any): String = t("«${asIs(name)}» غیرفعال است", "“$name” is inactive", "«$name» غیرفعال دی")
+  /** بارکدخوان روی صفحهٔ انبارگردانی با «ابزارهای تازهٔ دستگاه» ِ خاموش (`CountState.scan`) */
+  val scanOff: String get() = t(
+    "بارکد خوانده شد ولی شمرده نشد؛ این صفحه و عددهایش سرِ جایشان است. برای شمردن با بارکدخوان، «ابزارهای تازهٔ دستگاه» را در «دستگاه‌ها» روشن کنید.",
+    "Barcode read but not counted; this page and its numbers are kept. To count with the scanner, turn on “New device tools” in “Devices”.",
+    "بارکوډ ولوستل شو خو ونه شمېرل شو؛ دا پاڼه او شمېرې یې خپل ځای دي. د بارکوډ لوستونکي سره د شمېرلو لپاره، په «وسیلې» کې «د وسیلو نوې اوزار» روښانه کړئ.",
+  )
   fun badNumber(name: Any): String = t("عددِ «${asIs(name)}» درست نیست", "The count for “$name” isn't valid", "د «$name» شمېر سم نه دی")
 
   // خلاصه و ثبت

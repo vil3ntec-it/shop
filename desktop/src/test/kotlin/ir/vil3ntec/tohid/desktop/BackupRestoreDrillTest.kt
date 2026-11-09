@@ -465,7 +465,7 @@ class BackupRestoreDrillTest {
     val h1 = HeldInvoice(
       id = "drill-h1", number = 1, label = "آقای کریمی", lines = listOf(line(p[0], 2.0, 95.0), SaleDraft.Line("", 1.0, 5.0, label = "کیسه")),
       debtorId = d.debtors.firstOrNull()?.id, discount = "10", note = "پولش را می‌آورد", heldAt = 1_762_600_000_000, payment = "CREDIT",
-      paid = "50", coupons = listOf("EID5"), discountAmount = true, saleNote = "فاکتورِ عمده", priceList = "wholesale",
+      paid = "50", coupons = listOf("EID5"), discountAmount = true, saleNote = "فاکتورِ عمده", priceList = "wholesale", seller = "علی",
     )
     val h2 = HeldInvoice(id = "drill-h2", number = 3, lines = listOf(line(p[1], 1.0)), heldAt = 1_762_600_100_000)
     val cart = SaleDraft(key = "drill-c1", lines = listOf(line(p[2], 4.0)), savedAt = 1_762_600_200_000, coupons = listOf("NEW"), note = "سبدِ نیمه‌کاره")

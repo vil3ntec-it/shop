@@ -101,6 +101,8 @@ internal fun NewProductsScreen(
   val suggest = rememberCategorySuggest(data)
   val pasteOn = rememberPasteOn()
   var pasting by remember { mutableStateOf(false) }
+  //  PRD-12: «قیمتِ عمده» فقط با «لیستِ قیمت در صندوق» (پیش‌فرض خاموش ⇒ همان فرم و `wholesalePrice = null` = ۰، همان ویرایش)
+  val wholesaleOn = remember { ir.vil3ntec.tohid.ui.components.pos.PriceListPrefs.on(context) }
 
   fun update(key: Int, change: (ProductRowDraft) -> ProductRowDraft) { rows = ProductFormModel.update(rows, key, change) }
 
@@ -129,7 +131,8 @@ internal fun NewProductsScreen(
       }
       is ProductFormModel.Check.Ok -> {
         val before = store.data.value
-        when (val r = WarehouseEngine.addProducts(before, check.drafts, System.currentTimeMillis(), ::newId)) {
+        val drafts = check.drafts.map { it.copy(wholesalePrice = it.wholesalePrice.takeIf { wholesaleOn }) }
+        when (val r = WarehouseEngine.addProducts(before, drafts, System.currentTimeMillis(), ::newId)) {
           is WarehouseEngine.Result.Failed -> { banner = r.message; errorShake++ }
           is WarehouseEngine.Result.Ok -> {
             banner = null
@@ -210,6 +213,7 @@ internal fun NewProductsScreen(
               mode = Mode.NEW,
               nameHelper = if (index == 0 && rows.size == 1 && row.name.isBlank()) StrProducts.firstRowHint else null,
               suggest = suggest,
+              wholesale = wholesaleOn,
             )
           }
         } }

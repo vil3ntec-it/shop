@@ -465,6 +465,49 @@ class HeldInvoicesTest {
     assertEquals(HeldExtras("5"), (HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A") as HeldRules.Result.Ok).extras)
   }
 
+  /**
+   *  «اصلاحِ فاکتور» (`SaleReopen`): فاکتورِ دوباره ثبت‌شده به نامِ فروشندهٔ همان فاکتور می‌ماند (`HeldExtras.seller`). پیش‌تر
+   *  `HeldInvoice` فروشنده نداشت ⇒ نگه‌داشتن و بازگرداندن آن را می‌برد و فاکتور به نامِ صندوق‌دارِ همین لحظه ثبت می‌شد.
+   *  نگه‌داشتهٔ بی فروشنده و فایلِ نسخهٔ پیش بایت‌به‌بایت همان پیشین؛ پشتیبانِ نگه‌داشته‌ها (`HeldBackup`) هم آن را می‌برد.
+   */
+  @Test
+  fun `فروشندهٔ فاکتورِ اصلاح‌شده با نگه‌داشتن، بازگرداندن و پشتیبان می‌ماند`() = runBlocking<Unit> {
+    val disk = MemDisk(); val cart = MemCart(); val s = store(disk)
+    cart.put("A", "p1" to 2.0)
+    done(s.hold(cart, HeldExtras("10", seller = " زهرا ")))
+    assertTrue(disk.text!!.contains("\"seller\":\"زهرا\""))
+    //  بی فروشنده ⇒ کلید نوشته نمی‌شود (همان شکلِ امروز)
+    cart.put("B", "p2" to 1.0)
+    done(s.hold(cart, HeldExtras("5")))
+    assertEquals(1, Regex("\"seller\"").findAll(disk.text!!).count())
+    //  پس از بسته شدنِ برنامه، از همان فایل
+    val again = store(disk)
+    assertEquals(HeldExtras("10", seller = "زهرا"), done(again.resume(cart, "A", HeldExtras())).extras)
+    //  سبدِ اصلاح‌شده‌ای که با بازگرداندنِ دیگری خودکار کنار می‌رود هم فروشنده‌اش را نگه می‌دارد
+    assertEquals(HeldExtras("5"), done(again.resume(cart, "B", HeldExtras("10", seller = "زهرا"))).extras)
+    assertEquals("زهرا", HeldInvoiceCodec.decode(disk.text)!!.items.single { it.id == "A" }.seller)
+    //  نگه‌داشتهٔ نسخهٔ پیش ⇒ فروشندهٔ خالی = کاربرِ همین صندوق
+    val old = HeldInvoiceCodec.decode("""{"items":[{"id":"O","number":3,"lines":[{"productId":"p3","quantity":1}],"discount":"5"}]}""")!!
+    assertEquals("", old.items.single().seller)
+    assertEquals(HeldExtras("5"), (HeldRules.resume(old, "O", SaleDraft(), HeldExtras(), now, "A") as HeldRules.Result.Ok).extras)
+
+    //  پشتیبان: نگه‌داشته و سبدِ جاری (برگهٔ صندوقش در `SaleDraft.page`) با فروشنده می‌روند و برمی‌گردند
+    val book = HeldInvoiceCodec.decode(disk.text)!!
+    val live = SaleDraft(key = "C", lines = listOf(SaleDraft.Line("p1", 1.0)), savedAt = 5,
+      page = SaleDraft.Page(discount = "200", discountAmount = true, payment = "CREDIT", paid = "50", seller = "مریم"))
+    val backup = HeldBackupRules.of(book, live, "A", "u1", "s1", now)!!
+    assertEquals(backup, HeldBackupRules.decode(HeldBackupRules.encode(backup)))
+    val parked = backup.cart!!
+    assertEquals(HeldExtras("200", SalesEngine.Payment.CREDIT, "50", discountAmount = true, seller = "مریم"),
+      (HeldRules.resume(HeldBook(items = listOf(parked)), "C", SaleDraft(), HeldExtras(), now, "A") as HeldRules.Result.Ok).extras)
+    val back = HeldBackupRules.restore(HeldBook(), HeldBackupRules.decode(HeldBackupRules.encode(backup))!!, "u1", "s1", null, shop())!!
+    assertEquals("زهرا", back.items.single { it.id == "A" }.seller)
+    assertEquals("مریم", back.items.single { it.id == "C" }.seller)
+    //  سبدِ بی برگه همان نگه‌داشتهٔ پیشین است — بی کلیدِ تازه
+    val plain = HeldBackupRules.of(HeldBook(), live.copy(page = null), "A", "u1", "s1", now)!!
+    assertFalse(HeldBackupRules.encode(plain).contains("\"seller\""))
+  }
+
   /** نسیهٔ بی‌مشتری نسیه می‌ماند (ثبت خودش مشتری می‌خواهد)؛ نبودِ روش ⇒ مشتری دارد ⇒ نسیه */
   @Test
   fun `روشِ پرداخت پس از جابه‌جایی`() {
