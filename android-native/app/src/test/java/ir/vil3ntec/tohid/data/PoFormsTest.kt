@@ -118,6 +118,33 @@ class PoFormsTest {
     assertNull(PoForms.after(partial, "l2", PoForms.RecvRow(received = "1", damaged = "2")))
   }
 
+  @Test fun `دریافتِ همهٔ باقی‌مانده — هر ردیفِ باز کامل، ردیفِ کامل دست‌نخورده، خراب و فی می‌مانند`() {
+    //  بخشی: A کامل (۰ باز) و B ۳ باز؛ خرابِ تایپ‌شدهٔ B و فیِ هر دو ردیف می‌مانند
+    val typed = rows("l2" to PoForms.RecvRow(received = "1", damaged = "1", price = "210"))
+    val filled = PoForms.fillRemaining(partial, typed)
+    assertEquals(typed.getValue("l1"), filled.getValue("l1"))
+    assertEquals(PoForms.RecvRow(received = "3", damaged = "1", price = "210"), filled.getValue("l2"))
+    assertTrue(PoForms.hasRemaining(partial))
+    //  همان سنجشِ رسید: ۳ رسیده − ۱ خراب ⇒ ۲ پذیرفته و ۱ باز؛ بی خراب ⇒ این قلم کامل
+    val ok = PoForms.receipt(partial, filled, rid, allowOver = false) as PoForms.ReceiptCheck.Ok
+    assertEquals(listOf(PoReceiptLineDto("l2", 3_000, 1_000, 21_000)), ok.lines)
+    assertEquals(PoForms.After(leftMilli = 1_000, overMilli = 0), PoForms.after(partial, "l2", filled.getValue("l2")))
+    assertTrue(PoForms.after(partial, "l2", PoForms.fillRemaining(partial, rows()).getValue("l2"))!!.done)
+
+    //  فرستاده بی رسید (بی `progress`): همان مقدارِ سفارش؛ ردیفِ به واحدِ خرید به هزارمِ همان واحد، دقیق تا ثبت
+    val sent = unitPo.copy(lines = listOf(unitPo.lines[0].copy(qtyMilli = 1_042), unitPo.lines[1]))
+    val all = PoForms.fillRemaining(sent, PoForms.recvRows(sent))
+    assertEquals(listOf("1.042", "10"), sent.lines.map { all.getValue(it.id).received })
+    val chk = PoForms.receipt(sent, all, rid, allowOver = false) as PoForms.ReceiptCheck.Ok
+    assertEquals(listOf(1_042L, 10_000L), chk.lines.map { it.receivedMilli })
+    assertTrue(sent.lines.all { PoForms.after(sent, it.id, all.getValue(it.id))!!.done })
+
+    //  سفارشِ کامل: دکمه نیست و پر کردن هیچ نمی‌کند
+    val complete = partial.copy(progress = partial.progress.map { it.copy(remainingMilli = 0) })
+    assertFalse(PoForms.hasRemaining(complete))
+    assertEquals(PoForms.recvRows(complete), PoForms.fillRemaining(complete, PoForms.recvRows(complete)))
+  }
+
   @Test fun `فرمِ خالی، عددِ نادرست، کرایهٔ نادرست و سفارشِ دریافت‌نگیر پیش از سرور رد می‌شوند`() {
     assertEquals(PoForms.ReceiptCheck.Bad(StrPurchasePages.nothingEntered), PoForms.receipt(partial, PoForms.recvRows(partial), rid, false))
     assertEquals(PoForms.ReceiptCheck.Bad(StrPurchasePages.rowBadQty(2)), PoForms.receipt(partial, rows("l2" to PoForms.RecvRow(received = "x", price = "200")), rid, false))

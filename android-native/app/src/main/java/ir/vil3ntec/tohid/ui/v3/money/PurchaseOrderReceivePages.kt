@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.FactCheck
+import androidx.compose.material.icons.outlined.DoneAll
 import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.MoveToInbox
 import androidx.compose.material.icons.outlined.Print
@@ -176,6 +177,7 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
     onScan = { nav.openForResult(SalesPaths.scan("purchase")) { code -> code?.let(::scan) } },
     onSubmit = { scan(scanText); scanText = "" },
   )
+  PoReceiveAll(o, rows, enabled = !busy) { filled -> rows = filled; error = null; message = V3Tone.INFO to StrPurchaseOrders.filledAll }
   message?.let { (tone, text) -> V3Message(tone, text, modifier = Modifier.padding(top = 8.dp)) }
 
   val prog = remember(o) { o.progress.associateBy { it.lineId } }
@@ -224,6 +226,20 @@ private fun RouteScope.PoReceiveForm(host: PurchaseOrderHost, o: PurchaseOrderDt
   V3Button(
     StrLayaway.payConfirm, { submit() },
     Modifier.fillMaxWidth().padding(top = 12.dp), icon = Icons.Outlined.MoveToInbox, loading = busy, haptic = true,
+  )
+}
+
+/**
+ *  PUR-04 «دریافتِ همهٔ باقی‌مانده»: دریافتِ کامل با یک لمس، بی تایپ یا اسکنِ تک‌تکِ اقلام — «رسیده» ِ هر ردیفِ باز همان
+ *  باقی‌مانده (`PoForms.fillRemaining`، دقیق به هزارمِ واحدِ ردیف). فقط کادرها پر می‌شوند؛ ثبت همان دکمهٔ پایینِ صفحه با
+ *  سنجشِ `PoForms.receipt` و سرور. سفارشی که ردیفِ باز ندارد دکمه ندارد.
+ */
+@Composable
+internal fun PoReceiveAll(o: PurchaseOrderDto, rows: Map<String, PoForms.RecvRow>, enabled: Boolean, onFilled: (Map<String, PoForms.RecvRow>) -> Unit) {
+  if (!PoForms.hasRemaining(o)) return
+  V3Button(
+    StrPurchaseOrders.receiveAll, { onFilled(PoForms.fillRemaining(o, rows)) },
+    Modifier.fillMaxWidth().padding(top = 8.dp), kind = V3ButtonKind.SECONDARY, icon = Icons.Outlined.DoneAll, enabled = enabled,
   )
 }
 

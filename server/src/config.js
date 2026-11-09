@@ -395,6 +395,9 @@ const config = {
      *  پمپ). ⚠️ پشتِ تونل و بی `TRUST_PROXY` همهٔ مشتری‌ها یک IP‌اند.
      */
     storeCheckoutMax: num(process.env.RATE_STORE_CHECKOUT_MAX, 20),
+    //  هم‌گامیِ حسابِ ویترین (سبدِ سرور و ♥: `PUT/merge` ِ سبد، `PUT/DELETE` ِ دلخواه) — سطلِ خودش به‌ازای IP، تا
+    //  ویرایشِ سبد هرگز سهمِ ثبتِ سفارش (`storeCheckoutMax`) را نخورد (`storefront-sync-limit.test.js`)
+    storeSyncMax: num(process.env.RATE_STORE_SYNC_MAX, 240),
     //  گزارشِ مشکل و نظرِ سفارش (NTF-07/09): نوشتن به‌ازای هر سفارش (توکن) در **یک ساعت**
     storeFeedbackMax: num(process.env.RATE_STORE_FEEDBACK_MAX, 20),
     /*

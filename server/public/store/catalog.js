@@ -6,7 +6,10 @@
  *
  * WEB-11 فقط با `features.favorites` ِ سرور (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ‌کدام): ♥ روی کارت و در
  * برگهٔ کالا و ردیفِ «دلخواه‌ها»؛ «فهرستِ خرید» شناسه و مقدارِ سبد را نگه می‌دارد و «همه به سبد» همان «خریدِ دوباره»
- * ِ store.js است (قیمت و موجودیِ امروز). هر دو مثلِ سبدِ مهمان (S132) و دلخواه‌های بازارچه فقط روی همین دستگاه‌اند.
+ * ِ store.js است (قیمت و موجودیِ امروز). هر دو مثلِ سبدِ مهمان (S132) روی همین دستگاه‌اند؛ با نشستِ حساب (`K.sess()`)
+ * ♥ با حساب هم‌گام است (`/account/favorites`): نخستین بارِ هر نشست ⇒ ♥ ِ این دستگاه به حساب می‌رود (ادغام)، سپس حساب حرفِ
+ * آخر را می‌زند؛ ♥ ِ این دستگاه در صف (`store-favsync:<slug>`) و یکی‌یکی تا رسیدن (بی اینترنت/۴۲۹ ⇒ `online` یا بارِ بعد).
+ * کالای نبوده (۴۰۴) و حسابِ پر (۴۰۹) ⇒ کنار؛ ۴۰۱ ⇒ همان محلی. فهرستِ خرید درِ سروری ندارد و محلی می‌ماند.
  * WEB-24 فقط با `features.banners` (پرچمِ `shop.storefront.banners`): بنرهای همین لحظه برای ناحیهٔ مشتری از
  * `GET /banners?zone=` (ساعت، ناحیه و کالای فروختنی را سرور می‌سنجد)، ردیفِ افقی بی چرخشِ خودکار؛ پیوندِ کالا ⇒ برگهٔ
  * کالا، پیوندِ دسته ⇒ همان دسته (فقط اگر دسته در ویترین هست)؛ ناحیه عوض شد ⇒ دوباره، با برگشت به کاتالوگ.
@@ -92,6 +95,7 @@
     // ── WEB-11: دلخواه‌ها و فهرستِ خرید ──
     var KEY_FAV = 'store-favs:' + ctx.slug; var KEY_LIST = 'store-list:' + ctx.slug;
     var on = false; var favs = []; var list = []; var sheetP = null; var sb = null;
+    var KEY_SYNC = 'store-favsync:' + ctx.slug; var busy = false;
 
     function paint(b, p) {
       var yes = favs.indexOf(p.id) >= 0;
@@ -118,6 +122,50 @@
       paintSheet();
       drawFavs();
       K.toast(t(i < 0 ? 'fav.added' : 'fav.removed', { name: p.name }));
+      var st = state();
+      if (st) { st.ops = st.ops.filter(function (o) { return o[0] !== p.id; }).concat([[p.id, i < 0 ? 1 : 0]]); K.save(KEY_SYNC, st); flush(false); }
+    }
+    /** صفِ هم‌گامیِ همین نشست؛ نشستِ تازه ⇒ ادغام: همهٔ ♥ ِ این دستگاه، کهنه‌ترین اول تا ترتیبِ حساب همان بماند */
+    function state() {
+      var s = K.sess(); if (!s) return null;
+      var st = K.load(KEY_SYNC, null);
+      if (!st || st.t !== s.expiresAt || !Array.isArray(st.ops)) {
+        st = { t: s.expiresAt, ops: favs.slice().reverse().map(function (id) { return [id, 1]; }) };
+        K.save(KEY_SYNC, st);
+      }
+      return st;
+    }
+    /** صف یکی‌یکی؛ `pull` ⇒ پس از خالی شدن، فهرستِ حساب جای فهرستِ دستگاه */
+    function flush(pull) {
+      var st = state();
+      if (!st || busy || navigator.onLine === false) return;
+      var op = st.ops[0];
+      if (!op) { if (pull) adopt(); return; }
+      busy = true;
+      //  صف از حافظه دوباره خوانده می‌شود: ♥ ِ زده‌شده در میانهٔ درخواست گم نمی‌شود
+      var done = function () {
+        busy = false;
+        var now = state();
+        if (now) { now.ops = now.ops.filter(function (o) { return !(o[0] === op[0] && o[1] === op[1]); }); K.save(KEY_SYNC, now); }
+        flush(pull);
+      };
+      api('/account/favorites/' + encodeURIComponent(op[0]), { method: op[1] ? 'PUT' : 'DELETE' }).then(done, function (e) {
+        if (e.status === 400 || e.status === 404 || e.status === 409) done(); else busy = false;
+      });
+    }
+    function adopt() {
+      busy = true;
+      api('/account/favorites').then(function (r) {
+        busy = false;
+        var st = state();
+        if (!st || st.ops.length) { flush(true); return; }
+        r.items.forEach(function (p) { ctx.items[p.id] = ctx.items[p.id] || p; });
+        favs = cleanFavs(r.items.map(function (p) { return p.id; }));
+        K.save(KEY_FAV, favs);
+        Array.prototype.forEach.call(document.querySelectorAll('.fav[data-fav]'), function (b) { var p = ctx.items[b.getAttribute('data-fav')]; if (p) paint(b, p); });
+        paintSheet();
+        drawFavs();
+      }, function () { busy = false; });
     }
     /** کالایی که دیگر در ویترین نیست دیده نمی‌شود ولی می‌ماند (همان قاعدهٔ علاقه‌مندیِ حساب) */
     function drawFavs() {
@@ -174,6 +222,8 @@
       $('list-clear').addEventListener('click', function () { list = []; saveList(); K.toast(t('list.cleared')); });
       drawList();
       fetchMissing().then(function () { drawFavs(); drawList(); });
+      flush(true);
+      window.addEventListener('online', function () { flush(true); });
     }
 
     // ── WEB-24: بنرها ──
