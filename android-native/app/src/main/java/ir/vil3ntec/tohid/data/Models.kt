@@ -219,6 +219,7 @@ data class WarehouseEntry(
    *  PRD-07 — ارزشِ **دقیقِ** کالای همین ردیف به صدمِ افغانی (بی هزینهٔ جانبی): خریدی که به واحدِ خرید ثبت شد
    *  (۱ کارتنِ ۲۴ به ۱٬۰۰۰ ⇒ 100000)، تا میانگینِ موزون (`StockLedger`، `ReportCore`) ارزش را از `units × price` ِ گردشده
    *  (۲۴ × ۴۱٫۶۷ = ۱٬۰۰۰٫۰۸) نسازد. `null` = همان `units × price` ِ پیشین؛ نوشته نمی‌شود ⇒ ردیفِ قدیمی همان.
+   *  INV-21 — همین فیلد بهای دقیقِ کلِ ردیفِ خروجیِ تولید (`Repack` ِ `lots`، جمعِ بهای اجزا) هم هست؛ همان قاعده.
    */
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
@@ -422,7 +423,7 @@ const val ONLINE_SERIES = "W"
  *  `null` اگر فاکتور شماره ندارد. شماره‌های قبلی همان‌طور می‌مانند.
  */
 fun Sale.invoiceLabel(): String? =
-  invoiceNumber?.let { n -> series?.trim()?.takeIf { it.isNotEmpty() }?.let { "$it-$n" } ?: n.toString() }
+  invoiceNumber?.let { n -> series?.let(ir.vil3ntec.tohid.core.text.JsText::trim)?.takeIf { it.isNotEmpty() }?.let { "$it-$n" } ?: n.toString() }  // trim ِ JS (saleLabel)
 
 @Serializable
 data class SaleItem(
@@ -487,6 +488,8 @@ data class SaleItem(
   @OptIn(ExperimentalSerializationApi::class)
   @EncodeDefault(EncodeDefault.Mode.NEVER)
   val priceSource: String? = null,
+  /** POS-23 — فروشندهٔ قلمِ جدا از فاکتور (`line_seller`، `LineSeller.stored`)؛ `null` = `Sale.seller`، نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val seller: String? = null,
 )
 
 @Serializable
@@ -849,6 +852,7 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val specialOrder: SpecialOrderDoc? = null,
   /** POS-27 — فقط `layaway` (سند) و `layaway_status` (وضعیتِ تازه)؛ `Layaways`. `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val layaway: LayawayDoc? = null,
+  /** INV-21 — فقط `stock_bom` (`Bom`): دستورِ ساختِ کالای `refId`؛ `null` نوشته نمی‌شود */ @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val bom: BomDoc? = null,
   /** PRM-13 — فقط ردیف‌های `loyalty_*` (`LoyaltyPoints`): شمارِ امتیاز (همیشه مثبت؛ نوع علامت را می‌گوید). `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val points: Long? = null,
   /** PAY-07 — فقط `pay_status` (`PayStatusFlow`؛ `refId` = فاکتور، `amount` = مبلغِ ردیف): جای ردیف در `payments`، روشش،
@@ -867,6 +871,18 @@ data class AuditEntry(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val role: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val device: String? = null,
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val view: String? = null,
+  /** STF-09 — مُهرِ نشست هنگامِ نوشتن (`AuditSeal`، نه صفحه): کاربرِ واردشده، نقشش و دستگاه (`SyncStore.deviceUid` ِ همگام‌سازی).
+   *  پس از ساخت عوض نمی‌شوند؛ ردیفِ کهنه بی این‌ها «نامعلوم» دیده می‌شود. `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val userId: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val userRole: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val deviceId: String? = null,
+  /** STF-09 — حلقهٔ زنجیرهٔ هشِ سابقهٔ همین دستگاه (`core/audit/AuditChain`، فقط با پرچمِ `shop.doc_chain`): زنجیره
+   *  (`<deviceId>/<دوره>`)، شماره، هشِ پیشین، هشِ همین ردیف و سطحِ مدل (`AuditSeal.LEVEL`؛ ۱ نوشته نمی‌شود). `null` نوشته نمی‌شود */
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chain: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chainSeq: Long? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val prev: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val hash: String? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val chainV: Long? = null,
 )
 
 /**

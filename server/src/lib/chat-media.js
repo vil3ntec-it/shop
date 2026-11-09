@@ -4,6 +4,7 @@
  *
  *   sniff(buf)               ⇒ { kind, mime } یا null — فقط از روی بایت‌های آغاز
  *   stripImageMetadata(buf)  ⇒ همان عکس بی EXIF ِ مکان/XMP/IPTC/توضیح؛ جهت می‌ماند
+ *   cleanImage(buf, mime, role) ⇒ سقفِ ابعاد از سرآیند (بمبِ فشرده، CHAT-05) و سپس همان stripImageMetadata
  *   send(res, m)             ⇒ بایت‌ها به بیننده با سرآیندهای امن (`chat.sendMedia`)
  *
  * ⛔ سرآیندِ `Content-Type` و پسوندِ کلاینت هیچ‌وقت ملاک نیست: فایلِ اجرایی
@@ -16,7 +17,11 @@
  * افتِ کیفیت، نه چرخشِ غلط (CHAT-06). ساختارِ خراب ⇒ خطای `bad_media`.
  */
 const { sniff: sniffImage } = require('./product-photos');
-const { badRequest } = require('../middleware/errors');
+const { MAX_SIDE, MAX_PIXELS } = require('./image-bytes');
+const { ApiError, badRequest } = require('../middleware/errors');
+
+//  پیش‌نمایش ≤ ۳۲۰px می‌آید (`ChatImage.THUMB_PX`، ویترین هم)؛ «پیش‌نمایشِ» ۱۰٬۰۰۰ پیکسلی همان بمب است در جامهٔ کوچک
+const THUMB_SIDE = 1024;
 
 const ascii = (buf, from, to) => buf.slice(from, to).toString('latin1');
 
@@ -164,6 +169,50 @@ function stripWebp(buf) {
   return Buffer.concat([head, body]);
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  ابعاد از سرآیند — بی رمزگشایی. عکسِ مشتری نامطمئن است و دستگاهِ دکان آن را باز می‌کند: PNG ِ یک‌رنگِ
+//  ۲۰٬۰۰۰×۲۰٬۰۰۰ زیرِ سقفِ ۱٫۵MB جا می‌شود و رمزگشا ۱٫۶ گیگابایت می‌خواهد. **بیشینهٔ همهٔ** سرآیندهای ابعاد
+//  (هر SOF ِ JPEG؛ بوم و جریانِ WebP) سنجیده می‌شود تا رمزگشا هر کدام را بخواند از سقف نگذرد. سرآیندِ نیافته
+//  (JPEG ِ بی SOF) ⇒ null: هیچ رمزگشایی بی آن پیکسلی نمی‌سازد، و ساختار را stripImageMetadata می‌سنجد.
+// ════════════════════════════════════════════════════════════════════
+
+function dimsOf(buf, mime) {
+  let w = 0, h = 0;
+  const see = (x, y) => { w = Math.max(w, x); h = Math.max(h, y); };
+  if (mime === 'image/png' && buf.length >= 24 && ascii(buf, 12, 16) === 'IHDR') see(buf.readUInt32BE(16), buf.readUInt32BE(20));
+  if (mime === 'image/jpeg') {
+    for (let i = 2; i + 4 <= buf.length;) {
+      const m = buf[i + 1];
+      if (buf[i] !== 0xff || m === 0xda || m === 0xd9) break;
+      if (m === 0xff) { i += 1; continue; }
+      if (m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+      //  SOF0–SOF15 جز DHT (C4)، JPG (C8) و DAC (CC): بلندی در +۵، پهنا در +۷
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc && i + 9 <= buf.length) see(buf.readUInt16BE(i + 7), buf.readUInt16BE(i + 5));
+      i += 2 + Math.max(2, buf.readUInt16BE(i + 2));
+    }
+  }
+  if (mime === 'image/webp') {
+    for (let i = 12; i + 8 <= buf.length;) {
+      const type = ascii(buf, i, i + 4), len = buf.readUInt32LE(i + 4), d = i + 8;
+      if (type === 'VP8X' && d + 10 <= buf.length) see(buf.readUIntLE(d + 4, 3) + 1, buf.readUIntLE(d + 7, 3) + 1);
+      if (type === 'VP8 ' && d + 10 <= buf.length) see(buf.readUInt16LE(d + 6) & 0x3fff, buf.readUInt16LE(d + 8) & 0x3fff);
+      if (type === 'VP8L' && d + 5 <= buf.length) { const b = buf.readUInt32LE(d + 1); see((b & 0x3fff) + 1, ((b >>> 14) & 0x3fff) + 1); }
+      i = d + len + (len & 1);
+    }
+  }
+  return w || h ? { width: w, height: h } : null;
+}
+
+/** عکسِ پذیرفتنیِ چت: ابعادِ سرآیند زیرِ سقفِ بانکِ تصاویر (`image-bytes`: ۱۰٬۰۰۰ در هر بُعد، ۴۰ مگاپیکسل؛ پیش‌نمایش ۱۰۲۴)، سپس بی metadata. */
+function cleanImage(buf, mime, role = 'main') {
+  const d = dimsOf(buf, mime);
+  const side = role === 'thumb' ? THUMB_SIDE : MAX_SIDE;
+  if (d && (d.width > side || d.height > side || d.width * d.height > MAX_PIXELS)) {
+    throw new ApiError(413, 'image_too_large_dimensions', 'ابعادِ عکس بیش از حد بزرگ است');
+  }
+  return stripImageMetadata(buf, mime);
+}
+
 function stripImageMetadata(buf, mime) {
   if (mime === 'image/jpeg') return stripJpeg(buf);
   if (mime === 'image/png') return stripPng(buf);
@@ -186,4 +235,4 @@ function send(res, m) {
   res.end(m.data);
 }
 
-module.exports = { sniff, stripImageMetadata, orientationOf, send };
+module.exports = { sniff, stripImageMetadata, cleanImage, dimsOf, orientationOf, send, THUMB_SIDE };

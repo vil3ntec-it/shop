@@ -523,7 +523,7 @@ class AtRestTest {
   }
 
   @Test fun `صفِ opها و ژورنال‌ها رمز نمی‌شوند؛ با رمزِ روشن، دفتر و حالِ همگام‌سازی با هم از پشتیبانِ اندروید بیرون`() {
-    for (n in listOf("oplog-u1.json", "oplog-u1-dropped.json", "sync-journal-u1.json", "sync-v3-u1/queue.json", "ledger-summary.json", "sale-draft.json", "sync-replay-u1-sent.jsonl")) {
+    for (n in listOf("oplog-u1.json", "oplog-u1-dropped.json", "sync-journal-u1.json", "sync-v3-u1/queue.json", "sync-v3/u1/queue.json", "sync-v3/u1/state.json", "ledger-summary.json", "sale-draft.json", "sync-replay-u1-sent.jsonl")) {
       assertFalse(n, AtRestScope.sealable(n))
     }
     for (n in listOf("shop-data.json", "before-restore.json", "ledger-u1.json", "ledger-archive.json", "auto-backups/auto-14050801-1200.json")) {
@@ -537,6 +537,8 @@ class AtRestTest {
       "sync-replay-u1-sent.jsonl", "sync-v3-u1/replay-sent.jsonl",
       //  سایهٔ همگام‌سازی در فایلِ خودش (`shop.sync_shadow_file`): پوشهٔ `sync-shadow/` و جای ساختِ پیشین
       "sync-shadow", "sync-shadow/sync-shadow-u1-1.dat", "sync-shadow/sync-shadow-u1-1.dat.prev", "sync-shadow-u1-1.dat",
+      //  DATA-06: حالِ Sync v3 در پوشهٔ خودش (`V3StateDir`) — cursor، سایه، صف، ژورنال و دفترچه با هم
+      "sync-v3", "sync-v3/u1", "sync-v3/u1/state.json", "sync-v3/u1/queue.json", "sync-v3/u1/journal.json", "sync-v3/u1/replay-sent.jsonl",
     )) assertTrue(n, AtRestScope.skipInDeviceBackup(n))
     for (n in listOf("sale-draft.json", "product-photos/p1.jpg", "chat-outbox/1.json")) assertFalse(n, AtRestScope.skipInDeviceBackup(n))
     assertTrue("tohid-sync-v1.xml" in AtRestScope.SYNC_PREFS)

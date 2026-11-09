@@ -57,14 +57,18 @@ data class SaleDraft(
     val note: String? = null,
     /** سریال‌های ردیف (POS-28، افزودنی) */
     val serials: List<String>? = null,
+    /** فروشندهٔ ردیف (POS-23، افزودنی)؛ `null` نوشته نمی‌شود ⇒ پیش‌نویسِ بی فروشندهٔ ردیف بایت‌به‌بایت همان پیشین */
+    @OptIn(kotlinx.serialization.ExperimentalSerializationApi::class)
+    @kotlinx.serialization.EncodeDefault(kotlinx.serialization.EncodeDefault.Mode.NEVER)
+    val seller: String? = null,
   )
 
-  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials) }
+  fun cart(): List<SalesEngine.CartLine> = lines.map { SalesEngine.CartLine(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, seller = it.seller) }
 
   companion object {
     fun of(key: String?, cart: List<SalesEngine.CartLine>, debtorId: String?, now: Long, coupons: List<String> = emptyList(), note: String? = null) = SaleDraft(
       key = key,
-      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials) },
+      lines = cart.map { Line(it.productId, it.quantity, it.unitPrice, it.label, it.lotId, it.note, it.serials, it.seller) },
       debtorId = debtorId,
       savedAt = now,
       //  کد بی سبد معنا ندارد

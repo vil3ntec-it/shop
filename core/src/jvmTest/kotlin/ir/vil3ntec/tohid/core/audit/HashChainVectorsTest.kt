@@ -128,7 +128,8 @@ class HashChainVectorsTest {
       assertEquals(HashChain.canonicalJson(o["expected"]), HashChain.canonicalJson(rev), name)
       assertEquals(before, HashChain.canonicalJson(doc), "سندِ اصلی دست نخورد")
       assertTrue(PostedDocument.isPosted(rev))
-      assertEquals(rev, PostedDocument.findReversal(listOf(doc, rev), doc["id"] as String))
+      //  سندِ بی شناسه (null) معکوسش پیدا نمی‌شود — همان `findReversal` ِ JS
+      assertEquals(if (doc["id"] == null) null else rev, PostedDocument.findReversal(listOf(doc, rev), doc["id"]))
       assertFalse(PostedDocument.guardEdit(rev, doc).ok)
     }
   }

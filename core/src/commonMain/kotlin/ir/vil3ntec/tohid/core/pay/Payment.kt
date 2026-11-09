@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.money.MAX_EXACT
 import ir.vil3ntec.tohid.core.money.Rounding
 import ir.vil3ntec.tohid.core.money.addExact
 import ir.vil3ntec.tohid.core.money.mulExact
+import ir.vil3ntec.tohid.core.text.JsText
 
 /*
  *  هستهٔ پرداخت — PAY-01..07، 09، 10، 23 (docs/spec/06-PAY.md، بخشِ ۳.۴ و ۴.۲).
@@ -191,8 +192,8 @@ object Pay {
     val seen = HashSet<String>()
     val out = ArrayList<PayMethod>()
     list.forEachIndexed { i, x ->
-      val id = x.id.trim()
-      val name = x.name.trim()
+      val id = JsText.trim(x.id)
+      val name = JsText.trim(x.name)
       val limit = x.limit
       if (id.isEmpty() || id == ACCOUNT || id in seen || x.kind !in KINDS || name.isEmpty() ||
         (limit != null && !posExact(limit))
@@ -230,7 +231,7 @@ object Pay {
   )
 
   private fun analyse(input: SettleInput): PayResult<Analysis> {
-    val cur = try { Currency.of(input.currency) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
+    val cur = try { Currency.of(input.currency.ifEmpty { "AFN" }) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
     if (!nonNegExact(input.total)) return PayResult.Err("INVALID_AMOUNT")
     val step = input.cashRounding
     if (!nonNegExact(step) || (step > 0 && step % cur.stepMinor != 0L)) return PayResult.Err("INVALID_STEP")
@@ -244,8 +245,8 @@ object Pay {
       val m = t[x.method] ?: return PayResult.Err("UNKNOWN_METHOD", index = i)
       if (!m.enabled) return PayResult.Err("METHOD_DISABLED", index = i)
       if (!posExact(x.amount)) return PayResult.Err("INVALID_AMOUNT", index = i)
-      if ((x.currency ?: cur.code) != cur.code) return PayResult.Err("CURRENCY_MISMATCH", index = i)
-      val ref = x.ref?.trim().orEmpty()
+      if ((x.currency?.ifEmpty { null } ?: cur.code) != cur.code) return PayResult.Err("CURRENCY_MISMATCH", index = i)
+      val ref = x.ref?.let(JsText::trim).orEmpty()
       if (m.needsRef && ref.isEmpty()) return PayResult.Err("REF_REQUIRED", index = i)
       if (m.limit != null && x.amount > m.limit) return PayResult.Err("METHOD_LIMIT", index = i)
       if (m.kind == CASH) {
@@ -271,7 +272,7 @@ object Pay {
 
   fun settle(input: SettleInput): PayResult<Settlement> {
     val a = when (val r = analyse(input)) { is PayResult.Ok -> r.value; is PayResult.Err -> return r }
-    val customer = input.customerId?.trim().orEmpty()
+    val customer = input.customerId?.let(JsText::trim).orEmpty()
     val toAccount = if (customer.isNotEmpty()) a.remaining else 0L
     val payments = ArrayList<PaymentRow>()
     a.rows.forEach { r ->
@@ -310,14 +311,14 @@ object Pay {
   fun exchange(op: ExchangeInput): PayResult<ExchangeRecord> {
     val src: Currency
     val dst: Currency
-    try { src = Currency.of(op.fromCurrency); dst = Currency.of(op.to) } catch (e: IllegalArgumentException) {
+    try { src = Currency.of(op.fromCurrency); dst = Currency.of(op.to.ifEmpty { "AFN" }) } catch (e: IllegalArgumentException) {
       return PayResult.Err("UNKNOWN_CURRENCY")
     }
     if (src == dst) return PayResult.Err("EXCHANGE_SAME_CURRENCY")
     if (!posExact(op.fromAmount)) return PayResult.Err("INVALID_AMOUNT")
     if (!posExact(op.rate)) return PayResult.Err("INVALID_RATE")
-    val source = op.source?.trim().orEmpty()
-    val approver = op.approvedBy?.trim().orEmpty()
+    val source = op.source?.let(JsText::trim).orEmpty()
+    val approver = op.approvedBy?.let(JsText::trim).orEmpty()
     if (source.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "source")
     if (op.at == null || !posExact(op.at)) return PayResult.Err("EXCHANGE_FIELDS", field = "at")
     if (approver.isEmpty()) return PayResult.Err("EXCHANGE_FIELDS", field = "approvedBy")
@@ -330,15 +331,15 @@ object Pay {
 
   // ── بازپرداخت (PAY-23) ──────────────────────────────────
   fun refund(input: RefundInput): PayResult<Refund> {
-    val approver = input.approvedBy?.trim().orEmpty()
+    val approver = input.approvedBy?.let(JsText::trim).orEmpty()
     if (approver.isEmpty()) return PayResult.Err("APPROVAL_REQUIRED")
     if (!posExact(input.amount)) return PayResult.Err("INVALID_AMOUNT")
     val mode = input.mode
     if (mode != "original" && mode != "cash" && mode != "store_credit") return PayResult.Err("BAD_MODE")
-    val cur = try { Currency.of(input.currency) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
+    val cur = try { Currency.of(input.currency.ifEmpty { "AFN" }) } catch (e: IllegalArgumentException) { return PayResult.Err("UNKNOWN_CURRENCY") }
     val t = when (val r = table(input.methods)) { is PayResult.Ok -> r.value; is PayResult.Err -> return r }
     if (mode == "store_credit") {
-      if (input.customerId?.trim().isNullOrEmpty()) return PayResult.Err("CUSTOMER_REQUIRED")
+      if (JsText.isBlank(input.customerId)) return PayResult.Err("CUSTOMER_REQUIRED")
       if (t.creditId == null) return PayResult.Err("UNKNOWN_METHOD", index = -1)
     }
     val pays = input.payments

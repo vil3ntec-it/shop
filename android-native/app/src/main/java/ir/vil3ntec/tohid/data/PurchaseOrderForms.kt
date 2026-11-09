@@ -1,13 +1,18 @@
 package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrGoods
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
 import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.product.PurchaseUnits
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.stock.StockCore
 import ir.vil3ntec.tohid.data.repo.PurchaseOrderRepository
 import ir.vil3ntec.tohid.latinDigits
+import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
 import kotlin.math.abs
 import kotlin.math.floor
@@ -20,6 +25,11 @@ import kotlin.math.floor
  *  یک منطق را صدا می‌زنند: سنجشِ فرم، مجوزِ هر کار، شمارشِ رسید و تطبیق از `PurchaseOrderCore` (همان بردارهای سرور) و
  *  `PurchaseOrderBook`. صفحه فقط می‌کشد. ⛔ سرور خودش دوباره می‌سنجد (نقش، وضعیت، اضافه، کلیدِ یکتا)؛ این‌جا فقط پیش از
  *  فرستادن همان را می‌گوید تا کاربر بی رفت‌وبرگشت بداند.
+ *
+ *  PRD-07 (واحدهای خرید، پشتِ `ShopPolicy.productTools` ِ صفحه): ردیف به یکی از واحدهای خریدِ کالا (`EditRow.unitName`؛ مقدار
+ *  و فی به همان واحد) ⇐ `PoLineDto.unit` نامِ همان واحد و `factorMilli` ضریبش؛ اسکنِ بارکدِ واحد همان واحد را می‌شمارد؛ ثبتِ
+ *  رسید (`PurchaseOrderBook.post`) موجودی را مقدار × ضریب و ارزش را جمعِ دقیقِ ردیف (`WarehouseEntry.costMinor`) می‌کند. حساب
+ *  همه از `core/product/PurchaseUnits` و `PurchaseBook.inUnitOf` (همان فاکتورِ خرید). ردیفِ بی واحدِ خرید ⇒ همان JSON ِ پیشین.
  */
 object PoForms {
 
@@ -124,20 +134,45 @@ object PoForms {
 
   /* ── ساختن و ویرایش (PUR-02/03) ─────────────────────────────────────── */
 
-  data class EditRow(val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String)
+  /**
+   *  یک ردیفِ فرم. [unit] واحدِ پایهٔ کالا؛ [unitName] (PRD-07) نامِ یکی از واحدهای خریدِ کالا — [qty] و [price] به همان
+   *  واحد (۲ کارتن، فیِ یک کارتن) — یا `null` = واحدِ پایه، همان پیشین.
+   */
+  data class EditRow(
+    val key: Int, val productId: String, val name: String, val unit: String, val qty: String, val price: String,
+    val unitName: String? = null,
+  )
 
-  fun rowsOf(base: PurchaseOrderDto?): List<EditRow> = base?.lines.orEmpty().mapIndexed { i, l ->
-    EditRow(i, l.productId, l.name, l.unit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)))
+  /** واحدی که مقدار و فیِ ردیف به آن است (کادرِ «مقدار به …») */
+  fun unitOf(r: EditRow): String = r.unitName ?: r.unit
+
+  /**
+   *  ردیف‌های همان پیش‌نویس. ردیفِ به واحدِ خرید (`factorMilli`) همان واحد را نگه می‌دارد — با پرچمِ خاموش هم، تا ویرایشِ
+   *  پیش‌نویس ضریب را گم نکند؛ [d] واحدِ پایهٔ کالا را می‌دهد (نبود ⇒ همان نامِ ردیف).
+   */
+  fun rowsOf(base: PurchaseOrderDto?, d: ShopData? = null): List<EditRow> = base?.lines.orEmpty().mapIndexed { i, l ->
+    val inUnit = l.factorMilli != null
+    val baseUnit = if (inUnit) d?.products?.find { it.id == l.productId }?.unit ?: l.unit else l.unit
+    EditRow(i, l.productId, l.name, baseUnit, num(PurchaseOrderBook.units(l.qtyMilli)), num(PurchaseOrderBook.asAfn(l.priceMinor)), if (inUnit) l.unit else null)
   }
 
   private fun nextKey(rows: List<EditRow>): Int = (rows.maxOfOrNull { it.key } ?: -1) + 1
 
-  /** کالای تازه با مقدارِ پیشنهادی (تا «حدِ کم») و آخرین فیِ همین تأمین‌کننده؛ کالای پیش‌تر در سفارش ⇒ `null` */
-  fun addProduct(d: ShopData, rows: List<EditRow>, supplierId: String, p: Product): List<EditRow>? {
+  /**
+   *  کالای تازه با مقدارِ پیشنهادی (تا «حدِ کم») و آخرین فیِ همین تأمین‌کننده؛ کالای پیش‌تر در سفارش ⇒ `null`.
+   *  PRD-07 ([unitsOn] = `ShopPolicy.productTools` ِ صفحه): واحدی که تأمین‌کنندهٔ پیش‌فرضش همین تأمین‌کننده است پیش‌گزیده می‌شود
+   *  (`PurchaseUnits.defaultFor`، همان فاکتورِ خرید) — فی با [pickUnit] به همان واحد و مقدارِ پیشنهادی به واحدِ درستِ همان
+   *  واحد، رو به بالا (۳۰ دانه کم ⇒ ۲ کارتنِ ۲۴)؛ کاربر می‌تواند عوضش کند. نبود یا پرچمِ خاموش ⇒ همان ردیفِ پیشین.
+   */
+  fun addProduct(d: ShopData, rows: List<EditRow>, supplierId: String, p: Product, unitsOn: Boolean = false): List<EditRow>? {
     if (rows.any { it.productId == p.id }) return null
     val q = PurchaseOrderBook.suggestedQtyMilli(d, p)
     val pr = PurchaseOrderBook.lastPriceMinor(d, supplierId, p)
-    return rows + EditRow(nextKey(rows), p.id, p.name, p.unit, num(PurchaseOrderBook.units(q)), num(PurchaseOrderBook.asAfn(pr)))
+    val row = EditRow(nextKey(rows), p.id, p.name, p.unit, num(PurchaseOrderBook.units(q)), num(PurchaseOrderBook.asAfn(pr)))
+    val def = if (unitsOn) PurchaseUnits.defaultFor(p.purchaseUnits?.map(ShopStore::coreOf), supplierId) else null
+    if (def == null || def.factorMilli <= 0) return rows + row
+    val whole = ((q + def.factorMilli - 1) / def.factorMilli).coerceAtLeast(1)
+    return rows + pickUnit(d, row, def.name).copy(qty = num(whole.toDouble()))
   }
 
   /** ردیف از پیشنهادها (`supplierPicks`/`planned`)؛ کالای پیش‌تر در سفارش کنار؛ هیچ تازه ⇒ همان ردیف‌ها */
@@ -150,7 +185,56 @@ object PoForms {
     return out
   }
 
-  fun total(rows: List<EditRow>): Double = rows.sumOf { (parse(it.qty) ?: 0.0) * (parse(it.price) ?: 0.0) }
+  /** جمعِ یک ردیف به افغانی (مقدار × فی به همان واحدِ ردیف) */
+  fun lineTotal(r: EditRow): Double = (parse(r.qty) ?: 0.0) * (parse(r.price) ?: 0.0)
+
+  fun total(rows: List<EditRow>): Double = rows.sumOf(::lineTotal)
+
+  /* ── PRD-07: واحدِ خریدِ ردیف ──────────────────────────────────────── */
+
+  /** واحدهای خریدِ کالای ردیف (هسته)؛ کالای بی واحدِ خرید ⇒ خالی (صفحه انتخاب را نمی‌کشد) */
+  fun purchaseUnits(d: ShopData, productId: String): List<PurchaseUnits.Item> =
+    d.products.find { it.id == productId }?.purchaseUnits.orEmpty().map(ShopStore::coreOf)
+
+  /**
+   *  ردیف به واحدِ [unitName] (`null` = پایه). مقدار همان عدد می‌ماند و فی به نسبتِ ضریب جابه‌جا می‌شود تا فیِ هر واحدِ پایه
+   *  همان بماند (۱۰۰ برای یک دانه ⇒ ۲٬۴۰۰ برای کارتنِ ۲۴؛ `mulDivRound` ِ هسته، به صدمِ افغانی). واحدی که روی کالا نیست ⇒ همان ردیف.
+   */
+  fun pickUnit(d: ShopData, row: EditRow, unitName: String?): EditRow {
+    val p = d.products.find { it.id == row.productId } ?: return row
+    val units = p.purchaseUnits?.map(ShopStore::coreOf)
+    val to = PurchaseUnits.find(units, unitName)
+    if (unitName != null && to == null) return row
+    val next = row.copy(unit = p.unit, unitName = to?.name)
+    return repriced(p, row.price, row.unitName, to?.name)?.let { next.copy(price = it) } ?: next
+  }
+
+  /**
+   *  فیِ [price] (متنِ کادر) از واحدِ [from] به واحدِ [to] ِ کالای [p] (نام‌ها؛ `null` یا ناشناخته = پایه): × ضریبِ تازه ÷ پیشین با
+   *  `PurchaseOrderCore.mulDivRound` به صدمِ افغانی، تا فیِ هر واحدِ پایه همان بماند. همان حساب برای ردیفِ سفارشِ خرید ([pickUnit])
+   *  و ردیفِ فاکتورِ خریدِ گوشی (`PurchaseFormModel`). فیِ نادرست یا منفی ⇒ null (کادر دست نمی‌خورد).
+   */
+  fun repriced(p: Product, price: String, from: String?, to: String?): String? {
+    val units = p.purchaseUnits?.map(ShopStore::coreOf)
+    val f = PurchaseUnits.find(units, from)?.factorMilli ?: PurchaseUnits.MILLI
+    val t = PurchaseUnits.find(units, to)?.factorMilli ?: PurchaseUnits.MILLI
+    val v = parse(price)?.takeIf { it >= 0 } ?: return null
+    return runCatching { num(PurchaseOrderBook.asAfn(PurchaseOrderCore.mulDivRound(PurchaseOrderBook.minor(v), t, f))) }.getOrNull()
+  }
+
+  /**
+   *  زیرِ ردیفِ به واحدِ خرید: «= ۴۸ دانه · بهای هر دانه ۴۱٫۶۷» از `PurchaseUnits.baseCost` (همان حسابی که رسید ثبت می‌کند)؛
+   *  ردیفِ پایه یا عددِ هنوز نادرست ⇒ null
+   */
+  fun unitLine(d: ShopData, r: EditRow): String? {
+    val p = d.products.find { it.id == r.productId } ?: return null
+    val u = PurchaseUnits.find(p.purchaseUnits?.map(ShopStore::coreOf), r.unitName) ?: return null
+    val q = parse(r.qty)?.takeIf { it > 0 } ?: return null
+    val pr = parse(r.price)?.takeIf { it >= 0 } ?: return null
+    val qm = PurchaseOrderBook.milli(q)
+    val bc = runCatching { PurchaseUnits.baseCost(qm, u.factorMilli, PurchaseUnits.lineTotalMinor(qm, PurchaseOrderBook.minor(pr))) }.getOrNull() ?: return null
+    return StrPurchaseUnits.lineBase(qty(PurchaseOrderBook.units(bc.baseQtyMilli)), p.unit, money(PurchaseOrderBook.asAfn(bc.unitCostMinor)))
+  }
 
   sealed interface DraftCheck {
     data class Ok(val draft: PurchaseOrderRepository.Draft) : DraftCheck
@@ -169,7 +253,16 @@ object PoForms {
       val p = parse(r.price)
       if (q == null || q <= 0) return DraftCheck.Bad(StrPurchasePages.rowBadQty(i + 1))
       if (p == null || p < 0) return DraftCheck.Bad(StrPurchasePages.rowBadPrice(i + 1))
-      lines += PoLineDto(id = "l${i + 1}", productId = r.productId, name = r.name, unit = r.unit, qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p))
+      //  PRD-07: ردیفِ به واحدِ خرید ⇐ ضریبِ همان واحد روی کالا، با همان سنجشِ فاکتورِ خرید (`PurchaseBook.inUnitOf`: واحد روی
+      //  کالا هست و مقدارِ پایهٔ کالای شمارشی عددِ درست است)؛ ردیفِ پایه همان ردیفِ پیشین (بی `factorMilli`)
+      val inUnit = r.unitName?.let { name ->
+        val product = d.products.find { it.id == r.productId } ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, StrLedger.pickProduct))
+        PurchaseBook.inUnitOf(product, name, q, q * p) ?: return DraftCheck.Bad(StrGoods.rowOfWhy(i + 1, PurchaseBook.unitWhy(product, name, q)))
+      }
+      lines += PoLineDto(
+        id = "l${i + 1}", productId = r.productId, name = r.name, unit = inUnit?.name ?: r.unit,
+        qtyMilli = PurchaseOrderBook.milli(q), priceMinor = PurchaseOrderBook.minor(p), factorMilli = inUnit?.factorMilli,
+      )
     }
     val check = PurchaseOrderCore.checkOrder(
       PurchaseOrderCore.Order(supplier.id, PurchaseOrderCore.State.DRAFT, lines.map { PurchaseOrderCore.Line(it.id, it.productId, it.qtyMilli, it.priceMinor) }),
@@ -191,18 +284,45 @@ object PoForms {
     o.lines.associate { it.id to RecvRow(price = num(PurchaseOrderBook.asAfn(it.priceMinor))) }
 
   sealed interface Scan {
-    data class Added(val rows: Map<String, RecvRow>, val lineId: String, val name: String, val received: String) : Scan
+    /** [unit] (PRD-07) نامِ واحدِ خریدی که بارکدش خوانده شد؛ بارکدِ خودِ کالا ⇒ null */
+    data class Added(val rows: Map<String, RecvRow>, val lineId: String, val name: String, val received: String, val unit: String? = null) : Scan
     data class NotInPo(val code: String) : Scan
   }
 
-  /** اسکن: یک واحدِ کالای همان بارکد به «رسیده» ِ ردیفش؛ رقمِ فارسیِ بارکدخوان هم پذیرفته */
-  fun scan(o: PurchaseOrderDto, rows: Map<String, RecvRow>, index: Map<String, String>, raw: String): Scan {
+  /**
+   *  اسکن: یک واحدِ کالای همان بارکد به «رسیده» ِ ردیفش؛ رقمِ فارسیِ بارکدخوان هم پذیرفته.
+   *  PRD-07 ([units] = `ShopStore.purchaseUnitIndex`، فقط با پرچمِ صفحه؛ null ⇒ همان پیشین): بارکدِ یک واحدِ خرید (کارتنِ ۲۴)
+   *  ردیفِ همان واحد را +۱ می‌کند، و ردیفِ همان کالا به واحدِ دیگر را به نسبتِ ضریب (کارتنِ ۲۴ روی ردیفِ دانه ⇒ +۲۴، روی
+   *  کارتنِ ۱۲ ⇒ +۲). بارکدِ خودِ کالا همیشه +۱ ِ واحدِ ردیف است.
+   */
+  fun scan(o: PurchaseOrderDto, rows: Map<String, RecvRow>, index: Map<String, String>, raw: String, units: PurchaseUnits.Index? = null): Scan {
     val code = raw.trim()
-    val pid = index[code] ?: index[latinDigits(code)]
+    val hit = units?.find(code)
+    val pid = hit?.productId ?: index[code] ?: index[latinDigits(code)]
     val line = o.lines.find { it.productId == pid } ?: return Scan.NotInPo(code)
+    val step = when {
+      hit == null -> 1.0
+      line.factorMilli != null && PurchaseUnits.key(line.unit) == PurchaseUnits.key(hit.unit.name) -> 1.0
+      else -> hit.unit.factorMilli.toDouble() / (line.factorMilli?.takeIf { it > 0 } ?: PurchaseUnits.MILLI).toDouble()
+    }
     val cur = rows[line.id] ?: RecvRow()
-    val next = num((parse(cur.received.ifBlank { "0" }) ?: 0.0) + 1.0)
-    return Scan.Added(rows + (line.id to cur.copy(received = next)), line.id, line.name, next)
+    val next = num((parse(cur.received.ifBlank { "0" }) ?: 0.0) + step)
+    return Scan.Added(rows + (line.id to cur.copy(received = next)), line.id, line.name, next, hit?.unit?.name)
+  }
+
+  /**
+   *  PRD-07: زیرِ ردیفِ به واحدِ خرید، آنچه همین رسید به موجودی می‌برد: (رسیده − خراب) × ضریب به واحدِ پایهٔ کالا
+   *  («به موجودی: +۴۸ دانه») — همان `PurchaseUnits.baseQtyMilli` ِ ثبت. ردیفِ پایه، چیزی نرسیده یا عددِ نادرست ⇒ null.
+   */
+  fun toStock(d: ShopData, line: PoLineDto, r: RecvRow): String? {
+    val f = line.factorMilli?.takeIf { it > 0 } ?: return null
+    val rec = parse(r.received.ifBlank { "0" }) ?: return null
+    val dmg = parse(r.damaged.ifBlank { "0" }) ?: return null
+    if (rec <= 0 || dmg < 0 || dmg > rec) return null
+    val accepted = PurchaseOrderBook.milli(rec) - PurchaseOrderBook.milli(dmg)
+    if (accepted <= 0) return null
+    val base = d.products.find { it.id == line.productId }?.unit.orEmpty()
+    return StrPurchaseUnits.toStock(qty(PurchaseOrderBook.units(PurchaseUnits.baseQtyMilli(accepted, f))), base)
   }
 
   /** حالِ یک ردیف پس از همین رسید: مانده (باز)، کامل، یا بیش از باقی‌مانده — میلی‌واحد */
@@ -276,6 +396,32 @@ object PoForms {
       else -> if (row > 0) StrPurchaseOrders.rowRefused(row, f.code) else StrPurchasePages.poInvalid(f.code)
     }
   }
+
+  /* ── برچسب (PUR-13) ─────────────────────────────────────────────────── */
+
+  /** یک کارِ چاپ: برچسبِ همان «دستگاه‌ها» برای [product] با [copies] نسخه */
+  data class LabelJob(val product: Product, val copies: Int)
+
+  /** سقفِ نسخه: چاپگرِ برچسب ۹۹ (`LabelPlan.MAX_COPIES`)، برگهٔ A4 ِ ۳×۸ یک برگه */
+  const val LABEL_MAX = 99
+  const val LABEL_MAX_A4 = 24
+
+  /**
+   *  برچسب‌های اقلامِ پذیرفتهٔ یک رسید — یک شمارش برای پنجرهٔ کامپیوتر و گوشیِ نسخهٔ ۳ (چاپ از
+   *  `PurchaseOrderHost.printReceiptLabels`): هر واحدِ شمارشی یک برچسب (تا [LABEL_MAX]؛ A4 تا [LABEL_MAX_A4])، کالای وزنی یکی.
+   *  PRD-07: ردیفِ به واحدِ خرید به واحدِ پایه شمرده می‌شود (۲ کارتنِ ۲۴ ⇒ ۴۸ برچسب) و «وزنی» از واحدِ پایهٔ کالاست.
+   *  ردیفی که کالایش در دفترِ همین دستگاه نیست کنار می‌رود.
+   */
+  fun labels(d: ShopData, o: PurchaseOrderDto, r: PoReceiptDto, a4: Boolean): List<LabelJob> =
+    r.posted.filter { it.acceptedMilli > 0 }.mapNotNull { p ->
+      val line = o.lines.find { it.id == p.lineId } ?: return@mapNotNull null
+      val product = d.products.find { it.id == line.productId } ?: return@mapNotNull null
+      val f = line.factorMilli?.takeIf { it > 0 }
+      val baseMilli = if (f == null) p.acceptedMilli else PurchaseUnits.baseQtyMilli(p.acceptedMilli, f)
+      val unit = if (f == null) line.unit else product.unit
+      val units = ((baseMilli + 999) / 1000).toInt()
+      LabelJob(product, if (unit in PurchaseOrderBook.WEIGHED_UNITS) 1 else units.coerceIn(1, if (a4) LABEL_MAX_A4 else LABEL_MAX))
+    }
 
   /* ── تطبیق (PUR-14) ─────────────────────────────────────────────────── */
 

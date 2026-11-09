@@ -139,7 +139,8 @@ fun ReportsScreen(
   var failures by remember { mutableStateOf(0) }
   val (from, to) = ReportsModel.bounds(period, today)
 
-  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today)
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23
+  fun sheet() = ReportCsv.of(tab.csv, d, from, to, today).let { ReportCsv.lineSellers(it, tab.csv, d, from, to, lineSeller) }
   var pending by remember { mutableStateOf<ReportCsv.Sheet?>(null) }
   //  نوشتن با انتخابگرِ خودِ اندروید — بی اجازهٔ ذخیره‌سازی (همان راهِ امروز)
   val saveCsv = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/csv")) { uri ->
@@ -201,7 +202,7 @@ fun ReportsScreen(
         ReportTab.PRODUCTS -> ProductsTab(d, canSeeMoney, list)
         ReportTab.DEBTORS -> DebtorsTab(d, list)
         ReportTab.PURCHASES -> PurchasesTab(d, from, to, list)
-        ReportTab.EXPIRY -> ExpiryTab(d, today, list)
+        ReportTab.EXPIRY -> ExpiryTab(d, today, list, places = remember { ir.vil3ntec.tohid.data.StockPlacesPref.places(context) })
         ReportTab.STOCK -> StockTab(d, list)
         //  زبانه‌های اختیاری: همان بخش‌های گزارشِ گوشیِ پیشین (`ui/screens`)
         ReportExtra.SHRINK -> ReportList(list) {

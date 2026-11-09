@@ -13,7 +13,7 @@ import java.io.File
  *
  *  ── خاموش (پیش‌فرض) ────────────────────────────────────────────────
  *  همان `super.onFullBackup`: قاعده‌های `backup_rules.xml` و `backup_rules_legacy.xml`
- *  بی هیچ تغییری (دفتر، تنظیمات، صف و ژورنال می‌روند؛ توکن، شناسهٔ دستگاه و `tohid-sync-v1` نه).
+ *  بی هیچ تغییری (دفتر، تنظیمات و صف‌ها می‌روند؛ توکن، شناسهٔ دستگاه، `tohid-sync-v1`، `sync-shadow/` و حالِ v3 در `sync-v3/` نه).
  *
  *  ── رمز در کار است ──────────────────────────────────────────────────
  *  کلیدِ Keystore با پشتیبان نمی‌رود. اگر دفترِ رمزدار و سایهٔ پُر و صف و cursor با هم
@@ -38,14 +38,18 @@ class TohidBackupAgent : BackupAgent() {
     //  همان دو دامنهٔ XML (`file`، `sharedpref`)، منهای حالِ رمز و همگام‌سازی
     val files = filesDir
     files.walkTopDown()
-      .onEnter { dir -> dir == files || !AtRestScope.skipInDeviceBackup(dir.relativeTo(files).invariantSeparatorsPath) }
-      .filter { it.isFile && !AtRestScope.skipInDeviceBackup(it.relativeTo(files).invariantSeparatorsPath) }
+      .onEnter { dir -> dir == files || !skipped(dir.relativeTo(files).invariantSeparatorsPath) }
+      .filter { it.isFile && !skipped(it.relativeTo(files).invariantSeparatorsPath) }
       .forEach { runCatching { fullBackupFile(it, data) } }
     val prefs = File(applicationInfo.dataDir, "shared_prefs")
     prefs.listFiles().orEmpty()
       .filter { it.isFile && it.name !in EXCLUDED_PREFS && it.name !in AtRestScope.SYNC_PREFS }
       .forEach { runCatching { fullBackupFile(it, data) } }
   }
+
+  /** همان پوشه‌های `exclude domain="file"` ِ XML ([EXCLUDED_DIRS]) و قاعدهٔ رمزِ دفتر */
+  private fun skipped(rel: String): Boolean =
+    rel.substringBefore('/') in EXCLUDED_DIRS || AtRestScope.skipInDeviceBackup(rel)
 
   private companion object {
     /**
@@ -55,5 +59,11 @@ class TohidBackupAgent : BackupAgent() {
      */
     val EXCLUDED_PREFS = setOf("tohid-sync.xml", "tohid-session.xml", "tohid-session-secure.xml", "tohid-staff-pins.xml",
       "tohid-doc-series.xml", "tohid-sync-v1.xml")
+
+    /**
+     *  همان `exclude domain="file"` ِ XML: سایهٔ v1 در فایلِ خودش (`sync-shadow/`، `ShadowStore.DIR`) و حالِ Sync v3 (`sync-v3/`،
+     *  `V3StateDir.DIR` — DATA-06: cursor ِ گوشیِ پیشین روی گوشیِ دوم). `AtRestScope.syncState` هم هر دو را دارد.
+     */
+    val EXCLUDED_DIRS = setOf("sync-shadow", "sync-v3")
   }
 }

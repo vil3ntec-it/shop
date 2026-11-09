@@ -223,12 +223,11 @@ class DeviceIdentityJvmTest {
       .map { File(it, "app/src/main/res/xml/backup_rules.xml") }.firstOrNull { it.isFile }?.readText()
       ?: error("backup_rules.xml پیدا نشد (cwd=${File(".").absoluteFile})")
     val rule = Regex("""<exclude\s+domain="sharedpref"\s+path="([^"]+)\.xml"\s*/>""")
+    //  `tohid-sync-v1` (DATA-06، #991) را اندروید هم کنار می‌گذارد؛ آیفون آن را نگه می‌دارد و چرخش replicaهایش را به شناسهٔ
+    //  تازه می‌برد ([K.V1_SUITE])، cursor و سایه‌اش را حصارِ کدِ مشترک (`V1Replica.fence`) — پس «فقط همین دستگاه» نیست ولی در فهرست هست
     for (section in listOf("cloud-backup", "device-transfer")) {
       val body = xml.substringAfter("<$section>").substringBefore("</$section>")
-      //  `tohid-sync-v1` (replica و cursor ِ هر حساب) را اندروید از پشتیبان بیرون می‌گذارد (DATA-06، `claude/android-restore-id`)؛
-      //  روی آیفون پاک نمی‌شود، چون حصارِ مشترکِ `V1ReplicaAndroid` + `core/sync/RestoredDevice` (در ios-exclude نیست) همان حال را
-      //  به `device_uid` ِ امروز می‌بندد و پس از بازیابی پیش از هر Pull «بازسازی از سرور» می‌کند — همان تضمین، بی پاک کردن
-      assertEquals(K.DEVICE_ONLY.toSet() + "tohid-sync-v1", rule.findAll(body).map { it.groupValues[1] }.toSet(), section)
+      assertEquals((K.DEVICE_ONLY + K.V1_SUITE).toSet(), rule.findAll(body).map { it.groupValues[1] }.toSet(), section)
     }
   }
 

@@ -270,7 +270,7 @@ const BASE_MAX = 200;
  *          op ِ درجی که سرور **دارد** (همان شناسه از راهِ دیگر نشست ⇒ دستگاه آن را بیرون نمی‌گذارد).
  * فقط خواندن؛ `lib/sync-v1.js` دست نمی‌خورد (همان جدول‌های `sync_rows`/`sync_v3_rows`، فقط همین دکان).
  */
-async function settleOf(shopId, r) {
+async function settleOf(shopId, r, { hideContact = false } = {}) {
   const p = payloadOf(r);
   const ops = p.ops
     .filter((o) => isObj(o) && str(o.op_id))
@@ -284,7 +284,14 @@ async function settleOf(shopId, r) {
     const found = p.path === 'v3'
       ? await many(`SELECT table_name, row_id, data FROM sync_v3_rows WHERE ${ACC} AND table_name = ANY($2::text[]) AND row_id = ANY($3::text[]) AND inserted AND deleted_at IS NULL`, [shopId, tables, ids])
       : await many(`SELECT table_name, row_id, data FROM sync_rows WHERE ${ACC} AND table_name = ANY($2::text[]) AND row_id = ANY($3::text[]) AND deleted_at IS NULL`, [shopId, tables, ids]);
-    const have = new Map(found.map((x) => [`${x.table_name}/${x.row_id}`, isObj(x.data) ? x.data : {}]));
+    //  ⛔ CRM-15: بی `customers.contact` همان شکلِ pull ِ همین اصل (شماره و نشانی نه) — opهای بسته را خودِ او ساخته و
+    //  هر ردیفی را می‌توانند نام ببرند؛ بی این، «کنار بگذار» شمارهٔ کاملِ قرض‌دار را به انباردار می‌داد
+    const contact = hideContact ? require('./customer-contact') : null;
+    const view = (x) => {
+      const data = isObj(x.data) ? x.data : {};
+      return contact ? contact.omit(x.table_name, data) : data;
+    };
+    const have = new Map(found.map((x) => [`${x.table_name}/${x.row_id}`, view(x)]));
     for (const [k, needed] of want) {
       if (have.has(k)) base[k] = have.get(k);
       else if (needed) base[k] = null;
@@ -293,7 +300,7 @@ async function settleOf(shopId, r) {
   return { path: p.path, ops, base, ...(p.truncated ? { truncated: true } : {}) };
 }
 
-async function mine(shopId, actor, { limit = 100 } = {}) {
+async function mine(shopId, actor, { limit = 100, hideContact = false } = {}) {
   if (!actor || !actor.userId) throw forbidden();
   const cap = Math.min(Math.max(1, Number(limit) || 100), LIST_MAX);
   const rows = await many(
@@ -309,7 +316,7 @@ async function mine(shopId, actor, { limit = 100 } = {}) {
       reason: reasonOf(r), status: r.status, at: Number(r.at),
       resolvedAt: r.resolved_at === null ? null : Number(r.resolved_at), note: r.resolution_note || '',
       fixedDoc: str(isObj(r.detail) ? r.detail.fixed_doc : ''),
-      ...(SETTLED.has(r.status) ? { settle: await settleOf(shopId, r) } : {}),
+      ...(SETTLED.has(r.status) ? { settle: await settleOf(shopId, r, { hideContact }) } : {}),
     });
   }
   return { conflicts, server_time: now() };

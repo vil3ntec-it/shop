@@ -23,6 +23,16 @@ data class PriceWindow(val from: String = "", val to: String = "", val price: Do
 data class VariantAxis(val name: String = "", val values: List<String> = emptyList())
 
 /**
+ *  INV-21 — دستورِ ساختِ ثبت‌شده (BOM) روی ردیفِ سابقهٔ `stock_bom` (`Bom`): اجزای **یک** واحدِ کالای ساخته‌شده (مقدار به
+ *  هزارم) و اتلافِ پیش‌بینی‌شده (یک‌دهم‌هزارم: ۲۵۰ = ٪۲٫۵، روی مصرفِ هر جزء). فهرستِ خالی = دستور برداشته شد.
+ */
+@Serializable
+data class BomDoc(val parts: List<BomPart> = emptyList(), val lossBp: Int = 0)
+
+@Serializable
+data class BomPart(val productId: String = "", val qtyMilli: Long = 0)
+
+/**
  *  POS-26 — سفارشِ ویژه روی ردیفِ سابقه (`SpecialOrders`): سند روی `special_order` (مشتری، کالا یا شرح، مقدار، جمع،
  *  پیش‌پرداخت، روزِ تحویل) و وضعیتِ تازه روی `special_order_status` (`to`، و فاکتورِ تحویل در `saleId`). پول به پول
  *  (یک‌صدمِ افغانی). هر فیلدِ خالی نوشته نمی‌شود — ردیفِ وضعیت فقط `to` (و `saleId`) دارد.

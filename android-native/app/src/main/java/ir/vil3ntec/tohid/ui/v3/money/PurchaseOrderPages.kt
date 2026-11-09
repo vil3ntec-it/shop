@@ -46,11 +46,13 @@ import ir.vil3ntec.tohid.core.i18n.StrMoney
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrPurchaseOrders
 import ir.vil3ntec.tohid.core.i18n.StrPurchasePages
+import ir.vil3ntec.tohid.core.i18n.StrPurchaseUnits
 import ir.vil3ntec.tohid.core.i18n.StrReturnPages
 import ir.vil3ntec.tohid.core.i18n.StrSafe
 import ir.vil3ntec.tohid.core.i18n.StrSupplierBills
 import ir.vil3ntec.tohid.core.net.ApiFailure
 import ir.vil3ntec.tohid.core.net.ApiResult
+import ir.vil3ntec.tohid.core.product.PurchaseUnits
 import ir.vil3ntec.tohid.core.purchase.PurchaseOrderCore
 import ir.vil3ntec.tohid.core.purchase.ReorderCore
 import ir.vil3ntec.tohid.data.PoConfigDto
@@ -68,6 +70,7 @@ import ir.vil3ntec.tohid.todayIso
 import ir.vil3ntec.tohid.ui.platform.PurchaseOrderHost
 import ir.vil3ntec.tohid.ui.platform.rememberPurchaseOrderHost
 import ir.vil3ntec.tohid.ui.screens.PoSuggest
+import ir.vil3ntec.tohid.ui.screens.purchaseUnitsOn
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
@@ -218,16 +221,17 @@ internal fun RouteScope.PurchaseOrdersRoute() {
       PoForms.Filter.entries.forEach { f -> V3Chip(PoForms.label(f), selected = filter == f, onClick = { filter = f }) }
     }
     Spacer(Modifier.height(12.dp))
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+    //  زیرِ هم با پهنای کامل (همان کارهای صفحهٔ جزئیات): کنارِ هم در ۳۶۰dp نوشتهٔ هر دو دکمه بریده می‌شد («New purcha…»)
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
       if (perms.manage) {
         V3Button(
           StrPurchasePages.newPoTitle,
           { nav.openForResult(MoneyPaths.NEW_PURCHASE_ORDER) { id -> tick++; if (id != null) nav.open(MoneyPaths.purchaseOrder(id)) } },
-          Modifier.weight(1f), icon = Icons.Outlined.Add,
+          Modifier.fillMaxWidth(), icon = Icons.Outlined.Add,
         )
       }
       V3Button(
-        StrPurchasePages.reorderSuggest, { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) }, Modifier.weight(1f),
+        StrPurchasePages.reorderSuggest, { nav.open(MoneyPaths.PURCHASE_ORDER_SUGGEST) }, Modifier.fillMaxWidth(),
         kind = V3ButtonKind.SECONDARY,
       )
     }
@@ -416,6 +420,10 @@ internal fun RouteScope.PurchaseOrderRoute(id: String) {
               else V3TextButton(StrPurchasePages.postToLedger, { post(o, r) })
             },
           )
+          //  PUR-13: برچسبِ اقلامِ پذیرفتهٔ همین رسید — همان شمارش و چاپِ کامپیوتر (`printReceiptLabels`)
+          if (r.posted.any { it.acceptedMilli > 0 }) {
+            PoReceiptLabels(host, o, r, Modifier.padding(start = 16.dp, end = 16.dp, bottom = 10.dp))
+          }
         }
       }
     }
@@ -510,10 +518,12 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
   //  کلیدِ یکتای همین فرم (`Idempotency-Key`): دو بار زدن یا قطعِ نت همان سفارش است، نه دومی
   val formKey = remember { moneyId() }
   val guard = remember { PoForms.SubmitGuard() }
+  //  PRD-07: واحدِ خریدِ ردیف فقط با `ShopPolicy.productTools` (پیش‌فرض خاموش ⇒ همان فرمِ پیشین)
+  val unitsOn = purchaseUnitsOn()
   var supplierId by remember {
     mutableStateOf(base?.supplierId ?: supplierArg?.takeIf { s -> d.suppliers.any { it.id == s } } ?: d.suppliers.singleOrNull()?.id.orEmpty())
   }
-  var rows by remember { mutableStateOf(PoForms.rowsOf(base)) }
+  var rows by remember { mutableStateOf(PoForms.rowsOf(base, d)) }
   var expected by remember { mutableStateOf(base?.expectedDate.orEmpty()) }
   var note by remember { mutableStateOf(base?.note.orEmpty()) }
   var error by remember { mutableStateOf<String?>(null) }
@@ -609,12 +619,21 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
         Row(Modifier.padding(top = 6.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
           V3TextField(
             r.qty, { v -> rows = rows.map { if (it.key == r.key) it.copy(qty = v) else it }; error = null },
-            StrPurchasePages.qtyIn(r.unit), Modifier.weight(1f), kind = V3FieldKind.NUMBER,
+            StrPurchasePages.qtyIn(PoForms.unitOf(r)), Modifier.weight(1f), kind = V3FieldKind.NUMBER,
           )
           V3TextField(
             r.price, { v -> rows = rows.map { if (it.key == r.key) it.copy(price = v) else it }; error = null },
-            StrReturnPages.unitPriceAfn, Modifier.weight(1f), kind = V3FieldKind.MONEY,
+            r.unitName?.let(StrPurchaseUnits::priceIn) ?: StrReturnPages.unitPriceAfn, Modifier.weight(1f), kind = V3FieldKind.MONEY,
           )
+        }
+        //  PRD-07: واحدِ خریدِ ردیف (`PoForms.pickUnit`: فی به نسبتِ ضریب) و مقدار/بهای واحدِ پایه از هسته
+        val units = if (unitsOn) PoForms.purchaseUnits(d, r.productId) else emptyList()
+        if (units.isNotEmpty()) {
+          PoUnitChips(units, d.products.find { it.id == r.productId }?.unit.orEmpty(), r.unitName) { u ->
+            rows = rows.map { if (it.key == r.key) PoForms.pickUnit(d, it, u) else it }
+            error = null
+          }
+          PoForms.unitLine(d, r)?.let { Text(it, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 4.dp)) }
         }
       }
     }
@@ -648,11 +667,23 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
     EditorSheet.PRODUCT -> V3Sheet(onDismiss = { sheet = null }, title = StrPurchaseOrders.addItem, scroll = false) { closer ->
       ProductPickerList(d, null, onPick = { p ->
         closer.close {
-          rows = PoForms.addProduct(d, rows, supplierId, p) ?: run { toasts.show(StrPurchasePages.alreadyInPo(p.name), V3Tone.INFO); rows }
+          rows = PoForms.addProduct(d, rows, supplierId, p, unitsOn) ?: run { toasts.show(StrPurchasePages.alreadyInPo(p.name), V3Tone.INFO); rows }
         }
       }, onNew = null)
     }
     null -> Unit
+  }
+}
+
+/** PRD-07: «واحدِ خرید» ِ یک ردیف — واحدِ پایه یا یکی از واحدهای خریدِ کالا ([unit] نامِ برگزیده؛ null = پایه) */
+@Composable
+internal fun PoUnitChips(units: List<PurchaseUnits.Item>, baseUnit: String, unit: String?, onPick: (String?) -> Unit) {
+  val c = PhoneV3.colors
+  val chosen = PurchaseUnits.find(units, unit)
+  Text(StrPurchaseUnits.unit, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 8.dp))
+  V3ChipRow(contentPadding = PaddingValues(0.dp), modifier = Modifier.padding(top = 4.dp)) {
+    V3Chip(StrPurchaseUnits.baseOnly(baseUnit), selected = chosen == null, onClick = { onPick(null) })
+    units.forEach { u -> V3Chip(PurchaseUnits.label(u, baseUnit), selected = chosen == u, onClick = { onPick(u.name) }) }
   }
 }
 

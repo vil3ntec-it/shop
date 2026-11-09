@@ -127,6 +127,194 @@
           { "id": "g2", "row": 3, "give": true, "balanceAfterMinor": -2000, "openMinor": 0, "overdue": false, "due": null, "sale": null, "allocations": [["r1", 3000]], "lines": [] }
         ]
       }
+    },
+    {
+      "name": "شرح و سری و سررسید با فاصلهٔ نشکن/BOM — همان \\s و trim ِ JS (فازِ تفاضلی)",
+      "debtorId": "c1",
+      "today": "2026-10-17",
+      "ledger": {
+        "products": [
+          {
+            "id": "p1",
+            "name": "روغن",
+            "unit": "بوتل",
+            "salePrice": 50
+          }
+        ],
+        "debtors": [
+          {
+            "id": "c1",
+            "name": "احمد",
+            "creditLimit": 120
+          }
+        ],
+        "sales": [
+          {
+            "id": "sb",
+            "invoiceNumber": 5,
+            "series": "\ufeffB1",
+            "debtorId": "c1",
+            "total": 100,
+            "finalTotal": 100,
+            "remaining": 100,
+            "paymentMethod": "credit",
+            "status": "completed",
+            "date": "2026-10-01",
+            "createdAt": 1
+          },
+          {
+            "id": "sa",
+            "invoiceNumber": 9,
+            "debtorId": "c1",
+            "total": 50,
+            "finalTotal": 50,
+            "remaining": 50,
+            "paymentMethod": "credit",
+            "status": "completed",
+            "date": "2026-10-02",
+            "createdAt": 2
+          }
+        ],
+        "saleItems": [
+          {
+            "id": "ib",
+            "saleId": "sb",
+            "productId": "p1",
+            "quantity": 2,
+            "unitPrice": 50,
+            "totalPrice": 100
+          },
+          {
+            "id": "ia",
+            "saleId": "sa",
+            "productId": "p1",
+            "quantity": 1,
+            "unitPrice": 50,
+            "totalPrice": 50
+          }
+        ],
+        "transactions": [
+          {
+            "id": "g1",
+            "debtorId": "c1",
+            "type": "give",
+            "amount": 100,
+            "date": "2026-10-01",
+            "notes": "فروش نسیه — فاکتور\u00a0#B1-5",
+            "createdAt": 1,
+            "dueDate": "\ufeff2026-10-10"
+          },
+          {
+            "id": "g2",
+            "debtorId": "c1",
+            "type": "give",
+            "amount": 50,
+            "date": "2026-10-02",
+            "notes": "فروش نسیه — فاکتور #\ufeff9",
+            "createdAt": 2,
+            "dueDate": "2026-10-20\u001f"
+          },
+          {
+            "id": "r1",
+            "debtorId": "c1",
+            "type": "receive",
+            "amount": 30,
+            "date": "2026-10-03",
+            "notes": "رسید — فاکتور\u00a0#9",
+            "createdAt": 3
+          }
+        ]
+      },
+      "expect": {
+        "balanceMinor": 12000,
+        "overdueMinor": 10000,
+        "overdue": [
+          "g1"
+        ],
+        "nextDue": "g2",
+        "credit": {
+          "limitMinor": 12000,
+          "balanceMinor": 12000,
+          "headroomMinor": 0,
+          "over": false
+        },
+        "creditCheck": {
+          "extraMinor": 1000,
+          "result": {
+            "limitMinor": 12000,
+            "balanceMinor": 12000,
+            "afterMinor": 13000,
+            "over": true,
+            "excessMinor": 1000
+          }
+        },
+        "entries": [
+          {
+            "id": "g1",
+            "row": 1,
+            "give": true,
+            "balanceAfterMinor": 10000,
+            "openMinor": 10000,
+            "overdue": true,
+            "due": "2026-10-10",
+            "sale": "sb",
+            "allocations": [],
+            "lines": [
+              {
+                "name": "روغن",
+                "quantity": 2,
+                "unit": "بوتل",
+                "unitPriceMinor": 5000,
+                "totalMinor": 10000,
+                "returned": 0
+              }
+            ]
+          },
+          {
+            "id": "g2",
+            "row": 2,
+            "give": true,
+            "balanceAfterMinor": 15000,
+            "openMinor": 2000,
+            "overdue": false,
+            "due": "2026-10-20\u001f",
+            "sale": "sa",
+            "allocations": [
+              [
+                "r1",
+                3000
+              ]
+            ],
+            "lines": [
+              {
+                "name": "روغن",
+                "quantity": 1,
+                "unit": "بوتل",
+                "unitPriceMinor": 5000,
+                "totalMinor": 5000,
+                "returned": 0
+              }
+            ]
+          },
+          {
+            "id": "r1",
+            "row": 3,
+            "give": false,
+            "balanceAfterMinor": 12000,
+            "openMinor": 0,
+            "overdue": false,
+            "due": null,
+            "sale": "sa",
+            "allocations": [
+              [
+                "g2",
+                3000
+              ]
+            ],
+            "lines": []
+          }
+        ]
+      }
     }
   ]
 }

@@ -331,9 +331,9 @@ router.post(['/staff', '/staff-login'], joinLimit, staffCodeLimit, async (req, r
 
 /**
  * ⛔ رازِ دستگاه برای نشستِ **بازِ** شاگرد که پیش از ۲.۱۴.۵ وارد شده (مهاجرتِ آرام، بی بیرون انداختن) — فقط حسابِ
- * کدِ شاگرد، فقط دستگاهِ همین توکن، فقط وقتی رازِ زنده‌ای نیست (`lib/staff-login.enrollDevice`).
+ * کدِ شاگرد، فقط دستگاهِ همین توکن، فقط وقتی رازِ زنده‌ای نیست (`lib/staff-login.enrollDevice`). سقف: سطلِ IP پیش از احراز و سطلِ **هر حساب** (`deviceKeyMax`) پس از آن — توکنِ دزدیده از IP های تازه هم بسته (بازبینیِ درهای دستهٔ ۳۲).
  */
-router.post('/staff/device-key', sessionLimit, requireAnyUser, async (req, res, next) => {
+router.post('/staff/device-key', sessionLimit, requireAnyUser, rateLimit({ max: config.rateLimit.deviceKeyMax, keyPrefix: 'staff-device-key', key: (req) => (req.user ? `u:${req.user.id}` : null) }), async (req, res, next) => {
   try {
     const out = await staffLogin.enrollDevice(req);
     res.status(out.deviceKey ? 201 : 200).json(out);
@@ -910,12 +910,14 @@ router.post('/logout-all', requireAnyUser, reauth.requireRecentAuth, async (req,
   const deviceKeys = require('../lib/staff-device-keys');
   //  ⛔ نشست‌ها و رازهای دستگاهِ شاگرد (فقط بخشِ دکان) در یک تراکنش: پس از «خروج از همه» هیچ دستگاهی با رازِ
   //  پیشینش برنمی‌گردد — فقط با کدِ تازهٔ صاحب (و آن هم حسابِ تازه، `lib/staff-login`)
-  const out = await require('../db').tx(async (c) => ({
-    n: await tokens.revokeAllForSubject(req.user.id, null, app, { client: c }),
-    keys: app === require('../lib/tenancy').SHOP.app
+  //  راز پیش از نشست‌ها (همان ترتیبِ `staff-device-keys.revokeDevice`): ورودِ هم‌زمان با همین راز را `staff-login` پس
+  //  از نوشتنِ نشستش دوباره می‌سنجد
+  const out = await require('../db').tx(async (c) => {
+    const keys = app === require('../lib/tenancy').SHOP.app
       ? await deviceKeys.revokeIn(c, { userIds: [req.user.id], reason: 'logout_all', by: req.user.id, ip: clientIp(req) })
-      : deviceKeys.NONE,
-  }));
+      : deviceKeys.NONE;
+    return { keys, n: await tokens.revokeAllForSubject(req.user.id, null, app, { client: c }) };
+  });
   await out.keys.afterCommit();
   await tokens.liveRecheck(req.user.id);
   await require('../lib/push').revokeUser(req.user.id, app, 'logout_all');

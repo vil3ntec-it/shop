@@ -58,6 +58,7 @@ object ShopSettingsKeys {
     shop("blind_count", "b"),                   // ShopPolicy: شمارشِ کورِ شیفت برای کارمند
     shop("pay_fix", "b"),                       // POS-40: اصلاحِ روشِ پرداخت
     shop("till_receive", "b"),                  // POS-39: دریافت در صندوق (F7)
+    shop("line_seller", "b"),                   // POS-23/STF-08: فروشندهٔ هر ردیف (پایهٔ پورسانت)
     shop("quick_register", "b"),                // TillGoodsPref
     shop("unit_sale", "b"),
     shop("whole_packs", "b"),
@@ -80,6 +81,7 @@ object ShopSettingsKeys {
     shop("count_blind", "b"),                   // INV-06/07/08: انبارگردانیِ کور
     shop("stock_places", "b"),                  // INV-20/21
     shop("stock_repack", "b"),
+    shop("stock_bom", "b"),                     // INV-21: دستورِ ساخت و سریِ تولید
     //  مشتری و وفاداری (قاعدهٔ همین دستگاه؛ قاعدهٔ سرور PRM-13 جدا: `loyalty_shop:`)
     shop("loyalty", "b"),
     shop("loyalty_every_afn", "l"),

@@ -339,7 +339,10 @@
     { "role": "staff", "key": "sales.pay_fix", "override": { "caps": { "maxAmount": 1000 } }, "out": "unknown_cap" },
     { "role": "staff", "key": "sales.credit", "override": { "mode": "approve", "caps": { "maxAmount": 1000 } }, "out": null },
     { "role": "staff", "key": "sales.credit", "override": { "caps": { "maxPct": 10 } }, "out": "unknown_cap" },
-    { "role": "storekeeper", "key": "sales.credit", "override": { "mode": "allow" }, "out": "exceeds_role" }
+    { "role": "storekeeper", "key": "sales.credit", "override": { "mode": "allow" }, "out": "exceeds_role" },
+    {"role": "staff", "key": "__proto__", "override": {}, "out": "unknown_permission"},
+    {"role": "owner", "key": "constructor", "override": {"mode": "deny"}, "out": "unknown_permission"},
+    {"role": "manager", "key": "toString", "override": {}, "out": "unknown_permission"}
   ],
   "discount_bp": [
     { "discount": 0, "total": 10000, "out": 0 },
@@ -349,7 +352,10 @@
     { "discount": 2000, "total": 10000, "out": 1950 },
     { "discount": 100, "total": 0, "out": 10000 },
     { "discount": 500000, "total": 100000, "out": 10000 },
-    { "discount": 123456, "total": 1234567, "out": 999 }
+    { "discount": 123456, "total": 1234567, "out": 999 },
+    {"discount": 1357349467884387, "total": 50, "out": 10000},
+    {"discount": 7816246161289980, "total": 5391647268227405, "out": 10000},
+    {"discount": 922337203685478, "total": 922337203685479, "out": 9999}
   ],
   "writes": [
     { "role": "owner", "table": "auditLog", "out": true },

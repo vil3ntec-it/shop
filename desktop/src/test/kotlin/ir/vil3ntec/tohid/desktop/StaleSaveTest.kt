@@ -11,6 +11,7 @@ import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopPolicy
 import ir.vil3ntec.tohid.data.ShopStore
+import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.sync.v1.LedgerDiff
 import ir.vil3ntec.tohid.sync.v1.OpQueue
 import ir.vil3ntec.tohid.sync.v1.SyncOp
@@ -20,6 +21,7 @@ import ir.vil3ntec.tohid.sync.v1.Ulid
 import ir.vil3ntec.tohid.sync.v3.FileV3Store
 import ir.vil3ntec.tohid.sync.v3.SyncChoice
 import ir.vil3ntec.tohid.sync.v3.V3Meta
+import ir.vil3ntec.tohid.sync.v3.V3StateDir
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -61,6 +63,7 @@ class StaleSaveTest {
     ctx.filesDir.listFiles().orEmpty()
       .filter { it.name.startsWith("shop-data.json") || it.name.startsWith("ledger-stale") || it.name.startsWith("sync-v3-stale") }
       .forEach { it.deleteRecursively() }
+    File(ctx.filesDir, V3StateDir.DIR).listFiles().orEmpty().filter { it.name.startsWith("stale") }.forEach { it.deleteRecursively() }
     File(ctx.filesDir, "atrest").deleteRecursively()
     kek.delete()
     AtRest.keyring(ctx).forget()
@@ -264,8 +267,9 @@ class StaleSaveTest {
   @Test fun `Sync v3 — همان ذخیرهٔ کهنه فقط فروشِ صفحه را در صف می‌گذارد`() {
     //  سایهٔ v3 همان دفترِ پس از Pull است (کارگر نشانده)؛ صفحه هنوز دفترِ پیش از آن را دارد
     val after = LedgerDiff.fromJson(LedgerDiff.applyRemote(LedgerDiff.toJson(seed), fromOther))
+    //  جای ساختِ پیشین (حال به `sync-v3/` می‌رود، صف همین‌جا می‌ماند — `V3StateDir`)؛ حالِ همین دستگاه (`V3Meta.device`، DATA-06)
     val dir = File(ctx.filesDir, "sync-v3-${OpQueue.fileKey(account)}")
-    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(after).toString(), cursor = 7))
+    FileV3Store(dir).saveMeta(V3Meta(initialized = true, shadow = LedgerDiff.shadowOf(after).toString(), cursor = 7, device = SyncStore(ctx).deviceUid))
     assertEquals("", SyncChoice.set(ctx, SyncChoice.V3, 0))
     AtRest.writeText(ctx, ledger, Json.encodeToString(ShopData.serializer(), seed))
 

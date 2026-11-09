@@ -560,6 +560,11 @@ test('D-06: `<slug>.vill3n.top` در ریشه همان ویترین است؛ ز�
   assert.match(csp, /script-src 'self';/);
   assert.doesNotMatch(csp, /unsafe-inline|unsafe-eval/);
   assert.match(csp, /connect-src 'self';/);
+  //  CHAT-07: صدای چت فقط از همین مبدأ یا blob: ِ همین صفحه — نه data:، نه *، نه میزبانِ دیگر
+  assert.match(csp, /(^|; )media-src 'self' blob:;/);
+  assert.doesNotMatch(csp, /\b(?:img|media)-src [^;]*(\*|https?:)/);
+  //  CHAT-05: عکسِ مشتری بی blob: (رمزگشایی با createImageBitmap، پیش‌نمایش data:) ⇒ img-src همان 'self' data:
+  assert.match(csp, /(^|; )img-src 'self' data:;/);
   assert.equal((await rawGet('/', 'nope-shop.vill3n.top')).statusCode, 404, 'ویترینِ ناموجود ⇒ ۴۰۴');
   const api = await rawGet('/', 'api.vill3n.top');
   assert.equal(api.statusCode, 302, 'زیردامنهٔ رزرو همان رفتارِ پیشین (پنل)');

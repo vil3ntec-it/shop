@@ -77,7 +77,9 @@ router.get(`${base}/conversations`, readLimit, customer, async (req, res) => {
 
 router.post(`${base}/conversations`, readLimit, customer, sendLimit, async (req, res) => {
   const out = await chat.open(v(req), req.body);
-  res.status(out.created ? 201 : 200).json({ conversation: out.conversation });
+  //  سقفِ عکس تا ویترین پیش از بارگذاری به همان کوچک کند (CHAT-05)؛ سرور هر بایت را باز خودش می‌سنجد (`putMedia`)
+  const limits = { imageMax: config.shopChat.imageMax, thumbMax: config.shopChat.thumbMax };
+  res.status(out.created ? 201 : 200).json({ conversation: out.conversation, limits });
 });
 
 router.get(`${base}/search`, readLimit, customer, async (req, res) => {

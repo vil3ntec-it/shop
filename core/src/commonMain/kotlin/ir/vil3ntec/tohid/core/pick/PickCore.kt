@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.pick
 
+import ir.vil3ntec.tohid.core.text.JsText
+
 /**
  *  منطقِ خالصِ جمع‌آوری و بسته‌بندی (PCK، v3 §۶.۱۷) — دوقلوی `server/src/lib/pick-core.js`.
  *
@@ -149,19 +151,26 @@ object PickCore {
 
   // ═══════════════════════════ PCK-04 ═══════════════════════════
 
-  fun isWeighedUnit(unit: String): Boolean = squash(unit).lowercase() in WEIGHT_UNITS
+  fun isWeighedUnit(unit: String): Boolean = JsText.lowercase(squash(unit)) in WEIGHT_UNITS
 
   enum class Weigh(val key: String) { OK("ok"), SHORT("short"), OVER("over") }
 
   private fun clampBp(bp: Int) = bp.coerceIn(0, MAX_TOLERANCE_BP)
 
+  /**
+   *  `Math.floor((orderedMilli * bp) / 10000)` ِ JS، با همان Double: `orderedMilli * bp` ِ Long از ۱٫۸×۱۰^۱۵ هزارم به بعد
+   *  سرریز می‌کرد و «بیش از حد» می‌داد (فازِ تفاضلی)؛ درونِ بازهٔ واقعی همان عددِ دقیق است.
+   */
+  private fun slackMilli(orderedMilli: Long, toleranceBp: Int): Long =
+    kotlin.math.floor(orderedMilli.toDouble() * clampBp(toleranceBp) / 10_000.0).toLong()
+
   /** بیشترین وزنِ پذیرفتنی (هزارم) */
   fun maxWeighMilli(orderedMilli: Long, toleranceBp: Int = DEFAULT_TOLERANCE_BP): Long =
-    orderedMilli + (orderedMilli * clampBp(toleranceBp)).floorDiv(10_000L)
+    orderedMilli + slackMilli(orderedMilli, toleranceBp)
 
   /** کمترین وزنی که هنوز «کامل» است (هزارم) */
   fun minWeighMilli(orderedMilli: Long, toleranceBp: Int = DEFAULT_TOLERANCE_BP): Long =
-    orderedMilli - (orderedMilli * clampBp(toleranceBp)).floorDiv(10_000L)
+    orderedMilli - slackMilli(orderedMilli, toleranceBp)
 
   fun weighVerdict(orderedMilli: Long, actualMilli: Long, toleranceBp: Int = DEFAULT_TOLERANCE_BP): Weigh = when {
     actualMilli > maxWeighMilli(orderedMilli, toleranceBp) -> Weigh.OVER

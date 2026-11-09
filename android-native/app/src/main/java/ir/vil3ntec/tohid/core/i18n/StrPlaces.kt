@@ -30,6 +30,26 @@ object StrPlaces {
     "کارتن په دانو ووېشئ یا له څو توکو بسته جوړه کړئ؛ بیه له توکي سره ځي.",
   )
 
+  /** INV-21 — «دستورِ ساخت و سریِ تولید» (`StockPlacesPref.bom`) */
+  val bomSection: String get() = t("دستورِ ساخت و سریِ تولید", "Recipes and production lots", "د جوړولو لارښود او د تولید لړۍ")
+  val bomSectionNote: String get() = t(
+    "دستورِ ساخت برای هر کالا ثبت کنید و از آن بسازید؛ اجزا به ترتیبِ انقضا (یا سریِ برگزیده) برداشته می‌شوند، کالای ساخته‌شده زودترین انقضای اجزا را می‌گیرد و بهایش جمعِ بهای میانگینِ اجزاست. خاموش ⇒ همان بسته‌بندیِ امروز.",
+    "Save a recipe per product and build from it; parts are taken by expiry (or a chosen lot), the product takes the earliest part expiry and its cost is the sum of the parts' average cost. Off ⇒ repacking stays as today.",
+    "د هر توکي لپاره د جوړولو لارښود ثبت کړئ او له هغه جوړ کړئ؛ برخې د پای نېټې په ترتیب (یا ټاکلې لړۍ) اخیستل کېږي، جوړ شوی توکی د برخو تر ټولو ژره پای نېټه اخلي او بیه یې د برخو د منځنۍ بیې ټولګه ده. مړ ⇒ بسته‌بندي لکه نن.",
+  )
+  val bomTitle: String get() = t("دستورِ ساخت", "Recipe", "د جوړولو لارښود")
+  val bomPick: String get() = t("ساختن از دستور", "Build from a recipe", "له لارښود څخه جوړول")
+  val bomNone: String get() = t("هنوز دستوری ثبت نشده است", "No recipe saved yet", "تر اوسه هېڅ لارښود نه دی ثبت شوی")
+  val bomSave: String get() = t("ثبتِ همین اجزا به‌عنوانِ دستور", "Save these parts as the recipe", "دا برخې د لارښود په توګه ثبت کړئ")
+  val bomRemove: String get() = t("برداشتنِ دستور", "Remove the recipe", "لارښود لرې کول")
+  val bomSaved: String get() = t("دستورِ ساخت ثبت شد", "Recipe saved", "لارښود ثبت شو")
+  val bomRemoved: String get() = t("دستورِ ساخت برداشته شد", "Recipe removed", "لارښود لرې شو")
+  val bomLoss: String get() = t("اتلاف (درصد)", "Expected loss (%)", "ضایع (سلنه)")
+  fun bomLine(parts: Any, loss: Any): String = t(
+    "${asIs(parts)} جزء، اتلاف ٪${asIs(loss)}", "$parts parts, loss $loss%", "$parts برخې، ضایع $loss٪",
+  )
+  fun lotsOut(text: Any): String = t("برداشت: ${asIs(text)}", "Taken: $text", "اخیستل: $text")
+
   /** POS-16 — سرخطِ «موجودی در محل‌ها» در برگهٔ ردیفِ سبدِ صندوق */
   val atTill: String get() = t("موجودی در محل‌ها", "Stock by place", "موجودي په ځایونو کې")
 
@@ -57,6 +77,22 @@ object StrPlaces {
   val reason: String get() = t("دلیل (اختیاری)", "Reason (optional)", "دلیل (اختیاري)")
   val transfer: String get() = t("انتقال", "Move", "لېږد")
   val noStock: String get() = t("این کالا در هیچ محلی موجودی ندارد", "This product has no stock in any place", "دا توکی په هېڅ ځای کې موجودي نه لري")
+
+  // ── سری و انقضا در انتقال (INV-20) ──
+  val lotsHere: String get() = t("سری‌ها در مبدأ", "Lots at the origin", "په سرچینه کې لړۍ")
+  val byFefo: String get() = t("اول آنچه زودتر منقضی می‌شود", "Earliest expiry first", "لومړی هغه چې ژر یې نېټه تېرېږي")
+  val byLot: String get() = t("انتخابِ سری", "Choose lots", "لړۍ وټاکئ")
+  fun expires(date: Any): String = t("انقضا ${asIs(date)}", "Expires $date", "د تېرېدو نېټه $date")
+  val noExpiry: String get() = t("بی انقضا", "No expiry", "بې نېټې")
+  fun moves(list: Any): String = t("جابه‌جا می‌شود: ${asIs(list)}", "Moves: $list", "لېږدول کېږي: $list")
+  fun total(q: Any, unit: Any): String = t("جمع: ${asIs(q)} ${asIs(unit)}", "Total: $q $unit", "ټول: $q $unit")
+  val lotlessHint: String get() = t(
+    "کالای بی سری فقط با «اول آنچه زودتر منقضی می‌شود» و پس از همهٔ سری‌ها جابه‌جا می‌شود.",
+    "Stock without a lot moves only with “earliest expiry first”, after every lot.",
+    "بې لړۍ توکی یوازې د «لومړی هغه چې ژر یې نېټه تېرېږي» سره او له ټولو لړیو وروسته لېږدول کېږي.",
+  )
+  /** گزارشِ انقضا: محل‌هایی که همان محموله حالا در آن‌هاست */
+  fun inPlaces(names: Any): String = t("در ${asIs(names)}", "At $names", "په $names کې")
   val close: String get() = t("بستن", "Close", "بندول")
   val cancel: String get() = t("انصراف", "Cancel", "لغوه")
 

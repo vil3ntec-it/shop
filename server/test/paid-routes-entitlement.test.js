@@ -206,6 +206,23 @@ const DATA_WRITES = {
     body: { device_id: dev, format: 'tohid-hashchain-v1', heads: [], links: [] } }),
   'POST /products': (t) => h.post('/api/products', { data: { name: 'کالا' } }, { token: t }),
 };
+/**
+ * FREE ِ بیرون از /api/shop: پاسبانیِ یکپارچگی، نه نوشتنِ دادهٔ دکان — شاگرد و صاحب با هر وضعِ اشتراک، هرگز
+ * subscription_* و هرگز ۵xx؛ با پرچمِ روشن واقعاً می‌نشیند (`enabled: true`).
+ */
+const SYNC_FREE = {
+  //  STF-09: سرِ زنجیرهٔ سابقهٔ عملیاتِ دستگاه (`routes/audit-anchor.js`، بی `requireSyncWrite`)؛ پرچمِ `shop.doc_chain` روشن است.
+  //  بریدن یا دست‌کاریِ سابقه پس از پایانِ اشتراک هم باید دیده شود
+  'POST /sync/v1/audit-anchor': (t, dev) => h.api('POST', '/api/sync/v1/audit-anchor', { token: t, headers: { 'X-App': 'shop', 'X-Device': dev },
+    body: { device_id: dev, format: 'tohid-audit-chain-v1', heads: [{ chain: `${dev}/1`, seq: ++seq, hash: 'a'.repeat(64) }] } }),
+};
+const freeOk = (res) => res.status < 300 && res.body?.enabled === true && !/^subscription_/.test(code(res));
+/**
+ * ⛔ لنگرِ سابقه فقط برای دستگاهِ همین نشست (`device-audit-anchor.ownDevice`، بازبینیِ درهای دستهٔ ۳۲) ⇒ FREE با
+ * همان `device_uid` ِ ثبت‌شدهٔ نشستِ هر نفر، نه شناسهٔ ساختگی (پیش‌تر `dev-staff`/`dev-owner` با پرچمِ خاموشِ
+ * `sync.device_bind` فقط ثبت می‌شد)
+ */
+const ownDev = async (u) => (await query('SELECT device_uid FROM devices WHERE user_id=$1 ORDER BY created_at LIMIT 1', [u.user.id])).rows[0].device_uid;
 
 test('SUB-10: هر مسیرِ نوشتنیِ /api/shop دقیقاً یک دسته دارد و دروازهٔ سورس با دسته می‌خواند', () => {
   const all = writes();
@@ -233,6 +250,12 @@ test('SUB-10: با اشتراکِ فعال هیچ مسیرِ PAID برای صا�
   for (const [k, call] of Object.entries(DATA_WRITES)) {
     const res = await call(s.staff.accessToken, 'dev-staff');
     if (res.status >= 300) bad.push(`شاگرد ${k} ⇒ ${res.status} ${code(res)}`);
+  }
+  for (const [k, call] of Object.entries(SYNC_FREE)) {
+    for (const [who, t, u] of [['شاگرد', s.staff.accessToken, s.staff], ['صاحب', s.owner.accessToken, s.owner]]) {
+      const res = await call(t, await ownDev(u));
+      if (!freeOk(res)) bad.push(`FREE ${who} ${k} ⇒ ${res.status} ${code(res)} ${JSON.stringify(res.body).slice(0, 120)}`);
+    }
   }
   assert.deepEqual(bad, [], bad.join('\n'));
 });
@@ -266,6 +289,13 @@ for (const [name, apply] of Object.entries(STATES)) {
     for (const r of free) {
       const res = await h.api(r.method, url(r), { body: {}, token: s.owner.accessToken });
       if (/^subscription_/.test(code(res)) || res.status >= 500) bad.push(`FREE ${r.key} ⇒ ${res.status} ${code(res)}`);
+    }
+    //  ۵) FREE ِ بیرون از /api/shop: شاگرد هم (برخلافِ دادهٔ دکان) باز است
+    for (const [k, call] of Object.entries(SYNC_FREE)) {
+      for (const [who, t, u] of [['شاگرد', s.staff.accessToken, s.staff], ['صاحب', s.owner.accessToken, s.owner]]) {
+        const res = await call(t, await ownDev(u));
+        if (!freeOk(res)) bad.push(`FREE ${who} ${k} ⇒ ${res.status} ${code(res)}`);
+      }
     }
     assert.deepEqual(bad, [], bad.join('\n'));
   });

@@ -212,12 +212,14 @@ async function redeem({ shopId, userId, code, computer, at = now() }) {
   const claim = await tx(async (c) => {
     let row = (await c.query('SELECT * FROM shop_offline_codes WHERE serial=$1 FOR UPDATE', [p.serial])).rows[0];
     if (!row) {
-      //  کدِ امضاشدهٔ خودمان که ردیفش نیست (دیتابیسِ بازگردانده‌شده) ⇒ ثبت
-      row = (await c.query(
+      //  کدِ امضاشدهٔ خودمان که ردیفش نیست (دیتابیسِ بازگردانده‌شده) ⇒ ثبت. ⛔ دو آوردنِ هم‌زمان (PostgreSQL) هر دو
+      //  «نیست» می‌دیدند و دومی روی `serial` ِ یکتا `23505` (۵۰۰) می‌گرفت ⇒ ثبتِ بی‌اثر در تکرار و قفلِ همان ردیف
+      await c.query(
         `INSERT INTO shop_offline_codes (id, serial, plan, computer, issued_at, ends_at, created_by, created_at)
-         VALUES ($1,$2,$3,$4,$5,$6,'redeem',$7) RETURNING *`,
+         VALUES ($1,$2,$3,$4,$5,$6,'redeem',$7) ON CONFLICT (serial) DO NOTHING`,
         [newId('sfc'), p.serial, p.plan, pc.text, p.issuedAt, p.endsAt, at]
-      )).rows[0];
+      );
+      row = (await c.query('SELECT * FROM shop_offline_codes WHERE serial=$1 FOR UPDATE', [p.serial])).rows[0];
     }
     if (row.status === 'revoked') return { row, revoked: true };
     if (row.redeemed_shop_id && row.redeemed_shop_id !== shopId) return { row, elsewhere: true };

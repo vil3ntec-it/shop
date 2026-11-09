@@ -54,6 +54,7 @@ object I18nTables {
     StrConflictInbox, // صندوقِ سندهای ردشده ِ صاحب/مدیر و نشانِ «سرور نپذیرفت» روی فاکتورِ دستگاهِ سازنده
     StrSaleCaps, // STF-03: پیش‌سنجیِ سقفِ قرض، تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» در صندوق (`SaleCapGate`)
     StrCustomerPrices, // POS-18: «قیمتِ خاصِ این مشتری» (پروندهٔ مشتری، صندوق، رسید و تنظیم)
+    StrLineSeller, // POS-23/STF-08: فروشندهٔ هر ردیف (پایهٔ پورسانت)
     StrSalePages, StrReturnPages, StrDebtPages, StrOrderPages, StrShellPages, // صفحه‌های قدیمیِ `ui/screens` که نسخهٔ ۳ صدا می‌زند — پیش‌تر متنِ خام (LOC-08 دری، دورِ ۲)
     StrCustomerPages, StrStockPages, StrDevicePages, StrProductPages, StrPurchasePages, StrPromoPages, StrPayPages, StrReportPages, // همان، دورِ ۳
     StrSetupPages, StrImagePages, StrMarketPages, StrCatalogPages, // همان، دورِ ۴

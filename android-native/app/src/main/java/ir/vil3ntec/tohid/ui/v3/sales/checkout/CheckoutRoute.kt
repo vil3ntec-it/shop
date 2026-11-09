@@ -111,7 +111,9 @@ fun RouteScope.CheckoutRoute() {
     //  STF-03 — سقف‌هایی که سرور برای همین دکان اجرا می‌کند (قرض، تغییرِ قیمت، تخفیفِ پنهان)؛ پرچم‌های خاموش ⇒ `active` نادرست
     val capRules = remember { ShopRole.saleCaps(context) }
     val saleKey = remember(lines) { cart.saleKey() }
-    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep)
+    //  POS-23: فروشندهٔ هر ردیف فقط با تنظیمِ روشنِ دکان روی قلم می‌نشیند (`LineSellerPref`)؛ خاموش ⇒ همان امروز
+    val lineSellers = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
+    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, seller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)

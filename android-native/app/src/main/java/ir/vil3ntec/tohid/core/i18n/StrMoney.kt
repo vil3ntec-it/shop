@@ -292,6 +292,12 @@ object StrMoney {
   val addPurchaseRow: String get() = t("افزودنِ ردیفِ کالا", "Add an item row", "د توکي کرښه زیاته کړئ")
   fun purchaseRow(n: Any): String = t("ردیفِ ${asIs(n)}", "Row $n", "کرښه $n")
   val removePurchaseRow: String get() = t("برداشتنِ این ردیف", "Remove this row", "دا کرښه لرې کړئ")
+  /** بارکدِ کالای تازه وقتی فاکتورِ گوشی به سقفِ ردیف رسیده */
+  fun purchaseRowsFull(max: Any): String = t(
+    "این فاکتور بیش از ${asIs(max)} ردیف نمی‌گیرد؛ آن را ثبت کنید و فاکتورِ تازه باز کنید",
+    "This invoice takes at most $max rows; save it and start a new one",
+    "دا بل تر $max کرښو زیات نه اخلي؛ ثبت یې کړئ او نوی بل پرانیزئ",
+  )
   val invalidNumber: String get() = t("عدد درست بنویسید", "Enter a valid number", "سم شمېر ولیکئ")
 
   /* ------------------------------ مصارف ------------------------------ */

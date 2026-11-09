@@ -270,6 +270,14 @@ object PosKeys {
   fun priceList(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
     enabled && key != null && KeyMap.SALE_PRICE_LIST.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
 
+  /**
+   *  POS-23 — «فروشندهٔ ردیف» (`sale.lineSeller`، Shift+F2 از `keymap.json`)، پیش از [screen]: برگهٔ فروشندهٔ ردیفِ
+   *  انتخاب‌شده. فقط با «فروشندهٔ هر ردیف» ِ روشن ([enabled] = `LineSellerPref.on`)؛ خاموش ⇒ `false` و Shift+F2 همان
+   *  «مشتری» ِ F2 است (همان امروز، بیت‌به‌بیت). پیرایه‌ها دقیق‌اند (Ctrl/Alt نه).
+   */
+  fun lineSeller(key: KeyName?, primary: Boolean, shift: Boolean, alt: Boolean, enabled: Boolean): Boolean =
+    enabled && key != null && KeyMap.SALE_LINE_SELLER.keys.any { it.key == key && it.mod == primary && it.shift == shift && it.alt == alt }
+
   /** کادرِ اسکن/جست‌وجو */
   fun field(key: KeyName?, primary: Boolean, queryEmpty: Boolean, hasMatches: Boolean, hasSelection: Boolean): PosAction? = when (key) {
     KeyName.Enter -> if (!primary) PosAction.SUBMIT else null

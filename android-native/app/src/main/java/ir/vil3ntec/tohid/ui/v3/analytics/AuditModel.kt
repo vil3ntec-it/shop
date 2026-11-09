@@ -1,5 +1,9 @@
 package ir.vil3ntec.tohid.ui.v3.analytics
 
+import ir.vil3ntec.tohid.core.audit.AuditAnchor
+import ir.vil3ntec.tohid.core.audit.AuditChain
+import ir.vil3ntec.tohid.core.i18n.StrAccount
+import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.AuditEntry
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.ui.v3.money.MoneyPaths
@@ -79,4 +83,67 @@ object AuditModel {
   }
 
   private fun order(type: String): Int = KINDS.indexOf(type).let { if (it < 0) KINDS.size else it }
+
+  /* ───── STF-09: چه کسی و کجا، و سلامتِ زنجیرهٔ هش ───── */
+
+  /** کاربر (نام اگر این دستگاه می‌شناسد، وگرنه شناسه)، نقش و دستگاه؛ ردیفِ کهنهٔ بی مُهر ⇐ «نامعلوم» */
+  data class Who(val user: String, val role: String?, val device: String)
+
+  fun who(e: AuditEntry, names: Map<String, String>, thisDevice: String): Who = Who(
+    user = e.userId?.let { names[it]?.takeIf(String::isNotBlank) ?: it } ?: StrReports.unknown,
+    role = e.userRole?.let(::roleName),
+    device = deviceName(e.deviceId, thisDevice),
+  )
+
+  /** «علی (صندوق‌دار) · این دستگاه» */
+  fun whoLine(w: Who): String = StrReports.whoLine(w.user + (w.role?.let { " ($it)" } ?: ""), w.device)
+
+  fun deviceName(id: String?, thisDevice: String): String = when {
+    id.isNullOrBlank() -> StrReports.unknown
+    id == thisDevice -> StrReports.thisDevice
+    else -> StrReports.deviceShort(id.orEmpty().take(6))
+  }
+
+  fun roleName(role: String): String = when (role.trim().lowercase()) {
+    "owner" -> StrAccount.roleOwner
+    "manager" -> StrAccount.roleManager
+    "staff" -> StrAccount.roleStaff
+    "seller" -> StrAccount.roleSeller
+    "cashier" -> StrAccount.roleCashier
+    "storekeeper" -> StrAccount.roleStorekeeper
+    "picker" -> StrAccount.rolePicker
+    "accountant" -> StrAccount.roleAccountant
+    "courier" -> StrAccount.roleCourier
+    else -> role
+  }
+
+  /** وضعیتِ زنجیره برای سرِ صفحه: [ok] = `null` ⇐ هنوز هیچ ردیفِ زنجیره‌داری نیست */
+  data class ChainLine(val ok: Boolean?, val title: String, val body: String?)
+
+  /**
+   *  @param server حکمِ سرور (`AuditAnchor.Verdict`: رونوشتِ همگام‌شده و لنگرِ گزارش‌شدهٔ **همهٔ** دستگاه‌ها، STF-09)؛
+   *  شکستِ همین دفتر جلوتر است، وگرنه شکستِ سرور با «به گفتهٔ سرور» (دُمِ بریدهٔ دستگاهِ دیگر، انشعاب، عقب‌گرد…).
+   *  `null` (پرچمِ خاموش، بی‌اینترنت، بی اجازه) ⇐ فقط سنجشِ همین دستگاه، همان پیشین.
+   */
+  fun chainLine(r: AuditChain.Report, thisDevice: String, server: AuditAnchor.Verdict? = null): ChainLine {
+    val b = r.broken
+    val s = server?.broken
+    fun where(x: AuditChain.Break) = StrReports.whoLine(reasonText(x.reason), deviceName(x.chain.substringBeforeLast('/', ""), thisDevice))
+    return when {
+      b != null -> ChainLine(false, StrReports.chainBroken(b.seq.coerceAtLeast(1)), where(b))
+      s != null -> ChainLine(false, StrReports.chainServerBroken(s.seq.coerceAtLeast(1)), where(s))
+      r.chained == 0 -> ChainLine(null, StrReports.chainNotStarted, null)
+      else -> ChainLine(true, StrReports.chainOk, if (r.unverified > 0) StrReports.chainUnverified(r.unverified) else StrReports.chainOkBody)
+    }
+  }
+
+  /** دلیلِ شکست به زبانِ صاحب؛ `deleted` و `rewritten` فقط از سرور می‌آیند (حذفِ نرم و بازنویسی پس از رسیدن) */
+  fun reasonText(reason: String): String = when (reason) {
+    "hash_mismatch", "bad_doc", "rewritten" -> StrReports.chainEdited
+    "seq_gap", "truncated", "deleted" -> StrReports.chainDeleted
+    else -> StrReports.chainReordered
+  }
+
+  /** شناسهٔ ردیفی که زنجیره از آن شکسته (نشانِ قرمز روی همان ردیف): همین دفتر، وگرنه سرور؛ ردیفِ پاک‌شده ⇐ null */
+  fun brokenId(r: AuditChain.Report?, server: AuditAnchor.Verdict? = null): String? = r?.broken?.id ?: server?.broken?.id
 }

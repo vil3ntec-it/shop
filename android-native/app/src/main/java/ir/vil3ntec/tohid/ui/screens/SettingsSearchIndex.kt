@@ -129,6 +129,7 @@ object SettingsSearchIndex {
     L.HELD to kw("چند فاکتور نگه‌داشته", "multiple held invoices", "څو بلونه"),
     "کالای منقضی" to kw("منقضی تاریخ انقضا", "expired items expiry date", "تېر شوي توکي"),
     L.LINE_PRICING to kw("تخفیف قیمت ردیف", "discount line price", "تخفیف بیه"),
+    L.LINE_SELLER to kw("فروشنده ردیف پورسانت کارمند Shift+F2", "seller line commission staff Shift+F2", "پلورونکی کرښه کمیشن کارکوونکی"), // داده: واژه‌های جست‌وجوی تنظیمات در سه زبان
     L.AUTO_FEES to kw("هزینه خودکار کیسه بسته‌بندی مصرف خودکار", "automatic charges fee bag", "اتومات لګښت"),
     L.QUOTE to kw("پیش فاکتور قیمت‌دهی", "quote estimate", "مخکینی بل"),
     L.SPECIAL_ORDER to kw("سفارش ویژه پیش پرداخت", "special order deposit", "ځانګړی فرمایش"),
@@ -168,7 +169,7 @@ object SettingsSearchIndex {
     L.PRODUCT_SUGGEST to kw("پیشنهاد دسته نام از متن چسباندن فهرست", "suggest category name paste text list", "وړاندیز ډله نوم له متن"),
     L.LABEL_TOOLS to kw("برچسب بارکد لیبل", "label barcode", "لیبل بارکوډ"),
     L.PRODUCT_TOOLS to kw("ابزار کالا", "product tools", "د توکو وسایل"),
-    L.STOCK_PLACES to kw("محل جا انبار قفسه بسته‌بندی", "locations warehouse repack", "ځایونه ګدام بسته"),
+    L.STOCK_PLACES to kw("محل جا انبار قفسه بسته‌بندی دستور ساخت تولید اتلاف سری", "locations warehouse repack recipe bom production loss lot", "ځایونه ګدام بسته لارښود جوړول تولید ضایع لړۍ"),
     L.COUNT_TOOLS to kw("انبارگردانی شمارش", "stock count", "شمېرنه"),
     L.SHRINK_REPORT to kw("ضایعات کسری", "shrink waste", "ضایعات کمښت"),
     L.STOCK_LEVELS to kw("نقطه سفارش حداقل", "reorder point minimum", "د فرمایش ټکی"),

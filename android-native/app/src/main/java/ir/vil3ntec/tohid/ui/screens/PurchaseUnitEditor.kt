@@ -55,20 +55,21 @@ fun PurchaseUnitEditor(
     }
     units.forEachIndexed { i, p ->
       Spacer(Modifier.height(6.dp))
+      //  نام با پهنای کامل: سه‌تا کنارِ هم در گوشیِ ۳۶۰dp کادرِ نام ~۱۱۰dp می‌شد و برچسبِ «نامِ واحد (مثلاً کارتن)» در آن جا نمی‌شد
+      OutlinedTextField(
+        value = p.name,
+        onValueChange = { set(i, p.copy(name = it)) },
+        label = { Text(StrPurchaseUnits.name) },
+        singleLine = true,
+        modifier = Modifier.fillMaxWidth(),
+      )
       Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-        OutlinedTextField(
-          value = p.name,
-          onValueChange = { set(i, p.copy(name = it)) },
-          label = { Text(StrPurchaseUnits.name) },
-          singleLine = true,
-          modifier = Modifier.weight(1f),
-        )
         OutlinedTextField(
           value = p.factor,
           onValueChange = { set(i, p.copy(factor = ir.vil3ntec.tohid.numericInput(it))) },
           label = { Text(StrPurchaseUnits.factor(u)) },
           singleLine = true,
-          modifier = Modifier.weight(0.8f),
+          modifier = Modifier.weight(1f),
         )
         TextButton(onClick = { onChange(units.filterIndexed { j, _ -> j != i }) }) { Text(StrPurchaseUnits.remove) }
       }

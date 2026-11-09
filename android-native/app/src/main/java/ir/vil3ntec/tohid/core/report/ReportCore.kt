@@ -344,15 +344,24 @@ object ReportCore {
 
   private class Agg(val totals: Totals, val dims: Map<String, List<Row>>)
 
-  private fun aggregate(l: ReportLedger, from: String, to: String, clock: ReportClock?, costs: Costs, withDims: Boolean): Agg {
+  /**
+   *  POS-23 — «کاربر» ِ یک ردیف: با [lineSeller] (تنظیمِ خاموشِ دکان `line_seller`) فروشندهٔ ردیف (`saleItems[].seller`) و
+   *  نبودش فروشندهٔ فاکتور؛ بی آن همیشه فروشندهٔ فاکتور (همان پیشین). همان `userOf` ِ `report-core.js`.
+   */
+  private fun userOf(item: ReportLedger.Item?, sale: ReportLedger.Sale?, lineSeller: Boolean): String =
+    if (lineSeller && item != null && item.seller != "") item.seller else sale?.seller ?: ""
+
+  private fun aggregate(
+    l: ReportLedger, from: String, to: String, clock: ReportClock?, costs: Costs, withDims: Boolean, lineSeller: Boolean = false,
+  ): Agg {
     var invoices = 0; var returnCount = 0
     var gross = 0L; var discount = 0L; var sales = 0L; var returns = 0L; var cogs = 0L; var estimated = 0
     val acc = DIMS.associateWith { HashMap<String, Acc>() }
     fun productName(pid: String, fallback: String) = l.products[pid]?.name?.takeIf { it != "" } ?: fallback
     fun categoryOf(pid: String) = l.products[pid]?.category ?: ""
     fun row(dim: String, key: String, name: String) = acc.getValue(dim).getOrPut(key) { Acc(key, name) }
-    fun keysFor(pid: String, itemName: String, sale: ReportLedger.Sale?, hour: String): Map<String, Pair<String, String>> {
-      val seller = sale?.seller ?: ""; val method = sale?.method ?: ""; val channel = sale?.channel ?: ""
+    fun keysFor(pid: String, itemName: String, sale: ReportLedger.Sale?, hour: String, item: ReportLedger.Item?): Map<String, Pair<String, String>> {
+      val seller = userOf(item, sale, lineSeller); val method = sale?.method ?: ""; val channel = sale?.channel ?: ""
       return mapOf(
         "product" to (pid to (if (pid == "") "" else productName(pid, itemName))),
         "category" to (categoryOf(pid) to categoryOf(pid)),
@@ -362,13 +371,13 @@ object ReportCore {
         "channel" to (channel to channel),
       )
     }
-    class Line(val pid: String, val name: String, val qty: Long, val gross: Long, val cost: Long, val est: Boolean)
+    class Line(val pid: String, val name: String, val qty: Long, val gross: Long, val cost: Long, val est: Boolean, val item: ReportLedger.Item? = null)
     for (s in l.sales) {
       if (s.cancelled) continue
       val d = posDate(s, clock)
       if (!(d >= from && d <= to)) continue
       invoices++; gross += s.total; discount += s.discount; sales += s.finalTotal
-      val lines = l.itemsBySale[s.id].orEmpty().map { Line(it.productId, it.name, it.qty, it.total, costs.line.getValue(it.id), it.id in costs.est) }
+      val lines = l.itemsBySale[s.id].orEmpty().map { Line(it.productId, it.name, it.qty, it.total, costs.line.getValue(it.id), it.id in costs.est, it) }
         .ifEmpty { listOf(Line("", "", 0L, s.total, 0L, true)) }
       val shares = allocate(lines.sumOf { it.gross } - s.finalTotal, lines.map { it.gross })
       val hour = posHour(s, clock)
@@ -376,7 +385,7 @@ object ReportCore {
         cogs += ln.cost
         if (ln.est) estimated++
         if (!withDims) return@forEachIndexed
-        val keys = keysFor(ln.pid, ln.name, s, hour)
+        val keys = keysFor(ln.pid, ln.name, s, hour, ln.item)
         for (dim in DIMS) {
           val (k, n) = keys.getValue(dim)
           val r = row(dim, k, n)
@@ -393,7 +402,8 @@ object ReportCore {
       returnCount++; returns += r.amount; cogs -= c
       if (!withDims) continue
       val it = l.itemById[r.saleItemId]
-      val keys = keysFor(it?.productId ?: r.productId, it?.name ?: "", s, posHour(r, clock))
+      //  POS-23: برگشت از فروشندهٔ **ردیفِ اصل** کم می‌شود (با `lineSeller`)
+      val keys = keysFor(it?.productId ?: r.productId, it?.name ?: "", s, posHour(r, clock), it)
       for (dim in DIMS) {
         val (k, n) = keys.getValue(dim)
         val x = row(dim, k, n)
@@ -415,14 +425,18 @@ object ReportCore {
     return Agg(totals, dims)
   }
 
-  /** RPT-02/03 — فروشِ بازهٔ `from..to` (روزِ کاری، هر دو سر) به شش تفکیک، با سود و حاشیه */
+  /**
+   *  RPT-02/03 — فروشِ بازهٔ `from..to` (روزِ کاری، هر دو سر) به شش تفکیک، با سود و حاشیه.
+   *  [lineSeller] (POS-23، تنظیمِ خاموشِ `line_seller`): تفکیکِ «کاربر» به فروشندهٔ هر ردیف و برگشت از فروشندهٔ ردیفِ اصل؛
+   *  `false` ⇒ بیت‌به‌بیت پیشین. همان `opts.lineSeller` ِ `report-core.js`.
+   */
   fun sales(
     l: ReportLedger, from: String? = null, to: String? = null, clock: ReportClock? = null,
-    costing: Costing = Costing.LINE, costApproved: Boolean = false,
+    costing: Costing = Costing.LINE, costApproved: Boolean = false, lineSeller: Boolean = false,
   ): SalesReport {
     val f = from?.ifEmpty { null } ?: "0000-01-01"
     val t = to?.ifEmpty { null } ?: "9999-12-31"
-    val a = aggregate(l, f, t, clock, costs(l, costing, costApproved), true)
+    val a = aggregate(l, f, t, clock, costs(l, costing, costApproved), true, lineSeller)
     fun d(k: String) = a.dims.getValue(k)
     return SalesReport(f, t, costing.id, a.totals, d("product"), d("category"), d("user"), d("hour"), d("payment"), d("channel"))
   }
@@ -438,7 +452,9 @@ object ReportCore {
   /** RPT-13: «همهٔ فاکتورها» برای [invoicesOf] — ریزِ یک روزِ «امروز» ([dayInvoices]) */
   const val ALL = "all"
 
-  fun invoicesOf(l: ReportLedger, from: String?, to: String?, dim: String, key: String, clock: ReportClock? = null): List<InvoiceShare> {
+  fun invoicesOf(
+    l: ReportLedger, from: String?, to: String?, dim: String, key: String, clock: ReportClock? = null, lineSeller: Boolean = false,
+  ): List<InvoiceShare> {
     if (dim !in DIMS && dim != ALL) return emptyList()
     val f = from?.ifEmpty { null } ?: "0000-01-01"
     val t = to?.ifEmpty { null } ?: "9999-12-31"
@@ -448,6 +464,7 @@ object ReportCore {
       val d = posDate(s, clock)
       if (!(d >= f && d <= t)) continue
       val items = l.itemsBySale[s.id].orEmpty()
+      val users = items.map { userOf(it, s, lineSeller) }.ifEmpty { listOf(s.seller) }
       val pids = items.map { it.productId }.ifEmpty { listOf("") }
       val qtys = items.map { it.qty }.ifEmpty { listOf(0L) }
       val gross = items.map { it.total }.ifEmpty { listOf(s.total) }
@@ -458,7 +475,7 @@ object ReportCore {
         val k = when (dim) {
           "product" -> pid
           "category" -> l.products[pid]?.category ?: ""
-          "user" -> s.seller
+          "user" -> users[i]
           "hour" -> hour
           "payment" -> s.method
           ALL -> key

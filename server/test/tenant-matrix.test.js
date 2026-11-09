@@ -263,6 +263,11 @@ function casesFor(I) {
   //  `shop.doc_chain` ⇒ `{enabled:false}` و هیچ نوشتنی. سریِ دستگاهِ دیگر با پرچمِ روشن: doc-chain.test.js (series_owner)
   add('GET /api/sync/v1/chain', { url: `/api/sync/v1/chain?device_id=${I.device}` });
   add('POST /api/sync/v1/chain', { url: '/api/sync/v1/chain', body: { device_id: I.device, heads: [], links: [] } });
+  //  STF-09: سرِ زنجیرهٔ سابقهٔ دستگاه (`routes/audit-anchor.js`، مهاجرتِ ۴۱۰) — دکان از نشست، زنجیره فقط `<device_id>/…`؛
+  //  همان پرچمِ خاموشِ `shop.doc_chain` ⇒ `{enabled:false}` و هیچ نوشتنی. «ب» روی لنگرِ واقعیِ «الف» با پرچمِ روشن:
+  //  device-audit-anchor.test.js (۴)
+  add('GET /api/sync/v1/audit-anchor', { url: '/api/sync/v1/audit-anchor' });
+  add('POST /api/sync/v1/audit-anchor', { url: '/api/sync/v1/audit-anchor', body: { device_id: I.device, format: 'tohid-audit-chain-v1', heads: [{ chain: `${I.device}/1`, seq: 1, hash: 'a'.repeat(64) }] } });
 
   //  Sync v3
   const v3ops = () => ({ device_id: 'v3-other', protocol: 3, ops: [

@@ -78,7 +78,9 @@ class StockPlacesOffTest {
     assertTrue(entry.contains("if (!placesOn && !repackOn) return"))
     //  هر نوشتن فقط از `StockPlacesPref.record` (دفترِ همین لحظهٔ دیسک، یک بار برای هر کلید)
     assertEquals(1, Regex(Regex.escape("StockPlacesPref.record(")).findAll(entry).count())
-    assertEquals(5, Regex("""(?<!fun )\bwrite\(""").findAll(entry).count())
+    //  ۵ کارِ امروز + سه کارِ «دستورِ ساخت» (INV-21: ساختن از دستور، ثبت و برداشتنِ دستور) — همه از همان `write` ⇐ `record`
+    assertEquals(8, Regex("""(?<!fun )\bwrite\(""").findAll(entry).count())
+    assertTrue(pref.contains("getBoolean(BOM, false)") && entry.contains("StockPlacesPref.bom(context) } && repackOn"))
     //  «انبارِ» رابطِ امروز (`Warehouse.kt`، بی‌مرجع از نسخهٔ ۳) در «پاک‌سازی، گامِ ۳» پاک شد. جای سنجشِ «انبار خودش
     //  نمی‌نویسد»: هیچ صفحه‌ای جز همین درگاه و برگه‌اش به `StockPlaces`/`Repack` دست نمی‌زند و `record` فقط همین‌جاست
     val ui = root().resolve("ui").walkTopDown().filter { it.isFile && it.extension == "kt" }

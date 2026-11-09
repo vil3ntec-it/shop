@@ -39,6 +39,11 @@ test('stock-v1: mulDivRound — نیمه به سمتِ +∞، دقیق تا ۵۳
   }
 });
 
+test('stock-v1: mulDivRound بیرون از ۲^۵۳−۱ (ورودی یا حاصل) رد می‌شود — همان Kotlin (فازِ تفاضلی)', () => {
+  assert.ok(vectors.mulDivRoundRefuse.length >= 5);
+  for (const [a, b, c] of vectors.mulDivRoundRefuse) assert.throws(() => core.mulDivRound(a, b, c), RangeError, `mulDivRound(${a}, ${b}, ${c})`);
+});
+
 for (const fc of vectors.fefo) {
   test(`stock-v1 FEFO: ${fc.name}`, () => {
     for (const p of fc.picks) {
@@ -83,6 +88,8 @@ test('stock-v1 دفترِ حرکت (INV-02): علامت، موجودی، فیل�
   }
   assert.deepEqual(core.EXPORT_HEADER, v.exportHeader);
   assert.deepEqual(core.exportRows(v.docs), v.exportRows);
+  //  تعدیلِ بها بی مبلغ: خانهٔ خالی، نه undefined/null (فازِ تفاضلی)
+  assert.deepEqual(core.exportRows(v.exportBlank.docs), v.exportBlank.rows);
 });
 
 /* ---- فقط JS: چیزهایی که در Kotlin از نظرِ نوع ممکن نیست ---- */

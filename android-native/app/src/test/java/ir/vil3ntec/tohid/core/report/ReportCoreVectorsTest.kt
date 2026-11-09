@@ -40,7 +40,9 @@ class ReportCoreVectorsTest {
     l, s(o, "date"), clock(o), costing(o), (o["now"] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: 0L, approved(o),
   )
 
-  private fun sales(l: ReportLedger, o: JsonObject) = ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), approved(o))
+  //  POS-23: `lineSeller` ِ همان opts ِ JS (نبودش ⇒ خاموش، همان پیشین)
+  private fun sales(l: ReportLedger, o: JsonObject) =
+    ReportCore.sales(l, s(o, "from"), s(o, "to"), clock(o), costing(o), approved(o), lineSeller = s(o, "lineSeller") == "true")
 
   private fun debts(l: ReportLedger, o: JsonObject) =
     ReportCore.debts(l, s(o, "asOf")!!, (o["buckets"] as? JsonArray)?.map { it.jsonPrimitive.long } ?: emptyList(), clock(o))
@@ -78,6 +80,18 @@ class ReportCoreVectorsTest {
       val got = run(c)
       val want = c.getValue("expect")
       if (got == want) null else "${c.getValue("name").jsonPrimitive.content}\n  want: $want\n  got:  $got"
+    }
+    assertTrue(failures.joinToString("\n"), failures.isEmpty())
+  }
+
+  /** دفترهایی که فقط شکلِ وب نگه می‌دارد (عدد به‌صورتِ متن، BOM/U+001F در نام) — همان `trim` و `Number()` ِ JS (فازِ تفاضلی) */
+  @Test
+  fun `آزمون‌های مرجعِ فقط-وب عیناً برابرِ JS`() {
+    val cases = vectors.getValue("webOnly").jsonArray
+    assertTrue(cases.size >= 3)
+    val failures = cases.map { it.jsonObject }.mapNotNull { c ->
+      val got = run(c)
+      if (got == c.getValue("expect")) null else "${c.getValue("name").jsonPrimitive.content}\n  want: ${c.getValue("expect")}\n  got:  $got"
     }
     assertTrue(failures.joinToString("\n"), failures.isEmpty())
   }

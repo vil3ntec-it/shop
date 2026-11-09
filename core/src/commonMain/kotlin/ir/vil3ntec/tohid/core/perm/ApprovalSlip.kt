@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.perm
 
+import ir.vil3ntec.tohid.core.text.JsText
+
 /**
  *  «برگهٔ امضاشده»ی تأیید — STF-02 (بخشِ ۱۰.۱ِ مشخصات).
  *
@@ -32,6 +34,10 @@ object ApprovalSlip {
   const val MAX_REASON = 200
 
   private val NONCE_RE = Regex("^[A-Za-z0-9_-]{16,64}$")
+
+  /** همان `isInt` ِ JS: هر عدد بیرون از ±(۲^۵۳−۱) نادرست است (فازِ تفاضلی: iat/exp/amount ِ ۲^۶۰ را Kotlin می‌پذیرفت) */
+  private const val MAX_SAFE = 9_007_199_254_740_991L
+  private fun safe(v: Long) = v in -MAX_SAFE..MAX_SAFE
 
   data class Slip(
     val shop: String,
@@ -87,21 +93,31 @@ object ApprovalSlip {
     if (!isText(s.shop, 80) || !isText(s.doc, 200) || !isText(s.by, 80) || !isText(s.key, 80)) return "bad_slip"
     if (s.perm !in PERMS) return "bad_perm"
     if (s.pctBp != null && (s.pctBp < 0 || s.pctBp > 10_000)) return "bad_value"
-    if (s.amount != null && s.amount < 0) return "bad_value"
-    if (s.iat <= 0) return "bad_time"
+    if (s.amount != null && (s.amount < 0 || !safe(s.amount))) return "bad_value"
+    if (!safe(s.iat) || !safe(s.exp) || s.iat <= 0) return "bad_time"
     if (s.exp <= s.iat || s.exp - s.iat > TTL_MAX_MS) return "bad_time"
     if (!NONCE_RE.matches(s.nonce)) return "bad_nonce"
-    if (s.reason.isBlank() || s.reason.length > MAX_REASON || '\n' in s.reason || '\r' in s.reason) return "bad_reason"
+    //  «خالی» همان `trim()` ِ JS (BOM خالی است، U+001F نه) — `JsText`
+    if (JsText.isBlank(s.reason) || s.reason.length > MAX_REASON || '\n' in s.reason || '\r' in s.reason) return "bad_reason"
     if (s.sig.isEmpty() || s.sig.length > 200) return "bad_sig"
     return null
+  }
+
+  /**
+   *  نیازِ عددی که برگه نمی‌پوشاند (همان `uncovered` ِ JS): بی نیاز (null یا صحیحِ ≤ ۰) ⇐ نه؛ نیاز یا سقفِ بیرون از
+   *  ±(۲^۵۳−۱) ⇐ هرگز پوشیده نمی‌شود (بسته‌به‌خطا)؛ وگرنه بیش از سقفِ برگه.
+   */
+  private fun uncovered(need: Long?, cap: Long?): Boolean {
+    if (need == null || need in -MAX_SAFE..0L) return false
+    return !safe(need) || cap == null || !safe(cap) || need > cap
   }
 
   /** آیا برگه همین کار را می‌پوشاند؟ null یعنی بله */
   fun covers(s: Slip, need: Need): String? {
     if (s.perm != need.perm || s.doc != need.doc) return "approval_mismatch"
-    if (need.pctBp != null && need.pctBp > 0 && (s.pctBp == null || need.pctBp > s.pctBp)) return "approval_too_small"
-    if (need.amount != null && need.amount > 0 && (s.amount == null || need.amount > s.amount)) return "approval_too_small"
-    if (need.at != null && (need.at < s.iat - SKEW_MS || need.at > s.exp + SKEW_MS)) return "approval_expired"
+    if (uncovered(need.pctBp, s.pctBp)) return "approval_too_small"
+    if (uncovered(need.amount, s.amount)) return "approval_too_small"
+    if (need.at != null && (!safe(need.at) || need.at < s.iat - SKEW_MS || need.at > s.exp + SKEW_MS)) return "approval_expired"
     return null
   }
 
@@ -140,7 +156,8 @@ object ApprovalSlip {
         amount = if (m["amount"] == null) null else l("amount")!!,
         by = s("by")!!, key = s("key")!!, iat = l("iat")!!, exp = l("exp")!!,
         nonce = s("nonce")!!, reason = s("reason")!!, sig = s("sig") ?: "",
-        v = l("v")?.toInt() ?: 0,
+        //  نه `toInt()` ِ بی‌مرز: ۴۲۹۴۹۶۷۲۹۷ (۲^۳۲+۱) نسخهٔ ۱ می‌شد و JS ردش می‌کند
+        v = l("v")?.takeIf { it in Int.MIN_VALUE..Int.MAX_VALUE }?.toInt() ?: 0,
       )
     }.getOrNull()
   }

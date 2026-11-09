@@ -115,6 +115,41 @@ function note(req, { customerRef, kind, door }) {
   } catch (err) { failed(err); }
 }
 
+/**
+ * ⛔ «سفارش‌های یک مشتری» (`GET /api/shop/orders/customer`): هر شماره‌ای که پرس‌وجو **واقعاً** خواند (همان دو شمارهٔ
+ * نخستِ `orders.forCustomer`) ثبت می‌شود، نه فقط نخستین و نه فقط `customerId` ِ فرستاده. پیش‌تر `?phone=x&phone=<شماره>`
+ * (نخستینِ نادرست ⇒ هیچ ردیف) یا `customerId` ِ ساختگی دیدن را از پروندهٔ همان مشتری پنهان می‌کرد. `customerId` ِ درست
+ * (شمارهٔ پرس‌وجو در دفترِ سرورِ همان پرونده) ⇒ فقط یک ردیف با شناسهٔ پرونده، همان پیشین؛ هر شمارهٔ دیگر ردیفِ `ph:` ِ خودش.
+ * بی انتظار و بی خطا، مثلِ [note].
+ */
+function noteLookup(req, { customerId, phones, kind = 'detail', door = 'orders' }) {
+  try {
+    if (!req || !req.shopId || !req.user) return;
+    const cid = refOf(customerId);
+    const asked = (Array.isArray(phones) ? phones : []).slice(0, 2)
+      .map((p) => (typeof p === 'string' && p.trim() && p.length <= 40 ? phoneRef(p) : null)).filter(Boolean);
+    if (!cid && !asked.length) return;
+    const who = {
+      shopId: req.shopId, viewerId: req.user.id, role: req.role || req.member?.role || '',
+      deviceId: req.device?.device_uid || '', kind, door,
+    };
+    const p = Promise.resolve()
+      .then(async () => {
+        const covered = new Set(cid && asked.length ? await phoneRefsOf({ query }, req.shopId, cid) : []);
+        const refs = [...new Set([...(cid ? [cid] : []), ...asked.filter((r) => !covered.has(r))])];
+        for (const customerRef of refs) {
+          try {
+            await api.record({ ...who, customerRef });
+            counters.recorded += 1;
+          } catch (err) { failed(err); }
+        }
+      })
+      .catch(failed)
+      .finally(() => pending.delete(p));
+    pending.add(p);
+  } catch (err) { failed(err); }
+}
+
 /** همهٔ نوشتن‌های در راه (آزمون، و پیش از بستنِ سرور) */
 async function settle() { while (pending.size) await Promise.allSettled([...pending]); }
 
@@ -206,7 +241,7 @@ async function sweep({ at = now(), days = retentionDays() } = {}) {
 
 const api = module.exports = {
   KINDS, DOORS, WINDOW_MS, PHONE_PREFIX, ERASED_PREFIX,
-  refOf, phoneRef, record, note, settle, stats, list, anonymize, sweep, retentionDays,
+  refOf, phoneRef, record, note, noteLookup, settle, stats, list, anonymize, sweep, retentionDays,
   //  برای آزمون
   _debtorIdsByPhone: debtorIdsByPhone, _counters: counters,
 };

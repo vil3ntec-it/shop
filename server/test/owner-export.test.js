@@ -182,6 +182,18 @@ test('CRC32 همان CRCِ استاندارد است', () => {
   assert.equal(X.crc32(new TextEncoder().encode('123456789')), 0xCBF43926);
 });
 
+test('POS-23: فروشندهٔ ردیف (`saleItems[].seller`) ستونِ «فروشنده» ِ برگهٔ اقلام است؛ قلمِ بی آن همان ستون‌های پیشین', async () => {
+  const src = ledger();
+  const before = await book(src);
+  const items = (b) => sheetRows(b.files.get(`xl/worksheets/sheet${b.names.indexOf('اقلام فاکتورها') + 1}.xml`));
+  assert.ok(!items(before)[0].some((c) => c.v === 'فروشنده'), 'بی فروشندهٔ ردیف ستونی افزوده نمی‌شود');
+  src.saleItems = src.saleItems.concat([{ id: 'si2', saleId: 's1', productId: 'p2', quantity: 1, unitPrice: 0, purchasePrice: 0, totalPrice: 0, seller: 'زهرا' }]);
+  const rows = items(await book(src));
+  const col = rows[0].findIndex((c) => c.v === 'فروشنده');
+  assert.ok(col > 0, 'همان برچسبِ `seller` ِ OwnerExport.HEADERS');
+  assert.equal(rows[2].find((c) => c.v === 'زهرا') !== undefined, true);
+});
+
 test('همان نام‌های فارسیِ برنامهٔ نصبی (OwnerExport.kt)', () => {
   const kt = fs.readFileSync(path.join(ROOT, 'android-native/app/src/main/java/ir/vil3ntec/tohid/data/OwnerExport.kt'), 'utf8');
   const block = (name) => {

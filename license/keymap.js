@@ -42,6 +42,7 @@
     "sale.deleteRow": {"scope":"sale","title":"حذفِ ردیف","status":"live","webStatus":"planned","page":null,"web":[["Delete",false,false,false]],"overrides":[]},
     "sale.undo": {"scope":"sale","title":"برگرداندن","status":"planned","webStatus":"planned","page":null,"web":[["Z",true,false,false]],"overrides":[]},
     "sale.customer": {"scope":"sale","title":"انتخاب یا ساختِ مشتری","status":"live","webStatus":"planned","page":null,"web":[["C",false,false,true]],"overrides":[]},
+    "sale.lineSeller": {"scope":"sale","title":"فروشندهٔ ردیف (پایهٔ پورسانت)","status":"partial","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "sale.editRow": {"scope":"sale","title":"ویرایشِ ردیف","status":"live","webStatus":"planned","page":null,"web":[["J",false,false,true]],"overrides":[]},
     "sale.freeItem": {"scope":"sale","title":"قلمِ آزاد","status":"live","webStatus":"planned","page":null,"web":[["Q",false,false,true]],"overrides":[]},
     "sale.discountRow": {"scope":"sale","title":"تخفیفِ ردیف","status":"partial","webStatus":"planned","page":null,"web":[["X",false,false,true]],"overrides":[]},

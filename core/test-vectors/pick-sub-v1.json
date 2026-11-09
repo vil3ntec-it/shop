@@ -77,7 +77,11 @@
     { "name": "جایگزینِ قیمتِ صفر",
       "orig": { "productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000 },
       "cand": { "productId": "oil2", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 0 },
-      "want": "no_price" }
+      "want": "no_price" },
+    {"name": "فاز: «U+FEFF halal» همان حلال است (trim ِ JS)", "orig": {"productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "halal", "unit": "بوتل", "priceMinor": 30000}, "cand": {"productId": "zz1", "category": "خوراکی", "subcategory": "", "halal": "\ufeffhalal", "unit": "بوتل", "priceMinor": 100}, "want": null},
+    {"name": "فاز: «halal U+001F» نامعلوم است", "orig": {"productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "halal", "unit": "بوتل", "priceMinor": 30000}, "cand": {"productId": "zz2", "category": "خوراکی", "subcategory": "", "halal": "halal\u001f", "unit": "بوتل", "priceMinor": 100}, "want": "halal_mismatch"},
+    {"name": "فاز: بهای ۲^۶۰ بی قیمت است", "orig": {"productId": "oil", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000}, "cand": {"productId": "zz3", "category": "خوراکی", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 1152921504606847000}, "want": "no_price"},
+    {"name": "فاز: سیگمای پایانیِ دسته مثلِ JS (ΑΣ پیش از حرفِ عربی)", "orig": {"productId": "oil", "category": "ΑΣعددgram", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 30000}, "cand": {"productId": "zz4", "category": "Ασعددgram", "subcategory": "", "halal": "", "unit": "بوتل", "priceMinor": 100}, "want": "category_mismatch"}
   ],
   "charge": [
     { "origUnitPriceMinor": 12000, "candUnitPriceMinor": 10000, "qtyMilli": 1000, "want": { "chargedUnitPriceMinor": 10000, "totalMinor": 10000 } },

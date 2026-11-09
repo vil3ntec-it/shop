@@ -173,15 +173,11 @@ internal fun MemberContent(team: TeamData, member: MemberDto?, canEdit: Boolean,
                 keys.forEachIndexed { i, k ->
                   if (i > 0) V3Divider(start = 64.dp)
                   val kr = MemberModel.keyRow(k)
-                  V3ListRow(
-                    title = kr.title,
-                    subtitle = kr.meta,
-                    icon = Icons.Outlined.Key,
-                    chevron = false,
-                    trailing = if (canRevoke && !busy) {
-                      { V3TextButton(StrAccount.revokeDeviceKey, { actions.revokeKey(kr.id) }, danger = true) }
-                    } else null,
-                  )
+                  //  «باطل کردنِ این دستگاه» زیرِ ردیف، نه کنارش: در گوشیِ ۳۶۰dp دکمهٔ بلند نام و «آخرین استفاده» را تا چند حرف می‌برید
+                  V3ListRow(title = kr.title, subtitle = kr.meta, subtitleLines = 3, icon = Icons.Outlined.Key, chevron = false)
+                  if (canRevoke && !busy) {
+                    V3TextButton(StrAccount.revokeDeviceKey, { actions.revokeKey(kr.id) }, modifier = Modifier.padding(start = 52.dp, bottom = 6.dp), danger = true)
+                  }
                 }
                 if (canRevoke && !busy) {
                   V3Divider(start = 16.dp)

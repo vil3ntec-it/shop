@@ -144,7 +144,7 @@ object StockLedger {
     val adjKind: String = "",
   )
 
-  private fun lotRefOf(w: WarehouseEntry): LotRef? {
+  internal fun lotRefOf(w: WarehouseEntry): LotRef? {
     val batch = w.batch.trim()
     val exp = w.expiryDate.takeIf { it.isNotEmpty() && StockCore.isoDateOk(it) }
     var prod = w.productionDate.takeIf { it.isNotEmpty() && StockCore.isoDateOk(it) }
@@ -226,10 +226,13 @@ object StockLedger {
       } else if (w.isAdjustment && w.adjKind == Repack.KIND) {
         //  INV-21: بسته‌بندیِ دوباره/ساختِ بسته ⇒ سندِ `production` ِ هسته (علامت‌دار)؛ خروجی با بهای همان ردیف
         //  (بهای کارتن ÷ دانه، جمعِ اجزا — `Repack`)، ورودی به میانگینِ همان محل. ردیفی که تا امروز بوده این نوع را ندارد.
+        //  سری فقط از ردیفِ «دستورِ ساخت و سریِ تولید» (`lotId`): ورودی همان سری، خروجی [lotRefOf] (`Repack` همان شناسه را می‌نویسد) و `costMinor`
+        val lid = w.lotId?.takeIf { it.isNotEmpty() }
         out += Event(
           id, "entry", Repack.MOVE, at, dayOf(w.date, at), w.productId, loc, q, user, ref,
           reason = w.notes.trim().ifEmpty { "بسته‌بندیِ دوباره" },  // داده: دلیلِ رویدادِ دفترِ موجودی (ستونِ خروجی)
-          costMinor = if (q > 0) max(0L, roundOr0(w.units * w.price * 100.0)) else null,
+          costMinor = if (q > 0) max(0L, w.costMinor ?: roundOr0(w.units * w.price * 100.0)) else null,
+          lotId = if (q < 0) lid else null, lot = if (q > 0 && lid != null) lotRefOf(w) else null,
         )
       } else {
         val kind = if (w.isAdjustment) adjKindOf(w, moveTypeByRef, dmg != null) else "other"
@@ -333,8 +336,8 @@ object StockLedger {
      ========================================================== */
 
   /** شناسهٔ انبار در هسته خالی نمی‌شود؛ محلِ اصلی "" است ⇒ «L:» + نام */
-  private fun wid(location: String) = "L:$location"
-  private fun locOf(warehouseId: String) = warehouseId.substring(2)
+  internal fun wid(location: String) = "L:$location"
+  internal fun locOf(warehouseId: String) = warehouseId.substring(2)
 
   data class Snap(val location: String, val position: Position) {
     val lots: List<Lot> get() = position.lots.filter { it.qtyMilli != 0L }
@@ -405,7 +408,7 @@ object StockLedger {
   data class Applied(val doc: StockDoc, val result: StockResult)
   private data class Step(val book: StockBook, val applied: List<Applied>, val error: StockResult?)
 
-  private fun applyEvent(book0: StockBook, ev: Event, recorded: Boolean, today: String?): Step {
+  private fun applyEvent(book0: StockBook, ev: Event, recorded: Boolean, today: String?, keepPlace: Boolean = false): Step {
     val mode = if (recorded) StockMode.RECORDED else StockMode.LOCAL
     var book = book0
     val applied = ArrayList<Applied>()
@@ -440,7 +443,7 @@ object StockLedger {
         return Step(book, applied, null)
       }
       "sale" -> {
-        val parts = saleParts(book, ev.productId, ev.qtyMilli, ev.location, ev.lotId, today, recorded)
+        val parts = if (keepPlace) listOf(Part(ev.location, ev.qtyMilli)) else saleParts(book, ev.productId, ev.qtyMilli, ev.location, ev.lotId, today, recorded)
         for ((p, part) in parts.withIndex()) {
           val sd = docOf(ev, "sale", part.location, part.qtyMilli, id = if (parts.size > 1) "${ev.id}:$p" else ev.id, lotId = ev.lotId)
           val r = StockCore.apply(book, sd, mode, today)
@@ -454,7 +457,7 @@ object StockLedger {
         val d = if (ev.type == "purchase_receipt") {
           docOf(ev, ev.type, ev.location, ev.qtyMilli, lot = ev.lot, costMinor = ev.costMinor, landedMinor = ev.landedMinor.takeIf { it > 0 })
         } else {
-          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId, costMinor = ev.costMinor.takeIf { ev.type == Repack.MOVE })
+          docOf(ev, ev.type, ev.location, ev.qtyMilli, lotId = ev.lotId, lot = ev.lot.takeIf { ev.type == Repack.MOVE }, costMinor = ev.costMinor.takeIf { ev.type == Repack.MOVE })
         }
         val r = StockCore.apply(book, d, mode, today)
         if (!r.result.ok) return Step(book0, emptyList(), r.result)
@@ -538,6 +541,13 @@ object StockLedger {
       }
     }
     return View(books, rows, tasks, errors)
+  }
+
+  /** INV-20 — همین بازپخش با قاعدهٔ موتورِ امروز ([applyEvent] ِ `keepPlace`: فروش از محلِ خودِ قلم، بی پخش)؛ `StockPlaces.lotsAt` */
+  internal fun placeBooks(d: ShopData, productIds: Set<String>): Map<String, StockBook> {
+    val books = HashMap<String, StockBook>()
+    for (ev in events(d, productIds)) applyEvent(books[ev.productId] ?: StockBook(), ev, true, ev.day, keepPlace = true).let { if (it.error == null) books[ev.productId] = it.book }
+    return books
   }
 
   /* ==========================================================

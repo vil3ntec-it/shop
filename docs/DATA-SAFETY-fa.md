@@ -135,9 +135,46 @@
     بی چرخش، جداییِ حساب‌ها و بستن/باز کردنِ پیاپی، بسته شدن میانِ حصار)؛ `DeviceOnlyPrefsTest` (اندروید، **فقط CI**)؛ JB6 ِ
     `server/test/e2e/journeys-b.e2e.mjs` (سرورِ واقعی: شاهدِ دو بار شمردن، سپس گوشیِ دوم با شناسه و سریِ تازه، فروشِ پیش از ورود،
     موجودی و قرض درست همان سرور، چهار دستگاه یکی؛ بی رفع سرخ: «دو گوشی، دو شناسه»).
-    **مانده:** (الف) بازیابیِ واقعی روی دو گوشیِ واقعی (ابری و انتقالِ مستقیم) — کارِ دستیِ صاحب محصول؛ (ب) Sync v3 (انتخابیِ هر
-    دستگاه، پیش‌فرض v1) cursor ِ خودش را در `filesDir/sync-v3-*` با پشتیبان می‌برد و با `device_uid` ِ تازه همان خطرِ دو بار
-    شمردن را دارد — PR ِ جدا؛ (ج) ابزارِ انتقالی که `tohid-sync.xml` را هم خام کپی کند (دو گوشی، یک `device_uid`) در نرم‌افزار
+    **Sync v3 (بندِ «ب» ِ مانده) — بسته شد (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/v3-restore-fence`؛ `sync/v3/V3State.kt`،
+    `V3StateDirAndroid.kt`).** **اشکال:** v3 (انتخابیِ هر دستگاه، پیش‌فرض v1) حالِ هر حساب را در `filesDir/sync-v3-<کلید>/`
+    می‌گذاشت و با پشتیبان می‌رفت؛ `device_id` و گرهٔ HLC ِ v3 خودِ `deviceUid` است (پس روی گوشیِ دوم تازه)، ولی cursor ِ
+    پشتیبان همان ⇒ Pull ِ سرور (`device_id <> $6`) opهای خودِ گوشیِ اول پس از cursor را «دیگری» می‌داد و برگشت دو بار
+    می‌نشست. شاهد (`SyncV3EngineTest`، سرورِ حافظه‌ای): همان حالِ پشتیبان با شناسهٔ تازه و بی حصار ⇒ `debtSettled` ِ فاکتور
+    ۱۰۰ به‌جای ۵۰. **رفع:** (۱) حالِ v3 (`state.json`: cursor، سایه، ساعت، بستگی؛ `journal.json`؛ دفترچهٔ §۹.۵) در
+    `filesDir/sync-v3/<کلید>/` و این پوشه از هر سه راه بیرون: `backup_rules.xml` (ابری و انتقال)، `backup_rules_legacy.xml`،
+    `TohidBackupAgent.EXCLUDED_DIRS` (تازه، کنارِ `sync-shadow`)؛ با رمزِ دفتر `AtRestScope.syncState` (`sync-v3/…`). **صف**
+    (`sync-v3-<کلید>/queue.json`: نرفته‌ها و ردشده‌ها) سرِ جایش و **با** پشتیبان، مثلِ `oplog-*` ِ v1: گوشیِ دوم آن را اول
+    می‌فرستد (همان op_idها ⇒ «تکراری») و تغییرِ نرفتهٔ گوشیِ از کار افتاده گم نمی‌شود. کوچ: هر فایلِ حال در نخستین خواندن با
+    یک `rename` (اتمی؛ کوچِ نیمه‌کاره بارِ بعد ادامه؛ جای تازه هرگز رونویسی و جای پیشین هرگز پاک نمی‌شود). (۲) حصار با همان
+    `RestoredDevice.decide` (آشکارسازِ دوم نیست): بستگی `V3Meta.device`؛ «replica» ِ v3 گرهٔ ساعتِ نوشته‌شده (`V3Meta.clock`،
+    `<wall>:<counter>:<node>`) ⇒ حالِ دستگاهِ دیگر (رونوشتِ خام، پشتیبانِ ساختِ پیشین) حتی با `restoredAt` ِ صفر؛ بی حال
+    (پشتیبانِ این ساخت) ⇒ همان `restoredAt` + ردیف/صف. حصار **یک** نوشتنِ اتمیِ `state.json`: پایهٔ سایه = دفترِ روی میز
+    (فروشِ پیش از ورود op می‌شود)، cursor ِ بازیابی‌شده ۰، `restorePending` + `restoredRebuild` (Pull بسته)، بستن به همین
+    دستگاه؛ گرهٔ HLC همیشه از `deviceUid` ِ امروز. هنگامِ باز شدنِ دفتر (`SyncV3Runner.recover`)، پس از ورود (`AccountBind`) و
+    پیش از هر دور (`work`؛ ننشست ⇒ این دور هیچ). (۳) «بازسازی از سرور» همان `SyncV3Engine.rebuild` ِ §۹.۵: صف اول، بعد دفتر =
+    Snapshot + ردیف‌های تنهای همین دستگاه جز حذف‌شده‌های سرور (`/deleted`)، cursor = سرِ Snapshot، بعد Pull. (۴) نچرخان بر
+    شک: شناسهٔ دستگاه یا حالِ ناخوانا (`FileV3Store` فایلِ خراب را کنار گذاشت) ⇒ هیچ تصمیمی؛ به‌روزرسانیِ همین دستگاه ⇒ فقط
+    بستن (همان cursor، بی بازسازی)؛ صفِ بی حال با `restoredAt` ِ صفر ⇒ بستن ولی با همان بازسازی (نه `initialize`: Snapshot ِ
+    پیش از صف دفتر را بی اثرِ آن opها می‌گذاشت). دفتر هرگز پاک نمی‌شود، صف و ردشده‌ها هرگز دور ریخته نمی‌شوند. کامپیوتر همین
+    کد است (رونوشتِ خامِ پوشهٔ داده)؛ آیفون هم (`ios/shared`؛ پوشه از پشتیبانِ iCloud هم بیرون — پایین). **آزمون:** `SyncV3EngineTest`
+    (۳۷/۳۷؛ بخشِ DATA-06، ۶ آزمونِ تازه: حالِ دستگاهِ دیگر ⇒ گرهٔ تازه، cursor ۰، «اول صف، بعد Snapshot، Pull پس از آن»، قرض/برگشت/
+    موجودی همان سرور و `$inc` یک بار + شاهدِ دو بار؛ بازیابیِ عادی بی حال با کالای پاک‌شده که زنده نمی‌شود؛ صفِ گوشیِ از کار
+    افتاده یک بار؛ به‌روزرسانی بی چرخش و ناخوانا بی تصمیم؛ بسته شدن میانِ حصار و میانِ بازسازی؛ صفِ بی حال)؛
+    `RestoredDeviceV3DesktopTest` (۴: کوچ + حصار هنگامِ باز شدنِ دفترِ واقعی و نخستین فروشِ تنها، به‌روزرسانی، کوچِ نیمه‌کاره،
+    قاعده‌های پشتیبان)؛ `RestoredDeviceTest` (core ۸/۸، `sync-v3*` ردِ کار است)؛ `AtRestTest` (۲۷/۲۷)؛ `DeviceOnlyPrefsTest` (۴/۴، با آزمونِ تازهٔ
+    پوشه‌ها؛ محلی روی کامپیوتر و در CI روی `testReleaseUnitTest` ِ اندروید). سه آزمونِ کامپیوتر (`LedgerMergeOnTest`،
+    `SaveBaseTest`، `StaleSaveTest`) حالِ کاشته را به همین دستگاه می‌بندند (`V3Meta.device`) — تغییرِ آگاهانه.
+    E2E: هارنسِ `journeys-b` (`NativeDevice`) فقط v1 ِ برنامه را بازی می‌کند و `lib/v3-devices.mjs` موتورِ وب (بی حصار) است ⇒
+    گونهٔ v3 ِ JB7 ساختنی نیست؛ پوششِ v3 همان آزمون‌های JVM با موتورِ واقعیِ کاتلین.
+    **مانده:** (الف) بازیابیِ واقعی روی دو گوشیِ واقعی (ابری و انتقالِ مستقیم) — کارِ دستیِ صاحب محصول؛ (ب) ~~Sync v3 ِ cursor ِ
+    پشتیبان~~ بسته شد (بالا) — جز بازیابیِ واقعیِ v3 روی دو گوشی که مثلِ (الف) دستی است. ~~آیفون پوشهٔ `sync-v3/` را از پشتیبانِ
+    iCloud بیرون نمی‌گذارد~~ **بسته شد (۱۴۰۵/۰۸/۱۸، شاخهٔ `claude/ios-backup-dirs`؛ `docs/IOS-PLAN-fa.md` §۰.۱۶.۲):** `sync-v3/` و
+    `sync-shadow/` (همان `exclude domain="file"` ِ اندروید؛ فهرست: `ios/shared/…/backup/NoBackupDirs.kt`) روی آیفون
+    `NSURLIsExcludedFromBackupKey` می‌گیرند — هنگامِ ساخت (نخستین `filesDir` ِ هر فرآیند، پیش از هر نوشتنِ کدِ مشترک) و در هر
+    آغاز برای نصبِ پیشین. دفتر، `oplog-*` و صفِ v3 (`sync-v3-<کلید>/`) با پشتیبان می‌مانند. حصار همان‌جا می‌ماند: پشتیبانِ
+    گرفته‌شده پیش از این نسخه هنوز این پوشه‌ها را دارد. آزمون: `NoBackupDirsJvmTest` (فهرست = هر دو بخشِ `backup_rules.xml`،
+    `backup_rules_legacy.xml`، `TohidBackupAgent.EXCLUDED_DIRS` و `ShadowStore.DIR`/`V3StateDir.DIR`؛ کمک برای هر پوشه) و
+    `NoBackupDirsIosTest` (ویژگی روی پوشهٔ واقعی، **فقط CI** ِ macOS)؛ (ج) ابزارِ انتقالی که `tohid-sync.xml` را هم خام کپی کند (دو گوشی، یک `device_uid`) در نرم‌افزار
     شناختنی نیست؛ (د) آیفون: همین بستگی در کدِ مشترک است، پس آیفونی که نگهبانِ #1012 شناسه‌اش را چرخاند هم حصار و بازسازی
     می‌گیرد — فقط برای پشتیبانی که با این نسخه گرفته شد (پیش از آن بستگی نیست ⇒ همان «مانده» ِ §۰.۱۶.۱)؛ (ه) با
     `shop.ledger_merge` خاموشِ صریح بازسازیِ کارگر (نمونهٔ دیگرِ دفتر) به صفحهٔ باز نمی‌رسد — برای همین اول از `bootstrapSoon` با
@@ -178,7 +215,8 @@
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، نشانِ یک‌بارهٔ `tohid-settings-restore`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مالِ همین دستگاه (عمداً) | نشست و همگام‌سازی (`tohid-session`، `tohid-sync*`، `tohid-api`، `tohid-config`، `tohid-servers`، `tohid-ledger*`، سایهٔ تنظیماتِ دکان `tohid-settings-sync`، پیوندِ «اصلاح و ثبت» ِ سبد به سندِ ردشده `tohid-conflict-fix`)، قفل (`tohid-lock`)، زبان و ظاهر (`tohid-locale`، `tohid-theme`، `tohid-ui`، `tohid-shell`)، چاپگر و دستگاه‌های جفت‌شده (`tohid`، `tohid-devices`)، مکان و نبض (`tohid-location*`، `tohid-visit-ping`، `tohid-watch`)، پیش‌نویس‌ها (`tohid-stock`، `tohid-stock-transfer`، `tohid-debtor-detail`)، `tohid-otp`، `tohid_preview` | دوباره روی همان دستگاه |
 | مانده | `tohid-staff-pins` | دوباره گذاشته می‌شود (بالا، بند ۵) |
-| مالِ همین دستگاه (عمداً) | فایلِ سایهٔ همگام‌سازی `sync-shadow/sync-shadow-*.dat` (+ `.prev`؛ فقط با پرچمِ `shop.sync_shadow_file`) — همان حالِ `tohid-sync-v1`: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` پوشه را بیرون می‌گذارد؛ با رمزِ روشن `AtRestScope.syncState`). پیش‌تر در خودِ `filesDir` بود و بی رمز با پشتیبان می‌رفت: بی نشانش در گوشیِ بازیابی‌شده بی‌کار، و هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد | از سرور (Snapshot)؛ prefs نیست، پس `DataSafetyGuardTest` آن را نمی‌شمارد |
+| مالِ همین دستگاه (عمداً) | حالِ Sync v3 ِ هر حساب در `sync-v3/<کلید>/` (`state.json`: cursor، سایه، ساعت، بستگی؛ `journal.json`؛ `replay-sent.jsonl`) — DATA-06: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` و `TohidBackupAgent.EXCLUDED_DIRS`؛ با رمز `AtRestScope.syncState`) و آیفون (`NSURLIsExcludedFromBackupKey`، `ios/…/backup/NoBackupDirs.kt`). صفِ v3 (`sync-v3-<کلید>/queue.json`) مثلِ `oplog-*` با پشتیبان می‌رود و گوشیِ دوم اول آن را می‌فرستد | از سرور (حصار ⇐ صف اول ⇐ Snapshot)؛ ساختِ پیشین همه را در `sync-v3-<کلید>/` داشت ⇐ کوچ در نخستین خواندن |
+| مالِ همین دستگاه (عمداً) | فایلِ سایهٔ همگام‌سازی `sync-shadow/sync-shadow-*.dat` (+ `.prev`؛ فقط با پرچمِ `shop.sync_shadow_file`) — همان حالِ `tohid-sync-v1`: هرگز در پشتیبانِ اندروید (`backup_rules*.xml` پوشه را بیرون می‌گذارد؛ با رمزِ روشن `AtRestScope.syncState`) و آیفون (`NSURLIsExcludedFromBackupKey` روی پوشه). پیش‌تر در خودِ `filesDir` بود و بی رمز با پشتیبان می‌رفت: بی نشانش در گوشیِ بازیابی‌شده بی‌کار، و هم‌اندازهٔ دفتر سقفِ ۲۵ مگیِ پشتیبانِ ابری را پر می‌کرد | از سرور (Snapshot)؛ prefs نیست، پس `DataSafetyGuardTest` آن را نمی‌شمارد |
 | بایگانی | `ledger-archive.json` (ردیف‌های بیش از ۴۰۰ روز) | روی سرور می‌مانند (`forgetArchived` فقط سایه را هرس می‌کند) |
 
 ## ۶. تنظیماتِ دکان: کدام کلید مالِ دکان، کدام مالِ همین دستگاه (۱۴۰۵/۰۸/۱۸)
@@ -193,7 +231,7 @@
 | دسته | کلیدها (`tohid-policy` مگر گفته شود) | پیش‌فرض و دلیل |
 |---|---|---|
 | **مالِ دکان** — پول و صندوق | `cash_rounding`، `auto_fees`، `checkout_block_zero_total`، `checkout_customer_from_minor`، `line_pricing`، `line_price_direction`، `free_line_cap_minor`، `pay_v2`، `credit_gate`، `block_expired`، `blind_count`، `pay_fix`، `till_receive`، `quick_register`، `unit_sale`، `whole_packs`، `price_lists`، `customer_prices`، `gift_cards`، `layaway`، `quotes`، `special_orders`، `safe_book` | دو صندوقِ یک دکان دو گردکردن یا دو سقفِ قیمت ندارند؛ پیش‌فرضِ هر کلید همان پیش‌فرضِ کد (همه‌جا یکی) |
-| **مالِ دکان** — برگشت، کالا، انبار | `returns_v2`، `return_limit`، `return_reasons`، `return_blocked`، `return_window_days`، `expiry_approval`، `expiry_near_days`، `count_blind`، `stock_places`، `stock_repack` | قاعدهٔ برگشت و تاریخ باید روی هر صندوق یکی باشد |
+| **مالِ دکان** — برگشت، کالا، انبار | `returns_v2`، `return_limit`، `return_reasons`، `return_blocked`، `return_window_days`، `expiry_approval`، `expiry_near_days`، `count_blind`، `stock_places`، `stock_repack`، `stock_bom` | قاعدهٔ برگشت و تاریخ باید روی هر صندوق یکی باشد |
 | **مالِ دکان** — مشتری، مالیات، روزِ کاری | `loyalty`، `loyalty_every_afn`، `loyalty_point_afn`، `loyalty_max_share`، `loyalty_silver_afn`، `loyalty_gold_afn`، `loyalty_expiry_months`، `debt_reminder_template`، `tax_quarter`، `tax_quarter_rate_bp`، `tax_quarter_start_month`، `tax_quarter_due_months`، `tax_quarter_due_day`، `tax_quarter_remind_days`، `day_end_hour`، `fraud_trail` | امتیاز، مالیاتِ فصلی و «پایانِ روز» در گزارشِ هر دستگاه باید یکی باشند |
 | **مالِ همین دستگاه** | `multi_drawer`، `multi_drawer_shift` (کشو)، `label_tools` (چاپگرِ برچسب)، `customer_card` (کارت/بارکدخوان)، `count_tools` (پنجرهٔ اسکن)، `chat_media_guard` (جای دیسک)، `training_mode`، `training_staff`، `whats_new`، `report_keys`، `crm_reports`، `doc_gaps`، `shrink_report`، `simple_ask`، `stock_insight`، `stock_levels`، `product_tools`، `product_suggest`، `ai_forecast`، `ai_anomaly`؛ `tohid-modules`: `on` | سخت‌افزار، صفحه یا آموزشِ همین دستگاه؛ دادهٔ این‌ها (کارت، برچسب، حدِ موجودی) خودش همگام می‌شود |
 | **نسخهٔ سرور** | `loyalty_shop:<دکان>` (PRM-13)؛ `tohid-receipt`: `v2:<دکان>`، `debt-minor:v2:<دکان>`، `profile:<دکان>` | از درِ خودشان (`/shop/loyalty`، `/shop/receipt-profile`…) |

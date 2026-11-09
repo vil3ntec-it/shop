@@ -125,7 +125,7 @@ test('انگلیسی هیچ حرفِ فارسی/پشتو ندارد؛ فارسی
 });
 
 test('در JS ِ صفحه‌ها متنِ فارسیِ ثابت نمانده', () => {
-  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js']) {
+  for (const f of ['kit/kit.js', 'kit/settings.js', 'kit/order-kit.js', 'market/market.js', 'store/store.js', 'store/order.js', 'store/checkout.js', 'store/product.js', 'store/share.js', 'store/catalog.js', 'store/filters.js', 'store/reviews.js', 'store/account.js', 'store/delivery-method.js', 'store/chat.js', 'store/chat-photo.js', 'store/pay-step.js', 'store/line-prefs.js', 'store/acct.js']) {
     const lines = read(f).split('\n').filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l) && !/^\s*K\.FB = \{/.test(l)).map((l) => l.replace(/\s\/\/.*$/, ''));
     //  استثنا: نامِ خودِ زبان‌ها در گزینش‌گر و رقم/جداکنندهٔ فارسی (نه متن)
     const hits = lines.filter((l) => [...l.matchAll(/'([^'\\]*)'/g)].some((m) => ARABIC.test(m[1]) && !/^(فارسی|دری|پښتو|[۰-۹٬٫]+)$/.test(m[1])));

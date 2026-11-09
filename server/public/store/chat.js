@@ -13,6 +13,11 @@
  *           (#907). هر دو با پرسشِ تأیید؛ دکمه‌ها تا پاسخ خاموش (دوبار زدن یک درخواست)؛ سرور باز هم می‌سنجد (CHAT-08).
  * ⛔ هر متن فقط با textContent (`K.el`)؛ عکس با بلیت خوانده و data: می‌شود (CSP: img-src 'self' data:).
  * ⛔ شماره فقط با کدِ یک‌بارمصرف (`/verify`)؛ بلیتِ منقضی ⇒ همان فرمِ تأیید.
+ * ⛔ پیامِ صوتی (CHAT-07): هیچ بایتی پیش از «پخش»؛ بایت با بلیت از همان درِ رسانه و پخش از blob: ِ همین صفحه
+ *   (CSP: media-src 'self' blob:) — <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ امضاشده ندارد (S118).
+ * ⛔ عکسِ مشتری (CHAT-05): کوچک‌کردن در `store/chat-photo.js` ِ دیربار (فقط با برگزیدنِ عکس)؛ پیش‌نمایش data: (img-src بی
+ *   blob:)؛ بارگذاری با XHR برای پیشرفت، «لغو» و «تلاشِ دوباره»؛ یک `clientId` برای هر عکس و همان بایت ⇒ تکرار پیامِ دوم یا
+ *   سهمِ دوم نمی‌سازد (CHAT-11)؛ بی‌اینترنت ⇒ همان صفِ متن (backoff و `online`). سرور همه را دوباره می‌سنجد.
  */
 (function () {
   'use strict';
@@ -29,6 +34,8 @@
     var info = {}; var acting = null; var inflight = {};
     //  پیامِ در راه { conv, body, key, wait } — تا رسیدن با همان شناسه (CHAT-02/11)؛ retry = زمان‌سنجِ تلاشِ دوباره
     var out = null; var retry = 0;
+    //  عکسِ در راه { conv, key, main, thumb, w, h, thumbId, mainId, xhr, wait } و سقف‌های سرور (`limits` ِ گشودن)
+    var ph = null; var lim = null;
     //  واژه‌نامه پیش از ساختنِ برگه (برگه هنوز نیست ⇒ ترجمهٔ دوباره لازم نیست؛ متن‌ها با t() از همین واژه‌نامه)
     var ready = K.part('chat', $('chat-sheet'));
 
@@ -53,7 +60,20 @@
         el('div', { class: 'note', attrs: { id: 'ct-state', role: 'status' }, hidden: true }),
         el('button', { class: 'btn btn-block', attrs: { id: 'ct-issue', type: 'button' }, text: t('ct.issue'), hidden: true, on: { click: issue } }),
         el('button', { class: 'btn btn-block', attrs: { id: 'ct-new', type: 'button' }, text: t('ct.new'), hidden: true, on: { click: function () { start({}); } } }),
+        el('div', { class: 'ct-ph', attrs: { id: 'ct-ph', role: 'group', 'aria-label': t('ct.ph'), 'data-st': 'idle' }, hidden: true },
+          el('img', { class: 'ct-ph-img', attrs: { id: 'ct-ph-img', alt: t('ct.ph'), width: '96', height: '96' }, hidden: true }),
+          el('div', { class: 'ct-ph-side' },
+            el('progress', { class: 'ct-bar', attrs: { id: 'ct-ph-bar', max: '1', value: '0', 'aria-label': t('ct.ph.up') }, hidden: true }),
+            el('small', { attrs: { id: 'ct-ph-st', role: 'status' } }),
+            el('div', { class: 'ct-ph-acts' },
+              el('button', { class: 'btn btn-accent', attrs: { id: 'ct-ph-send', type: 'button' }, text: t('ct.ph.send'), hidden: true, on: { click: function () { phGo(ph); } } }),
+              el('button', { class: 'btn', attrs: { id: 'ct-ph-retry', type: 'button' }, text: t('ct.au.retry'), hidden: true, on: { click: function () { phGo(ph); } } }),
+              el('button', { class: 'btn btn-ghost', attrs: { id: 'ct-ph-cancel', type: 'button' }, text: t('ct.ph.cancel'), on: { click: phDrop } })))),
         el('form', { class: 'ct-form', attrs: { id: 'ct-form', novalidate: '' }, hidden: true },
+          el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-ph-add', type: 'button', 'aria-label': t('ct.ph.add') }, on: { click: function () { $('ct-file').click(); } } }, K.icon('image')),
+          coarse() ? el('button', { class: 'btn btn-icon btn-ghost', attrs: { id: 'ct-ph-cam', type: 'button', 'aria-label': t('ct.ph.cam') }, on: { click: function () { $('ct-cam').click(); } } }, K.icon('camera')) : null,
+          el('input', { attrs: { id: 'ct-file', type: 'file', accept: 'image/*' }, hidden: true, on: { change: pick } }),
+          el('input', { attrs: { id: 'ct-cam', type: 'file', accept: 'image/*', capture: 'environment' }, hidden: true, on: { change: pick } }),
           el('textarea', { class: 'input', attrs: { id: 'ct-text', rows: '2', maxlength: '4000', 'aria-label': t('ct.text'), placeholder: t('ct.text') } }),
           el('button', { class: 'btn btn-accent', attrs: { id: 'ct-send', type: 'submit' }, text: t('ct.send') })),
         el('div', { class: 'note', attrs: { id: 'ct-msg', role: 'alert' }, hidden: true }));
@@ -99,7 +119,7 @@
       $('ct-msg').hidden = true;
       if (!K.ticket()) { verify(); return Promise.resolve(); }
       $('ct-verify').hidden = true; $('ct-body').hidden = false;
-      return api('/chat/conversations', { method: 'POST', body: body }).then(function (r) { show(r.conversation, true); }).catch(fail);
+      return api('/chat/conversations', { method: 'POST', body: body }).then(function (r) { lim = r.limits || lim; show(r.conversation, true); }).catch(fail);
     }
     function title(c) { return c.orderNo ? t('ct.order', { n: K.fa(c.orderNo, 0) }) : t('ct.general'); }
     function show(c, fresh) {
@@ -107,6 +127,7 @@
         conv = c; cursor = 0; msgs = {}; info = {}; acting = null; inflight = {};
         K.clear($('ct-list')); K.clear($('ct-old-list')); prev();
       }
+      if (ph && ph.conv !== c.id) phDrop();   //  عکسِ آمادهٔ رشتهٔ دیگر به این رشته نمی‌رود
       conv = c;
       $('ct-title').textContent = title(c);
       state();
@@ -175,7 +196,8 @@
       var li = el('li', { class: 'ct-msg ' + (mine ? 'mine' : 'shop'), attrs: { 'data-id': m.id } });
       if (m.deleted) li.appendChild(el('p', { class: 'muted', text: t('ct.deleted') }));
       else {
-        if (m.kind === 'image' && m.media) li.appendChild(photo(cid, m.media));
+        if (m.kind === 'image' && m.media) li.appendChild(photo(cid, m.media, m.sender === 'customer'));
+        if (m.kind === 'audio' && m.media) li.appendChild(voice(cid, m));
         if (m.body) li.appendChild(el('p', { text: m.body }));
       }
       var x = { m: m, cid: cid, li: li, more: null, sp: null, st: was && !m.deleted ? was.st : null };
@@ -299,8 +321,8 @@
       clearTimeout(doneAt);
       doneAt = setTimeout(function () { if (box.classList.contains('ok') && box.textContent === text) box.hidden = true; }, 4000);
     }
-    function photo(cid, media) {
-      var img = el('img', { class: 'ct-img', attrs: { alt: t('ct.photo'), width: '200', height: '150' } });
+    function photo(cid, media, mine) {
+      var img = el('img', { class: 'ct-img', attrs: { alt: t(mine ? 'ct.ph.mine' : 'ct.photo'), width: '200', height: '150' } });
       var btn = el('button', { class: 'ct-imgbtn', attrs: { type: 'button', 'aria-label': t('ct.photo.big') } }, img);
       var load = function (id) {
         var tk = K.ticket();
@@ -312,6 +334,94 @@
       load(media.thumbId || media.id).catch(function () { img.alt = t('ct.err'); });
       btn.onclick = function () { btn.classList.add('big'); if (media.thumbId) load(media.id).catch(function () { /* همان پیش‌نمایش */ }); };
       return btn;
+    }
+
+    // ── پیامِ صوتی (CHAT-07): پیش از «پخش» نه <audio>، نه درخواست؛ نوعی که این مرورگر نمی‌شناسد اصلاً بار نمی‌شود ──
+    //  ۴۰۴ ⇒ پاک‌شده یا سرآمده (بی «دوباره»)؛ بی‌اینترنت، ۴۲۹ یا ۵xx ⇒ «دوباره»؛ ۴۰۱ ⇒ فرمِ تأیید. <audio> ِ حبابِ برداشته
+    //  (حذف برای همه) خودش می‌ایستد؛ blob اش با بارِ بعدی یا بستنِ برگه آزاد می‌شود.
+    K.ICONS.play = 'M8 5.5v13l10.5-6.5z';
+    K.ICONS.pause = 'M8.5 5.5v13 M15.5 5.5v13';
+    var blobs = []; var probe = null;
+    function free() {
+      blobs = blobs.filter(function (b) { if (b.au.isConnected) return true; URL.revokeObjectURL(b.url); return false; });
+    }
+    function hush() { if (sheet) [].forEach.call(sheet.querySelectorAll('audio'), function (a) { a.pause(); }); free(); }
+    function mmss(ms) {
+      var s = Math.max(0, Math.round(ms / 1000)); var r = s % 60;
+      return K.fa(Math.floor(s / 60), 0) + ':' + (r < 10 ? K.fa(0, 0) : '') + K.fa(r, 0);
+    }
+    function voice(cid, m) {
+      var media = m.media; var known = Number((m.meta || {}).durationMs) || 0;
+      var au = null; var busy = false;
+      var btn = el('button', { class: 'btn btn-icon ct-play', attrs: { type: 'button', 'aria-label': t('ct.au.play') } }, K.icon('play'));
+      var bar = el('progress', { class: 'ct-bar', attrs: { max: '1', value: '0', 'aria-label': t('ct.au') } });
+      var time = el('span', { class: 'num ct-time', text: known ? mmss(known) : '' });
+      var note = el('small', { class: 'ct-aerr', hidden: true });
+      var box = el('div', { class: 'ct-voice', attrs: { role: 'group', 'aria-label': t('ct.au'), 'data-st': 'idle' } }, btn, bar, time, note);
+      function mode(st, icon, label) {
+        box.setAttribute('data-st', st);
+        if (st === 'loading') box.setAttribute('aria-busy', 'true'); else box.removeAttribute('aria-busy');
+        btn.replaceChild(K.icon(icon), btn.firstChild);
+        btn.setAttribute('aria-label', label);
+      }
+      function stop(text, again) {
+        busy = false; btn.disabled = !again;
+        note.textContent = text; note.hidden = false;
+        mode('err', 'play', t(again ? 'ct.au.retry' : 'ct.au.play'));
+      }
+      function tick() {
+        var d = au && isFinite(au.duration) && au.duration > 0 ? au.duration * 1000 : known;
+        var c = au && !au.ended ? au.currentTime * 1000 : 0;
+        bar.value = d ? Math.min(1, c / d) : 0;
+        time.textContent = (c > 0 ? mmss(c) + ' / ' : '') + (d ? mmss(d) : '');
+      }
+      function go() {
+        var p = au.play();
+        //  Safari پخش پس از fetch را بی لمسِ تازه نمی‌پذیرد ⇒ آماده، «پخش» ِ دوباره
+        if (p && p.catch) p.catch(function (e) { if (e && e.name === 'NotAllowedError') mode('ready', 'play', t('ct.au.play')); });
+      }
+      function broke() {
+        if (au && au.parentNode) au.parentNode.removeChild(au);
+        au = null; free();
+        stop(t('ct.au.codec'), false);
+      }
+      function load() {
+        var h = {}; var tk = K.ticket(); var ss = K.sess();
+        if (tk) h['X-Store-Ticket'] = tk.ticket;
+        if (ss) h['X-Store-Session'] = ss.token;
+        var no = function (s) { var e = new Error('media'); e.status = s; return e; };
+        busy = true; note.hidden = true; free();
+        mode('loading', 'play', t('ct.au.play'));
+        fetch(base + path(cid, '/media/' + encodeURIComponent(media.id)), { headers: h, credentials: 'omit', cache: 'no-store' })
+          .then(function (res) { if (!res.ok) throw no(res.status); return res.blob(); }, function () { throw no(0); })
+          .then(function (b) {
+            var url = URL.createObjectURL(b);
+            au = el('audio', { attrs: { preload: 'auto' }, on: {
+              play: function () { mode('playing', 'pause', t('ct.au.pause')); tick(); },
+              pause: function () { mode('ready', 'play', t('ct.au.play')); tick(); },
+              ended: tick, timeupdate: tick, durationchange: tick, error: broke,
+            } });
+            au.src = url;
+            box.appendChild(au);
+            blobs.push({ au: au, url: url });
+            busy = false;
+            go();
+          })
+          .catch(function (e) {
+            var s = e && e.status;
+            if (s === 401) { busy = false; mode('idle', 'play', t('ct.au.play')); fail(e); }
+            else if (s === 404 || s === 410) stop(t('ct.au.gone'), false);
+            else stop(t(s === 0 ? 'err.network' : s === 429 ? 'err.rate' : 'err.generic'), true);
+          });
+      }
+      btn.addEventListener('click', function () {
+        if (busy) return;
+        if (au) { if (au.paused) go(); else au.pause(); return; }
+        probe = probe || el('audio');
+        if (media.mime && !probe.canPlayType(media.mime)) { stop(t('ct.au.codec'), false); return; }
+        load();
+      });
+      return box;
     }
     function render(list) {
       var l = conv.life || {};
@@ -385,6 +495,125 @@
     //  فقط همان پیام، همان رشتهٔ باز و همان متنِ کادر — متنِ عوض‌شده یعنی کاربر پیامِ دیگری می‌خواهد
     function again(my) { if (out === my && conv && conv.id === my.conv && $('ct-text').value.trim() === my.body) push(my); }
     window.addEventListener('online', function () { if (out) again(out); });
+
+    // ── عکسِ مشتری (CHAT-05): برگزیدن ⇒ کوچک‌کردن (دیربار) و پیش‌نمایش ⇒ «فرستادن» ⇒ پیش‌نمایش، اصل، پیام ──
+    //  «۱» ِ نوار فقط پس از پذیرشِ پیام؛ «لغو» بارگذاری را می‌بُرد (پیام هنوز نرفته)؛ تلاشِ دوباره همان شناسه و همان بایت را
+    //  می‌فرستد ⇒ سرور همان رسانه (`reused`) و همان پیام (`replayed`) را برمی‌گرداند و سهم را پس می‌دهد.
+    K.ICONS.image = 'M4 5h16v14H4z M4 16l4.5-4.5 3.5 3.5 2.5-2.5L20 17 M15.5 9.5h.01';
+    K.ICONS.camera = 'M4 8h3.5L9 5.5h6L16.5 8H20v11H4z M12 16.5a3 3 0 1 0 0-6 3 3 0 0 0 0 6z';
+    function coarse() { return Boolean(window.matchMedia && window.matchMedia('(pointer: coarse)').matches); }
+    function phMode(st, text) {
+      var box = $('ct-ph');
+      box.setAttribute('data-st', st);
+      if (st === 'prep' || st === 'up' || st === 'post') box.setAttribute('aria-busy', 'true'); else box.removeAttribute('aria-busy');
+      $('ct-ph-bar').hidden = !(st === 'up' || st === 'post' || st === 'queued');
+      $('ct-ph-send').hidden = st !== 'ready';
+      $('ct-ph-retry').hidden = !(st === 'queued' || st === 'retry');
+      $('ct-ph-cancel').disabled = st === 'post';
+      $('ct-ph-st').textContent = text || '';
+    }
+    function phDrop() {
+      var my = ph;
+      if (!my || my.posting) return;
+      ph = null; clearTimeout(my.timer);
+      if (my.xhr) my.xhr.abort();
+      $('ct-ph').hidden = true; $('ct-ph-img').hidden = true; $('ct-ph-img').removeAttribute('src');
+    }
+    function pick(e) {
+      var f = e.target.files && e.target.files[0];
+      e.target.value = '';
+      if (!f || !conv || !conv.canSend) return;
+      phDrop();
+      if (ph) return;   //  پیامِ عکسِ پیشین در راه است
+      var my = ph = { conv: conv.id, key: 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10), wait: 2000 };
+      $('ct-ph').hidden = false; $('ct-ph-bar').value = 0;
+      phMode('prep', t('ct.ph.prep'));
+      K.js('/store/chat-photo.js').then(function () { return window.StoreChatPhoto.prepare(f, lim); }, function () { var n = new Error('net'); n.net = true; throw n; })
+        .then(function (p) {
+          if (ph !== my) return '';
+          my.main = p.main; my.thumb = p.thumb; my.w = p.width; my.h = p.height;
+          return window.StoreChatPhoto.dataUrl(p.thumb);
+        })
+        .then(function (u) {
+          if (ph !== my) return;
+          if (/^data:image\/jpeg;/.test(u)) { $('ct-ph-img').src = u; $('ct-ph-img').hidden = false; }
+          phMode('ready');
+          $('ct-ph-send').focus();
+        })
+        .catch(function (x) { if (ph === my) phMode('err', x && x.net ? t('err.network') : t('ct.ph.bad')); });
+    }
+    function upErr(s, b) {
+      var e = (b && b.error) || {}; var c = e.code || '';
+      var err = new Error(s === 0 ? t('err.network') : s === 429 && !K.has('err.' + c) ? t('err.rate')
+        : K.has('err.' + c) ? t('err.' + c) : (K.lang === 'fa' && e.message ? e.message : t('err.generic')));
+      err.status = s; err.code = c;
+      return err;
+    }
+    //  بارگذاری با XHR (fetch پیشرفتِ فرستادن ندارد)؛ همان سرآیندهای `K.api`. status ِ ‎-1‎ = لغو، ۰ = بی‌اینترنت
+    function upload(my, role, blob, prog) {
+      return new Promise(function (ok, no) {
+        var x = new XMLHttpRequest(); var tk = K.ticket(); var ss = K.sess();
+        my.xhr = x;
+        x.open('POST', base + path(my.conv, '/media') + (role === 'thumb' ? '?role=thumb' : ''));
+        x.setRequestHeader('Accept', 'application/json');
+        x.setRequestHeader('Accept-Language', K.lang);
+        x.setRequestHeader('Content-Type', 'image/jpeg');
+        if (tk) x.setRequestHeader('X-Store-Ticket', tk.ticket);
+        if (ss) x.setRequestHeader('X-Store-Session', ss.token);
+        x.upload.onprogress = function (e) { if (e.lengthComputable) prog(e.loaded); };
+        x.onload = function () {
+          my.xhr = null;
+          var b = null;
+          try { b = JSON.parse(x.responseText); } catch (_) { /* نه JSON */ }
+          if (x.status >= 200 && x.status < 300 && b && b.mediaId) ok(b); else no(upErr(x.status, b));
+        };
+        x.onerror = function () { my.xhr = null; no(upErr(0)); };
+        x.onabort = function () { my.xhr = null; no(upErr(-1)); };
+        x.send(blob);
+      });
+    }
+    function phGo(my) {
+      if (!my || ph !== my || my.busy || !my.main) return;
+      clearTimeout(my.timer);
+      my.busy = true; my.queued = false;
+      phMode('up');
+      var total = my.thumb.size + my.main.size;
+      var bar = function (n) { $('ct-ph-bar').value = Math.min(0.99, n / total); };
+      var still = function () { if (ph !== my) throw upErr(-1); };
+      Promise.resolve().then(function () {
+        if (!my.thumbId) return upload(my, 'thumb', my.thumb, bar).then(function (r) { my.thumbId = r.mediaId; });
+        return null;
+      }).then(function () {
+        still();
+        if (!my.mainId) return upload(my, 'main', my.main, function (n) { bar(my.thumb.size + n); }).then(function (r) { my.mainId = r.mediaId; });
+        return null;
+      }).then(function () {
+        still();
+        my.posting = true; phMode('post'); bar(total);
+        return api(path(my.conv, '/messages'), { method: 'POST', body: {
+          clientId: my.key, kind: 'image', mediaId: my.mainId, thumbId: my.thumbId, meta: { width: my.w, height: my.h } } });
+      }).then(function (r) {
+        my.busy = my.posting = false;
+        $('ct-ph-bar').value = 1;
+        if (ph === my) phDrop();
+        if (conv && conv.id === my.conv) { put($('ct-list'), r.message, my.conv); $('ct-empty').hidden = true; }
+      }).catch(function (e) {
+        my.busy = my.posting = false;
+        if (ph !== my || e.status === -1) return;
+        if (e.status === 0) {   //  بی‌اینترنت: همان صفِ متن — با `online` یا پس از کمی، با همان شناسه و همان بایت
+          my.queued = true;
+          phMode('queued', t('ct.queued'));
+          my.wait = Math.min(60000, my.wait * 2);
+          my.timer = setTimeout(function () { phAgain(my); }, my.wait);
+          return;
+        }
+        if (e.code === 'chat_closed' || e.code === 'chat_blocked') reload();
+        phMode(e.status === 401 || e.status === 429 || e.status >= 500 ? 'retry' : 'err', e.message);
+        if (e.status === 401) fail(e);
+      });
+    }
+    function phAgain(my) { if (ph === my && conv && conv.id === my.conv) phGo(my); }
+    window.addEventListener('online', function () { if (ph && ph.queued) phAgain(ph); });
     function issue() {
       var b = $('ct-issue'); b.disabled = true;
       api(path(conv.id, '/issue'), { method: 'POST', body: {} }).then(function (r) {
@@ -396,7 +625,7 @@
     function openWith(body) {
       return ready.then(function () {
         build();
-        K.openSheet(sheet, function () { loop++; });
+        K.openSheet(sheet, function () { loop++; hush(); });
         return start(body);
       });
     }

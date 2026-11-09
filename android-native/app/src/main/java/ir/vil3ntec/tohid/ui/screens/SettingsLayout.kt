@@ -177,6 +177,8 @@ object SettingsLayout {
   const val DOC_GAPS = "شماره‌های جاافتادهٔ اسناد"
   /** قیمت و تخفیفِ ردیف (POS-08/10/20/21، `LinePolicyPrefs`) */
   const val LINE_PRICING = "قیمت و تخفیفِ ردیف"
+  /** فروشندهٔ هر ردیف — پایهٔ پورسانت (POS-23/STF-08، `LineSellerPref`، تنظیمِ دکان، پیش‌فرض خاموش) */
+  const val LINE_SELLER = "فروشندهٔ هر ردیف" // داده: کلیدِ بخشِ تنظیمات؛ نامِ صفحه `StrLineSeller.settingsTitle`
   /** ثبتِ سریع و واحدِ بزرگ در صندوق (S03/S05، `TillGoodsPref`) — همان `TILL_GOODS_TITLE` */
   const val TILL_GOODS = "ثبتِ سریع و واحدِ بزرگ در صندوق"
   /** یادداشتِ ردیف و فاکتور (POS-11، `PosNotesPrefs`) */
@@ -232,7 +234,7 @@ object SettingsLayout {
         Part("pay", listOf(PAY, HESAB_SHOP, TILL_RECEIVE, PAY_FIX, CREDIT_GATE, GIFT_CARD, LAYAWAY, SAFE_BOOK, CUSTOMER_CARD)),
         Part("invoice", listOf(CHECKOUT_RULES, HELD, "کالای منقضی", LINE_PRICING, AUTO_FEES, QUOTE, SPECIAL_ORDER, DELIVER_LATER, PRICE_WHY, POS_NOTES)),
         Part("receipt", listOf(PRINTER, RETURNS, LOYALTY, PRICE_LIST, GIFT_RECEIPT)),
-        Part("till", listOf(MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
+        Part("till", listOf(LINE_SELLER, MULTI_DRAWER, POS_TOUCH, POS_MORE_KEYS, POS_SEARCH, POS_PRICE_CHECK, KEY_HELP)),
         Part("online", listOf(ONLINE_ORDERS, STORE_PLACE, STORE_STOCK, STOREFRONT_ETA, PROMO_GUARD)),
       ),
     ),
@@ -375,6 +377,7 @@ object SettingsLayout {
     REPORT_KEYS to "report-keys",
     DOC_GAPS to "doc-gaps",
     LINE_PRICING to "line-pricing",
+    LINE_SELLER to "line-seller",
     TILL_GOODS to "till-goods",
     POS_NOTES to "notes",
     AUTO_FEES to "auto-fees",
@@ -462,6 +465,7 @@ object SettingsLayout {
     REPORT_KEYS -> ir.vil3ntec.tohid.core.i18n.StrHome.reportKeys
     DOC_GAPS -> ir.vil3ntec.tohid.core.i18n.StrReports.docGaps
     LINE_PRICING -> ir.vil3ntec.tohid.core.i18n.StrLine.section
+    LINE_SELLER -> ir.vil3ntec.tohid.core.i18n.StrLineSeller.settingsTitle
     TILL_GOODS -> StrSettingsPages.titleTillGoods
     POS_NOTES -> StrPos.notesSection
     AUTO_FEES -> StrSale.feesTitle

@@ -336,6 +336,9 @@ async function createApp({ runMigrations = true } = {}) {
     //  WEB-15: کارتِ ویترین (`PUT /sync/v1/photos/:productId/thumb`) — فقط دکان، جدا از `routes/sync-v1.js` ِ مشترک با
     //  پمپ؛ پیش از آن و فقط همان یک در (زنجیره روی خودِ در، نه `router.use`) ⇒ هیچ درخواستِ دیگری از آن نمی‌گذرد
     api.use('/sync/v1', require('./routes/sync-photo-thumbs'));
+    //  STF-09: سرِ زنجیرهٔ سابقهٔ دستگاه (`/sync/v1/audit-anchor`) — فقط دکان، جدا از `routes/sync-v1.js` ِ مشترک با
+    //  پمپ؛ پیش از آن و فقط همان درها (زنجیره روی خودِ در، نه `router.use`) ⇒ هیچ درخواستِ دیگری از آن نمی‌گذرد
+    api.use('/sync/v1', require('./routes/audit-anchor'));
     api.use('/sync/v1', require('./routes/sync-v1'));
     //  Sync v3 (بخشِ ۳.۸) — فقط دکان، پیش‌فرض خاموش (‎config.syncV3‎)
     api.use('/sync/v3', require('./routes/sync-v3'));
@@ -564,13 +567,15 @@ async function createApp({ runMigrations = true } = {}) {
   }));
   // ---- ویترینِ اینترنتی (فاز ۴؛ D-06: `{slug}.vill3n.top`) ----
   //  CSP ِ سخت مثلِ پنل، حتی بی style ِ درون‌خطی؛ فقط مکانِ دستگاه برای پین.
+  //  `media-src blob:` فقط برای پیامِ صوتیِ چت (CHAT-07): <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ
+  //  امضاشده ندارد (S118) ⇒ بایت با fetch ِ بلیت‌دار و پخش از blob: ِ همین صفحه؛ blob را فقط اسکریپتِ همین مبدأ می‌سازد. نه data:.
   //  پوسته ایستاست و داده از `/api/store/:slug` می‌آید (همان مبدأ ⇒ بی CORS).
   //  ویترینِ خاموش یا ناموجود ⇒ همان پوسته با وضعیتِ ۴۰۴.
   const storeDir = path.join(__dirname, '..', 'public', 'store');
   const storefront = require('./lib/storefront');
   const storeHeaders = (req, res, next) => {
     res.set('Content-Security-Policy',
-      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; " +
+      "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; font-src 'self'; " +
       "connect-src 'self'; manifest-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'");
     res.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=(self), payment=()');
     next();

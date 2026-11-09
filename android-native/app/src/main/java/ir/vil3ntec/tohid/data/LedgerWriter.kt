@@ -17,12 +17,26 @@ class LedgerWriter(
   private val lock: Any,
   private val current: () -> ShopData?,
   private val write: (ShopData) -> Boolean,
+  /**
+   *  STF-09: مُهر و زنجیرهٔ ردیف‌های تازهٔ سابقه (`AuditSeal`، `prior` = `base` = دفترِ همان لحظه)؛ زیرِ همین قفل،
+   *  پس افزودن‌های هم‌زمانِ یک دستگاه پشتِ هم‌اند. `null` ⇐ بی مُهر (آزمون‌های پیشین).
+   */
+  private val seal: ((prior: ShopData, next: ShopData) -> AuditSeal.Plan)? = null,
 ) {
-  fun save(next: ShopData): Boolean = synchronized(lock) { write(next) }
+  /**
+   *  [base] `null`: جایگزینیِ کامل (بازیابی، بازسازی، «پاک کردنِ همه») — بی مُهر، ردیف‌ها مالِ این لحظه نیستند.
+   *  [base] ِ صریح (راهِ پیشینِ بی ادغام): ردیف‌های تازه نسبت به [base] مُهر می‌خورند.
+   */
+  fun save(next: ShopData, base: ShopData? = null): Boolean = synchronized(lock) { if (base == null) write(next) else sealed(base, next) }
 
   fun edit(change: (ShopData) -> ShopData): Boolean = synchronized(lock) {
     val cur = current() ?: return@synchronized false
-    write(change(cur))
+    sealed(cur, change(cur))
+  }
+
+  private fun sealed(prior: ShopData, next: ShopData): Boolean {
+    val plan = seal?.let { runCatching { it(prior, next) }.getOrNull() } ?: return write(next)
+    return write(plan.data).also { if (it) plan.commit() }
   }
 
   companion object {

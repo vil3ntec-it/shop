@@ -23,8 +23,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.Str
+import ir.vil3ntec.tohid.core.i18n.StrPlaces
 import ir.vil3ntec.tohid.core.i18n.StrReports
 import ir.vil3ntec.tohid.data.ExpiryEngine
+import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.ReportEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -149,11 +151,15 @@ internal fun PurchasesTab(d: ShopData, from: String, to: String, spec: ReportLis
   }
 }
 
-/** «انقضا»: منقضی، تا N روز و بعدتر — هر محموله ⇐ انبارِ همان کالا */
+/**
+ *  «انقضا»: منقضی، تا N روز و بعدتر — هر محموله ⇐ انبارِ همان کالا. [places]: «محل‌های نگه‌داری» ِ همین دستگاه
+ *  (`StockPlacesPref.places`) ⇒ محلِ کنونیِ هر محموله پس از انتقال (INV-20، `PlaceStock.lotPlaces`؛ عدد همان `ExpiryEngine`).
+ */
 @Composable
-internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec) {
+internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec, places: Boolean = false) {
   val c = PhoneV3.colors
   val lots = remember(d, today) { ExpiryEngine.lots(d, today) }
+  val at = remember(d, lots, places) { if (places) PlaceStock.lotPlaces(d, lots) else emptyMap() }
   val near = ExpiryEngine.nearDays
   val groups = listOf(
     StrReports.expired to lots.filter { it.expired },
@@ -179,7 +185,10 @@ internal fun ExpiryTab(d: ShopData, today: String, spec: ReportListSpec) {
             if (i > 0) V3Divider(start = 64.dp)
             V3ListRow(
               l.product.name,
-              subtitle = listOfNotNull(uiDate(l.entry.expiryDate), l.entry.batch.takeIf { it.isNotBlank() }?.let { StrReports.batch(it) }, "${qty(l.remaining)} ${l.product.unit}").joinToString(" · "),
+              subtitle = listOfNotNull(
+                uiDate(l.entry.expiryDate), l.entry.batch.takeIf { it.isNotBlank() }?.let { StrReports.batch(it) }, "${qty(l.remaining)} ${l.product.unit}",
+                at[l.entry.id]?.let { StrPlaces.inPlaces(it.joinToString("، ")) },
+              ).joinToString(" · "),
               icon = Icons.Outlined.EventBusy, hue = if (l.expired) null else V3Hue.ORANGE, danger = l.expired,
               trailing = {
                 when {

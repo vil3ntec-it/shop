@@ -154,6 +154,19 @@ async function login(req, { issueSession, loginPayload }) {
 
     //  کدِ شاگرد مالِ دفترِ دکان است، پس نشستش هم همان بخش است. بخشِ پمپ راهِ پیوستنِ خودش را دارد.
     const session = await issueSession(user, { uid: deviceUid, name: device.name, platform: device.platform }, ip, tenancy.SHOP.app);
+    /*
+     *  ⛔ هم‌زمانی: «سنجشِ راز ⇐ نشست» دو گامِ جداست. «باطل کردنِ این دستگاه» یا «خروج از همه» ِ صاحب که میانِ آن دو
+     *  کامیت شد، نشستِ تازه را نمی‌دید (هنوز نبود) و گوشیِ گم‌شده با نشستِ زنده می‌ماند. پس پس از نوشتنِ نشست راز
+     *  دوباره سنجیده می‌شود — با همان `UPDATE` ِ قفل‌گیرِ `verify`: باطل‌کننده‌ای که ردیفِ راز را گرفته تا کامیتش
+     *  منتظر می‌ماند؛ باطل‌کننده‌ای که پس از این می‌رسد (راز ⇐ نشست‌ها، همان ترتیبِ `staff-device-keys`) نشستِ تازه را
+     *  هم می‌بندد. رازِ چرخانده (پیوستنِ دوباره، `deviceKey`) نه: رازِ تازه همین الان داده شد.
+     */
+    if (k && !deviceKey && !(await deviceKeys.verify({ shopId, deviceUid, secret: deviceKeys.presented(device) }))) {
+      const tokens = require('./tokens');
+      await tokens.revoke(session.accessToken, 'access');
+      await tokens.revoke(session.refreshToken, 'refresh');
+      throw forbidden(UNVERIFIED_MESSAGE, 'staff_device_unverified');
+    }
     const payload = await loginPayload(user, session);
     if (deviceKey) payload.deviceKey = deviceKey;
     await trailLog('staff_login.ok', trail, ip, { mode, proof, guard, keyIssued: Boolean(deviceKey) });

@@ -19,8 +19,15 @@ object ReportCsv {
     val isEmpty: Boolean get() = rows.size <= 1
   }
 
-  /** @param reminderTemplate متنِ یادآوریِ همین دستگاه (`DebtReminderPref`، CRM-06)؛ پیش‌فرض همان جملهٔ امروز */
-  fun of(section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE): Sheet =
+  /**
+   *  @param reminderTemplate متنِ یادآوریِ همین دستگاه (`DebtReminderPref`، CRM-06)؛ پیش‌فرض همان جملهٔ امروز
+   *  @param lineSeller POS-23 — «فروشندهٔ هر ردیف» (`LineSellerPref`): برگهٔ `sellers` به فروشندهٔ ردیف و با ستونِ برگشتی؛
+   *    `false` (پیش‌فرض) ⇒ همان برگهٔ امروز
+   */
+  fun of(
+    section: String, d: ShopData, from: String, to: String, today: String, reminderTemplate: String = DebtReminder.DEFAULT_TEMPLATE,
+    lineSeller: Boolean = false,
+  ): Sheet =
     when (section) {
       "sales" -> sales(d, from, to)
       "products" -> products(d, today)
@@ -29,7 +36,7 @@ object ReportCsv {
       "expiry" -> expiry(d, today)
       "profit" -> profit(d, from, to)
       "expenses" -> expenses(d, from, to)
-      "sellers" -> sellers(d, from, to)
+      "sellers" -> sellers(d, from, to, lineSeller)
       //  گزارش‌های مشتری (CRM-04، ۱۰، ۰۶، ۱۴) — فقط وقتی `ShopPolicy.crmReports` روشن است دیده می‌شوند
       "aging" -> CustomerInsight.agingSheet(d, today)
       "rfm" -> CustomerInsight.rfmSheet(d, today)
@@ -45,6 +52,13 @@ object ReportCsv {
       "reorder" -> reorder(d, today)
       else -> stock(d, today)
     }
+
+  /**
+   *  POS-23 — برگهٔ [sheet] ِ صفحه با «فروشندهٔ هر ردیف» ([on] = `LineSellerPref.on`): فقط برگهٔ `sellers` عوض می‌شود (به
+   *  فروشندهٔ ردیف و با ستونِ برگشتی)؛ خاموش یا برگهٔ دیگر ⇒ همان [sheet]، بی هیچ کارِ دیگری.
+   */
+  fun lineSellers(sheet: Sheet, section: String, d: ShopData, from: String, to: String, on: Boolean): Sheet =
+    if (on && section == "sellers") sellers(d, from, to, true) else sheet
 
   /**
    *  RPT-13 — ستونی که «مقایسه با دورهٔ قبل» در خودِ جدول کنارش «دورهٔ قبل» و «تغییر» می‌گذارد؛ فقط برگه‌هایی که ستونِ
@@ -86,9 +100,13 @@ object ReportCsv {
     return Sheet("مصارف-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
   }
 
-  private fun sellers(d: ShopData, from: String, to: String): Sheet {
+  private fun sellers(d: ShopData, from: String, to: String, lineSeller: Boolean = false): Sheet {
     val rows = mutableListOf(listOf("فروشنده", "تعدادِ فاکتور", "فروشِ خالص", "تخفیف"))  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
-    ReportEngine.bySeller(d, from, to).forEach { s -> rows += listOf(s.seller, s.count.toString(), round(s.net), round(s.discount)) }
+    //  POS-23: فروشندهٔ هر ردیف ⇒ همان برگه به فروشندهٔ ردیف، با ستونِ برگشتیِ ردیف‌های همان فروشنده (پایهٔ پورسانت)
+    if (lineSeller) rows[0] = rows[0] + "برگشتی"  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
+    ReportEngine.bySeller(d, from, to, lineSeller).forEach { s ->
+      rows += listOf(s.seller, s.count.toString(), round(s.net), round(s.discount)) + (if (lineSeller) listOf(round(s.returns)) else emptyList())
+    }
     return Sheet("فروشِ-هر-کاربر-$from-تا-$to", rows)  // داده: برگه و ستونِ خروجیِ اکسل (منتظرِ تصمیمِ صاحب‌کار)
   }
 

@@ -383,6 +383,12 @@ async function redeemOnce(rawCode, userId, ip = '') {
     }
     if (shop.owner_user_id === userId) throw conflict('شما صاحب همین دکان هستید', 'already_owner');
 
+    //  ⛔ هم‌زمانی (PostgreSQL): `FOR UPDATE` ِ بالا فقط همان کد را پشتِ هم می‌گذارد. دو کدِ جدا برای یک دکان
+    //  (سقفِ اعضا) و یک حساب با کدِ دو دکان («عضوِ دکانِ دیگر») هر دو «بشمار، بعد بنویس» اند و هر دو می‌نشستند.
+    //  قفلِ حساب، سپس قفلِ دکان — همیشه همین ترتیب. PGlite تراکنش‌ها را پشتِ هم می‌گذارد و این را پنهان می‌کرد.
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`staff-join-user:${userId}`]);
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`staff-join-shop:${code.shop_id}`]);
+
     // اگر کاربر جای دیگری عضو است، بی‌خبر جابه‌جا نمی‌شود
     const other = (await c.query(
       `SELECT shop_id FROM shop_members WHERE user_id=$1 AND status='active' AND shop_id <> $2`,

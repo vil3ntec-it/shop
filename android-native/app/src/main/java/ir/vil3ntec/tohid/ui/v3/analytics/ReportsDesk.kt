@@ -189,13 +189,14 @@ fun ReportsDesk(d: ShopData, snackbar: SnackbarHostState, onOpen: (String) -> Un
     DeskSpan.CUSTOM -> (Jalali.parseTyped(fromText) ?: "0000-01-01") to (Jalali.parseTyped(toText) ?: "9999-12-31")
   }
   val (from, to) = if (keys && shift != 0) ReportKeys.range(span.name, baseFrom, baseTo, shift, today) else baseFrom to baseTo
-  val base = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate) }
+  val lineSeller = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) } // POS-23: فروشندهٔ هر ردیف
+  val base = remember(d, rep, from, to) { ReportCsv.of(rep.key, d, from, to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, from, to, lineSeller) } }
   //  RPT-13: «مقایسه» ⇒ ستونِ «دورهٔ قبل» و «تغییر» در خودِ جدول (فقط برگهٔ کلیددار؛ چاپ و اکسل همان جدول)
   val sheet = remember(base, keys, compare, span, from, to) {
     val prev = if (keys && compare && rep.ranged && ReportCsv.compareColumn(rep.key) != null)
       ir.vil3ntec.tohid.core.report.ReportPeriod.shift(ReportKeys.unitOf(span.name), from, to, -1, today) else null
     if (prev == null) base
-    else ReportCsv.compared(rep.key, base, ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate), StrReach.prevColumn, StrReach.changeColumn)
+    else ReportCsv.compared(rep.key, base, ReportCsv.of(rep.key, d, prev.from, prev.to, today, reminderTemplate).let { ReportCsv.lineSellers(it, rep.key, d, prev.from, prev.to, lineSeller) }, StrReach.prevColumn, StrReach.changeColumn)
   }
   //  «پرسشِ ساده» برگه ندارد: Ctrl+P/Ctrl+E آن‌جا کاری نمی‌کنند
   fun print() { if (rep != DeskRep.ASK) { onExport(rep.key); ReportPrint.print(context, sheet, sheet.name) } }

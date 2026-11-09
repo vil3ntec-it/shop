@@ -378,12 +378,27 @@ function eventHash(ev) {
 }
 
 /**
+ * ترتیبِ قفل «سفارش ⇐ مأموریت» — همان ترتیبِ سپردن، پرداختِ آنلاین (`delivery-due.syncIn`)، ویرایش و جمع‌آوری.
+ * راهی که از مأموریت می‌آید (رویدادِ پیک، اصلاحِ نشانی) ردیفِ سفارش را **پیش از** ردیفِ مأموریت قفل می‌کند؛ پیش‌تر
+ * «تحویل شد» مأموریت ⇐ سفارش می‌گرفت و پرداختِ هم‌زمانِ همان سفارش سفارش ⇐ مأموریت ⇒ بن‌بستِ PostgreSQL (`40P01`،
+ * یکی ۵۰۰). PGlite تراکنش‌ها را پشتِ هم می‌گذارد و این را پنهان می‌کرد. `order_id` ِ مأموریت هرگز عوض نمی‌شود.
+ * مأموریتِ ناموجود ⇒ هیچ قفلی؛ همان «پیدا نشد» ِ پسین.
+ */
+function lockOrderOf(c, shopId, assignmentId) {
+  return c.query(
+    `SELECT o.id FROM delivery_assignments a JOIN online_orders o ON o.id = a.order_id AND o.shop_id = a.shop_id
+      WHERE a.shop_id=$1 AND a.id=$2 FOR UPDATE OF o`, [shopId, String(assignmentId || '')]
+  );
+}
+
+/**
  * یک رویداد را درونِ تراکنشِ `c` اعمال می‌کند. ردِ کسب‌وکاری استثنا نیست
  * (شمارِ تلاشِ کدِ نادرست باید بماند)؛ فقط خطای غیرمنتظره پرتاب می‌شود.
  * @param {{kind:'courier'|'staff', userId:string, role:string, courierId?:string, active?:boolean,
  *          canAssign?:boolean, canHandover?:boolean, deviceId?:string}} actor
  */
 async function applyEvent(c, shopId, ev, actor) {
+  await lockOrderOf(c, shopId, ev.assignmentId);
   const a = (await c.query(
     'SELECT * FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, ev.assignmentId]
   )).rows[0];
@@ -594,6 +609,7 @@ async function fixAddress(shopId, assignmentId, body, idem = null) {
       const prev = await idempotency.find(idem, idempotency.viaClient(c));
       if (prev) return { ...prev.response, replayed: true };
     }
+    await lockOrderOf(c, shopId, assignmentId);
     const a = (await c.query(
       'SELECT * FROM delivery_assignments WHERE shop_id=$1 AND id=$2 FOR UPDATE', [shopId, String(assignmentId || '')]
     )).rows[0];

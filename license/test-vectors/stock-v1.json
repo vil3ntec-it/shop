@@ -28,6 +28,10 @@
     [-9007199254740991, 4503599627370496, 9007199254740991, -4503599627370496],
     [4503599627370497, 3, 6, 2251799813685249]
   ],
+  "mulDivRoundRefuse": [
+    [9007199254740992, 1, 1], [1, -9007199254740992, 1], [1, 1, 9007199254740992], [4503599627370496, 4, 1],
+    [-9007199254740991, 9007199254740991, 1], [1, 1, 0], [3, 3, -1]
+  ],
   "fefo": [
     {
       "name": "same expiry falls back to receipt sequence; no expiry last; expired skipped",
@@ -262,6 +266,28 @@
       }
     },
     {
+      "name": "lots move between warehouses: a chosen lot, then FEFO; the receiving lot keeps its expiry (INV-20)",
+      "today": "2026-10-14",
+      "defaults": {"productId": "P1", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 6000, "costMinor": 60000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 48000, "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 1000, "lotId": "Y", "refId": "T1"}, "expect": {"ok": true, "costMinor": 10800, "picks": [{"lotId": "Y", "qtyMilli": 1000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 1000, "costMinor": 10800, "refId": "T1", "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true, "costMinor": 10800}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 6000, "refId": "T2"}, "expect": {"ok": true, "costMinor": 64800, "picks": [{"lotId": "X", "qtyMilli": 6000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 6000, "costMinor": 64800, "refId": "T2", "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 64800}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 4000, "lotId": "Y"}, "expect": {"ok": false, "error": "insufficient_stock", "availableMilli": 3000}},
+        {"doc": {"type": "sale", "warehouseId": "W2", "qtyMilli": 2000}, "expect": {"ok": true, "costMinor": 21600, "picks": [{"lotId": "X", "qtyMilli": 2000}], "shortMilli": 0}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "P1", "warehouseId": "W1", "qtyMilli": 3000, "valueMinor": 32400, "lots": [{"lotId": "Y", "qtyMilli": 3000}]},
+          {"productId": "P1", "warehouseId": "W2", "qtyMilli": 5000, "valueMinor": 54000, "lots": [{"lotId": "X", "qtyMilli": 4000}, {"lotId": "Y", "qtyMilli": 1000}]}
+        ],
+        "totals": {"purchasesMinor": 108000, "transfersMinor": 0, "cogsMinor": 21600}
+      }
+    },
+    {
       "name": "production consumes a component at average and books the product at its cost",
       "defaults": {"productId": "P2", "warehouseId": "W1", "userId": "u1"},
       "steps": [
@@ -275,6 +301,49 @@
           {"productId": "P3", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 4000}
         ],
         "totals": {"purchasesMinor": 8000, "productionMinor": 0}
+      }
+    },
+    {
+      "name": "production takes component lots FEFO - dated first, the lot without expiry after - and books the product lot with the earliest component expiry at the exact cost (INV-21)",
+      "today": "2026-11-08",
+      "defaults": {"productId": "C", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 3000, "costMinor": 3000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 2000, "costMinor": 2600, "lot": {"lotId": "Y", "productionDate": null, "expiryDate": "2027-02-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 4000, "costMinor": 4400, "lot": {"lotId": "Z", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true}},
+        {"doc": {"type": "production", "qtyMilli": -5500, "refId": "R1"}, "expect": {"ok": true, "costMinor": 6111, "picks": [{"lotId": "X", "qtyMilli": 3000}, {"lotId": "Y", "qtyMilli": 2000}, {"lotId": "Z", "qtyMilli": 500}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "B", "qtyMilli": 1000, "costMinor": 6111, "refId": "R1", "lot": {"lotId": "w:o1", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 6111}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "B", "warehouseId": "W1", "qtyMilli": 1000, "valueMinor": 6111, "lots": [{"lotId": "w:o1", "qtyMilli": 1000}]},
+          {"productId": "C", "warehouseId": "W1", "qtyMilli": 3500, "valueMinor": 3889, "lots": [{"lotId": "Z", "qtyMilli": 3500}]}
+        ],
+        "totals": {"purchasesMinor": 10000, "productionMinor": 0}
+      }
+    },
+    {
+      "name": "production at a place after a lot transfer: the chosen lot, pieces keep a lot without expiry, then FEFO at the source; no lot goes negative (INV-21)",
+      "today": "2026-11-08",
+      "defaults": {"productId": "C", "warehouseId": "W1", "userId": "u1"},
+      "steps": [
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 5000, "lot": {"lotId": "X", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 5000, "costMinor": 6000, "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true}},
+        {"doc": {"type": "transfer_out", "qtyMilli": 4000, "lotId": "N", "refId": "T1"}, "expect": {"ok": true, "costMinor": 4400, "picks": [{"lotId": "N", "qtyMilli": 4000}], "shortMilli": 0}},
+        {"doc": {"type": "transfer_in", "warehouseId": "W2", "qtyMilli": 4000, "costMinor": 4400, "refId": "T1", "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true, "costMinor": 4400}},
+        {"doc": {"type": "production", "warehouseId": "W2", "qtyMilli": -1500, "lotId": "N", "refId": "R2"}, "expect": {"ok": true, "costMinor": 1650, "picks": [{"lotId": "N", "qtyMilli": 1500}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "D", "warehouseId": "W2", "qtyMilli": 3000, "costMinor": 1650, "refId": "R2", "lot": {"lotId": "N", "productionDate": null, "expiryDate": null}}, "expect": {"ok": true, "costMinor": 1650}},
+        {"doc": {"type": "production", "qtyMilli": -6000, "refId": "R3"}, "expect": {"ok": true, "costMinor": 6600, "picks": [{"lotId": "X", "qtyMilli": 5000}, {"lotId": "N", "qtyMilli": 1000}], "shortMilli": 0}},
+        {"doc": {"type": "production", "productId": "B", "qtyMilli": 2000, "costMinor": 6600, "refId": "R3", "lot": {"lotId": "w:o2", "productionDate": null, "expiryDate": "2026-12-01"}}, "expect": {"ok": true, "costMinor": 6600}}
+      ],
+      "final": {
+        "positions": [
+          {"productId": "B", "warehouseId": "W1", "qtyMilli": 2000, "valueMinor": 6600, "lots": [{"lotId": "w:o2", "qtyMilli": 2000}]},
+          {"productId": "C", "warehouseId": "W1", "qtyMilli": 0, "valueMinor": 0, "lots": []},
+          {"productId": "C", "warehouseId": "W2", "qtyMilli": 2500, "valueMinor": 2750, "lots": [{"lotId": "N", "qtyMilli": 2500}]},
+          {"productId": "D", "warehouseId": "W2", "qtyMilli": 3000, "valueMinor": 1650, "lots": [{"lotId": "N", "qtyMilli": 3000}]}
+        ],
+        "totals": {"purchasesMinor": 11000, "transfersMinor": 0, "productionMinor": 0}
       }
     },
     {
@@ -298,7 +367,11 @@
         {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "productionDate": "2026-05-01", "expiryDate": "2026-04-01"}}, "expect": {"ok": false, "error": "bad_date"}},
         {"doc": {"type": "cost_adjust", "valueMinor": 0, "reason": "x"}, "expect": {"ok": false, "error": "bad_cost"}},
         {"doc": {"type": "cost_adjust", "valueMinor": 100, "qtyMilli": 5, "reason": "x"}, "expect": {"ok": false, "error": "bad_qty"}},
-        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}}
+        {"mode": "recorded", "doc": {"type": "sale", "qtyMilli": 1000, "userId": ""}, "expect": {"ok": false, "error": "user_required"}},
+        {"doc": {"type": "sale", "qtyMilli": 1000, "userId": "\ufeff"}, "expect": {"ok": false, "error": "user_required"}},
+        {"doc": {"type": "sale", "qtyMilli": 0, "userId": "\u001f"}, "expect": {"ok": false, "error": "bad_qty"}},
+        {"doc": {"type": "damage", "qtyMilli": 1000, "reason": "\ufeff\u00a0"}, "expect": {"ok": false, "error": "reason_required"}},
+        {"doc": {"type": "purchase_receipt", "qtyMilli": 1000, "costMinor": 1000, "lot": {"lotId": "L", "expiryDate": "۲۰۲۶-۰۵-۰۱"}}, "expect": {"ok": false, "error": "bad_date"}}
       ],
       "final": {"positions": [], "totals": {"purchasesMinor": 0, "cogsMinor": 0}}
     }
@@ -334,6 +407,10 @@
       ["d5", 5000, "transfer_out", "P1", "W1", -1000, "", "u1", "", "", "T1"],
       ["d6", 6000, "reserve", "P1", "W1", 0, "", "u3", "", "", ""],
       ["d7", 7000, "cost_adjust", "P1", "W1", 0, 50, "u1", "حمل", "", ""]
-    ]
+    ],
+    "exportBlank": {
+      "docs": [{"id": "x1", "type": "cost_adjust", "productId": "P1", "warehouseId": "W1", "userId": "u1", "at": 1, "reason": "حمل"}],
+      "rows": [["x1", 1, "cost_adjust", "P1", "W1", 0, "", "u1", "حمل", "", ""]]
+    }
   }
 }
