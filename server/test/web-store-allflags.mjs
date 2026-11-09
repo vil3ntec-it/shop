@@ -226,6 +226,10 @@ async function device(width, lang, { ticket = null } = {}) {
   await ctx.grantPermissions(['microphone', 'geolocation', 'clipboard-read', 'clipboard-write'], { origin: base });
   await ctx.addInitScript(([tk]) => {
     window.__csp = [];
+    //  هر گذار/پویانماییِ تازه (مثلاً «ثبت» که پس از پاسخِ ناحیه باز می‌شود و رنگش ۱۵۰ms جابه‌جا می‌شود)
+    window.__motion = { n: 0, at: 0 };
+    const bump = () => { window.__motion.n++; window.__motion.at = performance.now(); };
+    for (const ev of ['transitionrun', 'animationstart']) document.addEventListener(ev, bump, true);
     document.addEventListener('securitypolicyviolation', (e) => window.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
     try {
       if (tk && !sessionStorage.getItem('seeded')) { sessionStorage.setItem('seeded', '1'); localStorage.setItem('store-ticket', JSON.stringify(tk)); }
@@ -269,11 +273,13 @@ async function check(P, label) {
   const name = `${P.tag} · ${label}`;
   const fails = [];
   await page.evaluate(() => document.fonts && document.fonts.ready).catch(() => {});
-  //  پایانِ همهٔ گذارهای پایان‌دار (رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد؛ web-store.mjs ِ IMG-12)؛ چرخنده‌های بی‌پایان شمرده نمی‌شوند
-  const settled = await page.waitForFunction(() => document.getAnimations().every((a) => {
+  //  پایانِ همهٔ گذارهای پایان‌دار و ۳۰۰ms بی گذارِ تازه (رنگِ نیمه‌راه کنتراستِ ساختگی می‌دهد؛ web-store.mjs ِ IMG-12)؛
+  //  چرخنده‌های بی‌پایان شمرده نمی‌شوند
+  const settle = () => page.waitForFunction(() => document.getAnimations().every((a) => {
     const tm = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
     return a.playState !== 'running' || Boolean(tm && tm.iterations === Infinity);
-  }), null, { timeout: 10000 }).then(() => true, () => false);
+  }) && performance.now() - ((window.__motion || {}).at || 0) > 300, null, { timeout: 10000 }).then(() => true, () => false);
+  const settled = await settle();
   if (!settled) fails.push('گذارها تمام نشدند');
   const over = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   if (over > 0) fails.push(`بیرون‌زدگیِ افقی ${over}px`);
@@ -281,8 +287,21 @@ async function check(P, label) {
   if (axeSrc) {
     //  axe از CDP (page.evaluate)، نه <script> ِ درون‌خطی ⇒ همان CSP ِ سخت می‌ماند و هر نقضی شمرده می‌شود
     if (!(await page.evaluate(() => typeof window.axe === 'object'))) await page.evaluate(axeSrc);
-    const v = await page.evaluate(async (tags) => (await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations
-      .map((x) => `${x.id}: ${x.nodes.slice(0, 3).map((n) => n.target.join(' ') + (n.any[0] ? ` (${n.any[0].message})` : '')).join(' ; ')}`), AXE_TAGS);
+    const run = () => page.evaluate(async (tags) => {
+      const busy = () => document.getAnimations().some((a) => {
+        const tm = a.effect && a.effect.getComputedTiming ? a.effect.getComputedTiming() : null;
+        return a.playState === 'running' && !(tm && tm.iterations === Infinity);
+      });
+      const n0 = window.__motion.n;
+      const before = busy();
+      const v = (await window.axe.run(document, { runOnly: { type: 'tag', values: tags }, resultTypes: ['violations'] })).violations
+        .map((x) => `${x.id}: ${x.nodes.slice(0, 3).map((n) => n.target.join(' ') + (n.any[0] ? ` (${n.any[0].message})` : '')).join(' ; ')}`);
+      return { v, raced: before || busy() || window.__motion.n !== n0 };
+    }, AXE_TAGS);
+    //  گذاری که در میانهٔ خودِ axe آغاز شد ⇒ عکسِ نیمه‌راه؛ پس از آرام شدن دوباره (حداکثر سه بار، نتیجهٔ آخر گزارش می‌شود)
+    let r = await run();
+    for (let i = 0; r.raced && i < 2; i++) { await settle(); r = await run(); }
+    const v = r.v;
     axeN = v.length;
     if (v.length) fails.push(`axe: ${v.join(' | ')}`);
   }
@@ -312,6 +331,8 @@ async function closeDevice(P) {
   for (const e of P.expect) ok(e.seen > 0, `${P.tag}: ${e.status} ِ موردِ انتظار رسید — ${e.why}`, `${e.seen}`);
   await P.ctx.close();
 }
+/** صبر تا شرط، با نتیجهٔ گزارش‌شده (هرگز بلعیده نمی‌شود) */
+const waitOk = (P, pred, arg, what) => P.page.waitForFunction(pred, arg, { timeout: 15000 }).then(() => ok(true, `${P.tag}: ${what}`), () => ok(false, `${P.tag}: ${what}`));
 const shown = (P, id) => P.page.evaluate((x) => { const e = document.getElementById(x); return Boolean(e) && !e.hidden && e.offsetParent !== null; }, id);
 const ids = (P) => P.page.locator('#products li[data-id]').evaluateAll((l) => l.map((x) => x.getAttribute('data-id')).sort().join(','));
 async function clickCard(P, id, sel) {
@@ -355,7 +376,8 @@ async function journey(width, lang, phone) {
     await page.evaluate(() => { window.__csp = []; });
   }
   ok(await page.evaluate((l) => document.documentElement.lang === l && document.documentElement.dir === (l === 'en' ? 'ltr' : 'rtl'), lang), `${P.tag}: زبان و جهتِ صفحه`);
-  ok(await ids(P) === 'oil,rice,soap,tea' || await ids(P) === 'oil,rice,tea', `${P.tag}: کالاهای منتشرشده`, await ids(P));
+  //  صابونِ ناموجود هم دیده می‌شود (بی «پنهان کردنِ ناموجود») تا «وقتی موجود شد خبرم کن» داشته باشد
+  ok(await ids(P) === 'oil,rice,soap,tea', `${P.tag}: هر چهار کالای منتشرشده، ناموجود هم`, await ids(P));
   await check(P, 'ویترین');
   const chip = page.locator('#cats button', { hasText: 'نوشیدنی' });
   await chip.click();
@@ -441,7 +463,7 @@ async function journey(width, lang, phone) {
   await page.locator('#ps-alerts button[aria-pressed="true"]').first().click();
   await page.waitForSelector('#ps-alerts button[aria-pressed="false"]', { timeout: 10000 });
   await page.click('#ps-close');
-  if (await page.locator('#products li[data-id="soap"]').count()) {
+  {
     await clickCard(P, 'soap', '.p-open');
     await page.waitForSelector('#product-sheet:not([hidden]) #ps-name', { timeout: 10000 });
     await page.waitForSelector('#ps-alerts:not([hidden]) button', { timeout: 10000 });
@@ -507,7 +529,6 @@ async function journey(width, lang, phone) {
   const before = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n;
   await page.click('#submit-order');
   await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
-  await page.waitForSelector('#o-placed:not([hidden])', { timeout: 10000 }).catch(() => {});
   const row = await one('SELECT id, order_no, total_minor, delivery_fee_minor, delivery, customer_phone, status FROM online_orders WHERE shop_id=$1 ORDER BY created_at DESC LIMIT 1', [shopId]);
   const dj = row && (typeof row.delivery === 'string' ? JSON.parse(row.delivery) : row.delivery);
   ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n === before + 1
@@ -516,7 +537,7 @@ async function journey(width, lang, phone) {
   const token = decodeURIComponent((/#\/o\/(.+)$/.exec(page.url()) || [])[1] || '');
   //  `shop.storefront.link_expiry` ⇒ توکنِ زمان‌دارِ v2 (TEN-03: شناسه، زمانِ صدور، نسل، HMAC)
   ok(/^[0-9A-Z]{26}\.[0-9a-z]{1,12}\.[0-9a-z]{1,7}\.[A-Za-z0-9_-]{32}$/.test(token), `${P.tag}: نشانیِ پیگیری با توکنِ زمان‌دارِ حدس‌نزدنی (TEN-03)`, token);
-  ok(await shown(P, 'o-placed'), `${P.tag}: «سفارش ثبت شد» (رسید)`);
+  await waitOk(P, () => { const e = document.getElementById('o-placed'); return Boolean(e) && !e.hidden && e.textContent.trim() !== ''; }, null, '«سفارش ثبت شد» (رسید)');
   await page.waitForSelector('#o-ps-state', { timeout: 10000 });
   ok(!(await shown(P, 'o-ps-cash')), `${P.tag}: گامِ پرداخت پیش از پذیرش: بی دکمهٔ نقد`);
   ok(await until(async () => same(await dbCart(intl), {})), `${P.tag}: پس از ثبت سبدِ حساب روی سرور خالی شد`, JSON.stringify(await dbCart(intl)));
@@ -571,7 +592,7 @@ async function journey(width, lang, phone) {
   await check(P, 'گفت‌وگو: صفِ بی‌اینترنت');
   await P.ctx.setOffline(false);
   ok(await until(async () => (await count('text')) === 2, 25000), `${P.tag}: وصل شد ⇒ پیامِ صف خودش یک بار رفت`);
-  await page.waitForFunction(() => !document.querySelector('#ct-out .ct-q'), null, { timeout: 15000 }).catch(() => {});
+  await waitOk(P, () => !document.querySelector('#ct-out .ct-q'), null, 'صفِ گفت‌وگو پس از رفتن خالی شد');
   await check(P, 'گفت‌وگو: پس از صف');
   await page.keyboard.press('Escape');
 
@@ -606,7 +627,7 @@ async function journey(width, lang, phone) {
   //  ── ۹ سفارش‌های من و خروج ──
   await page.goto(url(P, '#/orders'));
   await page.waitForSelector('#ac-mine button.btn-ghost', { timeout: 15000 });
-  await page.waitForSelector('#my-orders li', { timeout: 10000 }).catch(() => {});
+  await waitOk(P, () => document.querySelectorAll('#my-orders li').length >= 1, null, '«سفارش‌های من» بار شد');
   ok(await page.locator('#my-orders li').count() >= 1, `${P.tag}: «سفارش‌های من» همین سفارش را دارد`);
   await check(P, 'سفارش‌های من پس از تحویل');
   await page.click('#ac-mine button.btn-ghost');
@@ -625,7 +646,7 @@ async function sweep(width, lang, o) {
   await goStore(P);
   await check(P, 'ویترین');
   await page.fill('#q', 'چای ۵۰۰');
-  await page.waitForFunction(() => [...document.querySelectorAll('#products li[data-id]')].map((x) => x.dataset.id).join() === 'tea', null, { timeout: 10000 }).catch(() => {});
+  await waitOk(P, () => [...document.querySelectorAll('#products li[data-id]')].map((x) => x.dataset.id).join() === 'tea', null, 'جست‌وجوی «چای ۵۰۰» ⇒ چای');
   await check(P, 'جست‌وجو');
   await page.fill('#q', '');
   await page.waitForFunction(() => document.querySelectorAll('#products li[data-id]').length >= 3, null, { timeout: 10000 });
@@ -642,14 +663,16 @@ async function sweep(width, lang, o) {
   await page.waitForSelector('#view-checkout:not([hidden])', { timeout: 10000 });
   await page.check('input[name="fulfillment"][value="delivery"]');
   await page.click('#pin-btn');
-  await page.waitForFunction((z) => document.getElementById('zone-msg').textContent.includes(z), ZONE, { timeout: 10000 }).catch(() => {});
+  await waitOk(P, (z) => document.getElementById('zone-msg').textContent.includes(z), ZONE, `پینِ درون ⇒ ناحیهٔ ${ZONE}`);
   await check(P, 'ثبت: ناحیه');
   await page.goto(url(P, `#/o/${encodeURIComponent(o.token)}`));
   await page.waitForFunction(() => { const s = document.getElementById('o-status'); return !document.getElementById('view-order').hidden && s && s.textContent.trim() !== ''; }, null, { timeout: 15000 });
   await check(P, 'پیگیری');
-  if (await page.locator('#o-chat-open').count()) {
+  {
+    //  کارتِ گفت‌وگو دیربار است (chat.js + واژه‌نامه) ⇒ صبر، نه «اگر بود»
+    await page.waitForSelector('#o-chat-open', { timeout: 15000 });
     await page.click('#o-chat-open');
-    await page.waitForFunction(() => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, { timeout: 15000 }).catch(() => {});
+    await waitOk(P, () => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, 'گفت‌وگوی همان سفارش با پیام‌ها');
     await check(P, 'گفت‌وگو');
     await page.keyboard.press('Escape');
   }
