@@ -184,7 +184,8 @@ await step('پرچمِ روشن: دکمه در «انبار»، پنجره با 
   assert.equal((await page.locator('#xfr-btn').innerText()).trim(), 'انتقالِ موجودی');
   await page.click('#xfr-btn');
   await page.waitForSelector('#xfr-modal.open');
-  await page.waitForSelector('#xfr-body .xfr-empty');
+  //  «در حالِ خواندن…» هم `.xfr-empty` است ⇒ منتظرِ پایانِ خواندن (پاسخِ نخستِ `/transfers` گاهی کند است)، نه فقط همان کلاس
+  await page.waitForFunction(() => !/در حالِ خواندن/.test(document.querySelector('#xfr-body')?.textContent || '') && !!document.querySelector('#xfr-body .xfr-empty'), null, { timeout: 10000 });
   assert.match(await page.locator('#xfr-body').innerText(), /هیچ انتقالی در مسیر نیست/);
   assert.equal(await page.locator('[data-xfr="new"]').count(), 1);
 });
