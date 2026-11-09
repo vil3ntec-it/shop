@@ -20,22 +20,32 @@ const ESC = Buffer.from('\\u0000');
 
 const cut = (s) => (s.includes('\u0000') ? s.replace(/\u0000/g, '') : s);
 
-/** NUL از هر رشتهٔ مقدار (هر عمق، آرایه و شیء) — درجا؛ کلیدها همان (مثلِ reviver ِ پیشین) */
+/**
+ * NUL از هر رشتهٔ مقدار (هر عمق، آرایه و شیء)؛ کلیدها همان (مثلِ reviver ِ پیشین). نسخهٔ تمیز از پایین به بالا ساخته
+ * می‌شود — بی بازگشت (بدنهٔ ۲MB می‌تواند هزاران لایه باشد) و بی نوشتنِ پویا روی شیءِ کاربر (`Object.fromEntries` ویژگیِ
+ * خودی می‌سازد، «__proto__» هم فقط کلید است؛ CodeQL ۲۹۴/۲۹۵). فقط بدنه‌ای که گریزِ `\u0000` دارد این راه را می‌رود.
+ */
 function stripNul(root) {
   if (typeof root === 'string') return cut(root);
   if (root === null || typeof root !== 'object') return root;
-  const stack = [root];
+  const isNode = (v) => v !== null && typeof v === 'object';
+  const done = new Map();
+  const of = (v) => (isNode(v) ? done.get(v) : typeof v === 'string' ? cut(v) : v);
+  const stack = [[root, false]];
   while (stack.length) {
-    const o = stack.pop();
-    const keys = Array.isArray(o) ? null : Object.keys(o);
-    const n = keys ? keys.length : o.length;
-    for (let i = 0; i < n; i++) {
-      const k = keys ? keys[i] : i;
-      const v = o[k];
-      if (typeof v === 'string') { if (v.includes('\u0000')) o[k] = cut(v); } else if (v !== null && typeof v === 'object') stack.push(v);
+    const [o, ready] = stack.pop();
+    if (Array.isArray(o)) {
+      if (ready) { done.set(o, o.map(of)); continue; }
+      stack.push([o, true]);
+      for (const v of o) if (isNode(v)) stack.push([v, false]);
+    } else {
+      const entries = Object.entries(o);
+      if (ready) { done.set(o, Object.fromEntries(entries.map(([k, v]) => [k, of(v)]))); continue; }
+      stack.push([o, true]);
+      for (const [, v] of entries) if (isNode(v)) stack.push([v, false]);
     }
   }
-  return root;
+  return done.get(root);
 }
 
 function jsonBody() {
