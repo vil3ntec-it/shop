@@ -35,6 +35,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrPriceCheck
 import ir.vil3ntec.tohid.core.i18n.StrProducts
 import ir.vil3ntec.tohid.core.product.ProductSuggest
 import ir.vil3ntec.tohid.data.Supplier
@@ -92,6 +93,8 @@ internal fun ProductFieldGroups(
   nameHelper: String? = null,
   /** AI-06: دستهٔ پیشنهادی از نام (`rememberCategorySuggest`)؛ null ⇒ هیچ */
   suggest: ((String) -> List<ProductSuggest.Pick>)? = null,
+  /** PRD-12: کادرِ «قیمتِ عمده» — فقط ویرایش با «لیستِ قیمت در صندوق» روشن */
+  wholesale: Boolean = false,
 ) {
   val strict = mode == ProductFormModel.Mode.NEW
   var newUnit by remember { mutableStateOf(false) }
@@ -128,6 +131,14 @@ internal fun ProductFieldGroups(
       )
     }
     ProfitLine(row)
+    if (wholesale) {
+      Spacer(Modifier.height(10.dp))
+      V3TextField(
+        row.wholesale, { v -> hooks.onChange { it.copy(wholesale = v) } }, StrPriceCheck.wholesale,
+        modifier = Modifier.fillMaxWidth().field(Field.WHOLESALE, hooks), kind = V3FieldKind.MONEY,
+        helper = StrProducts.wholesaleHelper, error = errors[Field.WHOLESALE]?.let(::problemText),
+      )
+    }
   }
   section(StrProducts.groupStock) {
     ChipGroup(StrProducts.unit, errors[Field.UNIT], required = strict) {

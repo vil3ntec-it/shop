@@ -77,6 +77,8 @@ object WarehouseEngine {
      *  (`PurchaseUnits.check`). null ⇒ در ویرایش دست نمی‌خورد؛ فهرستِ خالی ⇒ همه برداشته.
      */
     val purchaseUnits: List<ir.vil3ntec.tohid.core.product.PurchaseUnits.Draft>? = null,
+    /** PRD-12 قیمتِ عمده (لیستِ «عمده» ِ صندوق، POS-18)؛ null ⇒ در ویرایش دست نمی‌خورد و کالای تازه ۰ (= ندارد) */
+    val wholesalePrice: Double? = null,
   )
 
   data class EntryDraft(
@@ -297,24 +299,12 @@ object WarehouseEngine {
     return d.products.firstOrNull { it.id != exceptId && nameKey(it.name) == key }
   }
 
-  /** واحدِ فروش و ضریب با هم معنی دارند؛ ضریب باید عددِ مثبتِ معتبر باشد */
-  private fun unitProblem(unit: String, saleUnit: String?, factor: Double?): String? {
-    val su = saleUnit?.trim().orEmpty()
-    if (su.isEmpty()) return null
-    if (su == unit.trim()) return StrGoods.saleUnitSame
-    val f = factor ?: return StrGoods.factorNeeded
-    if (f.isNaN() || f.isInfinite() || f <= 0) return StrGoods.factorPositive
-    return null
-  }
-
   fun addProduct(d: ShopData, draft: ProductDraft, now: Long, newId: () -> String): Result {
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed(StrGoods.nameNeeded)
     //  کالای هم‌نام، موجودی و گزارش را دو تکه می‌کند و فروشنده نمی‌داند کدام را بزند
     duplicateName(d, name)?.let { return Result.Failed(StrGoods.nameTaken(it.name)) }
-    unitProblem(draft.unit, draft.saleUnit, draft.unitFactor)?.let { return Result.Failed(it) }
-    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed(StrGoods.salePriceBad)
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrGoods.buyPriceBad)
+    ProductDraftRules.problem(d, draft, null)?.let { return Result.Failed(it) } // واحد، ضریب و قیمت‌ها (PRD-07، PRD-12)
     val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
     if (draft.editLevels) levelsProblem(minStock, draft.reorderPoint, draft.maxStock)?.let { return Result.Failed(it) }
 
@@ -340,7 +330,7 @@ object WarehouseEngine {
       unit = draft.unit,
       purchasePrice = draft.purchasePrice,
       salePrice = draft.salePrice,
-      wholesalePrice = 0.0,
+      wholesalePrice = draft.wholesalePrice ?: 0.0,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       notes = "",
       barcodes = codes,
@@ -380,10 +370,8 @@ object WarehouseEngine {
     val name = draft.name.trim()
     if (name.isEmpty()) return Result.Failed(StrGoods.nameNeeded)
     duplicateName(d, name, exceptId = id)?.let { return Result.Failed(StrGoods.nameTaken(it.name)) }
-    unitProblem(draft.unit, draft.saleUnit ?: existing.saleUnit, draft.unitFactor ?: existing.unitFactor)
-      ?.let { return Result.Failed(it) }
-    if (draft.salePrice.isNaN() || draft.salePrice < 0) return Result.Failed(StrGoods.salePriceBad)
-    if (draft.purchasePrice.isNaN() || draft.purchasePrice < 0) return Result.Failed(StrGoods.buyPriceBad)
+    //  واحدِ پایهٔ کالای گردش‌دار، ضریبِ تازهٔ ناجور با هزارم و قیمت‌ها (PRD-07، PRD-12)
+    ProductDraftRules.problem(d, draft, existing)?.let { return Result.Failed(it) }
     //  حدِ کم بودن همیشه از فرم می‌آید؛ نقطهٔ سفارش و بیشینه فقط وقتی فرم آن‌ها را دارد — ترتیبِ هر سه با هم سنجیده می‌شود
     val minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock
     val reorderPoint = if (draft.editLevels) draft.reorderPoint else existing.reorderPoint
@@ -429,6 +417,7 @@ object WarehouseEngine {
       unit = draft.unit,
       purchasePrice = draft.purchasePrice,
       salePrice = draft.salePrice,
+      wholesalePrice = draft.wholesalePrice ?: existing.wholesalePrice,
       minStock = if (draft.minStock.isNaN()) 0.0 else draft.minStock,
       barcodes = codes,
       subcategory = draft.subcategory?.trim() ?: existing.subcategory,

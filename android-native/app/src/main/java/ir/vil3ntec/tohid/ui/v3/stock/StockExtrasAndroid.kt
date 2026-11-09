@@ -71,6 +71,13 @@ import kotlinx.coroutines.withContext
  *  پنجره‌های پیشینِ `ui/screens` در مسیرهای نسخهٔ ۳ — بی رونوشتِ منطق؛ نوشتن با همان `StockWriter` ِ انبار.
  */
 
+/** INV-01: «موجودی به تفکیکِ محل» در فهرستِ انبار — «محل‌های نگه‌داری» ِ همین دستگاه و دفترِ تازهٔ خاموش (روشن ⇒ محل‌ها در «دفترِ موجودی») */
+@Composable
+internal fun RouteScope.rememberStockPlacesOn(): Boolean {
+  val context = LocalContext.current
+  return remember(data.auditLog, StockLedger.serverFlag) { StockPlacesPref.places(context) && !StockLedger.isOn(data) }
+}
+
 /** «…» ِ انبار: کارهای دیدنیِ همین دستگاه و نقش */
 @Composable
 internal fun RouteScope.rememberStockExtras(): List<V3MenuItem> {

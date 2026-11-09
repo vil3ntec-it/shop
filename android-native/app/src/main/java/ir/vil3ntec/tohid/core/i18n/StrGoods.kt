@@ -31,6 +31,17 @@ object StrGoods {
     "The conversion factor must be a number above zero",
     "د اړونې ضریب باید له صفر لوی عدد وي",
   )
+  val factorExact: String get() = t(
+    "ضریب را دقیق و حداکثر با سه رقمِ اعشار بنویسید (مثلاً ۰٫۰۰۱ یا ۲۴)؛ اگر واحدِ فروش کسرِ ناتمامی از واحدِ موجودی است (یک دانه از کارتنِ ۲۴تایی)، واحدِ کوچک‌تر را واحدِ موجودی بگیرید و بزرگ‌تر را بسته",
+    "Write the factor exactly, with at most three decimals (e.g. 0.001 or 24); if the sale unit is an endless fraction of the stock unit (one piece of a 24-piece carton), make the smaller unit the stock unit and the bigger one a pack",
+    "ضریب سم او تر درېیو اعشاري رقمونو پورې ولیکئ (لکه ۰٫۰۰۱ یا ۲۴)؛ که د پلور واحد د موجودۍ د واحد نه ختمېدونکې برخه وي (د ۲۴ دانه‌یي کارتن یوه دانه)، کوچنی واحد د موجودۍ واحد او لوی یې بسته کړئ",
+  )
+  fun unitHasHistory(unit: Any?): String = t(
+    "واحدِ موجودیِ این کالا «${asIs(unit)}» است و ورود یا فروش دارد؛ با عوض کردنش همهٔ گذشته به واحدِ تازه خوانده می‌شد. برای فروش به واحدِ دیگر «واحدِ فروشِ دوم» یا بسته بگذارید",
+    "This item's stock unit is «$unit» and it has entries or sales; changing it would re-read all of its past in the new unit. To sell in another unit, add a second sale unit or a pack",
+    "د دې توکي د موجودۍ واحد «$unit» دی او راتګ یا پلور لري؛ په بدلولو یې ټول تېر په نوي واحد لوستل کېده. په بل واحد د پلور لپاره «دوهم د پلور واحد» یا بسته ورزیات کړئ",
+  )
+  val wholesaleBad: String get() = t("قیمتِ عمده درست نیست", "The wholesale price isn't valid", "د عمده بیه سمه نه ده")
   val nameNeeded: String get() = t("نام کالا را بنویسید", "Write the item's name", "د توکي نوم ولیکئ")
   fun nameTaken(name: Any?): String = t(
     "کالایی به نامِ «${asIs(name)}» از قبل هست",
