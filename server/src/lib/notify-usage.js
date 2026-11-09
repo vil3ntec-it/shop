@@ -10,6 +10,8 @@
  *   نشانه ─ «سقفِ هزینه»: ردیفی که کانالِ پولی‌اش را سقفِ روزانهٔ دکان راه نداد (`cost_cap` در `tried`، یا `notice` ِ
  *           خبر)؛ «سقفِ مشتری»: ردیفی که سقفِ ساعتی/روزانهٔ یک شماره نگهش داشت (`rate_limited`)؛ «نزدیکِ سقف»: هزینهٔ
  *           ۲۴ ساعتِ گذشتهٔ یک کانالِ پولی دست‌کم ۸۰٪ ِ سقفِ همان کانال.
+ *   کدها ── `codes`: پیامکِ کدِ ورود/ثبت‌نام/ویترین از دفترِ `sms_usage` (`lib/sms-usage.js`) در همان بازه، جمع و به تفکیکِ
+ *           `purpose` (با دکان/بی دکان)؛ هزینه به واحدِ خودِ آن دفتر (`currency`، `costMinor`)، نه میکروی کانال‌ها.
  *   حریم ── فقط شناسه و نامِ دکان، کانال و عدد؛ هیچ شماره، `phone_key`، متن، شناسهٔ سفارش یا کالا.
  *   حد ──── بازه ۱ تا ۳۱ روز (پیش‌فرض ۷)؛ حداکثر [MAX_SHOPS] دکان، پرهزینه‌ترین و سپس پرپیام‌ترین اول؛ هزینه از حداکثر
  *           [MAX_ROWS] ردیفِ «فرستاده» ِ هر صندوق (بیشتر ⇒ `truncated`، تازه‌ترین‌ها شمرده می‌شوند).
@@ -124,9 +126,13 @@ async function report({ days, at = now(), env = process.env } = {}) {
     totals.costCap += s.costCap;
     totals.rateLimited += s.rateLimited;
   }
+  //  OPS-09: پیامکِ کدهای ورود و ویترین در همین گزارش (دفترِ `sms_usage`؛ واحدِ هزینه‌اش جداست: `currency`/`costMinor`)
+  const sms = require('./sms-usage');
+  const [codeTotal, codeKinds, unitCostMinor] = await Promise.all([sms.totals({ since, until: at + 1 }), sms.byPurpose({ since, until: at + 1 }), sms.unitCost()]);
   return {
     days: d, since, checkedAt: at, channels, totals, shops: shown,
     shopsTruncated: all.length > shown.length, truncated,
+    codes: { currency: sms.CURRENCY, unitCostMinor, total: codeTotal, byPurpose: codeKinds },
   };
 }
 

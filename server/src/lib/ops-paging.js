@@ -123,7 +123,7 @@ async function criticalFindings(t = now()) {
         detail: { queue: id, oldestAgeMs: Number(q.oldestAgeMs) } });
     }
   }
-  const rh = require('./payment-reconciler').reconcileHealth();
+  const rh = await require('./payment-reconciler').sharedHealth();   //  پایگاه: همهٔ نمونه‌ها، پس از راه‌اندازیِ دوباره هم
   if (rh.streak >= CRIT.reconcileFailStreak) {
     out.push({ target: 'payments.reconcile', title: `تطبیقِ پرداخت ${rh.streak} نوبتِ پیاپی شکست خورد`,
       detail: { streak: rh.streak, lastFailAt: rh.lastFailAt, lastOkAt: rh.lastOkAt, lastError: rh.lastError } });

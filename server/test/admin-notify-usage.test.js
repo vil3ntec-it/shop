@@ -172,3 +172,31 @@ test('هزینهٔ تازه با قیمتِ همین env؛ هیچ دکانی ⇒
   assert.deepEqual(empty.shops, []);
   assert.deepEqual(empty.totals, { sent: 0, costMicros: 0, costCap: 0, rateLimited: 0, shops: 0 });
 });
+
+test('OPS-09: پیامکِ کدِ ورود و ویترین در همین گزارش — جمع و به تفکیکِ کار، با هزینهٔ همان دفتر و بی شماره', async () => {
+  const sms = require('../src/lib/sms-usage');
+  await sms.setUnitCost(250, 'test');
+  const at = now();
+  await sms.record({ purpose: 'login', via: 'sms', ok: true, at: at - 1000 });
+  await sms.record({ purpose: 'login', via: 'sms', ok: true, at: at - 900 });
+  await sms.record({ purpose: 'login', via: 'sms', ok: false, at: at - 800 });
+  await sms.record({ shopId: A.shopId, purpose: 'store_phone', via: 'sms', ok: true, parts: 2, at: at - 700 });
+  await sms.record({ purpose: 'register', via: 'log', ok: true, at: at - 600 });
+  await sms.record({ purpose: 'login', via: 'sms', ok: true, at: at - 40 * DAY });   //  بیرونِ بازه
+
+  const r = await get('?days=7', { token: admin });
+  assert.equal(r.status, 200);
+  const c = r.body.codes;
+  assert.ok(c, '⛔ هزینهٔ پیامکِ کدها در همان گزارش');
+  assert.deepEqual([c.currency, c.unitCostMinor], [sms.CURRENCY, 250]);
+  assert.deepEqual([c.total.sent, c.total.failed, c.total.mock, c.total.costMinor], [3, 1, 1, 250 * 4]);
+  const kind = (p, shop) => c.byPurpose.find((x) => x.purpose === p && x.shop === shop);
+  assert.deepEqual([kind('login', false).sent, kind('login', false).failed, kind('login', false).costMinor], [2, 1, 500]);
+  assert.deepEqual([kind('store_phone', true).sent, kind('store_phone', true).costMinor], [1, 500]);
+  assert.equal(kind('register', false).mock, 1, 'آزمایشی شمرده می‌شود ولی هزینه ندارد');
+  assert.equal(kind('register', false).costMinor, 0);
+  const raw = JSON.stringify(r.body);
+  for (const secret of [PHONE, PHONE_KEY]) assert.ok(!raw.includes(secret));
+  assert.ok(!/\+93\d{6,}/.test(raw), 'هیچ شماره‌ای');
+  assert.equal(c.byPurpose.some((x) => 'shopId' in x), false, 'بی شناسهٔ دکان در تفکیکِ کدها');
+});
