@@ -120,4 +120,4 @@ function bucketsOf(w) {
   return out;
 }
 
-module.exports = { DAY, LIMITS, GROUPS, tz, badWindow, windowOf, bucketsOf, bucketYmd, nextBucketYmd, localYmd, dayStart, ymdAdd, persianOf };
+module.exports = { DAY, LIMITS, GROUPS, tz, tzOffsetMs, badWindow, windowOf, bucketsOf, bucketYmd, nextBucketYmd, localYmd, dayStart, ymdAdd, persianOf };

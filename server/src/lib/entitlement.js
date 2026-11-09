@@ -99,7 +99,12 @@ function build(T) {
      *  مصرف‌شده می‌کند. ⚠️ `pending` نه: درخواستِ خریدی که هنوز تایید
      *  نشده نباید مشتری را همان لحظه از دورهٔ آزمایشی‌اش بیرون بیندازد.
      */
-    if (sub && sub.status !== 'pending' && trial.active) {
+    /*
+     *  ⛔ SUB-01 (فقط دکان؛ پمپ همان پیشین): اشتراکِ **شروع‌نشده** (`active` با `starts_at` ِ آینده) دوره را
+     *  نمی‌سوزاند. مدیر شروع را روی پایانِ آزمایشی می‌گذاشت و دکانِ پول‌داده تا آن روز `free` می‌ماند.
+     */
+    const scheduled = T === tenancy.SHOP && state.phase === 'scheduled';
+    if (sub && sub.status !== 'pending' && !scheduled && trial.active) {
       trial = { ...trial, active: false, used: true, daysLeft: 0, consumed: true };
     }
 

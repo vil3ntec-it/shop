@@ -98,6 +98,7 @@ const SHELL_ASSETS = [
   './license/orders-desk.js',
   //  MKT-06: «چرخهٔ مصرف» در ویرایشِ کالا — بی آن، ویرایشِ بی اینترنت کادر را نشان نمی‌داد
   './license/product-cycle.js',
+  './license/orders-risk.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
   './license/vendor/zxing-0.21.3.min.js',
