@@ -39,6 +39,9 @@ object LocalSnapshots {
 
   private val lock = Any()
 
+  /** همهٔ نوشتن‌ها و هرس زیرِ یک قفل (رونوشتِ ساده، رمزدار، هرس) */
+  private inline fun <T> guarded(block: () -> T): T = synchronized(lock) { block() }
+
   /** نسخه‌های موجود، تازه‌ترین اول (فایلِ نیمه‌کارهٔ `.tmp` نسخه نیست) */
   fun list(dir: File): List<Snapshot> =
     dir.listFiles().orEmpty()
@@ -50,7 +53,7 @@ object LocalSnapshots {
    *  رونوشتِ دفتر با نامِ `name`، اگر دفتر هست و با تازه‌ترین نسخه فرق دارد.
    *  نسخهٔ ساخته‌شده را برمی‌گرداند، یا null اگر کاری نبود.
    */
-  fun takeIfChanged(ledger: File, dir: File, name: String, valid: (File) -> Boolean = { true }): File? = synchronized(lock) {
+  fun takeIfChanged(ledger: File, dir: File, name: String, valid: (File) -> Boolean = { true }): File? = guarded {
     if (!ledger.exists() || ledger.length() == 0L) return null
     val newest = list(dir).firstOrNull()
     if (newest != null && same(ledger, newest.file)) return null
@@ -61,12 +64,41 @@ object LocalSnapshots {
     target
   }
 
+  /**
+   *  OPS-02 — نسخهٔ **رمزدار** (`SnapshotSeal`): متنِ بازِ دفتر ([plain]) با متنِ بازِ تازه‌ترین نسخه ([open]) سنجیده
+   *  می‌شود — بایت‌های رمزدار هر بار فرق دارند (nonce ِ تازه)، پس سنجشِ [same] این‌جا هر نیم ساعت نسخهٔ تکراری
+   *  می‌ساخت و «۶ آخر» را از نسخه‌های سالم خالی می‌کرد. تازه‌ترین نسخه باز نشد (کلیدِ دیگر) ⇒ «عوض شده» (سوی امن:
+   *  یک نسخهٔ بیشتر، نه کمتر).
+   *
+   *  نسخهٔ نوشته‌شده همان‌جا از روی دیسک باز و با [plain] سنجیده می‌شود؛ نخورد ⇒ پاک و پرتاب (صدازننده همان رونوشتِ
+   *  خام را می‌گیرد). @return نسخهٔ تازه، یا `null` اگر دفتر عوض نشده
+   */
+  fun takeSealedIfChanged(
+    plain: ByteArray,
+    dir: File,
+    name: String,
+    seal: (ByteArray) -> ByteArray,
+    open: (File) -> ByteArray,
+  ): File? = guarded {
+    if (plain.isEmpty()) return null
+    val newest = list(dir).firstOrNull()
+    if (newest != null && runCatching { open(newest.file) }.getOrNull()?.contentEquals(plain) == true) return null
+    val target = File(dir, name)
+    DiskWrite.bytes(target, seal(plain))
+    val back = runCatching { open(target) }.getOrNull()
+    if (back == null || !back.contentEquals(plain)) {
+      runCatching { target.delete() }
+      throw IOException("sealed snapshot did not verify")
+    }
+    target
+  }
+
   /** پاک کردنِ نسخه‌هایی که قاعدهٔ «۶ آخر + ۷ روزانه + ۴ هفتگی» نگه نمی‌دارد */
   fun prune(
     dir: File,
     utcOffsetMinutes: (Long) -> Int,
     policy: BackupRetention.Policy = BackupRetention.Policy(),
-  ): Int = synchronized(lock) {
+  ): Int = guarded {
     val all = list(dir)
     val keep = BackupRetention.keep(all.map { BackupRetention.Snap(it.file.name, it.at) }, utcOffsetMinutes, policy)
     all.count { it.file.name !in keep && runCatching { it.file.delete() }.getOrDefault(false) }

@@ -198,13 +198,15 @@ class AuditSealTest {
   private companion object {
     /**
      *  `AuditEntry` و سندهای درونش در سطحِ ۱ (نامِ فیلدها، مرتب). سطحِ ۱ = شکلِ مدل وقتی زنجیره نخستین بار رسید (دستهٔ ۳۲)،
-     *  با فیلدهای هم‌دستهٔ CRM-15 (`viewer`/`role`/`device`/`view`) و INV-21 (`bom`)؛ هیچ نسخه‌ای پیش از آن ردیفِ زنجیره‌دار ننوشت.
+     *  با فیلدهای هم‌دستهٔ CRM-15 (`viewer`/`role`/`device`/`view`) و INV-21 (`bom`)، و یادداشت و قیمتِ خاصِ ردیفِ امانی (دستهٔ ۳۳،
+     *  `claude/convert-fidelity`)؛ پرچمِ `shop.doc_chain` هنوز هیچ‌جا روشن نشده، پس هیچ ردیفِ زنجیره‌داری با سطحِ کهنه نوشته نشده است.
      */
     const val SCHEMA_V1 =
       "amount,approval,approvedBy,bom,bom.lossBp,bom.parts,bom.parts.productId,bom.parts.qtyMilli,by,chain," +
       "chainSeq,chainV,createdAt,date,device,deviceId,drawer,fromMethod,fromStatus,hash,id,layaway," +
       "layaway.debtorId,layaway.depositMinor,layaway.kind,layaway.lines,layaway.lines.label," +
-      "layaway.lines.name,layaway.lines.productId,layaway.lines.qtyMilli,layaway.lines.unitMinor," +
+      "layaway.lines.name,layaway.lines.note,layaway.lines.productId,layaway.lines.qtyMilli," +
+      "layaway.lines.specialMinor,layaway.lines.unitMinor," +
       "layaway.saleId,layaway.schedule,layaway.schedule.amountMinor,layaway.schedule.due," +
       "layaway.schedule.no,layaway.to,layaway.totalMinor,note,notes,payMethod,payRef,payRow,points,prev," +
       "reason,refId,refIds,role,specialOrder,specialOrder.debtorId,specialOrder.depositMinor," +

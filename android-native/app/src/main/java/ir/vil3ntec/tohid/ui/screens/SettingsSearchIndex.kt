@@ -184,7 +184,11 @@ object SettingsSearchIndex {
     L.SCAN_CASH to kw("کارت فرمان فروش نقدی اسکنر بارکدخوان بی برنامه", "command card cash sale scanner background", "د امر کارت نغده پلور سکنر"),
     //  داده و پشتیبان
     "همگام‌سازی" to kw("همگام‌سازی سینک سرور", "sync server", "همغږي"),
-    "داده‌ها" to kw("پشتیبان بک‌آپ بازگردانی", "backup restore", "بیک اپ بېرته راوستل"),
+    "داده‌ها" to kw(
+      "پشتیبان بک‌آپ بازگردانی بازیابی عبارت بازیابی رمز نسخه خودکار چاپ عبارت",
+      "backup restore recovery phrase encrypt automatic copies snapshot print phrase",
+      "بیک اپ بېرته راوستل د بېرته راګرځولو عبارت کوډ خپلکاره نسخې",
+    ),
     L.ABOUT_APP to kw("نسخه به‌روزرسانی آپدیت حریم خصوصی", "version update privacy policy", "نسخه تازه کول محرمیت"),
     L.CHAT_GUARD to kw("گفت‌وگو چت جا", "chat storage", "خبرې اترې"),
     L.WHATS_NEW to kw("تازه‌ها چه چیزی تازه است تغییرها به‌روزرسانی", "what's new changes update", "څه نوي دي بدلونونه"),

@@ -1,0 +1,196 @@
+{
+  "v": 1,
+  "about": "دفترِ کاملاً پر (هر فیلدِ هر مدلِ ShopData، تودرتو هم) — نگهبانِ «هیچ فیلدِ کسب‌وکاری بی همگام‌سازی نیست». برنامه: android-native/app/src/test/java/ir/vil3ntec/tohid/sync/v1/LedgerSyncCoverageTest.kt (پوشش، شکلِ روی خط، Pull، Snapshot، v3). سرور: server/test/sync-ledger-coverage.test.js (push/pull/Snapshot ِ v1 و v3 روی PGlite و PostgreSQL). ops و v3 را آزمونِ برنامه می‌نویسد: TOHID_WRITE_VECTORS=ledger-sync. فیلدِ تازهٔ مدل ⇒ یک مقدار در ledger، یا دلیل در deviceOnly. عددهای 0.0004، 0.0002، 5.684341886080802e-14 و 12345678.5 عمداً همان‌هایی‌اند که جاوا/کاتلین نمایی می‌نویسد (4.0E-4) و جاوااسکریپت نه — شکلِ روی خط باید جاوااسکریپت باشد (DATA-SAFETY §۸).",
+  "deviceOnly": {
+    "nextInvoiceNo": "شمارندهٔ همین دستگاه؛ روی دستگاهِ تازه از بلندترین شمارهٔ همان سری + ۱ (InvoiceNumber.next) از فاکتورهای همگام‌شده ساخته می‌شود",
+    "setAside": "سندِ ردشده که صاحب «کنار گذاشت/اصلاح کرد»: کاملش روی سرور در صندوقِ سندهای ردشده (sync_v3_conflicts.loser_value، وضعِ بسته) است و هرگز در دفترِ شمرده نبود"
+  },
+  "ledger": {
+    "debtors": [
+      {
+        "id": "d-full", "name": "احمد کریمی", "phone": "0700123456", "phone2": "0799888777", "notes": "مشتریِ عمده", "createdAt": 1762500000000,
+        "creditLimit": 5000, "tags": ["عمده"], "group": "عمده‌فروش", "priceList": "wholesale", "marketingConsent": true,
+        "mergedInto": "d-old", "cardCode": "C-0001",
+        "deliveryAddress": { "area": "کارتهٔ سه", "landmark": "پهلوی مسجد", "gate": "درِ سبز", "floor": "۲", "plusCode": "8FW4V75V+8Q", "postalCode": "1001" },
+        "specialPrices": [{ "productId": "p-full", "priceMinor": 11500, "from": "2026-11-01", "to": "2026-12-01" }]
+      }
+    ],
+    "transactions": [
+      {
+        "id": "t-full", "debtorId": "d-full", "type": "receive", "amount": 50, "date": "2026-11-02", "notes": "قسطِ اول",
+        "createdAt": 1762500300000, "dueDate": "2026-12-01", "refId": "s-full", "kind": "settle", "shiftId": "sh-1"
+      }
+    ],
+    "expenses": [
+      { "id": "e-full", "title": "کرایهٔ دکان", "category": "کرایه", "amount": 3000, "date": "2026-11-01", "notes": "ماهِ عقرب", "createdAt": 1762500000000 }
+    ],
+    "expenseCategories": ["کرایه", "برقِ دکان"],
+    "products": [
+      {
+        "id": "p-full", "name": "برنجِ سیلا", "category": "غله", "unit": "کیلوگرم", "purchasePrice": 90.5, "salePrice": 120,
+        "wholesalePrice": 110, "minStock": 5, "notes": "انبارِ پشت", "barcodes": ["6260000000017", "6260000000024"], "photo": true,
+        "createdAt": 1762500000000, "subcategory": "دانه‌بلند", "supplierId": "su-full", "active": false, "saleUnit": "بوجی",
+        "unitFactor": 0.0004, "namePs": "وريجې", "nameEn": "Sella rice", "synonyms": ["برنج سیلا"], "keywords": ["برنج", "سیلا"],
+        "aisle": "A", "shelf": "3", "shelfLevel": "2", "alternatives": ["p-part"], "customFields": { "origin": "پاکستان" },
+        "sku": "RICE-SEL-25", "stockless": true, "brand": "گلستان", "tags": ["پرفروش"], "reorderPoint": 8, "maxStock": 200,
+        "packs": [{ "name": "بوجی ۲۵", "sizeMilli": 25000, "barcodes": ["6260000000031"], "priceMinor": 280000 }],
+        "kit": [{ "productId": "p-part", "qty": 0.0002 }],
+        "priceWindows": [{ "from": "2026-11-01", "to": "2026-11-07", "price": 115 }],
+        "variantAxes": [{ "name": "وزن", "values": ["۵", "۲۵"] }], "variantOf": "p-part", "variant": { "وزن": "۲۵" },
+        "serialTracked": true, "consumptionDays": 14,
+        "purchaseUnits": [{ "name": "کارتن", "factorMilli": 12000, "supplierId": "su-full", "barcode": "6260000000048" }]
+      }
+    ],
+    "productCategories": ["لبنیات", "غله"],
+    "productUnits": ["عدد", "بوجی"],
+    "warehouseEntries": [
+      {
+        "id": "w-full", "productId": "p-full", "cartons": 2, "perCarton": 25, "units": 50, "unit": "کیلوگرم", "price": 90.5,
+        "date": "2026-11-01", "notes": "رسیدِ خرید", "isAdjustment": true, "purchaseId": "pu-full", "refId": "pu-full",
+        "createdAt": 1762500000000, "expiryDate": "2027-05-01", "batch": "B-2026-11", "productionDate": "2026-10-01",
+        "landedCost": 92.25, "landedCostMinor": 9225, "locationId": "loc-back", "userId": "u-owner", "adjKind": "count",
+        "lotId": "lot-1", "countedAt": 1762500100000, "seenMilli": 48000, "correctedAt": 1762500200000, "costMinor": 9050
+      }
+    ],
+    "sales": [
+      {
+        "id": "s-full", "invoiceNumber": 7, "total": 240, "discountType": "percent", "discountValue": 5.684341886080802e-14,
+        "discount": 10, "finalTotal": 230, "paymentMethod": "mixed", "debtorId": "d-full", "paidAmount": 130, "remaining": 100,
+        "status": "completed", "debtGiven": 100, "debtSettled": 50, "createdAt": 1762500000000, "date": "2026-11-01",
+        "syncStatus": "synced", "cancelReason": "", "seller": "u-cashier", "orderId": "o-1", "orderNo": 1001, "series": "A1",
+        "approval": { "by": "u-owner", "kind": "discount", "at": 1762500000000 },
+        "cancelApproval": { "by": "u-owner", "kind": "cancel", "at": 1762500000001 },
+        "creditApproval": { "by": "u-owner", "kind": "credit", "at": 1762500000002 },
+        "priceApproval": { "by": "u-owner", "kind": "price", "at": 1762500000003 },
+        "payments": [{ "method": "cash", "kind": "pay", "amount": 8000, "status": "done", "ref": "R-1", "verification": "code", "custody": "drawer", "payee": "shop" }],
+        "tenderedMinor": 15000, "changeMinor": 2000, "roundingMinor": 50, "channel": "pos", "receiptToken": "rt-abc",
+        "promoDiscountMinor": 500, "coupons": ["NOWRUZ"], "note": "تحویل فردا", "correctedAt": 1762500200000, "shiftId": "sh-1"
+      }
+    ],
+    "saleItems": [
+      {
+        "id": "si-full", "saleId": "s-full", "productId": "p-full", "name": "برنجِ سیلا", "quantity": 2, "unitPrice": 120,
+        "purchasePrice": 90.5, "totalPrice": 240, "returnedQty": 1, "lotId": "lot-1", "locationId": "loc-front",
+        "parts": [{ "productId": "p-part", "qty": 1 }], "serials": ["SN-1"], "listPriceMinor": 12500,
+        "promo": [{ "id": "pr-1", "rev": 2, "name": "تخفیفِ هفته", "discountMinor": 500 }], "note": "بی بسته",
+        "priceSource": "list", "seller": "u-cashier"
+      }
+    ],
+    "returns": [
+      {
+        "id": "r-full", "saleId": "s-full", "saleItemId": "si-full", "productId": "p-full", "quantity": 1, "amount": 120,
+        "reason": "خراب", "date": "2026-11-02", "createdAt": 1762500300000, "docId": "rd-1", "disposition": "restock",
+        "refund": "cash", "toAccount": 70, "toCredit": 50, "creditTo": "d-full", "toMethods": { "cash": 70 }, "unitPrice": 120,
+        "by": "u-cashier", "approvedBy": "u-owner", "exchangeSaleId": "s-ex", "channel": "pos",
+        "approval": { "by": "u-owner", "kind": "return", "at": 1762500300000 }, "shiftId": "sh-1"
+      }
+    ],
+    "nextInvoiceNo": 8,
+    "suppliers": [
+      { "id": "su-full", "name": "عمده‌فروشِ کابل", "phone": "0799000111", "address": "مندوی", "notes": "نقد", "createdAt": 1762500000000, "leadDays": 3 }
+    ],
+    "purchases": [
+      {
+        "id": "pu-full", "productId": "p-full", "supplierId": "su-full", "quantity": 50, "unit": "کیلوگرم", "purchasePrice": 90.5,
+        "totalAmount": 4525, "date": "2026-11-01", "notes": "بارِ اول", "paidAmount": 4000, "debt": 525,
+        "warehouseEntryId": "w-full", "createdAt": 1762500000000, "invoiceNo": 77, "landedCost": 12345678.5,
+        "landedCostMinor": 9225, "dueDate": "2026-12-01", "unitName": "کارتن", "unitQtyMilli": 4000, "unitFactorMilli": 12000
+      }
+    ],
+    "supplierPayments": [
+      { "id": "sp-full", "supplierId": "su-full", "amount": 4000, "date": "2026-11-01", "notes": "نقد", "createdAt": 1762500000000 }
+    ],
+    "stockMovements": [
+      {
+        "id": "sm-full", "productId": "p-full", "type": "transfer", "qty": 3, "date": "2026-11-01", "notes": "به جلوی دکان",
+        "refId": "x-1", "createdAt": 1762500000000, "userId": "u-owner", "reason": "جابه‌جایی", "locationId": "loc-back",
+        "toLocationId": "loc-front", "lotId": "lot-1", "correctedAt": 1762500200000
+      }
+    ],
+    "priceHistory": [
+      { "id": "ph-full", "productId": "p-full", "oldPrice": 110, "newPrice": 120, "date": "2026-11-01", "createdAt": 1762500000000, "by": "u-owner", "reason": "نرخِ تازه" }
+    ],
+    "auditLog": [
+      {
+        "id": "al-full", "type": "stock_bom", "date": "2026-11-01", "refId": "p-full", "notes": "دستورِ ساخت", "createdAt": 1762500000000,
+        "amount": 120, "by": "u-owner", "approvedBy": "u-owner", "approval": { "by": "u-owner", "kind": "bom", "at": 1762500000000 },
+        "reason": "ساخت", "note": "بسته‌بندی", "z": { "total": 240 }, "refIds": ["s-full", "r-full"], "fromMethod": "cash",
+        "toMethod": "card", "payRef": "PR-1",
+        "specialOrder": { "debtorId": "d-full", "productId": "p-full", "item": "برنجِ ویژه", "qtyMilli": 2000, "totalMinor": 24000, "depositMinor": 5000, "due": "2026-11-20", "to": "ready", "saleId": "s-full" },
+        "layaway": {
+          "debtorId": "d-full", "kind": "open", "totalMinor": 24000, "depositMinor": 4000,
+          "lines": [{ "productId": "p-full", "label": "۲۵ کیلو", "name": "برنجِ سیلا", "qtyMilli": 2000, "unitMinor": 12000, "note": "بی‌نمک", "specialMinor": 11500 }],
+          "schedule": [{ "no": 1, "due": "2026-12-01", "amountMinor": 10000 }], "to": "paid", "saleId": "s-full"
+        },
+        "bom": { "parts": [{ "productId": "p-part", "qtyMilli": 500 }], "lossBp": 150 },
+        "points": 12, "payRow": 1, "payMethod": "cash", "fromStatus": "open", "toStatus": "done", "drawer": "D1",
+        "xfer": { "from": "loc-back", "to": "loc-front" }, "viewer": "u-cashier", "role": "cashier", "device": "dev-1",
+        "view": "debtor", "userId": "u-owner", "userRole": "owner", "deviceId": "dev-1", "chain": "c-1", "chainSeq": 3,
+        "prev": "0f1e2d3c", "hash": "4b5a6978", "chainV": 1
+      }
+    ],
+    "safeEntries": [
+      { "id": "se-count", "kind": "count", "amountMinor": 500000, "createdAt": 1762500000000, "by": "u-owner", "reason": "شمارشِ شب", "note": "کم بود", "expectedMinor": 480000 },
+      { "id": "se-bank", "kind": "to_bank", "amountMinor": 200000, "createdAt": 1762500000000, "by": "u-owner", "note": "بانکِ ملی", "bagNo": "B-17" },
+      { "id": "se-drawer", "kind": "from_drawer", "amountMinor": 150000, "createdAt": 1762500000000, "shiftId": "sh-1", "auditId": "al-full" }
+    ],
+    "setAside": [
+      {
+        "id": "cf-1", "status": "dismissed", "note": "کنار گذاشته شد", "reason": "credit_limit", "fixedDoc": "", "table": "sales",
+        "rowId": "s-x", "saleId": "s-x", "resolvedAt": 1762500400000, "settledAt": 1762500500000,
+        "ops": [{ "op_id": "01JX0000000000000000000001", "table": "sales", "row_id": "s-x", "type": "insert" }],
+        "rows": { "sales": [{ "id": "s-x" }] }, "undo": [{ "op_id": "01JX0000000000000000000002", "table": "debtors", "row_id": "d-full", "type": "update" }], "kept": ["debtors/d-full.notes"]
+      }
+    ]
+  },
+  "ops": [
+    {"table":"returns","row_id":"r-full","type":"insert","fields":{"saleId":"s-full","saleItemId":"si-full","productId":"p-full","quantity":1,"amount":120,"reason":"خراب","date":"2026-11-02","createdAt":1762500300000,"docId":"rd-1","disposition":"restock","refund":"cash","toAccount":70,"toCredit":50,"creditTo":"d-full","toMethods":{"cash":70},"unitPrice":120,"by":"u-cashier","approvedBy":"u-owner","exchangeSaleId":"s-ex","channel":"pos","approval":{"by":"u-owner","kind":"return","at":1762500300000},"shiftId":"sh-1"},"hash":"7ab309057ed916f0b681842a688121d7923e0b596131e30ab80db6584a146deb"},
+    {"table":"products","row_id":"p-full","type":"insert","fields":{"name":"برنجِ سیلا","category":"غله","unit":"کیلوگرم","purchasePrice":90.5,"salePrice":120,"wholesalePrice":110,"minStock":5,"notes":"انبارِ پشت","barcodes":["6260000000017","6260000000024"],"photo":true,"createdAt":1762500000000,"subcategory":"دانه‌بلند","supplierId":"su-full","active":false,"saleUnit":"بوجی","unitFactor":0.0004,"namePs":"وريجې","nameEn":"Sella rice","synonyms":["برنج سیلا"],"keywords":["برنج","سیلا"],"aisle":"A","shelf":"3","shelfLevel":"2","alternatives":["p-part"],"customFields":{"origin":"پاکستان"},"sku":"RICE-SEL-25","stockless":true,"brand":"گلستان","tags":["پرفروش"],"reorderPoint":8,"maxStock":200,"packs":[{"name":"بوجی ۲۵","sizeMilli":25000,"barcodes":["6260000000031"],"priceMinor":280000}],"kit":[{"productId":"p-part","qty":0.0002}],"priceWindows":[{"from":"2026-11-01","to":"2026-11-07","price":115}],"variantAxes":[{"name":"وزن","values":["۵","۲۵"]}],"variantOf":"p-part","variant":{"وزن":"۲۵"},"serialTracked":true,"consumptionDays":14,"purchaseUnits":[{"name":"کارتن","factorMilli":12000,"supplierId":"su-full","barcode":"6260000000048"}]},"hash":"72844ce85112304edd763b25d2a99d98edff5652ccaa087a12a4ef45b149fcec"},
+    {"table":"warehouseEntries","row_id":"w-full","type":"insert","fields":{"productId":"p-full","cartons":2,"perCarton":25,"units":50,"unit":"کیلوگرم","price":90.5,"date":"2026-11-01","notes":"رسیدِ خرید","isAdjustment":true,"purchaseId":"pu-full","refId":"pu-full","createdAt":1762500000000,"expiryDate":"2027-05-01","batch":"B-2026-11","productionDate":"2026-10-01","landedCost":92.25,"landedCostMinor":9225,"locationId":"loc-back","userId":"u-owner","adjKind":"count","lotId":"lot-1","countedAt":1762500100000,"seenMilli":48000,"correctedAt":1762500200000,"costMinor":9050},"hash":"9d1ca2150b72b3a0936f49607a57cb987dbbf29685daa474148d9ab7b345dcfa"},
+    {"table":"sales","row_id":"s-full","type":"insert","fields":{"invoiceNumber":7,"total":240,"discountType":"percent","discountValue":5.684341886080802e-14,"discount":10,"finalTotal":230,"paymentMethod":"mixed","debtorId":"d-full","paidAmount":130,"remaining":100,"status":"completed","debtGiven":100,"debtSettled":50,"createdAt":1762500000000,"date":"2026-11-01","syncStatus":"synced","cancelReason":"","seller":"u-cashier","orderId":"o-1","orderNo":1001,"series":"A1","approval":{"by":"u-owner","kind":"discount","at":1762500000000},"cancelApproval":{"by":"u-owner","kind":"cancel","at":1762500000001},"creditApproval":{"by":"u-owner","kind":"credit","at":1762500000002},"priceApproval":{"by":"u-owner","kind":"price","at":1762500000003},"payments":[{"method":"cash","kind":"pay","amount":8000,"status":"done","ref":"R-1","verification":"code","custody":"drawer","payee":"shop"}],"tenderedMinor":15000,"changeMinor":2000,"roundingMinor":50,"channel":"pos","receiptToken":"rt-abc","promoDiscountMinor":500,"coupons":["NOWRUZ"],"note":"تحویل فردا","correctedAt":1762500200000,"shiftId":"sh-1"},"hash":"0c1ca63d1173e1e7646f3d868baa6929edbaf133f1962d5e4d24d0a70d475ddb"},
+    {"table":"saleItems","row_id":"si-full","type":"insert","fields":{"saleId":"s-full","productId":"p-full","name":"برنجِ سیلا","quantity":2,"unitPrice":120,"purchasePrice":90.5,"totalPrice":240,"returnedQty":1,"lotId":"lot-1","locationId":"loc-front","parts":[{"productId":"p-part","qty":1}],"serials":["SN-1"],"listPriceMinor":12500,"promo":[{"id":"pr-1","rev":2,"name":"تخفیفِ هفته","discountMinor":500}],"note":"بی بسته","priceSource":"list","seller":"u-cashier"},"hash":"0fce2b3c6e0d5cc7317c57e61b227b86bb590f5ed62fabc13803b7090c170738"},
+    {"table":"debtors","row_id":"d-full","type":"insert","fields":{"name":"احمد کریمی","phone":"0700123456","notes":"مشتریِ عمده","createdAt":1762500000000,"creditLimit":5000,"phone2":"0799888777","tags":["عمده"],"group":"عمده‌فروش","priceList":"wholesale","marketingConsent":true,"mergedInto":"d-old","cardCode":"C-0001","deliveryAddress":{"area":"کارتهٔ سه","landmark":"پهلوی مسجد","gate":"درِ سبز","floor":"۲","plusCode":"8FW4V75V+8Q","postalCode":"1001"},"specialPrices":[{"productId":"p-full","priceMinor":11500,"from":"2026-11-01","to":"2026-12-01"}]},"hash":"7106b4c73eb45fe15e247c0686136a5d311bc463491051ffe2af423904a9e807"},
+    {"table":"transactions","row_id":"t-full","type":"insert","fields":{"debtorId":"d-full","type":"receive","amount":50,"date":"2026-11-02","notes":"قسطِ اول","createdAt":1762500300000,"dueDate":"2026-12-01","refId":"s-full","kind":"settle","shiftId":"sh-1"},"hash":"9f01199998d1609824a25e131639a7c617999f287567160418dbed2ff97e4f16"},
+    {"table":"expenses","row_id":"e-full","type":"insert","fields":{"title":"کرایهٔ دکان","category":"کرایه","amount":3000,"date":"2026-11-01","notes":"ماهِ عقرب","createdAt":1762500000000},"hash":"aa90ba834ecfee63656fc4482d789258f756f726d0bf6f6c3251169ead22e8b6"},
+    {"table":"suppliers","row_id":"su-full","type":"insert","fields":{"name":"عمده‌فروشِ کابل","phone":"0799000111","address":"مندوی","notes":"نقد","createdAt":1762500000000,"leadDays":3},"hash":"52d644e335d651b33e526f89bb489c23b124c85a1b23b12729e6d508381896ef"},
+    {"table":"purchases","row_id":"pu-full","type":"insert","fields":{"productId":"p-full","supplierId":"su-full","quantity":50,"unit":"کیلوگرم","purchasePrice":90.5,"totalAmount":4525,"date":"2026-11-01","notes":"بارِ اول","paidAmount":4000,"debt":525,"warehouseEntryId":"w-full","createdAt":1762500000000,"invoiceNo":77,"landedCost":12345678.5,"landedCostMinor":9225,"dueDate":"2026-12-01","unitName":"کارتن","unitQtyMilli":4000,"unitFactorMilli":12000},"hash":"3f0b891030ce302d2f609e3f410682f27c07d979bc4a168b3926d9bd44737daf"},
+    {"table":"supplierPayments","row_id":"sp-full","type":"insert","fields":{"supplierId":"su-full","amount":4000,"date":"2026-11-01","notes":"نقد","createdAt":1762500000000},"hash":"4906a2f3892fb9512c3b2c43fe14c59de7c8cd93bb697bb29d142e39d4e09cc3"},
+    {"table":"stockMovements","row_id":"sm-full","type":"insert","fields":{"productId":"p-full","type":"transfer","qty":3,"date":"2026-11-01","notes":"به جلوی دکان","refId":"x-1","createdAt":1762500000000,"userId":"u-owner","reason":"جابه‌جایی","locationId":"loc-back","toLocationId":"loc-front","lotId":"lot-1","correctedAt":1762500200000},"hash":"d49ca685a3e2262d2b765028195e28546fc0d0289d58e573fd0de05cefbe2e20"},
+    {"table":"priceHistory","row_id":"ph-full","type":"insert","fields":{"productId":"p-full","oldPrice":110,"newPrice":120,"date":"2026-11-01","createdAt":1762500000000,"by":"u-owner","reason":"نرخِ تازه"},"hash":"0855372845b565fb3622cb40625ec20b7d9fd8fbaf2b1dc6c6f897ab93579bd3"},
+    {"table":"auditLog","row_id":"al-full","type":"insert","fields":{"type":"stock_bom","date":"2026-11-01","refId":"p-full","notes":"دستورِ ساخت","createdAt":1762500000000,"amount":120,"by":"u-owner","approvedBy":"u-owner","approval":{"by":"u-owner","kind":"bom","at":1762500000000},"reason":"ساخت","note":"بسته‌بندی","z":{"total":240},"refIds":["s-full","r-full"],"fromMethod":"cash","toMethod":"card","payRef":"PR-1","specialOrder":{"debtorId":"d-full","productId":"p-full","item":"برنجِ ویژه","qtyMilli":2000,"totalMinor":24000,"depositMinor":5000,"due":"2026-11-20","to":"ready","saleId":"s-full"},"layaway":{"debtorId":"d-full","kind":"open","totalMinor":24000,"depositMinor":4000,"lines":[{"productId":"p-full","label":"۲۵ کیلو","name":"برنجِ سیلا","qtyMilli":2000,"unitMinor":12000,"note":"بی‌نمک","specialMinor":11500}],"schedule":[{"no":1,"due":"2026-12-01","amountMinor":10000}],"to":"paid","saleId":"s-full"},"bom":{"parts":[{"productId":"p-part","qtyMilli":500}],"lossBp":150},"points":12,"payRow":1,"payMethod":"cash","fromStatus":"open","toStatus":"done","drawer":"D1","xfer":{"from":"loc-back","to":"loc-front"},"viewer":"u-cashier","role":"cashier","device":"dev-1","view":"debtor","userId":"u-owner","userRole":"owner","deviceId":"dev-1","chain":"c-1","chainSeq":3,"prev":"0f1e2d3c","hash":"4b5a6978","chainV":1},"hash":"459d24bfa75b54823b859d5c9724ee4fd0eb2c0f4db954b494d929e9059f26b8"},
+    {"table":"safeEntries","row_id":"se-count","type":"insert","fields":{"kind":"count","amountMinor":500000,"createdAt":1762500000000,"by":"u-owner","reason":"شمارشِ شب","note":"کم بود","expectedMinor":480000},"hash":"e05c6818048ab273c06a50bea672cd86c8c037067aeca2daca555ee20c9d71a0"},
+    {"table":"safeEntries","row_id":"se-bank","type":"insert","fields":{"kind":"to_bank","amountMinor":200000,"createdAt":1762500000000,"by":"u-owner","note":"بانکِ ملی","bagNo":"B-17"},"hash":"4caeaf46a2969187a2aeb41e5a0ca09e5f6285b0c9d504d850b80f154abd5b01"},
+    {"table":"safeEntries","row_id":"se-drawer","type":"insert","fields":{"kind":"from_drawer","amountMinor":150000,"createdAt":1762500000000,"shiftId":"sh-1","auditId":"al-full"},"hash":"fe0f61049a48226d01c4b040992f7f6a98e52d53eb2e3f94ce219ad2cda9d5e0"},
+    {"table":"productCategories","row_id":"a72af6c8ff341e1ecccc39a08735213a","type":"insert","fields":{"name":"لبنیات"},"hash":"e1cb463412af2c0c54097f8c3b27f429cca7d088b319bd1ab578f83c2b45b183"},
+    {"table":"productCategories","row_id":"9cb2f786f27ec6d245eb0cc34696e246","type":"insert","fields":{"name":"غله"},"hash":"0fa3c928c4208c6d04ea477a8b26ee8cd399b0871c5407837ae535effcd18c40"},
+    {"table":"productUnits","row_id":"a760cfd5140ee8f206d71f317c502073","type":"insert","fields":{"name":"عدد"},"hash":"669d3a8b8162449b08a2d164e06dfdb6971202451bc6e57b0ace96ef9f1e60ae"},
+    {"table":"productUnits","row_id":"afc0d6855cb28f779fca35843f4a8fbc","type":"insert","fields":{"name":"بوجی"},"hash":"35b0bf7f3592632d45dc5aa26b2d16780f09bcd4cf54ee8ffc81b7befac2b0dc"},
+    {"table":"expenseCategories","row_id":"894ff9381d2b9ef59045d288545c5d94","type":"insert","fields":{"name":"کرایه"},"hash":"abb01e28fb8daf64794bb0e2e566e321820df4b0ae558c44e2b94331afb65947"},
+    {"table":"expenseCategories","row_id":"2b9c753a1355c12fc443f4505ac07b9e","type":"insert","fields":{"name":"برقِ دکان"},"hash":"8055f03eab7d07121b3bbf0e3bbe17e67c117c5fe6ef81accfe72430ce5bfa1b"}
+  ],
+  "v3": [
+    {"table":"returns","row_id":"r-full","kind":"insert","fields":{"saleId":"s-full","saleItemId":"si-full","productId":"p-full","quantityMilli":1000,"amountMinor":12000,"reason":"خراب","date":"2026-11-02","createdAt":1762500300000,"docId":"rd-1","disposition":"restock","refund":"cash","toAccount":70,"toCredit":50,"creditTo":"d-full","toMethods":{"cash":70},"unitPrice":120,"by":"u-cashier","approvedBy":"u-owner","exchangeSaleId":"s-ex","channel":"pos","approval":{"by":"u-owner","kind":"return","at":1762500300000},"shiftId":"sh-1"}},
+    {"table":"products","row_id":"p-full","kind":"insert","fields":{"name":"برنجِ سیلا","category":"غله","unit":"کیلوگرم","purchasePriceMinor":9050,"salePriceMinor":12000,"wholesalePriceMinor":11000,"minStockMilli":5000,"notes":"انبارِ پشت","barcodes":["6260000000017","6260000000024"],"photo":true,"createdAt":1762500000000,"subcategory":"دانه‌بلند","supplierId":"su-full","active":false,"saleUnit":"بوجی","unitFactor":0.0004,"namePs":"وريجې","nameEn":"Sella rice","synonyms":["برنج سیلا"],"keywords":["برنج","سیلا"],"aisle":"A","shelf":"3","shelfLevel":"2","alternatives":["p-part"],"customFields":{"origin":"پاکستان"},"sku":"RICE-SEL-25","stockless":true,"brand":"گلستان","tags":["پرفروش"],"reorderPoint":8,"maxStock":200,"packs":[{"name":"بوجی ۲۵","sizeMilli":25000,"barcodes":["6260000000031"],"priceMinor":280000}],"kit":[{"productId":"p-part","qty":0.0002}],"priceWindows":[{"from":"2026-11-01","to":"2026-11-07","price":115}],"variantAxes":[{"name":"وزن","values":["۵","۲۵"]}],"variantOf":"p-part","variant":{"وزن":"۲۵"},"serialTracked":true,"consumptionDays":14,"purchaseUnits":[{"name":"کارتن","factorMilli":12000,"supplierId":"su-full","barcode":"6260000000048"}]}},
+    {"table":"warehouseEntries","row_id":"w-full","kind":"insert","fields":{"productId":"p-full","cartonsMilli":2000,"perCartonMilli":25000,"unitsMilli":50000,"unit":"کیلوگرم","priceMinor":9050,"date":"2026-11-01","notes":"رسیدِ خرید","isAdjustment":true,"purchaseId":"pu-full","refId":"pu-full","createdAt":1762500000000,"expiryDate":"2027-05-01","batch":"B-2026-11","productionDate":"2026-10-01","landedCost":92.25,"landedCostMinor":9225,"locationId":"loc-back","userId":"u-owner","adjKind":"count","lotId":"lot-1","countedAt":1762500100000,"seenMilli":48000,"correctedAt":1762500200000,"costMinor":9050}},
+    {"table":"sales","row_id":"s-full","kind":"insert","fields":{"invoiceNumber":7,"totalMinor":24000,"discountType":"percent","discountValue":5.684341886080802e-14,"discountMinor":1000,"finalTotalMinor":23000,"paymentMethod":"mixed","debtorId":"d-full","paidAmountMinor":13000,"remainingMinor":10000,"status":"completed","debtGivenMinor":10000,"debtSettledMinor":5000,"createdAt":1762500000000,"date":"2026-11-01","cancelReason":"","seller":"u-cashier","orderId":"o-1","orderNo":1001,"series":"A1","approval":{"by":"u-owner","kind":"discount","at":1762500000000},"cancelApproval":{"by":"u-owner","kind":"cancel","at":1762500000001},"creditApproval":{"by":"u-owner","kind":"credit","at":1762500000002},"priceApproval":{"by":"u-owner","kind":"price","at":1762500000003},"payments":[{"method":"cash","kind":"pay","amount":8000,"status":"done","ref":"R-1","verification":"code","custody":"drawer","payee":"shop"}],"tenderedMinor":15000,"changeMinor":2000,"roundingMinor":50,"channel":"pos","receiptToken":"rt-abc","promoDiscountMinor":500,"coupons":["NOWRUZ"],"note":"تحویل فردا","correctedAt":1762500200000,"shiftId":"sh-1"}},
+    {"table":"saleItems","row_id":"si-full","kind":"insert","fields":{"saleId":"s-full","productId":"p-full","name":"برنجِ سیلا","quantityMilli":2000,"unitPriceMinor":12000,"purchasePriceMinor":9050,"totalPriceMinor":24000,"returnedQtyMilli":1000,"lotId":"lot-1","locationId":"loc-front","parts":[{"productId":"p-part","qty":1}],"serials":["SN-1"],"listPriceMinor":12500,"promo":[{"id":"pr-1","rev":2,"name":"تخفیفِ هفته","discountMinor":500}],"note":"بی بسته","priceSource":"list","seller":"u-cashier"}},
+    {"table":"debtors","row_id":"d-full","kind":"insert","fields":{"name":"احمد کریمی","phone":"0700123456","notes":"مشتریِ عمده","createdAt":1762500000000,"creditLimit":5000,"phone2":"0799888777","tags":["عمده"],"group":"عمده‌فروش","priceList":"wholesale","marketingConsent":true,"mergedInto":"d-old","cardCode":"C-0001","deliveryAddress":{"area":"کارتهٔ سه","landmark":"پهلوی مسجد","gate":"درِ سبز","floor":"۲","plusCode":"8FW4V75V+8Q","postalCode":"1001"},"specialPrices":[{"productId":"p-full","priceMinor":11500,"from":"2026-11-01","to":"2026-12-01"}]}},
+    {"table":"transactions","row_id":"t-full","kind":"insert","fields":{"debtorId":"d-full","type":"receive","amountMinor":5000,"date":"2026-11-02","notes":"قسطِ اول","createdAt":1762500300000,"dueDate":"2026-12-01","refId":"s-full","kind":"settle","shiftId":"sh-1"}},
+    {"table":"expenses","row_id":"e-full","kind":"insert","fields":{"title":"کرایهٔ دکان","category":"کرایه","amountMinor":300000,"date":"2026-11-01","notes":"ماهِ عقرب","createdAt":1762500000000}},
+    {"table":"suppliers","row_id":"su-full","kind":"insert","fields":{"name":"عمده‌فروشِ کابل","phone":"0799000111","address":"مندوی","notes":"نقد","createdAt":1762500000000,"leadDays":3}},
+    {"table":"purchases","row_id":"pu-full","kind":"insert","fields":{"productId":"p-full","supplierId":"su-full","quantityMilli":50000,"unit":"کیلوگرم","purchasePriceMinor":9050,"totalAmountMinor":452500,"date":"2026-11-01","notes":"بارِ اول","paidAmountMinor":400000,"debtMinor":52500,"warehouseEntryId":"w-full","createdAt":1762500000000,"invoiceNo":77,"landedCost":12345678.5,"landedCostMinor":9225,"dueDate":"2026-12-01","unitName":"کارتن","unitQtyMilli":4000,"unitFactorMilli":12000}},
+    {"table":"supplierPayments","row_id":"sp-full","kind":"insert","fields":{"supplierId":"su-full","amountMinor":400000,"date":"2026-11-01","notes":"نقد","createdAt":1762500000000}},
+    {"table":"stockMovements","row_id":"sm-full","kind":"insert","fields":{"productId":"p-full","type":"transfer","qtyMilli":3000,"date":"2026-11-01","notes":"به جلوی دکان","refId":"x-1","createdAt":1762500000000,"userId":"u-owner","reason":"جابه‌جایی","locationId":"loc-back","toLocationId":"loc-front","lotId":"lot-1","correctedAt":1762500200000}},
+    {"table":"priceHistory","row_id":"ph-full","kind":"insert","fields":{"productId":"p-full","oldPriceMinor":11000,"newPriceMinor":12000,"date":"2026-11-01","createdAt":1762500000000,"by":"u-owner","reason":"نرخِ تازه"}},
+    {"table":"auditLog","row_id":"al-full","kind":"insert","fields":{"type":"stock_bom","date":"2026-11-01","refId":"p-full","notes":"دستورِ ساخت","createdAt":1762500000000,"amountMinor":12000,"by":"u-owner","approvedBy":"u-owner","approval":{"by":"u-owner","kind":"bom","at":1762500000000},"reason":"ساخت","note":"بسته‌بندی","z":{"total":240},"refIds":["s-full","r-full"],"fromMethod":"cash","toMethod":"card","payRef":"PR-1","specialOrder":{"debtorId":"d-full","productId":"p-full","item":"برنجِ ویژه","qtyMilli":2000,"totalMinor":24000,"depositMinor":5000,"due":"2026-11-20","to":"ready","saleId":"s-full"},"layaway":{"debtorId":"d-full","kind":"open","totalMinor":24000,"depositMinor":4000,"lines":[{"productId":"p-full","label":"۲۵ کیلو","name":"برنجِ سیلا","qtyMilli":2000,"unitMinor":12000,"note":"بی‌نمک","specialMinor":11500}],"schedule":[{"no":1,"due":"2026-12-01","amountMinor":10000}],"to":"paid","saleId":"s-full"},"bom":{"parts":[{"productId":"p-part","qtyMilli":500}],"lossBp":150},"points":12,"payRow":1,"payMethod":"cash","fromStatus":"open","toStatus":"done","drawer":"D1","xfer":{"from":"loc-back","to":"loc-front"},"viewer":"u-cashier","role":"cashier","device":"dev-1","view":"debtor","userId":"u-owner","userRole":"owner","deviceId":"dev-1","chain":"c-1","chainSeq":3,"prev":"0f1e2d3c","hash":"4b5a6978","chainV":1}},
+    {"table":"safeEntries","row_id":"se-count","kind":"insert","fields":{"kind":"count","amountMinor":500000,"createdAt":1762500000000,"by":"u-owner","reason":"شمارشِ شب","note":"کم بود","expectedMinor":480000}},
+    {"table":"safeEntries","row_id":"se-bank","kind":"insert","fields":{"kind":"to_bank","amountMinor":200000,"createdAt":1762500000000,"by":"u-owner","note":"بانکِ ملی","bagNo":"B-17"}},
+    {"table":"safeEntries","row_id":"se-drawer","kind":"insert","fields":{"kind":"from_drawer","amountMinor":150000,"createdAt":1762500000000,"shiftId":"sh-1","auditId":"al-full"}},
+    {"table":"productCategories","row_id":"a72af6c8ff341e1ecccc39a08735213a","kind":"insert","fields":{"name":"لبنیات"}},
+    {"table":"productCategories","row_id":"9cb2f786f27ec6d245eb0cc34696e246","kind":"insert","fields":{"name":"غله"}},
+    {"table":"productUnits","row_id":"a760cfd5140ee8f206d71f317c502073","kind":"insert","fields":{"name":"عدد"}},
+    {"table":"productUnits","row_id":"afc0d6855cb28f779fca35843f4a8fbc","kind":"insert","fields":{"name":"بوجی"}},
+    {"table":"expenseCategories","row_id":"894ff9381d2b9ef59045d288545c5d94","kind":"insert","fields":{"name":"کرایه"}},
+    {"table":"expenseCategories","row_id":"2b9c753a1355c12fc443f4505ac07b9e","kind":"insert","fields":{"name":"برقِ دکان"}}
+  ]
+}

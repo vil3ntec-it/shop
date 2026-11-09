@@ -194,8 +194,8 @@ fun DeskSaleScreen(
   //  پیش‌فرض خاموش). خاموش ⇒ هرگز `true` نمی‌شود و کادر همان درصدِ امروز است — جز فاکتورِ نگه‌داشته‌ای که
   //  با تنظیمِ روشن به مبلغ نگه داشته شد: عددش همان مبلغ می‌ماند، نه درصد (۵۰۰ ؋ هرگز ۱۰۰٪ نمی‌شود).
   val amountChoosable = remember { ir.vil3ntec.tohid.data.LinePolicyPrefs.on(context) }
-  var discountAmount by remember { mutableStateOf(false) }
-  var paidText by remember { mutableStateOf("") }
+  var discountAmount by remember { mutableStateOf(false) }; var paidText by remember { mutableStateOf("") }
+  LaunchedEffect(cart) { ir.vil3ntec.tohid.ui.v3.sales.cart.HeldSession.take(cartStore)?.let { discountText = it.discount; discountAmount = it.discountAmount } } // «اصلاحِ فاکتور» (`SaleReopen`): تخفیفِ همان فاکتور، یک بار
   //  POS-12: مشتریِ فاکتوری که با جابه‌جایی آمد روشِ پرداختِ برگشته‌اش را عوض نمی‌کند
   var switchedDebtor by remember { mutableStateOf<String?>(null) }
   LaunchedEffect(cartDebtorId) {

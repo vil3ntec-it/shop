@@ -388,6 +388,11 @@ tasks.test {
   System.getenv("TOHID_BIG_LEDGER_HEAP")?.takeIf { it.isNotBlank() }?.let { maxHeapSize = it }
   System.getenv("TOHID_BIG_LEDGER")?.takeIf { it.isNotBlank() }?.let { environment("TOHID_BIG_LEDGER", it); outputs.upToDateWhen { false } }
   System.getenv("TOHID_BIG_LEDGER_CPU_ONLY")?.let { environment("TOHID_BIG_LEDGER_CPU_ONLY", it) }
+  //  POS-42: سنجهٔ دستیِ اسکن و جست‌وجو با ۲۰ هزار کالا (`perf/PosSpeedBenchTest`) — `TOHID_POS_SPEED=1` یا `-Ptohid.posSpeed=1`
+  (System.getenv("TOHID_POS_SPEED") ?: findProperty("tohid.posSpeed")?.toString())?.takeIf { it.isNotBlank() }?.let {
+    systemProperty("tohid.posSpeed", it); outputs.upToDateWhen { false }
+    if (System.getenv("TOHID_BIG_LEDGER_HEAP").isNullOrBlank()) maxHeapSize = "3g"
+  }
   //  گزارشِ کشیدنِ صفحه‌ها (`shots/NewScreensRenderTest`، فقط کارِ «(گزارش)» ِ desktop-shots.yml): پوشهٔ PNG و render-report.json؛
   //  بی آن، آزمون کنار می‌رود و آزمونِ سدِ کامپیوتر هیچ صفحه‌ای نمی‌کشد
   System.getenv("TOHID_RENDER_OUT")?.takeIf { it.isNotBlank() }?.let { environment("TOHID_RENDER_OUT", it); outputs.upToDateWhen { false } }

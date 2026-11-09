@@ -50,14 +50,26 @@ data class CheckoutNumbers(
  */
 object CheckoutModel {
 
-  /** @param presetDiscount POS-12 — تخفیفی که با فاکتورِ نگه‌داشته آمد (درصد، همان کادرِ کامپیوتر) */
-  fun start(presetDebtorId: String?, debtors: List<Debtor>, presetDiscount: String = ""): CheckoutForm {
+  /**
+   *  @param presetDiscount POS-12 — تخفیفی که با فاکتورِ نگه‌داشته (یا اصلاحِ فاکتور، `SaleReopen`) آمد
+   *  @param presetAmount   POS-20 — همان تخفیف به مبلغ (افغانی) است، نه درصد (`HeldExtras.discountAmount`). بی آن «۵۰۰ ؋» ِ
+   *    فاکتورِ نگه‌داشتهٔ کامپیوتر این‌جا «۵۰۰٪» خوانده می‌شد و تا ۱۰۰٪ بریده ⇒ کلِ فاکتور رایگان.
+   *  @param presetPaid     دریافتیِ نسیه‌ای که با همان فاکتور آمد (`HeldExtras.paid`)؛ فقط برگهٔ نسیه
+   */
+  fun start(
+    presetDebtorId: String?, debtors: List<Debtor>, presetDiscount: String = "", presetAmount: Boolean = false, presetPaid: String = "",
+  ): CheckoutForm {
     //  مشتریِ ادغام‌شده (CRM-10) نسیه نمی‌گیرد (`CreditDebtor`) ⇒ مثلِ مشتریِ ناپیدا، نقدی
     val preset = presetDebtorId?.takeIf { id -> debtors.any { it.id == id && ir.vil3ntec.tohid.data.CustomerCrm.isActive(it) } }
-    val discount = presetDiscount.ifBlank { "0" }
-    return if (preset != null) CheckoutForm(SalesEngine.Payment.CREDIT, preset, discountText = discount, paidText = "0")
-    else CheckoutForm(SalesEngine.Payment.CASH, null, discountText = discount)
+    val discount = presetDiscount.trim().ifBlank { "0" }
+    val type = if (presetAmount && presetDiscount.isNotBlank()) SalesEngine.DiscountType.AMOUNT else SalesEngine.DiscountType.PERCENT
+    return if (preset != null) CheckoutForm(SalesEngine.Payment.CREDIT, preset, type, discount, paidText = presetPaid.trim().ifBlank { "0" })
+    else CheckoutForm(SalesEngine.Payment.CASH, null, type, discount)
   }
+
+  /** همان [start] با آنچه با فاکتور آمد (`HeldSession`) */
+  fun start(presetDebtorId: String?, debtors: List<Debtor>, x: ir.vil3ntec.tohid.data.HeldExtras): CheckoutForm =
+    start(presetDebtorId, debtors, x.discount, x.discountAmount, if (x.payment == SalesEngine.Payment.CREDIT) x.paid else "")
 
   /** @param cashRounding PAY-09 — پلهٔ `CashRoundPref` برای نقدِ کاملِ پرداختِ ساده؛ ترکیبی ⇒ ۰ (گرد از پنل) */
   fun checkout(form: CheckoutForm, canDiscount: Boolean, blockExpired: Boolean, seller: String, cashRounding: Long = 0L): SalesEngine.Checkout =

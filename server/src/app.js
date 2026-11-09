@@ -416,6 +416,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/ledger-merge', require('./routes/shop-ledger-merge'));
     //  تنظیماتِ دکان، همگام‌سازیِ زنده (مهاجرتِ ۳۰۰) — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.settings_sync`
     api.use('/shop/settings-sync', require('./routes/shop-settings-sync'));
+    //  پشتیبانِ فاکتورهای نگه‌داشته (مهاجرتِ ۴۲۵، POS-12/S09) — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.held_sync`
+    api.use('/shop/held-invoices', require('./routes/shop-held-invoices'));
     //  PRM-13: قاعدهٔ یکسانِ امتیازِ وفاداری برای همهٔ دستگاه‌های دکان — پیش از `/shop`؛ پشتِ پرچمِ خاموشِ `shop.loyalty_rule`
     api.use('/shop/loyalty', require('./routes/shop-loyalty'));
     api.use('/receipt', require('./routes/receipt-public'));

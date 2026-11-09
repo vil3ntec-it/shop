@@ -60,20 +60,37 @@ object CatalogSearch {
 
   /** فقط کالاهای فعال؛ یک بار با هر تغییرِ کالاها یا فروش‌ها */
   fun index(products: List<Product>, popularity: Map<String, Int>): Index {
-    val entries = products.asSequence()
-      .filter { it.active }
-      .map { p ->
-        Entry(
-          id = p.id,
-          category = p.category,
-          nameKey = TextNormalizer.compareKey(p.name),
-          codes = p.barcodes.map { TextNormalizer.compareKey(it) }.filter { it.isNotEmpty() },
-          sold = popularity[p.id] ?: 0,
-        )
-      }
+    val entries = keys(products)
+      .map { it.copy(sold = popularity[it.id] ?: 0) }
       .sortedWith(compareByDescending<Entry> { it.sold }.thenBy { it.nameKey }.thenBy { it.id })
-      .toList()
     return Index(entries)
+  }
+
+  /*
+   *  POS-42 — کلیدهای نرمالِ کالاهای فعال (`sold` = ۰، به ترتیبِ فهرستِ کالا) فقط با تغییرِ **کالاها** از نو: نمایه با هر
+   *  فروش هم از نو ساخته می‌شود (پرفروش‌ترین اول)، ولی نامِ ۲۰ هزار کالا با فروش عوض نمی‌شود و نرمال کردنشان نیمی از
+   *  «نخستین اسکن پس از فروش» در گوشی بود. یک خانه بس است (یک دفتر روی صفحه). کلیدِ خانه رونوشتِ همان فهرست است و
+   *  برابری محتوایی سنجیده می‌شود (همان `remember(d.products)` ِ صفحه): فهرستِ دیگری با همان کالاها ⇒ همان کلیدها؛ هر کالای
+   *  عوض‌شده ⇒ از نو. نتیجه مو‌به‌مو همان ساختنِ کامل است (`CatalogSearchTest`).
+   */
+  private var keyedFrom: List<Product>? = null
+  private var keyed: List<Entry> = emptyList()
+
+  @Synchronized
+  private fun keys(products: List<Product>): List<Entry> {
+    if (keyedFrom == products) return keyed
+    val fresh = products.filter { it.active }.map { p ->
+      Entry(
+        id = p.id,
+        category = p.category,
+        nameKey = TextNormalizer.compareKey(p.name),
+        codes = p.barcodes.map { TextNormalizer.compareKey(it) }.filter { it.isNotEmpty() },
+        sold = 0,
+      )
+    }
+    keyedFrom = products.toList()
+    keyed = fresh
+    return fresh
   }
 
   /** پرفروش‌ترین‌ها برای ردیفِ «پرفروش‌ها» — کالایی که هرگز فروخته نشده نه */

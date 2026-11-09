@@ -167,6 +167,17 @@ object CustomerPriceCart {
     return after.count { l -> !l.free && was[l.productId]?.let { w -> !((w.unitPrice == null && l.unitPrice == null) || same(w.unitPrice, l.unitPrice)) } == true }
   }
 
+  /**
+   *  نشانِ «قیمتِ خاص» ِ ردیفی از سندِ ثابت‌قیمت (پیش‌فاکتور، اصلاحِ فاکتور) هنگامِ رفتن به سبد: فقط اگر [unit] امروز
+   *  ([date]) هنوز همان قیمتِ خاصِ فعالِ همین مشتری برای همین کالاست؛ وگرنه `null` ⇒ ردیف «دستی» با همان فی می‌ماند
+   *  (`CustomerPrice.reprice`). بی این شرط، نشان فیِ سند را به قیمتِ خاصِ تازه (یا پس از پایانِ بازه به لیست) می‌بُرد.
+   */
+  fun stillSpecial(d: ShopData, debtorId: String?, productId: String, unit: Double?, date: String): Double? {
+    if (unit == null || debtorId == null) return null
+    val e = CustomerPrice.find(CustomerPrices.entries(d.debtors.find { it.id == debtorId }), productId, date) ?: return null
+    return unit.takeIf { e.priceMinor == CustomerPrices.minor(it) }
+  }
+
   /** برچسبِ منبعِ قیمتِ قلمِ ثبت‌شده (رسید و سابقه): «قیمتِ خاص» یا `null` */
   fun label(item: SaleItem): String? = if (item.priceSource == CustomerPrice.SPECIAL) StrCustomerPrices.sourceLabel else null
 

@@ -35,7 +35,9 @@ object SetAsideSync {
     val book = runCatching {
       if (v3) SetAside.v3Book(SyncV3Runner.of(app).rejected()) else SetAside.v1Book(SyncV1Engine.of(app).droppedOps())
     }.getOrDefault(emptyList())
-    if (book.isEmpty() || !SetAside.openRejected(book, store.ledgerNow())) return 0
+    //  DATA-SAFETY §۷: نشانِ بیرون از دفتر (`SetAsideMarks`) هم «بسته» است — دفتری که `setAside` را از دست داد هر ۵ دقیقه نمی‌پرسد
+    val marked = runCatching { if (v3) SyncV3Runner.of(app).settledOps() else ir.vil3ntec.tohid.sync.v1.OpQueue(app, SyncV1Engine.of(app).currentKey()).settledMarks().read().ops }.getOrDefault(emptySet())
+    if (book.isEmpty() || !SetAside.openRejected(book, store.ledgerNow(), marked)) return 0
     val t = System.currentTimeMillis()
     if (!due && t - lastAt < MIN_MS) return 0
     lastAt = t

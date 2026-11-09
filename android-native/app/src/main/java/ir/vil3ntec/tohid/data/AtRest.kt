@@ -107,7 +107,8 @@ object AtRest {
     val vaults = dir.listFiles().orEmpty().filter {
       it.isFile && it.name.startsWith("ledger-") && it.name.endsWith(".json") && it.name != "ledger-summary.json"
     }.sortedBy { it.name }
-    val snaps = runCatching { AutoBackup.list(context).map { it.file } }.getOrDefault(emptyList())
+    //  OPS-02: نسخهٔ رمزدار با عبارتِ بازیابی (`SnapshotSeal`) مالِ کوچِ کلیدِ دستگاه نیست — هرگز به کلیدِ دستگاه برنمی‌گردد
+    val snaps = runCatching { AutoBackup.list(context).map { it.file }.filterNot { SnapshotSeal.isPhraseSealed(it) } }.getOrDefault(emptyList())
     //  DATA-SAFETY: نسخهٔ پیشینِ دفتر (`shop-data.json.prev`) همان رمزِ دفتر را می‌گیرد
     return listOf(File(dir, "shop-data.json"), File(dir, "before-restore.json"), File(dir, "shop-data.json.prev")) + vaults + snaps
   }

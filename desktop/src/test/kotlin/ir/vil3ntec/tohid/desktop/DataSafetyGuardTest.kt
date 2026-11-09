@@ -2,8 +2,12 @@ package ir.vil3ntec.tohid.desktop
 
 import android.content.Context
 import ir.vil3ntec.tohid.data.BackupBundle
+import ir.vil3ntec.tohid.data.DeviceDocsBundle
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.QuoteBook
+import ir.vil3ntec.tohid.data.QuoteStore
 import ir.vil3ntec.tohid.data.Sale
+import ir.vil3ntec.tohid.data.SavedQuote
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopSettingsBundle
 import ir.vil3ntec.tohid.data.ShopStore
@@ -41,6 +45,8 @@ class DataSafetyGuardTest {
     policy.edit().remove("dsg.rounding").remove("dsg.kept").commit()
     ctx.getSharedPreferences("tohid-session", Context.MODE_PRIVATE).edit().remove("dsg.evil").commit()
     ShopSettingsBundle.dropStaged(ctx)
+    DeviceDocsBundle.dropStaged(ctx)
+    File(ctx.filesDir, QuoteStore.FILE).delete()
   }
 
   @Before fun before() = clean()
@@ -104,6 +110,32 @@ class DataSafetyGuardTest {
 
     assertEquals(500L, policy.getLong("dsg.rounding", 0L))
     assertEquals("تنظیمِ موجودِ این دستگاه بی‌صدا عوض نمی‌شود", "here", policy.getString("dsg.kept", null))
+  }
+
+  /**
+   *  DATA-SAFETY §۸: پیش‌فاکتور (`quotes.json`) نه در دفتر است نه در همگام‌سازی؛ پیش از این در پشتیبان هم نبود و با نصبِ
+   *  دوباره گم می‌شد. حالا در هر پشتیبانِ کامل (پس با پشتیبانِ ابری روی سرور) و پس از تأییدِ بازیابی — فقط روی دستگاهی
+   *  که هیچ پیش‌فاکتوری ندارد — برمی‌گردد.
+   */
+  @Test fun `پیش‌فاکتورها با پشتیبانِ کامل به دستگاهِ تازه برمی‌گردند و پیش‌فاکتورِ موجود عوض نمی‌شود`() {
+    val q = SavedQuote(id = "dsg-q1", number = 3, createdAt = 1762500000000, createdDay = "2026-11-01",
+      validUntil = "2026-11-08", totalMinor = 24000, by = "صاحب", note = "برای آقای کریمی")
+    assertTrue(QuoteStore.update(ctx) { QuoteBook(items = listOf(q)) } != null)
+    val zip = ByteArrayOutputStream().also { BackupBundle.write(ctx, it, "{\"products\":[{\"id\":\"dsg-p1\",\"name\":\"x\"}]}").getOrThrow() }.toByteArray()
+
+    //  نصبِ دوباره: پرونده نیست
+    File(ctx.filesDir, QuoteStore.FILE).delete()
+    BackupBundle.read(ctx, ByteArrayInputStream(zip)) { ShopStore(ctx).parseBackup(it) }.getOrThrow()
+    assertTrue("تا تأییدِ بازیابی چیزی نمی‌نشیند", QuoteStore.read(ctx).items.isEmpty())
+    BackupBundle.commitPhotos(ctx, onlyMissing = true)
+    assertEquals(listOf(q), QuoteStore.read(ctx).items)
+
+    //  دستگاهی که پیش‌فاکتورِ خودش را دارد: هیچ چیز رونویسی یا قاطی نمی‌شود
+    val mine = q.copy(id = "dsg-q2", number = 1, totalMinor = 500)
+    assertTrue(QuoteStore.update(ctx) { QuoteBook(items = listOf(mine)) } != null)
+    BackupBundle.read(ctx, ByteArrayInputStream(zip)) { ShopStore(ctx).parseBackup(it) }.getOrThrow()
+    BackupBundle.commitPhotos(ctx)
+    assertEquals(listOf(mine), QuoteStore.read(ctx).items)
   }
 
   @Test fun `پشتیبانِ دست‌ساز نشست یا همگام‌سازی را نمی‌نویسد`() {
@@ -188,6 +220,8 @@ class DataSafetyGuardTest {
       "tohid-settings-restore",
       //  سایه و cursor ِ همگام‌سازیِ تنظیماتِ دکان (`ShopSettingsSync`) — خودِ تنظیم‌ها در `SHOP_PREFS`
       "tohid-settings-sync",
+      //  صف، نسخه‌ها و cursor ِ پشتیبانِ فاکتورهای نگه‌داشته (`HeldSync`، پرچمِ `shop.held_sync`) — خودِ نگه‌داشته‌ها روی سرورند
+      "tohid-held-sync",
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: کلیدِ سبدِ همین صندوق ⇒ ردیفِ صندوقِ سرور (`ConflictFix`)؛ خودِ ردیف روی سرور است
       "tohid-conflict-fix",
     ).forEach { put(it, Kind.DEVICE) }

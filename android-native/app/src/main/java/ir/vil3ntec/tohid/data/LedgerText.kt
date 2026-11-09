@@ -14,24 +14,24 @@ import kotlinx.serialization.json.Json
  */
 internal object LedgerTables {
 
-  class Table<T>(val key: String, val rows: (ShopData) -> List<T>, val serializer: KSerializer<T>)
+  class Table<T>(val key: String, val rows: (ShopData) -> List<T>, val serializer: KSerializer<T>, val id: (T) -> String)
 
   val ALL: List<Table<*>> = listOf(
-    Table("products", { it.products }, Product.serializer()),
-    Table("warehouseEntries", { it.warehouseEntries }, WarehouseEntry.serializer()),
-    Table("sales", { it.sales }, Sale.serializer()),
-    Table("saleItems", { it.saleItems }, SaleItem.serializer()),
-    Table("returns", { it.saleReturns }, SaleReturn.serializer()),
-    Table("debtors", { it.debtors }, Debtor.serializer()),
-    Table("transactions", { it.transactions }, DebtTransaction.serializer()),
-    Table("expenses", { it.expenses }, Expense.serializer()),
-    Table("suppliers", { it.suppliers }, Supplier.serializer()),
-    Table("purchases", { it.purchases }, Purchase.serializer()),
-    Table("supplierPayments", { it.supplierPayments }, SupplierPayment.serializer()),
-    Table("stockMovements", { it.stockMovements }, StockMovement.serializer()),
-    Table("priceHistory", { it.priceHistory }, PriceChange.serializer()),
-    Table("auditLog", { it.auditLog }, AuditEntry.serializer()),
-    Table("safeEntries", { it.safeEntries }, SafeEntry.serializer()),
+    Table("products", { it.products }, Product.serializer(), { it.id }),
+    Table("warehouseEntries", { it.warehouseEntries }, WarehouseEntry.serializer(), { it.id }),
+    Table("sales", { it.sales }, Sale.serializer(), { it.id }),
+    Table("saleItems", { it.saleItems }, SaleItem.serializer(), { it.id }),
+    Table("returns", { it.saleReturns }, SaleReturn.serializer(), { it.id }),
+    Table("debtors", { it.debtors }, Debtor.serializer(), { it.id }),
+    Table("transactions", { it.transactions }, DebtTransaction.serializer(), { it.id }),
+    Table("expenses", { it.expenses }, Expense.serializer(), { it.id }),
+    Table("suppliers", { it.suppliers }, Supplier.serializer(), { it.id }),
+    Table("purchases", { it.purchases }, Purchase.serializer(), { it.id }),
+    Table("supplierPayments", { it.supplierPayments }, SupplierPayment.serializer(), { it.id }),
+    Table("stockMovements", { it.stockMovements }, StockMovement.serializer(), { it.id }),
+    Table("priceHistory", { it.priceHistory }, PriceChange.serializer(), { it.id }),
+    Table("auditLog", { it.auditLog }, AuditEntry.serializer(), { it.id }),
+    Table("safeEntries", { it.safeEntries }, SafeEntry.serializer(), { it.id }),
   )
 
   /** دفترِ بی ردیف — همان کلیدها و هر فیلدِ دیگر، با فهرست‌های ردیفیِ خالی */
@@ -64,16 +64,19 @@ internal object LedgerText {
   /** ردیف در هر تکه — چند صد کیلوبایت */
   private const val CHUNK = 1_000
 
-  /** @param out نوشتنِ تکه‌ای از بایت‌ها: (آرایه، آغاز، اندازه) — همان `OutputStream.write` */
-  fun write(json: Json, d: ShopData, out: (ByteArray, Int, Int) -> Unit) {
-    val skeleton = json.encodeToString(ShopData.serializer(), LedgerTables.bare(d))
+  /**
+   *  @param out نوشتنِ تکه‌ای از بایت‌ها: (آرایه، آغاز، اندازه) — همان `OutputStream.write`
+   *  @param extras کلیدهای نسخهٔ تازه‌تر که این نسخه نمی‌شناسد (`LedgerExtras`)؛ `null` ⇒ همان بایت‌های همیشه
+   */
+  fun write(json: Json, d: ShopData, extras: LedgerExtras? = null, out: (ByteArray, Int, Int) -> Unit) {
+    val skeleton = extras?.skeleton(json, LedgerTables.bare(d)) ?: json.encodeToString(ShopData.serializer(), LedgerTables.bare(d))
     val cuts = ArrayList<Pair<Int, LedgerTables.Table<*>>>()
     for (t in LedgerTables.ALL) {
       if (t.rows(d).isEmpty()) continue
       val needle = "\"${t.key}\":[]"
       val at = skeleton.indexOf(needle)
       if (at < 0 || skeleton.indexOf(needle, at + 1) >= 0) {
-        out.all(json.encodeToString(ShopData.serializer(), d).toByteArray(Charsets.UTF_8))
+        out.all((extras?.text(json, d) ?: json.encodeToString(ShopData.serializer(), d)).toByteArray(Charsets.UTF_8))
         return
       }
       //  جای `]` ِ همان فهرست
@@ -83,13 +86,22 @@ internal object LedgerText {
     var pos = 0
     for ((at, t) in cuts) {
       out.all(skeleton.substring(pos, at).toByteArray(Charsets.UTF_8))
-      rows(json, t, d, out)
+      if (extras?.hasRows(t.key) == true) kept(json, t, d, extras, out) else rows(json, t, d, out)
       pos = at
     }
     out.all(skeleton.substring(pos).toByteArray(Charsets.UTF_8))
   }
 
   private fun ((ByteArray, Int, Int) -> Unit).all(b: ByteArray) = this(b, 0, b.size)
+
+  /** جدولی که ردیفِ با کلیدِ نگه‌داشته دارد: ردیف به ردیف (فقط پس از برگشت به این نسخه؛ `LedgerExtras`) */
+  private fun <T> kept(json: Json, t: LedgerTables.Table<T>, d: ShopData, extras: LedgerExtras, out: (ByteArray, Int, Int) -> Unit) {
+    val one = t.serializer
+    t.rows(d).forEachIndexed { i, r ->
+      if (i > 0) out.all(byteArrayOf(','.code.toByte()))
+      out.all((extras.row(json, t.key, one, r, t.id(r)) ?: json.encodeToString(one, r)).toByteArray(Charsets.UTF_8))
+    }
+  }
 
   private fun <T> rows(json: Json, t: LedgerTables.Table<T>, d: ShopData, out: (ByteArray, Int, Int) -> Unit) {
     val all = t.rows(d)

@@ -17,11 +17,15 @@
  *   UF.web-clear وب سقفِ اعتبار را پاک می‌کند ⇒ null روی سرور می‌نشیند (وب از تورِ سرور می‌گذرد)
  *   UF.net      ساختِ نصب‌شدهٔ پیش از A00 همان null را می‌فرستد ⇐ سرور برای کلیدی که آن ساخت
  *               نمی‌شناسد کنارش می‌گذارد؛ ساختی که فیلد را می‌شناسد هنوز می‌تواند پاکش کند
+ *   UF.batch30  دستگاهِ نسخهٔ پیشین (main ِ دستهٔ ۳۰، مدلِ واقعیِ همان نسخه از `tools/compat-ledger`) ردیف‌هایی را که
+ *               دستهٔ ۳۱ با فیلدهای تازه‌اش نوشت (واحدِ خرید، ارزشِ دقیق، قیمتِ خاص، منبعِ قیمت، واحدِ خریدِ فاکتور)
+ *               ویرایش می‌کند ⇒ هیچ op ای به آن فیلدها دست نمی‌زند، سرور و دستگاهِ تازه همه را دارند (DATA-SAFETY §۷)
  *
  * اجرا:  node test/e2e/fields.e2e.mjs
  */
 import { boot, assert } from './lib/harness.mjs';
-import { core, KOTLIN, PRE_A00 } from './lib/native.mjs';
+import path from 'node:path';
+import { core, KOTLIN, PRE_A00, modelOfLedger, row as modelRow } from './lib/native.mjs';
 
 const E = await boot({ name: 'fields' });
 const { db } = E;
@@ -184,6 +188,70 @@ await E.step('UF.net', 'ساختِ پیش از A00 null می‌فرستد ⇐ س
   assert.equal((await row('sales', saleId)).orderId, 'ord_e2e');
   E.ok(await clear(A, { orderId: null }), 'push');
   assert.equal((await row('sales', saleId)).orderId, null, 'ساختِ A00 (caps) از تور می‌گذرد');
+}, { needs: ['UF.0'] });
+
+await E.step('UF.batch30', 'دستگاهِ دستهٔ ۳۰ ردیف‌های دستهٔ ۳۱ را ویرایش می‌کند ⇒ فیلدهای تازه روی سرور و دستگاهِ تازه می‌مانند', async () => {
+  const OLD_MODEL = modelOfLedger(path.join(import.meta.dirname, '..', '..', '..', 'android-native', 'app', 'src', 'test', 'resources', 'compat', 'old-maximal.json'));
+  //  فیلدهای دستهٔ ۳۱ که مدلِ دستهٔ ۳۰ ندارد (همان جدولِ §۷)
+  const NEW_KEYS = { products: ['purchaseUnits'], warehouseEntries: ['costMinor'], debtors: ['specialPrices'], saleItems: ['priceSource'], purchases: ['unitName', 'unitQtyMilli', 'unitFactorMilli'] };
+  for (const [c, ks] of Object.entries(NEW_KEYS)) for (const k of ks) assert.ok(!OLD_MODEL[c].has(k), `${c}.${k} در مدلِ دستهٔ ۳۰ هست؟`);
+  await A.drain();
+  const d = structuredClone(A.ledger);
+  const pid = d.products[0].id;
+  const t = Date.now();
+  const FRESH = {
+    products: { [pid]: { purchaseUnits: [{ name: 'کارتن ۲۴', factorMilli: 24000 }] } },
+    warehouseEntries: { 'we-b31': { costMinor: 100000 } },
+    debtors: { 'deb-b31': { specialPrices: [{ productId: pid, priceMinor: 9000 }] } },
+    saleItems: { [d.saleItems[0].id]: { priceSource: 'special' } },
+    purchases: { 'pu-b31': { unitName: 'کارتن ۲۴', unitQtyMilli: 1000, unitFactorMilli: 24000 } },
+  };
+  Object.assign(d.products[0], FRESH.products[pid]);
+  Object.assign(d.saleItems[0], FRESH.saleItems[d.saleItems[0].id]);
+  d.warehouseEntries.push(modelRow('WarehouseEntry', { id: 'we-b31', productId: pid, units: 24, unit: 'دانه', price: 41.67, date: '2026-11-08', purchaseId: 'pu-b31', createdAt: t, ...FRESH.warehouseEntries['we-b31'] }));
+  d.purchases.push(modelRow('Purchase', { id: 'pu-b31', productId: pid, quantity: 24, unit: 'دانه', purchasePrice: 41.67, totalAmount: 1000, date: '2026-11-08', warehouseEntryId: 'we-b31', createdAt: t, ...FRESH.purchases['pu-b31'] }));
+  d.debtors.push(modelRow('Debtor', { id: 'deb-b31', name: 'مشتریِ خاص', createdAt: t, ...FRESH.debtors['deb-b31'] }));
+  A.save(d);
+  await A.drain();
+  const ids = Object.fromEntries(Object.entries(FRESH).map(([c, m]) => [c, Object.keys(m)]));
+  const onServer = async () => {
+    const out = {};
+    for (const [c, list] of Object.entries(ids)) for (const id of list) out[`${c}/${id}`] = await row(c, id);
+    return out;
+  };
+  const pickNew = (rows) => Object.fromEntries(Object.entries(rows).map(([k, r]) => [k, pick(r, Object.keys(FRESH[k.split('/')[0]][k.split('/')[1]]))]));
+  const want = Object.fromEntries(Object.entries(FRESH).flatMap(([c, m]) => Object.entries(m).map(([id, v]) => [`${c}/${id}`, v])));
+  assert.deepEqual(pickNew(await onServer()), want, 'دستهٔ ۳۱ فیلدهای تازه را به سرور نرساند');
+
+  const O = await E.device('O-batch30', owner.email, { appVersion: NEW, model: OLD_MODEL });
+  assert.equal((await O.firstSync()).ok, true);
+  const mine = (c, id) => O.ledger[c].find((r) => r.id === id);
+  for (const [c, m] of Object.entries(FRESH)) for (const id of Object.keys(m)) {
+    for (const k of Object.keys(m[id])) assert.equal(mine(c, id)[k], undefined, `دستهٔ ۳۰ ${c}.${k} را نمی‌شناسد`);
+  }
+  //  دستهٔ ۳۰ هر ردیف را روی فیلدی که می‌شناسد ویرایش می‌کند
+  const e = structuredClone(O.ledger);
+  e.products.find((r) => r.id === pid).salePrice += 5;
+  e.warehouseEntries.find((r) => r.id === 'we-b31').notes = 'ویرایشِ دستهٔ ۳۰';
+  e.debtors.find((r) => r.id === 'deb-b31').name = 'نامِ تازه';
+  e.saleItems.find((r) => r.id === d.saleItems[0].id).note = 'یادداشتِ دستهٔ ۳۰';
+  e.purchases.find((r) => r.id === 'pu-b31').notes = 'ویرایشِ دستهٔ ۳۰';
+  O.save(e);
+  const sent = O.queue.filter((o) => ids[o.table]?.includes(o.row_id));
+  assert.equal(sent.length, 5, JSON.stringify(O.queue));
+  for (const o of sent) for (const k of NEW_KEYS[o.table]) assert.ok(!(k in o.fields), `دستهٔ ۳۰ به ${o.table}.${k} دست زد: ${JSON.stringify(o.fields)}`);
+  await O.drain();
+  const after = await onServer();
+  assert.deepEqual(pickNew(after), want, 'ویرایشِ دستهٔ ۳۰ فیلدِ تازه را روی سرور پاک کرد');
+  assert.equal(after['debtors/deb-b31'].name, 'نامِ تازه');
+  assert.equal(after['warehouseEntries/we-b31'].notes, 'ویرایشِ دستهٔ ۳۰');
+  //  دستگاهِ دستهٔ ۳۱ هر دو را دارد: ویرایشِ دستگاهِ کهنه و فیلدهای خودش
+  await A.drain();
+  for (const [c, m] of Object.entries(FRESH)) for (const [id, v] of Object.entries(m)) {
+    assert.deepEqual(pick(A.ledger[c].find((r) => r.id === id), Object.keys(v)), v, `${c}/${id} روی دستگاهِ تازه`);
+  }
+  assert.equal(A.ledger.debtors.find((r) => r.id === 'deb-b31').name, 'نامِ تازه');
+  assert.equal(A.ledger.products.find((r) => r.id === pid).salePrice, e.products.find((r) => r.id === pid).salePrice);
 }, { needs: ['UF.0'] });
 
 await E.finish();

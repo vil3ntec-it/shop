@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.data
 
 import android.content.Context
+import ir.vil3ntec.tohid.core.backup.BackupStamp
+import ir.vil3ntec.tohid.core.backup.ZipTail
 import ir.vil3ntec.tohid.core.i18n.StrAppData
+import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import java.io.File
 import java.io.InputStream
 import java.io.OutputStream
@@ -29,6 +32,8 @@ import java.util.zip.ZipOutputStream
  *
  *      shop-data.json      ← همان فایلی که تا امروز ساخته می‌شد، مو به مو
  *      photos/<شناسه>.jpg  ← عکسِ هر کالا
+ *      settings.json       ← تنظیماتِ دکان (`ShopSettingsBundle`)
+ *      bundle.json         ← OPS-02: نسخهٔ قالب و دکانِ صاحبِ دفتر (`BackupStamp`)؛ پشتیبانِ کهنه ندارد
  *
  *  چون `shop-data.json`ِ داخلش دقیقاً همان قالبِ قبلی است، هرکس ZIP را
  *  باز کند همان فایلِ آشنا را دارد و می‌تواند در نسخهٔ وب هم بازش کند.
@@ -46,7 +51,8 @@ object BackupBundle {
   /** بیش از این اندازه، فایل عکس نیست و باز نمی‌شود */
   private const val MAX_PHOTO_BYTES = 4L * 1024 * 1024
 
-  data class Opened(val data: ShopData, val photos: Int)
+  /** @param stamp مُهرِ `bundle.json` (پشتیبانِ کهنه ⇒ `BackupStamp.LEGACY`) — `BackupRestore.open` با صاحبِ دفتر می‌سنجد */
+  data class Opened(val data: ShopData, val photos: Int, val stamp: BackupStamp.Stamp = BackupStamp.LEGACY)
 
   /* ------------------------------ نوشتن ------------------------------ */
 
@@ -58,6 +64,11 @@ object BackupBundle {
   fun write(context: Context, out: OutputStream, ledgerJson: String): Result<Int> = runCatching {
     var count = 0
     ZipOutputStream(out.buffered()).use { zip ->
+      //  OPS-02: نسخهٔ قالب و دکانِ صاحبِ دفتر — بازیابیِ پشتیبانِ دکانِ دیگر رد می‌شود (`BackupStamp.judge`)
+      zip.putNextEntry(ZipEntry(BackupStamp.ENTRY))
+      zip.write(BackupStampIo.of(context).toByteArray(Charsets.UTF_8))
+      zip.closeEntry()
+
       zip.putNextEntry(ZipEntry(LEDGER_ENTRY))
       zip.write(ledgerJson.toByteArray(Charsets.UTF_8))
       zip.closeEntry()
@@ -67,6 +78,14 @@ object BackupBundle {
         val settings = ShopSettingsBundle.export(context)
         zip.putNextEntry(ZipEntry(ShopSettingsBundle.ENTRY))
         zip.write(settings.toByteArray(Charsets.UTF_8))
+        zip.closeEntry()
+      }
+
+      //  DATA-SAFETY §۸: پیش‌فاکتورهای همین دستگاه (`DeviceDocsBundle`) — نه در دفتر، نه در همگام‌سازی
+      runCatching {
+        val quotes = DeviceDocsBundle.quotes(context) ?: return@runCatching
+        zip.putNextEntry(ZipEntry(DeviceDocsBundle.QUOTES_ENTRY))
+        zip.write(quotes.toByteArray(Charsets.UTF_8))
         zip.closeEntry()
       }
 
@@ -121,55 +140,80 @@ object BackupBundle {
     staging.deleteRecursively()
     staging.mkdirs()
     ShopSettingsBundle.dropStaged(context)
+    DeviceDocsBundle.dropStaged(context)
 
     var ledger: String? = null
     var photos = 0
+    var entries = 0
+    var stamp = BackupStamp.LEGACY
+    val tap = BackupStampIo.Tap(head)
 
-    ZipInputStream(head).use { zip ->
-      var entry: ZipEntry? = zip.nextEntry
-      while (entry != null) {
-        val name = entry.name
-        when {
-          !entry.isDirectory && name.endsWith(LEDGER_ENTRY) && !name.contains(PHOTO_DIR) ->
-            ledger = zip.readBytes().toString(Charsets.UTF_8)
+    /*
+     *  OPS-02 (`BackupRestoreDrillTest`): ZIP ِ بریده یا خراب هرگز «پشتیبانِ سالم» نیست. هر خطای خواندن (بریده وسطِ
+     *  قلم، CRC، deflate ِ خراب) ⇒ پیامِ روشن، نه متنِ فنیِ جاوا؛ و بریده **سرِ مرزِ قلم** (که `ZipInputStream` «پایان»
+     *  می‌بیند) با رکوردِ پایانیِ ZIP گرفته می‌شود (`ZipTail.complete`). پیش از این دفتر بی تنظیمات و بی بخشی از عکس‌ها
+     *  بازیابی می‌شد. هنوز هیچ چیزی جز پوشهٔ موقت ننشسته؛ صدازننده با شکست آن را پاک می‌کند (`dropStaging`).
+     */
+    try {
+      ZipInputStream(tap).use { zip ->
+        var entry: ZipEntry? = zip.nextEntry
+        while (entry != null) {
+          entries++
+          val name = entry.name
+          when {
+            !entry.isDirectory && name == BackupStamp.ENTRY -> stamp = BackupStampIo.read(zip)
 
-          //  DATA-SAFETY: تا تأییدِ بازیابی کنار می‌ماند، همان قاعدهٔ عکس‌ها (`ShopSettingsBundle.commit`)
-          !entry.isDirectory && name == ShopSettingsBundle.ENTRY ->
-            ShopSettingsBundle.stageFrom(context, zip)
+            !entry.isDirectory && name.endsWith(LEDGER_ENTRY) && !name.contains(PHOTO_DIR) ->
+              ledger = zip.readBytes().toString(Charsets.UTF_8)
 
-          !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
-            /*
-             *  فقط نامِ خودِ فایل برداشته می‌شود، نه مسیرِ داخلِ ZIP.
-             *  فایلِ دست‌ساز می‌تواند مسیری مثل `photos/../../x` داشته
-             *  باشد و بیرونِ پوشه بنویسد؛ همین یک خط جلویش را می‌گیرد.
-             */
-            val leaf = File(name).name
-            if (leaf.isNotBlank() && leaf.endsWith(".jpg")) {
-              val target = File(staging, leaf)
-              if (target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
-                var written = 0L
-                target.outputStream().use { out ->
-                  val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
-                  while (true) {
-                    val n = zip.read(buffer)
-                    if (n <= 0) break
-                    written += n
-                    if (written > MAX_PHOTO_BYTES) break
-                    out.write(buffer, 0, n)
+            //  DATA-SAFETY: تا تأییدِ بازیابی کنار می‌ماند، همان قاعدهٔ عکس‌ها (`ShopSettingsBundle.commit`)
+            !entry.isDirectory && name == ShopSettingsBundle.ENTRY ->
+              ShopSettingsBundle.stageFrom(context, zip)
+
+            //  DATA-SAFETY §۸: پیش‌فاکتورهای همین دستگاه — تا تأییدِ بازیابی کنار می‌مانند (`DeviceDocsBundle`)
+            !entry.isDirectory && name == DeviceDocsBundle.QUOTES_ENTRY ->
+              DeviceDocsBundle.stageFrom(context, zip)
+
+            !entry.isDirectory && name.startsWith(PHOTO_DIR) && name.endsWith(".jpg") -> {
+              /*
+               *  فقط نامِ خودِ فایل برداشته می‌شود، نه مسیرِ داخلِ ZIP.
+               *  فایلِ دست‌ساز می‌تواند مسیری مثل `photos/../../x` داشته
+               *  باشد و بیرونِ پوشه بنویسد؛ همین یک خط جلویش را می‌گیرد.
+               */
+              val leaf = File(name).name
+              if (leaf.isNotBlank() && leaf.endsWith(".jpg")) {
+                val target = File(staging, leaf)
+                if (target.canonicalPath.startsWith(staging.canonicalPath + File.separator)) {
+                  var written = 0L
+                  target.outputStream().use { out ->
+                    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                    while (true) {
+                      val n = zip.read(buffer)
+                      if (n <= 0) break
+                      written += n
+                      if (written > MAX_PHOTO_BYTES) break
+                      out.write(buffer, 0, n)
+                    }
                   }
+                  if (written in 1..MAX_PHOTO_BYTES) photos++ else target.delete()
                 }
-                if (written in 1..MAX_PHOTO_BYTES) photos++ else target.delete()
               }
             }
           }
+          zip.closeEntry()
+          entry = zip.nextEntry
         }
-        zip.closeEntry()
-        entry = zip.nextEntry
+        //  فهرستِ پایانیِ ZIP هم از همان تَپ بگذرد
+        tap.drain()
       }
+    } catch (e: Exception) {
+      throw IllegalStateException(StrBackupSafety.damaged, e)
     }
+    if (!ZipTail.complete(tap.tail(), entries)) error(StrBackupSafety.damaged)
+    if (stamp.formatVersion > BackupStamp.FORMAT_VERSION) error(StrBackupSafety.newerApp)
 
     val text = ledger ?: error(StrAppData.notOurBackup)
-    Opened(parse(text).getOrThrow(), photos)
+    Opened(parse(text).getOrThrow(), photos, stamp)
   }
 
   /**
@@ -194,12 +238,15 @@ object BackupBundle {
     staging.deleteRecursively()
     //  DATA-SAFETY: تنظیماتِ دکانِ همان پشتیبان — فقط کلیدهایی که این دستگاه هنوز ندارد
     ShopSettingsBundle.commit(context)
+    //  DATA-SAFETY §۸: پیش‌فاکتورها — فقط روی دستگاهی که هیچ پیش‌فاکتوری ندارد
+    DeviceDocsBundle.commit(context)
     return moved
   }
 
   fun dropStaging(context: Context) {
     runCatching { staging(context).deleteRecursively() }
     ShopSettingsBundle.dropStaged(context)
+    DeviceDocsBundle.dropStaged(context)
   }
 
   /**
@@ -210,8 +257,10 @@ object BackupBundle {
    *  می‌بیند و فکر می‌کند برنامه خراب است. این تابع پرچم را با آنچه
    *  واقعاً روی دیسک هست هماهنگ می‌کند.
    */
-  fun reconcilePhotoFlags(context: Context, d: ShopData): ShopData {
-    val have = photoDir(context).listFiles().orEmpty()
+  fun reconcilePhotoFlags(context: Context, d: ShopData, staged: Boolean = false): ShopData {
+    //  `staged` (`BackupRestore.confirm`): عکس‌های کنار گذاشته هم — همان‌ها که پس از نشستنِ دفتر سرِ جایشان می‌روند
+    val dirs = if (staged) listOf(photoDir(context), staging(context)) else listOf(photoDir(context))
+    val have = dirs.flatMap { it.listFiles().orEmpty().toList() }
       .filter { it.isFile }
       .mapTo(HashSet()) { it.name.removeSuffix(".jpg") }
     var changed = false

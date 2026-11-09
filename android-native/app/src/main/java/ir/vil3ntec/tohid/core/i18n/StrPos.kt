@@ -152,6 +152,11 @@ object StrPos {
     "On: while the till is open, a held invoice that gets stale is discarded without asking and can't be brought back. The invoice on the till is never cleared. This device only.",
     "روښانه: تر هغه چې صندوق خلاص وي، هغه ساتل شوی بل چې زوړ شي پرته له پوښتنې لرې کېږي او نه راګرځي. د صندوق اوسنی بل نه پاکېږي. یوازې همدا وسیله.",
   )
+  val heldNotYours: String get() = t(
+    "فاکتورِ نگه‌داشتهٔ کسِ دیگر را فقط کسی که اجازهٔ لغوِ فاکتور دارد دور می‌اندازد",
+    "Only someone allowed to cancel invoices can discard someone else's held invoice",
+    "د بل چا ساتل شوی بل یوازې هغه څوک لرې کولی شي چې د بل د لغوه کولو اجازه لري",
+  )
   val heldAutoCleanLocked: String get() = t("فقط کسی که اجازهٔ لغوِ فاکتور دارد این را عوض می‌کند", "Only someone allowed to cancel invoices can change this", "یوازې هغه څوک چې د بل د لغوه کولو اجازه لري دا بدلولی شي")
   fun heldAutoCleared(n: Any, h: Any): String = t("${asIs(n)} فاکتورِ نگه‌داشتهٔ کهنه‌تر از ${asIs(h)} ساعت خودکار پاک شد", "$n held invoices older than $h hours were cleared automatically", "$n ساتل شوي بلونه له $h ساعتونو زاړه پخپله پاک شول")
   val clearIt: String get() = t("پاک کن", "Clear", "پاک یې کړئ")

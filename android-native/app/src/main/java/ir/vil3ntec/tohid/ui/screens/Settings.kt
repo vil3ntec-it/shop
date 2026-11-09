@@ -318,7 +318,7 @@ fun SettingsScreen(
         runCatching {
           val input = context.contentResolver.openInputStream(uri)
             ?: error(StrSettings.fileNotOpened)
-          input.use { BackupBundle.read(context, it) { text -> store.parseBackup(text) }.getOrThrow() }
+          input.use { ir.vil3ntec.tohid.data.BackupRestore.open(context, store, it).getOrThrow() }
         }
       }
       opened
@@ -863,7 +863,7 @@ fun SettingsScreen(
                   scope.launch {
                     val opened = withContext(Dispatchers.IO) {
                       //  نسخهٔ خودکار رونوشتِ دفتر است؛ اگر دفتر رمزدار بود، این هم (SEC-01)
-                      runCatching { store.parseBackup(ir.vil3ntec.tohid.data.AtRest.readText(context, snap.file)).getOrThrow() }
+                      ir.vil3ntec.tohid.data.BackupRestore.openSnapshot(context, store, snap.file)
                     }
                     opened
                       .onSuccess { pendingRestore = it; restorePhotos = 0; restoreError = null }
@@ -1118,17 +1118,12 @@ fun SettingsScreen(
           val next = incoming
           pendingRestore = null
           scope.launch {
-            store.keepSafetyCopy()
-            //  اول عکس‌ها سرِ جایشان، بعد پرچمِ `photo` با واقعیتِ دیسک
-            //  یکی می‌شود — وگرنه کاربر جای خالیِ عکس می‌بیند و فکر
-            //  می‌کند برنامه خراب است
-            val moved = withContext(Dispatchers.IO) { BackupBundle.commitPhotos(context) }
-            val fixed = withContext(Dispatchers.IO) { BackupBundle.reconcilePhotoFlags(context, next) }
             //  ⚠️ بازیابیِ پشتیبان دادهٔ خودِ کاربر است؛ قفلِ نرمِ پایانِ اشتراک گروگانش نمی‌گیرد.
             //  S143: هرگز op نمی‌سازد؛ دستگاهِ همگام ⇒ اطلاعات از سرور. نشد (دیسک F0-01، شبکه، صف) ⇒
-            //  دفترِ قبلی دست‌نخورده و دلیلش
-            val r = store.restoreBackup(fixed)
+            //  دفترِ قبلی دست‌نخورده و دلیلش. OPS-02: همان راهِ نسخهٔ ۳ (`BackupRestore.confirm`) — عکس‌ها پس از دفتر
+            val r = ir.vil3ntec.tohid.data.BackupRestore.confirm(context, store, next)
             if (!r.ok) { toast(r.message); return@launch }
+            val moved = r.photos
             canUndo = true
             restorePhotos = 0
             val done = if (moved > 0) StrSettings.restoredWithPhotos(plain(moved)) else StrSettings.restored

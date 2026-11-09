@@ -1,7 +1,7 @@
 {
  "version": 1,
  "format": "cost-v1",
- "about": "Shared golden vectors for the moving weighted average cost (D-23 option A, 1405/08/13): RPT-03 gross profit, PRD-15 product average cost and stock value, PRM-16 promo effect. The ledger is the web/ShopData shape. Run by license/report-core.js (server/test/cost-vectors.test.js, also through the server owner report) and by core/report/ReportCore.kt (CostVectorsTest, which also runs PromoEffect on case F). Money = integer minor units (AFN 1/100), quantity = integer milli, percent = basis points. Expected numbers were worked out by hand from the rules in the report-core header (one stock-core position per product, recorded mode; returns at the cost they left with), not copied from either engine. sales = report-core sales() over the whole day with costing mavg and costApproved true; lineSales (case A) = the optional 'purchase price on the line' method for comparison.",
+ "about": "Shared golden vectors for the moving weighted average cost (D-23 option A, 1405/08/13): RPT-03 gross profit, PRD-15 product average cost and stock value, PRM-16 promo effect. The ledger is the web/ShopData shape. Run by license/report-core.js (server/test/cost-vectors.test.js, also through the server owner report) and by core/report/ReportCore.kt (CostVectorsTest, which also runs PromoEffect on case F). Money = integer minor units (AFN 1/100), quantity = integer milli, percent = basis points. Expected numbers were worked out by hand from the rules in the report-core header (one stock-core position per product, recorded mode; returns at the cost they left with), not copied from either engine. sales = report-core sales() over the whole day with costing mavg and costApproved true; lineSales (case A) = the optional 'purchase price on the line' method for comparison. Case G (INV-21): a recipe build (Bom.build rows: adjustment rows with adjKind repack) values the output at its exact costMinor (sum of the component costs, as StockLedger books the production document), never units x the rounded row price; components leave at the average of that moment.",
  "range": {
   "from": "2026-11-01",
   "to": "2026-11-01"
@@ -943,6 +943,208 @@
        "discountDepthBp": 345
       }
      ]
+    }
+   }
+  },
+  {
+   "name": "ساختِ بسته از دستور (INV-21): خروجی به بهای دقیقِ اجزا (costMinor)، نه مقدار × بهای گردشدهٔ یک بسته — همان StockLedger",
+   "id": "G",
+   "ledger": {
+    "products": [
+     {
+      "id": "c",
+      "name": "شیرِ خشک",
+      "category": "",
+      "purchasePrice": 11.49,
+      "salePrice": 13
+     },
+     {
+      "id": "r",
+      "name": "روبان",
+      "category": "",
+      "purchasePrice": 0.47,
+      "salePrice": 1
+     },
+     {
+      "id": "b",
+      "name": "بستهٔ صبحانه",
+      "category": "",
+      "purchasePrice": 11.33,
+      "salePrice": 15
+     }
+    ],
+    "warehouseEntries": [
+     {
+      "id": "w1",
+      "productId": "c",
+      "units": 3,
+      "price": 10.01,
+      "date": "2026-11-01",
+      "createdAt": 1793509200000
+     },
+     {
+      "id": "w2",
+      "productId": "c",
+      "units": 4,
+      "price": 11.49,
+      "date": "2026-11-01",
+      "createdAt": 1793509800000
+     },
+     {
+      "id": "w3",
+      "productId": "r",
+      "units": 7,
+      "price": 0.47,
+      "date": "2026-11-01",
+      "createdAt": 1793510400000
+     },
+     {
+      "id": "n01",
+      "productId": "c",
+      "units": -6,
+      "price": 10.86,
+      "date": "2026-11-01",
+      "notes": "ساختِ بسته",
+      "isAdjustment": true,
+      "refId": "op1",
+      "createdAt": 1793512800000,
+      "userId": "کریم",
+      "adjKind": "repack"
+     },
+     {
+      "id": "n02",
+      "productId": "r",
+      "units": -6,
+      "price": 0.47,
+      "date": "2026-11-01",
+      "notes": "ساختِ بسته",
+      "isAdjustment": true,
+      "refId": "op1",
+      "createdAt": 1793512800000,
+      "userId": "کریم",
+      "adjKind": "repack"
+     },
+     {
+      "id": "n03",
+      "productId": "b",
+      "units": 6,
+      "price": 11.33,
+      "date": "2026-11-01",
+      "notes": "ساختِ بسته",
+      "isAdjustment": true,
+      "refId": "op1",
+      "createdAt": 1793512800000,
+      "userId": "کریم",
+      "adjKind": "repack",
+      "costMinor": 6795
+     }
+    ],
+    "sales": [
+     {
+      "id": "s1",
+      "total": 60,
+      "discount": 0,
+      "finalTotal": 60,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793516400000
+     },
+     {
+      "id": "s2",
+      "total": 28,
+      "discount": 0,
+      "finalTotal": 28,
+      "paymentMethod": "cash",
+      "status": "completed",
+      "date": "2026-11-01",
+      "createdAt": 1793520000000
+     }
+    ],
+    "saleItems": [
+     {
+      "id": "i1",
+      "saleId": "s1",
+      "productId": "b",
+      "name": "",
+      "quantity": 4,
+      "unitPrice": 15,
+      "purchasePrice": 11.33,
+      "totalPrice": 60
+     },
+     {
+      "id": "i2",
+      "saleId": "s2",
+      "productId": "b",
+      "name": "",
+      "quantity": 1,
+      "unitPrice": 15,
+      "purchasePrice": 11.33,
+      "totalPrice": 15
+     },
+     {
+      "id": "i3",
+      "saleId": "s2",
+      "productId": "c",
+      "name": "",
+      "quantity": 1,
+      "unitPrice": 13,
+      "purchasePrice": 11.49,
+      "totalPrice": 13
+     }
+    ]
+   },
+   "expect": {
+    "line": {
+     "i1": 4530,
+     "i2": 1133,
+     "i3": 1086
+    },
+    "ret": {},
+    "est": [],
+    "stock": {
+     "rows": [
+      {
+       "productId": "b",
+       "name": "بستهٔ صبحانه",
+       "qtyMilli": 1000,
+       "valueMinor": 1132,
+       "unitCostMinor": 1132,
+       "approximate": false
+      },
+      {
+       "productId": "c",
+       "name": "شیرِ خشک",
+       "qtyMilli": 0,
+       "valueMinor": 0,
+       "unitCostMinor": 1086,
+       "approximate": true
+      },
+      {
+       "productId": "r",
+       "name": "روبان",
+       "qtyMilli": 1000,
+       "valueMinor": 47,
+       "unitCostMinor": 47,
+       "approximate": false
+      }
+     ],
+     "totals": {
+      "products": 3,
+      "valueMinor": 1179,
+      "negative": 0,
+      "approximate": false
+     }
+    },
+    "sales": {
+     "sales": 8800,
+     "returns": 0,
+     "netSales": 8800,
+     "cogs": 6749,
+     "grossProfit": 2051,
+     "marginBp": 2331,
+     "costEstimatedLines": 0,
+     "profitApproximate": false
     }
    }
   }

@@ -16,6 +16,8 @@ import androidx.compose.material.icons.outlined.Compress
 import androidx.compose.material.icons.outlined.DeleteForever
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.Key
+import androidx.compose.material.icons.outlined.Lock
 import androidx.compose.material.icons.outlined.Restore
 import androidx.compose.material.icons.outlined.TableChart
 import androidx.compose.material3.CircularProgressIndicator
@@ -29,11 +31,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import ir.vil3ntec.tohid.core.i18n.StrBackupSafety
 import ir.vil3ntec.tohid.core.i18n.StrSettings
 import ir.vil3ntec.tohid.data.AutoBackup
 import ir.vil3ntec.tohid.data.BackupClock
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.LedgerArchive
+import ir.vil3ntec.tohid.data.ShopRole
+import ir.vil3ntec.tohid.data.SnapshotSeal
 import ir.vil3ntec.tohid.displayMillis
 import ir.vil3ntec.tohid.sync.SyncStore
 import ir.vil3ntec.tohid.ui.Platform
@@ -66,10 +71,18 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
   val signedIn = remember { SyncStore(context).accessToken != null }
   val (ctrl, launch) = rememberBackupController(store, toasts, signedIn)
   val autoBackups = remember(data) { AutoBackup.list(context) }
+  //  OPS-02: نسخه‌های رمزدار با عبارت (قفل) و «رمزِ نسخه‌های خودکار» فقط برای صاحب/مدیر
+  val sealed = remember(autoBackups) { autoBackups.filter { SnapshotSeal.isPhraseSealed(it.file) }.mapTo(HashSet()) { it.file.name } }
+  val owner = remember { !ShopRole.isStaff(context) }
   val plan = remember(data) { LedgerArchive.plan(data) }
   var ask by remember { mutableStateOf(if (SettingsShotState.wipeSheet) Ask.WIPE else null) }
 
   ctrl.pendingRestore?.let { RestoreSheet(current = data, incoming = it, photos = ctrl.restorePhotos, onConfirm = ctrl::confirmRestore, onDismiss = ctrl::cancelRestore) }
+  RecoveryPhraseSheet(ctrl)
+  SnapshotUnlockSheet(ctrl)
+  if (ctrl.askSealOff) {
+    V3ConfirmSheet(StrBackupSafety.offQ, StrBackupSafety.offWarn, StrBackupSafety.offDo, ctrl::sealOff, ctrl::dismissSealOff, icon = Icons.Outlined.Lock, danger = false)
+  }
   when (ask) {
     Ask.COMPACT -> V3ConfirmSheet(StrSettings.compactQ, StrSettings.compactWarn(plan.total), StrSettings.compactDo, { ctrl.compact(data) }, { ask = null }, icon = Icons.Outlined.Compress, danger = false)
     Ask.WIPE -> V3ConfirmSheet(StrSettings.wipeQ, StrSettings.wipeWarn, StrSettings.wipe, { ctrl.wipe() }, { ask = null }, icon = Icons.Outlined.DeleteForever)
@@ -103,7 +116,29 @@ internal fun RouteScope.BackupScreen(onBack: (() -> Unit)?) {
         V3Section(StrSettings.autoTitle, footer = StrSettings.autoSnapshots) {
           autoBackups.forEachIndexed { i, snap ->
             if (i > 0) V3Divider(start = ROW_DIVIDER_START)
-            V3ListRow(displayMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = Icons.Outlined.History, tile = false, onClick = { ctrl.readSnapshot(snap) })
+            val icon = if (snap.file.name in sealed) Icons.Outlined.Lock else Icons.Outlined.History
+            V3ListRow(displayMillis(snap.at), subtitle = StrSettings.snapshotDesc((snap.bytes / 1024).toInt()), icon = icon, tile = false, onClick = { ctrl.readSnapshot(snap) })
+          }
+        }
+      }
+    }
+    if (owner) {
+      item(key = "seal") {
+        V3Section(StrBackupSafety.sealTitle, footer = StrBackupSafety.sealFooter) {
+          V3ToggleRow(
+            StrBackupSafety.sealToggle,
+            checked = ctrl.sealOn,
+            onCheckedChange = ctrl::toggleSeal,
+            subtitle = when {
+              !ctrl.sealOn -> null
+              ctrl.sealKeyReady -> StrBackupSafety.sealOnLine
+              else -> StrBackupSafety.sealKeyMissing
+            },
+            icon = Icons.Outlined.Lock,
+          )
+          if (ctrl.sealOn) {
+            V3Divider(start = ROW_DIVIDER_START)
+            V3ListRow(StrBackupSafety.newPhrase, subtitle = StrBackupSafety.newPhraseLine, icon = Icons.Outlined.Key, tile = false, onClick = ctrl::startPhrase)
           }
         }
       }
