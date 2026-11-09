@@ -32,7 +32,8 @@ function decide(decision) {
     await sf.track(store, req.params.token);   // توکنِ درست و سفارشِ همین ویترین — وگرنه ۴۰۴
     const orderId = sf.orderIdOf(store.shop_id, req.params.token);
     const out = await amend.decide(store.shop_id, orderId, req.params.amendId, decision, CUSTOMER);
-    const order = await sf.track(store, req.params.token);   // با کلیدِ `amendment` (پرچم روشن است)
+    //  با کلیدِ `amendment` (پرچم روشن است)؛ همان نمای پیگیری (`lib/store-order-view.js`): صفحه با همین پاسخ دوباره می‌کشد
+    const order = await require('../lib/store-order-view').customerOrder(store, req.params.token);
     if (out.code) {
       return res.status(409).json({ error: { code: out.code, message: MESSAGE[out.code], status: out.status }, order });
     }
