@@ -1334,6 +1334,11 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   باید `updated_at = now()` هم بنویسد. سنجه: `server/test/entitlement-clock.test.js` (ساعتِ ساختگی؛ پیش از رفع ۳ از ۵ سرخ).
 
 ### سنجشِ کارایی
+- ⛔ **PERF-02 — بار در مقیاسِ §۹.۳ و درستی زیرِ بار (`claude/perf-load`):** `load-test.mjs --profile scale,scale-burst --check`
+  (آمیزه و دفترِ بارساز `scripts/load-scale.mjs`، سنجه `scripts/load-check.js`). هر تغییرِ push/pull ِ v3، وظیفه/تعارض، نگه‌داشته،
+  ویترین یا جدایی دکان ⇒ `test/load-correctness.test.js` روی PGlite و PostgreSQL (بی سنجهٔ زمانی، ~۱ دقیقه). جست‌وجوی ردیفِ «باز» با
+  کلید (`dedupe_key` و مانندش) فقط با نمایهٔ جزئیِ همان کلید (نمونه: مهاجرتِ ۴۵۰)؛ نمایهٔ (حساب، وضعیت) که کلید را فیلتر کند با شمارِ
+  بازها خطی است. کاشتنِ ابزارِ بار پرچم را از `/api/admin/flags` می‌نویسد، نه درِ پمپ؛ «پایان‌دادنِ صف» دو گذر است (همه push، سپس همه pull).
 - ⛔ **PERF-04 — مهلت‌ها (`claude/ops-perf`، همه پیش‌فرض ۰ = خاموش):** `REQUEST_TIMEOUT_MS` (`middleware/deadline.js`، کف ۵ ثانیه؛
   درخواستِ `?wait=` ِ long-poll ۳۰ ثانیه بیشتر؛ پمپ و Sync v1 بیرون؛ از پس از خواندنِ بدنهٔ JSON) ⇒ ۵۰۳ ِ `request_timeout` (در
   `server_errors` هم) و نوشتنِ دیرِ مسیر بی‌صدا دور ریخته می‌شود. `PG_STATEMENT_TIMEOUT_MS` و `PG_IDLE_TX_TIMEOUT_MS` (`db.js`) ⇒ ۵۰۳ ِ `db_timeout`؛ مهاجرت‌ها
