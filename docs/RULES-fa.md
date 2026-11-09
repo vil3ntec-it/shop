@@ -374,6 +374,13 @@
   ⛔ سرور: سندِ پولیِ ردشده (سقفِ قرض، تخفیف/لغو/برگشتِ بیرون از نقش، سقفِ برگشت) **کامل** با همهٔ همراه‌هایش در
   `sync_v3_conflicts.loser_value` (`lib/conflict-payload.js`؛ v1 از `staff-approval.v1Guard` و همراهِ دستهٔ بعد به همان ردیف،
   v3 از `sync-v3.push`)، فقط با `account_id` ِ همان دکان؛ هرگز فقط خلاصه. سنجه: `server/test/conflict-payload.test.js`.
+- ⛔ **سازگاری میانِ نسخه‌ها** (`docs/DATA-SAFETY-fa.md` §۷، `claude/compat-audit`): هر فیلد یا قالبِ تازهٔ دفتر را
+  `LedgerCompatDiskTest` با نمونه‌های **مدلِ خودِ هر نسخه** می‌سنجد (`tools/compat-ledger/regen.sh` ⇐
+  `android-native/app/src/test/resources/compat/`؛ OLD = آخرین main ِ پیش از دسته). فیلدی که نسخهٔ پیشین با ذخیره
+  می‌اندازد در `lostOnDowngrade` و جدولِ §۷ می‌آید. دستگاهِ هرگز همگام‌نشده کلیدِ ناشناختهٔ نسخهٔ تازه‌تر را نگه می‌دارد
+  (`LedgerExtras`؛ همگام ⇒ نه، سرور مرجع است). دادهٔ فقط‌محلی که نشانِ «یک بار» است بیرون از دفتر هم نشان می‌خورد
+  (`SetAsideMarks`) — نسخهٔ پیشین آن را از دفتر می‌اندازد. فیلدِ آینه‌ای (`costMinor` کنارِ `price`) فقط وقتی با فیلدِ
+  پایه جور است خوانده می‌شود (`ReportLedger.exactValue` + همتای JS)؛ نسخهٔ پیشین پایه را عوض می‌کند و آینه کهنه می‌ماند.
 
 ### v3 · ورود و نشست
 

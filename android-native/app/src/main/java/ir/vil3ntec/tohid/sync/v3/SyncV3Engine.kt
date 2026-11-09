@@ -300,7 +300,7 @@ internal class SyncV3Engine(
   fun queued(): Int = queue.outbox.sumOf { it.size }
   fun rejected(): List<V3Entry> = queue.rejected
   /** «کنار بگذار»/«اصلاح و ثبت» ِ صاحب روی همین دفتر (`data/SetAside`؛ شرح سرِ `sync/v1/SetAsideCommit`) */
-  fun setAside(decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>): Int { var n = 0; withLock { n = ir.vil3ntec.tohid.sync.v1.SetAsideCommit.run(commit, { queue.outbox.mapTo(HashSet()) { "${it.table}/${it.rowId}" } }, decisions, book, ledger::read, ledger::write, now()) }; return n }
+  fun setAside(decisions: List<ir.vil3ntec.tohid.core.sync.ConflictInbox.Mine>, book: List<JsonObject>, marks: ir.vil3ntec.tohid.sync.v1.SetAsideMarks? = null): Int { var n = 0; withLock { n = ir.vil3ntec.tohid.sync.v1.SetAsideCommit.run(commit, { queue.outbox.mapTo(HashSet()) { "${it.table}/${it.rowId}" } }, decisions, book, ledger::read, ledger::write, now(), marks) }; return n }
 
   fun status(): V3Status {
     val m = meta

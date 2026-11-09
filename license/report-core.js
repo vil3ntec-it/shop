@@ -68,6 +68,12 @@
   function money(x) { return rnd(num(x) * 100); }
   function ms(x) { var n = Math.floor(num(x)); return n === 0 ? 0 : n; }
   function milli(x) { return rnd(num(x) * 1000); }
+  /*  PRD-07: `costMinor` فقط وقتی با مقدار × بهای همان ردیف جور است (نیم‌صدم برای هر واحد + ۱)؛ نسخهٔ پیش از دستهٔ ۳۱ با
+   *  ویرایشِ بها فقط `price` را می‌فرستد ⇒ ناجور ⇒ null (همتای `ReportLedger.exactValue`، DATA-SAFETY §۷) */
+  function exactValue(c, qtyMilli, unitCost) {
+    if (c === null) return null;
+    return Math.abs(c - qtyMilli * unitCost / 1000) <= Math.abs(qtyMilli) / 2000 + 1 ? c : null;
+  }
   function str(x) { return x === undefined || x === null ? '' : String(x); }
   function arr(x) { return Object.prototype.toString.call(x) === '[object Array]' ? x : []; }
   function cmp(a, b) { return a < b ? -1 : (a > b ? 1 : 0); }
@@ -181,8 +187,8 @@
         //  هزینهٔ جانبیِ کلِ ردیف (PUR-06): `landedCostMinor` ِ دقیق، وگرنه `landedCost` ِ افغانی؛ منفی یا نادرست ⇒ ۰
         landed: landedOf(e),
         adjustment: e.isAdjustment === true, date: str(e.date), createdAt: ms(e.createdAt),
-        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود ⇒ null = مقدار × بها، همان پیشین (همتای `ReportLedger.Entry.value`)
-        value: Number.isSafeInteger(e.costMinor) ? e.costMinor : null,
+        //  PRD-07: ارزشِ دقیقِ ورود (`costMinor`)؛ نبود یا ناجور با مقدار × بها ⇒ null = همان پیشین (همتای `ReportLedger.exactValue`)
+        value: exactValue(Number.isSafeInteger(e.costMinor) ? e.costMinor : null, milli(e.units), money(e.price)),
       });
     });
     arr(raw.auditLog).forEach(function (a) {

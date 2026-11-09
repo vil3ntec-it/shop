@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.sync.v1
 
 import ir.vil3ntec.tohid.core.sync.ConflictInbox
+import ir.vil3ntec.tohid.core.sync.RejectedSettle
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ReturnFlow
@@ -94,7 +95,7 @@ class SetAsideSettleTest {
       settle = ConflictInbox.Settle("v1", ops.map { ConflictInbox.SettleOp(it.opId, it.table, it.rowId, it.type) }, base, false),
     )
 
-  private fun settle(disk: Disk, vararg m: ConflictInbox.Mine, at: At = At.NONE): Int {
+  private fun settle(disk: Disk, vararg m: ConflictInbox.Mine, at: At = At.NONE, marks: SetAsideMarks? = null): Int {
     val dead = BooleanArray(1)
     return SetAsideCommit.run(
       session(disk, at, dead), { disk.queue.mapTo(HashSet()) { "${it.table}/${it.rowId}" } }, m.toList(), book,
@@ -105,6 +106,7 @@ class SetAsideSettleTest {
         if (at == At.AFTER_LEDGER) { dead[0] = true; throw Crash() }
       },
       now = clock,
+      marks = marks,
     )
   }
 
@@ -285,5 +287,33 @@ class SetAsideSettleTest {
     assertEquals(0.0, s.ledger.saleItems.single().returnedQty, 0.0)
     assertEquals(16.0, ShopStore.stock(s.ledger, "sugar"), 0.0)
     assertTrue(s.ledger.saleReturns.isEmpty())
+  }
+  @Test fun `برگشت به نسخهٔ کهنه‌تر — تصمیم دو بار نمی‌نشیند`() {
+    val owner = synced(d0)
+    save(owner, credit(owner.ledger, 4.0))
+    val placed = push(owner, accept = true)
+    val s = synced(d0)
+    pull(s, placed)
+    val sale = s.ledger.sales.single()
+    val item = s.ledger.saleItems.single { it.saleId == sale.id }
+    val req = ReturnFlow.Request(docId = "rd-2", saleId = sale.id, picks = mapOf(item.id to ReturnFlow.Pick(2.0)), reason = "خراب")
+    save(s, (ReturnFlow.post(s.ledger, req, today, clock++, ::newId) as ReturnFlow.Outcome.Ok).value.data)
+    val ops = push(s, accept = false)
+    val m = decision(ops, ConflictInbox.DISMISSED)
+    val mf = journal.resolveSibling(SetAsideMarks.v1Name("t"))
+    val marks = SetAsideMarks({ mf.takeIf { it.isFile }?.readText() }, { mf.writeText(it) })
+    assertEquals(1, settle(s, m, marks = marks))
+    assertSameAsServer(s)
+    //  دستهٔ ۳۰ (یا «بازسازی از سرور») دفتر را بی `setAside` نوشت (`LedgerCompatDiskTest`)؛ دفترِ کنارِ صف ولی ماند
+    s.ledger = s.ledger.copy(setAside = emptyList())
+    //  نشانِ «یک بار» اگر فقط دفتر بود: همان تصمیم دوباره برنامه می‌گرفت — `$inc` ِ وارونهٔ دوم
+    assertTrue(RejectedSettle.plan(m, book, LedgerDiff.toJson(s.ledger), SetAside.doneIds(s.ledger)) is RejectedSettle.Result.Ok)
+    assertEquals(0, settle(s, m, marks = marks))
+    assertEquals(0.0, s.ledger.saleItems.single().returnedQty, 0.0)
+    assertEquals(16.0, ShopStore.stock(s.ledger, "sugar"), 0.0)
+    assertEquals(figures(serverLedger()), figures(s.ledger))
+    //  و کارگر دیگر هر ۵ دقیقه نمی‌پرسد
+    assertFalse(SetAside.openRejected(book, s.ledger, marks.read().ops))
+    assertEquals(setOf(m.id), marks.read().ids)
   }
 }

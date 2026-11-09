@@ -14,6 +14,8 @@ import kotlinx.serialization.json.JsonObject
  *   ۳) opهای برگرداننده روی دفتر و سایه، و نشانِ «کنار گذاشته شد» در همان نوشتن (`SyncCommit.setAside`)؛ شکست در
  *      میانه ⇒ همان‌جا با دفترِ همین حالا تمام یا برگردانده می‌شود (همان `absorbRemote`).
  *  ⛔ هیچ op ای به صف نمی‌رود؛ cursor دست نمی‌خورد؛ تصمیمِ تکراری یا دیررس بی‌اثر است.
+ *  ⛔ «یک بار» = `ShopData.setAside` ∪ [SetAsideMarks] (بیرون از دفتر): دفتری که آن کلید را از دست داد (نسخهٔ کهنه‌تر
+ *     ذخیره‌اش کرد، یا «بازسازی از سرور») همان opهای برگرداننده را دوباره نمی‌گیرد (`$inc` ِ دوبار).
  */
 internal object SetAsideCommit {
 
@@ -26,12 +28,14 @@ internal object SetAsideCommit {
     read: () -> ShopData,
     write: (ShopData) -> Unit,
     now: Long,
+    marks: SetAsideMarks? = null,
   ): Int {
     if (commit.pending()) commit.recover(read())
     var n = 0
+    val kept = marks?.read()?.ids.orEmpty()
     for (m in decisions) {
       val cur = read()
-      val plan = (RejectedSettle.plan(m, book, LedgerDiff.toJson(cur), SetAside.doneIds(cur)) as? RejectedSettle.Result.Ok)?.plan ?: continue
+      val plan = (RejectedSettle.plan(m, book, LedgerDiff.toJson(cur), SetAside.doneIds(cur) + kept) as? RejectedSettle.Result.Ok)?.plan ?: continue
       if (queuedRows().any { it in plan.touched }) continue
       val undo = plan.undo.mapNotNull(SyncOp::fromJson)
       try {
@@ -40,6 +44,7 @@ internal object SetAsideCommit {
         runCatching { commit.recover(read()) }
         throw e
       }
+      marks?.add(plan.id, plan.ops.mapNotNull { (it["op_id"] as? kotlinx.serialization.json.JsonPrimitive)?.content })
       n++
     }
     return n

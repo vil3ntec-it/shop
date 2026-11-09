@@ -823,7 +823,7 @@ object WarehouseEngine {
       landedCost = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 } else existing.landedCost,
       landedCostMinor = if (draft.landedCost != null) draft.landedCost.takeIf { it > 0 }?.let(StockLedger::minor) else existing.landedCostMinor,
       locationId = if (draft.locationId != null) draft.locationId.trim().ifEmpty { null } else existing.locationId,
-    )
+      costMinor = existing.costMinor.takeIf { draft.productId == existing.productId && draft.units == existing.units && draft.price == existing.price })  //  PRD-07: بهای تازه ⇒ مقدار × بها، نه ارزشِ کهنه
     return Result.Ok(
       d.copy(
         warehouseEntries = d.warehouseEntries.map { if (it.id == id) updated else it },

@@ -166,6 +166,9 @@ class OpQueue(context: Context, accountKey: String) : V1Restore.Queue {
   @Synchronized
   fun dropped(): List<JsonObject> = read(dropFile)
 
+  /** نشانِ «تصمیمِ صندوق نشست» ِ همین حساب، کنارِ همین دفترِ کنار (`SetAsideMarks`؛ با `SyncV1Keys.move` جابه‌جا می‌شود) */
+  fun settledMarks(): SetAsideMarks = File(dir, SetAsideMarks.v1Name(safe)).let { f -> SetAsideMarks({ f.takeIf { it.isFile }?.readText() }, { DiskWrite.text(f, it) }) }
+
   @Synchronized
   fun clear() { write(file, emptyList()) }
 

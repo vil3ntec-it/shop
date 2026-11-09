@@ -113,7 +113,7 @@ class ReportLedger private constructor() {
           e.s("id"), e.s("productId"), milli(e, "units"), money(e, "price"),
           (e["isAdjustment"] as? JsonPrimitive)?.let { !it.isString && it.content == "true" } == true,
           e.s("date"), ms(e, "createdAt"), landedOf(e),
-          (e["costMinor"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull(),
+          exactValue((e["costMinor"] as? JsonPrimitive)?.takeIf { !it.isString }?.content?.toLongOrNull(), milli(e, "units"), money(e, "price")),
         )
       }
       raw.list("auditLog").forEach { a ->
@@ -124,6 +124,18 @@ class ReportLedger private constructor() {
         )
       }
       return l
+    }
+
+    /**
+     *  PRD-07 — `costMinor` ِ ردیفِ ورود فقط وقتی «ارزشِ دقیق» است که با مقدار × بهای **همان** ردیف جور باشد: بهای واحد
+     *  گردِ همان جمع است، پس فرق حداکثر نیم‌صدم برای هر واحد (+۱ برای گردکردنِ عدد). نسخهٔ پیش از دستهٔ ۳۱ این فیلد را
+     *  نمی‌شناسد: ویرایشِ بهای ورود روی آن فقط `price` را می‌فرستد و سرور `costMinor` ِ کهنه را نگه می‌دارد (A00) ⇒ ناجور
+     *  ⇒ `null` = همان مقدار × بها ِ پیشین (DATA-SAFETY §۷). همتای `exactValue` ِ `license/report-core.js` و `StockLedger`.
+     */
+    fun exactValue(costMinor: Long?, qtyMilli: Long, unitCostMinor: Long): Long? {
+      val c = costMinor ?: return null
+      val plain = qtyMilli.toDouble() * unitCostMinor.toDouble() / 1000.0
+      return c.takeIf { kotlin.math.abs(c - plain) <= kotlin.math.abs(qtyMilli.toDouble()) / 2000.0 + 1.0 }
     }
 
     private fun JsonObject.list(k: String): List<JsonObject> = (this[k] as? JsonArray)?.mapNotNull { it as? JsonObject } ?: emptyList()
