@@ -396,7 +396,18 @@ await page.click('#ct-send');
 await page2.waitForFunction(() => /این را پاک می‌کنم/.test(document.getElementById('ct-list').textContent), null, { timeout: 30000 });
 const doomed = await msgOf('این را پاک می‌کنم');
 const shopCur = (await call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=0`, null, T)).body.cursor;
-const shopWait = call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=${shopCur}&wait=20000`, null, T);
+//  long-poll ِ دکان با **هر** تغییرِ گفت‌وگو بیدار می‌شود (رسیدِ برگه‌ای از مشتری، …) و آن‌گاه بی سنگِ قبر برمی‌گردد (PostgreSQL ِ پربار:
+//  «long-poll ِ دکان … سنگِ قبر را گرفت» سرخ با پاسخِ تهیِ ۱۸ms) ⇒ همان long-poll از cursor ِ پاسخ تا رسیدنِ سنگِ قبر، در همان ۲۰ ثانیه
+const shopWait = (async () => {
+  let cur = shopCur;
+  let r = null;
+  for (const end = Date.now() + 20000; Date.now() < end;) {
+    r = await call('GET', `/api/shop/chat/conversations/${conv1.id}/messages?after=${cur}&wait=${Math.max(1, end - Date.now())}`, null, T);
+    if (r.status !== 200 || (r.body.messages || []).some((m) => m.id === doomed.id)) return r;
+    cur = r.body.cursor;
+  }
+  return r;
+})();
 const dels = [];
 const onDel = (r) => { if (r.method() === 'DELETE') dels.push(r.url()); };
 page.on('request', onDel);
