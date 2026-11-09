@@ -224,10 +224,15 @@ await step('ساختِ کدِ دکان واقعاً کد می‌سازد', async
 });
 
 await step('کدِ تازه در جدولِ همان کارت دیده می‌شود', async () => {
+  //  «کد: …» پیش از `reload()` ِ جدول نوشته می‌شود (`support.js`) ⇒ تا رسیدنِ پاسخِ GET ِ فهرست صبر، نه خواندنِ همان دم
+  //  (با ۹۰۰ms تأخیرِ همان GET جدول هنوز کهنه/تهی بود)؛ ردیفِ خودِ همین کد با دو رقمِ آخرش
+  const hint = (((await page.textContent('#svip-msg')).match(/کد:\s*(\d+)/) || [])[1] || '').slice(-2);
+  await page.waitForFunction((h) => (document.getElementById('svip-body')?.textContent || '').includes(`••••${h}`), hint, { timeout: 10_000 }).catch(() => {});
   const rows = await page.$$eval('#svip-body tr', (r) => r.length);
   assert.ok(rows >= 1, 'جدولِ کدها باید پر شود');
   const text = await page.textContent('#svip-body');
   assert.ok(text.includes('••••'), 'فقط دو رقمِ آخر باید دیده شود، نه خودِ کد');
+  assert.ok(hint.length === 2 && text.includes(`••••${hint}`), `ردیفِ همین کد (••••${hint}) در جدول نیست`);
 });
 
 // ── ۴) پشتیبانِ هر حساب در صفحهٔ دکان ─────────────────────────────
@@ -294,7 +299,8 @@ await step('گفت‌وگوی پشتیبانی در پنل دیده و جواب 
 
 await step('صافیِ بخش، فهرست را واقعاً کم می‌کند', async () => {
   await page.selectOption('#sup-app', 'pump');
-  await page.waitForTimeout(600);
+  //  پاسخِ GET ِ فهرستِ صافی‌شده، نه ۶۰۰ms ِ ثابت (با ۹۰۰ms تأخیرِ همان GET فهرستِ پیشین هنوز سرِ جایش بود)
+  await page.waitForFunction(() => (document.getElementById('sup-body')?.textContent || '').includes('گفت‌وگویی نیست'), null, { timeout: 10_000 }).catch(() => {});
   const text = await page.textContent('#sup-body');
   assert.ok(text.includes('گفت‌وگویی نیست'), 'هیچ گفت‌وگوی پمپی نیست، پس فهرست باید خالی باشد');
   await page.selectOption('#sup-app', '');
@@ -535,9 +541,12 @@ await step('ثبتِ پرداخت از پنل واقعاً ردیف می‌سا�
 
 await step('داشبوردِ فروش همان پرداخت را نشان می‌دهد', async () => {
   await openTab('sales');
+  //  کارت‌های بازدیدِ پیشینِ همین تب (پیش از پرداخت) هم «length > 0» اند ⇒ تا نشستنِ پاسخِ تازهٔ `sales/summary` (مبلغِ
+  //  پرداخت با واحد) صبر؛ سنجه‌ها همان‌اند (با ۹۰۰ms تأخیرِ همان GET کارت‌های کهنه خوانده می‌شد)
   await page.waitForFunction(
-    () => document.querySelectorAll('#sales-stats .stat').length > 0, null, { timeout: 10_000 }
-  );
+    () => document.querySelectorAll('#sales-stats .stat').length > 0
+      && document.getElementById('sales-stats').textContent.includes('افغانی'), null, { timeout: 10_000 }
+  ).catch(() => {});
   const cards = await page.$$eval('#sales-stats .stat', (ns) => ns.map((n) => n.textContent));
   assert.ok(cards.some((c) => c.includes('امروز') && c.includes('دکان')), `کارتِ درآمد: ${JSON.stringify(cards)}`);
   assert.ok(cards.join(' ').includes('افغانی'), 'مبلغ با واحدِ خودش دیده می‌شود');
@@ -729,7 +738,9 @@ await step('حداقل نسخه: از پنل ذخیره می‌شود، نادر
 
 await step('همگام‌سازی و امنیت: دستگاه‌ها، خطاها و درخواست‌های ورود بی خطا پر می‌شوند', async () => {
   await openTab('health');
-  await page.waitForTimeout(400);
+  //  `loadHealth` جدول‌ها را پیش از پاسخ تهی می‌کند ⇒ تا پرشدنِ هر چهار صبر، نه ۴۰۰ms ِ ثابت (با ۹۰۰ms تأخیرِ GET ِ سلامت تهی ماند)
+  await page.waitForFunction(() => ['health-devices', 'health-conflicts', 'health-errors', 'health-logins']
+    .every((id) => document.querySelectorAll(`#${id} tr`).length >= 1), null, { timeout: 10_000 }).catch(() => {});
   for (const id of ['health-devices', 'health-conflicts', 'health-errors', 'health-logins']) {
     const rows = await page.locator(`#${id} tr`).count();
     assert.ok(rows >= 1, `${id} خالی ماند`);

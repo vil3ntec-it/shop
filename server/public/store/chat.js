@@ -472,7 +472,9 @@
     function poll(my, first) {
       if (my !== loop || K.sheetOpen() !== sheet || !conv) return;
       var id = conv.id;
-      api(path(id, '/messages?after=' + cursor + '&wait=' + (first ? 0 : WAIT))).then(function (r) {
+      //  CHAT-04: رسیدهای دانسته (`pd`/`pr`) ⇒ رسیدِ دکان که میانِ دو پرسش نشست همان دم می‌رسد، نه پس از مهلت (`chat-wait.js`)
+      var rc = conv.receipts || {};
+      api(path(id, '/messages?after=' + cursor + '&wait=' + (first ? 0 : WAIT) + '&pd=' + (Number(rc.peerDeliveredSeq) || 0) + '&pr=' + (Number(rc.peerReadSeq) || 0))).then(function (r) {
         if (my !== loop || !conv || conv.id !== id) return;
         if (r.conversation) { conv = r.conversation; state(); }
         cursor = r.cursor;

@@ -337,6 +337,40 @@ test('CHAT-04: رسید فقط با اعلامِ گیرنده؛ خواندنِ �
   assert.equal(bad.status, 400);
 });
 
+test('CHAT-04: رسیدی که میانِ دو long-poll رسید (هیچ منتظری نبود) ⇒ long-poll ِ بعدی با `pd`/`pr` ِ کهنه همان دم برمی‌گردد، نه پس از مهلت', async () => {
+  //  ریشهٔ لرزشِ «خوانده شد» ِ web-store-chat.mjs (۹۰۰ms تأخیرِ GET): رسید فقط منتظرانِ همان لحظه را بیدار می‌کرد و
+  //  long-poll ِ بعدی جز پیامِ تازه چیزی نمی‌دید ⇒ «خوانده شد» تا پایانِ مهلت (۲۵ ثانیه) نمی‌رسید
+  const o = await chatShop('رسیدِ میانه');
+  const me = customer(o.shopId, '+93790000014');
+  const conv = (await chat.open(me, {})).conversation.id;
+  const m = (await chat.send(me, conv, { clientId: cid(), body: 'سلام' })).message;
+  const reply = (await h.post(`${base}/conversations/${conv}/messages`, { clientId: cid(), body: 'بفرمایید' }, { token: o.token })).body.message;
+  const seenByShop = await msgs(o.token, conv);
+  assert.equal(seenByShop.status, 200);
+  const known = seenByShop.body.conversation.receipts;
+  assert.deepEqual([known.peerDeliveredSeq, known.peerReadSeq], [0, 0]);
+  //  مشتری پاسخِ دکان را می‌خواند در حالی که دکان هنوز پرسشِ بعدی را نفرستاده
+  await chat.receipts(me, conv, { deliveredSeq: reply.seq, readSeq: reply.seq });
+  const t0 = Date.now();
+  const got = await msgs(o.token, conv, seenByShop.body.cursor, `&wait=3000&pd=${known.peerDeliveredSeq}&pr=${known.peerReadSeq}`);
+  assert.equal(got.status, 200, JSON.stringify(got.body));
+  assert.ok(Date.now() - t0 < 1500, `منتظرِ پایانِ مهلت ماند (${Date.now() - t0}ms)`);
+  assert.deepEqual(got.body.messages, []);
+  assert.equal(got.body.conversation.receipts.peerReadSeq, reply.seq);
+  //  رسیدِ دانسته ⇒ همان صبرِ همیشگی (بی چرخشِ پیاپی)
+  const t1 = Date.now();
+  const idle = await msgs(o.token, conv, got.body.cursor, `&wait=400&pd=${reply.seq}&pr=${reply.seq}`);
+  assert.equal(idle.status, 200);
+  assert.ok(Date.now() - t1 >= 350, `بی تغییر هم زود برگشت (${Date.now() - t1}ms)`);
+  //  همان برای مشتری (درِ کتابخانه): «خواندم» ِ دکان میانِ دو پرسش
+  const cur = (await chat.changes(me, conv, { after: 0 })).cursor;
+  await h.post(`${base}/conversations/${conv}/receipts`, { deliveredSeq: m.seq, readSeq: m.seq }, { token: o.token });
+  const t2 = Date.now();
+  const mine = await chat.changes(me, conv, { after: cur, wait: 3000, known: { d: 0, r: 0 } });
+  assert.ok(Date.now() - t2 < 1500, `مشتری منتظرِ پایانِ مهلت ماند (${Date.now() - t2}ms)`);
+  assert.equal(mine.conversation.receipts.peerReadSeq, m.seq);
+});
+
 test('CHAT-05 و CHAT-06: عکس — نوع از بایت، EXIF ِ مکان پاک و جهت باقی؛ پیش‌نمایش؛ بایت‌های سالم', async () => {
   //  خودِ پاک‌کننده
   const clean = chatMedia.stripImageMetadata(jpegWithGps(6), 'image/jpeg');

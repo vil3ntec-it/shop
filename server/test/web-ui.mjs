@@ -9,7 +9,7 @@
  * نبودِ پلی‌رایت یا axe-core قرمز است، نه «رد» (F0-17)؛ ردِ آگاهانه فقط با SKIP_BROWSER_TESTS=1.
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL, SKIP, closeSafeRoute } from './browser-guard.mjs';
+import { animationsSettled, missingTool, PLAYWRIGHT_INSTALL, SKIP, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -125,6 +125,8 @@ if (!axeSrc && SKIP) {
     for (const p of PAGES) {
       await pg.evaluate(x => { try { goTo(x); } catch { /* */ } }, p);
       await pg.waitForTimeout(900);   // پس از پایانِ پویانماییِ ورود — وگرنه رنگِ نیمه‌شفاف سنجیده می‌شود
+      //  ۹۰۰ms روی CI ِ پربار تضمین نیست (آغازِ پویانمایی با نخستین فریم است) ⇒ صبر تا پایانِ واقعیِ آن
+      await animationsSettled(pg, '.page.active');
       const v = await pg.evaluate(async () => {
         const out = await window.axe.run(document.querySelector('.page.active') || document,
           { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] });
