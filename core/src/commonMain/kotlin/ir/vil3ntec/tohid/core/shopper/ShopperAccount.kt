@@ -1,6 +1,7 @@
 package ir.vil3ntec.tohid.core.shopper
 
 import ir.vil3ntec.tohid.core.market.PublicProduct
+import ir.vil3ntec.tohid.core.market.StockBadge
 import kotlinx.serialization.DeserializationStrategy
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
@@ -8,8 +9,9 @@ import kotlinx.serialization.json.JsonElement
 /*
  *  برنامهٔ خرید — حسابِ مشتری: سبد، ♥ و «فهرستِ خرید» همراهِ حساب (WEB-11، CHK-03) با **همان درها و همان قاعده‌های
  *  ادغامِ وب** (`server/public/store/catalog.js` و `acct.js`):
- *    سبد ── نخستین بارِ هر نشست ادغام (`/account/cart/merge`، بیشینهٔ مقدار)، سپس حساب جای سبدِ دستگاه؛ هر تغییرِ
- *           دستگاه ⇒ جایگزینی با نسخهٔ دیده‌شده (۴۰۹ ⇒ همان سبدِ دستگاه روی نسخهٔ تازه، دستگاه برنده)؛ پر ⇒ سبدِ دستگاه.
+ *    سبد ── ماشینِ [CartSync] (CHK-03): نخستین بارِ هر نشست ادغامِ سبدِ مهمان (`/account/cart/merge`، بیشینه؛ سبدِ خالی ⇒
+ *           فقط خواندن)، سپس حساب جای سبدِ دستگاه؛ تغییرهای دستگاه پس از سکوت یک جایگزینی با نسخهٔ دیده‌شده (۴۰۹ ⇒ همان
+ *           تغییرِ دستگاه روی سبدِ تازه، یک بار)؛ پر ⇒ سبدِ دستگاه؛ خروج ⇒ سبدِ حساب از دستگاه پاک.
  *    ♥ ──── نخستین بارِ هر نشست همهٔ ♥ ِ دستگاه (کهنه‌ترین اول) در صف؛ هر ♥ یک کار؛ صف خالی ⇒ حساب حرفِ آخر.
  *    فهرست ─ ادغام، سپس هر تغییر یک کار («همه» یا «برداشتنِ یکی») روی نسخهٔ دیده‌شده؛ ۴۰۹ ⇒ همان کار روی فهرستِ تازه؛
  *           صف خالی ⇒ حساب حرفِ آخر؛ پر ⇒ فهرستِ دستگاه جای حساب؛ `too_many_lists` ⇒ فقط روی دستگاه.
@@ -41,6 +43,8 @@ data class AccountCartLine(
   val unit: String? = null,
   val priceMinor: Long? = null,
   val maxQtyMilli: Long? = null,
+  /** نشانِ موجودیِ امروز (`publicStock`)؛ «ناموجود»/«قابلِ سفارش نیست» ⇒ قلمِ دستگاه خط‌خورده ([CartSync.orderable]) */
+  val stock: StockBadge? = null,
 )
 
 @Serializable
@@ -82,6 +86,13 @@ data class AccountSync(
   val cartM: Boolean = false,
   /** یادداشتِ قلم‌های سبدِ حساب (از وب) تا نوشتنِ برنامه آن را پاک نکند */
   val cartNotes: Map<String, String> = emptyMap(),
+  /** CHK-03: قلم‌های سبدِ حساب در آخرین پاسخ — پایهٔ [CartSync.rebase] پس از ۴۰۹ */
+  val cartB: List<AccountItem> = emptyList(),
+  /** ۴۰۹ ِ `cart_changed` ِ پشتِ‌هم (سقف [CartSync.CONFLICT_RETRIES] در یک دور) */
+  val cartC: Int = 0,
+  /** شکستِ گذرای پشتِ‌هم و «نه پیش از» ِ دورِ بعد ([CartSync.backoffMs]) */
+  val fails: Int = 0,
+  val retryAt: Long = 0,
 )
 
 /** درهای روشنِ همین دکان (`features` ِ `GET /:slug`) */
@@ -117,8 +128,20 @@ class AccountReply(
   val error: ShopperError? get() = cart?.errorOrNull() ?: favs?.errorOrNull() ?: fav?.errorOrNull() ?: list?.errorOrNull()
 }
 
-/** حالِ تازه؛ [go] ⇒ کارِ بعد؛ [products] کالاهای امروزِ پاسخ (برای نمایش)؛ [signedOut] ⇒ نشست دیگر کار نمی‌کند (۴۰۱) */
-data class AccountOutcome(val state: ShopperState, val go: Boolean, val products: List<PublicProduct> = emptyList(), val signedOut: Boolean = false)
+/**
+ *  حالِ تازه؛ [go] ⇒ کارِ بعد؛ [products] کالاهای امروزِ پاسخ (برای نمایش)؛ [signedOut] ⇒ نشست دیگر کار نمی‌کند (۴۰۱)؛
+ *  [cartOff] ⇒ درِ سبد در این دکان نیست ([CartSync.doorClosed]): فراخوان سبدِ همین دکان را خاموش می‌کند و اگر بخواهد ادامه می‌دهد؛
+ *  [repriced]/[gone] ⇒ شمارِ قلم‌های سبدِ دستگاه با قیمتِ تازه یا دیگر-نیست پس از پاسخِ سرور (برای پیام).
+ */
+data class AccountOutcome(
+  val state: ShopperState,
+  val go: Boolean,
+  val products: List<PublicProduct> = emptyList(),
+  val signedOut: Boolean = false,
+  val cartOff: Boolean = false,
+  val repriced: Int = 0,
+  val gone: Int = 0,
+)
 
 object AccountRules {
   const val MAX_FAVS = 200
@@ -144,16 +167,20 @@ object AccountRules {
   private fun <T> withKey(m: Map<String, List<T>>, slug: String, v: List<T>): Map<String, List<T>> =
     if (v.isEmpty()) m - slug else (mapOf(slug to v) + (m - slug)).entries.take(MAX_SHOPS).associate { it.key to it.value }
 
-  /** نشستِ تازه (یا نخستین دورِ این دکان) ⇒ ♥ ِ دستگاه، کهنه‌ترین اول، در صف؛ فهرست و سبد «هنوز ادغام نشده» */
+  /**
+   *  نشستِ تازه (یا نخستین دورِ این دکان) ⇒ ♥ ِ دستگاه، کهنه‌ترین اول، در صف؛ فهرست و سبد «هنوز ادغام نشده». سبدِ دستگاهی که
+   *  هنوز آینهٔ نشستِ پیشین است (شاید حسابِ دیگر) ادغام نمی‌شود: کنار می‌رود (CHK-03).
+   */
   fun begin(s: ShopperState, slug: String, expiresAt: Long): ShopperState {
     val st = s.sync[slug]
     if (st != null && st.t == expiresAt) return s
-    val fresh = AccountSync(t = expiresAt, favOps = favsOf(s, slug).reversed().map { FavOp(it, true) })
-    return s.copy(sync = s.sync + (slug to fresh))
+    val base = if (st != null && st.cartM) s.copy(carts = s.carts.filter { it.slug != slug }) else s
+    val fresh = AccountSync(t = expiresAt, favOps = favsOf(base, slug).reversed().map { FavOp(it, true) })
+    return base.copy(sync = base.sync + (slug to fresh))
   }
 
-  /** خروج ⇒ همهٔ صف‌ها و نسخه‌ها پاک (♥، فهرست و سبد روی دستگاه می‌مانند) */
-  fun signedOut(s: ShopperState): ShopperState = s.copy(sync = emptyMap())
+  /** خروج ⇒ همهٔ صف‌ها و نسخه‌ها پاک؛ سبدی که آینهٔ حساب بود هم ([CartSync.forget])؛ ♥، فهرست و سبدِ مهمان روی دستگاه می‌مانند */
+  fun signedOut(s: ShopperState): ShopperState = CartSync.forget(s).copy(sync = emptyMap())
 
   // ── کارهای دستگاه ──
 
@@ -212,20 +239,6 @@ object AccountRules {
 
   private fun notesOf(c: AccountCart): Map<String, String> = c.lines.filter { it.note.isNotBlank() }.associate { it.productId to it.note }
 
-  /** سبدِ حساب ⇒ سبدِ دستگاه؛ قیمت و «هست؟» همان پاسخِ امروزِ سرور، عکسِ قلمِ هم‌شناسه می‌ماند */
-  fun cartFromServer(slug: String, cur: Cart, c: AccountCart, at: Long): Cart {
-    val old = cur.lines.associateBy { it.productId }
-    val lines = c.lines.map { l ->
-      val o = old[l.productId]
-      CartLine(
-        productId = l.productId, name = l.name ?: o?.name.orEmpty(), unit = l.unit ?: o?.unit.orEmpty(),
-        priceMinor = l.priceMinor ?: o?.priceMinor ?: 0L, qtyMilli = l.qtyMilli, maxQtyMilli = l.maxQtyMilli,
-        photo = o?.photo ?: false, photoVersion = o?.photoVersion, unavailable = !l.available,
-      )
-    }
-    return Cart(slug, lines, at)
-  }
-
   // ── گام‌ها ──
 
   /** کارِ بعدی برای [slug] — یا null (همه رسید). همیشه یک درخواست در هر بار، مثلِ وب. */
@@ -233,7 +246,8 @@ object AccountRules {
     val st = s.sync[slug] ?: return null
     if (f.cart) {
       val items = cartItems(ShopperMemory.cartOf(s, slug), st.cartNotes)
-      if (!st.cartM) return AccountStep.CartMerge(items)
+      //  ادغام فقط وقتی سبدِ مهمان هست؛ سبدِ خالی ⇒ همان یک خواندن (S140)
+      if (!st.cartM) return if (items.isEmpty()) AccountStep.CartPull(mark(items)) else AccountStep.CartMerge(items)
       if (mark(items) != st.cartK) return AccountStep.CartPut(st.cartV, items)
     }
     if (f.favorites) {
@@ -249,11 +263,11 @@ object AccountRules {
     return null
   }
 
-  /** پس از پاسخِ خواندنِ موفق، همان خواندن از فهرستِ این دور بیرون می‌رود */
+  /** پس از پاسخِ خواندنِ موفق، همان خواندن از فهرستِ این دور بیرون می‌رود (پاسخِ ادغام خودش سبدِ امروز است) */
   fun after(p: AccountPulls, step: AccountStep, reply: AccountReply): AccountPulls {
     if (reply.error != null) return p
     return when (step) {
-      is AccountStep.CartPull -> p.copy(cart = false)
+      is AccountStep.CartPull, is AccountStep.CartMerge -> p.copy(cart = false)
       AccountStep.FavPull -> p.copy(fav = false)
       AccountStep.ListPull -> p.copy(list = false)
       else -> p
@@ -274,38 +288,22 @@ object AccountRules {
 
   private fun listItems(l: AccountList): List<ListItem> = l.lines.map { ListItem(it.productId, it.qtyMilli) }
 
-  /** حالِ تازه پس از پاسخِ [step] — حالِ [s] همان حالِ **اکنون** است (کارِ تازه در میانهٔ درخواست گم نمی‌شود). */
-  fun apply(s: ShopperState, slug: String, step: AccountStep, reply: AccountReply, at: Long): AccountOutcome {
+  /**
+   *  حالِ تازه پس از پاسخِ [step] — حالِ [s] همان حالِ **اکنون** است (کارِ تازه در میانهٔ درخواست گم نمی‌شود). شکستِ گذرا ⇒
+   *  درنگِ دورِ بعد ([CartSync.paced]).
+   */
+  fun apply(s: ShopperState, slug: String, step: AccountStep, reply: AccountReply, at: Long): AccountOutcome =
+    CartSync.paced(applyStep(s, slug, step, reply, at), slug, reply.error, at)
+
+  private fun applyStep(s: ShopperState, slug: String, step: AccountStep, reply: AccountReply, at: Long): AccountOutcome {
     val st = s.sync[slug] ?: return AccountOutcome(s, go = false)
     val e = reply.error
+    val cartStep = step is AccountStep.CartMerge || step is AccountStep.CartPut || step is AccountStep.CartPull
+    //  پرچمِ سبد خاموش شد (درِ ناشناخته ⇒ ۴۰۱ بی `session_required`) یا ویترین بسته ⇒ فقط سبدِ دستگاه، هرگز خروج
+    if (e != null && cartStep && CartSync.doorClosed(e)) return AccountOutcome(s, go = false, cartOff = true)
     if (e != null && e.status == 401) return AccountOutcome(signedOut(s), go = false, signedOut = true)
     return when (step) {
-      is AccountStep.CartMerge, is AccountStep.CartPull -> {
-        val c = reply.cart?.valueOrNull()
-        val d = e?.let { cartIn(it) }
-        when {
-          c != null -> {
-            val now = mark(cartItems(ShopperMemory.cartOf(s, slug), st.cartNotes))
-            val seen = if (step is AccountStep.CartMerge) mark(step.items) else (step as AccountStep.CartPull).mark
-            val synced = st.copy(cartV = c.version, cartK = mark(serverItems(c)), cartM = true, cartNotes = notesOf(c))
-            //  سبدِ دستگاه در میانهٔ درخواست عوض شد ⇒ همان، روی نسخهٔ تازه (بی جای‌گزینیِ بی‌صدا)
-            if (now != seen) AccountOutcome(put(s, slug, synced), go = true)
-            else AccountOutcome(ShopperMemory.withCart(put(s, slug, synced), cartFromServer(slug, ShopperMemory.cartOf(s, slug), c, at)), go = true)
-          }
-          //  بیش از ۱۰۰ قلم ⇒ سبدِ دستگاه جای سبدِ حساب (هیچ چیز بی‌صدا گم نمی‌شود)
-          e?.code == "cart_full" && d != null -> AccountOutcome(put(s, slug, st.copy(cartV = d.version, cartK = "", cartM = true)), go = true)
-          else -> AccountOutcome(s, go = false)
-        }
-      }
-      is AccountStep.CartPut -> {
-        val c = reply.cart?.valueOrNull()
-        val d = e?.let { cartIn(it) }
-        when {
-          c != null -> AccountOutcome(put(s, slug, st.copy(cartV = c.version, cartK = mark(serverItems(c)), cartNotes = notesOf(c))), go = true)
-          e?.code == "cart_changed" && d != null -> AccountOutcome(put(s, slug, st.copy(cartV = d.version)), go = true)
-          else -> AccountOutcome(s, go = false)
-        }
-      }
+      is AccountStep.CartMerge, is AccountStep.CartPull, is AccountStep.CartPut -> applyCart(s, slug, st, step, reply, at)
       is AccountStep.Fav -> when {
         e == null || e.status == 400 || e.status == 404 || e.status == 409 ->
           AccountOutcome(put(s, slug, st.copy(favOps = drop(st.favOps, step.op))), go = true)
@@ -318,6 +316,41 @@ object AccountRules {
       }
       is AccountStep.ListMerge, is AccountStep.ListPut, AccountStep.ListPull -> applyList(s, slug, st, step, reply)
     }
+  }
+
+  /** CHK-03: پاسخِ گام‌های سبد — [CartSync.rebase] و [CartSync.adopt]؛ ۴۰۹ ِ نوشتن فقط [CartSync.CONFLICT_RETRIES] بار پشتِ‌هم دوباره */
+  private fun applyCart(s: ShopperState, slug: String, st: AccountSync, step: AccountStep, reply: AccountReply, at: Long): AccountOutcome {
+    val local = cartItems(ShopperMemory.cartOf(s, slug), st.cartNotes)
+    val c = reply.cart?.valueOrNull()
+    if (c != null) {
+      //  پایهٔ تغییرِ در صف: آن‌چه فرستاده شد (ادغام/نوشتن) یا سبدِ دیده‌شده (خواندن)؛ تغییرِ میانهٔ درخواست می‌ماند
+      val base = when (step) {
+        is AccountStep.CartMerge -> step.items
+        is AccountStep.CartPut -> step.items
+        is AccountStep.CartPull -> if (mark(local) == step.mark) local else st.cartB
+        else -> st.cartB
+      }
+      return cartSeen(s, slug, st, c, CartSync.rebase(base, local, serverItems(c)), conflicts = 0, go = true, at = at)
+    }
+    val e = reply.error ?: return AccountOutcome(s, go = false)
+    val d = cartIn(e) ?: return AccountOutcome(s, go = false)
+    return when {
+      //  دستگاهِ دیگر سبد را عوض کرد ⇒ همان تغییرِ این دستگاه روی سبدِ تازه؛ دومین ۴۰۹ ِ پشتِ‌هم ⇒ دورِ بعد با درنگ (بی حلقه)
+      e.code == CartSync.CART_CHANGED && step is AccountStep.CartPut ->
+        cartSeen(s, slug, st, d, CartSync.rebase(st.cartB, local, serverItems(d)), conflicts = st.cartC + 1, go = st.cartC < CartSync.CONFLICT_RETRIES, at = at)
+      //  بیش از ۱۰۰ قلم ⇒ سبدِ دستگاه جای سبدِ حساب (هیچ چیز بی‌صدا گم نمی‌شود)
+      e.code == CartSync.CART_FULL && step !is AccountStep.CartPut ->
+        AccountOutcome(put(s, slug, st.copy(cartV = d.version, cartK = "", cartB = emptyList(), cartM = true, cartC = 0)), go = true)
+      else -> AccountOutcome(s, go = false)
+    }
+  }
+
+  /** سبدِ سرور [c] دیده شد: نسخه و پایهٔ تازه، و سبدِ دستگاه = [items] با نام، قیمت، موجودی و سقفِ امروزِ سرور */
+  private fun cartSeen(s: ShopperState, slug: String, st: AccountSync, c: AccountCart, items: List<AccountItem>, conflicts: Int, go: Boolean, at: Long): AccountOutcome {
+    val fresh = serverItems(c)
+    val next = st.copy(cartV = c.version, cartK = mark(fresh), cartB = fresh, cartM = true, cartNotes = notesOf(c), cartC = conflicts)
+    val a = CartSync.adopt(ShopperMemory.cartOf(s, slug), items, c, at)
+    return AccountOutcome(ShopperMemory.withCart(put(s, slug, next), a.cart), go = go, repriced = a.repriced, gone = a.gone)
   }
 
   private fun applyList(s: ShopperState, slug: String, st: AccountSync, step: AccountStep, reply: AccountReply): AccountOutcome {

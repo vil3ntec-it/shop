@@ -9,6 +9,7 @@ import ir.vil3ntec.tohid.core.shopper.AccountPulls
 import ir.vil3ntec.tohid.core.shopper.AccountReply
 import ir.vil3ntec.tohid.core.shopper.AccountRules
 import ir.vil3ntec.tohid.core.shopper.AccountSession
+import ir.vil3ntec.tohid.core.shopper.CartSync
 import ir.vil3ntec.tohid.core.shopper.ListItem
 import ir.vil3ntec.tohid.core.shopper.ShopperError
 import ir.vil3ntec.tohid.core.shopper.ShopperJson
@@ -18,6 +19,7 @@ import ir.vil3ntec.tohid.core.shopper.ShopperResult
 import ir.vil3ntec.tohid.core.shopper.ShopperText
 import ir.vil3ntec.tohid.core.shopper.StorePage
 import ir.vil3ntec.tohid.core.text.LocaleFormat
+import kotlinx.coroutines.Job
 
 /*
  *  برنامهٔ خرید — حسابِ مشتری، ♥ و «فهرستِ خرید» کنارِ [CustomerModel] (فایلِ جدا تا مدل از سقفِ اندازه نگذرد).
@@ -45,6 +47,8 @@ class AccountBox(private val secrets: ShopperKeyValue?) {
   internal var running = false
   internal var pulls = AccountPulls()
   internal var features: Map<String, AccountFeatures> = emptyMap()
+  /** CHK-03: دورِ بعدِ هر دکان پس از سکوت یا درنگ ([CartSync.waitMs]) */
+  internal val wakes = HashMap<String, Job>()
 
   private fun load(): AccountSession? = try {
     secrets?.get(KEY)?.let { ShopperJson.decodeFromString(AccountSession.serializer(), it) }
@@ -117,7 +121,7 @@ fun CustomerModel.accountSignIn(slug: String) {
   }
 }
 
-/** خروج: نشست در سرور بسته (بهترین تلاش) و صف‌ها پاک؛ سبد، ♥ و فهرست روی همین دستگاه می‌مانند */
+/** خروج: نشست در سرور بسته (بهترین تلاش) و صف‌ها پاک؛ سبدِ حساب از دستگاه پاک (CHK-03)؛ ♥، فهرست و سبدِ مهمان می‌مانند */
 fun CustomerModel.accountSignOut() {
   val s = account.session ?: return
   val slug = storeSlug.ifBlank { saved.recent.firstOrNull()?.slug.orEmpty() }
@@ -145,11 +149,32 @@ fun CustomerModel.enteredStore(slug: String, page: StorePage) {
 fun CustomerModel.syncAccount(slug: String, pulls: AccountPulls = AccountPulls()) {
   account.pulls = account.pulls + pulls
   if (account.running || slug.isBlank()) return
+  //  CHK-03: تغییرهای پشتِ‌همِ سبد ⇒ یک نوشتن پس از سکوت؛ پس از شکستِ گذرا ⇒ همان درنگ
+  val wait = CartSync.waitMs(saved, slug, clock())
+  if (wait > 0) {
+    wakeLater(slug, wait)
+    return
+  }
   accountStep(slug, 0)
+}
+
+private fun CustomerModel.wakeLater(slug: String, ms: Long) {
+  account.wakes.remove(slug)?.cancel()
+  account.wakes[slug] = later(ms) {
+    account.wakes.remove(slug)
+    syncAccount(slug)
+  }
+}
+
+/** نشست سرِ مهلت مُرد ⇒ همان خروج روی دستگاه، بی درخواست: سبدِ حساب روی گوشی نمی‌ماند */
+private fun CustomerModel.accountExpired() {
+  account.keep(null)
+  persist(AccountRules.signedOut(saved))
 }
 
 private fun CustomerModel.accountStep(slug: String, n: Int) {
   val s = account.live(clock())
+  if (s == null && account.session != null) accountExpired()
   val f = account.features[slug]
   if (s == null || f == null || n >= MAX_STEPS) {
     account.running = false
@@ -170,13 +195,24 @@ private fun CustomerModel.accountStep(slug: String, n: Int) {
     account.pulls = AccountRules.after(account.pulls, step, reply)
     account.learn(slug, out.products)
     if (out.signedOut) account.keep(null)
-    if (out.go) accountStep(slug, n + 1) else accountIdle(slug)
+    //  درِ سبد در این دکان نیست (پرچمِ خاموش) ⇒ فقط سبدِ دستگاه تا بارِ بعدِ دکان؛ بقیهٔ کارها ادامه
+    if (out.cartOff) account.features = account.features + (slug to f.copy(cart = false))
+    if (out.repriced > 0 || out.gone > 0) cartFresh(slug, out.repriced, out.gone)
+    if (out.go || out.cartOff) accountStep(slug, n + 1) else accountIdle(slug)
   }
 }
 
-/** دورِ این دکان تمام شد؛ اگر در میانه دکانِ دیگری باز شد، نوبتِ آن */
+/** قیمت یا «هست؟» ِ سبد با پاسخِ سرور عوض شد ⇒ پیامِ کوتاه، فقط روی سبد یا برگهٔ ثبتِ همان دکان (هرگز خطای خام) */
+private fun CustomerModel.cartFresh(slug: String, repriced: Int, gone: Int) {
+  val r = route
+  if ((r is Route.CartPage && r.slug == slug) || (r is Route.Checkout && r.slug == slug)) notice = ShopperText.cartFresh(repriced, gone)
+}
+
+/** دورِ این دکان تمام شد (پس از شکستِ گذرا ⇒ دورِ بعد با درنگ)؛ اگر در میانه دکانِ دیگری باز شد، نوبتِ آن */
 private fun CustomerModel.accountIdle(slug: String) {
   account.running = false
+  val wait = CartSync.waitMs(saved, slug, clock())
+  if (wait > 0) wakeLater(slug, wait)
   if (storeSlug.isNotBlank() && storeSlug != slug) syncAccount(storeSlug)
 }
 
