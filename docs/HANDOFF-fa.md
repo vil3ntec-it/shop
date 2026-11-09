@@ -53,6 +53,12 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
+  مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
+  سقفِ نرخ ۱۰–۲۵ برابر کند می‌کرد ⇒ `middleware/json-body.js` بی reviver، همان رفتارِ B4؛ SR38-3 (Medium) `openSnapshot` با `PG_IDLE_TX_TIMEOUT_MS` و dump ِ بلند
+  سرور را با uncaughtException می‌خواباند ⇒ شنونده + `release(err)` و شمارِ seal از استخر. سطلِ مدیر، پاکتِ رازها، نمای سفارش، صدا، سبدِ حساب، کدِ خطا و مهلت سالم ماندند.
+- نیمه‌کاره: هیچ. قدمِ بعدی: پیش از ارتقای PostgreSQL ِ تولید به ۱۸، `backup-secrets.test.js` روی همان pg_dump (R1)؛ محدود کردنِ نامِ `unseal` به `SECRET_KEYS` (R2، لایهٔ دوم).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/store-allflags` (ویترین با همهٔ پرچم‌های مشتری‌رو روشن، سرتاسر در مرورگر؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `server/test/web-store-allflags.mjs` (در `test:web-store`): ۵۲ پرچمِ خانوادهٔ ویترین/گفت‌وگو/سفارش + catalog/image_bank/customer_notify/
   delivery_customer_view از `KNOWN`، با پیش‌نیازِ shop.delivery، shop.visual_search و pay.hesabpay؛ سفرِ کامل در ۳۶۰·fa، ۷۶۸·en، ۱۲۸۰·ps و همان صفحه‌ها در

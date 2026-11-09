@@ -67,24 +67,37 @@ function warnUnencrypted(kind) {
  */
 async function openSnapshot() {
   let client = null;
+  /*
+   *  ⛔ SR38-3: این اتصال تا پایانِ pg_dump در تراکنشِ باز و بیکار می‌ماند و pg-pool شنوندهٔ `error` ِ اتصالِ بیرون‌کشیده را
+   *  برداشته است ⇒ `PG_IDLE_TX_TIMEOUT_MS` ِ کوتاه‌تر از dump نشست را می‌بُرد و `error` ِ بی شنونده uncaughtException بود
+   *  (`index.js` سرور را خاموش می‌کرد). حالا: افتادن ثبت، اتصالِ مرده نابود (`release(err)`)، شمارِ seal از استخر.
+   */
+  let broken = null;
+  const onLost = (e) => { broken = broken || e; };
   try {
     client = await db.getPool().connect();
+    client.on('error', onLost);
     await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
     const id = (await client.query('SELECT pg_export_snapshot() AS id')).rows[0].id;
     const manifest = await require('./restore-drill').fingerprint((t, p) => client.query(t, p));
     const c = client;
     return {
       id, manifest,
-      //  F0-28: شمارِ رازها در **همان** snapshot (فقط در `BACKUP_SECRETS=seal`)
-      query: (t, p) => c.query(t, p),
+      //  F0-28: شمارِ رازها در **همان** snapshot (فقط در `BACKUP_SECRETS=seal`)؛ snapshot افتاد ⇒ پرس‌وجوی تازه (همان راهِ بی snapshot)
+      query: (t, p) => (broken ? db.query(t, p) : c.query(t, p)),
       async close() {
-        try { await c.query('COMMIT'); } catch { /* اتصال رفته */ }
-        c.release();
+        try { await c.query('COMMIT'); } catch (e) { broken = broken || e; }
+        c.off('error', onLost);
+        c.release(broken || undefined);
       },
     };
   } catch (err) {
     console.warn(`[backup] manifest ساخته نشد (پشتیبان بی آن ادامه می‌دهد): ${err.message}`);
-    if (client) { try { await client.query('ROLLBACK'); } catch { /* بی‌اهمیت */ } client.release(); }
+    if (client) {
+      try { await client.query('ROLLBACK'); } catch (e) { broken = broken || e; }
+      client.off('error', onLost);
+      client.release(broken || undefined);
+    }
     return null;
   }
 }
