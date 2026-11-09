@@ -77,7 +77,7 @@ router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) 
 router.get('/errors', async (req, res, next) => {
   try {
     const app = sectionOf(req.query?.app);
-    const limit = Math.min(500, Number(req.query?.limit || 100) || 100);
+    const limit = Math.min(500, Math.max(1, Number(req.query?.limit || 100) || 100));   //  ممیزیِ ۳۵ (X1): منفی ⇒ ۵۰۰ ِ LIMIT
     const rows = app
       ? await many('SELECT * FROM client_errors WHERE app=$1 ORDER BY at DESC LIMIT $2', [app, limit])
       : await many('SELECT * FROM client_errors ORDER BY at DESC LIMIT $1', [limit]);

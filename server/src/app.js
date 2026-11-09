@@ -115,10 +115,14 @@ async function createApp({ runMigrations = true } = {}) {
 
   //  ⛔ ممیزیِ ۳۵ (B4): NUL در مسیر (`%00`) — PostgreSQL متنِ NUL‌دار را نمی‌پذیرد (۲۲۰۲۱)، پس هر شناسهٔ خامِ مسیر
   //  ۵۰۰ می‌شد (و خطای سرور ثبت می‌کرد). هیچ برنامه‌ای NUL نمی‌فرستد ⇒ ۴۰۰ پیش از هر کار. `%2500` (متنِ «%00») NUL نیست.
-  //  پرسش (`?…`) دست نمی‌خورد: درهایش خودشان می‌سنجند (`routes-idor-31.test.js`).
-  app.use((req, res, next) => (/%00/i.test(req.url.split('?')[0])
-    ? res.status(400).json({ error: { code: 'bad_path', message: 'نشانیِ درخواست درست نیست' } })
-    : next()));
+  //  ⛔ X2: پرسش (`?…`، کلید یا مقدار) هم ⇒ ۴۰۰ ِ `bad_query`؛ در به در سنجیدن هفت درِ مدیر را جا انداخته بود. شناسهٔ NUL‌دار
+  //  «نیافته» نیست، نادرست است (همان شناسه در مسیر `bad_path` است). همگام‌سازی و پمپ (`RAW_SYNC`، مشترک) مثلِ بدنه دست‌نخورده.
+  app.use((req, res, next) => {
+    const q = req.url.indexOf('?');
+    const bad = /%00/.test(q < 0 ? req.url : req.url.slice(0, q)) ? 'bad_path'
+      : (q >= 0 && /%00/.test(req.url.slice(q)) && !RAW_SYNC.test(req.path) ? 'bad_query' : '');
+    return bad ? res.status(400).json({ error: { code: bad, message: 'نشانیِ درخواست درست نیست' } }) : next();
+  });
 
   // ---- CORS ----
   // برنامه‌ی اندروید به CORS کاری ندارد؛ این فقط برای نسخه‌ی وب است و

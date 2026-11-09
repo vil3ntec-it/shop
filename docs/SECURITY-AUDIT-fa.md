@@ -77,6 +77,10 @@ Cloudflare Tunnel ─▶ پنلِ خانگی :4701 (درگاه account-proxy.js)
 | B6 | Medium | زمانِ خبرِ دکان (`POST /api/events`) از دستگاه بی سقف بود: یک کارمند (هر نقش) با خبرِ «۲۰۵۸» `since` و «دیده شد» ِ برنامهٔ صاحب را به آینده می‌برد و هیچ خبرِ واقعیِ بعدی (کالا تمام شد، قرض) دیگر نمی‌رسید؛ ۱e300 ⇒ ۵۰۰. | ✅ آینده (با ۵ دقیقه لغزش)، منفی و ناعدد ⇐ ساعتِ سرور؛ `seen` هم. ⚠️ ردیف‌های آینده‌دارِ کهنه و `seen_at` ِ کهنه پاک نمی‌شوند | B6 |
 | B7 | Low | درهای مدیر: `GET /api/admin/otp?limit=-1` و `ops/alerts?since=1e20` ⇒ ۵۰۰. | ✅ | B7 |
 | B8 | Medium | «هر کاربر یک دکان» بشمار-بعد-بنویس بود: هشت `POST /api/shop` ِ هم‌زمان ⇒ هشت دکان و هشت دورهٔ آزمایشی (روی PostgreSQL؛ PGlite پنهانش می‌کرد). | ✅ قفلِ حسابِ `staff-join-user` (همان قفلِ پیوستن) + سنجشِ دوباره در تراکنش | B8 (روی PostgreSQL پیش از رفع سرخ) |
+| X1 | Low | `GET /api/admin/sync/errors?limit=-1` ⇒ ۵۰۰ (LIMIT منفی)؛ NUL در پرسشِ `admin/sync/status`، `admin/sync/conflicts` ⇒ ۵۰۰. | ✅ `Math.max(1, …)` (شاخهٔ `claude/sec-left`)؛ NUL با X2 | `security-audit-35b` X1 |
+| X2 | Low | NUL در پرسشِ درهای مدیر (`image-bank/queue`، `image-bank/review`، `logins`، `otp`، `shop-desk/groups`) ⇒ ۵۰۰. | ✅ **سراسری** مثلِ مسیر: `%00` در پرسش (کلید یا مقدار) ⇒ ۴۰۰ ِ `bad_query` پیش از هر در (بی‌توکن هم)؛ `sync`/`shop/sync`/`pump` دست‌نخورده (مثلِ بدنهٔ B4). در-به-در هفت در را جا انداخته بود؛ شناسهٔ NUL‌دار «نیافته» نیست، نادرست است ⇒ سنجهٔ `customer-access` ِ `routes-idor-31` (۲۰۰ ِ خالی) به ۴۰۰ ِ بی ردیف و `bad_product_id` ِ B4 به `bad_query` درست شد | `security-audit-35b` X1/X2 |
+| X3 | Low | سقفِ پنج کلیدِ تأیید بشمار-بعد-بنویس: بیست ثبتِ هم‌زمان روی PostgreSQL هفت/هشت کلیدِ فعال. و **یک کلیدِ عمومی از دو کاربر** هم‌زمان: هر دو ۲۰۱ و دومی برچسب و دستگاهِ کلیدِ کاربرِ اول (دکانِ دیگر) را رونویسی می‌کرد. | ✅ تراکنش + `pg_advisory_xact_lock` ِ «دکان+کاربر» (الگوی B8)؛ `ON CONFLICT … WHERE` همان دکان و کاربر، وگرنه ۴۰۹ `key_taken` | `security-audit-35b` X3 (روی PostgreSQL پیش از رفع سرخ؛ PGlite پنهان) |
+| X4 | Info | کدِ وی‌آی‌پی فقط سطلِ هر IP (ده در ربع) داشت ⇒ حدس از IP های گوناگون بی‌سقف. | ✅ تلاشِ **ناموفق** به‌ازای هر حساب و (کارمندها با هم) هر دکان: ده در ساعت (`RATE_VIP_FAIL_MAX`، `RATE_VIP_FAIL_WINDOW_MS`)؛ موفق پس داده می‌شود؛ صاحب فقط سطلِ خودش ⇒ کارمند صاحب را نمی‌بندد؛ قفل موقت و فقط همین در (ورود، نشست و دکان باز) | `security-audit-35b` X4 |
 
 **باز — بیرون از دامنهٔ این شاخه (فقط گزارش):**
 
@@ -85,12 +89,11 @@ Cloudflare Tunnel ─▶ پنلِ خانگی :4701 (درگاه account-proxy.js)
 | P1 | High | `app.js` پارسرِ JSON ِ ۳۴MB (`/api/pump/device/report/`) و ۴MB (`/api/pump/device/state`) را **پیش از هر احراز و پیش از سقفِ نرخِ عمومی** می‌زند ⇒ هر کسی بی‌توکن ۳۴MB ِ JSON را به پارس کردن وامی‌دارد. | پمپ (مشترک) | پارسرِ بزرگ پس از `requireDevice` و سطلِ IP |
 | P2 | Medium | `stations.createStation` همان رقابتِ B8 («هر کاربر یک پمپ»، دورهٔ آزمایشیِ تازه). | پمپ (مشترک) | همان قفلِ حساب |
 | P3 | Low | خبرهای پمپ (`/api/pump/events`) همان زمانِ آینده‌دارِ B6 را می‌پذیرند (`lib/events.js` مشترک). | پمپ (مشترک) | همان `atOf` در درِ پمپ |
-| X1 | Low | `GET /api/admin/sync/errors?limit=-1` ⇒ ۵۰۰ (LIMIT منفی)؛ NUL در پرسشِ `admin/sync/status`، `admin/sync/conflicts` ⇒ ۵۰۰. | همگام‌سازی (`claude/p0-syn`) | `Math.max(1, …)` و ردِ NUL |
-| X2 | Low | NUL در پرسشِ درهای مدیر: `image-bank/queue`، `image-bank/review`، `logins`، `otp`، `shop-desk/groups` ⇒ ۵۰۰ (فقط مدیرِ واردشده). | مدیر | ردِ NUL در پرسش (`customer-access` ِ `routes-idor-31` امروز ۲۰۰ ِ خالی می‌خواهد ⇒ ردِ سراسری نه) |
-| X3 | Low | سقفِ پنج کلیدِ تأییدکننده (`shop_approver_keys`) بشمار-بعد-بنویس است. | `staff-approval.js` | قفلِ کاربر |
-| X4 | Info | کدِ شش‌رقمیِ وی‌آی‌پی فقط سقفِ هر IP (ده در ربع) دارد؛ حدسِ پخش‌شده از چند IP و چند حساب. | `routes/vip.js` | سطلِ هر حساب/دکان کنارِ IP |
+| P4 | Low | کدِ وی‌آی‌پیِ پمپ (`/api/pump/device/activate` بی‌توکن و `/api/pump/device/redeem`) همان X4 را دارد: فقط سطلِ هر IP. | پمپ (مشترک) | همان سطلِ ناموفقِ هر پمپ/دستگاه |
+| P5 | Low | `GET /api/sync/v1/status?device_id=a%00b` ⇒ ۵۰۰ (۲۲۰۲۱). راه‌های `sync`/`pump` عمداً بیرون از ردِ سراسریِ X2 ماندند. | همگام‌سازی (مشترک) | برداشتنِ استثنای `RAW_SYNC` فقط برای پرسش (رد، نه دست‌کاریِ op) — با اجازهٔ صاحبِ پمپ |
+| X5 | Info | `tenancy.sectionOf` با `constructor` یا `__proto__` عضوِ پروتوتایپ را برمی‌گرداند (نه `''`) ⇒ ورود با `app: 'constructor'` ۲۰۰ می‌دهد ولی نشستش همان دم ۴۰۱ است؛ اثر فقط روی خودِ درخواست‌کننده. | `lib/tenancy.js` (مشترک با پمپ) | `Object.hasOwn(ALIASES, key)` |
 
-سه دورِ فاز پس از رفع: هیچ ۵xx جز X1 و X2. آن‌چه گشته شد و سالم بود: IDOR ِ شناسه‌ها (همه با `shop_id`)، `requireShop` از توکن،
+سه دورِ فاز پس از رفع: هیچ ۵xx جز X1 و X2 (هر دو بسته در `claude/sec-left`؛ کاوشِ دوباره P5 را در راهِ مشترک یافت). آن‌چه گشته شد و سالم بود: IDOR ِ شناسه‌ها (همه با `shop_id`)، `requireShop` از توکن،
 mass-assignment (SEC-AUTH-11)، وب‌هوکِ حساب‌پی (امضا، مبلغ، رویدادِ تکراری، اجاره)، تسویهٔ پیک و بازپرداخت (`FOR UPDATE` + کلیدِ یکتایی)،
 کدِ تحویل (قفلِ ردیف)، سوکتِ زندهٔ کارمندِ برداشته (`accessChanged`)، SSRF (فقط نشانی‌های پیکربندیِ مدیر)، stack trace (هرگز).
 

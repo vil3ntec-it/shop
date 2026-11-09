@@ -268,7 +268,8 @@ test('B4: NUL در پرسشِ درِ بی‌توکنِ request-status و گزا�
   await setFlag('shop.catalog', true);
   const rep = await h.get('/api/shop/catalog/report?productId=a%00b', { token: T.owner.token });
   assert.equal(rep.status, 400, JSON.stringify(rep.body));
-  assert.equal(rep.body.error.code, 'bad_product_id');
+  //  X2 (`security-audit-35b`): NUL در پرسش حالا پیش از هر در ⇒ `bad_query`؛ `bad_product_id` ِ خودِ در لایهٔ دوم است
+  assert.equal(rep.body.error.code, 'bad_query');
   assert.equal((await h.get('/api/shop/catalog/report', { token: T.owner.token })).status, 200);
   await setFlag('shop.catalog', false);
 });

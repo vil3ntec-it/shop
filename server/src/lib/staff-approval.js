@@ -36,7 +36,7 @@ const crypto = require('crypto');
 const core = require('./perm-core');
 const slipCore = require('./approval-core');
 const staffPerms = require('./staff-perms');
-const { one, many, query, newId, now } = require('../db');
+const { one, many, query, tx, newId, now } = require('../db');
 const { badRequest, forbidden, notFound, conflict } = require('../middleware/errors');
 const hlc = require('./hlc');
 const { rejectOps } = require('./v1-reject');
@@ -101,26 +101,26 @@ async function registerKey(shopId, member, { publicKey, label = '', deviceId = '
   if (!pk) throw badRequest(MESSAGES.bad_public_key, 'bad_public_key');
   const id = keyIdOf(pk.der);
   const userId = member.user_id;
-  const existing = await one('SELECT * FROM shop_approver_keys WHERE id=$1', [id]);
-  if (existing) {
-    if (existing.shop_id !== shopId || existing.user_id !== userId) throw conflict(MESSAGES.key_taken, 'key_taken');
-    if (existing.revoked_at === null) return shapeKey(existing);
-  }
-  const active = await one(
-    'SELECT COUNT(*)::int AS n FROM shop_approver_keys WHERE shop_id=$1 AND user_id=$2 AND revoked_at IS NULL',
-    [shopId, userId]
-  );
-  if (active.n >= MAX_KEYS_PER_USER) throw badRequest(MESSAGES.too_many_keys, 'too_many_keys');
-  const t = now();
-  const row = await one(
-    `INSERT INTO shop_approver_keys (id, shop_id, user_id, alg, public_key, label, device_id, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-     ON CONFLICT (id) DO UPDATE SET revoked_at = NULL, revoked_by = '', label = excluded.label,
-       device_id = excluded.device_id, created_at = excluded.created_at
-     RETURNING *`,
-    [id, shopId, userId, ALG, pk.b64, String(label || '').slice(0, 60), String(deviceId || '').slice(0, 64), t]
-  );
-  return shapeKey(row);
+  //  ⛔ ممیزیِ ۳۵ (X3): بشمار-بعد-بنویس بود (بیست ثبتِ هم‌زمان روی PostgreSQL ⇒ هفت کلید) ⇒ قفلِ دکان+کاربر (الگوی B8)؛ و یک
+  //  کلید از دو کاربرِ هم‌زمان: دومی برچسب و دستگاهِ کلیدِ اولی را رونویسی می‌کرد ⇒ رونویسی فقط همان دکان و کاربر، وگرنه key_taken.
+  return tx(async (c) => {
+    const q1 = async (sql, args) => (await c.query(sql, args)).rows[0];
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`approver-keys:${shopId}:${userId}`]);
+    const existing = await q1('SELECT * FROM shop_approver_keys WHERE id=$1', [id]);
+    if (existing && (existing.shop_id !== shopId || existing.user_id !== userId)) throw conflict(MESSAGES.key_taken, 'key_taken');
+    if (existing && existing.revoked_at === null) return shapeKey(existing);
+    const active = await q1('SELECT COUNT(*)::int AS n FROM shop_approver_keys WHERE shop_id=$1 AND user_id=$2 AND revoked_at IS NULL', [shopId, userId]);
+    if (Number(active.n) >= MAX_KEYS_PER_USER) throw badRequest(MESSAGES.too_many_keys, 'too_many_keys');
+    const row = await q1(
+      `INSERT INTO shop_approver_keys (id, shop_id, user_id, alg, public_key, label, device_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+       ON CONFLICT (id) DO UPDATE SET revoked_at = NULL, revoked_by = '', label = excluded.label, device_id = excluded.device_id,
+         created_at = excluded.created_at WHERE shop_approver_keys.shop_id = excluded.shop_id AND shop_approver_keys.user_id = excluded.user_id
+       RETURNING *`,
+      [id, shopId, userId, ALG, pk.b64, String(label || '').slice(0, 60), String(deviceId || '').slice(0, 64), now()]
+    );
+    if (!row) throw conflict(MESSAGES.key_taken, 'key_taken');
+    return shapeKey(row);
+  });
 }
 
 /** صاحب دکان همه را می‌بیند؛ بقیه فقط کلیدهای خودشان */
