@@ -46,6 +46,8 @@ val legacyFiles = listOf(
   "ir/vil3ntec/tohid/core/calendar/CivilDays.kt",
   "ir/vil3ntec/tohid/core/text/LocaleFormat.kt",
   "ir/vil3ntec/tohid/core/text/TextNormalizer.kt",
+  //  `Sale.invoiceLabel` و نام‌های دیگرِ مدل `trim` ِ JS را از `JsText` می‌گیرند (فازِ تفاضلیِ هسته‌ها، کاتلینِ خالصِ core)
+  "ir/vil3ntec/tohid/core/text/JsText.kt",
   //  I18n.kt دری را از لایهٔ واژهٔ core می‌گیرد (`DariText`، کاتلینِ خالص)
   "ir/vil3ntec/tohid/core/text/DariText.kt",
   //  LocaleFormat گرد کردن را از `mathRound` (برگردانِ دقیقِ Math.round، کاتلینِ خالص) می‌گیرد
