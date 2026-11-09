@@ -30,8 +30,8 @@
       "optional": 1
     },
     "byShape": {
-      "extracted": 701,
-      "empty": 298,
+      "extracted": 702,
+      "empty": 297,
       "unresolved": 2
     }
   },
@@ -952,7 +952,7 @@
     {"method":"GET","path":"/api/store/:slug/orders/:token","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":["order"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/amendments/:amendId/accept","area":"store","source":"server/src/routes/order-amend-store.js","auth":"none-detected","guards":["limit"],"params":["amendId","slug","token"],"query":[],"body":[],"response":{"statuses":[200,409],"keys":["error","order","status","unchanged"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/amendments/:amendId/reject","area":"store","source":"server/src/routes/order-amend-store.js","auth":"none-detected","guards":["limit"],"params":["amendId","slug","token"],"query":[],"body":[],"response":{"statuses":[200,409],"keys":["error","order","status","unchanged"]},"errors":["404 not_found"],"shape":"extracted"},
-    {"method":"POST","path":"/api/store/:slug/orders/:token/cancel","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/orders/:token/cancel","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","order"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/delivery","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/fulfillment","area":"store","source":"server/src/routes/order-method-store.js","auth":"none-detected","guards":["rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-method-ip'"],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":["changed","order","replayed"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/issues","area":"store","source":"server/src/routes/order-feedback-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
