@@ -224,6 +224,8 @@ FLAGS.push('shop.approval_requests');
 FLAGS.push('shop.custom_roles');
 //  تنظیماتِ دکان، همگام‌سازیِ زنده (`/shop/settings-sync`، مهاجرتِ ۳۰۰) — «ب» فقط کلیدهای دکانِ خودش را می‌بیند و می‌نویسد
 FLAGS.push('shop.settings_sync');
+//  POS-12/S09: پشتیبانِ فاکتورهای نگه‌داشته (`/shop/held-invoices/:id`، مهاجرتِ ۴۲۵) — «ب» با شناسهٔ «الف» فقط فضای خودش
+FLAGS.push('shop.held_sync');
 
 /**
  * شناسه‌هایی که ردیفِ سراسری نیستند، کلیدِ فضای خودِ هر دکان‌اند: نامِ نقش، و
@@ -236,11 +238,13 @@ FLAGS.push('shop.settings_sync');
 const PER_SHOP_KEYS = new Set([
   'PUT /shop/permissions/roles/:role', 'GET /shop/images/products/:productId',
   'PUT /shop/promos/rules/:id', 'DELETE /shop/promos/rules/:id',
+  //  شناسهٔ فاکتورِ نگه‌داشته (`SaleDraft.key`) را برنامه می‌سازد؛ upsert با (shop_id, id)
+  'PUT /shop/held-invoices/:id', 'DELETE /shop/held-invoices/:id',
   //  M3: `:kind` (logo/header) نامِ جایگاه در فضای خودِ هر دکان است — «ب» فقط لوگوی خودش را می‌نویسد
   'PUT /shop/storefront/media/:kind', 'DELETE /shop/storefront/media/:kind',
 ]);
 /** شناسهٔ کالا و قاعدهٔ تخفیف کلیدِ فضای دکان‌اند، نه راز — برای «ب» بازتابِ همان نشانی‌اند */
-const NOT_SECRET = new Set(['product', 'promoRule']);
+const NOT_SECRET = new Set(['product', 'promoRule', 'heldInvoice']);
 
 let k = 0;
 const fresh = (p) => `${p}-${++k}-${Date.now()}`;
@@ -542,6 +546,13 @@ async function seedShop(a) {
     { rule: { name: 'تخفیفِ الف', kind: 'percent', bp: 1000 } }, { token: a.accessToken });
   assert.equal(promo.status, 200, JSON.stringify(promo.body));
 
+  //  فاکتورِ نگه‌داشته (POS-12/S09) — شناسه را برنامه می‌سازد (کلیدِ فروشِ بعدی)؛ کلیدِ فضای خودِ دکان
+  ids.heldInvoice = 'inv-held-a1';
+  const held = await h.put(`/api/shop/held-invoices/${ids.heldInvoice}`,
+    { version: 10, body: { id: ids.heldInvoice, number: 1, label: 'نگه‌داشتهٔ الف', lines: [{ productId: 'p-a', quantity: 1 }] } },
+    { token: a.accessToken });
+  assert.equal(held.status, 200, JSON.stringify(held.body));
+
   //  سفارشِ خرید (PUR-02/04): فرستاده و با یک رسید — شناسه را سرور می‌سازد
   const pur = await h.post('/api/shop/purchase-orders',
     { supplierId: 'sup-a', supplierName: 'تأمین‌کنندهٔ الف', lines: [{ productId: 'p-a', name: 'کالای الف', qtyMilli: 5000, priceMinor: 1000 }] },
@@ -658,6 +669,7 @@ function concreteFor(ids) {
     [/^(\/shop\/custom-roles\/members\/):id/, ids.member],
     [/^(\/shop\/custom-roles\/):id/, ids.customRole],
     [/^(\/shop\/promos\/rules\/):id/, ids.promoRule],
+    [/^(\/shop\/held-invoices\/):id/, ids.heldInvoice],
     [/^(\/shop\/trust\/cases\/):id/, ids.trustCase],
     [/^(\/shop\/purchase-orders\/):id/, ids.purchaseOrder],
     [/(\/bills\/):billId/, ids.purchaseBill],
@@ -731,6 +743,7 @@ function bodyFor(r, ids) {
     'PUT /shop/custom-roles/members/:id': { roleId: ids.customRole },
     'PUT /shop/permissions/roles/:role': { perms: {} },
     'PUT /shop/promos/rules/:id': { rule: { name: 'تخفیفِ ب', kind: 'percent', bp: 500 } },
+    'PUT /shop/held-invoices/:id': { version: 50, body: { id: ids.heldInvoice, number: 1, label: 'نگه‌داشتهٔ ب', lines: [{ productId: 'p-b', quantity: 1 }] } },
     'POST /shop/trust/cases/:id/responses': { body: 'پاسخِ ب', clientId: `client-${fresh('t')}-0000` },
     'POST /shop/trust/cases/:id/appeal': { body: 'اعتراضِ «ب» به این تصمیم' },
     'PUT /shop/purchase-orders/:id': { version: 1, supplierId: 'sup-b', lines: [{ productId: 'p-b', qtyMilli: 1000, priceMinor: 1 }] },

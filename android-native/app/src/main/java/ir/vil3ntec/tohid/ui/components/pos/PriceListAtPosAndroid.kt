@@ -10,6 +10,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +23,7 @@ import ir.vil3ntec.tohid.core.i18n.StrPos
 import ir.vil3ntec.tohid.core.i18n.StrSalePages
 import ir.vil3ntec.tohid.core.i18n.StrSettingsPages
 import ir.vil3ntec.tohid.core.sale.PriceList
+import ir.vil3ntec.tohid.data.CartPriceList
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.CustomerPriceCart
 import ir.vil3ntec.tohid.data.SalesEngine
@@ -86,19 +88,29 @@ fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.Car
   if (!on) return
   fun customerList(): String? = debtorId?.let { id -> d.debtors.find { it.id == id }?.priceList.orEmpty() }
   var state by remember { mutableStateOf(PriceList.FRESH) }
+  //  POS-18: انتخابِ دستیِ لیست مالِ همان فاکتور است (`CartStore.priceList`) — با نگه‌داشتن، بازگشت و بازیابی می‌رود و
+  //  برمی‌گردد. فاکتورِ صندوق که عوض شد (یا خالی شد) حالت از همان فاکتور، نه از فاکتورِ پیشین (`CartPriceList`)
+  val hand by cartStore.priceList.collectAsState()
+  LaunchedEffect(hand) { state = CartPriceList.restore(hand, customerList()) }
   LaunchedEffect(debtorId) { state = PriceList.onCustomer(state, customerList()) }
+  fun toggle() {
+    state = PriceList.toggle(state)
+    cartStore.setPriceList(CartPriceList.hand(state))
+  }
+  //  قیمت‌گذاری با لیستِ همین فاکتور — مقدارِ سبد، نه حالتِ صفحه که شاید هنوز به سبدِ تازه نرسیده
+  fun current(): PriceList.State = CartPriceList.effective(state, cartStore.priceList.value)
   //  Ctrl+R: فقط افزایشِ شمار، نه نخستین ترکیب (همان شمارِ پیشین ⇒ هیچ)
   val seen = remember { intArrayOf(toggles) }
-  LaunchedEffect(toggles) { if (toggles != seen[0]) { seen[0] = toggles; state = PriceList.toggle(state) } }
+  LaunchedEffect(toggles) { if (toggles != seen[0]) { seen[0] = toggles; toggle() } }
   //  فاکتورِ تازه (سبدِ خالی) از نو: لیستِ مشتریِ همین لحظه یا خرده، بی انتخابِ دستی
   LaunchedEffect(cart.isEmpty()) { if (cart.isEmpty()) state = PriceList.onCustomer(PriceList.FRESH, customerList()) }
   val special = remember { CustomerPricePrefs.on(context) }
   if (!special) {
     LaunchedEffect(cart, state.list) {
-      val next = repriceCart(d, cart, state.list)
+      val next = repriceCart(d, cart, current().list)
       if (next !== cart) cartStore.set(next)
     }
-    PriceListChip(state.list, { state = PriceList.toggle(state) }, modifier.padding(bottom = 6.dp))
+    PriceListChip(state.list, { toggle() }, modifier.padding(bottom = 6.dp))
     return
   }
   //  POS-18 «قیمتِ خاص»: دستی ← قیمتِ خاص ← لیستِ مشتری ← لیستِ فاکتور ← خرده (`CustomerPrice.resolve`)؛ فیِ دستی فقط
@@ -111,13 +123,13 @@ fun PriceListAtPos(cartStore: CartStore, d: ShopData, cart: List<SalesEngine.Car
   LaunchedEffect(cart, state, debtorId, specials) {
     if (debtorId != seenDebtor[0]) { seenDebtor[0] = debtorId; before = cart.takeIf { debtorId != null && it.isNotEmpty() } }
     if (cart.isEmpty()) before = null
-    val r = CustomerPriceCart.reprice(d, cart, state, debtorId, ir.vil3ntec.tohid.todayIso(), manualAllowed)
+    val r = CustomerPriceCart.reprice(d, cart, current(), debtorId, ir.vil3ntec.tohid.todayIso(), manualAllowed)
     notice = before?.let { b -> CustomerPriceCart.changedSince(b, r.cart).takeIf { it > 0 || r.keptManual > 0 }?.let { StrCustomerPrices.repriced(it, r.keptManual) } }
       ?: r.special.takeIf { it > 0 }?.let(StrCustomerPrices::specialLines)
     if (r.cart !== cart) cartStore.set(r.cart)
   }
   Column(modifier.padding(bottom = 6.dp)) {
-    PriceListChip(state.list, { state = PriceList.toggle(state) }, Modifier)
+    PriceListChip(state.list, { toggle() }, Modifier)
     notice?.let { Text(it, style = MaterialTheme.typography.labelSmall, color = Shop.colors.muted2) }
   }
 }

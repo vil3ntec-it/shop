@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 995,
+    "routes": 998,
     "byAuth": {
       "none-detected": 185,
       "admin": 276,
       "inline": 2,
-      "user": 489,
+      "user": 492,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 695,
+      "extracted": 698,
       "empty": 298,
       "unresolved": 2
     }
@@ -689,6 +689,9 @@
     {"method":"GET","path":"/api/shop/devices","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["devices"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/devices/:id/disable","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.manage')"],"params":["id"],"query":[],"body":["reason"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/devices/:id/enable","area":"shop","source":"server/src/routes/shop-staff.js","auth":"user","guards":["requireUser","requireShop","requirePermission('members.manage')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/held-invoices","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":[],"query":["since"],"body":[],"response":{"statuses":[200],"keys":["...","enabled","permissions"]},"errors":[],"shape":"extracted"},
+    {"method":"DELETE","path":"/api/shop/held-invoices/:id","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["deleted","enabled","version"]},"errors":[],"shape":"extracted"},
+    {"method":"PUT","path":"/api/shop/held-invoices/:id","area":"shop","source":"server/src/routes/shop-held-invoices.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'shop-held-ip' })","requireUser","requireShop","limit","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/hesabpay","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/shop/hesabpay/account","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/hesabpay/account/remove","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
