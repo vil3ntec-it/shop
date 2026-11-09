@@ -26,6 +26,7 @@ import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.storefront.AreaRequests
+import ir.vil3ntec.tohid.core.text.ContactMask
 import ir.vil3ntec.tohid.data.repo.AreaRequestsRepository
 import ir.vil3ntec.tohid.data.repo.Backend
 import ir.vil3ntec.tohid.ui.screens.Haptics
@@ -84,7 +85,8 @@ internal fun AreaRequestsSection() {
             chevron = false,
             trailing = {
               Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                V3TextButton(StrOnline.call, {
+                //  CRM-15: صاحب «شمارهٔ مشتریان» را برای این کاربر بسته ⇒ سرور شماره را پوشیده می‌دهد؛ «زنگ» بی‌فایده است
+                if (!ContactMask.isMasked(c.phone)) V3TextButton(StrOnline.call, {
                   runCatching { uri.openUri("tel:" + c.phone) }.onFailure {
                     clipboard.setText(AnnotatedString(c.phone))
                     toasts?.show(StrOnline.numberCopied)

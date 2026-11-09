@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.core.text
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 /** CRM-15 — پوشاندنِ شمارهٔ مشتری برای نقشِ بی مجوزِ `customers.contact` */
 class ContactMaskTest {
@@ -22,6 +23,13 @@ class ContactMaskTest {
     assertEquals("12", ContactMask.phone("12"))
     assertEquals("••3", ContactMask.phone("123", keep = 1))
     assertFalse(ContactMask.phone("0799123456").contains("0799"))
+  }
+
+  @Test fun maskedNumberIsRecognised() {
+    assertTrue(ContactMask.isMasked(ContactMask.phone("+93791200003")))
+    assertTrue(ContactMask.isMasked("+•••••••••03"))
+    assertFalse(ContactMask.isMasked("+93791200003"))
+    assertFalse(ContactMask.isMasked(""))
   }
 
   @Test fun visibleKeepsTheNumber() {
