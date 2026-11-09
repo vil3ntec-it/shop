@@ -57,6 +57,11 @@ data class StoreFeatures(
   val chat: Boolean = false,
   /** نظرهای تأییدشده (`shop.orders.reviews`) */
   val reviews: Boolean = false,
+  /** WEB-11: ♥ و «فهرستِ خرید» (`shop.storefront.favorites`) */
+  val favorites: Boolean = false,
+  /** CHK-01: حسابِ مشتری در ویترین (`shop.storefront.web_account`)؛ سبدِ حساب فقط با [accountCart] (`shop.storefront.cart`) */
+  val webAccount: Boolean = false,
+  val accountCart: Boolean = false,
 )
 
 /** کاتالوگ با صفحه‌بندیِ نشانگری (`nextCursor`). */

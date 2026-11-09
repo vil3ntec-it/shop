@@ -125,3 +125,4 @@
 .ord-area-list,.ord-area-cells{list-style:none; margin:8px 0; padding:0;}
 .ord-area-row{display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 0; border-bottom:1px solid var(--border);}
 .ord-area-cells li{padding:4px 0; font-size:13px;}
+.ord-risk-flags{list-style:none; margin:6px 0; padding:0; display:grid; gap:6px;} .ord-risk-flags li{padding:6px 10px; border-radius:8px; background:var(--surface-2, transparent); border-inline-start:3px solid var(--border);} .ord-risk-flags li.ord-risk-warn{background:var(--warning-tint); border-inline-start-color:var(--warning);}

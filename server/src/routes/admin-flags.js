@@ -72,6 +72,10 @@ const KNOWN = Object.freeze([
   { key: 'shop.credit_cap', scope: 'shop', default: false, what: 'سقفِ فروشِ قرضیِ کارمند در سرور (`sales.credit`، STF-03)' },
   //  CRM-03: فقط سابقهٔ بررسی، هرگز رد (تصمیمِ «رد یا بررسی» با صاحب‌کار؛ ‎lib/credit-limit-review.js‎)
   { key: 'shop.credit_limit_review', scope: 'shop', default: false, what: 'فروشِ نسیهٔ بیش از سقفِ اعتبارِ مشتری بی تأییدِ دستگاه ⇒ سابقهٔ بررسی برای صاحب (CRM-03؛ رد نمی‌کند)' },
+  //  CRM-03 / §۱۰.۱: سرور مجوزِ `customers.credit_limit` را در v1، v3 و REST اجرا می‌کند (‎lib/credit-limit-perm.js‎)
+  { key: 'shop.credit_limit_perm', scope: 'shop', default: false, what: 'مجوزِ «تغییرِ سقفِ اعتبارِ مشتری» در سرور (`customers.credit_limit`، CRM-03)؛ ویرایشِ بی‌اجازه رد و به صندوقِ تعارض' },
+  //  STF-03: فقط سابقهٔ بررسی، هرگز رد (‎lib/promo-loyalty-review.js‎)
+  { key: 'shop.promo_loyalty_review', scope: 'shop', default: false, what: 'تخفیفِ خودکارِ قلم و مصرفِ امتیازِ فاکتورِ کارمند با تعریف‌های دکان ⇒ سابقهٔ بررسی برای صاحب (STF-03؛ رد نمی‌کند)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
   { key: 'shop.count_absorb', scope: 'shop', default: false, what: 'فروشِ آفلاینِ پیش از شمارش که پس از ثبتِ شمارش می‌رسد دوباره از موجودی کم نمی‌شود — سرور و برنامه (INV-10)؛ با shop.catalog' },

@@ -219,3 +219,108 @@ test('جداییِ دکان و دیدن: دکانِ دیگر با همان شن�
   assert.ok(!otherView.body.entries.some((e) => e.action === 'sale.credit_over_limit'));
   assert.equal((await h.get('/api/shop/audit', { token: staff.accessToken })).status, 403, 'شاگرد سابقه را نمی‌بیند');
 });
+
+//  ── CRM-03، پیگیری‌ها: دلتای `debtGivenMinor` ِ v3، ویرایشِ بالابرندهٔ قرضِ v1 و تراکنشِ دیررسیده ──
+
+test('پیگیری، v3: دلتای مثبتِ `debtGivenMinor` فاکتورِ نشستهٔ زیرِ سقف را از سقف می‌گذراند ⇒ یک سابقه (`raised`)؛ تکرارِ دلتا نه', async () => {
+  const before = (await flags()).length;
+  const at = Date.now();
+  const ins = (table, id, fields) => ({ op_id: oid(), hlc: H('pos3'), table, row_id: id, kind: 'insert', fields });
+  assert.deepEqual(statuses(await push3(staff, 'pos-3', [
+    ins('debtors', 'd3-up', { name: 'مشتریِ دلتا', creditLimitMinor: 500000 }),
+    ins('transactions', 'd3-up-old', { debtorId: 'd3-up', type: 'give', amountMinor: 300000, createdAt: at - 10000 }),
+    ins('sales', 's3-up', { totalMinor: 1000000, finalTotalMinor: 1000000, paidAmountMinor: 900000, remainingMinor: 100000,
+      debtGivenMinor: 100000, debtorId: 'd3-up', paymentMethod: 'credit', status: 'completed', createdAt: at }),
+  ])), ['applied', 'applied', 'applied']);
+  assert.equal((await flags()).length, before, 'زیرِ سقف');
+  const delta = { op_id: oid(), hlc: H('pos3'), table: 'sales', row_id: 's3-up', kind: 'delta', fields: { debtGivenMinor: 200000 } };
+  const r = await push3(staff, 'pos-3', [delta]);
+  assert.deepEqual(statuses(r), ['applied'], JSON.stringify(r.body));
+  let f = (await flags()).slice(before);
+  assert.deepEqual(f.map((x) => [x.sale, x.path, x.raised, x.balanceMinor, x.addMinor, x.excessMinor]), [['s3-up', 'v3', true, 300000, 300000, 100000]]);
+  assert.deepEqual(statuses(await push3(staff, 'pos-3', [delta])), ['duplicate']);
+  //  دلتای منفی یا دلتای فیلدِ دیگر ⇒ هیچ پرسشی
+  await push3(staff, 'pos-3', [{ op_id: oid(), hlc: H('pos3'), table: 'sales', row_id: 's3-up', kind: 'delta', fields: { debtSettledMinor: 1000 } }]);
+  f = (await flags()).slice(before);
+  assert.equal(f.length, 1);
+});
+
+test('پیگیری، v1: `update` ِ `debtGiven` ِ فاکتورِ نشسته ⇒ با ماندهٔ تا همان op سنجیده می‌شود؛ ویرایشِ بی قرض نه', async () => {
+  const before = (await flags()).length;
+  await push1(staff, 'pos-1', debtor1('d-up', 5000, 2000));
+  assert.deepEqual(statuses(await push1(staff, 'pos-1', sale1('s-up', 'd-up', 2000))), ['applied', 'applied']);
+  assert.equal((await flags()).length, before, 'زیرِ سقف: ۲٬۰۰۰ + ۲٬۰۰۰');
+  assert.equal((await push1(staff, 'pos-1', [op1('sales', 's-up', 'update', { seller: 'x' })])).status, 200);
+  assert.equal((await flags()).length, before);
+  const up = op1('sales', 's-up', 'update', { debtGiven: 4000, remaining: 4000 });
+  assert.deepEqual(statuses(await push1(staff, 'pos-1', [up])), ['applied']);
+  const f = (await flags()).slice(before);
+  assert.deepEqual(f.map((x) => [x.sale, x.path, x.raised, x.balanceMinor, x.addMinor, x.excessMinor]), [['s-up', 'v1', true, 200000, 400000, 100000]]);
+  assert.deepEqual(statuses(await push1(staff, 'pos-1', [up])), ['duplicate']);
+  assert.equal((await flags()).slice(before).length, 1);
+});
+
+test('پیگیری، تراکنشِ دیررسیده (v1، v3، راهِ قدیم): «give» ِ پیش از فاکتورِ نشسته که دیر رسید ⇒ همان فاکتور یک سابقه (`late`)', async () => {
+  const before = (await flags()).length;
+  //  v1: فاکتورِ زیرِ سقف، بعد قرضِ دستیِ دستگاهِ دیگر با زمانِ پیش از فاکتور
+  await push1(staff, 'pos-1', debtor1('d-late', 5000, 0));
+  const ops = sale1('s-late', 'd-late', 3000);
+  const saleAt = ops[0].fields.createdAt;
+  assert.deepEqual(statuses(await push1(staff, 'pos-1', ops)), ['applied', 'applied']);
+  assert.equal((await flags()).length, before, 'هنگامِ ثبت زیرِ سقف');
+  //  قرضِ پس از فاکتور ماندهٔ لحظهٔ فاکتور را عوض نمی‌کند
+  await push1(staff, 'pos-9', [op1('transactions', 'd-late-after', 'insert', { debtorId: 'd-late', type: 'give', amount: 3000, date: '2026-11-08', createdAt: saleAt + 60000 })]);
+  assert.equal((await flags()).length, before);
+  const lateTx = op1('transactions', 'd-late-old', 'insert', { debtorId: 'd-late', type: 'give', amount: 3000, date: '2026-11-06', createdAt: saleAt - 500 });
+  assert.deepEqual(statuses(await push1(staff, 'pos-9', [lateTx])), ['applied']);
+  let f = (await flags()).slice(before);
+  assert.deepEqual(f.map((x) => [x.sale, x.path, x.late, x.balanceMinor, x.addMinor, x.excessMinor]), [['s-late', 'v1', true, 300000, 300000, 100000]]);
+  //  تکرار و تراکنشِ دیررسیدهٔ دوم برای همان فاکتور ⇒ سابقهٔ دوم نه
+  assert.deepEqual(statuses(await push1(staff, 'pos-9', [lateTx])), ['duplicate']);
+  await push1(staff, 'pos-9', [op1('transactions', 'd-late-old2', 'insert', { debtorId: 'd-late', type: 'give', amount: 100, createdAt: saleAt - 400 })]);
+  assert.equal((await flags()).slice(before).length, 1);
+
+  //  v3
+  const at = Date.now();
+  const ins = (table, id, fields) => ({ op_id: oid(), hlc: H('pos3'), table, row_id: id, kind: 'insert', fields });
+  await push3(staff, 'pos-3', [
+    ins('debtors', 'd3-late', { name: 'مشتریِ دیر', creditLimitMinor: 500000 }),
+    ins('sales', 's3-late', { totalMinor: 1000000, finalTotalMinor: 1000000, paidAmountMinor: 700000, remainingMinor: 300000,
+      debtGivenMinor: 300000, debtorId: 'd3-late', paymentMethod: 'credit', status: 'completed', createdAt: at }),
+  ]);
+  assert.equal((await flags()).slice(before).length, 1);
+  const r3 = await push3(staff, 'pos-4', [ins('transactions', 'd3-late-old', { debtorId: 'd3-late', type: 'give', amountMinor: 300000, createdAt: at - 5000 })]);
+  assert.deepEqual(statuses(r3), ['applied'], JSON.stringify(r3.body));
+  f = (await flags()).slice(before);
+  assert.deepEqual(f.slice(1).map((x) => [x.sale, x.path, x.late, x.excessMinor]), [['s3-late', 'v3', true, 100000]]);
+
+  //  راهِ قدیم: ردیفِ `transactions` ِ تنها
+  const t = Date.now();
+  await legacy(staff, 'web-2', [
+    { collection: 'debtors', id: 'dl-late', updatedAt: t, data: { name: 'مشتریِ دیرِ وب', creditLimit: 5000, createdAt: t - 9000 } },
+    { collection: 'sales', id: 'sl-late', updatedAt: t, data: { total: 10000, finalTotal: 10000, paymentMethod: 'credit', debtorId: 'dl-late',
+      paidAmount: 7000, remaining: 3000, debtGiven: 3000, status: 'completed', createdAt: t } },
+  ]);
+  assert.equal((await flags()).slice(before).length, 2);
+  const rl = await legacy(staff, 'web-2', [{ collection: 'transactions', id: 'dl-late-old', updatedAt: t + 5,
+    data: { debtorId: 'dl-late', type: 'give', amount: 3000, createdAt: t - 100 } }]);
+  assert.equal(rl.status, 200, JSON.stringify(rl.body));
+  f = (await flags()).slice(before);
+  assert.deepEqual(f.slice(2).map((x) => [x.sale, x.late, x.excessMinor]), [['sl-late', true, 100000]]);
+  assert.ok(['legacy', 'api'].includes(f[2].path));
+});
+
+test('پیگیری: صاحب و پرچمِ خاموش ⇒ تراکنشِ دیررسیده هیچ پرسشی نمی‌سازد', async () => {
+  const before = (await flags()).length;
+  await push1(staff, 'pos-1', debtor1('d-own', 5000, 0));
+  const ops = sale1('s-own', 'd-own', 3000);
+  await push1(staff, 'pos-1', ops);
+  await push1(owner, 'own-1', [op1('transactions', 'd-own-old', 'insert', { debtorId: 'd-own', type: 'give', amount: 3000, createdAt: ops[0].fields.createdAt - 500 })]);
+  assert.equal((await flags()).length, before, 'صاحب خودش بررسی‌کننده است');
+  //  دکانی که پرچم ندارد: هیچ خواندنی و هیچ سابقه
+  const ctx = { app: 'shop', accountKind: 'shop', accountId: 'shp_no_flag_here', role: 'staff', userId: 'u' };
+  assert.equal(await review.v3(ctx, 'x', [{ table: 'transactions', row_id: 't', kind: 'insert', fields: { debtorId: 'd', type: 'give', createdAt: 1 } }],
+    [{ status: 'applied' }]), 0);
+  assert.deepEqual(review.triggersOf([{ debtorId: 'd', type: 'pay' }, { debtorId: ' ', type: 'give' }, { debtorId: 'd', type: 'give', createdAt: 5, refId: 's' }]),
+    [{ debtorId: 'd', at: 5, refId: 's' }]);
+});

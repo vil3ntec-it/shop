@@ -400,18 +400,15 @@
      ========================================================== */
   var attempt = 0;
   var retryTimer = null;
+  var gzipRefused = false;   // SYN-04: میان‌راهی بدنهٔ فشرده را نپذیرفت ⇒ تا بسته شدنِ صفحه push ِ ساده
 
   /** حسابی که هنوز دکان نساخته — خطا نیست، یک کارِ نکرده است. */
   var NOT_YET = ['no_shop', 'no_account', 'no_station'];
 
   function failed(message, code) {
     if (NOT_YET.indexOf(code) !== -1) {
-      /*
-       *  ⚠️ چراغِ قرمز یعنی «چیزی خراب است». حسابی که تازه ساخته شده و
-       *  هنوز دکانی ندارد چیزی خراب نکرده — فقط هنوز جایی برای
-       *  فرستادن نیست. قرمز کردنش کاربر را دنبالِ باگی می‌فرستد که
-       *  وجود ندارد.
-       */
+      //  ⚠️ چراغِ قرمز یعنی «چیزی خراب است». حسابِ تازهٔ بی دکان چیزی خراب نکرده — فقط هنوز جایی برای
+      //  فرستادن نیست؛ قرمز کردنش کاربر را دنبالِ باگی می‌فرستد که وجود ندارد.
       patchState({ lastError: '', lastErrorAt: 0, needsShop: true });
       attempt += 1;
       if (retryTimer) clearTimeout(retryTimer);
@@ -449,12 +446,13 @@
       since: sinceForPush(),
     };
     var r;
+    var gzip = state().gzipPush === true && !gzipRefused;   // SYN-04: فقط با `gzip_push` ِ pull؛ اندازه را `call` می‌سنجد
     try {
-      r = await acc.authFetch('/api/sync/v1/push', { method: 'POST', body: body });
+      r = await acc.authFetch('/api/sync/v1/push', { method: 'POST', body: body, gzip: gzip });
     } catch (e) {
+      if (gzip && (e.status === 415 || e.status === 400)) gzipRefused = true;   // پراکسی فشرده را نپذیرفت ⇒ بارِ بعد ساده
       if (e.status === 426) {
-        //  سرور عقب‌تر است. هیچ opی اعمال نشده و هیچ opی هم پاک
-        //  نمی‌شود؛ منتظر می‌مانیم تا سرور به‌روز شود.
+        //  سرور عقب‌تر است: هیچ opی اعمال یا پاک نشده؛ منتظرِ به‌روز شدنِ سرور می‌مانیم.
         //  پلهٔ بالاتر از پایه را سرور دیگر نمی‌شناسد (پرچمِ دکان خاموش شد)؟ بارِ بعد با پایه
         var sent = body.schema_version;
         patchState({ holding: true, lastError: e.message || 'سرور باید به‌روز شود',
@@ -507,6 +505,7 @@
       + encodeURIComponent(acc.deviceId()) + '&since=' + since);
     if (tabLock.readOnly()) return 0;   // نقش در همین فاصله روشن شد
     var ops = Array.isArray(r.ops) ? r.ops : [];
+    if (ops.length && (r.gzip_push === true) !== (state().gzipPush === true)) patchState({ gzipPush: r.gzip_push === true });   // فقط pull ِ با op
     //  پرچمِ دکانِ `sync.keep_pending`: تغییرِ محلیِ «در صف» (مثلاً ذخیره‌شده وسطِ همین pull) با opِ رسیده
     //  بازنویسی نمی‌شود — همان opها روی دفتر و سایه (`core.keepPending`؛ sync-core ِ کهنه ⇒ همان پیشین)
     if (r.keep_pending === true && ops.length && typeof core.keepPending === 'function') ops = core.keepPending(ops, queue().all());

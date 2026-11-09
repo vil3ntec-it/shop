@@ -64,6 +64,7 @@ async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan 
     })) || require('./credit-cap').judgeV3(c, ctx, op, row, { withDiscount: true, deviceId, origin });   //  STF-03: قرضِ همان فاکتور
   }
   { const cr = await require('./credit-cap').judgeV3(c, ctx, op, row, { deviceId, origin }); if (cr) return cr; }   //  STF-03: قرض/دلتای قرض (‎lib/credit-cap.js‎)
+  { const cl = await require('./credit-limit-perm').judgeV3(c, ctx, op, row, { origin }); if (cl) return cl; }   //  CRM-03 §۱۰.۱: سقفِ اعتبارِ مشتری (‎lib/credit-limit-perm.js‎)
   if (op.kind === 'cancel') {
     if (can(role, op.spec.cancel)) return null;
     //  همان قاعدهٔ v1: «حذفِ ردیفِ خودت» — برای سندِ غیرِ فاکتور

@@ -212,13 +212,13 @@
   const WHEN = { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
   const when = (ms) => { const d = new Date(Number(ms)); try { return d.toLocaleString('fa-AF-u-nu-latn', WHEN); } catch { return d.toLocaleString(); } };
 
-  /** افزونه‌های پشتِ پرچم: `orders-desk.js` (ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») با `presence`/`delay` و `area-requests.js` (CHK-10 «خبرم کن») با `notifyArea` ِ `/config` */
+  /** افزونه‌های پشتِ پرچم: `orders-desk.js` (ORD-03 «باز / بسته»، ORD-07 «عقب انداختن») با `presence`/`delay`، `area-requests.js` (CHK-10 «خبرم کن») با `notifyArea` و `orders-risk.js` (RSK-03 سابقهٔ مشتری) با `risk` ِ `/config` */
   const extApi = { call, toast, esc, when, $, closeModal, get cfg() { return st.cfg; }, get open() { return st.open; },
     showOrder(o) { st.open = o; st.detailSeq++; paintDetail(); }, reopen(id) { openDetail(id, true); },
     refresh() { pollSummary(); if (isActive()) loadList(true); } };
-  const ext = (name, ...a) => [root.TohidOrdersDesk, root.TohidAreaRequests].reduce((r, x) => (x && typeof x[name] === 'function' ? x[name](extApi, ...a) ?? r : r), undefined);
+  const ext = (name, ...a) => [root.TohidOrdersDesk, root.TohidAreaRequests, root.TohidOrdersRisk].reduce((r, x) => (x && typeof x[name] === 'function' ? x[name](extApi, ...a) ?? r : r), undefined);
   function loadExt() {
-    [['TohidOrdersDesk', 'orders-desk', st.cfg && (st.cfg.delay || st.cfg.presence)], ['TohidAreaRequests', 'area-requests', st.cfg && st.cfg.notifyArea]].forEach(([g, f, on]) => {
+    [['TohidOrdersDesk', 'orders-desk', st.cfg && (st.cfg.delay || st.cfg.presence)], ['TohidAreaRequests', 'area-requests', st.cfg && st.cfg.notifyArea], ['TohidOrdersRisk', 'orders-risk', st.cfg && st.cfg.risk]].forEach(([g, f, on]) => {
       if (!on || root[g] || st.extLoading[f]) return;
       const el = Object.assign(document.createElement('script'), { src: `license/${f}.js?v=1` }); st.extLoading[f] = true;
       el.onload = () => { st.extLoading[f] = false; ext('mount'); if (st.open) paintDetail(); };
@@ -669,7 +669,7 @@
       <p class="ord-tags">${tags(o)}<span class="ord-tag">${timeOf(o)}</span></p>
       ${acts ? `<div class="ord-actions" id="ord-actions">${acts}</div>` : ''}
       <h4 class="ord-h">مشتری</h4>
-      <p class="ord-cust"><b>${esc(c.name)}</b> ${phone}</p>
+      <p class="ord-cust"><b>${esc(c.name)}</b> ${phone}</p>${ext('detailCard', o) || ''}
       ${o.fulfillment === 'delivery' ? `<h4 class="ord-h">نشانی</h4><p>${addrBits.join(' · ') || '—'}</p>` : ''}
       ${o.note ? `<h4 class="ord-h">یادداشت</h4><p class="ord-note">${esc(o.note)}</p>` : ''}
       <h4 class="ord-h">اقلام</h4>

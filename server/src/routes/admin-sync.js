@@ -20,6 +20,7 @@ const { badRequest } = require('../middleware/errors');
 const { clientIp } = require('../middleware/ratelimit');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { requireReason } = require('../lib/admin-access');
+const finalized = require('../lib/finalized-sales');
 
 const router = express.Router();
 
@@ -64,6 +65,8 @@ router.get('/conflicts', async (req, res, next) => {
 router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) => {
   try {
     const reason = requireReason(req);
+    //  SEC-03 (پرچمِ `shop.doc_chain`): مقدارِ بازنده فاکتورِ ثبت‌شده را سرِ جا عوض نمی‌کند ⇒ ۴۰۹ (‎lib/finalized-sales.js‎)
+    await finalized.adminRestoreCheck(req.params.id, { adminId: req.admin.id, ip: clientIp(req) });
     const out = await sync.restoreConflict(req.params.id);
     await audit.log({
       shopId: out?.ctx?.accountKind === 'shop' ? String(out.ctx.accountId || '') : '',

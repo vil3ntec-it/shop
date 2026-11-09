@@ -84,6 +84,7 @@ class MainActivity : ComponentActivity() {
       api, kv, lifecycleScope, Dispatchers.IO, System::currentTimeMillis,
       locator = Locator { done -> locate(done) },
       secureRandom = { n -> ByteArray(n).also { random.nextBytes(it) } },
+      secrets = SecretsAndroid(this),
     )
     val platform = Platform(
       photo = { path, modifier -> ImagesAndroid.Photo(server().trimEnd('/') + path, modifier) },

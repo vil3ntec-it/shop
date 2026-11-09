@@ -153,6 +153,14 @@
       defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'allow'),
       edit: 'full', approvable: false, caps: [], display: true,
     },
+    //  CRM-03 (§۱۰.۱ «تغییرِ سقفِ اعتبار»): نوشتنِ `creditLimit` ِ مشتری — درج با سقف، تغییر یا برداشتنِ سقف. امروز هر
+    //  نویسندهٔ دفترِ مشتری سقف می‌گذارد، پس پیش‌فرض همان `sales.credit`؛ سقفِ `maxAmount` (Minor) = بزرگ‌ترین سقفی که
+    //  این نقش می‌گذارد (برداشتنِ سقف = بی‌نهایت). بی «نیازمند تأیید» (ردیفِ مشتری برگه نمی‌برد). سرور فقط با پرچمِ
+    //  خاموشِ `shop.credit_limit_perm` می‌سنجد (`server/src/lib/credit-limit-perm.js`)
+    'customers.credit_limit': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: false, caps: ['maxAmount'], display: false,
+    },
   };
 
   function has(o, k) { return o != null && Object.prototype.hasOwnProperty.call(o, k); }

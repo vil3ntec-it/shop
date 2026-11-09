@@ -19,8 +19,12 @@
  *
  *  • `sync.gzip_pull` ⇒ پاسخِ pull ِ بزرگ‌تر از ۱ کیلوبایت، اگر درخواست `Accept-Encoding: gzip` داشت، فشرده
  *    می‌رود (همان سازوکارِ Snapshot: اندروید و مرورگر خودشان باز می‌کنند؛ JVM ِ کامپیوتر این سرآیند را
- *    نمی‌فرستد ⇒ همان پاسخِ ساده). push فشرده نشد: برنامه باید بدنه را خودش فشرده کند و از سرور بداند که
- *    می‌پذیرد — جدا، پس از این.
+ *    نمی‌فرستد ⇒ همان پاسخِ ساده).
+ *
+ *  • `sync.gzip_push` (SYN-04) ⇒ `gzip_push: true` در پاسخِ pull ِ با op: «push ات را فشرده بفرست». سرور بدنهٔ
+ *    `Content-Encoding: gzip`/`deflate` را همیشه باز می‌کرد (`express.json`، سقفِ ۲ مگابایت روی بدنهٔ باز‌شده)؛ پرچم
+ *    فقط نوبتِ روشن کردن در دستگاه است (وب: `account-code.js` ⇐ `CompressionStream`، بالای ۱ کیلوبایت). pull ِ بی op
+ *    چیزی نمی‌گوید و دستگاه آخرین پاسخِ با op را نگه می‌دارد.
  */
 const { many } = require('../db');
 const { applyOp } = require('./sync-v1');
@@ -29,6 +33,7 @@ const { SHOP } = require('./tenancy');
 const KEEP_PENDING = 'sync.keep_pending';
 const REVIVE_ROW = 'sync.revive_full_row';
 const GZIP_PULL = 'sync.gzip_pull';
+const GZIP_PUSH = 'sync.gzip_push';
 
 const ACC = 'app=$1 AND account_kind=$2 AND account_id=$3';
 const accArgs = (ctx) => [ctx.app, ctx.accountKind, ctx.accountId];
@@ -40,16 +45,19 @@ function decode(text) {
 
 const isShop = (ctx) => !!ctx && ctx.app === SHOP.app && ctx.accountKind === SHOP.app && !!ctx.accountId;
 
-/** هر سه پرچم با یک پرس‌وجو — همان قاعدهٔ `orders.flagOf` */
+/** هر چهار پرچم با یک پرس‌وجو — همان قاعدهٔ `orders.flagOf` */
 async function flags(ctx) {
   const rows = await many(
     'SELECT scope, key, value FROM live_config WHERE key = ANY($1::text[]) AND scope IN ($2,$3)',
-    [[KEEP_PENDING, REVIVE_ROW, GZIP_PULL], 'all', String(ctx.accountId)]
+    [[KEEP_PENDING, REVIVE_ROW, GZIP_PULL, GZIP_PUSH], 'all', String(ctx.accountId)]
   );
   const v = {};
   for (const r of rows) if (r.scope === 'all') v[r.key] = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v[r.key] = decode(r.value);
-  return { keepPending: v[KEEP_PENDING] === true, reviveRow: v[REVIVE_ROW] === true, gzip: v[GZIP_PULL] === true };
+  return {
+    keepPending: v[KEEP_PENDING] === true, reviveRow: v[REVIVE_ROW] === true, gzip: v[GZIP_PULL] === true,
+    gzipPush: v[GZIP_PUSH] === true,
+  };
 }
 
 /**
@@ -102,16 +110,17 @@ async function reviveRows(ctx, ops) {
 
 /**
  * افزوده‌های پاسخِ pull (`routes/sync-v1.js`) — شرح سرِ همین فایل.
- * @returns {Promise<null | {body:{ops?:Array, keep_pending?:true}, gzip:boolean}>} null ⇒ پاسخ همان پیشین
+ * @returns {Promise<null | {body:{ops?:Array, keep_pending?:true, gzip_push?:true}, gzip:boolean}>} null ⇒ پاسخ همان پیشین
  */
 async function pullExtras(ctx, ops) {
   if (!Array.isArray(ops) || !ops.length || !isShop(ctx)) return null;
   try {
     const f = await flags(ctx);
-    if (!f.keepPending && !f.reviveRow && !f.gzip) return null;
+    if (!f.keepPending && !f.reviveRow && !f.gzip && !f.gzipPush) return null;
     const body = {};
     if (f.reviveRow) body.ops = await reviveRows(ctx, ops);
     if (f.keepPending) body.keep_pending = true;
+    if (f.gzipPush) body.gzip_push = true;
     return { body, gzip: f.gzip };
   } catch (err) {
     //  افزوده است، نه شرطِ pull: شکست ⇒ همان پاسخِ پیشین (رفتارِ بی پرچم)
@@ -120,4 +129,4 @@ async function pullExtras(ctx, ops) {
   }
 }
 
-module.exports = { KEEP_PENDING, REVIVE_ROW, GZIP_PULL, GZIP_MIN_BYTES: 1024, flags, reviveRows, pullExtras };
+module.exports = { KEEP_PENDING, REVIVE_ROW, GZIP_PULL, GZIP_PUSH, GZIP_MIN_BYTES: 1024, flags, reviveRows, pullExtras };

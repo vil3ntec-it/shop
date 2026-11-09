@@ -711,6 +711,10 @@
   if (!window.TohidStockTransfers) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/stock-transfers.js?v=1', defer: true }));
   }
+  //  MKT-06: «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`product-cycle.js`، همان کادرِ برنامه؛ بی سرور)
+  if (!window.TohidProductCycle) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/product-cycle.js?v=1', defer: true }));
+  }
   //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو) — فارسی ⇒ هیچ واژه‌نامه و ناظری (`web-i18n.js`)
   if (!window.TohidWebI18n) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/web-i18n.js?v=1', defer: true }));
