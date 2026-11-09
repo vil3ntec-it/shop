@@ -83,6 +83,11 @@
   نماند؛ مانده‌ها پرچم و v3 (تصمیمِ صاحب‌کار) و «۵-ب» در `lib/sync-v1.js` ِ مشترک با پمپ.
 - قدمِ بعدی: شاهدِ CI ِ `sale-void-chain`، `sync-gzip-push` و `phrase-backup-tool`؛ کاتلین: `GZIPOutputStream` برای push پس از
   `gzip_push`، و «پشتیبان روی USB با عبارت» در برنامه با همان پاکت.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/srv-authority` (اختیارِ سرور: STF-03 تخفیف/امتیاز، پیگیری‌های CRM-03، مجوزِ «تغییرِ سقفِ اعتبار»؛ آغاز روی `ccr-3a0d593c-ac0jpj-batch-35`، سپس روی main پس از #1019 (همان درخت)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (همه پشتِ پرچمِ خاموش، بی مسیرِ تازه، بی مهاجرت، ⛔ `sync-v1.js` دست نخورد): (۱) **STF-03** `lib/promo-loyalty-review.js` (`shop.promo_loyalty_review`): `promo` ِ قلم با `promo-core.evaluate` و قاعده‌های دکان، `loyalty_spend` با `Loyalty.spend` (همتای JS ِ تازه در `loyalty-balance.js` + بردارِ `core/test-vectors/loyalty-spend-v1.json` + `LoyaltySpendVectorsTest.kt`) ⇒ فقط سابقهٔ `sale.promo_review` (یک بار، هرگز رد، شکستش push را نمی‌خواباند). (۲) **CRM-03** بررسیِ سقفِ اعتبار حالا دلتای `debtGivenMinor` ِ v3، ویرایشِ قرضِ v1 و تراکنشِ دیررسیده را هم می‌بیند. (۳) مجوزِ هسته‌ایِ `customers.credit_limit` (§۱۰.۱؛ JS/Kotlin/`perm-v1.json`) و اجرا در v1، v3 و REST پشتِ `shop.credit_limit_perm` (`lib/credit-limit-perm.js`). آزمون‌ها روی PGlite و PostgreSQL ِ محلی.
+- نیمه‌کاره: برنامه مجوزِ تازه را پیش از ذخیره نمی‌پرسد و برچسبِ فارسی ندارد (صفحهٔ کارمند/مشتری، بیرون از این کار)؛ Kotlin (`PermCore`، `LoyaltySpendVectorsTest`) فقط در CI.
+- تصمیمِ صاحب‌کار: STF-03/CRM-03 «رد یا بررسی»؛ پیش‌فرضِ `customers.credit_limit` برای شاگرد/صندوق‌دار (امروز «مجاز» = رفتارِ امروز).
+- قدمِ بعدی: شاهدِ CI برای پنج آزمونِ تازه/گسترده و `PermCoreTest`/`LoyaltySpendVectorsTest`؛ سپس پرسیدنِ مجوز در فرمِ مشتریِ برنامه.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-2` (ردیف‌های غیرِ P0 ِ ویترین، سفارشِ آنلاین و پیک؛ بارِ نخست؛ روی `ccr-3a0d593c-ac0jpj-batch-34` = #1018؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) باگِ واقعیِ مشتری: `PUT`/`merge` ِ سبدِ سرور و ♥ همان سطلِ `store-checkout` ِ ثبت را (۲۰ در ربع ساعت به‌ازای IP) می‌خوردند ⇒
   مشتریِ واردشده پس از ~۲۰ تغییرِ سبد سفارش را با ۴۲۹ نمی‌توانست ثبت کند؛ حالا سطلِ `store-acct-sync` (`RATE_STORE_SYNC_MAX` ۲۴۰)،

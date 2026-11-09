@@ -101,6 +101,10 @@ object PermCore {
     // CRM-15: دیدنِ شماره و نشانیِ مشتری (کمترین اطلاعاتِ شخصی) — فقط نمایش (داده روی دستگاه هست)؛ سه نقشِ قدیم
     // و صندوق‌دار و حسابدار مثلِ امروز می‌بینند، انباردار و جمع‌آور نه؛ صاحب برای هر نقش یا کاربر تنگ یا باز می‌کند
     "customers.contact" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "allow"), "full", false, emptyList(), true),
+    // CRM-03 (§۱۰.۱ «تغییرِ سقفِ اعتبار»): نوشتنِ `creditLimit` ِ مشتری — امروز هر نویسندهٔ دفترِ مشتری؛ سقفِ `maxAmount`
+    // (Minor) = بزرگ‌ترین سقفی که این نقش می‌گذارد، بی «نیازمند تأیید». سرور فقط با پرچمِ خاموشِ `shop.credit_limit_perm`
+    // می‌سنجد — همان `d()` ِ JS
+    "customers.credit_limit" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", false, listOf("maxAmount"), false),
   )
 
   /** «همه» — رفتارِ امروزِ سه نقشِ قدیم */

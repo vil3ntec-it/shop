@@ -751,7 +751,7 @@ async function v1Guard(req, res, next) {
     });
     const deviceId = String(req.body?.device_id || req.body?.deviceId || '').slice(0, 64);
     const credit = await creditCap.markV1(ctx, valid);   //  STF-03: قرضِ درجِ فاکتور (`x.need`/`x.credit`)؛ ویرایش در `judgeEdits`
-    const offTable = await roleV1.offRole(ctx, valid, rejected);
+    const offTable = await roleV1.offRole(ctx, valid, rejected, deviceId);
     const hasNeed = valid.some((x) => x.need || isMoneyEdit(x.op, credit));
     if (!hasNeed && !offTable.length && !valid.some((x) => LINKABLE.has(x.op.table))) return finish();
     const held0 = await heldParents(ctx, deviceId, valid.map((x) => x.op));
@@ -1050,5 +1050,5 @@ module.exports = {
   keyIdOf, parsePublicKey, registerKey, listKeys, revokeKey,
   needOf, needOfV1, verifySignature, acceptSlip, judge, wallOf, slipOf, v1Guard, requesterLayers, listApprovals: (...a) => require('./approval-log').listApprovals(...a),
   returnDocKey, groupReturns, returnGroupsOf, judgeGroup, companionOf, parentOf, belongs, headKey, bundleV3, HOLD_KINDS,   //  سه‌تا: `return-line-cap` ِ v1
-  returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs,
+  returnsLockKey, returnedTotal, holdInfoV3, holdV3Units, heldTxs, boxV1,   //  boxV1: ‎lib/credit-limit-perm.js‎
 };
