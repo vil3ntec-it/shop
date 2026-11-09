@@ -52,6 +52,10 @@ function errorHandler(err, req, res, _next) {
   if (err && !err.status && err.message === POOL_BUSY) {
     err = Object.assign(new ApiError(503, 'db_busy', 'سرور الان شلوغ است؛ چند ثانیهٔ دیگر دوباره بکوشید'), { cause: err });
     res.set('Retry-After', '2');
+  } else if (err && !err.status && (err.code === '57014' || err.code === '25P03')) {
+    //  PERF-04: سقفِ پرس‌وجو/تراکنشِ بیکار (`PG_STATEMENT_TIMEOUT_MS`، `PG_IDLE_TX_TIMEOUT_MS`) بُرید ⇒ «دیر شد، دوباره»
+    err = Object.assign(new ApiError(503, 'db_timeout', 'پاسخ از پایگاه دیر شد؛ چند ثانیهٔ دیگر دوباره بکوشید'), { cause: err });
+    res.set('Retry-After', '2');
   } else if (err && err.status === 503 && err.code === 'db_busy') {
     //  پس‌زدنِ زودِ خودِ سرور (صفِ استخر `PG_POOL_MAX_WAITING`، دروازهٔ push ِ v3) — همان پاسخ
     res.set('Retry-After', String(err.retryAfter || 2));
@@ -62,7 +66,7 @@ function errorHandler(err, req, res, _next) {
   if (status >= 500) {
     const where = require('../lib/log-redact').redactPath(req.originalUrl || req.path);
     //  استخرِ پر زیرِ بار صدها بار در ثانیه می‌رسد: یک خط، بی stack (لاگ خودش بارِ تازه نشود)
-    if (err.code === 'db_busy') console.error(`[error] ${ref} db_busy`, req.method, where);
+    if (err.code === 'db_busy' || err.code === 'db_timeout') console.error(`[error] ${ref} ${err.code}`, req.method, where);
     else console.error(`[error] ${ref}${err.step ? ` @${err.step}` : ''}`, req.method, where, err);
     //  پنلِ مرکزی ۴.۱۰: همان خطا با همان «کدِ پیگیری» در `server_errors` (پوشانده از راز، بی await؛
     //  شکستِ ثبت هرگز به پاسخ نمی‌رسد) ⇒ مرکزِ رخدادِ پنل آن را می‌بیند، نه فقط لاگِ کنسول

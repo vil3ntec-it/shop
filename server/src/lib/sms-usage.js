@@ -139,6 +139,21 @@ async function totals({ since = 0, until = null, shopId } = {}) {
   return shape(await one(`SELECT ${sums(3, 'u')} FROM sms_usage u WHERE ${where}`, args));
 }
 
+/**
+ * OPS-09: پیامکِ کدها (ورود، ثبت‌نام، شمارهٔ ویترین …) به تفکیکِ `purpose` و «بی‌دکان/با دکان» از `since` — برای همان
+ * گزارشِ «مصرف و هزینهٔ پیام» (`lib/notify-usage.js`). فقط شمار و هزینه؛ هیچ شماره و دکانی. سقفِ ۵۰ گونه.
+ */
+async function byPurpose({ since = 0, until = null } = {}) {
+  const rows = await many(
+    `SELECT u.purpose, (u.shop_id <> '') AS has_shop, ${sums(3, 'u')}
+       FROM sms_usage u WHERE u.at >= $1 AND u.at < $2
+      GROUP BY u.purpose, (u.shop_id <> '')
+      ORDER BY COALESCE(SUM(u.cost_minor), 0) DESC, COUNT(*) DESC, u.purpose LIMIT 50`,
+    [intOr(since, 0), until == null ? Number.MAX_SAFE_INTEGER : intOr(until, Number.MAX_SAFE_INTEGER), [...REAL_VIA]]
+  );
+  return rows.map((r) => ({ purpose: r.purpose || '', shop: r.has_shop === true, ...shape(r) }));
+}
+
 /** گزارشِ پنل: هر دکان جدا (پرهزینه‌ترین بالا) + بی‌دکان + جمع. */
 async function report({ days, limit } = {}) {
   const d = Math.min(LIMITS.maxDays, Math.max(1, intOr(days, LIMITS.defDays)));
@@ -168,4 +183,4 @@ async function report({ days, limit } = {}) {
   };
 }
 
-module.exports = { UNIT_KEY, CURRENCY, REAL_VIA, MOCK_VIA, LIMITS, unitCost, setUnitCost, record, countSince, costSince, totals, report };
+module.exports = { UNIT_KEY, CURRENCY, REAL_VIA, MOCK_VIA, LIMITS, unitCost, setUnitCost, record, countSince, costSince, totals, byPurpose, report };

@@ -53,16 +53,48 @@ let reconRunning = false;
 let reconTicks = 0;
 
 /**
- * OPS-01@29: نوبت‌های پیاپیِ ناموفقِ تطبیق (پرتاب، یا `errors > 0` ِ درِ وضعیت) — فقط در حافظهٔ همین نمونه و فقط
- * `lib/ops-paging.js` می‌خواند (سه نوبت ⇒ هشدارِ بحرانی). نوبتی که اجرا نشد (بی کلید، قفلِ نمونهٔ دیگر) چیزی نمی‌شمارد.
+ * OPS-01@29: نوبت‌های پیاپیِ ناموفقِ تطبیق (پرتاب، یا `errors > 0` ِ درِ وضعیت) — فقط `lib/ops-paging.js` می‌خواند (سه نوبت ⇒
+ * هشدارِ بحرانی). نوبتی که اجرا نشد (بی کلید، قفلِ نمونهٔ دیگر) چیزی نمی‌شمارد.
+ * ⛔ در پایگاه هم (`app_config` ِ [HEALTH_KEY]، یک ردیف): تا ۲.۱۴.۵ فقط در حافظهٔ همان نمونه بود ⇒ راه‌اندازیِ دوباره، جابه‌جاییِ
+ * رهبر یا اجارهٔ تطبیق در نمونهٔ دیگر شمارش را صفر می‌کرد و سرورِ «هر ده دقیقه یک بار از نو» هرگز خبر نمی‌داد. حافظه همان
+ * دم (هم‌گام) عوض می‌شود و نوشتنِ پایگاه به ترتیب در صف؛ `sharedHealth()` پس از صف از پایگاه می‌خواند (خطا ⇒ حافظه).
+ * فقط عدد، زمان و نام/کدِ خطا — هرگز پیامِ خام. این کلید در فهرستِ سفیدِ `plans.publicConfig` نیست.
  */
+const HEALTH_KEY = 'ops:payments.reconcile.health';
 const reconHealth = { streak: 0, lastOkAt: null, lastFailAt: null, lastError: '' };
+let persisted = Promise.resolve();
 function noteReconcile(fail, at = Date.now()) {
-  if (!fail) { Object.assign(reconHealth, { streak: 0, lastOkAt: at, lastError: '' }); return; }
-  const code = fail.code ? `:${String(fail.code).slice(0, 40)}` : '';
-  Object.assign(reconHealth, { streak: reconHealth.streak + 1, lastFailAt: at, lastError: `${String(fail.name || 'Error').slice(0, 40)}${code}` });
+  let label = '';
+  if (!fail) Object.assign(reconHealth, { streak: 0, lastOkAt: at, lastError: '' });
+  else {
+    const code = fail.code ? `:${String(fail.code).slice(0, 40)}` : '';
+    label = `${String(fail.name || 'Error').slice(0, 40)}${code}`;
+    Object.assign(reconHealth, { streak: reconHealth.streak + 1, lastFailAt: at, lastError: label });
+  }
+  //  شمارشِ پایگاه از ردیفِ خودِ پایگاه (نه از حافظهٔ این نمونه) — نوبتِ نمونهٔ دیگر را ادامه می‌دهد
+  persisted = persisted.then(() => query(
+    `INSERT INTO app_config (key, value, updated_at) VALUES ($1, $2, $3)
+     ON CONFLICT (key) DO UPDATE SET updated_at = EXCLUDED.updated_at, value = CASE WHEN $4::boolean
+       THEN jsonb_build_object('streak', 0, 'lastOkAt', $3::bigint, 'lastFailAt', app_config.value::jsonb->'lastFailAt', 'lastError', '')::text
+       ELSE jsonb_build_object('streak', COALESCE((app_config.value::jsonb->>'streak')::int, 0) + 1,
+                               'lastOkAt', app_config.value::jsonb->'lastOkAt', 'lastFailAt', $3::bigint, 'lastError', $5::text)::text END`,
+    [HEALTH_KEY, JSON.stringify(fail ? { streak: 1, lastOkAt: null, lastFailAt: at, lastError: label } : { streak: 0, lastOkAt: at, lastFailAt: null, lastError: '' }),
+      at, !fail, label]
+  )).catch((err) => console.error('[payments] ثبتِ سلامتِ تطبیق', err.code || err.name));
+  return persisted;
 }
 const reconcileHealth = () => ({ ...reconHealth });
+/** همان `reconcileHealth`، ولی مشترکِ همهٔ نمونه‌ها و ماندگار پس از راه‌اندازیِ دوباره */
+async function sharedHealth() {
+  await persisted;
+  try {
+    const r = await one('SELECT value FROM app_config WHERE key = $1', [HEALTH_KEY]);
+    if (!r) return reconcileHealth();
+    const v = JSON.parse(r.value);
+    const n = (x) => (x === null || x === undefined ? null : Number(x));
+    return { streak: Number(v.streak) || 0, lastOkAt: n(v.lastOkAt), lastFailAt: n(v.lastFailAt), lastError: String(v.lastError || '') };
+  } catch { return reconcileHealth(); }
+}
 /**
  * یک نوبتِ زمان‌بند. null ⇒ اجرا نشد (پیکربندی نشده، نوبتِ قبلی هنوز در کار، یا نمونهٔ دیگری قفل دارد).
  * @returns {Promise<null|{checked, paid, closed, mismatched, errors, truncated, wide}>}
@@ -77,8 +109,8 @@ async function reconcileTick({ wide } = {}) {
       let out;
       try {
         out = await reconcile({ ...(full ? {} : { sinceMs: RECONCILE_RECENT_MS }), budgetMs: RECONCILE_BUDGET_MS });
-      } catch (err) { noteReconcile(err); throw err; }
-      noteReconcile(out.errors ? { name: 'ReconcileErrors', code: String(out.errors) } : null);
+      } catch (err) { await noteReconcile(err); throw err; }
+      await noteReconcile(out.errors ? { name: 'ReconcileErrors', code: String(out.errors) } : null);
       if (out.paid || out.closed || out.mismatched || out.errors || out.truncated || out.flagged) {
         console.log(`[payments] تطبیق: ${JSON.stringify(out)}`);
       }
@@ -100,4 +132,4 @@ function stopReconciler() {
   reconTimer = null;
 }
 
-module.exports = { reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY, reconcileHealth, noteReconcile };
+module.exports = { reconcileTick, startReconciler, stopReconciler, RECONCILE_LEASE_KEY, reconcileHealth, sharedHealth, noteReconcile, HEALTH_KEY };

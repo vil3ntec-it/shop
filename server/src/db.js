@@ -57,6 +57,9 @@ function poolOptions(max, url = config.db.url) {
     //  پس از `closeDb` برسد استخرِ تازه‌ای می‌سازد؛ بی این، اتصالِ آن هرگز ۳۰ ثانیه بیکار
     //  نمی‌ماند و فرآیند (پرونده‌ای از آزمون‌ها) تا ابد باز می‌ماند. سرور را شنوندهٔ HTTP زنده نگه می‌دارد.
     allowExitOnIdle: true,
+    //  PERF-04: پرس‌وجوی کند یا تراکنشِ رهاشده اتصالِ استخر را تا ابد نگه نمی‌دارد (۰ ⇒ گزینه نیست، همان پیشین)
+    ...(config.db.statementTimeoutMs > 0 ? { statement_timeout: config.db.statementTimeoutMs } : {}),
+    ...(config.db.idleTxTimeoutMs > 0 ? { idle_in_transaction_session_timeout: config.db.idleTxTimeoutMs } : {}),
   };
 }
 
@@ -204,16 +207,25 @@ async function tx(fn) {
     });
   }
   const client = await admit(getPool()).connect();
+  /*
+   *  اتصالی که وسطِ تراکنش افتاد (سقفِ تراکنشِ بیکار `PG_IDLE_TX_TIMEOUT_MS`، راه‌اندازیِ دوبارهٔ پایگاه، شبکه) به استخر
+   *  برنمی‌گردد: `release(err)` نابودش می‌کند. پیش‌تر سالم برمی‌گشت و پرس‌وجوی بعدیِ کسِ دیگر با همان خطا می‌افتاد؛ و
+   *  رخدادِ `error` ِ اتصالِ بیرون‌کشیده شنونده‌ای نداشت ⇒ uncaughtException (`request-deadline.test.js`).
+   */
+  let broken = null;
+  const onLost = (e) => { broken = broken || e; };
+  client.on('error', onLost);
   try {
     await client.query('BEGIN');
     const out = await pgTxStore.run(true, () => fn(client));
     await client.query('COMMIT');
     return out;
   } catch (err) {
-    try { await client.query('ROLLBACK'); } catch { /* اتصال از دست رفته */ }
+    try { await client.query('ROLLBACK'); } catch (e) { broken = broken || e; }
     throw err;
   } finally {
-    client.release();
+    client.off('error', onLost);
+    client.release(broken || undefined);
   }
 }
 
