@@ -188,6 +188,70 @@ for (const [label, call] of [
   });
 }
 
+/*
+ *  ⛔ ۴۰۱ ِ دیررس: درخواستی که با توکنِ دسترسیِ کهنه رفته و جوابش **پس از** تازه‌سازیِ لایهٔ دیگر می‌رسد، زنجیره را
+ *  دوباره نمی‌چرخاند؛ همان توکنِ تازه را برمی‌دارد. ریشهٔ «لرزانیِ» گام‌های بالا (۳ از ۲۶ اجرا، هر بار «دورِ ۱»): در
+ *  `index.html` ‏`setTimeout(refreshCloudBackups, 2500)` ‏`backups.list` می‌زند؛ ۴۰۱ اش که پس از پایانِ تازه‌سازیِ گام
+ *  می‌رسید (تک‌پروازِ `TohidAccount.refresh` دیگر بسته بود) تازه‌سازیِ دوم را می‌زد و توکنی که همان لحظه ذخیره بود
+ *  در سرور چرخیده بود. این‌جا زمان قطعی است: درخواست در `page.route` نگه داشته می‌شود تا لایهٔ دیگر تازه کند.
+ */
+for (const [late, glob, lateCall, firstCall] of [
+  ['license-client', '**/api/v1/me/backups', () => window.TohidLicense.backups.list(), () => window.TohidShop.apiAuth('/api/v1/shop/me')],
+  ['shop-sync', '**/api/v1/shop/me', () => window.TohidShop.apiAuth('/api/v1/shop/me'), () => window.TohidAccount.authFetch('/api/me/heartbeat')],
+  ['account-code', '**/api/me/heartbeat', () => window.TohidAccount.authFetch('/api/me/heartbeat'), () => window.TohidLicense.backups.list()],
+]) {
+  await step(`${late}: ۴۰۱ ِ دیررس پس از تازه‌سازیِ لایهٔ دیگر ⇒ زنجیره دوباره نمی‌چرخد`, async () => {
+    //  پیش‌شرط: درخواستِ نگه‌داشته واقعاً با توکنِ مرده رفته و ۴۰۱ گرفته؛ اگر کارِ پس‌زمینهٔ صفحه درست در همان چند
+    //  میلی‌ثانیه زودتر تازه کرده بود، دوباره (حداکثر سه بار) — نه «سبزِ» بی‌آزمون
+    for (let attempt = 1; ; attempt++) {
+      await anHourLater();
+      const held = [];
+      const heldReqs = new Set();
+      let holding = true;
+      let gotFirst;
+      const caught = new Promise((ok) => { gotFirst = ok; });
+      const lateStatuses = [];
+      let refreshes = 0;
+      const onRequest = (r) => { if (r.method() === 'POST' && /\/auth\/refresh$/.test(r.url().split('?')[0])) refreshes++; };
+      const onResponse = (r) => { if (heldReqs.has(r.request())) lateStatuses.push(r.status()); };
+      page.on('request', onRequest);
+      page.on('response', onResponse);
+      await page.route(glob, closeSafeRoute((route) => {
+        if (!holding) return route.continue();
+        held.push(route);
+        heldReqs.add(route.request());
+        gotFirst();
+        return undefined;
+      }));
+      let lateOut;
+      try {
+        const lateP = inPage(lateCall);
+        await Promise.race([caught, new Promise((_, no) => setTimeout(() => no(new Error('درخواستِ دیررس نرفت')), 10000))]);
+        const first = await inPage(firstCall);
+        assert.equal(first.ok, true, `لایهٔ نخست: ${first.message} (${first.code})`);
+        const rtAfter = (await stored()).refreshToken;
+        holding = false;
+        for (const r of held.splice(0)) await r.continue();
+        lateOut = await lateP;
+        if (!lateStatuses.includes(401) && attempt < 3) continue;
+        assert.ok(lateStatuses.includes(401), `پیش‌شرط: درخواستِ نگه‌داشته باید ۴۰۱ ِ توکنِ مرده بگیرد (${lateStatuses})`);
+        assert.equal(lateOut.ok, true, `درخواستِ دیررس با توکنِ تازه: ${lateOut.message} (${lateOut.code})`);
+        const row = await refreshRow(rtAfter);
+        assert.equal(row && row.revoked_at, null, 'توکنی که پس از تازه‌سازیِ نخست ذخیره شد نباید با ۴۰۱ ِ دیررس دوباره بچرخد');
+        assert.equal((await stored()).refreshToken, rtAfter, 'توکنِ ذخیره همان حلقهٔ زنده ماند');
+        assert.equal(refreshes, 1, `یک انقضا ⇒ یک تازه‌سازی، نه ${refreshes}`);
+        return;
+      } finally {
+        holding = false;
+        for (const r of held.splice(0)) await r.continue().catch(() => {});
+        await page.unroute(glob);
+        page.off('request', onRequest);
+        page.off('response', onResponse);
+      }
+    }
+  });
+}
+
 await step('بستن و باز کردنِ دوبارهٔ صفحه ⇒ همان نشست، بی ورودِ دوباره', async () => {
   await anHourLater();
   await page.reload({ waitUntil: 'domcontentloaded' });

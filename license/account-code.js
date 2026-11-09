@@ -227,12 +227,19 @@
      بگیرند، هر کدام یک بار زنجیره را می‌چرخانند و آخری‌ها به توکنِ
      باطل می‌رسند. سرور پنجرهٔ ارفاقِ سی‌ثانیه‌ای دارد ولی تکیه به آن
      پوشاندنِ باگ است.
+     ⚠️ و ۴۰۱ ِ **دیررس** هم همان است: `stale` = توکنی که آن درخواست با آن
+     رفت. جوابی که پس از پایانِ تازه‌سازیِ دیگری می‌رسد (توکنِ ذخیره دیگر
+     آن نیست) همان توکنِ تازه را می‌گیرد و زنجیره را دوباره نمی‌چرخاند —
+     تا دیروز تک‌پرواز بسته بود و چرخشِ دوم توکنِ همان لحظه ذخیره را در
+     سرور باطل می‌کرد (`web-session.mjs`، «۴۰۱ ِ دیررس»).
      ========================================================== */
   var refreshing = null;
 
-  async function refresh() {
+  async function refresh(stale) {
     if (refreshing) return refreshing;
-    var rt = acct().refreshToken;
+    var now = acct();
+    if (stale && now.accessToken && now.accessToken !== stale) return now.accessToken;
+    var rt = now.refreshToken;
     if (!rt) throw ApiError('نشست شما منقضی شده است، دوباره وارد شوید', 'no_refresh', 401);
     refreshing = (async function () {
       try {
@@ -284,7 +291,7 @@
        *  ۲۳.۴ سندِ v3). خطای **خودِ تازه‌سازی** بالا می‌رود تا «اینترنت
        *  نیست» به‌جای «نشست تمام شد» دیده شود.
        */
-      try { fresh = await refresh(); } catch (e2) {
+      try { fresh = await refresh(token); } catch (e2) {
         if (e2 && e2.status === 401) { signOutLocal(); throw e; }
         throw e2;
       }
