@@ -42,6 +42,7 @@ fun SettingsScreen(model: CustomerModel) {
       listOf("system" to ShopperText.themeSystem, "light" to ShopperText.themeLight, "dark" to ShopperText.themeDark).forEach { (k, label) ->
         Option(label, model.saved.theme == k) { model.setTheme(k) }
       }
+      AccountSettings(model)
       SectionTitle(ShopperText.server)
       OutlinedTextField(
         value = server, onValueChange = { server = it.trim() }, singleLine = true, modifier = Modifier.fillMaxWidth(),

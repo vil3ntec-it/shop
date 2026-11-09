@@ -208,7 +208,7 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   }
 
   // ── نشانی‌های حسابِ مشتری (CHK-09) — نشستِ `X-Store-Session`؛ هر خواندن و نوشتن به همان `customer_id` بسته است ──
-  //  ⛔ ساختنِ نشست (ورودِ مشتری و نشستِ بلند) پیامکِ واقعی می‌خواهد (CHK-02، D-09) و این‌جا نیست.
+  //  نشست از [signIn] (بلیتِ تازهٔ کدِ واقعیِ سرور؛ پیامکِ تولید D-09 است).
 
   fun addresses(slug: String, session: String): ShopperResult<List<SavedAddress>> =
     call("GET", base(slug) + "/account/addresses", null, sessionHeader(session)) { decodeOrNull(AddressList.serializer(), it)?.addresses }
@@ -223,6 +223,39 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     call("DELETE", base(slug) + "/account/addresses/" + ShopperUrl.encode(id), null, sessionHeader(session)) { root ->
       (root["deleted"] as? JsonPrimitive)?.booleanOrNull
     }
+
+  // ── حسابِ مشتری: ورود، سبد، ♥ و «فهرستِ خرید» (CHK-01/03، WEB-11؛ [AccountRules]) — همان درهای `acct.js`/`catalog.js` ِ وب ──
+  //  ⛔ ورود فقط با بلیتِ تازهٔ کدِ واقعیِ سرور؛ سرورِ بی راهِ پیامک کد نمی‌فرستد (`verification_unavailable`، D-09).
+
+  fun signIn(slug: String, ticket: String, name: String): ShopperResult<AccountSession> =
+    call("POST", base(slug) + "/account", obj("name" to name.trim().take(80)), ticketHeader(ticket)) { decodeOrNull(AccountSession.serializer(), it) }
+
+  fun signOut(slug: String, session: String): ShopperResult<Boolean> =
+    call("POST", base(slug) + "/account/logout", "{}", sessionHeader(session)) { true }
+
+  fun accountCart(slug: String, session: String): ShopperResult<AccountCart> =
+    call("GET", base(slug) + "/account/cart", null, sessionHeader(session)) { accountCartOf(it) }
+
+  fun putAccountCart(slug: String, session: String, version: Long, items: List<AccountItem>): ShopperResult<AccountCart> =
+    call("PUT", base(slug) + "/account/cart", write(version, items), sessionHeader(session)) { accountCartOf(it) }
+
+  fun mergeAccountCart(slug: String, session: String, items: List<AccountItem>): ShopperResult<AccountCart> =
+    call("POST", base(slug) + "/account/cart/merge", write(null, items), sessionHeader(session)) { accountCartOf(it) }
+
+  fun favorites(slug: String, session: String): ShopperResult<FavoritesPage> =
+    call("GET", base(slug) + "/account/favorites", null, sessionHeader(session)) { decodeOrNull(FavoritesPage.serializer(), it) }
+
+  fun setFavorite(slug: String, session: String, productId: String, on: Boolean): ShopperResult<Boolean> =
+    call(if (on) "PUT" else "DELETE", base(slug) + "/account/favorites/" + ShopperUrl.encode(productId), if (on) "{}" else null, sessionHeader(session)) { true }
+
+  fun shoppingList(slug: String, session: String): ShopperResult<AccountList> =
+    call("GET", base(slug) + "/account/shopping-list", null, sessionHeader(session)) { accountListOf(it) }
+
+  fun putShoppingList(slug: String, session: String, version: Long, items: List<ListItem>): ShopperResult<AccountList> =
+    call("PUT", base(slug) + "/account/shopping-list", write(version, items.map { AccountItem(it.id, it.q) }), sessionHeader(session)) { accountListOf(it) }
+
+  fun mergeShoppingList(slug: String, session: String, items: List<ListItem>): ShopperResult<AccountList> =
+    call("POST", base(slug) + "/account/shopping-list/merge", write(null, items.map { AccountItem(it.id, it.q) }), sessionHeader(session)) { accountListOf(it) }
 
   // ── گفت‌وگو با دکان (CHAT-02/06) — هویت همان شمارهٔ تأییدشده (`X-Store-Ticket`، مثلِ `store/chat.js` ِ وب) ──
 
@@ -307,6 +340,13 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   private fun sessionHeader(session: String): Map<String, String> = mapOf("X-Store-Session" to session)
 
   private fun address(root: JsonObject): SavedAddress? = root["address"]?.let { decodeOrNull(SavedAddress.serializer(), it) }
+
+  private fun accountCartOf(root: JsonObject): AccountCart? = root["cart"]?.let { decodeOrNull(AccountCart.serializer(), it) }
+
+  private fun accountListOf(root: JsonObject): AccountList? = root["list"]?.let { decodeOrNull(AccountList.serializer(), it) }
+
+  private fun write(version: Long?, items: List<AccountItem>): String =
+    ShopperJson.encodeToString(AccountWrite.serializer(), AccountWrite(version, items))
 
   private fun json(vararg kv: Pair<String, JsonElement>): String = ShopperJson.encodeToString(JsonObject.serializer(), JsonObject(kv.toMap()))
 

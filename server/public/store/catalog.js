@@ -9,7 +9,10 @@
  * ِ store.js است (قیمت و موجودیِ امروز). هر دو مثلِ سبدِ مهمان (S132) روی همین دستگاه‌اند؛ با نشستِ حساب (`K.sess()`)
  * ♥ با حساب هم‌گام است (`/account/favorites`): نخستین بارِ هر نشست ⇒ ♥ ِ این دستگاه به حساب می‌رود (ادغام)، سپس حساب حرفِ
  * آخر را می‌زند؛ ♥ ِ این دستگاه در صف (`store-favsync:<slug>`) و یکی‌یکی تا رسیدن (بی اینترنت/۴۲۹ ⇒ `online` یا بارِ بعد).
- * کالای نبوده (۴۰۴) و حسابِ پر (۴۰۹) ⇒ کنار؛ ۴۰۱ ⇒ همان محلی. فهرستِ خرید درِ سروری ندارد و محلی می‌ماند.
+ * کالای نبوده (۴۰۴) و حسابِ پر (۴۰۹) ⇒ کنار؛ ۴۰۱ ⇒ همان محلی. «فهرستِ خرید» هم با نشست همراهِ حساب است
+ * (`/account/shopping-list`، همان پرچم): نخستین بارِ هر نشست ادغام (بیشینهٔ مقدار؛ پر ⇒ فهرستِ این دستگاه جای فهرستِ حساب)،
+ * سپس هر تغییر یک کارِ صف (`store-listsync:<slug>`: «همه» یا «برداشتنِ یکی») روی نسخهٔ دیده‌شده؛ ۴۰۹ ِ نسخه ⇒ همان کار روی
+ * فهرستِ تازه؛ صف خالی ⇒ حساب حرفِ آخر را می‌زند. حسابِ پر از فهرست (`too_many_lists`) ⇒ همین دستگاه، محلی.
  * WEB-24 فقط با `features.banners` (پرچمِ `shop.storefront.banners`): بنرهای همین لحظه برای ناحیهٔ مشتری از
  * `GET /banners?zone=` (ساعت، ناحیه و کالای فروختنی را سرور می‌سنجد)، ردیفِ افقی بی چرخشِ خودکار؛ پیوندِ کالا ⇒ برگهٔ
  * کالا، پیوندِ دسته ⇒ همان دسته (فقط اگر دسته در ویترین هست)؛ ناحیه عوض شد ⇒ دوباره، با برگشت به کاتالوگ.
@@ -96,6 +99,7 @@
     var KEY_FAV = 'store-favs:' + ctx.slug; var KEY_LIST = 'store-list:' + ctx.slug;
     var on = false; var favs = []; var list = []; var sheetP = null; var sb = null;
     var KEY_SYNC = 'store-favsync:' + ctx.slug; var busy = false;
+    var KEY_LSYNC = 'store-listsync:' + ctx.slug; var lbusy = false;
 
     function paint(b, p) {
       var yes = favs.indexOf(p.id) >= 0;
@@ -174,13 +178,65 @@
       $('favs').hidden = !ul.children.length;
     }
     function saveList() { K.save(KEY_LIST, list); drawList(); }
+
+    // ── فهرستِ خرید با حساب: { t: نشست، v: نسخهٔ سرور، s: قلم‌های سرور، m: ادغام شد، ops } ──
+    function lstate() {
+      var s = K.sess(); if (!s) return null;
+      var st = K.load(KEY_LSYNC, null);
+      if (!st || st.t !== s.expiresAt || !Array.isArray(st.ops)) { st = { t: s.expiresAt, v: 0, s: [], m: false, ops: [] }; K.save(KEY_LSYNC, st); }
+      return st.off ? null : st;
+    }
+    function wire(a) { return a.map(function (x) { return { productId: x.id, qtyMilli: x.q }; }); }
+    function norm(lines) { return lines.map(function (l) { return { productId: l.productId, qtyMilli: l.qtyMilli }; }); }
+    /** کارِ تازه؛ «همه» کارهای پیشین را بی‌اثر می‌کند */
+    function lop(o) {
+      var st = lstate(); if (!st) return;
+      st.ops = o[0] === 'all' ? [o] : st.ops.concat([o]); K.save(KEY_LSYNC, st); lflush(false);
+    }
+    /** پاسخِ سرور؛ `op` انجام شد. صف خالی ⇒ فهرستِ حساب جای فهرستِ این دستگاه */
+    function took(srv, op) {
+      var st = lstate(); if (!st) return;
+      st.v = srv.version; st.m = true; st.s = norm(srv.lines);
+      var j = JSON.stringify(op);
+      for (var i = 0; op && i < st.ops.length; i++) if (JSON.stringify(st.ops[i]) === j) { st.ops.splice(i, 1); break; }
+      K.save(KEY_LSYNC, st);
+      if (st.ops.length) return;
+      srv.items.forEach(function (p) { ctx.items[p.id] = ctx.items[p.id] || p; });
+      list = cleanList(st.s.map(function (l) { return { id: l.productId, q: l.qtyMilli }; }));
+      saveList();
+    }
+    function lflush(pull, tries) {
+      var st = lstate();
+      if (!st || lbusy || navigator.onLine === false) return;
+      var op = st.m ? st.ops[0] : null;
+      if (st.m && !op && !pull) return;
+      lbusy = true;
+      var req = !st.m ? api('/account/shopping-list/merge', { method: 'POST', body: { items: wire(list) } })
+        : op ? api('/account/shopping-list', { method: 'PUT', body: { version: st.v, items: op[0] === 'all' ? wire(op[1])
+          : st.s.filter(function (l) { return l.productId !== op[1]; }) } })
+          : api('/account/shopping-list');
+      req.then(function (r) { lbusy = false; took(r.list, op); lflush(false); }, function (e) {
+        lbusy = false;
+        var cur = lstate(); var d = e.data && e.data.list;
+        if (!cur) return;
+        if (e.code === 'list_changed' && d && (tries || 0) < 3) { cur.v = d.version; cur.s = norm(d.lines); K.save(KEY_LSYNC, cur); lflush(pull, (tries || 0) + 1); return; }
+        //  ادغام جا نشد ⇒ فهرستِ این دستگاه جای فهرستِ حساب (هیچ چیز بی‌صدا گم نمی‌شود)
+        if (e.code === 'list_full' && d) { cur.v = d.version; cur.s = norm(d.lines); cur.m = true; cur.ops = [['all', list]].concat(cur.ops); K.save(KEY_LSYNC, cur); lflush(pull); return; }
+        if (e.code === 'too_many_lists') { cur.off = true; K.save(KEY_LSYNC, cur); return; }
+        //  کارِ ردشده کنار می‌رود؛ ادغام/خواندنِ ردشده (پرچم خاموش شد…) ⇒ همان محلی تا بارِ بعد. شبکه/۴۲۹/۴۰۱ ⇒ `online` یا بارِ بعد
+        if (op && (e.status === 400 || e.status === 404 || e.status === 409)) {
+          cur.ops = cur.ops.filter(function (o) { return JSON.stringify(o) !== JSON.stringify(op); });
+          K.save(KEY_LSYNC, cur); lflush(pull);
+        }
+      });
+    }
     function drawList() {
       var ul = K.clear($('list-lines'));
       list.forEach(function (x) {
         var p = ctx.items[x.id];
         if (!p) return;
         var rm = el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'aria-label': t('list.remove', { name: p.name }) },
-          on: { click: function () { list = list.filter(function (y) { return y.id !== x.id; }); saveList(); } } }, K.icon('close'));
+          on: { click: function () { list = list.filter(function (y) { return y.id !== x.id; }); saveList(); lop(['rm', x.id]); } } }, K.icon('close'));
         ul.appendChild(el('li', {}, el('span', { class: 'grow', text: p.name }), el('span', { class: 'num', text: K.qty(x.q) + (p.unit ? ' ' + p.unit : '') }), rm));
       });
       var n = ul.children.length;
@@ -214,16 +270,18 @@
       $('list-save').addEventListener('click', function () {
         list = cleanList(ctx.ids().map(function (id) { return { id: id, q: ctx.cart[id].qtyMilli }; }));
         saveList();
+        lop(['all', list]);
         K.toast(t('list.saved'));
       });
       $('list-add').addEventListener('click', function () {
         ctx.reorder({ lines: list.map(function (x) { return { productId: x.id, qtyMilli: x.q }; }) }, function (e) { K.toast(e.message); });
       });
-      $('list-clear').addEventListener('click', function () { list = []; saveList(); K.toast(t('list.cleared')); });
+      $('list-clear').addEventListener('click', function () { list = []; saveList(); lop(['all', []]); K.toast(t('list.cleared')); });
       drawList();
       fetchMissing().then(function () { drawFavs(); drawList(); });
       flush(true);
-      window.addEventListener('online', function () { flush(true); });
+      lflush(true);
+      window.addEventListener('online', function () { flush(true); lflush(true); });
     }
 
     // ── WEB-24: بنرها ──

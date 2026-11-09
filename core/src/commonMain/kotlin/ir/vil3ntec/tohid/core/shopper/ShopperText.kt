@@ -582,6 +582,31 @@ object ShopperText {
     else t("نقد هنگامِ تحویل می‌پردازم", "I'll pay cash on delivery", "د سپارلو پر مهال نغدې ورکوم")
   val payCashDone get() = t("روشِ پرداخت ثبت شد: نقد", "Payment method saved: cash", "د تادیې لاره ثبت شوه: نغدې")
 
+  // ── حسابِ مشتری، دلخواه‌ها و «فهرستِ خرید» (WEB-11، CHK-01؛ همان `fav.*`/`list.*`/`ac.*` ِ وب) ──
+  val favorites get() = t("دلخواه‌ها", "Favourites", "خوښې")
+  val favAdd get() = t("♡ افزودن به دلخواه‌ها", "♡ Add to favourites", "♡ خوښو ته ور اضافه کړئ")
+  val favOn get() = t("♥ در دلخواه‌ها", "♥ In your favourites", "♥ په خوښو کې")
+  fun favAdded(name: String) = t("${asIs(name)} به دلخواه‌ها رفت.", "$name added to favourites.", "$name خوښو ته ورغی.")
+  fun favRemoved(name: String) = t("${asIs(name)} از دلخواه‌ها برداشته شد.", "$name removed from favourites.", "$name له خوښو لرې شو.")
+  val shoppingList get() = t("فهرستِ خرید", "Shopping list", "د پېرود لړ")
+  val listEmpty get() = t("فهرست خالی است؛ سبدِ امروز را نگه دارید تا دفعهٔ بعد یک‌جا بخرید.",
+    "Your list is empty — keep today's cart to buy it again in one go.", "لړ تش دی؛ د نن ټوکرۍ وساتئ چې بل ځل یې یوځای واخلئ.")
+  val listSave get() = t("نگه‌داشتنِ همین سبد در فهرست", "Keep this cart as my list", "دا ټوکرۍ په لړ کې وساتئ")
+  val listAdd get() = t("همه به سبد (با قیمتِ امروز)", "Add all to cart (today's prices)", "ټول ټوکرۍ ته (د نن په بیه)")
+  val listClear get() = t("پاک کردنِ فهرست", "Clear the list", "لړ پاک کړئ")
+  val listSaved get() = t("فهرستِ خرید نگه داشته شد.", "Shopping list saved.", "د پېرود لړ وساتل شو.")
+  val listCleared get() = t("فهرستِ خرید پاک شد.", "Shopping list cleared.", "د پېرود لړ پاک شو.")
+  val accountTitle get() = t("حسابِ من", "My account", "زما حساب")
+  val accountWhy get() = t("با ورود، سبد، دلخواه‌ها و فهرستِ خرید در همهٔ دستگاه‌هایتان همراهتان است.",
+    "Sign in to keep your cart, favourites and shopping list on all your devices.", "په ننوتلو سره ستاسو ټوکرۍ، خوښې او د پېرود لړ په ټولو وسیلو کې درسره وي.")
+  val signIn get() = t("ورود", "Sign in", "ننوتل")
+  val signedIn get() = t("وارد شدید؛ سبد، دلخواه‌ها و فهرست همراهِ حساب شد.", "Signed in — your cart, favourites and list now follow your account.",
+    "ننوتلئ؛ ټوکرۍ، خوښې او لړ اوس ستاسو له حساب سره دي.")
+  val signOut get() = t("خروج از حساب", "Sign out", "له حساب څخه وتل")
+  fun signedInAs(phone: String) = t("واردشده با ${asIs(phone)}", "Signed in as $phone", "د $phone سره ننوتلي")
+  val notSignedIn get() = t("وارد نشده‌اید؛ سبد و فهرست فقط روی همین دستگاه‌اند.", "Not signed in — your cart and list are on this device only.",
+    "نه یاست ننوتلي؛ ټوکرۍ او لړ یوازې په همدې وسیله کې دي.")
+
   // ── خطاها (همان `err.*` ِ وب؛ کدِ ناشناخته ⇒ پیامِ فارسیِ سرور در فارسی/دری، وگرنه پیامِ همگانی) ──
   fun error(e: ShopperError): String = when {
     e.network -> t("اتصال برقرار نشد؛ اینترنت را ببینید و دوباره بزنید.", "No connection — check your internet and try again.", "اړیکه ونه شوه؛ انټرنېټ وګورئ او بیا هڅه وکړئ.")
@@ -597,6 +622,12 @@ object ShopperText {
     "rate_limited" -> t("درخواست‌ها زیاد شد؛ کمی بعد دوباره بزنید.", "Too many requests — please try again in a moment.", "غوښتنې ډېرې شوې؛ لږ وروسته بیا هڅه وکړئ.")
     "bad_phone" -> problem(CheckoutProblem.PHONE)
     "verification_unavailable" -> verifyOff
+    "session_required" -> t("دوباره وارد حسابِ خود شوید.", "Please sign in again.", "بیا خپل حساب ته ننوځئ.")
+    "favorites_disabled" -> t("دلخواه‌ها و فهرستِ خرید در این دکان روشن نیست.", "Favourites and lists aren't turned on for this shop.", "خوښې او لړ په دې دوکان کې فعال نه دي.")
+    "too_many_favorites" -> t("دلخواه‌ها پر است (حداکثر ۲۰۰ کالا).", "Your favourites are full (200 items at most).", "خوښې ډکې دي (تر ۲۰۰ توکو).")
+    "list_full" -> t("فهرستِ خرید پر است (حداکثر ۱۰۰ قلم).", "The shopping list is full (100 items at most).", "د پېرود لړ ډک دی (تر ۱۰۰ توکو).")
+    "too_many_lists" -> t("فهرست‌های حسابِ شما پر است؛ این فهرست روی همین دستگاه می‌ماند.", "Your account has too many lists — this one stays on this device.",
+      "ستاسو په حساب کې ډېر لړونه دي؛ دا لړ په همدې وسیله کې پاتې کېږي.")
     "verification_required" -> t("برای ادامه، شمارهٔ خود را دوباره تأیید کنید.", "Please verify your number again to continue.", "د دوام لپاره خپله شمېره بیا تایید کړئ.")
     "phone_not_verified" -> problem(CheckoutProblem.VERIFY)
     "otp_required" -> t("کد را بنویسید.", "Please enter the code.", "کوډ ولیکئ.")

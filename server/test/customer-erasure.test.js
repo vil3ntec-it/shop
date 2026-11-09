@@ -200,6 +200,7 @@ async function extras(shopId, customerId, phone) {
   if (customerId) {
     await query("INSERT INTO store_customer_carts (customer_id, shop_id, items, updated_at) VALUES ($1,$2,'[{\"productId\":\"rice\",\"qtyMilli\":1000}]'::jsonb,$3)", [customerId, shopId, at]);
     await query("INSERT INTO store_customer_favorites (customer_id, shop_id, product_id, created_at) VALUES ($1,$2,'rice',$3)", [customerId, shopId, at]);
+    await query("INSERT INTO store_customer_lists (customer_id, shop_id, items, version, updated_at) VALUES ($1,$2,'[{\"productId\":\"rice\",\"qtyMilli\":2000}]'::jsonb,1,$3)", [customerId, shopId, at]);
   }
   await query(
     'INSERT INTO storefront_area_requests (id, shop_id, phone, cell_lat, cell_lng, created_at, updated_at) VALUES ($1,$2,$3,34.55,69.2,$4,$4)',
@@ -235,7 +236,7 @@ async function money(shopId) {
 
 const PII_TABLES = ['online_orders', 'online_order_lines', 'online_order_events', 'delivery_events', 'delivery_photos',
   'order_pick_photos', 'delivery_locations', 'customer_notify_outbox', 'shop_chat_conversations', 'shop_chat_messages',
-  'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'storefront_area_requests',
+  'shop_chat_media', 'shop_chat_pins', 'shop_chat_reports', 'store_customer_carts', 'store_customer_favorites', 'store_customer_lists', 'storefront_area_requests',
   'storefront_alerts', 'order_issues', 'order_issue_photos', 'order_reviews'];
 const BYTES = new Set(['delivery_photos', 'order_pick_photos', 'shop_chat_media', 'order_issue_photos']);
 
@@ -322,7 +323,7 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
   assert.deepEqual(done.body.counts, preview.body.counts, 'پیش‌نمایش همان شمارشِ اجرا');
   assert.deepEqual(done.body.counts, {
     orders: 2, orderLines: 2, orderEvents: 2, deliveryEvents: 2, deliveryPhotos: 2, pickPhotos: 2, deliveryLocations: 2,
-    notifyOutbox: 2, conversations: 2, messages: 4, chatMedia: 2, chatPins: 2, chatReports: 2, carts: 1, favorites: 1, areaRequests: 1,
+    notifyOutbox: 2, conversations: 2, messages: 4, chatMedia: 2, chatPins: 2, chatReports: 2, carts: 1, favorites: 1, lists: 1, areaRequests: 1,
     alerts: (await exists('storefront_alerts')) ? 1 : 0,
     issues: (await exists('order_issues')) ? 2 : 0, issuePhotos: (await exists('order_issues')) ? 2 : 0,
     reviews: (await exists('order_reviews')) ? 2 : 0,

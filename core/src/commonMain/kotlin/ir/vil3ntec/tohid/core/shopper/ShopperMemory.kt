@@ -16,9 +16,9 @@ data class SavedOrder(val slug: String, val token: String, val orderNo: Long, va
 data class RecentShop(val slug: String, val title: String, val at: Long)
 
 /**
- *  هر چه برنامهٔ خرید روی دستگاه نگه می‌دارد — فقط همین دستگاه، هرگز همگام نمی‌شود (مثلِ `localStorage` ِ وب).
- *  ⛔ بلیتِ شماره کوتاه‌عمر است (`ticketTtlMs` ِ سرور) و نشستِ بلند/حسابِ مشتری پس از پیامکِ واقعی (CHK-02، D-09) با
- *  Keystore/Keychain می‌آید. نشانی‌های ذخیره‌شده تا آن روز فقط همین‌جایند (همان مدل و سقفِ سرور، [AddressBook]).
+ *  هر چه برنامهٔ خرید روی دستگاه نگه می‌دارد (مثلِ `localStorage` ِ وب). سبد، ♥ و «فهرستِ خرید» فقط با نشستِ حساب و از
+ *  راهِ [AccountRules] با حساب هم‌گام می‌شوند؛ ⛔ خودِ نشست (۱۸۰ روزه) این‌جا نیست: نگه‌دارِ رمزشدهٔ سکو (Keystore ِ اندروید؛
+ *  بی آن فقط در حافظهٔ همان اجرا). بلیتِ شماره کوتاه‌عمر است (`ticketTtlMs` ِ سرور). نشانی‌ها فقط همین‌جایند ([AddressBook]).
  */
 @Serializable
 data class ShopperState(
@@ -43,6 +43,11 @@ data class ShopperState(
   val deviceId: String = "",
   /** MKT-06: آخرین خریدِ هر کالا از همین دستگاه برای «وقتِ دوباره خریدن؟» ([Refills]، سقفِ ۶۰) */
   val bought: List<Bought> = emptyList(),
+  /** WEB-11: ♥ ِ هر دکان (تازه‌ترین اول، حداکثر ۲۰۰) و «فهرستِ خرید» (فقط شناسه و مقدار) — [AccountRules] */
+  val favs: Map<String, List<String>> = emptyMap(),
+  val lists: Map<String, List<ListItem>> = emptyMap(),
+  /** هم‌گامیِ هر دکان با حسابِ مشتری در نشستِ کنونی (صف‌ها و نسخه‌ها؛ خودِ نشست در نگه‌دارِ رمزشده است، نه این‌جا) */
+  val sync: Map<String, AccountSync> = emptyMap(),
 )
 
 /** خواندن و نوشتنِ [ShopperState] با سقف‌های روشن (هیچ فهرستی بی‌پایان بزرگ نمی‌شود). */
@@ -83,6 +88,9 @@ object ShopperMemory {
     keys = s.keys.mapKeys { if (it.key == from) to else it.key },
     plans = RepeatPlans.moved(s.plans, from, to),
     bought = Refills.moved(s.bought, from, to),
+    favs = s.favs.mapKeys { if (it.key == from) to else it.key },
+    lists = s.lists.mapKeys { if (it.key == from) to else it.key },
+    sync = s.sync.mapKeys { if (it.key == from) to else it.key },
   )
 
   /** همان الگوی `deviceId` ِ وب (`^[A-Za-z0-9_-]{8,128}$`)؛ نبود ⇒ تازه از [random] (مولّدِ امنِ سکو) */

@@ -61,6 +61,8 @@ fun ProductScreen(model: CustomerModel, slug: String, id: String) {
               }
             } else if (CartRules.canOrder(p)) MainButton(ShopperText.add) { model.add(slug, p) }
           }
+          //  WEB-11: ♥ (پرچمِ `shop.storefront.favorites`؛ با نشستِ حساب همراهِ حساب)
+          item { FavButton(model, slug, p) }
           model.notice?.let { n -> item { Note(n, Tone.WARN) } }
           p.description?.takeIf { it.isNotBlank() }?.let { d -> item { Text(d, style = MaterialTheme.typography.bodyLarge) } }
           if (p.specs.isNotEmpty()) {

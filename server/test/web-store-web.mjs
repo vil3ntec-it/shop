@@ -7,7 +7,7 @@
  *   • WEB-13: «دیده‌شده‌های اخیر» (پرچمِ `shop.storefront.recent`) پس از دیدنِ کالا و بارِ دوباره، فقط روی همین دستگاه؛
  *   • WEB-20: دکمهٔ «فرستادنِ نشانیِ کالا» (پرچمِ `shop.storefront.seo`) نشانیِ `/p/…` را کپی می‌کند؛
  *   • WEB-11: ♥ روی کارت و برگهٔ کالا، «دلخواه‌ها» و «فهرستِ خرید» (پرچمِ `shop.storefront.favorites`؛ خاموش ⇒ هیچ)؛
- *     با نشستِ حساب ♥ با حساب هم‌گام است (دو دستگاه، بی اینترنت در صف، بی نشست فقط محلی)؛
+ *     با نشستِ حساب ♥ و «فهرستِ خرید» با حساب هم‌گام‌اند (دو دستگاه، بی اینترنت در صف، ۴۰۹ ِ نسخه، بی نشست فقط محلی)؛
  *   • WEB-24: بنرهای همین لحظه (پرچمِ `shop.storefront.banners`)، پیوندِ کالا و دسته؛
  *   • WEB-04: «تحویلِ تقریبی: … تا … دقیقه» در برگهٔ ثبت (ارسال و دریافت) و پیگیری (پرچمِ `shop.storefront.eta`؛ خاموش ⇒ هیچ)؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
@@ -209,6 +209,81 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
   await page.waitForFunction(() => document.querySelector('#products li[data-id="oil"] .fav')?.getAttribute('aria-pressed') === 'false', null, { timeout: 5000 });
   await new Promise((r) => setTimeout(r, 500));
   ok(JSON.stringify(await favsOf(S1)) === '["rice","oil"]', 'بی نشست ⇒ ♥ فقط روی همین دستگاه؛ حساب دست نمی‌خورد');
+}
+
+//  WEB-11: «فهرستِ خرید» با حساب (`/account/shopping-list`، همان پرچم): ادغامِ نخستین بار (بیشینه، نه جای‌گزینی)، دستگاهِ دوم،
+//  برداشتن در یکی ⇒ دیگری، بی اینترنت در صف، ۴۰۹ ِ نسخه ⇒ همان کار روی فهرستِ تازه (کارِ دستگاهِ دیگر می‌ماند)، بی نشست فقط محلی
+{
+  const phone = '0791114999';
+  const listUrl = `/api/store/${slug}/account/shopping-list`;
+  const sessionOf = async () => {
+    const vs = await call('POST', `/api/store/${slug}/verify/start`, { phone });
+    const vc = await call('POST', `/api/store/${slug}/verify/check`, { phone, code: vs.body.devCode });
+    const a = await call('POST', `/api/store/${slug}/account`, {}, null, { 'X-Store-Ticket': vc.body.ticket });
+    return { token: a.body.session, expiresAt: a.body.expiresAt, phone: a.body.customer.phone, name: '' };
+  };
+  const L1 = await sessionOf();
+  const listOf = async (S) => (await call('GET', listUrl, null, null, { 'X-Store-Session': S.token })).body.list;
+  const linesOf = async (S) => (await listOf(S)).lines.map((l) => [l.productId, l.qtyMilli]);
+  const until = async (S, want, what) => {
+    let got = [];
+    for (let i = 0; i < 50; i++) { got = await linesOf(S); if (JSON.stringify(got) === JSON.stringify(want)) break; await new Promise((r) => setTimeout(r, 100)); }
+    ok(JSON.stringify(got) === JSON.stringify(want), what, JSON.stringify(got));
+  };
+  const seed = (pg, S, items) => pg.evaluate(([sl, v, it]) => {
+    localStorage.setItem('store-session', JSON.stringify(v));
+    localStorage.setItem(`store-list:${sl}`, JSON.stringify(it));
+    localStorage.removeItem(`store-listsync:${sl}`);
+  }, [slug, S, items]);
+  ok(JSON.stringify(await linesOf(L1)) === '[]', 'حسابِ تازه: فهرستِ سروری خالی');
+  await seed(page, L1, [{ id: 'oil', q: 2000 }]);
+  await open();
+  await until(L1, [['oil', 2000]], 'WEB-11 فهرست: نخستین بارِ نشست ⇒ فهرستِ این دستگاه به حساب رفت (ادغام)');
+
+  const ctx3 = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+  const p3 = await ctx3.newPage();
+  p3.on('pageerror', (e) => errors.push(String(e)));
+  await p3.goto(`${base}/store/${slug}`);
+  await seed(p3, await sessionOf(), [{ id: 'rice', q: 1000 }, { id: 'oil', q: 500 }]);
+  await p3.goto(`${base}/store/${slug}`);
+  await until(L1, [['oil', 2000], ['rice', 1000]], 'دستگاهِ دوم: ادغام، نه جای‌گزینی (برای کالای مشترک بیشینهٔ مقدار)');
+  await p3.waitForFunction(() => document.querySelectorAll('#list-lines li').length === 2, null, { timeout: 10000 });
+  ok(true, 'دستگاهِ دوم پس از ادغام همان دو قلمِ حساب را نشان می‌دهد');
+  await p3.click('#list-lines li:has-text("روغن") button');
+  await until(L1, [['rice', 1000]], 'برداشتنِ قلم در دستگاهِ دوم ⇒ از حساب هم رفت');
+  await ctx3.close();
+
+  await open();
+  await page.waitForFunction(() => document.querySelectorAll('#list-lines li').length === 1 && /برنج/.test(document.querySelector('#list-lines').textContent), null, { timeout: 10000 });
+  ok(true, 'دستگاهِ نخست پس از بارِ دوباره: حساب حرفِ آخر را می‌زند (فقط برنج)');
+
+  await ctx.setOffline(true);
+  await page.click('#list-clear');
+  const lq = await page.evaluate((k) => JSON.parse(localStorage.getItem(k) || '{}').ops, `store-listsync:${slug}`);
+  ok(JSON.stringify(lq) === '[["all",[]]]', 'بی اینترنت ⇒ «پاک کردنِ فهرست» در صفِ همین دستگاه', JSON.stringify(lq));
+  ok(JSON.stringify(await linesOf(L1)) === '[["rice",1000]]', '…و هنوز به حساب نرفته');
+  await ctx.setOffline(false);
+  await until(L1, [], 'برگشتِ شبکه ⇒ صف رفت');
+
+  //  دستگاهِ دیگر (این‌جا خودِ آزمون) دو بار می‌نویسد؛ دستگاهِ نخست فقط بارِ اول را دیده ⇒ برداشتنِ برنج با نسخهٔ کهنه ⇒ ۴۰۹ ⇒
+  //  همان «برداشتن» روی فهرستِ تازه: مقدارِ تازهٔ روغن ِ آن دستگاه می‌ماند
+  let v = (await listOf(L1)).version;
+  v = (await call('PUT', listUrl, { version: v, items: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'oil', qtyMilli: 3000 }] }, null, { 'X-Store-Session': L1.token })).body.list.version;
+  await open();
+  await page.waitForFunction(() => document.querySelectorAll('#list-lines li').length === 2, null, { timeout: 10000 });
+  const w2 = await call('PUT', listUrl, { version: v, items: [{ productId: 'rice', qtyMilli: 1000 }, { productId: 'oil', qtyMilli: 4000 }] }, null, { 'X-Store-Session': L1.token });
+  ok(w2.status === 200, 'دستگاهِ دیگر مقدارِ روغن را عوض کرد', JSON.stringify(w2.body).slice(0, 80));
+  await page.click('#list-lines li:has-text("برنج") button');
+  await until(L1, [['oil', 4000]], '۴۰۹ ِ نسخه ⇒ برداشتن روی فهرستِ تازه؛ کارِ دستگاهِ دیگر گم نشد');
+  const stored = await page.evaluate((k) => localStorage.getItem(k) || '', `store-list:${slug}`);
+  ok(!/price|name/i.test(stored) && /4000/.test(stored), 'فهرستِ دستگاه همان فهرستِ حساب، فقط شناسه و مقدار', stored);
+
+  await page.evaluate(() => localStorage.removeItem('store-session'));
+  await open();
+  await page.waitForSelector('#list:not([hidden]) #list-lines li', { timeout: 10000 });
+  await page.click('#list-clear');
+  await new Promise((r) => setTimeout(r, 500));
+  ok(JSON.stringify(await linesOf(L1)) === '[["oil",4000]]', 'بی نشست ⇒ فهرست فقط روی همین دستگاه؛ حساب دست نمی‌خورد');
 }
 
 //  WEB-24: بنرها — خاموش ⇒ هیچ؛ روشن ⇒ فقط بنرِ اکنون و همه‌جا (بی ناحیهٔ دانسته)، پیوندِ کالا و دسته
