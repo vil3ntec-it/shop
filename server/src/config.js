@@ -359,6 +359,12 @@ const config = {
     //  خودِ سقف هم جدا سنجیده شود.
     broadcastMax: num(process.env.RATE_BROADCAST_MAX, 5),
     generalMax:   num(process.env.RATE_GENERAL_MAX, 600),
+    //  سطلِ جدای ترافیکِ اثبات‌شدهٔ مدیر و پلِ پنل (`middleware/admin-bucket.js`): کلیدِ سرویسِ فعال یا نشستِ زندهٔ
+    //  مدیر روی درهای مدیر، به‌ازای همان کلید/مدیر. ⛔ تا ۲.۱۴.۵ پل (127.0.0.1، بی XFF) همان `generalMax` ِ یک IP را
+    //  می‌خورد و کنسولِ صاحب را می‌بست. `adminProbeMax`: پرسشِ پایگاه برای اعتبارنامهٔ ناشناخته به‌ازای IP (فقط شکست‌ها).
+    adminBucket:    bool(process.env.RATE_ADMIN_BUCKET, true),
+    adminProvenMax: num(process.env.RATE_ADMIN_PROVEN_MAX, 6000),
+    adminProbeMax:  num(process.env.RATE_ADMIN_PROBE_MAX, 60),
     /*
      *  همگام‌سازی (‎/api/sync/v1/*‎) — **سطلِ خودش، به‌ازای هر حساب**.
      *
