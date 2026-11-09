@@ -45,7 +45,9 @@ import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrStock
 import ir.vil3ntec.tohid.data.Product
 import ir.vil3ntec.tohid.data.ReportCsv
+import ir.vil3ntec.tohid.core.stock.CountScan
 import ir.vil3ntec.tohid.data.ShopData
+import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.WarehouseEngine
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.qty
@@ -121,6 +123,20 @@ fun StockCountScreen(
   var confirm by remember { mutableStateOf(false) }
   var askDiscard by remember { mutableStateOf(false) }
   var failure by remember { mutableStateOf<String?>(null) }
+  //  بارکدخوان بی کادرِ فوکوس‌دار (پنجرهٔ کامپیوتر، بارکدخوانِ وصل‌شده، گوشیِ جفت‌شده) همین صفحه را می‌گیرد، نه صندوق: رفتن به
+  //  صندوق صفحه و شمارشِ ذخیره‌نشده را می‌بست. «ابزارهای تازهٔ دستگاه» ⇒ +۱ (`CountState.scan`)؛ خاموش ⇒ فقط پیام، بی تغییرِ عدد
+  var scanNote by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+  val index = remember(data) { ShopStore.barcodeIndex(data) }
+  val onScan by androidx.compose.runtime.rememberUpdatedState<(String) -> Unit>({ code ->
+    val (next, r) = state.scan(data, code, index, ir.vil3ntec.tohid.print.HwTools.on.value)
+    if (r is CountScan.Result.Counted) { state = next; at = at + (r.productId to clock()); failure = null }
+    scanNote = (r is CountScan.Result.Counted) to CountState.scanMessage(r, data)
+  })
+  val scanOwner = remember { Any() }
+  androidx.compose.runtime.DisposableEffect(scanOwner) {
+    ir.vil3ntec.tohid.scan.ScanRouter.register(scanOwner) { code -> onScan(code); true }
+    onDispose { ir.vil3ntec.tohid.scan.ScanRouter.unregister(scanOwner) }
+  }
   val lines = remember(data, state) { state.lines(data) }
   val system = remember(data) { CountState.system(data) }
   val rows = remember(data, query) { CountState.rows(data, query) }
@@ -160,6 +176,7 @@ fun StockCountScreen(
           Spacer(Modifier.height(10.dp))
           V3TextField(state.note, { state = state.copy(note = it) }, StrStock.countNote, Modifier.fillMaxWidth())
           failure?.let { V3Message(V3Tone.ERROR, it, Modifier.padding(top = 10.dp).v3Shake(shake)) }
+          scanNote?.let { (ok, text) -> V3Message(if (ok) V3Tone.SUCCESS else V3Tone.WARNING, text, Modifier.padding(top = 10.dp)) }
         }
       }
       itemsIndexed(rows, key = { _, p -> p.id }) { i, p ->

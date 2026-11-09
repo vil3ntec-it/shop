@@ -117,9 +117,9 @@ class HeldSyncTest {
   private fun draft(key: String) = SaleDraft.of(key, cart, "d1", 42L, coupons = listOf("EID5"), note = "فاکتورِ عمده", priceList = "wholesale")
   private fun bytes(d: SaleDraft) = SaleDraftCodec.encode(d.copy(savedAt = 0))
 
-  private suspend fun hold(dev: Device, key: String, label: String = "") {
+  private suspend fun hold(dev: Device, key: String, label: String = "", seller: String = "") {
     dev.cart.mem = draft(key); dev.cart.disk = dev.cart.mem
-    assertTrue(dev.store.hold(dev.cart, HeldExtras(discount = "10"), label = label) is HeldInvoiceStore.Outcome.Done)
+    assertTrue(dev.store.hold(dev.cart, HeldExtras(discount = "10", seller = seller), label = label) is HeldInvoiceStore.Outcome.Done)
   }
 
   @Test
@@ -155,7 +155,7 @@ class HeldSyncTest {
     val a = Device(server, "u-a", "S-A")
     a.sync()
     assertTrue(a.state.s.on)
-    hold(a, "K1", label = "آقای کریمی")
+    hold(a, "K1", label = "آقای کریمی", seller = "مریم")
     a.sync()
     assertEquals(setOf("K1"), server.rows.keys)
     //  نصبِ تازه روی دستگاهِ «ب» (فایلِ خالی)
@@ -169,7 +169,10 @@ class HeldSyncTest {
     assertTrue("نگه‌داشتهٔ «الف» برای «ب» مالِ کسِ دیگر است", b.engine.othersHeld("K1"))
     //  بازگشت روی «ب» ⇒ سبدِ «ب» بایت‌به‌بایت همان فاکتورِ «الف»
     b.now += 1000
-    assertTrue(b.store.resume(b.cart, "K1", HeldExtras()) is HeldInvoiceStore.Outcome.Done)
+    val back = b.store.resume(b.cart, "K1", HeldExtras())
+    assertTrue(back is HeldInvoiceStore.Outcome.Done)
+    //  فروشندهٔ فاکتورِ اصلاح‌شده (`HeldInvoice.seller`) هم از «الف» به «ب» می‌رسد
+    assertEquals(HeldExtras("10", seller = "مریم"), (back as HeldInvoiceStore.Outcome.Done).extras)
     assertEquals(bytes(draft("K1")), bytes(b.cart.snapshot()))
     assertEquals(cart, b.cart.snapshot().cart())
     b.sync()

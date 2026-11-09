@@ -212,6 +212,8 @@ object WarehouseEngine {
   internal fun productChanges(a: Product, b: Product): List<String> = buildList {
     if (a.name != b.name) add("نام «${a.name}» ⇐ «${b.name}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     if (a.salePrice != b.salePrice) add("قیمت فروش ${money(a.salePrice)} ⇐ ${money(b.salePrice)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
+    //  PRD-12/PRD-14: قیمتِ عمده (لیستِ «عمده» ِ صندوق) هم ردِ سابقه دارد — پیش‌تر بی‌صدا عوض می‌شد؛ ۰ = «ندارد»
+    if (a.wholesalePrice != b.wholesalePrice) add("قیمت عمده ${money(a.wholesalePrice)} ⇐ ${money(b.wholesalePrice)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     if (a.category != b.category) add("دسته «${a.category}» ⇐ «${b.category}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     if (a.unit != b.unit) add("واحد «${a.unit}» ⇐ «${b.unit}»")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
     if (a.minStock != b.minStock) add("حداقل موجودی ${money(a.minStock)} ⇐ ${money(b.minStock)}")  // داده: تکهٔ یادداشتِ سابقهٔ ویرایشِ کالا
@@ -471,7 +473,7 @@ object WarehouseEngine {
         type = "product_edit",
         date = today,
         refId = id,
-        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice) whySuffix else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
+        notes = "ویرایش «${existing.name}»: ${changes.joinToString("، ")}" + if (updated.salePrice != existing.salePrice || updated.wholesalePrice != existing.wholesalePrice) whySuffix else "",  // داده: یادداشتِ سابقهٔ دفتر (ذخیره و همگام می‌شود)
         createdAt = now,
         by = by,
       )

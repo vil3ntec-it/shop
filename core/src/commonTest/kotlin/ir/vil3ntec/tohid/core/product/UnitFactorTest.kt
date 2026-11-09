@@ -52,6 +52,22 @@ class UnitFactorTest {
     assertNull(UnitSale.toBaseQty(Double.NaN, 0.001))
   }
 
+  /** کادرِ ردیفِ صندوق (`CartLineDialog`) همان هزارمِ `toBaseQty` را دارد؛ فقط ضریبِ بیرون از سقف ضربِ پیشینِ کادر */
+  @Test
+  fun typedToBase_tillLineDialog_sameAsToBaseQty() {
+    //  ضربِ پیشینِ کادر: Math.round(1.5 × 0.009 × 1000) / 1000 = 0.013 — یک فروش، دو موجودی بسته به راه
+    assertEquals(0.014, UnitSale.typedToBase(1.5, 0.009))
+    for (q in listOf(0.5, 1.0, 1.5, 2.5, 7.5, 250.0)) for (f in listOf(0.001, 0.005, 0.009, 0.5, 24.0)) {
+      assertEquals(UnitSale.toBaseQty(q, f), UnitSale.typedToBase(q, f), "q=$q f=$f")
+    }
+    //  ضریبِ کهنهٔ ناجور: ۶ بطری از کارتنِ ۱۲ = دقیقاً ۰٫۵؛ ۲۴ دانه از ۱/۲۴ = یک کارتن
+    assertEquals(0.5, UnitSale.typedToBase(6.0, 1.0 / 12))
+    assertEquals(1.0, UnitSale.typedToBase(24.0, 1.0 / 24))
+    //  بیرون از سقف یا NaN: همان ضربِ پیشینِ کادر، بی پرتابِ خطا در صندوق
+    assertEquals(4_000_000.0, UnitSale.typedToBase(2.0, 2e6))
+    assertEquals(0.0, UnitSale.typedToBase(Double.NaN, 0.001))
+  }
+
   @Test
   fun tillUnitsUseTheSameMilli() {
     val units = UnitSale.units("کیلو", "گرم", 0.001, emptyList())
