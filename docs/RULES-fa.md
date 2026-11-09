@@ -350,6 +350,12 @@
   ⚠️ یافتهٔ باز (آزمونِ todo ِ «۳-ب»): cursor ِ سرور هنگامِ pull جلو می‌رود حتی اگر پاسخ نرسد؛ اصلاحش تغییرِ معنای همگام‌سازی است ⇒ پرچم و تصمیمِ صاحب محصول.
 - push ِ v3 ِ دسته‌ای (`SYNC_V3_BATCH`، ⛔ پیش‌فرض خاموش؛ `lib/sync-v3-batch.js`): همان `applyOne` و همان واحدها، فقط «انبارِ» دیگر (`sync-v3-store.direct` در برابرِ `batch.open`). ⛔ هر پرس‌وجوی داورِ بیرونی همان دم: اگر به `sync_v3_ops|rows|conflicts` اشاره کند نوشته‌های مانده پیش از آن نوشته می‌شوند، اگر فقط‌خواندنیِ مطمئن نیست savepoint ِ واحد پیش از آن باز است، و اگر خودش دفتر را بنویسد از آن پس همه از دیتابیس. حالِ ردیف در حافظه همان است که دیتابیس برمی‌گرداند (ترتیبِ کلیدِ jsonb). هر تغییرِ `applyOne`/`after`/`sync-v3-store` باید `test/sync-v3-batch.test.js` (برابریِ پاسخ و دفتر در هر دو راه، و رشتهٔ تصادفی) را سبز نگه دارد؛ ⛔ `sync-v1.js` دست نمی‌خورد (`claude/scale-4`).
 - ⛔ S28b — «تاریخِ تصحیح‌شده» ِ سند (`correctedAt`) فقط از سرور (`lib/sync-v3-time.js`، درونِ `merge` ِ درجِ سند): اختلافِ `createdAt` با دیواریِ HLC ِ مؤثر بیش از `SKEW_MS` ⇒ فیلدِ جدا؛ `createdAt`/`date` ِ دستگاه هرگز بازنویسی نمی‌شوند، نوشتهٔ دستگاه دور ریخته می‌شود و سندِ ساعتِ درست بایت‌به‌بایت همان (`sync-v3-time.test.js`). نوارِ قرمزِ ساعت از `core/sync/ClockSkew` و فقط با v3 ِ همان دستگاه؛ پاسخِ سرور بر «بالاترین زمانِ دیده‌شده» ِ کهنه مقدم است (`claude/scenario-gaps-2`).
+- ⛔ **فیلدبه‌فیلد** (DATA-SAFETY §۷، `claude/sync-coverage`): هر فیلدِ تازهٔ مدلِ دفتر (`ShopData` و هر مدلِ تودرتو) در
+  `core/test-vectors/ledger-sync-v1.json` مقدار می‌گیرد و `ops`/`v3` ِ آن با `TOHID_WRITE_VECTORS=ledger-sync` دوباره نوشته
+  می‌شود؛ کلیدِ تازهٔ `ShopData` یا مجموعهٔ همگام است یا با دلیل در `deviceOnly` ِ همان بردار. سنجه: `LedgerSyncCoverageTest`
+  (برنامه) و `server/test/sync-ledger-coverage.test.js` (push/Pull/Snapshot ِ v1 و v3، بایت‌به‌بایت).
+- ⛔ عددِ روی خط فقط شکلِ جاوااسکریپت (`sync/v1/JsNumber.kt`): `Double` ِ نماییِ جاوا (`4.0E-4`) ⇒ سرور `hash_mismatch`
+  می‌دهد و ردیف هرگز نمی‌رسد. هر درِ تازه‌ای که op یا دلتا می‌سازد عدد را از `JsNumber.of` بگذراند، نه `JsonPrimitive(Double)`.
 
 ### v3 · دفترِ محلی و مهاجرتِ داده
 

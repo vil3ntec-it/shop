@@ -185,23 +185,18 @@ object LedgerDiff {
    *  و سودِ دومش: ردیفی که اندروید می‌نویسد با ردیفی که وب می‌نویسد
    *  بایت‌به‌بایت یکی می‌شود، پس دفترِ سرور دو شکل نمی‌گیرد.
    *
-   *  ⚠️ عددِ کسری دست نمی‌خورد (`2.5` همان `2.5` است). عددِ خیلی بزرگ
-   *  (بالای ۲^۵۳) در دو زبان دو شکل می‌شود؛ در دفترِ یک دکان چنین
-   *  عددی نیست و اگر روزی بود، همان‌جا باید دیده شود.
+   *  ⚠️ عددِ کسری دست نمی‌خورد (`2.5` همان `2.5` است)، جز شکلِ نماییِ جاوا
+   *  (`4.0E-4`، `1.23456785E7`) که همان رقم‌ها با شکلِ جاوااسکریپت می‌رود
+   *  (`0.0004`، `12345678.5`) — وگرنه همان `hash_mismatch` (`JsNumber`، DATA-SAFETY §۷).
    */
   fun toJson(data: ShopData): JsonObject =
     jsNumbers(json.encodeToJsonElement(ShopData.serializer(), data)) as JsonObject
 
-  /** عددِ صحیحِ `Double` ⇒ عددِ بی اعشار، مثلِ جاوااسکریپت. */
+  /** عددِ `Double` ⇒ متنِ جاوااسکریپت: صحیح بی اعشار، نمایی به شکلِ JS (`JsNumber`). */
   private fun jsNumbers(e: JsonElement): JsonElement = when (e) {
     is JsonArray -> JsonArray(e.map { jsNumbers(it) })
     is JsonObject -> JsonObject(e.mapValues { (_, v) -> jsNumbers(v) })
-    is JsonPrimitive -> {
-      val d = if (e.isString) null else e.doubleOrNull
-      if (d != null && e.content.contains('.') && d == Math.rint(d) &&
-        !d.isInfinite() && Math.abs(d) < 9.007199254740992E15
-      ) JsonPrimitive(d.toLong()) else e
-    }
+    is JsonPrimitive -> JsNumber.of(e)
   }
 
   /**
@@ -373,13 +368,16 @@ object LedgerDiff {
       if (k == "id") continue
       val old = before[k]
       if (old != null && OpHash.canonical(old) == OpHash.canonical(v)) continue
+      //  همان عدد با شکلِ نماییِ جاوا در سایهٔ ساختِ پیشین (`JsNumber`) تغییر نیست — وگرنه هر ردیفی که insertِ آن
+      //  `hash_mismatch` گرفته بود با یک «ویرایشِ» تنها ردیفِ نیمه روی سرور می‌ساخت
+      if (old != null && OpHash.canonical(jsNumbers(old)) == OpHash.canonical(v)) continue
       if (isInc(table, k)) {
         val now = numberOf(v)
         if (now != null) {
           val was = numberOf(old) ?: 0.0
           val delta = now - was
           if (delta == 0.0) continue
-          out[k] = buildJsonObject { put("\$inc", JsonPrimitive(trim(delta))) }
+          out[k] = buildJsonObject { put("\$inc", JsNumber.of(delta)) }
           continue
         }
       }
@@ -392,10 +390,6 @@ object LedgerDiff {
     }
     return if (out.isEmpty()) null else JsonObject(out)
   }
-
-  /** عددِ گرد — تا `3.0` به شکلِ `3` برود، همان‌طور که جاوااسکریپت می‌نویسد. */
-  private fun trim(d: Double): Number =
-    if (d == Math.rint(d) && !d.isInfinite() && Math.abs(d) < 9.007199254740992E15) d.toLong() else d
 
   /**
    *  تفاضلِ سایه با دفترِ همین حالا.
@@ -572,7 +566,7 @@ object LedgerDiff {
         val incNum = numberOf(inc)
         if (inc != null && incNum != null) {
           val cur = numberOf(current[f]) ?: 0.0
-          current[f] = JsonPrimitive(trim(cur + incNum))
+          current[f] = JsNumber.of(cur + incNum)
         } else {
           current[f] = v
         }
@@ -635,7 +629,7 @@ object LedgerDiff {
           for ((f, value) in op.fields ?: JsonObject(emptyMap())) {
             if (f in v.drop) continue
             val delta = v.rebase[f]
-            kept[f] = if (delta == null) value else JsonPrimitive(trim((numberOf(value) ?: 0.0) + delta))
+            kept[f] = if (delta == null) value else JsNumber.of((numberOf(value) ?: 0.0) + delta)
           }
           out += op.copy(fields = JsonObject(kept))
         }
