@@ -8,7 +8,7 @@
  *   بسته ── سفارشِ تمام‌شده ⇒ فقط خواندن؛ تا مهلتِ سرور «مشکل دارم» همان رشته را باز می‌کند. عمومیِ بی‌کار ⇒
  *           «گفت‌وگوی تازه». تصمیم فقط با سرور (`life`)؛ ۴۰۹ ِ سرور ⇒ خواندنِ دوباره، نه حدس.
  *   وضعیت ── پیامِ خودم «رفت / رسید / خوانده شد» فقط از `status` ِ سرور و رسیدِ واقعیِ دکان (`receipts.peer*Seq`)؛
- *           هرگز جلوتر و هرگز عقب (CHAT-04). پیامِ در صف حبابی ندارد ⇒ وضعیتِ جعلی هم ندارد.
+ *           هرگز جلوتر و هرگز عقب (CHAT-04). پیامِ در صف فقط حبابِ «در صف» ِ جدا (`#ct-out`) دارد، هرگز «رفت».
  *   حذف ── «حذف برای من» هر پیام؛ «حذف برای همه» فقط پیامِ زندهٔ خودم، تا `deleteUntil` ِ سرور و نه در رشتهٔ بسته
  *           (#907). هر دو با پرسشِ تأیید؛ دکمه‌ها تا پاسخ خاموش (دوبار زدن یک درخواست)؛ سرور باز هم می‌سنجد (CHAT-08).
  * ⛔ هر متن فقط با textContent (`K.el`)؛ عکس با بلیت خوانده و data: می‌شود (CSP: img-src 'self' data:).
@@ -17,7 +17,11 @@
  *   (CSP: media-src 'self' blob:) — <audio> سرآیندِ بلیت را نمی‌فرستد و رسانهٔ چت پیوندِ امضاشده ندارد (S118).
  * ⛔ عکسِ مشتری (CHAT-05): کوچک‌کردن در `store/chat-photo.js` ِ دیربار (فقط با برگزیدنِ عکس)؛ پیش‌نمایش data: (img-src بی
  *   blob:)؛ بارگذاری با XHR برای پیشرفت، «لغو» و «تلاشِ دوباره»؛ یک `clientId` برای هر عکس و همان بایت ⇒ تکرار پیامِ دوم یا
- *   سهمِ دوم نمی‌سازد (CHAT-11)؛ بی‌اینترنت ⇒ همان صفِ متن (backoff و `online`). سرور همه را دوباره می‌سنجد.
+ *   سهمِ دوم نمی‌سازد (CHAT-11)؛ بی‌اینترنت ⇒ backoff و `online` با همان بایت. سرور همه را دوباره می‌سنجد.
+ *   صف ── پیامِ متنی (CHAT-02) با «فرستادن» از کادر به حبابِ «در صف» ِ `#ct-out` می‌رود و با همان `clientId` تا رسیدن می‌ماند،
+ *           با «دوباره» و «لغو» و پس از بستنِ برگه (`store/chat-out.js` ِ دیربار، localStorage ِ `store-chat-out`، فقط متن)؛
+ *           با گشودنِ دوبارهٔ گفت‌وگو فرستادن از سر گرفته می‌شود. تأییدِ شمارهٔ دیگر ⇒ صف پاک.
+ *   کارها ── پاسخ، ویرایش، سنجاق و جست‌وجو (CHAT-14) در `store/chat-acts.js` ِ دیربار؛ نیامد ⇒ همین گفت‌وگو بی آن‌ها.
  */
 (function () {
   'use strict';
@@ -32,12 +36,28 @@
     var conv = null; var cursor = 0; var msgs = {}; var loop = 0; var want = null; var sheet = null;
     //  info[شناسه] = { m, cid, li, more, sp, st } — پیامِ نشان‌داده؛ acting = نوارِ کارهای بازِ یک پیام؛ inflight = حذفِ در راه
     var info = {}; var acting = null; var inflight = {};
-    //  پیامِ در راه { conv, body, key, wait } — تا رسیدن با همان شناسه (CHAT-02/11)؛ retry = زمان‌سنجِ تلاشِ دوباره
-    var out = null; var retry = 0;
+    //  صفِ پیام‌های متنیِ نرفته (CHAT-02/11، `chat-out.js`): Q = منطق، oq = آخرین نمای صف، flying = پیامِ در راهِ همین برگه؛
+    //  A = کارهای CHAT-14 (`chat-acts.js`)
+    var Q = null; var oq = null; var flying = {}; var draining = false; var wake = 0; var A = null;
+    var qslug = String(ctx.slug || '').toLowerCase();
     //  عکسِ در راه { conv, key, main, thumb, w, h, thumbId, mainId, xhr, wait } و سقف‌های سرور (`limits` ِ گشودن)
     var ph = null; var lim = null;
+    //  کمک‌های همین برگه برای `chat-acts.js`
+    var H = { api: api, path: path, put: put, bar: bar, shut: shut, home: home, done: done, fail: fail, reload: reload,
+      conv: function () { return conv; }, info: function () { return info; }, list: function () { return $('ct-list'); },
+      note: function (m) { K.note($('ct-msg'), 'err', m); },
+      adopt: function (c) { if (c && conv && conv.id === c.id) { conv = c; state(); } } };
     //  واژه‌نامه پیش از ساختنِ برگه (برگه هنوز نیست ⇒ ترجمهٔ دوباره لازم نیست؛ متن‌ها با t() از همین واژه‌نامه)
     var ready = K.part('chat', $('chat-sheet'));
+    //  صف و کارها فقط با گشودنِ برگه (نه با کارتِ پیگیری)؛ نیامد ⇒ گشودنِ بعدی دوباره می‌خواهد
+    var more = null;
+    function extras() {
+      var noop = function () { /* بی این بخش */ };
+      return more || (more = Promise.all([
+        Q ? null : K.js('/store/chat-out.js').then(function () { Q = window.StoreChatOut; oq = Q.forPhone(onDisk(), phone()); saveQ(); return Q.ready; }, noop),
+        A ? null : K.js('/store/chat-acts.js').then(function () { A = window.StoreChatActs(H); return A.ready; }, noop),
+      ]).then(function () { if (!Q || !A) more = null; }));
+    }
 
     function build() {
       if (sheet) return;
@@ -56,6 +76,7 @@
           el('details', { class: 'ct-prev', attrs: { id: 'ct-prev' }, hidden: true }, el('summary', { attrs: { id: 'ct-prev-s' } }), el('div', { attrs: { id: 'ct-prev-list' } })),
           el('details', { class: 'ct-prev', attrs: { id: 'ct-old' }, hidden: true }, el('summary', { attrs: { id: 'ct-old-s' } }), el('ol', { class: 'ct-list', attrs: { id: 'ct-old-list' } })),
           el('ol', { class: 'ct-list', attrs: { id: 'ct-list' } }),
+          el('ol', { class: 'ct-list ct-outq', attrs: { id: 'ct-out' } }),
           el('p', { class: 'muted small', attrs: { id: 'ct-empty' }, text: t('ct.empty'), hidden: true })),
         el('div', { class: 'note', attrs: { id: 'ct-state', role: 'status' }, hidden: true }),
         el('button', { class: 'btn btn-block', attrs: { id: 'ct-issue', type: 'button' }, text: t('ct.issue'), hidden: true, on: { click: issue } }),
@@ -108,6 +129,7 @@
       var b = $('ct-vcheck'); b.disabled = true;
       api('/verify/check', { method: 'POST', body: { phone: $('ct-phone').value, code: $('ct-code').value } }).then(function (r) {
         K.setTicket(r);
+        if (Q) { oq = Q.reverified(onDisk(), r.phone); saveQ(); }   //  شمارهٔ دیگر ⇒ صفِ نفرِ پیشین پاک؛ همان ⇒ دوباره در راه
         $('ct-code').value = ''; $('ct-verify').hidden = true; $('ct-vmsg').hidden = true;
         start(want || {});
       }).catch(function (e) { K.note($('ct-vmsg'), 'err', e.message); }).then(function () { b.disabled = false; });
@@ -126,12 +148,14 @@
       if (fresh || !conv || conv.id !== c.id) {
         conv = c; cursor = 0; msgs = {}; info = {}; acting = null; inflight = {};
         K.clear($('ct-list')); K.clear($('ct-old-list')); prev();
+        if (A) A.reset();
       }
       if (ph && ph.conv !== c.id) phDrop();   //  عکسِ آمادهٔ رشتهٔ دیگر به این رشته نمی‌رود
       conv = c;
       $('ct-title').textContent = title(c);
       state();
       if (fresh) poll(++loop, true);
+      outs(); drain();   //  صفِ همین دستگاه با هر گشودن از سر گرفته می‌شود
     }
     function state() {
       var l = conv.life || { state: 'open' };
@@ -147,6 +171,7 @@
       else box.hidden = true;
       refresh();
       ticks();
+      if (A) A.sync();
     }
 
     // ── رشته‌های پیشینِ همین شماره (جمع‌شده) ──
@@ -210,6 +235,7 @@
         meta.appendChild(x.more);
       }
       li.appendChild(meta);
+      if (A) A.decorate(li, m, meta);
       if (old && old.parentNode) old.parentNode.replaceChild(li, old); else list.appendChild(li);
       msgs[m.id] = li; info[m.id] = x;
       if (x.sp) tick(x);
@@ -265,6 +291,7 @@
         first = el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-del': 'me' }, text: t('ct.del.me'), on: { click: function () { bar(id, 'me', '', true); } } });
         box.appendChild(first);
         if (canAll(x)) box.appendChild(el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-del': 'all' }, text: t('ct.del.all'), on: { click: function () { bar(id, 'all', '', true); } } }));
+        if (A) A.menu(box, x);   //  پاسخ، ویرایش، سنجاق (CHAT-14) پس از حذف ⇒ نخستین کار همان «حذف برای من» می‌ماند
       } else {
         first = el('button', { class: 'btn btn-ghost btn-sm', attrs: { type: 'button', 'data-no': '' }, text: t('no'), on: { click: function () { bar(id, null, '', true); } } });
         var yes = el('button', { class: 'btn btn-danger btn-sm', attrs: { type: 'button', 'data-yes': ask }, text: t('ct.del.yes'), on: { click: function () { drop(id, ask); } } });
@@ -431,7 +458,9 @@
       $('ct-old').hidden = !old;
       $('ct-old-s').textContent = t('ct.old', { n: K.fa(old, 0) });
       $('ct-empty').hidden = $('ct-list').childNodes.length > 0;
-      var last = $('ct-list').lastChild;
+      if ($('ct-out').childNodes.length) $('ct-empty').hidden = true;
+      if (A) A.sync();
+      var last = $('ct-out').lastChild || $('ct-list').lastChild;
       if (last && last.scrollIntoView) last.scrollIntoView({ block: 'end' });
     }
     //  نخستین خواندن بی صبر؛ پس از آن همیشه long-poll — رشتهٔ بی‌پیام (cursor همان ۰) هم پیاپی نمی‌پرسد
@@ -464,37 +493,73 @@
       if (((conv.receipts || {}).myReadSeq || 0) < (conv.seq || 0)) receipt(conv.id, conv.seq);
     });
 
+    // ── صفِ پیام‌های متنی (CHAT-02/11): متن از کادر به حبابِ «در صف»؛ هر گفت‌وگو فقط سرِ صفش، یکی‌یکی، با همان `clientId` ──
+    function phone() { var tk = K.ticket(); var ss = K.sess(); return (tk && tk.phone) || (ss && ss.phone) || ''; }
+    //  localStorage حرفِ آخر است (برگه‌های دیگرِ همین ویترین هم می‌نویسند): هر کار = خواندن ⇐ تغییر ⇐ نوشتن، و پیامِ در راهِ
+    //  همین برگه «در راه» می‌ماند. «در راه» ِ برگهٔ دیگر این‌جا «در صف» است ⇒ شاید دو برگه یک پیام را بفرستند؛ همان `clientId`
+    //  ⇒ سرور یکی نگه می‌دارد (`replayed`).
+    function onDisk() {
+      var d = Q.load(K.load(Q.KEY, null));
+      Object.keys(flying).forEach(function (id) { d = Q.sending(d, id); });
+      return d;
+    }
+    //  فقط تغییرِ واقعی نوشته می‌شود ⇒ رویدادِ `storage` میانِ دو برگه پینگ‌پنگ نمی‌شود
+    function saveQ() {
+      var v = oq.items.length ? Q.dump(oq) : null;
+      try { if (localStorage.getItem(Q.KEY) !== v) { if (v === null) localStorage.removeItem(Q.KEY); else localStorage.setItem(Q.KEY, v); } } catch (e) { /* بی حافظه */ }
+    }
     function send() {
-      var body = $('ct-text').value.trim();
-      if (!body || !conv) return;
-      //  همان متن در همان رشته ⇒ همان شناسه: جوابِ گم‌شده یا اینترنتِ رفته پیامِ دوم نمی‌سازد (CHAT-02/11)
-      if (!out || out.conv !== conv.id || out.body !== body) {
-        out = { conv: conv.id, body: body, key: 'ct-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 10), wait: 2000 };
+      if (!conv) return;
+      if (A && A.editing()) { A.save(); return; }
+      if (!Q) { K.note($('ct-msg'), 'err', t('ct.err')); return; }
+      var r = Q.add(Q.forPhone(onDisk(), phone()), { slug: qslug, convId: conv.id, body: $('ct-text').value, replyTo: A ? A.replyTo() : null }, Date.now(), Math.random);
+      if (r.error) { if (r.error !== 'empty') K.note($('ct-msg'), 'err', Q.why(r.error)); return; }   //  رد ⇒ متن در کادر، هرگز بریده
+      oq = r.state; saveQ();
+      $('ct-text').value = ''; $('ct-msg').hidden = true;
+      if (A) A.sent();
+      outs(); drain();
+      var b = $('ct-out').lastChild;
+      if (b && b.scrollIntoView) b.scrollIntoView({ block: 'end' });
+    }
+    function outs() {
+      var ol = $('ct-out');
+      if (!Q || !ol) return;
+      Q.render(ol, conv ? Q.forConv(oq, conv.id) : [], { retry: resend, cancel: unsend, home: home });
+      if (ol.childNodes.length) $('ct-empty').hidden = true;
+    }
+    function resend(id) { oq = Q.retry(onDisk(), id); saveQ(); outs(); drain(); }
+    function unsend(id) { var r = Q.cancel(onDisk(), id); oq = r.state; if (r.ok) saveQ(); outs(); }   //  در راه ⇒ لغو نمی‌شود
+    function drain() {
+      clearTimeout(wake);
+      if (!Q || draining) return;
+      oq = onDisk();
+      var p = phone() ? Q.forPhone(oq, phone()) : oq;   //  ⛔ پیامِ شمارهٔ دیگر هرگز با بلیتِ این شماره نمی‌رود
+      if (p !== oq) { oq = p; saveQ(); }
+      var x = Q.due(oq, qslug, Date.now());
+      if (!x) {
+        outs();
+        var at = Q.wakeAt(oq, qslug);
+        if (at !== null) wake = setTimeout(drain, Math.max(250, at - Date.now()));
+        return;
       }
-      push(out);
-    }
-    function push(my) {
-      clearTimeout(retry);
-      var b = $('ct-send'); b.disabled = true;
-      api(path(my.conv, '/messages'), { method: 'POST', body: { clientId: my.key, body: my.body } }).then(function (r) {
-        if (out === my) out = null;
-        if ($('ct-text').value.trim() === my.body) $('ct-text').value = '';
-        $('ct-msg').hidden = true;
-        if (conv && conv.id === my.conv) { put($('ct-list'), r.message, my.conv); $('ct-empty').hidden = true; }
-      }).catch(function (e) {
-        if (e.status === 0 && out === my) {   //  بی‌اینترنت: در صف؛ با وصل شدن (`online`) یا پس از کمی، خودش با همان شناسه
-          K.note($('ct-msg'), 'warn', t('ct.queued'));
-          my.wait = Math.min(60000, my.wait * 2);
-          retry = setTimeout(function () { again(my); }, my.wait);
-          return;
-        }
+      if (!phone()) { oq = Q.failed(oq, x.clientId, { status: 401, code: 'verification_required' }, Date.now(), 0); saveQ(); outs(); return; }
+      draining = true; flying[x.clientId] = true;
+      oq = Q.sending(oq, x.clientId); saveQ(); outs();
+      var body = { clientId: x.clientId, body: x.body };
+      if (x.replyTo) body.replyTo = x.replyTo;
+      api(path(x.convId, '/messages'), { method: 'POST', body: body }).then(function (r) {
+        delete flying[x.clientId];
+        oq = Q.done(onDisk(), x.clientId); saveQ();
+        if (conv && conv.id === x.convId && r.message) { put($('ct-list'), r.message, x.convId); $('ct-empty').hidden = true; }
+      }, function (e) {
+        delete flying[x.clientId];
+        oq = Q.failed(onDisk(), x.clientId, e, Date.now(), Math.random()); saveQ();
         if (e.code === 'chat_closed' || e.code === 'chat_blocked') reload();
-        fail(e);
-      }).then(function () { b.disabled = false; });
+        if (Q.failureOf(e) === 'verify') fail(e);   //  همهٔ صف تا تأییدِ دوباره می‌ماند
+      }).then(function () { draining = false; outs(); drain(); });
     }
-    //  فقط همان پیام، همان رشتهٔ باز و همان متنِ کادر — متنِ عوض‌شده یعنی کاربر پیامِ دیگری می‌خواهد
-    function again(my) { if (out === my && conv && conv.id === my.conv && $('ct-text').value.trim() === my.body) push(my); }
-    window.addEventListener('online', function () { if (out) again(out); });
+    window.addEventListener('online', function () { if (Q) { oq = Q.online(onDisk()); saveQ(); drain(); } });
+    window.addEventListener('storage', function (e) { if (Q && e.key === Q.KEY) { oq = onDisk(); outs(); drain(); } });
 
     // ── عکسِ مشتری (CHAT-05): برگزیدن ⇒ کوچک‌کردن (دیربار) و پیش‌نمایش ⇒ «فرستادن» ⇒ پیش‌نمایش، اصل، پیام ──
     //  «۱» ِ نوار فقط پس از پذیرشِ پیام؛ «لغو» بارگذاری را می‌بُرد (پیام هنوز نرفته)؛ تلاشِ دوباره همان شناسه و همان بایت را
@@ -622,10 +687,15 @@
     }
     function reload() { if (conv) api(path(conv.id)).then(function (r) { conv = r.conversation; state(); }).catch(function () { /* همان */ }); }
 
+    //  برگه همان دم باز می‌شود؛ رشته پس از رسیدنِ صف و کارها (بارِ نخستِ برگه، سپس از حافظهٔ `K.js`)
     function openWith(body) {
+      var go = extras();
       return ready.then(function () {
         build();
         K.openSheet(sheet, function () { loop++; hush(); });
+        return go;
+      }).then(function () {
+        if (A) A.mount();
         return start(body);
       });
     }

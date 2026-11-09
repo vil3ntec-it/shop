@@ -161,6 +161,17 @@
 .ct-ph-side { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: var(--s2); }
 .ct-ph .ct-bar { width: 100%; height: 6px; accent-color: var(--primary); }
 .ct-ph-acts { display: flex; flex-wrap: wrap; gap: var(--s2); }
+.ct-msg.ct-q { border-style: dashed; opacity: .9; }
+.ct-outq:not(:empty) { margin-top: var(--s2); }
+.ct-msg.ct-hl { outline: 2px solid var(--primary); outline-offset: 2px; }
+.ct-quote { display: block; width: 100%; margin: 0 0 4px; padding: 2px var(--s2); border: 0; border-inline-start: 3px solid currentColor; border-radius: 4px; background: none; color: inherit; font: inherit; font-size: 13px; text-align: start; opacity: .85; cursor: pointer; overflow-wrap: anywhere; }
+.ct-chip { display: flex; align-items: center; gap: var(--s2); padding: var(--s1) var(--s2); border-inline-start: 3px solid var(--primary); border-radius: var(--r-ctl); background: var(--surface-2); }
+.ct-chip span { flex: 1 1 auto; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.ct-pins { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s1); margin-bottom: var(--s2); }
+.ct-pin, .ct-hit { max-width: 100%; min-height: 32px; padding: 4px var(--s2); border: 1px solid var(--line); border-radius: var(--r-ctl); background: var(--surface-2); color: inherit; font: inherit; font-size: 13px; text-align: start; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ct-hits { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--s1); }
+.ct-hit { width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.ct-find .input { flex: 1 1 auto; min-width: 0; }
 
 /* CHK-15/16: یادداشت و «اگر نبود…» ِ هر قلم در برگهٔ ثبت (store/line-prefs.js ِ دیربار) */
 .sum-lines li.lp-li { flex-wrap: wrap; }

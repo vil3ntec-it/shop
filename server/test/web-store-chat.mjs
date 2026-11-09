@@ -22,6 +22,11 @@
  *     بی EXIF/«مکان»؛ JPEG ِ خوابیده با جهتِ ۶ ⇒ عمودی؛ شفافیت روی سفید؛ رویدادهای پیشرفتِ XHR؛ «لغو» بارگذاری را می‌بُرد؛
  *     افتادنِ شبکه در میانِ بارگذاری و پیام + «تلاشِ دوباره» ⇒ یک پیام؛ بی‌اینترنت ⇒ صف و رفتنِ خودکار؛ دکان عکس را می‌بیند؛
  *     کدِ عکس دیربار؛ axe ِ کنترل‌های تازه (با دوربینِ گوشیِ لمسی)؛
+ *   • CHAT-02 (صفِ متن، `chat-out.js`): بی‌اینترنت متن به حبابِ «در صف» با «دوباره»/«لغو» می‌رود (localStorage فقط متن و شماره)،
+ *     جوابِ گم‌شده + «دوباره» ِ حباب ⇒ همان clientId؛ برگهٔ بسته ⇒ صف با همان شناسه می‌ماند و گشودنِ دوباره می‌فرستد؛ ۴۰۱ صف را تا
+ *     تأییدِ دوباره نگه می‌دارد؛ شمارهٔ دیگر ⇒ صف پاک؛
+ *   • CHAT-14 (`chat-acts.js`): پاسخ (replyTo و نقل)، ویرایش تا `editUntil` ِ سرور (۴۰۳ ِ دیرهنگام ⇒ پیامِ روشن)، سنجاقِ فقط برای
+ *     خودم، جست‌وجو و رفتن به پیام؛ axe ِ برچسبِ پاسخ، جست‌وجو و حبابِ «در صف»؛
  *   • پرچمِ `shop.chat` خاموش ⇒ نه دکمه، نه اسکریپت؛ بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -197,41 +202,148 @@ await sleep(1200);
 ok(back.status === 200 && Number(back.body.conversation.receipts.peerReadSeq) >= Number(hour.seq) && await stOf(page, hour.id) === 'read|خوانده شد',
   'رسیدِ کهنه‌تر (seq ِ ۱) هیچ چیز را عقب نمی‌برد — نه سرور، نه برگه');
 
-//  ── CHAT-02/11: بی‌اینترنت ⇒ متن در صف می‌ماند و با وصل شدن خودش یک بار می‌رود؛ جوابِ گم‌شده + زدنِ دوباره ⇒ همان شناسه ──
+//  ── CHAT-02/11: بی‌اینترنت ⇒ متن به حبابِ «در صف» می‌رود و با وصل شدن خودش یک بار می‌رود؛ جوابِ گم‌شده + «دوباره» ⇒ همان شناسه ──
 const countFrom = async (convId, body) => Number((await one(
   "SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1 AND sender='customer' AND body=$2", [convId, body])).n);
 const bubbles = (text, p = page) => p.evaluate((x) => [...document.querySelectorAll('#ct-list .ct-msg')].filter((li) => li.textContent.includes(x)).length, text);
+//  حبابِ صف (`#ct-out`): data-st ِ هر حبابی که این متن را دارد؛ صفِ روی دیسک (`store-chat-out`)
+const queued = (text, p = page) => p.evaluate((x) => [...document.querySelectorAll('#ct-out .ct-q')].filter((li) => li.textContent.includes(x)).map((li) => li.dataset.st).join(','), text);
+const stored = (p = page) => p.evaluate(() => { try { return JSON.parse(localStorage.getItem('store-chat-out')); } catch { return 'bad'; } });
 await ctx.setOffline(true);
 await page.fill('#ct-text', 'پیامِ بی‌اینترنت');
 await page.click('#ct-send');
-await page.waitForFunction(() => !document.getElementById('ct-msg').hidden, null, { timeout: 10000 });
-ok(await countFrom(conv1.id, 'پیامِ بی‌اینترنت') === 0 && (await page.inputValue('#ct-text')) === 'پیامِ بی‌اینترنت',
-  'بی‌اینترنت: متن در کادر و در صف می‌ماند', await page.textContent('#ct-msg'));
+await page.waitForFunction(() => document.querySelector('#ct-out .ct-q[data-st="waiting"]'), null, { timeout: 10000 });
+//  ⇐ تغییرِ عمدی (CHAT-02 در وب): پیش‌تر متن در کادر می‌ماند و فقط یادداشتِ «در صف» داشت؛ حالا از کادر به حبابِ «در صف»
+//  با «دوباره» و «لغو» می‌رود (کادر برای پیامِ بعدی آزاد، صف پس از بستنِ برگه هم می‌ماند)
+ok(await countFrom(conv1.id, 'پیامِ بی‌اینترنت') === 0 && (await page.inputValue('#ct-text')) === '' &&
+  await queued('پیامِ بی‌اینترنت') === 'waiting' && await bubbles('پیامِ بی‌اینترنت') === 0,
+'بی‌اینترنت: متن از کادر به حبابِ «در صف» رفت — نه روی سرور، نه حبابِ «رفت»', await page.textContent('#ct-out'));
+ok(await page.$('#ct-out .ct-q [data-q="retry"]') !== null && await page.$('#ct-out .ct-q [data-q="cancel"]') !== null,
+  'حبابِ «در صف»: «دوباره» و «لغو»');
+const disk1 = await stored();
+ok(disk1 && disk1.phone === vc.body.phone && disk1.items.length === 1 && disk1.items[0].body === 'پیامِ بی‌اینترنت' &&
+  !Object.keys(disk1.items[0]).some((k) => /media|kind|bytes|photo/i.test(k)),
+'صف روی localStorage ِ store-chat-out: فقط متن، با برچسبِ همان شماره', JSON.stringify(disk1 && Object.keys(disk1.items[0] || {})));
 await ctx.setOffline(false);
 ok(await until(async () => (await countFrom(conv1.id, 'پیامِ بی‌اینترنت')) === 1, 20000), 'وصل شد ⇒ خودش رفت، بی زدنِ دوباره');
 await page.waitForFunction(() => /بی‌اینترنت/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
-ok((await page.inputValue('#ct-text')) === '' && await bubbles('پیامِ بی‌اینترنت') === 1, 'پس از رسیدن: کادر خالی و یک حباب');
+ok((await page.inputValue('#ct-text')) === '' && await bubbles('پیامِ بی‌اینترنت') === 1 && await queued('پیامِ بی‌اینترنت') === '' &&
+  (await stored()) === null, 'پس از رسیدن: یک حباب، صف و localStorage تهی');
 const offMsg = await msgOf('پیامِ بی‌اینترنت');
 ok(await stOf(page, offMsg.id) === 'sent|رفت' && await stOf(page, hour.id) === 'read|خوانده شد',
   'پیامِ تازه‌تر از «خواندم» ِ دکان «رفت» می‌ماند؛ هر پیام از seq ِ خودش', `${await stOf(page, offMsg.id)} / ${await stOf(page, hour.id)}`);
 
 let drop = 1;
+const posted = [];
 const postUrl = `**/api/store/${slug}/chat/conversations/${conv1.id}/messages`;
 await page.route(postUrl, async (route) => {
-  if (route.request().method() !== 'POST' || drop < 1) return route.fallback();
+  if (route.request().method() !== 'POST') return route.fallback();
+  posted.push(JSON.parse(route.request().postData() || '{}').clientId);
+  if (drop < 1) return route.fallback();
   drop--;
   await route.fetch();            //  سرور ثبت می‌کند…
   return route.abort('failed');   //  …و جواب به صفحه نمی‌رسد
 });
 await page.fill('#ct-text', 'جوابِ گم‌شده');
 await page.click('#ct-send');
-await page.waitForFunction(() => !document.getElementById('ct-msg').hidden, null, { timeout: 10000 });
-await page.click('#ct-send');     //  کاربر دوباره می‌زند
+await page.waitForSelector('#ct-out .ct-q[data-st="waiting"] [data-q="retry"]', { timeout: 10000 });
+//  ⇐ تغییرِ عمدی: «زدنِ دوباره» پیش‌تر دوباره زدنِ «فرستادن» با همان متنِ کادر بود؛ متن حالا در حباب است ⇒ «دوباره» ِ همان حباب
+await page.click('#ct-out .ct-q [data-q="retry"]');
 await page.waitForFunction(() => /جوابِ گم‌شده/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
 await new Promise((r) => setTimeout(r, 1500));
-ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles('جوابِ گم‌شده') === 1,
-  'جوابِ گم‌شده و زدنِ دوباره ⇒ یک پیام روی سرور و یک حباب', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')}`);
+ok(await countFrom(conv1.id, 'جوابِ گم‌شده') === 1 && await bubbles('جوابِ گم‌شده') === 1 && await queued('جوابِ گم‌شده') === '' &&
+  posted.length === 2 && posted[0] === posted[1],
+'جوابِ گم‌شده و «دوباره» ِ حباب ⇒ همان clientId، یک پیام روی سرور و یک حباب', `${await countFrom(conv1.id, 'جوابِ گم‌شده')} / ${await bubbles('جوابِ گم‌شده')} / ${posted.length}`);
 await page.unroute(postUrl);
+
+//  ── CHAT-02: صف بستنِ برگه را تاب می‌آورد و با گشودنِ دوبارهٔ گفت‌وگو خودش می‌رود؛ «لغو»؛ ۴۰۱ صف را نگه می‌دارد؛ شمارهٔ دیگر ⇒ پاک ──
+//  زمینهٔ جدا (localStorage ِ خودش) تا برگهٔ بازِ دیگری صف را نفرستد
+const qc = await browser.newContext({ viewport: { width: 360, height: 760 }, locale: 'fa-AF' });
+await qc.addInitScript((t) => {
+  try { if (!localStorage.getItem('qc-seeded')) { localStorage.setItem('qc-seeded', '1'); localStorage.setItem('store-ticket', JSON.stringify(t)); } } catch { /* about:blank */ }
+}, { phone: vc.body.phone, ticket: vc.body.ticket, expiresAt: vc.body.expiresAt });
+const qOpen = async () => {
+  const p = await qc.newPage();
+  p.on('pageerror', (e) => errors.push(String(e)));
+  p.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
+  await p.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o1.token)}`);
+  await p.waitForSelector('#o-chat-open', { timeout: 15000 });
+  await p.click('#o-chat-open');
+  await p.waitForFunction(() => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, { timeout: 15000 });
+  return p;
+};
+let qp = await qOpen();
+ok(await qp.$('script[src="/store/chat-out.js"]') !== null && await qp.$('script[src="/store/chat-acts.js"]') !== null,
+  'صف و کارهای گفت‌وگو فقط با گشودنِ برگه بار شدند (دیربار)');
+await qc.setOffline(true);
+for (const text of ['پیامِ ماندگار', 'پیامِ لغوشدنی']) { await qp.fill('#ct-text', text); await qp.click('#ct-send'); }
+await qp.waitForFunction(() => document.querySelectorAll('#ct-out .ct-q').length === 2, null, { timeout: 10000 });
+ok(await queued('پیامِ ماندگار', qp) !== '' && await queued('پیامِ لغوشدنی', qp) === 'queued',
+  'دو پیامِ بی‌اینترنت: فقط سرِ صف می‌رود، دومی «در صف» پشتِ آن', `${await queued('پیامِ ماندگار', qp)} / ${await queued('پیامِ لغوشدنی', qp)}`);
+await qp.click('#ct-out .ct-q[data-st="queued"] [data-q="cancel"]');
+await qp.waitForFunction(() => document.querySelectorAll('#ct-out .ct-q').length === 1, null, { timeout: 5000 });
+const keptId = (await stored(qp)).items[0].clientId;
+ok((await stored(qp)).items.map((x) => x.body).join() === 'پیامِ ماندگار', '«لغو» ⇒ حباب و ردیفِ localStorage رفتند');
+await qp.goto('about:blank');
+await qp.close();
+await qc.setOffline(false);
+//  برگهٔ تازهٔ همان مرورگر، بی گشودنِ گفت‌وگو: صف همان‌جاست با همان شناسه. (درخواستی که برگهٔ رو به بسته شدن در راه داشت
+//  شاید به سرور برسد — در Playwright گاهی پس از برداشتنِ «بی‌اینترنت» ِ برگهٔ بسته — و همان شناسه است ⇒ پایین فقط یک پیام.)
+const peek = await qc.newPage();
+await peek.goto(`${base}/store/${slug}`);
+await peek.waitForFunction(() => { const b = document.getElementById('store-chat'); return b && !b.hidden; }, null, { timeout: 15000 });
+const kept = await stored(peek);
+ok(kept && kept.items.length === 1 && kept.items[0].clientId === keptId && kept.items[0].body === 'پیامِ ماندگار' &&
+  await peek.$('script[src="/store/chat-out.js"]') === null, 'برگه بسته شد ⇒ پیام با همان شناسه در صفِ همین مرورگر ماند (بی گشودنِ گفت‌وگو چیزی بار نشد)',
+  JSON.stringify(kept && kept.items.map((x) => x.state)));
+await peek.close();
+qp = await qOpen();
+ok(await until(async () => (await countFrom(conv1.id, 'پیامِ ماندگار')) === 1, 20000), 'گشودنِ دوبارهٔ گفت‌وگو ⇒ پیامِ ماندهٔ صف رفت');
+ok(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE client_id=$1', [keptId])).n) === 1, 'همان clientId، یک پیام روی سرور');
+await qp.waitForFunction(() => /پیامِ ماندگار/.test(document.getElementById('ct-list').textContent), null, { timeout: 15000 });
+ok(await bubbles('پیامِ ماندگار', qp) === 1 && await queued('پیامِ ماندگار', qp) === '' && (await stored(qp)) === null &&
+  await countFrom(conv1.id, 'پیامِ لغوشدنی') === 0, 'رسید: یک حباب، صفِ تهی؛ پیامِ لغوشده هرگز نرفت');
+
+//  ۴۰۱ (بلیتِ دست‌خورده) ⇒ فرمِ تأیید و پیام «منتظرِ تأیید» می‌ماند؛ همان شماره دوباره ⇒ همان پیام می‌رود
+await qp.evaluate(() => { const t = JSON.parse(localStorage.getItem('store-ticket')); t.ticket += 'xx'; localStorage.setItem('store-ticket', JSON.stringify(t)); });
+await qp.fill('#ct-text', 'پس از تأیید');
+await qp.click('#ct-send');
+await qp.waitForFunction(() => !document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+ok(await countFrom(conv1.id, 'پس از تأیید') === 0 && (await stored(qp)).items[0].state === 'verify',
+  '۴۰۱ ⇒ فرمِ تأیید؛ پیام «منتظرِ تأیید» در صف ماند', JSON.stringify((await stored(qp)).items.map((x) => x.state)));
+const reverify = async (p, num) => {
+  await query('UPDATE otp_codes SET created_at = created_at - $1', [10 * 60 * 1000]);   //  فاصلهٔ «کدِ تازه» (۱۲۰ ثانیه) گذشته
+  await p.fill('#ct-phone', num);
+  await p.click('#ct-vsend');
+  await p.waitForFunction(() => /\d{4,}/.test(document.getElementById('ct-vmsg').textContent), null, { timeout: 10000 });
+  const code = (await p.textContent('#ct-vmsg')).match(/(\d{4,})/)[1];
+  await p.fill('#ct-code', code);
+  await p.click('#ct-vcheck');
+  await p.waitForFunction(() => document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+};
+await reverify(qp, phone);
+ok(await until(async () => (await countFrom(conv1.id, 'پس از تأیید')) === 1, 15000), 'همان شماره دوباره تأیید شد ⇒ همان پیام با همان شناسه رفت');
+//  شمارهٔ دیگر روی همین دستگاه ⇒ صفِ نفرِ پیشین پاک و هرگز به نامِ این یکی نمی‌رود
+await qc.setOffline(true);
+await qp.fill('#ct-text', 'پیامِ نفرِ اول');
+await qp.click('#ct-send');
+await qp.waitForFunction(() => document.querySelector('#ct-out .ct-q[data-st="waiting"]'), null, { timeout: 10000 });
+await qp.evaluate(() => localStorage.removeItem('store-ticket'));   //  نفرِ اول رفت (بلیت نیست، هنوز بی‌اینترنت)
+await qp.goto('about:blank');
+await qp.close();
+await qc.setOffline(false);
+qp = await qc.newPage();
+qp.on('pageerror', (e) => errors.push(String(e)));
+await qp.goto(`${base}/store/${slug}`);
+await qp.waitForFunction(() => { const b = document.getElementById('store-chat'); return b && !b.hidden; }, null, { timeout: 15000 });
+await qp.click('#store-chat');
+await qp.waitForFunction(() => { const v = document.getElementById('ct-verify'); return v && !v.hidden; }, null, { timeout: 15000 });
+await reverify(qp, '0791112255');
+await sleep(2500);
+ok((await stored(qp)) === null && await countFrom(conv1.id, 'پیامِ نفرِ اول') === 0 &&
+  Number((await one("SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE body='پیامِ نفرِ اول'")).n) === 0,
+'شمارهٔ دیگر تأیید شد ⇒ صف پاک؛ پیامِ نفرِ اول نه در رشتهٔ او رفت، نه به نامِ نفرِ دوم');
+await qc.close();
 
 //  ── CHAT-04: برگهٔ پنهانِ مرورگر «رسید» می‌دهد ولی «خواندم» نه؛ دیده شدن ⇒ «خواندم» ──
 const vis = (s, p = page) => p.evaluate((v) => {
@@ -398,6 +510,81 @@ await page.evaluate(() => sessionStorage.removeItem('hide-tab'));
 await vis('visible');
 await page2.close();
 
+//  ── CHAT-14 در وب (`chat-acts.js` ِ دیربار): پاسخ، ویرایش تا `editUntil` ِ سرور، سنجاقِ فقط برای خودم، جست‌وجو ──
+const actOf = async (id, act) => {
+  await page.click(li(id, '.ct-more'));
+  await page.waitForSelector(li(id, '[data-del="me"]'));
+  const b = await page.$(li(id, `[data-act="${act}"]`));
+  if (!b) await page.click(li(id, '.ct-more'));
+  return b;
+};
+ok(Boolean(await actOf(askId, 'reply')) && await page.$(li(askId, '[data-act="edit"]')) === null, 'پیامِ دکان: «پاسخ» هست، «ویرایش» نه');
+await page.click(li(askId, '[data-act="reply"]'));
+ok(/پاسخ به: کی می‌آیید؟/.test(await page.textContent('#ct-chip')) && await page.evaluate(() => document.activeElement.id === 'ct-text'),
+  '«پاسخ» ⇒ برچسبِ «پاسخ به …» بالای کادر و تمرکز در کادر', await page.textContent('#ct-chip'));
+await page.fill('#ct-text', 'ساعتِ شش');
+await page.click('#ct-send');
+await page.waitForFunction(() => /ساعتِ شش/.test(document.getElementById('ct-list').textContent), null, { timeout: 10000 });
+const six = await msgOf('ساعتِ شش');
+const sixRow = await one('SELECT reply_to FROM shop_chat_messages WHERE id=$1', [six.id]);
+ok(sixRow.reply_to === askId && /کی می‌آیید؟/.test(await page.textContent(li(six.id, '.ct-quote'))) && await page.isHidden('#ct-chip'),
+  'پاسخ از همان صف رفت: replyTo روی سرور، نقلِ پیامِ اصل در حباب، برچسب برداشته شد', String(sixRow.reply_to));
+await page.click(li(six.id, '.ct-quote'));
+ok(await page.evaluate((x) => document.activeElement && document.activeElement.dataset.id === x, askId), 'زدنِ نقل ⇒ تمرکز روی پیامِ اصل');
+
+ok(await actOf(lostMsg.id, 'edit') === null, 'پیامِ کهنهٔ خودم (پس از editUntil ِ سرور): «ویرایش» نیست');
+ok(Boolean(await actOf(six.id, 'edit')), 'پیامِ تازهٔ خودم: «ویرایش» هست');
+await page.click(li(six.id, '[data-act="edit"]'));
+ok(await page.inputValue('#ct-text') === 'ساعتِ شش' && /ذخیره/.test(await page.textContent('#ct-send')), '«ویرایش» ⇒ همان متن در کادر و «ذخیره»');
+await page.fill('#ct-text', 'ساعتِ هفت');
+await page.click('#ct-send');
+await page.waitForFunction((x) => /ساعتِ هفت/.test((document.querySelector(`#ct-list li[data-id="${x}"]`) || {}).textContent || ''), six.id, { timeout: 10000 });
+const sevenRow = await one('SELECT body, edited_at FROM shop_chat_messages WHERE id=$1', [six.id]);
+ok(sevenRow.body === 'ساعتِ هفت' && sevenRow.edited_at && await countFrom(conv1.id, 'ساعتِ هفت') === 1 && await page.$(li(six.id, '[data-edited]')) !== null &&
+  !/ذخیره/.test(await page.textContent('#ct-send')) && await page.inputValue('#ct-text') === '',
+'ویرایش ⇒ همان پیام روی سرور (نه پیامِ تازه) و «ویرایش‌شده» کنارِ زمان؛ کادر خالی', JSON.stringify(sevenRow));
+//  ساعتِ سرور حرفِ آخر است: دکمه هنوز بود ولی مهلت در سرور گذشت ⇒ ۴۰۳ و پیامِ روشن؛ متن در کادر می‌ماند
+await actOf(six.id, 'edit');
+await page.click(li(six.id, '[data-act="edit"]'));
+await page.fill('#ct-text', 'ساعتِ هشت');
+await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE id=$1', [six.id, 3600 * 1000]);
+await page.click('#ct-send');
+await page.waitForFunction(() => /وقتِ ویرایش/.test(document.getElementById('ct-msg').textContent), null, { timeout: 10000 });
+ok((await one('SELECT body FROM shop_chat_messages WHERE id=$1', [six.id])).body === 'ساعتِ هفت' && await page.inputValue('#ct-text') === 'ساعتِ هشت' &&
+  !/ذخیره/.test(await page.textContent('#ct-send')),
+'مهلتِ سرور گذشت ⇒ «وقتِ ویرایش… گذشته»، پیام همان و متن در کادر (حالتِ ویرایش بسته)', await page.textContent('#ct-msg'));
+await page.fill('#ct-text', '');
+
+ok(Boolean(await actOf(askId, 'pin')), '«سنجاق» در نوارِ کارها');
+await page.click(li(askId, '[data-act="pin"]'));
+await page.waitForFunction(() => !document.getElementById('ct-pins').hidden, null, { timeout: 10000 });
+const pinRow = await one("SELECT side FROM shop_chat_pins WHERE message_id=$1", [askId]);
+const shopPins = (await call('GET', `/api/shop/chat/conversations/${conv1.id}`, null, T)).body.conversation.pinned || [];
+ok(/کی می‌آیید؟/.test(await page.textContent('#ct-pins')) && pinRow && pinRow.side === 'customer' && !shopPins.some((x) => x.messageId === askId),
+  'سنجاق ⇒ نوارِ «سنجاق‌شده» با متنِ همین صفحه؛ روی سرور فقط برای مشتری، دکان نمی‌بیند', await page.textContent('#ct-pins'));
+await page.click(`#ct-pins [data-pin="${askId}"]`);
+ok(await page.evaluate((x) => document.activeElement && document.activeElement.dataset.id === x, askId), 'زدنِ سنجاق ⇒ رفتن به همان پیام');
+ok(Boolean(await actOf(askId, 'unpin')), 'پیامِ سنجاق‌شده: «برداشتنِ سنجاق»');
+await page.click(li(askId, '[data-act="unpin"]'));
+await page.waitForFunction(() => document.getElementById('ct-pins').hidden, null, { timeout: 10000 });
+ok(!(await one("SELECT 1 AS x FROM shop_chat_pins WHERE message_id=$1", [askId])), 'برداشتنِ سنجاق ⇒ نوار پنهان و ردیفِ سرور رفت');
+
+await page.click('#ct-find-btn');
+ok(await page.getAttribute('#ct-find-btn', 'aria-expanded') === 'true' && await page.evaluate(() => document.activeElement.id === 'ct-find-q'),
+  'جست‌وجو: دکمه با aria-expanded و تمرکز در کادرِ جست‌وجو');
+await page.fill('#ct-find-q', 'ه');
+await page.click('#ct-find-go');
+ok(/دست‌کم دو حرف/.test(await page.textContent('#ct-find-st')), 'یک حرف ⇒ «دست‌کم دو حرف»، بی درخواست');
+await page.fill('#ct-find-q', 'هفت');
+await page.click('#ct-find-go');
+await page.waitForSelector(`#ct-find-list [data-hit="${six.id}"]`, { timeout: 10000 });
+ok((await page.$$('#ct-find-list li')).length === 1 && /ساعتِ هفت/.test(await page.textContent('#ct-find-list')), 'جست‌وجو ⇒ همان پیام، فقط از همین شماره و همین دکان',
+  await page.textContent('#ct-find-list'));
+await page.click(`#ct-find-list [data-hit="${six.id}"]`);
+ok(await page.isHidden('#ct-find') && await page.evaluate((x) => document.activeElement && document.activeElement.dataset.id === x, six.id),
+  'زدنِ نتیجه ⇒ جست‌وجو بسته و تمرکز روی همان پیام');
+ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), 'عرضِ گوشی (۳۶۰): کارها و جست‌وجو بی پیمایشِ افقی');
+
 //  ── دکان تحویل می‌دهد ⇒ همان برگهٔ باز «بسته شد» (long-poll) ⇒ «مشکل دارم» ⇒ همان رشته باز ──
 //  CHAT-08 + #907: رشتهٔ بسته «حذف برای همه» ندارد — نوارِ بازِ پیامِ خودم همان دم (long-poll) آن را با دلیل برمی‌دارد
 await page.click(li(hour.id, '.ct-more'));
@@ -485,17 +672,29 @@ if (axeSrc) {
   await ap.click('#o-chat-open');
   await ap.waitForFunction(() => document.querySelectorAll('#ct-list .ct-msg').length > 0, null, { timeout: 15000 });
   await ap.waitForTimeout(400);
+  //  CHAT-14 و صف (CHAT-02): برچسبِ «پاسخ به …»، کادرِ جست‌وجو با نتیجه و حبابِ «در صف» با «دوباره»/«لغو» هم زیرِ همین سنجه
+  await ap.click('#ct-find-btn');
+  await ap.fill('#ct-find-q', 'گم‌شده');
+  await ap.click('#ct-find-go');
+  await ap.waitForSelector('#ct-find-list li', { timeout: 10000 });
+  await ac.setOffline(true);
+  await ap.fill('#ct-text', 'پیامِ axe');
+  await ap.click('#ct-send');
+  await ap.waitForSelector('#ct-out .ct-q [data-q="retry"]', { timeout: 10000 });
+  await ap.evaluate(() => [...document.querySelectorAll('#ct-list .ct-msg.shop .ct-more')].pop().click());
+  await ap.click('#ct-list .ct-acts [data-act="reply"]');
   //  نوارِ کارها و پرسشِ تأیید هم زیرِ همان سنجه (کنتراستِ دکمه‌ها درونِ حبابِ تیره)
   await ap.evaluate(() => [...document.querySelectorAll('#ct-list .ct-msg.mine .ct-more')].pop().click());
   await ap.waitForSelector('#ct-list .ct-acts [data-del]');
   if (await ap.$('#ct-list .ct-acts [data-del="all"]')) await ap.click('#ct-list .ct-acts [data-del="all"]');
   else await ap.click('#ct-list .ct-acts [data-del="me"]');
   await ap.waitForSelector('#ct-list .ct-acts [data-yes]');
+  ok(!(await ap.isHidden('#ct-chip')) && !(await ap.isHidden('#ct-find')), 'axe: برچسبِ پاسخ، جست‌وجو و حبابِ «در صف» همه پیدا');
   await ap.addScriptTag({ content: axeSrc });
   const v = await ap.evaluate(async () => (await window.axe.run(document.getElementById('chat-sheet'),
-    { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name'] })).violations
+    { runOnly: ['color-contrast', 'button-name', 'label', 'image-alt', 'link-name', 'aria-allowed-attr', 'nested-interactive', 'list', 'listitem'] })).violations
     .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
-  ok(v.length === 0, 'دسترس‌پذیری (axe-core): برگهٔ گفت‌وگو', v.join(' | '));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core): برگهٔ گفت‌وگو، کارهای CHAT-14 و صف', v.join(' | '));
   await ac.close();
 } else if (process.env.SKIP_BROWSER_TESTS === '1') {
   console.log('⏭  axe-core نیست و SKIP_BROWSER_TESTS=1 — سنجهٔ دسترس‌پذیری اجرا نشد');
@@ -833,7 +1032,8 @@ await flag('shop.chat', false);
 await page.goto('about:blank');   //  بارِ تازهٔ صفحه ⇒ هیچ اسکریپتِ پیشین نمی‌ماند
 await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o2.token)}`);
 await page.waitForFunction(() => document.querySelectorAll('#o-lines li').length > 0, null, { timeout: 15000 });
-ok(!(await shown('store-chat')) && await page.$('#o-chat') === null && await page.$('script[src="/store/chat.js"]') === null, 'پرچمِ خاموش ⇒ نه دکمه، نه کارت، نه اسکریپت');
+ok(!(await shown('store-chat')) && await page.$('#o-chat') === null && await page.$('script[src="/store/chat.js"]') === null &&
+  await page.$('script[src="/store/chat-out.js"]') === null && await page.$('script[src="/store/chat-acts.js"]') === null, 'پرچمِ خاموش ⇒ نه دکمه، نه کارت، نه اسکریپت');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));

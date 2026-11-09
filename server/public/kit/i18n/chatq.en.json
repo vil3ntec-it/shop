@@ -1,0 +1,12 @@
+{
+  "cq.list": "Messages not sent yet",
+  "cq.queued": "Queued",
+  "cq.sending": "Sending…",
+  "cq.wait": "Not delivered yet; it will go by itself when the internet is back.",
+  "cq.verify": "Waiting for you to confirm your number again",
+  "cq.failed": "Not sent",
+  "cq.retry": "Retry",
+  "cq.cancel": "Cancel",
+  "cq.full": "50 unsent messages are queued; cancel some before writing a new one.",
+  "cq.long": "The message is longer than 4000 characters; please shorten it."
+}
