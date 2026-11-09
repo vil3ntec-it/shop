@@ -1,13 +1,6 @@
-/*
- * ویترینِ یک دکان — کاتالوگ، برگهٔ کالا، نوار و برگهٔ تیرهٔ سبد (r3/r2)، پیگیری و خریدِ دوباره؛
- * ثبتِ سفارش با شمارهٔ تأییدشده در `checkout.js`؛ برگهٔ رسید، لغو و پرداختِ آنلاین در `order.js`
- * (WEB، CHK، §۲۳، §۳۱.۱، §۳۲.۳). داده فقط از `/api/store/<slug>`؛ متن از K.t.
- *
- * ⛔ قیمت را سرور می‌گوید؛ جمعِ دیده‌شده (`expectedTotalMinor`) فقط برای این است
- *    که اگر قیمت عوض شده، سفارش ثبت نشود و برگهٔ تازه روشن نشان داده شود (CHK-17).
- * ⛔ پرداختِ آنلاین فقط «پرداخت با حساب‌پی» ِ واقعیِ سرور (PAY-21، `order.js`) — هیچ دکمهٔ ساختگی.
- * ⛔ −/+ فقط در سبد؛ کارتِ کالا «یک زدن = یک واحد» با نشانِ تعداد (DESIGN v2).
- */
+/* ویترینِ یک دکان: کاتالوگ، برگهٔ کالا، سبد، پیگیری (WEB، CHK، §۲۳، §۳۱.۱، §۳۲.۳)؛ ثبت checkout.js، رسید order.js.
+ * ⛔ قیمت را سرور می‌گوید (expectedTotalMinor فقط CHK-17)؛ پرداختِ آنلاین فقط حساب‌پی ِ سرور (PAY-21)؛ −/+ فقط در سبد.
+ * قاعده‌ها: docs/RULES-fa.md «v3 · ویترین». */
 (function () {
   'use strict';
   var $ = K.$; var el = K.el; var t = K.t;
@@ -16,12 +9,12 @@
   var KEY_CART = K.cartKey(slug);
   var KEY_ORDERS = 'store-orders:' + slug;
   var store = null; var marketOn = false; var verifyAvailable = true;
-  var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹ ِ out_of_stock، فقط در حافظه
+  var stockList = false; var cap = {}; // E2E-MKT-02: سقفِ ۴۰۹، در حافظه
   var cart = sanitize(K.load(KEY_CART, {}));
   var catalog = { q: '', category: '', cursor: null, items: {} };
   var searchTimer = 0;
-  var share = null; // WEB-20: share.js، فقط وقتی سرور صفحهٔ کالا را می‌دهد (`seo.productBase`)
-  //  MKT-11: پیوندِ کمپین/QR (`/store/go/<کد>` ⇒ `?c=<کد>`) تا پایانِ همین نشست با ثبت می‌رود (`checkout.js`)
+  var share = null; // WEB-20: share.js
+  //  MKT-11: `?c=<کد>` ِ کمپین تا پایانِ نشست با ثبت می‌رود
   var campaign = campaignOfPage();
 
   function slugOfPage() {
@@ -46,8 +39,7 @@
     return out;
   }
   function api(path, opts) { return K.api(BASE + path, opts); }
-  //  WEB-16: کارت و سبد thumb؛ برگهٔ کالا photo
-  //  IMG-12: v = photoVersion (عکسِ تازه ⇒ نشانیِ تازه)
+  //  WEB-16: کارت thumb، برگه photo؛ IMG-12: v = photoVersion
   function photoUrl(id, big, v) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb') + (v ? '?v=' + encodeURIComponent(v) : ''); }
 
   var VIEWS = ['view-missing', 'view-catalog', 'view-checkout', 'view-order', 'view-orders'];
@@ -59,7 +51,7 @@
     $('to-market').hidden = inner || !marketOn;
     document.querySelector('.topbar').classList.toggle('inner', inner);
     K.nav(id === 'view-orders' ? 'orders' : (id === 'view-missing' ? '' : 'shop'));
-    //  اول حالتِ سبد (جای پیمایش را برمی‌گرداند)، بعد بالای صفحهٔ تازه
+    //  اول حالتِ سبد (جای پیمایش)، بعد بالای صفحه
     renderBar();
     if (inner) window.scrollTo(0, 0);
   }
@@ -75,11 +67,10 @@
     K.clear($('bar-avatar')).appendChild(K.avatar(store.title, store.accent, slug, 'sm'));
     K.clear($('nav-avatar')).appendChild(K.avatar(store.title, store.accent, slug, 'sm'));
     $('nav-title').textContent = store.title;
-    //  پیوندهای بازارچه فقط وقتی بازارچه باز است
     Array.prototype.forEach.call(document.querySelectorAll('.mk'), function (a) { a.hidden = !marketOn; });
     $('side-logo').href = marketOn ? '/market/' : '#/';
     if (store.contactPhone) { $('store-call').href = 'tel:' + store.contactPhone; $('store-call').hidden = false; }
-    //  گفت‌وگو با دکان (store/chat.js ِ دیربار، فقط با `features.chat`)
+    //  گفت‌وگو: chat.js ِ دیربار
     $('store-chat').hidden = !store.features.chat;
     $('store-chat').onclick = function () { K.js('/store/chat.js').then(function () { window.StoreChat({ api: api, slug: slug }).general(); }); };
 
@@ -89,7 +80,7 @@
       box.appendChild(K.pill(s));
       var hours = K.hours(s);
       if (hours) box.appendChild(el('span', {}, hours));
-      //  ۳۱.۱: آخرین اتصال فقط وقتی تأیید نیست (ممیزی ۶: زبانِ فنی نه)
+      //  ۳۱.۱: آخرین اتصال فقط وقتی تأیید نیست
       if (s.connection !== 'confirmed') box.appendChild(el('span', { text: s.lastConfirmedAt ? t('sh.seen', { t: K.clock(s.lastConfirmedAt, s.timezone) }) : t('sh.unseen') }));
       box.appendChild(el('span', { class: 'accept', text: accept(s) }));
       if (s.notice) box.appendChild(el('span', { class: 'notice', text: s.notice }));
@@ -142,7 +133,7 @@
     $(id).hidden = !list.length;
   }
 
-  // ── پیشنهادها (WEB-02)، اخیر (WEB-13)، دلخواه‌ها/فهرستِ خرید (WEB-11) و بنرها (WEB-24): store/catalog.js پس از بارِ نخست (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  // ── ردیف‌ها، اخیر، ♥ و بنرها: catalog.js ِ دیربار (WEB-15) ──
   var more = null;
   function loadMore(r) {
     return K.js('/store/catalog.js').then(function () {
@@ -153,7 +144,7 @@
         filter: function (qs) { catalog.extra = qs; loadProducts(false); }, // WEB-07: store/filters.js
       });
       return more.picks();
-    }).catch(function () { /* بی catalog.js (شبکه) همان کاتالوگ، بی این ردیف‌ها */ });
+    }).catch(function () { /* همان کاتالوگ */ });
   }
 
   function loadProducts(more) {
@@ -183,7 +174,7 @@
     }).then(function () { ul.setAttribute('aria-busy', 'false'); });
   }
 
-  // ── برگهٔ کالا؛ توضیح، مشخصات، مشابه و مکمل در store/product.js، با نخستین بازشدن (WEB-08، WEB-15) ──
+  // ── برگهٔ کالا؛ جزئیات در product.js ِ دیربار (WEB-08) ──
   var detail = null; var detailP = null;
   function loadProductView() {
     detailP = detailP || K.js('/store/product.js').then(function () { detail = window.StoreProduct({ rail: rail }); return detail; }, function (e) { detailP = null; throw e; });
@@ -191,7 +182,7 @@
   }
   function openProduct(id) {
     var p = catalog.items[id];
-    //  پاسخِ دیررس (کالای دیگر یا پس از بستن) برگه را باز نمی‌کند
+    //  پاسخِ دیررس برگه را باز نمی‌کند
     var here = function () { return location.hash === '#/p/' + encodeURIComponent(id); };
     var fill = function (x) {
       catalog.items[x.id] = x;
@@ -214,7 +205,7 @@
     };
     if (detail) detail(null);
     if (p) fill(p);
-    //  بی product.js (شبکه) برگه همان باز می‌شود، فقط بی جزئیات
+    //  بی product.js برگه بی جزئیات
     Promise.all([api('/products/' + encodeURIComponent(id)), loadProductView().catch(function () { return null; })]).then(function (r) {
       if (!here()) return;
       fill(r[0].product);
@@ -258,7 +249,7 @@
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
     if (milli <= 0) delete cart[id];
     else {
-      //  CHK-15/16: یادداشت و «اگر نبود» ِ قلم (line-prefs.js) با تغییرِ تعداد می‌مانند
+      //  CHK-15/16: یادداشت و «اگر نبود» می‌مانند
       cart[id] = Object.assign({}, line, {
         qtyMilli: milli, name: src.name, unit: src.unit || '', priceMinor: src.priceMinor,
         maxQtyMilli: src.maxQtyMilli || null, photo: Boolean(src.photo), photoVersion: src.photoVersion, unavailable: line ? line.unavailable === true : false,
@@ -270,8 +261,7 @@
   function ids() { return Object.keys(cart); }
   function subtotal() { return ids().reduce(function (s, id) { return s + K.lineTotal(cart[id].qtyMilli, cart[id].priceMinor); }, 0); }
   function defaultFulfillment() { return store && store.fulfillment.delivery ? 'delivery' : 'pickup'; }
-  // ── CHK-05/06/07/10 ناحیهٔ ارسال (`store.delivery.zoned`، پرچمِ `shop.storefront.zones`؛ خاموش ⇒ هزینه و حداقلِ ثابت).
-  //  ناحیه از پین (`/delivery`) یا گزینش؛ ندانسته ⇒ هزینه «پس از ناحیه» و سبد بسته نمی‌شود. حساب همان `forCheckout` ِ سرور.
+  // ── CHK-05/06/07/10 ناحیه (`store.delivery.zoned`)؛ ندانسته ⇒ «پس از ناحیه»؛ حساب همان `forCheckout` ِ سرور ──
   var zone = null;
   function zones() { return store && store.delivery && store.delivery.zoned ? store.delivery.zones : null; }
   function setZone(z) {
@@ -286,7 +276,7 @@
     if (f !== 'delivery' || !store) return 0;
     return zones() ? (zone ? zoneFee(zone, subtotal()) : 0) : store.deliveryFeeMinor;
   }
-  /** حداقلی که سبد را می‌بندد؛ ناحیهٔ «هزینهٔ سبدِ کوچک» زیرِ حداقل را با هزینه می‌پذیرد (CHK-06) */
+  /** حداقلی که سبد را می‌بندد؛ «سبدِ کوچک» با هزینه باز (CHK-06) */
   function minFor(f) {
     if (!store) return 0;
     if (f !== 'delivery' || !zones()) return store.minOrderMinor;
@@ -310,7 +300,7 @@
     return th;
   }
 
-  // ── گوشی: شکلِ r3 بسته / r2 باز (kit)؛ تبلت برگه، کامپیوتر کشو ──
+  // ── گوشی r3/r2، تبلت برگه، کامپیوتر کشو ──
   var editing = '';
   function applyMode() { K.cartMode(ids().length > 0 && !$('view-catalog').hidden); }
   function openCart() {
@@ -397,7 +387,7 @@
     if (!ids().length) { closeCart(); closeToCatalog(); }
   }
 
-  /** WEB-12/۳۲.۳: قیمت و «هنوز در ویترین» ِ سبد با سرور تازه می‌شود؛ بی‌صدا عوض نمی‌شود. */
+  /** WEB-12/۳۲.۳: قیمت و «هنوز هست» ِ سبد از سرور، نه بی‌صدا */
   function refreshCart() {
     var list = ids();
     if (!list.length) return Promise.resolve();
@@ -413,7 +403,7 @@
       saveCart();
       if (changed) K.toast(t('cart.repriced', { n: K.fa(changed, 0) }));
       else if (gone) K.toast(t('cart.gone', { n: K.fa(gone, 0) }));
-    }).catch(function () { /* سبد همان می‌ماند؛ هنگامِ ثبت سرور دوباره می‌سنجد */ });
+    }).catch(function () { /* ثبت دوباره می‌سنجد */ });
   }
 
   function closeToCatalog() {
@@ -422,11 +412,10 @@
     renderBar();
   }
 
-  // ── ثبتِ سفارش: store/checkout.js، فقط با بازشدنِ سبد یا صفحهٔ ثبت (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  // ── ثبت: checkout.js + order-kit.js ِ دیربار، با سبد یا صفحهٔ ثبت ──
   var checkout = null; var checkoutP = null;
   var ORDER_KIT = '/kit/order-kit.js';
   function loadCheckout() {
-    //  یاورهای ثبت (شماره، کلیدِ یکتایی، پرسشِ تأیید) در kit/order-kit.js ِ دیربار، هم‌زمان
     checkoutP = checkoutP || Promise.all([K.js('/store/checkout.js'), K.js(ORDER_KIT)]).then(function () { return K.part('checkout', $('view-checkout')); }).then(function () {
       checkout = window.StoreCheckout({
         api: api, slug: slug, orders: KEY_ORDERS, show: show, verifyAvailable: verifyAvailable,
@@ -436,7 +425,7 @@
         get store() { return store; }, get cart() { return cart; }, get cap() { return cap; }, get stockList() { return stockList; },
         empty: function () { cart = {}; cap = {}; saveCart(); },
         campaign: campaign, acct: account,
-        //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی ⇒ «ثبت» بسته با همان پیام
+        //  subscribers_only ⇒ «ثبت» بسته
         closed: closed, renderHead: renderHead,
       });
       return checkout;
@@ -444,15 +433,14 @@
     return checkoutP;
   }
   function openCheckout() {
-    //  بی اینترنت در نخستین باز شدن ⇒ برگشت به سبد با پیام؛ «بعدی» دوباره می‌کوشد
+    //  نیامد ⇒ برگشت به سبد با پیام
     loadCheckout().then(function (c) { if (location.hash === '#/checkout') c.open(); })
       .catch(function (e) { K.toast(e.message); if (location.hash === '#/checkout') location.replace('#/cart'); });
   }
 
-  // ── رسید و پیگیری: store/order.js، فقط با بازشدنِ صفحهٔ سفارش (بودجهٔ JS ِ بارِ اول، WEB-15) ──
+  // ── رسید و پیگیری: order.js + order-kit.js + واژه‌نامه، هم‌زمان و دیربار ──
   var orderView = null; var ov = null;
   function loadOrderView() {
-    //  واژه‌نامهٔ order.<زبان>.json و یاورهای پیگیری (kit/order-kit.js) هم‌زمان؛ واژه‌نامه نیامد ⇒ متنِ HTML
     orderView = orderView || Promise.all([K.js('/store/order.js'), K.js(ORDER_KIT), K.part('order', $('view-order'))]).then(function () { ov = window.StoreOrder({ api: api, slug: slug, store: store, reorder: reorder, cart: function () { return cart; }, emptyCart: function () { cart = {}; cap = {}; saveCart(); }, acct: account }); return ov; })
       .catch(function () { orderView = null; throw new Error(t('err.network')); });
     return orderView;
@@ -466,10 +454,10 @@
     $('o-msg').hidden = true;
     if (K.loadS('placed:' + token)) K.note($('o-placed'), 'ok', t('od.placed'));
     else $('o-placed').hidden = true;
-    //  نخستین بار order.js هم‌زمان با خودِ سفارش می‌آید، نه پس از آن؛ پیگیریِ زنده و برگهٔ خطا در order.js (`open`، `fail`)
+    //  order.js هم‌زمان با سفارش (`open`، `fail`)
     Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) { r[1].open(token, r[0].order); }).catch(function (e) {
       if (ov) { ov.fail(e); return; }
-      //  order.js نیامد ⇒ هنوز هیچ چیزِ سفارش در صفحه نیست (بخش‌ها پنهان‌اند تا order.js بنشاندشان)
+      //  order.js نیامد ⇒ فقط پیامِ خطا
       $('o-title').textContent = t('od.title');
       $('o-status').className = 'pill err';
       $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
@@ -477,7 +465,7 @@
     });
   }
 
-  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز؛ آن‌چه نیست گفته می‌شود. «فهرستِ خرید» (WEB-11) هم با `fail` ِ خودش. */
+  /** WEB-12: همان اقلام با قیمت و موجودیِ امروز (فهرستِ خرید هم، با `fail` ِ خودش) */
   function reorder(o, fail) {
     var want = {}; o.lines.forEach(function (l) { want[l.productId] = l.qtyMilli; });
     api('/products?ids=' + Object.keys(want).map(encodeURIComponent).join(',')).then(function (r) {
@@ -529,7 +517,7 @@
       $('my-orders-empty').hidden = list.length > 0;
     };
     draw(K.load(KEY_ORDERS, []) || []);
-    //  S138: با شمارهٔ تأییدشده، سفارش‌های همین شماره از هر دستگاه
+    //  S138: سفارش‌های همین شماره از هر دستگاه
     if (K.ticket() || K.sess()) api('/orders').then(function (r) { if (r.orders.length) draw(r.orders); }).catch(function () { /* همان محلی */ });
     account().then(function (a) { a.mine(); }, function () {});
     // CRM-13
@@ -564,7 +552,7 @@
     renderBar();
   }
 
-  /** صفحهٔ کالا (`/p/<id>` یا `/store/<slug>/p/<id>`، WEB-20) ⇒ همان مسیرِ `#/p/<id>` ِ همین پوسته. */
+  /** WEB-20: `/p/<id>` ⇒ `#/p/<id>` */
   function fromProductPath() {
     var m = /^(.*?)\/p\/([^/]+)\/?$/.exec(location.pathname);
     if (!m || (location.hash && location.hash !== '#/')) return;
@@ -592,7 +580,7 @@
       store.features = r.features || {};
       verifyAvailable = !r.verification || r.verification.available !== false;
       if (r.seo && typeof r.seo.productBase === 'string') {
-        //  برگهٔ کالا پیش از رسیدنِ share.js باز شد (پیوندِ `/p/<id>`) ⇒ دکمه همان‌جا پیدا می‌شود؛ نیامد ⇒ بی دکمه
+        //  برگهٔ باز پیش از share.js ⇒ دکمه همان‌جا
         K.js('/store/share.js').then(function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; }, function () { /* بی «فرستادن» */ });
       }
       renderHead();

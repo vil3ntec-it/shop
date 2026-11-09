@@ -55,6 +55,8 @@ const WEB_ACCOUNT_FLAG = 'shop.storefront.web_account';
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
+//  ⛔ هم‌گامیِ سبد و ♥ ِ حساب سطلِ خودش را دارد: ۲۰ ویرایشِ سبد دیگر ثبتِ سفارش را ۴۲۹ نمی‌کند
+const syncLimit = rateLimit({ max: config.rateLimit.storeSyncMax, keyPrefix: 'store-acct-sync' });
 const sendCodeLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-verify' });
 const codeLimit = rateLimit({ max: config.rateLimit.verifyMax, keyPrefix: 'store-verify-code' });
 //  ⛔ پیشگوی «درون/بیرون»: سقفِ روزانه به‌ازای (IP، ویترین) — نه سطلِ ربع‌ساعتهٔ خواندن
@@ -478,11 +480,11 @@ router.get('/:slug/account/favorites', readLimit, store, customer, favoritesOn, 
   res.json(await extras.favorites(req.store.shop_id, req.customer));
 });
 
-router.put('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+router.put('/:slug/account/favorites/:productId', syncLimit, store, customer, favoritesOn, async (req, res) => {
   res.json(await extras.addFavorite(req.store.shop_id, req.customer, req.params.productId));
 });
 
-router.delete('/:slug/account/favorites/:productId', checkoutLimit, store, customer, favoritesOn, async (req, res) => {
+router.delete('/:slug/account/favorites/:productId', syncLimit, store, customer, favoritesOn, async (req, res) => {
   res.json(await extras.removeFavorite(req.store.shop_id, req.customer, req.params.productId));
 });
 
@@ -508,12 +510,12 @@ router.get('/:slug/account/cart', cartStore, readLimit, customer, async (req, re
 });
 
 //  جایگزینیِ کامل با نسخهٔ دیده‌شده؛ فهرستِ خالی = خالی کردن (پس از ثبتِ سفارش هم)
-router.put('/:slug/account/cart', cartStore, checkoutLimit, customer, async (req, res) => {
+router.put('/:slug/account/cart', cartStore, syncLimit, customer, async (req, res) => {
   res.json({ cart: await cart.replace(req.store, req.customer, req.body) });
 });
 
 //  سبدِ مهمانِ همین مرورگر پس از ورود — تکرارش اثرِ دوم ندارد
-router.post('/:slug/account/cart/merge', cartStore, checkoutLimit, customer, async (req, res) => {
+router.post('/:slug/account/cart/merge', cartStore, syncLimit, customer, async (req, res) => {
   res.json({ cart: await cart.merge(req.store, req.customer, req.body) });
 });
 
