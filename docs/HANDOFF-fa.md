@@ -53,7 +53,7 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/safety-followups-kt` (بخشِ Kotlin ِ `docs/wip/safety-followups-kotlin.patch`؛ روی `ccr-3a0d593c-ac0jpj-batch-33`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/safety-followups-kt` (بخشِ Kotlin ِ `docs/wip/safety-followups-kotlin.patch`؛ روی main پس از #1017؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد (آزمون‌ها اول سرخ با تابع‌های خالی، بعد سبز): (الف) نگه‌داشته‌ها و سبدِ جاری در پشتیبانِ کامل (`device/held-invoices.json`)
   و بازیابی فقط پس از دفتر و حصارِ بازیابی، فقط دستگاهِ بی فاکتورِ باز، همان دکان، نه فروخته؛ **افزوده بر وصله:** راهِ خودکارِ
   پس از ورود فقط پشتیبانِ همین دستگاه (`HeldBackup.from`) تا پشتیبانِ ابریِ گوشیِ دیگر نگه‌داشته‌های بازِ آن را روی کامپیوترِ تازه
