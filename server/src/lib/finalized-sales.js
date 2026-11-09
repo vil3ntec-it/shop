@@ -74,6 +74,7 @@ const TEXT_MAX = 80;
 
 const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+const UNSAFE_KEY = new Set(['__proto__', 'constructor', 'prototype']);
 const isInc = (v) => isPlainObject(v) && Object.keys(v).length === 1 && typeof v.$inc === 'number';
 const isEmpty = (v) => v === undefined || v === null || v === '' || v === 0
   || (Array.isArray(v) && !v.length) || (isPlainObject(v) && !Object.keys(v).length);
@@ -114,7 +115,11 @@ const numText = (v) => (typeof v === 'number' && Number.isFinite(v) ? String(v) 
 function nextSale(cur, fields, full) {
   if (full || !cur) return { ...fields };
   const out = { ...cur };
-  for (const [k, v] of Object.entries(fields)) out[k] = after(cur[k], v);
+  for (const [k, v] of Object.entries(fields)) {
+    //  کلیدِ «__proto__» ِ JSON ِ دستگاه نمونهٔ out را عوض می‌کرد و فیلدِ ساختگی ارث می‌رسید (CodeQL ۲۹۰)
+    if (UNSAFE_KEY.has(k)) continue;
+    out[k] = after(cur[k], v);
+  }
   return out;
 }
 
@@ -459,5 +464,5 @@ const forbiddenError = () => conflict('فاکتورِ ثبت‌شده ویرای
 
 module.exports = {
   REASON, PROBLEM, VOID_PROBLEM, SALE_FIXED, SALE_ONCE, ITEM_FIXED, voidChainOf,
-  v1Guard, legacyGuard, adminRestoreCheck, forbiddenError,
+  v1Guard, legacyGuard, adminRestoreCheck, forbiddenError, nextSale,
 };

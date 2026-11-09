@@ -159,18 +159,42 @@ function readFile(path) {
   return fs.readFileSync(path);
 }
 
-/** خروجی بی رونویسی: `.tmp` ِ تازه، fsync، جابه‌جایی؛ پروندهٔ موجود ⇒ خطا */
-function writeNew(path, bytes) {
-  if (fs.existsSync(path)) throw new PhraseError('bad_input', `خروجی از پیش هست و رونویسی نمی‌شود: ${path}`);
-  const tmp = `${path}.tmp-${process.pid}`;
-  const fd = fs.openSync(tmp, 'wx', 0o600);
+const exists = (path) => new PhraseError('bad_input', `خروجی از پیش هست و رونویسی نمی‌شود: ${path}`);
+
+/** پروندهٔ تازه با 'wx' (ساختنِ انحصاری، اتمی) ⇐ نوشتن و fsync؛ شکست ⇒ پروندهٔ نیمه پاک می‌شود */
+function writeExclusive(path, bytes) {
+  const fd = fs.openSync(path, 'wx', 0o600);
   try {
     fs.writeSync(fd, bytes);
     fs.fsyncSync(fd);
-  } finally {
+  } catch (e) {
     fs.closeSync(fd);
+    fs.unlinkSync(path);
+    throw e;
   }
-  fs.renameSync(tmp, path);
+  fs.closeSync(fd);
+}
+
+/**
+ *  خروجی بی رونویسی و بی پنجرهٔ «بررسی سپس نوشتن» (CodeQL ۲۸۹): `.tmp` ِ تازه، fsync، پیوندِ سخت به نامِ نهایی
+ *  (پروندهٔ موجود ⇒ EEXIST ِ اتمی)، پاک کردنِ `.tmp`. دیسکِ بی پیوندِ سخت (FAT/exFAT ِ USB) ⇒ ساختنِ انحصاری مستقیم.
+ */
+function writeNew(path, bytes) {
+  const tmp = `${path}.tmp-${process.pid}`;
+  writeExclusive(tmp, bytes);
+  try {
+    fs.linkSync(tmp, path);
+  } catch (e) {
+    if (e.code === 'EEXIST') throw exists(path);
+    if (!['EPERM', 'ENOTSUP', 'EOPNOTSUPP', 'EXDEV', 'ENOSYS'].includes(e.code)) throw e;
+    try {
+      writeExclusive(path, bytes);
+    } catch (e2) {
+      throw e2.code === 'EEXIST' ? exists(path) : e2;
+    }
+  } finally {
+    fs.unlinkSync(tmp);
+  }
 }
 
 async function readPhrase() {
@@ -232,4 +256,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = { PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, main };
+module.exports = { PhraseError, normalize, kidOf, parseKid, deriveKey, isSealed, parse, seal, sealWith, open, zipComplete, writeNew, main };
