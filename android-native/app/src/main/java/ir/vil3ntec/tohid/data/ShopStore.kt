@@ -807,16 +807,9 @@ class ShopStore(
    *  فایلی که JSON درستی باشد ولی مالِ این برنامه نباشد، همه‌جا خالی
    *  می‌خواند و بی‌صدا دفتر را پاک می‌کند. برای همین یک بررسیِ ساده هست:
    *  فایلِ پشتیبانِ واقعی دستِ‌کم یکی از فهرست‌هایش پر است، یا صریحاً
-   *  مُهرِ `exportedAt` دارد.
+   *  مُهرِ `exportedAt` دارد. OPS-02: همین قاعده و پیامِ روشنِ فایلِ بریده/تازه‌تر در `BackupRestore.decode`.
    */
-  fun parseBackup(raw: String): Result<ShopData> = runCatching {
-    val tree = json.parseToJsonElement(raw) as? kotlinx.serialization.json.JsonObject
-      ?: error(StrSettings.invalidBackup)
-    val parsed = json.decodeFromJsonElement(ShopData.serializer(), tree)
-    val stamped = tree.containsKey("exportedAt")
-    if (!stamped && backupSize(parsed) == 0) error(StrAppData.notOurBackup)
-    parsed
-  }
+  fun parseBackup(raw: String): Result<ShopData> = runCatching { BackupRestore.decode(raw) }
 
   /**
    *  واردکردنِ داده‌ای که از نسخهٔ وب می‌آید.

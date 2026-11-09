@@ -137,8 +137,17 @@ object AutoBackup {
   fun take(context: Context, today: String): Result<File?> = runCatching {
     val ledger = File(context.filesDir, "shop-data.json")
     val time = java.text.SimpleDateFormat("HHmmss", java.util.Locale.US).format(java.util.Date())
-    val made = LocalSnapshots.takeIfChanged(ledger, dir(context), "${LocalSnapshots.PREFIX}$today-$time${LocalSnapshots.SUFFIX}") {
-      LedgerRecovery.readable(it, parseJson) { f -> AtRest.readText(context, f) }
+    val name = "${LocalSnapshots.PREFIX}$today-$time${LocalSnapshots.SUFFIX}"
+    //  OPS-02: «رمزِ نسخه‌های خودکار» (`SnapshotSeal`، پیش‌فرض خاموش) — خاموش/بی‌کلید ⇒ همان رونوشتِ پیشین
+    val sealed = SnapshotSeal.take(context, ledger, dir(context), name) {
+      LedgerRecovery.decode(String(it, Charsets.UTF_8), parseJson) is LedgerRecovery.Read.Ok
+    }
+    val made = when (sealed) {
+      is SnapshotSeal.Took.Made -> sealed.file
+      SnapshotSeal.Took.Unchanged -> null
+      SnapshotSeal.Took.NotSealed -> LocalSnapshots.takeIfChanged(ledger, dir(context), name) {
+        LedgerRecovery.readable(it, parseJson) { f -> AtRest.readText(context, f) }
+      }
     }
     prune(context)
     made

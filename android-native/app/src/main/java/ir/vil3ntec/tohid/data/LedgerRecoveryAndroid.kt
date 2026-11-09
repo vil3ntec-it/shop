@@ -121,7 +121,8 @@ object LedgerRecovery {
   /** تازه‌ترین نسخهٔ سالمِ کنارِ [ledger] (`.tmp`، `.prev` و — اگر [snapshots] — نسخه‌های خودکار) */
   fun near(context: Context, ledger: File, json: Json, snapshots: Boolean): Found? {
     val snaps = if (!snapshots) emptyList() else runCatching { AutoBackup.list(context).map { it.file } }.getOrDefault(emptyList())
-    return best(candidates(ledger, snaps), json) { AtRest.readText(context, it) }
+    //  OPS-02: نسخهٔ رمزدار با عبارت با کلیدِ همین دستگاه (`SnapshotSeal`)؛ بقیه همان `AtRest`
+    return best(candidates(ledger, snaps), json) { SnapshotSeal.readText(context, it) }
   }
 
   /**
