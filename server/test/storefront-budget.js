@@ -16,6 +16,6 @@
  *   پس از مرجِ دسته به ۷۱KB پایین بیاید.
  */
 const SPEC = 75 * 1024;
-const FIRST_LOAD = 72 * 1024;
+const FIRST_LOAD = 71 * 1024;
 
 module.exports = { SPEC, FIRST_LOAD };
