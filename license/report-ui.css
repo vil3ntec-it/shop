@@ -65,3 +65,32 @@ p .rf-pill,.rf-note .rf-pill{cursor:default;}
 .rf-alerts{border:1px solid var(--danger); border-radius:10px; padding:8px 12px; margin:0 0 12px;}
 .rf-alerts-title{font-weight:600; color:var(--danger); margin:0 0 4px;}
 .rf-alerts ul{margin:0 0 6px; padding-inline-start:18px;}
+/* RPT-13: برچسبِ کلید کنارِ نامِ دکمه، نوارِ دوره، نامِ ردیفِ ریزشدنی و کادرِ ریز */
+.rf-kbd{display:inline-block; margin-inline-start:6px; padding:0 5px; border:1px solid var(--border); border-radius:5px;
+  font:inherit; font-size:11px; line-height:16px; color:var(--text); background:var(--bg); direction:ltr; unicode-bidi:isolate;}
+.rf-period .rf-range{font-size:12.5px; color:var(--text); font-weight:600; padding:0 4px;}
+.rf-period .btn:disabled{opacity:.55; cursor:default;}
+.rf-drill-btn{border:0; background:none; padding:0; font:inherit; color:var(--primary); text-decoration:underline; cursor:pointer; text-align:start;}
+.rf-drill-btn:focus-visible,.rf-period .btn:focus-visible,#rf-drill-h:focus-visible{outline:2px solid var(--primary); outline-offset:2px;}
+.rf-drill{border:1px solid var(--primary); border-radius:12px; padding:10px 12px; margin:0 0 14px; background:var(--surface-solid);}
+.rf-drill .rf-title{margin:0;}
+.rf-compare span[dir="ltr"]{unicode-bidi:isolate;}
+/* RPT-08: نقشهٔ ساعت × روز — عدد در هر خانه (رنگ فقط کمک)؛ پله‌ها با کنتراستِ متن ≥ ۴٫۵ در روشن و تیره */
+.rf-table.rf-heat th,.rf-table.rf-heat td{padding:5px 4px; min-width:28px; text-align:center; font-size:12.5px;}
+.rf-table.rf-heat tbody th,.rf-table.rf-heat tfoot th{position:sticky; inset-inline-start:0; z-index:1; background:var(--bg); text-align:start; font-weight:600;}
+.rf-table.rf-heat tbody th{top:auto;}
+.rf-table.rf-heat tfoot th{bottom:0; top:auto;}
+.rf-table.rf-heat thead th:first-child{inset-inline-start:0; z-index:2;}
+.rf-table.rf-heat tbody tr td{background:var(--surface-solid);}
+.rf-table.rf-heat tbody td.rf-h0{color:var(--muted);}
+.rf-table.rf-heat tbody td.rf-h1,.rf-sw.rf-h1{background:#e1edec;}
+.rf-table.rf-heat tbody td.rf-h2,.rf-sw.rf-h2{background:#c1d9d7;}
+.rf-table.rf-heat tbody td.rf-h3,.rf-sw.rf-h3{background:#9cc2bf;}
+.rf-table.rf-heat tbody td.rf-h4,.rf-sw.rf-h4{background:#6ba39f; font-weight:700;}
+html[data-theme="dark"] .rf-table.rf-heat tbody td.rf-h1,html[data-theme="dark"] .rf-sw.rf-h1{background:#16323f;}
+html[data-theme="dark"] .rf-table.rf-heat tbody td.rf-h2,html[data-theme="dark"] .rf-sw.rf-h2{background:#174449;}
+html[data-theme="dark"] .rf-table.rf-heat tbody td.rf-h3,html[data-theme="dark"] .rf-sw.rf-h3{background:#175855;}
+html[data-theme="dark"] .rf-table.rf-heat tbody td.rf-h4,html[data-theme="dark"] .rf-sw.rf-h4{background:#177365;}
+.rf-table.rf-heat tbody td[class*="rf-h"]:not(.rf-h0){color:var(--text);}
+.rf-legend{gap:4px;}
+.rf-sw{display:inline-block; width:18px; height:12px; border-radius:3px; border:1px solid var(--border);}

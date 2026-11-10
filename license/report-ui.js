@@ -15,6 +15,12 @@
    با `costApproved`؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر (`tohid-report-cost`) و همیشه «تقریبی».
    RPT-11: «اکسل» = ‎.xlsx‎ ِ واقعی (`TohidOwnerExport.report`، عدد عدد می‌ماند) و «PDF» = فایلِ مستقیم (`report-pdf.js`،
    دیربار با نخستین بار) — هر دو از همان برگهٔ CSV و چاپ.
+   RPT-13 (§۵.۲): کلید فقط از `keymap.js` ِ ساخته‌شده از keymap.json — Ctrl+P چاپ، Ctrl+E اکسل، − / + دورهٔ قبل/بعد
+   (`report-period-core.js` = دوقلوی `ReportPeriod`؛ بازه‌های وب: امروز/۷ روز ⇒ روز، این ماه ⇒ ماهِ میلادی، «همه» نه)، Alt+C
+   «مقایسه با دورهٔ پیش» (Ctrl+Shift+C ِ کامپیوتر در مرورگر بازرسیِ عنصر است) و Enter روی ردیف ⇒ ریزِ فاکتورها
+   (`invoicesOf`/`dayInvoices` ِ report-core، جمع = همان ردیف)؛ Esc ریز را می‌بندد. کادرِ نوشتن و پنجرهٔ باز کلید نمی‌گیرند.
+   RPT-08: زبانهٔ «ساعت و روز» (`sales-heatmap-core.js` = دوقلوی `SalesHeatmap`) — جدولِ ۷ × ۲۴ با عددِ هر خانه (رنگ فقط کمک)،
+   با ساعتِ همین دستگاه و روزِ کاری از نیمه‌شب (وب تنظیمِ پایانِ روز و آغازِ هفتهٔ دکان را ندارد ⇒ شنبه).
    ========================================================== */
 (function () {
   'use strict';
@@ -22,12 +28,31 @@
   var VM_KEY = 'view_mode:local:report-fresh';
   var COST_KEY = 'tohid-report-cost';
   var PDF_SRC = 'license/report-pdf.js?v=1';
-  var state = { tab: 'today', span: 'month', dim: 'product', sort: null };
+  var state = { tab: 'today', span: 'month', dim: 'product', sort: null, shift: 0, compare: false, drill: null };
 
   function core() { return window.TohidReportCore; }
   function board() { return window.TohidReportBoard; }
   /** INV-16: هستهٔ «ارزش موجودی» (`stock-value-core.js`، دوقلوی `StockAnalysis.valuation`)؛ نبودش ⇒ بی آن زبانه */
   function value() { return window.TohidStockValue; }
+  /** RPT-13: «دورهٔ قبل / بعد» و «تغییر» (`report-period-core.js`)؛ نبودش ⇒ بی دکمه و بی کلیدِ دوره */
+  function period() { return window.TohidReportPeriod; }
+  /** RPT-08: نقشهٔ حرارتی (`sales-heatmap-core.js`)؛ نبودش ⇒ بی زبانهٔ «ساعت و روز» */
+  function heat() { return window.TohidSalesHeatmap; }
+  /** RPT-13: میان‌برها فقط از `keymap.js` (تنها منبع: keymap.json)؛ نبودش ⇒ بی کلید، دکمه‌ها همان */
+  function keymap() { return window.TohidKeymap; }
+  var MAC = /Mac|iP(hone|ad|od)/.test((window.navigator && window.navigator.platform) || '');
+  function hint(id) { var K = keymap(); return K ? K.label(id, MAC) : ''; }
+  /** برچسبِ کلید کنارِ نامِ دکمه (صفحه‌خوان نامِ دکمه را می‌خواند و کلید را از `aria-keyshortcuts`) */
+  function kbd(id) {
+    var h = hint(id);
+    return h ? ' <kbd class="rf-kbd" aria-hidden="true">' + esc(h) + '</kbd>' : '';
+  }
+  /** دکمه با نام و برچسبِ کلیدِ `id` */
+  function keyBtn(attrs, label, id) { return '<button type="button" ' + attrs + ariaKeys(id) + '>' + esc(label) + kbd(id) + '</button>'; }
+  function ariaKeys(id) {
+    var h = hint(id).replace(/\bCtrl\b/g, 'Control').replace(/\bCmd\b/g, 'Meta').replace(/\bOption\b/g, 'Alt').replace(/^\+$/, 'Plus').replace('\u2212', '-');
+    return h ? ' aria-keyshortcuts="' + esc(h) + '"' : '';
+  }
   function env() { return typeof window.tohidReportEnv === 'function' ? window.tohidReportEnv() : null; }
   function get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function put(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* حالتِ خصوصی: فقط همین بار */ } }
@@ -93,11 +118,30 @@
 
   /** INV-16 — مثلِ «بهای میانگین» ِ برنامه (`StockCostFresh.tabs`) بیرون از تابلوی مشترک و فقط برای کسی که پول را می‌بیند */
   var STOCK_TAB = { id: 'stock-value', label: 'ارزش موجودی', ranged: false };
+  /** RPT-08 — مثلِ `HeatmapModel.tabs` ِ برنامه: فقط برای کسی که پول را می‌بیند */
+  var HEAT_TAB = { id: 'heatmap', label: 'ساعت و روز', ranged: true };
   function tabsFor(E) {
     var B = board();
     if (!E.money) return B.TABS.filter(function (t) { return t.id === 'debts'; });
-    return value() ? B.TABS.concat([STOCK_TAB]) : B.TABS;
+    return B.TABS.concat(heat() ? [HEAT_TAB] : [], value() ? [STOCK_TAB] : []);
   }
+
+  /* ---------------- RPT-13: دوره ---------------- */
+
+  /** بازهٔ وب ⇒ واحدِ جابه‌جایی (همان `ReportKeys.unitOf` ِ کامپیوتر)؛ «همه» جابه‌جا نمی‌شود */
+  var UNITS = { today: 'days', week: 'days', month: 'gmonth' };
+  function unit() { return period() ? UNITS[state.span] : undefined; }
+  /** بازهٔ مؤثر: `shift` دوره از بازهٔ پایه؛ نشد ⇒ همان پایه (`ReportKeys.range`) */
+  function rangeOf(E) {
+    var b = board().range(state.span, E.today), u = unit();
+    return (state.shift && u && period().shift(u, b.from, b.to, state.shift, E.today)) || b;
+  }
+  /** `shift + by` ممکن است؟ نه دورهٔ آینده، نه «همه» (`ReportKeys.can`) */
+  function can(E, by) {
+    var b = board().range(state.span, E.today), u = unit(), to = state.shift + by;
+    return !!u && to <= 0 && period().shift(u, b.from, b.to, to, E.today) !== null;
+  }
+  function comparable() { return (state.tab === 'sales' || state.tab === 'profit') && !!unit(); }
 
   /* ---------------- خانه ---------------- */
 
@@ -125,6 +169,7 @@
     var E = env();
     state.tab = el.getAttribute('data-tab') || 'today';
     state.span = el.getAttribute('data-span') || 'today';
+    state.shift = 0; state.drill = null;
     if (el.getAttribute('data-dim')) state.dim = el.getAttribute('data-dim');
     state.sort = null;
     if (E && E.goTo) E.goTo('reports');
@@ -153,20 +198,28 @@
   /** جدول‌های یک زبانه — همان `ReportFreshModel.view`ِ Kotlin */
   function compute(E) {
     var C = core(), B = board(), L = C.ledger(E.ledger), ck = clock(), co = cost();
-    var r = B.range(state.span, E.today), dim = B.DIMS.indexOf(state.dim) >= 0 ? state.dim : 'product';
+    var r = rangeOf(E), dim = B.DIMS.indexOf(state.dim) >= 0 ? state.dim : 'product';
     var tab = state.tab;
     if (tab === 'today') {
-      return { tables: C.tables('today', C.today(L, { date: E.today, clock: ck, costing: co.costing, costApproved: co.costApproved })) };
+      var td = C.tables('today', C.today(L, { date: E.today, clock: ck, costing: co.costing, costApproved: co.costApproved }));
+      td[0].drillRows = td[0].rows.length;
+      return { tables: td };
     }
     if (tab === 'sales' || tab === 'profit') {
-      var s = C.sales(L, { from: r.from, to: r.to, clock: ck, costing: co.costing, costApproved: co.costApproved });
-      var t = C.tables('sales', s).filter(function (x) { return x.id === 'sales.' + dim; })[0];
-      if (tab === 'sales') return { tables: [t], sales: s };
-      var keys = ['name', 'netSales', 'cogs', 'grossProfit', 'marginBp'];
-      var idx = keys.map(function (k) { return t.columns.map(function (c) { return c.key; }).indexOf(k); }).filter(function (i) { return i >= 0; });
-      var pick = function (row) { return idx.map(function (i) { return row[i]; }); };
-      return { sales: s, tables: [{ id: 'profit', title: costLabel('سود و حاشیه به تفکیک ' + B.DIM_LABELS[dim], s.costing),
-        columns: idx.map(function (i) { return t.columns[i]; }), rows: t.rows.map(pick), total: t.total ? pick(t.total) : null }] };
+      var opts = function (x) { return { from: x.from, to: x.to, clock: ck, costing: co.costing, costApproved: co.costApproved }; };
+      var s = C.sales(L, opts(r)), t = salesView(s, dim, tab), v = { sales: s, dim: dim, tables: [t] };
+      t.drillRows = t.rows.length;
+      //  RPT-13 «مقایسه»: همان گزارش در یک دوره پیش از بازهٔ مؤثر (`ReportPeriod.shift(…, −1)`)
+      var prev = state.compare && comparable() ? period().shift(unit(), r.from, r.to, -1, E.today) : null;
+      if (prev) {
+        v.prev = C.sales(L, opts(prev));
+        v.tables = [compared(t, s[dim], salesView(v.prev, dim, tab), v.prev[dim], tab === 'sales' ? 'netSales' : 'grossProfit')];
+      }
+      return v;
+    }
+    if (tab === HEAT_TAB.id) {
+      var H = heat(), h = H.build(H.events(L, r.from, r.to), ck.offsetMinutes, ck.dayStartMinute, 6);
+      return { heat: h, range: r, tables: H.tables(h) };
     }
     if (tab === 'debts') {
       var d = C.debts(L, { asOf: E.today, clock: ck });
@@ -175,6 +228,38 @@
     if (tab === STOCK_TAB.id) return stockValueView(value().fromLedger(E.ledger, C));
     var f = C.fraud(L, { from: r.from, to: r.to, clock: ck });
     return { tables: C.tables('fraud', f), fraud: f };
+  }
+
+  /** جدولِ تفکیکِ «فروش» یا «سود و حاشیه» از گزارشِ هسته — همان `ReportFreshModel.view` */
+  function salesView(s, dim, tab) {
+    var B = board(), t = core().tables('sales', s).filter(function (x) { return x.id === 'sales.' + dim; })[0];
+    if (tab === 'sales') return t;
+    var keys = ['name', 'netSales', 'cogs', 'grossProfit', 'marginBp'];
+    var idx = keys.map(function (k) { return t.columns.map(function (c) { return c.key; }).indexOf(k); }).filter(function (i) { return i >= 0; });
+    var pick = function (row) { return idx.map(function (i) { return row[i]; }); };
+    return { id: 'profit', title: costLabel('سود و حاشیه به تفکیک ' + B.DIM_LABELS[dim], s.costing),
+      columns: idx.map(function (i) { return t.columns[i]; }), rows: t.rows.map(pick), total: t.total ? pick(t.total) : null };
+  }
+
+  /**
+   *  RPT-13 «مقایسه» در خودِ جدول (همان قاعدهٔ `ReportCompare.column` ِ برنامه): «دورهٔ قبل» و «تغییر» (این − قبل) ِ ستونِ `col`،
+   *  ردیف‌به‌ردیف با کلیدِ ردیفِ هسته (نه نوشتهٔ خانه)؛ ردیفِ فقط-دورهٔ-قبل در انتها با خانه‌های خالیِ این دوره.
+   */
+  function compared(t, cur, p, past, col) {
+    var i = t.columns.map(function (c) { return c.key; }).indexOf(col), before = {}, seen = {};
+    if (i < 0) return t;
+    past.forEach(function (x, j) { before[x.key] = p.rows[j][i]; });
+    var pair = function (c, q) { return [q, c === null && q === null ? null : (c || 0) - (q || 0)]; };
+    var rows = t.rows.map(function (row, j) {
+      seen[cur[j].key] = true;
+      return row.concat(pair(row[i], Object.prototype.hasOwnProperty.call(before, cur[j].key) ? before[cur[j].key] : null));
+    });
+    past.forEach(function (x, j) {
+      if (!seen[x.key]) rows.push(t.columns.map(function (c, n) { return n === 0 ? p.rows[j][0] : null; }).concat(pair(null, p.rows[j][i])));
+    });
+    return { id: t.id, title: t.title, rows: rows, drillRows: t.rows.length,
+      columns: t.columns.concat([{ key: 'prev', label: 'دورهٔ قبل', kind: 'money' }, { key: 'change', label: 'تغییر', kind: 'money' }]),
+      total: t.total ? t.total.concat(pair(t.total[i], p.total ? p.total[i] : null)) : null };
   }
 
   /**
@@ -219,6 +304,7 @@
     if (id.indexOf('debts.') === 0) return ['balance', 'credit', 'oldestDays'];
     if (id === 'fraud') return ['discount', 'returnCount', 'voidCount', 'lineDeleteCount', 'noSaleCount'];
     if (id === STOCK_TAB.id) return ['qty', 'costValue', 'retailValue', 'profit'];
+    if (id === 'heatmap.hours' || id === 'heatmap.days') return ['count', 'net'];
     return [];
   }
 
@@ -247,7 +333,8 @@
     if (v.sales && state.tab === 'sales') {
       var t = v.sales.totals, p = periodOf(v.sales.from, v.sales.to, E);
       return '<div class="rf-stats">' + stat('فروش خالص', af(t.netSales), p) + stat('فاکتور', String(t.invoices), p) +
-        stat('تخفیف', af(t.discount), p) + stat('برگشتی', af(t.returns), p) + stat('میانگین فاکتور', af(t.avgTicket), p) + '</div>';
+        stat('تخفیف', af(t.discount), p) + stat('برگشتی', af(t.returns), p) + stat('میانگین فاکتور', af(t.avgTicket), p) + '</div>' +
+        compareLine(v, E);
     }
     if (v.sales) {
       //  RPT-03: روشِ بها همان که هسته با آن حساب کرد (`costing`)، نه حدسِ صفحه — همان کارت‌های `ReportFresh` ِ برنامه
@@ -260,8 +347,10 @@
           ? '<span class="rf-pill rf-warning" role="status"><span class="dot" aria-hidden="true"></span>سود تقریبی</span> '
           : '<span class="rf-pill rf-success" role="status"><span class="dot" aria-hidden="true"></span>سود قطعی</span> ') +
         explainHtml(m) +
-        (u.costEstimatedLines > 0 ? ' <span>' + esc(u.costEstimatedLines + ' قلم بی بهای خرید است.') + '</span>' : '') + '</p>';
+        (u.costEstimatedLines > 0 ? ' <span>' + esc(u.costEstimatedLines + ' قلم بی بهای خرید است.') + '</span>' : '') + '</p>' +
+        compareLine(v, E);
     }
+    if (v.heat) return heatSummary(v.heat, E);
     if (v.debts) {
       var c = v.debts.customers, edge = v.debts.buckets[v.debts.buckets.length - 1];
       var late = c.rows.filter(function (x) { return x.buckets[x.buckets.length - 1] > 0; }).length;
@@ -282,6 +371,87 @@
         alertsHtml(v.fraud, E);
     }
     return '';
+  }
+
+  /** RPT-13 — خطِ «نسبت به دورهٔ قبل» (همان `ReportCompareLine` ِ کامپیوتر): فروشِ خالص، فاکتورها و سودِ ناخالص با `change` */
+  function compareLine(v, E) {
+    if (!state.compare || !comparable()) return '';
+    if (!v.prev) return '<p class="rf-note rf-compare">' + esc('دورهٔ قبلی برای مقایسه نیست.') + '</p>';
+    var a = v.sales.totals, b = v.prev.totals;
+    var part = function (label, cur, prev, money) {
+      var c = period().change(cur, prev), sign = c.diff > 0 ? '+' : '';
+      var amount = money ? sign + E.formatMoney(c.diff / 100) + ' ؋' : sign + c.diff / 100;
+      return '<span>' + esc(label) + '</span> <span dir="ltr">' + esc(amount) + '</span> (' +
+        (c.bp === null ? '<span>' + esc('بی پایه') + '</span>' : '<span dir="ltr">' + esc((c.bp > 0 ? '+' : '') + percent(c.bp)) + '</span>') + ')';
+    };
+    return '<p class="rf-note rf-compare"><span>' + esc('نسبت به ' + E.formatDate(v.prev.from) + ' تا ' + E.formatDate(v.prev.to) + ':') + '</span> ' +
+      [part('فروشِ خالص', a.netSales, b.netSales, true), part('فاکتورها', a.invoices * 100, b.invoices * 100, false),
+        part('سودِ ناخالص', a.grossProfit, b.grossProfit, true)].join(' · ') + '</p>';
+  }
+
+  /** RPT-08 — کارت‌های «ساعت و روز» (همان `HeatmapSummary`): پرفروش‌ترین خانه، شمارِ فروش، خالصِ مبلغ */
+  function heatSummary(h, E) {
+    var H = heat(), pk = h.peak;
+    var peak = pk ? '<span>' + esc(H.dayName(h.weekdays[pk[0]])) + '</span> ' + esc(H.hourLabel(pk[1])) : '—';
+    return '<div class="rf-stats"><div class="rf-stat"><span class="t">' + esc('پرفروش‌ترین ساعت') + '</span><span class="v">' + peak +
+      '</span><span class="p">' + esc(pk ? h.maxCount + ' فروش' : 'بی فروش') + '</span></div>' +
+      stat('شمارِ فروش', String(h.total.count), 'در این بازه') + stat('خالصِ مبلغ', E.formatMoney(h.total.totalMinor / 100) + ' ؋', 'فروش − برگشت') + '</div>' +
+      '<p class="rf-note">' + esc('عددِ هر خانه شمارِ فروشِ همان روز و ساعت است و رنگش فقط شدتِ آن؛ برگشتی در مبلغِ ساعتِ خودش کم می‌شود و شمرده نمی‌شود. ساعت با ساعتِ همین دستگاه است و روزِ کاری از نیمه‌شب.') + '</p>';
+  }
+
+  /** نقشه: جدولِ واقعیِ ۷ × ۲۴ — سرخطِ ستون (ساعت) و ردیف (روز) برای صفحه‌خوان، عدد در هر خانه، رنگ با `level` ِ هسته */
+  function gridHtml(t, h) {
+    var H = heat(), cells = function (row, r) {
+      return row.slice(1).map(function (v, i) {
+        var lv = r >= 0 && i < H.HOURS ? H.level(h, r, i, 4) : 0;
+        return '<td class="n rf-h' + lv + '">' + esc(String(v)) + '</td>';
+      }).join('');
+    };
+    var legend = '<p class="rf-note rf-legend" aria-hidden="true"><span>' + esc('کم') + '</span>' +
+      [1, 2, 3, 4].map(function (l) { return '<span class="rf-sw rf-h' + l + '"></span>'; }).join('') + '<span>' + esc('زیاد') + '</span></p>';
+    return '<div class="rf-table-wrap" tabindex="0" role="region" aria-label="' + esc(t.title) + '"><table class="rf-table rf-heat" data-table-id="' + esc(t.id) + '">' +
+      '<caption class="rf-sr">' + esc(t.title) + '</caption><thead><tr>' +
+      t.columns.map(function (c, i) {
+        //  ساعت: «08» دیده می‌شود و «08:00» خوانده (۲۴ ستون در پهنای کامپیوتر جا شوند)
+        var lab = i > 0 && i <= H.HOURS ? '<span aria-hidden="true">' + esc(c.label.slice(0, 2)) + '</span><span class="rf-sr">' + esc(c.label) + '</span>' : esc(c.label);
+        return '<th scope="col" class="' + (i ? 'n' : '') + '">' + lab + '</th>';
+      }).join('') + '</tr></thead><tbody>' +
+      t.rows.map(function (row, r) { return '<tr><th scope="row">' + esc(row[0]) + '</th>' + cells(row, r) + '</tr>'; }).join('') +
+      '</tbody><tfoot><tr><th scope="row">' + esc(t.total[0]) + '</th>' + cells(t.total, -1) + '</tr></tfoot></table></div>' + legend;
+  }
+
+  /**
+   *  RPT-13 — ریزِ ردیفِ `state.drill` (همان `ReportFreshModel.drill`/`dayDrill`): فاکتورهای همان ردیف، جمعِ «فروش» = همان ردیف.
+   *  نامِ فاکتور همان `invoiceLabel` ِ صفحه (سری و شماره)؛ نبودش ⇒ «—».
+   */
+  function drillView(v, E) {
+    var d = state.drill, C = core(), t = d && v.tables.filter(function (x) { return x.id === d.table; })[0];
+    if (!t || !(d.index < t.drillRows)) return null;
+    var row = t.rows[d.index], ck = clock(), L = C.ledger(E.ledger), raw = {}, day = t.id === 'today';
+    (E.ledger.sales || []).forEach(function (x) { raw[x.id] = x; });
+    var doc = function (id) { var f = window.invoiceLabel; return (raw[id] && typeof f === 'function' && f(raw[id])) || '—'; };
+    var list = day ? C.dayInvoices(L, { date: row[1], clock: ck })
+      : C.invoicesOf(L, { from: v.sales.from, to: v.sales.to, dim: v.dim, key: v.sales[v.dim][d.index].key, clock: ck });
+    var qty = 0, sum = 0;
+    list.forEach(function (x) { qty += x.qty; sum += x.sales; });
+    var cols = [{ key: 'doc', label: 'فاکتور', kind: 'text' }, { key: 'qty', label: 'مقدار', kind: 'qty' }, { key: 'sales', label: 'فروش', kind: 'money' }];
+    var label = fmt(row[0], t.columns[0].kind, E) || '—';
+    return {
+      note: day ? 'جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ همین روز است؛ برگشتی جداست.' : 'جمعِ «فروش» ِ این فاکتورها همان ستونِ «فروش» ِ ردیف است؛ برگشتی جداست.',
+      table: {
+        id: day ? 'today.drill' : 'sales.drill', title: 'ریزِ «' + label + '» — ' + list.length + ' فاکتور',
+        columns: day ? cols : [{ key: 'date', label: 'روز', kind: 'date' }].concat(cols),
+        rows: list.map(function (x) { return (day ? [] : [x.date]).concat([doc(x.saleId), x.qty, x.sales]); }),
+        total: (day ? ['جمع'] : ['جمع', '']).concat([qty, sum]),
+      },
+    };
+  }
+
+  function drillHtml(v, E) {
+    var dv = drillView(v, E);
+    if (!dv) return '';
+    return '<section class="rf-drill" aria-labelledby="rf-drill-h"><div class="rf-bar"><h3 class="rf-title" id="rf-drill-h" tabindex="-1">' + esc(dv.table.title) +
+      '</h3><span class="sp"></span>' + keyBtn('class="btn btn-secondary btn-sm" data-act="drill-close"', 'بستن', 'global.back') + '</div><p class="rf-note">' + esc(dv.note) + '</p>' + tableHtml(dv.table, E) + '</section>';
   }
 
   /**
@@ -308,8 +478,17 @@
       return '<th scope="col" aria-sort="' + sort + '" class="' + (num(c.kind) ? 'n' : '') + '"><button type="button" data-sort="' + i +
         '" data-table="' + esc(t.id) + '">' + esc(c.label) + (sort === 'none' ? '' : (sort === 'descending' ? ' ▼' : ' ▲')) + '</button></th>';
     }).join('');
+    //  RPT-13: ردیفِ ریزشدنی (`drillRows`) نامش دکمه است — Tab تا آن و Enter (یا کلیک) ⇒ ریزِ فاکتورهای همان ردیف
     var body = rows.length ? rows.map(function (r) {
-      return '<tr>' + r.map(function (v, i) { return '<td class="' + (num(t.columns[i].kind) ? 'n' : '') + '">' + esc(fmt(v, t.columns[i].kind, E)) + '</td>'; }).join('') + '</tr>';
+      var j = t.drillRows ? t.rows.indexOf(r) : -1;
+      return '<tr>' + r.map(function (v, i) {
+        var text = esc(fmt(v, t.columns[i].kind, E));
+        if (i === 0 && j >= 0 && j < t.drillRows) {
+          text = '<button type="button" class="rf-drill-btn" data-drill="' + j + '" data-table="' + esc(t.id) + '" aria-label="' +
+            esc('ریزِ ' + fmt(v, t.columns[0].kind, E)) + '"' + ariaKeys('reports.drill') + '>' + text + '</button>';
+        }
+        return '<td class="' + (num(t.columns[i].kind) ? 'n' : '') + '">' + text + '</td>';
+      }).join('') + '</tr>';
     }).join('') : '<tr><td class="rf-empty" colspan="' + t.columns.length + '">در این بازه چیزی نیست.</td></tr>';
     var foot = t.total ? '<tfoot><tr>' + t.total.map(function (v, i) {
       return '<td class="' + (num(t.columns[i].kind) ? 'n' : '') + '">' + (v === null ? '' : esc(fmt(v, t.columns[i].kind, E))) + '</td>';
@@ -356,33 +535,136 @@
     last = { v: v, label: def.label, name: ('گزارش-' + def.label + '-' + E.today).replace(/ /g, '-') };  // داده: نامِ پروندهٔ خروجی
     var mode = viewMode();
     var html = '<div class="rf-head"><div><h2>گزارش‌ها</h2><p>از هستهٔ مشترکِ گزارش (همان عددهای برنامهٔ نصبی).</p></div>' +
-      '<div class="rf-actions"><button type="button" class="btn btn-secondary btn-sm" data-act="print">چاپ</button>' +
+      '<div class="rf-actions">' + keyBtn('class="btn btn-secondary btn-sm" data-act="print"', 'چاپ', 'global.print') +
       '<button type="button" class="btn btn-secondary btn-sm" data-act="pdf">خروجی PDF</button>' +
       '<button type="button" class="btn btn-secondary btn-sm" data-act="csv">CSV</button>' +
-      '<button type="button" class="btn btn-primary btn-sm" data-act="xlsx">خروجی اکسل</button></div></div>' +
+      keyBtn('class="btn btn-primary btn-sm" data-act="xlsx"', 'خروجی اکسل', 'global.export') + '</div></div>' +
       '<div class="rf-bar">' + seg('rtab', tabs.map(function (t) { return [t.id, t.label]; }), state.tab, 'نوعِ گزارش') +
       (def.ranged ? seg('span', B.SPANS.map(function (s) { return [s, B.SPAN_LABELS[s]]; }), state.span, 'بازه') : '') +
       '<span class="sp"></span>' + (phone() ? '' : seg('vm', [['card', 'نمای کارتی'], ['table', 'نمای جدولی']], mode, 'نمایش')) + '</div>' +
+      periodBar(def, E) +
       (state.tab === 'sales' || state.tab === 'profit'
         ? '<div class="rf-bar">' + seg('dim', B.DIMS.map(function (d) { return [d, B.DIM_LABELS[d]]; }), state.dim, 'تفکیک') + '</div>' : '') +
       summary(v, E) +
       v.tables.map(function (t) {
-        return (v.tables.length > 1 ? '<h3 class="rf-title">' + esc(t.title) + '</h3>' : '') + (mode === 'table' ? tableHtml(t, E) : cardsHtml(t, E));
-      }).join('');
+        return (v.tables.length > 1 ? '<h3 class="rf-title">' + esc(t.title) + '</h3>' : '') +
+          (t.id === 'heatmap.grid' ? gridHtml(t, v.heat) : mode === 'table' ? tableHtml(t, E) : cardsHtml(t, E));
+      }).join('') + (mode === 'table' ? drillHtml(v, E) : '');
     el.innerHTML = html;
     if (!el.__rf) {
       el.__rf = true;
       el.addEventListener('click', onClick);
+      document.addEventListener('keydown', onKey);
     }
+  }
+
+  /** RPT-13 — «دورهٔ قبل / بعد» (− / +) و «مقایسه» (Alt+C) برای زبانهٔ بازه‌دار؛ «همه» دوره ندارد */
+  function periodBar(def, E) {
+    if (!def.ranged || !unit()) return '';
+    var r = rangeOf(E);
+    var step = function (by, label, id) { return keyBtn('class="btn btn-secondary btn-sm" data-period="' + by + '"' + (can(E, by) ? '' : ' disabled'), label, id); };
+    return '<div class="rf-bar rf-period" role="group" aria-label="دوره">' + step(-1, 'دورهٔ قبل', 'reports.prevPeriod') +
+      '<span class="rf-range">' + esc(periodOf(r.from, r.to, E)) + '</span>' + step(1, 'دورهٔ بعد', 'reports.nextPeriod') +
+      (comparable() ? '<span class="rf-seg">' + keyBtn('data-compare="1" aria-pressed="' + state.compare + '"', 'مقایسه با دورهٔ پیش', 'reports.compare') + '</span>' : '') + '</div>';
+  }
+
+  /** پیامِ صفحه‌خوان پس از کارِ کلید (دوره، مقایسه): یک ناحیهٔ `status` ِ ماندگار بیرون از صفحهٔ بازکشیده */
+  function announce(html) {
+    var fr = document.getElementById('rep-fresh'), live = document.getElementById('rep-fresh-live');
+    if (!fr || !fr.parentNode) return;
+    if (!live) {
+      live = document.createElement('p');
+      live.id = 'rep-fresh-live'; live.className = 'rf-sr';
+      live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite');
+      fr.parentNode.insertBefore(live, fr.nextSibling);
+    }
+    live.innerHTML = html;
+  }
+
+  /** کشیدنِ دوباره با فوکوس روی همان دکمه؛ نبود یا خاموش ⇒ نخستین دکمهٔ روشنِ دوره، یا خودِ گزارش */
+  function redraw(sel) {
+    renderReports();
+    var fr = document.getElementById('rep-fresh'), again = sel ? fr.querySelector(sel) : null;
+    if (again && again.disabled) again = fr.querySelector('button[data-period]:not([disabled])');
+    if (again) again.focus();
+  }
+
+  function step(E, by) {
+    if (!can(E, by)) return false;
+    state.shift += by; state.drill = null;
+    return true;
+  }
+  function stepAndSay(E, by, sel) {
+    if (!step(E, by)) return;
+    redraw(sel);
+    var r = rangeOf(E);
+    announce('<span>' + esc(periodOf(r.from, r.to, E)) + '</span>');
+  }
+  function toggleCompare(sel) {
+    state.compare = !state.compare;
+    redraw(sel);
+    announce('<span>مقایسه با دورهٔ پیش</span>: <span>' + (state.compare ? 'روشن' : 'خاموش') + '</span>');
+  }
+  function openDrill(table, index) {
+    state.drill = { table: table, index: index };
+    renderReports();
+    var h = document.getElementById('rf-drill-h');
+    if (h) h.focus();
+  }
+  function closeDrill() {
+    var d = state.drill;
+    state.drill = null;
+    redraw(d ? 'button[data-drill="' + d.index + '"][data-table="' + d.table + '"]' : null);
+  }
+
+  /**
+   *  RPT-13 — کلیدهای «گزارش‌ها» در وب، فقط با صفحهٔ گزارشِ باز و گزارشِ تازهٔ روشن، و نه در کادرِ نوشتن یا پنجرهٔ باز.
+   *  هر کلید با `TohidKeymap.matches` (کدِ فیزیکی؛ چیدمانِ فارسی/پشتو هم): Ctrl/Cmd+P چاپ، Ctrl/Cmd+E اکسل، − و + دوره،
+   *  Alt+C مقایسه، Esc بستنِ ریز. Enter روی نامِ ردیف همان دکمهٔ «ریز» است (کارِ خودِ مرورگر).
+   */
+  function onKey(e) {
+    var K = keymap(), E = env(), fr = document.getElementById('rep-fresh'), pg = document.getElementById('page-reports');
+    if (!K || !E || !fr || fr.hidden || !last || e.defaultPrevented || e.isComposing) return;
+    if ((pg && !pg.classList.contains('active')) || document.querySelector('.modal-scrim.open')) return;
+    var t = e.target;
+    if (t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName || ''))) return;
+    var def = tabsFor(E).filter(function (x) { return x.id === state.tab; })[0] || {};
+    var ranged = !!def.ranged && !!unit(), sel = t && t.closest && t.closest('#rep-fresh') && t.hasAttribute && t.hasAttribute('data-period')
+      ? 'button[data-period="' + t.getAttribute('data-period') + '"]' : null;
+    var run;
+    if (K.matches(e, 'global.print')) run = function () { exportAct('print', E); };
+    else if (K.matches(e, 'global.export')) run = function () { exportAct('xlsx', E); };
+    else if (state.drill && K.matches(e, 'global.back')) run = closeDrill;
+    else if (ranged && K.matches(e, 'reports.prevPeriod')) run = function () { stepAndSay(E, -1, sel || 'button[data-period="-1"]'); };
+    else if (ranged && K.matches(e, 'reports.nextPeriod')) run = function () { stepAndSay(E, 1, sel || 'button[data-period="1"]'); };
+    else if (comparable() && K.matches(e, 'reports.compare')) run = function () { toggleCompare('button[data-compare]'); };
+    if (!run) return;
+    e.preventDefault();
+    run();
+  }
+
+  /** چاپ، CSV، اکسل و PDF از همان برگه (RPT-11)؛ دکمه یا Ctrl+P / Ctrl+E */
+  function exportAct(act, E, btn) {
+    if (!last || !E) return;
+    var rows = exportRows(last.v.tables);
+    if (act === 'print') { E.printRows(rows, last.name); return; }
+    if (rows.length <= 1) { if (E.showToast) E.showToast('در این گزارش داده‌ای برای خروجی وجود ندارد', 'warning'); return; }
+    if (act === 'csv') E.downloadCsv(last.name + '.csv', rows);
+    else if (act === 'xlsx') excel(rows, last.name, E);
+    else if (act === 'pdf' && btn) pdf(rows, last, E, btn);
   }
 
   function onClick(e) {
     var b = e.target.closest('button');
     if (!b) return;
     var E = env();
-    if (b.hasAttribute('data-rtab')) { state.tab = b.getAttribute('data-rtab'); state.sort = null; }
-    else if (b.hasAttribute('data-span')) state.span = b.getAttribute('data-span');
-    else if (b.hasAttribute('data-dim')) { state.dim = b.getAttribute('data-dim'); state.sort = null; }
+    if (b.hasAttribute('data-rtab')) { state.tab = b.getAttribute('data-rtab'); state.sort = null; state.drill = null; }
+    else if (b.hasAttribute('data-span')) { state.span = b.getAttribute('data-span'); state.shift = 0; state.drill = null; }
+    else if (b.hasAttribute('data-dim')) { state.dim = b.getAttribute('data-dim'); state.sort = null; state.drill = null; }
+    else if (b.hasAttribute('data-period')) { if (E) stepAndSay(E, +b.getAttribute('data-period'), 'button[data-period="' + b.getAttribute('data-period') + '"]'); return; }
+    else if (b.hasAttribute('data-compare')) { toggleCompare('button[data-compare]'); return; }
+    else if (b.hasAttribute('data-drill')) { openDrill(b.getAttribute('data-table'), +b.getAttribute('data-drill')); return; }
+    else if (b.getAttribute('data-act') === 'drill-close') { closeDrill(); return; }
     else if (b.hasAttribute('data-vm')) put(VM_KEY, b.getAttribute('data-vm'));
     else if (b.hasAttribute('data-cost')) put(COST_KEY, b.getAttribute('data-cost'));
     else if (b.hasAttribute('data-sort')) {
@@ -392,15 +674,7 @@
       state.sort = state.sort && state.sort.id === id && state.sort.col === col
         ? { id: id, col: col, desc: !state.sort.desc } : { id: id, col: col, desc: !textCol };
     } else if (b.hasAttribute('data-kpi') || b.hasAttribute('data-pill')) { openPreset(b); }
-    else if (b.hasAttribute('data-act') && b.getAttribute('data-act') !== 'print' && last && E) {
-      var rows = exportRows(last.v.tables);
-      if (rows.length <= 1) { if (E.showToast) E.showToast('در این گزارش داده‌ای برای خروجی وجود ندارد', 'warning'); return; }
-      var act = b.getAttribute('data-act');
-      if (act === 'csv') E.downloadCsv(last.name + '.csv', rows);
-      else if (act === 'xlsx') excel(rows, last.name, E);
-      else if (act === 'pdf') pdf(rows, last, E, b);
-      return;
-    } else if (b.getAttribute('data-act') === 'print' && last && E) { E.printRows(exportRows(last.v.tables), last.name); return; }
+    else if (b.hasAttribute('data-act')) { exportAct(b.getAttribute('data-act'), E, b); return; }
     else return;
     //  بعد از کشیدنِ دوباره، فوکوس روی همان دکمه می‌ماند (کار با کیبورد)
     var attr = ['data-rtab', 'data-span', 'data-dim', 'data-vm', 'data-cost', 'data-sort'].filter(function (a) { return b.hasAttribute(a); })[0];
@@ -489,13 +763,16 @@
     renderHome();
   }
 
-  //  INV-16: index.html ِ یخ‌زده برچسبِ `stock-value-core.js` را ندارد ⇒ همین‌جا؛ رسید ⇒ صفحهٔ بازِ گزارش زبانه را می‌گیرد
-  if (!value() && document.head) {
-    var sv = document.createElement('script');
-    sv.src = 'license/stock-value-core.js?v=1';
-    sv.onload = function () { var fr = document.getElementById('rep-fresh'); if (fr && !fr.hidden) renderReports(); };
-    document.head.appendChild(sv);
-  }
+  //  index.html ِ یخ‌زده برچسبِ این هسته‌ها را ندارد ⇒ همین‌جا؛ رسید ⇒ صفحهٔ بازِ گزارش زبانه/دکمه/کلید را می‌گیرد:
+  //  INV-16 «ارزش موجودی»، RPT-13 دوره و میان‌برها (keymap.js ِ ساختهٔ gen-keymap.mjs)، RPT-08 «ساعت و روز»
+  [[value, 'license/stock-value-core.js?v=1'], [period, 'license/report-period-core.js?v=1'], [keymap, 'license/keymap.js?v=1'],
+    [heat, 'license/sales-heatmap-core.js?v=1']].forEach(function (p) {
+    if (p[0]() || !document.head) return;
+    var sc = document.createElement('script');
+    sc.src = p[1];
+    sc.onload = function () { var fr = document.getElementById('rep-fresh'); if (fr && !fr.hidden) renderReports(); };
+    document.head.appendChild(sc);
+  });
 
   window.TohidReportUi = {
     enabled: enabled,

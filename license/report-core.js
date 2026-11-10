@@ -409,6 +409,39 @@
     return r;
   }
 
+  /**
+   * RPT-13 — «ریز» ِ ردیفِ `key` از تفکیکِ `dim` (همان `ReportCore.invoicesOf`؛ بردار: report-drill-v1.json): هر فاکتورِ لغونشدهٔ
+   * بازه با سهمِ «فروش» (پس از تخفیفِ `allocate`) و مقدارِ همان کلید؛ جمعِ سهم‌ها = `sales` و شمارشان = `invoices` ِ ردیف.
+   * `dim: 'all'` = همهٔ قلم‌ها (`dayInvoices`). به ترتیبِ (روز، لحظه، شناسه).
+   */
+  function invoicesOf(raw, opts) {
+    opts = opts || {};
+    var L = ledger(raw), clock = clockOf(opts.clock), dim = str(opts.dim), key = str(opts.key), out = [];
+    if (DIMS.indexOf(dim) < 0 && dim !== 'all') return out;
+    var f = str(opts.from) || '0000-01-01', t = str(opts.to) || '9999-12-31', lineSeller = opts.lineSeller === true;
+    L.sales.forEach(function (s) {
+      var d = posDate(s, clock);
+      if (s.cancelled || !(d >= f && d <= t)) return;
+      var items = L.itemsBySale[s.id] || [], hour = posHour(s, clock), qty = 0, net = 0, hit = false;
+      var gross = items.length ? items.map(function (i) { return i.total; }) : [s.total];
+      var shares = allocate(gross.reduce(function (a, b) { return a + b; }, 0) - s.finalTotal, gross);
+      gross.forEach(function (g, i) {
+        var it = items[i], pid = it ? it.productId : '', p = L.products[pid];
+        var k = dim === 'product' ? pid : dim === 'category' ? (p ? p.category : '') : dim === 'user' ? userOf(it, s, lineSeller)
+          : dim === 'hour' ? hour : dim === 'payment' ? s.method : dim === 'all' ? key : s.channel;
+        if (k === key) { hit = true; qty += it ? it.qty : 0; net += g - shares[i]; }
+      });
+      if (hit) out.push({ saleId: s.id, date: d, createdAt: s.createdAt, qty: qty, sales: net });
+    });
+    return out.sort(function (a, b) { return cmp(a.date, b.date) || (a.createdAt - b.createdAt) || cmp(a.saleId, b.saleId); });
+  }
+
+  /** RPT-13 — ریزِ یک روزِ جدولِ «امروز»: هر فاکتورِ لغونشدهٔ همان روز (همان `ReportCore.dayInvoices`) */
+  function dayInvoices(raw, opts) {
+    opts = opts || {};
+    return epochDay(str(opts.date)) === null ? [] : invoicesOf(raw, { from: opts.date, to: opts.date, dim: 'all', key: '', clock: opts.clock });
+  }
+
   /* ---------------- داشبوردِ امروز (RPT-01) ---------------- */
 
   var DELTA_KEYS = ['invoices', 'sales', 'returns', 'netSales', 'grossProfit', 'avgTicket', 'discount'];
@@ -739,6 +772,8 @@
     stockCost: stockCost,
     today: today,
     sales: sales,
+    invoicesOf: invoicesOf,
+    dayInvoices: dayInvoices,
     debts: debts,
     fraud: fraud,
     tables: tables,

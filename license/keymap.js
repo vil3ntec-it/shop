@@ -26,8 +26,8 @@
     "global.new": {"scope":"global","title":"موردِ تازه در همین صفحه","status":"live","webStatus":"planned","page":null,"web":[["N",false,false,true]],"overrides":[]},
     "global.find": {"scope":"global","title":"جست‌وجو در همین صفحه","status":"partial","webStatus":"live","page":null,"web":[["Slash",false,false,false]],"overrides":[]},
     "global.save": {"scope":"global","title":"ذخیره یا تأیید","status":"partial","webStatus":"planned","page":null,"web":[["S",true,false,false],["Enter",true,false,false]],"overrides":[]},
-    "global.print": {"scope":"global","title":"چاپ","status":"partial","webStatus":"planned","page":null,"web":[["P",true,false,false]],"overrides":[]},
-    "global.export": {"scope":"global","title":"خروجی","status":"partial","webStatus":"planned","page":null,"web":[["E",true,false,false]],"overrides":[]},
+    "global.print": {"scope":"global","title":"چاپ","status":"partial","webStatus":"partial","page":null,"web":[["P",true,false,false]],"overrides":[]},
+    "global.export": {"scope":"global","title":"خروجی","status":"partial","webStatus":"partial","page":null,"web":[["E",true,false,false]],"overrides":[]},
     "global.lock": {"scope":"global","title":"قفلِ صندوق و تعویضِ کاربر با PIN","status":"partial","webStatus":"planned","page":null,"web":[["L",false,false,true]],"overrides":[]},
     "global.zoomIn": {"scope":"global","title":"بزرگ‌نمایی","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "global.zoomOut": {"scope":"global","title":"کوچک‌نمایی","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
@@ -101,10 +101,10 @@
     "productGrid.undo": {"scope":"productGrid","title":"برگرداندن","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "productGrid.save": {"scope":"productGrid","title":"ثبتِ همهٔ تغییرها","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
     "productGrid.cancel": {"scope":"productGrid","title":"لغوِ ویرایشِ خانه؛ بستنِ جدول","status":"live","webStatus":"planned","page":null,"web":[],"overrides":[]},
-    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"partial","webStatus":"planned","page":null,"web":[],"overrides":[]},
-    "reports.nextPeriod": {"scope":"reports","title":"دورهٔ بعد","status":"planned","webStatus":"planned","page":null,"web":[],"overrides":[]},
-    "reports.prevPeriod": {"scope":"reports","title":"دورهٔ قبل","status":"planned","webStatus":"planned","page":null,"web":[],"overrides":[]},
-    "reports.compare": {"scope":"reports","title":"ستونِ مقایسه با دورهٔ قبل","status":"planned","webStatus":"planned","page":null,"web":[],"overrides":[]}
+    "reports.drill": {"scope":"reports","title":"ریز شدن در ردیف","status":"partial","webStatus":"partial","page":null,"web":[["Enter",false,false,false]],"overrides":[]},
+    "reports.nextPeriod": {"scope":"reports","title":"دورهٔ بعد","status":"partial","webStatus":"partial","page":null,"web":[["Plus",false,false,false],["Equals",false,true,false]],"overrides":[]},
+    "reports.prevPeriod": {"scope":"reports","title":"دورهٔ قبل","status":"partial","webStatus":"partial","page":null,"web":[["Minus",false,false,false]],"overrides":[]},
+    "reports.compare": {"scope":"reports","title":"ستونِ مقایسه با دورهٔ قبل","status":"partial","webStatus":"partial","page":null,"web":[["C",false,false,true]],"overrides":[]}
   };
   function chordMatches(e, c) {
     return CODES[c[0]].indexOf(e.code) >= 0 &&
