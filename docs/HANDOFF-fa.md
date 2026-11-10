@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-native` (دو ردیفِ P1 ِ فقط‌برنامه: LOC-06 پوستهٔ کامپیوتر و RPT-13 ستونِ مقایسهٔ برگهٔ فهرستی؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) RPT-13: «مقایسه» در «گزارش‌ها» ِ کامپیوتر برای فاکتور/خرید/مصرف — گروه با روشِ پرداخت/تأمین‌کننده/دسته و جمعِ همان ستون (فاکتورِ
+  لغوشده بیرون، جمع به صدم با عددِ صحیح، گروهِ فقط-دورهٔ-قبل در انتها) در `core/report/ReportCompare.group`/`grouped` (commonMain) و
+  `ReportCsv.compareGroup`/`comparedList`، صفحهٔ `ReportsDesk` پشتِ همان `ReportKeysPref`؛ `ReportCompare.format` دیگر «1.2E7» نمی‌نویسد.
+  آزمون: ۷ آزمونِ تازهٔ `ReportCompareTest` و یکی در `ReportEngineTest`. (۲) LOC-06: ۲۰ متنِ خامِ پوستهٔ کامپیوتر (سینی، عنوانِ پنجره‌ها، پنجرهٔ
+  فایل، ۱۲ ردیفِ میان‌برهای قدیم) از جدول — جملهٔ عیناً موجود یا `StrDesktop` با رونوشتِ ترجمهٔ همان جمله، بی پشتوی تازه؛ نگهبانِ
+  `DesktopTextTest` (سقفِ ۵۹). فهرستِ بی‌ترجمه‌ها برای صاحب‌کار در `docs/i18n-glossary.md` («پوستهٔ کامپیوتر»).
+- نیمه‌کاره: هیچ آزمونِ کاتلینی این‌جا اجرا نشد (بی Gradle) ⇒ شاهدِ CI ِ دسته؛ STATUS ارتقا نیافت.
+- قدمِ بعدی: ترجمهٔ صاحب‌کار برای فهرستِ glossary؛ تصمیمِ `en`/`ps` در `keymap.json` برای پنجرهٔ F1؛ پس از CI ِ سبز، RPT-13 فقط با شاهد ارتقا.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

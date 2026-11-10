@@ -362,4 +362,55 @@ class ReportEngineTest {
     val sales = ReportCsv.of("sales", both, "2026-09-01", "2026-09-30", "2026-09-30")
     assertTrue(ReportCsv.compared("sales", sales, ReportCsv.of("sales", both, "2026-08-01", "2026-08-31", "2026-09-30"), "p", "c") === sales)
   }
+  @Test
+  fun `مقایسهٔ برگهٔ فهرستیِ فروش، خرید و مصرف گروه‌به‌گروه است و فاکتورِ لغوشده شمرده نمی‌شود`() {
+    var d = sell(ledger(), "p1", 10.0, "2026-08-10").data               // ۳۰۰۰ نقدی (دورهٔ قبل)
+    d = sell(d, "p1", 4.0, "2026-09-05").data                          // ۱۲۰۰ نقدی
+    d = sell(d, "p1", 3.0, "2026-09-06").data                          // ۹۰۰ ⇒ لغو
+    d = sell(d, "p1", 2.0, "2026-09-07").data                          // ۶۰۰ ⇒ کارت
+    d = d.copy(
+      sales = d.sales.map {
+        when (it.date) {
+          "2026-09-06" -> it.copy(status = "cancelled")
+          "2026-09-07" -> it.copy(paymentMethod = "card", payments = null)
+          else -> it
+        }
+      },
+      suppliers = listOf(Supplier(id = "s1", name = "حاجی")),
+      purchases = listOf(
+        Purchase(id = "b1", productId = "p1", supplierId = "s1", totalAmount = 700.0, date = "2026-08-02"),
+        Purchase(id = "b2", productId = "p1", supplierId = "s1", totalAmount = 250.0, date = "2026-09-02"),
+        Purchase(id = "b3", productId = "p2", totalAmount = 100.0, date = "2026-09-03"),
+      ),
+      expenses = listOf(
+        Expense(id = "e1", title = "برق", category = "قبض", amount = 900.0, date = "2026-08-03"),
+        Expense(id = "e2", title = "برق", category = "قبض", amount = 1200.0, date = "2026-09-03"),
+        Expense(id = "e3", title = "کرایه", category = "کرایه", amount = 5000.0, date = "2026-09-04"),
+      ),
+    )
+    fun cmp(section: String): List<List<String>> = ReportCsv.comparedList(
+      section, ReportCsv.of(section, d, "2026-09-01", "2026-09-30", "2026-09-30"),
+      ReportCsv.of(section, d, "2026-08-01", "2026-08-31", "2026-09-30"), "n", "p", "c",
+    ).rows
+
+    //  ستون‌های گروه و جمع همان سرخطِ برگه‌اند (شماره‌ستونِ ثابتِ `compareGroup`)
+    for ((section, cols) in listOf("sales" to ("روش پرداخت" to "مبلغ نهایی"), "purchases" to ("تأمین‌کننده" to "جمع"), "expenses" to ("دسته" to "مبلغ"))) {
+      val head = ReportCsv.of(section, d, "2026-09-01", "2026-09-30", "2026-09-30").rows[0]
+      val (k, v) = ReportCsv.compareGroup(section)!!
+      assertEquals(section, listOf(cols.first, cols.second), listOf(head[k], head[v]))
+    }
+    //  فروش: روشِ پرداخت؛ ۹۰۰ ِ لغوشده نه در شمار است نه در جمع
+    assertEquals(
+      listOf(listOf("روش پرداخت", "n", "مبلغ نهایی", "p", "c"), listOf("نقدی", "1", "1200", "3000", "-1800"), listOf("کارت", "1", "600", "", "600")),
+      cmp("sales"),
+    )
+    //  خرید: تأمین‌کننده؛ خریدِ بی تأمین‌کننده گروهِ «—»
+    assertEquals(listOf(listOf("حاجی", "1", "250", "700", "-450"), listOf("—", "1", "100", "", "100")), cmp("purchases").drop(1))
+    //  مصرف: دسته
+    assertEquals(listOf(listOf("کرایه", "1", "5000", "", "5000"), listOf("قبض", "1", "1200", "900", "300")), cmp("expenses").drop(1))
+    //  برگهٔ کلیددار و برگهٔ بی‌بازه دست نمی‌خورند
+    val profit = ReportCsv.of("profit", d, "2026-09-01", "2026-09-30", "2026-09-30")
+    assertTrue(ReportCsv.comparedList("profit", profit, profit, "n", "p", "c") === profit)
+    assertTrue(ReportCsv.compareGroup("products") == null && ReportCsv.compareGroup("sellers") == null)
+  }
 }

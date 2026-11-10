@@ -12,7 +12,7 @@ object Build {
     val os = System.getProperty("os.name").orEmpty().trim()
     val host = runCatching { InetAddress.getLocalHost().hostName }.getOrNull()
       ?: System.getenv("COMPUTERNAME") ?: System.getenv("HOSTNAME")
-    listOfNotNull("کامپیوتر", os.ifBlank { null }, host?.ifBlank { null }).joinToString(" · ")
+    listOfNotNull("کامپیوتر", os.ifBlank { null }, host?.ifBlank { null }).joinToString(" · ")  // داده: نامِ دستگاه در فهرستِ دستگاه‌های حساب (سرور)
   }
   @JvmField val MANUFACTURER: String = System.getProperty("os.name").orEmpty()
   @JvmField val BRAND: String = "desktop"
