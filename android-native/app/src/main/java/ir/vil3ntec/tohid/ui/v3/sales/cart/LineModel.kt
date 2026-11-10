@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.product.UnitSale
 import ir.vil3ntec.tohid.data.PlaceQty
 import ir.vil3ntec.tohid.data.PlaceStock
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.QtyExactWiring
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.UnitLine
@@ -175,6 +176,8 @@ object LineModel {
     }
     val q = quantity(form, info) ?: return StrSale.badNumberShort
     if (q <= 0) return StrSale.positiveNeeded
+    //  PRD-08 (`shop.qty_exact`): «1.2345» بی‌صدا ۱٫۲۳۵ نمی‌شود؛ خاموش ⇒ همان پیشین
+    if (QtyExactWiring.tooPrecise(form.qtyText)) return StrSale.qtyThreeDecimals
     return info.product?.let { SalesEngine.quantityProblem(it, q) }
   }
 

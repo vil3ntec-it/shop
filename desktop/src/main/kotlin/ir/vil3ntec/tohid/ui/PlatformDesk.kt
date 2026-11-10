@@ -8,7 +8,7 @@ object Platform {
   fun defaultBackupDir(context: android.content.Context): java.io.File? {
     val home = System.getProperty("user.home") ?: return null
     val docs = java.io.File(home, "Documents").takeIf { it.isDirectory } ?: java.io.File(home)
-    return java.io.File(docs, "فروشگاه من/پشتیبان")
+    return java.io.File(docs, "فروشگاه من/پشتیبان")  // داده: نامِ پوشه روی دیسک — با زبان عوض نمی‌شود
   }
 
   fun pickFolder(start: String?): String? {
@@ -72,7 +72,7 @@ object Platform {
       val home = System.getProperty("user.home") ?: "."
       val docs = java.io.File(home, "Documents").takeIf { it.isDirectory } ?: java.io.File(home)
       val ch = javax.swing.JFileChooser(docs).apply {
-        dialogTitle = "ذخیره"
+        dialogTitle = ir.vil3ntec.tohid.core.i18n.StrKit.save
         selectedFile = java.io.File(docs, suggestedName.replace(Regex("[\\\\/:*?\"<>|]"), " "))
         applyComponentOrientation(java.awt.ComponentOrientation.RIGHT_TO_LEFT)
       }

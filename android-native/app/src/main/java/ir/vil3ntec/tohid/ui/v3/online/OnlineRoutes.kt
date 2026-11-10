@@ -13,6 +13,7 @@ import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrReach
+import ir.vil3ntec.tohid.core.i18n.StrRisk
 import ir.vil3ntec.tohid.core.nav.AppMode
 import ir.vil3ntec.tohid.core.nav.MoreGroup
 import ir.vil3ntec.tohid.core.nav.Need
@@ -42,6 +43,7 @@ import ir.vil3ntec.tohid.ui.v3.online.orders.OrderActionRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrderDetailRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrderPickRoute
 import ir.vil3ntec.tohid.ui.v3.online.orders.OrdersRoute
+import ir.vil3ntec.tohid.ui.v3.online.orders.RiskListsRoute
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontModel
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontProductRoute
 import ir.vil3ntec.tohid.ui.v3.online.storefront.StorefrontRoute
@@ -55,6 +57,8 @@ object OnlinePaths {
   /** PCK: برگهٔ جمع‌آوری و بسته‌بندیِ یک سفارش */
   fun pick(id: String) = order(id) + "/pick"
   const val NEW_ORDER = "orders/new"
+  /** RSK-04: فهرستِ بسته و مطمئنِ دکان (شماره و جا)، بیرون از هر سفارش */
+  const val RISK_LISTS = "orders/risk-lists"
   const val STOREFRONT = "storefront"
   fun storefront(tab: String? = null) = RoutePaths.withQuery(STOREFRONT, "tab" to tab)
   fun storefrontProduct(id: String) = "storefront/products/" + RoutePaths.encode(id)
@@ -97,6 +101,7 @@ val OnlineModule = AppModule(
   routes = listOf(
     V3Route(OnlinePaths.ORDERS, RouteKind.TAB, { StrOnline.ordersTitle }, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { OrdersRoute() },
     V3Route(OnlinePaths.NEW_ORDER, RouteKind.PAGE, { StrOnline.manualOrder }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) { NewOrderRoute() },
+    V3Route(OnlinePaths.RISK_LISTS, RouteKind.PAGE, { StrRisk.listsTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE)) { RiskListsRoute() },
     V3Route("orders/{id}", RouteKind.PAGE, { StrOnline.ordersTitle }, parent = OnlinePaths.ORDERS, needs = setOf(Need.ORDERS_LIVE), chrome = Chrome.OWN) {
       OrderDetailRoute(args["id"].orEmpty())
     },

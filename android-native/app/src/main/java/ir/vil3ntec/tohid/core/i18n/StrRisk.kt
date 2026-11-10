@@ -1,7 +1,8 @@
 package ir.vil3ntec.tohid.core.i18n
 
 /**
- *  هشدارِ رفتارِ غیرعادیِ صندوقدار (RSK-10) در زبانهٔ «ضدتقلب» ِ گزارشِ تازه.
+ *  هشدارِ رفتارِ غیرعادیِ صندوقدار (RSK-10) در زبانهٔ «ضدتقلب» ِ گزارشِ تازه؛ سابقهٔ مشتری (RSK-03، جزئیات و صف) و
+ *  فهرستِ بسته و مطمئن (RSK-04، `OrderRiskV3.kt` و `OrderRiskListsV3.kt`).
  *
  *  قاعده‌ها سرِ `I18n.kt`؛ منطقِ هشدار در `core/risk/CashierAlerts` (commonMain).
  */
@@ -80,4 +81,51 @@ object StrRisk {
   fun entryPin(radiusM: Any): String = t("جای بسته (شعاعِ ${asIs(radiusM)} متر)", "Blocked place ($radiusM m radius)", "بند ځای ($radiusM متره)")
   fun entrySubtitle(reason: String, until: String): String =
     t("${asIs(reason)} · تا ${asIs(until)}", "$reason · until $until", "$reason · تر $until پورې")
+
+  /* ---------------- RSK-03 «کارت در صف» — سفارش‌های پیش از ارسال با هشدار (`OrderRisk.queue`) ---------------- */
+
+  fun queueTitle(n: Any): String = t(
+    "${asIs(n)} سفارش پیش از ارسال نگاهِ دوباره می‌خواهد",
+    "$n ${pl(n, "order needs", "orders need")} a second look before sending",
+    "$n فرمایشونه د لېږلو مخکې بیا کتنې ته اړتیا لري",
+  )
+  val queueFooter: String get() = t(
+    "از سابقهٔ همین مشتری در دکانِ شما؛ تصمیم با خودتان است.",
+    "From this customer's history with your shop; the decision is yours.",
+    "ستاسو په دوکان کې د همدې پیرودونکي له مخینې؛ پرېکړه ستاسو ده.",
+  )
+  val queueTruncated: String get() = t(
+    "فقط سفارش‌های تازه‌تر سنجیده شدند؛ بقیه را در جزئیاتِ هر سفارش ببینید.",
+    "Only the newest orders were checked; see the rest in each order's details.",
+    "یوازې نوي فرمایشونه وکتل شول؛ نور د هر فرمایش په جزئیاتو کې وګورئ.",
+  )
+  val queueFailed: String get() = t("سفارش‌های پیش از ارسال سنجیده نشدند", "Couldn't check orders before sending", "د لېږلو مخکې فرمایشونه ونه کتل شول")
+
+  /* ---------------- RSK-04 — پین (جای بسته) و صفحهٔ جدای فهرست ---------------- */
+
+  val blockPlace: String get() = t("بستنِ این جا", "Block this place", "دا ځای بندول")
+  val blockPlaceHelp: String get() = t(
+    "سفارشِ اینترنتیِ تازه برای ارسال به این جا (درونِ شعاع) پذیرفته نمی‌شود؛ مشتری دلیل را نمی‌بیند.",
+    "New online delivery orders to this place (within the radius) are refused; the customer never sees the reason.",
+    "دې ځای ته (د شعاع دننه) نوي انلاین فرمایشونه نه منل کېږي؛ پیرودونکی دلیل نه ویني.",
+  )
+  val entryRadius: String get() = t("شعاع (متر)", "Radius (metres)", "شعاع (متره)")
+  val entryRadiusError: String get() = t("۱۰ تا ۲۰۰۰ متر", "10 to 2000 metres", "۱۰ تر ۲۰۰۰ متره")
+  val blockANumber: String get() = t("بستنِ یک شماره", "Block a number", "یوه شمېره بندول")
+  val trustANumber: String get() = t("شمارهٔ مطمئنِ تازه", "Trust a number", "یوه شمېره باوري کول")
+  val blockAPlace: String get() = t("بستنِ یک جا", "Block a place", "یو ځای بندول")
+  val entryPhone: String get() = t("شمارهٔ مشتری", "Customer's number", "د پیرودونکي شمېره")
+  val entryPhoneError: String get() = t("شماره لازم است", "Enter a number", "شمېره ولیکئ")
+  val entryPlace: String get() = t("مختصات یا پیوندِ نقشه", "Coordinates or map link", "مختصات یا د نقشې لینک")
+  val entryPlaceHelp: String get() = t(
+    "پیوند را از برنامهٔ نقشه بچسبانید، یا مثلاً ۳۴٫۵۲۸, ۶۹٫۱۷۲",
+    "Paste a link from your maps app, or e.g. 34.528, 69.172",
+    "د نقشې له اپ څخه لینک ولګوئ، یا لکه 34.528, 69.172",
+  )
+  val entryPlaceError: String get() = t("مختصات یا پیوند خوانده نشد", "Couldn't read the coordinates or link", "مختصات یا لینک ونه لوستل شو")
+  val listsOnlyManagers: String get() = t(
+    "این فهرست فقط برای صاحب و مدیر است و فقط وقتی «ریسکِ سفارش» روشن باشد.",
+    "Only owners and managers can see this list, and only when order risk checks are on.",
+    "دا لېست یوازې د خاوند او مدیر لپاره دی، او یوازې کله چې د فرمایش خطر څارنه روښانه وي.",
+  )
 }

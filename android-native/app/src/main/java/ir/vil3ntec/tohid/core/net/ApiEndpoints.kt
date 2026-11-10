@@ -25,6 +25,11 @@ object ApiEndpoints {
   /** گزارشِ خطای برنامه — با اجازهٔ کاربر (بندِ ۲۰.۸). توکن اختیاری است. */
   const val ERRORS = "/errors"
 
+  /** LOC-04: جدولِ تعطیلاتِ رسمی — بی‌توکن، روزی یک بار (`ShopDayChoice.refreshHolidays`) */
+  object Calendar {
+    const val HOLIDAYS = "/calendar/holidays"
+  }
+
   /* ------------------------------ ورود ------------------------------ */
 
   object Auth {

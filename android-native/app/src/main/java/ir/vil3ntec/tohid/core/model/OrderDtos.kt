@@ -56,6 +56,8 @@ data class OrdersConfigDto(
   val presence: Boolean = false,
   /** ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (پرچمِ `shop.orders.bulk`؛ خاموش ⇒ کلید نیست) */
   val bulk: Boolean = false,
+  /** RSK-03/04 سابقهٔ مشتری، «کارت در صف» و فهرستِ بسته/مطمئن (پرچمِ `shop.order_risk`؛ خاموش یا سرورِ کهنه ⇒ کلید نیست) */
+  val risk: Boolean = false,
   /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
   val noticeResend: OrderNoticeResendCfgDto? = null,
   /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
@@ -95,6 +97,22 @@ data class OrderInvoiceDto(val saleId: String = "", val at: Long = 0, val by: St
  */
 @Serializable
 data class OrderPayStepDto(val mode: String = "", val state: String = "", val choice: String = "")
+
+/**
+ *  O-06 = ب: نگه‌داشتنِ موجودیِ همین سفارش (`stockHold` ِ `GET /:id`، `stock-reserve.orderView`) — فقط وقتی سفارش
+ *  نگه‌داشته دارد (پرچمِ خاموشِ `shop.stock_reserve`)؛ سرورِ پیشین یا پرچمِ خاموش ⇒ null. `status` = held · expired ·
+ *  committed · released؛ `review` = فروشِ حضوری نگه‌داشته را برد؛ `expiresAt` = پایانِ مهلت (null ⇒ تا پایانِ سفارش)
+ */
+@Serializable
+data class OrderStockHoldDto(
+  val status: String = "",
+  val review: Boolean = false,
+  val expiresAt: Long? = null,
+  val lines: List<OrderStockHoldLineDto> = emptyList(),
+)
+
+@Serializable
+data class OrderStockHoldLineDto(val lineNo: Int = 0, val status: String = "", val short: Boolean = false)
 
 /** `amend` ِ `/config` (`order-amend.configOf` + `paid`/`settleMethods`) */
 @Serializable
@@ -376,6 +394,10 @@ data class OrderDto(
   val invoice: OrderInvoiceDto? = null,
   /** حالِ پرداخت (`lib/order-flow.staffView`) — فقط در `GET /:id` و پاسخِ `/invoice`؛ سرورِ پیشین ⇒ null */
   val payStep: OrderPayStepDto? = null,
+  /** O-06 = ب: نگه‌داشتنِ موجودی — فقط در `GET /:id` و فقط وقتی سفارش نگه‌داشته دارد؛ وگرنه null (بی بخش) */
+  val stockHold: OrderStockHoldDto? = null,
+  /** O-06 = ب: کارتِ صف (`GET /shop/orders`) — «موجودیِ نگه‌داشته کم آمد»؛ نبودِ کلید (سرورِ پیشین) ⇒ false */
+  val stockReview: Boolean = false,
 )
 
 /** `refund` ِ جزئیاتِ سفارش (`order-refunds.summaryOf`): جمعِ برگشته و ماندهٔ قابلِ برگشت، به واحدِ خرد */

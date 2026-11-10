@@ -241,6 +241,19 @@ object StrSettings {
   )
   fun dayEndNow(d: Any): String = t("فروشِ همین حالا به تاریخِ ${asIs(d)} ثبت می‌شود", "A sale made right now is dated $d", "همدا اوس پلور د $d په نېټه ثبتېږي")
 
+  // هفتهٔ دکان (DigitsScreen، LOC-03)
+  val weekStartNote: String get() = t(
+    "آغازِ هفته. آمار، نمودارِ «هفته» ِ خانه، نقشهٔ «ساعت و روز» و روزهای تخفیف از همین روز شروع می‌شوند. پیش‌فرض شنبه.",
+    "Start of the week. Stats, the home “Week” chart, the hour-and-day map and promotion days start on this day. Default: Saturday.",
+    "د اونۍ پیل. احصایه، د کور د «اونۍ» چارټ، د «ساعت او ورځ» نقشه او د تخفیف ورځې له همدې ورځې پیلېږي. اصلي: شنبه.",
+  )
+  val workDays: String get() = t("روزهای کاریِ دکان", "Shop working days", "د دکان کاري ورځې")
+  val workDaysNote: String get() = t(
+    "روزِ خاموش تعطیلِ هفتگیِ دکان است: در «روزهای فروشِ این هفته» ِ آمار، اگر فروش نداشت «تعطیل» نشان داده می‌شود و شمرده نمی‌شود. پیش‌فرض: جمعه تعطیل. دست‌کم یک روزِ کاری می‌ماند.",
+    "A day turned off is the shop's weekly day off: in “Days with sales this week” it shows as closed when there were no sales, and isn't counted. Default: closed on Friday. At least one working day stays on.",
+    "بنده ورځ د دکان اونیزه رخصتي ده: د «د دې اونۍ د پلور ورځې» کې، که پلور یې نه وو «رخصت» ښودل کېږي او نه شمېرل کېږي. اصلي: جمعه رخصت. لږ تر لږه یوه کاري ورځ پاتې کېږي.",
+  )
+
   // تاریخ و رقم (LocaleSection)
   val persianDigits: String get() = t("رقمِ فارسی", "Persian digits", "فارسي عددونه")
   val latinDigits: String get() = t("رقمِ لاتین", "Latin digits", "لاتین عددونه")

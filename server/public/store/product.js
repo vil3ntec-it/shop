@@ -10,11 +10,22 @@
   'use strict';
   var $ = K.$; var el = K.el;
 
-  /** `ctx.rail(id, list)` از store.js (ردیفِ کارت). برمی‌گرداند `detail(r)`؛ `r` تهی ⇒ همه پاک و پنهان. */
+  //  S70: «همین کالا در دکان‌های دیگر» (same.js ِ دیربار) فقط برای کالای پیوسته به بانک (`bankProductId`)
+  var same = null; var sameP = null;
+  function loadSame(slug) {
+    sameP = sameP || K.js('/store/same.js').then(function () { same = window.StoreSame({ slug: slug }); return same; }, function (e) { sameP = null; throw e; });
+    return sameP;
+  }
+
+  /** `ctx.rail(id, list)` از store.js (ردیفِ کارت)، `ctx.slug` دکانِ همین ویترین. برمی‌گرداند `detail(r)`؛ `r` تهی ⇒ همه پاک و پنهان. */
   window.StoreProduct = function (ctx) {
-    var rail = ctx.rail;
+    var rail = ctx.rail; var want = 0;
     return function detail(r) {
       var x = r ? r.product : {};
+      var my = ++want;
+      if (same) same(null);
+      //  same.js ِ دیررس برگهٔ کالای دیگری را پر نمی‌کند
+      if (x.bankProductId) loadSame(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بخش */ });
       $('ps-desc').textContent = x.description || '';
       $('ps-desc').hidden = !x.description;
       var dl = K.clear($('ps-specs'));

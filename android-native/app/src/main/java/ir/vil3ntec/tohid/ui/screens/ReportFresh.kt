@@ -253,9 +253,9 @@ fun DeskFreshReports(d: ShopData, snackbar: SnackbarHostState) {
     if (def.id == DayEndModel.TAB_ID) DayEndModel.build(d, day, clock, ReportBridge.nowMs(), ReportBridge.offsetMinutes()) else null
   }
   //  RPT-08: «ساعت و روز» از فروش‌ها و برگشت‌های دفتر در همان بازه
-  val heat = remember(d, def.id, span, today) {
+  val heat = remember(d, def.id, span, today, ShopDayChoice.weekStart) {
     if (def.id == HeatmapModel.TAB_ID) {
-      HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours))
+      HeatmapModel.build(d, ReportBoard.range(span, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart)
     } else null
   }
   //  RPT-04 / S48: ریزِ تراکنش‌های یک روش (کلیک یا Enter روی ردیفِ «نقد» ِ «پایانِ روز»)
@@ -690,8 +690,8 @@ fun PhoneFreshReports(d: ShopData) {
   }
   //  RPT-08: «ساعت و روز» روی گوشی هم — همان نقشهٔ کامپیوتر، فقط برای کسی که پول را می‌بیند
   var heatSpan by remember { mutableStateOf(HeatmapModel.PHONE_SPANS.first()) }
-  val heat = remember(d, heatSpan, today, money) {
-    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours)) else null
+  val heat = remember(d, heatSpan, today, money, ShopDayChoice.weekStart) {
+    if (money) HeatmapModel.build(d, ReportBoard.range(heatSpan, today), ReportBridge.offsetMinutes(), ShopDay.dayStartMinutes(ShopDayChoice.hours), ShopDayChoice.weekStart) else null
   }
   //  PRD-15: ارزشِ موجودی به بهای میانگینِ موزون (فقط خواندنی)؛ PRM-16: اثرِ تخفیف‌های این ماه با همان روشِ بها —
   //  هر دو فقط برای کسی که پول را می‌بیند (همان کامپیوتر: «بهای میانگین» و «اثرِ تخفیف»)

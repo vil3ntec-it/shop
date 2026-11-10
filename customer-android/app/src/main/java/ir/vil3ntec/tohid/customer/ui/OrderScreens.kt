@@ -121,8 +121,11 @@ private fun OrderBody(model: CustomerModel, o: PublicOrder, onCancel: () -> Unit
       OutlinedButton(onClick = onCancel, enabled = !model.orderBusy, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.cancelOrder) }
     }
 
-    //  مرحلهٔ ۲: گفت‌وگو دربارهٔ همین سفارش، نظر، امتیاز به رساننده و «تکرارِ این سفارش»
-    (model.route as? Route.Track)?.let { OrderExtrasBlock(model, it.slug, o) }
+    //  CHK-24: «دستورِ تحویل» تا پیش از حرکت؛ مرحلهٔ ۲: گفت‌وگو دربارهٔ همین سفارش، نظر، امتیاز به رساننده و «تکرارِ این سفارش»
+    (model.route as? Route.Track)?.let {
+      DeliveryPrefsCard(model, it.slug, o)
+      OrderExtrasBlock(model, it.slug, o)
+    }
   }
 }
 

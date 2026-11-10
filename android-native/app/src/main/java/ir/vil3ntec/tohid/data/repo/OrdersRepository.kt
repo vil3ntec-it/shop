@@ -71,11 +71,18 @@ class OrdersRepository(private val api: ApiClient) {
   suspend fun risk(id: String): ApiResult<ir.vil3ntec.tohid.core.orders.OrderRisk.View> =
     result { ir.vil3ntec.tohid.core.orders.OrderRisk.parse(api.get("$ROOT/${enc(id)}/risk")) }
 
+  /**
+   *  RSK-03 «کارت در صف»: سفارش‌های پیش از ارسالِ همین دکان با هشدار (`GET /risk/queue`، یک پرسش برای همهٔ صف)؛ پرچمِ
+   *  `shop.order_risk` خاموش ⇒ `enabled = false`؛ سرورِ کهنه ⇒ ۴۰۴ (کارتی نیست، `OrderRisk.queueCard`).
+   */
+  suspend fun riskQueue(): ApiResult<ir.vil3ntec.tohid.core.orders.OrderRisk.Queue> =
+    result { ir.vil3ntec.tohid.core.orders.OrderRisk.queue(api.get("$ROOT/risk/queue")) }
+
   /** RSK-04: ردیف‌های فعالِ فهرستِ بسته و مطمئن — فقط صاحب و مدیر (`orders.contact`)؛ پرچمِ خاموش ⇒ ۴۰۳ `order_risk_disabled` */
   suspend fun riskLists(): ApiResult<List<ir.vil3ntec.tohid.core.orders.OrderRisk.Entry>> =
     result { ir.vil3ntec.tohid.core.orders.OrderRisk.entries(api.get("$ROOT/risk/lists")) }
 
-  /** RSK-04: افزودن (بدنه از `OrderRisk.phoneEntryBody`)؛ ردِ سرور (شمارهٔ هم‌اکنون در فهرستِ دیگر، سقف) ⇒ پیامِ خودش */
+  /** RSK-04: افزودن (بدنه از `OrderRisk.phoneEntryBody` یا `pinEntryBody`)؛ ردِ سرور (شمارهٔ هم‌اکنون در فهرستِ دیگر، سقف) ⇒ پیامِ خودش */
   suspend fun addRiskEntry(body: JsonObject): ApiResult<Unit> = result { api.post("$ROOT/risk/lists", body); Unit }
 
   /** RSK-04: برداشتنِ نرم (سابقه می‌ماند)؛ تکرار بی اثر */

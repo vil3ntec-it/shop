@@ -62,6 +62,24 @@
   آزمون‌ها: `image-studio.test.js` ۱۳/۱۳، `image-studio-jobs.test.js` ۱۱/۱۱ (PGlite و PostgreSQL ِ محلی).
 - نیمه‌کاره: صفحهٔ «استودیوی عکسِ محصول» در برنامه‌ها (فقط API هست)؛ مدلِ حذفِ پس‌زمینه (AI-01) نیست؛ آستانه‌ها فقط روی عکسِ مصنوعی.
 - قدمِ بعدی: صفحهٔ استودیو در برنامه (core + Compose) روی همین API؛ تصمیمِ صاحب‌کار دربارهٔ مدلِ خودمیزبان (AI-01) و نگه‌داشتنِ نسخه‌های ردشده.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
+  پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
+  در `OrderRiskListsV3.kt` بی‌پلتفرم ماند و سطرِ سقف برداشته شد. بقیهٔ سقف‌های همان کامیت فقط پایین آمده بودند و دست نخوردند. quality، eslint، spec «سالم»، آینه‌های Kotlin و dari ۲۱/۲۱.
+- نیمه‌کاره: کامپایلِ اندروید/کامپیوتر و `V3ReachabilityTest` (`RiskListsRoute` ⇐ `RiskListsContent` ⇐ `RiskEntriesList`) فقط در CI.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد. `finish-pr.sh` با `[ -n "$BUMP" ]` می‌سنجد ⇒ `BUMP=0` هم سقف می‌افزاید؛ برای «بی سقفِ تازه» `BUMP` را خالی بگذارید.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-42` (بازبینیِ امنیتیِ دومِ دسته‌های ۴۱–۴۲، روی `ccr-…-batch-42` ‏a8704c12؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دو یافتهٔ Low در نگه‌داشتنِ موجودی (O-06، پرچم‌های خاموش)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-42.test.js`، ۴ آزمون):
+  SR42-1 قلمِ بزرگ‌شده (افزودنِ مشتری) جای صفِ پیشین را نگه می‌داشت ⇒ سفارشِ دیگری به بررسی می‌رفت ⇒ بزرگ شدن ته صف؛ SR42-2 بن‌بستِ گذارِ کارمند و
+  فروشِ حضوری روی PostgreSQL (`40P01`) ⇒ `FOR KEY SHARE NOWAIT` در خبرِ بررسی. شرح، «حمله شد و سالم ماند» و R5–R7 در `SECURITY-AUDIT-fa.md` B6؛ یک خطِ RULES.
+- نیمه‌کاره: هیچ. R5 (سقفِ احتکار برای هر شماره) و R6 (خاموش کردنِ پرچم نگه‌داشته‌ها را آزاد نمی‌کند) برای `OWNER-PENDING-fa.md` (هماهنگ‌کننده).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پیش از روشن کردنِ `shop.stock_reserve` تصمیمِ R5.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ci-evidence-2` (ردیف‌هایی که فقط شاهدِ CI کم داشتند، با خطِ KTEST؛ روی `ccr-…-batch-41` ‏86102aed؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: از ۲۷۸ ردیفِ PARTIAL/NOT-VERIFIED، ۱۸۸ از CI نام می‌برند؛ پنج ردیف جز شاهدِ CI کمبودی نداشتند و هر آزمونِ نام‌برده‌شان در لاگِ سرِ #1025 ‏75b13cee PASS بود ⇒
+  IMPLEMENTED-VERIFIED: POS-01، WEB-11، WEB-13، CHK-14، MKT-02 (KTEST ِ «کامپایل و آزمون» 129620741220، «ساخت نسخهٔ بومی» 129620745030، «برنامهٔ خریدِ مشتری (گزارش)» 129620744584؛
+  PostgreSQL 129620741156 و مرورگر 129620741305). همه: ۴۳۵ IV، ۲۶۱ PARTIAL. یک خطِ RULES («v3 · CI و آزمون»): کلاسِ بی متد ⇒ PASS = شمارِ `@Test`.
+- نیمه‌کاره: NTF-08، CHAT-07، CHAT-14 (برنامهٔ خرید)؛ CHAT-02، CHAT-06، POS-12، SYN-14 (دستگاه)؛ CHK-03، CHK-20، ORD-16، WEB-10 (D-09)؛ POS-10، PRD-12، STF-03، WEB-01 (صاحب‌کار)؛ CRM-03، S70، SEC-03، AI-06 (کد).
+- قدمِ بعدی: همین روش برای ردیفی که کمبودِ دیگرش بسته شد؛ لاگ با `gh api repos/vil3ntec-it/shop/actions/jobs/<id>/logs`.
 ### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
 - انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
 - قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.
@@ -83,6 +101,222 @@
 - نیمه‌کاره: سمتِ پنل (ریپوی server) — پشتِ `idempotent-writes.v1` کلیدِ پنجره را به بالادست بفرستد (مثلِ `sync-restore-once.v1`)، دکمهٔ
   «برگرداندن» پشتِ `staff-perms.v1`، و ۴۰۹ ِ `idempotency_in_progress`/`disabled_by_other_shop` را بشناسد.
 - قدمِ بعدی: شاهدِ CI ِ آزمونِ تازه؛ تصمیمِ صاحب‌کار دربارهٔ اجباری کردنِ دلیل روی disable ِ مدیر (امروز اختیاری، پل همیشه می‌فرستد).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stock-flake` (ریشهٔ سرخیِ گاه‌به‌گاهِ `web-store-stock.mjs:154`؛ روی `claude/stock-ui` ‏1c1c3f6c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ریشه = پنجرهٔ پرسشِ ۵۰۰ms ِ `catalog.refresh` (`CATALOG_REFRESH_THROTTLE_MS`) — push ِ روغنِ O-06 درونِ پنجرهٔ پرسشِ `look()` ِ پیشین
+  می‌افتاد، خواندنِ ویترین بی پرسش همان دفترِ پیش از push را می‌داد و صفحه دوباره نمی‌پرسد ⇒ دکمه تا ۱۰ ثانیه بسته. کهنگیِ تا ۵۰۰ms طراحیِ سرور است (ساختِ سفارش
+  بی مهلت می‌خواند) ⇒ رفعِ آزمون: پس از push خودِ رسیدن در دفترِ سرور با `GET /api/shop/catalog/products/oil` (قفسه ۱۰۰۰، فروختنی ۱۰۰۰، `in_stock`) و سپس ویترین.
+  شاهد: شیمِ ثبتِ پرسش‌ها ⇒ اجرای سرخ بی هیچ `hasNewer` پس از push و `oil = out_of_stock`؛ اجرای عادیِ کدِ پیشین ۲ از ۴ سرخ؛ بازتولیدِ قطعی (پاسخِ
+  `PUT /api/shop/storefront` ۶۰۰ms دیر، یا `CATALOG_REFRESH_THROTTLE_MS=5000`): کدِ پیشین PGlite ۵/۵ و ۳/۳، PostgreSQL ۲/۲ سرخ؛ کدِ تازه ۵/۵، ۵/۵ و ۲/۲ سبز؛
+  اجرای عادی ۳/۳ PGlite و ۳/۳ PostgreSQL، هر بار ۳۰ ✅. قاعده در `RULES-fa.md` «v3 · CI و آزمون».
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: ادغام در دستهٔ بعد؛ آزمونِ مرورگرِ تازه‌ای که پس از push ویترین را می‌خواند همین مانع را بگذارد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stock-ui` (سمتِ برنامهٔ O-06 = ب و پوشِ «سفارش به بررسی رفت»؛ روی `claude/p0-stock` ‏4cd1002c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) برنامهٔ مدیریت (v3): `OrderDto.stockHold`/`stockReview` (پیش‌فرض‌دار؛ نبود ⇒ هیچ)، `ui/v3/online/orders/OrderStockHold` (نشان و پیام)، نشانِ
+  «موجودیِ رزروشده کم آمد — بررسی کنید» نخستین برچسبِ `OrderTags` (کارت و سرِ جزئیات) و پیامِ حالِ نگه‌داشتن زیرِ سرِ جزئیات؛ متن‌ها در `StrOrdersHub`
+  (fa/en/ps، دری از لایه). (۲) سرور: `stock-reserve.recheckShort` ⇒ `order-notify.enqueueReviewIn` در همان تراکنش زیرِ SAVEPOINT، پشتِ `shop.stock_reserve` +
+  `shop.order_notify`، هر سفارش یک بار (یکتاییِ صف)، رویدادِ یک‌باره، متن فقط شماره؛ بررسیِ بسته پیش از فرستادن ⇒ بی پوش؛ مهاجرتِ ۵۲۰ (CHECK) + rollback.
+  آزمون: `stock-reserve-review-notify.test.js` ۶/۶ (پیش از کد ۵ سرخ) روی PGlite و PostgreSQL ۱۶؛ `stock-reserve` ۱۷، `order-notify` ۱۳، `push-fcm` ۶ روی هر دو سبز.
+- نیمه‌کاره: `OrderStockHoldTest` (۶ آزمون) و ساختِ Kotlin فقط در CI — هنوز دیده نشده. فهرستِ «در انتظار» ِ اعلان در برنامه (`/pending`) همان سفارشِ تازه می‌ماند.
+- قدمِ بعدی: شاهدِ CI (اندروید/کامپیوتر/آیفون برای `OrderStockHoldTest`)؛ روشن کردنِ `shop.stock_reserve` + `shop.order_notify` برای دکانِ آزمایشی و دیدنِ پوش روی
+  گوشیِ واقعی؛ ریسکِ مانده: یک فروشِ بزرگِ حضوری می‌تواند هم‌زمان چند سفارش را به بررسی ببرد ⇒ چند پوش (هر سفارش یکی، کارگر ۲۰ در هر دور).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p0-stock` (O-06 = ب: نگه‌داشتنِ موجودیِ سفارشِ آنلاین، ORD-20 و CHK-18؛ روی main ‏f81344458 ِ دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `lib/stock-reserve.js` + مهاجرتِ ۴۳۵ پشتِ پرچمِ تازهٔ خاموشِ `shop.stock_reserve` (در کاتالوگِ پرچم‌ها، RULES «نقشهٔ پرچم‌ها»،
+  `docs/FLAGS-ON-fa.md` §۴ب): ساختِ سفارش با موجودیِ تازه ⇒ نگه‌داشتن زیرِ قفلِ `catalog:<دکان>` (دو سفارشِ هم‌زمانِ آخرین عدد ⇒ دقیقاً یکی)،
+  مهلت `reserveTtlSec` (تنبل + جاروی دقیقه‌ای در `workers.js`)، قبول ⇒ بی‌مهلت یا دوباره یا ۴۰۹، تحویل ⇒ تا رسیدنِ فروشِ `o-<سفارش>-<قلم>`
+  (مهلتِ پشتیبانِ ۲۴ساعته) که در **همان تراکنشِ** کسرِ دستگاه «انجام‌شده» می‌شود (سرور هرگز کم نمی‌کند)، پایان ⇒ آزاد، INV-19 ⇒ بررسی؛
+  ویرایش/افزودن/بسته‌بندی ⇒ هم‌اندازه (`syncOrderIn`)؛ رفعِ ۴۰۹ ِ نادرستِ افزودنِ قلم وقتی نگه‌داشتهٔ خودِ سفارش شمرده می‌شد. ویترین:
+  کالای نگه‌داشته «ناموجود» و پیامِ «برای سفارشِ دیگری نگه داشته شده». آزمون: `stock-reserve.test.js` ۱۷ (PGlite و PostgreSQL؛ آزمونِ مسابقه
+  بی قفل روی PostgreSQL سرخ)، `web-store-stock.mjs`. STATUS: ORD-20 ⇒ PARTIAL، CHK-18 «مانع» ⇒ —؛ AI-04 (۳) همان `select` با `version` است.
+- نیمه‌کاره: نشانِ «در بررسی» و `stockHold` در برنامهٔ دکان (Kotlin) ساخته نشد؛ اعلانِ «سفارش به بررسی رفت» (#429 داشت) نه. شاهدِ CI.
+- قدمِ بعدی: شاهدِ CI؛ روشن کردنِ `shop.stock_reserve` برای یک دکانِ آزمایشی؛ ریسکِ مانده: یک شمارهٔ تأییدشده تا سقفِ RSK-07 (۱۰ سفارش در ساعت)
+  و `maxQtyMilli` می‌تواند موجودی را ۳۰ دقیقه نگه دارد — مهلت را کوتاه‌تر کنید یا سقفِ نگه‌داشتنِ هر شماره را بسازید.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chat-thread` (برگهٔ گفت‌وگو تا پاسخِ POST ِ رشتهٔ تازه رشتهٔ پیشین و کادرش را داشت؛ روی `claude/chat-flake-2`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: یافتهٔ شاخهٔ پیشین باگِ محصول بود: «گفت‌وگو با دکان» ِ سفارشِ دیگر تا پاسخِ POST ِ `/chat/conversations` عنوان، پیام‌ها و
+  کادرِ رشتهٔ پیشین را داشت و `send()` با `conv` ِ پیشین در صف می‌گذاشت ⇒ پیامِ o4 در رشتهٔ o3. رفع در `store/chat.js`: `hold(body)` (از
+  `openWith` و `start`) برگه را خالی می‌کند (`conv` ِ تهی، `loop++`، فهرست‌ها، سنجاق، عکس و صدای پیشین، کادر پنهان، عنوان از درخواست،
+  «در حالِ باز کردن…» + `aria-busy`)؛ `opening` پاسخِ دیرِ گشودنِ پیشین را می‌اندازد؛ `prev`/`reload`/`issue`/خطای حذف و ویرایش (`chat-acts.js`) فقط برای همان رشته؛
+  `draftOf` متنِ نیمه‌نوشته را به رشتهٔ دیگر نمی‌برد. `chat-out.js` دست نخورد (هر پیام `convId` ِ همان دمِ نوشتن را دارد). سرور پیامِ
+  رشتهٔ دیگرِ همان مشتری را بی سنجشِ سفارش می‌پذیرد (`rowOf` فقط دکان + شماره) — درست است، مرز برگه است.
+  بازتولید: `--require` ِ `repro-thread.cjs` (فقط `page.route`؛ POST ِ گشودنِ o4 نگه داشته، مشتری می‌نویسد و می‌فرستد، پایگاه می‌گوید
+  کدام رشته): کدِ پیشین ۷/۷ سرخ (پیام در رشتهٔ #۳؛ ۵ PGlite + ۲ PostgreSQL)، تازه ۷/۷ سبز (کادر در نگه‌داشت نیست، پیام در رشتهٔ #۴).
+  آزمون: گامِ تازهٔ `web-store-chat.mjs` (گشودنِ o3 و o4 نگه‌داشته، پاسخِ دیرِ o3 پس از o4) روی محصولِ پیشین ۴/۴ سرخ (۶ ❌)؛ کلِ پرونده ۱۸۹ ✅
+  (PGlite ۲ بار، PostgreSQL ۲ بار)؛ `web-store.mjs` ۱۳۲ و `web-store-allflags.mjs` ۳۳۵ سبز؛ `web-chat-out` ۱۱/۱۱.
+- نیمه‌کاره: هیچ.
+- قدمِ بعدی: اگر CI سرخی دیگری از همین پرونده نشان داد، با همان شیم (`page.route`) بازتولید شود.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chat-flake-2` (ریشهٔ دو سرخیِ `web-store-chat.mjs`: تمرکز پس از «حذف برای من» ِ خطِ ۵۰۰ و عکسِ خطِ ۹۴۴؛ روی `claude/chat-old`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر دو باگِ محصول بودند، نه بخت. (۱) دکمهٔ خاموشِ «بله» تمرکز را به body می‌دهد و فقط پاسخِ DELETE آن را برمی‌گرداند؛ زیرِ بار
+  long-poll ِ همان «پنهان» زودتر می‌رسید (لاگِ سرور: هر دو long-poll پیش از DELETE تمام شدند) و حباب با تمرکزِ body می‌رفت ⇒ `put` ِ
+  `store/chat.js` «کارِ busy ِ همین پیام + body» را تمرکزِ درونِ حباب می‌شمارد. (۲) پیگیریِ سفارشِ دیگر در همان سند (`#/o/…` ِ دیگر) تا پاسخ
+  سفارشِ پیشین را با کارهایش نشان می‌داد؛ آزمون (فقط `hidden` ِ خودِ کارت) کارتِ «گفت‌وگو» ِ o3 را زد و عکس به رشتهٔ o3 رفت ⇒ `wait`/`want`
+  در `store/order.js` (پیشین پنهان + «در حالِ باز کردن…»، پاسخِ دیرِ سفارشِ دیگر نمی‌نشیند) و `orderTok` در `store.js`؛ آزمون با
+  `checkVisibility()` و عنوانِ همین شماره. سه گامِ تازهٔ قطعی در آزمون (پاسخِ DELETE نگه‌داشته، GET ِ o4 نگه‌داشته، تمرکزِ رشتهٔ بسته).
+  بازتولید: `--require` ِ `repro-net.cjs` (فقط `page.route`): کدِ پیشین هر کدام ۷/۷ سرخ با همان نشانه (۵ PGlite + ۲ PostgreSQL؛ عکس: POST ِ
+  گفت‌وگو با `orderNo:3`)، تازه ۷/۷ سبز (`orderNo:4`، تمرکز روی `#ct-text`)؛ دو گامِ نگه‌داشتهٔ تازهٔ آزمون روی محصولِ پیشین ۵/۵ سرخ. کلِ پرونده: ۱۸۳ ✅
+  (PGlite ۲ بار، PostgreSQL ۲ بار)؛ ۱۲ آزمونِ مرورگرِ دیگرِ پیگیری (web-store*، web-market) سبز.
+- نیمه‌کاره: هیچ. بررسی‌نشده: `fail()` ِ `order.js` (سفارشِ دیگرِ ناموفق) فقط بخشی از کارت‌ها را پنهان می‌کند؛ کارت‌های دیربارِ سفارشِ پیشین (امتیاز، جایگزین، روش…) شاید بمانند (پیش از این شاخه هم).
+- یافتهٔ تازه (رفع‌نشده، بیرون از این دو گام): برگهٔ گفت‌وگو با «گفت‌وگو با دکان» ِ سفارشِ دیگر همان دم باز می‌شود و تا پاسخِ
+  POST ِ `/chat/conversations` عنوان، پیام‌ها و کادرِ نوشتنِ رشتهٔ پیشین را دارد و `send()` هنوز به `conv` ِ پیشین می‌فرستد (روی PostgreSQL ِ
+  محلی ۴/۴ عنوانِ «#۳» درست پس از پیدا شدنِ `#ct-form`)؛ آزمون اکنون عنوانِ همین رشته را منتظر می‌ماند.
+- قدمِ بعدی: همان برگه در `openWith` ِ `store/chat.js` تا `show()` ِ رشتهٔ تازه بدنه و فرمِ پیشین را پنهان کند (آزمون: POST ِ همان رشته
+  با `page.route` نگه داشته شود). اگر CI سرخی دیگری از همین پرونده نشان داد، با همان شیم بازتولید شود.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/chat-old` (ریشهٔ سرخیِ `web-store-chat.mjs:691` در CI ِ #1024؛ روی `origin/main`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ریشه در آزمون بود، نه محصول. گامِ «شمارهٔ دیگر» (۰۷۹۱۱۱۲۲۵۵) در همان دکان گفت‌وگوی عمومیِ دومی می‌سازد و آزمون رشتهٔ عمومی را
+  با «دکان + `order_id=''`» و `one()` ِ بی `ORDER BY` می‌گرفت. بی آمار برنامه‌ریز Index Scan ِ `idx_shop_chat_conv_inbox` (`updated_at DESC` ⇒
+  رشتهٔ تازه، سبز)؛ پس از autoanalyze ِ PostgreSQL ِ CI Seq Scan به ترتیبِ heap ⇒ رشتهٔ شمارهٔ دیگر ۸ روز کهنه شد، رشتهٔ «آرد دارید؟» باز ماند،
+  `restart` چیزی نکرد و `#ct-old` نیامد (همان لاگِ CI). اکنون با کلیدِ یکتا (دکان، شماره، '') + سنجشِ همان پیام (۱۷۶ ✅).
+  بازتولید: شیمِ `--require` که پیش از SELECT ِ آزمون `ANALYZE` می‌زند (یا از چند ردیف آخری را می‌دهد): کدِ پیشین ۱۰/۱۰ سرخ در `691:12`، تازه ۱۰/۱۰ سبز.
+- نیمه‌کاره: هیچ. زیرِ بارِ محلیِ سه مرورگرِ هم‌زمان یک بار دو گامِ دیگر (تمرکزِ پس از «حذف برای من» ِ خطِ ۵۰۰، عکسِ خطِ ۹۴۴) سرخ شد؛ تنها سبز — بررسی نشد.
+- قدمِ بعدی: اگر CI همان دو گام را سرخ نشان داد، با `Animation`/CPU-throttle ِ همان صفحه بازتولید شود.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-decisions-2` (فهرستِ یکتای تصمیم‌های مانده به‌روز شد؛ فقط سند؛ روی `ccr-3a0d593c-ac0jpj-batch-40` = main ‏b6419a69c (#1024)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ۵۴ ⇐ ۶۶ تصمیم (۹ / ۲۰ / ۱۹ / ۱۸)، هر کدام با متنِ همان شاخه و دستهٔ ۴۱ سنجیده: ۱-۹ پیامِ بازپرداخت با مبلغ و بی پیامک
+  (`claude/ntf-refund`)، ۲-۱۶ و ۲-۱۷ R2/R3 ِ `SECURITY-AUDIT-fa.md` B5 (`claude/sec-review-40`)، ۲-۱۸ S11، ۲-۱۹ ویرایشِ مجوزِ کارکنان، ۲-۲۰ دلیلِ اجباریِ disable ِ مدیر (`acct-console-2`)، ۳-۱۷ بارگذاریِ
+  بانکِ عکس، ۳-۱۸ سقفِ ~۱۰۰ ثانیهٔ Cloudflare و مهلتِ رسانهٔ پشتیبانی در درِ مدیر (ریپوی `server`، ممیزی §۹ و RULES «۱.۵۰.۷۵»/«۱.۵۰.۷۶»)،
+  ۳-۱۶ تنظیمِ تولید پس از آزمونِ بار و برداشتنِ `SYNC_V3_GATE_POOL_DEADLINE` (`PERF-LOAD-fa.md` «(سوم)» §۴، `claude/perf-2`)، ۳-۱۹ مسیرهای
+  `server.yml`، ۴-۱۷ کدِ پستیِ CRM-09، ۴-۱۸ سقفِ ۲۰ دکانِ «دیده‌شده‌ها» (`claude/shopper-gaps`). ۳-۲ با آزمونِ سوم هم‌راستا شد (مهلتِ کلِ
+  درخواست خاموش، سقفِ صف به ۳-۱۶)؛ «اسکناس» ِ برنامهٔ خرید در ۴-۱۰ (همان ۱۵ واژه)؛ دو یادداشتِ کهنه (#1023 مرج شد، `product_unit_rules`
+  با #1024 مرج شد). «مانع» ِ DLV-06 در STATUS: O-07 گرفته‌شده (ب).
+- نیمه‌کاره: هیچ. شاخه‌های منبع (`perf-2`، `ntf-refund`، `sec-review-40`، `shopper-gaps`، `acct-console-2`) در دستهٔ ۴۱‌اند و هنوز مرج نشده؛
+  اگر یکی کنار رفت، بندش را هم بردار. «مانع» ِ CHK-18/ORD-20 عمداً دست نخورد (عاملِ دیگر).
+- قدمِ بعدی: با هر جوابِ صاحب‌کار بندِ همان تصمیم به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/tender-stale` (اسکناسِ مانده پس از تغییرِ جمع، CHK-24؛ روی `claude/web-chk24` ‏b3f1b377؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دو «نیمه‌کاره» ِ بندِ `claude/web-chk24`. سرور — یک قاعده (`delivery-prefs.dropStaleTenderIn`): هر نویسندهٔ جمع/روشِ پرداخت/روشِ تحویل (ویرایشِ
+  ORD-14 در `propose` و `decide`، افزودنِ قلم، `pack` ِ جمع‌آوری با جایگزین/«پیدا نشد»، روشِ تحویل، پرداختِ آنلاین) پس از نوشتن و زیرِ همان قفل
+  اسکناسی را که از `checkTender` نمی‌گذرد برمی‌دارد، با رویدادِ `delivery_edit` ِ `system` و یادداشتِ فارسی در خطِ زمانیِ کارمند؛ `edit` بی کلیدِ اسکناس هم
+  همین را برای ردیفِ کهنه می‌کند ⇒ ویرایشِ وب، برنامهٔ خرید و کارتِ کارمند دیگر `cash_tender_*` نمی‌گیرد؛ مبلغِ فرستاده همان ۴۰۰. بی مهاجرت، بی در و بی پرچمِ تازه.
+  `payment-intents.js` در سقفِ ۸۵۵ ماند (یک UPDATE دو سطری شد). برنامهٔ خرید — `PrefsRules.body`: نقد نیست و اسکناس مانده ⇒ `cashTenderMinor: null` ِ صریح، مثلِ وب.
+  آزمون‌ها: `order-tender-stale.test.js` ۸/۸ روی PGlite و PostgreSQL ِ محلی (پیش از رفع ۰/۸ روی هر دو؛ هم‌زمانی پنج بار روی PostgreSQL، هر دو ترتیب دیده شد)،
+  و `order-delivery-prefs`، `order-amend`، `order-amend-paid`، `order-add-items`، `order-delivery-method`، `order-picking`، `payment-intents`، `pick-substitutes`،
+  `order-substitution`، `cash-tender-vectors`، `hesabpay-guard` سبز روی هر دو.
+- نیمه‌کاره: `ShopperPrefsTest.nonCashOrderWithAStoredBanknoteSendsAnExplicitNull` (و یک سطرِ عوض‌شدهٔ `bodyCarriesTheSeenVersion…` که همان باگ را قفل کرده بود) فقط CI.
+  کارتِ کارمند (`OrderDeliveryPrefsUi`) دست نخورد: اسکناسِ نشان‌داده اکنون همیشه درست یا خالی است.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-chk24` (CHK-24 در وبِ پیگیری: «با کدام اسکناس…» و رفعِ کارتِ ردشده/لغوشده؛ روی `claude/shopper-gaps-2` ‏921c168f؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: باگ — کارتِ «دستورِ تحویل» ِ `store/order.js` برای سفارشِ ردشده/لغوشده «از دکان بیرون رفته» نشان می‌داد؛ حالا مثلِ `PrefsRules.shown`
+  پنهان است (`K.orderKind` = err). همزادی — «با کدام اسکناس…» در همان کارت فقط برای «نقد هنگامِ تحویل»: یک تابعِ `K.tenders` در `kit/order-kit.js`
+  برای فرمِ ثبت و پیگیری (نسخهٔ checkout.js برداشته شد)، اسکناسِ کنونیِ درست می‌ماند، null ِ صریح، `expectedVersion`، یک درخواست در هر لحظه، ۴xx ⇒
+  پیگیری از نو و «ثبت شد» اگر همان نشست؛ کادرها با `توکن:نسخه`. جا در `order.*.json` بی بالا بردنِ سقف: `od.prefs.locked` (همان متنِ
+  `err.delivery_locked`) برداشته، نُه کلید کوتاه (`od.pf.*`، `od.pay.go/wait/fail`، `od.sub.ok/rm`)، متنِ `err.version_conflict` کوتاه و عام —
+  fa ۴۰۲۶⇐۴۰۸۳، ps ۴۰۴۲⇐۴۰۸۸، en ۲۹۱۵⇐۲۹۶۷ از ۴۰۹۶. آزمون‌ها: `web-store-zones.mjs` ۹۰ ✅ روی PGlite و PostgreSQL (پیش از رفع ۱۶ ❌، `cash-tender-vectors` ۳ از ۴ سرخ)،
+  `cash-tender-vectors` ۴/۴، `web-i18n` + `dari-text` ۴۰/۴۰، web-store/allflags/dari/paystep سبز. `server/src/app.js` ِ main ۸۰۱ خط بود (سقفِ
+  ۸۰۰، کیفیتِ main سرخ): یک توضیح کنارِ همان سطر رفت.
+- نیمه‌کاره: سرور — اسکناسی که جمعِ امروز دیگر نمی‌پذیرد (جایگزین/برداشتنِ قلم پس از ثبت) هر ویرایشِ دیگرِ دستورِ تحویل را، از کارمند هم، رد می‌کند
+  (`cash_tender_*`) تا کسی صریحاً پاکش کند؛ وب حالا null می‌فرستد، برنامهٔ خرید هم (`PrefsRules.formOf`)، ولی کارتِ کارمند نه. برنامهٔ خرید برای
+  سفارشی که پس از ثبت با حساب‌پی پرداخت شده کلیدِ اسکناس را نمی‌فرستد ⇒ اسکناسِ مانده `bad_cash_tender` می‌گیرد (وب null می‌فرستد).
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24؛ تصمیم دربارهٔ دو موردِ «نیمه‌کاره» (درست‌کردن در سرور یا در کارتِ کارمند و `PrefsRules.body`).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps-2` (CHK-24 در برنامهٔ خرید: «دستورِ تحویل» و اسکناس پس از ثبت؛ روی `claude/shopper-gaps` ‏cf438f31؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: کارتِ «دستورِ تحویل» در پیگیریِ برنامهٔ خرید، همزادِ `#o-prefs` ِ وب (`core/.../shopper/ShopperPrefs.kt` ِ `PrefsRules`،
+  `ShopperApi.editDelivery`، `OrderExtras.deliveryPrefs`؛ `customer/ui/ModelPrefs.kt` ِ `PrefsModel`، `OrderCards.DeliveryPrefsCard`):
+  «زنگ»، «تحویل به»، نشانهٔ تازه و «با کدام اسکناس…» (فقط نقد) با همان در و `expectedVersion`؛ یک درخواست در هر لحظه، بی تکرارِ خودکار،
+  ۴۰۹ + نمای تازهٔ همان ⇒ «ثبت شد». سرور: `customerPrefs` کلیدِ `cashTenderMinor` گرفت (بی آن برنامه اسکناسِ کنونی را نمی‌دانست و
+  ذخیرهٔ کادرِ دیگر پاکش می‌کرد)؛ `order-delivery-prefs.test.js` (فهرستِ کلیدها عمداً + ویرایشِ اسکناس با توکن، کدهای خطا، تکرار) ۵/۵
+  روی PGlite و PostgreSQL، پیش از رفع سرخ. بی مهاجرت، بی درِ تازه، بی پرچمِ تازه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperPrefsTest`، `ShopperTenderVectorsTest.afterPlacingOptionsAreTheSameVectorAndEachIsServerValid`،
+  `CustomerDeliveryPrefsTest`) فقط CI. ⚠️ وبِ پیگیری اسکناس را پس از ثبت نمی‌پرسد: `order.fa.json` ۴۰۲۶ از ۴۰۹۶ بایت و واژه‌نامهٔ اصلی
+  ۲۱۱۵۸ از ۲۱۵۰۴ — جا نیست مگر صاحب‌کار سقف یا جای واژه‌ها را بگوید.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24 ِ STATUS؛ تصمیمِ صاحب‌کار دربارهٔ اسکناس در وبِ پیگیری.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps` (کاستی‌های برنامهٔ خرید در برابرِ ویترین: WEB-13 و CHK-14؛ روی `origin/main` ‏f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) WEB-13 — ردیفِ «دیده‌شده‌های اخیر» در صفحهٔ دکانِ برنامهٔ خرید با همان کلیدِ `recent` ِ `GET /api/store/:slug` و همان قاعدهٔ
+  `RecentlyViewed` (core/shopper `RecentProducts`، `ShopperState.seen`؛ هر دکان ۱۲ کالا، ۳۰ روز، حداکثر ۲۰ دکان)، فقط روی دستگاه، `?ids=` با هر ورود
+  (نیامده ⇒ بیرون)، «پاک کردن»؛ `ui/ModelRecent.kt` + `ShopScreen.RecentRow`. (۲) CHK-14 — «با کدام اسکناس…» در برگهٔ ثبت فقط با
+  `features.deliveryPrefs` و ارسال (`CheckoutRules.tenderOptions`/`tenders`/`tenderOf`، `CheckoutDelivery.cashTenderMinor`؛ `CheckoutScreen.Tender`)؛
+  بردارِ مشترکِ `core/test-vectors/cash-tender-v1.json` با `server/test/cash-tender-vectors.test.js` (تابعِ `tenders` ِ `checkout.js` در vm و `checkTender` ِ سرور).
+  هیچ درِ سرور، مهاجرت یا پرچمِ تازه‌ای نیست؛ پرچمِ خاموش ⇒ همان بدنه و همان صفحه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
+  `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
+- قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/safety-kt-2` (شکافِ ماندهٔ POS-12 از شاخهٔ کهنهٔ `claude/safety-followups-kt`؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سنجشِ فایل‌به‌فایلِ شاخهٔ کهنه (دو کامیت روی دستهٔ ۳۳، ۳۰ فایل) با main: هر ۲۴ فایلِ کد و آزمون یا عیناً در main است یا main
+  از آن جلوتر است (`HeldInvoices.kt` فروشنده، `BackupRestoreDrillTest` همان، `desktop/build.gradle.kts` گزارشِ کاملِ شکست) و هر سطرِ افزودهٔ
+  سندهایش هم در main هست — همه با دستهٔ ۳۴ (#1018) آمد ⇒ **هیچ کدی آورده نشد** (دوباره‌کاری می‌شد). شاخهٔ کهنه جانشین دارد (همین main) و دست نخورد.
+  شاهدِ CI دیده‌شده: main ‏f8134445 بومی run 42742083103 (`testReleaseUnitTest` تازه، ۳۱/۳۱ کار) و کامپیوتر run 42742083227 (`./gradlew test`)
+  سبز ⇒ `HeldClaimTest`/`HeldSyncTest`/`RecoveryPhraseSecureWiringTest`/`RecoveryPhraseFlowTest`/`BackupRestoreDrillTest`/`DataSafetyGuardTest`
+  در STATUS (POS-12، S09، OPS-02) و ردیفِ پرچمِ `shop.held_sync` ِ RULES («باز» ⇐ «main»). محلی: `shop-held-invoices` ۱۱/۱۱ (PGlite و PostgreSQL)،
+  `dari-text` ۱۵، `kotlin-file-mirrors` ۶، `core-vectors-common-mirror` ۶، `keymap` ۷.
+- نیمه‌کاره: POS-12 همچنان PARTIAL — آزمون با دو دستگاهِ واقعی و آزمونِ تصویریِ برگه‌های «در دستِ دستگاه» و «دوتایی» نیست.
+- قدمِ بعدی: آزمونِ دستیِ دو گوشی با `shop.held_sync` روشن روی دکانِ آزمایشی؛ سپس تصمیمِ ارتقای POS-12.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-native` (دو ردیفِ P1 ِ فقط‌برنامه: LOC-06 پوستهٔ کامپیوتر و RPT-13 ستونِ مقایسهٔ برگهٔ فهرستی؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) RPT-13: «مقایسه» در «گزارش‌ها» ِ کامپیوتر برای فاکتور/خرید/مصرف — گروه با روشِ پرداخت/تأمین‌کننده/دسته و جمعِ همان ستون (فاکتورِ
+  لغوشده بیرون، جمع به صدم با عددِ صحیح، گروهِ فقط-دورهٔ-قبل در انتها) در `core/report/ReportCompare.group`/`grouped` (commonMain) و
+  `ReportCsv.compareGroup`/`comparedList`، صفحهٔ `ReportsDesk` پشتِ همان `ReportKeysPref`؛ `ReportCompare.format` دیگر «1.2E7» نمی‌نویسد.
+  آزمون: ۷ آزمونِ تازهٔ `ReportCompareTest` و یکی در `ReportEngineTest`. (۲) LOC-06: ۲۰ متنِ خامِ پوستهٔ کامپیوتر (سینی، عنوانِ پنجره‌ها، پنجرهٔ
+  فایل، ۱۲ ردیفِ میان‌برهای قدیم) از جدول — جملهٔ عیناً موجود یا `StrDesktop` با رونوشتِ ترجمهٔ همان جمله، بی پشتوی تازه؛ نگهبانِ
+  `DesktopTextTest` (سقفِ ۵۹). فهرستِ بی‌ترجمه‌ها برای صاحب‌کار در `docs/i18n-glossary.md` («پوستهٔ کامپیوتر»).
+- نیمه‌کاره: هیچ آزمونِ کاتلینی این‌جا اجرا نشد (بی Gradle) ⇒ شاهدِ CI ِ دسته؛ STATUS ارتقا نیافت.
+- قدمِ بعدی: ترجمهٔ صاحب‌کار برای فهرستِ glossary؛ تصمیمِ `en`/`ps` در `keymap.json` برای پنجرهٔ F1؛ پس از CI ِ سبز، RPT-13 فقط با شاهد ارتقا.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/loc-04` (ردیفِ P1 ِ LOC-04: تعطیلاتِ رسمی از سرور؛ روی `claude/loc-03` ‏a0f77ca9؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سرور از پیش در داشت (`routes/calendar.js`، `routes/admin-calendar.js`، `lib/holidays.js`)؛ کمبودها بسته شد: دلیلِ اجباری (۴۰۰ `reason_required`)،
+  سابقه با دلیل و افزوده/برداشته **در همان تراکنش**، جدولِ یکسان ⇒ `unchanged` (تکرارِ پاسخِ گم‌شده ۴۰۹ ِ دروغ نمی‌گیرد)، قفلِ تراکنشیِ کلید
+  (نخستین نوشتنِ هم‌زمان روی PostgreSQL هر دو «نسخهٔ ۱» می‌شد)، سقفِ IP ِ `calendar-ip` و `admin-calendar-ip` (در `routes/admin.js` پیش از
+  `requireAdmin`)، `from>to` ⇒ ۴۰۰، `If-None-Match` ِ چندتایی، ردیفِ خرابِ پایگاه کنار (نه ۵۰۰)، «توانایی» ِ `holidays.v1` و دو ردیفِ بندِ ۶ ِ
+  ADMIN-CONTROL-PLANE. برنامه‌ها: `core/calendar/Holidays` (commonMain؛ همان `parse` ِ سرور با بردارِ `core/test-vectors/calendar-holidays-v1.json`)،
+  `ShopDayChoice.holidays` در `rules` (نسخه در `tohid-holidays`، DATA-SAFETY §۶)، `keepHolidaysFresh` در `AppShell` (اندروید و آیفون) و `Main.kt` ِ
+  کامپیوتر — روزی یک بار، بی‌توکن و بی شناسهٔ دستگاه؛ بی جدول همان رفتارِ پیشین. `holidays.test.js` ۱۴/۱۴ روی PGlite و PostgreSQL ِ محلی.
+- نیمه‌کاره: آزمون‌های کاتلین فقط در CI (`HolidaysTest`، `HolidayVectorsTest`، `ShopWeekWiringTest`، `HolidaysPrefDesktopTest`، `DataSafetyGuardTest`)؛
+  صفحهٔ ویرایشِ جدول ساخته نشد: `server/public/admin` فقط نگه‌داری است و پنلِ مرکزی در ریپوی server (این سیزن خاموش) ⇒ `OWNER-PENDING-fa.md` ۴-۱۷.
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های بالا؛ پاسخِ صاحب‌کار به ۴-۱۷ (پیشنهاد: ویرایشگر در پنلِ مرکزی پشتِ `holidays.v1`)؛ گذاشتنِ نخستین جدول.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/loc-03` (ردیفِ P0 ِ LOC-03: هفتهٔ دکان؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: منطقِ هفته از پیش در `BusinessDay`/`WeekRules` بود ولی هیچ‌جا تنظیم نمی‌شد و خانه شنبه را ثابت داشت. تازه: `core/calendar/ShopWeek`
+  (commonMain: آغازِ شنبه/یکشنبه/دوشنبه، متنِ روزهای تعطیل، `toggle` با نگه‌داشتنِ آخرین روزِ کاری، `order`/`indexOf`)؛ `ShopDayChoice.weekStart`/
+  `closedDays`/`rules` با کلیدهای «مالِ دکان» ِ `week_start`/`closed_days` (ShopSettingsKeys و DATA-SAFETY §۶)؛ تنظیم در «تاریخ و رقم» ِ نسخهٔ ۳؛
+  آمار، نمودارِ «هفته» ِ خانه، نقشهٔ «ساعت و روز» و روزهای تخفیف همان قاعده را می‌گیرند؛ «دیروز» ِ کادرِ تاریخِ نسخهٔ ۳ (`V3Inputs`) روزِ کاری شد.
+  بردارهای `calendar.json` (weekStart +۴ با آینهٔ CoreVectorsCommonTest، dayKind +۶)؛ JS ِ locale-vectors و common-mirror ۱۳/۱۳ محلی.
+- نیمه‌کاره: آزمون‌های کاتلین فقط در CI (ShopWeekTest، StatsModelTest، HomeHeroTest، HeatmapModelTest، PromoTextTest، ShopWeekWiringTest،
+  ShopWeekPrefDesktopTest)؛ LOC-04 در برنامه (گرفتنِ `/api/calendar/holidays` و پرکردنِ `WeekRules.holidays`) و خواندنِ تنظیمِ رسیده از دستگاهِ دیگر بی بازکردنِ
+  دوباره (`ShopSettingsSync` پرونده را می‌نویسد، `ShopDayChoice` با `load` ِ بعدی می‌خواند — همان رفتارِ «پایانِ روز»)؛ خلاصهٔ پیکِ سرور هنوز شنبهٔ ثابت.
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های بالا ⇐ LOC-03 به IMPLEMENTED-VERIFIED فقط اگر صاحب‌کار «تعطیلاتِ رسمی» را جدا (LOC-04) بپذیرد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p2-close` (ردیف‌های P2 ِ PARTIAL/MISSING؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ممیزیِ ۳۹ ردیفِ P2 با سنجشِ کد؛ دو کمبودِ کدیِ سرور/وب بی مانع ساخته شد، هر دو پشتِ پرچمِ خاموش:
+  (۱) PRM-11: قاعدهٔ تخفیفِ گروه‌دار در ویترین — `shop.storefront.promo_groups`، `lib/storefront-promo-groups.js`؛ گروه فقط از قرض‌دارِ همین دکان با
+  همان شمارهٔ تأییدشده (`store-account-history.debtorRowsOf`)، دو گروهِ ناهم‌سان ⇒ بی گروه، هرگز از بدنه؛ ثبت، پیش‌نمایش و افزودنِ قلم (CHK-21) یکی.
+  (۲) SEC-10: «پاک کردنِ داده‌های من در این دکان» در «حسابِ من» ِ وب (`store/erase.js`، `features.erasure`، واژه‌نامهٔ `erase.*.json`).
+  آزمون: `storefront-promo-groups` ۵/۵ و `customer-erasure` ۶/۶ (PGlite و PostgreSQL ۱۶)، کرومیومِ `web-store-erase.mjs` ۳۱ ✅ با axe (هر دو پایگاه)؛
+  `web-store-allflags.mjs` حالا `shop.customer_erasure` را هم روشن می‌کند (۵۸ پرچم، سبز). ردیف‌های کهنه درست شد: PRM-11 («ویترین هسته را نمی‌خواند»)،
+  NTF-10 («امروز no_channel» — پوشِ وب از دستهٔ ۳۹ کانالِ `push` است)؛ شاهدِ CI ِ کادرِ وب ِ MKT-06 (main ‏b6419a69، اجرای 42752721248) ثبت شد.
+- نیمه‌کاره: هیچ‌کدام بی شاهدِ CI ارتقا نیافت. ORD-15 (کسرِ سفارشِ پرداخت‌شدهٔ آنلاین) دفترِ بازپرداختِ «معلق» با روشِ غیرنقد می‌خواهد ⇐ تصمیمِ صاحب‌کار
+  دربارهٔ روشِ بازپرداختِ پیش‌پرداخت؛ AI-03/05 رمزگشا/رمزگذارِ تصویر روی سرور می‌خواهند (وابستگیِ تازه ⇐ تصمیم)؛ RPT-18 «صفحه در پنل» روشن نیست کدام پنل.
+- قدمِ بعدی: شاهدِ CI ِ دو آزمونِ تازه و `web-store-erase.mjs`؛ آزمونِ رسیدنِ پوزشِ NTF-10 از پوشِ وب؛ متنِ ۱۶ راهنمای OPS-06 (O-14 گرفته شد، فقط Kotlin)؛
+  آزمونِ خودکارِ صفحهٔ PRM-18 (Kotlin).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ops-06` (OPS-06: متنِ راهنمای ۱۶ صفحه با F1، O-14 ب؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۱۶ ردیفِ `core/guide/ScreenGuides.kt` READY با ۵ تا ۷ گامِ فارسی و انگلیسی (۸۹ گام) — هر گام پس از خواندنِ صفحهٔ **کامپیوترِ**
+  همان مسیر (`DeskHome`، `DeskSale`، `DeskCustomers`، `DeskProducts`، `DeskPurchasing`، `ReportsDesk`، `StockRoutes`، `OrdersRouteContent`،
+  ویترین، `Promos`، `TeamRoute`، `DevicesScreen`، تنظیماتِ نسخهٔ دوم)؛ قابلیتِ پشتِ پرچمِ خاموش (پرداختِ ترکیبی، برگشتِ v2، گاوصندوقِ «به‌زودی») نیامد.
+  عنوان = سرخطِ `V3Route` با فارسی/انگلیسی/پشتوی همان جدول؛ پشتوی گام‌ها ساخته نشد (⇐ فارسی). رفعِ همراه: `AppRoot` مسیرِ `stock` را
+  `warehouse` نمی‌کرد و راهنمای انبار هرگز نمی‌آمد ⇐ `ScreenGuides.screenOf`. آزمون‌ها (فقط CI): `ScreenGuidesTest` (۶؛ دو آزمونِ «همه جای خالی»
+  عمداً به «همه READY» عوض شد)، `ScreenGuidesTextTest` ِ تازه (۴: عنوان، هر «…»/“…” = نوشتهٔ `Str*` با کلیدِ فهرست، دریِ نام = دریِ دکمه،
+  مسیرِ واقعیِ نسخهٔ ۳)، `DariWordsTest` (+۱). محلی: آینهٔ همان قاعده‌ها با `kit/dari.js` (۱۶ راهنما، ۸۹ گام، ۰ ایراد)، `dari-words.js`،
+  `dari-text` + `kotlin-file-mirrors` ۲۱/۲۱.
+- نیمه‌کاره: ویدیوها؛ پشتوی ۸۹ گام (بازبینی‌شده نداریم)؛ دکمهٔ «راهنمای این صفحه» روی گوشی (تصمیمِ صاحب‌کار، OWNER-ACTIONS بخشِ ۷). STATUS همان PARTIAL.
+- قدمِ بعدی: شاهدِ CI ِ سه آزمونِ Kotlin؛ اگر صاحب‌کار نامِ دکمه‌ای را عوض کرد، `ScreenGuidesTextTest` همان راهنما را نشان می‌دهد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/rsk-app` (RSK-03 «کارت در صف» و RSK-04 پین و صفحهٔ جدای فهرست، سمتِ برنامه؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور: `GET /api/shop/orders/risk/queue` (`order-risk.queueOf`، `routes/order-risk-queue.js`، سوار پیش از `/shop/orders`؛ سطلِ IP و سقفِ هر کاربر)
+  فقط سفارش‌های پیش از ارسال با هشدار، نشانه‌ها همان `riskOf`؛ `order-risk-queue` ۳/۳ (اول ۰/۳ سرخ) روی PGlite و PostgreSQL ِ محلی، `docs/api/routes.json` تازه؛
+  `app.js` با فشرده کردنِ دو توضیح ۸۰۰ خط ماند. (۲) هسته: `OrderRisk.queue/queueCard/cardFlags/orderPin/pinEntryError/pinEntryBody/typedPhone`. (۳) برنامه:
+  کارتِ بالای صف و نشانِ کارتِ هر سفارش (`OrderRiskQueueCardV3`، `OrderCard.risk`)، «بستنِ این جا» در کارتِ سابقه، صفحهٔ `orders/risk-lists` (`OrderRiskListsV3.kt`) از «…» ِ صف، `OrdersConfigDto.risk`.
+- نیمه‌کاره: آزمون‌های Kotlin (`OrderRiskTest` +۶، `OnlineRoutesTest` +۱، `V3ReachabilityTest` +۳ ردیف) این‌جا ساخته نشدند — فقط CI؛ کارتِ وب (وبِ یخ‌زده)؛ «دستگاه» ِ RSK-04.
+- قدمِ بعدی: شاهدِ CI ِ همین آزمون‌ها روی PR ِ دسته؛ دیدنِ کارت و صفحه روی دستگاه با پرچمِ `shop.order_risk` روشن.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/prd-08` (PRD-08: کالای وزنی با ۳ رقمِ اعشار، سرتاسری؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دروازهٔ یگانه `core/money/QtyExact` (+ هم‌زادِ `qtyExact` در `license/money.js`، بردارِ `core/test-vectors/qty-exact-v1.json` با سازندهٔ
+  `server/scripts/qty-exact-vectors.js`) و در برنامه `data/QtyExactWiring` پشتِ پرچمِ خاموشِ `shop.qty_exact` (کلیدِ `qtyExact` در
+  `GET /api/shop/stock-ledger/config` ⇐ `StockFlag`). روشن ⇒ مبلغِ ردیفِ مقدارِ اعشاری با قاعدهٔ ۳.۴ (= سفارشِ آنلاین)، همهٔ ۳۸ صدای
+  `SalesEngine.lineTotal` از همان؛ جمعِ سبد، جای خالی تا موجودی، قلم و حرکتِ انبار به هزارمِ دقیق؛ پیامِ کمبود با اعشار؛ کادرِ مقدارِ برگهٔ ردیف
+  (نسخهٔ ۳: پیام؛ کامپیوتر: کادر رقمِ چهارم نمی‌گیرد) و پیش‌نمایشِ مبلغِ `CartLineDialog`. مقدارِ درست و پرچمِ خاموش بیت‌به‌بیت همان. بی مهاجرت.
+- آزموده: `qty-exact.test.js` ۶/۶ (جاروب ۸۹۹٬۱۰۰ ⇒ ۱۳۱ فرق، همه +۱ افغانی؛ دو جهش کشته)، `shop-stock-ledger.test.js` ۲/۲ روی PGlite و
+  PostgreSQL. ⚠️ فقط CI: `QtyExactTest`، `QtyExactVectorsTest`، `QtyExactWiringTest` (Kotlin اینجا ساخته نمی‌شود).
+- نیمه‌کاره/کنار: گرد کردنِ دقیقِ ردیفِ **مقدارِ درست** با قیمتِ پول‌دار (۵۰ × ۰٫۲۹: امروز ۱۴، دقیق ۱۵؛ ۴۲ از ۹۰٬۰۰۰) تصمیمِ جدای صاحب‌کار
+  است و عمداً وصل نشد؛ `index.html` ِ یخ‌زده همان قاعدهٔ امروز؛ برگشتِ بخشی همان `ReturnShare`.
+- قدمِ بعدی: CI ِ سبزِ سه آزمونِ Kotlin، سپس ارتقای PRD-08 و روشن کردنِ `shop.qty_exact` برای یک دکانِ آزمایشی (`OWNER-PENDING` ۳-۱۴ب، `FLAGS-ON` §۱۴).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/code-gaps` (شکاف‌های کدیِ S70، SEC-03 و S48؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **SEC-03، بازبینیِ خصمانه:** نگهبانِ S89 حالتِ `enforce` را فقط از `device_id` ِ بدنه می‌گرفت ⇒ نشستِ دستگاهِ زنجیره‌دار با شناسهٔ تازه (v1) یا از `/api/sync`
+  مبلغِ فاکتورِ ثبت‌شده را سرِ جا عوض می‌کرد. حالا «زنجیره‌دار» = شناسهٔ ادعاشده یا دستگاهِ نشست (`lib/finalized-sales.js` `chainDevice`/`boundOf`؛ `lib/sync.js` و
+  `routes/sync.js` `boundDevice`)؛ راهِ قدیم با نشست/شناسهٔ زنجیره‌دار ۴۰۹. `sync-v1.js` ِ مشترک دست نخورد. آزمون: `finalized-sales-bound.test.js` ۵/۵ (PGlite و PostgreSQL، پیش از رفع ۳ سرخ).
+  (۲) **S70:** `market-units.sizeOfItem` (اندازهٔ واحدِ بی عدد از `saleUnit` و `packs`، فقط نامِ روشن و نسبتِ دقیق) در `sameProduct`؛ رابطِ وب «همین کالا در دکان‌های دیگر» روی برگهٔ
+  کالای ویترین (`store/same.js` ِ دیربار + واژه‌نامهٔ `same`، فقط با `bankProductId`)؛ آزمون‌ها: `market-units` ۶/۶، `market-same-units` ۲/۲ (هر دو پایگاه)، `web-store-same.mjs` ۲۹ ✅ با axe.
+  (۳) **S48:** شکافِ کدی نماند؛ PENDING ِ کهنهٔ `scenario-s48` درست شد و `S48.keys` حالا Enter ِ `reports.drill` را هم می‌سنجد.
+- نیمه‌کاره/باز: سندهای برگشت/قرض/خرید/حرکت نگهبانِ «ثبت‌شده» ندارند؛ ویرایشِ فاکتورِ حذف‌شده آن را با محتوای تازه زنده می‌کند (حذف فقط از راهِ `log`)؛ برنامهٔ خریدِ مشتری
+  «همین کالا» را ندارد؛ نشستِ بی زنجیره همچنان `log` (F0-02).
+- تصمیمِ صاحب‌کار: SEC-03 — رد (نه فقط رویداد) برای دستگاهِ بی زنجیره و `/api/sync` وقتی `shop.doc_chain` روشن است (برنامهٔ کهنه ویرایشش رد می‌شود)، و پیش‌فرضِ خودِ `shop.doc_chain`؛
+  S48 — پیش‌فرضِ «گزارشِ تازه» (`report_fresh`) و `shop.owner_report`؛ S70 — `market.directory` و `market.product_details`.
+- قدمِ بعدی: شاهدِ CI ِ دسته (نام‌به‌نام) برای `finalized-sales-bound`، `market-units`، `market-same-units`، `web-store-same` و `DayEndTest`؛ نگهبانِ سندهای برگشت/قرض/خرید (S89).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

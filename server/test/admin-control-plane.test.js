@@ -384,6 +384,7 @@ const CAPABILITY_PROBES = {
   'image-bank.v1': ['GET /admin/image-bank/status', 'GET /admin/image-bank/review', 'POST /admin/image-bank/images/x1/approve',
     'POST /admin/image-bank/images/x1/reject', 'POST /admin/image-bank/images/x1/archive', 'POST /admin/image-bank/images/x1/search'],
   'idempotent-writes.v1': ['POST /admin/shops/x1/staff-perms/devices/x1/enable', 'POST /admin/image-bank/images/x1/archive'],
+  'holidays.v1': ['GET /admin/calendar/holidays', 'PUT /admin/calendar/holidays'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

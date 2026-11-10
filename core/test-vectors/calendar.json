@@ -134,7 +134,11 @@
     { "iso": "2026-10-16", "rules": null, "out": "2026-10-10" },
     { "iso": "2026-10-09", "rules": null, "out": "2026-10-03" },
     { "iso": "2026-10-14", "rules": { "weekStart": 1 }, "out": "2026-10-12" },
-    { "iso": "2026-10-14", "rules": { "weekStart": 7 }, "out": "2026-10-11" }
+    { "iso": "2026-10-14", "rules": { "weekStart": 7 }, "out": "2026-10-11" },
+    { "iso": "2026-10-11", "rules": { "weekStart": 7 }, "out": "2026-10-11" },
+    { "iso": "2026-10-17", "rules": { "weekStart": 7 }, "out": "2026-10-11" },
+    { "iso": "2026-10-11", "rules": { "weekStart": 1 }, "out": "2026-10-05" },
+    { "iso": "2026-10-17", "rules": { "weekStart": 1 }, "out": "2026-10-12" }
   ],
   "dayKind": [
     { "iso": "2026-10-16", "rules": null, "out": "weekend" },
@@ -143,7 +147,13 @@
     { "iso": "2026-10-15", "rules": { "holidays": ["2026-10-15"] }, "out": "holiday" },
     { "iso": "2026-10-16", "rules": { "holidays": ["2026-10-16"] }, "out": "holiday" },
     { "iso": "2026-10-18", "rules": { "weekend": [5, 7] }, "out": "weekend" },
-    { "iso": "2026-02-30", "rules": null, "out": null }
+    { "iso": "2026-02-30", "rules": null, "out": null },
+    { "iso": "2026-10-15", "rules": { "weekend": [4, 5] }, "out": "weekend" },
+    { "iso": "2026-10-16", "rules": { "weekend": [4, 5] }, "out": "weekend" },
+    { "iso": "2026-10-17", "rules": { "weekend": [4, 5] }, "out": "work" },
+    { "iso": "2026-10-16", "rules": { "weekStart": 1, "weekend": [6, 7] }, "out": "work" },
+    { "iso": "2026-10-18", "rules": { "weekStart": 1, "weekend": [6, 7] }, "out": "weekend" },
+    { "iso": "2026-10-15", "rules": { "weekend": [], "holidays": ["2026-10-15"] }, "out": "holiday" }
   ],
   "businessDate": [
     { "local": "2026-10-14T01:30", "dayStart": 120, "out": "2026-10-13" },

@@ -5,6 +5,7 @@
  *
  *   ثبت از ویترین ─▶ orders.create ─▶ order-rate.guard: قفلِ شماره ⇒ سقفِ سرعت (RSK-07) ⇒ قیمت ⇒ checkIn ِ همین‌جا
  *   برنامهٔ دکان ──▶ GET /api/shop/orders/:id/risk ⇒ riskOf: سابقه و نشانه‌های توضیح‌دار
+ *   صفِ برنامه ────▶ GET /api/shop/orders/risk/queue ⇒ queueOf: سفارش‌های پیش از ارسال با هشدار (همان riskOf)
  *
  * ── آن‌چه این‌جا قفل است ─────────────────────────────────────────────
  *   • ⛔ پیش‌فرض خاموش: بی کلیدِ `shop.order_risk` (دکان یا `all`) هیچ قاعده‌ای اجرا نمی‌شود و
@@ -281,7 +282,34 @@ async function riskOf(shopId, orderId, { at = Date.now() } = {}) {
   return { enabled: true, policy, known: history.orders > 0, history, flags };
 }
 
+/** «پیش از ارسال»: هنوز دستِ دکان (یا ارسالِ دوباره)؛ «در راه» و «تحویل ناموفق» دیگر صف نیستند. */
+const QUEUE_STATUSES = Object.freeze(['new', 'accepted', 'picking', 'packed', 'ready_for_pickup', 'retry_scheduled']);
+/** سقفِ پویش: هر سفارش همان `riskOf` (چند پرسش) ⇒ تازه‌ترین‌ها، بیشتر ⇒ `truncated` */
+const QUEUE_LIMIT = 20;
+
+/**
+ * RSK-03 «کارت در صف»: سفارش‌های بازِ پیش از ارسالِ همین دکان (نه آزمایشی، با شماره) که دستِ کم یک نشانهٔ
+ * `warn` دارند — نشانه‌ها همان `riskOf` (بی شماره، بی دلیلِ فهرست). خاموش ⇒ `{enabled:false}`. فقط خواندن.
+ */
+async function queueOf(shopId, { at = Date.now(), limit = QUEUE_LIMIT } = {}) {
+  if (!(await flagIn(viaDb, shopId))) return { enabled: false };
+  const n = Math.max(1, Math.min(QUEUE_LIMIT, Math.trunc(Number(limit)) || QUEUE_LIMIT));
+  const rows = (await query(
+    `SELECT id, order_no, status, created_at FROM online_orders
+      WHERE shop_id = $1 AND status = ANY($2::text[]) AND customer_phone <> '' AND NOT is_test
+      ORDER BY created_at DESC, id DESC LIMIT $3`,
+    [shopId, [...QUEUE_STATUSES], n + 1]
+  )).rows;
+  const items = [];
+  for (const r of rows.slice(0, n)) {
+    const v = await riskOf(shopId, r.id, { at });
+    if (!v || !v.enabled || !v.flags.some((f) => f.severity === 'warn')) continue;
+    items.push({ orderId: r.id, orderNo: Number(r.order_no), status: r.status, createdAt: Number(r.created_at), flags: v.flags });
+  }
+  return { enabled: true, items, scanned: Math.min(rows.length, n), limit: QUEUE_LIMIT, truncated: rows.length > n };
+}
+
 module.exports = {
-  FLAG_KEY, POLICY_KEY, DEFAULTS, DEAD, COMPLETED, OPEN,
-  flagIn, policyIn, placeKey, linesKey, checkIn, riskOf,
+  FLAG_KEY, POLICY_KEY, DEFAULTS, DEAD, COMPLETED, OPEN, QUEUE_STATUSES, QUEUE_LIMIT,
+  flagIn, policyIn, placeKey, linesKey, checkIn, riskOf, queueOf,
 };

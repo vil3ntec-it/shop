@@ -499,3 +499,16 @@ test('SEC-10: scrub ِ جزئیات — کد، شناسه و عدد می‌ما�
   assert.deepEqual(['delivered', 'picked_up', 'cancelled', 'refunded_full', 'restocked', 'new', 'out_for_delivery', 'return_requested', 'returned_to_store'].map(settled),
     [true, true, true, true, true, false, false, false, false]);
 });
+
+test('SEC-10 (وب): `GET /:slug` کلیدِ `features.erasure` را فقط با پرچمِ روشن دارد — خاموش ⇒ پاسخ همان پیشین', async () => {
+  const off = await liveStore('حذفِ وب-خاموش', { erasure: false });
+  const a = await h.get(`/api/store/${off.slug}`);
+  assert.equal(a.status, 200, JSON.stringify(a.body));
+  assert.ok(!('erasure' in (a.body.features || {})), JSON.stringify(a.body.features || null));
+  const on = await liveStore('حذفِ وب-روشن');
+  const b = await h.get(`/api/store/${on.slug}`);
+  assert.equal(b.status, 200, JSON.stringify(b.body));
+  assert.equal(b.body.features && b.body.features.erasure, true);
+  //  پرچمِ دکانِ دیگر کلید را به این ویترین نمی‌دهد
+  assert.ok(!('erasure' in ((await h.get(`/api/store/${off.slug}`)).body.features || {})));
+});

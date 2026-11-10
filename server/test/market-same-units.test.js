@@ -11,6 +11,8 @@
  *   ۳) `compare` = گروه‌های هم‌سنج (پایه، کمترین، شمار) روی همهٔ پیشنهادهای پیدا‌شده، نه فقط صفحه.
  *   ۴) دو کالای یک دکان که به همان کالای بانک وصل‌اند به قیمتِ یک پایه چیده می‌شوند، نه قیمتِ خامِ
  *      دو واحدِ ناهم‌سنج (پیش‌تر «عدد ۲۰» پیش از «کارتنِ ۲۴ عددی ۴۵۰» می‌آمد).
+ *   ۵) واحدِ بی عدد («شیشه»، «بسته») اندازه را از بسته‌های کالا (`packs`) یا واحدِ فروشِ دوم (`saleUnit` + ضریب)
+ *      می‌گیرد؛ ⛔ خودِ بسته‌ها (بارکد، قیمتِ جدا) در پاسخ نیستند.
  * قاعدهٔ خالص: `market-units.test.js`.
  */
 process.env.MARKET_GATE_CACHE_MS = '0';
@@ -136,6 +138,36 @@ test('S70: قیمتِ یک دانه فقط با تعدادِ روشن؛ «ارز
 
     //  بی پیشنهاد ⇒ همان شکل
     assert.deepEqual((await h.get('/api/market/same/nothing-here')).body, { bankProductId: 'nothing-here', offers: [], compare: [] });
+  } finally {
+    await setFlag('all', 'market.product_details', false);
+  }
+});
+
+test('S70: اندازهٔ واحدِ بی عدد از بسته‌ها و واحدِ فروشِ دوم؛ بسته‌ها در پاسخ نیستند', async () => {
+  const bank = `bp-pk-${uniq()}`;
+  const e = await liveStore('شیشه‌ای', [['jar', {
+    name: 'مربا شیشه', unit: 'شیشه', salePrice: 25,
+    packs: [{ name: 'کارتن ۱۲ عددی', sizeMilli: 12000, barcodes: ['6260000000999'], priceMinor: 27000 }],
+  }]]);
+  const f = await liveStore('بسته‌ای', [['pk', { name: 'مربا بسته', unit: 'بسته', salePrice: 180, saleUnit: 'عدد', unitFactor: 0.1 }]]);
+  const g = await liveStore('کارتنِ مبهم', [['ct', { name: 'مربا کارتن', unit: 'کارتن', salePrice: 200, saleUnit: 'عدد', unitFactor: 0.0417 }]]);
+  await linkBank(e.shopId, 'jar', bank);
+  await linkBank(f.shopId, 'pk', bank);
+  await linkBank(g.shopId, 'ct', bank);
+  await setFlag('all', 'market.product_details', true);
+  try {
+    const r = await h.get(`/api/market/same/${bank}`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    const by = new Map(r.body.offers.map((o) => [o.id, o]));
+    assert.deepEqual(by.get('jar').perUnit, { base: 'piece', priceMinor: 2500 }, 'کارتنِ ۱۲ عددی = ۱۲ شیشه ⇒ شیشه یک دانه');
+    assert.deepEqual(by.get('pk').perUnit, { base: 'piece', priceMinor: 1800 }, 'یک عدد = ۰٫۱ بسته ⇒ ۱۸۰ ÷ ۱۰');
+    assert.equal(by.get('ct').perUnit, null, '۱ ÷ ۰٫۰۴۲ دانهٔ درست نیست ⇒ هیچ');
+    assert.equal(by.get('pk').cheapest, true);
+    assert.equal(by.get('jar').cheapest, false);
+    assert.equal(by.get('ct').cheapest, false);
+    assert.deepEqual(r.body.compare, [{ base: 'piece', lowestMinor: 1800, count: 2 }]);
+    const text = JSON.stringify(r.body);
+    for (const leak of ['packs', '6260000000999', '27000', 'sizeMilli']) assert.ok(!text.includes(leak), `«${leak}» در پاسخ نیست`);
   } finally {
     await setFlag('all', 'market.product_details', false);
   }

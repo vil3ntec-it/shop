@@ -44,11 +44,18 @@ const { badRequest, notFound } = require('../middleware/errors');
 const FLAG_KEY = 'shop.order_notify';
 const EVENT = 'order_created';
 /**
- * رویدادهای یک‌بارهٔ همان صف (مهاجرتِ ۲۱۳، O-01): «پرداختِ آنلاین رسید» و «مشتری سفارشِ تازه را لغو کرد». یک پوش
- * (با همان سقفِ تلاش)، بی یادآوری و بی کانالِ پشتیبان؛ پذیرفته ⇒ `delivered`. لغو همان اعلانِ «سفارشِ تازه» را در
- * گوشی جایگزین می‌کند (همان `tag`)، تا کسی سفارشِ لغوشده را آماده نکند.
+ * O-06 = ب (مهاجرتِ ۵۲۰، طرحِ #429): «سفارش به بررسی رفت» — فروشِ حضوری موجودیِ نگه‌داشتهٔ سفارش را برد
+ * (`stock-reserve.recheckShort`). همان رفتارِ یک‌باره؛ فقط با هر دو پرچمِ `shop.stock_reserve` و `shop.order_notify`
+ * ([enqueueReviewIn])، و اگر پیش از فرستادن بررسی تمام شد (پوشش، رد، لغو، گذشت) دیگر نمی‌رود.
  */
-const ONCE_EVENTS = Object.freeze(['order_paid', 'order_cancelled']);
+const REVIEW_EVENT = 'order_review';
+const RESERVE_FLAG_KEY = 'shop.stock_reserve';
+/**
+ * رویدادهای یک‌بارهٔ همان صف (مهاجرتِ ۲۱۳، O-01): «پرداختِ آنلاین رسید» و «مشتری سفارشِ تازه را لغو کرد» (و از ۵۲۰
+ * «به بررسی رفت»). یک پوش (با همان سقفِ تلاش)، بی یادآوری و بی کانالِ پشتیبان؛ پذیرفته ⇒ `delivered`. لغو همان اعلانِ
+ * «سفارشِ تازه» را در گوشی جایگزین می‌کند (همان `tag`)، تا کسی سفارشِ لغوشده را آماده نکند.
+ */
+const ONCE_EVENTS = Object.freeze(['order_paid', 'order_cancelled', REVIEW_EVENT]);
 const EVENTS = Object.freeze([EVENT, ...ONCE_EVENTS]);
 const CHANNEL = 'orders';
 /** پوشِ سفارش پس از این دیگر به گوشیِ خاموش نمی‌رسد — خبرِ «سفارشِ تازه» ِ دیروز کمکی نمی‌کند (یادآوری هست) */
@@ -80,10 +87,10 @@ function decode(text) { try { return JSON.parse(text); } catch { return null; } 
  * همان قاعدهٔ `orders.flagOf` (مقدارِ دکان بر `all` جلو می‌افتد؛ فقط `true`
  * روشن است) — ولی با `run` تا درونِ تراکنشِ ساختِ سفارش هم خوانده شود.
  */
-async function flagIn(run, shopId) {
+async function flagIn(run, shopId, key = FLAG_KEY) {
   const rows = (await run(
     'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)',
-    [FLAG_KEY, 'all', String(shopId)]
+    [key, 'all', String(shopId)]
   )).rows;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
@@ -103,6 +110,8 @@ const flagOf = (shopId) => flagIn((t, p) => query(t, p), shopId);
  */
 async function enqueueIn(run, { shopId, orderId, orderNo, at = now(), event = EVENT }) {
   if (!EVENTS.includes(event)) throw new Error(`order-notify: رویدادِ ناشناخته ${event}`);
+  //  «به بررسی رفت» پرچمِ دوم و شرطِ دکان دارد ⇒ فقط از [enqueueReviewIn]
+  if (event === REVIEW_EVENT) throw new Error('order-notify: order_review فقط از enqueueReviewIn');
   if (!(await flagIn(run, shopId))) return null;
   const r = await run(
     `INSERT INTO order_notify_outbox (id, shop_id, order_id, order_no, event, status,
@@ -113,6 +122,32 @@ async function enqueueIn(run, { shopId, orderId, orderNo, at = now(), event = EV
   );
   soon();
   return r.rows[0] ? r.rows[0].id : null;
+}
+
+/**
+ * «سفارش به بررسی رفت» — درونِ همان تراکنشی که نگه‌داشتهٔ سفارش `short_at` گرفت (`stock-reserve.recheckShort`، زیرِ
+ * قفلِ موجودیِ دکان). هر دو پرچم (خوانده با همان اتصال، بی حافظه) ⇒ یک ردیف؛ وگرنه null. سفارش فقط از **همین** دکان
+ * (`shop_id` در شرط) و نه آزمایشی؛ شماره از خودِ سفارش. هر سفارش یک بار (یکتاییِ order_id + event).
+ * @returns {Promise<string|null>} شناسهٔ اعلان
+ */
+async function enqueueReviewIn(run, { shopId, orderId, at = now() }) {
+  if (!(await flagIn(run, shopId, RESERVE_FLAG_KEY)) || !(await flagIn(run, shopId))) return null;
+  const r = await run(
+    `INSERT INTO order_notify_outbox (id, shop_id, order_id, order_no, event, status,
+                                      next_attempt_at, created_at, updated_at)
+     SELECT $1, o.shop_id, o.id, o.order_no, $4, 'pending', $5, $5, $5
+       FROM online_orders o WHERE o.id=$3 AND o.shop_id=$2 AND o.is_test = false
+     ON CONFLICT (order_id, event) DO NOTHING RETURNING id`,
+    [ulid(at), String(shopId), String(orderId || ''), REVIEW_EVENT, at]
+  );
+  soon();
+  return r.rows[0] ? r.rows[0].id : null;
+}
+
+/** بررسیِ سفارش هنوز باز است؟ (همان شرطِ نشانِ «در بررسی» ِ `stock-reserve.reviewIdsOf`) */
+async function reviewOpen(row, at) {
+  const ids = await require('./stock-reserve').reviewIdsOf((t, p) => query(t, p), row.shop_id, [row.order_id], at);
+  return ids.has(row.order_id);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -171,16 +206,19 @@ function messageFor(row, reminder, waiting = 0) {
   const open = 'برای دیدنِ جزئیات باز کنید.';
   const title = event === 'order_paid' ? `سفارشِ شمارهٔ ${faNum(no)} پرداخت شد`
     : event === 'order_cancelled' ? `مشتری سفارشِ شمارهٔ ${faNum(no)} را لغو کرد`
-      : `سفارشِ تازه — شمارهٔ ${faNum(no)}`;
-  const body = event !== EVENT ? open
+      : event === REVIEW_EVENT ? `سفارشِ شمارهٔ ${faNum(no)} به بررسی رفت`
+        : `سفارشِ تازه — شمارهٔ ${faNum(no)}`;
+  const body = event === REVIEW_EVENT ? 'موجودیِ نگه‌داشتهٔ این سفارش کم آمد (فروشِ حضوری)؛ برای تصمیم باز کنید.'
+    : event !== EVENT ? open
     : reminder ? 'این سفارش هنوز باز نشده است.'
       : count > 1 ? `${faNum(count)} سفارشِ تازه منتظرِ شماست. ${open}` : open;
   return {
     title,
     body,
     channel: CHANNEL,
-    //  «پرداخت شد» کنارِ اعلانِ سفارش می‌ماند؛ «لغو» همان اعلانِ «سفارشِ تازه» را جایگزین می‌کند
-    tag: event === 'order_paid' ? `order-${row.order_id}-paid` : `order-${row.order_id}`,
+    //  «پرداخت شد» و «به بررسی رفت» کنارِ اعلانِ سفارش می‌مانند؛ «لغو» همان اعلانِ «سفارشِ تازه» را جایگزین می‌کند
+    tag: event === 'order_paid' ? `order-${row.order_id}-paid`
+      : event === REVIEW_EVENT ? `order-${row.order_id}-review` : `order-${row.order_id}`,
     ttlSeconds: TTL_SECONDS,
     data: {
       type: 'order_notify', event, notifId: row.id, orderId: row.order_id, orderNo: String(no),
@@ -275,8 +313,13 @@ async function settle(row, lock, set) {
 
 /** رویدادِ یک‌باره: یک پوش با همان سقفِ تلاش؛ پذیرفته ⇒ `delivered`؛ بی یادآوری و بی کانالِ پشتیبان */
 async function processOnce(row, lock, at) {
-  if (!(await flagOf(row.shop_id))) {
+  const review = row.event === REVIEW_EVENT;
+  if (!(await flagOf(row.shop_id)) || (review && !(await flagIn((t, p) => query(t, p), row.shop_id, RESERVE_FLAG_KEY)))) {
     return settle(row, lock, { status: 'cancelled', last_result: 'flag_off', updated_at: at });
+  }
+  //  بررسی پیش از فرستادن تمام شد (موجودی رسید، رد/لغو/تحویل، گذشت) ⇒ کسی رسیدگی کرده؛ خبرِ کهنه نمی‌رود
+  if (review && !(await reviewOpen(row, at))) {
+    return settle(row, lock, { status: 'acked', acked_at: at, ack_source: 'order_status', updated_at: at });
   }
   const attempts = Number(row.attempts);
   if (attempts > MAX_ATTEMPTS) return settle(row, lock, { status: 'failed', attempts: MAX_ATTEMPTS, updated_at: at });
@@ -483,6 +526,6 @@ async function ack(shopId, notifId, { kind, userId = '', deviceUid = '' } = {}) 
 }
 
 module.exports = {
-  FLAG_KEY, EVENT, EVENTS, ONCE_EVENTS, CHANNEL, TTL_SECONDS, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
-  flagOf, enqueueIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
+  FLAG_KEY, EVENT, REVIEW_EVENT, EVENTS, ONCE_EVENTS, CHANNEL, TTL_SECONDS, MAX_ATTEMPTS, MAX_REMINDERS, BACKOFF_MS, ACK_WINDOW_MS, STALE_MS,
+  flagOf, enqueueIn, enqueueReviewIn, messageFor, tick, start, stop, setFallback, config, pending, ack, shape, recipientIds,
 };

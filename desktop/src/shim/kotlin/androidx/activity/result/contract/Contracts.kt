@@ -61,7 +61,7 @@ class ActivityResultContracts private constructor() {
         input.startsWith("image/") -> DesktopFiles.IMAGE
         else -> { _ -> true }
       }
-      done(DesktopFiles.open("انتخاب فایل", filter)?.let(Uri::fromFile))
+      done(DesktopFiles.open(ir.vil3ntec.tohid.core.i18n.StrDesktop.pickFile, filter)?.let(Uri::fromFile))
     }
   }
 
@@ -78,12 +78,12 @@ class ActivityResultContracts private constructor() {
 
   class CreateDocument(private val mime: String = "*/*") : ActivityResultContract<String, Uri?>() {
     override fun run(input: String, done: (Uri?) -> Unit) =
-      done(DesktopFiles.save("ذخیره", input)?.let(Uri::fromFile))
+      done(DesktopFiles.save(ir.vil3ntec.tohid.core.i18n.StrKit.save, input)?.let(Uri::fromFile))
   }
 
   class PickVisualMedia : ActivityResultContract<PickVisualMediaRequest, Uri?>() {
     override fun run(input: PickVisualMediaRequest, done: (Uri?) -> Unit) =
-      done(DesktopFiles.open("انتخاب تصویر", DesktopFiles.IMAGE)?.let(Uri::fromFile))
+      done(DesktopFiles.open(ir.vil3ntec.tohid.core.i18n.StrProducts.pickImage, DesktopFiles.IMAGE)?.let(Uri::fromFile))
 
     sealed interface VisualMediaType
     object ImageOnly : VisualMediaType
