@@ -226,6 +226,8 @@ object StrAccount {
   val permCredit: String get() = t("فروشِ قرضی (به حساب)", "Selling on credit", "په پور پلورل")
   //  STF-03: سقفِ تغییرِ قیمتِ ردیف (درصد از قیمتِ فهرست؛ سرور با پرچمِ `shop.price_cap` می‌سنجد)
   val permPrice: String get() = t("تغییرِ قیمتِ ردیف", "Changing a line price", "د کرښې د بیې بدلول")
+  //  CRM-03 (§۱۰.۱): تغییرِ سقفِ اعتبارِ مشتری (سرور با پرچمِ `shop.credit_limit_perm` می‌سنجد؛ برگهٔ مشتری `CreditLimitGate`)
+  val permCreditLimit: String get() = t("تغییرِ سقفِ اعتبارِ مشتری", "Changing a customer's credit limit", "د پېرودونکي د پور حد بدلول")
 
   //  STF-01: نقشِ سفارشی — نام + یکی از نقش‌های کارمند + مجوز و سقفِ خودش (سرور با پرچمِ `shop.custom_roles`)
   val roleCashier: String get() = t("صندوق‌دار", "Cashier", "صندوق‌دار")

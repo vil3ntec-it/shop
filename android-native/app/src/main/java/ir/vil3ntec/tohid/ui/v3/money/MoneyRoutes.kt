@@ -423,15 +423,18 @@ private fun RouteScope.DebtorFormRoute(id: String?) {
   val debtor = id?.let { k -> data.debtors.find { it.id == k } }
   if (id != null && debtor == null) { LandOn(MoneyPaths.DEBTORS); return }
   val saved = remember { arrayOfNulls<String>(1) }
+  //  CRM-03: «تغییرِ سقفِ اعتبار» (`customers.credit_limit`) پیش از ذخیره — فقط با پرچمِ `shop.credit_limit_perm` ِ دکان
+  val limitRules = ir.vil3ntec.tohid.ui.components.rememberCreditLimitRules()
   VipGate(Str.debtors) {
     DebtorFormSheet(
       debtor = debtor,
       onClose = { back() },
       onSave = { f ->
-        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
+        saved[0] = MoneyWriter.debtor(store, toasts, context, data, DebtorFormsModel.save(data, id, f, System.currentTimeMillis(), limitRules, ::moneyId), if (id == null) StrMoney.saved else StrMoney.edited)
         saved[0] != null
       },
       onSaved = { if (id == null) nav.finish(saved[0]) else back() },
+      limitRules = limitRules,
     )
   }
 }
