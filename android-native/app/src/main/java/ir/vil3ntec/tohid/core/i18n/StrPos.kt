@@ -48,6 +48,10 @@ object StrPos {
 
   // پنلِ پرداخت
   val payPanel: String get() = t("پنلِ پرداخت", "Payment panel", "د ورکړې پاڼه")
+  /** POS-41 — Alt+P ِ پنلِ پرداخت: چاپِ همین فاکتور پس از ثبت (فقط همین یکی)؛ [key] برچسبِ کلید از keymap («Alt+P») */
+  fun printThisInvoice(on: Boolean, key: String): String =
+    if (on) t("چاپِ همین فاکتور: روشن (${asIs(key)})", "Print this invoice: on ($key)", "د همدې بل چاپ: روښانه ($key)")
+    else t("چاپِ همین فاکتور: خاموش (${asIs(key)})", "Print this invoice: off ($key)", "د همدې بل چاپ: بند ($key)")
   val cashReceived: String get() = t("نقدِ دریافتی", "Cash received", "ترلاسه شوې نغدې")
   val enterExactHint: String get() = t("Enter روی کادرِ خالی = نقدِ دقیق", "Enter on an empty box = exact cash", "په تش بکس کې Enter = دقیق نغد")
   val exactCash: String get() = t("نقدِ دقیق", "Exact cash", "دقیق نغد")

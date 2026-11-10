@@ -732,10 +732,10 @@ async function rememberHeld(p) {
 async function v1Guard(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return next();
-  if (ctx.role === 'owner') return next();
   try {
+    await require('./till-guard').v1Guard(req, res);   //  POS-40: «اصلاحِ روشِ پرداخت» در v1 هم (پرچمِ `shop.sync.pay_fix`؛ صاحب هم)
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
-    if (!ops || !ops.length) return next();
+    if (ctx.role === 'owner' || !ops || !ops.length) return next();
     const { validateOp, tableOf } = require('./sync-v1');
     const valid = [];
     const rejected = new Map();

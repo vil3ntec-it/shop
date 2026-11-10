@@ -86,7 +86,7 @@
     { "id": "sale.payment.note100", "scope": "sale.payment", "title": "اسکناسِ ۱۰۰", "status": "partial", "keys": ["Shift+4"], "web": ["Shift+4"] },
     { "id": "sale.payment.note500", "scope": "sale.payment", "title": "اسکناسِ ۵۰۰", "status": "partial", "keys": ["Shift+5"], "web": ["Shift+5"] },
     { "id": "sale.payment.note1000", "scope": "sale.payment", "title": "اسکناسِ ۱۰۰۰", "status": "partial", "keys": ["Shift+6"], "web": ["Shift+6"] },
-    { "id": "sale.payment.togglePrint", "scope": "sale.payment", "title": "چاپ برای همین فاکتور: روشن یا خاموش", "status": "planned", "keys": ["Alt+P"], "web": ["Alt+P"] },
+    { "id": "sale.payment.togglePrint", "scope": "sale.payment", "title": "چاپ برای همین فاکتور: روشن یا خاموش", "status": "partial", "keys": ["Alt+P"], "web": ["Alt+P"] },
     { "id": "sale.payment.customer", "scope": "sale.payment", "title": "مشتری (برای باقی‌ماندهٔ قرضی)", "status": "partial", "keys": ["F2"], "web": ["Alt+C"] },
     { "id": "sale.payment.back", "scope": "sale.payment", "title": "برگشت به سبد، بی ثبتِ هیچ چیز", "status": "partial", "keys": ["Escape"], "web": ["Escape"] },
 

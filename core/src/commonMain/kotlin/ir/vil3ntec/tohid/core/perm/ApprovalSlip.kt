@@ -22,7 +22,7 @@ object ApprovalSlip {
   const val VERSION = 1
   const val HEADER = "tohid-approval/1"
   //  `sales.credit` (STF-03): فروشِ قرضی بیش از سقفِ کارمند — سرور با پرچمِ `shop.credit_cap` می‌سنجد
-  //  `sales.pay_fix` (POS-40): برگه فقط روی همان دستگاه، برای «نیازمند تأیید» ِ اصلاحِ روشِ پرداخت؛ سرور هنوز opی با آن نمی‌سنجد
+  //  `sales.pay_fix` (POS-40): برگه فقط روی همان دستگاه، برای «نیازمند تأیید» ِ اصلاحِ روشِ پرداخت؛ سرور با پرچمِ `shop.sync.pay_fix` می‌سنجد
   //  `sales.price` (STF-03): تغییرِ قیمتِ ردیف بیش از سقفِ کارمند — سرور با پرچمِ `shop.price_cap` می‌سنجد (`SaleCaps`)
   val PERMS: List<String> = listOf("returns.create", "sales.cancel", "sales.credit", "sales.discount", "sales.pay_fix", "sales.price")
 

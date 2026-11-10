@@ -61,7 +61,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.returns.sale_cap', scope: 'shop', default: false, what: 'برگشتِ کارمند بیش از جمعِ خودِ فاکتور رد می‌شود (SEC-DATA-07، DATA-04)' },
   //  ⛔ پیش‌فرض روشن (درستی، نه اجازه): فقط خاموش‌کنِ اضطراری — `false` ِ صریح ‎lib/return-line-cap.js‎ را برمی‌دارد
   { key: 'shop.returns.line_cap', scope: 'shop', default: true, what: 'هیچ‌کس (صاحب هم) بیش از فروخته‌شدهٔ هر قلمِ فاکتور برنمی‌گرداند؛ فقط false خاموش می‌کند (DATA-04، سفرِ JB5)' },
-  { key: 'shop.sync.pay_fix', scope: 'shop', default: false, what: 'سرور «اصلاحِ روشِ پرداخت» را می‌سنجد: مجوز و برگهٔ تأیید، و بیش از ماندهٔ روش رد (POS-40)' },
+  { key: 'shop.sync.pay_fix', scope: 'shop', default: false, what: 'سرور «اصلاحِ روشِ پرداخت» را در Sync v3 و v1 می‌سنجد: مجوز (و لایهٔ نقش) و برگهٔ تأیید، روزِ بسته، بیش از ماندهٔ روش، و سندِ اصلاحِ فقط‌افزودنی (POS-40)' },
   { key: 'shop.sync.refund_cap', scope: 'shop', default: false, what: 'بازپرداختِ سفارشِ ویژه و امانی بیش از پیش‌پرداختِ نگه‌داشته رد می‌شود (POS-26، POS-27)' },
   { key: 'shop.storefront.eta', scope: 'shop', default: false, what: 'زمانِ تقریبیِ تحویلِ ویترین (WEB-04)' },
   { key: 'shop.storefront.web_account', scope: 'shop', default: false, what: 'حسابِ مشتری در وبِ ویترین: پیشنهاد پس از ثبت، نشانی‌های نام‌دار و همگامیِ سبد (CHK-01/09، WEB-14)' },

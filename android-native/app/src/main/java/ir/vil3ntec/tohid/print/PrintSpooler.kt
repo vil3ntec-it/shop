@@ -257,9 +257,10 @@ object PrintSpooler {
    *      (POS-35)، هر نسخه کارِ جدا و به ترتیب؛ نتیجهٔ نخستین تلاشِ اصل گفته می‌شود
    *  هر چه نشد روی صفحهٔ فروش گفته می‌شود (`tillNotice`)، نه فقط در صفحهٔ دستگاه‌ها.
    *  [receipt] ⇒ فاکتور بی‌توجه به «چاپِ خودکار» (ثبتِ «کارتِ فرمان»: صفحه‌ای نیست و رسید تنها نشانِ ثبت است).
+   *  [print] — POS-41، Alt+P ِ پنلِ پرداخت: فقط برای همین فاکتور (`PrintToggle`)؛ `null` ⇒ همان «چاپِ خودکار». کشو جداست.
    */
-  fun afterSale(context: Context, data: ShopData, saleId: String, receipt: Boolean = false) {
-    val auto = receipt || autoPrint(context)
+  fun afterSale(context: Context, data: ShopData, saleId: String, receipt: Boolean = false, print: Boolean? = null) {
+    val auto = receipt || ir.vil3ntec.tohid.core.pos.PrintToggle.auto(print, autoPrint(context))
     val printer = PrinterRegistry.defaultSaved(context) ?: return
     val sale = data.sales.firstOrNull { it.id == saleId } ?: return
     //  HW-03 (فقط با «ابزارهای تازهٔ دستگاه»): فقط وقتی نقد به دخل آمد — ردیفِ نقدِ بی‌امانت در تسویهٔ
