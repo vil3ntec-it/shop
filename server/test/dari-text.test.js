@@ -210,6 +210,61 @@ d = o.t("z", "")`);
   assert.throws(() => KT.shopperTexts('t("تنها", "")'), /خوانده نشد/);
 });
 
+//  همان آزمون، بخشِ برنامهٔ دکان: `rows(I18nTables.all)` دریِ هر ویژگی/تابعِ هر جدولِ `Str*` را می‌سنجد و آن دری همیشه
+//  `DariText.of(fa)` ِ همان `t`/`td` است (I18n.kt؛ جدول دریِ جدا ندارد و جای‌خالیِ فارسی `asIs`). فارسیِ هر `t(…)`/`td(…)`
+//  از خودِ Str*.kt (`KT.appTexts`)، هر `{}` یک `protect("v<i>")` و همان `D.of`. دستهٔ ۴۳ (f067bf9c): دو نوشتهٔ تازه فقط
+//  در CI ِ اندروید سرخ شد و همهٔ JS سبز بود — این آینه همان را پیش از push می‌گیرد. `if … else` ⇒ هر دو شاخه (کاتلین فقط
+//  شاخهٔ آرگومانِ ساختگی را می‌بیند)، پس این‌جا سخت‌گیرتر است، نه سست‌تر.
+//  سقفِ خوانده‌نشده‌ها (شمرده، نه رد شدنِ بی‌صدا) = ۲، هر دو فارسی را در زمانِ اجرا می‌گیرند و کاتلین هم با آرگومانِ
+//  ساختگی به فارسی‌شان نمی‌رسد (کدِ ناشناخته ⇒ `t(asIs(id), …)`): StrOnline.coded (`t(fa, en, ps)`، فارسی از
+//  OrderText/DeliveryText) و StrOnline.deskActionLabel (`t(DeskActions.label(it), …)`). تازه‌ای ⇒ خواندنش در kt-source.js.
+const APP_UNREAD_MAX = 2;
+/** همان حلقهٔ `rows(I18nTables.all)` ِ کاتلین: «Table.key: «شکل» در «دری»» */
+const appBad = (rows) => {
+  const bad = new Set();
+  for (const r of rows) {
+    let i = 0;
+    const out = D.of(r.fa.split('{}').reduce((a, b) => a + D.protect(`v${i++}`) + b));
+    for (const w of farsiOnlyLeft(out)) bad.add(`${r.table}.${r.key}: «${w}» در «${out}»`);
+  }
+  return [...bad];
+};
+
+test('آینهٔ DariCoverageTest: جدول‌های Str ِ برنامهٔ دکان با همان of(protect) شکلِ فقط‌فارسی ندارند', () => {
+  const { tables, rows, unread } = KT.appTexts();
+  assert.deepEqual(appBad(rows), [], 'شکلِ فقط‌فارسی در دری ماند — جملهٔ کاملِ دری در DariText.PHRASES بنویسید (و node scripts/dari-words.js --write)');
+  assert.ok(unread.length <= APP_UNREAD_MAX, `نوشته‌های خوانده‌نشدهٔ Str (${unread.length} > ${APP_UNREAD_MAX}):\n${unread.join('\n')}`);
+  assert.ok(tables.length >= 125 && tables.includes('StrDebtor') && rows.length > 9000, `${tables.length} جدول، ${rows.length} نوشته`);
+  //  همان خواندنِ جدول: قالب ⇒ `{}`، `"…" + "…"` و چندسطری، `fa =`، `td`، هر دو شاخهٔ `if`، `asIs(…)`، ثابتِ پروندهٔ
+  //  دیگر (با import)، `t` ِ درونِ قالب؛ توضیحِ تودرتو، `o.t(` و `'"'` نه؛ فارسیِ متغیر ⇒ unread با جایش
+  const fake = KT.tableTexts(`import ir.vil3ntec.tohid.core.courier.CourierInputText
+object StrFake {
+  /* t("توضیح") /* تودرتو */ */
+  val a: String get() = t("x \${asIs(n)} y", "e") // t("نه")
+  fun b(n: Int): String = t(
+    "p" +
+      "q$n",
+    "e",
+  )
+  val c get() = td(fa = "r", "e", "p", "e", "p")
+  fun d(o: Boolean) = t("s" + if (o) "1" else "2", "e")
+  val e get() = t(CourierInputText.KEY_REUSED, "e")
+  val f get() = o.t("z") + '"' + t("\${t("درون")} بیرون")
+  private fun g(fa: String) = t(fa, null, null)
+  val h: String get() = t("آینهٔ جدول؛ دوباره بزنید.", "e")
+}
+val outside get() = t("بیرون از جدول")`, 'StrFake');
+  assert.deepEqual(fake.rows.map((r) => `${r.key}=${r.fa}`),
+    ['a=x {} y', 'b=pq{}', 'c=r', 'd=s1', 'd=s2', 'e=این شناسه در صف هست', 'f={} بیرون', 'f=درون', 'h=آینهٔ جدول؛ دوباره بزنید.']);
+  assert.deepEqual(fake.unread, ['StrFake.g: متغیرِ «fa»']);
+  //  خودِ سنجه سرخ می‌شود (جملهٔ ساختگی تا جملهٔ تازهٔ PHRASES بی‌اثرش نکند)؛ جدولِ بیرون از I18nTables یا تکراری خطاست
+  const h = 'آینهٔ جدول؛ دوباره بزنید.';
+  assert.ok(!(D.shape(h) in D.DATA.phrases), h);
+  assert.deepEqual(appBad(fake.rows), [`StrFake.h: «دوباره بزنید» در «${D.of(h)}»`]);
+  assert.throws(() => KT.appTables('val all: List<Any> get() = listOf(StrA, StrA)'), /تکراری/);
+  assert.throws(() => KT.appTables('val all: List<Any> get() = listOf(StrA, "x")'), /ناشناخته/);
+});
+
 test('جملهٔ کاملِ دری با {} (کلید‌به‌کلید): مقدار و {جای‌خالی} بایت‌به‌بایت سرِ جای خود', () => {
   //  همان PHRASES ِ کاتلین: هر {} یک مقدارِ asIs است، به همان ترتیب
   assert.equal(D.of(`PIN درست نیست — ${p('2')} تلاش مانده`), 'PIN درست نیست — 2 بار دیگر می‌توانید کوشش کنید');
