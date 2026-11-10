@@ -3,7 +3,9 @@
  *
  *   • پیش‌فرض خاموش: داشبورد و صفحهٔ گزارش همان امروزند
  *   • هستهٔ گزارش و تابلو در مرورگر همان پاسخِ آزمون‌های مرجع را می‌دهند (report-v1 و report-board-v1)
- *   • کارتِ خانه = جمعِ فهرستی که با کلیک باز می‌شود؛ نشانِ وضعیت «متن + رنگ + نقطه»؛ سود «تقریبی»
+ *   • کارتِ خانه = جمعِ فهرستی که با کلیک باز می‌شود؛ نشانِ وضعیت «متن + رنگ + نقطه»
+ *   • RPT-03: سود با روشِ مصوب (میانگینِ موزون، `costApproved`)؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر و همیشه «تقریبی»
+ *   • RPT-11: اکسل = ‎.xlsx‎ ِ واقعی (عدد عدد)، PDF ِ مستقیم (A4، صفحه‌بندی، سقفِ ۵۰۰ صفحه)
  *   • مرتب‌سازی با سرستون، کارت/جدول (ترجیحِ همین دستگاه)، CSV، گوشی همیشه کارت، axe
  *
  * اجرا:  node test/web-report-fresh.mjs
@@ -45,7 +47,41 @@ const DATE = '2026-10-14';
 const B = require(path.join(ROOT, 'license/report-board.js'));
 const C = require(path.join(ROOT, 'license/report-core.js'));
 const CLOCK = { offsetMinutes: 270, dayStartMinute: 0 };
-const HOME = B.build(LEDGER, { date: DATE, clock: CLOCK });
+//  RPT-03: روشِ پیش‌فرضِ صفحه همان روشِ مصوب (D-23، میانگینِ موزون) با تأییدِ هسته
+const MAVG = { costing: 'mavg', costApproved: true };
+const HOME = B.build(LEDGER, { date: DATE, clock: CLOCK, ...MAVG });
+//  همان دفتر بی فاکتورِ قلمِ بی‌کالا و بی فاکتورِ بی‌قلم ⇒ هیچ قلمِ بی‌بها: سودِ میانگینِ موزون «قطعی» است
+const FINAL = (() => {
+  const L = JSON.parse(JSON.stringify(LEDGER));
+  const has = new Set(L.saleItems.map((i) => i.saleId));
+  const drop = new Set([...L.saleItems.filter((i) => !i.productId).map((i) => i.saleId), ...L.sales.filter((x) => !has.has(x.id)).map((x) => x.id)]);
+  L.sales = L.sales.filter((x) => !drop.has(x.id)); L.saleItems = L.saleItems.filter((i) => !drop.has(i.saleId)); L.returns = L.returns.filter((r) => !drop.has(r.saleId));
+  return L;
+})();
+const P = require(path.join(ROOT, 'license/report-pdf.js'));
+/** پرونده‌های یک ZIP (‎.xlsx‎) ⇐ {نام: متن}؛ فقط stored و deflate */
+function unzip(buf) {
+  const zlib = require('node:zlib'), out = {};
+  let at = 0;
+  while (buf.readUInt32LE(at) === 0x04034b50) {
+    const method = buf.readUInt16LE(at + 8), size = buf.readUInt32LE(at + 18), nl = buf.readUInt16LE(at + 26), xl = buf.readUInt16LE(at + 28);
+    const name = buf.subarray(at + 30, at + 30 + nl).toString('utf8'), data = buf.subarray(at + 30 + nl + xl, at + 30 + nl + xl + size);
+    out[name] = (method === 8 ? zlib.inflateRawSync(data) : data).toString('utf8');
+    at += 30 + nl + xl + size;
+  }
+  return out;
+}
+/** نقطه‌های سیاهِ هر صفحهٔ PDF ِ تصویری (همان RunLengthDecode) */
+function pdfPages(buf) {
+  const t = buf.toString('latin1'), pages = [];
+  for (const m of t.matchAll(/\/Width (\d+) \/Height (\d+) [^>]*\/Length (\d+) >>\nstream\n/g)) {
+    const bits = P.runLengthDecode(buf.subarray(m.index + m[0].length, m.index + m[0].length + Number(m[3])));
+    let black = 0;
+    for (const b of bits) for (let k = b; k; k &= k - 1) black++;
+    pages.push({ w: Number(m[1]), h: Number(m[2]), bytes: bits.length, black });
+  }
+  return pages;
+}
 const AF = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 const money = (minor) => AF.format(Math.round(minor / 100));
 
@@ -214,17 +250,24 @@ await step('RSK-10: هشدارِ رفتارِ غیرعادیِ صندوقدار 
   await quiet.ctx.close();
 });
 
-await step('سود و حاشیه همیشه «تقریبی»؛ مرتب‌سازی با سرستون؛ کارت/جدول؛ CSV', async () => {
+await step('RPT-03: سود و حاشیه با روشِ مصوب (میانگینِ موزون)؛ مرتب‌سازی با سرستون؛ کارت/جدول؛ CSV', async () => {
   const { pg, ctx, errors } = await open(1366, '1');
   await go(pg, 'reports');
   await pg.click('#rep-fresh button[data-rtab="profit"]');
   await pg.click('#rep-fresh button[data-span="all"]');
-  const title = await pg.locator('#rep-fresh table.rf-table caption').textContent();
-  assert.ok(title.includes('تقریبی'), title);
-  assert.ok((await pg.locator('#rep-fresh .rf-note').textContent()).includes('سود تقریبی'));
-  assert.ok((await pg.locator('#rep-fresh .rf-stats').textContent()).includes('سود ناخالص (تقریبی)'));
-  const all = C.sales(LEDGER, { clock: CLOCK });
+  const all = C.sales(LEDGER, { clock: CLOCK, ...MAVG });
+  assert.equal(all.totals.profitApproximate, true, 'دفترِ مرجع قلمِ بی‌بها دارد');
+  assert.notEqual(all.totals.grossProfit, C.sales(LEDGER, { clock: CLOCK }).totals.grossProfit, 'دو روش در دفترِ مرجع یک عدد نمی‌دهند');
   assert.equal(await footCell(pg, 'سود ناخالص'), money(all.totals.grossProfit));
+  assert.equal(await footCell(pg, 'بهای تمام‌شده'), money(all.totals.cogs));
+  //  روشِ مصوب ⇒ برچسب بی «تقریبی»؛ قلمِ بی‌بها ⇒ نشانِ «سود تقریبی» و شمارش، با شرحِ روش
+  const title = await pg.locator('#rep-fresh table.rf-table caption').textContent();
+  assert.equal(title, 'سود و حاشیه به تفکیک کالا');
+  const stats = await pg.locator('#rep-fresh .rf-stats .rf-stat .t').allTextContents();
+  assert.deepEqual(stats, ['فروش خالص', 'بهای تمام‌شده', 'سود ناخالص', 'حاشیه']);
+  const note = await pg.locator('#rep-fresh .rf-note').textContent();
+  assert.ok(note.includes('سود تقریبی') && note.includes(B.COST.explain('mavg')) && note.includes(`${all.totals.costEstimatedLines} قلم بی بهای خرید است.`), note);
+  assert.deepEqual(await pressed(pg, 'data-cost'), ['mavg']);
 
   //  مرتب‌سازی: «سود ناخالص» نزولی، بعد صعودی — با کیبورد هم (دکمهٔ سرستون)
   const col = await pg.evaluate(() => [...document.querySelectorAll('#rep-fresh thead th')].findIndex(th => th.textContent.trim() === 'سود ناخالص'));
@@ -264,6 +307,103 @@ await step('سود و حاشیه همیشه «تقریبی»؛ مرتب‌ساز
   await pg.reload(); await pg.waitForTimeout(900);
   await go(pg, 'reports');
   assert.equal(await pg.locator('#rep-fresh .rf-cards').count() > 0, true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-03: بی قلمِ بی‌بها ⇒ «سود قطعی»؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر و همیشه «تقریبی»', async () => {
+  const { pg, ctx, errors } = await open(1366, '1', FINAL);
+  const want = { mavg: C.sales(FINAL, { clock: CLOCK, ...MAVG }).totals, line: C.sales(FINAL, { clock: CLOCK }).totals };
+  assert.equal(want.mavg.profitApproximate, false);
+  assert.equal(want.line.profitApproximate, true);
+  //  کارتِ خانه با همان روش و همان تأیید
+  await go(pg, 'dashboard');
+  const homeOf = (o) => B.build(FINAL, { date: DATE, clock: CLOCK, ...o }).kpis.find((k) => k.id === 'grossProfit');
+  const card = async () => pg.$eval('#dash-fresh .rf-kpi[data-kpi="grossProfit"]', (e) => ({ t: e.querySelector('.t').textContent.trim(), v: e.querySelector('.v').textContent.trim() }));
+  assert.deepEqual(await card(), { t: homeOf(MAVG).title, v: `${money(homeOf(MAVG).value)} ؋` });
+  assert.equal(homeOf(MAVG).approximate, false);
+  await go(pg, 'reports');
+  await pg.click('#rep-fresh button[data-rtab="profit"]');
+  await pg.click('#rep-fresh button[data-span="all"]');
+  assert.equal(await footCell(pg, 'سود ناخالص'), money(want.mavg.grossProfit));
+  assert.equal(await pg.locator('#rep-fresh .rf-note .rf-pill.rf-success').textContent(), 'سود قطعی');
+  assert.equal(await pg.locator('#rep-fresh .rf-note .rf-warning').count(), 0);
+
+  //  «قیمت خرید روی قلم»: عددِ همان روش، برچسبِ «(تقریبی، قیمت خرید روی قلم)» و شرحِ روشِ مصوب؛ فوکوس روی همان دکمه
+  await pg.focus('#rep-fresh button[data-cost="line"]'); await pg.keyboard.press('Enter');
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-cost')), 'line');
+  assert.equal(await pg.evaluate(() => document.activeElement && document.activeElement.dataset.cost), 'line');
+  assert.equal(await footCell(pg, 'سود ناخالص'), money(want.line.grossProfit));
+  assert.equal(await pg.locator('#rep-fresh table.rf-table caption').textContent(), 'سود و حاشیه به تفکیک کالا (تقریبی، قیمت خرید روی قلم)');
+  assert.deepEqual(await pg.locator('#rep-fresh .rf-stats .rf-stat .t').allTextContents(),
+    ['فروش خالص', 'بهای تمام‌شده (تقریبی، قیمت خرید روی قلم)', 'سود ناخالص (تقریبی، قیمت خرید روی قلم)', 'حاشیه (تقریبی، قیمت خرید روی قلم)']);
+  const note = await pg.locator('#rep-fresh .rf-note').textContent();
+  assert.ok(note.includes('سود تقریبی') && note.includes('«میانگین موزون»'), note);
+  //  ترجیحِ همین مرورگر: پس از بارگذاری و در کارتِ خانه هم
+  await pg.reload(); await pg.waitForTimeout(900);
+  await go(pg, 'dashboard');
+  assert.deepEqual(await card(), { t: homeOf({}).title, v: `${money(homeOf({}).value)} ؋` });
+  assert.ok(homeOf({}).title.includes('تقریبی'));
+  await go(pg, 'reports');
+  await pg.click('#rep-fresh button[data-rtab="profit"]');
+  assert.deepEqual(await pressed(pg, 'data-cost'), ['line']);
+  await pg.click('#rep-fresh button[data-cost="mavg"]');
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-cost')), 'mavg');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-11: اکسل = ‎.xlsx‎ ِ واقعی (عدد عدد، راست‌به‌چپ) و PDF ِ مستقیم (A4، صفحه‌بندی، سقفِ صفحه)', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.click('#rep-fresh button[data-rtab="profit"]');
+  await pg.click('#rep-fresh button[data-span="all"]');
+  const t = C.plain(C.tables('sales', C.sales(LEDGER, { clock: CLOCK, ...MAVG })).find((x) => x.id === 'sales.product'));
+  const gp = t.head.indexOf('سود ناخالص');
+
+  const [dx] = await Promise.all([pg.waitForEvent('download'), pg.click('#rep-fresh button[data-act="xlsx"]')]);
+  const zip = fs.readFileSync(await dx.path());
+  assert.equal(zip.subarray(0, 2).toString(), 'PK');
+  const files = unzip(zip);
+  const sheet = files['xl/worksheets/sheet1.xml'];
+  assert.ok(sheet && files['xl/workbook.xml'] && files['[Content_Types].xml'], Object.keys(files).join(','));
+  assert.ok(sheet.includes('rightToLeft="1"') && sheet.includes('state="frozen"'));
+  assert.ok(sheet.includes('<t xml:space="preserve">سود ناخالص</t>') && sheet.includes('<t xml:space="preserve">جمع</t>'));
+  //  جمعِ «سود ناخالص» عددِ اکسل است، نه متن
+  assert.ok(sheet.includes(`<v>${t.total[gp]}</v>`), `${t.total[gp]} عدد نیست`);
+  assert.ok(!sheet.includes(`>${t.total[gp]}</t>`));
+
+  const [dp] = await Promise.all([pg.waitForEvent('download'), pg.click('#rep-fresh button[data-act="pdf"]')]);
+  const pdf = fs.readFileSync(await dp.path());
+  assert.equal(pdf.subarray(0, 9).toString(), '%PDF-1.4\n');
+  const pages = pdfPages(pdf);
+  assert.equal(pages.length, 1);
+  assert.deepEqual([pages[0].w, pages[0].h, pages[0].bytes], [1240, 1754, 155 * 1754]);
+  //  جدول و نوشته روی صفحه هست، صفحه سیاه نیست
+  assert.ok(pages[0].black > 3000 && pages[0].black < 1240 * 1754 / 4, String(pages[0].black));
+  assert.ok(pdf.toString('latin1').includes('/MediaBox [0 0 595.2 841.92]'));
+  if (fs.existsSync('/usr/bin/pdfinfo')) {
+    const f = path.join(path.dirname(await dp.path()), 'rpt11.pdf');
+    fs.writeFileSync(f, pdf);
+    const info = execSync(`pdfinfo "${f}"`, { encoding: 'utf8' });
+    assert.ok(/Pages:\s+1\b/.test(info) && /595\.2 x 841\.92 pts \(A4\)/.test(info), info);
+  }
+  assert.equal(await pg.locator('#rep-fresh button[data-act="pdf"]').isDisabled(), false);
+
+  //  صفحه‌بندی: ۲۰۰ ردیف ⇒ چند صفحه، هر کدام با سرستون؛ بیش از سقف ⇒ خطای روشن، نه PDF ِ ناقص
+  const multi = await pg.evaluate(() => {
+    const rows = [['کالا', 'فروش', 'سود']];
+    for (let i = 0; i < 200; i++) rows.push(['کالای ' + i, String(i * 10), String(i)]);
+    return window.TohidReportPdf.render(rows, { title: 'آزمون' }).map((p) => { let n = 0; for (const b of p.bits) for (let k = b; k; k &= k - 1) n++; return n; });
+  });
+  assert.ok(multi.length >= 3 && multi.every((n) => n > 2000), multi.join(','));
+  const cap = await pg.evaluate(() => {
+    const rows = [['کالا']];
+    for (let i = 0; i < 40000; i++) rows.push(['x']);
+    try { window.TohidReportPdf.render(rows, {}); return 'made'; } catch (e) { return `${e.code}:${e.max}`; }
+  });
+  assert.equal(cap, 'too_many_pages:500');
+
   assert.deepEqual(errors, []);
   await ctx.close();
 });

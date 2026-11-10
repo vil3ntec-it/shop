@@ -451,7 +451,7 @@
 
   function shown(c) {
     if (!c) return '';
-    if (c.t === 's') return c.v;
+    if (c.t === 's' || c.t === 'g') return c.v;
     if (c.t === 'n') return num(c.v);
     if (c.t === 'b') return 'TRUE';
     return '0000-00-00 00:00';
@@ -471,6 +471,12 @@
   function cellXml(ref, c, head) {
     if (head) return textCell(ref, shown(c), true);
     if (c.t === 's') return textCell(ref, c.v, false);
+    //  RPT-11: متنِ گزارش — اگر عدد بنماید عدد (همان `Xlsx.Cell.Guess` ِ برنامه، بی گرد و بی تبدیل)
+    if (c.t === 'g') {
+      var g = String(c.v).replace(/^\s+|\s+$/g, '').replace(/[٬,]/g, '');
+      if (!/^-?[0-9]+(\.[0-9]+)?$/.test(g)) return textCell(ref, c.v, false);
+      return '<c r="' + ref + '"' + (g.indexOf('.') >= 0 ? '' : ' s="2"') + '><v>' + g + '</v></c>';
+    }
     if (c.t === 'b') return '<c r="' + ref + '" t="b"><v>' + (c.v ? 1 : 0) + '</v></c>';
     //  ۲۵۵۶۹ = روزهای ۱۹۰۰/۰۱/۰۰ تا ۱۹۷۰/۰۱/۰۱ در تقویمِ اکسل
     if (c.t === 'd') return '<c r="' + ref + '" s="3"><v>' + (c.v / 86400000 + 25569) + '</v></c>';
@@ -648,6 +654,13 @@
   /** فایلِ ‎.xlsx‎ از برگه‌ها ⇐ Promise<Uint8Array> */
   function xlsx(list, opts) { return zip(bookFiles(list || []), !(opts && opts.compress === false)); }
 
+  /** RPT-11: یک برگهٔ گزارش از ماتریسِ متن (همان CSV و چاپ) ⇐ Promise<Uint8Array>؛ همان `Xlsx.of(ReportCsv.Sheet)` */
+  function report(name, rows, opts) {
+    return xlsx([{ name: name, rows: (rows || []).map(function (r) {
+      return r.map(function (v) { return { t: 'g', v: v === null || v === undefined ? '' : String(v) }; });
+    }) }], opts);
+  }
+
   /* ------------------------------ ذخیره در مرورگر ------------------------------ */
 
   /**
@@ -693,6 +706,7 @@
     parse: parse,
     sheets: sheets,
     xlsx: xlsx,
+    report: report,
     crc32: crc32,
     save: save
   };

@@ -5,7 +5,7 @@
    فقط می‌گوید «کدام کارت، کدام عدد، کدام نشان، و کلیک به کدام فهرست» —
    v3 §۱۹.۵ بند ۲ و VISUAL-DIRECTION §۳ بند ۲. عددِ تازه‌ای نمی‌سازد؛ هر
    عدد همان عددِ هسته است (پس کارت و جمعِ جدولِ مقصد همیشه یکی‌اند).
-   سود تا تصمیمِ D-23 «تقریبی» نوشته می‌شود (v3 §۱۵.۴ بند ۴).
+   سود فقط وقتی «تقریبی» است که روشِ بهای صفحه مصوب نباشد یا قلمی بی‌بها باشد (D-23 گرفته‌شده؛ `COST`).
 
    دوقلوی `core/report/ReportBoard.kt`؛ هر دو `core/test-vectors/report-board-v1.json`
    را عیناً می‌گذرانند. رفتارِ یکی را بی دیگری و بی فایلِ مرجع عوض نکنید.
@@ -43,6 +43,46 @@
   var DIMS = ['product', 'category', 'user', 'hour', 'payment', 'channel'];
   var DIM_LABELS = { product: 'کالا', category: 'دسته', user: 'کاربر', hour: 'ساعت', payment: 'روش پرداخت', channel: 'کانال' };
   var VS = 'نسبت به دیروز';
+
+  /*
+   * RPT-03 — روشِ بهای سود و حاشیه؛ دوقلوی `core/cost/CostPolicy.kt` (بردار: `core/test-vectors/cost-policy-v1.json`،
+   * JS: `cost-policy-vectors.test.js`، Kotlin: `CostPolicyVectorsTest`). D-23 (۱۴۰۵/۰۸/۱۳): پیش‌فرض و مصوب میانگینِ موزون؛
+   * «قیمت خرید روی قلم» انتخابیِ همین دستگاه و همیشه «تقریبی». `decided` ِ نیامده = مصوب، `null` = هنوز تصمیم نشده.
+   */
+  var COST_METHODS = [
+    { id: 'line', label: 'قیمت خرید روی قلم', note: 'بهای هر قلم همان قیمتِ خریدی است که هنگامِ فروش روی قلم ثبت شد (رفتارِ پیشین).' },
+    { id: 'mavg', label: 'میانگین موزون', note: 'میانگینِ موزونِ متحرکِ هر کالا از ورودهای انبار، فروش و برگشت به ترتیبِ زمان؛ پیش از نخستین ورود همان قیمتِ روی قلم.' },
+  ];
+  var COST_DEFAULT = 'mavg';
+  var COST_DECIDED = 'mavg';
+
+  function costMethod(id) { return COST_METHODS.filter(function (m) { return m.id === id; })[0] || null; }
+  function decidedOf(d) { return d === undefined ? COST_DECIDED : d; }
+  /** مقدارِ ذخیره‌شده ⇒ شناسهٔ روش؛ نبود یا ناشناخته ⇒ پیش‌فرض (هرگز خطا) */
+  function costParse(stored) {
+    var s = stored === null || stored === undefined ? '' : String(stored).replace(/^[ \t\r\n]+|[ \t\r\n]+$/g, '');
+    return costMethod(s) ? s : COST_DEFAULT;
+  }
+  /** سودِ این روش قطعی است؟ فقط اگر D-23 همین را مصوب کرده باشد */
+  function costApproved(m, decided) { var d = decidedOf(decided); return d !== null && m === d; }
+  /** «سود ناخالص» / «… (تقریبی، قیمت خرید روی قلم)» */
+  function costLabel(base, m, decided) {
+    var tags = [];
+    if (!costApproved(m, decided)) tags.push('تقریبی');
+    if (m !== COST_DEFAULT) tags.push(costMethod(m).label.split(' (')[0].replace(/^\s+|\s+$/g, ''));
+    return tags.length ? base + ' (' + tags.join('، ') + ')' : base;
+  }
+  /** یک جمله زیرِ کارت‌های سود: روش، و چرا تقریبی است */
+  function costExplain(m, decided) {
+    var d = decidedOf(decided);
+    if (costApproved(m, decided)) return costMethod(m).note;
+    if (d === null) return costMethod(m).note + ' روشِ بهای تمام‌شده هنوز تصمیم نشده (D-23)؛ سود تقریبی است.';
+    return costMethod(m).note + ' روشِ مصوبِ بها (D-23) «' + costMethod(d).label + '» است؛ این سود تقریبی است.';
+  }
+  var COST = {
+    DEFAULT: COST_DEFAULT, DECIDED: COST_DECIDED, METHODS: COST_METHODS,
+    parse: costParse, approved: costApproved, label: costLabel, explain: costExplain,
+  };
 
   function preset(tab, span, dim) { return { tab: tab, span: span, dim: dim }; }
 
@@ -227,6 +267,7 @@
     TABS: TABS,
     DIMS: DIMS,
     DIM_LABELS: DIM_LABELS,
+    COST: COST,
     range: range,
     pct: pct,
     deltaText: deltaText,
