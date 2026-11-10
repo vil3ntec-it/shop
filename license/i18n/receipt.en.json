@@ -56,5 +56,6 @@
   "payOnline": "Online payment",
   "payCod": "Cash on delivery",
   "payAccount": "To customer account",
-  "payAfPayCard": "AfPay card"
+  "payAfPayCard": "AfPay card",
+  "payFx": "Foreign cash"
 }
