@@ -8,6 +8,7 @@
  * `store_not_found` ِ `sf.open` (SUB-10: دستهٔ STORE_PAID ِ `paid-routes-public-entitlement.test.js`). پرچمِ
  * `shop.orders.online_report` ِ همان دکان خاموش ⇒ `next()`، همان پاسخِ مسیرِ ناشناختهٔ امروز و هیچ ردیف.
  * عمومی و بی‌توکن: هیچ دادهٔ مشتری نمی‌گیرد و نمی‌دهد؛ shop_id فقط از `slug`؛ IP و مرورگر فقط در HMAC ِ روزانه.
+ * ⛔ `Sec-Fetch-Site: cross-site` ⇒ همان ۲۰۴ و هیچ شمارش (SR40-3).
  */
 const express = require('express');
 const config = require('../config');
@@ -23,7 +24,11 @@ router.post('/:slug/funnel/:step', beatLimit, async (req, res, next) => {
   const store = await sf.open(req.params.slug);
   if (!(await funnel.flagOn(store.shop_id))) return next();
   const step = funnel.stepOf(req.params.step);
-  await funnel.record(store.shop_id, step, { ip: clientIp(req), ua: req.get('user-agent') || '' });
+  //  ⛔ بازبینیِ ۴۰ (SR40-3): تپشِ سایتِ دیگر (`sendBeacon` از مرورگرِ بازدیدکنندهٔ خودش، IP ِ واقعی و بیرون از سقفِ IP) شمرده
+  //  نمی‌شود؛ همان ۲۰۴ (بی نشانه). مرورگر این سرآیند را می‌گذارد و صفحه نمی‌تواند عوضش کند؛ ابزارِ بی سرآیند همان سقفِ IP را دارد.
+  if (req.get('sec-fetch-site') !== 'cross-site') {
+    await funnel.record(store.shop_id, step, { ip: clientIp(req), ua: req.get('user-agent') || '' });
+  }
   res.set('Cache-Control', 'no-store').status(204).end();
 });
 

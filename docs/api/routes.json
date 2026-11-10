@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1009,
+    "routes": 1010,
     "byAuth": {
       "none-detected": 194,
-      "admin": 278,
+      "admin": 279,
       "inline": 2,
       "user": 492,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 702,
-      "empty": 305,
+      "extracted": 701,
+      "empty": 307,
       "unresolved": 2
     }
   },
@@ -68,7 +68,7 @@
     {"method":"POST","path":"/api/admin/apps/health","area":"admin","source":"server/src/routes/admin-platform.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["apps","checked"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/audit","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":["limit","shopId"],"body":[],"response":{"statuses":[200],"keys":["entries"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/backups","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["backups","dir","enabled","encryption"]},"errors":[],"shape":"extracted"},
-    {"method":"POST","path":"/api/admin/backups","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["kind"],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/backups","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["kind"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/calendar/holidays","area":"admin","source":"server/src/routes/admin-calendar.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/admin/calendar/holidays","area":"admin","source":"server/src/routes/admin-calendar.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":[],"query":[],"body":["holidays","version"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/campaigns","area":"admin","source":"server/src/routes/admin-sales.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["campaigns"]},"errors":[],"shape":"extracted"},
@@ -119,10 +119,10 @@
     {"method":"POST","path":"/api/admin/image-bank/images","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/image-bank/images/:id","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":["404 not_found"],"shape":"empty"},
     {"method":"PATCH","path":"/api/admin/image-bank/images/:id","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
-    {"method":"POST","path":"/api/admin/image-bank/images/:id/approve","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["version"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
-    {"method":"POST","path":"/api/admin/image-bank/images/:id/archive","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
-    {"method":"POST","path":"/api/admin/image-bank/images/:id/reject","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["version"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
-    {"method":"POST","path":"/api/admin/image-bank/images/:id/search","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["enabled"],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/image-bank/images/:id/approve","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["version"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/image-bank/images/:id/archive","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/admin/image-bank/images/:id/reject","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["version"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/image-bank/images/:id/search","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":["enabled"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/admin/image-bank/images/:id/v/:version/:size","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":["id","size","version"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/admin/image-bank/images/:id/versions","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/admin/image-bank/products","area":"admin","source":"server/src/routes/admin-image-bank.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["id"]},"errors":[],"shape":"extracted"},
@@ -267,8 +267,9 @@
     {"method":"POST","path":"/api/admin/shops/:id/holds/:holdId/lift","area":"admin","source":"server/src/routes/admin-shop-state.js","auth":"admin","guards":["requireAdmin"],"params":["holdId","id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/admin/shops/:id/staff-codes","area":"admin","source":"server/src/routes/admin-staff-codes.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["shop","students"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/admin/shops/:id/staff-codes/reveal","area":"admin","source":"server/src/routes/admin-staff-codes.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["code","generation","ok","role"]},"errors":["404 no_standing_code"],"shape":"extracted"},
-    {"method":"GET","path":"/api/admin/shops/:id/staff-perms","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["devices","perms","shop"]},"errors":[],"shape":"extracted"},
-    {"method":"POST","path":"/api/admin/shops/:id/staff-perms/devices/:did/disable","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["did","id"],"query":[],"body":["reason"],"response":{"statuses":[200],"keys":["...","ok"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/admin/shops/:id/staff-perms","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/admin/shops/:id/staff-perms/devices/:did/disable","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["did","id"],"query":[],"body":["reason"],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/admin/shops/:id/staff-perms/devices/:did/enable","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["did","id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/admin/shops/:id/staff-perms/members/:uid","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id","uid"],"query":[],"body":["perms"],"response":{"statuses":[200],"keys":["perms","userId"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/admin/shops/:id/staff-perms/roles/:role","area":"admin","source":"server/src/routes/admin-staff-perms.js","auth":"admin","guards":["requireAdmin","requireSuperAdmin"],"params":["id","role"],"query":[],"body":["perms"],"response":{"statuses":[200],"keys":["perms","role"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/admin/sms","area":"admin","source":"server/src/routes/admin.js","auth":"admin","guards":["requireAdmin"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["sms"]},"errors":[],"shape":"extracted"},

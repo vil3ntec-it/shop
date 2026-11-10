@@ -2,12 +2,14 @@ package ir.vil3ntec.tohid.customer.ui
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -22,6 +24,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -110,6 +113,8 @@ private fun Catalog(model: CustomerModel, slug: String, page: StorePage, modifie
     }
     //  WEB-11: دلخواه‌های همین دکان
     item { FavRow(model, slug) }
+    //  WEB-13: دیده‌شده‌های اخیر (فقط روی همین دستگاه)
+    item { RecentRow(model, slug) }
     model.notice?.let { n -> item { Note(n, Tone.WARN) } }
     val c = model.catalog
     if (model.items.isEmpty()) {
@@ -131,6 +136,31 @@ private fun Catalog(model: CustomerModel, slug: String, page: StorePage, modifie
         c is Load.Failed -> item { ErrorBox(c.error, onRetry = { model.retryCatalog() }) }
         model.cursor != null -> item {
           OutlinedButton(onClick = { model.loadMore() }, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.moreProducts) }
+        }
+      }
+    }
+  }
+}
+
+/** WEB-13: «دیده‌شده‌های اخیر» ِ همین دکان با «پاک کردن» (همان `#recent` ِ وب؛ فقط با `recent` ِ سرور) */
+@Composable
+private fun RecentRow(model: CustomerModel, slug: String) {
+  val seen = model.recentItems(slug)
+  if (seen.isEmpty()) return
+  Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+      Box(Modifier.weight(1f)) { SectionTitle(ShopperText.recentViewed) }
+      TextButton(onClick = { model.clearRecent(slug) }) { Text(ShopperText.recentClear) }
+    }
+    LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+      items(seen, key = { "seen-" + it.id }) { p ->
+        Column(
+          Modifier.width(112.dp).clickable(role = Role.Button) { model.go(Route.Product(slug, p.id)) }.padding(vertical = 4.dp),
+          verticalArrangement = Arrangement.spacedBy(2.dp),
+        ) {
+          Thumb(model.photoPath(slug, p, thumb = true), 104.dp)
+          Text(p.name, style = MaterialTheme.typography.bodyMedium, maxLines = 2, overflow = TextOverflow.Ellipsis)
+          p.priceMinor?.let { Text(ShopperText.perUnit(it, p.unit), style = MaterialTheme.typography.bodySmall, maxLines = 1, overflow = TextOverflow.Ellipsis) }
         }
       }
     }

@@ -75,6 +75,23 @@ function admit(p) {
   return p;
 }
 
+/**
+ * اتصال تا [deadline] (ms ِ ساعتِ دیواری؛ ۰ = همان `connect` ِ pg تا `PG_CONNECT_TIMEOUT_MS`)؛ دیرتر ⇒ ۵۰۳ ِ `db_busy` پیش از هر کار
+ * (`SYNC_V3_GATE_POOL_DEADLINE`، `lib/sync-v3-gate.js`). منتظرِ رهاشده در صفِ pg-pool می‌ماند و اتصالی که دیر برسد همان دم پس داده می‌شود.
+ */
+function connectBy(p, deadline) {
+  if (!deadline) return p.connect();
+  const left = deadline - Date.now();
+  const busy = () => require('./middleware/errors').busy();
+  if (left <= 0) return Promise.reject(busy());
+  return new Promise((resolve, reject) => {
+    let late = false;
+    const t = setTimeout(() => { late = true; reject(busy()); }, left);
+    p.connect().then((c) => { clearTimeout(t); if (late) c.release(); else resolve(c); },
+      (e) => { clearTimeout(t); if (!late) reject(e); });
+  });
+}
+
 function getPool() {
   if (isPglite()) return litePool();
   if (pool) return pool;
@@ -196,7 +213,8 @@ async function many(text, params = []) {
  * اجرای چند دستور در یک تراکنش.
  * اگر هر بخشی شکست بخورد، همه‌چیز برمی‌گردد و دیتابیس نیمه‌کاره نمی‌ماند.
  */
-async function tx(fn) {
+/** [acquireBy]: سقفِ گرفتنِ اتصال (`connectBy`)؛ بی آن همان پیشین */
+async function tx(fn, { acquireBy = 0 } = {}) {
   const scope = readScope.getStore();
   if (scope) scope.wrote = true;
   if (isPglite()) {
@@ -206,7 +224,7 @@ async function tx(fn) {
       return txStore.run(t, () => fn(client));
     });
   }
-  const client = await admit(getPool()).connect();
+  const client = await connectBy(admit(getPool()), acquireBy);
   /*
    *  اتصالی که وسطِ تراکنش افتاد (سقفِ تراکنشِ بیکار `PG_IDLE_TX_TIMEOUT_MS`، راه‌اندازیِ دوبارهٔ پایگاه، شبکه) به استخر
    *  برنمی‌گردد: `release(err)` نابودش می‌کند. پیش‌تر سالم برمی‌گشت و پرس‌وجوی بعدیِ کسِ دیگر با همان خطا می‌افتاد؛ و

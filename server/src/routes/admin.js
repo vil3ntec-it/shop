@@ -94,6 +94,7 @@ router.use('/system/notify-usage', rateLimit({ max: 30, windowMs: 60 * 1000, key
 //  دو درِ قراردادِ پل (`routes/admin-bridge.js`، S15 و S18) — سقفِ IP پیش از احراز؛ پل همه از یک IP است، پس گشاد
 router.use('/contract', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-contract-ip' }));
 router.use('/subscriptions/period-end', rateLimit({ max: 240, windowMs: 60 * 1000, keyPrefix: 'admin-period-end-ip' }));
+router.use('/shops/:id/staff-perms/devices', rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'admin-device-state-ip' }));
 
 router.use(requireAdmin);
 
@@ -736,11 +737,16 @@ router.get('/backups', async (req, res) => {
   });
 });
 
+//  `Idempotency-Key` (پنلِ مرکزی، `idempotent-writes.v1`) ⇒ یک pg_dump برای یک کلید، هم‌زمان ۴۰۹ (`lib/admin-write-once.js`)
 router.post('/backups', requireSuperAdmin, async (req, res, next) => {
   const backup = require('../lib/backup');
-  const out = await backup.run({ kind: v.oneOf(req.body?.kind, ['daily', 'weekly', 'monthly', 'manual'], { field: 'نوع', def: 'manual' }) });
-  await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.backup_created', detail: { file: out.file } });
-  res.status(201).json(out);
+  const kind = v.oneOf(req.body?.kind, ['daily', 'weekly', 'monthly', 'manual'], { field: 'نوع', def: 'manual' });
+  const once = require('../lib/admin-write-once');
+  once.send(res, await once.writeOnce(req, {}, async () => {
+    const out = await backup.run({ kind });
+    await audit.log({ actorType: 'admin', userId: req.admin.id, action: 'admin.backup_created', detail: { file: out.file } });
+    return out;
+  }), 201);
 });
 
 /* ==========================================================

@@ -6,7 +6,9 @@
  * هیچ ۵xx ِ کنترل‌نشده.
  *
  * ⛔ هیچ سنجهٔ زمانی (همان قاعدهٔ `load-smoke.test.js`): بارِ کم، مهلتِ بلندِ درخواست؛ فقط درستی.
- * آزمونِ دوم نشان می‌دهد سنجه تهی نیست: روی همان پایگاه یک op پاک، جمعِ یک فروش، بهای یک کالا و دکانِ یک ردیف عوض،
+ * شمارش (انبارگردانی): شمارش‌های بستهٔ پیشینِ هر دکان (`--count-history`) و شمارشِ بازِ آمیزه؛ پس از هر شمارش دفترِ کالا تا HLC ِ آن =
+ * شمرده‌شده (`counts`).
+ * آزمونِ دوم نشان می‌دهد سنجه تهی نیست: روی همان پایگاه یک op پاک، جمعِ یک فروش، بهای یک کالا، شمردهٔ یک شمارش و دکانِ یک ردیف عوض،
  * یک insert ِ دوتایی و در دفتر یک op ِ رسیده و یک ۵۰۰ کم/زیاد می‌شود ⇒ همان سنجه‌ها سرخ و بقیه سبز.
  * PGlite: پایگاه در پوشه (نه حافظه) تا پس از بیرون رفتنِ سرورِ آزمون از همین فرآیند هم باز شود.
  */
@@ -34,13 +36,13 @@ test('آمیزهٔ scale زیرِ بار: هیچ op ِ گم یا دوتایی، 
   const r = spawnSync(process.execPath, [
     'scripts/load-test.mjs', '--db', DB, '--profile', 'scale', '--check', '--no-budget', '--quiet',
     '--shops', '4', '--devices', '3', '--scale', '0.002', '--small-scale', '0.001', '--history', '300',
-    '--store-shops', '3', '--checkout-shops', '2', '--warmup', '2', '--rate', '12', '--duration', '12',
+    '--store-shops', '3', '--checkout-shops', '2', '--warmup', '2', '--rate', '12', '--duration', '12', '--count-history', '60,40,30',
     '--timeout', '120000', '--json', OUT, '--ledger', LEDGER,
   ], { cwd: ROOT, encoding: 'utf8', timeout: 220_000 });
   assert.equal(r.status, 0, `${r.stdout.slice(-2500)}\n${r.stderr.slice(-1500)}`);
   run = JSON.parse(fs.readFileSync(OUT, 'utf8'));
   const by = Object.fromEntries(run.check.checks.map((c) => [c.name, c]));
-  for (const name of ['ops.lost', 'ops.unresolved', 'ops.dup', 'pull.complete', 'totals.sales', 'totals.stock', 'lww.prices',
+  for (const name of ['ops.lost', 'ops.unresolved', 'ops.dup', 'pull.complete', 'totals.sales', 'totals.stock', 'counts', 'lww.prices',
     'customers', 'held', 'orders', 'tenant', 'http.5xx']) {
     assert.ok(by[name], `سنجهٔ ${name} اجرا شد`);
     assert.equal(by[name].ok, true, `${name}: ${by[name].detail} ${JSON.stringify(by[name].samples || [])}`);
@@ -49,6 +51,7 @@ test('آمیزهٔ scale زیرِ بار: هیچ op ِ گم یا دوتایی، 
   const L = JSON.parse(fs.readFileSync(LEDGER, 'utf8'));
   assert.ok(L.ops.length > 500, `op در دفتر: ${L.ops.length}`);
   assert.ok(Object.values(L.sales).reduce((s, x) => s + x.n, 0) > 50);
+  assert.ok(Object.values(L.counts).reduce((s, n) => s + n, 0) >= 60 + 3 * 40, `ردیفِ شمارش: ${JSON.stringify(L.counts)}`);
   assert.ok(L.devices.every((d) => d.seen.length > 0), 'هر دستگاه op ِ دستگاه‌های دیگر را دید');
   assert.ok(Object.values(L.checkouts).reduce((s, x) => s + x.ok, 0) >= 6, 'سفارشِ ویترین');
   assert.ok(run.profiles[0].endpoints['sync3.push'].n > 0 && run.profiles[0].endpoints['sync3.pull'].n > 0);
@@ -87,13 +90,17 @@ test('سنجهٔ درستی تهی نیست: خطای کاشته در پایگا
                   SELECT app, account_kind, account_id, op_id || 'x', device_id, origin, tx_id, hlc, client_hlc, skewed,
                     table_name, row_id, kind, fields, effect, status, received_at
                     FROM sync_v3_ops WHERE app='shop' AND account_id = ANY($1) AND op_id LIKE 'lo-ld-%-m0' ORDER BY server_seq LIMIT 1`, [ids]);
-  //  ۶) دفتر: op ای که دستگاه دید کم، و یک ۵۰۰ ⇒ pull.complete و http.5xx
+  //  ۶) شمردهٔ تازه‌ترین شمارشِ یک کالا ⇒ counts
+  await db.query(`UPDATE sync_v3_rows SET data = jsonb_set(data, '{countedQtyMilli}', to_jsonb((data->>'countedQtyMilli')::bigint + 1000))
+                   WHERE account_id=$1 AND table_name='stockCounts' AND row_id = (SELECT row_id FROM sync_v3_rows WHERE account_id=$1
+                     AND table_name='stockCounts' AND row_id LIKE 'lk-%' ORDER BY row_hlc DESC LIMIT 1)`, [shopA.shopId]);
+  //  ۷) دفتر: op ای که دستگاه دید کم، و یک ۵۰۰ ⇒ pull.complete و http.5xx
   const d = L.devices.find((x) => x.seen.length);
   d.seen = d.seen.slice(1);
   L.http['sync3.pull'] = { ...(L.http['sync3.pull'] || {}), '500:internal': 1 };
 
   const after = await check(db, L);
   const red = after.checks.filter((c) => !c.ok).map((c) => c.name).sort();
-  assert.deepEqual(red, ['http.5xx', 'lww.prices', 'ops.dup', 'ops.lost', 'pull.complete', 'tenant', 'totals.sales', 'totals.stock'],
+  assert.deepEqual(red, ['counts', 'http.5xx', 'lww.prices', 'ops.dup', 'ops.lost', 'pull.complete', 'tenant', 'totals.sales', 'totals.stock'],
     JSON.stringify(after.checks.map((c) => [c.name, c.ok, c.detail])));
 });
