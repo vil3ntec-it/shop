@@ -71,6 +71,8 @@ router.get('/config', async (req, res) => {
     refundLedger: await refunds.flagOf(req.shopId),
     //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
     picking: pickingOn,
+    //  S56: وزنِ بیش از حد تا پاسخِ مشتری (پرچمِ `shop.orders.weight_hold`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)
+    ...(pickingOn && (await require('../lib/pick-weight-hold').flagOf(req.shopId)) ? { weightHold: true } : {}),
     //  «با اسکناسِ … پرداخت می‌کنم» و ویرایشِ دستورِ تحویل تا پیش از ارسال (CHK-14، CHK-24) — پیش‌فرض خاموش
     deliveryPrefs: await require('../lib/delivery-prefs').flagOn(req.shopId),
     //  ترجیحِ کلیِ جایگزینی در فرمِ سفارشِ دستی و نامِ «کالای مشخص» (CHK-15) — پیش‌فرض خاموش

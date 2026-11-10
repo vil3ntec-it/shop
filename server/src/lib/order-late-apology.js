@@ -150,8 +150,10 @@ async function customerCausedIn(c, row, events, at) {
     if (d.type === 'ready_delay' && (d.reason === 'customer_request' || e.reason === 'customer_request')) return true;
   }
   if (require('./order-amend').ledgerOf(events, at).pending) return true;
+  //  جایگزین یا وزنِ بیشتری (S56) که هنوز منتظرِ پاسخِ خودِ مشتری است
   const sub = (await c.query(
-    `SELECT 1 FROM order_pick_substitutions WHERE order_id=$1 AND status='pending' LIMIT 1`, [row.id]
+    `SELECT 1 FROM order_pick_substitutions WHERE order_id=$1 AND status='pending'
+      UNION ALL SELECT 1 FROM order_pick_weight_holds WHERE order_id=$1 AND status='pending' LIMIT 1`, [row.id]
   )).rows[0];
   return Boolean(sub);
 }

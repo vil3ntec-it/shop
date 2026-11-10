@@ -2,7 +2,7 @@
  * ویترین با کرومیومِ واقعی: «خبرم کن روی همین دستگاه» ِ صفحهٔ پیگیری — پوشِ وب برای همین سفارش
  * (`store/order-push.js` ِ دیربار، `store/sw.js`، `lib/store-push.js`؛ CHK-20، NTF-01).
  *
- *     npm run test:web-store      (پس از web-store-paystep.mjs)
+ *     npm run test:web-store      (پس از web-store-weigh.mjs)
  *
  * store-push.test.js همین را روی API قفل می‌کند؛ این‌جا خودِ صفحه، در عرضِ گوشی (۳۶۰). سرویسِ پوشِ مرورگر (FCM) از این
  * ماشین در دسترس نیست، پس `pushManager.subscribe` با کلیدِ P-256 ِ واقعیِ آزمون جایگزین می‌شود و سرور به `useTransport`

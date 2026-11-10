@@ -124,6 +124,8 @@ const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');
+//  S56: وزنِ بیش از حد (`/shop/orders/:id/pick/weight-holds/decide`) با پرچمِ خودش
+FLAGS.push('shop.orders.weight_hold');
 //  M2: انتشارِ گروهیِ ویترین (`PUT /shop/storefront/products`) با پرچمِ خودش
 FLAGS.push('shop.storefront.bulk');
 //  M3: لوگو و تصویرِ سرِ ویترین (`/shop/storefront/media/*`) با پرچمِ خودش

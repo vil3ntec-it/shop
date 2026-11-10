@@ -54,6 +54,31 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-5` (دورِ پنجمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-4` ‏a64466b6؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — کارتِ وب: پیگیری کلیدِ `weightHold` (`pick-weight-hold.trackView`؛ فقط هر دو پرچم و نگه‌داشتِ باز)، `GET …/weight-holds`
+  با `now` ِ سرور، `store/weight-hold.js` ِ دیربار + واژه‌نامهٔ تازهٔ `kit/i18n/weigh.*` (۱۵ کلید؛ `order` پر ماند)، گامِ مرورگرِ
+  `web-store-weigh.mjs` (axe؛ روشن/خاموش، پذیرش، رد، سر رسیدنِ مهلت) در `test:web-store`؛ `pick-weight-hold` ۹/۹ (پایه ۱ سرخ). برنامهٔ
+  جمع‌آور (Kotlin، **کامپایل‌نشده**): `PickWeightHoldDto`، `decideWeight`/`holdJson`، `PickWeightHoldUi.kt`، `PickSheet` و `StrPick.hold*`،
+  آزمونِ `PickingWireTest`؛ FLAGS-ON §۱۸ ⇐ آن‌چه درست است. S86 — `stock-reserve.rebuild` و `stock-rebuild --reserve` (`reserve-rebuild` ۳/۳،
+  پایه ۳ سرخ) و آزمونِ منبعِ v3 ِ بازسازیِ کاتالوگ (`storefront-catalog-source` ۵/۵). S113 ⇐ ردهٔ A (مدلِ پشتیبانی). OWNER-PENDING ۱-۵
+  (تفاوتِ وزنِ سفارشِ پرداخت‌شده) و ۴-۲۵ (S113). همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ `web-store*` بی‌پسرفت.
+- نیمه‌کاره: شاهدِ CI ِ کاتلین (`PickingWireTest`، کامپایلِ `PickSheet`/`PickWeightHoldUi`) — اگر سرخ شد، همان پرونده‌ها؛ روشن کردنِ
+  `shop.orders.weight_hold` (A)؛ دو پرسشِ OWNER-PENDING.
+- قدمِ بعدی: CI ِ این شاخه؛ نامزدها: ORD-15، و هر ردیفِ E ِ دیگر در STATUS.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-4` (دورِ چهارمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-46` ‏4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — اول `order-picking.js` (۷۹۳/۸۰۰) جدا شد: «جای قفسه» و «وظیفهٔ پیدا نکردم» ⇐ `lib/pick-issues.js` (همان نام‌ها دوباره
+  صادر می‌شوند)؛ سپس پرچمِ خاموشِ `shop.orders.weight_hold` (`lib/pick-weight-hold.js`، مهاجرتِ ۷۶۰ + rollback): وزنِ بیش از حدِ سفارشِ
+  پرداخت‌نشده ⇒ نگه‌داشت با مهلتِ ۱۰ دقیقه، بسته‌بندی ۴۰۹ `weight_hold_pending`، پذیرش ⇒ همان وزن، رد/مهلت ⇒ `removed` و کسر، سقفِ پولِ
+  بسته‌بندی `capOf` ⇒ ۴۰۹ `over_cap`؛ درِ مشتری در `pick-substitutes-store.js` و درِ کارمند `…/pick/weight-holds/decide`؛ `/orders/config`
+  ⇒ `weightHold`؛ تأخیرِ چشم‌به‌راهِ مشتری در `order-late-apology` هم شمرده می‌شود. `pick-weight-hold` ۸/۸ (پایه ۷ سرخ). S86 — کاتالوگ:
+  `catalog-products.rebuildProducts` و `stock-rebuild --catalog` (SAVEPOINT: پاک و از نو با `upsertProduct`، برگشت، فقط تفاوت)؛
+  `catalog-rebuild` ۲/۲ (پایه ۲ سرخ). S118 و S37: کدی نماند (آزمونِ مسیرِ «S118.customer» از e-rows-2 هست و سبز؛ S37 ⇒ C/A) — فقط متنِ STATUS.
+  همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ فهرست‌های مسیر، `upgrade-rehearsal`، `storefront*` بی‌پسرفت.
+- نیمه‌کاره: S56 کارتِ «وزنِ بیشتر» در صفحهٔ پیگیریِ ویترین (واژه‌نامهٔ `order` پر است ⇒ بخشِ تازهٔ ≥۱۰ کلید با اسکریپتِ دیربار) و برنامهٔ
+  جمع‌آور (Kotlin) ساخته نشد ⇒ پرچم «هنوز روشن نکنید» (FLAGS-ON §۱۸)؛ گرفتنِ تفاوتِ سفارشِ پرداخت‌شده تصمیمِ صاحب‌کار. S86: بازسازیِ
+  `stock_reservations` از سفارش‌های باز و آزمونِ منبعِ v3.
+- قدمِ بعدی: کارتِ وب ِ S56 (`store/weight-hold.js` + `kit/i18n/weigh.*.json` + گامِ مرورگر با axe) و دکمهٔ برنامهٔ جمع‌آور؛ پرسشِ A
+  برای صاحب‌کار: تفاوتِ وزنِ بیشترِ سفارشِ پرداخت‌شده دمِ در نقد گرفته شود یا نه؛ نامزدهای دیگر: ORD-15، S113.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-46` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۶، روی 4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته بسته (`docs/SECURITY-AUDIT-fa.md` بخشِ B11): SR46-1 Medium — با `shop.price_cap` عمده کردنِ مشتری (`debtors.priceList`) فقط با
   `sales.discount` ِ بی سقف (v3 و راهِ قدیم، `lib/price-cap.js`)؛ SR46-2 Low — `FOR SHARE` در سنجشِ رضایتِ موقعیتِ پیک تا نقطه پس از «نه» نماند؛

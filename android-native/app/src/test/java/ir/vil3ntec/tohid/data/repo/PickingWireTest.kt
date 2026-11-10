@@ -70,6 +70,40 @@ class PickingWireTest {
     assertEquals("picking", out.pick?.status)
   }
 
+  @Test fun `S56 — وزنِ بیش از حد روی سیم، نگه‌داشت در برگه و نتیجهٔ رویداد با پیوندِ مشتری`() {
+    val hold = """{"id":"01JX0000000000000000000009","lineNo":3,"orderedQtyMilli":1000,"actualQtyMilli":1400,"unitPriceMinor":50000,
+      "originalTotalMinor":50000,"totalMinor":70000,"extraMinor":20000,"status":"pending","decidedBy":null,"decidedAt":null,
+      "deadlineAt":600000,"expired":false,"createdAt":1000}"""
+    val out = ApiJson.decode<PickEventsDto>(obj("""
+      {"results":[{"eventId":"pk-9","status":"accepted","line":{"lineNo":3,"status":"pending","pickedQtyMilli":0},"hold":$hold,
+        "customer":{"link":"https://x.example/store/s#/o/t","whatsappUrl":"https://wa.me/93790000000?text=x"}}],
+       "pick":{"orderNo":5,"status":"picking","weightHolds":[$hold]}}
+    """))
+    val r = out.results.single()
+    assertEquals("pending", r.line?.status)
+    assertEquals(1400L, r.hold?.actualQtyMilli)
+    assertEquals(20000L, r.hold?.extraMinor)
+    assertNull(r.hold?.decidedBy)
+    assertEquals("https://wa.me/93790000000?text=x", r.customer?.whatsappUrl)
+    val held = out.pick!!.weightHolds.single()
+    assertEquals("01JX0000000000000000000009", held.id)
+    assertEquals(3, held.lineNo)
+    assertEquals("pending", held.status)
+    assertFalse(held.expired)
+    //  پرچمِ خاموش ⇒ کلید نیست ⇒ فهرستِ خالی؛ نتیجهٔ بی نگه‌داشت ⇒ null
+    assertTrue(ApiJson.decode<PickEventsDto>(obj("""{"results":[{"eventId":"pk-1","status":"accepted"}],"pick":{"status":"picking"}}"""))
+      .let { it.pick!!.weightHolds.isEmpty() && it.results[0].hold == null && it.results[0].customer == null })
+    //  وقتِ گذشته ⇒ رد می‌شود
+    val late = ApiJson.decodeAt<PickSheetDto>(obj("""{"pick":{"weightHolds":[{"id":"h","lineNo":1,"status":"pending","expired":true,
+      "willApply":"reject","decidedBy":"timeout"}]}}"""), "pick")!!.weightHolds.single()
+    assertTrue(late.expired)
+    assertEquals("reject", late.willApply)
+    assertEquals("timeout", late.decidedBy)
+    val body = PickingRepository.holdJson("01JX0000000000000000000009", "accept")
+    assertEquals(setOf("holdId", "decision"), body.keys)
+    assertEquals("accept", body["decision"]!!.jsonPrimitive.content)
+  }
+
   @Test fun `بدنهٔ رویداد — فقط کلیدهای همان نوع`() {
     val scan = PickingRepository.event("pk-abcdefgh", "scan", 2, barcode = "6260000000017")
     assertEquals(setOf("eventId", "type", "lineNo", "barcode"), scan.keys)

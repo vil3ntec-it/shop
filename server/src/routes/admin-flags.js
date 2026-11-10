@@ -91,6 +91,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.subscribers_only', scope: 'shop', default: false, what: 'سفارشِ تازهٔ مشتری فقط با اشتراکِ فعال (SUB-10)؛ روشن کردن با صاحب محصول' },
   { key: 'shop.orders.desk', scope: 'shop', default: false, what: 'میزِ سفارش: «شلوغم»، توقفِ موقت و خودکار، قبولِ خودکار (ORD-04/08/09)' },
   { key: 'shop.orders.picking', scope: 'shop', default: false, what: 'جمع‌آوری و بسته‌بندیِ سفارش با فهرست، عکس و جایگزین (PCK)' },
+  { key: 'shop.orders.weight_hold', scope: 'shop', default: false, what: 'وزنِ بیش از حدِ مجاز تا پذیرش/ردِ مشتری نگه داشته می‌شود؛ رد یا بی‌پاسخ ⇒ قلم حذف و کسر (S56)؛ با `shop.orders.picking`' },
   { key: 'shop.orders.substitution', scope: 'shop', default: false, what: '«اگر نبود…» ِ کلی و هر قلم در ثبت و پیگیری (CHK-15)' },
   { key: 'shop.orders.delivery_prefs', scope: 'shop', default: false, what: 'دستورِ تحویل و «با کدام اسکناس» تا پیش از ارسال (CHK-14/24)' },
   { key: 'shop.orders.add_items', scope: 'shop', default: false, what: 'افزودنِ سبد به همان سفارش تا پیش از جمع‌آوری (CHK-21)' },

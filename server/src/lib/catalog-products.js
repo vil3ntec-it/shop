@@ -101,4 +101,76 @@ async function readProducts(shopId, at) {
   });
 }
 
-module.exports = { productSourceOf, refreshProducts };
+// ════════════════════════════════════════════════════════════════════
+//  S86 (§۱۹.۱۲) — بازسازیِ projection ِ کاتالوگ
+// ════════════════════════════════════════════════════════════════════
+
+/** ستون‌هایی که projection از ردیفِ منبع می‌سازد (`upsertProduct`) — `updated_at` فقط زمانِ نوشتن است */
+const FIELDS = ['parent_id', 'variant', 'name', 'description', 'category', 'subcategory', 'brand', 'barcodes', 'unit',
+  'sale_unit', 'unit_factor_milli', 'price_minor', 'min_stock_milli', 'active', 'deleted', 'source', 'source_seq'];
+const same = (a, b) => (a && typeof a === 'object') || (b && typeof b === 'object')
+  ? JSON.stringify(a) === JSON.stringify(b) : String(a) === String(b);
+
+/**
+ * بازسازیِ `catalog_products` ِ یک دکان از **همهٔ** ردیف‌های `products` ِ دفترِ دستگاه‌ها (منبعِ [productSourceOf]،
+ * همان که ویترین و ingest می‌خوانند): درونِ یک SAVEPOINT کالاهای دکان پاک و با همان `upsertProduct` از نو ساخته و
+ * با projection ِ زنده سنجیده می‌شوند، سپس همان SAVEPOINT برمی‌گردد و فقط تفاوت نوشته می‌شود:
+ *   • `built` (در منبع هست، این‌جا نیست)، `fixed` (نام، قیمتِ نمایش، فعال/حذف، … فرق دارد؛ `fields`)، `dropped` (در منبع نیست ⇒ پاک)؛
+ *   • پیش‌فرض فقط نشان می‌دهد؛ با `apply` زیرِ همان قفلِ موجودیِ دکان (`stock.lock` ِ هر نویسندهٔ کاتالوگ) و در یک
+ *     تراکنش با سابقهٔ `catalog.rebuild`؛ بی تفاوت هیچ نوشتن و هیچ سابقه ⇒ بارِ دوم بی‌اثر؛ دکانِ دیگر و دفتر دست نمی‌خورند.
+ *   • با `market.changes` تفاوتِ هر کالا در خوراکِ بازار هم ثبت می‌شود (همان راهِ ingest؛ برداشته ⇒ `unpublish`).
+ * @returns {{ok, applied, source, count: {projection, source}, changes: Array<{productId, kind, fields?}>}}
+ *          `ok` = پس از این کار projection با منبع می‌خواند
+ */
+async function rebuildProducts(shopId, { apply = false, by = '' } = {}) {
+  if (!shopId) throw new Error('شناسهٔ دکان لازم است');
+  const fmt = await productSourceOf(shopId);
+  const T = catalog.TABLES[fmt];
+  return tx(async (c) => {
+    await stock.lock(c, shopId);
+    const read = async () => new Map((await c.query('SELECT * FROM catalog_products WHERE shop_id=$1', [shopId])).rows
+      .map((r) => [r.product_id, r]));
+    const live = await read();
+    const rows = (await c.query(
+      `SELECT row_id, data, deleted_at, updated_seq FROM ${T}
+        WHERE app='shop' AND account_kind='shop' AND account_id=$1 AND table_name='products' ORDER BY row_id`, [shopId]
+    )).rows;
+    const at = now();
+    await c.query('SAVEPOINT s86_catalog');
+    await c.query('DELETE FROM catalog_products WHERE shop_id=$1', [shopId]);
+    for (const r of rows) await catalog.upsertProduct(c, shopId, r, fmt, at);
+    const built = await read();
+    await c.query('ROLLBACK TO SAVEPOINT s86_catalog');
+    const changes = [];
+    for (const id of [...new Set([...live.keys(), ...built.keys()])].sort()) {
+      const was = live.get(id);
+      const want = built.get(id);
+      if (!was) changes.push({ productId: id, kind: 'built' });
+      else if (!want) changes.push({ productId: id, kind: 'dropped' });
+      else {
+        const fields = FIELDS.filter((f) => !same(was[f], want[f]));
+        if (fields.length) changes.push({ productId: id, kind: 'fixed', fields });
+      }
+    }
+    const count = { projection: live.size, source: built.size };
+    if (!apply || !changes.length) return { ok: !changes.length, applied: false, source: fmt, count, changes };
+    const market = require('./market-changes');
+    const track = await market.enabled(shopId, c);
+    const byId = new Map(rows.map((r) => [r.row_id, r]));
+    for (const ch of changes) {
+      if (ch.kind !== 'dropped') {
+        await catalog.upsertProduct(c, shopId, byId.get(ch.productId), fmt, at, track);
+        continue;
+      }
+      await c.query('DELETE FROM catalog_products WHERE shop_id=$1 AND product_id=$2', [shopId, ch.productId]);
+      if (track) await market.catalogProduct(c, shopId, { row_id: ch.productId, deleted_at: at }, live.get(ch.productId).name, null, false, at);
+    }
+    await require('./audit').logIn(c, {
+      shopId, actorType: 'system', userId: String(by || '').slice(0, 64), action: 'catalog.rebuild', targetType: 'shop', targetId: shopId,
+      detail: { source: fmt, count, changes: changes.length, items: changes.slice(0, 50) },
+    });
+    return { ok: true, applied: true, source: fmt, count, changes };
+  });
+}
+
+module.exports = { productSourceOf, refreshProducts, rebuildProducts };

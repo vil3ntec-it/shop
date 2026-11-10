@@ -97,6 +97,15 @@ class PickingRepository(private val api: ApiClient) {
     Unit
   }
 
+  /**
+   *  S56: وزنِ بیشتر — تصمیمِ کارمند پس از تماس با مشتری: `accept` (همان وزن و مبلغ) یا `reject` (قلم حذف و کسر).
+   *  تکرارِ همان تصمیم بی‌اثر است؛ پرچمِ خاموش ⇒ ۴۰۳ `weight_hold_disabled`، وقتِ گذشته ⇒ ۴۰۹ `weight_hold_expired`.
+   */
+  suspend fun decideWeight(orderId: String, holdId: String, decision: String): ApiResult<Unit> = result {
+    api.post("$ROOT/${enc(orderId)}/pick/weight-holds/decide", holdJson(holdId, decision))
+    Unit
+  }
+
   /** حلالِ کالا (PCK-06): `halal`، `non_halal` یا خالی (نامعلوم) — فقط `stock.adjust` */
   suspend fun setHalal(productId: String, halal: String): ApiResult<Unit> = result {
     api.put("$ROOT/pick/products/${enc(productId)}", buildJsonObject { put("halal", halal) })
@@ -189,6 +198,12 @@ class PickingRepository(private val api: ApiClient) {
     /** ۴۰۹ ِ `paid_needs_refund` با «پس داده شد» ِ پیشنهادیِ سرور (پرچمِ `shop.orders.manual_refund` و مجوزِ `orders.refund`) */
     fun refundOffered(f: ApiFailure): Boolean =
       f.code == "paid_needs_refund" && (f.detail?.get("manualRefund") as? JsonPrimitive)?.content == "true"
+
+    /** S56: بدنهٔ `…/pick/weight-holds/decide` — همان `holdId` و `decision` که `routes/order-picking.js` می‌خواند */
+    fun holdJson(holdId: String, decision: String): JsonObject = buildJsonObject {
+      put("holdId", holdId)
+      put("decision", decision)
+    }
 
     fun batchJson(orderIds: List<String>): JsonObject = buildJsonObject {
       put("orderIds", JsonArray(orderIds.map { JsonPrimitive(it) }))

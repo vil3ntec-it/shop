@@ -1,6 +1,7 @@
 /*
  * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
- * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
+ * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ «وزنِ بیشتر از سفارش» (S56) در `weight-hold.js` ِ دیربار؛
+ * گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
  * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار؛ «پرداخت پس از پذیرش» در
  * `pay-step.js` ِ دیربار؛ «خبرم کن روی همین دستگاه» (پوشِ وب، CHK-20/NTF-01) در `order-push.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
@@ -83,6 +84,7 @@
       renderMethod(o, token);
       renderPay(o, token);
       renderSubs(o, token);
+      renderWeigh(o, token);
       renderRate(o, token);
       renderPrefs(o, token);
       renderFeedback(o, token);
@@ -316,6 +318,16 @@
           }
         });
       }).catch(function () { box.hidden = true; });
+    }
+
+    //  S56: وزنِ بیش از حد تا پاسخِ مشتری — store/weight-hold.js فقط وقتی پیگیری کلیدِ `weightHold` (نگه‌داشتِ باز) را داد
+    //  (پرچمِ خاموش یا بی نگه‌داشتِ باز ⇒ نه اسکریپت، نه واژه‌نامه، نه کارت؛ کارتِ پیشین پنهان)
+    var weigh = null;
+    function renderWeigh(o, token) {
+      if (!o.weightHold) { if ($('o-wh')) $('o-wh').hidden = true; return; }
+      weigh = weigh || K.js('/store/weight-hold.js').then(function () { return window.StoreWeightHold({ api: api }); })
+        .catch(function () { weigh = null; return null; });
+      weigh.then(function (f) { if (f && (want === null || want === token)) f.render(o, token); });
     }
 
     function choose(o, token, id, decision) {

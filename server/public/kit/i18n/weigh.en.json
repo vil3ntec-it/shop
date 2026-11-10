@@ -1,0 +1,17 @@
+{
+  "wh.title": "Heavier than ordered",
+  "wh.intro": "The actual weight of this item is over the allowed limit. Your total will not go up unless you accept.",
+  "wh.line": "{name}: ordered {a} {u}, actual weight {b} {u}",
+  "wh.amount": "Amount: {to} instead of {from} ({x} more)",
+  "wh.left": "Please answer by {t} — {n} min left",
+  "wh.yes": "I accept — {m}",
+  "wh.no": "No, remove it",
+  "wh.st.accepted": "Accepted: this weight and amount will be charged.",
+  "wh.st.rejected": "Removed; it will be taken off your total.",
+  "wh.st.timeout": "Time ran out; removed and taken off your total.",
+  "wh.by.shop": "(recorded by the shop after a call)",
+  "wh.done.yes": "Extra weight accepted",
+  "wh.done.no": "Item removed",
+  "err.weight_hold_expired": "The time to answer has passed; the item was removed from your total.",
+  "err.already_decided": "A decision has already been made for this weight."
+}

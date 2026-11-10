@@ -49,6 +49,10 @@ async function customerOrder(store, token) {
   //  `shop.storefront.web_push` + `shop.customer_notify` و سفارشِ هنوز باز (خاموش یا پایان‌یافته ⇒ کلید نیست)
   const push = await require('./store-push').viewOf(store.shop_id, order.status);
   if (push !== undefined) order.push = push;
+  //  S56: وزنِ بیش از حد تا پاسخِ مشتری (`store/weight-hold.js` ِ دیربار) فقط با پرچم‌های `shop.orders.picking` +
+  //  `shop.orders.weight_hold` و نگه‌داشتِ باز (خاموش، بی نگه‌داشت یا همه بسته ⇒ کلید نیست)
+  const weightHold = await require('./pick-weight-hold').trackView(store.shop_id, orderId);
+  if (weightHold !== undefined) order.weightHold = weightHold;
   return order;
 }
 
