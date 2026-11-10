@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stock-ui` (سمتِ برنامهٔ O-06 = ب و پوشِ «سفارش به بررسی رفت»؛ روی `claude/p0-stock` ‏4cd1002c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) برنامهٔ مدیریت (v3): `OrderDto.stockHold`/`stockReview` (پیش‌فرض‌دار؛ نبود ⇒ هیچ)، `ui/v3/online/orders/OrderStockHold` (نشان و پیام)، نشانِ
+  «موجودیِ رزروشده کم آمد — بررسی کنید» نخستین برچسبِ `OrderTags` (کارت و سرِ جزئیات) و پیامِ حالِ نگه‌داشتن زیرِ سرِ جزئیات؛ متن‌ها در `StrOrdersHub`
+  (fa/en/ps، دری از لایه). (۲) سرور: `stock-reserve.recheckShort` ⇒ `order-notify.enqueueReviewIn` در همان تراکنش زیرِ SAVEPOINT، پشتِ `shop.stock_reserve` +
+  `shop.order_notify`، هر سفارش یک بار (یکتاییِ صف)، رویدادِ یک‌باره، متن فقط شماره؛ بررسیِ بسته پیش از فرستادن ⇒ بی پوش؛ مهاجرتِ ۵۲۰ (CHECK) + rollback.
+  آزمون: `stock-reserve-review-notify.test.js` ۶/۶ (پیش از کد ۵ سرخ) روی PGlite و PostgreSQL ۱۶؛ `stock-reserve` ۱۷، `order-notify` ۱۳، `push-fcm` ۶ روی هر دو سبز.
+- نیمه‌کاره: `OrderStockHoldTest` (۶ آزمون) و ساختِ Kotlin فقط در CI — هنوز دیده نشده. فهرستِ «در انتظار» ِ اعلان در برنامه (`/pending`) همان سفارشِ تازه می‌ماند.
+- قدمِ بعدی: شاهدِ CI (اندروید/کامپیوتر/آیفون برای `OrderStockHoldTest`)؛ روشن کردنِ `shop.stock_reserve` + `shop.order_notify` برای دکانِ آزمایشی و دیدنِ پوش روی
+  گوشیِ واقعی؛ ریسکِ مانده: یک فروشِ بزرگِ حضوری می‌تواند هم‌زمان چند سفارش را به بررسی ببرد ⇒ چند پوش (هر سفارش یکی، کارگر ۲۰ در هر دور).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p0-stock` (O-06 = ب: نگه‌داشتنِ موجودیِ سفارشِ آنلاین، ORD-20 و CHK-18؛ روی main ‏f81344458 ِ دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `lib/stock-reserve.js` + مهاجرتِ ۴۳۵ پشتِ پرچمِ تازهٔ خاموشِ `shop.stock_reserve` (در کاتالوگِ پرچم‌ها، RULES «نقشهٔ پرچم‌ها»،
   `docs/FLAGS-ON-fa.md` §۴ب): ساختِ سفارش با موجودیِ تازه ⇒ نگه‌داشتن زیرِ قفلِ `catalog:<دکان>` (دو سفارشِ هم‌زمانِ آخرین عدد ⇒ دقیقاً یکی)،

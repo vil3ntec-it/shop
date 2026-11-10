@@ -24,7 +24,8 @@
  *   انقضا ─ تنبل هنگامِ خواندن (`heldOf` فقط نگذشته را می‌شمارد) + جاروی دقیقه‌ای ([sweep]) که ردیف و دفتر
  *           را می‌بندد.
  *   INV-19  فروشِ حضوری **هرگز** رد نمی‌شود. اگر نگه‌داشته را برد، سفارش به بررسی می‌رود: تازه‌ترین‌ها
- *           `short_at` می‌گیرند، وظیفهٔ `reservation_short` (`soft-short:<کالا>`) و `stockHold.review`.
+ *           `short_at` می‌گیرند، وظیفهٔ `reservation_short` (`soft-short:<کالا>`)، `stockHold.review` و (با
+ *           `shop.order_notify`) یک بار خبرِ `order_review` در صفِ اعلانِ سفارش (مهاجرتِ ۵۲۰).
  *   دفتر ─ هر نگه‌داشتن/آزادسازی یک حرکتِ `reserve`/`release` با کلیدِ یکتا (`res:<ردیف>:hold|release|commit`)
  *           ⇒ تطبیقِ INV-16 (`stock.reconcile`) سالم می‌ماند.
  *
@@ -288,6 +289,7 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
     byPid.get(r.product_id).push(r);
   }
   const shortAll = [];
+  const newly = new Set();
   for (const [pid, list] of byPid) {
     const sell = Math.max(0, stock.sellableOnHand(lvs.get(pid), s));
     let cum = 0;
@@ -298,6 +300,7 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
       if (isShort) short.push(r);
       if (isShort && r.short_at === null) {
         await c.query('UPDATE stock_reservations SET short_at=$2 WHERE id=$1', [r.id, at]);
+        newly.add(r.order_id);
       } else if (!isShort && r.short_at !== null) {
         await c.query('UPDATE stock_reservations SET short_at=NULL WHERE id=$1', [r.id]);
       }
@@ -310,7 +313,24 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
       shortAll.push(...short);
     }
   }
+  for (const orderId of [...newly].sort()) await notifyReviewIn(c, shopId, orderId, at);
   return shortAll;
+}
+
+/**
+ * «سفارش به بررسی رفت» (`order_review`، طرحِ #429) ⇒ همان صفِ پایدارِ اعلانِ سفارش، در همین تراکنش (بی بررسی، بی
+ * خبر) و پشتِ هر دو پرچم؛ هر سفارش یک بار (یکتاییِ پایگاه). زیرِ SAVEPOINT: نوشته نشدنِ خبر (مثلاً CHECK ِ کهنه پس از
+ * rollback ِ ۵۲۰) هرگز کارِ موجودی یا همگام‌سازی را پس نمی‌زند.
+ */
+async function notifyReviewIn(c, shopId, orderId, at) {
+  await c.query('SAVEPOINT stock_review_notify');
+  try {
+    await require('./order-notify').enqueueReviewIn((t, p) => c.query(t, p), { shopId, orderId, at });
+    await c.query('RELEASE SAVEPOINT stock_review_notify');
+  } catch (err) {
+    await c.query('ROLLBACK TO SAVEPOINT stock_review_notify');
+    console.error('[stock-reserve] اعلانِ بررسی', orderId, err.message);
+  }
 }
 
 /**

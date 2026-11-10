@@ -114,6 +114,10 @@ fun OrderDetailScreen(
           V3Message(V3Tone.WARNING, StrOnline.staleStatus, Modifier.padding(top = 8.dp), action = StrOnline.reload, onAction = actions.onReload)
         }
         HeaderCard(o, state.now)
+        //  O-06 = ب: حالِ نگه‌داشتنِ موجودیِ همین سفارش (فقط وقتی سرور `stockHold` داد)
+        OrderStockHold.note(o, OrdersModel::stamp)?.let { n ->
+          V3Message(n.tone, n.title, Modifier.padding(top = 8.dp), body = n.body)
+        }
         extra?.invoke()
         state.notes.forEach { n ->
           V3Message(
