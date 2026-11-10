@@ -61,6 +61,18 @@
   B8 ِ ممیزی (و B6 ِ تکراریِ `posted-docs` ⇐ B7)، یک خطِ RULES. سه شاخهٔ دیگر حمله شدند و سالم ماندند (B8).
 - نیمه‌کاره: هیچ. R7 (ادغام + جدا کردن در دو دسته)، R8 (`shiftId` ِ آزاد) و R9 (`amountMinor` در پلِ v3) تصمیمِ صاحب‌کارند.
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-decisions-3` (فهرستِ یکتای تصمیم‌های مانده به‌روز شد؛ فقط سند؛ روی `ccr-…-batch-42` ‏bd6f03a8 (#1026، squash‌شده در main ‏99036497)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ۶۷ ⇐ ۷۹ (۹ / ۲۲ / ۲۶ / ۲۲؛ ۳-۱۴ب پیش‌تر شمرده نشده بود)، هر بند با متنِ شاخهٔ منبع سنجیده: ۲-۲۱ R5 (`SECURITY-AUDIT` B6 ِ
+  دستهٔ ۴۲؛ R6 در `claude/reserve-off` بسته)، ۲-۲۲ SEC-03 سه پرسش (`code-gaps`، `posted-docs` R2)، ۳-۲۰ مقدارِ درستِ PRD-08، ۳-۲۱ SYN-12 (`Retry-After`،
+  ۲ شکست/۶۰ ثانیه، پخشِ ۱۵ ثانیه)، ۳-۲۲ پیش‌فرضِ `market.directory`/`market.product_details`/`report_fresh`/`shop.owner_report`، ۳-۲۳ آزمایشِ
+  `shop.stock_reserve` + `shop.order_notify` و «یک پوش برای هر سفارش» (`stock-ui`)، ۳-۲۴ سقفِ ۳۰ دقیقهٔ «ساخت نسخهٔ بومی» (`tohid-native.yml`؛ main
+  ۲۸:۴۹–۲۹:۳۰، لغوِ ۳۰:۱۵ در تلاشِ نخستِ #1025 — از `gh run`)، ۳-۲۵ دو رفتارِ پلِ پنل (ریپوی `server` ممیزی §۹، فقط خواندن)، ۴-۲۰ LOC-03، ۴-۲۱ PRM-02، ۴-۲۲
+  گالریِ ویترین. ۲-۱۸ (S11) با بازسنجیِ ۱.۵۰.۷۹ درست شد (هفت درِ `/admin/` هنوز در پنل نیست) و پرسشِ حذفِ پشتیبان گرفت؛ ۴-۱۹ فقط «روزی یک بار یا هر ۶ ساعت»
+  ماند (ویرایشگرِ تعطیلات در پنلِ ۱.۵۰.۷۸ مرج شده). ۴-۱۸ «برگشت‌پذیر» ِ جاافتاده گرفت؛ «هنوز مرج نشده» ِ
+  دسته‌های ۴۱ و ۴۲ در ۱-۹، ۲-۱۶، ۲-۲۱، ۳-۱۴ب و ۳-۱۶ به «مرج‌شده» درست شد.
+- نیمه‌کاره: هیچ. شاخه‌های `posted-docs`، `app-gaps-4`، `syn-12`، `syn-12b` و `reserve-off` هنوز در دسته نیستند؛ با مرجشان «هنوز در دسته نیست» ِ بندها را بردارید.
+  ⚠️ `posted-docs` بندِ «B6» ِ `SECURITY-AUDIT-fa.md` را دارد و دستهٔ ۴۲ هم B6 ِ دیگری (بازبینیِ ۴۱–۴۲)؛ هنگامِ ادغام یکی B7 شود.
+- قدمِ بعدی: پاسخِ صاحب‌کار؛ هر بندِ گرفته‌شده به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
