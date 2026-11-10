@@ -61,6 +61,11 @@ object PromoEngine {
      *  «تخفیفِ نزدیکِ انقضا» را نشان می‌دهد. خاموش ⇒ همان فرمِ پیشین.
      */
     val expiry: Boolean = false,
+    /**
+     *  PRM-11 — پرچمِ تخفیفِ ویترینِ سرور `shop.storefront.promos` (`online` در پاسخ، پیش‌فرض خاموش): فرمِ قاعده
+     *  «کجا اعمال شود» (صندوق / ویترین / هر دو) را نشان می‌دهد. خاموش ⇒ همان فرمِ پیشین و کانالِ قاعده دست نمی‌خورد.
+     */
+    val online: Boolean = false,
   ) {
     val active: Boolean get() = enabled && rules.any { it.active }
     val hasCodes: Boolean get() = rules.any { it.active && it.code.isNotBlank() }
