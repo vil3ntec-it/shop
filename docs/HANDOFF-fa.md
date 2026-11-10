@@ -54,6 +54,13 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
+  (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را
+  جابه‌جا می‌کرد ⇒ `v1Merges` + `claimOf` + `settle` (یک خط در `lib/sync.js`)؛ SR43-2 `$inc` ِ لفظی در کلِ ردیف «همان» دیده می‌شد ⇒ `after(…, full)`.
+  B8 ِ ممیزی (و B6 ِ تکراریِ `posted-docs` ⇐ B7)، یک خطِ RULES. سه شاخهٔ دیگر حمله شدند و سالم ماندند (B8).
+- نیمه‌کاره: هیچ. R7 (ادغام + جدا کردن در دو دسته)، R8 (`shiftId` ِ آزاد) و R9 (`amountMinor` در پلِ v3) تصمیمِ صاحب‌کارند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
