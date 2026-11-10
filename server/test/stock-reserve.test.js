@@ -489,6 +489,98 @@ test('CHK-18: لغوِ مشتری (ویترین) آزاد می‌کند؛ موج
   assert.equal((await holds(s)).length, 0);
 });
 
+test('CHK-21 + O-06: افزودنِ قلم به سفارشِ ویترین نگه‌داشتهٔ خودِ همان سفارش را «دیگران» نمی‌شمارد و افزوده را هم نگه می‌دارد', async () => {
+  const s = await shop('رزرو-افزودن');
+  await enable(s);
+  for (const k of ['shop.storefront', 'shop.orders.add_items']) await live(s.shopId, k, true);
+  const slug = `rsv-add-${Date.now().toString(36)}`;
+  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ نگه‌داشتن', contactPhone: '0700000001' }, { token: s.token });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  await stocked(s, 'ad1', 2);
+  assert.equal((await h.put('/api/shop/storefront/products/ad1', { published: true }, { token: s.token })).status, 200);
+  const phone = '0791112299';
+  const st = await h.post(`/api/store/${slug}/verify/start`, { phone });
+  const ticket = (await h.post(`/api/store/${slug}/verify/check`, { phone, code: st.body.devCode })).body.ticket;
+  assert.ok(ticket, 'تیکتِ شمارهٔ تأییدشده');
+  const ck = await h.post(`/api/store/${slug}/checkout`, {
+    fulfillment: 'pickup', customer: { name: 'مشتری', phone }, lines: [{ productId: 'ad1', qtyMilli: 1000 }],
+  }, { headers: { 'Idempotency-Key': `rsv-ck-${Date.now()}`, 'X-Store-Ticket': ticket } });
+  assert.equal(ck.status, 201, JSON.stringify(ck.body));
+  const id = (await one('SELECT id FROM online_orders WHERE shop_id=$1 AND order_no=$2', [s.shopId, ck.body.order.orderNo])).id;
+  const add = (k) => h.post(`/api/store/${slug}/orders/${ck.body.order.token}/items`, { lines: [{ productId: 'ad1', qtyMilli: 1000 }] },
+    { headers: { 'Idempotency-Key': k, 'X-Store-Ticket': ticket } });
+  //  دو عدد در قفسه، یکی نگه‌داشتهٔ همین سفارش ⇒ افزودنِ یکی دیگر می‌گذرد (نگه‌داشتهٔ خودی «دیگران» نیست)
+  const k1 = `rsv-add-${Date.now()}-1`;
+  const a1 = await add(k1);
+  assert.equal(a1.status, 201, JSON.stringify(a1.body));
+  const mine = await query(`SELECT COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held'`, [s.shopId, id]);
+  assert.equal(Number(mine.rows[0].q), 2000, 'افزوده هم نگه داشته شد');
+  assert.equal((await stockOf(s, 'ad1')).sellableMilli, 0);
+  //  تکرارِ همان کلید ⇒ همان نتیجه، بی نگه‌داشتنِ دوم
+  assert.equal((await add(k1)).status, 200);
+  assert.equal(Number((await query(`SELECT COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations WHERE shop_id=$1 AND status='held'`, [s.shopId])).rows[0].q), 2000);
+  //  سومی دیگر نیست
+  const a3 = await add(`rsv-add-${Date.now()}-3`);
+  assert.equal(a3.status, 409, JSON.stringify(a3.body));
+  assert.equal(a3.body.error.code, 'out_of_stock');
+  await reconciled(s, 'ad1');
+});
+
+test('ORD-14 + O-06: ویرایشِ سفارشِ کارمند نگه‌داشته را با قلم‌های تازه هم‌اندازه می‌کند (کم ⇒ آزاد، برداشته ⇒ آزاد)', async () => {
+  const s = await shop('رزرو-ویرایش');
+  await enable(s);
+  await live(s.shopId, 'shop.orders.amend', true);
+  await push(s, [product('am1'), entry('am1-e', 'am1', 3), product('am2'), entry('am2-e', 'am2', 1)]);
+  await refresh(s);
+  const a = await order(s, [line('am1', 3000), line('am2', 1000)]);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const id = a.body.order.id;
+  const r = await h.post(`/api/shop/orders/${id}/amendments`, {
+    changes: [{ lineNo: 1, qtyMilli: 1000 }, { lineNo: 2, qtyMilli: 0 }], reason: 'customer_request', consent: { via: 'phone' },
+  }, { token: s.token, headers: { 'Idempotency-Key': `rsv-am-${Date.now()}` } });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const held = await query(
+    `SELECT line_no, product_id, qty_milli FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' ORDER BY line_no`,
+    [s.shopId, id]
+  );
+  assert.deepEqual(held.rows.map((x) => [Number(x.line_no), x.product_id, Number(x.qty_milli)]), [[1, 'am1', 1000]]);
+  assert.equal((await stockOf(s, 'am1')).sellableMilli, 2000);
+  assert.equal((await stockOf(s, 'am2')).sellableMilli, 1000);
+  assert.equal((await getOrder(s, id)).body.order.stockHold.status, 'held');
+  await reconciled(s, 'am1');
+  await reconciled(s, 'am2');
+});
+
+test('PCK-07 + O-06: بسته‌بندی پس از جمع‌آوری نگه‌داشته را همان «واقعاً برداشته» می‌کند (پیدا نشد ⇒ آزاد)', async () => {
+  const s = await shop('رزرو-جمع‌آوری');
+  await enable(s);
+  await live(s.shopId, 'shop.orders.picking', true);
+  await push(s, [product('pk1'), entry('pk1-e', 'pk1', 3), product('pk2'), entry('pk2-e', 'pk2', 1)]);
+  await refresh(s);
+  const a = await order(s, [line('pk1', 2000), line('pk2', 1000)]);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const id = a.body.order.id;
+  assert.equal((await go(s, id, { to: 'accepted' })).status, 200);
+  assert.ok([200, 201].includes((await h.post(`/api/shop/orders/${id}/pick/start`, {}, { token: s.token })).status));
+  let evN = 0;
+  const ev = (lineNo, type, extra = {}) => ({ eventId: `ev-${++evN}-${Date.now()}`, lineNo, type, ...extra });
+  const sent = await h.post(`/api/shop/orders/${id}/pick/events`, {
+    events: [ev(1, 'pick', { qtyMilli: 1000 }), ev(1, 'not_found'), ev(2, 'not_found')],
+  }, { token: s.token });
+  assert.equal(sent.status, 200, JSON.stringify(sent.body));
+  const p = await h.post(`/api/shop/orders/${id}/pick/pack`, { bags: 1 }, { token: s.token, headers: { 'Idempotency-Key': `rsv-pack-${Date.now()}` } });
+  assert.ok([200, 201].includes(p.status), JSON.stringify(p.body));
+  const held = await query(
+    `SELECT line_no, product_id, qty_milli, expires_at FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND status='held' ORDER BY line_no`,
+    [s.shopId, id]
+  );
+  assert.deepEqual(held.rows.map((x) => [Number(x.line_no), x.product_id, Number(x.qty_milli), x.expires_at]), [[1, 'pk1', 1000, null]]);
+  assert.equal((await stockOf(s, 'pk1')).sellableMilli, 2000);
+  assert.equal((await stockOf(s, 'pk2')).sellableMilli, 1000);
+  await reconciled(s, 'pk1');
+  await reconciled(s, 'pk2');
+});
+
 test('⛔ کنار گذاشتنِ موجودیِ سفارش‌محورِ پیشین (retire) به رزروِ نرم دست نمی‌زند', async () => {
   const s = await shop('رزرو-retire');
   await enable(s);

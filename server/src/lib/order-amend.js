@@ -236,6 +236,7 @@ async function applyIn(c, shopId, row, p, at) {
     [shopId, row.id, p.subtotalMinor, p.totalMinor, p.itemsCount, at]
   );
   await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
+  await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at);   //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه
 }
 
 const amounts = (p) => ({

@@ -81,7 +81,7 @@ const pricedOf = (l) => ({
 });
 
 /** قلم‌های تازه با قیمتِ همین لحظه ⇒ تغییرها و قلم‌های پس از افزودن (همان سنجش‌های ثبت). */
-async function planIn(c, shopId, from, input, lines) {
+async function planIn(c, shopId, from, input, lines, orderId = '') {
   const sf = require('./storefront');
   const ids = input.lines.map((l) => l.productId);
   const rows = (await c.query(
@@ -132,7 +132,8 @@ async function planIn(c, shopId, from, input, lines) {
     productId: id, name: byId.get(id).name, unit: byId.get(id).unit,
     qtyMilli: after.filter((x) => x.productId === id).reduce((s, x) => s + x.qtyMilli, 0),
   }));
-  await require('./catalog').checkOrder(c, shopId, { lines: touched, isTest: false });
+  //  O-06 = ب: نگه‌داشتهٔ خودِ همین سفارش «دیگران» نیست (مقدارِ کل سنجیده می‌شود)
+  await require('./catalog').checkOrder(c, shopId, { lines: touched, isTest: false, orderId });
   return { changes, after, before: lines.map(pricedOf) };
 }
 
@@ -194,7 +195,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       throw conflict('پیشنهادِ دکان برای ویرایشِ این سفارش منتظرِ پاسخِ شماست؛ نخست پاسخ دهید', 'amend_pending');
     }
     const at = now();
-    const pl = await planIn(c, shopId, from, input, lines);
+    const pl = await planIn(c, shopId, from, input, lines, row.id);
     const subtotalMinor = pl.after.reduce((s, l) => s + l.lineTotalMinor, 0);
     const prevDiscountMinor = Number(row.discount_minor);
     const extra = await autoExtraIn(c, store, pl.before, pl.after, at, promosOn);
@@ -229,6 +230,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       [shopId, row.id, subtotalMinor, discountMinor, totalMinor, pl.after.length, at]
     );
     await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
+    await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at);   //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه
     const detail = {
       type: EVENT_TYPE, addId: `ad_${ulid(at)}`, key, hash,
       lines: pl.changes.map(({ note: _n, ...x }) => x),

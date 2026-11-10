@@ -774,16 +774,17 @@ async function toStockLines(c, shopId, lines) {
  * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
  * ⛔ هیچ حرکتِ مکان‌دار و هیچ کسری (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل می‌دهد و فروش
  * همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null. استثنای O-06 = ب (`shop.stock_reserve` +
- * موجودیِ تازه): سنجش با نگه‌داشتهٔ دیگران و زیرِ قفلِ موجودی ⇒ `hold` برای `orders.create`.
+ * موجودیِ تازه): سنجش با نگه‌داشتهٔ دیگران و زیرِ قفلِ موجودی ⇒ `hold` برای `orders.create`؛ [orderId] (افزودنِ
+ * قلم، CHK-21) ⇒ نگه‌داشتهٔ همان سفارش «دیگران» نیست.
  */
-async function checkOrder(c, shopId, { lines, isTest = false, at = now() }) {
+async function checkOrder(c, shopId, { lines, isTest = false, at = now(), orderId = '' }) {
   if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
   const settings = await stock.settingsOf(shopId, c);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  return reserve().checkOrderIn(c, shopId, { lines: sl, settings, names, at });
+  return reserve().checkOrderIn(c, shopId, { lines: sl, settings, names, at, orderId });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */

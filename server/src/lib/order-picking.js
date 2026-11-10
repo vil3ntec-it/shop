@@ -583,6 +583,8 @@ async function pack(shopId, orderId, { key, body }, actor) {
         );
       }
     }
+    //  O-06 = ب: نگه‌داشتهٔ بازِ سفارش = آن‌چه واقعاً برداشته شد (جایگزین ⇒ کالای جایگزین؛ برداشته‌نشده ⇒ آزاد)
+    await require('./stock-reserve').syncOrderIn(c, shopId, id, at);
     const kept = s.lines.filter((l) => l.qtyMilli > 0).length;
     const moneyChanged = s.totalMinor !== Number(order.total_minor);
     await c.query(

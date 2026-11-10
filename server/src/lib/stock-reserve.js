@@ -28,8 +28,8 @@
  *   دفتر ─ هر نگه‌داشتن/آزادسازی یک حرکتِ `reserve`/`release` با کلیدِ یکتا (`res:<ردیف>:hold|release|commit`)
  *           ⇒ تطبیقِ INV-16 (`stock.reconcile`) سالم می‌ماند.
  *
- * ⛔ کمبودِ شناخته: ویرایش یا افزودنِ قلمِ سفارش پس از ساخت (ORD-14، CHK-21) نگه‌داشتن را جابه‌جا نمی‌کند —
- *    قلمِ کم‌شده تا پایانِ سفارش نگه داشته می‌ماند (کم‌شماریِ امن) و قلمِ افزوده مثلِ امروز نگه‌داشته ندارد.
+ *   ویرایش ─ ORD-14 و CHK-21 ([syncOrderIn]): نگه‌داشتهٔ بازِ سفارش هم‌اندازهٔ قلم‌های تازه می‌شود؛ افزودن با همان
+ *           سنجشِ ساخت (نگه‌داشتهٔ خودِ سفارش «دیگران» نیست).
  */
 const { query, many, now, tx } = require('../db');
 const stock = require('./stock');
@@ -59,15 +59,18 @@ async function ttlSecOf(c, shopId) {
   return Number.isSafeInteger(v) && v >= 60 && v <= 86400 ? v : DEFAULT_TTL_SEC;
 }
 
-/** نگه‌داشتهٔ فعال (نگه‌داشته و نگذشته) به تفکیکِ کالا ⇒ Map<pid, milli>. بی ردیف ⇒ Map ِ خالی. */
-async function heldOf(c, shopId, ids, at = now()) {
+/**
+ * نگه‌داشتهٔ فعال (نگه‌داشته و نگذشته) به تفکیکِ کالا ⇒ Map<pid, milli>. بی ردیف ⇒ Map ِ خالی.
+ * [exceptOrderId]: نگه‌داشتهٔ همان سفارش «دیگران» نیست (افزودنِ قلم، CHK-21: مقدارِ کلِ سفارش سنجیده می‌شود).
+ */
+async function heldOf(c, shopId, ids, at = now(), exceptOrderId = '') {
   const map = new Map();
   if (!ids || !ids.length) return map;
   const rows = (await runOf(c)(
     `SELECT product_id, COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations
       WHERE shop_id=$1 AND kind='soft' AND status='held' AND product_id = ANY($2::text[])
-        AND (expires_at IS NULL OR expires_at > $3)
-      GROUP BY product_id`, [shopId, ids, at]
+        AND (expires_at IS NULL OR expires_at > $3) AND order_id <> $4
+      GROUP BY product_id`, [shopId, ids, at, String(exceptOrderId || '')]
   )).rows;
   for (const r of rows) map.set(r.product_id, num(r.q));
   return map;
@@ -119,21 +122,21 @@ async function insertHolds(c, shopId, orderId, lines, expiresAt, at) {
  * نگه‌داشتن روشن و موجودی تازه ⇒ قفلِ موجودیِ دکان گرفته و گذشته‌ها بسته می‌شوند تا سنجش و نوشتن هر دو
  * زیرِ همان قفل باشند (هیچ فروش/نگه‌داشتنِ دیگری میانشان نمی‌نشیند) ⇒ `{ held, ttlSec }`؛ وگرنه null.
  */
-async function planIn(c, shopId, settings, ids, at) {
+async function planIn(c, shopId, settings, ids, at, orderId = '') {
   if (!(await stock.reserveFlagOf(shopId, c))) return null;
   const fr = await require('./catalog').freshness(shopId, settings, at, c);
   if (!fr.fresh) return null;
   await stock.lock(c, shopId);
   await expireDueIn(c, shopId, at);
-  return { held: await heldOf(c, shopId, ids, at), ttlSec: await ttlSecOf(c, shopId) };
+  return { held: await heldOf(c, shopId, ids, at, orderId), ttlSec: await ttlSecOf(c, shopId) };
 }
 
 /**
  * سنجشِ سفارش (`catalog.checkOrder`، تراکنشِ `orders.create`): نگه‌داشتن خاموش یا موجودیِ کهنه ⇒ همان
  * `stock.check` ِ امروز؛ وگرنه نگه‌داشتهٔ دیگران هم از آزاد کم می‌شود و `hold` برای [holdIn] برمی‌گردد.
  */
-async function checkOrderIn(c, shopId, { lines, settings, names, at }) {
-  const plan = await planIn(c, shopId, settings, [...new Set(lines.map((l) => l.productId))].sort(), at);
+async function checkOrderIn(c, shopId, { lines, settings, names, at, orderId = '' }) {
+  const plan = await planIn(c, shopId, settings, [...new Set(lines.map((l) => l.productId))].sort(), at, orderId);
   const out = await stock.check(c, shopId, { lines, settings, names, held: plan ? plan.held : null });
   return plan ? { ...out, hold: { lines, ttlSec: plan.ttlSec } } : out;
 }
@@ -162,6 +165,55 @@ async function reholdIn(c, shopId, orderId, at) {
   )).rows.map((r) => [r.product_id, { name: r.name, unit: r.unit }]));
   await stock.check(c, shopId, { lines: lapsed, settings, names, held: await heldOf(c, shopId, ids, at) });
   await insertHolds(c, shopId, orderId, lapsed, null, at);
+}
+
+/**
+ * پس از عوض شدنِ قلم‌های سفارش (ویرایش ORD-14، افزودن CHK-21) در همان تراکنش: نگه‌داشتهٔ **باز** ِ سفارش هم‌اندازهٔ
+ * قلم‌های تازه می‌شود — قلمِ برداشته یا کم/زیادشده ⇒ ردیفِ پیشین آزاد و (اگر هنوز هست) ردیفِ تازه با همان مهلت؛ قلمِ
+ * تازه ⇒ نگه‌داشتنِ تازه با همان مهلت. سنجشِ «آزاد» پیش‌تر با [checkOrderIn] (و نگه‌داشتهٔ خودی کنار) انجام شده؛ ویرایشِ
+ * بی سنجش (کارمند) هرگز رد نمی‌شود و کمبود به بررسی می‌رود (INV-19). سفارشِ بی نگه‌داشتهٔ باز ⇒ هیچ.
+ */
+async function syncOrderIn(c, shopId, orderId, at) {
+  const held = (await c.query(
+    `SELECT id, order_id, line_no, product_id, qty_milli, expires_at FROM stock_reservations
+      WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held' ORDER BY line_no`, [shopId, orderId]
+  )).rows;
+  if (!held.length) return;
+  await stock.lock(c, shopId);
+  const exp = held.map((r) => (r.expires_at === null ? null : num(r.expires_at)));
+  const expiresAt = exp.includes(null) ? null : Math.min(...exp);
+  const raw = (await c.query(
+    `SELECT line_no, product_id, unit, qty_milli FROM online_order_lines WHERE order_id=$1 AND shop_id=$2 AND product_id <> ''
+      ORDER BY line_no`, [orderId, shopId]
+  )).rows.map((l) => ({ lineNo: num(l.line_no), productId: l.product_id, unit: l.unit, qtyMilli: num(l.qty_milli) }));
+  //  به واحدِ موجودی؛ کالایی که دیگر در کاتالوگ نیست ⇒ قلمش نگه‌داشته ندارد (آزاد می‌شود)
+  const want = new Map();
+  for (const l of raw) {
+    try {
+      const [sl] = (await require('./catalog').toStockLines(c, shopId, [l])).lines;
+      want.set(sl.lineNo, sl);
+    } catch { /* ناموجود یا واحدِ ناشناس ⇒ بی نگه‌داشته */ }
+  }
+  const byLine = new Map(held.map((r) => [num(r.line_no), r]));
+  const drop = held.filter((r) => {
+    const w = want.get(num(r.line_no));
+    return !w || w.productId !== r.product_id || w.qtyMilli !== num(r.qty_milli);
+  });
+  const add = [...want.values()].filter((w) => {
+    const r = byLine.get(w.lineNo);
+    return !r || drop.includes(r);
+  });
+  if (!drop.length && !add.length) return;
+  if (drop.length) {
+    const ids = drop.map((r) => r.id);
+    await c.query(
+      `UPDATE stock_reservations SET status='released', closed_at=$3, close_reason='order_amended'
+        WHERE shop_id=$1 AND id = ANY($2::text[]) AND status='held'`, [shopId, ids, at]
+    );
+    await postRelease(c, shopId, drop, 'release', 'order_amended', at);
+  }
+  await insertHolds(c, shopId, orderId, add, expiresAt, at);
+  await recheckShort(c, shopId, [...new Set([...drop.map((r) => r.product_id), ...add.map((w) => w.productId)])].sort(), at);
 }
 
 /**
@@ -348,6 +400,6 @@ function stop() {
 
 module.exports = {
   DEFAULT_TTL_SEC, HANDOVER_GRACE_MS, HANDED_OVER, RELEASE_ON,
-  enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, onTransitionIn, recheckShort, afterMovesIn,
+  enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, syncOrderIn, onTransitionIn, recheckShort, afterMovesIn,
   orderView, reviewIdsOf, sweep, start, stop,
 };
