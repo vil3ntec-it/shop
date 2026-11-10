@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1009,
+    "routes": 1010,
     "byAuth": {
       "none-detected": 194,
       "admin": 278,
       "inline": 2,
-      "user": 492,
+      "user": 493,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 702,
-      "empty": 305,
+      "empty": 306,
       "unresolved": 2
     }
   },
@@ -798,6 +798,7 @@
     {"method":"GET","path":"/api/shop/orders/risk/lists","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')","requireOrdersContact"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/risk/lists","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["entry"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/shop/orders/risk/lists/:entryId","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')"],"params":["entryId"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/orders/risk/queue","area":"shop","source":"server/src/routes/order-risk-queue.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-risk-queue-ip' }","requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/orders/summary","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/owner-report","area":"shop","source":"server/src/routes/owner-report.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'owner-report-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) "],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","owner"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/owner-report","area":"shop","source":"server/src/routes/owner-report.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'owner-report-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) "],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["settings"]},"errors":[],"shape":"extracted"},

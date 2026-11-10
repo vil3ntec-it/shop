@@ -27,6 +27,7 @@ import androidx.compose.material.icons.outlined.Science
 import androidx.compose.material.icons.outlined.ShoppingBag
 import androidx.compose.material.icons.outlined.Storefront
 import androidx.compose.material.icons.outlined.TwoWheeler
+import androidx.compose.material.icons.outlined.WarningAmber
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -72,6 +73,8 @@ fun OrderCard(
   flash: Boolean = false,
   /** حالتِ انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه نشانِ تیک کنارِ شماره، نه فقط رنگِ مرز */
   checked: Boolean? = null,
+  /** RSK-03 «کارت در صف»: نخستین هشدارِ سابقهٔ این مشتری (`OrderRisk.cardFlags`)؛ null ⇒ بی نشان */
+  risk: String? = null,
 ) {
   val c = PhoneV3.colors
   val awaiting = PhoneV3Roles.status(c, V3Status.AWAITING)
@@ -125,6 +128,10 @@ fun OrderCard(
     Text(OrdersHubModel.items(o), style = V3Type.callout, color = c.ink, maxLines = 2, overflow = TextOverflow.Ellipsis)
     Spacer(Modifier.height(10.dp))
     OrderTags(o, now)
+    if (risk != null) {
+      Spacer(Modifier.height(6.dp))
+      DraftTag(risk, Icons.Outlined.WarningAmber, tone = V3Tone.WARNING)
+    }
     Spacer(Modifier.height(12.dp))
     Row(verticalAlignment = Alignment.CenterVertically) {
       Column(Modifier.weight(1f)) {

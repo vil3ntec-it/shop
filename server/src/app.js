@@ -397,10 +397,8 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/branches-report', require('./routes/branches-report'));
     //  سفارشِ آنلاین (فاز ۴) — پیش از `/shop` تا `requireUser`ِ آن دو بار نرود؛
     //  زیرِ همان پیشوند، پس ACCOUNT_PREFIXESِ پنلِ خانگی دست نمی‌خورد
-    //  میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
-    api.use('/shop/orders/desk', require('./routes/order-desk'));
-    //  کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
-    api.use('/shop/orders/bulk', require('./routes/order-bulk'));
+    api.use('/shop/orders/desk', require('./routes/order-desk'));   // میزِ سفارش (ORD-04/08/09) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.desk`
+    api.use('/shop/orders/bulk', require('./routes/order-bulk'));   // کارِ گروهی روی سفارش‌ها (ORD-19) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.bulk`
     //  پروندهٔ مدرکِ اختلاف (RSK-08) — پیش از `/shop/orders`؛ پشتِ پرچمِ خاموشِ `shop.orders.dispute_file`
     api.use('/shop/orders/evidence', require('./routes/order-evidence'));
     api.use('/shop/order-feedback', require('./routes/order-feedback'));   // NTF-07/09: گزارشِ مشکل و نظرِ مشتری، پشتِ دو پرچمِ خاموش
@@ -408,6 +406,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/orders/late-apology', require('./routes/order-late-apology'));
     //  سفارش‌های باز/لغوشدهٔ یک مشتری برای پروندهٔ او (CRM-07) — پیش از `/shop/orders`؛ پشتِ همان پرچمِ `shop.orders`
     api.use('/shop/orders/customer', require('./routes/order-customer'));
+    api.use('/shop/orders/risk/queue', require('./routes/order-risk-queue'));   // RSK-03: صفِ پرخطرِ پیش از ارسال، پشتِ `shop.order_risk`
     //  «به فاکتور» ِ یک‌ضرب (`POST /shop/orders/:id/invoice`، lib/order-flow) — پیش از `/shop/orders`
     api.use('/shop/orders', require('./routes/order-flow'));
     api.use('/shop/orders', require('./routes/orders'));

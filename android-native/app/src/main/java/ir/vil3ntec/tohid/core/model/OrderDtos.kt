@@ -56,6 +56,8 @@ data class OrdersConfigDto(
   val presence: Boolean = false,
   /** ORD-19 انتخابِ چندتایی، چاپ و گذارِ گروهی (پرچمِ `shop.orders.bulk`؛ خاموش ⇒ کلید نیست) */
   val bulk: Boolean = false,
+  /** RSK-03/04 سابقهٔ مشتری، «کارت در صف» و فهرستِ بسته/مطمئن (پرچمِ `shop.order_risk`؛ خاموش یا سرورِ کهنه ⇒ کلید نیست) */
+  val risk: Boolean = false,
   /** ORD-16 «پیام‌ها» و «فرستادنِ دوباره» (پرچمِ `shop.orders.notice_resend`؛ خاموش ⇒ null و هیچ بخشی) */
   val noticeResend: OrderNoticeResendCfgDto? = null,
   /** ORD-14 «ویرایشِ سفارش» (پرچمِ `shop.orders.amend`؛ `paid` با `shop.orders.amend_paid`) — خاموش ⇒ null */
