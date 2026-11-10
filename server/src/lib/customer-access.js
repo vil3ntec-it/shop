@@ -39,6 +39,8 @@ const WINDOW_MS = 10 * 60 * 1000;
 const PHONE_PREFIX = 'ph:';
 const ERASED_PREFIX = 'erased:';
 const LIST_MAX = 200;
+/** SR45-1: سهمِ بیشینهٔ `*` از صفحهٔ فهرست وقتی ردیفِ خودیِ همان مشتری بیشتر است (۱ از ۴) */
+const ALL_SHARE = 4;
 const REF_RE = /^[A-Za-z0-9_.:-]{1,80}$/;
 
 //  ── شمارِ ops (در حافظهٔ همین نمونه) ─────────────────────────────────
@@ -242,20 +244,28 @@ async function anonymize(c, shopId, forms, placeholder) {
  * (و `all: true` برای خروجیِ برگهٔ همهٔ مشتریان).
  * ⛔ فقط همین دکان؛ `ph:` ِ شماره‌های همین قرض‌دار هم (خواندنِ «سفارش‌های مشتری» بی شناسهٔ پرونده)، و خروجی‌های
  *    برگهٔ همهٔ مشتریان (`*`، درِ `app`) — همان قاعدهٔ `CustomerAccess.rows` ِ برنامه.
+ * ⛔ SR45-1: ردیف‌های `*` در فهرستِ **هر** مشتری می‌آیند و هر عضو هر ۱۰ دقیقه یکی می‌نویسد ⇒ با یک `LIMIT` ِ مشترک،
+ *    همان انباشت (یا شاگردی که عمداً «خروجیِ همه» می‌فرستد) دیدنِ واقعیِ همین مشتری را از صفحه بیرون می‌راند. پس `*` وقتی
+ *    ردیفِ خودیِ بیشتری هست حداکثر یک‌چهارمِ صفحه را می‌گیرد؛ جای خالی را هر کدام پر می‌کند و ترتیب همان تازه‌ترین اول.
  */
 async function list(shopId, customerId, { limit = 100 } = {}) {
   const id = refOf(customerId);
   if (!id) return [];
   const lim = Math.min(Math.max(Number(limit) || 100, 1), LIST_MAX);
-  const refs = [id, ...(await phoneRefsOf({ query }, shopId, id)), ALL];
-  const rows = await many(
+  const refs = [id, ...(await phoneRefsOf({ query }, shopId, id))];
+  const of = (where, params) => many(
     `SELECT l.id, l.viewer_id, COALESCE(u.name, '') AS viewer_name, l.role, l.device_id, l.kind, l.door,
             l.first_at, l.last_at, l.hits, l.customer_ref = '*' AS all_sheet
        FROM customer_access_log l LEFT JOIN users u ON u.id = l.viewer_id
-      WHERE l.shop_id = $1 AND l.customer_ref = ANY($2::text[])
+      WHERE l.shop_id = $1 AND ${where}
       ORDER BY l.last_at DESC, l.id DESC LIMIT $3`,
-    [shopId, refs, lim]
+    [shopId, ...params, lim]
   );
+  const own = await of('l.customer_ref = ANY($2::text[])', [refs]);
+  const sheet = await of('l.customer_ref = $2', [ALL]);
+  const sheetTake = Math.min(sheet.length, Math.max(Math.ceil(lim / ALL_SHARE), lim - own.length));
+  const rows = [...own.slice(0, lim - sheetTake), ...sheet.slice(0, sheetTake)]
+    .sort((a, b) => Number(b.last_at) - Number(a.last_at) || (a.id < b.id ? 1 : a.id > b.id ? -1 : 0));
   return rows.map((r) => ({
     id: r.id, viewerId: r.viewer_id, viewerName: r.viewer_name, role: r.role, device: r.device_id,
     kind: r.kind, door: r.door, firstAt: Number(r.first_at), lastAt: Number(r.last_at), count: Number(r.hits),

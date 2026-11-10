@@ -54,6 +54,14 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-45` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۵، روی `ccr-…-batch-44` ‏391148a8 + هشت شاخهٔ دسته؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هشت شاخه (`stf-2`، `crm-2`، `web-2`، `pos-3`، `pur-2`، `prd-prm`، `syn-3`، `hw-2`) یکی‌یکی ادغام (ادغامِ آخر df7a6ac0) و حمله شدند؛ سه یافتهٔ Low،
+  هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-45.test.js`، ۳ از ۳ روی PGlite و PostgreSQL 16): SR45-1 ردیف‌های `*` ِ «خروجیِ همه» دیدنِ
+  واقعیِ مشتری را از ۲۰۰ ردیفِ فهرستِ صاحب بیرون نمی‌رانند (`customer-access.list`، `ALL_SHARE`)، SR45-2 PBKDF2 ِ گذاشتنِ PIN پس از سنجشِ عضو و اختیار و
+  سطلِ `till-pin-set` ِ ۲۰ در دقیقه، SR45-3 تعلیق/برداشتنِ عضو PIN ِ صندوق و نوبتِ بازش را پاک/بسته می‌کند (`till-pin.memberGone` در `shops.updateMember`).
+  B10 ِ `SECURITY-AUDIT-fa.md` (شش شاخهٔ دیگر سالم)، یک خطِ RULES کنارِ STF-04. ۱۸ پروندهٔ آزمونِ مرتبط (۱۴۹ آزمون) روی PGlite و PostgreSQL سبز.
+- نیمه‌کاره: هیچ. R13 (قفلِ PIN ِ هدف با حدسِ عضوِ دیگر)، R14 (مدیر با `unlock` حدس را از سر می‌گیرد)، R15–R17 (Info) تصمیمِ صاحب‌کار.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
   (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان
