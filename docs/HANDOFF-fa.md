@@ -53,6 +53,14 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/kt-testlog` (نامِ آزمون‌های Kotlin در لاگِ CI برای شاهدِ STATUS؛ روی `origin/main` f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: بلوکِ `tasks.withType<Test>()` ِ `desktop`، `core`، `android-native/app` و (تازه) `customer-android/app` برای هر آزمون یک خطِ
+  `KTEST PASS|FAIL|SKIP <کلاسِ کامل> > <نامِ آزمون>` چاپ می‌کند (`addTestListener`) و `events(FAILED, SKIPPED)` با `exceptionFormat = FULL`؛ PASSED ِ خودِ
+  Gradle نه (دو خط برای هر آزمون). بی افزونه/وابستگیِ تازه؛ ورک‌فلو دست نخورد. خطِ تازه در RULES «CI و آزمون».
+- برآوردِ خطِ افزوده (شمارِ `@Test`): «کامپایل و آزمون» ~۵٬۳۴۰ (desktop ۳٬۷۰۲ + core ۱٬۶۳۸)، «ساخت نسخهٔ بومی» ~۵٬۰۰۰ تا ~۶٬۶۰۰
+  (app ۳٬۳۵۸ + core ۱٬۶۳۸، و گامِ دومِ «آزمون‌های core» اگر دوباره بدود)، «برنامهٔ خریدِ مشتری (گزارش)» ۸.
+- نیمه‌کاره: Gradle محلی نیست؛ کامپایلِ اسکریپت‌ها و شکلِ خط فقط در CI ِ PR ِ دسته دیده می‌شود.
+- قدمِ بعدی: پس از سبز شدنِ دسته، ردیف‌های STATUS ِ Kotlin فقط با خطِ `KTEST PASS` ِ دیده‌شده + شناسهٔ run/job بالا بروند.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):

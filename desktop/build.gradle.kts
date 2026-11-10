@@ -1,6 +1,10 @@
 import org.jetbrains.compose.desktop.application.dsl.TargetFormat
 import java.util.Properties
+import org.gradle.api.tasks.testing.TestDescriptor
+import org.gradle.api.tasks.testing.TestListener
+import org.gradle.api.tasks.testing.TestResult
 import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+import org.gradle.api.tasks.testing.logging.TestLogEvent
 
 /*
  *  برنامهٔ کامپیوترِ فروشگاه — همان برنامهٔ اندروید، بومی روی ویندوز و
@@ -403,11 +407,27 @@ tasks.test {
 
 //  شکستِ آزمون در CI با پیام، علت و stack (پیش‌فرضِ SHORT ِ Gradle فقط «AssertionError at X.kt:113» می‌نوشت؛
 //  run 41645079134 ِ `ResumableDownloadServerTest`). فقط گزارشِ آزمون؛ در ساخت و انتشار اثری ندارد.
+//  شاهدِ CI برای STATUS (RULES «CI و آزمون»): هر آزمون یک خطِ «KTEST PASS|FAIL|SKIP <کلاسِ کامل> > <نامِ آزمون>».
+//  رخدادِ PASSED ِ خودِ Gradle نه: دو خط برای هر آزمون، و «ساخت نسخهٔ بومی» تا ~۶۶۰۰ آزمون دارد.
 tasks.withType<Test>().configureEach {
   testLogging {
+    events(TestLogEvent.FAILED, TestLogEvent.SKIPPED)
     exceptionFormat = TestExceptionFormat.FULL
     showExceptions = true
     showCauses = true
     showStackTraces = true
   }
+  addTestListener(object : TestListener {
+    override fun beforeSuite(suite: TestDescriptor) {}
+    override fun afterSuite(suite: TestDescriptor, result: TestResult) {}
+    override fun beforeTest(testDescriptor: TestDescriptor) {}
+    override fun afterTest(testDescriptor: TestDescriptor, result: TestResult) {
+      val r = when (result.resultType) {
+        TestResult.ResultType.SUCCESS -> "PASS"
+        TestResult.ResultType.FAILURE -> "FAIL"
+        else -> "SKIP"
+      }
+      println("KTEST $r ${testDescriptor.className} > ${testDescriptor.name}")
+    }
+  })
 }
