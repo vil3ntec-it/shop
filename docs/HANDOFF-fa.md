@@ -111,6 +111,27 @@
 - نیمه‌کاره: هیچ. شاخه‌های منبع (`perf-2`، `ntf-refund`، `sec-review-40`، `shopper-gaps`، `acct-console-2`) در دستهٔ ۴۱‌اند و هنوز مرج نشده؛
   اگر یکی کنار رفت، بندش را هم بردار. «مانع» ِ CHK-18/ORD-20 عمداً دست نخورد (عاملِ دیگر).
 - قدمِ بعدی: با هر جوابِ صاحب‌کار بندِ همان تصمیم به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps-2` (CHK-24 در برنامهٔ خرید: «دستورِ تحویل» و اسکناس پس از ثبت؛ روی `claude/shopper-gaps` ‏cf438f31؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: کارتِ «دستورِ تحویل» در پیگیریِ برنامهٔ خرید، همزادِ `#o-prefs` ِ وب (`core/.../shopper/ShopperPrefs.kt` ِ `PrefsRules`،
+  `ShopperApi.editDelivery`، `OrderExtras.deliveryPrefs`؛ `customer/ui/ModelPrefs.kt` ِ `PrefsModel`، `OrderCards.DeliveryPrefsCard`):
+  «زنگ»، «تحویل به»، نشانهٔ تازه و «با کدام اسکناس…» (فقط نقد) با همان در و `expectedVersion`؛ یک درخواست در هر لحظه، بی تکرارِ خودکار،
+  ۴۰۹ + نمای تازهٔ همان ⇒ «ثبت شد». سرور: `customerPrefs` کلیدِ `cashTenderMinor` گرفت (بی آن برنامه اسکناسِ کنونی را نمی‌دانست و
+  ذخیرهٔ کادرِ دیگر پاکش می‌کرد)؛ `order-delivery-prefs.test.js` (فهرستِ کلیدها عمداً + ویرایشِ اسکناس با توکن، کدهای خطا، تکرار) ۵/۵
+  روی PGlite و PostgreSQL، پیش از رفع سرخ. بی مهاجرت، بی درِ تازه، بی پرچمِ تازه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperPrefsTest`، `ShopperTenderVectorsTest.afterPlacingOptionsAreTheSameVectorAndEachIsServerValid`،
+  `CustomerDeliveryPrefsTest`) فقط CI. ⚠️ وبِ پیگیری اسکناس را پس از ثبت نمی‌پرسد: `order.fa.json` ۴۰۲۶ از ۴۰۹۶ بایت و واژه‌نامهٔ اصلی
+  ۲۱۱۵۸ از ۲۱۵۰۴ — جا نیست مگر صاحب‌کار سقف یا جای واژه‌ها را بگوید.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24 ِ STATUS؛ تصمیمِ صاحب‌کار دربارهٔ اسکناس در وبِ پیگیری.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps` (کاستی‌های برنامهٔ خرید در برابرِ ویترین: WEB-13 و CHK-14؛ روی `origin/main` ‏f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) WEB-13 — ردیفِ «دیده‌شده‌های اخیر» در صفحهٔ دکانِ برنامهٔ خرید با همان کلیدِ `recent` ِ `GET /api/store/:slug` و همان قاعدهٔ
+  `RecentlyViewed` (core/shopper `RecentProducts`، `ShopperState.seen`؛ هر دکان ۱۲ کالا، ۳۰ روز، حداکثر ۲۰ دکان)، فقط روی دستگاه، `?ids=` با هر ورود
+  (نیامده ⇒ بیرون)، «پاک کردن»؛ `ui/ModelRecent.kt` + `ShopScreen.RecentRow`. (۲) CHK-14 — «با کدام اسکناس…» در برگهٔ ثبت فقط با
+  `features.deliveryPrefs` و ارسال (`CheckoutRules.tenderOptions`/`tenders`/`tenderOf`، `CheckoutDelivery.cashTenderMinor`؛ `CheckoutScreen.Tender`)؛
+  بردارِ مشترکِ `core/test-vectors/cash-tender-v1.json` با `server/test/cash-tender-vectors.test.js` (تابعِ `tenders` ِ `checkout.js` در vm و `checkTender` ِ سرور).
+  هیچ درِ سرور، مهاجرت یا پرچمِ تازه‌ای نیست؛ پرچمِ خاموش ⇒ همان بدنه و همان صفحه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
+  `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
+- قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

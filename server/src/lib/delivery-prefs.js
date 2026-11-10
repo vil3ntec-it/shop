@@ -195,7 +195,8 @@ async function editByToken(sf, token, body) {
 /**
  * CHK-24، نمای مشتری (صفحهٔ پیگیری با توکن): آن‌چه «ویرایشِ دستورِ تحویل» لازم دارد — فقط با پرچم، فقط سفارشِ
  * «ارسال» ِ ویترین؛ وگرنه `undefined` (کلید نیست). ⛔ نشانی و نشانه نه (نمای مشتری نشانی ندارد): فقط «زنگ بزنید»،
- * «تحویل به…»، نسخه و «هنوز ویرایش‌پذیر؟».
+ * «تحویل به…»، اسکناسِ خودِ مشتری (`cashTenderMinor` یا null؛ برنامهٔ خرید با آن «با کدام اسکناس…» را پُر می‌کند تا
+ * ذخیرهٔ کادرِ دیگر اسکناس را بی‌صدا پاک نکند)، نسخه و «هنوز ویرایش‌پذیر؟».
  */
 async function customerPrefs(shopId, orderId) {
   if (!orderId || !(await flagOn(shopId))) return undefined;
@@ -206,6 +207,7 @@ async function customerPrefs(shopId, orderId) {
   return {
     editable: EDITABLE.includes(row.status), version: Number(row.version),
     callBeforeArrival: d.callBeforeArrival === true, leaveWith: d.leaveWith || '',
+    cashTenderMinor: Number.isSafeInteger(d.cashTenderMinor) ? d.cashTenderMinor : null,
   };
 }
 

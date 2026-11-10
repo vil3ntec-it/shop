@@ -269,8 +269,9 @@ private fun Field(
   )
 }
 
+/** گزینهٔ رادیویی (ثبت و کارتِ «دستورِ تحویل» ِ پیگیری) */
 @Composable
-private fun Choice(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
+internal fun Choice(text: String, selected: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
   Row(
     Modifier.fillMaxWidth().selectable(selected = selected, enabled = enabled, role = Role.RadioButton, onClick = onClick).padding(vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
@@ -281,12 +282,12 @@ private fun Choice(text: String, selected: Boolean, enabled: Boolean = true, onC
 }
 
 @Composable
-private fun Check(text: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+internal fun Check(text: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
   Row(
-    Modifier.fillMaxWidth().toggleable(value = checked, role = Role.Checkbox, onValueChange = onChange).padding(vertical = 4.dp),
+    Modifier.fillMaxWidth().toggleable(value = checked, enabled = enabled, role = Role.Checkbox, onValueChange = onChange).padding(vertical = 4.dp),
     verticalAlignment = Alignment.CenterVertically,
   ) {
-    Checkbox(checked = checked, onCheckedChange = null)
+    Checkbox(checked = checked, onCheckedChange = null, enabled = enabled)
     Text(text, Modifier.padding(start = 8.dp), style = MaterialTheme.typography.bodyLarge)
   }
 }
