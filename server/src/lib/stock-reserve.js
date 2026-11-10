@@ -447,6 +447,156 @@ async function sweep(at = now()) {
   return n;
 }
 
+// ════════════════════════════════════════════════════════════════════
+//  S86 — بازسازیِ projection ِ نگه‌داشته از دفتر و سفارش‌ها
+// ════════════════════════════════════════════════════════════════════
+
+const HOLD_KEY = /^res:(.+):hold$/;
+
+/** کلیدِ فروشِ تحویلِ همان قلم در دفتر (`afterMovesIn`) */
+const saleKeys = (orderId, lineNo) => [`si:o-${orderId}-${lineNo}`, `si:w-${orderId}-${lineNo}`];
+
+/**
+ * S86 (§۱۹.۱۲) — بازسازیِ `stock_reservations` ِ نرم (O-06 ب) از دو منبع: دفترِ موجودی (هر نگه‌داشتن یک حرکتِ
+ * `res:<ردیف>:hold` و هر بستن `…:release|commit`) و سفارش‌ها (وضعیت، قلم‌های امروز به واحدِ موجودی، فروشِ تحویل در
+ * `stock_sources`). هر نگه‌داشته‌ای که باید باشد و نیست، یا هست و نباید باشد:
+ *   گم ────────── نگه‌داشتنِ بازِ دفتر بی ردیف ⇒ همان ردیف با همان شناسه (قلمِ همان کالا در سفارش؛ مهلت از وضعیتِ سفارش)
+ *   پایان ─────── سفارشِ بسته (`RELEASE_ON`) یا نبوده ⇒ `released`
+ *   گذشته ─────── مهلت سر رسید ⇒ `expired` (همان `expireDueIn`)
+ *   تحویل ─────── فروشِ همان قلم در دفتر نشست ⇒ `committed` (همان `afterMovesIn`)
+ *   ناهم‌اندازه ── کالا/مقدار با قلمِ امروز نمی‌خواند ⇒ آزاد و، اگر قلم هست، نگه‌داشتنِ تازه با همان مهلت (همان `syncOrderIn`؛
+ *                 ⛔ R6: پرچمِ خاموش ⇒ فقط کوچک/هم‌اندازه)
+ * هر بستن حرکتِ آزادسازیِ خودش را دارد ⇒ تطبیقِ INV-16 (`stock.reconcile`) پس از آن سالم.
+ *   • پیش‌فرض فقط نشان می‌دهد (هیچ نوشتنی)؛ با `apply` زیرِ قفلِ موجودیِ دکان و در یک تراکنش با سابقهٔ `reserve.rebuild`؛
+ *   • بی تفاوت ⇒ هیچ نوشتن و هیچ سابقه ⇒ بارِ دوم بی‌اثر؛ دکانِ دیگر، ردیفِ `legacy` و سفارش هرگز دست نمی‌خورند.
+ *   • قلمِ بازی که هیچ ردِ نگه‌داشتنی در دفتر ندارد ساخته نمی‌شود: پرچم یا موجودیِ «تازه» هنگامِ ثبت شاید نبود (همان سفارشِ بی رزرو).
+ * @returns {{ok, applied, flag, count: {projection, source}, changes: Array<{kind, id, orderId, lineNo, productId, qtyMilli, toMilli?}>}}
+ */
+async function rebuild(shopId, { apply = false, by = '' } = {}) {
+  if (!shopId) throw require('../middleware/errors').badRequest('شناسهٔ دکان لازم است', 'shop_required');
+  return tx(async (c) => {
+    await stock.lock(c, shopId);
+    const at = now();
+    const on = await stock.reserveFlagOf(shopId, c);
+    const ttlMs = (await ttlSecOf(c, shopId)) * 1000;
+    const known = new Set((await c.query('SELECT id FROM stock_reservations WHERE shop_id=$1', [shopId])).rows.map((r) => r.id));
+    const held = (await c.query(
+      `SELECT id, order_id, line_no, product_id, qty_milli, expires_at, created_at FROM stock_reservations
+        WHERE shop_id=$1 AND kind='soft' AND status='held' ORDER BY created_at, id FOR UPDATE`, [shopId]
+    )).rows.map((r) => ({ id: r.id, orderId: r.order_id, lineNo: num(r.line_no), productId: r.product_id, qtyMilli: num(r.qty_milli),
+      expiresAt: r.expires_at === null ? null : num(r.expires_at), createdAt: num(r.created_at), lost: false }));
+    //  نگه‌داشتنِ بازِ دفتر (بی `release`/`commit`) که ردیفی ندارد — همان امضای `insertHolds`
+    const open = (await c.query(
+      `SELECT h.source_key, h.product_id, h.qty_milli, h.ref_id, h.at FROM stock_moves h
+        WHERE h.shop_id=$1 AND h.type='reserve' AND h.source='order' AND h.reason='online_order' AND h.source_key LIKE 'res:%:hold'
+          AND NOT EXISTS (SELECT 1 FROM stock_moves x WHERE x.shop_id=h.shop_id AND x.source_key IN
+                (substr(h.source_key, 1, length(h.source_key) - 4) || 'release', substr(h.source_key, 1, length(h.source_key) - 4) || 'commit'))
+        ORDER BY h.at, h.source_key`, [shopId]
+    )).rows.filter((m) => HOLD_KEY.test(m.source_key) && !known.has(HOLD_KEY.exec(m.source_key)[1]));
+    const orderIds = [...new Set([...held.map((r) => r.orderId), ...open.map((m) => m.ref_id)])];
+    const rowsOf = (await c.query('SELECT id, status, created_at FROM online_orders WHERE shop_id=$1 AND id = ANY($2::text[])',
+      [shopId, orderIds])).rows;
+    const orders = new Map(rowsOf.map((o) => [o.id, o.status]));
+    const placed = new Map(rowsOf.map((o) => [o.id, num(o.created_at)]));
+    const wants = new Map();
+    const wantOfOrder = async (id) => {
+      if (!wants.has(id)) wants.set(id, await wantOf(c, shopId, id));
+      return wants.get(id);
+    };
+    const isOpen = (id) => orders.has(id) && !RELEASE_ON.includes(orders.get(id));
+    //  ۱) ردیفِ گم از دفتر: قلمِ همان کالا که نگه‌داشتهٔ دیگری ندارد؛ مهلت از وضعیتِ امروزِ سفارش — «تازه» (یا پرچمِ خاموش، R6)
+    //     ⇒ همان مهلتِ ثبت (`created_at` ِ سفارش + مهلت)، تحویل‌شده ⇒ مهلتِ پشتیبان از همین حالا، بقیه ⇒ تا پایانِ سفارش
+    const taken = new Set(held.map((r) => `${r.orderId}\u0000${r.lineNo}`));
+    for (const m of open) {
+      const orderId = m.ref_id;
+      const holdAt = num(m.at);
+      const st = orders.get(orderId);
+      let lineNo = 0;
+      if (isOpen(orderId)) {
+        const line = [...(await wantOfOrder(orderId)).values()]
+          .find((w) => w.productId === m.product_id && !taken.has(`${orderId}\u0000${w.lineNo}`));
+        if (line) lineNo = line.lineNo;
+      }
+      if (lineNo) taken.add(`${orderId}\u0000${lineNo}`);
+      let expiresAt = null;
+      if (st === 'new' || !on) expiresAt = (placed.get(orderId) || holdAt) + ttlMs;
+      else if (HANDED_OVER.includes(st)) expiresAt = at + HANDOVER_GRACE_MS;
+      held.push({ id: HOLD_KEY.exec(m.source_key)[1], orderId, lineNo, productId: m.product_id, qtyMilli: num(m.qty_milli),
+        expiresAt, createdAt: holdAt, lost: true });
+    }
+    //  ۲) هر نگه‌داشته در برابرِ سفارشِ امروز
+    const sold = new Set((await c.query(
+      'SELECT DISTINCT source_key FROM stock_sources WHERE shop_id=$1 AND posted_milli <> 0 AND source_key = ANY($2::text[])',
+      [shopId, held.flatMap((r) => saleKeys(r.orderId, r.lineNo))]
+    )).rows.map((r) => r.source_key));
+    const changes = [];
+    for (const r of held) {
+      const base = { id: r.id, orderId: r.orderId, lineNo: r.lineNo, productId: r.productId, qtyMilli: r.qtyMilli };
+      if (!isOpen(r.orderId)) changes.push({ kind: 'released', ...base, r });
+      else if (r.expiresAt !== null && r.expiresAt <= at) changes.push({ kind: 'expired', ...base, r });
+      else if (saleKeys(r.orderId, r.lineNo).some((k) => sold.has(k))) changes.push({ kind: 'committed', ...base, r });
+      else {
+        const w = r.lineNo ? (await wantOfOrder(r.orderId)).get(r.lineNo) : null;
+        if (w && w.productId === r.productId && w.qtyMilli === r.qtyMilli) {
+          if (r.lost) changes.push({ kind: 'restored', ...base, r });
+          continue;
+        }
+        //  ⛔ R6: خاموش ⇒ نگه‌داشتنِ تازه فقط برای همان کالا و نه بیشتر از پیش (و جای صف همان)
+        const keep = w && w.productId === r.productId && w.qtyMilli <= r.qtyMilli;
+        const add = w && (on || keep) ? { ...w, ...(keep ? { createdAt: r.createdAt } : {}) } : null;
+        changes.push({ kind: 'resized', ...base, toMilli: add ? add.qtyMilli : 0, r, add });
+      }
+    }
+    const view = changes.map(({ r, add, ...x }) => x);
+    //  شمارِ نگه‌داشته‌ها: امروز (ردیف) و آن‌چه منبع می‌گوید (پس از بازسازی)
+    const closing = changes.filter((x) => x.kind !== 'restored').length;
+    const count = { projection: held.filter((r) => !r.lost).length,
+      source: held.length - closing + changes.filter((x) => x.add).length };
+    if (!apply || !changes.length) return { ok: !changes.length, applied: false, flag: on, count, changes: view };
+
+    const CLOSE = { released: ['released', 'release', 'rebuild_order_closed'], expired: ['expired', 'release', 'ttl'],
+      committed: ['committed', 'commit', 'fulfilled'], resized: ['released', 'release', 'rebuild_line_changed'] };
+    const touched = new Set();
+    for (const ch of changes) {
+      const { r } = ch;
+      touched.add(r.productId);
+      if (ch.kind === 'restored') {
+        await c.query(
+          `INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, branch_id, qty_milli, status, expires_at,
+             created_at, kind) VALUES ($1,$2,$3,$4,$5,'',$6,'held',$7,$8,'soft')`,
+          [r.id, shopId, r.orderId, r.lineNo, r.productId, r.qtyMilli, r.expiresAt, r.createdAt]
+        );
+        continue;
+      }
+      const [status, suffix, reason] = CLOSE[ch.kind];
+      if (r.lost) {
+        await c.query(
+          `INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, branch_id, qty_milli, status, expires_at,
+             created_at, closed_at, close_reason, kind) VALUES ($1,$2,$3,$4,$5,'',$6,$7,$8,$9,$10,$11,'soft')`,
+          [r.id, shopId, r.orderId, r.lineNo, r.productId, r.qtyMilli, status, r.expiresAt, r.createdAt, at, reason]
+        );
+      } else {
+        await c.query(
+          `UPDATE stock_reservations SET status=$3, closed_at=$4, close_reason=$5 WHERE shop_id=$1 AND id=$2 AND status='held'`,
+          [shopId, r.id, status, at, reason]
+        );
+      }
+      await postRelease(c, shopId, [{ id: r.id, product_id: r.productId, order_id: r.orderId, qty_milli: r.qtyMilli }],
+        suffix, `reservation_rebuild_${ch.kind}`, at);
+      if (ch.add) {
+        await insertHolds(c, shopId, r.orderId, [ch.add], r.expiresAt, at);
+        touched.add(ch.add.productId);
+      }
+    }
+    await recheckShort(c, shopId, [...touched].sort(), at);
+    await require('./audit').logIn(c, {
+      shopId, actorType: 'system', userId: String(by || '').slice(0, 64), action: 'reserve.rebuild', targetType: 'shop', targetId: shopId,
+      detail: { count, changes: changes.length, items: view.slice(0, 50) },
+    });
+    return { ok: true, applied: true, flag: on, count, changes: view };
+  });
+}
+
 let timer = null;
 let sweeping = false;
 async function tick() {
@@ -467,5 +617,5 @@ function stop() {
 module.exports = {
   DEFAULT_TTL_SEC, HANDOVER_GRACE_MS, HANDED_OVER, RELEASE_ON,
   enabled, ttlSecOf, heldOf, expireDueIn, planIn, checkOrderIn, holdIn, syncOrderIn, onTransitionIn, recheckShort, afterMovesIn,
-  orderView, reviewIdsOf, sweep, start, stop,
+  orderView, reviewIdsOf, sweep, start, stop, rebuild,
 };

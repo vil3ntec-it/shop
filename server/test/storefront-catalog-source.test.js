@@ -261,3 +261,53 @@ test('پرچمِ دکان (نه all) منبع را عوض نمی‌کند — و
   for (const r of await publishAll(b)) assert.equal(r.status, 404, JSON.stringify(r.body));
   assert.deepEqual(await storeList(b), []);
 });
+
+//  S86 (§۱۹.۱۲): بازسازیِ projection ِ کاتالوگ برای دکانِ **v3** — همان `rebuildProducts` ِ `catalog-rebuild.test.js` (آن‌جا v1)
+//  این‌بار از `sync_v3_rows`: تعداد، قیمتِ نمایش و وضعیت = دفترِ v3، فقط تفاوت، دفترِ v3 دست‌نخورده، ویترین دوباره همان
+test('S86 کاتالوگ از منبعِ v3: projection ِ خراب ⇒ rebuildProducts از sync_v3_rows و فقط تفاوت؛ ویترین دوباره همان', async () => {
+  const cp = require('../src/lib/catalog-products');
+  await setFlag('all', 'storefront.catalog_source', true);
+  try {
+    const b = await liveStore('سه-بازسازی', 'v3');
+    for (const r of await publishAll(b)) assert.equal(r.status, 200, JSON.stringify(r.body));
+    assert.deepEqual(await storeList(b), EXPECTED);
+    assert.equal(await cp.productSourceOf(b.shopId), 'v3');
+    const rows = async () => (await query(
+      'SELECT product_id, name, price_minor, active, deleted, source FROM catalog_products WHERE shop_id=$1 ORDER BY product_id', [b.shopId]
+    )).rows.map((r) => `${r.product_id}:${r.price_minor === null ? '-' : Number(r.price_minor)}:${r.active ? 'on' : 'off'}${r.deleted ? ':del' : ''}:${r.source}`);
+    const healthy = await rows();
+    assert.deepEqual(healthy, ['oil:30000:on:v3', 'rice:12050:on:v3', 'soap:4000:on:v3']);
+    const v3Rows = async () => Number((await one(
+      `SELECT COUNT(*)::int AS n FROM sync_v3_rows WHERE app='shop' AND account_id=$1 AND table_name='products'`, [b.shopId]
+    )).n);
+    const ledger = await v3Rows();
+
+    //  projection ِ خراب: قیمتِ دیگر، کالای گم، کالای بی منبع
+    await query(`UPDATE catalog_products SET price_minor = 1 WHERE shop_id=$1 AND product_id='rice'`, [b.shopId]);
+    await query(`DELETE FROM catalog_products WHERE shop_id=$1 AND product_id='oil'`, [b.shopId]);
+    await query(
+      `INSERT INTO catalog_products (shop_id, product_id, name, price_minor, source, updated_at) VALUES ($1,'ghost','شبح',100,'v3',$2)`,
+      [b.shopId, now()]
+    );
+    const dry = await cp.rebuildProducts(b.shopId);
+    assert.equal(dry.source, 'v3');
+    assert.equal(dry.ok, false);
+    assert.equal(dry.applied, false);
+    assert.deepEqual(dry.count, { projection: 3, source: 3 });
+    assert.deepEqual(dry.changes.map((c) => `${c.productId}:${c.kind}${c.fields ? `:${c.fields.join(',')}` : ''}`),
+      ['ghost:dropped', 'oil:built', 'rice:fixed:price_minor']);
+    assert.ok((await rows()).includes('rice:1:on:v3'), 'نمایش هیچ نمی‌نویسد');
+
+    const done = await cp.rebuildProducts(b.shopId, { apply: true, by: 'آزمون' });
+    assert.equal(done.applied, true);
+    assert.deepEqual(await rows(), healthy, 'همان دفترِ v3');
+    assert.equal(await v3Rows(), ledger, 'دفترِ v3 دست نمی‌خورد');
+    assert.deepEqual(await storeList(b), EXPECTED, 'ویترین دوباره همان فهرست و قیمت');
+    const again = await cp.rebuildProducts(b.shopId, { apply: true });
+    assert.equal(again.ok, true);
+    assert.deepEqual(again.changes, []);
+    assert.equal(Number((await one(`SELECT COUNT(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action='catalog.rebuild'`, [b.shopId])).n), 1);
+  } finally {
+    await setFlag('all', 'storefront.catalog_source', false);
+  }
+});

@@ -24,6 +24,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -35,8 +36,10 @@ import ir.vil3ntec.tohid.core.i18n.StrPick
 import ir.vil3ntec.tohid.core.i18n.StrProduct
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrdersConfigDto
+import ir.vil3ntec.tohid.core.model.PickCustomerLinkDto
 import ir.vil3ntec.tohid.core.model.PickLineDto
 import ir.vil3ntec.tohid.core.model.PickSheetDto
+import ir.vil3ntec.tohid.core.model.PickWeightHoldDto
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.orders.OrderStates
 import ir.vil3ntec.tohid.core.orders.OrderText
@@ -59,6 +62,8 @@ import kotlinx.serialization.json.JsonObject
  *  - «پیدا نکردم» روی هر قلمِ باز همیشه هست (PCK-03)؛ کالای وزنی وزنِ واقعی می‌گیرد با پیش‌سنجشِ حدِ مجاز
  *    (PCK-04)؛ «از نو» اشتباه را برمی‌گرداند.
  *  - «بسته‌بندی شد» فقط وقتی هیچ قلمِ بازی نیست؛ جمعِ تازه و کسرِ خودکار (PCK-07) و برچسبِ کیسه‌ها (PCK-09).
+ *  - S56 (پرچمِ `shop.orders.weight_hold`): وزنِ بیش از حد ⇒ قلم «در انتظارِ مشتری» با پیوندِ واتس‌اپ و «مشتری پذیرفت/رد کرد»
+ *    پس از تماس (`PickWeightHoldUi.kt`)؛ بسته‌بندی تا جواب صبر می‌کند (سرور).
  *
  *  ⛔ هر کار یک `eventId` دارد؛ اگر پاسخ گم شد، همان کار با همان شناسه دوباره می‌رود (سرور یک بار حساب
  *  می‌کند). کارِ بعدی — حتی همان اسکن برای بوتلِ دوم — شناسهٔ تازه می‌گیرد.
@@ -90,6 +95,9 @@ internal fun PickSheet(
   var refundAsk by remember(orderId) { mutableStateOf(false) }
   //  PCK-05/06: برگهٔ جایگزینِ یک قلمِ «پیدا نشد» (`PickSubstituteUi.kt`)
   var subFor by remember(orderId) { mutableStateOf<PickLineDto?>(null) }
+  //  S56: پیوندِ پیگیری/واتس‌اپ ِ مشتری پس از نگه‌داشتِ تازهٔ وزن
+  var holdLink by remember(orderId) { mutableStateOf<PickCustomerLinkDto?>(null) }
+  val uri = LocalUriHandler.current
 
   fun load() {
     loadError = null
@@ -119,9 +127,28 @@ internal fun PickSheet(
             buzz(false)
             note = false to r.message.ifBlank { PickText.reject(r.code) }
           }
+          //  S56: وزنِ بیش از حد ⇒ قلم باز و نگه‌داشت تا جوابِ مشتری
+          if (r != null && r.hold != null) {
+            note = true to StrPick.holdSent
+            r.customer?.let { holdLink = it }
+          }
         }
         .onFailure { note = false to StrOrderPages.pickRetry(it.userMessage) }
       busy = false
+    }
+  }
+
+  /** S56: تصمیمِ کارمند پس از تماس با مشتری دربارهٔ وزنِ بیشتر؛ پس از آن (یا خطا) برگهٔ تازه */
+  fun decideHold(holdId: String, decision: String) {
+    if (busy) return
+    busy = true
+    note = null
+    scope.launch {
+      repo.decideWeight(orderId, holdId, decision)
+        .onSuccess { note = true to (if (decision == "accept") StrPick.subAccepted else StrPick.holdRemoved) }
+        .onFailure { note = false to it.userMessage }
+      busy = false
+      load()
     }
   }
 
@@ -178,6 +205,9 @@ internal fun PickSheet(
         }
       }
       note?.let { (ok, text) -> Text(text, style = MaterialTheme.typography.bodySmall, color = if (ok) c.success else c.danger) }
+      holdLink?.let { k ->
+        if (open && k.whatsappUrl.isNotBlank()) TohidSecondaryButton(StrPick.subWhatsapp, onClick = { runCatching { uri.openUri(k.whatsappUrl) } })
+      }
 
       for (l in s.lines) {
         PickLineCard(
@@ -202,6 +232,8 @@ internal fun PickSheet(
           },
           onReset = { act("reset:${l.lineNo}:${l.status}:${l.pickedQtyMilli}") { PickingRepository.event(it, "reset", l.lineNo) } },
           onSubstitute = if (open && l.status == "not_found") ({ subFor = l }) else null,
+          hold = s.weightHolds.lastOrNull { it.lineNo == l.lineNo && it.status == "pending" },
+          onHold = if (open) ({ id: String, decision: String -> decideHold(id, decision) }) else null,
         )
       }
 
@@ -298,6 +330,10 @@ private fun PickLineCard(
   onLocation: ((String, String, String) -> Unit)? = null,
   /** PCK-05: «جایگزین» برای قلمِ «پیدا نشد»؛ null ⇒ دکمه نیست */
   onSubstitute: (() -> Unit)? = null,
+  /** S56: نگه‌داشتِ «در انتظار» ِ وزنِ بیشترِ همین قلم؛ null ⇒ نیست */
+  hold: PickWeightHoldDto? = null,
+  /** (شناسهٔ نگه‌داشت، `accept`/`reject`) ِ کارمند پس از تماس؛ null ⇒ فقط نمایش */
+  onHold: ((String, String) -> Unit)? = null,
 ) {
   val c = Shop.colors
   val pending = l.status == "pending"
@@ -324,6 +360,7 @@ private fun PickLineCard(
         if (l.wrongScans > 0) StrOrderPages.pickWrongScans(l.wrongScans) else "",
       style = MaterialTheme.typography.bodySmall, color = c.text,
     )
+    hold?.let { PickWeightHoldNote(it, l.unit, enabled = !busy, onDecide = onHold) }
     if (!open) return@TohidCard
     if (pending && l.weighed) {
       val milli = PickText.weightMilli(weight)

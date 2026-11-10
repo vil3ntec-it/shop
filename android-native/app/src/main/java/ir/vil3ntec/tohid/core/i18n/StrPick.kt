@@ -108,6 +108,26 @@ object StrPick {
   val halalUnknown: String get() = t("نامعلوم", "Unknown", "نامعلوم")
   val halalSaved: String get() = t("حلالِ کالا ثبت شد", "Halal status saved", "حلال حالت ثبت شو")
 
+  // وزنِ بیش از حد تا جوابِ مشتری (S56، `ui/screens/PickWeightHoldUi.kt`)
+  val holdPending: String get() = t("وزن بیشتر از حد؛ در انتظارِ مشتری", "Over the weight limit; waiting for the customer", "له حد څخه زیات وزن؛ د پېرودونکي په تمه")
+  fun holdLine(actual: String, total: String, extra: String): String = t(
+    "وزنِ واقعی ${asIs(actual)} · مبلغ ${asIs(total)} (${asIs(extra)} بیشتر)",
+    "Actual weight $actual · amount $total ($extra more)",
+    "رښتینی وزن $actual · بیه $total ($extra زیات)",
+  )
+  val holdHint: String get() = t(
+    "مشتری با پیوندِ پیگیری جواب می‌دهد، یا پس از تماس همین‌جا ثبت کنید. اگر تا وقتش جواب نیاید، قلم حذف و از جمع کسر می‌شود.",
+    "The customer answers on the tracking link, or record the answer here after a call. With no answer in time, the item is removed from the total.",
+    "پېرودونکی د تعقیب په لینک ځواب ورکوي، یا له اړیکې وروسته یې دلته ثبت کړئ. که په وخت ځواب رانشي، توکی لرې او له ټولې بیې کمېږي.",
+  )
+  val holdExpired: String get() = t("وقتِ جواب گذشت؛ قلم حذف می‌شود", "Time is up; the item will be removed", "د ځواب وخت تېر شو؛ توکی لرې کېږي")
+  val holdSent: String get() = t(
+    "وزن از حدِ مجاز بیشتر است؛ تا جوابِ مشتری نگه داشته شد",
+    "Over the allowed weight; held until the customer answers",
+    "وزن له اجازه لرونکي حد څخه زیات دی؛ د پېرودونکي تر ځواب پورې وساتل شو",
+  )
+  val holdRemoved: String get() = t("قلم حذف و از جمع کسر شد", "Item removed and taken off the total", "توکی لرې او له ټولې بیې کم شو")
+
   // عکسِ بسته (PCK-08)
   val photoTitle: String get() = t("عکسِ بسته", "Parcel photo", "د بستې انځور")
   val photoConsent: String get() = t(

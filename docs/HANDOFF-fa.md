@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-5` (دورِ پنجمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-4` ‏a64466b6؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S56 — کارتِ وب: پیگیری کلیدِ `weightHold` (`pick-weight-hold.trackView`؛ فقط هر دو پرچم و نگه‌داشتِ باز)، `GET …/weight-holds`
+  با `now` ِ سرور، `store/weight-hold.js` ِ دیربار + واژه‌نامهٔ تازهٔ `kit/i18n/weigh.*` (۱۵ کلید؛ `order` پر ماند)، گامِ مرورگرِ
+  `web-store-weigh.mjs` (axe؛ روشن/خاموش، پذیرش، رد، سر رسیدنِ مهلت) در `test:web-store`؛ `pick-weight-hold` ۹/۹ (پایه ۱ سرخ). برنامهٔ
+  جمع‌آور (Kotlin، **کامپایل‌نشده**): `PickWeightHoldDto`، `decideWeight`/`holdJson`، `PickWeightHoldUi.kt`، `PickSheet` و `StrPick.hold*`،
+  آزمونِ `PickingWireTest`؛ FLAGS-ON §۱۸ ⇐ آن‌چه درست است. S86 — `stock-reserve.rebuild` و `stock-rebuild --reserve` (`reserve-rebuild` ۳/۳،
+  پایه ۳ سرخ) و آزمونِ منبعِ v3 ِ بازسازیِ کاتالوگ (`storefront-catalog-source` ۵/۵). S113 ⇐ ردهٔ A (مدلِ پشتیبانی). OWNER-PENDING ۱-۵
+  (تفاوتِ وزنِ سفارشِ پرداخت‌شده) و ۴-۲۵ (S113). همه روی PGlite و PostgreSQL ۱۶ ِ محلی؛ `web-store*` بی‌پسرفت.
+- نیمه‌کاره: شاهدِ CI ِ کاتلین (`PickingWireTest`، کامپایلِ `PickSheet`/`PickWeightHoldUi`) — اگر سرخ شد، همان پرونده‌ها؛ روشن کردنِ
+  `shop.orders.weight_hold` (A)؛ دو پرسشِ OWNER-PENDING.
+- قدمِ بعدی: CI ِ این شاخه؛ نامزدها: ORD-15، و هر ردیفِ E ِ دیگر در STATUS.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-4` (دورِ چهارمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-46` ‏4e2a7459؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: S56 — اول `order-picking.js` (۷۹۳/۸۰۰) جدا شد: «جای قفسه» و «وظیفهٔ پیدا نکردم» ⇐ `lib/pick-issues.js` (همان نام‌ها دوباره
   صادر می‌شوند)؛ سپس پرچمِ خاموشِ `shop.orders.weight_hold` (`lib/pick-weight-hold.js`، مهاجرتِ ۷۶۰ + rollback): وزنِ بیش از حدِ سفارشِ

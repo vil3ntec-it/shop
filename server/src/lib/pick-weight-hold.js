@@ -266,10 +266,24 @@ async function forCustomer(store, token) {
     `SELECT * FROM order_pick_weight_holds WHERE shop_id=$1 AND order_id=$2 AND status <> 'withdrawn'
       ORDER BY line_no, created_at, id`, [store.shop_id, id]
   )).rows;
-  if (!rows.length) return { weightHolds: [] };
-  const lines = await linesOf(id);
   const at = now();
-  return { weightHolds: rows.map((r) => customerView(r, lines.get(Number(r.line_no)), at)) };
+  //  `now`: ساعتِ سرور تا شمارشِ «… دقیقه مانده» ِ کارت با ساعتِ گوشی کج نشود (داور همان مهلتِ سرور است)
+  if (!rows.length) return { weightHolds: [], now: at };
+  const lines = await linesOf(id);
+  return { weightHolds: rows.map((r) => customerView(r, lines.get(Number(r.line_no)), at)), now: at };
+}
+
+/**
+ * کلیدِ `weightHold` ِ پیگیریِ ویترین (`lib/store-order-view.js`): فقط با هر دو پرچم و دستِ‌کم یک نگه‌داشتِ «در انتظار» ِ
+ * مهلت‌نگذشته ⇒ `{open}`؛ وگرنه undefined (نه اسکریپتِ `store/weight-hold.js`، نه واژه‌نامه‌اش، نه کارت). فقط خواندن.
+ */
+async function trackView(shopId, orderId, at = now()) {
+  if (!(await require('./order-picking').flagOf(shopId)) || !(await flagOf(shopId))) return undefined;
+  const open = Number((await db.query(
+    `SELECT COUNT(*)::int AS n FROM order_pick_weight_holds WHERE shop_id=$1 AND order_id=$2 AND status='pending' AND deadline_at > $3`,
+    [shopId, orderId, at]
+  )).rows[0].n);
+  return open ? { open } : undefined;
 }
 
 async function decideByCustomer(store, token, holdId, body) {
@@ -282,5 +296,5 @@ async function decideByCustomer(store, token, holdId, body) {
 module.exports = {
   FLAG_KEY, WAIT_MIN,
   flagOf, holdView, withdrawLine, lineHeld, openIn, ofEvent, applyTimeouts, pendingOf, acceptedOf, capOf, forSheet,
-  decide, forCustomer, decideByCustomer,
+  decide, forCustomer, decideByCustomer, trackView,
 };

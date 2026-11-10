@@ -12,6 +12,7 @@
  *   ۶) سفارشِ پرداخت‌شده نگه‌داشت نمی‌گیرد (پولِ بیشتر گرفتنی نیست) — همان `over_tolerance`.
  *   ۷) سقفِ پولِ بسته‌بندی: جمعِ اقلام بیش از سفارش + حدِ وزن + مبلغِ پذیرفته ⇒ ۴۰۹ `over_cap`.
  *   ۸) ⛔ دکانِ دیگر، توکنِ دیگر، ویترینِ دیگر (نقش‌ها: `shop-route-inventory`).
+ *   ۹) پیگیریِ ویترین کلیدِ `weightHold` را فقط با نگه‌داشتِ باز دارد (کارتِ `store/weight-hold.js` ِ دیربار)؛ GET با ساعتِ سرور.
  */
 process.env.RATE_STORE_CHECKOUT_MAX = '40';
 const test = require('node:test');
@@ -343,6 +344,46 @@ test('S56: مشتری با لینکِ پیگیری وزنِ بیشتر را می
   const tr = await h.get(`/api/store/${slug}/orders/${token}`);
   assert.deepEqual(tr.body.order.lines.map((l) => l.name), ['روغن']);
   assert.equal(tr.body.order.totalMinor, 30000);
+});
+
+test('S56 پیگیری: کلیدِ weightHold فقط با نگه‌داشتِ باز (هر دو پرچم، مهلت نگذشته)؛ بسته یا خاموش ⇒ بی کلید؛ GET با ساعتِ سرور', async () => {
+  const { o, slug, id, token } = await storefrontOrder('وزن-پیگیری');
+  const track = async () => {
+    const r = await h.get(`/api/store/${slug}/orders/${token}`);
+    assert.equal(r.status, 200, JSON.stringify(r.body));
+    return r.body.order;
+  };
+  assert.equal('weightHold' in (await track()), false, 'بی نگه‌داشت ⇒ بی کلید (همان پاسخِ پیشین)');
+  await start(o, id);
+  const meat = (await sheetOf(o, id)).lines.find((l) => l.productId === 'meat').lineNo;
+  const hold = (await send(o, id, [ev(meat, 'weigh', { qtyMilli: 1400 })])).body.results[0].hold;
+  assert.ok(hold);
+  assert.deepEqual((await track()).weightHold, { open: 1 });
+  //  شمارشِ مهلت با ساعتِ سرور (نه ساعتِ گوشیِ مشتری)
+  const list = await h.get(`/api/store/${slug}/orders/${token}/weight-holds`);
+  assert.equal(typeof list.body.now, 'number');
+  assert.ok(Math.abs(list.body.now - Date.now()) < 60000, String(list.body.now));
+  assert.ok(list.body.weightHolds[0].deadlineAt > list.body.now);
+
+  //  مهلت گذشت (هنوز «در انتظار» تا خواندنِ بعدیِ برگه) ⇒ دیگر باز نیست
+  await query('UPDATE order_pick_weight_holds SET deadline_at=$2 WHERE id=$1', [hold.id, Date.now() - 1000]);
+  assert.equal('weightHold' in (await track()), false, 'مهلت‌گذشته ⇒ بی کلید');
+  await query('UPDATE order_pick_weight_holds SET deadline_at=$2 WHERE id=$1', [hold.id, Date.now() + 600000]);
+  assert.deepEqual((await track()).weightHold, { open: 1 });
+
+  //  ⛔ هر کدام از دو پرچم خاموش ⇒ بی کلید (درِ مشتری هم ۴۰۴ است)
+  await setFlag(o.shopId, 'shop.orders.weight_hold', false);
+  assert.equal('weightHold' in (await track()), false, 'نگه‌داشت خاموش');
+  await setFlag(o.shopId, 'shop.orders.weight_hold', true);
+  await setFlag(o.shopId, 'shop.orders.picking', false);
+  assert.equal('weightHold' in (await track()), false, 'جمع‌آوری خاموش');
+  await setFlag(o.shopId, 'shop.orders.picking', true);
+  assert.deepEqual((await track()).weightHold, { open: 1 });
+
+  //  پاسخِ مشتری ⇒ بسته ⇒ بی کلید
+  const yes = await h.post(`/api/store/${slug}/orders/${token}/weight-holds/${hold.id}`, { decision: 'accept' });
+  assert.equal(yes.status, 200, JSON.stringify(yes.body));
+  assert.equal('weightHold' in (await track()), false, 'پذیرفته ⇒ بی کلید');
 });
 
 test('⛔ S56: توکنِ نادرست، ویترینِ دیگر، دکانِ دیگر، پرچمِ خاموش ⇒ ۴۰۴ و هیچ تغییر', async () => {
