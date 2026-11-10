@@ -27,11 +27,12 @@
  *   • ⛔ صاحب هرگز بیرون نمی‌ماند: قفلِ PIN فقط همین سنجش را می‌بندد (ورود و توکنِ حساب دست نمی‌خورند)،
  *     زمان‌دار است، و صاحب پس از تأییدِ دوبارهٔ ورود (رمز یا کدِ ایمیل) PIN ِ تازه می‌گذارد که قفل را هم باز می‌کند.
  *
- * ⛔ پشتِ پرچمِ خاموشِ `shop.till_pin` (live_config): خاموش ⇒ جز `config` هیچ خواندن/نوشتنی از دو جدول.
+ * ⛔ پشتِ پرچمِ خاموشِ `shop.till_pin` (live_config): خاموش ⇒ جز `config` هیچ خواندن/نوشتنی از دو جدول؛ تنها استثنا
+ *    [memberGone] (تعلیق/برداشتنِ عضو) که فقط PIN و نوبتِ همان عضو را پاک می‌کند و می‌بندد (SR45-3).
  */
 const crypto = require('crypto');
 const { promisify } = require('util');
-const { one, many, tx, now, newId } = require('../db');
+const { one, many, query, tx, now, newId } = require('../db');
 const audit = require('./audit');
 const orders = require('./orders');
 const { badRequest, forbidden, notFound, conflict, ApiError } = require('../middleware/errors');
@@ -118,6 +119,11 @@ function wrongError(left) {
   const e = forbidden('PIN درست نیست.', 'till_pin_wrong');
   e.data = { attemptsLeft: left };
   return e;
+}
+
+/** گذاشتنِ PIN ِ [tm]: خودش، یا عضوی که [actor] اختیارش را دارد ([mayManage]) */
+function mayWrite(actor, tm) {
+  if (tm.id !== actor.id && !mayManage(actor, tm)) throw forbidden('PIN ِ این عضو را فقط صاحبِ دکان می‌گذارد', 'till_pin_forbidden');
 }
 
 function newPin(pin) {
@@ -210,12 +216,15 @@ async function members(shopId) {
 /** گذاشتن یا عوض کردنِ PIN ِ [target] (خودش، یا عضوی که [actor] اختیارش را دارد). قفل و شمارِ خطا پاک می‌شوند. */
 async function setPin(shopId, actor, target, pin, { ip = '' } = {}) {
   newPin(pin);
+  //  ⛔ SR45-2: عضو و اختیار پیش از PBKDF2 (۶۰۰٬۰۰۰ دور، بیرون از تراکنش) — وگرنه هر ۴۰۳/۴۰۴ همان کارِ سنگین را می‌کرد؛
+  //  درونِ تراکنش دوباره زیرِ قفلِ ردیفِ عضو سنجیده می‌شود
+  mayWrite(actor, await memberOf({ query }, shopId, target));
   const hash = await hashPin(pin);
   const t = now();
   let log;
   const m = await tx(async (c) => {
     const tm = await memberOf(c, shopId, target, true);
-    if (tm.id !== actor.id && !mayManage(actor, tm)) throw forbidden('PIN ِ این عضو را فقط صاحبِ دکان می‌گذارد', 'till_pin_forbidden');
+    mayWrite(actor, tm);
     await c.query(
       `INSERT INTO shop_till_pins (shop_id, member_id, pin_hash, failures, locked_until, set_by, set_at)
        VALUES ($1,$2,$3,0,0,$4,$5)
@@ -249,6 +258,18 @@ async function removePin(shopId, actor, target, { ip = '' } = {}) {
   });
   await log.afterCommit();
   return out;
+}
+
+/**
+ * ⛔ SR45-3: عضو تعلیق یا برداشته شد (`shops.updateMember`، **همان تراکنش** که توکن‌ها و کلیدِ دستگاهش را باطل می‌کند) ⇒
+ * PIN اش پاک و نوبتِ بازش بسته (`pin_removed`). وگرنه تا ۱۲ ساعت `sessions`/[whoAt] او را «پشتِ دستگاه» نشان می‌دادند و
+ * عضوِ دوباره‌فعال با همان PIN ِ کهنه برمی‌گشت. فقط پاک می‌کند و می‌بندد (هیچ ردیفِ تازه)، پس پرچم را نمی‌پرسد: PIN ِ مانده
+ * از روزِ روشن بودن هم می‌رود.
+ */
+async function memberGone(c, shopId, memberId) {
+  const r = await c.query('DELETE FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [shopId, memberId]);
+  const ended = await closeOpen(c, shopId, 'till_member_id=$4', [memberId], 'pin_removed', now());
+  return { removed: r.rowCount || 0, ended };
 }
 
 /** بازکردنِ قفلِ PIN ِ [target] (نه برای خودِ عضو: او PIN ِ تازه می‌گذارد) */
@@ -382,5 +403,5 @@ async function whoAt(shopId, deviceId, at) {
 
 module.exports = {
   FLAG, MAX_FAILURES, SESSION_MS, LOCK_BASE_MS, flagOf, rank, mayManage, pinProblem, lockMs,
-  config, members, setPin, removePin, unlock, verify, current, endCurrent, sessions, whoAt,
+  config, members, setPin, removePin, memberGone, unlock, verify, current, endCurrent, sessions, whoAt,
 };

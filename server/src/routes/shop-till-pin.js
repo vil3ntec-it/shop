@@ -15,7 +15,8 @@
  *
  * ✱ تأییدِ دوبارهٔ ورود (`lib/reauth.js`): شاگرد روی صندوقِ بازِ صاحب نه PIN ِ کسی را عوض می‌کند، نه قفلِ
  *   PIN ِ صاحب را باز می‌کند تا حدس را از سر بگیرد. صاحب با همان تأیید همیشه PIN ِ خودش را از نو می‌گذارد.
- * ⛔ سقف: سطلِ IP پیش از احراز، سطلِ هر کاربر پس از آن، و سطلِ تنگ‌ترِ `/verify`؛ قفلِ PIN جدا در خودِ سرور است.
+ * ⛔ سقف: سطلِ IP پیش از احراز، سطلِ هر کاربر پس از آن، و سطل‌های تنگ‌ترِ `/verify` و گذاشتنِ PIN (هر دو PBKDF2، SR45-2)؛
+ *   قفلِ PIN جدا در خودِ سرور است.
  * ⛔ shop_id و عضو فقط از عضویتِ توکن؛ دستگاه فقط از ردیفِ توکن (`req.device`). PIN هرگز در پاسخ یا سابقه نیست.
  * ⛔ پیش‌فرض خاموش: بی `shop.till_pin` همه جز `/config` ⇒ ۴۰۳ `till_pin_disabled`.
  * ⛔ SUB-10: FREE — هویتِ کاربرِ صندوق بخشی از مجوزهای هستهٔ دکان است و پس از پایانِ اشتراک هم باید کار کند.
@@ -38,6 +39,11 @@ const verifyLimit = rateLimit({
   max: Number(process.env.RATE_TILL_PIN_VERIFY_MAX) || 20, windowMs: 60 * 1000, keyPrefix: 'till-pin-verify',
   key: (req) => `${req.shopId}:${req.user.id}`,
 });
+//  ⛔ SR45-2: گذاشتنِ PIN همان PBKDF2 ِ سنجش را دارد ⇒ همان بودجهٔ ۲۰ در دقیقهٔ هر کاربر (نه ۱۲۰ ِ همهٔ درها)
+const setLimit = rateLimit({
+  max: Number(process.env.RATE_TILL_PIN_SET_MAX) || 20, windowMs: 60 * 1000, keyPrefix: 'till-pin-set',
+  key: (req) => `${req.shopId}:${req.user.id}`,
+});
 
 const actorOf = (req) => ({ id: req.member.id, role: req.role, userId: req.user.id });
 const opts = (req) => ({ ip: clientIp(req) });
@@ -58,11 +64,11 @@ router.get('/members', requirePermission('members.view'), async (req, res) => {
   res.json(await tp.members(req.shopId));
 });
 
-router.put('/me', requireRecentAuth, async (req, res) => {
+router.put('/me', setLimit, requireRecentAuth, async (req, res) => {
   res.json(await tp.setPin(req.shopId, actorOf(req), { memberId: req.member.id }, req.body?.pin, opts(req)));
 });
 
-router.put('/members/:id', requireRecentAuth, requirePermission('members.view'), async (req, res) => {
+router.put('/members/:id', setLimit, requireRecentAuth, requirePermission('members.view'), async (req, res) => {
   res.json(await tp.setPin(req.shopId, actorOf(req), memberParam(req), req.body?.pin, opts(req)));
 });
 
