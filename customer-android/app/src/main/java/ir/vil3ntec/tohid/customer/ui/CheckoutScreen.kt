@@ -19,6 +19,7 @@ import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.semantics.Role
@@ -29,6 +30,7 @@ import ir.vil3ntec.tohid.core.shopper.CheckoutForm
 import ir.vil3ntec.tohid.core.shopper.CheckoutRules
 import ir.vil3ntec.tohid.core.shopper.DeliverySlot
 import ir.vil3ntec.tohid.core.shopper.ShopperText
+import ir.vil3ntec.tohid.core.shopper.StorePage
 import ir.vil3ntec.tohid.core.shopper.PromoRules
 import ir.vil3ntec.tohid.core.shopper.RepeatPlans
 
@@ -106,6 +108,7 @@ fun CheckoutScreen(model: CustomerModel, slug: String) {
       // ── پرداخت: فقط نقد، بی پرسش (سرور هم فقط `cod` می‌پذیرد) ──
       SectionTitle(ShopperText.pay)
       Text(if (ful == CheckoutRules.PICKUP) ShopperText.payCashPickup else ShopperText.payCash, style = MaterialTheme.typography.bodyLarge)
+      Tender(model, page, slug)
 
       // ── پول (برآورد؛ جمعِ نهایی را سرور هنگامِ ثبت می‌سنجد) ──
       val s = CheckoutRules.summary(page, model.cartOf(slug), f, model.slotsPage())
@@ -200,6 +203,29 @@ private fun Promo(model: CustomerModel) {
     } else TextButton(onClick = { model.clearPromo() }) { Text(ShopperText.promoClear) }
   }
   p.note?.let { Note(it, if (p.code.isNotBlank()) Tone.OK else Tone.WARN) }
+}
+
+/**
+ *  CHK-14: «با کدام اسکناس پرداخت می‌کنید؟» — فقط `features.deliveryPrefs` و ارسال؛ گزینه‌ها همان قاعدهٔ سرور برای جمعِ
+ *  دیده‌شده ([CheckoutRules.tenders])؛ جمع عوض شد و اسکناس دیگر درست نیست ⇒ برداشته می‌شود (همان `renderTender` ِ وب).
+ */
+@Composable
+private fun Tender(model: CustomerModel, page: StorePage, slug: String) {
+  val f = model.form
+  val cart = model.cartOf(slug)
+  val slots = model.slotsPage()
+  val off = model.promo.applied(model.saved.ticket, model.saved.deviceId)?.discountMinor ?: 0
+  val chosen = CheckoutRules.tenderOf(page, cart, f, slots, off)
+  LaunchedEffect(chosen, f.cashTenderMinor) {
+    if (chosen == null && model.form.cashTenderMinor != null) model.updateForm(model.form.copy(cashTenderMinor = null))
+  }
+  if (!CheckoutRules.tenderShown(page, cart, f, slots)) return
+  val total = CheckoutRules.summary(page, cart, f, slots).totalMinor - off
+  Text(ShopperText.tenderAsk, style = MaterialTheme.typography.bodyMedium)
+  Choice(ShopperText.tenderNone, chosen == null) { model.updateForm(model.form.copy(cashTenderMinor = null)) }
+  CheckoutRules.tenders(page, cart, f, slots, off).forEach { x ->
+    Choice(ShopperText.tenderOption(x, x - total), chosen == x) { model.updateForm(model.form.copy(cashTenderMinor = x)) }
+  }
 }
 
 @Composable

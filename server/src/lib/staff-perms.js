@@ -236,8 +236,21 @@ async function setMemberLayer(shopId, idOrUserId, perms, byUserId) {
   return { member: m, layer };
 }
 
-/** همهٔ لایه‌ها و نتیجهٔ هر عضو — برای صفحهٔ مدیریتِ صاحب دکان و پنل */
-async function overview(shopId) {
+const MEMBERS_OF = `FROM shop_members m
+       JOIN users u ON u.id = m.user_id
+       LEFT JOIN shop_member_perms p ON p.shop_id = m.shop_id AND p.user_id = m.user_id
+      WHERE m.shop_id=$1 AND m.status <> 'removed'`;
+
+/** شمارِ اعضای همان `overview` (صفحه‌بندیِ پنلِ مدیر). */
+async function memberCount(shopId) {
+  return Number((await one(`SELECT COUNT(*)::int AS n ${MEMBERS_OF}`, [shopId])).n);
+}
+
+/**
+ * همهٔ لایه‌ها و نتیجهٔ هر عضو — برای صفحهٔ مدیریتِ صاحب دکان و پنل. `page` (‎{ limit, offset }‎، فقط پنلِ مدیر)
+ * فقط **اعضا** را صفحه می‌کند — صاحب اول، بعد به ترتیبِ پیوستن و شناسه (پایدار)؛ بی آن همان پاسخِ امروز.
+ */
+async function overview(shopId, page = null) {
   const roleRows = await many('SELECT role, perms, updated_at FROM shop_role_perms WHERE shop_id=$1', [shopId]);
   const roles = {};
   for (const role of EDITABLE_ROLES) roles[role] = {};
@@ -247,12 +260,9 @@ async function overview(shopId) {
   const custom = await require('./custom-roles').effectiveByUser(shopId);
   const members = await many(
     `SELECT m.id, m.user_id, m.role, m.status, u.name, p.perms
-       FROM shop_members m
-       JOIN users u ON u.id = m.user_id
-       LEFT JOIN shop_member_perms p ON p.shop_id = m.shop_id AND p.user_id = m.user_id
-      WHERE m.shop_id=$1 AND m.status <> 'removed'
-      ORDER BY (m.role = 'owner') DESC, m.created_at ASC`,
-    [shopId]
+       ${MEMBERS_OF}
+      ORDER BY (m.role = 'owner') DESC, m.created_at ASC${page ? ', m.id ASC LIMIT $2 OFFSET $3' : ''}`,
+    page ? [shopId, page.limit, page.offset] : [shopId]
   );
   const editable = await editableFor(shopId);
   return {
@@ -282,6 +292,6 @@ async function overview(shopId) {
 
 module.exports = {
   SERVER_EDITABLE, FLAGGED, EDITABLE_ROLES, MESSAGES, editableFor, requireEnforced,
-  layersFor, layersOfReq, isLayered, memberAllows, legacyPermissions, policyPayload, policyOf,
+  layersFor, layersOfReq, isLayered, memberAllows, legacyPermissions, policyPayload, policyOf, memberCount,
   cleanLayer, setRoleLayer, setMemberLayer, overview, editableMember,
 };

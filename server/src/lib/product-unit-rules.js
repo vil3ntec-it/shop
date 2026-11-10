@@ -52,8 +52,15 @@ function exactMilli(f) {
   return m !== null && Math.abs(f * 1000 - m) <= 1e-9 * m ? m : null;
 }
 
+/**
+ * ⛔ بازبینیِ ۴۰ (SR40-1): واحدِ **نامتنی** (عدد، بولی، آرایه، شیء، `$inc` ِ v1) — برنامه هرگز نمی‌فرستدش و v1/v3 آن را همان‌طور
+ * می‌نشانند ⇒ همیشه «تغییرِ واحد» است (پیش‌تر نه op ِ واحددار بود نه تغییر: ۴۸ «دانه» ⇒ ۴۸ «7» در یک op). null و متن همان قاعدهٔ برنامه.
+ */
+const oddUnit = (fields) => has(fields, 'unit') && fields.unit !== null && typeof fields.unit !== 'string';
+
 /** op ِ کالا که واحد یا ضریب می‌نویسد؟ (بی آن هیچ پرسشی نیست) */
-const touches = (fields) => isObj(fields) && (filled(fields.unit) || (has(fields, 'unitFactor') && fields.unitFactor !== null));
+const touches = (fields) => isObj(fields)
+  && (filled(fields.unit) || oddUnit(fields) || (has(fields, 'unitFactor') && fields.unitFactor !== null));
 
 /**
  * @param fields  فیلدهای op (درج یا ویرایش)
@@ -64,7 +71,8 @@ const touches = (fields) => isObj(fields) && (filled(fields.unit) || (has(fields
 async function reasonOf(fields, before, moved) {
   if (!isObj(fields)) return '';
   const b = isObj(before) ? before : null;
-  if (filled(fields.unit) && b && filled(b.unit) && key(fields.unit) !== key(b.unit) && await moved()) return LOCKED;
+  const changed = () => oddUnit(fields) || (filled(fields.unit) && key(fields.unit) !== key(b.unit));
+  if (b && filled(b.unit) && changed() && await moved()) return LOCKED;
   if (!has(fields, 'unitFactor') || fields.unitFactor === null) return '';
   const saleUnit = has(fields, 'saleUnit') && fields.saleUnit !== null ? fields.saleUnit : b?.saleUnit;
   if (!filled(saleUnit)) return '';

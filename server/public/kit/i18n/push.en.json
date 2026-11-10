@@ -1,6 +1,7 @@
 {
   "np.title": "Updates for this order on this device",
   "np.hint": "Get a notification on this device when the shop accepts, prepares or sends your order.",
+  "np.hint.rf": "Get a notification on this device when the shop refunds money for this order.",
   "np.on": "Notify me",
   "np.off": "Turn off",
   "np.wait": "Turning on…",
