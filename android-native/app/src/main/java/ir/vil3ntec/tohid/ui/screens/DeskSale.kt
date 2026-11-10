@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.data.BarcodeMatch
-import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.SalePost
@@ -235,8 +234,8 @@ fun DeskSaleScreen(
   //  PRD-04: بارکدِ بسته‌ها (کارتن ⇒ ۲۴ دانه) — جدا، فقط کامل
   val packIndex = remember(d.products) { ShopStore.packIndex(d) }
 
-  //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06، `CartQuery`)
-  val parsed = remember(query) { CartQuery.parse(query).let { it.count to it.term } }
+  //  «۳*کد» ⇐ (۳، «کد») — رقمِ فارسی هم (F0-06)؛ متنی که خودش بارکدِ کالا یا بسته است («12x34») بی پیشوند (POS-03، `PosSearch.parse`)
+  val parsed = remember(query, index, packIndex) { PosSearch.parse(query, index, packIndex).let { it.count to it.term } }
   val term = parsed.second.trim()
   //  همان قاعدهٔ پیشنهادها، حالا در شبکه (`PosCatalog`): فعال، نام یا آغازِ بارکد
   //  POS-04 (پشتِ `PosSearchPrefs`، پیش‌فرض خاموش): جست‌وجوی مقاوم با هستهٔ متن؛ خاموش ⇒ همان `matches`

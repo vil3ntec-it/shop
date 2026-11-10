@@ -159,7 +159,7 @@ fun SaleScreen(
           bottomGap = bottomGap,
           //  POS-03: «۳*نام» ⇒ هر لمس سه تا؛ پس از افزودن کادر پاک می‌شود (لمسِ بعدی دوباره سه تا نمی‌شود)
           onTap = { item ->
-            val q = CatalogModel.query(search)
+            val q = CatalogModel.query(search, d)
             if (q.count != 1.0) { actions.tapCount(item, q.count); search = "" } else actions.tap(item)
           },
           onHold = actions.hold,

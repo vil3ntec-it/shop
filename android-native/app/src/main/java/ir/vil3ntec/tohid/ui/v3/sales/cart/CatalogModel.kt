@@ -56,8 +56,12 @@ object CatalogModel {
   /**
    *  POS-03 — پیشوندِ شمار «۳*» یا «۳×» پیش از نام یا بارکد (همان `CartQuery` ِ صندوقِ کامپیوتر، رقمِ فارسی هم): جست‌وجو با
    *  بخشِ پس از ستاره و هر لمسِ کاشی همان شمار را می‌افزاید. بی پیشوند ⇒ شمار ۱ و همان نوشته (رفتارِ امروز).
+   *  با [d]: متنی که خودش بارکدِ کامل است («12x34») بی پیشوند می‌ماند (`PosSearch.isFullCode`، همان صندوقِ کامپیوتر و وب)؛
+   *  نمایه‌ها فقط وقتی ساخته می‌شوند که پیشوندی خوانده شد.
    */
-  fun query(text: String): ir.vil3ntec.tohid.data.CartQuery.Parsed = ir.vil3ntec.tohid.data.CartQuery.parse(text)
+  fun query(text: String, d: ShopData? = null): ir.vil3ntec.tohid.data.CartQuery.Parsed =
+    if (d == null) ir.vil3ntec.tohid.data.CartQuery.parse(text)
+    else ir.vil3ntec.tohid.data.CartQuery.parse(text) { ir.vil3ntec.tohid.ui.components.pos.PosSearch.isFullCode(it, ShopStore.barcodeIndex(d), ShopStore.packIndex(d)) }
 
   /**
    *  کاشی‌های جورشده به ترتیبِ نمایش — با پیشوندِ شمار فقط بخشِ پس از ستاره جست‌وجو می‌شود. [pins] (POS-06، `TillPins`
@@ -73,7 +77,7 @@ object CatalogModel {
     pins: List<String> = emptyList(),
   ): List<PhoneCatalogItem> {
     val byId = d.products.associateBy { it.id }
-    val term = query(query).term
+    val term = query(query, d).term
     val ids = CatalogSearch.search(index, term, category).let { if (term.isBlank()) TillPins.arrange(it, pins) else it }
     return ids.mapNotNull { id -> byId[id]?.let { item(d, it, inCart[id] ?: 0.0, held) } }
   }

@@ -4,7 +4,6 @@ import android.content.Context
 import ir.vil3ntec.tohid.core.promo.PromoCore
 import ir.vil3ntec.tohid.core.sale.PriceList
 import ir.vil3ntec.tohid.data.BarcodeMatch
-import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.CartStore
 import ir.vil3ntec.tohid.data.DiscountGate
 import ir.vil3ntec.tohid.data.PackScan
@@ -209,7 +208,7 @@ internal object PosSpeed {
    */
   fun deskField(t: Till, d: ShopData, query: String): Boolean {
     val ctx = t.ctx
-    val parsed = CartQuery.parse(query).let { it.count to it.term }
+    val parsed = PosSearch.parse(query, t.index, t.packIndex).let { it.count to it.term }
     val term = parsed.second.trim()
     val matches = PosCatalog.matches(d.products, term, false)
     //  submit()
