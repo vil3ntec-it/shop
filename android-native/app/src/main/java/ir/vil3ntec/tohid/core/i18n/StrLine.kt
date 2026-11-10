@@ -55,4 +55,16 @@ object StrLine {
     "هېڅ ډله مه ټاکئ ⇐ ټول، حتی بې پیرودونکي پلور. له ډلې سره، تخفیف یوازې هغه وخت راځي چې د هماغې ډلې پیرودونکی په بل کې وي (ډله د پیرودونکي په دوسیه کې: «ډله، د بیو لړ او رضایت»).",
   )
   fun promoOnlyGroups(names: String): String = t("فقط گروهِ ${asIs(names)}", "Only group $names", "یوازې ډله $names")
+
+  // PRM-11 — کانالِ قاعده: صندوقِ دکان، ویترینِ اینترنتی یا هر دو (فقط وقتی ویترین تخفیف می‌خواند)
+  val promoWhereTitle: String get() = t("کجا اعمال شود", "Where it applies", "چېرته پلي شي")
+  val promoWherePos: String get() = t("فقط صندوقِ دکان", "Shop till only", "یوازې د دوکان صندوق")
+  val promoWhereOnline: String get() = t("فقط ویترینِ اینترنتی", "Online storefront only", "یوازې آنلاین ویترین")
+  val promoWhereBoth: String get() = t("صندوق و ویترین", "Till and storefront", "صندوق او ویترین")
+  val promoOnlyOnline: String get() = t("فقط ویترین", "Storefront only", "یوازې ویترین")
+  val promoWhereHint: String get() = t(
+    "«ویترین» یعنی سفارشِ اینترنتیِ همین دکان. قاعدهٔ «فقط ویترینِ اینترنتی» در صندوق اعمال نمی‌شود و کدش در صندوق پذیرفته نمی‌شود؛ قاعدهٔ «فقط صندوقِ دکان» در ویترین اعمال نمی‌شود.",
+    "“Storefront” means this shop's online orders. An “Online storefront only” rule never applies at the till and its code isn't accepted there; a “Shop till only” rule never applies online.",
+    "«ویترین» یعنی د همدې دوکان آنلاین فرمایش. د «یوازې آنلاین ویترین» قاعده په صندوق کې نه پلي کېږي او کوډ یې په صندوق کې نه منل کېږي؛ د «یوازې د دوکان صندوق» قاعده په ویترین کې نه پلي کېږي.",
+  )
 }

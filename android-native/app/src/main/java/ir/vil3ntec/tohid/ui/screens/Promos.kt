@@ -376,7 +376,9 @@ private fun PromoEditor(
   val c = Shop.colors
   //  PRM-02: «سقفِ مصرف» فقط وقتی سرور مصرف را می‌شمارد (پرچمِ `redeem`)
   val counted = PromoLive.snap.value.redeem
-  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule, uses = counted).let { if (isNew) it.copy(name = "") else it }) }
+  //  PRM-11: «کجا اعمال شود» فقط وقتی ویترین تخفیف می‌خواند (`online`) یا قاعده از پیش ویترین دارد
+  val online = PromoLive.snap.value.online || PromoText.ONLINE in rule.channels
+  var f by remember(rule.id) { mutableStateOf(PromoForm.of(rule, uses = counted, online = online).let { if (isNew) it.copy(name = "") else it }) }
   var error by remember { mutableStateOf("") }
   var saving by remember { mutableStateOf(false) }
   val categories = remember(d.products) { d.products.map { it.category }.filter { it.isNotBlank() }.distinct().sorted() }
@@ -571,6 +573,11 @@ private fun PromoEditor(
           }
         }
         Hint(ir.vil3ntec.tohid.core.i18n.StrLine.promoGroupsHint)
+      }
+      f.channel?.let { ch ->
+        Section(StrLine.promoWhereTitle)
+        Choice(StrLine.promoWhereTitle, PromoText.CHANNELS, ch) { f = f.copy(channel = it) }
+        Hint(StrLine.promoWhereHint)
       }
 
       Section(StrPromoPages.whenSection)

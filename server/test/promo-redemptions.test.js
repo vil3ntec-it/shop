@@ -164,6 +164,23 @@ test('چند کدِ یک فاکتور همه یا هیچ؛ کدِ ناشناخت
   assert.deepEqual(f.body.codes, [{ code: 'FREE1', promoId: 'free', status: 'redeemed', uses: 1, maxUses: 0 }]);
 });
 
+test('PRM-11: کدِ «فقط ویترین» در صندوق گرفته نمی‌شود (wrong_channel، همه یا هیچ)؛ «هر دو» و بی کانال گرفته می‌شوند', async () => {
+  const t = await shopWithTeam('کانال');
+  await rule(t, 'web', { code: 'WEB10', maxUses: 3, channels: ['online'] });
+  await rule(t, 'both', { code: 'BOTH10', maxUses: 3, stack: 'combine', channels: ['pos', 'online'] });
+  await rule(t, 'any', { code: 'ANY10', maxUses: 3, stack: 'combine' });
+  const s = saleId();
+  const r = await redeem(t, t.staff, s, ['BOTH10', 'WEB10']);
+  assert.equal(r.status, 409, JSON.stringify(r.body));
+  assert.deepEqual(r.body.error.codes.map((c) => [c.code, c.status]), [['BOTH10', 'ok'], ['WEB10', 'wrong_channel']]);
+  assert.equal(r.body.error.message, 'کدِ WEB10 فقط در ویترین است — آن را از سبد بردارید');
+  assert.equal((await live(t.shopId)).length, 0, 'هیچ‌کدام نماند');
+  assert.equal(await usesOf(t, 'web'), 0, 'ظرفیتِ ویترین در صندوق نمی‌سوزد');
+  const ok = await redeem(t, t.staff, s, ['BOTH10', 'ANY10']);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual(ok.body.codes.map((c) => [c.code, c.status]), [['BOTH10', 'redeemed'], ['ANY10', 'redeemed']]);
+});
+
 test('ورودیِ نادرست ۴۰۰؛ فقط عضوِ نویسنده؛ دکانِ دیگر کد را نمی‌بیند', async () => {
   const t = await shopWithTeam('ورودی');
   const o = await shopWithTeam('دیگر');

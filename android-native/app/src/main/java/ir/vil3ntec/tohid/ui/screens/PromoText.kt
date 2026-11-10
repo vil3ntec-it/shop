@@ -61,6 +61,34 @@ object PromoText {
     "expiry" to StrMarketPages.errExpiry,
   )
 
+  /**
+   *  PRM-11 — «کجا اعمال شود» (`Rule.channels`، خالی = همه): فقط وقتی ویترین تخفیف می‌خواند (`Snapshot.online`) یا
+   *  قاعده از پیش ویترین دارد. «هر دو» = `["pos", "online"]` (همان ترتیبِ `PromoCore.CHANNELS`).
+   */
+  const val POS = "pos"
+  const val ONLINE = "online"
+  const val BOTH = "both"
+  val CHANNELS: List<Pair<String, String>> get() = listOf(
+    POS to StrLine.promoWherePos,
+    ONLINE to StrLine.promoWhereOnline,
+    BOTH to StrLine.promoWhereBoth,
+  )
+
+  /** کانال‌های قاعده ⇒ گزینهٔ فرم */
+  fun channelOf(channels: List<String>): String {
+    val pos = channels.isEmpty() || POS in channels
+    val online = channels.isEmpty() || ONLINE in channels
+    return if (pos && online) BOTH else if (online) ONLINE else POS
+  }
+
+  /** گزینهٔ فرم ⇒ کانال‌ها؛ `null` (فرم نشانش نمی‌دهد) یا همان گزینهٔ قاعدهٔ پایه ⇒ همان فهرستِ پیشین، حتی خالی (N2) */
+  fun channelsFor(choice: String?, base: List<String>): List<String> = when {
+    choice == null || choice == channelOf(base) -> base
+    choice == ONLINE -> listOf(ONLINE)
+    choice == BOTH -> listOf(POS, ONLINE)
+    else -> listOf(POS)
+  }
+
   fun kindLabel(k: String): String = KINDS.firstOrNull { it.first == k }?.second ?: k
   fun stackLabel(s: String): String = STACKS.firstOrNull { it.first == s }?.second ?: s
   fun errors(codes: List<String>): String = codes.joinToString("؛ ") { ERRORS[it] ?: it }
@@ -105,6 +133,8 @@ object PromoText {
     if (s.exSuppliers.isNotEmpty()) t += StrMarketPages.exceptSupplier(s.exSuppliers.joinToString("، ") { supplierName(it, d) })
     //  PRM-11: قاعدهٔ «فقط این گروه‌های مشتری»
     if (r.groups.isNotEmpty()) t += " · " + ir.vil3ntec.tohid.core.i18n.StrLine.promoOnlyGroups(r.groups.joinToString("، "))
+    //  PRM-11: فقط وقتی ویترین در کانال‌هاست («فقط صندوق» و کانالِ خالی همان متنِ پیشین)
+    if (ONLINE in r.channels) t += " · " + if (POS in r.channels) StrLine.promoWhereBoth else StrLine.promoOnlyOnline
     return t
   }
 
@@ -194,12 +224,17 @@ data class PromoForm(
    *  دست نمی‌خورد (همان رفتارِ پیشین)؛ خالی = بی سقف.
    */
   val maxUses: String? = null,
+  /** PRM-11 — `PromoText.CHANNELS`؛ `null` = فرم نشانش نمی‌دهد و کانالِ قاعدهٔ پایه دست نمی‌خورد */
+  val channel: String? = null,
 ) {
   companion object {
     private fun num(d: Double): String = if (d == Math.floor(d)) d.roundToLong().toString() else d.toString()
 
-    /** @param uses پرچمِ `redeem` ِ سرور روشن است ⇒ فرم «سقفِ مصرف» را نشان می‌دهد */
-    fun of(r: PromoCore.Rule, uses: Boolean = false): PromoForm = PromoForm(
+    /**
+     *  @param uses پرچمِ `redeem` ِ سرور روشن است ⇒ فرم «سقفِ مصرف» را نشان می‌دهد
+     *  @param online ویترین تخفیف می‌خواند (`Snapshot.online`) یا قاعده از پیش ویترین دارد ⇒ «کجا اعمال شود» (PRM-11)
+     */
+    fun of(r: PromoCore.Rule, uses: Boolean = false, online: Boolean = false): PromoForm = PromoForm(
       name = r.name,
       kind = r.kind.ifEmpty { "percent" },
       pct = if (r.kind == "bxgy" || r.kind == "percent" || r.kind == "expiry") num(r.bp / 100.0) else "10",
@@ -237,6 +272,7 @@ data class PromoForm(
       active = r.active,
       allowBelowCost = r.allowBelowCost,
       maxUses = if (!uses) null else if (r.maxUses > 0) r.maxUses.toString() else "",
+      channel = if (online) PromoText.channelOf(r.channels) else null,
     )
 
     /** «۱۴:۳۰» ⇒ دقیقه؛ خالی ⇒ -1؛ نادرست ⇒ -2 (که `validate` رد می‌کند) */
@@ -258,8 +294,8 @@ data class PromoForm(
   private fun int(s: String, dflt: Long): Long = dbl(s)?.takeIf { it == Math.floor(it) }?.roundToLong() ?: dflt
 
   /**
-   *  فرم ⇒ قاعده، روی `base` (شناسه، کانال و شمارِ مصرف از همان می‌مانند؛ گروه‌ها از فرم، PRM-11).
-   *  قاعدهٔ تازه فقط برای صندوق است (`channels = ["pos"]` را خودِ `base` دارد).
+   *  فرم ⇒ قاعده، روی `base` (شناسه و شمارِ مصرف از همان می‌مانند؛ گروه‌ها و کانال از فرم، PRM-11).
+   *  قاعدهٔ تازه فقط برای صندوق است (`channels = ["pos"]` را خودِ `base` دارد)؛ کانال فقط با `channel` ِ زده‌شده عوض می‌شود.
    *  ⛔ هر چه فرم نشان نمی‌دهد دست نمی‌خورد (N2): کانالِ خالی (= همه) خالی می‌ماند،
    *  و از «قیمتِ ویژه»ی چندکالایی فقط ردیفِ نخست (همان که فرم دارد) عوض می‌شود.
    */
@@ -279,7 +315,7 @@ data class PromoForm(
       priority = int(priority, 0),
       code = code.trim(),
       allowBelowCost = allowBelowCost,
-      channels = base.channels,
+      channels = PromoText.channelsFor(channel, base.channels),
       //  PRM-11: گروه‌های دست‌نخورده همان ترتیبِ پیشین را نگه می‌دارند (N2)
       groups = if (groups == base.groups.toSet()) base.groups else groups.sorted(),
       scope = base.scope.copy(
