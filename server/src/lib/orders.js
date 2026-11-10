@@ -238,24 +238,30 @@ function parseAddress(raw) {
   if ((lat === null) !== (lng === null)) throw badRequest('پین ناقص است', 'bad_address');
   const landmark = text(a.landmark, 200);
   const addrText = text(a.text, 300);
-  const area = text(a.area, 80);
-  const gateColor = text(a.gateColor, 40);
-  //  CHK-08: شمارهٔ دوم (کارتِ پیک فقط کلیدهای خودش را برمی‌دارد، پس پوشیده می‌ماند) و Plus Code (فقط متن، بی ژئوکدر)
-  let phone2 = null;
-  if (text(a.phone2, 40)) {
-    try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
-  }
-  const plusCode = plusCodeOf(a.plusCode);
-  //  CHK-08 (§۴.۴): ولایت، گذر یا کوچه، منزل و طبقه — فقط متنِ کمکی، جای نشانه/پین را نمی‌گیرند (کلیدِ دیگر دور، LOC-10)
-  const province = text(a.province, 60);
-  const street = text(a.street, 120);
-  const house = text(a.house, 60);
+  const { area, gateColor, phone2, plusCode, province, street, house } = addressExtras(a);
   //  پین منبعِ اصلی است (CHK-08)؛ سفارشِ تلفنی بی پین با نشانه پذیرفته است
   if (lat === null && !landmark && !addrText) throw badRequest('نشانی یا پینِ تحویل لازم است', 'bad_address');
   return {
     ...(lat !== null ? { lat, lng } : {}), ...(landmark ? { landmark } : {}), ...(addrText ? { text: addrText } : {}),
     ...(area ? { area } : {}), ...(gateColor ? { gateColor } : {}), ...(phone2 ? { phone2 } : {}), ...(plusCode ? { plusCode } : {}),
     ...(province ? { province } : {}), ...(street ? { street } : {}), ...(house ? { house } : {}),
+  };
+}
+
+/**
+ * کلیدهای کمکیِ نشانی (§۴.۴) — مشترکِ ثبت (`parseAddress`) و دفترِ نشانیِ حساب (CRM-09، `store-customers`): ناحیه و
+ * رنگِ دروازه (کارتِ پیک، DLV-02)؛ CHK-08: شمارهٔ دوم (کارتِ پیک فقط کلیدهای خودش را برمی‌دارد، پس پوشیده می‌ماند)،
+ * Plus Code (فقط متن، بی ژئوکدر)، ولایت، گذر یا کوچه، منزل و طبقه — فقط متنِ کمکی، جای نشانه/پین را نمی‌گیرند
+ * (کلیدِ دیگر دور، LOC-10). نیامده یا خالی ⇒ ''؛ نادرست ⇒ ۴۰۰ `bad_phone2`/`bad_plus_code`.
+ */
+function addressExtras(a) {
+  let phone2 = '';
+  if (text(a.phone2, 40)) {
+    try { phone2 = require('./validate').phone(a.phone2); } catch { throw badRequest('شمارهٔ دوم معتبر نیست', 'bad_phone2'); }
+  }
+  return {
+    area: text(a.area, 80), gateColor: text(a.gateColor, 40), phone2, plusCode: plusCodeOf(a.plusCode),
+    province: text(a.province, 60), street: text(a.street, 120), house: text(a.house, 60),
   };
 }
 
@@ -758,7 +764,7 @@ async function summary(shopId) {
 
 module.exports = {
   FLAG_KEY, FEATURE_KEY, SUBSCRIBERS_FLAG, NOT_ACCEPTING, NOT_ACCEPTING_MESSAGE, KEY_RE, MAX_LINES, STAFF_SOURCES,
-  flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, maskPhone,
+  flagOf, entitledOf, intakeOf, stateOf, clientKeyOf, hashOf, parseCreate, parseContact, parseAddress, addressExtras, maskPhone,
   create, transition, transitionIn, codIn, get, list, summary, OPEN_STATUSES, SUMMARY_SQL,
   forCustomer, CUSTOMER_LIMIT, CUSTOMER_STATUSES,
 };

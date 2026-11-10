@@ -39,9 +39,24 @@ class OnlineReportTest {
     assertEquals(OnlineReport.Time(3, 1900 * s, 2000 * s), v.times["total"])
     assertEquals(1_234_500L, v.completedTotalMinor)
     assertEquals(listOf(OnlineReport.Miss("زعفران", 2), OnlineReport.Miss("کیک", 1)), v.misses)
-    assertNull(v.visits, "بازدید تا MKT-10 عدد نیست، نه صفر")
+    assertNull(v.visits, "بازدید پیش از شمارشِ سرور عدد نیست، نه صفر")
     assertEquals(1000L to 87_401_000L, v.from to v.to)
     assertEquals(false, v.empty)
+  }
+
+  @Test
+  fun topOfFunnelIsTheServerWebCountAndNullBeforeCounting() {
+    val v = OnlineReport.of(
+      json(
+        """{"enabled":true,"funnel":{"placed":1},"visits":3,
+          "top":{"web":true,"visits":3,"productViews":2,"cartAdds":1,"viewBp":6667,"cartBp":3333,"since":86400000,"capped":true}}""",
+      ),
+    )!!
+    assertEquals(3L, v.visits)
+    assertEquals(OnlineReport.Top(3, 2, 1, 6667L, 3333L, 86_400_000L, true), v.top)
+    assertNull(OnlineReport.of(sample)!!.top, "پیش از شمارش ⇒ null، نه صفر")
+    val odd = OnlineReport.of(json("""{"enabled":true,"funnel":{},"top":{"visits":"3","cartAdds":-1,"capped":"true"}}"""))!!
+    assertEquals(OnlineReport.Top(null, null, null, null, null, null, false), odd.top, "بدشکل ⇒ null، نه صفر")
   }
 
   @Test

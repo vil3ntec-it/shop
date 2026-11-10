@@ -142,6 +142,17 @@ private fun OnlineReportBody(v: OnlineReport.View) {
     V3Stat(StrOnlineReport.completedTotal, (v.completedTotalMinor ?: 0L) / 100.0, ::afn, Modifier.weight(1f), hue = V3Hue.BRAND)
   }
   if (v.empty) Text(StrOnlineReport.none, style = V3Type.callout, color = c.inkMuted, modifier = Modifier.padding(top = 12.dp))
+  //  RPT-14: بالای قیفِ ویترینِ وب، همان عددِ سرور (`OnlineReport.Top`)؛ هنوز شمرده نشده ⇒ یادداشتِ پایینِ صفحه
+  val top = v.top
+  if (top != null) {
+    V3Section(StrOnlineReport.webFunnel, footer = if (top.capped) StrOnlineReport.webFunnelCapped else StrOnlineReport.webFunnelNote) {
+      V3ListRow(StrOnlineReport.visitors, value = count(top.visits), chevron = false)
+      V3Divider()
+      V3ListRow(StrOnlineReport.productViewers, value = count(top.productViews) + (top.viewBp?.let { " · " + pct(it) } ?: ""), chevron = false)
+      V3Divider()
+      V3ListRow(StrOnlineReport.cartAdders, value = count(top.cartAdds) + (top.cartBp?.let { " · " + pct(it) } ?: ""), chevron = false)
+    }
+  }
   V3Section(StrOnlineReport.funnel, footer = StrOnlineReport.funnelNote) {
     OnlineReport.STEPS.forEachIndexed { i, k ->
       if (i > 0) V3Divider()
@@ -174,5 +185,5 @@ private fun OnlineReportBody(v: OnlineReport.View) {
       V3ListRow(m.q, value = StrOnlineReport.times(m.n), chevron = false)
     }
   }
-  if (v.visits == null) Text(StrOnlineReport.visitsNone, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 12.dp))
+  if (top == null) Text(StrOnlineReport.visitsNone, style = V3Type.footnote, color = c.inkMuted, modifier = Modifier.padding(top = 12.dp))
 }

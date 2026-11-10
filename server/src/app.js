@@ -426,6 +426,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-funnel-store'));   // RPT-14: تپشِ بالای قیفِ ویترینِ وب، پشتِ پرچمِ خاموشِ گزارش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-visual-store'));   // AI-11: «جست‌وجو با عکس» ِ ویترین، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));

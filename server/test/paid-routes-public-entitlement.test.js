@@ -50,6 +50,7 @@ const CATEGORY = {
   'storefront-visual-store.js': 'STORE_PAID',  //  AI-11: «جست‌وجو با عکس» ِ ویترین — همان ویترینِ پولی (sf.open پیش از پرچم)
   'order-method-store.js': 'STORE_PAID',       //  S72: تغییرِ روشِ تحویل پیش از جمع‌آوری — همان ویترینِ پولی (sf.open)
   'order-pay-store.js': 'STORE_PAID',          //  «پرداخت پس از پذیرش»: نقد هنگامِ تحویل — همان ویترینِ پولی (sf.open)
+  'storefront-funnel-store.js': 'STORE_PAID',  //  RPT-14: تپشِ بالای قیفِ ویترینِ وب — همان ویترینِ پولی (sf.open پیش از پرچم)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */
@@ -58,7 +59,9 @@ const FLAGS = ['shop.orders', 'shop.storefront', 'shop.chat', 'shop.delivery', '
   //  SEC-10: `POST /store/:slug/account/erase` پشتِ پرچمِ خودش (خاموش ⇒ همان درِ ناشناخته)
   'shop.customer_erasure',
   //  AI-11: `POST /store/:slug/visual-search` پشتِ پرچمِ ویترین و پرچمِ نمایه (خاموش ⇒ همان درِ ناشناخته)
-  'shop.visual_search', 'shop.storefront.visual_search'];
+  'shop.visual_search', 'shop.storefront.visual_search',
+  //  RPT-14: `POST /store/:slug/funnel/:step` پشتِ پرچمِ گزارش (خاموش ⇒ همان درِ ناشناخته)
+  'shop.orders.online_report'];
 
 /** `${base}` ِ روترهای چت و شکایت همان ثابتِ `const base = '…'` ِ پرونده است. */
 const baseOf = (file) => (fs.readFileSync(nodePath.join(ROUTES, file), 'utf8').match(/const base = '([^']+)'/) || [])[1] || '';
