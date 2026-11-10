@@ -54,6 +54,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/app-gaps-4` (سه کمبودِ برنامه با سرورِ موجود: PRM-02، PRD-17، PRD-27؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) PRM-02: صاحب/مدیر نمی‌دانست کدام فاکتور کد را نگه داشته ⇒ درِ تازهٔ `GET /api/shop/promos/redemptions` (فقط `mayCancel`، پرچمِ `shop.promo_uses`،
+  سقفِ IP پیش از احراز، ۲۰۰ ردیف + `more`، بی شناسهٔ کاربر/دستگاه) و صفحهٔ «تنظیمات ← فروش ← کدهای تخفیفِ نگه‌داشته» (`core/promo/PromoHeld`) که فقط فاکتورِ
+  لغوشدهٔ دفترِ همان دستگاه را با همان `POST /redeem/release` آزاد می‌کند. (۲) PRD-17/27: صفحهٔ «عکس‌های بیشتر و ویترین» (`products/{id}/photo/gallery`،
+  `core/image/ProductGallery`): تکمیلی با نقش روی همان `POST /api/shop/images` بی `select`؛ عکسِ جدای ویترین با نقشِ `promo` + `select`؛ `ImageBank.uploadOwn` آن را با
+  عکسِ تازهٔ دستگاه کنار نمی‌زند؛ «برداشتن از کالا» با درِ تازهٔ `POST /api/shop/images/:id/detach` (اصل می‌ماند). آزمون: `promo-held` ۵/۵ و `image-bank-extras` ۳/۳
+  روی PGlite و PostgreSQL ِ محلی (پیش از دو در سرخ)؛ `promo-redemptions`، `shop-promos`، `image-bank`، `shop-route-inventory`، `tenant-matrix`، `route-authz-inventory`، `paid-routes-entitlement` سبز.
+- نیمه‌کاره: Kotlin (`PromoHeldTest`، `ProductGalleryTest`، `PromoHeldStateTest`، `ProductGalleryStateTest`، دو `Feature` ِ `V3ReachabilityTest`) فقط در CI.
+  گالریِ چندعکسی در خودِ ویترین سمتِ سرور ندارد (تصمیمِ صاحب‌کار)؛ فاکتورِ «نارسیده» (سبدِ ثبت‌نشده) در فهرست دکمه ندارد (تصمیمِ صاحب‌کار).
+- قدمِ بعدی: شاهدِ CI ِ چهار آزمونِ Kotlin و سپس STATUS ِ سه ردیف.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود

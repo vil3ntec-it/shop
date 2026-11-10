@@ -383,8 +383,11 @@ object ImageBank {
   /**
    *  عکسِ خودِ دکان روی بانک: اصل ← نسخهٔ نمایش ← کوچک ← انتخاب به‌عنوانِ عکسِ
    *  این کالا. `up` پیشرفت است و پس از هر قدم با `onStep` ذخیره می‌شود.
+   *  PRD-27: اگر ویترین همین حالا عکسِ جدای خودش را نشان می‌دهد (`ProductGallery.keepStorefrontPhoto`)، گامِ انتخاب زده
+   *  نمی‌شود — عکسِ تازهٔ دستگاه آن را کنار نمی‌زند؛ فقط «همان عکسِ کالا در ویترین» ِ صاحب (`force`). پرسشِ این سنجه که
+   *  گذرا شکست بخورد بالا می‌رود (صف دوباره می‌زند)؛ خطای دیگرش همان رفتارِ پیشین (انتخاب).
    */
-  suspend fun uploadOwn(context: Context, productId: String, prep: Prepared, up: BulkJob.Upload, onStep: () -> Unit = {}) {
+  suspend fun uploadOwn(context: Context, productId: String, prep: Prepared, up: BulkJob.Upload, force: Boolean = false, onStep: () -> Unit = {}) {
     val api = Backend.api(context)
     if (up.imageId.isEmpty()) {
       //  POST خودکار تکرار نمی‌شود (`postBytes`)؛ کلید تا سرور هم تکرارِ پس از قطعی را «همان کار» بداند
@@ -399,6 +402,20 @@ object ImageBank {
     val base = "$BASE/${enc(up.imageId)}/v/${up.version}"
     if (!up.display) { api.putBytes("$base/display", prep.display, "image/jpeg"); up.display = true; onStep() }
     if (prep.thumb != null && !up.thumb) { api.putBytes("$base/thumb", prep.thumb, "image/jpeg"); up.thumb = true; onStep() }
+    if (!up.selected && !force) {
+      val keep = try {
+        val shown = ir.vil3ntec.tohid.core.image.ImageQuality.shownOf(api.get("$BASE/products/${enc(productId)}"))
+        shown.source == "shop" && shown.imageId != up.imageId && ir.vil3ntec.tohid.core.image.ProductGallery.keepStorefrontPhoto(
+          shown, ir.vil3ntec.tohid.core.image.ProductGallery.itemsOf(api.get(ir.vil3ntec.tohid.core.image.ProductGallery.minePath(productId))), up.imageId,
+        )
+      } catch (c: CancellationException) {
+        throw c
+      } catch (f: Exception) {
+        if (transient(f)) throw f
+        false
+      }
+      if (keep) { up.selected = true; onStep() }
+    }
     if (!up.selected) {
       api.post("$BASE/select", buildJsonObject {
         put("product_id", productId); put("source", "shop"); put("image_id", up.imageId); put("version", up.version)
