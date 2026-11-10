@@ -1,0 +1,1681 @@
+{
+ "format": "report-drill-v1",
+ "about": "RPT-13 — «ریز» ِ ردیفِ گزارش: ReportCore.invoicesOf/dayInvoices (Kotlin) و همان در license/report-core.js؛ دفترها از ledgers ِ report-v1.json. جمعِ «sales» ِ هر مورد = «فروش» ِ همان ردیف و شمارش = «فاکتور».",
+ "cases": [
+  {
+   "name": "kabul: product «p1» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: product «p2» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: product «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: product «p3» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p3"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: category «نوشیدنی» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": "نوشیدنی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: category «خوراکی» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: category «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: user «کریم» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": "کریم"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: user «احمد» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: user «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «02» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "02"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «09» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "09"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: hour «10» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "10"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «12» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "12"
+   },
+   "expect": [
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «15» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "15"
+   },
+   "expect": []
+  },
+  {
+   "name": "kabul: hour «18» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "18"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «cash» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «credit» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "payment",
+    "key": "credit"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «pos» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «online» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "channel",
+    "key": "online"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: product «p1» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: product «p2» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: product «» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "product",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: product «p3» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "product",
+    "key": "p3"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: category «نوشیدنی» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "category",
+    "key": "نوشیدنی"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: category «» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "category",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: category «خوراکی» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: user «احمد» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: user «» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "user",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: user «کریم» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "user",
+    "key": "کریم"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «02» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "hour",
+    "key": "02"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «09» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "hour",
+    "key": "09"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: hour «10» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "hour",
+    "key": "10"
+   },
+   "expect": []
+  },
+  {
+   "name": "kabul: hour «12» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "hour",
+    "key": "12"
+   },
+   "expect": [
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «cash» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «credit» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "payment",
+    "key": "credit"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «online» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "channel",
+    "key": "online"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: channel «pos» (ساعتِ کابل) 2026-10-14..2026-10-14",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "from": "2026-10-14",
+    "to": "2026-10-14",
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: product «p1» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: product «p2» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: product «» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "product",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: product «p3» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "product",
+    "key": "p3"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: category «نوشیدنی» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "category",
+    "key": "نوشیدنی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: category «خوراکی» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: category «» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "category",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: user «کریم» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "user",
+    "key": "کریم"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: user «احمد» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: user «» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "user",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «cash» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «credit» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "payment",
+    "key": "credit"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «pos» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «online» (بی ساعت)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "channel",
+    "key": "online"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: product «p1» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: product «p2» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: product «» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "product",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: product «p3» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "product",
+    "key": "p3"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: category «نوشیدنی» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "category",
+    "key": "نوشیدنی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 3000, "sales": 42000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1500, "sales": 21518 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: category «خوراکی» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 5000, "sales": 28000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 2000, "sales": 11476 }
+   ]
+  },
+  {
+   "name": "kabul: category «» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "category",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 1000, "sales": 956 }
+   ]
+  },
+  {
+   "name": "kabul: user «کریم» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "user",
+    "key": "کریم"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: user «احمد» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: user «» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "user",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «02» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "02"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «09» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "09"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "kabul: hour «10» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "10"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «12» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "12"
+   },
+   "expect": [
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: hour «15» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "15"
+   },
+   "expect": []
+  },
+  {
+   "name": "kabul: hour «18» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "hour",
+    "key": "18"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «cash» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: payment «credit» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "payment",
+    "key": "credit"
+   },
+   "expect": [
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «pos» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s3", "date": "2026-10-13", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: channel «online» (روزِ کاری تا ۴)",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 },
+    "dim": "channel",
+    "key": "online"
+   },
+   "expect": [
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 }
+   ]
+  },
+  {
+   "name": "lineSeller: product «p1» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 9000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: product «p2» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 18000 }
+   ]
+  },
+  {
+   "name": "lineSeller: category «خوراکی» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: user «زهرا» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "user",
+    "key": "زهرا"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 18000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 500, "sales": 5001 }
+   ]
+  },
+  {
+   "name": "lineSeller: user «احمد» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 9000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 500, "sales": 5000 }
+   ]
+  },
+  {
+   "name": "lineSeller: hour «10» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "hour",
+    "key": "10"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: payment «cash» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: channel «pos» (ساعتِ کابل) با فروشندهٔ ردیف",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "lineSeller": true,
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: product «p1» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 9000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: product «p2» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 1000, "sales": 18000 }
+   ]
+  },
+  {
+   "name": "lineSeller: category «خوراکی» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": "خوراکی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: user «احمد» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 }
+   ]
+  },
+  {
+   "name": "lineSeller: user «زهرا» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": "زهرا"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: hour «10» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": "10"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: payment «cash» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "lineSeller: channel «pos» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "lineSeller",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-10", "createdAt": 1791610260000, "qty": 2000, "sales": 27000 },
+    { "saleId": "s2", "date": "2026-10-10", "createdAt": 1791610320000, "qty": 1000, "sales": 10001 }
+   ]
+  },
+  {
+   "name": "messy: product «p1» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "messy: product «p2» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p2"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "messy: category «نوشیدنی» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": "نوشیدنی"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "messy: category «خوراکی\u001f» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": "خوراکی\u001f"
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "messy: user «احمد» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": "احمد"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "messy: hour «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "messy: payment «cash» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "messy: channel «pos» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "messy",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-06", "createdAt": 0, "qty": 1000, "sales": 20000 }
+   ]
+  },
+  {
+   "name": "returnFirst: product «p1» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "product",
+    "key": "p1"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "returnFirst: category «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "category",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "returnFirst: user «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "user",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "returnFirst: hour «» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "hour",
+    "key": ""
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "returnFirst: payment «cash» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "payment",
+    "key": "cash"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "returnFirst: channel «pos» (ساعتِ کابل)",
+   "fn": "invoicesOf",
+   "ledger": "returnFirst",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 },
+    "dim": "channel",
+    "key": "pos"
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-05", "createdAt": 0, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "kabul: ریزِ روزِ 2026-10-14 (ساعتِ کابل)",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: ریزِ روزِ 2026-10-13 (ساعتِ کابل)",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-13",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": [
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 }
+   ]
+  },
+  {
+   "name": "kabul: ریزِ روزِ 2026-10-07 (ساعتِ کابل)",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-07",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 }
+   ]
+  },
+  {
+   "name": "kabul: ریزِ روزِ 2026-10-14 (بی ساعت)",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14"
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "kabul: ریزِ روزِ 2026-10-14 (روزِ کاری تا ۴)",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 240 }
+   },
+   "expect": [
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "lineSeller: ریزِ روزِ 2026-10-14 (ساعتِ کابل)",
+   "fn": "dayInvoices",
+   "ledger": "lineSeller",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "empty: ریزِ روزِ 2026-10-14 (ساعتِ کابل)",
+   "fn": "dayInvoices",
+   "ledger": "empty",
+   "opts": {
+    "date": "2026-10-14",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "تفکیکِ ناشناخته ⇒ هیچ",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "nope",
+    "key": "",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "کلیدِ ناموجود ⇒ هیچ",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "product",
+    "key": "no-such",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "همهٔ قلم‌ها (all) با کلیدِ خالی",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "all",
+    "key": "",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "همهٔ قلم‌ها (all) با کلیدِ دیگر هم همه",
+   "fn": "invoicesOf",
+   "ledger": "kabul",
+   "opts": {
+    "dim": "all",
+    "key": "x",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": [
+    { "saleId": "s1", "date": "2026-10-07", "createdAt": 1791351000000, "qty": 2000, "sales": 30000 },
+    { "saleId": "s2", "date": "2026-10-13", "createdAt": 1791898200000, "qty": 8000, "sales": 70000 },
+    { "saleId": "s7", "date": "2026-10-14", "createdAt": 0, "qty": 0, "sales": 10000 },
+    { "saleId": "s3", "date": "2026-10-14", "createdAt": 1791928800000, "qty": 1000, "sales": 4000 },
+    { "saleId": "s4", "date": "2026-10-14", "createdAt": 1791953100000, "qty": 4500, "sales": 33950 },
+    { "saleId": "s6", "date": "2026-10-14", "createdAt": 1791963000000, "qty": 1000, "sales": 15000 }
+   ]
+  },
+  {
+   "name": "دفترِ خالی",
+   "fn": "invoicesOf",
+   "ledger": "empty",
+   "opts": {
+    "dim": "product",
+    "key": "",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "تاریخِ نادرست ⇒ هیچ",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "date": "2026-02-30",
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  },
+  {
+   "name": "بی تاریخ ⇒ هیچ",
+   "fn": "dayInvoices",
+   "ledger": "kabul",
+   "opts": {
+    "clock": { "offsetMinutes": 270, "dayStartMinute": 0 }
+   },
+   "expect": []
+  }
+ ]
+}

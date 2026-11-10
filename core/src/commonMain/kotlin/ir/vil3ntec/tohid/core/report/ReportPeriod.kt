@@ -16,6 +16,9 @@ import ir.vil3ntec.tohid.core.calendar.SolarHijri
  *  هیچ دوره‌ای که سراسر در آینده است ساخته نمی‌شود (`null`): «دورهٔ بعد» در دورهٔ جاری کاری نمی‌کند.
  *  تاریخ‌ها `YYYY-MM-DD` ِ میلادی‌اند؛ ورودیِ نادرست ⇒ `null`.
  *
+ *  دوقلوی وب: `license/report-period-core.js` با بردارِ مشترکِ `core/test-vectors/report-period-v1.json`
+ *  (`ReportPeriodVectorsTest` و `server/test/report-period-vectors.test.js`)؛ یکی را بی دیگری و بردار عوض نکن.
+ *
  *  Kotlin ِ خالص (commonMain)، بی android.* و java.*.
  */
 object ReportPeriod {
@@ -73,11 +76,15 @@ object ReportPeriod {
   /** `diff` = جاری − پیشین؛ `bp` = تغییر به ده‌هزارم نسبت به |پیشین| (نیمه دور از صفر)؛ پیشینِ صفر ⇒ null */
   data class Change(val diff: Long, val bp: Long?)
 
-  private const val MAX_DIFF = Long.MAX_VALUE / 10_000L
+  /**
+   *  ⌊(2^53 − 1) / 10٬000⌋: تفاضلِ بیشتر بی درصد — همان سقفِ دوقلوی وب (`license/report-period-core.js`، که با Number ِ JS
+   *  فقط تا 2^53 دقیق است)؛ پیش‌تر `Long.MAX_VALUE / 10_000` بود و دو سو در تفاضلِ بالای ۹ میلیارد افغانی دو عدد می‌دادند.
+   */
+  const val MAX_DIFF: Long = 900_719_925_474L
 
   fun change(current: Long, previous: Long): Change {
     val diff = current - previous
-    //  پیشینِ صفر، یا تفاضلی که ×۱۰٬۰۰۰ از Long می‌گذرد ⇒ بی درصد
+    //  پیشینِ صفر، یا تفاضلی که ×۱۰٬۰۰۰ از 2^53 می‌گذرد ⇒ بی درصد
     if (previous == 0L || diff > MAX_DIFF || diff < -MAX_DIFF) return Change(diff, null)
     val base = if (previous < 0) -previous else previous
     val scaled = diff * 10_000L

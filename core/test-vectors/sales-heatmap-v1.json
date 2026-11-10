@@ -1,0 +1,545 @@
+{
+ "format": "sales-heatmap-v1",
+ "about": "RPT-08 — دوقلوی SalesHeatmap.kt و license/sales-heatmap-core.js؛ موردهای SalesHeatmapTest عیناً. cells/levels فقط خانه‌های ناصفر: [ردیف، ساعت، شمار، جمع] و [ردیف، ساعت، شدت]",
+ "weekdayOf": [
+  { "epochDay": 0, "expect": 4 },
+  { "epochDay": -1, "expect": 3 },
+  { "epochDay": 19728, "expect": 6 },
+  { "epochDay": 19723, "expect": 1 },
+  { "epochDay": -7, "expect": 4 },
+  { "epochDay": -8, "expect": 3 },
+  { "epochDay": 20000, "expect": 5 }
+ ],
+ "cases": [
+  {
+   "name": "ساعتِ دیواریِ کابل و شنبه نخست",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704519900000, "amountMinor": 12050, "isSale": true },
+    { "atMs": 1704522540000, "amountMinor": 5000, "isSale": true },
+    { "atMs": 1705087740000, "amountMinor": 100, "isSale": true },
+    { "atMs": 1704569400000, "amountMinor": 7, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 10, 2, 17050], [1, 0, 1, 7], [6, 23, 1, 100]],
+    "maxCount": 2,
+    "peak": [0, 10],
+    "rowTotals": [[2, 17050], [1, 7], [0, 0], [0, 0], [0, 0], [0, 0], [1, 100]],
+    "hourTotals": [[1, 7], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 17050], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 100]],
+    "total": [4, 17157],
+    "levels": [[0, 10, 4], [1, 0, 2], [6, 23, 2]]
+   }
+  },
+  {
+   "name": "بی جابه‌جاییِ کابل همان رویداد ساعتِ دیگری است",
+   "offsetMinutes": 0,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704519900000, "amountMinor": 12050, "isSale": true },
+    { "atMs": 1704520200000, "amountMinor": 5000, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 5, 2, 17050]],
+    "maxCount": 2,
+    "peak": [0, 5],
+    "rowTotals": [[2, 17050], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 17050], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [2, 17050],
+    "levels": [[0, 5, 4]]
+   }
+  },
+  {
+   "name": "روزِ کاری تا نیمه‌شب ⇒ یکشنبه",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704574800000, "amountMinor": 900, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[1, 1, 1, 900]],
+    "maxCount": 1,
+    "peak": [1, 1],
+    "rowTotals": [[0, 0], [1, 900], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [1, 900], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 900],
+    "levels": [[1, 1, 4]]
+   }
+  },
+  {
+   "name": "روزِ کاری تا ۲ بامداد ⇒ ردیفِ شنبه، ستونِ ساعتِ ۱",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 120,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704574800000, "amountMinor": 900, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 1, 1, 900]],
+    "maxCount": 1,
+    "peak": [0, 1],
+    "rowTotals": [[1, 900], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [1, 900], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 900],
+    "levels": [[0, 1, 4]]
+   }
+  },
+  {
+   "name": "درست سرِ پایانِ روز مالِ روزِ تازه است",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 120,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704576600000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[1, 2, 1, 1]],
+    "maxCount": 1,
+    "peak": [1, 2],
+    "rowTotals": [[0, 0], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 1],
+    "levels": [[1, 2, 4]]
+   }
+  },
+  {
+   "name": "برگشتی در خانهٔ خودش و شمرده نمی‌شود",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704515400000, "amountMinor": 10000, "isSale": true },
+    { "atMs": 1704706200000, "amountMinor": -4000, "isSale": false }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 9, 1, 10000], [2, 14, 0, -4000]],
+    "maxCount": 1,
+    "peak": [0, 9],
+    "rowTotals": [[1, 10000], [0, 0], [0, -4000], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 10000], [0, 0], [0, 0], [0, 0], [0, 0], [0, -4000], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 6000],
+    "levels": [[0, 9, 4]]
+   }
+  },
+  {
+   "name": "شدت با سقفِ عددِ صحیح از بیشینه",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704529800000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 12, 8, 8], [0, 13, 1, 1], [0, 14, 2, 2], [0, 15, 4, 4], [0, 16, 5, 5]],
+    "maxCount": 8,
+    "peak": [0, 12],
+    "rowTotals": [[20, 20], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [8, 8], [1, 1], [2, 2], [4, 4], [5, 5], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [20, 20],
+    "levels": [[0, 12, 4], [0, 13, 1], [0, 14, 1], [0, 15, 2], [0, 16, 3]]
+   }
+  },
+  {
+   "name": "شدت با سه پله",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 3,
+   "sales": [
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704529800000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 12, 8, 8], [0, 13, 1, 1], [0, 14, 2, 2], [0, 15, 4, 4], [0, 16, 5, 5]],
+    "maxCount": 8,
+    "peak": [0, 12],
+    "rowTotals": [[20, 20], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [8, 8], [1, 1], [2, 2], [4, 4], [5, 5], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [20, 20],
+    "levels": [[0, 12, 3], [0, 13, 1], [0, 14, 1], [0, 15, 2], [0, 16, 2]]
+   }
+  },
+  {
+   "name": "شدتِ صفرپله ⇒ همه صفر",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 0,
+   "sales": [
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704526200000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704529800000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704533400000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704537000000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704540600000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 12, 8, 8], [0, 13, 1, 1], [0, 14, 2, 2], [0, 15, 4, 4], [0, 16, 5, 5]],
+    "maxCount": 8,
+    "peak": [0, 12],
+    "rowTotals": [[20, 20], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [8, 8], [1, 1], [2, 2], [4, 4], [5, 5], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [20, 20],
+    "levels": []
+   }
+  },
+  {
+   "name": "بی رویداد",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [],
+    "maxCount": 0,
+    "peak": null,
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [0, 0],
+    "levels": []
+   }
+  },
+  {
+   "name": "تنظیمِ نامعتبر ⇒ پیش‌فرضِ امن",
+   "offsetMinutes": 10000,
+   "dayStartMinutes": -5,
+   "weekStart": 0,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704510000000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 3, 1, 1]],
+    "maxCount": 1,
+    "peak": [0, 3],
+    "rowTotals": [[1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 1],
+    "levels": [[0, 3, 4]]
+   }
+  },
+  {
+   "name": "هفته از دوشنبه",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 1,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704511800000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [1, 2, 3, 4, 5, 6, 7],
+    "cells": [[5, 8, 1, 1]],
+    "maxCount": 1,
+    "peak": [5, 8],
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 1],
+    "levels": [[5, 8, 4]]
+   }
+  },
+  {
+   "name": "پیش از ۱۹۷۰ (تقسیمِ کف)",
+   "offsetMinutes": 0,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": -1, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[4, 23, 1, 1]],
+    "maxCount": 1,
+    "peak": [4, 23],
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [1, 1], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1]],
+    "total": [1, 1],
+    "levels": [[4, 23, 4]]
+   }
+  },
+  {
+   "name": "برابری ⇒ نخستین خانه در ترتیبِ ردیف و ساعت",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704807000000, "amountMinor": 500, "isSale": true },
+    { "atMs": 1704641400000, "amountMinor": 400, "isSale": true },
+    { "atMs": 1704601800000, "amountMinor": 300, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[1, 9, 1, 300], [1, 20, 1, 400], [3, 18, 1, 500]],
+    "maxCount": 1,
+    "peak": [1, 9],
+    "rowTotals": [[0, 0], [2, 700], [0, 0], [1, 500], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 300], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 500], [0, 0], [1, 400], [0, 0], [0, 0], [0, 0]],
+    "total": [3, 1200],
+    "levels": [[1, 9, 4], [1, 20, 4], [3, 18, 4]]
+   }
+  },
+  {
+   "name": "هفته از یکشنبه، روزِ کاری تا ۴ بامداد، تهران",
+   "offsetMinutes": 210,
+   "dayStartMinutes": 240,
+   "weekStart": 7,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1792196100000, "amountMinor": 2500, "isSale": true },
+    { "atMs": 1792198800000, "amountMinor": 1000, "isSale": true },
+    { "atMs": 1792182600000, "amountMinor": 700, "isSale": true },
+    { "atMs": 1792197060000, "amountMinor": -200, "isSale": false }
+   ],
+   "expect": {
+    "weekdays": [7, 1, 2, 3, 4, 5, 6],
+    "cells": [[5, 0, 1, 700], [5, 3, 1, 2500], [6, 4, 1, 800]],
+    "maxCount": 1,
+    "peak": [5, 0],
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 3200], [1, 800]],
+    "hourTotals": [[1, 700], [0, 0], [0, 0], [1, 2500], [1, 800], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [3, 4000],
+    "levels": [[5, 0, 4], [5, 3, 4], [6, 4, 4]]
+   }
+  },
+  {
+   "name": "جابه‌جاییِ منفی روی مرزِ ۱۴ ساعت",
+   "offsetMinutes": -840,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1792206000000, "amountMinor": 100, "isSale": true },
+    { "atMs": 1792238400000, "amountMinor": 200, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[6, 13, 1, 100], [6, 22, 1, 200]],
+    "maxCount": 1,
+    "peak": [6, 13],
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 300]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 100], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 200], [0, 0]],
+    "total": [2, 300],
+    "levels": [[6, 13, 4], [6, 22, 4]]
+   }
+  },
+  {
+   "name": "جابه‌جاییِ بیرون از ±۱۴ ساعت ⇒ صفر",
+   "offsetMinutes": -841,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1792206000000, "amountMinor": 100, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 3, 1, 100]],
+    "maxCount": 1,
+    "peak": [0, 3],
+    "rowTotals": [[1, 100], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [1, 100], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 100],
+    "levels": [[0, 3, 4]]
+   }
+  },
+  {
+   "name": "پایانِ روزِ ۲۳:۵۹",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 1439,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704569280000, "amountMinor": 1, "isSale": true },
+    { "atMs": 1704569340000, "amountMinor": 2, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 23, 1, 2], [6, 23, 1, 1]],
+    "maxCount": 1,
+    "peak": [0, 23],
+    "rowTotals": [[1, 2], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [1, 1]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 3]],
+    "total": [2, 3],
+    "levels": [[0, 23, 4], [6, 23, 4]]
+   }
+  },
+  {
+   "name": "پایانِ روزِ نامعتبرِ ۱۴۴۰ ⇒ نیمه‌شب",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 1440,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704484800000, "amountMinor": 1, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 0, 1, 1]],
+    "maxCount": 1,
+    "peak": [0, 0],
+    "rowTotals": [[1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[1, 1], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [1, 1],
+    "levels": [[0, 0, 4]]
+   }
+  },
+  {
+   "name": "برگشتیِ تنها: بی شمار و بی رنگ",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704868200000, "amountMinor": -3000, "isSale": false },
+    { "atMs": 1704870000000, "amountMinor": -1000, "isSale": false }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[4, 11, 0, -4000]],
+    "maxCount": 0,
+    "peak": null,
+    "rowTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, -4000], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, -4000], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [0, -4000],
+    "levels": []
+   }
+  },
+  {
+   "name": "مبلغِ بزرگ و دقیق",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704508200000, "amountMinor": 4503599627370496, "isSale": true },
+    { "atMs": 1704508500000, "amountMinor": 4503599627370495, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 7, 2, 9007199254740991]],
+    "maxCount": 2,
+    "peak": [0, 7],
+    "rowTotals": [[2, 9007199254740991], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [2, 9007199254740991], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [2, 9007199254740991],
+    "levels": [[0, 7, 4]]
+   }
+  },
+  {
+   "name": "یک هفتهٔ پُر",
+   "offsetMinutes": 270,
+   "dayStartMinutes": 0,
+   "weekStart": 6,
+   "levels": 4,
+   "sales": [
+    { "atMs": 1704511800000, "amountMinor": 100, "isSale": true },
+    { "atMs": 1704511800000, "amountMinor": 1008, "isSale": true },
+    { "atMs": 1704529800000, "amountMinor": 1013, "isSale": true },
+    { "atMs": 1704551400000, "amountMinor": 1019, "isSale": true },
+    { "atMs": 1704598620000, "amountMinor": 1018, "isSale": true },
+    { "atMs": 1704616620000, "amountMinor": 1023, "isSale": true },
+    { "atMs": 1704638220000, "amountMinor": 1029, "isSale": true },
+    { "atMs": 1704685440000, "amountMinor": 1028, "isSale": true },
+    { "atMs": 1704703440000, "amountMinor": 1033, "isSale": true },
+    { "atMs": 1704725040000, "amountMinor": 1039, "isSale": true },
+    { "atMs": 1704772260000, "amountMinor": 1038, "isSale": true },
+    { "atMs": 1704790260000, "amountMinor": 1043, "isSale": true },
+    { "atMs": 1704811860000, "amountMinor": 1049, "isSale": true },
+    { "atMs": 1704859080000, "amountMinor": 1048, "isSale": true },
+    { "atMs": 1704877080000, "amountMinor": 1053, "isSale": true },
+    { "atMs": 1704898680000, "amountMinor": 1059, "isSale": true },
+    { "atMs": 1704945900000, "amountMinor": 1058, "isSale": true },
+    { "atMs": 1704963900000, "amountMinor": 1063, "isSale": true },
+    { "atMs": 1704985500000, "amountMinor": 1069, "isSale": true },
+    { "atMs": 1705032720000, "amountMinor": 1068, "isSale": true },
+    { "atMs": 1705050720000, "amountMinor": 1073, "isSale": true },
+    { "atMs": 1705072320000, "amountMinor": 1079, "isSale": true }
+   ],
+   "expect": {
+    "weekdays": [6, 7, 1, 2, 3, 4, 5],
+    "cells": [[0, 8, 2, 1108], [0, 13, 1, 1013], [0, 19, 1, 1019], [1, 8, 1, 1018], [1, 13, 1, 1023], [1, 19, 1, 1029], [2, 8, 1, 1028], [2, 13, 1, 1033], [2, 19, 1, 1039], [3, 8, 1, 1038], [3, 13, 1, 1043], [3, 19, 1, 1049], [4, 8, 1, 1048], [4, 13, 1, 1053], [4, 19, 1, 1059], [5, 8, 1, 1058], [5, 13, 1, 1063], [5, 19, 1, 1069], [6, 8, 1, 1068], [6, 13, 1, 1073], [6, 19, 1, 1079]],
+    "maxCount": 2,
+    "peak": [0, 8],
+    "rowTotals": [[4, 3140], [3, 3070], [3, 3100], [3, 3130], [3, 3160], [3, 3190], [3, 3220]],
+    "hourTotals": [[0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [8, 7366], [0, 0], [0, 0], [0, 0], [0, 0], [7, 7301], [0, 0], [0, 0], [0, 0], [0, 0], [0, 0], [7, 7343], [0, 0], [0, 0], [0, 0], [0, 0]],
+    "total": [22, 22010],
+    "levels": [[0, 8, 4], [0, 13, 2], [0, 19, 2], [1, 8, 2], [1, 13, 2], [1, 19, 2], [2, 8, 2], [2, 13, 2], [2, 19, 2], [3, 8, 2], [3, 13, 2], [3, 19, 2], [4, 8, 2], [4, 13, 2], [4, 19, 2], [5, 8, 2], [5, 13, 2], [5, 19, 2], [6, 8, 2], [6, 13, 2], [6, 19, 2]]
+   }
+  }
+ ]
+}

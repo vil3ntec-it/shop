@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v72';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v75';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -84,6 +84,11 @@ const SHELL_ASSETS = [
   './license/report-ui.js',
   //  INV-16: «ارزش موجودی» ِ گزارشِ تازه (دوقلوی `StockAnalysis.valuation`) — بی آن، نصبِ آفلاین زبانه را نداشت
   './license/stock-value-core.js',
+  //  RPT-13 دوره و میان‌برهای گزارش (دوقلوی `ReportPeriod` و keymap.js ِ ساخته از keymap.json) و RPT-08 «ساعت و روز»
+  //  (دوقلوی `SalesHeatmap`) — report-ui.js بارشان می‌کند؛ بی این‌ها نصبِ آفلاین دکمه، کلید و زبانه را نداشت
+  './license/report-period-core.js',
+  './license/keymap.js',
+  './license/sales-heatmap-core.js',
   './license/report-ui.css',
   //  RPT-11: PDF ِ مستقیمِ گزارش — دیربار با نخستین «PDF»؛ بی این، روی نصبِ آفلاین PDF ساخته نمی‌شد
   './license/report-pdf.js',
