@@ -115,6 +115,16 @@
   پربار یک بار سرخ شد (`DROP SCHEMA` زیرِ سقفِ ۴۰۰ms ِ خودِ آزمون)؛ روی پایگاهِ تازه و ماشینِ آرام ۴/۴ — دست نخورد.
 - قدمِ بعدی (صاحب محصول): روشن کردنِ آن سه تنظیم در تولید؛ سپس همین `--plan` روی سخت‌افزارِ جدا. اگر صاحب‌کار پرچمِ آزمودهٔ
   `SYNC_V3_GATE_POOL_DEADLINE` را نمی‌خواهد، برداشتنش (سه پرونده + یک آزمون) بی‌خطر است.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps` (کاستی‌های برنامهٔ خرید در برابرِ ویترین: WEB-13 و CHK-14؛ روی `origin/main` ‏f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) WEB-13 — ردیفِ «دیده‌شده‌های اخیر» در صفحهٔ دکانِ برنامهٔ خرید با همان کلیدِ `recent` ِ `GET /api/store/:slug` و همان قاعدهٔ
+  `RecentlyViewed` (core/shopper `RecentProducts`، `ShopperState.seen`؛ هر دکان ۱۲ کالا، ۳۰ روز، حداکثر ۲۰ دکان)، فقط روی دستگاه، `?ids=` با هر ورود
+  (نیامده ⇒ بیرون)، «پاک کردن»؛ `ui/ModelRecent.kt` + `ShopScreen.RecentRow`. (۲) CHK-14 — «با کدام اسکناس…» در برگهٔ ثبت فقط با
+  `features.deliveryPrefs` و ارسال (`CheckoutRules.tenderOptions`/`tenders`/`tenderOf`، `CheckoutDelivery.cashTenderMinor`؛ `CheckoutScreen.Tender`)؛
+  بردارِ مشترکِ `core/test-vectors/cash-tender-v1.json` با `server/test/cash-tender-vectors.test.js` (تابعِ `tenders` ِ `checkout.js` در vm و `checkTender` ِ سرور).
+  هیچ درِ سرور، مهاجرت یا پرچمِ تازه‌ای نیست؛ پرچمِ خاموش ⇒ همان بدنه و همان صفحه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
+  `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
+- قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):

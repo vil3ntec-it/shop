@@ -165,4 +165,62 @@ class ShopperCheckoutTest {
     assertTrue(Regex("^[A-Za-z0-9_.:-]{8,128}$").matches(real.key), "KEY_RE ِ سرور")
     assertNotEquals(real.key, CheckoutKeys.keyFor(null, r1).key)
   }
+
+  // ── CHK-14: «با کدام اسکناس…» (همان `tenders` ِ `checkout.js` و `delivery-prefs.checkTender` ِ سرور) ──
+
+  private fun prefs(p: StorePage) = StorePage(p.shop, p.delivery, true, false, StoreFeatures(deliveryPrefs = true))
+
+  @Test fun tenderOptionsAreTheWebListAndAlwaysPassTheServerRule() {
+    assertEquals(listOf(100_000L), CheckoutRules.tenderOptions(95_000), "۹۵۰ ⇒ فقط ۱۰۰۰")
+    assertEquals(listOf(110_000L, 150_000L), CheckoutRules.tenderOptions(100_000), "جمعِ گرد ⇒ اسکناسِ بالاتر؛ ۲۰۰۰ پول خردِ ۱۰۰۰ است، نه")
+    assertEquals(listOf(130_000L, 150_000L, 200_000L), CheckoutRules.tenderOptions(123_450))
+    assertEquals(emptyList(), CheckoutRules.tenderOptions(0))
+    assertEquals(emptyList(), CheckoutRules.tenderOptions(-500))
+    //  هر گزینه همان قاعدهٔ سرور: بیش از جمع، افغانیِ کامل، پول خرد کمتر از یک اسکناسِ ۱۰۰۰
+    var total = 1L
+    while (total < 2_500_000) {
+      val list = CheckoutRules.tenderOptions(total)
+      assertTrue(list.isNotEmpty() && list == list.sorted() && list.distinct() == list, "جمع $total: $list")
+      for (x in list) assertTrue(x > total && x % 100 == 0L && x - total < CheckoutRules.NOTE_MINOR, "جمع $total، اسکناس $x")
+      total += 3_337
+    }
+  }
+
+  @Test fun tenderGoesOnlyWithTheFlagForDeliveryAndTodaysTotal() {
+    val c = cart(line("rice", 45000, 2000))
+    val f = ready.copy(cashTenderMinor = 100_000)
+    //  پرچمِ خاموش ⇒ نه پرسش، نه کلید در بدنه (همان سفارشِ پیشین، بایت‌به‌بایت)
+    val off = page()
+    assertTrue(CheckoutRules.tenders(off, c, f, null).isEmpty())
+    val plain = CheckoutRules.request(off, c, f, "+93700000002", "fa", null)
+    assertEquals(CheckoutDelivery(false, ""), plain.delivery)
+    assertTrue("cashTenderMinor" !in CheckoutKeys.json(plain), CheckoutKeys.json(plain))
+    //  روشن: جمع ۹۰۰ + ارسال ۵۰ = ۹۵۰ ⇒ فقط ۱۰۰۰
+    val on = prefs(page())
+    assertTrue(CheckoutRules.tenderShown(on, c, f, null))
+    assertEquals(listOf(100_000L), CheckoutRules.tenders(on, c, f, null))
+    assertEquals(100_000L, CheckoutRules.tenderOf(on, c, f, null))
+    assertEquals(CheckoutDelivery(false, "", 100_000), CheckoutRules.request(on, c, f, "+93700000002", "fa", null).delivery)
+    assertTrue("\"cashTenderMinor\":100000" in CheckoutKeys.json(CheckoutRules.request(on, c, f, "+93700000002", "fa", null)))
+    //  جمع عوض شد و اسکناس دیگر درست نیست ⇒ برداشته می‌شود؛ هرگز مبلغی که سرور رد می‌کند
+    val bigger = cart(line("rice", 45000, 3000))
+    assertNull(CheckoutRules.tenderOf(on, bigger, f, null))
+    assertNull(CheckoutRules.request(on, bigger, f, "+93700000002", "fa", null).delivery?.cashTenderMinor)
+    //  همان جمعِ `expectedTotalMinor` (پس از تخفیفِ سرور): ۹۵۰ − ۱۰۰ = ۸۵۰ ⇒ ۹۰۰ یا ۱۰۰۰
+    val promo = AppliedPromo(discountMinor = 10_000)
+    assertEquals(listOf(90_000L, 100_000L), CheckoutRules.tenders(on, c, f, null, 10_000))
+    val r = CheckoutRules.request(on, c, f.copy(cashTenderMinor = 90_000), "+93700000002", "fa", null, promo)
+    assertEquals(85_000, r.expectedTotalMinor)
+    assertEquals(90_000L, r.delivery?.cashTenderMinor)
+    assertNull(CheckoutRules.tenderOf(on, c, f.copy(cashTenderMinor = 90_000), null), "بی تخفیف ۹۰۰ کمتر از جمع است")
+    //  فقط ارسال: «دریافت از دکان» ⇒ نه پرسش، نه دستورِ تحویل
+    val pickup = f.copy(fulfillment = "pickup")
+    assertTrue(!CheckoutRules.tenderShown(on, c, pickup, null) && CheckoutRules.tenders(on, c, pickup, null).isEmpty())
+    assertNull(CheckoutRules.request(on, c, pickup, "+93700000002", "fa", null).delivery)
+    //  ناحیه هنوز گزیده نشده (هزینه نادانسته) ⇒ پرسش پنهان (همان وب)؛ با ناحیه ⇒ گزینه‌های جمعِ همان ناحیه
+    val zoned = prefs(page(zones = listOf(ZONE_B)))
+    assertTrue(!CheckoutRules.tenderShown(zoned, c, f, null))
+    assertEquals(listOf(100_000L), CheckoutRules.tenders(zoned, c, f.copy(zoneId = "zone_b"), null), "۹۰۰ + ۸۰ = ۹۸۰ ⇒ ۱۰۰۰")
+    assertEquals(listOf(110_000L, 150_000L), CheckoutRules.tenders(zoned, cart(line("rice", 46000, 2000)), f.copy(zoneId = "zone_b"), null), "۹۲۰ + ۸۰ = ۱۰۰۰")
+  }
 }

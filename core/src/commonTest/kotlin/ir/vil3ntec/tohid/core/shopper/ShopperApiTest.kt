@@ -42,6 +42,23 @@ class ShopperApiTest {
     assertNull(r.headers["Content-Type"], "GET بی بدنه ⇒ بی Content-Type")
   }
 
+  @Test fun recentAndDeliveryPrefsAreReadOnlyWhenTheServerSendsThem() {
+    //  پرچمِ خاموش ⇒ کلید نیست ⇒ هر دو false (WEB-13 `recent` ِ ریشه، CHK-14 `features.deliveryPrefs`)
+    val off = api { ok(ShopperSamples.STORE_JSON) }.first.store("golestan").valueOrNull()
+    assertNotNull(off)
+    assertFalse(off.recent)
+    assertFalse(off.features.deliveryPrefs)
+    val json = ShopperSamples.STORE_JSON.replace(
+      "\"features\": {\"chat\": true}", "\"recent\": true, \"features\": {\"chat\": true, \"deliveryPrefs\": true}",
+    )
+    assertTrue(json != ShopperSamples.STORE_JSON)
+    val on = api { ok(json) }.first.store("golestan").valueOrNull()
+    assertNotNull(on)
+    assertTrue(on.recent)
+    assertTrue(on.features.deliveryPrefs)
+    assertTrue(on.features.chat)
+  }
+
   @Test fun catalogQueryIsEncodedTrimmedAndCapped() {
     val (a, http) = api { ok("""{"items":[{"id":"oil","name":"روغن","priceMinor":30000}],"nextCursor":"c2"}""") }
     val long = "  روغنِ آفتاب‌گردان ${"x".repeat(80)} "
