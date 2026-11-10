@@ -55,6 +55,20 @@
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
 
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e-rows-3` (دورِ سومِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-2`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S33 (`public/store/plus-code.js` یک منبع برای ویترین و سرور + `lib/plus-code.js`، پرچمِ خاموشِ `shop.orders.plus_code`:
+  `address.pinCode` ِ ساختهٔ سرور در ثبت، اصلاحِ نشانی و تغییرِ روش؛ نشانیِ ذخیره‌شده از پینِ خودش؛ زیرِ پینِ برگهٔ ثبت؛ کارتِ فهرستِ
+  مأموریتِ پیک؛ بردارِ مشترکِ `core/test-vectors/plus-code-v1.json` با `PlusCodeVectorsTest.kt`؛ `plus-code` ۴/۴)؛ E2E-RET-11
+  (`lib/order-refund-receipt.js`، پرچمِ خاموشِ `shop.orders.refund_receipt`: رسیدِ اصلاحیِ `<سفارش>-R<seq>` برای کارمند و مشتری؛
+  `order-refund-receipt` ۳/۳ و گامِ `web-store-changes`). شاهد (روی کدِ پایه هم سبز): S67 (ردِ مجوزِ موقعیت؛ گامِ `ok(true)` ِ بی‌شرطِ
+  `web-market.mjs` واقعی شد)، S68 (برچسبِ «≈»)، S73 (برگهٔ سبدها «هر دکان سفارشِ جدا دارد»).
+- رفعِ سرخِ پایه: `web-i18n.test.js` روی `claude/e-rows-1`/`-2` دو سرخ داشت (fa.json ۲۱٬۵۱۲ > ۲۱KB با `ck.dup.*` ِ S41؛ order.fa.json
+  ۴٬۱۹۲ > ۴KB با `od.courier.none` ِ S93) ⇒ `ck.dup.*` به `checkout.*.json`، `od.courier.none` به اصلی؛ `web-store-dup.mjs` سبز.
+- بازطبقه‌بندی (فقط متنِ STATUS): S73 «ثبتِ یک‌جای چند دکان» ⇒ A (تصمیمِ محصول).
+- نیمه‌کاره: S33 و E2E-RET-11 پرچمِ خاموش؛ چاپِ رسیدِ اصلاحی در برنامهٔ دکان؛ آزمون‌های کاتلین فقط CI.
+- قدمِ بعدی: S56 (وزنِ بیش از سقف ⇒ نگه‌داشتن تا تأییدِ مشتری؛ اول `order-picking.js` ۷۹۳/۸۰۰ را جدا کنید — بخش‌های «جای قفسه» و
+  «وظیفهٔ بررسی» (خطِ ۶۴۳ تا ۷۵۱) جدا می‌شوند؛ الگوی «در انتظارِ مشتری» همان `pick-substitutes.pendingOf` و ۴۰۹ ِ بسته‌بندی است)،
+  ORD-15 (ردِ قلم دمِ در پس از رفتنِ پیک)، S113.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e-rows-2` (دورِ دومِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-1`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: S124 (`lib/admin-money.js` + `reconciliation?money=1`: GMV، صندوق، آنلاین، بازپرداخت، وصول، تسویه‌نشده و درآمدِ پلتفرم؛
   فاکتورِ تحویلِ سفارشِ آنلاین `o-…`/`w-…` از صندوق بیرون تا دو بار شمرده نشود؛ `owner-report.salesLedgerOf` جدا شد؛ `admin-money` ۳/۳)؛

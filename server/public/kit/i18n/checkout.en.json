@@ -46,5 +46,9 @@
   "ck.eta": "Approximate delivery: {a} to {b} minutes",
   "ck.eta.pickup": "Ready for pickup, approximately: {a} to {b} minutes",
   "ck.eta.none": "Delivery time cannot be estimated right now",
-  "ck.more": "More details (optional)"
+  "ck.more": "More details (optional)",
+  "pin.plus": "Plus Code of this pin: {code}",
+  "ck.dup.q": "This order (same items, same address) was placed a few minutes ago as number {no}. Follow that one, or place a separate second order?",
+  "ck.dup.track": "Follow that order",
+  "ck.dup.second": "Place a second order"
 }

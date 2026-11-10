@@ -1,0 +1,25 @@
+{
+  "about": "بردارِ مرجعِ Plus Code ِ ده‌نویسه‌ای از پینِ نشانی (S33) — core/courier/PlusCode.kt (PlusCodeVectorsTest)، server/public/store/plus-code.js و server/src/lib/plus-code.js (server/test/plus-code.test.js) همه باید همین خروجی‌ها را بدهند. سه سطرِ نخست از encoding.csv ِ پروژهٔ مرجعِ OLC اند؛ مختصاتِ نامعتبر به صورتِ رشته (\"NaN\"، \"Infinity\") ⇒ code = null.",
+  "version": 1,
+  "cases": [
+    { "lat": 47.0000625, "lng": 8.0000625, "code": "8FVC2222+22", "note": "OLC encoding.csv" },
+    { "lat": 20.3700625, "lng": 2.7821875, "code": "7FG49QCJ+2V", "note": "OLC encoding.csv" },
+    { "lat": -41.2730625, "lng": 174.7859375, "code": "4VCPPQGP+Q9", "note": "OLC encoding.csv" },
+    { "lat": 90, "lng": 1, "code": "CFX3X2X2+X2", "note": "عرضِ ۹۰ یک پله پایین" },
+    { "lat": 95, "lng": 1, "code": "CFX3X2X2+X2", "note": "بیش از ۹۰ همان ۹۰" },
+    { "lat": 1, "lng": 180, "code": "62H22222+22", "note": "طولِ ۱۸۰ همان −۱۸۰" },
+    { "lat": 1, "lng": -180, "code": "62H22222+22" },
+    { "lat": 1, "lng": 540, "code": "62H22222+22", "note": "طولِ ۵۴۰ هم" },
+    { "lat": -90, "lng": -180, "code": "22222222+22" },
+    { "lat": 0, "lng": 0, "code": "6FG22222+22" },
+    { "lat": -0.000001, "lng": -0.000001, "code": "6CFXXXXX+XX", "note": "زیرِ صفر: خانهٔ پیشین" },
+    { "lat": 34.5553, "lng": 69.2075, "code": "8J6FH645+42", "note": "کابل" },
+    { "lat": 34.555349, "lng": 69.207486, "code": "8J6FH644+4X", "note": "پینِ شش‌رقمی" },
+    { "lat": 34.53, "lng": 69.17, "code": "8J6FG5JC+22" },
+    { "lat": 34.3482, "lng": 62.1997, "code": "8J6485XX+7V", "note": "هرات" },
+    { "lat": 31.6133, "lng": 65.7101, "code": "8J37JP76+82", "note": "کندهار" },
+    { "lat": 36.7069, "lng": 67.1105, "code": "8J89P446+Q6", "note": "مزار" },
+    { "lat": "NaN", "lng": 69.2, "code": null },
+    { "lat": 34.5, "lng": "Infinity", "code": null }
+  ]
+}

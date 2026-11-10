@@ -356,7 +356,16 @@
       pin = p; area = null;
       $('pin-text').textContent = p ? text : t('pin.hint');
       $('pin-btn').textContent = p ? t('pin.again') : t('pin.btn');
-      if (p) locate(); else renderCheckout();
+      if (p) { pinCode(); locate(); } else renderCheckout();
+    }
+    //  S33: Plus Code ِ همین پین زیرِ آن (`store/plus-code.js` ِ دیربار، فقط با `features.plusCode`) — همان که سرور در سفارش می‌نویسد
+    function pinCode() {
+      var p = pin;
+      if (!p || !(c.store.features && c.store.features.plusCode)) return;
+      K.js('/store/plus-code.js').then(function () {
+        var code = p === pin && window.StorePlusCode ? window.StorePlusCode.encode(p.lat, p.lng) : null;
+        if (code) $('pin-text').textContent += ' · ' + t('pin.plus', { code: code });
+      }, function () { /* بی کد، همان پین */ });
     }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
@@ -365,6 +374,7 @@
         pin = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
         $('pin-text').textContent = t('pin.ok', { m: K.fa(Math.round(pos.coords.accuracy || 0), 0) });
         $('pin-btn').textContent = t('pin.again');
+        pinCode();
         locate();
       }, function () {
         pin = null;

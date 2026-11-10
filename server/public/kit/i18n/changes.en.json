@@ -28,5 +28,7 @@
   "ch.rf.sum": "Refunded to you: {a}",
   "ch.rf.cash": "Cash",
   "ch.rf.other": "Other method",
-  "ch.rf.asked": "Return requested: {d}"
+  "ch.rf.asked": "Return requested: {d}",
+  "ch.rc.title": "Correction receipt {no}",
+  "ch.rc.line": "{d} — order amount {a}, refunded on this receipt {b}, corrected order amount {c}"
 }

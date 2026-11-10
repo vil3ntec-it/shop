@@ -206,11 +206,15 @@ const EXTRA_COLS = Object.freeze({
 });
 const EXTRA_KEYS = Object.keys(EXTRA_COLS);
 
-function addressView(r) {
+/** S33: `pinCode` (پرچمِ `shop.orders.plus_code` ِ ویترینِ همان دکان) از پینِ ذخیره‌شده — `lib/plus-code.js`؛ خاموش ⇒ همان پاسخ */
+function addressView(r, { pinCode = false } = {}) {
+  const lat = r.lat === null ? null : Number(r.lat);
+  const lng = r.lng === null ? null : Number(r.lng);
+  const code = pinCode ? require('./plus-code').codeOf({ lat, lng }) : null;
   return {
-    id: r.id, label: r.label, text: r.text, landmark: r.landmark,
-    lat: r.lat === null ? null : Number(r.lat), lng: r.lng === null ? null : Number(r.lng),
+    id: r.id, label: r.label, text: r.text, landmark: r.landmark, lat, lng,
     ...Object.fromEntries(EXTRA_KEYS.map((k) => [k, r[EXTRA_COLS[k]] || ''])),
+    ...(code ? { pinCode: code } : {}),
     updatedAt: Number(r.updated_at),
   };
 }
@@ -238,12 +242,12 @@ function parseAddress(body) {
   return out;
 }
 
-async function addresses(customer) {
+async function addresses(customer, opts = {}) {
   return (await many('SELECT * FROM store_customer_addresses WHERE customer_id = $1 ORDER BY created_at, id', [customer.id]))
-    .map(addressView);
+    .map((r) => addressView(r, opts));
 }
 
-async function addAddress(customer, body) {
+async function addAddress(customer, body, opts = {}) {
   const a = parseAddress(body);
   return tx(async (c) => {
     await c.query('SELECT id FROM store_customers WHERE id = $1 FOR UPDATE', [customer.id]);
@@ -257,11 +261,11 @@ async function addAddress(customer, body) {
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING *`,
       [ulid(at), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, at, ...EXTRA_KEYS.map((k) => a.extra[k] ?? '')]
     )).rows[0];
-    return addressView(r);
+    return addressView(r, opts);
   });
 }
 
-async function updateAddress(customer, id, body) {
+async function updateAddress(customer, id, body, opts = {}) {
   const a = parseAddress(body);
   const r = await one(
     `UPDATE store_customer_addresses SET label = $3, text = $4, landmark = $5, lat = $6, lng = $7, updated_at = $8,
@@ -272,7 +276,7 @@ async function updateAddress(customer, id, body) {
     [String(id || ''), customer.id, a.label, a.text, a.landmark, a.lat, a.lng, now(), ...EXTRA_KEYS.map((k) => a.extra[k])]
   );
   if (!r) throw notFound('این نشانی پیدا نشد', 'address_not_found');
-  return addressView(r);
+  return addressView(r, opts);
 }
 
 async function removeAddress(customer, id) {
