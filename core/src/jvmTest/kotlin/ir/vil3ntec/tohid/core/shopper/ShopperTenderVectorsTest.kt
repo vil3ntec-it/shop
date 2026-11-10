@@ -13,8 +13,8 @@ import kotlin.test.assertTrue
 
 /**
  *  CHK-14 — `core/test-vectors/cash-tender-v1.json`: «با کدام اسکناس…» ِ برنامهٔ خرید ([CheckoutRules.tenderOptions]) برای
- *  هر جمع همان گزینه‌های ویترین است؛ همان فایل را `server/test/cash-tender-vectors.test.js` روی `tenders` ِ `checkout.js`
- *  و قاعدهٔ سرور (`delivery-prefs.checkTender`) می‌دواند.
+ *  هر جمع همان گزینه‌های ویترین است؛ همان فایل را `server/test/cash-tender-vectors.test.js` روی `K.tenders` ِ `kit/order-kit.js`
+ *  (ثبت و پیگیریِ وب) و قاعدهٔ سرور (`delivery-prefs.checkTender`) می‌دواند.
  */
 class ShopperTenderVectorsTest {
 

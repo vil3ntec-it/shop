@@ -111,6 +111,19 @@
 - نیمه‌کاره: هیچ. شاخه‌های منبع (`perf-2`، `ntf-refund`، `sec-review-40`، `shopper-gaps`، `acct-console-2`) در دستهٔ ۴۱‌اند و هنوز مرج نشده؛
   اگر یکی کنار رفت، بندش را هم بردار. «مانع» ِ CHK-18/ORD-20 عمداً دست نخورد (عاملِ دیگر).
 - قدمِ بعدی: با هر جوابِ صاحب‌کار بندِ همان تصمیم به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-chk24` (CHK-24 در وبِ پیگیری: «با کدام اسکناس…» و رفعِ کارتِ ردشده/لغوشده؛ روی `claude/shopper-gaps-2` ‏921c168f؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: باگ — کارتِ «دستورِ تحویل» ِ `store/order.js` برای سفارشِ ردشده/لغوشده «از دکان بیرون رفته» نشان می‌داد؛ حالا مثلِ `PrefsRules.shown`
+  پنهان است (`K.orderKind` = err). همزادی — «با کدام اسکناس…» در همان کارت فقط برای «نقد هنگامِ تحویل»: یک تابعِ `K.tenders` در `kit/order-kit.js`
+  برای فرمِ ثبت و پیگیری (نسخهٔ checkout.js برداشته شد)، اسکناسِ کنونیِ درست می‌ماند، null ِ صریح، `expectedVersion`، یک درخواست در هر لحظه، ۴xx ⇒
+  پیگیری از نو و «ثبت شد» اگر همان نشست؛ کادرها با `توکن:نسخه`. جا در `order.*.json` بی بالا بردنِ سقف: `od.prefs.locked` (همان متنِ
+  `err.delivery_locked`) برداشته، نُه کلید کوتاه (`od.pf.*`، `od.pay.go/wait/fail`، `od.sub.ok/rm`)، متنِ `err.version_conflict` کوتاه و عام —
+  fa ۴۰۲۶⇐۴۰۸۳، ps ۴۰۴۲⇐۴۰۸۸، en ۲۹۱۵⇐۲۹۶۷ از ۴۰۹۶. آزمون‌ها: `web-store-zones.mjs` ۹۰ ✅ روی PGlite و PostgreSQL (پیش از رفع ۱۶ ❌، `cash-tender-vectors` ۳ از ۴ سرخ)،
+  `cash-tender-vectors` ۴/۴، `web-i18n` + `dari-text` ۴۰/۴۰، web-store/allflags/dari/paystep سبز. `server/src/app.js` ِ main ۸۰۱ خط بود (سقفِ
+  ۸۰۰، کیفیتِ main سرخ): یک توضیح کنارِ همان سطر رفت.
+- نیمه‌کاره: سرور — اسکناسی که جمعِ امروز دیگر نمی‌پذیرد (جایگزین/برداشتنِ قلم پس از ثبت) هر ویرایشِ دیگرِ دستورِ تحویل را، از کارمند هم، رد می‌کند
+  (`cash_tender_*`) تا کسی صریحاً پاکش کند؛ وب حالا null می‌فرستد، برنامهٔ خرید هم (`PrefsRules.formOf`)، ولی کارتِ کارمند نه. برنامهٔ خرید برای
+  سفارشی که پس از ثبت با حساب‌پی پرداخت شده کلیدِ اسکناس را نمی‌فرستد ⇒ اسکناسِ مانده `bad_cash_tender` می‌گیرد (وب null می‌فرستد).
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24؛ تصمیم دربارهٔ دو موردِ «نیمه‌کاره» (درست‌کردن در سرور یا در کارتِ کارمند و `PrefsRules.body`).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps-2` (CHK-24 در برنامهٔ خرید: «دستورِ تحویل» و اسکناس پس از ثبت؛ روی `claude/shopper-gaps` ‏cf438f31؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: کارتِ «دستورِ تحویل» در پیگیریِ برنامهٔ خرید، همزادِ `#o-prefs` ِ وب (`core/.../shopper/ShopperPrefs.kt` ِ `PrefsRules`،
   `ShopperApi.editDelivery`، `OrderExtras.deliveryPrefs`؛ `customer/ui/ModelPrefs.kt` ِ `PrefsModel`، `OrderCards.DeliveryPrefsCard`):

@@ -42,6 +42,24 @@
   };
   K.dropKey = function (scope) { K.saveS('key:' + scope, null); };
 
+  /**
+   * CHK-14/24: «با کدام اسکناس…» ِ ثبت و پیگیری — همان قاعدهٔ سرور (`delivery-prefs.checkTender`): بیش از جمع، افغانیِ
+   * کامل، پول خرد کمتر از یک اسکناسِ ۱۰۰۰ (بردارِ `core/test-vectors/cash-tender-v1.json`). [cur] (پس از ثبت) اسکناسِ کنونی:
+   * هنوز درست و بیرون از فهرست ⇒ افزوده (`PrefsRules.tenders`). جمعِ صفر یا منفی ⇒ هیچ.
+   */
+  var NOTE_MINOR = 100000;
+  K.tenders = function (total, cur) {
+    var out = [];
+    if (!(total > 0)) return out;
+    [10000, 50000, 100000].forEach(function (u) {
+      var x = Math.ceil(total / u) * u;
+      if (x === total) x += u;
+      if (x - total < NOTE_MINOR && out.indexOf(x) < 0) out.push(x);
+    });
+    if (cur > 0 && cur % 100 === 0 && cur >= total && cur - total < NOTE_MINOR && out.indexOf(cur) < 0) out.push(cur);
+    return out.sort(function (a, b) { return a - b; });
+  };
+
   // ── پرسشِ تأیید (dialog، نه confirm ِ مرورگر) ──
   K.confirm = function (text, okText) {
     return new Promise(function (resolve) {
