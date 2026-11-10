@@ -123,8 +123,11 @@ function same(a, b) {
   return canonical(a) === canonical(b);
 }
 
-/** مقدارِ پس از op: دلتا روی مقدارِ فعلی، وگرنه خودِ مقدار */
-const after = (cur, v) => (isInc(v) ? (Number(cur) || 0) + v.$inc : v);
+/**
+ * مقدارِ پس از op: دلتا روی مقدارِ فعلی، وگرنه خودِ مقدار. `full` (کلِ ردیف، راهِ قدیم و API): `$inc` دلتا نیست و همان
+ * شیء در جدول می‌نشیند ⇒ خودِ مقدار سنجیده می‌شود (SR43-2: `{$inc:0}` «همان» و شمارندهٔ خرید «آزاد» دیده می‌شد).
+ */
+const after = (cur, v, full = false) => (!full && isInc(v) ? (Number(cur) || 0) + v.$inc : v);
 const statusOf = (s) => (isEmpty(s) ? 'completed' : String(s));
 const isCredit = (s) => Number(s.debtGiven) > 0 || Number(s.remaining) > 0;
 
@@ -176,7 +179,7 @@ function isVoid(cur, fields, { type, full }) {
 function saleChanges(cur, fields, { full = false, insert = false } = {}) {
   const has = (k) => full || hasOwn(fields, k);
   const out = [];
-  for (const k of SALE_FIXED) if (has(k) && !same(cur[k], after(cur[k], fields[k]))) out.push(k);
+  for (const k of SALE_FIXED) if (has(k) && !same(cur[k], after(cur[k], fields[k], full))) out.push(k);
   for (const k of SALE_ONCE) if (has(k) && !isEmpty(cur[k]) && !same(cur[k], fields[k])) out.push(k);
   if (!insert && has('status') && statusOf(fields.status) !== statusOf(cur.status) && statusOf(fields.status) !== 'cancelled') {
     out.push('status');
@@ -194,17 +197,17 @@ const customerMove = (cur, fields, opts) => (isCredit(cur) ? debtorMove(cur, fie
 
 function itemChanges(cur, fields, { full = false } = {}) {
   const out = [];
-  for (const k of ITEM_FIXED) if ((full || hasOwn(fields, k)) && !same(cur[k], after(cur[k], fields[k]))) out.push(k);
+  for (const k of ITEM_FIXED) if ((full || hasOwn(fields, k)) && !same(cur[k], after(cur[k], fields[k], full))) out.push(k);
   return out;
 }
 
-/** فیلدهای مالیِ سندِ [table] که [fields] عوض می‌کند؛ دلتای شمارنده آزاد */
+/** فیلدهای مالیِ سندِ [table] که [fields] عوض می‌کند؛ دلتای شمارنده آزاد (فقط v1؛ کلِ ردیف دلتا ندارد، SR43-2) */
 function docChanges(table, cur, fields, { full = false } = {}) {
   const counters = DOC_COUNTERS[table] || [];
   const out = [];
   for (const k of DOC_FIXED[table]) {
-    if (!(full || hasOwn(fields, k)) || (counters.includes(k) && isInc(fields[k]))) continue;
-    if (!same(cur[k], after(cur[k], fields[k]))) out.push(k);
+    if (!(full || hasOwn(fields, k)) || (!full && counters.includes(k) && isInc(fields[k]))) continue;
+    if (!same(cur[k], after(cur[k], fields[k], full))) out.push(k);
   }
   return out;
 }
@@ -225,7 +228,7 @@ const boundOf = (ctx) => (ctx && typeof ctx.deviceUid === 'string' ? ctx.deviceU
 /**
  * نگهبانِ یک نوشتن. `rowOf(c, table, id)` ⇐ دادهٔ ردیفِ زنده یا null، `deadOf(c, table, id)` ⇐ دادهٔ ردیفِ حذف‌شده
  * (با محتوا) یا null، `firstInsert(c, saleId)` ⇐ {device, ts} یا null.
- * `merges`: ادغام‌های همین دسته (شناسهٔ مشتری ⇐ `mergedInto` یا null).
+ * `merges`: ادغام‌های همین دسته (شناسهٔ مشتری ⇐ `{to, opId?}`؛ v1 با op_id، راهِ قدیم بی آن — [claimOf]).
  */
 class Guard {
   constructor({ ctx, deviceId, mode, path, merges, rowOf, deadOf, firstInsert, ip = '', voids = true }) {
@@ -233,22 +236,67 @@ class Guard {
     this.notes = new Map();
     this.newSales = new Set();
     this.voidFails = new Map();
+    this.relied = [];            //  راهِ قدیم: جابه‌جایی‌هایی که به ادغامِ همین دسته تکیه کردند ([settle])
+    this.confirmed = new Map();  //  راهِ قدیم: مشتری ⇐ `mergedInto` ِ نوشتنی که واقعاً به نوشتن رسید
   }
 
   get enforce() { return this.mode === 'enforce'; }
 
-  /** آیا مشتریِ [from] (با زنجیرهٔ `mergedInto`) در [to] ادغام شده؟ */
-  async merged(c, from, to) {
+  /**
+   * آیا مشتریِ [from] (با زنجیرهٔ `mergedInto`) در [to] ادغام شده (یا با همین دسته می‌شود)؟ [ref]: سندِ جابه‌جاشده،
+   * برای [settle] ِ راهِ قدیم.
+   */
+  async merged(c, from, to, ref = null) {
     let id = from;
+    const used = [];
     for (let i = 0; i < MERGE_HOPS && id; i++) {
       let next;
-      if (this.merges.has(id)) next = this.merges.get(id);
+      const claim = await this.claimOf(c, id);
+      if (claim) { next = claim.to; if (!claim.opId) used.push({ id, to: claim.to }); }
       else { const d = await this.rowOf(c, 'debtors', id); next = d ? d.mergedInto : null; }
       if (isEmpty(next)) return false;
-      if (String(next) === to) return true;
+      if (String(next) === to) {
+        if (ref) for (const u of used) this.relied.push({ ...u, ...ref });
+        return true;
+      }
       id = String(next);
     }
     return false;
+  }
+
+  /**
+   * ادغامِ همین دسته برای مشتریِ [id] که هنوز به ردیف نرسیده ⇐ `{to, opId?}` یا null (⇐ خودِ ردیف حقیقت است).
+   * ⛔ SR43-1: ادغامِ دسته فقط «پیش‌بینی» است. v1: op ِ معتبر با op_id ِ یکتا ([v1Merges])، و op_id ای که همین حالا در
+   * `oplog` است یا نشسته (پیش‌تر در همین دسته ⇒ ردیف همان را دارد) یا تکراری است (هرگز نمی‌نشیند) ⇒ null. راهِ قدیم:
+   * تکیه ثبت می‌شود و [settle] پس از دسته می‌سنجد که همان ادغام واقعاً به نوشتن رسید.
+   */
+  async claimOf(c, id) {
+    const cl = this.merges.get(id);
+    if (!cl) return null;
+    if (cl.opId && (await c.query('SELECT 1 FROM oplog WHERE op_id=$1', [cl.opId])).rows.length) return null;
+    return cl;
+  }
+
+  /** نوشتنِ مشتری که به نوشتن رسید (راهِ قدیم: کلِ ردیف ⇒ بی `mergedInto` یعنی «ادغام نیست»؛ حذف ⇒ نیست) */
+  confirm(id, type, fields, full) {
+    if (type === 'delete') this.confirmed.set(id, null);
+    else if (full || hasOwn(fields, 'mergedInto')) this.confirmed.set(id, isEmpty(fields.mergedInto) ? null : String(fields.mergedInto));
+  }
+
+  /**
+   * راهِ قدیم، پس از آخرین نوشتنِ دسته و درونِ همان تراکنش ⇐ null یا {reject}: جابه‌جاییِ مشتریِ سندی که به ادغامِ همین
+   * دسته تکیه کرد ولی آن ادغام همان‌طور ننشست (کهنه، کنارگذاشته، یا برداشته با ردیفِ کاملِ بعدی) ⇒ ویرایشِ سند (SR43-1).
+   */
+  settle() {
+    let res = null;
+    for (const r of this.relied) {
+      const want = isEmpty(r.to) ? null : String(r.to);
+      if (this.confirmed.has(r.id) && this.confirmed.get(r.id) === want) continue;
+      this.note(r.row, { table: r.table, row: r.row, type: 'update', fields: ['debtorId'] }, r.kind);
+      if (this.enforce && !res) res = { reject: r.reason };
+    }
+    this.relied = [];
+    return res;
   }
 
   /** فاکتورِ زنده با شناسهٔ [id] ⇐ داده یا null */
@@ -260,6 +308,7 @@ class Guard {
    */
   async check(c, op, live) {
     const { table, rowId, type, fields = {}, ts = 0, full = false } = op;
+    if (table === 'debtors') { this.confirm(rowId, type, fields, full); return null; }
     if (!GUARDED(table)) return null;
     //  ردیفِ حذف‌شدهٔ با محتوا سندِ ثبت‌شده است، نه «ثبتِ تازه» (پیش‌تر نوشتن آن را با محتوای تازه زنده می‌کرد)
     const dead = !live && type !== 'delete' ? await this.deadOf(c, table, rowId) : null;
@@ -279,7 +328,8 @@ class Guard {
         const insert = type === 'insert';
         changed = saleChanges(cur, fields, { full, insert });
         const move = customerMove(cur, fields, { full });
-        if (move && !(await this.merged(c, move[0], move[1])) && !(insert && (await this.merged(c, move[1], move[0])))) {
+        const ref = { kind: 'sale', table, row: rowId, reason: REASON };
+        if (move && !(await this.merged(c, move[0], move[1], ref)) && !(insert && (await this.merged(c, move[1], move[0], ref)))) {
           changed.push('debtorId');
         }
         if (insert && !changed.length && this.enforce) return { replay: true };
@@ -322,7 +372,8 @@ class Guard {
       const insert = type === 'insert';
       changed = docChanges(table, cur, fields, { full });
       const move = table === 'transactions' ? debtorMove(cur, fields, { full }) : null;
-      if (move && !(await this.merged(c, move[0], move[1])) && !(insert && (await this.merged(c, move[1], move[0])))) {
+      const ref = { kind: table, table, row: rowId, reason: DOC_REASON };
+      if (move && !(await this.merged(c, move[0], move[1], ref)) && !(insert && (await this.merged(c, move[1], move[0], ref)))) {
         changed.push('debtorId');
       }
       if (insert && !changed.length && this.enforce) return { replay: true };
@@ -454,17 +505,32 @@ const v1RowOf = (shopId, dead = false) => async (c, table, id) => {
   return r && !(dead && isEmpty(r.data)) ? r.data : null;
 };
 
+/**
+ * ادغام‌های دستهٔ v1 ⇐ Map(مشتری ⇐ {to, opId}) — فقط opی که `push` ِ v1 می‌تواند بنشاند: همان `validateOp` و op_id ِ
+ * یکتا در دسته (op_id ِ دوباره ⇒ «ادغام نیست»)؛ op_id ِ نشسته یا تکراریِ `oplog` هنگامِ پرسش ([Guard.claimOf]). آخرین
+ * op ِ هر مشتری = حالِ پایانِ دسته. ⛔ SR43-1: پیش‌تر op ِ خام (شناسهٔ بد، تکراری) هم «ادغام» شمرده می‌شد.
+ */
+function v1Merges(ops, tableOfRaw) {
+  const merges = new Map();
+  if (!ops.some((r) => tableOfRaw(r) === 'debtors' && isPlainObject(r.fields) && hasOwn(r.fields, 'mergedInto'))) return merges;
+  const { validateOp } = require('./sync-v1');
+  const valid = ops.map((r) => validateOp(SHOP_V1.app, r)).filter((v) => v.ok).map((v) => v.op);
+  const times = new Map();
+  for (const o of valid) times.set(o.op_id, (times.get(o.op_id) || 0) + 1);
+  for (const o of valid) {
+    if (o.table !== 'debtors' || !hasOwn(o.fields, 'mergedInto')) continue;
+    merges.set(o.row_id, { to: times.get(o.op_id) === 1 ? o.fields.mergedInto : null, opId: o.op_id });
+  }
+  return merges;
+}
+
 async function v1Guard(ctx, deviceId, ops, { ip = '' } = {}) {
   if (!ctx || ctx.app !== SHOP_V1.app || ctx.accountKind !== SHOP_V1.accountKind || !ctx.accountId || !Array.isArray(ops)) return null;
   const { tableOf } = require('./sync-v1');
   const tableOfRaw = (r) => (isPlainObject(r) ? tableOf(SHOP_V1.app, r.table ?? r.table_name ?? r.tableName) : null);
   if (!ops.some((r) => GUARDED(tableOfRaw(r)))) return null;
   if (!(await flagOn(ctx.accountId))) return null;
-  const merges = new Map();
-  for (const r of ops) {
-    const f = isPlainObject(r) && isPlainObject(r.fields) ? r.fields : null;
-    if (f && tableOfRaw(r) === 'debtors' && hasOwn(f, 'mergedInto')) merges.set(String(r.row_id ?? r.rowId ?? r.id ?? ''), f.mergedInto);
-  }
+  const merges = v1Merges(ops, tableOfRaw);
   const shopId = ctx.accountId;
   return new Guard({
     ctx, deviceId, path: 'v1', merges, ip,
@@ -538,9 +604,13 @@ async function legacyGuard({ shopId, userId = '', deviceId = '', boundDevice = '
   if (!shopId || !mode || !Array.isArray(changes)) return null;
   if (!changes.some((r) => r && GUARDED(String(r.collection || '')))) return null;
   if (!(await flagOn(shopId))) return null;
+  //  ⛔ SR43-1: هر نوشتنِ مشتری، آخرینش (راهِ قدیم کلِ ردیف را جایگزین می‌کند ⇒ بی `mergedInto` = «ادغام نیست»؛ حذف ⇒ نیست)؛
+  //  جابه‌جایی‌ای که به آن تکیه کرد پس از دسته با [Guard.settle] سنجیده می‌شود (نوشتنِ کهنه یا کنارگذاشته نمی‌نشیند)
   const merges = new Map();
   for (const r of changes) {
-    if (r && r.collection === 'debtors' && isPlainObject(r.data) && hasOwn(r.data, 'mergedInto')) merges.set(String(r.id || ''), r.data.mergedInto);
+    if (!r || r.collection !== 'debtors') continue;
+    const live = r.deleted !== true && isPlainObject(r.data);
+    merges.set(String(r.id || ''), { to: live && !isEmpty(r.data.mergedInto) ? r.data.mergedInto : null });
   }
   const path = mode === 'enforce' ? 'api' : 'legacy';
   const enforce = mode === 'enforce' || (await chainDevice(shopId, deviceId, boundDevice));

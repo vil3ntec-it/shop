@@ -260,6 +260,11 @@ async function pushChanges(ctx, changes) {
       );
       applied++;
     }
+    //  SR43-1: جابه‌جاییِ مشتریِ سندِ ثبت‌شده که به ادغامِ همین دسته تکیه کرد ولی آن ادغام ننشست ⇒ ۴۰۹ و کلِ دسته برمی‌گردد
+    if (guard) {
+      const g = guard.settle();
+      if (g && g.reject) throw require('./finalized-sales').forbiddenError(g.reject);
+    }
 
     return { applied, skipped, conflicts, rev: await (async () => {
       const r = (await c.query('SELECT last_rev FROM shop_rev WHERE shop_id=$1', [shopId])).rows[0];
