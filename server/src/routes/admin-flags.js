@@ -27,7 +27,7 @@ const SHOP_SCOPE = 'shop';
 
 const router = express.Router();
 
-/** پرچم‌های شناخته — scope: «shop» = شناسهٔ دکان یا all؛ «all» = فقط all. */
+/** پرچم‌ها و تنظیم‌های زندهٔ شناخته — scope: «shop» = شناسهٔ دکان یا all؛ «all» = فقط all؛ بقیه (security، release، ops) = همان نام. */
 const KNOWN = Object.freeze([
   { key: 'shop.orders', scope: 'shop', default: false, what: 'سفارشِ آنلاین (`/api/shop/orders/*`)' },
   { key: 'shop.storefront', scope: 'shop', default: false, what: 'ویترینِ عمومی و مدیریتِ ویترین' },
@@ -128,6 +128,71 @@ const KNOWN = Object.freeze([
   //  O-01 (docs/FIREBASE-SETUP-fa.md): هر دو برای «سفارش با برنامهٔ بسته» لازم‌اند
   { key: 'shop.order_notify', scope: 'shop', default: false, what: 'اعلانِ سفارشِ تازه، پرداخت و لغوِ مشتری به گوشی‌های دکان (صفِ پایدار و یادآوری)' },
   { key: 'shop.device_push', scope: 'shop', default: false, what: 'پوشِ گوشی با Firebase: ثبتِ توکنِ دستگاه‌های دکان (برنامهٔ بسته هم زنگ می‌زند)' },
+  //  دستهٔ ۳۸: هر کلیدِ دیگری که کدِ غیرِ پمپ می‌خواند (سنجه: `console-shell.test.js` + `test/flag-scan.js`). پیش‌فرض همان پیش‌فرضِ کد است
+  //  (`admin-flags.test.js`)؛ عدد/شیء = تنظیمِ زنده. بیرون: مشترک با پمپ (`sync.device_bind`، `sync.live_expiry_close`) و پویا (`stage.*`)
+  //  ── پیک و تحویل (همه با `shop.delivery`)
+  { key: 'shop.delivery_map', scope: 'shop', default: false, what: 'پیوندِ مسیریاب و نقشهٔ آفلاینِ پیک در کارتِ مأموریت (DLV-05)' },
+  { key: 'shop.delivery_courier_call', scope: 'shop', default: false, what: '«تماس با مشتری» روی کارتِ پیک؛ شمارهٔ کامل فقط برای همان تماس' },
+  { key: 'shop.delivery_bag_scan', scope: 'shop', default: false, what: '«بسته را گرفتم» ِ پیک فقط با اسکنِ برچسبِ همهٔ کیسه‌های بسته (DLV-07)' },
+  { key: 'shop.delivery_near_pin', scope: 'shop', default: false, what: '«تحویل شد» ِ پیک برای سفارشِ پین‌دار فقط نزدیکِ پین (DLV-17)' },
+  { key: 'shop.delivery_near_pin.max_m', scope: 'shop', default: 300, what: 'فاصلهٔ مجازِ «تحویل شد» از پین به متر (۲۰ تا ۵۰۰۰؛ نامعتبر ⇒ ۳۰۰)؛ با `shop.delivery_near_pin`' },
+  { key: 'shop.delivery_route', scope: 'shop', default: false, what: 'ترتیبِ پیشنهادیِ مأموریت‌های پذیرفتهٔ پیک (`GET /api/courier/route`، DLV-04)' },
+  { key: 'shop.delivery_ratings', scope: 'shop', default: false, what: 'امتیازِ تحویل از پیک و مشتری و فهرستِ امتیازها برای دکان (DLV-18)' },
+  { key: 'shop.delivery_code_rule', scope: 'shop', default: false, what: 'کدِ تحویلِ اجباری برای سپردن به پیکِ دکان وقتی نقد هنگامِ تحویل یا گران‌قیمت است (DLV-08)' },
+  { key: 'shop.delivery_code_rule.min_total_minor', scope: 'shop', default: 0, what: 'آستانهٔ «گران‌قیمت» به واحدِ خرد؛ ۰ ⇒ فقط نقد هنگامِ تحویل؛ با `shop.delivery_code_rule`' },
+  { key: 'shop.delivery_live_location', scope: 'shop', default: false, what: 'موقعیتِ زندهٔ پیکِ «در راه» برای مشتری (DLV-16)؛ با `shop.delivery_customer_view`' },
+  //  ── صاحب، گزارش، مجوز، کارمند و تخفیف
+  { key: 'shop.owner_report', scope: 'shop', default: false, what: 'گزارشِ خودکارِ روزانه/هفتگیِ صاحب در ساعتِ محلیِ دکان (PAY-20، RPT-12)' },
+  { key: 'shop.branches_report', scope: 'shop', default: false, what: 'خلاصهٔ هر شعبهٔ همان صاحب و جمعِ همه، فقط خواندنی (RPT-18)؛ هر شعبه با پرچمِ خودش' },
+  { key: 'shop.debt_minor', scope: 'shop', default: false, what: 'ماندهٔ حسابِ قرض‌دار در برنامه به پولِ دقیق (واحدِ خرد)، نه جمعِ Double' },
+  { key: 'shop.doc_chain', scope: 'shop', default: false, what: 'زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه و لنگرِ سابقهٔ دستگاه (SEC-02)' },
+  { key: 'shop.device_cap', scope: 'shop', default: false, what: 'سقفِ دستگاهِ اشتراک برای دستگاهِ ثبت‌شده هم: بیرون از n ِ اول ⇒ بی مجوز (جز دستگاهِ خودِ صاحب)' },
+  { key: 'shop.license_offline_30d', scope: 'shop', default: false, what: 'مجوزِ ۳۵ روزه به‌جای ده روز تا دستگاهِ بی اینترنت ۳۰ روز بفروشد (SYN-01)؛ هرگز پس از پایانِ اشتراک' },
+  { key: 'shop.price_cap', scope: 'shop', default: false, what: 'سقفِ تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» ِ کارمند در سرور (`sales.price`، STF-03)' },
+  { key: 'shop.promo_uses', scope: 'shop', default: false, what: 'دفترِ مصرفِ کدِ تخفیف و سقفِ `maxUses` در سرور (PRM-02)' },
+  { key: 'shop.promo_expiry', scope: 'shop', default: false, what: 'قاعدهٔ «تخفیفِ نزدیکِ انقضا» (PRM-10)' },
+  { key: 'shop.promo_tier_price', scope: 'shop', default: false, what: 'پلهٔ «قیمتِ ثابتِ هر واحد» در تخفیفِ پله‌ای (POS-19)' },
+  { key: 'shop.purchase_orders', scope: 'shop', default: false, what: 'سفارشِ خرید، رسیدِ دریافت و فاکتورِ تأمین‌کننده (PUR-02/04/14)' },
+  { key: 'shop.staff_time', scope: 'shop', default: false, what: 'ورود و خروجِ کارمند و پورسانتِ ماه (STF-07/08)' },
+  { key: 'shop.stock_v2', scope: 'shop', default: false, what: 'موتورِ تازهٔ موجودی و بهای برنامه (میانگینِ موزون، سری/FEFO، دفترِ حرکت)؛ با `stock_mode=on` ِ دکان' },
+  { key: 'shop.order_risk', scope: 'shop', default: false, what: 'قاعده‌های ریسکِ ثبتِ ویترین: سفارشِ تکراری و سقفِ مشتریِ تازه (RSK-02/03/05)' },
+  { key: 'shop.order_risk.policy', scope: 'shop', default: { newCustomerMaxTotalMinor: 1_000_000, newCustomerMaxOpen: 2, duplicateWindowMin: 10 },
+    what: 'سیاستِ همان قاعده‌ها؛ هر کلید جدا، نامعتبر ⇒ پیش‌فرض، ۰ = آن قاعده خاموش؛ با `shop.order_risk`' },
+  { key: 'shop.visual_search', scope: 'shop', default: false, what: '«جست‌وجو با عکس» ِ کارمند و نمایهٔ هشِ عکسِ کالاها (AI-11)؛ پایهٔ `shop.storefront.visual_search`' },
+  { key: 'image_bank.quality', scope: 'shop', default: false, what: 'نشان‌های پیشنهادیِ کیفیت روی عکسِ بانک؛ هرگز رد (IMG-15)' },
+  { key: 'image_bank.resume', scope: 'all', default: false, what: 'ادامهٔ بارگذاریِ دسته‌ایِ بانکِ تصاویر بی فرستادنِ دوبارهٔ همان فایل (IMG-14)' },
+  { key: 'pay.hesabpay', scope: 'shop', default: false, what: 'حساب‌پی ِ خودکار با کلیدهای خودِ دکان؛ پول مستقیم به حسابِ دکان، تأیید فقط با webhook' },
+  //  ── همگام‌سازیِ دکان (پمپ هیچ‌کدام را نمی‌خواند)
+  { key: 'shop.sync.doc_roles', scope: 'shop', default: false, what: 'داوریِ نقشِ سندهای سابقه‌سوار (کارتِ هدیه، امتیاز، امانی…) در Sync v3' },
+  { key: 'shop.sync_v3_to_v1', scope: 'shop', default: false, what: 'پلِ v3 ⇒ v1 برای دکانی که دستگاهِ کهنه و تازه با هم دارد' },
+  { key: 'sync.cursor_from_since', scope: 'shop', default: false, what: 'cursor ِ دستگاهِ Sync v1 = آنچه دستگاه تأیید کرد، نه آنچه سرور فرستاد (#481)' },
+  { key: 'sync.safe_entries', scope: 'shop', default: false, what: 'گاوصندوق (PAY-18): پلهٔ ۴ ِ schema و جدولِ `safeEntries` در Sync v1/v3' },
+  { key: 'sync.keep_pending', scope: 'shop', default: false, what: 'pull ِ Sync v1 می‌گوید تغییرِ محلیِ در صف با opِ رسیده بازنویسی نشود (`KeepPending`)' },
+  { key: 'sync.revive_full_row', scope: 'shop', default: false, what: 'op ِ زنده‌کنندهٔ ردیفِ حذف‌شده در pull ِ Sync v1 دادهٔ کاملِ ردیف را دارد' },
+  { key: 'sync.gzip_pull', scope: 'shop', default: false, what: 'پاسخِ pull ِ Sync v1 ِ بزرگ‌تر از ۱KB با `Accept-Encoding: gzip` فشرده' },
+  { key: 'sync.gzip_push', scope: 'shop', default: false, what: 'pull به دستگاه می‌گوید push ِ بزرگ را فشرده بفرستد (SYN-04)' },
+  //  ── بازار (کارمزدها: تصمیمِ صاحب محصول «فعلاً ۰»)
+  { key: 'market.changes', scope: 'shop', default: false, what: 'جریانِ تغییرِ بازار (`market_changes`) برای باطل کردنِ کش و نمایهٔ جست‌وجو (S6)' },
+  { key: 'market.trust', scope: 'shop', default: false, what: 'شکایت و تخلفِ بازارچه برای مشتری و دکان' },
+  { key: 'market.public_id', scope: 'shop', default: false, what: 'شناسهٔ عمومیِ پایدارِ دکان و نشانی‌های پیشینِ ویترین (S3)' },
+  { key: 'market.platform_fee_bps', scope: 'shop', default: 0, what: 'کارمزدِ سامانه روی سفارشِ مشتری، صدمِ درصد (۰ تا ۱۰٬۰۰۰)' },
+  { key: 'market.platform_fee_fixed_minor', scope: 'shop', default: 0, what: 'مبلغِ ثابتِ کارمزدِ سامانه روی سفارشِ مشتری، واحدِ خرد' },
+  { key: 'market.commission_bps', scope: 'shop', default: 0, what: 'کمیسیونِ بازار روی سفارشِ مشتری، صدمِ درصد (۰ تا ۱۰٬۰۰۰)' },
+  { key: 'market.commission_fixed_minor', scope: 'shop', default: 0, what: 'مبلغِ ثابتِ کمیسیونِ بازار روی سفارشِ مشتری، واحدِ خرد' },
+  { key: 'market.account', scope: 'all', default: false, what: 'حسابِ مشتریِ بازار بی دکان (`/api/market/account/*`، S9)' },
+  { key: 'market.product_details', scope: 'all', default: false, what: 'برند، بارکد، واحد و دستهٔ سراسری در نمای عمومیِ کالا (M4)' },
+  { key: 'market.public_views', scope: 'all', default: false, what: 'پاسخ‌های عمومیِ ویترین و بازار فقط با فیلدهای مجاز (`lib/public-views.js`)' },
+  { key: 'storefront.catalog_source', scope: 'all', default: false, what: 'ویترین و بازار کالا را از کاتالوگِ واحد (`catalog_products`) می‌خوانند، نه `sync_rows` (S1)' },
+  { key: 'console.delivery_thresholds', scope: 'all',
+    default: { acceptMin: 30, dispatchMin: 30, courierAcceptMin: 15, pickupMin: 30, inDeliveryMin: 120, failedMin: 240, recallMin: 60 },
+    what: 'آستانه‌های «گیر کرده» ِ سفارش و تحویل در پنل، به دقیقه (۴.۶، ۴.۷)' },
+  //  ── ops و امنیت
+  { key: 'ops.critical_alerts', scope: 'ops', default: false, what: 'هشدارِ بحرانی با ایمیل و پوش به مدیرانِ پلتفرم، با پیگیری (OPS-01)' },
+  { key: 'ops.critical_alerts.escalate_min', scope: 'ops', default: 15, what: 'دقیقه تا پیگیریِ هشدارِ بحرانیِ دیده‌نشده (۵ تا ۲۴۰)' },
+  { key: 'ops.critical_alerts.max_escalations', scope: 'ops', default: 2, what: 'بیشترین بارِ پیگیریِ یک هشدارِ بحرانی (۰ تا ۵)' },
+  { key: 'ops.sync_lag', scope: 'ops', default: false, what: 'بخشِ «تأخیرِ همگام‌سازی» در سلامتِ سامانه (OPS-04)' },
+  { key: 'backup.require_encryption', scope: 'security', default: false, what: 'پشتیبانِ سرور فقط رمزدار و پس از بازگشاییِ همان فایل (SEC-07)' },
+  { key: 'auth.phone_add_code', scope: 'security', default: false, what: 'افزودنِ شمارهٔ ورود فقط با کدِ همان شماره (AUTH-08)؛ پیش از روشن کردن برنامه‌ها `phoneCode` بفرستند' },
 ]);
 
 router.get('/', async (req, res) => {

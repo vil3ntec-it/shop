@@ -12,7 +12,7 @@
  * اجرا:  node test/e2e/pick.e2e.mjs
  */
 import { createRequire } from 'node:module';
-import { boot, assert } from './lib/harness.mjs';
+import { boot, assert, sameOrderLink } from './lib/harness.mjs';
 
 const E = await boot({ name: 'pick' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -21,6 +21,9 @@ const verifyData = require('../../src/lib/verify-data');
 const { db } = E;
 const owner = await E.owner('owner-pick@e2e.local', 'صاحبِ جمع‌آوری', 'دکانِ جمع‌آوری');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.orders.picking']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو با یک مشتری چند سفارشِ باز می‌گذارد تا به جایگزین و حذف برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-pick-store';
 const PHONE = '0793334455';
 const B_OIL = '6260000000024';
@@ -81,7 +84,9 @@ await E.step('E2E-PCK-06.1', 'روغن پیدا نشد ⇒ فقط جایگزین
   assert.equal(wrong.body.error.code, 'wrong_item', 'اسکنِ کالای دیگر');
   const p = E.ok(await A.api('POST', `/shop/orders/${first.id}/pick/substitutions`, { eventId: E.key('sub'), lineNo: oilLine, productId: P.oil2, barcode: B_OIL2 }), 'پیشنهاد');
   subId = p.substitution.id;
-  assert.ok(p.customer.link.endsWith(`#/o/${encodeURIComponent(first.token)}`), p.customer.link);
+  //  پیوندِ پیگیریِ همان سفارش؛ با `shop.storefront.link_expiry` (TEN-03، مثلاً `E2E_FLAGS_ON`) هر صدور v2 ِ تازه است ⇒ `sameOrderLink`
+  const [, linkToken = ''] = p.customer.link.match(/#\/o\/([^#?]+)$/) || [];
+  assert.ok(sameOrderLink(decodeURIComponent(linkToken), first.token), p.customer.link);
   assert.match(p.customer.whatsappUrl, /^https:\/\/wa\.me\/93793334455\?text=/, 'صاحب شمارهٔ مشتری را می‌بیند');
 }, { needs: ['E2E-PCK-06.0'] });
 

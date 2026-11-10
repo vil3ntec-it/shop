@@ -14,7 +14,8 @@ import { boot, assert } from './lib/harness.mjs';
 
 const E = await boot({ name: 'admin' });
 const { db } = E;
-const owner = await E.owner('owner-adm@e2e.local', 'صاحبِ مدیریت', 'دکانِ مدیریت');
+//  `subscribe: false`: این سناریو خودش آزمایشیِ تمام‌شده و دادنِ اشتراک را می‌سنجد (نه اشتراکِ «همه روشن» ِ `harness.mjs`)
+const owner = await E.owner('owner-adm@e2e.local', 'صاحبِ مدیریت', 'دکانِ مدیریت', { subscribe: false });
 const staff = await E.staff(owner, 'staff-adm@e2e.local', 'شاگردِ مدیریت');
 //  «یک ماه بعد»: دورهٔ آزمایشیِ دکان (از created_at ِ خودش) تمام شده است
 await db.query('UPDATE shops SET created_at=$1 WHERE id=$2', [Date.now() - 30 * 86400_000, owner.shopId]);

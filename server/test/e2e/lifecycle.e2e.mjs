@@ -28,6 +28,9 @@ const { db } = E;
 const owner = await E.owner('owner-life@e2e.local', 'صاحبِ چرخه', 'دکانِ چرخه');
 const courierAcct = await E.staff(owner, 'courier-life@e2e.local', 'پیکِ چرخه');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.catalog', 'shop.orders.refunds', 'shop.delivery']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو عمداً همان سبد را چند بار می‌گذارد تا به وضعیت‌های دیگر برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-life-store';
 const PHONE = '0791240001';
 const FEE = 5000;
@@ -402,11 +405,14 @@ await E.step('S85', 'جمعِ مشتری = اقلام − تخفیف + هزین�
   const d3 = await place([[oil, 1], [tea, 1]], 'delivery');
   await walk(d3.id, PREP);
   const fare = 7000;
-  const a = E.ok(await A.api('POST', `/shop/delivery/orders/${d3.id}/assign`, { mode: 'shop_courier', courierId, fareMinor: fare }, { headers: { 'Idempotency-Key': E.key('asg') } }), 'سپردن', 201).assignment.id;
+  const given = E.ok(await A.api('POST', `/shop/delivery/orders/${d3.id}/assign`, { mode: 'shop_courier', courierId, fareMinor: fare }, { headers: { 'Idempotency-Key': E.key('asg') } }), 'سپردن', 201);
+  const a = given.assignment.id;
+  //  `code`: با `shop.delivery_code_rule` (DLV-08، مثلاً `E2E_FLAGS_ON`) سپردنِ نقد کدِ مشتری می‌خواهد؛ پیک همان کد را از مشتری می‌گیرد
+  const code = given.code ? { code: given.code } : {};
   let n = 0;
   const ev = (type, extra = {}) => ({ eventId: `${K.deviceId}-ev-${++n}`, assignmentId: a, type, deviceTime: Date.UTC(2026, 9, 30, 7) + n * 60_000, deviceSeq: n, ...extra });
   const total = Number((await row(d3.id)).total_minor);
-  for (const x of E.ok(await K.api('POST', '/courier/events', { events: [ev('assigned'), ev('picked_up'), ev('delivered', { cashCollectedMinor: total })] }), 'رویدادهای پیک').results) {
+  for (const x of E.ok(await K.api('POST', '/courier/events', { events: [ev('assigned'), ev('picked_up'), ev('delivered', { cashCollectedMinor: total, ...code })] }), 'رویدادهای پیک').results) {
     assert.equal(x.status, 'applied', JSON.stringify(x));
   }
   const pv = E.ok(await A.api('GET', `/shop/delivery/couriers/${courierId}/settlement-preview`), 'پیش‌نمایش').totals;

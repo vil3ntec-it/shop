@@ -35,6 +35,9 @@ export const PENDING = [
 
 const owner = await E.owner('owner-s36@e2e.local', 'صاحبِ S36', 'دکانِ S36');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.order_notify']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو عمداً همان سبد را چند بار می‌گذارد تا به وضعیت‌های دیگر برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-s36-store';
 const PHONE = '0791230036';
 let A; let rice; let ticket = '';
