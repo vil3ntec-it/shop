@@ -885,6 +885,7 @@
   استناد = همان خط + نامِ کار و شناسهٔ run/job (`actions/runs/<run>/job/<job>`): «کامپایل و آزمون» (desktop + core)، «ساخت نسخهٔ بومی»
   (app + `:core:jvmTest`)، «برنامهٔ خریدِ مشتری (گزارش)» (continue-on-error: سبزیِ کار شاهد نیست، خطِ KTEST هست). `BUILD SUCCESSFUL`،
   `> Task :test` و شمارِ کلی شاهد نیستند؛ کارِ آزمونِ UP-TO-DATE خطی ندارد. iOS (`KotlinNativeTest`) همان `<testsuite>` ِ خودش.
+  ردیفی که فقط نامِ کلاس را می‌برد ⇒ شمارِ PASS ِ همان کلاسِ کامل = شمارِ `@Test` ِ منبع، بی FAIL/SKIP؛ هم‌نامِ بستهٔ دیگر و SKIP شاهد نیستند (`claude/ci-evidence-2`).
 - ⛔ تأخیرِ سراسریِ `context.route` به درخواستی که `page.route` ِ همان صفحه جواب می‌دهد نمی‌رسد (route ِ صفحه جلوتر است): پیش از نسبت دادنِ سرخی به تأخیر، درخواست‌های کندشده و ناوبری‌ها شمرده می‌شوند (`slownet-log` + `framenavigated`). `web-sync-ux.mjs` («element not stable» ِ `#lv-sync`) زیرِ ۹۰۰ms فقط ۵ GET ِ سندِ پیش از `reload` را کند می‌دید ⇒ سرخش زادهٔ بارِ میزبان بود، نه تأخیر.
 - سرور روی Express 5 است: دستگیره و میان‌افزارِ async مستقیم، بی پوشانندهٔ `Promise.resolve(fn(…)).catch(next)` (سنجهٔ `express-wrap`).
 - ⛔ CodeQL ِ `js/missing-rate-limiting`: `rateLimit` ِ `server/src/middleware/ratelimit.js` با model pack ِ `.github/codeql/extensions/shop-javascript`
