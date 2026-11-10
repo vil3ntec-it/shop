@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v72';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v73';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -108,6 +108,8 @@ const SHELL_ASSETS = [
   './license/catalog-match.js',
   //  CRM-15: شمارهٔ پوشیدهٔ مشتری برای اصلِ بی «شمارهٔ مشتریان» — بی اینترنت هم (دفترِ ازپیش‌همگام‌شده)
   './license/customer-access.js',
+  //  R10: خانهٔ CSV بی «فرمول» — بی آن، خروجیِ CSV ِ نصبِ آفلاین نامِ «=…» را فرمول می‌کرد
+  './license/csv-cell.js',
   './license/orders-risk.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد

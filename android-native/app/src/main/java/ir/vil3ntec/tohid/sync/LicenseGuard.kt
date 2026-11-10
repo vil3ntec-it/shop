@@ -23,6 +23,13 @@ object LicenseGuard {
   val changes = androidx.compose.runtime.mutableIntStateOf(0)
   fun changed() { changes.intValue++ }
 
+  /**
+   *  [changes] را پیش از نخستین ترکیب روی همان رشته می‌سازد (`AppStart.loadSettings`، `desktop/Main.kt`). اگر نخستین لمسِ این
+   *  شیء از کارِ پس‌زمینه (`Syncer`/`loadAndSummarize`) هم‌زمان با ترکیب باشد، Compose با «Reading a state that was created after
+   *  the snapshot was taken» می‌افتد (`rememberDeviceCapOver`؛ عکس‌های money/onboarding/online ِ #1028).
+   */
+  fun warm(): Int = changes.intValue
+
   /** یک روز ارفاق: تنظیمِ منطقهٔ زمانی یا ساعتِ تابستانی، دست‌کاری نیست */
   private const val CLOCK_SLACK = 24L * 60 * 60 * 1000
 
