@@ -104,9 +104,28 @@ internal class FileV3Store(private val dir: File, private val queueDir: File = d
 
 /** `ApiClient`ِ برنامه (توکن، نوسازی و سرآیندهای قرارداد از همان‌جا) */
 internal class HttpV3Transport(private val api: ApiClient) : V3Transport {
+  /** SYN-04: آخرین pull `gzip_push` داشت (پرچمِ دکانِ `sync.gzip_push`) ⇒ push ِ بزرگ فشرده (`V3Gzip`) */
+  @Volatile private var gzip = false
+  /** فشرده پذیرفته نشد (۴۱۵، یا ۴۰۰ ِ `bad_json` ِ پراکسی) ⇒ تا پایانِ همین اجرا ساده */
+  @Volatile private var refused = false
+
   override suspend fun request(method: String, path: String, body: JsonObject?): V3Response = try {
     val full = "/sync/v3$path"
-    val res = if (method == "GET") api.get(full) else api.post(full, body ?: JsonObject(emptyMap()))
+    val text = body?.toString()
+    val packed = method == "POST" && path == "/push" && gzip && !refused && text != null && text.length >= V3Gzip.MIN_CHARS
+    val res = when {
+      method == "GET" -> api.get(full)
+      packed -> try {
+        api.postBytes(full, V3Gzip.pack(text!!), "application/json", mapOf("Content-Encoding" to "gzip"))
+      } catch (f: ApiFailure) {
+        //  پیش از هر اثری رد شد (بدنه باز نشد) ⇒ همان دم ساده، و از این پس ساده
+        if (f.status != 415 && !(f.status == 400 && f.code == "bad_json")) throw f
+        refused = true
+        api.post(full, body!!)
+      }
+      else -> api.post(full, body ?: JsonObject(emptyMap()))
+    }
+    if (method == "GET" && path.startsWith("/pull")) gzip = (res["gzip_push"] as? JsonPrimitive)?.content == "true"
     V3Response(200, res)
   } catch (f: ApiFailure) {
     //  status صفر یعنی اصلاً به سرور نرسید ⇒ همان «قطعِ شبکه»

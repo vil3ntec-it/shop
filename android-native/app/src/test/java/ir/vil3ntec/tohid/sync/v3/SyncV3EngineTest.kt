@@ -105,6 +105,10 @@ class SyncV3EngineTest {
     val refuse = HashSet<String>()
     /** v2 بی هیچ opِ v3 (فقط مانده یا نشانِ محلی) ⇒ `converted: []` بی شماره */
     var v2Empty = false
+    /** SYN-05/06: «جدول/ردیف/کار» ⇒ پاسخِ سرورِ واقعی برای op ای که همان ننشست (وضعیت + `current`، `lib/sync-v3-apply.js`) */
+    val answer = HashMap<String, Pair<String, JsonObject>>()
+    /** پیش از برگشتنِ پاسخِ push (کاربر وسطِ push ذخیره می‌کند) */
+    var during: (() -> Unit)? = null
 
     private fun meta(body: Map<String, JsonElement>): JsonObject = JsonObject(
       body + mapOf("server_time" to JsonPrimitive(time), "hlc" to JsonPrimitive("%015d:000000:server".format(time))),
@@ -127,6 +131,7 @@ class SyncV3EngineTest {
         path.startsWith("/conflicts") -> V3Response(200, meta(mapOf("conflicts" to JsonArray(conflicts))))
         else -> V3Response(404, null)
       }
+      if (path == "/push") during?.let { during = null; it() }
       if (path == "/push" && loseNext > 0) { loseNext--; throw IOException("پاسخ گم شد") }
       r
     }
@@ -178,7 +183,14 @@ class SyncV3EngineTest {
           id in refuse -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("rejected")); put("reason", JsonPrimitive("forbidden")) }
           i in bad -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("rejected")); put("reason", JsonPrimitive(bad.getValue(i))) }
           tx.isNotEmpty() && tx in badTx -> buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("rejected")); put("reason", JsonPrimitive("tx_rejected")) }
-          else -> { apply(device, o); buildJsonObject { put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive("applied")); put("server_seq", JsonPrimitive(seq)) } }
+          else -> {
+            val ans = answer["${str(o, "table")}/${str(o, "row_id")}/${str(o, "kind")}"]
+            if (ans == null || ans.first == "applied") apply(device, o) else { seq += 1; seen[id] = seq }
+            buildJsonObject {
+              put("op_id", JsonPrimitive(id)); put("status", JsonPrimitive(ans?.first ?: "applied")); put("server_seq", JsonPrimitive(seq))
+              if (ans != null) put("current", ans.second)
+            }
+          }
         }
       }
       return V3Response(200, meta(mapOf("results" to JsonArray(results), "head" to JsonPrimitive(seq))))
@@ -326,6 +338,45 @@ class SyncV3EngineTest {
     assertTrue(a.sync(first = false).ok)
     assertEquals(listOf(false, true), server.caps)
     assertEquals("", a.store.meta!!.legacyOpsUpTo)
+  }
+
+  /**
+   *  SYN-05/06: `current` ِ پاسخِ push روی دفتر و سایه (`V3Current`): قیمتِ بازندهٔ ساعتِ کج ⇒ قیمتِ سرور، `correctedAt` ِ
+   *  فاکتورِ خودِ دستگاه، و تغییرِ تازه‌ترِ همان کالا که وسطِ push در صف رفت دست نمی‌خورد. هیچ op ِ تازه‌ای ساخته نمی‌شود.
+   */
+  @Test fun serverCurrentLandsOnLedgerAndShadowButNeverOverAQueuedEdit() {
+    val server = FakeServer()
+    val a = Device("dev-cur", server, baseData)
+    assertTrue(a.sync().ok)
+    server.answer["products/p1/update"] = "conflict" to buildJsonObject {
+      put("deleted", JsonPrimitive(false)); put("data", buildJsonObject { put("salePriceMinor", JsonPrimitive(11550)) })
+    }
+    a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 130.0) }) }
+    assertTrue(a.sync(first = false).ok)
+    assertEquals("قیمتِ سرور روی دستگاهِ ساعت‌کج", 115.5, a.ledger.data.products.single().salePrice, 0.0)
+    assertEquals(0, a.engine.queued())
+    assertEquals("نشاندنِ current هیچ op ِ تازه‌ای نمی‌سازد", 0, a.engine.record(a.ledger.data))
+
+    server.answer["sales/s2/insert"] = "applied" to buildJsonObject {
+      put("deleted", JsonPrimitive(false)); put("data", buildJsonObject { put("correctedAt", JsonPrimitive(1_800_000_000_000L)) })
+    }
+    a.edit { d -> d.copy(sales = d.sales + Sale(id = "s2", total = 10.0, finalTotal = 10.0, paidAmount = 10.0, createdAt = 946_684_800_000L)) }
+    assertTrue(a.sync(first = false).ok)
+    val s2 = a.ledger.data.sales.single { it.id == "s2" }
+    assertEquals("تاریخِ تصحیح‌شدهٔ سرور روی فاکتورِ خودِ دستگاه", 1_800_000_000_000L, s2.correctedAt)
+    assertEquals(946_684_800_000L, s2.createdAt)
+    assertEquals(0, a.engine.record(a.ledger.data))
+
+    //  کاربر وسطِ push دوباره قیمت را عوض می‌کند: آن تغییر در صف است و زیرِ قیمتِ سرور نمی‌رود
+    server.during = { a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 150.0) }) }; assertEquals(1, a.engine.record(a.ledger.data)) }
+    a.edit { d -> d.copy(products = d.products.map { it.copy(salePrice = 140.0) }) }
+    assertEquals(1, a.engine.record(a.ledger.data))
+    assertTrue(runBlocking { a.engine.pushOnce() }.ok)
+    assertEquals("تغییرِ هنوز در صف دست نخورد", 150.0, a.ledger.data.products.single().salePrice, 0.0)
+    assertEquals(1, a.engine.queued())
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(115.5, a.ledger.data.products.single().salePrice, 0.0)
+    assertEquals(0, a.engine.record(a.ledger.data))
   }
 
   @Test fun firstUploadUsesFromLegacyAndOneTxThenSecondDeviceFromSnapshot() {
