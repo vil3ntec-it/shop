@@ -5,10 +5,17 @@
  * ⛔ یکی را بی دیگری و بی فایلِ مرجع عوض نکنید. صندوق با همین قاعده پیش‌سنجی می‌کند و سرور با همین داوری.
  *
  * خالص: بی دیتابیس. همهٔ مبلغ‌ها Minor (یک‌صدمِ افغانی) و مقدارها Milli، عددِ صحیح. شرحِ قاعده‌ها سرِ همان پروندهٔ Kotlin.
+ *
+ * تصمیمِ ۱-۱۱ (۱۴۰۵/۰۸/۱۹)، هر دو فقط با `enforcePrice` (پرچمِ `shop.price_cap`):
+ *   (۲) قلمِ آزاد (ردیفِ بی کارتِ کالا: `productId` خالی یا کالایی که این‌سو ندارد) ⇒ نیازِ `sales.free_line` با
+ *       `amount` = بیشترین قیمتِ واحدِ قلم‌های آزاد (Minor)؛ بی قلمِ آزاد ⇒ هیچ.
+ *   (۳) قیمتِ عمده فقط وقتی «قیمتِ فهرست» است که فاکتور لیستِ عمده دارد (`sale.wholesale` = مشتریِ فاکتور لیستِ پیش‌فرضِ
+ *       عمده دارد)؛ وگرنه فروش به قیمتِ عمده کاهشِ ردیف (تخفیفِ پنهان) است و همان سقفِ `sales.discount` را می‌خواهد.
  */
 
 const DISCOUNT = 'sales.discount';
 const PRICE = 'sales.price';
+const FREE_LINE = 'sales.free_line';
 const CREDIT = 'sales.credit';
 const PRICE_FLAG = 'shop.price_cap';
 const CREDIT_FLAG = 'shop.credit_cap';
@@ -44,13 +51,13 @@ function gross(unitMinor, qtyMilli) {
 
 function divHalfUp(a, b) { return Math.floor(a / b) + ((a % b) * 2 >= b ? 1 : 0); }
 
-/** قیمت‌های واحدِ فهرستِ کالا در روزِ `date`، صعودی و بی تکرار */
-function refUnits(p, date) {
+/** قیمت‌های واحدِ فهرستِ کالا در روزِ `date`، صعودی و بی تکرار؛ `wholesale` نادرست ⇒ قیمتِ عمده فهرست نیست (۱-۱۱ (۳)) */
+function refUnits(p, date, wholesale = true) {
   const windows = Array.isArray(p.windows) ? p.windows : [];
   const w = windows.find((x) => typeof date === 'string' && date !== '' && date >= x.from && date <= x.to);
   const base = w ? int(w.priceMinor) : int(p.saleMinor);
   const out = new Set([Math.max(0, base)]);
-  if (int(p.wholesaleMinor) > 0) out.add(int(p.wholesaleMinor));
+  if (wholesale !== false && int(p.wholesaleMinor) > 0) out.add(int(p.wholesaleMinor));
   for (const k of Array.isArray(p.packs) ? p.packs : []) {
     const size = int(k.sizeMilli);
     const price = int(k.priceMinor);
@@ -76,12 +83,12 @@ function bpCeil(a0, c0) {
 }
 
 /** `l` = {productId, unitMinor, qtyMilli, promoMinor}؛ `p` = قیمتِ کالا ({saleMinor, wholesaleMinor, windows, packs}) یا null */
-function line(l, p, date) {
+function line(l, p, date, wholesale = true) {
   if (!p || typeof l.productId !== 'string' || !l.productId.trim() || int(l.qtyMilli) <= 0 || int(l.unitMinor) < 0) return EXEMPT;
   try {
     const sold = gross(l.unitMinor, l.qtyMilli) + Math.max(0, int(l.promoMinor));
     let list = -1;
-    for (const r of refUnits(p, date)) {
+    for (const r of refUnits(p, date, wholesale)) {
       const g = gross(r, l.qtyMilli);
       if (list < 0 || dist(sold, g) < dist(sold, list)) list = g;
     }
@@ -136,35 +143,51 @@ function loyaltyShares(list, loyaltyMinor) {
   return s ? s.map((x) => x * 100) : zero;
 }
 
-function lines(list, refs, date, loyaltyMinor = 0) {
+const refOfLine = (refs, id) => (refs.get ? refs.get(id) : Object.prototype.hasOwnProperty.call(refs, id) ? refs[id] : undefined);
+
+/**
+ * قلمِ آزاد (۱-۱۱ (۲)): ردیفِ بی کارتِ کالا — `productId` ِ خالی، یا کالایی که در `refs` نیست — با مقدارِ مثبت و قیمتِ
+ * نامنفی. همان «بی‌سنجش» ِ `line` که حالا مجوزِ خودش را دارد.
+ */
+function isFree(l, refs) {
+  if (int(l.qtyMilli) <= 0 || int(l.unitMinor) < 0) return false;
+  const id = typeof l.productId === 'string' ? l.productId : '';
+  return !id.trim() || !refOfLine(refs, id);
+}
+
+function lines(list, refs, date, loyaltyMinor = 0, wholesale = true) {
   let dev = 0;
   let red = 0;
+  let free = -1;
   const shares = loyaltyShares(list, loyaltyMinor);
   for (const [i, l0] of list.entries()) {
     const l = shares[i] > 0 ? { ...l0, promoMinor: Math.max(0, int(l0.promoMinor)) + shares[i] } : l0;
-    const c = line(l, refs.get ? refs.get(l.productId) : refs[l.productId], date);
+    if (isFree(l0, refs)) free = Math.max(free, int(l0.unitMinor));
+    const c = line(l, refOfLine(refs, l.productId) || null, date, wholesale);
     if (c.deviationBp > dev) dev = c.deviationBp;
     red += c.reductionMinor;
   }
-  return { maxDeviationBp: dev, reductionMinor: red };
+  return { maxDeviationBp: dev, reductionMinor: red, freeUnitMaxMinor: free };
 }
 
 /** درصدِ تخفیف به صدمِ درصد — همان `perm-core.discountBp` (نیم افغانی بخشیده) */
 function discountBp(d, s) { return require('./perm-core').discountBp(d, s); }
 
 /**
- * نیازهای فاکتور به همان ترتیبِ Kotlin: تخفیف (با تخفیفِ پنهان اگر `enforcePrice`)، تغییرِ قیمت، قرض.
+ * نیازهای فاکتور به همان ترتیبِ Kotlin: تخفیف (با تخفیفِ پنهان اگر `enforcePrice`)، تغییرِ قیمت، قلمِ آزاد، قرض.
  * ⇒ [{perm, doc, pctBp, amount}] (`pctBp`/`amount` null وقتی نیست)
  */
 function needs(sale, list, refs, { enforcePrice = false, enforceCredit = false } = {}) {
   const doc = `sales/${sale.id}`;
   const out = [];
-  const sum = enforcePrice ? lines(list, refs, sale.date || '', sale.loyaltyMinor) : { maxDeviationBp: 0, reductionMinor: 0 };
+  const sum = enforcePrice ? lines(list, refs, sale.date || '', sale.loyaltyMinor, sale.wholesale === true)
+    : { maxDeviationBp: 0, reductionMinor: 0, freeUnitMaxMinor: -1 };
   const b = enforcePrice
     ? basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor)
     : { discountMinor: int(sale.discountMinor), baseMinor: int(sale.totalMinor) };
   if (b.discountMinor > 0) out.push({ perm: DISCOUNT, doc, pctBp: discountBp(b.discountMinor, b.baseMinor), amount: b.discountMinor });
   if (enforcePrice && sum.maxDeviationBp > 0) out.push({ perm: PRICE, doc, pctBp: sum.maxDeviationBp, amount: null });
+  if (enforcePrice && sum.freeUnitMaxMinor >= 0) out.push({ perm: FREE_LINE, doc, pctBp: null, amount: sum.freeUnitMaxMinor });
   if (enforceCredit) {
     const a = creditAmount(sale.debtGivenMinor, sale.priorDebtMinor);
     if (a > 0) out.push({ perm: CREDIT, doc, pctBp: null, amount: a });
@@ -209,19 +232,28 @@ function lineOf(f, { legacy = false } = {}) {
   };
 }
 
-/** سرِ فاکتور ⇒ فاکتورِ هسته؛ تاریخ = `date` ِ فاکتور (روزِ دستگاه، همان بازهٔ قیمتِ صندوق) */
-function saleOf(id, f, { legacy = false, priorDebtMinor = 0, loyaltyMinor = 0 } = {}) {
+/**
+ * سرِ فاکتور ⇒ فاکتورِ هسته؛ تاریخ = `date` ِ فاکتور (روزِ دستگاه، همان بازهٔ قیمتِ صندوق). `wholesale` = لیستِ فاکتور عمده
+ * است (مشتریِ فاکتور روی **همین سرور** لیستِ پیش‌فرضِ عمده دارد — `priceListOf`)؛ ادعای صندوق پذیرفته نمی‌شود.
+ */
+function saleOf(id, f, { legacy = false, priorDebtMinor = 0, loyaltyMinor = 0, wholesale = false } = {}) {
   const m = (k) => (legacy ? int(Number(f[k]) * 100) : int(f[`${k}Minor`]));
   const fin = legacy ? f.finalTotal : f.finalTotalMinor;
   return {
     id, totalMinor: m('total'), discountMinor: m('discount'),
     finalTotalMinor: fin === undefined || fin === null || !Number.isFinite(Number(fin)) ? null : m('finalTotal'),
     roundingMinor: int(f.roundingMinor), debtGivenMinor: m('debtGiven'),
-    date: typeof f.date === 'string' ? f.date : '', priorDebtMinor, loyaltyMinor,
+    date: typeof f.date === 'string' ? f.date : '', priorDebtMinor, loyaltyMinor, wholesale: wholesale === true,
   };
 }
 
+/** لیستِ قیمتِ پیش‌فرضِ مشتری (`Debtor.priceList`، همان `PriceList.of`): فقط «wholesale» عمده است، بقیه خرده */
+function isWholesaleDebtor(data) {
+  return isObj(data) && typeof data.priceList === 'string' && data.priceList.trim() === 'wholesale';
+}
+
 module.exports = {
-  VERSION: 1, DISCOUNT, PRICE, CREDIT, PRICE_FLAG, CREDIT_FLAG, ROUND_MAX_MINOR, TOL_MINOR, FULL_BP,
-  creditAmount, gross, refUnits, line, basis, split, loyaltyShares, lines, needs, req, refOf, lineOf, saleOf, LOYALTY_SPEND: 'loyalty_spend',
+  VERSION: 1, DISCOUNT, PRICE, FREE_LINE, CREDIT, PRICE_FLAG, CREDIT_FLAG, ROUND_MAX_MINOR, TOL_MINOR, FULL_BP,
+  creditAmount, gross, refUnits, line, basis, split, loyaltyShares, isFree, lines, needs, req, refOf, lineOf, saleOf, isWholesaleDebtor,
+  LOYALTY_SPEND: 'loyalty_spend',
 };

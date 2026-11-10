@@ -22,6 +22,9 @@ const { stripControl } = require('./validate');
 const { toMilli } = require('./sync-v3-convert');
 
 const FLAG_KEY = 'market.product_details';
+//  تصمیمِ ۳-۲۲ (۱۴۰۵/۰۸/۱۹): «همین کالا در دکان‌های دیگر» اول فقط در بازارچه، نه در ویترینِ خودِ دکان — روی برگهٔ کالای ویترین
+//  فقط با این پرچمِ جدا (scope `all`، ⛔ پیش‌فرض خاموش) و `market.product_details` (`sameElsewhere` ِ نما، `store/product.js`)
+const SAME_IN_STORE_KEY = 'market.same_in_store';
 const BANK_ID_RE = /^[A-Za-z0-9_-]{1,40}$/;
 const MAX_MAP = 60;
 
@@ -35,8 +38,8 @@ const decode = (v) => {
 const obj = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 const pairKey = (shopId, id) => `${shopId}\u0000${id}`;
 
-async function on() {
-  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [FLAG_KEY]);
+async function on(key = FLAG_KEY) {
+  const r = await one("SELECT value FROM live_config WHERE key = $1 AND scope = 'all'", [key]);
   if (!r) return false;
   try { return JSON.parse(r.value) === true; } catch { return false; }
 }
@@ -131,7 +134,11 @@ async function load(pairs) {
 async function attach(shopId, items) {
   if (!items.length || !(await on())) return items;
   const by = await load(items.map((p) => ({ shopId, id: p.id })));
-  for (const p of items) Object.assign(p, by.get(pairKey(shopId, p.id)) || {});
+  const same = await on(SAME_IN_STORE_KEY);
+  for (const p of items) {
+    Object.assign(p, by.get(pairKey(shopId, p.id)) || {});
+    if (same && p.bankProductId) p.sameElsewhere = true;
+  }
   return items;
 }
 
@@ -153,6 +160,6 @@ function parseCategoryMap(raw, current, keys, badRequest) {
 }
 
 module.exports = {
-  FLAG_KEY, BANK_ID_RE, JOINS, COLS,
+  FLAG_KEY, SAME_IN_STORE_KEY, BANK_ID_RE, JOINS, COLS,
   on, barcodeOf, detailsOf, load, attach, globalCategoryOf, mapOf, parseCategoryMap, pairKey,
 };

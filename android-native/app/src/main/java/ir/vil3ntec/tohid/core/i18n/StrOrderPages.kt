@@ -124,6 +124,19 @@ object StrOrderPages {
     "$cut is taken off the order's $orig (item not found or short) — till and courier cash use this new total.",
     "د فرمایش له $orig څخه $cut کمېږي (نه موندل شوی یا کم توکی) — د صندوق او سپارونکي نغدې همدا نوې ټولګه ده.",
   )
+  //  تصمیمِ ۱-۶ ب: سفارشِ پرداخت‌شده با کسر — دکان پول را خودش پس می‌دهد و «پس داده شد» می‌زند؛ سرور ثبت می‌کند
+  val pickRefundNote: String get() = t(
+    "این سفارش پرداخت شده است. مبلغِ کم‌شده را خودتان به مشتری پس بدهید، بعد یکی را بزنید؛ مبلغ را سرور حساب و ثبت می‌کند.",
+    "This order is paid. Give the customer back the amount taken off yourself, then tap one; the server works out and records the amount.",
+    "دا فرمایش تادیه شوی دی. کمه شوې پیسې پخپله پېرودونکي ته بېرته ورکړئ، بیا یو یې ووهئ؛ مبلغ سرور حسابوي او ثبتوي.",
+  )
+  val pickRefundCash: String get() = t("نقد پس دادم", "Paid back in cash", "نغدې مې بېرته ورکړې")
+  val pickRefundHesab: String get() = t("با حساب‌پی پس دادم", "Paid back by HesabPay", "په حساب‌پې مې بېرته ورکړې")
+  val pickRefundDone: String get() = t(
+    "بسته‌بندی شد و بازپرداخت ثبت شد؛ برچسبِ کیسه‌ها پایین است",
+    "Packed and the refund was recorded; bag labels are below",
+    "بسته بندي شو او بېرته ورکړه ثبت شوه؛ د کڅوړو لیبلونه لاندې دي",
+  )
   val pickBags: String get() = t("کیسه‌ها", "Bags", "کڅوړې")
   fun pickLeft(n: Any?): String = t("${asIs(n)} قلم مانده", "$n lines left", "$n توکي پاتې")
   val pickPackedDone: String get() = t("بسته‌بندی شد", "Packed", "بسته بندي شو")

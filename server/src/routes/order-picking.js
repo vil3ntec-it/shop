@@ -170,7 +170,9 @@ router.post('/:id/pick/pack', needOrders, manage, needWrite, needPick, async (re
     orderNo: out.sheet.orderNo, bags: out.sheet.bags, totalMinor: out.sheet.totals.totalMinor,
     originalTotalMinor: out.sheet.totals.originalTotalMinor, deductedMinor: out.deductedMinor,
   });
-  res.json({ pick: out.sheet, replayed: false });
+  //  تصمیمِ ۱-۶ ب: «پس داده شد» ِ دستیِ کسرِ سفارشِ پرداخت‌شده (‎lib/order-pack-refund.js‎) — در سابقهٔ عملیات هم
+  if (out.refund) await log(req, 'order.manual_refund', out.sheet.orderId, { orderNo: out.sheet.orderNo, ...out.refund });
+  res.json({ pick: out.sheet, replayed: false, ...(out.refund ? { refund: out.refund } : {}) });
 });
 
 // ── قفسهٔ انتظار (PCK-10) و جمع‌آوریِ گروهی (PCK-12) ─────────────────

@@ -226,6 +226,8 @@ object StrAccount {
   val permCredit: String get() = t("فروشِ قرضی (به حساب)", "Selling on credit", "په پور پلورل")
   //  STF-03: سقفِ تغییرِ قیمتِ ردیف (درصد از قیمتِ فهرست؛ سرور با پرچمِ `shop.price_cap` می‌سنجد)
   val permPrice: String get() = t("تغییرِ قیمتِ ردیف", "Changing a line price", "د کرښې د بیې بدلول")
+  //  POS-10 (تصمیمِ ۱-۱۱ (۲)): قلمِ آزاد — سقف روی قیمتِ واحد (سرور با همان پرچمِ `shop.price_cap` می‌سنجد)
+  val permFreeLine: String get() = t("قلمِ آزاد (بی کارتِ کالا)", "Custom item (no product card)", "آزاد توکی (بې د توکي کارته)")
   //  CRM-03 (§۱۰.۱): تغییرِ سقفِ اعتبارِ مشتری (سرور با پرچمِ `shop.credit_limit_perm` می‌سنجد؛ برگهٔ مشتری `CreditLimitGate`)
   val permCreditLimit: String get() = t("تغییرِ سقفِ اعتبارِ مشتری", "Changing a customer's credit limit", "د پېرودونکي د پور حد بدلول")
 

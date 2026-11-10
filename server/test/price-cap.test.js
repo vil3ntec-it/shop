@@ -6,8 +6,11 @@
  * سنجه‌ها: پرچمِ خاموش همان امروز (سقف ذخیره نمی‌شود، قیمتِ دستی و «جمعِ نهایی» ِ کم می‌نشیند)؛ با پرچمِ روشن در Sync v3
  * کاهشِ قیمتِ ردیف و شکافِ جمعِ نهایی تخفیف‌اند (شاگردِ بی تخفیف ⇒ `discount_not_allowed`، مدیرِ سقف‌دار ⇒ تأیید)، تغییرِ
  * قیمتِ بیش از `maxPct` ⇒ `approval_required` یا `price_not_allowed`، «درخواستِ تأیید» در `priceApproval` یک‌بارمصرف؛ همهٔ
- * قلم‌ها با سرشان برمی‌گردند؛ قلمِ دیرآمده جمعِ تازه را می‌سنجد؛ قیمتِ فهرست/عمده/تخفیفِ خودکار آزاد؛ REST ۴۰۳؛ صاحب هرگز؛
+ * قلم‌ها با سرشان برمی‌گردند؛ قلمِ دیرآمده جمعِ تازه را می‌سنجد؛ قیمتِ فهرست/تخفیفِ خودکار آزاد؛ REST ۴۰۳؛ صاحب هرگز؛
  * دکانِ دیگر پرچم را نمی‌بیند.
+ * تصمیمِ ۱-۱۱ (۱۴۰۵/۰۸/۱۹): قیمتِ عمده فقط برای مشتریِ لیستِ عمده (ردیفِ مشتریِ همین سرور) «فهرست» است — وگرنه تخفیفِ پنهان
+ * (ادعای `priceList` ِ فاکتور پذیرفته نیست)؛ قلمِ آزاد (بی کارت یا کالای ناشناخته) مجوزِ `sales.free_line` با سقفِ قیمتِ واحد،
+ * «با تأیید» (`freeLineApproval`) یا «ممنوع» دارد — v3، قلمِ دیرآمده و REST؛ پرچمِ خاموش ⇒ ذخیرهٔ مجوز `not_enforceable_yet`.
  */
 process.env.SYNC_V3_ENABLED = '1';
 
@@ -138,13 +141,14 @@ test('پرچمِ روشن، v3: کاهشِ قیمتِ ردیف و شکافِ ج�
   assert.equal(page.body.shop.catalog.find((c) => c.key === 'sales.price').edit, 'restrict');
   assert.ok(page.body.policy.editable.includes('sales.price'));
 
-  //  همان قیمتِ فهرست، قیمتِ بالاتر (بی لایه = همان امروز)، قیمتِ عمده و تخفیفِ خودکار آزادند
+  //  همان قیمتِ فهرست، قیمتِ بالاتر (بی لایه = همان امروز) و تخفیفِ خودکار آزادند
   assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-ok', [['pc-rice', 100049, 2000], ['pc-oil', 80000, 1000]]))), ['applied', 'applied', 'applied']);
-  assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-whole', [['pc-rice', 80000, 1000]]))), ['applied', 'applied']);
+  //  تصمیمِ ۱-۱۱ (۳): فاکتورِ بی مشتریِ عمده به قیمتِ عمده = کاهش از خرده (تخفیفِ پنهان) — پیش از تصمیم «آزاد» بود
+  assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-whole', [['pc-rice', 80000, 1000]]))), ['discount_not_allowed', 'tx_rejected']);
   assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-promo', [['pc-rice', 90000, 1000, { listPriceMinor: 100000, promo: [{ id: 'r1', rev: 1, name: 'ده', discountMinor: 10000 }] }]]))), ['applied', 'applied']);
 
-  //  میانِ عمده و خرده ⇒ «بالاتر از عمده» (تغییرِ قیمت، نه تخفیف؛ بی لایه آزاد) — عمده را صاحب گذاشته
-  assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-mid', [['pc-rice', 90000, 1000]]))), ['applied', 'applied']);
+  //  میانِ عمده و خرده، بی مشتریِ عمده ⇒ از خرده پایین (تخفیفِ پنهان؛ تصمیمِ ۱-۱۱ (۳)) — با مشتریِ عمده: آزمونِ «۱-۱۱ (۳)» پایین
+  assert.deepEqual(why(await push3(staff, 'p3', sale3('pc-mid', [['pc-rice', 90000, 1000]]))), ['discount_not_allowed', 'tx_rejected']);
   //  مصرفِ امتیازِ مشتری (PRM-13) قیمتِ ردیف‌ها را پایین می‌آورد؛ ردیفِ `loyalty_spend` ِ همان ثبت آن را برمی‌گرداند
   const spent = sale3('pc-loyal', [['pc-oil', 45000, 1000], ['pc-oil', 45000, 1000]]);
   spent.push({ op_id: oid(), hlc: H('pos'), table: 'auditLog', row_id: 'pc-loyal-lp-s', kind: 'insert', tx: spent[0].tx,
@@ -208,6 +212,87 @@ test('پرچمِ روشن، v3: تغییرِ قیمتِ بیش از maxPct ⇒ a
   assert.deepEqual(why(await push3(staff, 'pp', denied)), ['price_not_allowed', 'tx_rejected']);
   assert.equal((await boxOf(denied[0].op_id)).kind, 'perm_denied');
   assert.deepEqual(why(await push3(staff, 'pp', sale3('pc-list', [['pc-oil', 50000, 1000]]))), ['applied', 'applied']);
+  assert.equal((await setRole('staff', {})).status, 200);
+});
+
+test('تصمیمِ ۱-۱۱ (۳)، v3: قیمتِ عمده فقط برای مشتریِ لیستِ عمدهٔ همین سرور «فهرست» است؛ ادعای فاکتور نه', async () => {
+  const debtor = (id, priceList) => ({ op_id: oid(), hlc: H('own'), table: 'debtors', row_id: id, kind: 'insert',
+    fields: { name: id, phone: '', ...(priceList ? { priceList } : {}) } });
+  assert.deepEqual(why(await push3(owner, 'own', [debtor('pc-wcust', 'wholesale'), debtor('pc-rcust', null)])), ['applied', 'applied']);
+  //  مشتریِ عمده: قیمتِ عمده و «بالاتر از عمده» (تغییرِ قیمت، بی لایه آزاد) می‌نشینند
+  assert.deepEqual(why(await push3(staff, 'w3', sale3('pc-w-ok', [['pc-rice', 80000, 1000]], { debtorId: 'pc-wcust' }))), ['applied', 'applied']);
+  assert.deepEqual(why(await push3(staff, 'w3', sale3('pc-w-mid', [['pc-rice', 90000, 1000]], { debtorId: 'pc-wcust' }))), ['applied', 'applied']);
+  //  مشتریِ خرده، مشتریِ ناشناخته، یا فقط ادعای «لیستِ عمده» در سرِ فاکتور ⇒ تخفیفِ پنهان
+  for (const [id, head] of [['pc-w-r', { debtorId: 'pc-rcust' }], ['pc-w-x', { debtorId: 'pc-nobody' }], ['pc-w-c', { priceList: 'wholesale' }]]) {
+    const ops = sale3(id, [['pc-rice', 80000, 1000]], head);
+    assert.deepEqual(why(await push3(staff, 'w3', ops)), ['discount_not_allowed', 'tx_rejected'], id);
+    assert.deepEqual([(await boxOf(ops[0].op_id)).detail.perm, (await boxOf(ops[0].op_id)).detail.amount], ['sales.discount', 20000], id);
+  }
+  //  مدیرِ با تخفیفِ آزاد («کسی که اجازه‌اش را دارد») همان لیست را برای مشتریِ خرده برمی‌گزیند
+  assert.deepEqual(why(await push3(manager, 'w3m', sale3('pc-w-m', [['pc-rice', 80000, 1000]], { debtorId: 'pc-rcust' }))), ['applied', 'applied']);
+  //  راهِ قدیم: مشتریِ عمدهٔ همین دسته یا ردیفِ نشستهٔ راهِ قدیم (کالای راهِ قدیم با عمدهٔ ۸۰۰)
+  const p = await h.post('/api/products', { id: 'pc-lrice', name: 'pc-lrice', salePrice: 1000, wholesalePrice: 800 }, { token: owner.accessToken });
+  assert.ok([200, 201].includes(p.status), JSON.stringify(p.body));
+  const t = Date.now();
+  const legacy = (changes) => h.api('POST', '/api/sync/push', { token: staff.accessToken, headers: { 'X-App': 'shop' }, body: { deviceId: 'web-w', changes } });
+  const head = (id, debtorId) => ({ collection: 'sales', id, updatedAt: t,
+    data: { total: 800, discount: 0, finalTotal: 800, status: 'completed', date: '2026-11-08', ...(debtorId ? { debtorId } : {}) } });
+  const item = (sid) => ({ collection: 'saleItems', id: `${sid}-i`, updatedAt: t, data: { saleId: sid, productId: 'pc-lrice', quantity: 1, unitPrice: 800 } });
+  const lw = await legacy([{ collection: 'debtors', id: 'pc-lw', updatedAt: t, data: { name: 'عمده‌فروش', priceList: 'wholesale' } }, head('pc-l-w', 'pc-lw'), item('pc-l-w')]);
+  assert.equal(lw.status, 200, JSON.stringify(lw.body));
+  const lr = await legacy([head('pc-l-r'), item('pc-l-r')]);
+  assert.equal(lr.status, 403, JSON.stringify(lr.body));
+  assert.equal(lr.body.error.code, 'discount_not_allowed');
+  const again = await legacy([head('pc-l-w2', 'pc-lw'), item('pc-l-w2')]);
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+});
+
+test('تصمیمِ ۱-۱۱ (۲): قلمِ آزاد مجوزِ sales.free_line دارد — سقفِ قیمتِ واحد، «با تأیید» (freeLineApproval)، «ممنوع»؛ دکانِ بی پرچم نه', async () => {
+  //  دکانِ «ب» (پرچم خاموش): مجوز ذخیره نمی‌شود و قلمِ آزاد همان امروز
+  const off = await setRole('staff', { 'sales.free_line': { mode: 'deny' } }, ownerB);
+  assert.deepEqual([off.status, off.body.error?.code], [400, 'not_enforceable_yet']);
+  assert.deepEqual(why(await push3(staffB, 'fb', sale3('pc-f-b', [['', 999900, 1000, { name: 'آزاد' }]]))), ['applied', 'applied']);
+  //  همین دکان (پرچم روشن): بی لایه همان امروز
+  const page = await h.get('/api/shop/permissions', { token: owner.accessToken });
+  assert.equal(page.body.shop.catalog.find((c) => c.key === 'sales.free_line').edit, 'restrict');
+  assert.deepEqual(why(await push3(staff, 'f3', sale3('pc-f-0', [['pc-rice', 100000, 1000], ['', 700000, 2000, { name: 'آزاد' }]]))), ['applied', 'applied', 'applied']);
+  //  سقفِ قیمتِ واحد ۵۰ افغانی: تا سقف آزاد، بیشتر ⇒ تأیید (مبلغ = بیشترین قیمتِ واحد، نه جمع)
+  assert.equal((await setRole('staff', { 'sales.free_line': { caps: { maxAmount: 5000 } } })).status, 200);
+  assert.deepEqual(why(await push3(staff, 'f3', sale3('pc-f-1', [['', 5000, 9000, { name: 'آزاد' }]]))), ['applied', 'applied']);
+  const over = sale3('pc-f-2', [['', 3000, 1000, { name: 'آ' }], ['', 6000, 1000, { name: 'ب' }]]);
+  assert.deepEqual(why(await push3(staff, 'f3', over)), ['approval_required', 'tx_rejected', 'tx_rejected']);
+  const box = await boxOf(over[0].op_id);
+  assert.deepEqual([box.detail.perm, box.detail.amount, box.detail.cap, box.detail.limit], ['sales.free_line', 6000, 'maxAmount', 5000]);
+  //  کالای ناشناختهٔ سرور هم قلمِ آزاد است
+  assert.deepEqual(why(await push3(staff, 'f3', sale3('pc-f-g', [['pc-ghost', 9000, 1000]]))), ['approval_required', 'tx_rejected']);
+  const reqId = await approved('sales.free_line', 'sales/pc-f-2', { amount: 6000 });
+  const ok = sale3('pc-f-2', [['', 3000, 1000, { name: 'آ' }], ['', 6000, 1000, { name: 'ب' }]], {}, { freeLineApproval: { v: 1, request: reqId } });
+  assert.deepEqual(why(await push3(staff, 'f3', ok)), ['applied', 'applied', 'applied']);
+  const used = await one(`SELECT perm, doc, amount FROM shop_approvals WHERE shop_id=$1 AND nonce=$2`, [shopId, `req_${reqId}`]);
+  assert.deepEqual({ ...used, amount: Number(used.amount) }, { perm: 'sales.free_line', doc: 'sales/pc-f-2', amount: 6000 });
+  //  برگهٔ قیمت جای برگهٔ قلمِ آزاد را نمی‌گیرد (قیمت هم سقف‌دار تا درخواستش معنا داشته باشد)
+  assert.equal((await setRole('staff', { 'sales.free_line': { caps: { maxAmount: 5000 } }, 'sales.price': { caps: { maxPct: 5 } } })).status, 200);
+  const priceReq = await approved('sales.price', 'sales/pc-f-3', { pctBp: 1000 });
+  assert.deepEqual(why(await push3(staff, 'f3', sale3('pc-f-3', [['', 6000, 1000]], {}, { priceApproval: { v: 1, request: priceReq } }))), ['approval_required', 'tx_rejected']);
+  //  «ممنوع»: حتی رایگان؛ قلمِ دیرآمده هم؛ صاحب هرگز
+  assert.equal((await setRole('staff', { 'sales.free_line': { mode: 'deny' } })).status, 200);
+  const denied = sale3('pc-f-d', [['', 0, 1000, { name: 'هدیه' }]]);
+  assert.deepEqual(why(await push3(staff, 'f3', denied)), ['free_line_not_allowed', 'tx_rejected']);
+  assert.equal((await boxOf(denied[0].op_id)).kind, 'perm_denied');
+  const [h0, l0] = sale3('pc-f-late', [['pc-oil', 50000, 1000]]);
+  delete h0.tx; delete l0.tx;
+  assert.deepEqual(why(await push3(staff, 'fl', [h0, l0])), ['applied', 'applied']);
+  const late = { ...l0, op_id: oid(), hlc: H('pos'), row_id: 'pc-f-late-i9', fields: { ...l0.fields, productId: '', name: 'آزاد', unitPriceMinor: 1000 } };
+  assert.deepEqual(why(await push3(staff, 'fl', [late])), ['free_line_not_allowed']);
+  assert.equal(await row3('saleItems', 'pc-f-late-i9'), null);
+  assert.deepEqual(why(await push3(owner, 'fo', sale3('pc-f-own', [['', 999900, 1000]]))), ['applied', 'applied']);
+  //  REST/راهِ قدیم
+  const rest = await h.post('/api/sales/full', {
+    sale: { id: 'pc-f-r', total: 10, discount: 0, finalTotal: 10, status: 'completed', date: '2026-11-08' },
+    items: [{ id: 'pc-f-r-i', productId: '', name: 'آزاد', quantity: 1, unitPrice: 10 }],
+  }, { token: staff.accessToken });
+  assert.equal(rest.status, 403, JSON.stringify(rest.body));
+  assert.equal(rest.body.error.code, 'free_line_not_allowed');
   assert.equal((await setRole('staff', {})).status, 200);
 });
 

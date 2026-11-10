@@ -54,6 +54,23 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-yes-1` («همه بله» ِ صاحب‌کار به ۱۹ بندِ `OWNER-PENDING`؛ روی دستهٔ ۴۵ + `claude/owner-decisions-4`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱-۱۱) مجوزِ هسته‌ایِ `sales.free_line` (perm-core JS×۲ و Kotlin، perm-v1، approval-core×۲، `RemoteApproval`، staff-perms FLAGGED)
+  و قاعدهٔ «قلمِ آزاد» + «عمده فقط برای مشتریِ لیستِ عمده» در `sale-caps.js` = `SaleCaps.kt` (بردارِ تازهٔ sale-caps-v1)، داوریِ
+  `price-cap.js` (v3، قلمِ دیرآمده، REST؛ برگهٔ `freeLineApproval`)، پیش‌سنجیِ `SaleCapGate`، فیلدِ `Sale.freeLineApproval` (+ بردارهای
+  ledger-sync و resend-dropped با هشِ کاتلین بازسازی‌شده، core-fuzz نو)؛ (۱-۶) `lib/order-pack-refund.js` پشتِ `shop.orders.manual_refund`
+  + دکمه‌های `PickSheet` و حساب‌پیِ دستی در تسویهٔ ویرایش؛ (۱-۱) پیش‌فرضِ سقفِ پیامک ۸۰ + ۲۰ = ۱۰۰؛ (۳-۲۲) «گزارشِ تازه» پیش‌فرض
+  روشن (وب و برنامه، خاموشِ کاربر می‌ماند) و `market.same_in_store`؛ (۴-۲۵ (۳)) `compose.desktop.uiTestJUnit4` + `PromoLinesUiTest`.
+  سند: OWNER-PENDING ۹۰ ⇐ ۷۱ (شماره‌ها پیوسته)، OWNER-DECISIONS «گرفته‌شده — ۱۴۰۵/۰۸/۱۹»، `spec/OWNER-ACTIONS-fa.md` §۸ (کلیک‌ها و سه
+  حساب)، FLAGS-ON §۱۵–۱۷، STATUS (۱۲ ردیف؛ POS-02 ⇐ IMPLEMENTED-VERIFIED)، RULES، WHATS-NEW. آزمون‌ها: price-cap ۱۰/۱۰، order-picking
+  ۱۵/۱۵، order-amend-paid ۴/۴، sale-caps ۷/۷، sms-daily-cap، core-fuzz، sync-resend-dropped و ledger-coverage روی PGlite و PostgreSQL ۱۶؛
+  `web-report-fresh.mjs`، `web-store-same.mjs` و `web-pos-qty.mjs` با axe سبز؛ تازه‌ها پیش از کد سرخ.
+- نیمه‌کاره: همهٔ Kotlin فقط CI (`SaleCapsVectorsTest`، `SaleCapGateTest`، `ReportFreshDefaultTest`، `PromoLinesUiTest` و وابستگیِ
+  آزمونِ Compose، `LedgerSyncCoverageTest`/`DroppedResendTest` با بردارِ دستی‌ساز)؛ همهٔ کلیدها خاموش‌اند تا صاحب‌کار در پنل بزند.
+  تسویهٔ ویرایش در برنامه هنوز فقط «نقد» می‌فرستد (سرور حساب‌پیِ دستی را می‌پذیرد). Sync v1 قلمِ آزاد را نمی‌سنجد (همان سقفِ قیمت).
+- قدمِ بعدی: CI ِ سبز (اگر `compose.desktop.uiTestJUnit4` در CI حل نشد، همان خط و آزمون را بردارید و در PR بگویید)؛ پس از
+  کلیک‌های §۸ ِ OWNER-ACTIONS هر ردیف را با شاهدِ دکانِ آزمایشی بالا ببرید.
+
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/syn-3` (ردیف‌های P0 ِ SYN-04/05/06: پاسخِ push ِ v3 روی خودِ دستگاه و push ِ فشردهٔ v3؛ روی main ‏cceb5930 = دستهٔ ۴۳ (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) SYN-05/06: سرور `current` را برای درجِ سندِ ساعت‌کج (`correctedAt`) و برای «تکراری» ِ پاسخِ گم‌شده هم می‌دهد
   (`lib/sync-v3-apply.js`، `amendOf` ِ `lib/sync-v3-time.js`)؛ وب `currentFixes` و کاتلین `V3Current` آن را پیش از بیرون رفتنِ ورودی از صف

@@ -456,7 +456,8 @@ fun DeskSaleScreen(
     val slips = buildMap { approval?.let { put(ir.vil3ntec.tohid.core.perm.SaleCaps.DISCOUNT, it) }; putAll(capSlips) }
     val sale = checkout.copy(settlement = st, approval = signed ?: if (capRules.price) approval?.let(DiscountGate::json) else null, creditGate = creditGateOn, creditApproval = creditApproval)
       .copy(creditCapSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.CREDIT),
-        priceSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.PRICE))
+        priceSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.PRICE),
+        freeLineSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.FREE_LINE))
     //  CRM-03 / S07: بی تأییدِ مدیر هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
     val over = SalesEngine.creditOver(d, loyal, sale)
     if (over != null && ir.vil3ntec.tohid.core.credit.CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval) ==

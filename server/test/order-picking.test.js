@@ -416,6 +416,69 @@ test('PCK-07 (پول): سفارشِ پرداخت‌شده با کسر ⇒ ۴۰۹
   assert.deepEqual(rep.checks.filter((c) => c.count > 0).map((c) => c.id), [], 'verify-data بی خطا');
 });
 
+test('تصمیمِ ۱-۶ ب: کسرِ سفارشِ پرداخت‌شده با «پس داده شد» ِ دستی (نقد یا حساب‌پی) پشتِ shop.orders.manual_refund؛ سرور ثبت می‌کند', async () => {
+  const o = await pickShop('بازپرداختِ دستی');
+  const staff = await member(o.shopId, 'staff', 'شاگردِ بسته‌بندی');
+  const picked = async () => {
+    const order = await paidOrder(o);
+    await start(o, order.id);
+    const r = await send(o, order.id, [ev(1, 'not_found'), ev(2, 'pick', { qtyMilli: 1000 })]);
+    assert.ok(r.body.results.every((x) => x.status === 'accepted'), JSON.stringify(r.body.results));
+    return order;
+  };
+  //  پرچمِ خاموش: درخواستِ «پس داده شد» همان ۴۰۹ ِ امروز است و برنامه دکمه را نمی‌بیند
+  const a = await picked();
+  const off = await pack(o, a.id, { bags: 1, refund: { method: 'cash' } });
+  assert.equal(off.status, 409, JSON.stringify(off.body));
+  assert.deepEqual([off.body.error.code, off.body.error.manualRefund], ['paid_needs_refund', false]);
+  await setFlag(o.shopId, 'shop.orders.manual_refund', true);
+  //  پرچمِ روشن: بی «پس داده شد» هنوز ۴۰۹ (با نشانِ دکمه)، روشِ ناجور ۴۰۰، جمع‌آورِ بی `orders.refund` ۴۰۳
+  const plain = await pack(o, a.id, { bags: 1 });
+  assert.deepEqual([plain.status, plain.body.error.code, plain.body.error.manualRefund], [409, 'paid_needs_refund', true]);
+  const bad = await pack(o, a.id, { bags: 1, refund: { method: 'card' } });
+  assert.deepEqual([bad.status, bad.body.error.code], [400, 'bad_refund']);
+  const byStaff = await h.post(`/api/shop/orders/${a.id}/pick/pack`, { bags: 1, refund: { method: 'cash' } },
+    { token: staff.token, headers: { 'Idempotency-Key': key('pack') } });
+  assert.deepEqual([byStaff.status, byStaff.body.error.code], [403, 'permission_denied']);
+  const staffView = await h.post(`/api/shop/orders/${a.id}/pick/pack`, { bags: 1 }, { token: staff.token, headers: { 'Idempotency-Key': key('pack') } });
+  assert.equal(staffView.body.error.manualRefund, false, 'جمع‌آورِ بی مجوز دکمه را نمی‌بیند');
+  assert.deepEqual(await moneyOf(a.id), { status: 'picking', total: 65000, lines: 2, refunds: 0, notes: 0 }, 'هیچ چیز عوض نشد');
+  //  صاحب «نقد پس دادم» ⇒ بسته می‌شود؛ مبلغ را سرور می‌سازد (۶۵۰ − ۵۰ = ۶۰۰)، نه برنامه
+  const k = key('pack');
+  const ok = await pack(o, a.id, { bags: 1, refund: { method: 'cash', note: 'به دستِ خودش', amountMinor: 1 } }, k);
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.deepEqual(ok.body.refund, { amountMinor: 60000, method: 'cash' });
+  const row = await one('SELECT status, payment_status, total_minor::int AS total FROM online_orders WHERE id=$1', [a.id]);
+  assert.deepEqual(row, { status: 'packed', payment_status: 'partially_refunded', total: 5000 });
+  const evs = await many("SELECT from_status, to_status, note, detail FROM online_order_events WHERE order_id=$1 AND kind='payment'", [a.id]);
+  assert.equal(evs.length, 1);
+  assert.deepEqual([evs[0].from_status, evs[0].to_status, evs[0].note], ['paid', 'partially_refunded', 'به دستِ خودش']);
+  const d = typeof evs[0].detail === 'string' ? JSON.parse(evs[0].detail) : evs[0].detail;
+  assert.deepEqual(d.manualRefund, { amountMinor: 60000, method: 'cash', paidMinor: 65000, totalMinor: 5000, key: k });
+  const log = await many("SELECT detail FROM audit_logs WHERE action='order.manual_refund' AND target_id=$1", [a.id]);
+  assert.equal(log.length, 1, 'سابقهٔ عملیات');
+  //  تکرارِ همان کلید ⇒ همان برگه، بی ثبتِ دوم
+  const again = await pack(o, a.id, { bags: 1, refund: { method: 'cash', note: 'به دستِ خودش', amountMinor: 1 } }, k);
+  assert.equal(again.status, 200, JSON.stringify(again.body));
+  assert.equal(again.body.replayed, true);
+  assert.equal((await many("SELECT 1 FROM online_order_events WHERE order_id=$1 AND kind='payment'", [a.id])).length, 1);
+  //  حساب‌پیِ دستی هم
+  const b = await picked();
+  const hp = await pack(o, b.id, { bags: 1, refund: { method: 'hesabpay' } });
+  assert.equal(hp.status, 200, JSON.stringify(hp.body));
+  assert.deepEqual(hp.body.refund, { amountMinor: 60000, method: 'hesabpay' });
+  //  پولِ بیشتر هرگز: افزایشِ جمع همان ۴۰۹ (راهِ دستی فقط برای کسر)
+  const c = await paidOrder(o);
+  await start(o, c.id);
+  await send(o, c.id, [ev(1, 'scan', { barcode: OIL, qtyMilli: 2000 }), ev(2, 'pick', { qtyMilli: 1000 })]);
+  const same = await pack(o, c.id, { bags: 1, refund: { method: 'cash' } });
+  assert.equal(same.status, 200, JSON.stringify(same.body));
+  assert.equal(same.body.refund, undefined, 'بی کسر ثبتِ بازپرداخت نیست');
+  assert.equal((await one('SELECT payment_status FROM online_orders WHERE id=$1', [c.id])).payment_status, 'paid');
+  const rep = await require('../src/lib/verify-data').verify({ shopId: o.shopId });
+  assert.deepEqual(rep.checks.filter((x) => x.count > 0).map((x) => x.id), [], 'verify-data بی خطا');
+});
+
 test('PCK-04 (پول): وزنِ بیشتر روی سفارشِ پرداخت‌شده ⇒ ۴۰۹ paid_total_increase و مبلغ همان؛ نقد هنگامِ تحویل همان رفتار', async () => {
   const o = await pickShop('وزن-پرداخت');
   const order = await paidOrder(o, [LINES[1]]);

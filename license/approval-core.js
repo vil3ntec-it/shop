@@ -44,7 +44,8 @@
   //  `sales.credit` (STF-03): فروشِ قرضی بیش از سقفِ کارمند — سرور با پرچمِ `shop.credit_cap` می‌سنجد
   //  `sales.pay_fix` (POS-40): برگه فقط روی همان دستگاه، برای «نیازمند تأیید» ِ اصلاحِ روشِ پرداخت؛ سرور هنوز opی با آن نمی‌سنجد
   //  `sales.price` (STF-03): تغییرِ قیمتِ ردیف بیش از سقفِ کارمند — سرور با پرچمِ `shop.price_cap` می‌سنجد
-  var PERMS = ['returns.create', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.pay_fix', 'sales.price'];
+  //  `sales.free_line` (POS-10، تصمیمِ ۱-۱۱): قلمِ آزاد (بی کارتِ کالا) بیش از سقفِ قیمتِ واحد — همان پرچمِ `shop.price_cap`
+  var PERMS = ['returns.create', 'sales.cancel', 'sales.credit', 'sales.discount', 'sales.free_line', 'sales.pay_fix', 'sales.price'];
   /** بیشترین عمرِ برگه: از PINِ مدیر تا بستنِ فاکتور */
   var TTL_MAX_MS = 15 * 60 * 1000;
   /** اختلافِ ساعتِ پذیرفتنی میانِ برگه و op */

@@ -86,6 +86,8 @@ internal fun PickSheet(
   //  کارِ در راه: امضای کار ⇒ شناسهٔ رویداد (پاسخِ گم‌شده ⇒ همان شناسه)
   var inflight by remember(orderId) { mutableStateOf<Pair<String, String>?>(null) }
   val packKey = remember(orderId) { DeliveryRepository.OnceKey { PickingRepository.newEventId() } }
+  //  تصمیمِ ۱-۶ ب: سفارشِ پرداخت‌شده با کسر — سرور «پس داده شد» ِ دستی را پیشنهاد کرد (`PickingRepository.refundOffered`)
+  var refundAsk by remember(orderId) { mutableStateOf(false) }
   //  PCK-05/06: برگهٔ جایگزینِ یک قلمِ «پیدا نشد» (`PickSubstituteUi.kt`)
   var subFor by remember(orderId) { mutableStateOf<PickLineDto?>(null) }
 
@@ -234,11 +236,28 @@ internal fun PickSheet(
             scope.launch {
               repo.pack(orderId, bags, packKey.of(PickingRepository.packJson(bags)))
                 .onSuccess { sheet = it; buzz(true); note = true to StrOrderPages.pickPackedLabels; onChanged() }
-                .onFailure { note = false to it.userMessage }
+                .onFailure { note = false to it.userMessage; refundAsk = PickingRepository.refundOffered(it) }
               busy = false
             }
           },
         )
+        //  «پس داده شد»: دکان پولِ کسرشده را خودش پس داده؛ مبلغ را سرور می‌سازد و ثبت می‌کند (نقد یا حساب‌پیِ دستی)
+        if (refundAsk) {
+          Text(StrOrderPages.pickRefundNote, style = MaterialTheme.typography.bodySmall, color = c.muted)
+          Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            for ((method, label) in listOf("cash" to StrOrderPages.pickRefundCash, "hesabpay" to StrOrderPages.pickRefundHesab)) {
+              TohidSecondaryButton(label, enabled = !busy, onClick = {
+                busy = true
+                scope.launch {
+                  repo.pack(orderId, bags, packKey.of(PickingRepository.packJson(bags, method)), method)
+                    .onSuccess { sheet = it; buzz(true); refundAsk = false; note = true to StrOrderPages.pickRefundDone; onChanged() }
+                    .onFailure { note = false to it.userMessage }
+                  busy = false
+                }
+              })
+            }
+          }
+        }
       }
 
       if (s.labels.isNotEmpty()) {

@@ -26,7 +26,7 @@ class SaleCapGateTest {
 
   private fun ledger() = ShopData(
     products = listOf(rice, oil),
-    debtors = listOf(Debtor(id = "d1", name = "احمد")),
+    debtors = listOf(Debtor(id = "d1", name = "احمد"), Debtor(id = "d2", name = "عمده‌فروش", priceList = "wholesale")),
     warehouseEntries = listOf(WarehouseEntry(id = "w1", productId = "p1", units = 50.0), WarehouseEntry(id = "w2", productId = "p2", units = 50.0)),
   )
 
@@ -100,9 +100,9 @@ class SaleCapGateTest {
     assertTrue(SaleCapGate.check(priceCap, up.data, up.saleId, mapOf(SaleCaps.PRICE to approved("sales.price", 2000, null))).ok)
     val withSlip = record(listOf(SalesEngine.CartLine("p2", 1.0, unitPrice = 600.0)), SalesEngine.Checkout(priceSlip = SaleCapGate.json(mapOf(SaleCaps.PRICE to approved("sales.price", 2000, null)), SaleCaps.PRICE)))
     assertNotNull(withSlip.data.sales.single().priceApproval)
-    //  ۵٪ زیرِ سقف؛ قیمتِ عمده (صاحب گذاشته) نه تغییر است نه تخفیف
+    //  ۵٪ زیرِ سقف؛ قیمتِ عمده فقط برای مشتریِ لیستِ عمده نه تغییر است نه تخفیف (تصمیمِ ۱-۱۱ (۳)؛ آزمونِ پایین)
     assertTrue(SaleCapGate.check(priceCap, record(listOf(SalesEngine.CartLine("p2", 1.0, unitPrice = 525.0))).data, "s-1", emptyMap()).ok)
-    assertTrue(SaleCapGate.check(priceCap, record(listOf(SalesEngine.CartLine("p1", 1.0, unitPrice = 800.0))).data, "s-1", emptyMap()).ok)
+    assertTrue(SaleCapGate.check(priceCap, record(listOf(SalesEngine.CartLine("p1", 1.0, unitPrice = 800.0)), SalesEngine.Checkout(debtorId = "d2")).data, "s-1", emptyMap()).ok)
     //  «تخفیفِ پنهان»: قیمتِ ردیفِ پایین‌تر برای شاگردی که تخفیف ندارد ⇒ ممنوع (همان `discount_not_allowed` ِ سرور)
     val low = record(listOf(SalesEngine.CartLine("p2", 1.0, unitPrice = 450.0)))
     val asks = SaleCapGate.check(priceCap, low.data, low.saleId, emptyMap()).asks
@@ -115,6 +115,45 @@ class SaleCapGateTest {
     assertEquals(5_000L, SaleCapGate.sale(low.data.sales.single(), listOf(spend)).loyaltyMinor)
     //  بی پرچمِ قیمت تخفیف همان `DiscountGate` ِ امروز است و این‌جا شمرده نمی‌شود
     assertTrue(SaleCapGate.check(creditCap, low.data, low.saleId, emptyMap()).ok)
+  }
+
+  /** تصمیمِ ۱-۱۱ (۳): قیمتِ عمده فقط در فاکتورِ مشتریِ لیستِ عمده «فهرست» است — همان `sale-caps.isWholesaleDebtor` ِ سرور */
+  @Test fun wholesalePriceIsAListPriceOnlyForAWholesaleCustomer() {
+    val walkIn = record(listOf(SalesEngine.CartLine("p1", 1.0, unitPrice = 800.0)))
+    val asks = SaleCapGate.check(priceCap, walkIn.data, walkIn.saleId, emptyMap()).asks
+    assertEquals(listOf("sales.discount" to SaleCaps.State.DENIED, "sales.price" to SaleCaps.State.NEEDS_APPROVAL), asks.map { it.perm to it.state })
+    assertEquals(20_000L, asks.first().need.amount)
+    assertFalse(SaleCapGate.sale(walkIn.data.sales.single(), debtors = walkIn.data.debtors).wholesale)
+    val retail = record(listOf(SalesEngine.CartLine("p1", 1.0, unitPrice = 800.0)), SalesEngine.Checkout(debtorId = "d1"))
+    assertNotNull(SaleCapGate.check(priceCap, retail.data, retail.saleId, emptyMap()).blocked)
+    val wholesale = record(listOf(SalesEngine.CartLine("p1", 1.0, unitPrice = 800.0)), SalesEngine.Checkout(debtorId = "d2"))
+    assertTrue(SaleCapGate.sale(wholesale.data.sales.single(), debtors = wholesale.data.debtors).wholesale)
+    assertTrue(SaleCapGate.check(priceCap, wholesale.data, wholesale.saleId, emptyMap()).ok)
+  }
+
+  /** تصمیمِ ۱-۱۱ (۲): قلمِ آزاد مجوزِ `sales.free_line` دارد؛ سقف روی قیمتِ واحد، برگه در `freeLineApproval` */
+  @Test fun freeLineAsksForItsOwnPermission() {
+    val cap = SaleCapGate.Rules("staff", layer("sales.free_line", mapOf("caps" to mapOf("maxAmount" to 5_000.0))), price = true, credit = false)
+    val ok = record(listOf(SalesEngine.CartLine("", 3.0, unitPrice = 50.0, label = "کیسه")))
+    assertTrue(SaleCapGate.check(cap, ok.data, ok.saleId, emptyMap()).ok)
+    val over = record(listOf(SalesEngine.CartLine("", 1.0, unitPrice = 60.0, label = "کیسه")))
+    val b = SaleCapGate.check(cap, over.data, over.saleId, emptyMap()).blocked!!
+    assertEquals(ir.vil3ntec.tohid.core.perm.ApprovalSlip.Need(SaleCaps.FREE_LINE, "sales/s-1", null, 6_000), b.need)
+    assertEquals(SaleCaps.State.NEEDS_APPROVAL, b.state)
+    assertEquals(StrSaleCaps.needsApproval(StrSaleCaps.freeLineTitle), SaleCapGate.message(b))
+    val slip = approved(SaleCaps.FREE_LINE, null, 6_000)
+    assertTrue(SaleCapGate.check(cap, over.data, over.saleId, mapOf(SaleCaps.FREE_LINE to slip)).ok)
+    val json = SaleCapGate.json(mapOf(SaleCaps.FREE_LINE to slip), SaleCaps.FREE_LINE)
+    val withSlip = record(listOf(SalesEngine.CartLine("", 1.0, unitPrice = 60.0, label = "کیسه")), SalesEngine.Checkout(freeLineSlip = json))
+    assertEquals(json, withSlip.data.sales.single().freeLineApproval)
+    val denied = cap.copy(layers = layer("sales.free_line", mapOf("mode" to "deny")))
+    val d = SaleCapGate.check(denied, ok.data, ok.saleId, emptyMap()).blocked!!
+    assertEquals(SaleCaps.State.DENIED, d.state)
+    assertEquals(StrSaleCaps.freeLineDenied, SaleCapGate.message(d))
+    //  بی پرچمِ قیمت هیچ؛ کالای کارت‌دار قلمِ آزاد نیست
+    assertTrue(SaleCapGate.check(denied.copy(price = false, credit = true), ok.data, ok.saleId, emptyMap()).ok)
+    assertTrue(SaleCapGate.check(denied, record(listOf(SalesEngine.CartLine("p2", 1.0))).data, "s-1", emptyMap()).ok)
+    assertTrue(SaleCaps.FREE_LINE in RemoteApproval.PERMS && SaleCaps.FREE_LINE in ir.vil3ntec.tohid.core.perm.ApprovalSlip.PERMS)
   }
 
   @Test fun saleJsonUnchangedWithoutSlipsAndPolicyEditableIsRead() {

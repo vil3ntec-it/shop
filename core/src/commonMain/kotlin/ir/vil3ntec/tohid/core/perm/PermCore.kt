@@ -87,6 +87,9 @@ object PermCore {
     // STF-03: تغییرِ قیمتِ ردیف نسبت به فهرست (`SaleCaps`)؛ سقفِ `maxPct` = بیشترین فاصلهٔ یک ردیف. سرور فقط با پرچمِ
     // خاموشِ `shop.price_cap` می‌سنجد — همان `d()` ِ JS
     "sales.price" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxPct"), false),
+    // POS-10 (تصمیمِ ۱-۱۱ (۲) الف): «قلمِ آزاد» (بی کارتِ کالا)؛ سقفِ `maxAmount` (Minor) روی قیمتِ واحد، «نیازمند تأیید» یا
+    // «ممنوع» از لایه. سرور فقط با پرچمِ خاموشِ `shop.price_cap` می‌سنجد (`SaleCaps.FREE_LINE`) — همان `d()` ِ JS
+    "sales.free_line" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMA, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMA, "full", false, emptyList(), true),

@@ -10,7 +10,8 @@
   'use strict';
   var $ = K.$; var el = K.el;
 
-  //  S70: «همین کالا در دکان‌های دیگر» (same.js ِ دیربار) فقط برای کالای پیوسته به بانک (`bankProductId`)
+  //  S70: «همین کالا در دکان‌های دیگر» (same.js ِ دیربار) فقط برای کالای پیوسته به بانک (`bankProductId`) و فقط وقتی سرور
+  //  `sameElsewhere` را داد (تصمیمِ ۳-۲۲: اول فقط در بازارچه؛ پرچمِ جدای `market.same_in_store`)
   var same = null; var sameP = null;
   function loadSame(slug) {
     sameP = sameP || K.js('/store/same.js').then(function () { same = window.StoreSame({ slug: slug }); return same; }, function (e) { sameP = null; throw e; });
@@ -25,7 +26,7 @@
       var my = ++want;
       if (same) same(null);
       //  same.js ِ دیررس برگهٔ کالای دیگری را پر نمی‌کند
-      if (x.bankProductId) loadSame(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بخش */ });
+      if (x.bankProductId && x.sameElsewhere === true) loadSame(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بخش */ });
       $('ps-desc').textContent = x.description || '';
       $('ps-desc').hidden = !x.description;
       var dl = K.clear($('ps-specs'));

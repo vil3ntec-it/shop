@@ -168,8 +168,10 @@ const config = {
       blockPhones:   num(process.env.OTP_SMS_BLOCK_PHONES, 10),     // در یک بلوکِ هزارتایی در ساعت
       foreignPhones: num(process.env.OTP_SMS_FOREIGN_PHONES, 20),   // شمارهٔ خارجیِ ناآشنای جدا در ساعت، کلِ سرور
       knownForeignPhones: num(process.env.OTP_SMS_KNOWN_FOREIGN_PHONES, 200), // همان برای آشنا
-      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 2000),      // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
-      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 500),     // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
+      //  تصمیمِ ۱-۱ (D-09 ب، ۱۴۰۵/۰۸/۱۹): سقفِ کلِ سرور ۱۰۰ پیامک در روز = dailyMax + knownExtra (همان نسبتِ ۴ به ۱ ِ پیشین:
+      //  ناآشنا تا ۸۰، شمارهٔ آشنا تا ۱۰۰). پر شدن ⇒ ۴۲۹ `sms_daily_ceiling` و راهِ ایمیل/اعلانِ رایگان باز می‌ماند
+      dailyMax:      num(process.env.OTP_SMS_DAILY_MAX, 80),        // پیامکِ واقعی در ۲۴ ساعت، کلِ سرور
+      knownExtra:    num(process.env.OTP_SMS_KNOWN_EXTRA, 20),      // سهمِ افزودهٔ شمارهٔ آشنا بر dailyMax
       //  SEC-06، سقفِ **هزینه** (واحدِ خُردِ sms_usage.cost_minor) در ۲۴ ساعت برای هر کانال؛ ۰ = خاموش
       dailyCostMax:     num(process.env.OTP_SMS_DAILY_COST_MAX_MINOR, 0),      // کلِ سرور
       shopDailyCostMax: num(process.env.OTP_SMS_SHOP_DAILY_COST_MAX_MINOR, 0), // هر دکان (ویترین)

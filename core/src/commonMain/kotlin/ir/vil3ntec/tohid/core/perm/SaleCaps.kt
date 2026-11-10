@@ -14,17 +14,20 @@ import ir.vil3ntec.tohid.core.pos.LinePricing
  *      کاهشِ قیمتِ ردیف زیرِ فهرست ([line]) و «جمعِ نهایی کمتر از جمع − تخفیف» ([basis] ⇒ `gapMinor`).
  *      پرچمِ خاموش ⇒ همان (تخفیف، جمع) ِ امروز (`ApprovalSlip.discountNeed`).
  *   2. `sales.price` — بیشترین فاصلهٔ قیمتِ یک ردیف از فهرست، بالا یا پایین (صدمِ درصد)؛ فقط با `shop.price_cap`.
- *   3. `sales.credit` — قرضِ فاکتور (`debtGiven`، Minor) پس از همین سند ([creditAmount])؛ فقط با `shop.credit_cap`.
+ *   3. `sales.free_line` — قلمِ آزاد ([isFree]: ردیفِ بی کارتِ کالا) با بیشترین قیمتِ واحدِ قلم‌های آزاد (Minor)؛ فقط با
+ *      `shop.price_cap` (تصمیمِ ۱-۱۱ (۲) الف، ۱۴۰۵/۰۸/۱۹).
+ *   4. `sales.credit` — قرضِ فاکتور (`debtGiven`، Minor) پس از همین سند ([creditAmount])؛ فقط با `shop.credit_cap`.
  *  تصمیم همان `PermCore.evaluate(role, layers, perm, req(need))` است.
  *
  *  ── قیمتِ فهرستِ یک ردیف ([refUnits]) ────────────────────────────────
  *  قیمت‌هایی که صاحب/مدیر برای کالا گذاشته‌اند و دلخواهِ صندوقدار نیستند: قیمتِ امروز (بازهٔ زمان‌بندی‌شدهٔ فعال،
- *  PRD-13، وگرنه `salePrice`)، قیمتِ عمده (`wholesalePrice` > ۰) و قیمتِ هر واحدِ بستهٔ فهرست‌دار (S05). ردیف با
+ *  PRD-13، وگرنه `salePrice`)، قیمتِ عمده (`wholesalePrice` > ۰؛ **فقط در فاکتورِ لیستِ عمده** — [Sale.wholesale]، تصمیمِ
+ *  ۱-۱۱ (۳): وگرنه فروش به قیمتِ عمده کاهشِ ردیف است) و قیمتِ هر واحدِ بستهٔ فهرست‌دار (S05). ردیف با
  *  **نزدیک‌ترین** آن‌ها سنجیده می‌شود (روی مبلغِ گردشدهٔ ردیف، `LinePricing.grossMinor`). تخفیفِ خودکار ([Line.promoMinor]،
  *  PRM) را صاحب تعریف کرده و پیش از سنجش به مبلغ برمی‌گردد. مصرفِ امتیازِ مشتری ([Sale.loyaltyMinor]، PRM-13) قیمتِ ردیف‌ها
  *  را پایین می‌آورد؛ همان مبلغ به نسبتِ مبلغِ ردیف‌ها (همان `Loyalty.split` ِ صندوق) پیش از سنجش برمی‌گردد. مصرفِ نادرست
  *  (بیش از جمع، یا نه افغانیِ کامل) ⇒ هیچ برنمی‌گردد. فاصلهٔ تا یک پله ([TOL_MINOR]) گردکردن است، نه تغییر.
- *  بی‌سنجش: قلمِ آزاد/کالای ناشناخته، مقدارِ نامثبت، و کالای بی قیمت.
+ *  بی‌سنجش (در [line]): قلمِ آزاد/کالای ناشناخته (مجوزِ خودش را دارد: [FREE_LINE])، مقدارِ نامثبت، و کالای بی قیمت.
  *
  *  Kotlin خالص — بی java.*، بی android.*.
  */
@@ -33,6 +36,7 @@ object SaleCaps {
   const val VERSION = 1
   const val DISCOUNT = "sales.discount"
   const val PRICE = "sales.price"
+  const val FREE_LINE = "sales.free_line"
   const val CREDIT = "sales.credit"
   const val PRICE_FLAG = "shop.price_cap"
   const val CREDIT_FLAG = "shop.credit_cap"
@@ -63,11 +67,11 @@ object SaleCaps {
     val packs: List<Pack> = emptyList(),
   )
 
-  /** قیمت‌های واحدِ فهرستِ کالا در روزِ [date] (`yyyy-MM-dd`)، صعودی و بی تکرار */
-  fun refUnits(p: Ref, date: String): List<Long> {
+  /** قیمت‌های واحدِ فهرستِ کالا در روزِ [date] (`yyyy-MM-dd`)، صعودی و بی تکرار؛ [wholesale] نادرست ⇒ عمده فهرست نیست */
+  fun refUnits(p: Ref, date: String, wholesale: Boolean = true): List<Long> {
     val base = p.windows.firstOrNull { date.isNotEmpty() && date >= it.from && date <= it.to }?.priceMinor ?: p.saleMinor
     val out = mutableSetOf(maxOf(0L, base))
-    if (p.wholesaleMinor > 0) out += p.wholesaleMinor
+    if (wholesale && p.wholesaleMinor > 0) out += p.wholesaleMinor
     for (k in p.packs) {
       if (k.sizeMilli <= 0 || k.priceMinor <= 0 || k.priceMinor > LinePricing.MAX_EXACT / 1000) continue
       out += divHalfUp(k.priceMinor * 1000, k.sizeMilli)
@@ -94,12 +98,12 @@ object SaleCaps {
 
   fun gross(unitMinor: Long, qtyMilli: Long): Long = LinePricing.grossMinor(unitMinor, qtyMilli)
 
-  fun line(l: Line, p: Ref?, date: String): LineCheck {
+  fun line(l: Line, p: Ref?, date: String, wholesale: Boolean = true): LineCheck {
     if (p == null || l.productId.isBlank() || l.qtyMilli <= 0 || l.unitMinor < 0) return EXEMPT
     return runCatching {
       val sold = gross(l.unitMinor, l.qtyMilli) + maxOf(0L, l.promoMinor)
       var list = -1L
-      for (r in refUnits(p, date)) {
+      for (r in refUnits(p, date, wholesale)) {
         val g = gross(r, l.qtyMilli)
         if (list < 0 || dist(sold, g) < dist(sold, list)) list = g
       }
@@ -161,10 +165,19 @@ object SaleCaps {
     val date: String = "",
     val priorDebtMinor: Long = 0,
     val loyaltyMinor: Long = 0,
+    /** تصمیمِ ۱-۱۱ (۳): لیستِ فاکتور عمده است (مشتریِ فاکتور لیستِ پیش‌فرضِ عمده دارد — `PriceList.WHOLESALE`) */
+    val wholesale: Boolean = false,
   )
 
-  /** خلاصهٔ ردیف‌ها: بیشترین فاصله و جمعِ کاهش‌ها */
-  data class Lines(val maxDeviationBp: Long, val reductionMinor: Long)
+  /** خلاصهٔ ردیف‌ها: بیشترین فاصله، جمعِ کاهش‌ها و بیشترین قیمتِ واحدِ قلمِ آزاد (`-1` = بی قلمِ آزاد) */
+  data class Lines(val maxDeviationBp: Long, val reductionMinor: Long, val freeUnitMaxMinor: Long = -1)
+
+  /**
+   *  قلمِ آزاد (تصمیمِ ۱-۱۱ (۲)): ردیفِ بی کارتِ کالا — `productId` ِ خالی یا کالایی که در [refs] نیست — با مقدارِ مثبت و
+   *  قیمتِ نامنفی (همان `sale-caps.isFree` ِ سرور)
+   */
+  fun isFree(l: Line, refs: Map<String, Ref>): Boolean =
+    l.qtyMilli > 0 && l.unitMinor >= 0 && (l.productId.isBlank() || refs[l.productId] == null)
 
   /**
    *  سهمِ امتیازِ هر ردیف (Minor): [loyaltyMinor] به نسبتِ مبلغِ ثبت‌شدهٔ ردیف‌ها (`Loyalty.split`، بیشترین باقی‌مانده)؛
@@ -178,17 +191,19 @@ object SaleCaps {
     return s.map { it * LinePricing.STEP_MINOR }
   }
 
-  fun lines(lines: List<Line>, refs: Map<String, Ref>, date: String, loyaltyMinor: Long = 0): Lines {
+  fun lines(lines: List<Line>, refs: Map<String, Ref>, date: String, loyaltyMinor: Long = 0, wholesale: Boolean = true): Lines {
     var dev = 0L
     var red = 0L
+    var free = -1L
     val shares = loyaltyShares(lines, loyaltyMinor)
     for ((i, l0) in lines.withIndex()) {
       val l = if (shares[i] > 0) l0.copy(promoMinor = maxOf(0L, l0.promoMinor) + shares[i]) else l0
-      val c = line(l, refs[l.productId], date)
+      if (isFree(l0, refs)) free = maxOf(free, l0.unitMinor)
+      val c = line(l, refs[l.productId], date, wholesale)
       if (c.deviationBp > dev) dev = c.deviationBp
       red += c.reductionMinor
     }
-    return Lines(dev, red)
+    return Lines(dev, red, free)
   }
 
   /**
@@ -197,12 +212,13 @@ object SaleCaps {
    */
   fun needs(sale: Sale, lines: List<Line>, refs: Map<String, Ref>, enforcePrice: Boolean, enforceCredit: Boolean): List<ApprovalSlip.Need> {
     val doc = "sales/${sale.id}"
-    val out = ArrayList<ApprovalSlip.Need>(3)
-    val sum = if (enforcePrice) SaleCaps.lines(lines, refs, sale.date, sale.loyaltyMinor) else Lines(0, 0)
+    val out = ArrayList<ApprovalSlip.Need>(4)
+    val sum = if (enforcePrice) SaleCaps.lines(lines, refs, sale.date, sale.loyaltyMinor, sale.wholesale) else Lines(0, 0)
     val b = if (enforcePrice) basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor)
     else Basis(sale.discountMinor, sale.totalMinor, 0, 0)
     if (b.discountMinor > 0) out += ApprovalSlip.discountNeed(sale.id, b.discountMinor, b.baseMinor)
     if (enforcePrice && sum.maxDeviationBp > 0) out += ApprovalSlip.Need(PRICE, doc, sum.maxDeviationBp, null)
+    if (enforcePrice && sum.freeUnitMaxMinor >= 0) out += ApprovalSlip.Need(FREE_LINE, doc, null, sum.freeUnitMaxMinor)
     if (enforceCredit) {
       val a = creditAmount(sale.debtGivenMinor, sale.priorDebtMinor)
       if (a > 0) out += ApprovalSlip.Need(CREDIT, doc, null, a)
