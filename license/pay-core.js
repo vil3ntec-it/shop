@@ -38,6 +38,8 @@
 
   // ── ثابت‌ها ─────────────────────────────────────────────
   var ACCOUNT = 'account';            // روشِ رزرو: باقی‌ماندهٔ پرداختِ جزئی به حسابِ مشتری
+  var FX = 'fx';                      // روش و نوعِ رزرو: ارزِ نقدِ تبادل‌شده (PAY-10)؛ شمردنیِ افغانی نیست
+  var FX_PER = [1, 10, 100, 1000, 10000, 100000, 1000000]; // نرخ برای چند واحدِ ارز
   var KINDS = ['cash', 'wallet', 'card', 'transfer', 'store_credit', 'gift_card', 'other'];
   var COUNTABLE = { cash: 1, wallet: 1, card: 1, transfer: 1, other: 1 }; // در شمارشِ صندوق
   var NOTES = [1000, 2000, 5000, 10000, 50000, 100000];  // ۱۰ تا ۱۰۰۰ افغانی، به پول
@@ -115,7 +117,7 @@
       var x = list[i] || {};
       var id = text(x.id), name = text(x.name);
       var limit = x.limit === undefined ? null : x.limit;
-      if (!id || id === ACCOUNT || has(seen, id) || KINDS.indexOf(x.kind) < 0 || !name ||
+      if (!id || id === ACCOUNT || id === FX || has(seen, id) || KINDS.indexOf(x.kind) < 0 || !name ||
           (limit !== null && !posInt(limit))) return fail('BAD_METHOD', { index: i });
       if (x.kind === 'cash') cash++;
       seen[id] = 1;
@@ -137,7 +139,7 @@
     return { ok: true, methods: r.methods, by: by, cashId: cashId, creditId: creditId };
   }
 
-  function kindOf(t, id) { return id === ACCOUNT ? ACCOUNT : (t.by[id] ? t.by[id].kind : null); }
+  function kindOf(t, id) { return id === ACCOUNT || id === FX ? id : (t.by[id] ? t.by[id].kind : null); }
 
   // ── وضعیتِ پرداخت (PAY-07) ─────────────────────────────
   function canTransition(from, to) {
@@ -184,22 +186,57 @@
         rows.push({ method: meth.id, kind: meth.kind, amount: x.amount, ref: ref || null, status: 'pending', verification: 'manual' });
       }
     }
+    // PAY-10: ارزِ دیگر فقط رکوردِ همین `exchange`؛ بازسازی و برابر ⇐ رکوردِ دست‌خورده یا ناقص رد می‌شود
+    var fx = input.fx === undefined || input.fx === null ? [] : input.fx;
+    if (!Array.isArray(fx)) return fail('FX_INVALID', { index: -1, field: 'fx' });
+    var fxTotal = 0, fxRecs = [];
+    for (var j = 0; j < fx.length; j++) {
+      var rec = fx[j] || {}, again = null;
+      try { again = fxAgain(rec); } catch (e) { again = null; }
+      if (!again) return fail('FX_INVALID', { index: j, field: 'fx' });
+      if (again.to.currency !== cur.code) return fail('CURRENCY_MISMATCH', { index: j, field: 'fx' });
+      fxTotal = add(fxTotal, again.to.amount);
+      fxRecs.push(again);
+    }
     // پول پس فقط از نقد: بیش‌پرداختِ کیف پول یا کارت پس داده نمی‌شود
     if (nonCash > input.total) return fail('NON_CASH_OVERPAY');
 
     var cashDue = input.total - nonCash;
     var rounded = step > 0 ? exactMul(M.roundHalfUp(cashDue, step), step) : cashDue;
+    // نقدِ افغانی و ارزِ نقد یک «نقد» اند؛ پولِ پس همیشه افغانیِ نقد (بی ارز: همان `cash` ِ امروز)
+    var pool = add(cash, fxTotal);
     // گردکردنِ نقدی فقط وقتی نقد فاکتور را می‌بندد؛ هرگز بیش از مبلغِ دقیق از مشتری نمی‌خواهد
-    var rounding = (cash > 0 && step > 0 && cash >= rounded) ? rounded - cashDue : 0;
+    var rounding = (pool > 0 && step > 0 && pool >= rounded) ? rounded - cashDue : 0;
     var due = add(cashDue, rounding);
-    var change = cash >= due ? cash - due : 0;
-    var kept = cash - change;
+    var change = pool >= due ? pool - due : 0;
+    var kept = pool - change;
     var remaining = due - kept;
+    // ارز اول به فاکتور می‌نشیند؛ ارزی که هیچ سهمی نمی‌گیرد لازم نبود (صندوق صرافی نیست)
+    var left = kept, fxRows = [];
+    for (j = 0; j < fxRecs.length; j++) {
+      var take = Math.min(fxRecs[j].to.amount, left);
+      if (take <= 0) return fail('FX_EXCESS', { index: j, field: 'fx' });
+      left -= take;
+      fxRows.push({ method: FX, kind: FX, amount: take, ref: null, status: 'confirmed', verification: null, fx: fxRecs[j] });
+    }
 
     return {
       ok: true, cur: cur, t: t, total: input.total, cash: cash, nonCash: nonCash, cashDue: cashDue, rounded: rounded,
       rounding: rounding, change: change, kept: kept, remaining: remaining, rows: rows, cashAt: cashAt,
+      fxTotal: fxTotal, afnKept: left, fxRows: fxRows,
     };
+  }
+
+  /* رکوردِ تبادل از نو با همان ورودی؛ همان رکورد ⇒ رکوردِ یک‌دست (با `per`)، وگرنه null */
+  function fxAgain(rec) {
+    var from = rec.from || {}, to = rec.to || {};
+    var r = exchange({ from: from, to: to.currency, rate: rec.rate, per: rec.per, source: rec.source, at: rec.at, approvedBy: rec.approvedBy });
+    if (!r.ok) return null;
+    var x = r.record, per = rec.per === undefined || rec.per === null ? 1 : rec.per;
+    var same = x.from.currency === from.currency && x.from.amount === from.amount && x.to.currency === to.currency &&
+      x.to.amount === to.amount && x.rate === rec.rate && x.per === per && x.source === rec.source && x.at === rec.at &&
+      x.approvedBy === rec.approvedBy;
+    return same && x.to.amount > 0 ? x : null;
   }
 
   function settle(input) {
@@ -210,8 +247,9 @@
     var payments = [];
     a.rows.forEach(function (r) {
       if (r !== null) payments.push(r);
-      else if (a.kept > 0) payments.push({ method: a.t.cashId, kind: 'cash', amount: a.kept, ref: null, status: 'confirmed', verification: null });
+      else if (a.afnKept > 0) payments.push({ method: a.t.cashId, kind: 'cash', amount: a.afnKept, ref: null, status: 'confirmed', verification: null });
     });
+    a.fxRows.forEach(function (r) { payments.push(r); });
     if (toAccount > 0) payments.push({ method: ACCOUNT, kind: ACCOUNT, amount: toAccount, ref: null, status: 'confirmed', verification: null });
     return {
       ok: true,
@@ -220,7 +258,7 @@
       total: a.total,
       rounding: a.rounding,
       due: add(a.total, a.rounding),
-      tendered: add(a.cash, a.nonCash),
+      tendered: add(add(a.cash, a.nonCash), a.fxTotal),
       change: a.change,
       remaining: a.remaining,
       toAccount: toAccount,
@@ -232,11 +270,11 @@
   function exactCash(input) {
     var a = analyse(input);
     if (!a.ok) return a;
-    return { ok: true, amount: a.remaining === 0 ? 0 : a.rounded - a.cash };
+    return { ok: true, amount: a.remaining === 0 ? 0 : a.rounded - a.cash - a.fxTotal };
   }
 
   // ── تبادلِ ارز (PAY-10) ────────────────────────────────
-  /* `rate` = چند واحدِ کوچکِ ارزِ مقصد برای یک واحدِ اصلیِ ارزِ مبدأ (۷۰٫۲۵ افغانی ⇐ 7025).
+  /* `rate` = چند واحدِ کوچکِ ارزِ مقصد برای `per` واحدِ اصلیِ ارزِ مبدأ (۷۰٫۲۵ افغانی ⇐ 7025؛ `per` از FX_PER، پیش‌فرض ۱).
      مبلغِ مقصد به پلهٔ ارزِ مقصد گرد و در خودِ رکورد ثابت می‌شود؛ نرخِ بعدی آن را عوض نمی‌کند. */
   function exchange(op) {
     op = op || {};
@@ -244,17 +282,18 @@
     try { src = M.currency(from.currency); dst = M.currency(op.to || 'AFN'); } catch (e) { return fail('UNKNOWN_CURRENCY'); }
     if (src.code === dst.code) return fail('EXCHANGE_SAME_CURRENCY');
     if (!posInt(from.amount)) return fail('INVALID_AMOUNT');
-    if (!posInt(op.rate)) return fail('INVALID_RATE');
+    var per = op.per === undefined || op.per === null ? 1 : op.per;
+    if (!posInt(op.rate) || FX_PER.indexOf(per) < 0) return fail('INVALID_RATE');
     var fields = { source: text(op.source), at: posInt(op.at), approvedBy: text(op.approvedBy) };
     for (var k in fields) if (!fields[k]) return fail('EXCHANGE_FIELDS', { field: k });
-    var amount = M.roundHalfUp(exactMul(from.amount, op.rate), exactMul(src.minorPerMajor, dst.stepMinor));
+    var amount = M.roundHalfUp(exactMul(from.amount, op.rate), exactMul(exactMul(src.minorPerMajor, per), dst.stepMinor));
     amount = exactMul(amount, dst.stepMinor);
     return {
       ok: true,
       record: {
         from: { currency: src.code, amount: from.amount },
         to: { currency: dst.code, amount: amount },
-        rate: op.rate, source: fields.source, at: op.at, approvedBy: fields.approvedBy,
+        rate: op.rate, per: per, source: fields.source, at: op.at, approvedBy: fields.approvedBy,
       },
     };
   }
@@ -314,7 +353,8 @@
         pay(ACCOUNT, debt);
         pay(fallback, take - debt); // بدهیِ تسویه‌شده: پولش جدا آمده، پس نقد یا اعتبار
       } else {
-        pay(mode === 'original' ? pays[idx].method : fallback, take);
+        // PAY-10: سهمِ ارز به افغانی پس داده می‌شود (نقد یا اعتبار)، نه اسکناسِ ارز
+        pay(mode === 'original' && pays[idx].method !== FX ? pays[idx].method : fallback, take);
       }
     });
 
@@ -682,6 +722,8 @@
     MOVE_REASONS: MOVE_REASONS,
     DEFAULT_METHODS: DEFAULT_METHODS,
     DEFAULT_VARIANCE_THRESHOLD: DEFAULT_VARIANCE_THRESHOLD,
+    FX: FX,
+    FX_PER: FX_PER,
     defineMethods: defineMethods,
     canTransition: canTransition,
     transition: transition,

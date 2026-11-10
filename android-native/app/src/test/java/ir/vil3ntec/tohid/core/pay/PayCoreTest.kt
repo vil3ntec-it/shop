@@ -276,6 +276,7 @@ class PayCoreTest {
         ExchangeInput(
           fromCurrency = from.str("currency")!!, fromAmount = from.lng("amount")!!, to = o.str("to") ?: "AFN",
           rate = o.lng("rate")!!, source = o.str("source"), at = o.lng("at"), approvedBy = o.str("approvedBy"),
+          per = o.lng("per") ?: 1, // PAY-10: نرخ برای چند واحد؛ بی آن همان ۱
         )
       )
       val got = res(r) { x ->
@@ -283,7 +284,7 @@ class PayCoreTest {
           "record" to mapOf(
             "from" to mapOf("currency" to x.fromCurrency, "amount" to x.fromAmount),
             "to" to mapOf("currency" to x.toCurrency, "amount" to x.toAmount),
-            "rate" to x.rate, "source" to x.source, "at" to x.at, "approvedBy" to x.approvedBy,
+            "rate" to x.rate, "per" to x.per, "source" to x.source, "at" to x.at, "approvedBy" to x.approvedBy,
           )
         )
       }

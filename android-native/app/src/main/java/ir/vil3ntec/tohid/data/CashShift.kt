@@ -151,10 +151,12 @@ object CashShift {
   fun saleCash(s: Sale, fixes: List<ir.vil3ntec.tohid.core.pay.PayFix.Fix> = emptyList(), until: Long = Long.MAX_VALUE): Double {
     //  فاکتورِ اینترنتیِ سرور (W): نه آنلاین و نه «نقد هنگامِ تحویل»ِ دستِ پیک پولِ دخل است
     if (isOnline(s)) return 0.0
-    if (fixes.isNotEmpty()) return PayFlow.saleRows(s, fixes, until).filter { it.method == PayFlow.CASH }.sumOf { it.amount } / 100.0
+    //  PAY-10: پولِ پسِ افغانیِ ارزِ نقد (`FxTillFlow.changeOut`) از همین دخل رفت؛ ارز خودش نقدِ افغانی نیست. بی ارز ⇒ ۰
+    val fxOut = FxTillFlow.changeOut(s)
+    if (fixes.isNotEmpty()) return (PayFlow.saleRows(s, fixes, until).filter { it.method == PayFlow.CASH }.sumOf { it.amount } - fxOut) / 100.0
     s.payments?.takeIf { it.isNotEmpty() }?.let { list ->
       //  ردیفِ نقدی که امانتِ کسِ دیگری است (`custody`، مثلاً پیک) هم در دخل نیست
-      return list.filter { it.kind == PayFlow.CASH && it.custody == null && it.amountMinor > 0 }.sumOf { it.amountMinor } / 100.0
+      return (list.filter { it.kind == PayFlow.CASH && it.custody == null && it.amountMinor > 0 }.sumOf { it.amountMinor } - fxOut) / 100.0
     }
     return (s.finalTotal - s.debtGiven).coerceAtLeast(0.0)
   }

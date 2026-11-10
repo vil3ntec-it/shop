@@ -54,6 +54,10 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/pay-10` (ارزِ نقد در صندوق، PAY-10؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دالر، کلدار و ریال در صندوقِ «ترکیبی و شیفت» پشتِ تنظیمِ خاموشِ **دکان** `FxTillPref` (`fx_tender` + جدولِ نرخِ `fx_rates`، هر دو `ShopSettingsKeys` ِ دکان؛ D-15 رعایت شد). هسته: `core/pay/FxTill.kt` (جدولِ نرخ، پرداختِ ارز، متن ⇐⇒ واحد)، `Pay.settle`/`exactCash` با `SettleInput.fx` (ردیفِ `fx`، ارز اول، پولِ پس افغانی، `FX_INVALID`/`FX_EXCESS`)، `exchange` با `per`، ارزهای PKR/IRR؛ هم‌زاد `license/fx-till.js` + `pay-core.js`؛ بردار `core/test-vectors/fx-till-v1.json` و موردهای تازهٔ `pay-v1.json`. برنامه: `FxTillFlow`، کادرِ `CheckoutFxBox`، تنظیمِ `FxTillSettings`، رسید، X/Z (`DrawerModel.fxLines`)، شیفت (`cash_out` ِ پولِ پسِ ارز) و `CashShift.saleCash`، برگشت به افغانی، کشو. سرور دست نخورد (ردیفِ پرداخت سنجیده نمی‌شود؛ `sync-v1.js` نه).
+- نیمه‌کاره: آزمون‌های Kotlin (`FxTillVectorsTest`، `FxTillFlowTest`، `PayCoreTest.exchange`، `PrinterDrawerTest`) فقط در CI؛ STATUS ِ PAY-10 تا شاهدِ CI همان PARTIAL. صندوقِ کامپیوترِ قدیم (`DeskSale`) و برنامهٔ آیفون کادرِ ارز ندارند. گزارشِ خودکارِ صاحب در سرور ارز را در «نقد» می‌شمارد (`paymentMethod = cash`).
+- قدمِ بعدی: پس از CI ِ سبز ردیف را IMPLEMENTED-VERIFIED کن؛ تصمیم‌های صاحب‌کار: سقفِ کهنگیِ نرخ (یک روز)، گردِ نیمه رو به بالا به یک افغانی، و این‌که «پولِ پسِ ارز» سقف بخواهد یا نه.
 ### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
 - انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
 - قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.

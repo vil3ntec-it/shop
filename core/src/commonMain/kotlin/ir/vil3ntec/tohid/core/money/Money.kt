@@ -66,9 +66,13 @@ class Currency(val code: String, val decimals: Int, val stepMinor: Long) {
     val AFN = Currency("AFN", 2, 100)
     /** دالر: فقط برای عملیاتِ تبادل (PAY-10)؛ پله یک سنت */
     val USD = Currency("USD", 2, 1)
+    /** کلدار (روپیهٔ پاکستان): فقط تبادل (PAY-10)؛ پله یک روپیه (پیسه در گردش نیست) */
+    val PKR = Currency("PKR", 2, 100)
+    /** ریالِ ایران: فقط تبادل (PAY-10)؛ بی اعشار (دینار در گردش نیست)، پله یک ریال */
+    val IRR = Currency("IRR", 0, 1)
 
     /** جدولِ ارزها — باید با `CURRENCIES`ِ `license/money.js` و بخشِ `currencies`ِ بردارها یکی باشد. */
-    val TABLE: List<Currency> = listOf(AFN, USD)
+    val TABLE: List<Currency> = listOf(AFN, USD, PKR, IRR)
 
     private val byCode = TABLE.associateBy { it.code }
 

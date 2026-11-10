@@ -383,8 +383,7 @@ data class SalePromo(
 
 /**
  *  یک ردیفِ پرداختِ فاکتور (`Sale.payments`) — به پول، نام‌ها همان `PaymentRow`ِ هسته.
- *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`)
- *  تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
+ *  غیرنقد «ثبتِ دستی، در انتظار» است (`status = pending`، `verification = manual`) تا تأییدِ قابلِ اتکا برسد (PAY-08)؛ نقد و «به حساب» تأییدشده‌اند.
  *
  *  روی سیم مبلغ `amount` است (به پول) — همان `PaymentRow`ِ هسته و ردیفی که سرور روی فاکتورِ
  *  W می‌گذارد (`order-ledger.js`، #321)؛ `amountMinor`ِ نسخهٔ پیشِ این شاخه هم خوانده می‌شود.
@@ -405,6 +404,7 @@ data class SalePayment(
   @EncodeDefault(EncodeDefault.Mode.NEVER) val custody: String? = null,
   /** حساب‌پیِ دکان: اثرِ انگشتِ حسابِ گیرنده (همان `PaymentRow.payee`) ⇐ گزارشِ «پول به کدام حساب رفت» ِ صاحب */
   @EncodeDefault(EncodeDefault.Mode.NEVER) val payee: String? = null,
+  @EncodeDefault(EncodeDefault.Mode.NEVER) val fx: SaleFx? = null, // PAY-10: فقط ردیفِ `fx` — رکوردِ تبادلِ ثابت (`FxTillFlow`)
 )
 
 /**

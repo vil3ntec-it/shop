@@ -67,6 +67,8 @@
   var CURRENCIES = Object.freeze({
     AFN: makeCurrency('AFN', 2, 100), // پلهٔ یک افغانی (۱۰۰ پول) — همان رفتارِ امروز
     USD: makeCurrency('USD', 2, 1),   // فقط برای تبادل (PAY-10)
+    PKR: makeCurrency('PKR', 2, 100), // کلدار: فقط تبادل (PAY-10)؛ پله یک روپیه
+    IRR: makeCurrency('IRR', 0, 1),   // ریال: فقط تبادل (PAY-10)؛ بی اعشار
   });
 
   /* ارز از جدول؛ پله برای هر دکان قابلِ تنظیم است. فقط کلیدِ خودِ جدول: «constructor» و «__proto__» ارزِ ناشناخته‌اند،

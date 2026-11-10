@@ -50,6 +50,7 @@ import ir.vil3ntec.tohid.ui.v3.V3Type
  *  همهٔ حساب `PayFlow` است؛ متن‌ها در `PayPanelState` (`CheckoutSession.pay`) می‌مانند.
  *  PAY-24: با `state.stored` (`GiftCardPref`) «کارت هدیه» و «اعتبار فروشگاه» هم در تراشه‌هایند، با راهنمای مانده زیرِ
  *  ردیف و پیامِ خرجِ بیش از مانده (`CheckoutStoredPay`، همان صندوقِ قدیم)؛ خاموش ⇒ همان روش‌های امروز.
+ *  PAY-10: با جدولِ نرخِ دکان (`state.fxRates`) کادرِ «ارزِ نقد» (`CheckoutFxBox`)؛ پولِ پس همچنان افغانیِ نقد.
  */
 @Composable
 fun CheckoutPaySplit(
@@ -119,6 +120,11 @@ fun CheckoutPaySplit(
     }
     Spacer(Modifier.height(10.dp))
     V3AddChip(StrSale.otherMethod) { state.addRow() }
+    //  PAY-10: ارزِ نقد فقط با جدولِ نرخِ روشنِ دکان (`state.fxRates`)؛ خاموش ⇒ هیچ کادرِ تازه‌ای
+    if (state.fxRates.isNotEmpty()) {
+      Spacer(Modifier.height(10.dp))
+      CheckoutFxBox(state, bad = preview is PayFlow.Outcome.Bad && preview.problem.method == ir.vil3ntec.tohid.core.pay.Pay.FX, onSubmit = onSubmit)
+    }
 
     //  خلاصه — همان عددِ هسته
     val s: Settlement? = preview.valueOrNull()

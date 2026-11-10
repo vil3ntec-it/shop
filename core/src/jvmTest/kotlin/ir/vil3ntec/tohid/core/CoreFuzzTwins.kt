@@ -312,13 +312,14 @@ internal object CoreFuzzTwins {
           ExchangeInput(
             fromCurrency = from?.str("currency") ?: "", fromAmount = from?.lOrNull("amount") ?: 0, to = x.str("to") ?: "AFN",
             rate = x.lOrNull("rate") ?: 0, source = x.str("source"), at = x.lOrNull("at"), approvedBy = x.str("approvedBy"),
+            per = x.lOrNull("per") ?: 1,
           ),
         ),
       ) { e ->
         mapOf(
           "record" to obj(
             "from" to obj("currency" to s(e.fromCurrency), "amount" to n(e.fromAmount)), "to" to obj("currency" to s(e.toCurrency), "amount" to n(e.toAmount)),
-            "rate" to n(e.rate), "source" to s(e.source), "at" to n(e.at), "approvedBy" to s(e.approvedBy),
+            "rate" to n(e.rate), "per" to n(e.per), "source" to s(e.source), "at" to n(e.at), "approvedBy" to s(e.approvedBy),
           ),
         )
       }

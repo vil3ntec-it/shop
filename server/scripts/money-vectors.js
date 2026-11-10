@@ -151,6 +151,8 @@ function build() {
     currencies: [
       { code: 'AFN', decimals: 2, stepMinor: 100 },
       { code: 'USD', decimals: 2, stepMinor: 1 },
+      { code: 'PKR', decimals: 2, stepMinor: 100 },
+      { code: 'IRR', decimals: 0, stepMinor: 1 },
     ],
     lineTotal: { columns: ['qtyMilli', 'priceMinor', 'stepMinor', 'legacyMinor', 'minor'], rows },
     lineTotalOverflow: { columns: ['qtyMilli', 'priceMinor', 'stepMinor'], rows: overflow },

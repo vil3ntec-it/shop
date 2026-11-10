@@ -38,12 +38,14 @@ object DrawerRule {
   )
 
   const val CASH = "cash"
+  /** PAY-10 — ارزِ نقد (`Pay.FX`) هم در دخل گذاشته می‌شود و پولِ پسش افغانیِ همان دخل است */
+  const val FX = "fx"
   private val NOT_TILL_METHODS = setOf("online", "cod")
   private val DEAD_STATUSES = setOf("failed", "cancelled")
 
   /** آیا این ردیف نقدی است که همین حالا در دخل گذاشته می‌شود */
   fun isTillCash(p: Payment): Boolean =
-    p.kind == CASH && p.amountMinor > 0 && p.custody.isNullOrEmpty() && p.status !in DEAD_STATUSES
+    (p.kind == CASH || p.kind == FX) && p.amountMinor > 0 && p.custody.isNullOrEmpty() && p.status !in DEAD_STATUSES
 
   /**
    *  درِ `PrintSpooler`: قاعدهٔ تازه فقط با «ابزارهای تازهٔ دستگاه» (`HwTools`، `hw_tools_v2`، پیش‌فرض

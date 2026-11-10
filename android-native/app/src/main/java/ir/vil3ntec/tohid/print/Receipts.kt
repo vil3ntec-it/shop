@@ -222,6 +222,7 @@ object Receipts {
       "card" to { StrReceipt.payCard }, "transfer" to { StrReceipt.payTransfer }, "wallet" to { StrReceipt.payWallet },
       "store_credit" to { StrReceipt.payStoreCredit }, "gift_card" to { StrReceipt.payGiftCard }, "other" to { StrReceipt.payOther },
       PayFlow.MIXED to { StrReceipt.payMixed }, PayFlow.ONLINE to { StrReceipt.payOnline }, PayFlow.COD to { StrReceipt.payCod },
+      ir.vil3ntec.tohid.core.pay.Pay.FX to { StrReceipt.payFx }, // PAY-10
     )
     buildMap {
       byKind.forEach { (key, text) -> PayFlow.KIND_LABELS[key]?.let { put(it, text) } }
