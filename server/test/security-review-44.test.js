@@ -10,12 +10,22 @@
  *           شمارِ پیش از دیگری را می‌دید و همه پذیرفته می‌شدند (فقط PostgreSQL؛ PGlite تراکنش‌ها را پشتِ هم می‌برد).
  *   SR44-3  دو کارِ هم‌`digest` (همان عکس، نسخه و تنظیمات در دو دسته) که هم‌زمان برداشته شوند هر دو نسخه می‌ساختند ⇒
  *           «دوباره‌کاری هرگز نسخهٔ تکراری نمی‌سازد» نمی‌ماند (سقفِ ۳۰ نسخهٔ هر عکس با تکرار پر می‌شد).
+ *   R12     (پیگیری، `claude/sec-fix-44`) کارِ دستهٔ لغوشده که به `complete` نرسید (فرآیند افتاد ⇒ «در کار» با اجارهٔ تمام‌شده؛
+ *           شکستِ گذرای هم‌زمان با لغو ⇒ «در صف») هرگز برداشته نمی‌شد (`claim` فقط دستهٔ `active`) ⇒ تا همیشه در سقفِ ۵۰۰۰.
+ *   R11     (پیگیری) سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد ⇒ بودجهٔ بایتِ پیکسلِ بازشده (`IMAGE_STUDIO_DECODE_MB`) میانِ کارگرها.
+ *   R10     (پیگیری) خانهٔ CSV ِ سرور (`finance-reports.cell`، همزادِ `license/csv-cell.js`): متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان
+ *           خانهٔ `g` ِ xlsx) فرمول نیست ⇒ عدد می‌ماند؛ هر متنِ دیگرِ آغازشده با = + - @ تب یا CR همان «'».
+ *   R18     (پیگیری) گزارشِ خطای دستهٔ بانکِ مرکزی (`image-bank.reportCsv`، CSV ِ مدیر) خانه را بی نگهبانِ فرمول می‌نوشت ⇒ همان `cell`.
  */
 process.env.IMAGE_STUDIO_WORKERS = '2';
+//  R11: بودجهٔ ۲ مگابایت ⇒ سهمِ هر کار ۱ مگابایت؛ عکسِ ۶۰۰×۴۵۰ ِ آزمون‌های دیگر (۸۱۰ هزار بایت RGB) زیرِ آن می‌ماند
+process.env.IMAGE_STUDIO_DECODE_MB = '2';
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const zlib = require('zlib');
+const path = require('path');
+const { execFileSync } = require('child_process');
 const h = require('./helpers');
 const F = require('./image-fixtures');
 const bytes = require('../src/lib/image-bytes');
@@ -26,6 +36,8 @@ const jobs = require('../src/lib/image-studio-jobs');
 const { ulid } = require('../src/lib/ulid');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const finance = require('../src/lib/finance-reports');
+const bank = require('../src/lib/image-bank');
 
 let root = '';
 let A; let C;
@@ -164,4 +176,154 @@ test('SR44-3: دو کارِ هم‌digest ِ هم‌زمان (دو دسته، ه
   assert.deepEqual(rows.map((r) => r.status), ['done', 'done']);
   assert.equal(Number(rows[0].result_version), Number(rows[1].result_version));
   assert.deepEqual(rows.map((r) => !!r.reused).sort(), [false, true]);
+});
+
+test('R12: کارِ بازِ دستهٔ لغوشده پس از افتادنِ فرآیند بسته می‌شود؛ اجارهٔ زنده، دستهٔ فعال و متوقف دست نمی‌خورند', async () => {
+  const D = await shopOwner('د');
+  await setFlag(D.shopId, 'shop.image_studio', true);
+  const img = [];
+  for (const k of [1, 2, 3]) img.push((await upload(D, jpg(), `r12-${k}`)).body.id);
+  const K = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-cancelled', image_ids: img, preset: 'enhance' });
+  const L = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-active', image_ids: [img[0]], preset: 'catalog' });
+  const P = await jobs.createBatch(D.shopId, D.user.id, { key: 'r12-paused', image_ids: [img[1]], preset: 'ad' });
+  const t = now();
+  const set = (batch, image, status, lease, until) => query(
+    `UPDATE image_studio_jobs SET status=$3, lease=$4, lease_until=$5, attempts=1 WHERE batch_id=$1 AND image_id=$2`,
+    [batch, image, status, lease, until]);
+  //  هر سه کارِ K «در کار» هنگامِ لغو (لغو فقط «در صف» را می‌بندد)
+  for (const x of img) await set(K.id, x, 'running', `l_${x}`, t + 60000);
+  await jobs.batchAction(D.shopId, D.user.id, K.id, 'cancel');
+  await set(K.id, img[0], 'running', 'l_dead', t - 1);           //  فرآیند افتاد: اجاره تمام شد، `complete` هرگز
+  await query(`UPDATE image_studio_jobs SET status='queued', lease='', lease_until=0, next_at=0, error='timeout'
+    WHERE batch_id=$1 AND image_id=$2`, [K.id, img[1]]);          //  `failOrRetry` ِ گذرا پس از لغو ⇒ دوباره «در صف»
+  await set(K.id, img[2], 'running', 'l_live', t + 60000);       //  کارگرِ زنده هنوز روی آن است
+  await set(L.id, img[0], 'running', 'l_active', t + 60000);     //  دستهٔ فعال، اجارهٔ زنده
+  await jobs.batchAction(D.shopId, D.user.id, P.id, 'pause');
+  await set(P.id, img[1], 'running', 'l_paused', t - 1);         //  دستهٔ متوقف: «ادامه» دوباره برمی‌دارد
+  const openOf = async () => Number((await one(
+    `SELECT COUNT(*)::int AS n FROM image_studio_jobs WHERE shop_id=$1 AND status IN ('queued','running')`, [D.shopId])).n);
+  const row = (batch, image) => one('SELECT status, lease FROM image_studio_jobs WHERE batch_id=$1 AND image_id=$2', [batch, image]);
+  assert.equal(await openOf(), 5);
+
+  assert.deepEqual(await jobs.claim(4), [], 'هیچ کاری برداشته نشد');
+  assert.deepEqual(await row(K.id, img[0]), { status: 'cancelled', lease: '' }, 'اجارهٔ تمام‌شدهٔ دستهٔ لغوشده ⇒ لغو');
+  assert.deepEqual(await row(K.id, img[1]), { status: 'cancelled', lease: '' }, '«در صف» ِ دستهٔ لغوشده ⇒ لغو');
+  assert.deepEqual(await row(K.id, img[2]), { status: 'running', lease: 'l_live' }, 'اجارهٔ زنده دست نخورد');
+  assert.deepEqual(await row(L.id, img[0]), { status: 'running', lease: 'l_active' }, 'دستهٔ فعال دست نخورد');
+  assert.deepEqual(await row(P.id, img[1]), { status: 'running', lease: 'l_paused' }, 'دستهٔ متوقف دست نخورد');
+  assert.equal(await openOf(), 3, 'در سقفِ «کارِ باز» دیگر شمرده نمی‌شوند');
+  const view = await jobs.batchView(D.shopId, K.id);
+  assert.deepEqual([view.progress.cancelled, view.progress.running], [2, 1]);
+
+  //  کارگرِ زنده هم افتاد ⇒ جاروی بعدی؛ دوباره ⇒ هیچ
+  await set(K.id, img[2], 'running', 'l_live', now() - 1);
+  assert.equal(await jobs.sweep(), 1);
+  assert.equal(await jobs.sweep(), 0);
+  assert.deepEqual([(await jobs.batchView(D.shopId, K.id)).progress.cancelled], [3]);
+  //  «ادامه» ِ دستهٔ متوقف ⇒ همان `claim` اجارهٔ تمام‌شده را دوباره برمی‌دارد (کار گم نمی‌شود)
+  await jobs.batchAction(D.shopId, D.user.id, P.id, 'resume');
+  const again = await jobs.claim(4);
+  assert.deepEqual(again.map((j) => [j.batch_id, j.image_id]), [[P.id, img[1]]]);
+  for (const b of [L, P]) await jobs.batchAction(D.shopId, D.user.id, b.id, 'cancel');
+  await query(`UPDATE image_studio_jobs SET lease_until=0 WHERE shop_id=$1 AND status='running'`, [D.shopId]);
+  await jobs.sweep();
+  assert.equal(await openOf(), 0);
+});
+
+test('R11: بودجهٔ بایتِ پیکسلِ بازشده میانِ کارگرها — پیش‌فرض همان دیروز، بیشتر از سهم ⇒ `memory_budget` بی رشته و بی تلاشِ دوباره', async () => {
+  const limits = (env) => JSON.parse(execFileSync(process.execPath, ['-e',
+    "process.stdout.write(JSON.stringify(require('./src/lib/image-studio-jobs').LIMITS))"], {
+    cwd: path.join(__dirname, '..'), encoding: 'utf8',
+    env: { ...process.env, IMAGE_STUDIO_WORKERS: '', IMAGE_STUDIO_DECODE_MB: '', ...env },
+  }));
+  const MIB = 1048576, MAX = codec.MAX_PIXELS * 4;                //  بزرگ‌ترین عکسِ رمزگشاشدنی، RGBA
+  for (const [env, workers, mb] of [[{}, 2, 256], [{ IMAGE_STUDIO_WORKERS: '4' }, 4, 256], [{ IMAGE_STUDIO_WORKERS: '1' }, 1, 256],
+    [{ IMAGE_STUDIO_WORKERS: '4', IMAGE_STUDIO_DECODE_MB: '96' }, 4, 96]]) {
+    const L = limits(env);
+    assert.equal(L.WORKERS, workers, JSON.stringify(env));
+    assert.equal(L.DECODE_BYTES, Math.floor((mb * MIB) / workers), JSON.stringify(env));
+    assert.ok(L.DECODE_BYTES * L.WORKERS <= mb * MIB, 'جمعِ همهٔ کارگرها ≤ بودجه');
+    if (mb === 256) assert.ok(L.DECODE_BYTES >= MAX, 'پیش‌فرض: ۱۶ مگاپیکسل RGBA همان دیروز');
+  }
+  assert.equal(jobs.LIMITS.DECODE_BYTES, MIB, 'همین پرونده: ۲ مگابایت ÷ ۲ کارگر');
+
+  //  JPEG ِ ۸۰۰×۶۰۰ (۱٫۴۴ مگابایت RGB) و PNG ِ ۵۲۰×۵۲۰ (رمزگشا همیشه RGBA ⇒ ۱٫۰۸) بیشتر از سهم؛ JPEG ِ ۵۲۰×۵۲۰ (۰٫۸۱) نه
+  const big = (await upload(C, jpg(800, 600), 'r11-big')).body.id;
+  const wide = (await upload(C, F.pngImage(520, 520, F.scene(520, 520), { mode: 'rgb' }), 'r11-png')).body.id;
+  const fits = (await upload(C, jpg(520, 520), 'r11-fits')).body.id;
+  for (const x of [big, wide, fits]) assert.ok(x, 'بارگذاری');
+  const b = await jobs.createBatch(C.shopId, C.user.id, { key: 'r11-budget', image_ids: [big, wide, fits], preset: 'enhance' });
+  const sent = [];
+  jobs._setIsolate(async (task) => { sent.push(task.image_id); return studio.render(task.buf, task.info, task.request, task.maxBytes); });
+  try { await jobs.drain({ timeoutMs: 30000 }); } finally { jobs._setIsolate(null); }
+  const rows = await Promise.all([big, wide, fits].map((x) => one(
+    'SELECT status, error, attempts FROM image_studio_jobs WHERE batch_id=$1 AND image_id=$2', [b.id, x])));
+  assert.deepEqual(rows.map((r) => [r.status, r.error, Number(r.attempts)]),
+    [['failed', 'memory_budget', 1], ['failed', 'memory_budget', 1], ['done', '', 1]]);
+  assert.deepEqual(sent, [fits], 'فقط عکسِ زیرِ سهم به رشته رفت');
+});
+
+test('R10: خانهٔ CSV ِ سرور — متنِ فقط-عدد عدد می‌ماند، هر شکلِ دیگر «\'» (همان CSV ِ «خروجیِ مالی» ِ پنلِ مرکزی)', async () => {
+  const plain = ['-500', '-500.00', '-0', '-0.5'];
+  const prefixed = { '-2+3': "'-2+3", '-1e5': "'-1e5", '+500': "'+500", '-.5': "'-.5", '- 500': "'- 500", '-500.': "'-500.",
+    '-150.00%': "'-150.00%", '-1,000': `"'-1,000"`, '=500': "'=500", '@500': "'@500", '\t500': "'\t500", '-500\n': `"'-500\n"` };
+  for (const v of plain) assert.equal(finance.cell(v), v, `فقط-عدد: ${v}`);
+  for (const [v, want] of Object.entries(prefixed)) assert.equal(finance.cell(v), want, `فرمول‌نما: ${JSON.stringify(v)}`);
+  assert.equal(finance.cell(-500), '-500');
+
+  //  همان قاعده در تنها CSV ِ سرور که `cell` را می‌خواند: GET /api/admin/finance/export
+  const t = now(), ids = { '-500.00': 'r10-plain', '-2+3': 'r10-minus', '=HYPERLINK("http://evil.example/","x")': 'r10-link' };
+  for (const [tenant, id] of Object.entries(ids)) {
+    await query(`INSERT INTO sub_payments (id, app, tenant_kind, tenant_id, amount, currency, method, receipt_no, paid_at, created_at)
+                 VALUES ($1,'shop','shop',$2,500,'AFN','cash',$1,$3,$3)`, [id, tenant, t]);
+  }
+  const r = await h.get('/api/admin/finance/export?dataset=payments', { token: root });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 300));
+  const lines = r.body.csv.replace(/^﻿/, '').split('\r\n');
+  const row = (id) => lines.find((l) => l.startsWith(`${id},`));
+  assert.equal(row('r10-plain').split(',')[4], '-500.00', 'متنِ فقط-عدد بی «\'»');
+  assert.equal(row('r10-minus').split(',')[4], "'-2+3");
+  assert.ok(row('r10-link').includes(`"'=HYPERLINK(""http://evil.example/"",""x"")"`), row('r10-link'));
+});
+
+test('R18: گزارشِ خطای دستهٔ بانک (CSV ِ مدیر) هر خانه را از همان `finance-reports.cell` می‌گذراند؛ ستون‌ها همان', async () => {
+  const LINK = '=HYPERLINK("http://evil.example/","x")', LINK_CSV = `"'=HYPERLINK(""http://evil.example/"",""x"")"`;
+  const lines = (csv) => csv.replace(/^﻿/, '').split('\r\n');
+  //  هر خانهٔ ردیف و فایل، بی پایگاه
+  const rep = {
+    rows: [
+      { row_no: 7, status: 'failed', error: '=1+1', image_id: '@img', product_id: LINK, candidates: ['-2+3', 'bp_1'] },
+      { row_no: 8, status: 'ok', error: '', image_id: 'i', product_id: 'p', candidates: [] },
+      { row_no: 9, status: 'needs_review', error: '', image_id: '', product_id: '-500.00', candidates: [] },
+    ],
+    files: { failed: [{ name: 'bad.jpg', error: '+cmd' }] },
+  };
+  assert.deepEqual(lines(bank.reportCsv(rep)), [
+    'row_no,status,error,image_id,product_id,candidates',
+    `7,failed,'=1+1,'@img,${LINK_CSV},'-2+3|bp_1`,
+    '9,needs_review,,,-500.00,',
+    "file:bad.jpg,failed,'+cmd,,,",
+    '',
+  ]);
+
+  //  همان درِ پنل: شناسهٔ کالای «=HYPERLINK(…)» در CSV ِ بارگذاری‌شده
+  await setFlag('all', 'image_bank.central', true);
+  const AD = (method, p, body) => h.api(method, '/api/admin/image-bank' + p, { token: root, body });
+  const b = await AD('POST', '/batches', { license_source: 'کاتالوگِ تأمین‌کننده', license_status: 'licensed', commercial_use: true });
+  assert.equal(b.status, 201, JSON.stringify(b.body));
+  const put = await h.raw('PUT', `/api/admin/image-bank/batches/${b.body.id}/files/r18.jpg`, jpg(), { token: root });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const rows = await AD('POST', `/batches/${b.body.id}/rows`, { csv: `product_id,image_path\n"${LINK.replace(/"/g, '""')}",r18.jpg\n` });
+  assert.equal(rows.status, 200, JSON.stringify(rows.body));
+  assert.deepEqual(rows.body.rows.map((r) => [r.status, r.error, r.product_id]), [['failed', 'product_not_found', '']]);
+  const report = async () => lines((await h.download(`/api/admin/image-bank/batches/${b.body.id}/report?format=csv`, { token: root })).buffer.toString('utf8'));
+  let out = await report();
+  assert.equal(out[0], 'row_no,status,error,image_id,product_id,candidates');
+  assert.ok(out.every((l) => !l.includes('HYPERLINK')), 'شناسهٔ ناشناس در گزارش برنمی‌گردد');
+  //  مقدارِ ذخیره‌شده (هر راهی که روزی آن را بنویسد) هم در CSV فرمول نمی‌شود
+  await query(`UPDATE image_batch_rows SET product_id=$2, error='-2+3', candidates='["@x"]' WHERE batch_id=$1`, [b.body.id, LINK]);
+  out = await report();
+  const row = out.find((l) => /^\d+,failed,/.test(l));
+  assert.ok(row && row.endsWith(`,'-2+3,,${LINK_CSV},'@x`), JSON.stringify(out));
+  assert.ok(out.every((l) => !/(^|,)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'Q'))), JSON.stringify(out));
 });
