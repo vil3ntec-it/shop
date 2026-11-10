@@ -61,6 +61,12 @@ object PrinterFinderPlatform {
   /** `in_addr` به ترتیبِ شبکه (big-endian) در حافظه؛ روی arm64 ِ little-endian بایتِ اول کم‌ارزش‌ترین است */
   private fun ipv4(raw: UInt): String = (0 until 4).joinToString(".") { ((raw shr (8 * it)) and 0xFFu).toString() }
 
+  /**
+   *  HW-12: پرسشِ mDNS ِ اندروید/کامپیوتر (`MdnsProbe`، هدفِ jvm) این‌جا نیست — فرستادنِ چندپخش در iOS مجوزِ
+   *  `com.apple.developer.networking.multicast` ِ اپل را می‌خواهد. جست‌وجوی ۹۱۰۰ همچنان هست.
+   */
+  suspend fun mdnsPrinters(context: Context, lans: List<Subnet.Lan>): List<FoundPrinter> = emptyList()
+
   fun bluetoothPermissions(): List<String> = emptyList()
 
   fun bluetoothGranted(context: Context): Boolean = false

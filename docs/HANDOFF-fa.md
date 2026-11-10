@@ -153,6 +153,17 @@
   خاموش و بی دکمه (تصمیمِ صاحب‌کار)؛ push ِ v1 ِ کاتلین هنوز ساده؛ v3 روی 2G سنجیده نشد.
 - قدمِ بعدی: شاهدِ CI ِ همین آزمون‌ها و `sync-v3-current`/`sync-v3-gzip-push`/`web-sync-v3`/`scenario-s28b` ⇒ STATUS؛ سپس push ِ فشردهٔ v1 ِ
   کاتلین با همان `V3Gzip` (پس از `gzip_push` ِ pull ِ v1).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/hw-2` (خانوادهٔ HW، دورِ دوم: شکاف‌های کدیِ بی‌نیاز به دستگاه؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: HW-12 — پیدا کردنِ چاپگرِ خامِ شبکه با mDNS/DNS-SD (`_pdl-datastream._tcp`): `core/hw/Mdns.kt` (پرسش، خواندنِ بسته با فشرده‌سازیِ نام،
+  PTR ⇐ SRV ⇐ A، فقط RFC1918)، `MdnsProbe` در core/jvmMain (پرسشِ یک‌باره و پاسخِ تک‌پخشِ RFC 6762 §6.7، بسته به نشانیِ کارت)،
+  `PrinterFinderPlatform.mdnsPrinters` (اندروید پس از `LocalNetworkAccess.blocked` ِ HW-13؛ کامپیوتر؛ آیفون فهرستِ خالی) و هم‌زمان با جست‌وجوی ۹۱۰۰
+  در «پیدا کردنِ خودکارِ چاپگر» (پشتِ همان `easy_setup` ِ خاموش). بردارهای `core/test-vectors/mdns-v1.json` را dnspython ساخته؛
+  `hw-mdns.test.js` ۵/۵ محلی (پیش از `Mdns.kt` سرخ)؛ MdnsVectorsTest، MdnsProbeTest (پاسخ‌دهندهٔ ساختگی روی loopback) و یک آزمونِ EasySetupWiringTest فقط CI.
+- نیمه‌کاره: کامپایل و آزمونِ Kotlin فقط در CI (Gradle این‌جا نیست؛ kotlinc ِ جدا هم اجرا نشد). هیچ ردیفی بالا نرفت (سخت‌افزارِ واقعی، MKT-10).
+  بررسی شد و ساخته نشد: HW-01/02/03/08/11/13 جز دستگاهِ واقعی کمبودی ندارند؛ HW-07 (اسکنِ گوشی ⇐ هاب ⇐ صندوق) روی مرزِ امنیتیِ هابِ SYN-09 است
+  (توکن بی اینترنت سنجیده نمی‌شود) و طرح می‌خواهد؛ HW-10 (سبد روی صفحهٔ دومِ اندروید) با `Presentation` ِ حساب‌پی در `pay/platform` یکی می‌شود؛
+  HW-09 ِ گوشی (ترازوی بلوتوثی در صندوق): `ScaleWeighButton` فقط در `CartLineDialog` ِ صندوقِ پیشین و `PickSheet` است و صندوقِ v3 دکمهٔ وزن ندارد؛ BLE ِ GATT ِ چاپگر بی دستگاه آزمودنی نیست.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و KTEST ِ `:core:jvmTest` (MdnsVectorsTest ۵، MdnsProbeTest ۵) و EasySetupWiringTest ۷ را در STATUS ِ HW-12 بنویسد.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را

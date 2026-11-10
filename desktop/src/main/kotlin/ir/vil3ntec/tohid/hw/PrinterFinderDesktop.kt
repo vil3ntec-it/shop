@@ -2,7 +2,10 @@ package ir.vil3ntec.tohid.hw
 
 import android.content.Context
 import ir.vil3ntec.tohid.core.hw.FoundPrinter
+import ir.vil3ntec.tohid.core.hw.MdnsProbe
 import ir.vil3ntec.tohid.core.hw.Subnet
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.net.Inet4Address
 import java.net.NetworkInterface
 
@@ -26,6 +29,11 @@ object PrinterFinderPlatform {
         }
       }
   }.getOrDefault(emptyList())
+
+  /** HW-12 — همان `MdnsProbe` ِ اندروید (پرسشِ یک‌بارهٔ mDNS از هر کارت)؛ کامپیوتر اجازهٔ شبکهٔ محلی نمی‌خواهد */
+  suspend fun mdnsPrinters(context: Context, lans: List<Subnet.Lan>): List<FoundPrinter> = withContext(Dispatchers.IO) {
+    lans.flatMap { lan -> runCatching { MdnsProbe.ask(lan.ip) }.getOrDefault(emptyList()) }
+  }
 
   fun bluetoothPermissions(): List<String> = emptyList()
 
