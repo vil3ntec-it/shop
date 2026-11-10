@@ -243,6 +243,8 @@ const MOUNTS = {
   'admin-finance.js': '/admin/finance',
   //  مدیرانِ سکو (از `admin.js` جدا شد تا زیرِ سقفِ ۸۰۰ خط بماند؛ همان مسیرها)
   'admin-admins.js': '/admin/admins',
+  //  دو درِ قراردادِ پل (ممیزیِ پنلِ مرکزی §۹: S15 پایانِ دوره، S18 قرارداد)
+  'admin-bridge.js': '/admin',
 };
 const PUBLIC = new Set(['POST /admin/login']);   // تنها درِ بی‌توکن: خودِ ورود
 
@@ -374,6 +376,9 @@ const CAPABILITY_PROBES = {
     ? { 'release-stage.v1': ['GET /admin/release/stage', 'PUT /admin/release/stage', 'DELETE /admin/release/stage'] } : {}),
   'finance.v1': ['GET /admin/finance/summary', 'GET /admin/finance/payments', 'POST /admin/finance/adjustments',
     'GET /admin/finance/discrepancies', 'GET /admin/finance/export'],
+  'sync-restore-once.v1': ['POST /admin/sync/conflicts/1/restore'],
+  'subscription-period.v1': ['GET /admin/subscriptions/period-end?amount=1&unit=month'],
+  'admin-contract.v1': ['GET /admin/contract'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {

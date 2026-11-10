@@ -39,6 +39,13 @@
     return out;
   }
   function api(path, opts) { return K.api(BASE + path, opts); }
+  //  RPT-14: تپشِ بالای قیف، یک بار برای هر گام در هر بارِ صفحه، فقط با `features.funnel`
+  var beats = {};
+  function beat(s) {
+    if (!store || !store.features.funnel || beats[s]) return;
+    beats[s] = 1;
+    try { navigator.sendBeacon(BASE + '/funnel/' + s); } catch (e) { /* بی تپش */ }
+  }
   //  WEB-16: کارت thumb، برگه photo؛ IMG-12: v = photoVersion
   function photoUrl(id, big, v) { return BASE + '/products/' + encodeURIComponent(id) + (big ? '/photo' : '/thumb') + (v ? '?v=' + encodeURIComponent(v) : ''); }
 
@@ -182,6 +189,7 @@
   }
   function openProduct(id) {
     var p = catalog.items[id];
+    beat('view');
     //  پاسخِ دیررس برگه را باز نمی‌کند
     var here = function () { return location.hash === '#/p/' + encodeURIComponent(id); };
     var fill = function (x) {
@@ -249,6 +257,7 @@
     if (src.maxQtyMilli && milli > src.maxQtyMilli) milli = src.maxQtyMilli;
     if (milli <= 0) delete cart[id];
     else {
+      if (!line || milli > line.qtyMilli) beat('cart');
       //  CHK-15/16: یادداشت و «اگر نبود» می‌مانند
       cart[id] = Object.assign({}, line, {
         qtyMilli: milli, name: src.name, unit: src.unit || '', priceMinor: src.priceMinor,
@@ -584,6 +593,7 @@
         K.js('/store/share.js').then(function () { share = window.StoreShare(r.seo.productBase); if (K.sheetOpen() === $('product-sheet')) $('ps-share').hidden = false; }, function () { /* بی «فرستادن» */ });
       }
       renderHead();
+      beat('visit');
       renderCats();
       setZone({ id: K.loadS('zone:' + slug) });
       var link = el('link', { attrs: { rel: 'manifest', href: '/store/' + encodeURIComponent(slug) + '/manifest.webmanifest' } });

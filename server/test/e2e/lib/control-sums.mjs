@@ -7,9 +7,9 @@
  *     transactions، …) شمارِ ردیفِ زنده و جمعِ **هر** فیلدِ عددی (finalTotal، qty، amount، …) —
  *     بی‌نیاز به دانستنِ شکلِ مدل، پس فیلدِ تازهٔ برنامه هم شمرده می‌شود.
  *
- * درون‌فرایند: `fingerprint((sql, params) => rows)`. فرایندِ جدا («محیطِ جدا»):
+ * درون‌فرایند: `fingerprint((sql, params) => rows)`. فرایندِ جدا («محیطِ جدا»، `restore-copy.mjs`):
  *   node control-sums.mjs load <پوشه> <tar.gz>   پوشهٔ تازه از پشتیبانِ رمزگشایی‌شده (PGlite)
- *   node control-sums.mjs sums <پوشه>            JSON ِ fingerprint روی stdout
+ *   node control-sums.mjs sums <پوشه|postgres://…>   JSON ِ fingerprint روی stdout (پوشهٔ PGlite یا دیتابیسِ PostgreSQL)
  */
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
@@ -91,9 +91,16 @@ export function diff(a, b, { only = null, ignore = [], countsOnly = [] } = {}) {
   return out;
 }
 
-/* ════════════════════════ CLI: فرایندِ جدا روی پوشهٔ PGlite ════════════════════════ */
+/* ════════════════════════ CLI: فرایندِ جدا روی پوشهٔ PGlite یا دیتابیسِ PostgreSQL ════════════════════════ */
 
 async function cli([cmd, dir, file]) {
+  if (cmd === 'sums' && /^postgres(ql)?:\/\//.test(dir)) {
+    const { Client } = require('pg');
+    const c = new Client({ connectionString: dir });
+    await c.connect();
+    try { console.log(JSON.stringify(await fingerprint(async (sql, params) => (await c.query(sql, params)).rows))); } finally { await c.end(); }
+    return;
+  }
   const { PGlite } = require('@electric-sql/pglite');
   if (cmd === 'load') {
     if (fs.existsSync(dir) && fs.readdirSync(dir).length) throw new Error(`پوشهٔ مقصد خالی نیست: ${dir}`);

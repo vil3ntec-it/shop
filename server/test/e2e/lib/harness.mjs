@@ -108,7 +108,9 @@ export async function boot({ name, env = {}, port = 0 }) {
   const syncV1 = require('../../../src/lib/sync-v1');
 
   if (!db.isPglite()) {
-    await db.query('DROP SCHEMA public CASCADE');
+    //  `IF EXISTS`: سناریویی که میانِ این دو کشته شد (خاموشیِ ظرف، سقفِ زمانِ run.mjs) دیتابیسِ مشترک را بی `public` می‌گذاشت
+    //  و از آن پس هر سناریو همین‌جا با «schema "public" does not exist» می‌افتاد (۳۷ از ۳۷ سرخ)
+    await db.query('DROP SCHEMA IF EXISTS public CASCADE');
     await db.query('CREATE SCHEMA public');
   }
   await migrate.run();
@@ -149,7 +151,11 @@ class Harness {
     this._browser = null;
     this._seq = 0;
     this._failedIds = new Set();
+    this._onFinish = [];
   }
+
+  /** کارِ پایان (پیش از بستنِ دیتابیس)؛ مثلاً انداختنِ دیتابیسِ بازیابیِ `restore-copy.mjs` */
+  onFinish(fn) { this._onFinish.push(fn); }
 
   /* ════════════════════════ HTTP (بیرون از برنامه: مدیر، مشتری) ════════════════════════ */
 
@@ -326,6 +332,7 @@ class Harness {
   async finish() {
     for (const pg of this.pages) await pg.ctx.close().catch(() => {});
     if (this._browser) await this._browser.close().catch(() => {});
+    for (const fn of this._onFinish) await Promise.resolve().then(fn).catch((e) => console.error(`پایان: ${e.message}`));
     this.outbox.stop();
     //  همان خاموشیِ `src/index.js`: رهبری و گذرگاه (اگر خوشه است)، استخرِ نسخهٔ خواندنی (اگر هست)
     await this.cluster.stop().catch(() => {});

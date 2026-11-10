@@ -111,12 +111,14 @@ async function createApp({ runMigrations = true } = {}) {
     next();
   });
 
-  //  ⛔ ممیزیِ ۳۵ (B4): NUL در مسیر (`%00`) — PostgreSQL متنِ NUL‌دار را نمی‌پذیرد (۲۲۰۲۱)، پس هر شناسهٔ خامِ مسیر
-  //  ۵۰۰ می‌شد (و خطای سرور ثبت می‌کرد). هیچ برنامه‌ای NUL نمی‌فرستد ⇒ ۴۰۰ پیش از هر کار. `%2500` (متنِ «%00») NUL نیست.
-  //  پرسش (`?…`) دست نمی‌خورد: درهایش خودشان می‌سنجند (`routes-idor-31.test.js`).
-  app.use((req, res, next) => (/%00/i.test(req.url.split('?')[0])
-    ? res.status(400).json({ error: { code: 'bad_path', message: 'نشانیِ درخواست درست نیست' } })
-    : next()));
+  //  ⛔ ممیزیِ ۳۵: NUL (`%00`) در مسیر (B4 ⇒ `bad_path`) یا پرسش، کلید یا مقدار (X2 ⇒ `bad_query`) ⇒ ۴۰۰ پیش از هر کار (PostgreSQL
+  //  ۲۲۰۲۱ ⇒ ۵۰۰؛ در-به-در هفت درِ مدیر جا افتاده بود). شناسهٔ NUL‌دار نادرست است نه «نیافته»؛ `%2500` NUL نیست؛ پرسشِ `RAW_SYNC` دست‌نخورده.
+  const { RAW_SYNC } = require('./middleware/json-body');   //  همان استثنای پارسرِ بدنه (همگام‌سازی و پمپ)
+  app.use((req, res, next) => {
+    const [p, ...q] = req.url.split('?');
+    const bad = /%00/.test(p) ? 'bad_path' : (/%00/.test(q.join('?')) && !RAW_SYNC.test(req.path) ? 'bad_query' : '');
+    return bad ? res.status(400).json({ error: { code: bad, message: 'نشانیِ درخواست درست نیست' } }) : next();
+  });
 
   // ---- CORS ----
   // برنامه‌ی اندروید به CORS کاری ندارد؛ این فقط برای نسخه‌ی وب است و
@@ -239,6 +241,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش ⇒ فقط `next()`): هر درخواستِ نوشتنی ⇒ خواندن‌های
     //  همان مشتری/کاربر تا `REPLICA_STICKY_MS` از پایگاهِ اصلی (`lib/read-replica.js`)
     api.use(require('./lib/read-replica').writes);
+    //  S18: نسخهٔ قراردادِ درهای مدیر روی هر پاسخِ `/admin/*` (۴۰۱ و ۴۰۴ هم) — افزودنی؛ پنلِ کهنه نمی‌خواندش
+    api.use('/admin', require('./lib/admin-capabilities').adminApiVersion);
     api.get('/health', health);
     api.get('/ready', ready);
 
@@ -427,6 +431,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/storefront-funnel-store'));   // RPT-14: تپشِ بالای قیفِ ویترینِ وب، پشتِ پرچمِ خاموشِ گزارش
     api.use('/store', require('./routes/store-account-history'));   // CRM-13: «حسابِ من» (خرید و مانده)، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-visual-store'));   // AI-11: «جست‌وجو با عکس» ِ ویترین، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront'));

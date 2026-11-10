@@ -4,10 +4,10 @@
  *
  *   ۱) دکانِ واقعی: فروشِ نقد و نسیه، دریافت، مرجوعی (برنامه، Sync v1)؛ سفارشِ اینترنتی تا
  *      «برده شد» با بازپرداخت؛ کاتالوگِ سرور.
- *   ۲) پشتیبانِ رمزدارِ سرور (PGlite، AES-256-GCM): بی عبارتِ عبور یا با عبارتِ غلط باز نمی‌شود
- *      و متنِ دکان در فایل خوانا نیست.
+ *   ۲) پشتیبانِ رمزدارِ سرور (PGlite: tar ِ پوشه؛ PostgreSQL ِ `E2E_DATABASE_URL`: SQL ِ pg_dump؛ هر دو AES-256-GCM):
+ *      بی عبارتِ عبور یا با عبارتِ غلط باز نمی‌شود و متنِ دکان در فایل خوانا نیست.
  *   ۳) پس از پشتیبان، شاگرد یک فروشِ دیگر می‌فرستد (پنجرهٔ «پس از آخرین پشتیبان»).
- *   ۴) سرورِ تازه از همان فایل (فرایندِ جدا، پوشهٔ تازه) بالا می‌آید.
+ *   ۴) سرورِ تازه از همان فایل (فرایندِ جدا، پوشه یا دیتابیسِ تازه — `lib/restore-copy.mjs`) بالا می‌آید.
  *   ۵) دستگاه‌ها با همان نشست ادامه می‌دهند؛ دستگاهِ نو از Snapshot همان دفتر را می‌گیرد؛ سفارش،
  *      رویدادها، بازپرداخت، گزارشِ تطبیق و کاتالوگ با پیش از پشتیبان یکی‌اند.
  *   ۶) §۹.۵: کارهای «پس از پشتیبان» که در سرورِ بازیابی‌شده نیستند، از دفترچهٔ دستگاه‌ها
@@ -24,9 +24,9 @@ import { createRequire } from 'node:module';
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
 import { boot, assert } from './lib/harness.mjs';
 import { NativeDevice } from './lib/native.mjs';
+import { restoreCopy } from './lib/restore-copy.mjs';
 
 const require = createRequire(import.meta.url);
 const PASS = 'e2e-backup-passphrase-ops-14';
@@ -121,7 +121,8 @@ await E.step('E2E-OPS-14.backup', 'پشتیبانِ رمزدارِ سرور: م�
   assert.equal(raw.subarray(0, 7).toString(), 'SHOPBK1');
   assert.equal(raw.includes(Buffer.from('دکانِ پشتیبان')), false, 'نامِ دکان در فایلِ رمزدار خوانا است');
   const meta = JSON.parse(fs.readFileSync(`${file}.meta.json`, 'utf8'));
-  assert.equal(meta.format, 'pglite-datadir-tar-gzip');
+  //  قالبِ همان پایگاهِ سرور: PGlite ⇒ tar ِ پوشه؛ PostgreSQL ⇒ SQL ِ pg_dump (`lib/backup.js`)
+  assert.equal(meta.format, db.isPglite() ? 'pglite-datadir-tar-gzip' : 'pg_dump-plain-gzip');
   config.backup.passphrase = 'عبارتِ غلط';
   await assert.rejects(() => backup.decode(file));
   config.backup.passphrase = '';
@@ -204,13 +205,9 @@ await E.step('E2E-OPS-14.late-bookless', 'پس از پشتیبان: گوشیِ �
 }, { needs: ['E2E-OPS-14.late-offline', 'E2E-OPS-14.late-join'] });
 
 await E.step('E2E-OPS-14.restore', 'سرورِ تازه از همان فایل در پوشهٔ تازه بالا می‌آید (فرایندِ جدا)', async () => {
-  const backup = require('../../src/lib/backup');
-  const tar = await backup.decode(file);
-  const tgz = path.join(E.tmp, 'restore.tar.gz');
-  fs.writeFileSync(tgz, zlib.gzipSync(tar));
-  const dir = path.join(E.tmp, 'restored-db');
-  child = spawn(process.execPath, [path.join(import.meta.dirname, 'lib', 'restored-server.mjs'), dir, tgz], {
-    env: { ...process.env, DATABASE_URL: `pglite:${dir}` }, stdio: ['ignore', 'pipe', 'pipe'],
+  const url = await restoreCopy(E, file, path.join(E.tmp, 'restored-db'));
+  child = spawn(process.execPath, [path.join(import.meta.dirname, 'lib', 'restored-server.mjs'), url], {
+    env: { ...process.env, DATABASE_URL: url }, stdio: ['ignore', 'pipe', 'pipe'],
   });
   const port = await new Promise((resolve, reject) => {
     let out = '';

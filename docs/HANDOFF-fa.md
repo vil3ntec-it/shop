@@ -4,6 +4,7 @@
 **هر سیزن، پیش از کار روی پروژه، این فایل خوانده می‌شود و پیش از پایانِ سیزن یک بند به «گزارشِ سیزن‌ها» اضافه می‌شود**: چه
 کاری انجام شد، چه کاری نیمه‌کاره ماند و قدمِ بعدی چیست. وضعیتِ تک‌تکِ شناسه‌ها همچنان در `docs/spec/STATUS.md` است.
 این فایل فقط تصویرِ کلی، تصمیم‌های صاحب محصول و کارهای در جریان را نگه می‌دارد.
+**تصمیم‌های مانده با صاحب‌کار (فهرستِ یکتا، از ۱۴۰۵/۰۸/۱۹):** [`OWNER-PENDING-fa.md`](OWNER-PENDING-fa.md).
 
 ## تصمیم‌های صاحب محصول (۱۴۰۵/۰۸/۰۸) — در سند: `docs/spec/40-owner-decisions.md` (§۴۰)
 
@@ -74,6 +75,35 @@
 - نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
   `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
 - قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
+  (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
+  (بستن/تنزل/نشست/کلیدِ سرویس)؛ شکافِ مانده «مالک = پیشین‌ترین ارشد، فعال یا نه» بسته شد (`lib/admin-owner.js`: فقط ارشدِ فعال، جابه‌جاییِ نشانِ
+  مانده با سابقه). (۳) S15: `GET /admin/subscriptions/period-end` با همان `subscriptions.periodEnd` ِ اعطا. (۴) S18: `X-Admin-API-Version` و
+  `GET /admin/contract` از `server/src/lib/admin-contract.json` (ساختهٔ `generate.cjs` از `docs/api/routes.json`). آزمون‌ها: `admin-sync-restore-once` ۸،
+  `admin-owner-active` ۷، `admin-bridge-contract` ۸ (پیش از تغییر ۱۹ از ۲۳ سرخ؛ چهار سبزِ ماندنی نگهبانِ پسرفت‌اند)، روی PGlite و PostgreSQL ِ محلی؛ شرح در RULES «v3 · پنلِ مدیر» و بندِ ۱۲.۱۰ ِ ADMIN-CONTROL-PLANE.
+- نیمه‌کاره: سمتِ پنل (ریپوی server) — فرستادنِ `Idempotency-Key` به بالادست، جایگزینیِ `addPeriod` با `period-end`، خواندنِ `/admin/contract`؛ S14 فقط پیشنهاد (تصمیمِ صاحب محصول).
+- قدمِ بعدی: شاهدِ CI ِ سه آزمونِ تازه؛ تغییرِ پنل پشتِ توانایی‌های `sync-restore-once.v1`، `subscription-period.v1` و `admin-contract.v1`.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-close` (ردیف‌های P1 ِ همهٔ خانواده‌ها؛ روی main ‏ed8009d7 = دستهٔ ۳۸، سپس ادغامِ main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ممیزیِ ۶۱ ردیفِ P1 (PARTIAL/MISSING) با سنجشِ کد؛ فقط دو کمبودِ کدیِ سرور/وب بی مانع ماند و هر دو ساخته شد:
+  (۱) CRM-09: دفترِ نشانیِ حساب (ویترین و بازارچه) ناحیه، دروازه، ولایت، گذر، منزل/طبقه، شمارهٔ دوم و Plus Code را نگه می‌دارد — مهاجرتِ ۴۹۰،
+  `orders.addressExtras` ِ مشترک با ثبت، `PUT` ِ برنامهٔ پیشین پاکشان نمی‌کند؛ `acct.js` کادرها را پر و «جزئیاتِ بیشتر» را باز می‌کند.
+  (۲) RPT-14: بالای قیفِ ویترینِ وب (بازدید ⇐ دیدنِ کالا ⇐ سبد) — مهاجرتِ ۴۹۱، `lib/storefront-funnel.js`، `POST /api/store/:slug/funnel/:step`،
+  تپش در `store.js` (+۴۴۳ بایت؛ بارِ نخست پس از ادغامِ دستهٔ ۳۹ ۷۰٬۹۴۹ از ۷۲٬۷۰۴)، `visits`/`top` در گزارش؛ هم‌زادِ کوچکِ Kotlin (`OnlineReport.Top` و بخشِ «بالای قیف» در صفحهٔ گزارش).
+  آزمون: `store-address-extra` ۴/۴، `storefront-funnel` ۶/۶ (PGlite و PostgreSQL ۱۶)، کرومیومِ `web-store-p1.mjs` ۱۷ ✅ با axe (هر دو پایگاه).
+- نیمه‌کاره: `OnlineReportTest` (+۱) و کامپایلِ `OnlineReportPage`/`StrOnlineReport` فقط در CI. ردهٔ بقیه در گزارشِ شاخه: شاهدِ CI (WEB-11، MKT-02، …)،
+  تصمیمِ صاحب‌کار (کدِ پستیِ اختیاری در ویترین که نگهبانِ LOC-10 می‌بندد، POS-06/32/40، PAY-16، PUR-03، SEC-01، SYN-07، CHK-18، DLV-06، OPS-01/09، LOC-04، CRM-10)،
+  دستگاه/سرویسِ بیرونی (D-08، D-09، ترازو، کشو، چاپگر، AI-01/02 که رمزگشای تصویرِ بومی روی سرور می‌خواهد) و فقط Kotlin.
+- قدمِ بعدی: شاهدِ CI ِ دو آزمون و `web-store-p1.mjs`؛ تپشِ همان قیف در برنامهٔ خریدِ بومی؛ NTF-08 با پوشِ وبِ مشتریِ دستهٔ ۳۹ حالا ساختنی است:
+  رویدادِ «پول برگشت» برای **هر** ردیفِ `online_order_refunds` در صفِ `customer_notify` (یکتایی امروز (سفارش، رویداد) است ⇒ مهاجرت برای (سفارش، رویداد، شناسهٔ بازپرداخت) و CHECK ِ `event`).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/ci-evidence` (ردیف‌های STATUS که فقط شاهدِ CI کم داشتند؛ روی main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: از ۱۴۱ ردیفِ PARTIAL/NOT-VERIFIED که از CI نام می‌برند فقط POS-01، WEB-11 و MKT-02 جز شاهدِ CI کمبودی نداشتند. لاگِ کاملِ کارهای main ‏f8134445
+  (PostgreSQL 129585341948، PGlite 129585342405، مرورگر 129585342400، «برنامهٔ خریدِ مشتری (گزارش)» 129585337686، «کامپایل و آزمون» 129585337797) و iOS ِ
+  سرِ PR ِ #1023 (129573624196) خوانده شد. هیچ ردیفی ارتقا نیافت: لاگِ Gradle ِ اندروید، کامپیوتر و برنامهٔ خرید فقط `> Task :test` و BUILD SUCCESSFUL
+  می‌نویسد (`testLogging` بی `events`) ⇒ `CatalogCountsTest`/`CartQueryTest` (POS-01)، `CustomerAccountTest` (WEB-11) و `CustomerStage2Test` (MKT-02)
+  نام‌به‌نام دیده نمی‌شوند. شاهدِ دیده‌شده در WEB-11 و MKT-02 ثبت شد (JS، مرورگر و `<testsuite>` ِ iOS برای `ShopperAccountTest` ۸ و `ShopperStage2Test` ۷).
+- نیمه‌کاره: سه ردیفِ بالا تا شاهدِ نام‌به‌نامِ Kotlin.
+- قدمِ بعدی: گامِ `grep -ho '<testsuite [^>]*'` (مثلِ `ios-spike.yml`) پس از آزمونِ اندروید/کامپیوتر/برنامهٔ خرید، یا `events` در `testLogging`؛ سپس همین سه ردیف.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
@@ -81,6 +111,17 @@
   همهٔ اشتراک‌ها را پاک می‌کرد. `store-push.js` + یک واژه در صادراتِ `storefront.js` (`parseToken`)؛ آزمون `security-review-39.test.js` پیش از رفع سرخ روی هر دو پایگاه.
 - نیمه‌کاره: هیچ. باز (فقط گزارش): `PUT /api/admin/pump/live-config` (کدِ پمپ) سنجشِ کاتالوگِ `admin-flags` را دور می‌زند — همان مدیرِ ارشد.
 - قدمِ بعدی: اگر صاحب محصول بخواهد، درِ پمپ هم از `checkKnown` بگذرد (کارِ کدِ پمپ، نه این شاخه).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e2e-pg` (سناریوهای سرتاسری روی PostgreSQL؛ روی `claude/flag-catalog` ‏4da5ef2e؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۳۷ سناریو روی PostgreSQL ِ محلی (`E2E_DATABASE_URL`) — پایه: ۲۴۳ سبز، ۵ سرخ، ۱۵ اجرانشده. هیچ‌کدام باگِ محصول نبود:
+  (۱) notify، ops، recovery: هارنس SQL ِ pg_dump را gzip کرده به `loadDataDir` ِ PGlite می‌داد (خطای gunzip) و ops قالبِ PGlite را
+  می‌خواست ⇒ `test/e2e/lib/restore-copy.mjs`: قالب از نامِ فایل؛ PostgreSQL ⇒ دیتابیسِ تازهٔ `…_rtest` و `scripts/restore.js` (راهِ
+  واقعیِ صاحب‌کار، روی PostgreSQL سالم دیده شد)، `control-sums.mjs sums` نشانیِ PostgreSQL هم می‌گیرد، `cutPower` برای «برق رفت».
+  (۲) DOM ِ کهنه: E2E-ADM.counts (شمارِ بازکردنِ پیشین)، E2E-ADM.user (`/فعال$/` «غیرفعال» را هم می‌گرفت)، E2E-PCK-06.4 (`goto` با
+  همان سند ⇒ جایگزینِ سفارشِ اول؛ رفعش `about:blank` در دستهٔ ۳۹، #1023، نه این شاخه)، S132 ِ customer با `all` (نوارِ سبد پیش از `route` ِ ویترین ⇒ `booted`).
+  (۳) خاموشیِ ظرف میانِ `DROP SCHEMA public` و `CREATE` دیتابیسِ مشترک را بی public گذاشت ⇒ ۳۷/۳۷ سرخ ⇒ `IF EXISTS` در `harness.mjs`.
+  شاهد (هر حالت سه اجرای پیاپی، با رفعِ pick ِ دستهٔ ۳۹): PostgreSQL پیش‌فرض و `all` هر بار ۲۶۳/۲۶۳، PGlite پیش‌فرض و `all` هر بار ۲۶۲/۲۶۲.
+- نیمه‌کاره: E2E روی PostgreSQL در CI نیست (فقط پیشنهاد در گزارش؛ ورک‌فلو دست نخورد).
+- قدمِ بعدی: کارِ `e2e-pg` در `server.yml` (سرویسِ postgres:16 و `E2E_DATABASE_URL`، ubuntu-24.04 برای psql/pg_dump ِ ۱۶).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flag-catalog` (کاتالوگِ کاملِ پرچم‌ها و «همه روشن» ِ سرتاسری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) ۵۵ کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند و در `KNOWN` نبود (خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`،
   `shop.promo_*`، `shop.owner_report`، همگام‌سازیِ دکان، بازار و کارمزدها، ops/security و تنظیم‌های عددی/شیء) با پیش‌فرضِ خودِ کد ⇒ ۱۴۲ ردیف.
@@ -119,6 +160,39 @@
   آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد). یافتهٔ امنیتیِ بیرون از دامنه: `station-chat.js` (پمپ،
   دست‌نخورده) endpoint ِ پوشِ مشتری را بی فهرستِ سفید POST می‌کند (SSRF) — رفعش اجازهٔ کدِ پمپ می‌خواهد.
 - قدمِ بعدی: پس از CI ِ سبز، ارتقای ردیف‌های «فقط شاهدِ CI»؛ «خبرم کن ِ موجود شد» (WEB-10) روی همین کانال؛ جوابِ D-09 برای مشتریِ بی پوش.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-shop` (ممیزیِ P0 ِ خانواده‌های پشتِ صحنه: POS، PAY ِ دکان، PRD، PRM، INV، PUR، RET، STF، RPT، HW، SYN، SEC، F0، OPS؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۳۸ ردیفِ P0 ِ نیمه‌کاره رده‌بندی شد؛ تنها کارِ کدیِ سرور/وبِ مانده PRD-07 بود: `server/src/lib/product-unit-rules.js` پشتِ پرچمِ خاموشِ
+  `shop.product_unit_rules` (تغییرِ واحدِ پایهٔ کالای گردش‌دار ⇒ `unit_locked`، ضریبِ تازهٔ ناجور ⇒ `unit_factor_inexact`؛ v3 از `authorize`، v1 از
+  `newer-fields.v1NewerFields` با گردشِ همان دسته؛ ⛔ `sync-v1.js` دست نخورد) — `product-unit-rules.test.js` ۸/۸ روی PGlite و PostgreSQL (و `SYNC_V3_BATCH=1`).
+  STATUS ِ PRD-07، PRD-12 (کادرِ عمده در main با #1021) و POS-12 (قفلِ «در دستِ دستگاهِ X» در main با #1018) به‌روز شد.
+- نیمه‌کاره: هیچ. Kotlin دست نخورد. راهِ قدیمِ `/api/sync` این قاعده را ندارد (برنامهٔ بسیار کهنه).
+- قدمِ بعدی: شاهدِ CI ِ `product-unit-rules`؛ بقیهٔ P0ها شاهدِ CI، دستگاه/سخت‌افزار، حسابِ بیرونی (D-08، D-02) یا تصمیمِ صاحب‌کار‌اند (جدولِ گزارشِ همین شاخه).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-decisions` (فهرستِ یکتای تصمیم‌های مانده؛ فقط سند؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ِ تازه: ۵۴ تصمیمِ مانده از STATUS، BLOCKERS، OWNER-DECISIONS/TODO/ACTIONS، FLAGS-ON، HANDOFF، PRهای
+  #1019 تا #1023 ِ shop و #104، #112، #122 تا #125 ِ server؛ هر کدام با چیستی، ردیف‌های بسته، گزینه، پیشنهاد، خطر، راهِ اجرا و برگشت‌پذیری، در
+  چهار گروه (مشتری/پول ۸، امنیت ۱۵، سرعت و کار ۱۵، خوب‌است ۱۶). هشت موردِ «تصمیمِ صاحب‌کار» ِ کهنه که پیش‌تر گرفته شده بودند جدا آمدند
+  (D-15، D-16، O-06 ⇐ CHK-18/ORD-20، O-07 ⇐ DLV-06، O-09، subscribers_only، D-03، اجازهٔ push در server). قاعده در RULES («مشخصات جامع»).
+- نیمه‌کاره: هیچ. قدمِ بعدی: با هر جوابِ صاحب‌کار بندِ همان تصمیم از OWNER-PENDING به «گرفته‌شده» ِ OWNER-DECISIONS برود؛ ستونِ «مانع» ِ
+  CHK-18، ORD-20 و DLV-06 در STATUS هنوز «تصمیمِ صاحب‌کار» می‌گوید (O-06 و O-07 گرفته شده‌اند).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/guard-mirror` (آینهٔ JS ِ آزمون‌های کاتلینِ پرونده‌خوان؛ روی `main` ِ دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: فهرستِ آزمون‌های کاتلینی که پروندهٔ سرور/وب/license/docs/بردار می‌خوانند (RULES-fa «v3 · CI و آزمون»). آینهٔ `node --test` در `server/test`،
+  با فهرست‌های خوانده از خودِ کاتلین (`kt-source.js`، تجزیه‌گرِ سخت): `dari-text.test.js` حالا `farsiOnlyForms`/`farsiOnlyAllowed` را از DariCoverageTest.kt
+  می‌خواند (پیش‌تر رونوشت) و همان گذرِ کاتلین را روی ۳۴۹ متنِ ShopperText + ۷۵۹ متنِ وب می‌زند (خرید پیش‌تر نبود)؛ `kotlin-file-mirrors.test.js`
+  (WhatsNewFileTest، بخشِ پرونده‌ایِ WhatsNewTest، WebPaletteParityTest، CustomerOnlineOrdersTest)؛ `core-vectors-common-mirror.test.js`
+  (CoreVectorsCommonParityTest: ۲۹ جدول، ۲٬۰۳۴ سطر، و فهرستِ بخش‌ها). `tools/whatsnew/check.mjs` بخش‌ها را هم برمی‌گرداند و سطرِ هم‌کلید و shipped=0 را
+  مثلِ `WhatsNew.parse` مشکل می‌داند. پیش‌سرخ: حالتِ `e7bbb0e0a` ِ دستهٔ ۳۹ (np.fail بی PHRASES) سرخ، با `5f8fdfa60` سبز؛ هر آینه با تغییرِ موقت سرخ شد.
+- نیمه‌کاره: هیچ. CI ِ سرور روی PR ای که فقط `docs/WHATS-NEW-fa.md`، `docs/DARI-REVIEW-fa.md` یا پروندهٔ کاتلینِ خوانده‌شده را عوض کند نمی‌دود (pathهای `server.yml`) — تصمیمِ هماهنگ‌کننده.
+- قدمِ بعدی: آزمونِ کاتلینِ پرونده‌خوانِ تازه ⇒ آینه در همان PR؛ برای بردارهای فقط‌کاتلین (customer-price، gift، layaway، price-list، returns، special-order،
+  stock-ledger) همتای JS نیست.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-left` (بندهای بازِ ممیزیِ ۳۵: X1–X4 و لرزانیِ push-fcm؛ روی `main` + `claude/sec-audit-35`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (`server/test/security-audit-35b.test.js`، ردیف‌های X1–X4 در `docs/SECURITY-AUDIT-fa.md`): X1 `admin/sync/errors?limit=-1`؛ X2 NUL در
+  پرسش **سراسری** ⇒ ۴۰۰ `bad_query` (جز `sync`/`shop/sync`/`pump`؛ دو سنجهٔ کهنه با دلیل درست شد: `customer-access` ِ `routes-idor-31` و
+  `bad_product_id` ِ B4)؛ X3 کلیدِ تأیید زیرِ قفلِ دکان+کاربر و رونویسیِ کلیدِ کاربرِ دیگر بسته (روی PostgreSQL پیش از رفع هفت/هشت کلید)؛
+  X4 سطلِ «ناموفق» ِ وی‌آی‌پی به‌ازای حساب و دکان (صاحب جدا، موقت، فقط همین در)؛ لرزانیِ `push-fcm` («250» در شناسهٔ تصادفی) با دانهٔ
+  ثابت بازتولید و رفع، سنجه سخت‌تر (رقمِ فارسی و جداکنندهٔ هزارگان).
+- نیمه‌کاره/تصمیم: P4 (کدِ وی‌آی‌پیِ پمپ فقط IP)، P5 (`sync/v1/status?device_id=%00` ⇒ ۵۰۰ در راهِ مشترک)، X5 (`sectionOf` و پروتوتایپ) فقط
+  گزارش؛ P1–P3 همان. کاتلینی عوض نشد.
+- قدمِ بعدی: P1/P4/P5 در کارِ پمپ با اجازهٔ صاحب‌کار؛ شاهدِ CI.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از

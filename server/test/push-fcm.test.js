@@ -295,8 +295,24 @@ test('سفارشِ مشتری ⇒ پوشِ بی دادهٔ مشتری؛ «پرد
   assert.equal(created.data.orderNo, String(o.no));
   assert.equal(created.data.count, '1');
   assert.equal(created.android.notification.tag, `order-${o.id}`);
-  const text = JSON.stringify(created);
-  for (const pii of ['گل‌احمد', '0791230007', '791230007', 'برنج', '25000', '250']) assert.ok(!text.includes(pii), `بی ${pii}`);
+  /*
+   *  بی دادهٔ مشتری و بی مبلغ: «250» و «25000» همان جمعِ سفارش‌اند (۱۲۵ × ۲ کیلو؛ `total_minor`)، از خودِ ردیف خوانده.
+   *  ⛔ لرزان بود: توکنِ دستگاه، شناسهٔ دکان (هگزِ تصادفی) و شناسهٔ سفارش و اعلان (ULID) گاهی خودشان «250» داشتند (~۱٪).
+   *  آن چهار شناسهٔ مات اول با مقدارِ شناخته‌شده‌شان سنجیده و بعد از متن برداشته می‌شوند؛ بقیهٔ متن (عنوان، متن، داده، tag)
+   *  سخت‌تر از پیش سنجیده می‌شود: رقمِ فارسی/عربی و جداکنندهٔ هزارگان هم (۲۵۰، 25,000) نشت است.
+   */
+  const ord = await one('SELECT total_minor, subtotal_minor FROM online_orders WHERE id=$1', [o.id]);
+  const money = [...new Set([ord.total_minor, ord.total_minor / 100, ord.subtotal_minor / 100, 125].map((n) => String(Number(n))))];
+  assert.deepEqual(money, ['25000', '250', '125'], 'جمع و بهای سفارشِ همین آزمون');
+  assert.equal(created.token, mobile);
+  assert.equal(created.data.orderId, o.id);
+  assert.equal(created.data.shopId, s.shopId);
+  assert.match(created.data.notifId, /^[0-9A-HJKMNP-TV-Z]{26}$/);
+  let text = JSON.stringify(created);
+  for (const id of [mobile, o.id, s.shopId, created.data.notifId]) text = text.split(id).join('<id>');
+  text = text.replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d)).replace(/[٠-٩]/g, (d) => '٠١٢٣٤٥٦٧٨٩'.indexOf(d))
+    .replace(/(\d)[,\u066c\u00a0\u202f](?=\d)/g, '$1');
+  for (const pii of ['گل‌احمد', '0791230007', '791230007', 'برنج', ...money]) assert.ok(!text.includes(pii), `بی ${pii}: ${text}`);
 
   //  پرداختِ آنلاین ⇒ یک پوشِ «پرداخت شد»
   const pay = await h.post(`/api/store/${s.slug}/orders/${o.token}/pay`, {}, { headers: { 'Idempotency-Key': `pay-${uniq()}-key` } });

@@ -24,7 +24,34 @@ const CAPABILITIES = Object.freeze([
   'delivery-watch.v1', //  GET /admin/delivery/overview|queue|events|connectivity|report|thresholds · PUT …/thresholds (۴.۷)
   ...require('./ops-overview').CAPABILITIES,   //  ops.v1 (+release-stage.v1 با OPS-01) — پنلِ مرکزی ۴.۸–۴.۱۱، ۴.۱۳
   'finance.v1',       //  ماژولِ ۴.۵: GET /admin/finance/(summary…export) · POST …/adjustments (app.js ⇒ routes/admin-finance.js)
+  //  ممیزیِ پنلِ مرکزی §۹ (۱۴۰۵/۰۸/۲۰):
+  'sync-restore-once.v1',   //  POST /admin/sync/conflicts/:id/restore — شناسهٔ یک‌شکل، ۴۰۹ already_restored، Idempotency-Key
+  'subscription-period.v1', //  GET /admin/subscriptions/period-end — پایانِ دوره از سرور (S15)
+  'admin-contract.v1',      //  GET /admin/contract + سرآیندِ X-Admin-API-Version (S18)
 ]);
+
+/*
+ *  S18 — نسخهٔ قراردادِ درهای مدیر با پل. **فقط با شکستنِ** یک درِ موجود (برداشتن، عوض شدنِ معنا یا شکلِ پاسخ) بالا می‌رود؛
+ *  درِ تازه نسخه را عوض نمی‌کند و فقط `routesHash` ِ `GET /admin/contract` را. پنلِ کهنه سرآیند را نمی‌خواند ⇒ همان کار.
+ *  فهرست از `admin-contract.json` است که `tools/api-contract/generate.cjs` از `docs/api/routes.json` می‌سازد (`--check` هر دو).
+ */
+const ADMIN_API_VERSION = 1;
+const VERSION_HEADER = 'X-Admin-API-Version';
+
+/** میان‌افزارِ سرآیند — سرِ همهٔ `/api[/v1]/admin` در `app.js`، پیش از هر احراز (پاسخِ ۴۰۱ و ۴۰۴ هم دارندش). */
+function adminApiVersion(req, res, next) {
+  res.set(VERSION_HEADER, String(ADMIN_API_VERSION));
+  next();
+}
+
+/** پاسخِ `GET /admin/contract` (`routes/admin-bridge.js`). */
+function contract() {
+  const file = require('./admin-contract.json');
+  return {
+    version: ADMIN_API_VERSION, routesHash: file.routesHash, count: file.routes.length, generatedFrom: file.source,
+    serverVersion: require('../../package.json').version, capabilities: CAPABILITIES, routes: file.routes,
+  };
+}
 
 /**
  * ⛔ یک WHERE برای ردیف‌ها و `total` ِ `GET /admin/shops` — پیش‌تر `total` همهٔ دکان‌ها را می‌شمرد و
@@ -41,4 +68,4 @@ const SHOP_WHERE = `
         AND ($3 = '' OR ($3 = 'none' AND NOT EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL))
              OR EXISTS (SELECT 1 FROM shop_holds h WHERE h.shop_id=s.id AND h.lifted_at IS NULL AND h.kind=$3))`;
 
-module.exports = { CAPABILITIES, SHOP_WHERE };
+module.exports = { CAPABILITIES, SHOP_WHERE, ADMIN_API_VERSION, VERSION_HEADER, adminApiVersion, contract };

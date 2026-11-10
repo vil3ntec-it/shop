@@ -29,25 +29,36 @@ export const APP_CODE = [
 
 const KINDS = ['تازه', 'تغییر', 'رفع', 'برداشته'];
 const INSTEAD = '⇐ به‌جایش:';
-const HEADING = /^##\s+\d+\.\d+\s+·\s+\S/;
+const HEADING = /^##\s+(\d+\.\d+)\s+·\s+(\S.*)$/;
 const SHIPPED = /^<!--\s*shipped:\s*([a-z]+=\d+(\s+[a-z]+=\d+)*)\s*-->$/;
 const ENTRY = /^-\s+(\S+?):\s*(.*)$/;
 
 export const isAppCode = (path) => APP_CODE.some((re) => re.test(path));
 
+/** همان `squash` ِ WhatsNew.kt: فاصله‌های پیاپی (ASCII، مثلِ `\s` ِ کاتلین) یکی */
+const squash = (s) => s.trim().split(/[ \t\n\x0B\f\r]+/).filter(Boolean).join(' ');
+
 /**
- * سطرهای یادداشتِ پرونده (پس از نخستین «## »، یکدست‌شده) و مشکل‌های قالب.
- * @returns {{ entries: string[], problems: string[] }}
+ * سطرهای یادداشتِ پرونده (پس از نخستین «## »، یکدست‌شده)، مشکل‌های قالب و بخش‌های درست (همان `log.sections` ِ
+ * `WhatsNew.parse`: سرخطِ درست با دست‌کم یک سطرِ درست، به ترتیبِ پرونده، با `shipped` ِ همان بخش). سطرِ هم‌کلید
+ * (نوع + متن + «به‌جایش»، فاصله‌ها یکدست) و شمارهٔ shipped ِ صفر یا بیرون از Int هم همان مشکلِ کاتلین‌اند.
+ * @returns {{ entries: string[], problems: string[], sections: { line: string, title: string, at: number, shipped: Record<string, number>,
+ *   entries: { kind: string, text: string, instead: string|null }[] }[] }}
  */
 export function scan(text) {
   const entries = [];
   const problems = [];
+  const sections = [];
+  const keys = new Set();
   let inSection = false;
   let inComment = false;
   let sectionLines = 0;
   let sectionAt = 0;
+  let cur = null;   //  بخشِ در دست؛ null ⇒ سرخطِ بد (سطرهایش سنجیده می‌شوند، خودش نه)
+  let good = 0;     //  سطرهای درستِ همان بخش
   const close = () => {
     if (inSection && sectionLines === 0) problems.push(`سطرِ ${sectionAt}: بخش سطری ندارد`);
+    if (cur && good) sections.push(cur);
   };
   String(text ?? '').replace(/\r\n/g, '\n').split('\n').forEach((raw, i) => {
     const n = i + 1;
@@ -56,13 +67,25 @@ export function scan(text) {
     if (inComment) { if (s.endsWith('-->')) inComment = false; return; }
     if (s.startsWith('## ')) {
       close();
-      inSection = true; sectionLines = 0; sectionAt = n;
-      if (!HEADING.test(s)) problems.push(`سطرِ ${n}: سرخطِ بخش باید «## <دو عدد> · <عنوان>» باشد`);
+      inSection = true; sectionLines = 0; sectionAt = n; good = 0;
+      const h = HEADING.exec(s);
+      cur = h ? { line: h[1], title: h[2].trim(), at: n, shipped: {}, entries: [] } : null;
+      if (!h) problems.push(`سطرِ ${n}: سرخطِ بخش باید «## <دو عدد> · <عنوان>» باشد`);
       return;
     }
     if (s === '') return;
     if (s.startsWith('<!--')) {
-      if (/^<!--\s*shipped:/.test(s) && !SHIPPED.test(s)) problems.push(`سطرِ ${n}: shipped باید «کانال=شماره» باشد`);
+      const sh = SHIPPED.exec(s);
+      if (/^<!--\s*shipped:/.test(s) && !sh) problems.push(`سطرِ ${n}: shipped باید «کانال=شماره» باشد`);
+      if (sh) {
+        const shipped = {};
+        for (const p of sh[1].split(/\s+/)) {
+          const [ch, v] = p.split('=');
+          if (Number(v) > 0 && Number(v) <= 2147483647) shipped[ch] = Number(v);
+          else problems.push(`سطرِ ${n}: «${p}» در shipped باید «کانال=شماره» باشد`);
+        }
+        if (cur) cur.shipped = shipped;
+      }
       if (!s.endsWith('-->')) inComment = true;
       return;
     }
@@ -74,11 +97,17 @@ export function scan(text) {
     if (!body) problems.push(`سطرِ ${n}: متن خالی است`);
     else if (m[1] === 'برداشته' && !instead) problems.push(`سطرِ ${n}: «برداشته» بی «${INSTEAD} …» پذیرفته نیست`);
     else if (m[1] !== 'برداشته' && cut >= 0) problems.push(`سطرِ ${n}: «به‌جایش» فقط برای «برداشته» است`);
+    else if (keys.has(`${m[1]}|${squash(body)}|${squash(instead)}`)) problems.push(`سطرِ ${n}: همین سطر پیش‌تر آمده (دو سطرِ یکسان یک کلید دارند)`);
+    else {
+      keys.add(`${m[1]}|${squash(body)}|${squash(instead)}`);
+      good++;
+      if (cur) cur.entries.push({ kind: m[1], text: body, instead: instead || null });
+    }
     sectionLines++;
     entries.push(s.replace(/\s+/g, ' '));
   });
   close();
-  return { entries, problems };
+  return { entries, problems, sections };
 }
 
 /** سطرهای تازهٔ «پس از» که «پیش از» نداشت (چندتایی: سطرِ تکراری هم شمرده می‌شود) */
