@@ -15,6 +15,7 @@
  *   R11     (پیگیری) سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد ⇒ بودجهٔ بایتِ پیکسلِ بازشده (`IMAGE_STUDIO_DECODE_MB`) میانِ کارگرها.
  *   R10     (پیگیری) خانهٔ CSV ِ سرور (`finance-reports.cell`، همزادِ `license/csv-cell.js`): متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان
  *           خانهٔ `g` ِ xlsx) فرمول نیست ⇒ عدد می‌ماند؛ هر متنِ دیگرِ آغازشده با = + - @ تب یا CR همان «'».
+ *   R18     (پیگیری) گزارشِ خطای دستهٔ بانکِ مرکزی (`image-bank.reportCsv`، CSV ِ مدیر) خانه را بی نگهبانِ فرمول می‌نوشت ⇒ همان `cell`.
  */
 process.env.IMAGE_STUDIO_WORKERS = '2';
 //  R11: بودجهٔ ۲ مگابایت ⇒ سهمِ هر کار ۱ مگابایت؛ عکسِ ۶۰۰×۴۵۰ ِ آزمون‌های دیگر (۸۱۰ هزار بایت RGB) زیرِ آن می‌ماند
@@ -36,6 +37,7 @@ const { ulid } = require('../src/lib/ulid');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
 const finance = require('../src/lib/finance-reports');
+const bank = require('../src/lib/image-bank');
 
 let root = '';
 let A; let C;
@@ -282,4 +284,46 @@ test('R10: خانهٔ CSV ِ سرور — متنِ فقط-عدد عدد می‌�
   assert.equal(row('r10-plain').split(',')[4], '-500.00', 'متنِ فقط-عدد بی «\'»');
   assert.equal(row('r10-minus').split(',')[4], "'-2+3");
   assert.ok(row('r10-link').includes(`"'=HYPERLINK(""http://evil.example/"",""x"")"`), row('r10-link'));
+});
+
+test('R18: گزارشِ خطای دستهٔ بانک (CSV ِ مدیر) هر خانه را از همان `finance-reports.cell` می‌گذراند؛ ستون‌ها همان', async () => {
+  const LINK = '=HYPERLINK("http://evil.example/","x")', LINK_CSV = `"'=HYPERLINK(""http://evil.example/"",""x"")"`;
+  const lines = (csv) => csv.replace(/^﻿/, '').split('\r\n');
+  //  هر خانهٔ ردیف و فایل، بی پایگاه
+  const rep = {
+    rows: [
+      { row_no: 7, status: 'failed', error: '=1+1', image_id: '@img', product_id: LINK, candidates: ['-2+3', 'bp_1'] },
+      { row_no: 8, status: 'ok', error: '', image_id: 'i', product_id: 'p', candidates: [] },
+      { row_no: 9, status: 'needs_review', error: '', image_id: '', product_id: '-500.00', candidates: [] },
+    ],
+    files: { failed: [{ name: 'bad.jpg', error: '+cmd' }] },
+  };
+  assert.deepEqual(lines(bank.reportCsv(rep)), [
+    'row_no,status,error,image_id,product_id,candidates',
+    `7,failed,'=1+1,'@img,${LINK_CSV},'-2+3|bp_1`,
+    '9,needs_review,,,-500.00,',
+    "file:bad.jpg,failed,'+cmd,,,",
+    '',
+  ]);
+
+  //  همان درِ پنل: شناسهٔ کالای «=HYPERLINK(…)» در CSV ِ بارگذاری‌شده
+  await setFlag('all', 'image_bank.central', true);
+  const AD = (method, p, body) => h.api(method, '/api/admin/image-bank' + p, { token: root, body });
+  const b = await AD('POST', '/batches', { license_source: 'کاتالوگِ تأمین‌کننده', license_status: 'licensed', commercial_use: true });
+  assert.equal(b.status, 201, JSON.stringify(b.body));
+  const put = await h.raw('PUT', `/api/admin/image-bank/batches/${b.body.id}/files/r18.jpg`, jpg(), { token: root });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const rows = await AD('POST', `/batches/${b.body.id}/rows`, { csv: `product_id,image_path\n"${LINK.replace(/"/g, '""')}",r18.jpg\n` });
+  assert.equal(rows.status, 200, JSON.stringify(rows.body));
+  assert.deepEqual(rows.body.rows.map((r) => [r.status, r.error, r.product_id]), [['failed', 'product_not_found', '']]);
+  const report = async () => lines((await h.download(`/api/admin/image-bank/batches/${b.body.id}/report?format=csv`, { token: root })).buffer.toString('utf8'));
+  let out = await report();
+  assert.equal(out[0], 'row_no,status,error,image_id,product_id,candidates');
+  assert.ok(out.every((l) => !l.includes('HYPERLINK')), 'شناسهٔ ناشناس در گزارش برنمی‌گردد');
+  //  مقدارِ ذخیره‌شده (هر راهی که روزی آن را بنویسد) هم در CSV فرمول نمی‌شود
+  await query(`UPDATE image_batch_rows SET product_id=$2, error='-2+3', candidates='["@x"]' WHERE batch_id=$1`, [b.body.id, LINK]);
+  out = await report();
+  const row = out.find((l) => /^\d+,failed,/.test(l));
+  assert.ok(row && row.endsWith(`,'-2+3,,${LINK_CSV},'@x`), JSON.stringify(out));
+  assert.ok(out.every((l) => !/(^|,)[=+\-@]/.test(l.replace(/"[^"]*(""[^"]*)*"/g, 'Q'))), JSON.stringify(out));
 });

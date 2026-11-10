@@ -99,3 +99,24 @@ test('بارکننده و سرویس‌ورکر؛ index.html ِ یخ‌زده د
     assert.ok(!re.test(src), bad);
   }
 });
+
+test('فهرستِ نویسنده‌های CSV: سرور فقط از `finance-reports.cell`، وب فقط از `csv-cell.js` — نویسندهٔ دومِ بی نگهبان نه', () => {
+  const walk = (dir) => fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).flatMap((d) => {
+    const rel = `${dir}/${d.name}`;
+    if (d.isDirectory()) return ['vendor', 'i18n', 'node_modules'].includes(d.name) ? [] : walk(rel);
+    return /\.(js|mjs|html)$/.test(d.name) && !/\.min\.js$/.test(d.name) ? [rel] : [];
+  });
+  //  نشانِ نوشتنِ CSV: نوعِ text/csv، نامِ پروندهٔ ‎.csv‎ ِ دانلود، یا ردیفِ «,» که با CRLF پیوند می‌خورد
+  const writes = (t) => /type: ?'text\/csv|'text\/csv;|\.csv["'`]|\.join\(','\)\)?\.join\('\\r\\n'\)|\.join\(','\)\);[^\n]*\n[^\n]*'\\r\\n'/.test(t);
+  const found = ['server/src', 'license', 'server/public'].flatMap(walk).filter((f) => writes(read(f))).sort();
+  const want = {
+    'server/src/lib/finance-reports.js': /\.map\(cell\)\.join\(','\)/,
+    'server/src/lib/image-bank.js': /require\('\.\/finance-reports'\)[\s\S]*\.map\(cell\)\.join\(','\)[\s\S]*\.map\(cell\)\.join\(','\)/,
+    'server/src/routes/admin-image-bank.js': /bank\.reportCsv\(rep\)/,
+    'server/public/admin/image-bank.js': /report\?format=csv/,
+    'license/report-ui.js': /E\.downloadCsv\(/,
+  };
+  assert.deepEqual(found, Object.keys(want).sort(), 'نویسندهٔ CSV ِ تازه ⇒ همین قاعده و همین فهرست');
+  for (const [f, re] of Object.entries(want)) assert.match(read(f), re, f);
+  assert.ok(!/const esc = /.test(read('server/src/lib/image-bank.js').split('function reportCsv')[1].split('\n}\n')[0]), 'reportCsv بی `esc` ِ خودش');
+});

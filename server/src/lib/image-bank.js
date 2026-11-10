@@ -1140,13 +1140,13 @@ async function batchReport(id) {
 }
 
 function reportCsv(rep) {
-  const esc = (v) => /[",\n\r]/.test(String(v)) ? '"' + String(v).replace(/"/g, '""') + '"' : String(v);
+  const { cell } = require('./finance-reports');   //  R18: هر خانه همان CSV ِ مالی (فرمول ⇒ «'»، متنِ فقط-عدد عدد)؛ ستون‌ها همان
   const lines = ['row_no,status,error,image_id,product_id,candidates'];
   for (const r of rep.rows) {
     if (r.status === 'ok') continue;
-    lines.push([r.row_no, r.status, r.error, r.image_id, r.product_id, r.candidates.join('|')].map(esc).join(','));
+    lines.push([r.row_no, r.status, r.error, r.image_id, r.product_id, r.candidates.join('|')].map(cell).join(','));
   }
-  for (const f of rep.files.failed) lines.push(['file:' + f.name, 'failed', f.error, '', '', ''].map(esc).join(','));
+  for (const f of rep.files.failed) lines.push(['file:' + f.name, 'failed', f.error, '', '', ''].map(cell).join(','));
   return '﻿' + lines.join('\r\n') + '\r\n';
 }
 
