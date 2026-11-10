@@ -120,8 +120,7 @@ await E.step('S60', 'انقضای اشتراک با ساعتِ غلطِ گوشی
 }, { needs: ['S123'] });
 
 await E.step('S47', 'S47 (D-05): هشدارِ چند روز پیش از پایان؛ پایان در حالِ آفلاین ⇒ داده قفل نمی‌شود — فروشِ آفلاینِ صاحب، همگام‌سازی، خواندنِ دفتر و پشتیبان باز', async () => {
-  //  (سطرهای ساخته‌نشده: پیامِ یادآور «N روز دیگر» تاریخِ دقیق ندارد — تاریخ فقط در `endsAt` ِ /me/subscription؛
-  //   چاپ و خروجیِ فایل کارِ خودِ برنامه‌اند و این‌جا سنجیده نمی‌شوند)
+  //  (چاپ و خروجیِ فایل کارِ خودِ برنامه‌اند و این‌جا سنجیده نمی‌شوند؛ پیامِ یادآور از `claude/e-rows-6` روزِ دقیقِ پایان را هم دارد)
   const subs = require('../../src/lib/subscriptions');
   const ends = Date.now() + 3 * DAY - 60_000;
   await db.query("UPDATE subscriptions SET ends_at=$1, grace_days=0 WHERE shop_id=$2 AND status='active'", [ends, owner.shopId]);
@@ -131,6 +130,7 @@ await E.step('S47', 'S47 (D-05): هشدارِ چند روز پیش از پایا
   assert.ok((await subs.notifyExpiring({ thresholds: [7, 3, 1] })).sent >= 1, 'یادآورِ پیش از پایان نرفت');
   const msg = await db.one("SELECT body FROM support_messages WHERE body LIKE '%روز دیگر تمام می‌شود%' ORDER BY created_at DESC LIMIT 1");
   assert.match(msg.body, /۳|3/, msg.body);
+  assert.ok(msg.body.includes(`روزِ ${subs.endDayOf(ends)}`), `S47: تاریخِ دقیقِ پایان در یادآور — ${msg.body}`);
   assert.equal((await subs.notifyExpiring({ thresholds: [7, 3, 1] })).sent, 0, 'همان آستانه دو بار نه');
 
   //  پایان وقتی گوشیِ صاحب آفلاین است

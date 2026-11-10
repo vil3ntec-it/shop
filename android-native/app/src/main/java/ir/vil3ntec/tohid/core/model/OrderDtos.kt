@@ -68,6 +68,11 @@ data class OrdersConfigDto(
    */
   val refundLedger: Boolean = false,
   /**
+   *  ORD-15 / تصمیمِ ۱-۶ ب: روش‌های ثبتِ بازپرداخت وقتی «حساب‌پیِ دستی» هم باز است (`["cash","hesabpay"]`، پرچمِ خاموشِ
+   *  `shop.orders.manual_refund` و `orders.refund`)؛ خاموش یا سرورِ پیشین ⇒ خالی و فقط نقد (همان رفتارِ پیشین)
+   */
+  val refundMethods: List<String> = emptyList(),
+  /**
    *  «چرا سفارشِ آنلاین نمی‌رسد؟» (`lib/order-arrival.js`) — هر دروازهٔ میانِ ویترین و این برنامه با کد و «چه کسی
    *  درستش می‌کند»؛ حتی وقتی `enabled` نیست. سرورِ پیشین ⇒ null
    */

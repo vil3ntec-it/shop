@@ -22,6 +22,16 @@ object OrderRefundModel {
 
   fun ledger(cfg: OrdersConfigDto?, to: String): Boolean = cfg?.refundLedger == true && to in OrderStates.MONEY_TARGETS
 
+  /** ORD-15 / تصمیمِ ۱-۶ ب: روش‌هایی که این برنامه می‌شناسد — «حساب‌پی» فقط ثبتِ پولی است که دکان خودش پس داد */
+  val KNOWN_METHODS: List<String> = listOf("cash", "hesabpay")
+
+  /** تراشه‌های روش فقط وقتی سرور بیش از نقد را می‌پذیرد (`refundMethods` ِ `/config`)؛ روشِ ناشناخته کنار می‌رود */
+  fun methods(cfg: OrdersConfigDto?): List<String> =
+    cfg?.refundMethods.orEmpty().filter { it in KNOWN_METHODS }.distinct().takeIf { it.size > 1 }.orEmpty()
+
+  /** روشی که به سرور می‌رود: همان انتخاب اگر پذیرفته است، وگرنه نقد (سرورِ پیشین هم همین را می‌پذیرد) */
+  fun methodFor(chosen: String, methods: List<String>): String = if (chosen in methods) chosen else "cash"
+
   fun remainingMinor(o: OrderDto): Long = o.refund?.remainingMinor ?: o.totalMinor
 
   /** کادرِ مبلغ در آغاز: «کامل» همان مانده؛ «بخشی» خالی تا کاربر خودش بنویسد */

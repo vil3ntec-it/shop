@@ -77,4 +77,18 @@ class OrderRefundModelTest {
     assertNull(old.refund)
     assertFalse(ApiJson.decode<OrdersConfigDto>(Json.parseToJsonElement("""{"enabled":true}""") as JsonObject).refundLedger)
   }
+
+  @Test fun `ORD-15 — تراشهٔ «حساب‌پیِ دستی» فقط وقتی سرور refundMethods داد؛ وگرنه همان نقد`() {
+    val on = ApiJson.decode<OrdersConfigDto>(
+      Json.parseToJsonElement("""{"enabled":true,"refundLedger":true,"refundMethods":["cash","hesabpay","card"]}""") as JsonObject,
+    )
+    assertEquals(listOf("cash", "hesabpay"), OrderRefundModel.methods(on))
+    assertEquals("hesabpay", OrderRefundModel.methodFor("hesabpay", OrderRefundModel.methods(on)))
+    //  پرچمِ خاموش، سرورِ پیشین یا فقط نقد ⇒ هیچ تراشه و همیشه نقد (همان بدنهٔ پیشین)
+    val off = OrdersConfigDto(enabled = true, refundLedger = true)
+    assertEquals(emptyList<String>(), OrderRefundModel.methods(off))
+    assertEquals(emptyList<String>(), OrderRefundModel.methods(off.copy(refundMethods = listOf("cash"))))
+    assertEquals("cash", OrderRefundModel.methodFor("hesabpay", OrderRefundModel.methods(off)))
+    assertEquals("cash", OrderActionModel.Form().method)
+  }
 }

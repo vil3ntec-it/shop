@@ -20,6 +20,8 @@
  *
  * ⛔ ردیفِ دفتر هرگز ویرایش یا پاک نمی‌شود؛ هیچ مسیری برای آن نیست.
  * ⛔ مبلغ عددِ صحیح به واحدِ کوچک؛ از کلِ سفارش بیشتر برنمی‌گردد.
+ * ORD-15 / تصمیمِ ۱-۶ ب: روش `cash`؛ `hesabpay` (دکان پول را خودش با حساب‌پی پس داد — فقط **ثبت**، هیچ درگاهی) فقط
+ *   با پرچمِ خاموشِ `shop.orders.manual_refund` (همان «پس داده شد» ِ بسته‌بندی)؛ خاموش ⇒ همان ۴۰۰ `bad_method` (مهاجرتِ ۷۷۰).
  * ⛔ سفارشِ آزمایشی در جمع‌های گزارش شمرده نمی‌شود.
  * NTF-08: هر ردیفِ تازهٔ دفتر (نه تکرار) یک پیامِ مشتری در همان تراکنش (`customer-notify.onRefundIn`، مهاجرتِ ۴۹۶).
  */
@@ -36,6 +38,8 @@ const FLAG_KEY = 'shop.orders.refunds';
 const OPEN_STATUS = 'return_requested';
 const CLOSED = Object.freeze(['refunded_partial', 'refunded_full']);
 const METHODS = Object.freeze(['cash']);
+/** تصمیمِ ۱-۶ ب: روش‌های «بازپرداختِ دستی» — `hesabpay` فقط با `shop.orders.manual_refund` ([methodsOf]) */
+const MANUAL_METHODS = Object.freeze(['cash', 'hesabpay']);
 const MAX_AMOUNT_MINOR = 100_000_000_000;
 const MAX_WINDOW_MS = 92 * 24 * 60 * 60 * 1000;
 const MAX_ISSUES = 100;
@@ -70,7 +74,7 @@ function parse(body) {
   const reason = stripControl(str(b.reason)).slice(0, 300);
   if (!reason) throw badRequest('دلیلِ بازپرداخت لازم است', 'reason_required');
   const method = str(b.method) || 'cash';
-  if (!METHODS.includes(method)) throw badRequest('فعلاً فقط بازپرداختِ نقدی', 'bad_method');
+  if (!MANUAL_METHODS.includes(method)) throw badRequest('فعلاً فقط بازپرداختِ نقدی (یا حساب‌پیِ دستی)', 'bad_method');
   if (b.final !== undefined && typeof b.final !== 'boolean') throw badRequest('final باید true یا false باشد', 'bad_final');
   return { amountMinor, reason, method, final: b.final === true };
 }
@@ -124,6 +128,16 @@ async function summaryOf(run, shopId, orderId) {
 
 const viaDb = (text, params) => db.query(text, params);
 
+/**
+ * روش‌هایی که این دکان و این نقش امروز ثبت می‌کنند: همیشه `cash`؛ `hesabpay` (دستی) فقط با پرچمِ خاموشِ
+ * `shop.orders.manual_refund` و `orders.refund` (تصمیمِ ۱-۶ ب، ORD-15). برنامه از `/orders/config` ِ `refundMethods` می‌خواند.
+ */
+async function methodsOf(shopId, role, run = null) {
+  if (!can(role, 'orders.refund')) return [...METHODS];
+  const manual = await require('./orders').flagOf(shopId, require('./order-pack-refund').FLAG, run);
+  return manual ? [...MANUAL_METHODS] : [...METHODS];
+}
+
 async function summary(shopId, orderId) {
   return summaryOf(viaDb, shopId, String(orderId || ''));
 }
@@ -156,6 +170,12 @@ async function record(shopId, orderId, { key, body, actor }) {
         throw conflict('این کلیدِ یکتایی پیش‌تر برای بازپرداختِ دیگری به کار رفته است', 'idempotency_key_reused');
       }
       return { replayed: true, from: row.status, to: row.status, entry: entryOut(prev) };
+    }
+    //  ⛔ حساب‌پیِ دستی فقط با پرچمِ همان تصمیم (پس از تکرار: ردیفِ ثبت‌شده با خاموش شدنِ پرچم هم همان پاسخ را دارد)؛
+    //  خاموش ⇒ همان ۴۰۰ ِ پیشین (برنامهٔ کهنه و درخواستِ دستی یکسان)
+    const role = actor.type === 'system' ? 'owner' : actor.role;
+    if (!METHODS.includes(input.method) && !(await methodsOf(shopId, role, (t, p) => c.query(t, p))).includes(input.method)) {
+      throw badRequest('فعلاً فقط بازپرداختِ نقدی', 'bad_method');
     }
 
     if (CLOSED.includes(row.status)) throw conflict('بازپرداختِ این سفارش بسته شده است', 'refund_closed');
@@ -329,4 +349,4 @@ async function report(shopId, query = {}) {
   return (await reportMany([shopId], query)).get(String(shopId));
 }
 
-module.exports = { FLAG_KEY, flagOf, parse, issueOf, summary, record, report, reportMany };
+module.exports = { FLAG_KEY, METHODS, MANUAL_METHODS, flagOf, methodsOf, parse, issueOf, summary, record, report, reportMany };

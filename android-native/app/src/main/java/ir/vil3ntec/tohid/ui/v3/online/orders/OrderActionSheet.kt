@@ -18,6 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.OnlineFmt
 import ir.vil3ntec.tohid.core.i18n.StrOnline
+import ir.vil3ntec.tohid.core.i18n.StrOrderPages
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.orders.OrderText
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
@@ -49,6 +50,8 @@ fun OrderActionSheet(
   start: OrderActionModel.Form = OrderActionModel.start(order, to),
   /** FIN-01: دفترِ بازپرداختِ روشن ⇒ مبلغ و دلیل به جای هشدارِ ساده (`OrderRefundModel`) */
   ledger: Boolean = false,
+  /** ORD-15 / تصمیمِ ۱-۶ ب: روش‌های بازپرداخت (`OrderRefundModel.methods`)؛ خالی ⇒ فقط نقد و هیچ تراشه‌ای */
+  methods: List<String> = emptyList(),
 ) {
   val c = PhoneV3.colors
   var form by remember(order.id, to) { mutableStateOf(if (ledger) start.copy(amount = OrderRefundModel.startAmount(order, to)) else start) }
@@ -117,6 +120,18 @@ fun OrderActionSheet(
         singleLine = false,
         modifier = Modifier.fillMaxWidth(),
       )
+      if (methods.size > 1) {
+        //  دکان پول را خودش پس داد؛ این‌جا فقط روشِ همان کار ثبت می‌شود (هیچ درگاهی صدا زده نمی‌شود)
+        Spacer(Modifier.height(12.dp))
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+          methods.forEach { m ->
+            V3Chip(
+              if (m == "hesabpay") StrOrderPages.pickRefundHesab else StrOrderPages.pickRefundCash,
+              OrderRefundModel.methodFor(form.method, methods) == m, { form = form.copy(method = m) },
+            )
+          }
+        }
+      }
       Spacer(Modifier.height(12.dp))
       V3Message(V3Tone.WARNING, StrOnline.refundWarn(OnlineFmt.afn(OrderRefundModel.amountMinor(form.amount) ?: 0L)))
     } else if (OrderActionModel.refund(to)) {

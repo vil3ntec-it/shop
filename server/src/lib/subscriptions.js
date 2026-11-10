@@ -632,9 +632,10 @@ function build(T) {
           shopId: T === tenancy.SHOP ? row.tenantId : '',
           stationId: T === tenancy.SHOP ? '' : row.tenantId,
           who: row.ownerName || row.tenantName || '',
+          //  S47: با تاریخِ دقیقِ پایان (همان لحظه‌ای که `daysLeft` تا آن شمرده شد)، نه فقط «N روز»
           body: row.daysLeft <= 0
-            ? `اشتراک ${T.expiryNoun} امروز تمام می‌شود. برای اینکه قابلیت‌ها بسته نشوند، تمدیدش کنید.`
-            : `اشتراک ${T.expiryNoun} ${row.daysLeft} روز دیگر تمام می‌شود. اگر بخواهید، همین‌جا بگویید تا تمدید شود.`,
+            ? `اشتراک ${T.expiryNoun} امروز (${endDayOf(row.graceEndsAt)}) تمام می‌شود. برای اینکه قابلیت‌ها بسته نشوند، تمدیدش کنید.`
+            : `اشتراک ${T.expiryNoun} ${row.daysLeft} روز دیگر تمام می‌شود — روزِ ${endDayOf(row.graceEndsAt)}. اگر بخواهید، همین‌جا بگویید تا تمدید شود.`,
         });
         await plans.setConfig(key, String(now()));
         sent++;
@@ -652,6 +653,19 @@ function build(T) {
   };
 }
 
+/**
+ * S47: روزِ پایان به خورشیدی («۲۲ عقرب ۱۴۰۵») در منطقهٔ زمانیِ سرور (`DEFAULT_TIMEZONE`، پیش‌فرض کابل) — برای
+ * یادآورِ «رو به پایان» و متغیرِ `{تاریخ-پایان}` ِ مرکزِ اعلان. نام‌ها و حسابِ تقویم همان `calendar-core` (همتای Kotlin).
+ */
+function endDayOf(at) {
+  const t = Number(at);
+  if (!Number.isSafeInteger(t) || t <= 0) return '';
+  const { localParts } = require('./storefront-hours');
+  let iso;
+  try { iso = localParts(t, require('../config').defaults.timezone || 'Asia/Kabul').date; } catch { iso = localParts(t, 'Asia/Kabul').date; }
+  return require('./calendar-core').formatSolarLong(iso, 'fa', 'fa');
+}
+
 const shop = build(tenancy.SHOP);
 const pump = build(tenancy.PUMP);
 
@@ -665,5 +679,6 @@ module.exports = {
   forApp: (app) => (app === 'pump' ? pump : shop),
   stateOf,
   periodEnd,
+  endDayOf,
   DAY,
 };
