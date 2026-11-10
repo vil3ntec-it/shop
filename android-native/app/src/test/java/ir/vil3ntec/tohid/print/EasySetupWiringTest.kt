@@ -70,6 +70,21 @@ class EasySetupWiringTest {
     }
   }
 
+  @Test fun `جست‌وجوی شبکه پرسشِ mDNS را هم می‌فرستد و اندروید پیش از سوکت اجازهٔ شبکهٔ محلی را می‌پرسد`() {
+    val ui = main.resolve("ui/screens/EasySetupAndroid.kt").readText()
+    val job = ui.substringAfter("netJob = scope.launch {").substringBefore("NetPrinterScan.scan(hosts)")
+    assertTrue(job.contains("launch { add(PrinterFinderPlatform.mdnsPrinters(context, lans)) }"))
+    val android = main.resolve("hw/PrinterFinderAndroid.kt").readText()
+    val body = android.substringAfter("suspend fun mdnsPrinters(").substringBefore("\n  }\n")
+    val ask = body.indexOf("MdnsProbe.ask(")
+    assertTrue(ask > 0)
+    assertTrue(body.indexOf("LocalNetworkAccess.blocked(context, Mdns.GROUP)") in 0 until ask)
+    assertTrue(body.indexOf("LocalNetworkAccess.blocked(context, it.ip)") in 0 until ask)
+    //  آیفون همان API را دارد و پرسش نمی‌فرستد (مجوزِ چندپخشِ اپل)
+    val ios = repo.resolve("ios/shared/src/iosMain/kotlin/ir/vil3ntec/tohid/hw/PrinterFinderIos.kt").readText()
+    assertTrue(ios.contains("suspend fun mdnsPrinters(context: Context, lans: List<Subnet.Lan>): List<FoundPrinter> = emptyList()"))
+  }
+
   @Test fun `اجازهٔ جست‌وجوی بلوتوث در مانیفست با neverForLocation است و فقط هنگامِ زدنِ دکمه خواسته می‌شود`() {
     val manifest = repo.resolve("android-native/app/src/main/AndroidManifest.xml").readText()
     assertTrue(Regex("""android\.permission\.BLUETOOTH_SCAN"\s+android:usesPermissionFlags="neverForLocation"""").containsMatchIn(manifest))
