@@ -127,6 +127,7 @@ class ReceiptLangTest {
       assertEquals(k.getValue(PayFlow.MIXED), StrReceipt.payMixed)
       assertEquals(k.getValue(PayFlow.ONLINE), StrReceipt.payOnline)
       assertEquals(k.getValue(PayFlow.COD), StrReceipt.payCod)
+      assertEquals(k.getValue(ir.vil3ntec.tohid.core.pay.Pay.FX), StrReceipt.payFx) // PAY-10
       assertEquals(PayFlow.methodName(PayFlow.ACCOUNT), StrReceipt.payAccount)
       assertEquals(PayFlow.methodName("afpay_card"), StrReceipt.payAfPayCard)
       //  فارسی ⇒ همان نام، هرچه باشد

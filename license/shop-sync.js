@@ -719,6 +719,14 @@
   if (!window.TohidProductCycle) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/product-cycle.js?v=1', defer: true }));
   }
+  //  POS-03: «۳*کد» در کادرِ بارکدِ فروش (`cart-query.js`، همان `CartQuery` ِ برنامه؛ پشتِ تنظیمِ خاموشِ همین مرورگر)
+  if (!window.TohidCartQuery) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/cart-query.js?v=1', defer: true }));
+  }
+  //  R10: خانهٔ CSV ِ هر چهار خروجیِ صفحه بی «فرمول» در اکسل (`csv-cell.js`، همان `finance-reports.cell` ِ سرور)
+  if (!window.TohidCsvCell) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/csv-cell.js?v=1', defer: true }));
+  }
   //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو) — فارسی ⇒ هیچ واژه‌نامه و ناظری (`web-i18n.js`)
   if (!window.TohidWebI18n) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/web-i18n.js?v=1', defer: true }));

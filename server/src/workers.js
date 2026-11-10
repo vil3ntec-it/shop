@@ -49,6 +49,8 @@ function backgroundJobs() {
     mod('order-late-apology'),
     //  AI-11: نمایهٔ هشِ عکسِ کالاها برای «جست‌وجو با عکس» — فقط دکان‌های پرچمِ `shop.visual_search`، دسته‌ای و بی‌تکرار
     mod('visual-search'),
+    //  AI-05/IMG-PRO-14: صفِ استودیوی عکس — هر کار در رشتهٔ جدا، همزمانیِ محدود، نوبتی میانِ دکان‌ها (بی پرچمِ `shop.image_studio` ⇒ صفِ خالی)
+    mod('image-studio-jobs'),
     //  PAY-21: تطبیقِ زمان‌بندی‌شدهٔ حساب‌پی (هر ۵ دقیقه، قفل میانِ نمونه‌ها)؛ بی کلیدِ ارائه‌دهنده هیچ پرسشی نمی‌رود
     ['payment-reconciler', () => payments.startReconciler(), () => payments.stopReconciler()],
     ['backup', () => backup.schedule(), (timer) => { if (timer) clearInterval(timer); }],

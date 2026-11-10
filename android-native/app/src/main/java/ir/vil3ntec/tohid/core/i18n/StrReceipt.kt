@@ -88,4 +88,6 @@ object StrReceipt {
   val payCod: String get() = t("نقد هنگامِ تحویل", "Cash on delivery", "د سپارلو پر وخت نغدې")
   val payAccount: String get() = t("به حسابِ مشتری", "To customer account", "د پېرودونکي حساب ته")
   val payAfPayCard: String get() = t("کارت AfPay", "AfPay card", "د AfPay کارت")
+  /** PAY-10 — ردیفِ ارزِ نقد (ریزِ ارز و نرخ کنارش، رقم و کدِ لاتین) */
+  val payFx: String get() = t("ارز", "Foreign cash", "بهرنۍ پیسې")
 }

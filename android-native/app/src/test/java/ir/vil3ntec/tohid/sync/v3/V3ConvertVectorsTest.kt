@@ -12,6 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 
@@ -65,6 +66,21 @@ class V3ConvertVectorsTest {
       assertEquals("dropped: $id", strings(c.getValue("dropped")), r.dropped)
       assertEquals("native: $id", c.getValue("native").jsonPrimitive.boolean, r.native)
       assertEquals("reason: $id", c.getValue("reason").jsonPrimitive.content, r.reason)
+    }
+  }
+
+  /** R9: نامِ قدیم و واحددارِ ناجورِ یک فیلد (`amount`/`amountMinor`) ⇒ v2 تا سرور با همان دلیل رد کند، هر ترتیبی */
+  @Test fun unitClashGoesToServer() {
+    val hlc = v.getValue("hlc").jsonPrimitive.content
+    val rejects = v.getValue("rejects").jsonArray.map { it.jsonObject }
+    assertTrue(rejects.size >= 2)
+    for (c in rejects) {
+      val op = SyncOp.fromJson(c.getValue("in").jsonObject)!!
+      val r = V3Convert.fromLegacyOp(op, hlc)
+      assertEquals("ok: ${op.opId}", false, r.ok)
+      assertEquals("ops: ${op.opId}", emptyList<JsonObject>(), r.ops)
+      assertEquals("native: ${op.opId}", false, r.native)
+      assertEquals("reason: ${op.opId}", c.getValue("reason").jsonPrimitive.content, r.reason)
     }
   }
 

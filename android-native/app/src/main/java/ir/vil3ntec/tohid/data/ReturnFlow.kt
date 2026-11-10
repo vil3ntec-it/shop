@@ -423,7 +423,7 @@ object ReturnFlow {
     }
     val rows = list.mapIndexed { i, p ->
       val id = when {
-        p.kind == Pay.CASH -> Pay.CASH
+        p.kind == Pay.CASH || p.kind == Pay.FX -> Pay.CASH // PAY-10: سهمِ ارزِ نقد به افغانیِ نقد پس داده می‌شود
         p.method == Pay.ACCOUNT || p.kind == Pay.ACCOUNT -> Pay.ACCOUNT
         else -> p.method
       }

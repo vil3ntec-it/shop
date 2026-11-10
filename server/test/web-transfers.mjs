@@ -8,6 +8,7 @@
  *     با دلیل ماندهٔ در مسیر به مبدأ. مانده‌ها از خودِ سرور سنجیده می‌شوند.
  *   • صندوق‌دار (`stock.view` بی `stock.move`): فقط دیدن — نه «انتقالِ تازه»، نه دریافت/رد.
  *   • گوشی (۳۷۵px): صفحه افقی بیرون نمی‌زند؛ axe (اگر هست) بر پنجرهٔ باز.
+ *   • INV-01 «موجودیِ هر مکان»: هر کالا در قفسه، انبار، خراب و در مسیر و جمع — عیناً پاسخِ خودِ سرور؛ جست‌وجو؛ نامِ کالا متن.
  *   • زبانِ صفحه (`web-i18n.js`) بی بارگذاریِ دوباره: پنجرهٔ باز، دکمه و فرمِ دریافت با هر زبان عوض می‌شوند، آنچه در فرم
  *     نوشته شده می‌ماند، نامِ کالا داده است، و برگشت به فارسی همان متنِ پیشین.
  *
@@ -50,6 +51,7 @@ const migrate = require('../src/migrate');
 const liveConfig = require('../src/lib/live-config');
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
+const XC = require(path.join(ROOT, 'license', 'stock-transfers.js'));
 let failures = 0;
 const results = [];
 async function step(name, fn) {
@@ -416,6 +418,66 @@ await step('هرگز دو بار: قطعِ نت وسطِ ارسال، بعد و�
   await page.waitForSelector('#xfr-list .xfr-row');
 });
 
+await step('INV-01: «موجودیِ هر مکان» — هر کالا در هر مکانِ سرور و جمع، عیناً پاسخِ سرور؛ جست‌وجو؛ نامِ کالا متن', async () => {
+  const server = (await call('GET', '/api/shop/catalog/products?limit=50', undefined, owner.accessToken)).body.items;
+  //  انتقال‌های بالا موجودی را میانِ مکان‌ها پخش کرده‌اند ⇒ دست‌کم یک کالا در دو مکان عدد دارد
+  assert.ok(server.some((p) => XC.PLACES.filter((l) => p.stock.levels[l] > 0).length >= 2), JSON.stringify(server.map((p) => p.stock.levels)));
+  await page.click('[data-xfr="tab"][data-tab="stock"]');
+  await page.waitForSelector('#xfr-stock-table tbody tr');
+  assert.deepEqual(await page.$$eval('#xfr-stock-table thead th', (ths) => ths.map((th) => th.textContent.trim())),
+    ['کالا', 'قفسهٔ فروشگاه', 'انبار', 'خراب', 'در مسیر', 'جمع']);
+  const rows = await page.$$eval('#xfr-stock-table tbody tr', (trs) => trs.map((tr) => ({ id: tr.dataset.id, cells: [...tr.children].map((c) => c.textContent.trim()) })));
+  assert.deepEqual(rows.map((r) => r.id), server.map((p) => p.id));
+  for (const p of server) {
+    const lv = XC.PLACES.map((l) => p.stock.levels[l]);
+    assert.deepEqual(rows.find((r) => r.id === p.id).cells, [p.name, ...lv.map(XC.qtyText), XC.qtyText(lv.reduce((a, b) => a + b, 0))], p.id);
+  }
+  //  نامِ کالا دادهٔ دفتر است ⇒ متن، هرگز HTML
+  assert.equal(await page.locator('#xss-probe').count(), 0);
+  assert.ok(rows.some((r) => r.cells[0] === 'زهر <img src=x id="xss-probe">'));
+  //  جست‌وجو (Enter در کادر) فقط همان کالا؛ بی نتیجه ⇒ «کالایی پیدا نشد»
+  await page.fill('#xfr-stock input[name="sq"]', 'روغن');
+  await page.press('#xfr-stock input[name="sq"]', 'Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('#xfr-stock-table tbody tr')].map((tr) => tr.dataset.id).join() === 'oil');
+  await page.fill('#xfr-stock input[name="sq"]', 'ناموجود');
+  await page.click('#xfr-stock button[type="submit"]');
+  await page.waitForFunction(() => /کالایی پیدا نشد/.test(document.querySelector('#xfr-body .xfr-empty')?.textContent || ''));
+  if (axeSrc) {
+    await page.fill('#xfr-stock input[name="sq"]', '');
+    await page.press('#xfr-stock input[name="sq"]', 'Enter');
+    await page.waitForSelector('#xfr-stock-table tbody tr');
+    await page.addScriptTag({ content: axeSrc });
+    const v = await page.evaluate(async () => (await window.axe.run('#xfr-modal', { runOnly: ['wcag2a', 'wcag2aa'] })).violations
+      .filter((x) => x.impact === 'critical' || x.impact === 'serious').map((x) => x.id));
+    assert.deepEqual(v, []);
+  }
+  //  صفحهٔ بعد و «شاید تازه نباشد»: پاسخِ نخست یک کالا با نشانگر و `fresh: false`، «بیشتر» بقیه را می‌افزاید و دکمه می‌رود
+  const asked = [];
+  await page.route('**/api/v1/shop/catalog/products?*', closeSafeRoute(async (route) => {
+    const u = new URL(route.request().url());
+    asked.push(u.searchParams.get('cursor') || '');
+    if (!u.searchParams.get('cursor')) return route.fulfill({ json: { items: server.slice(0, 1), nextCursor: 'next-1', freshness: { fresh: false, reason: 'stale', checkedAt: null } } });
+    return route.fulfill({ json: { items: server.slice(1), nextCursor: null, freshness: { fresh: true, reason: '', checkedAt: 1 } } });
+  }));
+  await page.fill('#xfr-stock input[name="sq"]', '');
+  await page.press('#xfr-stock input[name="sq"]', 'Enter');
+  await page.waitForSelector('[data-xfr="more"]');
+  assert.equal(await page.locator('#xfr-stock-table tbody tr').count(), 1);
+  assert.match(await page.locator('#xfr-body').innerText(), /شاید تازه نباشد/);
+  await page.click('[data-xfr="more"]');
+  await page.waitForFunction((n) => document.querySelectorAll('#xfr-stock-table tbody tr').length === n, server.length);
+  assert.deepEqual(await page.$$eval('#xfr-stock-table tbody tr', (trs) => trs.map((tr) => tr.dataset.id)), server.map((p) => p.id));
+  assert.equal(await page.locator('[data-xfr="more"]').count(), 0);
+  assert.deepEqual(asked, ['', 'next-1']);
+  await page.unroute('**/api/v1/shop/catalog/products?*');
+  //  بستن و بازگشایی روی همان زبانه، با خواندنِ تازه؛ بازگشت به «در مسیر» همان فهرستِ انتقال
+  await page.keyboard.press('Escape');
+  await page.click('#xfr-btn');
+  await page.waitForSelector('#xfr-stock-table tbody tr');
+  await page.click('[data-xfr="tab"][data-tab="open"]');
+  await page.waitForFunction(() => !document.querySelector('#xfr-stock-table') && !/در حالِ خواندن/.test(document.querySelector('#xfr-body')?.textContent || ''));
+});
+
 await step('صندوق‌دار (بی stock.move): فقط دیدن — نه «انتقالِ تازه»، نه دریافت/رد؛ گوشی بی بیرون‌زدگی', async () => {
   const s = await openAs(cashier, { width: 375 });
   await s.page.locator('#xfr-btn').waitFor({ timeout: 10000 });
@@ -428,6 +490,12 @@ await step('صندوق‌دار (بی stock.move): فقط دیدن — نه «ا
   await s.page.waitForSelector('.xfr-table');
   assert.equal(await s.page.locator('[data-xfr="act"]').count(), 0);
   assert.ok((await s.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'صفحه افقی بیرون زد');
+  //  INV-01: «موجودیِ هر مکان» برای همه با `stock.view`؛ جدولِ پهن درونِ قابِ خودش می‌لغزد، صفحه نه
+  await s.page.click('[data-xfr="back"]');
+  await s.page.click('[data-xfr="tab"][data-tab="stock"]');
+  await s.page.waitForSelector('#xfr-stock-table tbody tr');
+  assert.equal(await s.page.locator('#xfr-stock-table thead th').count(), 6);
+  assert.ok((await s.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)) <= 1, 'جدولِ مکان‌ها صفحه را بیرون زد');
   await s.ctx.close();
 });
 

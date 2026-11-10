@@ -56,5 +56,6 @@
   "payOnline": "پرداختِ آنلاین",
   "payCod": "نقد هنگامِ تحویل",
   "payAccount": "به حسابِ مشتری",
-  "payAfPayCard": "کارت AfPay"
+  "payAfPayCard": "کارت AfPay",
+  "payFx": "ارز"
 }

@@ -10,20 +10,56 @@
 
    دفتر و ابزارهای صفحه (رفتن به صفحه، CSV، چاپ، قالبِ پول و تاریخ) را
    `window.tohidReportEnv()`ِ index.html می‌دهد — نسخهٔ دومی از آن‌ها این‌جا نیست.
+
+   RPT-03: روشِ بهای سود و حاشیه همان `COST` ِ report-board (دوقلوی `CostPolicy`): پیش‌فرض و مصوب میانگینِ موزون
+   با `costApproved`؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر (`tohid-report-cost`) و همیشه «تقریبی».
+   RPT-11: «اکسل» = ‎.xlsx‎ ِ واقعی (`TohidOwnerExport.report`، عدد عدد می‌ماند) و «PDF» = فایلِ مستقیم (`report-pdf.js`،
+   دیربار با نخستین بار) — هر دو از همان برگهٔ CSV و چاپ.
    ========================================================== */
 (function () {
   'use strict';
   var KEY = 'tohid-report-fresh';
   var VM_KEY = 'view_mode:local:report-fresh';
+  var COST_KEY = 'tohid-report-cost';
+  var PDF_SRC = 'license/report-pdf.js?v=1';
   var state = { tab: 'today', span: 'month', dim: 'product', sort: null };
 
   function core() { return window.TohidReportCore; }
   function board() { return window.TohidReportBoard; }
+  /** INV-16: هستهٔ «ارزش موجودی» (`stock-value-core.js`، دوقلوی `StockAnalysis.valuation`)؛ نبودش ⇒ بی آن زبانه */
+  function value() { return window.TohidStockValue; }
   function env() { return typeof window.tohidReportEnv === 'function' ? window.tohidReportEnv() : null; }
   function get(k) { try { return window.localStorage.getItem(k); } catch (e) { return null; } }
   function put(k, v) { try { window.localStorage.setItem(k, v); } catch (e) { /* حالتِ خصوصی: فقط همین بار */ } }
 
   function enabled() { return get(KEY) === '1'; }
+
+  /** RPT-03: روشِ بهای همین مرورگر (`COST.parse`: نبود ⇒ مصوب) و تأییدش برای هسته — هرگز `true` ِ ثابت */
+  function cost() {
+    var C = board() && board().COST;
+    var m = C ? C.parse(get(COST_KEY)) : 'line';
+    return { m: m, costing: m, costApproved: C ? C.approved(m) : false };
+  }
+  function homeOf(E) {
+    var c = cost();
+    return board().build(E.ledger, { date: E.today, clock: clock(), money: E.money, costing: c.costing, costApproved: c.costApproved });
+  }
+  function costLabel(base, m) { var C = board().COST; return C ? C.label(base, m) : base + ' (تقریبی)'; }
+  /** همان `costLabel`، هر تکه در span ِ خودش تا لایهٔ زبان (`web-i18n.js`) هر کدام را جدا بشناسد */
+  function labelHtml(base, m) {
+    var full = costLabel(base, m);
+    if (full === base) return esc(base);
+    return '<span>' + esc(base) + '</span> (' + full.slice(base.length + 2, -1).split('، ').map(function (t) {
+      return '<span>' + esc(t) + '</span>';
+    }).join('، ') + ')';
+  }
+  /** `COST.explain`: شرحِ روش و (اگر مصوب نیست) چرا تقریبی است، دو جملهٔ جدا */
+  function explainHtml(m) {
+    var C = board().COST, def = C && C.METHODS.filter(function (x) { return x.id === m; })[0];
+    if (!def) return '';
+    var rest = C.explain(m).slice(def.note.length).replace(/^\s+/, '');
+    return '<span>' + esc(def.note) + '</span>' + (rest ? ' <span>' + esc(rest) + '</span>' : '');
+  }
 
   /** ساعتِ همین دستگاه: روزِ کاری از نیمه‌شب؛ فقط تفکیکِ «ساعت» از آن درمی‌آید */
   function clock() { return { offsetMinutes: -new Date().getTimezoneOffset(), dayStartMinute: 0 }; }
@@ -54,7 +90,13 @@
   /** VISUAL-DIRECTION §۱.۵: صفحهٔ مدیریت پیش‌فرض جدول؛ گوشی همیشه کارت */
   function viewMode() { return phone() ? 'card' : (get(VM_KEY) === 'card' ? 'card' : 'table'); }
 
-  function tabsFor(E) { var B = board(); return E.money ? B.TABS : B.TABS.filter(function (t) { return t.id === 'debts'; }); }
+  /** INV-16 — مثلِ «بهای میانگین» ِ برنامه (`StockCostFresh.tabs`) بیرون از تابلوی مشترک و فقط برای کسی که پول را می‌بیند */
+  var STOCK_TAB = { id: 'stock-value', label: 'ارزش موجودی', ranged: false };
+  function tabsFor(E) {
+    var B = board();
+    if (!E.money) return B.TABS.filter(function (t) { return t.id === 'debts'; });
+    return value() ? B.TABS.concat([STOCK_TAB]) : B.TABS;
+  }
 
   /* ---------------- خانه ---------------- */
 
@@ -92,7 +134,7 @@
     if (!el) return;
     var E = env(), B = board();
     if (!enabled() || !E || !B || !core()) { el.hidden = true; el.innerHTML = ''; return; }
-    var home = B.build(E.ledger, { date: E.today, clock: clock(), money: E.money });
+    var home = homeOf(E);
     el.innerHTML = '<div class="rf-kpis">' + home.kpis.map(function (k) { return kpiHtml(k, E); }).join('') + '</div>' +
       '<div class="rf-pills" role="list" aria-label="وضعیتِ دکان">' + home.pills.map(pillHtml).join('') + '</div>';
     el.hidden = false;
@@ -109,28 +151,64 @@
 
   /** جدول‌های یک زبانه — همان `ReportFreshModel.view`ِ Kotlin */
   function compute(E) {
-    var C = core(), B = board(), L = C.ledger(E.ledger), ck = clock();
+    var C = core(), B = board(), L = C.ledger(E.ledger), ck = clock(), co = cost();
     var r = B.range(state.span, E.today), dim = B.DIMS.indexOf(state.dim) >= 0 ? state.dim : 'product';
     var tab = state.tab;
     if (tab === 'today') {
-      return { tables: C.tables('today', C.today(L, { date: E.today, clock: ck })) };
+      return { tables: C.tables('today', C.today(L, { date: E.today, clock: ck, costing: co.costing, costApproved: co.costApproved })) };
     }
     if (tab === 'sales' || tab === 'profit') {
-      var s = C.sales(L, { from: r.from, to: r.to, clock: ck });
+      var s = C.sales(L, { from: r.from, to: r.to, clock: ck, costing: co.costing, costApproved: co.costApproved });
       var t = C.tables('sales', s).filter(function (x) { return x.id === 'sales.' + dim; })[0];
       if (tab === 'sales') return { tables: [t], sales: s };
       var keys = ['name', 'netSales', 'cogs', 'grossProfit', 'marginBp'];
       var idx = keys.map(function (k) { return t.columns.map(function (c) { return c.key; }).indexOf(k); }).filter(function (i) { return i >= 0; });
       var pick = function (row) { return idx.map(function (i) { return row[i]; }); };
-      return { sales: s, tables: [{ id: 'profit', title: 'سود و حاشیه به تفکیک ' + B.DIM_LABELS[dim] + ' (تقریبی)',
+      return { sales: s, tables: [{ id: 'profit', title: costLabel('سود و حاشیه به تفکیک ' + B.DIM_LABELS[dim], s.costing),
         columns: idx.map(function (i) { return t.columns[i]; }), rows: t.rows.map(pick), total: t.total ? pick(t.total) : null }] };
     }
     if (tab === 'debts') {
       var d = C.debts(L, { asOf: E.today, clock: ck });
       return { tables: C.tables('debts', d), debts: d };
     }
+    if (tab === STOCK_TAB.id) return stockValueView(value().fromLedger(E.ledger, C));
     var f = C.fraud(L, { from: r.from, to: r.to, clock: ck });
     return { tables: C.tables('fraud', f), fraud: f };
+  }
+
+  /**
+   *  INV-16 — ارزشِ موجودی به بها و به قیمتِ فروش و سودِ بالقوه: بها = میانگینِ موزونِ همین دفتر (D-23)، ارزش = جمعِ دفتر.
+   *  فقط کالاهای موجودِ حساب‌شده در جدول؛ ردیفِ «جمع» همان جمعِ هسته (منفی، کیت و «حساب نشد» بیرون‌اند و زیرِ جدول گفته می‌شوند).
+   */
+  function stockValueView(sv) {
+    var v = sv.valuation;
+    var approx = !v.complete || sv.rows.some(function (r) { return r.approximate; });
+    return {
+      value: v,
+      tables: [{
+        id: STOCK_TAB.id, title: 'ارزش موجودی و سود بالقوه',
+        columns: [
+          { key: 'name', label: 'کالا', kind: 'text' }, { key: 'qty', label: 'موجودی', kind: 'qty' },
+          { key: 'unitCost', label: 'بهای یک واحد', kind: 'money' }, { key: 'costValue', label: 'ارزش موجودی', kind: 'money' },
+          { key: 'retailValue', label: 'ارزش به قیمت فروش', kind: 'money' }, { key: 'profit', label: 'سود بالقوه', kind: 'money' },
+          { key: 'approx', label: 'تقریبی', kind: 'flag' },
+        ],
+        rows: sv.rows.map(function (r) { return [r.name, r.qtyMilli, r.unitCostMinor, r.costMinor, r.retailMinor, r.profitMinor, r.approximate]; }),
+        total: ['جمع', null, null, v.costMinor, v.retailMinor, v.potentialProfitMinor, approx],
+      }],
+    };
+  }
+
+  /** زیرِ آمار: قاعده، و هر کم‌بود جدا (پنهان نمی‌شود؛ همان یادداشت‌های «تحلیلِ موجودی» ِ برنامه) */
+  function stockValueNotes(v) {
+    var out = [];
+    if (v.missingCost.length) out.push(v.missingCost.length + ' کالای موجود بی بها — در سود نیامد');
+    if (v.missingPrice.length) out.push(v.missingPrice.length + ' کالای موجود بی قیمت فروش');
+    if (v.belowCost.length) out.push(v.belowCost.length + ' کالا قیمت فروشِ زیرِ بها دارد');
+    if (v.negative.length) out.push(v.negative.length + ' کالا موجودیِ منفی دارد و در جمع نیست.');
+    if (v.outOfRange.length) out.push(v.outOfRange.length + ' کالا عددِ نامعقول دارد — حساب نشد');
+    return '<p class="rf-note">بها میانگینِ موزونِ متحرکِ همین دفتر است (D-23)؛ سود بالقوه فقط کالاهایی را می‌شمارد که هم بها و هم قیمت فروش دارند. فقط خواندنی؛ «تقریبی» یعنی بهای پایه معلوم نیست.</p>' +
+      (out.length ? '<ul class="rf-note">' + out.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : '');
   }
 
   function cardKeys(id) {
@@ -139,6 +217,7 @@
     if (id.indexOf('sales.') === 0) return ['netSales', 'invoices', 'qty', 'returns'];
     if (id.indexOf('debts.') === 0) return ['balance', 'credit', 'oldestDays'];
     if (id === 'fraud') return ['discount', 'returnCount', 'voidCount', 'lineDeleteCount', 'noSaleCount'];
+    if (id === STOCK_TAB.id) return ['qty', 'costValue', 'retailValue', 'profit'];
     return [];
   }
 
@@ -148,8 +227,9 @@
     }).join('') + '</div>';
   }
 
-  function stat(title, value, period) {
-    return '<div class="rf-stat"><span class="t">' + esc(title) + '</span><span class="v">' + esc(value) + '</span><span class="p">' + esc(period) + '</span></div>';
+  function stat(title, value, period) { return statHtml(esc(title), value, period); }
+  function statHtml(title, value, period) {
+    return '<div class="rf-stat"><span class="t">' + title + '</span><span class="v">' + esc(value) + '</span><span class="p">' + esc(period) + '</span></div>';
   }
 
   function periodOf(from, to, E) {
@@ -160,7 +240,7 @@
   function summary(v, E) {
     var af = function (x) { return E.formatMoney(x / 100) + ' ؋'; };
     if (state.tab === 'today') {
-      var home = board().build(E.ledger, { date: E.today, clock: clock(), money: E.money });
+      var home = homeOf(E);
       return '<div class="rf-kpis">' + home.kpis.map(function (k) { return kpiHtml(k, E); }).join('') + '</div>';
     }
     if (v.sales && state.tab === 'sales') {
@@ -169,12 +249,17 @@
         stat('تخفیف', af(t.discount), p) + stat('برگشتی', af(t.returns), p) + stat('میانگین فاکتور', af(t.avgTicket), p) + '</div>';
     }
     if (v.sales) {
-      var u = v.sales.totals, q = periodOf(v.sales.from, v.sales.to, E);
-      return '<div class="rf-stats">' + stat('فروش خالص', af(u.netSales), q) + stat('بهای تمام‌شده (تقریبی)', af(u.cogs), q) +
-        stat('سود ناخالص (تقریبی)', af(u.grossProfit), q) + stat('حاشیه (تقریبی)', u.marginBp === null ? '—' : percent(u.marginBp), q) + '</div>' +
-        '<p class="rf-note"><span class="rf-pill rf-warning" role="status"><span class="dot" aria-hidden="true"></span>سود تقریبی</span> ' +
-        'بهای فروش از قیمتِ خریدِ ثبت‌شده روی هر قلم است، نه روشِ مصوب (تصمیمِ D-23).' +
-        (u.costEstimatedLines > 0 ? ' ' + u.costEstimatedLines + ' قلم بی بهای خرید است.' : '') + '</p>';
+      //  RPT-03: روشِ بها همان که هسته با آن حساب کرد (`costing`)، نه حدسِ صفحه — همان کارت‌های `ReportFresh` ِ برنامه
+      var u = v.sales.totals, q = periodOf(v.sales.from, v.sales.to, E), m = v.sales.costing, CP = board().COST;
+      return '<div class="rf-stats">' + stat('فروش خالص', af(u.netSales), q) + statHtml(labelHtml('بهای تمام‌شده', m), af(u.cogs), q) +
+        statHtml(labelHtml('سود ناخالص', m), af(u.grossProfit), q) + statHtml(labelHtml('حاشیه', m), u.marginBp === null ? '—' : percent(u.marginBp), q) + '</div>' +
+        (CP ? '<div class="rf-bar"><span class="rf-label">روش بها</span>' +
+          seg('cost', CP.METHODS.map(function (x) { return [x.id, x.label]; }), m, 'روش بها') + '</div>' : '') +
+        '<p class="rf-note">' + (u.profitApproximate
+          ? '<span class="rf-pill rf-warning" role="status"><span class="dot" aria-hidden="true"></span>سود تقریبی</span> '
+          : '<span class="rf-pill rf-success" role="status"><span class="dot" aria-hidden="true"></span>سود قطعی</span> ') +
+        explainHtml(m) +
+        (u.costEstimatedLines > 0 ? ' <span>' + esc(u.costEstimatedLines + ' قلم بی بهای خرید است.') + '</span>' : '') + '</p>';
     }
     if (v.debts) {
       var c = v.debts.customers, edge = v.debts.buckets[v.debts.buckets.length - 1];
@@ -182,6 +267,12 @@
       return '<div class="rf-stats">' + stat('طلب از مشتریان', af(c.totals.balance), 'تا امروز') +
         stat('مشتریانِ بدهکار', String(c.rows.filter(function (x) { return x.balance > 0; }).length), 'تا امروز') +
         stat('قرضِ بیش از ' + edge + ' روز', String(late), 'مشتری') + stat('بدهی به تأمین‌کنندگان', af(v.debts.suppliers.totals.balance), 'تا امروز') + '</div>';
+    }
+    if (v.value) {
+      var m = v.value;
+      return '<div class="rf-stats">' + stat('ارزش موجودی', af(m.costMinor), 'تا امروز') + stat('ارزش به قیمت فروش', af(m.retailMinor), 'تا امروز') +
+        stat('سود بالقوه', af(m.potentialProfitMinor), 'تا امروز') + stat('حاشیه', m.marginBp === null ? '—' : percent(m.marginBp), 'تا امروز') + '</div>' +
+        stockValueNotes(m);
     }
     if (v.fraud) {
       var f = v.fraud.totals, w = periodOf(v.fraud.from, v.fraud.to, E);
@@ -261,11 +352,13 @@
     var def = tabs.filter(function (t) { return t.id === state.tab; })[0];
     if (B.SPANS.indexOf(state.span) < 0) state.span = 'month';
     var v = compute(E);
-    last = { v: v, name: ('گزارش-' + def.label + '-' + E.today).replace(/ /g, '-') };  // داده: نامِ پروندهٔ خروجی
+    last = { v: v, label: def.label, name: ('گزارش-' + def.label + '-' + E.today).replace(/ /g, '-') };  // داده: نامِ پروندهٔ خروجی
     var mode = viewMode();
-    var html = '<div class="rf-head"><div><h2>گزارش‌ها</h2><p>از هستهٔ مشترکِ گزارش (همان عددهای برنامهٔ نصبی). سود تا تعیینِ روشِ بهای تمام‌شده تقریبی است.</p></div>' +
+    var html = '<div class="rf-head"><div><h2>گزارش‌ها</h2><p>از هستهٔ مشترکِ گزارش (همان عددهای برنامهٔ نصبی).</p></div>' +
       '<div class="rf-actions"><button type="button" class="btn btn-secondary btn-sm" data-act="print">چاپ</button>' +
-      '<button type="button" class="btn btn-primary btn-sm" data-act="csv">خروجی اکسل (CSV)</button></div></div>' +
+      '<button type="button" class="btn btn-secondary btn-sm" data-act="pdf">خروجی PDF</button>' +
+      '<button type="button" class="btn btn-secondary btn-sm" data-act="csv">CSV</button>' +
+      '<button type="button" class="btn btn-primary btn-sm" data-act="xlsx">خروجی اکسل</button></div></div>' +
       '<div class="rf-bar">' + seg('rtab', tabs.map(function (t) { return [t.id, t.label]; }), state.tab, 'نوعِ گزارش') +
       (def.ranged ? seg('span', B.SPANS.map(function (s) { return [s, B.SPAN_LABELS[s]]; }), state.span, 'بازه') : '') +
       '<span class="sp"></span>' + (phone() ? '' : seg('vm', [['card', 'نمای کارتی'], ['table', 'نمای جدولی']], mode, 'نمایش')) + '</div>' +
@@ -290,6 +383,7 @@
     else if (b.hasAttribute('data-span')) state.span = b.getAttribute('data-span');
     else if (b.hasAttribute('data-dim')) { state.dim = b.getAttribute('data-dim'); state.sort = null; }
     else if (b.hasAttribute('data-vm')) put(VM_KEY, b.getAttribute('data-vm'));
+    else if (b.hasAttribute('data-cost')) put(COST_KEY, b.getAttribute('data-cost'));
     else if (b.hasAttribute('data-sort')) {
       var col = +b.getAttribute('data-sort'), id = b.getAttribute('data-table');
       var t = last && last.v.tables.filter(function (x) { return x.id === id; })[0];
@@ -297,20 +391,78 @@
       state.sort = state.sort && state.sort.id === id && state.sort.col === col
         ? { id: id, col: col, desc: !state.sort.desc } : { id: id, col: col, desc: !textCol };
     } else if (b.hasAttribute('data-kpi') || b.hasAttribute('data-pill')) { openPreset(b); }
-    else if (b.getAttribute('data-act') === 'csv' && last && E) {
+    else if (b.hasAttribute('data-act') && b.getAttribute('data-act') !== 'print' && last && E) {
       var rows = exportRows(last.v.tables);
       if (rows.length <= 1) { if (E.showToast) E.showToast('در این گزارش داده‌ای برای خروجی وجود ندارد', 'warning'); return; }
-      E.downloadCsv(last.name + '.csv', rows);
+      var act = b.getAttribute('data-act');
+      if (act === 'csv') E.downloadCsv(last.name + '.csv', rows);
+      else if (act === 'xlsx') excel(rows, last.name, E);
+      else if (act === 'pdf') pdf(rows, last, E, b);
       return;
     } else if (b.getAttribute('data-act') === 'print' && last && E) { E.printRows(exportRows(last.v.tables), last.name); return; }
     else return;
     //  بعد از کشیدنِ دوباره، فوکوس روی همان دکمه می‌ماند (کار با کیبورد)
-    var attr = ['data-rtab', 'data-span', 'data-dim', 'data-vm', 'data-sort'].filter(function (a) { return b.hasAttribute(a); })[0];
+    var attr = ['data-rtab', 'data-span', 'data-dim', 'data-vm', 'data-cost', 'data-sort'].filter(function (a) { return b.hasAttribute(a); })[0];
     var sel = attr ? 'button[' + attr + '="' + b.getAttribute(attr) + '"]' +
       (attr === 'data-sort' ? '[data-table="' + b.getAttribute('data-table') + '"]' : '') : null;
     renderReports();
     var again = sel ? document.querySelector('#rep-fresh ' + sel) : null;
     if (again) again.focus();
+  }
+
+  /* ---------------- RPT-11: اکسل و PDF ---------------- */
+
+  function saveBlob(blob, filename) {
+    var url = URL.createObjectURL(blob), a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 10000);
+  }
+  function failed(E) { if (E.showToast) E.showToast('فایل ساخته نشد', 'danger'); }
+
+  /** همان برگهٔ CSV ⇒ ‎.xlsx‎ ِ راست‌به‌چپ، سرستونِ ثابت و عددِ عدد (`Xlsx.of` ِ برنامه) */
+  function excel(rows, name, E) {
+    var X = window.TohidOwnerExport;
+    if (!X || typeof X.report !== 'function') { failed(E); return; }
+    X.report(name, rows).then(function (u8) {
+      saveBlob(new Blob([u8], { type: X.XLSX_MIME }), name + '.xlsx');
+    }, function () { failed(E); });
+  }
+
+  var pdfLoad = null;
+  /** `report-pdf.js` فقط با نخستین «PDF» (هر بارِ صفحه یک بار)؛ نبودش ⇒ پیامِ خطا، نه صفحهٔ خراب */
+  function pdfLib() {
+    if (window.TohidReportPdf) return Promise.resolve(window.TohidReportPdf);
+    if (!pdfLoad) {
+      pdfLoad = new Promise(function (ok, no) {
+        var sc = document.createElement('script');
+        sc.src = PDF_SRC;
+        sc.onload = function () { if (window.TohidReportPdf) ok(window.TohidReportPdf); else no(new Error('pdf')); };
+        sc.onerror = function () { pdfLoad = null; no(new Error('pdf')); };
+        document.head.appendChild(sc);
+      });
+    }
+    return pdfLoad;
+  }
+
+  /** PDF ِ A4 ِ سیاه‌وسفید با قلمِ همین صفحه (`report-pdf.js`)؛ دکمه تا پایانِ ساختن خاموش */
+  function pdf(rows, at, E, btn) {
+    btn.disabled = true;
+    btn.setAttribute('aria-busy', 'true');
+    var done = function () { btn.disabled = false; btn.removeAttribute('aria-busy'); };
+    var fonts = document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve();
+    pdfLib().then(function (P) {
+      return fonts.then(function () {
+        var font = window.getComputedStyle(document.body).fontFamily;
+        try {
+          saveBlob(P.blob(rows, { title: 'گزارش‌ها — ' + at.label, sub: at.name, font: font }), at.name + '.pdf'); // داده: عنوانِ درونِ پرونده، همان برگهٔ CSV
+        } catch (e) {
+          if (e && e.code === 'too_many_pages') {
+            if (E.showToast) E.showToast('PDF ساخته نشد: گزارش بیش از ' + e.max + ' صفحه است. بازهٔ کوتاه‌تری بگیرید یا خروجیِ Excel بگیرید.', 'danger');
+          } else failed(E);
+        }
+      });
+    }).then(done, function () { done(); failed(E); });
   }
 
   /** صفحهٔ گزارش: روشن ⇒ گزارشِ تازه؛ خاموش ⇒ همان گزارشِ امروز */
@@ -334,6 +486,14 @@
     put(KEY, on ? '1' : '0');
     syncReports();
     renderHome();
+  }
+
+  //  INV-16: index.html ِ یخ‌زده برچسبِ `stock-value-core.js` را ندارد ⇒ همین‌جا؛ رسید ⇒ صفحهٔ بازِ گزارش زبانه را می‌گیرد
+  if (!value() && document.head) {
+    var sv = document.createElement('script');
+    sv.src = 'license/stock-value-core.js?v=1';
+    sv.onload = function () { var fr = document.getElementById('rep-fresh'); if (fr && !fr.hidden) renderReports(); };
+    document.head.appendChild(sv);
   }
 
   window.TohidReportUi = {

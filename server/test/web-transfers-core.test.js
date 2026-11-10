@@ -6,6 +6,7 @@
  *   ⛔ پیش‌نویس: مبدأ ≠ مقصد، دست‌کم یک کالا، هر ردیف مقدارِ درست — همان سنجشِ سرور (`parseSend`).
  *   ⛔ دریافت: هر ردیفِ در مسیر فرستاده می‌شود (حتی صفر) تا «بستن» هرگز «بقیه رسید» ِ ناخواسته نشود؛ بیش از ماندهٔ در
  *      مسیر نه؛ گامِ ناقصِ تهی نه؛ کسریِ بی دلیل نه. رد بی دلیل نه.
+ *   ⛔ INV-01 «موجودیِ هر مکان»: هر مکانِ سرور یک ستون به همان ترتیب، عددِ ناجور ⇒ ۰، جمع فقط مکان‌های همان ستون‌ها.
  *   ⛔ fa/en/ps همان کلیدها و همان جای‌نگهدارها؛ en بی حرفِ فارسی؛ هر کلیدی که JS به کار می‌برد هست؛
  *      در کدِ JS (جز یادداشت) هیچ متنِ فارسیِ ثابت و هیچ رویداد/اسکریپتِ درون‌خطی نیست (CSP).
  */
@@ -67,6 +68,21 @@ test('دریافت: همهٔ ردیف‌های در مسیر (حتی صفر)؛ �
   assert.equal(X.isOpen({ status: 'received' }), false);
 });
 
+test('INV-01: موجودیِ هر مکان — ستونِ هر مکان به ترتیب، عددِ ناجور ⇒ ۰، جمعِ همان ستون‌ها؛ محدوده فقط همان مکان‌ها', () => {
+  //  همان مکان‌های سرور (`stock.LOCATIONS`)؛ انتقال فقط میانِ دو تای نخست
+  assert.deepEqual(X.PLACES, ['shop_floor', 'warehouse', 'damaged', 'in_transit']);
+  assert.deepEqual(X.LOCS, X.PLACES.slice(0, 2));
+  assert.deepEqual(X.TABS, ['open', 'all', 'stock']);
+  const p = { id: 'rice', name: 'برنج', stock: { levels: { shop_floor: 7500, warehouse: 2000, damaged: -500, in_transit: 1000 }, reservedMilli: 900 } };
+  assert.deepEqual(X.placesRow(p, X.PLACES), { id: 'rice', name: 'برنج', cells: [7500, 2000, -500, 1000], totalMilli: 10000 });
+  //  عضوِ محدود: سرور فقط مکان‌های محدوده را می‌دهد ⇒ فقط همان ستون و همان جمع (رزرو هرگز در جمع نیست)
+  assert.deepEqual(X.placesRow({ id: 'rice', name: 'برنج', stock: { levels: { warehouse: 2000 } } }, ['warehouse']), { id: 'rice', name: 'برنج', cells: [2000], totalMilli: 2000 });
+  //  عددِ ناجور یا نبود ⇒ ۰، نه NaN؛ بی نام ⇒ شناسه
+  assert.deepEqual(X.placesRow({ id: 'x', stock: { levels: { shop_floor: '5', warehouse: 1.5, damaged: null } } }, X.PLACES), { id: 'x', name: 'x', cells: [0, 0, 0, 0], totalMilli: 0 });
+  assert.deepEqual(X.placesRow({ id: 'y' }, ['shop_floor']).cells, [0]);
+  assert.equal(X.qtyText(-500), '-0.5');
+});
+
 test('کلیدِ یکتایی همان الگوی سرور؛ زبانِ ناشناخته ⇒ fa', () => {
   const k = X.newKey();
   assert.match(k, /^[A-Za-z0-9_.:-]{8,128}$/);
@@ -92,8 +108,8 @@ test('هر کلیدی که JS به کار می‌برد در واژه‌نامه
   const used = new Set([...src.matchAll(/\bt\(\s*'([a-z][\w.]*)'/g)].map((m) => m[1]));
   for (const m of src.matchAll(/t\(\s*[^'()]*\?\s*'([a-z][\w.]*)'\s*:\s*'([a-z][\w.]*)'/g)) { used.add(m[1]); used.add(m[2]); }
   for (const s of ['in_transit', 'partial', 'received', 'rejected']) used.add(`st.${s}`);
-  for (const l of X.LOCS) used.add(`loc.${l}`);
-  for (const k of ['open', 'all']) used.add(`tab.${k}`);
+  for (const l of X.PLACES) used.add(`loc.${l}`);
+  for (const k of X.TABS) used.add(`tab.${k}`);
   //  کلیدهایی که هسته به‌جای خطا برمی‌گرداند
   for (const m of src.matchAll(/error: '([a-z][\w.]*)'/g)) used.add(m[1]);
   assert.ok(used.size > 30, `کلیدها خوانده نشدند (${used.size})`);

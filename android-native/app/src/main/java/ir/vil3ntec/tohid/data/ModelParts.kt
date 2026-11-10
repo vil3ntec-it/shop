@@ -97,3 +97,25 @@ data class LayawayLine(
 /** یک قسطِ جدول: شماره از ۱، سررسید (`yyyy-MM-dd`) و مبلغ به پول */
 @Serializable
 data class LayawayDue(val no: Int = 0, val due: String = "", val amountMinor: Long = 0)
+
+/**
+ *  PAY-10 — ردیفِ ارزِ نقدِ یک فاکتور (`SalePayment.fx`، فقط روی ردیفِ `fx`): همان رکوردِ تبادلِ هسته (`ExchangeRecord`)
+ *  که در لحظهٔ فروش ثابت شد. `amountMinor` ِ خودِ ردیف سهمِ افغانیِ همین فاکتور است؛ [afnMinor] ارزشِ همهٔ ارزِ گرفته‌شده
+ *  و تفاوتشان پولِ پسِ افغانی ([FxTillFlow.changeOut]). نرخِ تازه هیچ‌کدام را عوض نمی‌کند.
+ */
+@Serializable
+data class SaleFx(
+  val currency: String,
+  /** مبلغِ دریافتی به واحدِ کوچکِ همان ارز (سنت، پیسه، ریال) */
+  val amount: Long,
+  /** پولِ افغانی برای [per] واحدِ ارز */
+  val rate: Long,
+  val per: Long = 1,
+  /** ارزشِ افغانیِ همهٔ [amount] به پول */
+  val afnMinor: Long,
+  val source: String,
+  /** زمانِ گذاشتنِ نرخ */
+  val at: Long,
+  /** گذارنده/تأییدکنندهٔ نرخ */
+  val by: String,
+)

@@ -1,0 +1,270 @@
+{
+  "_doc": "POS-03 پیشوندِ شمار «۳*» یا «۳×» پیش از بارکد یا نام: متنِ کادر ⇐ (شمار، بخشِ پس از ستاره). برنامه: android-native/.../data/CartQuery.kt (CartQueryVectorsTest)؛ وب: license/cart-query.js (web-cart-query.test.js). قاعده: رقمِ فارسی/عربی و «٫ ٬» ⇐ لاتین و «.» (نویسه به نویسه)، سپس Regex ِ Kotlin روی JVM: ^\\s*([0-9]+(?:\\.[0-9]+)?)\\s*[*×xX]\\s*(.*)$ با \\s = [ \\t\\n\\x0B\\f\\r]، «.» = هر نویسه جز \\n \\r U+0085 U+2028 U+2029، و $ = پایان یا پیش از یک پایانِ خطِ پایانی. term = متنِ اصلی از جای گروهِ دوم تا پایان (رقمِ فارسی دست نمی‌خورد)؛ بی جور ⇒ count ۱ و همان متن. count همان toDouble ِ گروهِ نخست.",
+  "parse": [
+    {
+      "in": "۳*5449000000996",
+      "count": 3,
+      "term": "5449000000996"
+    },
+    {
+      "in": "٣×برنج",
+      "count": 3,
+      "term": "برنج"
+    },
+    {
+      "in": "۱٫۵*برنج",
+      "count": 1.5,
+      "term": "برنج"
+    },
+    {
+      "in": " 12 x abc",
+      "count": 12,
+      "term": "abc"
+    },
+    {
+      "in": "۲*برنج ۵ کیلویی",
+      "count": 2,
+      "term": "برنج ۵ کیلویی"
+    },
+    {
+      "in": "2*۵۴۴۹۰۰۰۰۰۰۹۹۶",
+      "count": 2,
+      "term": "۵۴۴۹۰۰۰۰۰۰۹۹۶"
+    },
+    {
+      "in": "برنج ۵ کیلویی",
+      "count": 1,
+      "term": "برنج ۵ کیلویی"
+    },
+    {
+      "in": "۵۴۴۹۰۰۰۰۰۰۹۹۶",
+      "count": 1,
+      "term": "۵۴۴۹۰۰۰۰۰۰۹۹۶"
+    },
+    {
+      "in": "",
+      "count": 1,
+      "term": ""
+    },
+    {
+      "in": "  ",
+      "count": 1,
+      "term": "  "
+    },
+    {
+      "in": "3*",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3* ",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3×",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3x",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3 * 111",
+      "count": 3,
+      "term": "111"
+    },
+    {
+      "in": "3X111",
+      "count": 3,
+      "term": "111"
+    },
+    {
+      "in": "10 × 2",
+      "count": 10,
+      "term": "2"
+    },
+    {
+      "in": "2 x 3 x 4",
+      "count": 2,
+      "term": "3 x 4"
+    },
+    {
+      "in": "3**111",
+      "count": 3,
+      "term": "*111"
+    },
+    {
+      "in": "3*x111",
+      "count": 3,
+      "term": "x111"
+    },
+    {
+      "in": "3x*111",
+      "count": 3,
+      "term": "*111"
+    },
+    {
+      "in": "12x34",
+      "count": 12,
+      "term": "34"
+    },
+    {
+      "in": "۱۲×۳۴",
+      "count": 12,
+      "term": "۳۴"
+    },
+    {
+      "in": "١٠*abc",
+      "count": 10,
+      "term": "abc"
+    },
+    {
+      "in": "۱٬۵*abc",
+      "count": 1.5,
+      "term": "abc"
+    },
+    {
+      "in": "٬5*abc",
+      "count": 1,
+      "term": "٬5*abc"
+    },
+    {
+      "in": "0*111",
+      "count": 0,
+      "term": "111"
+    },
+    {
+      "in": "007*111",
+      "count": 7,
+      "term": "111"
+    },
+    {
+      "in": "1.50×abc",
+      "count": 1.5,
+      "term": "abc"
+    },
+    {
+      "in": "*111",
+      "count": 1,
+      "term": "*111"
+    },
+    {
+      "in": "x111",
+      "count": 1,
+      "term": "x111"
+    },
+    {
+      "in": "3.*111",
+      "count": 1,
+      "term": "3.*111"
+    },
+    {
+      "in": ".5*111",
+      "count": 1,
+      "term": ".5*111"
+    },
+    {
+      "in": "3.5.5*a",
+      "count": 1,
+      "term": "3.5.5*a"
+    },
+    {
+      "in": "1e3*abc",
+      "count": 1,
+      "term": "1e3*abc"
+    },
+    {
+      "in": "３*abc",
+      "count": 1,
+      "term": "３*abc"
+    },
+    {
+      "in": "3*abc ",
+      "count": 3,
+      "term": "abc "
+    },
+    {
+      "in": "\t3\t*\tabc",
+      "count": 3,
+      "term": "abc"
+    },
+    {
+      "in": "\n3*abc",
+      "count": 3,
+      "term": "abc"
+    },
+    {
+      "in": "3\n*abc",
+      "count": 3,
+      "term": "abc"
+    },
+    {
+      "in": " 3*abc",
+      "count": 1,
+      "term": " 3*abc"
+    },
+    {
+      "in": "3 *abc",
+      "count": 1,
+      "term": "3 *abc"
+    },
+    {
+      "in": "3* abc",
+      "count": 3,
+      "term": " abc"
+    },
+    {
+      "in": "3*abc\u000b",
+      "count": 3,
+      "term": "abc\u000b"
+    },
+    {
+      "in": "3*abc\n",
+      "count": 3,
+      "term": "abc\n"
+    },
+    {
+      "in": "3*abc\r\n",
+      "count": 3,
+      "term": "abc\r\n"
+    },
+    {
+      "in": "3*ab\r",
+      "count": 3,
+      "term": "ab\r"
+    },
+    {
+      "in": "3*ab",
+      "count": 3,
+      "term": "ab"
+    },
+    {
+      "in": "3*\n",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3*\r\n",
+      "count": 3,
+      "term": ""
+    },
+    {
+      "in": "3*ab\ncd",
+      "count": 1,
+      "term": "3*ab\ncd"
+    },
+    {
+      "in": "3*ab\n\n",
+      "count": 1,
+      "term": "3*ab\n\n"
+    },
+    {
+      "in": "3*ab cd",
+      "count": 1,
+      "term": "3*ab cd"
+    }
+  ]
+}

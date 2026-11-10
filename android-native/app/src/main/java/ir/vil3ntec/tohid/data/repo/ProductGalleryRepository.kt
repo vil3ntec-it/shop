@@ -23,7 +23,8 @@ interface ProductGallerySource {
 }
 
 class ProductGalleryRepository(private val api: ApiClient) : ProductGallerySource {
-  override suspend fun items(productId: String) = result { ProductGallery.itemsOf(api.get(ProductGallery.minePath(productId))) }
+  //  همهٔ صفحه‌های `/mine` (نه فقط ۵۰ ِ نخست): وگرنه عکسِ ویترینِ کالای پرعکس از فهرست می‌افتاد
+  override suspend fun items(productId: String) = result { ProductGallery.collect(productId) { api.get(it) } }
 
   override suspend fun shown(productId: String) = result { ImageQuality.shownOf(api.get(ImageChanges.productPath(productId))) }
 

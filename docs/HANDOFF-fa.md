@@ -54,6 +54,76 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-44` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۴: R10، R12، R11؛ روی `claude/sec-review-44` ‏671931d3؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) R10: `license/csv-cell.js` (بارکننده `shop-sync.js`، `sw.js` ‏v72) `csvCell` ِ index.html ِ یخ‌زده را با همان `finance-reports.cell` ِ سرور عوض می‌کند ⇒
+  هر چهار CSV ِ صفحه (گزارش‌ها، صورت‌حساب، انبارگردانی، «گزارشِ تازه») بی فرمول، عددِ منفی عدد. `web-csv-cell.test.js` ۵/۵، `web-csv-export.mjs` ۶/۶ (روی پایه ۵ سرخ؛
+  در `test:web`). (۲) R12: `sweep` در هر `claim` کارِ «در صف»/«در کار با اجارهٔ تمام‌شده» ِ دستهٔ لغوشده را می‌بندد. (۳) R11: بودجهٔ `IMAGE_STUDIO_DECODE_MB` میانِ
+  کارگرها (پیش‌فرض بی تغییر). `security-review-44.test.js` ۶/۶ و `image-studio-jobs.test.js` ۱۱/۱۱ روی PGlite و PostgreSQL ‏16 (R12 و R11 پیش از رفع سرخ).
+  پیگیریِ B9 ِ ممیزی، دو خطِ RULES. (۴) به خواستِ هماهنگ‌کننده: متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان خانهٔ `g` ِ xlsx) در `finance-reports.cell`
+  و `csv-cell.js` با هم بی «'» ⇒ پولِ منفیِ «گزارشِ تازه» عدد؛ `-2+3`، `-1e5`، `+500`، `-.5`، `- 500`، `-150.00%` همان «'». سنجه: `web-csv-cell.test.js` ۵/۵،
+  R10 ِ `security-review-44.test.js` (خروجیِ مالیِ پنل)، گامِ «گزارشِ تازه» ِ `web-csv-export.mjs` — هر سه پیش از استثنا سرخ.
+  (۵) R18 (نامِ R13 به خاطرِ B10 ِ `claude/sec-review-45` عوض شد): `image-bank.reportCsv` هر خانه را از `finance-reports.cell` می‌گذراند (پیش‌گیرانه؛ امروز هیچ
+  ورودیِ کاربر به آن گزارش نمی‌رسد)؛ فهرستِ نویسنده‌های CSV (سرور/وب/پنل) در `web-csv-cell.test.js` ۶/۶. `security-review-44.test.js` ۷/۷ (PGlite و PostgreSQL).
+- نیمه‌کاره: هیچ. پیش‌فرضِ کم‌ترِ `IMAGE_STUDIO_DECODE_MB` برای سرورِ خانگیِ کم‌حافظه — تصمیمِ صاحب‌کار.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را پس از `claude/sec-review-44` در دسته بگذارد؛ `VERSION` ِ `sw.js` با شاخه‌های دیگرِ دسته هماهنگ شود.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
+  (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان
+  (فقط PostgreSQL سرخ بود: ۲۸۰۰ کار با سقفِ ۲۰۰۰)، SR44-3 کارِ هم‌digest ِ هم‌زمان ⇒ `doneOf` در `complete` زیرِ قفلِ عکس. B9 ِ ممیزی، یک خطِ RULES.
+  شش شاخهٔ دیگر حمله شدند و سالم ماندند (B9). ۲۵ پروندهٔ آزمونِ عکس/مسیر روی PGlite و PostgreSQL سبز.
+- نیمه‌کاره: هیچ. R10 (فرمول در CSV ِ `index.html` ِ یخ‌زده، پیش از این دسته)، R11 (سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد) و R12 (کارِ «در کار» ِ دستهٔ لغوشده پس از افتادنِ فرآیند) تصمیمِ صاحب‌کارند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/dari-mirror` (آینهٔ JS ِ DariCoverageTest برای جدول‌های `Str*`؛ روی main ‏99036497؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: روی `ccr-…-batch-43` ‏f067bf9c فقط CI ِ اندروید سرخ شد (`StrProductGallery.notSent`، `StrPromoHeld.releaseFailed`: «دوباره بزنید») و همهٔ JS سبز بود،
+  چون آینهٔ `dari-text.test.js` فقط خرید + وب را می‌سنجید. حالا `KT.appTexts` (`server/test/kt-source.js`) همان `rows(I18nTables.all)` را از خودِ Str*.kt می‌خواند
+  (۱۲۵ جدول، ~۹۳۷۰ فارسی؛ قالب ⇒ protect، `+`، چندسطری، `fa =`، `td`، `if … else`، `asIs(…)`، ثابتِ پروندهٔ دیگر) و آزمونِ تازهٔ آینه همان `of` + `farsiOnlyLeft` را می‌گذراند؛
+  خوانده‌نشده ۲ (`StrOnline.coded`، `StrOnline.deskActionLabel`؛ سقفِ `APP_UNREAD_MAX`). روی main سبز، روی f067bf9c دقیقاً همان دو سرخ، با دو جملهٔ PHRASES سبز. فقط آزمون (`WHATSNEW_OK=test-only`).
+- نیمه‌کاره: هیچ. یادداشت برای رفعِ دستهٔ ۴۳: جز دو سطرِ PHRASES و `dari-words.js --write`، دو ردیف در `docs/DARI-REVIEW-fa.md` هم لازم است (وگرنه آزمونِ «فهرستِ بازبینی» ِ همان پرونده سرخ).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از ادغامِ رفعِ دستهٔ ۴۳ همین آینه سبز می‌ماند.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-2` (ردیف‌های P0 ِ صندوق: POS-03 در نسخهٔ وب، شاهدِ وب برای POS-02، و راست کردنِ POS-04/10/21؛ روی main ‏990364974؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **POS-03 وب** (سند: «در گوشی و وب اضافه شود») — `license/cart-query.js` همزادِ `CartQuery.parse` با `\s`/`.`/`$` ِ java.util.regex و بردارِ مشترکِ
+  `license/test-vectors/cart-query-v1.json` (۵۳ مورد؛ جدا با JDK 21 ِ همین ماشین ۵۳/۵۳ و همهٔ BMP هم‌خوان؛ `CartQueryVectorsTest` ِ Kotlin فقط CI)؛ پشتِ
+  تنظیمِ خاموشِ همین مرورگر `tohid-pos-qty-prefix-v1` («تنظیمات» ⇐ «دوربین بارکدخوان»)؛ «۳*کد» در کادرِ دستی و «۳*» ِ تنها برای اسکنِ بعدی، فقط از
+  `handleBarcodeScanned` ِ صفحه؛ بارکدِ کامل بر پیشوند پیش است؛ کادر روی گوشی `tel`. بارکننده `shop-sync.js`، `sw.js` v71، چهار کلیدِ واژه‌نامه (fa/en/ps).
+  آزمون: `web-cart-query.test.js` ۸/۸ (PGlite و PostgreSQL)، `web-pos-qty.mjs` ۹/۹ (روی origin/main ۹ سرخ)، بی‌پسرفتِ پنج آزمونِ مرورگرِ وب. **STATUS:** POS-02 شاهدِ وب؛
+  POS-04 «#359 باز» کهنه بود و وب جست‌وجوی نام ندارد؛ POS-21 «سرور نمی‌سنجد» کهنه بود (`shop.price_cap` هست؛ price-cap ۸/۸، sale-caps ۶/۶، staff-approval ۲۱/۲۱ روی هر دو)؛
+  POS-10 یافته: قلمِ آزاد (`productId` خالی) در سرور از سنجشِ قیمت بیرون است. هیچ ردیفی وضعیت عوض نکرد (همه PARTIAL). یک خطِ RULES («v3 · فروش و صندوق») و یک خطِ نقشهٔ پرچم‌ها.
+- نیمه‌کاره: POS-41 (Alt+P در پنلِ پرداخت = پرونده‌های پرداخت، بیرون از قلمرو)؛ POS-02 «ردیفِ جدا» و POS-10/21 تصمیمِ صاحب‌کار؛ `PosSearch.resolve` ِ کامپیوتر پیشوند را پیش از
+  بارکدِ کامل می‌خواند (یافته، دست نخورد)؛ دوربینی که پیش از بارِ `cart-query.js` روشن شد «۳*» ِ تنها را تا روشن شدنِ دوباره نمی‌بیند.
+- قدمِ بعدی: CI (`CartQueryVectorsTest`)؛ سنجشِ وب روی آیفونِ واقعی (صفحه‌کلیدِ `tel`)؛ تصمیمِ صاحب‌کار دربارهٔ مجوزِ «قلمِ آزاد» در سرور و روشن کردنِ `shop.price_cap`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/inv-2` (ردیف‌های PARTIAL ِ INV: INV-16 و INV-01، بخشِ وب؛ روی main ‏99036497 = دستهٔ ۴۲، #1026؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **INV-16** زبانهٔ «ارزش موجودی» در «گزارشِ تازه» ِ وب (`license/stock-value-core.js` = دوقلوی `StockAnalysis.valuation`، بردارِ تازهٔ `core/test-vectors/stock-value-v1.json` ۱۷ مورد؛ بها = بازپخشِ میانگینِ موزونِ `report-core.stockCost`، ارزش = جمعِ دفتر؛ کم‌بودها زیرِ جدول؛ فقط با `money`) — `stock-value-core.test.js` ۶/۶ و `web-report-fresh.mjs` ۹/۹ (هر دو پیش از تغییر سرخ). **INV-01** زبانهٔ «موجودیِ هر مکان» در پنجرهٔ «انتقالِ موجودی» ِ وب (موجودیِ سرور در قفسه/انبار/خراب/در مسیر و جمع، محدودهٔ STF-06) — `web-transfers.mjs` ۱۱/۱۱ روی PGlite و PostgreSQL 16 و `web-transfers-core.test.js` ۸/۸. بی مسیرِ سرورِ تازه، بی مهاجرت، بی Kotlin ِ برنامه؛ `sw.js` ‏v71. هر دو ردیف PARTIAL ماندند.
+- نیمه‌کاره: `StockValueVectorsTest` (core ‏jvmTest) فقط در CI. INV-09/11/13 دست نخوردند (ماندهٔ هر سه دستگاهِ واقعی است). INV-03 و INV-04@32 (رزرو) عمداً بیرون.
+- قدمِ بعدی: شاهدِ CI (خطِ `KTEST PASS ir.vil3ntec.tohid.core.stock.StockValueVectorsTest`) در STATUS ِ INV-16؛ تصمیمِ صاحب‌کار برای «ارزش موجودی (به بهای خرید)» ِ `ReportEngine.products`/`DashboardEngine` (هنوز `purchasePrice` با کیت/منفی) و `shop.stock_v2`؛ مدلِ انبار جدا از محل و شعبه (INV-01).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-43` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۳: R9 و صفحه‌های `/images/mine`؛ روی `claude/sec-review-43` ‏041e8995 + main؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) R9: نامِ قدیم و واحددارِ یک فیلد در op ِ v1/v2 (`amount`+`amountMinor`) دیگر به ترتیبِ کلیدها بسته نیست — `unitClash` در `fromV2` و همزادهای
+  وب/Kotlin؛ یکی ⇒ همان مقدار، ناجور ⇒ `unit_conflict` (راهِ op ِ نادرست). بردارِ `rejects`؛ `sync-v3-unit-pair.test.js` ۴/۴ (پیش از رفع ۴ سرخ، PGlite و PostgreSQL)؛
+  همهٔ `sync-v3*` روی هر دو سبز. (۲) صفحهٔ «عکس‌های بیشتر و ویترین»: `ProductGallery.collect` همهٔ صفحه‌های `/mine` را می‌خواند (فهرست و نگه داشتنِ عکسِ ویترین
+  در `ImageBank.uploadOwn`)؛ بی درِ تازه. پیگیریِ B8 ِ ممیزی، دو خطِ RULES، WHATS-NEW.
+- نیمه‌کاره: Kotlin (`V3ConvertVectorsTest.unitClashGoesToServer`، `ProductGalleryTest`، `ProductGalleryRepositoryTest`) فقط در CI. `ImageBank.source` (کارتِ منبعِ عکس،
+  وضعِ پیشنهاد به بانک) هنوز صفحهٔ نخستِ `/mine` را می‌خواند — فقط نمایش. سندِ ناجورِ v1 در v1 می‌ماند و در v3 نیست (`sync-v1.js` ِ مشترک دست نمی‌خورد).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را پس از `claude/sec-review-43` در دسته بگذارد؛ R7 و R8 تصمیمِ صاحب‌کار.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/missing-rows` (دسته‌بندیِ ۳۰ ردیفِ MISSING و استودیوی عکسِ محلی؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۳۰ ردیف دسته‌بندی شد (یادداشتِ همان روز در پایانِ `docs/spec/STATUS.md`). ۱۳ ردیفِ تصویر (AI-01/02/03/05، IMG-04/05/06،
+  IMG-PRO-01/02/03/04/08/14) ⇐ PARTIAL: استودیوی عکس روی سرورِ خودمان پشتِ پرچمِ خاموشِ `shop.image_studio` — رمزگشا/رمزگذارِ JPEG/PNG ِ بی
+  کتابخانه (`lib/image-codec.js`)، زنجیرهٔ قطعی (`lib/image-studio.js`)، صف و کارگر در رشتهٔ جدا (`lib/image-studio-jobs.js`)، درهای
+  `/api/shop/images/studio/*`، مهاجرتِ ۵۹۰. درِ انتشارِ `image-bank.selectIn` حالا نسخهٔ تأییدنشده و تصویرِ تبلیغ را نمی‌پذیرد (پیش‌تر هر نسخه).
+  آزمون‌ها: `image-studio.test.js` ۱۳/۱۳، `image-studio-jobs.test.js` ۱۱/۱۱ (PGlite و PostgreSQL ِ محلی).
+- نیمه‌کاره: صفحهٔ «استودیوی عکسِ محصول» در برنامه‌ها (فقط API هست)؛ مدلِ حذفِ پس‌زمینه (AI-01) نیست؛ آستانه‌ها فقط روی عکسِ مصنوعی.
+- قدمِ بعدی: صفحهٔ استودیو در برنامه (core + Compose) روی همین API؛ تصمیمِ صاحب‌کار دربارهٔ مدلِ خودمیزبان (AI-01) و نگه‌داشتنِ نسخه‌های ردشده.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rpt-2` (خانوادهٔ RPT: سود و خروجیِ «گزارشِ تازه» ِ وب، RPT-03 و RPT-11؛ روی main ‏28f6acc2 + ادغامِ main ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) RPT-03 — «گزارشِ تازه» ِ وب و کارتِ سودِ خانه هنوز همیشه با قیمتِ روی قلم و «تقریبی» بودند (متنشان «نه روشِ مصوب (D-23)» می‌گفت، با این‌که D-23 گرفته شده)؛
+  حالا `COST` ِ `report-board.js` (دوقلوی `CostPolicy`، بردارِ `cost-policy-v1.json`) با میانگینِ موزون + `costApproved`، گزینهٔ «روش بها» (همین مرورگر) و نشانِ «سود قطعی/تقریبی».
+  (۲) RPT-11 — وب فقط CSV و چاپ داشت: «خروجی اکسل» = ‎.xlsx‎ ِ واقعی (`TohidOwnerExport.report`) و «خروجی PDF» = `license/report-pdf.js` (دوقلوی `ImagePdf`، بردارِ `image-pdf-v1.json`؛
+  canvas، A4، سقفِ ۵۰۰ صفحه)، `sw.js` v71. آزمون: `cost-policy-vectors` ۴/۴ و `report-pdf-vectors` ۴/۴ (روی پایه سرخ)، کرومیومِ `web-report-fresh.mjs` ۱۰/۱۰ با axe (چهار سنجه روی پایه سرخ)،
+  `owner-export`، `web-shop-i18n` (۱۳ کلیدِ تازه در سه زبان، ۵ کلیدِ کهنه برداشته)، `web-owner-export.mjs`، `web-beta-channel.mjs` سبز.
+- نیمه‌کاره: `CostPolicyVectorsTest` و `ImagePdfVectorsTest` (core jvmTest) فقط در CI دیده می‌شوند (Gradle این‌جا نیست)؛ هر دو ردیف PARTIAL می‌مانند: RPT-03 با روشن کردنِ «گزارشِ تازه»/پرچمِ سود
+  به دستِ صاحب‌کار، RPT-11 با دستگاه و چاپگرِ واقعی. RPT-13 (کلیدهای گزارش در وب: Ctrl+P/E و −/+) و RPT-14 (تپشِ برنامهٔ خریدِ بومی) دست نخوردند؛ RPT-04 بیرون از دامنه (`claude/pay-10`).
+- قدمِ بعدی: شاهدِ CI ِ دو آزمونِ Kotlin؛ اگر شاخهٔ دیگری `sw.js` را به v71 برد، یکی‌شان v72 شود. انگلیسی/پشتوی تازه‌ها را صاحب‌کار ببیند (CostPolicy خودش در برنامه فقط فارسی است).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/pay-10` (ارزِ نقد در صندوق، PAY-10؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دالر، کلدار و ریال در صندوقِ «ترکیبی و شیفت» پشتِ تنظیمِ خاموشِ **دکان** `FxTillPref` (`fx_tender` + جدولِ نرخِ `fx_rates`، هر دو `ShopSettingsKeys` ِ دکان؛ D-15 رعایت شد). هسته: `core/pay/FxTill.kt` (جدولِ نرخ، پرداختِ ارز، متن ⇐⇒ واحد)، `Pay.settle`/`exactCash` با `SettleInput.fx` (ردیفِ `fx`، ارز اول، پولِ پس افغانی، `FX_INVALID`/`FX_EXCESS`)، `exchange` با `per`، ارزهای PKR/IRR؛ هم‌زاد `license/fx-till.js` + `pay-core.js`؛ بردار `core/test-vectors/fx-till-v1.json` و موردهای تازهٔ `pay-v1.json`. برنامه: `FxTillFlow`، کادرِ `CheckoutFxBox`، تنظیمِ `FxTillSettings`، رسید، X/Z (`DrawerModel.fxLines`)، شیفت (`cash_out` ِ پولِ پسِ ارز) و `CashShift.saleCash`، برگشت به افغانی، کشو. سرور دست نخورد (ردیفِ پرداخت سنجیده نمی‌شود؛ `sync-v1.js` نه).
+- نیمه‌کاره: آزمون‌های Kotlin (`FxTillVectorsTest`، `FxTillFlowTest`، `PayCoreTest.exchange`، `PrinterDrawerTest`) فقط در CI؛ STATUS ِ PAY-10 تا شاهدِ CI همان PARTIAL. صندوقِ کامپیوترِ قدیم (`DeskSale`) و برنامهٔ آیفون کادرِ ارز ندارند. گزارشِ خودکارِ صاحب در سرور ارز را در «نقد» می‌شمارد (`paymentMethod = cash`).
+- قدمِ بعدی: پس از CI ِ سبز ردیف را IMPLEMENTED-VERIFIED کن؛ تصمیم‌های صاحب‌کار: سقفِ کهنگیِ نرخ (یک روز)، گردِ نیمه رو به بالا به یک افغانی، و این‌که «پولِ پسِ ارز» سقف بخواهد یا نه.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را

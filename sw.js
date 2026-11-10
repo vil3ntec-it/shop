@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v70';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v72';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -82,7 +82,11 @@ const SHELL_ASSETS = [
   './license/report-core.js',
   './license/report-board.js',
   './license/report-ui.js',
+  //  INV-16: «ارزش موجودی» ِ گزارشِ تازه (دوقلوی `StockAnalysis.valuation`) — بی آن، نصبِ آفلاین زبانه را نداشت
+  './license/stock-value-core.js',
   './license/report-ui.css',
+  //  RPT-11: PDF ِ مستقیمِ گزارش — دیربار با نخستین «PDF»؛ بی این، روی نصبِ آفلاین PDF ساخته نمی‌شد
+  './license/report-pdf.js',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد
   './license/ledger-store.js',
@@ -98,6 +102,10 @@ const SHELL_ASSETS = [
   './license/orders-desk.js',
   //  MKT-06: «چرخهٔ مصرف» در ویرایشِ کالا — بی آن، ویرایشِ بی اینترنت کادر را نشان نمی‌داد
   './license/product-cycle.js',
+  //  POS-03: پیشوندِ شمار «۳*» در کادرِ بارکدِ فروش — بی آن، تنظیمِ روشن روی نصبِ آفلاین کاری نمی‌کرد
+  './license/cart-query.js',
+  //  R10: خانهٔ CSV بی «فرمول» — بی آن، خروجیِ CSV ِ نصبِ آفلاین نامِ «=…» را فرمول می‌کرد
+  './license/csv-cell.js',
   './license/orders-risk.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد

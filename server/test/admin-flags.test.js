@@ -75,6 +75,7 @@ const PARITY = [
   ['shop.order_risk.policy', (s) => L('order-risk').policyIn(run, s), { newCustomerMaxTotalMinor: 500_000, newCustomerMaxOpen: 1, duplicateWindowMin: 5 }],
   ['shop.visual_search', (s) => L('visual-search').flagOn(s)],
   ['image_bank.quality', (s) => L('image-bank').flagOf('image_bank.quality', s)],
+  ['shop.image_studio', (s) => L('image-studio-jobs').enabled(s)],
   ['pay.hesabpay', flagAt('lib/payment-intents.js', 'FLAG_KEY', 'pay.hesabpay')],
   //  همگام‌سازیِ دکان
   ['shop.sync.doc_roles', flagAt('lib/doc-roles.js', 'FLAG', 'shop.sync.doc_roles')],
@@ -114,7 +115,7 @@ const putFlag = (scope, key, value) => h.put('/api/admin/flags', { scope, key, v
 test('کاتالوگ: هر ردیفِ تازه همان پیش‌فرضِ کد است؛ نوشتنِ پیش‌فرض بی‌اثر، مقدارِ دیگر اثردار', async () => {
   const { KNOWN } = require('../src/routes/admin-flags');
   assert.equal(new Set(PARITY.map((p) => p[0])).size, PARITY.length, 'کلیدِ تکراری در جدول');
-  assert.equal(PARITY.length, 55);
+  assert.equal(PARITY.length, 56);
   for (const [key, read, other, needs = []] of PARITY) {
     const k = KNOWN.find((x) => x.key === key);
     assert.ok(k, `${key}: در کاتالوگ نیست`);

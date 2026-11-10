@@ -69,6 +69,8 @@ object ShopSettingsKeys {
     shop("quotes", "b"),                        // پیش‌فاکتور
     shop("special_orders", "b"),
     shop("safe_book", "b"),                     // PAY-18: گاوصندوق
+    shop("fx_tender", "b"),                     // PAY-10: پرداخت با ارزِ نقد (`FxTillPref`)
+    shop("fx_rates", "s"),                      // PAY-10: جدولِ نرخِ خودِ دکان (JSON)
     //  برگشت
     shop("returns_v2", "b"),                    // ReturnSettings
     shop("return_limit", "f"),
