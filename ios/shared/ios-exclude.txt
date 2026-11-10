@@ -25,3 +25,4 @@ scan/GuidedCapture.kt  # دوربینِ راهنمای CameraX؛ iOS: scan/Guide
 ui/SecureWindowAndroid.kt  # OPS-02: `FLAG_SECURE` ِ برگهٔ عبارت (android.view) — آیفون پنجرهٔ امن ندارد؛ ui/PlatformIos.kt: `SecureWindow` ِ بی‌اثر
 ui/Platform.kt  # «کدام سکو» (شناسهٔ دستگاه، پوشهٔ پشتیبان) — برای هر سکو جدا، مثلِ ui/PlatformDesk.kt؛ iOS: ui/PlatformIos.kt (identifierForVendor)
 ui/screens/Haptics.kt  # الگوی خامِ VibrationEffect.createWaveform؛ iOS: ui/screens/HapticsIos.kt ⇐ ios/IosHaptics.kt (مولدهای UIKit با همان معنا: موفق/خطا/تأیید/انتخاب/آستانه، گامِ ۱۰ §۰.۱۵)
+sync/v3/V3GzipAndroid.kt  # java.util.zip ِ JVM؛ iOS: sync/v3/V3GzipIos.kt (push ِ v3 همیشه ساده — MIN_CHARS هرگز نمی‌رسد؛ سرور هر دو را می‌پذیرد)
