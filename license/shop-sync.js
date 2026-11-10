@@ -516,9 +516,14 @@
       //  نقش بیرونِ `shop` می‌آید (`role`، `isOwner`)؛ کنارِ دکان نگه داشته
       //  می‌شود تا صفحه بداند تخفیف و لغو با این حساب هست یا نه، و «نقشِ شما»
       //  در نمایه دیگر «—» نماند.
-      const shop = r.shop ? Object.assign({}, r.shop, { role: r.role || '', isOwner: !!r.isOwner }) : null;
+      //  CRM-15: `policy` (لایه‌های مجوز، `effective`) برای «شمارهٔ مشتریان» و «سابقه» ِ `customer-access.js`
+      const shop = r.shop ? Object.assign({}, r.shop, {
+        role: r.role || '', isOwner: !!r.isOwner, actualRole: r.actualRole || r.role || '', policy: r.policy || null,
+      }) : null;
       setState({ shop, members: r.members || [] });
       assignInvoiceBlock(r);
+      //  مجوزِ تازه (لایهٔ صاحب) بی بارگذاریِ دوباره به صفحه می‌رسد — `customer-access.js` شماره‌ها را دوباره می‌پوشاند
+      try { window.dispatchEvent(new CustomEvent('tohid:shop-info')); } catch { /* مرورگرِ کهنه */ }
       return r;
     } catch { return null; }
   }
@@ -718,6 +723,10 @@
   //  MKT-06: «چرخهٔ مصرف (روز)» در ویرایشِ کالا (`product-cycle.js`، همان کادرِ برنامه؛ بی سرور)
   if (!window.TohidProductCycle) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/product-cycle.js?v=1', defer: true }));
+  }
+  //  CRM-15: شمارهٔ پوشیدهٔ مشتری، سابقهٔ دسترسی و «چه کسی این پرونده را دید» (`customer-access.js`)
+  if (!window.TohidCustomerAccess) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/customer-access.js?v=1', defer: true }));
   }
   //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو) — فارسی ⇒ هیچ واژه‌نامه و ناظری (`web-i18n.js`)
   if (!window.TohidWebI18n) {

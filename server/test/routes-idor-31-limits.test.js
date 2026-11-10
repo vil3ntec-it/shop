@@ -51,7 +51,7 @@ test.beforeEach(() => resetAll());
 test('سطلِ IP پیش از احراز: توکنِ نادرست و بی توکن پس از سقف ۴۲۹ (نه ۴۰۱)؛ توکنِ درست از همان IP هم بسته؛ IP ِ دیگر باز', async () => {
   const doors = [
     ['GET', '/api/shop/staff-keys', 6], ['GET', '/api/shop/conflict-inbox', 6], ['GET', '/api/shop/conflict-inbox/mine', 6],
-    ['GET', '/api/shop/customer-access?customerId=d-1', 6], ['GET', '/api/shop/settings-sync', 6],
+    ['GET', '/api/shop/customer-access?customerId=d-1', 6], ['POST', '/api/shop/customer-access', 6], ['GET', '/api/shop/settings-sync', 6],
     ['GET', '/api/shop/ledger-merge/config?v=3', 6], ['GET', '/api/shop/stock-ledger/config', 6],
     ['POST', '/api/auth/staff/device-key', 4], ['PUT', '/api/sync/v1/photos/p-1/thumb', 4],
   ];

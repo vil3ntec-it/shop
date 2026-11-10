@@ -108,6 +108,9 @@ const FREE = [
   ['پوشِ گوشی (O-01، FCM): ثبت و پاک کردنِ توکنِ دستگاهِ خودِ عضو — خبر و اعلان هیچ‌وقت پشتِ اشتراک نمی‌رود؛ '
     + 'فقط پرچمِ shop.device_push (پاک کردن همیشه باز)', [
     'POST /shop/push/devices', 'DELETE /shop/push/devices']],
+  ['«سابقهٔ دسترسی» (CRM-15، درِ app ِ مهاجرتِ ۶۱۰): دیدنِ پرونده از دفترِ خودِ برنامه (وب، حسابدار) سپرِ حریمِ خصوصی است، '
+    + 'نه قابلیتِ پولی؛ کلید و پرچم ندارد و پس از پایانِ اشتراک هم باید ثبت شود (customer-access-app.test.js)', [
+    'POST /shop/customer-access']],
 ];
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',

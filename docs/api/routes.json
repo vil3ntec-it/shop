@@ -20,17 +20,17 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1011,
+    "routes": 1012,
     "byAuth": {
       "none-detected": 194,
       "admin": 279,
       "inline": 2,
-      "user": 493,
+      "user": 494,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 701,
+      "extracted": 702,
       "empty": 308,
       "unresolved": 2
     }
@@ -666,6 +666,7 @@
     {"method":"GET","path":"/api/shop/custom-roles/config","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["baseRoles","enabled","max"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/custom-roles/members/:id","area":"shop","source":"server/src/routes/shop-custom-roles.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'custom-roles-ip' })","requireUser","requireShop","limit","requirePermission('members.view')","requireRecentAuth"],"params":["id"],"query":[],"body":["roleId"],"response":{"statuses":[200],"keys":["baseRole","role","userId"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/shop/customer-access","area":"shop","source":"server/src/routes/shop-customer-access.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'customer-access-ip' })","requireUser","requireShop","limit","requirePermission('audit.view')"],"params":[],"query":["customerId","limit"],"body":[],"response":{"statuses":[200],"keys":["customerId","entries","retentionDays"]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/customer-access","area":"shop","source":"server/src/routes/shop-customer-access.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'customer-access-ip' })","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["kind","recorded"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/customer-erasure","area":"shop","source":"server/src/routes/shop-customer-erasure.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'customer-erasure-ip' }","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["403 owner_only"],"shape":"empty"},
     {"method":"GET","path":"/api/shop/delivery/assignments","area":"shop","source":"server/src/routes/delivery.js","auth":"user","guards":["requireUser","requireShop","requirePermission('delivery.view')"],"params":[],"query":["before","limit","scope"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/delivery/assignments/:id/address","area":"shop","source":"server/src/routes/delivery.js","auth":"user","guards":["requireUser","requireShop","requirePermission('delivery.view')","requirePermission('delivery.assign')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},

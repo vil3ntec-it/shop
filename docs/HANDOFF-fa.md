@@ -54,6 +54,12 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/crm-2` (CRM-15، P0: سابقهٔ دسترسیِ وب و حسابدار، شمارهٔ پوشیدهٔ وب؛ روی `origin/main` ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور `POST /api/shop/customer-access` (درِ `app`، مهاجرتِ ۶۱۰ با rollback، `lib/customer-access.noteApp`): بیننده/نقش/دستگاه از توکن، `phone` ِ بی مجوز ⇐ `detail`، `*` فقط `export` (`all: true` در فهرست)، سطلِ IP و هر کاربر، FREE ِ SUB-10؛
+  (۲) حسابدار روی دستگاه (`CustomerAccessNote`) به همین در؛ (۳) وب `license/customer-access.js` (بارکننده و `policy` در `shop-sync.js`، پیش‌کشِ `sw.js` v71): شمارهٔ پوشیده، کادرِ شمارهٔ پنهان، ثبتِ دیدن‌ها و «چه کسی این پرونده را دید».
+  آزمون: `customer-access-app` ۸/۸ (PGlite و PostgreSQL ۱۶، پیش از کد ۰/۸)، `web-customer-access.test.js` ۵/۵، کرومیوم `web-customer-access.mjs` ۱۰/۱۰ (سه بار PGlite، یک بار PostgreSQL؛ بی کد سرخ)، و فهرست‌های در/مجوز/دکان سبز.
+- نیمه‌کاره: Kotlin (`CustomerAccessTest`، `CustomerAccessLogTest`) فقط CI؛ حسابدارِ بی‌اینترنت ثبت نمی‌شود؛ CRM-15 PARTIAL می‌ماند (تصمیمِ صاحب: `phoneMasked` ۴+۳، نشانیِ سفارش/تحویل؛ SEC-10 روی دفترِ دستگاه).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ شاهدِ CI ِ همین آزمون‌ها در STATUS. CRM-06: قالبِ یادآوری حالا با `shop.settings_sync` (خاموش) همگام می‌شود — «مانده» ِ STATUS کهنه است.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
