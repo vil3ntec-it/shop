@@ -72,6 +72,23 @@ object Repack {
 
   fun has(d: ShopData, key: String): Boolean = d.auditLog.any { it.id == key } || d.warehouseEntries.any { it.refId == key }
 
+  /**
+   *  ردیفِ یک سندِ تولید (`adjKind = repack` با کلیدِ کار): سند یا-همه-یا-هیچ نوشته شد، پس یک ردیفش **تنها** پاک نمی‌شود و
+   *  کالا، مقدار و بهایش عوض نمی‌شود (`WarehouseEngine.deleteEntry`/`editEntry`، همان قاعدهٔ ورودِ خرید ِ PUR-05) — وگرنه
+   *  برداشتنِ ردیفِ منفیِ کارتن کارتن را برمی‌گرداند و دانه‌ها هم می‌ماندند (کالا و ارزشِ ساختگی). اصلاح = همان کار برعکس.
+   */
+  fun isDocRow(e: WarehouseEntry): Boolean = e.isAdjustment && e.adjKind == KIND && !e.refId.isNullOrBlank()
+
+  /**
+   *  پیامِ ردِ حذف ([productId] `null`) یا ویرایشِ یک ورودِ انبار: ورودِ فاکتورِ خرید (`PurchaseBook.fixedEntry`، PUR-05: کالا و
+   *  مقدار) یا ردیفِ سندِ تولید ([isDocRow]: کالا، مقدار و بها)؛ `null` ⇒ آزاد. یادداشت و انقضا در هر دو آزادند.
+   */
+  fun entryFixed(d: ShopData, e: WarehouseEntry, productId: String? = null, units: Double? = null, price: Double? = null): String? = when {
+    PurchaseBook.fixedEntry(d, e, productId, units) -> PurchaseBook.PURCHASE_ENTRY
+    isDocRow(e) && (productId == null || productId != e.productId || units != e.units || price != e.price) -> StrGoods.repackEntryFixed
+    else -> null
+  }
+
   /** بهای یک واحدِ کالا (یک‌صدمِ افغانی) — همان `purchasePrice` */
   fun unitMinor(p: Product): Long = maxOf(0L, StockLedger.minor(p.purchasePrice))
 

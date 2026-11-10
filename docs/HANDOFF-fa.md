@@ -54,6 +54,19 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/inv-3` (INV-21 و INV-20؛ روی `ccr-…-batch-44` ‏040ae52c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **INV-21 سرور** پشتِ پرچمِ خاموشِ `shop.catalog_repack` (با `shop.catalog`؛ کاتالوگِ پرچم‌ها، RULES، FLAGS-ON §۸ی): `lib/catalog-repack.js` +
+  نوع‌های `repack`/`assemble` ِ `POST /api/shop/catalog/moves` (بی مسیرِ تازه؛ `stock.adjust`) — یک سند = `production` ِ منفی برای هر ورودی و مثبت برای
+  خروجی، یک تراکنش زیرِ قفلِ دکان، همان `ref_type`/`ref_id`، دقیق به هزارم با BigInt (نادقیق ⇒ ۴۰۰ `repack_inexact`)، کمبود ⇒ ۴۰۹ بی ردیف، تکرار ⇒ همان
+  حرکت‌ها؛ ردیفِ تولیدِ برنامه (`adjKind = repack`) در خواندنِ دفترِ دستگاه `production` ِ پیوسته با کلیدِ کار (نه «رسید + اصلاح»)؛ مهاجرتِ ۷۲۰ (CHECK ِ
+  `stock_moves.type` + `production`، rollback با `NOT VALID`). `catalog-repack.test.js` ۸/۸ و ۲۳ پروندهٔ بی‌پسرفت (کاتالوگ، موجودی، قفلِ سند، مسیرها،
+  `upgrade-rehearsal`) روی PGlite و PostgreSQL 16 سبز؛ روی پایه ۷ از ۸ سرخ. **INV-21 برنامه:** یک ردیفِ سندِ تولید دیگر تنها پاک/عوض نمی‌شود
+  (`Repack.entryFixed` (⇐ `isDocRow`) در `WarehouseEngine.deleteEntry`/`editEntry`، `StrGoods.repackEntryFixed`، یک سطرِ «تازه‌ها») — `RepackTest` ِ تازه **فقط CI**.
+  **INV-20:** بی کد — محلِ درونِ انبار در سرور همان پرسشِ ۳ ِ ۳-۲۶ است (`claude/owner-decisions-4`)؛ ماندهٔ کهنهٔ «سریِ دانه‌ها» در STATUS راست شد. `finalized-sales.js` دست نخورد.
+- نیمه‌کاره: دکمهٔ وب برای بسته‌بندیِ سرور (فقط API)؛ کیت/خدماتی را کاتالوگِ سرور نمی‌شناسد (فقط برنامه رد می‌کند)؛ `warehouseEntries` در `DOC_FIXED` ِ
+  قفلِ سند نیست ⇒ ردیفِ تولید از راهِ v1 با `shop.doc_chain` هنوز پاک‌شدنی است (v3: فقط «لغو» با `data.delete.any`) — عمداً دست نخورد (شاخهٔ دیگری همان پرونده را دارد).
+- قدمِ بعدی: CI (`RepackTest`)؛ تصمیمِ صاحب‌کار: (۱) بهای دقیقِ تولید (`stock_bom`) پیش‌فرض شود؟ بی آن ۱۰۰۰ ÷ ۲۴ ⇒ ارزشِ انبار ۱۰۰۰٫۰۸؛ (۲) ۳-۲۶ پرسشِ ۳ برای INV-20؛
+  (۳) ردیفِ تولید در قفلِ سندِ v1.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-44` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۴: R10، R12، R11؛ روی `claude/sec-review-44` ‏671931d3؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) R10: `license/csv-cell.js` (بارکننده `shop-sync.js`، `sw.js` ‏v72) `csvCell` ِ index.html ِ یخ‌زده را با همان `finance-reports.cell` ِ سرور عوض می‌کند ⇒
   هر چهار CSV ِ صفحه (گزارش‌ها، صورت‌حساب، انبارگردانی، «گزارشِ تازه») بی فرمول، عددِ منفی عدد. `web-csv-cell.test.js` ۵/۵، `web-csv-export.mjs` ۶/۶ (روی پایه ۵ سرخ؛

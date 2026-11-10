@@ -261,6 +261,12 @@ object StrGoods {
     "This entry came from a purchase invoice and can't be deleted or changed on its own — to correct it, tap «Return to supplier» so stock and debt go down together",
     "دا ننوتنه له پېرود بل راغلې او جلا نه ړنګېږي او نه بدلېږي — د سمون لپاره «برابروونکي ته بېرته» ووهئ چې موجودي او پور یوځای کم شي",
   )
+  /** INV-21 — یک ردیفِ «بسته‌بندیِ دوباره» یا «ساختِ بسته» تنها پاک یا عوض نمی‌شود (`Repack.isDocRow`) */
+  val repackEntryFixed: String get() = t(
+    "این ردیف بخشی از یک «بسته‌بندیِ دوباره» یا «ساختِ بسته» است و تنها حذف یا عوض نمی‌شود — برای اصلاح همان کار را برعکس ثبت کنید",
+    "This row is part of a repack or an assembly and can't be deleted or changed on its own — to correct it, record the same job in reverse",
+    "دا کرښه د «بیا بسته‌بندي» یا «د بستې جوړول» برخه ده او یوازې نه ړنګېږي او نه بدلېږي — د سمون لپاره همغه کار برعکس ثبت کړئ",
+  )
   val purchaseRecorded: String get() = t(
     "همین فاکتورِ خرید پیش‌تر ثبت شده است",
     "This purchase invoice was already recorded",

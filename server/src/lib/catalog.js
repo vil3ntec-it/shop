@@ -134,6 +134,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
   let wm = !st || st.source !== fmt || full ? 0 : num(st.watermark);
   const ACC = "app='shop' AND account_kind='shop' AND account_id=$1";
   const track = await require('./market-changes').enabled(shopId, c);   //  S6: پرچمِ `market.changes` یک بار برای کلِ همین خواندن
+  const repackRef = require('./catalog-repack').deviceRefs(shopId, c);   //  INV-21: ردیفِ تولیدِ برنامه ⇒ `production` ِ پیوسته
   let products = 0;
   let moves = 0;
   const transfers = { applied: 0, refused: 0 };
@@ -194,7 +195,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
       const pid = str(d.productId);
       const q = rd.qty(d, 'units');
       if (pid && q !== 0 && !cancelled(r, d)) want.set(pid, q);
-      contrib.set(`we:${r.row_id}`, { want, kind: 'we', refType: 'warehouseEntries', refId: r.row_id, at: atOf(d, at) });
+      contrib.set(`we:${r.row_id}`, { want, kind: 'we', refType: 'warehouseEntries', refId: r.row_id, at: atOf(d, at), ...(await repackRef(d)) });
     }
     for (const r of items.values()) {
       const d = decode(r.data) || {};
@@ -224,7 +225,8 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
           if (delta === 0) continue;
           let type;
           let reason;
-          if (k.kind === 'we') {
+          if (k.production) [type, reason] = ['production', 'device_repack'];
+          else if (k.kind === 'we') {
             type = delta > 0 ? 'purchase_receipt' : 'adjustment';
             reason = delta > 0 ? 'device_receipt' : 'device_correction';
           } else {
@@ -234,7 +236,7 @@ async function ingestTx(c, shopId, at, settings, { full = false } = {}) {
           const rev = prev.rev + 1;
           await stock.postMove(c, shopId, {
             productId: pid, location: settings.deviceLocation, type,
-            qtyMilli: type === 'adjustment' ? delta : Math.abs(delta),
+            qtyMilli: type === 'adjustment' || type === 'production' ? delta : Math.abs(delta),
             mode: 'recorded', source: 'device', sourceKey: `dev:${key}:${pid}:${rev}`,
             refType: k.refType, refId: k.refId, actorType: 'device', actorId: '', reason, at: k.at,
           }, at);
