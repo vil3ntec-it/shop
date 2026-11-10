@@ -85,13 +85,32 @@ class ShopperPrefsTest {
     assertEquals("پشتِ مسجد", none.getValue("address").jsonObject.getValue("landmark").jsonPrimitive.content)
     //  ⛔ هرگز مبلغی که سرور رد می‌کند: بیرون از گزینه‌ها ⇒ null
     assertNull(PrefsRules.sent(o, p, PrefsForm(cashTenderMinor = 200_000)).cashTenderMinor)
-    //  بی «نقد هنگامِ تحویل» کلیدِ اسکناس اصلاً نمی‌رود (سرور `bad_cash_tender` می‌داد)
+    //  بی «نقد هنگامِ تحویل» و بی اسکناسِ مانده کلیدِ اسکناس اصلاً نمی‌رود (با اسکناسِ مانده: [nonCashOrderWithAStoredBanknoteSendsAnExplicitNull])
     val online = order(pay = "hesabpay")
-    assertFalse("cashTenderMinor" in PrefsRules.body(online, p, PrefsRules.sent(online, p, PrefsForm(cashTenderMinor = 20_000))).getValue("delivery").jsonObject)
+    val bare = prefs(version = 7)
+    assertFalse("cashTenderMinor" in PrefsRules.body(online, bare, PrefsRules.sent(online, bare, PrefsForm(cashTenderMinor = 20_000))).getValue("delivery").jsonObject)
     //  همان برش‌های سرور (`text(v, 80)`/`text(v, 200)`)
     val long = PrefsRules.sent(o, p, PrefsForm(leaveWith = "ا".repeat(120), landmark = "ب".repeat(300)))
     assertEquals(PrefsRules.LEAVE_MAX, long.leaveWith.length)
     assertEquals(PrefsRules.LANDMARK_MAX, long.landmark.length)
+  }
+
+  @Test fun nonCashOrderWithAStoredBanknoteSendsAnExplicitNull() {
+    //  پس از ثبت با حساب‌پی پرداخت شد و اسکناسی مانده ⇒ همان وب (`store/order.js`): `cashTenderMinor: null` ِ صریح، نه `bad_cash_tender`
+    val online = order(pay = "hesabpay")
+    val p = prefs(50_000, version = 9, call = true)
+    val sent = PrefsRules.sent(online, p, PrefsRules.formOf(online, p).copy(leaveWith = "دربان"))
+    assertNull(sent.cashTenderMinor)
+    val b = PrefsRules.body(online, p, sent)
+    assertEquals(JsonNull, b.getValue("delivery").jsonObject["cashTenderMinor"])
+    assertTrue(b.toString().contains("\"cashTenderMinor\":null"), b.toString())
+    assertEquals("دربان", b.getValue("delivery").jsonObject.getValue("leaveWith").jsonPrimitive.content)
+    assertEquals(9L, b.getValue("expectedVersion").jsonPrimitive.long)
+    //  ⛔ هرگز مبلغ: حتی گزینهٔ برگزیده برای سفارشِ غیرنقد null می‌رود
+    val chosen = PrefsRules.body(online, p, PrefsRules.sent(online, p, PrefsForm(cashTenderMinor = 20_000)))
+    assertEquals(JsonNull, chosen.getValue("delivery").jsonObject["cashTenderMinor"])
+    //  نمای تازهٔ بی اسکناس ⇒ «ثبت شد»
+    assertTrue(PrefsRules.landed(sent, online, prefs(null, version = 10, call = true, leave = "دربان")))
   }
 
   @Test fun landedOnlyWhenTheFreshViewIsWhatWasSentAndNoLandmark() {

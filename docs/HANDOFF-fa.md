@@ -130,6 +130,18 @@
 - نیمه‌کاره: هیچ. شاخه‌های منبع (`perf-2`، `ntf-refund`، `sec-review-40`، `shopper-gaps`، `acct-console-2`) در دستهٔ ۴۱‌اند و هنوز مرج نشده؛
   اگر یکی کنار رفت، بندش را هم بردار. «مانع» ِ CHK-18/ORD-20 عمداً دست نخورد (عاملِ دیگر).
 - قدمِ بعدی: با هر جوابِ صاحب‌کار بندِ همان تصمیم به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/tender-stale` (اسکناسِ مانده پس از تغییرِ جمع، CHK-24؛ روی `claude/web-chk24` ‏b3f1b377؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دو «نیمه‌کاره» ِ بندِ `claude/web-chk24`. سرور — یک قاعده (`delivery-prefs.dropStaleTenderIn`): هر نویسندهٔ جمع/روشِ پرداخت/روشِ تحویل (ویرایشِ
+  ORD-14 در `propose` و `decide`، افزودنِ قلم، `pack` ِ جمع‌آوری با جایگزین/«پیدا نشد»، روشِ تحویل، پرداختِ آنلاین) پس از نوشتن و زیرِ همان قفل
+  اسکناسی را که از `checkTender` نمی‌گذرد برمی‌دارد، با رویدادِ `delivery_edit` ِ `system` و یادداشتِ فارسی در خطِ زمانیِ کارمند؛ `edit` بی کلیدِ اسکناس هم
+  همین را برای ردیفِ کهنه می‌کند ⇒ ویرایشِ وب، برنامهٔ خرید و کارتِ کارمند دیگر `cash_tender_*` نمی‌گیرد؛ مبلغِ فرستاده همان ۴۰۰. بی مهاجرت، بی در و بی پرچمِ تازه.
+  `payment-intents.js` در سقفِ ۸۵۵ ماند (یک UPDATE دو سطری شد). برنامهٔ خرید — `PrefsRules.body`: نقد نیست و اسکناس مانده ⇒ `cashTenderMinor: null` ِ صریح، مثلِ وب.
+  آزمون‌ها: `order-tender-stale.test.js` ۸/۸ روی PGlite و PostgreSQL ِ محلی (پیش از رفع ۰/۸ روی هر دو؛ هم‌زمانی پنج بار روی PostgreSQL، هر دو ترتیب دیده شد)،
+  و `order-delivery-prefs`، `order-amend`، `order-amend-paid`، `order-add-items`، `order-delivery-method`، `order-picking`، `payment-intents`، `pick-substitutes`،
+  `order-substitution`، `cash-tender-vectors`، `hesabpay-guard` سبز روی هر دو.
+- نیمه‌کاره: `ShopperPrefsTest.nonCashOrderWithAStoredBanknoteSendsAnExplicitNull` (و یک سطرِ عوض‌شدهٔ `bodyCarriesTheSeenVersion…` که همان باگ را قفل کرده بود) فقط CI.
+  کارتِ کارمند (`OrderDeliveryPrefsUi`) دست نخورد: اسکناسِ نشان‌داده اکنون همیشه درست یا خالی است.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ CHK-24.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web-chk24` (CHK-24 در وبِ پیگیری: «با کدام اسکناس…» و رفعِ کارتِ ردشده/لغوشده؛ روی `claude/shopper-gaps-2` ‏921c168f؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: باگ — کارتِ «دستورِ تحویل» ِ `store/order.js` برای سفارشِ ردشده/لغوشده «از دکان بیرون رفته» نشان می‌داد؛ حالا مثلِ `PrefsRules.shown`
   پنهان است (`K.orderKind` = err). همزادی — «با کدام اسکناس…» در همان کارت فقط برای «نقد هنگامِ تحویل»: یک تابعِ `K.tenders` در `kit/order-kit.js`

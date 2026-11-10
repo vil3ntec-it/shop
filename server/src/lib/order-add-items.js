@@ -240,6 +240,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       prevTotalMinor: Number(row.total_minor), totalMinor, differenceMinor: totalMinor - Number(row.total_minor),
     };
     await amend.event(c, shopId, row, CUSTOMER, detail, {}, at);
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     return { replayed: false, detail, row };
   });
   if (!out.replayed) await afterAdd(shopId, out.row, out.detail);

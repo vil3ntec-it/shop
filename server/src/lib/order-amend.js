@@ -329,6 +329,7 @@ async function propose(shopId, id, { key, body, actor }) {
       await event(c, shopId, row, actor, {
         type: TYPES.applied, ...common, consent: { ...p.consent, by: 'staff' }, settlement: settlementOf(row, pl),
       }, p, at);
+      await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     }
     return { replayed: false, amendId };
   });
@@ -381,6 +382,7 @@ async function decide(shopId, id, amendId, decision, actor) {
     await event(c, shopId, row, actor, {
       type: TYPES.closed, amendId, outcome: 'applied', consent: { via: 'link', by: 'customer' }, settlement: settlementOf(row, it),
     }, {}, at);
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     return { status: 'applied', unchanged: false };
   });
 }
