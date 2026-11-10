@@ -54,17 +54,8 @@ async function createApp({ runMigrations = true } = {}) {
   //  وب‌هوکِ درگاهِ پرداخت (حساب‌پی): امضا روی **بایت‌های خام** است ⇒ بدنهٔ خام، پیش از پارسرِ
   //  همگانی (او بدنهٔ خوانده‌شده را دوباره نمی‌خواند). سقفِ کوچک: رویدادِ پرداخت چند صد بایت است.
   app.use(['/api/payments/webhook', '/api/v1/payments/webhook'], express.raw({ type: () => true, limit: '64kb' }));
-  /*
-   *  ⛔ ممیزیِ ۳۵ (B4): NUL (`\u0000`) در رشته‌های بدنه — PostgreSQL متن و jsonb ِ NUL‌دار را نمی‌پذیرد، پس هر دری
-   *  که رشته را بی `validate.text` (که NUL را از پیش می‌انداخت) می‌نوشت ۵۰۰ می‌داد (خرج کردنِ کد، پاک کردنِ مشتری…).
-   *  همان کارِ `validate.text`، این‌بار برای همه. همگام‌سازی و پمپ (`sync`، `shop/sync`، `pump`) پارسرِ دست‌نخوردهٔ
-   *  پیشین را دارند: آن راه‌ها مشترک با پمپ‌اند و opِ همگام‌سازی بیت‌به‌بیت همانی می‌ماند که دستگاه فرستاد.
-   */
-  const jsonPlain = express.json({ limit: '2mb' });
-  const noNul = (k, val) => (typeof val === 'string' && val.includes('\u0000') ? val.replace(/\u0000/g, '') : val);
-  const jsonClean = express.json({ limit: '2mb', reviver: noNul });
-  const RAW_SYNC = /^\/api(?:\/v1)?\/(?:sync|shop\/sync|pump)(?:\/|$)/;
-  app.use((req, res, next) => (RAW_SYNC.test(req.path) ? jsonPlain : jsonClean)(req, res, next));
+  //  ⛔ ممیزیِ ۳۵ (B4): NUL ِ رشته‌های بدنه می‌افتد (همگام‌سازی و پمپ دست‌نخورده)؛ SR38-2: بی reviver ِ کند پیش از سقفِ نرخ
+  app.use(require('./middleware/json-body').jsonBody());
 
   /*
    *  بدنه‌ای که JSON نیست.
@@ -192,7 +183,9 @@ async function createApp({ runMigrations = true } = {}) {
   //  PERF-04: مهلتِ سراسریِ درخواست — `REQUEST_TIMEOUT_MS` (۰ = خاموش)؛ پمپ و v1 بیرون (`middleware/deadline.js`)
   app.use('/api', require('./middleware/deadline').requestDeadline());
   //  ⚠️ همگام‌سازی سطلِ خودش را دارد (‎routes/sync-v1.js‎، شرحش در ‎config.rateLimit.syncMax‎)
-  const general = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' });
+  //  ترافیکِ اثبات‌شدهٔ مدیر/پلِ پنل سطلِ خودش را دارد؛ بقیه همین سطلِ IP (`middleware/admin-bucket.js`)
+  const general = require('./middleware/admin-bucket').withAdminBucket(
+    rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'general' }));
   app.use((req, res, next) => (/^\/api\/sync\/v[13]\//.test(req.path) ? next() : general(req, res, next)));
 
   // ---- بررسی سلامت ----

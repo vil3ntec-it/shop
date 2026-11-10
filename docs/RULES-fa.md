@@ -576,6 +576,7 @@
 
 ### v3 · ویترین
 
+- ⛔ «همه روشن» (`server/test/web-store-allflags.mjs`، در `test:web-store`): هر پرچمِ خانوادهٔ `shop.storefront*`/`shop.chat*`/`shop.orders*` + `shop.catalog`/`shop.image_bank`/`shop.customer_notify`/`shop.delivery_customer_view` با هم، سفرِ مشتری در ۳۶۰/۷۶۸/۱۲۸۰ و fa/en/ps؛ هر صفحه پس از پایانِ گذارها axe ِ WCAG 2.1 A/AA (از CDP، با همان CSP)، بی بیرون‌زدگی، بی خطای JS/CSP، بی ۴xx/۵xx ِ نسنجیده و بارِ نخستِ همان سه پرونده. پرچمِ تازهٔ همین خانواده ⇒ ردیفِ `KNOWN` ِ `routes/admin-flags.js` (وگرنه `console-shell.test.js` سرخ و زبانهٔ «پرچم‌ها»/`E2E_FLAGS_ON=all` نمی‌بینندش). پاسخِ هر کارِ مشتری که صفحه با آن دوباره می‌کشد (`pay-choice`، `items`، پذیرش/ردِ ویرایش، لغو) = `lib/store-order-view.js` ِ همان GET، نه `sf.track`؛ کلیدِ تازهٔ پیگیری فقط همان‌جا. درِ پرچم‌دار را صفحه فقط با کلیدِ پیگیری می‌خواهد (`chat`، `deliveryRating`)، نه کورکورانه. ردیفِ افقیِ پیمایش‌پذیر (`#store-meta` ِ گوشی) ⇒ `tabindex=0` + `role=group` + نام. سرتاسری با `E2E_FLAGS_ON`: «همان لینکِ پیگیری» با `sameOrderLink` (`test/e2e/lib/harness.mjs`؛ با `link_expiry` هر صدور v2 ِ تازه است) و دکمهٔ «+» ِ کارت با `.p-add` (♥ هم «افزودنِ …» است).
 - تخفیفِ ویترین (MKT-01/09، پشتِ پرچمِ خاموشِ `shop.storefront.promos`، `lib/storefront-promos.js`): همان قاعده‌های `shop_promotions` با کانالِ «اینترنتی» و فقط `promo-core.evaluate` (همان صندوق)، ساعتِ محلیِ دکان؛ پیچیده دورِ `pricer` در همان تراکنش؛ کدِ اعمال‌نشده ⇒ ۴۰۹ `promo_code_rejected` (`promo.status`)، هرگز سفارشِ بی‌صدا با قیمتِ دیگر؛ کدِ سقف‌دار زیرِ قفلِ ردیفِ قاعده و در دفترِ مصرف با `sale_id = sf:<کلیدِ یکتایی>`؛ «جمعِ دیده‌شده» پس از تخفیف؛ ⛔ `GET /promos` هیچ کدی فهرست نمی‌کند و پیش‌نمایش چیزی نمی‌نویسد (`claude/mkt-01-store-promo`).
 - اولین خرید و سدِ تخفیفِ ویترین (MKT-02، RSK-09، پشتِ پرچمِ خاموشِ `shop.storefront.promo_guard`، `lib/storefront-promo-guard.js`): ⛔ «یک بار» با قیدِ یکتای پایگاه (`storefront_promo_claims`: (دکان، شماره) و (دکان، دستگاه) برای `first_order`) درونِ همان تراکنشِ `orders.create`، نه فقط با شمارش؛ درجِ ناکام ⇒ همان سفارش بی این تخفیف (جمعِ دیده‌شده ⇒ ۴۰۹ `price_changed`). ⛔ شناسهٔ دستگاه (`deviceId` ِ بدنه) از مشتری است و در پایگاه فقط چکیدهٔ SHA-256 ِ آن؛ سدِ سخت همان شمارهٔ تأییدشده است. ⛔ پرچم و تنظیم پیش از تراکنش خوانده می‌شوند (درونِ قفلِ سفارش فقط اتصالِ همان تراکنش). ⛔ کدِ نادرست ۴۲۹ `promo_attempts` را پس از بررسیِ تکرارِ کلید می‌دهد (تکرارِ همان ثبت هرگز ۴۲۹ نمی‌گیرد)؛ شمارش حافظه‌ای است. ⛔ قاعدهٔ «انحصاری» ِ اعمال‌شده تنها می‌ماند. `storefront-promo-guard.test.js`.
 - ویترین فقط با `shop.orders` + `shop.storefront` + کلیدِ اشتراکِ `storefront`؛ «نیست»، «خاموش» و «پرچم نیست» یک جواب دارند (۴۰۴) (#244).
@@ -863,6 +864,10 @@
   (`parseCsv` ِ `lib/image-bank-csv.js`: `csv_too_large`)؛ شیء از کلیدهای درخواست با `Object.fromEntries` + کنار گذاشتنِ `__proto__`/`constructor`/`prototype`، نه
   `o[k] = …`؛ احراز (`auth(...)`) بی شرطِ بیرونی روی مقدارِ کاربر — خودش ورودیِ تهی/بی‌شکل را رد می‌کند. هشدارهای `lib/sync-v1.js`
   (کلیدِ `op.fields` در `applyOp`) مشترک با پمپ‌اند و دست نمی‌خورند.
+- ⛔ آزمونِ شبیه‌سازِ آیفون (`iosSimulatorArm64Test`، فرآیندِ بی بستهٔ `test.kexe`) کلیددانِ iOS ندارد (OSStatus -25291، حتی با
+  `e2e/test.entitlements`): آزمونی که از `Keychain` می‌گذرد (KEK ِ `AtRest`/`SignOutVault`، هویتِ دستگاه، توکن) روی `Keychain.memory`
+  می‌رود و پس از خود برمی‌گرداند؛ ردهٔ دسترسی (`kSecAttrAccessible`) با `Keychain.addRequestIs` (همان درخواستِ `SecItemAdd`) سنجیده
+  می‌شود، نه با خواندنِ کلیددان. آزمونِ تازهٔ iOS پیش از ادغام یک بار روی کارِ `ios-app` سبز دیده شود (دستهٔ ۳۱ ‏#1015: اجرای خودِ شاخه‌ها لغو شد و سه آزمون از آن پس سرخ ماند).
 
 ### v3 · نقشهٔ پرچم‌ها
 
@@ -1164,6 +1169,14 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
 - ⛔ **F0-08:** نبودِ `BACKUP_PASSPHRASE` پشتیبان را **نمی‌ایستاند**. هر اجرا یک `backup.unencrypted`
   (`actor_type=system`) در «سابقه» و یک هشدار در لاگ می‌گذارد و پنل بالای همهٔ زبانه‌ها هشدارِ قرمز نشان می‌دهد
   (`GET /api/admin/backups` ⇐ `encryption`). `privacy.html` فقط چیزی را می‌گوید که راست است.
+- ⛔ **F0-28 (۱۴۰۵/۰۸/۱۹، ۲.۱۴.۵):** `BACKUP_SECRETS=seal` (پیش‌فرض `plain` = همان امروز، بی هیچ تبدیلی) ردیف‌های `SECRET_KEYS` ِ
+  `lib/backup-secrets.js` را در خودِ پشتیبان `sealed:<نام>` با AES-256-GCM (کلید `BACKUP_SECRETS_KEY[_FILE]`، AAD = kid + نام) می‌کند؛
+  کلید هرگز در دیتابیس یا پشتیبان نیست. رازِ تازه در `app_config` ⇒ همان فهرست در همان کامیت. PGlite: رونوشت + `VACUUM FULL` + چرخاندنِ
+  WAL و **سنجشِ** هر صفحهٔ WAL (`walCheck`)؛ مانده ⇒ پشتیبان نمی‌نشیند، هرگز «مهرشده» ای که راز را خام دارد. باز کردن (restore، تمرین،
+  راه‌اندازی پیش از نخستین درخواست) همه یا هیچ است: پاکتِ دست‌خورده یا کلیدِ دیگر ⇒ هیچ نوشتنی؛ مقدارِ تازه‌تر روی‌نویسی نمی‌شود
+  (`sealed.orphan:`). بی کلید ⇒ بازیابی موفق، پیامِ بلند با kid، **هیچ کلیدِ تازه**: مجوز ۵۰۳ (`license.js`، حتی development/test)
+  و ردیفِ خالیِ `station_read_key` جلوی کلیدِ تازهٔ پمپ را می‌گیرد (کدِ پمپ دست نمی‌خورد). seal بی کلید یا حالتِ ناشناخته ⇒ پشتیبان
+  ساخته نمی‌شود (۴۰۹). ⛔ هیچ مقدار، پاکت یا کلیدی در لاگ، سابقه یا meta (`test/backup-secrets.test.js` نشانِ کاشته را می‌جوید).
 - **F0-15:** تأییدِ دومرحله‌ایِ مدیر **اختیاری** است و هر مدیر خودش روشنش می‌کند؛ ⛔ اجباری شدن فقط با تصمیمِ
   صاحب محصول. TOTP پیاده‌سازیِ خودمان است (`lib/totp.js`، RFC 6238) و ⛔ بردارهای RFC در
   `test/admin-totp.test.js` نباید قرمز شوند. کدِ نادرست در قفل حساب می‌شود، یک گام دو بار پذیرفته نمی‌شود، کدِ
@@ -1321,6 +1334,11 @@ PRD-21؛ #466، باز)، برند و برچسب (PRD-06؛ #473، باز) و و�
   باید `updated_at = now()` هم بنویسد. سنجه: `server/test/entitlement-clock.test.js` (ساعتِ ساختگی؛ پیش از رفع ۳ از ۵ سرخ).
 
 ### سنجشِ کارایی
+- ⛔ **PERF-02 — بار در مقیاسِ §۹.۳ و درستی زیرِ بار (`claude/perf-load`):** `load-test.mjs --profile scale,scale-burst --check`
+  (آمیزه و دفترِ بارساز `scripts/load-scale.mjs`، سنجه `scripts/load-check.js`). هر تغییرِ push/pull ِ v3، وظیفه/تعارض، نگه‌داشته،
+  ویترین یا جدایی دکان ⇒ `test/load-correctness.test.js` روی PGlite و PostgreSQL (بی سنجهٔ زمانی، ~۱ دقیقه). جست‌وجوی ردیفِ «باز» با
+  کلید (`dedupe_key` و مانندش) فقط با نمایهٔ جزئیِ همان کلید (نمونه: مهاجرتِ ۴۵۰)؛ نمایهٔ (حساب، وضعیت) که کلید را فیلتر کند با شمارِ
+  بازها خطی است. کاشتنِ ابزارِ بار پرچم را از `/api/admin/flags` می‌نویسد، نه درِ پمپ؛ «پایان‌دادنِ صف» دو گذر است (همه push، سپس همه pull).
 - ⛔ **PERF-04 — مهلت‌ها (`claude/ops-perf`، همه پیش‌فرض ۰ = خاموش):** `REQUEST_TIMEOUT_MS` (`middleware/deadline.js`، کف ۵ ثانیه؛
   درخواستِ `?wait=` ِ long-poll ۳۰ ثانیه بیشتر؛ پمپ و Sync v1 بیرون؛ از پس از خواندنِ بدنهٔ JSON) ⇒ ۵۰۳ ِ `request_timeout` (در
   `server_errors` هم) و نوشتنِ دیرِ مسیر بی‌صدا دور ریخته می‌شود. `PG_STATEMENT_TIMEOUT_MS` و `PG_IDLE_TX_TIMEOUT_MS` (`db.js`) ⇒ ۵۰۳ ِ `db_timeout`؛ مهاجرت‌ها
@@ -2973,6 +2991,7 @@ test/staff-code-desk.test.js  ۶ بند
   `bad_path` و در بدنه انداخته می‌شود (جز `sync`/`shop/sync`/`pump`)؛ ۵xx هرگز SQLSTATE یا کدِ درونی را بیرون نمی‌دهد؛
   «هر کاربر یک دکان» زیرِ قفلِ `staff-join-user` ِ همان حساب است (روی PostgreSQL پیش از رفع هشت دکان)؛ `otp/request` سطلِ
   IP ِ `otp-ip` (`RATE_OTP_IP_MAX`) دارد؛ پشتیبانِ کاملِ دکان با پرچمِ `shop.backup_contact_guard` فقط برای `customers.contact`.
+- ⛔ (بازبینیِ ۳۸، `security-review-38.test.js`) پارسرِ پیش از سقفِ نرخ هرگز `reviver` نمی‌گیرد (`middleware/json-body.js`)؛ `sealPglite` آمارِ app_config (`pg_statistic`) را هم می‌بَرد؛ هر اتصالِ بیرون‌کشیده‌ای که در تراکنش منتظرِ کارِ بیرونی می‌ماند شنوندهٔ `error` و `release(err)` دارد.
 - آزمون: `test/security-hardening.test.js` (۱۳ بند).
 
 ## ⛔ لغو و تعلیقِ اشتراک در ماهِ اول واقعاً می‌بندد (از ۱۴۰۵/۰۷/۱۳)
@@ -3298,6 +3317,12 @@ SCALE=2000 SCALE_PAR=40 node --test test/pump-scale.test.js
   آی‌پی (`syncIpMax`، ۶٬۰۰۰). بی‌سقف نیست؛ فقط دیگر دستگاه‌های همسایه را
   نمی‌بندد.
 - آزمون: `test/sync-v1-ratelimit.test.js` (هر دو سمت؛ روی کدِ پیشین سرخ).
+- ⛔ **ترافیکِ اثبات‌شدهٔ مدیر و پلِ پنل سطلِ خودش را دارد** (۲.۱۴.۵، `middleware/admin-bucket.js`): پل از 127.0.0.1 و بی XFF
+  می‌آمد و کنسولِ صاحب با همان ۶۰۰ ِ یک IP بسته می‌شد («سقفِ نرخِ سرورِ حساب پر شده»). فقط `/api[/v1]/admin/*` (نه
+  `login`/`reauth`/`2fa`/`pump`) با کلیدِ سرویسِ فعال یا نشستِ زندهٔ مدیرِ فعال ⇒ سطلِ همان کلید/مدیر (`RATE_ADMIN_PROVEN_MAX`
+  ۶٬۰۰۰)؛ ساختگی/باطل/توکنِ کاربر/بی‌توکن ⇒ همان سطلِ IP. پرسشِ پایگاه برای اعتبارنامهٔ ناشناخته پیش از احراز سطلِ IP ِ خودش
+  را دارد (`RATE_ADMIN_PROBE_MAX` ۶۰، فقط شکست‌ها). سطل را هرگز از IP یا XFF ندهید؛ شکستِ `requireAdmin` باید `forget` بزند.
+  `RATE_ADMIN_BUCKET=0` ⇒ رفتارِ پیشین. آزمون: `test/admin-bucket.test.js` (روی کدِ پیشین سرخ، هشت جهش سرخ).
 
 ## ⛔ مجوز زیرِ Electron امضا نمی‌شد — ریشهٔ «اشتراک به برنامه نمی‌رسد» (از ۱۴۰۵/۰۷/۱۵، نسخهٔ ۲.۱۱.۱۰)
 

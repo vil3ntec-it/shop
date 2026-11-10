@@ -4,12 +4,15 @@ import android.content.Context
 import android.content.IosContext
 import android.content.SharedPreferences
 import android.content.UserDefaultsPreferences
+import ir.vil3ntec.tohid.core.atrest.AtRestKeyring
+import ir.vil3ntec.tohid.data.AtRest
 import ir.vil3ntec.tohid.data.BackupMirror
 import ir.vil3ntec.tohid.data.DiskWrite
 import ir.vil3ntec.tohid.data.LedgerRecovery
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopSettingsBundle
 import ir.vil3ntec.tohid.data.ShopSettingsSync
+import ir.vil3ntec.tohid.ios.keychain.Keychain
 import ir.vil3ntec.tohid.sync.v1.SignOutVault
 import ir.vil3ntec.tohid.sync.v1.SyncOp
 import ir.vil3ntec.tohid.sync.v1.SyncV1Keys
@@ -180,7 +183,7 @@ class DataSafetyIosTest {
   }
 
   @Test
-  fun signOutVaultSealsOnKeychainForTheSameAccountOnly() {
+  fun signOutVaultSealsOnKeychainForTheSameAccountOnly() = onMemoryKeychain {
     val user = "ios-test-vault-user"
     SignOutVault.drop(IosContext, user)
     try {
@@ -209,6 +212,27 @@ class DataSafetyIosTest {
     folder.mkdirs()
     assertTrue(folder.isDirectory)
     assertTrue(folder.canWrite())
+  }
+
+  /**
+   *  کلیددانِ درونِ حافظهٔ همین فرآیند (`Keychain.memory`؛ اگر آزمونِ سرتاسری گذاشته، همان): test.kexe کلیددانِ iOS ندارد
+   *  (OSStatus -25291، ‎docs/IOS-PLAN-fa.md‎) و پیش‌تر KEK ِ `AtRestKeysIos` به `KEY_UNAVAILABLE` می‌خورد ⇒ `seal` همیشه false.
+   *  KEK، کلیددانِ دفتر (`filesDir/atrest/keyring`) و پاکت همان کدِ برنامه‌اند؛ کلیددانی که همین آزمون ساخت پس از آن برمی‌دارد.
+   */
+  private fun onMemoryKeychain(body: () -> Unit) {
+    val memory = Keychain.memory
+    val ring = File(File(IosContext.filesDir, "atrest"), "keyring")
+    val hadRing = ring.exists()
+    Keychain.memory = memory ?: HashMap()
+    try {
+      body()
+    } finally {
+      Keychain.memory = memory
+      if (!hadRing) {
+        for (suffix in listOf("", AtRestKeyring.BACKUP_SUFFIX, AtRestKeyring.SUSPECT_SUFFIX)) File(ring.path + suffix).delete()
+        AtRest.keyring(IosContext).forget()
+      }
+    }
   }
 
   private fun restore(prefs: SharedPreferences, before: Map<String, Any?>) {

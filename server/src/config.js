@@ -288,6 +288,8 @@ const config = {
     rtoTargetMs: num(process.env.BACKUP_RTO_HOURS, 12) * 60 * 60 * 1000,
     enabled:    bool(process.env.BACKUP_ENABLED, true),
     passphrase: process.env.BACKUP_PASSPHRASE || '',   // اگر پر باشد، پشتیبان رمز می‌شود
+    //  F0-28: plain (پیش‌فرض، همان امروز) | seal — رازهای app_config در پشتیبان با BACKUP_SECRETS_KEY مهر می‌شوند (lib/backup-secrets.js)
+    secrets:    process.env.BACKUP_SECRETS || 'plain',
     pgDump:     process.env.PG_DUMP_BIN || 'pg_dump',
     pgRestore:  process.env.PSQL_BIN || 'psql',
     //  OPS-02@29: «سلامت» زرد اگر آخرین تمرینِ بازیابیِ موفق کهنه‌تر از این چند روز است (`npm run restore-drill`).
@@ -368,6 +370,12 @@ const config = {
     //  خودِ سقف هم جدا سنجیده شود.
     broadcastMax: num(process.env.RATE_BROADCAST_MAX, 5),
     generalMax:   num(process.env.RATE_GENERAL_MAX, 600),
+    //  سطلِ جدای ترافیکِ اثبات‌شدهٔ مدیر و پلِ پنل (`middleware/admin-bucket.js`): کلیدِ سرویسِ فعال یا نشستِ زندهٔ
+    //  مدیر روی درهای مدیر، به‌ازای همان کلید/مدیر. ⛔ تا ۲.۱۴.۵ پل (127.0.0.1، بی XFF) همان `generalMax` ِ یک IP را
+    //  می‌خورد و کنسولِ صاحب را می‌بست. `adminProbeMax`: پرسشِ پایگاه برای اعتبارنامهٔ ناشناخته به‌ازای IP (فقط شکست‌ها).
+    adminBucket:    bool(process.env.RATE_ADMIN_BUCKET, true),
+    adminProvenMax: num(process.env.RATE_ADMIN_PROVEN_MAX, 6000),
+    adminProbeMax:  num(process.env.RATE_ADMIN_PROBE_MAX, 60),
     /*
      *  همگام‌سازی (‎/api/sync/v1/*‎) — **سطلِ خودش، به‌ازای هر حساب**.
      *

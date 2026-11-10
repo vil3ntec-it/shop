@@ -13,7 +13,6 @@ const express = require('express');
 const config = require('../config');
 const sf = require('../lib/storefront');
 const flow = require('../lib/order-flow');
-const pay = require('../lib/payment-intents');
 const { rateLimit } = require('../middleware/ratelimit');
 
 const router = express.Router();
@@ -25,11 +24,8 @@ router.post('/:slug/orders/:token/pay-choice', async (req, res) => {
   const store = await sf.open(req.params.slug);
   const orderId = await sf.orderIdOfLink(store, req.params.token);
   const out = await flow.choose(store.shop_id, orderId, req.body);
-  //  همان شکلِ پیگیری (`GET …/orders/:token`): دکمهٔ حساب‌پی و کارتِ «پرداخت» با پاسخِ همین درخواست تازه می‌شوند
-  const order = await sf.track(store, req.params.token);
-  const view = await flow.trackView(store.shop_id, orderId);
-  order.onlinePay = { available: !view.blocked && await pay.orderPayable(store.shop_id, orderId) };
-  if (view.step !== undefined) order.paymentStep = { ...view.step, online: order.onlinePay.available };
+  //  همان نمای پیگیری (`GET …/orders/:token`، `lib/store-order-view.js`): صفحه با همین پاسخ دوباره می‌کشد
+  const order = await require('../lib/store-order-view').customerOrder(store, req.params.token);
   res.status(200).json({ changed: out.changed, order });
 });
 

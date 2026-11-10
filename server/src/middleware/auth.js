@@ -372,10 +372,13 @@ async function requireAdmin(req, res, next) {
     if (!token) return next(unauthorized());
     const svc = require('../lib/admin-service');
     if (svc.isServiceKey(token)) return await serviceAdmin(req, res, next, token);
+    //  نپذیرفت ⇒ سطلِ جدای مدیر (`admin-bucket.js`) از درخواستِ بعد همان سطلِ IP
+    const forget = () => require('./admin-bucket').forget(token);
     const row = await tokens.verify(token, 'admin');
-    if (!row) return next(unauthorized('نشست مدیر منقضی شده است', 'invalid_token'));
+    if (!row) { forget(); return next(unauthorized('نشست مدیر منقضی شده است', 'invalid_token')); }
     const admin = await one('SELECT * FROM admins WHERE id=$1', [row.subject_id]);
     if (!admin || admin.status !== 'active') {
+      forget();
       return next(forbidden('حساب مدیر غیرفعال است', 'admin_disabled'));
     }
     //  SEC-AUTH-12: تأییدِ دومرحله‌ایِ اجباری (پرچمِ خاموشِ `ADMIN_2FA_REQUIRED`) — از ردیفِ زنده، هر درخواست
@@ -394,7 +397,10 @@ async function serviceAdmin(req, res, next, token) {
   const svc = require('../lib/admin-service');
   const roles = require('../lib/admin-roles');
   const key = await svc.verify(token);
-  if (!key) return next(unauthorized('کلیدِ سرویس معتبر نیست یا باطل شده است', 'invalid_service_key'));
+  if (!key) {
+    require('./admin-bucket').forget(token);
+    return next(unauthorized('کلیدِ سرویس معتبر نیست یا باطل شده است', 'invalid_service_key'));
+  }
   const actor = svc.actorOf(req);
   const role = roles.lower(actor.role, key.role_cap);
   req.admin = {

@@ -463,6 +463,20 @@ test('پیگیری فقط با توکن (S137)؛ لغوِ رایگان تا پی
   assert.equal(late.body.error.code, 'cannot_cancel');
 });
 
+//  ⛔ «همه روشن» (`web-store-allflags.mjs`): پاسخِ این کارِ مشتری فقط `sf.track` بود و صفحه (`renderOrder(r.order)`) هر کلیدِ نیامده را
+//  پنهان می‌کرد ⇒ کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش تا پیگیریِ بعدی می‌رفتند. حالا همان نمای پیگیری (`lib/store-order-view.js`).
+test('با پرچم‌های دیگرِ پیگیری: پاسخِ «لغو» همان نمای پیگیری است (گفت‌وگو، دستورِ تحویل، زمان، …)', async () => {
+  const s = await liveStore('لغوِ همه‌روشن');
+  for (const k of ['shop.chat', 'shop.orders.delivery_prefs', 'shop.storefront.eta', 'shop.storefront.delivery_method', 'shop.orders.issue_reports', 'shop.orders.reviews', 'shop.orders.refund_tracking']) await setFlag(s.shopId, k, true);
+  const o = (await checkout(s.slug, cart(), { ticket: await ticketFor(s.slug, PHONE) })).body.order;
+  const c = await h.post(`/api/store/${s.slug}/orders/${o.token}/cancel`, {});
+  assert.equal(c.status, 200, JSON.stringify(c.body));
+  const tr = (await h.get(`/api/store/${s.slug}/orders/${o.token}`)).body.order;
+  assert.equal(c.body.order.status, 'cancelled_by_customer');
+  assert.equal(c.body.order.chat, true, 'کارتِ گفت‌وگو با پاسخِ «لغو» نمی‌رود');
+  assert.deepEqual(Object.keys(c.body.order).sort(), Object.keys(tr).sort());
+});
+
 test('«سفارش‌های من»: فقط همان شمارهٔ تأییدشده، از هر دستگاه (S138)', async () => {
   const s = await liveStore('سفارش‌های من');
   const mine = await ticketFor(s.slug, PHONE);

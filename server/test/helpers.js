@@ -48,8 +48,13 @@ let server = null;
 let base = '';
 
 async function resetDatabase() {
-  await query('DROP SCHEMA public CASCADE');
-  await query('CREATE SCHEMA public');
+  //  پاک‌سازیِ آزمون زیرِ سقفِ پرس‌وجوی استخر (`PG_STATEMENT_TIMEOUT_MS` ِ `request-deadline.test.js`: ۴۰۰ms) نمی‌رود:
+  //  DROP SCHEMA ِ پایگاهِ پر گاهی بیش از آن است ⇒ 57014 و آزمونِ سرخ (۱ از ۶ روی PostgreSQL). مهاجرت‌ها خودشان بی سقف‌اند.
+  await require('../src/db').tx(async (c) => {
+    await c.query('SET LOCAL statement_timeout = 0');
+    await c.query('DROP SCHEMA public CASCADE');
+    await c.query('CREATE SCHEMA public');
+  });
   await migrate.run();
 }
 

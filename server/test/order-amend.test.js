@@ -275,6 +275,22 @@ test('سفارشِ ویترین: پیشنهاد تا پذیرشِ مشتری چ�
   assert.deepEqual(evs[1].detail.consent, { via: 'link', by: 'customer' });
 });
 
+//  ⛔ «همه روشن» (`web-store-allflags.mjs`): پاسخِ این کارِ مشتری فقط `sf.track` بود و صفحه (`renderOrder(r.order)`) هر کلیدِ نیامده را
+//  پنهان می‌کرد ⇒ کارتِ گفت‌وگو، دستورِ تحویل، زمان و روش تا پیگیریِ بعدی می‌رفتند. حالا همان نمای پیگیری (`lib/store-order-view.js`).
+test('با پرچم‌های دیگرِ پیگیری: پاسخِ «می‌پذیرم» همان نمای پیگیری است (گفت‌وگو، دستورِ تحویل، زمان، …)', async () => {
+  const s = await shop('همه‌روشن');
+  for (const k of ['shop.chat', 'shop.orders.delivery_prefs', 'shop.storefront.eta', 'shop.storefront.delivery_method', 'shop.orders.issue_reports', 'shop.orders.reviews', 'shop.orders.refund_tracking']) await setFlag(s.shopId, k, true);
+  const so = await storeOrder(s);
+  const r = await propose(s, so.id, { changes: [{ lineNo: 1, qtyMilli: 2000 }], reason: 'out_of_stock' });
+  assert.equal(r.status, 201, JSON.stringify(r.body));
+  const ok = await decide(s, so.token, r.body.amendment.id, 'accept');
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  const tr = (await track(s, so.token)).body.order;
+  assert.equal(ok.body.order.chat, true, 'کارتِ گفت‌وگو با پاسخِ «می‌پذیرم» نمی‌رود');
+  assert.deepEqual(Object.keys(ok.body.order).sort(), Object.keys(tr).sort());
+  assert.deepEqual(ok.body.order.amendment, tr.amendment);
+});
+
 test('سفارشِ ویترین: رد ⇒ همان سفارش؛ پس گرفتنِ کارمند ⇒ مشتری دیگر نمی‌پذیرد', async () => {
   const s = await shop('رد');
   const so = await storeOrder(s);

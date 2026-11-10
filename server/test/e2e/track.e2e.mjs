@@ -83,6 +83,7 @@ await E.step('DLV-06.0', 'کالا از برنامه، ویترین روشن، �
 });
 
 await E.step('DLV-06.off', 'بی پرچمِ نمای پیک: سپرده و پذیرفته، ولی صفحه هیچ بخشِ پیکی ندارد', async () => {
+  await E.flag(owner.shopId, VIEW_FLAG, false);   //  «بی پرچم» صریح: `E2E_FLAGS_ON` همین پرچم را برای دکانِ تازه روشن می‌کند
   const o = await packedOrder();
   const a = await assign(o);
   await courierOk([event(a.assignment.id, 'assigned')]);

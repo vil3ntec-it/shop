@@ -104,7 +104,8 @@ await E.step('S74', 'قیمت بینِ بازکردنِ صفحه و ثبت عو�
   const { page } = C;
   await page.goto(`${E.apiBase}/store/${SLUG}`);
   await page.waitForSelector('#products li[data-id]', { timeout: 15_000 });
-  const add = async (id, n) => { for (let i = 0; i < n; i++) await page.locator(`#products li[data-id="${id}"]`).getByRole('button', { name: /افزودن/ }).click(); };
+  //  `.p-add`: با ♥ ِ `shop.storefront.favorites` (E2E_FLAGS_ON) کارت دکمهٔ دومی با نامِ «افزودنِ … به دلخواه‌ها» هم دارد
+  const add = async (id, n) => { const li = page.locator(`#products li[data-id="${id}"]`); for (let i = 0; i < n; i++) await li.getByRole('button', { name: /افزودن/ }).and(li.locator('.p-add')).click(); };
   await add(rice, 2);
   await add(oil, 1);
   await page.click('#open-cart');
@@ -299,7 +300,7 @@ await E.step('S107', '۴۰۴/۴۰۹: پیوندِ کالای برداشته، ک
   const { page } = C;
   await page.goto(`${E.apiBase}/store/${SLUG}#/`);
   await page.waitForSelector('#products li[data-id]');
-  for (const id of [rice, oil]) await page.locator(`#products li[data-id="${id}"]`).getByRole('button', { name: /افزودن/ }).click();
+  for (const id of [rice, oil]) { const li = page.locator(`#products li[data-id="${id}"]`); await li.getByRole('button', { name: /افزودن/ }).and(li.locator('.p-add')).click(); }
   //  دکان روغن را از ویترین برمی‌دارد ⇐ مشتری دوباره باز می‌کند
   E.ok(await A.api('PUT', `/shop/storefront/products/${oil}`, { published: false }), 'برداشتنِ روغن');
   await page.reload();

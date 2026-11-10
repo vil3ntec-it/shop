@@ -49,6 +49,15 @@ export const FLAGS_ON_BATCH = Object.freeze([
   'shop.catalog',   //  پیش‌نیازِ سمتِ سرورِ `shop.count_absorb` (دفترِ موجودیِ سرور)
 ]);
 
+/**
+ * «همان لینکِ پیگیری»: v1 همان رشته؛ با `shop.storefront.link_expiry` (TEN-03، مثلاً `E2E_FLAGS_ON`) هر صدور v2 ِ تازه با زمانِ همان
+ * صدور است (فهرست، تکرارِ ثبت، پیام) ⇒ همان سفارش (پیشوندِ ULID ِ هر دو v2). v1 کنارِ v2 هرگز «همان» نیست.
+ */
+export function sameOrderLink(a, b) {
+  const v2 = (t) => String(t).split('.').length === 4;
+  return v2(a) && v2(b) ? String(a).split('.')[0] === String(b).split('.')[0] : a === b;
+}
+
 /** فهرستِ پرچم‌های حالتِ «همه روشن» از روی `E2E_FLAGS_ON` و `KNOWN` */
 export function flagsOnList(raw = process.env.E2E_FLAGS_ON, known = require('../../../src/routes/admin-flags').KNOWN) {
   const v = String(raw || '').trim();

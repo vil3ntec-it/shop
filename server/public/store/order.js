@@ -236,7 +236,7 @@
     }
     function renderRate(o, token) {
       var box = $('o-rate');
-      if (o.status !== 'delivered' || o.fulfillment !== 'delivery') { box.hidden = true; return; }
+      if (!o.deliveryRating || o.status !== 'delivered' || o.fulfillment !== 'delivery') { box.hidden = true; return; }
       if (box.getAttribute('data-for') === token) return;
       box.setAttribute('data-for', token);
       var path = '/orders/' + encodeURIComponent(token) + '/rating';

@@ -24,6 +24,10 @@ const { closeDb } = require('../src/db');
 backup.restore(file)
   .then(async (out) => {
     console.log(`بازیابی انجام شد (${Math.round(out.bytes / 1024)} کیلوبایت SQL).`);
+    //  F0-28: پشتیبانِ مهرشده — فقط نام، شمار و kid؛ هرگز مقدار
+    const sec = out.secrets;
+    if (sec && sec.unsealed && !sec.rejected) console.log(`${sec.unsealed} رازِ مهرشده با BACKUP_SECRETS_KEY باز شد${sec.conflicts?.length ? ` (روی‌نویسی‌نشده: ${sec.conflicts.join('، ')})` : ''}.`);
+    if (sec && (sec.missingKey || sec.rejected || sec.error)) console.error(`⛔ ${sec.message || `پاکت‌های راز سنجیده نشدند (${sec.error})`}`);
     if (out.epochError) {
       //  دادهٔ پشتیبان نشسته است؛ فقط «دورانِ بازیابی» تازه نشد — جدا و روشن، با کدِ خروجِ جدا
       console.error(`⚠️ داده برگشت ولی دورانِ بازیابیِ همگام‌سازی تازه نشد: ${out.epochError}\n`
@@ -34,5 +38,7 @@ backup.restore(file)
       process.exit(2);
     }
     await closeDb();
+    //  داده برگشت ولی پاکتِ راز رد شد (کلیدِ دیگر یا دست‌کاری) ⇒ کدِ خروجِ جدا؛ بی کلید = ۰ (بازیابی موفق، پیامِ بالا)
+    if (sec && (sec.rejected || sec.error)) process.exit(3);
   })
   .catch(async (e) => { console.error('✖', e.message); await closeDb(); process.exit(1); });

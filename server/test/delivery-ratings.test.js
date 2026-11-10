@@ -147,6 +147,11 @@ test('DLV-18 خاموش: پیک ۴۰۴، مشتری «سفارش پیدا نشد
   r = await customerGet(s, d.token);
   assert.equal(r.status, 404);
   assert.equal(code(r), 'order_not_found');
+  //  ⛔ «همه روشن» (`web-store-allflags.mjs`): صفحهٔ هر سفارشِ ارسالیِ تحویل‌شده `…/rating` را می‌خواست و ۴۰۴ می‌گرفت ⇒ کلیدِ
+  //  `deliveryRating` در پیگیری فقط با پرچم، و صفحه فقط با همان کلید می‌خواهد
+  const tr = (await h.get(`/api/store/${s.slug}/orders/${d.token}`)).body.order;
+  assert.equal(tr.status, 'delivered');
+  assert.equal('deliveryRating' in tr, false, 'پرچمِ خاموش ⇒ بی کلید');
   r = await customerPost(s, d.token, { stars: 5 });
   assert.equal(r.status, 404);
   r = await h.get('/api/shop/delivery/ratings', { token: s.token });
@@ -157,6 +162,7 @@ test('DLV-18 خاموش: پیک ۴۰۴، مشتری «سفارش پیدا نشد
   assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.ratingsEnabled, false);
   assert.equal((await h.get('/api/shop/delivery/config', { token: s.token })).body.ratings, false);
   await setFlag(s.shopId, R.FLAG, true);
+  assert.equal((await h.get(`/api/store/${s.slug}/orders/${d.token}`)).body.order.deliveryRating, true, 'پرچمِ روشن ⇒ کلید');
   assert.equal((await h.get('/api/courier/me', { token: s.courier.token })).body.ratingsEnabled, true);
   assert.equal((await h.get('/api/shop/delivery/config', { token: s.token })).body.ratings, true);
 });
@@ -247,6 +253,7 @@ test('DLV-18 ویترین: صفحهٔ پیگیری فرمِ امتیاز را ف
   for (const id of ['o-rate', 'o-rate-form', 'o-rate-stars', 'o-rate-tags', 'o-rate-send', 'o-rate-msg']) assert.match(html, new RegExp(`id="${id}"`), id);
   assert.match(html, /id="o-rate"[^>]*hidden/, 'پیش‌فرض پنهان');
   assert.match(js, /o\.status !== 'delivered'/, 'فقط پس از «تحویل شد»');
+  assert.match(js, /if \(!o\.deliveryRating \|\|/, 'فقط با کلیدِ `deliveryRating` ِ پیگیری (پرچمِ خاموش ⇒ بی درخواستِ ۴۰۴)');
   assert.match(js, /'\/orders\/' \+ encodeURIComponent\(token\) \+ '\/rating'/, 'همان درِ `/api/store/:slug/orders/:token/rating`');
   //  برچسب‌های صفحه همان فهرستِ ثابتِ سرور برای مشتری‌اند — نه بیشتر، نه کمتر
   const tags = [...js.matchAll(/\{ tag: '([a-z_]+)', label: 'od\.rt\.\1' \}/g)].map((m) => m[1]);

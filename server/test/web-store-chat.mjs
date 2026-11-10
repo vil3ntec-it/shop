@@ -318,8 +318,20 @@ const reverify = async (p, num) => {
   await p.waitForFunction(() => /\d{4,}/.test(document.getElementById('ct-vmsg').textContent), null, { timeout: 10000 });
   const code = (await p.textContent('#ct-vmsg')).match(/(\d{4,})/)[1];
   await p.fill('#ct-code', code);
+  //  CI ِ #1022 دو بار: `verify/check` ۴۰۰ (فقط کد یا شمارهٔ تهی/ناجور ۴۰۰ است؛ کدِ نادرست ۴۰۳) و فرم ماند ⇒ اگر باز شد،
+  //  همان پاسخ و مقدارهای فرم در لاگ تا علت حدس نباشد (سنجش همان است: فرم باید بسته شود)
+  const answer = p.waitForResponse((r) => /\/verify\/check$/.test(r.url()), { timeout: 10000 }).catch(() => null);
   await p.click('#ct-vcheck');
-  await p.waitForFunction(() => document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+  try {
+    await p.waitForFunction(() => document.getElementById('ct-verify').hidden, null, { timeout: 10000 });
+  } catch (e) {
+    const r = await answer;
+    const form = await p.evaluate(() => ({ phone: document.getElementById('ct-phone').value, code: document.getElementById('ct-code').value,
+      vmsg: document.getElementById('ct-vmsg').textContent, active: document.activeElement && document.activeElement.id }));
+    console.log('reverify', num, 'code', code, 'form', JSON.stringify(form), 'check', r && r.status(), r && (await r.text().catch(() => '')).slice(0, 300),
+      'sent', r && r.request().postData());
+    throw e;
+  }
 };
 await reverify(qp, phone);
 ok(await until(async () => (await countFrom(conv1.id, 'پس از تأیید')) === 1, 15000), 'همان شماره دوباره تأیید شد ⇒ همان پیام با همان شناسه رفت');
