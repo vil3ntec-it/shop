@@ -18,6 +18,8 @@
     var api = ctx.api;
 
     function renderOrder(o, token) {
+      if (want !== null && token !== want) return o;   //  پاسخِ دیرِ سفارشی که دیگر این‌جا نیست (لغو، جایگزین، روش…)
+      seen(token);
       $('o-title').textContent = t('od.no', { n: K.fa(o.orderNo, 0) });
       var st = $('o-status');
       var why = K.reason(o.statusReason);
@@ -416,9 +418,24 @@
     //  پرداختِ در انتظار (برگشت از حساب‌پی) ⇒ هر ۵ ثانیه تا سرور «پرداخت‌شده/ناموفق» بگوید
     var FINAL = ['rejected', 'auto_rejected', 'cancelled_by_customer', 'cancelled', 'delivered', 'picked_up', 'restocked', 'refunded_full', 'refunded_partial'];
     var poll = 0;
+    //  سفارشِ همین نشانی (`want`) و سفارشی که صفحه نشان می‌دهد (`shown`): سفارشِ دیگر در همان سند (فقط `#/o/…` ِ دیگر) ⇒
+    //  محتوا و کارهای سفارشِ پیشین (لغو، پرداخت، گفت‌وگو…) تا پاسخِ همین پنهان، و پاسخِ دیرِ سفارشِ پیشین (پیگیری، لغو…)
+    //  نمی‌نشیند — پیش‌تر روی شبکهٔ کند کارتِ «گفت‌وگو» ِ سفارشِ پیشین زدنی ماند و عکس به رشتهٔ همان رفت
+    var want = null; var shown = null;
+    function body() { return $('view-order').querySelector('.split'); }
+    function wait(token) {
+      clearTimeout(poll); want = token;
+      var stale = shown !== token; var w = $('o-wait');
+      if (stale && !w) { w = el('p', { class: 'muted', attrs: { id: 'o-wait', role: 'status' }, text: t('loading') }); body().parentNode.insertBefore(w, body()); }
+      body().hidden = stale;
+      if (w) w.hidden = !stale;
+    }
+    function seen(token) { shown = token; body().hidden = false; if ($('o-wait')) $('o-wait').hidden = true; }
     function open(token, order) {
+      if (want !== null && token !== want) return;
+      want = token;
       clearTimeout(poll);
-      var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(fail); };
+      var load = function () { api('/orders/' + encodeURIComponent(token)).then(function (r) { open(token, r.order); }).catch(function (e) { if (token === want) fail(e); }); };
       var o = renderOrder(order, token);
       //  CHK-01: پیشنهادِ ساختنِ حساب پس از ثبت (acct.js، فقط با `features.webAccount` و بی نشست)
       if (ctx.acct) ctx.acct().then(function (a) { a.offer(token); }, function () {});
@@ -426,6 +443,7 @@
       if (pend || FINAL.indexOf(o.status) < 0) poll = setTimeout(function () { if (!document.hidden && location.hash === '#/o/' + encodeURIComponent(token)) load(); else poll = setTimeout(load, 20000); }, pend ? 5000 : 20000);
     }
     function fail(e) {
+      seen(null);
       $('o-title').textContent = t('od.title');
       K.clear($('o-steps')); K.clear($('o-lines')); K.clear($('o-totals')); K.clear($('o-timeline'));
       $('o-status').className = 'pill err';
@@ -435,6 +453,6 @@
       $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat', 'o-np'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
     }
 
-    return { open: open, fail: fail, stop: function () { clearTimeout(poll); } };
+    return { open: open, fail: fail, wait: wait, stop: function () { clearTimeout(poll); } };
   };
 })();

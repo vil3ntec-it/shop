@@ -13,11 +13,12 @@
  *     دوباره، هرگز عقب؛ برگهٔ پنهان «خواندم» نمی‌دهد؛
  *   • CHAT-08: «حذف برای همه» ِ مشتری با پرسشِ تأیید (دوبار زدن یک درخواست) به برگهٔ دیگر و long-poll ِ دکان می‌رسد؛ مهلتِ
  *     سرور و رشتهٔ بسته (#907) آن را برمی‌دارند؛ «حذف برای من» فقط نمای همین مشتری — هر دو برگه، پیش‌نمایش و شمارِ نخواندهٔ
- *     صندوق، پس از بازکردنِ دوباره هم؛ بی‌اینترنت پیامِ روشن؛
+ *     صندوق، پس از بازکردنِ دوباره هم؛ long-poll پیش از پاسخِ DELETE ⇒ تمرکز همان دم به کادرِ نوشتن؛ بی‌اینترنت پیامِ روشن؛
  *   • «پرسش از دکان» ِ سرِ ویترین ⇒ گفت‌وگوی عمومی؛ پس از ۷ روز بی‌کاری دورِ تازه و پیام‌های پیشین جمع‌شده؛
  *   • CHAT-07: پیامِ صوتیِ دکان ⇒ پخش‌کننده (پخش/توقف، زمان، پیشرفت)؛ بایت فقط با زدنِ «پخش» و با بلیت؛ پخش از blob:
  *     (readyState ≥ ۲ و زمانِ پیش‌رونده)؛ بی‌اینترنت ⇒ «تلاشِ دوباره»؛ نوعِ ناشناخته (AMR) بی درخواست ⇒ پیامِ روشن؛
  *     پیامِ پاک‌شده در برگهٔ عقب‌مانده ⇒ «پاک شده یا مهلتش گذشته» و سپس سنگِ قبر؛ بستنِ برگه صدا را می‌ایستاند؛
+ *   • پیگیریِ سفارشِ دیگر در همان سند روی شبکهٔ کند: تا پاسخ، نه سفارشِ پیشین و نه کارهایش (کارتِ «گفت‌وگو»)؛
  *   • CHAT-05: مشتری عکس می‌فرستد — PNG ِ بزرگ ⇒ پیش‌نمایش (data:) ⇒ ۱۶۰۰px زیرِ ۱٫۵MB و پیش‌نمایشِ ۳۲۰px زیرِ ۶۴KB روی سرور،
  *     بی EXIF/«مکان»؛ JPEG ِ خوابیده با جهتِ ۶ ⇒ عمودی؛ شفافیت روی سفید؛ رویدادهای پیشرفتِ XHR؛ «لغو» بارگذاری را می‌بُرد؛
  *     افتادنِ شبکه در میانِ بارگذاری و پیام + «تلاشِ دوباره» ⇒ یک پیام؛ بی‌اینترنت ⇒ صف و رفتنِ خودکار؛ دکان عکس را می‌بیند؛
@@ -157,9 +158,15 @@ const page = await ctx.newPage();
 page.on('pageerror', (e) => errors.push(String(e)));
 page.on('console', (m) => { if (/Content Security Policy/i.test(m.text())) violations.push(m.text()); });
 const shown = (id) => page.evaluate((x) => { const e = document.getElementById(x); return Boolean(e) && !e.hidden; }, id);
+//  پیگیریِ همین سفارش پیداست: عنوانِ همین شماره (فقط پاسخِ تازه می‌سازدش) و کارتِ «گفت‌وگو» واقعاً دیدنی — `hidden` ِ خودِ کارت بس
+//  نیست: سفارشِ دیگر در همان سند (فقط `#…` ِ دیگر) کارتِ سفارشِ پیشین را تا پاسخ در DOM دارد (CHAT-05 پایین)
+const orderShown = (o) => page.waitForFunction((no) => {
+  const b = document.getElementById('o-chat'); const h = document.getElementById('o-title');
+  return b && b.checkVisibility() && b.textContent.length > 0 && h && h.textContent === K.t('od.no', { n: K.fa(no, 0) });
+}, o.orderNo, { timeout: 15000 });
 const openOrder = async (o) => {
   await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o.token)}`);
-  await page.waitForFunction(() => { const b = document.getElementById('o-chat'); return b && !b.hidden && b.textContent.length > 0; }, null, { timeout: 15000 });
+  await orderShown(o);
 };
 
 //  ── پیگیری ⇒ «گفت‌وگو با دکان» ──
@@ -495,9 +502,20 @@ await page.waitForSelector(li(hideMe.id, '[data-del="me"]'));
 ok(await page.$(li(hideMe.id, '[data-del="all"]')) === null, 'پیامِ دکان برای مشتری «حذف برای همه» ندارد');
 await page.click(li(hideMe.id, '[data-del="me"]'));
 ok(/فقط از نمای شما/.test(await page.textContent(li(hideMe.id, '.ct-acts'))), 'پرسشِ «حذف برای من»');
+//  پاسخِ DELETE تا رفتنِ حباب نگه داشته می‌شود: long-poll ِ همان «پنهان» پیش از آن می‌رسد (زیرِ بارِ CPU همین شد) و دکمهٔ خاموشِ
+//  «بله» تمرکز را به body داده ⇒ تمرکز باید همان دم به کادرِ نوشتن برود، نه تا رسیدنِ پاسخ روی body بماند
+const heldDel = [];
+const delMe = (u) => decodeURIComponent(u.pathname).endsWith(`/chat/conversations/${conv1.id}/messages/${hideMe.id}`);
+await page.route(delMe, async (route) => (route.request().method() === 'DELETE' ? heldDel.push({ route, res: await route.fetch() }) : route.fallback()));
 await page.click(li(hideMe.id, '[data-yes="me"]'));
 for (const p of [page, page2]) await p.waitForFunction((x) => !document.querySelector(`#ct-list li[data-id="${x}"]`), hideMe.id, { timeout: 30000 });
-ok(await page.evaluate(() => Boolean(document.activeElement) && document.activeElement.id === 'ct-text'), '«حذف برای من» ⇒ از هر دو برگهٔ همین مشتری رفت؛ تمرکز به کادرِ نوشتن');
+const focusOf = (p = page) => p.evaluate(() => { const a = document.activeElement; return a ? `${a.tagName.toLowerCase()}${a.id ? '#' + a.id : ''}` : 'null'; });
+ok(await focusOf() === 'textarea#ct-text', '«حذف برای من» ⇒ از هر دو برگهٔ همین مشتری رفت (long-poll، پاسخِ DELETE نرسیده)؛ تمرکز همان دم به کادرِ نوشتن', await focusOf());
+ok(await until(async () => heldDel.length === 1), 'سرور «حذف برای من» را پاسخ داد (نگه‌داشته برای صفحه)');
+await heldDel[0].route.fulfill({ response: heldDel[0].res });
+await page.unroute(delMe);
+await page.waitForFunction(() => /از نمای شما پاک شد/.test(document.getElementById('ct-msg').textContent), null, { timeout: 10000 });
+ok(await focusOf() === 'textarea#ct-text', 'پاسخِ دیرِ همان DELETE: «پاک شد» و تمرکز همان‌جا ماند', await focusOf());
 const after = await inbox();
 ok(after.unread === 1 && after.lastMessage.preview === 'کی می‌آیید؟', 'صندوقِ مشتری: پیش‌نمایش به پیامِ دیدنیِ پیشین برگشت و پنهان در نخوانده نیست',
   JSON.stringify({ u: after.unread, l: after.lastMessage }));
@@ -637,6 +655,7 @@ ok(closedAll.status === 409 && closedAll.body.error.code === 'chat_closed', 'س�
 await page.click(li(hour.id, '[data-del="me"]'));
 await page.click(li(hour.id, '[data-yes="me"]'));
 await page.waitForFunction((x) => !document.querySelector(`#ct-list li[data-id="${x}"]`), hour.id, { timeout: 10000 });
+ok(await focusOf() === 'button#ct-close', 'رشتهٔ بسته: حباب رفت ⇒ تمرکز همان دم به «بستن» (نوشتن پنهان است)، هر کدام از پاسخ و long-poll زودتر برسد', await focusOf());
 ok(Boolean(await one("SELECT 1 AS x FROM shop_chat_hidden WHERE message_id=$1 AND viewer='customer'", [hour.id])), 'رشتهٔ بسته: «حذف برای من» باز است');
 ok(!(await shown('ct-form')), 'تحویل‌شده و پرداخت‌شده ⇒ بسته شد: نوشتن پنهان');
 ok(/بسته شد/.test(await page.textContent('#ct-state')) && /مشکل دارم/.test(await page.textContent('#ct-state')), 'یادداشتِ «بسته شد» با مهلتِ «مشکل دارم»', await page.textContent('#ct-state'));
@@ -915,12 +934,27 @@ const attach = async (buffer, name, mimeType) => {
   await page.waitForFunction(() => { const b = document.getElementById('ct-ph'); return b && !b.hidden && /^(ready|err)$/.test(b.getAttribute('data-st')); }, null, { timeout: 20000 });
 };
 
-await openOrder(o4);
+//  سفارشِ دیگر در همان سند (فقط `#…` ِ دیگر) روی شبکهٔ کند: تا پاسخِ همین سفارش، سفارشِ پیشین (o3) و کارهایش پیدا نیست —
+//  پیش‌تر کارتِ «گفت‌وگو» ِ o3 (فقط `hidden` ِ خودش سنجیده) زدنی ماند و عکسِ پایین به رشتهٔ o3 رفت (۰ عکس در رشتهٔ o4)
+const heldO4 = [];
+const o4Get = (u) => decodeURIComponent(u.pathname) === `/api/store/${slug}/orders/${o4.token}`;
+await page.route(o4Get, (route) => (route.request().method() === 'GET' ? heldO4.push(route) : route.fallback()));
+await page.goto(`${base}/store/${slug}#/o/${encodeURIComponent(o4.token)}`);
+ok(await until(async () => heldO4.length > 0, 10000), 'پیگیریِ سفارشِ دیگر (o4) در راه است (نگه‌داشته)');
+const staleO3 = await page.evaluate(() => ['o-title', 'o-lines', 'o-reorder', 'o-chat', 'o-chat-open'].filter((id) => { const e = document.getElementById(id); return e && e.checkVisibility(); }));
+ok(staleO3.length === 0 && await page.isVisible('#o-wait'), 'پاسخِ سفارشِ دیگر نرسیده ⇒ نه سفارشِ پیشین و نه کارهایش (خریدِ دوباره، گفت‌وگو) پیداست؛ «در حالِ باز کردن…»', JSON.stringify(staleO3));
+for (const r of heldO4) await r.continue();
+await page.unroute(o4Get);
+await orderShown(o4);
+ok(!(await page.isVisible('#o-wait')), 'پاسخ رسید ⇒ همین سفارش و «در حالِ باز کردن…» رفت');
 await page.click('#o-chat-open');
-await page.waitForFunction(() => { const f = document.getElementById('ct-form'); return f && !f.hidden; }, null, { timeout: 15000 });
+//  برگه همان دم باز می‌شود و تا پاسخِ POST ِ همین رشته هنوز رشتهٔ پیشین (o3، با `#ct-form` ِ پیدا) را دارد ⇒ صبر برای عنوانِ همین سفارش
+const ctTitle4 = await page.evaluate((no) => K.t('ct.order', { n: K.fa(no, 0) }), o4.orderNo);
+await page.waitForFunction((x) => { const f = document.getElementById('ct-form'); return f && !f.hidden && document.getElementById('ct-title').textContent === x; }, ctTitle4, { timeout: 15000 }).catch(() => {});
 const inputs = await page.evaluate(() => ['ct-file', 'ct-cam'].map((id) => { const i = document.getElementById(id); return i && [i.type, i.accept, i.getAttribute('capture')]; }));
 ok(JSON.stringify(inputs) === JSON.stringify([['file', 'image/*', null], ['file', 'image/*', 'environment']]) && Boolean(await page.getAttribute('#ct-ph-add', 'aria-label')),
   'گزینشِ عکس: دکمهٔ «افزودنِ عکس» (accept=image/*) و دوربینِ گوشی (capture=environment)', JSON.stringify(inputs));
+ok(await page.textContent('#ct-title') === ctTitle4, 'برگهٔ گفت‌وگوی همین سفارش (o4)', await page.textContent('#ct-title'));
 ok(await page.$('script[src="/store/chat-photo.js"]') === null, 'کدِ کوچک‌کردنِ عکس پیش از برگزیدنِ عکس بار نشده (دیربار)');
 await page.evaluate(() => {
   window.__up = { progress: 0, aborts: 0, sends: 0, last: null };

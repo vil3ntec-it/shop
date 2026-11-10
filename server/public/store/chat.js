@@ -214,8 +214,10 @@
         return;
       }
       //  نوارِ بازِ همین پیام با نسخهٔ تازه بسته می‌شود؛ تمرکزِ درونِ حباب به دکمهٔ تازه (یا کادر) می‌رود
+      //  کارِ در راهِ همین پیام دکمه‌اش را خاموش کرده و تمرکز به body افتاده ⇒ هنوز از آنِ همین حباب است (long-poll پیش از پاسخِ DELETE)
       var had = acting && acting.id === m.id ? acting : null;
-      var focusIn = Boolean((had && had.box.contains(document.activeElement)) || (old && old.contains(document.activeElement)));
+      var focusIn = Boolean((had && (had.box.contains(document.activeElement) || (had.busy && document.activeElement === document.body))) ||
+        (old && old.contains(document.activeElement)));
       if (had) acting = null;
       if (m.hidden) {
         if (old && old.parentNode) old.parentNode.removeChild(old);

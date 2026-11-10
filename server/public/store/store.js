@@ -456,15 +456,19 @@
   }
   function stopOrder() { if (ov) ov.stop(); }
 
+  var orderTok = null;   //  سفارشِ همین مسیر؛ دیگری ⇒ پیشین پنهان تا پاسخ (`wait` ِ order.js) و پاسخِ دیرش نمی‌نشیند
   function openOrder(token) {
     show('view-order');
     document.title = t('od.title') + ' — ' + store.title;
     stopOrder();
+    orderTok = token;
+    if (ov) ov.wait(token);
     $('o-msg').hidden = true;
     if (K.loadS('placed:' + token)) K.note($('o-placed'), 'ok', t('od.placed'));
     else $('o-placed').hidden = true;
     //  order.js هم‌زمان با سفارش (`open`، `fail`)
-    Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) { r[1].open(token, r[0].order); }).catch(function (e) {
+    Promise.all([api('/orders/' + encodeURIComponent(token)), loadOrderView()]).then(function (r) { if (orderTok === token) r[1].open(token, r[0].order); }).catch(function (e) {
+      if (orderTok !== token) return;
       if (ov) { ov.fail(e); return; }
       //  order.js نیامد ⇒ فقط پیامِ خطا
       $('o-title').textContent = t('od.title');
