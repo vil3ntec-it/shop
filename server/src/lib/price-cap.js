@@ -8,8 +8,12 @@
  * `core/perm/SaleCaps.kt`، بردارِ `sale-caps-v1.json`) و قیمتِ کالایی که **خودش** دارد می‌سنجد:
  *   sales.discount  تخفیف + کاهشِ ردیف‌ها زیرِ فهرست + شکافِ جمعِ نهایی، روی جمع + کاهش‌ها (همان `LinePricing.basis`)
  *   sales.price     بیشترین فاصلهٔ یک ردیف از فهرست (بالا یا پایین)، سقفِ `maxPct`
+ *   sales.free_line قلمِ آزاد (بی کارتِ کالا، یا کالایی که سرور ندارد) با بیشترین قیمتِ واحد، سقفِ `maxAmount` — تصمیمِ ۱-۱۱ (۲)
+ * قیمتِ عمده فقط وقتی «قیمتِ فهرست» است که مشتریِ فاکتور روی **همین سرور** لیستِ پیش‌فرضِ عمده دارد (`Debtor.priceList`)؛
+ * وگرنه فروش به قیمتِ عمده کاهشِ ردیف (تخفیفِ پنهان) است — تصمیمِ ۱-۱۱ (۳). ادعای صندوق دربارهٔ لیست پذیرفته نمی‌شود.
  * تصمیم همان سه‌حالتهٔ `staff-approval.judge`؛ «نیازمند تأیید» با برگهٔ امضاشده یا «درخواستِ تأیید» ِ STF-02:
- *   تخفیف ⇒ همان `approval` ِ فاکتور؛ قیمت ⇒ `priceApproval` (op یا فیلد)، یا `approval` اگر خودش `sales.price` است.
+ *   تخفیف ⇒ همان `approval` ِ فاکتور؛ قیمت ⇒ `priceApproval` (op یا فیلد)، یا `approval` اگر خودش `sales.price` است؛
+ *   قلمِ آزاد ⇒ `freeLineApproval` (op یا فیلد)، یا `approval` اگر خودش `sales.free_line` است.
  *
  *   v3   درجِ `sales`: ردیف‌های همین دسته (`batchOf`) + ردیف‌های نشستهٔ همان فاکتور. قلمِ دیرآمده (`saleItems` ِ فاکتوری
  *        که سرش در دسته‌ای پیش‌تر نشست): جمعِ تازهٔ همان فاکتور؛ تأییدِ پیشینِ همان سند (`shop_approvals`) اگر بپوشاند بس است.
@@ -68,12 +72,19 @@ function batchOf(units) {
 }
 
 /** برگهٔ قیمت: `priceApproval` ِ op یا فیلد؛ بی نیازِ تخفیف همان `approval` هم اگر خودش `sales.price` است */
-function slipOf(op, withDiscount) {
-  if (isObj(op.priceApproval)) return op.priceApproval;
-  if (isObj(op.fields) && isObj(op.fields.priceApproval)) return op.fields.priceApproval;
+function slipOf(op, withDiscount, { field = 'priceApproval', perm = PERM } = {}) {
+  if (isObj(op[field])) return op[field];
+  if (isObj(op.fields) && isObj(op.fields[field])) return op.fields[field];
   if (withDiscount) return null;
   const s = require('./staff-approval').slipOf(op);
-  return s && s.perm === PERM ? s : null;
+  return s && s.perm === perm ? s : null;
+}
+
+/** برگهٔ هر نیاز: تخفیف ⇒ `approval`؛ قیمت ⇒ `priceApproval`؛ قلمِ آزاد ⇒ `freeLineApproval` (تصمیمِ ۱-۱۱ (۲)) */
+function slipFor(op, perm, withDiscount) {
+  if (perm === caps.DISCOUNT) return require('./staff-approval').slipOf(op);
+  if (perm === caps.FREE_LINE) return slipOf(op, withDiscount, { field: 'freeLineApproval', perm: caps.FREE_LINE });
+  return slipOf(op, withDiscount);
 }
 
 const needOf = (n) => ({
@@ -120,6 +131,14 @@ async function loyaltyV3(c, ctx, saleId, batch, stored = false) {
   return rows.reduce((a, r) => a + Math.max(0, Math.round(Number(r.data && r.data.amountMinor) || 0)), 0);
 }
 
+/** مشتریِ فاکتور روی همین سرور لیستِ عمده دارد؟ (تصمیمِ ۱-۱۱ (۳)؛ بی مشتری یا مشتریِ ناشناخته ⇒ خرده) */
+async function wholesaleV3(c, ctx, head) {
+  const id = isObj(head) ? str(head.debtorId) : '';
+  if (!id) return false;
+  const rows = await v3Rows(c, ctx, 'debtors', 'row_id = $5', [id]);
+  return rows.length > 0 && caps.isWholesaleDebtor(rows[0].data);
+}
+
 /** تأییدِ پذیرفته‌شدهٔ پیشینِ همین سند و کار، که همین نیاز را بپوشاند (قلمِ دیرآمده) */
 async function coveredBefore(c, shopId, n) {
   const rows = (await c.query(
@@ -141,13 +160,15 @@ async function judgeSaleV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   if (!(await on(ctx, (s, p) => c.query(s, p)))) return undefined;
   const list = await linesV3(c, ctx, op.row_id, batch);
   const refs = await refsV3(c, ctx, list);
-  const sale = caps.saleOf(op.row_id, op.fields, { loyaltyMinor: await loyaltyV3(c, ctx, op.row_id, batch) });
+  const sale = caps.saleOf(op.row_id, op.fields, {
+    loyaltyMinor: await loyaltyV3(c, ctx, op.row_id, batch), wholesale: await wholesaleV3(c, ctx, op.fields),
+  });
   const needs = caps.needs(sale, list, refs, { enforcePrice: true });
   const withDiscount = needs.some((n) => n.perm === caps.DISCOUNT);
   const sa = require('./staff-approval');
   const at = sa.wallOf(op.hlc);
   for (const n of needs) {
-    const slip = n.perm === caps.DISCOUNT ? sa.slipOf(op) : slipOf(op, withDiscount);
+    const slip = slipFor(op, n.perm, withDiscount);
     const denied = await sa.judge(c, ctx, needOf(n), slip, { opId: op.op_id, at, deviceId, path: origin });
     if (denied) return { denied, withDiscount };
   }
@@ -156,7 +177,7 @@ async function judgeSaleV3(c, ctx, op, row, { batch = null, deviceId = '', origi
 
 /**
  * قلمِ v3 ِ فاکتوری که سرش در همین دسته نیست ولی روی سرور نشسته (دستهٔ بزرگِ بریده، یا op ِ دست‌ساز). ⇒ null یا رد.
- * فقط وقتی همین قلم خودش از فهرست فاصله دارد؛ سرِ نانشسته ⇒ همان سر بعداً با همهٔ قلم‌ها سنجیده می‌شود.
+ * فقط وقتی همین قلم خودش از فهرست فاصله دارد یا قلمِ آزاد است؛ سرِ نانشسته ⇒ همان سر بعداً با همهٔ قلم‌ها سنجیده می‌شود.
  */
 async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origin = 'v3' } = {}) {
   if (!touchesV3(op) || op.table !== 'saleItems' || (row && row.inserted)) return null;
@@ -165,10 +186,12 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
   if (!(await on(ctx, (s, p) => c.query(s, p)))) return null;
   const head = (await v3Rows(c, ctx, 'sales', 'row_id = $5', [sid]))[0];
   if (!head || !isObj(head.data)) return null;
-  const sale = caps.saleOf(sid, head.data, { loyaltyMinor: await loyaltyV3(c, ctx, sid, batch, true) });
+  const sale = caps.saleOf(sid, head.data, {
+    loyaltyMinor: await loyaltyV3(c, ctx, sid, batch, true), wholesale: await wholesaleV3(c, ctx, head.data),
+  });
   const me = caps.lineOf(op.fields);
   const own = await refsV3(c, ctx, [me]);
-  if (caps.line(me, own.get(me.productId) || null, sale.date).deviationBp === 0) return null;
+  if (!caps.isFree(me, own) && caps.line(me, own.get(me.productId) || null, sale.date, sale.wholesale).deviationBp === 0) return null;
   const list = await linesV3(c, ctx, sid, { headers: new Set(), lines: new Map([[sid, new Map([[op.row_id, op.fields]])]]) });
   const needs = caps.needs(sale, list, await refsV3(c, ctx, list), { enforcePrice: true });
   const sa = require('./staff-approval');
@@ -178,7 +201,7 @@ async function judgeLineV3(c, ctx, op, row, { batch = null, deviceId = '', origi
     const d = core.evaluate(ctx.role, layers, n.perm, caps.req(n));
     if (d.decision === 'allow') continue;
     if (d.decision === 'approve' && await coveredBefore(c, ctx.accountId, n)) continue;
-    const slip = n.perm === caps.DISCOUNT ? sa.slipOf(op) : slipOf(op, true);
+    const slip = slipFor(op, n.perm, true);
     const denied = await sa.judge(c, ctx, needOf(n), slip, { opId: op.op_id, at: sa.wallOf(op.hlc), deviceId, path: origin });
     if (denied) return denied;
   }
@@ -221,6 +244,15 @@ async function judgeLegacy(c, ctx, changes) {
   const heads = changes.filter((ch) => live(ch, 'sales'));
   const items = changes.filter((ch) => live(ch, 'saleItems'));
   const spends = changes.filter((ch) => live(ch, 'auditLog') && ch.data.type === caps.LOYALTY_SPEND && str(ch.data.refId));
+  //  تصمیمِ ۱-۱۱ (۳): لیستِ عمده از مشتریِ همین دسته (راهِ قدیم پیش از نوشتن می‌سنجد) وگرنه همان ردیفِ سرور
+  const debtorsHere = new Map(changes.filter((ch) => live(ch, 'debtors')).map((ch) => [ch.id, ch.data]));
+  const wholesaleOf = async (h) => {
+    const id = isObj(h) ? str(h.debtorId) : '';
+    if (!id) return false;
+    if (debtorsHere.has(id)) return caps.isWholesaleDebtor(debtorsHere.get(id));
+    const r = (await c.query('SELECT data FROM debtors WHERE shop_id=$1 AND id=$2 AND deleted = false', [shopId, id])).rows[0];
+    return !!r && caps.isWholesaleDebtor(r.data);
+  };
   if (!heads.length && !items.length) return null;
   const run = (s, p) => c.query(s, p);
   if (!(await require('./orders').flagOf(shopId, FLAG, run))) return null;
@@ -264,9 +296,10 @@ async function judgeLegacy(c, ctx, changes) {
       [shopId, sid, caps.LOYALTY_SPEND])).rows.map((r) => r.amount)) : 0;
     const mine = spends.filter((a) => a.data.refId === sid);
     const loyaltyMinor = mine.length ? sumAfn(mine.map((a) => a.data.amount)) : kept;
-    const needs = caps.needs(caps.saleOf(sid, head, { legacy: true, loyaltyMinor }), list, refs, { enforcePrice: true });
+    const wholesale = await wholesaleOf(head);
+    const needs = caps.needs(caps.saleOf(sid, head, { legacy: true, loyaltyMinor, wholesale }), list, refs, { enforcePrice: true });
     //  نیازِ همان سند پیش از این دسته (سر و قلم‌های نشسته): آنچه بیش از آن نیست ویرایشِ بی‌پول است، آزاد
-    const prior = isObj(stored) ? caps.needs(caps.saleOf(sid, stored, { legacy: true, loyaltyMinor: kept }), before, refs, { enforcePrice: true }) : [];
+    const prior = isObj(stored) ? caps.needs(caps.saleOf(sid, stored, { legacy: true, loyaltyMinor: kept, wholesale }), before, refs, { enforcePrice: true }) : [];
     const covered = (n) => prior.some((b) => b.perm === n.perm
       && (n.pctBp === null || (b.pctBp !== null && b.pctBp >= n.pctBp)) && (n.amount === null || (b.amount !== null && b.amount >= n.amount)));
     for (const n of needs) {
@@ -274,15 +307,17 @@ async function judgeLegacy(c, ctx, changes) {
       const d = core.evaluate(role, layers, n.perm, caps.req(n));
       if (d.decision === 'allow') continue;
       if (d.decision === 'deny') {
+        if (n.perm === caps.FREE_LINE) return forbidden(`قلمِ آزاد (بی کارتِ کالا) برای نقشِ شما ممنوع است (sales/${sid})`, 'free_line_not_allowed');
         return n.perm === PERM
           ? forbidden(`تغییرِ قیمتِ ردیف برای نقشِ شما ممنوع است (sales/${sid})`, 'price_not_allowed')
           : forbidden(`تخفیف (با کاهشِ قیمتِ ردیف) برای نقشِ شما ممنوع است (sales/${sid})`, 'discount_not_allowed');
       }
       if (await coveredBefore(c, shopId, n)) continue;
-      return forbidden(`این ${n.perm === PERM ? 'تغییرِ قیمت' : 'تخفیف'} تأییدِ مدیر می‌خواهد؛ از صندوقِ برنامه با تأیید بفرستید (sales/${sid})`, 'approval_required');
+      const what = n.perm === PERM ? 'تغییرِ قیمت' : n.perm === caps.FREE_LINE ? 'قلمِ آزاد' : 'تخفیف';
+      return forbidden(`این ${what} تأییدِ مدیر می‌خواهد؛ از صندوقِ برنامه با تأیید بفرستید (sales/${sid})`, 'approval_required');
     }
   }
   return null;
 }
 
-module.exports = { FLAG, PERM, on, onUnits, touchesV3, batchOf, slipOf, judgeV3, judgeSaleV3, judgeLineV3, judgeLegacy };
+module.exports = { FLAG, PERM, on, onUnits, touchesV3, batchOf, slipOf, slipFor, judgeV3, judgeSaleV3, judgeLineV3, judgeLegacy };

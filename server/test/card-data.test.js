@@ -137,3 +137,78 @@ test('S117: یادداشتِ درخواستِ خرید بی شمارهٔ کام�
   const row = await one('SELECT note FROM purchase_requests WHERE id = $1', [r.body.request.id]);
   assert.equal(row.note, 'از کارتِ [کارت] پرداختم');
 });
+
+test('S117: گفت‌وگوی مشتری ↔ دکان (پیام، ویرایش، پیش‌نمایش، پاسخِ دکان و گزارش) بی شمارهٔ کاملِ کارت ذخیره می‌شود', async () => {
+  const { query, newId, now } = require('../src/db');
+  const chat = require('../src/lib/shop-chat');
+  const pw = require('../src/lib/password');
+  await query(
+    `INSERT INTO admins (id, username, name, password_hash, role, status, created_at)
+     VALUES ($1,'card-chat-admin','مدیر',$2,'superadmin','active',$3)`,
+    [newId('adm'), await pw.hashPassword('Admin!12345'), now()]
+  );
+  const admin = (await h.post('/api/admin/login', { username: 'card-chat-admin', password: 'Admin!12345' })).body.token;
+  const u = await h.newUser('دکان‌دارِ چت', 'shop');
+  const made = await h.post('/api/shop', { name: 'دکانِ چتِ کارت' }, { token: u.accessToken });
+  assert.equal(made.status, 201, JSON.stringify(made.body));
+  const shopId = made.body.shop.id;
+  const flag = await h.put('/api/admin/pump/live-config', { scope: shopId, key: 'shop.chat', value: true }, { token: admin });
+  assert.equal(flag.status, 200, JSON.stringify(flag.body));
+
+  const me = { side: 'customer', shopId, phone: '+93791117117' };
+  const conv = (await chat.open(me, { name: 'مشتری' })).conversation.id;
+  const raw = `کارتم ${VISA} است؛ کدِ کالا 6261234567890`;
+  const sent = await chat.send(me, conv, { clientId: 'client-card-0001', body: raw });
+  assert.equal(sent.message.body, 'کارتم [کارت] است؛ کدِ کالا 6261234567890');
+  //  ارسالِ دوبارهٔ همان پیام (صفِ آفلاین) همان ردیف است، نه «کلیدِ تکراری با بدنهٔ دیگر»
+  const again = await chat.send(me, conv, { clientId: 'client-card-0001', body: raw });
+  assert.equal(again.replayed, true);
+  assert.equal(again.message.id, sent.message.id);
+
+  const edited = await chat.edit(me, conv, sent.message.id, { body: `نه، این: ${VISA.replace(/(\d{4})(?=\d)/g, '$1-')}` });
+  assert.ok(edited, 'ویرایش پذیرفته شد');
+  const reply = await h.post(`/api/shop/chat/conversations/${conv}/messages`,
+    { clientId: 'client-card-0002', body: `شمارهٔ ${AMEX.slice(0, 4)} ${AMEX.slice(4, 10)} ${AMEX.slice(10)} را این‌جا ننویسید` },
+    { token: u.accessToken });
+  assert.equal(reply.status, 201, JSON.stringify(reply.body));
+  assert.equal(reply.body.message.body, 'شمارهٔ [کارت] را این‌جا ننویسید');
+  await chat.report(me, conv, { reason: 'fraud', messageId: reply.body.message.id, note: `از من کارتِ ${AMEX} خواست (فاکتور 6261234567890)` });
+
+  const inbox = await h.get('/api/shop/chat/conversations', { token: u.accessToken });
+  assert.equal(inbox.status, 200, JSON.stringify(inbox.body));
+  const stored = [
+    ...(await require('../src/db').many('SELECT body FROM shop_chat_messages WHERE shop_id = $1', [shopId])).map((r) => r.body),
+    ...(await require('../src/db').many('SELECT note, snapshot::text AS snap FROM shop_chat_reports WHERE shop_id = $1', [shopId]))
+      .flatMap((r) => [r.note, r.snap]),
+    JSON.stringify(inbox.body.conversations.map((c) => c.lastMessage)),
+  ].join('\n').replace(/[ -]/g, '');
+  assert.ok(!stored.includes(VISA) && !stored.includes(AMEX), stored);
+  assert.ok(stored.includes('[کارت]'));
+  assert.ok(stored.includes('6261234567890'), 'بارکد دست نخورد');
+});
+
+test('S117: یادداشتِ سفارش (ویترین و کارمند، هر قلم) و نظرِ مشتری بی شمارهٔ کاملِ کارت', () => {
+  const storefront = require('../src/lib/storefront');
+  const orders = require('../src/lib/orders');
+  const reviews = require('../src/lib/order-reviews');
+  const dashed = VISA.replace(/(\d{4})(?=\d)/g, '$1 ');
+  const sf = { accept_delivery: true, accept_pickup: true };
+  const c = storefront.parseCheckout({
+    fulfillment: 'pickup', customer: { name: 'مشتری', phone: '0791117117' }, note: `کارت ${VISA} برای پیش‌پرداخت`,
+    lines: [{ productId: 'p-card-1', qtyMilli: 1000, note: `روی بسته ${dashed} ننویسید` }],
+  }, sf);
+  assert.equal(c.note, 'کارت [کارت] برای پیش‌پرداخت');
+  assert.equal(c.lines[0].note, 'روی بسته [کارت] ننویسید');
+
+  const o = orders.parseCreate({
+    source: 'phone', fulfillment: 'pickup', customer: { name: 'مشتری', phone: '0791117117' }, note: `کارتِ ${AMEX}`,
+    lines: [{ name: 'برنج', qtyMilli: 1000, unitPriceMinor: 100, substitution: '', note: `${VISA} و بارکد 6261234567890` }],
+  }, Date.now());
+  assert.equal(o.note, 'کارتِ [کارت]');
+  assert.equal(o.lines[0].note, '[کارت] و بارکد 6261234567890');
+
+  const r = reviews.parse({ stars: 5, comment: `خوب بود؛ با کارتِ ${dashed} پرداختم` });
+  assert.equal(r.comment, 'خوب بود؛ با کارتِ [کارت] پرداختم');
+  //  همان نوشته ⇒ همان هش (تکرارِ همان نظر «تکراری» می‌ماند، نه «بدنهٔ دیگر»)
+  assert.equal(reviews.parse({ stars: 5, comment: `خوب بود؛ با کارتِ ${dashed} پرداختم` }).hash, r.hash);
+});

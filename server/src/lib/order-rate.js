@@ -80,11 +80,11 @@ async function check(run, shopId, phone, { at = now(), rules = RULES } = {}) {
  * قاعده‌های ریسکِ ویترین (RSK-02 مشتریِ تازه، RSK-05 تکراری؛ پشتِ پرچمِ خاموشِ `shop.order_risk`،
  * `lib/order-risk`) با همان قفلِ شماره، تا دو ثبتِ هم‌زمان از لای قاعده رد نشوند.
  */
-function guard(price, { shopId, phone }) {
+function guard(price, { shopId, phone, secondOrder = false }) {
   return async (run, at) => {
     await check(run, shopId, phone, { at });
     const input = await price(run, at);
-    await require('./order-risk').checkIn(run, shopId, phone, input, { at });
+    await require('./order-risk').checkIn(run, shopId, phone, input, { at, secondOrder: secondOrder === true });
     return input;
   };
 }

@@ -30,9 +30,9 @@ object RemoteApproval {
    *  STF-03: قرض (`sales.credit`) و تغییرِ قیمتِ ردیف (`sales.price`) فقط وقتی پرسیده می‌شوند که صندوق پیش‌سنجی‌شان کرده
    *  (`SaleCaps`، با پرچمِ سرور)؛ سرور هر دو را با همان `create` ِ عمومی و همان سقف می‌پذیرد.
    */
-  val PERMS: List<String> = listOf("sales.discount", "sales.cancel", "returns.create", "sales.credit", "sales.price")
+  val PERMS: List<String> = listOf("sales.discount", "sales.cancel", "returns.create", "sales.credit", "sales.price", "sales.free_line")
   /** کارهایی که بی مقدار معنا ندارند — همان `NEEDS_VALUE` ِ سرور */
-  val NEEDS_VALUE: Set<String> = setOf("sales.discount", "returns.create", "sales.credit", "sales.price")
+  val NEEDS_VALUE: Set<String> = setOf("sales.discount", "returns.create", "sales.credit", "sales.price", "sales.free_line")
   val APPROVER_ROLES: List<String> = listOf("owner", "manager")
   const val TTL_DEFAULT_MS: Long = 10 * 60 * 1000L
   const val POLL_MIN_MS: Long = 2_000L
@@ -194,7 +194,7 @@ object RemoteApproval {
     "request_expired", "approval_expired" -> Wait.EXPIRED
     "request_not_found", "approval_requests_disabled", "approval_not_needed", "bad_perm", "request_invalid", "bad_value",
     "bad_reason", "bad_time", "request_key_reused", "too_many_pending", "request_closed", "discount_not_allowed", "approval_needs_v3",
-    "cancel_not_allowed", "return_not_allowed", "credit_not_allowed", "price_not_allowed", "perm_denied" -> Wait.FAILED
+    "cancel_not_allowed", "return_not_allowed", "credit_not_allowed", "price_not_allowed", "free_line_not_allowed", "perm_denied" -> Wait.FAILED
     else -> null
   }
 

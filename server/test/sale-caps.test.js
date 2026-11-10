@@ -26,16 +26,29 @@ test('پخشِ امتیاز میانِ ردیف‌ها — همان Loyalty.spli
 
 test('مبلغِ ردیف و قیمت‌های فهرست', () => {
   for (const r of V.gross) assert.equal(C.gross(r.unit, r.qty), r.out, JSON.stringify(r));
-  for (const r of V.refs) assert.deepEqual(C.refUnits(r.product, r.date), r.out, JSON.stringify(r));
+  //  تصمیمِ ۱-۱۱ (۳): `wholesale` ِ بردار (نیامده ⇒ درست، همان پیش‌فرضِ هسته) = قیمتِ عمده فهرست هست یا نه
+  for (const r of V.refs) assert.deepEqual(C.refUnits(r.product, r.date, r.wholesale !== false), r.out, JSON.stringify(r));
+  assert.ok(V.refs.some((r) => r.wholesale === false), 'بردارِ فاکتورِ خرده با کالای عمده‌دار');
 });
 
 test('سنجشِ ردیف، پایهٔ تخفیف و نیازهای فاکتور', () => {
   assert.ok(V.lines.length >= 15 && V.needs.length >= 8);
-  for (const r of V.lines) assert.deepEqual(C.line(r.line, r.product, r.date), r.out, r._);
+  for (const r of V.lines) assert.deepEqual(C.line(r.line, r.product, r.date, r.wholesale !== false), r.out, r._);
   for (const r of V.basis) assert.deepEqual(C.basis(r.discount, r.total, r.final, r.rounding, r.reduction), r.out, JSON.stringify(r));
   for (const r of V.needs) {
     assert.deepEqual(C.needs(r.sale, r.lines, r.refs, { enforcePrice: r.enforcePrice, enforceCredit: r.enforceCredit }), r.out, r._);
   }
+});
+
+test('تصمیمِ ۱-۱۱: قلمِ آزاد نیازِ sales.free_line دارد و قیمتِ عمده فقط در فاکتورِ لیستِ عمده فهرست است', () => {
+  const free = V.needs.filter((r) => r.out.some((n) => n.perm === C.FREE_LINE));
+  assert.ok(free.length >= 4, 'بردارهای قلمِ آزاد');
+  for (const r of free) assert.equal(r.enforcePrice, true, `${r._}: فقط با پرچمِ قیمت`);
+  const ws = V.needs.filter((r) => r.lines.some((l) => r.refs[l.productId] && l.unitMinor === r.refs[l.productId].wholesaleMinor));
+  assert.ok(ws.some((r) => r.sale.wholesale === true && r.out.length === 0), 'مشتریِ عمده بی نیاز');
+  assert.ok(ws.some((r) => r.sale.wholesale !== true && r.enforcePrice && r.out.some((n) => n.perm === C.DISCOUNT)), 'فاکتورِ خرده ⇒ تخفیفِ پنهان');
+  assert.equal(C.isWholesaleDebtor({ priceList: ' wholesale ' }), true);
+  for (const d of [{ priceList: 'retail' }, { priceList: 'Wholesale' }, {}, null, { priceList: 5 }]) assert.equal(C.isWholesaleDebtor(d), false, JSON.stringify(d));
 });
 
 test('تصمیمِ perm-core برای همان نیازها', () => {

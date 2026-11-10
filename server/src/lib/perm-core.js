@@ -115,6 +115,13 @@
       defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: true, caps: ['maxPct'], display: false,
     },
+    //  POS-10 (تصمیمِ ۱-۱۱ (۲) الف، ۱۴۰۵/۰۸/۱۹): «قلمِ آزاد» — ردیفِ بی کارتِ کالا با قیمتِ دلخواه. امروز هر نویسندهٔ
+    //  فاکتور آن را می‌زند، پس پیش‌فرض همان `sales.price`؛ صاحب برای نقش یا کاربر «ممنوع»، «نیازمند تأیید» یا سقفِ
+    //  `maxAmount` (Minor) روی **قیمتِ واحد** می‌گذارد. سرور فقط با پرچمِ خاموشِ `shop.price_cap` می‌سنجد (`price-cap.js`)
+    'sales.free_line': {
+      defaults: d('allow', 'allow', 'allow', 'allow', 'deny', 'deny', 'deny'),
+      edit: 'restrict', approvable: true, caps: ['maxAmount'], display: false,
+    },
     'settings.write': {
       defaults: d('allow', 'allow', 'deny', 'deny', 'deny', 'deny', 'deny'),
       edit: 'restrict', approvable: false, caps: [], display: false,

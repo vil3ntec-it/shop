@@ -151,7 +151,7 @@ function editNeedV1(rowId, was, now) {
 }
 
 /** سندِ «درجِ فاکتور» در `staff-approval` — همراه‌ها، نگه‌داشتن و دفترِ پایه یکی (تخفیف و قرض) */
-const SALE_INSERT_PERMS = new Set(['sales.discount', PERM, 'sales.price']);   //  قیمت: ‎lib/price-cap.js‎
+const SALE_INSERT_PERMS = new Set(['sales.discount', PERM, 'sales.price', 'sales.free_line']);   //  قیمت و قلمِ آزاد: ‎lib/price-cap.js‎
 
 module.exports = {
   FLAG, PERM, SALE_INSERT_PERMS, on, onUnits, needV3, needV1, touchesV1, touchesV3, slipOf, judgeV3, markV1, judgeLegacy, editNeedV1, minor,

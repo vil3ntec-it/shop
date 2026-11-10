@@ -23,6 +23,7 @@ const courierMap = require('../lib/courier-map');
 const courierChecks = require('../lib/courier-checks');
 const courierRoute = require('../lib/courier-route');
 const ratings = require('../lib/delivery-ratings');
+const locationConsent = require('../lib/courier-location-consent');
 const { requireUser, requireShop, allowCourierScope } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound } = require('../middleware/errors');
@@ -56,8 +57,19 @@ router.get('/me', async (req, res) => {
     //  DLV-04/DLV-18: دکمه‌های «مسیرِ پیشنهادی» و «امتیاز» فقط با پرچمِ خودِ دکان دیده می‌شوند
     routeEnabled: await orders.flagOf(req.shopId, courierRoute.FLAG),
     ratingsEnabled: await orders.flagOf(req.shopId, ratings.FLAG),
+    //  S94: «اشتراکِ موقعیت» ِ خودِ پیک — `required` یعنی دکان بی رضایت موقعیت نمی‌گیرد
+    locationConsent: await locationConsent.stateOf(req.shopId, c),
     serverTime: Date.now(),
   });
+});
+
+/**
+ * S94: رضایتِ خودِ پیک برای موقعیتِ زنده (`{granted: true|false}`)؛ فقط خودش. «نه» همان لحظه نقطه‌های ذخیره‌شدهٔ
+ * مأموریت‌هایش را پاک می‌کند و هر تغییر یک ردیفِ سابقه دارد (`lib/courier-location-consent.js`).
+ */
+router.put('/location-consent', async (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json(await locationConsent.set(req.shopId, req.courier, req.body, { userId: req.user.id, ip: clientIp(req) }));
 });
 
 /**

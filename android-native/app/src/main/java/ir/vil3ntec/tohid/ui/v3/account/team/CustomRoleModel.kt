@@ -47,6 +47,7 @@ object CustomRoleModel {
     "sales.cancel" -> StrSetupPages.permVoid
     "sales.credit" -> StrAccount.permCredit
     "sales.price" -> StrAccount.permPrice
+    "sales.free_line" -> StrAccount.permFreeLine // POS-10، تصمیمِ ۱-۱۱ (۲)
     "customers.credit_limit" -> StrAccount.permCreditLimit // CRM-03
     "returns.create" -> StrSetupPages.permReturns
     "shift.report" -> StrShiftReview.permReports

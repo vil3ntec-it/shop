@@ -81,16 +81,16 @@ import kotlinx.serialization.json.JsonPrimitive
  *  «گزارشِ تازه» — صفحه‌های گزارش و کارت‌های خانه روی هستهٔ مشترکِ گزارش
  *  (`core/report`، همان منطقِ وب) — RPT-01/02/03/06/09/11، v3 §۱۹.۵ بند ۲.
  *
- *  پشتِ تنظیمِ «گزارشِ تازه»، **پیش‌فرض خاموش**: خاموش ⇒ همان صفحه‌های امروزِ
- *  `ReportEngine` و داشبوردِ امروز، بی هیچ تغییری. انتخابِ هر دستگاه است (مثلِ
- *  نمایشِ عکس) و همگام نمی‌شود؛ دفتر و فرمتِ داده دست نمی‌خورد.
+ *  پشتِ تنظیمِ «گزارشِ تازه» ِ هر دستگاه (همگام نمی‌شود؛ دفتر دست نمی‌خورد)؛ تصمیمِ ۳-۲۲: **پیش‌فرض روشن** ([stored])، خاموشِ
+ *  خودِ دستگاه می‌ماند. خاموش ⇒ همان صفحه‌های `ReportEngine` و داشبوردِ پیشین، بی هیچ تغییری.
  */
 object ReportFresh {
   private const val PREFS = "tohid-ui"
   private const val KEY = "report_fresh"
   private const val COST_KEY = "report_cost"
 
-  val on = mutableStateOf(false)
+  val on = mutableStateOf(true)
+  fun stored(saved: Boolean?): Boolean = saved ?: true // تصمیمِ ۳-۲۲: هرگز ذخیره نشده (نصبِ تازه یا پیش از این نسخه) ⇒ روشن
 
   /**
    *  RPT-03: روشِ بهای سود و حاشیه (`CostPolicy` ِ core) — همین دستگاه، همگام نمی‌شود؛ پیش‌فرض
@@ -106,7 +106,7 @@ object ReportFresh {
   fun load(context: android.content.Context) {
     if (loaded) return
     loaded = true
-    on.value = runCatching { context.getSharedPreferences(PREFS, 0).getBoolean(KEY, false) }.getOrDefault(false)
+    on.value = runCatching { context.getSharedPreferences(PREFS, 0).let { stored(if (it.contains(KEY)) it.getBoolean(KEY, true) else null) } }.getOrDefault(true)
     val app = context.applicationContext
     cost.value = CostPolicy.parse(runCatching { app.getSharedPreferences(PREFS, 0).getString(COST_KEY, null) }.getOrNull())
     saveCost = { m -> runCatching { app.getSharedPreferences(PREFS, 0).edit().putString(COST_KEY, m.id).apply() } }

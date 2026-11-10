@@ -26,6 +26,7 @@
   "od.pay.fail": "The payment didn't complete — try again or pay cash on delivery.",
   "od.courier": "Your courier: {name}",
   "od.courier.at": "{name}, your courier, has arrived",
+  "od.courier.none": "Your order is packed; no courier has been assigned yet",
   "od.eta": "Estimated arrival: {t}",
   "od.code": "Delivery code",
   "od.code.hint": "Share this code only when you receive your order.",

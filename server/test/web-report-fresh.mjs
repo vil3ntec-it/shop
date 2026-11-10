@@ -1,7 +1,7 @@
 /**
  * نسخهٔ وب — «گزارشِ تازه» (RPT-01/02/03/06/09/11) و کارت‌های خانه (v3 §۱۹.۵ بند ۲)، با مرورگرِ واقعی.
  *
- *   • پیش‌فرض خاموش: داشبورد و صفحهٔ گزارش همان امروزند
+ *   • تصمیمِ ۳-۲۲: پیش‌فرض روشن؛ مرورگری که خودش خاموش کرد (`'0'`) همان داشبورد و صفحهٔ گزارشِ پیشین را دارد
  *   • هستهٔ گزارش و تابلو در مرورگر همان پاسخِ آزمون‌های مرجع را می‌دهند (report-v1 و report-board-v1)
  *   • کارتِ خانه = جمعِ فهرستی که با کلیک باز می‌شود؛ نشانِ وضعیت «متن + رنگ + نقطه»
  *   • RPT-03: سود با روشِ مصوب (میانگینِ موزون، `costApproved`)؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر و همیشه «تقریبی»
@@ -120,8 +120,21 @@ const footCell = (pg, label) => pg.evaluate(l => {
   return i < 0 ? null : t.querySelectorAll('tfoot td')[i].textContent.trim();
 }, label);
 
-await step('پیش‌فرض خاموش: داشبورد و گزارش همان امروزند', async () => {
+await step('تصمیمِ ۳-۲۲: مرورگرِ تازه (بی ترجیح) «گزارشِ تازه» را روشن می‌بیند', async () => {
   const { pg, ctx, errors } = await open();
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-fresh')), null);
+  await go(pg, 'dashboard');
+  assert.equal(await pg.locator('#dash-fresh').isVisible(), true);
+  await go(pg, 'reports');
+  assert.equal(await pg.locator('#rep-fresh').isVisible(), true);
+  assert.equal(await pg.locator('#rep-legacy').isHidden(), true);
+  assert.equal(await pg.locator('#rep-fresh-toggle').isChecked(), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('مرورگری که خودش خاموش کرد: داشبورد و گزارش همان پیشین‌اند', async () => {
+  const { pg, ctx, errors } = await open(1366, '0');
   await go(pg, 'dashboard');
   assert.equal(await pg.locator('#dash-fresh').isHidden(), true);
   assert.equal(await pg.locator('#dash-fresh .rf-kpi').count(), 0);
@@ -160,7 +173,7 @@ await step('هستهٔ گزارش و تابلو در مرورگر همان پا�
 });
 
 await step('روشن کردن از صفحهٔ گزارش: گزارشِ تازه جای گزارشِ امروز، و ترجیحِ همین دستگاه می‌ماند', async () => {
-  const { pg, ctx, errors } = await open();
+  const { pg, ctx, errors } = await open(1366, '0');
   await go(pg, 'reports');
   await pg.locator('#rep-fresh-toggle').check();
   assert.equal(await pg.locator('#rep-fresh').isVisible(), true);
@@ -174,6 +187,11 @@ await step('روشن کردن از صفحهٔ گزارش: گزارشِ تازه 
   await pg.locator('#rep-fresh-toggle').uncheck();
   assert.equal(await pg.locator('#rep-legacy').isVisible(), true);
   assert.equal(await pg.locator('#rep-fresh').isHidden(), true);
+  //  خاموشِ خودِ کاربر پس از بارگذاریِ دوباره هم خاموش می‌ماند (پیش‌فرضِ روشن جایش را نمی‌گیرد)
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-fresh')), '0');
+  await pg.reload(); await pg.waitForTimeout(900);
+  await go(pg, 'reports');
+  assert.equal(await pg.locator('#rep-legacy').isVisible(), true);
   assert.deepEqual(errors, []);
   await ctx.close();
 });

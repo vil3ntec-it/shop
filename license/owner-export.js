@@ -173,6 +173,7 @@
     cancelApproval: 'تأییدِ لغو',
     creditApproval: 'تأییدِ قرض', // STF-03 — همتای OwnerExport.kt
     priceApproval: 'تأییدِ قیمت', // STF-03
+    freeLineApproval: 'تأییدِ قلمِ آزاد', // POS-10، تصمیمِ ۱-۱۱ (۲)
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',

@@ -19,6 +19,9 @@
  *   • «مشتریِ تازه» = این شماره در همین دکان هنوز هیچ سفارشِ تحویل‌شده‌ای ندارد (از هر منبع).
  *   • «تکراری» = همان شماره، همان روشِ تحویل و نشانی (پینِ گرد به ۴ رقم، ناحیه، متن) و همان اقلام و
  *     مقدارها در `duplicateWindowMin` دقیقهٔ اخیر، از سفارشی که رد یا لغو نشده است.
+ *   • S41 «ادغام یا سفارشِ دوم؟»: ردِ تکراری `ask: 'track_or_second'` و توکنِ همان سفارش را دارد؛ ویترین می‌پرسد و
+ *     «همان را دنبال کن» ⇒ پیگیریِ سفارشِ پیشین (هیچ سفارشی ساخته نمی‌شود)، «سفارشِ دوم» ⇒ همان سبد با
+ *     `secondOrder: true` (کلیدِ یکتاییِ تازه) — فقط قاعدهٔ تکرار کنار می‌رود.
  *   • سیاست (`POLICY_KEY`، شیءِ JSON در «تنظیماتِ زنده»، دکان بر `all` جلو می‌افتد): هر عددِ نامعتبر
  *     همان پیش‌فرض است؛ ۰ = آن قاعده خاموش.
  *   • نمای سابقه فقط همین دکان را می‌شمارد (نه دکان‌های دیگر — حریمِ مشتری) و شماره را برنمی‌گرداند.
@@ -158,7 +161,7 @@ function refuse(status, code, message, data) {
  * RSK-02 و RSK-05 برای سفارشِ ویترین — `input` همان خروجیِ قیمت‌گذار (`fulfillment`، `address`، `lines`،
  * `totalMinor`). پرچم خاموش ⇒ هیچ. ردِ توضیح‌دار ⇒ ApiError ِ ۴۰۹ با `data`.
  */
-async function checkIn(run, shopId, phone, input, { at = Date.now() } = {}) {
+async function checkIn(run, shopId, phone, input, { at = Date.now(), secondOrder = false } = {}) {
   if (!phone || !input || !(await flagIn(run, shopId))) return;
   //  RSK-04: فهرستِ بسته ⇒ ردِ خنثی (نه دلیل، نه این‌که شماره بود یا جا)؛ فهرستِ مطمئن ⇒ بی سقفِ مشتریِ تازه
   const listed = await require('./risk-lists').matchIn(run, shopId, {
@@ -171,14 +174,16 @@ async function checkIn(run, shopId, phone, input, { at = Date.now() } = {}) {
   const policy = await policyIn(run, shopId);
   const forms = require('./order-rate').formsOf(require('./order-rate').canon(phone));
 
-  if (policy.duplicateWindowMin > 0) {
+  //  S41: «ادغام یا سفارشِ دوم؟» — پاسخِ صریحِ «سفارشِ دوم» (`secondOrder: true`) فقط از قاعدهٔ تکرار می‌گذرد؛
+  //  سقفِ مشتریِ تازه، فهرستِ بسته و سقفِ سرعتِ شماره همان می‌مانند
+  if (policy.duplicateWindowMin > 0 && secondOrder !== true) {
     const windowMs = policy.duplicateWindowMin * 60_000;
     const dup = await duplicateOf(run, shopId, forms, input, { from: at - windowMs });
     if (dup) {
       const retryAfter = Math.max(1, Math.ceil((Number(dup.created_at) + windowMs - at) / 1000));
       const err = refuse(409, 'duplicate_order',
-        `همین سفارش (همان اقلام و همان نشانی) چند دقیقه پیش با شمارهٔ ${dup.order_no} ثبت شده است؛ آن را پیگیری کنید، یا اگر دوباره همین را می‌خواهید کمی بعد امتحان کنید یا با دکان تماس بگیرید`,
-        { reason: 'same_items_same_place', orderNo: Number(dup.order_no), windowMin: policy.duplicateWindowMin,
+        `همین سفارش (همان اقلام و همان نشانی) چند دقیقه پیش با شمارهٔ ${dup.order_no} ثبت شده است؛ همان را پیگیری کنید، یا اگر سفارشِ دومِ جدا می‌خواهید کمی بعد امتحان کنید یا با دکان تماس بگیرید`,
+        { reason: 'same_items_same_place', ask: 'track_or_second', orderNo: Number(dup.order_no), windowMin: policy.duplicateWindowMin,
           retryAfter, token: await require('./storefront').currentTokenOf(shopId, dup.id, run) });
       err.retryAfter = retryAfter;
       throw err;

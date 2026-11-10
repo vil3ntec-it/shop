@@ -290,6 +290,7 @@ data class Sale(
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val creditApproval: kotlinx.serialization.json.JsonObject? = null,
   /** STF-03 — برگهٔ تأییدِ **تغییرِ قیمتِ ردیف** بیش از سقف (`sales.price`، `price-cap.slipOf`، پرچمِ `shop.price_cap`)؛ `null` نوشته نمی‌شود */
   @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val priceApproval: kotlinx.serialization.json.JsonObject? = null,
+  @OptIn(ExperimentalSerializationApi::class) @EncodeDefault(EncodeDefault.Mode.NEVER) val freeLineApproval: kotlinx.serialization.json.JsonObject? = null, // POS-10 (۱-۱۱)
   /**
    *  PAY (v3 A4) — ردیف‌های پرداختِ ترکیبی (نقد، کیف پول، کارت، حواله، به حساب)، به پول.
    *  فقط فروشی که با پرچمِ `ShopPolicy.payV2` ثبت شده دارد؛ معنای فیلدهای بالا
@@ -905,8 +906,7 @@ data class ShopData(
   // شمارهٔ فاکتور از یک شروع می‌شود. قبلاً از ۱۰۰۰ بود — عددی که فقط
   // «بزرگ‌تر به نظر رسیدن» را می‌ساخت و برای دکان‌داری هیچ معنایی نداشت.
   // دفترهای موجود شمارهٔ خودشان را نگه می‌دارند: شمارهٔ فاکتور در سابقهٔ
-  // عملیات و در حساب قرض‌داران نوشته شده و عوض کردنش آن ارجاع‌ها را
-  // می‌شکند.
+  // عملیات و در حساب قرض‌داران نوشته شده و عوض کردنش آن ارجاع‌ها را می‌شکند.
   val nextInvoiceNo: Int = 1,
   val suppliers: List<Supplier> = emptyList(),
   val purchases: List<Purchase> = emptyList(),

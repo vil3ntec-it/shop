@@ -603,8 +603,16 @@ function settledOf(rows) {
   return by;
 }
 
+/** `money` فقط ۱/true/۰/false/خالی؛ هر چیزِ دیگر ۴۰۰ (همان `bad_window` ِ بازه نیست: `bad_money`). */
+function moneyFlag(v) {
+  if (v === undefined || v === null || v === '' || v === '0' || v === 'false') return false;
+  if (v === '1' || v === 'true') return true;
+  throw require('../middleware/errors').badRequest('money فقط 1 یا 0', 'bad_money');
+}
+
 async function reconciliation(query = {}) {
   const w = reconWindow(query);
+  const wantMoney = moneyFlag(query.money);
   const shops = await reconShops(w);
   const ids = shops.map((r) => r.shop_id);
   const names = new Map(shops.map((r) => [r.shop_id, r.name || '']));
@@ -671,6 +679,8 @@ async function reconciliation(query = {}) {
   rows.sort((a, b) => b.issues.length - a.issues.length || b.courier.heldMinor - a.courier.heldMinor
     || b.netMinor - a.netMinor || (a.shopId < b.shopId ? -1 : a.shopId > b.shopId ? 1 : 0));
   const sum = (f) => rows.reduce((a, r) => a + f(r), 0);
+  //  S124: `?money=1` ⇒ GMV، صندوق، آنلاین، وصول، تسویه‌نشده، بازپرداخت و درآمدِ پلتفرم کنارِ هم (`lib/admin-money.js`)
+  const money = wantMoney ? await require('./admin-money').moneyOf(w, rows, { maxShops: RECON_LIMITS.maxShops }) : undefined;
   return {
     window: { from: w.from, to: w.to },
     local: { timezone: w.timezone, fromDate: w.fromDate, toDate: w.toDate },
@@ -687,6 +697,7 @@ async function reconciliation(query = {}) {
       issues: sum((r) => r.issues.length), commissionMinor: sum((r) => r.commission),
     },
     shops: rows.slice(0, RECON_LIMITS.maxShops),
+    ...(money ? { money } : {}),
   };
 }
 

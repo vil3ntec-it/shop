@@ -14,7 +14,8 @@
  *   POST /api/admin/system/chain-verify ⇐ بررسیِ زنجیرهٔ هشِ سابقه (SEC-02)؛
  *                                      فقط مدیرِ ارشد، فقط‌خواندنی، با یک ردیفِ سابقه
  *   GET /api/admin/system/reconciliation ⇐ تطبیقِ فروشِ آنلاین، لغو، بازپرداخت، نقدِ
- *                                      پیک و تسویه به‌ازای هر دکان (E2E-ADM-15)؛ فقط ارشد
+ *                                      پیک و تسویه به‌ازای هر دکان (E2E-ADM-15)؛ فقط ارشد؛ `?money=1` ⇒
+ *                                      GMV/صندوق/آنلاین/وصول/تسویه‌نشده/بازپرداخت/درآمدِ پلتفرم (S124)
  *
  * زیرِ `requireAdmin`ِ `routes/admin.js` سوار است. فقط عدد و وضعیت؛ هیچ
  * راز، نشانی یا دادهٔ مشتری (شرح در `lib/system-health.js`).
@@ -79,10 +80,10 @@ router.post('/chain-verify', requireSuperAdmin, async (req, res, next) => {
 router.get('/reconciliation', requireSuperAdmin, async (req, res, next) => {
   try {
     const q = req.query || {};
-    const out = await health.reconciliation({ from: q.from, to: q.to, fromDate: q.fromDate, toDate: q.toDate });
+    const out = await health.reconciliation({ from: q.from, to: q.to, fromDate: q.fromDate, toDate: q.toDate, money: q.money });
     await audit.log({
       actorType: 'admin', userId: req.admin.id, ip: clientIp(req), action: 'admin.reconciliation_viewed',
-      detail: { from: out.window.from, to: out.window.to, shops: out.shopsTotal },
+      detail: { from: out.window.from, to: out.window.to, shops: out.shopsTotal, money: Boolean(out.money) },
     });
     res.set('Cache-Control', 'no-store');
     res.json(out);

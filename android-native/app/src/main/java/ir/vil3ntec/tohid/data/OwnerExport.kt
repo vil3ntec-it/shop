@@ -217,6 +217,7 @@ object OwnerExport {
     "cancelApproval" to "تأییدِ لغو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "creditApproval" to "تأییدِ قرض",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، STF-03
     "priceApproval" to "تأییدِ قیمت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، STF-03
+    "freeLineApproval" to "تأییدِ قلمِ آزاد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، POS-10
     "payments" to "ردیف‌های پرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "tenderedMinor" to "دریافتی (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "changeMinor" to "پول پس (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

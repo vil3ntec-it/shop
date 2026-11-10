@@ -26,7 +26,7 @@
  *   پرداخت‌شده (پرچمِ جدای `shop.orders.amend_paid`؛ ⛔ پیش‌فرض خاموش ⇒ همان ۴۰۹ `amend_paid_order`) ── فقط
  *           `payment_status = paid` (در جریان یا بخشی‌بازپرداخت‌شده نه). اعمالِ ویرایش تفاوت را **ثبت** می‌کند
  *           (`settlement`: `refund` = دکان به مشتری بدهکار، `charge` = مشتری بدهکار، با مبلغ؛ بی درگاه، بی تغییرِ
- *           وضعیتِ پرداخت یا نقدِ پیک). تسویه با `settle` (`POST …/amendments/:amendId/settlement`): فقط نقد (D-08)،
+ *           وضعیتِ پرداخت یا نقدِ پیک). تسویه با `settle` (`POST …/amendments/:amendId/settlement`): نقد یا حساب‌پیِ دستی (۱-۶ ب)،
  *           یک بار برای هر ویرایش، با کلیدِ یکتایی و `orders.refund`؛ رویدادِ `amend_settled` و سابقه.
  */
 const crypto = require('crypto');
@@ -57,7 +57,7 @@ const MAX_QTY_MILLI = 10_000_000;
 const MAX_CHANGES = orders.MAX_LINES;
 const TYPES = Object.freeze({ proposed: 'amend_proposed', applied: 'amend_applied', closed: 'amend_closed', settled: 'amend_settled' });
 const PAID_FLAG_KEY = 'shop.orders.amend_paid';
-const SETTLE_METHODS = Object.freeze(['cash']);
+const SETTLE_METHODS = Object.freeze(['cash', 'hesabpay']);   //  تصمیمِ ۱-۶ ب: حساب‌پی فقط «دستی» (دکان خودش پس داد)، بی درگاه
 const AMEND_ID_RE = /^am_[0-9A-Z]{26}$/;
 
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG_KEY);
@@ -413,7 +413,7 @@ async function withAmendment(shopId, orderId, view) {
 function parseSettle(body) {
   const b = body && typeof body === 'object' ? body : {};
   const method = str(b.method);
-  if (!SETTLE_METHODS.includes(method)) throw badRequest('روشِ تسویه فقط نقد است (بی درگاه)', 'bad_method');
+  if (!SETTLE_METHODS.includes(method)) throw badRequest('روشِ تسویه فقط نقد یا حساب‌پیِ دستی است (بی درگاه)', 'bad_method');
   return { method, note: clean(b.note, 300) };
 }
 

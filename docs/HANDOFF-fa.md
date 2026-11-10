@@ -54,6 +54,51 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e-rows-2` (دورِ دومِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-1`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S124 (`lib/admin-money.js` + `reconciliation?money=1`: GMV، صندوق، آنلاین، بازپرداخت، وصول، تسویه‌نشده و درآمدِ پلتفرم؛
+  فاکتورِ تحویلِ سفارشِ آنلاین `o-…`/`w-…` از صندوق بیرون تا دو بار شمرده نشود؛ `owner-report.salesLedgerOf` جدا شد؛ `admin-money` ۳/۳)؛
+  S94 (`lib/courier-location-consent.js`، پرچمِ خاموشِ `shop.delivery_live_location.consent`، مهاجرتِ ۷۵۰ + rollback،
+  `PUT /api/courier/location-consent`؛ «نه» نقطه‌ها را همان لحظه پاک می‌کند؛ `courier-location-consent` ۴/۴). شاهد (روی کدِ پایه هم سبز):
+  S118 درِ مشتری با بلیتِ منقضی/دست‌خورده/لغوشده (`scenario-s118` ۳/۳)، S39 و S43 پیامِ مشتری از راهِ واقعیِ پیک و دریافتِ حضوری
+  (`scenario-s39-s43` ۲/۲)؛ S123 و S37 با آزمون‌های موجود. آزمون‌های تازهٔ کد پیش از رفع سرخ؛ ۲۷ مجموعهٔ مرتبط روی PGlite و PostgreSQL ۱۶.
+- بازطبقه‌بندی (فقط متنِ STATUS): S130 (اجبارِ TOTP/احرازِ دوباره env ِ خاموش ⇒ A)، S95 (C/A)، S109 و RPT-18 (پنلِ ریپوی server)،
+  E2E-ADM-15 (پنل + کمیسیونِ #432).
+- نیمه‌کاره: S124 و E2E-ADM-15 نمایش در پنل (ریپوی server)؛ S94 کلیدِ «اشتراکِ موقعیت» در برنامهٔ پیک (کاتلین) پیش از روشن کردنِ پرچم.
+- قدمِ بعدی: شاهدِ CI ِ همین شاخه؛ نامزدها: S33 (Plus Code ِ ساخته از پین در سفارش/نشانی و سایتِ مشتری)، E2E-RET-11 (رسیدِ اصلاحیِ
+  بازپرداخت)، S56 (وزنِ بیش از سقف ⇒ نگه‌داشتن تا تأییدِ مشتری؛ `order-picking.js` ۷۹۳/۸۰۰ ⇒ اول جدا کردن)، ORD-15 (تحویلِ بخشی دمِ در).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/e-rows-1` (ردیف‌های PARTIAL ِ ردهٔ E «کدِ ساخته‌نشده»؛ روی `claude/owner-yes-1`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: S117 (`maskCards` در گفت‌وگوی مشتری ↔ دکان، یادداشتِ گزارش، یادداشتِ سفارشِ ویترین/کارمند/قلم/گذار و نظرِ مشتری؛
+  `card-data` ۷/۷)؛ S79 (`lib/order-stuck-alert.js` + پرچمِ خاموشِ `shop.orders.stuck_alert` در کاتالوگ و `workers.js`؛ رویدادِ `note`،
+  سابقه، پوش؛ وضعیت دست نمی‌خورد؛ `order-stuck-alert` ۳/۳)؛ S41 (`secondOrder` در `parseCheckout` ⇒ `order-rate.guard` ⇒
+  `order-risk.checkIn`، `ask: 'track_or_second'`، پرسشِ ویترین با `K.confirm(text, ok, no)`؛ `order-risk` ۱۰/۱۰ و مرورگرِ تازهٔ
+  `web-store-dup.mjs` در زنجیرِ `test:web-store`)؛ S93 («پیک تعیین نشده» در پیگیری؛ گامِ تازه در `track.e2e.mjs`)؛ S47 (تاریخِ دقیق در
+  بنرِ وب؛ `web-backup.mjs`). هر آزمونِ تازه پیش از رفع سرخ؛ ۳۵ مجموعهٔ مرتبط ۳۰۹/۳۰۹ روی PGlite و PostgreSQL ۱۶ ِ محلی؛
+  `web-store`، `web-store-allflags`، `web-store-changes`، `web-store-method` و سرتاسریِ `lifecycle`/`track` سبز.
+- بازطبقه‌بندی (نه کد؛ فقط متنِ STATUS): SYN-01، SYN-06، PAY-16، PRD-08، PRM-02، RPT-13 (تصمیم/دستگاه/شاهدِ CI)، OPS-09 (رابطِ پنلِ
+  ریپوی دیگر/وبِ منجمد)، CRM-10 و STF-06 (طراحیِ همگام‌سازی، نه کدِ کوچک).
+- نیمه‌کاره: S117 (یادداشت‌های کارمند و پنل)، S41 (همین پرسش در `customer-android`؛ پیش‌پرداختِ مشتریِ تازه ⇐ D-08)، S93 («جایگزینی در انتظارِ پاسخ»)، S47 (بنرِ کاتلین
+  و قالبِ اعلانِ سرور)؛ SYN-09 و LOC-06 کدِ بزرگ‌اند و شروع نشدند.
+- قدمِ بعدی: شاهدِ CI ِ همین شاخه؛ S124 (گزارشِ GMV/صندوق/آنلاین/وصول/تسویه‌نشده/بازپرداخت در پنل) و S118 (آزمونِ درِ مشتری با
+  بلیتِ منقضی) نامزدهای دورِ بعد.
+
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-yes-1` («همه بله» ِ صاحب‌کار به ۱۹ بندِ `OWNER-PENDING`؛ روی دستهٔ ۴۵ + `claude/owner-decisions-4`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱-۱۱) مجوزِ هسته‌ایِ `sales.free_line` (perm-core JS×۲ و Kotlin، perm-v1، approval-core×۲، `RemoteApproval`، staff-perms FLAGGED)
+  و قاعدهٔ «قلمِ آزاد» + «عمده فقط برای مشتریِ لیستِ عمده» در `sale-caps.js` = `SaleCaps.kt` (بردارِ تازهٔ sale-caps-v1)، داوریِ
+  `price-cap.js` (v3، قلمِ دیرآمده، REST؛ برگهٔ `freeLineApproval`)، پیش‌سنجیِ `SaleCapGate`، فیلدِ `Sale.freeLineApproval` (+ بردارهای
+  ledger-sync و resend-dropped با هشِ کاتلین بازسازی‌شده، core-fuzz نو)؛ (۱-۶) `lib/order-pack-refund.js` پشتِ `shop.orders.manual_refund`
+  + دکمه‌های `PickSheet` و حساب‌پیِ دستی در تسویهٔ ویرایش؛ (۱-۱) پیش‌فرضِ سقفِ پیامک ۸۰ + ۲۰ = ۱۰۰؛ (۳-۲۲) «گزارشِ تازه» پیش‌فرض
+  روشن (وب و برنامه، خاموشِ کاربر می‌ماند) و `market.same_in_store`؛ (۴-۲۵ (۳)) `compose.desktop.uiTestJUnit4` + `PromoLinesUiTest`.
+  سند: OWNER-PENDING ۹۰ ⇐ ۷۱ (شماره‌ها پیوسته)، OWNER-DECISIONS «گرفته‌شده — ۱۴۰۵/۰۸/۱۹»، `spec/OWNER-ACTIONS-fa.md` §۸ (کلیک‌ها و سه
+  حساب)، FLAGS-ON §۱۵–۱۷، STATUS (۱۲ ردیف؛ POS-02 ⇐ IMPLEMENTED-VERIFIED)، RULES، WHATS-NEW. آزمون‌ها: price-cap ۱۰/۱۰، order-picking
+  ۱۵/۱۵، order-amend-paid ۴/۴، sale-caps ۷/۷، sms-daily-cap، core-fuzz، sync-resend-dropped و ledger-coverage روی PGlite و PostgreSQL ۱۶؛
+  `web-report-fresh.mjs`، `web-store-same.mjs` و `web-pos-qty.mjs` با axe سبز؛ تازه‌ها پیش از کد سرخ.
+- نیمه‌کاره: همهٔ Kotlin فقط CI (`SaleCapsVectorsTest`، `SaleCapGateTest`، `ReportFreshDefaultTest`، `PromoLinesUiTest` و وابستگیِ
+  آزمونِ Compose، `LedgerSyncCoverageTest`/`DroppedResendTest` با بردارِ دستی‌ساز)؛ همهٔ کلیدها خاموش‌اند تا صاحب‌کار در پنل بزند.
+  تسویهٔ ویرایش در برنامه هنوز فقط «نقد» می‌فرستد (سرور حساب‌پیِ دستی را می‌پذیرد). Sync v1 قلمِ آزاد را نمی‌سنجد (همان سقفِ قیمت).
+- قدمِ بعدی: CI ِ سبز (اگر `compose.desktop.uiTestJUnit4` در CI حل نشد، همان خط و آزمون را بردارید و در PR بگویید)؛ پس از
+  کلیک‌های §۸ ِ OWNER-ACTIONS هر ردیف را با شاهدِ دکانِ آزمایشی بالا ببرید.
+
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-44` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۴: R10، R12، R11؛ روی `claude/sec-review-44` ‏671931d3؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) R10: `license/csv-cell.js` (بارکننده `shop-sync.js`، `sw.js` ‏v72) `csvCell` ِ index.html ِ یخ‌زده را با همان `finance-reports.cell` ِ سرور عوض می‌کند ⇒
   هر چهار CSV ِ صفحه (گزارش‌ها، صورت‌حساب، انبارگردانی، «گزارشِ تازه») بی فرمول، عددِ منفی عدد. `web-csv-cell.test.js` ۵/۵، `web-csv-export.mjs` ۶/۶ (روی پایه ۵ سرخ؛
@@ -238,6 +283,18 @@
 - انجام شد: دالر، کلدار و ریال در صندوقِ «ترکیبی و شیفت» پشتِ تنظیمِ خاموشِ **دکان** `FxTillPref` (`fx_tender` + جدولِ نرخِ `fx_rates`، هر دو `ShopSettingsKeys` ِ دکان؛ D-15 رعایت شد). هسته: `core/pay/FxTill.kt` (جدولِ نرخ، پرداختِ ارز، متن ⇐⇒ واحد)، `Pay.settle`/`exactCash` با `SettleInput.fx` (ردیفِ `fx`، ارز اول، پولِ پس افغانی، `FX_INVALID`/`FX_EXCESS`)، `exchange` با `per`، ارزهای PKR/IRR؛ هم‌زاد `license/fx-till.js` + `pay-core.js`؛ بردار `core/test-vectors/fx-till-v1.json` و موردهای تازهٔ `pay-v1.json`. برنامه: `FxTillFlow`، کادرِ `CheckoutFxBox`، تنظیمِ `FxTillSettings`، رسید، X/Z (`DrawerModel.fxLines`)، شیفت (`cash_out` ِ پولِ پسِ ارز) و `CashShift.saleCash`، برگشت به افغانی، کشو. سرور دست نخورد (ردیفِ پرداخت سنجیده نمی‌شود؛ `sync-v1.js` نه).
 - نیمه‌کاره: آزمون‌های Kotlin (`FxTillVectorsTest`، `FxTillFlowTest`، `PayCoreTest.exchange`، `PrinterDrawerTest`) فقط در CI؛ STATUS ِ PAY-10 تا شاهدِ CI همان PARTIAL. صندوقِ کامپیوترِ قدیم (`DeskSale`) و برنامهٔ آیفون کادرِ ارز ندارند. گزارشِ خودکارِ صاحب در سرور ارز را در «نقد» می‌شمارد (`paymentMethod = cash`).
 - قدمِ بعدی: پس از CI ِ سبز ردیف را IMPLEMENTED-VERIFIED کن؛ تصمیم‌های صاحب‌کار: سقفِ کهنگیِ نرخ (یک روز)، گردِ نیمه رو به بالا به یک افغانی، و این‌که «پولِ پسِ ارز» سقف بخواهد یا نه.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/owner-decisions-4` (فهرستِ یکتای تصمیم‌های مانده، دورِ چهارم؛ فقط سند؛ روی main ‏cceb5930 (#1027)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ۷۹ ⇐ ۹۰ (۱۱ / ۲۶ / ۲۸ / ۲۵؛ شماره‌ها با اسکریپت: بی تکرار، پیوسته، هر ارجاعِ «گ-ش» موجود)، هر بند با متنِ منبع سنجیده:
+  ۱-۱۰ PAY-10 (یک روز / ۱۰ دقیقه، نیمه رو به بالا، `FX_EXCESS`، پولِ پسِ بی سقف، IRR بی اعشار و واحدهای ۱ / ۱٬۰۰۰ / ۱٬۰۰۰٬۰۰۰ از `license/fx-till.js`)،
+  ۱-۱۱ POS-10/21 + PRD-12 (عمده بی مجوز)، ۲-۲۳ R7/R8 (B8، در main)، ۲-۲۴ R10 (B9)، ۲-۲۵ `shop.till_pin` + STF-07، ۲-۲۶ `panel.db`، به‌روزرسان، مخزن، امضا و
+  مقدارِ env ِ سایت برای viewer (ریپوی `server`: «۱.۵۰.۸۲» در main، «۱.۵۰.۸۳» در `claude/server-48` تا f09672b)، ۳-۲۶ `shop.stock_v2` / ارزشِ موجودیِ D-23 /
+  انبار و محل، ۳-۲۷ PUR-03، ۴-۲۳ استودیوی عکس (+ R11/R12)، ۴-۲۴ HW-07/09، ۴-۲۵ POS-02 / PRD-12 ِ نام‌دار / PRM-18. یکی‌شده: ۲-۸ (۴+۳)، ۲-۱۰، ۲-۱۱ (کاربرِ
+  غیرِ root)، ۲-۱۳، ۲-۱۸ (چهار از هفت در ۱.۵۰.۸۰؛ دانلودِ پشتیبان)، ۳-۳، ۳-۱۲، ۳-۲۲ (+ `shop.owner_report.profit`)، ۴-۱، ۴-۲، ۴-۷ (AI-01/09/12)، ۴-۱۰ (en/ps ِ
+  `claude/rpt-2`)، ۴-۱۱ (مجوزِ چندپخشِ HW-12). «گرفته‌شده»: R9، نوشتنِ انتشار فقط مالک، کلیدهای پرخطرِ پنل.
+- نیمه‌کاره: بی منبعِ «تصمیم» و نیامد: هشدار و «فقط کپی» ِ نشانیِ پیگیری (CHK-20 فقط D-09 ِ ۱-۱)، کلیدهای گزارشِ وب (RPT-13 دست نخورد)، جای «موجودیِ هر مکان».
+  R10/R11/R12 در `claude/sec-fix-44` (push‌نشده) در دستِ رفع‌اند؛ با مرجش ۲-۲۴ و یادداشتِ ۴-۲۳ به «گرفته‌شده». تاریخ: ساعتِ سیستم ۲۰۲۶/۱۱/۱۰ = ۱۴۰۵/۰۸/۱۹.
+- قدمِ بعدی: پاسخِ صاحب‌کار؛ با مرجِ هر شاخهٔ منبع «هنوز در main نیست» ِ بندها برداشته شود. ⚠️ `pay-10` (دستهٔ ۴۴) و `stf-2` هر دو بخشِ «۸ط» ِ `FLAGS-ON-fa.md` را
+  دارند؛ هنگامِ ادغام یکی «۸ی» شود (OWNER-PENDING به نامِ بخش ارجاع می‌دهد، نه شماره).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را
