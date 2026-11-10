@@ -3,7 +3,8 @@
  *
  *   • نامِ کالا «=HYPERLINK(…)»، «+cmd|…»، دستهٔ «-2+3»، مشتریِ «@SUM(…)» و شرحِ تراکنشِ «\t=…» در «گزارش‌ها» (محصولات و قرض‌داران)،
  *     «صورت‌حسابِ مشتری»، «انبارگردانی» و «گزارشِ تازه» ⇒ با «'» در آغاز (همان `finance-reports.cell` ِ سرور، `license/csv-cell.js`).
- *   • عددِ منفی (مانده و بدهیِ ۵۰۰-، اختلافِ انبارگردانی) همان عدد می‌ماند؛ هیچ خانهٔ دیگری با = + - @ تب یا CR آغاز نمی‌شود.
+ *   • عددِ منفی (مانده و بدهیِ ۵۰۰-، اختلافِ انبارگردانی) همان عدد می‌ماند؛ پولِ منفیِ «گزارشِ تازه» (متنِ «-60.00») هم — متنِ
+ *     فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` فرمول نیست — ولی «-150.00%» «'» می‌گیرد؛ هیچ خانهٔ دیگری با = + - @ تب یا CR آغاز نمی‌شود.
  *   • axe بر نوارِ همان دکمه‌ها؛ هیچ خطای صفحه.
  *
  * اجرا:  node test/web-csv-export.mjs        (WEB_ROOT=<پوشه> برای سنجیدنِ نسخهٔ دیگری از صفحه، مثلاً پیش از این تغییر)
@@ -52,6 +53,10 @@ LEDGER.products[0].name = BAD.link;
 LEDGER.products[1].name = BAD.plus;
 LEDGER.products[1].category = BAD.minus;
 LEDGER.debtors[0].name = BAD.at;
+//  «صابون» زیرِ بها فروخته شد (بها ۱۰۰، فروش ۴۰) ⇒ سودِ ناخالصِ ۶۰- و حاشیهٔ ۱۵۰-٪ در «گزارشِ تازه»
+const SOAP = LEDGER.products[2];
+SOAP.purchasePrice = 100;
+LEDGER.warehouseEntries.find((w) => w.productId === SOAP.id).price = 100;
 const D = LEDGER.debtors[0].id;
 //  رسیدِ بیشتر از برد (۸۴۰) ⇒ ماندهٔ ۵۰۰- (عدد) در ردیفِ پایانی؛ شرحِ آغازشده با تب
 LEDGER.transactions.push({ id: 'tx-r10', debtorId: D, type: 'receive', amount: 1340, date: '2026-10-14', notes: BAD.tab, createdAt: 1791929000000 });
@@ -70,7 +75,7 @@ function parse(text) {
   if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
   return rows;
 }
-/** هیچ خانه‌ای فرمول نیست: آغازِ = + @ تب CR هرگز؛ «-» فقط عددِ ساده */
+/** هیچ خانه‌ای فرمول نیست: آغازِ = + @ تب CR هرگز؛ «-» فقط متنِ فقط-عدد (همان الگوی `csv-cell.js`) */
 function safe(rows, label) {
   for (const r of rows) for (const c of r) {
     assert.ok(!/^[=+@\t\r]/.test(c), `${label}: خانهٔ فرمول ${JSON.stringify(c)}`);
@@ -153,7 +158,7 @@ await step('«انبارگردانی»: نامِ «=HYPERLINK(…)» با «\'»
   safe(rows, 'انبارگردانی');
 });
 
-await step('«گزارشِ تازه» (`report-ui.js`، همان `downloadCsv`): نامِ کالا با «\'»', async () => {
+await step('«گزارشِ تازه» (`report-ui.js`، همان `downloadCsv`): نامِ کالا با «\'»؛ پولِ منفی (متن) همان عدد، درصدِ منفی «\'»', async () => {
   await pg.evaluate(() => goTo('reports'));
   await pg.locator('#rep-fresh-toggle').check();
   await pg.click('#rep-fresh button[data-rtab="sales"]');
@@ -163,6 +168,10 @@ await step('«گزارشِ تازه» (`report-ui.js`، همان `downloadCsv`):
   const all = cells(rows);
   assert.ok(all.includes(`'${BAD.link}`), JSON.stringify(rows.slice(0, 4)));
   assert.ok(!all.includes(BAD.link));
+  const head = rows[0], soap = rows.find((r) => r[0] === SOAP.name);
+  assert.ok(soap, JSON.stringify(rows));
+  assert.equal(soap[head.indexOf('سود ناخالص')], '-60.00', 'پولِ منفیِ متنی فقط-عدد است ⇒ بی «\'»');
+  assert.equal(soap[head.indexOf('حاشیه')], "'-150.00%", 'درصد فقط-عدد نیست ⇒ «\'»');
   safe(rows, 'گزارشِ تازه');
 });
 

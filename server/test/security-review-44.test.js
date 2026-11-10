@@ -13,6 +13,8 @@
  *   R12     (پیگیری، `claude/sec-fix-44`) کارِ دستهٔ لغوشده که به `complete` نرسید (فرآیند افتاد ⇒ «در کار» با اجارهٔ تمام‌شده؛
  *           شکستِ گذرای هم‌زمان با لغو ⇒ «در صف») هرگز برداشته نمی‌شد (`claim` فقط دستهٔ `active`) ⇒ تا همیشه در سقفِ ۵۰۰۰.
  *   R11     (پیگیری) سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد ⇒ بودجهٔ بایتِ پیکسلِ بازشده (`IMAGE_STUDIO_DECODE_MB`) میانِ کارگرها.
+ *   R10     (پیگیری) خانهٔ CSV ِ سرور (`finance-reports.cell`، همزادِ `license/csv-cell.js`): متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان
+ *           خانهٔ `g` ِ xlsx) فرمول نیست ⇒ عدد می‌ماند؛ هر متنِ دیگرِ آغازشده با = + - @ تب یا CR همان «'».
  */
 process.env.IMAGE_STUDIO_WORKERS = '2';
 //  R11: بودجهٔ ۲ مگابایت ⇒ سهمِ هر کار ۱ مگابایت؛ عکسِ ۶۰۰×۴۵۰ ِ آزمون‌های دیگر (۸۱۰ هزار بایت RGB) زیرِ آن می‌ماند
@@ -33,6 +35,7 @@ const jobs = require('../src/lib/image-studio-jobs');
 const { ulid } = require('../src/lib/ulid');
 const { query, one, newId, now } = require('../src/db');
 const { resetAll } = require('../src/middleware/ratelimit');
+const finance = require('../src/lib/finance-reports');
 
 let root = '';
 let A; let C;
@@ -256,4 +259,27 @@ test('R11: بودجهٔ بایتِ پیکسلِ بازشده میانِ کارگ
   assert.deepEqual(rows.map((r) => [r.status, r.error, Number(r.attempts)]),
     [['failed', 'memory_budget', 1], ['failed', 'memory_budget', 1], ['done', '', 1]]);
   assert.deepEqual(sent, [fits], 'فقط عکسِ زیرِ سهم به رشته رفت');
+});
+
+test('R10: خانهٔ CSV ِ سرور — متنِ فقط-عدد عدد می‌ماند، هر شکلِ دیگر «\'» (همان CSV ِ «خروجیِ مالی» ِ پنلِ مرکزی)', async () => {
+  const plain = ['-500', '-500.00', '-0', '-0.5'];
+  const prefixed = { '-2+3': "'-2+3", '-1e5': "'-1e5", '+500': "'+500", '-.5': "'-.5", '- 500': "'- 500", '-500.': "'-500.",
+    '-150.00%': "'-150.00%", '-1,000': `"'-1,000"`, '=500': "'=500", '@500': "'@500", '\t500': "'\t500", '-500\n': `"'-500\n"` };
+  for (const v of plain) assert.equal(finance.cell(v), v, `فقط-عدد: ${v}`);
+  for (const [v, want] of Object.entries(prefixed)) assert.equal(finance.cell(v), want, `فرمول‌نما: ${JSON.stringify(v)}`);
+  assert.equal(finance.cell(-500), '-500');
+
+  //  همان قاعده در تنها CSV ِ سرور که `cell` را می‌خواند: GET /api/admin/finance/export
+  const t = now(), ids = { '-500.00': 'r10-plain', '-2+3': 'r10-minus', '=HYPERLINK("http://evil.example/","x")': 'r10-link' };
+  for (const [tenant, id] of Object.entries(ids)) {
+    await query(`INSERT INTO sub_payments (id, app, tenant_kind, tenant_id, amount, currency, method, receipt_no, paid_at, created_at)
+                 VALUES ($1,'shop','shop',$2,500,'AFN','cash',$1,$3,$3)`, [id, tenant, t]);
+  }
+  const r = await h.get('/api/admin/finance/export?dataset=payments', { token: root });
+  assert.equal(r.status, 200, JSON.stringify(r.body).slice(0, 300));
+  const lines = r.body.csv.replace(/^﻿/, '').split('\r\n');
+  const row = (id) => lines.find((l) => l.startsWith(`${id},`));
+  assert.equal(row('r10-plain').split(',')[4], '-500.00', 'متنِ فقط-عدد بی «\'»');
+  assert.equal(row('r10-minus').split(',')[4], "'-2+3");
+  assert.ok(row('r10-link').includes(`"'=HYPERLINK(""http://evil.example/"",""x"")"`), row('r10-link'));
 });

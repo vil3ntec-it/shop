@@ -7,8 +7,9 @@
  * را با `cell` عوض می‌کند (`downloadCsv` نام را هنگامِ فراخوان از `window` می‌خواند ⇒ هر چهار خروجی، بی نسخهٔ دوم).
  *
  * ⛔ قاعده همان `cell` ِ `server/src/lib/finance-reports.js` (سرور و وب یک‌جور): null/undefined ⇒ خالی؛ **عدد** (typeof number)
- *    همان عدد (۵۰۰- در ستونِ مبلغ عدد می‌ماند)؛ هر متنِ آغازشده با `=` `+` `-` `@` تب یا CR ⇒ «'» پیشش (OWASP CSV Injection)،
- *    متنِ عددنما هم (همان سرور). نقل‌قول: `"` `,` CR LF ِ سرور + `;` ِ پیشینِ صفحه (اکسلِ جداکنندهٔ «;») — مقدارِ خانه یکی است.
+ *    همان عدد؛ هر متنِ آغازشده با `=` `+` `-` `@` تب یا CR ⇒ «'» پیشش (OWASP CSV Injection)، جز متنِ فقط-عدد
+ *    `^-?[0-9]+(\.[0-9]+)?$` (همان خانهٔ `g` ِ xlsx: «-500.00» ِ «گزارشِ تازه» عدد می‌ماند؛ «-2+3»، «-1e5»، «+500»، «-.5»،
+ *    «- 500»، «-150.00%» نه). نقل‌قول: `"` `,` CR LF ِ سرور + `;` ِ پیشینِ صفحه (اکسلِ جداکنندهٔ «;») — مقدارِ خانه یکی است.
  * آزمون: `server/test/web-csv-cell.test.js` (برابر با سرور) و `server/test/web-csv-export.mjs` (دانلودِ واقعی در کرومیوم).
  */
 (function (root, factory) {
@@ -23,6 +24,8 @@
   'use strict';
 
   const FORMULA = /^[=+\-@\t\r]/;
+  /** متنِ فقط-عدد — همان خانهٔ `g` ِ xlsx (`owner-export.js`) و `PLAIN_NUMBER` ِ سرور؛ فرمول نمی‌شود ⇒ عدد می‌ماند */
+  const PLAIN_NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
   const QUOTE = /[",;\r\n]/;
 
   /** یک خانهٔ CSV — همان `finance-reports.cell` */
@@ -30,7 +33,7 @@
     if (v === null || v === undefined) return '';
     if (typeof v === 'number') return String(v);
     let s = String(v);
-    if (FORMULA.test(s)) s = "'" + s;
+    if (FORMULA.test(s) && !PLAIN_NUMBER.test(s)) s = "'" + s;
     return QUOTE.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
   }
 

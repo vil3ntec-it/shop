@@ -248,12 +248,17 @@ async function history(q = {}) {
 
 /* ═══════════════════════════════ خروجیِ CSV ═══════════════════════════════ */
 
-/** خانهٔ CSV — نقل‌قول، و جلوی «فرمول» در اکسل (= + - @ در آغازِ متن). */
+/** متنِ فقط-عدد — همان خانهٔ `g` ِ xlsx (`license/owner-export.js`)؛ فرمول نمی‌شود ⇒ عدد می‌ماند («-500.00»، نه «'-500.00») */
+const PLAIN_NUMBER = /^-?[0-9]+(\.[0-9]+)?$/;
+/**
+ * خانهٔ CSV — نقل‌قول، و جلوی «فرمول» در اکسل: متنِ آغازشده با = + - @ تب یا CR ⇒ «'» پیشش، جز متنِ فقط-عدد.
+ * ⛔ همزادِ بایت‌به‌بایتِ `license/csv-cell.js` ِ وب (`web-csv-cell.test.js`)؛ یکی را بی دیگری عوض نکن.
+ */
 function cell(x) {
   if (x === null || x === undefined) return '';
   if (typeof x === 'number') return String(x);
   let s = String(x);
-  if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+  if (/^[=+\-@\t\r]/.test(s) && !PLAIN_NUMBER.test(s)) s = `'${s}`;
   return /[",\r\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
 }
 const iso = (ms) => (ms ? new Date(Number(ms)).toISOString() : '');
