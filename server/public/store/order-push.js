@@ -9,18 +9,23 @@
  *
  * ⛔ هرگز بی لمسِ مشتری اجازه نمی‌پرسد. هر متن فقط با textContent (`K.el`). «روشن است» فقط پس از پاسخِ سرور.
  * مرورگرِ بی پوش (سافاریِ آیفون بیرون از «افزودن به صفحهٔ اصلی»، مرورگرِ قدیمی) ⇒ هیچ بخشی.
+ * کارگرِ سرویس، اشتراک و اجازه در `store/push-client.js` ِ مشترک با «خبرم کن» ِ کالا (`store/alert-push.js`).
  */
 (function () {
   'use strict';
   var $ = K.$; var el = K.el; var t = K.t;
-  var SW = '/store/sw.js';
 
   window.StoreOrderPush = function (ctx) {
+    return K.js('/store/push-client.js').then(function () { return make(ctx); });
+  };
+
+  function make(ctx) {
     var api = ctx.api; var slug = ctx.slug;
+    var P = window.StorePush;
     var OPT = 'store-push:' + slug;          //  مشتری در این دکان «خبرم کن» زده است
     var ATT = 'store-push-at:' + slug;       //  { توکن: نشانیِ اشتراک } — سفارش‌هایی که همین حالا وصل‌اند
-    var page = /^\/store\//.test(location.pathname) ? '/store/' + slug : '/';
-    var supported = Boolean(window.isSecureContext && navigator.serviceWorker && window.PushManager && window.Notification);
+    var page = P.page(slug);
+    var supported = P.supported;
     var box = null; var cur = { token: '', key: '' }; var busy = false;
 
     function ensure() {
@@ -56,54 +61,10 @@
       if (note) K.note($('o-np-msg'), 'err', note); else $('o-np-msg').hidden = true;
     }
 
-    function bytes(b64) {
-      var s = String(b64).replace(/-/g, '+').replace(/_/g, '/');
-      while (s.length % 4) s += '=';
-      var raw = atob(s); var out = new Uint8Array(raw.length);
-      for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-      return out;
-    }
-    function sameKey(sub, key) {
-      try {
-        var a = new Uint8Array(sub.options.applicationServerKey); var b = bytes(key);
-        if (a.length !== b.length) return false;
-        for (var i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-        return true;
-      } catch (e) { return true; }   //  مرورگری که کلید را نمی‌گوید: همان اشتراک (سرور ناجور را خودش رد می‌کند)
-    }
-    function active(reg) {
-      if (reg.active) return Promise.resolve(reg);
-      var w = reg.installing || reg.waiting;
-      return new Promise(function (ok, no) {
-        if (!w) { no(new Error('sw')); return; }
-        w.addEventListener('statechange', function () {
-          if (w.state === 'activated') ok(reg); else if (w.state === 'redundant') no(new Error('sw'));
-        });
-      });
-    }
-    /** اشتراکِ همین مرورگر برای همین ویترین (کلیدِ کهنهٔ سرور ⇒ اشتراکِ تازه، بی پرسشِ دوباره) */
-    function subscription(key) {
-      return navigator.serviceWorker.register(SW, { scope: page }).then(active).then(function (reg) {
-        return reg.pushManager.getSubscription().then(function (sub) {
-          if (sub && sameKey(sub, key)) return sub;
-          return (sub ? sub.unsubscribe().catch(function () { return false; }) : Promise.resolve(false)).then(function () {
-            return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: bytes(key) });
-          });
-        });
-      });
-    }
     function attach(token, key) {
-      return subscription(key).then(function (sub) {
-        var json = sub.toJSON();
-        return api('/orders/' + encodeURIComponent(token) + '/push', { method: 'POST', body: { subscription: { endpoint: json.endpoint, keys: json.keys }, page: page } })
-          .then(function () { remember(token, json.endpoint); return json.endpoint; });
-      });
-    }
-    function permission() {
-      if (Notification.permission !== 'default') return Promise.resolve(Notification.permission);
-      return new Promise(function (ok) {
-        var p = Notification.requestPermission(ok);   //  سافاریِ قدیمی فقط callback
-        if (p && p.then) p.then(ok, function () { ok('denied'); });
+      return P.subscription(key, page).then(function (sub) {
+        return api('/orders/' + encodeURIComponent(token) + '/push', { method: 'POST', body: { subscription: sub, page: page } })
+          .then(function () { remember(token, sub.endpoint); return sub.endpoint; });
       });
     }
 
@@ -111,7 +72,7 @@
       if (busy || !cur.token) return;
       var token = cur.token; var key = cur.key;
       busy = true; view('idle');
-      permission().then(function (p) {
+      P.permission().then(function (p) {
         if (p !== 'granted') { busy = false; view(p === 'denied' ? 'denied' : 'idle'); return null; }
         return attach(token, key).then(function () {
           busy = false;
@@ -158,5 +119,5 @@
       if (!ok) throw new Error('i18n');
       return { render: render };
     });
-  };
+  }
 })();

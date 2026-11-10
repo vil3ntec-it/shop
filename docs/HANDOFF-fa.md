@@ -53,6 +53,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web10-push` (WEB-10: «خبرم کن» ِ کالا روی پوشِ وب؛ `CustomerErasure.kt`؛ روی `claude/p0-close` ‏2f502da1؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) «خبرم کن وقتی موجود/ارزان شد» حالا کانالِ رایگانِ پوشِ وب دارد (مهاجرتِ ۴۷۵ `store_alert_push`، `lib/store-alert-push.js`، درِ
+  `POST/DELETE /api/store/:slug/alerts/push`، `store/alert-push.js` + `store/push-client.js` ِ مشترک با پیگیریِ سفارش): اشتراک برای (دکان، شمارهٔ
+  تأییدشده، مرورگر) با اثباتِ همان تأیید (`storefront.verification`، تنها منبعِ `verifiedPhone`)؛ بلیتِ باطل/منقضی، نشستِ بسته یا شمارهٔ عوض‌شده ⇒
+  هیچ پیام؛ ۳ مرورگر، سقفِ ۲۴ ساعتهٔ دکان (`STORE_ALERTS_SHOP_PER_DAY`)، SEC-10 `alertPushSubs`، پاک کردنِ حساب؛ پیام فقط نام و قیمت. رمز/VAPID/SSRF
+  فقط از `store-push.fanOut` (کپی نشد). (۲) `CustomerErasure.kt` کلیدهای `lists`، `pushSubs`، `alertPushSubs` (+ متن‌های `StrErasure`) و آزمونِ هم‌سانی
+  با `COUNT_KEYS` ِ سرور در `ServerFeatureScreensTest`. آزمون: `store-alert-push.test.js` ۱۱/۱۱ (PGlite و PostgreSQL، پیش از کد ۱۱ سرخ)، جهش ۱۳/۱۳،
+  `web-store-alert-push.mjs` ۳۷ ✅، `web-store-push.mjs` ۳۸ ✅، `web-store-finder.mjs` ۱۷ ✅.
+- نیمه‌کاره: شاهدِ CI؛ Kotlin فقط در CI (`ServerFeatureScreensTest`)؛ آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد).
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ WEB-10 (هنوز PARTIAL به‌خاطرِ D-09 برای مشتریِ بی پوش)؛ اگر صاحب‌کار بخواهد، «فرستادنِ دوباره»ی خبرِ
+  `no_channel` ِ تازه پس از روشن کردنِ پوش (امروز عمداً نیست: کارِ مشتری هیچ پیامی برنمی‌انگیزد).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-close` (ردیف‌های P0 ِ ویترین و مشتری: دسته‌بندی و پوشِ وب ِ مشتری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) دسته‌بندیِ ۲۱ ردیفِ P0 ِ نیمه‌کارهٔ WEB/CHK/ORD/DLV/PCK/CRM/NTF/LOC (+ PAY-07/23 ِ سفارشِ آنلاین): تقریباً همه پشتِ D-09، O-01، D-08،
   تصمیمِ صاحب‌کار (نقشه، مترادف، CDN، وبِ پیک، رد یا بررسیِ سقفِ اعتبار) یا کارِ Kotlin‌اند. تنها شکافِ کدیِ ساختنی «پیامِ تأیید» بود:

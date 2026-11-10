@@ -21,6 +21,8 @@
  *     سرویسِ پوش نمی‌رسد. نشانیِ لمسِ اعلان فقط مسیرِ همین مبدأ (`/#/o/…` یا `/store/<slug>#/o/…`).
  *   • کارِ مشتری هرگز کانالِ پولی را برنمی‌انگیزد: `catchUp` فقط `only_channel = 'push'`.
  *   • ⛔ آزمون هرگز شبکه نمی‌زند: `useTransport` (فقط آزمون)؛ در `NODE_ENV=test` بی آن هیچ درخواستی بیرون نمی‌رود.
+ *   • «خبرم کن» ِ کالا (WEB-10، `store-alert-push.js`، مهاجرتِ ۴۷۵) همین رمز، VAPID، SSRF و ۴۰۴/۴۱۰ را از `parse`/`fanOut`
+ *     می‌گیرد — جدولِ اشتراکِ خودش، نه کپیِ این‌ها.
  */
 const crypto = require('crypto');
 const db = require('../db');
@@ -254,6 +256,33 @@ async function deliver(sub, payload, keys, { topic, urgency }) {
   return 'rejected';
 }
 
+/** جدول‌های اشتراکِ مرورگر (فقط همین دو؛ نامِ جدول هرگز از ورودی نمی‌آید) */
+const SUB_TABLES = Object.freeze(['store_push_subs', 'store_alert_push']);
+
+/**
+ * یک پیام به چند مرورگرِ یک جدول — مشترکِ پیگیریِ سفارش و «خبرم کن» ِ کالا (`store-alert-push.js`): رمز، VAPID و SSRF ِ
+ * `deliver`؛ ۴۰۴/۴۱۰ ⇒ ردیف پاک؛ ۲xx ⇒ `last_ok_at`. هم‌زمان: سه مرورگر × مهلتِ هر درخواست هرگز از مهلتِ کلِ
+ * `customer-notify.callProvider` (۱۵ ثانیه) نمی‌گذرد. ⇒ همان قراردادِ `setProviders` (`accepted`/`retry`/`rejected`).
+ */
+async function fanOut(table, subs, payloadOf, { topic, urgency = 'normal' }) {
+  if (!SUB_TABLES.includes(table)) throw new Error(`جدولِ اشتراکِ ناشناخته: ${table}`);
+  if (!subs.length || !webpush) return { status: 'rejected', code: 'no_subscription' };
+  const keys = await vapid();
+  const results = await Promise.all(subs.map((s) => deliver(s, JSON.stringify(payloadOf(s)), keys, { topic, urgency })));
+  const out = { ok: [], gone: [], rejected: 0, retry: 0 };
+  subs.forEach((s, i) => {
+    const r = results[i];
+    if (r === 'ok') out.ok.push(s.id); else if (r === 'gone') out.gone.push(s.id); else out[r]++;
+  });
+  if (out.gone.length) await query(`DELETE FROM ${table} WHERE id = ANY($1::text[])`, [out.gone]);
+  if (out.ok.length) {
+    await query(`UPDATE ${table} SET last_ok_at=$2 WHERE id = ANY($1::text[])`, [out.ok, now()]);
+    return { status: 'accepted', ref: `web_push:${out.ok.length}` };
+  }
+  if (out.retry) return { status: 'retry', code: 'push_unavailable' };
+  return { status: 'rejected', code: out.gone.length ? 'push_gone' : 'push_rejected' };
+}
+
 /**
  * `msg` همان پیامِ customer-notify: `{ key, shopId, orderId, event, lang, title, text }`. شماره (`to.phone`) هرگز
  * خوانده یا فرستاده نمی‌شود. نتیجه همان قراردادِ `setProviders`.
@@ -268,32 +297,18 @@ async function send(msg) {
   const live = subs.filter((s) => Number(s.link_gen) === Number(o.track_gen));
   if (!live.length || !webpush) return { status: 'rejected', code: 'no_subscription' };
 
-  const keys = await vapid();
   const token = await require('./storefront').currentTokenOf(msg.shopId, msg.orderId);
   const notify = require('./customer-notify');
   const urgent = (notify.MATRIX[msg.event] || []).includes('sms');
-  const opts = { topic: topicOf(msg.key), urgency: urgent ? 'high' : 'normal' };
-  const out = { ok: [], gone: [], rejected: 0, retry: 0 };
-  //  هم‌زمان: سه مرورگر × مهلتِ هر درخواست هرگز از مهلتِ کلِ `customer-notify.callProvider` (۱۵ ثانیه) نمی‌گذرد
-  const results = await Promise.all(live.map((s) => deliver(s, JSON.stringify({
+  const out = await fanOut('store_push_subs', live, (s) => ({
     v: 1, title: String(msg.title || '').slice(0, 80), body: String(msg.text || '').slice(0, 300), lang: msg.lang,
     url: `${s.page === '/' ? '/' : s.page}#/o/${encodeURIComponent(token)}`, tag: tagOf(msg.orderId),
-  }), keys, opts)));
-  live.forEach((s, i) => {
-    const r = results[i];
-    if (r === 'ok') out.ok.push(s.id); else if (r === 'gone') out.gone.push(s.id); else out[r]++;
-  });
-  if (out.gone.length) await query('DELETE FROM store_push_subs WHERE id = ANY($1::text[])', [out.gone]);
-  if (out.ok.length) {
-    await query('UPDATE store_push_subs SET last_ok_at=$2 WHERE id = ANY($1::text[])', [out.ok, now()]);
-    //  سفارشی که دیگر خبری ندارد ⇒ اشتراکش هم نمی‌ماند (کمینهٔ داده)
-    if (quiet(o.status)) {
-      await query('DELETE FROM store_push_subs WHERE shop_id=$1 AND order_id=$2', [msg.shopId, msg.orderId]);
-    }
-    return { status: 'accepted', ref: `web_push:${out.ok.length}` };
+  }), { topic: topicOf(msg.key), urgency: urgent ? 'high' : 'normal' });
+  //  سفارشی که دیگر خبری ندارد ⇒ اشتراکش هم نمی‌ماند (کمینهٔ داده)
+  if (out.status === 'accepted' && quiet(o.status)) {
+    await query('DELETE FROM store_push_subs WHERE shop_id=$1 AND order_id=$2', [msg.shopId, msg.orderId]);
   }
-  if (out.retry) return { status: 'retry', code: 'push_unavailable' };
-  return { status: 'rejected', code: out.gone.length ? 'push_gone' : 'push_rejected' };
+  return out;
 }
 
 const provider = Object.freeze({ send });
@@ -301,4 +316,5 @@ const provider = Object.freeze({ send });
 module.exports = {
   FLAG, PUB_KEY, PRIV_KEY, MAX_SUBS, KEEP_MS, PUSH_HOSTS,
   flagOn, ownFlagOn, vapid, publicKey, endpointOk, p256dhOk, authOk, parse, quiet, attach, detach, viewOf, provider, useTransport,
+  fanOut, topicOf,
 };

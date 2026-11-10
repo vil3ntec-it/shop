@@ -1,6 +1,7 @@
 /*
- * ویترین — کارگرِ سرویس **فقط** برای پوشِ وب ِ مشتری (`lib/store-push.js`، CHK-20، NTF-01): نمایشِ اعلانِ سفارش و بازکردنِ
- * صفحهٔ پیگیری با لمس. فقط `store/order-push.js` پس از «خبرم کن» ِ خودِ مشتری آن را ثبت می‌کند (دامنه = همین ویترین).
+ * ویترین — کارگرِ سرویس **فقط** برای پوشِ وب ِ مشتری (`lib/store-push.js`، CHK-20، NTF-01؛ «خبرم کن» ِ کالا، WEB-10):
+ * نمایشِ اعلان و بازکردنِ صفحهٔ پیگیری یا برگهٔ کالا با لمس. فقط `store/push-client.js` (از `order-push.js` یا `alert-push.js`)
+ * پس از لمسِ خودِ مشتری آن را ثبت می‌کند (دامنه = همین ویترین).
  *
  * ⛔ هیچ fetch، هیچ کش و هیچ پیامی از صفحه: رفتارِ شبکه‌ایِ ویترین همان پیشین است.
  * ⛔ متن فقط از پیامِ رمزشدهٔ همین سرور (عنوان ≤ ۸۰، متن ≤ ۳۰۰)؛ نشانیِ لمس فقط مسیرِ همین مبدأ (`/…`، نه `//…`) — هر
@@ -19,7 +20,8 @@ self.addEventListener('push', function (e) {
   try { d = e.data ? e.data.json() : {}; } catch (x) { d = {}; }
   var title = typeof d.title === 'string' ? d.title.slice(0, 80) : '';
   var body = typeof d.body === 'string' ? d.body.slice(0, 300) : '';
-  var tag = typeof d.tag === 'string' && /^o-[A-Za-z0-9_-]{1,20}$/.test(d.tag) ? d.tag : undefined;
+  //  o- سفارش (store-push)، a- «خبرم کن» ِ کالا (store-alert-push)
+  var tag = typeof d.tag === 'string' && /^[oa]-[A-Za-z0-9_-]{1,20}$/.test(d.tag) ? d.tag : undefined;
   var lang = d.lang === 'en' || d.lang === 'ps' ? d.lang : 'fa';
   //  userVisibleOnly: هر پوش یک اعلانِ دیدنی دارد (پیامِ خراب ⇒ همان نامِ ویترین بی متن)
   e.waitUntil(self.registration.showNotification(title || body || '…', {

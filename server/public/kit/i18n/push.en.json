@@ -10,5 +10,11 @@
   "np.fail": "Could not turn on; try again.",
   "err.push_limit": "Updates for this order go to at most 3 devices.",
   "err.order_closed": "This order is finished; there are no more updates.",
-  "err.bad_subscription": "This browser's notifications were not accepted; try another browser."
+  "err.bad_subscription": "This browser's notifications were not accepted; try another browser.",
+  "ap.title": "“Notify me” on this device",
+  "ap.hint": "Also get back-in-stock and price-drop news on this device.",
+  "ap.on": "Notify me on this device too",
+  "ap.state.on": "On: “notify me” news comes to this device.",
+  "ap.state.off": "Off: “notify me” news no longer comes to this device.",
+  "err.alert_push_limit": "“Notify me” for this shop goes to at most 3 devices."
 }

@@ -183,12 +183,13 @@ async function changePhone(customer, sessionId, phone) {
 }
 
 /**
- * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade) و همهٔ بلیت‌های این شماره؛
- * سفارش‌ها سندِ دکان‌اند و می‌مانند.
+ * پاک کردنِ حساب: نشست‌ها و نشانی‌ها هم (cascade)، همهٔ بلیت‌های این شماره و اشتراک‌های پوشِ «خبرم کن» ِ همین
+ * شماره در همهٔ دکان‌ها (مهاجرتِ ۴۷۵)؛ سفارش‌ها سندِ دکان‌اند و می‌مانند.
  */
 async function remove(customer) {
   return tx(async (c) => {
     await revokeTickets(customer.phone, (sql, params) => c.query(sql, params));
+    await c.query('DELETE FROM store_alert_push WHERE phone = $1', [customer.phone]);
     await c.query('DELETE FROM store_customers WHERE id = $1', [customer.id]);
     return { deleted: true };
   });
