@@ -91,6 +91,10 @@ const FREE = [
   ['محدودهٔ مکانِ کارمندان (STF-06) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ shop.staff_scope؛ '
     + 'صاحب باید پس از پایانِ اشتراک هم بتواند دسترسیِ کارمند را ببندد', [
     'PUT /shop/staff-scope/members/:id']],
+  ['PIN ِ شخصیِ صندوق و نوبت‌های سنجیدهٔ صندوق (STF-04، S46، مهاجرتِ ۶۴۰) هویتِ کاربرِ صندوق‌اند، بخشی از مجوزهای هستهٔ دکان، '
+    + 'و کلیدِ کاتالوگ ندارند، فقط پرچمِ shop.till_pin؛ صاحب باید پس از پایانِ اشتراک هم PIN را بگذارد/بردارد و قفلش را باز کند', [
+    'PUT /shop/till-pin/me', 'PUT /shop/till-pin/members/:id', 'DELETE /shop/till-pin/members/:id', 'POST /shop/till-pin/members/:id/unlock',
+    'POST /shop/till-pin/verify', 'POST /shop/till-pin/current/end']],
   ['«درخواستِ تأیید» از راهِ دور (STF-02) بخشی از مجوزهای هستهٔ دکان است و کلیدِ کاتالوگ ندارد، فقط پرچمِ '
     + 'shop.approval_requests؛ مثلِ برگهٔ امضاشده (`/shop/approver-keys`) پس از پایانِ اشتراک هم باید کار کند', [
     'POST /shop/approval-requests', 'POST /shop/approval-requests/:id/approve', 'POST /shop/approval-requests/:id/deny',
@@ -113,7 +117,7 @@ const FREE = [
 const FREE_KEYS = FREE.flatMap(([, keys]) => keys);
 const FLAGS = ['shop.orders', 'shop.orders.refunds', 'shop.orders.delay', 'shop.delivery', 'shop.storefront', 'shop.storefront.zones',
   'shop.storefront.notify_area', 'shop.storefront.banners',
-  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.staff_scope', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
+  'shop.chat', 'shop.catalog', 'shop.image_bank', 'shop.order_notify', 'market.trust', 'shop.staff_time', 'shop.staff_scope', 'shop.till_pin', 'shop.orders.desk', 'shop.orders.bulk', 'shop.doc_chain', 'shop.purchase_orders', 'shop.promo_uses'];
 
 //  جمع‌آوری و بسته‌بندی (PCK): درهای `/shop/orders/…/pick…` با پرچمِ خودشان هم سنجیده شوند
 FLAGS.push('shop.orders.picking');

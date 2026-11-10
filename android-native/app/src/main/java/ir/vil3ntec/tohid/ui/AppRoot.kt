@@ -334,7 +334,7 @@ private fun AppRootActive(
     if (lockAsk == lockSeen) return@LaunchedEffect
     lockSeen = lockAsk
     when (AppLockKey.after(ir.vil3ntec.tohid.data.TillUser.lock(context, lockStore.enabled), lockStore.enabled)) {
-      AppLockKey.Then.TILL -> Unit
+      AppLockKey.Then.TILL -> ir.vil3ntec.tohid.data.TillUser.serverEnd(context)   //  STF-04: نوبتِ سرورِ صندوق هم بسته
       AppLockKey.Then.APP -> unlocked = false
       AppLockKey.Then.HINT -> toasts.show(ir.vil3ntec.tohid.core.i18n.StrTill.lockNeedsPassword, ir.vil3ntec.tohid.ui.theme.V3Tone.WARNING)
     }

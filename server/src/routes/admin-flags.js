@@ -162,6 +162,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.promo_tier_price', scope: 'shop', default: false, what: 'پلهٔ «قیمتِ ثابتِ هر واحد» در تخفیفِ پله‌ای (POS-19)' },
   { key: 'shop.purchase_orders', scope: 'shop', default: false, what: 'سفارشِ خرید، رسیدِ دریافت و فاکتورِ تأمین‌کننده (PUR-02/04/14)' },
   { key: 'shop.staff_time', scope: 'shop', default: false, what: 'ورود و خروجِ کارمند و پورسانتِ ماه (STF-07/08)' },
+  { key: 'shop.till_pin', scope: 'shop', default: false, what: 'PIN ِ شخصیِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق: چه کسی پشتِ کدام دستگاه بود (STF-04، S46)' },
   { key: 'shop.stock_v2', scope: 'shop', default: false, what: 'موتورِ تازهٔ موجودی و بهای برنامه (میانگینِ موزون، سری/FEFO، دفترِ حرکت)؛ با `stock_mode=on` ِ دکان' },
   { key: 'shop.order_risk', scope: 'shop', default: false, what: 'قاعده‌های ریسکِ ثبتِ ویترین: سفارشِ تکراری و سقفِ مشتریِ تازه (RSK-02/03/05)' },
   { key: 'shop.order_risk.policy', scope: 'shop', default: { newCustomerMaxTotalMinor: 1_000_000, newCustomerMaxOpen: 2, duplicateWindowMin: 10 },

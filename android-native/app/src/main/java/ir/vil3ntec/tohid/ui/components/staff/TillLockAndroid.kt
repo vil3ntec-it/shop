@@ -106,7 +106,10 @@ fun TillLockScreen(cart: CartStore, store: ShopStore, deviceCode: Boolean) {
               val out = withContext(Dispatchers.Default) { ApproverVault.verify(r, pin) }
               pins.put(out.record)
               if (out.ok) {
-                TillUser.unlock(context, cart, store, TillUser.user(out.record))
+                val opened = TillUser.user(out.record)
+                TillUser.unlock(context, cart, store, opened)
+                //  STF-04: سرور هم همان PIN را می‌سنجد و نوبتِ صندوق را باز می‌کند (پرچمِ `shop.till_pin`؛ بهترین‌کوشش)
+                TillUser.serverVerify(context, opened, pin)
               } else {
                 users = TillSwitch.lockList(TillUser.users(context), device)
                 error = StrPos.pinWrong(plain(PinGuard.remaining(out.record.guard)))
@@ -205,6 +208,8 @@ fun TillUsersBlock() {
         val rec = withContext(Dispatchers.Default) { ApproverVault.create(m.userId, m.name.ifBlank { m.contact }, m.role, pin) }
         pins.put(rec)
         users = TillUser.users(context)
+        //  STF-04: همان PIN در سرور هم (پرچمِ `shop.till_pin`) تا سرور بداند چه کسی پشتِ صندوق است
+        if (!TillUser.serverEnroll(context, m.id, pin)) note = StrTill.serverEnrollFailed
       }
     }
   }

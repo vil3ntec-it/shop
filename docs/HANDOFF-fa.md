@@ -131,6 +131,14 @@
 - نیمه‌کاره: هیچ. شاخه‌های `posted-docs`، `app-gaps-4`، `syn-12`، `syn-12b` و `reserve-off` هنوز در دسته نیستند؛ با مرجشان «هنوز در دسته نیست» ِ بندها را بردارید.
   ⚠️ `posted-docs` بندِ «B6» ِ `SECURITY-AUDIT-fa.md` را دارد و دستهٔ ۴۲ هم B6 ِ دیگری (بازبینیِ ۴۱–۴۲)؛ هنگامِ ادغام یکی B7 شود.
 - قدمِ بعدی: پاسخِ صاحب‌کار؛ هر بندِ گرفته‌شده به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/stf-2` (خانوادهٔ STF: STF-04 هویتِ سروریِ کاربرِ صندوق، STF-07 «دیر ثبت‌شده»؛ روی main ‏99036497 (#1026)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **STF-04/S46** PIN ِ صندوق در سرور پشتِ پرچمِ خاموشِ `shop.till_pin` (مهاجرتِ ۶۴۰ ِ `shop_till_pins`/`shop_till_sessions` + rollback؛
+  `lib/till-pin.js`، `routes/shop-till-pin.js`): فقط اثرِ PBKDF2، سنجش زیرِ `FOR UPDATE`، هر ۵ خطا قفلِ زمان‌دار، هر نوشتن با تأییدِ دوبارهٔ ورود، صاحب هرگز
+  بیرون نمی‌ماند؛ PIN ِ درست روی دستگاهِ توکن نوبتِ صندوق باز می‌کند (`whoAt`). برنامه (فقط CI): `TillPinRepository`، `TillUser.serverEnroll/serverVerify/serverEnd`.
+  **STF-07** هر زدن `recordedAt` و `late` (ساعتِ سرور، >۳۰ دقیقه) دارد؛ کارتِ «۷ روز و این ماه» نشانش را برای صاحب و مدیر دارد. `till-pin.test.js` ۹/۹ و
+  `staff-time.test.js` ۹/۹ روی PGlite و PostgreSQL 16 (پیش از کار سرخ)، درهای SUB-10/route-authz/tenant/inventory/admin-flags سبز. STATUS ِ STF-04، STF-07 و S46 (PARTIAL).
+- نیمه‌کاره: کامپایل و آزمونِ برنامه فقط CI؛ سندهای همگام‌سازی ستونِ کاربرِ صندوق ندارند (نسبت با دستگاه + زمان)؛ STF-06 دست نخورد (مانده‌اش امضای هر کارمند، فاز ۶ یا `routes/sync-v1.js` ِ ممنوع است).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ تصمیمِ صاحب‌کار: روشن کردنِ `shop.till_pin` (کاربرانِ پیشین یک بار دوباره افزوده شوند — FLAGS-ON §۸ط).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
