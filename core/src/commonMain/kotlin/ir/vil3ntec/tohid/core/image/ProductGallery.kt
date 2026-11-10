@@ -13,7 +13,7 @@ import kotlinx.serialization.json.put
  *  `server/src/routes/shop-images.js`، `server/test/image-bank-extras.test.js`).
  *
  *   • تکمیلی: `POST /shop/images?product_id=&role=` با نقشِ [EXTRA_ROLES]، سپس نسخهٔ نمایش و کوچک (`PUT /:id/v/:v/:size`)،
- *     **بی** `select` — عکسِ اصلیِ کالا و ویترین دست نمی‌خورد. فهرست از `GET /mine?product_id=`؛ برداشتن از کالا
+ *     **بی** `select` — عکسِ اصلیِ کالا و ویترین دست نمی‌خورد. فهرست از `GET /mine?product_id=` (همهٔ صفحه‌ها، [collect])؛ برداشتن از کالا
  *     `POST /:id/detach` (اصل و نسخه‌ها روی سرور می‌مانند).
  *   • ویترین: همان بارگذاری با نقشِ [STOREFRONT_ROLE] و سپس `POST /select {source:'shop'}` — ویترین این عکس را نشان
  *     می‌دهد و عکسِ روی دستگاه (صندوق و فهرست) دست نمی‌خورد. ⛔ عکسِ تازهٔ دستگاه آن را خودکار کنار نمی‌زند
@@ -67,7 +67,36 @@ object ProductGallery {
 
   fun canAdd(extras: Int): Boolean = extras < MAX_EXTRAS
 
-  fun minePath(productId: String): String = "$BASE/mine?product_id=" + ImageChanges.encode(productId) + "&limit=50"
+  /** همان `PAGE_MAX` ِ `lib/image-bank.js` (سرور بیش از این نمی‌دهد) */
+  const val PAGE = 50
+  /** سقفِ صفحه‌ها در یک خواندن: کلِ عکس‌های دکان (`MAX_PHOTOS` ِ `lib/product-photos.js`، ۲۰۰۰۰) ÷ [PAGE] */
+  const val MAX_PAGES = 400
+
+  /** یک صفحهٔ `GET /mine` (تازه‌ترین اول)؛ صفحهٔ بعد با `cursor` = `next_cursor` ِ همان پاسخ */
+  fun minePath(productId: String, cursor: String? = null): String = "$BASE/mine?product_id=" + ImageChanges.encode(productId) +
+    "&limit=$PAGE" + (cursor?.let { "&cursor=" + ImageChanges.encode(it) } ?: "")
+
+  /** `next_cursor` ِ پاسخ؛ صفحهٔ آخر ⇒ null */
+  fun nextCursorOf(o: JsonObject?): String? = o?.get("next_cursor").str()
+
+  /**
+   *  همهٔ عکس‌های کالا، صفحه‌به‌صفحه با `next_cursor` ِ سرور — پیش‌تر فقط صفحهٔ اول (۵۰): کالای با بیش از ۵۰ عکس عکسِ
+   *  ویترین را از فهرست می‌انداخت ([storefrontOf] «همان عکسِ کالا» می‌دید) و بارگذاریِ بعدیِ دستگاه ([keepStorefrontPhoto]
+   *  ⇐ false) جایش را می‌گرفت. [enough] ⇒ زودتر بس (مثلاً عکسِ نشان‌داده پیدا شد)؛ cursor ِ درجا یا صفحهٔ خالی ⇒ پایان.
+   *  [get] پاسخِ یک صفحه (`inline` ⇒ از تابعِ suspend می‌شود `api.get` زد).
+   */
+  inline fun collect(productId: String, enough: (List<Item>) -> Boolean = { false }, get: (String) -> JsonObject?): List<Item> {
+    val all = ArrayList<Item>()
+    var cursor: String? = null
+    repeat(MAX_PAGES) {
+      val page = get(minePath(productId, cursor))
+      val items = itemsOf(page)
+      all += items
+      if (items.isEmpty() || enough(all)) return all
+      cursor = nextCursorOf(page)?.takeIf { next -> next != cursor } ?: return all
+    }
+    return all
+  }
 
   /** نشانیِ بارگذاری؛ نقشِ دیگری هرگز ساخته نمی‌شود */
   fun uploadPath(productId: String, role: String): String {

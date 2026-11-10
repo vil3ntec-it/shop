@@ -219,20 +219,15 @@
     if (typeof x === 'string' && x.trim() !== '') x = Number(x);
     return typeof x === 'number' && Number.isFinite(x) ? x : undefined;
   }
-  function toMinor(x) {
+  function scaledBy(x, minor) {
     var n = legacyNumber(x);
     if (n === undefined) return undefined;
     var v;
-    try { v = Money().moneyFromLegacy(n, 'AFN').minor; } catch (e) { return undefined; }
+    try { v = minor ? Money().moneyFromLegacy(n, 'AFN').minor : Money().qtyFromLegacy(n).milli; } catch (e) { return undefined; }
     return v === 0 ? 0 : v;
   }
-  function toMilli(x) {
-    var n = legacyNumber(x);
-    if (n === undefined) return undefined;
-    var v;
-    try { v = Money().qtyFromLegacy(n).milli; } catch (e) { return undefined; }
-    return v === 0 ? 0 : v;
-  }
+  function toMinor(x) { return scaledBy(x, true); }
+  function toMilli(x) { return scaledBy(x, false); }
 
   function convertFields(spec, fields) {
     var set = {};
@@ -261,10 +256,17 @@
     return { set: set, inc: inc, dropped: dropped };
   }
 
+  /** R9: نامِ قدیم و واحددارِ یک فیلد (`amount`/`amountMinor`) هر یک به‌تنهایی با همین مبدل ⇒ همان خروجی، وگرنه op ⇒ v2 تا سرور `unit_conflict` رد کند — `unitClash` ِ سرور */
+  function unitClash(spec, f) {
+    var alone = function (k) { var o = {}; o[k] = f[k]; return Object.prototype.hasOwnProperty.call(f, k) ? JSON.stringify(convertFields(spec, o)) : null; };
+    var pairs = spec.money.map(function (k) { return [k, k + 'Minor']; }).concat(spec.qty.map(function (k) { return [k, k + 'Milli']; }));
+    return pairs.some(function (p) { var a = alone(p[0]); var b = alone(p[1]); return a !== null && b !== null && a !== b; });
+  }
   /** @returns {{ok:boolean, ops:Array, dropped:string[], native:boolean, reason:string}} */
   function fromLegacyOp(op, stamp) {
     var spec = specOf(op && op.table);
     if (!spec || spec.v3only) return { ok: false, ops: [], dropped: [], native: false, reason: 'unknown_table' };
+    if (op.type !== 'delete' && isPlainObject(op.fields) && unitClash(spec, op.fields)) return { ok: false, ops: [], dropped: [], native: false, reason: 'unit_conflict' };
     var base = { tx: op.op_id, hlc: stamp, table: op.table, row_id: op.row_id };
     var conv = op.type === 'delete' ? { set: {}, inc: {}, dropped: [] } : convertFields(spec, op.fields);
     var set = conv.set;

@@ -405,8 +405,10 @@ object ImageBank {
     if (!up.selected && !force) {
       val keep = try {
         val shown = ir.vil3ntec.tohid.core.image.ImageQuality.shownOf(api.get("$BASE/products/${enc(productId)}"))
+        //  صفحه‌به‌صفحه تا همان عکسِ نشان‌داده (کالای با بیش از ۵۰ عکس عکسِ ویترین را در صفحهٔ نخست ندارد)
         shown.source == "shop" && shown.imageId != up.imageId && ir.vil3ntec.tohid.core.image.ProductGallery.keepStorefrontPhoto(
-          shown, ir.vil3ntec.tohid.core.image.ProductGallery.itemsOf(api.get(ir.vil3ntec.tohid.core.image.ProductGallery.minePath(productId))), up.imageId,
+          shown, ir.vil3ntec.tohid.core.image.ProductGallery.collect(productId, enough = { all -> all.any { it.id == shown.imageId } }) { api.get(it) },
+          up.imageId,
         )
       } catch (c: CancellationException) {
         throw c

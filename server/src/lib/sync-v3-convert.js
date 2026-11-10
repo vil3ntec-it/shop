@@ -19,6 +19,7 @@
  *     می‌برد — دیده می‌شود، گم نمی‌شود، ولی سندِ مالی را هم عوض نمی‌کند.
  *   • مانده‌ها و نشان‌های محلی نمی‌روند (`dropped` در خروجی).
  *   • مقدارِ نامفهوم (مثلاً مبلغی که عدد نیست) با **نامِ قدیم** می‌ماند.
+ *   • نامِ قدیم و واحددارِ ناجورِ یک فیلد (`amount` و `amountMinor`) ⇒ کلِ op رد (`unit_conflict`، R9).
  *
  * تابع خالص است: یک op می‌گیرد و همیشه همان خروجی را می‌دهد؛ پس تبدیلِ
  * دوبارهٔ همان op همان `op_id`ها را می‌سازد و تکرار بی‌اثر می‌ماند.
@@ -83,6 +84,18 @@ function convertFields(spec, fields) {
 }
 
 /**
+ * R9 (بازبینیِ دومِ دستهٔ ۴۳): نامِ قدیم و واحددارِ **یک** فیلد با هم (`amount` و `amountMinor`) هر دو به `amountMinor`
+ * می‌رسیدند و برنده را ترتیبِ کلیدها می‌گفت ⇒ v1 و v3 یک سند را دو مبلغ می‌دیدند. حالا هر نام **به‌تنهایی** با همین مبدل
+ * تبدیل می‌شود و خروجیِ هر دو باید یکی باشد (همان سطل و همان مقدار: null، عدد یا `$inc`)؛ وگرنه کلِ op با `unit_conflict` رد.
+ * همزادها: `fromLegacyOp` ِ `license/sync-v3-engine.js` و `V3Convert.kt` (بردارِ `rejects` ِ `sync-v3-convert-v1.json`).
+ */
+function unitClash(spec, fields) {
+  const alone = (k) => JSON.stringify(convertFields(spec, { [k]: fields[k] }));
+  const pairs = [...spec.money.map((k) => [k, `${k}Minor`]), ...spec.qty.map((k) => [k, `${k}Milli`])];
+  return pairs.some(([k, u]) => Object.hasOwn(fields, k) && Object.hasOwn(fields, u) && alone(k) !== alone(u));
+}
+
+/**
  * @param raw  opِ v2 همان‌طور که برنامه فرستاده (یا از `oplog`ِ v1 خوانده شده)
  * @param opts {schemaVersion, deviceId, index, hlc?}
  * @returns {{ok:true, ops:Array, dropped:string[]} | {ok:false, reason:string, op_id:string}}
@@ -97,6 +110,7 @@ function fromV2(raw, { schemaVersion, deviceId, index = 0, hlc: given = '' } = {
   const spec = schema.specOf(op.table);
   if (!spec) return { ok: false, reason: 'unknown_table', op_id: op.op_id };
 
+  if (op.type !== 'delete' && unitClash(spec, op.fields)) return { ok: false, reason: 'unit_conflict', op_id: op.op_id };
   const stamp = (given && hlc.canonical(given)) || hlc.fromTs(op.ts, index, String(deviceId || 'v2'));
   const base = { tx: op.op_id, hlc: stamp, table: op.table, row_id: op.row_id, legacy: true };
   const { set, inc, dropped } = op.type === 'delete' ? { set: {}, inc: {}, dropped: [] } : convertFields(spec, op.fields);

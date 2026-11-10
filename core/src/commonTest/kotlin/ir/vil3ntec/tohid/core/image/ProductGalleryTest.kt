@@ -101,6 +101,56 @@ class ProductGalleryTest {
     assertFalse(ProductGallery.keepStorefrontPhoto(shown("shop", "i4"), emptyList(), "new1"), "فهرست نیامد ⇒ همان رفتارِ امروز")
   }
 
+  /** یک صفحهٔ `/mine` از [total] عکسِ هم‌طول (تازه‌ترین اول) با همان `id < cursor` و `next_cursor` ِ `shopList` ِ سرور */
+  private fun pageOf(path: String, total: Int, promo: String): JsonObject {
+    val ids = (total downTo 1).map { "i" + it.toString().padStart(3, '0') }
+    val cursor = path.substringAfter("&cursor=", "").ifEmpty { null }
+    val page = ids.filter { cursor == null || it < cursor }.take(ProductGallery.PAGE)
+    val rows = page.joinToString(",") { """{"id":"$it","product_id":"p1","role":"${if (it == promo) "promo" else "main"}","version":1,"urls":{}}""" }
+    val next = if (page.size == ProductGallery.PAGE) "\"" + page.last() + "\"" else "null"
+    return json("""{"items":[$rows],"next_cursor":$next}""")
+  }
+
+  @Test
+  fun `کالای با بیش از ۵۰ عکس — همهٔ صفحه‌ها خوانده می‌شود و عکسِ ویترین کنار نمی‌رود`() {
+    val asked = ArrayList<String>()
+    val items = ProductGallery.collect("p1") { asked += it; pageOf(it, 120, "i005") }
+    assertEquals(120, items.size)
+    assertEquals(
+      listOf("", "&cursor=i071", "&cursor=i021").map { "/shop/images/mine?product_id=p1&limit=50$it" },
+      asked,
+    )
+    assertEquals(ProductGallery.Storefront.OWN, ProductGallery.storefrontOf(shown("shop", "i005"), items))
+    assertTrue(ProductGallery.keepStorefrontPhoto(shown("shop", "i005"), items, "new1"))
+    assertFalse(
+      ProductGallery.keepStorefrontPhoto(shown("shop", "i005"), ProductGallery.itemsOf(pageOf(asked[0], 120, "i005")), "new1"),
+      "صفحهٔ نخست به‌تنهایی (رفتارِ پیشین) عکسِ ویترین را نداشت",
+    )
+    asked.clear()
+    ProductGallery.collect("p1", enough = { all -> all.any { it.id == "i100" } }) { asked += it; pageOf(it, 120, "i005") }
+    assertEquals(1, asked.size, "عکسِ نشان‌داده پیدا شد ⇒ صفحهٔ بعد خوانده نمی‌شود")
+  }
+
+  @Test
+  fun `صفحه‌ها — cursor ِ درجا، صفحهٔ خالی یا بی پاسخ ⇒ پایان؛ هرگز بیش از MAX_PAGES`() {
+    var n = 0
+    val stuck = ProductGallery.collect("p1") { n++; json("""{"items":[{"id":"x","role":"main"}],"next_cursor":"x"}""") }
+    assertEquals(2, n)
+    assertEquals(2, stuck.size)
+    n = 0
+    assertEquals(emptyList<ProductGallery.Item>(), ProductGallery.collect("p1") { n++; json("""{"items":[],"next_cursor":"z"}""") })
+    assertEquals(1, n)
+    n = 0
+    ProductGallery.collect("p1") { n++; null }
+    assertEquals(1, n)
+    n = 0
+    ProductGallery.collect("p1") { n++; json("""{"items":[{"id":"x$n","role":"main"}],"next_cursor":"c$n"}""") }
+    assertEquals(ProductGallery.MAX_PAGES, n)
+    assertEquals("/shop/images/mine?product_id=p%201&limit=50&cursor=a%2Fb", ProductGallery.minePath("p 1", "a/b"))
+    assertEquals("i9", ProductGallery.nextCursorOf(json("""{"next_cursor":"i9"}""")))
+    assertNull(ProductGallery.nextCursorOf(json("""{"next_cursor":null}""")))
+  }
+
   @Test
   fun `پاسخِ برداشتن و خواندن`() {
     assertEquals(ProductGallery.Detach.DONE, ProductGallery.detachOutcome(true, 200, ""))
