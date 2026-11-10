@@ -121,9 +121,10 @@ async function pushChanges(ctx, changes) {
     ? await require('./staff-perms').layersFor(shopId, role, userId) : null;
   //  CRM-03 §۱۰.۱ (پرچمِ خاموشِ `shop.credit_limit_perm`): تغییرِ سقفِ اعتبارِ مشتری بی `customers.credit_limit` ⇒ کلِ دسته ۴۰۳
   const limitLayers = await require('./credit-limit-perm').legacyLayers({ shopId, role, userId }, changes);
-  //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎
+  //  S89 (پرچمِ `shop.doc_chain`): `finalized` = `log` (راهِ قدیم) یا `enforce` (API ِ مستقیم) — ‎lib/finalized-sales.js‎؛
+  //  `boundDevice` = دستگاهِ نشست (SEC-03: نشستِ زنجیره‌دار در راهِ قدیم هم `enforce`)
   const guard = ctx.finalized
-    ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, ip: ctx.ip || '' }, ctx.finalized, changes)
+    ? await require('./finalized-sales').legacyGuard({ shopId, userId, deviceId, boundDevice: ctx.boundDevice || '', ip: ctx.ip || '' }, ctx.finalized, changes)
     : null;
   //  رویداد پس از تراکنش — در `enforce` همان ردی که تراکنش را برگرداند هم ثبت می‌شود
   //  PRD-07: ردیفِ کالا با `purchaseUnits` ِ نادرست ⇒ ۴۰۰ و هیچ ردیفی نمی‌نشیند (‎lib/purchase-units.js‎)

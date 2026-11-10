@@ -54,6 +54,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/code-gaps` (شکاف‌های کدیِ S70، SEC-03 و S48؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **SEC-03، بازبینیِ خصمانه:** نگهبانِ S89 حالتِ `enforce` را فقط از `device_id` ِ بدنه می‌گرفت ⇒ نشستِ دستگاهِ زنجیره‌دار با شناسهٔ تازه (v1) یا از `/api/sync`
+  مبلغِ فاکتورِ ثبت‌شده را سرِ جا عوض می‌کرد. حالا «زنجیره‌دار» = شناسهٔ ادعاشده یا دستگاهِ نشست (`lib/finalized-sales.js` `chainDevice`/`boundOf`؛ `lib/sync.js` و
+  `routes/sync.js` `boundDevice`)؛ راهِ قدیم با نشست/شناسهٔ زنجیره‌دار ۴۰۹. `sync-v1.js` ِ مشترک دست نخورد. آزمون: `finalized-sales-bound.test.js` ۵/۵ (PGlite و PostgreSQL، پیش از رفع ۳ سرخ).
+  (۲) **S70:** `market-units.sizeOfItem` (اندازهٔ واحدِ بی عدد از `saleUnit` و `packs`، فقط نامِ روشن و نسبتِ دقیق) در `sameProduct`؛ رابطِ وب «همین کالا در دکان‌های دیگر» روی برگهٔ
+  کالای ویترین (`store/same.js` ِ دیربار + واژه‌نامهٔ `same`، فقط با `bankProductId`)؛ آزمون‌ها: `market-units` ۶/۶، `market-same-units` ۲/۲ (هر دو پایگاه)، `web-store-same.mjs` ۲۹ ✅ با axe.
+  (۳) **S48:** شکافِ کدی نماند؛ PENDING ِ کهنهٔ `scenario-s48` درست شد و `S48.keys` حالا Enter ِ `reports.drill` را هم می‌سنجد.
+- نیمه‌کاره/باز: سندهای برگشت/قرض/خرید/حرکت نگهبانِ «ثبت‌شده» ندارند؛ ویرایشِ فاکتورِ حذف‌شده آن را با محتوای تازه زنده می‌کند (حذف فقط از راهِ `log`)؛ برنامهٔ خریدِ مشتری
+  «همین کالا» را ندارد؛ نشستِ بی زنجیره همچنان `log` (F0-02).
+- تصمیمِ صاحب‌کار: SEC-03 — رد (نه فقط رویداد) برای دستگاهِ بی زنجیره و `/api/sync` وقتی `shop.doc_chain` روشن است (برنامهٔ کهنه ویرایشش رد می‌شود)، و پیش‌فرضِ خودِ `shop.doc_chain`؛
+  S48 — پیش‌فرضِ «گزارشِ تازه» (`report_fresh`) و `shop.owner_report`؛ S70 — `market.directory` و `market.product_details`.
+- قدمِ بعدی: شاهدِ CI ِ دسته (نام‌به‌نام) برای `finalized-sales-bound`، `market-units`، `market-same-units`، `web-store-same` و `DayEndTest`؛ نگهبانِ سندهای برگشت/قرض/خرید (S89).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
