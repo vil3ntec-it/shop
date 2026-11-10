@@ -99,7 +99,10 @@ async function expireDueIn(c, shopId, at) {
   return rows.length;
 }
 
-/** یک ردیفِ نگه‌داشته + حرکتِ `reserve` برای هر قلم. `expiresAt = null` ⇒ تا پایانِ سفارش. */
+/**
+ * یک ردیفِ نگه‌داشته + حرکتِ `reserve` برای هر قلم. `expiresAt = null` ⇒ تا پایانِ سفارش. `l.createdAt` (هم‌اندازه
+ * کردنِ قلمِ موجود) ⇒ جای همان قلم در صفِ «بررسی» ([recheckShort]: تازه‌ترین‌ها کم می‌آورند) نمی‌رود.
+ */
 async function insertHolds(c, shopId, orderId, lines, expiresAt, at) {
   for (const l of lines) {
     const id = ulid(at);
@@ -107,7 +110,7 @@ async function insertHolds(c, shopId, orderId, lines, expiresAt, at) {
       `INSERT INTO stock_reservations (id, shop_id, order_id, line_no, product_id, branch_id, qty_milli,
          status, expires_at, created_at, kind)
        VALUES ($1,$2,$3,$4,$5,'',$6,'held',$7,$8,'soft')`,
-      [id, shopId, orderId, l.lineNo, l.productId, l.qtyMilli, expiresAt, at]
+      [id, shopId, orderId, l.lineNo, l.productId, l.qtyMilli, expiresAt, l.createdAt ? num(l.createdAt) : at]
     );
     await stock.insertMove(c, shopId, {
       productId: l.productId, location: '', type: 'reserve', qtyMilli: l.qtyMilli,
@@ -148,15 +151,35 @@ async function holdIn(c, shopId, { orderId, lines, ttlSec, at }) {
   return { expiresAt };
 }
 
-/** قلم‌هایی که آخرین ردیفشان «گذشته» است (پس از [expireDueIn]) ⇒ دوباره نگه داشتن یا ۴۰۹ */
+/**
+ * قلم‌های کالادارِ امروزِ سفارش به واحدِ موجودی ⇒ Map<lineNo, {lineNo, productId, qtyMilli}>. کالایی که دیگر در
+ * کاتالوگ نیست یا واحدش ناشناس است ⇒ بی نگه‌داشته (کنار).
+ */
+async function wantOf(c, shopId, orderId) {
+  const raw = (await c.query(
+    `SELECT line_no, product_id, unit, qty_milli FROM online_order_lines WHERE order_id=$1 AND shop_id=$2 AND product_id <> ''
+      ORDER BY line_no`, [orderId, shopId]
+  )).rows.map((l) => ({ lineNo: num(l.line_no), productId: l.product_id, unit: l.unit, qtyMilli: num(l.qty_milli) }));
+  const want = new Map();
+  for (const l of raw) {
+    try {
+      const [sl] = (await require('./catalog').toStockLines(c, shopId, [l])).lines;
+      want.set(sl.lineNo, sl);
+    } catch { /* ناموجود یا واحدِ ناشناس ⇒ بی نگه‌داشته */ }
+  }
+  return want;
+}
+
+/** قلم‌هایی که آخرین ردیفشان «گذشته» است (پس از [expireDueIn]) ⇒ با مقدارِ امروزِ قلم دوباره نگه داشتن یا ۴۰۹ */
 async function reholdIn(c, shopId, orderId, at) {
   const latest = (await c.query(
-    `SELECT DISTINCT ON (line_no) line_no, product_id, qty_milli, status FROM stock_reservations
+    `SELECT DISTINCT ON (line_no) line_no, status FROM stock_reservations
       WHERE shop_id=$1 AND order_id=$2 AND kind='soft' ORDER BY line_no, created_at DESC, id DESC`, [shopId, orderId]
-  )).rows;
-  const lapsed = latest.filter((r) => r.status === 'expired')
-    .map((r) => ({ lineNo: num(r.line_no), productId: r.product_id, qtyMilli: num(r.qty_milli) }));
-  if (!lapsed.length || !(await stock.reserveFlagOf(shopId, c))) return;
+  )).rows.filter((r) => r.status === 'expired');
+  if (!latest.length || !(await stock.reserveFlagOf(shopId, c))) return;
+  const want = await wantOf(c, shopId, orderId);
+  const lapsed = latest.map((r) => want.get(num(r.line_no))).filter(Boolean);
+  if (!lapsed.length) return;
   const settings = await stock.settingsOf(shopId, c);
   if (!(await require('./catalog').freshness(shopId, settings, at, c)).fresh) return;
   const ids = [...new Set(lapsed.map((l) => l.productId))].sort();
@@ -174,26 +197,17 @@ async function reholdIn(c, shopId, orderId, at) {
  * بی سنجش (کارمند) هرگز رد نمی‌شود و کمبود به بررسی می‌رود (INV-19). سفارشِ بی نگه‌داشتهٔ باز ⇒ هیچ.
  */
 async function syncOrderIn(c, shopId, orderId, at) {
-  const held = (await c.query(
-    `SELECT id, order_id, line_no, product_id, qty_milli, expires_at FROM stock_reservations
-      WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held' ORDER BY line_no`, [shopId, orderId]
-  )).rows;
-  if (!held.length) return;
+  const heldSql = `SELECT id, order_id, line_no, product_id, qty_milli, expires_at, created_at FROM stock_reservations
+      WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held' ORDER BY line_no`;
+  if (!(await c.query(heldSql, [shopId, orderId])).rows.length) return;
   await stock.lock(c, shopId);
+  await expireDueIn(c, shopId, at);
+  const held = (await c.query(heldSql, [shopId, orderId])).rows;
+  if (!held.length) return;
   const exp = held.map((r) => (r.expires_at === null ? null : num(r.expires_at)));
   const expiresAt = exp.includes(null) ? null : Math.min(...exp);
-  const raw = (await c.query(
-    `SELECT line_no, product_id, unit, qty_milli FROM online_order_lines WHERE order_id=$1 AND shop_id=$2 AND product_id <> ''
-      ORDER BY line_no`, [orderId, shopId]
-  )).rows.map((l) => ({ lineNo: num(l.line_no), productId: l.product_id, unit: l.unit, qtyMilli: num(l.qty_milli) }));
   //  به واحدِ موجودی؛ کالایی که دیگر در کاتالوگ نیست ⇒ قلمش نگه‌داشته ندارد (آزاد می‌شود)
-  const want = new Map();
-  for (const l of raw) {
-    try {
-      const [sl] = (await require('./catalog').toStockLines(c, shopId, [l])).lines;
-      want.set(sl.lineNo, sl);
-    } catch { /* ناموجود یا واحدِ ناشناس ⇒ بی نگه‌داشته */ }
-  }
+  const want = await wantOf(c, shopId, orderId);
   const byLine = new Map(held.map((r) => [num(r.line_no), r]));
   const drop = held.filter((r) => {
     const w = want.get(num(r.line_no));
@@ -202,7 +216,7 @@ async function syncOrderIn(c, shopId, orderId, at) {
   const add = [...want.values()].filter((w) => {
     const r = byLine.get(w.lineNo);
     return !r || drop.includes(r);
-  });
+  }).map((w) => (byLine.get(w.lineNo) ? { ...w, createdAt: byLine.get(w.lineNo).created_at } : w));
   if (!drop.length && !add.length) return;
   if (drop.length) {
     const ids = drop.map((r) => r.id);
