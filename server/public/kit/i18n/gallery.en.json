@@ -1,0 +1,12 @@
+{
+  "gl.label": "Product photos",
+  "gl.prev": "Previous photo",
+  "gl.next": "Next photo",
+  "gl.of": "Photo {i} of {n}",
+  "gl.main": "Main photo",
+  "gl.r.detail": "Detail",
+  "gl.r.back": "Back of the pack",
+  "gl.r.label": "Label",
+  "gl.r.variant": "Other variant",
+  "gl.hint": "Tap a number or swipe the photo sideways to see the other photos"
+}

@@ -54,6 +54,29 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-yes-2` («همه با پیشنهادِ خودت» ِ صاحب‌کار و دامنهٔ نسخهٔ ۱؛ روی `ccr-…-batch-48` ‏fe84f4d5b؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (ثبت): OWNER-PENDING ۷۳ ⇐ ۴ (۲-۱۴، ۴-۱۲ و پرسشِ ۲ ِ ۳-۱۰ و ۴-۲۴ ماند — پیشنهادشان به واقعیتی بسته است که فقط صاحب‌کار
+  می‌داند)؛ ۶۹ بند + پرسشِ ۱ ِ دو بند با متنِ کامل و «پیشنهاد پذیرفته شد» در OWNER-DECISIONS «گرفته‌شده — ۱۴۰۵/۰۸/۲۰» با یادداشتِ
+  وضعیتِ هر بند (کد لازم نیست / کارِ شما / کدِ Claude / ریپوی server / ⚠️ استثنا)؛ `spec/OWNER-ACTIONS-fa.md` §۹؛ BLOCKERS (D-01، D-02،
+  D-06، D-10، D-11، D-25 و «د) دامنهٔ نسخهٔ ۱»)؛ STATUS ۵۸ ردیف یادداشت، NTF-08 ⇐ IMPLEMENTED-VERIFIED. نسخهٔ ۱: `spec/RELEASE-1-fa.md`
+  (۲۱ ردیفِ «پس از انتشار»: MKT-01..12، AI-01، AI-06، AI-09، AI-10، AI-12، PUR-12، RPT-16، S121، S122)، نشان در ستونِ «مانع»، جدولِ
+  خودکارِ «خلاصهٔ نسخهٔ ۱» در `spec.mjs status` و سنجشِ «فهرست = نشان» در `check` (`spec.test.mjs` ۱۰/۱۰). قاعدهٔ تازهٔ همان روزِ
+  صاحب‌کار: نسخهٔ وبِ دکان (`index.html`، `license/`) قابلیتِ تازه نمی‌گیرد؛ تنها سطحِ وب ویترین و بازارچه است.
+- انجام شد (کد): (۴-۲۲) گالریِ ویترین — `lib/storefront-gallery.js`، دو درِ `GET /api/store/:slug/products/:id/gallery[/:tag/:size]`،
+  `features.gallery`، `store/gallery.js` + `gallery.{fa,en,ps}.json` ِ دیربار، پرچمِ خاموشِ `shop.storefront.gallery` (+ `shop.image_bank`)،
+  FLAGS-ON §۲۰؛ PRD-17 و PRD-27 ⇐ IMPLEMENTED-VERIFIED. (۲-۲۰) درِ مدیرِ «از کار انداختنِ دستگاه» دلیلِ نوشته می‌خواهد. آزمون‌ها:
+  `storefront-gallery` ۰/۳ ⇐ ۳/۳ و `admin-console-writes` (آزمونِ تازه ۲۰۰ ⇐ ۴۰۰) روی PGlite و PostgreSQL 16؛ `web-store-gallery.mjs`
+  بی ❌ روی هر دو؛ `web-store-allflags`، `web-store-same`، `web-store`، `web-i18n` ۳۰/۳۰، `market-web`، `paid-routes-public-entitlement`،
+  `admin-flags`، `console-shell`، `storefront-photo-version`، `admin-control-plane` سبز.
+- نیمه‌کاره: ⚠️ `admin-console-writes` «هم‌زمان: چهار ازکارانداختن با یک کلید» روی PostgreSQL گاهی دو پاسخِ تازه می‌دهد — روی پایهٔ
+  همین دسته هم (۱ از ۵) سرخ شد، پس از پیش بوده (کلیدِ یکتاییِ `lib/admin-write-once.js` زیرِ هم‌زمانی)؛ دست نخورد. گروه‌های کدِ مانده
+  به ترتیب: ۲-۲۳ (R7/R8 سابقه، `lib/finalized-sales.js`)، ۲-۲۱ (سقفِ نگه‌داشتِ هر شماره)، ۲-۸ (پوشاندنِ شماره در سفارش و تحویل)،
+  ۳-۱۳ (سه عددِ SYN-12 فقط برنامه)، ۴-۲۱ (PRM-02 ب)، ۳-۱۲ (PRD-08 الف)، ۳-۱۷ (PUR-03)، ۳-۱۶ (۲) ارزشِ موجودیِ برنامه، ۲-۱۶ (PRD-07)،
+  ۱-۲ (O-22 ب، هسته و بردار)، ۴-۲۰ (۲) متنِ «پایانِ روزِ کاری»، ۳-۴ (ابزارِ بی‌نام‌کننده)، ۴-۳ (نقشهٔ OSM)، ۳-۱۱ (`server.yml`)، ۴-۲۳ (۱)
+  صفحهٔ استودیو، ۴-۲ (وابستگیِ تازهٔ عکس). ریپوی `server`: ۲-۹، ۲-۱۱، ۲-۱۸، ۲-۲۶، ۳-۷، ۳-۹، ۳-۱۵، ۴-۱، ۴-۱۶.
+- قدمِ بعدی: هماهنگ‌کننده استثناها را صریح از صاحب‌کار بپرسد (۱-۱، ۲-۱، ۲-۶، ۲-۲۲ (۳)، ۳-۸ (۲)، ۳-۱۴، ۴-۱۳، ۴-۲۳ (۲))؛ سپس همان
+  ترتیبِ گروه‌های بالا.
+
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/missing-1` (ردیف‌های MISSING: POS-37؛ روی `ccr-…-batch-47` ‏96053218a؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: POS-37 ⇐ PARTIAL — مالیاتِ فاکتور پشتِ پرچمِ خاموشِ `shop.sale_tax` و تنظیمِ دکانِ `tohid-policy:sale_tax*` (بی نرخِ پیش‌فرض، D-11):
   هستهٔ `core/sale/SaleTax` + هم‌زادِ `license/sale-tax.js` + بردارِ `sale-tax-v1.json` («فاکتور» یا «ردیف» با نرخِ هر کالا)، `Sale.taxMinor`،

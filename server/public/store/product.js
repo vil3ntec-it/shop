@@ -18,13 +18,22 @@
     return sameP;
   }
 
-  /** `ctx.rail(id, list)` از store.js (ردیفِ کارت)، `ctx.slug` دکانِ همین ویترین. برمی‌گرداند `detail(r)`؛ `r` تهی ⇒ همه پاک و پنهان. */
+  //  PRD-17/27: گالریِ عکس‌های بیشتر (gallery.js ِ دیربار) فقط با `features.gallery` ِ سرور (تصمیمِ ۴-۲۲)
+  var gal = null; var galP = null;
+  function loadGal(slug) {
+    galP = galP || K.js('/store/gallery.js').then(function () { gal = window.StoreGallery({ slug: slug }); return gal; }, function (e) { galP = null; throw e; });
+    return galP;
+  }
+
+  /** `ctx.rail(id, list)` از store.js (ردیفِ کارت)، `ctx.slug` دکانِ همین ویترین، `ctx.feat()` همان `features`. برمی‌گرداند `detail(r)`؛ `r` تهی ⇒ همه پاک و پنهان. */
   window.StoreProduct = function (ctx) {
     var rail = ctx.rail; var want = 0;
     return function detail(r) {
       var x = r ? r.product : {};
       var my = ++want;
       if (same) same(null);
+      if (gal) gal(null);
+      if (r && ctx.feat && ctx.feat().gallery) loadGal(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی گالری */ });
       //  same.js ِ دیررس برگهٔ کالای دیگری را پر نمی‌کند
       if (x.bankProductId && x.sameElsewhere === true) loadSame(ctx.slug).then(function (show) { if (my === want) show(x); }, function () { /* بی بخش */ });
       $('ps-desc').textContent = x.description || '';

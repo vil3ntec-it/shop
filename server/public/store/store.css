@@ -57,6 +57,11 @@
 .ps-img.tile { padding: 8%; background: var(--tile); }
 .ps-img img { width: 100%; height: 100%; object-fit: contain; }
 .ps-img .ph { font-size: 56px; font-weight: 700; color: var(--faint); }
+/* PRD-17/27: گالری (gallery.js ِ دیربار) — کشیدنِ افقی روی عکس به اسکریپت می‌رسد، پیمایشِ عمودی همان */
+.ps-img { touch-action: pan-y; }
+.ps-gal { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center; margin-top: 8px; }
+.ps-gal .dot[aria-current] { background: var(--surface-2); font-weight: 700; }
+.ps-gal p { flex-basis: 100%; text-align: center; margin: 0; }
 .ps-price { font-size: 22px; font-weight: 700; }
 .ps-price small { font-size: 13px; font-weight: 400; color: var(--muted); }
 .ps-desc { margin-top: var(--s3); overflow-wrap: anywhere; }

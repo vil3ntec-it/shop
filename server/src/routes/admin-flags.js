@@ -87,6 +87,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.campaigns', scope: 'shop', default: false, what: 'پیوند و QR ِ کمپین با ردیابیِ منبع (MKT-10/11)' },
   { key: 'shop.storefront.bulk', scope: 'shop', default: false, what: 'انتشارِ گروهیِ کالای ویترین از کاتالوگِ واحد (M2)' },
   { key: 'shop.storefront.visual_search', scope: 'shop', default: false, what: '«جست‌وجو با عکس» ِ ویترین (AI-11)؛ با `shop.visual_search`' },
+  { key: 'shop.storefront.gallery', scope: 'shop', default: false, what: 'گالریِ عکس‌های بیشترِ کالا در برگهٔ کالای ویترین (PRD-17/27، تصمیمِ ۴-۲۲)؛ با `shop.image_bank`' },
   { key: 'shop.storefront.link_expiry', scope: 'shop', default: false, what: 'لینکِ پیگیریِ سفارش زمان‌دار و باطل‌شدنی؛ QR ِ فاکتور یک سال (TEN-03، O-08)' },
   { key: 'shop.orders.subscribers_only', scope: 'shop', default: false, what: 'سفارشِ تازهٔ مشتری فقط با اشتراکِ فعال (SUB-10)؛ روشن کردن با صاحب محصول' },
   { key: 'shop.orders.desk', scope: 'shop', default: false, what: 'میزِ سفارش: «شلوغم»، توقفِ موقت و خودکار، قبولِ خودکار (ORD-04/08/09)' },

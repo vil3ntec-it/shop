@@ -6,10 +6,11 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   splitParts, collect, sha, readBlockers, readStatus, verifyStatus, buildStatus, expandRefs, counts, familyOf,
-  buildBlockers, verifyBlockers, RESOLVED_CLASH,
+  buildBlockers, verifyBlockers, RESOLVED_CLASH, LATER, verifyRelease,
 } from './spec.mjs';
 
 const DIR = join(dirname(fileURLToPath(import.meta.url)), '..');
+const toFaN = (n) => String(n).replace(/[0-9]/g, (x) => '۰۱۲۳۴۵۶۷۸۹'[x]);
 
 // سندِ کوچکی با همهٔ شکل‌های سرخط و شناسه‌ای که v3 دارد.
 const DOC = [
@@ -178,6 +179,27 @@ test('STATUS: نگاشتِ نسخهٔ ۱ و قاعدهٔ شواهد', () => {
   const badState = built.replace(/^(\| AUTH-01 \|(?:[^|]*\|){4}) NOT-VERIFIED \|/m, '$1 DONE |');
   assert.ok(verifyStatus(d, badState).some((e) => e.includes('AUTH-01') && e.includes('نامعتبر')));
   assert.ok(verifyStatus(d, built.replace(/^\| POS-02 \|.*\n/m, '')).some((e) => e.includes('POS-02')), 'ردیفِ جاافتاده');
+});
+
+test('STATUS: دامنهٔ نسخهٔ ۱ — «پس از انتشار» در ستونِ مانع و فهرستِ RELEASE-1-fa.md', () => {
+  const { parts } = splitParts(DOC);
+  const d = collect(parts, new Map([['INV-01', 'برخورد'], ['S141', 'هم‌معنا']]));
+  const base = buildStatus(d, '', sha(Buffer.from(DOC)));
+  const n = d.entries.length;
+  assert.match(base, new RegExp(`^\\| نسخهٔ ۱ \\| ${toFaN(n)} \\|`, 'm'), 'بی نشان همه در دامنه');
+  assert.match(base, /^\| پس از انتشار \| ۰ \|/m);
+  const marked = base.replace(/^(\| POS-02 \|(?:[^|]*\|){7}) — \|/m, `$1 ${LATER} (تصمیمِ صاحب‌کار) |`);
+  assert.notEqual(marked, base);
+  const built = buildStatus(d, marked, sha(Buffer.from(DOC)));
+  assert.equal(buildStatus(d, built, sha(Buffer.from(DOC))), built, 'status دوباره همان را می‌سازد');
+  assert.match(built, new RegExp(`^\\| نسخهٔ ۱ \\| ${toFaN(n - 1)} \\|`, 'm'));
+  assert.match(built, /^\| پس از انتشار \| ۱ \| ۰ \| ۰ \| ۰ \| ۰ \| ۱ \| ۰ \|$/m, 'ردیفِ نشان‌دار با همان وضعیت');
+  const rel = (ids) => `# نسخهٔ ۱\n\n## شناسه‌های «پس از انتشار»\n\n| شناسه | چرا |\n|---|---|\n${ids.map((i) => `| ${i} | x |`).join('\n')}\n\n## بعد\n\n| POS-01 | بیرونِ بخش |\n`;
+  assert.deepEqual(verifyRelease(built, rel(['POS-02'])), []);
+  assert.ok(verifyRelease(built, rel([])).some((e) => e.includes('POS-02')), 'نشان‌دار ولی نه در فهرست');
+  assert.ok(verifyRelease(built, rel(['POS-02', 'F0-01'])).some((e) => e.includes('F0-01')), 'در فهرست ولی بی نشان');
+  assert.ok(verifyRelease(built, '').some((e) => e.includes('RELEASE-1-fa.md')), 'نشان بی پرونده');
+  assert.deepEqual(verifyRelease(base, ''), [], 'بی نشان و بی پرونده: سالم');
 });
 
 test('سندِ واقعیِ docs/spec: همان SHA، بی خطا با ردهٔ BLOCKERS.md، و شمارهای واقعی', () => {
