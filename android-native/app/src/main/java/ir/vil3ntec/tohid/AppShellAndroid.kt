@@ -125,6 +125,8 @@ fun AppShell(context: Context, store: ShopStore, onShopShown: (suspend () -> Uni
     }
   }
   if (onShopShown != null && welcomed && !courier) LaunchedEffect(Unit) { onShopShown() }
+  //  LOC-04: جدولِ تعطیلاتِ رسمیِ سرور روزی یک بار (بی‌توکن؛ بی‌شبکه همان نسخهٔ ذخیره‌شده) ⇒ `ShopDayChoice.rules`
+  LaunchedEffect(Unit) { ShopDayChoice.keepHolidaysFresh(context) }
 
   //  حالتِ برنامه (دکان / پیک) — انتخابِ کاربر؛ نصبِ پیشین همان رفتارِ امروز
   val chosen = ModeState.chosen.value

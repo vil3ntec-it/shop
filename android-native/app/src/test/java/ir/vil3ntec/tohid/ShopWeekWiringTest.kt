@@ -59,4 +59,23 @@ class ShopWeekWiringTest {
     assertTrue("کادرِ تاریخِ نسخهٔ ۳ باید باشد", defs.any { it.first == "ir/vil3ntec/tohid/ui/v3/V3Inputs.kt" })
     for ((path, line) in defs) assertTrue("$path: $line", line.contains("= ir.vil3ntec.tohid.yesterdayIso()"))
   }
+
+  /** LOC-04 — جدولِ تعطیلاتِ سرور به همان قاعدهٔ هفته می‌رسد؛ منطقِ خواندن در `HolidaysTest`/`HolidayVectorsTest` (core) */
+  @Test fun `تعطیلاتِ رسمیِ سرور در قاعدهٔ هفته‌اند و روزی یک بار گرفته می‌شوند`() {
+    val choice = src("ir/vil3ntec/tohid/ShopDayChoiceAndroid.kt")
+    assertTrue(choice.contains("WeekRules(weekStart = weekStart, weekend = closedDays, holidays = holidays)"))
+    assertTrue(choice.contains("Holidays.parse(holidayPrefs(context).getString(HOLIDAY_TABLE, null)).dates"))
+    //  بی‌توکن و بی شناسهٔ دستگاه؛ پاسخِ بدشکل نسخهٔ ذخیره‌شده را پاک نمی‌کند
+    assertTrue(choice.contains("getPublic(ApiEndpoints.Calendar.HOLIDAYS, anonymous = true)"))
+    assertTrue(choice.contains("val table = Holidays.of(body) ?: return false"))
+    assertTrue(choice.contains("if (!Holidays.due("))
+    //  پوستهٔ مشترکِ اندروید و آیفون
+    assertTrue(src("ir/vil3ntec/tohid/AppShellAndroid.kt").contains("LaunchedEffect(Unit) { ShopDayChoice.keepHolidaysFresh(context) }"))
+    assertEquals("/calendar/holidays", ir.vil3ntec.tohid.core.net.ApiEndpoints.Calendar.HOLIDAYS)
+    //  همان درِ سرور (`docs/api/routes.json`)
+    val routes = listOf("../../docs/api/routes.json", "../docs/api/routes.json", "docs/api/routes.json").map(::File)
+      .firstOrNull { it.isFile } ?: error("docs/api/routes.json پیدا نشد (cwd=${File(".").absoluteFile})")
+    assertTrue(routes.readText().contains("\"method\":\"GET\",\"path\":\"/api/calendar/holidays\""))
+  }
 }
+

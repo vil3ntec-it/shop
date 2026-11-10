@@ -183,6 +183,17 @@
   `DesktopTextTest` (سقفِ ۵۹). فهرستِ بی‌ترجمه‌ها برای صاحب‌کار در `docs/i18n-glossary.md` («پوستهٔ کامپیوتر»).
 - نیمه‌کاره: هیچ آزمونِ کاتلینی این‌جا اجرا نشد (بی Gradle) ⇒ شاهدِ CI ِ دسته؛ STATUS ارتقا نیافت.
 - قدمِ بعدی: ترجمهٔ صاحب‌کار برای فهرستِ glossary؛ تصمیمِ `en`/`ps` در `keymap.json` برای پنجرهٔ F1؛ پس از CI ِ سبز، RPT-13 فقط با شاهد ارتقا.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/loc-04` (ردیفِ P1 ِ LOC-04: تعطیلاتِ رسمی از سرور؛ روی `claude/loc-03` ‏a0f77ca9؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سرور از پیش در داشت (`routes/calendar.js`، `routes/admin-calendar.js`، `lib/holidays.js`)؛ کمبودها بسته شد: دلیلِ اجباری (۴۰۰ `reason_required`)،
+  سابقه با دلیل و افزوده/برداشته **در همان تراکنش**، جدولِ یکسان ⇒ `unchanged` (تکرارِ پاسخِ گم‌شده ۴۰۹ ِ دروغ نمی‌گیرد)، قفلِ تراکنشیِ کلید
+  (نخستین نوشتنِ هم‌زمان روی PostgreSQL هر دو «نسخهٔ ۱» می‌شد)، سقفِ IP ِ `calendar-ip` و `admin-calendar-ip` (در `routes/admin.js` پیش از
+  `requireAdmin`)، `from>to` ⇒ ۴۰۰، `If-None-Match` ِ چندتایی، ردیفِ خرابِ پایگاه کنار (نه ۵۰۰)، «توانایی» ِ `holidays.v1` و دو ردیفِ بندِ ۶ ِ
+  ADMIN-CONTROL-PLANE. برنامه‌ها: `core/calendar/Holidays` (commonMain؛ همان `parse` ِ سرور با بردارِ `core/test-vectors/calendar-holidays-v1.json`)،
+  `ShopDayChoice.holidays` در `rules` (نسخه در `tohid-holidays`، DATA-SAFETY §۶)، `keepHolidaysFresh` در `AppShell` (اندروید و آیفون) و `Main.kt` ِ
+  کامپیوتر — روزی یک بار، بی‌توکن و بی شناسهٔ دستگاه؛ بی جدول همان رفتارِ پیشین. `holidays.test.js` ۱۴/۱۴ روی PGlite و PostgreSQL ِ محلی.
+- نیمه‌کاره: آزمون‌های کاتلین فقط در CI (`HolidaysTest`، `HolidayVectorsTest`، `ShopWeekWiringTest`، `HolidaysPrefDesktopTest`، `DataSafetyGuardTest`)؛
+  صفحهٔ ویرایشِ جدول ساخته نشد: `server/public/admin` فقط نگه‌داری است و پنلِ مرکزی در ریپوی server (این سیزن خاموش) ⇒ `OWNER-PENDING-fa.md` ۴-۱۷.
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های بالا؛ پاسخِ صاحب‌کار به ۴-۱۷ (پیشنهاد: ویرایشگر در پنلِ مرکزی پشتِ `holidays.v1`)؛ گذاشتنِ نخستین جدول.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/loc-03` (ردیفِ P0 ِ LOC-03: هفتهٔ دکان؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: منطقِ هفته از پیش در `BusinessDay`/`WeekRules` بود ولی هیچ‌جا تنظیم نمی‌شد و خانه شنبه را ثابت داشت. تازه: `core/calendar/ShopWeek`
   (commonMain: آغازِ شنبه/یکشنبه/دوشنبه، متنِ روزهای تعطیل، `toggle` با نگه‌داشتنِ آخرین روزِ کاری، `order`/`indexOf`)؛ `ShopDayChoice.weekStart`/
