@@ -140,7 +140,8 @@ test('⛔ پشتِ همان پرچم: بی `shop.order_notify`، یا `shop.stoc
   assert.equal((await getOrder(a, oa.id)).stockHold.review, true, 'بررسی همان رفتارِ پیشین');
   assert.equal((await reviewRows(a)).length, 0);
 
-  //  ۲) هر دو روشن، سپس `shop.stock_reserve` خاموش — نگه‌داشتهٔ باز هنوز بررسی می‌شود، خبر نه
+  //  ۲) هر دو روشن، سپس `shop.stock_reserve` خاموش — ⛔ R6: نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (جزئیات بی stockHold، همان main) و
+  //  خبر نه؛ کمبود فقط دفترداری می‌شود ⇒ روشنِ دوباره همان دم «در بررسی»، باز هم بی خبر
   const b = await shop('بررسی-پرچم‌خاموش');
   await enable(b);
   await stocked(b, 'q2', 1);
@@ -148,6 +149,9 @@ test('⛔ پشتِ همان پرچم: بی `shop.order_notify`، یا `shop.stoc
   await live(b.shopId, 'shop.stock_reserve', false);
   await sync(b, sale('q2-s', [['q2-i', 'q2', 1]]));
   await refresh(b);
+  assert.equal((await getOrder(b, ob.id)).stockHold, undefined);
+  assert.equal((await reviewRows(b)).length, 0);
+  await live(b.shopId, 'shop.stock_reserve', true);
   assert.equal((await getOrder(b, ob.id)).stockHold.review, true);
   assert.equal((await reviewRows(b)).length, 0);
   await drain();
@@ -177,9 +181,16 @@ test('فروشِ حضوری نگه‌داشته را برد ⇒ یک ردیفِ 
   assert.equal(m.data.orderId, o.id);
   //  همان کلیدهای دادهٔ رویدادهای یک‌بارهٔ پیشین — هیچ کلیدِ تازه‌ای برای دادهٔ مشتری
   assert.deepEqual(Object.keys(m.data).sort(), ['count', 'event', 'notifId', 'orderId', 'orderNo', 'reminder', 'shopId', 'type']);
-  const text = JSON.stringify(m);
+  //  شناسه‌های مات (تصادفی/پیاپی) ممکن است تصادفاً «50» داشته باشند (سرخیِ «زیرِ Electron» روی f067bf9c):
+  //  هر کدام اول به مقدارِ شناخته‌اش بسته می‌شود — پس جای پنهان کردنِ داده نیست — و سپس از متنِ سنجه بیرون می‌رود.
+  assert.equal(m.data.shopId, s.shopId);
+  assert.equal(String(m.data.notifId), String(rows[0].id));
+  assert.equal(String(m.data.orderNo), String(o.orderNo));
+  const bare = JSON.parse(JSON.stringify(m));
+  for (const k of ['shopId', 'notifId', 'orderId', 'orderNo']) delete bare.data[k];
+  const text = JSON.stringify(bare);
   for (const secret of [CUSTOMER.name, CUSTOMER.phone, '791234567', 'کالای r1', '5000', '50']) {
-    assert.ok(!text.includes(secret), `بی دادهٔ مشتری/کالا/مبلغ: ${secret}`);
+    assert.ok(!text.includes(secret), `بی دادهٔ مشتری/کالا/مبلغ: ${secret} در ${text}`);
   }
   assert.equal((await one('SELECT status FROM order_notify_outbox WHERE id=$1', [rows[0].id])).status, 'delivered');
   //  دورِ دوم و سوم ⇒ هیچ

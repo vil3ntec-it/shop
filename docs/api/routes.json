@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1011,
+    "routes": 1014,
     "byAuth": {
-      "none-detected": 194,
+      "none-detected": 195,
       "admin": 279,
       "inline": 2,
-      "user": 493,
+      "user": 495,
       "device": 42,
       "optional": 1
     },
     "byShape": {
-      "extracted": 701,
-      "empty": 308,
+      "extracted": 702,
+      "empty": 310,
       "unresolved": 2
     }
   },
@@ -704,6 +704,7 @@
     {"method":"PUT","path":"/api/shop/hesabpay/pin","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/hesabpay/pin/reset","area":"shop","source":"server/src/routes/shop-hesabpay.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'shop-hesabpay-ip' })","requireUser","requireShop","limit","requireRecentAuth"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/images","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":[],"query":["product_id","role"],"body":[],"response":{"statuses":[201],"keys":[]},"errors":[],"shape":"extracted"},
+    {"method":"POST","path":"/api/shop/images/:id/detach","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'imgbank-detach-ip' })","requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r","requirePermission('data.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/images/:id/process","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":["id"],"query":[],"body":["step"],"response":{"statuses":[200,201],"keys":["...","result","step"]},"errors":["404 not_found"],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/images/:id/propose","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r","requirePermission('shop.update')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/images/:id/report","area":"shop","source":"server/src/routes/shop-images.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')","rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => r"],"params":["id"],"query":[],"body":[],"response":{"statuses":[201],"keys":[]},"errors":["404 not_found"],"shape":"empty"},
@@ -813,6 +814,7 @@
     {"method":"GET","path":"/api/shop/promos","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","permissions","redeem","stamp","tierPrice","version"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/promos/redeem","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200,409],"keys":["codes","error"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/shop/promos/redeem/release","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('data.write')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["released"]},"errors":["403 release_not_allowed"],"shape":"extracted"},
+    {"method":"GET","path":"/api/shop/promos/redemptions","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'promo-held-ip' })","requireUser","requireShop","requirePermission('data.read')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["held","more"]},"errors":["403 release_not_allowed"],"shape":"extracted"},
     {"method":"DELETE","path":"/api/shop/promos/rules/:id","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":["id"],"query":[],"body":[],"response":{"statuses":[200],"keys":["ok"]},"errors":["404 rule_not_found"],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/promos/rules/:id","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":["id"],"query":[],"body":["rule"],"response":{"statuses":[200,400],"keys":["error","rule"]},"errors":["400 invalid_id","400 invalid_rule","400 max_uses_unsupported","400 too_large","403 below_cost_owner_only","403 expiry_promo_disabled","403 tier_price_disabled","409 code_taken","409 too_many_rules"],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/promos/settings","area":"shop","source":"server/src/routes/shop-promos.js","auth":"user","guards":["requireUser","requireShop","requirePermission('settings.write')"],"params":[],"query":[],"body":["enabled"],"response":{"statuses":[200],"keys":["enabled","updatedAt"]},"errors":["400 invalid_setting"],"shape":"extracted"},
@@ -943,6 +945,7 @@
     {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/messages","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/chat/conversations/:id/messages/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":["for"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"PATCH","path":"/api/store/:slug/chat/conversations/:id/messages/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/messages/:mid/edit","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/chat/conversations/:id/pins/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/store/:slug/chat/conversations/:id/pins/:mid","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","mid","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["conversation"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/chat/conversations/:id/receipts","area":"store","source":"server/src/routes/shop-chat-store.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},

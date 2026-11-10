@@ -201,6 +201,18 @@ class PhoneHomeModelTest {
   }
 
   @Test
+  fun `قطعیِ ماندگارِ سرور کارتِ آرام است، نه سرخ — SYN-12`() {
+    val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OUTAGE, queued = 3, syncError = "به سرور نرسیدیم")).single()
+    assertEquals(HomeAlerts.Kind.SYNC, a.kind)
+    assertEquals("همگام‌سازی منتظرِ سرور است", a.title)
+    assertFalse("هشدارِ بی‌مورد نه", a.urgent)
+    assertTrue("روی کارتِ خانه دیده می‌شود", a.pressing)
+    assertEquals("settings/data/sync", a.route)
+    //  بی صف هم: داده‌های دستگاه‌های دیگر نمی‌رسند
+    assertEquals(1, HomeAlerts.pressing(HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OUTAGE))).size)
+  }
+
+  @Test
   fun `صفِ بی‌اینترنت هم به صفحهٔ همگام‌سازی می‌رود`() {
     val a = HomeAlerts.build(HomeAlerts.Input(sync = HomeAlerts.Sync.OFFLINE, queued = 4)).single()
     assertEquals("settings/data/sync", a.route)

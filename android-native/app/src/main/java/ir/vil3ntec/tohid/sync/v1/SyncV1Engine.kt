@@ -5,6 +5,7 @@ import ir.vil3ntec.tohid.core.config.AppConfig
 import ir.vil3ntec.tohid.core.i18n.StrSync
 import ir.vil3ntec.tohid.core.sync.OpBacklog
 import ir.vil3ntec.tohid.core.sync.RestoreReplay
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.data.LedgerArchive
 import ir.vil3ntec.tohid.data.ShopData
@@ -82,6 +83,7 @@ class SyncV1Engine private constructor(context: Context) {
     }
 
   private val gate = Mutex()
+  @Volatile private var streak: SyncOutage.Streak? = null  // SYN-12: رشتهٔ شکستِ جاری در حافظه (`SyncFailure.note`)؛ پیش از `_status` که آن را می‌خواند
   private val _status = MutableStateFlow(snapshotStatus())
   val status: StateFlow<SyncStatus> = _status.asStateFlow()
 
@@ -305,10 +307,10 @@ class SyncV1Engine private constructor(context: Context) {
     //  `force`: همان کلید ولی پرونده‌هایش جابه‌جا شدند (`SyncV1Keys.switchShop`) ⇒ صف و ژورنال از نو خوانده شوند
     if (fresh == accountKey && !force) return
     accountKey = fresh
+    streak = null; SyncV3Runner.of(app).forgetOutage()  // SYN-12: رشتهٔ شکستِ حساب یا دکانِ پیشین در حافظه نمی‌ماند
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
-    commit = commitFor(accountKey)
-    restore = restoreFor(accountKey)
+    commit = commitFor(accountKey); restore = restoreFor(accountKey)
     publish()
   }
 
@@ -513,7 +515,7 @@ class SyncV1Engine private constructor(context: Context) {
         throw cancelled
       } catch (error: Throwable) {
         attempt++
-        state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+        streak = SyncFailure.note(state, streak, error, error.message ?: "خطای نامشخص", clock())  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
         Result.failure(error)
       } finally {
         busy = false
@@ -604,7 +606,7 @@ class SyncV1Engine private constructor(context: Context) {
       throw cancelled
     } catch (error: Throwable) {
       attempt++
-      state.lastError = error.message ?: "خطای نامشخص"  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
+      streak = SyncFailure.note(state, streak, error, error.message ?: "خطای نامشخص", clock())  // داده: متنِ خامِ `lastError` (ذخیره می‌شود؛ `SyncModel.classify` با نشانه‌هایش دسته می‌کند) — جزئیاتِ پشتیبانی
       Result.failure(error)
     } finally {
       busy = false
@@ -850,15 +852,13 @@ class SyncV1Engine private constructor(context: Context) {
      ========================================================== */
 
   /** عقب‌نشینیِ نمایی: ۲، ۴، ۸ … تا پنج دقیقه، بی‌نهایت تلاش. */
-  fun backoffMs(): Long {
-    val ms = min(MAX_BACKOFF_MS.toDouble(), MIN_BACKOFF_MS * 2.0.pow(attempt)).toLong()
-    return ms
-  }
+  fun backoffMs(): Long = min(MAX_BACKOFF_MS.toDouble(), MIN_BACKOFF_MS * 2.0.pow(attempt)).toLong()
 
   fun snapshotStatus(): SyncStatus {
     //  Sync v3 پشتِ تنظیمِ هر دستگاه (پیش‌فرض v1): همان نوار و قفلِ خروج، از صفِ v3
     if (SyncChoice.isV3(app)) SyncV3Runner.of(app).asV1Status()?.let { return it }
     val queued = runCatching { queue.size() }.getOrDefault(0)
+    val outage = SyncOutage.of(streak, state.lastError, Backend.isOnline(app), attempt, clock())  // SYN-12: کوتاه یا بی‌نت سرخ نمی‌کند
     return SyncStatus(
       dot = SyncDot.of(
         error = state.lastError.isNotBlank(),
@@ -866,7 +866,7 @@ class SyncV1Engine private constructor(context: Context) {
         signedIn = Backend.tokens(app).signedIn,
         configured = AppConfig.isConfigured(app),
         queued = queued,
-        busy = busy,
+        busy = busy, alarm = outage.alarm,
       ),
       queued = queued,
       dropped = runCatching { queue.droppedCount() }.getOrDefault(0),
@@ -879,7 +879,7 @@ class SyncV1Engine private constructor(context: Context) {
       upgradeAvailable = state.upgradeAvailable,
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
       serverSchema = state.serverSchema,
-      live = liveConnected,
+      live = liveConnected, outage = outage.kind,
     )
   }
 

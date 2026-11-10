@@ -31,6 +31,10 @@
  *
  *   ویرایش ─ ORD-14 و CHK-21 ([syncOrderIn]): نگه‌داشتهٔ بازِ سفارش هم‌اندازهٔ قلم‌های تازه می‌شود؛ افزودن با همان
  *           سنجشِ ساخت (نگه‌داشتهٔ خودِ سفارش «دیگران» نیست).
+ *   خاموش ─ ⛔ R6: پرچمِ `shop.stock_reserve` خاموش ⇒ نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (همان main): [heldOf] ⇒ ۰ (ویترین،
+ *           کاتالوگ، سنجش)، [orderView]/[reviewIdsOf] ⇒ هیچ، وظیفه و خبرِ بررسی نه؛ و سرور نگه‌داشته‌ای نمی‌سازد، بزرگ
+ *           نمی‌کند و مهلتش را دراز نمی‌کند (قبول دست نمی‌زند، تحویل فقط کوتاه می‌کند). ردیف‌ها در جدول می‌مانند و فقط بسته
+ *           می‌شوند (پایان، فروشِ تحویل، قلمِ عوض‌شده، جارو با مهلتِ خودش) ⇒ روشنِ دوباره امن: نگذشته می‌شمارد، گذشته نه.
  */
 const { query, many, now, tx } = require('../db');
 const stock = require('./stock');
@@ -61,10 +65,17 @@ async function ttlSecOf(c, shopId) {
 }
 
 /**
- * نگه‌داشتهٔ فعال (نگه‌داشته و نگذشته) به تفکیکِ کالا ⇒ Map<pid, milli>. بی ردیف ⇒ Map ِ خالی.
+ * نگه‌داشتهٔ فعال (نگه‌داشته و نگذشته) به تفکیکِ کالا ⇒ Map<pid, milli>. بی ردیف یا پرچمِ خاموش (R6) ⇒ Map ِ خالی؛ پرچم
+ * فقط وقتی ردیفی هست خوانده می‌شود (دکانِ بی نگه‌داشته همان یک پرسش).
  * [exceptOrderId]: نگه‌داشتهٔ همان سفارش «دیگران» نیست (افزودنِ قلم، CHK-21: مقدارِ کلِ سفارش سنجیده می‌شود).
  */
 async function heldOf(c, shopId, ids, at = now(), exceptOrderId = '') {
+  const map = await sumHeld(c, shopId, ids, at, exceptOrderId);
+  return map.size && !(await stock.reserveFlagOf(shopId, c)) ? new Map() : map;
+}
+
+/** همان [heldOf] بی پرسشِ پرچم — فقط برای فراخواننده‌ای که پرچم را همین حالا روشن دیده ([planIn]، [reholdIn]) */
+async function sumHeld(c, shopId, ids, at, exceptOrderId = '') {
   const map = new Map();
   if (!ids || !ids.length) return map;
   const rows = (await runOf(c)(
@@ -132,7 +143,7 @@ async function planIn(c, shopId, settings, ids, at, orderId = '') {
   if (!fr.fresh) return null;
   await stock.lock(c, shopId);
   await expireDueIn(c, shopId, at);
-  return { held: await heldOf(c, shopId, ids, at, orderId), ttlSec: await ttlSecOf(c, shopId) };
+  return { held: await sumHeld(c, shopId, ids, at, orderId), ttlSec: await ttlSecOf(c, shopId) };
 }
 
 /**
@@ -187,7 +198,7 @@ async function reholdIn(c, shopId, orderId, at) {
   const names = new Map((await c.query(
     'SELECT product_id, name, unit FROM catalog_products WHERE shop_id=$1 AND product_id = ANY($2::text[])', [shopId, ids]
   )).rows.map((r) => [r.product_id, { name: r.name, unit: r.unit }]));
-  await stock.check(c, shopId, { lines: lapsed, settings, names, held: await heldOf(c, shopId, ids, at) });
+  await stock.check(c, shopId, { lines: lapsed, settings, names, held: await sumHeld(c, shopId, ids, at) });
   await insertHolds(c, shopId, orderId, lapsed, null, at);
 }
 
@@ -195,7 +206,8 @@ async function reholdIn(c, shopId, orderId, at) {
  * پس از عوض شدنِ قلم‌های سفارش (ویرایش ORD-14، افزودن CHK-21) در همان تراکنش: نگه‌داشتهٔ **باز** ِ سفارش هم‌اندازهٔ
  * قلم‌های تازه می‌شود — قلمِ برداشته یا کم/زیادشده ⇒ ردیفِ پیشین آزاد و (اگر هنوز هست) ردیفِ تازه با همان مهلت؛ قلمِ
  * تازه ⇒ نگه‌داشتنِ تازه با همان مهلت. سنجشِ «آزاد» پیش‌تر با [checkOrderIn] (و نگه‌داشتهٔ خودی کنار) انجام شده؛ ویرایشِ
- * بی سنجش (کارمند) هرگز رد نمی‌شود و کمبود به بررسی می‌رود (INV-19). سفارشِ بی نگه‌داشتهٔ باز ⇒ هیچ.
+ * بی سنجش (کارمند) هرگز رد نمی‌شود و کمبود به بررسی می‌رود (INV-19). سفارشِ بی نگه‌داشتهٔ باز ⇒ هیچ. پرچمِ خاموش (R6) ⇒
+ * فقط آزاد کردن و کوچک کردن؛ قلمِ تازه/بزرگ‌شده/جایگزین نگه‌داشته نمی‌گیرد.
  */
 async function syncOrderIn(c, shopId, orderId, at) {
   const heldSql = `SELECT id, order_id, line_no, product_id, qty_milli, expires_at, created_at FROM stock_reservations
@@ -205,6 +217,7 @@ async function syncOrderIn(c, shopId, orderId, at) {
   await expireDueIn(c, shopId, at);
   const held = (await c.query(heldSql, [shopId, orderId])).rows;
   if (!held.length) return;
+  const on = await stock.reserveFlagOf(shopId, c);
   const exp = held.map((r) => (r.expires_at === null ? null : num(r.expires_at)));
   const expiresAt = exp.includes(null) ? null : Math.min(...exp);
   //  به واحدِ موجودی؛ کالایی که دیگر در کاتالوگ نیست ⇒ قلمش نگه‌داشته ندارد (آزاد می‌شود)
@@ -222,7 +235,7 @@ async function syncOrderIn(c, shopId, orderId, at) {
   }).map((w) => {
     const r = byLine.get(w.lineNo);
     return r && r.product_id === w.productId && w.qtyMilli <= num(r.qty_milli) ? { ...w, createdAt: r.created_at } : w;
-  });
+  }).filter((w) => on || w.createdAt !== undefined);   //  ⛔ R6: خاموش ⇒ فقط کوچک/هم‌اندازه (همان جا)؛ تازه یا بزرگ‌شده نه
   if (!drop.length && !add.length) return;
   if (drop.length) {
     const ids = drop.map((r) => r.id);
@@ -250,6 +263,9 @@ async function onTransitionIn(c, shopId, orderId, to, at) {
     `SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND order_id=$2 AND kind='soft' LIMIT 1`, [shopId, orderId]
   )).rows.length > 0;
   if (!any) return;
+  //  ⛔ R6: خاموش ⇒ قبول به نگه‌داشته دست نمی‌زند (بی‌مهلت نمی‌شود؛ جارو با مهلتِ خودش می‌بندد) و تحویل فقط کوتاه می‌کند
+  const on = await stock.reserveFlagOf(shopId, c);
+  if (accept && !on) return;
   await stock.lock(c, shopId);
   await expireDueIn(c, shopId, at);
   if (accept) {
@@ -262,7 +278,8 @@ async function onTransitionIn(c, shopId, orderId, to, at) {
   }
   if (out) {
     await c.query(
-      `UPDATE stock_reservations SET expires_at=$3 WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held'`,
+      `UPDATE stock_reservations SET expires_at=${on ? '$3' : 'LEAST(expires_at, $3)'}
+        WHERE shop_id=$1 AND order_id=$2 AND kind='soft' AND status='held'`,
       [shopId, orderId, at + HANDOVER_GRACE_MS]
     );
     return;
@@ -277,9 +294,13 @@ async function onTransitionIn(c, shopId, orderId, to, at) {
   if (rows.length) await recheckShort(c, shopId, [...new Set(rows.map((r) => r.product_id))].sort(), at);
 }
 
-/** «بررسی»: تازه‌ترین نگه‌داشته‌هایی که موجودیِ قابل‌فروش دیگر پوششان نمی‌دهد `short_at` می‌گیرند. */
+/**
+ * «بررسی»: تازه‌ترین نگه‌داشته‌هایی که موجودیِ قابل‌فروش دیگر پوششان نمی‌دهد `short_at` می‌گیرند. پرچمِ خاموش (R6) ⇒ همین
+ * دفترداری (نادیده تا روشنِ دوباره، که همان دم درست است) ولی بی وظیفه و بی خبر.
+ */
 async function recheckShort(c, shopId, ids, at, settings = null) {
   if (!ids.length) return [];
+  const on = await stock.reserveFlagOf(shopId, c);
   const s = settings || await stock.settingsOf(shopId, c);
   const lvs = await stock.levelsOf(c, shopId, ids);
   const rows = (await c.query(
@@ -310,15 +331,15 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
         await c.query('UPDATE stock_reservations SET short_at=NULL WHERE id=$1', [r.id]);
       }
     }
-    if (short.length) {
+    if (short.length && on) {
       await stock.openTask(c, shopId, {
         kind: 'reservation_short', productId: pid, dedupe: `soft-short:${pid}`,
         detail: { sellableMilli: sell, heldMilli: cum, orderIds: [...new Set(short.map((r) => r.order_id))].slice(0, 50) },
       }, at);
-      shortAll.push(...short);
     }
+    shortAll.push(...short);
   }
-  for (const orderId of [...newly].sort()) await notifyReviewIn(c, shopId, orderId, at);
+  if (on) for (const orderId of [...newly].sort()) await notifyReviewIn(c, shopId, orderId, at);
   return shortAll;
 }
 
@@ -366,13 +387,13 @@ async function afterMovesIn(c, shopId, ids, settings, at) {
   await recheckShort(c, shopId, [...new Set([...(ids || []), ...done.map((r) => r.product_id)])].sort(), at, settings);
 }
 
-/** خلاصهٔ نگه‌داشتنِ یک سفارش برای جزئیات ⇒ null (بی نگه‌داشتهٔ نرم) یا { status, review, expiresAt, lines }. */
+/** خلاصهٔ نگه‌داشتنِ یک سفارش برای جزئیات ⇒ null (بی نگه‌داشتهٔ نرم یا پرچمِ خاموش، R6) یا { status, review, expiresAt, lines }. */
 async function orderView(run, shopId, orderId, at = now()) {
   const rows = (await run(
     `SELECT line_no, status, expires_at, short_at FROM stock_reservations
       WHERE shop_id=$1 AND order_id=$2 AND kind='soft' ORDER BY line_no, created_at, id`, [shopId, orderId]
   )).rows;
-  if (!rows.length) return null;
+  if (!rows.length || !(await stock.reserveFlagOf(shopId, { query: run }))) return null;
   const byLine = new Map();
   for (const r of rows) byLine.set(num(r.line_no), r);   //  آخرین ردیفِ هر قلم
   const lines = [...byLine.values()].map((r) => {
@@ -392,7 +413,7 @@ async function orderView(run, shopId, orderId, at = now()) {
   };
 }
 
-/** از میانِ [orderIds] آن‌هایی که در بررسی‌اند ⇒ Set (کارتِ فهرستِ سفارش‌ها). بی شناسه ⇒ بی پرسش. */
+/** از میانِ [orderIds] آن‌هایی که در بررسی‌اند ⇒ Set (کارتِ فهرستِ سفارش‌ها). بی شناسه ⇒ بی پرسش؛ پرچمِ خاموش (R6) ⇒ هیچ. */
 async function reviewIdsOf(run, shopId, orderIds, at = now()) {
   const out = new Set();
   if (!orderIds || !orderIds.length) return out;
@@ -401,6 +422,7 @@ async function reviewIdsOf(run, shopId, orderIds, at = now()) {
       WHERE shop_id=$1 AND kind='soft' AND status='held' AND short_at IS NOT NULL
         AND (expires_at IS NULL OR expires_at > $2) AND order_id = ANY($3::text[])`, [shopId, at, orderIds]
   )).rows;
+  if (rows.length && !(await stock.reserveFlagOf(shopId, { query: run }))) return out;
   for (const r of rows) out.add(r.order_id);
   return out;
 }

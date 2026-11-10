@@ -187,6 +187,9 @@ object StrHome {
   val alertSyncErrorBody: String get() = t("کارهای این دستگاه نگه داشته شده‌اند", "This device's changes are being held", "د دې وسیلې کارونه ساتل شوي دي")
   fun alertWaitingInternet(n: Any): String = t("${asIs(n)} کار در انتظارِ اینترنت", "$n ${pl(n, "change", "changes")} waiting for internet", "$n ${pl(n, "کار", "کارونه")} د انټرنېټ په تمه")
   val alertWaitingInternetBody: String get() = t("با وصل شدن خودکار فرستاده می‌شوند", "They'll be sent automatically once online", "د وصلېدو سره به پخپله ولېږل شي")
+  //  SYN-12: قطعیِ ماندگارِ سرور یا راهِ سرور — کارتِ آرام، نه سرخ
+  val alertOutage: String get() = t("همگام‌سازی منتظرِ سرور است", "Sync is waiting for the server", "همغږي د سرور په تمه ده")
+  val alertOutageBody: String get() = t("کارها روی همین دستگاه نگه داشته شده‌اند و با برگشتنِ اتصال خودکار فرستاده می‌شوند", "Changes are kept on this device and go out automatically once the connection is back", "کارونه په همدې وسیله ساتل شوي او د اړیکې په بېرته راتګ سره پخپله لېږل کېږي")
   fun alertOut(n: Any): String = t("${asIs(n)} کالا تمام شده", "$n ${pl(n, "item", "items")} sold out", "$n ${pl(n, "توکی", "توکي")} خلاص شوي")
   fun alertLow(n: Any): String = t("${asIs(n)} کالا رو به پایان", "$n ${pl(n, "item", "items")} running low", "$n ${pl(n, "توکی", "توکي")} د ختمېدو په حال کې")
   fun alertAlsoLow(n: Any): String = t("و ${asIs(n)} کالای دیگر کم مانده", "and $n more running low", "او $n نور لږ پاتې دي")

@@ -1,6 +1,8 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
+import ir.vil3ntec.tohid.data.CreditLimitGate
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.DeliveryAddress
@@ -70,6 +72,15 @@ internal object DebtorFormsModel {
 
   fun limitError(f: DebtorForm): String? = parseLimit(f.creditLimit)?.let { if (it.isNaN() || it < 0) StrKit.notANumber else null }
 
+  /**
+   *  CRM-03 — سقفِ تازه‌ای که این کاربر نمی‌گذارد (`customers.credit_limit` با پرچمِ `shop.credit_limit_perm`) ⇒ خطای درجا؛
+   *  نوشتهٔ نادرست را [limitError] می‌گوید. مشتریِ تازه، سقفِ عوض‌نشده یا قاعدهٔ خاموش ⇒ null.
+   */
+  fun limitPermError(rules: CreditLimitPerm.Rules, debtor: Debtor?, f: DebtorForm): String? {
+    if (limitError(f) != null) return null
+    return CreditLimitGate.error(rules, debtor, parseLimit(f.creditLimit))
+  }
+
   /** «بله» بی منبع ⇒ خطای درجا (همان شرطِ `setMarketingConsent`) */
   fun consentError(f: DebtorForm): String? = if (f.consent == true && f.consentSource.isBlank()) StrKit.required else null
 
@@ -81,7 +92,21 @@ internal object DebtorFormsModel {
    *  و رضایت (`setMarketingConsent`).
    *  هر کدام رد کند، هیچ‌چیز نوشته نمی‌شود و پیامِ همان موتور برمی‌گردد.
    */
-  fun save(d: ShopData, editingId: String?, f: DebtorForm, now: Long, newId: () -> String): DebtorEngine.Result {
+  fun save(d: ShopData, editingId: String?, f: DebtorForm, now: Long, newId: () -> String): DebtorEngine.Result =
+    save(d, editingId, f, now, CreditLimitPerm.Rules.OFF, newId)
+
+  /** همان [save]، با CRM-03: آخرین سد پیش از نوشتنِ دفتر — تغییرِ سقفی که [limitRules] نمی‌پذیرد ⇒ پیامِ [limitPermError] و هیچ نوشتن */
+  fun save(
+    d: ShopData,
+    editingId: String?,
+    f: DebtorForm,
+    now: Long,
+    limitRules: CreditLimitPerm.Rules,
+    newId: () -> String,
+  ): DebtorEngine.Result {
+    if (editingId != null) {
+      limitPermError(limitRules, d.debtors.find { it.id == editingId }, f)?.let { return DebtorEngine.Result.Failed(it) }
+    }
     val base = if (editingId == null) DebtorEngine.add(d, draft(f), now, newId) else DebtorEngine.editWithLimit(d, editingId, draft(f))
     val saved = base as? DebtorEngine.Result.Ok ?: return base
     val id = saved.id

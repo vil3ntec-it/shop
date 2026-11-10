@@ -637,23 +637,8 @@ private fun CustomerFile(store: ShopStore, d: ShopData, snackbar: SnackbarHostSt
       )
     }
   }
-  if (limitOpen) {
-    var text by remember { mutableStateOf(limitText(debtor.creditLimit)) }
-    AlertDialog(
-      onDismissRequest = { limitOpen = false },
-      containerColor = Shop.colors.surfaceSolid,
-      title = { Text(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitOf(debtor.name), color = Shop.colors.text) },
-      text = { Column { CreditLimitField(text) { text = it } } },
-      confirmButton = {
-        TextButton(onClick = {
-          when (val r = DebtorEngine.setCreditLimit(d, id, parseLimit(text))) {
-            is DebtorEngine.Result.Failed -> toast(r.message)
-            is DebtorEngine.Result.Ok -> { scope.launch { store.save(d, r.data) }; limitOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitSaved) }
-          }
-        }) { Text(ir.vil3ntec.tohid.core.i18n.StrKit.save) }
-      },
-      dismissButton = { TextButton(onClick = { limitOpen = false }) { Text(ir.vil3ntec.tohid.core.i18n.Str.cancel) } },
-    )
+  if (limitOpen) DeskCreditLimitDialog(d, debtor, { toast(it) }, onDismiss = { limitOpen = false }) { next ->
+    scope.launch { store.save(d, next) }; limitOpen = false; toast(ir.vil3ntec.tohid.core.i18n.StrCustomerPages.creditLimitSaved)
   }
   if (profileOpen && crm) {
     CrmProfileDialog(debtor, onDismiss = { profileOpen = false }) { phone2, tags ->

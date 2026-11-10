@@ -36,6 +36,8 @@ object I18nTables {
     StrOnlineReport, // RPT-14: گزارشِ فروشِ اینترنتی در برنامهٔ مدیریت
     StrBranches, // RPT-18: گزارشِ همهٔ شعبه‌ها
     StrImageChanges, // IMG-PRO-17/16: تغییرِ دسته‌ایِ عکس‌ها و نسخه‌های عکس
+    StrProductGallery, // PRD-17/27: عکس‌های تکمیلیِ کالا و عکسِ جدای ویترین
+    StrPromoHeld, // PRM-02: آزادِ دستیِ کدِ تخفیفِ نگه‌داشته
     StrDrawers, // PAY-17: چند کشو و شیفتِ شناور
     StrSupplierBills, // PUR-14: فاکتورهای تأمین‌کننده در گوشیِ نسخهٔ ۳
     StrPurchaseOrders, // PUR-02/03/04/14: سفارش‌های خرید در گوشیِ نسخهٔ ۳ (فهرست، فرم، دریافت با اسکن، تطبیق)

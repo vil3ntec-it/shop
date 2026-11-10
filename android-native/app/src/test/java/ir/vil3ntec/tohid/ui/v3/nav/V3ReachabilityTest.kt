@@ -62,6 +62,9 @@ class V3ReachabilityTest {
     Feature("INV-11 پیش‌نویس و ارسالِ انتقال", "stock/transfers/new", "ir.vil3ntec.tohid.ui.v3.stock.TransferDraftRoute"),
     Feature("INV-11 دریافت با اسکن، ناقص و رد", "stock/transfers/{key}", "ir.vil3ntec.tohid.ui.v3.stock.TransferReceiveRoute"),
     Feature("IMG-PRO-16 نسخه‌های کوچک و بزرگِ عکس و سنجهٔ فشرده‌سازی", "products/{id}/photo/versions", "ir.vil3ntec.tohid.ui.v3.products.PhotoVersionsPage"),
+    //  ── PRD-17/27 و PRM-02 (`claude/app-gaps-4`): صفحه برای درهای موجودِ سرور ──
+    Feature("PRD-17/27 عکس‌های تکمیلی و عکسِ جدای ویترین", "products/{id}/photo/gallery", "ir.vil3ntec.tohid.ui.v3.products.ProductGalleryPage"),
+    Feature("PRM-02 آزادِ دستیِ کدِ تخفیفِ نگه‌داشته", "settings/promo-held", "ir.vil3ntec.tohid.ui.v3.settings.sections.PromoHeldScreen"),
     Feature("RPT-18 گزارشِ همهٔ شعبه‌ها", "reports/branches", "ir.vil3ntec.tohid.ui.v3.analytics.BranchesReportPage"),
     Feature(
       "PAY-17 چند کشو و شیفتِ شناور (ردهٔ B، پیش‌فرض خاموش)", "settings/sales/multi-drawer",

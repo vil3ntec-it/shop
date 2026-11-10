@@ -213,6 +213,7 @@ object AutoSync {
     //  نت که نیست، رفتن سراغِ شبکه فقط انتظارِ بی‌فایده است — ولی اگر
     //  چیزی برای فرستادن مانده، بعداً دوباره امتحان می‌کنیم
     if (!Backend.isOnline(app)) {
+      ir.vil3ntec.tohid.sync.v1.SyncV1Worker.reconnect.offline()   // SYN-12: دورِ پس از برگشتنِ شبکه پخش می‌شود (`ReconnectGate`)
       scheduleRetry(app, store)
       return
     }

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.v3.settings.sections
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.StrSettings
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.sync.AutoSync
 import ir.vil3ntec.tohid.ui.screens.ServerPulse
 import ir.vil3ntec.tohid.ui.theme.V3Tone
@@ -41,7 +42,7 @@ internal object SyncModel {
     if (queued > 0) Line(StrNav.changesQueued(queued), V3Tone.WARNING) else Line(StrNav.noChangesQueued, V3Tone.SUCCESS)
 
   /** گرهِ همگام‌سازی به زبانِ آدم — چه شده، چه نگه داشته شده، کاربر چه کند */
-  enum class Problem { NONE, OFFLINE, SIGN_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, UNKNOWN }
+  enum class Problem { NONE, OFFLINE, SIGN_IN, SERVER, SERVER_BEHIND, NO_SHOP, LOCAL, REJECTED, UNKNOWN, UNREACHABLE, RETRYING }
 
   data class Diagnosis(val problem: Problem, val title: String, val body: String, val action: String, val tone: V3Tone, val detail: String?)
 
@@ -63,15 +64,39 @@ internal object SyncModel {
     }
   }
 
+  /** SYN-12: حکمِ موتور (`SyncStatus.outage`، از کدِ HTTP و مدتِ شکست) جای نشانه‌های متنی؛ «خطا»/«همگام» ⇒ همان نشانه‌ها */
+  fun fromOutage(outage: SyncOutage.Kind?): Problem? = when (outage) {
+    SyncOutage.Kind.OFFLINE -> Problem.OFFLINE
+    SyncOutage.Kind.RETRYING -> Problem.RETRYING
+    SyncOutage.Kind.UNREACHABLE -> Problem.UNREACHABLE
+    SyncOutage.Kind.SERVER -> Problem.SERVER
+    SyncOutage.Kind.AUTH -> Problem.SIGN_IN
+    else -> null
+  }
+
   /**
-   *  ترتیب: سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان ⇐ نتِ دستگاه ⇐
-   *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام برای پشتیبانی است.
+   *  SYN-12: سرخطِ نوارِ وضعیتِ کامپیوتر برای شکستِ بی هشدار (حکمِ موتور) — همان `dotHead` ِ وب: «دوباره می‌کوشد»،
+   *  «به سرور نمی‌رسیم» یا «سرور الان جواب نمی‌دهد» به‌جای «در صف» ِ زرد؛ بی شکست یا سرخ/خاکستری ⇒ `null` (همان پیشین)
    */
-  fun diagnose(error: String, holding: Boolean, dropped: Int, needsShop: Boolean, server: ServerPulse.State): Diagnosis {
+  fun quietHead(outage: SyncOutage.Kind?): String? = when (outage) {
+    SyncOutage.Kind.RETRYING -> StrSettings.diagRetryingTitle
+    SyncOutage.Kind.UNREACHABLE -> StrSettings.diagUnreachableTitle
+    SyncOutage.Kind.SERVER -> StrSettings.diagServerTitle
+    else -> null
+  }
+
+  /**
+   *  ترتیب: سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐
+   *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام برای پشتیبانی است. سرورِ گرفتار (حکمِ
+   *  موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
+   */
+  fun diagnose(error: String, holding: Boolean, dropped: Int, needsShop: Boolean, server: ServerPulse.State, outage: SyncOutage.Kind? = null): Diagnosis {
     val raw = error.trim()
+    val judged = if (raw.isNotEmpty()) fromOutage(outage) else null
     val problem = when {
       holding -> Problem.SERVER_BEHIND
       needsShop -> Problem.NO_SHOP
+      judged != null -> judged
       server == ServerPulse.State.NO_NET && raw.isNotEmpty() -> Problem.OFFLINE
       raw.isNotEmpty() -> classify(raw)
       dropped > 0 -> Problem.REJECTED
@@ -82,7 +107,9 @@ internal object SyncModel {
       Problem.NONE -> Diagnosis(problem, StrNav.syncAllOnServer, "", "", V3Tone.SUCCESS, null)
       Problem.OFFLINE -> Diagnosis(problem, StrSettings.diagOfflineTitle, StrSettings.diagOfflineBody, StrSettings.diagOfflineDo, V3Tone.WARNING, detail)
       Problem.SIGN_IN -> Diagnosis(problem, StrSettings.diagSignInTitle, StrSettings.diagSignInBody, StrSettings.diagSignInDo, V3Tone.ERROR, detail)
-      Problem.SERVER -> Diagnosis(problem, StrSettings.diagServerTitle, StrSettings.diagServerBody, StrSettings.diagServerDo, V3Tone.ERROR, detail)
+      Problem.SERVER -> Diagnosis(problem, StrSettings.diagServerTitle, StrSettings.diagServerBody, StrSettings.diagServerDo, if (judged == Problem.SERVER) V3Tone.WARNING else V3Tone.ERROR, detail)
+      Problem.UNREACHABLE -> Diagnosis(problem, StrSettings.diagUnreachableTitle, StrSettings.diagUnreachableBody, StrSettings.diagUnreachableDo, V3Tone.WARNING, detail)
+      Problem.RETRYING -> Diagnosis(problem, StrSettings.diagRetryingTitle, StrSettings.diagRetryingBody, StrSettings.diagRetryingDo, V3Tone.INFO, detail)
       Problem.SERVER_BEHIND -> Diagnosis(problem, StrSettings.diagBehindTitle, StrNav.serverBehind, StrSettings.diagBehindDo, V3Tone.WARNING, null)
       Problem.NO_SHOP -> Diagnosis(problem, StrSettings.diagNoShopTitle, StrSettings.diagNoShopBody, StrSettings.diagNoShopDo, V3Tone.WARNING, detail)
       Problem.LOCAL -> Diagnosis(problem, StrSettings.diagLocalTitle, StrSettings.diagLocalBody, StrSettings.diagLocalDo, V3Tone.ERROR, detail)
