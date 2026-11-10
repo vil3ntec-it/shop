@@ -445,7 +445,8 @@ const QUERIES = [
     sql: `SELECT COALESCE(SUM((data->>'qtyMilli')::bigint), 0)::bigint AS s FROM sync_v3_rows
       WHERE ${ACC} AND table_name='stockMovements' AND inserted AND data->>'productId' = $4
         AND ($5 = '' OR row_hlc <= $5)`, params: (c) => [...acc(c.shops.C), c.productId, ''] },
-  { id: 'v3.lateCount', area: 'sync', src: 'lib/sync-v3.js after() — هر حرکتِ کالا',
+  { id: 'v3.lateCount', area: 'sync', src: 'lib/sync-v3.js after() — هر حرکتِ کالا', expect: ['ix_sync_v3_rows_counts_product'],
+    hint: 'sync_v3_rows (account_id, (data->>\'productId\'), row_hlc) WHERE app=\'shop\' AND table_name=\'stockCounts\' (۴۶۵)',
     sql: `SELECT row_id, row_hlc FROM sync_v3_rows
           WHERE ${ACC} AND table_name='stockCounts' AND inserted AND data->>'productId' = $4
             AND row_hlc >= $5 AND row_id <> $6

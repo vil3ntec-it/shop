@@ -611,8 +611,10 @@ const config = {
      * هم‌زمان **پیش از** گرفتنِ اتصالِ استخر. فقط PostgreSQL. `slots` پیش‌فرض نیمِ `PG_POOL_MAX`
      * (دست‌کم ۱؛ ۰ = بی سقف)، تا نیمِ دیگرِ استخر همیشه برای ویترین و میز بماند. بیرون از سقفِ
      * انتظار (`waitMs`) یا شمارِ منتظرها (`queueMax`، ۰ = بی سقف) ⇒ ۵۰۳ ِ `db_busy` با `Retry-After`.
-     * `waitMs` کمتر از مهلتِ معمولِ کلاینت (۱۰ ثانیه) است: سرور پیش از رفتنِ کلاینت پس می‌زند، نه
-     * پس از آن (burst ِ `docs/PERF-LOAD-fa.md`: با ۱۵ ثانیه، ۵۰۳ ها پس از مهلتِ کلاینت می‌رسید).
+     * `waitMs` کمتر از مهلتِ کلاینت است: سرور پیش از رفتنِ کلاینت پس می‌زند، نه پس از آن (burst ِ `docs/PERF-LOAD-fa.md`:
+     * با ۱۵ ثانیه، ۵۰۳ ها پس از مهلتِ ۱۰ثانیه‌ایِ بارساز می‌رسید). مهلتِ برنامه‌ها: وب ۱۵ ثانیه برای کلِ درخواست
+     * (`license/account-code.js` `TIMEOUT_MS`)، اندروید اتصال ۱۵ و خواندن ۳۰ ثانیه (`ApiConfig.kt`). گرفتنِ اتصال پس از
+     * دروازه جداست (تا `PG_CONNECT_TIMEOUT_MS`) مگر `poolDeadline`.
      */
     gate: {
       enabled: bool(process.env.SYNC_V3_GATE, true),
@@ -620,6 +622,13 @@ const config = {
         Math.max(1, Math.floor(num(process.env.PG_POOL_MAX, 10) / 2))))),
       waitMs: Math.max(0, num(process.env.SYNC_V3_GATE_WAIT_MS, 8000)),
       queueMax: Math.max(0, Math.floor(num(process.env.SYNC_V3_GATE_QUEUE_MAX, 200))),
+      /**
+       * ⛔ پیش‌فرض خاموش (`SYNC_V3_GATE_POOL_DEADLINE`). خاموش: push ِ پذیرفته برای اتصالِ تراکنش جدا تا `PG_CONNECT_TIMEOUT_MS`
+       * در صفِ استخر می‌ماند (انتظارِ پیش از کار تا waitMs + ۱۰ ثانیه). روشن: همان سقفِ waitMs گرفتنِ اتصال را هم می‌پوشاند ⇒
+       * ۵۰۳ ِ `db_busy` پیش از هر کار، سرِ همان سقف (docs/PERF-LOAD-fa.md ۱۴۰۵/۰۸/۱۹ (سوم)). ⚠️ سنجیده: با مهلتِ ۱۵ثانیه‌ایِ برنامه‌ها
+       * سودی نداشت و به‌تنهایی زیرِ اشباع بدتر بود (منتظرِ رهاشده در صفِ pg-pool می‌ماند)؛ فقط برای کلاینتی با مهلتِ کوتاه‌تر.
+       */
+      poolDeadline: bool(process.env.SYNC_V3_GATE_POOL_DEADLINE, false),
     },
     /**
      * ⛔ پیش‌فرض خاموش. اعمالِ دسته‌ایِ push (`lib/sync-v3-batch.js`): تکراری‌ها، ردیف‌ها و شمارهٔ دفترِ همهٔ

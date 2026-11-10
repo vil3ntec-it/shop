@@ -344,6 +344,58 @@ test('دروازه: انتظارِ بلند، صفِ پر و سقفِ push ⇒ �
   assert.equal(gate.stats().inflight, 0);
 });
 
+/*
+ *  SYNC_V3_GATE_POOL_DEADLINE (پیش‌فرض خاموش؛ docs/PERF-LOAD-fa.md ۱۴۰۵/۰۸/۱۹ (سوم)): push ِ پذیرفته در دروازه تا اکنون برای
+ *  اتصالِ تراکنش جدا تا `PG_CONNECT_TIMEOUT_MS` (۱۰ ثانیه) در صفِ استخر می‌ماند ⇒ انتظارِ پیش از کار تا ۸ + ۱۰ ثانیه، بیش از
+ *  مهلتِ ۱۵ثانیه‌ایِ برنامهٔ وب. روشن ⇒ همان سقفِ waitMs ِ دروازه گرفتنِ اتصال را هم می‌پوشاند: ۵۰۳ ِ `db_busy` پیش از هر کار.
+ */
+test('SYNC_V3_GATE_POOL_DEADLINE: انتظارِ اتصال پس از دروازه هم زیرِ همان سقف ⇒ ۵۰۳ ِ db_busy سرِ وقت؛ هیچ چیز اعمال نشد', { skip: NO_PG }, async () => {
+  const before = { ...config.syncV3.gate };
+  const pool = db.getPool();
+  const held = [];
+  let extra = null;
+  let first;
+  let late;
+  let waited = 0;
+  try {
+    Object.assign(config.syncV3.gate, { enabled: true, waitMs: 1500, queueMax: 0, slots: 0, poolDeadline: true });
+    const release = await holdDbLock(shopC.id);
+    let t0 = 0;
+    let second;
+    try {
+      [first] = await waitingPushes(shopC, 1, 'D1');
+      await until(async () => (await lockWaiters()).n === 1, 'push ِ نخست پشتِ قفلِ پایگاه');
+      t0 = Date.now();
+      [second] = await waitingPushes(shopC, 1, 'D2');
+      await until(() => gate.stats().waiting === 1, 'push ِ دوم در صفِ همان دکان (کارهای پیش از دروازه‌اش گذشت)');
+      //  همهٔ اتصال‌های بیکار، و یک منتظرِ جلوی صف که اتصالِ push ِ نخست را پس از پایانش می‌گیرد
+      while (pool.idleCount > 0 || pool.totalCount < config.db.poolMax) held.push(await pool.connect());
+      extra = pool.connect();
+      await until(() => pool.waitingCount === 1, 'یک منتظر جلوی صفِ استخر');
+    } finally {
+      await release();
+    }
+    late = await second;
+    waited = Date.now() - t0;
+  } finally {
+    Object.assign(config.syncV3.gate, before);
+    for (const c of held) c.release();
+    if (extra) (await extra).release();
+  }
+  assertBusy(late, 'اتصال تا سقفِ دروازه نرسید');
+  assert.ok(waited < 3000, `۵۰۳ سرِ سقفِ دروازه (${waited}ms؛ نه پس از PG_CONNECT_TIMEOUT_MS = ${config.db.connectTimeoutMs}ms)`);
+  assert.equal(await db.one(`SELECT 1 FROM sync_v3_ops WHERE account_id=$1 AND row_id='p-idle-D2-0'`, [shopC.id]), null, 'هیچ چیز اعمال نشد');
+  const ok = await first;
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  //  همان دسته دوباره ⇒ اعمال
+  const [again] = await waitingPushes(shopC, 1, 'D2');
+  const r = await again;
+  assert.equal(r.status, 200, JSON.stringify(r.body));
+  assert.equal(r.body.results[0].status, 'applied');
+  assert.equal(gate.stats().waiting, 0);
+  assert.equal(gate.stats().inflight, 0);
+});
+
 test('PG_POOL_MAX_WAITING: صفِ استخرِ پر ⇒ ۵۰۳ ِ db_busy بی‌درنگ (نه پس از PG_CONNECT_TIMEOUT_MS)', { skip: NO_PG }, async () => {
   const pool = db.getPool();
   const held = [];
