@@ -1,5 +1,7 @@
 package ir.vil3ntec.tohid.core.product
 
+import kotlinx.serialization.Serializable
+
 /**
  *  WEB-13 — «دیده‌شده‌های اخیر» ِ خریدار: فهرستی کوتاه که فقط روی همان دستگاه می‌ماند
  *  (مثلِ سبدِ مهمان، S132) و هیچ‌وقت به سرور نمی‌رود.
@@ -20,6 +22,8 @@ object RecentlyViewed {
   /** همان `PRODUCT_ID_RE` ِ سرورِ ویترین */
   private val ID = Regex("^[A-Za-z0-9_.:-]{1,80}$")
 
+  /** برنامهٔ خرید همین را روی دستگاه نگه می‌دارد (`ShopperState.seen`) */
+  @Serializable
   data class Seen(val id: String, val atMs: Long)
 
   /** فهرستِ پاک: شناسهٔ درست، بی تکرار (تازه‌ترین می‌ماند)، تازه‌ترین اول، بی کهنه، حداکثر MAX. */

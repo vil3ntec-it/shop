@@ -335,6 +335,7 @@ class CustomerModel(
         persist(ShopperMemory.withRecent(saved, RecentShop(slug, page.shop.title, clock())))
         loadCatalog(reset = true)
         enteredStore(slug, page)
+        loadRecent(slug, page)   //  WEB-13: «دیده‌شده‌های اخیر» با قیمتِ امروز (فقط با `recent`)
         if (page.features.reviews) feedback.loadShop(slug)
         //  ثبت پیش از رسیدنِ دکان باز شده بود (خانه ⇐ سبد ⇐ ثبت): روشِ پیش‌فرض و بازه‌ها همین حالا
         if (route is Route.Checkout) {
@@ -390,7 +391,10 @@ class CustomerModel(
 
   private fun loadProduct(slug: String, id: String) {
     product = Load.Busy
-    request({ api.product(slug, id) }) { r -> product = r.load() }
+    request({ api.product(slug, id) }) { r ->
+      product = r.load()
+      r.valueOrNull()?.let { sawProduct(slug, it.product) }
+    }
   }
 
   fun photoPath(slug: String, p: PublicProduct, thumb: Boolean): String? =
@@ -653,7 +657,7 @@ class CustomerModel(
     syncAccount(slug)   //  سبدِ حساب هم خالی (همان وب)
     placeNote = null
     repriced = false
-    form = form.copy(note = "", slotStartsAt = null)
+    form = form.copy(note = "", slotStartsAt = null, cashTenderMinor = null)
     order = Load.Ready(o)
     stack = listOf(Route.Home, Route.Shop(slug), Route.Placed(slug, o.token))
   }

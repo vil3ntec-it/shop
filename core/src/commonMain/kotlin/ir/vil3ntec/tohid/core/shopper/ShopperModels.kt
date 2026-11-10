@@ -48,6 +48,8 @@ class StorePage(
   val marketAvailable: Boolean,
   /** بخش‌های پرچم‌دارِ همین دکان (`features` ِ پاسخ؛ پرچمِ خاموش ⇒ کلید نیست ⇒ false) */
   val features: StoreFeatures = StoreFeatures(),
+  /** WEB-13: «دیده‌شده‌های اخیر» (`recent: true` ِ ریشهٔ پاسخ، پرچمِ `shop.storefront.recent`؛ [RecentProducts]) */
+  val recent: Boolean = false,
 )
 
 /** `features` ِ `GET /api/store/:slug` (فقط کلیدهایی که برنامهٔ خرید به کار می‌برد). */
@@ -62,6 +64,8 @@ data class StoreFeatures(
   /** CHK-01: حسابِ مشتری در ویترین (`shop.storefront.web_account`)؛ سبدِ حساب فقط با [accountCart] (`shop.storefront.cart`) */
   val webAccount: Boolean = false,
   val accountCart: Boolean = false,
+  /** CHK-14: «با کدام اسکناس…» در برگهٔ ثبت (`shop.orders.delivery_prefs`؛ [CheckoutRules.tenders]) */
+  val deliveryPrefs: Boolean = false,
 )
 
 /** کاتالوگ با صفحه‌بندیِ نشانگری (`nextCursor`). */
@@ -188,8 +192,9 @@ data class CheckoutAddress(
   val lng: Double? = null,
 )
 
+/** [cashTenderMinor] (CHK-14): اسکناسِ مشتری هنگامِ تحویل؛ null ⇒ در بدنه نیست (همان سفارشِ بی پرچم) */
 @Serializable
-data class CheckoutDelivery(val callBeforeArrival: Boolean = false, val leaveWith: String = "")
+data class CheckoutDelivery(val callBeforeArrival: Boolean = false, val leaveWith: String = "", val cashTenderMinor: Long? = null)
 
 @Serializable
 data class CheckoutRequest(

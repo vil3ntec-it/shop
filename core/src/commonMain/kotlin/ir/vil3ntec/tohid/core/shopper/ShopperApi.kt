@@ -101,7 +101,8 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     val shop = decodeOrNull(PublicShop.serializer(), store) ?: return@call null
     val delivery = store["delivery"]?.let { decodeOrNull(StoreDelivery.serializer(), it) } ?: StoreDelivery()
     val features = (root["features"] as? JsonObject)?.let { decodeOrNull(StoreFeatures.serializer(), it) } ?: StoreFeatures()
-    StorePage(shop, delivery, flag(root, "verification"), flag(root, "market"), features)
+    val recent = (root["recent"] as? JsonPrimitive)?.booleanOrNull == true
+    StorePage(shop, delivery, flag(root, "verification"), flag(root, "market"), features, recent)
   }
 
   /** کاتالوگ: جست‌وجو (`q`، حداکثر ۶۰ نویسه، مثلِ سرور)، دسته و صفحهٔ بعد (`cursor`). */

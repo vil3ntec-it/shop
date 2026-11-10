@@ -1,0 +1,24 @@
+{
+ "_doc": "CHK-14 — «با کدام اسکناس پرداخت می‌کنید؟»: برای هر جمع (یک‌صدمِ افغانی) همان گزینه‌هایی که ویترین (`tenders` ِ server/public/store/checkout.js) نشان می‌دهد. server/test/cash-tender-vectors.test.js همان را روی تابعِ وب و قاعدهٔ سرور (`delivery-prefs.checkTender`) و core/src/jvmTest/.../ShopperTenderVectorsTest.kt روی `CheckoutRules.tenderOptions` ِ برنامهٔ خرید می‌دواند. جمعِ صفر یا منفی ⇒ هیچ گزینه.",
+ "version": 1,
+ "noteMinor": 100000,
+ "cases": [
+  {"totalMinor":100,"options":[10000,50000,100000]},
+  {"totalMinor":9900,"options":[10000,50000,100000]},
+  {"totalMinor":10000,"options":[20000,50000,100000]},
+  {"totalMinor":17100,"options":[20000,50000,100000]},
+  {"totalMinor":50000,"options":[60000,100000]},
+  {"totalMinor":85000,"options":[90000,100000]},
+  {"totalMinor":95000,"options":[100000]},
+  {"totalMinor":98000,"options":[100000]},
+  {"totalMinor":100000,"options":[110000,150000]},
+  {"totalMinor":123450,"options":[130000,150000,200000]},
+  {"totalMinor":140000,"options":[150000,200000]},
+  {"totalMinor":199900,"options":[200000]},
+  {"totalMinor":250000,"options":[260000,300000]},
+  {"totalMinor":999900,"options":[1000000]},
+  {"totalMinor":1000000,"options":[1010000,1050000]},
+  {"totalMinor":1234550,"options":[1240000,1250000,1300000]},
+  {"totalMinor":0,"options":[]}
+ ]
+}
