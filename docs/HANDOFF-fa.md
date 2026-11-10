@@ -98,6 +98,13 @@
   آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد). یافتهٔ امنیتیِ بیرون از دامنه: `station-chat.js` (پمپ،
   دست‌نخورده) endpoint ِ پوشِ مشتری را بی فهرستِ سفید POST می‌کند (SSRF) — رفعش اجازهٔ کدِ پمپ می‌خواهد.
 - قدمِ بعدی: پس از CI ِ سبز، ارتقای ردیف‌های «فقط شاهدِ CI»؛ «خبرم کن ِ موجود شد» (WEB-10) روی همین کانال؛ جوابِ D-09 برای مشتریِ بی پوش.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-shop` (ممیزیِ P0 ِ خانواده‌های پشتِ صحنه: POS، PAY ِ دکان، PRD، PRM، INV، PUR، RET، STF، RPT، HW، SYN، SEC، F0، OPS؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ۳۸ ردیفِ P0 ِ نیمه‌کاره رده‌بندی شد؛ تنها کارِ کدیِ سرور/وبِ مانده PRD-07 بود: `server/src/lib/product-unit-rules.js` پشتِ پرچمِ خاموشِ
+  `shop.product_unit_rules` (تغییرِ واحدِ پایهٔ کالای گردش‌دار ⇒ `unit_locked`، ضریبِ تازهٔ ناجور ⇒ `unit_factor_inexact`؛ v3 از `authorize`، v1 از
+  `newer-fields.v1NewerFields` با گردشِ همان دسته؛ ⛔ `sync-v1.js` دست نخورد) — `product-unit-rules.test.js` ۸/۸ روی PGlite و PostgreSQL (و `SYNC_V3_BATCH=1`).
+  STATUS ِ PRD-07، PRD-12 (کادرِ عمده در main با #1021) و POS-12 (قفلِ «در دستِ دستگاهِ X» در main با #1018) به‌روز شد.
+- نیمه‌کاره: هیچ. Kotlin دست نخورد. راهِ قدیمِ `/api/sync` این قاعده را ندارد (برنامهٔ بسیار کهنه).
+- قدمِ بعدی: شاهدِ CI ِ `product-unit-rules`؛ بقیهٔ P0ها شاهدِ CI، دستگاه/سخت‌افزار، حسابِ بیرونی (D-08، D-02) یا تصمیمِ صاحب‌کار‌اند (جدولِ گزارشِ همین شاخه).
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
