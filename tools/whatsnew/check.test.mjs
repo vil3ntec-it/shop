@@ -70,6 +70,11 @@ test('bad format is reported (same rules as WhatsNew.parse)', () => {
   assert.equal(check({ changed: [], before: '', after: '## 3.2 · x\nمتن\n' }).code, 2);
   //  توضیحِ چندسطری کنار می‌رود
   assert.deepEqual(scan('## 3.2 · x\n<!--\n- نه: این توضیح است\n-->\n- تازه: بله\n').problems, []);
+  //  دو مشکلِ دیگرِ WhatsNew.parse: سطرِ هم‌کلید (فاصله‌ها یکدست، حتی در بخشِ دیگر) و shipped ِ صفر
+  assert.match(scan('## 3.2 · x\n- تازه: یک\n## 3.2 · y\n- تازه:  یک \n').problems.join(), /پیش‌تر آمده/);
+  assert.match(scan('## 3.2 · x\n<!-- shipped: preview=0 -->\n- تازه: یک\n').problems.join(), /preview=0/);
+  //  بخش‌ها (همان log.sections): تازه‌ترین اول، shipped ِ همان بخش
+  assert.deepEqual(scan(AFTER).sections.map((s) => [s.line, s.shipped]), [['3.2', {}], ['3.2', { preview: 61, beta: 1896 }]]);
 });
 
 test('the real changelog has the right shape', () => {

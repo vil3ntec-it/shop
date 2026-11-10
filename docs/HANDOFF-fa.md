@@ -53,6 +53,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/guard-mirror` (آینهٔ JS ِ آزمون‌های کاتلینِ پرونده‌خوان؛ روی `main` ِ دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: فهرستِ آزمون‌های کاتلینی که پروندهٔ سرور/وب/license/docs/بردار می‌خوانند (RULES-fa «v3 · CI و آزمون»). آینهٔ `node --test` در `server/test`،
+  با فهرست‌های خوانده از خودِ کاتلین (`kt-source.js`، تجزیه‌گرِ سخت): `dari-text.test.js` حالا `farsiOnlyForms`/`farsiOnlyAllowed` را از DariCoverageTest.kt
+  می‌خواند (پیش‌تر رونوشت) و همان گذرِ کاتلین را روی ۳۴۹ متنِ ShopperText + ۷۵۹ متنِ وب می‌زند (خرید پیش‌تر نبود)؛ `kotlin-file-mirrors.test.js`
+  (WhatsNewFileTest، بخشِ پرونده‌ایِ WhatsNewTest، WebPaletteParityTest، CustomerOnlineOrdersTest)؛ `core-vectors-common-mirror.test.js`
+  (CoreVectorsCommonParityTest: ۲۹ جدول، ۲٬۰۳۴ سطر، و فهرستِ بخش‌ها). `tools/whatsnew/check.mjs` بخش‌ها را هم برمی‌گرداند و سطرِ هم‌کلید و shipped=0 را
+  مثلِ `WhatsNew.parse` مشکل می‌داند. پیش‌سرخ: حالتِ `e7bbb0e0a` ِ دستهٔ ۳۹ (np.fail بی PHRASES) سرخ، با `5f8fdfa60` سبز؛ هر آینه با تغییرِ موقت سرخ شد.
+- نیمه‌کاره: هیچ. CI ِ سرور روی PR ای که فقط `docs/WHATS-NEW-fa.md`، `docs/DARI-REVIEW-fa.md` یا پروندهٔ کاتلینِ خوانده‌شده را عوض کند نمی‌دود (pathهای `server.yml`) — تصمیمِ هماهنگ‌کننده.
+- قدمِ بعدی: آزمونِ کاتلینِ پرونده‌خوانِ تازه ⇒ آینه در همان PR؛ برای بردارهای فقط‌کاتلین (customer-price، gift، layaway، price-list، returns، special-order،
+  stock-ledger) همتای JS نیست.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
