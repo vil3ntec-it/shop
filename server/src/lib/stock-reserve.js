@@ -101,8 +101,8 @@ async function expireDueIn(c, shopId, at) {
 }
 
 /**
- * یک ردیفِ نگه‌داشته + حرکتِ `reserve` برای هر قلم. `expiresAt = null` ⇒ تا پایانِ سفارش. `l.createdAt` (هم‌اندازه
- * کردنِ قلمِ موجود) ⇒ جای همان قلم در صفِ «بررسی» ([recheckShort]: تازه‌ترین‌ها کم می‌آورند) نمی‌رود.
+ * یک ردیفِ نگه‌داشته + حرکتِ `reserve` برای هر قلم. `expiresAt = null` ⇒ تا پایانِ سفارش. `l.createdAt` (کوچک یا هم‌اندازه
+ * کردنِ قلمِ موجودِ همان کالا، [syncOrderIn]) ⇒ جای همان قلم در صفِ «بررسی» ([recheckShort]: تازه‌ترین‌ها کم می‌آورند) نمی‌رود.
  */
 async function insertHolds(c, shopId, orderId, lines, expiresAt, at) {
   for (const l of lines) {
@@ -214,10 +214,15 @@ async function syncOrderIn(c, shopId, orderId, at) {
     const w = want.get(num(r.line_no));
     return !w || w.productId !== r.product_id || w.qtyMilli !== num(r.qty_milli);
   });
+  //  ⛔ SR42-1: جای صف (`created_at`) فقط برای همان کالا و نه بیشتر از پیش می‌ماند؛ بزرگ شدن یا کالای دیگر (افزودنِ مشتری،
+  //  ویرایش، جایگزین) ادعای تازه است و ته صف می‌رود — وگرنه افزودهٔ دیر نگه‌داشتهٔ سفارش‌های پیش‌ترِ دیگران را به بررسی می‌برد
   const add = [...want.values()].filter((w) => {
     const r = byLine.get(w.lineNo);
     return !r || drop.includes(r);
-  }).map((w) => (byLine.get(w.lineNo) ? { ...w, createdAt: byLine.get(w.lineNo).created_at } : w));
+  }).map((w) => {
+    const r = byLine.get(w.lineNo);
+    return r && r.product_id === w.productId && w.qtyMilli <= num(r.qty_milli) ? { ...w, createdAt: r.created_at } : w;
+  });
   if (!drop.length && !add.length) return;
   if (drop.length) {
     const ids = drop.map((r) => r.id);
@@ -325,11 +330,16 @@ async function recheckShort(c, shopId, ids, at, settings = null) {
 async function notifyReviewIn(c, shopId, orderId, at) {
   await c.query('SAVEPOINT stock_review_notify');
   try {
+    //  ⛔ SR42-2: ما قفلِ موجودی را داریم؛ گذار/ویرایش/بسته‌بندیِ همین سفارش ردیف را `FOR UPDATE` گرفته و منتظرِ همین قفل است ⇒
+    //  منتظرِ قفلِ کلید (FK ِ صفِ اعلان) ماندن بن‌بست بود (۴۰P01 ⇒ گذارِ کارمند ۵۰۰). ردیفِ گرفته ⇒ بی پوش، همان دم؛ کمبود
+    //  (`short_at`، نشانِ «در بررسی»، وظیفه) نوشته می‌ماند و همان سفارش همین لحظه در دستِ کارمند است.
+    await c.query('SELECT 1 FROM online_orders WHERE id=$1 AND shop_id=$2 FOR KEY SHARE NOWAIT', [String(orderId || ''), String(shopId)]);
     await require('./order-notify').enqueueReviewIn((t, p) => c.query(t, p), { shopId, orderId, at });
     await c.query('RELEASE SAVEPOINT stock_review_notify');
   } catch (err) {
     await c.query('ROLLBACK TO SAVEPOINT stock_review_notify');
-    console.error('[stock-reserve] اعلانِ بررسی', orderId, err.message);
+    if (err && err.code === '55P03') console.warn('[stock-reserve] اعلانِ بررسی کنار ماند: سفارش همین حالا در دستِ کارمند است', orderId);
+    else console.error('[stock-reserve] اعلانِ بررسی', orderId, err.message);
   }
 }
 
