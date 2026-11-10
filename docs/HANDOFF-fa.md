@@ -54,6 +54,16 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/syn-12b` (SYN-12، دنبالهٔ `claude/syn-12` ‏54e2b31c: هجومِ پس از وصلِ دوباره، نوارِ کامپیوتر، رشتهٔ شکست با ورود/دکانِ دیگر؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: قاعدهٔ یگانهٔ `core/…/core/sync/SyncReconnect.kt` ⇔ `reconnectDelayMs`/`reconnectHold` ِ `license/sync-core.js` (بخش‌های تازهٔ
+  `sync-outage-v1.json`): دورِ نخستِ پس از `online` ِ وب (v1 و v3) یا پس از دیدنِ بی‌نتی در برنامه (`sync/v1/ReconnectGate` در `SyncV1Worker`)
+  درنگِ یکنواختِ ۰ تا ۱۵ ثانیه؛ تیک/Pull ِ دوره‌ای صبر، «همگام‌سازی حالا»، تغییرِ وب و تلاشِ پس از شکست همان دم؛ فاصلهٔ تلاش، صف و بدنه دست‌نخورده.
+  رشتهٔ شکست با `onSignedIn` ِ وب و `SyncV1Engine.rebind` (⇒ `SyncV3Runner.forgetOutage`) پاک؛ نوارِ وضعیتِ کامپیوتر `SyncModel.quietHead`.
+  آزمون: `sync-outage.test.js` ۱۸/۱۸ (۱۰ جهش ⇒ سرخ)، `web-sync-ux.mjs` ۸ ✅، `web-sync-v3.mjs` ۷ ✅، ۱۵ پروندهٔ موتورِ همگام‌سازی ۱۶۲ سبز.
+- نیمه‌کاره: Kotlin فقط در CI (`SyncReconnectTest`، `SyncOutageVectorsTest.reconnect*`، `ReconnectGateTest`، `SyncV3EngineTest.forgetOutage…`،
+  `SettingsModelsTest` ِ نوارِ کامپیوتر)؛ STATUS همان PARTIAL. در برنامه دورِ پس از تغییر در پنجرهٔ درنگ صبر می‌کند (همان کارِ WorkManager).
+  `web-idb.mjs` «سهمیهٔ IndexedDB» روی پایهٔ syn-12 هم سرخ است (به این کار ربطی ندارد).
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin ِ syn-12 و syn-12b؛ اگر صاحب‌کار خواست `Retry-After` (با سقف) و نشانِ تغییرِ دورِ برنامه (`change`).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/syn-12` (SYN-12 ِ سمتِ دستگاه: قطعیِ شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تصمیمِ یگانه در `core/…/core/sync/SyncOutage.kt` و همزادِ `license/sync-core.js` با بردارِ `core/test-vectors/sync-outage-v1.json`
   (بی‌نت ⇒ آفلاین؛ شکستِ شبکه/سرورِ کوتاه ⇒ «دوباره می‌کوشد» بی هشدار؛ ≥ ۲ شکست و ۶۰ ثانیه ⇒ «به سرور نمی‌رسیم» یا «سرور» با اعلانِ آرام؛

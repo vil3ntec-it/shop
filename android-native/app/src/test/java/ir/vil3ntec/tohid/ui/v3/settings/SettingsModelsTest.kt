@@ -165,6 +165,22 @@ class SettingsModelsTest {
   }
 
   @Test
+  fun `SYN-12 — نوارِ وضعیتِ کامپیوتر: قطعیِ بی هشدار برچسبِ حکمِ موتور را دارد، نه «در صف»`() {
+    assertEquals(StrSettings.diagRetryingTitle, SyncModel.quietHead(SyncOutage.Kind.RETRYING))
+    assertEquals(StrSettings.diagUnreachableTitle, SyncModel.quietHead(SyncOutage.Kind.UNREACHABLE))
+    assertEquals(StrSettings.diagServerTitle, SyncModel.quietHead(SyncOutage.Kind.SERVER))
+    //  بی شکست (صفِ عادی)، بی‌نت، نشست و خطای واقعی ⇒ همان سرخطِ پیشین («در صف»، خاکستری، سرخ)
+    for (k in listOf(SyncOutage.Kind.OK, SyncOutage.Kind.OFFLINE, SyncOutage.Kind.AUTH, SyncOutage.Kind.ERROR, null)) {
+      assertNull(k.toString(), SyncModel.quietHead(k))
+    }
+    //  همان واژه‌های `OUTAGE_LABEL` ِ وب (license/sync-core.js)
+    I18n.source = { Lang.FA }
+    assertEquals("دوباره می‌کوشد", SyncModel.quietHead(SyncOutage.Kind.RETRYING))
+    assertEquals("به سرور نمی‌رسیم", SyncModel.quietHead(SyncOutage.Kind.UNREACHABLE))
+    assertEquals("سرور الان جواب نمی‌دهد", SyncModel.quietHead(SyncOutage.Kind.SERVER))
+  }
+
+  @Test
   fun `دستگاه‌های جانبی — برگه از پیوند، و راهِ وصلِ چاپگر`() {
     assertEquals(DeviceTab.PRINTERS, DevicesModel.tab("printers"))
     assertEquals(DeviceTab.PHONE, DevicesModel.tab(" Phone "))

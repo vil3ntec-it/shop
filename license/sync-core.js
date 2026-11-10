@@ -897,40 +897,30 @@
   function dotHead(st) { return quietFailure(st) ? OUTAGE_LABEL[st.outage.kind] : (DOT_LABEL[st && st.dot] || ''); }
   function outageNotice(st) { return quietFailure(st) && st.outage.level === 'notice' && OUTAGE_BODY[st.outage.kind] ? st.outage.kind : ''; }
 
+  /* ۱۳) SYN-12: هجومِ پس از وصلِ دوباره — قرینهٔ core/…/core/sync/SyncReconnect.kt (بخش‌های reconnectDelay/reconnectHold ِ همان بردار):
+     دورِ نخستِ پس از `online` با درنگِ یکنواختِ ۰ تا RECONNECT_SPREAD_MS؛ دورهای زمان‌دار (`timer`) تا پایانِ درنگ صبر می‌کنند؛ کاربر،
+     تغییر و تلاشِ پس از شکست (`user`/`change`/`retry`) هرگز منتظر نمی‌مانند و درنگ را پایان می‌دهند. random ِ نادرست ⇒ بی درنگ. */
+  var RECONNECT_SPREAD_MS = 15000;
+  function reconnectDelayMs(random) {
+    return typeof random === 'number' && isFinite(random) ? Math.floor(Math.min(1, Math.max(0, random)) * RECONNECT_SPREAD_MS) : 0;
+  }
+  function reconnectHold(until, cause, now, random) {
+    var u = Number(until) || 0, t = Number(now) || 0;
+    if (u > t && (cause === 'reconnect' || cause === 'timer')) return { until: u, waitMs: u - t };
+    var w = cause === 'reconnect' ? reconnectDelayMs(random) : 0;
+    return w > 0 ? { until: t + w, waitMs: w } : { until: 0, waitMs: 0 };
+  }
+
   return {
-    SCHEMA_VERSION: SCHEMA_VERSION,
-    BASE_SCHEMA: BASE_SCHEMA,
-    wireSchema: wireSchema,
-    COLLECTIONS: COLLECTIONS,
-    LIST_COLLECTIONS: LIST_COLLECTIONS,
-    listRowId: listRowId,
-    INC_FIELDS: INC_FIELDS,
-    QUEUE_WARN: QUEUE_WARN,
-    BACKOFF_MIN_MS: BACKOFF_MIN_MS,
-    BACKOFF_MAX_MS: BACKOFF_MAX_MS,
-    DOT_LABEL: DOT_LABEL,
-    ulid: ulid,
-    canonical: canonical,
-    sha256Hex: sha256Hex,
-    hashOf: hashOf,
-    pushSinceNote: pushSinceNote,
-    pushSince: pushSince,
-    diff: diff,
-    applyRemote: applyRemote,
-    fromSnapshot: fromSnapshot,
-    restoreLocalOnly: restoreLocalOnly,
-    restoreMerge: restoreMerge,
-    shadowOf: shadowOf,
-    cloneLedger: cloneLedger,
-    isIncField: isIncField,
-    OpQueue: OpQueue,
-    faCount: faCount,
-    backlogWarning: backlogWarning,
-    keepPendingVerdicts: keepPendingVerdicts,
-    keepPending: keepPending,
-    dotOf: dotOf,
-    backoffMs: backoffMs,
+    SCHEMA_VERSION: SCHEMA_VERSION, BASE_SCHEMA: BASE_SCHEMA, wireSchema: wireSchema, COLLECTIONS: COLLECTIONS,
+    LIST_COLLECTIONS: LIST_COLLECTIONS, listRowId: listRowId, INC_FIELDS: INC_FIELDS, QUEUE_WARN: QUEUE_WARN,
+    BACKOFF_MIN_MS: BACKOFF_MIN_MS, BACKOFF_MAX_MS: BACKOFF_MAX_MS, DOT_LABEL: DOT_LABEL,
+    ulid: ulid, canonical: canonical, sha256Hex: sha256Hex, hashOf: hashOf, pushSinceNote: pushSinceNote, pushSince: pushSince,
+    diff: diff, applyRemote: applyRemote, fromSnapshot: fromSnapshot, restoreLocalOnly: restoreLocalOnly, restoreMerge: restoreMerge,
+    shadowOf: shadowOf, cloneLedger: cloneLedger, isIncField: isIncField, OpQueue: OpQueue, faCount: faCount,
+    backlogWarning: backlogWarning, keepPendingVerdicts: keepPendingVerdicts, keepPending: keepPending, dotOf: dotOf, backoffMs: backoffMs,
     OUTAGE_SUSTAIN_FAILURES: OUTAGE_SUSTAIN_FAILURES, OUTAGE_SUSTAIN_MS: OUTAGE_SUSTAIN_MS, OUTAGE_LABEL: OUTAGE_LABEL, OUTAGE_BODY: OUTAGE_BODY,
     outageOf: outageOf, outageStreak: outageStreak, outageFrom: outageFrom, quietFailure: quietFailure, dotHead: dotHead, outageNotice: outageNotice,
+    RECONNECT_SPREAD_MS: RECONNECT_SPREAD_MS, reconnectDelayMs: reconnectDelayMs, reconnectHold: reconnectHold,
   };
 });

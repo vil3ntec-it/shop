@@ -21,6 +21,7 @@ import ir.vil3ntec.tohid.plain
 import ir.vil3ntec.tohid.sync.v1.SyncDot
 import ir.vil3ntec.tohid.ui.AppNav
 import ir.vil3ntec.tohid.ui.theme.Shop
+import ir.vil3ntec.tohid.ui.v3.settings.sections.SyncModel
 import kotlinx.coroutines.delay
 import ir.vil3ntec.tohid.core.i18n.StrNav
 import ir.vil3ntec.tohid.core.i18n.Str
@@ -55,7 +56,8 @@ fun DeskStatusBar(d: ShopData) {
     val (dot, head) = when {
       !signedIn -> colors.muted2 to StrNav.statusNoAccount
       sync.dot == SyncDot.GREEN -> colors.success to (if (sync.live) StrNav.syncLive else StrNav.syncedWithServer)
-      sync.dot == SyncDot.YELLOW -> colors.warning to StrNav.syncQueued
+      //  SYN-12: قطعیِ بی هشدار (حکمِ موتور) برچسبِ خودش را دارد، نه «در صف» — همان `dotHead` ِ وب
+      sync.dot == SyncDot.YELLOW -> colors.warning to (SyncModel.quietHead(sync.outage) ?: StrNav.syncQueued)
       sync.dot == SyncDot.RED -> colors.danger to StrNav.syncError
       else -> colors.muted2 to StrNav.offlineHeld
     }

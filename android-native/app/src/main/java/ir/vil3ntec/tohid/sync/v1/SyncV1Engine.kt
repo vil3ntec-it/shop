@@ -307,10 +307,10 @@ class SyncV1Engine private constructor(context: Context) {
     //  `force`: همان کلید ولی پرونده‌هایش جابه‌جا شدند (`SyncV1Keys.switchShop`) ⇒ صف و ژورنال از نو خوانده شوند
     if (fresh == accountKey && !force) return
     accountKey = fresh
+    streak = null; SyncV3Runner.of(app).forgetOutage()  // SYN-12: رشتهٔ شکستِ حساب یا دکانِ پیشین در حافظه نمی‌ماند
     state = SyncStateV1(app, accountKey)
     queue = OpQueue(app, accountKey)
-    commit = commitFor(accountKey)
-    restore = restoreFor(accountKey)
+    commit = commitFor(accountKey); restore = restoreFor(accountKey)
     publish()
   }
 

@@ -267,6 +267,9 @@ class SyncV3Runner private constructor(context: Context) {
 
   fun queueSize(): Int = runCatching { engine().queued() }.getOrDefault(0)
 
+  /** SYN-12: `SyncV1Engine.rebind` (ورود، خروج، دکانِ دیگر) — موتورِ ساخته‌شده رشتهٔ شکستش را فراموش می‌کند؛ بی ساختنِ موتور */
+  fun forgetOutage() { engine?.forgetOutage() }
+
   /** opهای ردشدهٔ همین حساب روی همین دستگاه (نشانِ «سرور نپذیرفت» ِ فاکتور، `data/RejectedDocs`) */
   fun rejected(): List<V3Entry> = runCatching { engine().rejected() }.getOrDefault(emptyList())
 

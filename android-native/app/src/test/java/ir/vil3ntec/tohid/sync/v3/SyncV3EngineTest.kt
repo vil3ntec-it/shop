@@ -427,6 +427,26 @@ class SyncV3EngineTest {
     assertTrue("نشست بالاتر از بی‌نت", a.engine.outage(false).alarm)
   }
 
+  /** SYN-12: حساب یا دکانِ دیگر (`SyncV1Engine.rebind` ⇒ `SyncV3Runner.forgetOutage`) ⇒ رشتهٔ شکست در حافظه نمی‌ماند */
+  @Test fun forgetOutageDropsTheStreakButKeepsTheErrorAndQueue() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "نو") }) }
+    a.engine.record(a.ledger.data)
+    server.offline = true
+    runBlocking { a.engine.pushOnce() }
+    server.time += 61_000
+    runBlocking { a.engine.pushOnce() }
+    assertEquals(SyncOutage.Kind.UNREACHABLE, a.engine.outage(true).kind)
+    val error = a.engine.status().lastError
+    a.engine.forgetOutage()
+    assertEquals("خطای ماندگار بی رشته ⇒ ناشناخته ⇒ همان سرخِ پیشین", SyncOutage.Kind.ERROR, a.engine.outage(true).kind)
+    assertEquals("lastError پنهان نمی‌شود (SYN-08)", error, a.engine.status().lastError)
+    assertEquals(1, a.engine.queued())
+    runBlocking { a.engine.pushOnce() }
+    assertEquals("شکستِ بعدی رشتهٔ تازه", SyncOutage.Kind.RETRYING, a.engine.outage(true).kind)
+  }
+
   @Test fun offlineKeepsQueueAndBacksOffExponentiallyWithJitter() {
     val server = FakeServer()
     val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }

@@ -12,8 +12,10 @@ import androidx.work.OutOfQuotaPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.data.ShopStore
 import ir.vil3ntec.tohid.data.repo.Backend
+import kotlinx.coroutines.delay
 import java.util.concurrent.TimeUnit
 
 /**
@@ -45,6 +47,8 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     if (!Backend.isReady(app)) return Result.success()
     //  حسابِ پیک دفترِ دکان ندارد (DLV-01): سرور ۴۰۳ می‌دهد، پس اصلاً نمی‌پرسیم
     if (ir.vil3ntec.tohid.data.ShopRole.isCourier(app)) return Result.success()
+    //  SYN-12: هجومِ پس از وصلِ دوباره — نخستین دورِ خودکار پس از برگشتنِ شبکهٔ خودِ دستگاه با درنگِ کران‌دار (`ReconnectGate`)
+    if (!Backend.isOnline(app)) reconnect.offline() else reconnect.beforeRound().let { if (it > 0) delay(it) }
     //  تنظیماتِ دکان (`shop.settings_sync`، پیش‌فرض خاموش): تغییرِ صاحب/مدیر روی همین دستگاه با همین دور می‌رود
     //  (حداکثر هر دقیقه یک بار؛ جدا از دفتر و بی اثر بر نتیجهٔ این دور)
     ir.vil3ntec.tohid.data.ShopSettingsSync.kick(app)
@@ -67,6 +71,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     if (ir.vil3ntec.tohid.sync.v3.SyncChoice.isV3(app)) {
       val done = ir.vil3ntec.tohid.sync.v3.SyncV3Runner.of(app).work(store)
       sweepAfterPull(store)
+      noteOffline()
       return if (done) Result.success() else Result.retry()
     }
     val engine = SyncV1Engine.of(app)
@@ -119,7 +124,13 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
     //  STF-09: سرِ زنجیرهٔ سابقهٔ همین دستگاه پس از هر دور، فقط وقتی عوض شده — ردیف‌های هنوز نرفته هم (بریدنشان روی
     //  سرور دیده می‌شود). پرچمِ خاموشِ shop.doc_chain ⇒ هیچ؛ شکستش بی‌صدا و دورِ بعد دوباره (`AuditAnchorSync`)
     runCatching { ir.vil3ntec.tohid.sync.platform.AuditAnchorSync.cycle(app) }
+    noteOffline()
     return if (outcome.isSuccess) Result.success() else Result.retry()
+  }
+
+  /** SYN-12: دور شبکهٔ خودِ دستگاه را نیافت (حکمِ موتور «آفلاین») ⇒ دورِ خودکارِ پس از برگشتنش پخش می‌شود */
+  private fun noteOffline() {
+    if (SyncV1Engine.of(applicationContext).status.value.outage == SyncOutage.Kind.OFFLINE) reconnect.offline()
   }
 
   /**
@@ -137,6 +148,9 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
   companion object {
     private const val PERIODIC = "tohid-sync-v1-periodic"
     private const val NOW = "tohid-sync-v1-now"
+
+    /** SYN-12: درِ هجومِ پس از وصلِ دوباره، در حافظهٔ همین فرآیند (`ReconnectGate`)؛ «همگام‌سازی حالا» پیش از [now] `userAsked` می‌زند */
+    internal val reconnect = ReconnectGate()
 
     private val net = Constraints.Builder()
       .setRequiredNetworkType(NetworkType.CONNECTED)
@@ -161,6 +175,7 @@ class SyncV1Worker(context: Context, params: WorkerParameters) : CoroutineWorker
      */
     fun now(context: Context) {
       if (!ir.vil3ntec.tohid.data.TrainingMode.networkAllowed()) return
+      if (!Backend.isOnline(context)) reconnect.offline()   // SYN-12: تغییرِ بی‌نت ⇒ دورش پس از برگشتنِ شبکه پخش می‌شود
       val work = OneTimeWorkRequestBuilder<SyncV1Worker>()
         .setConstraints(net)
         .setInitialDelay(500, TimeUnit.MILLISECONDS)

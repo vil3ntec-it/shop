@@ -1,5 +1,5 @@
 {
-  "about": "SYN-12: SyncOutage (core/…/core/sync/SyncOutage.kt) و outageOf/outageStreak/outageFrom/dotOf (license/sync-core.js) — یک رفتار. status: کدِ HTTP ِ شکستِ آخر، 0 = بی پاسخ، -1 = محلی/ناشناخته. قطعی = دست‌کم sustainFailures شکست و sustainMs از نخستین شکست. since=-1 در streak/of یعنی رشته‌ای نیست",
+  "about": "SYN-12: SyncOutage (core/…/core/sync/SyncOutage.kt) و SyncReconnect (SyncReconnect.kt ⇔ reconnectDelayMs/reconnectHold؛ random ِ رشته‌ای = Number) و outageOf/outageStreak/outageFrom/dotOf (license/sync-core.js) — یک رفتار. status: کدِ HTTP ِ شکستِ آخر، 0 = بی پاسخ، -1 = محلی/ناشناخته. قطعی = دست‌کم sustainFailures شکست و sustainMs از نخستین شکست. since=-1 در streak/of یعنی رشته‌ای نیست",
   "sustainFailures": 2,
   "sustainMs": 60000,
   "classify": [
@@ -62,5 +62,32 @@
     { "name": "قطعیِ بی هشدار با صف", "error": true, "alarm": false, "online": true, "signedIn": true, "configured": true, "queued": 4, "busy": false, "dot": "yellow" },
     { "name": "قطعیِ بی هشدار بی صف هرگز سبز نیست", "error": true, "alarm": false, "online": true, "signedIn": true, "configured": true, "queued": 0, "busy": false, "dot": "yellow" },
     { "name": "قطعیِ بی هشدار روی دستگاهِ بی‌نت", "error": true, "alarm": false, "online": false, "signedIn": true, "configured": true, "queued": 4, "busy": false, "dot": "grey" }
+  ],
+  "spreadMs": 15000,
+  "reconnectDelay": [
+    { "name": "صفر ⇒ همین حالا", "random": 0, "ms": 0 },
+    { "name": "میانه", "random": 0.5, "ms": 7500 },
+    { "name": "یک‌دهم (گردِ پایین، نه 1500.0000000000002)", "random": 0.1, "ms": 1500 },
+    { "name": "کسرِ دراز", "random": 0.123456789, "ms": 1851 },
+    { "name": "زیرِ سقف", "random": 0.999999, "ms": 14999 },
+    { "name": "یک ⇒ سقف", "random": 1, "ms": 15000 },
+    { "name": "منفی ⇒ لبهٔ پایین", "random": -0.3, "ms": 0 },
+    { "name": "بیش از یک ⇒ سقف، نه بیشتر", "random": 1.7, "ms": 15000 },
+    { "name": "NaN ⇒ بی درنگ", "random": "NaN", "ms": 0 },
+    { "name": "بی‌نهایت ⇒ بی درنگ", "random": "Infinity", "ms": 0 }
+  ],
+  "reconnectHold": [
+    { "name": "online ⇒ درنگِ تازه", "until": 0, "cause": "reconnect", "now": 1000, "random": 0.5, "untilOut": 8500, "wait": 7500 },
+    { "name": "online با تصادفِ صفر ⇒ همین حالا", "until": 0, "cause": "reconnect", "now": 1000, "random": 0, "untilOut": 0, "wait": 0 },
+    { "name": "online ِ دوباره درنگ را دراز نمی‌کند", "until": 8500, "cause": "reconnect", "now": 3000, "random": 0.9, "untilOut": 8500, "wait": 5500 },
+    { "name": "online پس از پایانِ درنگ ⇒ درنگِ تازه", "until": 8500, "cause": "reconnect", "now": 8500, "random": 0.2, "untilOut": 11500, "wait": 3000 },
+    { "name": "online با تصادفِ نادرست ⇒ همین حالا", "until": 0, "cause": "reconnect", "now": 1000, "random": "NaN", "untilOut": 0, "wait": 0 },
+    { "name": "تیک در درنگ صبر می‌کند", "until": 8500, "cause": "timer", "now": 3000, "random": 0.9, "untilOut": 8500, "wait": 5500 },
+    { "name": "تیک درست سرِ پایانِ درنگ ⇒ همین حالا", "until": 8500, "cause": "timer", "now": 8500, "random": 0.9, "untilOut": 0, "wait": 0 },
+    { "name": "تیک بی درنگ ⇒ همین حالا", "until": 0, "cause": "timer", "now": 3000, "random": 0.9, "untilOut": 0, "wait": 0 },
+    { "name": "کاربر در درنگ ⇒ همین حالا و درنگ تمام", "until": 8500, "cause": "user", "now": 3000, "random": 0.9, "untilOut": 0, "wait": 0 },
+    { "name": "تغییرِ تازه در درنگ ⇒ همین حالا", "until": 8500, "cause": "change", "now": 3000, "random": 0.9, "untilOut": 0, "wait": 0 },
+    { "name": "تلاشِ پس از شکست در درنگ ⇒ فاصلهٔ تلاش همان", "until": 8500, "cause": "retry", "now": 3000, "random": 0.9, "untilOut": 0, "wait": 0 },
+    { "name": "علتِ ناشناخته ⇒ همین حالا", "until": 8500, "cause": "boot", "now": 3000, "random": 0.9, "untilOut": 0, "wait": 0 }
   ]
 }

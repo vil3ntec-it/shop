@@ -5,9 +5,9 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- *  `SyncOutage` = `outageOf` / `outageStreak` / `outageFrom` / `dotOf` ِ وب: همان
- *  `core/test-vectors/sync-outage-v1.json` که `server/test/sync-outage.test.js` هم می‌خواند (SYN-12).
- *  گردشِ کامل روی JVM و شبیه‌سازِ iOS: `commonTest/…/SyncOutageTest.kt`.
+ *  `SyncOutage` = `outageOf` / `outageStreak` / `outageFrom` / `dotOf` ِ وب و `SyncReconnect` = `reconnectDelayMs` /
+ *  `reconnectHold` ِ وب: همان `core/test-vectors/sync-outage-v1.json` که `server/test/sync-outage.test.js` هم می‌خواند
+ *  (SYN-12). گردشِ کامل روی JVM و شبیه‌سازِ iOS: `commonTest/…/SyncOutageTest.kt` و `SyncReconnectTest.kt`.
  */
 class SyncOutageVectorsTest {
   private val text = SyncVectors.text("sync-outage-v1.json")
@@ -65,6 +65,27 @@ class SyncOutageVectorsTest {
     for (r in list) {
       val got = SyncOutage.dot(r.bool("error"), r.bool("alarm"), r.bool("online"), r.bool("signedIn"), r.bool("configured"), r.int("queued"), r.bool("busy"))
       assertEquals(r.getValue("dot"), got.id, r.getValue("name"))
+    }
+  }
+
+  /** `random` ِ رشته‌ای ("NaN"، "Infinity") همان `Number(…)` ِ JS است */
+  private fun Map<String, String>.rnd(): Double = getValue("random").toDouble()
+
+  @Test
+  fun reconnectSpreadMatchesVectors() {
+    assertEquals(SyncReconnect.SPREAD_MS, Regex("\"spreadMs\"\\s*:\\s*(\\d+)").find(text)!!.groupValues[1].toLong())
+    val list = rows("reconnectDelay")
+    assertTrue(list.size >= 10)
+    for (r in list) assertEquals(r.long("ms"), SyncReconnect.delayMs(r.rnd()), r.getValue("name"))
+  }
+
+  @Test
+  fun reconnectHoldMatchesVectors() {
+    val list = rows("reconnectHold")
+    assertTrue(list.size >= 12)
+    for (r in list) {
+      val got = SyncReconnect.hold(r.long("until"), r.getValue("cause"), r.long("now"), r.rnd())
+      assertEquals(SyncReconnect.Hold(r.long("untilOut"), r.long("wait")), got, r.getValue("name"))
     }
   }
 }
