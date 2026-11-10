@@ -44,6 +44,8 @@
     var qslug = String(ctx.slug || '').toLowerCase();
     //  عکسِ در راه { conv, key, main, thumb, w, h, thumbId, mainId, xhr, wait } و سقف‌های سرور (`limits` ِ گشودن)
     var ph = null; var lim = null;
+    //  opening = نوبتِ گشودنِ رشته (پاسخِ دیرِ گشودنِ پیشین نمی‌نشیند)؛ draftOf = رشته‌ای که متنِ کادر برایش نوشته شد
+    var opening = 0; var draftOf = null;
     //  کمک‌های همین برگه برای `chat-acts.js`
     var H = { api: api, path: path, put: put, bar: bar, shut: shut, home: home, done: done, fail: fail, reload: reload,
       conv: function () { return conv; }, info: function () { return info; }, list: function () { return $('ct-list'); },
@@ -142,10 +144,36 @@
     // ── باز کردنِ رشته ──
     function start(body) {
       want = body;
+      var my = ++opening;
+      hold(body);
       $('ct-msg').hidden = true;
       if (!K.ticket()) { verify(); return Promise.resolve(); }
       $('ct-verify').hidden = true; $('ct-body').hidden = false;
-      return api('/chat/conversations', { method: 'POST', body: body }).then(function (r) { lim = r.limits || lim; show(r.conversation, true); }).catch(fail);
+      return api('/chat/conversations', { method: 'POST', body: body }).then(function (r) {
+        if (my !== opening) return;   //  گشودنِ دیگری پس از این آغاز شد
+        lim = r.limits || lim; show(r.conversation, true);
+      }).catch(function (e) {
+        if (my !== opening) return;
+        $('ct-state').hidden = true; $('ct-body').removeAttribute('aria-busy');
+        fail(e);
+      });
+    }
+    //  ⛔ تا پاسخِ POST ِ همین رشته برگه نه پیام‌ها، سنجاق‌ها و کادرِ رشتهٔ پیشین را دارد و نه کاری از آن می‌پذیرد: `conv` ِ تهی
+    //  فرستادن، عکس، صدا، «مشکل دارم» و رسید را خاموش می‌کند و `loop` ِ تازه long-poll ِ پیشین را می‌بُرد (پیش‌تر پیامِ سفارشِ #۴
+    //  در همین فاصله به رشتهٔ #۳ می‌رفت). عنوان از خودِ درخواست، با «در حالِ باز کردن…».
+    function hold(body) {
+      hush();
+      loop++; conv = null; cursor = 0; msgs = {}; info = {}; acting = null; inflight = {};
+      phDrop(); $('ct-ph').hidden = true;
+      if (window.StoreChatVoice) window.StoreChatVoice.drop();
+      $('ct-form').hidden = true; $('ct-issue').hidden = true; $('ct-new').hidden = true;
+      $('ct-prev').hidden = true; $('ct-old').hidden = true; $('ct-empty').hidden = true;
+      K.clear($('ct-list')); K.clear($('ct-old-list')); K.clear($('ct-prev-list')); free();
+      if (A) { A.reset(); A.sync(); }
+      outs();
+      $('ct-title').textContent = title(body);
+      $('ct-body').setAttribute('aria-busy', 'true');
+      K.note($('ct-state'), 'info', t('loading'));
     }
     function title(c) { return c.orderNo ? t('ct.order', { n: K.fa(c.orderNo, 0) }) : t('ct.general'); }
     function show(c, fresh) {
@@ -156,7 +184,9 @@
       }
       if (ph && ph.conv !== c.id) phDrop();   //  عکسِ آمادهٔ رشتهٔ دیگر به این رشته نمی‌رود
       if (window.StoreChatVoice) window.StoreChatVoice.drop(c.id);   //  صدا هم
-      conv = c;
+      if (draftOf !== c.id) $('ct-text').value = '';   //  متنِ نیمه‌نوشتهٔ رشتهٔ دیگر به این رشته نمی‌رود
+      conv = c; draftOf = c.id;
+      $('ct-body').removeAttribute('aria-busy');
       $('ct-title').textContent = title(c);
       state();
       if (fresh) poll(++loop, true);
@@ -184,6 +214,7 @@
     function prev() {
       var me = conv.id;
       api('/chat/conversations?limit=50').then(function (r) {
+        if (!conv || conv.id !== me) return;   //  رشتهٔ دیگری باز شد
         var others = (r.conversations || []).filter(function (c) { return c.id !== me && (c.seq > 0 || c.orderNo); });
         var d = $('ct-prev'); d.hidden = !others.length; d.open = false;
         $('ct-prev-s').textContent = t('ct.prev', { n: K.fa(others.length, 0) });
@@ -342,6 +373,7 @@
       }).catch(function (e) {
         delete inflight[key]; a.busy = false;
         if (e.status === 401) { if (acting === a) acting = null; fail(e); return; }
+        if (!conv || conv.id !== cid) return;   //  رشتهٔ دیگری باز شد
         if (e.code === 'delete_window_passed') x.m.deleteUntil = 0;
         if (e.code === 'chat_closed') reload();
         var msg = e.status === 0 ? t('ct.del.off') : e.message;
@@ -702,19 +734,27 @@
         .catch(function () { K.note($('ct-msg'), 'err', t('err.network')); })
         .then(function () { b.disabled = false; });
     }
+    //  پاسخِ دیرِ رشته‌ای که دیگر باز نیست نمی‌نشیند (`conv` ِ رشتهٔ دیگر را جایگزین نمی‌کند)
     function issue() {
-      var b = $('ct-issue'); b.disabled = true;
-      api(path(conv.id, '/issue'), { method: 'POST', body: {} }).then(function (r) {
+      if (!conv) return;
+      var b = $('ct-issue'); b.disabled = true; var id = conv.id;
+      api(path(id, '/issue'), { method: 'POST', body: {} }).then(function (r) {
+        if (!conv || conv.id !== id) return;
         conv = r.conversation; state(); $('ct-msg').hidden = true; $('ct-text').focus();
-      }).catch(function (e) { reload(); fail(e); }).then(function () { b.disabled = false; });
+      }).catch(function (e) { if (e.status === 401 || (conv && conv.id === id)) { reload(); fail(e); } }).then(function () { b.disabled = false; });
     }
-    function reload() { if (conv) api(path(conv.id)).then(function (r) { conv = r.conversation; state(); }).catch(function () { /* همان */ }); }
+    function reload() {
+      if (!conv) return;
+      var id = conv.id;
+      api(path(id)).then(function (r) { if (conv && conv.id === id) { conv = r.conversation; state(); } }).catch(function () { /* همان */ });
+    }
 
     //  برگه همان دم باز می‌شود؛ رشته پس از رسیدنِ صف و کارها (بارِ نخستِ برگه، سپس از حافظهٔ `K.js`)
     function openWith(body) {
       var go = extras();
       return ready.then(function () {
         build();
+        hold(body);   //  از نخستین فریم: نه رشتهٔ پیشین، نه کادرش (تا صف و کارها برسند و POST ِ همین رشته پاسخ دهد)
         K.openSheet(sheet, function () { loop++; hush(); if (window.StoreChatVoice) window.StoreChatVoice.drop(); });
         return go;
       }).then(function () {

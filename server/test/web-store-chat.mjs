@@ -934,6 +934,21 @@ const attach = async (buffer, name, mimeType) => {
   await page.waitForFunction(() => { const b = document.getElementById('ct-ph'); return b && !b.hidden && /^(ready|err)$/.test(b.getAttribute('data-st')); }, null, { timeout: 20000 });
 };
 
+//  گفت‌وگو روی شبکهٔ کند: گشودنِ رشتهٔ o3 بی پاسخ ماند، مشتری برگه را بست و سراغِ o4 رفت (پاسخِ هر دو POST نگه داشته می‌شود؛
+//  سرور هر دو را همان دم پاسخ داده) — پیش‌تر برگهٔ o4 تا پاسخ رشته و کادرِ o3 را داشت و پیامی که برای o4 نوشته شد به رشتهٔ o3 رفت
+const heldOpen = { o3: [], o4: [] };
+const openPost = (u) => u.pathname === `/api/store/${slug}/chat/conversations`;
+await page.route(openPost, async (route) => {
+  const no = route.request().method() === 'POST' ? (route.request().postDataJSON() || {}).orderNo : null;
+  const k = no === o3.orderNo ? 'o3' : no === o4.orderNo ? 'o4' : '';
+  if (!k) return route.fallback();
+  heldOpen[k].push({ route, res: await route.fetch() });
+});
+await page.click('#o-chat-open');
+ok(await until(async () => heldOpen.o3.length > 0, 10000), 'گشودنِ گفت‌وگوی o3 در راه است (پاسخ نگه‌داشته)');
+await page.keyboard.press('Escape');
+await page.waitForFunction(() => document.getElementById('chat-sheet').hidden, null, { timeout: 5000 });
+
 //  سفارشِ دیگر در همان سند (فقط `#…` ِ دیگر) روی شبکهٔ کند: تا پاسخِ همین سفارش، سفارشِ پیشین (o3) و کارهایش پیدا نیست —
 //  پیش‌تر کارتِ «گفت‌وگو» ِ o3 (فقط `hidden` ِ خودش سنجیده) زدنی ماند و عکسِ پایین به رشتهٔ o3 رفت (۰ عکس در رشتهٔ o4)
 const heldO4 = [];
@@ -948,9 +963,33 @@ await page.unroute(o4Get);
 await orderShown(o4);
 ok(!(await page.isVisible('#o-wait')), 'پاسخ رسید ⇒ همین سفارش و «در حالِ باز کردن…» رفت');
 await page.click('#o-chat-open');
-//  برگه همان دم باز می‌شود و تا پاسخِ POST ِ همین رشته هنوز رشتهٔ پیشین (o3، با `#ct-form` ِ پیدا) را دارد ⇒ صبر برای عنوانِ همین سفارش
-const ctTitle4 = await page.evaluate((no) => K.t('ct.order', { n: K.fa(no, 0) }), o4.orderNo);
-await page.waitForFunction((x) => { const f = document.getElementById('ct-form'); return f && !f.hidden && document.getElementById('ct-title').textContent === x; }, ctTitle4, { timeout: 15000 }).catch(() => {});
+ok(await until(async () => heldOpen.o4.length > 0, 10000), 'گشودنِ گفت‌وگوی o4 هم در راه است (پاسخ نگه‌داشته)');
+const [ctTitle3, ctTitle4, opening] = await page.evaluate((n) => [K.t('ct.order', { n: K.fa(n[0], 0) }), K.t('ct.order', { n: K.fa(n[1], 0) }), K.t('loading')], [o3.orderNo, o4.orderNo]);
+const sheetNow = () => page.evaluate(() => {
+  const vis = (s) => [...document.querySelectorAll(s)].filter((e) => e.checkVisibility()).length;
+  const st = document.getElementById('ct-state');
+  return { title: document.getElementById('ct-title').textContent, msgs: vis('#ct-list .ct-msg, #ct-old-list .ct-msg, #ct-prev, #ct-pins, #ct-ph'),
+    form: vis('#ct-form, #ct-text, #ct-send, #ct-vc-mic'), state: st.checkVisibility() ? st.textContent : null, busy: document.getElementById('ct-body').getAttribute('aria-busy') };
+});
+const during4 = await sheetNow();
+ok(during4.msgs === 0 && during4.form === 0 && during4.title === ctTitle4 && during4.state === opening && during4.busy === 'true',
+  'تا پاسخِ گشودنِ o4: نه پیام‌ها و نه کادرِ رشتهٔ پیشین (o3)؛ عنوانِ همین سفارش و «در حالِ باز کردن…» (aria-busy)', JSON.stringify(during4));
+const forO4 = 'این پیام برای سفارشِ چهارم است';
+const typed = await page.fill('#ct-text', forO4, { timeout: 1000 }).then(() => true, () => false);
+if (typed) await page.click('#ct-send', { timeout: 1000 }).catch(() => { /* دکمه نیست */ });
+ok(!typed && !(await until(async () => (await countFrom(conv3.id, forO4)) > 0, 1500)), 'در همین فاصله نوشتن و فرستادن ممکن نیست؛ پیامی به رشتهٔ o3 نرفت', `typed=${typed}`);
+for (const h of heldOpen.o4) await h.route.fulfill({ response: h.res });
+const ready4 = (x) => { const f = document.getElementById('ct-form'); return f && f.checkVisibility() && document.getElementById('ct-title').textContent === x && !document.getElementById('ct-body').hasAttribute('aria-busy'); };
+await page.waitForFunction(ready4, ctTitle4, { timeout: 15000 });
+//  پاسخِ دیرِ گشودنِ o3 (رشته‌ای که دیگر نشان داده نمی‌شود) پس از o4 می‌رسد ⇒ برگهٔ o4 همان می‌ماند
+for (const h of heldOpen.o3) await h.route.fulfill({ response: h.res });
+await page.unroute(openPost);
+await until(async () => (await page.textContent('#ct-title')) === ctTitle3, 1500);
+ok(await page.evaluate(ready4, ctTitle4), 'پاسخِ دیرِ گشودنِ o3 برگهٔ o4 را جایگزین نکرد', await page.textContent('#ct-title'));
+await page.fill('#ct-text', forO4);
+await page.click('#ct-send');
+ok(await until(async () => (await countFrom(conv4.id, forO4)) === 1) && (await countFrom(conv3.id, forO4)) === 0 && !(await page.isVisible('#ct-state')),
+  'پیامِ نوشته‌شده برای o4 فقط در رشتهٔ o4 (پایگاه)، نه o3', `o4=${await countFrom(conv4.id, forO4)} o3=${await countFrom(conv3.id, forO4)}`);
 const inputs = await page.evaluate(() => ['ct-file', 'ct-cam'].map((id) => { const i = document.getElementById(id); return i && [i.type, i.accept, i.getAttribute('capture')]; }));
 ok(JSON.stringify(inputs) === JSON.stringify([['file', 'image/*', null], ['file', 'image/*', 'environment']]) && Boolean(await page.getAttribute('#ct-ph-add', 'aria-label')),
   'گزینشِ عکس: دکمهٔ «افزودنِ عکس» (accept=image/*) و دوربینِ گوشی (capture=environment)', JSON.stringify(inputs));
