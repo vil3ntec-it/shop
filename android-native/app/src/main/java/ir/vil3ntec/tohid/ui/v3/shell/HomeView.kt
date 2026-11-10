@@ -7,6 +7,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalContext
 import ir.vil3ntec.tohid.core.i18n.StrHome
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
@@ -89,6 +90,8 @@ fun rememberHomeView(d: ShopData): HomeView {
   val sync = when {
     !signedIn -> HomeAlerts.Sync.LOCAL_ONLY
     status == null -> HomeAlerts.Sync.OK
+    //  SYN-12: قطعیِ ماندگار (شبکه هست و سرور نه، یا سرورِ گرفتار) ⇒ کارتِ آرام، نه «خطا»
+    status.outage == SyncOutage.Kind.UNREACHABLE || status.outage == SyncOutage.Kind.SERVER -> HomeAlerts.Sync.OUTAGE
     status.dot == SyncDot.RED -> HomeAlerts.Sync.ERROR
     status.dot == SyncDot.YELLOW -> HomeAlerts.Sync.QUEUED
     status.dot == SyncDot.GREY -> HomeAlerts.Sync.OFFLINE

@@ -22,10 +22,10 @@ internal object SyncVectors {
   fun section(text: String, section: String): String =
     Regex("\"$section\"\\s*:\\s*\\[(.*?)\\n\\s*\\]", RegexOption.DOT_MATCHES_ALL).find(text)!!.groupValues[1]
 
-  /** هر `{ … }` ِ تخت ⇐ کلید ⇐ مقدارِ خام (رشته بی گیومه، عدد همان‌طور) */
+  /** هر `{ … }` ِ تخت ⇐ کلید ⇐ مقدارِ خام (رشته بی گیومه، عدد و true/false همان‌طور) */
   fun rows(body: String): List<Map<String, String>> =
     Regex("\\{([^{}]*)\\}").findAll(body).map { m ->
-      Regex("\"(\\w+)\"\\s*:\\s*(\"((?:[^\"\\\\]|\\\\.)*)\"|-?[\\d.]+)").findAll(m.groupValues[1])
+      Regex("\"(\\w+)\"\\s*:\\s*(\"((?:[^\"\\\\]|\\\\.)*)\"|-?[\\d.]+|true|false)").findAll(m.groupValues[1])
         .associate { it.groupValues[1] to (if (it.groupValues[2].startsWith("\"")) it.groupValues[3] else it.groupValues[2]) }
     }.toList()
 
