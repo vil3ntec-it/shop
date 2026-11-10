@@ -83,7 +83,7 @@ private fun <T> ShopperResult<T>.load(): Load<T> = when (this) {
  *  این‌جا فقط ترتیبِ کارها، حالِ صفحه و نگه‌داری.
  *
  *  [io] نخِ درخواست‌ها (اندروید: `Dispatchers.IO`)؛ [debounceMs] مکثِ جست‌وجو (آزمون: ۰)؛ [locator] موقعیتِ گوشی؛
- *  [secureRandom] مولّدِ امنِ سکو (شناسهٔ دستگاهِ MKT-02)؛ [chatWaitMs] long-poll ِ گفت‌وگو (آزمون: ۰).
+ *  [secureRandom] مولّدِ امنِ سکو (شناسهٔ دستگاهِ MKT-02)؛ [chatWaitMs] long-poll ِ گفت‌وگو (آزمون: ۰)؛ [voice] میکروفون و پخشِ سکو.
  */
 class CustomerModel(
   internal val api: ShopperApi,
@@ -96,6 +96,7 @@ class CustomerModel(
   secureRandom: (Int) -> ByteArray = { Random.nextBytes(it) },
   chatWaitMs: Int = 20_000,
   secrets: ShopperKeyValue? = null,
+  voice: VoiceDevice? = null,
 ) {
   var saved: ShopperState by mutableStateOf(ShopperMemory.withDevice(ShopperMemory.load(kv)) { secureRandom(16) })
     private set
@@ -185,7 +186,7 @@ class CustomerModel(
   /** CHK-24: کارتِ «دستورِ تحویل» ِ پیگیری (`ModelPrefs.kt`) */
   val deliveryPrefs = PrefsModel(api, scope, io) { refreshOrder() }
   val book = AddressModel({ saved.addresses }, { persist(saved.copy(addresses = it)) }, locator, clock)
-  val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs)
+  val chat = ChatModel(api, kv, scope, io, clock, { saved.ticket?.takeIf { it.expiresAt > clock() } }, { persist(saved.copy(ticket = null)) }, chatWaitMs, device = voice)
   /** WEB-11/CHK-01: حسابِ مشتری — سبد، ♥ و «فهرستِ خرید» همراهِ حساب (`ModelAccount.kt`؛ [secrets] نگه‌دارِ رمزشدهٔ نشست) */
   val account = AccountBox(secrets)
   /** MKT-11: کدِ کمپینِ پیوند/QR که مشتری با آن به هر دکان آمد (فقط همین اجرا، مثلِ «همین نشست» ِ وب) */

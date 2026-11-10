@@ -173,7 +173,9 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     call("GET", base(slug) + "/orders/" + ShopperUrl.encode(token), null) { root ->
       val o = root["order"] as? JsonObject ?: return@call null
       val order = decodeOrNull(PublicOrder.serializer(), o) ?: return@call null
-      TrackPage(order, decodeOrNull(OrderExtras.serializer(), o) ?: OrderExtras())
+      //  NTF-08: `refund` جدا ⇒ شکلِ نادرستش فقط کارتِ بازپرداخت را می‌برد، نه نظر و گفت‌وگو را
+      val refund = o["refund"]?.let { decodeOrNull(RefundView.serializer(), it) }
+      TrackPage(order, (decodeOrNull(OrderExtras.serializer(), o) ?: OrderExtras()).copy(refund = refund))
     }
 
   /** WEB-12: «خریدِ دوباره» — قلم‌های همان سفارش با قیمت و موجودیِ امروز (فقط خواندن) */
@@ -277,10 +279,18 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
     }
 
   /** گفت‌وگوی همین سفارش ([orderNo]) یا گفت‌وگوی عمومی (null)؛ همان رشته اگر هست (دورِ تازهٔ عمومیِ بسته با سرور) */
-  fun chatOpen(slug: String, ticket: String, orderNo: Long?, name: String): ShopperResult<ChatConversation> {
+  fun chatOpen(slug: String, ticket: String, orderNo: Long?, name: String): ShopperResult<ChatConversation> =
+    when (val r = chatStart(slug, ticket, orderNo, name)) {
+      is ShopperResult.Ok -> ShopperResult.Ok(r.value.conversation)
+      is ShopperResult.Fail -> r
+    }
+
+  /** همان گشودن با سقف‌های سرور (`limits`، CHAT-05/07)؛ `limits` ِ نیامده یا نادرست ⇒ پیش‌فرض (بی دکمهٔ صدا) */
+  fun chatStart(slug: String, ticket: String, orderNo: Long?, name: String): ShopperResult<ChatOpened> {
     val body = json(*listOfNotNull(orderNo?.let { "orderNo" to JsonPrimitive(it) }, name.trim().takeIf { it.isNotEmpty() }?.let { "name" to JsonPrimitive(it.take(60)) }).toTypedArray())
     return call("POST", chatBase(slug) + "/conversations", body, ticketHeader(ticket)) { root ->
-      root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) }
+      val conv = root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) } ?: return@call null
+      ChatOpened(conv, root["limits"]?.let { decodeOrNull(ChatOpenLimits.serializer(), it) } ?: ChatOpenLimits())
     }
   }
 
@@ -330,6 +340,22 @@ class ShopperApi(private val http: ShopperHttp, private val lang: () -> String =
   fun chatDelete(slug: String, ticket: String, convId: String, messageId: String, scope: ChatDeleteScope): ShopperResult<ChatMessage> =
     call("DELETE", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/messages/" + ShopperUrl.encode(messageId) +
       ShopperUrl.query("for" to scope.wire), null, ticketHeader(ticket)) { root -> root["message"]?.let { decodeOrNull(ChatMessage.serializer(), it) } }
+
+  /** ویرایشِ پیامِ خودم (CHAT-14) با `POST …/edit` (همان PATCH ِ سرور؛ HttpURLConnection PATCH نمی‌فرستد) ⇒ همان پیام با `rev` ِ تازه */
+  fun chatEdit(slug: String, ticket: String, convId: String, messageId: String, text: String): ShopperResult<ChatMessage> =
+    call("POST", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/messages/" + ShopperUrl.encode(messageId) + "/edit",
+      json("body" to JsonPrimitive(text)), ticketHeader(ticket)) { root -> root["message"]?.let { decodeOrNull(ChatMessage.serializer(), it) } }
+
+  /** سنجاق/برداشتنِ سنجاقِ خودم (فقط برای خودم؛ سقفِ ۵ ⇒ ۴۰۹ `pin_limit`) ⇒ گفت‌وگو با `pinned` ِ تازه */
+  fun chatPin(slug: String, ticket: String, convId: String, messageId: String, on: Boolean): ShopperResult<ChatConversation> =
+    call(if (on) "PUT" else "DELETE", chatBase(slug) + "/conversations/" + ShopperUrl.encode(convId) + "/pins/" + ShopperUrl.encode(messageId),
+      null, ticketHeader(ticket)) { root -> root["conversation"]?.let { decodeOrNull(ChatConversation.serializer(), it) } }
+
+  /** جست‌وجو در پیام‌های همین دکان و همین شماره (پاک‌شده و «حذف برای من» بیرون؛ کوتاه‌تر از ۲ ⇒ ۴۰۰ `query_too_short`) */
+  fun chatSearch(slug: String, ticket: String, q: String, limit: Int = ChatActs.SEARCH_LIMIT): ShopperResult<List<ChatHit>> =
+    call("GET", chatBase(slug) + "/search" + ShopperUrl.query("q" to q, "limit" to limit.toString()), null, ticketHeader(ticket)) { root ->
+      (root["results"] as? JsonArray)?.mapNotNull { decodeOrNull(ChatHit.serializer(), it) }?.filter { it.id.isNotEmpty() && it.conversationId.isNotEmpty() }
+    }
 
   /** «مشکل دارم»: رشتهٔ سفارشِ بسته تا مهلتِ سرور دوباره باز می‌شود (پس از آن ۴۰۹ ِ `issue_window_passed`) */
   fun chatIssue(slug: String, ticket: String, convId: String): ShopperResult<ChatConversation> =

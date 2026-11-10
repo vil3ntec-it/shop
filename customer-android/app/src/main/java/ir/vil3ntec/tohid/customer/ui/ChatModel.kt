@@ -5,11 +5,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import ir.vil3ntec.tohid.core.shopper.ChatAct
 import ir.vil3ntec.tohid.core.shopper.ChatChanges
+import ir.vil3ntec.tohid.core.shopper.ChatCompose
 import ir.vil3ntec.tohid.core.shopper.ChatConversation
 import ir.vil3ntec.tohid.core.shopper.ChatDeleteScope
 import ir.vil3ntec.tohid.core.shopper.ChatDeletes
 import ir.vil3ntec.tohid.core.shopper.ChatFailure
 import ir.vil3ntec.tohid.core.shopper.ChatMessage
+import ir.vil3ntec.tohid.core.shopper.ChatOpenLimits
+import ir.vil3ntec.tohid.core.shopper.ChatOpening
 import ir.vil3ntec.tohid.core.shopper.ChatOutItem
 import ir.vil3ntec.tohid.core.shopper.ChatOutbox
 import ir.vil3ntec.tohid.core.shopper.ChatPhoto
@@ -30,32 +33,48 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** تمرکز پس از کار (دستهٔ ۴۲ ِ وب): [messageId] = دکمهٔ «کارها» ِ همان حباب، null = کادرِ نوشتن */
+data class ChatFocus(val messageId: String?)
+
 /**
  *  گفت‌وگو با دکان (CHAT-02/06) — حالِ صفحه، long-poll و صفِ بی‌اینترنت؛ بی android.* (آیفون هم همین را می‌گیرد).
- *  قاعده‌ها در core است (`ChatOutbox`، `ChatThread`)؛ این‌جا فقط ترتیبِ کارها.
+ *  قاعده‌ها در core است (`ChatOutbox`، `ChatThread`، `ChatCompose`)؛ این‌جا فقط ترتیبِ کارها. پاسخ/ویرایش/سنجاق/جست‌وجو
+ *  در [acts] (CHAT-14) و صدا در [voice] (CHAT-07).
  *
  *  ⛔ هویت همان بلیتِ شمارهٔ تأییدشده ([ticket])؛ ۴۰۱ ⇒ [ticketLost] و پیام‌ها در صف می‌مانند تا تأییدِ دوباره.
- *  [pollWaitMs] مهلتِ long-poll ِ سرور (۰ ⇒ فقط یک بار خواندن؛ آزمون).
+ *  ⛔ پیوندِ رشته (دستهٔ ۴۲ ِ `store/chat.js`: `hold`/`opening`): گشودنِ رشتهٔ دیگر همان دم رشته، کارها، پاسخ/ویرایش و
+ *  ضبطِ پیشین را برمی‌دارد و تا پاسخِ همین گشودن هیچ نوشتنی نمی‌پذیرد؛ پاسخِ دیرِ گشودنِ پیشین نمی‌نشیند؛ متنِ کادر فقط
+ *  در همان رشته‌ای که نوشته شد می‌ماند. [pollWaitMs] مهلتِ long-poll ِ سرور (۰ ⇒ فقط یک بار خواندن؛ آزمون).
  */
 class ChatModel(
   private val api: ShopperApi,
   private val kv: ShopperKeyValue,
-  private val scope: CoroutineScope,
-  private val io: CoroutineDispatcher,
-  private val clock: () -> Long,
+  internal val scope: CoroutineScope,
+  internal val io: CoroutineDispatcher,
+  internal val clock: () -> Long,
   private val ticket: () -> PhoneTicket?,
   private val ticketLost: () -> Unit,
   private val pollWaitMs: Int = 20_000,
   private val rand: () -> Double = { Random.nextDouble() },
+  device: VoiceDevice? = null,
 ) {
   var thread: Load<ChatThread> by mutableStateOf(Load.Idle)
     private set
   var outbox: List<ChatOutItem> by mutableStateOf(ChatOutbox.load(kv.get(ChatOutbox.KEY)))
     private set
-  var draft: String by mutableStateOf("")
+  /** کادرِ نوشتن، بسته به رشته‌ای که در آن نوشته شد (`ChatCompose`) */
+  var compose: ChatCompose by mutableStateOf(ChatCompose())
+    internal set
+  /** متنِ کادر — نوشتن آن را به رشتهٔ بازِ همین دم می‌بندد؛ بی رشتهٔ باز هیچ */
+  var draft: String
+    get() = compose.text
+    set(value) { current()?.let { compose = compose.type(it.conversation.id, value) } }
   var note: String? by mutableStateOf(null)
   var preparing: Boolean by mutableStateOf(false)
   var needVerify: Boolean by mutableStateOf(false)
+    private set
+  /** سقف‌های همین گشودن (`limits`)؛ تا پاسخ ⇒ پیش‌فرض (بی دکمهٔ صدا) */
+  var limits: ChatOpenLimits by mutableStateOf(ChatOpenLimits())
     private set
   /** با هر عکسِ تازه‌رسیده بالا می‌رود تا صفحه دوباره بکشد */
   var mediaRev: Int by mutableStateOf(0)
@@ -66,11 +85,16 @@ class ChatModel(
   /** «پاک شد» پس از حذف */
   var deletedNote: String? by mutableStateOf(null)
     private set
+  /** تمرکزی که صفحه پس از حذف باید بدهد؛ صفحه پس از دادن [focused] را می‌زند */
+  var focus: ChatFocus? by mutableStateOf(null)
+    private set
 
   private val photos = HashMap<String, ChatPhoto>()
+  private val voices = HashMap<String, ByteArray>()
   private val media = LinkedHashMap<String, ByteArray>()
   private val loading = HashSet<String>()
   private var at: Triple<String, Long?, String>? = null
+  private val opening = ChatOpening()
   private var pollJob: Job? = null
   private var wakeJob: Job? = null
   private var draining = false
@@ -82,18 +106,48 @@ class ChatModel(
   private var asked: ChatReceiptNeed? = null
   private val deletes = ChatDeletes()
 
+  /** پاسخ، ویرایش، سنجاق و جست‌وجو (CHAT-14) */
+  val acts = ChatActsModel(this, api)
+  /** ضبط و پخشِ پیامِ صوتی (CHAT-07)؛ [device] ِ null ⇒ نه دکمهٔ میکروفون، نه پخش‌کننده */
+  val voice = ChatVoiceModel(this, api, device)
+
   private fun putOutbox(list: List<ChatOutItem>) {
     outbox = list
     runCatching { kv.put(ChatOutbox.KEY, ChatOutbox.dump(list)) }
   }
 
-  private fun current(): ChatThread? = thread.valueOrNull()
+  internal fun current(): ChatThread? = thread.valueOrNull()
+
+  internal val slug: String? get() = at?.first
+
+  /** رشتهٔ [convId] هنوز همان رشتهٔ باز است (کارِ دیرِ رشتهٔ دیگر این‌جا نمی‌نشیند) */
+  internal fun live(convId: String): Boolean = current()?.conversation?.id == convId
+
+  /** بلیتِ زنده، یا null و تأییدِ دوبارهٔ شماره */
+  internal fun ticketOrLost(): String? = ticket()?.ticket ?: run { lost(); null }
+
+  /**
+   *  گشودنِ رشتهٔ دیگر یا بستنِ صفحه (همان `hold` ِ وب): نوبتِ تازه، long-poll ِ پیشین بریده، رشته، کارها، پاسخ/ویرایش،
+   *  جست‌وجو، ضبط و پخشِ پیشین برداشته. متنِ نوشتهٔ تازه می‌ماند ولی فقط در همان رشته دیده می‌شود (`compose.bind`).
+   */
+  private fun hold(next: Triple<String, Long?, String>?): Int {
+    val turn = opening.next()
+    pollJob?.cancel()
+    at = next
+    note = null
+    act = null
+    deletedNote = null
+    focus = null
+    asked = null
+    compose = compose.stop(true)
+    acts.reset()
+    voice.drop()
+    return turn
+  }
 
   /** گفت‌وگوی همین سفارش ([orderNo]) یا گفت‌وگوی عمومیِ دکان (null) */
   fun open(slug: String, orderNo: Long?, name: String) {
-    pollJob?.cancel()
-    at = Triple(slug, orderNo, name)
-    note = null
+    val turn = hold(Triple(slug, orderNo, name))
     val tk = ticket()
     if (tk == null) {
       needVerify = true
@@ -102,12 +156,16 @@ class ChatModel(
     }
     needVerify = false
     thread = Load.Busy
+    limits = ChatOpenLimits()
     scope.launch {
-      when (val r = withContext(io) { api.chatOpen(slug, tk.ticket, orderNo, name) }) {
+      val r = withContext(io) { api.chatStart(slug, tk.ticket, orderNo, name) }
+      if (!opening.live(turn)) return@launch   //  گشودنِ دیگری (یا بستنِ صفحه) پس از این آغاز شد
+      when (r) {
         is ShopperResult.Ok -> {
-          if (at?.first != slug) return@launch
-          thread = Load.Ready(ChatThread(r.value))
-          poll(slug, r.value.id)
+          limits = r.value.limits
+          compose = compose.bind(r.value.conversation.id)   //  متنِ نیمه‌نوشتهٔ رشتهٔ دیگر به این رشته نمی‌رود
+          thread = Load.Ready(ChatThread(r.value.conversation))
+          poll(slug, r.value.conversation.id)
           drain()
         }
         is ShopperResult.Fail -> if (ChatOutbox.failureOf(r.error) == ChatFailure.VERIFY) lost() else thread = Load.Failed(r.error)
@@ -117,18 +175,15 @@ class ChatModel(
 
   fun retryOpen() = at?.let { open(it.first, it.second, it.third) }
 
-  /** صفحه بسته شد: long-poll می‌ایستد؛ صف می‌ماند و هر بار که برنامه پیش آمد می‌رود */
+  /** صفحه بسته شد: long-poll می‌ایستد و پاسخِ دیرِ گشودن نمی‌نشیند؛ صف می‌ماند و هر بار که برنامه پیش آمد می‌رود */
   fun leave() {
-    pollJob?.cancel()
-    at = null
-    act = null
-    deletedNote = null
+    hold(null)
   }
 
   /** برنامه پیش آمد/پس رفت؛ پیش آمدن با صفحهٔ باز ⇒ «خواندم» تا آخرین پیامِ رسیده (همان `visibilitychange` ِ وب) */
   fun visible(on: Boolean) {
     foreground = on
-    if (on) receipts()
+    if (on) receipts() else voice.hidden()
   }
 
   private fun poll(slug: String, convId: String) {
@@ -142,12 +197,12 @@ class ChatModel(
         when (val r = withContext(io) { api.chatChanges(slug, tk.ticket, convId, cur.cursor, wait) }) {
           is ShopperResult.Ok -> {
             fails = 0
-            merge(slug, r.value)
+            merge(r.value)
             if (r.value.hasMore) continue
           }
           is ShopperResult.Fail -> {
             if (ChatOutbox.failureOf(r.error) == ChatFailure.VERIFY) { lost(); break }
-            if (ChatOutbox.failureOf(r.error) == ChatFailure.FAIL) { note = ShopperText.error(r.error); break }
+            if (ChatOutbox.failureOf(r.error) == ChatFailure.FAIL) { if (live(convId)) note = ShopperText.error(r.error); break }
             delay(ChatOutbox.delayMs(++fails, rand()))
           }
         }
@@ -157,15 +212,23 @@ class ChatModel(
     }
   }
 
-  private fun merge(slug: String, c: ChatChanges) {
+  private fun merge(c: ChatChanges) {
     val cur = current() ?: return
     if (cur.conversation.id != c.conversation.id) return
     val next = cur.merge(c)
     thread = Load.Ready(next)
     //  جوابِ گم‌شده: سرور پیام را دارد ⇒ از صف بیرون، بی ارسالِ دوم
     val arrived = outbox.filter { it.convId == c.conversation.id && next.arrived(it.clientId) }
-    if (arrived.isNotEmpty()) putOutbox(outbox.filter { it !in arrived })
+    if (arrived.isNotEmpty()) {
+      arrived.forEach { photos.remove(it.clientId); voices.remove(it.clientId) }
+      putOutbox(outbox.filter { it !in arrived })
+    }
     receipts()
+  }
+
+  /** یک پیامِ تازه‌شده از پاسخِ کاری (حذف، ویرایش) — فقط در همان رشته */
+  internal fun put(convId: String, m: ChatMessage) {
+    current()?.takeIf { it.conversation.id == convId }?.let { thread = Load.Ready(it.merge(ChatChanges(it.conversation, listOf(m), it.cursor))) }
   }
 
   /**
@@ -182,33 +245,44 @@ class ChatModel(
     scope.launch {
       val r = withContext(io) { api.chatReceipts(slug, tk.ticket, convId, need.deliveredSeq, need.readSeq) }
       if (asked == need) asked = null
-      r.valueOrNull()?.let(::conversation)
+      r.valueOrNull()?.let(::adopt)
     }
   }
 
-  /** گفت‌وگوی تازه از سرور (رسید، «مشکل دارم») — همان رشته، رسیدها فقط جلو */
-  private fun conversation(c: ChatConversation) {
+  /** گفت‌وگوی تازه از سرور (رسید، «مشکل دارم»، سنجاق) — فقط همان رشته، رسیدها فقط جلو */
+  internal fun adopt(c: ChatConversation) {
     current()?.takeIf { it.conversation.id == c.id }?.let { thread = Load.Ready(it.merge(ChatChanges(c, emptyList(), it.cursor))) }
   }
 
+  /** «فرستادن» یا، در حالِ ویرایش، «ذخیره» */
+  fun submit() = if (compose.editing != null) acts.save() else send()
+
   fun send() {
     val cur = current() ?: return
-    val text = draft.trim()
-    if (text.isEmpty()) return
+    if (compose.text.isBlank()) return
     if (!cur.conversation.canSend) {
       note = ShopperText.chatClosed
       return
     }
     val slug = at?.first ?: return
-    putOutbox(ChatOutbox.add(outbox, slug, cur.conversation.id, "text", text, clock()).first)
-    draft = ""
+    //  همیشه رشته‌ای که متن در آن نوشته شد (`ChatCompose.outgoing`)؛ پاسخ فقط به پیامی از همین رشته
+    val out = compose.outgoing(cur) ?: return
+    putOutbox(ChatOutbox.add(outbox, slug, out.convId, "text", out.body, clock(), replyTo = out.replyTo).first)
+    compose = compose.copy(text = "", replyTo = null)
     drain()
   }
 
-  /** عکسِ آمادهٔ سکو (چرخیده، بی EXIF، فشرده) ⇒ صف؛ بایت‌ها فقط در حافظه */
-  fun sendPhoto(photo: ChatPhoto?) {
+  /** آغازِ برگزیدنِ عکس: رشتهٔ همین دم (عکس فقط به همان می‌رود)، یا null ⇒ رشته‌ای باز نیست */
+  fun photoStart(): String? = current()?.conversation?.id?.also { preparing = true }
+
+  /**
+   *  عکسِ آمادهٔ سکو (چرخیده، بی EXIF، فشرده) ⇒ صف؛ بایت‌ها فقط در حافظه. [convId] = رشته‌ای که عکس برایش برگزیده شد:
+   *  رشتهٔ دیگری باز شده ⇒ عکس دور (همان `phDrop` ِ وب)، هرگز به رشتهٔ تازه.
+   */
+  fun sendPhoto(photo: ChatPhoto?, convId: String? = null) {
     preparing = false
     val cur = current() ?: return
+    if (convId != null && convId != cur.conversation.id) return
     val slug = at?.first ?: return
     if (photo == null) {
       note = ShopperText.chatPhotoBad
@@ -220,6 +294,17 @@ class ChatModel(
     drain()
   }
 
+  /** پیامِ صوتیِ آماده (CHAT-07) ⇒ همان صف، با یک `clientId` و همان بایت در هر تلاش؛ فقط به رشتهٔ [convId] */
+  internal fun sendVoice(convId: String, bytes: ByteArray, durationMs: Long): Boolean {
+    if (!live(convId)) return false
+    val slug = at?.first ?: return false
+    val (list, item) = ChatOutbox.add(outbox, slug, convId, "audio", "", clock(), durationMs = durationMs)
+    voices[item.clientId] = bytes
+    putOutbox(list)
+    drain()
+    return true
+  }
+
   fun retry(clientId: String) {
     putOutbox(ChatOutbox.retry(outbox, clientId))
     drain()
@@ -227,6 +312,7 @@ class ChatModel(
 
   fun cancel(clientId: String) {
     photos.remove(clientId)
+    voices.remove(clientId)
     putOutbox(ChatOutbox.done(outbox, clientId))
   }
 
@@ -244,7 +330,7 @@ class ChatModel(
     drain()
   }
 
-  private fun lost() {
+  internal fun lost() {
     ticketLost()
     needVerify = true
   }
@@ -266,20 +352,23 @@ class ChatModel(
           }
           putOutbox(ChatOutbox.patch(outbox, item.clientId) { it.copy(state = ChatOutbox.SENDING) })
           val photo = photos[item.clientId]
-          if (item.kind == "image" && item.mediaId == null && photo == null) {
+          val sound = voices[item.clientId]
+          if (item.mediaId == null && ((item.kind == "image" && photo == null) || (item.kind == "audio" && sound == null))) {
             //  بایت‌ها با بسته شدنِ برنامه رفتند ⇒ این پیام دیگر فرستادنی نیست
             putOutbox(ChatOutbox.done(outbox, item.clientId))
             continue
           }
-          val up = withContext(io) { upload(item, photo, tk.ticket) }
+          val up = withContext(io) { upload(item, photo, sound, tk.ticket) }
           if (up is ShopperResult.Fail) { fail(item, up.error); continue }
           val ready = (up as ShopperResult.Ok).value
           if (ready != item) putOutbox(ChatOutbox.patch(outbox, item.clientId) { it.copy(mediaId = ready.mediaId, thumbId = ready.thumbId) })
           when (val r = withContext(io) { api.chatSend(ready.slug, tk.ticket, ready) }) {
             is ShopperResult.Ok -> {
               photos.remove(ready.clientId)
+              voices.remove(ready.clientId)
               putOutbox(ChatOutbox.done(outbox, ready.clientId))
               current()?.takeIf { it.conversation.id == ready.convId }?.let { thread = Load.Ready(it.withMine(r.value.message)) }
+              if (ready.kind == "audio") voice.sent(ready.convId)
             }
             is ShopperResult.Fail -> fail(ready, r.error)
           }
@@ -292,11 +381,18 @@ class ChatModel(
   }
 
   /**
-   *  عکس: بایت‌های اصلی و پیش‌نمایش یک بار (تکرارِ همان بایت ⇒ همان رسانهٔ سرور، `reused`). فقط درخواست، بی دست
-   *  زدن به حالِ صفحه (روی نخِ [io]). پیش‌نمایشِ نرسیده پیام را نمی‌بندد.
+   *  عکس: بایت‌های اصلی و پیش‌نمایش یک بار؛ صدا: یک بار (تکرارِ همان بایت ⇒ همان رسانهٔ سرور، `reused`). فقط درخواست، بی
+   *  دست زدن به حالِ صفحه (روی نخِ [io]). پیش‌نمایشِ نرسیده پیام را نمی‌بندد.
    */
-  private fun upload(item: ChatOutItem, photo: ChatPhoto?, tk: String): ShopperResult<ChatOutItem> {
-    if (item.kind != "image" || item.mediaId != null || photo == null) return ShopperResult.Ok(item)
+  private fun upload(item: ChatOutItem, photo: ChatPhoto?, sound: ByteArray?, tk: String): ShopperResult<ChatOutItem> {
+    if (item.mediaId != null) return ShopperResult.Ok(item)
+    if (item.kind == "audio" && sound != null) {
+      return when (val r = api.chatUpload(item.slug, tk, item.convId, sound, thumb = false)) {
+        is ShopperResult.Ok -> ShopperResult.Ok(item.copy(mediaId = r.value.mediaId))
+        is ShopperResult.Fail -> r
+      }
+    }
+    if (item.kind != "image" || photo == null) return ShopperResult.Ok(item)
     val main = when (val r = api.chatUpload(item.slug, tk, item.convId, photo.main, thumb = false)) {
       is ShopperResult.Ok -> r.value.mediaId
       is ShopperResult.Fail -> return r
@@ -319,7 +415,19 @@ class ChatModel(
     }
   }
 
-  fun issue() = convAction { slug, tk, id -> api.chatIssue(slug, tk, id) }
+  /** «مشکل دارم» — پاسخ فقط در همان رشته می‌نشیند (رشتهٔ دیگری باز شد ⇒ هیچ) */
+  fun issue() {
+    val cur = current() ?: return
+    val slug = at?.first ?: return
+    val tk = ticketOrLost() ?: return
+    val convId = cur.conversation.id
+    scope.launch {
+      when (val r = withContext(io) { api.chatIssue(slug, tk, convId) }) {
+        is ShopperResult.Ok -> if (live(convId)) current()?.let { thread = Load.Ready(it.copy(conversation = r.value)) }
+        is ShopperResult.Fail -> if (ChatOutbox.failureOf(r.error) == ChatFailure.VERIFY) lost() else if (live(convId)) note = ShopperText.error(r.error)
+      }
+    }
+  }
 
   // ── حذف (CHAT-08): نوار ⇐ پرسشِ تأیید ⇐ یک درخواست؛ قاعده‌ها در `ChatDeletes` ِ core ──
 
@@ -345,6 +453,11 @@ class ChatModel(
     if (act?.busy != true) act = null
   }
 
+  /** دکمه‌ای از فهرست که نوار را می‌بندد و کارِ دیگری می‌کند (پاسخ، ویرایش) */
+  internal fun dropActions() {
+    if (act?.busy != true) act = null
+  }
+
   /** «بله، پاک کن»: یک درخواست برای هر (پیام، دامنه)؛ دوبار زدن هیچ */
   fun confirmDelete() {
     val a = act ?: return
@@ -366,8 +479,11 @@ class ChatModel(
       when {
         e == null -> {
           //  همان پیام با `rev` ِ تازه: «برای من» ⇒ `hidden` (از رشته می‌رود)، «برای همه» ⇒ سنگِ قبر
-          r.valueOrNull()?.let { msg -> current()?.takeIf { it.conversation.id == convId }?.let { thread = Load.Ready(it.merge(ChatChanges(it.conversation, listOf(msg), it.cursor))) } }
+          r.valueOrNull()?.let { msg -> put(convId, msg) }
           if (act?.messageId == m.id) act = null
+          if (!live(convId)) return@launch   //  رشتهٔ دیگری باز شد ⇒ نه پیام، نه تمرکز این‌جا
+          //  تمرکز (دستهٔ ۴۲): حبابِ رفته ⇒ کادرِ نوشتن؛ سنگِ قبر ⇒ دکمهٔ «کارها» ِ همان حباب
+          focus = ChatFocus(if (what == ChatDeleteScope.ALL) m.id else null)
           val done = if (what == ChatDeleteScope.ALL) ShopperText.chatDeleteAllDone else ShopperText.chatDeleteMeDone
           deletedNote = done
           delay(4_000)
@@ -377,29 +493,27 @@ class ChatModel(
         else -> {
           if (act?.messageId == m.id) act = back
           //  رشته همین حالا بسته شد ⇒ حالِ تازهٔ گفت‌وگو (کادرِ نوشتن و «حذف برای همه» می‌روند)
-          if (e.code == "chat_closed") refresh(slug, convId)
+          if (e.code == "chat_closed") refresh(convId)
         }
       }
     }
   }
 
-  /** یک بار خواندنِ تغییرها بی صبر (long-poll ِ باز ممکن است هنوز منتظر باشد) */
-  private fun refresh(slug: String, convId: String) {
-    val tk = ticket() ?: return
-    val cur = current()?.takeIf { it.conversation.id == convId } ?: return
-    scope.launch { withContext(io) { api.chatChanges(slug, tk.ticket, convId, cur.cursor, 0) }.valueOrNull()?.let { merge(slug, it) } }
+  fun focused() {
+    focus = null
   }
 
-  private fun convAction(call: (String, String, String) -> ShopperResult<ChatConversation>) {
-    val cur = current() ?: return
+  /** پس از پاسخ/ویرایش/ذخیره: تمرکز به کادرِ نوشتن */
+  internal fun focusComposer() {
+    focus = ChatFocus(null)
+  }
+
+  /** یک بار خواندنِ تغییرها بی صبر (long-poll ِ باز ممکن است هنوز منتظر باشد) */
+  internal fun refresh(convId: String) {
     val slug = at?.first ?: return
-    val tk = ticket() ?: return lost()
-    scope.launch {
-      when (val r = withContext(io) { call(slug, tk.ticket, cur.conversation.id) }) {
-        is ShopperResult.Ok -> current()?.let { thread = Load.Ready(it.copy(conversation = r.value)) }
-        is ShopperResult.Fail -> note = ShopperText.error(r.error)
-      }
-    }
+    val tk = ticket() ?: return
+    val cur = current()?.takeIf { it.conversation.id == convId } ?: return
+    scope.launch { withContext(io) { api.chatChanges(slug, tk.ticket, convId, cur.cursor, 0) }.valueOrNull()?.let { merge(it) } }
   }
 
   /** بایت‌های عکسِ یک پیام (حافظهٔ کوچکِ ۲۴ تایی)؛ نیامده ⇒ null و بارگیری در پس‌زمینه */
