@@ -83,6 +83,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.storefront.media', scope: 'shop', default: false, what: 'لوگو و تصویرِ سرِ ویترین (M3)' },
   { key: 'shop.storefront.promos', scope: 'shop', default: false, what: 'کدِ تخفیف و تخفیفِ خودکار/زمان‌دارِ ویترین (MKT-01/09)' },
   { key: 'shop.storefront.promo_guard', scope: 'shop', default: false, what: 'تخفیفِ اولین خرید و سدِ سوءاستفاده از تخفیف (MKT-02، RSK-09)؛ با `shop.storefront.promos`' },
+  { key: 'shop.storefront.promo_groups', scope: 'shop', default: false, what: 'تخفیفِ گروهِ مشتری در ویترین فقط با گروهِ قرض‌دارِ همان شمارهٔ تأییدشده (PRM-11)؛ با `shop.storefront.promos`' },
   { key: 'shop.storefront.campaigns', scope: 'shop', default: false, what: 'پیوند و QR ِ کمپین با ردیابیِ منبع (MKT-10/11)' },
   { key: 'shop.storefront.bulk', scope: 'shop', default: false, what: 'انتشارِ گروهیِ کالای ویترین از کاتالوگِ واحد (M2)' },
   { key: 'shop.storefront.visual_search', scope: 'shop', default: false, what: '«جست‌وجو با عکس» ِ ویترین (AI-11)؛ با `shop.visual_search`' },

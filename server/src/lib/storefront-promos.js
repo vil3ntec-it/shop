@@ -26,6 +26,7 @@ const orders = require('./orders');
 const S = require('./order-states');
 const { localParts } = require('./storefront-hours');
 const guard = require('./storefront-promo-guard');
+const groups = require('./storefront-promo-groups');
 const { badRequest, conflict, notFound } = require('../middleware/errors');
 
 const FLAG = 'shop.storefront.promos';
@@ -80,12 +81,14 @@ async function factsOf(run, shopId, ids) {
  * قلم‌های قیمت‌خورده (`{lineNo, productId, qtyMilli, unitPriceMinor, lineTotalMinor}`) ⇒ نتیجهٔ هسته.
  * ⇒ `{discountMinor, lines:[{lineNo, discountMinor}], applied:[{id, name, discountMinor}], code:{code,status}|null, codeRuleIds}`
  */
-async function evaluate(run, sf, lines, code, at, { exceptSale = '' } = {}) {
+async function evaluate(run, sf, lines, code, at, { exceptSale = '', group = '' } = {}) {
   const rules = await rulesOf(run, sf.shop_id, { exceptSale });
   const facts = await factsOf(run, sf.shop_id, [...new Set(lines.map((l) => l.productId))]);
   const r = P.evaluate({
     stepMinor: STEP_MINOR,
     channel: 'online',
+    //  PRM-11: گروهِ مشتری فقط از `storefront-promo-groups.prepare` (شمارهٔ تأییدشده، پرچمِ خاموش ⇒ '')
+    group: groups.match(group, rules),
     at: atOf(sf, at),
     coupons: code ? [code] : [],
     lines: lines.map((l) => ({
@@ -124,6 +127,7 @@ async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
   const sale = `sf:${key}`;
   //  MKT-02/RSK-09: پرچم و تنظیم پیش از تراکنش؛ خاموش ⇒ null و همان راهِ پیشین
   const g = await guard.prepare(sf.shop_id, { body, phone, ip });
+  const group = await groups.prepare(sf.shop_id, phone);   //  PRM-11: پیش از تراکنش، فقط از شمارهٔ تأییدشده
   return async (run, at) => {
     if (g && code) guard.gate(g);   //  ۴۲۹ پس از بررسیِ تکرارِ کلید (تکرارِ همان ثبت هرگز ۴۲۹ نمی‌گیرد)
     //  «جمعِ دیده‌شده» پس از تخفیف: همین‌جا سنجیده می‌شود، نه درونِ `pricer`
@@ -133,7 +137,7 @@ async function wrap(price, sf, { key, body, input, phone = '', ip = '' }) {
     try { out = await price(run, at); } finally { input.expectedTotalMinor = expected; }
     //  کدِ سقف‌دار: قفلِ ردیفِ همان قاعده پیش از شمارش (دو سفارشِ هم‌زمان پشتِ سرِ هم)
     if (code) await run('SELECT id FROM shop_promotions WHERE shop_id=$1 AND code=$2 AND deleted=false FOR UPDATE', [sf.shop_id, code]);
-    const e = await evaluate(run, sf, out.lines, code, at, { exceptSale: sale });
+    const e = await evaluate(run, sf, out.lines, code, at, { exceptSale: sale, group });
     if (e.code && e.code.status !== 'applied') {
       if (g) guard.failed(g);
       throw Object.assign(conflict(REJECT[e.code.status] || REJECT.unknown, 'promo_code_rejected'), { data: { promo: e.code } });
@@ -207,6 +211,7 @@ async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
   const q = parseQuote(body);
   const g = await guard.prepare(sf.shop_id, { body, phone, ip });
   if (g && q.code) guard.gate(g);
+  const group = await groups.prepare(sf.shop_id, phone);   //  PRM-11: همان گروهِ ثبت (بی شمارهٔ تأییدشده ⇒ '')
   const { PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, productView } = require('./storefront');
   const run = (t, p) => db.query(t, p);
   const rows = (await run(
@@ -226,7 +231,7 @@ async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
   //  NTF-10: کدِ پوزش جدا از قاعده‌ها و سدِ کد (بی شماره: شماره در ثبت سنجیده می‌شود)
   const apology = await require('./order-late-apology').couponOf(sf.shop_id, q.code);
   if (apology) {
-    const e0 = await evaluate(run, sf, lines, '', at);
+    const e0 = await evaluate(run, sf, lines, '', at, { group });
     const ap = await apology.preview(subtotalMinor - e0.discountMinor, at);
     return {
       subtotalMinor, discountMinor: e0.discountMinor + ap.discountMinor, totalMinor: subtotalMinor - e0.discountMinor - ap.discountMinor,
@@ -234,7 +239,7 @@ async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
       code: { code: q.code, status: ap.status }, unavailable,
     };
   }
-  let e = await evaluate(run, sf, lines, q.code, at);
+  let e = await evaluate(run, sf, lines, q.code, at, { group });
   if (!g) {
     return {
       subtotalMinor, discountMinor: e.discountMinor, totalMinor: subtotalMinor - e.discountMinor,
@@ -247,7 +252,7 @@ async function quote(sf, body, at = db.now(), { phone = '', ip = '' } = {}) {
   if (e.code && e.code.status !== 'applied') guard.failed(g);
   else if (e.code && await guard.overLimit(run, g, e.codeRuleIds)) {
     guard.failed(g);
-    e = await evaluate(run, sf, lines, '', at);
+    e = await evaluate(run, sf, lines, '', at, { group });
     codeOut = { code: q.code, status: 'limit_reached' };
   }
   const r = await guard.preview(run, g, { e, subtotalMinor, code: codeOut && codeOut.status === 'applied' ? q.code : '' });

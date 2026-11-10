@@ -1,0 +1,18 @@
+{
+  "er.title": "Delete my data in this shop",
+  "er.p": "Your name, number, address, notes, photos, chats and stock alerts in this shop are deleted. Purchase amounts and dates stay without your name for the shop's accounts. Your account and other shops are not touched.",
+  "er.check": "Show what will be deleted",
+  "er.g.orders": "Orders (kept without name or address): {n}",
+  "er.g.chat": "Chats: {n}",
+  "er.g.media": "Photos and delivery locations: {n}",
+  "er.g.saved": "Cart and saved lists: {n}",
+  "er.g.alerts": "Stock alerts and notifications: {n}",
+  "er.g.notes": "Reviews and problem reports (kept without text): {n}",
+  "er.other": "Some other data of yours will also be deleted.",
+  "er.none": "No data of yours is left in this shop.",
+  "er.open": "{n} of your orders are not finished yet; ask again after delivery or cancellation.",
+  "er.sure": "I understand this cannot be undone",
+  "er.go": "Delete everything for good",
+  "er.verify": "To delete, confirm the number {phone} with a code now.",
+  "er.done": "Your data in this shop has been deleted."
+}
