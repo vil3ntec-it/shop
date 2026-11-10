@@ -18,7 +18,6 @@ const E = await boot({ name: 'scenario-s28b', env: { SYNC_V3_ENABLED: '1' } });
 /** سطرهایی که امروز ساخته نشده‌اند — سند، نه assert */
 export const PENDING = [
   'موتورِ v3 در برنامه پیش‌فرض خاموش است (SYN-05)؛ نوارِ قرمزِ ساعت فقط با v3 ِ همان دستگاه (قاعده‌اش `core/sync/ClockSkew`، ClockSkewTest)',
-  '«تاریخِ تصحیح‌شده» ِ سندِ خودِ دستگاه روی همان دستگاه نمی‌نشیند (Pull opِ خودِ دستگاه را برنمی‌گرداند)؛ روی سرور و دستگاه‌های دیگر هست',
 ];
 
 const owner = await E.owner('owner-s28b@e2e.local', 'صاحبِ S28b', 'دکانِ S28b');
@@ -101,6 +100,12 @@ await E.step('S28b', 'وصل شدن: تغییرِ D1 نمی‌برد و به ص�
   assert.equal(new Date(D1.find('sales', 's28b-d2').date).getUTCFullYear(), 2000, 'تاریخِ دستگاه دست نخورد');
   assert.ok(Math.abs(D1.find('sales', 's28b-d2').correctedAt - Date.now()) < 60 * 60_000, 'D1 فاکتورِ D2 را با تاریخِ تصحیح‌شده دارد');
   assert.ok(Math.abs(D2.find('sales', 's28b-d1').correctedAt - Date.now()) < 60 * 60_000, 'D2 فاکتورِ D1 را با تاریخِ تصحیح‌شده دارد');
+  //  SYN-05: فاکتورِ هر دستگاه همان `correctedAt` ِ سرور را روی **خودِ** همان دستگاه هم دارد (`current` ِ پاسخِ push؛ Pull opِ خودش را نمی‌آورد)
+  for (const [dev, id] of [[D1, 's28b-d1'], [D2, 's28b-d2']]) {
+    assert.equal(dev.find('sales', id).correctedAt, (await rowOf(E, owner.shopId, 'sales', id)).data.correctedAt, `${id} روی دستگاهِ خودش`);
+  }
+  const price = (await rowOf(E, owner.shopId, 'products', P.id)).data.salePriceMinor;
+  assert.deepEqual([D1.find('products', P.id).salePrice * 100, D2.find('products', P.id).salePrice * 100], [price, price], 'قیمتِ هر دو دستگاه = سرور');
   //  ۳) هشدارِ قرمزِ ساعت روی D2: اختلافِ ساعت با سرور از مرزِ نگهبان (`SKEW_MS`، ۵ دقیقه، همان `skew_limit_ms` ِ سرور) گذشت —
   //     همان قاعدهٔ `ClockSkew.level` ِ برنامه (core، ClockSkewTest «S28b»)؛ D1 هم جلوست و هشدار دارد
   assert.ok(Math.abs(D2.engine.status().clockOffsetMs) > V3.hlc.SKEW_MS, `clockOffsetMs = ${D2.engine.status().clockOffsetMs}`);

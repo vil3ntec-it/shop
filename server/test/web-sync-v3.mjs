@@ -36,7 +36,7 @@ process.env.CORS_ORIGIN = '*';
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 
 const h = require('./helpers');
-const { one } = require('../src/db');
+const { one, query } = require('../src/db');
 
 const ROOT = path.join(import.meta.dirname, '..', '..');
 const apiBase = await h.start();
@@ -262,6 +262,62 @@ await step('رابطِ window.TohidSync: با v1 (پیش‌فرض) نصب نمی
   assert.ok(['green', 'yellow', 'red', 'grey'].includes(out.st.dot));
   assert.equal(out.pulled, true, 'ردیف‌های سرور از Snapshot رسیدند');
   assert.equal((await rowOf('products', 'wpc')).data.salePriceMinor, 800);
+});
+
+await step('SYN-04: پس از `gzip_push` ِ pull push ِ بزرگ با CompressionStream ِ خودِ مرورگر فشرده می‌رود؛ کوچک ساده', async () => {
+  await query(`INSERT INTO live_config (scope, key, value, updated_at) VALUES ($1,'sync.gzip_push','true',1)
+    ON CONFLICT (scope, key) DO UPDATE SET value = excluded.value`, [shopId]);
+  const ctxG = await browser.newContext();
+  const G = await ctxG.newPage();
+  G.on('pageerror', (e) => errors.push(String(e.message)));
+  const encs = [];
+  G.on('request', (req) => { if (req.url().includes('/api/sync/v3/push')) encs.push(req.headers()['content-encoding'] || ''); });
+  await G.goto(`${siteBase}/v3.html`);
+  const out = await G.evaluate(async (t) => {
+    const e = await mk('web-gz', t);
+    const r0 = await e.sync();
+    const d = window.ledgers['web-gz'].read();
+    d.products = (d.products || []).concat(Array.from({ length: 30 }, (_, i) => ({ id: 'wgz' + i, name: 'کالای فشرده ' + i, salePrice: 10 + i })));
+    window.ledgers['web-gz'].write(d);
+    const r1 = await e.sync();
+    const d2 = window.ledgers['web-gz'].read();
+    d2.products = d2.products.map((p) => (p.id === 'wgz0' ? Object.assign({}, p, { name: 'تک' }) : p));
+    window.ledgers['web-gz'].write(d2);
+    const r2 = await e.sync();
+    return { r0, r1, r2, flag: e.meta.gzipPush, queued: e.queued() };
+  }, token);
+  await ctxG.close();
+  await query(`DELETE FROM live_config WHERE scope=$1 AND key='sync.gzip_push'`, [shopId]);
+  assert.equal(out.r1.ok && out.r2.ok, true, JSON.stringify(out));
+  assert.equal(out.flag, true);
+  assert.equal(out.queued, 0);
+  assert.deepEqual(encs.slice(-2), ['gzip', ''], JSON.stringify(encs));
+  assert.equal((await rowOf('products', 'wgz29')).data.salePriceMinor, 3900);
+  assert.equal((await rowOf('products', 'wgz0')).data.name, 'تک');
+});
+
+await step('SYN-05: «تاریخِ تصحیح‌شده» ِ فاکتورِ خودِ همین مرورگر (ساعتِ سالِ ۲۰۰۰) از پاسخِ push روی دفترش', async () => {
+  const ctxY = await browser.newContext();
+  const Y = await ctxY.newPage();
+  Y.on('pageerror', (e) => errors.push(String(e.message)));
+  await Y.goto(`${siteBase}/v3.html`);
+  const out = await Y.evaluate(async (t) => {
+    const e = await mk('web-y2k', t);
+    await e.sync();
+    const d = window.ledgers['web-y2k'].read();
+    d.sales = (d.sales || []).concat([{ id: 'ws-y2k', total: 50, finalTotal: 50, paidAmount: 50, remaining: 0, status: 'completed', createdAt: Date.UTC(2000, 0, 1), date: '2000-01-01' }]);
+    window.ledgers['web-y2k'].write(d);
+    const r = await e.sync();
+    const again = await e.record();
+    return { r, again, sale: window.ledgers['web-y2k'].read().sales.find((x) => x.id === 'ws-y2k') };
+  }, token);
+  await ctxY.close();
+  assert.equal(out.r.ok, true, JSON.stringify(out.r));
+  const srv = (await rowOf('sales', 'ws-y2k')).data;
+  assert.ok(Number.isSafeInteger(srv.correctedAt));
+  assert.equal(out.sale.correctedAt, srv.correctedAt);
+  assert.equal(out.sale.createdAt, Date.UTC(2000, 0, 1));
+  assert.equal(out.again, 0, 'بی op ِ تازه');
 });
 
 await step('بی خطای صفحه', async () => {

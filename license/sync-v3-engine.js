@@ -83,8 +83,7 @@
   function hlcCanonical(s) { var p = hlcParse(s); return p ? hlcFormat(p) : ''; }
   function asTuple(x) { return typeof x === 'string' ? hlcParse(x) : x; }
   function hlcCompare(a, b) {
-    var x = asTuple(a);
-    var y = asTuple(b);
+    var x = asTuple(a), y = asTuple(b);
     if (x.wall !== y.wall) return x.wall < y.wall ? -1 : 1;
     if (x.counter !== y.counter) return x.counter < y.counter ? -1 : 1;
     if (x.node === y.node) return 0;
@@ -96,27 +95,22 @@
     return hlcFormat({ wall: wall, counter: Math.min(Math.max(0, counter | 0), MAX_COUNTER), node: node });
   }
   function createClock(o) {
-    var opts = o || {};
-    var node = opts.node || 'web';
-    var now = opts.now || Date.now;
-    var skewMs = opts.skewMs === undefined ? SKEW_MS : opts.skewMs;
-    var last = { wall: 0, counter: 0 };
+    var opts = o || {}, node = opts.node || 'web', now = opts.now || Date.now;
+    var skewMs = opts.skewMs === undefined ? SKEW_MS : opts.skewMs, last = { wall: 0, counter: 0 };
     function bump(wall, counter) {
       if (counter > MAX_COUNTER) { wall += 1; counter = 0; }
       last = { wall: wall, counter: counter };
       return hlcFormat({ wall: wall, counter: counter, node: node });
     }
     return {
-      node: node,
-      skewMs: skewMs,
+      node: node, skewMs: skewMs,
       tick: function () {
         var pt = now();
         if (pt > last.wall) return bump(pt, 0);
         return bump(last.wall, last.counter + 1);
       },
       recv: function (remote) {
-        var r = asTuple(remote);
-        var pt = now();
+        var r = asTuple(remote), pt = now();
         if (!r) return { skewed: false, hlc: this.tick() };
         if (r.wall > pt + skewMs) return { skewed: true, hlc: hlcFormat({ wall: last.wall, counter: last.counter, node: node }) };
         var wall = Math.max(last.wall, r.wall, pt);
@@ -130,9 +124,7 @@
       observe: function (seen) {
         var s = asTuple(seen);
         if (!s) return;
-        if (s.wall > last.wall || (s.wall === last.wall && s.counter > last.counter)) {
-          last = { wall: s.wall, counter: s.counter };
-        }
+        if (s.wall > last.wall || (s.wall === last.wall && s.counter > last.counter)) last = { wall: s.wall, counter: s.counter };
       },
       isSkewed: function (remote) {
         var r = asTuple(remote);
@@ -175,13 +167,7 @@
     stockMovements: { policy: 'moves', qty: ['qty'] },
     stockCounts: { policy: 'count', qty: ['countedQty'], v3only: true },
   };
-  var KINDS = {
-    master: ['insert', 'update', 'delete', 'delta'],
-    doc: ['insert', 'delta', 'cancel'],
-    log: ['insert'],
-    moves: ['insert'],
-    count: ['insert'],
-  };
+  var KINDS = { master: ['insert', 'update', 'delete', 'delta'], doc: ['insert', 'delta', 'cancel'], log: ['insert'], moves: ['insert'], count: ['insert'] };
   var ALL_KINDS = ['insert', 'update', 'delete', 'delta', 'cancel'];
   var OP_ID_RE = /^[A-Za-z0-9_.-]{1,80}$/;
   var MAX_FIELDS_BYTES = 64 * 1024;
@@ -391,6 +377,36 @@
     return Object.assign(base, { type: item.kind === 'insert' ? 'insert' : 'update', fields: fields });
   }
 
+  /**
+   *  SYN-05/06: `current` ِ پاسخِ push (ساعتِ کج یا «آخرین نوشتن» نبرد، حذفِ کهنه، `correctedAt` ِ سرور) ⇒ opهای v1 که دفتر
+   *  و سایه را به سرور می‌رسانند. [items] به ترتیبِ دسته: `{table, row_id, kind, fields, res, pending, exists}`. همزادِ
+   *  `V3Current.fixes` (کاتلین)، بردارِ `core/test-vectors/v3-current-v1.json`. ⛔ ردیفِ هنوز در صف، فهرستِ نامی و سندِ مالی
+   *  (جز `correctedAt`) دست نمی‌خورند؛ ردیفِ نبوده فقط با دادهٔ کاملِ پاسخِ حذف؛ فیلدی که op ِ بعدیِ همان دسته فرستاد نه.
+   */
+  function currentFix(it) {
+    var spec = specOf(it.table), res = it.res || {}, cur = res.current, master = !!spec && spec.policy === 'master';
+    if (!spec || spec.v3only || Core().LIST_COLLECTIONS.indexOf(spec.name) >= 0 || it.pending || !isPlainObject(cur) || !DONE[res.status]) return null;
+    var base = { op_id: 'cur.' + res.op_id, table: spec.name, row_id: it.row_id };
+    if (cur.deleted === true) return it.exists && master ? Object.assign(base, { type: 'delete' }) : null;
+    var data = isPlainObject(cur.data) ? cur.data : {};
+    if (!master) data = Number.isSafeInteger(data.correctedAt) ? { correctedAt: data.correctedAt } : {};
+    var fields = dataToLegacy(spec, data);
+    if (!Object.keys(fields).length || (!it.exists && (!master || it.kind !== 'delete'))) return null;
+    return Object.assign(base, { type: it.exists ? 'update' : 'insert', fields: fields });
+  }
+  function currentFixes(items) {
+    var out = [], later = {};
+    for (var i = items.length - 1; i >= 0; i--) {
+      var it = items[i], key = it.table + '/' + it.row_id, seen = later[key] || (later[key] = {}), spec = specOf(it.table);
+      var f = seen['*'] ? null : currentFix(it), n = Object.keys(seen).length;
+      if (f && f.fields) Object.keys(seen).forEach(function (k) { delete f.fields[k]; });
+      if (f && (f.type === 'delete' ? n : !Object.keys(f.fields).length)) f = null;
+      if (f) out.unshift(f);
+      if (it.kind === 'delete') seen['*'] = true; else if (spec) Object.keys(dataToLegacy(spec, it.fields || {})).forEach(function (k) { seen[k] = true; });
+    }
+    return out;
+  }
+
   /** پاسخِ `/snapshot`ِ v3 ⇒ همان شکلی که `fromSnapshot`ِ v1 می‌خواند */
   function snapshotToLegacy(body) {
     var tables = {};
@@ -406,10 +422,7 @@
   /* ==========================================================
      ۴) انبارِ محلی — صف، ردشده‌ها، حال؛ هر commit یک تراکنش
      ========================================================== */
-  function MemoryStore() {
-    this.data = { meta: null, journal: null, outbox: {}, rejected: {} };
-    this.commits = 0;
-  }
+  function MemoryStore() { this.data = { meta: null, journal: null, outbox: {}, rejected: {} }; this.commits = 0; }
   MemoryStore.prototype.load = function () {
     var d = this.data;
     var sorted = function (m) { return Object.keys(m).sort().map(function (k) { return clone(m[k]); }); };
@@ -420,8 +433,7 @@
     var next = clone(this.data);
     if (this.failNext) { var f = this.failNext; this.failNext = null; return Promise.reject(f); }
     applyChange(next, ch);
-    this.data = next;
-    this.commits++;
+    this.data = next; this.commits++;
     return Promise.resolve();
   };
   function applyChange(d, ch) {
@@ -434,11 +446,7 @@
   }
 
   /** IndexedDB — صف، ردشده‌ها و حال در **یک** تراکنشِ readwrite (SYN-02) */
-  function IdbStore(name, idb) {
-    this.name = name;
-    this.idb = idb || root.indexedDB;
-    this.db = null;
-  }
+  function IdbStore(name, idb) { this.name = name; this.idb = idb || root.indexedDB; this.db = null; }
   IdbStore.prototype.open = function () {
     var self = this;
     if (self.db) return Promise.resolve(self.db);
@@ -503,13 +511,17 @@
   /** با `fetch` و توکن (آزمونِ Node و هر جای بی `TohidAccount`) */
   function FetchTransport(baseUrl, token, extraHeaders) {
     return {
-      request: function (method, path, body) {
+      request: async function (method, path, body, opts) {
         var headers = Object.assign({ 'Content-Type': 'application/json', 'Accept-Encoding': 'gzip' }, extraHeaders || {});
         var t = typeof token === 'function' ? token() : token;
         if (t) headers.Authorization = 'Bearer ' + t;
-        return fetch(baseUrl + path, {
-          method: method, headers: headers, body: body === undefined ? undefined : JSON.stringify(body),
-        }).then(function (res) {
+        var payload = body === undefined ? undefined : JSON.stringify(body);
+        //  SYN-04: بدنهٔ فشرده (`opts.gzip`، پس از `gzip_push` ِ pull) بالای ۱KB با `CompressionStream`؛ نبودش ⇒ ساده
+        if (opts && opts.gzip && payload && payload.length >= 1024 && typeof CompressionStream === 'function') {
+          payload = new Uint8Array(await new Response(new Blob([payload]).stream().pipeThrough(new CompressionStream('gzip'))).arrayBuffer());
+          headers['Content-Encoding'] = 'gzip';
+        }
+        return fetch(baseUrl + path, { method: method, headers: headers, body: payload }).then(function (res) {
           return res.text().then(function (text) {
             var json = null;
             try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
@@ -522,8 +534,8 @@
   /** با `TohidAccount.authFetch` (نوسازیِ توکن و سرآیندهای قرارداد از همان‌جا) */
   function AccountTransport(acc) {
     return {
-      request: function (method, path, body) {
-        return acc.authFetch(path, body === undefined ? { method: method } : { method: method, body: body })
+      request: function (method, path, body, opts) {   //  SYN-04: `gzip` همان فشرده‌سازیِ `account-code.js`
+        return acc.authFetch(path, body === undefined ? { method: method } : { method: method, body: body, gzip: !!(opts && opts.gzip) })
           .then(function (data) { return { status: 200, body: data }; }, function (e) {
             if (e && e.status) return { status: e.status, body: e.body || { error: e.code, message: e.message } };
             throw e;
@@ -583,11 +595,7 @@
     this.random = o.random || Math.random;
     this.protocol = o.protocol || PROTOCOL;
     this.failpoint = o.failpoint || function () { };
-    this.meta = null;
-    this.outbox = [];
-    this.rejectedList = [];
-    this.conflictList = [];
-    this.listeners = [];
+    this.meta = null; this.outbox = []; this.rejectedList = []; this.conflictList = []; this.listeners = [];
     this.busy = false;
     this.streak = null;   // SYN-12: رشتهٔ شکستِ پیاپیِ جاری در حافظه (`outageStreak` ِ sync-core) — فقط برای حال (`outage`)
     //  هر کاری که صف، سایه یا حال را می‌نویسد پشتِ همین زنجیر است: دو ثبتِ هم‌زمان یا ثبتی
@@ -640,8 +648,8 @@
     return this.store.commit(ch).then(function () { self.meta = meta; return meta; });
   };
 
-  Engine.prototype.call = async function (method, path, body) {
-    var r = await this.transport.request(method, '/api/sync/v3' + path, body);
+  Engine.prototype.call = async function (method, path, body, opts) {
+    var r = await this.transport.request(method, '/api/sync/v3' + path, body, opts);
     var b = r && r.body;
     if (b && Number.isFinite(Number(b.server_time)) && Number(b.server_time) > 0) {
       //  اختلافِ ساعت از `server_time` (بخشِ ۳.۸.۱ بندِ ۸)؛ HLC و ULID از زمانِ تصحیح‌شده
@@ -709,20 +717,14 @@
     if (!this.meta || !this.meta.initialized) return 0;
     var data = this.ledger.read();
     if (!data) return 0;
-    var self = this;
-    var ts = this.now();
+    var self = this, ts = this.now();
     var out = Core().diff(this.meta.shadow || {}, data, { ts: ts, ulid: function () { return Core().ulid(self.now()); } });
     var v1ops = out.ops || [];
     if (!v1ops.length) return 0;
-    var seq = this.meta.seq;
-    var entries = [];
-    var docOps = 0;
+    var seq = this.meta.seq, entries = [], docOps = 0;
     v1ops.forEach(function (op) {
       var conv = fromLegacyOp(op, self.clock.tick());
-      if (!conv.ok) {
-        entries.push({ v1: op, fmt: 'v2', reason: conv.reason });
-        return;
-      }
+      if (!conv.ok) { entries.push({ v1: op, fmt: 'v2', reason: conv.reason }); return; }
       if (!conv.ops.length) return;        //  فقط مانده یا نشانِ محلی عوض شده بود
       if (!conv.native) { entries.push({ v1: op, fmt: 'v2', reason: conv.reason }); return; }
       var spec = specOf(op.table);
@@ -753,9 +755,7 @@
     if (!this.outbox.length) return null;
     var fmt = this.outbox[0].fmt;
     var budget = Math.min(MAX_BYTES, Math.max(MIN_BYTES, this.meta.pushBytes || MIN_BYTES));
-    var entries = [];
-    var ops = [];
-    var bytes = 2;
+    var entries = [], ops = [], bytes = 2;
     for (var i = 0; i < this.outbox.length; i++) {
       var e = this.outbox[i];
       if (e.fmt !== fmt) break;
@@ -798,6 +798,7 @@
     var attempt = (this.meta.attempt || 0) + 1, before = this.meta.lastError || '';
     var patch = { attempt: attempt, lastError: status ? errorMessage(status, body) : String((body && body.message) || 'به سرور نرسیدیم'), lastErrorAt: now };
     if (status === 400 && code === 'batch_too_large') patch.pushBytes = MIN_BYTES;
+    if (extra && extra.gzip && (status === 415 || (status === 400 && code === 'bad_json'))) patch.gzipRefused = true;   //  فشرده پذیرفته نشد ⇒ ساده
     if (status === 401 || status === 403) patch.attempt = this.meta.attempt || 0;
     await this.persist(patch);
     if (typeof Core().outageStreak === 'function') this.streak = Core().outageStreak(this.streak, before, status, code, patch.lastError, now);
@@ -822,19 +823,15 @@
     if (b.fmt === 'v2') { body.format = 'v2'; body.schema_version = LEGACY_SCHEMA; }
     var r;
     try {
-      r = await this.call('POST', '/push', body);
+      r = await this.call('POST', '/push', body, { gzip: !!this.meta.gzipPush && !this.meta.gzipRefused });
     } catch (e) {
       return this.fail(0, { message: (e && e.message) || 'به سرور نرسیدیم' }, { sent: 0 });
     }
-    if (r.status !== 200 || !r.body) return this.fail(r.status, r.body, { sent: 0 });
+    if (r.status !== 200 || !r.body) return this.fail(r.status, r.body, { sent: 0, gzip: !!this.meta.gzipPush && !this.meta.gzipRefused });
     return this.locked(async function () {
     var results = Array.isArray(r.body.results) ? r.body.results : [];
-    var done = [];
-    var rejected = [];
-    var conflicts = false;
-    var at = 0;
-    var seq = this.meta.seq;
-    var now = this.now();
+    var done = [], rejected = [], pairs = [], conflicts = false, at = 0;
+    var seq = this.meta.seq, now = this.now();
     b.entries.forEach(function (e) {
       var n = b.fmt === 'v3' ? e.ops.length : 1;
       var mine = results.slice(at, at + n);
@@ -850,21 +847,35 @@
       }
       if (mine.every(function (x) { return DONE[x.status]; })) {
         done.push(e.key);
+        pairs.push({ e: e, mine: mine });
         if (mine.some(function (x) { return x.status === 'conflict' || x.status === 'partial'; })) conflicts = true;
       }
     });
     var removing = done.concat(rejected.map(function (x) { return x.outboxKey; }));
-    var grow = Math.min(MAX_BYTES, (this.meta.pushBytes || MIN_BYTES) * 2);
-    await this.persist({
-      seq: seq, attempt: 0, lastError: '', lastErrorAt: 0, lastOkAt: now, lastPushAt: now, pushBytes: grow,
-      conflictsDirty: !!(this.meta.conflictsDirty || conflicts),
-    }, { removeOutbox: removing, addRejected: rejected });
+    //  SYN-05/06: `current` ِ سرور روی دفتر و سایه (`currentFixes`)، در همان commit که ورودی از صف بیرون می‌رود
+    var items = [], fixed = {}, left = {}, data = this.ledger.read() || {};
+    this.outbox.forEach(function (e) { if (removing.indexOf(e.key) < 0) left[e.table + '/' + e.row_id] = true; });
+    pairs.forEach(function (p) {
+      (b.fmt === 'v3' ? p.e.ops.map(function (o, k) { return [o, p.mine[k]]; }) : (p.mine[0].converted || []).map(function (x) {
+        return [{ table: p.e.table, row_id: p.e.row_id, kind: p.e.op.type, fields: p.e.op.fields }, x];
+      })).forEach(function (x) {
+        if (x[1].current) fixed[p.e.key] = true;
+        items.push({ table: x[0].table, row_id: x[0].row_id, kind: x[0].kind, fields: x[0].fields, res: x[1], pending: !!left[x[0].table + '/' + x[0].row_id],
+          exists: (data[x[0].table] || []).some(function (r) { return r && String(r.id) === x[0].row_id; }) });
+      });
+    });
+    var fixes = currentFixes(items), push = { seq: seq, attempt: 0, lastError: '', lastErrorAt: 0, lastOkAt: now, lastPushAt: now,
+      pushBytes: Math.min(MAX_BYTES, (this.meta.pushBytes || MIN_BYTES) * 2), conflictsDirty: !!(this.meta.conflictsDirty || conflicts) };
+    //  دفتر وسطِ هر ژورنال عوض شد ⇒ ورودیِ با `current` در صف می‌ماند: بارِ بعد «تکراری» همان `current` را می‌گیرد
+    var why = await this.absorb(fixes, push, { removeOutbox: removing, addRejected: rejected });
+    if (why) await this.persist(push, { removeOutbox: (removing = removing.filter(function (k) { return !fixed[k]; })), addRejected: rejected });
     var gone = {};
     removing.forEach(function (k) { gone[k] = true; });
     this.outbox = this.outbox.filter(function (e) { return !gone[e.key]; });
     this.rejectedList = this.rejectedList.concat(rejected);
     this.emit();
-    return { ok: true, sent: b.ops.length, done: done.length, rejected: rejected.length, conflicts: conflicts, head: Number(r.body.head || r.body.cursor || 0) };
+    return { ok: true, sent: b.ops.length, done: done.length, rejected: rejected.length, conflicts: conflicts, fixed: why ? 0 : fixes.length,
+      head: Number(r.body.head || r.body.cursor || 0) };
     });
   };
 
@@ -889,7 +900,7 @@
     (r.body.ops || []).forEach(function (item) { var l = effectToLegacy(item); if (l) legacy.push(l); });
     var now = this.now();
     var patch = { cursor: cursor, lastPullAt: now, lastOkAt: now, attempt: 0, lastError: '', lastErrorAt: 0,
-      pullBytes: Math.min(MAX_BYTES, budget * 2) };
+      pullBytes: Math.min(MAX_BYTES, budget * 2), gzipPush: r.body.gzip_push === true };
     //  §۹.۵: دورانِ سرور (`lib/sync-epoch.js`) عوض شده و این دستگاه پس از پایه چیزی دیده ⇒ «در انتظار»؛
     //  این صفحه (از cursor ِ کهنه) نشانده نمی‌شود — `rebuild` («نگه‌دارِ محلی»؛ وب دفترچهٔ op ندارد)
     var ep = r.body.epoch;
@@ -904,42 +915,44 @@
       }
       if (known !== ep.id) patch.epoch = ep.id;
     }
-    if (legacy.length) {
-      var data = this.ledger.read();
-      //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود
-      if (!data) return { ok: false, applied: 0, reason: 'no_ledger' };
-      var C = Core();
-      var before = fingerprint(C.canonical(this.meta.shadow || {}));
-      var shadow = C.shadowOf(C.applyRemote(this.meta.shadow || {}, legacy).data);
-      var next = null;
-      for (var tries = 0; tries < 5 && data && !next; tries++) {
-        var planned = ledgerPrint(C.applyRemote(data, legacy).data);
-        await this.store.commit({ journal: {
-          stage: 'absorb', before: before, after: fingerprint(C.canonical(shadow)),
-          ledger: planned, cursor: cursor, ops: legacy,
-        } });
-        this.failpoint('after-journal');
-        //  ذخیرهٔ UI ممکن است وسطِ همین await نشسته باشد: دفتر را دوباره بخوان و op را روی نسخهٔ تازه بنشان
-        //  (خواندن تا نوشتن بی await است). اگر دفترِ نشسته با ژورنال نمی‌خواند، ژورنال دوباره نوشته می‌شود
-        data = this.ledger.read();
-        var fresh = data ? C.applyRemote(data, legacy).data : null;
-        if (fresh && ledgerPrint(fresh) === planned) next = fresh;
-      }
-      if (!next) {
-        //  دفتر پیوسته عوض می‌شود یا نیست: چیزی نوشته نمی‌شود، cursor جلو نمی‌رود؛ همان صفحه دوباره می‌آید
-        await this.store.commit({ journal: null });
-        return { ok: false, applied: 0, reason: data ? 'ledger_busy' : 'no_ledger' };
-      }
-      this.ledger.write(next);
-      this.failpoint('after-ledger');
-      patch.shadow = shadow;
-      await this.persist(patch, { journal: null });
-    } else {
-      await this.persist(patch);
-    }
+    var why = await this.absorb(legacy, patch);
+    if (why) return { ok: false, applied: 0, reason: why };
     this.emit();
     return { ok: true, applied: legacy.length, ops: (r.body.ops || []).length, cursor: cursor, hasMore: !!r.body.has_more };
     });
+  };
+
+  /** opهای v1 (Pull، یا `current` ِ پاسخِ push) ⇒ ژورنال ⇐ دفتر ⇐ سایه + [patch]/[extra] در یک commit؛ '' یا دلیلِ «هیچ نوشتنی» */
+  Engine.prototype.absorb = async function (legacy, patch, extra) {
+    if (!legacy.length) { await this.persist(patch, extra); return ''; }
+    var data = this.ledger.read();
+    //  دفتر هنوز به صفحه بسته نیست: cursor جلو نمی‌رود
+    if (!data) return 'no_ledger';
+    var C = Core(), next = null, before = fingerprint(C.canonical(this.meta.shadow || {}));
+    var shadow = C.shadowOf(C.applyRemote(this.meta.shadow || {}, legacy).data);
+    for (var tries = 0; tries < 5 && data && !next; tries++) {
+      var planned = ledgerPrint(C.applyRemote(data, legacy).data);
+      await this.store.commit({ journal: {
+        stage: 'absorb', before: before, after: fingerprint(C.canonical(shadow)),
+        ledger: planned, cursor: patch.cursor === undefined ? this.meta.cursor : patch.cursor, ops: legacy,
+      } });
+      this.failpoint('after-journal');
+      //  ذخیرهٔ UI ممکن است وسطِ همین await نشسته باشد: دفتر را دوباره بخوان و op را روی نسخهٔ تازه بنشان
+      //  (خواندن تا نوشتن بی await است). اگر دفترِ نشسته با ژورنال نمی‌خواند، ژورنال دوباره نوشته می‌شود
+      data = this.ledger.read();
+      var fresh = data ? C.applyRemote(data, legacy).data : null;
+      if (fresh && ledgerPrint(fresh) === planned) next = fresh;
+    }
+    if (!next) {
+      //  دفتر پیوسته عوض می‌شود یا نیست: چیزی نوشته نمی‌شود، cursor جلو نمی‌رود؛ همان صفحه دوباره می‌آید
+      await this.store.commit({ journal: null });
+      return data ? 'ledger_busy' : 'no_ledger';
+    }
+    this.ledger.write(next);
+    this.failpoint('after-ledger');
+    patch.shadow = shadow;
+    await this.persist(patch, Object.assign({ journal: null }, extra || {}));
+    return '';
   };
 
   Engine.prototype.fetchConflicts = async function (status) {
@@ -1012,8 +1025,7 @@
   Engine.prototype.pullAll = async function () {
     for (var j = 0; j < 50; j++) {
       var q = await this.pullOnce();
-      if (!q.ok) return q;
-      if (!q.hasMore) break;
+      if (!q.ok || !q.hasMore) return q.ok ? null : q;
     }
     return null;
   };
@@ -1098,8 +1110,7 @@
     var C = Core(), m = this.meta || emptyMeta();
     return typeof C.outageFrom === 'function' ? C.outageFrom(this.streak, m.lastError || '', online !== false, m.attempt || 0, this.now()) : null;
   };
-  Engine.prototype.rejected = function () { return clone(this.rejectedList); };
-  Engine.prototype.conflicts = function () { return clone(this.conflictList); };
+  Engine.prototype.rejected = function () { return clone(this.rejectedList); }; Engine.prototype.conflicts = function () { return clone(this.conflictList); };
   Engine.prototype.onChange = function (fn) {
     var l = this.listeners;
     l.push(fn);
@@ -1218,28 +1229,22 @@
         }).catch(function () { });
         return 0;
       },
-      sync: pump,
+      sync: pump, firstSync: function () { return pump(); }, pushBaseline: function () { return pump(); },
       pullOnce: function () { return ensure().then(function () { return engine.pullOnce(); }); },
       restoreFromServer: function () { return ensure().then(function () { return engine.initialize({ keepLocalOnly: false }); }); },
-      firstSync: function () { return pump(); },
-      pushBaseline: function () { return pump(); },
       status: function () { return facadeStatus(); },
       onChange: function (fn) {
         var off = null;
         ensure().then(function () { off = engine.onChange(function (s) { fn(facadeStatus(s)); }); });
         return function () { if (off) off(); };
       },
-      queueSize: function () { return engine ? engine.queued() : 0; },
-      dropped: function () { return engine ? engine.rejected() : []; },
+      queueSize: function () { return engine ? engine.queued() : 0; }, dropped: function () { return engine ? engine.rejected() : []; },
       conflicts: function () { return engine ? engine.conflicts() : []; },
       clearError: function () {
         if (engine) engine.locked(function () { return this.persist({ lastError: '', lastErrorAt: 0 }); }).then(function () { engine.emit(); });
       },
-      connectLive: function () { },
-      disconnectLive: function () { },
-      relay: function () { return false; },
-      get liveOpen() { return false; },
-      v3: function () { return engine; },
+      connectLive: function () { }, disconnectLive: function () { }, relay: function () { return false; },
+      get liveOpen() { return false; }, v3: function () { return engine; },
     };
     return true;
   }
@@ -1247,7 +1252,7 @@
   return {
     PROTOCOL: PROTOCOL,
     hlc: { SKEW_MS: SKEW_MS, parse: hlcParse, format: hlcFormat, canonical: hlcCanonical, compare: hlcCompare, fromTs: hlcFromTs, createClock: createClock },
-    TABLES: TABLES, KINDS: KINDS, specOf: specOf, fromLegacyOp: fromLegacyOp, nativeReason: nativeReason, effectToLegacy: effectToLegacy,
+    TABLES: TABLES, KINDS: KINDS, specOf: specOf, fromLegacyOp: fromLegacyOp, nativeReason: nativeReason, effectToLegacy: effectToLegacy, currentFixes: currentFixes,
     dataToLegacy: dataToLegacy, snapshotToLegacy: snapshotToLegacy, Engine: Engine, MemoryStore: MemoryStore, IdbStore: IdbStore,
     FetchTransport: FetchTransport, AccountTransport: AccountTransport, CHOICE_KEY: CHOICE_KEY, choice: choice, setChoice: setChoice,
     install: install, UPGRADE_MESSAGE: UPGRADE_MESSAGE,
