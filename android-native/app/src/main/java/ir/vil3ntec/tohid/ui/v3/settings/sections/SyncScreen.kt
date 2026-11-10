@@ -94,7 +94,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
         V3Button(
           StrSettings.syncNow,
           {
-            runCatching { SyncV1Worker.now(context) }
+            runCatching { SyncV1Worker.reconnect.userAsked(); SyncV1Worker.now(context) }   // SYN-12: دورِ کاربر هرگز درنگِ پس از وصل ندارد
               .onSuccess { Haptics.confirm(context); toasts.show(StrSettings.syncStarted) }
               .onFailure { toasts.show(it.userText(StrSettings.syncFailed)) }
           },

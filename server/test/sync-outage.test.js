@@ -9,6 +9,8 @@
  *   ۲) موتورِ v3 ِ وب: قطعیِ کوتاه ⇒ «دوباره می‌کوشد»، ماندگار ⇒ «به سرور نمی‌رسیم» / «سرور»؛ ۴۰۱ ⇒ نشست؛ موفق ⇒ ok —
  *      و صف، بدنهٔ push و فاصلهٔ تلاش همان پیشین
  *   ۳) موتورِ v1 ِ وب (sync-engine.js در vm): همان حکم‌ها روی status() و چراغ؛ sync-core ِ کهنه ⇒ همان رفتارِ پیشین
+ *   ۴) هجومِ پس از وصلِ دوباره (`SyncReconnect` ⇔ `reconnectHold`): بردارها، و گردشِ موتورهای v1 و v3 ِ وب با زمان‌سنجِ ساختگی —
+ *      دورِ نخستِ پس از `online` پخش، دوره‌ای صبر، کاربر و تلاشِ پس از شکست همان دم؛ رشتهٔ شکست با ورودِ دوباره پاک
  *
  * بی پایگاه و بی سرور.
  */
@@ -297,4 +299,288 @@ test('۳) v1 ِ وب: sync-core ِ کهنه (بی outage*) ⇒ بی خطا و ه
   const st = w.sync.status();
   assert.equal(st.outage, null);
   assert.equal(st.dot, 'red');
+});
+
+/* ══════════════════ ۴) هجومِ پس از وصلِ دوباره (SyncReconnect ⇔ reconnectHold) ══════════════════ */
+
+const KT_RECONNECT = fs.readFileSync(path.join(ROOT, 'core', 'src', 'commonMain', 'kotlin', 'ir', 'vil3ntec', 'tohid', 'core', 'sync', 'SyncReconnect.kt'), 'utf8');
+const V3_SRC = fs.readFileSync(path.join(ROOT, 'license', 'sync-v3-engine.js'), 'utf8');
+
+test('۴) بردارها: درنگِ کران‌دار ۰ تا سقف و نگه‌داشتنِ دورهای زمان‌دار؛ همان سقف و علت‌ها در SyncReconnect.kt', () => {
+  assert.equal(core.RECONNECT_SPREAD_MS, VECTORS.spreadMs);
+  assert.ok(VECTORS.spreadMs < VECTORS.sustainMs, 'خودِ درنگ هرگز اعلانِ قطعی نمی‌سازد');
+  assert.equal(Number(/const val SPREAD_MS: Long = ([\d_]+)L/.exec(KT_RECONNECT)[1].replace(/_/g, '')), VECTORS.spreadMs);
+  for (const [k, v] of [['RECONNECT', 'reconnect'], ['TIMER', 'timer'], ['USER', 'user'], ['CHANGE', 'change'], ['RETRY', 'retry']]) {
+    assert.match(KT_RECONNECT, new RegExp(`const val ${k} = "${v}"`), k);
+  }
+  assert.ok(VECTORS.reconnectDelay.length >= 10);
+  for (const r of VECTORS.reconnectDelay) assert.equal(core.reconnectDelayMs(Number(r.random)), r.ms, r.name);
+  assert.ok(VECTORS.reconnectHold.length >= 12);
+  for (const r of VECTORS.reconnectHold) {
+    assert.deepEqual(core.reconnectHold(r.until, r.cause, r.now, Number(r.random)), { until: r.untilOut, waitMs: r.wait }, r.name);
+  }
+  //  هر عددِ تصادفی ⇒ درونِ بازه
+  for (let i = 0; i <= 100; i++) {
+    const ms = core.reconnectDelayMs(i / 100);
+    assert.ok(ms >= 0 && ms <= core.RECONNECT_SPREAD_MS, String(i));
+  }
+});
+
+/** ساعت و زمان‌سنجِ ساختگی: هیچ چیزی خودش نمی‌دود؛ آزمون `fire`/`every` می‌کند */
+function fakeClock(start) {
+  const c = { now: start, seq: 0, timers: new Map(), intervals: new Map(), rnd: 0.5 };
+  c.setTimeout = (fn, ms) => { const id = ++c.seq; c.timers.set(id, { fn, ms: Number(ms) || 0, at: c.now + (Number(ms) || 0) }); return id; };
+  c.clearTimeout = (id) => { c.timers.delete(id); };
+  c.setInterval = (fn, ms) => { const id = ++c.seq; c.intervals.set(id, { fn, ms }); return id; };
+  c.clearInterval = (id) => { c.intervals.delete(id); };
+  c.pending = () => [...c.timers.values()].map((t) => t.ms).sort((a, b) => a - b);
+  c.fire = (ms) => {
+    const hit = [...c.timers].find(([, t]) => t.ms === ms);
+    assert.ok(hit, `زمان‌سنجِ ${ms}ms هست`);
+    c.timers.delete(hit[0]);
+    c.now = Math.max(c.now, hit[1].at);
+    hit[1].fn();
+  };
+  c.every = (ms) => { for (const t of c.intervals.values()) if (t.ms === ms) t.fn(); };
+  return c;
+}
+const settle = async () => { for (let i = 0; i < 12; i++) await new Promise((r) => setImmediate(r)); };
+const NetErr = () => apiError('به سرور نرسیدیم', 'network', 0);
+
+/** sync-engine.js ِ واقعی در vm با زمان‌سنجِ ساختگی، رویدادهای window و Math.random ِ تزریقی */
+function webV1Live({ coreImpl = core } = {}) {
+  const c = fakeClock(1_700_000_000_000);
+  const box = { error: null, user: 'u-a', calls: [] };
+  const navigator = { onLine: true };
+  const on = {};
+  const ls = storage();
+  const window = {
+    TohidSyncCore: coreImpl,
+    TohidApiConfig: { baseUrl: () => 'http://127.0.0.1' },
+    TohidAccount: {
+      configured: () => true, isSignedIn: () => true, account: () => ({ userId: box.user }),
+      deviceId: () => 'web-reconnect', appId: () => 'shop', on() { }, heartbeat: async () => ({}),
+      accessToken: async () => 'tok',
+      async authFetch(p) {
+        box.calls.push(p);
+        if (box.error) throw box.error;
+        if (p.startsWith('/api/sync/v1/pull')) return { ops: [], cursor: 7, has_more: false };
+        return {};
+      },
+    },
+    addEventListener(t, fn) { (on[t] = on[t] || []).push(fn); }, dispatchEvent() { },
+  };
+  const ctx = vm.createContext({
+    window, localStorage: ls, navigator, document: { addEventListener() { }, hidden: false }, URL, console,
+    setTimeout: c.setTimeout, clearTimeout: c.clearTimeout, setInterval: c.setInterval, clearInterval: c.clearInterval,
+    __now: () => c.now, __rnd: () => c.rnd,
+  });
+  vm.runInContext('Date.now = function () { return __now(); }; Math.random = function () { return __rnd(); };', ctx);
+  vm.runInContext(ENGINE_SRC, ctx);
+  const sync = window.TohidSync;
+  sync.bind({ read: () => ({ products: [] }), write: () => { } });
+  const count = (prefix) => box.calls.filter((p) => p.startsWith(prefix)).length;
+  return {
+    sync, box, c, navigator, ls,
+    emit: (t) => (on[t] || []).forEach((fn) => fn()),
+    pulls: () => count('/api/sync/v1/pull'), tickets: () => count('/api/sync/v1/live/ticket'),
+  };
+}
+
+/** فاصلهٔ تلاشِ موتورِ v1 در خودِ sync-core (همین قلمرو) با Math.random ِ ثابت */
+async function withRandom(r, fn) {
+  const real = Math.random;
+  Math.random = () => r;
+  try { return await fn(); } finally { Math.random = real; }
+}
+
+test('۴) v1 ِ وب: `online` ⇒ دورِ نخست پس از درنگِ تصادفی؛ تیک و Pull ِ دوره‌ای صبر می‌کنند؛ online ِ دوباره دراز نمی‌کند', async () => {
+  const w = webV1Live();
+  w.sync.start();
+  await settle();
+  const base = w.pulls();
+  assert.ok(base >= 1, 'start یک دور زد');
+  assert.deepEqual(w.c.pending(), [], 'هیچ زمان‌سنجی پیش از قطع');
+
+  w.navigator.onLine = false; w.emit('offline');
+  w.c.every(30000); await settle();
+  assert.equal(w.pulls(), base, 'بی‌نت ⇒ هیچ درخواستی');
+
+  w.c.rnd = 0.5;
+  w.navigator.onLine = true; w.emit('online');
+  await settle();
+  assert.equal(w.pulls(), base, 'همان دمِ online هیچ درخواستی نیست');
+  assert.deepEqual(w.c.pending(), [7500], 'دورِ نخست ۰٫۵ × ۱۵ ثانیه بعد');
+  const tickets = w.tickets();
+
+  w.c.now += 3000;
+  w.c.every(30000); w.c.every(2000); await settle();
+  assert.equal(w.pulls(), base, 'Pull ِ دوره‌ای تا پایانِ درنگ صبر می‌کند');
+  w.emit('online'); await settle();
+  assert.deepEqual(w.c.pending(), [7500], 'online ِ دوباره زمان‌سنجِ دوم نمی‌سازد');
+
+  w.c.fire(7500); await settle();
+  assert.equal(w.pulls(), base + 1, 'دورِ نخست پس از درنگ');
+  assert.equal(w.tickets(), tickets + 1, 'سوکتِ زنده هم با همان درنگ');
+  w.c.every(30000); await settle();
+  assert.equal(w.pulls(), base + 2, 'پس از درنگ Pull ِ دوره‌ای همان پیشین');
+});
+
+test('۴) v1 ِ وب: «همگام‌سازی حالا» در میانهٔ درنگ همان دم می‌رود و درنگ را پایان می‌دهد', async () => {
+  const w = webV1Live();
+  w.sync.start();
+  await settle();
+  const base = w.pulls();
+  w.c.rnd = 0.9;
+  w.emit('online');
+  assert.deepEqual(w.c.pending(), [13500]);
+  await w.sync.sync();
+  await settle();
+  assert.equal(w.pulls(), base + 1, 'دورِ کاربر منتظر نماند');
+  assert.deepEqual(w.c.pending(), [], 'درنگ پایان یافت؛ دورِ دومی پشتِ سر نمی‌آید');
+  assert.ok(w.tickets() >= 1, 'سوکتِ زنده هم همان دم');
+  w.c.every(30000); await settle();
+  assert.equal(w.pulls(), base + 2, 'Pull ِ دوره‌ای دیگر صبر نمی‌کند');
+});
+
+test('۴) v1 ِ وب: فاصلهٔ تلاشِ پس از شکستِ واقعی دست نمی‌خورد و در میانهٔ درنگ همان دم می‌رود', async () => {
+  await withRandom(0.5, async () => {
+    const w = webV1Live();
+    w.sync.start();
+    await settle();
+    w.box.error = NetErr();
+    await w.sync.sync();
+    const retry = core.backoffMs(1, 0.5);
+    assert.deepEqual(w.c.pending(), [retry], 'همان فرمولِ فاصلهٔ تلاش');
+
+    w.navigator.onLine = false; w.emit('offline');
+    w.c.rnd = 0.9;
+    w.navigator.onLine = true; w.emit('online');
+    assert.deepEqual(w.c.pending(), [retry, 13500], 'زمان‌سنجِ تلاش همان ماند؛ درنگ کنارش');
+
+    w.box.error = null;
+    const before = w.pulls();
+    w.c.fire(retry); await settle();
+    assert.equal(w.pulls(), before + 1, 'تلاشِ پس از شکست سرِ موعدِ خودش، نه پس از درنگ');
+    assert.deepEqual(w.c.pending(), [], 'دورِ واقعی درنگ را پایان داد');
+    assert.equal(w.sync.status().lastError, '');
+  });
+});
+
+test('۴) v1 ِ وب: sync-core ِ کهنه (بی reconnectHold) ⇒ همان رفتارِ پیشین: online همان دم یک دور', async () => {
+  const old = { ...core };
+  delete old.reconnectHold;
+  const w = webV1Live({ coreImpl: old });
+  w.sync.start();
+  await settle();
+  const base = w.pulls();
+  w.emit('online'); await settle();
+  assert.equal(w.pulls(), base + 1);
+  assert.deepEqual(w.c.pending(), []);
+});
+
+test('۴) v1 ِ وب: ورودِ دوباره (حساب یا دکانِ دیگر) رشتهٔ شکستِ پیشین را در حافظه نگه نمی‌دارد', async () => {
+  const w = webV1Live();
+  w.box.error = NetErr();
+  await w.sync.sync();
+  w.c.now += 61_000;
+  await w.sync.sync();
+  assert.equal(w.sync.status().outage.kind, 'unreachable');
+
+  //  حسابِ دیگر؛ بی‌نت تا دورِ پسِ ورود چیزی ننویسد
+  w.box.error = null;
+  w.box.user = 'u-b';
+  w.navigator.onLine = false;
+  w.sync.onSignedIn();
+  await settle();
+  w.navigator.onLine = true;
+  //  همان متنِ خطا را نویسندهٔ دیگری (زبانهٔ دیگر، حالِ کهنه) برای حسابِ تازه نوشت ⇒ ناشناخته ⇒ همان سرخِ پیشین
+  const key = 'tohid-sync-v1-u-b-state';
+  const st = JSON.parse(w.ls.getItem(key) || '{}');
+  w.ls.setItem(key, JSON.stringify({ ...st, lastError: 'به سرور نرسیدیم', lastErrorAt: w.c.now }));
+  assert.equal(w.sync.status().outage.kind, 'error', 'رشتهٔ حسابِ پیشین «قطعیِ آرام» نمی‌سازد');
+});
+
+/** sync-v3-engine.js ِ واقعی در vm: `install` با MemoryStore ِ همگام‌شده (`o.store`) و حسابی که شبکه‌اش قطع است */
+function webV3Live() {
+  const c = fakeClock(1_700_000_000_000);
+  const box = { user: 'u-a', calls: [] };
+  const navigator = { onLine: true };
+  const on = {};
+  const window = { TohidSyncCore: core, navigator, addEventListener(t, fn) { (on[t] = on[t] || []).push(fn); }, dispatchEvent() { } };
+  const ctx = vm.createContext({
+    window, navigator, console, URL,
+    setTimeout: c.setTimeout, clearTimeout: c.clearTimeout, setInterval: c.setInterval, clearInterval: c.clearInterval,
+    __now: () => c.now, __rnd: () => c.rnd,
+  });
+  vm.runInContext('Date.now = function () { return __now(); }; Math.random = function () { return __rnd(); };', ctx);
+  vm.runInContext(V3_SRC, ctx);
+  const V = window.TohidSyncV3;
+  const ledger = { products: [] };
+  const acc = {
+    configured: () => true, isSignedIn: () => true, account: () => ({ userId: box.user }), deviceId: () => 'web-v3-reconnect',
+    async authFetch(p) { box.calls.push(p); throw Object.assign(new Error('به سرور نرسیدیم'), { status: 0 }); },
+  };
+  const installed = V.install(acc, {
+    storage: { getItem: () => 'v3', setItem() { } },
+    store: () => { const s = new V.MemoryStore(); s.data.meta = { initialized: true, shadow: core.shadowOf(ledger) }; return s; },
+  });
+  assert.equal(installed, true);
+  const sync = window.TohidSync;
+  sync.bind({ read: () => ledger, write: () => { } });
+  return {
+    sync, box, c, navigator,
+    emit: (t) => (on[t] || []).forEach((fn) => fn()),
+    pulls: () => box.calls.filter((p) => p.startsWith('/api/sync/v3/pull')).length,
+  };
+}
+
+test('۴) v3 ِ وب: `online` ⇒ درنگ؛ تیکِ ۳۰ ثانیه صبر می‌کند؛ تلاشِ پس از شکست و دورِ کاربر همان دم', async () => {
+  const w = webV3Live();
+  w.sync.start();
+  await settle();
+  assert.equal(w.pulls(), 1, 'start یک دور زد (شکستِ شبکه)');
+  const retry = core.backoffMs(0, 0.5);
+  assert.deepEqual(w.c.pending(), [retry], 'فاصلهٔ تلاشِ v3 همان فرمول');
+
+  w.c.rnd = 0.2;
+  w.emit('online'); await settle();
+  assert.equal(w.pulls(), 1, 'همان دمِ online هیچ درخواستی نیست');
+  assert.deepEqual(w.c.pending(), [retry, 3000], 'زمان‌سنجِ تلاش همان؛ دورِ نخست ۰٫۲ × ۱۵ ثانیه بعد');
+  w.c.every(30000); await settle();
+  assert.equal(w.pulls(), 1, 'تیکِ ۳۰ ثانیه تا پایانِ درنگ صبر می‌کند');
+
+  //  تلاشِ پس از شکست زودتر سر رسید ⇒ همان دم، و درنگ تمام
+  w.c.fire(retry); await settle();
+  assert.equal(w.pulls(), 2, 'تلاشِ پس از شکست سرِ موعدِ خودش');
+  assert.ok(!w.c.pending().includes(3000), 'دورِ واقعی درنگ را پایان داد');
+
+  //  درنگِ تازه، این بار تا ته
+  w.emit('online'); await settle();
+  assert.ok(w.c.pending().includes(3000));
+  w.c.fire(3000); await settle();
+  assert.equal(w.pulls(), 3, 'دورِ نخست پس از درنگ');
+
+  //  و «همگام‌سازی حالا» هرگز منتظر نمی‌ماند
+  w.emit('online'); await settle();
+  assert.ok(w.c.pending().includes(3000));
+  await w.sync.sync(); await settle();
+  assert.equal(w.pulls(), 4, 'دورِ کاربر همان دم');
+  assert.ok(!w.c.pending().includes(3000), 'درنگ پایان یافت');
+});
+
+test('۴) v3 ِ وب: ورود با حسابِ دیگر ⇒ موتور و رشتهٔ شکستِ تازه (نه «قطعیِ» حسابِ پیشین)', async () => {
+  const w = webV3Live();
+  w.sync.start();
+  await settle();
+  w.c.now += 61_000;
+  await w.sync.sync(); await settle();
+  assert.equal(w.sync.status().outage.kind, 'unreachable');
+  const first = w.sync.v3();
+
+  w.box.user = 'u-b';
+  w.sync.onSignedIn();
+  await settle();
+  assert.notEqual(w.sync.v3(), first, 'موتورِ همان حساب');
+  assert.deepEqual(w.sync.status().outage, { kind: 'retrying', level: 'none' }, 'نخستین شکستِ حسابِ تازه بی هشدار است');
 });

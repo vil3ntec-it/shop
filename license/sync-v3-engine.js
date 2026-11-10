@@ -1138,12 +1138,22 @@
    */
   function install(acc, opts) {
     var o = opts || {};
-    if (!acc || choice(o.storage) !== 'v3' || typeof root.indexedDB === 'undefined') return false;
+    if (!acc || choice(o.storage) !== 'v3' || (!o.store && typeof root.indexedDB === 'undefined')) return false;
     var C = Core();
     var ledger = { read: function () { return null; }, write: function () { } };
     var engine = null;
     var timer = null;
     var retry = null;
+    //  SYN-12: دورِ نخستِ پس از `online` با درنگِ کران‌دار (`reconnectHold` ِ sync-core، همان قاعدهٔ sync-engine.js)؛ تیکِ ۳۰ ثانیه
+    //  تا پایانش صبر می‌کند و هر دورِ واقعی (کاربر، تغییر، تلاشِ پس از شکست) آن را پایان می‌دهد
+    var spread = null, until = 0;
+    function hold(cause, r) { return typeof C.reconnectHold === 'function' ? C.reconnectHold(until, cause, Date.now(), r || 0) : { until: 0, waitMs: 0 }; }
+    function reconnected() {
+      var h = hold('reconnect', Math.random());
+      if (!(h.waitMs > 0)) { until = 0; return void pump().catch(function () { }); }
+      until = h.until;
+      if (!spread) spread = setTimeout(function () { spread = null; pump().catch(function () { }); }, h.waitMs);
+    }
     function account() { return String((acc.account() || {}).userId || 'anon').replace(/[^A-Za-z0-9_-]/g, '_'); }
     /** حالِ موتورِ v1ِ همین حساب (همان کلیدِ `sync-engine.js`) — فقط خواندن */
     function v1State() {
@@ -1152,7 +1162,7 @@
     function make() {
       engine = new Engine({
         transport: AccountTransport(acc),
-        store: new IdbStore('tohid-sync-v3-' + account()),
+        store: o.store ? o.store(account()) : new IdbStore('tohid-sync-v3-' + account()),   // `o.store`: فقط آزمون
         deviceId: acc.deviceId(),
         ledger: { read: function () { return ledger.read(); }, write: function (d) { ledger.write(d); } },
       });
@@ -1180,6 +1190,7 @@
     }
     async function pump() {
       if (!acc.isSignedIn()) return { ok: false };
+      until = 0; if (spread) { clearTimeout(spread); spread = null; }
       await ensure();
       var r = await engine.sync();
       if (retry) { clearTimeout(retry); retry = null; }
@@ -1194,8 +1205,8 @@
       },
       start: function () {
         if (timer) return;
-        timer = setInterval(function () { pump().catch(function () { }); }, 30000);
-        root.addEventListener('online', function () { pump().catch(function () { }); });
+        timer = setInterval(function () { if (!(hold('timer').waitMs > 0)) pump().catch(function () { }); }, 30000);
+        root.addEventListener('online', reconnected);
         if (acc.isSignedIn()) pump().catch(function () { });
       },
       onSignedIn: function () { ready = null; pump().catch(function () { }); },
@@ -1234,23 +1245,9 @@
   return {
     PROTOCOL: PROTOCOL,
     hlc: { SKEW_MS: SKEW_MS, parse: hlcParse, format: hlcFormat, canonical: hlcCanonical, compare: hlcCompare, fromTs: hlcFromTs, createClock: createClock },
-    TABLES: TABLES,
-    KINDS: KINDS,
-    specOf: specOf,
-    fromLegacyOp: fromLegacyOp,
-    nativeReason: nativeReason,
-    effectToLegacy: effectToLegacy,
-    dataToLegacy: dataToLegacy,
-    snapshotToLegacy: snapshotToLegacy,
-    Engine: Engine,
-    MemoryStore: MemoryStore,
-    IdbStore: IdbStore,
-    FetchTransport: FetchTransport,
-    AccountTransport: AccountTransport,
-    CHOICE_KEY: CHOICE_KEY,
-    choice: choice,
-    setChoice: setChoice,
-    install: install,
-    UPGRADE_MESSAGE: UPGRADE_MESSAGE,
+    TABLES: TABLES, KINDS: KINDS, specOf: specOf, fromLegacyOp: fromLegacyOp, nativeReason: nativeReason, effectToLegacy: effectToLegacy,
+    dataToLegacy: dataToLegacy, snapshotToLegacy: snapshotToLegacy, Engine: Engine, MemoryStore: MemoryStore, IdbStore: IdbStore,
+    FetchTransport: FetchTransport, AccountTransport: AccountTransport, CHOICE_KEY: CHOICE_KEY, choice: choice, setChoice: setChoice,
+    install: install, UPGRADE_MESSAGE: UPGRADE_MESSAGE,
   };
 });

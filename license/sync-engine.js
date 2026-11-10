@@ -389,6 +389,17 @@
   var attempt = 0;
   var streak = null;   // SYN-12: رشتهٔ شکستِ پیاپیِ جاری در حافظه (`outageStreak` ِ sync-core) — فقط برای حال، نه صف یا فاصلهٔ تلاش
   var retryTimer = null;
+  //  SYN-12: هجومِ پس از وصلِ دوباره — دورِ نخستِ پس از `online` با درنگِ کران‌دار (`reconnectHold` ِ sync-core؛ کهنه ⇒ همان دم)؛
+  //  تیک و Pull ِ دوره‌ای تا پایانش صبر می‌کنند، هر دورِ واقعی (کاربر، تغییر، تلاشِ پس از شکست) آن را پایان می‌دهد
+  var spread = null, spreadUntil = 0;
+  function hold(cause, r) { return typeof core.reconnectHold === 'function' ? core.reconnectHold(spreadUntil, cause, Date.now(), r || 0) : { until: 0, waitMs: 0 }; }
+  function reconnected() {
+    attempt = 0;
+    var h = hold('reconnect', Math.random());
+    if (!(h.waitMs > 0)) { spreadUntil = 0; pump(); connectLive(); return; }
+    spreadUntil = h.until;
+    if (!spread) spread = setTimeout(function () { spread = null; spreadUntil = 0; pump(); connectLive(); }, h.waitMs);
+  }
   var gzipRefused = false;   // SYN-04: میان‌راهی بدنهٔ فشرده را نپذیرفت ⇒ تا بسته شدنِ صفحه push ِ ساده
 
   /** حسابی که هنوز دکان نساخته — خطا نیست، یک کارِ نکرده است. */
@@ -625,6 +636,7 @@
     if (tabLock.readOnly()) { announce(); return; }
     if (!acc.configured() || !acc.isSignedIn()) { announce(); return; }
     if (navigator.onLine === false) { announce(); return; }
+    spreadUntil = 0; if (spread) { clearTimeout(spread); spread = null; connectLive(); }
     busy = true;
     announce();
     try {
@@ -819,13 +831,13 @@
 
     //  صفِ مانده از نشستِ قبلی — همان «سه روز آفلاین» — اول می‌رود
     //  ⚠️ عددِ کش‌شده، نه خواندنِ دوبارهٔ حافظه هر دو ثانیه
-    tickTimer = setInterval(function () { if (queueCounts().queued) pump(); }, PUSH_TICK_MS);
-    pullTimer = setInterval(function () { if (!socketOpen) pump(); }, PULL_EVERY_MS);
+    tickTimer = setInterval(function () { if (queueCounts().queued && !(hold('timer').waitMs > 0)) pump(); }, PUSH_TICK_MS);
+    pullTimer = setInterval(function () { if (!socketOpen && !(hold('timer').waitMs > 0)) pump(); }, PULL_EVERY_MS);
     beatTimer = setInterval(function () {
       if (acc.isSignedIn() && navigator.onLine !== false) acc.heartbeat().catch(function () { });
     }, HEARTBEAT_MS);
 
-    window.addEventListener('online', function () { attempt = 0; pump(); connectLive(); });
+    window.addEventListener('online', reconnected);
     window.addEventListener('offline', function () { announce(); });
     //  برگشتن به صفحه: کاربر منتظر نماند
     document.addEventListener('visibilitychange', function () {
@@ -844,7 +856,7 @@
 
   /** پس از ورودِ تازه صدا زده می‌شود. */
   function onSignedIn() {
-    attempt = 0;
+    attempt = 0; streak = null;   // SYN-12: رشتهٔ شکستِ حسابِ پیشین در حافظه نمی‌ماند
     //  کلیدهای این حساب فرق دارند، پس شمارشِ کش‌شده هم بی‌اعتبار است
     forgetCounts();
     patchState({ lastError: '' });

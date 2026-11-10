@@ -781,7 +781,7 @@ fun SettingsScreen(
             text = "همگام‌سازی حالا",
             enabled = signedIn,
             onClick = {
-              runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(context) }
+              runCatching { ir.vil3ntec.tohid.sync.v1.SyncV1Worker.reconnect.userAsked(); ir.vil3ntec.tohid.sync.v1.SyncV1Worker.now(context) }
                 .onSuccess { toast("همگام‌سازی شروع شد؛ چند ثانیه بعد «آخرین همگام‌سازی» تازه می‌شود") }
                 .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
             },

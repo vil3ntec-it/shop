@@ -315,6 +315,7 @@ internal class SyncV3Engine(
 
   /** SYN-12: شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست — همان `Engine.outage` ِ وب؛ کوتاه و بی‌نت بی هشدار، سرخ فقط نشست و خطای واقعی */
   fun outage(online: Boolean): SyncOutage.Verdict = SyncOutage.of(streak, meta.lastError, online, meta.attempt, now())
+  fun forgetOutage() { streak = null }  // SYN-12: حساب یا دکانِ دیگر (`SyncV3Runner.forgetOutage`) ⇒ رشتهٔ پیشین در حافظه نمی‌ماند
 
   private fun save(m: V3Meta) {
     val next = m.copy(clock = clock.peek())

@@ -75,6 +75,17 @@ internal object SyncModel {
   }
 
   /**
+   *  SYN-12: سرخطِ نوارِ وضعیتِ کامپیوتر برای شکستِ بی هشدار (حکمِ موتور) — همان `dotHead` ِ وب: «دوباره می‌کوشد»،
+   *  «به سرور نمی‌رسیم» یا «سرور الان جواب نمی‌دهد» به‌جای «در صف» ِ زرد؛ بی شکست یا سرخ/خاکستری ⇒ `null` (همان پیشین)
+   */
+  fun quietHead(outage: SyncOutage.Kind?): String? = when (outage) {
+    SyncOutage.Kind.RETRYING -> StrSettings.diagRetryingTitle
+    SyncOutage.Kind.UNREACHABLE -> StrSettings.diagUnreachableTitle
+    SyncOutage.Kind.SERVER -> StrSettings.diagServerTitle
+    else -> null
+  }
+
+  /**
    *  ترتیب: سرورِ عقب‌مانده (چیزی نمی‌رود تا به‌روز شود) ⇐ نبودنِ دکان ⇐ حکمِ موتور (SYN-12) ⇐ نتِ دستگاه ⇐
    *  خطای آخرین دور ⇐ تغییرهای ردشده. `detail` همان متنِ خام برای پشتیبانی است. سرورِ گرفتار (حکمِ
    *  موتور) زرد است، نه سرخ: تقصیرِ این دستگاه نیست و خودش دوباره می‌رود.
