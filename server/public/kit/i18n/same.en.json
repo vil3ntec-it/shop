@@ -1,0 +1,14 @@
+{
+  "sm.title": "Same item in other shops",
+  "sm.hint": "A per-unit price is compared only when the size or the count inside the pack is clear; “cheapest” is only among comparable units.",
+  "sm.here": "This shop",
+  "sm.per": "Per {b}: {p}",
+  "sm.low": "Lowest per {b} among {n} offers: {p}",
+  "sm.cheapest": "Cheapest",
+  "sm.unclear": "Unit size is not clear; not compared",
+  "sm.list": "Price of this item in shops",
+  "sm.b.piece": "piece",
+  "sm.b.kg": "kg",
+  "sm.b.l": "litre",
+  "sm.b.m": "metre"
+}

@@ -11,6 +11,14 @@ const details = require('./product-details');
 const units = require('./market-units');   //  S70: مقایسه فقط با واحدِ هم‌سنج
 const { badRequest, notFound } = require('../middleware/errors');
 
+/** بسته‌های دادهٔ کالا (PRD-04) ⇒ `[{ name, sizeMilli }]` — فقط برای اندازه (S70)، نه پاسخ */
+function packsOf(data) {
+  let d = data;
+  if (typeof d === 'string') { try { d = JSON.parse(d); } catch { return []; } }
+  const list = d && typeof d === 'object' && Array.isArray(d.packs) ? d.packs : [];
+  return list.filter((k) => k && typeof k === 'object').map((k) => ({ name: k.name, sizeMilli: k.sizeMilli }));
+}
+
 module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODUCTS, MAX_CANDIDATES }) => {
   //  امضای جزئیات: تغییرِ برند/بارکد/variant یا پیوندِ بانک ⇒ همان دکان از نو نمایه می‌شود
   const DETAIL_SIG = `COALESCE(cp.brand, r.data->>'brand', '') || chr(31)
@@ -77,6 +85,8 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
    * S70: هر پیشنهاد `perUnit` (قیمتِ یک دانه/کیلو/لیتر/متر، فقط با اندازهٔ روشن؛ وگرنه null) و `cheapest`
    * (فقط درونِ همان پایه، با دست‌کم دو پیشنهاد)؛ `compare` = گروه‌های هم‌سنج روی همهٔ پیدا‌شده‌ها، نه فقط
    * صفحه. درونِ یک دکان ترتیب با قیمتِ یک پایه است، نه قیمتِ خامِ دو واحدِ ناهم‌سنج (`lib/market-units.js`).
+   * واحدِ بی عدد اندازه را از `saleUnit` ِ جزئیات و `packs` ِ دادهٔ کالا می‌گیرد (`units.sizeOfItem`)؛ ⛔ خودِ بسته‌ها
+   * (بارکد، قیمتِ جدا) هرگز در پاسخ نیستند.
    */
   async function sameProduct(bankProductId, { lat, lng, limit, exclude } = {}, at = now()) {
     if (!(await details.on())) throw notFound('پیدا نشد', 'not_found');
@@ -95,12 +105,13 @@ module.exports = ({ eligible, cardOf, rank, geoOf, str, CATEGORY_KEYS, MAX_PRODU
         ORDER BY sp.shop_id, r.row_id LIMIT $3`,
       [bank, [...bySlug.keys()], MAX_CANDIDATES]
     );
-    const found = rows.map((r) => ({ shop: bySlug.get(r.shop_id), shopId: r.shop_id, p: sf.productView(r) }))
+    const found = rows.map((r) => ({ shop: bySlug.get(r.shop_id), shopId: r.shop_id, p: sf.productView(r), packs: packsOf(r.data) }))
       .filter((x) => x.shop && x.p.priceMinor !== null && x.p.name);
     const extra = await details.load(found.map((x) => ({ shopId: x.shopId, id: x.p.id })));
     const linked = found
-      .filter((x) => (extra.get(details.pairKey(x.shopId, x.p.id)) || {}).bankProductId === bank)
-      .map((x) => ({ ...x, per: units.perUnit(x.p.unit, x.p.priceMinor), priceMinor: x.p.priceMinor }));
+      .map((x) => ({ ...x, d: extra.get(details.pairKey(x.shopId, x.p.id)) || {} }))
+      .filter((x) => x.d.bankProductId === bank)
+      .map((x) => ({ ...x, per: units.perUnit(x.p.unit, x.p.priceMinor, { saleUnit: x.d.saleUnit, packs: x.packs }), priceMinor: x.p.priceMinor }));
     const compare = units.compare(linked.map((x) => x.per));
     const offers = linked
       .sort((a, b) => rank(near)(a.shop, b.shop) || units.order(a, b))

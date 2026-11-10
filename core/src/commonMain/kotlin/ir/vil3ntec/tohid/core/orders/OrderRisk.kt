@@ -1,5 +1,8 @@
 package ir.vil3ntec.tohid.core.orders
 
+import ir.vil3ntec.tohid.core.shopper.AddressRules
+import ir.vil3ntec.tohid.core.shopper.GeoPin
+import ir.vil3ntec.tohid.core.text.LocaleFormat
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -63,28 +66,71 @@ object OrderRisk {
         returnsOrRefunds = num(x, "returnsOrRefunds") ?: 0, firstOrderAt = num(x, "firstOrderAt"), lastOrderAt = num(x, "lastOrderAt"),
       )
     }
-    val flags = (o["flags"] as? JsonArray).orEmpty().mapNotNull { e ->
-      val f = e as? JsonObject ?: return@mapNotNull null
-      val code = str(f, "code")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
-      Flag(
-        code = code,
-        severity = if (str(f, "severity") == "warn") Severity.WARN else Severity.INFO,
-        count = num(f, "count") ?: 0,
-        until = num(f, "until"),
-        orderNo = num(f, "orderNo"),
-      )
-    }
-    return View(enabled = true, known = bool(o, "known"), history = h, flags = flags)
+    return View(enabled = true, known = bool(o, "known"), history = h, flags = flagsOf(o))
   }
+
+  /** `flags` ِ هر پاسخ (`riskOf`، هر ردیفِ صف): بی کد ⇒ کنار؛ شدتِ ناشناخته ⇒ info */
+  private fun flagsOf(o: JsonObject): List<Flag> = (o["flags"] as? JsonArray).orEmpty().mapNotNull { e ->
+    val f = e as? JsonObject ?: return@mapNotNull null
+    val code = str(f, "code")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+    Flag(
+      code = code,
+      severity = if (str(f, "severity") == "warn") Severity.WARN else Severity.INFO,
+      count = num(f, "count") ?: 0,
+      until = num(f, "until"),
+      orderNo = num(f, "orderNo"),
+    )
+  }
+
+  private fun warnFirst(flags: List<Flag>): List<Flag> = flags.filter { it.severity == Severity.WARN } + flags.filter { it.severity == Severity.INFO }
 
   /** کارت دیده شود؟ فقط با پرچمِ روشن و چیزی برای گفتن (سابقه یا نشانه) */
   fun visible(v: View): Boolean = v.enabled && (v.known || v.flags.isNotEmpty())
 
   /** نشانه‌ها برای نمایش: هشدارها اول، به ترتیبِ سرور در هر گروه */
-  fun shown(v: View): List<Flag> = v.flags.filter { it.severity == Severity.WARN } + v.flags.filter { it.severity == Severity.INFO }
+  fun shown(v: View): List<Flag> = warnFirst(v.flags)
 
   /** بیشترین شدت (رنگِ کارت): هشدار اگر یکی هست */
   fun worst(v: View): Severity = if (v.flags.any { it.severity == Severity.WARN }) Severity.WARN else Severity.INFO
+
+  /* ── RSK-03 «کارت در صف»: `GET /api/shop/orders/risk/queue` (`order-risk.js` ‹queueOf›) ── */
+
+  /** سفارشِ پیش از ارسال با دستِ کم یک هشدار؛ نشانه‌ها هشدار-اول، مثلِ [shown] */
+  data class QueueItem(val orderId: String, val orderNo: Long, val status: String, val flags: List<Flag>)
+
+  data class Queue(val enabled: Boolean, val items: List<QueueItem> = emptyList(), val truncated: Boolean = false)
+
+  /** پاسخِ صف ⇐ نما؛ شکلِ نادرست ⇒ خاموش؛ ردیفِ بی شناسه یا بی هشدار کنار (هیچ کارتِ خالی‌ای ساخته نمی‌شود) */
+  fun queue(o: JsonObject?): Queue {
+    if (o == null || !bool(o, "enabled")) return Queue(enabled = false)
+    val items = (o["items"] as? JsonArray).orEmpty().mapNotNull { e ->
+      val x = e as? JsonObject ?: return@mapNotNull null
+      val id = str(x, "orderId")?.takeIf { it.isNotBlank() } ?: return@mapNotNull null
+      val flags = flagsOf(x)
+      if (flags.none { it.severity == Severity.WARN }) return@mapNotNull null
+      QueueItem(id, num(x, "orderNo") ?: 0, str(x, "status").orEmpty(), warnFirst(flags))
+    }
+    return Queue(enabled = true, items = items, truncated = bool(o, "truncated"))
+  }
+
+  enum class QueueCard { HIDDEN, ITEMS, FAILED }
+
+  /**
+   *  کارتِ «نگاهِ دوباره» بالای صف: [flagOn] = `risk` ِ `/config`؛ [q] آخرین پاسخِ خوانده‌شده؛ [failedStatus] کدِ HTTP ِ
+   *  خطا (۰ = شبکه) وقتی هیچ پاسخی نیست. ⛔ سرورِ کهنه بی این در (۴۰۴) یا بی اجازه/پرچم (۴۰۳) ⇒ هیچ؛ خطای دیگر ⇒
+   *  «خوانده نشد» با «دوباره»، هرگز نشانِ «بی‌خطر».
+   */
+  fun queueCard(flagOn: Boolean, q: Queue?, failedStatus: Int?): QueueCard = when {
+    !flagOn -> QueueCard.HIDDEN
+    q != null -> if (q.enabled && q.items.isNotEmpty()) QueueCard.ITEMS else QueueCard.HIDDEN
+    failedStatus == null || failedStatus == 403 || failedStatus == 404 -> QueueCard.HIDDEN
+    else -> QueueCard.FAILED
+  }
+
+  /** نشانِ کارتِ هر سفارش در صف: شناسه ⇐ نخستین هشدار (پرچمِ خاموش یا بی پاسخ ⇒ هیچ) */
+  fun cardFlags(q: Queue?): Map<String, Flag> =
+    if (q == null || !q.enabled) emptyMap()
+    else q.items.mapNotNull { i -> i.flags.firstOrNull { it.severity == Severity.WARN }?.let { i.orderId to it } }.toMap()
 
   /* ── RSK-04: فهرستِ بسته و مطمئنِ دکان (`/api/shop/orders/risk/lists`، `server/src/lib/risk-lists.js`) ── */
 
@@ -94,6 +140,9 @@ object OrderRisk {
   const val REASON_MAX = 200
   const val DAYS_MAX = 365
   const val DAYS_DEFAULT = 30
+  const val RADIUS_MIN = 10
+  const val RADIUS_MAX = 2000
+  const val RADIUS_DEFAULT = 100
 
   /** ردیفِ فعالِ فهرست: شماره یا پین (پین فقط «بسته»)؛ دلیل فقط برای صاحب و مدیر */
   data class Entry(
@@ -121,12 +170,41 @@ object OrderRisk {
     else -> null
   }
 
-  /** بدنهٔ `POST …/risk/lists` برای شمارهٔ کاملِ همین سفارش (فقط شماره؛ پین از برنامه هنوز نه) */
+  /** بدنهٔ `POST …/risk/lists` برای یک شماره (شمارهٔ کاملِ سفارش، یا تایپ‌شده در صفحهٔ فهرست با [typedPhone]) */
   fun phoneEntryBody(list: String, phone: String, reason: String, days: Int): JsonObject = buildJsonObject {
     put("list", list)
     put("kind", "phone")
     put("phone", phone)
-    put("reason", reason.trim().split(Regex("\\s+")).joinToString(" "))
+    put("reason", cleanReason(reason))
+    put("expiresInDays", days)
+  }
+
+  private fun cleanReason(reason: String): String = reason.trim().split(Regex("\\s+")).joinToString(" ")
+
+  /** شمارهٔ تایپ‌شده در صفحهٔ فهرست: رقمِ فارسی ⇐ لاتین، فاصله و خط تیره بیرون؛ درستی‌اش را سرور می‌سنجد */
+  fun typedPhone(raw: String): String = LocaleFormat.asciiDigits(raw).filter { it.isDigit() || it == '+' }
+
+  /** «بستنِ این جا» ِ یک سفارش: فقط ارسالی با پینِ درست (همان `matchIn` ِ سرور که فقط `delivery` را می‌سنجد) */
+  fun orderPin(fulfillment: String, lat: Double?, lng: Double?): GeoPin? =
+    if (fulfillment == "delivery" && lat != null && lng != null && AddressRules.validPin(lat, lng)) GeoPin(lat, lng) else null
+
+  /** فرمِ «بستنِ یک جا» ⇐ کدِ خطای درجا یا `null` (همان مرزهای `risk-lists.parse`: پین، شعاعِ ۱۰ تا ۲۰۰۰ متر، دلیل، انقضا) */
+  fun pinEntryError(pin: GeoPin?, radiusM: Int?, reason: String, days: Int?): String? = when {
+    pin == null || !AddressRules.validPin(pin.lat, pin.lng) -> "pin_required"
+    radiusM == null || radiusM !in RADIUS_MIN..RADIUS_MAX -> "bad_radius"
+    reason.trim().length !in REASON_MIN..REASON_MAX -> "reason_required"
+    days == null || days !in 1..DAYS_MAX -> "bad_expiry"
+    else -> null
+  }
+
+  /** بدنهٔ `POST …/risk/lists` برای پین (پین فقط «بسته»؛ مختصات گردِ شش رقم مثلِ سرور) */
+  fun pinEntryBody(pin: GeoPin, radiusM: Int, reason: String, days: Int): JsonObject = buildJsonObject {
+    put("list", BLOCK)
+    put("kind", "pin")
+    put("lat", AddressRules.round6(pin.lat))
+    put("lng", AddressRules.round6(pin.lng))
+    put("radiusM", radiusM)
+    put("reason", cleanReason(reason))
     put("expiresInDays", days)
   }
 }

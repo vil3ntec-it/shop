@@ -21,6 +21,7 @@ class OnlineRoutesTest {
       OnlinePaths.order("o-1") to "orders/{id}",
       OnlinePaths.action("o-1", "rejected") to "orders/{id}/action",
       OnlinePaths.NEW_ORDER to "orders/new",
+      OnlinePaths.RISK_LISTS to "orders/risk-lists",
       OnlinePaths.storefront(StorefrontModel.PRODUCTS) to "storefront",
       OnlinePaths.storefrontProduct("p-1") to "storefront/products/{id}",
       OnlinePaths.conversation("c-1") to "chat/{conversationId}",
@@ -65,6 +66,17 @@ class OnlineRoutesTest {
       assertTrue(nav.back())
       assertEquals(path, OnlinePaths.DELIVERY, nav.current.substringBefore('?'))
     }
+  }
+
+  @Test
+  fun `فهرستِ بسته و مطمئن صفحهٔ جداست و برگشتش به صف است، نه به یک سفارش`() {
+    val r = table.resolve(OnlinePaths.RISK_LISTS)!!
+    assertEquals(RouteKind.PAGE, r.route.kind)
+    val nav = V3Nav(table, "home", NavStack.of("home"))
+    nav.openDeep(OnlinePaths.RISK_LISTS)
+    assertEquals(OnlinePaths.RISK_LISTS, nav.current)
+    assertTrue(nav.back())
+    assertEquals(OnlinePaths.ORDERS, nav.current.substringBefore('?'))
   }
 
   @Test

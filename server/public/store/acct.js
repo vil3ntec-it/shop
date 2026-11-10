@@ -111,6 +111,10 @@
           }).then(function () { gone(); K.setTicket(null); K.account(); mine(); });
         });
         box.append(el('div', { class: 'spread' }, el('b', { text: t('ac.me') }), el('span', { class: 'ltr', text: K.localPhone(s.phone) })), out);
+        //  SEC-10: «پاک کردنِ داده‌های من در این دکان» (erase.js ِ دیربار) فقط با `features.erasure`
+        if (ctx.store.features && ctx.store.features.erasure) {
+          K.js('/store/erase.js').then(function () { window.StoreErase({ api: api, slug: ctx.slug, phone: s.phone, into: box }); }, function () {});
+        }
       });
     }
 

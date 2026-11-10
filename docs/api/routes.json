@@ -20,18 +20,18 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1010,
+    "routes": 1011,
     "byAuth": {
       "none-detected": 194,
       "admin": 279,
       "inline": 2,
-      "user": 492,
+      "user": 493,
       "device": 42,
       "optional": 1
     },
     "byShape": {
       "extracted": 701,
-      "empty": 307,
+      "empty": 308,
       "unresolved": 2
     }
   },
@@ -357,7 +357,7 @@
     {"method":"GET","path":"/api/billing/plans","area":"billing","source":"server/src/app.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["currency","plans","whatsapp"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/billing/request","area":"billing","source":"server/src/app.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":["note","plan","planCode"],"response":{"statuses":[201,403],"keys":["error","request"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/billing/status","area":"billing","source":"server/src/app.js","auth":"user","guards":["requireUser","optionalShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["active","catalog","daysLeft","endsAt","features","graceEndsAt","phase","plan","serverTime","shop","source","startsAt","status","trial"]},"errors":[],"shape":"extracted"},
-    {"method":"GET","path":"/api/calendar/holidays","area":"calendar","source":"server/src/routes/calendar.js","auth":"none-detected","guards":[],"params":[],"query":["from","to"],"body":[],"response":{"statuses":[200,304],"keys":["holidays","updatedAt","version"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/api/calendar/holidays","area":"calendar","source":"server/src/routes/calendar.js","auth":"none-detected","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'calendar-ip' })"],"params":[],"query":["from","to"],"body":[],"response":{"statuses":[200,304],"keys":["holidays","updatedAt","version"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/config","area":"config","source":"server/src/app.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["googleClientId","otpEnabled","pumpChatVapid","registrationOpen","serverTime","termsVersion","vipCodes","visitPing","whatsapp"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/config/server","area":"config","source":"server/src/routes/server-info.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/courier/events","area":"courier","source":"server/src/routes/courier.js","auth":"user","guards":["allowCourierScope","requireUser","requireShop"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
@@ -799,6 +799,7 @@
     {"method":"GET","path":"/api/shop/orders/risk/lists","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')","requireOrdersContact"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/shop/orders/risk/lists","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')"],"params":[],"query":[],"body":[],"response":{"statuses":[201],"keys":["entry"]},"errors":[],"shape":"extracted"},
     {"method":"DELETE","path":"/api/shop/orders/risk/lists/:entryId","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')","requirePermission('orders.contact')"],"params":["entryId"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"GET","path":"/api/shop/orders/risk/queue","area":"shop","source":"server/src/routes/order-risk-queue.js","auth":"user","guards":["rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'order-risk-queue-ip' }","requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/orders/summary","area":"shop","source":"server/src/routes/orders.js","auth":"user","guards":["requireUser","requireShop","requirePermission('orders.view')"],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/shop/owner-report","area":"shop","source":"server/src/routes/owner-report.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'owner-report-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) "],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["...","enabled","owner"]},"errors":[],"shape":"extracted"},
     {"method":"PUT","path":"/api/shop/owner-report","area":"shop","source":"server/src/routes/owner-report.js","auth":"user","guards":["rateLimit({ max: 120, windowMs: 60 * 1000, keyPrefix: 'owner-report-ip' })","requireUser","requireShop","rateLimit({ max: 60, windowMs: 60 * 1000, keyPrefix: 'owner-report', key: (req) "],"params":[],"query":[],"body":[],"response":{"statuses":[200],"keys":["settings"]},"errors":[],"shape":"extracted"},

@@ -6,8 +6,9 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 /**
- *  OPS-06 — ساختارِ راهنمای هر صفحه: جای خالی هرگز به کاربر نشان داده نمی‌شود، ردیفِ READY ِ
- *  ناقص هم نه، و فهرستِ «چه چیزی را صاحب محصول بدهد» از خودِ داده می‌آید.
+ *  OPS-06 — راهنمای هر صفحه: هر ۱۶ صفحه متنِ آمادهٔ فارسی و انگلیسی دارد (O-14 ب)، جای خالی هرگز به
+ *  کاربر نشان داده نمی‌شود، ردیفِ READY ِ ناقص هم نه، و فهرستِ «چه چیزی هنوز مانده» (ویدیو) از خودِ داده می‌آید.
+ *  نام‌های میانِ «» با جدولِ `Str*` در `ScreenGuidesTextTest` ِ اندروید سنجیده می‌شوند.
  */
 class ScreenGuidesTest {
 
@@ -19,23 +20,50 @@ class ScreenGuidesTest {
   )
 
   @Test
-  fun everyScreenHasOneUniqueValidRowAndTodayAllArePlaceholders() {
+  fun everyScreenHasOneUniqueReadyRowInPersianAndEnglish() {
     val ids = ScreenGuides.ALL.map { it.screen }
+    assertEquals(16, ids.size)
     assertEquals(ids.size, ids.toSet().size, "شناسهٔ تکراری")
     for (g in ScreenGuides.ALL) assertEquals(emptyList(), ScreenGuides.problems(g), g.screen)
     //  میان‌برهای Ctrl+1..9 ِ کامپیوتر (`AppNav.SHORTCUTS`) همه راهنما دارند
     for (s in listOf("dashboard", "sale", "debtors", "warehouse", "products", "sales", "purchasing", "reports", "expenses")) {
       assertTrue(s in ids, s)
     }
-    assertTrue(ScreenGuides.ALL.all { it.status == GuideStatus.PLACEHOLDER })
+    for (g in ScreenGuides.ALL) {
+      assertEquals(GuideStatus.READY, g.status, g.screen)
+      assertTrue(g.title.fa.isNotBlank() && g.title.en.isNotBlank(), g.screen)
+      assertTrue(g.steps.size >= 3, "${g.screen}: کمتر از ۳ گام")
+      g.steps.forEachIndexed { i, s ->
+        assertTrue(s.fa.isNotBlank() && s.en.isNotBlank(), "${g.screen} #${i + 1}")
+        //  انگلیسی بی حرفِ فارسی (؋ نمادِ پول است)
+        assertTrue(s.en.none { it in '\u0600'..'\u06FF' && it != '؋' }, "${g.screen} #${i + 1}: ${s.en}")
+        //  پشتوی گام هنوز نیست ⇒ همان فارسی، مثلِ هر نوشتهٔ بی پشتوی جدول‌ها
+        assertEquals(s.fa, s.of("ps"), "${g.screen} #${i + 1}")
+      }
+    }
+    //  ویدیو هنوز هیچ صفحه‌ای ندارد ⇒ همهٔ ۱۶ ردیف در فهرستِ مانده
     assertEquals(ScreenGuides.ALL.size, ScreenGuides.pending().size)
   }
 
   @Test
-  fun placeholderAndUnknownScreensShowNothing() {
-    for (g in ScreenGuides.ALL) assertNull(ScreenGuides.forScreen(g.screen), g.screen)
+  fun readyScreensShowAndPlaceholderAndUnknownShowNothing() {
+    for (g in ScreenGuides.ALL) assertEquals(g, ScreenGuides.forScreen(g.screen), g.screen)
+    //  ردیفِ جای خالی (صفحهٔ تازه‌ای که هنوز متن ندارد) هیچ چیز نشان نمی‌دهد
+    val draft = ScreenGuide("loyalty", GuideText("وفاداری", "Loyalty"))
+    assertEquals(emptyList(), ScreenGuides.problems(draft))
+    assertNull(ScreenGuides.forScreen("loyalty", ScreenGuides.ALL + draft))
     assertNull(ScreenGuides.forScreen(null))
     assertNull(ScreenGuides.forScreen("nope"))
+  }
+
+  @Test
+  fun v3RouteBaseMapsToTheGuideId() {
+    assertEquals("dashboard", ScreenGuides.screenOf("home"))
+    assertEquals("warehouse", ScreenGuides.screenOf("stock"))
+    for (g in ScreenGuides.ALL) if (g.screen != "dashboard" && g.screen != "warehouse") assertEquals(g.screen, ScreenGuides.screenOf(g.screen))
+    //  مسیرِ بی راهنما همان می‌ماند و چیزی نشان نمی‌دهد
+    assertEquals("chat", ScreenGuides.screenOf("chat"))
+    assertNull(ScreenGuides.forScreen(ScreenGuides.screenOf("chat")))
   }
 
   @Test

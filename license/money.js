@@ -190,7 +190,54 @@
     return norm(Math.max(0, upTo(before + qty) - base));
   }
 
+  // ── PRD-08: مقدارِ اعشاری (هم‌زادِ `core/money/QtyExact.kt`؛ بردارِ `core/test-vectors/qty-exact-v1.json`) ──
+  /* هزارم از Double (Math.round(q × 1000))؛ NaN، بی‌نهایت یا بیرون از بازهٔ دقیق ⇒ null */
+  function qMilli(q) {
+    if (typeof q !== 'number' || !isFinite(q)) return null;
+    var m = norm(Math.round(q * 1000));
+    return Math.abs(m) > MAX_EXACT ? null : m;
+  }
+  function qFractional(milli) { return milli % 1000 !== 0; }
+  function qExactMinor(priceMinor, qtyMilli) {
+    try { return lineTotalMinor(qtyMilli, priceMinor, 100); } catch (e) { if (e instanceof RangeError) return null; throw e; }
+  }
+  /* فقط مقدارِ اعشاری قاعدهٔ دقیق دارد؛ مقدارِ درست یا عددِ نامعتبر ⇒ null (همان حسابِ پیشین) */
+  function qLineMinorOrNull(price, quantity) {
+    var q = qMilli(quantity);
+    if (q === null || !qFractional(q) || typeof price !== 'number' || !isFinite(price)) return null;
+    var p = norm(Math.round(price * 100));
+    return Math.abs(p) > MAX_EXACT ? null : qExactMinor(p, q);
+  }
+  function qLegacyMinor(price, quantity) { return mulExact(norm(Math.round(price * quantity)), 100); }
+  function qLineMinor(price, quantity, on) {
+    var e = on ? qLineMinorOrNull(price, quantity) : null;
+    return e === null ? qLegacyMinor(price, quantity) : e;
+  }
+  function qClean(q) { var m = qMilli(q); return m === null ? q : m / 1000; }
+  function qPlus(a, b) {
+    var x = qMilli(a), y = qMilli(b);
+    if (x === null || y === null || Math.abs(x + y) > MAX_EXACT) return a + b;
+    return (x + y) / 1000;
+  }
+  function qRoom(available, inCart) {
+    var a = qMilli(available), c = qMilli(inCart);
+    if (a === null || c === null) return Math.max(0, available - inCart);
+    return a > c ? (a - c) / 1000 : 0;
+  }
+  function qTooPrecise(text) {
+    var s = String(text);
+    var at = s.search(/[.٫٬]/);
+    if (at < 0) return false;
+    var digits = s.slice(at + 1).replace(/[۰-۹]/g, function (c) { return String(c.charCodeAt(0) - 0x06F0); })
+      .replace(/[٠-٩]/g, function (c) { return String(c.charCodeAt(0) - 0x0660); }).replace(/[^0-9]/g, '');
+    return digits.replace(/0+$/, '').length > 3;
+  }
+
   return {
+    qtyExact: Object.freeze({
+      DECIMALS: 3, milli: qMilli, fractional: qFractional, exactMinor: qExactMinor, lineMinorOrNull: qLineMinorOrNull,
+      legacyMinor: qLegacyMinor, lineMinor: qLineMinor, clean: qClean, plus: qPlus, room: qRoom, tooPrecise: qTooPrecise,
+    }),
     MAX_EXACT: MAX_EXACT,
     ROUNDING_LINE_TYPE: ROUNDING_LINE_TYPE,
     CURRENCIES: CURRENCIES,

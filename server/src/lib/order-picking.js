@@ -583,6 +583,8 @@ async function pack(shopId, orderId, { key, body }, actor) {
         );
       }
     }
+    //  O-06 = ب: نگه‌داشتهٔ بازِ سفارش = آن‌چه واقعاً برداشته شد (جایگزین ⇒ کالای جایگزین؛ برداشته‌نشده ⇒ آزاد)
+    await require('./stock-reserve').syncOrderIn(c, shopId, id, at);
     const kept = s.lines.filter((l) => l.qtyMilli > 0).length;
     const moneyChanged = s.totalMinor !== Number(order.total_minor);
     await c.query(
@@ -619,6 +621,7 @@ async function pack(shopId, orderId, { key, body }, actor) {
           : 'جمع‌آوری: همهٔ قلم‌ها برداشته شد', 300),
         JSON.stringify({ pick: pickDetail }), at]
     );
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, id, at);   //  CHK-24: جایگزین/«پیدا نشد» و اسکناسِ مشتری
     await orders.transitionIn(c, shopId, id, { to: 'packed', from: 'picking' }, actor);
     await c.query(
       `UPDATE order_picks SET status='packed', bags=$2, final_total_minor=$3, pack_key=$4, packed_at=$5,

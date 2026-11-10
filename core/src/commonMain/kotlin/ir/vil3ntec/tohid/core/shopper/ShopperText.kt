@@ -296,6 +296,13 @@ object ShopperText {
   val tenderNone get() = t("پول خرد لازم نیست", "No change needed", "پرچون ته اړتیا نشته")
   fun tenderOption(note: Long, change: Long) =
     t("${asIs(money(note))} — پول خرد: ${asIs(money(change))}", "${money(note)} — change: ${money(change)}", "${money(note)} — پرچون: ${money(change)}")
+  //  CHK-24: همان `od.pf.*` و `err.delivery_locked` ِ وب (`kit/i18n/order.*.json`)
+  val prefsTitle get() = t("دستورِ تحویل", "Delivery instructions", "د سپارلو لارښوونه")
+  val prefsLandmark get() = t("نشانهٔ تازه (اختیاری)", "New landmark (optional)", "نوې نښه (اختیاري)")
+  val prefsSave get() = t("ثبتِ دستورِ تحویل", "Save instructions", "لارښوونه ثبت کړئ")
+  val prefsSaved get() = t("دستورِ تحویل ثبت شد؛ پیک همین را می‌بیند.", "Saved; the courier sees these instructions.", "لارښوونه ثبت شوه؛ پیک همدا ویني.")
+  val prefsLocked get() = t("سفارش از دکان بیرون رفته است؛ برای تغییر با پیک تماس بگیرید.",
+    "The order has left the shop; contact the courier to change this.", "فرمایش له دوکان وتلی دی؛ د بدلون لپاره له پیک سره اړیکه ونیسئ.")
   fun submit(sum: Long) = t("ثبتِ سفارش — ${asIs(money(sum))}", "Place order — ${money(sum)}", "فرمایش ثبت کړئ — ${money(sum)}")
   fun accept(sum: Long) = t("پذیرفتنِ قیمتِ تازه و ثبت — ${asIs(money(sum))}", "Accept new price and place order — ${money(sum)}", "نوې بیه ومنئ او ثبت یې کړئ — ${money(sum)}")
   val sending get() = t("در حالِ ثبت…", "Placing your order…", "ثبتېږي…")
@@ -680,6 +687,11 @@ object ShopperText {
     "cash_tender_excess" -> t("پول خرد از یک اسکناسِ ۱۰۰۰ بیشتر می‌شود؛ اسکناسِ کوچک‌تری برگزینید.", "The change would be more than one 1000 note; choose a smaller banknote.",
       "پرچون به له یوې ۱۰۰۰ یي بانکنوټ ډېر شي؛ کوچنۍ بانکنوټ وټاکئ.")
     "bad_cash_tender" -> t("مبلغِ اسکناس درست نیست؛ دوباره برگزینید.", "The banknote amount is not valid; please choose again.", "د بانکنوټ اندازه سمه نه ده؛ بیا یې وټاکئ.")
+    //  CHK-24 (`lib/delivery-prefs.js`)
+    "delivery_locked" -> prefsLocked
+    "version_conflict" -> t("سفارش همین حالا جای دیگری عوض شد؛ دوباره ببینید.", "This order was just changed elsewhere — please look again.", "فرمایش همدا اوس بل ځای بدل شو؛ بیا یې وګورئ.")
+    "delivery_prefs_disabled" -> t("ویرایشِ دستورِ تحویل برای این دکان روشن نیست.", "Editing delivery instructions isn't turned on for this shop.",
+      "په دې دوکان کې د سپارلو د لارښوونې سمول فعال نه دي.")
     "too_many_addresses" -> addressProblem(AddressProblem.FULL)
     "chat_closed" -> chatClosed
     "chat_blocked" -> chatBlocked

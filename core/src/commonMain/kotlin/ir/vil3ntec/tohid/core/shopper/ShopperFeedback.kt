@@ -20,9 +20,9 @@ data class OrderReview(val stars: Int, val comment: String = "", val status: Str
 @Serializable
 data class ReviewState(val canReview: Boolean = false, val commentMax: Int = ReviewRules.COMMENT_MAX, val review: OrderReview? = null)
 
-/** کلیدهای پیگیری که در `PublicOrder` ِ قراردادِ بازار نیستند (پرچم‌دار؛ نبود ⇒ پیش‌فرض) */
+/** کلیدهای پیگیری که در `PublicOrder` ِ قراردادِ بازار نیستند (پرچم‌دار؛ نبود ⇒ پیش‌فرض)؛ [deliveryPrefs] ⇒ CHK-24 ([PrefsRules]) */
 @Serializable
-data class OrderExtras(val review: ReviewState? = null, val chat: Boolean = false)
+data class OrderExtras(val review: ReviewState? = null, val chat: Boolean = false, val deliveryPrefs: CustomerDeliveryPrefs? = null)
 
 class TrackPage(val order: PublicOrder, val extras: OrderExtras)
 

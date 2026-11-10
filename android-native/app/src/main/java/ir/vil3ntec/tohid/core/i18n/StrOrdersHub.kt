@@ -36,6 +36,30 @@ object StrOrdersHub {
   fun itemsPreview(names: String, more: Int): String =
     if (more > 0) t("${asIs(names)} و ${asIs(more)} قلمِ دیگر", "$names and $more more", "$names او $more نور توکي") else names
 
+  // ── نگه‌داشتنِ موجودیِ سفارش (O-06 = ب؛ کارتِ صف و جزئیات، `OrderStockHold`) ──
+  val stockReview: String get() = t("موجودیِ رزروشده کم آمد — بررسی کنید", "Reserved stock ran short — review", "خوندي شوې موجودي کمه شوه — وګورئ")
+  val stockReviewBody: String get() = t(
+    "فروشِ حضوری بخشی از کالای نگه‌داشتهٔ این سفارش را برد. موجودی را ببینید؛ اگر کالا نیست، سفارش را رد کنید یا با مشتری هماهنگ کنید.",
+    "An in-store sale took some of the stock held for this order. Check the stock; if the item is gone, reject the order or agree a change with the customer.",
+    "حضوري پلور د دې فرمایش لپاره د ساتل شوي توکي یوه برخه یوړه. موجودي وګورئ؛ که توکی نشته، فرمایش رد کړئ یا له پېرودونکي سره همغږي وکړئ.",
+  )
+  fun stockHeldUntil(at: String): String =
+    t("کالای این سفارش تا ${asIs(at)} نگه داشته شده است", "Stock is held for this order until $at", "د دې فرمایش توکي تر $at پورې ساتل شوي دي")
+  val stockHeldAcceptHint: String get() = t(
+    "اگر تا آن وقت قبول نکنید، کالا برای سفارش‌های دیگر آزاد می‌شود.",
+    "If you don't accept by then, the stock is freed for other orders.",
+    "که تر هغه وخته یې ونه منئ، توکي د نورو فرمایشونو لپاره خلاصېږي.",
+  )
+  val stockHeldOpen: String get() = t("کالای این سفارش تا پایانِ سفارش نگه داشته شده است", "Stock is held for this order until it is done", "د دې فرمایش توکي د فرمایش تر پایه ساتل شوي دي")
+  val stockExpired: String get() = t("مهلتِ نگه‌داشتن گذشت و کالا آزاد شد", "The hold expired and the stock was freed", "د ساتلو موده تېره شوه او توکي خلاص شول")
+  val stockExpiredHint: String get() = t(
+    "با قبول، اگر کالا هنوز باشد دوباره نگه داشته می‌شود؛ وگرنه قبول ممکن نیست.",
+    "If you accept and the item is still in stock, it is held again; otherwise accepting is not possible.",
+    "که یې ومنئ او توکی لا شته وي، بیا ساتل کېږي؛ که نه، منل ممکن نه دي.",
+  )
+  val stockCommitted: String get() = t("فروشِ تحویلِ این سفارش ثبت شد و نگه‌داشتن بسته شد", "This order's handover sale was recorded and the hold closed", "د دې فرمایش د سپارلو پلور ثبت شو او ساتل بند شول")
+  val stockReleased: String get() = t("کالای نگه‌داشتهٔ این سفارش آزاد شد", "The stock held for this order was released", "د دې فرمایش ساتل شوي توکي خلاص شول")
+
   // ── آماده‌سازی و تحویل (جزئیاتِ سفارش) ──
   val prepTitle: String get() = t("آماده‌سازی و تحویل", "Prepare and hand over", "چمتو کول او سپارل")
   val sendPhoto: String get() = t("عکس برای مشتری", "Photo to customer", "پېرودونکي ته انځور")

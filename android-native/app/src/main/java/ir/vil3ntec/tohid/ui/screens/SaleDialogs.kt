@@ -1035,7 +1035,7 @@ fun CartLineDialog(
         }
         NumberField(
           value = qtyText,
-          onValueChange = { qtyText = it },
+          onValueChange = { if (!ir.vil3ntec.tohid.data.QtyExactWiring.tooPrecise(it)) qtyText = it }, // PRD-08: حداکثر سه رقمِ اعشار، مثلِ صفحه‌کلیدِ گوشی
           label = (unitNow?.name ?: if (inSaleUnit) saleUnit else unit).let { u -> if (u.isNotBlank()) ir.vil3ntec.tohid.core.i18n.StrSalePages.qtyIn(u) else ir.vil3ntec.tohid.core.i18n.StrSale.qty },
           modifier = Modifier.fillMaxWidth(),
         )
@@ -1100,7 +1100,7 @@ fun CartLineDialog(
         Spacer(Modifier.height(14.dp))
         val shownPrice = if (manual) (parsedPrice ?: 0.0) else listPrice ?: basePrice
         Text(
-          ir.vil3ntec.tohid.core.i18n.StrSalePages.lineTotal(money((parsedQty ?: 0.0) * shownPrice)),
+          ir.vil3ntec.tohid.core.i18n.StrSalePages.lineTotal(money(ir.vil3ntec.tohid.data.QtyExactWiring.preview(shownPrice, parsedQty ?: 0.0))), // PRD-08: همان مبلغِ ثبت
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )
@@ -1202,7 +1202,7 @@ fun FreeLineDialog(
         }
         Spacer(Modifier.height(14.dp))
         Text(
-          ir.vil3ntec.tohid.core.i18n.StrSalePages.total(money((parsedQty ?: 0.0) * (parsedPrice ?: 0.0))),
+          ir.vil3ntec.tohid.core.i18n.StrSalePages.total(money(ir.vil3ntec.tohid.data.QtyExactWiring.preview(parsedPrice ?: 0.0, parsedQty ?: 0.0))),
           style = MaterialTheme.typography.titleSmall,
           color = Shop.colors.text,
         )

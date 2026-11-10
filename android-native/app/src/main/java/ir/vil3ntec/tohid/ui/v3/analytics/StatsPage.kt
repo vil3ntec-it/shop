@@ -44,6 +44,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.LocaleChoice
+import ir.vil3ntec.tohid.ShopDayChoice
 import ir.vil3ntec.tohid.core.calendar.CivilDays
 import ir.vil3ntec.tohid.core.calendar.SolarHijri
 import ir.vil3ntec.tohid.core.i18n.I18n
@@ -133,13 +134,15 @@ private fun StatsBody(d: ShopData, periodArg: String?, onOpen: (String) -> Unit,
     if (requested != null) { periodId = StatsPeriod.of(requested).id; StatsRequest.period.value = null }
   }
   val period = StatsPeriod.of(periodId)
-  val live = remember(d, period, today) { StatsModel.bars(d, period, today) }
+  //  LOC-03: هفتهٔ دکان (آغاز و روزهای تعطیل) از «تاریخ و رقم»؛ تنظیم‌نشده همان شنبه و جمعه
+  val week = ShopDayChoice.rules
+  val live = remember(d, period, today, week) { StatsModel.bars(d, period, today, week) }
   //  عکسِ «عددِ بلند» ِ خانه (PhoneHomeShot.big) — همان ستون‌ها با عددِ میلیاردی
   val bars = if (big) live.map { it.copy(net = it.net * 1000 + 1_234_567_890.0) } else live
   var selected by remember(period, bars.size) { mutableStateOf(bars.lastIndex) }
   val sel = bars.getOrNull(selected)
   val spend = remember(d, sel) { sel?.let { StatsModel.spend(d, it.from, it.to) } ?: 0.0 }
-  val streak = remember(d, today) { StatsModel.streak(d, today) }
+  val streak = remember(d, today, week) { StatsModel.streak(d, today, week) }
   val bins = remember(d, sel) { sel?.let { StatsModel.hours(d, it.from, it.to, ::hourOf) }.orEmpty() }
   val peak = StatsModel.peak(bins)
   val grow = rememberV3Grow(period)

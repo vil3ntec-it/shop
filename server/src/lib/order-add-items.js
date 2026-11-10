@@ -81,7 +81,7 @@ const pricedOf = (l) => ({
 });
 
 /** قلم‌های تازه با قیمتِ همین لحظه ⇒ تغییرها و قلم‌های پس از افزودن (همان سنجش‌های ثبت). */
-async function planIn(c, shopId, from, input, lines) {
+async function planIn(c, shopId, from, input, lines, orderId = '') {
   const sf = require('./storefront');
   const ids = input.lines.map((l) => l.productId);
   const rows = (await c.query(
@@ -132,17 +132,19 @@ async function planIn(c, shopId, from, input, lines) {
     productId: id, name: byId.get(id).name, unit: byId.get(id).unit,
     qtyMilli: after.filter((x) => x.productId === id).reduce((s, x) => s + x.qtyMilli, 0),
   }));
-  await require('./catalog').checkOrder(c, shopId, { lines: touched, isTest: false });
+  //  O-06 = ب: نگه‌داشتهٔ خودِ همین سفارش «دیگران» نیست (مقدارِ کل سنجیده می‌شود)
+  await require('./catalog').checkOrder(c, shopId, { lines: touched, isTest: false, orderId });
   return { changes, after, before: lines.map(pricedOf) };
 }
 
 /** اثرِ قاعده‌های خودکارِ ویترین بر قلم‌های افزوده: سبدِ تازه منهای سبدِ پیشین، همین لحظه (کد هرگز). */
-async function autoExtraIn(c, store, before, after, at, promosOn) {
+async function autoExtraIn(c, store, before, after, at, promosOn, group = '') {
   if (!promosOn) return 0;
   const promos = require('./storefront-promos');
   const run = (t, p) => c.query(t, p);
-  const a = await promos.evaluate(run, store, after, '', at);
-  const b = await promos.evaluate(run, store, before, '', at);
+  //  PRM-11: همان گروهِ ثبت (شمارهٔ تأییدشدهٔ همان سفارش؛ پرچمِ `shop.storefront.promo_groups` خاموش ⇒ '')
+  const a = await promos.evaluate(run, store, after, '', at, { group });
+  const b = await promos.evaluate(run, store, before, '', at, { group });
   return Math.max(0, a.discountMinor - b.discountMinor);
 }
 
@@ -171,6 +173,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
     orders.flagOf(shopId, require('./storefront-promos').FLAG),
   ]);
   await require('./catalog').prepare(shopId, { at: now() });
+  const group = promosOn ? await require('./storefront-promo-groups').prepare(shopId, phone) : '';
 
   const out = await tx(async (c) => {
     const { row, lines, events } = await amend.lockOrder(c, shopId, orderId);
@@ -194,10 +197,10 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       throw conflict('پیشنهادِ دکان برای ویرایشِ این سفارش منتظرِ پاسخِ شماست؛ نخست پاسخ دهید', 'amend_pending');
     }
     const at = now();
-    const pl = await planIn(c, shopId, from, input, lines);
+    const pl = await planIn(c, shopId, from, input, lines, row.id);
     const subtotalMinor = pl.after.reduce((s, l) => s + l.lineTotalMinor, 0);
     const prevDiscountMinor = Number(row.discount_minor);
-    const extra = await autoExtraIn(c, store, pl.before, pl.after, at, promosOn);
+    const extra = await autoExtraIn(c, store, pl.before, pl.after, at, promosOn, group);
     const discountMinor = Math.min(subtotalMinor, prevDiscountMinor + extra);
     const deliveryFeeMinor = Number(row.delivery_fee_minor);
     const totalMinor = subtotalMinor - discountMinor + deliveryFeeMinor;
@@ -229,6 +232,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       [shopId, row.id, subtotalMinor, discountMinor, totalMinor, pl.after.length, at]
     );
     await require('./delivery-due').syncIn(c, shopId, row.id, at);   //  DLV-11: پیکِ سپرده‌شده جمعِ تازه را می‌گیرد
+    await require('./stock-reserve').syncOrderIn(c, shopId, row.id, at);   //  O-06 = ب: نگه‌داشته هم‌اندازهٔ قلم‌های تازه
     const detail = {
       type: EVENT_TYPE, addId: `ad_${ulid(at)}`, key, hash,
       lines: pl.changes.map(({ note: _n, ...x }) => x),
@@ -236,6 +240,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
       prevTotalMinor: Number(row.total_minor), totalMinor, differenceMinor: totalMinor - Number(row.total_minor),
     };
     await amend.event(c, shopId, row, CUSTOMER, detail, {}, at);
+    await require('./delivery-prefs').dropStaleTenderIn(c, shopId, row.id, at);   //  CHK-24: اسکناسی که جمعِ تازه نمی‌پذیرد
     return { replayed: false, detail, row };
   });
   if (!out.replayed) await afterAdd(shopId, out.row, out.detail);

@@ -2,11 +2,13 @@
 /**
  * CHK-14 — «با کدام اسکناس پرداخت می‌کنید؟»: بردارِ مشترکِ `core/test-vectors/cash-tender-v1.json`.
  *
- *   ۱) تابعِ `tenders` ِ ویترین (`public/store/checkout.js`، همان متنِ پرونده در vm) برای هر جمع همان گزینه‌ها را می‌دهد.
+ *   ۱) `K.tenders` ِ ویترین (`public/kit/order-kit.js`، همان پرونده در vm) برای هر جمع همان گزینه‌ها را می‌دهد؛ فرمِ ثبت
+ *      (`store/checkout.js`، CHK-14) و «دستورِ تحویل» ِ پیگیری (`store/order.js`، CHK-24) هر دو همین یک تابع را می‌خوانند.
  *   ۲) ⛔ هر گزینه را قاعدهٔ سرور (`lib/delivery-prefs.checkTender`) برای ارسال + نقد می‌پذیرد؛ اسکناسِ یکی بالاتر
  *      (پول خرد ≥ ۱۰۰۰) و کمتر از جمع رد می‌شوند — پس نه وب و نه برنامه مبلغی نمی‌فرستند که سرور رد کند.
- *   همان فایل را `core/src/jvmTest/.../shopper/ShopperTenderVectorsTest.kt` (فقط CI) روی `CheckoutRules.tenderOptions` ِ
- *   برنامهٔ خرید می‌دواند؛ یکی عوض شد، دو دیگر هم.
+ *   ۳) پس از ثبت (CHK-24، همزادِ `PrefsRules.tenders`): اسکناسِ کنونیِ درستِ بیرون از فهرست افزوده می‌شود، نادرست هرگز.
+ *   همان فایل را `core/src/jvmTest/.../shopper/ShopperTenderVectorsTest.kt` (فقط CI) روی `CheckoutRules.tenderOptions` و
+ *   `PrefsRules.tenders` ِ برنامهٔ خرید می‌دواند؛ یکی عوض شد، دو دیگر هم.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -17,15 +19,27 @@ const prefs = require('../src/lib/delivery-prefs');
 
 const V = require(path.join(__dirname, '..', '..', 'core', 'test-vectors', 'cash-tender-v1.json'));
 
-/** همان `function tenders(total) {…}` ِ checkout.js، بی هیچ رونوشتِ دستی */
+const pub = (f) => fs.readFileSync(path.join(__dirname, '..', 'public', f), 'utf8');
+/** همان `K.tenders` ِ order-kit.js: کلِ پرونده در vm (کیتِ کمینه)، بی هیچ رونوشتِ دستی */
 function webTenders() {
-  const src = fs.readFileSync(path.join(__dirname, '..', 'public', 'store', 'checkout.js'), 'utf8');
-  const m = /var NOTE_MINOR = (\d+);[^\n]*\n\s*(function tenders\(total\) \{[\s\S]*?\n\s*return out\.sort\([^\n]*\n\s*\})/.exec(src);
-  assert.ok(m, 'تابعِ tenders در checkout.js پیدا نشد — اگر جابه‌جا شد، همین آزمون را هم به‌روز کنید');
-  const ctx = { NOTE_MINOR: Number(m[1]) };
-  vm.runInNewContext(`${m[2]}\nthis.tenders = tenders;`, ctx);
-  return { tenders: ctx.tenders, note: ctx.NOTE_MINOR };
+  const src = pub('kit/order-kit.js');
+  const m = /var NOTE_MINOR = (\d+);/.exec(src);
+  assert.ok(m, 'NOTE_MINOR در order-kit.js پیدا نشد — اگر جابه‌جا شد، همین آزمون را هم به‌روز کنید');
+  const ctx = { window: { K: { ICONS: {} } } };
+  vm.runInNewContext(src, ctx);
+  assert.equal(typeof ctx.window.K.tenders, 'function', 'K.tenders در order-kit.js');
+  return { tenders: ctx.window.K.tenders, note: Number(m[1]) };
 }
+
+test('فرمِ ثبت و پیگیری هر دو همان K.tenders را می‌خوانند (بی نسخهٔ دوم)', () => {
+  const ck = pub('store/checkout.js');
+  const od = pub('store/order.js');
+  assert.match(ck, /var list = K\.tenders\(total\);/, 'checkout.js');
+  assert.match(od, /K\.tenders\(o\.totalMinor, p\.cashTenderMinor\)/, 'order.js');
+  for (const [f, s] of [['checkout.js', ck], ['order.js', od]]) {
+    assert.ok(!/function tenders\(|NOTE_MINOR|\[10000, 50000, 100000\]/.test(s), `${f}: قاعدهٔ اسکناسِ جدا نیست`);
+  }
+});
 
 test('گزینه‌های ویترین همان بردار است', () => {
   const w = webTenders();
@@ -33,9 +47,9 @@ test('گزینه‌های ویترین همان بردار است', () => {
   assert.equal(prefs.LARGEST_NOTE_MINOR, V.noteMinor, 'بزرگ‌ترین اسکناسِ سرور همان');
   assert.ok(V.cases.length >= 15);
   for (const c of V.cases) {
-    //  وب فقط برای جمعِ مثبت می‌پرسد (`total > 0 ? tenders(total) : []`)
-    const got = c.totalMinor > 0 ? Array.from(w.tenders(c.totalMinor)) : [];
-    assert.deepEqual(got, c.options, `جمع ${c.totalMinor}`);
+    //  جمعِ صفر یا منفی ⇒ هیچ (خودِ تابع)
+    assert.deepEqual(Array.from(w.tenders(c.totalMinor)), c.options, `جمع ${c.totalMinor}`);
+    assert.deepEqual(Array.from(w.tenders(c.totalMinor, null)), c.options, `جمع ${c.totalMinor}، بی اسکناسِ کنونی`);
   }
 });
 
@@ -53,4 +67,33 @@ test('⛔ هر گزینه را سرور می‌پذیرد؛ پول خردِ ۱۰
     assert.equal(code(() => prefs.checkTender(c.totalMinor, at(c.totalMinor + 100))), 'cash_tender_short');
     assert.equal(code(() => prefs.checkTender(c.options[0], { ...at(c.totalMinor), fulfillment: 'pickup' })), 'bad_cash_tender');
   }
+});
+
+test('CHK-24 پس از ثبت: اسکناسِ کنونیِ درست می‌ماند، نادرست هرگز؛ هر گزینه را سرور می‌پذیرد', () => {
+  const w = webTenders();
+  const at = (totalMinor) => ({ fulfillment: 'delivery', paymentMethod: 'cod', totalMinor });
+  const code = (fn) => { try { fn(); return 'ok'; } catch (e) { return e.code; } };
+  let kept = 0;
+  for (const c of V.cases) {
+    const T = c.totalMinor;
+    //  همان گزینه‌ها با هر اسکناسِ کنونیِ درونِ فهرست
+    for (const x of c.options) assert.deepEqual(Array.from(w.tenders(T, x)), c.options, `${T}: ${x}`);
+    if (T <= 0) { assert.deepEqual(Array.from(w.tenders(T, 100)), [], 'جمعِ صفر ⇒ هیچ'); continue; }
+    //  درست ولی بیرون از فهرست (دکان نوشت): همان جمع (افغانیِ کامل)، و یک افغانی بیشتر ⇒ افزوده و مرتب
+    const whole = Math.ceil(T / 100) * 100;
+    for (const cur of [whole, whole + 100]) {
+      if (c.options.includes(cur)) continue;
+      assert.equal(code(() => prefs.checkTender(prefs.parseTender(cur), at(T))), 'ok', `${T}: ${cur} درست است`);
+      assert.deepEqual(Array.from(w.tenders(T, cur)), [...c.options, cur].sort((a, b) => a - b), `${T}: ${cur} می‌ماند`);
+      kept++;
+    }
+    //  ⛔ نادرست برای جمعِ امروز (کم، پول خرد ≥ ۱۰۰۰، نیم‌افغانی، منفی) ⇒ همان فهرست، بی آن
+    for (const cur of [T - 100, T + V.noteMinor, T + V.noteMinor + 100, whole + 50, -100, 0]) {
+      assert.notEqual(code(() => prefs.checkTender(prefs.parseTender(cur), at(T))), 'ok', `${T}: ${cur} را سرور رد می‌کند`);
+      assert.deepEqual(Array.from(w.tenders(T, cur)), c.options, `${T}: ${cur} افزوده نشد`);
+    }
+    //  هر چه پیگیری نشان می‌دهد سرور می‌پذیرد
+    for (const x of w.tenders(T, T)) assert.equal(code(() => prefs.checkTender(x, at(T))), 'ok', `${T}: ${x}`);
+  }
+  assert.ok(kept >= 15, `${kept} اسکناسِ کنونیِ بیرون از فهرست`);
 });

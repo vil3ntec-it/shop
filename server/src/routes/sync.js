@@ -40,8 +40,9 @@ async function pushHandler(req, res) {
   const { result, replayed } = await sync.runIdempotent(
     { shopId: req.shopId, userId: req.user.id, deviceId, operationId },
     () => sync.pushChanges(
-      //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد، هرگز رد (F0-02)
-      { shopId: req.shopId, userId: req.user.id, deviceId, role: req.role, finalized: 'log',
+      //  S89: برنامهٔ کهنه (بی زنجیره) — با پرچمِ `shop.doc_chain` فقط رویداد (F0-02)؛ SEC-03: نشست یا شناسهٔ
+      //  زنجیره‌دار ⇒ ۴۰۹ مثلِ API (`boundDevice` = دستگاهِ همین نشست، نه بدنه)
+      { shopId: req.shopId, userId: req.user.id, deviceId, boundDevice: req.device ? String(req.device.device_uid || '') : '', role: req.role, finalized: 'log',
         ip: require('../middleware/ratelimit').clientIp(req), hideContact },
       changes
     )

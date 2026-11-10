@@ -150,6 +150,10 @@ class V3ReachabilityTest {
     Feature("کاشیِ «سفارش‌های آنلاین» با نشانِ زنده روی خانه", "orders", "$SHELL.HomeOrdersTile", "$SHELL.rememberHomeOrders"),
     Feature("«فروشِ تازه» ِ شناور روی خانه وقتی نوار راهِ صندوق ندارد", "sale", "$SHELL.HomeSaleFab", "$SHELL.HomeTiles"),
     Feature("آماده‌سازی و تحویل: عکس برای مشتری، «بسته شد»، پیک یا «خودش می‌آید»", "orders/{id}", "$ONLINE.orders.OrderPrepCardV3"),
+    //  ── RSK-03/04: «کارت در صف» بالای صف و فهرستِ بسته و مطمئن (شماره و جا) بیرون از هر سفارش ──
+    Feature("RSK-03 سفارش‌های پیش از ارسال با هشدار، بالای صف", "orders", "$ONLINE.orders.OrderRiskQueueCardV3", "$ONLINE.orders.rememberRiskQueue"),
+    Feature("RSK-04 صفحهٔ جدای فهرستِ بسته و مطمئن", "orders/risk-lists", "$ONLINE.orders.RiskListsRoute", "$ONLINE.orders.RiskEntriesList"),
+    Feature("RSK-04 بستنِ جای همین سفارش (پین) با شعاع", "orders/{id}", "$ONLINE.orders.OrderRiskCardV3", "$ONLINE.orders.RiskEntrySheet"),
     Feature(
       "گفت‌وگوی هر سفارش: «بسته شد»، «مشکل دارم» و رشته‌های پیشینِ مشتری", "chat/{conversationId}",
       "$ONLINE.chat.ChatLifeBanner", "$ONLINE.chat.ChatEarlierThreads",

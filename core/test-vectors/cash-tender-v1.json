@@ -1,5 +1,5 @@
 {
- "_doc": "CHK-14 — «با کدام اسکناس پرداخت می‌کنید؟»: برای هر جمع (یک‌صدمِ افغانی) همان گزینه‌هایی که ویترین (`tenders` ِ server/public/store/checkout.js) نشان می‌دهد. server/test/cash-tender-vectors.test.js همان را روی تابعِ وب و قاعدهٔ سرور (`delivery-prefs.checkTender`) و core/src/jvmTest/.../ShopperTenderVectorsTest.kt روی `CheckoutRules.tenderOptions` ِ برنامهٔ خرید می‌دواند. جمعِ صفر یا منفی ⇒ هیچ گزینه.",
+ "_doc": "CHK-14 — «با کدام اسکناس پرداخت می‌کنید؟»: برای هر جمع (یک‌صدمِ افغانی) همان گزینه‌هایی که ویترین (`K.tenders` ِ server/public/kit/order-kit.js، فرمِ ثبت و «دستورِ تحویل» ِ پیگیری) نشان می‌دهد. server/test/cash-tender-vectors.test.js همان را روی تابعِ وب و قاعدهٔ سرور (`delivery-prefs.checkTender`) و core/src/jvmTest/.../ShopperTenderVectorsTest.kt روی `CheckoutRules.tenderOptions` ِ برنامهٔ خرید و `PrefsRules.tenders` ِ «با کدام اسکناس…» پس از ثبت (CHK-24) می‌دواند. جمعِ صفر یا منفی ⇒ هیچ گزینه.",
  "version": 1,
  "noteMinor": 100000,
  "cases": [

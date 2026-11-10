@@ -32,6 +32,8 @@ const CAPABILITIES = Object.freeze([
   'staff-perms.v1',         //  GET /admin/shops/:id/staff-perms[?limit=&offset=] · POST …/devices/:did/disable|enable (ارشد + دلیل)
   'image-bank.v1',          //  GET /admin/image-bank/status|review|search|images/:id|reports|file · POST …/images/:id/approve|reject|archive|search
   'idempotent-writes.v1',   //  Idempotency-Key روی دستگاه (disable/enable)، بازبینیِ بانکِ عکس و POST /admin/backups (lib/admin-write-once.js)
+  //  LOC-04: ویرایشگرِ تعطیلاتِ رسمی در پنلِ مرکزی (خواندن: هر مدیر؛ نوشتن: ارشد + دلیل، یک‌باره، قفلِ نسخه)
+  'holidays.v1',            //  GET|PUT /admin/calendar/holidays
 ]);
 
 /*
