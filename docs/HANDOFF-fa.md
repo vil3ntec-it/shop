@@ -54,6 +54,15 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rpt-2` (خانوادهٔ RPT: سود و خروجیِ «گزارشِ تازه» ِ وب، RPT-03 و RPT-11؛ روی main ‏28f6acc2 + ادغامِ main ‏99036497 = دستهٔ ۴۲؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) RPT-03 — «گزارشِ تازه» ِ وب و کارتِ سودِ خانه هنوز همیشه با قیمتِ روی قلم و «تقریبی» بودند (متنشان «نه روشِ مصوب (D-23)» می‌گفت، با این‌که D-23 گرفته شده)؛
+  حالا `COST` ِ `report-board.js` (دوقلوی `CostPolicy`، بردارِ `cost-policy-v1.json`) با میانگینِ موزون + `costApproved`، گزینهٔ «روش بها» (همین مرورگر) و نشانِ «سود قطعی/تقریبی».
+  (۲) RPT-11 — وب فقط CSV و چاپ داشت: «خروجی اکسل» = ‎.xlsx‎ ِ واقعی (`TohidOwnerExport.report`) و «خروجی PDF» = `license/report-pdf.js` (دوقلوی `ImagePdf`، بردارِ `image-pdf-v1.json`؛
+  canvas، A4، سقفِ ۵۰۰ صفحه)، `sw.js` v71. آزمون: `cost-policy-vectors` ۴/۴ و `report-pdf-vectors` ۴/۴ (روی پایه سرخ)، کرومیومِ `web-report-fresh.mjs` ۱۰/۱۰ با axe (چهار سنجه روی پایه سرخ)،
+  `owner-export`، `web-shop-i18n` (۱۳ کلیدِ تازه در سه زبان، ۵ کلیدِ کهنه برداشته)، `web-owner-export.mjs`، `web-beta-channel.mjs` سبز.
+- نیمه‌کاره: `CostPolicyVectorsTest` و `ImagePdfVectorsTest` (core jvmTest) فقط در CI دیده می‌شوند (Gradle این‌جا نیست)؛ هر دو ردیف PARTIAL می‌مانند: RPT-03 با روشن کردنِ «گزارشِ تازه»/پرچمِ سود
+  به دستِ صاحب‌کار، RPT-11 با دستگاه و چاپگرِ واقعی. RPT-13 (کلیدهای گزارش در وب: Ctrl+P/E و −/+) و RPT-14 (تپشِ برنامهٔ خریدِ بومی) دست نخوردند؛ RPT-04 بیرون از دامنه (`claude/pay-10`).
+- قدمِ بعدی: شاهدِ CI ِ دو آزمونِ Kotlin؛ اگر شاخهٔ دیگری `sw.js` را به v71 برد، یکی‌شان v72 شود. انگلیسی/پشتوی تازه‌ها را صاحب‌کار ببیند (CostPolicy خودش در برنامه فقط فارسی است).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/pay-10` (ارزِ نقد در صندوق، PAY-10؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دالر، کلدار و ریال در صندوقِ «ترکیبی و شیفت» پشتِ تنظیمِ خاموشِ **دکان** `FxTillPref` (`fx_tender` + جدولِ نرخِ `fx_rates`، هر دو `ShopSettingsKeys` ِ دکان؛ D-15 رعایت شد). هسته: `core/pay/FxTill.kt` (جدولِ نرخ، پرداختِ ارز، متن ⇐⇒ واحد)، `Pay.settle`/`exactCash` با `SettleInput.fx` (ردیفِ `fx`، ارز اول، پولِ پس افغانی، `FX_INVALID`/`FX_EXCESS`)، `exchange` با `per`، ارزهای PKR/IRR؛ هم‌زاد `license/fx-till.js` + `pay-core.js`؛ بردار `core/test-vectors/fx-till-v1.json` و موردهای تازهٔ `pay-v1.json`. برنامه: `FxTillFlow`، کادرِ `CheckoutFxBox`، تنظیمِ `FxTillSettings`، رسید، X/Z (`DrawerModel.fxLines`)، شیفت (`cash_out` ِ پولِ پسِ ارز) و `CashShift.saleCash`، برگشت به افغانی، کشو. سرور دست نخورد (ردیفِ پرداخت سنجیده نمی‌شود؛ `sync-v1.js` نه).
 - نیمه‌کاره: آزمون‌های Kotlin (`FxTillVectorsTest`، `FxTillFlowTest`، `PayCoreTest.exchange`، `PrinterDrawerTest`) فقط در CI؛ STATUS ِ PAY-10 تا شاهدِ CI همان PARTIAL. صندوقِ کامپیوترِ قدیم (`DeskSale`) و برنامهٔ آیفون کادرِ ارز ندارند. گزارشِ خودکارِ صاحب در سرور ارز را در «نقد» می‌شمارد (`paymentMethod = cash`).
