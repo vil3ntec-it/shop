@@ -184,7 +184,7 @@
   // ── برگهٔ کالا؛ جزئیات در product.js ِ دیربار (WEB-08) ──
   var detail = null; var detailP = null;
   function loadProductView() {
-    detailP = detailP || K.js('/store/product.js').then(function () { detail = window.StoreProduct({ rail: rail, slug: slug }); return detail; }, function (e) { detailP = null; throw e; });
+    detailP = detailP || K.js('/store/product.js').then(function () { detail = window.StoreProduct({ rail: rail, slug: slug, feat: function () { return store.features || {}; } }); return detail; }, function (e) { detailP = null; throw e; });
     return detailP;
   }
   function openProduct(id) {

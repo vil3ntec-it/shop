@@ -40,6 +40,7 @@ const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const orderView = require('../lib/store-order-view');
 const plusCode = require('../lib/plus-code');
+const gallery = require('../lib/storefront-gallery');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { reads: replicaReads } = require('../lib/read-replica');
@@ -168,6 +169,8 @@ async function featuresOf(shopId, sf) {
     ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
     //  RPT-14: تپشِ بالای قیف (`POST /:slug/funnel/:step`، `storefront-funnel-store.js`) با پرچمِ `shop.orders.online_report`
     ...((await onlineReport.flagOf(shopId)) ? { funnel: true } : {}),
+    //  PRD-17/27: گالریِ عکس‌های بیشترِ برگهٔ کالا (`store/gallery.js` ِ دیربار از product.js) با `shop.storefront.gallery` + `shop.image_bank`
+    ...((await gallery.flagOn(shopId)) ? { gallery: true } : {}),
   };
   //  S71: روش و مسئولِ هر تحویلی که این ویترین دارد (برگهٔ ثبت) با پرچمِ `shop.storefront.delivery_method`
   const dm = await require('../lib/order-delivery-method').storeMethods(sf);
@@ -277,6 +280,22 @@ router.get('/:slug/media/:kind/:version', readLimit, store, async (req, res) => 
 });
 router.get('/:slug/products/:id/photo', readLimit, store, picture('display'));
 router.get('/:slug/products/:id/thumb', readLimit, store, picture('thumb'));
+//  ── PRD-17/27 (تصمیمِ ۴-۲۲): گالریِ عکس‌های بیشترِ کالا — پشتِ `shop.storefront.gallery` + `shop.image_bank` (شرح: lib/storefront-gallery.js)
+router.get('/:slug/products/:id/gallery', readLimit, store, async (req, res) => {
+  const g = await gallery.list(req.store.shop_id, req.params.id);
+  if (!g) throw notFound('گالری نیست', 'gallery_not_found');
+  res.set('Cache-Control', 'no-store').json(g);
+});
+router.get('/:slug/products/:id/gallery/:tag/:size', readLimit, store, async (req, res) => {
+  const f = await gallery.file(req.store.shop_id, req.params.id, req.params.tag, req.params.size);
+  if (!f) throw notFound('عکس نیست', 'photo_not_found');
+  //  نشانی با tag ِ (عکس، نسخه) ⇒ نسخهٔ تازه نشانیِ تازه؛ یک روز (نه immutable) تا «برداشتن» دیر یا زود به کشِ مشترک برسد
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.set('ETag', `"${f.hash}"`);
+  res.set('X-Content-Type-Options', 'nosniff');
+  if (req.get('if-none-match') === `"${f.hash}"`) return res.status(304).end();
+  res.type(f.mime).send(f.data);
+});
 
 //  ── ۲۳: تأییدِ شماره پیش از ثبتِ سفارش ──────────────────────────────
 router.post('/:slug/verify/start', sendCodeLimit, store, async (req, res) => {

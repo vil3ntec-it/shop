@@ -7,7 +7,8 @@
  * همان سنجشِ هسته که صاحب دکان دارد — پنل هم بیش از نقش نمی‌دهد.
  *
  * پنلِ مرکزی (۱.۵۰.۷۵، توانایی‌های `staff-perms.v1` و `idempotent-writes.v1`): `?limit=&offset=` (سقفِ ۲۰۰؛ بی آن همان
- * پاسخِ امروز)، برگرداندنِ دستگاه برای مدیر (ارشد + دلیلِ ۳ تا ۲۰۰، همان `deviceOfShop` و سابقهٔ `device.enabled`) و
+ * پاسخِ امروز)، برگرداندنِ دستگاه برای مدیر (ارشد + دلیلِ ۳ تا ۲۰۰، همان `deviceOfShop` و سابقهٔ `device.enabled`؛ از کار انداختن
+ * هم با همان دلیلِ اجباری از ۱۴۰۵/۰۸/۲۰) و
  * `Idempotency-Key` روی هر دو کارِ دستگاه (`lib/admin-write-once.js`).
  */
 const express = require('express');
@@ -91,10 +92,11 @@ router.put('/members/:uid', requireSuperAdmin, async (req, res) => {
   res.json({ userId: member.user_id, perms: layer });
 });
 
+//  تصمیمِ ۲-۲۰ (۱۴۰۵/۰۸/۲۰): از کار انداختن هم مثلِ برگرداندن دلیلِ نوشته می‌خواهد (۳ تا ۲۰۰؛ پنلِ مرکزی همیشه می‌فرستد)
 router.post('/devices/:did/disable', requireSuperAdmin, async (req, res) => {
   const shop = await shopOf(req);
   const did = v.id(req.params.did, { field: 'شناسه دستگاه' });
-  const reason = v.text(req.body?.reason, { max: 200 });
+  const reason = requireReason(req);
   once.send(res, await once.writeOnce(req, { tenantId: shop.id, resultId: did }, async () => ({
     ok: true,
     ...await deviceBlock.disable(shop.id, did, { byId: `admin:${req.admin.id}`, actorType: 'admin', reason, ip: clientIp(req) }),
