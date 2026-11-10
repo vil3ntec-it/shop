@@ -48,3 +48,24 @@ export function closeSafeRoute(handler) {
     }
   };
 }
+
+/*
+ *  axe بر همان حالتی که کاربر می‌بیند (CI ِ #881 و #1020): رنگِ نیمه‌راهِ انیمیشن یا گذار کنتراستِ ساختگی می‌دهد، و
+ *  خوابِ ثابت (`waitForTimeout`) روی CI ِ پربار به پایانِ آن نمی‌رسد — انیمیشن با نخستین فریم آغاز می‌شود و آن فریم زیرِ
+ *  بار دیر می‌رسد. این‌جا تا وقتی هیچ انیمیشن/گذارِ پایان‌دارِ در جریانی روی خودِ `selector`، درونش یا پدرانش (شفافیتِ
+ *  پدر هم رنگ را می‌برد) نمانده صبر می‌شود؛ انیمیشنِ جای دیگرِ صفحه (تزئینی) و انیمیشنِ بی‌پایان شمرده نمی‌شوند.
+ *  بازتولید: پخشِ ۷ تا ۲۰ برابر کندِ انیمیشن‌ها با CDP ِ `Animation.setPlaybackRate` (۰٫۱۵–۰٫۰۵) ⇒ همان خطای کنتراستِ CI
+ *  روی کدِ پیشین؛ با این صبر سبز.
+ */
+export async function animationsSettled(page, selector, { timeout = 10_000 } = {}) {
+  await page.waitForFunction((sel) => {
+    const root = document.querySelector(sel);
+    if (!root) return false;
+    return document.getAnimations().every((a) => {
+      const t = a.effect && a.effect.target;
+      if (!t || !(t === root || root.contains(t) || t.contains(root))) return true;
+      if (a.effect.getComputedTiming().endTime === Infinity) return true;
+      return a.playState !== 'running' && !a.pending;
+    });
+  }, selector, { timeout });
+}

@@ -1,3 +1,4 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 /*
@@ -123,4 +124,15 @@ tasks.register("test") {
   group = "verification"
   description = "آزمون‌های jvmِ core"
   dependsOn("jvmTest")
+}
+
+//  شکستِ آزمون در CI با پیام، علت و stack (پیش‌فرضِ SHORT ِ Gradle فقط «AssertionError at X.kt:113» می‌نوشت؛
+//  run 41645079134 ِ `ResumableDownloadServerTest`). فقط گزارشِ آزمون؛ در ساخت و انتشار اثری ندارد.
+tasks.withType<Test>().configureEach {
+  testLogging {
+    exceptionFormat = TestExceptionFormat.FULL
+    showExceptions = true
+    showCauses = true
+    showStackTraces = true
+  }
 }

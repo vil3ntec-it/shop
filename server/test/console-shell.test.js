@@ -232,6 +232,54 @@ test('کاتالوگ: هر پرچمِ ویترین/سفارش/گفت‌وگو ک
   assert.equal((await one(`SELECT COUNT(*)::int n FROM live_config WHERE key='shop.storefront.recent'`)).n, 0);
 });
 
+/*
+ *  ⛔ همان سنجه برای **هر** کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند (`test/flag-scan.js`: سرور، وبِ `public/*` و `license/`،
+ *  کاتلینِ برنامه‌ها): خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`، `shop.promo_uses`، `shop.owner_report`، بازار،
+ *  همگام‌سازیِ دکان و ops/security بیرون از کاتالوگ بودند. بیرون‌مانده فقط با دلیل؛ ردیفِ کاتالوگ بی خواننده هم سرخ است.
+ */
+const NOT_CATALOG = Object.freeze({
+  'shop.orders.ledger': 'بازنشسته؛ فقط کفِ تحویلِ هنگامِ راه‌اندازی هنوز می‌خواندش (`order-ledger.LEGACY_FLAGS`) — تصمیمِ صاحب‌کار',
+  'sync.device_bind': 'مشترک با پمپ (scope = دکان یا پمپ، `sync-v1-auth.js`)؛ ردیفِ «دکان» نوشتنِ scope ِ پمپ را می‌بست',
+  'sync.live_expiry_close': 'مشترک با پمپ (scope = دکان یا پمپ، `sync-v1-live.js`)؛ همان دلیل',
+  'sync.epoch': 'کلیدِ `app_config`، نه `live_config` (`sync-epoch.js`)',
+  'customers.contact': 'نامِ مجوز (`customer-contact.js`)، نه پرچم',
+});
+test('کاتالوگ: هر کلیدِ live_config که سرور، وب یا کاتلینِ غیرِ پمپ می‌خواند در KNOWN است (یا با دلیل بیرون)', () => {
+  const { scanFlags } = require('./flag-scan');
+  const { KNOWN } = require('../src/routes/admin-flags');
+  const { RESERVED } = require('../src/lib/live-config');
+  const known = new Set(KNOWN.map((k) => k.key));
+  const { keys, files } = scanFlags([...known]);
+  //  سنجه خودش هم سنجیده می‌شود: هر پوشهٔ اصلی خوانده شد و هر روشِ یافتن هنوز کلیدِ شناخته‌اش را می‌یابد
+  for (const d of ['server/src', 'server/public/store', 'server/public/admin', 'license', 'android-native/app/src/main', 'core/src/commonMain']) {
+    assert.ok(files[d] > 5, `${d}: ${files[d]} پرونده`);
+  }
+  const by = (k, how, dir) => (keys.get(k) || []).some((x) => x.how === how && x.at.startsWith(dir));
+  for (const [k, how, dir] of [
+    ['shop.delivery_map', 'const', 'server/src/lib/courier-map.js'], ['sync.keep_pending', 'const', 'server/src/lib/sync-v1-keep.js'],
+    ['pay.hesabpay', 'call', 'server/src/lib/hesabpay-account.js'], ['market.directory', 'sql', 'server/src/lib/admin-market.js'],
+    ['ops.sync_lag', 'obj', 'server/src/lib/system-health.js'], ['shop.storefront.recent', 'ref', 'server/public/store/recent.js'],
+    ['sync.safe_entries', 'ref', 'license/'], ['shop.price_cap', 'const', 'core/src/commonMain/'],
+  ]) assert.ok(by(k, how, dir), `سنجه ${k} را با «${how}» در ${dir} نیافت`);
+  assert.ok(keys.size >= 130, `فقط ${keys.size} کلید`);
+
+  const missing = [...keys.keys()].filter((k) => !known.has(k) && !RESERVED.includes(k) && !NOT_CATALOG[k]).sort();
+  assert.deepEqual(missing.map((k) => `${k} ⇐ ${keys.get(k)[0].at}`), [], 'کلیدِ خوانده‌شده بیرون از کاتالوگ');
+  for (const k of Object.keys(NOT_CATALOG)) {
+    assert.ok(keys.has(k), `${k}: دیگر در کد نیست ⇒ از NOT_CATALOG بردار`);
+    assert.ok(!known.has(k), `${k}: هم در کاتالوگ هم بیرون`);
+  }
+  assert.deepEqual(KNOWN.filter((x) => !keys.has(x.key)).map((x) => x.key), [], 'ردیفِ کاتالوگی که هیچ کدی نمی‌خواند');
+  //  همان شکلِ ردیف‌های پیشین؛ بی تکرار؛ بی پمپ
+  assert.equal(known.size, KNOWN.length, 'کلیدِ تکراری در کاتالوگ');
+  for (const k of KNOWN) {
+    assert.deepEqual(Object.keys(k), ['key', 'scope', 'default', 'what'], k.key);
+    assert.ok(['shop', 'all', 'security', 'release', 'ops'].includes(k.scope), `${k.key}: scope ِ ${k.scope}`);
+    assert.ok(typeof k.what === 'string' && k.what.length >= 10, `${k.key}: شرح`);
+    assert.ok(!/(^|\.)pump(\.|_|$)/.test(k.key), `${k.key}: پرچمِ پمپ در کاتالوگِ دکان`);
+  }
+});
+
 /* ── ۴) تنظیماتِ مرکزی با «پیشین ⇒ تازه» ─────────────────────────── */
 
 test('PATCH /config ⇒ سابقه «پیشین ⇒ تازه» و دلیل را دارد', async () => {

@@ -103,13 +103,15 @@ async function owner(email, shopName) {
 }
 const trial = await owner('vip-trial@panel.local', 'دکانِ آزمایشی');
 const expired = await owner('vip-expired@panel.local', 'دکانِ تمام‌شده');
+const racer = await owner('vip-race@panel.local', 'دکانِ ورودِ کند');   //  حسابِ جدا: فاصلهٔ ۶۰ ثانیه‌ایِ کدِ ورودِ همان ایمیل
 //  دورهٔ آزمایشیِ دکان از `created_at` ِ خودش است — یک ماه عقب ⇒ تمام‌شده، بی اشتراک
 await query('UPDATE shops SET created_at=$1 WHERE id=$2', [Date.now() - 30 * 86400_000, expired.shopId]);
 
 const browser = await chromium.launch();
 const pageErrors = [];
-async function open(acct) {
+async function open(acct, prep = null) {
   const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: 'block' });
+  if (prep) await prep(ctx);
   await ctx.addInitScript(([bundle]) => {
     if (localStorage.getItem('seeded')) return;
     localStorage.setItem('seeded', '1');
@@ -171,6 +173,41 @@ await step('ورود با ایمیل از خودِ صفحه ⇒ بی بارِ د
   assert.equal(await salesLocked(page), false);
   assert.doesNotMatch(await page.locator('#vip-badge').innerText(), /حساب رایگان بسازید/);
   await ctx.close();
+});
+
+//  ⛔ ورود وسطِ پرسشِ کندِ مهمان: `refresh` ِ ورود به پرسشِ بی‌کلیدِ آغازِ صفحه می‌پیوست و پاسخِ مهمانِ آن صندوق را تا بارِ
+//  دوباره قفل نگه می‌داشت (۲ از ۳ با ۹۰۰ms تأخیرِ GET؛ CI ِ پربار). این‌جا همان پرسش تا پس از ورود نگه داشته می‌شود.
+await step('ورود وسطِ پرسشِ کندِ مهمان ⇒ پاسخِ کهنهٔ مهمان قفلِ حساب را نگه نمی‌دارد', async () => {
+  let release = () => {};
+  const held = new Promise((r) => { release = r; });
+  let guestHeld = null;
+  const guestSeen = new Promise((r) => { guestHeld = r; });
+  let guests = 0;
+  const { ctx, page } = await open(null, (c) => c.route('**/api/v1/billing/status', async (route) => {
+    if (!route.request().headers().authorization && ++guests === 1) { guestHeld(); await held; }
+    await route.fallback().catch(() => {});
+  }));
+  try {
+    let timer = null;
+    await Promise.race([guestSeen, new Promise((_, no) => { timer = setTimeout(() => no(new Error('پرسشِ مهمانِ آغازِ صفحه نیامد')), 10000); })])
+      .finally(() => clearTimeout(timer));
+    await page.evaluate(() => window.TohidAccountUI.openLogin());
+    await page.fill('#lg-email', racer.email);
+    await page.click('#lg-send');
+    await page.waitForSelector('#lg-step-code:not([hidden])', { timeout: 10000 });
+    const row = await one(`SELECT code_sealed FROM login_requests WHERE email=$1 ORDER BY created_at DESC LIMIT 1`, [racer.email]);
+    await page.locator('#lg-boxes .code-box').first().focus();
+    await page.keyboard.type(codes.unseal(row.code_sealed), { delay: 30 });
+    await page.waitForFunction(() => window.TohidAccount.isSignedIn(), null, { timeout: 10000 });
+    release();
+    await page.waitForFunction(() => window.TohidVip.hasFeature('sales'), null, { timeout: 8000 })
+      .catch(() => { throw new Error('پاسخِ دیرِ مهمان پس از ورود صندوق را تا بارِ دوبارهٔ صفحه قفل نگه داشت'); });
+    assert.equal(await page.evaluate(() => window.TohidVip.entitlement.source), 'trial');
+    assert.equal(await salesLocked(page), false);
+  } finally {
+    release();
+    await ctx.close();
+  }
 });
 
 await step('قفل سرِ جایش است: دکانی که آزمایشی‌اش تمام شده و اشتراک ندارد', async () => {

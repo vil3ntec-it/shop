@@ -221,8 +221,11 @@ await E.step('S40', 'S40: موردِ انتظار ۱۲٬۴۰۰، شمرده ۱۲
   assert.equal(await held(), 0, 'پیک پیش از این سفارش نقدِ تسویه‌نشده دارد');
   //  سفارشِ اول: پیک ۱۲٬۴۰۰ نقد می‌گیرد
   const o1 = await place('کنارِ پارک');
-  const a1 = E.ok(await assign(o1), 'سپردنِ اول', 201).assignment.id;
-  await courierOk([event(a1, 'assigned'), event(a1, 'picked_up'), event(a1, 'moving'), event(a1, 'arrived'), event(a1, 'delivered', { cashCollectedMinor: 1_240_000 })]);
+  const r1 = E.ok(await assign(o1), 'سپردنِ اول', 201);
+  const a1 = r1.assignment.id;
+  //  `code`: با `shop.delivery_code_rule` (DLV-08، مثلاً `E2E_FLAGS_ON`) سپردنِ نقد کدِ مشتری می‌خواهد؛ پیک همان کد را از مشتری می‌گیرد
+  const code = r1.code ? { code: r1.code } : {};
+  await courierOk([event(a1, 'assigned'), event(a1, 'picked_up'), event(a1, 'moving'), event(a1, 'arrived'), event(a1, 'delivered', { cashCollectedMinor: 1_240_000, ...code })]);
   assert.equal(await held(), 1_240_000);
   //  سفارشِ دوم: ۱۲٬۴۰۰ در دست + ۱۲٬۴۰۰ > سقفِ ۱۵٬۰۰۰ ⇒ تا تسویه به پیک نمی‌رسد
   const o2 = await place('پشتِ مکتب');

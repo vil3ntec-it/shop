@@ -59,6 +59,35 @@ test('⛔ فقط پایگاهِ test/bench/staging یا PGlite', () => {
   }
 });
 
+//  دودآزمایی زیرِ بار «fetch failed» می‌داد: درخواست روی سوکتِ keep-alive ِ بیکاری رفت که مهلتِ سرور همان دم بستش
+//  (ECONNRESET). بازتولید: کارِ همگامِ ۵٫۵ ثانیه‌ای پیش از `/api/ready`. حالا هر درخواست اتصالِ تازه دارد و بستنِ واقعی
+//  از سوی سرور همچنان خطاست (بی تلاشِ دوباره).
+test('⛔ هر درخواستِ تمرین اتصالِ تازه؛ بستنِ اتصال از سوی سرور پنهان نمی‌شود', async () => {
+  const nodeHttp = require('node:http');
+  const seen = [];
+  let drop = false;
+  const srv = nodeHttp.createServer((req, res) => {
+    seen.push({ port: req.socket.remotePort, connection: req.headers.connection });
+    if (drop) { req.socket.destroy(); return; }
+    res.setHeader('Content-Type', 'application/json');
+    res.end('{}');
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  try {
+    const base = `http://127.0.0.1:${srv.address().port}`;
+    assert.deepEqual(await rh.smoke(base, { shops: [] }), []);
+    assert.deepEqual(await rh.smoke(base, { shops: [] }), []);
+    assert.deepEqual(seen.map((s) => s.connection), ['close', 'close']);
+    assert.notEqual(seen[0].port, seen[1].port, 'سوکتِ keep-alive ِ پیشین دوباره به کار نرفت');
+    drop = true;
+    await assert.rejects(rh.smoke(base, { shops: [] }), /fetch failed/);
+    assert.equal(seen.length, 3, 'بستنِ اتصال از سوی سرور بی تلاشِ دوباره خطاست');
+  } finally {
+    srv.closeAllConnections();
+    await new Promise((r) => srv.close(r));
+  }
+});
+
 let state = null;
 let before = null;
 const columnsOf = (f) => Object.fromEntries(Object.entries(f.tables).map(([t, v]) => [t, v.columns]));

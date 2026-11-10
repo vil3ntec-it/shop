@@ -35,6 +35,9 @@ const owner = await E.owner('owner-cur@e2e.local', 'صاحبِ پیک', 'دکا�
 const k1Acct = await E.staff(owner, 'courier1-cur@e2e.local', 'پیکِ اول');
 const k2Acct = await E.staff(owner, 'courier2-cur@e2e.local', 'پیکِ دوم');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو عمداً همان سبد را چند بار می‌گذارد تا به وضعیت‌های دیگر برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-courier-store';
 const PHONE = '0791234568';
 const order = (id) => db.one('SELECT status, cod_status, total_minor FROM online_orders WHERE id=$1', [id]);
@@ -194,14 +197,16 @@ await E.step('DEL-02', 'مشتری کمتر می‌دهد ⇐ بی دلیل رد
   await flushed(K2);
   const expected = Number((await order(o.id)).total_minor);
   const paid = expected - 500;
+  //  `code`: با `shop.delivery_code_rule` (DLV-08، مثلاً `E2E_FLAGS_ON`) سپردنِ نقد کدِ مشتری می‌خواهد؛ پیک همان کد را از مشتری می‌گیرد
+  const code = asg.code || '';
   //  برنامه‌ای که دلیل را نفرستد: سرور رد می‌کند و ردشده در گوشی می‌ماند تا پیک ببیند
-  K2.record(a, 'delivered', { cash: paid });
+  K2.record(a, 'delivered', { cash: paid, code });
   await K2.flush();
   assert.equal(K2.queue.pending.length, 0);
   const rej = K2.queue.rejected.find((x) => x.event.assignmentId === a);
   assert.equal(rej?.code, 'cash_reason_required', JSON.stringify(K2.queue.rejected));
   assert.equal((await db.one('SELECT status FROM delivery_assignments WHERE id=$1', [a])).status, 'arrived', 'بی دلیل تحویل ثبت شد');
-  K2.record(a, 'delivered', { cash: paid, cashReason: 'partial_payment', note: 'مشتری ۵ افغانی کم داشت' });
+  K2.record(a, 'delivered', { cash: paid, cashReason: 'partial_payment', note: 'مشتری ۵ افغانی کم داشت', code });
   await flushed(K2);
   assert.equal((await db.one('SELECT status, cash_collected_minor FROM delivery_assignments WHERE id=$1', [a])).cash_collected_minor, String(paid));
   const pv = E.ok(await A.api('GET', `/shop/delivery/couriers/${c2}/settlement-preview`), 'پیش‌نمایشِ تسویه');
@@ -291,7 +296,9 @@ await E.step('DLV-16.app', 'موقعیت فقط «در راه» از سرویس�
   const t0 = Date.now();
   const at = (lat, when) => ({ lat, lng: 69.1712, accuracyM: 12, at: when });
   const rows = async () => (await db.one('SELECT COUNT(*)::int AS n FROM delivery_locations WHERE assignment_id=$1', [a])).n;
-  //  پرچم‌ها خاموش ⇒ کارت بی `tracking` ⇒ سرویس هدفی ندارد، هیچ درخواستی
+  //  پرچم‌ها خاموش ⇒ کارت بی `tracking` ⇒ سرویس هدفی ندارد، هیچ درخواستی («بی پرچم» صریح: `E2E_FLAGS_ON` هر دو را روشن می‌کند)
+  for (const k of [DL.VIEW_FLAG, DL.LOCATION_FLAG]) await E.flag(owner.shopId, k, false);
+  await flushed(K1);
   assert.equal('tracking' in K1.cards.active.find((c) => c.id === a), false);
   let r = await K1.trackTick(pacer, t0, at(34.5312, t0));
   assert.deepEqual([r.left, r.sent.length], [0, 0]);

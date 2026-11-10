@@ -53,17 +53,63 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
-### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-close` (ردیف‌های P1 ِ همهٔ خانواده‌ها؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-close` (ردیف‌های P1 ِ همهٔ خانواده‌ها؛ روی main ‏ed8009d7 = دستهٔ ۳۸، سپس ادغامِ main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: ممیزیِ ۶۱ ردیفِ P1 (PARTIAL/MISSING) با سنجشِ کد؛ فقط دو کمبودِ کدیِ سرور/وب بی مانع ماند و هر دو ساخته شد:
   (۱) CRM-09: دفترِ نشانیِ حساب (ویترین و بازارچه) ناحیه، دروازه، ولایت، گذر، منزل/طبقه، شمارهٔ دوم و Plus Code را نگه می‌دارد — مهاجرتِ ۴۹۰،
   `orders.addressExtras` ِ مشترک با ثبت، `PUT` ِ برنامهٔ پیشین پاکشان نمی‌کند؛ `acct.js` کادرها را پر و «جزئیاتِ بیشتر» را باز می‌کند.
   (۲) RPT-14: بالای قیفِ ویترینِ وب (بازدید ⇐ دیدنِ کالا ⇐ سبد) — مهاجرتِ ۴۹۱، `lib/storefront-funnel.js`، `POST /api/store/:slug/funnel/:step`،
-  تپش در `store.js` (+۴۴۳ بایت، بارِ نخست ۷۰٬۹۰۶)، `visits`/`top` در گزارش؛ هم‌زادِ کوچکِ Kotlin (`OnlineReport.Top` و بخشِ «بالای قیف» در صفحهٔ گزارش).
+  تپش در `store.js` (+۴۴۳ بایت؛ بارِ نخست پس از ادغامِ دستهٔ ۳۹ ۷۰٬۹۴۹ از ۷۲٬۷۰۴)، `visits`/`top` در گزارش؛ هم‌زادِ کوچکِ Kotlin (`OnlineReport.Top` و بخشِ «بالای قیف» در صفحهٔ گزارش).
   آزمون: `store-address-extra` ۴/۴، `storefront-funnel` ۶/۶ (PGlite و PostgreSQL ۱۶)، کرومیومِ `web-store-p1.mjs` ۱۷ ✅ با axe (هر دو پایگاه).
 - نیمه‌کاره: `OnlineReportTest` (+۱) و کامپایلِ `OnlineReportPage`/`StrOnlineReport` فقط در CI. ردهٔ بقیه در گزارشِ شاخه: شاهدِ CI (WEB-11، MKT-02، …)،
   تصمیمِ صاحب‌کار (کدِ پستیِ اختیاری در ویترین که نگهبانِ LOC-10 می‌بندد، POS-06/32/40، PAY-16، PUR-03، SEC-01، SYN-07، CHK-18، DLV-06، OPS-01/09، LOC-04، CRM-10)،
   دستگاه/سرویسِ بیرونی (D-08، D-09، ترازو، کشو، چاپگر، AI-01/02 که رمزگشای تصویرِ بومی روی سرور می‌خواهد) و فقط Kotlin.
-- قدمِ بعدی: شاهدِ CI ِ دو آزمون و `web-store-p1.mjs`؛ تپشِ همان قیف در برنامهٔ خریدِ بومی؛ اعلانِ هر بازپرداخت (NTF-08) پس از مرجِ پوشِ وبِ مشتری (`claude/p0-close`).
+- قدمِ بعدی: شاهدِ CI ِ دو آزمون و `web-store-p1.mjs`؛ تپشِ همان قیف در برنامهٔ خریدِ بومی؛ NTF-08 با پوشِ وبِ مشتریِ دستهٔ ۳۹ حالا ساختنی است:
+  رویدادِ «پول برگشت» برای **هر** ردیفِ `online_order_refunds` در صفِ `customer_notify` (یکتایی امروز (سفارش، رویداد) است ⇒ مهاجرت برای (سفارش، رویداد، شناسهٔ بازپرداخت) و CHECK ِ `event`).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
+  `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
+  SR39-1 «باطل کردنِ لینک» وسطِ اشتراک یا وسطِ فرستادن لینکِ تازه را به دارندهٔ لینکِ باطل می‌داد؛ SR39-2 خطای خودِ سرور (`VAPID_SUBJECT` ِ نادرست)
+  همهٔ اشتراک‌ها را پاک می‌کرد. `store-push.js` + یک واژه در صادراتِ `storefront.js` (`parseToken`)؛ آزمون `security-review-39.test.js` پیش از رفع سرخ روی هر دو پایگاه.
+- نیمه‌کاره: هیچ. باز (فقط گزارش): `PUT /api/admin/pump/live-config` (کدِ پمپ) سنجشِ کاتالوگِ `admin-flags` را دور می‌زند — همان مدیرِ ارشد.
+- قدمِ بعدی: اگر صاحب محصول بخواهد، درِ پمپ هم از `checkKnown` بگذرد (کارِ کدِ پمپ، نه این شاخه).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flag-catalog` (کاتالوگِ کاملِ پرچم‌ها و «همه روشن» ِ سرتاسری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) ۵۵ کلیدِ `live_config` که کدِ غیرِ پمپ می‌خواند و در `KNOWN` نبود (خانوادهٔ `shop.delivery_*`، `shop.visual_search`، `pay.hesabpay`،
+  `shop.promo_*`، `shop.owner_report`، همگام‌سازیِ دکان، بازار و کارمزدها، ops/security و تنظیم‌های عددی/شیء) با پیش‌فرضِ خودِ کد ⇒ ۱۴۲ ردیف.
+  (۲) `server/test/flag-scan.js` + سنجهٔ `console-shell.test.js`: سرور، `public/*`، `license/` و کاتلینِ برنامه‌ها؛ روی پایه سرخ با فهرستِ همان ۵۵؛
+  بیرون فقط با دلیل (`NOT_CATALOG`). (۳) `admin-flags.test.js`: برای هر ۵۵ ردیف بی ردیف = پیش‌فرضِ کاتالوگ، نوشتنِ همان پیش‌فرض بی‌اثر، مقدارِ
+  دیگر اثردار (جهشِ پیش‌فرض سرخ می‌کند). (۴) `E2E_FLAGS_ON=all` (۱۱۸ پرچم): پیش از کار ۲۲ سناریو سرخ — همه از `subscribers_only` ِ بی اشتراک ⇒
+  `harness.mjs` با آن پرچم اشتراکِ فعال می‌دهد (`subscribe: false` برای admin/entitle)؛ سپس ۱۶ گامِ سرخ، هیچ‌کدام باگِ محصول نبود:
+  `shop.delivery_code_rule` (پیک کدِ برگشته از سپردن را می‌فرستد)، `shop.delivery_near_pin` (S31 موقعیتِ پین با `nearPin`)، `shop.order_risk`
+  («بی پرچمِ ریسک» صریح در شش سناریوی سبدِ تکراری)، `shop.delivery_live_location` (فازِ «بی پرچم» ِ DLV-16 صریح)، `link_expiry` (`sameOrderLink`
+  در pick). نتیجه: ۲۶۲/۲۶۲ گام با `all`.
+- نیمه‌کاره: شاهدِ CI. تصمیمِ صاحب‌کار: `shop.orders.ledger` (هنوز `order-ledger.LEGACY_FLAGS` هنگامِ راه‌اندازی)، دو پرچمِ مشترک با پمپ
+  (`sync.device_bind`، `sync.live_expiry_close`) و `stage.*` ِ پویا بیرون از کاتالوگ‌اند. PostgreSQL ِ `E2E_DATABASE_URL`: notify، ops، recovery و pick
+  بی پرچم هم سرخ‌اند (قالبِ پشتیبانِ PGlite، DOM ِ کهنهٔ پیگیری) و `E2E-ADM.counts` با فهرستِ پیشین هم ناپایدار است (DOM ِ کهنه) — نه از این کار.
+- قدمِ بعدی: پرچمِ تازه ⇐ ردیفِ `KNOWN` با پیش‌فرضِ کد (وگرنه `console-shell.test.js` سرخ)؛ پس از CI ِ سبز همین `E2E_FLAGS_ON=all` در CI.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/web10-push` (WEB-10: «خبرم کن» ِ کالا روی پوشِ وب؛ `CustomerErasure.kt`؛ روی `claude/p0-close` ‏2f502da1؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) «خبرم کن وقتی موجود/ارزان شد» حالا کانالِ رایگانِ پوشِ وب دارد (مهاجرتِ ۴۷۵ `store_alert_push`، `lib/store-alert-push.js`، درِ
+  `POST/DELETE /api/store/:slug/alerts/push`، `store/alert-push.js` + `store/push-client.js` ِ مشترک با پیگیریِ سفارش): اشتراک برای (دکان، شمارهٔ
+  تأییدشده، مرورگر) با اثباتِ همان تأیید (`storefront.verification`، تنها منبعِ `verifiedPhone`)؛ بلیتِ باطل/منقضی، نشستِ بسته یا شمارهٔ عوض‌شده ⇒
+  هیچ پیام؛ ۳ مرورگر، سقفِ ۲۴ ساعتهٔ دکان (`STORE_ALERTS_SHOP_PER_DAY`)، SEC-10 `alertPushSubs`، پاک کردنِ حساب؛ پیام فقط نام و قیمت. رمز/VAPID/SSRF
+  فقط از `store-push.fanOut` (کپی نشد). (۲) `CustomerErasure.kt` کلیدهای `lists`، `pushSubs`، `alertPushSubs` (+ متن‌های `StrErasure`) و آزمونِ هم‌سانی
+  با `COUNT_KEYS` ِ سرور در `ServerFeatureScreensTest`. آزمون: `store-alert-push.test.js` ۱۱/۱۱ (PGlite و PostgreSQL، پیش از کد ۱۱ سرخ)، جهش ۱۳/۱۳،
+  `web-store-alert-push.mjs` ۳۷ ✅، `web-store-push.mjs` ۳۸ ✅، `web-store-finder.mjs` ۱۷ ✅.
+- نیمه‌کاره: شاهدِ CI؛ Kotlin فقط در CI (`ServerFeatureScreensTest`)؛ آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد).
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ WEB-10 (هنوز PARTIAL به‌خاطرِ D-09 برای مشتریِ بی پوش)؛ اگر صاحب‌کار بخواهد، «فرستادنِ دوباره»ی خبرِ
+  `no_channel` ِ تازه پس از روشن کردنِ پوش (امروز عمداً نیست: کارِ مشتری هیچ پیامی برنمی‌انگیزد).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-close` (ردیف‌های P0 ِ ویترین و مشتری: دسته‌بندی و پوشِ وب ِ مشتری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) دسته‌بندیِ ۲۱ ردیفِ P0 ِ نیمه‌کارهٔ WEB/CHK/ORD/DLV/PCK/CRM/NTF/LOC (+ PAY-07/23 ِ سفارشِ آنلاین): تقریباً همه پشتِ D-09، O-01، D-08،
+  تصمیمِ صاحب‌کار (نقشه، مترادف، CDN، وبِ پیک، رد یا بررسیِ سقفِ اعتبار) یا کارِ Kotlin‌اند. تنها شکافِ کدیِ ساختنی «پیامِ تأیید» بود:
+  §۳.۱۲ برای مشتری «پوشِ PWA» را نخستین کانال می‌داند و هیچ حسابِ بیرونی نمی‌خواهد. (۲) پوشِ وب ِ مشتریِ ویترین (CHK-20، NTF-01، ORD-16؛
+  مهاجرتِ ۴۷۰؛ پرچمِ خاموشِ `shop.storefront.web_push` + `shop.customer_notify`): `lib/store-push.js` (VAPID ِ خودِ سرور، رمزِ aes128gcm،
+  فهرستِ سفیدِ SSRF، حداکثر ۳ مرورگر با `FOR UPDATE`، لینکِ باطل ⇒ اشتراک پاک، SEC-10 `pushSubs`)، `customer-notify.builtin/catchUp`
+  («ثبت شد» ِ ماندهٔ پیش از «خبرم کن» فقط از پوش، `only_channel`)، درِ `POST/DELETE /api/store/:slug/orders/:token/push`، کارتِ
+  `store/order-push.js` و `store/sw.js`. `store-push.test.js` ۱۱/۱۱ (PGlite و PostgreSQL ِ محلی)، جهش ۱۲/۱۲، `web-store-push.mjs` ۳۸/۳۸
+  (کرومیومِ کامل؛ PGlite و PostgreSQL)، `web-store-allflags.mjs` ۳۳۵ ✅ با پرچمِ تازه.
+- نیمه‌کاره: شاهدِ CI؛ `CustomerErasure.kt` کلیدِ `pushSubs` را نشان نمی‌دهد (مثلِ `lists`)؛ `storefront-alerts` (WEB-10) هنوز پوشِ وب ندارد؛
+  آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد). یافتهٔ امنیتیِ بیرون از دامنه: `station-chat.js` (پمپ،
+  دست‌نخورده) endpoint ِ پوشِ مشتری را بی فهرستِ سفید POST می‌کند (SSRF) — رفعش اجازهٔ کدِ پمپ می‌خواهد.
+- قدمِ بعدی: پس از CI ِ سبز، ارتقای ردیف‌های «فقط شاهدِ CI»؛ «خبرم کن ِ موجود شد» (WEB-10) روی همین کانال؛ جوابِ D-09 برای مشتریِ بی پوش.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
@@ -115,6 +161,43 @@
   `fetch failed` (ECONNRESET ِ اتصالِ keep-alive ِ کهنه) می‌گیرد؛ در CI سبز؛ دست نخورد.
 - قدمِ بعدی (صاحب محصول): روشن کردنِ `SYNC_V3_BATCH` و `HOT_CACHE_MS` در تولید (اجرای سوم همین سند)؛ بودجهٔ ورود؛ رفتارِ «قطعِ سراسری»
   (مهلتِ کلاینتِ ۱۰ ثانیه در برابرِ ۸ ثانیه انتظارِ دروازه، `REQUEST_TIMEOUT_MS`/`PG_POOL_MAX_WAITING`)؛ همین اجرا روی سخت‌افزارِ جدا.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flake-2` (دنبالهٔ شکارِ لرزش؛ روی `claude/flake-hunt` ‏b05891a2؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد (هر ردیف: زمانِ به‌زور کدِ پیشین را با همان خطای CI سرخ کرد؛ کدِ تازه زیرِ همان زور بارها سبز):
+  (۱) Kotlin: `testLogging` (`exceptionFormat = FULL`، علت، stack) در `android-native/app`، `core`، `desktop`. `ResumableDownloadServerTest:113`
+  (run 41645079134، فقط «AssertionError»): سرورِ آزمایشی `sent` را پس از flush می‌شمرد و پاسخِ کامل برای کلاینت بی صبر برای آن ریسه تمام است ⇒
+  شمردن پیش از نوشتن. بازسازیِ JDK ِ همان سرور/کلاینت: پیشین بی زور ۳۸ از ۲۰۰ و با ۵ms مکث ۴۸ از ۵۰ سرخ (`sent` = ۲٬۸۰۰٬۰۰۰)، تازه ۰ از ۴۰۰.
+  (۲) `hesabpay-account.test.js`: «9999» به `device.trustedAfter` ِ خودِ «ب» می‌خورد ⇒ آن عدد با مقدارِ دقیق (session_at + TRUST_MS)، جاهای
+  کلید/حساب تهی، بقیهٔ متن بی کلید/راز/وب‌هوک/شناسهٔ «الف». ساعتِ به‌زور: پیشین ۲ از ۲ سرخ، تازه ۱۰ از ۱۰؛ کلِ فایل PGlite و PG سبز.
+  `push-fcm.test.js` را `claude/sec-left` درست کرده (دست نخورد).
+  (۳) زیرِ ۹۰۰ms ِ GET سه باگِ واقعی: `license/vip.js` (ورود به پرسشِ کندِ مهمان می‌پیوست ⇒ صندوق تا بارِ دوباره قفل؛ پیشین ۳ از ۳ سرخ)،
+  `admin/app.js` (۴۰۱ ِ GET ِ دیرِ نشستِ پیشین نشستِ تازه را می‌بست ⇒ گامِ ۲FA) و `admin/image-bank.js` (بارهای هم‌پوشان ⇒ ردیفِ دوتایی)؛
+  پنل پیشین ۱ از ۲ سرخ؛ تازه vip ۷ و پنل ۶ اجرا (بی زور، زیرِ تأخیر، PG) سبز. گام‌های نخست-سرخ همان درخواست را نگه می‌دارند (با کدِ پیشین سرخ). `web-sync-ux.mjs`: تأخیر فقط ۵ GET ِ سندِ پیش از
+  `reload` را کند می‌کند (route ِ صفحه جلوتر است) ⇒ سرخِ پیشین زادهٔ بارِ میزبان؛ ۷ اجرا زیرِ تأخیر، CPU×6 و هر دو سبز.
+  (۴) `upgrade-rehearsal`: مکثِ همگامِ ۵٫۵s پیش از `/api/ready` ⇒ پیشین ۲ از ۲ «fetch failed ← ECONNRESET»؛ `Connection: close` در `http()`،
+  تازه ۵ از ۵ (و PG)؛ آزمونِ تازه: هر درخواست سوکتِ تازه و بستنِ واقعیِ اتصال هنوز خطاست.
+  (۵) `web-store-chat.mjs` reverify (CI ِ #1022: run 42716236303 و 42721354292): تایمرِ ۸۰ms ِ `verify()` میانِ fill ِ کد ⇒ کد در کادرِ
+  شماره ⇒ `verify/check` ۴۰۰؛ تایمرِ ۶۰ms ِ `K.openSheet` هم. `latefill`: پیشین همان ۴۰۰ و همان Timeout (322/341) با لاگِ «phone = شماره+کد، code تهی ⇒ bad_request»، تازه همه سبز (PGlite و PG)؛
+  گامِ `refocus` با هر کدام از کدهای پیشین سرخ. تشخیصِ batch-38 همان شد (ادغامِ بی‌برخورد)؛ از 303629cd9 در CI دیگر reverify نیفتاده
+  (42723742564 در web-store-acct افتاد، 42725165760 سبز) ⇒ خطِ «reverify … sent» هنوز نیامده.
+- نیمه‌کاره: آزمون‌های Kotlin (`ResumableDownloadServerTest` و گزارشِ FULL) فقط در CI سنجیده می‌شوند.
+- قدمِ بعدی: لرزشِ بعدیِ Kotlin پیام و stack دارد — از همان شروع شود. ابزارهای زور (`clock9999`، `stallfetch`، `latefill`، `slownet-log`،
+  probe ِ ناوبری/نقشِ برگه) در scratchpad ِ همین سیزن‌اند، نه در مخزن.
+
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/flake-hunt` (شکارِ آزمون‌های لرزان از CI ِ ۸ روزِ اخیر؛ روی main ‏98dece3a = دستهٔ ۳۷، #1021؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) ۷۶۷ اجرای کامل‌شدهٔ بی‌لغو (سرور، توحید بومی، کامپیوتر و…؛ ۱۱/۰۱ تا ۱۱/۰۹) و همهٔ تلاش‌هایشان، به‌علاوهٔ کارهای سرخِ اجراهای
+  لغوشده جدا: هر لرزشِ دیده‌شده بیرون از Kotlin پیش‌تر ریشه‌دار رفع شده بود (ترتیبِ سابقهٔ IMG-PRO-17، بلیتِ «دست‌خورده»، ۳۷۰۳۵ ِ مُهرِ زمان،
+  انقضای سوکت، بذرِ هم‌زمانِ پلن، کلیکِ ناحیه، صبرِ کاتالوگ، سه موردِ دستهٔ ۳۷)؛ باقی قطعی بودند یا زیرساخت (ubuntu-26.04). (۲) همان روشِ
+  «زمان را به زور» روی همزادهای همان رده‌ها: پخشِ کندِ انیمیشن (CDP) ⇒ axe ِ نیمه‌راه در `web-debtors-ledger`، `web-orders`، `web-report-fresh`،
+  `web-ui` ⇒ `animationsSettled` ِ `test/browser-guard.mjs`؛ ۹۰۰ms تأخیرِ GET ⇒ چهار گامِ `admin-panel.mjs` (کد، صافیِ پشتیبانی، فروش، سلامت)
+  خوابِ ثابت داشتند ⇒ صبر برای پاسخِ تازه؛ دیرکردِ `onload` ⇒ شمارشِ RSK-03 ِ `web-orders` فقط برای همان سفارش. (۳) باگِ واقعی: رسیدِ
+  CHAT-04 که میانِ دو long-poll می‌نشست تا ۲۵ ثانیه نمی‌رسید ⇒ `pd`/`pr` ِ `messages?wait` (`chat-wait.js`، هر دو درِ چت، `store/chat.js`)؛
+  آزمونِ نخست-سرخِ `shop-chat.test.js` (کدِ پیشین ۳۰۴۳ms منتظر ماند). (۴) `web-store-chat.mjs`: long-poll ِ دکان برای سنگِ قبر با هر تغییرِ
+  گفت‌وگو تهی برمی‌گشت (یک بار سرخ روی PostgreSQL ِ پربارِ محلی) ⇒ پرسشِ دوباره از cursor تا رسیدنِ همان؛ با رسیدِ تزریق‌شده کدِ پیشین سرخ، تازه سبز.
+- نیمه‌کاره: `ResumableDownloadServerTest` (Kotlin، یک بار در `claude/gaps15-partial`، همان sha سبز) — لاگِ Gradle فقط «AssertionError at :113»
+  دارد، ریشه قطعی نیست، دست نخورد. iOS (`DataSafetyIosTest`/`DeviceIdentityIosTest`، کارِ «گزارش») قطعی سرخ است: `KeychainException` روی شبیه‌ساز.
+- قدمِ بعدی: `testLogging.exceptionFormat = FULL` برای Gradle تا لرزشِ بعدیِ Kotlin پیام داشته باشد (تصمیمِ صاحب‌کار)؛ ابزارهای بازتولید
+  (کندیِ انیمیشن، تأخیرِ GET، دیرکردِ onload) در گزارشِ همین شاخه‌اند، نه در مخزن.
+
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای

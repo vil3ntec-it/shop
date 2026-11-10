@@ -81,9 +81,11 @@ class ResumableDownloadServerTest {
       ex.sendResponseHeaders(if (honour) 206 else 200, if (chunked) 0 else len.toLong())
       val cut = cuts > 0
       val n = if (cut) minOf(cutAfter, len) else len
+      //  شمردن **پیش از** نوشتن: پاسخِ کامل با رسیدنِ بایتِ آخر برای کلاینت تمام است و آزمون بی صبر برای این ریسه
+      //  `sent` را می‌خواند؛ شمردنِ پس از flush می‌توانست ۲٬۸۰۰٬۰۰۰ ببیند (بازسازیِ JDK ِ همین سرور؛ run 41645079134)
+      sent.addAndGet(n.toLong())
       ex.responseBody.write(content, start, n)
       ex.responseBody.flush()
-      sent.addAndGet(n.toLong())
       if (cut) {
         cuts--
         throw IOException("قطعِ عمدی")

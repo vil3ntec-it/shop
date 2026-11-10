@@ -45,6 +45,10 @@ async function customerOrder(store, token) {
   //  DLV-18: فرمِ «به پیک امتیاز دهید» فقط با پرچمِ `shop.delivery_ratings` — بی این کلید صفحه `…/rating` را نمی‌خواهد (خاموش ⇒ ۴۰۴ ِ
   //  بی‌جا روی هر سفارشِ ارسالیِ تحویل‌شده؛ `web-store-allflags.mjs`)
   if (await require('./orders').flagOf(store.shop_id, require('./delivery-ratings').FLAG)) order.deliveryRating = true;
+  //  CHK-20/NTF-01: «خبرم کن روی همین دستگاه» (پوشِ وب، `store/order-push.js` ِ دیربار) فقط با پرچم‌های
+  //  `shop.storefront.web_push` + `shop.customer_notify` و سفارشِ هنوز باز (خاموش یا پایان‌یافته ⇒ کلید نیست)
+  const push = await require('./store-push').viewOf(store.shop_id, order.status);
+  if (push !== undefined) order.push = push;
   return order;
 }
 

@@ -17,6 +17,9 @@ const { db } = E;
 const owner = await E.owner('owner-track@e2e.local', 'صاحبِ پیگیری', 'دکانِ پیگیری');
 const courierAcct = await E.staff(owner, 'courier-track@e2e.local', 'پیکِ پیگیری');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.delivery', 'shop.catalog']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو عمداً همان سبد را چند بار می‌گذارد تا به وضعیت‌های دیگر برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-track-store';
 const PHONE = '0791237788';
 const COURIER_PHONE = '0799990011';

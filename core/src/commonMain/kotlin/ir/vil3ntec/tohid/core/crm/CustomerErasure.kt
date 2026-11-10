@@ -27,11 +27,11 @@ object CustomerErasure {
   const val OPEN_ORDERS = "open_orders"
   const val REAUTH = "reauth_required"
 
-  /** همان `COUNT_KEYS` ِ سرور، به همان ترتیب */
+  /** همان `COUNT_KEYS` ِ سرور (`lib/customer-erasure.js`)، به همان ترتیب — آزمونِ `ServerFeatureScreensTest` هر دو را می‌سنجد */
   val COUNT_KEYS: List<String> = listOf(
     "orders", "orderLines", "orderEvents", "deliveryEvents", "deliveryPhotos", "pickPhotos", "deliveryLocations",
-    "notifyOutbox", "conversations", "messages", "chatMedia", "chatPins", "chatReports", "carts", "favorites", "areaRequests",
-    "alerts", "issues", "issuePhotos", "reviews",
+    "notifyOutbox", "conversations", "messages", "chatMedia", "chatPins", "chatReports", "carts", "favorites", "lists", "areaRequests",
+    "alerts", "issues", "issuePhotos", "reviews", "pushSubs", "alertPushSubs",
   )
 
   /** شمارِ رقم‌هایی که برای تأیید باید نوشته شود */

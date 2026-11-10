@@ -1,5 +1,6 @@
 import java.security.KeyStore
 import java.security.MessageDigest
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
 
 plugins {
   id("com.android.application")
@@ -433,4 +434,15 @@ dependencies {
  */
 tasks.register("printVersionName") {
   doLast { println(android.defaultConfig.versionName) }
+}
+
+//  شکستِ آزمون در CI با پیام، علت و stack (پیش‌فرضِ SHORT ِ Gradle فقط «AssertionError at X.kt:113» می‌نوشت؛
+//  run 41645079134 ِ `ResumableDownloadServerTest`). فقط گزارشِ آزمون؛ در ساخت و انتشار اثری ندارد.
+tasks.withType<Test>().configureEach {
+  testLogging {
+    exceptionFormat = TestExceptionFormat.FULL
+    showExceptions = true
+    showCauses = true
+    showStackTraces = true
+  }
 }

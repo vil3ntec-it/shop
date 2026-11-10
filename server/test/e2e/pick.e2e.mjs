@@ -12,7 +12,7 @@
  * اجرا:  node test/e2e/pick.e2e.mjs
  */
 import { createRequire } from 'node:module';
-import { boot, assert } from './lib/harness.mjs';
+import { boot, assert, sameOrderLink } from './lib/harness.mjs';
 
 const E = await boot({ name: 'pick' });
 //  ⚠️ پس از boot: کدِ سرور پیکربندی را همان لحظهٔ نخستین require می‌خواند
@@ -21,6 +21,9 @@ const verifyData = require('../../src/lib/verify-data');
 const { db } = E;
 const owner = await E.owner('owner-pick@e2e.local', 'صاحبِ جمع‌آوری', 'دکانِ جمع‌آوری');
 for (const k of ['shop.orders', 'shop.storefront', 'shop.orders.picking']) await E.flag(owner.shopId, k, true);
+//  E2E_FLAGS_ON: RSK-05/RSK-02 (`shop.order_risk`) همان سبد از همان شمارهٔ تأییدشده را تا ۱۰ دقیقه و مشتریِ تازه را بیش از دو سفارشِ باز رد
+//  می‌کند؛ این سناریو با یک مشتری چند سفارشِ باز می‌گذارد تا به جایگزین و حذف برسد ⇒ «بی پرچمِ ریسک» صریح (خودِ قاعده: order-risk.test.js)
+await E.flag(owner.shopId, 'shop.order_risk', false);
 const SLUG = 'e2e-pick-store';
 const PHONE = '0793334455';
 const B_OIL = '6260000000024';
@@ -81,7 +84,9 @@ await E.step('E2E-PCK-06.1', 'روغن پیدا نشد ⇒ فقط جایگزین
   assert.equal(wrong.body.error.code, 'wrong_item', 'اسکنِ کالای دیگر');
   const p = E.ok(await A.api('POST', `/shop/orders/${first.id}/pick/substitutions`, { eventId: E.key('sub'), lineNo: oilLine, productId: P.oil2, barcode: B_OIL2 }), 'پیشنهاد');
   subId = p.substitution.id;
-  assert.ok(p.customer.link.endsWith(`#/o/${encodeURIComponent(first.token)}`), p.customer.link);
+  //  پیوندِ پیگیریِ همان سفارش؛ با `shop.storefront.link_expiry` (TEN-03، مثلاً `E2E_FLAGS_ON`) هر صدور v2 ِ تازه است ⇒ `sameOrderLink`
+  const [, linkToken = ''] = p.customer.link.match(/#\/o\/([^#?]+)$/) || [];
+  assert.ok(sameOrderLink(decodeURIComponent(linkToken), first.token), p.customer.link);
   assert.match(p.customer.whatsappUrl, /^https:\/\/wa\.me\/93793334455\?text=/, 'صاحب شمارهٔ مشتری را می‌بیند');
 }, { needs: ['E2E-PCK-06.0'] });
 
@@ -142,6 +147,9 @@ await E.step('E2E-PCK-06.4', 'مشتری تا پایانِ مهلت جواب ن�
   //  گذشتِ مهلت (بی خواب): مهلتِ ثبت‌شده به گذشته
   await db.query('UPDATE order_pick_substitutions SET deadline_at = $2 WHERE id = $1', [p.substitution.id, Date.now() - 1000]);
   const { page } = C;
+  //  همان برگه روی سفارشِ اول بود: goto با فقط هشِ دیگر صفحه را از نو بار نمی‌کند و `#o-subs` ِ سفارشِ اول هنوز پیداست ⇒
+  //  waitForSelector همان دم برمی‌گشت و متنِ سفارشِ اول خوانده می‌شد (CI ِ #1023: «روغن نبود؛ به جایش روغنِ دوم»). صفحهٔ تازه.
+  await page.goto('about:blank');
   await page.goto(`${E.apiBase}/store/${SLUG}#/o/${encodeURIComponent(second.token)}`);
   await page.waitForSelector('#o-subs:not([hidden])', { timeout: 15_000 });
   assert.equal(await page.locator('#o-sub-list button').count(), 0, 'پس از مهلت دکمه نیست');

@@ -2,7 +2,7 @@
  * ویترین — رسید و پیگیریِ یک سفارش (CHK-20/22، S136/S137، ORD-16)، «پرداخت با حساب‌پی» (PAY-21) و
  * تأییدِ جایگزینِ کالای پیدانشده (PCK-05)؛ گزارشِ مشکل و نظر (NTF-07/09) در `order-feedback.js` ِ دیربار و
  * پیشنهادِ ویرایش و پیگیریِ بازپرداخت (ORD-14، NTF-08) در `order-changes.js` ِ دیربار؛ «پرداخت پس از پذیرش» در
- * `pay-step.js` ِ دیربار.
+ * `pay-step.js` ِ دیربار؛ «خبرم کن روی همین دستگاه» (پوشِ وب، CHK-20/NTF-01) در `order-push.js` ِ دیربار.
  * فقط با بازشدنِ صفحهٔ سفارش بار می‌شود (`loadOrderView` در store.js) تا JS ِ بارِ اولِ ویترین زیرِ
  * سقف بماند (WEB-15، §۳.۱۰)؛ مسیر و نخستین خواندنِ سفارش در store.js، پیگیریِ زنده و برگهٔ خطا همین‌جا.
  *
@@ -90,7 +90,18 @@
       renderApology(o);
       renderAlt(o);
       renderPlace(o);
+      renderPush(o, token);
       return o;
+    }
+
+    //  CHK-20/NTF-01: «خبرم کن روی همین دستگاه» (پوشِ وب) — store/order-push.js فقط وقتی پیگیری کلیدِ `push` را داد
+    //  (پرچمِ خاموش یا سفارشِ پایان‌یافته ⇒ نه اسکریپت، نه واژه‌نامه، نه کارگرِ سرویس، نه گره)
+    var push = null;
+    function renderPush(o, token) {
+      if (!o.push) { if ($('o-np')) $('o-np').hidden = true; return; }
+      push = push || K.js('/store/order-push.js').then(function () { return window.StoreOrderPush({ api: api, slug: ctx.slug }); })
+        .catch(function () { push = null; return null; });
+      push.then(function (f) { if (f) f.render(o, token); });
     }
 
     //  ORD-13/PCK-05 (ممیزیِ ۱۴۰۵/۰۸/۱۷، مشکلِ ۱۰): سفارشِ ردشده/لغوشده به‌خاطرِ «ناموجود» ⇒ کالاهای مشابهِ فروختنیِ همین
@@ -421,7 +432,7 @@
       $('o-status').textContent = e.status === 404 ? t('od.nf') : t('od.err');
       $('o-meta').textContent = e.message;
       $('o-cancel').hidden = true; $('o-reorder').hidden = true; $('o-pay').hidden = true; $('o-payhint').hidden = true; $('o-paynote').hidden = true;
-      $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
+      $('o-dlv').hidden = true; ['o-add', 'o-apology', 'o-chat', 'o-np'].forEach(function (id) { if ($(id)) $(id).hidden = true; });
     }
 
     return { open: open, fail: fail, stop: function () { clearTimeout(poll); } };

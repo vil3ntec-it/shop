@@ -325,7 +325,7 @@
       new Promise(function (ok, no) {
         document.head.appendChild(el('script', { attrs: { src: '/store/filters.js' }, on: { load: ok, error: no } }));
       }).then(function () {
-        finder = window.StoreFinder({ api: ctx.api, features: f, filter: ctx.filter });
+        finder = window.StoreFinder({ api: ctx.api, features: f, filter: ctx.filter, slug: ctx.slug });
         if (sheetP) finder.seen(sheetP);
       }).catch(function () { /* بی filters.js (شبکه) همان کاتالوگ */ });
     }

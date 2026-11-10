@@ -51,6 +51,7 @@ const CATEGORY = {
   'order-method-store.js': 'STORE_PAID',       //  S72: تغییرِ روشِ تحویل پیش از جمع‌آوری — همان ویترینِ پولی (sf.open)
   'order-pay-store.js': 'STORE_PAID',          //  «پرداخت پس از پذیرش»: نقد هنگامِ تحویل — همان ویترینِ پولی (sf.open)
   'storefront-funnel-store.js': 'STORE_PAID',  //  RPT-14: تپشِ بالای قیفِ ویترینِ وب — همان ویترینِ پولی (sf.open پیش از پرچم)
+  'store-push.js': 'STORE_PAID',               //  CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش — همان ویترینِ پولی (sf.open)
   'courier.js': 'COURIER', 'market.js': 'MARKET',
 };
 /** دسته‌ای که به‌جای دستهٔ پرونده برای یک مسیرِ خاص است (کلید = `روش مسیر`). */

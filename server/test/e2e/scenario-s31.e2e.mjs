@@ -133,7 +133,8 @@ await E.step('S31.3', 'سپردن به پیک ⇒ پیک با اسکنِ هر د
   await courierOk([cev('picked_up', { bags: S.labels })]);
   await deliver();
   await courierOk([cev('moving'), cev('arrived')]);
-  await courierOk([cev('delivered', { cashCollectedMinor: S.cart + FEE, code: asg.code })]);
+  //  DLV-17 (`shop.delivery_near_pin`، مثلاً `E2E_FLAGS_ON`): کارتِ پین‌دار `nearPin` دارد ⇒ برنامهٔ پیک موقعیتِ همان لحظه را هم می‌فرستد
+  await courierOk([cev('delivered', { cashCollectedMinor: S.cart + FEE, code: asg.code, ...(card.nearPin ? { position: PIN } : {}) })]);
   await deliver();
   const o = await orderRow();
   assert.deepEqual([o.status, o.cod_status], ['delivered', 'collected_by_courier']);

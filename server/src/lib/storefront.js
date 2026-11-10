@@ -577,7 +577,7 @@ function macOf(shopId, orderId) {
 }
 
 //  TEN-03: لینکِ پیگیریِ زمان‌دار و باطل‌شدنی — `lib/storefront-links.js` (شرح همان‌جا)
-const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
+const { LINK_FLAG, tokenOf, linkPolicyOn, listTokenOf, currentTokenOf, parseToken, orderIdOf, orderIdOfLink, revokeLink } = require('./storefront-links')({ tokenKey, macOf, orders, one, now, config, ApiError, notFound });
 
 /**
  * نمای مشتری — نه شناسهٔ کارمند، نه یادداشتِ داخلی، نه شماره و نشانی.
@@ -618,14 +618,10 @@ function publicOrder(o, token, delivery) {
 
 const CUSTOMER = Object.freeze({ type: 'customer', id: '' });
 
-/** شمارهٔ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null. */
+/** شمارهٔ تأییدشده: از بلیتِ تازه، وگرنه از نشستِ حسابِ مشتری — یا null (`storefront-ticket.verification`). */
 async function verifiedPhone(ticket, session) {
-  const fromTicket = await verifiedPhoneOfTicket(ticket);
-  if (fromTicket) return fromTicket;
-  //  ⛔ بی شرطِ «نشست هست؟»: `auth` خودش نشستِ تهی/بی‌شکل را بی پرس‌وجو null می‌کند؛ شرطِ بیرونی
-  //     یعنی «مقدارِ کاربر تصمیم می‌گیرد احراز اجرا شود یا نه» (CodeQL: user-controlled bypass)
-  const a = await require('./store-customers').auth(session);
-  return a ? a.customer.phone : null;
+  const v = await verification(ticket, session);
+  return v ? v.phone : null;
 }
 
 async function checkout(sf, { key, body, ticket, session, ip = '' }) {
@@ -673,7 +669,7 @@ async function cancel(sf, token) {
 }
 
 //  ۲۳: تأییدِ شمارهٔ مشتری (بلیتِ امضاشده و کدِ یک‌بارمصرف) — `lib/storefront-ticket.js` (شرح همان‌جا)
-const { ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification } = require('./storefront-ticket')({ tokenKey, obj });
+const { ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification } = require('./storefront-ticket')({ tokenKey, obj });
 
 /** S138: سفارش‌های همین شمارهٔ تأییدشده در همین ویترین — از هر دستگاهی. */
 async function myOrders(sf, ticket, session = '') {
@@ -792,8 +788,8 @@ module.exports = {
   normalize, slugOf, slugFromHost, stateOf, open, profile, categories, catalog, catalogByIds, photo,
   highlights, productDetail, reorder, ordersOfPhone, verifiedPhone,
   localParts, presenceOf, statusOf,
-  parseCheckout, checkout, track, cancel, tokenOf, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
-  K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification, myOrders,
+  parseCheckout, checkout, track, cancel, tokenOf, parseToken, orderIdOf, orderIdOfLink, listTokenOf, currentTokenOf, linkPolicyOn, revokeLink, LINK_FLAG, publicOrder,
+  K_ANON, ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification, myOrders,
   settingsOf, saveSettings, declarePresence, staffProducts, setProduct, ...sfc,   //  S1 و M2: storefront-catalog.js
   //  بازارچه (`lib/market.js`) همان دروازهٔ کالا را می‌خواند، نه نسخهٔ دومی از آن
   PRODUCT_FROM, PRODUCT_COLS, LIVE_PRODUCT, SQL_NAME, productView,

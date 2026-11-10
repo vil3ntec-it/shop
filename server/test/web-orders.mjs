@@ -12,7 +12,7 @@
  * اجرا:  TEST_DATABASE_URL=pglite:memory node test/web-orders.mjs
  */
 import { createRequire } from 'node:module';
-import { missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
+import { animationsSettled, missingTool, PLAYWRIGHT_INSTALL, closeSafeRoute } from './browser-guard.mjs';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import http from 'node:http';
@@ -537,10 +537,12 @@ if (axeSrc) {
       const out = await window.axe.run(document.querySelector(s), { runOnly: ['color-contrast', 'button-name', 'label', 'link-name'] });
       return out.violations.map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`);
     }, sel);
+    await animationsSettled(page, '#page-orders');
     const bad = [...await check('#page-orders')];
     await page.click('#ord-new-btn');
     await page.waitForSelector('#ord-new-modal.open');
     await page.waitForTimeout(400);
+    await animationsSettled(page, '#ord-new-modal .modal-box');
     bad.push(...await check('#ord-new-modal .modal-box'));
     await page.keyboard.press('Escape');
     assert.deepEqual(bad, [], bad.join('\n    '));
@@ -588,7 +590,7 @@ await step('CHK-10: «خبرم کن» — شماره فقط برای محلِ پ
 
 /* ══════════════════════ RSK-03: کارتِ سابقهٔ مشتری ══════════════════════ */
 const riskLoaded = () => page.evaluate(() => performance.getEntriesByType('resource').some((e) => /orders-risk\.js/.test(e.name)));
-const riskAsked = () => seen.filter((s) => /^GET \/api\/v1\/shop\/orders\/[^/]+\/risk$/.test(s)).length;
+const riskAsked = (id = '[^/]+') => seen.filter((s) => new RegExp(`^GET /api/v1/shop/orders/${id}/risk$`).test(s)).length;
 const latin = (t) => String(t).replace(/[۰-۹]/g, (d) => '۰۱۲۳۴۵۶۷۸۹'.indexOf(d));
 async function openAccepted() {
   for (let i = 0; i < 2; i++) await page.keyboard.press('Escape');
@@ -611,7 +613,6 @@ await step('RSK-03: پرچمِ روشن ⇒ «سابقهٔ این مشتری د�
   await liveConfig.set(String(shopOn), 'shop.order_risk', true);
   await page.evaluate(() => window.TohidOrders.refreshConfig());
   await page.waitForFunction(() => !!window.TohidOrdersRisk, null, { timeout: 10000 });
-  const asked = riskAsked();
   const made = await openAccepted();
   await page.waitForSelector('#ord-risk .ord-risk-sum', { timeout: 10000 });
   const card = latin(await page.locator('#ord-risk').innerText());
@@ -623,7 +624,9 @@ await step('RSK-03: پرچمِ روشن ⇒ «سابقهٔ این مشتری د�
   assert.equal(await page.locator('#ord-risk .ord-risk-flags li').first().getAttribute('class'), 'ord-risk-warn', 'هشدار اول');
   assert.ok(!card.includes('0700111222') && !card.includes('+93700111222') && !card.includes('700111222'), 'کارت شماره ندارد');
   await page.waitForTimeout(1600);   //  دو دورِ صفِ زنده (۷۰۰ میلی‌ثانیه)
-  assert.equal(riskAsked() - asked, 1, 'هر سفارش یک بار');
+  //  فقط پرسش‌های همین سفارش: `onload` ِ orders-risk.js جزئیاتِ سفارشِ پیشینِ هنوز باز را هم دوباره می‌کشد و گاه پس از
+  //  عکسِ «پیش» می‌پرسید ⇒ «2 !== 1» (همان با ۴۰۰ms دیرکردِ آن onload)؛ «هر سفارش یک بار» یعنی همین سفارش
+  assert.equal(riskAsked(made.id), 1, 'هر سفارش یک بار');
   assert.equal(await page.locator('#ord-risk .ord-risk-sum').count(), 1);
 });
 

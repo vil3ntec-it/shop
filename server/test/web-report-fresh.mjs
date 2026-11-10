@@ -14,6 +14,7 @@ import { execSync } from 'node:child_process';
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
+import { animationsSettled } from './browser-guard.mjs';
 
 const require = createRequire(import.meta.url);
 const globalRoot = (() => { try { return execSync('npm root -g', { encoding: 'utf8' }).trim(); } catch { return ''; } })();
@@ -290,6 +291,7 @@ if (axeSrc) {
       await pg.addScriptTag({ content: axeSrc });
       const check = async (label) => {
         await pg.waitForTimeout(700);
+        await animationsSettled(pg, '.page.active');
         const v = await pg.evaluate(async () => {
           const out = await window.axe.run(document.querySelector('.page.active'),
             { runOnly: ['color-contrast', 'button-name', 'label', 'aria-allowed-attr', 'aria-valid-attr-value', 'th-has-data-cells', 'nested-interactive'] });

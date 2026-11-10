@@ -26,6 +26,7 @@
  *   storefront_area_requests   «خبرم کن» ِ همین شماره در همین دکان پاک.
  *   (اگر جدولش هست — مهاجرت‌های ۱۸۸/۱۹۱)
  *   storefront_alerts          «خبرم کن» ِ موجودی/قیمت پاک (شمارِ هزینهٔ پیامِ امروزِ دکان به‌اندازهٔ همین خبرها کم می‌شود).
+ *   store_alert_push           اشتراکِ پوشِ مرورگر برای «خبرم کن» ِ همین شماره در همین دکان پاک (مهاجرتِ ۴۷۵).
  *   order_issues               متنِ گزارشِ مشکل و پاسخِ دکان پاک؛ نوع و وضعیت می‌مانند. order_issue_photos پاک.
  *   order_reviews              متنِ نظر پاک؛ ستاره و وضعیت (میانگینِ امتیاز) همان.
  *   customer_access_log        «سابقهٔ دسترسی» (CRM-15): پروندهٔ همین شماره (`ph:` ِ شماره و قرض‌دارانِ دفترِ سرور با
@@ -62,7 +63,7 @@ const KEPT = Object.freeze([
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
-  'alerts', 'issues', 'issuePhotos', 'reviews',
+  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs', 'alertPushSubs',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -223,6 +224,10 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
             WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND phone_key <> 'erased' RETURNING id`,
           [shopId, orderIds, at]
         );
+        //  پوشِ وب ِ همین سفارش‌ها (مهاجرتِ ۴۷۰): نشانی و کلیدِ مرورگرِ مشتری — پاک، نه ناشناس
+        if (await has(c, 'store_push_subs')) {
+          counts.pushSubs = await q('DELETE FROM store_push_subs WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING id', [shopId, orderIds]);
+        }
         if (await has(c, 'order_issues')) {
           counts.issuePhotos = await qk(
             `DELETE FROM order_issue_photos WHERE shop_id=$1 AND issue_id IN (
@@ -287,6 +292,9 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
         counts.areaRequests = await q('DELETE FROM storefront_area_requests WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);
         if (await has(c, 'storefront_alerts')) {
           counts.alerts = await q('DELETE FROM storefront_alerts WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);
+        }
+        if (await has(c, 'store_alert_push')) {
+          counts.alertPushSubs = await q('DELETE FROM store_alert_push WHERE shop_id=$1 AND phone = ANY($2::text[]) RETURNING id', [shopId, t.forms]);
         }
       }
 
