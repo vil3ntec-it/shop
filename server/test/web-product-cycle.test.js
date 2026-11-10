@@ -1,14 +1,13 @@
 'use strict';
 /**
  * MKT-06 — «چرخهٔ مصرف (روز)» در ویرایشِ کالای نسخهٔ وبِ دکان (`license/product-cycle.js`)، بی مرورگر و بی پایگاه.
- * (رفتارِ صفحه با سرورِ واقعی و همگام‌سازی تا ویترین: `test/web-product-cycle.mjs`.)
+ * (وبِ دکان به تصمیمِ صاحب برداشته شد، ۱۴۰۵/۰۸/۲۰: واژه‌نامهٔ صفحه، بارکننده، سرویس‌ورکر و index.html رفتند؛ هسته و بردارش همین‌جاست.)
  *
  *   ⛔ کادر همان `data/ProductCycle.kt` ِ برنامه است: بردارِ مشترکِ `license/test-vectors/product-cycle-v1.json`
  *      (`ProductCycleVectorsTest` ِ Kotlin همان را می‌خواند) و همان مجموعهٔ فاصلهٔ `trim` ِ Kotlin روی JVM.
  *   ⛔ دفتر: کالای بی چرخه بایت‌به‌بایت همان (هیچ کلیدِ تازه، حتی null)؛ پاک کردن = برداشتنِ کلید (سایهٔ همگام‌سازی
  *      آن را null ِ صریح می‌فرستد)؛ کادرِ خراب هیچ چیزی را عوض نمی‌کند.
- *   ⛔ متن: سه نوشتهٔ کادر کلیدِ واژه‌نامهٔ صفحه‌اند و انگلیسی/پشتو همان `StrProducts` ِ برنامه.
- *   ⛔ بارکننده `shop-sync.js`، سرویس‌ورکر نگهش می‌دارد، `index.html` ِ یخ‌زده دست نمی‌خورد؛ بی innerHTML/style/eval.
+ *   ⛔ متن: سه نوشتهٔ کادر همان فارسیِ `StrProducts` ِ برنامه؛ بی innerHTML/style/eval.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -98,10 +97,7 @@ test('سابقهٔ عملیات: یک تکهٔ خوانا برای ویرایش�
   assert.equal(X.changeText(null), '');
 });
 
-test('متن: سه کلیدِ واژه‌نامهٔ صفحه؛ انگلیسی و پشتو همان `StrProducts` ِ برنامه', () => {
-  const fa = JSON.parse(read('license/i18n/web.fa.json'));
-  const en = JSON.parse(read('license/i18n/web.en.json'));
-  const ps = JSON.parse(read('license/i18n/web.ps.json'));
+test('متن: سه برچسبِ هسته همان فارسیِ `StrProducts` ِ برنامه', () => {
   const kt = read('android-native/app/src/main/java/ir/vil3ntec/tohid/core/i18n/StrProducts.kt');
   const tri = (name) => {
     const m = new RegExp(`val ${name}: String get\\(\\) = t\\(\\s*"([^"]+)",\\s*"([^"]+)",\\s*"([^"]+)",?\\s*\\)`).exec(kt);
@@ -109,18 +105,10 @@ test('متن: سه کلیدِ واژه‌نامهٔ صفحه؛ انگلیسی و
     return m.slice(1);
   };
   const pairs = [[X.TEXT.label, tri('cycle')], [X.TEXT.hint, tri('cycleHelper')], [X.TEXT.bad, tri('cycleBad')]];
-  for (const [key, [kfa, ken, kps]] of pairs) {
-    assert.equal(key, kfa, 'فارسی همان برنامه');
-    assert.ok(fa.includes(key), `web.fa.json: ${key}`);
-    assert.equal(en[key], ken, `en: ${key}`);
-    assert.equal(ps[key], kps, `ps: ${key}`);
-  }
+  for (const [key, [kfa]] of pairs) assert.equal(key, kfa, 'فارسی همان برنامه');
 });
 
-test('بارکننده و سرویس‌ورکر؛ index.html ِ یخ‌زده دست‌نخورده؛ بی innerHTML/style/eval/رویدادِ درون‌خطی', () => {
-  assert.match(read('license/shop-sync.js'), /src: 'license\/product-cycle\.js\?v=1'/);
-  assert.ok(read('sw.js').includes("'./license/product-cycle.js'"), 'نصبِ آفلاین هم کادر را دارد');
-  assert.ok(!read('index.html').includes('product-cycle'), 'index.html یخ‌زده است: بارکننده shop-sync.js');
+test('بی innerHTML/style/eval/رویدادِ درون‌خطی', () => {
   for (const [bad, re] of [
     ['eval', /\beval\s*\(/], ['new Function', /new\s+Function\s*\(/], ['رویدادِ درون‌خطی', /\son[a-z]+\s*=\s*["']/i],
     ['setAttribute(on…)', /setAttribute\(\s*['"]on/i], ['javascript:', /javascript:/i],

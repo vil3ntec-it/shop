@@ -4,7 +4,7 @@
  *
  * همان فایلِ بردارِ `ReturnShareVectorsTest` ِ core (`license/test-vectors/return-share-v1.json`)،
  * و همان ویژگیِ `ReturnShareTest`: جمعِ هر شکستنِ مقدار = برگشتِ یک‌جا = round(جمعِ قلم × سهم).
- * صفحهٔ وب (`index.html`، «مرجوعی جزئی») همین تابع را صدا می‌زند؛ آزمونِ آخر همین را می‌پاید.
+ * (سیم‌کشیِ «مرجوعی جزئی» ِ وبِ دکان — `index.html` — با برداشتنِ آن به تصمیمِ صاحب رفت، ۱۴۰۵/۰۸/۲۰.)
  * هیچ پایگاه‌داده‌ای لازم نیست.
  */
 const test = require('node:test');
@@ -65,26 +65,6 @@ test('هر شکستنِ مقدار = برگشتِ یک‌جا، و هرگز بی
     assert.equal(oneShot, Math.round(lineTotal * paidRatio));
     assert.ok(amounts.every((x) => x >= 0));
   }
-});
-
-test('index.html در «مرجوعی جزئی» همین تابع را صدا می‌زند، نه فرمولِ پیشین', () => {
-  const html = fs.readFileSync(path.join(ROOT, 'index.html'), 'utf8');
-  const start = html.indexOf("document.getElementById('btn-confirm-return')");
-  assert.ok(start > 0, 'دکمهٔ مرجوعیِ جزئی پیدا نشد');
-  const body = html.slice(start, start + 4000);
-  //  مبنا پولِ واقعاً پس‌دادهٔ همین قلم (#586): جمعِ amount و quantity ِ برگشت‌های پیشینِ همان saleItemId
-  assert.match(body, /TohidMoney\.returnShare\(\s*si\.totalPrice,\s*si\.quantity,\s*si\.returnedQty\s*\|\|\s*0,\s*qty,\s*paidRatio,\s*priorAmount,\s*priorQty\s*\)/);
-  assert.match(body, /const prior = returns\.filter\(r=>r\.saleItemId===si\.id\)/);
-  assert.match(body, /priorAmount = prior\.reduce\(\(s,r\)=>s\+\(r\.amount\|\|0\), 0\)/);
-  assert.match(body, /priorQty = prior\.reduce\(\(s,r\)=>s\+\(r\.quantity\|\|0\), 0\)/);
-  //  حتی با money.js ِ کهنه: هرگز بیش از «پولِ قلم منهای پس‌داده»
-  assert.match(body, /Math\.round\(si\.totalPrice \* paidRatio\) - priorAmount/);
-  //  فرمولِ پیشین فقط وقتی که money.js ِ کهنهٔ کش returnShare ندارد
-  assert.match(body, /typeof TohidMoney\.returnShare === 'function'\s*\?\s*TohidMoney\.returnShare\(/);
-  assert.equal(body.split('Math.round((si.totalPrice/si.quantity)').length - 1, 1);
-  //  money.js پیش از این کد بار می‌شود (در <head>) و نسخهٔ پرسش‌نامه‌اش بالا رفت تا کشِ کهنه جا نماند
-  assert.ok(html.indexOf('license/money.js') < start);
-  assert.ok(!html.includes('license/money.js?v=1'), 'money.js?v=1 کهنه است');
 });
 
 test('#586 تاریخچهٔ قاطی: برگشت‌های کهنهٔ جداجدا + برگشتِ تازه هرگز بیش از پولِ قلم', () => {

@@ -4,7 +4,7 @@ cd "$(dirname "$0")" || exit 1
 case "$(uname -m)" in
   x86_64|amd64) ;;
   *) echo "این برنامه برای لینوکسِ ۶۴ بیتیِ اینتل/AMD است (سیستمِ شما: $(uname -m))."
-     echo "نسخهٔ مرورگری: https://vil3ntec-it.github.io/shop/"; exit 1 ;;
+     echo "برنامهٔ اندروید (گوشی یا تبلت) با همان حساب: https://vil3ntec-it.github.io/shop/download.html"; exit 1 ;;
 esac
 if command -v apt >/dev/null 2>&1; then
   sudo apt install -y "./Linux/MyShop-Linux.deb"

@@ -7,7 +7,8 @@
  *   ۱) `core/…/guide/WhatsNewFileTest` و بخشِ پرونده‌ایِ `WhatsNewTest.bundledLog…` — `docs/WHATS-NEW-fa.md`
  *      (پارسرِ `tools/whatsnew/check.mjs`). `bundledTextIsTheFileOnDisk` آینه ندارد: `WhatsNewBundled` را Gradle
  *      هنگامِ ساخت از همین پرونده می‌سازد.
- *   ۲) `android-native/…/ui/theme/WebPaletteParityTest` — پالتِ منجمد و گِردی‌های `index.html`.
+ *   ۲) (`WebPaletteParityTest` و آینه‌اش — پالتِ منجمدِ `index.html` ِ وبِ دکان — با برداشتنِ وبِ دکان به تصمیمِ صاحب رفتند،
+ *      ۱۴۰۵/۰۸/۲۰.)
  *   ۳) `android-native/…/data/CustomerOnlineOrdersTest` — وضعیت‌های باز/لغوِ برنامه در `server/src/lib/orders.js`.
  * بی پایگاه و بی شبکه؛ فهرستِ کامل و دلیلِ آینه‌نشدنِ بقیه: RULES-fa «v3 · CI و آزمون».
  */
@@ -102,80 +103,6 @@ test('آینهٔ WhatsNewTest.bundledLog…: «برداشته» ِ شکلِ قد
   assert.equal(removed.length, 1, `«برداشته» با «${a}» باید درست یک بار بیاید`);
   assert.ok(removed[0].text.includes(b), removed[0].text);
   assert.ok(removed[0].instead && removed[0].instead.trim(), 'بی «به‌جایش»');
-});
-
-/* --------------------------------- ۲) WebPaletteParityTest ---------------------------------- */
-
-const PALETTE_TEST = 'android-native/app/src/test/java/ir/vil3ntec/tohid/ui/theme/WebPaletteParityTest.kt';
-const TOKENS = 'android-native/app/src/main/java/ir/vil3ntec/tohid/ui/theme/Tokens.kt';
-
-/** همان `block`: متنِ پس از نخستین selector تا نخستین `}` ⇒ { نام: مقدار } (آخری می‌ماند) */
-function block(src, selector) {
-  const a = src.indexOf(selector);
-  const after = a < 0 ? '' : src.slice(a + selector.length);
-  const b = after.indexOf('}');
-  const body = b < 0 ? after : after.slice(0, b);
-  assert.ok(body.length, `بلوکِ ${selector} در index.html پیدا نشد`);
-  const out = {};
-  for (const m of body.matchAll(/--([a-z0-9-]+)[ \t\n\x0B\f\r]*:[ \t\n\x0B\f\r]*([^;]+);/g)) out[m[1]] = m[2].trim();
-  return out;
-}
-
-/** همان `html` ِ آزمون: index.html ِ ریشه که «--primary» دارد */
-function indexHtml() {
-  const src = KT.read('index.html');
-  assert.ok(src.includes('--primary'), 'index.html پیدا نشد');
-  return src;
-}
-
-/** `Triple("light", block(src, ":root{"), frozenLight)` ِ آزمون ⇒ [نام، selector، پالتِ منجمد] */
-function themes(kt = KT.read(PALETTE_TEST)) {
-  const all = [...kt.matchAll(/Triple\("(\w+)", block\(src, ("(?:[^"\\]|\\.)*")\), (frozen\w+)\)/g)];
-  assert.equal(all.length, 2, 'WebPaletteParityTest.kt: دو Triple ِ light/dark خوانده نشد');
-  return all.map((m) => [m[1], KT.literal(m[2], 0, 'WebPaletteParityTest.kt').value,
-    KT.map(PALETTE_TEST, `private val ${m[3]} = mapOf(`)]);
-}
-
-/** رنگ‌هایی که با پالتِ منجمدِ آزمون نمی‌خوانند */
-function paletteFailures(src, list) {
-  const bad = [];
-  for (const [theme, selector, frozen] of list) {
-    const web = block(src, selector);
-    for (const [name, want] of frozen) {
-      const got = web[name] === undefined ? null : web[name].toLowerCase().replaceAll(' ', '');
-      if (got !== want) bad.push(`${theme}:${name}: وب ${got} ≠ منجمد ${want} — وب فقط درمانِ ایمنیِ داده می‌گیرد، نه رنگ`);
-    }
-  }
-  return bad;
-}
-
-test('آینهٔ WebPaletteParityTest: پالتِ وبِ منجمد (index.html) عوض نشده است — وبِ منجمد، تصمیمِ صاحب‌کار', () => {
-  const src = indexHtml();
-  const list = themes();
-  assert.deepEqual(list.map(([t, s, f]) => [t, s, f.length > 20]), [['light', ':root{', true], ['dark', 'html[data-theme="dark"]{', true]]);
-  assert.deepEqual(paletteFailures(src, list), []);
-  //  رنگِ عوض‌شده سرخ است
-  const changed = src.replace(/(:root\{[^}]*--primary\s*:\s*)#08665f/, '$1#08665e');
-  assert.notEqual(changed, src);
-  assert.deepEqual(paletteFailures(changed, list).map((x) => x.split(':').slice(0, 2).join(':')), ['light:primary']);
-});
-
-/** Kotlin ِ `toFloatOrNull` برای عددِ ساده */
-const toFloatOrNull = (s) => (/^[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?$/.test(s) ? Number(s) : null);
-
-test('آینهٔ WebPaletteParityTest: گِردی‌های وب همان ستونِ لمسیِ برنامه‌اند (Corner.touch)', () => {
-  const root = block(indexHtml(), ':root{');
-  const pairs = [...KT.read(PALETTE_TEST).matchAll(/"(radius-[a-z]+)" to Corner\.(\w+)/g)].map((m) => [m[1], m[2]]);
-  assert.deepEqual(pairs.map(([n]) => n), ['radius-sm', 'radius-md', 'radius-lg']);
-  const tokens = KT.read(TOKENS);
-  const bad = [];
-  for (const [name, token] of pairs) {
-    const touch = KT.one(tokens, new RegExp(`val ${token} = Token\\("${token}", (\\w+), (\\w+)\\)`), 'Tokens.kt')[2];
-    const dp = Number(KT.one(tokens, new RegExp(`val ${touch} = (\\d+(?:\\.\\d+)?)\\.dp\\b`), 'Tokens.kt')[1]);
-    const w = root[name] === undefined ? null : toFloatOrNull(root[name].replace(/px$/, ''));
-    if (w !== dp) bad.push(`${name}: وب ${root[name]} ≠ برنامه ${dp}.dp`);
-  }
-  assert.deepEqual(bad, []);
 });
 
 /* ------------------------------- ۳) CustomerOnlineOrdersTest -------------------------------- */

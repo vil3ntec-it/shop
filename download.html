@@ -73,7 +73,7 @@
     برنامهٔ کامپیوتر فقط <b>۶۴ بیتی</b> است — ویندوزِ ۱۰ و ۱۱ (۶۴ بیت)، مکِ اینتل و اپل، لینوکسِ ۶۴ بیت. موتورِ گرافیکِ برنامه (همان که آن را سریع و کامپیوتری کرده) نسخهٔ ۳۲ بیتی ندارد.
     <ol>
       <li>بیشترِ کامپیوترهای ده سالِ اخیر ۶۴ بیتی‌اند، حتی اگر ویندوزِ ۳۲ بیتی رویشان نصب باشد. ویندوز ⇐ تنظیمات ⇐ System ⇐ About ⇐ «System type» را ببینید؛ اگر نوشته «x64-based processor»، با نصبِ ویندوزِ ۶۴ بیتی همین برنامه کار می‌کند.</li>
-      <li>روی کامپیوترِ واقعاً ۳۲ بیتی، نسخهٔ وبِ فروشگاه من در مرورگر کار می‌کند — با همان حساب و همان دفتر: <a href="./">vil3ntec-it.github.io/shop</a></li>
+      <li>روی کامپیوترِ واقعاً ۳۲ بیتی برنامهٔ کامپیوتر نصب نمی‌شود؛ برنامهٔ اندروید را روی گوشی یا تبلت بگیرید — با همان حساب و همان دفتر. (نسخهٔ وبِ مدیریتِ فروشگاه برداشته شده است.)</li>
     </ol>
   </div>
 </main>
@@ -89,7 +89,8 @@
     {id:'mac-intel', os:'مک — اینتل', sub:'مک‌های پیش از ۲۰۲۱ · فایلِ ‎.dmg‎', url: BASE + 'tohid-desktop/MyShop-Mac-Intel.dmg'},
     {id:'linux', os:'لینوکس', sub:'دبیان، اوبونتو، مینت (۶۴ بیت) · فایلِ ‎.deb‎', url: BASE + 'tohid-desktop/MyShop-Linux.deb'},
     {id:'android', os:'اندروید', sub:'گوشی و تبلت · فایلِ ‎.apk‎', url: BASE + 'tohid-native/MyShop-Android.apk'},
-    {id:'iphone', os:'آیفون و آیپد', sub:'در Safari باز کنید ⇐ دکمهٔ اشتراک‌گذاری (مربع با پیکان) ⇐ «افزودن به صفحهٔ اصلی» (Add to Home Screen)', url: './'},
+    //  برنامهٔ آیفون هنوز در App Store نیست (docs/IOS-PLAN-fa.md §۰.۶)؛ نسخهٔ وبِ مدیریت برداشته شد (۱۴۰۵/۰۸/۲۰) ⇒ بی پیوند
+    {id:'iphone', os:'آیفون و آیپد', sub:'برنامهٔ آیفون به‌زودی در App Store می‌آید؛ تا آن روز دادهٔ همگام‌شدهٔ دکان روی سرور می‌ماند و با اندروید یا کامپیوتر هم در دسترس است.', url: null},
   ];
   function guess(){
     var ua = navigator.userAgent || '', plat = (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '';
@@ -111,7 +112,7 @@
   }
   function card(it, mine){
     return '<div class="card' + (mine ? ' mine' : '') + '"><b>' + it.os + (mine ? '<span class="tag">سیستمِ شما</span>' : '') +
-      '</b><span>' + it.sub + '</span><a href="' + it.url + '">' + (it.id === 'iphone' ? 'باز کردن' : 'دانلود') + '</a></div>';
+      '</b><span>' + it.sub + '</span>' + (it.url ? '<a href="' + it.url + '">دانلود</a>' : '') + '</div>';
   }
   guess().then(function(ids){
     var byId = {}; ITEMS.forEach(function(i){ byId[i.id] = i; });
@@ -122,8 +123,8 @@
     t.textContent = mine.length === 1 ? 'پیشنهاد برای سیستمِ شما: ' + mine[0].os : 'مکِ شما — کدام تراشه؟';
     s.textContent = mine.length === 1 ? mine[0].sub
       : 'منوی سیب ⇐ About This Mac: اگر «Chip: Apple M…» نوشته، اولی؛ اگر «Processor: Intel»، دومی.';
-    a.innerHTML = mine.map(function(m, k){
-      return '<a class="btn' + (k ? ' alt' : '') + '" href="' + m.url + '">' + (m.id === 'iphone' ? 'باز کردنِ فروشگاه من' : 'دانلود — ' + m.os) + '</a> ';
+    a.innerHTML = mine.filter(function(m){ return m.url; }).map(function(m, k){
+      return '<a class="btn' + (k ? ' alt' : '') + '" href="' + m.url + '">دانلود — ' + m.os + '</a> ';
     }).join('');
   });
 })();

@@ -1,12 +1,12 @@
 'use strict';
 /**
  * R10 (بازبینیِ دومِ دستهٔ ۴۴) — خانهٔ CSV ِ نسخهٔ وبِ دکان (`license/csv-cell.js`) همان قاعدهٔ سرور (`finance-reports.cell`)، بی مرورگر.
- * (دانلودِ واقعیِ هر چهار خروجیِ صفحه در کرومیوم: `test/web-csv-export.mjs`.)
+ * (وبِ دکان به تصمیمِ صاحب برداشته شد، ۱۴۰۵/۰۸/۲۰: بارکننده، سرویس‌ورکر، index.html و report-ui.js رفتند؛ هسته همین‌جاست.)
  *
  *   ⛔ متنِ آغازشده با `=` `+` `-` `@` تب یا CR ⇒ «'» پیشش (OWASP)؛ عدد (typeof number) همان عدد، منفی هم؛ null/undefined ⇒ خالی.
  *   ⛔ جز متنِ فقط-عدد `^-?[0-9]+(\.[0-9]+)?$` (همان خانهٔ `g` ِ xlsx ِ `owner-export.js`): «-500.00» عدد می‌ماند؛ هر چیزِ دیگر نه.
  *   ⛔ مقدارِ هر خانه پس از خواندنِ CSV با سرور یکی است؛ تنها فرقِ متن: `;` ِ پیشینِ صفحه هم نقل‌قول می‌شود.
- *   ⛔ بارکننده `shop-sync.js`، سرویس‌ورکر، index.html ِ یخ‌زده دست‌نخورده و `downloadCsv` ِ صفحه همان `csvCell` ِ سراسری را می‌خواند.
+ *   ⛔ `install` همان `csvCell` ِ سراسریِ هر صفحه‌ای را که بخواند جایگزین می‌کند؛ نویسندهٔ CSV ِ دومِ بی همین قاعده در license/ نیست.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -83,15 +83,7 @@ test('نصب: `csvCell` ِ سراسری ⇐ `cell`؛ بی آن (Node، صفحه�
   assert.equal(ctx.TohidCsvCell.install(), true, 'دوباره ⇒ همان');
 });
 
-test('بارکننده و سرویس‌ورکر؛ index.html ِ یخ‌زده دست‌نخورده و `csvCell` ِ آن هنوز تنها سازندهٔ CSV است؛ بی innerHTML/eval', () => {
-  assert.match(read('license/shop-sync.js'), /src: 'license\/csv-cell\.js\?v=1'/);
-  assert.ok(read('sw.js').includes("'./license/csv-cell.js'"), 'نصبِ آفلاین هم پرونده را دارد');
-  const html = read('index.html');
-  assert.ok(!html.includes('csv-cell'), 'index.html یخ‌زده است: بارکننده shop-sync.js');
-  //  `csvCell` اعلانِ تابعِ سراسری است (ویژگیِ نوشتنیِ window) و `downloadCsv` فقط از راهِ آن می‌نویسد
-  assert.match(html, /\n {2}function csvCell\(v\)\{/);
-  assert.match(html, /rows\.map\(r=> r\.map\(csvCell\)\.join\(','\)\)/);
-  assert.equal((html.match(/type: ?'text\/csv/g) || []).length, 1, 'سازندهٔ CSV ِ دیگری در صفحه نیست');
+test('هیچ سازندهٔ CSV ِ دیگری در license/ نیست؛ بی innerHTML/eval', () => {
   for (const f of fs.readdirSync(path.join(ROOT, 'license')).filter((x) => x.endsWith('.js') && x !== 'csv-cell.js')) {
     assert.ok(!/type: ?'text\/csv/.test(read(`license/${f}`)), `license/${f}: CSV ِ دوم بی همین قاعده`);
   }
@@ -114,7 +106,6 @@ test('فهرستِ نویسنده‌های CSV: سرور فقط از `finance-re
     'server/src/lib/image-bank.js': /require\('\.\/finance-reports'\)[\s\S]*\.map\(cell\)\.join\(','\)[\s\S]*\.map\(cell\)\.join\(','\)/,
     'server/src/routes/admin-image-bank.js': /bank\.reportCsv\(rep\)/,
     'server/public/admin/image-bank.js': /report\?format=csv/,
-    'license/report-ui.js': /E\.downloadCsv\(/,
   };
   assert.deepEqual(found, Object.keys(want).sort(), 'نویسندهٔ CSV ِ تازه ⇒ همین قاعده و همین فهرست');
   for (const [f, re] of Object.entries(want)) assert.match(read(f), re, f);

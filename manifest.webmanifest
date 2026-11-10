@@ -2,7 +2,7 @@
   "id": "/tohid-shop/",
   "name": "فروشگاه من",
   "short_name": "فروشگاه من",
-  "description": "مدیریت فروش، انبار، قرض‌داران، مصارف و گزارشات فروشگاه — بدون نیاز به اینترنت",
+  "description": "نسخهٔ وبِ مدیریتِ فروشگاه برداشته شد — برنامهٔ اندروید، آیفون یا کامپیوتر را نصب کنید",
   "lang": "fa",
   "dir": "rtl",
   "start_url": "./index.html",
@@ -18,10 +18,5 @@
     { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "icons/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
     { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
-  ],
-  "shortcuts": [
-    { "name": "فروش جدید", "short_name": "فروش", "url": "./index.html#sale", "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }] },
-    { "name": "محصولات", "short_name": "محصولات", "url": "./index.html#products", "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }] },
-    { "name": "قرض‌داران", "short_name": "قرض‌داران", "url": "./index.html#debtors", "icons": [{ "src": "icons/icon-96.png", "sizes": "96x96" }] }
   ]
 }

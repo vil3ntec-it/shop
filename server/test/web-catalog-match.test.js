@@ -1,12 +1,11 @@
 'use strict';
 /**
  * POS-04 — جست‌وجوی نامِ کالا در کادرِ صندوقِ نسخهٔ وبِ دکان (`license/catalog-match.js`)، بی مرورگر و بی پایگاه.
- * (رفتارِ صفحه در کرومیومِ واقعی: `test/web-pos-name.mjs`.)
+ * (وبِ دکان به تصمیمِ صاحب برداشته شد، ۱۴۰۵/۰۸/۲۰: واژه‌نامهٔ صفحه، بارکننده، سرویس‌ورکر و index.html رفتند؛ هسته و بردارش همین‌جاست.)
  *
  *   ⛔ همان `core/text/CatalogMatch.kt` ِ صندوقِ کامپیوتر: بردارِ مشترکِ `core/test-vectors/catalog-match-v1.json`
  *      (`CatalogMatchVectorsTest` ِ Kotlin همان را می‌خواند)؛ یک‌شکل کردن فقط از `license/text-core.js` (= `TextNormalizer.kt`).
  *   ⛔ تصمیمِ کادر: خالی یا بارکدِ کامل ⇒ راهِ صفحه؛ پیشوند فقط با تنظیمِ خودش (و «۳*کد» با بارکد همان cart-query.js).
- *   ⛔ متن: کلیدهای واژه‌نامهٔ صفحه با انگلیسی و پشتو؛ بارکننده `shop-sync.js`، سرویس‌ورکر v72، index.html ِ یخ‌زده دست‌نخورده.
  */
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -97,35 +96,13 @@ test('کلیدِ تنها در جست‌وجو همان `String.trim` ِ JVM ا�
   assert.deepEqual(C.search(C.index([{ id: 'x', name: 'a' }]), '\u001Ca\u001D'), ['x']);
 });
 
-test('متن: کلیدهای واژه‌نامهٔ صفحه، با انگلیسی و پشتو، و جای‌خالی همان', () => {
-  const fa = JSON.parse(read('license/i18n/web.fa.json'));
-  const en = JSON.parse(read('license/i18n/web.en.json'));
-  const ps = JSON.parse(read('license/i18n/web.ps.json'));
-  const keys = Object.values(C.TEXT);
-  assert.equal(keys.length, 7);
-  for (const k of keys) {
-    assert.ok(fa.includes(k), `web.fa.json: ${k}`);
-    assert.ok(en[k], `en: ${k}`);
-    assert.ok(ps[k], `ps: ${k}`);
-  }
-  assert.equal(C.TEXT.placeholderOff, 'یا بارکد را دستی وارد کنید', 'خاموش ⇒ همان placeholder ِ index.html');
-  assert.ok(read('index.html').includes(`placeholder="${C.TEXT.placeholderOff}"`));
-});
-
 test('پیش‌فرض خاموش: کلیدِ همین مرورگر فقط با «۱» روشن است و پرونده بی مرورگر هیچ نصب نمی‌کند', () => {
   assert.equal(C.PREF, 'tohid-pos-name-search-v1');
   assert.match(src, /getItem\(k\) === '1'/);
   assert.doesNotThrow(() => C.install(), 'در Node (بی document) کاری نمی‌کند');
 });
 
-test('بارکننده و سرویس‌ورکر v72 یا تازه‌تر؛ index.html ِ یخ‌زده دست‌نخورده؛ بی innerHTML/صفتِ style/eval', () => {
-  assert.match(read('license/shop-sync.js'), /src: 'license\/catalog-match\.js\?v=1'/);
-  const sw = read('sw.js');
-  assert.ok(sw.includes("'./license/catalog-match.js'"), 'نصبِ آفلاین هم پرونده را دارد');
-  //  همان نسخه‌ای که این پرونده را آورد یا تازه‌تر (دسته‌های بعدی نسخه را بالا می‌برند؛ پایین آمدن یعنی کشِ کهنه)
-  const ver = Number((sw.match(/'tohid-shop-v(\d+)'/) || [])[1]);
-  assert.ok(ver >= 72, `نسخهٔ سرویس‌ورکر ${ver}`);
-  assert.ok(!read('index.html').includes('catalog-match'), 'index.html یخ‌زده است: بارکننده shop-sync.js');
+test('یک‌شکل کردن فقط از text-core.js؛ بی innerHTML/صفتِ style/eval', () => {
   assert.ok(!/\bfunction (searchKey|compareKey|typoBudget)\b/.test(src), 'یک‌شکل کردن فقط از text-core.js، نه رونوشت');
   for (const [bad, re] of [
     ['eval', /\beval\s*\(/], ['new Function', /new\s+Function\s*\(/], ['رویدادِ درون‌خطی', /\son[a-z]+\s*=\s*["']/i],

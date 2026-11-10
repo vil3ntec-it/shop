@@ -5,7 +5,7 @@
  *      (HwCoreTest.kt) با همین فایل می‌سنجد — دو پیاده‌سازیِ جدا، یک جواب.
  *   ۲. `legacyRaster` از کدِ پیش از این تغییر گرفته شده: پیش‌فرضِ پروفایل باید عیناً
  *      همان بایت‌ها باشد (چاپگری که دیروز کار می‌کرد امروز هم کار کند).
- *   ۳. `thermal-print.js`ِ دست‌نخوردهٔ وب هم هنوز همان بایت‌ها را می‌دهد (مشخصه).
+ *   ۳. (مشخصهٔ `thermal-print.js` ِ وبِ دکان با برداشتنِ آن به تصمیمِ صاحب رفت، ۱۴۰۵/۰۸/۲۰.)
  *   ۴. پیش‌نمایش (`decode`) از روی بایت‌ها همان تصویر را پس می‌دهد.
  *   ۵. بارکدها را رمزگشای مستقلِ zxing همان رشته می‌خواند.
  *
@@ -15,7 +15,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const vm = require('node:vm');
 const crypto = require('node:crypto');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -42,18 +41,6 @@ function same(bytes, want, label) {
 test('پیش‌فرضِ پروفایل = بایت‌های پیشین (legacyRaster)', () => {
   for (const L of V.legacyRaster) {
     same(H.document(pattern(L.w, L.h).img, { paperDots: L.w }), L, `${L.w}x${L.h}`);
-  }
-});
-
-test('thermal-print.jsِ دست‌نخوردهٔ وب هنوز همان بایت‌ها را می‌سازد (مشخصه)', () => {
-  const ctx = { window: {}, navigator: {} };
-  vm.createContext(ctx);
-  vm.runInContext(fs.readFileSync(path.join(ROOT, 'license', 'thermal-print.js'), 'utf8'), ctx);
-  const T = ctx.window.TohidThermal;
-  for (const L of V.legacyRaster) {
-    const { rgba } = pattern(L.w, L.h);
-    const canvas = { width: L.w, height: L.h, getContext: () => ({ getImageData: () => ({ data: rgba }) }) };
-    same(T.toEscPos(canvas, L.w), L, `toEscPos ${L.w}x${L.h}`);
   }
 });
 

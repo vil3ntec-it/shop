@@ -19,7 +19,7 @@ $ProgressPreference = 'SilentlyContinue'
 try { [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12 } catch {}
 
 if (-not [Environment]::Is64BitOperatingSystem) {
-  Write-Host 'My Shop needs 64-bit Windows 10 or 11. On this PC use the web version: https://vil3ntec-it.github.io/shop/' -ForegroundColor Red
+  Write-Host 'My Shop needs 64-bit Windows 10 or 11. On this PC use the Android app on a phone or tablet: https://vil3ntec-it.github.io/shop/download.html' -ForegroundColor Red
   return
 }
 
