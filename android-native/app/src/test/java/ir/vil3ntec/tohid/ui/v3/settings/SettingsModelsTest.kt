@@ -140,7 +140,7 @@ class SettingsModelsTest {
   }
 
   @Test
-  fun `SYN-12 — حکمِ موتور جای نشانهٔ متنی: قطعیِ کوتاه آبی، ماندگار و سرور زرد، نشست سرخ`() {
+  fun `SYN-12 — حکمِ موتور جای نشانهٔ متنی — قطعیِ کوتاه آبی، ماندگار و سرور زرد، نشست سرخ`() {
     val up = ServerPulse.State.UP
     val raw = "به سرور نرسیدیم"
     val retrying = SyncModel.diagnose(raw, false, 0, false, up, SyncOutage.Kind.RETRYING)
@@ -165,7 +165,7 @@ class SettingsModelsTest {
   }
 
   @Test
-  fun `SYN-12 — نوارِ وضعیتِ کامپیوتر: قطعیِ بی هشدار برچسبِ حکمِ موتور را دارد، نه «در صف»`() {
+  fun `SYN-12 — نوارِ وضعیتِ کامپیوتر — قطعیِ بی هشدار برچسبِ حکمِ موتور را دارد، نه «در صف»`() {
     assertEquals(StrSettings.diagRetryingTitle, SyncModel.quietHead(SyncOutage.Kind.RETRYING))
     assertEquals(StrSettings.diagUnreachableTitle, SyncModel.quietHead(SyncOutage.Kind.UNREACHABLE))
     assertEquals(StrSettings.diagServerTitle, SyncModel.quietHead(SyncOutage.Kind.SERVER))
