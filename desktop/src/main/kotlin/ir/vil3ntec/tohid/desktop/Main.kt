@@ -452,7 +452,7 @@ private fun ShortcutsHelp() {
       androidx.compose.ui.Modifier.fillMaxSize().background(Shop.colors.surfaceSolid)
         .verticalScroll(androidx.compose.foundation.rememberScrollState()).padding(16.dp)
     ) {
-      //  OPS-06: راهنمای همین صفحه — فقط وقتی متنش آماده است (امروز هیچ صفحه‌ای؛ جای خالی دیده نمی‌شود)
+      //  OPS-06: راهنمای همین صفحه — فقط وقتی متنش آماده است (۱۶ صفحه؛ جای خالی هرگز دیده نمی‌شود)
       val guide = ir.vil3ntec.tohid.core.guide.ScreenGuides.forScreen(ir.vil3ntec.tohid.ui.AppNav.screen.value)
       if (guide != null) {
         val lang = ir.vil3ntec.tohid.LocaleChoice.lang.code
