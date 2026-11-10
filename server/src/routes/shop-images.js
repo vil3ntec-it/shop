@@ -13,6 +13,7 @@
  *   POST /:id/propose                 پیشنهاد به بانکِ مرکزی — فقط صاحبِ دکان، با اجازهٔ صریح
  *   POST /:id/report                  «عکسِ اشتباه / بستهٔ قدیمی»
  *   POST /:id/process                 مرحلهٔ پردازش — بیرونی‌ها ۵۰۳ و بی هیچ ارسالی
+ *   POST /:id/detach                  برداشتنِ عکسِ تکمیلی از کالا (PRD-17)؛ اصل می‌ماند
  *   GET  /file/:id/:version/:size     خودِ فایل (دسترسی برای هر درخواست سنجیده می‌شود)
  *
  * ⛔ پیش‌فرض خاموش: بی پرچمِ `shop.image_bank` همه‌چیز ۴۰۳ است و هیچ ردیفی
@@ -22,6 +23,7 @@
  */
 const express = require('express');
 const bank = require('../lib/image-bank');
+const extras = require('../lib/image-bank-extras');   //  PRD-17: برداشتنِ عکسِ تکمیلی از کالا
 const upload = require('../lib/image-upload');
 const pipeline = require('../lib/image-pipeline');
 const audit = require('../lib/audit');
@@ -35,21 +37,33 @@ const router = express.Router();
 const BASE = '/api/shop/images';
 const body = (max) => express.raw({ type: () => true, limit: max + 1024 });
 
-router.use(requireUser, requireShop, requirePermission('data.read'));
-router.use(rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => req.shopId }));
-router.use(async (req, res, next) => {
+//  A16: نوشتن در بانکِ تصویر یعنی عکسِ کالا ⇐ همان `canWrite(role, 'products')`ِ هسته
+const canWriteProducts = (req, res, next) => (require('../lib/perm-core').canWrite(req.role, 'products')
+  ? next() : next(forbidden('عکسِ کالا در حدِ نقشِ شما نیست', 'table_not_allowed')));
+const write = [requirePermission('data.write'), canWriteProducts];
+const bankOn = async (req, res, next) => {
   if (!(await bank.shopEnabled(req.shopId))) {
     return next(forbidden('بانکِ تصاویر برای این دکان روشن نیست', 'image_bank_disabled'));
   }
   next();
+};
+
+//  PRD-17: برداشتنِ عکسِ تکمیلی از کالا — سقفِ نرخِ IP پیش از احراز (سوار پیش از `router.use(requireUser…)`)، سپس همان
+//  زنجیرهٔ کلِ روتر: احراز، همان سطلِ دکان (`imgbank`، کلیدِ یکسان ⇒ سطلِ مشترک)، پرچم و «نوشتنِ عکسِ کالا»
+router.post('/:id/detach', rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'imgbank-detach-ip' }), requireUser, requireShop, requirePermission('data.read'), rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => req.shopId }), bankOn, requirePermission('data.write'), canWriteProducts, async (req, res) => {
+  const out = await extras.detach(req.shopId, String(req.params.id || ''));
+  if (out.detached) {
+    await audit.log({
+      shopId: req.shopId, userId: req.user.id, action: 'image.detached', targetType: 'image', targetId: out.image_id,
+      ip: clientIp(req), detail: { product_id: out.product_id },
+    });
+  }
+  res.json(out);
 });
 
-//  A16: نوشتن در بانکِ تصویر یعنی عکسِ کالا ⇐ همان `canWrite(role, 'products')`ِ هسته
-const write = [
-  requirePermission('data.write'),
-  (req, res, next) => (require('../lib/perm-core').canWrite(req.role, 'products')
-    ? next() : next(forbidden('عکسِ کالا در حدِ نقشِ شما نیست', 'table_not_allowed'))),
-];
+router.use(requireUser, requireShop, requirePermission('data.read'));
+router.use(rateLimit({ max: config.rateLimit.syncMax, keyPrefix: 'imgbank', key: (req) => req.shopId }));
+router.use(bankOn);
 //  بدنهٔ خام + سنجشِ `X-Content-SHA256` اگر برنامه فرستاده باشد (IMG-14؛ بی سرآیند همان پیشین)
 const bufOf = (req) => {
   const buf = rawBody(req);

@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.data.repo
 import ir.vil3ntec.tohid.core.net.ApiClient
 import ir.vil3ntec.tohid.core.net.ApiResult
 import ir.vil3ntec.tohid.core.promo.PromoCore
+import ir.vil3ntec.tohid.core.promo.PromoHeld
 import ir.vil3ntec.tohid.data.PermPolicy
 import ir.vil3ntec.tohid.data.PromoJson
 import kotlinx.serialization.json.JsonArray
@@ -53,6 +54,17 @@ class PromoRepository(private val api: ApiClient) {
   suspend fun release(saleId: String): ApiResult<Unit> = result {
     api.post("$ROOT/redeem/release", buildJsonObject { put("saleId", saleId) })
     Unit
+  }
+
+  /**
+   *  PRM-02 — کدهای نگه‌داشته برای آزادِ دستیِ صاحب/مدیر (`GET /redemptions`؛ فقط دارندهٔ `sales.cancel`).
+   *  خطا ⇒ `ApiFailure` با `status` و `code` ِ سرور (`PromoHeld.access`).
+   */
+  suspend fun held(): ApiResult<PromoHeld.Page> = result { PromoHeld.parse(api.get(PromoHeld.PATH)) }
+
+  /** PRM-02 — آزادِ دستیِ یک فاکتورِ لغوشده: همان `POST /redeem/release`، با شمارِ آزادشده (`PromoHeld.releaseOutcome`) */
+  suspend fun releaseHeld(saleId: String): ApiResult<Int> = result {
+    PromoHeld.releasedOf(api.post(PromoHeld.RELEASE_PATH, PromoHeld.releaseBody(saleId)))
   }
 
   private companion object {

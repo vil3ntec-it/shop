@@ -109,6 +109,16 @@
 - تصمیمِ صاحب‌کار: SEC-03 — رد (نه فقط رویداد) برای دستگاهِ بی زنجیره و `/api/sync` وقتی `shop.doc_chain` روشن است (برنامهٔ کهنه ویرایشش رد می‌شود)، و پیش‌فرضِ خودِ `shop.doc_chain`؛
   S48 — پیش‌فرضِ «گزارشِ تازه» (`report_fresh`) و `shop.owner_report`؛ S70 — `market.directory` و `market.product_details`.
 - قدمِ بعدی: شاهدِ CI ِ دسته (نام‌به‌نام) برای `finalized-sales-bound`، `market-units`، `market-same-units`، `web-store-same` و `DayEndTest`؛ نگهبانِ سندهای برگشت/قرض/خرید (S89).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/app-gaps-4` (سه کمبودِ برنامه با سرورِ موجود: PRM-02، PRD-17، PRD-27؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) PRM-02: صاحب/مدیر نمی‌دانست کدام فاکتور کد را نگه داشته ⇒ درِ تازهٔ `GET /api/shop/promos/redemptions` (فقط `mayCancel`، پرچمِ `shop.promo_uses`،
+  سقفِ IP پیش از احراز، ۲۰۰ ردیف + `more`، بی شناسهٔ کاربر/دستگاه) و صفحهٔ «تنظیمات ← فروش ← کدهای تخفیفِ نگه‌داشته» (`core/promo/PromoHeld`) که فقط فاکتورِ
+  لغوشدهٔ دفترِ همان دستگاه را با همان `POST /redeem/release` آزاد می‌کند. (۲) PRD-17/27: صفحهٔ «عکس‌های بیشتر و ویترین» (`products/{id}/photo/gallery`،
+  `core/image/ProductGallery`): تکمیلی با نقش روی همان `POST /api/shop/images` بی `select`؛ عکسِ جدای ویترین با نقشِ `promo` + `select`؛ `ImageBank.uploadOwn` آن را با
+  عکسِ تازهٔ دستگاه کنار نمی‌زند؛ «برداشتن از کالا» با درِ تازهٔ `POST /api/shop/images/:id/detach` (اصل می‌ماند). آزمون: `promo-held` ۵/۵ و `image-bank-extras` ۳/۳
+  روی PGlite و PostgreSQL ِ محلی (پیش از دو در سرخ)؛ `promo-redemptions`، `shop-promos`، `image-bank`، `shop-route-inventory`، `tenant-matrix`، `route-authz-inventory`، `paid-routes-entitlement` سبز.
+- نیمه‌کاره: Kotlin (`PromoHeldTest`، `ProductGalleryTest`، `PromoHeldStateTest`، `ProductGalleryStateTest`، دو `Feature` ِ `V3ReachabilityTest`) فقط در CI.
+  گالریِ چندعکسی در خودِ ویترین سمتِ سرور ندارد (تصمیمِ صاحب‌کار)؛ فاکتورِ «نارسیده» (سبدِ ثبت‌نشده) در فهرست دکمه ندارد (تصمیمِ صاحب‌کار).
+- قدمِ بعدی: شاهدِ CI ِ چهار آزمونِ Kotlin و سپس STATUS ِ سه ردیف.
 ### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
 - انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
 - قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.
