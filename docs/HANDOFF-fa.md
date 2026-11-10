@@ -88,6 +88,27 @@
 - نیمه‌کاره: Kotlin فقط در CI (`SyncOutageTest`، `SyncOutageVectorsTest`، `SyncV3EngineTest`، `SyncV1CoreTest`، `PhoneHomeModelTest`، `SettingsModelsTest`)؛
   STATUS همان PARTIAL. «کنترلِ هجوم پس از وصلِ دوباره» در دستگاه نیست (رویدادِ `online` ِ وب همان دم یک دور می‌زند)؛ `Retry-After` نادیده (تصمیمِ صاحب‌کار).
 - قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin؛ اگر صاحب‌کار خواست، پراکندگیِ دورِ نخست پس از `online`/بازگشتِ شبکه و پذیرفتنِ `Retry-After` (با سقف).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/posted-docs` (SEC-03/S89: سندهای مالیِ دیگر و «زنده کردن»؛ روی `claude/code-gaps` ‏99220d4b؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **S89، سندهای دیگر:** برگشت، قرض/رسید، خرید و حرکتِ انبار با همان پرچمِ `shop.doc_chain` و همان `enforce`/`log` ِ فاکتور (`lib/finalized-sales.js` `DOC_FIXED`/`checkDoc`،
+  `doc_posted_edit_forbidden`؛ آزاد: فیلدِ غیرمالی، دلتای `paidAmount`/`debt` ِ خرید، ادغامِ مشتری). (۲) **زنده کردن:** ردیفِ حذف‌شدهٔ با محتوا (`deadOf`) دیگر «ثبتِ تازه» نیست ⇒ v1،
+  راهِ قدیم، API و بازگرداندنِ تعارضِ مدیر روی فاکتور/سندِ حذف‌شده `*revive*` (زنجیره‌دار رد). `sync-v1.js` ِ مشترک دست نخورد؛ `lib/sync.js` فقط کدِ رد را می‌رساند.
+  آزمون: `posted-docs.test.js` ۸/۸ روی PGlite و PostgreSQL (پیش از رفع ۷ سرخ). شرح در RULES «v3 · سابقهٔ عملیات و زنجیرهٔ هش» و SECURITY-AUDIT بندِ B6.
+- نیمه‌کاره/باز: `restoreDeleted` ِ `lib/sync-v1.js` (مشترک با پمپ) بی نگهبان ولی بی درِ HTTP؛ برنامهٔ زنجیره‌دار قرض و حرکت را سرِ جا پاک می‌کند (`DebtorEngine.deleteTransaction`،
+  حذفِ مشتری/کالا/ورودی) ⇒ با پرچمِ روشن «rejected» — باید سندِ معکوس بسازد؛ شاهدِ CI نیست.
+- تصمیمِ صاحب‌کار: حذفِ v1 ِ برگشت/قرض/خرید از دستگاهِ زنجیره‌دار رد بماند (SEC-03) یا مثلِ v3 «لغو» شمرده شود؛ پیش‌فرضِ `shop.doc_chain` همان تصمیمِ پیشین.
+- قدمِ بعدی: شاهدِ CI برای `posted-docs`؛ در برنامه به‌جای «حذفِ قرض» رسیدِ قرینه (سندِ معکوس) وقتی زنجیره روشن است.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/code-gaps` (شکاف‌های کدیِ S70، SEC-03 و S48؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **SEC-03، بازبینیِ خصمانه:** نگهبانِ S89 حالتِ `enforce` را فقط از `device_id` ِ بدنه می‌گرفت ⇒ نشستِ دستگاهِ زنجیره‌دار با شناسهٔ تازه (v1) یا از `/api/sync`
+  مبلغِ فاکتورِ ثبت‌شده را سرِ جا عوض می‌کرد. حالا «زنجیره‌دار» = شناسهٔ ادعاشده یا دستگاهِ نشست (`lib/finalized-sales.js` `chainDevice`/`boundOf`؛ `lib/sync.js` و
+  `routes/sync.js` `boundDevice`)؛ راهِ قدیم با نشست/شناسهٔ زنجیره‌دار ۴۰۹. `sync-v1.js` ِ مشترک دست نخورد. آزمون: `finalized-sales-bound.test.js` ۵/۵ (PGlite و PostgreSQL، پیش از رفع ۳ سرخ).
+  (۲) **S70:** `market-units.sizeOfItem` (اندازهٔ واحدِ بی عدد از `saleUnit` و `packs`، فقط نامِ روشن و نسبتِ دقیق) در `sameProduct`؛ رابطِ وب «همین کالا در دکان‌های دیگر» روی برگهٔ
+  کالای ویترین (`store/same.js` ِ دیربار + واژه‌نامهٔ `same`، فقط با `bankProductId`)؛ آزمون‌ها: `market-units` ۶/۶، `market-same-units` ۲/۲ (هر دو پایگاه)، `web-store-same.mjs` ۲۹ ✅ با axe.
+  (۳) **S48:** شکافِ کدی نماند؛ PENDING ِ کهنهٔ `scenario-s48` درست شد و `S48.keys` حالا Enter ِ `reports.drill` را هم می‌سنجد.
+- نیمه‌کاره/باز: سندهای برگشت/قرض/خرید/حرکت نگهبانِ «ثبت‌شده» ندارند؛ ویرایشِ فاکتورِ حذف‌شده آن را با محتوای تازه زنده می‌کند (حذف فقط از راهِ `log`)؛ برنامهٔ خریدِ مشتری
+  «همین کالا» را ندارد؛ نشستِ بی زنجیره همچنان `log` (F0-02).
+- تصمیمِ صاحب‌کار: SEC-03 — رد (نه فقط رویداد) برای دستگاهِ بی زنجیره و `/api/sync` وقتی `shop.doc_chain` روشن است (برنامهٔ کهنه ویرایشش رد می‌شود)، و پیش‌فرضِ خودِ `shop.doc_chain`؛
+  S48 — پیش‌فرضِ «گزارشِ تازه» (`report_fresh`) و `shop.owner_report`؛ S70 — `market.directory` و `market.product_details`.
+- قدمِ بعدی: شاهدِ CI ِ دسته (نام‌به‌نام) برای `finalized-sales-bound`، `market-units`، `market-same-units`، `web-store-same` و `DayEndTest`؛ نگهبانِ سندهای برگشت/قرض/خرید (S89).
 ### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
 - انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
 - قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.
