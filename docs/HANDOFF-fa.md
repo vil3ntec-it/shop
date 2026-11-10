@@ -83,6 +83,17 @@
   نام‌به‌نام دیده نمی‌شوند. شاهدِ دیده‌شده در WEB-11 و MKT-02 ثبت شد (JS، مرورگر و `<testsuite>` ِ iOS برای `ShopperAccountTest` ۸ و `ShopperStage2Test` ۷).
 - نیمه‌کاره: سه ردیفِ بالا تا شاهدِ نام‌به‌نامِ Kotlin.
 - قدمِ بعدی: گامِ `grep -ho '<testsuite [^>]*'` (مثلِ `ios-spike.yml`) پس از آزمونِ اندروید/کامپیوتر/برنامهٔ خرید، یا `events` در `testLogging`؛ سپس همین سه ردیف.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ntf-refund` (NTF-08: پیامِ هر بازپرداخت به مشتری؛ روی main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ردیفِ تازهٔ دفترِ بازپرداخت (بخشی/پایانی/کامل) در همان تراکنش یک ردیفِ `customer_notify_outbox` می‌سازد (`onRefundIn`)؛ مهاجرتِ ۴۹۶ (+rollback):
+  ستونِ `refund_id`، رویدادِ `order_refund:<refund_id>` و CHECK ِ تازهٔ `event` که آن را به `refund_id` می‌بندد، FK به بازپرداختِ همان سفارش؛
+  UNIQUE (order_id, event) ِ ۱۴۳ عمداً ماند (نسخهٔ پیش با `ON CONFLICT (order_id, event)` باید بنویسد، OPS-03). متن با مبلغِ همان بازپرداخت
+  (`store-alert-push.money`) و شمارهٔ سفارش، fa/ps/en؛ پشتِ `shop.customer_notify` + `shop.orders.refund_tracking` (بی پرچمِ تازه)؛ فقط کانالِ رایگان.
+  پوشِ وب: `store-push.quietOf` ⇒ با این پرچم‌ها اشتراک پس از تحویل تا بسته شدنِ بازپرداخت می‌ماند، کارت با شرحِ `np.hint.rf`، برچسبِ جدای هر
+  بازپرداخت. برنامهٔ دکان: نامِ `order_refund` و `order_late_apology` در `OrderNoticesUi.kt`. رفعِ کوچک: جایگزینیِ `render` با تابع (نامِ ویترینِ دارای `$&`).
+  آزمون: `customer-notify-refund.test.js` ۱۵/۱۵ (PGlite و PostgreSQL ِ محلی؛ پیش از کد ۱۲ سرخ)، `web-store-refund-push.mjs` ۲۶ ✅ (هر دو پایگاه؛ پیش از کد سرخ).
+- نیمه‌کاره: شاهدِ CI؛ Kotlin فقط در CI (دو رشته و دو شاخهٔ `when`، بی آزمونِ تازهٔ Kotlin — هم‌سانی با آزمونِ سرور قفل است)؛ نمای برنامهٔ خرید (native).
+- تصمیمِ صاحب‌کار: پیامِ بازپرداخت تنها پیامی است که مبلغ دارد (روی صفحهٔ قفلِ گوشی هم دیده می‌شود؛ همان مبلغی که صفحهٔ پیگیری با همین پرچم نشان می‌دهد)؛ پیامک برای آن نیست.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ NTF-08 (هنوز PARTIAL به‌خاطرِ برنامهٔ خرید).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):
