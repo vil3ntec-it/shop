@@ -118,11 +118,13 @@ test('پیش‌فرض خاموش: کلیدِ همین مرورگر فقط با �
   assert.doesNotThrow(() => C.install(), 'در Node (بی document) کاری نمی‌کند');
 });
 
-test('بارکننده و سرویس‌ورکر v72؛ index.html ِ یخ‌زده دست‌نخورده؛ بی innerHTML/صفتِ style/eval', () => {
+test('بارکننده و سرویس‌ورکر v72 یا تازه‌تر؛ index.html ِ یخ‌زده دست‌نخورده؛ بی innerHTML/صفتِ style/eval', () => {
   assert.match(read('license/shop-sync.js'), /src: 'license\/catalog-match\.js\?v=1'/);
   const sw = read('sw.js');
   assert.ok(sw.includes("'./license/catalog-match.js'"), 'نصبِ آفلاین هم پرونده را دارد');
-  assert.match(sw, /'tohid-shop-v72'/);
+  //  همان نسخه‌ای که این پرونده را آورد یا تازه‌تر (دسته‌های بعدی نسخه را بالا می‌برند؛ پایین آمدن یعنی کشِ کهنه)
+  const ver = Number((sw.match(/'tohid-shop-v(\d+)'/) || [])[1]);
+  assert.ok(ver >= 72, `نسخهٔ سرویس‌ورکر ${ver}`);
   assert.ok(!read('index.html').includes('catalog-match'), 'index.html یخ‌زده است: بارکننده shop-sync.js');
   assert.ok(!/\bfunction (searchKey|compareKey|typoBudget)\b/.test(src), 'یک‌شکل کردن فقط از text-core.js، نه رونوشت');
   for (const [bad, re] of [
