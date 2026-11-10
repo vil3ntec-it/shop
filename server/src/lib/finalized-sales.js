@@ -48,6 +48,9 @@
  *   فیلدِ مالی عوض نمی‌شود، حذف هرگز؛ آزاد: هر فیلدِ بیرونِ فهرست (یادداشت، سررسید، شیفت، برچسب‌ها)، دلتای
  *   شمارندهٔ خرید (`paidAmount`/`debt`، همان `counters` ِ v3) و مشتریِ قرض فقط با ادغام (CRM-10). درجِ دوبارهٔ همان
  *   سند مثلِ فاکتور «replay». اصلاح فقط با سندِ معکوس (رسیدِ قرینه، برگشت به تأمین‌کننده، حرکتِ تعدیل).
+ *   RPT-04: ردیف‌های صندوق در سابقه (`auditLog` با نوعِ **ذخیره‌شدهٔ** `SHIFT_DOCS`: اولِ صندوق، Z ِ بسته در `z`،
+ *   ورود/خروجِ نقد، کشو بی فروش، بررسی و ادامهٔ شیفت) هم همین‌اند؛ ردیف‌های دیگرِ سابقه آزاد. اصلاحِ Z فقط سندِ تازه
+ *   (`shift_review`)؛ Sync v3 خودش `auditLog` را فقط‌افزودنی می‌داند (`log`).
  * ── زنده کردن ─────────────────────────────────────────────────────────────────────────────
  *   ردیفِ حذف‌شده با محتوا (`deadOf`) «ثبتِ تازه» نیست: هر نوشتنی جز حذف روی آن ویرایشِ سندِ ثبت‌شده است و
  *   `*revive*` می‌گیرد (enforce ⇒ رد و ردیف حذف‌شده می‌ماند؛ درجِ دوبارهٔ همان محتوا «replay»). پیش‌تر v1 و راهِ قدیم
@@ -89,7 +92,12 @@ const DOC_FIXED = Object.freeze({
   purchases: Object.freeze(['productId', 'supplierId', 'quantity', 'purchasePrice', 'totalAmount', 'paidAmount', 'debt',
     'unitQtyMilli', 'unitFactorMilli', 'date', 'createdAt']),
   stockMovements: Object.freeze(['productId', 'type', 'qty', 'refId', 'locationId', 'toLocationId', 'lotId', 'date', 'createdAt']),
+  //  RPT-04: فقط ردیف‌های صندوق ([SHIFT_DOCS]، با نوعِ ردیفِ ذخیره‌شده)؛ مُهر و حلقهٔ زنجیرهٔ سابقه (STF-09) بیرونِ فهرست
+  auditLog: Object.freeze(['type', 'refId', 'amount', 'amountMinor', 'z', 'notes', 'note', 'reason', 'by', 'approvedBy',
+    'drawer', 'date', 'createdAt']),
 });
+/** RPT-04 — نوع‌های سابقه که سندِ صندوق‌اند: X/Z از آن‌ها ساخته می‌شود و Z ِ بسته در `shift_close.z` است */
+const SHIFT_DOCS = new Set(['shift_open', 'shift_close', 'shift_review', 'shift_resume', 'cash_in', 'cash_out', 'no_sale']);
 /** شمارنده‌های سندِ معکوس: فقط دلتا (`$inc`) آزاد است */
 const DOC_COUNTERS = Object.freeze({ purchases: Object.freeze(['paidAmount', 'debt']) });
 const DOC_REASON = 'doc_posted_edit_forbidden';
@@ -366,6 +374,7 @@ class Guard {
   /** سندِ مالیِ دیگر (`DOC_FIXED`) روی [cur] (زنده یا حذف‌شده، [dead]) ⇐ همان سه پاسخِ `check` */
   async checkDoc(c, { table, rowId, type, fields = {}, full = false }, cur, dead) {
     if (!cur) return null;                                    //  سندِ تازه: ثبت
+    if (table === 'auditLog' && !SHIFT_DOCS.has(cur.type)) return null;   //  ردیفِ دیگرِ سابقه: همان امروز
     let changed;
     if (type === 'delete') changed = ['*delete*'];
     else {
@@ -584,6 +593,7 @@ async function adminRestoreCheck(conflictId, { adminId = '', ip = '' } = {}) {
 const LEGACY = Object.freeze({
   sales: 'sales', saleItems: 'sale_items', debtors: 'debtors',
   returns: 'sale_returns', transactions: 'payments', purchases: 'purchases', stockMovements: 'stock_movements',
+  auditLog: 'shop_audit_log',
 });
 
 /** ردیفِ راهِ قدیم ⇐ داده یا null؛ `dead`: حذف‌شده با محتوا (همان `v1RowOf`) */
@@ -627,6 +637,6 @@ const forbiddenError = (reason = REASON) => (reason === DOC_REASON
   : conflict('فاکتورِ ثبت‌شده ویرایش یا حذف نمی‌شود؛ اصلاح فقط با لغو یا برگشت (سندِ معکوس)', REASON));
 
 module.exports = {
-  REASON, DOC_REASON, PROBLEM, VOID_PROBLEM, SALE_FIXED, SALE_ONCE, ITEM_FIXED, DOC_FIXED, voidChainOf,
+  REASON, DOC_REASON, PROBLEM, VOID_PROBLEM, SALE_FIXED, SALE_ONCE, ITEM_FIXED, DOC_FIXED, SHIFT_DOCS, voidChainOf,
   v1Guard, legacyGuard, adminRestoreCheck, forbiddenError, nextSale,
 };

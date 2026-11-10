@@ -17,6 +17,7 @@ import kotlinx.serialization.json.longOrNull
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 /**
@@ -38,6 +39,8 @@ class SaleCapsVectorsTest {
   private fun JsonObject.l(k: String): Long = getValue(k).jsonPrimitive.long
   private fun JsonObject.s(k: String): String = getValue(k).jsonPrimitive.content
   private fun JsonObject.ln(k: String): Long? = (get(k) as? JsonPrimitive)?.longOrNull
+  /** تصمیمِ ۱-۱۱ (۳): `wholesale` ِ بردار؛ نیامده ⇒ درست (همان پیش‌فرضِ هسته) */
+  private fun JsonObject.ws(): Boolean = (get("wholesale") as? JsonPrimitive)?.booleanOrNull ?: true
   private fun rows(k: String): List<JsonObject> = v.getValue(k).jsonArray.map { it.jsonObject }
 
   private fun ref(e: JsonElement?): SaleCaps.Ref? {
@@ -56,6 +59,7 @@ class SaleCapsVectorsTest {
     id = o.s("id"), totalMinor = o.l("totalMinor"), discountMinor = o.l("discountMinor"), finalTotalMinor = o.ln("finalTotalMinor"),
     roundingMinor = o.ln("roundingMinor") ?: 0, debtGivenMinor = o.ln("debtGivenMinor") ?: 0, date = o.s("date"),
     priorDebtMinor = o.ln("priorDebtMinor") ?: 0, loyaltyMinor = o.ln("loyaltyMinor") ?: 0,
+    wholesale = (o["wholesale"] as? JsonPrimitive)?.booleanOrNull ?: false,
   )
 
   private fun need(o: JsonObject) = ApprovalSlip.Need(o.s("perm"), o.s("doc"), o.ln("pctBp"), o.ln("amount"))
@@ -78,7 +82,7 @@ class SaleCapsVectorsTest {
   @Test
   fun grossAndRefs() {
     for (r in rows("gross")) assertEquals(r.l("out"), SaleCaps.gross(r.l("unit"), r.l("qty")), r.toString())
-    for (r in rows("refs")) assertEquals(r.getValue("out").jsonArray.map { it.jsonPrimitive.long }, SaleCaps.refUnits(ref(r["product"])!!, r.s("date")), r.toString())
+    for (r in rows("refs")) assertEquals(r.getValue("out").jsonArray.map { it.jsonPrimitive.long }, SaleCaps.refUnits(ref(r["product"])!!, r.s("date"), r.ws()), r.toString())
   }
 
   /** پخشِ امتیاز همان `Loyalty.split` ِ صندوق است که `sale-caps.split` ِ سرور هم همان را می‌دهد */
@@ -98,7 +102,7 @@ class SaleCapsVectorsTest {
     assertTrue(all.size >= 15)
     for (r in all) {
       val o = r.getValue("out").jsonObject
-      val got = SaleCaps.line(line(r.getValue("line").jsonObject), ref(r["product"]), r.s("date"))
+      val got = SaleCaps.line(line(r.getValue("line").jsonObject), ref(r["product"]), r.s("date"), r.ws())
       assertEquals(
         SaleCaps.LineCheck(o.getValue("exempt").jsonPrimitive.boolean, o.l("listMinor"), o.l("soldMinor"), o.l("deviationBp"), o.l("reductionMinor")),
         got, r.s("_"),
@@ -134,6 +138,19 @@ class SaleCapsVectorsTest {
         .map { it.perm to PermCore.evaluate(r.s("role"), layers, it.perm, SaleCaps.req(it)).decision }
       assertEquals(r.getValue("out").jsonArray.map { it.jsonObject.let { o -> o.s("perm") to o.s("decision") } }, got, r.s("_"))
     }
+  }
+
+  /** تصمیمِ ۱-۱۱ (۲): قلمِ آزاد همان `isFree` ِ سرور — بی کارت یا کالای ناشناخته، مقدارِ مثبت */
+  @Test
+  fun freeLineIsALineWithoutAProductCard() {
+    val refs = mapOf("p1" to SaleCaps.Ref(100_000))
+    assertTrue(SaleCaps.isFree(SaleCaps.Line("", 5_000, 1_000), refs))
+    assertTrue(SaleCaps.isFree(SaleCaps.Line(" ", 0, 1_000), refs))
+    assertTrue(SaleCaps.isFree(SaleCaps.Line("p9", 5_000, 1_000), refs))
+    assertFalse(SaleCaps.isFree(SaleCaps.Line("p1", 5_000, 1_000), refs))
+    assertFalse(SaleCaps.isFree(SaleCaps.Line("", 5_000, 0), refs))
+    assertFalse(SaleCaps.isFree(SaleCaps.Line("", -1, 1_000), refs))
+    assertTrue(rows("needs").any { r -> r.getValue("out").jsonArray.any { it.jsonObject.s("perm") == SaleCaps.FREE_LINE } })
   }
 
   @Test

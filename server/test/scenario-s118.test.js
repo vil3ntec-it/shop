@@ -134,3 +134,68 @@ test('S118.expiry: نشانیِ خصوصیِ رسانه با توکنِ منقض
   assert.equal(gone.body.error.code, 'media_gone');
   await assert.rejects(chat.getMedia(customer, conv, up.body.mediaId), (e) => e.code === 'media_gone');
 });
+
+test('S118.customer: درِ مشتری (/api/store/:slug/chat) با بلیتِ منقضی، دست‌خورده یا لغوشده ۴۰۱ است و نه پیام می‌دهد نه رسانه', async () => {
+  const sf = require('../src/lib/storefront');
+  const customers = require('../src/lib/store-customers');
+  const o = await chatShop('بلیتِ منقضی');
+  for (const key of ['shop.orders', 'shop.storefront']) {
+    const f = await h.put('/api/admin/pump/live-config', { scope: o.shopId, key, value: true }, { token: admin });
+    assert.equal(f.status, 200, JSON.stringify(f.body));
+  }
+  const slug = `s118-${Date.now().toString(36)}`;
+  const put = await h.put('/api/shop/storefront', { slug, enabled: true, title: 'ویترینِ S118', contactPhone: '0700000118' }, { token: o.token });
+  assert.equal(put.status, 200, JSON.stringify(put.body));
+  const start = await h.post(`/api/store/${slug}/verify/start`, { phone: '0790001182' });
+  assert.equal(start.status, 200, JSON.stringify(start.body));
+  const check = await h.post(`/api/store/${slug}/verify/check`, { phone: '0790001182', code: start.body.devCode });
+  assert.equal(check.status, 200, JSON.stringify(check.body));
+  const ticket = check.body.ticket;
+  const phone = sf.parseTicket(ticket).phone;
+  const door = `/api/store/${slug}/chat`;
+  const pub = (method, path, t, body = null) => h.api(method, `${door}${path}`, { body, headers: t ? { 'X-Store-Ticket': t } : {} });
+  const bytes = async (path, t) => {
+    const res = await fetch(`${h.base()}${door}${path}`, { headers: t ? { 'X-Store-Ticket': t } : {} });
+    return { status: res.status, buffer: Buffer.from(await res.arrayBuffer()) };
+  };
+
+  //  بلیتِ زنده: گفت‌وگو، عکس و پیام از همین در
+  const opened = await pub('POST', '/conversations', ticket, { name: 'نادر' });
+  assert.equal(opened.status, 201, JSON.stringify(opened.body));
+  const conv = opened.body.conversation.id;
+  const pic = jpeg(7);
+  const up = await h.raw('POST', `${door}/conversations/${conv}/media`, pic, { headers: { 'X-Store-Ticket': ticket, 'Content-Type': 'image/jpeg' } });
+  assert.equal(up.status, 201, JSON.stringify(up.body));
+  const sent = await pub('POST', `/conversations/${conv}/messages`, ticket, { clientId: cid(), kind: 'image', mediaId: up.body.mediaId });
+  assert.equal(sent.status, 201, JSON.stringify(sent.body));
+  const media = `/conversations/${conv}/media/${up.body.mediaId}`;
+  assert.equal((await bytes(media, ticket)).buffer.length, pic.length);
+
+  //  همان شماره و همان نسل، فقط زمانِ گذشته ⇒ تنها فرقِ این بلیت با بلیتِ زنده «منقضی بودن» است
+  const ttl = require('../src/config').storefront.ticketTtlMs;
+  const gen = await customers.ticketGen(phone);
+  const expired = sf.ticketOf(phone, now() - ttl - 60_000, gen).ticket;
+  const fresh = sf.ticketOf(phone, now(), gen).ticket;
+  assert.equal((await pub('GET', '/conversations', fresh)).status, 200, 'بلیتِ ساختگیِ تازه با همان کلید پذیرفته است');
+  const before = Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1', [conv])).n);
+  for (const t of [expired, h.tampered(ticket), '']) {
+    for (const [method, path, body] of [
+      ['GET', '/conversations', null], ['GET', `/conversations/${conv}`, null], ['GET', `/conversations/${conv}/messages?after=0`, null],
+      ['POST', `/conversations/${conv}/messages`, { clientId: cid(), body: 'پس از انقضا' }],
+    ]) {
+      const r = await pub(method, path, t, body);
+      assert.equal(r.status, 401, `${method} ${path}`);
+      assert.equal(r.body.error.code, 'verification_required');
+      assert.equal(JSON.stringify(r.body).includes('پس از انقضا'), false);
+    }
+    const m = await bytes(media, t);
+    assert.equal(m.status, 401);
+    assert.notEqual(m.buffer.length, pic.length);
+  }
+  assert.equal(Number((await one('SELECT COUNT(*)::int AS n FROM shop_chat_messages WHERE conversation_id=$1', [conv])).n), before);
+
+  //  «خروج از همه‌جا» (نسلِ تازه) ⇒ همان بلیتی که تا الان زنده بود هم ۴۰۱
+  await customers.revokeTickets(phone);
+  assert.equal((await pub('GET', `/conversations/${conv}/messages?after=0`, ticket)).status, 401);
+  assert.equal((await bytes(media, ticket)).status, 401);
+});

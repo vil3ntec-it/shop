@@ -1,13 +1,16 @@
 /**
  * نسخهٔ وب — «گزارشِ تازه» (RPT-01/02/03/06/09/11) و کارت‌های خانه (v3 §۱۹.۵ بند ۲)، با مرورگرِ واقعی.
  *
- *   • پیش‌فرض خاموش: داشبورد و صفحهٔ گزارش همان امروزند
+ *   • تصمیمِ ۳-۲۲: پیش‌فرض روشن؛ مرورگری که خودش خاموش کرد (`'0'`) همان داشبورد و صفحهٔ گزارشِ پیشین را دارد
  *   • هستهٔ گزارش و تابلو در مرورگر همان پاسخِ آزمون‌های مرجع را می‌دهند (report-v1 و report-board-v1)
  *   • کارتِ خانه = جمعِ فهرستی که با کلیک باز می‌شود؛ نشانِ وضعیت «متن + رنگ + نقطه»
  *   • RPT-03: سود با روشِ مصوب (میانگینِ موزون، `costApproved`)؛ «قیمت خرید روی قلم» انتخابِ همین مرورگر و همیشه «تقریبی»
  *   • RPT-11: اکسل = ‎.xlsx‎ ِ واقعی (عدد عدد)، PDF ِ مستقیم (A4، صفحه‌بندی، سقفِ ۵۰۰ صفحه)
  *   • مرتب‌سازی با سرستون، کارت/جدول (ترجیحِ همین دستگاه)، CSV، گوشی همیشه کارت، axe
  *   • INV-16: زبانهٔ «ارزش موجودی» (`stock-value-core.js`): همان عددِ هسته، کم‌بودها زیرِ جدول، فقط برای کسی که پول را می‌بیند
+ *   • RPT-13 (§۵.۲): Ctrl+P / Ctrl+E، − / + ِ دوره، Alt+C ِ مقایسه (چیدمانِ فارسی هم)، Enter ِ ریزِ ردیف و Esc — فقط از keymap.js،
+ *     نه در کادرِ نوشتن و نه در صفحهٔ دیگر؛ عددِ دوره و ریز همان هسته (`report-period-core.js`، `invoicesOf`/`dayInvoices`)
+ *   • RPT-08: زبانهٔ «ساعت و روز» (`sales-heatmap-core.js`): جدولِ ۷ × ۲۴ با عددِ هر خانه، سرخطِ ردیف و ستون، همان هسته
  *
  * اجرا:  node test/web-report-fresh.mjs
  */
@@ -48,6 +51,7 @@ const DATE = '2026-10-14';
 const B = require(path.join(ROOT, 'license/report-board.js'));
 const C = require(path.join(ROOT, 'license/report-core.js'));
 const SV = require(path.join(ROOT, 'license/stock-value-core.js'));
+const H = require(path.join(ROOT, 'license/sales-heatmap-core.js'));
 const CLOCK = { offsetMinutes: 270, dayStartMinute: 0 };
 //  RPT-03: روشِ پیش‌فرضِ صفحه همان روشِ مصوب (D-23، میانگینِ موزون) با تأییدِ هسته
 const MAVG = { costing: 'mavg', costApproved: true };
@@ -120,8 +124,21 @@ const footCell = (pg, label) => pg.evaluate(l => {
   return i < 0 ? null : t.querySelectorAll('tfoot td')[i].textContent.trim();
 }, label);
 
-await step('پیش‌فرض خاموش: داشبورد و گزارش همان امروزند', async () => {
+await step('تصمیمِ ۳-۲۲: مرورگرِ تازه (بی ترجیح) «گزارشِ تازه» را روشن می‌بیند', async () => {
   const { pg, ctx, errors } = await open();
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-fresh')), null);
+  await go(pg, 'dashboard');
+  assert.equal(await pg.locator('#dash-fresh').isVisible(), true);
+  await go(pg, 'reports');
+  assert.equal(await pg.locator('#rep-fresh').isVisible(), true);
+  assert.equal(await pg.locator('#rep-legacy').isHidden(), true);
+  assert.equal(await pg.locator('#rep-fresh-toggle').isChecked(), true);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('مرورگری که خودش خاموش کرد: داشبورد و گزارش همان پیشین‌اند', async () => {
+  const { pg, ctx, errors } = await open(1366, '0');
   await go(pg, 'dashboard');
   assert.equal(await pg.locator('#dash-fresh').isHidden(), true);
   assert.equal(await pg.locator('#dash-fresh .rf-kpi').count(), 0);
@@ -160,7 +177,7 @@ await step('هستهٔ گزارش و تابلو در مرورگر همان پا�
 });
 
 await step('روشن کردن از صفحهٔ گزارش: گزارشِ تازه جای گزارشِ امروز، و ترجیحِ همین دستگاه می‌ماند', async () => {
-  const { pg, ctx, errors } = await open();
+  const { pg, ctx, errors } = await open(1366, '0');
   await go(pg, 'reports');
   await pg.locator('#rep-fresh-toggle').check();
   assert.equal(await pg.locator('#rep-fresh').isVisible(), true);
@@ -174,6 +191,11 @@ await step('روشن کردن از صفحهٔ گزارش: گزارشِ تازه 
   await pg.locator('#rep-fresh-toggle').uncheck();
   assert.equal(await pg.locator('#rep-legacy').isVisible(), true);
   assert.equal(await pg.locator('#rep-fresh').isHidden(), true);
+  //  خاموشِ خودِ کاربر پس از بارگذاریِ دوباره هم خاموش می‌ماند (پیش‌فرضِ روشن جایش را نمی‌گیرد)
+  assert.equal(await pg.evaluate(() => localStorage.getItem('tohid-report-fresh')), '0');
+  await pg.reload(); await pg.waitForTimeout(900);
+  await go(pg, 'reports');
+  assert.equal(await pg.locator('#rep-legacy').isVisible(), true);
   assert.deepEqual(errors, []);
   await ctx.close();
 });
@@ -486,6 +508,231 @@ await step('گوشی (۳۹۰): همیشه کارت، بی کلیدِ نما؛ خ
   await ctx.close();
 });
 
+/** گزارشِ هسته برای بازهٔ [from, to] با همان ساعت و روشِ صفحه */
+const salesOf = (from, to) => C.sales(LEDGER, { from, to, clock: CLOCK, ...MAVG });
+const periodText = (pg) => pg.locator('#rep-fresh .rf-period .rf-range').textContent();
+const shiftOf = (pg) => pg.evaluate(() => window.TohidReportUi.state.shift);
+
+await step('RPT-13: − / + دورهٔ قبل و بعد (کلید و دکمه)، بی دورهٔ آینده؛ کادرِ نوشتن و صفحهٔ دیگر کلید نمی‌گیرند', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.waitForFunction(() => !!(window.TohidKeymap && window.TohidReportPeriod));
+  await pg.click('#rep-fresh button[data-rtab="sales"]');
+  await pg.click('#rep-fresh button[data-span="week"]');
+  const now = salesOf('2026-10-08', DATE).totals, prev = salesOf('2026-10-01', '2026-10-07').totals;
+  assert.equal(await footCell(pg, 'فروش خالص'), money(now.netSales));
+  const label = async (f, t) => pg.evaluate(([a, b]) => `${formatDate(a)} تا ${formatDate(b)}`, [f, t]);
+  assert.equal(await periodText(pg), await label('2026-10-08', DATE));
+  //  دورهٔ جاری: «دورهٔ بعد» خاموش و + کاری نمی‌کند
+  assert.equal(await pg.locator('#rep-fresh button[data-period="1"]').isDisabled(), true);
+  await pg.keyboard.press('NumpadAdd');
+  assert.equal(await shiftOf(pg), 0);
+  //  − ⇒ همان ۷ روز پیش از آن، با همان عددِ هسته
+  await pg.keyboard.press('Minus');
+  assert.equal(await shiftOf(pg), -1);
+  assert.equal(await periodText(pg), await label('2026-10-01', '2026-10-07'));
+  assert.equal(await footCell(pg, 'فروش خالص'), money(prev.netSales));
+  assert.equal(await pg.locator('#rep-fresh .rf-stats .rf-stat').first().locator('.v').textContent(), `${money(prev.netSales)} ؋`);
+  assert.equal(await pg.locator('#rep-fresh-live').textContent(), await label('2026-10-01', '2026-10-07'), 'صفحه‌خوان بازهٔ تازه را می‌شنود');
+  //  صفحهٔ عددی هم؛ بعد + (Shift و = ِ ردیفِ بالا) دو بار ⇒ دوباره جاری
+  await pg.keyboard.press('NumpadSubtract');
+  assert.equal(await shiftOf(pg), -2);
+  await pg.keyboard.press('Shift+Equal');
+  await pg.keyboard.press('Shift+Equal');
+  assert.equal(await shiftOf(pg), 0);
+  assert.equal(await footCell(pg, 'فروش خالص'), money(now.netSales));
+  //  دکمه هم همان کار؛ فوکوس روی همان دکمه می‌ماند
+  await pg.click('#rep-fresh button[data-period="-1"]');
+  assert.equal(await shiftOf(pg), -1);
+  assert.equal(await pg.evaluate(() => document.activeElement && document.activeElement.getAttribute('data-period')), '-1');
+  //  «این ماه» ⇒ ماهِ میلادیِ کامل پیش از آن؛ عوض کردنِ بازه دوره را صفر می‌کند
+  await pg.click('#rep-fresh button[data-span="month"]');
+  assert.equal(await shiftOf(pg), 0);
+  await pg.keyboard.press('Minus');
+  assert.equal(await periodText(pg), await label('2026-09-01', '2026-09-30'));
+  //  «همه» دوره ندارد: نه دکمه، نه کلید
+  await pg.click('#rep-fresh button[data-span="all"]');
+  assert.equal(await pg.locator('#rep-fresh .rf-period').count(), 0);
+  await pg.keyboard.press('Minus');
+  assert.equal(await shiftOf(pg), 0);
+  //  کادرِ نوشتن: − نویسه است، نه دوره
+  await pg.click('#rep-fresh button[data-span="week"]');
+  await pg.evaluate(() => { const i = document.createElement('input'); i.id = 'rf-probe'; document.getElementById('page-reports').appendChild(i); });
+  await pg.focus('#rf-probe');
+  await pg.keyboard.press('Minus');
+  assert.equal(await shiftOf(pg), 0);
+  assert.equal(await pg.inputValue('#rf-probe'), '-');
+  //  صفحهٔ دیگر: − مالِ آن صفحه است
+  await go(pg, 'sale');
+  await pg.evaluate(() => document.activeElement && document.activeElement.blur());
+  await pg.keyboard.press('Minus');
+  assert.equal(await shiftOf(pg), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-13: Alt+C «مقایسه با دورهٔ پیش» (چیدمانِ فارسی هم) — ستونِ «دورهٔ قبل» و «تغییر» و خطِ مقایسه با همان عددِ هسته', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.waitForFunction(() => !!(window.TohidKeymap && window.TohidReportPeriod));
+  await pg.click('#rep-fresh button[data-rtab="sales"]');
+  await pg.click('#rep-fresh button[data-span="week"]');
+  assert.equal(await pg.locator('#rep-fresh button[data-compare]').getAttribute('aria-pressed'), 'false');
+  //  KeyC با حرفِ «ز» ِ چیدمانِ فارسی: کلید با کدِ فیزیکی خوانده می‌شود
+  await pg.evaluate(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyC', key: 'ز', altKey: true, bubbles: true, cancelable: true })));
+  assert.equal(await pg.locator('#rep-fresh button[data-compare]').getAttribute('aria-pressed'), 'true');
+  const now = salesOf('2026-10-08', DATE), prev = salesOf('2026-10-01', '2026-10-07');
+  assert.equal(await footCell(pg, 'دورهٔ قبل'), money(prev.totals.netSales));
+  assert.equal(await footCell(pg, 'تغییر'), money(now.totals.netSales - prev.totals.netSales));
+  //  ردیف‌به‌ردیف با کلیدِ ردیف؛ ردیفِ فقط-دورهٔ-قبل در انتها با خانه‌های خالیِ این دوره
+  const rows = await pg.$$eval('#rep-fresh tbody tr', (trs) => trs.map((tr) => [...tr.children].map((td) => td.textContent.trim())));
+  const head = await pg.$$eval('#rep-fresh thead th', (ths) => ths.map((th) => th.textContent.trim()));
+  assert.deepEqual(head.slice(-2), ['دورهٔ قبل', 'تغییر']);
+  const want = now.product.map((r) => {
+    const p = prev.product.find((x) => x.key === r.key);
+    return [p ? money(p.netSales) : '—', money(r.netSales - (p ? p.netSales : 0))];
+  }).concat(prev.product.filter((p) => !now.product.some((r) => r.key === p.key)).map((p) => [money(p.netSales), money(-p.netSales)]));
+  assert.deepEqual(rows.map((r) => r.slice(-2)), want);
+  const line = await pg.locator('#rep-fresh .rf-compare').textContent();
+  const pct = (a, b) => { const bp = Math.round(((a - b) * 10000) / Math.abs(b)); const t = Math.floor((Math.abs(bp) + 5) / 10); return (bp > 0 ? '+' : bp < 0 ? '-' : '') + Math.floor(t / 10) + (t % 10 ? `.${t % 10}` : '') + '٪'; };
+  assert.ok(line.includes(`+${money(now.totals.netSales - prev.totals.netSales)} ؋`) && line.includes(pct(now.totals.netSales, prev.totals.netSales)), line);
+  assert.ok(line.includes('فاکتورها') && line.includes(`+${now.totals.invoices - prev.totals.invoices}`), line);
+  assert.equal((await pg.locator('#rep-fresh-live').textContent()).replace(/\s+/g, ' '), 'مقایسه با دورهٔ پیش: روشن');
+  //  Playwright ِ Alt+C ِ لاتین هم؛ دوباره ⇒ خاموش
+  await pg.keyboard.press('Alt+KeyC');
+  assert.equal(await pg.locator('#rep-fresh button[data-compare]').getAttribute('aria-pressed'), 'false');
+  assert.equal(await pg.locator('#rep-fresh thead th').filter({ hasText: 'دورهٔ قبل' }).count(), 0);
+  //  «سود و حاشیه» ⇒ سودِ ناخالص مقایسه می‌شود؛ دورهٔ پیش از نخستین فروش ⇒ صفر، و تغییرِ «بی پایه»
+  await pg.click('#rep-fresh button[data-compare]');
+  await pg.click('#rep-fresh button[data-rtab="profit"]');
+  assert.equal(await footCell(pg, 'دورهٔ قبل'), money(prev.totals.grossProfit));
+  await pg.keyboard.press('Minus');
+  assert.equal(await footCell(pg, 'دورهٔ قبل'), money(0));
+  assert.ok((await pg.locator('#rep-fresh .rf-compare').textContent()).includes('بی پایه'));
+  //  «ضدتقلب» مقایسه ندارد
+  await pg.click('#rep-fresh button[data-rtab="fraud"]');
+  assert.equal(await pg.locator('#rep-fresh button[data-compare]').count(), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-13: Ctrl+P چاپ و Ctrl+E اکسل ِ همان برگه (پیش‌فرضِ مرورگر گرفته می‌شود)', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.waitForFunction(() => !!window.TohidKeymap);
+  await pg.click('#rep-fresh button[data-rtab="sales"]');
+  await pg.click('#rep-fresh button[data-span="all"]');
+  await pg.evaluate(() => window.addEventListener('keydown', (e) => { window.__dp = e.defaultPrevented; }));
+  const [popup] = await Promise.all([pg.waitForEvent('popup'), pg.keyboard.press('Control+KeyP')]);
+  await popup.waitForLoadState();
+  const printed = await popup.locator('table').textContent();
+  assert.ok(printed.includes('فروش خالص') && printed.includes((salesOf('', '').totals.netSales / 100).toFixed(2)), printed.slice(0, 200));
+  assert.equal(await pg.evaluate(() => window.__dp), true, 'Ctrl+P ِ مرورگر گرفته نشد');
+  await popup.close();
+  const [dl] = await Promise.all([pg.waitForEvent('download'), pg.keyboard.press('Control+KeyE')]);
+  assert.equal(fs.readFileSync(await dl.path()).subarray(0, 2).toString(), 'PK', 'همان ‎.xlsx‎ ِ دکمهٔ «خروجی اکسل»');
+  assert.equal(await pg.evaluate(() => window.__dp), true);
+  //  برچسبِ کلید کنارِ نامِ دکمه، و aria-keyshortcuts
+  assert.equal(await pg.locator('#rep-fresh button[data-act="print"] kbd').textContent(), 'Ctrl+P');
+  assert.equal(await pg.locator('#rep-fresh button[data-act="xlsx"]').getAttribute('aria-keyshortcuts'), 'Control+E');
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-13: Enter روی ردیف ⇒ ریزِ فاکتورهای همان ردیف (جمع = همان ردیف)؛ Esc می‌بندد و فوکوس برمی‌گردد', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.waitForFunction(() => !!window.TohidKeymap);
+  await pg.click('#rep-fresh button[data-rtab="sales"]');
+  await pg.click('#rep-fresh button[data-span="all"]');
+  const all = salesOf('', '');
+  //  مرتب‌سازی با «فروش خالص» نزولی: ریزِ ردیفِ نخستینِ دیده‌شده همان کالا است، نه ردیفِ نخستِ هسته
+  const col = await pg.evaluate(() => [...document.querySelectorAll('#rep-fresh thead th')].findIndex((th) => th.textContent.trim() === 'فروش خالص'));
+  await pg.click(`#rep-fresh thead th:nth-child(${col + 1}) button`);
+  const top = [...all.product].sort((a, b) => b.netSales - a.netSales)[0];
+  const first = pg.locator('#rep-fresh tbody tr').first().locator('button[data-drill]');
+  assert.equal(await first.getAttribute('aria-label'), `ریزِ ${top.name || top.key}`);
+  await first.focus();
+  await pg.keyboard.press('Enter');
+  assert.equal(await pg.locator('#rep-fresh .rf-drill').count(), 1);
+  assert.equal(await pg.evaluate(() => document.activeElement && document.activeElement.id), 'rf-drill-h');
+  const list = C.invoicesOf(LEDGER, { dim: 'product', key: top.key, clock: CLOCK });
+  assert.equal(list.length, top.invoices);
+  assert.equal(await pg.locator('#rf-drill-h').textContent(), `ریزِ «${top.name || top.key}» — ${top.invoices} فاکتور`);
+  const drillFoot = await pg.$$eval('#rep-fresh .rf-drill tfoot td', (tds) => tds.map((td) => td.textContent.trim()));
+  assert.equal(drillFoot.at(-1), money(top.sales), 'جمعِ ریز همان «فروش» ِ ردیف');
+  const docs = await pg.$$eval('#rep-fresh .rf-drill tbody tr', (trs) => trs.map((tr) => tr.children[1].textContent.trim()));
+  assert.deepEqual(docs, list.map((x) => String(LEDGER.sales.find((s) => s.id === x.saleId).invoiceNumber)));
+  //  Esc ⇒ بسته، فوکوس روی همان ردیف
+  await pg.keyboard.press('Escape');
+  assert.equal(await pg.locator('#rep-fresh .rf-drill').count(), 0);
+  assert.equal(await pg.evaluate(() => document.activeElement && document.activeElement.getAttribute('aria-label')), `ریزِ ${top.name || top.key}`);
+  //  «امروز»: ریزِ روز همان «فروش» و «فاکتور» ِ همان ردیف
+  await pg.click('#rep-fresh button[data-rtab="today"]');
+  const t = C.today(LEDGER, { date: DATE, clock: CLOCK, ...MAVG }).today;
+  await pg.click('#rep-fresh tbody tr:first-child button[data-drill]');
+  assert.equal(await pg.locator('#rep-fresh .rf-drill tbody tr').count(), t.invoices);
+  assert.equal((await pg.$$eval('#rep-fresh .rf-drill tfoot td', (tds) => tds.map((td) => td.textContent.trim()))).at(-1), money(t.sales));
+  await pg.click('#rep-fresh button[data-act="drill-close"]');
+  assert.equal(await pg.locator('#rep-fresh .rf-drill').count(), 0);
+  //  «سنِ بدهی» ریز ندارد (هنوز)؛ نمای کارتی هم نه
+  await pg.click('#rep-fresh button[data-rtab="debts"]');
+  assert.equal(await pg.locator('#rep-fresh button[data-drill]').count(), 0);
+  assert.deepEqual(errors, []);
+  await ctx.close();
+});
+
+await step('RPT-08: «ساعت و روز» — جدولِ ۷ × ۲۴ با عددِ هر خانه و سرخطِ ردیف و ستون، همان هسته؛ پرفروش‌ترین ساعت؛ CSV؛ صندوق‌دار نمی‌بیند', async () => {
+  const { pg, ctx, errors } = await open(1366, '1');
+  await go(pg, 'reports');
+  await pg.waitForFunction(() => !!window.TohidSalesHeatmap);
+  await pg.click('#rep-fresh button[data-rtab="heatmap"]');
+  await pg.click('#rep-fresh button[data-span="all"]');
+  const h = H.build(H.events(C.ledger(LEDGER), '0000-01-01', '9999-12-31'), CLOCK.offsetMinutes, 0, 6);
+  assert.equal(h.total.count, 5, 'پنج فاکتورِ لغونشدهٔ بالحظه (s7 لحظه ندارد، s5 لغو)');
+  const grid = pg.locator('#rep-fresh table.rf-heat');
+  assert.equal(await grid.locator('caption').textContent(), 'شمارِ فروش: روز × ساعت');
+  assert.equal(await grid.locator('thead th[scope="col"]').count(), 26);
+  assert.deepEqual(await grid.locator('tbody th[scope="row"]').allTextContents(), ['شنبه', 'یکشنبه', 'دوشنبه', 'سه‌شنبه', 'چهارشنبه', 'پنجشنبه', 'جمعه']);
+  const cells = await grid.locator('tbody tr').evaluateAll((trs) => trs.map((tr) => [...tr.querySelectorAll('td')].map((td) => [td.textContent.trim(), td.className])));
+  cells.forEach((line, r) => {
+    line.slice(0, 24).forEach(([text, cls], hour) => {
+      assert.equal(text, String(h.cells[r][hour].count), `${r}×${hour}`);
+      assert.ok(cls.split(' ').includes(`rf-h${H.level(h, r, hour, 4)}`), `${r}×${hour}: ${cls}`);
+    });
+    assert.equal(line[24][0], String(h.rowTotals[r].count));
+  });
+  //  کابل: s1 چهارشنبه ۱۰:۰۰، s3 ِ ۰۲:۳۰ ِ چهارشنبه (۲۲:۰۰ UTC) — همان ساعتِ دیواری
+  assert.equal(cells[4][2][0], '1', 'چهارشنبه ۰۲:۰۰');
+  const peak = await pg.locator('#rep-fresh .rf-stats .rf-stat').first().textContent();
+  assert.ok(peak.includes(`${H.dayName(h.weekdays[h.peak[0]])} ${H.hourLabel(h.peak[1])}`) && peak.includes(`${h.maxCount} فروش`), peak);
+  assert.equal(await grid.locator('tfoot td').last().textContent(), String(h.total.count));
+  const [, hours, days] = H.tables(h);
+  assert.equal(await pg.locator('#rep-fresh table.rf-table').nth(1).locator('tfoot td').last().textContent(), money(hours.total[2]));
+  assert.equal(await pg.locator('#rep-fresh table.rf-table').nth(2).locator('tfoot td').last().textContent(), money(days.total[2]));
+  //  برگشتِ r1 (۱۰:۰۰ ِ چهارشنبه) در مبلغِ ساعتِ خودش کم شد و شمرده نشد
+  assert.equal(hours.rows[10][1], 1);
+  assert.equal(hours.rows[10][2], 30000 - 14000);
+  //  − ⇒ ۷ روزِ پیش از این هفته هم نقشه دارد (همان دوره‌ها)
+  await pg.click('#rep-fresh button[data-span="week"]');
+  await pg.keyboard.press('Minus');
+  const w = H.build(H.events(C.ledger(LEDGER), '2026-10-01', '2026-10-07'), CLOCK.offsetMinutes, 0, 6);
+  assert.equal(await pg.locator('#rep-fresh table.rf-heat tfoot td').last().textContent(), String(w.total.count));
+  const [dl] = await Promise.all([pg.waitForEvent('download'), pg.click('#rep-fresh button[data-act="csv"]')]);
+  const csv = fs.readFileSync(await dl.path(), 'utf8');
+  assert.ok(csv.includes('شمارِ فروش: روز × ساعت') && csv.includes('به تفکیکِ ساعت') && csv.includes('09:00'), csv.slice(0, 300));
+  assert.deepEqual(errors, []);
+  await ctx.close();
+  const staff = await open(1366, '1');
+  await staff.pg.evaluate(() => localStorage.setItem('tohid-sync-state-v1', JSON.stringify({ rev: 0, lastSyncAt: 0, members: [], shop: { role: 'staff' } })));
+  await staff.pg.reload(); await staff.pg.waitForTimeout(900);
+  await staff.pg.waitForFunction(() => !!window.TohidSalesHeatmap);
+  await go(staff.pg, 'reports');
+  assert.equal(await staff.pg.locator('#rep-fresh button[data-rtab="heatmap"]').count(), 0);
+  assert.deepEqual(staff.errors, []);
+  await staff.ctx.close();
+});
+
 if (axeSrc) {
   await step('دسترس‌پذیری (axe): خانه و هر زبانهٔ گزارش، روز و شب', async () => {
     const bad = [];
@@ -505,11 +752,47 @@ if (axeSrc) {
       };
       await go(pg, 'dashboard'); await check('خانه');
       await go(pg, 'reports');
-      await pg.waitForFunction(() => !!window.TohidStockValue);
-      for (const t of ['today', 'sales', 'profit', 'debts', 'fraud', 'stock-value']) {
+      await pg.waitForFunction(() => !!(window.TohidStockValue && window.TohidSalesHeatmap && window.TohidKeymap));
+      for (const t of ['today', 'sales', 'profit', 'debts', 'fraud', 'heatmap', 'stock-value']) {
         await pg.click(`#rep-fresh button[data-rtab="${t}"]`);
         await check(t);
       }
+      await ctx.close();
+    }
+    assert.deepEqual(bad, [], bad.join('\n    '));
+  });
+
+  await step('دسترس‌پذیری (axe): RPT-13 دوره، مقایسه و ریز، و RPT-08 نقشه — روشن و تیرهٔ واقعیِ صفحه (data-theme)', async () => {
+    const bad = [];
+    for (const theme of ['light', 'dark']) {
+      const { pg, ctx } = await open(1366, '1');
+      await pg.evaluate((t) => localStorage.setItem('tohid-shop-settings-v1', JSON.stringify({ theme: t })), theme);
+      await pg.reload(); await pg.waitForTimeout(900);
+      await pg.addScriptTag({ content: axeSrc });
+      const rules = ['color-contrast', 'button-name', 'label', 'aria-allowed-attr', 'aria-valid-attr-value', 'th-has-data-cells', 'td-headers-attr',
+        'nested-interactive', 'scope-attr-valid', 'table-duplicate-name', 'empty-table-header', 'aria-allowed-role'];
+      const check = async (label) => {
+        await pg.waitForTimeout(500);
+        await animationsSettled(pg, '.page.active');
+        const v = await pg.evaluate(async (r) => {
+          const out = await window.axe.run(document.querySelector('#rep-fresh'), { runOnly: r });
+          return out.violations.map(x => `${x.id}: ${x.nodes.slice(0, 2).map(n => n.target.join(' ')).join(' ; ')}`);
+        }, rules);
+        v.forEach(x => bad.push(`${theme} ${label} — ${x}`));
+      };
+      assert.equal(await pg.evaluate(() => document.documentElement.getAttribute('data-theme') || 'light'), theme);
+      await go(pg, 'reports');
+      await pg.waitForFunction(() => !!(window.TohidSalesHeatmap && window.TohidKeymap && window.TohidReportPeriod));
+      await pg.click('#rep-fresh button[data-rtab="sales"]');
+      await pg.click('#rep-fresh button[data-span="week"]');
+      await pg.keyboard.press('Minus');
+      await pg.click('#rep-fresh button[data-compare]');
+      await check('دوره و مقایسه');
+      await pg.click('#rep-fresh button[data-span="all"]');
+      await pg.click('#rep-fresh tbody tr:first-child button[data-drill]');
+      await check('ریز');
+      await pg.click('#rep-fresh button[data-rtab="heatmap"]');
+      await check('نقشه');
       await ctx.close();
     }
     assert.deepEqual(bad, [], bad.join('\n    '));

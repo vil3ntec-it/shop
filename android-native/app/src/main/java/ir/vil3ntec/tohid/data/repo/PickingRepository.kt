@@ -42,8 +42,9 @@ class PickingRepository(private val api: ApiClient) {
     ApiJson.decode<PickEventsDto>(api.post("$ROOT/${enc(orderId)}/pick/events", buildJsonObject { put("events", JsonArray(events)) }))
   }
 
-  suspend fun pack(orderId: String, bags: Int, key: String): ApiResult<PickSheetDto> = result {
-    sheetOf(api.postKeyed("$ROOT/${enc(orderId)}/pick/pack", packJson(bags), key))
+  /** [refund] = تصمیمِ ۱-۶ ب: «پس داده شد» ِ دستیِ کسرِ سفارشِ پرداخت‌شده (`cash` یا `hesabpay`)؛ مبلغ را فقط سرور می‌سازد */
+  suspend fun pack(orderId: String, bags: Int, key: String, refund: String? = null): ApiResult<PickSheetDto> = result {
+    sheetOf(api.postKeyed("$ROOT/${enc(orderId)}/pick/pack", packJson(bags, refund), key))
   }
 
   /** جای کالا در دکان (PCK-01) — برای برگه‌های بعدی؛ هر سه خالی ⇒ پاک */
@@ -180,7 +181,14 @@ class PickingRepository(private val api: ApiClient) {
         if (qtyMilli != null) put("qtyMilli", qtyMilli)
       }
 
-    fun packJson(bags: Int): JsonObject = buildJsonObject { put("bags", bags) }
+    fun packJson(bags: Int, refund: String? = null): JsonObject = buildJsonObject {
+      put("bags", bags)
+      if (refund != null) put("refund", buildJsonObject { put("method", refund) })
+    }
+
+    /** ۴۰۹ ِ `paid_needs_refund` با «پس داده شد» ِ پیشنهادیِ سرور (پرچمِ `shop.orders.manual_refund` و مجوزِ `orders.refund`) */
+    fun refundOffered(f: ApiFailure): Boolean =
+      f.code == "paid_needs_refund" && (f.detail?.get("manualRefund") as? JsonPrimitive)?.content == "true"
 
     fun batchJson(orderIds: List<String>): JsonObject = buildJsonObject {
       put("orderIds", JsonArray(orderIds.map { JsonPrimitive(it) }))

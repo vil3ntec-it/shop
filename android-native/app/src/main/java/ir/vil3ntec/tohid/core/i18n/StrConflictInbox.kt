@@ -143,6 +143,7 @@ object StrConflictInbox {
     "cancel_not_allowed" -> t("لغوِ فاکتور در حدِ نقشِ کارمند نیست", "Cancelling is beyond the staff role", "د بل لغوه د کارکوونکي له رول څخه بهر ده")
     "return_not_allowed" -> t("برگشت در حدِ نقشِ کارمند نیست", "Returns are beyond the staff role", "بېرته ورکول د کارکوونکي له رول څخه بهر دي")
     "price_not_allowed" -> t("تغییرِ قیمت در حدِ نقشِ کارمند نیست", "The price change is beyond the staff role", "د بیې بدلون د کارکوونکي له رول څخه بهر دی")
+    "free_line_not_allowed" -> t("قلمِ آزاد در حدِ نقشِ کارمند نیست", "Custom items are beyond the staff role", "آزاد توکی د کارکوونکي له رول څخه بهر دی") // POS-10، ۱-۱۱
     "pay_fix_not_allowed" -> t("اصلاحِ پرداخت در حدِ نقشِ کارمند نیست", "Fixing payments is beyond the staff role", "د ورکړې سمون د کارکوونکي له رول څخه بهر دی")
     "return_exceeds_sold" -> t("برگشت بیش از مقدارِ فروخته‌شدهٔ همان قلم است", "The return is more than was sold of that item", "بېرته ورکول د همغه توکي له پلورل شوي مقدار څخه ډېر دي")
     "return_exceeds_sale" -> t("برگشت بیش از مبلغِ فاکتور است", "The return is more than the invoice amount", "بېرته ورکول د بل له مبلغ څخه ډېر دي")

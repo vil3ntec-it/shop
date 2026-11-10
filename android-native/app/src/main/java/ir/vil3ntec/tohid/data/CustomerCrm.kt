@@ -2,6 +2,9 @@ package ir.vil3ntec.tohid.data
 
 import ir.vil3ntec.tohid.LocaleText
 import ir.vil3ntec.tohid.core.i18n.StrLedger
+import ir.vil3ntec.tohid.core.shopper.AddressRules
+import ir.vil3ntec.tohid.core.shopper.GeoPin
+import ir.vil3ntec.tohid.core.shopper.PinText
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.core.text.TextNormalizer
 
@@ -253,6 +256,39 @@ object CustomerCrm {
   /** یک سطرِ نشانی برای پرونده و پیک: «نشانه · ناحیه · دروازه · طبقه · Plus Code · کدِ پستی»؛ بی نشانی ⇒ "" */
   fun addressLine(a: DeliveryAddress?): String = if (a == null) "" else
     listOf(a.landmark, a.area, a.gate, a.floor, a.plusCode, a.postalCode).filter { it.isNotBlank() }.joinToString(" · ")
+
+  /** همان سطرِ [addressLine] با پینِ مشتری (پنج رقمِ اعشار) در پایان */
+  fun addressLineOf(c: Debtor): String =
+    (listOf(addressLine(c.deliveryAddress)) + listOfNotNull(pinOf(c)?.let { PinText.short(it) })).filter { it.isNotBlank() }.joinToString(" · ")
+
+  /**
+   *  پینِ نشانیِ تحویل (CRM-09، `Debtor.deliveryPin`): هر دو یا هیچ؛ در بازه و نه (۰، ۰) (`AddressRules.validPin`)؛ شش رقمِ
+   *  اعشار با همان گردِ سرور. هیچ ⇒ برداشتنِ پین. همان پین ⇒ همان دفتر (بی op). بی ردیفِ سابقه — پول را عوض نمی‌کند.
+   */
+  fun setDeliveryPin(d: ShopData, id: String, lat: Double?, lng: Double?): DebtorEngine.Result {
+    val c = d.debtors.find { it.id == id } ?: return DebtorEngine.Result.Failed(StrLedger.customerNotFound)
+    if (!isActive(c)) return DebtorEngine.Result.Failed(StrLedger.customerMerged)
+    if ((lat == null) != (lng == null)) return DebtorEngine.Result.Failed(StrLedger.addressPinBad)
+    val next = if (lat != null && lng != null) {
+      if (!AddressRules.validPin(lat, lng)) return DebtorEngine.Result.Failed(StrLedger.addressPinBad)
+      DeliveryPin(AddressRules.round6(lat), AddressRules.round6(lng))
+    } else null
+    if (next == c.deliveryPin) return DebtorEngine.Result.Ok(d, id)
+    return DebtorEngine.Result.Ok(d.copy(debtors = d.debtors.map { if (it.id == id) it.copy(deliveryPin = next) else it }), id)
+  }
+
+  /** پینِ مشتری یا null */
+  fun pinOf(c: Debtor?): GeoPin? = c?.deliveryPin?.let { GeoPin(it.lat, it.lng) }
+
+  /** پین در کادرِ برگه: شش رقمِ اعشار (همان که ذخیره شده؛ دوباره خواندنش همان پین است) */
+  fun pinText(c: Debtor?): String = c?.deliveryPin?.let { "${fixed6(it.lat)}, ${fixed6(it.lng)}" }.orEmpty()
+
+  private fun fixed6(v: Double): String {
+    val neg = v < 0
+    val scaled = Math.round(kotlin.math.abs(v) * 1e6)
+    val body = "${scaled / 1_000_000}.${(scaled % 1_000_000).toString().padStart(6, '0')}"
+    return if (neg) "-$body" else body
+  }
 
   /* ------------------------- رضایتِ پیامِ تبلیغاتی ------------------------- */
 

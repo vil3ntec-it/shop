@@ -408,7 +408,7 @@ object KeyMap {
     web = listOf(Chord(KeyName.D6, shift = true)),
   )
   val SALE_PAYMENT_TOGGLE_PRINT = KeyAction(
-    "sale.payment.togglePrint", "sale.payment", "چاپ برای همین فاکتور: روشن یا خاموش", KeyStatus.PLANNED,
+    "sale.payment.togglePrint", "sale.payment", "چاپ برای همین فاکتور: روشن یا خاموش", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.P, alt = true)),
     web = listOf(Chord(KeyName.P, alt = true)),
   )
@@ -555,22 +555,22 @@ object KeyMap {
   val REPORTS_DRILL = KeyAction(
     "reports.drill", "reports", "ریز شدن در ردیف", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Enter)),
-    web = emptyList(),
+    web = listOf(Chord(KeyName.Enter)),
   )
   val REPORTS_NEXT_PERIOD = KeyAction(
-    "reports.nextPeriod", "reports", "دورهٔ بعد", KeyStatus.PLANNED,
+    "reports.nextPeriod", "reports", "دورهٔ بعد", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Plus), Chord(KeyName.Equals, shift = true)),
-    web = emptyList(),
+    web = listOf(Chord(KeyName.Plus), Chord(KeyName.Equals, shift = true)),
   )
   val REPORTS_PREV_PERIOD = KeyAction(
-    "reports.prevPeriod", "reports", "دورهٔ قبل", KeyStatus.PLANNED,
+    "reports.prevPeriod", "reports", "دورهٔ قبل", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.Minus)),
-    web = emptyList(),
+    web = listOf(Chord(KeyName.Minus)),
   )
   val REPORTS_COMPARE = KeyAction(
-    "reports.compare", "reports", "ستونِ مقایسه با دورهٔ قبل", KeyStatus.PLANNED,
+    "reports.compare", "reports", "ستونِ مقایسه با دورهٔ قبل", KeyStatus.PARTIAL,
     keys = listOf(Chord(KeyName.C, mod = true, shift = true)),
-    web = emptyList(),
+    web = listOf(Chord(KeyName.C, alt = true)),
   )
 
   val ALL: List<KeyAction> = listOf(

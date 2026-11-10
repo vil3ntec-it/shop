@@ -102,6 +102,18 @@ class ShiftSlipTest {
     assertEquals(2, blind.count { it.kind == Kind.COUNTED })
   }
 
+  /** RPT-04 — شمارهٔ Z بالای همهٔ ردیف‌ها، در نمای کور هم؛ X هرگز شماره ندارد */
+  @Test
+  fun numberedZStartsWithItsNumberAndXNeverHasOne() {
+    val numbered = z().copy(no = 7, series = "A1")
+    val rows = ShiftSlip.rows(numbered)
+    assertEquals(Row(Kind.NUMBER, count = 7, text = "A1"), rows[0])
+    assertEquals(Row(Kind.CLOSED, amount = 9_000), rows[2])
+    assertEquals(Row(Kind.NUMBER, count = 7, text = "A1"), ShiftSlip.rows(ShiftSlip.forViewer(numbered, seesExpected = false))[0])
+    assertTrue(ShiftSlip.rows(x().copy(no = 7, series = "A1")).none { it.kind == Kind.NUMBER })
+    assertTrue(ShiftSlip.rows(z()).none { it.kind == Kind.NUMBER }, "Z ِ کهنهٔ بی شماره")
+  }
+
   @Test
   fun uncountedMethodStaysUncountedNotZero() {
     val rows = ShiftSlip.rows(z())

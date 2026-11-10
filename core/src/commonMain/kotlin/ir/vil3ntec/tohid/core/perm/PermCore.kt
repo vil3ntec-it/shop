@@ -77,7 +77,7 @@ object PermCore {
     "sales.discount" to Spec(OMD, "restrict", true, listOf("maxPct", "maxAmount"), false),
     "sales.cancel" to Spec(OMD, "restrict", true, emptyList(), false),
     // POS-40: اصلاحِ روشِ پرداخت پس از فروش (`core/pay/PayFix`) — کارِ تازه: صاحب و مدیر خودشان، شاگرد و صندوق‌دار
-    // «نیازمند تأیید»، بقیه نه؛ همان `d()` ِ JS. سرور هنوز اجرایش نمی‌کند (not_enforceable_yet)
+    // «نیازمند تأیید»، بقیه نه؛ همان `d()` ِ JS. سرور فقط با پرچمِ `shop.sync.pay_fix` اجرا می‌کند (v3 و v1)
     "sales.pay_fix" to Spec(d("allow", "allow", "approve", "approve", "deny", "deny", "deny"), "restrict", true, emptyList(), false),
     // برگشتِ کالا و بازپرداخت (STF-03): امروز هر عضوِ نویسنده ثبت می‌کند؛ از نقش‌های تازه فقط صندوق‌دار
     "returns.create" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
@@ -87,6 +87,9 @@ object PermCore {
     // STF-03: تغییرِ قیمتِ ردیف نسبت به فهرست (`SaleCaps`)؛ سقفِ `maxPct` = بیشترین فاصلهٔ یک ردیف. سرور فقط با پرچمِ
     // خاموشِ `shop.price_cap` می‌سنجد — همان `d()` ِ JS
     "sales.price" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxPct"), false),
+    // POS-10 (تصمیمِ ۱-۱۱ (۲) الف): «قلمِ آزاد» (بی کارتِ کالا)؛ سقفِ `maxAmount` (Minor) روی قیمتِ واحد، «نیازمند تأیید» یا
+    // «ممنوع» از لایه. سرور فقط با پرچمِ خاموشِ `shop.price_cap` می‌سنجد (`SaleCaps.FREE_LINE`) — همان `d()` ِ JS
+    "sales.free_line" to Spec(d("allow", "allow", "allow", "allow", "deny", "deny", "deny"), "restrict", true, listOf("maxAmount"), false),
     "settings.write" to Spec(OMD, "restrict", false, emptyList(), false),
     "audit.view" to Spec(OMA, "restrict", false, emptyList(), false),
     "reports.money" to Spec(OMA, "full", false, emptyList(), true),

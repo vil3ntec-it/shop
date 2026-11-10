@@ -39,6 +39,7 @@ const { phoneKey } = require('../lib/validate');
 const pay = require('../lib/payment-intents');
 const flow = require('../lib/order-flow');
 const orderView = require('../lib/store-order-view');
+const plusCode = require('../lib/plus-code');
 const { sniff } = require('../lib/product-photos');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { reads: replicaReads } = require('../lib/read-replica');
@@ -54,6 +55,8 @@ const STOCK_LIST_FLAG = 'shop.storefront.stock_list';
 const ADDRESS_EXTRA_FLAG = 'shop.storefront.address_extra';
 //  CHK-01/09، WEB-14: حسابِ مشتری در وبِ ویترین (`store/acct.js` ِ دیربار: پیشنهادِ حساب پس از ثبت، نشانی‌های نام‌دار، همگامیِ سبد)
 const WEB_ACCOUNT_FLAG = 'shop.storefront.web_account';
+//  S33: نشانیِ پین‌دار `pinCode` ِ همان پین را دارد فقط با پرچمِ `shop.orders.plus_code` ِ همین دکان (`lib/plus-code.js`)
+const pinOpt = async (req) => ({ pinCode: await plusCode.flagOn(req.store.shop_id) });
 
 const readLimit = rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'store-read' });
 const checkoutLimit = rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-checkout' });
@@ -136,6 +139,8 @@ async function featuresOf(shopId, sf) {
   const f = {
     ...((await orders.flagOf(shopId, STOCK_LIST_FLAG)) ? { stockList: true } : {}),
     ...((await orders.flagOf(shopId, ADDRESS_EXTRA_FLAG)) ? { addressExtra: true } : {}),
+    //  S33: Plus Code ِ پین زیرِ پینِ برگهٔ ثبت (`store/plus-code.js` ِ دیربار) با پرچمِ `shop.orders.plus_code`
+    ...((await plusCode.flagOn(shopId)) ? { plusCode: true } : {}),
     //  WEB-11: ♥ و «فهرستِ خرید» ِ وب (`store/catalog.js`، روی همین دستگاه) با پرچمِ `shop.storefront.favorites`
     ...((await extras.favoritesOn(shopId)) ? { favorites: true } : {}),
     //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در فرمِ ثبتِ وب با پرچمِ `shop.orders.delivery_prefs` (همان درِ `delivery.cashTenderMinor`)
@@ -379,7 +384,7 @@ router.post('/:slug/account', checkoutLimit, store, async (req, res) => {
 router.get('/:slug/account', readLimit, store, customer, async (req, res) => {
   res.json({
     customer: customers.view(req.customer), expiresAt: req.session.expiresAt,
-    addresses: await customers.addresses(req.customer),
+    addresses: await customers.addresses(req.customer, await pinOpt(req)),
   });
 });
 
@@ -434,15 +439,15 @@ router.get('/:slug/account/orders', readLimit, store, customer, async (req, res)
 });
 
 router.get('/:slug/account/addresses', readLimit, store, customer, async (req, res) => {
-  res.json({ addresses: await customers.addresses(req.customer) });
+  res.json({ addresses: await customers.addresses(req.customer, await pinOpt(req)) });
 });
 
 router.post('/:slug/account/addresses', checkoutLimit, store, customer, async (req, res) => {
-  res.status(201).json({ address: await customers.addAddress(req.customer, req.body) });
+  res.status(201).json({ address: await customers.addAddress(req.customer, req.body, await pinOpt(req)) });
 });
 
 router.put('/:slug/account/addresses/:id', checkoutLimit, store, customer, async (req, res) => {
-  res.json({ address: await customers.updateAddress(req.customer, req.params.id, req.body) });
+  res.json({ address: await customers.updateAddress(req.customer, req.params.id, req.body, await pinOpt(req)) });
 });
 
 router.delete('/:slug/account/addresses/:id', checkoutLimit, store, customer, async (req, res) => {

@@ -1,7 +1,10 @@
 package ir.vil3ntec.tohid.ui.v3.money
 
 import ir.vil3ntec.tohid.core.i18n.StrKit
+import ir.vil3ntec.tohid.core.i18n.StrLedger
 import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
+import ir.vil3ntec.tohid.core.shopper.GeoPin
+import ir.vil3ntec.tohid.core.shopper.PinText
 import ir.vil3ntec.tohid.data.CreditLimitGate
 import ir.vil3ntec.tohid.data.CustomerCrm
 import ir.vil3ntec.tohid.data.DebtBook
@@ -26,6 +29,8 @@ internal data class DebtorForm(
   val consentSource: String = "",
   /** نشانیِ تحویل (CRM-09) — همه اختیاری؛ همه خالی ⇒ بی نشانی */
   val address: DeliveryAddress = DeliveryAddress(),
+  /** پینِ همان نشانی، همان‌طور که نوشته یا چسبانده شد (مختصات یا پیوندِ نقشه، `PinText`)؛ خالی ⇒ بی پین */
+  val pinText: String = "",
 )
 
 /** نوشته‌های برگهٔ تراکنش (`debtors/{id}/tx?kind=`) */
@@ -59,8 +64,14 @@ internal object DebtorFormsModel {
       tags = p.tags.joinToString("، "),
       consent = debtor.marketingConsent,
       address = debtor.deliveryAddress ?: DeliveryAddress(),
+      pinText = CustomerCrm.pinText(debtor),
     )
   }
+
+  /** CRM-09 — پین از کادر: خالی ⇒ بی پین (null)؛ نوشتهٔ بی مختصات ⇒ خطای درجا ([pinError]) */
+  fun pinOf(f: DebtorForm): GeoPin? = f.pinText.takeIf { it.isNotBlank() }?.let { PinText.parse(it) }
+
+  fun pinError(f: DebtorForm): String? = if (f.pinText.isNotBlank() && pinOf(f) == null) StrLedger.addressPinBad else null
 
   /** متنِ کادرِ سقف ⇒ عدد؛ خالی ⇒ null (بی سقف)؛ نوشتهٔ نامعتبر ⇒ NaN تا موتور ردش کند، نه این‌که بی‌صدا «بی سقف» شود */
   fun parseLimit(text: String): Double? =
@@ -88,7 +99,7 @@ internal object DebtorFormsModel {
 
   /**
    *  ذخیرهٔ کاملِ برگه — همه یا هیچ: قرض‌دار (`add` / `editWithLimit`)، بعد شمارهٔ دوم و برچسب
-   *  (`CustomerCrm.setProfile`، گروه و لیستِ قیمت همان که بود)، نشانیِ تحویل (`setDeliveryAddress`، CRM-09)
+   *  (`CustomerCrm.setProfile`، گروه و لیستِ قیمت همان که بود)، نشانیِ تحویل (`setDeliveryAddress`، CRM-09) و پینش (`setDeliveryPin`)
    *  و رضایت (`setMarketingConsent`).
    *  هر کدام رد کند، هیچ‌چیز نوشته نمی‌شود و پیامِ همان موتور برمی‌گردد.
    */
@@ -114,9 +125,13 @@ internal object DebtorFormsModel {
     val profile = CustomerCrm.profileOf(debtor).copy(phone2 = f.phone2, tags = CustomerCrm.parseTags(f.tags))
     val withProfile = CustomerCrm.setProfile(saved.data, id, profile)
     if (withProfile !is DebtorEngine.Result.Ok) return withProfile
+    pinError(f)?.let { return DebtorEngine.Result.Failed(it) }
     val withAddress = CustomerCrm.setDeliveryAddress(withProfile.data, id, f.address)
     if (withAddress !is DebtorEngine.Result.Ok) return withAddress
-    val withConsent = CustomerCrm.setMarketingConsent(withAddress.data, id, f.consent, f.consentSource)
+    val pin = pinOf(f)
+    val withPin = CustomerCrm.setDeliveryPin(withAddress.data, id, pin?.lat, pin?.lng)
+    if (withPin !is DebtorEngine.Result.Ok) return withPin
+    val withConsent = CustomerCrm.setMarketingConsent(withPin.data, id, f.consent, f.consentSource)
     return if (withConsent is DebtorEngine.Result.Ok) DebtorEngine.Result.Ok(withConsent.data, id) else withConsent
   }
 

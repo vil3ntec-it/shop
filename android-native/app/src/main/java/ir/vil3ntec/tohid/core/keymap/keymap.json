@@ -38,8 +38,8 @@
     { "id": "global.new", "scope": "global", "title": "موردِ تازه در همین صفحه", "status": "live", "keys": ["Mod+N"], "web": ["Alt+N"] },
     { "id": "global.find", "scope": "global", "title": "جست‌وجو در همین صفحه", "status": "partial", "keys": ["Mod+F"], "web": ["Slash"], "webStatus": "live" },
     { "id": "global.save", "scope": "global", "title": "ذخیره یا تأیید", "status": "partial", "keys": ["Mod+S", "Mod+Enter"], "web": ["Mod+S", "Mod+Enter"] },
-    { "id": "global.print", "scope": "global", "title": "چاپ", "status": "partial", "keys": ["Mod+P"], "web": ["Mod+P"] },
-    { "id": "global.export", "scope": "global", "title": "خروجی", "status": "partial", "keys": ["Mod+E"], "web": ["Mod+E"] },
+    { "id": "global.print", "scope": "global", "title": "چاپ", "status": "partial", "keys": ["Mod+P"], "web": ["Mod+P"], "webStatus": "partial" },
+    { "id": "global.export", "scope": "global", "title": "خروجی", "status": "partial", "keys": ["Mod+E"], "web": ["Mod+E"], "webStatus": "partial" },
     { "id": "global.lock", "scope": "global", "title": "قفلِ صندوق و تعویضِ کاربر با PIN", "status": "partial", "keys": ["Mod+L"], "web": ["Alt+L"] },
     { "id": "global.zoomIn", "scope": "global", "title": "بزرگ‌نمایی", "status": "live", "keys": ["Mod+Equals", "Mod+Plus"] },
     { "id": "global.zoomOut", "scope": "global", "title": "کوچک‌نمایی", "status": "live", "keys": ["Mod+Minus"] },
@@ -86,7 +86,7 @@
     { "id": "sale.payment.note100", "scope": "sale.payment", "title": "اسکناسِ ۱۰۰", "status": "partial", "keys": ["Shift+4"], "web": ["Shift+4"] },
     { "id": "sale.payment.note500", "scope": "sale.payment", "title": "اسکناسِ ۵۰۰", "status": "partial", "keys": ["Shift+5"], "web": ["Shift+5"] },
     { "id": "sale.payment.note1000", "scope": "sale.payment", "title": "اسکناسِ ۱۰۰۰", "status": "partial", "keys": ["Shift+6"], "web": ["Shift+6"] },
-    { "id": "sale.payment.togglePrint", "scope": "sale.payment", "title": "چاپ برای همین فاکتور: روشن یا خاموش", "status": "planned", "keys": ["Alt+P"], "web": ["Alt+P"] },
+    { "id": "sale.payment.togglePrint", "scope": "sale.payment", "title": "چاپ برای همین فاکتور: روشن یا خاموش", "status": "partial", "keys": ["Alt+P"], "web": ["Alt+P"] },
     { "id": "sale.payment.customer", "scope": "sale.payment", "title": "مشتری (برای باقی‌ماندهٔ قرضی)", "status": "partial", "keys": ["F2"], "web": ["Alt+C"] },
     { "id": "sale.payment.back", "scope": "sale.payment", "title": "برگشت به سبد، بی ثبتِ هیچ چیز", "status": "partial", "keys": ["Escape"], "web": ["Escape"] },
 
@@ -122,10 +122,10 @@
     { "id": "productGrid.save", "scope": "productGrid", "title": "ثبتِ همهٔ تغییرها", "status": "live", "keys": ["Mod+S"] },
     { "id": "productGrid.cancel", "scope": "productGrid", "title": "لغوِ ویرایشِ خانه؛ بستنِ جدول", "status": "live", "keys": ["Escape"] },
 
-    { "id": "reports.drill", "scope": "reports", "title": "ریز شدن در ردیف", "status": "partial", "keys": ["Enter"] },
-    { "id": "reports.nextPeriod", "scope": "reports", "title": "دورهٔ بعد", "status": "planned", "keys": ["Plus", "Shift+Equals"] },
-    { "id": "reports.prevPeriod", "scope": "reports", "title": "دورهٔ قبل", "status": "planned", "keys": ["Minus"] },
-    { "id": "reports.compare", "scope": "reports", "title": "ستونِ مقایسه با دورهٔ قبل", "status": "planned", "keys": ["Mod+Shift+C"] }
+    { "id": "reports.drill", "scope": "reports", "title": "ریز شدن در ردیف", "status": "partial", "keys": ["Enter"], "web": ["Enter"], "webStatus": "partial" },
+    { "id": "reports.nextPeriod", "scope": "reports", "title": "دورهٔ بعد", "status": "partial", "keys": ["Plus", "Shift+Equals"], "web": ["Plus", "Shift+Equals"], "webStatus": "partial" },
+    { "id": "reports.prevPeriod", "scope": "reports", "title": "دورهٔ قبل", "status": "partial", "keys": ["Minus"], "web": ["Minus"], "webStatus": "partial" },
+    { "id": "reports.compare", "scope": "reports", "title": "ستونِ مقایسه با دورهٔ قبل", "status": "partial", "keys": ["Mod+Shift+C"], "web": ["Alt+C"], "webStatus": "partial" }
   ],
   "reserved": {
     "native": [

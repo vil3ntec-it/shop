@@ -78,7 +78,7 @@
         });
       };
       $('o-reorder').onclick = function () { ctx.reorder(o); };
-      renderDelivery(o.delivery);
+      renderDelivery(o.delivery, o);
       renderEta(o);
       renderMethod(o, token);
       renderPay(o, token);
@@ -391,18 +391,20 @@
 
     //  DLV-06 (S5): پیک برای مشتری فقط از نمای سرور (`delivery`، پشتِ پرچمِ shop.delivery_customer_view):
     //  نامِ کوچک، رسیدنِ تقریبی و کدِ تحویل — نه شماره، نه شناسه. بی کلید یا چیزی برای گفتن ⇒ پنهان.
-    function renderDelivery(d) {
+    //  S93 «پیک تعیین نشده»: ارسالِ بسته‌بندی‌شده و سرور (با همان پرچم) هیچ مأموریتی ندارد (`delivery: null`) ⇒ برچسبِ جدا.
+    function renderDelivery(d, o) {
       var name = d && d.courierName ? String(d.courierName) : '';
       var eta = d && d.etaAt ? K.clock(d.etaAt) : '';
       var code = d && d.code ? String(d.code) : '';
       var arrived = Boolean(d) && d.status === 'arrived';
-      $('o-courier').hidden = !name;
-      $('o-courier').textContent = name ? t(arrived ? 'od.courier.at' : 'od.courier', { name: name }) : '';
+      var none = d === null && Boolean(o) && o.fulfillment === 'delivery' && o.status === 'packed';
+      $('o-courier').hidden = !name && !none;
+      $('o-courier').textContent = name ? t(arrived ? 'od.courier.at' : 'od.courier', { name: name }) : none ? t('od.courier.none') : '';
       $('o-eta').hidden = !eta;
       $('o-eta').textContent = eta ? t('od.eta', { t: eta }) : '';
       $('o-code').hidden = !code;
       $('o-code-n').textContent = code.replace(/[0-9]/g, function (c) { return K.fa(Number(c), 0); });
-      $('o-dlv').hidden = !(name || eta || code);
+      $('o-dlv').hidden = !(name || eta || code || none);
     }
 
     //  WEB-04: زمانِ تقریبیِ همین سفارش (`order.eta`، پرچمِ `shop.storefront.eta`؛ خاموش ⇒ کلید نیست ⇒ پنهان)؛ با هر بارِ

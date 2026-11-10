@@ -153,6 +153,7 @@ internal fun approvalWhat(r: RemoteApproval.Request): String {
     "returns.create" -> StrRemoteApproval.permReturn
     "sales.credit" -> StrRemoteApproval.permCredit // STF-03
     "sales.price" -> StrRemoteApproval.permPrice
+    "sales.free_line" -> StrRemoteApproval.permFreeLine // POS-10، تصمیمِ ۱-۱۱ (۲)
     else -> r.perm
   }
   val pct = r.pctBp?.let { if (it % 100 == 0L) "${it / 100}٪" else "${it / 100.0}٪" }

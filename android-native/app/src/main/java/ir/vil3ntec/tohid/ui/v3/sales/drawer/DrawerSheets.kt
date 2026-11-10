@@ -35,6 +35,7 @@ import ir.vil3ntec.tohid.ui.screens.MotionSpec
 import ir.vil3ntec.tohid.ui.screens.MotionTokens
 import ir.vil3ntec.tohid.ui.theme.PhoneV3
 import ir.vil3ntec.tohid.ui.theme.PhoneV3Roles
+import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Status
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Button
@@ -214,12 +215,19 @@ fun DrawerMoveSheet(
   }
 }
 
-/** گزارشِ X (میانِ شیفت) یا Z (پایانِ شیفت)؛ شاگرد نه در X نه در Z مورد انتظار و اختلاف را می‌بیند (`DrawerModel.forViewer`، PAY-13) */
+/**
+ *  گزارشِ X (میانِ شیفت) یا Z (پایانِ شیفت)؛ شاگرد نه در X نه در Z مورد انتظار و اختلاف را می‌بیند (`DrawerModel.forViewer`، PAY-13).
+ *  [onPrint] (PAY-15/RPT-04): دکمهٔ «چاپ» با همان ردیف‌ها و یادداشت‌های همین برگه (`ShiftPrint`)؛ null ⇒ بی دکمه.
+ */
 @Composable
-fun ShiftReportSheet(rep: ShiftReport, staff: Boolean, title: String?, notes: List<String>, onClose: () -> Unit) {
+fun ShiftReportSheet(
+  rep: ShiftReport, staff: Boolean, title: String?, notes: List<String>, onClose: () -> Unit,
+  onPrint: ((title: String, lines: List<ReportLine>, notes: List<String>) -> Unit)? = null,
+) {
   val c = PhoneV3.colors
   val shown = DrawerModel.forViewer(rep, seesExpected = !staff)
-  V3Sheet(onDismiss = onClose, title = title ?: if (rep.kind == "Z") StrSale.zReport else StrSale.xReportTitle) {
+  val head = title ?: if (rep.kind == "Z") StrSale.zReport else StrSale.xReportTitle
+  V3Sheet(onDismiss = onClose, title = head) {
     notes.forEach { Text(it, style = V3Type.footnote, color = c.inkMuted); Spacer(Modifier.height(4.dp)) }
     if (notes.isNotEmpty()) Spacer(Modifier.height(8.dp))
     V3Card(radius = 16.dp, padding = PaddingValues(horizontal = 14.dp, vertical = 8.dp)) {
@@ -234,6 +242,10 @@ fun ShiftReportSheet(rep: ShiftReport, staff: Boolean, title: String?, notes: Li
     if (rep.kind == "Z" && rep.needsReview == true) {
       Spacer(Modifier.height(8.dp))
       V3StatusPill(V3Status.WARNING, StrSale.needsReview)
+    }
+    if (onPrint != null) {
+      Spacer(Modifier.height(12.dp))
+      V3Button(StrSale.print, { onPrint(head, DrawerModel.report(shown), notes) }, Modifier.fillMaxWidth(), kind = V3ButtonKind.NEUTRAL)
     }
   }
 }

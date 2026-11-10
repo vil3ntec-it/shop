@@ -16,7 +16,7 @@
  *             PCK-07)، قلم‌های سفارش و مبلغِ نقدِ موردِ انتظارِ مأموریتِ هنوز‌نرفته در همان تراکنش، و
  *             «بسته‌بندی‌شده» با تعدادِ کیسه و برچسب (PCK-09). مبلغِ پیشین در برگه و رویداد می‌ماند.
  *             ⛔ سفارشِ پرداخت‌شده: هر تغییرِ مبلغ ⇒ ۴۰۹ (`paid_needs_refund` برای کسر، `paid_total_increase`
- *             برای افزایش) — دفترِ بازپرداخت حالتِ «معلق» و روشِ آنلاین ندارد، پس کسر بی‌ردپا نمی‌ماند.
+ *             برای افزایش) — کسر فقط با «پس داده شد» ِ دستی و پرچمِ `shop.orders.manual_refund` (‎lib/order-pack-refund.js‎).
  *   شاخص ──── زمانِ جمع‌آوری، درصدِ پیدا شدن و نرخِ جایگزینی از برگه‌های بسته‌شده (PCK-13).
  *
  * ⛔ موجودیِ دکان دست نمی‌خورد (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): فروش را برنامه هنگامِ تحویل با
@@ -32,6 +32,7 @@ const { stable } = require('./idempotency');
 const { badRequest, notFound, conflict, ApiError } = require('../middleware/errors');
 //  جایگزینی (PCK-05/06) — دیر بار می‌شود (آن پرونده هم پرچمِ همین‌جا را می‌خواند)
 const subs = () => require('./pick-substitutes');
+const packRefund = () => require('./order-pack-refund');   //  تصمیمِ ۱-۶ ب: «پس داده شد» ِ دستی
 
 const FLAG_KEY = 'shop.orders.picking';
 const KEY_RE = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -553,12 +554,13 @@ async function pack(shopId, orderId, { key, body }, actor) {
     if (live) throw conflict('بسته پیش‌تر به پیک سپرده شده است', 'already_dispatched');
     //  ⛔ پولِ گرفته‌شده: جمعِ تازه نه کم می‌شود (بازپرداختِ بی‌ردپا) نه زیاد (پولِ بی‌رضایت)
     const paidMinor = Number(order.total_minor);
-    if (PAID.includes(order.payment_status) && (s.deductedMinor > 0 || s.totalMinor !== paidMinor)) {
+    const manual = PAID.includes(order.payment_status) && s.totalMinor < paidMinor ? await packRefund().allowIn(run, shopId, b, actor) : null;
+    if (PAID.includes(order.payment_status) && !manual && (s.deductedMinor > 0 || s.totalMinor !== paidMinor)) {
       const down = s.deductedMinor > 0;
       const err = new ApiError(409, down ? 'paid_needs_refund' : 'paid_total_increase', down
         ? 'این سفارش پرداخت شده است؛ کم کردنِ مبلغ بازپرداخت می‌خواهد — همهٔ قلم‌ها را بردارید یا سفارش را لغو و بازپرداخت کنید'
         : 'این سفارش پرداخت شده است؛ مبلغِ بیشتر بی رضایتِ مشتری گرفته نمی‌شود — همان مقدارِ سفارش را بردارید');
-      err.data = { paidMinor, totalMinor: s.totalMinor, deductedMinor: s.deductedMinor };
+      err.data = { paidMinor, totalMinor: s.totalMinor, deductedMinor: s.deductedMinor, manualRefund: down && await packRefund().offered(run, shopId, actor) };
       throw err;
     }
 
@@ -592,6 +594,7 @@ async function pack(shopId, orderId, { key, body }, actor) {
               version=version+1, updated_at=$7 WHERE shop_id=$1 AND id=$2`,
       [shopId, id, s.subtotalMinor, s.discountMinor, s.totalMinor, kept, at]
     );
+    const refund = manual ? await packRefund().recordIn(c, { shopId, order, actor, refund: manual, paidMinor, totalMinor: s.totalMinor, at, key }) : null;
     //  مأموریتِ هنوز‌نرفته (دریافتِ حضوری یا پیکِ سپرده‌شده): نقدِ موردِ انتظار = جمعِ تازه
     if (moneyChanged && order.payment_method === 'cod' && order.payment_status !== 'paid') {
       await c.query(
@@ -633,7 +636,7 @@ async function pack(shopId, orderId, { key, body }, actor) {
        VALUES ($1,$2,$3,$4,$5,'pack','accepted',$6::jsonb,$7,$8)`,
       [ulid(at), id, shopId, `pack:${key}`, hashOf({ bags }), JSON.stringify(pickDetail), actor.id || '', at]
     );
-    return { sheet: await loadSheet(run, shopId, id), replayed: false, deductedMinor: s.deductedMinor };
+    return { sheet: await loadSheet(run, shopId, id), replayed: false, deductedMinor: s.deductedMinor, refund };
   });
 }
 

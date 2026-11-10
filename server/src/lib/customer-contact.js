@@ -26,8 +26,8 @@ const isShopSync = (ctx) => Boolean(ctx && ctx.app === SHOP.app && ctx.accountKi
 
 const KEY = 'customers.contact';
 const DOT = '•';
-/** فیلدهای تماسِ هر جدولِ دفتر (`Debtor`: شماره، شمارهٔ دوم CRM-02، نشانیِ تحویل CRM-09) */
-const FIELDS = Object.freeze({ debtors: Object.freeze(['phone', 'phone2', 'deliveryAddress']) });
+/** فیلدهای تماسِ هر جدولِ دفتر (`Debtor`: شماره، شمارهٔ دوم CRM-02، نشانیِ تحویل و پینِ آن CRM-09) */
+const FIELDS = Object.freeze({ debtors: Object.freeze(['phone', 'phone2', 'deliveryAddress', 'deliveryPin']) });
 const PHONES = new Set(['phone', 'phone2']);
 const ND = /^\p{Nd}$/u;
 

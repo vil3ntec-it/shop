@@ -64,6 +64,20 @@ class CartStore(context: Context) : HeldCart {
   val note: StateFlow<String?> = _note.asStateFlow()
 
   /**
+   *  POS-41 — Alt+P ِ پنلِ پرداخت: چاپِ همین فاکتور روشن/خاموش (`PrintToggle`)؛ `null` ⇒ همان «چاپِ خودکار» ِ دستگاه.
+   *  پول نیست، پس فقط حافظه (پیش‌نویس نمی‌برد)؛ سبدِ خالی (ثبت یا خالی کردن) ⇒ دوباره `null`. کشو جداست.
+   */
+  private val _print = MutableStateFlow<Boolean?>(null)
+  val print: StateFlow<Boolean?> = _print.asStateFlow()
+  /** آنچه پنل نشان می‌دهد؛ `null` ⇒ چاپگرِ پیش‌فرض نیست (نه دکمه، نه کلید) */
+  fun printShown(choice: Boolean? = _print.value): Boolean? =
+    if (ir.vil3ntec.tohid.print.PrinterRegistry.defaultSaved(app) == null) null
+    else ir.vil3ntec.tohid.core.pos.PrintToggle.auto(choice, ir.vil3ntec.tohid.print.PrintSpooler.autoPrint(app))
+  fun togglePrint() {
+    _print.value = ir.vil3ntec.tohid.core.pos.PrintToggle.toggle(_print.value, ir.vil3ntec.tohid.print.PrintSpooler.autoPrint(app))
+  }
+
+  /**
    *  POS-18 — لیستِ قیمتِ **دستیِ** همین فاکتور (`retail`/`wholesale`، `CartPriceList`): با پیش‌نویس و فاکتورِ نگه‌داشته
    *  می‌رود و برمی‌گردد تا فاکتورِ عمدهٔ دستی پس از بازگشت دوباره خرده قیمت نخورد. `null` ⇒ لیستِ مشتری یا خرده.
    */
@@ -135,7 +149,7 @@ class CartStore(context: Context) : HeldCart {
     //  سبدِ خالی کلید ندارد؛ نخستین قلم کلیدِ تازه می‌سازد
     key = if (lines.isEmpty()) null else key ?: newKey()
     _lines.value = lines
-    if (lines.isEmpty()) { _coupons.value = emptyList(); _note.value = null; _priceList.value = null; _page.value = null }
+    if (lines.isEmpty()) { _coupons.value = emptyList(); _note.value = null; _priceList.value = null; _page.value = null; _print.value = null }
     persist()
     if (byUser) removed(before, lines, draftKey)
     return true
@@ -222,6 +236,7 @@ class CartStore(context: Context) : HeldCart {
     _note.value = null
     _priceList.value = null
     _page.value = null
+    _print.value = null
     persist()
   }
 
@@ -247,10 +262,11 @@ class CartStore(context: Context) : HeldCart {
     //  POS-12: F9/F12ِ وسطِ جابه‌جاییِ فاکتور ثبت نمی‌شود (سبد نیمه‌جابه‌جا است)
     if (frozen || _lines.value.isEmpty()) return SalePost.Outcome.Busy
     val cartKey = saleKey()
+    val print = _print.value   //  POS-41: پیش از پاک شدنِ سبد (`wipe`)
     val out = poster.run(cartKey, record, { store.save(base, it) }, gate, offMain = StockLedger.isOn(store.data.value)) { done -> if (key == done) wipe() }
     //  فروش ثبت شده و روی دیسک است؛ چاپ پس از آن و جدا از آن (S16: چاپگرِ خاموش فروش را نگه نمی‌دارد)
     if (out is SalePost.Outcome.Done) {
-      runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId) }
+      runCatching { ir.vil3ntec.tohid.print.PrintSpooler.afterSale(app, out.ok.data, out.ok.saleId, print = print) }
       //  «اصلاح و ثبت» ِ صندوقِ سندهای ردشده: همین سبد برای ردیفی باز شده بود ⇒ آن ردیف با همین فاکتور بسته می‌شود
       if (!training) runCatching { ConflictFix.posted(app, cartKey, out.ok.saleId) }
     }

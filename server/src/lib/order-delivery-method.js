@@ -158,6 +158,7 @@ async function change(sf, token, { key, body, ticket = '', session = '' }) {
   const phone = await store.verifiedPhone(ticket, session);
   if (!phone) throw new ApiError(401, 'verification_required', 'برای تغییرِ روشِ تحویل، شمارهٔ خود را تأیید کنید');
   const zonesOn = await sfd.flagOn(shopId);   // پرچم پیش از تراکنش (درونِ قفل فقط اتصالِ همان تراکنش)
+  const pinOn = await require('./plus-code').flagOn(shopId);   // S33: نشانیِ تازه ⇒ Plus Code ِ همان پین
 
   let out;
   try {
@@ -228,7 +229,7 @@ async function change(sf, token, { key, body, ticket = '', session = '' }) {
         `UPDATE online_orders SET fulfillment=$3, address=$4::jsonb, delivery=$5::jsonb, delivery_fee_minor=$6, total_minor=$7,
                 scheduled_for=$8, version=version+1, updated_at=$9
           WHERE shop_id=$1 AND id=$2`,
-        [shopId, row.id, input.fulfillment, JSON.stringify(d.address || {}), JSON.stringify(d.delivery || {}),
+        [shopId, row.id, input.fulfillment, JSON.stringify(require('./plus-code').stamp(d.address || {}, pinOn)), JSON.stringify(d.delivery || {}),
           deliveryFeeMinor, totalMinor, d.scheduledFor, at]
       );
       const side = (f, z, fee) => ({ fulfillment: f, zoneName: z, deliveryFeeMinor: fee });

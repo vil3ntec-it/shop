@@ -40,6 +40,8 @@ object ShiftSlip {
 
   /** نوعِ ردیف؛ برچسب را برنامه می‌گذارد */
   enum class Kind {
+    /** RPT-04 — شمارهٔ Z: [Row.count] شماره و [Row.text] سری (`ZSeq.label`) */
+    NUMBER,
     OPENED, AT, CLOSED, BY, FLOAT,
     SALES, RECEIPTS, REFUNDS, CASH_IN, CASH_OUT, NO_SALE,
     EXPECTED, DENOMINATION, COUNTED, VARIANCE, REASON, NEEDS_REVIEW,
@@ -69,6 +71,8 @@ object ShiftSlip {
   fun rows(r: ShiftReport): List<Row> = buildList {
     val z = r.kind == "Z"
     val blind = r.expected == null
+    //  RPT-04: شمارهٔ Z بالای همه (نمای کور هم — شماره مبلغی را لو نمی‌دهد)
+    if (z && r.no != null) add(Row(Kind.NUMBER, count = r.no, text = r.series.orEmpty()))
     add(Row(Kind.OPENED, amount = r.openedAt))
     add(Row(if (z) Kind.CLOSED else Kind.AT, amount = r.at))
     r.by?.let { add(Row(Kind.BY, text = it)) }

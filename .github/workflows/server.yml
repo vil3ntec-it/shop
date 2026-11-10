@@ -276,7 +276,8 @@ jobs:
         run: npm run test:web-store
 
       # WEB-15 (§۳.۱۰): LCP و INP ِ ویترین روی گوشیِ ارزان با 3G ِ تند و 2G (شبکه و پردازندهٔ شبیه‌سازی‌شده با CDP،
-      # gzip ِ همان Caddy، میانهٔ چند بارِ سرد)؛ سقف‌ها و دلیلشان در خودِ آزمون
+      # gzip ِ همان Caddy، میانهٔ چند بارِ سرد)؛ سقف‌ها و دلیلشان در خودِ آزمون. S92/S110 (`web-store-weak.mjs`): حجمِ سیم،
+      # heap، خطای عکس، برگشت از پس‌زمینه، شکستِ بار بی گم شدنِ سبد و کاهشِ حرکت روی همان 2G
       - name: آزمونِ LCP و INP ِ ویترین
         working-directory: server
         run: npm run test:web-vitals

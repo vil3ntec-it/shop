@@ -56,7 +56,7 @@ const DENY_CODE = Object.freeze({
   'sales.discount': 'discount_not_allowed', 'sales.cancel': 'cancel_not_allowed',
   'sales.pay_fix': 'pay_fix_not_allowed',   //  POS-40، فقط از `till-guard.js` (پرچمِ `shop.sync.pay_fix`)
   'returns.create': 'return_not_allowed', 'sales.credit': 'credit_not_allowed', 'sales.price': 'price_not_allowed',   //  قرض و قیمت: STF-03
-});
+  'sales.free_line': 'free_line_not_allowed' });   //  قلمِ آزاد: POS-10، تصمیمِ ۱-۱۱ (۲)
 const { SALE_INSERT_PERMS } = creditCap;
 
 const MESSAGES = {
@@ -732,10 +732,10 @@ async function rememberHeld(p) {
 async function v1Guard(req, res, next) {
   const ctx = req.sync;
   if (!ctx || ctx.app !== 'shop' || ctx.accountKind !== 'shop' || !ctx.accountId) return next();
-  if (ctx.role === 'owner') return next();
   try {
+    await require('./till-guard').v1Guard(req, res);   //  POS-40: «اصلاحِ روشِ پرداخت» در v1 هم (پرچمِ `shop.sync.pay_fix`؛ صاحب هم)
     const ops = Array.isArray(req.body?.ops) ? req.body.ops : null;
-    if (!ops || !ops.length) return next();
+    if (ctx.role === 'owner' || !ops || !ops.length) return next();
     const { validateOp, tableOf } = require('./sync-v1');
     const valid = [];
     const rejected = new Map();

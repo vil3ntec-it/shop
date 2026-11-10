@@ -158,7 +158,8 @@ fun RouteScope.DrawerCloseRoute() {
     expectedMinor = x.valueOrNull()?.report?.let { DrawerModel.forViewer(it, seesExpected = !blind) }?.expected?.get(PayFlow.CASH),
     error = error,
     onSubmit = { counts, reason ->
-      when (val r = PayFlow.closeRow(data, shift.open, PayFlow.Count(counts, by = me, blind = blind, reason = reason), System.currentTimeMillis(), Ulid::next)) {
+      //  RPT-04: شمارهٔ Z در سریِ سندِ همین دستگاه (همان سریِ فاکتور)
+      when (val r = PayFlow.closeRow(data, shift.open, PayFlow.Count(counts, by = me, blind = blind, reason = reason), System.currentTimeMillis(), Ulid::next, series = ir.vil3ntec.tohid.sync.DocSeries.current(context))) {
         is PayFlow.Outcome.Bad -> error = if (r.problem.code == "REASON_REQUIRED") StrSale.reasonOver50 else PayFlow.message(r.problem)
         is PayFlow.Outcome.Ok -> {
           val z = r.value.report
@@ -239,10 +240,13 @@ fun RouteScope.DrawerXRoute() {
   else remember(data, shift) { DrawerNotes.unreceived(data, shift.open.createdAt, System.currentTimeMillis()) }
   //  حساب‌پی به تفکیکِ حسابِ گیرنده (نام و ۴ رقم از تاریخچهٔ سرور)
   val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
+  //  RPT-04 × PAY-17: خط‌های حساب‌پی و ارز فقط فروش‌های همین کشو (همان مهرِ هستهٔ شیفت)، نه هر فروشِ همان ساعت
+  val own = CashShift.ownSale(data, rep.shiftId, rep.openedAt, rep.at)
   ShiftReportSheet(rep, remember { ShopPolicy.blindHere(context) }, title = null,
     notes = listOfNotNull(DrawerModel.scannerLine(data, rep.openedAt, rep.at, seesMoney = !staff)) + DrawerNotes.unreceivedNotes(waiting) +
-      DrawerModel.hesabPayLines(data, rep.openedAt, rep.at, known, seesMoney = !staff) + DrawerModel.fxLines(data, rep.openedAt, rep.at, seesMoney = !staff),
-    onClose = { back() })
+      DrawerModel.hesabPayLines(data, rep.openedAt, rep.at, known, seesMoney = !staff, keep = own) +
+      DrawerModel.fxLines(data, rep.openedAt, rep.at, seesMoney = !staff, keep = own) + (if (rep.kind == "Z") DrawerModel.zLines(data) else emptyList()),
+    onClose = { back() }, onPrint = ShiftPrint.button(copy = false) { toasts.show(it) })
 }
 
 /** `sales/drawer/shift/{id}` — ریزِ یک صندوق: گزارشِ Z اگر ذخیره شده، وگرنه یادداشت‌ها */
@@ -255,6 +259,9 @@ fun RouteScope.DrawerShiftRoute() {
   if (shift == null) { LaunchedEffect(Unit) { back() }; return }
   val z = shift.close?.z?.let { PayFlow.reportOf(it) }
   val known = ir.vil3ntec.tohid.ui.screens.rememberHesabPayees()
-  if (z != null) ShiftReportSheet(z, remember { ShopPolicy.blindHere(context) }, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)) + DrawerModel.hesabPayLines(data, z.openedAt, z.at, known, seesMoney = !staff) + DrawerModel.fxLines(data, z.openedAt, z.at, seesMoney = !staff), onClose = { back() })
+  val own = CashShift.ownSale(data, shift.open.id, shift.open.createdAt, z?.at ?: shift.open.createdAt)
+  //  RPT-04: Z ِ سابقه روی کاغذ «چاپِ دوباره» است
+  val print = ShiftPrint.button(copy = true) { toasts.show(it) }
+  if (z != null) ShiftReportSheet(z, remember { ShopPolicy.blindHere(context) }, title = null, notes = listOfNotNull(shift.open.notes.ifBlank { null }, shift.close?.notes?.ifBlank { null }, DrawerModel.scannerLine(data, z.openedAt, z.at, seesMoney = !staff)) + DrawerModel.hesabPayLines(data, z.openedAt, z.at, known, seesMoney = !staff, keep = own) + DrawerModel.fxLines(data, z.openedAt, z.at, seesMoney = !staff, keep = own) + DrawerModel.zLines(data), onClose = { back() }, onPrint = print)
   else ShiftNotesSheet(shift, onClose = { back() })
 }

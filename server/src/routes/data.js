@@ -14,7 +14,7 @@ const { many, one, now } = require('../db');
 const v = require('../lib/validate');
 const sync = require('../lib/sync');
 const audit = require('../lib/audit');
-const { requireUser, requireShop, requirePermission, requireDataWrite } = require('../middleware/auth');
+const { requireUser, requireShop, requireDataWrite } = require('../middleware/auth');
 const { badRequest, notFound, forbidden } = require('../middleware/errors');
 const { can } = require('../lib/permissions');
 const contact = require('../lib/customer-contact');
@@ -127,7 +127,8 @@ for (const [path, collection] of Object.entries(ROUTES)) {
     const data = hidden ? contact.mask(collection, row.data) : row.data;
     //  CRM-15: «چه کسی پروندهٔ مشتری را دید» — بی انتظار و بی خطا (‎lib/customer-access.js‎)
     if (collection === 'debtors') {
-      const full = !hidden && ['phone', 'phone2', 'deliveryAddress'].some((k) => row.data?.[k]);
+      //  SR46-3: همان فیلدهای تماسِ `customer-contact` (پینِ تحویل ِ CRM-09 هم)، نه فهرستِ جدا
+      const full = !hidden && contact.fieldsOf(collection).some((k) => row.data?.[k]);
       access.note(req, { customerRef: access.refOf(row.id), kind: full ? 'phone' : 'detail', door: 'debtor' });
     }
     res.json({

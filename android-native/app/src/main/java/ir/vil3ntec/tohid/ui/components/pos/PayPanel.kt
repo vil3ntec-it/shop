@@ -341,12 +341,20 @@ private fun MethodPicker(selected: String, methods: List<PayMethod>, target: Dp,
  *  پیش از F9 با F2 می‌گذارد؛ باقی‌مانده فقط با مشتری به حساب می‌رود.
  */
 /** POS-41 — کلیدهای سطحِ پنلِ پرداخت (`sale.payment.*` ِ keymap.json)؛ بقیه (Enter، PageUp/Down، Shift+رقم) مالِ کادرهاست */
-internal enum class PayPanelKey { BACK, CUSTOMER }
+internal enum class PayPanelKey { BACK, CUSTOMER, TOGGLE_PRINT }
 
-/** خالص: [hit] = «این رویداد همین کار است؟»؛ F2 فقط وقتی صفحه گزینشِ مشتری را دارد ([canCustomer]) */
-internal fun payPanelKey(hit: (ir.vil3ntec.tohid.core.keymap.KeyAction) -> Boolean, canCustomer: Boolean): PayPanelKey? = when {
+/**
+ *  خالص: [hit] = «این رویداد همین کار است؟»؛ F2 فقط وقتی صفحه گزینشِ مشتری را دارد ([canCustomer])؛ Alt+P
+ *  (`sale.payment.togglePrint`) فقط وقتی چاپگرِ پیش‌فرض هست و صفحه کلید را می‌گیرد ([canPrint])
+ */
+internal fun payPanelKey(
+  hit: (ir.vil3ntec.tohid.core.keymap.KeyAction) -> Boolean,
+  canCustomer: Boolean,
+  canPrint: Boolean = false,
+): PayPanelKey? = when {
   hit(KeyMap.SALE_PAYMENT_BACK) -> PayPanelKey.BACK
   canCustomer && hit(KeyMap.SALE_PAYMENT_CUSTOMER) -> PayPanelKey.CUSTOMER
+  canPrint && hit(KeyMap.SALE_PAYMENT_TOGGLE_PRINT) -> PayPanelKey.TOGGLE_PRINT
   else -> null
 }
 
@@ -370,7 +378,14 @@ fun PayPanelDialog(
   onCustomer: (() -> Unit)? = null,
   /** «انتخابِ مشتری (F2)» کنارِ پیامِ نسیهٔ بی مشتری (`CreditDebtor`)؛ `null` ⇒ فقط پیام */
   onPickCustomer: (() -> Unit)? = null,
+  /**
+   *  POS-41 — Alt+P (`sale.payment.togglePrint`): چاپِ همین فاکتور پس از ثبت (`PrintToggle.auto`)؛ `null` ⇒ چاپگرِ پیش‌فرض
+   *  نیست یا صفحه نمی‌گیرد ⇒ نه دکمه، نه کلید (همان پنلِ امروز)
+   */
+  print: Boolean? = null,
+  onTogglePrint: (() -> Unit)? = null,
 ) {
+  val printToggle = onTogglePrint.takeIf { print != null }
   val state = remember { PayPanelState().also { it.stored = stored; it.cashRounding = cashRounding } }
   val cashFocus = remember { FocusRequester() }
   LaunchedEffect(Unit) { runCatching { cashFocus.requestFocus() } }
@@ -389,9 +404,10 @@ fun PayPanelDialog(
     Surface(color = Shop.colors.surfaceSolid, shape = RoundedCornerShape(14.dp), modifier = Modifier.widthIn(max = 640.dp)) {
       Column(
         Modifier.padding(18.dp).verticalScroll(rememberScrollState()).onPreviewKeyEvent { e ->
-          when (payPanelKey({ e.matches(it) }, canCustomer = onCustomer != null && !busy)) {
+          when (payPanelKey({ e.matches(it) }, canCustomer = onCustomer != null && !busy, canPrint = printToggle != null && !busy)) {
             PayPanelKey.BACK -> { onDismiss(); true }
             PayPanelKey.CUSTOMER -> { onCustomer?.invoke(); true }
+            PayPanelKey.TOGGLE_PRINT -> { printToggle?.invoke(); true }
             null -> false
           }
         },
@@ -414,6 +430,12 @@ fun PayPanelDialog(
         //  ⛔ باقیِ پرداخت‌نشده بی مشتریِ موجود و فعال (`CreditDebtor`) ⇒ «ثبت» خاموش، پیام و «انتخابِ مشتری»
         val creditBlock = ledger?.let { CreditDebtor.tillBlock(it, customerId, CreditDebtor.splitOwed(PayFlow.preview(state.draft(total, customerId)).valueOrNull()), split = true) }
         CreditDebtorHint(creditBlock.takeIf { error == null }) { (onPickCustomer ?: onCustomer)?.invoke() }
+        //  POS-41: برچسبِ کلید روی خودِ دکمه (`KeyAction.hint`) — همان Alt+P ِ keymap.json
+        if (printToggle != null && print != null) {
+          TextButton(onClick = printToggle, enabled = !busy, modifier = Modifier.heightIn(min = target)) {
+            Text(StrPos.printThisInvoice(print, KeyMap.SALE_PAYMENT_TOGGLE_PRINT.hint()), color = if (print) Shop.colors.text else Shop.colors.muted)
+          }
+        }
         Spacer(Modifier.height(10.dp))
         HorizontalDivider(color = Shop.colors.border)
         Spacer(Modifier.height(10.dp))

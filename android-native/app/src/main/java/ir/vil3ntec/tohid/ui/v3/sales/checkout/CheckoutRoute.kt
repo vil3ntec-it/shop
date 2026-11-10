@@ -157,7 +157,8 @@ fun RouteScope.CheckoutRoute() {
       val over = SalesEngine.creditOver(data, loyal, gated)
       //  STF-03: برگه‌های قرض و قیمتِ همین فاکتور (`SaleCapGate`) همراهِ همان ثبت
       val sale = CheckoutModel.credited(gated, over, CheckoutSession.creditApproval)
-        ?.copy(creditCapSlip = SaleCapGate.json(capSlips, SaleCaps.CREDIT), priceSlip = SaleCapGate.json(capSlips, SaleCaps.PRICE))
+        ?.copy(creditCapSlip = SaleCapGate.json(capSlips, SaleCaps.CREDIT), priceSlip = SaleCapGate.json(capSlips, SaleCaps.PRICE),
+          freeLineSlip = SaleCapGate.json(capSlips, SaleCaps.FREE_LINE))
       if (sale == null) {
         val o = over ?: return
         CheckoutSession.credit = CreditAsk(

@@ -120,6 +120,7 @@ object OwnerExport {
     "cardCode" to "کارت مشتری",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `license/owner-export.js`
     "deliveryAddress" to "نشانی تحویل",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
+    "deliveryPin" to "پین تحویل",  // داده: CRM-09، همان `license/owner-export.js`
     "specialPrices" to "قیمت‌های خاص مشتری",  // داده: POS-18، همان `license/owner-export.js`
     "notes" to "یادداشت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "createdAt" to "زمان ثبت (UTC)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
@@ -217,6 +218,7 @@ object OwnerExport {
     "cancelApproval" to "تأییدِ لغو",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "creditApproval" to "تأییدِ قرض",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، STF-03
     "priceApproval" to "تأییدِ قیمت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، STF-03
+    "freeLineApproval" to "تأییدِ قلمِ آزاد",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)، POS-10
     "payments" to "ردیف‌های پرداخت",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "tenderedMinor" to "دریافتی (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)
     "changeMinor" to "پول پس (پول)",  // داده: برگه و ستونِ خروجیِ کاملِ صاحب (هم‌سانِ `license/owner-export.js`)

@@ -42,14 +42,21 @@ const SERVER_EDITABLE = Object.freeze([
   'sales.credit',
   //  STF-03: سقفِ تغییرِ قیمتِ ردیف (و «تخفیفِ پنهان» زیرِ همان `sales.discount`) — فقط با پرچمِ دکان (‎lib/price-cap.js‎)
   'sales.price',
+  //  POS-10 (تصمیمِ ۱-۱۱ (۲)): قلمِ آزاد — ممنوع / نیازمندِ تأیید / سقفِ قیمتِ واحد؛ همان پرچمِ دکان (‎lib/price-cap.js‎)
+  'sales.free_line',
   //  CRM-03 (§۱۰.۱): تغییرِ سقفِ اعتبارِ مشتری در v1، v3 و REST — فقط با پرچمِ دکان (‎lib/credit-limit-perm.js‎)
   'customers.credit_limit',
+  //  POS-40: اصلاحِ روشِ پرداخت در v3 و v1 (‎lib/till-guard.js‎) — فقط با پرچمِ دکان
+  'sales.pay_fix',
 ]);
 /**
  * کلیدی که سرور فقط با پرچمِ خاموشِ خودش اجرا می‌کند: پرچمِ خاموش ⇒ در کاتالوگ «none» و ذخیره‌اش
  * `not_enforceable_yet` (همان قاعدهٔ «تغییرِ فقط ظاهری پذیرفته نمی‌شود»)
  */
-const FLAGGED = Object.freeze({ 'sales.credit': 'shop.credit_cap', 'sales.price': 'shop.price_cap', 'customers.credit_limit': 'shop.credit_limit_perm' });
+const FLAGGED = Object.freeze({
+  'sales.credit': 'shop.credit_cap', 'sales.price': 'shop.price_cap', 'sales.free_line': 'shop.price_cap', 'customers.credit_limit': 'shop.credit_limit_perm',
+  'sales.pay_fix': 'shop.sync.pay_fix',
+});
 //  همهٔ نقش‌های کارمند، از جمله چهار نقشِ تازهٔ A16 (مهاجرتِ ۱۲۳)
 const EDITABLE_ROLES = STAFF_ROLES;
 

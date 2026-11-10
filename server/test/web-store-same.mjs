@@ -152,6 +152,13 @@ ok(asked.length === 0 && !(await page.$('script[src="/store/same.js"]')) && !(aw
 //  ── روشن ──
 await flag('all', 'market.directory', true);
 await flag('all', 'market.product_details', true);
+//  تصمیمِ ۳-۲۲: با جزئیاتِ بازار ولی بی `market.same_in_store` ⇒ «همین کالا در دکان‌های دیگر» فقط در بازارچه، نه در ویترینِ دکان
+asked.length = 0;
+await sheet(page, a.slug, 'cola');
+await page.waitForTimeout(600);
+ok(asked.length === 0 && !(await page.$('script[src="/store/same.js"]')) && !(await page.$('#ps-same')),
+  'بی market.same_in_store ⇒ برگهٔ کالای ویترین بی same.js و بی درخواستِ «همین کالا»', asked.join(' '));
+await flag('all', 'market.same_in_store', true);
 await sheet(page, a.slug, 'cola');
 await page.waitForSelector('#ps-same:not([hidden]) #ps-same-list li', { timeout: 10000 });
 ok((await page.textContent('#ps-same-t')).trim() === 'همین کالا در دکان‌های دیگر', 'عنوانِ بخش');

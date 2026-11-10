@@ -116,6 +116,7 @@ object SalesEngine {
     val creditCapSlip: kotlinx.serialization.json.JsonObject? = null,
     /** STF-03 — برگهٔ تأییدِ تغییرِ قیمتِ ردیف بیش از سقف ⇒ `Sale.priceApproval`؛ `null` همان امروز */
     val priceSlip: kotlinx.serialization.json.JsonObject? = null,
+    val freeLineSlip: kotlinx.serialization.json.JsonObject? = null, // POS-10 (۱-۱۱): برگهٔ قلمِ آزاد ⇒ `Sale.freeLineApproval`
     /**
      *  PAY (v3 A4) — تسویهٔ پنلِ پرداختِ ترکیبی (`PayFlow.checkout`)، فقط با پرچمِ
      *  `ShopPolicy.payV2`. `null` (پیش‌فرض) ⇒ همان نقد/نسیهٔ امروز با `payment` و
@@ -505,7 +506,7 @@ object SalesEngine {
       syncStatus = "pending",
       seller = checkout.seller.trim(),
       approval = checkout.approval,
-      creditApproval = checkout.creditCapSlip, priceApproval = checkout.priceSlip, // STF-03 (`SaleCapGate`)؛ بی برگه `null`
+      creditApproval = checkout.creditCapSlip, priceApproval = checkout.priceSlip, freeLineApproval = checkout.freeLineSlip, // STF-03/POS-10
       //  PAY (v3 A4): فقط با پرچم — فیلدِ تازه؛ بی پرچم `null` و نوشته نمی‌شود
       payments = settled?.payments,
       tenderedMinor = settled?.tenderedMinor,
@@ -581,8 +582,7 @@ object SalesEngine {
     }
 
     //  فروشِ نسیه به حسابِ قرض‌دار می‌رود، با همان منطقِ قرض‌داران.
-    //  مشتریِ فاکتورِ نقدی اینجا نمی‌آید: نامش روی فاکتور هست ولی بدهی
-    //  ندارد.
+    //  مشتریِ فاکتورِ نقدی اینجا نمی‌آید: نامش روی فاکتور هست ولی بدهی ندارد.
     val transactions = d.transactions.toMutableList()
     //  `debtorId != null` بالاتر تضمین شده؛ اینجا فقط برای کامپایلر است
     if (onCredit && debtorId != null) {

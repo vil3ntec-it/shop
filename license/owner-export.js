@@ -79,6 +79,7 @@
     cardCode: 'کارت مشتری',
     //  نشانیِ تحویلِ مشتری (CRM-09) — همان `OwnerExport.kt`
     deliveryAddress: 'نشانی تحویل',
+    deliveryPin: 'پین تحویل',
     //  قیمت‌های خاصِ مشتری (POS-18) — همان `OwnerExport.kt`
     specialPrices: 'قیمت‌های خاص مشتری',
     notes: 'یادداشت',
@@ -173,6 +174,7 @@
     cancelApproval: 'تأییدِ لغو',
     creditApproval: 'تأییدِ قرض', // STF-03 — همتای OwnerExport.kt
     priceApproval: 'تأییدِ قیمت', // STF-03
+    freeLineApproval: 'تأییدِ قلمِ آزاد', // POS-10، تصمیمِ ۱-۱۱ (۲)
     //  PAY (v3 A4): فقط فروش و صندوقِ پرچم‌دار
     payments: 'ردیف‌های پرداخت',
     tenderedMinor: 'دریافتی (پول)',

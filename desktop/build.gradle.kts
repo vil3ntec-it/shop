@@ -298,6 +298,8 @@ dependencies {
   implementation("org.json:json:20250517")
 
   testImplementation("junit:junit:4.13.2")
+  //  تصمیمِ ۴-۲۵ (۳) الف (PRM-18): کتابخانهٔ رسمیِ آزمونِ صفحهٔ Compose — فقط آزمون، در برنامهٔ نصبی نیست (`PromoLinesUiTest`)
+  testImplementation(compose.desktop.uiTestJUnit4)
 }
 
 java {

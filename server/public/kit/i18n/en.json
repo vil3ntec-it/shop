@@ -347,5 +347,6 @@
   "sort.az": "A–Z",
   "sort.low": "Cheapest",
   "sort.high": "Most expensive",
-  "sort.new": "Newest"
+  "sort.new": "Newest",
+  "od.courier.none": "Your order is packed; no courier has been assigned yet"
 }

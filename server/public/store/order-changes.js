@@ -105,6 +105,12 @@
         wrap.appendChild(list);
       }
       if (r.requestedAt) wrap.appendChild(el('p', { class: 'muted small', text: t('ch.rf.asked', { d: K.when(r.requestedAt) }) }));
+      //  E2E-RET-11: رسیدِ اصلاحیِ هر ردیفِ دفتر (پرچمِ `shop.orders.refund_receipt`؛ عددها همه از سرور)
+      (r.receipts || []).forEach(function (x) {
+        wrap.appendChild(el('div', { class: 'stack', attrs: { id: 'o-ch-rc-' + x.seq } },
+          el('h3', { text: t('ch.rc.title', { no: x.no }) }),
+          el('p', { class: 'small', text: t('ch.rc.line', { d: K.when(x.at), a: K.money(x.totalMinor), b: K.money(x.amountMinor), c: K.money(x.netMinor) }) })));
+      });
     }
 
     function render(o, token) {

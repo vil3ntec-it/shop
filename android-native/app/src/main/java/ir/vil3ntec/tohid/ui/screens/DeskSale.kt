@@ -456,7 +456,8 @@ fun DeskSaleScreen(
     val slips = buildMap { approval?.let { put(ir.vil3ntec.tohid.core.perm.SaleCaps.DISCOUNT, it) }; putAll(capSlips) }
     val sale = checkout.copy(settlement = st, approval = signed ?: if (capRules.price) approval?.let(DiscountGate::json) else null, creditGate = creditGateOn, creditApproval = creditApproval)
       .copy(creditCapSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.CREDIT),
-        priceSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.PRICE))
+        priceSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.PRICE),
+        freeLineSlip = ir.vil3ntec.tohid.data.SaleCapGate.json(slips, ir.vil3ntec.tohid.core.perm.SaleCaps.FREE_LINE))
     //  CRM-03 / S07: بی تأییدِ مدیر هیچ چیز ثبت نمی‌شود (`SalesEngine.record` هم دوباره می‌سنجد)
     val over = SalesEngine.creditOver(d, loyal, sale)
     if (over != null && ir.vil3ntec.tohid.core.credit.CreditGate.state(over, sale.debtorId.orEmpty(), creditApproval) ==
@@ -921,7 +922,7 @@ fun DeskSaleScreen(
   }
 
   if (receivePick) {
-    DebtorPicker(d = d, selected = null, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
+    DebtorPicker(d = d, selected = null, touch = touchExtras, onClose = { receivePick = false; refocus() }, onPick = { id -> receivePick = false; receiveFor = id })
   }
   receiveFor?.let { id ->
     val name = d.debtors.find { it.id == id }?.name
@@ -953,7 +954,7 @@ fun DeskSaleScreen(
     DebtReceiptDialog(data, debtorId, txId, onDismiss = { receiptOf = null; refocus() })
   }
   if (pickDebtor) {
-    DebtorPicker(d = d, selected = cartDebtorId, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
+    DebtorPicker(d = d, selected = cartDebtorId, touch = touchExtras, onClose = { pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true } }, onPick = { id ->
       cartStore.setDebtor(id); pickDebtor = false; refocus(); if (payAfterPick) { payAfterPick = false; payOpen = true }
     })
   }
@@ -1062,7 +1063,7 @@ fun DeskSaleScreen(
       //  PAY-24: کارتِ هدیه و اعتبارِ فروشگاه فقط با تنظیمِ همین دستگاه (پیش‌فرض خاموش ⇒ همان پنل)
       ledger = d,
       stored = remember { ir.vil3ntec.tohid.data.GiftCardPref.on(context) },
-      cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, // PAY-09؛ POS-41: F2
+      cashRounding = cashStep, onCustomer = { payOpen = false; payAfterPick = true; pickDebtor = true }, print = cartStore.print.collectAsState().value.let { remember(it) { cartStore.printShown(it) } }, onTogglePrint = cartStore::togglePrint, // PAY-09؛ POS-41: F2 و Alt+P
     )
   }
   if (priceCheck) ir.vil3ntec.tohid.ui.components.pos.PriceCheckDialog(

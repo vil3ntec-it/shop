@@ -30,6 +30,18 @@ object StrSaleCaps {
     "Changing a line price is not allowed for your role; use the list price.",
     "ستاسو رول ته د کرښې د بیې بدلول اجازه نه لري؛ د لیست بیه وکاروئ.",
   )
+  //  POS-10 (تصمیمِ ۱-۱۱ (۲)): قلمِ آزاد — ردیفی بی کارتِ کالا با قیمتِ دلخواه؛ سقف روی قیمتِ واحد
+  val freeLineTitle: String get() = t("قلمِ آزاد بیش از سقفِ شما", "Custom item above your limit", "ستاسو له حد څخه زیات آزاد توکی")
+  fun freeLineSummary(unit: String, limit: String): String = t(
+    "قیمتِ واحدِ قلمِ آزاد ${asIs(unit)} افغانی است؛ سقفِ شما ${asIs(limit)} افغانی.",
+    "The custom item's unit price is $unit afghani; your limit is $limit afghani.",
+    "د آزاد توکي د یوې بیه $unit افغانۍ ده؛ ستاسو حد $limit افغانۍ.",
+  )
+  val freeLineDenied: String get() = t(
+    "قلمِ آزاد (بی کارتِ کالا) برای نقشِ شما ممنوع است؛ کالا را از فهرست بردارید یا صاحبِ دکان ثبت کند.",
+    "Custom items (without a product card) are not allowed for your role; pick the product from the list or ask the owner.",
+    "ستاسو رول ته آزاد توکی (بې د توکي کارته) اجازه نه لري؛ توکی له لیست څخه وټاکئ یا د دوکان خاوند یې ثبت کړي.",
+  )
   val hiddenTitle: String get() = t("تخفیف (با کاهشِ قیمتِ ردیف) بیش از سقف", "Discount (including lowered line prices) above the limit", "تخفیف (د کرښې د ټیټې بیې په ګډون) له حد څخه زیات")
   fun hiddenSummary(amount: String, pct: String): String = t(
     "کاهشِ قیمتِ ردیف و کمبودِ جمعِ نهایی هم تخفیف‌اند: روی‌هم ${asIs(amount)} افغانی (${asIs(pct)}٪).",

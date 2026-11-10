@@ -160,6 +160,32 @@ test('RSK-05: همان شماره، اقلام و جا در ۱۰ دقیقه ⇒ 
   assert.equal(b.body.replayed, true);
 });
 
+test('S41: «ادغام یا سفارشِ دوم؟» — ردِ تکراری می‌پرسد؛ «سفارشِ دوم» ِ صریح ثبت می‌شود و سقفِ مشتریِ تازه همان می‌ماند', async () => {
+  const o = await liveStore('سفارشِ دوم');
+  const first = await checkout(o, cart());
+  assert.equal(first.status, 201, JSON.stringify(first.body));
+  const again = await checkout(o, cart());
+  assert.equal(again.status, 409, JSON.stringify(again.body));
+  assert.equal(again.body.error.code, 'duplicate_order');
+  assert.equal(again.body.error.ask, 'track_or_second', 'ویترین «همان را دنبال کن» یا «سفارشِ دوم» را می‌پرسد');
+  assert.equal(again.body.error.token, first.body.order.token);
+  assert.match(again.body.error.message, /سفارشِ دومِ جدا/);
+  //  «بله» فقط true ِ صریح است
+  const loose = await checkout(o, { ...cart(), secondOrder: 'true' });
+  assert.equal(loose.status, 409, JSON.stringify(loose.body));
+  assert.equal(await count(o.shopId), 1);
+
+  const second = await checkout(o, { ...cart(), secondOrder: true });
+  assert.equal(second.status, 201, JSON.stringify(second.body));
+  assert.notEqual(second.body.order.orderNo, first.body.order.orderNo);
+  assert.equal(await count(o.shopId), 2);
+  //  ⛔ «سفارشِ دوم» فقط از قاعدهٔ تکرار می‌گذرد: سومین سفارشِ بازِ مشتریِ تازه (سقفِ ۲) همچنان رد
+  const third = await checkout(o, { ...cart(), secondOrder: true });
+  assert.equal(third.status, 409, JSON.stringify(third.body));
+  assert.equal(third.body.error.code, 'new_customer_limit');
+  assert.equal(await count(o.shopId), 2);
+});
+
 test('RSK-05: مقدارِ دیگر، نشانیِ دیگر، دریافت از دکان، سفارشِ لغوشده یا پسِ پنجره ⇒ تکراری نیست', async () => {
   //  سقفِ سفارشِ باز خاموش تا فقط قاعدهٔ تکرار سنجیده شود
   const o = await liveStore('نه‌تکراری', { policy: { newCustomerMaxOpen: 0 } });

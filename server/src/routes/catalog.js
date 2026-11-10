@@ -30,10 +30,13 @@ const router = express.Router();
 router.use(requireUser, requireShop, requirePermission('stock.view'));
 
 const reserve = require('../lib/stock-reserve');
+const repack = require('../lib/catalog-repack');
 const needFlag = async (req, res, next) => { await catalog.requireEnabled(req.shopId); next(); };
 
 router.get('/config', async (req, res) => {
   const sc = await scope.scopeOfReq(req);
+  //  INV-21: شکستنِ کارتن و ساختِ بسته فقط با `shop.catalog_repack` (خاموش ⇒ همان فهرستِ پیشین)
+  const repackKinds = (await repack.enabled(req.shopId)) ? repack.KINDS : [];
   res.json({
     enabled: await stock.flagOf(req.shopId),
     settings: await stock.settingsOf(req.shopId),
@@ -42,7 +45,7 @@ router.get('/config', async (req, res) => {
       ? { reserve: { enabled: true, ttlSec: await reserve.ttlSecOf(null, req.shopId) } } : {}),
     locations: sc ? sc.slice() : stock.LOCATIONS,
     sellableChoices: stock.SELLABLE_CHOICES,
-    kinds: Object.keys(catalog.MANUAL),
+    kinds: Object.keys(catalog.MANUAL).concat(repackKinds),
     permissions: {
       move: can(req.role, 'stock.move'),
       adjust: can(req.role, 'stock.adjust'),
@@ -127,9 +130,11 @@ router.post('/tasks/:id/resolve', needFlag, requirePermission('stock.adjust'), a
 /**
  * حرکتِ دستی: transfer (stock.move)؛ damage، writeoff، return، adjust، count
  * (stock.adjust، با دلیل). کلیدِ یکتایی: سرآیندِ `Idempotency-Key`.
+ * INV-21 (پرچمِ خاموشِ `shop.catalog_repack`): repack و assemble (stock.adjust) — یک سندِ تولید، `lib/catalog-repack.js`.
  */
 router.post('/moves', needFlag, async (req, res) => {
-  const spec = catalog.MANUAL[String(req.body?.kind || '')];
+  const kind = String(req.body?.kind || '');
+  const spec = catalog.MANUAL[kind] || (repack.isKind(kind) && await repack.enabled(req.shopId) ? repack.SPEC : null);
   if (!spec) throw badRequest('نوعِ حرکت معتبر نیست', 'bad_kind');
   if (!can(req.role, spec.permission)) throw forbidden('این کار در حد دسترسی شما نیست', 'permission_denied');
   const sc = await scope.scopeOfReq(req);

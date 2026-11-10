@@ -97,9 +97,14 @@ await E.step('DLV-06.off', 'بی پرچمِ نمای پیک: سپرده و پذ�
   assert.equal(v.body.includes('کریم'), false, 'نامِ پیک بی پرچم پیدا شد');
 }, { needs: ['DLV-06.0'] });
 
-await E.step('DLV-06.page', 'با پرچم: کد ⇐ نامِ کوچک ⇐ ساعتِ تقریبی ⇐ «رسیده است» ⇐ تحویل با همان کدِ صفحه ⇐ هیچ', async () => {
+await E.step('DLV-06.page', 'با پرچم: «پیک تعیین نشده» (S93) ⇐ کد ⇐ نامِ کوچک ⇐ ساعتِ تقریبی ⇐ «رسیده است» ⇐ تحویل با همان کدِ صفحه ⇐ هیچ', async () => {
   await E.flag(owner.shopId, VIEW_FLAG, true);
   const o = await packedOrder();
+  //  S93 «پیک تعیین نشده»: بسته‌بندی‌شده و هنوز بی مأموریت ⇒ برچسبِ جدا، نه همان «بسته‌بندی شد» ِ تنها
+  const before = await viewOf(o.token);
+  assert.equal(before.card, true, JSON.stringify(before));
+  assert.match(before.courier, /تعیین نشده/, JSON.stringify(before));
+  assert.equal(before.code, '');
   const a = await assign(o);
   const id = a.assignment.id;
 

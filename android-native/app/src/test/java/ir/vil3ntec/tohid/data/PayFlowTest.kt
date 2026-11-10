@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.pay.SettleInput
 import ir.vil3ntec.tohid.core.pay.Settlement
 import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.Tender
+import ir.vil3ntec.tohid.core.pay.ZSeq
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonNull
@@ -343,6 +344,27 @@ class PayFlowTest {
     val r = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts, blind = true, reason = "پولِ خرد کم بود"), 1300, newId))
     assertEquals(-10000L, r.report.variance!!["cash"])
     assertEquals("پولِ خرد کم بود", r.row.reason)
+  }
+
+  @Test fun `RPT-04 - هر Z شمارهٔ بعدیِ سریِ همین دستگاه را می‌گیرد و در Z ِ ذخیره‌شده می‌ماند؛ X شماره ندارد`() {
+    val (d, open) = s12()
+    val counts = mapOf("100000" to 16L, "50000" to 1L, "10000" to 3L)  // ۱۶٬۸۰۰، بی اختلاف
+    val first = ok(PayFlow.closeRow(d, open, PayFlow.Count(counts), 1300, newId, series = " A1 "))
+    assertEquals(1L, first.report.no)
+    assertEquals("A1", first.report.series)
+    assertEquals(1L, first.row.z!!["no"]!!.jsonPrimitive.longOrNull)
+    assertEquals(first.report, PayFlow.reportOf(first.row.z!!))
+    //  شیفتِ دوم روی همین دستگاه ⇒ ۲؛ دستگاهِ دیگر (B1) از ۱؛ Z ِ کهنهٔ بی شماره شمارنده را جلو نمی‌برد
+    val open2 = AuditEntry(id = "sh13", type = CashShift.OPEN, createdAt = 1400, amount = 0.0)
+    val legacy = AuditEntry(
+      id = "old", type = CashShift.CLOSE, refId = "x", createdAt = 900, amount = 1.0,
+      z = PayFlow.reportJson(first.report.copy(no = null, series = null)),
+    )
+    val d2 = d.copy(auditLog = d.auditLog + first.row + legacy + open2)
+    assertEquals(2L, ok(PayFlow.closeRow(d2, open2, PayFlow.Count(emptyMap()), 1500, newId, series = "A1")).report.no)
+    assertEquals(1L, ok(PayFlow.closeRow(d2, open2, PayFlow.Count(emptyMap()), 1500, newId, series = "B1")).report.no)
+    assertEquals(listOf(ZSeq.Z(first.row.id, "A1", 1), ZSeq.Z("old", "", 0)), PayFlow.zs(d2))
+    assertNull(ok(PayFlow.report(d2, open2, null, 1450)).report.no)
   }
 
   @Test fun `سابقهٔ بستن در نمای شاگرد بی مورد انتظار و بی اختلاف — بستنِ مدیر، کور و ردیفِ قدیمی`() {

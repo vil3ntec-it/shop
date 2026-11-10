@@ -24,6 +24,7 @@
     //  shop.orders.subscribers_only: ویترینِ فقط‌خواندنی (`store.ordering.accepting === false`) ⇒ «ثبت» بسته
     var closed = c.closed || function () { return false; };
     var pin = null; var quoteNote = '';
+    var secondOrder = false;   //  S41: مشتری به «ادغام یا سفارشِ دوم؟» «سفارشِ دوم» گفت (فقط برای همین سبد)
     var ac = null;              // CHK-09: نشانی‌های حساب (acct.js)
     //  روش‌های دریافت و نشانهٔ پرداخت فقط در همین صفحه‌اند ⇒ این‌جا، نه در بارِ نخستِ store.js
     $('opt-delivery').hidden = !c.store.fulfillment.delivery;
@@ -41,6 +42,17 @@
         el('input', { attrs: { id: f[0], type: 'text', maxlength: String(f[2]) } })));
     });
     function extra(id) { return $(id) ? $(id).value.trim() : ''; }
+    //  CHK-08 (همان پرچم): پین از پیوند یا مختصاتِ برنامهٔ نقشه — برای کسی که برای جای دیگری سفارش می‌دهد یا مرورگرش موقعیت
+    //  ندارد. خواندنِ نوشته در `store/pin-text.js` ِ دیربار (همزادِ `PinText` ِ برنامهٔ خرید، بی شبکه)؛ پین همان راهِ «موقعیتِ
+    //  من» را می‌رود (`setPin` ⇒ `GET /delivery`) و ناحیه را فقط سرور می‌گوید
+    var pinTextP = null;
+    if (c.store.addressExtra && K.has('pin.paste.l') && !$('pin-paste')) {
+      var pinRow = $('pin-btn').parentNode;
+      pinRow.parentNode.insertBefore(el('div', { class: 'pin-row' },
+        el('label', { class: 'field' }, el('span', { text: t('pin.paste.l'), attrs: { 'data-t': 'pin.paste.l' } }),
+          el('input', { attrs: { id: 'pin-paste', type: 'text', class: 'ltr', inputmode: 'url', autocomplete: 'off', maxlength: '2000', placeholder: '34.5281, 69.1723' } })),
+        el('button', { class: 'btn btn-soft btn-sm', text: t('pin.paste.use'), attrs: { id: 'pin-use', type: 'button', 'data-t': 'pin.paste.use' } })), pinRow.nextSibling);
+    }
 
     // ── MKT-01/09 و CHK-04: تخفیف (پرچمِ `shop.storefront.promos`؛ ‏`GET /promos` ِ ۴۰۴ ⇒ خاموش، همان فرمِ امروز) ──
     //  حساب فقط از سرور (`/promos/quote` = همان حسابِ ثبت)؛ تخفیفِ دیده‌شده در `expectedTotalMinor` می‌رود و
@@ -355,7 +367,26 @@
       pin = p; area = null;
       $('pin-text').textContent = p ? text : t('pin.hint');
       $('pin-btn').textContent = p ? t('pin.again') : t('pin.btn');
-      if (p) locate(); else renderCheckout();
+      if (p) { pinCode(); locate(); } else renderCheckout();
+    }
+    //  S33: Plus Code ِ همین پین زیرِ آن (`store/plus-code.js` ِ دیربار، فقط با `features.plusCode`) — همان که سرور در سفارش می‌نویسد
+    function pinCode() {
+      var p = pin;
+      if (!p || !(c.store.features && c.store.features.plusCode)) return;
+      K.js('/store/plus-code.js').then(function () {
+        var code = p === pin && window.StorePlusCode ? window.StorePlusCode.encode(p.lat, p.lng) : null;
+        if (code) $('pin-text').textContent += ' · ' + t('pin.plus', { code: code });
+      }, function () { /* بی کد، همان پین */ });
+    }
+    function pastePin() {
+      var raw = $('pin-paste').value;
+      if (!raw.trim()) { $('pin-paste').focus(); return; }
+      pinTextP = pinTextP || K.js('/store/pin-text.js').then(function () { return window.StorePinText; }, function (e) { pinTextP = null; throw e; });
+      pinTextP.then(function (P) {
+        var p = P.parse(raw);
+        if (!p) { $('pin-text').textContent = t('pin.paste.bad'); return; }
+        setPin(p, t('pin.paste.ok', { c: K.fa(p.lat, 5) + ', ' + K.fa(p.lng, 5) }));
+      }, function () { $('pin-text').textContent = t('pin.paste.bad'); });
     }
     function takePin() {
       if (!navigator.geolocation) { $('pin-text').textContent = t('pin.none'); return; }
@@ -364,6 +395,7 @@
         pin = { lat: Math.round(pos.coords.latitude * 1e6) / 1e6, lng: Math.round(pos.coords.longitude * 1e6) / 1e6 };
         $('pin-text').textContent = t('pin.ok', { m: K.fa(Math.round(pos.coords.accuracy || 0), 0) });
         $('pin-btn').textContent = t('pin.again');
+        pinCode();
         locate();
       }, function () {
         pin = null;
@@ -388,6 +420,7 @@
         lang: K.lang,
       };
       if (lp) lp.order(body);
+      if (secondOrder) body.secondOrder = true;
       if (c.campaign) body.campaign = c.campaign;
       if (slotOf(f)) body.slotStartsAt = slotAt;
       if (promos && promos.guard && deviceId()) body.deviceId = deviceId();   //  MKT-02: «یک بار برای هر دستگاه»
@@ -432,14 +465,24 @@
         //  فقط روی همین دستگاه، برای سفارشِ بعدی (نام و آخرین نشانی)
         K.save('store-customer', { name: body.customer.name, addressText: body.address ? body.address.text : '', landmark: body.address ? body.address.landmark : '' });
         if (ac) ac.placed(body);   //  CHK-09: «این نشانی را با نام نگه دار»
-        quoteNote = ''; c.empty();
+        quoteNote = ''; secondOrder = false; c.empty();
         msg.hidden = true;
         location.hash = '#/o/' + encodeURIComponent(r.order.token);
       }).catch(function (e) {
         var d = e.data || {};
+        secondOrder = false;
         if (e.code === 'promo_code_rejected') {
           code = ''; quoted = null; qKey = '';
           K.note(msg, 'err', reason(d.promo));
+        } else if (e.code === 'duplicate_order' && d.ask === 'track_or_second' && d.token) {
+          //  S41: «ادغام یا سفارشِ دوم؟» — «همان را دنبال کن» (بی‌خطر، پیش‌فرض) ⇒ پیگیریِ همان سفارش، هیچ سفارشِ تازه‌ای نه؛
+          //  «سفارشِ دوم» ⇒ همان سبد با `secondOrder` (کلیدِ یکتاییِ تازه، چون بدنه دیگر است). پیامِ سرور برای کلاینتِ بی پرسش است
+          msg.hidden = true;
+          K.confirm(t('ck.dup.q', { no: K.fa(d.orderNo, 0) }), t('ck.dup.second'), t('ck.dup.track')).then(function (second) {
+            if (!second) { msg.hidden = true; location.hash = '#/o/' + encodeURIComponent(d.token); return; }
+            secondOrder = true;
+            submitOrder({ preventDefault: function () {} });
+          });
         } else if (e.code === 'price_changed' && d.quote) {
           //  S135: تغییر روشن نشان داده می‌شود؛ بی پذیرشِ دوباره ثبت نمی‌شود
           var changed = [];
@@ -523,6 +566,11 @@
     $('verify-check').addEventListener('click', checkCode);
     $('v-code').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); checkCode(); } });
     $('pin-btn').addEventListener('click', takePin);
+    if ($('pin-use')) {
+      $('pin-use').addEventListener('click', pastePin);
+      //  Enter در کادر برگه را نفرستد
+      $('pin-paste').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); pastePin(); } });
+    }
     $('checkout-form').addEventListener('submit', submitOrder);
     $('zone-pick').addEventListener('change', function () {
       var id = $('zone-pick').value;

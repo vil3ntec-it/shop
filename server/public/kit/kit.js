@@ -413,13 +413,24 @@
     b.addEventListener('click', function (e) { e.stopPropagation(); onAdd(p); });
     return b;
   };
+  /** S92/S126: عکسِ نیامده ⇒ حرفِ نخستِ نام، نه آیکنِ شکسته (RULES «v3 · ویترین») */
+  K.photo = function (attrs, name) {
+    return K.el('img', { attrs: attrs, on: { error: function () {
+      var box = this.parentNode;
+      if (!box) return;
+      var letter = String(name || '?').slice(0, 1);
+      box.classList.remove('tile', 'photo');
+      if (box.classList.contains('thumb')) { box.textContent = letter; return; }
+      box.replaceChild(K.el('span', { class: 'ph', text: letter, attrs: { 'aria-hidden': 'true' } }), this);
+    } } });
+  };
   /** o = { href | onOpen, photo (نشانی), qty, onAdd, shop: نامِ دکان روی کارت } */
   K.productCard = function (p, o) {
     var el = K.el;
     var st = K.stockOf(p);
     var li = el('li', { class: 'p-card' + (st.orderable ? '' : ' unavailable'), attrs: { 'data-id': p.id } });
     var img = el('span', { class: 'p-img' + (p.photo ? ' tile' : '') });
-    if (p.photo) img.appendChild(el('img', { attrs: { src: o.photo, alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' } }));
+    if (p.photo) img.appendChild(K.photo({ src: o.photo, alt: '', loading: 'lazy', decoding: 'async', width: '300', height: '300' }, p.name));
     else img.appendChild(el('span', { class: 'ph', text: String(p.name || '?').slice(0, 1), attrs: { 'aria-hidden': 'true' } }));
     var deal = p.regularPriceMinor > p.priceMinor;
     var label = [p.name, K.money(p.priceMinor) + (p.unit ? ' ' + K.t('p.per', { unit: p.unit }) : '')];

@@ -60,6 +60,7 @@ object StrRemoteApproval {
   //  STF-03 — پیش‌سنجیِ صندوق (`SaleCapGate`) قرض و تغییرِ قیمتِ ردیف را هم می‌پرسد
   val permCredit: String get() = t("فروشِ قرضی", "Credit sale", "پور پلور")
   val permPrice: String get() = t("تغییرِ قیمت", "Price change", "د بیې بدلون")
+  val permFreeLine: String get() = t("قلمِ آزاد", "Custom item", "آزاد توکی") // POS-10، تصمیمِ ۱-۱۱ (۲)
   fun saleDoc(no: String): String = t("فاکتورِ ${asIs(no)}", "Invoice $no", "بل $no")
   fun returnDoc(no: String): String = t("سندِ برگشتِ ${asIs(no)}", "Return $no", "د بېرته ورکولو سند $no")
   fun who(name: String): String = t("از ${asIs(name)}", "From $name", "له $name")

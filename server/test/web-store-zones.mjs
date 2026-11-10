@@ -362,6 +362,45 @@ ok(aj.phone2 === '+93799888777' && aj.plusCode === '9G8F+6W کابل', 'CHK-08: 
 ok(aj.province === 'کابل' && aj.street === 'گذرِ سوم' && aj.house === 'منزلِ ۱۲، طبقهٔ دوم' && !('postalCode' in aj),
   'CHK-08: ولایت، گذر و منزل و طبقه در نشانیِ سفارش', JSON.stringify(aj));
 
+//  CHK-08 (همان پرچم): پین از پیوند یا مختصاتِ برنامهٔ نقشه — کسی که برای جای دیگری سفارش می‌دهد «موقعیتِ فعلی» ندارد.
+//  `store/pin-text.js` فقط با کلیک؛ پیوندِ کوتاه ⇒ پیام و بی پین؛ Enter برگه را نمی‌فرستد؛ ناحیه را سرور از همان پین می‌گوید
+//  (بیرون ⇒ «ثبت» بسته)؛ همان پین (شش رقم) در نشانیِ سفارش، بی `zoneId` ِ دستی
+await open();
+await addRice();
+await toCheckout();
+ok(await page.isVisible('#pin-paste') && await page.isVisible('#pin-use') && await page.isVisible('#pin-btn'),
+  'CHK-08: «پین از برنامهٔ نقشه» کنارِ «موقعیتِ فعلیِ من»، بیرون از «جزئیاتِ بیشتر»');
+ok(!(await page.$('script[src="/store/pin-text.js"]')), 'pin-text.js پیش از کلیک بار نشد');
+await page.fill('#pin-paste', 'https://maps.app.goo.gl/AbCdEf');
+await page.click('#pin-use');
+await page.waitForFunction(() => /پین پیدا نشد/.test(document.getElementById('pin-text').textContent), null, { timeout: 10000 });
+ok((await text('#pin-btn')).includes('موقعیتِ فعلیِ من'), 'پیوندِ کوتاه ⇒ «پین پیدا نشد…» و هیچ پینی گذاشته نشد', await text('#pin-btn'));
+await page.fill('#pin-paste', 'geo:35.2,70.4');
+await page.press('#pin-paste', 'Enter');
+await page.waitForFunction(() => /بیرون/.test(document.getElementById('zone-msg').textContent), null, { timeout: 10000 });
+ok(await page.isHidden('#view-order') && await page.isDisabled('#submit-order'), 'Enter برگه را نفرستاد؛ پینِ چسباندهٔ بیرون ⇒ «بیرون از محدوده» و «ثبت» بسته');
+await page.fill('#pin-paste', 'https://www.google.com/maps/place/X/@34.5312345,69.1711111,17z');
+await page.click('#pin-use');
+await page.waitForFunction(() => /کارته‌سه/.test(document.getElementById('zone-msg').textContent), null, { timeout: 10000 });
+ok((await text('#pin-text')).includes('۳۴٫۵۳۱۲') && (await text('#pin-btn')).includes('دوباره'), 'پینِ گوگل ⇒ ناحیه از سرور و پین با رقمِ فارسی', await text('#pin-text'));
+if (axeSrc) {
+  await page.evaluate(axeSrc);
+  const v = await page.evaluate(async () => (await window.axe.run(document.getElementById('address-box'),
+    { runOnly: ['color-contrast', 'button-name', 'label', 'aria-allowed-attr', 'nested-interactive'] })).violations
+    .map((x) => `${x.id}: ${x.nodes.slice(0, 2).map((n) => n.target.join(' ')).join(' ; ')}`));
+  ok(v.length === 0, 'دسترس‌پذیری (axe-core): نشانی با «پین از برنامهٔ نقشه»', v.join(' | '));
+} else if (process.env.SKIP_BROWSER_TESTS !== '1') ok(false, 'axe-core پیدا نشد (npm i -g axe-core@4.10.3، یا AXE_PATH)');
+await page.fill('#a-text', 'خانهٔ پدر، کارته‌سه');
+await page.waitForFunction(() => !document.getElementById('submit-order').disabled, null, { timeout: 10000 });
+await page.click('#submit-order');
+await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
+{
+  const r = await one('SELECT address FROM online_orders WHERE shop_id = $1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const a = typeof r.address === 'string' ? JSON.parse(r.address) : r.address;
+  ok(a.lat === 34.531235 && a.lng === 69.171111 && a.zone && a.zone.name === 'کارته‌سه' && a.zone.source === 'pin',
+    'CHK-08: پینِ چسبانده (شش رقم، گردِ سرور) در نشانیِ سفارش و ناحیه از پین', JSON.stringify(a));
+}
+
 
 //  CHK-07/12: زمانِ تحویل و هزینهٔ بازه — بی بازه ⇒ همان فرم؛ بازهٔ «ارسال» با هزینهٔ ۲۰ و بی «هرچه زودتر» ⇒ تا بازه
 //  برگزیده نشده «ثبت» بسته، هزینه روی هزینهٔ ناحیه، و همان بازه و هزینه در سفارشِ سرور (جمعِ دیده‌شده = جمعِ سرور)

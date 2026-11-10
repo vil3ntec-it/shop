@@ -822,8 +822,9 @@
         + 'خروجی و چاپ هم کار می‌کند. <a href="#" id="acct-banner-plan">دیدنِ اشتراک</a>', 'bad');
     } else if (sub.active && days !== null && days <= 7) {
       setSoftLock(false);
+      //  S47: هشدار با تاریخِ دقیقِ پایان (همان `day` ِ «اشتراکِ من»)، نه فقط «N روز»
       showBanner('soon:' + (sub.endsAt || 0),
-        '<b>' + fa(days) + ' روز تا پایانِ اشتراک.</b> پس از آن برنامه فقط‌خواندنی می‌شود؛ '
+        '<b>' + fa(days) + ' روز تا پایانِ اشتراک (' + day(sub.endsAt ? Math.floor(sub.endsAt / 1000) : 0) + ').</b> پس از آن برنامه فقط‌خواندنی می‌شود؛ '
         + 'هیچ داده‌ای پاک نمی‌شود. <a href="#" id="acct-banner-plan">دیدنِ اشتراک</a>', 'warn');
     } else {
       setSoftLock(false);

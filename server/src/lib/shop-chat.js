@@ -64,7 +64,7 @@ const sha256 = (x) => crypto.createHash('sha256').update(x).digest('hex');
 function cleanText(raw) {
   const t = String(raw == null ? '' : raw).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '').trim();
   if (t.length > MAX_BODY) throw badRequest(`پیام خیلی بلند است — حداکثر ${MAX_BODY} نویسه`, 'message_too_long');
-  return t;
+  return require('./ops-errors').maskCards(t);   //  S117: شمارهٔ کاملِ کارت ⇒ «[کارت]» پیش از دیتابیس، پیش‌نمایش و پوش
 }
 
 function shortText(raw, max) {
@@ -763,7 +763,7 @@ async function report(viewer, id, body) {
   const b = obj(body);
   const reason = str(b.reason);
   if (!REASONS.includes(reason)) throw badRequest('دلیلِ گزارش نامعتبر است', 'bad_reason');
-  const note = shortText(b.note, 500);
+  const note = require('./ops-errors').maskCards(shortText(b.note, 500));   //  S117
   const conv = await rowOf(viewer, id);
   let messageId = '';
   let snapshot = {};

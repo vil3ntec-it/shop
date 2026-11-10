@@ -135,10 +135,10 @@ test('⛔ پرچمِ خاموش: پرداخت‌شده همان ۴۰۹، درِ 
   assert.equal((await amendEvents(o.id)).length, 0);
 });
 
-test('روشن، سفارشِ کارمند: کم ⇒ «بازپرداخت» و زیاد ⇒ «پرداختِ تکمیلی» ثبت؛ تسویه فقط نقد، یک بار، با کلیدِ یکتایی', async () => {
+test('روشن، سفارشِ کارمند: کم ⇒ «بازپرداخت» و زیاد ⇒ «پرداختِ تکمیلی» ثبت؛ تسویه نقد یا حساب‌پیِ دستی (۱-۶ ب)، یک بار، با کلیدِ یکتایی', async () => {
   const s = await shop('کارمند');
   await setFlag(s.shopId, 'shop.orders.amend_paid', true);
-  assert.deepEqual((await h.get('/api/shop/orders/config', { token: s.token })).body.amend.settleMethods, ['cash']);
+  assert.deepEqual((await h.get('/api/shop/orders/config', { token: s.token })).body.amend.settleMethods, ['cash', 'hesabpay']);
   const o = await staffOrder(s);
   await paid(o.id);
   const before = await payRow(o.id);
@@ -159,7 +159,7 @@ test('روشن، سفارشِ کارمند: کم ⇒ «بازپرداخت» و �
   assert.equal(open.openRefundMinor, 2000);
   assert.equal(open.openChargeMinor, 0);
   assert.deepEqual(open.settled, { refundMinor: 0, chargeMinor: 0, count: 0 });
-  //  فقط نقد
+  //  فقط نقد یا حساب‌پیِ دستی (تصمیمِ ۱-۶ ب) — کارت و درگاه نه
   const card = await settle(s, o.id, a.id, { method: 'card' });
   assert.equal(card.status, 400);
   assert.equal(card.body.error.code, 'bad_method');
@@ -201,6 +201,17 @@ test('روشن، سفارشِ کارمند: کم ⇒ «بازپرداخت» و �
   const done = (await h.get('/api/shop/orders/reconciliation', { token: s.token })).body.amendSettlements;
   assert.deepEqual(done.open, []);
   assert.deepEqual(done.settled, { refundMinor: 2000, chargeMinor: 12000, count: 2 });
+  //  تصمیمِ ۱-۶ ب: دکان با حساب‌پی (دستی، بی درگاه) پس داد ⇒ همان ثبت با روشِ hesabpay؛ وضعیتِ پرداخت دست نمی‌خورد
+  const o3 = await staffOrder(s);
+  await paid(o3.id);
+  const down = await propose(s, o3.id, { changes: [{ lineNo: 3, qtyMilli: 0 }], consent: { via: 'phone' } });
+  assert.equal(down.status, 201, JSON.stringify(down.body));
+  const hp = await settle(s, o3.id, down.body.amendment.id, { method: 'hesabpay', note: 'از حساب‌پیِ دکان' });
+  assert.equal(hp.status, 200, JSON.stringify(hp.body));
+  assert.equal(hp.body.amendment.settlement.method, 'hesabpay');
+  assert.equal((await payRow(o3.id)).payment_status, 'paid');
+  const after3 = (await h.get('/api/shop/orders/reconciliation', { token: s.token })).body.amendSettlements;
+  assert.deepEqual(after3.settled, { refundMinor: 4000, chargeMinor: 12000, count: 3 });
 });
 
 test('سفارشِ ویترین: پذیرشِ مشتری همان ثبت را دارد؛ مشتری «تسویه شد؟» را می‌بیند', async () => {
