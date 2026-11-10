@@ -141,8 +141,7 @@
     }
   }
 
-  //  Sync v3 پشتِ تنظیمِ هر دستگاه (`tohid-sync-engine`، پیش‌فرض v1) — `license/sync-v3-engine.js`.
-  //  خاموش (پیش‌فرض) ⇒ همین موتورِ v1، بی هیچ تغییری؛ روشن ⇒ همان رابطِ `window.TohidSync` را v3 می‌سازد.
+  //  Sync v3 پشتِ تنظیمِ هر دستگاه (`tohid-sync-engine`، پیش‌فرض v1؛ `license/sync-v3-engine.js`): خاموش ⇒ همین v1 بی تغییر؛ روشن ⇒ همان `window.TohidSync` را v3 می‌سازد.
   if (window.TohidSyncV3 && window.TohidSyncV3.choice() === 'v3' && window.TohidSyncV3.install(acc)) {
     guardTabs(window.TohidSync);
     return;
