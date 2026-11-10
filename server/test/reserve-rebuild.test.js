@@ -215,3 +215,57 @@ test('S86 نگه‌داشته ⛔ R6: پرچمِ خاموش ⇒ قلمِ بزر�
   assert.equal(await cli.main(['--shop', s.shopId, '--reserve'], () => {}), 0);
   assert.equal((await audits(s))[0].user_id, 'اپراتور');
 });
+
+//  SR47-1: projection ِ کهنه (مثلاً ردیف‌های `stock_reservations` از پشتیبانِ پیشین) ردیفی را «نگه‌داشته» می‌گوید که دفتر پیش‌تر
+//  بسته است (`res:<id>:release|commit`). داور دفتر است: همان ردیف بی هیچ حرکتِ تازه بسته می‌شود — نه آزادسازیِ دوم با پسوندِ دیگر
+//  (دفترِ فقط‌افزودنی برای همیشه با نگه‌داشته‌ها نمی‌خواند)، نه ماندنِ «نگه‌داشتهٔ شبح» که نگه‌داشتنِ بازِ واقعی را کنار می‌زند.
+test('SR47 نگه‌داشته: ردیفِ «نگه‌داشته» ای که دفتر بسته است ⇒ بی حرکتِ تازه بسته می‌شود؛ نگه‌داشتنِ بازِ دفتر جایش می‌آید؛ INV-16 سالم', async () => {
+  const s = await shop('رزرو-کهنه');
+  await stocked(s, 'k1', 10);
+  await stocked(s, 'k2', 10);
+  const moves = async (id) => (await many(`SELECT source_key FROM stock_moves WHERE shop_id=$1 AND source_key LIKE $2 ORDER BY source_key`,
+    [s.shopId, `res:${id}:%`])).map((m) => m.source_key.split(':')[2]);
+
+  //  ۱) تحویل‌شده (فروشِ قلم در دفتر ⇒ `commit`)، سپس کالا برگشت ⇒ سفارش در RELEASE_ON
+  const a = await order(s, [line('k1', 1000)]);
+  await go(s, a.id, 'accepted');
+  const x = await one('SELECT * FROM stock_reservations WHERE order_id=$1', [a.id]);
+  await query(`INSERT INTO stock_sources (shop_id, source_key, product_id, posted_milli, rev, updated_at) VALUES ($1,$2,'k1',1000,1,$3)`,
+    [s.shopId, `si:o-${a.id}-${x.line_no}`, Date.now()]);
+  assert.equal((await lib().rebuild(s.shopId, { apply: true })).changes.map((c) => c.kind).join(), 'committed');
+  assert.deepEqual(await moves(x.id), ['commit', 'hold']);
+  await query(`UPDATE online_orders SET status='refunded_full' WHERE id=$1`, [a.id]);
+
+  //  ۲) قلمِ ۱ → ۲ → ۱ کیلو: X آزاد، Y آزاد، Z نگه‌داشته (هر سه در دفتر)
+  const b = await order(s, [line('k2', 1000)]);
+  const y0 = await one('SELECT * FROM stock_reservations WHERE order_id=$1', [b.id]);
+  await query('UPDATE online_order_lines SET qty_milli=2000 WHERE order_id=$1', [b.id]);
+  await lib().rebuild(s.shopId, { apply: true });
+  await query('UPDATE online_order_lines SET qty_milli=1000 WHERE order_id=$1', [b.id]);
+  await lib().rebuild(s.shopId, { apply: true });
+  const z = await one(`SELECT * FROM stock_reservations WHERE order_id=$1 AND status='held'`, [b.id]);
+  assert.notEqual(z.id, y0.id);
+  assert.equal(await reconciled(s), true);
+
+  //  پشتیبانِ کهنهٔ projection برگردانده شد: X و Y0 «نگه‌داشته»، Z نیست
+  await query('DELETE FROM stock_reservations WHERE id=$1', [z.id]);
+  await query(`UPDATE stock_reservations SET status='held', closed_at=NULL, close_reason='' WHERE id = ANY($1::text[])`, [[x.id, y0.id]]);
+  assert.equal(await reconciled(s), false);
+  const movesBefore = await moveCount(s);
+
+  const dry = await lib().rebuild(s.shopId);
+  assert.equal(dry.ok, false);
+  assert.equal(await moveCount(s), movesBefore, 'نمایش دفتر را نمی‌نویسد');
+  const r = await lib().rebuild(s.shopId, { apply: true, by: 'آزمون' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(await moves(x.id), ['commit', 'hold'], 'بستنِ دوم (release) روی commit ِ دفتر نوشته نشد');
+  assert.deepEqual(await moves(y0.id), ['hold', 'release']);
+  assert.deepEqual(await moves(z.id), ['hold'], 'نگه‌داشتنِ بازِ دفتر آزاد نشد');
+  assert.equal((await one('SELECT status FROM stock_reservations WHERE id=$1', [x.id])).status, 'committed');
+  assert.equal((await one('SELECT status FROM stock_reservations WHERE id=$1', [y0.id])).status, 'released');
+  assert.deepEqual((await held(s)).map((h0) => h0.id), [z.id], 'همان Z ِ دفتر، با همان شناسه');
+  assert.equal(await reconciled(s), true, JSON.stringify((await stock.reconcile(s.shopId)).mismatches));
+  const again = await lib().rebuild(s.shopId, { apply: true });
+  assert.equal(again.ok, true);
+  assert.deepEqual(again.changes, []);
+});

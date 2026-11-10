@@ -11,8 +11,9 @@
  *               پذیرش ⇒ قلم «برداشته شد» با همان وزن و مبلغ؛ رد ⇒ قلم «حذف شد» و از جمع کسر (PCK-07).
  *   مهلت ───── بی‌پاسخ تا مهلت ⇒ رد (policy: بی رضایت هرگز گران‌تر نمی‌شود) — هر جا خوانده شود، بی کارِ زمان‌بندی‌شده.
  *   جمع‌آور ── وزنِ تازه، «پیدا نکردم» یا «از نو» روی همان قلم نگه‌داشتِ باز/پذیرفته را پس می‌گیرد (سابقه می‌ماند).
- *   سقف ────── بسته‌بندی جمعِ اقلام را با `capOf` می‌سنجد: هر قلم تا مقدارِ سفارش (وزنی + حدِ مجاز)، و قلمِ نگه‌داشتِ
- *               پذیرفته تا همان مبلغی که مشتری پذیرفت — بیشتر ⇒ ۴۰۹ `over_cap` (سپرِ سرور، نه فقط سنجشِ رویداد).
+ *   سقف ────── بسته‌بندی جمعِ اقلام را با `capOf` و **هر قلم** را با `overCap` می‌سنجد: هر قلم تا مقدارِ سفارش (وزنی + حدِ
+ *               مجاز)، و قلمِ نگه‌داشتِ پذیرفته تا همان مبلغی که مشتری پذیرفت — بیشتر ⇒ ۴۰۹ `over_cap` (سپرِ سرور، نه فقط
+ *               سنجشِ رویداد؛ SR47-2: قلمِ حذف‌شده بیشیِ قلمِ دیگر را نمی‌پوشاند).
  *
  * ⛔ ترتیبِ قفل‌ها همان جمع‌آوری: `order_picks` ⇐ قلم ⇐ نگه‌داشت.
  */
@@ -153,21 +154,36 @@ async function acceptedOf(c, orderId) {
 }
 
 /**
- * سقفِ جمعِ اقلامِ برگه (پیش از تخفیف و کرایه): هر قلم تا مقدارِ سفارش (وزنی: + حدِ مجاز)، جایگزین هرگز بیش از اصل
- * (قیمت و مقدارِ کمتر، PCK-06)، و قلمِ نگه‌داشتِ پذیرفته تا همان مبلغی که مشتری پذیرفت. قلم‌ها = `lineView` ِ برگه.
+ * سقفِ هر قلمِ برگه (شمارهٔ قلم ⇒ مبلغ، پیش از تخفیف و کرایه؛ `capOf` = جمعِ آن‌ها): هر قلم تا مقدارِ سفارش (وزنی: + حدِ مجاز)،
+ * جایگزین هرگز بیش از اصل (قیمت و مقدارِ کمتر، PCK-06)، و قلمِ نگه‌داشتِ پذیرفته تا همان مبلغی که مشتری پذیرفت. قلم‌ها = `lineView` ِ برگه.
  */
-function capOf(lines, accepted = new Map()) {
-  let cap = 0;
+function capsOf(lines, accepted = new Map()) {
+  const caps = new Map();
   for (const l of lines) {
     if (accepted.has(l.lineNo)) {
-      cap += accepted.get(l.lineNo);
+      caps.set(l.lineNo, accepted.get(l.lineNo));
       continue;
     }
     const ordered = Number(l.orderedQtyMilli);
     const max = l.weighed ? ordered + Math.floor((ordered * P.DEFAULT_TOLERANCE_BP) / 10000) : ordered;
-    cap += Math.max(Number(l.originalTotalMinor) || 0, P.lineTotalMinor(max, Number(l.unitPriceMinor)));
+    caps.set(l.lineNo, Math.max(Number(l.originalTotalMinor) || 0, P.lineTotalMinor(max, Number(l.unitPriceMinor))));
   }
+  return caps;
+}
+
+function capOf(lines, accepted = new Map()) {
+  let cap = 0;
+  for (const v of capsOf(lines, accepted).values()) cap += v;
   return cap;
+}
+
+/**
+ * SR47-2: قلم‌هایی که جمعِ تسویه‌شده‌شان (`settle().lines`) از سقفِ **خودشان** بیشتر است — سنجشِ جمع به تنهایی بیشیِ یک قلمِ
+ * بی رضایت را با سهمِ قلمِ حذف‌شده یا کم‌برداشته می‌پوشاند.
+ */
+function overCap(lines, settled, accepted = new Map()) {
+  const caps = capsOf(lines, accepted);
+  return settled.filter((l) => l.totalMinor > (caps.get(l.lineNo) || 0)).map((l) => l.lineNo);
 }
 
 /** همهٔ نگه‌داشت‌های یک برگه (برای برگهٔ جمع‌آور) */
@@ -295,6 +311,6 @@ async function decideByCustomer(store, token, holdId, body) {
 
 module.exports = {
   FLAG_KEY, WAIT_MIN,
-  flagOf, holdView, withdrawLine, lineHeld, openIn, ofEvent, applyTimeouts, pendingOf, acceptedOf, capOf, forSheet,
+  flagOf, holdView, withdrawLine, lineHeld, openIn, ofEvent, applyTimeouts, pendingOf, acceptedOf, capsOf, capOf, overCap, forSheet,
   decide, forCustomer, decideByCustomer, trackView,
 };

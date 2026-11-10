@@ -558,9 +558,10 @@ async function pack(shopId, orderId, { key, body }, actor) {
     //  سقفِ پول (سپرِ سرور): هر قلم تا مقدارِ سفارش + حدِ وزن، یا همان مبلغی که مشتری برای وزنِ بیشتر پذیرفت (S56)
     const accepted = await holds().acceptedOf(c, id);
     const capMinor = holds().capOf(lines, accepted);
-    if (s.subtotalMinor > capMinor) {
+    const overLines = holds().overCap(lines, s.lines, accepted);   //  SR47-2: هر قلم جدا
+    if (s.subtotalMinor > capMinor || overLines.length) {
       const err = conflict('جمعِ اقلام از سقفِ سفارش و رضایتِ مشتری بیشتر است', 'over_cap');
-      err.data = { capMinor, subtotalMinor: s.subtotalMinor };
+      err.data = { capMinor, subtotalMinor: s.subtotalMinor, lines: overLines };
       throw err;
     }
     const live = (await c.query(
