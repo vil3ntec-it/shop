@@ -27,6 +27,8 @@ const stock = require('./stock');
 const absorbLedger = require('./count-absorb-ledger');
 const { toMinor, toMilli } = require('./sync-v3-convert');
 const { badRequest, notFound, conflict, forbidden } = require('../middleware/errors');
+//  O-06 = ب (ORD-20/CHK-18): نگه‌داشتنِ نرم — آزاد = دفتر − نگه‌داشتهٔ فعال (پرچمِ خاموشِ `shop.stock_reserve`)
+const reserve = () => require('./stock-reserve');
 
 const TABLES = Object.freeze({ v1: 'sync_rows', v3: 'sync_v3_rows' });
 //  `stockMovements` فقط برای INV-10 (`count-absorb-ledger.collect`): موجودی همچنان از ورود و فروش است
@@ -413,8 +415,8 @@ async function retireOrderStock(c, shopId, at) {
   const touched = new Set();
   const none = { changed: false, touched: [], audit: null };
   const legacy = (await c.query(
-    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1)
-         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order') AS any`, [shopId]
+    `SELECT EXISTS (SELECT 1 FROM stock_reservations WHERE shop_id=$1 AND kind='legacy')
+         OR EXISTS (SELECT 1 FROM stock_moves WHERE shop_id=$1 AND source='order' AND type='sale') AS any`, [shopId]
   )).rows[0];
   if (!legacy || !legacy.any) return none;
   let undoneMilli = 0;
@@ -437,7 +439,7 @@ async function retireOrderStock(c, shopId, at) {
   }
   const held = (await c.query(
     `UPDATE stock_reservations SET status='released', closed_at=$2, close_reason='reservations_retired'
-      WHERE shop_id=$1 AND status='held' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
+      WHERE shop_id=$1 AND status='held' AND kind='legacy' RETURNING id, product_id, order_id, qty_milli`, [shopId, at]
   )).rows;
   for (const r of held) {
     await stock.insertMove(c, shopId, {
@@ -450,7 +452,8 @@ async function retireOrderStock(c, shopId, at) {
   const tasks = await c.query(
     `UPDATE stock_tasks SET status='dismissed', resolved_by='system', resolved_at=$2, updated_at=$2,
             note=$3
-      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')`, [shopId, at, RETIRED_NOTE]
+      WHERE shop_id=$1 AND status='open' AND kind IN ('reservation_short', 'transfer_needed')
+        AND dedupe NOT LIKE 'soft-short:%'`, [shopId, at, RETIRED_NOTE]
   );
   const undone = sold.length - keptWithW;
   const dismissed = tasks.rowCount || 0;
@@ -496,24 +499,26 @@ async function retireOrderStock(c, shopId, at) {
  * دستگاه‌های دکان در مهلتِ `staleAfterSec` دیده شده و هیچ دستگاهِ تازه‌دیده‌ای
  * صفِ نفرستاده ندارد.
  */
-async function freshness(shopId, settings, at) {
+async function freshness(shopId, settings, at, c = null) {
+  //  درونِ تراکنش (ساختِ سفارش، گذار) ⇒ همان اتصال: استخرِ PostgreSQL زیرِ قفل خالی نمی‌ماند
+  const row = c ? async (t, p) => (await c.query(t, p)).rows[0] : one;
   const since = at - settings.staleAfterSec * 1000;
   //  `queued` ِ Sync v1 اندازهٔ صف **پیش از** همان push است (دسته را هم می‌شمارد). برنامه پس از
   //  خالی کردنِ صف pull می‌کند ⇒ pull ِ پس از آخرین push یعنی صف خالی شد؛ وگرنه پس از هر فروش
   //  ویترین تا pushِ بعدی «در حال بررسی» می‌ماند و عددِ تازه را نشان نمی‌داد.
-  const v1 = await one(
+  const v1 = await row(
     `SELECT COALESCE(MAX(last_seen_at),0)::bigint AS seen,
             COALESCE(MAX(CASE WHEN last_seen_at >= $2
                                AND NOT (last_push_at IS NOT NULL AND last_pull_at IS NOT NULL AND last_pull_at >= last_push_at)
                               THEN queued_count ELSE 0 END),0)::int AS queued
        FROM sync_devices WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, since]
   );
-  const v3 = await one(
+  const v3 = await row(
     `SELECT COALESCE(MAX(last_seen_at),0)::bigint AS seen,
             COALESCE(MAX(CASE WHEN last_seen_at >= $2 THEN queued ELSE 0 END),0)::int AS queued
        FROM sync_v3_devices WHERE app='shop' AND account_kind='shop' AND account_id=$1`, [shopId, since]
   );
-  const st = await one('SELECT last_run_at FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
+  const st = await row('SELECT last_run_at FROM catalog_sync_state WHERE shop_id=$1', [shopId]);
   const seen = Math.max(num(v1 && v1.seen), num(v3 && v3.seen));
   const queued = Math.max(num(v1 && v1.queued), num(v3 && v3.queued));
   let reason = '';
@@ -561,11 +566,11 @@ async function publicStock(shopId, productIds, { at = now() } = {}) {
   await refresh(shopId, { maxAgeMs: 5000, at });
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, at);
-  const [ps, lvs] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids)]);
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, ids), stock.levelsOf(null, shopId, ids), reserve().heldOf(null, shopId, ids, at)]);
   const out = new Map();
-  //  فقط دفترِ همگام‌شدهٔ دستگاه‌ها — سفارشِ آنلاین هیچ رزرو و کسری ندارد
+  //  دفترِ همگام‌شدهٔ دستگاه‌ها − نگه‌داشتهٔ فعالِ سفارش‌ها (O-06 = ب؛ بی پرچم همیشه ۰) — سرور هرگز کم نمی‌کند
   for (const id of ids) {
-    out.set(id, badgeOf(ps.get(id), lvs.get(id), 0, settings, fr, settings.showQty === 'exact'));
+    out.set(id, badgeOf(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr, settings.showQty === 'exact'));
   }
   return out;
 }
@@ -624,8 +629,8 @@ async function list(shopId, { q, cursor, limit } = {}) {
   const page = rows.slice(0, lim).map((r) => r.product_id);
   const settings = await stock.settingsOf(shopId);
   const fr = await freshness(shopId, settings, now());
-  const [ps, lvs] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page)]);
-  const items = page.map((id) => productView(ps.get(id), lvs.get(id), 0, settings, fr));
+  const [ps, lvs, held] = await Promise.all([productsOf(shopId, page), stock.levelsOf(null, shopId, page), reserve().heldOf(null, shopId, page)]);
+  const items = page.map((id) => productView(ps.get(id), lvs.get(id), held.get(id) || 0, settings, fr));
   const last = items[items.length - 1];
   return {
     items, freshness: fr,
@@ -644,7 +649,8 @@ async function detail(shopId, productId) {
   const lv = (await stock.levelsOf(null, shopId, [id])).get(id);
   const lows = {};
   for (const loc of stock.LOCATIONS) if (lv && lv[loc] && lv[loc].low !== null) lows[loc] = lv[loc].low;
-  return { product: productView(p, lv, 0, settings, fr), lowByLocation: lows, freshness: fr };
+  const held = (await reserve().heldOf(null, shopId, [id])).get(id) || 0;
+  return { product: productView(p, lv, held, settings, fr), lowByLocation: lows, freshness: fr };
 }
 
 function moveView(r) {
@@ -761,17 +767,19 @@ async function toStockLines(c, shopId, lines) {
  * درونِ تراکنشِ `orders.create`، پس از بررسیِ کلیدِ یکتایی: پرچم روشن ⇒ قلم‌های کالادار
  * **فقط سنجیده** می‌شوند — کالای ناموجود/غیرفعال/حذف‌شده (`product_unavailable`)، واحدِ
  * ناشناس (`bad_unit`) و مقدارِ بیش از موجودیِ قابل‌فروشِ همین لحظه (`out_of_stock`).
- * ⛔ هیچ رزرو، هیچ حرکت و هیچ نوشتنی (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل
- * می‌دهد و فروش همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null.
+ * ⛔ هیچ حرکتِ مکان‌دار و هیچ کسری (تصمیمِ صاحبِ مخزن): کالا را دکان از برنامه تحویل می‌دهد و فروش
+ * همان‌جا ثبت می‌شود. سفارشِ آزمایشی و پرچمِ خاموش ⇒ null. استثنای O-06 = ب (`shop.stock_reserve` +
+ * موجودیِ تازه): سنجش با نگه‌داشتهٔ دیگران و زیرِ قفلِ موجودی ⇒ `hold` برای `orders.create`؛ [orderId] (افزودنِ
+ * قلم، CHK-21) ⇒ نگه‌داشتهٔ همان سفارش «دیگران» نیست.
  */
-async function checkOrder(c, shopId, { lines, isTest = false }) {
+async function checkOrder(c, shopId, { lines, isTest = false, at = now(), orderId = '' }) {
   if (isTest) return null;
   const withProduct = (lines || []).filter((l) => str(l.productId));
   if (!withProduct.length) return null;
   if (!(await stock.flagOf(shopId, c))) return null;
   const settings = await stock.settingsOf(shopId, c);
   const { lines: sl, names } = await toStockLines(c, shopId, withProduct);
-  return stock.check(c, shopId, { lines: sl, settings, names });
+  return reserve().checkOrderIn(c, shopId, { lines: sl, settings, names, at, orderId });
 }
 
 /** برای مسیرهای HTTP: پرچم لازم است. */

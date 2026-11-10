@@ -15,7 +15,8 @@
  *
  * ⛔ موجودی (تصمیمِ صاحبِ مخزن، ۱۴۰۵/۰۷/۲۷): سفارش موجودیِ سرور را **نه رزرو می‌کند نه
  * کم** و هیچ ردیفی در دفترِ دکان نمی‌نویسد. ساختِ سفارش با پرچمِ `shop.catalog` فقط
- * می‌سنجد (`catalog.checkOrder`). وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
+ * می‌سنجد (`catalog.checkOrder`)؛ استثنای O-06 = ب: `shop.stock_reserve` + موجودیِ تازه ⇒ نگه‌داشتنِ
+ * کوتاه تا قبول (`lib/stock-reserve.js`)، باز هم بی کسر. وقتی دکان سفارش را تحویل می‌دهد (مشتری گرفت / به پیک
  * داده شد / رسید)، **برنامهٔ دکان** یک فروشِ عادی با `orderId` ثبت می‌کند
  * (`OrderFulfillment.kt`) و موجودی با همگام‌سازی همه‌جا کم می‌شود؛ `handoverPending`
  * سفارش‌های تحویل‌شدهٔ بی‌فروش را به برنامه می‌دهد. سفارشِ دستیِ کارمند قیمت را خودش می‌گوید، درست مثلِ صندوق؛
@@ -383,7 +384,11 @@ async function loadDetail(run, shopId, id, viewer) {
   const events = (await run('SELECT * FROM online_order_events WHERE order_id=$1 ORDER BY seq', [id])).rows;
   //  CRM-15: صاحب می‌تواند `customers.contact` را برای همین مدیر ببندد (‎lib/customer-contact.js‎)
   const contact = await require('./customer-contact').ordersContact({ shopId, role: viewer?.role, userId: viewer?.id }, run);
-  return detail(row, lines, events, viewer, now(), contact);
+  const out = detail(row, lines, events, viewer, now(), contact);
+  //  O-06 = ب: نگه‌داشتنِ موجودیِ همین سفارش (فقط اگر دارد ⇒ بی آن همان پاسخِ پیشین)
+  const hold = await require('./stock-reserve').orderView(run, shopId, id);
+  if (hold) out.stockHold = hold;
+  return out;
 }
 
 const viaDb = (text, params) => db.query(text, params);
@@ -440,8 +445,9 @@ async function create(shopId, { key, body, actor, price, notify, intakeKeys = []
     //  CHK-14: «با اسکناسِ … پرداخت می‌کنم» در برابرِ جمعِ همین لحظه؛ خاموش ⇒ کلید دور ریخته می‌شود
     input = require('./delivery-prefs').applyOnCreate(input, body, prefsOn);
     //  کاتالوگ (v3 §۳۲): پرچمِ `shop.catalog` روشن ⇒ فقط سنجش — کالای ناموجود/غیرفعال،
-    //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی رزرو.
-    await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest });
+    //  واحدِ ناشناس، یا بیش از موجودیِ همین لحظه ⇒ خطا پیش از هر نوشتنی. ⛔ بی کسر؛ با
+    //  `shop.stock_reserve` و موجودیِ تازه نگه‌داشتهٔ دیگران هم کم می‌شود (O-06 = ب) ⇒ `hold`.
+    const stockPlan = await require('./catalog').checkOrder(c, shopId, { lines: input.lines, isTest: input.isTest, at });
 
     const no = Number((await c.query(
       'SELECT COALESCE(MAX(order_no), 0) + 1 AS n FROM online_orders WHERE shop_id=$1', [shopId]
@@ -483,6 +489,10 @@ async function create(shopId, { key, body, actor, price, notify, intakeKeys = []
       [ulid(at), id, shopId, actor.type, actor.id || '', '',
         JSON.stringify({ source: input.source, isTest: input.isTest, totalMinor: input.totalMinor }), at]
     );
+    //  O-06 = ب: نگه‌داشتنِ کوتاه — همان تراکنش و همان قفلِ موجودی که سنجش زیرش بود
+    if (stockPlan && stockPlan.hold) {
+      await require('./stock-reserve').holdIn(c, shopId, { orderId: id, ...stockPlan.hold, at });
+    }
     /*
      *  اعلانِ سفارش (v3 §۳۰): `notify` = `async (run, {shopId, orderId, orderNo, at})`
      *  درونِ همین تراکنش و فقط برای سفارشِ تازه (تکرارِ همان کلید به این‌جا
@@ -581,6 +591,9 @@ async function applyTransition(c, shopId, id, { to, expected, reason, note, read
     }
 
     const at = now();
+    //  O-06 = ب: قبول ⇒ بی انقضا (گذشته ⇒ دوباره یا ۴۰۹ پیش از هر نوشتن)؛ تحویل ⇒ تا فروشِ برنامه؛
+    //  پایان ⇒ آزاد. ⛔ کسر نه — تحویل را برنامهٔ دکان با فروشِ عادی ثبت می‌کند. بی نگه‌داشته ⇒ هیچ.
+    await require('./stock-reserve').onTransitionIn(c, shopId, row.id, to, at);
     const seq = Number((await c.query(
       'SELECT COALESCE(MAX(seq), 0) + 1 AS n FROM online_order_events WHERE order_id=$1', [row.id]
     )).rows[0].n);
@@ -705,9 +718,13 @@ async function list(shopId, { tab = 'new', limit, cursor } = {}, viewer) {
     );
     for (const n of names) (preview[n.order_id] = preview[n.order_id] || []).push(n.name);
   }
+  //  O-06 = ب: «در بررسی» روی کارت (فروشِ حضوری نگه‌داشتهٔ سفارش را برد) — بی نگه‌داشته ⇒ همان کارتِ پیشین
+  const review = await require('./stock-reserve').reviewIdsOf(viaDb, shopId, page.map((r) => r.id), at);
   return {
     tab,
-    items: page.map((r) => ({ ...card(r, viewer, at), itemsPreview: preview[r.id] || [] })),
+    items: page.map((r) => ({
+      ...card(r, viewer, at), itemsPreview: preview[r.id] || [], ...(review.has(r.id) ? { stockReview: true } : {}),
+    })),
     nextCursor: more ? encodeCursor(Number(last[col]), last.id) : null,
   };
 }

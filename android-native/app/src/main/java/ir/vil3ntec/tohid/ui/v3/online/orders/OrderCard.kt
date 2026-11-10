@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Inventory2
 import androidx.compose.material.icons.outlined.Language
 import androidx.compose.material.icons.outlined.Payments
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
@@ -150,6 +151,8 @@ fun OrderCard(
 @Composable
 fun OrderTags(o: OrderDto, now: Long) {
   FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    //  O-06 = ب: فروشِ حضوری موجودیِ نگه‌داشتهٔ این سفارش را برد — نخست، تا پیش از قبول یا آماده‌سازی دیده شود
+    if (OrderStockHold.review(o)) DraftTag(StrOrdersHub.stockReview, Icons.Outlined.Inventory2, tone = V3Tone.WARNING)
     //  روشِ تحویل به زبانِ صاحب‌کار: «با پیک» یا «خودش می‌آید»
     if (OrdersHubModel.courier(o)) DraftTag(OrdersHubModel.method(o), Icons.Outlined.TwoWheeler)
     else DraftTag(OrdersHubModel.method(o), Icons.Outlined.Storefront)
