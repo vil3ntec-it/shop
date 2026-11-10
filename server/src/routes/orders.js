@@ -63,12 +63,16 @@ router.get('/config', async (req, res) => {
     ? await ledger.claimFloor(req.shopId, req.user.id)
     : await ledger.sinceOf(req.shopId);
   const pickingOn = await require('../lib/order-picking').flagOf(req.shopId);
+  const ledgerOn = await refunds.flagOf(req.shopId);
+  //  ORD-15 / تصمیمِ ۱-۶ ب: «حساب‌پیِ دستی» در دفترِ بازپرداخت (`shop.orders.manual_refund` + `orders.refund`)؛ وگرنه کلید نیست
+  const refundMethods = ledgerOn ? await refunds.methodsOf(req.shopId, req.role) : [];
   res.json({
     ...st,
     //  «چرا سفارش نمی‌رسد؟» — هر دروازهٔ میانِ ویترین و این برنامه با کد و «چه کسی درستش می‌کند» (lib/order-arrival)
     arrival: await require('../lib/order-arrival').arrivalOf(req.shopId),
     //  دفترِ بازپرداخت (§۳۸.۷، FIN-01) — پیش‌فرض خاموش
-    refundLedger: await refunds.flagOf(req.shopId),
+    refundLedger: ledgerOn,
+    ...(refundMethods.length > 1 ? { refundMethods } : {}),
     //  جمع‌آوری و بسته‌بندی (PCK، §۶.۱۷) — پیش‌فرض خاموش
     picking: pickingOn,
     //  S56: وزنِ بیش از حد تا پاسخِ مشتری (پرچمِ `shop.orders.weight_hold`) — خاموش ⇒ کلید نیست (همان پاسخِ پیشین)

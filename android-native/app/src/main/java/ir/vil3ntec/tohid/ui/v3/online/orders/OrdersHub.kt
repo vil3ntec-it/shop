@@ -99,9 +99,9 @@ internal object OrdersHub {
    */
   suspend fun refund(
     context: Context, store: ShopStore, o: OrderDto, to: String, amountMinor: Long, reason: String, key: String,
-    say: (String) -> Unit = {},
+    say: (String) -> Unit = {}, method: String = "cash",
   ): ApiResult<OrderDto> {
-    val r = repo(context).refund(o.id, key, amountMinor, reason, OrderRefundModel.final(to))
+    val r = repo(context).refund(o.id, key, amountMinor, reason, OrderRefundModel.final(to), method)
     if (r is ApiResult.Success) {
       put(r.value)
       stale.remove(o.id)

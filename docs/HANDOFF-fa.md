@@ -54,6 +54,18 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-6` (دورِ ششمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `ccr-…-batch-47` ‏d30302a7؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ORD-15 — بازپرداختِ باقی پس از رفتنِ پیک با تصمیمِ ۱-۶ ب: دفترِ بازپرداخت روشِ `hesabpay` ِ دستی را فقط با
+  `shop.orders.manual_refund` و `orders.refund` می‌پذیرد (`order-refunds.methodsOf`، مهاجرتِ ۷۷۰ + rollback)، `/orders/config` ⇒
+  `refundMethods`، برنامه تراشهٔ «نقد پس دادم / با حساب‌پی پس دادم» در برگهٔ بازپرداخت (Kotlin، **کامپایل‌نشده**؛ `OrderRefundModelTest`)؛
+  `order-refund-manual-method` ۴/۴ (پیش از کد ۳ سرخ)؛ FLAGS-ON §۱۶ ⇐ بخشِ «پس از رفتنِ پیک». S47 — هر دو یادآورِ سرور روزِ دقیقِ پایان
+  را دارند (`subscriptions.endDayOf`، متغیرِ `{تاریخ-پایان}`، مهاجرتِ ۷۷۱ فقط برای متنِ پیش‌فرضِ دست‌نخورده)؛ `subscription-end-day` ۴/۴
+  (پیش از کد ۴ سرخ)، گامِ «S47» ِ `entitle.e2e.mjs` روز را می‌سنجد. S46 و STF-06: ممیزی، بی کد (STATUS): ستونِ کاربرِ صندوقِ سرور مسیرِ
+  push ِ Sync v1 (کدِ پمپ) را می‌خواهد؛ صفِ پس از خروج در برنامه پیش‌تر با SYN-10 بسته است. ۲۲ مجموعه ۱۸۷/۱۸۷ روی PGlite و PostgreSQL ۱۶.
+- نیمه‌کاره: شاهدِ CI ِ کاتلین (`OrderRefundModelTest`، کامپایلِ `OrderActionSheet`/`OrdersRouteContent`)؛ اگر سرخ شد همان پرونده‌ها.
+  شمارهٔ مهاجرت‌های ۷۷۰ و ۷۷۱ را پیش از مرج با شاخه‌های هم‌زمان بسنجید (یکتا باشد).
+- قدمِ بعدی: CI ِ این شاخه؛ ردِ قلم با دستِ پیک در برنامهٔ پیک (ORD-15، کارِ بزرگ)؛ S46 پس از اجازهٔ O-19 (مهرِ `whoAt(req.device)`
+  هنگامِ push)؛ STF-06: امضای هر گام با کلیدِ هر کارمند (طراحی).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/e-rows-5` (دورِ پنجمِ ردیف‌های PARTIAL ِ ردهٔ E؛ روی `claude/e-rows-4` ‏a64466b6؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: S56 — کارتِ وب: پیگیری کلیدِ `weightHold` (`pick-weight-hold.trackView`؛ فقط هر دو پرچم و نگه‌داشتِ باز)، `GET …/weight-holds`
   با `now` ِ سرور، `store/weight-hold.js` ِ دیربار + واژه‌نامهٔ تازهٔ `kit/i18n/weigh.*` (۱۵ کلید؛ `order` پر ماند)، گامِ مرورگرِ

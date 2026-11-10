@@ -97,7 +97,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.add_items', scope: 'shop', default: false, what: 'افزودنِ سبد به همان سفارش تا پیش از جمع‌آوری (CHK-21)' },
   { key: 'shop.orders.amend', scope: 'shop', default: false, what: 'پیشنهادِ ویرایشِ سفارش با پذیرش/ردِ مشتری (ORD-14)' },
   { key: 'shop.orders.amend_paid', scope: 'shop', default: false, what: 'ویرایشِ سفارشِ پرداخت‌شده با تسویهٔ تفاوت (ORD-14)؛ با `shop.orders.amend`' },
-  { key: 'shop.orders.manual_refund', scope: 'shop', default: false, what: 'بسته‌بندیِ سفارشِ پرداخت‌شده با کسر: «پس داده شد» ِ دستی (نقد یا حساب‌پی) و ثبتِ سرور (ORD-15، PAY-23، تصمیمِ ۱-۶ ب)؛ با `shop.orders.picking`' },
+  { key: 'shop.orders.manual_refund', scope: 'shop', default: false, what: 'بسته‌بندیِ سفارشِ پرداخت‌شده با کسر: «پس داده شد» ِ دستی (نقد یا حساب‌پی) و ثبتِ سرور؛ و روشِ «حساب‌پیِ دستی» در دفترِ بازپرداخت پس از رفتنِ پیک (ORD-15، PAY-23، تصمیمِ ۱-۶ ب؛ مهاجرتِ ۷۷۰)؛ با `shop.orders.picking` / `shop.orders.refunds`' },
   { key: 'shop.orders.refund_tracking', scope: 'shop', default: false, what: 'پیگیریِ بازپرداخت برای مشتری در صفحهٔ سفارش (NTF-08)' },
   { key: 'shop.orders.refund_receipt', scope: 'shop', default: false, what: 'رسیدِ اصلاحیِ هر بازپرداختِ دفتر برای کارمند و مشتری (E2E-RET-11)' },
   { key: 'shop.orders.issue_reports', scope: 'shop', default: false, what: '«گزارشِ مشکل» با عکس در پیگیریِ سفارش (NTF-07)' },
