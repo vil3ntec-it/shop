@@ -260,3 +260,21 @@ test('v1OpOf همان پذیرشِ validateOp ِ v1 را دارد (شکل‌ها
     }
   }
 });
+
+test('v1Guard ِ مستقیم، روشن: op ِ ردشده از **همان** فهرستِ درخواست برداشته می‌شود (در جا، نه req.body.ops = …) و پاسخ سرِ جایش', async () => {
+  await setFlag(shopId, true);
+  const a = v1('products', 'ip-a', tea1());
+  const bad = v1('products', 'ip-b', tea1({ unitFactor: 1 / 7 }));
+  const c = v1('suppliers', 'ip-c', { name: 'تأمین' });
+  const ops = [a, bad, c];
+  const req = { sync: { accountId: shopId }, body: { ops } };
+  let sent = null;
+  const res = { json: (b) => { sent = b; return b; } };
+  await R.v1Guard(req, res);
+  assert.equal(req.body.ops, ops, 'همان آرایه');
+  assert.deepEqual(req.body.ops, [a, c]);
+  res.json({ ok: true, results: [{ op_id: a.op_id, status: 'applied' }, { op_id: c.op_id, status: 'applied' }] });
+  assert.deepEqual(sent.results.map((r) => [r.op_id, r.status, r.reason]), [
+    [a.op_id, 'applied', undefined], [bad.op_id, 'rejected', R.INEXACT], [c.op_id, 'applied', undefined],
+  ]);
+});

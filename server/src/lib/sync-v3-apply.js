@@ -41,8 +41,7 @@ function openTask(s, ctx, { kind, table, rowId, dedupe, detail, t }) {
  */
 async function authorize(c, ctx, op, row, deviceId, origin, groups = null, plan = null) {
   if (origin === 'v1' || origin === 'server') return null;      //  v1 خودش سنجیده بود (و `v1Guard`)
-  //  ⚗ آزمایشِ موقتِ CodeQL (دستهٔ ۴۰): قلابِ v3 ِ PRD-07 برداشته — پیش از ادغام برمی‌گردد
-  // { const pu = await require('./product-unit-rules').judgeV3(c, ctx, op, row); if (pu) return pu; }   //  PRD-07: واحدِ گردش‌دار و ضریبِ ناجور (صاحب هم)
+  { const pu = await require('./product-unit-rules').judgeV3(c, ctx, op, row); if (pu) return pu; }   //  PRD-07: واحدِ گردش‌دار و ضریبِ ناجور (صاحب هم)
   const role = ctx.role;
   const own = !!row && row.created_by === deviceId;
   if (op.kind === 'delete' && op.spec.policy === 'master') {

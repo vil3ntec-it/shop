@@ -186,7 +186,24 @@ async function v1Guard(req, res) {
       unitFactor: has(f, 'unitFactor') ? f.unitFactor : b.unitFactor,
     });
   }
-  require('./v1-reject').rejectOps(req, res, ops, rejected);
+  if (!rejected.size) return;
+  //  ⛔ همان `v1-reject.rejectOps`، ولی فهرستِ همان درخواست **در جا** کوتاه می‌شود، نه `req.body.ops = …`: این نگهبان پس از
+  //  `await` (بیرون از اجرای همگامِ میان‌افزار) می‌نویسد و CodeQL آن نوشتن را تا `applyOp` ِ `sync-v1.js` دنبال می‌کرد
+  //  (چهار هشدارِ remote-property-injection ِ دستهٔ ۴۰؛ با برداشتنِ همین قلاب سبز شد)
+  const original = ops.slice();
+  let w = 0;
+  for (let i = 0; i < original.length; i++) if (!rejected.has(i)) ops[w++] = original[i];
+  ops.length = w;
+  const send = res.json.bind(res);
+  res.json = (body) => {
+    if (body && body.ok && Array.isArray(body.results)) {
+      const rest = body.results.slice();
+      const merged = [];
+      for (let i = 0; i < original.length; i++) merged.push(rejected.has(i) ? rejected.get(i) : rest.shift());
+      body.results = merged.filter(Boolean).concat(rest);
+    }
+    return send(body);
+  };
 }
 
 module.exports = { FLAG, LOCKED, INEXACT, HISTORY, factorMilli, exactMilli, touches, reasonOf, judgeV3, v1OpOf, v1Hits, v1Guard };
