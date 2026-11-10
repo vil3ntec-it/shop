@@ -233,7 +233,7 @@ async function pushChanges(ctx, changes) {
         const g = await guard.check(c, {
           table: collection, rowId: recordId, type: deleted ? 'delete' : 'update', fields: data, full: true,
         }, existing && !existing.deleted ? existing.data : null);
-        if (g && g.reject) throw require('./finalized-sales').forbiddenError();
+        if (g && g.reject) throw require('./finalized-sales').forbiddenError(g.reject);
       }
       if (creditLayers && collection === 'sales' && !deleted) {
         const bad = await require('./credit-cap').judgeLegacy({ role }, recordId, data, existing, creditLayers);
