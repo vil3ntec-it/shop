@@ -14,7 +14,8 @@ import kotlinx.serialization.json.longOrNull
  *  (`server/src/lib/order-online-report.js`). منطقِ خالص، commonMain (گوشی، کامپیوتر و آیفون).
  *
  *  ⛔ هیچ عددی این‌جا حساب نمی‌شود: قیف، نرخ (ده‌هزارم)، زمان‌ها (میانه و صدکِ ۹۰) و جمعِ پول همان پاسخِ سرورند؛
- *  عددِ نیامده یا بدشکل `null` می‌ماند («—»)، نه صفر. بازدید (بالای قیف) تا MKT-10 `null` است.
+ *  عددِ نیامده یا بدشکل `null` می‌ماند («—»)، نه صفر. بالای قیف ([Top]: بازدید ⇐ دیدنِ کالا ⇐ سبد، فقط ویترینِ وب،
+ *  `lib/storefront-funnel.js`) تا سرور روزی را نشمرده `null` است.
  *  ⛔ پرچمِ خاموشِ `shop.orders.online_report` ⇒ سرور ۴۰۳ [OFF] ⇒ صفحه و راهش پنهان (پیش‌فرض همان امروز).
  *  بازه همان قاعدهٔ سرور: میلی‌ثانیه، حداکثر ۹۲ روز.
  */
@@ -47,6 +48,19 @@ object OnlineReport {
   data class Time(val n: Int, val medianMs: Long?, val p90Ms: Long?)
   data class Miss(val q: String, val n: Int)
 
+  /** بالای قیفِ ویترینِ وب (`top` ِ پاسخ): بازدیدکنندهٔ یکتای هر روز؛ نسبت‌ها از بازدید به ده‌هزارم، همان سرور */
+  data class Top(
+    val visits: Int?,
+    val productViews: Int?,
+    val cartAdds: Int?,
+    val viewBp: Long?,
+    val cartBp: Long?,
+    /** آغازِ نخستین روزِ شمرده‌شده (ms) */
+    val since: Long?,
+    /** روزی از بازه به سقفِ روزانهٔ سرور خورد ⇒ عدد کمتر از واقعی است */
+    val capped: Boolean,
+  )
+
   data class View(
     val from: Long?,
     val to: Long?,
@@ -62,6 +76,7 @@ object OnlineReport {
     val currency: String,
     val misses: List<Miss>,
     val visits: Long?,
+    val top: Top? = null,
   ) {
     /** هیچ سفارشی در بازه نیست */
     val empty: Boolean get() = (funnel["placed"] ?: 0) == 0
@@ -102,6 +117,17 @@ object OnlineReport {
         if (q.isEmpty()) null else Miss(q, n)
       },
       visits = o["visits"].long(),
+      top = o["top"].obj()?.let { t ->
+        Top(
+          visits = t["visits"].count(),
+          productViews = t["productViews"].count(),
+          cartAdds = t["cartAdds"].count(),
+          viewBp = t["viewBp"].long(),
+          cartBp = t["cartBp"].long(),
+          since = t["since"].long(),
+          capped = (t["capped"] as? JsonPrimitive)?.takeUnless { it.isString }?.booleanOrNull == true,
+        )
+      },
     )
   }
 

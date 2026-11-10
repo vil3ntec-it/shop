@@ -23,12 +23,15 @@
  *     هر دکان در هر روز (سیلِ عبارتِ ساختگی جدول را پر نمی‌کند)، بی عبارتِ شبیهِ شماره تلفن
  *     (هفت رقم یا بیشتر) و حداکثر ۶۰ نویسه؛ ۹۲ روز می‌ماند (`sweep`). خطای نوشتن هرگز
  *     جوابِ جست‌وجوی مشتری را خراب نمی‌کند.
- *   ⛔ «قیفِ بازدید» (بازدید ⇐ دیدنِ کالا ⇐ سبد) این‌جا نیست: شمارِ بازدیدِ ویترین با
- *     MKT-10 (#572) می‌آید و تا آن روز هیچ عددِ ساختگی‌ای جایش نمی‌نشیند.
+ *   بالای قیف ── `top` (بازدید ⇐ دیدنِ کالا ⇐ سبد) فقط ویترینِ وب، یکتا در روز (`lib/storefront-funnel.js`، مهاجرتِ ۴۹۱)؛
+ *              نسبت‌ها از «بازدید» به ده‌هزارم، نه از «ثبت» (برنامهٔ خرید تپش ندارد ولی سفارشش این‌جاست).
+ *              `visits` ِ سرِ پاسخ = `top.visits` (برنامهٔ مدیریت همین را می‌خواند)؛ هنوز هیچ روزی شمرده نشده ⇒
+ *              هر دو null — هیچ عددِ ساختگی‌ای جایش نمی‌نشیند.
  */
 const { many, query, now } = require('../db');
 const orders = require('./orders');
 const { normalize } = require('./storefront');
+const webFunnel = require('./storefront-funnel');
 const { badRequest } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.orders.online_report';
@@ -121,6 +124,7 @@ async function report(shopId, q = {}) {
     times.total.push(span(created, done));
   }
   const lostTotal = LOST.reduce((s, k) => s + lost[k], 0);
+  const t = await webFunnel.totals(shopId, w);
   return {
     enabled: true,
     window: w,
@@ -136,8 +140,12 @@ async function report(shopId, q = {}) {
     completedTotalMinor,
     currency: 'AFN',
     zeroResultSearches: await misses(shopId, w),
-    //  شمارِ بازدیدِ ویترین (بالای قیف) با MKT-10 می‌آید (#572)؛ تا آن روز عددی نیست
-    visits: null,
+    //  بالای قیفِ ویترینِ وب؛ هنوز هیچ روزی شمرده نشده ⇒ null (نه صفر)
+    visits: t ? t.visits : null,
+    top: t ? {
+      web: true, visits: t.visits, productViews: t.views, cartAdds: t.carts,
+      viewBp: bp(t.views, t.visits), cartBp: bp(t.carts, t.visits), since: t.since, capped: t.capped,
+    } : null,
   };
 }
 
@@ -188,9 +196,10 @@ async function misses(shopId, w) {
   return rows.map((r) => ({ q: r.q, n: Number(r.n), lastAt: Number(r.last_at) }));
 }
 
-/** نگهداری: روزهای کهنه‌تر از ۹۲ روز پاک می‌شوند (پرچم خاموش ⇒ جدول خالی و بی‌اثر). */
+/** نگهداری: روزهای کهنه‌تر از ۹۲ روز پاک می‌شوند (پرچم خاموش ⇒ جدول خالی و بی‌اثر)؛ بالای قیف هم (`storefront-funnel`). */
 async function sweep(ms = now()) {
   const r = await query('DELETE FROM storefront_search_misses WHERE day < $1', [dayOf(ms - KEEP_MS)]);
+  await webFunnel.sweep(ms);
   return r.rowCount;
 }
 

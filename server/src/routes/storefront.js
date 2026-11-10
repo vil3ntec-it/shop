@@ -159,6 +159,8 @@ async function featuresOf(shopId, sf) {
     ...((await orders.flagOf(shopId, WEB_ACCOUNT_FLAG)) ? { webAccount: true, ...((await cart.flagOn(shopId)) ? { accountCart: true } : {}) } : {}),
     //  گفت‌وگو با دکان (`store/chat.js` ِ دیربار، `/:slug/chat/…`) با پرچمِ `shop.chat`
     ...((await require('../lib/shop-chat').flagOf(shopId)) ? { chat: true } : {}),
+    //  RPT-14: تپشِ بالای قیف (`POST /:slug/funnel/:step`، `storefront-funnel-store.js`) با پرچمِ `shop.orders.online_report`
+    ...((await onlineReport.flagOf(shopId)) ? { funnel: true } : {}),
   };
   //  S71: روش و مسئولِ هر تحویلی که این ویترین دارد (برگهٔ ثبت) با پرچمِ `shop.storefront.delivery_method`
   const dm = await require('../lib/order-delivery-method').storeMethods(sf);

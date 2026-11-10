@@ -115,6 +115,8 @@
     }
 
     // ── نشانی‌های نام‌دار در برگهٔ ثبت (CHK-09) ──
+    /** CRM-09: کادرِ برگهٔ ثبت ⇐ کلیدِ نشانیِ حساب (همان کلیدهای `body.address` ِ checkout.js) */
+    var XF = [['a-area', 'area'], ['a-gate', 'gateColor'], ['a-phone2', 'phone2'], ['a-plus', 'plusCode'], ['a-prov', 'province'], ['a-street', 'street'], ['a-house', 'house']];
     /** `h.pin(p, متن)` از checkout.js: پینِ نشانیِ برگزیده یا null. ⇒ `{ placed(body) }` برای پس از ثبتِ موفق. */
     function checkout(h) {
       var pick = $('ac-addr'); var keep = $('ac-keep-row');
@@ -140,6 +142,10 @@
           var a = byId(sel.value);
           del.hidden = !a; keep.hidden = Boolean(a);
           $('a-text').value = a ? a.text : ''; $('a-landmark').value = a ? a.landmark : '';
+          //  CRM-09: کلیدهای کمکیِ همان نشانی در کادرهای همین برگه (کادرِ نبوده، مثلاً بی `addressExtra`، کنار)
+          XF.forEach(function (f) { if ($(f[0])) $(f[0]).value = (a && a[f[1]]) || ''; });
+          //  پرشده‌ها پنهان نمانند: «جزئیاتِ بیشتر» باز
+          if (a && $('addr-more') && XF.some(function (f) { return $(f[0]) && a[f[1]]; })) $('addr-more').open = true;
           h.pin(a && a.lat !== null ? { lat: a.lat, lng: a.lng } : null, t('ac.pin'));
         });
         box.addEventListener('change', function () { label.hidden = !box.checked; if (box.checked) label.focus(); });
@@ -159,7 +165,9 @@
           var name = label.value.trim();
           if (keep.hidden || !box.checked || !name || body.fulfillment !== 'delivery' || !body.address) return;
           var a = body.address;
-          api('/account/addresses', { method: 'POST', body: { label: name, text: a.text, landmark: a.landmark, lat: a.lat, lng: a.lng } })
+          var b = { label: name, text: a.text, landmark: a.landmark, lat: a.lat, lng: a.lng };
+          XF.forEach(function (f) { if (a[f[1]]) b[f[1]] = a[f[1]]; });
+          api('/account/addresses', { method: 'POST', body: b })
             .then(function (x) { K.toast(t('ac.saved', { label: x.address.label })); }).catch(function (e) { K.toast(e.message); });
         };
       }).catch(function () { /* همان فرمِ امروز */ });

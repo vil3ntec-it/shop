@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1008,
+    "routes": 1009,
     "byAuth": {
-      "none-detected": 193,
+      "none-detected": 194,
       "admin": 278,
       "inline": 2,
       "user": 492,
@@ -31,7 +31,7 @@
     },
     "byShape": {
       "extracted": 702,
-      "empty": 304,
+      "empty": 305,
       "unresolved": 2
     }
   },
@@ -950,6 +950,7 @@
     {"method":"GET","path":"/api/store/:slug/delivery","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":["lat","lng"],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/api/store/:slug/eta","area":"store","source":"server/src/routes/storefront-eta-store.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/filters","area":"store","source":"server/src/routes/storefront-finder-store.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/funnel/:step","area":"store","source":"server/src/routes/storefront-funnel-store.js","auth":"none-detected","guards":[],"params":["slug","step"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/highlights","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/media/:kind/:version","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["kind","slug","version"],"query":[],"body":[],"response":{"statuses":[304],"keys":[]},"errors":["404 media_not_found"],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/orders","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":["orders"]},"errors":[],"shape":"extracted"},

@@ -63,6 +63,18 @@
   `admin-owner-active` ۷، `admin-bridge-contract` ۸ (پیش از تغییر ۱۹ از ۲۳ سرخ؛ چهار سبزِ ماندنی نگهبانِ پسرفت‌اند)، روی PGlite و PostgreSQL ِ محلی؛ شرح در RULES «v3 · پنلِ مدیر» و بندِ ۱۲.۱۰ ِ ADMIN-CONTROL-PLANE.
 - نیمه‌کاره: سمتِ پنل (ریپوی server) — فرستادنِ `Idempotency-Key` به بالادست، جایگزینیِ `addPeriod` با `period-end`، خواندنِ `/admin/contract`؛ S14 فقط پیشنهاد (تصمیمِ صاحب محصول).
 - قدمِ بعدی: شاهدِ CI ِ سه آزمونِ تازه؛ تغییرِ پنل پشتِ توانایی‌های `sync-restore-once.v1`، `subscription-period.v1` و `admin-contract.v1`.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/p1-close` (ردیف‌های P1 ِ همهٔ خانواده‌ها؛ روی main ‏ed8009d7 = دستهٔ ۳۸، سپس ادغامِ main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: ممیزیِ ۶۱ ردیفِ P1 (PARTIAL/MISSING) با سنجشِ کد؛ فقط دو کمبودِ کدیِ سرور/وب بی مانع ماند و هر دو ساخته شد:
+  (۱) CRM-09: دفترِ نشانیِ حساب (ویترین و بازارچه) ناحیه، دروازه، ولایت، گذر، منزل/طبقه، شمارهٔ دوم و Plus Code را نگه می‌دارد — مهاجرتِ ۴۹۰،
+  `orders.addressExtras` ِ مشترک با ثبت، `PUT` ِ برنامهٔ پیشین پاکشان نمی‌کند؛ `acct.js` کادرها را پر و «جزئیاتِ بیشتر» را باز می‌کند.
+  (۲) RPT-14: بالای قیفِ ویترینِ وب (بازدید ⇐ دیدنِ کالا ⇐ سبد) — مهاجرتِ ۴۹۱، `lib/storefront-funnel.js`، `POST /api/store/:slug/funnel/:step`،
+  تپش در `store.js` (+۴۴۳ بایت؛ بارِ نخست پس از ادغامِ دستهٔ ۳۹ ۷۰٬۹۴۹ از ۷۲٬۷۰۴)، `visits`/`top` در گزارش؛ هم‌زادِ کوچکِ Kotlin (`OnlineReport.Top` و بخشِ «بالای قیف» در صفحهٔ گزارش).
+  آزمون: `store-address-extra` ۴/۴، `storefront-funnel` ۶/۶ (PGlite و PostgreSQL ۱۶)، کرومیومِ `web-store-p1.mjs` ۱۷ ✅ با axe (هر دو پایگاه).
+- نیمه‌کاره: `OnlineReportTest` (+۱) و کامپایلِ `OnlineReportPage`/`StrOnlineReport` فقط در CI. ردهٔ بقیه در گزارشِ شاخه: شاهدِ CI (WEB-11، MKT-02، …)،
+  تصمیمِ صاحب‌کار (کدِ پستیِ اختیاری در ویترین که نگهبانِ LOC-10 می‌بندد، POS-06/32/40، PAY-16، PUR-03، SEC-01، SYN-07، CHK-18، DLV-06، OPS-01/09، LOC-04، CRM-10)،
+  دستگاه/سرویسِ بیرونی (D-08، D-09، ترازو، کشو، چاپگر، AI-01/02 که رمزگشای تصویرِ بومی روی سرور می‌خواهد) و فقط Kotlin.
+- قدمِ بعدی: شاهدِ CI ِ دو آزمون و `web-store-p1.mjs`؛ تپشِ همان قیف در برنامهٔ خریدِ بومی؛ NTF-08 با پوشِ وبِ مشتریِ دستهٔ ۳۹ حالا ساختنی است:
+  رویدادِ «پول برگشت» برای **هر** ردیفِ `online_order_refunds` در صفِ `customer_notify` (یکتایی امروز (سفارش، رویداد) است ⇒ مهاجرت برای (سفارش، رویداد، شناسهٔ بازپرداخت) و CHECK ِ `event`).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):

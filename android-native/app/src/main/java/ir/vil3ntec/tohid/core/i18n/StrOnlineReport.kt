@@ -57,6 +57,21 @@ object StrOnlineReport {
     "د ویټرین د لیدنو شمېر (د کیف سر) لا نشته؛ جوړ شوی شمېر نه ښودل کېږي.",
   )
 
+  val webFunnel: String get() = t("بالای قیف (ویترینِ وب)", "Top of the funnel (web storefront)", "د کیف سر (ویب ویټرین)")
+  val webFunnelNote: String get() = t(
+    "بازدیدکنندهٔ یکتای هر روز؛ نسبت از بازدید است. برنامهٔ خرید شمرده نمی‌شود.",
+    "Unique visitors per day; rates are of visits. The shopping app is not counted.",
+    "د هرې ورځې ځانګړي لیدونکي؛ نسبت د لیدنو دی. د پېرودلو اپ نه شمېرل کېږي.",
+  )
+  val webFunnelCapped: String get() = t(
+    "در روزی از این بازه سقفِ روزانهٔ شمارش پر شد؛ عددِ واقعی بیشتر است.",
+    "The daily counting cap was reached on a day in this period; the real number is higher.",
+    "د دې مودې په یوه ورځ د شمېرنې ورځنی حد پوره شو؛ اصلي شمېر ډېر دی.",
+  )
+  val visitors: String get() = t("بازدید", "Visits", "لیدنې")
+  val productViewers: String get() = t("دیدنِ کالا", "Viewed a product", "توکی یې ولید")
+  val cartAdders: String get() = t("افزودن به سبد", "Added to cart", "ټوکرۍ ته ورزیاتول")
+
   val misses: String get() = t("جست‌وجوهای بی‌نتیجهٔ ویترین", "Storefront searches with no results", "د ویټرین بې پایلې لټونونه")
   val missesNote: String get() = t("کالایی که مشتری خواست و نیافت؛ پرتکرارترین بالا.", "What customers looked for and did not find; most frequent first.", "هغه څه چې پېرودونکو وغوښتل او ونه موندل؛ تر ټولو ډېر پورته.")
   val missesNone: String get() = t("در این بازه جست‌وجوی بی‌نتیجه‌ای نبود.", "No searches without results in this period.", "په دې موده کې بې پایلې لټون نه و.")
