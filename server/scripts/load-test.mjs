@@ -29,6 +29,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { scaleKit, SCALE_MIX, SCALE_BURST_MIX } from './load-scale.mjs';
+import { sessions as authSessions, planDefs, printExtras } from './load-plan.mjs';
 
 const argv = process.argv.slice(2);
 const arg = (k, d) => { const i = argv.indexOf(k); return i >= 0 && argv[i + 1] !== undefined ? argv[i + 1] : d; };
@@ -68,16 +69,9 @@ const QSTATS = has('--query-stats');
 const SETUP_PAR = Math.max(1, Number(arg('--setup-par', 4)) || 1);
 //  شمارش‌های بستهٔ پیشینِ هر دکان (انبارگردانی؛ `v3.lateCount`): «دکانِ ۰،دکان‌های ۱ تا ۹،بقیه» ردیف — پیش از بار، ثبت نمی‌شود
 const COUNT_HISTORY = (() => { const a = arg('--count-history', '0').split(',').map((x) => Math.max(0, Math.floor(Number(x) || 0))); return [a[0] || 0, a[1] ?? a[0] ?? 0, a[2] ?? a[1] ?? a[0] ?? 0]; })();
-/*
- *  `--plan <پرونده.json>`: گام‌های پیاپی روی **همان** پایگاهِ کاشته (کاشتن، پل، نشست‌ها و تاریخچه یک بار) — برای سنجیدنِ
- *  چند پیکربندیِ سرور بی دوباره‌کاشتن. هر گام: {profile, label?, env?, timeoutMs?, sql?: [...]}. `env` ِ دیگر ⇒ سرور با همان
- *  env دوباره بالا می‌آید (نمونهٔ «پیرو»: بی پاک کردن و بی کاشتن؛ توکن‌ها و دفترِ بارساز همان)؛ `sql` پیش از گام روی همان
- *  پایگاه (مثلاً برداشتن/ساختنِ نمایه برای پیش و پس). با `--check` میانِ گام‌ها صف‌ها خالی و دستگاه‌ها تا سر (ثبت نمی‌شود) و
- *  سنجهٔ درستی یک بار در پایان.
- */
+//  `--plan <پرونده.json>`: گام‌های پیاپی روی **همان** پایگاهِ کاشته ({profile, label?, env?, timeoutMs?, sql?}؛ env ِ دیگر ⇒ سرورِ «پیرو» ِ
+//  تازه، توکن‌ها و دفترِ بارساز همان؛ `sql` پیش از گام). `--check-each`: سنجهٔ درستی پس از هر گام، نه فقط در پایان (`load-plan.mjs`)
 const PLAN = arg('--plan') ? JSON.parse(fs.readFileSync(arg('--plan'), 'utf8')) : null;
-//  `--check-each` (با `--plan --check`): سنجهٔ درستی پس از **هر** گام هم (پس از پایان‌دادنِ صف‌ها)، نه فقط در پایان — راه‌اندازیِ دوبارهٔ
-//  ماشین وسطِ اجرای بلند گام‌های سنجیده را بی شاهدِ درستی نمی‌گذارد
 const CHECK_EACH = has('--check-each');
 //  «قطعِ سراسری»: هر دستگاه تا چند ثانیه با درنگِ برنامه دوباره می‌کوشد (`outage` ِ `load-scale.mjs`)؛ پس از آن «نرسیده»
 const OUTAGE_LIMIT_MS = Math.max(10, Number(arg('--outage-limit', 120))) * 1000;
@@ -175,37 +169,8 @@ function record(label, ms, status, err, bytes, startedAt, ok, errCode) {
   if (err || !(ok ? ok(status) : status >= 200 && status < 300)) { e.errors++; (e.errAt ||= []).push(rec.phase || 0); }
   e.bytes += bytes;
 }
-/*
- *  نشستِ دستگاه و صاحب پس از `ACCESS_TOKEN_TTL_MIN` (۶۰ دقیقه) ۴۰۱ می‌گیرد؛ اجرای بلندِ `--plan` از آن می‌گذرد. برنامه‌ها (`authFetch`،
- *  `ApiClient`) روی ۴۰۱ یک بار نشست را تازه می‌کنند و همان درخواست را دوباره می‌زنند — همین‌جا هم (زمانِ هر دو با هم ثبت می‌شود).
- */
-const whoByToken = new Map();
-let reauths = 0;
-function own(who, token, refreshToken) {
-  if (who.token) whoByToken.delete(who.token);
-  who.token = token;
-  if (refreshToken) who.refreshToken = refreshToken;
-  whoByToken.set(token, who);
-}
-function reauth(who) {
-  if (!who.reauth) {
-    who.reauth = (async () => {
-      const post = async (path_, body) => {
-        try {
-          const res = await fetch(base + path_, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App': 'shop' }, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.max(TIMEOUT, 15000)) });
-          return { status: res.status, json: await res.json().catch(() => null) };
-        } catch { return { status: 0, json: null }; }
-      };
-      let r = who.refreshToken ? await post('/api/auth/refresh', { refreshToken: who.refreshToken }) : null;
-      if (!r || r.status !== 200 || !r.json || !r.json.accessToken) {
-        const acct = who.shop || who;
-        r = await post('/api/auth/login', { identifier: acct.email, password: acct.password, app: 'shop', device: { deviceId: who.deviceId || who.id, name: 'آزمونِ بار', platform: 'test' } });
-      }
-      if (r.status === 200 && r.json && r.json.accessToken) { own(who, r.json.accessToken, r.json.refreshToken); reauths++; }
-    })().finally(() => { who.reauth = null; });
-  }
-  return who.reauth;
-}
+//  نشستِ ۶۰ دقیقه‌ای: روی ۴۰۱ یک بار تازه و دوباره، مثلِ برنامه‌ها (`load-plan.mjs`)
+const auth = authSessions({ baseOf: () => base, timeoutOf: () => TIMEOUT });
 async function hit(label, method, p, { token, body, headers = {}, shop, ok } = {}) {
   const t0 = performance.now();
   let status = 0, err = '', json = null, bytes = 0, text = '';
@@ -224,9 +189,9 @@ async function hit(label, method, p, { token, body, headers = {}, shop, ok } = {
     } catch (e) {
       err = e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout' : String((e && e.cause && e.cause.code) || (e && e.name) || 'error');
     }
-    const who = status === 401 && token ? whoByToken.get(token) : null;
+    const who = status === 401 && token ? auth.whoOf(token) : null;
     if (!who || attempt) break;
-    await reauth(who);
+    await auth.reauth(who);
     if (who.token === token) break;
     token = who.token;
   }
@@ -582,15 +547,7 @@ function print(o, fails) {
     for (const x of o.queries.slice(0, 12)) console.log(`   ${pad(Math.round(x.totalMs), 8)} ${pad(x.calls, 7)} ${pad(x.meanMs, 7)} ${pad(x.maxMs, 7)}  ${x.sql.slice(0, 150)}`);
   }
   if (o.recovery) console.log(`  بازگشت: ${o.recovery.ok ? '✅' : '❌'} ${o.recovery.detail}`);
-  if (o.generator) console.log(`  بارساز: حلقه p99 ${o.generator.loopP99Ms}ms (بیشینه ${o.generator.loopMaxMs})، CPU ${o.generator.cpuPct}%، درخواستِ باز ≤ ${o.generator.inflightMax} (سقف ${o.generator.maxInflight})، مهلتِ کلاینت ${o.generator.timeoutMs}ms`);
-  if (o.burst) {
-    const b = o.burst;
-    console.log(`  قطعِ سراسری: ${b.devices} دستگاه (${b.skippedBusy} سرگرم)، تا سر ${b.drained} (≤۱۰s ${b.within10s}، ≤۳۰s ${b.within30s}، ≤۶۰s ${b.within60s})، نرسیده ${b.notDrained}، دوباره ${b.retries}؛ تخلیه p50 ${b.p50Ms} p95 ${b.p95Ms} بیشینه ${b.maxMs}ms، آخرین دستگاه ${b.lastDrainedAfterMs}ms پس از آغاز`);
-  }
-  for (const [k, g] of Object.entries(o.gate || {})) {
-    if (!g.n) continue;
-    console.log(`  دروازه/${k}: ${g.n} (پذیرفته ${g.admitted}، ۵۰۳ ${g.rejected})؛ انتظارِ دروازه p50 ${g.wait.p50} p95 ${g.wait.p95} بیشینه ${g.wait.max}؛ گرفتنِ اتصال p95 ${g.acquire.p95} بیشینه ${g.acquire.max}؛ اجرا p95 ${g.exec.p95} بیشینه ${g.exec.max}؛ کل p95 ${g.total.p95} بیشینه ${g.total.max}ms؛ کل > ۱۰s ${g.over10s}، > ۱۵s ${g.over15s}`);
-  }
+  printExtras(o);
   if (o.steps) {
     console.log(`  پله‌ها (خواسته ⇒ رسیده/s، p95 ِ همه، بدترین مسیر، خطا [+استثنا]، جاافتاده؛ p95 ِ گروه‌ها):`);
     for (const st of o.steps) {
@@ -608,16 +565,8 @@ const plannedCheckouts = (defs) => {
   return defs.reduce((s, d) => s + d.phases.reduce((t, ph) => t + ph.sec * ph.rps * w(ph.mix || MIX), 0), 0) + WARMUP * RATE * w(MIX);
 };
 const groups = new Map();
-if (PLAN) {
-  //  همهٔ گام‌ها یک گروه (یک کاشتن)؛ سرورِ نخست با env ِ گامِ نخست
-  const steps = Array.isArray(PLAN) ? PLAN : PLAN.steps;
-  if (!Array.isArray(steps) || !steps.length || INSTANCES > 1) { console.error('--plan: فهرستِ گام‌ها لازم است (و نه با --instances)'); process.exit(2); }
-  groups.set('plan', steps.map((st) => {
-    if (!PROFILE_DEFS[st.profile]) { console.error(`--plan: نمایهٔ ناشناخته ${st.profile}`); process.exit(2); }
-    const def = { name: st.label || st.profile, ...PROFILE_DEFS[st.profile]() };
-    return { ...def, step: { profile: st.profile, env: { ...(def.serverEnv || {}), ...(st.env || {}) }, timeoutMs: st.timeoutMs || null, sql: st.sql || [] } };
-  }));
-} else for (const name of PROFILES) {
+if (PLAN) groups.set('plan', planDefs(PLAN, PROFILE_DEFS, INSTANCES));
+else for (const name of PROFILES) {
   const def = { name, ...PROFILE_DEFS[name]() };
   const key = JSON.stringify(def.serverEnv || {});
   if (!groups.has(key)) groups.set(key, []);
@@ -673,13 +622,13 @@ for (const defs of groups.values()) {
   //  چند دکان با هم (قفلِ هر دکان جداست؛ ترتیبِ کارِ هر دستگاه همان)
   const parallel = async (xs, fn) => { for (let i = 0; i < xs.length; i += SETUP_PAR) await Promise.all(xs.slice(i, i + SETUP_PAR).map(fn)); };
   //  هر دستگاه نشستِ خودش را دارد (همان برنامهٔ واقعی) — توکنِ یک دستگاه برای دستگاهِ دیگر نیست
-  await parallel(devices, async (d) => { const j = await login(d.shop, d.id); own(d, j.accessToken, j.refreshToken); });
-  for (const sh of shops) { sh.deviceId = `load-owner-${sh.index}`; own(sh, sh.token); }
+  await parallel(devices, async (d) => { const j = await login(d.shop, d.id); auth.own(d, j.accessToken, j.refreshToken); });
+  for (const sh of shops) { sh.deviceId = `load-owner-${sh.index}`; auth.own(sh, sh.token); }
   wstep(`${devices.length} نشستِ دستگاه`);
   let histOps = 0, countLines = 0;
   await parallel(shops, async (sh) => {
     const d = { shop: sh, id: `lh-${sh.index}`, cursor: 0, busy: false, wall: Date.now() - 3_600_000 };
-    { const j = await login(sh, d.id); own(d, j.accessToken, j.refreshToken); }
+    { const j = await login(sh, d.id); auth.own(d, j.accessToken, j.refreshToken); }
     const target = sh.index === 0 ? HISTORY : Math.min(150, HISTORY);
     for (let n = 0; n < target;) {
       //  `--check`: تاریخچه هم در دفتر (همان op ها در pull ِ دستگاه‌ها سنجیده می‌شوند)
@@ -820,8 +769,7 @@ for (const defs of groups.values()) {
     //  بارسازِ اشباع‌نشده: حلقهٔ رویدادش آزاد (p99) و پردازنده‌اش زیرِ یک هسته — وگرنه زمان‌ها انتظارِ خودِ بارساز است
     o.generator = { loopP99Ms: r1(genLoop.percentile(99) / 1e6), loopMaxMs: o.generatorLoopMaxMs,
       cpuPct: Math.round(((({ user, system }) => user + system)(process.cpuUsage(genCpu0))) / 1000 / (performance.now() - genT0) * 100),
-      inflightMax: rec.inflightMax || 0, maxInflight: MAX_INFLIGHT, timeoutMs: TIMEOUT, reauths };
-    reauths = 0;
+      inflightMax: rec.inflightMax || 0, maxInflight: MAX_INFLIGHT, timeoutMs: TIMEOUT, reauths: auth.take() };
     if (def.phases.some((ph) => ph.stampede === 'outage')) o.burst = kit.burstStats();
     if (def.step) o.step = def.step;
     o.gate = (await srv.ask({ type: 'gatestats' })).gate;

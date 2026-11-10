@@ -104,7 +104,9 @@ const gateTimes = { push: [], other: [] };
       const end = performance.now();
       (heavy ? gateTimes.push : gateTimes.other).push([g.tIn ? g.tIn - t0 : end - t0, g.acquireMs, g.tIn ? end - g.tIn - g.acquireMs : 0, end - t0, g.tIn ? 1 : 0, g.acquireFailed ? 1 : 0]);
     };
-    return origRun(key, heavy, (o) => { g.tIn = performance.now(); return inGate.run(g, () => fn(o)); }).then((r) => { done(); return r; }, (e) => { done(); throw e; });
+    //  ۵۰۳ پس از پذیرش در دروازه = گرفتنِ اتصال (`SYNC_V3_GATE_POOL_DEADLINE` یا سقفِ صفِ استخر)؛ promise ِ `connect` ِ رهاشده دیرتر می‌رسد
+    return origRun(key, heavy, (o) => { g.tIn = performance.now(); return inGate.run(g, () => fn(o)); })
+      .then((r) => { done(); return r; }, (e) => { if (g.tIn && e && e.code === 'db_busy') g.acquireFailed = true; done(); throw e; });
   };
 }
 function gateSummary(xs) {
