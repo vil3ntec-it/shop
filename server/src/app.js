@@ -451,8 +451,7 @@ async function createApp({ runMigrations = true } = {}) {
     //  بانکِ تصاویر (v3 ۳۷) — پشتِ پرچمِ `shop.image_bank`، پیش‌فرض خاموش
     //  IMG-PRO-17: تغییرِ دسته‌ایِ عکسِ کالاها و برگرداندنش — پیش از `/shop/images` (همان پرچم)
     api.use('/shop/images/changes', require('./routes/shop-image-changes'));
-    //  AI-02/AI-05: استودیوی عکس (صفِ پردازشِ محلی، بازبینی) — پیش از `/shop/images`؛ پرچمِ `shop.image_studio`
-    api.use('/shop/images/studio', require('./routes/shop-image-studio'));
+    api.use('/shop/images/studio', require('./routes/shop-image-studio')); //  AI-02/AI-05: استودیوی عکس (صفِ پردازشِ محلی، بازبینی) — پیش از `/shop/images`؛ پرچمِ `shop.image_studio`
     api.use('/shop/images', require('./routes/shop-images'));
     //  تحویل و پیک (۲۲.۲ C) — همان قاعده؛ درهای پیک زیرِ `/courier` (۳.۱۱)
     api.use('/shop/delivery', require('./routes/delivery'));
@@ -463,8 +462,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/shop/staff-time', require('./routes/staff-time'));
     //  STF-06: محدودهٔ مکانِ کارمندان (اجرا در `/shop/catalog`) — پشتِ `shop.staff_scope`، پیش‌فرض خاموش
     api.use('/shop/staff-scope', require('./routes/staff-scope'));
-    //  STF-04/S46: PIN ِ شخصیِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق (مهاجرتِ ۶۴۰) — پشتِ `shop.till_pin`، پیش‌فرض خاموش
-    api.use('/shop/till-pin', require('./routes/shop-till-pin'));
+    api.use('/shop/till-pin', require('./routes/shop-till-pin')); //  STF-04/S46: PIN ِ شخصیِ صندوق در سرور و نوبت‌های سنجیدهٔ صندوق (مهاجرتِ ۶۴۰) — پشتِ `shop.till_pin`، پیش‌فرض خاموش
     //  STF-02: «درخواستِ تأیید» از راهِ دور (شاگرد می‌پرسد، صاحب/مدیر روی دستگاهِ خودش) — پشتِ `shop.approval_requests`، پیش‌فرض خاموش
     api.use('/shop/approval-requests', require('./routes/shop-approval-requests'));
     //  صندوقِ سندهای ردشده (DATA-SAFETY، مهاجرتِ ۳۱۵): صاحب/مدیر می‌بیند، دوباره ثبت می‌کند یا کنار می‌گذارد؛ دستگاهِ سازنده ردیفِ خودش را — بی پرچم
@@ -680,8 +678,7 @@ async function createApp({ runMigrations = true } = {}) {
   };
   const productPage = (sf, req, res) => storeSeo.page(sf, { productId: req.params.id, lang: seoLang(req.query.lang) })
     .then((p) => storeHeaders(req, res, () => res.status(p.status).set('Cache-Control', 'no-cache').type('html').send(shell(p.body))));
-  //  WEB-17: بیش از یک برگ ⇒ فهرستِ برگ‌ها و `?page=<n>`؛ برگِ نبوده یا بدشکل ⇒ همان ۴۰۴ ِ نشانیِ ناشناخته
-  const sitemapOf = (sf, req, res, next) => storeSeo.sitemap(sf, { page: req.query.page })
+  const sitemapOf = (sf, req, res, next) => storeSeo.sitemap(sf, { page: req.query.page }) //  WEB-17: بیش از یک برگ ⇒ فهرستِ برگ‌ها و `?page=<n>`؛ برگِ نبوده یا بدشکل ⇒ همان ۴۰۴ ِ نشانیِ ناشناخته
     .then((x) => (x === false ? next() : res.set('Cache-Control', 'no-cache').type('application/xml').send(x)));
   const robotsOf = (sf, req, res) => storeSeo.robots(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));

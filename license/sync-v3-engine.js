@@ -598,8 +598,7 @@
     this.meta = null; this.outbox = []; this.rejectedList = []; this.conflictList = []; this.listeners = [];
     this.busy = false;
     this.streak = null;   // SYN-12: رشتهٔ شکستِ پیاپیِ جاری در حافظه (`outageStreak` ِ sync-core) — فقط برای حال (`outage`)
-    //  هر کاری که صف، سایه یا حال را می‌نویسد پشتِ همین زنجیر است: دو ثبتِ هم‌زمان یا ثبتی
-    //  وسطِ نشاندنِ Pull سایه را عقب نمی‌برد (وگرنه همان تغییر با شناسهٔ تازه دوباره می‌رفت)
+    //  هر کاری که صف، سایه یا حال را می‌نویسد پشتِ همین زنجیر است: دو ثبتِ هم‌زمان یا ثبتی وسطِ نشاندنِ Pull سایه را عقب نمی‌برد (وگرنه همان تغییر با شناسهٔ تازه دوباره می‌رفت)
     this.chain = Promise.resolve();
     var self = this;
     this.clock = createClock({ node: this.deviceId, now: function () { return self.now(); } });
@@ -937,8 +936,7 @@
         ledger: planned, cursor: patch.cursor === undefined ? this.meta.cursor : patch.cursor, ops: legacy,
       } });
       this.failpoint('after-journal');
-      //  ذخیرهٔ UI ممکن است وسطِ همین await نشسته باشد: دفتر را دوباره بخوان و op را روی نسخهٔ تازه بنشان
-      //  (خواندن تا نوشتن بی await است). اگر دفترِ نشسته با ژورنال نمی‌خواند، ژورنال دوباره نوشته می‌شود
+      //  ذخیرهٔ UI ممکن است وسطِ همین await نشسته باشد: دفتر را دوباره بخوان و op را روی نسخهٔ تازه بنشان (خواندن تا نوشتن بی await است). اگر دفترِ نشسته با ژورنال نمی‌خواند، ژورنال دوباره نوشته می‌شود
       data = this.ledger.read();
       var fresh = data ? C.applyRemote(data, legacy).data : null;
       if (fresh && ledgerPrint(fresh) === planned) next = fresh;
