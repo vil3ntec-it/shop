@@ -1,8 +1,7 @@
 /* ==========================================================
    فروشگاه من | موتورِ Sync v3 — سمتِ برنامه (وب)
    ----------------------------------------------------------
-   بخشِ ۳.۸ِ مشخصات؛ SYN-01..08، SYN-10، SYN-11. قرارداد همان
-   `server/src/routes/sync-v3.js` است.
+   بخشِ ۳.۸ِ مشخصات؛ SYN-01..08، SYN-10، SYN-11. قرارداد همان `server/src/routes/sync-v3.js` است.
 
    ⛔ **پیش‌فرض خاموش.** تنظیمِ هر دستگاه (`tohid-sync-engine`) پیش‌فرض
       `v1` است و تا کسی آگاهانه `v3` نکند، این فایل فقط تعریف می‌کند و
@@ -208,8 +207,7 @@
 
   /* ==========================================================
      ۳) مبدل: opِ دفترِ امروز (شکلِ v1) ⇒ opِ v3
-     همان `fromV2`ِ سرور، با همان پسوندها و همان دلتا/لغو؛ فرقش فقط
-     این است که HLC را ساعتِ همین دستگاه می‌دهد.
+     همان `fromV2`ِ سرور، با همان پسوندها و همان دلتا/لغو؛ فرقش فقط این است که HLC را ساعتِ همین دستگاه می‌دهد.
      ========================================================== */
   var DEFAULT_CANCEL_REASON = 'لغو از نسخهٔ قدیمیِ برنامه';
   var DELETE_CANCEL_REASON = 'حذف از نسخهٔ قدیمیِ برنامه';
@@ -305,9 +303,9 @@
   }
 
   /**
-   *  آیا سرور این op را **به‌عنوانِ v3ِ بومی** می‌پذیرد؟ قرینهٔ `validate(raw,'v3')`ِ
-   *  سرور (بردارها می‌سنجند). opی که نپذیرد با `format: "v2"` می‌رود تا خودِ سرور
-   *  با قاعدهٔ خودش تبدیلش کند (مثلاً ویرایشِ سندِ مالی ⇒ صندوقِ تعارض) — گم نمی‌شود.
+   *  آیا سرور این op را **به‌عنوانِ v3ِ بومی** می‌پذیرد؟ قرینهٔ `validate(raw,'v3')`ِ سرور (بردارها می‌سنجند). opی که
+   *  نپذیرد با `format: "v2"` می‌رود تا خودِ سرور با قاعدهٔ خودش تبدیلش کند (مثلاً ویرایشِ سندِ مالی ⇒ صندوقِ تعارض) —
+   *  گم نمی‌شود.
    *  @returns '' یا دلیل
    */
   function nativeReason(r) {
@@ -589,6 +587,7 @@
     this.conflictList = [];
     this.listeners = [];
     this.busy = false;
+    this.streak = null;   // SYN-12: رشتهٔ شکستِ پیاپیِ جاری در حافظه (`outageStreak` ِ sync-core) — فقط برای حال (`outage`)
     //  هر کاری که صف، سایه یا حال را می‌نویسد پشتِ همین زنجیر است: دو ثبتِ هم‌زمان یا ثبتی
     //  وسطِ نشاندنِ Pull سایه را عقب نمی‌برد (وگرنه همان تغییر با شناسهٔ تازه دوباره می‌رفت)
     this.chain = Promise.resolve();
@@ -652,9 +651,8 @@
 
   /**
    *  راه‌اندازی روی این دستگاه (تازه، یا گذر از v1): Snapshot ⇒ دفتر و سایه و cursor.
-   *  @param opts.keepLocalOnly ردیف‌هایی که فقط این‌جا هستند می‌مانند و با نخستین
-   *         ثبت «درج» می‌روند (دستگاهی که هرگز همگام نشده). دستگاهی که با v1 همگام
-   *         بوده `false` می‌دهد: ردیفِ نبود در سرور یعنی جای دیگری پاک شده است.
+   *  @param opts.keepLocalOnly ردیف‌هایی که فقط این‌جا هستند می‌مانند و با نخستین ثبت «درج» می‌روند (دستگاهی که هرگز
+   *  همگام نشده). دستگاهی که با v1 همگام بوده `false` می‌دهد: ردیفِ نبود در سرور یعنی جای دیگری پاک شده است.
    */
   Engine.prototype.initialize = async function (opts) {
     var o = opts || {};
@@ -746,11 +744,7 @@
     return add.length;
   };
 
-  Engine.prototype.queued = function () {
-    var n = 0;
-    this.outbox.forEach(function (e) { n += e.fmt === 'v3' ? e.ops.length : 1; });
-    return n;
-  };
+  Engine.prototype.queued = function () { var n = 0; this.outbox.forEach(function (e) { n += e.fmt === 'v3' ? e.ops.length : 1; }); return n; };
 
   /** دستهٔ بعدی: پیشوندِ هم‌قالبِ صف، در سقفِ بایت و تعداد؛ گروهِ tx شکسته نمی‌شود مگر ناچار */
   Engine.prototype.nextBatch = function () {
@@ -786,9 +780,7 @@
     return { fmt: fmt, entries: entries, ops: ops, bytes: bytes };
   };
 
-  Engine.prototype.fail = function (status, body, extra) {
-    return this.locked(function () { return this.failNow(status, body, extra); });
-  };
+  Engine.prototype.fail = function (status, body, extra) { return this.locked(function () { return this.failNow(status, body, extra); }); };
   Engine.prototype.failNow = async function (status, body, extra) {
     var code = errorCode(body);
     var now = this.now();
@@ -801,11 +793,12 @@
       this.emit();
       return Object.assign({ ok: false, stopped: true, upgrade: true, status: status }, extra || {});
     }
-    var attempt = (this.meta.attempt || 0) + 1;
+    var attempt = (this.meta.attempt || 0) + 1, before = this.meta.lastError || '';
     var patch = { attempt: attempt, lastError: status ? errorMessage(status, body) : String((body && body.message) || 'به سرور نرسیدیم'), lastErrorAt: now };
     if (status === 400 && code === 'batch_too_large') patch.pushBytes = MIN_BYTES;
     if (status === 401 || status === 403) patch.attempt = this.meta.attempt || 0;
     await this.persist(patch);
+    if (typeof Core().outageStreak === 'function') this.streak = Core().outageStreak(this.streak, before, status, code, patch.lastError, now);
     this.emit();
     var stop = status === 401 || status === 403 || status === 404;
     return Object.assign({
@@ -1034,9 +1027,9 @@
   var INCOMPLETE = 'سرور پس از بازیابی هنوز دفتر را آماده نکرده است؛ چند دقیقهٔ دیگر خودش دوباره امتحان می‌کند.';
 
   /**
-   *  §۹.۵ «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): Snapshot + تنهاهای این‌جا (جز حذف‌شده‌های
-   *  سرور، `POST /deleted`)؛ سایه = Snapshot ⇒ تنهاها «درج». فقط با صفِ خالی و تفاضلِ هیچ؛ اول سایه و cursor،
-   *  بعد دفتر (شکست ⇒ پیشین برمی‌گردد)؛ Snapshot ِ ناقص ⇒ دورِ بعد با خطای دیدنی. @returns null یا قدمِ شکست
+   *  §۹.۵ «نگه‌دارِ محلی» (`core.restoreMerge`، قرینهٔ `V1Restore.kt`): Snapshot + تنهاهای این‌جا (جز حذف‌شده‌های سرور،
+   *  `POST /deleted`)؛ سایه = Snapshot ⇒ تنهاها «درج». فقط با صفِ خالی و تفاضلِ هیچ؛ اول سایه و cursor، بعد دفتر (شکست
+   *  ⇒ پیشین برمی‌گردد)؛ Snapshot ِ ناقص ⇒ دورِ بعد با خطای دیدنی. @returns null یا قدمِ شکست
    */
   Engine.prototype.rebuild = async function () {
     var r = await this.call('GET', '/snapshot');
@@ -1098,6 +1091,11 @@
       unsynced: queued > 0,
     };
   };
+  /** SYN-12: شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست — همان `SyncV3Engine.outage` ِ برنامه؛ sync-core ِ کهنه ⇒ null (چراغِ پیشین) */
+  Engine.prototype.outage = function (online) {
+    var C = Core(), m = this.meta || emptyMeta();
+    return typeof C.outageFrom === 'function' ? C.outageFrom(this.streak, m.lastError || '', online !== false, m.attempt || 0, this.now()) : null;
+  };
   Engine.prototype.rejected = function () { return clone(this.rejectedList); };
   Engine.prototype.conflicts = function () { return clone(this.conflictList); };
   Engine.prototype.onChange = function (fn) {
@@ -1121,8 +1119,8 @@
     return v === 'v3' ? 'v3' : 'v1';
   }
   /**
-   *  گذر میانِ موتورها — فقط وقتی هیچ چیزی در صفِ موتورِ فعلی نمانده است؛
-   *  وگرنه همان تغییرها از دو راه با دو شناسه می‌رفتند (دلتای دوباره).
+   *  گذر میانِ موتورها — فقط وقتی هیچ چیزی در صفِ موتورِ فعلی نمانده است؛ وگرنه همان تغییرها از دو راه با دو شناسه
+   *  می‌رفتند (دلتای دوباره).
    *  @param pending تعدادِ منتظرِ موتورِ فعلی
    */
   function setChoice(next, pending, storage) {
@@ -1134,9 +1132,8 @@
   }
 
   /**
-   *  رابطِ `window.TohidSync` برای این دستگاه وقتی v3 برگزیده شده — همان نام‌هایی
-   *  که `index.html`، `account-ui.js` و `shop-sync.js` صدا می‌زنند. سوکتِ زندهٔ v1
-   *  این‌جا نیست؛ هر ۳۰ ثانیه و با «آنلاین شد» Pull می‌شود.
+   *  رابطِ `window.TohidSync` برای این دستگاه وقتی v3 برگزیده شده — همان نام‌هایی که `index.html`، `account-ui.js` و
+   *  `shop-sync.js` صدا می‌زنند. سوکتِ زندهٔ v1 این‌جا نیست؛ هر ۳۰ ثانیه و با «آنلاین شد» Pull می‌شود.
    *  @returns آیا نصب شد
    */
   function install(acc, opts) {
@@ -1171,11 +1168,12 @@
     function ensure() { if (!ready) ready = make(); return ready; }
     function facadeStatus(s) {
       var st = s || (engine ? engine.status() : {});
+      var online = root.navigator ? root.navigator.onLine !== false : true, outage = engine ? engine.outage(online) : null;
       return Object.assign({}, st, {
-        configured: acc.configured(), signedIn: acc.isSignedIn(), online: root.navigator ? root.navigator.onLine !== false : true,
-        holding: !!st.upgradeRequired, live: false, dropped: st.rejected || 0, schemaVersion: C.SCHEMA_VERSION,
+        configured: acc.configured(), signedIn: acc.isSignedIn(), online: online,
+        holding: !!st.upgradeRequired, live: false, dropped: st.rejected || 0, schemaVersion: C.SCHEMA_VERSION, outage: outage,
         dot: C.dotOf({
-          error: !!st.lastError, online: root.navigator ? root.navigator.onLine !== false : true,
+          error: !!st.lastError, alarm: outage ? outage.level === 'alarm' : true, online: online,
           signedIn: acc.isSignedIn(), configured: acc.configured(), queued: st.queued || 0, busy: !!st.busy,
         }),
       });

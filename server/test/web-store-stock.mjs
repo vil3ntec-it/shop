@@ -12,6 +12,7 @@
  *   • کالای بی موجودی در همان صفحه «ناموجود» و دکمه‌اش بسته — مرزِ مقابل؛
  *   • WEB-09: «کالای ناموجود را پنهان کن» ِ دکان ⇒ کارتش نیست، کالای موجود هست، پیوندِ مستقیمش «ناموجود» با دکمهٔ
  *     بسته؛ خاموش ⇒ دوباره دیده می‌شود (پالایه فقط در سرور، بی JS ِ تازه)؛
+ *   • O-06/R6: نگه‌داشته «ناموجود» می‌کند؛ پرچمِ `shop.stock_reserve` خاموش ⇒ همان کارت/برگهٔ قابلِ سفارش، روشنِ دوباره ⇒ «ناموجود»؛
  *   • بی نقضِ CSP و بی خطای جاوااسکریپت.
  */
 import { createRequire } from 'node:module';
@@ -198,6 +199,26 @@ ok(rej.status === 200, 'O-06: دکان سفارشِ تلفنی را رد کرد'
 await look();
 ok(!((await oilCard().textContent()) || '').includes('ناموجود') && await oilCard().locator('.p-add').isEnabled(),
   'O-06: رد ⇒ روغن آزاد و دوباره قابلِ سفارش');
+
+//  ⛔ R6: خاموش کردنِ `shop.stock_reserve` با نگه‌داشتهٔ باز ⇒ کارت همان main (قابلِ سفارش)؛ روشنِ دوباره ⇒ نگه‌داشتهٔ نگذشته دوباره «ناموجود»
+const phone2 = await call('POST', '/api/shop/orders', {
+  source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'مشتریِ تلفنی' },
+  lines: [{ productId: 'oil', name: 'روغن', unit: 'دانه', qtyMilli: 1000, unitPriceMinor: 25000 }],
+}, T, { 'Idempotency-Key': `web-stock-hold2-${Date.now()}` });
+ok(phone2.status === 201 && phone2.body.order.stockHold && phone2.body.order.stockHold.status === 'held', 'R6: سفارشِ تلفنیِ دوم آخرین روغن را نگه داشت');
+const flag = (value) => call('PUT', '/api/admin/pump/live-config', { scope: shopId, key: 'shop.stock_reserve', value }, A);
+ok((await flag(false)).status === 200, 'R6: نگه‌داشتن خاموش شد (نگه‌داشته باز ماند)');
+await look();
+ok(!((await oilCard().textContent()) || '').includes('ناموجود') && await oilCard().locator('.p-add').isEnabled(),
+  'R6 خاموش: کارتِ روغن قابلِ سفارش (نگه‌داشتهٔ باز نادیده)', (await oilCard().textContent()) || '');
+await oilCard().locator('.p-open').click();
+await page.waitForSelector('#product-sheet:not([hidden]) #ps-stock .pill', { timeout: 10000 });
+ok(!(await page.textContent('#ps-stock')).includes('ناموجود') && await page.isEnabled('#ps-add'), 'R6 خاموش: برگهٔ کالا هم قابلِ سفارش');
+ok((await flag(true)).status === 200, 'R6: نگه‌داشتن دوباره روشن شد');
+await look();
+ok(((await oilCard().textContent()) || '').includes('ناموجود') && await oilCard().locator('.p-add').isDisabled(),
+  'R6 روشن: نگه‌داشتهٔ نگذشته دوباره «ناموجود»');
+ok((await call('POST', `/api/shop/orders/${phone2.body.order.id}/transition`, { to: 'rejected', reason: 'busy' }, T)).status === 200, 'R6: سفارشِ دوم رد شد');
 
 ok(violations.length === 0, 'هیچ نقضِ CSP', violations.join(' | '));
 ok(errors.length === 0, 'بی خطای جاوااسکریپت', errors.join(' | '));

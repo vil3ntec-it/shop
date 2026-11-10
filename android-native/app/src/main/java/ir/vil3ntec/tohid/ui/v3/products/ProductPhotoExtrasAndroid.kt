@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CenterFocusStrong
 import androidx.compose.material.icons.outlined.Collections
+import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.PhotoSizeSelectLarge
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -14,6 +15,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrImageChanges
+import ir.vil3ntec.tohid.core.i18n.StrProductGallery
 import ir.vil3ntec.tohid.core.i18n.StrReach
 import ir.vil3ntec.tohid.data.ImageBank
 import ir.vil3ntec.tohid.data.PhotoStore
@@ -58,6 +60,8 @@ internal fun RouteScope.rememberPhotoMore(id: String): List<V3MenuItem> {
     if (bankOn) add(V3MenuItem(Icons.Outlined.Collections, StrReach.photoBank) { nav.replace(ProductsPaths.photoBank(id)) })
     //  IMG-PRO-16: نسخهٔ کوچک و بزرگِ عکسِ بانک (ویترین) و سنجهٔ فشرده‌سازی
     if (bankOn) add(V3MenuItem(Icons.Outlined.PhotoSizeSelectLarge, StrImageChanges.versionsTitle) { nav.replace(ProductsPaths.photoVersions(id)) })
+    //  PRD-17/27: عکس‌های تکمیلی و عکسِ جدای ویترین
+    if (bankOn) add(V3MenuItem(Icons.Outlined.PhotoLibrary, StrProductGallery.title) { nav.replace(ProductsPaths.photoGallery(id)) })
     if (GuidedCapture.AVAILABLE) add(V3MenuItem(Icons.Outlined.CenterFocusStrong, StrReach.photoGuided) { nav.replace(ProductsPaths.photoGuided(id)) })
   }
 }

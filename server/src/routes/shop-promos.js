@@ -37,6 +37,8 @@
  *      • `POST /redeem/release {saleId, codes?}`: آزاد کردنِ نرم (ردیف می‌ماند). خودِ صندوقدار فقط
  *        تا `RELEASE_WINDOW_MS` پس از گرفتن (سبدِ رهاشده/کدِ برداشته)؛ بعد از آن فقط دارندهٔ
  *        `sales.cancel` (لغوِ فاکتور).
+ *      • `GET /redemptions`: کدهای نگه‌داشته (آزادنشده، تازه‌ترین اول، سقفِ ۲۰۰ + `more`) فقط برای دارندهٔ
+ *        `sales.cancel` — آزادِ دستیِ کدی که لغوکننده اجازه‌اش را نداشت (`release_not_allowed`).
  *      • `uses` ِ هر قاعده در پاسخ‌ها = شمارِ مصرفِ آزادنشدهٔ دفتر؛ عددِ برنامه همیشه نادیده.
  *      • سقفِ نرخ برای هر کاربر (`RATE_PROMO_REDEEM_MAX` در دقیقه، پیش‌فرض ۱۲۰): شاگرد نمی‌تواند
  *        با فاکتورهای ساختگی ظرفیتِ کد را در یک لحظه بسوزاند؛ هر مصرف هم سابقه (`promos.redeem`) دارد.
@@ -56,6 +58,7 @@ const { clientIp, rateLimit } = require('../middleware/ratelimit');
 const { badRequest, forbidden, conflict, notFound } = require('../middleware/errors');
 
 const { flagOf } = require('../lib/orders');
+const config = require('../config');
 
 /** پرچمِ `live_config` ِ نشانِ تخفیف روی فاکتور — همان `receipt-public.js` */
 const STAMP_FLAG = 'shop.promo_stamp';
@@ -77,6 +80,27 @@ const redeemLimit = rateLimit({
 });
 
 const router = express.Router();
+
+/*  PRM-02 — کدهای نگه‌داشته برای آزادِ دستیِ صاحب/مدیر: صندوقداری که فاکتور را با «درخواستِ تأیید» لغو کرد
+ *  `release_not_allowed` می‌گیرد و کد تا ابد نگه‌داشته می‌ماند. فقط همان کسی که کدِ دیگران را آزاد می‌کند
+ *  (`sales.cancel`، `mayCancel`) فهرست را می‌بیند؛ آزاد کردن همان `POST /redeem/release` ِ پایین است.
+ *  سقفِ نرخِ IP پیش از احراز (سوار پیش از `router.use(requireUser…)` ِ کلِ روتر). بی شناسهٔ کاربر/دستگاه. */
+const HELD_MAX = 200;
+router.get('/redemptions', rateLimit({ max: config.rateLimit.generalMax, keyPrefix: 'promo-held-ip' }), requireUser, requireShop, requirePermission('data.read'), async (req, res) => {
+  await needUses(req);
+  if (!(await mayCancel(req))) {
+    throw forbidden('آزاد کردنِ کدِ مصرف‌شده کارِ کسی است که فاکتور را لغو می‌کند', 'release_not_allowed');
+  }
+  const rows = await many(
+    `SELECT sale_id, promo_id, code, updated_at FROM shop_promo_redemptions
+      WHERE shop_id=$1 AND released_at IS NULL
+      ORDER BY updated_at DESC, sale_id, promo_id LIMIT ${HELD_MAX + 1}`, [req.shopId]);
+  res.json({
+    held: rows.slice(0, HELD_MAX).map((r) => ({ saleId: r.sale_id, code: r.code, promoId: r.promo_id, at: Number(r.updated_at) })),
+    more: rows.length > HELD_MAX,
+  });
+});
+
 router.use(requireUser, requireShop);
 
 const MAX_RULES = 200;
