@@ -9,6 +9,7 @@
  *   node scripts/load-test.mjs --db … --profile knee,knee-store --steps 1,2,3,4,6   # نقطهٔ شکست: پله‌های ۲۰ثانیه‌ای
  *   node scripts/load-test.mjs --db … --profile knee --instances 2   # دو نمونهٔ سرور روی همان پایگاه (CLUSTER_ENABLED=1)
  *   … --rate 40 --shops 20 --devices 3 --scale 0.1 --json out.json
+ *   node scripts/load-test.mjs --db … --plan plan.json --check …     # چند گام روی **یک** پایگاهِ کاشته (پایین، `--plan`)
  *
  * ⛔ پایگاه داده را **پاک می‌کند** (`resetDatabase`ِ آزمون‌ها): فقط `pglite:memory`/`pglite:<پوشه>`
  *    یا پایگاهی که نامش `test` یا `bench` دارد.
@@ -41,7 +42,7 @@ const SHOPS = Math.max(1, Number(arg('--shops', 20)));
 const DEVICES = Math.max(1, Number(arg('--devices', 3)));
 const SCALE = Number(arg('--scale', 0.1));
 const SMALL_SCALE = Number(arg('--small-scale', 0.005));
-const TIMEOUT = Number(arg('--timeout', 10000));
+let TIMEOUT = Number(arg('--timeout', 10000));   //  `--plan`: هر گام می‌تواند مهلتِ کلاینتِ خودش را داشته باشد
 const WARMUP = Number(arg('--warmup', 5));
 const MAX_INFLIGHT = Number(arg('--max-inflight', 512));
 const JSON_OUT = arg('--json', '');
@@ -65,6 +66,21 @@ const LEDGER_OUT = arg('--ledger', '');
 //  `--query-stats` (فقط PostgreSQL): زمانِ هر پرس‌وجو در سرورِ آزمون، به‌جای pg_stat_statements که preload می‌خواهد
 const QSTATS = has('--query-stats');
 const SETUP_PAR = Math.max(1, Number(arg('--setup-par', 4)) || 1);
+//  شمارش‌های بستهٔ پیشینِ هر دکان (انبارگردانی؛ `v3.lateCount`): «دکانِ ۰،دکان‌های ۱ تا ۹،بقیه» ردیف — پیش از بار، ثبت نمی‌شود
+const COUNT_HISTORY = (() => { const a = arg('--count-history', '0').split(',').map((x) => Math.max(0, Math.floor(Number(x) || 0))); return [a[0] || 0, a[1] ?? a[0] ?? 0, a[2] ?? a[1] ?? a[0] ?? 0]; })();
+/*
+ *  `--plan <پرونده.json>`: گام‌های پیاپی روی **همان** پایگاهِ کاشته (کاشتن، پل، نشست‌ها و تاریخچه یک بار) — برای سنجیدنِ
+ *  چند پیکربندیِ سرور بی دوباره‌کاشتن. هر گام: {profile, label?, env?, timeoutMs?, sql?: [...]}. `env` ِ دیگر ⇒ سرور با همان
+ *  env دوباره بالا می‌آید (نمونهٔ «پیرو»: بی پاک کردن و بی کاشتن؛ توکن‌ها و دفترِ بارساز همان)؛ `sql` پیش از گام روی همان
+ *  پایگاه (مثلاً برداشتن/ساختنِ نمایه برای پیش و پس). با `--check` میانِ گام‌ها صف‌ها خالی و دستگاه‌ها تا سر (ثبت نمی‌شود) و
+ *  سنجهٔ درستی یک بار در پایان.
+ */
+const PLAN = arg('--plan') ? JSON.parse(fs.readFileSync(arg('--plan'), 'utf8')) : null;
+//  `--check-each` (با `--plan --check`): سنجهٔ درستی پس از **هر** گام هم (پس از پایان‌دادنِ صف‌ها)، نه فقط در پایان — راه‌اندازیِ دوبارهٔ
+//  ماشین وسطِ اجرای بلند گام‌های سنجیده را بی شاهدِ درستی نمی‌گذارد
+const CHECK_EACH = has('--check-each');
+//  «قطعِ سراسری»: هر دستگاه تا چند ثانیه با درنگِ برنامه دوباره می‌کوشد (`outage` ِ `load-scale.mjs`)؛ پس از آن «نرسیده»
+const OUTAGE_LIMIT_MS = Math.max(10, Number(arg('--outage-limit', 120))) * 1000;
 
 /** بودجه‌ها — پیش از آزمون ثابت (بخشِ ۲۹.۶ بندِ ۵)؛ عوض کردنشان پس از اجرا یعنی سبز کردنِ شکست. */
 export const BUDGET = Object.freeze({
@@ -336,18 +352,28 @@ for (const [k, fn] of Object.entries(kit.SCENARIOS)) {
 // ── زمان‌بندِ بارِ باز ──
 const inflight = new Set();
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-function launch(fn) {
-  if (inflight.size >= MAX_INFLIGHT) { if (rec) { rec.dropped++; (rec.droppedBy ||= {})[rec.phase || 0] = ((rec.droppedBy || {})[rec.phase || 0] || 0) + 1; } return; }
+/** [force]: یورشِ دستگاه‌ها (یکی برای هر دستگاه، پس کران‌دار) سقف را نمی‌گیرد و از آن کم نمی‌کند؛ سقف فقط برای رسیدنِ باز */
+let forced = 0;
+function launch(fn, force = false) {
+  if (!force && inflight.size - forced >= MAX_INFLIGHT) { if (rec) { rec.dropped++; (rec.droppedBy ||= {})[rec.phase || 0] = ((rec.droppedBy || {})[rec.phase || 0] || 0) + 1; } return; }
   const p = Promise.resolve().then(fn).catch((e) => { if (rec) rec.generatorErrors = (rec.generatorErrors || 0) + 1, rec.generatorError ||= String(e && e.stack || e); });
   inflight.add(p);
-  p.finally(() => inflight.delete(p));
+  if (force) forced++;
+  p.finally(() => { inflight.delete(p); if (force) forced--; });
+  if (rec) rec.inflightMax = Math.max(rec.inflightMax || 0, inflight.size);
 }
 async function runPhases(phases) {
   for (const [pi, ph] of phases.entries()) {
     if (rec) rec.phase = pi;
     const next = weighted(ph.mix || MIX);
-    if (ph.stampede === 'outage') for (const d of devices) launch(() => kit.outage(d));
-    else if (ph.stampede) for (const d of devices) launch(async () => { if (d.busy) return; d.busy = true; try { await push(d, true, 'sync3.pushLarge'); await pull(d); } finally { d.busy = false; } });
+    if (ph.stampede === 'outage') {
+      //  همه با هم، ولی هر ۵۰ دستگاه یک نوبت به حلقهٔ رویداد (ساختنِ ۱٬۰۰۰ دسته پشتِ سرِ هم حلقهٔ بارساز را ~۱٫۳ ثانیه می‌گرفت)
+      for (const [i, d] of devices.entries()) {
+        launch(() => kit.outage(d, { limitMs: OUTAGE_LIMIT_MS }), true);
+        if (i % 50 === 49) await new Promise((r) => setImmediate(r));
+      }
+    }
+    else if (ph.stampede) for (const d of devices) launch(async () => { if (d.busy) return; d.busy = true; try { await push(d, true, 'sync3.pushLarge'); await pull(d); } finally { d.busy = false; } }, true);
     const t0 = performance.now();
     let sent = 0;
     for (;;) {
@@ -503,7 +529,7 @@ function evaluate(o, def) {
 }
 const pad = (s, n) => String(s).padStart(n);
 function print(o, fails) {
-  console.log(`\n── ${o.profile} (بارِ ماشین ${o.loadAvgStart[0]} ⇐ ${o.loadAvgEnd[0]}): ${o.durationSec}s، ${o.total.n} درخواست (${o.total.rps}/s)، خطا ${o.total.errors}، جاافتاده ${o.dropped}، تأخیرِ بارساز ≤ ${o.generatorLagMaxMs}ms`);
+  console.log(`\n── ${o.profile} (بارِ ماشین ${o.loadAvgStart[0]} ⇐ ${o.loadAvgEnd[0]}${o.machineLoad1 ? `، کمینه/میانگین/بیشینه ${o.machineLoad1.min}/${o.machineLoad1.mean}/${o.machineLoad1.max}` : ''}): ${o.durationSec}s، ${o.total.n} درخواست (${o.total.rps}/s)، خطا ${o.total.errors}، جاافتاده ${o.dropped}، تأخیرِ بارساز ≤ ${o.generatorLagMaxMs}ms`);
   console.log(`  ${'مسیر'.padEnd(18)} ${pad('n', 6)} ${pad('rps', 6)} ${pad('p50', 7)} ${pad('p95', 7)} ${pad('p99', 7)} ${pad('max', 7)}  خطا`);
   for (const [label, e] of Object.entries(o.endpoints)) {
     console.log(`  ${label.padEnd(18)} ${pad(e.n, 6)} ${pad(e.rps, 6)} ${pad(e.p50, 7)} ${pad(e.p95, 7)} ${pad(e.p99, 7)} ${pad(e.max, 7)}  ${e.errors ? `${e.errors} (${e.firstError})` : '0'}`);
@@ -517,6 +543,15 @@ function print(o, fails) {
     for (const x of o.queries.slice(0, 12)) console.log(`   ${pad(Math.round(x.totalMs), 8)} ${pad(x.calls, 7)} ${pad(x.meanMs, 7)} ${pad(x.maxMs, 7)}  ${x.sql.slice(0, 150)}`);
   }
   if (o.recovery) console.log(`  بازگشت: ${o.recovery.ok ? '✅' : '❌'} ${o.recovery.detail}`);
+  if (o.generator) console.log(`  بارساز: حلقه p99 ${o.generator.loopP99Ms}ms (بیشینه ${o.generator.loopMaxMs})، CPU ${o.generator.cpuPct}%، درخواستِ باز ≤ ${o.generator.inflightMax} (سقف ${o.generator.maxInflight})، مهلتِ کلاینت ${o.generator.timeoutMs}ms`);
+  if (o.burst) {
+    const b = o.burst;
+    console.log(`  قطعِ سراسری: ${b.devices} دستگاه (${b.skippedBusy} سرگرم)، تا سر ${b.drained} (≤۱۰s ${b.within10s}، ≤۳۰s ${b.within30s}، ≤۶۰s ${b.within60s})، نرسیده ${b.notDrained}، دوباره ${b.retries}؛ تخلیه p50 ${b.p50Ms} p95 ${b.p95Ms} بیشینه ${b.maxMs}ms، آخرین دستگاه ${b.lastDrainedAfterMs}ms پس از آغاز`);
+  }
+  for (const [k, g] of Object.entries(o.gate || {})) {
+    if (!g.n) continue;
+    console.log(`  دروازه/${k}: ${g.n} (پذیرفته ${g.admitted}، ۵۰۳ ${g.rejected})؛ انتظارِ دروازه p50 ${g.wait.p50} p95 ${g.wait.p95} بیشینه ${g.wait.max}؛ گرفتنِ اتصال p95 ${g.acquire.p95} بیشینه ${g.acquire.max}؛ اجرا p95 ${g.exec.p95} بیشینه ${g.exec.max}؛ کل p95 ${g.total.p95} بیشینه ${g.total.max}ms؛ کل > ۱۰s ${g.over10s}، > ۱۵s ${g.over15s}`);
+  }
   if (o.steps) {
     console.log(`  پله‌ها (خواسته ⇒ رسیده/s، p95 ِ همه، بدترین مسیر، خطا [+استثنا]، جاافتاده؛ p95 ِ گروه‌ها):`);
     for (const st of o.steps) {
@@ -534,12 +569,22 @@ const plannedCheckouts = (defs) => {
   return defs.reduce((s, d) => s + d.phases.reduce((t, ph) => t + ph.sec * ph.rps * w(ph.mix || MIX), 0), 0) + WARMUP * RATE * w(MIX);
 };
 const groups = new Map();
-for (const name of PROFILES) {
+if (PLAN) {
+  //  همهٔ گام‌ها یک گروه (یک کاشتن)؛ سرورِ نخست با env ِ گامِ نخست
+  const steps = Array.isArray(PLAN) ? PLAN : PLAN.steps;
+  if (!Array.isArray(steps) || !steps.length || INSTANCES > 1) { console.error('--plan: فهرستِ گام‌ها لازم است (و نه با --instances)'); process.exit(2); }
+  groups.set('plan', steps.map((st) => {
+    if (!PROFILE_DEFS[st.profile]) { console.error(`--plan: نمایهٔ ناشناخته ${st.profile}`); process.exit(2); }
+    const def = { name: st.label || st.profile, ...PROFILE_DEFS[st.profile]() };
+    return { ...def, step: { profile: st.profile, env: { ...(def.serverEnv || {}), ...(st.env || {}) }, timeoutMs: st.timeoutMs || null, sql: st.sql || [] } };
+  }));
+} else for (const name of PROFILES) {
   const def = { name, ...PROFILE_DEFS[name]() };
   const key = JSON.stringify(def.serverEnv || {});
   if (!groups.has(key)) groups.set(key, []);
   groups.get(key).push(def);
 }
+const BASE_TIMEOUT = TIMEOUT;
 
 const result = {
   at: new Date().toISOString(),
@@ -556,8 +601,8 @@ let failed = false, invalid = false;
 for (const defs of groups.values()) {
   const checkoutShopsN = CHECKOUT_SHOPS;
   const phonesPerShop = Math.max(3, Math.ceil((plannedCheckouts(defs) * 1.3 + checkoutShopsN * 4) / checkoutShopsN / 9));
-  const serverEnv = { ...(CLUSTER ? { CLUSTER_ENABLED: 1 } : {}), ...(defs[0].serverEnv || {}) };
-  const srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv,
+  const serverEnv = { ...(CLUSTER ? { CLUSTER_ENABLED: 1 } : {}), ...(defs[0].step ? defs[0].step.env : (defs[0].serverEnv || {})) };
+  let srv = startServer({ db: DB, shops: SHOPS, scale: SCALE, smallScale: SMALL_SCALE, checkoutShops: checkoutShopsN, phonesPerShop, serverEnv,
     queryStats: QSTATS, setupPar: SETUP_PAR });
   const tReady = performance.now();
   const ready = await srv.ready;
@@ -566,7 +611,8 @@ for (const defs of groups.values()) {
   const followers = [];
   for (let i = 1; i < INSTANCES; i++) followers.push(startServer({ db: DB, follower: true, serverEnv }));
   bases = [base, ...(await Promise.all(followers.map((f) => f.ready))).map((m) => m.base)];
-  const servers = [srv, ...followers];
+  let servers = [srv, ...followers];
+  let liveEnv = JSON.stringify(serverEnv);
   shops = ready.shops;
   checkoutShops = shops.slice(0, checkoutShopsN);
   storeShops = shops.slice(0, Math.max(STORE_SHOPS, checkoutShopsN));
@@ -590,7 +636,7 @@ for (const defs of groups.values()) {
   //  هر دستگاه نشستِ خودش را دارد (همان برنامهٔ واقعی) — توکنِ یک دستگاه برای دستگاهِ دیگر نیست
   await parallel(devices, async (d) => { d.token = (await login(d.shop, d.id)).accessToken; });
   wstep(`${devices.length} نشستِ دستگاه`);
-  let histOps = 0;
+  let histOps = 0, countLines = 0;
   await parallel(shops, async (sh) => {
     const d = { shop: sh, id: `lh-${sh.index}`, cursor: 0, busy: false, wall: Date.now() - 3_600_000 };
     d.token = (await login(sh, d.id)).accessToken;
@@ -602,8 +648,11 @@ for (const defs of groups.values()) {
     }
     //  واحدهایی که در ۵۰۰ op ِ آخر جا نشدند هم بروند (وگرنه در دفتر «نفرستاده» می‌مانند)
     while (d.queue && d.queue.length) histOps += must(await kit.pushUnits(d, [], 'sync3.pushLarge'), 'تاریخچهٔ v3').ops;
+    //  انبارگردانی‌های بستهٔ پیشین (پس از فروش‌های تاریخچه، با همان دستگاه) — دکانِ ۰، ۱ تا ۹، بقیه
+    const lines = COUNT_HISTORY[sh.index === 0 ? 0 : sh.index < 10 ? 1 : 2];
+    if (lines) { const r = must(await kit.countHistory(d, lines), 'شمارش‌های پیشین'); histOps += r.sent; countLines += r.sent; }
   });
-  wstep(`تاریخچهٔ v3 (${histOps} op)`);
+  wstep(`تاریخچهٔ v3 (${histOps} op، ${countLines} ردیفِ شمارش)`);
   const pullFn = CHECK ? kit.pull : pull;
   await parallel(devices, async (d) => { for (let i = 0; i < 100; i++) { const r = must(await pullFn(d), 'pull ِ آغاز'); if (!r.json.has_more) break; } });
   wstep('همهٔ دستگاه‌ها تا سرِ دفتر');
@@ -619,19 +668,76 @@ for (const defs of groups.values()) {
   if (WARMUP > 0) await runPhases([{ sec: WARMUP, rps: RATE, mix: defs[0].phases[0].mix }]);
   setup.warmupMs = Math.round(performance.now() - tw);
   setup.v3HistoryOps = histOps;
+  setup.countHistoryLines = countLines;
   result.setups.push(setup);
 
+  /** درستی زیرِ بار: صف‌ها خالی، هر دستگاه تا سرِ دفتر، سپس `load-check.js` روی همان پایگاه (درونِ سرورِ آزمون) */
+  async function checkNow(label) {
+    const td = performance.now();
+    const drained = await kit.drain({ par: SETUP_PAR * 2 });
+    //  پوشهٔ موقتِ یکتا (mkdtemp) و ساختنِ انحصاری با ۰۶۰۰: نامِ پیش‌بینی‌پذیر در tmp راهِ symlink است (CodeQL ۲۹۳)
+    const tmpDir = LEDGER_OUT ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'load-ledger-'));
+    const file = LEDGER_OUT || path.join(tmpDir, 'ledger.json');
+    //  کدهای پاسخِ همهٔ نمایه‌ها تا این‌جا (فقط ۵۰۳ ِ کنترل‌شده پذیرفته است)
+    const http = {};
+    for (const o of result.profiles) for (const [lb, e] of Object.entries(o.endpoints)) for (const [c, n] of Object.entries(e.codes)) (http[lb] ||= {})[c] = (http[lb][c] || 0) + n;
+    fs.writeFileSync(file, JSON.stringify({ ...kit.ledger(), http, checkouts: state.checkouts, drained }), tmpDir ? { flag: 'wx', mode: 0o600 } : undefined);
+    const tc = performance.now();
+    const res = await srv.ask({ type: 'check', ledger: file });
+    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
+    const check = { label, drain: { ...drained, ms: Math.round(tc - td) }, checkMs: Math.round(performance.now() - tc), ...(res.check || { ok: false, error: res.error || 'بی پاسخ' }) };
+    result.check = check;
+    (result.checks ||= []).push({ label, ok: check.ok, drain: check.drain, checkMs: check.checkMs, checks: (check.checks || []).map(({ name, ok, detail }) => ({ name, ok, detail })) });
+    console.log(`\n── درستی ${label} (پایان‌دادنِ صف‌ها: ${drained.pushes} push، ${drained.pulls} pull، ${drained.left} مانده، ${check.drain.ms}ms؛ سنجه ${check.checkMs}ms)`);
+    for (const c of check.checks || []) {
+      console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}: ${c.detail}`);
+      if (!c.ok) for (const x of c.samples || []) console.log(`       ${x}`);
+    }
+    if (check.error) console.log(`  ❌ ${check.error}`);
+    if (!check.ok) failed = true;
+    if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));
+  }
+  let stepNo = 0;
   for (const def of defs) {
+    if (def.step) {
+      //  `--plan`: صف‌ها خالی و دستگاه‌ها تا سر پیش از هر گام (جز نخستین)، سپس سرورِ تازه اگر env دیگر است، سپس `sql`
+      if (stepNo++ && CHECK) {
+        if (CHECK_EACH) await checkNow(`پس از «${defs[stepNo - 2].name}»`);
+        else {
+          const td = performance.now();
+          const dr = await kit.drain({ par: SETUP_PAR * 2 });
+          console.log(`  [گام] پایان‌دادنِ صف‌ها پیش از «${def.name}»: ${dr.pushes} push، ${dr.pulls} pull، ${dr.left} مانده، ${Math.round(performance.now() - td)}ms`);
+        }
+      }
+      const env = JSON.stringify(def.step.env);
+      if (env !== liveEnv) {
+        for (const x of servers) {
+          x.child.removeAllListeners('exit');
+          await new Promise((resolve) => { x.child.once('exit', resolve); x.child.send({ type: 'stop' }); setTimeout(() => { x.child.kill('SIGKILL'); resolve(); }, 15000).unref(); });
+        }
+        srv = startServer({ db: DB, follower: true, serverEnv: def.step.env, queryStats: QSTATS });
+        base = (await srv.ready).base;
+        bases = [base];
+        servers = [srv];
+        liveEnv = env;
+        console.log(`  [گام] سرورِ تازه روی همان پایگاه: ${env}`);
+      }
+      for (const sql of def.step.sql) { const r = await srv.ask({ type: 'sql', sql }); if (r.error) throw new Error(`sql ِ گام: ${r.error}`); }
+      TIMEOUT = def.step.timeoutMs || BASE_TIMEOUT;
+    }
     await sleep(1000);
     const samples = [];
     const sampleOnce = async (gc) => {
       const t = rec ? r1((performance.now() - rec.t0) / 1000) : 0;
       const ms = await Promise.all(servers.map((x) => x.ask({ type: 'stats', gc })));
-      ms.forEach((m, inst) => samples.push({ t, ...(servers.length > 1 ? { inst } : {}), ...m.stats }));
+      const load1 = r1(os.loadavg()[0]);   //  بارِ ماشینِ مشترک کنارِ هر نمونه (عددها بی آن معنا ندارند)
+      ms.forEach((m, inst) => samples.push({ t, load1, ...(servers.length > 1 ? { inst } : {}), ...m.stats }));
     };
     await Promise.all(servers.map((x) => x.ask({ type: 'stats' })));   //  پنجرهٔ CPU/حلقه از همین لحظه
     if (QSTATS) await srv.ask({ type: 'qstats', reset: true });
+    await srv.ask({ type: 'gatestats', reset: true });
     genLoop.reset();
+    const genCpu0 = process.cpuUsage(), genT0 = performance.now();
     const loadStart = os.loadavg().map(r1);
     rec = newRec(def.name);
     rec.soak = !!def.soak;
@@ -669,7 +775,15 @@ for (const defs of groups.values()) {
     await sampleOnce(true);
     const o = report(rec, samples);
     o.loadAvgStart = loadStart; o.loadAvgEnd = os.loadavg().map(r1);
+    { const ls = samples.map((x) => x.load1).filter(Number.isFinite); o.machineLoad1 = ls.length ? { min: Math.min(...ls), mean: r1(ls.reduce((a, b) => a + b, 0) / ls.length), max: Math.max(...ls) } : null; }
     o.generatorLoopMaxMs = r1(genLoop.max / 1e6);
+    //  بارسازِ اشباع‌نشده: حلقهٔ رویدادش آزاد (p99) و پردازنده‌اش زیرِ یک هسته — وگرنه زمان‌ها انتظارِ خودِ بارساز است
+    o.generator = { loopP99Ms: r1(genLoop.percentile(99) / 1e6), loopMaxMs: o.generatorLoopMaxMs,
+      cpuPct: Math.round(((({ user, system }) => user + system)(process.cpuUsage(genCpu0))) / 1000 / (performance.now() - genT0) * 100),
+      inflightMax: rec.inflightMax || 0, maxInflight: MAX_INFLIGHT, timeoutMs: TIMEOUT };
+    if (def.phases.some((ph) => ph.stampede === 'outage')) o.burst = kit.burstStats();
+    if (def.step) o.step = def.step;
+    o.gate = (await srv.ask({ type: 'gatestats' })).gate;
     if (!/^pglite:/i.test(DB)) o.dbBytes = (await srv.ask({ type: 'dbsize' })).bytes;
     if (QSTATS) o.queries = (await srv.ask({ type: 'qstats' })).top;
     rec = null;
@@ -682,29 +796,7 @@ for (const defs of groups.values()) {
     print(o, fails);
     if (JSON_OUT) fs.writeFileSync(JSON_OUT, JSON.stringify(result, null, 2));
   }
-  if (CHECK) {
-    //  درستی زیرِ بار: صف‌ها خالی، هر دستگاه تا سرِ دفتر، سپس `load-check.js` روی همان پایگاه (درونِ سرورِ آزمون)
-    const td = performance.now();
-    const drained = await kit.drain({ par: SETUP_PAR * 2 });
-    //  پوشهٔ موقتِ یکتا (mkdtemp) و ساختنِ انحصاری با ۰۶۰۰: نامِ پیش‌بینی‌پذیر در tmp راهِ symlink است (CodeQL ۲۹۳)
-    const tmpDir = LEDGER_OUT ? null : fs.mkdtempSync(path.join(os.tmpdir(), 'load-ledger-'));
-    const file = LEDGER_OUT || path.join(tmpDir, 'ledger.json');
-    //  کدهای پاسخِ همهٔ نمایه‌ها (فقط ۵۰۳ ِ `db_busy` ِ کنترل‌شده پذیرفته است)
-    const http = {};
-    for (const o of result.profiles) for (const [label, e] of Object.entries(o.endpoints)) for (const [c, n] of Object.entries(e.codes)) (http[label] ||= {})[c] = (http[label][c] || 0) + n;
-    fs.writeFileSync(file, JSON.stringify({ ...kit.ledger(), http, checkouts: state.checkouts, drained }), tmpDir ? { flag: 'wx', mode: 0o600 } : undefined);
-    const res = await srv.ask({ type: 'check', ledger: file });
-    if (tmpDir) fs.rmSync(tmpDir, { recursive: true, force: true });
-    const check = { drain: { ...drained, ms: Math.round(performance.now() - td) }, ...(res.check || { ok: false, error: res.error || 'بی پاسخ' }) };
-    result.check = check;
-    console.log(`\n── درستی پس از بار (پایان‌دادنِ صف‌ها: ${drained.pushes} push، ${drained.pulls} pull، ${drained.left} مانده، ${check.drain.ms}ms)`);
-    for (const c of check.checks || []) {
-      console.log(`  ${c.ok ? '✅' : '❌'} ${c.name}: ${c.detail}`);
-      if (!c.ok) for (const x of c.samples || []) console.log(`       ${x}`);
-    }
-    if (check.error) console.log(`  ❌ ${check.error}`);
-    if (!check.ok) failed = true;
-  }
+  if (CHECK) await checkNow('پایان');
   for (const x of [...followers, srv]) {
     x.child.removeAllListeners('exit');
     await new Promise((resolve) => { x.child.once('exit', resolve); x.child.send({ type: 'stop' }); setTimeout(() => { x.child.kill('SIGKILL'); resolve(); }, 15000).unref(); });

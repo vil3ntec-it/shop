@@ -14,6 +14,7 @@ import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { makeReference, syncRowsOf, REFERENCE } from '../../bench/datagen.mjs';
 
 //  خطای کاشتن پارامترهای چندمگابایتی را چاپ نکند — فقط پیام و قید
@@ -87,6 +88,34 @@ function topQueries(n = 40) {
     .map(([sql, e]) => ({ sql, calls: e.calls, totalMs: Math.round(e.totalMs), meanMs: r2(e.totalMs / e.calls), maxMs: r2(e.maxMs), errors: e.errors }));
 }
 
+/*
+ *  زمانِ تراکنش‌های قفل‌دارِ Sync v3 (`lib/sync-v3-gate.js` ⇒ `lockedTx`): انتظار در دروازه (نوبتِ دکان + جای push)، گرفتنِ
+ *  اتصال از استخر پس از دروازه، و اجرا — هر کدام جدا، برای push (`heavy`) و بقیه. فقط سنجه: همان `run` و همان `connect`،
+ *  بی هیچ تغییری در رفتار (کدِ تولید نمی‌داند). `gatestats` در IPC.
+ */
+const inGate = new AsyncLocalStorage();
+const gateTimes = { push: [], other: [] };
+{
+  const origRun = gate.run;
+  gate.run = function run(key, heavy, fn) {
+    const t0 = performance.now();
+    const g = { tIn: 0, acquireMs: 0, acquireFailed: false };
+    const done = () => {
+      const end = performance.now();
+      (heavy ? gateTimes.push : gateTimes.other).push([g.tIn ? g.tIn - t0 : end - t0, g.acquireMs, g.tIn ? end - g.tIn - g.acquireMs : 0, end - t0, g.tIn ? 1 : 0, g.acquireFailed ? 1 : 0]);
+    };
+    return origRun(key, heavy, (o) => { g.tIn = performance.now(); return inGate.run(g, () => fn(o)); }).then((r) => { done(); return r; }, (e) => { done(); throw e; });
+  };
+}
+function gateSummary(xs) {
+  const r1 = (v) => Math.round(v * 10) / 10;
+  const st = (a) => { const s = Float64Array.from(a).sort(); const q = (p) => (s.length ? r1(s[Math.min(s.length - 1, Math.ceil(p * s.length) - 1)]) : null); return { p50: q(0.5), p95: q(0.95), max: s.length ? r1(s[s.length - 1]) : null }; };
+  const adm = xs.filter((x) => x[4]);
+  return { n: xs.length, admitted: adm.length, rejected: xs.length - adm.length, acquireFailed: adm.filter((x) => x[5]).length,
+    wait: st(xs.map((x) => x[0])), acquire: st(adm.map((x) => x[1])), exec: st(adm.map((x) => x[2])), total: st(xs.map((x) => x[3])),
+    over10s: xs.filter((x) => x[3] > 10_000).length, over15s: xs.filter((x) => x[3] > 15_000).length };
+}
+
 const loop = monitorEventLoopDelay({ resolution: 10 });
 loop.enable();
 let cpu0 = process.cpuUsage();
@@ -121,7 +150,7 @@ async function stats({ gc = false } = {}) {
     pool: pool ? { total: pool.totalCount, idle: pool.idleCount, waiting: pool.waitingCount } : null,
     pg: await pgActivity(),
     //  دروازهٔ push ِ v3: منتظر (صفِ دکان + سقفِ push، بی اتصال) و push ِ دارای جا
-    gate: (({ on, waiting, inflight }) => ({ on, waiting, inflight }))(gate.stats()),
+    gate: (({ on, waiting, inflight, rejected, timedOut }) => ({ on, waiting, inflight, rejected, timedOut }))(gate.stats()),
     //  `--instances`: رهبرِ خوشه (کارگرها) و خبرهای گذرگاه
     cluster: cluster.enabled() ? (({ leader, published, received }) => ({ leader, published, received }))(cluster.stats()) : null,
     slowLines,
@@ -139,6 +168,17 @@ step(CFG.follower ? 'نمونهٔ دیگر روی همان پایگاه' : 'پا
 //  همان مهلت‌های `src/index.js` — بی آن keepAliveِ پیش‌فرضِ ۵ثانیه‌ای اتصال‌های بارساز را می‌بُرد
 h.server().keepAliveTimeout = 65_000;
 h.server().headersTimeout = 70_000;
+//  گرفتنِ اتصال درونِ دروازه (همان `pool.connect` ِ promise ِ `db.tx`؛ گونهٔ callback ِ `pool.query` دست نمی‌خورد)
+if (!db.isPglite()) {
+  const pool = db.getPool();
+  const orig = pool.connect.bind(pool);
+  pool.connect = function connect(cb) {
+    const g = inGate.getStore();
+    if (typeof cb === 'function' || !g) return orig(cb);
+    const t0 = performance.now();
+    return orig().then((c) => { g.acquireMs += performance.now() - t0; return c; }, (e) => { g.acquireMs += performance.now() - t0; g.acquireFailed = true; throw e; });
+  };
+}
 if (!CFG.follower) await require(path.join(SERVER, 'src', 'lib', 'sync-v1.js')).syncSchemaTable();
 
 //  کارگرهای پس‌زمینهٔ `index.js` (soak بی آن‌ها نیمه است)؛ هر کدام بی پرچمش تقریباً بیکار است
@@ -311,6 +351,13 @@ process.on('message', async (m) => {
     } else if (m.type === 'qstats') {
       process.send({ type: 'qstats', id: m.id, top: topQueries() });
       if (m.reset) qstats.clear();
+    } else if (m.type === 'gatestats') {
+      process.send({ type: 'gatestats', id: m.id, gate: { push: gateSummary(gateTimes.push), other: gateSummary(gateTimes.other) } });
+      if (m.reset) { gateTimes.push = []; gateTimes.other = []; }
+    } else if (m.type === 'sql') {
+      //  `--plan`: پیش از گام روی همین پایگاهِ آزمون (نامش test/bench دارد؛ `load-test.mjs`)، مثلاً برداشتن/ساختنِ نمایه
+      for (const q of [].concat(m.sql)) await db.query(q);
+      process.send({ type: 'sql', id: m.id, ok: true });
     } else if (m.type === 'check') {
       //  درستی زیرِ بار (`scripts/load-check.js`): دفترِ بارساز در برابرِ همین پایگاه (PGlite ِ در حافظه هم فقط از این‌جا دیده می‌شود)
       const ledger = JSON.parse(fs.readFileSync(m.ledger, 'utf8'));
