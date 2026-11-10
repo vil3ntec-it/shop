@@ -147,6 +147,10 @@ await E.step('E2E-PCK-06.4', 'مشتری تا پایانِ مهلت جواب ن�
   //  گذشتِ مهلت (بی خواب): مهلتِ ثبت‌شده به گذشته
   await db.query('UPDATE order_pick_substitutions SET deadline_at = $2 WHERE id = $1', [p.substitution.id, Date.now() - 1000]);
   const { page } = C;
+  //  ⚠️ همان صفحه هنوز پیگیریِ سفارشِ اول است و تفاوتِ دو نشانی فقط در `#…` است ⇒ `goto` همان سند را نگه می‌داشت و
+  //  `#o-subs` ِ سفارشِ اول (پذیرفته، بی دکمه) همان دم «دیده» و خوانده می‌شد، پیش از رسیدنِ پاسخِ سفارشِ دوم. مشتری لینکِ
+  //  سفارشِ دوم را تازه باز می‌کند ⇒ سندِ تازه: `#o-subs` فقط با پاسخِ همین سفارش پیدا می‌شود.
+  await page.goto('about:blank');
   await page.goto(`${E.apiBase}/store/${SLUG}#/o/${encodeURIComponent(second.token)}`);
   await page.waitForSelector('#o-subs:not([hidden])', { timeout: 15_000 });
   assert.equal(await page.locator('#o-sub-list button').count(), 0, 'پس از مهلت دکمه نیست');

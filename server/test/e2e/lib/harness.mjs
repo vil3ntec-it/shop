@@ -149,7 +149,11 @@ class Harness {
     this._browser = null;
     this._seq = 0;
     this._failedIds = new Set();
+    this._onFinish = [];
   }
+
+  /** کارِ پایان (پیش از بستنِ دیتابیس)؛ مثلاً انداختنِ دیتابیسِ بازیابیِ `restore-copy.mjs` */
+  onFinish(fn) { this._onFinish.push(fn); }
 
   /* ════════════════════════ HTTP (بیرون از برنامه: مدیر، مشتری) ════════════════════════ */
 
@@ -326,6 +330,7 @@ class Harness {
   async finish() {
     for (const pg of this.pages) await pg.ctx.close().catch(() => {});
     if (this._browser) await this._browser.close().catch(() => {});
+    for (const fn of this._onFinish) await Promise.resolve().then(fn).catch((e) => console.error(`پایان: ${e.message}`));
     this.outbox.stop();
     //  همان خاموشیِ `src/index.js`: رهبری و گذرگاه (اگر خوشه است)، استخرِ نسخهٔ خواندنی (اگر هست)
     await this.cluster.stop().catch(() => {});

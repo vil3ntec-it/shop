@@ -1,31 +1,25 @@
 /**
  * «سرورِ بازیابی‌شده و صفِ اعلان» — فرایندِ جدا برای `notify.e2e.mjs` (NOTIF-08).
  *
- * همان راهِ `restored-server.mjs` (و پیامِ `backup.restore` برای PGlite): پوشهٔ دیتابیسِ خالی،
- * فایلِ پشتیبانِ رمزگشایی‌شده با `PGlite.create({ loadDataDir })`، سپس سرور روی همان پوشه. این‌جا
- * کارگرِ اعلان دستی می‌چرخد تا ترتیب قطعی باشد:
+ * همان راهِ `restored-server.mjs`: پشتیبان پیش‌تر در محیطِ جدا برگشته است (`restore-copy.mjs`: پوشهٔ PGlite یا
+ * دیتابیسِ تازهٔ PostgreSQL)، سپس سرور روی همان دیتابیس. این‌جا کارگرِ اعلان دستی می‌چرخد تا ترتیب قطعی باشد:
  *   ۱) حالِ دفتر و صف همان لحظهٔ بازیابی؛
  *   ۲) دو دورِ کارگر (دومی نباید چیزی بفرستد)؛
  *   ۳) مشتری همان «ثبت» را با همان کلیدِ یکتایی و همان بلیت دوباره می‌زند (برگشتِ شبکه)؛
  *   ۴) یک دورِ دیگرِ کارگر و حالِ پایانی.
  * پوش به هیچ سرویسی نمی‌رود (`push.setDeliver`)؛ پیام‌ها در گزارش می‌آیند.
  *
- *   node restored-notify.mjs <پوشهٔ دیتابیس> <فایلِ tar.gz> <ورودیِ JSON>
+ *   node restored-notify.mjs <DATABASE_URL ِ بازیابی‌شده> <ورودیِ JSON>
  *   ⇐ روی stdout یک خط: REPORT {…}
  */
 import { createRequire } from 'node:module';
 import fs from 'node:fs';
 
 const require = createRequire(import.meta.url);
-const [dir, tarGz, inputFile] = process.argv.slice(2);
+const [url, inputFile] = process.argv.slice(2);
 const input = JSON.parse(fs.readFileSync(inputFile, 'utf8'));
-const { PGlite } = require('@electric-sql/pglite');
 
-const blob = new File([fs.readFileSync(tarGz)], 'restore.tar.gz', { type: 'application/x-gzip' });
-const lite = await PGlite.create(dir, { loadDataDir: blob });
-await lite.close();
-
-Object.assign(process.env, { DATABASE_URL: `pglite:${dir}`, BACKUP_ENABLED: 'false' });
+Object.assign(process.env, { DATABASE_URL: url, BACKUP_ENABLED: 'false' });
 const { createApp } = require('../../../src/app');
 const db = require('../../../src/db');
 const push = require('../../../src/lib/push');
