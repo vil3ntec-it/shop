@@ -164,6 +164,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.doc_chain', scope: 'shop', default: false, what: 'زنجیرهٔ هشِ اسنادِ مالیِ هر سریِ دستگاه و لنگرِ سابقهٔ دستگاه (SEC-02)' },
   { key: 'shop.device_cap', scope: 'shop', default: false, what: 'سقفِ دستگاهِ اشتراک برای دستگاهِ ثبت‌شده هم: بیرون از n ِ اول ⇒ بی مجوز (جز دستگاهِ خودِ صاحب)' },
   { key: 'shop.license_offline_30d', scope: 'shop', default: false, what: 'مجوزِ ۳۵ روزه به‌جای ده روز تا دستگاهِ بی اینترنت ۳۰ روز بفروشد (SYN-01)؛ هرگز پس از پایانِ اشتراک' },
+  { key: 'shop.sale_tax', scope: 'shop', default: false, what: 'مالیاتِ فاکتور در صندوقِ برنامه (POS-37، D-11): نرخ و حالتِ «فاکتور/ردیف» را خودِ دکان در تنظیمات می‌گذارد؛ سرور مالیاتِ ثبت‌شده را در سقفِ تخفیف می‌شمارد' },
   { key: 'shop.price_cap', scope: 'shop', default: false, what: 'سقفِ تغییرِ قیمتِ ردیف و «تخفیفِ پنهان» ِ کارمند در سرور (`sales.price`، STF-03)؛ قلمِ آزاد (`sales.free_line`) و قیمتِ عمده فقط برای مشتریِ لیستِ عمده (تصمیمِ ۱-۱۱)' },
   { key: 'shop.promo_uses', scope: 'shop', default: false, what: 'دفترِ مصرفِ کدِ تخفیف و سقفِ `maxUses` در سرور (PRM-02)' },
   { key: 'shop.promo_expiry', scope: 'shop', default: false, what: 'قاعدهٔ «تخفیفِ نزدیکِ انقضا» (PRM-10)' },

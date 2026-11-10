@@ -18,6 +18,7 @@ const PRICE = 'sales.price';
 const FREE_LINE = 'sales.free_line';
 const CREDIT = 'sales.credit';
 const PRICE_FLAG = 'shop.price_cap';
+const TAX_FLAG = 'shop.sale_tax';
 const CREDIT_FLAG = 'shop.credit_cap';
 const ROUND_MAX_MINOR = 500;
 const TOL_MINOR = 100;
@@ -101,12 +102,16 @@ function line(l, p, date, wholesale = true) {
   }
 }
 
-/** `finalTotalMinor` null ⇒ نامعلوم، بی شکاف */
-function basis(discountMinor, totalMinor, finalTotalMinor, roundingMinor, reductionMinor) {
+/**
+ * `finalTotalMinor` null ⇒ نامعلوم، بی شکاف. POS-37: `taxMinor` (مالیاتِ ثبت‌شدهٔ فاکتور؛ فقط با پرچمِ `shop.sale_tax`،
+ * وگرنه ۰ و همان امروز) بخشی از نهاییِ «باید» است: مالیاتِ ادعاشده‌ای که در نهایی نیامد همان تخفیفِ پنهان است.
+ */
+function basis(discountMinor, totalMinor, finalTotalMinor, roundingMinor, reductionMinor, taxMinor = 0) {
   const d = Math.max(0, int(discountMinor));
   const s = Math.max(0, int(totalMinor));
   const r = Math.min(ROUND_MAX_MINOR, Math.max(-ROUND_MAX_MINOR, int(roundingMinor)));
-  const gap = finalTotalMinor === null || finalTotalMinor === undefined ? 0 : Math.max(0, s - d + r - int(finalTotalMinor));
+  const t = Math.max(0, int(taxMinor));
+  const gap = finalTotalMinor === null || finalTotalMinor === undefined ? 0 : Math.max(0, s - d + r + t - int(finalTotalMinor));
   const red = Math.max(0, int(reductionMinor));
   return { discountMinor: d + red + gap, baseMinor: s + red, reductionMinor: red, gapMinor: gap };
 }
@@ -183,7 +188,7 @@ function needs(sale, list, refs, { enforcePrice = false, enforceCredit = false }
   const sum = enforcePrice ? lines(list, refs, sale.date || '', sale.loyaltyMinor, sale.wholesale === true)
     : { maxDeviationBp: 0, reductionMinor: 0, freeUnitMaxMinor: -1 };
   const b = enforcePrice
-    ? basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor)
+    ? basis(sale.discountMinor, sale.totalMinor, sale.finalTotalMinor, sale.roundingMinor, sum.reductionMinor, sale.taxMinor)
     : { discountMinor: int(sale.discountMinor), baseMinor: int(sale.totalMinor) };
   if (b.discountMinor > 0) out.push({ perm: DISCOUNT, doc, pctBp: discountBp(b.discountMinor, b.baseMinor), amount: b.discountMinor });
   if (enforcePrice && sum.maxDeviationBp > 0) out.push({ perm: PRICE, doc, pctBp: sum.maxDeviationBp, amount: null });
@@ -235,14 +240,15 @@ function lineOf(f, { legacy = false } = {}) {
 /**
  * سرِ فاکتور ⇒ فاکتورِ هسته؛ تاریخ = `date` ِ فاکتور (روزِ دستگاه، همان بازهٔ قیمتِ صندوق). `wholesale` = لیستِ فاکتور عمده
  * است (مشتریِ فاکتور روی **همین سرور** لیستِ پیش‌فرضِ عمده دارد — `priceListOf`)؛ ادعای صندوق پذیرفته نمی‌شود.
+ * `taxOn` (POS-37، پرچمِ `shop.sale_tax` ِ همین دکان): فقط آن‌گاه `taxMinor` ِ فاکتور (به پول در هر دو راه، مثلِ گرد) شمرده می‌شود.
  */
-function saleOf(id, f, { legacy = false, priorDebtMinor = 0, loyaltyMinor = 0, wholesale = false } = {}) {
+function saleOf(id, f, { legacy = false, priorDebtMinor = 0, loyaltyMinor = 0, wholesale = false, taxOn = false } = {}) {
   const m = (k) => (legacy ? int(Number(f[k]) * 100) : int(f[`${k}Minor`]));
   const fin = legacy ? f.finalTotal : f.finalTotalMinor;
   return {
     id, totalMinor: m('total'), discountMinor: m('discount'),
     finalTotalMinor: fin === undefined || fin === null || !Number.isFinite(Number(fin)) ? null : m('finalTotal'),
-    roundingMinor: int(f.roundingMinor), debtGivenMinor: m('debtGiven'),
+    roundingMinor: int(f.roundingMinor), taxMinor: taxOn === true ? Math.max(0, int(f.taxMinor)) : 0, debtGivenMinor: m('debtGiven'),
     date: typeof f.date === 'string' ? f.date : '', priorDebtMinor, loyaltyMinor, wholesale: wholesale === true,
   };
 }
@@ -253,7 +259,7 @@ function isWholesaleDebtor(data) {
 }
 
 module.exports = {
-  VERSION: 1, DISCOUNT, PRICE, FREE_LINE, CREDIT, PRICE_FLAG, CREDIT_FLAG, ROUND_MAX_MINOR, TOL_MINOR, FULL_BP,
+  VERSION: 1, DISCOUNT, PRICE, FREE_LINE, CREDIT, PRICE_FLAG, CREDIT_FLAG, TAX_FLAG, ROUND_MAX_MINOR, TOL_MINOR, FULL_BP,
   creditAmount, gross, refUnits, line, basis, split, loyaltyShares, isFree, lines, needs, req, refOf, lineOf, saleOf, isWholesaleDebtor,
   LOYALTY_SPEND: 'loyalty_spend',
 };

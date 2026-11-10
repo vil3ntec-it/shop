@@ -176,7 +176,7 @@ object ScanCashRun {
     val plan = ScanCashSale.plan(d, pending, gate) { CommandCard.parse(it, key) }
     if (plan.record.isEmpty() && plan.hold.isEmpty() && plan.drop.isEmpty()) return@withLock
 
-    val till = ScanCashSale.Till(TillUser.me(app), CashRoundPref.step(app), ShopPolicy.blockExpired(app))
+    val till = ScanCashSale.Till(TillUser.me(app), CashRoundPref.step(app), ShopPolicy.blockExpired(app), ir.vil3ntec.tohid.data.SaleTaxPref.active(app))
     val series = runCatching { ir.vil3ntec.tohid.sync.DocSeries.current(app) }.getOrDefault("")
     val taken = LinkedHashSet(plan.drop)
     var recorded = 0

@@ -243,6 +243,22 @@ test('پول: مقدارِ درست با پولِ بیش از قلم رد؛ گر
   assert.equal((await push1(owner, 'own-b', ret1('nototal-b', 's-nototal', 'si-nototal', 1, 0))).body.results[0].reason, 'return_exceeds_sold');
 });
 
+test('POS-37: برگشتِ کاملِ قلمِ فاکتورِ مالیات‌دار سهمِ مالیاتِ همان قلم را هم پس می‌دهد — بیشتر نه (v3 و v1)', async () => {
+  //  جمعِ ۱۰۰۰ افغانی + ۱۰٪ مالیات = ۱۱۰۰؛ برگشتِ کامل ۱۱۰۰ می‌نشیند (پیش از رفع: return_exceeds_sold)، ۱۱۰۲ نه
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', sale3('s3-tax', 'si3-tax', 2000, 100000, { taxMinor: 10000, finalTotalMinor: 110000 }))), ['applied', 'applied']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3tax-over', 's3-tax', 'si3-tax', 2000, 110200))),
+    ['rejected:return_exceeds_sold', 'rejected:tx_rejected', 'rejected:tx_rejected']);
+  assert.deepEqual(statuses(await push3(owner, 'own3-a', ret3('3tax-full', 's3-tax', 'si3-tax', 2000, 110000))), ['applied', 'applied', 'applied']);
+  //  v1: مبلغ به افغانی، `taxMinor` به پول (مثلِ گرد)
+  const t = ts();
+  await push1(owner, 'own-a', [v1('sales', 's-tax1', { total: 500, discount: 0, finalTotal: 550, taxMinor: 5000, createdAt: t }, t),
+    v1('saleItems', 'si-tax1', { saleId: 's-tax1', productId: 'p-oil', quantity: 1, unitPrice: 500, totalPrice: 500 }, t)]);
+  assert.equal((await push1(owner, 'own-a', ret1('tax1-full', 's-tax1', 'si-tax1', 1, 550))).body.results[0].status, 'applied');
+  //  فاکتورِ بی مالیات همان سقفِ پیشین
+  assert.equal(cap.paidRatio(1000, 100), cap.paidRatio(1000, 100, 0));
+  assert.equal(cap.paidRatio(1000, 0, 100), 1.1);
+});
+
 /* ═══════════════════════════════ ④ ═══════════════════════════════ */
 
 test('تلاشِ دوباره: همان op دو بار ⇒ «تکراری»، یک بار شمرده؛ همان ردیف با op ِ تازه هم یک بار', async () => {

@@ -53,6 +53,7 @@ const LABELS = Object.freeze({
   tendered: 'دریافتی', change: 'پولِ پس', remaining: 'باقی‌مانده (نسیه)',
   cash: 'نقدی', credit: 'نسیه', online: 'آنلاین', item: 'کالا',
   rounding: 'گردکردنِ نقدی',
+  tax: 'مالیات',
 });
 
 const gone = () => notFound(NOT_YET, 'receipt_not_found');
@@ -265,6 +266,9 @@ function render({ sale, items, products, profile, tz, stamp = false }) {
   if (Number.isSafeInteger(rounding) && rounding !== 0) {
     view.rounding = { label: LABELS.rounding, amount: (rounding < 0 ? '−' : '+') + money(Math.abs(rounding) / 100) };
   }
+  //  POS-37: ردیفِ مالیاتِ فاکتور (`taxMinor`، به پول)؛ بی مالیات ⇒ کلیدی نیست و همان پاسخِ پیشین
+  const tax = sale.taxMinor;
+  if (Number.isSafeInteger(tax) && tax > 0) view.tax = { label: LABELS.tax, amount: '+' + money(tax / 100) };
   const note = noteOf(sale.note);
   if (note) view.note = note;
   return view;

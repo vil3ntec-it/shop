@@ -377,7 +377,7 @@ fun DeskSaleScreen(
     debtorId = cartDebtorId,
     blockExpired = blockExpired,
     rules = checkoutRules,
-    cashRounding = cashStep,
+    cashRounding = cashStep, tax = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }, // POS-37: خاموش ⇒ null
   )
   val totals = SalesEngine.totals(d, loyal, checkout)
   //  PAY-09: نقدِ کاملِ پرداختِ ساده ⇒ ردیفِ گرد و «قابلِ پرداخت» با آن (همان حسابِ `SalesEngine.record`)

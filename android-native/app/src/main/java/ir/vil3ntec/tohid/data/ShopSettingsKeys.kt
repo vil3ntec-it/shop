@@ -100,6 +100,9 @@ object ShopSettingsKeys {
     shop("tax_quarter_due_months", "i"),
     shop("tax_quarter_due_day", "i"),
     shop("tax_quarter_remind_days", "i"),
+    shop("sale_tax", "s"),                      // POS-37: مالیاتِ فاکتور («invoice»/«line»، `SaleTaxPref`)
+    shop("sale_tax_bp", "i"),
+    shop("sale_tax_rates", "set"),
     shop("day_end_hour", "i"),                  // ShopDayChoice: پایانِ روزِ کاری (گزارش‌ها)
     shop("week_start", "i"),                    // ShopDayChoice: آغازِ هفتهٔ دکان (LOC-03)
     shop("closed_days", "s"),                   // ShopDayChoice: روزهای تعطیلِ هفتگی (LOC-03)

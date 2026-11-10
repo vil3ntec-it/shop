@@ -34,7 +34,7 @@ test('مبلغِ ردیف و قیمت‌های فهرست', () => {
 test('سنجشِ ردیف، پایهٔ تخفیف و نیازهای فاکتور', () => {
   assert.ok(V.lines.length >= 15 && V.needs.length >= 8);
   for (const r of V.lines) assert.deepEqual(C.line(r.line, r.product, r.date, r.wholesale !== false), r.out, r._);
-  for (const r of V.basis) assert.deepEqual(C.basis(r.discount, r.total, r.final, r.rounding, r.reduction), r.out, JSON.stringify(r));
+  for (const r of V.basis) assert.deepEqual(C.basis(r.discount, r.total, r.final, r.rounding, r.reduction, r.tax), r.out, JSON.stringify(r));
   for (const r of V.needs) {
     assert.deepEqual(C.needs(r.sale, r.lines, r.refs, { enforcePrice: r.enforcePrice, enforceCredit: r.enforceCredit }), r.out, r._);
   }

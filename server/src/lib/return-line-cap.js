@@ -24,7 +24,7 @@
  *
  * ماندهٔ قلم همان `ReturnCap` ِ core است (`core/.../money/ReturnCap.kt`؛ بردار: `license/test-vectors/return-cap-v1.json`):
  *   مقدار  فروخته − برگشته
- *   پول    round(جمعِ قلم × سهمِ پرداخت) افغانی − پس‌داده، به‌اضافهٔ نیم افغانی برای هر ردیف (برنامهٔ پیش از #586 هر
+ *   پول    round(جمعِ قلم × سهمِ پرداخت (+ سهمِ مالیاتِ فاکتور، POS-37)) افغانی − پس‌داده، به‌اضافهٔ نیم افغانی برای هر ردیف (برنامهٔ پیش از #586 هر
  *          برگشت را جدا گرد می‌کرد) و گردِ نقدیِ مثبتِ فاکتور (`roundingMinor`، PAY-09)
  * فاکتورِ لغوشده چیزی برای برگشت ندارد (لغو همه را برگرداند). برگشتِ بی قلم (بی رسید)، و قلمی که سرور ندارد (نه در
  * دفتر، نه در همین دسته) سنجیده نمی‌شود. ردیفِ برگشتی که در یکی از دفترها حذف یا لغو شده شمرده نمی‌شود.
@@ -66,9 +66,13 @@ function capMinor(lineTotal, paidRatio) {
   return Math.max(0, Math.round(lineTotal * paidRatio)) * 100;
 }
 
-/** همان `SalesEngine.paidRatio` ِ برنامه */
-function paidRatio(total, discount) {
-  return total > 0 && discount > 0 ? Math.min(1, Math.max(0, (total - discount) / total)) : 1;
+/**
+ * همان `SalesEngine.paidRatio` ِ برنامه. POS-37: مالیاتِ فاکتور (`taxMinor`، همان واحدِ `total`) هم سهمی از هر قلم است ⇒
+ * سهم بیش از ۱؛ فاکتورِ بی مالیات بیت‌به‌بیت همان.
+ */
+function paidRatio(total, discount, tax = 0) {
+  const base = total > 0 && discount > 0 ? Math.min(1, Math.max(0, (total - discount) / total)) : 1;
+  return total > 0 && tax > 0 ? base + tax / total : base;
 }
 
 /** prior: [{qtyMilli, amountMinor}] */
@@ -122,7 +126,8 @@ function factsOf(item, sale, v3) {
   const sold = v3 ? num(item.quantityMilli) : num(item.quantity);
   if (sold === null) return null;
   const total = v3 ? num(item.totalPriceMinor) : num(item.totalPrice);
-  const ratio = v3 ? paidRatio(int(s.totalMinor), int(s.discountMinor)) : paidRatio(num(s.total) || 0, num(s.discount) || 0);
+  const tax = Math.max(0, int(s.taxMinor));   //  POS-37: به پول در هر دو راه (مثلِ گرد)
+  const ratio = v3 ? paidRatio(int(s.totalMinor), int(s.discountMinor), tax) : paidRatio(num(s.total) || 0, num(s.discount) || 0, tax / 100);
   return {
     sale: str(item.saleId), soldMilli: v3 ? Math.round(sold) : milli(sold),
     capMinor: total === null ? null : capMinor(v3 ? total / 100 : total, ratio),

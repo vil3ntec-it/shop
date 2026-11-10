@@ -421,5 +421,6 @@ internal fun RouteScope.AutoFeesScreen(onBack: (() -> Unit)?) {
       }
       if (saved) SettingsNote(StrSale.feesSaved)
     }
+    item(key = "sale-tax") { SaleTaxSection(d) } // POS-37: مالیاتِ فاکتور، همان «افزوده به فاکتور»
   }
 }

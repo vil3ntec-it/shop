@@ -123,6 +123,8 @@
     (r.included || []).forEach(function (d) { row(totals, d.label, d.amount); });
     r.discounts.forEach(function (d) { row(totals, d.label, '−' + d.amount); });
     //  PAY-09: گردکردنِ نقدی — ردیفِ جدا با علامت (مبلغِ نهایی همین حالا آن را دارد)
+    //  POS-37: مالیاتِ فاکتور — پیش از گرد، همان ترتیبِ حساب (جمع − تخفیف + مالیات + گرد)
+    if (r.tax) row(totals, r.tax.label, r.tax.amount);
     if (r.rounding) row(totals, r.rounding.label, r.rounding.amount);
     row(totals, MSG.total, r.total, 'is-total');
 

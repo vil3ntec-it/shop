@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/missing-1` (ردیف‌های MISSING: POS-37؛ روی `ccr-…-batch-47` ‏96053218a؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: POS-37 ⇐ PARTIAL — مالیاتِ فاکتور پشتِ پرچمِ خاموشِ `shop.sale_tax` و تنظیمِ دکانِ `tohid-policy:sale_tax*` (بی نرخِ پیش‌فرض، D-11):
+  هستهٔ `core/sale/SaleTax` + هم‌زادِ `license/sale-tax.js` + بردارِ `sale-tax-v1.json` («فاکتور» یا «ردیف» با نرخِ هر کالا)، `Sale.taxMinor`،
+  `SalesEngine.totals` ⇐ `SaleTaxWiring.totals`، ردیفِ «مالیات» در برگهٔ پرداخت/خلاصهٔ صندوق/رسید (`StrSaleTax`، `ReceiptLayout`)، برگشت
+  با سهمِ مالیات (`paidRatio` = `return-line-cap.paidRatio`)، بخشِ تنظیم در صفحهٔ «هزینهٔ خودکار»؛ سرور: `SALE_FIXED`، `verify-data`، پایهٔ
+  تخفیفِ `sale-caps`/`SaleCaps` فقط با پرچم (+ بردار)، فاکتورِ عمومی، `saleTax` در `/shop/stock-ledger/config`؛ ردیفِ `s-tax` در
+  `ledger-sync-v1.json` (s-full دست نخورد ⇒ `resend-dropped-v1.json` همان). ۱۳ مجموعه ۱۲۶/۱۲۶ روی PGlite و PostgreSQL ۱۶ (تازه‌ها پیش از کد
+  سرخ)؛ FLAGS-ON §۱۹، OWNER-PENDING ۴-۶. PUR-11 ساخته نشد: D-15 «الف» ِ گرفته‌شده (تا دکانِ واقعی نخواهد؛ PR ‏#784 پیش‌نویس).
+- نیمه‌کاره: Kotlin فقط CI (`SaleTaxVectorsTest`، `SaleTaxFlowTest`، `SaleCapsVectorsTest`، `LedgerSyncCoverageTest`، کامپایلِ
+  `SaleTaxSectionAndroid`/`CheckoutRoute`/`DeskSale`)؛ اگر سرخ شد همان پرونده‌ها. گزارش‌ها (سود، X/Z، `QuarterTax`) مالیات را جدا نمی‌کنند.
+- قدمِ بعدی: CI ِ این شاخه؛ جدا کردنِ مالیات در `report-core` (سه هم‌زاد + `report-v1.json`)؛ PUR-11 فقط اگر صاحب‌کار D-15 را «ب» کند (#784).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ci-evidence-1` (شاهدِ CI ِ ردیف‌های ردهٔ D؛ روی `ccr-…-batch-47` ‏96053218؛ فقط سند؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: لاگِ کاملِ push ِ سبزِ main ‏5ef491d97 (#1029) خوانده شد — «سرور» 42838745057 (PostgreSQL ۴۰۰۳ سبز، PGlite و Electron هر کدام ۳۹۹۰ آزمون، همه ۰ شکست؛
   مرورگر ۱۷۸۲ ✅ / ۰ ❌؛ E2E همه ✅)، «کامپایل و آزمون» 129907899978 (۵۵۵۲ PASS)، «ساخت نسخهٔ بومی» 129907898914 (۶۹۷۴ PASS)، برنامهٔ خرید ۳۰ PASS؛ هیچ FAIL.

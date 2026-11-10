@@ -110,6 +110,7 @@ fun CheckoutDialog(
     //  نامِ حسابِ واردشده — گزارشِ «فروشِ هر کاربر» از همین می‌خواند
     seller = remember { ir.vil3ntec.tohid.data.TillUser.me(context) }, // S46: کاربرِ صندوق؛ خاموش ⇒ همان نامِ حساب
     cashRounding = remember { ir.vil3ntec.tohid.data.CashRoundPref.step(context) }, // PAY-09، پیش‌فرض خاموش
+    tax = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }, // POS-37، پیش‌فرض خاموش
   )
   val totals = SalesEngine.totals(d, cart, checkout)
 

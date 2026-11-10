@@ -60,6 +60,8 @@ object ScanCashSale {
     val cashRounding: Long,
     /** `ShopPolicy.blockExpired` */
     val blockExpired: Boolean,
+    /** POS-37: `SaleTaxPref.active` (پرچمِ سرور و تنظیمِ دکان)؛ `null` ⇒ بی مالیات، همان امروز */
+    val tax: ir.vil3ntec.tohid.core.sale.SaleTax.Config? = null,
   )
 
   /**
@@ -100,6 +102,7 @@ object ScanCashSale {
     blockExpired = till.blockExpired,
     cashRounding = till.cashRounding,
     note = note,
+    tax = till.tax, // POS-37
   )
 
   /**
