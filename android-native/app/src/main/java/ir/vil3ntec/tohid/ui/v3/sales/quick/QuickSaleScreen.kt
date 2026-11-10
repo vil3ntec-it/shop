@@ -144,7 +144,7 @@ fun QuickSaleScreen(
             PhoneTile(
               item,
               onTap = {
-                val q = CatalogModel.query(query)
+                val q = CatalogModel.query(query, d)
                 if (q.count != 1.0) { actions.tapCount(it.id, q.count); query = "" } else actions.tap(it.id, it.weighed)
               },
               onHold = { actions.hold(it.id) },

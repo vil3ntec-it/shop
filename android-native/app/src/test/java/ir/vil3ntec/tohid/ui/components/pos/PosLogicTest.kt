@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.ui.components.pos
 import ir.vil3ntec.tohid.core.keymap.KeyName
 import ir.vil3ntec.tohid.data.CartQuery
 import ir.vil3ntec.tohid.data.Product
+import ir.vil3ntec.tohid.data.ProductPack
 import ir.vil3ntec.tohid.data.SalesEngine
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.data.ShopStore
@@ -92,9 +93,12 @@ class PosLogicTest {
 
   /* ---------------- Enter در کادر ---------------- */
 
-  private fun resolve(d: ShopData, query: String, hint: Int = 0): PosHit {
-    val term = CartQuery.parse(query).term.trim()
-    return PosSearch.resolve(query, ShopStore.barcodeIndex(d), d.products, PosCatalog.matches(d.products, term), hint)
+  /** همان `DeskSaleScreen`: پیشنهادها از بخشِ پس از پیشوندِ `PosSearch.parse`، سپس Enter */
+  private fun resolve(d: ShopData, query: String, hint: Int = 0, packs: Boolean = false): PosHit {
+    val index = ShopStore.barcodeIndex(d)
+    val packIndex = if (packs) ShopStore.packIndex(d) else null
+    val term = PosSearch.parse(query, index, packIndex).term.trim()
+    return PosSearch.resolve(query, index, d.products, PosCatalog.matches(d.products, term), hint, packIndex)
   }
 
   @Test
@@ -114,6 +118,36 @@ class PosLogicTest {
     assertEquals(PosHit.Unknown("999"), resolve(d, "999"))
     assertEquals(PosHit.None, resolve(d, "   "))
     assertEquals(PosHit.None, resolve(d, "4*"))
+  }
+
+  @Test
+  fun `Enter — متنی که خودش بارکدِ کالاست («12x34») همان کالا است، نه دوازده تا از کالای «34»`() {
+    val battery = Product(id = "b1", name = "باتری", unit = "عدد", salePrice = 40.0, barcodes = listOf("12x34"))
+    val p34 = Product(id = "b2", name = "پیچ", unit = "عدد", salePrice = 2.0, barcodes = listOf("34"))
+    val d = ledger().copy(products = ledger().products + battery + p34)
+    //  پیش از این پیشوند اول خوانده می‌شد ⇒ Add(p34, 12.0)
+    assertEquals(PosHit.Add(battery, 1.0), resolve(d, "12x34"))
+    assertEquals(PosHit.Add(battery, 1.0), resolve(d, " 12x34 "))
+    assertEquals(PosHit.Add(battery, 1.0), resolve(d, "۱۲x۳۴"))
+    //  پیشوند پیش از همان بارکد هنوز شمار است
+    assertEquals(PosHit.Add(battery, 2.0), resolve(d, "2*12x34"))
+    //  بارکدی که کالایی ندارد ⇒ همان پیشوند
+    assertEquals(PosHit.Add(p34, 12.0), resolve(d, "12X34"))
+    assertEquals(PosHit.Add(p34, 5.0), resolve(d, "5x34"))
+    //  شبکهٔ پیشنهادها و «بسته» همان متن را می‌خوانند
+    assertEquals(CartQuery.Parsed(1.0, "12x34"), PosSearch.parse("12x34", ShopStore.barcodeIndex(d)))
+    assertEquals(CartQuery.Parsed(12.0, "35"), PosSearch.parse("12x35", ShopStore.barcodeIndex(d)))
+  }
+
+  @Test
+  fun `Enter — بارکدِ کاملِ بسته هم بر پیشوند پیش است («6x10» یک کارتن)`() {
+    val bolt = Product(id = "k1", name = "پیچِ کارتنی", unit = "عدد", salePrice = 3.0, barcodes = listOf("777001"), packs = listOf(ProductPack("کارتن", 6_000, listOf("6x10"))))
+    val p10 = Product(id = "k2", name = "میخ", unit = "عدد", salePrice = 1.0, barcodes = listOf("10"))
+    val d = ledger().copy(products = ledger().products + bolt + p10)
+    assertEquals(PosHit.Add(bolt, 6.0), resolve(d, "6x10", packs = true))
+    assertEquals(PosHit.Add(bolt, 12.0), resolve(d, "2*6x10", packs = true))
+    //  بی نمایهٔ بسته (راهی که بسته را نمی‌شناسد) ⇒ همان پیشوند
+    assertEquals(PosHit.Add(p10, 6.0), resolve(d, "6x10"))
   }
 
   /* ---------------- − / تعداد / + ---------------- */
@@ -309,7 +343,7 @@ class PosLogicTest {
     var keys = 0
     var posted: SalesEngine.Result.Ok? = null
 
-    private fun term() = CartQuery.parse(query).term.trim()
+    private fun term() = PosSearch.parse(query, ShopStore.barcodeIndex(d)).term.trim()
     private fun matches() = PosCatalog.matches(d.products, term())
 
     /** نوشتنِ رقم یا حرف — شمرده نمی‌شود */

@@ -68,6 +68,17 @@
   خوانده‌نشده ۲ (`StrOnline.coded`، `StrOnline.deskActionLabel`؛ سقفِ `APP_UNREAD_MAX`). روی main سبز، روی f067bf9c دقیقاً همان دو سرخ، با دو جملهٔ PHRASES سبز. فقط آزمون (`WHATSNEW_OK=test-only`).
 - نیمه‌کاره: هیچ. یادداشت برای رفعِ دستهٔ ۴۳: جز دو سطرِ PHRASES و `dari-words.js --write`، دو ردیف در `docs/DARI-REVIEW-fa.md` هم لازم است (وگرنه آزمونِ «فهرستِ بازبینی» ِ همان پرونده سرخ).
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ پس از ادغامِ رفعِ دستهٔ ۴۳ همین آینه سبز می‌ماند.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-3` (دو پیگیریِ `claude/pos-2`: بارکدِ کامل پیش از پیشوند در کامپیوتر و گوشی، و POS-04 = نامِ کالا در کادرِ صندوقِ وب؛ روی `claude/pos-2` ‏63a0bbfc؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: **«12x34»** — `PosSearch.resolve` (و `DeskSale`: بسته و شبکهٔ پیشنهاد؛ `CatalogModel.query` ِ گوشی؛ شبیه‌سازِ `PosSpeed` ِ کامپیوتر) پیشوند را پیش از
+  بارکدِ کامل می‌خواند ⇒ ۱۲ تا از «34». حالا `CartQuery.parse(query, isCode)` ⇐ `PosSearch.parse`/`isFullCode` (بارکدِ کاملِ کالا یا بسته) همان `decide` ِ وب است؛ بخشِ
+  `fullCode` ِ `cart-query-v1.json` (۱۵ مورد) را `CartQueryVectorsTest` و `web-cart-query.test.js` می‌خوانند؛ JS خودش درست بود (فقط بردار تازه). **POS-04 وب** —
+  `license/catalog-match.js` همزادِ `CatalogMatch` با `text-core.js` و بردارِ `core/test-vectors/catalog-match-v1.json` (۵۳ جست‌وجو، ۲۶ تا از `CatalogMatchTest`؛ ۴۳۲ فاصله)
+  و `CatalogMatchVectorsTest` (jvmTest)؛ پشتِ تنظیمِ خاموشِ همین مرورگر `tohid-pos-name-search-v1` («تنظیمات» ⇐ «دوربین بارکدخوان»): فهرستِ شناورِ ARIA زیرِ کادر، ↑ ↓/Enter/لمس،
+  بارکدِ کامل اول، «۳*نام» با پیشوندِ روشن، افزودن با `addToCart` ِ صفحه. بارکننده `shop-sync.js`، `sw.js` v72، چهار کلیدِ تازهٔ واژه‌نامه (fa/en/ps)، `test:web` + `web-pos-name.mjs`.
+  آزمون (محلی): `web-catalog-match.test.js` ۹/۹، `web-cart-query.test.js` ۹/۹، `web-shop-i18n.test.js` ۱۷/۱۷ (PGlite)؛ `web-pos-name.mjs` ۱۲/۱۲ با axe (روی `claude/pos-2` ۱۱ سرخ)، `web-pos-qty` ۹/۹،
+  `web-shop-i18n.mjs` ۱۸/۱۸، `web-digits`/`web-pos-draft`/`web-beta-channel`/`web-vip-gate`/`web-product-cycle` سبز؛ بردارها جدا با برنامهٔ یک‌بارِ Java ِ JDK 21 هم‌خوان (۲٬۴۰۰ پرس‌وجوی تصادفی هم).
+- نیمه‌کاره: آزمون‌های Kotlin (`CartQueryVectorsTest`، `PosLogicTest`، `CartModelTest`، `CatalogMatchVectorsTest`) فقط CI؛ STATUS: POS-03 و POS-04 همان PARTIAL (گوشیِ واقعی؛ فرهنگِ مترادف OWNER-PENDING 4-1).
+- قدمِ بعدی: CI؛ سنجشِ وب روی گوشیِ واقعی (صفحه‌کلیدِ حرف و لمسِ فهرست)؛ اگر `claude/pos-2` جدا مرج شد، این شاخه روی main بازپایه شود (بخشِ «تازه‌ها» ی جدا دارد).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-2` (ردیف‌های P0 ِ صندوق: POS-03 در نسخهٔ وب، شاهدِ وب برای POS-02، و راست کردنِ POS-04/10/21؛ روی main ‏990364974؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **POS-03 وب** (سند: «در گوشی و وب اضافه شود») — `license/cart-query.js` همزادِ `CartQuery.parse` با `\s`/`.`/`$` ِ java.util.regex و بردارِ مشترکِ
   `license/test-vectors/cart-query-v1.json` (۵۳ مورد؛ جدا با JDK 21 ِ همین ماشین ۵۳/۵۳ و همهٔ BMP هم‌خوان؛ `CartQueryVectorsTest` ِ Kotlin فقط CI)؛ پشتِ

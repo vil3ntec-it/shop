@@ -732,6 +732,10 @@
   if (!window.TohidCustomerAccess) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/customer-access.js?v=1', defer: true }));
   }
+  //  POS-04: نامِ کالا در همان کادر (`catalog-match.js`، همزادِ `CatalogMatch` ِ کامپیوتر با `text-core.js`؛ پشتِ تنظیمِ خاموشِ همین مرورگر)
+  if (!window.TohidCatalogMatch) {
+    document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/catalog-match.js?v=1', defer: true }));
+  }
   //  زبانِ صفحه و فاکتور (فارسی، دری، انگلیسی، پشتو) — فارسی ⇒ هیچ واژه‌نامه و ناظری (`web-i18n.js`)
   if (!window.TohidWebI18n) {
     document.head.appendChild(Object.assign(document.createElement('script'), { src: 'license/web-i18n.js?v=1', defer: true }));

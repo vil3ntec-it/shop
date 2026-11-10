@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v71';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v72';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -106,6 +106,8 @@ const SHELL_ASSETS = [
   './license/cart-query.js',
   //  CRM-15: شمارهٔ پوشیدهٔ مشتری برای اصلِ بی «شمارهٔ مشتریان» — بی اینترنت هم (دفترِ ازپیش‌همگام‌شده)
   './license/customer-access.js',
+  //  POS-04: جست‌وجوی نامِ کالا در همان کادر — بی آن، تنظیمِ روشن روی نصبِ آفلاین کاری نمی‌کرد
+  './license/catalog-match.js',
   './license/orders-risk.js',
   //  خوانندهٔ بارکد برای آیفون — Safari «BarcodeDetector» ندارد و دوربین همیشه
   //  همین را بار می‌کند؛ بی آن، نصبِ تازه بی اینترنت اصلاً اسکن نمی‌کرد
