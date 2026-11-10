@@ -15,7 +15,7 @@
  */
 const BETA = /\/beta\/sw\.js$/.test(self.location.pathname);
 const BETA_PATH = new URL('./beta/', self.location).pathname;
-const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v70';
+const VERSION = (BETA ? 'beta-' : '') + 'tohid-shop-v71';
 const SHELL_CACHE = VERSION + '-shell';
 const FONT_CACHE = VERSION + '-fonts';
 
@@ -82,6 +82,8 @@ const SHELL_ASSETS = [
   './license/report-core.js',
   './license/report-board.js',
   './license/report-ui.js',
+  //  INV-16: «ارزش موجودی» ِ گزارشِ تازه (دوقلوی `StockAnalysis.valuation`) — بی آن، نصبِ آفلاین زبانه را نداشت
+  './license/stock-value-core.js',
   './license/report-ui.css',
   './license/photo-studio.js',
   //  جای دفتر (localStorage یا IndexedDB) — بی آن، دفترِ IndexedDB روی نصبِ آفلاین باز نمی‌شد

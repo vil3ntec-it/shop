@@ -1,0 +1,201 @@
+{
+  "format": "stock-value-v1",
+  "about": "INV-16 — ارزشِ موجودی به بها و به قیمتِ فروش و سودِ بالقوه: `StockAnalysis.valuation` (core، Kotlin؛ StockValueVectorsTest) و `valuation` ِ `license/stock-value-core.js` (stock-value-core.test.js) هر مورد را عیناً همین `expect` می‌دهند. پول = واحدِ کوچک، مقدار = هزارم، درصد = بیسیس‌پوینت. عددها با دست حساب شده‌اند (شرحِ هر مورد در `name`).",
+  "max_exact": 9007199254740991,
+  "cases": [
+    {
+      "name": "دو کالا: ۲٫۵ × ۱۰۰ و ۱۵۰، ۴ × ۵۰ و ۶۰ — حاشیه ۱۶۵۰۰ ÷ ۶۱۵۰۰ = ۲۶٫۸۳٪",
+      "lines": [
+        { "id": "rice", "onHandMilli": 2500, "unitCostMinor": 10000, "unitPriceMinor": 15000 },
+        { "id": "oil", "onHandMilli": 4000, "unitCostMinor": 5000, "unitPriceMinor": 6000 }
+      ],
+      "expect": {
+        "costMinor": 45000, "retailMinor": 61500, "potentialProfitMinor": 16500, "marginBp": 2683, "inStock": 2,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "rice", "costMinor": 25000, "retailMinor": 37500 }, { "id": "oil", "costMinor": 20000, "retailMinor": 24000 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "بی بها و بی قیمت: ارزش دارند ولی سود فقط از کالایی که هر دو را دارد (۲۰۰۰ ÷ ۱۲۰۰۰)",
+      "lines": [
+        { "id": "known", "onHandMilli": 1000, "unitCostMinor": 10000, "unitPriceMinor": 12000 },
+        { "id": "noCost", "onHandMilli": 3000, "unitCostMinor": 0, "unitPriceMinor": 5000 },
+        { "id": "noPrice", "onHandMilli": 2000, "unitCostMinor": 4000, "unitPriceMinor": 0 }
+      ],
+      "expect": {
+        "costMinor": 18000, "retailMinor": 27000, "potentialProfitMinor": 2000, "marginBp": 1667, "inStock": 3,
+        "missingCost": ["noCost"], "missingPrice": ["noPrice"], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [
+          { "id": "known", "costMinor": 10000, "retailMinor": 12000 },
+          { "id": "noCost", "costMinor": 0, "retailMinor": 15000 },
+          { "id": "noPrice", "costMinor": 8000, "retailMinor": 0 }
+        ],
+        "complete": false
+      }
+    },
+    {
+      "name": "موجودیِ منفی و صفر در هیچ جمعی نیستند؛ منفی فهرست می‌شود",
+      "lines": [
+        { "id": "neg", "onHandMilli": -2000, "unitCostMinor": 10000, "unitPriceMinor": 20000 },
+        { "id": "zero", "onHandMilli": 0, "unitCostMinor": 10000, "unitPriceMinor": 20000 },
+        { "id": "ok", "onHandMilli": 1000, "unitCostMinor": 100, "unitPriceMinor": 300 }
+      ],
+      "expect": {
+        "costMinor": 100, "retailMinor": 300, "potentialProfitMinor": 200, "marginBp": 6667, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": ["neg"], "outOfRange": [],
+        "lines": [ { "id": "ok", "costMinor": 100, "retailMinor": 300 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "قیمتِ زیرِ بها: سودِ منفی و نشان (−۲۰۰۰ ÷ ۸۰۰۰ = −۲۵٪)",
+      "lines": [ { "id": "loss", "onHandMilli": 1000, "unitCostMinor": 10000, "unitPriceMinor": 8000 } ],
+      "expect": {
+        "costMinor": 10000, "retailMinor": 8000, "potentialProfitMinor": -2000, "marginBp": -2500, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": ["loss"], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "loss", "costMinor": 10000, "retailMinor": 8000 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "گردِ نیمه به بالای هر ردیف: ۰٫۵ ⇒ ۱، ۱٫۵ ⇒ ۲، ۰٫۰۰۱ ⇒ ۰",
+      "lines": [
+        { "id": "half", "onHandMilli": 500, "unitCostMinor": 1, "unitPriceMinor": 3 },
+        { "id": "tiny", "onHandMilli": 1, "unitCostMinor": 1, "unitPriceMinor": 1 }
+      ],
+      "expect": {
+        "costMinor": 1, "retailMinor": 2, "potentialProfitMinor": 1, "marginBp": 5000, "inStock": 2,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "half", "costMinor": 1, "retailMinor": 2 }, { "id": "tiny", "costMinor": 0, "retailMinor": 0 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "بیرون از بازهٔ دقیق ⇒ «حساب نشد»، نه عددِ غلط؛ در شمارِ موجودها می‌ماند",
+      "lines": [
+        { "id": "huge", "onHandMilli": 9007199254740991, "unitCostMinor": 2, "unitPriceMinor": 3 },
+        { "id": "ok", "onHandMilli": 1000, "unitCostMinor": 10, "unitPriceMinor": 20 }
+      ],
+      "expect": {
+        "costMinor": 10, "retailMinor": 20, "potentialProfitMinor": 10, "marginBp": 5000, "inStock": 2,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": ["huge"],
+        "lines": [ { "id": "ok", "costMinor": 10, "retailMinor": 20 } ],
+        "complete": false
+      }
+    },
+    {
+      "name": "دفترِ خالی: صفر و بی حاشیه",
+      "lines": [],
+      "expect": {
+        "costMinor": 0, "retailMinor": 0, "potentialProfitMinor": 0, "marginBp": null, "inStock": 0,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [],
+        "complete": true
+      }
+    },
+    {
+      "name": "ارزشِ دقیقِ دفتر جای مقدار × بهای گرد: ۳ عدد به جمعِ ۲۰٫۰۰ ⇒ ۲۰٫۰۰ (نه ۲۰٫۰۱)",
+      "lines": [ { "id": "soap", "onHandMilli": 3000, "unitCostMinor": 667, "unitPriceMinor": 900, "costValueMinor": 2000 } ],
+      "expect": {
+        "costMinor": 2000, "retailMinor": 2700, "potentialProfitMinor": 700, "marginBp": 2593, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "soap", "costMinor": 2000, "retailMinor": 2700 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "بی ارزشِ دقیق همان مقدار × بهای واحد: ۳ × ۶٫۶۷ = ۲۰٫۰۱",
+      "lines": [ { "id": "soap", "onHandMilli": 3000, "unitCostMinor": 667, "unitPriceMinor": 900 } ],
+      "expect": {
+        "costMinor": 2001, "retailMinor": 2700, "potentialProfitMinor": 699, "marginBp": 2589, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "soap", "costMinor": 2001, "retailMinor": 2700 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "ارزشِ دقیقِ ناجور (منفی) ⇒ «حساب نشد»",
+      "lines": [ { "id": "soap", "onHandMilli": 3000, "unitCostMinor": 667, "unitPriceMinor": 900, "costValueMinor": -1 } ],
+      "expect": {
+        "costMinor": 0, "retailMinor": 0, "potentialProfitMinor": 0, "marginBp": null, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": ["soap"],
+        "lines": [],
+        "complete": false
+      }
+    },
+    {
+      "name": "موجودیِ منفی با ارزشِ دقیق هم فقط منفی است",
+      "lines": [ { "id": "neg", "onHandMilli": -1000, "unitCostMinor": 667, "unitPriceMinor": 900, "costValueMinor": 500 } ],
+      "expect": {
+        "costMinor": 0, "retailMinor": 0, "potentialProfitMinor": 0, "marginBp": null, "inStock": 0,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": ["neg"], "outOfRange": [],
+        "lines": [],
+        "complete": true
+      }
+    },
+    {
+      "name": "فقط ارزشِ دقیق (بهای واحدِ صفر) هم «بها دارد»: ۳۰۰ و ۱۰۰۰ ⇒ ۷۰٪",
+      "lines": [ { "id": "blind", "onHandMilli": 2000, "unitCostMinor": 0, "unitPriceMinor": 500, "costValueMinor": 300 } ],
+      "expect": {
+        "costMinor": 300, "retailMinor": 1000, "potentialProfitMinor": 700, "marginBp": 7000, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "blind", "costMinor": 300, "retailMinor": 1000 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "ارزشِ دقیقِ صفر و بهای صفر ⇒ بی بها؛ بی سود، بی حاشیه",
+      "lines": [ { "id": "z", "onHandMilli": 1000, "unitCostMinor": 0, "unitPriceMinor": 500, "costValueMinor": 0 } ],
+      "expect": {
+        "costMinor": 0, "retailMinor": 500, "potentialProfitMinor": 0, "marginBp": null, "inStock": 1,
+        "missingCost": ["z"], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "z", "costMinor": 0, "retailMinor": 500 } ],
+        "complete": false
+      }
+    },
+    {
+      "name": "جمعِ بی‌سرریز: دو ارزشِ ۵×۱۰^۱۵ ⇒ سقفِ ۲^۵۳−۱",
+      "lines": [
+        { "id": "a", "onHandMilli": 1, "unitCostMinor": 1, "unitPriceMinor": 0, "costValueMinor": 5000000000000000 },
+        { "id": "b", "onHandMilli": 1, "unitCostMinor": 1, "unitPriceMinor": 0, "costValueMinor": 5000000000000000 }
+      ],
+      "expect": {
+        "costMinor": 9007199254740991, "retailMinor": 0, "potentialProfitMinor": 0, "marginBp": null, "inStock": 2,
+        "missingCost": [], "missingPrice": ["a", "b"], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "a", "costMinor": 5000000000000000, "retailMinor": 0 }, { "id": "b", "costMinor": 5000000000000000, "retailMinor": 0 } ],
+        "complete": false
+      }
+    },
+    {
+      "name": "عددِ بزرگ: سودِ ۲×۱۰^۱۱ از ۳×۱۰^۱۱ ⇒ ۶۶۶۷ (حاصل‌ضربِ بیسیس‌پوینت بالای ۲^۵۰)",
+      "lines": [ { "id": "gold", "onHandMilli": 1000, "unitCostMinor": 100000000000, "unitPriceMinor": 300000000000 } ],
+      "expect": {
+        "costMinor": 100000000000, "retailMinor": 300000000000, "potentialProfitMinor": 200000000000, "marginBp": 6667, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": [], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "gold", "costMinor": 100000000000, "retailMinor": 300000000000 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "حاشیهٔ منفیِ نیمه رو به +∞: −۱ از ۲۰۰۰۰ = −۰٫۵ ⇒ ۰؛ −۳ = −۱٫۵ ⇒ −۱",
+      "lines": [ { "id": "m", "onHandMilli": 1000, "unitCostMinor": 20001, "unitPriceMinor": 20000 } ],
+      "expect": {
+        "costMinor": 20001, "retailMinor": 20000, "potentialProfitMinor": -1, "marginBp": 0, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": ["m"], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "m", "costMinor": 20001, "retailMinor": 20000 } ],
+        "complete": true
+      }
+    },
+    {
+      "name": "حاشیهٔ منفی: −۳ از ۲۰۰۰۰ = −۱٫۵ ⇒ −۱",
+      "lines": [ { "id": "m3", "onHandMilli": 1000, "unitCostMinor": 20003, "unitPriceMinor": 20000 } ],
+      "expect": {
+        "costMinor": 20003, "retailMinor": 20000, "potentialProfitMinor": -3, "marginBp": -1, "inStock": 1,
+        "missingCost": [], "missingPrice": [], "belowCost": ["m3"], "negative": [], "outOfRange": [],
+        "lines": [ { "id": "m3", "costMinor": 20003, "retailMinor": 20000 } ],
+        "complete": true
+      }
+    }
+  ]
+}

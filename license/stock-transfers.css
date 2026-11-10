@@ -37,6 +37,9 @@
 .xfr-table{width:100%; border-collapse:collapse; font-size:13px;}
 .xfr-table th, .xfr-table td{padding:6px 8px; border-bottom:1px solid var(--border); text-align:start; white-space:nowrap;}
 .xfr-table th{color:var(--muted); font-weight:600;}
+/* INV-01 «موجودیِ هر مکان»: نامِ کالا سرِ ردیف (th) به رنگِ متن؛ عددِ منفی سرخ */
+.xfr-table tbody th{color:var(--text); font-weight:400;}
+.xfr-neg{color:var(--danger);}
 .xfr-act{border-top:1px dashed var(--border); padding-top:10px;}
 .xfr-act h4{margin:0; font-size:14px; color:var(--text);}
 .xfr-box .sr{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;}
