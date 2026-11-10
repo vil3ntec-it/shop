@@ -181,10 +181,13 @@ class SyncV3Runner private constructor(context: Context) {
   internal fun asV1Status(): SyncStatus? = runCatching {
     val e = engine()
     val s = e.status()
+    val online = Backend.isOnline(app)
+    //  SYN-12: قطعیِ کوتاه یا شبکهٔ بی‌نت سرخ نمی‌کند؛ قطعیِ ماندگار اعلانِ آرام است
+    val outage = e.outage(online)
     SyncStatus(
       dot = SyncDot.of(
-        error = s.lastError.isNotBlank(), online = Backend.isOnline(app), signedIn = Backend.tokens(app).signedIn,
-        configured = AppConfig.isConfigured(app), queued = s.queued, busy = s.busy,
+        error = s.lastError.isNotBlank(), online = online, signedIn = Backend.tokens(app).signedIn,
+        configured = AppConfig.isConfigured(app), queued = s.queued, busy = s.busy, alarm = outage.alarm,
       ),
       queued = s.queued,
       dropped = s.rejected,
@@ -197,6 +200,7 @@ class SyncV3Runner private constructor(context: Context) {
       schemaVersion = LedgerDiff.SCHEMA_VERSION,
       serverSchema = 0,
       live = false,
+      outage = outage.kind,
     )
   }.getOrNull()
 
@@ -262,6 +266,9 @@ class SyncV3Runner private constructor(context: Context) {
   }
 
   fun queueSize(): Int = runCatching { engine().queued() }.getOrDefault(0)
+
+  /** SYN-12: `SyncV1Engine.rebind` (ورود، خروج، دکانِ دیگر) — موتورِ ساخته‌شده رشتهٔ شکستش را فراموش می‌کند؛ بی ساختنِ موتور */
+  fun forgetOutage() { engine?.forgetOutage() }
 
   /** opهای ردشدهٔ همین حساب روی همین دستگاه (نشانِ «سرور نپذیرفت» ِ فاکتور، `data/RejectedDocs`) */
   fun rejected(): List<V3Entry> = runCatching { engine().rejected() }.getOrDefault(emptyList())

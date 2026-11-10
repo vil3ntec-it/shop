@@ -94,7 +94,7 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
         V3Button(
           StrSettings.syncNow,
           {
-            runCatching { SyncV1Worker.now(context) }
+            runCatching { SyncV1Worker.reconnect.userAsked(); SyncV1Worker.now(context) }   // SYN-12: دورِ کاربر هرگز درنگِ پس از وصل ندارد
               .onSuccess { Haptics.confirm(context); toasts.show(StrSettings.syncStarted) }
               .onFailure { toasts.show(it.userText(StrSettings.syncFailed)) }
           },
@@ -107,7 +107,9 @@ internal fun RouteScope.SyncScreen(onBack: (() -> Unit)?) {
     }
     if (signedIn) {
       item(key = "diagnosis") {
-        val d = SyncModel.diagnose(SettingsShotState.syncError ?: v1.lastError.ifBlank { AutoSync.lastError.orEmpty() }, v1.holding, v1.dropped, AutoSync.needsShop, ServerPulse.state)
+        //  SYN-12: حکمِ موتور فقط برای خطای خودِ موتور (`v1.lastError`)؛ خطای عکسِ صفحه یا `AutoSync` ⇒ همان نشانه‌ها
+        val engineError = SettingsShotState.syncError == null && v1.lastError.isNotBlank()
+        val d = SyncModel.diagnose(SettingsShotState.syncError ?: v1.lastError.ifBlank { AutoSync.lastError.orEmpty() }, v1.holding, v1.dropped, AutoSync.needsShop, ServerPulse.state, if (engineError) v1.outage else null)
         if (d.problem != SyncModel.Problem.NONE) DiagnosisCard(d)
       }
     }

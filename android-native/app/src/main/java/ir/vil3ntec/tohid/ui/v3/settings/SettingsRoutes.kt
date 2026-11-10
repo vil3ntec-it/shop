@@ -2,12 +2,14 @@ package ir.vil3ntec.tohid.ui.v3.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Devices
+import androidx.compose.material.icons.outlined.LocalOffer
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import ir.vil3ntec.tohid.core.i18n.Str
 import ir.vil3ntec.tohid.core.i18n.StrLateApology
+import ir.vil3ntec.tohid.core.i18n.StrPromoHeld
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHelp
 import ir.vil3ntec.tohid.core.i18n.StrSettingsHome
 import ir.vil3ntec.tohid.core.nav.MoreGroup
@@ -32,6 +34,8 @@ import ir.vil3ntec.tohid.ui.v3.settings.sections.AboutScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.LateApologyScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.NavBarScreen
 import ir.vil3ntec.tohid.ui.v3.settings.sections.PinSheet
+import ir.vil3ntec.tohid.ui.v3.settings.sections.PromoHeldScreen
+import ir.vil3ntec.tohid.ui.v3.settings.sections.promoHeldRow
 import ir.vil3ntec.tohid.ui.v3.settings.sections.SyncScreen
 
 /**
@@ -53,6 +57,8 @@ object SettingsPaths {
   const val DEVICES_PRINTERS = "devices?tab=printers"
   /** پوزش و کوپنِ خودکارِ تأخیر (NTF-10) — صفحهٔ پشتِ پرچمِ سرور، بیرون از `SettingsLayout` (ردیفش از `SettingsModule.settings`) */
   const val LATE_APOLOGY = "settings/late-apology"
+  /** PRM-02: آزادِ دستیِ کدِ تخفیفِ نگه‌داشته — پشتِ پرچمِ سرور و اجازهٔ لغوِ فاکتور، ردیفش از `SettingsModule.settings` */
+  const val PROMO_HELD = "settings/promo-held"
   /** ردیفِ «نسخه و به‌روزرسانی»ِ «بیشتر» */
   const val UPDATES = ABOUT
 
@@ -118,6 +124,8 @@ val SettingsModule = AppModule(
   //  NTF-10: ردیفِ «پوزش و کوپنِ خودکارِ تأخیر» زیرِ «فروش» فقط با پرچمِ روشنِ سرور (`lateApologyRow`، همان ردیفِ رابطِ امروز)
   settings = listOf(
     SettingsEntry({ StrLateApology.title }, SettingsPaths.LATE_APOLOGY, Icons.Outlined.Schedule, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { lateApologyRow(lateApologyApi()) }, subtitle = { StrSettingsHelp.lateApologyLine }, part = "online"),
+    //  PRM-02: «کدهای تخفیفِ نگه‌داشته» فقط با شمارشِ روشنِ سرور (`shop.promo_uses`) و اجازهٔ لغوِ فاکتور (`promoHeldRow`)
+    SettingsEntry({ StrPromoHeld.title }, SettingsPaths.PROMO_HELD, Icons.Outlined.LocalOffer, SettingsLayout.SALES, setOf(Need.MANAGE), shown = { promoHeldRow() }, subtitle = { StrPromoHeld.line }, part = "receipt"),
   ),
   entries = listOf(
     ModuleEntry("settings", { Str.settings }, SettingsPaths.ROOT, Icons.Outlined.Settings, setOf(Place.NAV), needs = setOf(Need.MANAGE), order = 90),
@@ -156,6 +164,9 @@ val SettingsModule = AppModule(
     },
     V3Route(SettingsPaths.LATE_APOLOGY, RouteKind.PAGE, { StrLateApology.title }, parent = SettingsPaths.group(SettingsLayout.SALES), needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       CompositionLocalProvider(LocalSettingsKey provides SettingsPaths.LATE_APOLOGY) { LateApologyScreen(onBack = backOrNull) }
+    },
+    V3Route(SettingsPaths.PROMO_HELD, RouteKind.PAGE, { StrPromoHeld.title }, parent = SettingsPaths.group(SettingsLayout.SALES), needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
+      PromoHeldScreen(onBack = backOrNull)
     },
     V3Route(SettingsPaths.FEATURES, RouteKind.PAGE, { StrSettingsHome.features }, parent = SettingsPaths.ROOT, needs = setOf(Need.MANAGE), chrome = Chrome.OWN) {
       if (desk) DeskSettingsScreen(group = SettingsPaths.FEATURES)

@@ -118,6 +118,11 @@ router.patch(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sen
   res.json(await chat.edit(v(req), req.params.id, req.params.mid, req.body));
 });
 
+//  CHAT-14: همان ویرایش با POST — HttpURLConnection ِ برنامهٔ خریدِ مشتری PATCH نمی‌فرستد (الگوی `…/edit` ِ درِ دکان)
+router.post(`${base}/conversations/:id/messages/:mid/edit`, readLimit, customer, sendLimit, async (req, res) => {
+  res.json(await chat.edit(v(req), req.params.id, req.params.mid, req.body));
+});
+
 //  حذف و بلاک/برداشتن هم long-poll ِ دکان را بیدار می‌کنند ⇒ همان سقفِ (دکان، شماره) (CHAT-11؛ پیش‌تر فقط سطلِ IP)
 router.delete(`${base}/conversations/:id/messages/:mid`, readLimit, customer, sendLimit, async (req, res) => {
   res.json(await chat.remove(v(req), req.params.id, req.params.mid, req.query.for));

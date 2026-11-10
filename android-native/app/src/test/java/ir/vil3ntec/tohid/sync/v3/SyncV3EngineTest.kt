@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.sync.v3
 import ir.vil3ntec.tohid.core.sync.platform.FileReplayStore
 import ir.vil3ntec.tohid.core.sync.ReplayBook
 import ir.vil3ntec.tohid.core.sync.RestoredDevice
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.core.sync.v3.Hlc
 import ir.vil3ntec.tohid.data.CustomerMerge
 import ir.vil3ntec.tohid.data.DebtTransaction
@@ -50,6 +51,8 @@ class SyncV3EngineTest {
   private class FakeServer {
     var time = 1_800_000_000_000L
     var offline = false
+    /** SYN-12: سرور پاسخ می‌دهد ولی گرفتار است ⇒ ۵۰۳ ِ `db_busy` برای هر درخواست */
+    var busy = false
     var loseNext = 0
     /** Pushِ این دستگاه‌ها ۴۰۳ می‌گیرد (نقش یا اشتراک) — Pull باز است */
     val pushForbidden = HashSet<String>()
@@ -111,6 +114,9 @@ class SyncV3EngineTest {
       requests += "$method ${path.substringBefore('?')}"
       if (offline) throw IOException("offline")
       val r = when {
+        busy -> V3Response(503, buildJsonObject {
+          put("error", buildJsonObject { put("code", JsonPrimitive("db_busy")); put("message", JsonPrimitive("سرور الان شلوغ است")) })
+        })
         path == "/push" && device in pushForbidden -> V3Response(403, buildJsonObject {
           put("error", buildJsonObject { put("code", JsonPrimitive("permission_denied")); put("message", JsonPrimitive("اجازه‌ی ثبت اطلاعات ندارید")) })
         })
@@ -375,6 +381,70 @@ class SyncV3EngineTest {
     assertEquals(0, a.engine.queued())
     assertEquals(15025L, long(server.row("sales", "s1"), "paidAmountMinor"))
     assertEquals(8075L, long(server.row("sales", "s1"), "remainingMinor"))
+  }
+
+  /**
+   *  SYN-12: قطعیِ کوتاه «دوباره می‌کوشد» (بی هشدار)، ماندگار «به سرور نمی‌رسیم» و با ۵۰۳ «سرور» (اعلان، نه سرخ)،
+   *  بی‌نت «آفلاین»، ۴۰۳ «نشست» (سرخ) — و صف، فاصلهٔ تلاش و op ِ فرستاده همان پیشین.
+   */
+  @Test fun outageVerdictIsQuietThenNoticeAndLeavesQueueAndBackoffAlone() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    assertEquals(SyncOutage.Kind.OK, a.engine.outage(true).kind)
+    val pushesBefore = server.pushSizes.size
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "نو") }) }
+    a.engine.record(a.ledger.data)
+    server.offline = true
+    assertEquals(2000L, runBlocking { a.engine.pushOnce() }.retryInMs)
+    assertEquals(SyncOutage.Kind.RETRYING, a.engine.outage(true).kind)
+    assertFalse("نخستین شکست هشدار نیست", a.engine.outage(true).alarm)
+    assertTrue("خطا پنهان نمی‌شود (SYN-08)", a.engine.status().lastError.isNotBlank())
+    server.time += 30_000
+    assertEquals(4000L, runBlocking { a.engine.pushOnce() }.retryInMs)
+    assertEquals(SyncOutage.Kind.RETRYING, a.engine.outage(true).kind)
+    server.time += 31_000
+    val down = a.engine.outage(true)
+    assertEquals(SyncOutage.Kind.UNREACHABLE, down.kind)
+    assertEquals(SyncOutage.Level.NOTICE, down.level)
+    assertEquals(SyncOutage.Kind.OFFLINE, a.engine.outage(false).kind)
+    server.offline = false
+    server.busy = true
+    assertEquals(8000L, runBlocking { a.engine.pushOnce() }.retryInMs)
+    assertEquals(SyncOutage.Kind.SERVER, a.engine.outage(true).kind)
+    assertEquals(1, a.engine.queued())
+    assertEquals("هیچ push ای نرسید", pushesBefore, server.pushSizes.size)
+    server.busy = false
+    assertTrue(a.sync(first = false).ok)
+    assertEquals(SyncOutage.Kind.OK, a.engine.outage(true).kind)
+    assertEquals(0, a.engine.queued())
+    assertEquals("همان یک op، یک بار", listOf(1), server.pushSizes.drop(pushesBefore))
+
+    server.pushForbidden += "dev-a"
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "نوتر") }) }
+    a.engine.record(a.ledger.data)
+    runBlocking { a.engine.pushOnce() }
+    assertEquals(SyncOutage.Kind.AUTH, a.engine.outage(true).kind)
+    assertTrue("نشست بالاتر از بی‌نت", a.engine.outage(false).alarm)
+  }
+
+  /** SYN-12: حساب یا دکانِ دیگر (`SyncV1Engine.rebind` ⇒ `SyncV3Runner.forgetOutage`) ⇒ رشتهٔ شکست در حافظه نمی‌ماند */
+  @Test fun forgetOutageDropsTheStreakButKeepsTheErrorAndQueue() {
+    val server = FakeServer()
+    val a = Device("dev-a", server, baseData).also { assertTrue(it.sync().ok) }
+    a.edit { d -> d.copy(products = d.products.map { it.copy(name = "نو") }) }
+    a.engine.record(a.ledger.data)
+    server.offline = true
+    runBlocking { a.engine.pushOnce() }
+    server.time += 61_000
+    runBlocking { a.engine.pushOnce() }
+    assertEquals(SyncOutage.Kind.UNREACHABLE, a.engine.outage(true).kind)
+    val error = a.engine.status().lastError
+    a.engine.forgetOutage()
+    assertEquals("خطای ماندگار بی رشته ⇒ ناشناخته ⇒ همان سرخِ پیشین", SyncOutage.Kind.ERROR, a.engine.outage(true).kind)
+    assertEquals("lastError پنهان نمی‌شود (SYN-08)", error, a.engine.status().lastError)
+    assertEquals(1, a.engine.queued())
+    runBlocking { a.engine.pushOnce() }
+    assertEquals("شکستِ بعدی رشتهٔ تازه", SyncOutage.Kind.RETRYING, a.engine.outage(true).kind)
   }
 
   @Test fun offlineKeepsQueueAndBacksOffExponentiallyWithJitter() {

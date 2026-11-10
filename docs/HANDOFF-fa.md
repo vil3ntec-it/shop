@@ -54,12 +54,38 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
+  (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را
+  جابه‌جا می‌کرد ⇒ `v1Merges` + `claimOf` + `settle` (یک خط در `lib/sync.js`)؛ SR43-2 `$inc` ِ لفظی در کلِ ردیف «همان» دیده می‌شد ⇒ `after(…, full)`.
+  B8 ِ ممیزی (و B6 ِ تکراریِ `posted-docs` ⇐ B7)، یک خطِ RULES. سه شاخهٔ دیگر حمله شدند و سالم ماندند (B8).
+- نیمه‌کاره: هیچ. R7 (ادغام + جدا کردن در دو دسته)، R8 (`shiftId` ِ آزاد) و R9 (`amountMinor` در پلِ v3) تصمیمِ صاحب‌کارند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/owner-decisions-3` (فهرستِ یکتای تصمیم‌های مانده به‌روز شد؛ فقط سند؛ روی `ccr-…-batch-42` ‏bd6f03a8 (#1026، squash‌شده در main ‏99036497)؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `docs/OWNER-PENDING-fa.md` ۶۷ ⇐ ۷۹ (۹ / ۲۲ / ۲۶ / ۲۲؛ ۳-۱۴ب پیش‌تر شمرده نشده بود)، هر بند با متنِ شاخهٔ منبع سنجیده: ۲-۲۱ R5 (`SECURITY-AUDIT` B6 ِ
+  دستهٔ ۴۲؛ R6 در `claude/reserve-off` بسته)، ۲-۲۲ SEC-03 سه پرسش (`code-gaps`، `posted-docs` R2)، ۳-۲۰ مقدارِ درستِ PRD-08، ۳-۲۱ SYN-12 (`Retry-After`،
+  ۲ شکست/۶۰ ثانیه، پخشِ ۱۵ ثانیه)، ۳-۲۲ پیش‌فرضِ `market.directory`/`market.product_details`/`report_fresh`/`shop.owner_report`، ۳-۲۳ آزمایشِ
+  `shop.stock_reserve` + `shop.order_notify` و «یک پوش برای هر سفارش» (`stock-ui`)، ۳-۲۴ سقفِ ۳۰ دقیقهٔ «ساخت نسخهٔ بومی» (`tohid-native.yml`؛ main
+  ۲۸:۴۹–۲۹:۳۰، لغوِ ۳۰:۱۵ در تلاشِ نخستِ #1025 — از `gh run`)، ۳-۲۵ دو رفتارِ پلِ پنل (ریپوی `server` ممیزی §۹، فقط خواندن)، ۴-۲۰ LOC-03، ۴-۲۱ PRM-02، ۴-۲۲
+  گالریِ ویترین. ۲-۱۸ (S11) با بازسنجیِ ۱.۵۰.۷۹ درست شد (هفت درِ `/admin/` هنوز در پنل نیست) و پرسشِ حذفِ پشتیبان گرفت؛ ۴-۱۹ فقط «روزی یک بار یا هر ۶ ساعت»
+  ماند (ویرایشگرِ تعطیلات در پنلِ ۱.۵۰.۷۸ مرج شده). ۴-۱۸ «برگشت‌پذیر» ِ جاافتاده گرفت؛ «هنوز مرج نشده» ِ
+  دسته‌های ۴۱ و ۴۲ در ۱-۹، ۲-۱۶، ۲-۲۱، ۳-۱۴ب و ۳-۱۶ به «مرج‌شده» درست شد.
+- نیمه‌کاره: هیچ. شاخه‌های `posted-docs`، `app-gaps-4`، `syn-12`، `syn-12b` و `reserve-off` هنوز در دسته نیستند؛ با مرجشان «هنوز در دسته نیست» ِ بندها را بردارید.
+  ⚠️ `posted-docs` بندِ «B6» ِ `SECURITY-AUDIT-fa.md` را دارد و دستهٔ ۴۲ هم B6 ِ دیگری (بازبینیِ ۴۱–۴۲)؛ هنگامِ ادغام یکی B7 شود.
+- قدمِ بعدی: پاسخِ صاحب‌کار؛ هر بندِ گرفته‌شده به «گرفته‌شده» ِ `OWNER-DECISIONS-fa.md`.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/rsk-platform` (تمیزکاری: بی سقفِ پلتفرمیِ تازه برای `OrderRiskListsV3.kt`؛ روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: `090a2373` (از `claude/rsk-app`) برای یک `LocalContext` در صفحهٔ v3 سقفِ تازهٔ ۱ در `platformDeps` ِ `tools/quality/baseline.json` گذاشته بود.
   پوستهٔ مسیرِ `RiskListsRoute` (مخزن از `Context`) به `OrderRiskListsAndroid.kt` رفت (مرزِ `*Android.kt` در `PLATFORM_DEPS.boundary`)؛ بدنه `RiskListsContent(repo)`
   در `OrderRiskListsV3.kt` بی‌پلتفرم ماند و سطرِ سقف برداشته شد. بقیهٔ سقف‌های همان کامیت فقط پایین آمده بودند و دست نخوردند. quality، eslint، spec «سالم»، آینه‌های Kotlin و dari ۲۱/۲۱.
 - نیمه‌کاره: کامپایلِ اندروید/کامپیوتر و `V3ReachabilityTest` (`RiskListsRoute` ⇐ `RiskListsContent` ⇐ `RiskEntriesList`) فقط در CI.
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد. `finish-pr.sh` با `[ -n "$BUMP" ]` می‌سنجد ⇒ `BUMP=0` هم سقف می‌افزاید؛ برای «بی سقفِ تازه» `BUMP` را خالی بگذارید.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/reserve-off` (R6 ِ بازبینیِ ۴۲: پرچمِ خاموشِ نگه‌داشتن، روی `ccr-…-batch-42` ‏1879be76؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: `shop.stock_reserve` خاموش ⇒ نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (ویترین، کاتالوگ، ثبت، افزودن، قبول، جزئیات/کارتِ سفارش، وظیفه و خبر)؛ ردیف‌ها
+  می‌مانند و فقط بسته می‌شوند ⇒ روشنِ دوباره: نگذشته می‌شمارد، گذشته نه. `lib/stock-reserve.js` (`heldOf` پرچم را می‌سنجد، `sumHeld` ِ بی پرچم برای
+  `planIn`/`reholdIn`)؛ آزمون‌ها سرخ‌پیش‌از‌رفع: R6 ×۳ در `security-review-42.test.js` (PGlite و PostgreSQL) و `web-store-stock.mjs`؛ یک بندِ
+  `stock-reserve-review-notify.test.js` که همان رفتارِ نادرست را می‌خواست (`stockHold.review` با پرچمِ خاموش) عوض شد. B6 ِ ممیزی، FLAGS-ON §۴ب، یک خطِ RULES.
+- نیمه‌کاره: هیچ. کمبودی که در دورانِ خاموش رخ داد پس از روشنِ دوباره نشان دارد ولی پوشِ «به بررسی رفت» و وظیفه‌اش تا حرکتِ بعدی نمی‌آیند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-42` (بازبینیِ امنیتیِ دومِ دسته‌های ۴۱–۴۲، روی `ccr-…-batch-42` ‏a8704c12؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگه‌داشتنِ موجودی (O-06، پرچم‌های خاموش)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-42.test.js`، ۴ آزمون):
   SR42-1 قلمِ بزرگ‌شده (افزودنِ مشتری) جای صفِ پیشین را نگه می‌داشت ⇒ سفارشِ دیگری به بررسی می‌رفت ⇒ بزرگ شدن ته صف؛ SR42-2 بن‌بستِ گذارِ کارمند و
@@ -72,6 +98,64 @@
   PostgreSQL 129620741156 و مرورگر 129620741305). همه: ۴۳۵ IV، ۲۶۱ PARTIAL. یک خطِ RULES («v3 · CI و آزمون»): کلاسِ بی متد ⇒ PASS = شمارِ `@Test`.
 - نیمه‌کاره: NTF-08، CHAT-07، CHAT-14 (برنامهٔ خرید)؛ CHAT-02، CHAT-06، POS-12، SYN-14 (دستگاه)؛ CHK-03، CHK-20، ORD-16، WEB-10 (D-09)؛ POS-10، PRD-12، STF-03، WEB-01 (صاحب‌کار)؛ CRM-03، S70، SEC-03، AI-06 (کد).
 - قدمِ بعدی: همین روش برای ردیفی که کمبودِ دیگرش بسته شد؛ لاگ با `gh api repos/vil3ntec-it/shop/actions/jobs/<id>/logs`.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/syn-12b` (SYN-12، دنبالهٔ `claude/syn-12` ‏54e2b31c: هجومِ پس از وصلِ دوباره، نوارِ کامپیوتر، رشتهٔ شکست با ورود/دکانِ دیگر؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: قاعدهٔ یگانهٔ `core/…/core/sync/SyncReconnect.kt` ⇔ `reconnectDelayMs`/`reconnectHold` ِ `license/sync-core.js` (بخش‌های تازهٔ
+  `sync-outage-v1.json`): دورِ نخستِ پس از `online` ِ وب (v1 و v3) یا پس از دیدنِ بی‌نتی در برنامه (`sync/v1/ReconnectGate` در `SyncV1Worker`)
+  درنگِ یکنواختِ ۰ تا ۱۵ ثانیه؛ تیک/Pull ِ دوره‌ای صبر، «همگام‌سازی حالا»، تغییرِ وب و تلاشِ پس از شکست همان دم؛ فاصلهٔ تلاش، صف و بدنه دست‌نخورده.
+  رشتهٔ شکست با `onSignedIn` ِ وب و `SyncV1Engine.rebind` (⇒ `SyncV3Runner.forgetOutage`) پاک؛ نوارِ وضعیتِ کامپیوتر `SyncModel.quietHead`.
+  آزمون: `sync-outage.test.js` ۱۸/۱۸ (۱۰ جهش ⇒ سرخ)، `web-sync-ux.mjs` ۸ ✅، `web-sync-v3.mjs` ۷ ✅، ۱۵ پروندهٔ موتورِ همگام‌سازی ۱۶۲ سبز.
+- نیمه‌کاره: Kotlin فقط در CI (`SyncReconnectTest`، `SyncOutageVectorsTest.reconnect*`، `ReconnectGateTest`، `SyncV3EngineTest.forgetOutage…`،
+  `SettingsModelsTest` ِ نوارِ کامپیوتر)؛ STATUS همان PARTIAL. در برنامه دورِ پس از تغییر در پنجرهٔ درنگ صبر می‌کند (همان کارِ WorkManager).
+  `web-idb.mjs` «سهمیهٔ IndexedDB» روی پایهٔ syn-12 هم سرخ است (به این کار ربطی ندارد).
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin ِ syn-12 و syn-12b؛ اگر صاحب‌کار خواست `Retry-After` (با سقف) و نشانِ تغییرِ دورِ برنامه (`change`).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/syn-12` (SYN-12 ِ سمتِ دستگاه: قطعیِ شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: تصمیمِ یگانه در `core/…/core/sync/SyncOutage.kt` و همزادِ `license/sync-core.js` با بردارِ `core/test-vectors/sync-outage-v1.json`
+  (بی‌نت ⇒ آفلاین؛ شکستِ شبکه/سرورِ کوتاه ⇒ «دوباره می‌کوشد» بی هشدار؛ ≥ ۲ شکست و ۶۰ ثانیه ⇒ «به سرور نمی‌رسیم» یا «سرور» با اعلانِ آرام؛
+  نشست و خطای واقعی همان سرخ). موتورهای v1/v3 ِ وب و برنامه رشتهٔ شکست را در حافظه نگه می‌دارند و حکم و چراغ را در حال می‌گذارند؛ نوارِ
+  `#sync-outage` و پنجرهٔ همگام‌سازیِ وب، کارتِ آرامِ خانه و تشخیصِ صفحهٔ همگام‌سازیِ نسخهٔ ۳. صف، بدنهٔ push، فاصلهٔ تلاش و `Retry-After` دست نخوردند.
+  آزمون: `sync-outage.test.js` ۱۰/۱۰، `web-sync-ux.mjs` ۸ ✅ (axe روز و شب؛ گامِ «پهن» حالا زرد به‌جای سرخ برای نخستین شکستِ شبکه — عمدی).
+- نیمه‌کاره: Kotlin فقط در CI (`SyncOutageTest`، `SyncOutageVectorsTest`، `SyncV3EngineTest`، `SyncV1CoreTest`، `PhoneHomeModelTest`، `SettingsModelsTest`)؛
+  STATUS همان PARTIAL. «کنترلِ هجوم پس از وصلِ دوباره» در دستگاه نیست (رویدادِ `online` ِ وب همان دم یک دور می‌زند)؛ `Retry-After` نادیده (تصمیمِ صاحب‌کار).
+- قدمِ بعدی: شاهدِ CI ِ آزمون‌های Kotlin؛ اگر صاحب‌کار خواست، پراکندگیِ دورِ نخست پس از `online`/بازگشتِ شبکه و پذیرفتنِ `Retry-After` (با سقف).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/posted-docs` (SEC-03/S89: سندهای مالیِ دیگر و «زنده کردن»؛ روی `claude/code-gaps` ‏99220d4b؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **S89، سندهای دیگر:** برگشت، قرض/رسید، خرید و حرکتِ انبار با همان پرچمِ `shop.doc_chain` و همان `enforce`/`log` ِ فاکتور (`lib/finalized-sales.js` `DOC_FIXED`/`checkDoc`،
+  `doc_posted_edit_forbidden`؛ آزاد: فیلدِ غیرمالی، دلتای `paidAmount`/`debt` ِ خرید، ادغامِ مشتری). (۲) **زنده کردن:** ردیفِ حذف‌شدهٔ با محتوا (`deadOf`) دیگر «ثبتِ تازه» نیست ⇒ v1،
+  راهِ قدیم، API و بازگرداندنِ تعارضِ مدیر روی فاکتور/سندِ حذف‌شده `*revive*` (زنجیره‌دار رد). `sync-v1.js` ِ مشترک دست نخورد؛ `lib/sync.js` فقط کدِ رد را می‌رساند.
+  آزمون: `posted-docs.test.js` ۸/۸ روی PGlite و PostgreSQL (پیش از رفع ۷ سرخ). شرح در RULES «v3 · سابقهٔ عملیات و زنجیرهٔ هش» و SECURITY-AUDIT بندِ B7.
+- نیمه‌کاره/باز: `restoreDeleted` ِ `lib/sync-v1.js` (مشترک با پمپ) بی نگهبان ولی بی درِ HTTP؛ برنامهٔ زنجیره‌دار قرض و حرکت را سرِ جا پاک می‌کند (`DebtorEngine.deleteTransaction`،
+  حذفِ مشتری/کالا/ورودی) ⇒ با پرچمِ روشن «rejected» — باید سندِ معکوس بسازد؛ شاهدِ CI نیست.
+- تصمیمِ صاحب‌کار: حذفِ v1 ِ برگشت/قرض/خرید از دستگاهِ زنجیره‌دار رد بماند (SEC-03) یا مثلِ v3 «لغو» شمرده شود؛ پیش‌فرضِ `shop.doc_chain` همان تصمیمِ پیشین.
+- قدمِ بعدی: شاهدِ CI برای `posted-docs`؛ در برنامه به‌جای «حذفِ قرض» رسیدِ قرینه (سندِ معکوس) وقتی زنجیره روشن است.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/code-gaps` (شکاف‌های کدیِ S70، SEC-03 و S48؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) **SEC-03، بازبینیِ خصمانه:** نگهبانِ S89 حالتِ `enforce` را فقط از `device_id` ِ بدنه می‌گرفت ⇒ نشستِ دستگاهِ زنجیره‌دار با شناسهٔ تازه (v1) یا از `/api/sync`
+  مبلغِ فاکتورِ ثبت‌شده را سرِ جا عوض می‌کرد. حالا «زنجیره‌دار» = شناسهٔ ادعاشده یا دستگاهِ نشست (`lib/finalized-sales.js` `chainDevice`/`boundOf`؛ `lib/sync.js` و
+  `routes/sync.js` `boundDevice`)؛ راهِ قدیم با نشست/شناسهٔ زنجیره‌دار ۴۰۹. `sync-v1.js` ِ مشترک دست نخورد. آزمون: `finalized-sales-bound.test.js` ۵/۵ (PGlite و PostgreSQL، پیش از رفع ۳ سرخ).
+  (۲) **S70:** `market-units.sizeOfItem` (اندازهٔ واحدِ بی عدد از `saleUnit` و `packs`، فقط نامِ روشن و نسبتِ دقیق) در `sameProduct`؛ رابطِ وب «همین کالا در دکان‌های دیگر» روی برگهٔ
+  کالای ویترین (`store/same.js` ِ دیربار + واژه‌نامهٔ `same`، فقط با `bankProductId`)؛ آزمون‌ها: `market-units` ۶/۶، `market-same-units` ۲/۲ (هر دو پایگاه)، `web-store-same.mjs` ۲۹ ✅ با axe.
+  (۳) **S48:** شکافِ کدی نماند؛ PENDING ِ کهنهٔ `scenario-s48` درست شد و `S48.keys` حالا Enter ِ `reports.drill` را هم می‌سنجد.
+- نیمه‌کاره/باز: سندهای برگشت/قرض/خرید/حرکت نگهبانِ «ثبت‌شده» ندارند؛ ویرایشِ فاکتورِ حذف‌شده آن را با محتوای تازه زنده می‌کند (حذف فقط از راهِ `log`)؛ برنامهٔ خریدِ مشتری
+  «همین کالا» را ندارد؛ نشستِ بی زنجیره همچنان `log` (F0-02).
+- تصمیمِ صاحب‌کار: SEC-03 — رد (نه فقط رویداد) برای دستگاهِ بی زنجیره و `/api/sync` وقتی `shop.doc_chain` روشن است (برنامهٔ کهنه ویرایشش رد می‌شود)، و پیش‌فرضِ خودِ `shop.doc_chain`؛
+  S48 — پیش‌فرضِ «گزارشِ تازه» (`report_fresh`) و `shop.owner_report`؛ S70 — `market.directory` و `market.product_details`.
+- قدمِ بعدی: شاهدِ CI ِ دسته (نام‌به‌نام) برای `finalized-sales-bound`، `market-units`، `market-same-units`، `web-store-same` و `DayEndTest`؛ نگهبانِ سندهای برگشت/قرض/خرید (S89).
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/app-gaps-4` (سه کمبودِ برنامه با سرورِ موجود: PRM-02، PRD-17، PRD-27؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) PRM-02: صاحب/مدیر نمی‌دانست کدام فاکتور کد را نگه داشته ⇒ درِ تازهٔ `GET /api/shop/promos/redemptions` (فقط `mayCancel`، پرچمِ `shop.promo_uses`،
+  سقفِ IP پیش از احراز، ۲۰۰ ردیف + `more`، بی شناسهٔ کاربر/دستگاه) و صفحهٔ «تنظیمات ← فروش ← کدهای تخفیفِ نگه‌داشته» (`core/promo/PromoHeld`) که فقط فاکتورِ
+  لغوشدهٔ دفترِ همان دستگاه را با همان `POST /redeem/release` آزاد می‌کند. (۲) PRD-17/27: صفحهٔ «عکس‌های بیشتر و ویترین» (`products/{id}/photo/gallery`،
+  `core/image/ProductGallery`): تکمیلی با نقش روی همان `POST /api/shop/images` بی `select`؛ عکسِ جدای ویترین با نقشِ `promo` + `select`؛ `ImageBank.uploadOwn` آن را با
+  عکسِ تازهٔ دستگاه کنار نمی‌زند؛ «برداشتن از کالا» با درِ تازهٔ `POST /api/shop/images/:id/detach` (اصل می‌ماند). آزمون: `promo-held` ۵/۵ و `image-bank-extras` ۳/۳
+  روی PGlite و PostgreSQL ِ محلی (پیش از دو در سرخ)؛ `promo-redemptions`، `shop-promos`، `image-bank`، `shop-route-inventory`، `tenant-matrix`، `route-authz-inventory`، `paid-routes-entitlement` سبز.
+- نیمه‌کاره: Kotlin (`PromoHeldTest`، `ProductGalleryTest`، `PromoHeldStateTest`، `ProductGalleryStateTest`، دو `Feature` ِ `V3ReachabilityTest`) فقط در CI.
+  گالریِ چندعکسی در خودِ ویترین سمتِ سرور ندارد (تصمیمِ صاحب‌کار)؛ فاکتورِ «نارسیده» (سبدِ ثبت‌نشده) در فهرست دکمه ندارد (تصمیمِ صاحب‌کار).
+- قدمِ بعدی: شاهدِ CI ِ چهار آزمونِ Kotlin و سپس STATUS ِ سه ردیف.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/crm-03-app` (CRM-03، سمتِ برنامه؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: برنامه پیش از ذخیره «تغییرِ سقفِ اعتبار» (`customers.credit_limit`) را می‌پرسد: هستهٔ `core/perm/CreditLimitPerm` (همان قاعدهٔ `credit-limit-perm.js`)، `data/CreditLimitGate` با پیام‌های `StrSaleCaps`، برگهٔ «ویرایش قرض‌دار» ِ نسخهٔ ۳ (کادرِ بسته با دلیل یا «تا X»، خطای درجا، سدِ آخر در `DebtorFormsModel.save`) و پروندهٔ کامپیوتر (`DeskCreditLimitDialog`، جدا از `DeskCustomers.kt` تا سقفِ اندازه بماند)؛ قاعده از `rememberCreditLimitRules` (مرزِ سکو). پرچمِ خاموش/صاحب ⇒ همان امروز. نامِ اجازه در صفحهٔ نقش‌ها.
+- نیمه‌کاره: `CreditLimitPermTest` و `CreditLimitGateTest` فقط در CI (Gradle این‌جا نیست)؛ ادغامِ مشتری و صفحه‌های قدیمِ گوشی نمی‌پرسند. «رد یا بررسی» (OWNER-PENDING ۱-۸) دست نخورد؛ این کار به آن وابسته نیست.
+- قدمِ بعدی: پس از CI ِ سبز، شاهد در STATUS ِ CRM-03.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-chat` (برنامهٔ خرید: CHAT-07، CHAT-14 و کارتِ بازپرداختِ NTF-08؛ روی main ِ 28f6acc2؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: گفت‌وگوی برنامهٔ خرید همتای ویترین (`store/chat-acts.js`، `store/chat-voice.js` و دستهٔ ۴۲ ِ `store/chat.js`): «کارها» ⇐ پاسخ (`replyTo` از همان صف)، ویرایش (فقط پیامِ متنیِ زندهٔ خودم تا `editUntil`، بی صف)، سنجاق (نوار از `conversation.pinned`) و جست‌وجو؛ صدا پشتِ `limits.voice` با `VoiceDevice` (اندروید: `VoiceAndroid.kt`، اجازهٔ `RECORD_AUDIO` فقط با زدنِ میکروفون؛ آیفون null) و پخشِ حباب بی بایت پیش از «پخش»؛ کارتِ «بازپرداخت» در صفحهٔ سفارش. ⛔ پیوندِ رشته: هر نوشته فقط به رشتهٔ خودش (`ChatCompose`، `ChatOpening`)؛ رفعِ واقعیِ برنامه: گشودنِ پشتِ‌سرِ‌همِ دو سفارشِ یک دکان پاسخِ دیرِ اولی را می‌نشاند، متنِ کادر و پاسخِ «مشکل دارم» به رشتهٔ دیگر می‌رفتند. سرور: `POST /api/store/:slug/chat/conversations/:id/messages/:mid/edit` (همان PATCH؛ HttpURLConnection PATCH نمی‌فرستد) با آزمونِ سرخ‌پیش‌از‌در در `shop-chat-web-acts.test.js` (۷/۷ روی PGlite و PostgreSQL ِ محلی).
+- نیمه‌کاره: آزمون‌های Kotlin فقط در CI (`ShopperChatActsTest`، `ShopperVoiceTest`، `CustomerChatActsTest`، `CustomerChatVoiceTest` و بخشِ CHAT-14 ِ `ShopperStage2LiveTest`)؛ STATUS بی ارتقا تا شاهدِ CI. ضبط/پخشِ آیفون (`VoiceDevice` ِ iOS) نیست.
+- قدمِ بعدی: پس از CI ِ دسته، خطِ `KTEST PASS` ِ همین چهار کلاس را در ردیف‌های CHAT-07/14 و NTF-08 بگذار؛ سپس `VoiceDevice` ِ آیفون (AVAudioRecorder/AVAudioPlayer در `*Ios.kt`).
 ### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
 - انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
 - قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.

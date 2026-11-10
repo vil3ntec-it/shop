@@ -30,6 +30,8 @@ import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.market.PublicOrder
 import ir.vil3ntec.tohid.core.shopper.PrefsRules
 import ir.vil3ntec.tohid.core.shopper.RefillCard
+import ir.vil3ntec.tohid.core.shopper.RefundRules
+import ir.vil3ntec.tohid.core.shopper.RefundView
 import ir.vil3ntec.tohid.core.shopper.RepeatPlan
 import ir.vil3ntec.tohid.core.shopper.RepeatPlans
 import ir.vil3ntec.tohid.core.shopper.ShopperText
@@ -41,6 +43,7 @@ import ir.vil3ntec.tohid.core.shopper.ShopperText
 
 @Composable
 fun OrderExtrasBlock(model: CustomerModel, slug: String, o: PublicOrder) {
+  model.orderExtras.refund?.let { RefundCard(it) }
   if (model.orderExtras.chat) {
     OutlinedButton(onClick = { model.go(Route.Chat(slug, o.orderNo)) }, modifier = Modifier.fillMaxWidth()) { Text(ShopperText.chatOrder) }
   }
@@ -110,6 +113,26 @@ fun DeliveryPrefsCard(model: CustomerModel, slug: String, o: PublicOrder) {
       }
       m.note?.let { Note(it, if (m.ok) Tone.OK else if (p.editable) Tone.ERROR else Tone.INFO) }
       MainButton(ShopperText.prefsSave, enabled = on) { m.save(slug) }
+    }
+  }
+}
+
+/**
+ *  NTF-08: بازپرداختِ همین سفارش — همان `renderRefund` ِ `store/order-changes.js`: وضعیت، «برگشته به شما» و هر ردیفِ دفتر
+ *  (زمان — روش، مبلغ) و زمانِ درخواست؛ بی دلیلِ کارمند و کننده (سرور هم نمی‌دهد). کلیدِ نیامده (پرچمِ خاموش یا سرورِ کهنه) ⇒ هیچ.
+ */
+@Composable
+private fun RefundCard(r: RefundView) {
+  Card(Modifier.fillMaxWidth()) {
+    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+      Text(ShopperText.rfTitle, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+      Note(RefundRules.note(r), if (RefundRules.closed(r)) Tone.OK else Tone.INFO)
+      Text(ShopperText.rfSum(r.refundedMinor), style = MaterialTheme.typography.bodyLarge)
+      for (e in r.entries) {
+        val (left, right) = RefundRules.line(e)
+        MoneyRow(left, right)
+      }
+      r.requestedAt?.let { Text(ShopperText.rfAsked(it), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant) }
     }
   }
 }

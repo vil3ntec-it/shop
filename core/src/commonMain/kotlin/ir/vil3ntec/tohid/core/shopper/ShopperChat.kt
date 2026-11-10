@@ -19,7 +19,8 @@ import kotlinx.serialization.json.JsonObject
  *  همان را نگه می‌دارد (سرور تکراری نمی‌سازد)، در هر گفت‌وگو فقط سرِ صف می‌رود (ترتیبِ نوشتن)، خطای گذرا ⇒ backoff ِ
  *  نمایی با لرزش (۲ ثانیه تا ۵ دقیقه)، خطای قطعی ⇒ «نرفت» بی گیر انداختنِ پشتِ سری‌ها، بلیتِ منقضی ⇒ «منتظرِ تأییدِ
  *  شماره» (پیام می‌ماند)، و برنامه وسطِ ارسال بسته شد ⇒ همان شناسه دوباره در صف. صفِ متن روی دیسک می‌ماند؛ بایت‌های
- *  عکس فقط در حافظه (بسته شدنِ برنامه عکسِ نفرستاده را می‌برد و صفحه «نرفت» نمی‌گوید چون دیگر در صف نیست).
+ *  عکس و صدا فقط در حافظه (بسته شدنِ برنامه رسانهٔ نفرستاده را می‌برد و صفحه «نرفت» نمی‌گوید چون دیگر در صف نیست).
+ *  پاسخ، ویرایش، سنجاق، جست‌وجو و پیوندِ هر نوشته به رشتهٔ خودش: `ShopperChatActs.kt`؛ صدا: `ShopperVoice.kt`.
  */
 
 @Serializable
@@ -54,6 +55,8 @@ data class ChatConversation(
   val canSend: Boolean = true,
   val blockedShop: Boolean = false,
   val receipts: ChatReceipts = ChatReceipts(),
+  /** سنجاق‌های خودِ مشتری (CHAT-14؛ بی متن) — سرورِ کهنه ⇒ تهی */
+  val pinned: List<ChatPin> = emptyList(),
 )
 
 @Serializable
@@ -82,6 +85,8 @@ data class ChatMessage(
   val deleted: Boolean = false,
   /** فقط پیامِ زندهٔ خودِ مشتری: پایانِ «حذف برای همه» به ساعتِ سرور (`remove` ِ سرور باز هم می‌سنجد؛ CHAT-08) */
   val deleteUntil: Long? = null,
+  /** همان، برای «ویرایش» (CHAT-14؛ `edit` ِ سرور باز هم می‌سنجد) */
+  val editUntil: Long? = null,
 )
 
 @Serializable
@@ -117,6 +122,10 @@ data class ChatOutItem(
   /** کدِ خطای سرور برای «نرفت» (متن را [ShopperText.error] می‌گوید) */
   val error: String = "",
   val createdAt: Long = 0,
+  /** پاسخ به پیامی از همین گفت‌وگو (CHAT-14؛ سرور پاسخ به گفت‌وگوی دیگر را ۴۰۰ `bad_reply` می‌دهد) */
+  val replyTo: String? = null,
+  /** پیامِ صوتی (CHAT-07): مدتِ ضبط؛ بایت‌ها مثلِ عکس فقط در حافظه */
+  val durationMs: Long? = null,
 )
 
 /** بایت‌های عکسِ آماده (پس از چرخش، حذفِ EXIF و فشرده‌سازی؛ [ShopperPhoto]) — فقط در حافظه. */
@@ -167,15 +176,15 @@ object ChatOutbox {
     emptyList()
   }
 
-  /** روی دیسک فقط پیام‌های متنی (بایتِ عکس در حافظه است، پس عکسِ نیمه‌کاره پس از بسته شدن بی‌معناست) */
+  /** روی دیسک فقط پیام‌های متنی (بایتِ عکس و صدا در حافظه است، پس رسانهٔ نیمه‌کاره پس از بسته شدن بی‌معناست) */
   fun dump(items: List<ChatOutItem>): String =
     ShopperJson.encodeToString(kotlinx.serialization.builtins.ListSerializer(ChatOutItem.serializer()), items.filter { it.kind == "text" })
 
   /** پیامِ تازه، پشتِ صفِ همان گفت‌وگو؛ ترتیب حتی با دو پیام در یک میلی‌ثانیه */
   fun add(items: List<ChatOutItem>, slug: String, convId: String, kind: String, body: String, now: Long, random: Random = Random,
-          width: Int? = null, height: Int? = null): Pair<List<ChatOutItem>, ChatOutItem> {
+          width: Int? = null, height: Int? = null, replyTo: String? = null, durationMs: Long? = null): Pair<List<ChatOutItem>, ChatOutItem> {
     val at = max(now, (items.maxOfOrNull { it.createdAt } ?: 0) + 1)
-    val item = ChatOutItem(newId(at, random), slug, convId, kind, body.trim(), width, height, createdAt = at)
+    val item = ChatOutItem(newId(at, random), slug, convId, kind, body.trim(), width, height, createdAt = at, replyTo = replyTo, durationMs = durationMs)
     //  سقف: کهنه‌ترین «نرفته»ها اول می‌روند، هرگز پیامی که هنوز در راه است
     val kept = if (items.size < MAX_ITEMS) items else items.filter { it.state != FAILED }.takeLast(MAX_ITEMS - 1)
     return (kept + item) to item
@@ -237,6 +246,8 @@ object ChatOutbox {
       x.mediaId?.let { add("\"mediaId\":" + q(it)) }
       x.thumbId?.let { add("\"thumbId\":" + q(it)) }
       if (x.kind == "image" && x.width != null && x.height != null) add("\"meta\":{\"width\":${x.width},\"height\":${x.height}}")
+      if (x.kind == "audio" && x.durationMs != null) add("\"meta\":{\"durationMs\":${x.durationMs}}")
+      x.replyTo?.let { add("\"replyTo\":" + q(it)) }
     }
     return parts.joinToString(",", "{", "}")
   }

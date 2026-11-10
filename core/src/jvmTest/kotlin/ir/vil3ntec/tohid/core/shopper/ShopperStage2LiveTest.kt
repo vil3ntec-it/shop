@@ -116,6 +116,22 @@ class ShopperStage2LiveTest {
     assertTrue(thread.arrived(item.clientId), "پیامِ صف در رشتهٔ سرور ⇒ از صف بیرون")
     assertEquals(2, thread.messages.count { it.mine })
     api.chatReceipts(slug, t.ticket, conv.id, 0, 0).ok("رسید")
+    // ── CHAT-14/07 روی سرورِ واقعی: سقف‌های گشودن، پاسخ، ویرایش با POST (JDK ِ HttpURLConnection PATCH نمی‌فرستد)، سنجاق، جست‌وجو ──
+    val opened = api.chatStart(slug, t.ticket, placed.order.orderNo, "مشتریِ دوم").ok("گشودن با سقف‌ها")
+    assertEquals(conv.id, opened.conversation.id)
+    assertFalse(opened.limits.voice, "پرچمِ خاموشِ shop.chat.voice ⇒ بی دکمهٔ صدا")
+    assertTrue(opened.limits.audioMax > 0 && opened.limits.imageMax > 0)
+    val (_, reply) = ChatOutbox.add(emptyList(), slug, conv.id, "text", "پاسخ به پیامِ خودم", now(), replyTo = first.message.id)
+    val replied = api.chatSend(slug, t.ticket, reply).ok("پاسخ").message
+    assertEquals(first.message.id, replied.replyTo)
+    assertTrue((replied.editUntil ?: 0) > now(), "editUntil ِ ساعتِ سرور روی پیامِ خودم")
+    val edited = api.chatEdit(slug, t.ticket, conv.id, replied.id, "پاسخِ ویرایش‌شده").ok("ویرایش با POST …/edit")
+    assertEquals("پاسخِ ویرایش‌شده", edited.body)
+    assertNotNull(edited.editedAt)
+    assertEquals(listOf(replied.id), api.chatPin(slug, t.ticket, conv.id, replied.id, true).ok("سنجاق").pinned.map { it.messageId })
+    assertTrue(api.chatPin(slug, t.ticket, conv.id, replied.id, false).ok("برداشتنِ سنجاق").pinned.isEmpty())
+    assertEquals(listOf(replied.id), api.chatSearch(slug, t.ticket, "ویرایش‌شده").ok("جست‌وجو").map { it.id })
+    assertEquals("query_too_short", api.chatSearch(slug, t.ticket, "پ").errorOrNull()?.code)
     val noTicket = api.chatOpen(slug, "v2.bad", null, "").errorOrNull()
     assertEquals(ChatFailure.VERIFY, ChatOutbox.failureOf(assertNotNull(noTicket)), "بی بلیت ⇒ تأییدِ دوباره، پیام در صف می‌ماند")
 

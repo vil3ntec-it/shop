@@ -233,7 +233,7 @@ async function pushChanges(ctx, changes) {
         const g = await guard.check(c, {
           table: collection, rowId: recordId, type: deleted ? 'delete' : 'update', fields: data, full: true,
         }, existing && !existing.deleted ? existing.data : null);
-        if (g && g.reject) throw require('./finalized-sales').forbiddenError();
+        if (g && g.reject) throw require('./finalized-sales').forbiddenError(g.reject);
       }
       if (creditLayers && collection === 'sales' && !deleted) {
         const bad = await require('./credit-cap').judgeLegacy({ role }, recordId, data, existing, creditLayers);
@@ -259,6 +259,11 @@ async function pushChanges(ctx, changes) {
         [shopId, recordId, rev, t, updatedAt, deleted, deviceId, userId, json]
       );
       applied++;
+    }
+    //  SR43-1: جابه‌جاییِ مشتریِ سندِ ثبت‌شده که به ادغامِ همین دسته تکیه کرد ولی آن ادغام ننشست ⇒ ۴۰۹ و کلِ دسته برمی‌گردد
+    if (guard) {
+      const g = guard.settle();
+      if (g && g.reject) throw require('./finalized-sales').forbiddenError(g.reject);
     }
 
     return { applied, skipped, conflicts, rev: await (async () => {

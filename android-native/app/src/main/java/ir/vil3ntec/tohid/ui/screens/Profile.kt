@@ -418,7 +418,7 @@ fun ProfileScreen(
       confirmButton = {
         if (verdict is LogoutGuard.Block) {
           TextButton(enabled = !busy, onClick = {
-            runCatching { SyncV1Worker.now(context) }
+            runCatching { SyncV1Worker.reconnect.userAsked(); SyncV1Worker.now(context) }
               .onSuccess { toast("همگام‌سازی شروع شد") }
               .onFailure { toast(it.userText("همگام‌سازی ناموفق بود")) }
           }) { Text(LogoutGuard.SYNC_NOW, color = colors.primary) }

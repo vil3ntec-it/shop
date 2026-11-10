@@ -282,6 +282,10 @@ class SyncV1CoreTest {
     assertEquals(SyncDot.RED, dot(error = true))
     //  خطا از همه بالاتر است، وگرنه پنهان می‌ماند
     assertEquals(SyncDot.RED, dot(error = true, online = false))
+    //  SYN-12: شکستِ بی هشدار (قطعیِ کوتاه یا ماندگارِ شبکه/سرور) سرخ نیست و هرگز سبز هم نیست
+    assertEquals(SyncDot.YELLOW, SyncDot.of(true, true, true, configured = true, queued = 0, busy = false, alarm = false))
+    assertEquals(SyncDot.GREY, SyncDot.of(true, false, true, configured = true, queued = 2, busy = false, alarm = false))
+    assertEquals(SyncDot.RED, SyncDot.of(true, false, true, configured = true, queued = 0, busy = false, alarm = true))
   }
 
   /* ------------------------ ارقامِ کدِ ورود ------------------------ */

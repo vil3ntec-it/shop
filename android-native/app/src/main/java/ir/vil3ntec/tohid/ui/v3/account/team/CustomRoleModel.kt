@@ -47,6 +47,7 @@ object CustomRoleModel {
     "sales.cancel" -> StrSetupPages.permVoid
     "sales.credit" -> StrAccount.permCredit
     "sales.price" -> StrAccount.permPrice
+    "customers.credit_limit" -> StrAccount.permCreditLimit // CRM-03
     "returns.create" -> StrSetupPages.permReturns
     "shift.report" -> StrShiftReview.permReports
     "safe.move" -> StrSetupPages.permSafe

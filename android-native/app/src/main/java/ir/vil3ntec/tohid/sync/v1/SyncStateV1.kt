@@ -3,6 +3,8 @@ package ir.vil3ntec.tohid.sync.v1
 import android.content.Context
 
 import ir.vil3ntec.tohid.core.i18n.StrSync
+import ir.vil3ntec.tohid.core.net.ApiFailure
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 /**
  *  حالِ همگام‌سازیِ **این حساب** روی این دستگاه.
  *
@@ -218,13 +220,35 @@ enum class SyncDot { GREEN, YELLOW, GREY, RED;
   }
 
   companion object {
-    fun of(error: Boolean, online: Boolean, signedIn: Boolean, configured: Boolean, queued: Int, busy: Boolean): SyncDot =
-      when {
-        error -> RED
-        !online || !signedIn || !configured -> GREY
-        queued > 0 || busy -> YELLOW
-        else -> GREEN
+    /** SYN-12: `alarm = false` (حکمِ `SyncOutage`) ⇒ شکست سرخ نمی‌کند ولی هرگز سبز هم نیست — `SyncOutage.dot` ِ core */
+    fun of(error: Boolean, online: Boolean, signedIn: Boolean, configured: Boolean, queued: Int, busy: Boolean, alarm: Boolean = true): SyncDot =
+      when (SyncOutage.dot(error, alarm, online, signedIn, configured, queued, busy)) {
+        SyncOutage.Dot.RED -> RED
+        SyncOutage.Dot.GREY -> GREY
+        SyncOutage.Dot.YELLOW -> YELLOW
+        SyncOutage.Dot.GREEN -> GREEN
       }
+  }
+}
+
+/**
+ *  SYN-12: کدِ شکست برای `SyncOutage` — بی پاسخ (نت، دامنه، مهلت) ⇒ `NO_RESPONSE`؛ پاسخِ HTTP ⇒ همان کد؛
+ *  بقیه (دیسک، ژورنال، پیکربندی، نشستِ بی کد) ⇒ `LOCAL` (کدِ متنیِ نشست جدا سنجیده می‌شود).
+ */
+internal object SyncFailure {
+  fun status(error: Throwable): Int = when (error) {
+    is ApiFailure.Offline, is ApiFailure.Unreachable, is ApiFailure.Timeout -> SyncOutage.NO_RESPONSE
+    is ApiFailure -> if (error.status > 0) error.status else SyncOutage.LOCAL
+    else -> SyncOutage.LOCAL
+  }
+
+  fun code(error: Throwable): String = (error as? ApiFailure)?.code.orEmpty()
+
+  /** شکستِ تازه ⇒ `lastError` ِ حال + رشتهٔ تازه یا ادامهٔ همان (`SyncOutage.next`)؛ صف و فاصلهٔ تلاش دست نمی‌خورند */
+  fun note(state: SyncStateV1, prev: SyncOutage.Streak?, error: Throwable, message: String, now: Long): SyncOutage.Streak {
+    val before = state.lastError
+    state.lastError = message
+    return SyncOutage.next(prev, before, status(error), code(error), message, now)
   }
 }
 
@@ -241,4 +265,6 @@ data class SyncStatus(
   val schemaVersion: Int,
   val serverSchema: Int,
   val live: Boolean,
+  /** SYN-12: چرا نرسید — شبکهٔ دستگاه، سرور، قطعیِ سراسری یا نشست (`SyncOutage.of`) */
+  val outage: SyncOutage.Kind = SyncOutage.Kind.OK,
 )

@@ -9,6 +9,8 @@
  *   SR42-2  O-06 (`stock-reserve.notifyReviewIn`): نگه‌دارندهٔ قفلِ موجودی (فروشِ حضوری/دستی) برای خبرِ `order_review` قفلِ کلیدِ
  *           ردیفِ سفارش (FK ِ `order_notify_outbox`) را می‌خواست، و گذار/ویرایش/بسته‌بندیِ همان سفارش ردیف را `FOR UPDATE` گرفته و
  *           منتظرِ قفلِ موجودی بود ⇒ بن‌بست؛ PostgreSQL گذارِ کارمند را با ۴۰P01 (۵۰۰) می‌انداخت.
+ *   R6      O-06 (`stock-reserve`): خاموش کردنِ `shop.stock_reserve` نگه‌داشته‌های باز را آزاد نمی‌کرد و نشانِ ویترین/کاتالوگ آن‌ها را
+ *           «گرفته» می‌شمرد در حالی که ثبت دیگر نمی‌شمرد؛ «افزودن» نگه‌داشتهٔ تازه می‌ساخت، «قبول» بی‌مهلتش و «تحویل» دراز.
  */
 process.env.RATE_LOGIN_EDGE_MAX = process.env.RATE_LOGIN_EDGE_MAX || '100000';
 
@@ -165,6 +167,121 @@ test('SR42-1: کوچک شدن و همان مقدار جای صف را نگه م�
   await push(s, sale('c1-s', [['c1-i', 'c1', 2]]));
   await refresh(s);
   assert.deepEqual([(await review(s, a)).review, (await review(s, b)).review], [false, true]);
+});
+
+// ---------------------------------------------------------------- R6
+
+const pubList = async (s, pid) => (await h.get(`/api/store/${s.slug}/products`)).body.items.find((p) => p.id === pid).stock.status;
+const pubDetail = async (s, pid) => (await h.get(`/api/store/${s.slug}/products/${pid}`)).body.product.stock.status;
+const staffStock = async (s, pid) => {
+  const one1 = (await h.get(`/api/shop/catalog/products/${pid}`, { token: s.token })).body.product.stock;
+  const listed = (await h.get('/api/shop/catalog/products', { token: s.token })).body.items.find((p) => p.id === pid).stock;
+  assert.deepEqual(listed, one1, 'فهرست و جزئیاتِ کاتالوگ یکی');
+  return [one1.reservedMilli, one1.sellableMilli, one1.badge.status];
+};
+const holdOf = async (orderId) => (await query(
+  `SELECT status, expires_at, short_at FROM stock_reservations WHERE order_id=$1 ORDER BY created_at, id`, [orderId]
+)).rows.map((r) => ({ status: r.status, expiresAt: r.expires_at === null ? null : Number(r.expires_at), short: r.short_at !== null }));
+const cards = async (s) => (await h.get('/api/shop/orders?tab=new', { token: s.token })).body.items;
+const shortTasks = async (s) => (await h.get('/api/shop/catalog/tasks?status=open', { token: s.token })).body.tasks
+  .filter((t) => t.kind === 'reservation_short');
+
+test('R6: `shop.stock_reserve` خاموش ⇒ نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (ویترین، کاتالوگ، ثبت، افزودن، قبول)؛ روشنِ دوباره ⇒ نگذشته می‌شمارد، گذشته نه', async () => {
+  const s = await storeShop('بازبینی۴۲-خاموش', 'o1', 1);
+  await push(s, [product('o2'), entry('o2-e', 'o2', 1)]);
+  await refresh(s);
+  assert.equal((await h.put('/api/shop/storefront/products/o2', { published: true }, { token: s.token })).status, 200);
+  const x = await customerOrder(s, '0791110011', 'o1', 1);   //  تنها o1 را نگه داشت (با مهلت)
+  const [h0] = await holdOf(x.id);
+  assert.equal(h0.status, 'held');
+  assert.ok(h0.expiresAt > Date.now());
+  assert.equal(await pubList(s, 'o1'), 'out_of_stock', 'روشن: نگه‌داشته گرفته است');
+
+  await live(s.shopId, 'shop.stock_reserve', false);
+  //  ویترین (فهرست و برگهٔ کالا) و کاتالوگِ کارمند: همان «امروزِ main» — نگه‌داشته شمرده نمی‌شود
+  assert.equal(await pubList(s, 'o1'), 'in_stock', 'خاموش: فهرستِ ویترین موجود');
+  assert.equal(await pubDetail(s, 'o1'), 'in_stock', 'خاموش: برگهٔ کالا موجود');
+  assert.deepEqual(await staffStock(s, 'o1'), [0, 1000, 'in_stock'], 'خاموش: کاتالوگِ کارمند بی نگه‌داشته');
+  assert.equal(await review(s, x.id), undefined, 'خاموش: جزئیاتِ سفارش بی stockHold');
+  //  ثبتِ مشتریِ دیگر همان آخرین عدد ⇒ ۲۰۱ (بی نگه‌داشته)
+  const y = await customerOrder(s, '0791110012', 'o1', 1);
+  assert.deepEqual(await holdOf(y.id), []);
+  //  افزودن ⇒ نگه‌داشتهٔ تازه نه (قلمِ ۲ بی ردیف)
+  const a = await addItems(s, x, 'o2', 1);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  assert.deepEqual(await heldRows(s, x.id), [[1, 1000]], 'خاموش: افزودن نگه‌داشته نمی‌سازد');
+  //  قبول ⇒ مهلت همان (جارو با زمانِ خودش می‌بندد)، نه بی‌مهلت
+  for (const id of [x.id, y.id]) assert.equal((await h.post(`/api/shop/orders/${id}/transition`, { to: 'accepted' }, { token: s.token })).status, 200);
+  assert.deepEqual(await holdOf(x.id), [h0], 'خاموش: قبول نگه‌داشته را بی‌مهلت نمی‌کند');
+  assert.ok((await cards(s)).every((c) => c.stockReview === undefined));
+
+  //  روشنِ دوباره: نگه‌داشتهٔ نگذشته دوباره می‌شمارد (ردیف در جدول ماند)
+  await live(s.shopId, 'shop.stock_reserve', true);
+  assert.equal(await pubList(s, 'o1'), 'out_of_stock');
+  assert.deepEqual(await staffStock(s, 'o1'), [1000, 0, 'out_of_stock']);
+  assert.equal((await review(s, x.id)).status, 'held');
+  //  گذشت ⇒ دیگر نمی‌شمارد و جارو می‌بندد؛ دفتر = نگه‌داشته‌ها
+  await query(`UPDATE stock_reservations SET expires_at=$2 WHERE order_id=$1 AND status='held'`, [x.id, Date.now() - 1]);
+  assert.equal(await pubList(s, 'o1'), 'in_stock');
+  assert.deepEqual(await staffStock(s, 'o1'), [0, 1000, 'in_stock']);
+  assert.equal((await review(s, x.id)).status, 'expired');
+  assert.ok((await lib().sweep()) >= 1);
+  assert.deepEqual((await holdOf(x.id)).map((r) => r.status), ['expired']);
+  const rep = await h.get('/api/shop/catalog/report', { token: s.token });
+  assert.equal(rep.body.ok, true, JSON.stringify(rep.body.mismatches));
+});
+
+test('R6: خاموش ⇒ فروشِ حضوری وظیفه/نشانِ بررسی نمی‌سازد و جارو با مهلتِ خودش می‌بندد؛ روشنِ دوباره ⇒ کمبودِ ثبت‌شده درست', async () => {
+  const s = await storeShop('بازبینی۴۲-خاموش-صندوق', 'p1', 1);
+  const x = await customerOrder(s, '0791110013', 'p1', 1);
+  await live(s.shopId, 'shop.stock_reserve', false);
+  await push(s, sale('p1-s', [['p1-i', 'p1', 1]]));   //  INV-19: هرگز رد نمی‌شود
+  await refresh(s);
+  assert.deepEqual(await shortTasks(s), [], 'خاموش: وظیفهٔ «کمبودِ نگه‌داشته» نه');
+  assert.ok((await cards(s)).every((c) => c.stockReview === undefined), 'خاموش: کارتِ سفارش بی «در بررسی»');
+  assert.equal(await review(s, x.id), undefined);
+  //  روشنِ دوباره پیش از گذشت ⇒ همان کمبودِ واقعی (فروشِ حضوری عدد را برد)
+  await live(s.shopId, 'shop.stock_reserve', true);
+  assert.equal((await review(s, x.id)).review, true, 'روشن: سفارش در بررسی');
+  //  دوباره خاموش و گذشت ⇒ جارو مثلِ همیشه می‌بندد
+  await live(s.shopId, 'shop.stock_reserve', false);
+  await query(`UPDATE stock_reservations SET expires_at=$2 WHERE order_id=$1 AND status='held'`, [x.id, Date.now() - 1]);
+  assert.ok((await lib().sweep()) >= 1);
+  assert.deepEqual((await holdOf(x.id)).map((r) => r.status), ['expired']);
+  await live(s.shopId, 'shop.stock_reserve', true);
+  assert.equal((await review(s, x.id)).status, 'expired');
+  const rep = await h.get('/api/shop/catalog/report', { token: s.token });
+  assert.equal(rep.body.ok, true, JSON.stringify(rep.body.mismatches));
+});
+
+test('R6: خاموش ⇒ تحویل مهلت را فقط کوتاه می‌کند — بی‌مهلتِ قبول‌شده سرانجام می‌بندد، مهلت‌دار دراز نمی‌شود', async () => {
+  const s = await shop('بازبینی۴۲-خاموش-تحویل');
+  for (const k of ['shop.orders', 'shop.catalog', 'shop.stock_reserve']) await live(s.shopId, k, true);
+  await push(s, [product('t1'), entry('t1-e', 't1', 2)]);
+  await refresh(s);
+  const mk = async () => {
+    const r = await h.post('/api/shop/orders', {
+      source: 'phone', fulfillment: 'pickup', paymentMethod: 'cod', customer: { name: 'م' },
+      lines: [{ productId: 't1', name: 'کالای t1', unit: 'دانه', qtyMilli: 1000, unitPriceMinor: 5000 }],
+    }, { token: s.token, headers: { 'Idempotency-Key': fresh() } });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    return r.body.order.id;
+  };
+  const go = async (id, to) => assert.equal((await h.post(`/api/shop/orders/${id}/transition`, { to }, { token: s.token })).status, 200, to);
+  const a = await mk();
+  const b = await mk();
+  await go(a, 'accepted');   //  روشن ⇒ بی‌مهلت
+  assert.deepEqual((await holdOf(a)).map((r) => r.expiresAt), [null]);
+  const [hb] = await holdOf(b);
+  await live(s.shopId, 'shop.stock_reserve', false);
+  const t0 = Date.now();
+  for (const id of [a, b]) {
+    for (const to of [...(id === b ? ['accepted'] : []), 'picking', 'packed', 'ready_for_pickup', 'picked_up']) await go(id, to);
+  }
+  const [ha] = await holdOf(a);
+  assert.equal(ha.status, 'held');
+  assert.ok(ha.expiresAt >= t0 + lib().HANDOVER_GRACE_MS && ha.expiresAt <= Date.now() + lib().HANDOVER_GRACE_MS, 'بی‌مهلت ⇒ مهلتِ پشتیبان');
+  assert.deepEqual(await holdOf(b), [hb], 'مهلت‌دار دراز نشد');
 });
 
 // ---------------------------------------------------------------- SR42-2
