@@ -682,7 +682,11 @@ ok(gets.length <= 2, 'رشتهٔ بی‌پیام: یک long-poll ِ باز، ن�
 await page.fill('#ct-text', 'آرد دارید؟');
 await page.click('#ct-send');
 await page.waitForFunction(() => /آرد/.test(document.getElementById('ct-list').textContent), null, { timeout: 10000 });
-const gen = await one("SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND order_id=''", [shopId]);
+//  ⛔ رشتهٔ همین شماره با کلیدِ یکتا (دکان، شماره، ''): گامِ «شمارهٔ دیگر» (۰۷۹۱۱۱۲۲۵۵) هم در همین دکان گفت‌وگوی عمومی دارد و
+//  SELECT ِ بی شماره و بی ORDER BY هر کدام را شاید بدهد — پس از autoanalyze ِ PostgreSQL ِ CI ⇒ Seq Scan به ترتیبِ heap ⇒ رشتهٔ
+//  دیگر کهنه می‌شد، این یکی باز می‌ماند و `#ct-old` هرگز نمی‌آمد (CI ِ #1024). بازتولید: ANALYZE پیش از همین SELECT.
+const gen = await one("SELECT id FROM shop_chat_conversations WHERE shop_id=$1 AND customer_phone=$2 AND order_id=''", [shopId, vc.body.phone]);
+ok(gen && ((await lastFrom(gen.id, 'customer')) || {}).body === 'آرد دارید؟', 'سرور: گفت‌وگوی عمومیِ همین شماره همان پیامِ تازه را دارد');
 await query('UPDATE shop_chat_conversations SET created_at = created_at - $2, last_message_at = last_message_at - $2 WHERE id=$1', [gen.id, 8 * DAY]);
 await query('UPDATE shop_chat_messages SET created_at = created_at - $2 WHERE conversation_id=$1', [gen.id, 8 * DAY]);
 await page.reload();
