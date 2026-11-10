@@ -85,7 +85,7 @@ async function resend(shopId, orderId, noticeId, { key, actor }) {
     const next = (await c.query(
       `UPDATE customer_notify_outbox
           SET status='pending', attempts=0, next_attempt_at=$2, locked_at=NULL, tried='[]'::jsonb, last_error='',
-              updated_at=$2
+              only_channel='', updated_at=$2
         WHERE id=$1 AND status = ANY($3::text[]) RETURNING *`,
       [row.id, at, RESENDABLE]
     )).rows[0];

@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1001,
+    "routes": 1004,
     "byAuth": {
-      "none-detected": 188,
+      "none-detected": 191,
       "admin": 276,
       "inline": 2,
       "user": 492,
@@ -31,7 +31,7 @@
     },
     "byShape": {
       "extracted": 702,
-      "empty": 297,
+      "empty": 300,
       "unresolved": 2
     }
   },
@@ -960,6 +960,8 @@
     {"method":"POST","path":"/api/store/:slug/orders/:token/items","area":"store","source":"server/src/routes/order-add-store.js","auth":"none-detected","guards":["rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-add-items-"],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":["404 not_found"],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/pay","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[502],"keys":["error"]},"errors":[],"shape":"extracted"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/pay-choice","area":"store","source":"server/src/routes/order-pay-store.js","auth":"none-detected","guards":["rateLimit({ max: config.rateLimit.storeCheckoutMax, keyPrefix: 'store-pay-choice"],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":["changed","order"]},"errors":[],"shape":"extracted"},
+    {"method":"DELETE","path":"/api/store/:slug/orders/:token/push","area":"store","source":"server/src/routes/store-push.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/orders/:token/push","area":"store","source":"server/src/routes/store-push.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/orders/:token/rating","area":"store","source":"server/src/routes/delivery-rating-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/orders/:token/rating","area":"store","source":"server/src/routes/delivery-rating-store.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/orders/:token/reorder","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug","token"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
@@ -1045,6 +1047,7 @@
     {"method":"GET","path":"/store/:slug/manifest.webmanifest","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[404],"keys":["error"]},"errors":[],"shape":"extracted"},
     {"method":"GET","path":"/store/:slug/p/:id","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":["id","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/store/:slug/sitemap.xml","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
-    {"method":"GET","path":"/store/go/:code","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":["code"],"query":[],"body":[],"response":{"statuses":[200,404],"keys":["campaign","error","store"]},"errors":[],"shape":"extracted"}
+    {"method":"GET","path":"/store/go/:code","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":["code"],"query":[],"body":[],"response":{"statuses":[200,404],"keys":["campaign","error","store"]},"errors":[],"shape":"extracted"},
+    {"method":"GET","path":"/store/sw.js","area":"web","source":"server/src/app.js","auth":"none-detected","guards":[],"params":[],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"}
   ]
 }

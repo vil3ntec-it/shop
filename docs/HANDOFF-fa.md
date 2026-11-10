@@ -53,6 +53,19 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/p0-close` (ردیف‌های P0 ِ ویترین و مشتری: دسته‌بندی و پوشِ وب ِ مشتری؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) دسته‌بندیِ ۲۱ ردیفِ P0 ِ نیمه‌کارهٔ WEB/CHK/ORD/DLV/PCK/CRM/NTF/LOC (+ PAY-07/23 ِ سفارشِ آنلاین): تقریباً همه پشتِ D-09، O-01، D-08،
+  تصمیمِ صاحب‌کار (نقشه، مترادف، CDN، وبِ پیک، رد یا بررسیِ سقفِ اعتبار) یا کارِ Kotlin‌اند. تنها شکافِ کدیِ ساختنی «پیامِ تأیید» بود:
+  §۳.۱۲ برای مشتری «پوشِ PWA» را نخستین کانال می‌داند و هیچ حسابِ بیرونی نمی‌خواهد. (۲) پوشِ وب ِ مشتریِ ویترین (CHK-20، NTF-01، ORD-16؛
+  مهاجرتِ ۴۷۰؛ پرچمِ خاموشِ `shop.storefront.web_push` + `shop.customer_notify`): `lib/store-push.js` (VAPID ِ خودِ سرور، رمزِ aes128gcm،
+  فهرستِ سفیدِ SSRF، حداکثر ۳ مرورگر با `FOR UPDATE`، لینکِ باطل ⇒ اشتراک پاک، SEC-10 `pushSubs`)، `customer-notify.builtin/catchUp`
+  («ثبت شد» ِ ماندهٔ پیش از «خبرم کن» فقط از پوش، `only_channel`)، درِ `POST/DELETE /api/store/:slug/orders/:token/push`، کارتِ
+  `store/order-push.js` و `store/sw.js`. `store-push.test.js` ۱۱/۱۱ (PGlite و PostgreSQL ِ محلی)، جهش ۱۲/۱۲، `web-store-push.mjs` ۳۸/۳۸
+  (کرومیومِ کامل؛ PGlite و PostgreSQL)، `web-store-allflags.mjs` ۳۳۵ ✅ با پرچمِ تازه.
+- نیمه‌کاره: شاهدِ CI؛ `CustomerErasure.kt` کلیدِ `pushSubs` را نشان نمی‌دهد (مثلِ `lists`)؛ `storefront-alerts` (WEB-10) هنوز پوشِ وب ندارد؛
+  آزمون با سرویسِ پوشِ واقعیِ مرورگر روی گوشی (این ماشین به FCM راه ندارد). یافتهٔ امنیتیِ بیرون از دامنه: `station-chat.js` (پمپ،
+  دست‌نخورده) endpoint ِ پوشِ مشتری را بی فهرستِ سفید POST می‌کند (SSRF) — رفعش اجازهٔ کدِ پمپ می‌خواهد.
+- قدمِ بعدی: پس از CI ِ سبز، ارتقای ردیف‌های «فقط شاهدِ CI»؛ «خبرم کن ِ موجود شد» (WEB-10) روی همین کانال؛ جوابِ D-09 برای مشتریِ بی پوش.
 ### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
   مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از

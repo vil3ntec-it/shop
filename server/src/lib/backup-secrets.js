@@ -25,7 +25,7 @@
  *   • کلید نیست ⇒ بازیابی موفق، رازها مهر و بی‌استفاده، پیامِ بلند (نام‌ها و kid، هرگز مقدار) که دقیقاً چه بگذارد. هیچ کلیدِ
  *     تازه‌ای ساخته نمی‌شود: مجوز ۵۰۳ ِ روشن (`license.js`)؛ برای `station_read_key` یک ردیفِ خالی (`PLACEHOLDER_KEYS`) جلوی
  *     ساختنِ کلیدِ تازه در `stations.js` را می‌گیرد (`INSERT … DO NOTHING` ⇒ «ساخته نشد») — کدِ پمپ دست نخورد، فقط داده.
- *     کلیدِ پوشِ وب (`station-chat.js`) بی ردیف جفتِ تازه می‌سازد: اشتراک‌های پوشِ مرورگر دوباره ثبت می‌شوند، قفلی نیست.
+ *     کلیدِ پوشِ وب (`station-chat.js`، و `store-push.js` ِ ویترین) بی ردیف جفتِ تازه می‌سازد: اشتراک‌های پوشِ مرورگر دوباره ثبت می‌شوند، قفلی نیست.
  * ⛔ هیچ مقدار، پاکت یا کلیدی در لاگ، سابقه، خطا یا meta نیست.
  */
 const crypto = require('crypto');
@@ -35,6 +35,7 @@ const { Transform, Readable } = require('stream');
 
 const SECRET_KEYS = Object.freeze([
   'email_key', 'email_pass', 'license_private_key', 'push_service_account', 'sms_key', 'station_read_key', 'vapid_private',
+  'store_vapid_private',
 ]);
 const SECRET_SET = new Set(SECRET_KEYS);
 const SEALED = 'sealed:';

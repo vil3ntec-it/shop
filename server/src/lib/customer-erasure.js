@@ -62,7 +62,7 @@ const KEPT = Object.freeze([
 const COUNT_KEYS = Object.freeze([
   'orders', 'orderLines', 'orderEvents', 'deliveryEvents', 'deliveryPhotos', 'pickPhotos', 'deliveryLocations',
   'notifyOutbox', 'conversations', 'messages', 'chatMedia', 'chatPins', 'chatReports', 'carts', 'favorites', 'lists', 'areaRequests',
-  'alerts', 'issues', 'issuePhotos', 'reviews',
+  'alerts', 'issues', 'issuePhotos', 'reviews', 'pushSubs',
 ]);
 
 const flagOn = (shopId) => flagOf(shopId, FLAG);
@@ -223,6 +223,10 @@ async function erase(shopId, target, { dryRun = false, by, userId = '', ip = '' 
             WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND phone_key <> 'erased' RETURNING id`,
           [shopId, orderIds, at]
         );
+        //  پوشِ وب ِ همین سفارش‌ها (مهاجرتِ ۴۷۰): نشانی و کلیدِ مرورگرِ مشتری — پاک، نه ناشناس
+        if (await has(c, 'store_push_subs')) {
+          counts.pushSubs = await q('DELETE FROM store_push_subs WHERE shop_id=$1 AND order_id = ANY($2::text[]) RETURNING id', [shopId, orderIds]);
+        }
         if (await has(c, 'order_issues')) {
           counts.issuePhotos = await qk(
             `DELETE FROM order_issue_photos WHERE shop_id=$1 AND issue_id IN (

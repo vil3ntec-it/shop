@@ -423,6 +423,7 @@ async function createApp({ runMigrations = true } = {}) {
     api.use('/store', require('./routes/order-pay-store'));   // «پرداخت پس از پذیرش»: نقد هنگامِ تحویل، پشتِ تنظیمِ خاموشِ دکان
     api.use('/store', require('./routes/storefront-promos-store'));   // MKT-01/09: تخفیفِ ویترین، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/delivery-rating-store'));   // DLV-18: امتیازِ مشتری به پیک، پشتِ پرچمِ خاموش
+    api.use('/store', require('./routes/store-push'));   // CHK-20/NTF-01: پوشِ وب ِ مشتری برای همین سفارش، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/storefront-finder-store'));   // WEB-07/10: فیلتر و «خبرم کن»، پشتِ پرچمِ خاموش
     api.use('/store', require('./routes/order-feedback-store'));   // NTF-07/09: گزارشِ مشکل با عکس و نظرِ سفارش، پشتِ دو پرچمِ خاموش
     api.use('/store', require('./routes/storefront-eta-store'));   // WEB-04: زمانِ تقریبیِ تحویل، پشتِ پرچمِ خاموش
@@ -678,6 +679,9 @@ async function createApp({ runMigrations = true } = {}) {
   const robotsOf = (sf, req, res) => storeSeo.robots(sf)
     .then((x) => res.set('Cache-Control', 'no-cache').type('text/plain').send(x));
   const hostSlug = (req) => storefront.slugFromHost(req.hostname);
+  //  پوشِ وب ِ مشتری (`store/sw.js`، فقط push و لمسِ اعلان، بی fetch): روی نشانیِ خودِ دکان (`{slug}.vill3n.top/`) دامنهٔ
+  //  کارگر همان `/` است ⇒ فقط همان‌جا `Service-Worker-Allowed: /`؛ مسیرِ `/store/<slug>` زیرِ `/store/` است و سرآیند نمی‌خواهد
+  app.get('/store/sw.js', (req, res, next) => { if (hostSlug(req)) res.set('Service-Worker-Allowed', '/'); next(); });
   app.use('/store', storeHeaders, express.static(storeDir, staticOpts));
   app.get('/store/:slug', storeHeaders, (req, res, next) => storePage(req.params.slug, res, req.query.lang).catch(next));
   app.get('/store/:slug/p/:id', seoOnly((req) => req.params.slug, productPage));
