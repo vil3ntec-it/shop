@@ -106,6 +106,7 @@ const KNOWN = Object.freeze([
   { key: 'shop.orders.notice_resend', scope: 'shop', default: false, what: '«فرستادنِ دوبارهٔ» پیامِ وضعیت به مشتری (ORD-16)' },
   { key: 'shop.orders.online_report', scope: 'shop', default: false, what: 'گزارشِ فروشِ اینترنتی و جست‌وجوهای بی‌نتیجهٔ ویترین (RPT-14)' },
   { key: 'shop.customer_notify', scope: 'shop', default: false, what: 'اعلانِ وضعیتِ سفارش و «خبرم کن» به مشتری (NTF-01/03/04)' },
+  { key: 'shop.storefront.web_push', scope: 'shop', default: false, what: 'پوشِ وب ِ مشتری: «خبرم کن روی همین دستگاه» در پیگیریِ سفارش، بی حسابِ بیرونی (CHK-20، NTF-01)؛ با `shop.customer_notify`' },
   { key: 'shop.delivery_customer_view', scope: 'shop', default: false, what: 'نمای پیک برای مشتری: نامِ کوچک، کدِ تحویل و زمانِ تقریبی (S5، DLV-06)؛ با `shop.delivery`' },
   { key: 'market.directory', scope: 'shop', default: false, what: 'فهرستِ بازار' },
   //  دستهٔ ۲۷ (چک‌لیستِ روشن کردن: docs/FLAGS-ON-fa.md) — بی ردیفِ این‌جا زبانهٔ «پرچم‌ها» آن‌ها را نشان نمی‌داد و مقدارِ

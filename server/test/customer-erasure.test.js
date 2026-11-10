@@ -327,6 +327,7 @@ test('SEC-10: صاحبِ دکان — پیش‌نمایش بی نوشتن؛ اج
     alerts: (await exists('storefront_alerts')) ? 1 : 0,
     issues: (await exists('order_issues')) ? 2 : 0, issuePhotos: (await exists('order_issues')) ? 2 : 0,
     reviews: (await exists('order_reviews')) ? 2 : 0,
+    pushSubs: 0,   //  پوشِ وب (مهاجرتِ ۴۷۰): این دکان پرچمش را ندارد ⇒ هیچ اشتراکی؛ پاک شدنِ اشتراک‌ها در store-push.test.js
   });
   assert.ok(done.body.kept.includes('order_ledger_docs') && done.body.kept.includes('device_sync_ledger'));
 
