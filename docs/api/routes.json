@@ -20,9 +20,9 @@
     "shape": "extracted | empty | unresolved — شکلِ درخواست/پاسخ تقریبی است: فیلدی که به تابعِ کمکی می‌رود دیده نمی‌شود"
   },
   "counts": {
-    "routes": 1004,
+    "routes": 1006,
     "byAuth": {
-      "none-detected": 191,
+      "none-detected": 193,
       "admin": 276,
       "inline": 2,
       "user": 492,
@@ -31,7 +31,7 @@
     },
     "byShape": {
       "extracted": 702,
-      "empty": 300,
+      "empty": 302,
       "unresolved": 2
     }
   },
@@ -922,6 +922,8 @@
     {"method":"GET","path":"/api/store/:slug/alerts","area":"store","source":"server/src/routes/storefront-finder-store.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/alerts/:productId/:kind","area":"store","source":"server/src/routes/storefront-finder-store.js","auth":"none-detected","guards":[],"params":["kind","productId","slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"PUT","path":"/api/store/:slug/alerts/:productId/:kind","area":"store","source":"server/src/routes/storefront-finder-store.js","auth":"none-detected","guards":[],"params":["kind","productId","slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"DELETE","path":"/api/store/:slug/alerts/push","area":"store","source":"server/src/routes/store-push.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
+    {"method":"POST","path":"/api/store/:slug/alerts/push","area":"store","source":"server/src/routes/store-push.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"DELETE","path":"/api/store/:slug/area-request","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[200],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"POST","path":"/api/store/:slug/area-request","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":[],"body":[],"response":{"statuses":[],"keys":[]},"errors":[],"shape":"empty"},
     {"method":"GET","path":"/api/store/:slug/banners","area":"store","source":"server/src/routes/storefront.js","auth":"none-detected","guards":[],"params":["slug"],"query":["zone"],"body":[],"response":{"statuses":[200],"keys":["banners"]},"errors":["404 banners_disabled"],"shape":"extracted"},

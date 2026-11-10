@@ -81,11 +81,14 @@ object StrErasure {
     "chatReports" -> t("گزارشِ گفت‌وگو", "Chat reports", "د خبرو راپورونه")
     "carts" -> t("سبدِ خرید", "Carts", "د پېر ټوکرۍ")
     "favorites" -> t("پسندیده", "Favourites", "خوښې")
+    "lists" -> t("فهرستِ خرید", "Shopping lists", "د پېرود لړونه")
     "areaRequests" -> t("درخواستِ ناحیه", "Area requests", "د سیمې غوښتنې")
     "alerts" -> t("«خبرم کن»", "Notify-me requests", "ما خبر کړه غوښتنې")
     "issues" -> t("گزارشِ مشکل", "Problem reports", "د ستونزې راپورونه")
     "issuePhotos" -> t("عکسِ گزارش", "Report photos", "د راپور انځورونه")
     "reviews" -> t("نظر", "Reviews", "نظرونه")
+    "pushSubs" -> t("اعلانِ سفارش روی دستگاه", "Order notifications on devices", "پر وسیلو د فرمایش خبرتیاوې")
+    "alertPushSubs" -> t("اعلانِ «خبرم کن» روی دستگاه", "Notify-me notifications on devices", "پر وسیلو د «خبر مې کړه» خبرتیاوې")
     else -> t(asIs(key), key, key)
   }
 }

@@ -22,8 +22,11 @@
  *             `shop.customer_notify` ِ روشن (وگرنه `notify_off`)؛ سقفِ هر شماره `PER_DAY` خبر در ۲۴ ساعت؛
  *             کانالِ پولی فقط زیرِ سقفِ روزانهٔ هزینهٔ همان دکان و کانال (NTF-02) که **مشترک** است: هزینهٔ
  *             این خبرها در `customer-notify.spentToday` و هزینهٔ اعلانِ سفارش این‌جا شمرده می‌شود. پاسخِ مبهم
- *             ⇒ `failed`، نه کانالِ بعدی و نه دوباره (شاید رفته باشد). امروز هیچ سرویس‌دهنده‌ای وصل نیست
- *             (D-09) ⇒ حالِ صادقانهٔ `no_channel`؛ وضعیت در «هشدارهای من» ِ مشتری دیده می‌شود.
+ *             ⇒ `failed`، نه کانالِ بعدی و نه دوباره (شاید رفته باشد). سقفِ هر دکان: حداکثر `shopPerDay()`
+ *             خبرِ رفته در ۲۴ ساعت (همهٔ کانال‌ها، `STORE_ALERTS_SHOP_PER_DAY`) ⇒ بیشتر `rate_limited`.
+ *   پوش ──── کانالِ `push` ِ بی حسابِ بیرونی: پوشِ وب ِ همین مرورگر (`store-alert-push.js`، مهاجرتِ ۴۷۵، پرچمِ
+ *             `shop.storefront.web_push`)؛ مشتری در «خبرم کن» ِ برگهٔ کالا با لمسِ خودش روشنش می‌کند. پیام فقط
+ *             نام و قیمتِ کالا. واتس‌اپ/تلگرام امروز سرویس‌دهنده ندارند (D-09) ⇒ بی پوش حالِ صادقانهٔ `no_channel`.
  *   حریم ──── متن فقط نامِ ویترین و نامِ کالا (بی قیمت، بی شماره)؛ شماره فقط به سرویس‌دهنده، هرگز به لاگ.
  */
 const { query, one, many, tx, now } = require('../db');
@@ -46,6 +49,11 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const TTL_MS = 90 * DAY_MS;
 const BATCH = 200;
 const LIST_MAX = 100;
+/** سقفِ خبرهای رفتهٔ هر دکان در ۲۴ ساعت (هر کانال) — خبرِ بیشتر `rate_limited`؛ کمینه ۱ */
+const shopPerDay = () => {
+  const v = Number(process.env.STORE_ALERTS_SHOP_PER_DAY);
+  return Number.isSafeInteger(v) && v >= 1 ? v : 500;
+};
 const tickMs = () => {
   const v = Number(process.env.STORE_ALERTS_TICK_MS);
   return Number.isSafeInteger(v) && v >= 1000 ? v : 60_000;
@@ -109,7 +117,9 @@ async function list(store, phone) {
     `SELECT * FROM storefront_alerts WHERE shop_id = $1 AND phone = $2 ORDER BY created_at DESC, id LIMIT $3`,
     [store.shop_id, phone, LIST_MAX]
   );
-  return { items: rows.map(view), max: MAX_PER_SHOP };
+  //  پوشِ وب روشن ⇒ کلیدِ عمومیِ سرور برای «روی همین دستگاه» (نبود ⇒ کلید نیست)
+  const push = await require('./store-alert-push').keyOf(store.shop_id);
+  return { items: rows.map(view), max: MAX_PER_SHOP, ...(push ? { push } : {}) };
 }
 
 /** ثبت (یا مسلح کردنِ دوبارهٔ هشدارِ سوخته). ⇒ { alert, created } */
@@ -190,15 +200,23 @@ async function deliver(a, p, at) {
     "SELECT COUNT(*)::int AS n FROM storefront_alerts WHERE phone = $1 AND notice = 'sent' AND sent_at > $2", [a.phone, at - DAY_MS]
   );
   if (sent.n >= PER_DAY) return settle(a, 'rate_limited', { at });
+  const shopSent = await one(
+    "SELECT COUNT(*)::int AS n FROM storefront_alerts WHERE shop_id = $1 AND notice = 'sent' AND sent_at > $2", [a.shop_id, at - DAY_MS]
+  );
+  if (shopSent.n >= shopPerDay()) return settle(a, 'rate_limited', { tried: [{ channel: '*', result: 'shop_cap' }], at });
   const shop = await one('SELECT slug, title FROM storefronts WHERE shop_id = $1', [a.shop_id]);
   const lang = LANGS.includes(a.lang) ? a.lang : 'fa';
   const text = render(a.kind, lang, { shop: clean(shop && shop.title) || '—', product: clean(p.name) || '—' });
   const link = linkFor(shop && shop.slug, a.product_id, lang);
   const sized = link ? `${text} ${link}` : text;
-  const msg = { to: { phone: a.phone }, shopId: a.shop_id, productId: a.product_id, event: `product_${a.kind}_alert`, lang, text, link };
+  //  `productName`/`priceMinor`/`kind` فقط برای پوشِ وب (نام و قیمت، نه شماره)؛ `at` همان ساعتِ این دور
+  const msg = {
+    to: { phone: a.phone }, shopId: a.shop_id, productId: a.product_id, event: `product_${a.kind}_alert`, lang, text, link,
+    kind: a.kind, productName: clean(p.name), priceMinor: p.priceMinor, at,
+  };
   const tried = [];
   for (const channel of CHANNELS) {
-    const provider = notify.providerOf(channel);
+    const provider = notify.providerOf(channel) || await require('./store-alert-push').builtin(channel, a.shop_id);
     if (!provider) { tried.push({ channel, result: 'not_configured' }); continue; }
     const price = cost.costMicros(channel, sized);
     if (price > 0 && !cost.allows(channel, sized, await notify.spentToday(a.shop_id, channel, at)).ok) {
@@ -269,6 +287,8 @@ async function tick(at = now()) {
     for (const [shopId, list] of byShop) {
       try { fired += await checkShop(shopId, list, at); } catch (err) { console.error('[storefront-alerts]', err.message); }
     }
+    //  اشتراکِ پوشِ منقضی (مهاجرتِ ۴۷۵) حتی بی هیچ گذاری نمی‌ماند
+    try { await require('./store-alert-push').purge(at); } catch (err) { console.error('[storefront-alerts] purge', err.message); }
     return { checked: rows.length, fired };
   } finally {
     ticking = false;
@@ -287,6 +307,6 @@ function stop() {
 }
 
 module.exports = {
-  FLAG_KEY, KINDS, CHANNELS, MAX_PER_SHOP, WRITES_PER_HOUR, PER_DAY, TTL_MS, TEMPLATES,
+  FLAG_KEY, KINDS, CHANNELS, MAX_PER_SHOP, WRITES_PER_HOUR, PER_DAY, TTL_MS, TEMPLATES, shopPerDay,
   flagOn, langOf, render, list, subscribe, unsubscribe, spentToday, deliver, checkShop, tick, start, stop,
 };

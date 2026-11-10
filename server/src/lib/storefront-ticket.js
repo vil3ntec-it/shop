@@ -82,6 +82,22 @@ async function verifiedPhoneOfTicket(ticket, { maxAgeMs = null, at = now() } = {
 }
 
 /**
+ * شمارهٔ تأییدشده با اثباتش: بلیتِ تازه (`ticket`، نسل و انقضا)، وگرنه نشستِ حسابِ مشتری (`session`) — یا null.
+ * تنها منبعِ `storefront.verifiedPhone` (همان ترتیب: بلیت جلوتر). اثبات برای کاری که بعداً به نامِ همین شماره انجام می‌شود
+ * (پوشِ «خبرم کن»، `store-alert-push.js`) نگه داشته می‌شود تا باطل یا منقضی شدنش همان کار را هم ببندد.
+ * ⛔ بی شرطِ «نشست هست؟»: `auth` خودش نشستِ تهی/بی‌شکل را بی پرس‌وجو null می‌کند؛ شرطِ بیرونی یعنی «مقدارِ کاربر
+ *    تصمیم می‌گیرد احراز اجرا شود یا نه» (CodeQL: user-controlled bypass).
+ */
+async function verification(ticket, session, at = now()) {
+  const t = parseTicket(ticket, at);
+  if (t && (await require('./store-customers').ticketGen(t.phone)) === t.gen) {
+    return { phone: t.phone, proof: 'ticket', gen: t.gen, expiresAt: t.expiresAt };
+  }
+  const a = await require('./store-customers').auth(session, at);
+  return a ? { phone: a.customer.phone, proof: 'session', sessionId: a.sessionId, expiresAt: a.expiresAt } : null;
+}
+
+/**
  * آیا کد واقعاً به مشتری می‌رسد؟ در تولید، راهِ `log` یعنی کد فقط در لاگِ
  * سرور می‌نشیند ⇒ تأیید در دسترس نیست و همین را صریح می‌گوییم (۲۳.۳ بندِ ۳).
  */
@@ -114,5 +130,5 @@ async function checkVerification(body) {
   return { phone, ...ticketOf(phone, now(), gen) };
 }
 
-  return { ticketOf, parseTicket, verifiedPhoneOfTicket, verificationAvailable, startVerification, checkVerification };
+  return { ticketOf, parseTicket, verifiedPhoneOfTicket, verification, verificationAvailable, startVerification, checkVerification };
 };
