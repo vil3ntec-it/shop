@@ -138,12 +138,13 @@ async function planIn(c, shopId, from, input, lines, orderId = '') {
 }
 
 /** اثرِ قاعده‌های خودکارِ ویترین بر قلم‌های افزوده: سبدِ تازه منهای سبدِ پیشین، همین لحظه (کد هرگز). */
-async function autoExtraIn(c, store, before, after, at, promosOn) {
+async function autoExtraIn(c, store, before, after, at, promosOn, group = '') {
   if (!promosOn) return 0;
   const promos = require('./storefront-promos');
   const run = (t, p) => c.query(t, p);
-  const a = await promos.evaluate(run, store, after, '', at);
-  const b = await promos.evaluate(run, store, before, '', at);
+  //  PRM-11: همان گروهِ ثبت (شمارهٔ تأییدشدهٔ همان سفارش؛ پرچمِ `shop.storefront.promo_groups` خاموش ⇒ '')
+  const a = await promos.evaluate(run, store, after, '', at, { group });
+  const b = await promos.evaluate(run, store, before, '', at, { group });
   return Math.max(0, a.discountMinor - b.discountMinor);
 }
 
@@ -172,6 +173,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
     orders.flagOf(shopId, require('./storefront-promos').FLAG),
   ]);
   await require('./catalog').prepare(shopId, { at: now() });
+  const group = promosOn ? await require('./storefront-promo-groups').prepare(shopId, phone) : '';
 
   const out = await tx(async (c) => {
     const { row, lines, events } = await amend.lockOrder(c, shopId, orderId);
@@ -198,7 +200,7 @@ async function add(store, token, { key, body, ticket = '', session = '' }) {
     const pl = await planIn(c, shopId, from, input, lines, row.id);
     const subtotalMinor = pl.after.reduce((s, l) => s + l.lineTotalMinor, 0);
     const prevDiscountMinor = Number(row.discount_minor);
-    const extra = await autoExtraIn(c, store, pl.before, pl.after, at, promosOn);
+    const extra = await autoExtraIn(c, store, pl.before, pl.after, at, promosOn, group);
     const discountMinor = Math.min(subtotalMinor, prevDiscountMinor + extra);
     const deliveryFeeMinor = Number(row.delivery_fee_minor);
     const totalMinor = subtotalMinor - discountMinor + deliveryFeeMinor;
