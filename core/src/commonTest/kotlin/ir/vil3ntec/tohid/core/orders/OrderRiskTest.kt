@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.orders
 
+import ir.vil3ntec.tohid.core.shopper.GeoPin
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -12,6 +13,8 @@ import kotlin.test.assertTrue
 /**
  *  RSK-03 — خواندنِ «سابقهٔ مشتری» ِ سرور (`GET /api/shop/orders/:id/risk`، `order-risk.js` ‹riskOf›) برای کارتِ جزئیاتِ
  *  سفارش: پرچمِ خاموش و پاسخِ بدشکل ⇒ هیچ؛ مشتریِ تازه ⇒ فقط نشانهٔ «تازه»؛ هشدارها اول؛ کدِ ناشناخته کنار نمی‌رود.
+ *  «کارت در صف» (`GET …/risk/queue`، `queueOf`): خواندنِ نرم، تصمیمِ کارت (سرورِ کهنه ⇒ هیچ، خطا ⇒ «خوانده نشد») و نشانِ
+ *  کارتِ هر سفارش؛ RSK-04: فرم و بدنهٔ «بستنِ این جا» (همان رشتهٔ `server/test/order-risk-queue.test.js`).
  */
 class OrderRiskTest {
 
@@ -91,5 +94,93 @@ class OrderRiskTest {
       """{"list":"block","kind":"phone","phone":"+93700111222","reason":"سه بار نبود","expiresInDays":30}""",
       b.toString(),
     )
+  }
+
+  @Test fun queueIsReadLenientlyWarningsFirstAndQuietRowsDropped() {
+    val q = OrderRisk.queue(json(
+      """{"enabled":true,"items":[
+          {"orderId":"o2","orderNo":42,"status":"new","createdAt":9,"flags":[{"code":"new_customer","severity":"info","count":0},
+            {"code":"delivery_failed_before","severity":"warn","count":1},{"code":"returned_to_shop_before","severity":"warn","count":1}]},
+          {"orderId":"o3","orderNo":43,"status":"accepted","flags":[{"code":"new_customer","severity":"info","count":0}]},
+          {"orderNo":44,"flags":[{"code":"blocklisted","severity":"warn","count":1}]},
+          {"orderId":"o1","orderNo":41,"status":"packed","flags":[{"code":"chargeback_before","severity":"warn","count":2}]}],
+        "scanned":3,"limit":20,"truncated":true}""",
+    ))
+    assertTrue(q.enabled)
+    assertTrue(q.truncated)
+    assertEquals(listOf("o2", "o1"), q.items.map { it.orderId })
+    assertEquals(42L, q.items[0].orderNo)
+    assertEquals("new", q.items[0].status)
+    assertEquals(listOf("delivery_failed_before", "returned_to_shop_before", "new_customer"), q.items[0].flags.map { it.code })
+    //  کدِ ناشناختهٔ سرورِ تازه‌تر کنار نمی‌رود
+    assertEquals("chargeback_before", q.items[1].flags.single().code)
+    assertFalse(OrderRisk.queue(json("""{"enabled":false}""")).enabled)
+    assertFalse(OrderRisk.queue(json("""{"enabled":"true","items":[]}""")).enabled)
+    assertFalse(OrderRisk.queue(null).enabled)
+    assertTrue(OrderRisk.queue(json("""{"enabled":true,"items":"x"}""")).items.isEmpty())
+  }
+
+  @Test fun queueCardHidesForOldServerAndNeverClaimsSafe() {
+    val some = OrderRisk.Queue(true, listOf(OrderRisk.QueueItem("o1", 1, "new", listOf(OrderRisk.Flag("no_show_before", OrderRisk.Severity.WARN, 1)))))
+    val none = OrderRisk.Queue(true)
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(false, some, null), "پرچمِ /config خاموش")
+    assertEquals(OrderRisk.QueueCard.ITEMS, OrderRisk.queueCard(true, some, null))
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(true, none, null))
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(true, OrderRisk.Queue(false), null))
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(true, null, null), "هنوز بار نشده")
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(true, null, 404), "سرورِ کهنه بی این در")
+    assertEquals(OrderRisk.QueueCard.HIDDEN, OrderRisk.queueCard(true, null, 403))
+    assertEquals(OrderRisk.QueueCard.FAILED, OrderRisk.queueCard(true, null, 0), "بی شبکه")
+    assertEquals(OrderRisk.QueueCard.FAILED, OrderRisk.queueCard(true, null, 500))
+    assertEquals(OrderRisk.QueueCard.FAILED, OrderRisk.queueCard(true, null, 429))
+  }
+
+  @Test fun cardFlagsGiveFirstWarningPerOrder() {
+    val q = OrderRisk.queue(json(
+      """{"enabled":true,"items":[{"orderId":"o2","flags":[{"code":"new_customer","severity":"info"},
+        {"code":"many_open","severity":"warn","count":3},{"code":"no_show_before","severity":"warn","count":1}]}]}""",
+    ))
+    val m = OrderRisk.cardFlags(q)
+    assertEquals(setOf("o2"), m.keys)
+    assertEquals("many_open", m.getValue("o2").code)
+    assertEquals(3L, m.getValue("o2").count)
+    assertTrue(OrderRisk.cardFlags(null).isEmpty())
+    assertTrue(OrderRisk.cardFlags(OrderRisk.Queue(false)).isEmpty())
+    //  ردیفی که (دستی) بی هشدار ساخته شده کرش نمی‌دهد
+    assertTrue(OrderRisk.cardFlags(OrderRisk.Queue(true, listOf(OrderRisk.QueueItem("x", 1, "new", emptyList())))).isEmpty())
+  }
+
+  @Test fun pinEntryFormAndBodyUseServerBounds() {
+    val pin = GeoPin(34.531234, 69.171234)
+    assertNull(OrderRisk.pinEntryError(pin, 150, "نشانیِ ساختگی", 30))
+    assertEquals("pin_required", OrderRisk.pinEntryError(null, 150, "نشانیِ ساختگی", 30))
+    assertEquals("pin_required", OrderRisk.pinEntryError(GeoPin(0.0, 0.0), 150, "نشانیِ ساختگی", 30))
+    assertEquals("pin_required", OrderRisk.pinEntryError(GeoPin(91.0, 69.0), 150, "نشانیِ ساختگی", 30))
+    assertEquals("bad_radius", OrderRisk.pinEntryError(pin, 9, "نشانیِ ساختگی", 30))
+    assertEquals("bad_radius", OrderRisk.pinEntryError(pin, 2001, "نشانیِ ساختگی", 30))
+    assertEquals("bad_radius", OrderRisk.pinEntryError(pin, null, "نشانیِ ساختگی", 30))
+    assertNull(OrderRisk.pinEntryError(pin, OrderRisk.RADIUS_MIN, "abc", 1))
+    assertNull(OrderRisk.pinEntryError(pin, OrderRisk.RADIUS_MAX, "abc", OrderRisk.DAYS_MAX))
+    assertEquals("reason_required", OrderRisk.pinEntryError(pin, 150, " ab ", 30))
+    assertEquals("bad_expiry", OrderRisk.pinEntryError(pin, 150, "نشانیِ ساختگی", 366))
+    //  همان رشته‌ای که `order-risk-queue.test.js` به سرور می‌فرستد و ۲۰۱ می‌گیرد
+    assertEquals(
+      """{"list":"block","kind":"pin","lat":34.531234,"lng":69.171234,"radiusM":150,"reason":"نشانیِ ساختگی","expiresInDays":30}""",
+      OrderRisk.pinEntryBody(GeoPin(34.5312341, 69.1712339), 150, "  نشانیِ   ساختگی ", 30).toString(),
+    )
+  }
+
+  @Test fun orderPinOnlyForDeliveryWithRealPin() {
+    assertEquals(GeoPin(34.5, 69.2), OrderRisk.orderPin("delivery", 34.5, 69.2))
+    assertNull(OrderRisk.orderPin("pickup", 34.5, 69.2))
+    assertNull(OrderRisk.orderPin("delivery", null, 69.2))
+    assertNull(OrderRisk.orderPin("delivery", 0.0, 0.0))
+  }
+
+  @Test fun typedPhoneKeepsOnlyDigitsAndPlus() {
+    assertEquals("0791120005", OrderRisk.typedPhone(" ۰۷۹۱ ۱۲۰-۰۰۵ "))
+    assertEquals("+93700111222", OrderRisk.typedPhone("+93 700 111 222"))
+    assertEquals("", OrderRisk.typedPhone("  "))
+    assertEquals("phone_required", OrderRisk.entryError(OrderRisk.BLOCK, OrderRisk.typedPhone(" - "), "سه بار نبود", 30))
   }
 }

@@ -22,6 +22,7 @@ import ir.vil3ntec.tohid.core.i18n.StrOnline
 import ir.vil3ntec.tohid.core.i18n.StrOrdersHub
 import ir.vil3ntec.tohid.core.model.OrderDto
 import ir.vil3ntec.tohid.core.model.OrderPermsDto
+import ir.vil3ntec.tohid.core.orders.OrderRisk
 import ir.vil3ntec.tohid.ui.theme.V3ButtonKind
 import ir.vil3ntec.tohid.ui.theme.V3Tone
 import ir.vil3ntec.tohid.ui.v3.V3Action
@@ -79,6 +80,10 @@ fun OrdersScreen(
   header: (@Composable () -> Unit)? = null,
   /** انتخابِ چندتایی (ORD-19): null ⇒ نیست؛ وگرنه کارت تیک دارد و دکمهٔ گام ندارد */
   picked: Set<String>? = null,
+  /** RSK-03 «کارت در صف»: شناسهٔ سفارش ⇐ نخستین هشدار (`OrderRisk.cardFlags`)؛ تهی ⇒ هیچ نشانی */
+  riskFlags: Map<String, OrderRisk.Flag> = emptyMap(),
+  /** گزینه‌های افزودهٔ «…» (مثلاً RSK-04 «فهرستِ بسته و مطمئن»)، پس از «دوباره» */
+  menu: List<V3MenuItem> = emptyList(),
 ) {
   val stagger = rememberV3Stagger(state.tab)
   V3Scaffold(
@@ -87,7 +92,7 @@ fun OrdersScreen(
     modifier = modifier,
     onBack = onBack,
     actions = if (state.perms.create) listOf(V3Action(Icons.Outlined.Add, StrOnline.manualOrder, onClick = actions.onNew)) else emptyList(),
-    overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = actions.onRetry)),
+    overflow = listOf(V3MenuItem(Icons.Outlined.Refresh, StrOnline.reload, onClick = actions.onRetry)) + menu,
     chips = {
       DraftCountTabs(
         tabs = OrdersHubModel.tabs(state.counts, state.tab).map { t -> CountTab(t, StrOrdersHub.tab(t), state.counts[t] ?: 0, attention = t == "new") },
@@ -132,6 +137,7 @@ fun OrdersScreen(
               selected = o.id == selectedId || picked?.contains(o.id) == true,
               checked = picked?.let { o.id in it },
               flash = o.id in state.fresh,
+              risk = riskFlags[o.id]?.let(::flagText),
               modifier = Modifier.v3AnimateItem(this).v3Stagger(stagger, o.id, i),
             )
           }

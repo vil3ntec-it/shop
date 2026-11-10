@@ -273,6 +273,13 @@
   `dari-text` + `kotlin-file-mirrors` ۲۱/۲۱.
 - نیمه‌کاره: ویدیوها؛ پشتوی ۸۹ گام (بازبینی‌شده نداریم)؛ دکمهٔ «راهنمای این صفحه» روی گوشی (تصمیمِ صاحب‌کار، OWNER-ACTIONS بخشِ ۷). STATUS همان PARTIAL.
 - قدمِ بعدی: شاهدِ CI ِ سه آزمونِ Kotlin؛ اگر صاحب‌کار نامِ دکمه‌ای را عوض کرد، `ScreenGuidesTextTest` همان راهنما را نشان می‌دهد.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/rsk-app` (RSK-03 «کارت در صف» و RSK-04 پین و صفحهٔ جدای فهرست، سمتِ برنامه؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) سرور: `GET /api/shop/orders/risk/queue` (`order-risk.queueOf`، `routes/order-risk-queue.js`، سوار پیش از `/shop/orders`؛ سطلِ IP و سقفِ هر کاربر)
+  فقط سفارش‌های پیش از ارسال با هشدار، نشانه‌ها همان `riskOf`؛ `order-risk-queue` ۳/۳ (اول ۰/۳ سرخ) روی PGlite و PostgreSQL ِ محلی، `docs/api/routes.json` تازه؛
+  `app.js` با فشرده کردنِ دو توضیح ۸۰۰ خط ماند. (۲) هسته: `OrderRisk.queue/queueCard/cardFlags/orderPin/pinEntryError/pinEntryBody/typedPhone`. (۳) برنامه:
+  کارتِ بالای صف و نشانِ کارتِ هر سفارش (`OrderRiskQueueCardV3`، `OrderCard.risk`)، «بستنِ این جا» در کارتِ سابقه، صفحهٔ `orders/risk-lists` (`OrderRiskListsV3.kt`) از «…» ِ صف، `OrdersConfigDto.risk`.
+- نیمه‌کاره: آزمون‌های Kotlin (`OrderRiskTest` +۶، `OnlineRoutesTest` +۱، `V3ReachabilityTest` +۳ ردیف) این‌جا ساخته نشدند — فقط CI؛ کارتِ وب (وبِ یخ‌زده)؛ «دستگاه» ِ RSK-04.
+- قدمِ بعدی: شاهدِ CI ِ همین آزمون‌ها روی PR ِ دسته؛ دیدنِ کارت و صفحه روی دستگاه با پرچمِ `shop.order_risk` روشن.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
