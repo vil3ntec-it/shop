@@ -21,6 +21,7 @@ const { clientIp } = require('../middleware/ratelimit');
 const { requireSuperAdmin } = require('../middleware/auth');
 const { requireReason } = require('../lib/admin-access');
 const finalized = require('../lib/finalized-sales');
+const once = require('../lib/sync-restore-once');
 
 const router = express.Router();
 
@@ -61,19 +62,29 @@ router.get('/conflicts', async (req, res, next) => {
 /*
  *  ⛔ بازگرداندن دادهٔ یک حساب را عوض می‌کند (opِ تازه به همهٔ دستگاه‌هایش)
  *  ⇒ فقط مدیرِ ارشد، فقط با دلیلِ نوشته (ADMIN-CONTROL-PLANE.md، v3 ۳۹.۸).
+ *  ⛔ و فقط یک بار (`lib/sync-restore-once.js`، مهاجرتِ ۴۹۵): شناسه فقط رقم و یک شکل (۴۰۰ `bad_id`)؛ برگردانده‌شده ⇒ ۴۰۹
+ *  `already_restored`؛ در حالِ رفتن ⇒ ۴۰۹ `restore_in_progress`؛ `Idempotency-Key` ⇒ همان پاسخ (`Idempotent-Replayed`).
  */
 router.post('/conflicts/:id/restore', requireSuperAdmin, async (req, res, next) => {
   try {
+    const id = once.conflictIdOf(req.params.id);
     const reason = requireReason(req);
-    //  SEC-03 (پرچمِ `shop.doc_chain`): مقدارِ بازنده فاکتورِ ثبت‌شده را سرِ جا عوض نمی‌کند ⇒ ۴۰۹ (‎lib/finalized-sales.js‎)
-    await finalized.adminRestoreCheck(req.params.id, { adminId: req.admin.id, ip: clientIp(req) });
-    const out = await sync.restoreConflict(req.params.id);
+    const done = await once.restoreOnce(req, id, async () => {
+      //  SEC-03 (پرچمِ `shop.doc_chain`): مقدارِ بازنده فاکتورِ ثبت‌شده را سرِ جا عوض نمی‌کند ⇒ ۴۰۹ (‎lib/finalized-sales.js‎)
+      await finalized.adminRestoreCheck(id, { adminId: req.admin.id, ip: clientIp(req) });
+      return sync.restoreConflict(id);
+    });
+    if (done.replayed) {
+      res.set('Idempotent-Replayed', 'true');
+      return res.json(done.response);
+    }
+    const out = done.out;
     await audit.log({
       shopId: out?.ctx?.accountKind === 'shop' ? String(out.ctx.accountId || '') : '',
       actorType: 'admin', userId: req.admin.id, action: 'sync.conflict_restored', ip: clientIp(req),
-      targetType: 'sync_conflict', targetId: String(req.params.id), detail: { ...(out || {}), reason },
+      targetType: 'sync_conflict', targetId: id, detail: { ...(out || {}), reason },
     });
-    res.json({ ok: true, ...(out || {}) });
+    res.json(done.response);
   } catch (err) { next(err); }
 });
 

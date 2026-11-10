@@ -239,6 +239,8 @@ async function createApp({ runMigrations = true } = {}) {
     //  نسخهٔ خواندنی (`DATABASE_REPLICA_URL`، پیش‌فرض خاموش ⇒ فقط `next()`): هر درخواستِ نوشتنی ⇒ خواندن‌های
     //  همان مشتری/کاربر تا `REPLICA_STICKY_MS` از پایگاهِ اصلی (`lib/read-replica.js`)
     api.use(require('./lib/read-replica').writes);
+    //  S18: نسخهٔ قراردادِ درهای مدیر روی هر پاسخِ `/admin/*` (۴۰۱ و ۴۰۴ هم) — افزودنی؛ پنلِ کهنه نمی‌خواندش
+    api.use('/admin', require('./lib/admin-capabilities').adminApiVersion);
     api.get('/health', health);
     api.get('/ready', ready);
 
