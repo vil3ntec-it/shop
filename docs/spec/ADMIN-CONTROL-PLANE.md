@@ -143,7 +143,7 @@
 | `GET /admin/admins/:id/sessions` | ارشد | سراسری | — | خواندنِ سراسری (بی توکن، فقط ۱۶ نویسهٔ هش) | — | `admin-admins.js` |
 | `POST /admin/admins/:id/sessions/revoke` | ارشد | سراسری | دارد (+دلیل) | عملیات | — | `admin-admins.js` |
 | `GET /admin/backups` | مدیر | سراسری | — | خواندنِ سراسری | — | `admin.js:690` |
-| `POST /admin/backups` | ارشد | سراسری | دارد | خروجی/بازگردانی | — | `admin.js:700` |
+| `POST /admin/backups` | ارشد؛ `Idempotency-Key` ⇒ یک pg_dump ★ (هم‌زمان ۴۰۹ `idempotency_in_progress`) | سراسری | دارد | خروجی/بازگردانی | — | `admin.js:741` |
 | `GET /admin/2fa` | مدیر | سراسری | — | نشست | G5 | `admin-2fa.js:49` |
 | `POST /admin/2fa/setup` | مدیر | سراسری | ندارد | نشست | G5 | `admin-2fa.js:51` |
 | `POST /admin/2fa/enable` | مدیر | سراسری | دارد | نشست | G5 | `admin-2fa.js:63` |
@@ -161,6 +161,12 @@
 | `POST /admin/shop-offline-codes/:id/revoke` | مدیر | سراسری | دارد | مالی/اشتراک | G3 | `admin-shop-offline.js:41` |
 | `GET /admin/shops/:id/staff-codes` | مدیر | دکان | — | راز/پیکربندی | — | `admin-staff-codes.js:58` |
 | `POST /admin/shops/:id/staff-codes/reveal` | ارشد | دکان | دارد | راز/پیکربندی | — | `admin-staff-codes.js:98` |
+| `GET /admin/shops/:id/staff-perms` | مدیر (+ بیننده)؛ `?limit=&offset=` ★ (سقفِ ۲۰۰، بی آن همان پاسخ) | دکان | دارد (`admin.shop_staff_perms_viewed`) | خواندنِ دادهٔ دکان | — | `admin-staff-perms.js:50` |
+| `PUT /admin/shops/:id/staff-perms/roles/:role` | ارشد | دکان | دارد | پیکربندی | — | `admin-staff-perms.js:72` |
+| `PUT /admin/shops/:id/staff-perms/members/:uid` | ارشد | دکان | دارد | پیکربندی | — | `admin-staff-perms.js:83` |
+| `POST /admin/shops/:id/staff-perms/devices/:did/disable` | ارشد؛ `Idempotency-Key` ★؛ سقفِ IP پیش از احراز ★ | دکان (`deviceOfShop`) | دارد (`device.disabled`) | عملیات | — | `admin-staff-perms.js:94` |
+| `POST /admin/shops/:id/staff-perms/devices/:did/enable` ★ | ارشد + دلیل؛ `Idempotency-Key`؛ سقفِ IP پیش از احراز | دکان (`deviceOfShop`؛ انداختهٔ دکانِ دیگر ⇒ ۴۰۹ `disabled_by_other_shop`) | دارد (`device.enabled` + دلیل) | عملیات | — | `admin-staff-perms.js:105` |
+| `POST /admin/image-bank/images/:id/(approve\|reject\|archive\|search)` | ارشد + دلیل؛ `Idempotency-Key` ★ | سراسری (بانکِ مشترک) | دارد (`admin.bank_image_*`) | پیکربندی | — | `admin-image-bank.js:167` |
 | `GET /admin/otp` | مدیر | سراسری | — | خواندنِ دادهٔ شخصی | G4 | `admin-otp.js:34` |
 | `POST /admin/otp/:id/reveal` | ارشد | سراسری | دارد | راز/پیکربندی | — | `admin-otp.js:47` |
 | `POST /admin/otp/:id/resend` | مدیر | سراسری | دارد | عملیات | — | `admin-otp.js:77` |
@@ -529,3 +535,21 @@
   `subscriptions.periodEnd` که اعطا می‌کند (دکان: روزِ تقویمِ کابل، هرگز کمتر از UTC؛ پمپ: UTC). پایه = بیشینهٔ `from` و همین حالا.
   توانایی: `subscription-period.v1`.
 - **بازگرداندنِ تعارض یک بار:** توانایی `sync-restore-once.v1` (بالا، جدولِ بند ۶).
+
+### ۱۲.۱۱ درهای خواستهٔ پنل برای کارکنان، بانکِ عکس و پشتیبان (۱۴۰۵/۰۸/۲۰، شاخهٔ `claude/acct-console-2`، مهاجرتِ ۵۰۰)
+
+- **برگرداندنِ دستگاه برای مدیر:** `POST /api/admin/shops/:id/staff-perms/devices/:did/enable` با `{ reason }` (۳ تا ۲۰۰، وگرنه ۴۰۰
+  `reason_required`) ⇒ `{ ok: true, id }`. همان `deviceOfShop` (دستگاهِ عضوِ دکانِ دیگر ⇒ ۴۰۴ `device_not_found`)، همان سابقهٔ `device.enabled`
+  (`by: admin:<id>`، `reason`)؛ نیفتاده ⇒ ۴۰۰ `device_not_disabled`؛ انداختهٔ دکانِ دیگری که هنوز همین کاربر را دارد ⇒ ۴۰۹
+  `disabled_by_other_shop` (برای صاحبِ دکان هم؛ «انداختنِ دوباره» از دکانِ دیگر نشانِ «انداخته به دستِ» را عوض نمی‌کند). نوشتن شرطی ⇒
+  دو برگرداندنِ هم‌زمان یک سابقه. سقفِ IP ِ `admin-device-state-ip` (۶۰ در دقیقه) پیش از احراز، برای disable و enable.
+- **`Idempotency-Key`** روی disable/enable ِ دستگاه، `image-bank/images/:id/(approve|reject|archive|search)` و `POST /admin/backups`
+  (`lib/admin-write-once.js`): همان کلید + همان درخواست (روش + نشانی + بدنه) ⇒ همان پاسخ و همان کدِ موفق با `Idempotent-Replayed: true`؛
+  درخواستِ دیگر (بدنه یا **درِ** دیگر) ⇒ ۴۰۹ `idempotency_key_reused`؛ هم‌زمان ⇒ ۴۰۹ `idempotency_in_progress` (نشانِ `admin_write_claims`،
+  کهنه پس از ۳۰ دقیقه و فقط برای همان کلید)؛ کلیدِ بد ⇒ ۴۰۰ `bad_idempotency_key`؛ شکستِ روشن ثبت نمی‌شود. دامنه = مدیر (یا کلیدِ سرویس)
+  + «انجام‌دهنده»؛ بی‌کلید همان رفتارِ پیشین.
+- **صفحه‌بندیِ `GET …/staff-perms`:** `?limit=` (۱ تا ۲۰۰، پیش‌فرض ۵۰) و `?offset=` (۰ تا ۱۰۰۰۰۰۰)، فقط رقمِ ساده (وگرنه ۴۰۰ `bad_page`)؛ هر دو
+  فهرست (`perms.members` و `devices`) با همان دو عدد، فهرستِ مجوز و لایهٔ نقش کامل، و `page: { limit, offset, membersTotal, devicesTotal,
+  nextOffset }` (`null` = تمام). ترتیبِ صفحه پایدار: اعضا صاحب اول + پیوستن + شناسه، دستگاه‌ها ساخت + شناسه. بی هیچ پارامتر همان پاسخِ امروز.
+- **توانایی‌ها:** `staff-perms.v1`، `image-bank.v1`، `idempotent-writes.v1` (`CAPABILITY_PROBES` ِ `admin-control-plane.test.js`).
+  آزمون: `server/test/admin-console-writes.test.js`.

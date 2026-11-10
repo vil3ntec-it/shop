@@ -28,6 +28,10 @@ const CAPABILITIES = Object.freeze([
   'sync-restore-once.v1',   //  POST /admin/sync/conflicts/:id/restore — شناسهٔ یک‌شکل، ۴۰۹ already_restored، Idempotency-Key
   'subscription-period.v1', //  GET /admin/subscriptions/period-end — پایانِ دوره از سرور (S15)
   'admin-contract.v1',      //  GET /admin/contract + سرآیندِ X-Admin-API-Version (S18)
+  //  درخواستِ پنلِ مرکزی ۱.۵۰.۷۵ (ممیزی §۳-۴):
+  'staff-perms.v1',         //  GET /admin/shops/:id/staff-perms[?limit=&offset=] · POST …/devices/:did/disable|enable (ارشد + دلیل)
+  'image-bank.v1',          //  GET /admin/image-bank/status|review|search|images/:id|reports|file · POST …/images/:id/approve|reject|archive|search
+  'idempotent-writes.v1',   //  Idempotency-Key روی دستگاه (disable/enable)، بازبینیِ بانکِ عکس و POST /admin/backups (lib/admin-write-once.js)
 ]);
 
 /*

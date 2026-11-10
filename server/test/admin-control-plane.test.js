@@ -379,6 +379,11 @@ const CAPABILITY_PROBES = {
   'sync-restore-once.v1': ['POST /admin/sync/conflicts/1/restore'],
   'subscription-period.v1': ['GET /admin/subscriptions/period-end?amount=1&unit=month'],
   'admin-contract.v1': ['GET /admin/contract'],
+  'staff-perms.v1': ['GET /admin/shops/x1/staff-perms?limit=1', 'POST /admin/shops/x1/staff-perms/devices/x1/disable',
+    'POST /admin/shops/x1/staff-perms/devices/x1/enable'],
+  'image-bank.v1': ['GET /admin/image-bank/status', 'GET /admin/image-bank/review', 'POST /admin/image-bank/images/x1/approve',
+    'POST /admin/image-bank/images/x1/reject', 'POST /admin/image-bank/images/x1/archive', 'POST /admin/image-bank/images/x1/search'],
+  'idempotent-writes.v1': ['POST /admin/shops/x1/staff-perms/devices/x1/enable', 'POST /admin/image-bank/images/x1/archive'],
 };
 
 test('GET /api/admin/me: فهرستِ «توانایی»ها با همان نام‌های پل، و درِ هر کدام واقعاً هست', async () => {
