@@ -11,6 +11,7 @@
  * ⛔ هیچ دادهٔ واقعی‌ای این‌جا نیست: دفترها از `bench/datagen.mjs` (seed ثابت) می‌آیند.
  */
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 import path from 'node:path';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { makeReference, syncRowsOf, REFERENCE } from '../../bench/datagen.mjs';
@@ -51,6 +52,40 @@ const db = require(path.join(SERVER, 'src', 'db.js'));
 const migrations = require(path.join(SERVER, 'src', 'lib', 'sync-v1-migrations.js'));
 const pw = require(path.join(SERVER, 'src', 'lib', 'password.js'));
 const gate = require(path.join(SERVER, 'src', 'lib', 'sync-v3-gate.js'));
+
+/*
+ *  `--query-stats` (فقط PostgreSQL): زمانِ هر پرس‌وجو به‌ازای متنِ SQL (پارامترها جدا) — همان کارِ pg_stat_statements که
+ *  روی پایگاهِ مشترک بی preload و بی راه‌اندازیِ دوباره ممکن نیست. زمان = فرستادن تا پاسخ روی همان اتصال (انتظارِ قفل هم).
+ */
+const qstats = new Map();
+if (CFG.queryStats && !db.isPglite()) {
+  const { Client } = require('pg');
+  const orig = Client.prototype.query;
+  const note = (text, ms, err) => {
+    try {
+      const k = String(text).replace(/\s+/g, ' ').trim().slice(0, 400);
+      let e = qstats.get(k);
+      if (!e) qstats.set(k, e = { calls: 0, totalMs: 0, maxMs: 0, errors: 0 });
+      e.calls++; e.totalMs += ms; if (ms > e.maxMs) e.maxMs = ms; if (err) e.errors++;
+    } catch { /* سنجه هرگز پرس‌وجو را نمی‌اندازد */ }
+  };
+  Client.prototype.query = function (config, values, callback) {
+    const text = typeof config === 'string' ? config : config && typeof config.submit !== 'function' ? config.text : null;
+    if (!text) return orig.call(this, config, values, callback);
+    const t0 = performance.now();
+    const wrap = (cb) => (e, r) => { note(text, performance.now() - t0, e); cb(e, r); };
+    if (typeof values === 'function') return orig.call(this, config, wrap(values));
+    if (typeof callback === 'function') return orig.call(this, config, values, wrap(callback));
+    const r = orig.call(this, config, values);
+    if (r && typeof r.then === 'function') r.then(() => note(text, performance.now() - t0, null), (e) => note(text, performance.now() - t0, e));
+    return r;
+  };
+}
+function topQueries(n = 40) {
+  const r2 = (v) => Math.round(v * 100) / 100;
+  return [...qstats.entries()].sort((a, b) => b[1].totalMs - a[1].totalMs).slice(0, n)
+    .map(([sql, e]) => ({ sql, calls: e.calls, totalMs: Math.round(e.totalMs), meanMs: r2(e.totalMs / e.calls), maxMs: r2(e.maxMs), errors: e.errors }));
+}
 
 const loop = monitorEventLoopDelay({ resolution: 10 });
 loop.enable();
@@ -147,18 +182,22 @@ async function seedAll() {
   );
   const admin = (await call('POST', '/api/admin/login', { body: { username: 'loadtest', password: 'Load!12345' } })).token;
 
-  const shops = [];
-  for (let s = 0; s < CFG.shops; s++) {
+  //  چند دکان با هم (`--setup-par`)؛ شمارهٔ هر دکان همان جایگاهش
+  const par = Math.max(1, Number(CFG.setupPar) || 1);
+  const parallel = async (xs, fn) => { for (let i = 0; i < xs.length; i += par) await Promise.all(xs.slice(i, i + par).map(fn)); };
+  const shops = new Array(CFG.shops);
+  await parallel([...Array(CFG.shops).keys()], async (s) => {
     const u = await h.newUser(`صاحبِ دکانِ بار ${s}`, 'shop');
     const shopId = (await call('POST', '/api/shop', { token: u.accessToken, body: { name: `دکانِ بار ${s}` } })).shop.id;
-    for (const key of ['shop.orders', 'shop.storefront']) {
-      await call('PUT', '/api/admin/pump/live-config', { token: admin, body: { scope: shopId, key, value: true } });
+    //  همان درِ پرچم‌های پنلِ مدیر (`/api/admin/flags`) — نه درِ تنظیماتِ پمپ
+    for (const key of ['shop.orders', 'shop.storefront', 'shop.held_sync']) {
+      await call('PUT', '/api/admin/flags', { token: admin, body: { scope: shopId, key, value: true, reason: 'آزمونِ بار' } });
     }
     const owner = await h.signIn(u, 'shop');
     const slug = `load-${s}-${shopId.slice(-6).toLowerCase().replace(/[^a-z0-9]/g, 'x')}`;
     await call('PUT', '/api/shop/storefront', { token: owner.accessToken, body: { slug, enabled: true, title: `ویترینِ بار ${s}`, contactPhone: '0700000001' } });
-    shops.push({ index: s, shopId, slug, token: owner.accessToken, email: u.email, password: u.password });
-  }
+    shops[s] = { index: s, shopId, slug, token: owner.accessToken, email: u.email, password: u.password };
+  });
 
   step(`${shops.length} دکان و ویترین`);
   // ── دادهٔ دفتر: دکانِ ۰ بزرگ (مقیاسِ دادهٔ مرجع)، بقیه کوچک ──
@@ -205,6 +244,9 @@ async function seedAll() {
     const kind = sh.index === 0 ? 'big' : 'small';
     const ledger = ledgers[kind] ||= makeReference(dataset[kind]);
     const rows = [...syncRowsOf(ledger)];
+    //  «نشانِ دکان»: یک کالای منتشرشده با شناسه و نامِ یکتای همین دکان — ویترینِ دکانِ دیگر نباید آن را نشان دهد (`xt.probe`)
+    const first = rows.find((r) => r.table === 'products');
+    rows.push({ table: 'products', id: `mk-${sh.index}`, data: { ...first.data, name: `نشانِ دکان ~S${sh.index}~`, barcodes: [`mk${sh.index}x`] } });
     dataset.rows += rows.length;
     await seedRows(sh.shopId, rows);
     //  نمونه‌ای از کالاها برای «صفحهٔ کالا»، سبد و opهای فروش (همه منتشرشده و قیمت‌دار)
@@ -225,14 +267,15 @@ async function seedAll() {
   const sync3 = require(path.join(SERVER, 'src', 'lib', 'sync-v3.js'));
   const tBridge = performance.now();
   let bridged = 0;
-  for (const sh of shops) {
+  //  هر دکان قفلِ خودش را دارد ⇒ چند دکان با هم (بارِ پایدار همان پلِ تمام‌شده است)
+  await parallel(shops, async (sh) => {
     const ctx = { app: 'shop', accountKind: 'shop', accountId: sh.shopId };
     for (let i = 0; i < 100000; i++) {
       const r = await sync3.bridge(ctx, { max: 2000 });
       bridged += r.imported || 0;
       if (!r.behind) break;
     }
-  }
+  });
   dataset.bridge = { ops: bridged, ms: Math.round(performance.now() - tBridge) };
   dataset.bridge.opsPerSec = Math.round(bridged / Math.max(0.001, dataset.bridge.ms / 1000));
   step(`پلِ v1⇒v3: ${bridged} op، ${dataset.bridge.opsPerSec} op/s`);
@@ -240,7 +283,7 @@ async function seedAll() {
   // ── شماره‌های تأییدشدهٔ مشتری (هر شماره ۱۰ سفارش در ساعت در هر دکان: RSK-07) ──
   let phoneSeq = 0;
   const checkoutShops = shops.slice(0, CFG.checkoutShops);
-  for (const sh of checkoutShops) {
+  await parallel(checkoutShops, async (sh) => {
     sh.tickets = [];
     for (let i = 0; i < CFG.phonesPerShop; i++) {
       const phone = `079${String(1000000 + (++phoneSeq)).slice(-7)}`;
@@ -248,7 +291,7 @@ async function seedAll() {
       const ck = await call('POST', `/api/store/${sh.slug}/verify/check`, { body: { phone, code: st.devCode } });
       sh.tickets.push({ phone, ticket: ck.ticket });
     }
-  }
+  });
 
   step(`${CFG.phonesPerShop} شمارهٔ تأییدشده در ${checkoutShops.length} ویترین`);
   dataset.setupMs = Math.round(performance.now() - tSetup);
@@ -256,7 +299,7 @@ async function seedAll() {
   dataset.poolMax = db.isPglite() ? 1 : Number(process.env.PG_POOL_MAX || 10);
   dataset.workers = workers;
   dataset.gc = !!global.gc;
-  return { dataset, shops };
+  return { dataset, shops, admin };
 }
 
 process.on('message', async (m) => {
@@ -265,6 +308,14 @@ process.on('message', async (m) => {
     else if (m.type === 'dbsize') {
       const out = db.isPglite() ? null : Number((await db.one('SELECT pg_database_size(current_database())::bigint AS b')).b);
       process.send({ type: 'dbsize', id: m.id, bytes: out });
+    } else if (m.type === 'qstats') {
+      process.send({ type: 'qstats', id: m.id, top: topQueries() });
+      if (m.reset) qstats.clear();
+    } else if (m.type === 'check') {
+      //  درستی زیرِ بار (`scripts/load-check.js`): دفترِ بارساز در برابرِ همین پایگاه (PGlite ِ در حافظه هم فقط از این‌جا دیده می‌شود)
+      const ledger = JSON.parse(fs.readFileSync(m.ledger, 'utf8'));
+      const check = await require(path.join(SERVER, 'scripts', 'load-check.js')).check(db, ledger);
+      process.send({ type: 'check', id: m.id, check });
     } else if (m.type === 'stop') {
       await h.stop().catch(() => {});
       process.exit(0);

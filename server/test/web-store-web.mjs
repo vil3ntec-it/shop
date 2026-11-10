@@ -275,6 +275,8 @@ ok(/"oil"/.test(await page.evaluate((k) => localStorage.getItem(k) || '', `store
   ok(w2.status === 200, 'دستگاهِ دیگر مقدارِ روغن را عوض کرد', JSON.stringify(w2.body).slice(0, 80));
   await page.click('#list-lines li:has-text("برنج") button');
   await until(L1, [['oil', 4000]], '۴۰۹ ِ نسخه ⇒ برداشتن روی فهرستِ تازه؛ کارِ دستگاهِ دیگر گم نشد');
+  //  حساب پیش از رسیدنِ پاسخِ همان PUT به مرورگر ۴۰۰۰ است ⇒ صبر تا نسخهٔ دستگاه هم پاسخ را بنویسد (CI ِ #1022: «3000»)
+  await page.waitForFunction((k) => /4000/.test(localStorage.getItem(k) || ''), `store-list:${slug}`, { timeout: 10000 }).catch(() => {});
   const stored = await page.evaluate((k) => localStorage.getItem(k) || '', `store-list:${slug}`);
   ok(!/price|name/i.test(stored) && /4000/.test(stored), 'فهرستِ دستگاه همان فهرستِ حساب، فقط شناسه و مقدار', stored);
 

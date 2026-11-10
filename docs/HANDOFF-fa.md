@@ -53,6 +53,12 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۸ — شاخهٔ `claude/sec-review-38` (بازبینیِ امنیتیِ دومِ دسته‌های ۳۷–۳۸؛ روی `ccr-3a0d593c-ac0jpj-batch-38`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافته با آزمونِ پیش‌سرخ و رفعِ کوچک (`server/test/security-review-38.test.js`، شرح در `docs/SECURITY-AUDIT-fa.md` «B3»): SR38-1 (High) پشتیبانِ
+  مهرشدهٔ PGlite رازها را در `pg_statistic` ِ ANALYZE ِ دوره‌ای خام داشت ⇒ `sealPglite` آمار را هم می‌بَرد؛ SR38-2 (Medium) reviver ِ NUL پارسِ هر بدنه را پیش از
+  سقفِ نرخ ۱۰–۲۵ برابر کند می‌کرد ⇒ `middleware/json-body.js` بی reviver، همان رفتارِ B4؛ SR38-3 (Medium) `openSnapshot` با `PG_IDLE_TX_TIMEOUT_MS` و dump ِ بلند
+  سرور را با uncaughtException می‌خواباند ⇒ شنونده + `release(err)` و شمارِ seal از استخر. سطلِ مدیر، پاکتِ رازها، نمای سفارش، صدا، سبدِ حساب، کدِ خطا و مهلت سالم ماندند.
+- نیمه‌کاره: هیچ. قدمِ بعدی: پیش از ارتقای PostgreSQL ِ تولید به ۱۸، `backup-secrets.test.js` روی همان pg_dump (R1)؛ محدود کردنِ نامِ `unseal` به `SECRET_KEYS` (R2، لایهٔ دوم).
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/store-allflags` (ویترین با همهٔ پرچم‌های مشتری‌رو روشن، سرتاسر در مرورگر؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `server/test/web-store-allflags.mjs` (در `test:web-store`): ۵۲ پرچمِ خانوادهٔ ویترین/گفت‌وگو/سفارش + catalog/image_bank/customer_notify/
   delivery_customer_view از `KNOWN`، با پیش‌نیازِ shop.delivery، shop.visual_search و pay.hesabpay؛ سفرِ کامل در ۳۶۰·fa، ۷۶۸·en، ۱۲۸۰·ps و همان صفحه‌ها در
@@ -86,6 +92,18 @@
   «فقط همین دستگاه» با `Keychain.addRequestIs` (همان واژه‌نامهٔ `SecItemAdd` ِ `add`، `addQuery` ِ تازه) به‌جای `storedAs`. هیچ assertی کم نشد.
 - نیمه‌کاره / قدمِ بعد: فقط CI ِ macOS (کارِ `ios-app`) سه آزمون را می‌سنجد؛ کامپایل را کارِ `ios-ui-klib` ِ لینوکس. کلیددانِ واقعی در
   `test.kexe` (امضای ad-hoc با entitlements ِ DER، `__ents_der`) آزموده نشده — اگر خواستند، آزمونی جدا و گزارشی.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/perf-load` (PERF-02: نخستین اجرای واقعیِ ۲۰۰ دکان × ۵ دستگاه و درستی زیرِ بار؛ روی `ccr-3a0d593c-ac0jpj-batch-37`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) آمیزهٔ `scale` و `scale-burst` ِ ابزارِ بار (`server/scripts/load-scale.mjs`: فروش، ویرایشِ بها از چند دستگاه، حرکت، مشتری،
+  نگه‌داشته، ویترین روی زیرمجموعهٔ دکان‌ها، اشتراکِ صاحب، پنلِ مدیر، کاوشِ ویترینِ دکانِ دیگر) با دفترِ درستی و بازفرستِ op ِ بی‌پاسخ؛
+  سنجهٔ `server/scripts/load-check.js` (۱۲ سنجه، درونِ سرورِ آزمون یا جدا)؛ `--query-stats` به‌جای `pg_stat_statements`. (۲) سه اجرای ۲۰۰ × ۵
+  روی PostgreSQL ِ محلی (۱۰ دقیقه پایدار + «قطعِ سراسری»؛ عددها و بارِ ماشین در `docs/PERF-LOAD-fa.md` «۱۴۰۵/۰۸/۱۹ (دوم)»): پایدار هر بار
+  ۲۳٬۹۹۹ درخواست و ۰ خطا؛ داده بی گم/دوتایی و دکان‌ها جدا. (۳) رفع: مهاجرتِ ۴۵۰ (نمایهٔ جزئیِ وظیفهٔ بازِ تکراری‌نشو؛ آزمونِ
+  `sync-v3-task-dedupe.test.js` پیش از رفع سرخ). (۴) آزمونِ پایدارِ `load-correctness.test.js` (بی سنجهٔ زمانی، ~۱ دقیقه، ۳/۳ روی هر دو).
+  (۵) کاشتنِ ابزارِ بار دیگر درِ پمپ (`/api/admin/pump/live-config`) را نمی‌زند؛ `/api/admin/flags`.
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. PERF-02 همان PARTIAL (شاهدِ CI نیست). یافتهٔ بی‌ربط: `upgrade-rehearsal.test.js` روی PGlite ِ ماشینِ شلوغ گاهی
+  `fetch failed` (ECONNRESET ِ اتصالِ keep-alive ِ کهنه) می‌گیرد؛ در CI سبز؛ دست نخورد.
+- قدمِ بعدی (صاحب محصول): روشن کردنِ `SYNC_V3_BATCH` و `HOT_CACHE_MS` در تولید (اجرای سوم همین سند)؛ بودجهٔ ورود؛ رفتارِ «قطعِ سراسری»
+  (مهلتِ کلاینتِ ۱۰ ثانیه در برابرِ ۸ ثانیه انتظارِ دروازه، `REQUEST_TIMEOUT_MS`/`PG_POOL_MAX_WAITING`)؛ همین اجرا روی سخت‌افزارِ جدا.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/shopper-cart` (CHK-03 در برنامهٔ خرید: سبدِ حساب؛ روی `ccr-3a0d593c-ac0jpj-batch-36` = #1020؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) core: ماشینِ کوچکِ `CartSync` (`ShopperCartSync.kt`) زیرِ گام‌های سبدِ `AccountRules`: ادغامِ سبدِ مهمان یک بار و فقط اگر هست
   (پاسخش همان خواندن)، آینهٔ نشستِ پیشین ادغام نمی‌شود؛ ۴۰۹ ⇒ همان تغییرِ دستگاه روی سبدِ تازه (`rebase`، یک بار پشتِ‌هم، سپس درنگ) به‌جای

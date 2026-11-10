@@ -395,8 +395,11 @@ async function sealPglite(raw, k, { rounds = 3 } = {}) {
         if (r.affectedRows !== 1) throw sealErr('seal_failed', 'ردیفِ راز در رونوشتِ PGlite پیدا نشد');
       }
     });
+    //  ⛔ SR38-1: ANALYZE ِ دوره‌ای (`pglite-stats`) نمونهٔ مقدارهای خام را در pg_statistic گذاشته ⇒ آمارِ app_config هم می‌رود
+    //  (پس از بازگشت دوباره ساخته می‌شود)؛ `VACUUM FULL pg_statistic` نسخهٔ مردهٔ همان ردیف‌ها را هم از heap و TOAST می‌بَرد
+    await lite.query(`DELETE FROM pg_statistic WHERE starelid = 'public.app_config'::regclass`);
     //  heap و TOAST ِ تازه؛ پرونده‌های پیشینِ app_config (با مقدارِ خام) می‌روند
-    await lite.exec('VACUUM FULL app_config');
+    await lite.exec('VACUUM FULL app_config, pg_statistic');
     const setting = async (n) => BigInt((await lite.query('SELECT setting FROM pg_settings WHERE name = $1', [n])).rows[0].setting);
     const seg = await setting('wal_segment_size');
     const blk = Number(await setting('wal_block_size'));
