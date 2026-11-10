@@ -123,6 +123,8 @@ const KNOWN = Object.freeze([
   { key: 'shop.promo_loyalty_review', scope: 'shop', default: false, what: 'تخفیفِ خودکارِ قلم و مصرفِ امتیازِ فاکتورِ کارمند با تعریف‌های دکان ⇒ سابقهٔ بررسی برای صاحب (STF-03؛ رد نمی‌کند)' },
   { key: 'shop.custom_roles', scope: 'shop', default: false, what: 'نقشِ سفارشی: نام + نقشِ پایه + محدودیت‌های بیشتر (STF-01)' },
   { key: 'shop.catalog', scope: 'shop', default: false, what: 'دفترِ موجودیِ سرور: مکان‌ها، انتقالِ کالا و تطبیق (INV-11)؛ پایهٔ «پنهان کردنِ ناموجود» ِ ویترین' },
+  //  O-06 = ب (ORD-20، CHK-18؛ lib/stock-reserve.js): با `shop.catalog`؛ سرور باز هم موجودی را کم نمی‌کند
+  { key: 'shop.stock_reserve', scope: 'shop', default: false, what: 'نگه‌داشتنِ کوتاهِ موجودی برای سفارشِ آنلاین تا دکان قبول کند: آخرین عدد دو بار سفارش نمی‌گیرد (O-06 ب)؛ با shop.catalog' },
   { key: 'shop.count_absorb', scope: 'shop', default: false, what: 'فروشِ آفلاینِ پیش از شمارش که پس از ثبتِ شمارش می‌رسد دوباره از موجودی کم نمی‌شود — سرور و برنامه (INV-10)؛ با shop.catalog' },
   { key: 'market.slug_hold', scope: 'shop', default: false, what: 'نشانیِ پیشینِ ویترین یک سال برای همان دکان می‌ماند تا QR ِ چاپی به دکانِ دیگری نرسد' },
   //  RPT-03 (docs/FLAGS-ON-fa.md): عددِ تازه در پیامی که صاحب همین حالا می‌گیرد ⇒ جدا و خاموش؛ با `shop.owner_report`

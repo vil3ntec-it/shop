@@ -14,8 +14,9 @@
  *            می‌کند نه کم**. دکان کالا را از برنامهٔ خودش تحویل می‌دهد و همان‌جا فروشِ
  *            عادی ثبت می‌شود؛ این دفتر فقط آن‌چه دستگاه‌ها ثبت کرده‌اند را می‌خواند.
  *            «قابل‌فروش» = جمعِ موجودیِ مکان‌های قابل‌فروش (بخشِ ۳.۶). ساختِ سفارش فقط
- *            می‌سنجد (`check`)، بی نوشتن. جدولِ `stock_reservations` (migration 082)
- *            می‌ماند ولی دیگر نوشته یا شمرده نمی‌شود.
+ *            می‌سنجد (`check`)، بی نوشتن. استثنا (O-06 = ب، ORD-20/CHK-18): با پرچمِ خاموشِ
+ *            `shop.stock_reserve` و موجودیِ تازه، نگه‌داشتنِ کوتاه با انقضا در `stock_reservations`
+ *            (`kind = soft`، `lib/stock-reserve.js`) — سرور باز هم هرگز موجودی را کم نمی‌کند.
  *   هم‌زمانی  همهٔ نوشتن‌های موجودیِ یک دکان پشتِ یک قفلِ تراکنشی (`catalog:<shop>`).
  *   دستگاه ── فروشِ ثبت‌شدهٔ دستگاه (آفلاین) با حالتِ `recorded` می‌نشیند:
  *            هرگز رد نمی‌شود؛ منفی شدن «وظیفهٔ بررسی» می‌سازد (INV-19).
@@ -29,6 +30,8 @@ const { ulid } = require('./ulid');
 const { ApiError, badRequest, conflict } = require('../middleware/errors');
 
 const FLAG_KEY = 'shop.catalog';
+//  O-06 = ب: نگه‌داشتنِ کوتاهِ موجودی برای سفارشِ آنلاین (`lib/stock-reserve.js`) — جدا و پیش‌فرض خاموش
+const RESERVE_FLAG_KEY = 'shop.stock_reserve';
 const LOCATIONS = Object.freeze(['shop_floor', 'warehouse', 'damaged', 'in_transit']);
 //  فقط این دو می‌توانند «قابل‌فروش» باشند — خراب و در‌راه هرگز (§۳۲.۱)
 const SELLABLE_CHOICES = Object.freeze(['shop_floor', 'warehouse']);
@@ -61,14 +64,19 @@ async function flagOf(shopId, c) {
   if (!c) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${FLAG_KEY}\u0000p`, () => readFlag(shopId, null));
   return readFlag(shopId, c);
 }
-async function readFlag(shopId, c) {
+async function readFlag(shopId, c, key = FLAG_KEY) {
   const rows = (await runOf(c)(
-    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [FLAG_KEY, 'all', String(shopId)]
+    'SELECT scope, value FROM live_config WHERE key=$1 AND scope IN ($2,$3)', [key, 'all', String(shopId)]
   )).rows;
   let v;
   for (const r of rows) if (r.scope === 'all') v = decode(r.value);
   for (const r of rows) if (r.scope !== 'all') v = decode(r.value);
   return v === true;
+}
+/** پرچمِ نگه‌داشتنِ موجودی (`shop.stock_reserve`) با همان قاعده؛ درونِ تراکنش ⇒ همان اتصال، بی حافظه. */
+async function reserveFlagOf(shopId, c) {
+  if (!c) return require('./hot-cache').get('flag', `${String(shopId)}\u0000${RESERVE_FLAG_KEY}\u0000p`, () => readFlag(shopId, null, RESERVE_FLAG_KEY));
+  return readFlag(shopId, c, RESERVE_FLAG_KEY);
 }
 
 function normSellable(v) {
@@ -110,7 +118,9 @@ async function saveSettings(shopId, body, userId, at) {
     }
     next.sellableLocations = [...b.sellableLocations];
   }
-  //  `reserveTtlSec` دیگر معنایی ندارد (سفارش رزرو نمی‌کند) — آمدنش نادیده گرفته می‌شود
+  //  `reserveTtlSec` فقط با نگه‌داشتنِ روشن (`shop.stock_reserve`) معنا دارد؛ خاموش ⇒ مثلِ پیش نادیده
+  const ttl = b.reserveTtlSec !== undefined && (await reserveFlagOf(shopId))
+    ? intIn(b.reserveTtlSec, 'مهلتِ نگه‌داشتنِ سفارشِ آنلاین (ثانیه)', 60, 86400) : null;
   if (b.staleAfterSec !== undefined) next.staleAfterSec = intIn(b.staleAfterSec, 'مهلتِ تازگیِ موجودی (ثانیه)', 60, 604800);
   if (b.showQty !== undefined) {
     if (!['hidden', 'exact'].includes(b.showQty)) throw badRequest('نمایشِ عدد: hidden یا exact', 'bad_setting');
@@ -138,6 +148,10 @@ async function saveSettings(shopId, body, userId, at) {
     [shopId, JSON.stringify(next.sellableLocations), next.staleAfterSec, next.showQty,
       next.prepMinutes, next.deviceLocation, next.syncSource, userId || '', at]
   );
+  if (ttl !== null) {
+    await query('UPDATE catalog_settings SET reserve_ttl_sec=$2 WHERE shop_id=$1', [shopId, ttl]);
+    next.reserveTtlSec = ttl;
+  }
   return next;
 }
 
@@ -303,8 +317,9 @@ async function postMove(c, shopId, m, at) {
 }
 
 /**
- * پس از هر دسته حرکت: «موجودیِ کم» (§۳۲.۲ بندِ ۷) وظیفه می‌سازد. (سفارش دیگر رزرو
- * نمی‌کند، پس «رزروِ بی‌پشتوانه» هم دیگر نیست.)
+ * پس از هر دسته حرکت: «موجودیِ کم» (§۳۲.۲ بندِ ۷) وظیفه می‌سازد، و با نگه‌داشتنِ نرم
+ * (`lib/stock-reserve.js`، پرچمِ خاموشِ `shop.stock_reserve`) فروشِ تحویلِ رسیده را «انجام‌شده» و
+ * «نگه‌داشتهٔ بی‌پشتوانه» را به بررسی می‌برد. بی نگه‌داشتهٔ نرم ⇒ یک پرسشِ خالی.
  */
 async function checkProducts(c, shopId, ids, settings, at) {
   if (!ids.length) return;
@@ -331,6 +346,7 @@ async function checkProducts(c, shopId, ids, settings, at) {
       }
     }
   }
+  await require('./stock-reserve').afterMovesIn(c, shopId, ids, settings, at);
 }
 
 // ════════════════════════════════════════════════════════════════════
@@ -345,12 +361,11 @@ function fmtMilli(m) {
 function outOfStock(short) {
   const s = short[0];
   const what = s.name ? `«${s.name}»` : 'یکی از کالاها';
-  const err = conflict(
-    s.availableMilli > 0
-      ? `موجودیِ ${what} کافی نیست؛ اکنون فقط ${fmtMilli(s.availableMilli)} ${s.unit || 'واحد'} قابلِ سفارش است`
-      : `${what} اکنون موجود نیست`,
-    'out_of_stock'
-  );
+  let message = `${what} اکنون موجود نیست`;
+  if (s.availableMilli > 0) message = `موجودیِ ${what} کافی نیست؛ اکنون فقط ${fmtMilli(s.availableMilli)} ${s.unit || 'واحد'} قابلِ سفارش است`;
+  //  O-06 = ب: کالا هست ولی کوتاه برای سفارشِ دیگری نگه داشته شده (با انقضا)
+  else if (s.heldMilli > 0) message = `${what} همین حالا برای سفارشِ دیگری نگه داشته شده است؛ اگر آزاد شود دوباره می‌توانید سفارش دهید`;
+  const err = conflict(message, 'out_of_stock');
   err.data = { lines: short };
   return err;
 }
@@ -365,14 +380,16 @@ function outOfStock(short) {
  * بیش از موجودی نمی‌فروشد (همان سیاستِ صندوق).
  * lines: [{ lineNo, productId, qtyMilli }] به واحدِ موجودی. کمبود ⇒ `out_of_stock` (۴۰۹).
  */
-async function check(c, shopId, { lines, settings, names = new Map() }) {
+async function check(c, shopId, { lines, settings, names = new Map(), held = null }) {
   const ids = [...new Set(lines.map((l) => l.productId))].sort();
   const lvs = await levelsOf(c, shopId, ids);
   const need = new Map();
   for (const l of lines) need.set(l.productId, (need.get(l.productId) || 0) + l.qtyMilli);
   const short = [];
   for (const pid of ids) {
-    const d = decide(pid, AGG, sellableOnHand(lvs.get(pid), settings), 0, {
+    //  O-06 = ب (`held`، فقط با نگه‌داشتنِ روشن و موجودیِ تازه): نگه‌داشتهٔ فعالِ سفارش‌های دیگر از آزاد کم می‌شود
+    const hm = held ? Math.max(0, held.get(pid) || 0) : 0;
+    const d = decide(pid, AGG, sellableOnHand(lvs.get(pid), settings), hm, {
       id: `check:${pid}`, type: 'reserve', qtyMilli: need.get(pid), userId: 'check', at: 1,
     }, 'local');
     if (!d.result.ok) {
@@ -381,6 +398,7 @@ async function check(c, shopId, { lines, settings, names = new Map() }) {
         productId: pid, name: n.name || '', unit: n.unit || '',
         lineNos: lines.filter((l) => l.productId === pid).map((l) => l.lineNo),
         requestedMilli: need.get(pid), availableMilli: d.result.availableMilli || 0,
+        ...(hm > 0 && sellableOnHand(lvs.get(pid), settings) > 0 ? { heldMilli: hm } : {}),
       });
     }
   }
@@ -481,7 +499,7 @@ async function reconcile(shopId, { productId = '' } = {}) {
  * ِ حرکت‌های همان کالا و مکان (همان تعریفِ بالای پرونده و همان سنجشِ `reconcile`).
  *   • پیش‌فرض فقط نشان می‌دهد (`apply: false`) — هیچ نوشتنی؛
  *   • ⛔ دفتر (`stock_moves`) هرگز دست نمی‌خورد؛ فقط مانده‌های ناهمخوانِ **همین** دکان (ماندهٔ بی حرکت ⇒ ۰،
- *     ماندهٔ گم ⇒ ساخته)؛ رزرو بیرون است (`stock_reservations` دیگر نوشته نمی‌شود)؛
+ *     ماندهٔ گم ⇒ ساخته)؛ رزرو بیرون است (`stock_reservations` و حرکتِ بی‌مکانش دست نمی‌خورند)؛
  *   • پشتِ همان قفلِ موجودیِ دکان (`lock`) و در یک تراکنش با ردیفِ سابقهٔ `stock.rebuild` (`audit.logIn`)؛
  *     بی ناهمخوانی هیچ نوشتن و هیچ سابقه‌ای ⇒ بارِ دوم بی‌اثر.
  * @returns {{ok, applied, moves, fixed: Array<{productId, location, levelMilli, ledgerMilli}>}}
@@ -531,8 +549,8 @@ async function rebuild(shopId, { apply = false, by = '' } = {}) {
 }
 
 module.exports = {
-  FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
-  flagOf, settingsOf, saveSettings, lock, decide,
+  FLAG_KEY, RESERVE_FLAG_KEY, LOCATIONS, SELLABLE_CHOICES, DEFAULTS,
+  flagOf, reserveFlagOf, settingsOf, saveSettings, lock, decide,
   levelsOf, freeOf, sellableOnHand, onHandAt, fmtMilli,
   insertMove, postMove, openTask, checkProducts,
   check, outOfStock,
