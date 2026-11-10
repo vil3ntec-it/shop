@@ -9,14 +9,19 @@
  *           سنگین) و نوشتنِ PIN فقط سطلِ ۱۲۰ در دقیقهٔ همهٔ درها را داشت (شش برابرِ بودجهٔ `/verify` با همان هزینه).
  *   SR45-3  STF-04: برداشتن یا تعلیقِ عضو PIN ِ صندوقش و نوبتِ بازش را دست نمی‌زد ⇒ تا ۱۲ ساعت «چه کسی پشتِ دستگاه بود»
  *           (`sessions`، `whoAt`) عضوِ رفته را نشان می‌داد، و عضوِ دوباره‌فعال با همان PIN ِ کهنه برمی‌گشت.
+ *   R14     STF-04: مدیر با «۵ حدس، بازکردنِ قفل (تأییدِ دوباره)، ۵ حدس…» PIN ِ زیردست را پیدا می‌کرد (`unlock` پلهٔ دوبرابر را
+ *           هم صفر می‌کرد) ⇒ حالا پله می‌ماند و دهمین خطا از آخرین سنجشِ درست PIN را باطل می‌کند (فقط PIN ِ تازه)؛ صاحب بیرون نمی‌ماند.
+ *   R15     STF-04: `/verify` به هر عضو می‌گفت عضوِ دیگر PIN ِ سرور دارد یا نه (۴۰۹ `till_pin_not_set` در برابرِ ۴۰۳) ⇒ حالا به جز خودِ
+ *           عضو و صاحب/مدیر همان پاسخ، همان PBKDF2، همان شمار و همان قفل.
  */
 process.env.TILL_PIN_ITER = '1000';
 
 const crypto = require('node:crypto');
-//  SR45-2: شمارِ PBKDF2 — پیش از بار شدنِ برنامه، چون `lib/till-pin.js` همان `crypto.pbkdf2` را promisify می‌کند
+//  SR45-2: شمارِ PBKDF2 — پیش از بار شدنِ برنامه، چون `lib/till-pin.js` همان `crypto.pbkdf2` را promisify می‌کند (R15: و دورِ آخرین)
 let pbkdf2Calls = 0;
+let pbkdf2Iter = 0;
 const realPbkdf2 = crypto.pbkdf2;
-crypto.pbkdf2 = function countedPbkdf2(...args) { pbkdf2Calls += 1; return realPbkdf2.apply(this, args); };
+crypto.pbkdf2 = function countedPbkdf2(...args) { pbkdf2Calls += 1; pbkdf2Iter = args[2]; return realPbkdf2.apply(this, args); };
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
@@ -161,4 +166,137 @@ test('SR45-3: برداشتن یا تعلیقِ عضو PIN ِ صندوقش را �
   assert.equal(back.body.error?.code, 'till_pin_not_set');
   //  نوبت‌ها و PIN ِ عضوهای دیگر دست نخوردند
   assert.ok(await one('SELECT 1 AS x FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [A.shopId, A.staff.memberId]));
+});
+
+const pinRow = (s, who) => one('SELECT pin_hash, failures, locked_until, set_by FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [s.shopId, who.memberId]);
+const auditCount = (s, who, action) => one(
+  'SELECT count(*)::int AS n FROM audit_logs WHERE shop_id=$1 AND action=$2 AND target_id=$3', [s.shopId, action, who.memberId],
+).then((r) => r.n);
+
+test('R14: «۵ حدس، بازکردنِ قفل، ۵ حدس…» — بازکردن پلهٔ دوبرابر را نگه می‌دارد و دهمین خطا از آخرین درستی PIN را باطل می‌کند', async () => {
+  await tillFlag(A);
+  const sub = await member(A, 'cashier', 'زیردستِ R14');
+  ok(await setPinFor(A, sub, '730264'));
+  const unlock = () => h.post(`/api/shop/till-pin/members/${sub.memberId}/unlock`, {}, { token: A.manager.token });
+  const round = async (prefix) => {
+    for (let i = 0; i < 4; i++) {
+      const r = await verify(A.manager, sub, `${prefix}${i}`);
+      assert.equal(r.status, 403, `${prefix}${i}: ${JSON.stringify(r.body)}`);
+    }
+    const fifth = await verify(A.manager, sub, `${prefix}9`);
+    assert.equal(fifth.status, 423, JSON.stringify(fifth.body));
+    return fifth.body.error.lockedUntil;
+  };
+  //  دورِ اول ⇒ ۱۵ دقیقه؛ مدیر (با تأییدِ تازه) قفل را باز می‌کند ⇒ قفل نیست ولی شمار همان ۵
+  assert.ok((await round('11122')) < now() + 16 * MIN);
+  const opened = ok(await unlock());
+  assert.equal((await pinRow(A, sub)).failures, 5, 'بازکردنِ قفل پلهٔ دوبرابر را صفر کرد');
+  assert.equal(Number((await pinRow(A, sub)).locked_until), 0);
+  assert.deepEqual([opened.unlocked, opened.untilInvalid], [true, 5]);
+  //  دورِ دوم ⇒ پلهٔ دوبرابر (۳۰ دقیقه) و PIN باطل (دهمین خطا از آخرین درستی)
+  assert.ok((await round('22233')) > now() + 29 * MIN, 'بازکردنِ قفل پلهٔ دوبرابر را از سر گرفت');
+  assert.equal((await pinRow(A, sub)).pin_hash, '', 'PIN پس از ۱۰ خطا باطل نشد');
+  //  بازکردنِ دوباره PIN ِ باطل را برنمی‌گرداند، پایانِ قفل هم نه: PIN ِ درست هم دیگر نه
+  const again = await unlock();
+  assert.equal(again.status, 409, JSON.stringify(again.body));
+  assert.equal(again.body.error?.code, 'till_pin_invalidated');
+  await query('UPDATE shop_till_pins SET locked_until=0 WHERE shop_id=$1 AND member_id=$2', [A.shopId, sub.memberId]);
+  const right = await verify(A.manager, sub, '730264');
+  assert.equal(right.status, 409, JSON.stringify(right.body));
+  assert.equal(right.body.error?.code, 'till_pin_invalidated');
+  const other = await verify(A.staff, sub, '730264');
+  assert.equal(other.status, 403, 'به دیگران همان «غلط» (R15)');
+  assert.equal(other.body.error?.code, 'till_pin_wrong');
+  //  سابقه: یک بازکردن (دومی رد شد)، یک قفل، یک باطل شدن
+  assert.equal(await auditCount(A, sub, 'till_pin.unlocked'), 1);
+  assert.equal(await auditCount(A, sub, 'till_pin.locked'), 1);
+  assert.equal(await auditCount(A, sub, 'till_pin.invalidated'), 1);
+  //  صاحب/مدیر و خودِ عضو می‌بینند که PIN ِ تازه لازم است
+  const seen = ok(await h.get('/api/shop/till-pin/members', { token: A.manager.token })).members.find((m) => m.memberId === sub.memberId);
+  assert.deepEqual([seen.pinSet, seen.invalidated, seen.locked], [false, true, false]);
+  const mine = ok(await h.get('/api/shop/till-pin/config', { token: sub.token }));
+  assert.deepEqual([mine.pinSet, mine.invalidated], [false, true]);
+  //  خودِ عضو (تأییدِ تازه) PIN ِ تازه می‌گذارد ⇒ شمار و قفل صفر و سنجش درست
+  ok(await h.put('/api/shop/till-pin/me', { pin: '902817' }, { token: sub.token }));
+  const fresh = await pinRow(A, sub);
+  assert.deepEqual([fresh.failures, Number(fresh.locked_until), fresh.pin_hash !== ''], [0, 0, true]);
+  ok(await verify(A.manager, sub, '902817'));
+  //  PIN ِ درست شمار را صفر می‌کند: ۴ غلط، یک درست ⇒ ۰
+  for (let i = 0; i < 4; i++) assert.equal((await verify(A.manager, sub, `55566${i}`)).status, 403);
+  ok(await verify(A.manager, sub, '902817'));
+  assert.equal((await pinRow(A, sub)).failures, 0);
+  ok(await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.manager.token }));
+});
+
+test('R14: صاحب هرگز بیرون نمی‌ماند — PIN ِ باطل‌شدهٔ صاحب با تأییدِ دوبارهٔ ورود از نو، قفل و شمار و باطل شدن پاک', async () => {
+  await tillFlag(A);
+  ok(await h.put('/api/shop/till-pin/me', { pin: '482915' }, { token: A.token }));
+  for (let r = 0; r < 2; r++) {
+    for (let i = 0; i < 5; i++) await verify(A.staff, A, `33344${i}`);
+    assert.ok(Number((await pinRow(A, A)).locked_until) > now(), `دورِ ${r}`);
+    //  پایانِ قفل (شاگرد و مدیر قفلِ صاحب را باز نمی‌کنند)
+    await query('UPDATE shop_till_pins SET locked_until=$3 WHERE shop_id=$1 AND member_id=$2', [A.shopId, A.memberId, now() - 1]);
+  }
+  assert.equal((await pinRow(A, A)).pin_hash, '');
+  const self = await verify(A, A, '482915');
+  assert.equal(self.status, 409, JSON.stringify(self.body));
+  assert.equal(self.body.error?.code, 'till_pin_invalidated');
+  //  نشستِ کهنه ⇒ تأییدِ دوبارهٔ ورود با رمزِ حساب ⇒ PIN ِ تازه ⇒ همه پاک
+  await query(`DELETE FROM login_attempts WHERE scope='session_auth' AND identifier=$1`, [hashToken(A.token)]);
+  assert.equal((await h.put('/api/shop/till-pin/me', { pin: '518206' }, { token: A.token })).body.error?.code, 'reauth_required');
+  ok(await h.post('/api/auth/reauth', { password: A.password }, { token: A.token }));
+  ok(await h.put('/api/shop/till-pin/me', { pin: '518206' }, { token: A.token }));
+  const row = await pinRow(A, A);
+  assert.deepEqual([row.failures, Number(row.locked_until), row.pin_hash !== '', row.set_by], [0, 0, true, A.memberId]);
+  const c = ok(await h.get('/api/shop/till-pin/config', { token: A.token }));
+  assert.deepEqual([c.pinSet, c.invalidated, c.locked], [true, false, false]);
+  assert.equal(ok(await verify(A.manager, A, '518206')).session.memberId, A.memberId);
+  ok(await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.manager.token }));
+});
+
+test('R15: `/verify` به دیگران نمی‌گوید عضو PIN دارد یا نه — همان وضع و بدنه، همان PBKDF2، همان شمار و قفل؛ خودِ عضو و صاحب/مدیر می‌بینند', async () => {
+  await tillFlag(A);
+  const bare = await member(A, 'cashier', 'بی‌PIN ِ R15');
+  const withPin = await member(A, 'cashier', 'با‌PIN ِ R15');
+  ok(await setPinFor(A, withPin, '274096'));
+  const shape = (r) => {
+    const e = r.body.error || {};
+    return { status: r.status, keys: Object.keys(e).sort(), code: e.code, message: e.message, left: e.attemptsLeft };
+  };
+  const probe = async (target, pin) => {
+    const before = pbkdf2Calls;
+    pbkdf2Iter = 0;
+    const r = await verify(A.staff, target, pin);
+    return { r, work: pbkdf2Calls - before, iter: pbkdf2Iter };
+  };
+  //  یکمی بدشکل (هیچ‌کدام PBKDF2 ندارند ولی شمرده می‌شود)، بقیه با یک PBKDF2 با همان دور؛ پنجمی قفل؛ ششمی قفل بی PBKDF2
+  for (const [i, pin] of ['12', '405171', '405172', '405173', '405174', '405175'].entries()) {
+    const a = await probe(bare, pin);
+    const b = await probe(withPin, pin);
+    assert.deepEqual(shape(a.r), shape(b.r), `${i}: ${JSON.stringify(a.r.body)} ≠ ${JSON.stringify(b.r.body)}`);
+    assert.deepEqual([a.work, a.iter], [b.work, b.iter], `${i}: هزینهٔ سنجش یکی نیست`);
+    assert.equal(a.work, i === 0 || i === 5 ? 0 : 1, `${i}`);
+    assert.equal(a.r.status, i < 4 ? 403 : 423, `${i}`);
+    if (i >= 4) assert.ok(Math.abs(a.r.body.error.retryAfter - b.r.body.error.retryAfter) <= 2);
+  }
+  //  خودِ عضو و صاحب/مدیر همان «ندارد» را می‌بینند (و نمی‌شمارد)
+  for (const who of [bare, A, A.manager]) {
+    const r = await verify(who, bare, '405176');
+    assert.equal(r.status, 409, JSON.stringify(r.body));
+    assert.equal(r.body.error?.code, 'till_pin_not_set');
+  }
+  const c = ok(await h.get('/api/shop/till-pin/config', { token: bare.token }));
+  assert.deepEqual([c.pinSet, c.invalidated, c.locked], [false, false, false]);
+  const seen = ok(await h.get('/api/shop/till-pin/members', { token: A.manager.token })).members.find((m) => m.memberId === bare.memberId);
+  assert.deepEqual([seen.pinSet, seen.invalidated, seen.locked], [false, false, false]);
+  //  عضو PIN ِ خودش را می‌گذارد ⇒ شمار و قفلِ جانشین پاک و سنجش درست
+  ok(await h.put('/api/shop/till-pin/me', { pin: '390471' }, { token: bare.token }));
+  assert.equal(ok(await verify(A.staff, bare, '390471')).session.memberId, bare.memberId);
+  ok(await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.staff.token }));
+  //  حدس‌های هم‌زمان روی عضوِ بی PIN همان شکلِ عضوِ با PIN (`till-pin.test.js`): دقیقاً ۵ شمرده، بقیه ۴۲۳
+  resetAll();
+  const lone = await member(A, 'staff', 'بی‌PIN ِ هم‌زمان');
+  const out = await Promise.all(Array.from({ length: 9 }, (_, i) => verify(A.staff, lone, `00020${i}`)));
+  assert.deepEqual(out.map((r) => r.status).sort(), [403, 403, 403, 403, 423, 423, 423, 423, 423], JSON.stringify(out.map((r) => r.body)));
+  assert.equal((await pinRow(A, lone)).failures, 5);
 });

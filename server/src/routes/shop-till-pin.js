@@ -7,8 +7,9 @@
  *   PUT    /me                ✱    {pin} PIN ِ خودم (بازکردنِ قفلِ خودم هم همین است)
  *   PUT    /members/:id       ✱    {pin} PIN ِ عضوِ دیگر (صاحب: همه؛ مدیر: نقش‌های پایین‌تر)
  *   DELETE /members/:id       ✱    برداشتنِ PIN و بستنِ نوبتِ بازش
- *   POST   /members/:id/unlock ✱   بازکردنِ قفلِ PIN ِ عضوِ دیگر
- *   POST   /verify                 {memberId|userId, pin} ⇒ نوبتِ تازه روی دستگاهِ همین توکن (یا null = خودِ حسابِ دستگاه)
+ *   POST   /members/:id/unlock ✱   بازکردنِ قفلِ کنونیِ PIN ِ عضوِ دیگر (شمارِ خطا و پلهٔ دوبرابر می‌ماند؛ PIN ِ باطل نه — R14)
+ *   POST   /verify                 {memberId|userId, pin} ⇒ نوبتِ تازه روی دستگاهِ همین توکن (یا null = خودِ حسابِ دستگاه)؛
+ *                                  «ندارد/باطل» (۴۰۹) فقط به خودِ عضو و صاحب/مدیر، بقیه همان ۴۰۳ ِ PIN ِ غلط (R15)
  *   GET    /current                نوبتِ بازِ دستگاهِ همین توکن
  *   POST   /current/end            {reason:'lock'} بستنِ همان نوبت (قفلِ صندوق)
  *   GET    /sessions               نوبت‌های یک بازه (صاحب و مدیر همه؛ بقیه فقط خودشان)
@@ -25,6 +26,7 @@ const express = require('express');
 const config = require('../config');
 const v = require('../lib/validate');
 const tp = require('../lib/till-pin');
+const perms = require('../lib/staff-perms');
 const { requireUser, requireShop, requirePermission } = require('../middleware/auth');
 const { rateLimit, clientIp } = require('../middleware/ratelimit');
 const { requireRecentAuth } = require('../lib/reauth');
@@ -83,7 +85,9 @@ router.post('/members/:id/unlock', requireRecentAuth, requirePermission('members
 router.post('/verify', verifyLimit, async (req, res) => {
   const b = req.body || {};
   const target = b.memberId ? { memberId: v.id(b.memberId, { field: 'شناسه عضو' }) } : { userId: v.id(b.userId, { field: 'شناسه کاربر' }) };
-  res.json(await tp.verify(req.shopId, actorOf(req), req.device, target, b.pin, opts(req)));
+  //  ⛔ R15: «PIN ندارد/باطل است» فقط برای کسی که `/members` را هم می‌بیند (و خودِ عضو، در lib)؛ بقیه همان «غلط»
+  const seesAll = await perms.memberAllows(req, 'members.view');
+  res.json(await tp.verify(req.shopId, actorOf(req), req.device, target, b.pin, { ...opts(req), seesAll }));
 });
 
 router.get('/current', async (req, res) => {

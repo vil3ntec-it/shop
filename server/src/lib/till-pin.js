@@ -13,6 +13,13 @@
  *     (۶ رقم، نه همه یکسان و نه پشتِ سرِ هم؛ رقمِ فارسی/عربی پذیرفته).
  *   • سنجش فقط در سرور و زیرِ قفلِ ردیفِ همان PIN (حدس‌های هم‌زمان شمارِ خطا را دور نمی‌زنند): هر ۵ خطا
  *     ⇒ قفلِ زمان‌دارِ سرور، ۱۵ دقیقه و هر بار دو برابر تا ۲۴ ساعت. شمارِ خطا پیش از پاسخ commit می‌شود.
+ *   • ⛔ R14: شمار فقط با PIN ِ درست یا PIN ِ تازه صفر می‌شود — [unlock] و پایانِ قفل فقط قفلِ کنونی را برمی‌دارند و پلهٔ
+ *     دوبرابر می‌ماند. [VOID_AFTER] (۱۰) خطا از آخرین درستی ⇒ اثر پاک (`pin_hash=''`، «باطل»): سنجش تا PIN ِ تازه نه
+ *     (خودِ عضو با `PUT /me` یا صاحب/مدیر)، وگرنه مدیر با «۵ حدس، بازکردن، ۵ حدس…» PIN ِ زیردست را پیدا می‌کرد.
+ *   • ⛔ R15: «PIN ندارد/باطل است» را `/verify` فقط به خودِ عضو و کسی که `members.view` دارد (صاحب/مدیر، همان که
+ *     `/members` را می‌بیند) می‌گوید (۴۰۹)؛ بقیه همان پاسخِ PIN ِ غلط را می‌گیرند: ردیفِ جانشین (`pin_hash=''`، `set_by=''`)
+ *     همان شمار و قفل را دارد و سنجش همان PBKDF2 (با اثرِ ساختگی، همان دور) را می‌کند.
+ *     ردیف با `pin_hash=''`: `set_by` پُر ⇒ PIN ِ باطل‌شده؛ تهی ⇒ جانشینِ عضوِ بی PIN.
  *   • PIN ِ درست روی دستگاهِ **توکن** (`req.device`، نه چیزی که برنامه می‌فرستد) یک نوبت باز می‌کند و
  *     نوبتِ بازِ پیشینِ همان دستگاه را می‌بندد (`switch`)؛ PIN ِ خودِ حسابِ دستگاه فقط می‌بندد (`self`).
  *     قفلِ صندوق (`lock`)، برداشتنِ PIN (`pin_removed`) و پایانِ عمر (`expired`، ۱۲ ساعت) هم می‌بندند.
@@ -42,6 +49,8 @@ const pbkdf2 = promisify(crypto.pbkdf2);
 const FLAG = 'shop.till_pin';
 const PIN_ITER = 600_000;
 const MAX_FAILURES = 5;
+//  R14: دو دورِ قفل (۵ + ۵) از آخرین سنجشِ درست ⇒ باطل؛ حدسِ هر کس (مدیر با بازکردنِ قفل هم) پیش از PIN ِ درستِ بعدی ≤ ۱۰ از ۱۰⁶
+const VOID_AFTER = 10;
 const LOCK_BASE_MS = 15 * 60 * 1000;
 const LOCK_MAX_MS = 24 * 60 * 60 * 1000;
 const SESSION_MS = 12 * 60 * 60 * 1000;
@@ -105,6 +114,22 @@ async function pinMatches(pin, stored) {
   if (want.length !== 32) return false;
   const got = await pbkdf2(latinDigits(pin), Buffer.from(parts[2], 'base64'), iter, 32, 'sha256');
   return crypto.timingSafeEqual(got, want);
+}
+
+//  R15: اثرِ ساختگی برای ردیفِ بی PIN — همان کارِ [pinMatches] (همان دورِ [pinIter]) تا زمانِ پاسخ «ندارد» را نگوید؛ نتیجه‌اش دور ریخته می‌شود
+const DUMMY = { salt: crypto.randomBytes(16).toString('base64'), want: crypto.randomBytes(32).toString('base64') };
+const dummyHash = () => `pbkdf2-sha256$${pinIter()}$${DUMMY.salt}$${DUMMY.want}`;
+
+/** ردیفی با اثرِ واقعی (نه جانشینِ بی PIN، نه PIN ِ باطل‌شده) */
+const usable = (row) => Boolean(row && row.pin_hash);
+/** PIN ِ این ردیف باطل شده ([VOID_AFTER])، نه هرگز گذاشته‌نشده */
+const voided = (row) => Boolean(row && !row.pin_hash && row.set_by);
+
+/** «PIN ندارد» یا «باطل شد» — فقط برای خودِ عضو و صاحب/مدیر (R15) */
+function notSetError(row) {
+  return voided(row)
+    ? conflict('این PIN پس از ۱۰ سنجشِ غلط باطل شد؛ PIN ِ تازه بگذارید.', 'till_pin_invalidated')
+    : conflict('این عضو هنوز PIN ِ صندوق در سرور ندارد', 'till_pin_not_set');
 }
 
 /** قفلِ پس از هر ۵ خطا: ۱۵ دقیقه، و هر بار دو برابر تا ۲۴ ساعت */
@@ -189,27 +214,32 @@ async function config(shopId, actor) {
   const enabled = await flagOf(shopId);
   const out = { enabled, memberId: actor.id, role: actor.role };
   if (!enabled) return out;
-  const r = await one('SELECT failures, locked_until FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [shopId, actor.id]);
+  const r = await one('SELECT pin_hash, set_by, locked_until FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [shopId, actor.id]);
   const t = now();
-  const until = Number(r?.locked_until || 0);
-  return { ...out, pinSet: Boolean(r), locked: until > t, lockedUntil: until > t ? until : null };
+  const pinSet = usable(r);
+  const until = pinSet ? Number(r.locked_until || 0) : 0;
+  return { ...out, pinSet, invalidated: voided(r), locked: until > t, lockedUntil: until > t ? until : null };
 }
 
-/** اعضای فعال با حالِ PIN (برای «کاربرانِ صندوق» ِ صاحب و مدیر) — هرگز اثرِ PIN */
+/** اعضای فعال با حالِ PIN (برای «کاربرانِ صندوق» ِ صاحب و مدیر) — هرگز اثرِ PIN؛ `invalidated` ⇒ PIN ِ تازه لازم (R14) */
 async function members(shopId) {
   const t = now();
   const rows = await many(
-    `SELECT m.id, m.user_id, m.role, ${NAME_SQL} AS name, p.set_at, p.locked_until, (p.member_id IS NOT NULL) AS pin_set
+    `SELECT m.id, m.user_id, m.role, ${NAME_SQL} AS name, p.set_at, p.locked_until,
+            COALESCE(p.pin_hash <> '', false) AS pin_set, COALESCE(p.pin_hash = '' AND p.set_by <> '', false) AS pin_void
        FROM shop_members m LEFT JOIN users u ON u.id = m.user_id
        LEFT JOIN shop_till_pins p ON p.shop_id = m.shop_id AND p.member_id = m.id
       WHERE m.shop_id=$1 AND m.status='active' ORDER BY m.created_at, m.id LIMIT 500`,
     [shopId],
   );
   return {
-    members: rows.map((r) => ({
-      ...shapeMember(r), pinSet: Boolean(r.pin_set), setAt: r.set_at != null ? Number(r.set_at) : null,
-      locked: Number(r.locked_until || 0) > t, lockedUntil: Number(r.locked_until || 0) > t ? Number(r.locked_until) : null,
-    })),
+    members: rows.map((r) => {
+      const until = r.pin_set ? Number(r.locked_until || 0) : 0;
+      return {
+        ...shapeMember(r), pinSet: Boolean(r.pin_set), invalidated: Boolean(r.pin_void),
+        setAt: r.pin_set && r.set_at != null ? Number(r.set_at) : null, locked: until > t, lockedUntil: until > t ? until : null,
+      };
+    }),
   };
 }
 
@@ -248,13 +278,15 @@ async function removePin(shopId, actor, target, { ip = '' } = {}) {
   const out = await tx(async (c) => {
     const tm = await memberOf(c, shopId, target, true);
     if (tm.id !== actor.id && !mayManage(actor, tm)) throw forbidden('PIN ِ این عضو را فقط صاحبِ دکان برمی‌دارد', 'till_pin_forbidden');
-    const r = await c.query('DELETE FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [shopId, tm.id]);
+    //  ردیفِ جانشین یا باطل‌شده هم می‌رود، ولی «برداشته شد» فقط برای اثرِ واقعی
+    const r = await c.query('DELETE FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2 RETURNING pin_hash', [shopId, tm.id]);
+    const removed = r.rows.filter(usable).length;
     const ended = await closeOpen(c, shopId, 'till_member_id=$4', [tm.id], 'pin_removed', now());
     log = await audit.logIn(c, {
       shopId, userId: actor.userId, action: 'till_pin.removed', targetType: 'member', targetId: tm.id,
-      detail: { removed: r.rowCount || 0, ended }, ip,
+      detail: { removed, ended }, ip,
     });
-    return { member: shapeMember(tm), removed: (r.rowCount || 0) > 0, ended };
+    return { member: shapeMember(tm), removed: removed > 0, ended };
   });
   await log.afterCommit();
   return out;
@@ -272,16 +304,25 @@ async function memberGone(c, shopId, memberId) {
   return { removed: r.rowCount || 0, ended };
 }
 
-/** بازکردنِ قفلِ PIN ِ [target] (نه برای خودِ عضو: او PIN ِ تازه می‌گذارد) */
+/**
+ * بازکردنِ قفلِ PIN ِ [target] (نه برای خودِ عضو: او PIN ِ تازه می‌گذارد).
+ * ⛔ R14: فقط قفلِ کنونی برداشته می‌شود؛ شمارِ خطا (پلهٔ دوبرابر و نزدیکی به [VOID_AFTER]) می‌ماند، و PIN ِ باطل‌شده با
+ * بازکردن برنمی‌گردد (۴۰۹ `till_pin_invalidated`) — وگرنه «۵ حدس، بازکردن، ۵ حدس…» بی‌پایان بود.
+ */
 async function unlock(shopId, actor, target, { ip = '' } = {}) {
   let log;
   const out = await tx(async (c) => {
     const tm = await memberOf(c, shopId, target, true);
     if (!mayManage(actor, tm)) throw forbidden('قفلِ PIN ِ این عضو را فقط صاحبِ دکان باز می‌کند', 'till_pin_forbidden');
-    const r = await c.query('UPDATE shop_till_pins SET failures=0, locked_until=0 WHERE shop_id=$1 AND member_id=$2', [shopId, tm.id]);
-    if (!r.rowCount) throw conflict('این عضو PIN ِ صندوق ندارد', 'till_pin_not_set');
-    log = await audit.logIn(c, { shopId, userId: actor.userId, action: 'till_pin.unlocked', targetType: 'member', targetId: tm.id, detail: {}, ip });
-    return { member: shapeMember(tm), unlocked: true };
+    const row = (await c.query('SELECT pin_hash, set_by, failures, locked_until FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2 FOR UPDATE', [shopId, tm.id])).rows[0];
+    if (!usable(row)) throw notSetError(row);
+    await c.query('UPDATE shop_till_pins SET locked_until=0 WHERE shop_id=$1 AND member_id=$2', [shopId, tm.id]);
+    const failures = Number(row.failures);
+    log = await audit.logIn(c, {
+      shopId, userId: actor.userId, action: 'till_pin.unlocked', targetType: 'member', targetId: tm.id,
+      detail: { failures, wasLocked: Number(row.locked_until) > now() }, ip,
+    });
+    return { member: shapeMember(tm), unlocked: true, untilInvalid: Math.max(0, VOID_AFTER - failures) };
   });
   await log.afterCommit();
   return out;
@@ -290,25 +331,43 @@ async function unlock(shopId, actor, target, { ip = '' } = {}) {
 /**
  * سنجشِ PIN ِ [target] روی دستگاهِ توکنِ [actor] ⇒ نوبتِ تازه (یا null وقتی خودِ حسابِ دستگاه برگشت).
  * خطا (PIN ِ غلط، قفل) پس از commit ِ شمارِ خطا پرتاب می‌شود.
+ * [seesAll]: درخواست‌کننده `members.view` دارد (صاحب/مدیر) — فقط او و خودِ عضو «ندارد/باطل» را می‌بینند (R15).
  */
-async function verify(shopId, actor, device, target, pin, { ip = '' } = {}) {
+async function verify(shopId, actor, device, target, pin, { ip = '', seesAll = false } = {}) {
   const dev = deviceOf(device);
   if (typeof pin !== 'string' || !pin.trim()) throw badRequest('PIN را بزنید.', 'till_pin_required');
   const t = now();
   let log;
   const out = await tx(async (c) => {
     const tm = await memberOf(c, shopId, target);
+    const reveal = seesAll || tm.id === actor.id;
+    //  ⛔ R15: برای دیگران عضوِ بی PIN یک ردیفِ جانشین دارد تا شمار و قفل و پاسخ همان PIN ِ غلط باشد (همان گام‌ها برای هر دو)
+    if (!reveal) {
+      await c.query(
+        `INSERT INTO shop_till_pins (shop_id, member_id, pin_hash, failures, locked_until, set_by, set_at)
+         VALUES ($1,$2,'',0,0,'',$3) ON CONFLICT (shop_id, member_id) DO NOTHING`,
+        [shopId, tm.id, t],
+      );
+    }
     const row = (await c.query('SELECT * FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2 FOR UPDATE', [shopId, tm.id])).rows[0];
-    if (!row) return { error: conflict('این عضو هنوز PIN ِ صندوق در سرور ندارد', 'till_pin_not_set') };
+    const real = usable(row);
+    if (!real && reveal) return { error: notSetError(row) };
     if (Number(row.locked_until) > t) return { error: lockedError(row.locked_until, t) };
-    if (!(await pinMatches(pin, row.pin_hash))) {
+    const match = await pinMatches(pin, real ? row.pin_hash : dummyHash());
+    if (!real || !match) {
       const failures = Number(row.failures) + 1;
       const lockNow = failures % MAX_FAILURES === 0;
+      //  ⛔ R14: دهمین خطا از آخرین درستی ⇒ اثر پاک (باطل)؛ فقط PIN ِ تازه برمی‌گرداند. جانشین هم همان سابقه را می‌گیرد (R15)
+      const voidNow = failures === VOID_AFTER;
       const until = lockNow ? t + lockMs(failures) : Number(row.locked_until);
-      await c.query('UPDATE shop_till_pins SET failures=$3, locked_until=$4 WHERE shop_id=$1 AND member_id=$2', [shopId, tm.id, failures, until]);
+      await c.query(
+        `UPDATE shop_till_pins SET failures=$3, locked_until=$4, pin_hash=CASE WHEN $5::boolean THEN '' ELSE pin_hash END
+          WHERE shop_id=$1 AND member_id=$2`,
+        [shopId, tm.id, failures, until, voidNow],
+      );
       log = await audit.logIn(c, {
-        shopId, userId: actor.userId, action: lockNow ? 'till_pin.locked' : 'till_pin.wrong', targetType: 'member', targetId: tm.id,
-        detail: { failures, device: dev.id }, ip,
+        shopId, userId: actor.userId, action: voidNow ? 'till_pin.invalidated' : lockNow ? 'till_pin.locked' : 'till_pin.wrong',
+        targetType: 'member', targetId: tm.id, detail: { failures, device: dev.id }, ip,
       });
       return { error: lockNow ? lockedError(until, t) : wrongError(MAX_FAILURES - (failures % MAX_FAILURES)) };
     }
@@ -402,6 +461,6 @@ async function whoAt(shopId, deviceId, at) {
 }
 
 module.exports = {
-  FLAG, MAX_FAILURES, SESSION_MS, LOCK_BASE_MS, flagOf, rank, mayManage, pinProblem, lockMs,
+  FLAG, MAX_FAILURES, VOID_AFTER, SESSION_MS, LOCK_BASE_MS, flagOf, rank, mayManage, pinProblem, lockMs,
   config, members, setPin, removePin, memberGone, unlock, verify, current, endCurrent, sessions, whoAt,
 };

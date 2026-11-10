@@ -226,12 +226,14 @@ test('قفل: ۵ خطا ⇒ ۴۲۳ و PIN ِ درست هم نه؛ شمارِ خ�
   assert.equal(ok(await verify(A.manager, A, PIN.owner)).session.memberId, A.memberId);
   ok(await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.manager.token }));
 
-  //  صاحب قفلِ شاگرد را باز می‌کند (با تأییدِ تازه)؛ شمار صفر
+  //  صاحب قفلِ شاگرد را باز می‌کند (با تأییدِ تازه)؛ قفل برداشته ولی شمار (پلهٔ دوبرابر) می‌ماند (R14)؛ PIN ِ درست صفرش می‌کند
   for (let i = 0; i < 5; i++) await verify(A, A.staff, '000002');
   assert.equal((await verify(A, A.staff, PIN.staff)).status, 423);
   ok(await h.post(`/api/shop/till-pin/members/${A.staff.memberId}/unlock`, {}, { token: A.token }));
-  assert.equal((await one('SELECT failures FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [A.shopId, A.staff.memberId])).failures, 0);
+  const opened = await one('SELECT failures, locked_until FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [A.shopId, A.staff.memberId]);
+  assert.deepEqual([opened.failures, Number(opened.locked_until)], [5, 0]);
   ok(await verify(A, A.staff, PIN.staff));
+  assert.equal((await one('SELECT failures FROM shop_till_pins WHERE shop_id=$1 AND member_id=$2', [A.shopId, A.staff.memberId])).failures, 0);
   ok(await h.post('/api/shop/till-pin/current/end', { reason: 'lock' }, { token: A.token }));
 });
 
