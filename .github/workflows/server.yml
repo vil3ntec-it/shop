@@ -112,9 +112,15 @@ jobs:
           retention-days: 30
 
   pglite:
-    name: آزمون‌های سرور روی PGlite
+    name: آزمون‌های سرور روی PGlite (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    #  ⏱ همهٔ پرونده‌ها پشتِ‌سرِ‌هم به سقفِ ۴۵ دقیقه رسیدند (دستهٔ ۴۱) ⇒ دو تکهٔ هم‌زمان؛ هر پرونده دقیقاً
+    #  در یک تکه (`server/scripts/test-shard.js`، `test-shard.test.js`) و «آزمون‌های سرور» منتظرِ هر دو است
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -133,22 +139,28 @@ jobs:
       - name: آزمون‌های سرور روی PGlite
         working-directory: server
         env:
-          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-pglite.jsonl
+          TEST_EVIDENCE_FILE: ${{ runner.temp }}/evidence/server-pglite-${{ matrix.shard }}.jsonl
+          TEST_SHARD: ${{ matrix.shard }}/2
         run: npm run test:pglite
 
       - name: شواهدِ آزمون‌های سرور (PGlite)
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: test-evidence-pglite
+          name: test-evidence-pglite-${{ matrix.shard }}
           path: ${{ runner.temp }}/evidence
           if-no-files-found: ignore
           retention-days: 30
 
   electron:
-    name: آزمون‌های سرور زیرِ Electron
+    name: آزمون‌های سرور زیرِ Electron (${{ matrix.shard }}/2)
     runs-on: ubuntu-latest
     timeout-minutes: 45
+    #  ⏱ همان دو تکهٔ کارِ PGlite (دستهٔ ۴۱: ۴۵:۱۵ لغو، همهٔ آزمون‌ها تا آن لحظه سبز)
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
@@ -169,6 +181,8 @@ jobs:
       # بازهٔ `homelab-panel/desktop/package.json`ِ ریپوی server است.
       - name: آزمون‌های سرور زیرِ Electron (Nodeِ مرکز فرمان)
         working-directory: server
+        env:
+          TEST_SHARD: ${{ matrix.shard }}/2
         run: |
           npm install -g electron@38
           ELECTRON_RUN_AS_NODE=1 "$(npm root -g)/electron/dist/electron" -e "console.log('electron', process.versions.electron, 'openssl', process.versions.openssl)"
