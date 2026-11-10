@@ -24,8 +24,8 @@ class StaffTimeRepository(private val api: ApiClient) {
 
   data class Config(val enabled: Boolean, val memberId: String, val role: String)
 
-  /** زدن با نامِ عضو (برای گزارشِ مدیر) */
-  data class Named(val punch: TimeClock.Punch, val name: String)
+  /** زدن با نامِ عضو (برای گزارشِ مدیر)؛ [late] = سرور آن را بیش از نیم ساعت پس از زمانش گرفت (ساعتِ سرور) */
+  data class Named(val punch: TimeClock.Punch, val name: String, val late: Boolean = false)
 
   data class PlanDoc(val plan: Commission.Plan, val version: Int)
 
@@ -52,7 +52,7 @@ class StaffTimeRepository(private val api: ApiClient) {
       fun s(k: String) = (o[k] as? JsonPrimitive)?.content.orEmpty()
       val kind = TimeClock.Kind.entries.firstOrNull { it.code == s("kind") } ?: return@mapNotNull null
       val at = (o["at"] as? JsonPrimitive)?.longOrNull ?: return@mapNotNull null
-      Named(TimeClock.Punch(s("id"), s("memberId"), kind, at, s("deviceUid")), s("name"))
+      Named(TimeClock.Punch(s("id"), s("memberId"), kind, at, s("deviceUid")), s("name"), (o["late"] as? JsonPrimitive)?.booleanOrNull == true)
     }
   }
 

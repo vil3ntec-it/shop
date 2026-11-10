@@ -191,3 +191,31 @@ test('پورسانت: مدیر نرخ‌ها را می‌بیند ولی نمی�
   const w = await h.put('/api/shop/staff-time/commission-plan', { version: cur.body.version, defaultBp: 150 }, { token: owner.token });
   assert.equal(w.status, 200, JSON.stringify(w.body));
 });
+
+//  STF-07 (تصمیمِ صاحب‌کار: زدنِ خودِ کارمند تا ۷ روز عقب پذیرفته است) — صاحب باید ببیند کدام زدن دیر رسید.
+//  پیش از این کار پاسخ نه `recordedAt` داشت نه `late`، پس این آزمون سرخ بود.
+test('«دیر ثبت‌شده»: زدنی که بیش از نیم ساعت پس از زمانش رسید `late` است؛ داوری با ساعتِ سرور، نه بدنهٔ دستگاه', async () => {
+  const code = (await h.post('/api/shop/invite', { role: 'staff' }, { token: owner.token })).body.code;
+  const s = await h.post('/api/auth/staff-login', { code, name: 'شاگردِ دیر', device: { uid: `st-late-${Date.now()}`, name: 'گوشی', platform: 'android' } });
+  assert.equal(s.status, 201, JSON.stringify(s.body));
+  const late = { token: s.body.accessToken };
+  late.memberId = (await h.get('/api/shop/staff-time/config', { token: late.token })).body.memberId;
+  const t = Date.now();
+  const rows = [
+    { id: pid(), kind: 'in', at: t - 3 * 60 * MIN, recordedAt: t - 3 * 60 * MIN, late: false },   //  دستگاه دروغ می‌گوید
+    { id: pid(), kind: 'out', at: t - 20 * MIN },
+    { id: pid(), kind: 'in', at: t - 1 * MIN },
+  ];
+  for (const r of rows) assert.equal((await punch(late, r)).status, 201);
+  const list = await h.get(`/api/shop/staff-time/punches?member=${late.memberId}&from=${t - 4 * 60 * MIN}`, { token: owner.token });
+  assert.equal(list.status, 200, JSON.stringify(list.body));
+  const by = new Map(list.body.punches.map((p) => [p.id, p]));
+  assert.deepEqual(rows.map((r) => by.get(r.id).late), [true, false, false]);
+  for (const r of rows) {
+    const p = by.get(r.id);
+    assert.ok(p.recordedAt >= t && p.recordedAt <= Date.now(), `recordedAt ساعتِ سرور است: ${p.recordedAt}`);
+  }
+  //  خودِ کارمند هم همان را می‌بیند (هیچ چیزِ پنهانی نیست)، و ردیف همان است
+  const mine = await h.get(`/api/shop/staff-time/punches?from=${t - 4 * 60 * MIN}`, { token: late.token });
+  assert.deepEqual(mine.body.punches.map((p) => p.late), [true, false, false]);
+});

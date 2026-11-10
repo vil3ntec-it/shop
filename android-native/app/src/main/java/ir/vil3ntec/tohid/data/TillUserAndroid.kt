@@ -4,7 +4,13 @@ import android.content.Context
 import androidx.compose.runtime.mutableStateOf
 import ir.vil3ntec.tohid.core.perm.ApproverVault
 import ir.vil3ntec.tohid.core.staff.TillSwitch
+import ir.vil3ntec.tohid.data.repo.Backend
+import ir.vil3ntec.tohid.data.repo.TillPinRepository
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -105,6 +111,41 @@ object TillUser {
   }
 
   const val AUDIT_TYPE = "till_user"
+
+  /**
+   *  STF-04 در سرور (پرچمِ `shop.till_pin`، `TillPinRepository`): همان PIN را سرور هم می‌سنجد و نوبتِ «چه کسی پشتِ
+   *  صندوق است» را روی دستگاهِ همین توکن باز می‌کند. بهترین‌کوشش و **پس از** باز شدنِ صندوق با PIN ِ دستگاه: بی اینترنت،
+   *  پرچمِ خاموش یا ردِ سرور ⇒ صندوق همان‌طور باز است و سرور کار را به نامِ حسابِ دستگاه می‌بیند — هرگز اختیارِ بیشتر.
+   *  کارها در یک صف و به همان ترتیب می‌روند (سنجش و قفلِ پشتِ هم جابه‌جا نمی‌رسند) و با بسته شدنِ صفحهٔ قفل لغو نمی‌شوند.
+   */
+  fun serverVerify(context: Context, who: TillSwitch.User?, pin: String) {
+    if (who != null) toServer(context) { it.verify(who.userId, pin) }
+  }
+
+  /** Ctrl+L: نوبتِ سرورِ همین دستگاه هم بسته می‌شود (بهترین‌کوشش) */
+  fun serverEnd(context: Context) = toServer(context) { it.endCurrent() }
+
+  /** همان PIN ِ تازهٔ [memberId] در سرور هم؛ `false` فقط وقتی پرچم روشن است و سرور نپذیرفت (PIN ِ دستگاه می‌ماند) */
+  suspend fun serverEnroll(context: Context, memberId: String, pin: String): Boolean {
+    val repo = TillPinRepository(Backend.api(context))
+    return !repo.enabled() || (memberId.isNotBlank() && repo.enroll(memberId, pin).isSuccess)
+  }
+
+  private val serverJobs: Channel<suspend () -> Unit> by lazy {
+    Channel<suspend () -> Unit>(Channel.UNLIMITED).also { jobs ->
+      //  بهترین‌کوشش: شکستِ یک کار صف را نمی‌ایستاند؛ صندوق با PIN ِ دستگاه کار می‌کند
+      CoroutineScope(SupervisorJob() + Dispatchers.IO).launch { for (job in jobs) runCatching { job() } }
+    }
+  }
+
+  private fun toServer(context: Context, work: suspend (TillPinRepository) -> Unit) {
+    val app = context.applicationContext
+    val job: suspend () -> Unit = {
+      val repo = TillPinRepository(Backend.api(app))
+      if (repo.enabled()) work(repo)
+    }
+    serverJobs.trySend(job)
+  }
 
   private suspend fun swapCarts(context: Context, cart: HeldCart, s: TillSwitch.Swap) = withContext(Dispatchers.IO) {
     val dir = File(TrainingLedger.filesDir(context), DIR).apply { mkdirs() }

@@ -55,7 +55,8 @@ data class StaffTimeUi(
 
 data class TeamRow(val memberId: String, val name: String, val worked: String, val open: Boolean)
 
-data class PeriodRow(val name: String, val week: String, val month: String, val issues: Int)
+/** [late]: زدن‌های همین ماه که سرور دیر گرفت (STF-07، «دیر ثبت‌شده»)؛ فقط برای صاحب و مدیر */
+data class PeriodRow(val name: String, val week: String, val month: String, val issues: Int, val late: Int = 0)
 
 data class SellerRow(val seller: String, val base: String, val commission: String)
 
@@ -99,6 +100,7 @@ fun StaffTimeCard(
             Text(StrStaffTime.weekWorked(r.week), style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text)
             Text(r.month, style = MaterialTheme.typography.bodyMedium, color = Shop.colors.text, fontWeight = FontWeight.Bold)
             if (r.issues > 0) StaffNote(StrStaffTime.issues(r.issues), warning = true)
+            if (r.late > 0) StaffNote(StrStaffTime.lateRecorded(r.late), warning = true)
           }
         }
       }

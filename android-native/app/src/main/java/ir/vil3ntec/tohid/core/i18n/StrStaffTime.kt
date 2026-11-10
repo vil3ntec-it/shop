@@ -34,6 +34,11 @@ object StrStaffTime {
     "$n ${pl(n, "irregular shift was", "irregular shifts were")} not counted (no clock-out, no clock-in, or over the cap); a manager should fix it with a new punch.",
     "$n ناسم ${pl(n, "نوبت", "نوبتونه")} (بې وتلو، بې ننوتلو یا له حد څخه زیات) ونه شمېرل شول؛ مدیر دې په نوي ثبت سره سم کړي.",
   )
+  fun lateRecorded(n: Any): String = t(
+    "${asIs(n)} زدنِ این ماه دیر به سرور رسید (بیش از نیم ساعت پس از زمانِ خودش)؛ شاید با ساعتِ گذشته ثبت شده است.",
+    "$n ${pl(n, "punch", "punches")} this month reached the server late (more than half an hour after its time); it may have been entered for a past time.",
+    "$n ${pl(n, "ثبت", "ثبتونه")} پدې میاشت کې ناوخته سرور ته ورسېدل (د خپل وخت څخه له نیم ساعت زیات وروسته)؛ کېدای شي د تېر وخت لپاره ثبت شوي وي.",
+  )
   val periods: String get() = t("۷ روز و این ماه", "Last 7 days and this month", "تېرې ۷ ورځې او دا میاشت")
   fun weekWorked(time: String): String = t("۷ روزِ گذشته: ${asIs(time)}", "Last 7 days: $time", "تېرې ۷ ورځې: $time")
   fun monthWorked(time: String, days: Any): String = t(
