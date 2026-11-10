@@ -164,6 +164,11 @@
   color:inherit; font-size:16px; line-height:1; opacity:.7;
 }
 .acct-banner-body{ flex:1; min-width:0; }
+/* SYN-12: «جزئیات» ِ نوارِ قطعیِ ماندگار — همان رنگِ نوار، بی کم‌رنگی */
+.acct-banner .sync-outage-more{
+  margin-inline-start:auto; background:none; border:0; padding:2px 4px;
+  color:inherit; font:inherit; font-weight:800; text-decoration:underline; cursor:pointer;
+}
 
 /* ردیفِ فقط‌خواندنی: دکمه‌های نوشتن کم‌رنگ می‌شوند تا کاربر بداند چرا */
 html[data-soft-lock="1"] .dash-action{ opacity:.6; }

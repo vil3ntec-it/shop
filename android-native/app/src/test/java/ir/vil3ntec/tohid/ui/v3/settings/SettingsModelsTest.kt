@@ -7,6 +7,7 @@ import ir.vil3ntec.tohid.core.i18n.Lang
 import ir.vil3ntec.tohid.core.nav.Access
 import ir.vil3ntec.tohid.core.nav.NavStack
 import ir.vil3ntec.tohid.core.nav.Need
+import ir.vil3ntec.tohid.core.sync.SyncOutage
 import ir.vil3ntec.tohid.core.text.LocaleFormat
 import ir.vil3ntec.tohid.print.ThermalPrinter
 import ir.vil3ntec.tohid.sync.AutoSync
@@ -136,6 +137,31 @@ class SettingsModelsTest {
     val unknown = SyncModel.diagnose("boom", false, 0, false, up)
     assertEquals("boom", unknown.detail)
     assertTrue(unknown.action.isNotBlank() && unknown.body.isNotBlank())
+  }
+
+  @Test
+  fun `SYN-12 — حکمِ موتور جای نشانهٔ متنی: قطعیِ کوتاه آبی، ماندگار و سرور زرد، نشست سرخ`() {
+    val up = ServerPulse.State.UP
+    val raw = "به سرور نرسیدیم"
+    val retrying = SyncModel.diagnose(raw, false, 0, false, up, SyncOutage.Kind.RETRYING)
+    assertEquals(SyncModel.Problem.RETRYING, retrying.problem)
+    assertEquals(V3Tone.INFO, retrying.tone)
+    assertEquals(raw, retrying.detail)
+    val down = SyncModel.diagnose(raw, false, 0, false, up, SyncOutage.Kind.UNREACHABLE)
+    assertEquals(SyncModel.Problem.UNREACHABLE, down.problem)
+    assertEquals(V3Tone.WARNING, down.tone)
+    assertTrue(down.body.isNotBlank() && down.action.isNotBlank())
+    val server = SyncModel.diagnose("سرور الان شلوغ است", false, 0, false, up, SyncOutage.Kind.SERVER)
+    assertEquals(SyncModel.Problem.SERVER, server.problem)
+    assertEquals(V3Tone.WARNING, server.tone)
+    assertEquals(V3Tone.ERROR, SyncModel.diagnose("HTTP 503", false, 0, false, up).tone)   // بی حکم: همان پیشین
+    assertEquals(SyncModel.Problem.SIGN_IN, SyncModel.diagnose("x", false, 0, false, up, SyncOutage.Kind.AUTH).problem)
+    assertEquals(SyncModel.Problem.OFFLINE, SyncModel.diagnose(raw, false, 0, false, up, SyncOutage.Kind.OFFLINE).problem)
+    //  «خطا» ⇒ همان نشانه‌های متنی؛ نگه‌داشتِ سرور و نبودِ دکان مقدم‌اند؛ بی خطا ⇒ حکم بی‌اثر
+    assertEquals(SyncModel.Problem.LOCAL, SyncModel.diagnose("ژورنالِ همگام‌سازی با سایه نخواند", false, 0, false, up, SyncOutage.Kind.ERROR).problem)
+    assertEquals(SyncModel.Problem.SERVER_BEHIND, SyncModel.diagnose(raw, true, 0, false, up, SyncOutage.Kind.UNREACHABLE).problem)
+    assertEquals(SyncModel.Problem.NO_SHOP, SyncModel.diagnose(raw, false, 0, true, up, SyncOutage.Kind.UNREACHABLE).problem)
+    assertEquals(SyncModel.Problem.NONE, SyncModel.diagnose("", false, 0, false, up, SyncOutage.Kind.OFFLINE).problem)
   }
 
   @Test

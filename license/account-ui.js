@@ -1,11 +1,9 @@
 /* ==========================================================
    فروشگاه من | ورود با کد، «اشتراکِ من»، اعلان‌ها و قفلِ نرم — سمتِ وب
    ----------------------------------------------------------
-   ⚠️ همه‌ی این صفحه‌ها این‌جا **ساخته** می‌شوند، نه در `index.html`.
-   دلیلش سلیقه نیست: آن فایل سیزده هزار خط است و هر دست بردن در
-   نشانه‌گذاری‌اش خطرِ شکستنِ چیزی بی‌ربط دارد. این‌جا DOM از صفر ساخته
-   می‌شود و اگر این فایل بالا نیاید، برنامه دقیقاً مثلِ دیروز کار
-   می‌کند.
+   ⚠️ همه‌ی این صفحه‌ها این‌جا **ساخته** می‌شوند، نه در `index.html`. دلیلش سلیقه نیست: آن فایل سیزده هزار خط است و هر
+   دست بردن در نشانه‌گذاری‌اش خطرِ شکستنِ چیزی بی‌ربط دارد. این‌جا DOM از صفر ساخته می‌شود و اگر این فایل بالا نیاید،
+   برنامه دقیقاً مثلِ دیروز کار می‌کند.
 
    ⛔ **هیچ عددِ قیمتی این‌جا نوشته نمی‌شود.** قیمت‌ها فقط از سرور
       می‌آیند — همان قاعدهٔ همیشگیِ مخزن.
@@ -23,20 +21,13 @@
   if (!acc) return;
 
   var FA_DIGIT = '۰۱۲۳۴۵۶۷۸۹';
-  function fa(n) {
-    return String(n == null ? '' : n).replace(/[0-9]/g, function (d) { return FA_DIGIT[+d]; });
-  }
+  function fa(n) { return String(n == null ? '' : n).replace(/[0-9]/g, function (d) { return FA_DIGIT[+d]; }); }
   function toast(msg, kind) {
     if (typeof window.showToast === 'function') { window.showToast(msg, kind || 'success'); return; }
     //  نسخه‌ای که `showToast` ندارد نباید ساکت بماند
     try { console.log('[فروشگاه من]', msg); } catch (e) { /* بی‌خیال */ }
   }
-  function el(tag, cls, html) {
-    var n = document.createElement(tag);
-    if (cls) n.className = cls;
-    if (html !== undefined) n.innerHTML = html;
-    return n;
-  }
+  function el(tag, cls, html) { var n = document.createElement(tag); if (cls) n.className = cls; if (html !== undefined) n.innerHTML = html; return n; }
   function esc(s) {
     return String(s == null ? '' : s)
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -89,9 +80,8 @@
   /* ==========================================================
      ۱) ورود با کدِ شش‌رقمی
      ----------------------------------------------------------
-     دو پله: ایمیل، بعد شش خانه. بندِ ۲۱٫۴ پرامپت:
-     پرشِ خودکار · Paste · ارقامِ فارسی و انگلیسی · ارسالِ خودکار پس
-     از رقمِ ششم · شمارشِ معکوسِ شصت ثانیه.
+     دو پله: ایمیل، بعد شش خانه. بندِ ۲۱٫۴ پرامپت: پرشِ خودکار · Paste · ارقامِ فارسی و انگلیسی · ارسالِ خودکار پس از
+     رقمِ ششم · شمارشِ معکوسِ شصت ثانیه.
      ========================================================== */
   var login = null;
 
@@ -321,9 +311,8 @@
      ۲) «اشتراکِ من»
      ----------------------------------------------------------
      همه از تپشِ کش‌شده می‌آید، پس آفلاین هم چیزی برای نشان دادن هست.
-     ⛔ رنگ و روزِ مانده از **سرور** می‌آید (`subscriptionView` در
-     `routes/portal.js`)؛ قاعدهٔ جدا این‌جا نوشته نمی‌شود، وگرنه روزی
-     مشتری در برنامه سبز می‌بیند و در پورتال سرخ.
+     ⛔ رنگ و روزِ مانده از **سرور** می‌آید (`subscriptionView` در `routes/portal.js`)؛ قاعدهٔ جدا این‌جا نوشته نمی‌شود،
+     وگرنه روزی مشتری در برنامه سبز می‌بیند و در پورتال سرخ.
      ========================================================== */
   var planSheet = null;
 
@@ -457,7 +446,7 @@
       var host = s.body.querySelector('#sy-body');
       if (!sync) { host.innerHTML = '<div class="acct-empty">لایهٔ همگام‌سازی بالا نیامده.</div>'; return; }
       var st = sync.status();
-      var label = (core && core.DOT_LABEL[st.dot]) || '';
+      var label = headOf(st);
       var reports = errorReportsOn();
       var html = ''
         + '<div class="acct-row"><span class="acct-k">حال</span>'
@@ -470,8 +459,9 @@
         + fa(st.schemaVersion) + (st.serverSchema ? ' / سرور ' + fa(st.serverSchema) : '') + '</b></div>'
         + '<div class="acct-row"><span class="acct-k">سوکتِ زنده</span><b>' + (st.live ? 'وصل' : 'قطع') + '</b></div>'
         + (st.lastError
-          ? '<div class="acct-row"><span class="acct-k">آخرین خطا</span><b style="color:var(--danger)">' + esc(st.lastError) + '</b></div>'
+          ? '<div class="acct-row"><span class="acct-k">آخرین خطا</span><b' + (quiet(st) ? '' : ' style="color:var(--danger)"') + '>' + esc(st.lastError) + '</b></div>'
           : '')
+        + (outageHtml(st) ? '<div class="acct-banner warn show" id="sy-outage" role="status" style="margin:10px 0"><div class="acct-banner-body">' + outageHtml(st) + '</div></div>' : '')
         + (st.holding
           ? '<div class="acct-banner warn show" style="margin:10px 0"><div class="acct-banner-body">'
           + 'سرور از برنامه عقب‌تر است. تغییرها روی همین دستگاه نگه داشته می‌شوند و هیچ‌کدام گم نمی‌شود؛ '
@@ -521,20 +511,12 @@
     return syncSheet;
   }
 
-  function dotColor(d) {
-    return d === 'green' ? 'var(--success)'
-      : d === 'yellow' ? 'var(--warning)'
-        : d === 'red' ? 'var(--danger)' : 'var(--muted-2)';
-  }
+  function dotColor(d) { return d === 'green' ? 'var(--success)' : d === 'yellow' ? 'var(--warning)' : d === 'red' ? 'var(--danger)' : 'var(--muted-2)'; }
 
   /* ---------- گزارشِ خطا، با اجازهٔ کاربر (بندِ ۲۰.۸) ---------- */
   var REPORTS_KEY = 'tohid-error-reports-v1';
-  function errorReportsOn() {
-    try { return localStorage.getItem(REPORTS_KEY) !== '0'; } catch (e) { return true; }
-  }
-  function setErrorReports(on) {
-    try { localStorage.setItem(REPORTS_KEY, on ? '1' : '0'); } catch (e) { /* حافظه بسته */ }
-  }
+  function errorReportsOn() { try { return localStorage.getItem(REPORTS_KEY) !== '0'; } catch (e) { return true; } }
+  function setErrorReports(on) { try { localStorage.setItem(REPORTS_KEY, on ? '1' : '0'); } catch (e) { /* حافظه بسته */ } }
 
   function reportError(message, stack, context) {
     if (!errorReportsOn() || !acc.configured()) return;
@@ -615,9 +597,15 @@
     return fa(Math.floor(m / 1440)) + ' روز پیش';
   }
 
+  //  SYN-12: شکستِ بی هشدار سرخطِ خودش را دارد و سرخ نیست؛ خطای آخر پیداست (SYN-08). sync-core ِ کهنه ⇒ همان پیشین
+  function quiet(st) { return !!(core && core.quietFailure && core.quietFailure(st)); }
+  function headOf(st) { return !core ? '' : quiet(st) ? core.dotHead(st) : (core.DOT_LABEL[st.dot] || ''); }
+  function outageHtml(st) { var k = core && core.outageNotice ? core.outageNotice(st) : ''; return k ? '<b>' + esc(core.OUTAGE_LABEL[k]) + '</b> ' + esc(core.OUTAGE_BODY[k]) : ''; }
+
   function badgeLine(st, now) {
-    var head = core.DOT_LABEL[st.dot] || '';
-    var parts = [st.lastError ? head + ': ' + st.lastError : head];
+    var head = headOf(st);
+    var parts = [st.lastError && !quiet(st) ? head + ': ' + st.lastError : head];
+    if (quiet(st)) parts.push('آخرین خطا: ' + st.lastError);
     if (st.queued) parts.push('در صف: ' + fa(st.queued));
     if (st.signedIn) parts.push('آخرین همگام‌سازی: ' + since(st.lastOkAt, now));
     return parts.join(' · ');
@@ -634,24 +622,35 @@
     var n = dotBtn.querySelector('.sync-dot-n');
     if (n) { n.textContent = st.queued ? fa(st.queued) : ''; n.hidden = !st.queued; }
     var text = dotBtn.querySelector('.sync-dot-text');
-    if (text) text.textContent = core.DOT_LABEL[st.dot];
+    if (text) text.textContent = headOf(st);
     var when = dotBtn.querySelector('.sync-dot-when');
     if (when) when.textContent = st.signedIn ? since(st.lastOkAt, now) : '';
     var err = dotBtn.querySelector('.sync-dot-err');
     if (err) { err.textContent = st.lastError || ''; err.hidden = !st.lastError; }
+    paintOutage(st);
+  }
+
+  /* SYN-12: نوارِ آرامِ صفحه فقط برای قطعیِ ماندگار (نه قطعیِ کوتاه یا بی‌نت — هشدارِ بی‌مورد نه)؛ «جزئیات» ⇒ پنجرهٔ همگام‌سازی */
+  var outageBar = null;
+  function paintOutage(st) {
+    var main = document.querySelector('.main .content'), kind = st.signedIn !== false && core.outageNotice ? core.outageNotice(st) : '';
+    if (!outageBar && main) {
+      outageBar = el('div', 'acct-banner warn', '<div class="acct-banner-body"></div><button type="button" class="sync-outage-more" id="sync-outage-more">جزئیات</button>');
+      outageBar.id = 'sync-outage'; outageBar.setAttribute('role', 'status');
+      outageBar.lastChild.addEventListener('click', function () { buildSync().open(); });
+      main.parentNode.insertBefore(outageBar, main);
+    }
+    if (!outageBar || outageBar.getAttribute('data-kind') === kind) return;
+    outageBar.setAttribute('data-kind', kind); outageBar.classList.toggle('show', !!kind); outageBar.firstChild.innerHTML = outageHtml(st);
   }
 
   /* ==========================================================
      SYN-10 — قفلِ خروج وقتی چیزی هنوز به سرور نرفته
      ----------------------------------------------------------
-     تا صفِ opها خالی نشده، خروج از حساب بسته است. تنها راهِ دیگر «خروجِ
-     اجباری» است: اول فایلِ پشتیبانِ کامل (همان دکمهٔ «دانلودِ پشتیبان»ِ
-     تنظیمات)، بعد پرسشِ دوم. همان قاعدهٔ `LogoutGuard`ِ نیتیو.
+     تا صفِ opها خالی نشده، خروج از حساب بسته است. تنها راهِ دیگر «خروجِ اجباری» است: اول فایلِ پشتیبانِ کامل (همان
+     دکمهٔ «دانلودِ پشتیبان»ِ تنظیمات)، بعد پرسشِ دوم. همان قاعدهٔ `LogoutGuard`ِ نیتیو.
      ========================================================== */
-  function leaveVerdict(st) {
-    var n = Math.max(0, Number(st && st.queued) || 0);
-    return { allowed: n === 0, pending: n };
-  }
+  function leaveVerdict(st) { var n = Math.max(0, Number(st && st.queued) || 0); return { allowed: n === 0, pending: n }; }
 
   var leaveSheet = null;
   var leaveProceed = null;
@@ -726,8 +725,8 @@
   }
 
   /**
-   *  `proceed` همان خروجِ همیشگی است. صف خالی ⇒ همین حالا صدا زده می‌شود؛
-   *  وگرنه پنجرهٔ قفل باز می‌شود و `proceed({ forced })` فقط از آن‌جا.
+   *  `proceed` همان خروجِ همیشگی است. صف خالی ⇒ همین حالا صدا زده می‌شود؛ وگرنه پنجرهٔ قفل باز می‌شود و `proceed({
+   *  forced })` فقط از آن‌جا.
    *  @return true اگر خروج همین حالا آزاد بود
    */
   function guardLeave(proceed) {
@@ -772,12 +771,10 @@
   /**
    *  قفلِ نرم — بندِ ۲۱٫۸.
    *
-   *  ⛔ **هیچ داده‌ای پاک نمی‌شود** و خروجیِ اکسل/CSV و چاپ و پشتیبان
-   *     همچنان کار می‌کنند. فقط دکمه‌های «نوشتن» بسته می‌شوند و
-   *     می‌گویند چرا.
-   *  ⚠️ این یک قفلِ **رابط کاربری** است، نه یک قفلِ داده: هر کسی که با
-   *     ابزارِ توسعه‌دهندهٔ مرورگر کار بلد باشد دورش می‌زند. جای قفلِ
-   *     واقعی سرور است. این را صریح می‌نویسیم تا کسی به آن تکیه نکند.
+   *  ⛔ **هیچ داده‌ای پاک نمی‌شود** و خروجیِ اکسل/CSV و چاپ و پشتیبان همچنان کار می‌کنند. فقط دکمه‌های «نوشتن» بسته
+   *  می‌شوند و می‌گویند چرا.
+   *  ⚠️ این یک قفلِ **رابط کاربری** است، نه یک قفلِ داده: هر کسی که با ابزارِ توسعه‌دهندهٔ مرورگر کار بلد باشد دورش
+   *  می‌زند. جای قفلِ واقعی سرور است. این را صریح می‌نویسیم تا کسی به آن تکیه نکند.
    */
   var WRITE_ID = /^btn-(add|bulk|bp|cat|exp-cat|pf-cat|qs-cat|wf-cat|wh-|new|del|edit|tx-submit|finalize|qs-finalize|supplier-add|acc-add|pick-debtor-new|clear-all-data|save-store-name|confirm-return|import-backup)/;
   var ALWAYS_OK = /^btn-(export|print|cloud-backup|force-refresh|apply-update|install-app|alerts|header|logout|open-account|manual-lookup|toggle-scanner|test-camera|stop-test-camera|retry)/;

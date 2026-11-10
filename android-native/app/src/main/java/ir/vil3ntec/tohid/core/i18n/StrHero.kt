@@ -15,6 +15,7 @@ object StrHero {
   val queued: String get() = t("در صف", "Queued", "په کتار کې")
   val offline: String get() = t("بی‌اتصال", "Offline", "بې اتصاله")
   val syncError: String get() = t("خطای همگام‌سازی", "Sync error", "د همغږۍ تېروتنه")
+  val waitingServer: String get() = t("منتظرِ سرور", "Waiting for server", "د سرور په تمه")
   val localOnly: String get() = t("فقط این دستگاه", "This device only", "یوازې دا وسیله")
 
   //  بازه

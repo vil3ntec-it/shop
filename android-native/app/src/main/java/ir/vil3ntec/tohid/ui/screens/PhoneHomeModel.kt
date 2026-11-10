@@ -236,8 +236,8 @@ object HomeAlerts {
   /** هشدارهای کارتِ یک‌خطیِ خانه — «وقتی چیزی نیست، هیچ» */
   fun pressing(all: List<Alert>): List<Alert> = all.filter { it.pressing }
 
-  /** همگام‌سازی از نگاهِ هشدار */
-  enum class Sync { OK, QUEUED, OFFLINE, ERROR, LOCAL_ONLY }
+  /** همگام‌سازی از نگاهِ هشدار؛ `OUTAGE` = قطعیِ ماندگارِ سرور یا راهِ سرور (SYN-12: کارتِ آرام، نه سرخ) */
+  enum class Sync { OK, QUEUED, OFFLINE, ERROR, LOCAL_ONLY, OUTAGE }
 
   /** خطای بلندِ موتور در یک کارت جا نمی‌شود (همان سقفِ نوارِ وضعیت) */
   const val MAX_ERROR = SyncBadge.MAX_ERROR
@@ -283,6 +283,7 @@ object HomeAlerts {
       Sync.OFFLINE -> if (i.queued > 0) add(
         Alert(Kind.SYNC, StrHome.alertWaitingInternet(i.queued), StrHome.alertWaitingInternetBody, StrHome.actionCheck, ShellTargets.SYNC, pressing = true),
       )
+      Sync.OUTAGE -> add(Alert(Kind.SYNC, StrHome.alertOutage, StrHome.alertOutageBody, StrHome.actionCheck, ShellTargets.SYNC, pressing = true))
       else -> Unit
     }
     if (i.outOfStock > 0 || i.lowStock > 0) add(
