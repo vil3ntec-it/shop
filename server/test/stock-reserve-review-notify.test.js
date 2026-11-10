@@ -140,7 +140,8 @@ test('⛔ پشتِ همان پرچم: بی `shop.order_notify`، یا `shop.stoc
   assert.equal((await getOrder(a, oa.id)).stockHold.review, true, 'بررسی همان رفتارِ پیشین');
   assert.equal((await reviewRows(a)).length, 0);
 
-  //  ۲) هر دو روشن، سپس `shop.stock_reserve` خاموش — نگه‌داشتهٔ باز هنوز بررسی می‌شود، خبر نه
+  //  ۲) هر دو روشن، سپس `shop.stock_reserve` خاموش — ⛔ R6: نگه‌داشتهٔ باز هیچ‌جا اثر ندارد (جزئیات بی stockHold، همان main) و
+  //  خبر نه؛ کمبود فقط دفترداری می‌شود ⇒ روشنِ دوباره همان دم «در بررسی»، باز هم بی خبر
   const b = await shop('بررسی-پرچم‌خاموش');
   await enable(b);
   await stocked(b, 'q2', 1);
@@ -148,6 +149,9 @@ test('⛔ پشتِ همان پرچم: بی `shop.order_notify`، یا `shop.stoc
   await live(b.shopId, 'shop.stock_reserve', false);
   await sync(b, sale('q2-s', [['q2-i', 'q2', 1]]));
   await refresh(b);
+  assert.equal((await getOrder(b, ob.id)).stockHold, undefined);
+  assert.equal((await reviewRows(b)).length, 0);
+  await live(b.shopId, 'shop.stock_reserve', true);
   assert.equal((await getOrder(b, ob.id)).stockHold.review, true);
   assert.equal((await reviewRows(b)).length, 0);
   await drain();
