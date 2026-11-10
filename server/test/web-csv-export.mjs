@@ -101,6 +101,9 @@ await pg.evaluate((d) => {
   localStorage.setItem('tohid-shop-auth-v1', JSON.stringify({ method: 'local', value: '', name: 'آزمون', loginAt: 1 }));
   //  «قرض‌داران» پشتِ اشتراک است (`vip.js`)؛ دکانِ مشترک
   localStorage.setItem('tohid-entitlement-v1', JSON.stringify({ source: 'paid', isPaid: true, features: ['sales', 'debtors'], trial: { used: true, active: false, daysLeft: 0 } }));
+  //  «گزارشِ تازه» از تصمیمِ ۳-۲۲ پیش‌فرض روشن است؛ سه گامِ نخست صفحهٔ پیشین را می‌سنجند (مرورگری که خاموشش کرده: `'0'`)
+  //  و گامِ «گزارشِ تازه» خودش آن را روشن می‌کند — هر دو راهِ CSV سنجیده می‌مانند
+  localStorage.setItem('tohid-report-fresh', '0');
 }, LEDGER);
 await pg.reload();
 await pg.waitForFunction(() => typeof window.goTo === 'function' && document.readyState === 'complete');
