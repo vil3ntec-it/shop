@@ -161,10 +161,33 @@ object V3Convert {
     return Fields(set, inc, dropped)
   }
 
+  /**
+   *  R9: نامِ قدیم و واحددارِ یک فیلد (`amount`/`amountMinor`) هر یک به‌تنهایی با همین مبدل ⇒ همان خروجی (سطل، نام و مقدار؛
+   *  عدد با مقدارش، مثلِ JSON ِ JS)؛ وگرنه op ⇒ v2 تا سرور با `unit_conflict` رد کند (برنده دیگر ترتیبِ کلیدها نیست).
+   *  همان `unitClash` ِ `server/src/lib/sync-v3-convert.js` و وب؛ بردارِ `rejects` ِ `sync-v3-convert-v1.json`.
+   */
+  private fun unitClash(spec: V3TableSpec, f: JsonObject): Boolean {
+    fun alone(k: String) = convertFields(spec, JsonObject(mapOf(k to f.getValue(k))))
+    fun num(e: JsonElement): Double? = if (isNumber(e)) (e as JsonPrimitive).content.toDouble() else null
+    fun same(a: Map<String, JsonElement>, b: Map<String, JsonElement>) =
+      a.keys == b.keys && a.all { (k, x) -> val y = b.getValue(k); x == y || (num(x) != null && num(x) == num(y)) }
+    val pairs = spec.money.map { it to it + "Minor" } + spec.qty.map { it to it + "Milli" }
+    return pairs.any { (k, u) ->
+      if (k !in f || u !in f) return@any false
+      val a = alone(k)
+      val b = alone(u)
+      !(same(a.set, b.set) && same(a.inc, b.inc) && a.dropped == b.dropped)
+    }
+  }
+
   /** opِ شکلِ v1 (تفاضلِ دفتر) ⇒ opهای v3 — همان پسوندها و همان tx ِ `fromV2` */
   fun fromLegacyOp(op: SyncOp, hlc: String): Result {
     val spec = V3Schema.specOf(op.table)
     if (spec == null || spec.v3only) return Result(false, emptyList(), emptyList(), false, "unknown_table")
+    val raw = op.fields
+    if (op.type != SyncOp.DELETE && raw != null && unitClash(spec, raw)) {
+      return Result(false, emptyList(), emptyList(), false, "unit_conflict")
+    }
     val conv = if (op.type == SyncOp.DELETE) Fields(LinkedHashMap(), LinkedHashMap(), emptyList()) else convertFields(spec, op.fields)
     val set = conv.set
     val counterInc = LinkedHashMap<String, JsonElement>()

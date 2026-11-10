@@ -54,6 +54,14 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-fix-43` (پیگیریِ بازبینیِ دومِ دستهٔ ۴۳: R9 و صفحه‌های `/images/mine`؛ روی `claude/sec-review-43` ‏041e8995 + main؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) R9: نامِ قدیم و واحددارِ یک فیلد در op ِ v1/v2 (`amount`+`amountMinor`) دیگر به ترتیبِ کلیدها بسته نیست — `unitClash` در `fromV2` و همزادهای
+  وب/Kotlin؛ یکی ⇒ همان مقدار، ناجور ⇒ `unit_conflict` (راهِ op ِ نادرست). بردارِ `rejects`؛ `sync-v3-unit-pair.test.js` ۴/۴ (پیش از رفع ۴ سرخ، PGlite و PostgreSQL)؛
+  همهٔ `sync-v3*` روی هر دو سبز. (۲) صفحهٔ «عکس‌های بیشتر و ویترین»: `ProductGallery.collect` همهٔ صفحه‌های `/mine` را می‌خواند (فهرست و نگه داشتنِ عکسِ ویترین
+  در `ImageBank.uploadOwn`)؛ بی درِ تازه. پیگیریِ B8 ِ ممیزی، دو خطِ RULES، WHATS-NEW.
+- نیمه‌کاره: Kotlin (`V3ConvertVectorsTest.unitClashGoesToServer`، `ProductGalleryTest`، `ProductGalleryRepositoryTest`) فقط در CI. `ImageBank.source` (کارتِ منبعِ عکس،
+  وضعِ پیشنهاد به بانک) هنوز صفحهٔ نخستِ `/mine` را می‌خواند — فقط نمایش. سندِ ناجورِ v1 در v1 می‌ماند و در v3 نیست (`sync-v1.js` ِ مشترک دست نمی‌خورد).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را پس از `claude/sec-review-43` در دسته بگذارد؛ R7 و R8 تصمیمِ صاحب‌کار.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/missing-rows` (دسته‌بندیِ ۳۰ ردیفِ MISSING و استودیوی عکسِ محلی؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: هر ۳۰ ردیف دسته‌بندی شد (یادداشتِ همان روز در پایانِ `docs/spec/STATUS.md`). ۱۳ ردیفِ تصویر (AI-01/02/03/05، IMG-04/05/06،
   IMG-PRO-01/02/03/04/08/14) ⇐ PARTIAL: استودیوی عکس روی سرورِ خودمان پشتِ پرچمِ خاموشِ `shop.image_studio` — رمزگشا/رمزگذارِ JPEG/PNG ِ بی

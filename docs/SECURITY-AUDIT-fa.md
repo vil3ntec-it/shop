@@ -257,6 +257,15 @@ PostgreSQL ِ محلی سرخ بود (`server/test/security-review-40.test.js`).
 R9 Info — پلِ v1⇒v3 (`convertFields`) در **درجِ** تازه با هر دو `amount` و `amountMinor` ِ بدنه، بسته به ترتیبِ کلیدها یکی را روی دیگری می‌نشاند
 (`{amount:100, amountMinor:999999}` ⇒ v3 ‏9999.99) ⇒ v1 و v3 یک سند را دو مبلغ می‌بینند (سندِ تازه، نه ثبت‌شده؛ بیرون از این دسته).
 
+**پیگیری (۱۴۰۵/۰۸/۱۹، شاخهٔ `claude/sec-fix-43`):** R9 ✅ بسته — `unitClash` در `fromV2` (`lib/sync-v3-convert.js`) و همزادها (`fromLegacyOp` ِ
+`license/sync-v3-engine.js`، `V3Convert.kt`): هر نام به‌تنهایی با همان مبدل؛ خروجیِ یکی ⇒ همان یک مقدار، ناجور (عدد، null، `$inc`، رشته یا نامِ قدیمِ
+نامفهوم) ⇒ کلِ op `unit_conflict` با همان راهِ op ِ نادرست (push ِ v2 ⇒ `rejected`، پلِ v1 ⇒ به v3 نمی‌رسد، کلاینت ⇒ v2 برای داوریِ سرور)، هر ترتیبی؛
+بردارِ `rejects` ِ `core/test-vectors/sync-v3-convert-v1.json`. سنجه: `server/test/sync-v3-unit-pair.test.js` ۴/۴ (پیش از رفع ۴ سرخ، PGlite و PostgreSQL).
+`sync-v1.js` ِ مشترک دست نخورد ⇒ v1 همان سندِ ناجور را می‌پذیرد و نگه می‌دارد؛ v3 فقط آن را نمی‌بیند. هم‌چنین (برنامه، PRD-17/27): صفحهٔ «عکس‌های بیشتر
+و ویترین» فقط ۵۰ ِ نخستِ `GET /images/mine` را می‌خواند ⇒ کالای با بیش از ۵۰ عکس عکسِ ویترین را از فهرست می‌انداخت و بارگذاریِ بعدیِ دستگاه جایش
+می‌نشست ⇒ صفحه‌به‌صفحه با `next_cursor` ِ همان در (`ProductGallery.collect`، بی درِ تازه؛ `ProductGalleryTest`، `ProductGalleryRepositoryTest`، فقط CI).
+R7 و R8 همچنان تصمیمِ صاحب‌کار.
+
 ---
 
 ## C) API و دیتابیس — جدا

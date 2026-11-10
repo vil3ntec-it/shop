@@ -136,6 +136,11 @@ test('مبدلِ وب = fromV2ِ سرور و همان fromLegacy (core/test-vect
     assert.equal(r.native, c.native, `native: ${c.in.op_id}`);
     assert.equal(r.reason, c.reason, `reason: ${c.in.op_id}`);
   }
+  //  R9: نامِ قدیم و واحددارِ ناجور ⇒ v2 تا سرور با همان دلیل رد کند (هر ترتیبی)
+  assert.ok(CONV.rejects.length >= 2);
+  for (const c of CONV.rejects) {
+    assert.deepEqual(V3.fromLegacyOp(c.in, CONV.hlc), { ok: false, ops: [], dropped: [], native: false, reason: c.reason }, `reject: ${c.in.op_id}`);
+  }
   //  همان قاعدهٔ money-v1.json — بی گردکردنِ دوم
   const money = JSON.parse(fs.readFileSync(path.join(ROOT, 'license', 'test-vectors', 'money-v1.json'), 'utf8'));
   for (const [x, minor] of money.fromLegacy.money) {

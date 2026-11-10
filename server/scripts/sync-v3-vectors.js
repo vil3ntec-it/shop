@@ -178,7 +178,33 @@ function legacyOps() {
   out.push(upd('priceHistory', { newPrice: 3 }));
   out.push(upd('expenses', { amount: 12.345, title: 'کرایه' }));
   out.push(upd('suppliers', { name: 'تأمین‌کننده', balance: 10 }));
+
+  //  R9: نامِ قدیم و واحددارِ **یکیِ** یک فیلد ⇒ همان یک مقدار با نامِ تازه، هر ترتیبی (ناجورها در `rejects`)
+  out.push(ins('expenses', { title: 'کرایه', amount: 1.005, amountMinor: 100 }));
+  out.push(ins('expenses', { amountMinor: 100, title: 'کرایه', amount: 1.005 }));
+  out.push(ins('saleItems', { saleId: 's1', productId: 'p1', quantityMilli: 2500, quantity: 2.5 }));
+  out.push(upd('sales', { paidAmount: { $inc: 50.25 }, paidAmountMinor: { $inc: 5025 } }));
+  out.push(upd('expenses', { amountMinor: null, amount: null }));
   return out;
+}
+
+/** R9: نامِ قدیم و واحددارِ **ناجورِ** یک فیلد ⇒ کلِ op رد، هر دو ترتیب (کلاینت ⇒ v2 تا سرور با همین دلیل داوری کند) */
+function clashOps() {
+  let n = 0;
+  const op = (table, type, fields) => ({
+    op_id: `01JV3CLASH${String(++n).padStart(16, '0')}`, ts: 1760000000000 + n, table, row_id: `${table}-c${n}`, type, fields,
+  });
+  return [
+    ['expenses', 'insert', { title: 'کرایه', amount: 100, amountMinor: 999999 }],
+    ['expenses', 'insert', { title: 'کرایه', amount: 1.005, amountMinor: 101 }],
+    ['saleItems', 'insert', { saleId: 's', productId: 'p', quantity: 2, quantityMilli: 3000 }],
+    ['expenses', 'insert', { title: 'x', amount: 'نامعلوم', amountMinor: 5 }],
+    ['expenses', 'insert', { title: 'x', amount: 100, amountMinor: '10000' }],
+    ['expenses', 'update', { amount: null, amountMinor: 5 }],
+    ['sales', 'update', { paidAmount: { $inc: 50 }, paidAmountMinor: { $inc: 4000 } }],
+    ['sales', 'update', { paidAmount: { $inc: 50 }, paidAmountMinor: 5000 }],
+    ['products', 'update', { minStock: 2.5, minStockMilli: 2000 }],
+  ].flatMap(([t, type, f]) => [op(t, type, f), op(t, type, Object.fromEntries(Object.entries(f).reverse()))]);
 }
 
 function stripLegacy(o) {
@@ -200,6 +226,11 @@ function convertVectors() {
     }
     return { in: op, ops, dropped: r.dropped, native, reason };
   });
+  const rejects = clashOps().map((op) => {
+    const r = convert.fromV2(op, { schemaVersion: 3, deviceId: 'dev-x', hlc: GIVEN });
+    if (r.ok) throw new Error(`نمونهٔ ناجور پذیرفته شد: ${op.op_id}`);
+    return { in: op, reason: r.reason };
+  });
   const tables = {};
   for (const [name, t] of Object.entries(schema.TABLES)) {
     tables[name] = {
@@ -214,6 +245,7 @@ function convertVectors() {
     tables,
     kinds: schema.KINDS,
     cases,
+    rejects,
   };
 }
 
@@ -244,7 +276,7 @@ function serialize(v, listKeys) {
 function build() {
   return [
     [HLC_FILE, serialize(hlcVectors(), ['parse', 'format', 'canonical', 'compare', 'fromTs', 'clock'])],
-    [CONVERT_FILE, serialize(convertVectors(), ['tables', 'cases'])],
+    [CONVERT_FILE, serialize(convertVectors(), ['tables', 'cases', 'rejects'])],
   ];
 }
 
