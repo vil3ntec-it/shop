@@ -602,6 +602,7 @@ async function fixAddress(shopId, assignmentId, body, idem = null) {
   if (b.keepPin !== undefined && typeof b.keepPin !== 'boolean') throw badRequest('نامعتبر', 'bad_keep_pin');
   const expectedVersion = optInt(b.expectedVersion, 'نسخه', { min: 0, max: Number.MAX_SAFE_INTEGER });
   const idempotency = require('./idempotency');
+  const pinOn = await require('./plus-code').flagOn(shopId);   // S33: پینِ تازه ⇒ Plus Code ِ تازه
 
   return tx(async (c) => {
     if (idem) {
@@ -636,7 +637,7 @@ async function fixAddress(shopId, assignmentId, body, idem = null) {
     const fields = addressFields(prev, fixed);
     //  ناحیهٔ ارسالِ ویترین (`zone`، CHK-07) سندِ قیمتِ همان سفارش است و با اصلاحِ
     //  نشانی عوض نمی‌شود — هزینهٔ ارسالِ گرفته‌شده پس از رخداد بازحساب نمی‌شود
-    const next = { ...fixed, ...(prev.zone && typeof prev.zone === 'object' ? { zone: prev.zone } : {}), correctedAt: at };
+    const next = require('./plus-code').stamp({ ...fixed, ...(prev.zone && typeof prev.zone === 'object' ? { zone: prev.zone } : {}), correctedAt: at }, pinOn);
     await c.query(
       `UPDATE online_orders SET address=$3::jsonb, version=version+1, updated_at=$4 WHERE shop_id=$1 AND id=$2`,
       [shopId, order.id, JSON.stringify(next), at]

@@ -519,6 +519,10 @@ async function journey(width, lang, phone) {
   await page.check('input[name="fulfillment"][value="delivery"]');
   await page.click('#pin-btn');
   await page.waitForFunction((z) => document.getElementById('zone-msg').textContent.includes(z), ZONE, { timeout: 10000 });
+  //  S33 (`shop.orders.plus_code`): Plus Code ِ همان پین زیرِ آن، با `store/plus-code.js` ِ دیربار (همان حسابِ سرور)
+  const pinCode = require('../src/lib/plus-code').encode(INSIDE.latitude, INSIDE.longitude);
+  await page.waitForFunction((c) => document.getElementById('pin-text').textContent.includes(c), pinCode, { timeout: 10000 })
+    .then(() => ok(true, `${P.tag}: Plus Code ِ پین زیرِ آن (S33)`), async () => ok(false, `${P.tag}: Plus Code ِ پین زیرِ آن (S33)`, await page.textContent('#pin-text')));
   await page.fill('#a-text', `${ZONE}، کوچهٔ دوم`);
   await page.waitForSelector('#tender-row:not([hidden]) #d-tender option[value="100000"]', { state: 'attached', timeout: 10000 });
   const opt = await page.locator('#d-tender option[value="100000"]').textContent();
@@ -530,7 +534,9 @@ async function journey(width, lang, phone) {
   const before = (await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n;
   await page.click('#submit-order');
   await page.waitForSelector('#view-order:not([hidden])', { timeout: 15000 });
-  const row = await one('SELECT id, order_no, total_minor, delivery_fee_minor, delivery, customer_phone, status FROM online_orders WHERE shop_id=$1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const row = await one('SELECT id, order_no, total_minor, delivery_fee_minor, delivery, address, customer_phone, status FROM online_orders WHERE shop_id=$1 ORDER BY created_at DESC LIMIT 1', [shopId]);
+  const aj = row && (typeof row.address === 'string' ? JSON.parse(row.address) : row.address);
+  ok(aj && aj.pinCode === pinCode, `${P.tag}: سفارش همان Plus Code ِ پین را دارد که برگهٔ ثبت نشان داد (S33)`, JSON.stringify(aj && aj.pinCode));
   const dj = row && (typeof row.delivery === 'string' ? JSON.parse(row.delivery) : row.delivery);
   ok((await one('SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1', [shopId])).n === before + 1
     && Number(row.total_minor) === 78000 && Number(row.delivery_fee_minor) === 3000 && row.customer_phone === intl && dj && dj.cashTenderMinor === 100000,

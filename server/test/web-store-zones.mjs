@@ -374,7 +374,7 @@ ok(!(await page.$('script[src="/store/pin-text.js"]')), 'pin-text.js پیش از
 await page.fill('#pin-paste', 'https://maps.app.goo.gl/AbCdEf');
 await page.click('#pin-use');
 await page.waitForFunction(() => /پین پیدا نشد/.test(document.getElementById('pin-text').textContent), null, { timeout: 10000 });
-ok((await text('#pin-btn')).includes('موقعیتِ فعلیِ من'), 'پیوندِ کوتاه ⇒ «از این نوشته پین پیدا نشد…» و هیچ پینی گذاشته نشد', await text('#pin-btn'));
+ok((await text('#pin-btn')).includes('موقعیتِ فعلیِ من'), 'پیوندِ کوتاه ⇒ «پین پیدا نشد…» و هیچ پینی گذاشته نشد', await text('#pin-btn'));
 await page.fill('#pin-paste', 'geo:35.2,70.4');
 await page.press('#pin-paste', 'Enter');
 await page.waitForFunction(() => /بیرون/.test(document.getElementById('zone-msg').textContent), null, { timeout: 10000 });

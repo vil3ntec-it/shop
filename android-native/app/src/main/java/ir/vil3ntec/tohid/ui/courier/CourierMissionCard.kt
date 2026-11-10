@@ -73,6 +73,11 @@ internal fun MissionCardView(
         color = if (i == 0) p.ink else p.inkMuted, maxLines = 2, overflow = TextOverflow.Ellipsis,
       )
     }
+    //  S33: Plus Code از پینِ مقصد زیرِ نشانی، فقط در حالِ زنده (همان `missionPlusCode` ِ جزئیات؛ بی پین ⇒ هیچ)
+    if (live) missionPlusCode(c)?.let {
+      Spacer(Modifier.height(2.dp))
+      Text(StrCourier.plusCode(it), style = courierText(13.sp, FontWeight.Medium), color = p.inkMuted)
+    }
     val chips = live && (c.expectedCollectMinor > 0 || c.requiresCode) || !live && (c.cashCollectedMinor != null || c.fareMinor > 0)
     if (chips) {
       Spacer(Modifier.height(12.dp))

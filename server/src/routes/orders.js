@@ -14,6 +14,8 @@
 const express = require('express');
 const orders = require('../lib/orders');
 const refunds = require('../lib/order-refunds');
+//  E2E-RET-11: رسیدِ اصلاحیِ هر ردیفِ دفترِ بازپرداخت، فقط با پرچمِ `shop.orders.refund_receipt`
+const receipts = require('../lib/order-refund-receipt');
 const delay = require('../lib/order-delay');
 const amend = require('../lib/order-amend');
 const presence = require('../lib/order-presence');
@@ -190,7 +192,7 @@ router.post('/:id/track-link/revoke', needFlag, requirePermission('orders.contac
 router.get('/:id', needFlag, async (req, res) => {
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
   //  دفترِ بازپرداختِ همین سفارش — مبلغِ برگشته، مانده و اختلاف (FIN-01)
-  order.refund = await refunds.summary(req.shopId, order.id);
+  order.refund = await receipts.attachStaff(req.shopId, order, await refunds.summary(req.shopId, order.id));
   //  ORD-14: آخرین پیشنهاد/ویرایش — فقط با پرچمِ `shop.orders.amend` (خاموش ⇒ همان پاسخِ پیشین)
   if (await amend.flagOf(req.shopId)) order.amendment = await amend.staffOf(req.shopId, order.id);
   //  «فاکتور شد» و حالِ پرداخت («پرداخت پس از پذیرش»، مهاجرتِ ۲۱۰) — lib/order-flow
@@ -325,7 +327,7 @@ router.post('/:id/refunds', needFlag, requirePermission('orders.refund'), needWr
     throw err;
   }
   const order = await orders.get(req.shopId, req.params.id, actorOf(req));
-  order.refund = await refunds.summary(req.shopId, order.id);
+  order.refund = await receipts.attachStaff(req.shopId, order, await refunds.summary(req.shopId, order.id));
   if (out.replayed) {
     res.set('Idempotent-Replayed', 'true');
     return res.status(200).json({ order, entry: out.entry, replayed: true });

@@ -12,10 +12,12 @@
  *             • `in_progress`— بخشی برگشته و دکان هنوز نبسته
  *             • `partial` / `full` — بسته شد (بازپرداختِ بخشی / کامل)
  *           هر ردیف فقط مبلغ، روش، زمان و «پایانی» — ⛔ نه دلیلِ نوشتهٔ کارمند، نه کننده.
+ *           E2E-RET-11: با پرچمِ `shop.orders.refund_receipt` هم `receipts` (رسیدِ اصلاحیِ هر ردیف، `order-refund-receipt`).
  */
 const db = require('../db');
 const orders = require('./orders');
 const refunds = require('./order-refunds');
+const receipt = require('./order-refund-receipt');
 
 const FLAG_KEY = 'shop.orders.refund_tracking';
 const flagOf = (shopId) => orders.flagOf(shopId, FLAG_KEY);
@@ -28,7 +30,7 @@ async function viewOf(shopId, orderId) {
   const id = String(orderId || '');
   const sum = await refunds.summary(shopId, id);
   if (!sum) return null;
-  const order = await db.one('SELECT status FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id]);
+  const order = await db.one('SELECT status, order_no FROM online_orders WHERE shop_id=$1 AND id=$2', [shopId, id]);
   const asked = await db.one(
     `SELECT MIN(created_at) AS at FROM online_order_events
       WHERE shop_id=$1 AND order_id=$2 AND kind='status' AND to_status='return_requested'`, [shopId, id]);
@@ -44,6 +46,7 @@ async function viewOf(shopId, orderId) {
     currency: sum.currency,
     entries: sum.entries.map((e) => ({ amountMinor: e.amountMinor, method: e.method, at: e.at, final: e.final })),
     updatedAt: last ? last.at : requestedAt,
+    ...(await receipt.flagOn(shopId) ? { receipts: receipt.receiptsOf({ orderNo: order.order_no, totalMinor: sum.totalMinor, currency: sum.currency }, sum.entries) } : {}),
   };
 }
 

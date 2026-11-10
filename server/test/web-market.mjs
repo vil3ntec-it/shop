@@ -213,6 +213,9 @@ ok((await page.evaluate((s) => JSON.parse(localStorage.getItem(`store-cart:${s}`
 await page.click('#cart-bar');
 await page.waitForFunction(() => document.body.classList.contains('cart-open'), null, { timeout: 5000 });
 ok((await page.getAttribute('#sheet-lines a.cline-main', 'href')) === `/store/${gb.slug}#/cart`, 'سبدهای خانه: هر دکان جدا، با پیوند به سبدِ همان دکان');
+//  S73: محدودیت به مشتری گفته می‌شود — بی ثبتِ یک‌جای چند دکان، هر دکان سفارشِ جدا (برگهٔ سبدها، نه فقط پیوندها)
+ok(await page.evaluate(() => { const e = document.getElementById('cart-shop'); return Boolean(e) && e.offsetParent !== null && /هر دکان سفارشِ جدا دارد/.test(e.textContent); }),
+  'S73: برگهٔ سبدها می‌گوید «هر دکان سفارشِ جدا دارد»');
 await axe(page, 'سبدهای خانه (r2)');
 await page.keyboard.press('Escape');
 await page.waitForFunction(() => !document.body.classList.contains('cart-open'), null, { timeout: 5000 });
@@ -230,9 +233,32 @@ await page.waitForFunction(() => document.querySelectorAll('#shops a.shop-link')
 ok((await page.getAttribute('#shops a.shop-link', 'href')) === `/store/${gb.slug}`, 'همهٔ دکان‌ها، تراشهٔ دسته: فقط نانوایی');
 await page.click('#shop-cats button[data-cat=""]');
 await page.waitForFunction(() => document.querySelectorAll('#shops a.shop-link').length === 2, null, { timeout: 5000 });
+//  S67: مجوزِ موقعیت رد شد (این زمینه مجوز نداده) ⇒ یک پرسش، پیامِ روشن، دکمه دوباره آزاد و فهرستِ کامل — نه حلقهٔ پرسش
+await page.evaluate(() => {
+  const g = navigator.geolocation.getCurrentPosition.bind(navigator.geolocation);
+  window.__geoAsks = 0;
+  navigator.geolocation.getCurrentPosition = (ok, no, o) => { window.__geoAsks++; return g(ok, no, o); };
+});
 await page.click('#locate2');
-await page.waitForFunction(() => /نزدیک/.test(document.getElementById('shops-title').textContent), null, { timeout: 10000 }).catch(() => {});
-ok(true, '«نزدیکِ من» اختیاری است و بی آن هم فهرست کامل است');
+await page.waitForFunction(() => /موقعیت گرفته نشد/.test((document.getElementById('toast') || {}).textContent || ''), null, { timeout: 10000 })
+  .then(() => ok(true, 'S67: ردِ مجوزِ موقعیت ⇒ «موقعیت گرفته نشد؛ بی آن هم همه دیده می‌شوند»'), () => ok(false, 'S67: پیامِ ردِ مجوز'));
+await page.waitForTimeout(1500);
+const denied = await page.evaluate(() => ({ asks: window.__geoAsks, free: !document.getElementById('locate2').disabled,
+  pressed: document.getElementById('locate2').getAttribute('aria-pressed'), shops: document.querySelectorAll('#shops a.shop-link').length,
+  near: /نزدیک/.test(document.getElementById('shops-title').textContent) }));
+ok(denied.asks === 1 && denied.free && denied.pressed !== 'true' && denied.shops === 2 && !denied.near,
+  'S67: «نزدیکِ من» اختیاری است — پس از رد یک پرسش و نه بیشتر، دکمه آزاد و فهرستِ کامل', JSON.stringify(denied));
+//  S68: با مجوز ⇒ فاصلهٔ گردشده با برچسبِ «≈ … کیلومتر» فقط برای دکانِ مکان‌دار؛ دکانِ بی مکان برچسب ندارد
+await call('PUT', '/api/shop/market', { location: { lat: 34.54, lng: 69.18 } }, ga.token);
+await ctx.grantPermissions(['geolocation'], { origin: base });
+await page.click('#locate2');
+await page.waitForFunction(() => /نزدیک/.test(document.getElementById('shops-title').textContent), null, { timeout: 10000 })
+  .then(() => ok(true, 'S67: با مجوز «نزدیکِ من» روشن شد'), () => ok(false, 'S67: با مجوز «نزدیکِ من» روشن شد'));
+const dist = await page.$$eval('#shops article', (as) => as.map((a) => [a.querySelector('a.shop-link').getAttribute('href'), (/≈ [۰-۹٫]+ کیلومتر/.exec(a.textContent) || [''])[0]]));
+const da = (dist.find((d) => d[0] === `/store/${ga.slug}`) || [])[1];
+const db = (dist.find((d) => d[0] === `/store/${gb.slug}`) || [])[1];
+ok(da === '≈ ۱٫۵ کیلومتر' && db === '', 'S68: برچسبِ «≈ ۱٫۵ کیلومتر» (گرد به نیم کیلومتر) فقط برای دکانِ مکان‌دار', JSON.stringify(dist));
+await call('PUT', '/api/shop/market', { location: null }, ga.token);
 await noOverflow(page, 'همهٔ دکان‌ها');
 await axe(page, 'همهٔ دکان‌ها');
 

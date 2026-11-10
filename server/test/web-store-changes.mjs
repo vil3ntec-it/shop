@@ -181,6 +181,15 @@ const rfText = await text('#o-ch-rf');
 //  ممیزیِ ویترین (ORD-15): فقط «برگشته به شما» — «مانده» ِ کنارِ آن با «پرداخت‌شده» ِ صفحه نمی‌خواند
 ok(/بخشی از پول برگشته/.test(rfText) && /نقد/.test(rfText) && /برگشته به شما: ۱۰۰/.test(rfText) && !/مانده/.test(rfText), 'وضعیت، «برگشته به شما» و ردیفِ «نقد»', rfText.slice(0, 200));
 ok(!/یادداشتِ داخلی/.test(await page.textContent('body')), 'دلیلِ نوشتهٔ کارمند در صفحهٔ مشتری نیست');
+ok((await page.$('#o-ch-rc-1')) === null, 'E2E-RET-11: پرچمِ رسیدِ اصلاحی خاموش ⇒ بی رسید');
+//  E2E-RET-11 (`shop.orders.refund_receipt`): رسیدِ اصلاحیِ همان ردیف با شمارهٔ `<سفارش>-R1` و مبلغِ درستِ سفارش از سرور
+await flag('shop.orders.refund_receipt', true);
+await open(ob);
+await page.waitForSelector('#o-ch-rc-1', { timeout: 10000 });
+const rcText = await text('#o-ch-rc-1');
+ok(/رسیدِ اصلاحیِ \d+-R1/.test(rcText) && /برگشتِ همین رسید ۱۰۰/.test(rcText) && /مبلغِ درستِ سفارش/.test(rcText), 'E2E-RET-11: رسیدِ اصلاحی با شماره و مبلغِ درست', rcText.slice(0, 160));
+ok(!/یادداشتِ داخلی/.test(await page.textContent('body')), 'E2E-RET-11: رسید دلیلِ کارمند را ندارد');
+await flag('shop.orders.refund_receipt', false);
 await open(ob, '?lang=en');
 await page.waitForFunction(() => /Part of the money/.test((document.getElementById('o-ch-rf-st') || {}).textContent || ''), null, { timeout: 10000 });
 ok(/Cash/.test(await text('#o-ch-rf-list')), 'انگلیسی: همان بخش با واژه‌نامهٔ changes.en');
