@@ -162,3 +162,22 @@ test('S79: پس از پیشرفت و گیرِ تازه ⇒ هشدارِ تازه
     await query(`DELETE FROM live_config WHERE key='console.delivery_thresholds' AND scope='all'`);
   }
 });
+
+//  SR46 (R20): نامزدها دسته‌دسته تا آخر خوانده می‌شوند — پیش‌تر فقط ۳۰۰ کهنه‌ترین سفارشِ باز ِ همهٔ دکان‌ها، پس
+//  انبوهِ سفارشِ کهنهٔ دکانِ بی پرچم (یا رهاشده) سفارشِ گیرکردهٔ دکانِ پرچم‌دار را هرگز به جاروب نمی‌رساند
+test('S79 (R20): بیش از یک دسته سفارشِ کهنهٔ دکانِ بی پرچم سفارشِ گیرکردهٔ دکانِ پرچم‌دار را پنهان نمی‌کند', async () => {
+  const off = await shop('انبوه', { on: false });
+  const on = await shop('پشتِ صف');
+  const t = Date.now();
+  const seed = await order(off, { status: 'packed', updatedAt: t - 600 * MIN });
+  await query(
+    `INSERT INTO online_orders
+     SELECT (jsonb_populate_record(o, jsonb_build_object('id', o.id || '-r20-' || g, 'order_no', o.order_no + g, 'client_key', 'r20-' || g))).*
+       FROM online_orders o, generate_series(1, 320) g WHERE o.id = $1`, [seed]);
+  assert.equal(Number((await one(`SELECT COUNT(*)::int AS n FROM online_orders WHERE shop_id=$1 AND status='packed'`, [off.shopId])).n), 321);
+  const mine = await order(on, { status: 'packed', updatedAt: t - 31 * MIN });
+  assert.ok((await stuck.sweep(t)) >= 1);
+  assert.deepEqual((await alerts(on.shopId)).map((e) => [e.order_id, e.detail.code]), [[mine, 'dispatch_overdue']]);
+  assert.deepEqual(await alerts(off.shopId), [], 'دکانِ بی پرچم هشدار نمی‌گیرد');
+  assert.equal(await stuck.sweep(t + MIN), 0, 'دورِ دوم هشدارِ تکراری نمی‌سازد');
+});
