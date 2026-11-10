@@ -87,6 +87,13 @@
   بقیهٔ نامزدها جز کارِ بیرونی/تصمیم چیزی نداشتند: WEB-01 (صفحهٔ وبِ مدیریت، `market.slug_hold`)، WEB-05 (فرهنگِ مترادف ۴-۱)، WEB-20 (Sharing Debugger)، CHK-03 (D-09 و CI).
 - نیمه‌کاره: هیچ. ردیف‌ها PARTIAL ماندند (CHK-20: D-09 و CI؛ WEB-17: Search Console). شاخهٔ کهنهٔ `claude/web-2` (ac8bfe21، squash‌شده) روی origin بود.
 - قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ شاهدِ CI ِ `web-store-zones.mjs` و `storefront-seo.test.js`.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-44` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۴، روی `ccr-…-batch-44` ‏6c73e73c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافتهٔ Low در استودیوی عکس، هر سه با آزمونِ سرخ‌پیش‌از‌رفع (`server/test/security-review-44.test.js`، ۳ آزمون): SR44-1 PNG ِ دو-IHDR
+  (`inspectPng` ⇒ `png-multi-ihdr`؛ `image-codec.decodePng` و `image-quality.pngLuma` IHDR ِ دوم را نمی‌گیرند)، SR44-2 سقفِ روزانه/صفِ `createBatch` زیرِ قفلِ دکان
+  (فقط PostgreSQL سرخ بود: ۲۸۰۰ کار با سقفِ ۲۰۰۰)، SR44-3 کارِ هم‌digest ِ هم‌زمان ⇒ `doneOf` در `complete` زیرِ قفلِ عکس. B9 ِ ممیزی، یک خطِ RULES.
+  شش شاخهٔ دیگر حمله شدند و سالم ماندند (B9). ۲۵ پروندهٔ آزمونِ عکس/مسیر روی PGlite و PostgreSQL سبز.
+- نیمه‌کاره: هیچ. R10 (فرمول در CSV ِ `index.html` ِ یخ‌زده، پیش از این دسته)، R11 (سقفِ heap ِ رشته ArrayBuffer را نمی‌بندد) و R12 (کارِ «در کار» ِ دستهٔ لغوشده پس از افتادنِ فرآیند) تصمیمِ صاحب‌کارند.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/dari-mirror` (آینهٔ JS ِ DariCoverageTest برای جدول‌های `Str*`؛ روی main ‏99036497؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: روی `ccr-…-batch-43` ‏f067bf9c فقط CI ِ اندروید سرخ شد (`StrProductGallery.notSent`، `StrPromoHeld.releaseFailed`: «دوباره بزنید») و همهٔ JS سبز بود،
   چون آینهٔ `dari-text.test.js` فقط خرید + وب را می‌سنجید. حالا `KT.appTexts` (`server/test/kt-source.js`) همان `rows(I18nTables.all)` را از خودِ Str*.kt می‌خواند

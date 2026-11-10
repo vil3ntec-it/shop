@@ -70,6 +70,8 @@ async function createBatch(shopId, userId, body, ip = '') {
   const { preset, options, label } = studio.normalize(b);
   const reqDigest = sha256(JSON.stringify([ids, preset, options]));
   return tx(async (c) => {
+    //  SR44-2: سقف‌های صف و روز زیرِ قفلِ همین دکان — درخواستِ هم‌زمان شمارِ دستهٔ پیشین را می‌بیند، نه پیش از آن
+    await c.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`image-studio:${shopId}`]);
     const id = 'isb_' + ulid(), t = now();
     const ins = await c.query(
       `INSERT INTO image_studio_batches (id, shop_id, idem_key, request_digest, preset, options, total, created_by, created_at, updated_at)
@@ -327,6 +329,16 @@ async function claim(n) {
 
 const OWN_LEASE = 'id=$1 AND status=$2 AND lease=$3';
 
+/** خروجیِ آمادهٔ همان `digest` (کارِ دیگرِ همین دکان، نسخه‌اش هست) یا null — `c` = تراکنش، null = بیرون از آن */
+async function doneOf(c, job) {
+  const sql = `SELECT result_version, result FROM image_studio_jobs
+    WHERE shop_id=$1 AND digest=$2 AND status='done' AND result_version > 0 AND id <> $3
+      AND EXISTS (SELECT 1 FROM image_versions v WHERE v.image_id=image_studio_jobs.image_id AND v.version=image_studio_jobs.result_version)
+    ORDER BY updated_at LIMIT 1`;
+  const args = [job.shop_id, job.digest, job.id];
+  return c ? (await c.query(sql, args)).rows[0] || null : one(sql, args);
+}
+
 async function failOrRetry(job, e) {
   const permanent = !!e.permanent || job.attempts >= LIMITS.ATTEMPTS_MAX;
   const code = String(e.code || 'studio_failed').slice(0, 64);
@@ -354,6 +366,9 @@ async function complete(job, out, reuse) {
     if (reuse) return fin('done', { version: Number(reuse.result_version), reused: true, result: reuse.result });
     const img = await ownImage(c, j.shop_id, j.image_id, true);
     if (!img) return fin('failed', { error: 'image_gone' });
+    //  SR44-3: کارِ هم‌`digest` ِ هم‌زمان زیرِ همین قفلِ عکس پیش‌تر ثبت شد ⇒ همان خروجی، نه نسخهٔ دوم
+    const same = await doneOf(c, j);
+    if (same) return fin('done', { version: Number(same.result_version), reused: true, result: same.result });
     const n = (await c.query('SELECT COUNT(*)::int AS n FROM image_versions WHERE image_id=$1', [img.id])).rows[0];
     if (Number(n.n) >= LIMITS.VERSIONS_MAX) return fin('failed', { error: 'versions_limit' });
     const info = bytes.inspect(out.buf);
@@ -375,11 +390,7 @@ async function complete(job, out, reuse) {
 async function runJob(job) {
   try {
     if (job.attempts > LIMITS.ATTEMPTS_MAX) return await failOrRetry(job, { code: 'attempts_exhausted', permanent: true });
-    const reuse = await one(
-      `SELECT result_version, result FROM image_studio_jobs
-        WHERE shop_id=$1 AND digest=$2 AND status='done' AND result_version > 0 AND id <> $3
-          AND EXISTS (SELECT 1 FROM image_versions v WHERE v.image_id=image_studio_jobs.image_id AND v.version=image_studio_jobs.result_version)
-        ORDER BY updated_at LIMIT 1`, [job.shop_id, job.digest, job.id]);
+    const reuse = await doneOf(null, job);
     if (reuse) return await complete(job, null, reuse);
     const file = await bank.readFile(job.image_id, Number(job.source_version), 'original');
     if (!file) return await failOrRetry(job, { code: 'source_missing', permanent: true });
