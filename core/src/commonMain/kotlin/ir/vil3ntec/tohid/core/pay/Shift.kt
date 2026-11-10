@@ -137,6 +137,9 @@ data class ShiftReport(
   val reason: String? = null,
   val needsReview: Boolean? = null,
   val blind: Boolean? = null,
+  /** RPT-04 — شمارهٔ Z در سریِ دستگاهِ بندنده (`ZSeq`)؛ هسته نمی‌گذارد، `PayFlow.closeRow` از دفتر می‌گذارد. null = X یا Z ِ کهنه */
+  val no: Long? = null,
+  val series: String? = null,
 )
 
 object ShiftCore {

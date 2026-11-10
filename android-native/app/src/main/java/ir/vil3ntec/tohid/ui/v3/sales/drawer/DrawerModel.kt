@@ -6,11 +6,14 @@ import ir.vil3ntec.tohid.core.gateway.PayeeTotal
 import ir.vil3ntec.tohid.core.i18n.StrDrawers
 import ir.vil3ntec.tohid.core.i18n.StrPay
 import ir.vil3ntec.tohid.core.i18n.StrSale
+import ir.vil3ntec.tohid.core.i18n.StrShift
 import ir.vil3ntec.tohid.core.pay.Drawers
 import ir.vil3ntec.tohid.core.pay.Pay
 import ir.vil3ntec.tohid.core.pay.ShiftReport
+import ir.vil3ntec.tohid.core.pay.ZSeq
 import ir.vil3ntec.tohid.data.CashShift
 import ir.vil3ntec.tohid.data.PayFlow
+import ir.vil3ntec.tohid.data.Sale
 import ir.vil3ntec.tohid.data.ShopData
 import ir.vil3ntec.tohid.money
 import ir.vil3ntec.tohid.ui.components.pos.PhoneSaleText
@@ -33,6 +36,19 @@ data class ReportLine(val label: String, val value: String, val strong: Boolean 
  *  «بی اختلاف» زیرِ نیم افغانی؛ شمارشِ کور برای شاگرد (مبلغِ مورد انتظار دیده نمی‌شود).
  */
 object DrawerModel {
+
+  /**
+   *  RPT-04 — Z ِ جاافتاده یا شمارهٔ تکراری در سریِ هر دستگاه (`ZSeq.check` روی Z های دفتر)؛ همه درست ⇒ هیچ خط.
+   *  مبلغی ندارد، پس شاگرد هم می‌بیند. حداکثر [max] خط.
+   */
+  fun zLines(d: ShopData, max: Int = 5): List<String> {
+    val r = ZSeq.check(PayFlow.zs(d))
+    val gaps = r.gaps.map { g ->
+      val a = ZSeq.label(g.series, g.from)
+      StrShift.zMissing(if (g.from == g.to) a else a + "–" + ZSeq.label(g.series, g.to))
+    }
+    return (gaps + r.duplicates.map { StrShift.zDuplicate(ZSeq.label(it.series, it.no)) }).take(max)
+  }
 
   /** خطِ صندوق در تاریخچه و سربرگِ همین صفحه */
   fun line(d: ShopData, now: Long, blind: Boolean): DrawerLine {
@@ -72,9 +88,13 @@ object DrawerModel {
   /**
    *  X/Z: «پول رسید» ‌های حساب‌پیِ بازه به تفکیکِ حسابِ گیرنده (`SalePayment.payee`)، با نام و ۴ رقم از تاریخچهٔ حساب‌های
    *  سرور ([known] = `TillHesab.payees`). ⚠️ حسابی که مالِ این دکان نیست جدا و با نشان. شاگرد (شمارشِ کور) فقط شمار را می‌بیند.
+   *  [keep] (RPT-04): فقط فروش‌های همین کشو (`CashShift.ownSale`)؛ پیش‌فرض فقط پنجره.
    */
-  fun hesabPayLines(d: ShopData, from: Long, to: Long, known: List<Payee>, seesMoney: Boolean): List<String> {
-    val rows = d.sales.filter { it.status != "cancelled" && it.createdAt in from..to }
+  fun hesabPayLines(
+    d: ShopData, from: Long, to: Long, known: List<Payee>, seesMoney: Boolean,
+    keep: (Sale) -> Boolean = { it.createdAt in from..to },
+  ): List<String> {
+    val rows = d.sales.filter { it.status != "cancelled" && keep(it) }
       .flatMap { s -> s.payments.orEmpty().filter { it.method == "hesabpay" && it.status == "confirmed" }.map { it.payee to it.amountMinor } }
     return HesabPayShop.byPayee(rows, known).map { p ->
       val label = when (p.kind) {
@@ -90,9 +110,10 @@ object DrawerModel {
   /**
    *  PAY-10 — X/Z: ارزِ نقدِ دریافتیِ بازه به تفکیکِ ارز (`FxTillFlow.totals`) — همان اسکناسی که جدا از افغانی شمرده
    *  می‌شود؛ ارزشِ افغانی به نرخِ هر فاکتور. شاگرد (شمارشِ کور) فقط شمار را می‌بیند. بی ارز ⇒ هیچ خط.
+   *  [keep] (RPT-04): فقط فروش‌های همین کشو (`CashShift.ownSale`) — پیش‌تر کشوی نام‌دار ارزِ کشوی دیگرِ همان ساعت را هم می‌شمرد.
    */
-  fun fxLines(d: ShopData, from: Long, to: Long, seesMoney: Boolean): List<String> =
-    ir.vil3ntec.tohid.data.FxTillFlow.totals(d, from, to).map { t ->
+  fun fxLines(d: ShopData, from: Long, to: Long, seesMoney: Boolean, keep: (Sale) -> Boolean = { it.createdAt in from..to }): List<String> =
+    ir.vil3ntec.tohid.data.FxTillFlow.totals(d, from, to, keep).map { t ->
       if (seesMoney) ir.vil3ntec.tohid.core.i18n.StrFx.xzLine(
         t.currency, ir.vil3ntec.tohid.core.pay.FxTill.format(t.amount, t.currency), PhoneSaleText.amount(PayFlow.major(t.afnMinor)), t.count,
       ) else ir.vil3ntec.tohid.core.i18n.StrFx.xzCount(t.currency, t.count)
@@ -186,6 +207,8 @@ object DrawerModel {
 
   /** ردیف‌های گزارشِ X/Z — همان ترتیبِ `ShiftReportLines` ِ پیشین */
   fun report(rep: ShiftReport): List<ReportLine> = buildList {
+    //  RPT-04: شمارهٔ Z بالای همه (همان ردیفِ `ShiftSlip.Kind.NUMBER` ِ کاغذ)
+    if (rep.kind == "Z") rep.no?.let { add(ReportLine(StrShift.zNumber, ZSeq.label(rep.series.orEmpty(), it), strong = true)) }
     add(ReportLine(StrSale.openedAt, SaleTime.stamp(rep.openedAt)))
     add(ReportLine(if (rep.kind == "Z") StrSale.closedAt else StrSale.reportTime, SaleTime.stamp(rep.at)))
     rep.by?.let { add(ReportLine(StrSale.userWord, it)) }

@@ -391,5 +391,35 @@ class SalesFlowModelTest {
       ),
       DrawerModel.hesabPayLines(d, 0L, 50L, known, seesMoney = false),
     )
+    //  RPT-04 × PAY-17: کشوی نام‌دار فقط فروشِ مهرِ خودش (`CashShift.ownSale`)، نه هر فروشِ همان ساعت
+    val drawers = d.copy(
+      sales = d.sales.map { if (it.id == "s1") it.copy(shiftId = "nd") else it },
+      auditLog = listOf(ir.vil3ntec.tohid.data.AuditEntry(id = "nd", type = CashShift.OPEN, createdAt = 0L, drawer = "دوم")),
+    )
+    assertEquals(
+      listOf(ir.vil3ntec.tohid.core.i18n.StrPay.xzPayeeCount("دکانِ احمد — 1222", 1)),
+      DrawerModel.hesabPayLines(drawers, 0L, 50L, known, seesMoney = false, keep = CashShift.ownSale(drawers, "nd", 0L, 50L)),
+    )
+  }
+
+  @Test fun `RPT-04 - Z ِ شماره‌دار شماره را بالای گزارش دارد و Z ِ جاافتاده یا تکراری خط می‌گیرد`() {
+    val z = ir.vil3ntec.tohid.core.pay.ShiftReport(
+      kind = "Z", shiftId = "s", currency = "AFN", at = 2L, by = null, openedAt = 1L, openedBy = null, float = 0L,
+      methods = emptyMap(), moves = ir.vil3ntec.tohid.core.pay.Moves(0L, 0L), expected = mapOf("cash" to 0L),
+      events = ir.vil3ntec.tohid.core.pay.EventCounts(), no = 7L, series = "A1",
+    )
+    val first = DrawerModel.report(z).first()
+    assertEquals(ir.vil3ntec.tohid.core.i18n.StrShift.zNumber, first.label)
+    assertEquals("A1-7", first.value)
+    assertTrue(DrawerModel.report(z.copy(kind = "X", no = null, series = null)).none { it.label == ir.vil3ntec.tohid.core.i18n.StrShift.zNumber })
+    fun close(id: String, no: Long?) = ir.vil3ntec.tohid.data.AuditEntry(
+      id = id, type = CashShift.CLOSE, refId = "o-$id", createdAt = 5L, z = ir.vil3ntec.tohid.data.PayFlow.reportJson(z.copy(no = no)),
+    )
+    assertEquals(emptyList<String>(), DrawerModel.zLines(ShopData(auditLog = listOf(close("a", 1L), close("b", 2L)))))
+    val d = ShopData(auditLog = listOf(close("a", 1L), close("b", 4L), close("c", 4L), close("old", null)))
+    assertEquals(
+      listOf(ir.vil3ntec.tohid.core.i18n.StrShift.zMissing("A1-2–A1-3"), ir.vil3ntec.tohid.core.i18n.StrShift.zDuplicate("A1-4")),
+      DrawerModel.zLines(d),
+    )
   }
 }

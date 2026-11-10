@@ -22,6 +22,7 @@ import ir.vil3ntec.tohid.core.pay.ShiftSlip
 import ir.vil3ntec.tohid.core.pay.StoredPay
 import ir.vil3ntec.tohid.core.pay.Tender
 import ir.vil3ntec.tohid.core.pay.TillRounding
+import ir.vil3ntec.tohid.core.pay.ZSeq
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -567,8 +568,11 @@ object PayFlow {
 
   data class Closed(val row: AuditEntry, val report: ShiftReport, val skipped: List<Skipped>)
 
-  /** PAY-13، 14 — بستن با شمارشِ اسکناس؛ اختلافِ بالای آستانه بی دلیل بسته نمی‌شود؛ اختلاف اصلاح نمی‌شود */
-  fun closeRow(d: ShopData, open: AuditEntry, c: Count, now: Long, newId: () -> String): Outcome<Closed> {
+  /**
+   *  PAY-13، 14 — بستن با شمارشِ اسکناس؛ اختلافِ بالای آستانه بی دلیل بسته نمی‌شود؛ اختلاف اصلاح نمی‌شود.
+   *  RPT-04: Z شمارهٔ بعدیِ سریِ همین دستگاه را می‌گیرد ([series] = `DocSeries.current`؛ `ZSeq.next` روی Z های دفتر).
+   */
+  fun closeRow(d: ShopData, open: AuditEntry, c: Count, now: Long, newId: () -> String, series: String = ""): Outcome<Closed> {
     val r = when (val x = replay(d, open, now)) { is Outcome.Ok -> x.value; is Outcome.Bad -> return x }
     val id = newId()
     val by = c.by.trim().ifEmpty { null }
@@ -579,12 +583,18 @@ object PayFlow {
     val z = when (res) {
       is PayResult.Ok -> res.value.z ?: return Outcome.Bad(Problem("SHIFT_CLOSED"))
       is PayResult.Err -> return Outcome.Bad(Problem(res.code, variance = res.variance))
-    }
+    }.copy(no = ZSeq.next(zs(d), series), series = series.trim())
     val row = AuditEntry(
       id = id, type = CashShift.CLOSE, refId = open.id, createdAt = now,
       amount = major(z.counted?.get(CASH) ?: 0), by = by, reason = z.reason, z = reportJson(z),
     )
     return Outcome.Ok(Closed(row, z, r.skipped))
+  }
+
+  /** RPT-04 — Z های ذخیره‌شدهٔ دفتر (هر دستگاه) با سری و شماره؛ Z ِ کهنهٔ بی شماره ⇒ ۰ */
+  fun zs(d: ShopData): List<ZSeq.Z> = d.auditLog.mapNotNull { a ->
+    val z = a.z?.takeIf { a.type == CashShift.CLOSE } ?: return@mapNotNull null
+    ZSeq.Z(a.id, (z["series"] as? JsonPrimitive)?.contentOrNull.orEmpty(), (z["no"] as? JsonPrimitive)?.longOrNull ?: 0L)
   }
 
   /** شمارِ اسکناس ⇒ جمع (پول) — برای جمعِ زندهٔ فرمِ شمارش */
@@ -613,6 +623,8 @@ object PayFlow {
       put("reason", str(r.reason))
       r.needsReview?.let { put("needsReview", it) }
       r.blind?.let { put("blind", it) }
+      r.no?.let { put("no", it) }
+      r.series?.let { put("series", it) }
     }
   }
 
@@ -658,6 +670,8 @@ object PayFlow {
       reason = j.s("reason"),
       needsReview = (j["needsReview"] as? JsonPrimitive)?.booleanOrNull,
       blind = (j["blind"] as? JsonPrimitive)?.booleanOrNull,
+      no = (j["no"] as? JsonPrimitive)?.longOrNull,
+      series = j.s("series"),
     )
   }.getOrNull()
 }

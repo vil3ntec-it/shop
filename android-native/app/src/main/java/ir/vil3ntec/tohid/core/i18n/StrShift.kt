@@ -115,6 +115,18 @@ object StrShift {
   // گزارشِ X / Z و سابقه
   val zReportTitle: String get() = t("گزارش Z (پایانِ شیفت)", "Z report (end of shift)", "Z راپور (د شیفت پای)")
   val xReportTitle: String get() = t("گزارش X (میانِ شیفت)", "X report (mid-shift)", "X راپور (د شیفت په منځ کې)")
+  //  RPT-04: شمارهٔ Z در سریِ دستگاه (`ZSeq`) و پیوستگیِ شماره‌ها
+  val zNumber: String get() = t("شمارهٔ Z", "Z number", "د Z شمېره")
+  fun zMissing(no: Any): String = t(
+    "Z شمارهٔ ${asIs(no)} در دفتر نیست — پاک شده یا هنوز از دستگاهِ دیگری نرسیده است",
+    "Z number $no is not in the ledger — deleted, or not yet synced from another device",
+    "د Z شمېره $no په دفتر کې نشته — ړنګه شوې، یا لا له بلې وسیلې نه ده رارسېدلې",
+  )
+  fun zDuplicate(no: Any): String = t(
+    "دو Z با یک شمارهٔ ${asIs(no)} — دفتر را بررسی کنید",
+    "Two Z reports share number $no — check the ledger",
+    "دوه Z راپورونه یوه شمېره $no لري — دفتر وګورئ",
+  )
   val registerHistory: String get() = t("سابقهٔ صندوق", "Register history", "د صندوق تاریخچه")
   val noShiftsYet: String get() = t("هنوز صندوقی باز نشده.", "No register has been opened yet.", "لا تر اوسه هېڅ صندوق نه دی پرانیستل شوی.")
   val stillOpen: String get() = t("هنوز باز است", "Still open", "لا خلاص دی")

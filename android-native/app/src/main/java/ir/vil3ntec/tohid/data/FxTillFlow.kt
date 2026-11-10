@@ -106,11 +106,11 @@ object FxTillFlow {
 
   /**
    *  ارزِ نقدِ دریافتیِ بازه به تفکیکِ ارز — همان اسکناسی که باید در کشو باشد (برگشت به افغانی پس داده می‌شود و این را
-   *  کم نمی‌کند). فروشِ لغوشده و اینترنتی بیرون.
+   *  کم نمی‌کند). فروشِ لغوشده و اینترنتی بیرون. [keep] (RPT-04): فروش‌های همین کشو (`CashShift.ownSale`)؛ پیش‌فرض فقط پنجره.
    */
-  fun totals(d: ShopData, from: Long, to: Long): List<Total> {
+  fun totals(d: ShopData, from: Long, to: Long, keep: (Sale) -> Boolean = { it.createdAt in from..to }): List<Total> {
     val by = LinkedHashMap<String, Total>()
-    d.sales.filter { it.status != "cancelled" && !CashShift.isOnline(it) && it.createdAt in from..to }.forEach { s ->
+    d.sales.filter { it.status != "cancelled" && !CashShift.isOnline(it) && keep(it) }.forEach { s ->
       s.payments.orEmpty().forEach { p ->
         val fx = p.fx ?: return@forEach
         val t = by[fx.currency] ?: Total(fx.currency, 0, 0, 0)
