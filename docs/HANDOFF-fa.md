@@ -54,6 +54,27 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — دستهٔ ۴۱ (`ccr-3a0d593c-ac0jpj-batch-41`، #1025): کارهای PGlite و Electron دو تکه شدند
+- انجام شد: «آزمون‌های سرور زیرِ Electron» در ۴۵:۱۵ لغو شد (سقفِ کار؛ همهٔ آزمون‌ها تا آن لحظه سبز؛ همان روی main ِ f8134445؛ دستهٔ ۴۰: ۳۹ دقیقه، main ِ b6419a69: ۴۲). PGlite هم از ۲۸ به ۳۵+ دقیقه رسیده بود. ریشه: همهٔ ۴۷۸ پرونده پشتِ‌سرِ‌هم در یک کار. رفع: `TEST_SHARD=k/n` در `scripts/test-pglite.js` (`scripts/test-shard.js`) و ماتریسِ دو تکه برای هر دو کار در `server.yml`؛ «آزمون‌های سرور» منتظرِ همهٔ تکه‌هاست. `test-shard.test.js` ۴/۴ (پیش از سیم‌کشی ۳/۴: آزمونِ سیم‌کشی سرخ).
+- قدمِ بعدی: اگر تکه‌ای باز به ~۴۰ دقیقه رسید ⇒ n=3؛ سقف بالا نمی‌رود.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-40` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۰، PR #1024؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: سه یافتهٔ Low، هر سه با آزمونِ سرخ‌پیش‌از‌رفع روی PGlite و PostgreSQL ِ محلی (`server/test/security-review-40.test.js`، ۵ آزمون):
+  SR40-1 واحدِ نامتنی (عدد/آرایه/`$inc`) قفلِ واحدِ PRD-07 را در یک op دور می‌زد (v1 و v3) ⇒ `oddUnit`؛ SR40-2 NUL در پرسشِ `sync/v3` ⇒ ۵۰۰
+  (استثنای `RAW_SYNC` بیش از اندازه، `V3` ِ بزرگ هم) ⇒ v3 بیرون از استثنا؛ SR40-3 تپشِ قیف از سایتِ دیگر (sendBeacon) ⇒ `Sec-Fetch-Site: cross-site` شمرده نمی‌شود.
+  شرح و «حمله شد و سالم ماند» در `docs/SECURITY-AUDIT-fa.md` B5؛ سه خطِ RULES.
+- نیمه‌کاره: هیچ. باز برای صاحب‌کار (B5): R2 (PRD-07 در دو op با «واحدِ خالی»، همان قاعدهٔ برنامه)، R3 (چرخاندنِ User-Agent از یک IP در قیف؛ ترازو با CGNAT)، R4 Info ِ مشترکِ پمپ.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد؛ اگر صاحب‌کار R2 را بخواهد، «واحدِ خالی روی کالای گردش‌دار = قفل» در `ProductDraftRules` و سرور با هم.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console-2` (درهای خواستهٔ پنلِ مرکزی ۱.۵۰.۷۵ برای کارکنان، بانکِ عکس و پشتیبان؛ روی `ccr-…-batch-40` ‏76aa1657؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) `POST /api/admin/shops/:id/staff-perms/devices/:did/enable` (ارشد + دلیل، همان `deviceOfShop` و سابقه، سقفِ IP پیش از احراز)؛
+  (۲) `Idempotency-Key` روی disable/enable ِ دستگاه، بازبینیِ بانکِ عکس (approve/reject/archive/search) و `POST /admin/backups` با
+  `lib/admin-write-once.js` (نشانِ پایگاه `admin_write_claims`، مهاجرتِ ۵۰۰؛ هم‌زمان ⇒ ۴۰۹ `idempotency_in_progress`)؛ (۳) توانایی‌های
+  `staff-perms.v1`، `image-bank.v1`، `idempotent-writes.v1`؛ (۴) `?limit=&offset=` روی `GET …/staff-perms` (بی پارامتر همان پاسخ)؛ (۵) یافتهٔ
+  امنیتی: دکانِ «الف» دستگاهِ انداختهٔ دکانِ «ب» (کاربرِ هر دو) را برمی‌گرداند یا با «انداختنِ دوباره» نشانش را می‌دزدید ⇒ ۴۰۹
+  `disabled_by_other_shop`؛ دو برگرداندنِ هم‌زمان دو سابقه می‌ساخت ⇒ نوشتنِ شرطی. آزمون: `admin-console-writes` ۱۶ (PGlite و PostgreSQL ۱۶،
+  پیش از تغییر همه سرخ)، شرح در بندِ ۱۲.۱۱ ِ ADMIN-CONTROL-PLANE و RULES «v3 · پنلِ مدیر».
+- نیمه‌کاره: سمتِ پنل (ریپوی server) — پشتِ `idempotent-writes.v1` کلیدِ پنجره را به بالادست بفرستد (مثلِ `sync-restore-once.v1`)، دکمهٔ
+  «برگرداندن» پشتِ `staff-perms.v1`، و ۴۰۹ ِ `idempotency_in_progress`/`disabled_by_other_shop` را بشناسد.
+- قدمِ بعدی: شاهدِ CI ِ آزمونِ تازه؛ تصمیمِ صاحب‌کار دربارهٔ اجباری کردنِ دلیل روی disable ِ مدیر (امروز اختیاری، پل همیشه می‌فرستد).
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
@@ -83,6 +104,48 @@
   نام‌به‌نام دیده نمی‌شوند. شاهدِ دیده‌شده در WEB-11 و MKT-02 ثبت شد (JS، مرورگر و `<testsuite>` ِ iOS برای `ShopperAccountTest` ۸ و `ShopperStage2Test` ۷).
 - نیمه‌کاره: سه ردیفِ بالا تا شاهدِ نام‌به‌نامِ Kotlin.
 - قدمِ بعدی: گامِ `grep -ho '<testsuite [^>]*'` (مثلِ `ios-spike.yml`) پس از آزمونِ اندروید/کامپیوتر/برنامهٔ خرید، یا `events` در `testLogging`؛ سپس همین سه ردیف.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ntf-refund` (NTF-08: پیامِ هر بازپرداخت به مشتری؛ روی main ‏f8134445 = دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ردیفِ تازهٔ دفترِ بازپرداخت (بخشی/پایانی/کامل) در همان تراکنش یک ردیفِ `customer_notify_outbox` می‌سازد (`onRefundIn`)؛ مهاجرتِ ۴۹۶ (+rollback):
+  ستونِ `refund_id`، رویدادِ `order_refund:<refund_id>` و CHECK ِ تازهٔ `event` که آن را به `refund_id` می‌بندد، FK به بازپرداختِ همان سفارش؛
+  UNIQUE (order_id, event) ِ ۱۴۳ عمداً ماند (نسخهٔ پیش با `ON CONFLICT (order_id, event)` باید بنویسد، OPS-03). متن با مبلغِ همان بازپرداخت
+  (`store-alert-push.money`) و شمارهٔ سفارش، fa/ps/en؛ پشتِ `shop.customer_notify` + `shop.orders.refund_tracking` (بی پرچمِ تازه)؛ فقط کانالِ رایگان.
+  پوشِ وب: `store-push.quietOf` ⇒ با این پرچم‌ها اشتراک پس از تحویل تا بسته شدنِ بازپرداخت می‌ماند، کارت با شرحِ `np.hint.rf`، برچسبِ جدای هر
+  بازپرداخت. برنامهٔ دکان: نامِ `order_refund` و `order_late_apology` در `OrderNoticesUi.kt`. رفعِ کوچک: جایگزینیِ `render` با تابع (نامِ ویترینِ دارای `$&`).
+  آزمون: `customer-notify-refund.test.js` ۱۵/۱۵ (PGlite و PostgreSQL ِ محلی؛ پیش از کد ۱۲ سرخ)، `web-store-refund-push.mjs` ۲۶ ✅ (هر دو پایگاه؛ پیش از کد سرخ).
+- نیمه‌کاره: شاهدِ CI؛ Kotlin فقط در CI (دو رشته و دو شاخهٔ `when`، بی آزمونِ تازهٔ Kotlin — هم‌سانی با آزمونِ سرور قفل است)؛ نمای برنامهٔ خرید (native).
+- تصمیمِ صاحب‌کار: پیامِ بازپرداخت تنها پیامی است که مبلغ دارد (روی صفحهٔ قفلِ گوشی هم دیده می‌شود؛ همان مبلغی که صفحهٔ پیگیری با همین پرچم نشان می‌دهد)؛ پیامک برای آن نیست.
+- قدمِ بعدی: پس از CI ِ سبز شاهد در ردیفِ NTF-08 (هنوز PARTIAL به‌خاطرِ برنامهٔ خرید).
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/kt-testlog` (نامِ آزمون‌های Kotlin در لاگِ CI برای شاهدِ STATUS؛ روی `origin/main` f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: بلوکِ `tasks.withType<Test>()` ِ `desktop`، `core`، `android-native/app` و (تازه) `customer-android/app` برای هر آزمون یک خطِ
+  `KTEST PASS|FAIL|SKIP <کلاسِ کامل> > <نامِ آزمون>` چاپ می‌کند (`addTestListener`) و `events(FAILED, SKIPPED)` با `exceptionFormat = FULL`؛ PASSED ِ خودِ
+  Gradle نه (دو خط برای هر آزمون). بی افزونه/وابستگیِ تازه؛ ورک‌فلو دست نخورد. خطِ تازه در RULES «CI و آزمون».
+- برآوردِ خطِ افزوده (شمارِ `@Test`): «کامپایل و آزمون» ~۵٬۳۴۰ (desktop ۳٬۷۰۲ + core ۱٬۶۳۸)، «ساخت نسخهٔ بومی» ~۵٬۰۰۰ تا ~۶٬۶۰۰
+  (app ۳٬۳۵۸ + core ۱٬۶۳۸، و گامِ دومِ «آزمون‌های core» اگر دوباره بدود)، «برنامهٔ خریدِ مشتری (گزارش)» ۸.
+- نیمه‌کاره: Gradle محلی نیست؛ کامپایلِ اسکریپت‌ها و شکلِ خط فقط در CI ِ PR ِ دسته دیده می‌شود.
+- قدمِ بعدی: پس از سبز شدنِ دسته، ردیف‌های STATUS ِ Kotlin فقط با خطِ `KTEST PASS` ِ دیده‌شده + شناسهٔ run/job بالا بروند.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/perf-2` (PERF-02/04: شمارش زیرِ بار، «قطعِ سراسری» با بارسازِ بی‌اشباع، دروازه در برابرِ مهلتِ برنامه‌ها؛ روی `origin/main` ِ دستهٔ ۳۹؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) مهاجرتِ ۴۶۵ (نمایهٔ جزئیِ «شمارشِ دیررسیده»: `v3.lateCount` و شاخهٔ شمارشِ `STOCK_SQL` همهٔ شمارش‌های دکان را می‌خواندند؛ ۱۰ هزار ردیف
+  ۴۴۴ ⇐ ۲ بافر)، آزمونِ `sync-v3-late-count.test.js` (پیش از رفع سرخ) و `scripts/late-count-bench.js`. (۲) ابزارِ بار: انبارگردانی در آمیزه
+  (`sync3.count`، `--count-history`)، سنجهٔ `counts`، `--plan` (چند پیکربندیِ سرور روی یک پایگاهِ کاشته)، `--check-each`، یورشِ دستگاه‌ها بیرون از سقف
+  (`--max-inflight 4096`)، درنگِ برنامه پس از شکست و زمانِ تخلیه، زمانِ دروازه/اتصال/اجرا، تازه‌سازیِ نشست روی ۴۰۱. (۳) `SYNC_V3_GATE_POOL_DEADLINE`
+  (پیش‌فرض خاموش) با آزمونِ پیش از رفع سرخ. (۴) چهار اجرای ۲۰۰ × ۵ (ماشینِ مشترک، بارِ ۴ تا ۲۰؛ اجرای ۱ با راه‌اندازیِ دوبارهٔ ماشین نیمه ماند).
+- یافته: مهلتِ واقعیِ برنامه‌ها ۱۵ ثانیه (وب) و ۱۵ + ۳۰ (اندروید)، نه ۱۰؛ با پیش‌فرض‌ها ۰ مهلت ولی دیرترین push ‏۱۴٫۴ ثانیه و ویترین p95 تا ۸٫۷ ثانیه
+  در «قطعِ سراسری»؛ ترکیبِ `SYNC_V3_BATCH=1`+`PG_POOL_MAX_WAITING=100`+`HOT_CACHE_MS=2000` تخلیه را ~۲ برابر تند و ویترین را ≤ ۱٫۲ ثانیه کرد
+  (جفت‌های هم‌ترتیبِ اجرای ۴)؛ `SYNC_V3_GATE_POOL_DEADLINE` به‌تنهایی زیرِ اشباع بدتر بود ⇒ خاموش بماند (`docs/PERF-LOAD-fa.md` «(سوم)»، جدولِ پیشنهاد).
+- نیمه‌کاره: هیچ کدِ نیمه‌کاره. PERF-02/04 همان PARTIAL، PERF-03 همان (شاهدِ CI برای ۴۶۵ هنوز نیست). `request-deadline.test.js` روی پایگاهِ پرِ ماشینِ
+  پربار یک بار سرخ شد (`DROP SCHEMA` زیرِ سقفِ ۴۰۰ms ِ خودِ آزمون)؛ روی پایگاهِ تازه و ماشینِ آرام ۴/۴ — دست نخورد.
+- قدمِ بعدی (صاحب محصول): روشن کردنِ آن سه تنظیم در تولید؛ سپس همین `--plan` روی سخت‌افزارِ جدا. اگر صاحب‌کار پرچمِ آزمودهٔ
+  `SYNC_V3_GATE_POOL_DEADLINE` را نمی‌خواهد، برداشتنش (سه پرونده + یک آزمون) بی‌خطر است.
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/shopper-gaps` (کاستی‌های برنامهٔ خرید در برابرِ ویترین: WEB-13 و CHK-14؛ روی `origin/main` ‏f81344458؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: (۱) WEB-13 — ردیفِ «دیده‌شده‌های اخیر» در صفحهٔ دکانِ برنامهٔ خرید با همان کلیدِ `recent` ِ `GET /api/store/:slug` و همان قاعدهٔ
+  `RecentlyViewed` (core/shopper `RecentProducts`، `ShopperState.seen`؛ هر دکان ۱۲ کالا، ۳۰ روز، حداکثر ۲۰ دکان)، فقط روی دستگاه، `?ids=` با هر ورود
+  (نیامده ⇒ بیرون)، «پاک کردن»؛ `ui/ModelRecent.kt` + `ShopScreen.RecentRow`. (۲) CHK-14 — «با کدام اسکناس…» در برگهٔ ثبت فقط با
+  `features.deliveryPrefs` و ارسال (`CheckoutRules.tenderOptions`/`tenders`/`tenderOf`، `CheckoutDelivery.cashTenderMinor`؛ `CheckoutScreen.Tender`)؛
+  بردارِ مشترکِ `core/test-vectors/cash-tender-v1.json` با `server/test/cash-tender-vectors.test.js` (تابعِ `tenders` ِ `checkout.js` در vm و `checkTender` ِ سرور).
+  هیچ درِ سرور، مهاجرت یا پرچمِ تازه‌ای نیست؛ پرچمِ خاموش ⇒ همان بدنه و همان صفحه.
+- نیمه‌کاره: آزمون‌های کاتلین (`ShopperRecentTest`، `ShopperCheckoutTest.tender…`، `ShopperApiTest.recentAndDeliveryPrefs…`، `ShopperTenderVectorsTest`،
+  `CustomerRecentTenderTest`) نوشته شد ولی محلی اجرا نشد (بی Gradle) — شاهدِ CI. ویرایشِ اسکناس پس از ثبت (CHK-24) در برنامهٔ خرید هنوز نیست.
+- قدمِ بعدی: پس از CI ِ سبز، ردیف‌های WEB-13 و CHK-14 ِ STATUS با شاهدِ CI؛ سپس CHK-24 (ویرایشِ دستورِ تحویل) در برگهٔ پیگیریِ برنامهٔ خرید.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/sec-review-39` (بازبینیِ امنیتیِ مستقلِ دستهٔ ۳۹؛ روی `ccr-3a0d593c-ac0jpj-batch-39`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: تفاضلِ `server/src`، `server/public` و `license` ِ دستهٔ ۳۸..۳۹ خوانده و به آن حمله شد (پوشِ وب ِ سفارش و «خبرم کن»، SSRF، رمز، کاتالوگِ پرچم‌ها،
   `vip.js`، ۴۰۱ ِ پنل، بانکِ تصویر، تمرکزِ `kit`/`chat`، `upgrade-rehearsal`، `verification()`). دو یافتهٔ Low بسته شد (`docs/SECURITY-AUDIT-fa.md` B4):

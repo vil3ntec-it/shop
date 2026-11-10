@@ -13,12 +13,15 @@
  *   pull.complete   هر دستگاه همهٔ op های دستگاه‌های دیگرِ دکانش را گرفت (cursor جا نینداخت)
  *   totals.sales    شمار و جمعِ فروشِ هر دکان = دفتر
  *   totals.stock    جمعِ حرکتِ هر کالا در هر دکان = دفتر
+ *   counts          شمارِ ردیف‌های شمارشِ هر دکان = دفتر؛ و برای تازه‌ترین شمارشِ هر کالا، جمعِ **همهٔ** حرکت‌های کالا تا HLC ِ آن
+ *                   (تعدیلِ شمارش، «تعدیلِ دیررسیده» ِ حرکتی که پس از شمارش با HLC ِ پیش از آن رسید) = شمرده‌شده
  *   lww.prices      بهای هر کالای ویرایش‌شده = برندهٔ HLC؛ کالای دست‌نخورده همان بهای کاشته
  *   customers       هر مشتریِ تازه با نام (برندهٔ HLC) و تلفنِ درست، و هیچ مشتریِ اضافه
  *   held            نگه‌داشته‌های زندهٔ هر دکان = دفتر
  *   orders          شمارِ سفارش‌های ویترین میانِ «پذیرفته» و «پذیرفته + نامعلوم»
  *   tenant          هیچ op، ردیف، نگه‌داشته یا سفارشی در دکانِ دیگر؛ هیچ دادهٔ دکانِ دیگری در پاسخ‌ها؛ کاوشِ ویترینِ دکانِ دیگر ۴۰۴
- *   http.5xx        هیچ ۵xx جز ۵۰۳ ِ `db_busy` ِ کنترل‌شده؛ هیچ مهلت یا اتصالِ بریده
+ *   http.5xx        هیچ ۵xx جز ۵۰۳ ِ کنترل‌شده با `Retry-After` (`db_busy` ِ استخر/دروازه، و `request_timeout` ِ `REQUEST_TIMEOUT_MS` وقتی
+ *                   روشن است: کار شاید پشتِ آن تمام شد، پس op ِ آن «نامعلوم» است و با همان op_id دوباره می‌رود)؛ هیچ مهلت یا اتصالِ بریده
  * ⛔ فقط می‌خواند. دادهٔ بارساز با نشان‌هایش شناخته می‌شود (`lo-`، `ls-`/`lm-`/`lp-`/`lc-`، `hx<n>-`، `~S<n>~`).
  */
 
@@ -113,6 +116,34 @@ async function check(db, L) {
   }
   add('totals.stock', !mvBad.length, `${mvN} (دکان، کالا)؛ ناجور ${mvBad.length}`, mvBad);
 
+  // ── شمارش (انبارگردانی) ──
+  const cRows = await many(`SELECT account_id, count(*)::int AS n FROM sync_v3_rows
+                             WHERE ${ACC} AND table_name = 'stockCounts' AND row_id LIKE 'lk-%' GROUP BY 1`, [ids]);
+  const cAt = await many(`SELECT c.account_id, c.pid, c.row_id, c.counted, c.row_hlc,
+         COALESCE((SELECT sum((m.data->>'qtyMilli')::bigint) FROM sync_v3_rows m
+                    WHERE m.app = 'shop' AND m.account_kind = 'shop' AND m.account_id = c.account_id AND m.table_name = 'stockMovements'
+                      AND m.inserted AND m.data->>'productId' = c.pid AND m.row_hlc <= c.row_hlc), 0)::bigint AS at,
+         (SELECT count(*)::int FROM sync_v3_rows l
+           WHERE l.app = 'shop' AND l.account_kind = 'shop' AND l.account_id = c.account_id AND l.table_name = 'stockMovements'
+             AND l.inserted AND l.data->>'productId' = c.pid AND l.data->>'type' = 'count_adjust_late') AS late
+    FROM (SELECT DISTINCT ON (account_id, data->>'productId') account_id, data->>'productId' AS pid, row_id, row_hlc,
+                 (data->>'countedQtyMilli')::bigint AS counted
+            FROM sync_v3_rows WHERE ${ACC} AND table_name = 'stockCounts' AND inserted AND row_id LIKE 'lk-%'
+           ORDER BY account_id, data->>'productId', row_hlc DESC) c`, [ids]);
+  const kBad = [];
+  const kSrv = new Map(cRows.map((r) => [idx.get(r.account_id), r.n]));
+  let kWant = 0, kLate = 0;
+  for (const sh of L.shops) {
+    const want = (L.counts && L.counts[sh.index]) || 0;
+    kWant += want;
+    if ((kSrv.get(sh.index) || 0) !== want) kBad.push(`دکانِ ${sh.index}: ${kSrv.get(sh.index) || 0} ردیفِ شمارش ≠ ${want}`);
+  }
+  for (const r of cAt) {
+    kLate += r.late;
+    if (Number(r.at) !== Number(r.counted)) kBad.push(`${idx.get(r.account_id)}|${r.pid}: تا ${r.row_hlc} ${r.at} ≠ شمرده ${r.counted} (${r.row_id})`);
+  }
+  add('counts', !kBad.length, `${kWant} ردیفِ شمارش، ${cAt.length} (دکان، کالا) ِ شمرده؛ ${kLate} تعدیلِ دیررسیده؛ ناجور ${kBad.length}`, kBad);
+
   // ── LWW ِ بها ──
   const priceRows = await many(`SELECT account_id, row_id, (data->>'salePriceMinor')::bigint AS p FROM sync_v3_rows
                                   WHERE ${ACC} AND table_name = 'products'`, [ids]);
@@ -195,13 +226,14 @@ async function check(db, L) {
 
   // ── کدهای پاسخ ──
   const bad5 = [], netErr = [];
-  let n503 = 0;
+  let n503 = 0, nDeadline = 0;
   for (const [label, codes] of Object.entries(L.http || {})) for (const [c, n] of Object.entries(codes)) {
     if (c === '503:db_busy') n503 += n;
+    else if (c === '503:request_timeout') nDeadline += n;
     else if (/^5\d\d/.test(c)) bad5.push(`${label} ${c}×${n}`);
     else if (!/^\d{3}$/.test(c)) netErr.push(`${label} ${c}×${n}`);
   }
-  add('http.5xx', !bad5.length && !netErr.length, `۵۰۳ ِ db_busy ${n503}؛ ۵xx ِ دیگر ${bad5.length}؛ مهلت/اتصالِ بریده ${netErr.length}`, [...bad5, ...netErr]);
+  add('http.5xx', !bad5.length && !netErr.length, `۵۰۳ ِ db_busy ${n503}${nDeadline ? `، ۵۰۳ ِ request_timeout ${nDeadline}` : ''}؛ ۵xx ِ دیگر ${bad5.length}؛ مهلت/اتصالِ بریده ${netErr.length}`, [...bad5, ...netErr]);
 
   return { ok: checks.every((c) => c.ok), checks };
 }

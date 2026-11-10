@@ -290,6 +290,12 @@ object ShopperText {
   val pay get() = t("پرداخت", "Payment", "تادیه")
   val payCash get() = t("نقد هنگامِ تحویل", "Cash on delivery", "د سپارلو پر وخت نغدې")
   val payCashPickup get() = t("نقد هنگامِ دریافت از دکان", "Cash at pickup", "له دوکانه د اخیستو پر مهال نغدې")
+  //  CHK-14: همان `ck.tender.*` ِ وب
+  val tenderAsk get() = t("با کدام اسکناس پرداخت می‌کنید؟ (اختیاری، تا پیک پول خرد بیاورد)",
+    "Which banknote will you pay with? (optional, so the courier brings change)", "په کومه بانکنوټ پیسې ورکوئ؟ (اختیاري، چې سپاره پرچون راوړي)")
+  val tenderNone get() = t("پول خرد لازم نیست", "No change needed", "پرچون ته اړتیا نشته")
+  fun tenderOption(note: Long, change: Long) =
+    t("${asIs(money(note))} — پول خرد: ${asIs(money(change))}", "${money(note)} — change: ${money(change)}", "${money(note)} — پرچون: ${money(change)}")
   fun submit(sum: Long) = t("ثبتِ سفارش — ${asIs(money(sum))}", "Place order — ${money(sum)}", "فرمایش ثبت کړئ — ${money(sum)}")
   fun accept(sum: Long) = t("پذیرفتنِ قیمتِ تازه و ثبت — ${asIs(money(sum))}", "Accept new price and place order — ${money(sum)}", "نوې بیه ومنئ او ثبت یې کړئ — ${money(sum)}")
   val sending get() = t("در حالِ ثبت…", "Placing your order…", "ثبتېږي…")
@@ -601,6 +607,9 @@ object ShopperText {
   val listClear get() = t("پاک کردنِ فهرست", "Clear the list", "لړ پاک کړئ")
   val listSaved get() = t("فهرستِ خرید نگه داشته شد.", "Shopping list saved.", "د پېرود لړ وساتل شو.")
   val listCleared get() = t("فهرستِ خرید پاک شد.", "Shopping list cleared.", "د پېرود لړ پاک شو.")
+  //  WEB-13: همان `recent.*` ِ وب
+  val recentViewed get() = t("دیده‌شده‌های اخیر", "Recently viewed", "وروستي کتل شوي")
+  val recentClear get() = t("پاک کردن", "Clear", "پاکول")
   val accountTitle get() = t("حسابِ من", "My account", "زما حساب")
   val accountWhy get() = t("با ورود، سبد، دلخواه‌ها و فهرستِ خرید در همهٔ دستگاه‌هایتان همراهتان است.",
     "Sign in to keep your cart, favourites and shopping list on all your devices.", "په ننوتلو سره ستاسو ټوکرۍ، خوښې او د پېرود لړ په ټولو وسیلو کې درسره وي.")
@@ -666,6 +675,11 @@ object ShopperText {
     "idempotency_key_reused" -> t("این سفارش پیش‌تر با محتوای دیگری فرستاده شده؛ دوباره بزنید.", "This order was already sent with different contents — please try again.", "دا فرمایش مخکې له بل منځپانګې سره لېږل شوی؛ بیا هڅه وکړئ.")
     ShopperError.PRICE_CHANGED -> t("قیمت عوض شده است.", "Prices have changed.", "بیه بدله شوې ده.")
     "promo_code_rejected" -> promoStatus("")
+    "cash_tender_short" -> t("مبلغِ اسکناس از جمعِ سفارش کمتر است؛ دوباره برگزینید.", "The banknote is less than the order total; please choose again.",
+      "د بانکنوټ اندازه د فرمایش له ټولې لږه ده؛ بیا یې وټاکئ.")
+    "cash_tender_excess" -> t("پول خرد از یک اسکناسِ ۱۰۰۰ بیشتر می‌شود؛ اسکناسِ کوچک‌تری برگزینید.", "The change would be more than one 1000 note; choose a smaller banknote.",
+      "پرچون به له یوې ۱۰۰۰ یي بانکنوټ ډېر شي؛ کوچنۍ بانکنوټ وټاکئ.")
+    "bad_cash_tender" -> t("مبلغِ اسکناس درست نیست؛ دوباره برگزینید.", "The banknote amount is not valid; please choose again.", "د بانکنوټ اندازه سمه نه ده؛ بیا یې وټاکئ.")
     "too_many_addresses" -> addressProblem(AddressProblem.FULL)
     "chat_closed" -> chatClosed
     "chat_blocked" -> chatBlocked

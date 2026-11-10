@@ -147,7 +147,8 @@ const nf = () => notFound('سفارش پیدا نشد', 'order_not_found');
 
 /**
  * سفارشی که دیگر هیچ پیامی برای مشتری ندارد: از این وضعیت به هیچ وضعیتِ پیام‌دار (`EVENT_OF` ِ customer-notify) نمی‌رسد
- * (پایان‌یافته، تحویل‌شده/برداشته — برگشت و بازپرداخت پیامِ پوش ندارند). از جدولِ گذارها حساب می‌شود، نه فهرستِ دستی.
+ * (پایان‌یافته، تحویل‌شده/برداشته — گذارِ برگشت و بازپرداخت پیامِ وضعیت ندارد؛ پیامِ هر بازپرداخت را `quietOf` می‌سنجد).
+ * از جدولِ گذارها حساب می‌شود، نه فهرستِ دستی.
  */
 function quiet(status) {
   const { ORDER_TRANSITIONS } = require('./order-states');
@@ -162,6 +163,32 @@ function quiet(status) {
     q.push(...(ORDER_TRANSITIONS[st] || []));
   }
   return true;
+}
+
+/**
+ * NTF-08: «بی خبر» با پیامِ بازپرداختِ روشن (`customer-notify.refundOn`): سفارشی که هنوز به «درخواستِ برگشت» (تنها جای
+ * ردیفِ تازهٔ دفتر، `order-refunds`) می‌رسد یا در آن است بی خبر نیست — اشتراکش پس از تحویل برای پیامِ بازپرداخت می‌ماند
+ * و پس از بسته شدنِ بازپرداخت (جزئی/کامل) پاک می‌شود. پرچمِ خاموش ⇒ همان `quiet`. `run` ⇐ اتصالِ تراکنش.
+ * ⇒ `{ quiet, refund }` (`refund`: فقط برای خبرِ بازپرداخت باز است)
+ */
+function refundAhead(status) {
+  const { ORDER_TRANSITIONS } = require('./order-states');
+  const OPEN = 'return_requested';
+  const seen = new Set();
+  const q = [status];
+  while (q.length) {
+    const st = q.shift();
+    if (seen.has(st)) continue;
+    seen.add(st);
+    if (st === OPEN) return true;
+    q.push(...(ORDER_TRANSITIONS[st] || []));
+  }
+  return false;
+}
+async function quietOf(shopId, status, run = null) {
+  if (!quiet(status)) return { quiet: false, refund: false };
+  const refund = refundAhead(status) && await require('./customer-notify').refundOn(shopId, run);
+  return { quiet: !refund, refund };
 }
 
 async function orderOf(store, token) {
@@ -185,7 +212,9 @@ async function attach(store, token, body, at = now()) {
       && sf.parseToken(store.shop_id, token).gen !== Number(o.track_gen)) {
       throw new ApiError(410, 'link_revoked', 'این لینکِ پیگیری باطل شده است؛ سفارش را از «سفارش‌های من» با شمارهٔ خودتان ببینید');
     }
-    if (quiet(o.status)) throw conflict('این سفارش تمام شده است؛ خبرِ تازه‌ای ندارد', 'order_closed');
+    if ((await quietOf(store.shop_id, o.status, (q, p) => c.query(q, p))).quiet) {
+      throw conflict('این سفارش تمام شده است؛ خبرِ تازه‌ای ندارد', 'order_closed');
+    }
     const same = (await c.query('SELECT id FROM store_push_subs WHERE order_id=$1 AND endpoint=$2', [orderId, sub.endpoint])).rows[0];
     if (same) {
       await c.query('UPDATE store_push_subs SET p256dh=$2, auth=$3, page=$4, link_gen=$5 WHERE id=$1',
@@ -216,10 +245,16 @@ async function detach(store, token, body) {
   return { push: { on: false } };
 }
 
-/** کلیدِ `push` ِ نمای پیگیری: فقط با پرچم‌های روشن و سفارشِ هنوز باز — وگرنه undefined (کلید نیست). */
+/**
+ * کلیدِ `push` ِ نمای پیگیری: فقط با پرچم‌های روشن و سفارشِ هنوز باز — وگرنه undefined (کلید نیست). سفارشِ تحویل‌شده‌ای که
+ * فقط برای پیامِ بازپرداخت باز است (NTF-08) ⇒ `refund: true` (شرحِ کارت همان را می‌گوید).
+ */
 async function viewOf(shopId, status) {
-  if (quiet(status) || !(await flagOn(shopId))) return undefined;
-  try { return { key: await publicKey() }; } catch (err) {
+  if (quiet(status) && !refundAhead(status)) return undefined;   //  پایان‌یافته: بی پرسشِ پایگاه (همان پیشین)
+  if (!(await flagOn(shopId))) return undefined;
+  const q = await quietOf(shopId, status);
+  if (q.quiet) return undefined;
+  try { return { key: await publicKey(), ...(q.refund ? { refund: true } : {}) }; } catch (err) {
     console.error('[store-push] vapid', err.message);
     return undefined;
   }
@@ -312,10 +347,11 @@ async function send(msg) {
   const urgent = (notify.MATRIX[msg.event] || []).includes('sms');
   const out = await fanOut('store_push_subs', live, (s) => ({
     v: 1, title: String(msg.title || '').slice(0, 80), body: String(msg.text || '').slice(0, 300), lang: msg.lang,
-    url: `${s.page === '/' ? '/' : s.page}#/o/${encodeURIComponent(token)}`, tag: tagOf(msg.orderId),
+    //  NTF-08: هر بازپرداخت برچسبِ خودش ⇒ پیامِ بازپرداختِ دوم اولی را از روی صفحهٔ گوشی برنمی‌دارد
+    url: `${s.page === '/' ? '/' : s.page}#/o/${encodeURIComponent(token)}`, tag: tagOf(msg.refundId ? `${msg.orderId}\nrefund\n${msg.refundId}` : msg.orderId),
   }), { topic: topicOf(msg.key), urgency: urgent ? 'high' : 'normal' });
   //  سفارشی که دیگر خبری ندارد ⇒ اشتراکش هم نمی‌ماند (کمینهٔ داده)
-  if (out.status === 'accepted' && quiet(o.status)) {
+  if (out.status === 'accepted' && (await quietOf(msg.shopId, o.status)).quiet) {
     await query('DELETE FROM store_push_subs WHERE shop_id=$1 AND order_id=$2', [msg.shopId, msg.orderId]);
   }
   return out;
@@ -325,6 +361,6 @@ const provider = Object.freeze({ send });
 
 module.exports = {
   FLAG, PUB_KEY, PRIV_KEY, MAX_SUBS, KEEP_MS, PUSH_HOSTS,
-  flagOn, ownFlagOn, vapid, publicKey, endpointOk, p256dhOk, authOk, parse, quiet, attach, detach, viewOf, provider, useTransport,
+  flagOn, ownFlagOn, vapid, publicKey, endpointOk, p256dhOk, authOk, parse, quiet, quietOf, attach, detach, viewOf, provider, useTransport,
   fanOut, topicOf,
 };

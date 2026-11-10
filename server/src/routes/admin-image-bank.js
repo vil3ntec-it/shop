@@ -7,7 +7,8 @@
  *                   گزارش)، صف و `/review` (صف با جزئیات)؛ `/status` (روشن یا نه)
  *                   حتی با پرچمِ خاموش
  *   مدیرِ ارشد:     تأیید، رد، بایگانی، روشن/خاموش در جست‌وجو — هر بار با
- *                   دلیلِ نوشته و یک ردیفِ سابقه (الگوی ADMIN-CONTROL-PLANE)
+ *                   دلیلِ نوشته و یک ردیفِ سابقه (الگوی ADMIN-CONTROL-PLANE)؛
+ *                   با `Idempotency-Key` فقط یک بار (`image-bank.v1`، `idempotent-writes.v1`)
  *
  * ⛔ پیش‌فرض خاموش: بی `image_bank.central` (scope = all) همه‌چیز ۴۰۳ است.
  * ⛔ عکسِ اختصاصیِ دکان این‌جا دیده نمی‌شود؛ فقط کپیِ پیشنهادی با اجازهٔ صریح.
@@ -17,6 +18,7 @@ const bank = require('../lib/image-bank');
 const upload = require('../lib/image-upload');
 const audit = require('../lib/audit');
 const { requireReason } = require('../lib/admin-access');
+const once = require('../lib/admin-write-once');
 const { requireAdmin, requireSuperAdmin } = require('../middleware/auth');
 const { clientIp } = require('../middleware/ratelimit');
 const { forbidden, notFound, badRequest } = require('../middleware/errors');
@@ -159,32 +161,43 @@ router.put('/images/:id/v/:version/:size', raw, async (req, res) => {
   res.json(await bank.adminDerivative(req.params.id, num(req.params.version), req.params.size, bufOf(req)));
 });
 
+//  بازبینی (ارشد + دلیل): `Idempotency-Key` ⇒ یک بار، همان پاسخ و یک سابقه (`lib/admin-write-once.js`، `idempotent-writes.v1`)
+const reviewOnce = (req, res, run) => once.writeOnce(req, { resultId: String(req.params.id || '') }, run).then((out) => once.send(res, out));
+
 router.post('/images/:id/approve', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
-  const out = await bank.approve(req.admin.id, req.params.id, { reason, version: req.body?.version });
-  await log(req, 'admin.bank_image_approved', req.params.id, { reason, version: out.version });
-  res.json(out);
+  await reviewOnce(req, res, async () => {
+    const out = await bank.approve(req.admin.id, req.params.id, { reason, version: req.body?.version });
+    await log(req, 'admin.bank_image_approved', req.params.id, { reason, version: out.version });
+    return out;
+  });
 });
 
 router.post('/images/:id/reject', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
-  const out = await bank.reject(req.admin.id, req.params.id, { reason, version: req.body?.version });
-  await log(req, 'admin.bank_image_rejected', req.params.id, { reason, version: req.body?.version ?? null });
-  res.json(out);
+  await reviewOnce(req, res, async () => {
+    const out = await bank.reject(req.admin.id, req.params.id, { reason, version: req.body?.version });
+    await log(req, 'admin.bank_image_rejected', req.params.id, { reason, version: req.body?.version ?? null });
+    return out;
+  });
 });
 
 router.post('/images/:id/archive', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
-  const out = await bank.archive(req.admin.id, req.params.id, { reason });
-  await log(req, 'admin.bank_image_archived', req.params.id, { reason });
-  res.json(out);
+  await reviewOnce(req, res, async () => {
+    const out = await bank.archive(req.admin.id, req.params.id, { reason });
+    await log(req, 'admin.bank_image_archived', req.params.id, { reason });
+    return out;
+  });
 });
 
 router.post('/images/:id/search', requireSuperAdmin, async (req, res) => {
   const reason = reasonOf(req);
-  const out = await bank.setSearch(req.admin.id, req.params.id, req.body?.enabled === true);
-  await log(req, 'admin.bank_image_search', req.params.id, { reason, enabled: out.search_enabled });
-  res.json(out);
+  await reviewOnce(req, res, async () => {
+    const out = await bank.setSearch(req.admin.id, req.params.id, req.body?.enabled === true);
+    await log(req, 'admin.bank_image_search', req.params.id, { reason, enabled: out.search_enabled });
+    return out;
+  });
 });
 
 /** فایلِ عکسِ central/pending (با اصل) — عکسِ دکان هرگز. */

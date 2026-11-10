@@ -1,5 +1,6 @@
 package ir.vil3ntec.tohid.core.shopper
 
+import ir.vil3ntec.tohid.core.product.RecentlyViewed
 import kotlinx.serialization.Serializable
 
 /** مرزِ نگه‌داری روی دستگاه (SharedPreferences ِ اندروید، NSUserDefaults ِ آیفون، نقشه در آزمون). */
@@ -48,6 +49,8 @@ data class ShopperState(
   val lists: Map<String, List<ListItem>> = emptyMap(),
   /** هم‌گامیِ هر دکان با حسابِ مشتری در نشستِ کنونی (صف‌ها و نسخه‌ها؛ خودِ نشست در نگه‌دارِ رمزشده است، نه این‌جا) */
   val sync: Map<String, AccountSync> = emptyMap(),
+  /** WEB-13: «دیده‌شده‌های اخیر» ِ هر دکان، فقط روی همین دستگاه ([RecentProducts]؛ ۱۲ کالا، ۳۰ روز، ۲۰ دکان) */
+  val seen: Map<String, List<RecentlyViewed.Seen>> = emptyMap(),
 )
 
 /** خواندن و نوشتنِ [ShopperState] با سقف‌های روشن (هیچ فهرستی بی‌پایان بزرگ نمی‌شود). */
@@ -80,7 +83,7 @@ object ShopperMemory {
   fun withRecent(s: ShopperState, r: RecentShop): ShopperState =
     s.copy(recent = (listOf(r) + s.recent.filter { it.slug != r.slug }).take(MAX_RECENT))
 
-  /** S3: دکان نشانی‌اش را عوض کرد ⇒ سبد، سفارش‌ها و دکان‌های اخیر به نشانیِ تازه */
+  /** S3: دکان نشانی‌اش را عوض کرد ⇒ سبد، سفارش‌ها، دکان‌ها و کالاهای اخیر به نشانیِ تازه */
   fun moved(s: ShopperState, from: String, to: String): ShopperState = s.copy(
     carts = s.carts.map { if (it.slug == from) it.copy(slug = to) else it }.distinctBy { it.slug },
     orders = s.orders.map { if (it.slug == from) it.copy(slug = to) else it },
@@ -91,6 +94,7 @@ object ShopperMemory {
     favs = s.favs.mapKeys { if (it.key == from) to else it.key },
     lists = s.lists.mapKeys { if (it.key == from) to else it.key },
     sync = s.sync.mapKeys { if (it.key == from) to else it.key },
+    seen = s.seen.mapKeys { if (it.key == from) to else it.key },
   )
 
   /** همان الگوی `deviceId` ِ وب (`^[A-Za-z0-9_-]{8,128}$`)؛ نبود ⇒ تازه از [random] (مولّدِ امنِ سکو) */

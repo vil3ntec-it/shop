@@ -21,6 +21,7 @@
  * ⛔ ردیفِ دفتر هرگز ویرایش یا پاک نمی‌شود؛ هیچ مسیری برای آن نیست.
  * ⛔ مبلغ عددِ صحیح به واحدِ کوچک؛ از کلِ سفارش بیشتر برنمی‌گردد.
  * ⛔ سفارشِ آزمایشی در جمع‌های گزارش شمرده نمی‌شود.
+ * NTF-08: هر ردیفِ تازهٔ دفتر (نه تکرار) یک پیامِ مشتری در همان تراکنش (`customer-notify.onRefundIn`، مهاجرتِ ۴۹۶).
  */
 const db = require('../db');
 const { many, now, tx } = db;
@@ -217,6 +218,9 @@ async function record(shopId, orderId, { key, body, actor }) {
     );
     //  ⛔ هیچ ردیفی در دفترِ دکان (تصمیمِ صاحبِ مخزن): برگشتِ کالای سفارشِ تحویل‌شده را دکان
     //  در برنامه با «مرجوعیِ» عادیِ همان فاکتور ثبت می‌کند؛ این‌جا فقط دفترِ پولِ سفارش است.
+    //  NTF-08: پیامِ همین بازپرداخت به مشتریِ ویترین — همان تراکنش؛ تکرار (بالا) به این‌جا نمی‌رسد و یکتاییِ پایگاه
+    //  (۴۹۶) دومی را نمی‌سازد. پشتِ پرچم‌های خاموشِ `shop.customer_notify` + `shop.orders.refund_tracking`.
+    await require('./customer-notify').onRefundIn((t, p) => c.query(t, p), { shopId, order: row, refundId: entryId, at });
     const entry = (await c.query('SELECT * FROM online_order_refunds WHERE id=$1', [entryId])).rows[0];
     return { replayed: false, from: row.status, to, entry: entryOut(entry) };
   });
