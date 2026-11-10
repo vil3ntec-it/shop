@@ -1,0 +1,46 @@
+{
+  "_doc": "POS-37 — مالیاتِ فاکتور: core/sale/SaleTax.kt ⇔ license/sale-tax.js (SaleTaxVectorsTest، server/test/sale-tax.test.js). مبلغ به پول، نرخ به صدمِ درصد.",
+  "version": 1,
+  "constants": {"fullBp":10000,"step":100,"maxRates":200,"modes":["invoice","line"]},
+  "ofMinor": [
+    {"base":0,"rate":1000,"out":0},
+    {"base":100000,"rate":0,"out":0},
+    {"base":100000,"rate":1000,"out":10000},
+    {"base":12345,"rate":1000,"out":1200},
+    {"base":5000,"rate":100,"out":100},
+    {"base":4900,"rate":100,"out":0},
+    {"base":123456,"rate":550,"out":6800},
+    {"base":-5000,"rate":1000,"out":0},
+    {"base":9007199254740900,"rate":1,"out":900719925500},
+    {"base":100,"rate":10000,"out":100}
+  ],
+  "clean": [
+    {"_":"نبود ⇒ خاموش","input":null,"out":null},
+    {"_":"حالتِ ناشناخته","input":{"mode":"gross","rateBp":1000},"out":null},
+    {"_":"نرخِ بیش از ۱۰۰٪","input":{"mode":"invoice","rateBp":10001},"out":null},
+    {"_":"نرخِ منفی","input":{"mode":"invoice","rateBp":-1},"out":null},
+    {"_":"نرخِ صفر و بی نرخِ کالا ⇒ خاموش","input":{"mode":"line","rateBp":0,"rates":{"p1":0}},"out":null},
+    {"_":"فاکتور: نرخِ کالا کنار می‌رود","input":{"mode":"invoice","rateBp":1000,"rates":{"p1":500}},"out":{"mode":"invoice","rateBp":1000,"rates":{}}},
+    {"_":"ردیف: نرخِ نادرست و کلیدِ خالی کنار","input":{"mode":"line","rateBp":1000,"rates":{"p1":0,"p2":500,"p3":10001,"p4":-5," ":100}},"out":{"mode":"line","rateBp":1000,"rates":{"p1":0,"p2":500}}},
+    {"_":"ردیف: پایهٔ صفر با یک کالای مشمول","input":{"mode":"line","rateBp":0,"rates":{"p9":1500}},"out":{"mode":"line","rateBp":0,"rates":{"p9":1500}}}
+  ],
+  "compute": [
+    {"_":"خاموش ⇒ صفر","lines":[{"productId":"p1","grossMinor":100000}],"discount":0,"config":null,"out":{"taxMinor":0,"lineTaxMinor":[]}},
+    {"_":"فاکتور ۱۰٪","lines":[{"productId":"p1","grossMinor":100000},{"productId":"p2","grossMinor":50000}],"discount":0,"config":{"mode":"invoice","rateBp":1000},"out":{"taxMinor":15000,"lineTaxMinor":[]}},
+    {"_":"فاکتور ۱۰٪ پس از تخفیف","lines":[{"productId":"p1","grossMinor":100000},{"productId":"p2","grossMinor":50000}],"discount":10000,"config":{"mode":"invoice","rateBp":1000},"out":{"taxMinor":14000,"lineTaxMinor":[]}},
+    {"_":"فاکتور ۵٫۵٪ ِ مبلغِ اعشاری ⇒ افغانیِ کامل","lines":[{"productId":"p1","grossMinor":123456}],"discount":0,"config":{"mode":"invoice","rateBp":550},"out":{"taxMinor":6800,"lineTaxMinor":[]}},
+    {"_":"فاکتور: یک بار گرد (۳ × ۵ افغانی × ۱۰٪ = ۱٫۵ ⇒ ۲)","lines":[{"productId":"a","grossMinor":500},{"productId":"b","grossMinor":500},{"productId":"c","grossMinor":500}],"discount":0,"config":{"mode":"invoice","rateBp":1000},"out":{"taxMinor":200,"lineTaxMinor":[]}},
+    {"_":"ردیف: هر ردیف جدا گرد (۳ × ۰٫۵ ⇒ ۳)","lines":[{"productId":"a","grossMinor":500},{"productId":"b","grossMinor":500},{"productId":"c","grossMinor":500}],"discount":0,"config":{"mode":"line","rateBp":1000,"rates":{}},"out":{"taxMinor":300,"lineTaxMinor":[100,100,100]}},
+    {"_":"ردیف: کالای معاف (۰) و قلمِ آزاد با نرخِ پایه","lines":[{"productId":"p1","grossMinor":100000},{"productId":"p2","grossMinor":50000},{"productId":null,"grossMinor":3000}],"discount":0,"config":{"mode":"line","rateBp":1000,"rates":{"p2":0}},"out":{"taxMinor":10300,"lineTaxMinor":[10000,0,300]}},
+    {"_":"ردیف: سهمِ تخفیف به نسبت و نرخِ هر کالا","lines":[{"productId":"p1","grossMinor":100000},{"productId":"p2","grossMinor":50000}],"discount":15000,"config":{"mode":"line","rateBp":1000,"rates":{"p2":500}},"out":{"taxMinor":11300,"lineTaxMinor":[9000,2300]}},
+    {"_":"ردیف: بیشترین باقی‌مانده، برابر ⇒ ردیفِ جلوتر","lines":[{"productId":"p1","grossMinor":100},{"productId":"p2","grossMinor":100}],"discount":1,"config":{"mode":"line","rateBp":5000,"rates":{}},"out":{"taxMinor":100,"lineTaxMinor":[0,100]}},
+    {"_":"ردیف: پایهٔ صفر، فقط کالای نام‌برده","lines":[{"productId":"p1","grossMinor":20000},{"productId":"p9","grossMinor":10000}],"discount":0,"config":{"mode":"line","rateBp":0,"rates":{"p9":1500}},"out":{"taxMinor":1500,"lineTaxMinor":[0,1500]}},
+    {"_":"تخفیف بیش از جمع ⇒ صفر","lines":[{"productId":"p1","grossMinor":10000}],"discount":99999,"config":{"mode":"invoice","rateBp":1000},"out":{"taxMinor":0,"lineTaxMinor":[]}},
+    {"_":"ردیفِ منفی صفر شمرده می‌شود","lines":[{"productId":"p1","grossMinor":10000},{"productId":"p2","grossMinor":-5000}],"discount":0,"config":{"mode":"line","rateBp":1000,"rates":{}},"out":{"taxMinor":1000,"lineTaxMinor":[1000,0]}},
+    {"_":"سبدِ خالی (ردیف)","lines":[],"discount":0,"config":{"mode":"line","rateBp":1000,"rates":{}},"out":{"taxMinor":0,"lineTaxMinor":[]}},
+    {"_":"سبدِ بی مبلغ (فاکتور)","lines":[{"productId":"p1","grossMinor":0}],"discount":0,"config":{"mode":"invoice","rateBp":1000},"out":{"taxMinor":0,"lineTaxMinor":[]}},
+    {"_":"جمعِ بیرون از بازه ⇒ null","lines":[{"productId":"p1","grossMinor":9007199254740991},{"productId":"p2","grossMinor":1}],"discount":0,"config":{"mode":"invoice","rateBp":1000},"out":null},
+    {"_":"نهاییِ بیرون از بازه ⇒ null","lines":[{"productId":"p1","grossMinor":9007199254739991}],"discount":0,"config":{"mode":"invoice","rateBp":1000},"out":null},
+    {"_":"تنظیمِ نادرست ⇒ خاموش","lines":[{"productId":"p1","grossMinor":10000}],"discount":0,"config":{"mode":"invoice","rateBp":20000},"out":{"taxMinor":0,"lineTaxMinor":[]}}
+  ]
+}

@@ -62,6 +62,7 @@ object PromoSummary {
       add(PosSummaryRow(StrSale.subtotal, o.gross))
       add(PosSummaryRow(StrPos.autoDiscount, o.discount, negative = true))
       if (t.discount > 0) add(PosSummaryRow(Str.discount, t.discount, negative = true))
+      if (t.tax > 0) add(PosSummaryRow(ir.vil3ntec.tohid.core.i18n.StrSaleTax.line, t.tax)) // POS-37
     }
 }
 

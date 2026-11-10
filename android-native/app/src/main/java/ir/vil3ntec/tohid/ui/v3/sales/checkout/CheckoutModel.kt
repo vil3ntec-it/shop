@@ -36,6 +36,8 @@ data class CheckoutNumbers(
   val remaining: Double,
   /** PAY-09 — ردیفِ گردِ نقدِ کاملِ پرداختِ ساده (افغانیِ علامت‌دار)؛ ترکیبی و نسیه ⇒ ۰ */
   val rounding: Double = 0.0,
+  /** POS-37 — مالیاتِ فاکتور (در [finalTotal] هست)؛ بی تنظیم ۰ */
+  val tax: Double = 0.0,
 ) {
   /** «مبلغ نهایی» ِ برگه = آنچه ثبت می‌شود (`SalesEngine.record`): کالا − تخفیف + گرد */
   val payable: Double get() = finalTotal + rounding
@@ -90,7 +92,7 @@ object CheckoutModel {
     val due = t.finalTotal + rounding
     val paid = if (form.payment == SalesEngine.Payment.CASH) due
     else minOf(parseNumber(form.paidText)?.coerceAtLeast(0.0) ?: 0.0, t.finalTotal)
-    return CheckoutNumbers(t.subtotal, t.discount, t.finalTotal, paid, (due - paid).coerceAtLeast(0.0), rounding)
+    return CheckoutNumbers(t.subtotal, t.discount, t.finalTotal, paid, (due - paid).coerceAtLeast(0.0), rounding, t.tax)
   }
 
   /** همان `Checkout` با پرداختیِ نهایی و مشتری — آنچه به `record` می‌رود (پرداختِ ساده) */
@@ -130,6 +132,7 @@ object CheckoutModel {
     //  PRM-13: همان ردیفِ «مصرفِ امتیاز» ِ صندوقِ کامپیوتر (`LoyaltyAtTill.rows`) — «جمع» پیش از امتیاز
     if (pointsOff > 0) add(TotalRow(StrLoyalty.receiptUsed(points), -pointsOff))
     if (n.discount > 0) add(TotalRow(StrSale.discountWord, -n.discount))
+    if (n.tax > 0) add(TotalRow(ir.vil3ntec.tohid.core.i18n.StrSaleTax.line, n.tax)) // POS-37: فقط با مالیاتِ روشن
     if (n.rounding != 0.0) add(TotalRow(StrRounding.line, n.rounding)) // PAY-09
     add(TotalRow(StrSale.finalAmount, n.payable, strong = true))
     if (!payV2) {

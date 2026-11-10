@@ -64,6 +64,8 @@ object SaleCapGate {
     roundingMinor = s.roundingMinor ?: 0L, debtGivenMinor = minor(s.debtGiven), date = s.date,
     loyaltyMinor = audit.filter { it.type == LoyaltyPoints.SPEND && it.refId == s.id }.sumOf { maxOf(0L, minor(it.amount)) },
     wholesale = s.debtorId?.let { id -> debtors.firstOrNull { it.id == id } }?.priceList?.trim() == PriceList.WHOLESALE,
+    //  POS-37: همان `saleOf({ taxOn })` ِ سرور — مالیاتِ ثبت‌شده فقط با پرچمِ `shop.sale_tax` در پایهٔ تخفیف
+    taxMinor = if (SaleTaxWiring.serverFlag) maxOf(0L, s.taxMinor ?: 0L) else 0L,
   )
 
   fun line(i: SaleItem): SaleCaps.Line =

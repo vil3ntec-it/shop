@@ -180,6 +180,18 @@ test('گردکردنِ نقدی (PAY-09، `roundingMinor`): ردیفِ جدا ب
   assert.ok(!('rounding' in (await read(a.tag, plain)).body.receipt));
 });
 
+test('مالیاتِ فاکتور (POS-37، `taxMinor`): ردیفِ جدا با «+»؛ بی مالیات کلیدی نیست', async () => {
+  const a = await shop('مالیات');
+  const taxed = newToken();
+  const plain = newToken();
+  await sell(a, 'sale-t1', taxed, { finalTotal: 440, paidAmount: 440, taxMinor: 4000 });
+  await sell(a, 'sale-t2', plain, { taxMinor: 0 });
+  const x = (await read(a.tag, taxed)).body.receipt;
+  assert.equal(x.tax.label, 'مالیات');
+  assert.match(x.tax.amount, /^\+/);
+  assert.ok(!('tax' in (await read(a.tag, plain)).body.receipt));
+});
+
 test('ناشناخته، همگام‌نشده، نشانِ دکانِ دیگر و شکلِ بد: یک ۴۰۴ ِ یکسان', async () => {
   const a = await shop('ب');
   const b = await shop('پ');

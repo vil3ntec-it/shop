@@ -123,6 +123,7 @@ object Receipts {
       ) + ir.vil3ntec.tohid.data.LoyaltyPoints.receiptLines(d, sale.id).mapNotNull { (label, amount) -> amount?.let { DiscountLine(label, it) } }, // PRM-13
       total = sale.finalTotal,
       rounding = PayFlow.rounding(sale) ?: 0.0, // PAY-09
+      tax = PayFlow.major(sale.taxMinor ?: 0L), // POS-37
       //  ردیف‌های روش، «دریافتی» و «پولِ پس» — فقط فاکتوری که `payments` دارد؛ وگرنه «پرداختی»
       payments = paymentLines(sale),
       paid = sale.paidAmount,
@@ -185,6 +186,7 @@ object Receipts {
       subtotal = s.subtotal, discount = s.discount, total = s.total, paid = s.paid, tendered = s.tendered, change = s.change,
       remaining = s.remaining, debtor = s.debtor, phone = s.phone, scan = s.scan, storeScan = s.storeScan, footer = s.footer,
       cash = s.cash, credit = s.credit, online = s.online, note = s.note, rounding = s.rounding,
+      tax = ir.vil3ntec.tohid.core.i18n.StrSaleTax.line,
     )
   }
 

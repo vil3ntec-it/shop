@@ -148,6 +148,7 @@ object SalesEngine {
      *  را گرد می‌کند؛ با [settlement] گرد از خودِ تسویه می‌آید. ۰ (پیش‌فرض، و هر ثبتِ بیرون از صندوق) ⇒ همان امروز.
      */
     val cashRounding: Long = 0,
+    val tax: ir.vil3ntec.tohid.core.sale.SaleTax.Config? = null, // POS-37: `SaleTaxPref.active`، فقط صندوق؛ null ⇒ همان امروز (`SaleTaxWiring`)
   )
 
   data class Totals(
@@ -155,6 +156,7 @@ object SalesEngine {
     val discountValue: Double,
     val discount: Double,
     val finalTotal: Double,
+    val tax: Double = 0.0, val taxOutOfRange: Boolean = false, // POS-37: مالیات (در [finalTotal] هست) و «بیرون از بازه» ⇒ [record] رد
   )
 
   sealed interface Result {
@@ -326,12 +328,7 @@ object SalesEngine {
       discount = value.roundToLong().toDouble()
     }
 
-    return Totals(
-      subtotal = subtotal,
-      discountValue = value,
-      discount = discount,
-      finalTotal = max(0.0, subtotal - discount),
-    )
+    return SaleTaxWiring.totals(d, cart, checkout.tax, subtotal, value, discount) // POS-37: مالیات روی (جمع − تخفیف)؛ بی تنظیم همان امروز
   }
 
   /**
@@ -424,6 +421,7 @@ object SalesEngine {
     }
 
     val t = totals(d, cart, checkout)
+    if (t.taxOutOfRange) return Result.Failed(ir.vil3ntec.tohid.core.i18n.StrSaleTax.outOfRange) // POS-37
 
     //  PAY-24: ردیفِ کارتِ هدیه/اعتبارِ فروشگاه «تأییدشده با دفتر» است؛ تسویهٔ بی آن همان شیء
     val stl = checkout.settlement?.let(ir.vil3ntec.tohid.core.pay.StoredPay::confirm)
@@ -512,6 +510,7 @@ object SalesEngine {
       tenderedMinor = settled?.tenderedMinor,
       changeMinor = settled?.changeMinor,
       roundingMinor = roundingMinor.takeIf { it != 0L },
+      taxMinor = PayFlow.minor(t.tax).takeIf { it > 0L }, // POS-37: بی مالیات نوشته نمی‌شود
       receiptToken = receiptToken, shiftId = TillDrawer.stamp(d), // PAY-17: مهرِ کشوی نام‌دارِ همین دستگاه (خاموش ⇒ null)
       note = ir.vil3ntec.tohid.core.pos.SaleNotes.clean(checkout.note),
     )
@@ -824,8 +823,8 @@ object SalesEngine {
   fun returnable(item: SaleItem): Double = (item.quantity - item.returnedQty).coerceAtLeast(0.0)
 
   /** سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود */
-  fun paidRatio(sale: Sale): Double =
-    if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+  fun paidRatio(sale: Sale): Double = SaleTaxWiring.withTax(sale, // POS-37: + سهمِ مالیات، همان `return-line-cap.paidRatio`
+    if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0)
 
   /**
    *  مبلغِ برگشتِ `quantity` از یک قلم — قیمتِ همان قلم در همان فاکتور (نه قیمتِ امروز) با سهمِ
@@ -842,10 +841,9 @@ object SalesEngine {
    */
   fun returnAmount(d: ShopData, sale: Sale, item: SaleItem, quantity: Double): Double {
     //  سهمِ تخفیفِ فاکتور: مشتری مبلغِ بعد از تخفیف را داده، پس همان پس داده می‌شود
-    val paidRatio =
-      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+    val ratio = paidRatio(sale) // POS-37: با سهمِ مالیاتِ فاکتور؛ بی مالیات همان پیشین
     val prior = d.saleReturns.filter { it.saleItemId == item.id }
-    return ReturnShare.amount(item.totalPrice, item.quantity, ReturnLeft.returned(d, item), quantity, paidRatio,
+    return ReturnShare.amount(item.totalPrice, item.quantity, ReturnLeft.returned(d, item), quantity, ratio,
       refundedBefore = prior.sumOf { it.amount }, refundedQty = prior.sumOf { it.quantity })
   }
 

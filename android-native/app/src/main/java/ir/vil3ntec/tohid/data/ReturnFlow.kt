@@ -216,8 +216,7 @@ object ReturnFlow {
   fun quote(d: ShopData, saleId: String, picks: Map<String, Pick>): Outcome<Quote> {
     val sale = d.sales.find { it.id == saleId } ?: return Outcome.Bad(Code.SALE_NOT_FOUND)
     if (sale.status == "cancelled") return Outcome.Bad(Code.SALE_CANCELLED)
-    val paidRatio =
-      if (sale.total > 0 && sale.discount > 0) ((sale.total - sale.discount) / sale.total).coerceIn(0.0, 1.0) else 1.0
+    val paidRatio = SalesEngine.paidRatio(sale) // POS-37: با سهمِ مالیاتِ فاکتور؛ بی مالیات همان سهمِ پس از تخفیف
     val lines = ArrayList<Line>()
     for (item in d.saleItems) {
       if (item.saleId != saleId) continue

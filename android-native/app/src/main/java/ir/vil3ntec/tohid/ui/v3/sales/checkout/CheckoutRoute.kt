@@ -117,9 +117,11 @@ fun RouteScope.CheckoutRoute() {
     val saleKey = remember(lines) { cart.saleKey() }
     //  POS-23: فروشندهٔ هر ردیف فقط با تنظیمِ روشنِ دکان روی قلم می‌نشیند (`LineSellerPref`)؛ خاموش ⇒ همان امروز
     val lineSellers = remember { ir.vil3ntec.tohid.data.LineSellerPref.on(context) }
+    //  POS-37: مالیاتِ فاکتور فقط با پرچمِ سرورِ `shop.sale_tax` و تنظیمِ دکان (`SaleTaxPref`)؛ خاموش ⇒ `null` و همان امروز
+    val taxConfig = remember { ir.vil3ntec.tohid.data.SaleTaxPref.active(context) }
     //  «اصلاحِ فاکتور» (`SaleReopen.extras`): فروشندهٔ همان فاکتور؛ وگرنه کاربرِ صندوق. تأییدها همیشه به نامِ کاربرِ صندوق‌اند
     val invoiceSeller = HeldSession.extras(cart).seller.ifBlank { seller }
-    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers)
+    val checkout = CheckoutModel.checkout(form, canDiscount, blockExpired, invoiceSeller, if (payV2) 0L else cashStep).copy(lineSellers = lineSellers, tax = taxConfig)
     val n = CheckoutModel.numbers(data, loyal, form, checkout)
     val decision = ShopRole.decide(context, "sales.discount", DiscountGate.req(n.discount, n.subtotal))
     val gate = DiscountGate.state(decision.decision, saleKey, n.discount, n.subtotal, CheckoutSession.approval)

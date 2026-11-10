@@ -34,11 +34,12 @@ object StockFlag {
 
   /** مقدارِ ذخیره‌شدهٔ دکانِ فعال را در [StockLedger.serverFlag] بگذار (شروع، عوض شدنِ دکان)؛ INV-10: `shop.count_absorb`
    *  (کلیدِ `countAbsorb` ِ همان پاسخ؛ نیامده ⇒ خاموش) ⇒ [CountAbsorbWiring.serverFlag]؛ PRD-08: `shop.qty_exact` (کلیدِ
-   *  `qtyExact`؛ نیامده ⇒ خاموش) ⇒ [QtyExactWiring.serverFlag] */
+   *  `qtyExact`؛ نیامده ⇒ خاموش) ⇒ [QtyExactWiring.serverFlag]؛ POS-37: `shop.sale_tax` (کلیدِ `saleTax`) ⇒ [SaleTaxWiring.serverFlag] */
   fun load(context: Context): Boolean = enabled(context).also {
     StockLedger.serverFlag = it
     CountAbsorbWiring.serverFlag = prefs(context).getBoolean("${key(context)}:absorb", false)
     QtyExactWiring.serverFlag = prefs(context).getBoolean("${key(context)}:qty", false)
+    SaleTaxWiring.serverFlag = prefs(context).getBoolean("${key(context)}:tax", false) // POS-37
   }
 
   /** اتصالِ سوکتِ زنده (`hello`): پرچم را بپرس (نه زودتر از [CHECK_MS]) */
@@ -53,7 +54,9 @@ object StockFlag {
       val on = body["enabled"]?.jsonPrimitive?.booleanOrNull == true
       val absorb = body["countAbsorb"]?.jsonPrimitive?.booleanOrNull == true
       val qty = body["qtyExact"]?.jsonPrimitive?.booleanOrNull == true
-      prefs(app).edit().putBoolean(key(app), on).putBoolean("${key(app)}:absorb", absorb).putBoolean("${key(app)}:qty", qty).apply()
+      val tax = body["saleTax"]?.jsonPrimitive?.booleanOrNull == true // POS-37: `shop.sale_tax`
+      prefs(app).edit().putBoolean(key(app), on).putBoolean("${key(app)}:absorb", absorb).putBoolean("${key(app)}:qty", qty)
+        .putBoolean("${key(app)}:tax", tax).apply()
       load(app)
     }
   }
