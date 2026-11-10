@@ -54,6 +54,17 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/ops-06` (OPS-06: متنِ راهنمای ۱۶ صفحه با F1، O-14 ب؛ روی main ‏b6419a69 = دستهٔ ۴۰؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۱۶ ردیفِ `core/guide/ScreenGuides.kt` READY با ۵ تا ۷ گامِ فارسی و انگلیسی (۸۹ گام) — هر گام پس از خواندنِ صفحهٔ **کامپیوترِ**
+  همان مسیر (`DeskHome`، `DeskSale`، `DeskCustomers`، `DeskProducts`، `DeskPurchasing`، `ReportsDesk`، `StockRoutes`، `OrdersRouteContent`،
+  ویترین، `Promos`، `TeamRoute`، `DevicesScreen`، تنظیماتِ نسخهٔ دوم)؛ قابلیتِ پشتِ پرچمِ خاموش (پرداختِ ترکیبی، برگشتِ v2، گاوصندوقِ «به‌زودی») نیامد.
+  عنوان = سرخطِ `V3Route` با فارسی/انگلیسی/پشتوی همان جدول؛ پشتوی گام‌ها ساخته نشد (⇐ فارسی). رفعِ همراه: `AppRoot` مسیرِ `stock` را
+  `warehouse` نمی‌کرد و راهنمای انبار هرگز نمی‌آمد ⇐ `ScreenGuides.screenOf`. آزمون‌ها (فقط CI): `ScreenGuidesTest` (۶؛ دو آزمونِ «همه جای خالی»
+  عمداً به «همه READY» عوض شد)، `ScreenGuidesTextTest` ِ تازه (۴: عنوان، هر «…»/“…” = نوشتهٔ `Str*` با کلیدِ فهرست، دریِ نام = دریِ دکمه،
+  مسیرِ واقعیِ نسخهٔ ۳)، `DariWordsTest` (+۱). محلی: آینهٔ همان قاعده‌ها با `kit/dari.js` (۱۶ راهنما، ۸۹ گام، ۰ ایراد)، `dari-words.js`،
+  `dari-text` + `kotlin-file-mirrors` ۲۱/۲۱.
+- نیمه‌کاره: ویدیوها؛ پشتوی ۸۹ گام (بازبینی‌شده نداریم)؛ دکمهٔ «راهنمای این صفحه» روی گوشی (تصمیمِ صاحب‌کار، OWNER-ACTIONS بخشِ ۷). STATUS همان PARTIAL.
+- قدمِ بعدی: شاهدِ CI ِ سه آزمونِ Kotlin؛ اگر صاحب‌کار نامِ دکمه‌ای را عوض کرد، `ScreenGuidesTextTest` همان راهنما را نشان می‌دهد.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/acct-console` (بندهای سمتِ سرورِ حسابِ ممیزیِ پنلِ مرکزی §۹: بازگرداندنِ یک‌باره، S12، S15، S18؛ روی main ‏ed8009d7 = دستهٔ ۳۸؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: (۱) `POST /admin/sync/conflicts/:id/restore` یک بار — شناسهٔ یک‌شکل (۴۰۰ `bad_id`)، ۴۰۹ `already_restored`/`restore_in_progress` با نشانِ پایگاه
   (`sync_conflict_restore_claims`، مهاجرتِ ۴۹۵)، `Idempotency-Key` (`lib/sync-restore-once.js`؛ `sync-v1.js` دست نخورد). (۲) S12: نگهبانِ مالک از پیش بود
