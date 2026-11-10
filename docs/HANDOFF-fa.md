@@ -54,6 +54,26 @@
 | #273 | دکانِ فعالِ نشست — مهاجرتِ ۰۹۷ (منتظرِ «مرج کن» صاحب محصول) |
 
 ## گزارشِ سیزن‌ها (تازه‌ترین بالا)
+### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/nv-audit` (ممیزیِ ۱۲ ردیفِ NOT-VERIFIED: ۱۱ از S و POS-42؛ روی `ccr-…-batch-44` ‏040ae52c؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- انجام شد: هر ۱۲ ردیف وضعیتِ واقعی گرفت (NOT-VERIFIED ۱۲ ⇐ ۰). قاعده: نرم‌افزارِ کامل که فقط سخت‌افزار/آدم/production کم دارد ⇐ BLOCKED-EXTERNAL با
+  نامِ مانع؛ کارِ نرم‌افزاریِ مانده ⇐ PARTIAL. شاهدِ Kotlin فقط خطِ `KTEST` ِ CI ِ 866af600. ردیف‌ها (پیشین ⇐ تازه، چرا):
+  POS-42 ⇐ BLOCKED-EXTERNAL (`PosSpeedBenchTest` ِ سقفِ ۵× در CI سبز؛ فقط سخت‌افزارِ مرجع مانده)؛ S24 ⇐ BLOCKED-EXTERNAL (`ScenarioS24Test` ۲/۲ در CI؛
+  چاپگرِ برچسب، A4 و بارکدخوان)؛ S54 ⇐ PARTIAL (تمرینِ `restore-drill --migrate` آماده؛ ابزارِ ناشناس‌سازی نیست و کپیِ واقعی production می‌خواهد)؛
+  S63 ⇐ BLOCKED-EXTERNAL (`web-idb.mjs` ۷/۷ در CI؛ iPhone ِ واقعی)؛ S82 ⇐ IMPLEMENTED-VERIFIED (سه آزمونِ تازهٔ «S82» در `stock-reserve.test.js`:
+  «worker» ِ تکراری، پیامِ دیررسیده، مسابقهٔ قبول/جارو/ردِ خودکار؛ ۲۰/۲۰ روی PGlite و دو بار روی PostgreSQL 16؛ جهشِ کد سرخشان کرد)؛ S91 ⇐
+  BLOCKED-EXTERNAL (آزمونِ کاربری؛ نرم‌افزارِ مسیر در CI سبز)؛ S92 ⇐ PARTIAL و S110 ⇐ PARTIAL (`server/test/web-store-weak.mjs` ِ تازه، در
+  `test:web-vitals`: 2G ⇒ ۲۵۱KB روی سیم، فقط `/thumb`، heap ~۲٫۳MB، خطای عکس، برگشت از پس‌زمینه، شکستِ بار بی گم شدنِ سبد، و کاهشِ حرکت بی هیچ
+  حرکت با کنترلِ «بی تنظیم» ⇒ ۶ حرکت؛ مانده: برنامهٔ خرید، صندوقِ بومی، دستگاهِ واقعی)؛ S125 ⇐ PARTIAL (۵۰ هزار قلم اجرا نشده)؛ S127 ⇐
+  BLOCKED-EXTERNAL (`restore-drill.test.js` ۱۳/۱۳؛ رونوشتِ برون‌سرور = production)؛ S128 ⇐ IMPLEMENTED-VERIFIED (آزمونِ بارِ بازتولیدپذیر و
+  گزارش‌شدهٔ PERF-02؛ `load-smoke`/`load-correctness` PGlite ۳/۳ و «ok» در کارِ PostgreSQL ِ CI؛ بی ادعای میلیون)؛ S144 ⇐ PARTIAL (لغو و
+  `device_revoked` آزموده؛ D-26 ساخته نشده).
+  کدِ تازه: `K.photo` (`server/public/kit/kit.js`؛ کارتِ ویترین/بازارچه، نوارِ سبد، برگهٔ کالا) — عکسِ ۵۰۴/بریده/خراب ⇒ حرفِ نخستِ نام، پیش از
+  تغییر ۶ سرخ (S126 هم؛ کمبودش در STATUS نوشته شد). دو خطِ RULES («v3 · ویترین»، «v3 · موجودی»)، یک سطرِ WHATS-NEW. شمار: IMPLEMENTED-VERIFIED
+  ۴۳۷، PARTIAL ۲۸۰، MISSING ۱۶، NOT-VERIFIED ۰، BLOCKED-EXTERNAL ۳۱.
+- نیمه‌کاره: S144/D-26 (کارِ بزرگِ سرور + Kotlin؛ مسیرِ فعالِ برنامه Sync v1 ِ مشترک با پمپ است ⇒ O-19 بندِ ۶) ساخته نشد؛ ابزارِ ناشناس‌سازیِ S54 (منتظرِ O-15)؛ ۵۰ هزار قلمِ
+  S125؛ جای‌گزینِ عکس در `visual-search.js`؛ `web-store-weak.mjs` هنوز بی شاهدِ CI. اجرای محلیِ PostgreSQL ِ `load-*.test.js` با `nvaudit_db` را
+  خودِ ابزار رد کرد (نامِ پایگاه test/bench می‌خواهد) — شاهدِ PostgreSQL همان CI است.
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و پس از CI خطِ «web-store-weak» را به S92/S110/S126 بیفزاید؛ ساختِ D-26 روی Sync v3 (S144) به‌عنوانِ کارِ جدا.
 ### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pos-4` (ردیف‌های PARTIAL ِ صندوق: POS-40 در Sync v1، Alt+P ِ POS-41، حروفِ لمسیِ POS-31؛ روی `ccr-…-batch-44` ‏391148a8؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: **POS-40** — یافته: برنامه پیش‌فرض با Sync v1 همگام می‌شود (`SyncChoice`؛ هیچ دکمه‌ای v3 را روشن نمی‌کند)، پس `till-guard` ِ v3 روی دستگاهِ واقعی
   هیچ اصلاحی را نمی‌سنجید. حالا همان پرچمِ `shop.sync.pay_fix` در v1 هم (`till-guard.v1Guard` از سرِ `staff-approval.v1Guard`، صاحب هم؛ `sync-v1.js` دست نخورد):

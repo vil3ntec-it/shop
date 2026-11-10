@@ -591,3 +591,121 @@ test('⛔ کنار گذاشتنِ موجودیِ سفارش‌محورِ پیش�
   assert.equal((await holds(s)).length, 1);
   await reconciled(s, 'l1');
 });
+
+// ── S82 (§۱۹.۱۲، «رزرو منقضی»؛ با O-06 = ب: نگه‌داشتن تا قبولِ دکان، نه تا پرداخت) ─────────────────
+//  پرداخت/قبول نیامد ⇒ نگه‌داشته با همان مهلت آزاد می‌شود (امروز سفارش فقط «نقد هنگامِ تحویل» است، `bad_payment_method`)؛ «worker» ِ تکراری و پیامِ دیررسیده نگه‌داشتهٔ سفارشِ معتبر
+//  (قبول‌شده) را آزاد نمی‌کنند. «معتبر» = سفارشی که دکان قبول کرده (بی‌مهلت تا پایانش).
+
+const releasesOf = async (s, ids) => (await query(
+  `SELECT source_key FROM stock_moves WHERE shop_id=$1 AND type='release' AND source_key = ANY($2::text[])`,
+  [s.shopId, ids.map((id) => `res:${id}:release`)]
+)).rows.map((r) => r.source_key).sort();
+const SYSTEM = { type: 'system', id: '' };
+
+test('S82: «worker» ِ تکراری — چند جارو و چند انقضای هم‌زمان هر نگه‌داشتهٔ گذشته را دقیقاً یک بار می‌بندند؛ سفارشِ قبول‌شده دست نمی‌خورد', async () => {
+  const s = await shop('رزرو-جاروی-دوتایی');
+  await enable(s);
+  for (const pid of ['w1', 'w2', 'w3', 'w4']) await stocked(s, pid, 1);
+  const due = [];
+  for (const pid of ['w1', 'w2', 'w3']) {
+    const r = await order(s, [line(pid, 1000)]);
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    due.push(r.body.order.id);
+  }
+  const valid = await order(s, [line('w4', 1000)]);
+  assert.equal(valid.status, 201, JSON.stringify(valid.body));
+  assert.equal((await go(s, valid.body.order.id, { to: 'accepted' })).status, 200);
+  //  نه پرداخت آمد نه قبول، و مهلت گذشت
+  await query(`UPDATE stock_reservations SET expires_at=$3 WHERE shop_id=$1 AND order_id = ANY($2::text[]) AND status='held'`,
+    [s.shopId, due, Date.now() - 1]);
+  const ids = (await holds(s)).filter((r) => due.includes(r.order_id)).map((r) => r.id);
+  assert.equal(ids.length, 3);
+
+  //  چهار جاروی سراسری (دو نمونهٔ سرور، دو تیکِ هم‌پوشان) و دو انقضای مستقیمِ همین دکان، همه هم‌زمان
+  const at = Date.now();
+  const direct = () => tx(async (c) => { await require('../src/lib/stock').lock(c, s.shopId); return lib().expireDueIn(c, s.shopId, at); });
+  const [w1, w2, w3, w4, d1, d2] = await Promise.all([lib().sweep(at), lib().sweep(at), lib().sweep(at), lib().sweep(at), direct(), direct()]);
+  assert.equal(d1 + d2 <= 3, true, `انقضای مستقیم ${d1}+${d2}`);
+  assert.ok(w1 + w2 + w3 + w4 + d1 + d2 >= 3, 'همهٔ گذشته‌ها بسته شدند');
+  const closed = (await query(
+    'SELECT id, status, close_reason FROM stock_reservations WHERE id = ANY($1::text[]) ORDER BY id', [ids]
+  )).rows;
+  assert.deepEqual(closed.map((r) => [r.status, r.close_reason]), ids.map(() => ['expired', 'ttl']));
+  assert.deepEqual(await releasesOf(s, ids), ids.map((id) => `res:${id}:release`).sort(), 'هر نگه‌داشته یک آزادسازی، نه بیشتر');
+  //  دورِ دوم هیچ — نه ردیف، نه حرکتِ تازه
+  assert.equal(await direct(), 0);
+  assert.equal((await releasesOf(s, ids)).length, 3);
+
+  const kept = (await holds(s)).filter((r) => r.order_id === valid.body.order.id);
+  assert.equal(kept.length, 1, 'نگه‌داشتهٔ سفارشِ قبول‌شده ماند');
+  assert.equal(kept[0].expires_at, null);
+  for (const pid of ['w1', 'w2', 'w3']) assert.equal((await stockOf(s, pid)).sellableMilli, 1000, pid);
+  assert.equal((await stockOf(s, 'w4')).sellableMilli, 0);
+  for (const pid of ['w1', 'w2', 'w3', 'w4']) await reconciled(s, pid);
+});
+
+test('S82: پیامِ دیررسیده — جارو با زمانِ پیشین، ردِ خودکار و لغوِ مشتریِ پس از قبول نگه‌داشتهٔ سفارشِ معتبر را آزاد نمی‌کنند', async () => {
+  const s = await shop('رزرو-پیام-دیر');
+  await enable(s);
+  const set = await h.put('/api/shop/catalog/settings', { reserveTtlSec: 60 }, { token: s.token });
+  assert.equal(set.status, 200, JSON.stringify(set.body));
+  await stocked(s, 'd1', 1);
+  const a = await order(s, [line('d1', 1000)]);
+  assert.equal(a.status, 201, JSON.stringify(a.body));
+  const dueAt = Number((await holds(s))[0].expires_at);
+  //  جارویی که سرِ مهلت تصمیم گرفت ولی دیر رسید: قبول پیش از نوشتنش آمد
+  assert.equal((await go(s, a.body.order.id, { to: 'accepted' })).status, 200);
+  assert.equal(await lib().sweep(dueAt + 1), 0);
+  assert.equal(await tx(async (c) => { await require('../src/lib/stock').lock(c, s.shopId); return lib().expireDueIn(c, s.shopId, dueAt + 2 * 86_400_000); }), 0);
+  //  ردِ خودکارِ «زمان گذشت» (`order-timeout`، از «تازه») و لغوِ مشتری پس از قبول ⇒ رد، بی گذار
+  await assert.rejects(
+    require('../src/lib/orders').transition(s.shopId, a.body.order.id, { to: 'auto_rejected', from: 'new', reason: 'timeout' }, SYSTEM),
+    (err) => err.status === 409, 'ردِ خودکارِ دیررسیده'
+  );
+  await assert.rejects(
+    require('../src/lib/orders').transition(s.shopId, a.body.order.id, { to: 'cancelled_by_customer' }, { type: 'customer', id: '' }),
+    (err) => err.status >= 400 && err.status < 500, 'لغوِ دیررسیدهٔ مشتری'
+  );
+  const view = (await getOrder(s, a.body.order.id)).body.order;
+  assert.equal(view.status, 'accepted');
+  assert.equal(view.stockHold.status, 'held');
+  const kept = await holds(s);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].expires_at, null);
+  assert.equal((await releasesOf(s, [kept[0].id])).length, 0);
+  assert.equal((await stockOf(s, 'd1')).sellableMilli, 0);
+  await reconciled(s, 'd1');
+});
+
+test('S82 (روی PostgreSQL تراکنش‌های واقعاً جدا): قبول، جارو و ردِ خودکارِ هم‌زمان روی نگه‌داشتهٔ گذشته ⇒ یا قبول با یک نگه‌داشته یا رد با آزاد — هرگز قبولِ بی نگه‌داشته', async () => {
+  const s = await shop('رزرو-مسابقهٔ-جارو');
+  await enable(s);
+  for (let round = 1; round <= 6; round++) {
+    const pid = `x${round}`;
+    await stocked(s, pid, 1);
+    const a = await order(s, [line(pid, 1000)]);
+    assert.equal(a.status, 201, JSON.stringify(a.body));
+    const id = a.body.order.id;
+    const [row] = (await holds(s)).filter((r) => r.order_id === id);
+    await query('UPDATE stock_reservations SET expires_at=$2 WHERE id=$1', [row.id, Date.now() - 1]);
+    const late = round % 2 === 0
+      ? require('../src/lib/orders').transition(s.shopId, id, { to: 'auto_rejected', from: 'new', reason: 'timeout' }, SYSTEM).then(() => 'rejected', () => 'lost')
+      : Promise.resolve('none');
+    const [acc] = await Promise.all([go(s, id, { to: 'accepted' }), lib().sweep(), lib().sweep(), late]);
+    const st = (await getOrder(s, id)).body.order;
+    const held = await one(
+      `SELECT COALESCE(SUM(qty_milli),0)::bigint AS q FROM stock_reservations WHERE shop_id=$1 AND product_id=$2 AND status='held'`,
+      [s.shopId, pid]
+    );
+    if (st.status === 'accepted') {
+      assert.equal(acc.status, 200, `دورِ ${round}: ${JSON.stringify(acc.body)}`);
+      assert.equal(Number(held.q), 1000, `دورِ ${round}: قبول ⇒ یک نگه‌داشته`);
+      assert.equal(st.stockHold.status, 'held');
+    } else {
+      assert.equal(st.status, 'auto_rejected', `دورِ ${round}: ${st.status}`);
+      assert.equal(Number(held.q), 0, `دورِ ${round}: رد ⇒ آزاد`);
+    }
+    assert.ok((await releasesOf(s, [row.id])).length <= 1, `دورِ ${round}: آزادسازیِ دوتایی`);
+    await reconciled(s, pid);
+  }
+});
