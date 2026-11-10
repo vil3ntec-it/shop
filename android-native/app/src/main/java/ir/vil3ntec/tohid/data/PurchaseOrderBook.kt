@@ -470,15 +470,47 @@ object PurchaseOrderBook {
     return out
   }
 
-  /** «در راه»: باقی‌ماندهٔ سفارش‌های فرستاده/بخشی برای هر کالا */
+  /**
+   *  «در راه»: باقی‌ماندهٔ سفارش‌های فرستاده/بخشی برای هر کالا، **به واحدِ پایهٔ کالا** (همان واحدِ موجودی): ردیفِ به واحدِ
+   *  خرید (PRD-07، `PoLineDto.factorMilli`) ⇒ باقی‌مانده × ضریب (۲ کارتنِ ۲۴ ⇒ ۴۸)؛ پیش‌تر ۲ ⇒ پیشنهاد بیش از نیاز.
+   */
   fun onOrderMilli(orders: List<PurchaseOrderDto>): Map<String, Long> {
     val out = HashMap<String, Long>()
     for (o in orders) {
       val st = status(o)
       if (st != PurchaseOrderCore.Status.SENT && st != PurchaseOrderCore.Status.PARTIAL) continue
-      for (p in o.progress) out[p.productId] = (out[p.productId] ?: 0L) + p.remainingMilli
+      val factor = o.lines.associate { it.id to it.factorMilli }
+      for (p in o.progress) {
+        val f = factor[p.lineId]?.takeIf { it > 0 }
+        val base = if (f == null) p.remainingMilli else ir.vil3ntec.tohid.core.product.PurchaseUnits.baseQtyMilli(p.remainingMilli, f)
+        out[p.productId] = (out[p.productId] ?: 0L) + base
+      }
     }
     return out
+  }
+
+  /** `status` ِ سرور برای «فرستاده یا بخشی» (PUR-03: «در راه») */
+  const val OPEN_STATUS = "open"
+
+  /** سقفِ صفحه‌های «باز» در یک بار (۵۰ × ۴۰ = ۲۰۰۰ سفارشِ باز) */
+  const val PLANNING_PAGES = 40
+
+  /**
+   *  PUR-03/10: سفارش‌های لازمِ پیشنهاد — صفحهٔ نخستِ فرستاده‌ها (تازه‌ترین تحویل‌ها برای [leadTime]) + **همهٔ** صفحه‌های
+   *  «باز» (`status=open`، برای [onOrderMilli]) تا [PLANNING_PAGES]، بی تکرار (نسخهٔ صفحهٔ «باز» می‌ماند). [fetch]
+   *  (نشانگر، باز؟) ⇒ یک صفحه یا `null` (شکست ⇒ آنچه رسید). سرورِ کهنه `status` نمی‌شناسد و همهٔ فرستاده‌ها را صفحه به صفحه
+   *  می‌دهد ⇒ همان درست (کامل‌ها را [onOrderMilli] کنار می‌گذارد)، فقط بیشتر.
+   */
+  suspend fun planningOrders(fetch: suspend (cursor: String?, open: Boolean) -> PoPageDto?): List<PurchaseOrderDto> {
+    val out = LinkedHashMap<String, PurchaseOrderDto>()
+    fetch(null, false)?.orders?.forEach { out[it.id] = it }
+    var cursor: String? = null
+    for (i in 0 until PLANNING_PAGES) {
+      val page = fetch(cursor, true) ?: break
+      page.orders.forEach { out[it.id] = it }
+      cursor = page.next ?: break
+    }
+    return out.values.toList()
   }
 
   /**

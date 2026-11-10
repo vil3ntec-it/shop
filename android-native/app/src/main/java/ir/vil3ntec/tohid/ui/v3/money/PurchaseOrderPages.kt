@@ -203,7 +203,7 @@ internal fun RouteScope.PurchaseOrdersRoute() {
   val scope = rememberCoroutineScope()
   var tick by remember { mutableStateOf(0) }
   var filter by remember { mutableStateOf(PoForms.Filter.of(args.query("status"))) }
-  val st = rememberPoState(repo, filter, tick, { true }) { it.list(PoForms.serverState(filter)) }
+  val st = rememberPoState(repo, filter, tick, { true }) { it.list(PoForms.serverState(filter), status = PoForms.serverStatus(filter)) }
   var extra by remember(filter, tick) { mutableStateOf(emptyList<PurchaseOrderDto>()) }
   var next by remember(filter, st.value) { mutableStateOf(st.value?.next) }
   var more by remember { mutableStateOf(false) }
@@ -268,7 +268,7 @@ internal fun RouteScope.PurchaseOrdersRoute() {
           if (!more) {
             more = true
             scope.launch {
-              repo.list(PoForms.serverState(filter), cursor).valueOrNull()?.let { p -> extra = extra + p.orders; next = p.next }
+              repo.list(PoForms.serverState(filter), cursor, PoForms.serverStatus(filter)).valueOrNull()?.let { p -> extra = extra + p.orders; next = p.next }
                 ?: toasts.show(StrPurchaseOrders.failedTitle, V3Tone.ERROR)
               more = false
             }
@@ -529,10 +529,10 @@ private fun RouteScope.PoEditorForm(repo: PurchaseOrderRepository, base: Purchas
   var error by remember { mutableStateOf<String?>(null) }
   var busy by remember { mutableStateOf(false) }
   var sheet by remember { mutableStateOf<EditorSheet?>(null) }
-  //  PUR-09/10: آخرین فی از دفتر؛ سفارش‌های فرستاده برای زمانِ تأمین و «در راه»
+  //  PUR-09/10: آخرین فی از دفتر؛ سفارش‌های فرستاده برای زمانِ تأمین و «در راه» (همهٔ بازها، `planningOrders`)
   val buys = remember(d) { PurchaseOrderBook.buys(d) }
   var sentOrders by remember { mutableStateOf<List<PurchaseOrderDto>>(emptyList()) }
-  LaunchedEffect(Unit) { sentOrders = repo.list(PurchaseOrderCore.State.SENT).valueOrNull()?.orders.orEmpty() }
+  LaunchedEffect(Unit) { sentOrders = repo.planningOrders() }
   val lead = remember(d, sentOrders, supplierId) { PurchaseOrderBook.leadTime(sentOrders, supplierId, PurchaseOrderBook.manualLead(d, supplierId)) }
   val supplier = d.suppliers.find { it.id == supplierId }
 

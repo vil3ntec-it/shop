@@ -123,6 +123,17 @@
 - انجام شد: دالر، کلدار و ریال در صندوقِ «ترکیبی و شیفت» پشتِ تنظیمِ خاموشِ **دکان** `FxTillPref` (`fx_tender` + جدولِ نرخِ `fx_rates`، هر دو `ShopSettingsKeys` ِ دکان؛ D-15 رعایت شد). هسته: `core/pay/FxTill.kt` (جدولِ نرخ، پرداختِ ارز، متن ⇐⇒ واحد)، `Pay.settle`/`exactCash` با `SettleInput.fx` (ردیفِ `fx`، ارز اول، پولِ پس افغانی، `FX_INVALID`/`FX_EXCESS`)، `exchange` با `per`، ارزهای PKR/IRR؛ هم‌زاد `license/fx-till.js` + `pay-core.js`؛ بردار `core/test-vectors/fx-till-v1.json` و موردهای تازهٔ `pay-v1.json`. برنامه: `FxTillFlow`، کادرِ `CheckoutFxBox`، تنظیمِ `FxTillSettings`، رسید، X/Z (`DrawerModel.fxLines`)، شیفت (`cash_out` ِ پولِ پسِ ارز) و `CashShift.saleCash`، برگشت به افغانی، کشو. سرور دست نخورد (ردیفِ پرداخت سنجیده نمی‌شود؛ `sync-v1.js` نه).
 - نیمه‌کاره: آزمون‌های Kotlin (`FxTillVectorsTest`، `FxTillFlowTest`، `PayCoreTest.exchange`، `PrinterDrawerTest`) فقط در CI؛ STATUS ِ PAY-10 تا شاهدِ CI همان PARTIAL. صندوقِ کامپیوترِ قدیم (`DeskSale`) و برنامهٔ آیفون کادرِ ارز ندارند. گزارشِ خودکارِ صاحب در سرور ارز را در «نقد» می‌شمارد (`paymentMethod = cash`).
 - قدمِ بعدی: پس از CI ِ سبز ردیف را IMPLEMENTED-VERIFIED کن؛ تصمیم‌های صاحب‌کار: سقفِ کهنگیِ نرخ (یک روز)، گردِ نیمه رو به بالا به یک افغانی، و این‌که «پولِ پسِ ارز» سقف بخواهد یا نه.
+### ۱۴۰۵/۰۸/۱۹ — شاخهٔ `claude/pur-2` (خانوادهٔ PUR: PUR-02/03/04/13/14؛ روی `origin/main` ‏99036497 = #1026، سپس ادغامِ #1027؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
+- ممیزی: هر پنج ردیف جز آزمونِ **دستگاه** کد داشتند؛ سه کاستیِ واقعی پیدا شد. (۱) سرور «بخشی/کامل» را نمی‌پالایید و برنامه فقط صفحهٔ
+  نخستِ ۵۰تاییِ `state=sent` را می‌خواند ⇒ پالایه‌های گوشی ناقص و «در راه» ِ پیشنهادِ سفارش (PUR-03) بی سفارشِ بازِ کهنه. (۲) `onOrderMilli`
+  ضریبِ واحدِ خرید (PRD-07) را نمی‌دید: ۲ کارتنِ ۲۴تایی = ۲ ⇒ پیشنهادِ بیش از نیاز. (۳) پنجرهٔ دریافتِ کامپیوتر «دریافتِ همهٔ باقی‌مانده» نداشت.
+- انجام شد: سرور `GET /api/shop/purchase-orders?status=…` (draft/sent/partial/complete/cancelled/open) با `core.status`، صفحه‌بندیِ پیموده و
+  `SCAN_MAX` ِ ۵۰۰ (`lib/purchase-orders.js` ‹`list`›)، بی مهاجرت و بی پرچمِ تازه — `purchase-orders-status.test.js` ۳/۳ (پیش از تغییر ۰/۳) روی PGlite و
+  PostgreSQL 16؛ برنامه: `PurchaseOrderBook.planningOrders` (همهٔ بازها + صفحهٔ نخستِ فرستاده‌ها) در هر سه جای پیشنهاد، `onOrderMilli` به واحدِ پایه،
+  `PoForms.serverStatus`/`openOnly`، و `DeskReceiveAll` در `PoReceive`؛ `PurchaseOrderPlanningTest` (۴) و کارِ تازهٔ `V3ReachabilityTest`.
+- نیمه‌کاره: کامپایل و آزمون‌های Kotlin فقط در CI (Gradle این‌جا نیست). PUR-13/14 کدِ تازه نخواستند؛ مانده همان چاپگر/اسکنر و گوشی/کامپیوترِ واقعی.
+  PUR-03: فصل و درجهٔ اطمینانِ INV-13 در پیشنهادِ فرم همان **تصمیمِ صاحب‌کار**. پیشنهادِ اختیاری: `match` ِ سه‌طرفه در `GET /:id` ِ سرور (امروز فقط برنامه).
+- قدمِ بعدی: هماهنگ‌کننده شاخه را در دسته بگذارد و نتیجهٔ `PurchaseOrderPlanningTest` و `V3ReachabilityTest` را از CI در STATUS بنویسد.
 ### ۱۴۰۵/۰۸/۲۰ — شاخهٔ `claude/sec-review-43` (بازبینیِ امنیتیِ دومِ دستهٔ ۴۳، ادغامِ `reserve-off`، `syn-12`، `posted-docs` و `app-gaps-4` روی `ccr-…-batch-42`؛ سیزنِ `session_01BwqpPgixfqMFfpZzgeTkyJ`)
 - انجام شد: دو یافتهٔ Low در نگهبانِ S89 (`lib/finalized-sales.js`، پرچمِ خاموشِ `shop.doc_chain`)، هر دو با آزمونِ سرخ‌پیش‌از‌رفع
   (`server/test/security-review-43.test.js`، ۳ آزمون، PGlite و PostgreSQL): SR43-1 ادغامِ «خیالی» (op ِ ردشده/تکراری/کهنه) قرض یا فاکتورِ نسیهٔ ثبت‌شده را
