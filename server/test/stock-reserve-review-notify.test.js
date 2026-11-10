@@ -181,9 +181,16 @@ test('فروشِ حضوری نگه‌داشته را برد ⇒ یک ردیفِ 
   assert.equal(m.data.orderId, o.id);
   //  همان کلیدهای دادهٔ رویدادهای یک‌بارهٔ پیشین — هیچ کلیدِ تازه‌ای برای دادهٔ مشتری
   assert.deepEqual(Object.keys(m.data).sort(), ['count', 'event', 'notifId', 'orderId', 'orderNo', 'reminder', 'shopId', 'type']);
-  const text = JSON.stringify(m);
+  //  شناسه‌های مات (تصادفی/پیاپی) ممکن است تصادفاً «50» داشته باشند (سرخیِ «زیرِ Electron» روی f067bf9c):
+  //  هر کدام اول به مقدارِ شناخته‌اش بسته می‌شود — پس جای پنهان کردنِ داده نیست — و سپس از متنِ سنجه بیرون می‌رود.
+  assert.equal(m.data.shopId, s.shopId);
+  assert.equal(String(m.data.notifId), String(rows[0].id));
+  assert.equal(String(m.data.orderNo), String(o.orderNo));
+  const bare = JSON.parse(JSON.stringify(m));
+  for (const k of ['shopId', 'notifId', 'orderId', 'orderNo']) delete bare.data[k];
+  const text = JSON.stringify(bare);
   for (const secret of [CUSTOMER.name, CUSTOMER.phone, '791234567', 'کالای r1', '5000', '50']) {
-    assert.ok(!text.includes(secret), `بی دادهٔ مشتری/کالا/مبلغ: ${secret}`);
+    assert.ok(!text.includes(secret), `بی دادهٔ مشتری/کالا/مبلغ: ${secret} در ${text}`);
   }
   assert.equal((await one('SELECT status FROM order_notify_outbox WHERE id=$1', [rows[0].id])).status, 'delivered');
   //  دورِ دوم و سوم ⇒ هیچ
