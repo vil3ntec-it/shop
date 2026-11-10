@@ -175,21 +175,60 @@ function record(label, ms, status, err, bytes, startedAt, ok, errCode) {
   if (err || !(ok ? ok(status) : status >= 200 && status < 300)) { e.errors++; (e.errAt ||= []).push(rec.phase || 0); }
   e.bytes += bytes;
 }
+/*
+ *  نشستِ دستگاه و صاحب پس از `ACCESS_TOKEN_TTL_MIN` (۶۰ دقیقه) ۴۰۱ می‌گیرد؛ اجرای بلندِ `--plan` از آن می‌گذرد. برنامه‌ها (`authFetch`،
+ *  `ApiClient`) روی ۴۰۱ یک بار نشست را تازه می‌کنند و همان درخواست را دوباره می‌زنند — همین‌جا هم (زمانِ هر دو با هم ثبت می‌شود).
+ */
+const whoByToken = new Map();
+let reauths = 0;
+function own(who, token, refreshToken) {
+  if (who.token) whoByToken.delete(who.token);
+  who.token = token;
+  if (refreshToken) who.refreshToken = refreshToken;
+  whoByToken.set(token, who);
+}
+function reauth(who) {
+  if (!who.reauth) {
+    who.reauth = (async () => {
+      const post = async (path_, body) => {
+        try {
+          const res = await fetch(base + path_, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-App': 'shop' }, body: JSON.stringify(body), signal: AbortSignal.timeout(Math.max(TIMEOUT, 15000)) });
+          return { status: res.status, json: await res.json().catch(() => null) };
+        } catch { return { status: 0, json: null }; }
+      };
+      let r = who.refreshToken ? await post('/api/auth/refresh', { refreshToken: who.refreshToken }) : null;
+      if (!r || r.status !== 200 || !r.json || !r.json.accessToken) {
+        const acct = who.shop || who;
+        r = await post('/api/auth/login', { identifier: acct.email, password: acct.password, app: 'shop', device: { deviceId: who.deviceId || who.id, name: 'آزمونِ بار', platform: 'test' } });
+      }
+      if (r.status === 200 && r.json && r.json.accessToken) { own(who, r.json.accessToken, r.json.refreshToken); reauths++; }
+    })().finally(() => { who.reauth = null; });
+  }
+  return who.reauth;
+}
 async function hit(label, method, p, { token, body, headers = {}, shop, ok } = {}) {
   const t0 = performance.now();
   let status = 0, err = '', json = null, bytes = 0, text = '';
-  try {
-    const res = await fetch((bases.length > 1 ? bases[(baseRR++) % bases.length] : base) + p, {
-      method,
-      headers: { 'Content-Type': 'application/json', 'X-App': 'shop', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
-      body: body === undefined ? undefined : JSON.stringify(body),
-      signal: AbortSignal.timeout(TIMEOUT),
-    });
-    const buf = Buffer.from(await res.arrayBuffer());
-    status = res.status; bytes = buf.length; text = buf.toString('utf8');
-    try { json = JSON.parse(text); } catch { /* بی JSON */ }
-  } catch (e) {
-    err = e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout' : String((e && e.cause && e.cause.code) || (e && e.name) || 'error');
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetch((bases.length > 1 ? bases[(baseRR++) % bases.length] : base) + p, {
+        method,
+        headers: { 'Content-Type': 'application/json', 'X-App': 'shop', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...headers },
+        body: body === undefined ? undefined : JSON.stringify(body),
+        signal: AbortSignal.timeout(Math.max(1, Math.floor(TIMEOUT - (performance.now() - t0)))),
+      });
+      const buf = Buffer.from(await res.arrayBuffer());
+      status = res.status; bytes = buf.length; text = buf.toString('utf8');
+      json = null;
+      try { json = JSON.parse(text); } catch { /* بی JSON */ }
+    } catch (e) {
+      err = e && (e.name === 'TimeoutError' || e.name === 'AbortError') ? 'timeout' : String((e && e.cause && e.cause.code) || (e && e.name) || 'error');
+    }
+    const who = status === 401 && token ? whoByToken.get(token) : null;
+    if (!who || attempt) break;
+    await reauth(who);
+    if (who.token === token) break;
+    token = who.token;
   }
   const ms = performance.now() - t0;
   const code = json && json.error && typeof json.error === 'object' ? json.error.code : undefined;
@@ -634,12 +673,13 @@ for (const defs of groups.values()) {
   //  چند دکان با هم (قفلِ هر دکان جداست؛ ترتیبِ کارِ هر دستگاه همان)
   const parallel = async (xs, fn) => { for (let i = 0; i < xs.length; i += SETUP_PAR) await Promise.all(xs.slice(i, i + SETUP_PAR).map(fn)); };
   //  هر دستگاه نشستِ خودش را دارد (همان برنامهٔ واقعی) — توکنِ یک دستگاه برای دستگاهِ دیگر نیست
-  await parallel(devices, async (d) => { d.token = (await login(d.shop, d.id)).accessToken; });
+  await parallel(devices, async (d) => { const j = await login(d.shop, d.id); own(d, j.accessToken, j.refreshToken); });
+  for (const sh of shops) { sh.deviceId = `load-owner-${sh.index}`; own(sh, sh.token); }
   wstep(`${devices.length} نشستِ دستگاه`);
   let histOps = 0, countLines = 0;
   await parallel(shops, async (sh) => {
     const d = { shop: sh, id: `lh-${sh.index}`, cursor: 0, busy: false, wall: Date.now() - 3_600_000 };
-    d.token = (await login(sh, d.id)).accessToken;
+    { const j = await login(sh, d.id); own(d, j.accessToken, j.refreshToken); }
     const target = sh.index === 0 ? HISTORY : Math.min(150, HISTORY);
     for (let n = 0; n < target;) {
       //  `--check`: تاریخچه هم در دفتر (همان op ها در pull ِ دستگاه‌ها سنجیده می‌شوند)
@@ -780,7 +820,8 @@ for (const defs of groups.values()) {
     //  بارسازِ اشباع‌نشده: حلقهٔ رویدادش آزاد (p99) و پردازنده‌اش زیرِ یک هسته — وگرنه زمان‌ها انتظارِ خودِ بارساز است
     o.generator = { loopP99Ms: r1(genLoop.percentile(99) / 1e6), loopMaxMs: o.generatorLoopMaxMs,
       cpuPct: Math.round(((({ user, system }) => user + system)(process.cpuUsage(genCpu0))) / 1000 / (performance.now() - genT0) * 100),
-      inflightMax: rec.inflightMax || 0, maxInflight: MAX_INFLIGHT, timeoutMs: TIMEOUT };
+      inflightMax: rec.inflightMax || 0, maxInflight: MAX_INFLIGHT, timeoutMs: TIMEOUT, reauths };
+    reauths = 0;
     if (def.phases.some((ph) => ph.stampede === 'outage')) o.burst = kit.burstStats();
     if (def.step) o.step = def.step;
     o.gate = (await srv.ask({ type: 'gatestats' })).gate;
