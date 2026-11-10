@@ -3,6 +3,7 @@ package ir.vil3ntec.tohid.core.i18n
 /**
  *  STF-03 — پیش‌سنجیِ سقف‌های کارمند در صندوق (`data/SaleCapGate`، قاعده در `core/perm/SaleCaps`): فروشِ قرضی، تغییرِ
  *  قیمتِ ردیف و «تخفیفِ پنهان». فقط وقتی سرور همان سقف را اجرا می‌کند (پرچم‌های `shop.credit_cap` و `shop.price_cap`).
+ *  CRM-03 (§۱۰.۱): تغییرِ سقفِ اعتبارِ مشتری (`customers.credit_limit`، `data/CreditLimitGate`) — فقط با پرچمِ `shop.credit_limit_perm`.
  *  ⛔ مبلغ، درصد و سقف از `asIs` می‌گذرند (لایهٔ دری دستشان نمی‌زند).
  */
 @Suppress("unused")
@@ -39,6 +40,27 @@ object StrSaleCaps {
     "کاهشِ قیمتِ ردیف هم تخفیف است و تخفیف برای نقشِ شما ممنوع است؛ قیمتِ فهرست را بگذارید.",
     "A lowered line price is a discount too, and discounts are not allowed for your role; use the list price.",
     "د کرښې ټیټه بیه هم تخفیف دی او ستاسو رول ته تخفیف اجازه نه لري؛ د لیست بیه وکاروئ.",
+  )
+  //  CRM-03: سقفِ اعتبارِ مشتری در برگهٔ مشتری — «نیازمند تأیید» ندارد، پس فقط بسته یا تا سقفِ نقش
+  val limitLocked: String get() = t(
+    "تغییرِ سقفِ اعتبار برای نقشِ شما بسته است؛ از صاحبِ دکان بخواهید.",
+    "Changing the credit limit is closed for your role; ask the shop owner.",
+    "ستاسو رول ته د پور د حد بدلول تړلي دي؛ د دوکان له خاوند څخه وغواړئ.",
+  )
+  fun limitUpTo(cap: String): String = t(
+    "سقف را تا ${asIs(cap)} افغانی می‌توانید بگذارید؛ بیشتر یا «بی سقف» را صاحبِ دکان می‌گذارد.",
+    "You can set a limit up to $cap afghani; a higher limit or no limit is for the shop owner.",
+    "تاسو حد تر $cap افغانیو پورې ایښودلی شئ؛ لوړ حد یا «بې حده» د دوکان خاوند ږدي.",
+  )
+  fun limitOverCap(cap: String): String = t(
+    "سقفِ بیش از ${asIs(cap)} افغانی را نمی‌توانید بگذارید؛ از صاحبِ دکان بخواهید.",
+    "You cannot set a limit above $cap afghani; ask the shop owner.",
+    "تاسو له $cap افغانیو زیات حد نشئ ایښودلی؛ د دوکان له خاوند څخه وغواړئ.",
+  )
+  fun limitNoRemove(cap: String): String = t(
+    "«بی سقف» برای شما اجازه نیست؛ سقفی تا ${asIs(cap)} افغانی بگذارید یا از صاحبِ دکان بخواهید.",
+    "No limit is not allowed for you; set a limit up to $cap afghani or ask the shop owner.",
+    "«بې حده» تاسو ته اجازه نه لري؛ تر $cap افغانیو پورې حد کېږدئ یا د دوکان له خاوند څخه وغواړئ.",
   )
   fun needsApproval(title: String): String = t(
     "${asIs(title)} — تأییدِ مدیر لازم است",

@@ -22,6 +22,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import ir.vil3ntec.tohid.core.i18n.StrKit
 import ir.vil3ntec.tohid.core.i18n.StrMoney
+import ir.vil3ntec.tohid.core.perm.CreditLimitPerm
+import ir.vil3ntec.tohid.data.CreditLimitGate
 import ir.vil3ntec.tohid.data.DebtBook
 import ir.vil3ntec.tohid.data.Debtor
 import ir.vil3ntec.tohid.data.DebtorEngine
@@ -46,6 +48,8 @@ import kotlinx.coroutines.delay
 /**
  *  قرض‌دارِ تازه / ویرایش (`debtors/new`، `debtors/{id}/edit`): نام (لازم)، تلفن، یادداشت و سقفِ
  *  اعتبار (خالی = بی سقف). ذخیره = `DebtorEngine.add` / `editWithLimit`؛ ردِ موتور پیامِ خودش را دارد.
+ *  CRM-03: با پرچمِ `shop.credit_limit_perm` و کاربری که `customers.credit_limit` ندارد، کادرِ سقفِ مشتریِ موجود بسته است
+ *  (با دلیل) یا تا سقفِ نقش باز است و بیشتر یا «بی سقف» خطای درجا می‌گیرد و ذخیره نمی‌شود (`CreditLimitGate`).
  */
 @Composable
 internal fun DebtorFormSheet(
@@ -55,13 +59,16 @@ internal fun DebtorFormSheet(
   onSave: (DebtorForm) -> Boolean,
   /** پس از بسته شدنِ برگه (برگشت یا نتیجه به صدازننده) */
   onSaved: () -> Unit,
+  /** CRM-03 — همین کاربر و پرچمِ دکان (`rememberCreditLimitRules`)؛ پیش‌فرض خاموش = همان امروز */
+  limitRules: CreditLimitPerm.Rules = CreditLimitPerm.Rules.OFF,
 ) {
   val initial = remember(debtor?.id) { DebtorFormsModel.of(debtor) }
   var f by remember(debtor?.id) { mutableStateOf(initial) }
   var tried by rememberSaveable { mutableStateOf(false) }
   var shake by remember { mutableStateOf(0) }
   val nameError = DebtorFormsModel.nameError(f)
-  val limitError = DebtorFormsModel.limitError(f)
+  val limitField = remember(debtor?.id, limitRules) { CreditLimitPerm.field(limitRules, existing = debtor != null) }
+  val limitError = DebtorFormsModel.limitError(f) ?: DebtorFormsModel.limitPermError(limitRules, debtor, f)
   val consentError = DebtorFormsModel.consentError(f)
   V3FormSheet(title = if (debtor == null) StrMoney.newDebtor else StrMoney.editDebtor, dirty = f != initial, onClose = onClose) { sheet ->
     Column(Modifier.v3Shake(shake)) {
@@ -75,7 +82,8 @@ internal fun DebtorFormSheet(
       Spacer(Modifier.height(12.dp))
       V3TextField(
         f.creditLimit, { f = f.copy(creditLimit = it) }, StrMoney.creditLimitField,
-        kind = V3FieldKind.MONEY, helper = StrMoney.creditLimitHelper, error = limitError,
+        kind = V3FieldKind.MONEY, helper = CreditLimitGate.helper(limitField) ?: StrMoney.creditLimitHelper, error = limitError,
+        enabled = !limitField.locked,
       )
       Spacer(Modifier.height(12.dp))
       V3TextField(f.tags, { f = f.copy(tags = it) }, StrMoney.tagsField, helper = StrMoney.tagsHelper)
